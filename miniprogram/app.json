@@ -4,7 +4,8 @@
     "pages/create/create",
     "pages/me/me",
     "pages/detail/detail",
-    "pages/write/write"
+    "pages/write/write",
+    "pages/share/share"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",

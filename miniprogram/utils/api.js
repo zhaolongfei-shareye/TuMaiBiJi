@@ -98,4 +98,5 @@ module.exports = {
   updateCategory: (id, data) => request(`/api/categories/${id}`, 'PUT', data),
   deleteCategory: (id) => request(`/api/categories/${id}`, 'DELETE'),
   reorderCategories: (ids) => request('/api/categories/reorder', 'POST', { ids }),
+  createShare: (noteId) => request('/api/shares/', 'POST', { note_id: noteId }),
 }

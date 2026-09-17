@@ -1,0 +1,12 @@
+<view class="container">
+  <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>
+  
+  <view wx:if="{{generating}}" class="loading-overlay">
+    <text>生成分享图...</text>
+  </view>
+
+  <view class="actions-bar">
+    <view class="btn-secondary" bindtap="onCancel">取消</view>
+    <view class="btn-primary" bindtap="saveToAlbum" disabled="{{!imagePath}}">保存到相册</view>
+  </view>
+</view>

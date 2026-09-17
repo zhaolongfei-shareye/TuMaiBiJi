@@ -100,6 +100,7 @@ Page({
   },
 
   onShare() {
-    wx.showToast({ title: '分享功能开发中', icon: 'none' })
+    const { note } = this.data
+    wx.navigateTo({ url: `/pages/share/share?id=${note.id}` })
   },
 })
