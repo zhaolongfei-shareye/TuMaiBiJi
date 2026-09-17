@@ -1,0 +1,43 @@
+<view class="container">
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <view wx:elif="{{note}}" class="note-detail">
+    <text class="title">{{note.title}}</text>
+    
+    <view class="meta">
+      <text class="source-type">{{note.source_type_label}}</text>
+      <text class="time">{{note.created_at_label}}</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">摘要</text>
+      <text class="summary">{{note.summary}}</text>
+    </view>
+
+    <view wx:if="{{note.key_points && note.key_points.length}}" class="section">
+      <text class="section-title">核心要点</text>
+      <view class="key-points">
+        <view class="key-point" wx:for="{{note.key_points}}" wx:key="index">
+          <text class="bullet">•</text>
+          <text>{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{note.tags && note.tags.length}}" class="section">
+      <text class="section-title">标签</text>
+      <view class="tags">
+        <text class="tag" wx:for="{{note.tags}}" wx:key="*this">{{item}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{note.original_content}}" class="section">
+      <text class="section-title">原文</text>
+      <text class="original-content">{{note.original_content}}</text>
+    </view>
+
+    <view class="actions">
+      <view class="btn-secondary" bindtap="deleteNote">删除笔记</view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,30 @@
+<view class="container">
+  <view class="header">
+    <text class="page-title">我的笔记</text>
+    <view class="btn-primary" bindtap="goToCreate">+ 新建</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <view wx:elif="{{notes.length === 0}}" class="empty">
+    <text>还没有笔记</text>
+    <view class="btn-secondary" bindtap="goToCreate">去记录</view>
+  </view>
+
+  <view wx:else class="notes-list">
+    <view 
+      class="card note-card" 
+      wx:for="{{notes}}" 
+      wx:key="id"
+      bindtap="goToDetail"
+      data-id="{{item.id}}"
+    >
+      <text class="title">{{item.title}}</text>
+      <text class="summary">{{item.summary}}</text>
+      <view class="tags" wx:if="{{item.tags && item.tags.length}}">
+        <text class="tag" wx:for="{{item.tags}}" wx:key="*this">{{item}}</text>
+      </view>
+      <text class="time">{{item.created_at_label}}</text>
+    </view>
+  </view>
+</view>

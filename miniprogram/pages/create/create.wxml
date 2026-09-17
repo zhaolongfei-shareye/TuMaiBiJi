@@ -1,0 +1,50 @@
+<view class="container">
+  <view class="page-title">记录内容</view>
+
+  <view class="mode-switcher">
+    <view 
+      class="mode-tab {{inputMode === 'url' ? 'active' : ''}}"
+      bindtap="switchMode"
+      data-mode="url"
+    >粘贴链接</view>
+    <view 
+      class="mode-tab {{inputMode === 'screenshot' ? 'active' : ''}}"
+      bindtap="switchMode"
+      data-mode="screenshot"
+    >上传截图</view>
+  </view>
+
+  <view wx:if="{{inputMode === 'url'}}" class="input-section">
+    <input 
+      class="url-input"
+      placeholder="粘贴公众号文章链接"
+      value="{{url}}"
+      bindinput="onUrlInput"
+    />
+  </view>
+
+  <view wx:else class="input-section">
+    <view class="image-grid">
+      <view 
+        class="image-item" 
+        wx:for="{{images}}" 
+        wx:key="index"
+      >
+        <image src="{{item}}" mode="aspectFill" />
+        <view class="remove-btn" catchtap="removeImage" data-index="{{index}}">×</view>
+      </view>
+      <view 
+        class="add-image" 
+        wx:if="{{images.length < 9}}"
+        bindtap="chooseImages"
+      >
+        <text class="plus">+</text>
+        <text class="hint">选择截图</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="btn-primary submit-btn" bindtap="submit">
+    {{submitting ? '处理中...' : '开始提取'}}
+  </view>
+</view>
