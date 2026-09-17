@@ -1,105 +1,202 @@
 .loading {
   text-align: center;
   padding: 80rpx 0;
-  color: #999999;
+  color: var(--text-secondary);
 }
 
-.note-detail {
-  background: #ffffff;
-  border-radius: 16rpx;
+.detail-wrapper {
+  padding-bottom: 40rpx;
+}
+
+/* Action Bar */
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 24rpx;
+  margin-bottom: 16rpx;
+}
+
+.bar-left {
+  display: flex;
+  align-items: center;
+}
+
+.source-badge {
+  font-size: 24rpx;
+  background: rgba(7, 193, 96, 0.1);
+  color: var(--accent);
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+.bar-right {
+  display: flex;
+  gap: 8rpx;
+}
+
+.icon-btn {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.icon-btn.danger {
+  color: #ff4d4f;
+  background: rgba(255, 77, 79, 0.08);
+}
+
+/* Header Card */
+.header-card {
   padding: 32rpx;
 }
 
 .title {
-  font-size: 40rpx;
+  font-size: 36rpx;
   font-weight: 700;
-  color: #333333;
+  color: var(--text-primary);
+  line-height: 1.4;
   display: block;
   margin-bottom: 16rpx;
 }
 
-.meta {
+.meta-row {
   display: flex;
   gap: 24rpx;
-  margin-bottom: 32rpx;
-  padding-bottom: 24rpx;
-  border-bottom: 1rpx solid #f0f0f0;
-}
-
-.source-type {
-  font-size: 24rpx;
-  color: #07c160;
-  background: #e8f5e9;
-  padding: 4rpx 16rpx;
-  border-radius: 8rpx;
+  align-items: center;
 }
 
 .time {
   font-size: 24rpx;
-  color: #999999;
+  color: var(--text-secondary);
 }
 
-.section {
-  margin-bottom: 32rpx;
+.category {
+  font-size: 24rpx;
+  color: var(--accent);
 }
 
-.section-title {
-  font-size: 28rpx;
+/* Section Cards */
+.section-card {
+  padding: 28rpx 32rpx;
+}
+
+.section-label {
+  font-size: 26rpx;
   font-weight: 600;
-  color: #333333;
+  color: var(--text-secondary);
   display: block;
   margin-bottom: 16rpx;
 }
 
-.summary {
+.summary-text {
   font-size: 30rpx;
-  color: #333333;
+  color: var(--text-primary);
   line-height: 1.8;
+  display: block;
 }
 
-.key-points {
-  background: #f9f9f9;
-  border-radius: 12rpx;
-  padding: 20rpx;
-}
-
-.key-point {
+.points-list {
   display: flex;
-  gap: 12rpx;
-  margin-bottom: 12rpx;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.point-item {
+  display: flex;
+  gap: 16rpx;
+  align-items: flex-start;
+}
+
+.point-num {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.point-text {
+  flex: 1;
   font-size: 28rpx;
-  color: #333333;
+  color: var(--text-primary);
   line-height: 1.6;
+  padding-top: 6rpx;
 }
 
-.key-point:last-child {
-  margin-bottom: 0;
-}
-
-.bullet {
-  color: #07c160;
-  font-weight: bold;
-}
-
-.tags {
+.tags-wrap {
   display: flex;
   flex-wrap: wrap;
   gap: 12rpx;
 }
 
-.original-content {
+.tag-chip {
+  font-size: 24rpx;
+  background: rgba(7, 193, 96, 0.08);
+  color: var(--accent);
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+.link-text {
   font-size: 26rpx;
-  color: #666666;
+  color: #1890ff;
+  word-break: break-all;
+}
+
+.original-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.expand-icon {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+.original-scroll {
+  max-height: 400rpx;
+  margin-top: 16rpx;
+}
+
+.original-text {
+  font-size: 24rpx;
+  color: var(--text-secondary);
   line-height: 1.8;
-  background: #f9f9f9;
-  padding: 20rpx;
-  border-radius: 12rpx;
   white-space: pre-wrap;
   word-break: break-all;
 }
 
-.actions {
-  margin-top: 40rpx;
-  padding-top: 32rpx;
-  border-top: 1rpx solid #f0f0f0;
+/* Bottom Actions */
+.bottom-actions {
+  padding: 0 24rpx;
+  margin-top: 24rpx;
+}
+
+.btn-share {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  padding: 28rpx 0;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  backdrop-filter: blur(var(--card-blur));
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+.share-icon {
+  font-size: 36rpx;
 }

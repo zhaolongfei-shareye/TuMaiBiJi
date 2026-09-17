@@ -1,43 +1,78 @@
 <view class="container">
   <view wx:if="{{loading}}" class="loading">加载中...</view>
 
-  <view wx:elif="{{note}}" class="note-detail">
-    <text class="title">{{note.title}}</text>
-    
-    <view class="meta">
-      <text class="source-type">{{note.source_type_label}}</text>
-      <text class="time">{{note.created_at_label}}</text>
+  <view wx:elif="{{note}}" class="detail-wrapper">
+    <!-- 顶部操作栏 -->
+    <view class="action-bar card">
+      <view class="bar-left">
+        <text class="source-badge">{{note.source_type_label}}</text>
+      </view>
+      <view class="bar-right">
+        <view class="icon-btn" bindtap="togglePin">
+          <text>{{note.is_pinned ? '取消置顶' : '置顶'}}</text>
+        </view>
+        <view class="icon-btn" bindtap="onEdit">编辑</view>
+        <view class="icon-btn danger" bindtap="onDelete">删除</view>
+      </view>
     </view>
 
-    <view class="section">
-      <text class="section-title">摘要</text>
-      <text class="summary">{{note.summary}}</text>
+    <!-- 标题区 -->
+    <view class="card header-card">
+      <text class="title">{{note.title}}</text>
+      <view class="meta-row">
+        <text class="time">{{note.created_at_label}}</text>
+        <text class="category" wx:if="{{note.category_name}}">#{{note.category_name}}</text>
+      </view>
     </view>
 
-    <view wx:if="{{note.key_points && note.key_points.length}}" class="section">
-      <text class="section-title">核心要点</text>
-      <view class="key-points">
-        <view class="key-point" wx:for="{{note.key_points}}" wx:key="index">
-          <text class="bullet">•</text>
-          <text>{{item}}</text>
+    <!-- 摘要 -->
+    <view wx:if="{{note.summary}}" class="card section-card">
+      <text class="section-label">摘要</text>
+      <text class="summary-text">{{note.summary}}</text>
+    </view>
+
+    <!-- 要点 -->
+    <view wx:if="{{note.key_points && note.key_points.length}}" class="card section-card">
+      <text class="section-label">核心要点</text>
+      <view class="points-list">
+        <view class="point-item" wx:for="{{note.key_points}}" wx:key="index">
+          <text class="point-num">{{index + 1}}</text>
+          <text class="point-text">{{item}}</text>
         </view>
       </view>
     </view>
 
-    <view wx:if="{{note.tags && note.tags.length}}" class="section">
-      <text class="section-title">标签</text>
-      <view class="tags">
-        <text class="tag" wx:for="{{note.tags}}" wx:key="*this">{{item}}</text>
+    <!-- 标签 -->
+    <view wx:if="{{note.tags && note.tags.length}}" class="card section-card">
+      <text class="section-label">标签</text>
+      <view class="tags-wrap">
+        <text class="tag-chip" wx:for="{{note.tags}}" wx:key="*this">{{item}}</text>
       </view>
     </view>
 
-    <view wx:if="{{note.original_content}}" class="section">
-      <text class="section-title">原文</text>
-      <text class="original-content">{{note.original_content}}</text>
+    <!-- 原文链接 -->
+    <view wx:if="{{note.source_url}}" class="card section-card">
+      <text class="section-label">来源链接</text>
+      <text class="link-text" bindtap="openSourceUrl">{{note.source_url}}</text>
     </view>
 
-    <view class="actions">
-      <view class="btn-secondary" bindtap="deleteNote">删除笔记</view>
+    <!-- 原文内容（可折叠） -->
+    <view wx:if="{{note.original_content}}" class="card section-card">
+      <view class="original-header" bindtap="toggleOriginal">
+        <text class="section-label">原文内容</text>
+        <text class="expand-icon">{{showOriginal ? '收起' : '展开'}}</text>
+      </view>
+      <scroll-view wx:if="{{showOriginal}}" class="original-scroll" scroll-y>
+        <text class="original-text">{{note.original_content}}</text>
+      </scroll-view>
+    </view>
+
+    <!-- 底部操作 -->
+    <view class="bottom-actions">
+      <view class="btn-share" bindtap="onShare">
+        <text class="share-icon">📤</text>
+        <text>分享为图片</text>
+      </view>
     </view>
   </view>
 </view>

@@ -5,6 +5,8 @@ Page({
   data: {
     lang: 'zh',
     t,
+    noteId: null,
+    isEdit: false,
     formData: {
       title: '',
       summary: '',
@@ -16,9 +18,15 @@ Page({
     selectedCategoryIndex: -1,
   },
 
-  onShow() {
+  async onLoad(options) {
     this.setData({ lang: getApp().globalData.userInfo?.language || 'zh' })
-    this.loadCategories()
+    await this.loadCategories()
+
+    if (options.id && options.mode === 'edit') {
+      this.setData({ noteId: parseInt(options.id), isEdit: true })
+      wx.setNavigationBarTitle({ title: '编辑笔记' })
+      await this.loadNoteForEdit()
+    }
   },
 
   async loadCategories() {
@@ -30,6 +38,24 @@ Page({
       })
     } catch (err) {
       console.error('加载分类失败', err)
+    }
+  },
+
+  async loadNoteForEdit() {
+    try {
+      const note = await api.getNote(this.data.noteId)
+      this.setData({
+        'formData.title': note.title || '',
+        'formData.summary': note.summary || '',
+        keyPointsText: (note.key_points || []).join('\n'),
+        tagsText: (note.tags || []).join(', '),
+        selectedCategoryIndex: note.category_id 
+          ? this.data.categories.findIndex(c => c.id === note.category_id)
+          : -1,
+      })
+    } catch (err) {
+      console.error('加载笔记失败', err)
+      wx.showToast({ title: '加载失败', icon: 'none' })
     }
   },
 
@@ -68,7 +94,7 @@ Page({
     wx.showLoading({ title: '保存中...', mask: true })
 
     try {
-      const { categories, selectedCategoryIndex } = this.data
+      const { categories, selectedCategoryIndex, isEdit, noteId } = this.data
       const categoryId = selectedCategoryIndex >= 0 ? categories[selectedCategoryIndex].id : null
       
       const keyPoints = this.data.keyPointsText
@@ -81,19 +107,26 @@ Page({
         .map(s => s.trim())
         .filter(s => s)
 
-      const note = await api.createNote({
+      const payload = {
         title: title.trim(),
         summary: this.data.formData.summary.trim() || null,
         key_points: keyPoints.length > 0 ? keyPoints : null,
         tags: tags.length > 0 ? tags : null,
-        source_type: 'manual',
         category_id: categoryId,
-      })
+      }
+
+      let note
+      if (isEdit) {
+        note = await api.updateNote(noteId, payload)
+      } else {
+        payload.source_type = 'manual'
+        note = await api.createNote(payload)
+      }
 
       wx.hideLoading()
-      wx.showToast({ title: '保存成功', icon: 'success' })
+      wx.showToast({ title: isEdit ? '更新成功' : '保存成功', icon: 'success' })
       setTimeout(() => {
-        wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}` })
+        wx.redirectTo({ url: `/pages/detail/detail?id=${note.id}` })
       }, 800)
     } catch (err) {
       wx.hideLoading()
