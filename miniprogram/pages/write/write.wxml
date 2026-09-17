@@ -1,0 +1,62 @@
+<view class="container">
+  <view class="form-section card">
+    <view class="form-group">
+      <text class="label">{{t('title', lang)}} *</text>
+      <input 
+        class="input" 
+        placeholder="输入笔记标题"
+        value="{{formData.title}}"
+        bindinput="onTitleInput"
+        maxlength="100"
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">{{t('summary', lang)}}</text>
+      <textarea 
+        class="textarea" 
+        placeholder="输入摘要内容..."
+        value="{{formData.summary}}"
+        bindinput="onSummaryInput"
+        maxlength="500"
+        auto-height
+      />
+      <text class="char-count">{{formData.summary.length || 0}}/500</text>
+    </view>
+
+    <view class="form-group">
+      <text class="label">要点（每行一个）</text>
+      <textarea 
+        class="textarea" 
+        placeholder="• 第一个要点&#10;• 第二个要点"
+        value="{{keyPointsText}}"
+        bindinput="onKeyPointsInput"
+        auto-height
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">标签（逗号分隔）</text>
+      <input 
+        class="input" 
+        placeholder="技术, 产品, 设计"
+        value="{{tagsText}}"
+        bindinput="onTagsInput"
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">分类</text>
+      <picker mode="selector" range="{{categoryNames}}" value="{{selectedCategoryIndex}}" bindchange="onCategoryChange">
+        <view class="picker-value">
+          {{selectedCategoryIndex >= 0 ? categoryNames[selectedCategoryIndex] : '不分类'}}
+        </view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="actions">
+    <view class="btn-secondary" bindtap="onCancel">{{t('cancel', lang)}}</view>
+    <view class="btn-primary" bindtap="onSave">{{t('save', lang)}}</view>
+  </view>
+</view>

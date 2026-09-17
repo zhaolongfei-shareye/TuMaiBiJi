@@ -3,7 +3,8 @@
     "pages/index/index",
     "pages/create/create",
     "pages/me/me",
-    "pages/detail/detail"
+    "pages/detail/detail",
+    "pages/write/write"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",
