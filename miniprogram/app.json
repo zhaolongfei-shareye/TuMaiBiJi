@@ -2,6 +2,7 @@
   "pages": [
     "pages/index/index",
     "pages/create/create",
+    "pages/me/me",
     "pages/detail/detail"
   ],
   "window": {
@@ -12,7 +13,9 @@
   },
   "tabBar": {
     "color": "#999999",
-    "selectedColor": "#07c160",
+    "selectedColor": "#333333",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/index/index",
@@ -20,7 +23,11 @@
       },
       {
         "pagePath": "pages/create/create",
-        "text": "记录"
+        "text": "新建"
+      },
+      {
+        "pagePath": "pages/me/me",
+        "text": "我的"
       }
     ]
   },

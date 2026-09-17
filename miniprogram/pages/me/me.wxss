@@ -1,0 +1,63 @@
+.me-header {
+  display: flex;
+  align-items: center;
+  padding: 40rpx 32rpx;
+}
+
+.avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  margin-right: 28rpx;
+  background: #e0e0e0;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.nickname {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.login-hint {
+  font-size: 26rpx;
+  color: var(--accent);
+  margin-top: 8rpx;
+}
+
+.menu-group {
+  padding: 0;
+  overflow: hidden;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx;
+  border-bottom: 1rpx solid var(--border);
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-label {
+  font-size: 30rpx;
+  color: var(--text-primary);
+}
+
+.menu-value {
+  font-size: 26rpx;
+  color: var(--text-secondary);
+  margin-right: 8rpx;
+}
+
+.menu-arrow {
+  font-size: 32rpx;
+  color: var(--text-secondary);
+}

@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.note import Note
+from app.models.user import User
+from app.core.auth import get_current_user
 from app.services.scraper import scrape_url
 from app.services.ocr import ocr_images
 from app.services.llm import extract_knowledge
@@ -15,7 +17,11 @@ router = APIRouter()
 
 
 @router.post("/url")
-async def ingest_url(url: str = Form(...), db: Session = Depends(get_db)):
+async def ingest_url(
+    url: str = Form(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     try:
         scraped = await scrape_url(url)
     except Exception as e:
@@ -33,6 +39,7 @@ async def ingest_url(url: str = Form(...), db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"内容提取失败: {e}")
 
     note = Note(
+        user_id=str(user.id),
         title=knowledge["title"],
         summary=knowledge["summary"],
         key_points=knowledge["key_points"],
@@ -52,6 +59,7 @@ async def ingest_url(url: str = Form(...), db: Session = Depends(get_db)):
 async def ingest_screenshot(
     images: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     images_data = []
     for img in images:
@@ -60,22 +68,23 @@ async def ingest_screenshot(
             raise HTTPException(status_code=400, detail=f"图片 {img.filename} 超过 10MB 限制")
         images_data.append(data)
 
-    return await _process_ocr_images(images_data, db)
+    return await _process_ocr_images(images_data, db, str(user.id))
 
 
 @router.post("/screenshot_single")
 async def ingest_screenshot_single(
     images: UploadFile = File(...),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     data = await images.read()
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="图片超过 10MB 限制")
 
-    return await _process_ocr_images([data], db)
+    return await _process_ocr_images([data], db, str(user.id))
 
 
-async def _process_ocr_images(images_data: list[bytes], db: Session) -> dict:
+async def _process_ocr_images(images_data: list[bytes], db: Session, user_id: str) -> dict:
     try:
         ocr_text = await ocr_images(images_data)
     except Exception as e:
@@ -92,6 +101,7 @@ async def _process_ocr_images(images_data: list[bytes], db: Session) -> dict:
         raise HTTPException(status_code=500, detail=f"内容提取失败: {e}")
 
     note = Note(
+        user_id=user_id,
         title=knowledge["title"],
         summary=knowledge["summary"],
         key_points=knowledge["key_points"],

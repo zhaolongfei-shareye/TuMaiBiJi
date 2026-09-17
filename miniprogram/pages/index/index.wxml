@@ -1,30 +1,69 @@
 <view class="container">
-  <view class="header">
-    <text class="page-title">我的笔记</text>
-    <view class="btn-primary" bindtap="goToCreate">+ 新建</view>
+  <!-- 搜索栏 -->
+  <view class="search-bar card">
+    <input 
+      class="search-input" 
+      placeholder="{{t('search', lang)}}" 
+      value="{{searchKeyword}}"
+      bindinput="onSearchInput"
+      bindconfirm="onSearchConfirm"
+    />
+    <text class="search-icon" wx:if="{{!searchKeyword}}">🔍</text>
+    <text class="clear-icon" wx:if="{{searchKeyword}}" bindtap="clearSearch">✕</text>
   </view>
 
+  <!-- 分类筛选 -->
+  <scroll-view class="category-scroll" scroll-x show-scrollbar="{{false}}">
+    <view class="category-chips">
+      <view 
+        class="chip {{selectedCategory === null ? 'active' : ''}}"
+        bindtap="selectCategory"
+        data-id="{{null}}"
+      >
+        {{t('allCategories', lang)}}
+      </view>
+      <view 
+        class="chip {{selectedCategory === item.id ? 'active' : ''}}"
+        wx:for="{{categories}}"
+        wx:key="id"
+        bindtap="selectCategory"
+        data-id="{{item.id}}"
+        style="--chip-color: {{item.color}}"
+      >
+        {{item.name}}
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 加载状态 -->
   <view wx:if="{{loading}}" class="loading">加载中...</view>
 
-  <view wx:elif="{{notes.length === 0}}" class="empty">
-    <text>还没有笔记</text>
-    <view class="btn-secondary" bindtap="goToCreate">去记录</view>
+  <!-- 空状态 -->
+  <view wx:elif="{{notes.length === 0 && !loading}}" class="empty">
+    <text>{{t('noNotes', lang)}}</text>
   </view>
 
+  <!-- 笔记列表 -->
   <view wx:else class="notes-list">
     <view 
-      class="card note-card" 
+      class="card note-card {{item.is_pinned ? 'pinned' : ''}}" 
       wx:for="{{notes}}" 
       wx:key="id"
       bindtap="goToDetail"
       data-id="{{item.id}}"
     >
-      <text class="title">{{item.title}}</text>
-      <text class="summary">{{item.summary}}</text>
+      <view class="note-header">
+        <text class="title">{{item.title}}</text>
+        <text class="pin-badge" wx:if="{{item.is_pinned}}">置顶</text>
+      </view>
+      <text class="summary" wx:if="{{item.summary}}">{{item.summary}}</text>
       <view class="tags" wx:if="{{item.tags && item.tags.length}}">
         <text class="tag" wx:for="{{item.tags}}" wx:key="*this">{{item}}</text>
       </view>
-      <text class="time">{{item.created_at_label}}</text>
+      <view class="note-footer">
+        <text class="source-type">{{item.source_type_label}}</text>
+        <text class="time">{{item.created_at_label}}</text>
+      </view>
     </view>
   </view>
 </view>

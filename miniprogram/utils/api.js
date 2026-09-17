@@ -1,15 +1,24 @@
 const app = getApp()
 
-const request = (url, options = {}) => {
+function _headers(contentType, extra) {
+  const h = {
+    'content-type': contentType || 'application/json',
+  }
+  if (app.globalData.token) {
+    h['Authorization'] = `Bearer ${app.globalData.token}`
+  }
+  if (extra) Object.assign(h, extra)
+  return h
+}
+
+const request = (url, method, data, options = {}) => {
   return new Promise((resolve, reject) => {
     wx.request({
       url: `${app.globalData.apiBase}${url}`,
-      method: options.method || 'GET',
-      data: options.data || {},
-      header: {
-        'content-type': options.contentType || 'application/json',
-        ...options.header
-      },
+      method: method || 'GET',
+      data: data || {},
+      header: _headers(options.contentType, options.header),
+      timeout: 30000,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
@@ -30,6 +39,7 @@ const uploadSingleImage = (url, filePath) => {
       url: `${app.globalData.apiBase}${url}`,
       filePath,
       name: 'images',
+      header: _headers(),
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(JSON.parse(res.data))
@@ -70,14 +80,22 @@ const ingestScreenshots = (filePaths) => {
 }
 
 module.exports = {
-  getNotes: (skip = 0, limit = 20) => request(`/api/notes/?skip=${skip}&limit=${limit}`),
+  request,
+  getNotes: (skip = 0, limit = 20, categoryId) => {
+    let url = `/api/notes/?skip=${skip}&limit=${limit}`
+    if (categoryId != null) url += `&category_id=${categoryId}`
+    return request(url)
+  },
   getNote: (id) => request(`/api/notes/${id}`),
-  createNote: (data) => request('/api/notes/', { method: 'POST', data }),
-  deleteNote: (id) => request(`/api/notes/${id}`, { method: 'DELETE' }),
-  ingestUrl: (url) => request('/api/ingest/url', {
-    method: 'POST',
-    data: { url },
-    contentType: 'application/x-www-form-urlencoded'
-  }),
-  ingestScreenshots
+  createNote: (data) => request('/api/notes/', 'POST', data),
+  updateNote: (id, data) => request(`/api/notes/${id}`, 'PUT', data),
+  deleteNote: (id) => request(`/api/notes/${id}`, 'DELETE'),
+  pinNote: (id, pin) => request(`/api/notes/${id}/pin?pin=${pin}`, 'POST'),
+  ingestUrl: (url) => request('/api/ingest/url', 'POST', { url }, { contentType: 'application/x-www-form-urlencoded' }),
+  ingestScreenshots,
+  getCategories: () => request('/api/categories/'),
+  createCategory: (data) => request('/api/categories/', 'POST', data),
+  updateCategory: (id, data) => request(`/api/categories/${id}`, 'PUT', data),
+  deleteCategory: (id) => request(`/api/categories/${id}`, 'DELETE'),
+  reorderCategories: (ids) => request('/api/categories/reorder', 'POST', { ids }),
 }
