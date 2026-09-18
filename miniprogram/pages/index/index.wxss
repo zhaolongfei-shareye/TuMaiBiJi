@@ -127,3 +127,7 @@
   font-size: 22rpx;
   color: var(--text-secondary);
 }
+
+.container {
+  padding-bottom: 140rpx;
+}

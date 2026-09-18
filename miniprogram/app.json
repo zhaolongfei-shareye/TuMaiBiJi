@@ -5,7 +5,12 @@
     "pages/me/me",
     "pages/detail/detail",
     "pages/write/write",
-    "pages/share/share"
+    "pages/share/share",
+    "pages/share/view",
+    "pages/categories/categories",
+    "pages/wallpaper/wallpaper",
+    "pages/language/language",
+    "pages/about/about"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",
@@ -14,6 +19,7 @@
     "backgroundColor": "#f5f5f5"
   },
   "tabBar": {
+    "custom": true,
     "color": "#999999",
     "selectedColor": "#333333",
     "backgroundColor": "#ffffff",
@@ -34,5 +40,13 @@
     ]
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "requiredPrivateInfos": [
+    "record"
+  ],
+  "permission": {
+    "scope.record": {
+      "desc": "用于语音转写功能，将您的语音转为文字笔记"
+    }
+  }
 }

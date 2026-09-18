@@ -57,7 +57,16 @@
   margin-right: 8rpx;
 }
 
+.menu-right {
+  display: flex;
+  align-items: center;
+}
+
 .menu-arrow {
   font-size: 32rpx;
   color: var(--text-secondary);
+}
+
+.container {
+  padding-bottom: 140rpx;
 }

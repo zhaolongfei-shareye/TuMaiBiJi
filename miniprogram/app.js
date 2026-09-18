@@ -1,8 +1,19 @@
 const { request } = require('./utils/api')
 
+const WALLPAPER_THEME = {
+  'default': 'theme-default',
+  'gradient-blue': 'theme-blue',
+  'gradient-green': 'theme-green',
+  'gradient-sunset': 'theme-sunset',
+  'gradient-purple': 'theme-purple',
+  'gradient-ocean': 'theme-ocean',
+}
+
+const DARK_THEMES = ['theme-purple', 'theme-ocean']
+
 App({
   globalData: {
-    apiBase: 'http://localhost:8000',
+    apiBase: 'https://api.agentsbin.cn/wtsj',
     userInfo: null,
     isLoggedIn: false,
     userId: '',
@@ -11,6 +22,28 @@ App({
 
   onLaunch() {
     this.login()
+  },
+
+  getThemeClass(wallpaper) {
+    return WALLPAPER_THEME[wallpaper] || 'theme-default'
+  },
+
+  isDarkTheme(wallpaper) {
+    return DARK_THEMES.includes(this.getThemeClass(wallpaper))
+  },
+
+  applyTheme(wallpaper) {
+    const themeClass = this.getThemeClass(wallpaper)
+    const dark = DARK_THEMES.includes(themeClass)
+    wx.setNavigationBarColor({
+      frontColor: dark ? '#ffffff' : '#000000',
+      backgroundColor: dark ? '#0c0c1d' : '#f5f5f5',
+    })
+    const tabBar = this.getTabBar?.()
+    if (tabBar) {
+      tabBar.applyTheme?.(wallpaper)
+    }
+    return themeClass
   },
 
   async login() {
@@ -27,8 +60,11 @@ App({
       this.globalData.userInfo = {
         nickName: res.nickname || '',
         avatarUrl: res.avatar_url || '',
+        language: res.language || 'zh',
+        wallpaper: res.wallpaper || 'default',
       }
       this.globalData.isLoggedIn = true
+      this.applyTheme(this.globalData.userInfo.wallpaper)
     } catch (err) {
       console.error('登录失败:', err)
     }

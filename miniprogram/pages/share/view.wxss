@@ -1,0 +1,116 @@
+.container {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 40rpx;
+  box-sizing: border-box;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60vh;
+  color: #999;
+  font-size: 28rpx;
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+}
+
+.error-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 48rpx;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+
+.error-text {
+  color: #666;
+  font-size: 28rpx;
+}
+
+.share-card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 48rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+}
+
+.card-header {
+  margin-bottom: 40rpx;
+}
+
+.card-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #333;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.source-badge {
+  display: inline-block;
+  background: rgba(7, 193, 96, 0.1);
+  padding: 8rpx 20rpx;
+  border-radius: 8rpx;
+}
+
+.source-text {
+  font-size: 22rpx;
+  color: #07c160;
+}
+
+.card-section {
+  margin-bottom: 32rpx;
+}
+
+.section-title {
+  font-size: 26rpx;
+  color: #999;
+  display: block;
+  margin-bottom: 12rpx;
+}
+
+.section-content {
+  font-size: 30rpx;
+  color: #333;
+  line-height: 1.6;
+  display: block;
+}
+
+.tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.tag {
+  font-size: 22rpx;
+  color: #07c160;
+  background: rgba(7, 193, 96, 0.1);
+  padding: 8rpx 20rpx;
+  border-radius: 8rpx;
+}
+
+.card-footer {
+  margin-top: 40rpx;
+  padding-top: 32rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.footer-text {
+  font-size: 24rpx;
+  color: #999;
+}
