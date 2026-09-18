@@ -24,6 +24,7 @@ Page({
     themeClass: '',
     lang: 'zh',
     t: texts('zh'),
+    noteId: null,
   },
 
   onLoad(options) {
@@ -35,7 +36,14 @@ Page({
       themeClass: app.getThemeClass(app.globalData.userInfo?.wallpaper || 'default'),
     })
     if (options.id) {
+      this.setData({ noteId: options.id })
       this.loadNote(options.id)
+    }
+  },
+
+  onShow() {
+    if (this.data.noteId) {
+      this.loadNote(this.data.noteId)
     }
   },
 
