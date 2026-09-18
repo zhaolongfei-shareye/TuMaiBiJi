@@ -17,7 +17,7 @@ HEADERS = {
 }
 
 MAX_RESPONSE_SIZE = 5 * 1024 * 1024
-ALLOWED_SCHEMES = {"https"}
+ALLOWED_SCHEMES = {"https", "http"}
 BLOCKED_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),
     ipaddress.ip_network("10.0.0.0/8"),
@@ -45,7 +45,8 @@ def _is_private_ip(ip_str: str) -> bool:
 def _validate_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in ALLOWED_SCHEMES:
-        raise ValueError(f"不支持的协议: {parsed.scheme}，仅允许 HTTPS/HTTP")
+        allowed = "/".join(s.upper() for s in sorted(ALLOWED_SCHEMES))
+        raise ValueError(f"不支持的协议: {parsed.scheme}，仅允许 {allowed}")
     hostname = parsed.hostname
     if not hostname:
         raise ValueError("URL 缺少主机名")
