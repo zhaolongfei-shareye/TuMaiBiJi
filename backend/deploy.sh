@@ -24,7 +24,6 @@ VENV_DIR="$PROJECT_DIR/.venv"
 
 # 服务进程名（用于 pkill）
 UVICORN_VENV="uvicorn app.main:app"
-UVICORN_SYSTEM="python3.11 /usr/local/bin/uvicorn"
 WORKER_NAME="python3 worker.py"
 
 # ====== 准备 ======
@@ -47,12 +46,6 @@ echo ">>> 停止旧服务..."
 if pgrep -f "$UVICORN_VENV" > /dev/null; then
     echo "  停止 venv uvicorn (端口 8000)..."
     pkill -f "$UVICORN_VENV" || true
-fi
-
-# 停止系统 uvicorn（端口 8080，残留进程）
-if pgrep -f "$UVICORN_SYSTEM" > /dev/null; then
-    echo "  停止系统 uvicorn (端口 8080，残留)..."
-    pkill -f "$UVICORN_SYSTEM" || true
 fi
 
 # 停止 worker
