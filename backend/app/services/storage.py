@@ -35,7 +35,7 @@ def upload_file(data: bytes, file_type: str, user_id: str) -> dict:
     now = datetime.now(timezone.utc)
     date_prefix = now.strftime("%Y/%m/%d")
     ext = file_type.lower() if file_type else "bin"
-    object_key = f"wtsj/{user_id}/{date_prefix}/{uuid.uuid4().hex}.{ext}"
+    object_key = f"tmbj/{user_id}/{date_prefix}/{uuid.uuid4().hex}.{ext}"
 
     client.put_object(
         Bucket=settings.COS_BUCKET,

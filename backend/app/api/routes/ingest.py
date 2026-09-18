@@ -75,7 +75,7 @@ async def stage_screenshot(
     if batch is None:
         batch_id = uuid.uuid4().hex
         batch = {
-            "dir": tempfile.mkdtemp(prefix="wtsj_"),
+            "dir": tempfile.mkdtemp(prefix="tmbj_"),
             "paths": [],
             "user_id": str(user.id),
             "created_at": time.time(),
@@ -135,7 +135,7 @@ async def ingest_voice(
         if ext in ("wav", "mp3", "pcm", "aac", "ogg"):
             suffix = f".{ext}"
 
-    fd, path = tempfile.mkstemp(prefix="wtsj_voice_", suffix=suffix)
+    fd, path = tempfile.mkstemp(prefix="tmbj_voice_", suffix=suffix)
     with os.fdopen(fd, "wb") as f:
         f.write(data)
 

@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import model_validator
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "sqlite:///./wtsj.db"
+    DATABASE_URL: str = "sqlite:///./tmbj.db"
     DEEPSEEK_API_KEY: str = ""
     TENCENT_OCR_SECRET_ID: str = ""
     TENCENT_OCR_SECRET_KEY: str = ""

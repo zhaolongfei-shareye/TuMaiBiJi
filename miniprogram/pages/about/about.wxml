@@ -1,9 +1,9 @@
 <view class="container {{themeClass}}">
   <view class="about-header">
     <view class="app-icon">
-      <text class="icon-text">闪</text>
+      <text class="icon-text">麦</text>
     </view>
-    <text class="app-name">微图闪记</text>
+    <text class="app-name">图麦笔记</text>
     <text class="app-version">v{{version}}</text>
   </view>
 
@@ -38,7 +38,7 @@
     <text class="card-title">{{t.contactUs}}</text>
     <view class="contact-row" bindtap="onCopyEmail">
       <text class="contact-label">{{t.feedbackEmail}}</text>
-      <text class="contact-value">support@wetushanji.com</text>
+      <text class="contact-value">support@tumaibiji.com</text>
     </view>
   </view>
 

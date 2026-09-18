@@ -20,7 +20,7 @@ Page({
 
   onCopyEmail() {
     wx.setClipboardData({
-      data: 'support@wetushanji.com',
+      data: 'support@tumaibiji.com',
       success: () => {
         wx.showToast({ title: t('copied', this.data.lang), icon: 'success' })
       }

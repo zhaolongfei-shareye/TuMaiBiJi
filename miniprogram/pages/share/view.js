@@ -41,7 +41,7 @@ Page({
     const { share } = this.data
     if (!share) return {}
     return {
-      title: share.title || '微图闪记',
+      title: share.title || '图麦笔记',
       path: `/pages/share/view?token=${share.token}`,
     }
   },

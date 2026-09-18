@@ -7,7 +7,7 @@ from app.api.routes import notes, ingest, auth, categories, shares, user, tasks,
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
 
-app = FastAPI(title="微图闪记 API", version="0.1.0")
+app = FastAPI(title="图麦笔记 API", version="0.1.0")
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
@@ -34,7 +34,7 @@ app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 
 @app.get("/")
 async def root():
-    return {"message": "微图闪记 API", "version": "0.1.0"}
+    return {"message": "图麦笔记 API", "version": "0.1.0"}
 
 @app.get("/health")
 async def health():
