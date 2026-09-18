@@ -45,6 +45,7 @@ async def ingest_url(
 
 _batch_staging: dict[str, dict] = {}
 BATCH_TTL_SECONDS = 1800
+MAX_IMAGES_PER_BATCH = 20
 
 
 def _sweep_stale_batches():
@@ -56,6 +57,7 @@ def _sweep_stale_batches():
 
 
 @router.post("/screenshots/stage")
+@user_limiter.limit("20/minute")
 async def stage_screenshot(
     images: UploadFile = File(...),
     batch_id: str | None = Form(None),
@@ -88,6 +90,9 @@ async def stage_screenshot(
             "created_at": time.time(),
         }
         _batch_staging[batch_id] = batch
+    
+    if len(batch["paths"]) >= MAX_IMAGES_PER_BATCH:
+        raise HTTPException(status_code=400, detail=f"每批次最多 {MAX_IMAGES_PER_BATCH} 张图片")
 
     path = os.path.join(batch["dir"], f"{uuid.uuid4().hex}.png")
     with open(path, "wb") as f:
