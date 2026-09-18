@@ -25,6 +25,7 @@ Page({
     lang: 'zh',
     t: texts('zh'),
     noteId: null,
+    _loaded: false,
   },
 
   onLoad(options) {
@@ -42,7 +43,8 @@ Page({
   },
 
   onShow() {
-    if (this.data.noteId) {
+    // Skip first show (onLoad already loaded), only reload on navigateBack
+    if (this.data.noteId && this.data._loaded) {
       this.loadNote(this.data.noteId)
     }
   },
@@ -71,7 +73,7 @@ Page({
       }
       note.category_name = categoryName
       
-      this.setData({ note, loading: false })
+      this.setData({ note, loading: false, _loaded: true })
     } catch (err) {
       console.error('加载笔记失败', err)
       this.setData({ loading: false })
