@@ -29,9 +29,10 @@ async def transcribe_audio(audio_data: bytes, format: str = "aac") -> str:
         "ProjectId": 0,
         "SubServiceType": 1,
         "EngineModelType": "16k_zh",
-        "SourceType": 0,
+        "SourceType": 1,
         "VoiceFormat": format,
-        "SourceStringData": audio_b64,
+        "Data": audio_b64,
+        "DataLen": len(audio_data),
     }
     payload_json = json.dumps(payload)
 
