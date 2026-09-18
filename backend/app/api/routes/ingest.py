@@ -63,14 +63,17 @@ async def stage_screenshot(
     user: User = Depends(get_current_user),
 ):
     MAX_SIZE = 10 * 1024 * 1024  # 10MB
-    data = b""
+    chunks: list[bytes] = []
+    total = 0
     while True:
         chunk = await images.read(8192)
         if not chunk:
             break
-        data += chunk
-        if len(data) > MAX_SIZE:
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > MAX_SIZE:
             raise HTTPException(status_code=400, detail="图片超过 10MB 限制")
+    data = b"".join(chunks)
 
     _sweep_stale_batches()
 
