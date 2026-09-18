@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from datetime import datetime
 from app.db.database import get_db
 from app.models.note import Note
@@ -57,6 +57,13 @@ class NoteUpdate(BaseModel):
     original_content: str | None = None
     source_url: str | None = None
     category_id: int | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_null_title(cls, values):
+        if isinstance(values, dict) and "title" in values and values["title"] is None:
+            values.pop("title")  # Remove null title so it won't be updated
+        return values
 
 
 @router.get("/", response_model=List[NoteBrief])
