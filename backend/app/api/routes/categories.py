@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from datetime import datetime
 from app.db.database import get_db
 from app.models.category import Category
@@ -30,7 +30,14 @@ class CategoryCreate(BaseModel):
 
 class CategoryUpdate(BaseModel):
     name: str | None = None
-    color: str | None = "#666666"
+    color: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_null_color(cls, values):
+        if isinstance(values, dict) and "color" in values and values["color"] is None:
+            values["color"] = "#666666"
+        return values
 
 
 class CategoryReorder(BaseModel):
