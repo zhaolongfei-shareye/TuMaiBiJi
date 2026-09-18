@@ -1,0 +1,56 @@
+.page-title {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 40rpx;
+}
+
+.lang-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.lang-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx;
+  border: 4rpx solid transparent;
+}
+
+.lang-item.active {
+  border-color: var(--accent);
+}
+
+.lang-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.lang-label {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4rpx;
+}
+
+.lang-desc {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+.check-mark {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 44rpx;
+}

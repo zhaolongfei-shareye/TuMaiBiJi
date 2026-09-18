@@ -1,0 +1,104 @@
+.about-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60rpx 0 40rpx;
+}
+
+.app-icon {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 32rpx;
+  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20rpx;
+  box-shadow: 0 8rpx 24rpx rgba(7, 193, 96, 0.3);
+}
+
+.icon-text {
+  font-size: 64rpx;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.app-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8rpx;
+}
+
+.app-version {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+}
+
+.about-card {
+  padding: 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.card-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16rpx;
+}
+
+.card-text {
+  font-size: 26rpx;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.feature-dot {
+  color: var(--accent);
+  font-size: 28rpx;
+  font-weight: bold;
+  line-height: 1.6;
+}
+
+.feature-text {
+  font-size: 26rpx;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.contact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.contact-label {
+  font-size: 26rpx;
+  color: var(--text-secondary);
+}
+
+.contact-value {
+  font-size: 26rpx;
+  color: var(--accent);
+}
+
+.copyright {
+  display: block;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  padding: 40rpx 0;
+}
