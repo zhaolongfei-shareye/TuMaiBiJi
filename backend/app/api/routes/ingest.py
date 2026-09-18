@@ -43,7 +43,6 @@ async def ingest_url(
     return {"status": "queued", "task_id": task_id}
 
 
-_batch_staging: dict[str, dict] = {}
 BATCH_TTL_SECONDS = 1800
 MAX_IMAGES_PER_BATCH = 20
 
