@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel, model_validator
 from datetime import datetime
+from sqlalchemy import or_
 from app.db.database import get_db
 from app.models.note import Note
 from app.models.user import User
@@ -80,7 +81,13 @@ def list_notes(
         q = q.filter(Note.category_id == category_id)
     if search:
         escaped = search.replace("%", "\\%").replace("_", "\\_")
-        q = q.filter(Note.title.ilike(f"%{escaped}%", escape="\\"))
+        pattern = f"%{escaped}%"
+        q = q.filter(
+            or_(
+                Note.title.ilike(pattern, escape="\\"),
+                Note.summary.ilike(pattern, escape="\\"),
+            )
+        )
     notes = (
         q.order_by(Note.is_pinned.desc(), Note.pinned_at.desc().nullslast(), Note.created_at.desc())
         .offset(skip)
