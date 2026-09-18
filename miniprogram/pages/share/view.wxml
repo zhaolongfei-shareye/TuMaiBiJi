@@ -1,0 +1,34 @@
+<view class="container">
+  <view wx:if="{{loading}}" class="loading">
+    <text>{{t.loading}}</text>
+  </view>
+
+  <view wx:elif="{{error}}" class="error-state">
+    <text class="error-icon">!</text>
+    <text class="error-text">{{error}}</text>
+  </view>
+
+  <view wx:elif="{{share}}" class="share-card">
+    <view class="card-header">
+      <text class="card-title">{{share.title}}</text>
+      <view class="source-badge">
+        <text class="source-text">{{t.sharedNote}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{share.summary}}" class="card-section">
+      <text class="section-title">{{t.summary}}</text>
+      <text class="section-content">{{share.summary}}</text>
+    </view>
+
+    <view wx:if="{{share.tags && share.tags.length > 0}}" class="card-section">
+      <view class="tags-row">
+        <text wx:for="{{share.tags}}" wx:key="*this" class="tag">{{item}}</text>
+      </view>
+    </view>
+
+    <view class="card-footer">
+      <text class="footer-text">{{t.fromWtsj}}</text>
+    </view>
+  </view>
+</view>

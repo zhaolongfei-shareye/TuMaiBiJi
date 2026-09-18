@@ -1,0 +1,19 @@
+<view class="container {{themeClass}}">
+  <text class="page-title">{{t.selectLanguage}}</text>
+
+  <view class="lang-list">
+    <view
+      class="lang-item card {{item.key === currentLang ? 'active' : ''}}"
+      wx:for="{{languages}}"
+      wx:key="key"
+      bindtap="onSelect"
+      data-key="{{item.key}}"
+    >
+      <view class="lang-info">
+        <text class="lang-label">{{item.label}}</text>
+        <text class="lang-desc">{{item.desc}}</text>
+      </view>
+      <view wx:if="{{item.key === currentLang}}" class="check-mark">✓</view>
+    </view>
+  </view>
+</view>

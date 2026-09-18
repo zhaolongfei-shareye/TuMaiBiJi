@@ -1,10 +1,11 @@
 const api = require('../../utils/api.js')
-const { t } = require('../../utils/i18n.js')
+const { t, texts } = require('../../utils/i18n.js')
 
 Page({
   data: {
     lang: 'zh',
-    t,
+    t: texts('zh'),
+    themeClass: '',
     noteId: null,
     isEdit: false,
     formData: {
@@ -19,12 +20,18 @@ Page({
   },
 
   async onLoad(options) {
-    this.setData({ lang: getApp().globalData.userInfo?.language || 'zh' })
+    const app = getApp()
+    const lang = app.globalData.userInfo?.language || 'zh'
+    this.setData({
+      lang,
+      t: texts(lang),
+      themeClass: app.getThemeClass(app.globalData.userInfo?.wallpaper || 'default'),
+    })
     await this.loadCategories()
 
     if (options.id && options.mode === 'edit') {
       this.setData({ noteId: parseInt(options.id), isEdit: true })
-      wx.setNavigationBarTitle({ title: '编辑笔记' })
+      wx.setNavigationBarTitle({ title: t('editNote', this.data.lang) })
       await this.loadNoteForEdit()
     }
   },
@@ -55,7 +62,7 @@ Page({
       })
     } catch (err) {
       console.error('加载笔记失败', err)
-      wx.showToast({ title: '加载失败', icon: 'none' })
+      wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
     }
   },
 
@@ -86,15 +93,15 @@ Page({
 
   async onSave() {
     const { title } = this.data.formData
+    const { lang, isEdit, noteId, categories, selectedCategoryIndex } = this.data
     if (!title.trim()) {
-      wx.showToast({ title: '请输入标题', icon: 'none' })
+      wx.showToast({ title: t('enterTitle', lang), icon: 'none' })
       return
     }
 
-    wx.showLoading({ title: '保存中...', mask: true })
+    wx.showLoading({ title: t('saving', lang), mask: true })
 
     try {
-      const { categories, selectedCategoryIndex, isEdit, noteId } = this.data
       const categoryId = selectedCategoryIndex >= 0 ? categories[selectedCategoryIndex].id : null
       
       const keyPoints = this.data.keyPointsText
@@ -117,6 +124,7 @@ Page({
 
       let note
       if (isEdit) {
+        payload.source_type = undefined
         note = await api.updateNote(noteId, payload)
       } else {
         payload.source_type = 'manual'
@@ -124,14 +132,14 @@ Page({
       }
 
       wx.hideLoading()
-      wx.showToast({ title: isEdit ? '更新成功' : '保存成功', icon: 'success' })
+      wx.showToast({ title: isEdit ? t('updateSucceeded', lang) : t('saveSucceeded', lang), icon: 'success' })
       setTimeout(() => {
         wx.redirectTo({ url: `/pages/detail/detail?id=${note.id}` })
       }, 800)
     } catch (err) {
       wx.hideLoading()
       console.error('保存失败', err)
-      const msg = (err.data && err.data.detail) || '保存失败，请重试'
+      const msg = (err.data && err.data.detail) || t('saveFailed', lang)
       wx.showToast({ title: msg, icon: 'none' })
     }
   },

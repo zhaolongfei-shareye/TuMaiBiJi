@@ -1,5 +1,5 @@
-<view class="container">
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+<view class="container {{themeClass}}">
+  <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
   <view wx:elif="{{note}}" class="detail-wrapper">
     <!-- 顶部操作栏 -->
@@ -9,10 +9,10 @@
       </view>
       <view class="bar-right">
         <view class="icon-btn" bindtap="togglePin">
-          <text>{{note.is_pinned ? '取消置顶' : '置顶'}}</text>
+          <text>{{note.is_pinned ? t.unpin : t.pin}}</text>
         </view>
-        <view class="icon-btn" bindtap="onEdit">编辑</view>
-        <view class="icon-btn danger" bindtap="onDelete">删除</view>
+        <view class="icon-btn" bindtap="onEdit">{{t.edit}}</view>
+        <view class="icon-btn danger" bindtap="onDelete">{{t.delete}}</view>
       </view>
     </view>
 
@@ -27,13 +27,13 @@
 
     <!-- 摘要 -->
     <view wx:if="{{note.summary}}" class="card section-card">
-      <text class="section-label">摘要</text>
+      <text class="section-label">{{t.summaryLabel}}</text>
       <text class="summary-text">{{note.summary}}</text>
     </view>
 
     <!-- 要点 -->
     <view wx:if="{{note.key_points && note.key_points.length}}" class="card section-card">
-      <text class="section-label">核心要点</text>
+      <text class="section-label">{{t.keyPoints}}</text>
       <view class="points-list">
         <view class="point-item" wx:for="{{note.key_points}}" wx:key="index">
           <text class="point-num">{{index + 1}}</text>
@@ -44,7 +44,7 @@
 
     <!-- 标签 -->
     <view wx:if="{{note.tags && note.tags.length}}" class="card section-card">
-      <text class="section-label">标签</text>
+      <text class="section-label">{{t.tagsLabel}}</text>
       <view class="tags-wrap">
         <text class="tag-chip" wx:for="{{note.tags}}" wx:key="*this">{{item}}</text>
       </view>
@@ -52,15 +52,15 @@
 
     <!-- 原文链接 -->
     <view wx:if="{{note.source_url}}" class="card section-card">
-      <text class="section-label">来源链接</text>
+      <text class="section-label">{{t.sourceLink}}</text>
       <text class="link-text" bindtap="openSourceUrl">{{note.source_url}}</text>
     </view>
 
     <!-- 原文内容（可折叠） -->
     <view wx:if="{{note.original_content}}" class="card section-card">
       <view class="original-header" bindtap="toggleOriginal">
-        <text class="section-label">原文内容</text>
-        <text class="expand-icon">{{showOriginal ? '收起' : '展开'}}</text>
+        <text class="section-label">{{t.originalContent}}</text>
+        <text class="expand-icon">{{showOriginal ? t.collapse : t.expand}}</text>
       </view>
       <scroll-view wx:if="{{showOriginal}}" class="original-scroll" scroll-y>
         <text class="original-text">{{note.original_content}}</text>
@@ -71,7 +71,7 @@
     <view class="bottom-actions">
       <view class="btn-share" bindtap="onShare">
         <text class="share-icon">📤</text>
-        <text>分享为图片</text>
+        <text>{{t.shareAsImage}}</text>
       </view>
     </view>
   </view>

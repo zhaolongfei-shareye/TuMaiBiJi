@@ -1,0 +1,46 @@
+<view class="container {{themeClass}}">
+  <view class="about-header">
+    <view class="app-icon">
+      <text class="icon-text">闪</text>
+    </view>
+    <text class="app-name">微图闪记</text>
+    <text class="app-version">v{{version}}</text>
+  </view>
+
+  <view class="about-card card">
+    <text class="card-title">{{t.aboutApp}}</text>
+    <text class="card-text">{{t.appDesc}}</text>
+  </view>
+
+  <view class="about-card card">
+    <text class="card-title">{{t.features}}</text>
+    <view class="feature-list">
+      <view class="feature-item">
+        <text class="feature-dot">•</text>
+        <text class="feature-text">{{t.featureUrl}}</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-dot">•</text>
+        <text class="feature-text">{{t.featureOcr}}</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-dot">•</text>
+        <text class="feature-text">{{t.featureCategory}}</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-dot">•</text>
+        <text class="feature-text">{{t.featureShare}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="about-card card">
+    <text class="card-title">{{t.contactUs}}</text>
+    <view class="contact-row" bindtap="onCopyEmail">
+      <text class="contact-label">{{t.feedbackEmail}}</text>
+      <text class="contact-value">support@wetushanji.com</text>
+    </view>
+  </view>
+
+  <text class="copyright">{{t.copyright}}</text>
+</view>

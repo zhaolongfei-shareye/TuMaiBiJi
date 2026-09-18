@@ -1,13 +1,24 @@
 const api = require('../../utils/api.js')
+const { t, texts } = require('../../utils/i18n.js')
 
 Page({
   data: {
     noteId: null,
     generating: true,
     imagePath: '',
+    themeClass: '',
+    lang: 'zh',
+    t: texts('zh'),
   },
 
   async onLoad(options) {
+    const app = getApp()
+    const lang = app.globalData.userInfo?.language || 'zh'
+    this.setData({
+      lang,
+      t: texts(lang),
+      themeClass: app.getThemeClass(app.globalData.userInfo?.wallpaper || 'default'),
+    })
     if (!options.id) {
       wx.navigateBack()
       return
@@ -17,24 +28,36 @@ Page({
   },
 
   async generateShareImage() {
-    const { noteId } = this.data
+    const { noteId, lang } = this.data
     try {
-      // Create share record
       const share = await api.createShare(noteId)
-      
-      // Load full note for rendering
       const note = await api.getNote(noteId)
-      
-      // Render to canvas
-      await this.renderToCanvas(note, share.token)
+      const qrImagePath = await this.downloadQRImage(share.token)
+      await this.renderToCanvas(note, share.token, qrImagePath)
     } catch (err) {
       console.error('生成分享图失败', err)
-      wx.showToast({ title: '生成失败', icon: 'none' })
+      wx.showToast({ title: t('generateFailed', lang), icon: 'none' })
       setTimeout(() => wx.navigateBack(), 1500)
     }
   },
 
-  async renderToCanvas(note, token) {
+  downloadQRImage(token) {
+    return new Promise((resolve, reject) => {
+      wx.downloadFile({
+        url: api.getShareQRCodeUrl(token),
+        success(res) {
+          if (res.statusCode === 200) {
+            resolve(res.tempFilePath)
+          } else {
+            reject(new Error(`QR download failed: ${res.statusCode}`))
+          }
+        },
+        fail: reject,
+      })
+    })
+  },
+
+  async renderToCanvas(note, token, qrImagePath) {
     const query = wx.createSelectorQuery()
     query.select('#shareCanvas')
       .fields({ node: true, size: true })
@@ -96,7 +119,7 @@ Page({
         if (note.key_points && note.key_points.length > 0) {
           ctx.fillStyle = '#333333'
           ctx.font = 'bold 28px sans-serif'
-          ctx.fillText('核心要点', cardX + 40, cardY + 380)
+          ctx.fillText(t('keyPoints', this.data.lang), cardX + 40, cardY + 380)
           
           ctx.font = '26px sans-serif'
           ctx.fillStyle = '#555555'
@@ -124,16 +147,28 @@ Page({
           }
         }
 
-        // Footer
+        // Footer - QR code and scan text
         ctx.fillStyle = '#999999'
         ctx.font = '22px sans-serif'
         ctx.textAlign = 'center'
-        ctx.fillText('微图闪记 · 扫码查看原文', width / 2, cardY + cardH - 40)
+        ctx.fillText(t('scanToView', this.data.lang), width / 2, cardY + cardH - 40)
+
+        // Draw QR code image
+        const qrSize = 120
+        const qrX = (width - qrSize) / 2
+        const qrY = cardY + cardH - 180
         
-        // QR Code placeholder (would use real QR in production)
-        ctx.fillStyle = '#333333'
-        ctx.font = 'bold 20px monospace'
-        ctx.fillText(`Token: ${token.substring(0, 12)}...`, width / 2, cardY + cardH - 70)
+        if (qrImagePath) {
+          const img = canvas.createImage()
+          img.src = qrImagePath
+          await new Promise((resolve) => {
+            img.onload = () => {
+              ctx.drawImage(img, qrX, qrY, qrSize, qrSize)
+              resolve()
+            }
+            img.onerror = () => resolve()
+          })
+        }
 
         // Export image
         wx.canvasToTempFilePath({
@@ -142,7 +177,7 @@ Page({
             this.setData({ imagePath: res.tempFilePath, generating: false })
           },
           fail: () => {
-            wx.showToast({ title: '导出失败', icon: 'none' })
+            wx.showToast({ title: t('exportFailed', this.data.lang), icon: 'none' })
             this.setData({ generating: false })
           },
         }, this)
@@ -177,36 +212,38 @@ Page({
   },
 
   getSourceLabel(sourceType) {
-    const map = {
-      wechat_article: '公众号文章',
-      web_article: '网页文章',
-      screenshot: '截图识别',
-      manual: '手动撰写',
+    const keys = {
+      wechat_article: 'sourceWechatArticle',
+      web_article: 'sourceWebArticle',
+      screenshot: 'sourceScreenshot',
+      manual: 'sourceManual',
     }
-    return map[sourceType] || sourceType
+    const key = keys[sourceType]
+    return key ? t(key, this.data.lang) : sourceType
   },
 
   saveToAlbum() {
     if (!this.data.imagePath) return
+    const { lang } = this.data
     
     wx.saveImageToPhotosAlbum({
       filePath: this.data.imagePath,
       success: () => {
-        wx.showToast({ title: '已保存到相册', icon: 'success' })
+        wx.showToast({ title: t('savedToAlbum', lang), icon: 'success' })
         setTimeout(() => wx.navigateBack(), 1000)
       },
       fail: (err) => {
         console.error('保存失败', err)
         if (err.errMsg.includes('auth')) {
           wx.showModal({
-            title: '需要相册权限',
-            content: '请在设置中允许访问相册',
+            title: t('needAlbumPermission', lang),
+            content: t('permissionHint', lang),
             success: (res) => {
               if (res.confirm) wx.openSetting()
             },
           })
         } else {
-          wx.showToast({ title: '保存失败', icon: 'none' })
+          wx.showToast({ title: t('exportFailed', lang), icon: 'none' })
         }
       },
     })

@@ -1,31 +1,50 @@
-<view class="container">
-  <view class="page-title">{{t('tabCreate', lang)}}</view>
+<view class="container {{themeClass}}">
+  <view class="page-title">{{t.tabCreate}}</view>
 
   <!-- 三个入口卡片 -->
   <view class="entry-cards">
     <view class="card entry-card" bindtap="onUrlImport">
       <text class="entry-icon">🔗</text>
-      <text class="entry-label">{{t('importUrl', lang)}}</text>
-      <text class="entry-desc">公众号文章 / 网页链接</text>
+      <text class="entry-label">{{t.importUrl}}</text>
+      <text class="entry-desc">{{t.linkDesc}}</text>
     </view>
 
     <view class="card entry-card" bindtap="onScreenshotImport">
       <text class="entry-icon">📸</text>
-      <text class="entry-label">{{t('importScreenshot', lang)}}</text>
-      <text class="entry-desc">相册选择 / 拍照</text>
+      <text class="entry-label">{{t.importScreenshot}}</text>
+      <text class="entry-desc">{{t.albumDesc}}</text>
     </view>
 
     <view class="card entry-card" bindtap="onManualWrite">
       <text class="entry-icon">✍️</text>
-      <text class="entry-label">{{t('writeNote', lang)}}</text>
-      <text class="entry-desc">手动输入标题和摘要</text>
+      <text class="entry-label">{{t.writeNote}}</text>
+      <text class="entry-desc">{{t.manualDesc}}</text>
+    </view>
+
+    <view class="card entry-card" bindtap="onVoiceImport">
+      <text class="entry-icon">🎙️</text>
+      <text class="entry-label">{{t.voiceImport}}</text>
+      <text class="entry-desc">{{t.voiceDesc}}</text>
+    </view>
+  </view>
+
+  <!-- 录音面板 -->
+  <view wx:if="{{showRecorder}}" class="recorder-panel card">
+    <view class="recorder-indicator {{isRecording ? 'recording' : ''}}">
+      <view class="recorder-dot"></view>
+    </view>
+    <view class="recorder-timer">{{recorderTimeText}}</view>
+    <view class="recorder-status">{{isRecording ? t.recording : t.stopRecording}}</view>
+    <view class="recorder-actions">
+      <view wx:if="{{isRecording}}" class="btn-primary recorder-btn" bindtap="stopRecording">{{t.confirm}}</view>
+      <view class="btn-secondary recorder-btn" bindtap="cancelRecording">{{t.cancel}}</view>
     </view>
   </view>
 
   <!-- URL 导入弹窗 -->
   <view wx:if="{{showUrlDialog}}" class="dialog-mask" catchtap="closeUrlDialog">
     <view class="dialog-content" catchtap="stopPropagation">
-      <text class="dialog-title">粘贴链接</text>
+      <text class="dialog-title">{{t.pasteLink}}</text>
       <input 
         class="dialog-input" 
         placeholder="https://mp.weixin.qq.com/..."
@@ -34,8 +53,8 @@
         focus="{{showUrlDialog}}"
       />
       <view class="dialog-actions">
-        <view class="btn-secondary" bindtap="closeUrlDialog">{{t('cancel', lang)}}</view>
-        <view class="btn-primary" bindtap="submitUrl">{{t('save', lang)}}</view>
+        <view class="btn-secondary" bindtap="closeUrlDialog">{{t.cancel}}</view>
+        <view class="btn-primary" bindtap="submitUrl">{{t.save}}</view>
       </view>
     </view>
   </view>
@@ -43,8 +62,8 @@
   <!-- 截图预览区（选择后显示） -->
   <view wx:if="{{previewImages.length > 0}}" class="preview-section card">
     <view class="preview-header">
-      <text class="preview-title">已选 {{previewImages.length}} 张截图</text>
-      <text class="preview-clear" bindtap="clearPreview">清空</text>
+      <text class="preview-title">{{previewImages.length}} {{t.selectedCount}}</text>
+      <text class="preview-clear" bindtap="clearPreview">{{t.clear}}</text>
     </view>
     <scroll-view class="preview-scroll" scroll-x show-scrollbar="{{false}}">
       <view class="preview-images">
@@ -58,7 +77,7 @@
       </view>
     </scroll-view>
     <view class="btn-primary submit-btn" bindtap="submitScreenshots">
-      {{submitting ? '处理中...' : '开始提取'}}
+      {{submitting ? t.processing : t.startExtract}}
     </view>
   </view>
 </view>

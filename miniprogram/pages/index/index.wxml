@@ -1,9 +1,9 @@
-<view class="container">
+<view class="container {{themeClass}}">
   <!-- 搜索栏 -->
   <view class="search-bar card">
     <input 
       class="search-input" 
-      placeholder="{{t('search', lang)}}" 
+      placeholder="{{t.search}}" 
       value="{{searchKeyword}}"
       bindinput="onSearchInput"
       bindconfirm="onSearchConfirm"
@@ -20,7 +20,7 @@
         bindtap="selectCategory"
         data-id="{{null}}"
       >
-        {{t('allCategories', lang)}}
+        {{t.allCategories}}
       </view>
       <view 
         class="chip {{selectedCategory === item.id ? 'active' : ''}}"
@@ -36,11 +36,11 @@
   </scroll-view>
 
   <!-- 加载状态 -->
-  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
   <!-- 空状态 -->
   <view wx:elif="{{notes.length === 0 && !loading}}" class="empty">
-    <text>{{t('noNotes', lang)}}</text>
+    <text>{{t.noNotes}}</text>
   </view>
 
   <!-- 笔记列表 -->
@@ -54,7 +54,7 @@
     >
       <view class="note-header">
         <text class="title">{{item.title}}</text>
-        <text class="pin-badge" wx:if="{{item.is_pinned}}">置顶</text>
+        <text class="pin-badge" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>
       </view>
       <text class="summary" wx:if="{{item.summary}}">{{item.summary}}</text>
       <view class="tags" wx:if="{{item.tags && item.tags.length}}">

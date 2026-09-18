@@ -1,30 +1,33 @@
-<view class="container">
+<view class="container {{themeClass}}">
   <view class="me-header card">
     <image class="avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
     <view class="user-info">
-      <text class="nickname">{{userInfo.nickName || '未登录'}}</text>
-      <text class="login-hint" wx:if="{{!isLoggedIn}}" bindtap="onLogin">点击登录</text>
+      <text class="nickname">{{userInfo.nickName || t.notLoggedIn}}</text>
+      <text class="login-hint" wx:if="{{!isLoggedIn}}" bindtap="onLogin">{{t.login}}</text>
     </view>
   </view>
 
   <view class="menu-group card">
     <view class="menu-item" bindtap="onNavigate" data-page="categories">
-      <text class="menu-label">分类管理</text>
+      <text class="menu-label">{{t.categories}}</text>
       <text class="menu-arrow">›</text>
     </view>
     <view class="menu-item" bindtap="onNavigate" data-page="wallpaper">
-      <text class="menu-label">壁纸设置</text>
+      <text class="menu-label">{{t.wallpaper}}</text>
       <text class="menu-arrow">›</text>
     </view>
     <view class="menu-item" bindtap="onNavigate" data-page="language">
-      <text class="menu-label">语言 / Language</text>
-      <text class="menu-value">{{currentLang}}</text>
+      <text class="menu-label">{{t.language}}</text>
+      <view class="menu-right">
+        <text class="menu-value">{{currentLang}}</text>
+        <text class="menu-arrow">›</text>
+      </view>
     </view>
   </view>
 
   <view class="menu-group card">
     <view class="menu-item" bindtap="onNavigate" data-page="about">
-      <text class="menu-label">关于微图闪记</text>
+      <text class="menu-label">{{t.about}}</text>
       <text class="menu-arrow">›</text>
     </view>
   </view>

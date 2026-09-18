@@ -1,0 +1,49 @@
+<view class="container {{themeClass}}">
+  <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
+
+  <block wx:else>
+    <view wx:if="{{categories.length === 0}}" class="empty-state">
+      <text class="empty-text">{{t.noCategories}}</text>
+      <text class="empty-hint">{{t.noCategoriesHint}}</text>
+    </view>
+
+    <view wx:else class="category-list">
+      <view class="category-item card" wx:for="{{categories}}" wx:key="id">
+        <block wx:if="{{editingId === item.id}}">
+          <input class="edit-input" value="{{editingName}}" bindinput="onEditInput" bindconfirm="onEditConfirm" focus="{{true}}" />
+          <view class="edit-actions">
+            <text class="edit-confirm" bindtap="onEditConfirm">{{t.confirm}}</text>
+            <text class="edit-cancel" bindtap="onEditCancel">{{t.cancel}}</text>
+          </view>
+        </block>
+        <block wx:else>
+          <view class="category-info">
+            <view class="category-color" style="background: {{item.color}}"></view>
+            <text class="category-name">{{item.name}}</text>
+          </view>
+          <view class="category-actions">
+            <text class="action-btn" bindtap="onMoveUp" data-index="{{index}}" wx:if="{{index > 0}}">↑</text>
+            <text class="action-btn disabled" wx:if="{{index === 0}}">↑</text>
+            <text class="action-btn" bindtap="onMoveDown" data-index="{{index}}" wx:if="{{index < categories.length - 1}}">↓</text>
+            <text class="action-btn disabled" wx:if="{{index === categories.length - 1}}">↓</text>
+            <text class="action-btn edit-btn" bindtap="onEditTap" data-id="{{item.id}}" data-name="{{item.name}}">{{t.edit}}</text>
+            <text class="action-btn delete-btn" bindtap="onDeleteTap" data-id="{{item.id}}" data-name="{{item.name}}">{{t.delete}}</text>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <view class="add-btn" bindtap="onAddTap">{{t.addCategoryBtn}}</view>
+  </block>
+
+  <view wx:if="{{showAddDialog}}" class="dialog-mask" bindtap="onCloseDialog">
+    <view class="dialog-card card" catchtap="">
+      <text class="dialog-title">{{t.newCategory}}</text>
+      <input class="dialog-input" placeholder="{{t.categoryName}}" value="{{newCategoryName}}" bindinput="onNameInput" bindconfirm="onAddConfirm" focus="{{true}}" />
+      <view class="dialog-actions">
+        <text class="dialog-btn cancel" bindtap="onCloseDialog">{{t.cancel}}</text>
+        <text class="dialog-btn confirm" bindtap="onAddConfirm">{{t.confirm}}</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,11 +1,11 @@
 const api = require('../../utils/api.js')
-const { t } = require('../../utils/i18n.js')
+const { t, texts } = require('../../utils/i18n.js')
 
-const SOURCE_TYPE_MAP = {
-  wechat_article: '公众号文章',
-  web_article: '网页文章',
-  screenshot: '截图识别',
-  manual: '手动撰写',
+const SOURCE_TYPE_KEYS = {
+  wechat_article: 'sourceWechatArticle',
+  web_article: 'sourceWebArticle',
+  screenshot: 'sourceScreenshot',
+  manual: 'sourceManual',
 }
 
 function formatTime(dateStr) {
@@ -23,11 +23,23 @@ Page({
     searchKeyword: '',
     selectedCategory: null,
     lang: 'zh',
-    t,
+    themeClass: 'theme-default',
+    t: texts('zh'),
   },
 
   onShow() {
-    this.setData({ lang: getApp().globalData.userInfo?.language || 'zh' })
+    const app = getApp()
+    const themeClass = app.applyTheme(app.globalData.userInfo?.wallpaper || 'default')
+    const lang = app.globalData.userInfo?.language || 'zh'
+    this.setData({
+      lang,
+      t: texts(lang),
+      themeClass,
+    })
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().updateLabels()
+      this.getTabBar().setData({ selected: 0 })
+    }
     this.loadCategories()
     this.loadNotes()
   },
@@ -46,8 +58,10 @@ Page({
     try {
       const { searchKeyword, selectedCategory } = this.data
       const notes = await api.getNotes(0, 50, selectedCategory)
+      const lang = this.data.lang
       notes.forEach(n => {
-        n.source_type_label = SOURCE_TYPE_MAP[n.source_type] || n.source_type
+        const key = SOURCE_TYPE_KEYS[n.source_type]
+        n.source_type_label = key ? t(key, lang) : n.source_type
         n.created_at_label = formatTime(n.created_at)
       })
       // Filter by search keyword on frontend for MVP

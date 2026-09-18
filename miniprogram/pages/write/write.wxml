@@ -1,10 +1,10 @@
-<view class="container">
+<view class="container {{themeClass}}">
   <view class="form-section card">
     <view class="form-group">
-      <text class="label">{{t('title', lang)}} *</text>
+      <text class="label">{{t.title}} *</text>
       <input 
         class="input" 
-        placeholder="输入笔记标题"
+        placeholder="{{t.titlePlaceholder}}"
         value="{{formData.title}}"
         bindinput="onTitleInput"
         maxlength="100"
@@ -12,10 +12,10 @@
     </view>
 
     <view class="form-group">
-      <text class="label">{{t('summary', lang)}}</text>
+      <text class="label">{{t.summary}}</text>
       <textarea 
         class="textarea" 
-        placeholder="输入摘要内容..."
+        placeholder="{{t.summaryPlaceholder}}"
         value="{{formData.summary}}"
         bindinput="onSummaryInput"
         maxlength="500"
@@ -25,10 +25,10 @@
     </view>
 
     <view class="form-group">
-      <text class="label">要点（每行一个）</text>
+      <text class="label">{{t.keyPointsHint}}</text>
       <textarea 
         class="textarea" 
-        placeholder="• 第一个要点&#10;• 第二个要点"
+        placeholder="{{t.keyPointsPlaceholder}}"
         value="{{keyPointsText}}"
         bindinput="onKeyPointsInput"
         auto-height
@@ -36,27 +36,27 @@
     </view>
 
     <view class="form-group">
-      <text class="label">标签（逗号分隔）</text>
+      <text class="label">{{t.tagsHint}}</text>
       <input 
         class="input" 
-        placeholder="技术, 产品, 设计"
+        placeholder="{{t.tagsPlaceholder}}"
         value="{{tagsText}}"
         bindinput="onTagsInput"
       />
     </view>
 
     <view class="form-group">
-      <text class="label">分类</text>
+      <text class="label">{{t.categoryLabel}}</text>
       <picker mode="selector" range="{{categoryNames}}" value="{{selectedCategoryIndex}}" bindchange="onCategoryChange">
         <view class="picker-value">
-          {{selectedCategoryIndex >= 0 ? categoryNames[selectedCategoryIndex] : '不分类'}}
+          {{selectedCategoryIndex >= 0 ? categoryNames[selectedCategoryIndex] : t.noCategory}}
         </view>
       </picker>
     </view>
   </view>
 
   <view class="actions">
-    <view class="btn-secondary" bindtap="onCancel">{{t('cancel', lang)}}</view>
-    <view class="btn-primary" bindtap="onSave">{{t('save', lang)}}</view>
+    <view class="btn-secondary" bindtap="onCancel">{{t.cancel}}</view>
+    <view class="btn-primary" bindtap="onSave">{{t.save}}</view>
   </view>
 </view>

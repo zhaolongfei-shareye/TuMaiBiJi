@@ -1,0 +1,26 @@
+<view class="container {{themeClass}}">
+  <text class="page-title">{{t.selectWallpaper}}</text>
+  <text class="page-hint">{{t.wallpaperHint}}</text>
+
+  <view class="wallpaper-grid">
+    <view
+      class="wallpaper-item {{item.active ? 'active' : ''}}"
+      style="background: {{item.bg}}"
+      wx:for="{{wallpapers}}"
+      wx:key="key"
+      bindtap="onSelect"
+      data-key="{{item.key}}"
+    >
+      <view class="wallpaper-preview-card" style="background: {{item.key === 'gradient-purple' || item.key === 'gradient-ocean' ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.85)'}}">
+        <view class="preview-line" style="width: 60%; background: {{item.key === 'gradient-purple' || item.key === 'gradient-ocean' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.08)'}}"></view>
+        <view class="preview-line" style="width: 40%; background: {{item.key === 'gradient-purple' || item.key === 'gradient-ocean' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)'}}"></view>
+      </view>
+      <text class="wallpaper-label" style="color: {{item.key === 'gradient-purple' || item.key === 'gradient-ocean' ? '#ffffff' : '#333333'}}">{{item.label}}</text>
+      <view wx:if="{{item.active}}" class="check-mark">✓</view>
+    </view>
+  </view>
+
+  <view wx:if="{{applying}}" class="applying-mask">
+    <text class="applying-text">{{t.applying}}</text>
+  </view>
+</view>
