@@ -1,116 +1,123 @@
 import logging
+import os
+import tempfile
+import uuid
 
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
-from app.services.scraper import scrape_url
-from app.services.ocr import ocr_images
-from app.services.llm import extract_knowledge
+from app.core.rate_limit import user_limiter
+from app.services.queue import get_queue, set_task_status
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+_batch_staging: dict[str, dict] = {}
+
 
 @router.post("/url")
+@user_limiter.limit("10/minute")
 async def ingest_url(
+    request: Request,
     url: str = Form(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    try:
-        scraped = await scrape_url(url)
-    except Exception as e:
-        logger.error("抓取失败: %s", e)
-        raise HTTPException(status_code=400, detail=f"URL 抓取失败: {e}")
-
-    text = scraped["content"]
-    if not text.strip():
-        raise HTTPException(status_code=400, detail="未能从 URL 提取到有效内容")
-
-    try:
-        knowledge = await extract_knowledge(text, fallback_title=scraped["title"])
-    except Exception as e:
-        logger.error("LLM 提取失败: %s", e)
-        raise HTTPException(status_code=500, detail=f"内容提取失败: {e}")
-
-    note = Note(
-        user_id=str(user.id),
-        title=knowledge["title"],
-        summary=knowledge["summary"],
-        key_points=knowledge["key_points"],
-        tags=knowledge["tags"],
-        original_content=text[:50000],
-        source_type=scraped["source_type"],
-        source_url=url,
+    task_id = uuid.uuid4().hex
+    set_task_status(task_id, "queued", user_id=str(user.id))
+    q = get_queue()
+    q.enqueue(
+        "app.tasks.ingest_tasks.process_url_task",
+        task_id,
+        str(user.id),
+        url,
+        job_id=task_id,
     )
-    db.add(note)
-    db.commit()
-    db.refresh(note)
-
-    return {"status": "ok", "note_id": note.id, "title": note.title}
+    return {"status": "queued", "task_id": task_id}
 
 
-@router.post("/screenshot")
-async def ingest_screenshot(
-    images: list[UploadFile] = File(...),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    images_data = []
-    for img in images:
-        data = await img.read()
-        if len(data) > 10 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail=f"图片 {img.filename} 超过 10MB 限制")
-        images_data.append(data)
-
-    return await _process_ocr_images(images_data, db, str(user.id))
-
-
-@router.post("/screenshot_single")
-async def ingest_screenshot_single(
+@router.post("/screenshots/stage")
+async def stage_screenshot(
     images: UploadFile = File(...),
-    db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     data = await images.read()
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="图片超过 10MB 限制")
 
-    return await _process_ocr_images([data], db, str(user.id))
+    batch_id = uuid.uuid4().hex
+    if batch_id not in _batch_staging:
+        _batch_staging[batch_id] = {"dir": tempfile.mkdtemp(prefix="wtsj_"), "paths": []}
+
+    batch = _batch_staging[batch_id]
+    path = os.path.join(batch["dir"], f"{uuid.uuid4().hex}.png")
+    with open(path, "wb") as f:
+        f.write(data)
+    batch["paths"].append(path)
+
+    return {"batch_id": batch_id, "count": len(batch["paths"])}
 
 
-async def _process_ocr_images(images_data: list[bytes], db: Session, user_id: str) -> dict:
-    try:
-        ocr_text = await ocr_images(images_data)
-    except Exception as e:
-        logger.error("OCR 失败: %s", e)
-        raise HTTPException(status_code=500, detail=f"OCR 识别失败: {e}")
+@router.post("/screenshots/process")
+@user_limiter.limit("5/minute")
+async def process_screenshots(
+    request: Request,
+    batch_id: str = Form(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    batch = _batch_staging.pop(batch_id, None)
+    if not batch or not batch["paths"]:
+        raise HTTPException(status_code=400, detail="无暂存图片，请先上传")
 
-    if not ocr_text.strip():
-        raise HTTPException(status_code=400, detail="OCR 未识别到文字内容")
-
-    try:
-        knowledge = await extract_knowledge(ocr_text)
-    except Exception as e:
-        logger.error("LLM 提取失败: %s", e)
-        raise HTTPException(status_code=500, detail=f"内容提取失败: {e}")
-
-    note = Note(
-        user_id=user_id,
-        title=knowledge["title"],
-        summary=knowledge["summary"],
-        key_points=knowledge["key_points"],
-        tags=knowledge["tags"],
-        original_content=ocr_text[:50000],
-        source_type="screenshot",
+    task_id = uuid.uuid4().hex
+    set_task_status(task_id, "queued", user_id=str(user.id))
+    q = get_queue()
+    q.enqueue(
+        "app.tasks.ingest_tasks.process_screenshots_task",
+        task_id,
+        str(user.id),
+        batch["paths"],
+        job_id=task_id,
     )
-    db.add(note)
-    db.commit()
-    db.refresh(note)
+    return {"status": "queued", "task_id": task_id}
 
-    return {"status": "ok", "note_id": note.id, "title": note.title}
+
+@router.post("/voice")
+@user_limiter.limit("10/minute")
+async def ingest_voice(
+    request: Request,
+    audio: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    data = await audio.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="音频超过 10MB 限制")
+
+    suffix = ".aac"
+    if audio.filename and "." in audio.filename:
+        ext = audio.filename.rsplit(".", 1)[-1].lower()
+        if ext in ("wav", "mp3", "pcm", "aac", "ogg"):
+            suffix = f".{ext}"
+
+    fd, path = tempfile.mkstemp(prefix="wtsj_voice_", suffix=suffix)
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+
+    audio_format = suffix.lstrip(".")
+    task_id = uuid.uuid4().hex
+    set_task_status(task_id, "queued", user_id=str(user.id))
+    q = get_queue()
+    q.enqueue(
+        "app.tasks.ingest_tasks.process_voice_task",
+        task_id,
+        str(user.id),
+        path,
+        audio_format,
+        job_id=task_id,
+    )
+    return {"status": "queued", "task_id": task_id}
