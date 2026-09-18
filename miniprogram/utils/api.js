@@ -55,7 +55,7 @@ const request = (url, method, data, options = {}, retryCount = 0) => {
   })
 }
 
-const uploadSingleImage = (url, filePath, formData) => {
+const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
   return new Promise((resolve, reject) => {
     wx.uploadFile({
       url: `${getApp().globalData.apiBase}${url}`,
@@ -67,6 +67,12 @@ const uploadSingleImage = (url, filePath, formData) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(JSON.parse(res.data))
         } else if (res.statusCode === 401) {
+          // Prevent infinite relogin loop: only retry once
+          if (retryCount >= 1) {
+            reject(new Error('认证失败，请重新登录'))
+            return
+          }
+          
           // Handle 401 for uploads: clear auth and trigger re-login
           const app = getApp()
           app.globalData.token = ''
@@ -77,8 +83,8 @@ const uploadSingleImage = (url, filePath, formData) => {
           
           app.getLoginPromise()
             .then(() => {
-              // Retry upload with new token
-              return uploadSingleImage(url, filePath, formData)
+              // Retry upload with new token (increment retry count)
+              return uploadSingleImage(url, filePath, formData, retryCount + 1)
             })
             .then(resolve)
             .catch(reject)
@@ -93,7 +99,7 @@ const uploadSingleImage = (url, filePath, formData) => {
   })
 }
 
-const uploadFile = (url, filePath, name) => {
+const uploadFile = (url, filePath, name, retryCount = 0) => {
   return new Promise((resolve, reject) => {
     wx.uploadFile({
       url: `${getApp().globalData.apiBase}${url}`,
@@ -104,6 +110,12 @@ const uploadFile = (url, filePath, name) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(JSON.parse(res.data))
         } else if (res.statusCode === 401) {
+          // Prevent infinite relogin loop: only retry once
+          if (retryCount >= 1) {
+            reject(new Error('认证失败，请重新登录'))
+            return
+          }
+          
           // Handle 401 for uploads: clear auth and trigger re-login
           const app = getApp()
           app.globalData.token = ''
@@ -114,8 +126,8 @@ const uploadFile = (url, filePath, name) => {
           
           app.getLoginPromise()
             .then(() => {
-              // Retry upload with new token
-              return uploadFile(url, filePath, name)
+              // Retry upload with new token (increment retry count)
+              return uploadFile(url, filePath, name, retryCount + 1)
             })
             .then(resolve)
             .catch(reject)
