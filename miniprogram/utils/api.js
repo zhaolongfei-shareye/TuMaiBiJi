@@ -1,9 +1,8 @@
-const app = getApp()
-
 function _headers(contentType, extra) {
   const h = {
     'content-type': contentType || 'application/json',
   }
+  const app = getApp()
   if (app.globalData.token) {
     h['Authorization'] = `Bearer ${app.globalData.token}`
   }
@@ -14,7 +13,7 @@ function _headers(contentType, extra) {
 const request = (url, method, data, options = {}) => {
   return new Promise((resolve, reject) => {
     wx.request({
-      url: `${app.globalData.apiBase}${url}`,
+      url: `${getApp().globalData.apiBase}${url}`,
       method: method || 'GET',
       data: data || {},
       header: _headers(options.contentType, options.header),
@@ -36,7 +35,7 @@ const request = (url, method, data, options = {}) => {
 const uploadSingleImage = (url, filePath) => {
   return new Promise((resolve, reject) => {
     wx.uploadFile({
-      url: `${app.globalData.apiBase}${url}`,
+      url: `${getApp().globalData.apiBase}${url}`,
       filePath,
       name: 'images',
       header: _headers(),
@@ -54,28 +53,63 @@ const uploadSingleImage = (url, filePath) => {
   })
 }
 
-const ingestScreenshots = (filePaths) => {
+const uploadFile = (url, filePath, name) => {
   return new Promise((resolve, reject) => {
-    let completed = 0
-    let lastResult = null
-    let hasError = false
+    wx.uploadFile({
+      url: `${getApp().globalData.apiBase}${url}`,
+      filePath,
+      name: name || 'file',
+      header: _headers(),
+      success(res) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(JSON.parse(res.data))
+        } else {
+          reject(res)
+        }
+      },
+      fail(err) {
+        reject(err)
+      }
+    })
+  })
+}
 
-    filePaths.forEach((filePath) => {
-      uploadSingleImage('/api/ingest/screenshot_single', filePath)
-        .then((result) => {
-          if (hasError) return
-          lastResult = result
-          completed++
-          if (completed === filePaths.length) {
-            resolve(lastResult)
+const ingestVoice = (filePath) => {
+  return uploadFile('/api/ingest/voice', filePath, 'audio')
+}
+
+const ingestScreenshots = async (filePaths) => {
+  let batchId = null
+  for (const filePath of filePaths) {
+    const res = await uploadSingleImage('/api/ingest/screenshots/stage', filePath)
+    batchId = res.batch_id
+  }
+  return request('/api/ingest/screenshots/process', 'POST', { batch_id: batchId }, { contentType: 'application/x-www-form-urlencoded' })
+}
+
+const getTaskStatus = (taskId) => request(`/api/tasks/${taskId}`)
+
+const pollTask = (taskId, intervalMs = 2000, maxWaitMs = 300000) => {
+  return new Promise((resolve, reject) => {
+    const start = Date.now()
+    const poll = () => {
+      if (Date.now() - start > maxWaitMs) {
+        reject({ timeout: true })
+        return
+      }
+      getTaskStatus(taskId)
+        .then((data) => {
+          if (data.status === 'completed') {
+            resolve(data.result)
+          } else if (data.status === 'failed') {
+            reject(data.result || { error: 'unknown' })
+          } else {
+            setTimeout(poll, intervalMs)
           }
         })
-        .catch((err) => {
-          if (hasError) return
-          hasError = true
-          reject(err)
-        })
-    })
+        .catch(reject)
+    }
+    poll()
   })
 }
 
@@ -93,10 +127,17 @@ module.exports = {
   pinNote: (id, pin) => request(`/api/notes/${id}/pin?pin=${pin}`, 'POST'),
   ingestUrl: (url) => request('/api/ingest/url', 'POST', { url }, { contentType: 'application/x-www-form-urlencoded' }),
   ingestScreenshots,
+  ingestVoice,
+  getTaskStatus,
+  pollTask,
   getCategories: () => request('/api/categories/'),
   createCategory: (data) => request('/api/categories/', 'POST', data),
   updateCategory: (id, data) => request(`/api/categories/${id}`, 'PUT', data),
   deleteCategory: (id) => request(`/api/categories/${id}`, 'DELETE'),
   reorderCategories: (ids) => request('/api/categories/reorder', 'POST', { ids }),
   createShare: (noteId) => request('/api/shares/', 'POST', { note_id: noteId }),
+  getShareQRCodeUrl: (token) => `${getApp().globalData.apiBase}/api/shares/${token}/qrcode`,
+  getWallpaperOptions: () => request('/api/user/wallpaper/options'),
+  updateWallpaper: (wallpaper) => request('/api/user/wallpaper', 'PUT', { wallpaper }),
+  updateLanguage: (language) => request('/api/user/language', 'PUT', { language }),
 }
