@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 
 from app.db.database import SessionLocal
 from app.models.note import Note
@@ -51,15 +50,10 @@ def process_url_task(task_id: str, user_id: str, url: str):
         set_task_status(task_id, "failed", {"error": str(e)})
 
 
-def process_screenshots_task(task_id: str, user_id: str, image_paths: list[str]):
-    """RQ worker 同步任务：读取图片 → OCR → LLM 提取 → 写入数据库 → 清理临时文件。"""
+def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes]):
+    """RQ worker 同步任务：OCR → LLM 提取 → 写入数据库。"""
     try:
         set_task_status(task_id, "processing")
-
-        images_data = []
-        for path in image_paths:
-            with open(path, "rb") as f:
-                images_data.append(f.read())
 
         ocr_text = asyncio.run(ocr_images(images_data))
         if not ocr_text.strip():
@@ -90,28 +84,11 @@ def process_screenshots_task(task_id: str, user_id: str, image_paths: list[str])
         logger.exception("截图任务失败: %s", e)
         set_task_status(task_id, "failed", {"error": str(e)})
 
-    finally:
-        for path in image_paths:
-            try:
-                os.remove(path)
-            except OSError:
-                pass
-        # Remove the parent batch directory if it's now empty
-        if image_paths:
-            batch_dir = os.path.dirname(image_paths[0])
-            try:
-                os.rmdir(batch_dir)  # Only removes if empty
-            except OSError:
-                pass  # Dir may not be empty or already removed
 
-
-def process_voice_task(task_id: str, user_id: str, audio_path: str, audio_format: str):
-    """RQ worker 同步任务：读取音频 → ASR 转写 → LLM 提取 → 写入数据库 → 清理临时文件。"""
+def process_voice_task(task_id: str, user_id: str, audio_data: bytes, audio_format: str):
+    """RQ worker 同步任务：ASR 转写 → LLM 提取 → 写入数据库。"""
     try:
         set_task_status(task_id, "processing")
-
-        with open(audio_path, "rb") as f:
-            audio_data = f.read()
 
         text = asyncio.run(transcribe_audio(audio_data, format=audio_format))
         if not text.strip():
@@ -141,9 +118,3 @@ def process_voice_task(task_id: str, user_id: str, audio_path: str, audio_format
     except Exception as e:
         logger.exception("语音任务失败: %s", e)
         set_task_status(task_id, "failed", {"error": str(e)})
-
-    finally:
-        try:
-            os.remove(audio_path)
-        except OSError:
-            pass

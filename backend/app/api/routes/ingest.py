@@ -1,7 +1,4 @@
 import logging
-import os
-import shutil
-import tempfile
 import time
 import uuid
 
@@ -52,7 +49,6 @@ def _sweep_stale_batches():
     for batch_id, batch in list(_batch_staging.items()):
         if now - batch["created_at"] > BATCH_TTL_SECONDS:
             _batch_staging.pop(batch_id, None)
-            shutil.rmtree(batch["dir"], ignore_errors=True)
 
 
 @router.post("/screenshots/stage")
@@ -87,22 +83,18 @@ async def stage_screenshot(
     if batch is None:
         batch_id = uuid.uuid4().hex
         batch = {
-            "dir": tempfile.mkdtemp(prefix="tmbj_"),
-            "paths": [],
+            "data": [],
             "user_id": str(user.id),
             "created_at": time.time(),
         }
         _batch_staging[batch_id] = batch
-    
-    if len(batch["paths"]) >= MAX_IMAGES_PER_BATCH:
+
+    if len(batch["data"]) >= MAX_IMAGES_PER_BATCH:
         raise HTTPException(status_code=400, detail=f"每批次最多 {MAX_IMAGES_PER_BATCH} 张图片")
 
-    path = os.path.join(batch["dir"], f"{uuid.uuid4().hex}.png")
-    with open(path, "wb") as f:
-        f.write(data)
-    batch["paths"].append(path)
+    batch["data"].append(data)
 
-    return {"batch_id": batch_id, "count": len(batch["paths"])}
+    return {"batch_id": batch_id, "count": len(batch["data"])}
 
 
 @router.post("/screenshots/process")
@@ -116,7 +108,7 @@ async def process_screenshots(
     batch = _batch_staging.get(batch_id)
     if not batch or batch["user_id"] != str(user.id):
         raise HTTPException(status_code=404, detail="批次不存在或已失效，请重新上传")
-    if not batch["paths"]:
+    if not batch["data"]:
         raise HTTPException(status_code=400, detail="无暂存图片，请先上传")
 
     task_id = uuid.uuid4().hex
@@ -126,7 +118,7 @@ async def process_screenshots(
         "app.tasks.ingest_tasks.process_screenshots_task",
         task_id,
         str(user.id),
-        batch["paths"],
+        batch["data"],
         job_id=task_id,
         job_timeout=600,
     )
@@ -154,17 +146,12 @@ async def ingest_voice(
             raise HTTPException(status_code=400, detail="音频超过 10MB 限制")
     data = b"".join(chunks)
 
-    suffix = ".aac"
+    audio_format = "aac"
     if audio.filename and "." in audio.filename:
         ext = audio.filename.rsplit(".", 1)[-1].lower()
         if ext in ("wav", "mp3", "pcm", "aac", "ogg"):
-            suffix = f".{ext}"
+            audio_format = ext
 
-    fd, path = tempfile.mkstemp(prefix="tmbj_voice_", suffix=suffix)
-    with os.fdopen(fd, "wb") as f:
-        f.write(data)
-
-    audio_format = suffix.lstrip(".")
     task_id = uuid.uuid4().hex
     set_task_status(task_id, "queued", user_id=str(user.id))
     q = get_queue()
@@ -172,7 +159,7 @@ async def ingest_voice(
         "app.tasks.ingest_tasks.process_voice_task",
         task_id,
         str(user.id),
-        path,
+        data,
         audio_format,
         job_id=task_id,
         job_timeout=600,
