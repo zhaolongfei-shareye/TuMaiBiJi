@@ -1,10 +1,16 @@
+import asyncio
 import json
+import logging
 
 import httpx
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+MAX_RETRIES = 3
+INITIAL_BACKOFF = 1.0
 
 SYSTEM_PROMPT = """你是一个内容提取与知识整理助手。用户会提供一篇文章或截图识别的文本。
 你的任务是：
@@ -23,7 +29,11 @@ SYSTEM_PROMPT = """你是一个内容提取与知识整理助手。用户会提�
 
 
 async def extract_knowledge(text: str, fallback_title: str = "") -> dict:
-    """调用 DeepSeek API 提取结构化知识，返回 {title, summary, key_points, tags}。"""
+    """调用 DeepSeek API 提取结构化知识，返回 {title, summary, key_points, tags}。
+    
+    包含重试逻辑：对 429（限流）、5xx（服务器错误）、超时自动重试，
+    最多重试 MAX_RETRIES 次，使用指数退避策略。
+    """
     if not settings.DEEPSEEK_API_KEY:
         raise ValueError("DeepSeek API Key 未配置，请设置 DEEPSEEK_API_KEY")
 
@@ -34,28 +44,61 @@ async def extract_knowledge(text: str, fallback_title: str = "") -> dict:
     if fallback_title:
         user_content = f"参考标题：{fallback_title}\n\n{user_content}"
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            f"{DEEPSEEK_BASE_URL}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_content},
-                ],
-                "temperature": 0.3,
-                "max_tokens": 2000,
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-
-    content = data["choices"][0]["message"]["content"]
-    return _parse_response(content, fallback_title)
+    last_error = None
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(
+                    f"{DEEPSEEK_BASE_URL}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "deepseek-chat",
+                        "messages": [
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": user_content},
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 2000,
+                    },
+                )
+                
+                if resp.status_code == 429:
+                    raise httpx.HTTPStatusError(
+                        "Rate limit exceeded", request=resp.request, response=resp
+                    )
+                if resp.status_code >= 500:
+                    raise httpx.HTTPStatusError(
+                        f"Server error: {resp.status_code}", 
+                        request=resp.request, 
+                        response=resp
+                    )
+                
+                resp.raise_for_status()
+                data = resp.json()
+                
+                content = data["choices"][0]["message"]["content"]
+                return _parse_response(content, fallback_title)
+                
+        except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
+            last_error = e
+            if attempt < MAX_RETRIES:
+                backoff = INITIAL_BACKOFF * (2 ** attempt)
+                logger.warning(
+                    "LLM API 请求失败 (attempt %d/%d): %s，%0.1f 秒后重试",
+                    attempt + 1, MAX_RETRIES + 1, str(e), backoff
+                )
+                await asyncio.sleep(backoff)
+            else:
+                logger.error("LLM API 请求在 %d 次尝试后最终失败: %s", MAX_RETRIES + 1, str(e))
+                raise
+        except Exception as e:
+            logger.error("LLM API 请求遇到非重试错误: %s", str(e))
+            raise
+    
+    raise last_error
 
 
 def _parse_response(content: str, fallback_title: str) -> dict:

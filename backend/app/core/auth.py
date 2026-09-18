@@ -57,11 +57,11 @@ async def _wechat_code2session(code: str) -> dict:
 
 
 def get_current_user(
-    authorization: str = Header(..., description="Bearer <token>"),
+    authorization: str | None = Header(None, description="Bearer <token>"),
     db: Session = Depends(get_db),
 ) -> User:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="认证格式错误，应为 Bearer <token>")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="缺少认证凭证，请重新登录")
     token = authorization.split(" ", 1)[1]
     payload = _decode_token(token)
     user_id = int(payload["sub"])

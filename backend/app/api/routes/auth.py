@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.auth import login_or_register
+from app.core.rate_limit import limiter
 from app.db.database import get_db
 
 router = APIRouter()
@@ -22,7 +23,8 @@ class LoginResponse(BaseModel):
 
 
 @router.post("/wechat", response_model=LoginResponse)
-async def wechat_login(req: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def wechat_login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
     user, token = await login_or_register(req.code, db)
     return LoginResponse(
         token=token,
