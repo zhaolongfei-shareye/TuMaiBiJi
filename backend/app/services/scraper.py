@@ -17,7 +17,7 @@ HEADERS = {
 }
 
 MAX_RESPONSE_SIZE = 5 * 1024 * 1024
-ALLOWED_SCHEMES = {"https", "http"}
+ALLOWED_SCHEMES = {"https"}
 BLOCKED_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),
     ipaddress.ip_network("10.0.0.0/8"),
@@ -68,6 +68,9 @@ async def scrape_url(url: str) -> dict:
     ) as client:
         current_url = url
         for _ in range(5):
+            # Re-validate right before connect to narrow DNS rebinding TOCTOU window
+            _validate_url(current_url)
+            
             # Use stream to limit response size before full download
             total_bytes = 0
             chunks = []

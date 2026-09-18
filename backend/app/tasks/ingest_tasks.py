@@ -96,6 +96,13 @@ def process_screenshots_task(task_id: str, user_id: str, image_paths: list[str])
                 os.remove(path)
             except OSError:
                 pass
+        # Remove the parent batch directory if it's now empty
+        if image_paths:
+            batch_dir = os.path.dirname(image_paths[0])
+            try:
+                os.rmdir(batch_dir)  # Only removes if empty
+            except OSError:
+                pass  # Dir may not be empty or already removed
 
 
 def process_voice_task(task_id: str, user_id: str, audio_path: str, audio_format: str):
