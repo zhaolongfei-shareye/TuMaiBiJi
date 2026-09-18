@@ -2,6 +2,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,7 @@ from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.services.wechat import get_qr_code_image
 
 router = APIRouter()
 
@@ -59,13 +61,41 @@ def create_share(
     return share
 
 
-@router.get("/{token}", response_model=ShareResponse)
-def get_share(token: str, db: Session = Depends(get_db)):
+def _is_expired(share: Share) -> bool:
+    if not share.expires_at:
+        return False
+    expires = share.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) >= expires
+
+
+def _get_active_share(token: str, db: Session) -> Share:
     share = (
         db.query(Share)
         .filter(Share.token == token, Share.is_active == True)
         .first()
     )
-    if not share:
-        raise HTTPException(status_code=404, detail="Share not found or expired")
+    if not share or _is_expired(share):
+        raise HTTPException(status_code=404, detail="分享不存在或已过期")
     return share
+
+
+@router.get("/{token}", response_model=ShareResponse)
+def get_share(token: str, db: Session = Depends(get_db)):
+    return _get_active_share(token, db)
+
+
+@router.get("/{token}/qrcode")
+async def get_share_qrcode(token: str, db: Session = Depends(get_db)):
+    share = _get_active_share(token, db)
+
+    try:
+        image_data = await get_qr_code_image(
+            scene=token,
+            page="pages/share/view",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成小程序码失败: {e}")
+
+    return Response(content=image_data, media_type="image/png")
