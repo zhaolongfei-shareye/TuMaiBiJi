@@ -25,6 +25,7 @@ class ShareResponse(BaseModel):
     title: str | None
     summary: str | None
     tags: list | None
+    key_links: list | None
     created_at: datetime
 
     class Config:
@@ -53,6 +54,7 @@ def create_share(
         title=note.title,
         summary=note.summary,
         tags=note.tags,
+        key_links=note.key_links,
         expires_at=datetime.now(timezone.utc) + timedelta(days=7),
     )
     db.add(share)
