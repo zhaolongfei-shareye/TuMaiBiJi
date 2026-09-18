@@ -81,7 +81,10 @@ const ingestVoice = (filePath) => {
 const ingestScreenshots = async (filePaths) => {
   let batchId = null
   for (const filePath of filePaths) {
-    const res = await uploadSingleImage('/api/ingest/screenshots/stage', filePath)
+    const url = batchId
+      ? `/api/ingest/screenshots/stage?batch_id=${encodeURIComponent(batchId)}`
+      : '/api/ingest/screenshots/stage'
+    const res = await uploadSingleImage(url, filePath)
     batchId = res.batch_id
   }
   return request('/api/ingest/screenshots/process', 'POST', { batch_id: batchId }, { contentType: 'application/x-www-form-urlencoded' })

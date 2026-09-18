@@ -1,6 +1,8 @@
 import logging
 import os
+import shutil
 import tempfile
+import time
 import uuid
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Request
@@ -40,20 +42,46 @@ async def ingest_url(
     return {"status": "queued", "task_id": task_id}
 
 
+_batch_staging: dict[str, dict] = {}
+BATCH_TTL_SECONDS = 1800
+
+
+def _sweep_stale_batches():
+    now = time.time()
+    for batch_id, batch in list(_batch_staging.items()):
+        if now - batch["created_at"] > BATCH_TTL_SECONDS:
+            _batch_staging.pop(batch_id, None)
+            shutil.rmtree(batch["dir"], ignore_errors=True)
+
+
 @router.post("/screenshots/stage")
 async def stage_screenshot(
     images: UploadFile = File(...),
+    batch_id: str | None = Form(None),
     user: User = Depends(get_current_user),
 ):
     data = await images.read()
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="图片超过 10MB 限制")
 
-    batch_id = uuid.uuid4().hex
-    if batch_id not in _batch_staging:
-        _batch_staging[batch_id] = {"dir": tempfile.mkdtemp(prefix="wtsj_"), "paths": []}
+    _sweep_stale_batches()
 
-    batch = _batch_staging[batch_id]
+    batch = None
+    if batch_id:
+        batch = _batch_staging.get(batch_id)
+        if batch is None or batch["user_id"] != str(user.id):
+            raise HTTPException(status_code=404, detail="批次不存在或已失效，请重新上传")
+
+    if batch is None:
+        batch_id = uuid.uuid4().hex
+        batch = {
+            "dir": tempfile.mkdtemp(prefix="wtsj_"),
+            "paths": [],
+            "user_id": str(user.id),
+            "created_at": time.time(),
+        }
+        _batch_staging[batch_id] = batch
+
     path = os.path.join(batch["dir"], f"{uuid.uuid4().hex}.png")
     with open(path, "wb") as f:
         f.write(data)
@@ -70,8 +98,10 @@ async def process_screenshots(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    batch = _batch_staging.pop(batch_id, None)
-    if not batch or not batch["paths"]:
+    batch = _batch_staging.get(batch_id)
+    if not batch or batch["user_id"] != str(user.id):
+        raise HTTPException(status_code=404, detail="批次不存在或已失效，请重新上传")
+    if not batch["paths"]:
         raise HTTPException(status_code=400, detail="无暂存图片，请先上传")
 
     task_id = uuid.uuid4().hex
@@ -84,6 +114,7 @@ async def process_screenshots(
         batch["paths"],
         job_id=task_id,
     )
+    _batch_staging.pop(batch_id, None)
     return {"status": "queued", "task_id": task_id}
 
 
