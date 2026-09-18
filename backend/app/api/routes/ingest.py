@@ -38,6 +38,7 @@ async def ingest_url(
         str(user.id),
         url,
         job_id=task_id,
+        job_timeout=600,
     )
     return {"status": "queued", "task_id": task_id}
 
@@ -60,9 +61,15 @@ async def stage_screenshot(
     batch_id: str | None = Form(None),
     user: User = Depends(get_current_user),
 ):
-    data = await images.read()
-    if len(data) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="图片超过 10MB 限制")
+    MAX_SIZE = 10 * 1024 * 1024  # 10MB
+    data = b""
+    while True:
+        chunk = await images.read(8192)
+        if not chunk:
+            break
+        data += chunk
+        if len(data) > MAX_SIZE:
+            raise HTTPException(status_code=400, detail="图片超过 10MB 限制")
 
     _sweep_stale_batches()
 
@@ -113,6 +120,7 @@ async def process_screenshots(
         str(user.id),
         batch["paths"],
         job_id=task_id,
+        job_timeout=600,
     )
     _batch_staging.pop(batch_id, None)
     return {"status": "queued", "task_id": task_id}
@@ -125,9 +133,15 @@ async def ingest_voice(
     audio: UploadFile = File(...),
     user: User = Depends(get_current_user),
 ):
-    data = await audio.read()
-    if len(data) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="音频超过 10MB 限制")
+    MAX_SIZE = 10 * 1024 * 1024  # 10MB
+    data = b""
+    while True:
+        chunk = await audio.read(8192)
+        if not chunk:
+            break
+        data += chunk
+        if len(data) > MAX_SIZE:
+            raise HTTPException(status_code=400, detail="音频超过 10MB 限制")
 
     suffix = ".aac"
     if audio.filename and "." in audio.filename:
@@ -150,5 +164,6 @@ async def ingest_voice(
         path,
         audio_format,
         job_id=task_id,
+        job_timeout=600,
     )
     return {"status": "queued", "task_id": task_id}
