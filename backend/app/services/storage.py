@@ -56,7 +56,12 @@ def get_download_url(object_key: str, expires: int = 3600) -> str:
     client = _get_client()
     if client is None:
         raise RuntimeError("COS 未配置")
-    url = client.get_presigned_url("GET", settings.COS_BUCKET, object_key, expired=expires)
+    url = client.get_presigned_url(
+        Bucket=settings.COS_BUCKET,
+        Key=object_key,
+        Method="GET",
+        Expired=expires,
+    )
     return url
 
 

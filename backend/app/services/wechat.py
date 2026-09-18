@@ -55,11 +55,20 @@ async def get_qr_code_image(scene: str, page: str = "") -> bytes:
             f"{WX_QRCODE_URL}?access_token={token}",
             json=body,
         )
+        
+        # Check HTTP status first
+        if resp.status_code != 200:
+            raise RuntimeError(f"生成小程序码失败: HTTP {resp.status_code}")
+        
         content_type = resp.headers.get("content-type", "")
-        if "image" not in content_type and resp.headers.get("content-type") != "application/json":
-            pass
-        if resp.headers.get("content-type", "").startswith("application/json"):
+        
+        # Handle JSON error responses
+        if content_type.startswith("application/json"):
             data = resp.json()
             raise RuntimeError(f"生成小程序码失败: errcode={data.get('errcode')}, errmsg={data.get('errmsg')}")
+        
+        # Verify we got an image
+        if "image" not in content_type and content_type:
+            raise RuntimeError(f"生成小程序码失败: 非图片响应 (content-type: {content_type})")
 
         return resp.content

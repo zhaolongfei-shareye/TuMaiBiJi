@@ -21,6 +21,23 @@ const request = (url, method, data, options = {}) => {
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
+        } else if (res.statusCode === 401) {
+          // Clear auth state on 401 and trigger re-login
+          const app = getApp()
+          app.globalData.token = ''
+          app.globalData.userId = ''
+          app.globalData.userInfo = null
+          app.globalData.isLoggedIn = false
+          app.globalData.loginPromise = null // Reset login promise to allow retry
+          
+          // Trigger login and retry after successful authentication
+          app.getLoginPromise()
+            .then(() => {
+              // Retry original request with new token
+              return request(url, method, data, options)
+            })
+            .then(resolve)
+            .catch(reject)
         } else {
           reject(res)
         }
@@ -32,13 +49,14 @@ const request = (url, method, data, options = {}) => {
   })
 }
 
-const uploadSingleImage = (url, filePath) => {
+const uploadSingleImage = (url, filePath, formData) => {
   return new Promise((resolve, reject) => {
     wx.uploadFile({
       url: `${getApp().globalData.apiBase}${url}`,
       filePath,
       name: 'images',
       header: _headers(),
+      formData,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(JSON.parse(res.data))
@@ -81,10 +99,8 @@ const ingestVoice = (filePath) => {
 const ingestScreenshots = async (filePaths) => {
   let batchId = null
   for (const filePath of filePaths) {
-    const url = batchId
-      ? `/api/ingest/screenshots/stage?batch_id=${encodeURIComponent(batchId)}`
-      : '/api/ingest/screenshots/stage'
-    const res = await uploadSingleImage(url, filePath)
+    const formData = batchId ? { batch_id: batchId } : undefined
+    const res = await uploadSingleImage('/api/ingest/screenshots/stage', filePath, formData)
     batchId = res.batch_id
   }
   return request('/api/ingest/screenshots/process', 'POST', { batch_id: batchId }, { contentType: 'application/x-www-form-urlencoded' })
@@ -118,9 +134,10 @@ const pollTask = (taskId, intervalMs = 2000, maxWaitMs = 300000) => {
 
 module.exports = {
   request,
-  getNotes: (skip = 0, limit = 20, categoryId) => {
+  getNotes: (skip = 0, limit = 20, categoryId, search) => {
     let url = `/api/notes/?skip=${skip}&limit=${limit}`
     if (categoryId != null) url += `&category_id=${categoryId}`
+    if (search) url += `&search=${encodeURIComponent(search)}`
     return request(url)
   },
   getNote: (id) => request(`/api/notes/${id}`),

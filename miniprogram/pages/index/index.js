@@ -25,10 +25,15 @@ Page({
     lang: 'zh',
     themeClass: 'theme-default',
     t: texts('zh'),
+    skip: 0,
+    limit: 50,
+    hasMore: true,
+    loadingMore: false,
   },
 
-  onShow() {
+  async onShow() {
     const app = getApp()
+    await app.getLoginPromise().catch(() => {})
     const themeClass = app.applyTheme(app.globalData.userInfo?.wallpaper || 'default')
     const lang = app.globalData.userInfo?.language || 'zh'
     this.setData({
@@ -53,31 +58,46 @@ Page({
     }
   },
 
-  async loadNotes() {
-    this.setData({ loading: true })
+  async loadNotes(reset = false) {
+    if (reset) {
+      this.setData({ skip: 0, notes: [], hasMore: true })
+    }
+    
+    const { skip, limit, searchKeyword, selectedCategory, loadingMore } = this.data
+    if (loadingMore) return
+    
+    this.setData({ 
+      loading: !reset,
+      loadingMore: reset ? false : true,
+    })
+    
     try {
-      const { searchKeyword, selectedCategory } = this.data
-      const notes = await api.getNotes(0, 50, selectedCategory)
+      const notes = await api.getNotes(skip, limit, selectedCategory, searchKeyword)
       const lang = this.data.lang
       notes.forEach(n => {
         const key = SOURCE_TYPE_KEYS[n.source_type]
         n.source_type_label = key ? t(key, lang) : n.source_type
         n.created_at_label = formatTime(n.created_at)
       })
-      // Filter by search keyword on frontend for MVP
-      let filtered = notes
-      if (searchKeyword) {
-        const kw = searchKeyword.toLowerCase()
-        filtered = notes.filter(n => 
-          n.title.toLowerCase().includes(kw) || 
-          (n.summary && n.summary.toLowerCase().includes(kw))
-        )
-      }
-      this.setData({ notes: filtered, loading: false })
+      
+      const allNotes = reset ? notes : [...this.data.notes, ...notes]
+      this.setData({ 
+        notes: allNotes, 
+        loading: false,
+        loadingMore: false,
+        hasMore: notes.length === limit,
+        skip: skip + notes.length,
+      })
     } catch (err) {
       console.error('加载笔记失败', err)
-      this.setData({ loading: false })
+      this.setData({ loading: false, loadingMore: false })
       wx.showToast({ title: '加载失败', icon: 'none' })
+    }
+  },
+
+  onLoadMore() {
+    if (this.data.hasMore && !this.data.loadingMore) {
+      this.loadNotes(false)
     }
   },
 
@@ -86,18 +106,18 @@ Page({
   },
 
   onSearchConfirm() {
-    this.loadNotes()
+    this.loadNotes(true)
   },
 
   clearSearch() {
     this.setData({ searchKeyword: '' })
-    this.loadNotes()
+    this.loadNotes(true)
   },
 
   selectCategory(e) {
     const id = e.currentTarget.dataset.id
     this.setData({ selectedCategory: id === null ? null : parseInt(id) })
-    this.loadNotes()
+    this.loadNotes(true)
   },
 
   goToDetail(e) {

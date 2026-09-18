@@ -47,6 +47,22 @@ Page({
       const key = SOURCE_TYPE_KEYS[note.source_type]
       note.source_type_label = key ? t(key, lang) : note.source_type
       note.created_at_label = formatTime(note.created_at)
+      
+      // Resolve category name from categories list
+      let categoryName = null
+      if (note.category_id) {
+        try {
+          const categories = await api.getCategories()
+          const category = categories.find(c => c.id === note.category_id)
+          if (category) {
+            categoryName = category.name
+          }
+        } catch (err) {
+          console.error('加载分类列表失败', err)
+        }
+      }
+      note.category_name = categoryName
+      
       this.setData({ note, loading: false })
     } catch (err) {
       console.error('加载笔记失败', err)

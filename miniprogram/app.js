@@ -18,10 +18,49 @@ App({
     isLoggedIn: false,
     userId: '',
     token: '',
+    loginPromise: null,
   },
 
   onLaunch() {
     this.login()
+  },
+
+  getLoginPromise() {
+    if (!this.globalData.loginPromise) {
+      this.globalData.loginPromise = this._doLogin().finally(() => {
+        this.globalData.loginPromise = null
+      })
+    }
+    return this.globalData.loginPromise
+  },
+
+  async _doLogin() {
+    try {
+      const loginRes = await new Promise((resolve, reject) => {
+        wx.login({
+          success: resolve,
+          fail: reject,
+        })
+      })
+      const res = await request('/api/auth/wechat', 'POST', { code: loginRes.code })
+      this.globalData.token = res.token
+      this.globalData.userId = res.user_id
+      this.globalData.userInfo = {
+        nickName: res.nickname || '',
+        avatarUrl: res.avatar_url || '',
+        language: res.language || 'zh',
+        wallpaper: res.wallpaper || 'default',
+      }
+      this.globalData.isLoggedIn = true
+      this.applyTheme(this.globalData.userInfo.wallpaper)
+    } catch (err) {
+      console.error('登录失败:', err)
+      throw err
+    }
+  },
+
+  async login() {
+    return this.getLoginPromise()
   },
 
   getThemeClass(wallpaper) {
@@ -44,29 +83,5 @@ App({
       tabBar.applyTheme?.(wallpaper)
     }
     return themeClass
-  },
-
-  async login() {
-    try {
-      const loginRes = await new Promise((resolve, reject) => {
-        wx.login({
-          success: resolve,
-          fail: reject,
-        })
-      })
-      const res = await request('/api/auth/wechat', 'POST', { code: loginRes.code })
-      this.globalData.token = res.token
-      this.globalData.userId = res.user_id
-      this.globalData.userInfo = {
-        nickName: res.nickname || '',
-        avatarUrl: res.avatar_url || '',
-        language: res.language || 'zh',
-        wallpaper: res.wallpaper || 'default',
-      }
-      this.globalData.isLoggedIn = true
-      this.applyTheme(this.globalData.userInfo.wallpaper)
-    } catch (err) {
-      console.error('登录失败:', err)
-    }
   },
 })

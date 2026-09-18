@@ -118,9 +118,41 @@ def _parse_response(content: str, fallback_title: str) -> dict:
             "tags": [],
         }
 
+    # Validate structure and types
+    if not isinstance(result, dict):
+        return {
+            "title": fallback_title or "未命名笔记",
+            "summary": content[:500],
+            "key_points": [],
+            "tags": [],
+        }
+
+    title = result.get("title")
+    if not isinstance(title, str) or not title.strip():
+        title = fallback_title or "未命名笔记"
+    
+    # Truncate title to fit database constraint (500 chars)
+    title = title.strip()[:500]
+
+    summary = result.get("summary", "")
+    if not isinstance(summary, str):
+        summary = str(summary) if summary is not None else ""
+
+    key_points = result.get("key_points", [])
+    if not isinstance(key_points, list):
+        key_points = []
+    else:
+        key_points = [str(kp) for kp in key_points if isinstance(kp, (str, int, float))]
+
+    tags = result.get("tags", [])
+    if not isinstance(tags, list):
+        tags = []
+    else:
+        tags = [str(t) for t in tags if isinstance(t, (str, int, float))][:20]  # Limit tags
+
     return {
-        "title": result.get("title") or fallback_title or "未命名笔记",
-        "summary": result.get("summary", ""),
-        "key_points": result.get("key_points", []),
-        "tags": result.get("tags", []),
+        "title": title,
+        "summary": summary,
+        "key_points": key_points,
+        "tags": tags,
     }

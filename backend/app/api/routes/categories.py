@@ -30,7 +30,7 @@ class CategoryCreate(BaseModel):
 
 class CategoryUpdate(BaseModel):
     name: str | None = None
-    color: str | None = None
+    color: str | None = "#666666"
 
 
 class CategoryReorder(BaseModel):
@@ -86,7 +86,23 @@ def update_category(
     )
     if not db_cat:
         raise HTTPException(status_code=404, detail="Category not found")
+    
     update_data = cat.model_dump(exclude_unset=True)
+    
+    # Check for duplicate name when updating name
+    if "name" in update_data and update_data["name"]:
+        existing = (
+            db.query(Category)
+            .filter(
+                Category.user_id == str(user.id),
+                Category.name == update_data["name"],
+                Category.id != category_id,
+            )
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail="分类名称已存在")
+    
     for key, value in update_data.items():
         setattr(db_cat, key, value)
     db.commit()

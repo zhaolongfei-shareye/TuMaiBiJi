@@ -59,20 +59,21 @@ async def ocr_image(image_data: bytes) -> str:
         f"Signature={signature}"
     )
 
-    resp = await httpx.AsyncClient(timeout=30).post(
-        f"https://{host}",
-        headers={
-            "Authorization": authorization,
-            "Content-Type": "application/json",
-            "Host": host,
-            "X-TC-Action": action,
-            "X-TC-Timestamp": str(timestamp),
-            "X-TC-Version": version,
-        },
-        content=payload_json,
-    )
-    resp.raise_for_status()
-    data = resp.json()
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"https://{host}",
+            headers={
+                "Authorization": authorization,
+                "Content-Type": "application/json",
+                "Host": host,
+                "X-TC-Action": action,
+                "X-TC-Timestamp": str(timestamp),
+                "X-TC-Version": version,
+            },
+            content=payload_json,
+        )
+        resp.raise_for_status()
+        data = resp.json()
 
     if "Error" in data.get("Response", {}):
         err = data["Response"]["Error"]

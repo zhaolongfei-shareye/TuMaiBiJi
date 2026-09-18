@@ -40,6 +40,13 @@ Page({
     }
   },
 
+  onHide() {
+    // Stop recording when page is hidden (e.g., switching tabs)
+    if (this.data.isRecording) {
+      this._stopAndDiscardRecording()
+    }
+  },
+
   onLoad() {
     recorderManager.onStart(() => {
       this.setData({ isRecording: true, recorderTime: 0, recorderTimeText: '00:00' })
@@ -59,7 +66,9 @@ Page({
         this.setData({ showRecorder: false, isRecording: false, recorderTime: 0, recorderTimeText: '00:00' })
         return
       }
-      if (this.data.recorderTime < 1) {
+      // Use actual recording duration from result instead of UI timer
+      const actualDuration = Math.floor(res.duration / 1000) || this.data.recorderTime
+      if (actualDuration < 1) {
         this.setData({ showRecorder: false, isRecording: false })
         wx.showToast({ title: t('voiceTooShort', this.data.lang), icon: 'none' })
         return
@@ -77,6 +86,19 @@ Page({
 
   onUnload() {
     clearInterval(this._recorderTimer)
+    this._recorderTimer = null
+    // Stop recording when page is unloaded
+    if (this.data.isRecording) {
+      this._stopAndDiscardRecording()
+    }
+  },
+
+  _stopAndDiscardRecording() {
+    this._voiceCancelled = true
+    clearInterval(this._recorderTimer)
+    this._recorderTimer = null
+    recorderManager.stop()
+    this.setData({ showRecorder: false, isRecording: false, recorderTime: 0, recorderTimeText: '00:00' })
   },
 
   // URL 导入
@@ -182,8 +204,14 @@ Page({
       this.stopRecording()
       return
     }
+    // Clear any pending start timer first
+    if (this._startTimer) {
+      clearTimeout(this._startTimer)
+      this._startTimer = null
+    }
     this.setData({ showRecorder: true, isRecording: false, recorderTime: 0, recorderTimeText: '00:00' })
-    setTimeout(() => {
+    this._startTimer = setTimeout(() => {
+      this._startTimer = null
       recorderManager.start({
         duration: 60000,
         sampleRate: 16000,
@@ -199,11 +227,12 @@ Page({
   },
 
   cancelRecording() {
-    this._voiceCancelled = true
-    clearInterval(this._recorderTimer)
-    this._recorderTimer = null
-    recorderManager.stop()
-    this.setData({ showRecorder: false, isRecording: false, recorderTime: 0, recorderTimeText: '00:00' })
+    // Clear pending start timer if user cancels quickly
+    if (this._startTimer) {
+      clearTimeout(this._startTimer)
+      this._startTimer = null
+    }
+    this._stopAndDiscardRecording()
   },
 
   async _uploadVoice(filePath) {

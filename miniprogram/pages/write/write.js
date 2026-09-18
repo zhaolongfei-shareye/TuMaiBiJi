@@ -17,6 +17,7 @@ Page({
     categories: [],
     categoryNames: ['不分类'],
     selectedCategoryIndex: -1,
+    originalCategoryId: null, // Store original category ID to avoid clearing on failed load
   },
 
   async onLoad(options) {
@@ -51,14 +52,17 @@ Page({
   async loadNoteForEdit() {
     try {
       const note = await api.getNote(this.data.noteId)
+      const categoryIndex = note.category_id 
+        ? this.data.categories.findIndex(c => c.id === note.category_id)
+        : -1
+      
       this.setData({
         'formData.title': note.title || '',
         'formData.summary': note.summary || '',
         keyPointsText: (note.key_points || []).join('\n'),
         tagsText: (note.tags || []).join(', '),
-        selectedCategoryIndex: note.category_id 
-          ? this.data.categories.findIndex(c => c.id === note.category_id)
-          : -1,
+        selectedCategoryIndex: categoryIndex,
+        originalCategoryId: note.category_id, // Preserve original even if categories fail to load
       })
     } catch (err) {
       console.error('加载笔记失败', err)
@@ -93,7 +97,7 @@ Page({
 
   async onSave() {
     const { title } = this.data.formData
-    const { lang, isEdit, noteId, categories, selectedCategoryIndex } = this.data
+    const { lang, isEdit, noteId, categories, selectedCategoryIndex, originalCategoryId } = this.data
     if (!title.trim()) {
       wx.showToast({ title: t('enterTitle', lang), icon: 'none' })
       return
@@ -102,7 +106,16 @@ Page({
     wx.showLoading({ title: t('saving', lang), mask: true })
 
     try {
-      const categoryId = selectedCategoryIndex >= 0 ? categories[selectedCategoryIndex].id : null
+      // Use original category ID if categories failed to load and user didn't change it
+      let categoryId
+      if (categories.length === 0 && originalCategoryId) {
+        // Categories failed to load, preserve original
+        categoryId = originalCategoryId
+      } else if (selectedCategoryIndex >= 0) {
+        categoryId = categories[selectedCategoryIndex].id
+      } else {
+        categoryId = null
+      }
       
       const keyPoints = this.data.keyPointsText
         .split('\n')
@@ -134,7 +147,12 @@ Page({
       wx.hideLoading()
       wx.showToast({ title: isEdit ? t('updateSucceeded', lang) : t('saveSucceeded', lang), icon: 'success' })
       setTimeout(() => {
-        wx.redirectTo({ url: `/pages/detail/detail?id=${note.id}` })
+        if (isEdit) {
+          // Navigate back to detail page instead of creating duplicate
+          wx.navigateBack()
+        } else {
+          wx.redirectTo({ url: `/pages/detail/detail?id=${note.id}` })
+        }
       }, 800)
     } catch (err) {
       wx.hideLoading()

@@ -33,6 +33,9 @@ BLOCKED_NETWORKS = [
 def _is_private_ip(ip_str: str) -> bool:
     try:
         addr = ipaddress.ip_address(ip_str)
+        # Normalize IPv4-mapped IPv6 addresses
+        if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+            addr = addr.ipv4_mapped
     except ValueError:
         return True
     return any(addr in net for net in BLOCKED_NETWORKS)
@@ -64,19 +67,27 @@ async def scrape_url(url: str) -> dict:
     ) as client:
         current_url = url
         for _ in range(5):
-            resp = await client.get(current_url)
-            if resp.is_redirect:
-                location = resp.headers.get("location", "")
-                if not location:
-                    break
-                next_url = location if location.startswith("http") else str(httpx.URL(current_url).join(location))
-                _validate_url(next_url)
-                current_url = next_url
-                continue
-            resp.raise_for_status()
-            if len(resp.content) > MAX_RESPONSE_SIZE:
-                raise ValueError(f"页面内容超过 {MAX_RESPONSE_SIZE // 1024 // 1024}MB 限制")
-            html = resp.text
+            # Use stream to limit response size before full download
+            total_bytes = 0
+            chunks = []
+            async with client.stream("GET", current_url) as resp:
+                if resp.is_redirect:
+                    location = resp.headers.get("location", "")
+                    if not location:
+                        break
+                    next_url = location if location.startswith("http") else str(httpx.URL(current_url).join(location))
+                    _validate_url(next_url)
+                    current_url = next_url
+                    continue
+                resp.raise_for_status()
+                
+                async for chunk in resp.aiter_bytes(chunk_size=8192):
+                    total_bytes += len(chunk)
+                    if total_bytes > MAX_RESPONSE_SIZE:
+                        raise ValueError(f"页面内容超过 {MAX_RESPONSE_SIZE // 1024 // 1024}MB 限制")
+                    chunks.append(chunk)
+                
+                html = b"".join(chunks).decode(resp.encoding or "utf-8")
             break
         else:
             raise ValueError("重定向次数过多")

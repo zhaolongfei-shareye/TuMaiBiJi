@@ -47,9 +47,9 @@
 
     <view class="form-group">
       <text class="label">{{t.categoryLabel}}</text>
-      <picker mode="selector" range="{{categoryNames}}" value="{{selectedCategoryIndex}}" bindchange="onCategoryChange">
+      <picker mode="selector" range="{{categoryNames}}" value="{{selectedCategoryIndex >= 0 ? selectedCategoryIndex + 1 : 0}}" bindchange="onCategoryChange">
         <view class="picker-value">
-          {{selectedCategoryIndex >= 0 ? categoryNames[selectedCategoryIndex] : t.noCategory}}
+          {{selectedCategoryIndex >= 0 ? categoryNames[selectedCategoryIndex + 1] : t.noCategory}}
         </view>
       </picker>
     </view>

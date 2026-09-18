@@ -38,7 +38,12 @@ Page({
       if (app.globalData.userInfo) {
         app.globalData.userInfo.language = key
       }
-      this.setData({ currentLang: key })
+      // Update both currentLang and lang to refresh UI
+      this.setData({ 
+        currentLang: key,
+        lang: key,
+        t: texts(key),
+      })
       wx.hideLoading()
       wx.showToast({ title: t('switched', lang), icon: 'success' })
     } catch (err) {
