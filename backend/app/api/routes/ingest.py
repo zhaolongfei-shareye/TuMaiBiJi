@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.user import User
 from app.core.auth import get_current_user
-from app.core.rate_limit import user_limiter
+from app.core.rate_limit import limiter
 from app.services.queue import get_queue, set_task_status
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ _batch_staging: dict[str, dict] = {}
 
 
 @router.post("/url")
-@user_limiter.limit("10/minute")
+@limiter.limit("10/minute")
 async def ingest_url(
     request: Request,
     url: str = Form(...),
@@ -56,7 +56,7 @@ def _sweep_stale_batches():
 
 
 @router.post("/screenshots/stage")
-@user_limiter.limit("20/minute")
+@limiter.limit("20/minute")
 async def stage_screenshot(
     request: Request,
     images: UploadFile = File(...),
@@ -106,7 +106,7 @@ async def stage_screenshot(
 
 
 @router.post("/screenshots/process")
-@user_limiter.limit("5/minute")
+@limiter.limit("5/minute")
 async def process_screenshots(
     request: Request,
     batch_id: str = Form(...),
@@ -135,7 +135,7 @@ async def process_screenshots(
 
 
 @router.post("/voice")
-@user_limiter.limit("10/minute")
+@limiter.limit("10/minute")
 async def ingest_voice(
     request: Request,
     audio: UploadFile = File(...),

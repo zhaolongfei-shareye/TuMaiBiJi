@@ -5,12 +5,6 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
 
-limiter = Limiter(
-    key_func=get_remote_address,
-    storage_uri=settings.REDIS_URL,
-    strategy="fixed-window",
-)
-
 
 def get_user_key(request):
     auth_header = request.headers.get("authorization", "")
@@ -30,7 +24,7 @@ def get_user_key(request):
     return f"ip:{get_remote_address(request)}"
 
 
-user_limiter = Limiter(
+limiter = Limiter(
     key_func=get_user_key,
     storage_uri=settings.REDIS_URL,
     strategy="fixed-window",
