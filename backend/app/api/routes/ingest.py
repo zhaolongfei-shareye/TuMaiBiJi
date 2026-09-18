@@ -58,6 +58,7 @@ def _sweep_stale_batches():
 @router.post("/screenshots/stage")
 @user_limiter.limit("20/minute")
 async def stage_screenshot(
+    request: Request,
     images: UploadFile = File(...),
     batch_id: str | None = Form(None),
     user: User = Depends(get_current_user),
