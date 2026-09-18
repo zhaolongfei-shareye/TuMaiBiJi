@@ -111,8 +111,9 @@ def _parse_response(content: str, fallback_title: str) -> dict:
     try:
         result = json.loads(content)
     except json.JSONDecodeError:
+        title = (fallback_title or "未命名笔记").strip()[:500]
         return {
-            "title": fallback_title or "未命名笔记",
+            "title": title,
             "summary": content[:500],
             "key_points": [],
             "tags": [],
@@ -120,8 +121,9 @@ def _parse_response(content: str, fallback_title: str) -> dict:
 
     # Validate structure and types
     if not isinstance(result, dict):
+        title = (fallback_title or "未命名笔记").strip()[:500]
         return {
-            "title": fallback_title or "未命名笔记",
+            "title": title,
             "summary": content[:500],
             "key_points": [],
             "tags": [],
