@@ -79,7 +79,7 @@ async def scrape_url(url: str) -> dict:
                 if resp.is_redirect:
                     location = resp.headers.get("location", "")
                     if not location:
-                        break
+                        raise ValueError("重定向响应缺少 Location 头")
                     next_url = location if location.startswith("http") else str(httpx.URL(current_url).join(location))
                     _validate_url(next_url)
                     current_url = next_url
