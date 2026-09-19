@@ -15,5 +15,8 @@ Pillow==10.4.0
 qrcode[pil]==7.4.2
 PyJWT==2.9.0
 slowapi==0.1.9
-cos-python-sdk-v5==1.9.32
+# 自建 OCR：纯 CPU 推理，模型随包分发，无需任何密钥
+# rapidocr 依赖的是 GUI 版 opencv-python，无桌面 Ubuntu 上 import cv2 会缺 libGL.so.1（deploy.sh 自检会报）
+rapidocr==3.9.2
+onnxruntime==1.30.0
 psycopg2-binary==2.9.10

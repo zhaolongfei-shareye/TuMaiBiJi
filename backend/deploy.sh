@@ -140,15 +140,12 @@ REQUIRED = {
     "WECHAT_APP_SECRET": "微信登录（小程序进不去）",
 }
 # 缺失即【该条链路不可用】，但不影响其它功能
-FEATURE = {
-    "TENCENT_OCR_SECRET_ID": "截图转笔记",
-    "TENCENT_OCR_SECRET_KEY": "截图转笔记",
-}
+FEATURE = {}
 # 缺失只是【降级】：采集照常入库，少掉自动提炼
 DEGRADABLE = {
     "DEEPSEEK_API_KEY": "自动提炼摘要/要点/标签（缺失则只存原文，任务不再失败）",
 }
-# COS_* 四个字段刻意不检查：前端零调用，属死代码，不作为部署判定依据。
+# 截图 OCR 已无凭据依赖（自建 RapidOCR），改由下面的运行期自检覆盖。
 
 
 def unusable(name):
@@ -158,7 +155,6 @@ def unusable(name):
 
 print(f"  数据库类型: {s.DATABASE_URL.split('://')[0]}")
 missing = sorted(f"{v}  ← {k}" for k, v in REQUIRED.items() if unusable(k))
-feat_missing = sorted(set(v for k, v in FEATURE.items() if unusable(k)))
 deg_missing = sorted(f"{v}  ← {k}" for k, v in DEGRADABLE.items() if unusable(k))
 
 if missing:
@@ -169,13 +165,51 @@ if missing:
 else:
     print("  ✓ 必需配置齐全（注意：这只是配置层面，接口是否真通仍需端到端验证）")
 
-if feat_missing:
-    print(f"  · 缺失凭据导致不可用的功能: {', '.join(feat_missing)}")
 if deg_missing:
     print("  · 可降级项未配置（服务照常，功能降级）：")
     for d in deg_missing:
         print(f"     - {d}")
 PY
+
+# ---- 8. OCR 运行期自检：依赖装没装对，只有真跑一张才知道 ----
+echo ""
+echo ">>> 自建 OCR 自检..."
+python <<'PY'
+import asyncio
+import io
+import resource
+import sys
+import time
+
+try:
+    import cv2  # noqa: F401  GUI 版 opencv 在无桌面 Ubuntu 上会在此抛 OSError: libGL.so.1
+except Exception as exc:
+    print(f"  !! import cv2 失败：{exc}")
+    print("     修复：sudo apt install -y libgl1（或把 opencv-python 换成 opencv-python-headless）")
+    sys.exit(1)
+
+from PIL import Image, ImageDraw
+
+from app.services.ocr import ocr_image
+
+img = Image.new("RGB", (760, 140), "white")
+ImageDraw.Draw(img).text((16, 50), "TUMAIJI SELFTEST OCR 123", fill="black")
+buf = io.BytesIO()
+img.save(buf, format="PNG")
+
+t = time.perf_counter()
+text = asyncio.run(ocr_image(buf.getvalue()))
+dt = time.perf_counter() - t
+peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 if sys.platform != "darwin" else 1048576)
+print(f"  识别耗时 {dt:.2f}s  峰值 RSS {peak:.1f} MB  文本={text!r}")
+assert "OCR" in text and "123" in text, "自检图像未识别出预期文字"
+PY
+if [[ $? -eq 0 ]]; then
+    echo "  ✓ OCR 链路可用（含首次模型加载；常驻进程复用同一引擎，后续单张更快）"
+else
+    echo "  ✗ OCR 自检失败：截图转笔记在生产环境【不可用】"
+    RC=1
+fi
 
 echo ""
 if [[ "$RC" -eq 0 ]]; then

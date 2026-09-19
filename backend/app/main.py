@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, assets
+from app.api.routes import notes, ingest, auth, categories, shares, user, tasks
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
 
@@ -30,7 +30,6 @@ app.include_router(shares.router, prefix="/api/shares", tags=["shares"])
 app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"])
 app.include_router(user.router, prefix="/api/user", tags=["user"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
-app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 
 @app.get("/")
 async def root():

@@ -41,7 +41,10 @@ async def ingest_url(
 
 
 BATCH_TTL_SECONDS = 1800
-MAX_IMAGES_PER_BATCH = 20
+# 前端单次最多选 9 张，这里留 1 张余量；批次总字节管的是进 Redis job 的那份内存（R6）
+MAX_IMAGES_PER_BATCH = 10
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_BATCH_BYTES = 40 * 1024 * 1024
 
 
 def _sweep_stale_batches():
@@ -59,7 +62,6 @@ async def stage_screenshot(
     batch_id: str | None = Form(None),
     user: User = Depends(get_current_user),
 ):
-    MAX_SIZE = 10 * 1024 * 1024  # 10MB
     chunks: list[bytes] = []
     total = 0
     while True:
@@ -68,8 +70,10 @@ async def stage_screenshot(
             break
         chunks.append(chunk)
         total += len(chunk)
-        if total > MAX_SIZE:
-            raise HTTPException(status_code=400, detail="图片超过 10MB 限制")
+        if total > MAX_IMAGE_BYTES:
+            raise HTTPException(
+                status_code=400, detail=f"图片超过 {MAX_IMAGE_BYTES // 1048576}MB 限制"
+            )
     data = b"".join(chunks)
 
     _sweep_stale_batches()
@@ -84,6 +88,7 @@ async def stage_screenshot(
         batch_id = uuid.uuid4().hex
         batch = {
             "data": [],
+            "bytes": 0,
             "user_id": str(user.id),
             "created_at": time.time(),
         }
@@ -91,8 +96,14 @@ async def stage_screenshot(
 
     if len(batch["data"]) >= MAX_IMAGES_PER_BATCH:
         raise HTTPException(status_code=400, detail=f"每批次最多 {MAX_IMAGES_PER_BATCH} 张图片")
+    if batch["bytes"] + len(data) > MAX_BATCH_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"批次总大小超过 {MAX_BATCH_BYTES // 1048576}MB，请分多次提交",
+        )
 
     batch["data"].append(data)
+    batch["bytes"] += len(data)
 
     return {"batch_id": batch_id, "count": len(batch["data"])}
 

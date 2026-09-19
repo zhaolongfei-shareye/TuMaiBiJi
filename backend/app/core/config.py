@@ -4,12 +4,6 @@ from pydantic import model_validator
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./tmbj.db"
     DEEPSEEK_API_KEY: str = ""
-    TENCENT_OCR_SECRET_ID: str = ""
-    TENCENT_OCR_SECRET_KEY: str = ""
-    COS_SECRET_ID: str = ""
-    COS_SECRET_KEY: str = ""
-    COS_REGION: str = ""
-    COS_BUCKET: str = ""
     WECHAT_APP_ID: str = ""
     WECHAT_APP_SECRET: str = ""
     REDIS_URL: str = "redis://localhost:6379"
@@ -27,7 +21,7 @@ class Settings(BaseSettings):
             )
         return self
 
-    # extra 默认为 forbid：.env 里残留已删除的字段（如 TENCENT_ASR_*）会让服务启动即崩溃
+    # extra 默认为 forbid：.env 里残留已删除的字段（如 TENCENT_ASR_*、COS_*、TENCENT_OCR_*）会让服务启动即崩溃
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

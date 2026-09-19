@@ -20,10 +20,13 @@
 - ✅ 分类管理、手写笔记、分享图 + 小程序码、壁纸主题、多语言
 - ✅ 零第三方凭据下 18 项接口通过（+1 项为探测脚本假阳性，已 curl 复测）
 
-**架构已定案、代码尚未改**（v2.2，2026-09-19 深夜）：
-- 🔧 **截图认字**：从腾讯云 OCR 换成**自建开源 RapidOCR**（跑在我们服务器进程里）。**不申请任何密钥、不限次数、不按次付费**。选型已本机实测通过（中文可用、单张最慢 5.71s、常驻约 160MB），**代码仍是腾讯云实现**
-- 🔧 **结构化提炼**：从 DeepSeek 换成**云函数内的混元**（吃已领取的 10 亿 Token）。**代码一行未写**；改造完成前提炼停在"降级存原文"态——内容照常入库，只是没有摘要/要点/标签，UI 已隐藏对应区块不破版
-- ✂️ **待删除**：`TENCENT_OCR_*`×2、`DEEPSEEK_API_KEY`、`COS_*`×4 共 7 个配置字段，以及 `storage.py` + `routes/assets.py` + `cos-python-sdk-v5`
+**代码已改完、尚未部署**（v2.2 第 2 步，2026-09-19 本轮；**全部只到本地，线上仍是旧版**）：
+- ✅ **截图认字已换成自建开源 RapidOCR**：`services/ocr.py` 从腾讯云 TC3 签名整体重写为进程内调用，**对外两个函数签名一字未改**，worker 与既有测试零改动。落实了 4 条实测要求：识别前缩放长边 ≤1600、单张串行（线程锁）、按检测框坐标重排为视觉顺序、过滤噪声行。**本机同图对照：峰值 RSS 1,076.6MB → 666.6MB，识别字符数 294 → 301**（不是拿推理凑的）。新增 13 条测试，与原有 19 条合并 **32 passed**
+- ✂️ **COS 已整块删除**：`storage.py` + `routes/assets.py` + `main.py` 两处接线 + `config.py` 的 `COS_*`×4 + `TENCENT_OCR_*`×2 + `requirements.txt` 的 `cos-python-sdk-v5`。**`assets` 表和 `cover_asset_id` 外键故意留着**（线上库删表要迁移，收益为零，且无运行时代码碰它）
+- ⚠️ **`DEEPSEEK_API_KEY` 本轮刻意没删**：`services/llm.py` 仍在读它，删字段会让代码引用不存在的配置项。它随第 3 步（提炼接混元）一起删——**"凭据收口一次性做完"因此被拆成两次**，这是执行偏差，别当成计划本来如此
+- 🔧 **结构化提炼仍未动**：目标是从 DeepSeek 换成**云函数内的混元**（吃已领取的 10 亿 Token），**代码一行未写**；改造完成前提炼停在"降级存原文"态——内容照常入库，只是没有摘要/要点/标签，UI 已隐藏对应区块不破版
+
+> **本轮明确不部署。** 因此上面每一条的"验"都只到本机：**服务器端 `import cv2` 是否报缺 `libGL.so.1`（R13）、缩放后的真实峰值 RSS、真机"截图 → 认字 → 入库 → 列表可见"三件全部未发生**。`deploy.sh` 已新增第 8 节 OCR 运行期自检（真跑一张合成图、打印耗时与峰值 RSS），部署当天顺手就有数——但注意 `deploy.sh` 里**没有 `pip install` 步骤**，新依赖要先在服务器 venv 里手动装。
 
 **已决策下线**：语音转写链路 2026-09-19 **整体删除**（前端录音 UI、后端 route/worker task、`asr.py`、两个配置字段、i18n key、`permission.scope.record` 全清）。因此《隐私保护指引》不再需要申报麦克风权限。
 
@@ -35,9 +38,9 @@
 - **框架**: FastAPI (Python 3.10+)
 - **数据库**: SQLite（当前实况，PostgreSQL 尚未迁移）→ 阶段二再评估 pgvector
 - **任务队列**: Redis + RQ（异步 ingest）
-- **OCR**: **目标 = 自建开源 RapidOCR**（`rapidocr` + `onnxruntime`，纯 CPU，模型随 wheel 装约 30MB，进程内调用、零外部请求）。**现状代码仍是腾讯云 OCR**，属 v2.2 待改造项
-- **LLM**: **目标 = 云函数内的混元**（`wx-server-sdk ≥ 4.0.1` 的 `cloud.ai()`，吃成长计划免费额度）。**现状代码仍是 DeepSeek，v2.2 删除**。**提炼只有两级：混元 → 降级存原文**（缺凭据 / 超时 / 429 / 返回非 JSON 都走降级，不阻断入库）。**只维护一家大模型**是本项目的定案
-- **文件存储**: 腾讯云 COS 已封装但**前端零调用** → v2.2 定案整块删除（含 4 个配置字段与依赖）
+- **OCR**: **自建开源 RapidOCR**（`rapidocr==3.9.2` + `onnxruntime==1.30.0`，纯 CPU，模型随 wheel 装约 30MB，进程内调用、零外部请求、无任何密钥）。**代码已落地**（本机测试通过，服务器未部署）。两个坑已写进注释：① 引擎把传入的 `ndarray` 当 **BGR**，所以我们喂 `PIL.Image` 让它自己做 RGB→BGR；② `RapidOCR.__call__` 会改自身状态，**非线程安全**，必须串行
+- **LLM**: **目标 = 云函数内的混元**（`wx-server-sdk ≥ 4.0.1` 的 `cloud.ai()`，吃成长计划免费额度）。**现状代码仍是 DeepSeek，第 3 步删除**。**提炼只有两级：混元 → 降级存原文**（缺凭据 / 超时 / 429 / 返回非 JSON 都走降级，不阻断入库）。**只维护一家大模型**是本项目的定案
+- **文件存储**: ~~腾讯云 COS~~ → **本轮已整块删除**（路由、service、4 个配置字段、依赖）。数据库里的 `assets` 表保留，未来若做"笔记内嵌图片"是**重新设计**而不是捡起现成的
 - **网页抓取**: httpx + BeautifulSoup + trafilatura（含 SSRF 防护）
 - **鉴权**: PyJWT（HS256）+ slowapi 限流
 - **部署**: systemd 托管（`wtsj-api` / `wtsj-worker`）+ nginx 反代
@@ -56,21 +59,22 @@ TuMaiBiJi/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py              # FastAPI 入口 + 路由挂载
-│   │   ├── api/routes/          # auth notes categories ingest shares tasks user assets
+│   │   ├── api/routes/          # auth notes categories ingest shares tasks user（assets 路由已删）
 │   │   ├── services/
 │   │   │   ├── scraper.py       # 公众号/网页抓取（含 SSRF 防护）
-│   │   │   ├── ocr.py           # 现状：腾讯云 OCR（TC3 签名）→ v2.2 换自建 RapidOCR，函数签名不变
-│   │   │   ├── llm.py           # 现状：DeepSeek 提炼 → v2.2 改调云函数混元（_degraded/key_usable 保留）
+│   │   │   ├── ocr.py           # ✅ 自建 RapidOCR：缩放≤1600 / 串行锁 / 按框重排 / 降噪，对外签名与腾讯云版一致
+│   │   │   ├── llm.py           # 现状 DeepSeek 提炼 → 第 3 步改调云函数混元（_degraded/key_usable 保留）
 │   │   │   ├── wechat.py        # access_token 缓存 + 小程序码
-│   │   │   ├── storage.py       # 腾讯云 COS（前端零调用，v2.2 整块删除）
-│   │   │   └── queue.py         # RQ 入队 + 任务状态
-│   │   ├── tasks/ingest_tasks.py  # worker 侧两条链路（URL / 截图）
+│   │   │   └── queue.py         # RQ 入队 + 任务状态（storage.py 已随 COS 一起删除）
+│   │   ├── tasks/ingest_tasks.py  # worker 侧两条链路（URL / 截图）—— 本轮零改动，靠 ocr.py 签名不变
 │   │   ├── core/                # config / auth(JWT) / rate_limit
-│   │   ├── models/              # user note category share job asset
+│   │   ├── models/              # user note category share job asset（留着，但已无路由读写它）
 │   │   └── db/database.py
+│   ├── probes/ocr_probe.py      # OCR 性能探针（PRD §6.1-C 的数据来源，macOS/Linux 的 RSS 单位已自动换算）
 │   ├── tests/test_note_flows.py # 闭环 + 搜索覆盖 + 跨用户隔离（19 项）
+│   ├── tests/test_ocr_flows.py  # 自建 OCR 的 13 项：缩放 / 排序 / 降噪 / 串行 / 批次上限 / 失败态
 │   ├── worker.py                # RQ worker 入口
-│   ├── deploy.sh                # systemd 托管 + 真实重启断言 + 配置自检
+│   ├── deploy.sh                # systemd 托管 + 真实重启断言 + 配置自检 + 第 8 节 OCR 运行期自检（打印耗时/峰值 RSS）
 │   ├── upload.sh                # 打包上传（排除 .env / *.key / AppleDouble）
 │   ├── requirements.txt
 │   └── .env.example
@@ -92,13 +96,18 @@ TuMaiBiJi/
 cd backend
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt      # v2.2 后含 rapidocr + onnxruntime（模型随 wheel 装，运行时不联网下载）
+pip install -r requirements.txt      # 已含 rapidocr + onnxruntime（模型随 wheel 装约 30MB，运行时不联网下载）
 cp .env.example .env
-# v2.2 起 .env 只需要 3 个值：WECHAT_APP_ID / WECHAT_APP_SECRET / JWT_SECRET_KEY
+# 必需只有 3 个值：WECHAT_APP_ID / WECHAT_APP_SECRET / JWT_SECRET_KEY
 # （JWT_SECRET_KEY 缺失或仍为公开占位符 → 服务启动即失败；云函数上线后再加 1 个触发凭据）
+# DEEPSEEK_API_KEY 是第 3 步前的遗留项，留空即可，不影响启动
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+> **装完依赖先单跑一次 `python -c "import cv2"` 再启动服务。** `rapidocr` 硬依赖 **GUI 版 `opencv_python`**，无桌面的 Ubuntu 上可能因缺 `libGL.so.1` 直接失败——本机 macOS 永远测不出这一条。真报错了二选一：`apt install libgl1`，或把依赖换成 `opencv-python-headless`（**别两个都装**：两个 wheel 都往 `cv2/` 目录写，会静默互相覆盖）。`deploy.sh` 第 8 节已经把这段检查做成了自动的。
+
+跑测试：`pytest -q`（32 项 = 原有闭环 19 + 自建 OCR 13；OCR 相关用例不需要 Redis、不需要网络、不需要任何密钥）
 
 访问 http://localhost:8000/docs 查看 API 文档
 
@@ -112,9 +121,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 实测于 2026-09-19 深夜（旧版此段列的"搜索纳入正文 / 提炼降级 / 分享卡布局"**均已完成**，别再照那份清单干活；"腾讯云 OCR 凭据"这一条随 v2.2 换库**已作废**）：
 
-- [ ] **自建 OCR 换库** — `services/ocr.py` 仍是腾讯云实现。选型已本机实测通过，改造要落实 4 条：识别前缩放到长边 ≤1600、单张串行、按检测框坐标重排、过滤噪声单字行。**一张 3420×2214px 的图未缩放单独跑，进程峰值 RSS 实测 1,064MB vs 服务器可用 1,992MB，缩放是硬性前置而非优化项**
-  - ⚠️ 部署第一个坑（本机 macOS 测不出）：`rapidocr` 硬依赖 **GUI 版 `opencv_python`**，无桌面的 Ubuntu 服务器上 `import cv2` 可能因缺 `libGL.so.1` 失败。上服务器先单跑一次 `python -c "import cv2"`，再决定 `apt install libgl1` 还是换 `opencv-python-headless`
-- [ ] **凭据收口** — `config.py` 删 7 个字段（`TENCENT_OCR_*`×2、`DEEPSEEK_API_KEY`、`COS_*`×4）+ 新增 `EXTRACT_PROVIDER` 和云函数触发凭据 + `.env.example` 同步 + `requirements.txt` 换依赖 + 删 `storage.py`/`routes/assets.py` + 重写 `deploy.sh` 自检映射（含"该 provider 未实现，走降级"这一提示分支）
+- [x] ~~**自建 OCR 换库**~~ → **本轮已完成（代码 + 本机测试），未部署**。`services/ocr.py` 已整体换成进程内 RapidOCR，4 条要求全部落地并有测试锁死（缩放≤1600 / 串行 / 按框重排 / 降噪）。同图对照：峰值 RSS 1,076.6MB → 666.6MB，字数 294 → 301
+  - ⚠️ **剩下的唯一风险在服务器**：`rapidocr` 拉的是 GUI 版 `opencv_python`，无桌面的 Ubuntu 上 `import cv2` 可能缺 `libGL.so.1`（本机 macOS 测不出）；且**缩放后的峰值 RSS 必须在服务器上重测**，本机绝对值不可用作判定（详见 PRD §6.1-C 的两条"别误读"）
+- [x] ~~**凭据收口**~~ → **做了一半，剩 DeepSeek 一项**：已删 `TENCENT_OCR_*`×2 + `COS_*`×4 共 6 个字段、`storage.py`/`routes/assets.py`、`cos-python-sdk-v5`，`.env.example` 与 `deploy.sh` 自检映射同步重写并加了 OCR 运行期自检。**未做**：`DEEPSEEK_API_KEY` 删除 + 新增 `EXTRACT_PROVIDER`/云函数触发凭据——这两件属"提炼"链路，随下一条一起做（`llm.py` 现在还在读那个字段，先删会让代码引用不存在的配置项）
 - [ ] **云函数中转混元** — 一行代码都还没写。动手前先做一次最小实测（echo 函数 + 单次混元调用），确认三件事：真实超时上限（官方文档 60s/900s/15s 互相矛盾）、本环境是否开放 HTTP 网关、控制台实际开的是哪个模型名。**最硬的一条不变：混元调用必须发生在云函数内部**，服务器直连 AI 兼容端点会导致免费额度不抵扣、改扣套餐
   - **同时按"供应商可插拔"写**（PRD F6 四条）：4 字段 JSON 契约冻结、`extract_knowledge` 保持唯一入口（调用点只有 2 个，不许加第三个）、`_call_llm` 下抽 `EXTRACT_PROVIDER`（`hunyuan_cf` / `none` / 微信 AI 预留位）、云函数只做"文本进 → JSON 出"的哑管道。这样将来微信自家 AI 开放正式调用时换的是适配器，不是重构
 - [ ] 笔记列表下拉刷新（全项目无 `onPullDownRefresh`）
@@ -133,15 +142,16 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## 关键决策记录
 
-- **大模型只维护一家 = 混元**。DeepSeek 删除（服务器该 key 从来是空的，删它不损失任何现有能力）。提炼失败不再换模型，而是**降级存原文**
-- **OCR = 自建开源 RapidOCR**。~~"唯一可行路径是腾讯云 OCR"~~ 那句话只否证了**微信自带 OCR 接口**（个人主体过不了微信认证，实测 101003），从未评估自建路线；混元的视觉模型也已于 2026-06-22 下线，**已领的 token 做不了 OCR**，所以认字只能自己跑库
+- **大模型只维护一家 = 混元**。DeepSeek 删除（服务器该 key 从来是空的，删它不损失任何现有能力；**字段暂留到第 3 步**，因为 `llm.py` 还在读）。提炼失败不再换模型，而是**降级存原文**
+- **OCR = 自建开源 RapidOCR**（**本轮代码已落地，未部署**）。~~"唯一可行路径是腾讯云 OCR"~~ 那句话只否证了**微信自带 OCR 接口**（个人主体过不了微信认证，实测 101003），从未评估自建路线；混元的视觉模型也已于 2026-06-22 下线，**已领的 token 做不了 OCR**，所以认字只能自己跑库
 - **对外依赖只留两扇门**：服务器进程内的一个 OCR 库 + 云函数里的混元。任何"再接一家云产品 / 再造一个按次付费依赖"的提议，都要先解释为什么这两扇门不够
-- **内存方案 = 缩放（长边 ≤1600）+ 单张串行**为主，收紧批次只是顺带。实测证明峰值由**单张图像素**决定（B 图单独跑就 1,064MB），不是批次累积——落盘或减小批次都降不了 OCR 那份峰值，它们治的是 Redis/磁盘另一池
+- **内存方案 = 缩放（长边 ≤1600）+ 单张串行**为主，收紧批次只是顺带。实测证明峰值由**单张图像素**决定（B 图单独跑就 1,064MB），不是批次累积——落盘或减小批次都降不了 OCR 那份峰值，它们治的是 Redis/磁盘另一池。**本轮已把缩放这条从推理变成对照实测**：同一张 3420×2214 图，不缩放 4.32s / 1,076.6MB → ≤1600 3.32s / 666.6MB → ≤1280 2.63s / 528.5MB，**1600 是拐点**（再压就开始掉字，所以没继续往下）。批次上限也已定值：10 张 / 单张 10MB / 合计 40MB / TTL 1800s
 - **提炼供应商可插拔（v2.2 追加）**：契约冻结在 4 字段 JSON、`extract_knowledge` 唯一入口、`EXTRACT_PROVIDER` 分层、云函数只做哑管道。**当前默认混元（云函数内），并为微信自家 AI 预留枚举位但不写一行调用代码**。理由：小程序生态的 AI 能力过了测试期后大概率可正式调用，届时同平台产品是最优选，预留能把二次开发从"重做提炼"降到"换一个适配器文件"
 - **数据库**: SQLite（当前实况；旧版记录的"已迁移 PostgreSQL"**未生效**，MVP 阶段判定为不必迁）
 - **语音**: **整体下线**。旧版记录的"腾讯云 ASR `SentenceRecognition`（60 秒上限）"已作废，代码已删除
 - **海外站点**: **明确不支持**。服务器出海超时（`en.wikipedia.org` ConnectTimeout），抓取失败给可读文案
-- **文件存储**: COS 前端零调用 → 整块删除（含配置面与依赖）
+- **文件存储**: ~~COS 前端零调用 → 整块删除（含配置面与依赖）~~ → **本轮已删完**。只留数据库的 `assets` 表与外键（删表要迁移、零收益，且已无运行时代码读写它）
+- **不给 OCR 加 `opencv-python-headless`（本轮取舍）**：`rapidocr` 声明的是 GUI 版 `opencv_python`，两个 wheel 都往 `cv2/` 目录装，同时列进 `requirements.txt` 会静默互相覆盖、pip 不报错。所以依赖保持原样，改为**在 `deploy.sh` 第 8 节真跑一次 `import cv2`**——把不确定性从"读代码时猜"挪到"部署时当场报错并打印修复命令"
 - **提炼的作用面**: 只有"提炼"这一个动作碰大模型，全项目仅 **2 个调用点**（`ingest_tasks.py:25` URL、`:65` 截图），且都在采集完成之后。**没有任何自动归类、语义搜索、问答功能依赖大模型**
 - **视频号解析**: 元宝 cookie 法（非官方接口，个人自用可接受）；匿名抓取实测只能拿到空壳，故整体延后
 - **命名统一止于仓库与代码**：目录、GitHub 仓库、脚本临时产物、i18n key 全部改 `TuMaiBiJi`；**但服务器目录 `/home/ubuntu/wtsj-backend`、systemd unit `wtsj-api`/`wtsj-worker`、`apiBase` 里的 `/wtsj` 路径不改**。理由：URL 路径已编译进**已过审的客户端**，改它等于线上立刻 404、只能再提一版；unit 名是跑着线上流量的服务的身份。收益只是好看，风险是打断线上，所以只跟有功能变更的那轮提审一起做
@@ -152,8 +162,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 见 [`docs/产品需求.md` §8.2 上线阶梯](docs/产品需求.md)（v2.2 重排）。摘要：
 
-1. **自建 OCR 换库 + 凭据收口** — 0 个新 key，全在 agent 能力内；改完要在**服务器上**重测缩放后的峰值 RSS（本机数值不能照抄）
-2. **云函数最小验证** — echo 函数 + 单次混元调用，确认超时 / 网关 / 扣的是哪份额度。**部署方式需用户点头**（控制台上传 zip，或 `tcb login` 扫码）
+1. ~~**自建 OCR 换库 + 凭据收口**~~ → **本轮已做完代码侧（32 项测试全绿），未部署**。剩余的是**服务器侧三件事**：装新依赖前单跑 `import cv2`、部署当天读缩放后的峰值 RSS、真机走一遍"截图 → 认字 → 入库 → 列表可见"
+2. **云函数最小验证 + 收口 DeepSeek** — echo 函数 + 单次混元调用，确认超时 / 网关 / 扣的是哪份额度。**部署方式需用户点头**（控制台上传 zip，或 `tcb login` 扫码）
 3. 验证通过才把提炼接到混元；**不通过什么都不用回滚** —— 提炼停在降级态，产品照常可用，不再存在"没有第二家模型就上不了线"这回事
 4. **提审前用户侧三件事**：request 合法域名加 `https://api.agentsbin.cn`（这是唯一还卡着发布的一项）、《隐私保护指引》只需相册、确认最新版本号与提交范围
 
