@@ -28,6 +28,7 @@ COPYFILE_DISABLE=1 tar czf /tmp/wtsj-backend.tar.gz \
     --exclude='._*' \
     --exclude='keys' \
     --exclude='.env' \
+    --exclude='.env.bak*' \
     -C backend .
 
 echo "✓ 打包完成: /tmp/wtsj-backend.tar.gz ($(du -h /tmp/wtsj-backend.tar.gz | cut -f1))"
