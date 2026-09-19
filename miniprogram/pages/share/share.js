@@ -82,67 +82,89 @@ Page({
         const cardY = 60
         const cardW = width - 80
         const cardH = height - 160
-        ctx.fillStyle = '#ffffff'
-        ctx.roundRect(cardX, cardY, cardW, cardH, 24)
-        ctx.fill()
+        const contentX = cardX + 40
+        const contentW = cardW - 80
+        const qrTop = cardY + cardH - 180
+        const contentBottom = qrTop - 36
 
-        // Shadow effect
         ctx.shadowColor = 'rgba(0, 0, 0, 0.08)'
         ctx.shadowBlur = 20
         ctx.shadowOffsetY = 4
+        ctx.fillStyle = '#ffffff'
+        ctx.roundRect(cardX, cardY, cardW, cardH, 24)
+        ctx.fill()
+        ctx.shadowColor = 'transparent'
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetY = 0
 
-        // Title
+        // 内容驱动布局：y 随每块实际行数推进，装不下的块整块跳过
+        let y = cardY + 76
+
+        // Title，最多两行
         ctx.fillStyle = '#333333'
         ctx.font = 'bold 40px sans-serif'
-        const title = this.truncateText(note.title, 30, ctx)
-        ctx.fillText(title, cardX + 40, cardY + 80)
+        const allTitleLines = this.wrapText(note.title || '', contentW, ctx)
+        const titleLines = allTitleLines.slice(0, 2)
+        if (allTitleLines.length > 2) {
+          titleLines[1] = this.ellipsize(titleLines[1], contentW, ctx)
+        }
+        for (const line of titleLines) {
+          ctx.fillText(line, contentX, y)
+          y += 52
+        }
 
         // Source badge
-        const sourceType = this.getSourceLabel(note.source_type)
         ctx.font = '24px sans-serif'
         ctx.fillStyle = '#07c160'
-        ctx.fillText(sourceType, cardX + 40, cardY + 130)
+        y += 6
+        ctx.fillText(this.getSourceLabel(note.source_type), contentX, y)
+        y += 46
 
-        // Summary
+        // Summary，最多四行
         if (note.summary) {
           ctx.fillStyle = '#666666'
           ctx.font = '28px sans-serif'
-          const summaryLines = this.wrapText(note.summary, 620, ctx)
-          let y = cardY + 180
-          for (let i = 0; i < Math.min(summaryLines.length, 4); i++) {
-            ctx.fillText(summaryLines[i], cardX + 40, y)
+          const lines = this.wrapText(note.summary, contentW, ctx)
+          const shown = lines.slice(0, 4)
+          if (lines.length > 4) {
+            shown[3] = this.ellipsize(shown[3], contentW, ctx)
+          }
+          for (const line of shown) {
+            if (y > contentBottom) break
+            ctx.fillText(line, contentX, y)
             y += 40
           }
+          y += 16
         }
 
-        // Key points
-        if (note.key_points && note.key_points.length > 0) {
+        // Key points，最多五条
+        const points = (note.key_points || []).slice(0, 5)
+        if (points.length && y + 44 + points.length * 40 <= contentBottom) {
           ctx.fillStyle = '#333333'
           ctx.font = 'bold 28px sans-serif'
-          ctx.fillText(t('keyPoints', this.data.lang), cardX + 40, cardY + 380)
-          
+          ctx.fillText(t('keyPoints', this.data.lang), contentX, y)
+          y += 44
           ctx.font = '26px sans-serif'
           ctx.fillStyle = '#555555'
-          let py = cardY + 420
-          for (let i = 0; i < Math.min(note.key_points.length, 5); i++) {
-            const point = `${i + 1}. ${this.truncateText(note.key_points[i], 35, ctx)}`
-            ctx.fillText(point, cardX + 40, py)
-            py += 36
-          }
+          points.forEach((point, i) => {
+            ctx.fillText(this.ellipsize(`${i + 1}. ${point}`, contentW, ctx), contentX, y)
+            y += 40
+          })
+          y += 16
         }
 
-        // Tags
-        if (note.tags && note.tags.length > 0) {
-          let tx = cardX + 40
-          const ty = cardY + 620
+        // Tags，单行，放不下就少画几个
+        if (note.tags && note.tags.length && y + 40 <= contentBottom) {
           ctx.font = '22px sans-serif'
+          let tx = contentX
           for (const tag of note.tags.slice(0, 5)) {
             const tw = ctx.measureText(tag).width + 32
+            if (tx + tw > contentX + contentW) break
             ctx.fillStyle = 'rgba(7, 193, 96, 0.1)'
-            ctx.roundRect(tx, ty - 20, tw, 36, 8)
+            ctx.roundRect(tx, y - 24, tw, 36, 8)
             ctx.fill()
             ctx.fillStyle = '#07c160'
-            ctx.fillText(tag, tx + 16, ty)
+            ctx.fillText(tag, tx + 16, y)
             tx += tw + 12
           }
         }
@@ -184,10 +206,10 @@ Page({
       })
   },
 
-  truncateText(text, maxLen, ctx) {
-    if (ctx.measureText(text).width <= maxLen * 20) return text
+  ellipsize(text, maxWidth, ctx) {
+    if (ctx.measureText(text).width <= maxWidth) return text
     let truncated = text
-    while (ctx.measureText(truncated + '...').width > maxLen * 20 && truncated.length > 0) {
+    while (truncated.length > 1 && ctx.measureText(truncated + '...').width > maxWidth) {
       truncated = truncated.slice(0, -1)
     }
     return truncated + '...'
