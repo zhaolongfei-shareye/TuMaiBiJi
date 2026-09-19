@@ -7,8 +7,10 @@
 import asyncio
 import io
 import os
+import struct
 import sys
 import time
+import zlib
 from types import SimpleNamespace
 
 os.environ.setdefault("DATABASE_URL", "sqlite:////tmp/tumaibiji_pytest.db")
@@ -29,6 +31,25 @@ def png(width: int, height: int) -> bytes:
     buf = io.BytesIO()
     Image.new("RGB", (width, height), "white").save(buf, format="PNG")
     return buf.getvalue()
+
+
+def png_header_only(width: int, height: int) -> bytes:
+    """只有 IHDR、没有任何像素数据的 PNG：几十字节，用来证明拦截发生在解码之前。
+
+    真实攻击样本是纯色大图（实测 0.43MB / 1.44 亿像素 / 峰值 RSS 1271MB），但那种文件
+    要在测试里真造出来得先分配几百 MB，没必要——宽高是 Pillow 从文件头读的，走的是同一条路。
+    """
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(body))
+            + kind
+            + body
+            + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+        )
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IEND", b"")
 
 
 def box(x_left: float, y_top: float, w: float = 200, h: float = 30):
@@ -91,6 +112,25 @@ class TestScaleBeforeInference:
         asyncio.run(ocr.ocr_image(png(1200, 900)))
         assert isinstance(fake.seen[0], Image.Image)
         assert fake.seen[0].mode in ("RGB", "RGBA", "L")
+
+    def test_pixel_count_rejected_before_decode(self, engine_spy):
+        """10MB 上限管得住字节管不住像素：49M 像素的图必须在解码前拒掉，引擎一次都不进。"""
+        fake = engine_spy(FakeEngine())
+        with pytest.raises(RuntimeError) as exc:
+            asyncio.run(ocr.ocr_image(png_header_only(7000, 7000)))
+        assert str(exc.value) == ocr.TOO_MANY_PIXELS_HINT
+        assert fake.seen == []
+
+    def test_hint_survives_as_user_visible_toast(self):
+        """这句是直接弹给用户的 toast：icon:'none' 只有两行（约 30 个汉字）。"""
+        assert len(ocr.TOO_MANY_PIXELS_HINT) <= 30
+        assert "像素" in ocr.TOO_MANY_PIXELS_HINT
+
+    def test_real_screenshot_sizes_still_pass(self, engine_spy):
+        """闸门不能挡住真机截图：3420×2214 是实测值，留到 40M 像素才有几十倍余量。"""
+        fake = engine_spy(FakeEngine())
+        asyncio.run(ocr.ocr_image(png(3420, 2214)))
+        assert len(fake.seen) == 1
 
 
 class TestOrderAndNoise:

@@ -17,6 +17,11 @@ logger = logging.getLogger(__name__)
 # 实测：3420×2214 单张峰值 RSS 1064MB，而 RapidOCR 会把每个检测框按原图比例放大回去
 # （process_img.map_img_to_original），所以峰值由输入像素量决定，必须先缩放。
 MAX_LONG_EDGE = 1600
+# 缩放前要先解码，所以"文件小"挡不住内存：实测 0.43MB 的纯色 PNG（12000×12000）解码后
+# 峰值 RSS 1271MB，而 Pillow 的报错阈值在 1.79 亿像素、这条只给 warning。10MB 的上传上限
+# 管得住字节管不住像素，所以在 load() 之前按像素数当场拒——超了的图缩放也救不回来。
+MAX_PIXELS = 40_000_000
+TOO_MANY_PIXELS_HINT = "图片像素过大，请换一张或分次截取"
 MIN_CONFIDENCE = 0.5
 # 实测噪声是工具栏图标/角标（"AB X"、"κ7"）：不含中文且字符极少的行一律丢
 MAX_SHORT_LATIN_RUN = 4
@@ -62,6 +67,9 @@ def _prepare(image_data: bytes) -> Image.Image:
     """解码为 PIL 图像并缩放长边。交给 RapidOCR 时保持 RGB/RGBA，由它做 RGB→BGR。"""
     try:
         img = Image.open(BytesIO(image_data))
+        # open 只读文件头，宽高在这一步就已拿到；必须在任何解码动作之前判掉
+        if img.width * img.height > MAX_PIXELS:
+            raise RuntimeError(TOO_MANY_PIXELS_HINT)
         img = ImageOps.exif_transpose(img) or img
         if img.mode not in ("RGB", "RGBA", "L"):
             # P 模式可能带调色板透明，转 RGBA 才能正确合成背景
