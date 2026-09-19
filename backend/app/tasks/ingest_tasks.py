@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from app.core.errors import UserError
 from app.db.database import SessionLocal
 from app.models.note import Note
 from app.services.ocr import ocr_images
@@ -9,6 +10,14 @@ from app.services.llm import extract_knowledge
 from app.services.queue import set_task_status
 
 logger = logging.getLogger(__name__)
+
+# 任务失败时这个字段会被前端直接塞进 toast，所以宁可笼统，也不要英文栈/onnxruntime/依赖名
+GENERIC_TASK_ERROR = "处理失败，请重新提交试试"
+
+
+def failure_message(exc: Exception) -> str:
+    """只有 UserError 的文案是写给用户的；其余异常原文只进日志。"""
+    return str(exc) if isinstance(exc, UserError) else GENERIC_TASK_ERROR
 
 
 def process_url_task(task_id: str, user_id: str, url: str):
@@ -48,8 +57,8 @@ def process_url_task(task_id: str, user_id: str, url: str):
             db.close()
 
     except Exception as e:
-        logger.exception("URL 任务失败: %s", e)
-        set_task_status(task_id, "failed", {"error": str(e)})
+        logger.exception("URL 任务失败: %s: %s", type(e).__name__, e)
+        set_task_status(task_id, "failed", {"error": failure_message(e)})
 
 
 def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes]):
@@ -87,5 +96,5 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
             db.close()
 
     except Exception as e:
-        logger.exception("截图任务失败: %s", e)
-        set_task_status(task_id, "failed", {"error": str(e)})
+        logger.exception("截图任务失败: %s: %s", type(e).__name__, e)
+        set_task_status(task_id, "failed", {"error": failure_message(e)})

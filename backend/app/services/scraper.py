@@ -1,10 +1,15 @@
 import ipaddress
+import logging
 import socket
 from urllib.parse import urlparse
 
 import httpx
 import trafilatura
 from bs4 import BeautifulSoup
+
+from app.core.errors import UserError
+
+logger = logging.getLogger(__name__)
 
 HEADERS = {
     "User-Agent": (
@@ -30,6 +35,9 @@ BLOCKED_NETWORKS = [
     ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
 ]
 
+# 兜底文案：httpx 的异常文本是英文且带完整 URL，直接 str(e) 会进用户 toast（只两行，约 30 汉字）
+GENERIC_FETCH_ERROR = "读取网页失败，请稍后重试或改用截图"
+
 
 def _is_private_ip(ip_str: str) -> bool:
     try:
@@ -46,22 +54,45 @@ def _validate_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in ALLOWED_SCHEMES:
         allowed = "/".join(s.upper() for s in sorted(ALLOWED_SCHEMES))
-        raise ValueError(f"不支持的协议: {parsed.scheme}，仅允许 {allowed}")
+        raise UserError(f"不支持的协议: {parsed.scheme}，仅允许 {allowed}")
     hostname = parsed.hostname
     if not hostname:
-        raise ValueError("URL 缺少主机名")
+        raise UserError("链接里没有网址，请检查后重试")
     try:
         resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
     except socket.gaierror:
-        raise ValueError(f"无法解析域名: {hostname}")
+        raise UserError(f"无法解析域名: {hostname}")
     for family, _, _, _, sockaddr in resolved:
         ip = sockaddr[0]
         if _is_private_ip(ip):
-            raise ValueError(f"域名解析到内网地址，已拦截: {hostname}")
+            raise UserError(f"域名解析到内网地址，已拦截: {hostname}")
     return url
 
 
 async def scrape_url(url: str) -> dict:
+    """抓取并解析网页。
+
+    只有 UserError 的文案会走到用户面前（任务失败时前端直接把 error 塞进 toast）；
+    其余异常原文进日志，用户只看到一句通用中文。
+    """
+    try:
+        return await _fetch_and_parse(url)
+    except UserError:
+        raise
+    except Exception as exc:
+        logger.warning("抓取失败 url=%s：%s: %s", url, type(exc).__name__, exc)
+        raise UserError(GENERIC_FETCH_ERROR) from exc
+
+
+def _status_hint(code: int) -> str:
+    if code in (401, 403):
+        return "该网页需要登录，无法读取"
+    if code == 404:
+        return "网页不存在或已被删除"
+    return f"网页返回错误（HTTP {code}），读不到内容"
+
+
+async def _fetch_and_parse(url: str) -> dict:
     _validate_url(url)
 
     async with httpx.AsyncClient(
@@ -79,23 +110,25 @@ async def scrape_url(url: str) -> dict:
                 if resp.is_redirect:
                     location = resp.headers.get("location", "")
                     if not location:
-                        raise ValueError("重定向响应缺少 Location 头")
+                        raise UserError("重定向响应缺少 Location 头")
                     next_url = location if location.startswith("http") else str(httpx.URL(current_url).join(location))
                     _validate_url(next_url)
                     current_url = next_url
                     continue
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    raise UserError(_status_hint(resp.status_code))
                 
                 async for chunk in resp.aiter_bytes(chunk_size=8192):
                     total_bytes += len(chunk)
                     if total_bytes > MAX_RESPONSE_SIZE:
-                        raise ValueError(f"页面内容超过 {MAX_RESPONSE_SIZE // 1024 // 1024}MB 限制")
+                        raise UserError(f"页面内容超过 {MAX_RESPONSE_SIZE // 1024 // 1024}MB 限制")
                     chunks.append(chunk)
                 
-                html = b"".join(chunks).decode(resp.encoding or "utf-8")
+                # 声明了错误 charset 的页面不该让整条任务失败：replace 只是少几个字
+                html = b"".join(chunks).decode(resp.encoding or "utf-8", errors="replace")
             break
         else:
-            raise ValueError("重定向次数过多")
+            raise UserError("网页跳转次数过多，读不到内容")
 
     source_type = _detect_source_type(url)
 

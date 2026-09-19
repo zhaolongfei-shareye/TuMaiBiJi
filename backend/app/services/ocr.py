@@ -12,6 +12,8 @@ from typing import NamedTuple
 
 from PIL import Image, ImageOps
 
+from app.core.errors import UserError
+
 logger = logging.getLogger(__name__)
 
 # 实测：3420×2214 单张峰值 RSS 1064MB，而 RapidOCR 会把每个检测框按原图比例放大回去
@@ -53,10 +55,13 @@ def _get_engine():
             try:
                 from rapidocr import RapidOCR
             except ImportError as exc:
-                raise RuntimeError(
+                # 这句是给运维看的（apt install libgl1 / 换 headless），不能进用户 toast
+                logger.error(
                     "RapidOCR 加载失败。无桌面的 Ubuntu 上多为 opencv 找不到 libGL.so.1，"
-                    "需 apt install libgl1，或把 opencv-python 换成 opencv-python-headless。"
-                ) from exc
+                    "需 apt install libgl1，或把 opencv-python 换成 opencv-python-headless。",
+                    exc_info=True,
+                )
+                raise UserError("图片识别暂不可用，请稍后重试") from exc
             started = time.perf_counter()
             _engine = RapidOCR()
             logger.info("RapidOCR 模型加载完成 %.2fs", time.perf_counter() - started)
@@ -69,7 +74,7 @@ def _prepare(image_data: bytes) -> Image.Image:
         img = Image.open(BytesIO(image_data))
         # open 只读文件头，宽高在这一步就已拿到；必须在任何解码动作之前判掉
         if img.width * img.height > MAX_PIXELS:
-            raise RuntimeError(TOO_MANY_PIXELS_HINT)
+            raise UserError(TOO_MANY_PIXELS_HINT)
         img = ImageOps.exif_transpose(img) or img
         if img.mode not in ("RGB", "RGBA", "L"):
             # P 模式可能带调色板透明，转 RGBA 才能正确合成背景
@@ -77,12 +82,9 @@ def _prepare(image_data: bytes) -> Image.Image:
         # PNG 的截断要在这里才暴露（open 是懒解析），否则拖到缩放处抛英文栈
         img.load()
     except Image.UnidentifiedImageError as exc:
-        raise RuntimeError(
-            "图片无法识别，可能是 HEIC 格式或已损坏。iPhone 可在"
-            "「设置 → 相机 → 格式」选「兼容性最佳」后重试。"
-        ) from exc
+        raise UserError("图片无法识别，可能格式不受支持") from exc
     except (OSError, SyntaxError, ValueError, Image.DecompressionBombError) as exc:
-        raise RuntimeError("图片已损坏或尺寸过大，请重新截图后上传") from exc
+        raise UserError("图片已损坏或尺寸过大，请重新截图后上传") from exc
 
     width, height = img.size
     long_edge = max(width, height)

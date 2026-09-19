@@ -212,3 +212,38 @@ class TestExtractionDegradation:
         tasks.process_url_task("t-url", uid, "https://example.com/x")
         status, result = statuses[-1]
         assert status == "completed" and result["degraded"] is False
+
+
+class TestScrapeErrorWording:
+    """URL 链路失败时 error 会直接进 toast：只允许中文短句，技术原文留日志。"""
+
+    def test_non_http_scheme_is_chinese(self):
+        from app.services.scraper import UserError, scrape_url
+
+        with pytest.raises(UserError) as exc:
+            asyncio.run(scrape_url("ftp://example.com/a"))
+        assert "不支持的协议" in str(exc.value)
+
+    def test_unexpected_error_becomes_generic(self, monkeypatch):
+        import httpx
+
+        from app.services import scraper
+
+        async def refused(url):
+            raise httpx.ConnectError("Connection refused by host")
+
+        monkeypatch.setattr(scraper, "_fetch_and_parse", refused)
+        with pytest.raises(scraper.UserError) as exc:
+            asyncio.run(scraper.scrape_url("https://example.com/a"))
+        assert str(exc.value) == scraper.GENERIC_FETCH_ERROR
+        assert "Connection" not in str(exc.value)
+        assert len(str(exc.value)) <= 30
+
+    @pytest.mark.parametrize(
+        "code,expect",
+        [(401, "登录"), (403, "登录"), (404, "不存在"), (500, "HTTP 500")],
+    )
+    def test_status_hints(self, code, expect):
+        from app.services.scraper import _status_hint
+
+        assert expect in _status_hint(code)

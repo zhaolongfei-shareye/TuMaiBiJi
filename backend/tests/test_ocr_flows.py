@@ -17,6 +17,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:////tmp/tumaibiji_pytest.db")
 os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import httpx
 import pytest
 from PIL import Image
 
@@ -293,7 +294,7 @@ class TestBatchLimits:
 
 
 class TestUnreadableImage:
-    """认不出的字节要说人话：这些串会经 str(e) 进任务 failed.error 直接给用户看。"""
+    """认不出的字节要说人话：这些串会经任务 failed.error 进 toast（只两行，约 30 汉字）。"""
 
     def _expect_chinese(self, data):
         with pytest.raises(RuntimeError) as exc:
@@ -302,11 +303,13 @@ class TestUnreadableImage:
         assert "Error" not in msg and "Traceback" not in msg
         return msg
 
-    def test_unidentified_bytes_mention_heic_and_fix(self, engine_spy):
+    def test_unidentified_bytes_say_unsupported_format(self, engine_spy):
         engine_spy(FakeEngine())
         heic_like = b"\x00\x00\x00\x18ftypheic" + b"\x00" * 200
         msg = self._expect_chinese(heic_like)
-        assert "无法识别" in msg and "HEIC" in msg and "兼容性最佳" in msg
+        assert "无法识别" in msg
+        # 格式建议写在入口卡片的小字里（albumDesc），toast 放不下第二句
+        assert len(msg) <= 30
 
     def test_truncated_png_fails_before_engine(self, engine_spy):
         fake = engine_spy(FakeEngine())
@@ -319,6 +322,19 @@ class TestUnreadableImage:
         engine_spy(FakeEngine(out(["正常的图"], [box(0, 0)], [0.9])))
         assert asyncio.run(ocr.ocr_image(png(300, 200))) == "正常的图"
 
+    def test_engine_load_failure_keeps_ops_detail_in_log(self, monkeypatch, caplog):
+        """libGL 那句是运维线索，不能跟着 toast 出去；日志里必须还在。"""
+        monkeypatch.setattr(ocr, "_engine", None)
+        monkeypatch.setitem(sys.modules, "rapidocr", None)
+        caplog.set_level("ERROR")
+
+        with pytest.raises(ocr.UserError) as exc:
+            ocr._get_engine()
+
+        assert "libGL" not in str(exc.value) and "opencv" not in str(exc.value)
+        assert "图片识别暂不可用" in str(exc.value)
+        assert "libGL.so.1" in caplog.text
+
 
 class TestFailureState:
     @pytest.fixture
@@ -328,20 +344,55 @@ class TestFailureState:
         yield session
         session.close()
 
-    def test_ocr_exception_fails_task_without_hanging(self, db, monkeypatch):
+    def _run(self, db, monkeypatch, raiser, task_id="t-failure", uid="ocr-failure-user"):
         import app.tasks.ingest_tasks as tasks
 
         statuses = []
         monkeypatch.setattr(tasks, "set_task_status", lambda tid, st, res=None, **kw: statuses.append((st, res)))
-        monkeypatch.setattr(tasks, "ocr_images", _raise_libgl)
+        monkeypatch.setattr(tasks, "ocr_images", raiser)
+        tasks.process_screenshots_task(task_id, uid, [b"fake-png"])
+        return statuses, tasks
 
-        uid = "ocr-failure-user"
-        tasks.process_screenshots_task("t-libgl", uid, [b"fake-png"])
-
+    def test_ocr_exception_fails_task_without_hanging(self, db, monkeypatch):
+        statuses, _ = self._run(db, monkeypatch, _raise_engine_unavailable)
         assert [s for s, _ in statuses] == ["processing", "failed"]
-        assert "libGL.so.1" in statuses[-1][1]["error"]
-        assert db.query(Note).filter(Note.user_id == uid).count() == 0
+        assert statuses[-1][1]["error"] == ocr.TOO_MANY_PIXELS_HINT
+        assert db.query(Note).filter(Note.user_id == "ocr-failure-user").count() == 0
+
+    def test_unexpected_error_is_generic_and_logged(self, db, monkeypatch, caplog):
+        """英文栈/onnxruntime/依赖名一律不给用户，原文留日志。"""
+        caplog.set_level("ERROR")
+        statuses, tasks = self._run(
+            db, monkeypatch, _raise_english_crash, task_id="t-english", uid="english-failure-user"
+        )
+        error = statuses[-1][1]["error"]
+
+        assert error == tasks.GENERIC_TASK_ERROR
+        assert "onnxruntime" not in error and "Session" not in error
+        assert "onnxruntime" in caplog.text
+        assert len(error) <= 30
+
+    def test_url_task_unexpected_error_is_generic(self, db, monkeypatch):
+        """URL 链路同一个收口：抓取侧没标 UserError 的异常一律通用中文。"""
+        import app.tasks.ingest_tasks as tasks
+
+        statuses = []
+        monkeypatch.setattr(tasks, "set_task_status", lambda tid, st, res=None, **kw: statuses.append((st, res)))
+        monkeypatch.setattr(tasks, "scrape_url", _raise_connect_error)
+        tasks.process_url_task("t-connect", "url-failure-user", "https://example.com/x")
+
+        assert statuses[-1][0] == "failed"
+        assert statuses[-1][1]["error"] == tasks.GENERIC_TASK_ERROR
+        assert "Connection refused" not in statuses[-1][1]["error"]
 
 
-async def _raise_libgl(images_data):
-    raise RuntimeError("RapidOCR 加载失败：import cv2 缺 libGL.so.1")
+async def _raise_engine_unavailable(images_data):
+    raise ocr.UserError(ocr.TOO_MANY_PIXELS_HINT)
+
+
+async def _raise_english_crash(images_data):
+    raise RuntimeError("onnxruntime.capi.onnxruntime_pybind11_state.Fail: [ONNXRuntimeError] : 1 : FAIL")
+
+
+async def _raise_connect_error(url):
+    raise httpx.ConnectError("Connection refused")
