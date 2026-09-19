@@ -171,6 +171,11 @@ class TestBatchLimits:
     class User_:
         id = 4242
 
+    @staticmethod
+    def jpg(n: int) -> bytes:
+        """带 JPEG 文件头的假字节：过格式闸门，但内容是假的——这些用例只卡长度和数量。"""
+        return b"\xff\xd8\xff" + b"z" * (n - 3)
+
     async def _stage(self, data, batch_id=None):
         return await ingest_route.stage_screenshot.__wrapped__(
             request=None,
@@ -184,36 +189,46 @@ class TestBatchLimits:
 
         monkeypatch.setattr(ingest_route, "MAX_IMAGE_BYTES", 1024)
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(self._stage(b"x" * 2048))
-        assert exc.value.status_code == 400
+            asyncio.run(self._stage(self.jpg(2048)))
+        assert exc.value.status_code == 400 and "图片超过" in exc.value.detail
+
+    def test_unsupported_format_rejected_before_staging(self):
+        """HEIC 当场拒，不塞进 Redis 等 worker 解码时才失败——用户看到的还是英文栈。"""
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(self._stage(b"\x00\x00\x00\x18ftypheic" + b"\x00" * 200))
+        assert exc.value.status_code == 400 and "格式不支持" in exc.value.detail
+        assert "兼容性最佳" in exc.value.detail
+        assert ingest_route._batch_staging == {}
 
     def test_over_batch_count_rejected(self, monkeypatch):
         from fastapi import HTTPException
 
         monkeypatch.setattr(ingest_route, "MAX_IMAGES_PER_BATCH", 2)
-        staged = asyncio.run(self._stage(b"ab"))
-        staged = asyncio.run(self._stage(b"cd", staged["batch_id"]))
+        staged = asyncio.run(self._stage(self.jpg(5)))
+        staged = asyncio.run(self._stage(self.jpg(5), staged["batch_id"]))
         assert staged["count"] == 2
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(self._stage(b"ef", staged["batch_id"]))
+            asyncio.run(self._stage(self.jpg(5), staged["batch_id"]))
         assert exc.value.status_code == 400 and "每批次最多 2 张图片" in exc.value.detail
 
     def test_over_batch_total_bytes_rejected(self, monkeypatch):
         from fastapi import HTTPException
 
         monkeypatch.setattr(ingest_route, "MAX_BATCH_BYTES", 10)
-        staged = asyncio.run(self._stage(b"12345"))
+        staged = asyncio.run(self._stage(self.jpg(5)))
         assert staged["count"] == 1
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(self._stage(b"678901", staged["batch_id"]))
+            asyncio.run(self._stage(self.jpg(6), staged["batch_id"]))
         assert exc.value.status_code == 400 and "分多次" in exc.value.detail
 
     def test_per_user_batch_count_capped(self, monkeypatch):
         """不传 batch_id 就是新建批次：只卡"单批 40MB"挡不住半小时里堆出几百批。"""
         monkeypatch.setattr(ingest_route, "MAX_BATCHES_PER_USER", 2)
-        first = asyncio.run(self._stage(b"aa"))["batch_id"]
-        second = asyncio.run(self._stage(b"bb"))["batch_id"]
-        third = asyncio.run(self._stage(b"cc"))
+        first = asyncio.run(self._stage(self.jpg(5)))["batch_id"]
+        second = asyncio.run(self._stage(self.jpg(5)))["batch_id"]
+        third = asyncio.run(self._stage(self.jpg(5)))
         assert first not in ingest_route._batch_staging
         assert set(ingest_route._batch_staging) == {second, third["batch_id"]}
         assert third["count"] == 1
@@ -229,9 +244,9 @@ class TestBatchLimits:
             "user_id": "9999",
             "created_at": time.time(),
         }
-        asyncio.run(self._stage(b"12345"))
+        asyncio.run(self._stage(self.jpg(5)))
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(self._stage(b"67890"))
+            asyncio.run(self._stage(self.jpg(5)))
         assert exc.value.status_code == 429 and "服务器暂存已满" in exc.value.detail
         assert "other-user" in ingest_route._batch_staging
 

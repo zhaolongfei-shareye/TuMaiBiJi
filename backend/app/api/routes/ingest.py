@@ -50,6 +50,27 @@ MAX_BATCH_BYTES = 40 * 1024 * 1024
 MAX_BATCHES_PER_USER = 2
 MAX_STAGING_BYTES = 120 * 1024 * 1024
 
+UNSUPPORTED_IMAGE_HINT = (
+    "图片格式不支持，请用 JPG 或 PNG（iPhone 可在「设置 → 相机 → 格式」选「兼容性最佳」）"
+)
+
+
+def _image_format(data: bytes) -> str | None:
+    """按文件头判格式，只放行 Pillow 解得动的常见位图。
+
+    HEIC/HEIF 故意不支持：那要么引 pillow-heif（多一个依赖、和"只留两扇门"打架），
+    要么让前端改用压缩图（微信会重编码，直接掉识别率）。当场拒比塞进 Redis、等 worker
+    解码时才失败更早，也更省内存。
+    """
+    head = data[:12]
+    if head.startswith(b"\x89PNG\r\n\x1a\n") or head.startswith(b"\xff\xd8\xff"):
+        return "PNG/JPEG"
+    if head.startswith((b"GIF87a", b"GIF89a", b"BM", b"II*\x00", b"MM\x00*")):
+        return "GIF/BMP/TIFF"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "WEBP"
+    return None
+
 
 def _staging_bytes() -> int:
     return sum(batch["bytes"] for batch in _batch_staging.values())
@@ -106,6 +127,9 @@ async def stage_screenshot(
                 status_code=400, detail=f"图片超过 {MAX_IMAGE_BYTES // 1048576}MB 限制"
             )
     data = b"".join(chunks)
+
+    if _image_format(data) is None:
+        raise HTTPException(status_code=400, detail=UNSUPPORTED_IMAGE_HINT)
 
     _sweep_stale_batches()
 
