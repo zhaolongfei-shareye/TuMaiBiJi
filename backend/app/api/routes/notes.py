@@ -86,6 +86,8 @@ def list_notes(
             or_(
                 Note.title.ilike(pattern, escape="\\"),
                 Note.summary.ilike(pattern, escape="\\"),
+                Note.content.ilike(pattern, escape="\\"),
+                Note.original_content.ilike(pattern, escape="\\"),
             )
         )
     notes = (
