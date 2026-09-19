@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 
 import httpx
 
@@ -11,6 +12,31 @@ logger = logging.getLogger(__name__)
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 MAX_RETRIES = 3
 INITIAL_BACKOFF = 1.0
+
+# .env 里遗留的示例值（sk-your-key / your-secret-xxx）非空但不是真凭据，
+# 若当作已配置会把每条任务变成 401 重试失败，比缺 key 更难排查。
+_PLACEHOLDER = re.compile(
+    r"(?i)^(sk-)?(your[-_]|example|placeholder|changeme|dummy|todo|test[-_]?key|x{3,}|<|\{\{)"
+)
+
+
+def key_usable(key: str) -> bool:
+    key = (key or "").strip()
+    return bool(key) and not _PLACEHOLDER.match(key)
+
+
+def _degraded(text: str, fallback_title: str) -> dict:
+    """提炼不可用时的兜底：只给标题，正文与原文由调用方入库。"""
+    title = (fallback_title or "").strip()
+    if not title:
+        title = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")[:30]
+    return {
+        "title": (title or "未命名笔记")[:500],
+        "summary": "",
+        "key_points": [],
+        "tags": [],
+        "degraded": True,
+    }
 
 SYSTEM_PROMPT = """你是一个内容提取与知识整理助手。用户会提供一篇文章或截图识别的文本。
 你的任务是：
@@ -29,13 +55,28 @@ SYSTEM_PROMPT = """你是一个内容提取与知识整理助手。用户会提�
 
 
 async def extract_knowledge(text: str, fallback_title: str = "") -> dict:
+    """提炼结构化知识；提炼能力不可用时自动降级，绝不让整条采集任务失败。
+
+    返回 dict 含 title/summary/key_points/tags；降级时附带 degraded=True，
+    便于任务结果里区分「采集失败」与「只是没提炼」。
+    """
+    try:
+        result = await _call_llm(text, fallback_title)
+        result.setdefault("degraded", False)
+        return result
+    except Exception as e:
+        logger.warning("提炼不可用，降级为原文入库：%s: %s", type(e).__name__, e)
+        return _degraded(text, fallback_title)
+
+
+async def _call_llm(text: str, fallback_title: str = "") -> dict:
     """调用 DeepSeek API 提取结构化知识，返回 {title, summary, key_points, tags}。
-    
+
     包含重试逻辑：对 429（限流）、5xx（服务器错误）、超时自动重试，
     最多重试 MAX_RETRIES 次，使用指数退避策略。
     """
-    if not settings.DEEPSEEK_API_KEY:
-        raise ValueError("DeepSeek API Key 未配置，请设置 DEEPSEEK_API_KEY")
+    if not key_usable(settings.DEEPSEEK_API_KEY):
+        raise ValueError("DeepSeek API Key 未配置或仍为占位符，请设置 DEEPSEEK_API_KEY")
 
     user_content = text
     if len(user_content) > 12000:

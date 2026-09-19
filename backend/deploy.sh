@@ -132,35 +132,49 @@ echo ""
 echo ">>> 配置自检..."
 python <<'PY'
 from app.core.config import settings as s
+from app.services.llm import key_usable
 
+# 缺失即【功能完全不可用】
 REQUIRED = {
-    "WECHAT_APP_ID": "微信登录（小程序无法进入）",
-    "WECHAT_APP_SECRET": "微信登录（小程序无法进入）",
-    "DEEPSEEK_API_KEY": "LLM 知识提取（URL/截图/语音三条主链路都要）",
-    "TENCENT_OCR_SECRET_ID": "截图 OCR",
-    "TENCENT_OCR_SECRET_KEY": "截图 OCR",
-    "TENCENT_ASR_SECRET_ID": "语音转写",
-    "TENCENT_ASR_SECRET_KEY": "语音转写",
+    "WECHAT_APP_ID": "微信登录（小程序进不去）",
+    "WECHAT_APP_SECRET": "微信登录（小程序进不去）",
 }
-OPTIONAL = {
-    "COS_SECRET_ID": "COS 素材存储",
-    "COS_SECRET_KEY": "COS 素材存储",
-    "COS_REGION": "COS 素材存储",
-    "COS_BUCKET": "COS 素材存储",
+# 缺失即【该条链路不可用】，但不影响其它功能
+FEATURE = {
+    "TENCENT_OCR_SECRET_ID": "截图转笔记",
+    "TENCENT_OCR_SECRET_KEY": "截图转笔记",
 }
+# 缺失只是【降级】：采集照常入库，少掉自动提炼
+DEGRADABLE = {
+    "DEEPSEEK_API_KEY": "自动提炼摘要/要点/标签（缺失则只存原文，任务不再失败）",
+}
+# COS_* 四个字段刻意不检查：前端零调用，属死代码，不作为部署判定依据。
+
+
+def unusable(name):
+    """空值或仍是 .env.example 里的占位串，都算未配置。"""
+    return not key_usable(str(getattr(s, name, "") or ""))
+
 
 print(f"  数据库类型: {s.DATABASE_URL.split('://')[0]}")
-missing = sorted(f"{v}  ← {k}" for k, v in REQUIRED.items() if not getattr(s, k, ""))
-opt_missing = sorted(k for k in OPTIONAL if not getattr(s, k, ""))
+missing = sorted(f"{v}  ← {k}" for k, v in REQUIRED.items() if unusable(k))
+feat_missing = sorted(set(v for k, v in FEATURE.items() if unusable(k)))
+deg_missing = sorted(f"{v}  ← {k}" for k, v in DEGRADABLE.items() if unusable(k))
+
 if missing:
     print(f"  !! 缺失 {len(missing)} 项必需配置，对应功能在生产环境【完全不可用】：")
     for m in missing:
         print(f"     - {m}")
     print("  !! 因此本次部署【不能】宣称核心功能已验证 —— 需先在 .env 补齐并重启。")
 else:
-    print("  ✓ 必需配置齐全")
-if opt_missing:
-    print(f"  · 未配置的可选能力: {', '.join(opt_missing)}（小程序码/素材上传会失败）")
+    print("  ✓ 必需配置齐全（注意：这只是配置层面，接口是否真通仍需端到端验证）")
+
+if feat_missing:
+    print(f"  · 缺失凭据导致不可用的功能: {', '.join(feat_missing)}")
+if deg_missing:
+    print("  · 可降级项未配置（服务照常，功能降级）：")
+    for d in deg_missing:
+        print(f"     - {d}")
 PY
 
 echo ""
