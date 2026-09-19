@@ -20,12 +20,13 @@
 - ✅ 分类管理、手写笔记、分享图 + 小程序码、壁纸主题、多语言
 - ✅ 零第三方凭据下 18 项接口通过（+1 项为探测脚本假阳性，已 curl 复测）
 
-**代码已改完**（v2.2 第 2 步，2026-09-19 本轮）——**除最后那条 AppSecret 修复已单独上线，其余全部只到本地，线上仍是旧版**：
+**代码已改完**（v2.2 第 2 步，2026-09-19 本轮）——**除 AppSecret 外泄那条修复已单独上线，其余全部只到本地，线上仍是旧版**：
 - ✅ **截图认字已换成自建开源 RapidOCR**：`services/ocr.py` 从腾讯云 TC3 签名整体重写为进程内调用，**对外两个函数签名一字未改**，worker 与既有测试零改动。落实了 4 条实测要求：识别前缩放长边 ≤1600、单张串行（线程锁）、按检测框坐标重排为视觉顺序、过滤噪声行。**本机同图对照：峰值 RSS 1,076.6MB → 666.6MB，识别字符数 294 → 301**（不是拿推理凑的）。新增 19 条测试（审查后再补 6 条：暂存的每用户批次数与全局预算、坏图给中文字段、HEIC 在门口拒），与原有 19 条合并 **38 passed**
 - ✅ **图片格式改为"进门就拒"，不支持 HEIC**：`/screenshots/stage` 按**文件头**放行 PNG/JPEG/GIF/BMP/TIFF/WEBP，其余返回 400 + 23 字中文提示。不做 HEIC 支持是决策不是遗漏：`pillow-heif` 会与"对外只有两扇门"冲突且重演 R13 那类原生库坑，前端改用 `sizeType:['compressed']` 又要拿识别率换兼容。**顺带修了一个让提示到不了用户眼前的断点**：`wx.uploadFile` 的 `res.data` 是字符串（`wx.request` 才是对象），页面按 `err.data.detail` 取会拿到 `undefined`，现在非 2xx 时先 parse 再 reject。同时把"提取成功"改成"已存入笔记"——`completed` 只证明笔记建好了，不证明提炼成功（**这条文案要重新提审才生效**）
 - ✅ **OCR 补了像素闸门**（同日审查实测）：`_prepare` 原先"先全尺寸解码、再缩放长边"，而"单张 ≤10MB"管得住字节管不住像素——实测 **0.43MB 的纯色 PNG（12000×12000 / 1.44 亿像素）能过掉格式闸门，把进程峰值 RSS 顶到 1,271MB / 6.86s**。Pillow 自己的阈值挡不住这一档（1.79 亿像素以上才报错，8950 万～1.79 亿只 warn），所以改成在 `load()` **之前**用文件头宽高判像素数：`MAX_PIXELS=40_000_000`，超了直接拒。同一张图现在 **37MB / 0.015s** 拒掉；真机截图 3420×2214 只有 760 万像素，约 50 倍余量
 - ✅ **用户可见错误改成中文收口**（同日审查）：新增 `app/core/errors.py::UserError`，**只有它的文本允许进 toast**，其余异常在 `ingest_tasks.failure_message()` 与 `scraper.scrape_url()` 两处收口成通用中文、原文留日志。搬迁了两处泄漏：RapidOCR 导入失败原先把"opencv 缺 libGL.so.1 / apt install libgl1"抛给用户，URL 抓取原先把 httpx 的英文异常（含完整 URL）原样透出。顺带把 charset 声明错的页面改成 `errors="replace"`，不再让整条任务失败
 - ✅ **微信 AppSecret 不再经异常文本外泄**（同日第三轮，**已单独部署到现网**，2026-09-19 22:37）：`get_access_token` 原先用 `resp.raise_for_status()`，而 httpx 会把**整条请求 URL 拼进异常文本**，那条 URL 的 query 里就带着 AppSecret。喂同一份"微信 token 接口返回 502"的桩跑真实链路：旧版 `HTTPException(500).detail` = `生成小程序码失败: Server error '502 Bad Gateway' for url '…/cgi-bin/token?…&secret=<明文>'`，新版 `502` + `微信接口暂不可用，请稍后重试`。而 `/api/shares/{token}/qrcode` **不要求登录**（只要一个有效 share token）。现在两处凭据接口都不再 `raise_for_status`：状态码与响应体只写日志，往外抛固定中文；`shares.py` 改 502；`auth.py` 的 code2session 同规则处理，并补掉"响应非 JSON"和"缺 openid"两条裸异常。4 条哨兵测试（密钥注入假值）断言**异常文本、日志、HTTP 响应体三处都不含它**。**上线后在生产机上用真实凭据复验三条**：桩打 token 接口 → 异常与日志均不含密钥；真调微信拉小程序码 → 200 / 54,175 字节；假 code 打登录 → 401 且响应体里微信 errmsg 原文出现 0 次。只重启 `wtsj-api`（PID 变了、`NRestarts=0`），`wtsj-worker` 未被牵连。过程与回滚点见 PRD §8.7
+- ✅ **`.env` 不再按当前工作目录查找**（同日第四轮，**本地已修 / 未部署**）：部署 AppSecret 那条时，第一版验证脚本的 cwd 落在 `/home/ubuntu`，`env_file=".env"` 于是去读了**同机另一个项目的 `.env`**；线上 `config.py` 又没有 `model_config` 那一行（`extra` 默认 `forbid`），pydantic 就把对方的支付 appkey、`admin_signing_secret` 等字段值原样印进 `extra_forbidden` 报错。**外泄面已量化**：不经过任何 `detail`，客户端拿不到；本项目两个 unit 的 journal 里 grep 命中 **0 次**，泄露范围就是那次终端输出。改法两行：`env_file=PROJECT_ROOT / ".env"`（由 `__file__` 反推的绝对路径，本地 `backend/` == 服务器根目录）+ 显式 `extra="ignore"`。**三条测试各自做过反向验证**——把 `env_file` 改回相对就红 2 条，把 `ignore` 去掉本地整文件 collection error（本仓 `.env` 真残留 8 条腾讯字段，逐条回显），所以不是"写了个碰不到 bug 的测试"。**对方项目那个 `.env` 一个字节没动**（`watermark-image-api` 容器在用）。过程与量化见 PRD §8.8 / R15
 - ✂️ **COS 已整块删除**：`storage.py` + `routes/assets.py` + `main.py` 两处接线 + `config.py` 的 `COS_*`×4 + `TENCENT_OCR_*`×2 + `requirements.txt` 的 `cos-python-sdk-v5`。**`assets` 表和 `cover_asset_id` 外键故意留着**（线上库删表要迁移，收益为零，且无运行时代码碰它）
 - ⚠️ **`DEEPSEEK_API_KEY` 本轮刻意没删**：`services/llm.py` 仍在读它，删字段会让代码引用不存在的配置项。它随第 3 步（提炼接混元）一起删——**"凭据收口一次性做完"因此被拆成两次**，这是执行偏差，别当成计划本来如此
 - 🔧 **结构化提炼仍未动**：目标是从 DeepSeek 换成**云函数内的混元**（吃已领取的 10 亿 Token），**代码一行未写**；改造完成前提炼停在"降级存原文"态——内容照常入库，只是没有摘要/要点/标签，UI 已隐藏对应区块不破版
@@ -113,7 +114,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 > **装完依赖先单跑一次 `python -c "import cv2"` 再启动服务。** `rapidocr` 硬依赖 **GUI 版 `opencv_python`**（已在 `requirements.txt` 里显式钉住 `opencv-python==5.0.0.93`），无桌面的 Ubuntu 上可能因缺 `libGL.so.1` 直接失败——本机 macOS 永远测不出这一条。真报错了二选一：`apt install libgl1`，或把**那一行**的包名换成 `opencv-python-headless==5.0.0.93`（两个 wheel 都发 cp37-abi3 的 manylinux 包，已确认；**别两个都装**：它们往同一个 `cv2/` 目录写，会静默互相覆盖）。`deploy.sh` 第 2 节已经把这段检查做成了自动的，且在 `systemctl restart` 之前——不过就不推新代码。
 
-跑测试：`.venv/bin/python -m pytest -q`（**54 项** = 闭环 29 + 自建 OCR 25；**整套不依赖 Redis**——把 `REDIS_URL` 指向死端口重跑仍全绿，因为限流用例走 `.__wrapped__` 绕过了 slowapi；也不需要网络、不需要任何真实密钥，凭据用例注入的是哨兵假值）
+跑测试：`.venv/bin/python -m pytest -q`（**57 项** = 闭环 29 + 自建 OCR 25 + 配置装载 3；**整套不依赖 Redis**——把 `REDIS_URL` 指向死端口重跑仍全绿，因为限流用例走 `.__wrapped__` 绕过了 slowapi；也不需要网络、不需要任何真实密钥，凭据用例注入的是哨兵假值）
+
+> ⚠️ **加新测试文件时的一个坑（本轮踩过）**：`test_config_env_file.py` 按字母序最先被收集，它一 `import app.core.config`，模块级 `settings` 就按**那一刻的 env** 定型了。所以每个测试文件顶部那几行 `os.environ.setdefault(...)` 必须排在 `import app...` 之前；少了 `DATABASE_URL` 那一行，整套会安静地去连本地 Postgres 并报 22 个 connection error。
 
 访问 http://localhost:8000/docs 查看 API 文档
 
@@ -169,7 +172,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 见 [`docs/产品需求.md` §8.2 上线阶梯](docs/产品需求.md)（v2.2 重排）。摘要：
 
-1. ~~**自建 OCR 换库 + 凭据收口**~~ → **本轮已做完代码侧（54 项测试全绿），未部署**。剩余的是**服务器侧四件事**：`df -h` 看磁盘够不够 273MB、装新依赖前单跑 `import cv2`、部署当天读缩放后的峰值 RSS、真机走一遍"截图 → 认字 → 入库 → 列表可见"。**AppSecret 外泄那条（R14）不在这四件事里，已于 2026-09-19 22:37 单独上线并复验通过**
+1. ~~**自建 OCR 换库 + 凭据收口**~~ → **本轮已做完代码侧（57 项测试全绿），未部署**。剩余的是**服务器侧四件事**：`df -h` 看磁盘够不够 273MB、装新依赖前单跑 `import cv2`、部署当天读缩放后的峰值 RSS、真机走一遍"截图 → 认字 → 入库 → 列表可见"。**AppSecret 外泄那条（R14）不在这四件事里，已于 2026-09-19 22:37 单独上线并复验通过**。**`.env` 按 CWD 查找那条（R15 / §8.8）也不在这四件事里**：它只改 `app/core/config.py` 一个文件、不带新依赖、不碰 worker，理论上可以像 R14 那样单点上线——但**线上那份 `config.py` 与本地已经有差异**，要不要现在放它上去需要单独点头
 2. **云函数最小验证 + 收口 DeepSeek** — echo 函数 + 单次混元调用，确认超时 / 网关 / 扣的是哪份额度。**部署方式需用户点头**（控制台上传 zip，或 `tcb login` 扫码）
 3. 验证通过才把提炼接到混元；**不通过什么都不用回滚** —— 提炼停在降级态，产品照常可用，不再存在"没有第二家模型就上不了线"这回事
 4. **提审前用户侧三件事**：request 合法域名加 `https://api.agentsbin.cn`（这是唯一还卡着发布的一项）、《隐私保护指引》只需相册、确认最新版本号与提交范围。**注意小程序码走的是 `wx.downloadFile` 而不是 `wx.request`（`share.js:47`），所以后台的「downloadFile 合法域名」也必须包含同一域名**——这两处是分别配置的，本条我进不去后台，只能标出来
