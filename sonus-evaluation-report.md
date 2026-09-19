@@ -1,6 +1,6 @@
 # Sonus 大模型协作过程报告
 
-> 项目：微图闪记（WeTuShanJi）微信小程序
+> 项目：图麦笔记（TuMaiBiJi）微信小程序
 > 会话时间：2026-09-17 08:15 ~ 15:43（约 7.5 小时）
 > 模型：Qoder Sonus（efficient 模式）
 
@@ -54,7 +54,7 @@ Sonus 从**零开始**完成了：竞品调研 → 可行性分析 → 技术选
 ### 2.4 项目结构
 
 ```
-WeTuShanJi/
+TuMaiBiJi/
 ├── backend/                    # FastAPI 后端
 │   ├── app/
 │   │   ├── api/routes/         # 6 个路由模块（auth/notes/categories/ingest/shares/user）

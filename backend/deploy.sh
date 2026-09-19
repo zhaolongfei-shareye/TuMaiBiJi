@@ -1,7 +1,7 @@
 #!/bin/bash
-# 微图闪记后端部署脚本（在服务器上执行）
+# 图麦笔记后端部署脚本（在服务器上执行）
 #
-# 本地上传：cd /Users/zlfmac/Documents/WeTuShanJi/backend && ./upload.sh
+# 本地上传：cd /Users/zlfmac/Documents/TuMaiBiJi/backend && ./upload.sh
 # 服务器部署：ssh agentsbin && cd /home/ubuntu/wtsj-backend && ./deploy.sh
 #
 # 进程由 systemd 托管：wtsj-api.service / wtsj-worker.service（Restart=always, enabled）。
@@ -21,7 +21,7 @@ PUBLIC_URL="https://api.agentsbin.cn/wtsj/health"
 cd "$PROJECT_DIR"
 START_TS=$(date +%s)
 
-echo "=== 微图闪记后端部署 ==="
+echo "=== 图麦笔记后端部署 ==="
 source "$VENV_DIR/bin/activate"
 
 RC=0

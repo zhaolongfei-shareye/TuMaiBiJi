@@ -48,7 +48,7 @@
 ## 项目结构
 
 ```
-WeTuShanJi/
+TuMaiBiJi/
 ├── docs/
 │   └── 产品需求.md            # ⭐ PRD v2.2：技术依赖总表 / MVP 减法 / 验收标准
 ├── backend/
