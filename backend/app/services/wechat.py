@@ -4,6 +4,7 @@ import time
 import httpx
 
 from app.core.config import settings
+from app.core.errors import UserError
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +29,16 @@ async def get_access_token() -> str:
                 "secret": settings.WECHAT_APP_SECRET,
             },
         )
-        resp.raise_for_status()
+        # 这里不用 raise_for_status：httpx 的异常文本会把请求 URL 整条拼进去，而这个 URL 的
+        # query 里带着 AppSecret。状态码和响应体单独记日志，往外只抛不含凭据的固定文案。
+        if resp.status_code >= 400:
+            logger.error("获取 access_token 失败：HTTP %s，响应=%s", resp.status_code, resp.text[:200])
+            raise UserError("微信接口暂不可用，请稍后重试")
         data = resp.json()
 
     if "access_token" not in data:
-        raise RuntimeError(f"获取 access_token 失败: {data}")
+        logger.error("获取 access_token 被拒：%s", data)
+        raise UserError("微信接口暂不可用，请稍后重试")
 
     _access_token_cache["token"] = data["access_token"]
     _access_token_cache["expires_at"] = now + data.get("expires_in", 7200)

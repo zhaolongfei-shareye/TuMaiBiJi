@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -6,12 +7,15 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user
+from app.core.errors import UserError
 from app.db.database import get_db
 from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
-from app.core.auth import get_current_user
 from app.services.wechat import get_qr_code_image
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -97,7 +101,13 @@ async def get_share_qrcode(token: str, db: Session = Depends(get_db)):
             scene=token,
             page="pages/share/view",
         )
+    except UserError as e:
+        # 面向用户的文案（如"微信接口暂不可用"）可以直接给，但只这一类
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成小程序码失败: {e}")
+        # 这里面的 errmsg / httpx 异常文本可能带 access_token 或整条含 secret 的 URL，
+        # 只能进日志。这个接口不需要登录，detail 会被匿名调用方拿到。
+        logger.exception("生成小程序码失败 token=%s: %s: %s", token, type(e).__name__, e)
+        raise HTTPException(status_code=502, detail="小程序码生成失败，请稍后重试")
 
     return Response(content=image_data, media_type="image/png")

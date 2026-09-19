@@ -247,3 +247,117 @@ class TestScrapeErrorWording:
         from app.services.scraper import _status_hint
 
         assert expect in _status_hint(code)
+
+
+SECRET_SENTINEL = "SENTINEL-app-secret-7f3d"
+
+
+class _FakeResponse:
+    def __init__(self, status, body, payload):
+        self.status_code = status
+        self.text = body
+        self._payload = payload
+
+    def json(self):
+        if self._payload is None:
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+        return self._payload
+
+
+def _stub_wechat_http(monkeypatch, module, status=200, body="", payload=None):
+    """替掉 httpx：把真实请求 URL（query 里带 AppSecret）留在 list 里，供断言"它确实出去了"。"""
+    from urllib.parse import urlencode
+
+    sent = []
+    resp = _FakeResponse(status, body, payload)
+
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, params=None):
+            sent.append(f"{url}?{urlencode(params or {})}")
+            return resp
+
+    monkeypatch.setattr(module.httpx, "AsyncClient", _Client)
+    monkeypatch.setattr(module.settings, "WECHAT_APP_SECRET", SECRET_SENTINEL)
+    return sent
+
+
+class TestCredentialErrorsDoNotLeak:
+    """AppSecret 只在服务器 .env 里；异常文本、日志、HTTP detail 三处都不许带上它。"""
+
+    def test_access_token_http_error_is_sanitized(self, monkeypatch, caplog):
+        from app.core.errors import UserError
+        from app.services import wechat
+
+        monkeypatch.setattr(wechat, "_access_token_cache", {"token": None, "expires_at": 0})
+        sent = _stub_wechat_http(monkeypatch, wechat, status=502, body="bad gateway")
+        caplog.set_level("DEBUG")
+
+        with pytest.raises(UserError) as exc:
+            asyncio.run(wechat.get_access_token())
+
+        assert SECRET_SENTINEL not in str(exc.value)
+        assert SECRET_SENTINEL not in caplog.text
+        assert SECRET_SENTINEL in sent[0]  # 说明确实是那条含凭据的请求
+        assert "502" in caplog.text
+
+    def test_access_token_rejected_by_wechat_is_sanitized(self, monkeypatch, caplog):
+        from app.core.errors import UserError
+        from app.services import wechat
+
+        monkeypatch.setattr(wechat, "_access_token_cache", {"token": None, "expires_at": 0})
+        _stub_wechat_http(monkeypatch, wechat, payload={"errcode": 40013, "errmsg": "invalid appid"})
+        caplog.set_level("DEBUG")
+
+        with pytest.raises(UserError) as exc:
+            asyncio.run(wechat.get_access_token())
+        assert "微信接口暂不可用" in str(exc.value)
+        assert "invalid appid" in caplog.text
+
+    def test_code2session_rejects_non_json_and_hides_errmsg(self, monkeypatch, caplog):
+        """不打路由，直接测这个函数：路由上有 slowapi 限流，那会需要 Redis。"""
+        from fastapi import HTTPException
+
+        from app.core import auth
+
+        _stub_wechat_http(monkeypatch, auth, status=200, body="<html>502 Bad Gateway</html>")
+        caplog.set_level("DEBUG")
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(auth._wechat_code2session("x" * 12))
+        assert exc.value.status_code == 502
+        assert SECRET_SENTINEL not in exc.value.detail and "Bad Gateway" not in exc.value.detail
+        assert SECRET_SENTINEL not in caplog.text
+
+        _stub_wechat_http(monkeypatch, auth, payload={"errcode": 40029, "errmsg": "invalid code"})
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(auth._wechat_code2session("x" * 12))
+        assert exc.value.status_code == 401 and "invalid code" not in exc.value.detail
+
+        _stub_wechat_http(monkeypatch, auth, status=500, body="gateway blew up")
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(auth._wechat_code2session("x" * 12))
+        assert exc.value.status_code == 502 and "gateway" not in exc.value.detail
+
+    def test_qrcode_failure_detail_has_no_credential(self, client, ha, notes, monkeypatch):
+        from app.api.routes import shares as shares_route
+
+        token = client.post("/api/shares/", json={"note_id": notes["a_body"]}, headers=ha).json()["token"]
+
+        async def exploding_qr(scene, page=""):
+            raise RuntimeError(
+                f"Server error '500 Internal Server Error' for url "
+                f"'https://api.weixin.qq.com/cgi-bin/token?appid=wx1&secret={SECRET_SENTINEL}'"
+            )
+
+        monkeypatch.setattr(shares_route, "get_qr_code_image", exploding_qr)
+        resp = client.get(f"/api/shares/{token}/qrcode")
+        assert resp.status_code == 502
+        assert SECRET_SENTINEL not in resp.text and "url" not in resp.text

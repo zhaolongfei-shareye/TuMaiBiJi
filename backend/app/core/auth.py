@@ -49,10 +49,23 @@ async def _wechat_code2session(code: str) -> dict:
     }
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(url, params=params)
+    # 不 raise_for_status：httpx 的异常文本会带上整条含 AppSecret 的 URL。状态码、响应体
+    # 一律只写日志；这个接口的调用方是登录页，给用户的是固定文案。
+    if resp.status_code >= 400:
+        logger.error("code2session HTTP %s：%s", resp.status_code, resp.text[:200])
+        raise HTTPException(status_code=502, detail="微信登录暂不可用，请稍后重试")
+    try:
         data = resp.json()
+    except ValueError:
+        logger.error("code2session 返回非 JSON：%s", resp.text[:200])
+        raise HTTPException(status_code=502, detail="微信登录失败，请重新进入小程序")
     if "errcode" in data and data["errcode"] != 0:
+        # errcode/errmsg 是排障线索（40029 无效 code、45011 频率限制…），不外泄
         logger.error("code2session failed: %s", data)
-        raise HTTPException(status_code=401, detail=f"微信登录失败: {data.get('errmsg', 'unknown')}")
+        raise HTTPException(status_code=401, detail="微信登录失败，请重新进入小程序")
+    if not data.get("openid"):
+        logger.error("code2session 响应缺少 openid：%s", str(data)[:200])
+        raise HTTPException(status_code=401, detail="微信登录失败，请重新进入小程序")
     return data
 
 
