@@ -4,132 +4,139 @@
 # 本地上传：cd /Users/zlfmac/Documents/WeTuShanJi/backend && ./upload.sh
 # 服务器部署：ssh agentsbin && cd /home/ubuntu/wtsj-backend && ./deploy.sh
 #
-# 不用 set -e：本脚本大量依赖「命令返回非零」来判断状态，交由函数显式返回。
+# 进程由 systemd 托管：wtsj-api.service / wtsj-worker.service（Restart=always, enabled）。
+# 本脚本只重启 unit 并校验，绝不自己 nohup 拉进程 —— 旧版用 pkill+nohup 与 systemd
+# 抢 8000 端口，导致 wtsj-api 累计 crash-loop 5966 次；同时 pkill 的文本模式匹配不到
+# `rq worker default`，使旧 worker 长期不死，与新 worker 并存随机消费陈旧代码。
+#
+# 不用 set -e：脚本大量依赖命令返回非零来判断状态，交由函数显式返回。
 set -uo pipefail
 
 PROJECT_DIR="/home/ubuntu/wtsj-backend"
 VENV_DIR="$PROJECT_DIR/.venv"
 API_PORT=8000
-START_TS=$(date +%s)
+UNITS=(wtsj-api wtsj-worker)
+PUBLIC_URL="https://api.agentsbin.cn/wtsj/health"
 
 cd "$PROJECT_DIR"
-mkdir -p "$PROJECT_DIR/run"
+START_TS=$(date +%s)
 
 echo "=== 微图闪记后端部署 ==="
-echo "项目目录: $PROJECT_DIR"
-
 source "$VENV_DIR/bin/activate"
 
-# 只认「工作目录属于本项目」的进程。
-# 旧版按命令行文本 pkill（"python3 worker.py" / "uvicorn app.main:app"），有两个后果：
-#   1) 匹配不到以 .venv/bin/rq worker default 启动的 worker —— 旧 worker 长期不死，
-#      与新 worker 同时消费 default 队列，任务随机跑到修改前的陈旧代码上；
-#   2) 串扰到同机水印项目的 uvicorn --port 8080，pkill 报 Operation not permitted，
-#      且 pgrep 返回多个 PID 使「✓ 已启动」成为假阳性。
-OUR_PATTERN='uvicorn app.main:app|rq worker|worker\.py'
+RC=0
 
-our_pids() {
-    local pattern="${1:-$OUR_PATTERN}" pid cwd
-    for pid in $(pgrep -f "$pattern" 2>/dev/null); do
-        cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null)
-        [[ "$cwd" == "$PROJECT_DIR" ]] && printf '%s\n' "$pid"
-    done
-}
-
-proc_is_new() {
-    # /proc/<pid> 目录的 mtime 即进程启动时刻
-    local st
-    st=$(stat -c %Y "/proc/$1" 2>/dev/null) || return 1
-    [[ "$st" -ge "$START_TS" ]]
-}
-
-stop_services() {
-    echo ""
-    echo ">>> 停止旧服务..."
-    local pids
-    pids=$(our_pids)
-    if [[ -z "$pids" ]]; then
-        echo "  无运行中的本项目进程"
-        return 0
-    fi
-    echo "  TERM → $(tr '\n' ' ' <<<"$pids")"
-    kill -TERM $pids 2>/dev/null
-    for _ in $(seq 1 20); do
-        sleep 1
-        pids=$(our_pids)
-        [[ -z "$pids" ]] && { echo "  已全部优雅退出"; return 0; }
-    done
-    echo "  超时未退出，KILL → $(tr '\n' ' ' <<<"$pids")"
-    kill -KILL $pids 2>/dev/null
-    sleep 1
-    [[ -z "$(our_pids)" ]]
-}
-
-check_one() {
-    # 断言：该服务恰好 1 个进程，且是本次新起的
-    local label="$1" pattern="$2" pids count pid
-    pids=$(our_pids "$pattern")
-    if [[ -z "$pids" ]]; then
-        echo "✗ $label 未运行"
-        return 1
-    fi
-    count=$(grep -c . <<<"$pids")
-    if (( count > 1 )); then
-        echo "✗ $label 存在 $count 个重复进程：$(tr '\n' ' ' <<<"$pids")（会有任务被旧代码消费）"
-        return 1
-    fi
-    pid="$pids"
-    if ! proc_is_new "$pid"; then
-        echo "✗ $label PID $pid 早于本次部署启动 —— 代码没有真正更新，进程未被重启"
-        return 1
-    fi
-    echo "✓ $label  PID $pid  启动于 $(ps -o lstart= -p "$pid" 2>/dev/null | xargs)"
-    return 0
-}
-
+# ---- 1. 语法闸门：坏代码不要推上去，否则 systemd 会反复拉起又崩溃 ----
 echo ""
-echo ">>> 启动前状态检查"
-if [[ -n "$(our_pids)" ]]; then
-    echo "  发现旧进程：$(tr '\n' ' ' <<<"$(our_pids)")"
-fi
-
-stop_services || { echo "✗ 旧进程未能全部停止，终止部署（否则新旧代码会并存）"; exit 1; }
-
-echo ""
-echo ">>> 启动 uvicorn (端口 $API_PORT)..."
-nohup uvicorn app.main:app --host 0.0.0.0 --port "$API_PORT" \
-    --proxy-headers --forwarded-allow-ips=127.0.0.1 > uvicorn.log 2>&1 &
-echo $! > run/uvicorn.pid
-
-echo ">>> 启动 rq worker..."
-nohup python3 worker.py > worker.log 2>&1 &
-echo $! > run/worker.pid
-
-sleep 4
-
-echo ""
-echo ">>> 验证服务（按 cwd + 启动时刻确认，不只看进程名）..."
-DEPLOY_OK=0
-check_one "API   " 'uvicorn app.main:app' || DEPLOY_OK=1
-check_one "WORKER" 'rq worker|worker\.py' || DEPLOY_OK=1
-
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$API_PORT/docs" || echo 000)
-if [[ "$HTTP_CODE" == "200" ]]; then
-    echo "✓ API HTTP $HTTP_CODE (/docs)"
+echo ">>> 语法检查..."
+if python -m compileall -q app > /tmp/wtsj_compile.err 2>&1; then
+    echo "✓ 语法通过"
 else
-    echo "✗ API HTTP $HTTP_CODE —— 请查看 uvicorn.log"
-    DEPLOY_OK=1
+    echo "✗ 语法错误，终止部署（未重启服务，线上保持旧版本继续运行）"
+    tail -20 /tmp/wtsj_compile.err
+    exit 1
 fi
 
+# ---- 2. 记录重启前的 MainPID，用于确认「真的换了进程」----
+declare -A OLD_PID
+for u in "${UNITS[@]}"; do
+    OLD_PID[$u]=$(systemctl show "$u" -p MainPID --value 2>/dev/null)
+    [[ -z "${OLD_PID[$u]}" ]] && OLD_PID[$u]=0
+done
+
 echo ""
-echo ">>> 配置自检（只报有无，不打印任何明文密钥）..."
+echo ">>> 通过 systemd 重启服务..."
+for u in "${UNITS[@]}"; do
+    echo "  systemctl restart $u  (旧 MainPID=${OLD_PID[$u]})"
+done
+if ! sudo systemctl restart "${UNITS[@]}"; then
+    echo "✗ systemctl restart 失败"
+    sudo journalctl -u "${UNITS[0]}" -u "${UNITS[1]}" -n 20 --no-pager | tail -20
+    exit 1
+fi
+sleep 5
+
+# ---- 3. 校验每个 unit：active、MainPID 是本次新起的 ----
+echo ""
+echo ">>> 验证服务..."
+for u in "${UNITS[@]}"; do
+    state=$(systemctl is-active "$u" 2>/dev/null)
+    pid=$(systemctl show "$u" -p MainPID --value 2>/dev/null)
+    nrs=$(systemctl show "$u" -p NRestarts --value 2>/dev/null)
+
+    if [[ "$state" != "active" ]]; then
+        echo "✗ $u 状态为 $state"
+        RC=1
+        continue
+    fi
+    if [[ -z "$pid" || "$pid" == "0" ]]; then
+        echo "✗ $u 无 MainPID"
+        RC=1
+        continue
+    fi
+    st=$(stat -c %Y "/proc/$pid" 2>/dev/null)   # /proc/<pid> 的 mtime 即进程启动时刻
+    if [[ -z "$st" || "$st" -lt "$START_TS" ]]; then
+        echo "✗ $u MainPID=$pid 早于本次部署（代码未更新）"
+        RC=1
+        continue
+    fi
+    if [[ "$pid" == "${OLD_PID[$u]}" ]]; then
+        echo "✗ $u MainPID 未变化（$pid）—— 服务实际未被重启"
+        RC=1
+        continue
+    fi
+    echo "✓ $u  active  PID $pid  NRestarts=$nrs  启动于 $(ps -o lstart= -p "$pid" 2>/dev/null | xargs)"
+done
+
+# ---- 4. 孤儿检测：本项目目录下不允许有游离于 systemd 之外的进程 ----
+orphans=""
+for d in /proc/[0-9]*; do
+    p=${d#/proc/}
+    cwd=$(readlink "$d/cwd" 2>/dev/null)
+    [[ "$cwd" == "$PROJECT_DIR" ]] || continue
+    cmd=$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null)
+    [[ -n "$cmd" ]] || continue
+    # 命令行含 deploy.sh 的是本脚本自身的子 shell，跳过自匹配
+    [[ "$cmd" == *deploy.sh* || "$cmd" == *"systemctl "* ]] && continue
+    svc=$(awk -F/ '/0::/{gsub(/\.service$/,"",$NF); print $NF}' "$d/cgroup" 2>/dev/null)
+    if [[ "$svc" != "wtsj-api" && "$svc" != "wtsj-worker" ]]; then
+        orphans+="${p}(${svc:-非systemd}) "
+    fi
+done
+if [[ -n "$orphans" ]]; then
+    echo "✗ 发现游离进程，会与 systemd 抢端口/抢队列：$orphans"
+    echo "  处理：kill -TERM ${orphans%% *}"
+    RC=1
+else
+    echo "✓ 无游离进程（进程数与 unit 数一致）"
+fi
+
+# ---- 5. 端口归属必须是 wtsj-api 的 MainPID ----
+api_pid=$(systemctl show wtsj-api -p MainPID --value 2>/dev/null)
+port_pid=$(sudo ss -ltnp "sport = :$API_PORT" 2>/dev/null | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
+if [[ -n "$port_pid" && "$port_pid" == "$api_pid" ]]; then
+    echo "✓ 端口 $API_PORT 由 wtsj-api (PID $api_pid) 持有"
+else
+    echo "✗ 端口 $API_PORT 归属异常：监听者 PID=${port_pid:-无}，wtsj-api PID=${api_pid:-无}"
+    RC=1
+fi
+
+# ---- 6. HTTP 连通 ----
+code_local=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$API_PORT/docs" || echo 000)
+[[ "$code_local" == "200" ]] && echo "✓ 本机 /docs HTTP $code_local" || { echo "✗ 本机 /docs HTTP $code_local"; RC=1; }
+code_pub=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_URL" || echo 000)
+[[ "$code_pub" == "200" ]] && echo "✓ 公网 $PUBLIC_URL HTTP $code_pub" || { echo "✗ 公网健康检查 HTTP $code_pub"; RC=1; }
+
+# ---- 7. 配置自检（只报有无，绝不打印明文密钥）----
+echo ""
+echo ">>> 配置自检..."
 python <<'PY'
 from app.core.config import settings as s
 
 REQUIRED = {
-    "WECHAT_APP_ID": "微信登录",
-    "WECHAT_APP_SECRET": "微信登录",
-    "DEEPSEEK_API_KEY": "LLM 知识提取（三条主链路都要）",
+    "WECHAT_APP_ID": "微信登录（小程序无法进入）",
+    "WECHAT_APP_SECRET": "微信登录（小程序无法进入）",
+    "DEEPSEEK_API_KEY": "LLM 知识提取（URL/截图/语音三条主链路都要）",
     "TENCENT_OCR_SECRET_ID": "截图 OCR",
     "TENCENT_OCR_SECRET_KEY": "截图 OCR",
     "TENCENT_ASR_SECRET_ID": "语音转写",
@@ -142,25 +149,25 @@ OPTIONAL = {
     "COS_BUCKET": "COS 素材存储",
 }
 
-missing = sorted(f"{k} → {v}" for k, v in REQUIRED.items() if not getattr(s, k, ""))
-opt_missing = sorted(k for k in OPTIONAL if not getattr(s, k, ""))
-
 print(f"  数据库类型: {s.DATABASE_URL.split('://')[0]}")
+missing = sorted(f"{v}  ← {k}" for k, v in REQUIRED.items() if not getattr(s, k, ""))
+opt_missing = sorted(k for k in OPTIONAL if not getattr(s, k, ""))
 if missing:
     print(f"  !! 缺失 {len(missing)} 项必需配置，对应功能在生产环境【完全不可用】：")
     for m in missing:
         print(f"     - {m}")
+    print("  !! 因此本次部署【不能】宣称核心功能已验证 —— 需先在 .env 补齐并重启。")
 else:
     print("  ✓ 必需配置齐全")
 if opt_missing:
-    print(f"  · 未配置的可选能力: {', '.join(opt_missing)}（小程序码/素材上传/分享图会失败）")
+    print(f"  · 未配置的可选能力: {', '.join(opt_missing)}（小程序码/素材上传会失败）")
 PY
 
 echo ""
-if [[ "$DEPLOY_OK" -eq 0 ]]; then
-    echo "=== 部署完成：进程已确认重启，新代码已生效 ==="
+if [[ "$RC" -eq 0 ]]; then
+    echo "=== 部署完成：服务已由 systemd 重启并确认为新进程 ==="
+    echo "日志：sudo journalctl -u wtsj-api -f    sudo journalctl -u wtsj-worker -f"
 else
-    echo "=== 部署异常：请查看 uvicorn.log / worker.log ==="
+    echo "=== 部署异常：请按上面的 ✗ 项排查 ==="
 fi
-echo "日志: $PROJECT_DIR/uvicorn.log | $PROJECT_DIR/worker.log"
-exit "$DEPLOY_OK"
+exit "$RC"
