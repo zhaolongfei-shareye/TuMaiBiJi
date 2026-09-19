@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 # COPYFILE_DISABLE=1 阻止 macOS bsdtar 为扩展属性生成 AppleDouble（._xxx.py）垃圾文件；
 # 这些文件会以二进制形式落进生产代码树，并被 python -m compileall 判为语法错误。
 echo ">>> 打包后端代码..."
-COPYFILE_DISABLE=1 tar czf /tmp/wtsj-backend.tar.gz \
+COPYFILE_DISABLE=1 tar czf /tmp/tumaibiji-backend.tar.gz \
     --exclude='.venv' \
     --exclude='venv' \
     --exclude='*.db' \
@@ -31,20 +31,20 @@ COPYFILE_DISABLE=1 tar czf /tmp/wtsj-backend.tar.gz \
     --exclude='.env.bak*' \
     -C backend .
 
-echo "✓ 打包完成: /tmp/wtsj-backend.tar.gz ($(du -h /tmp/wtsj-backend.tar.gz | cut -f1))"
+echo "✓ 打包完成: /tmp/tumaibiji-backend.tar.gz ($(du -h /tmp/tumaibiji-backend.tar.gz | cut -f1))"
 
 # 上传到服务器
 echo ""
 echo ">>> 上传到 agentsbin..."
-scp /tmp/wtsj-backend.tar.gz agentsbin:/tmp/
+scp /tmp/tumaibiji-backend.tar.gz agentsbin:/tmp/
 
 # 服务器解压（解压后清掉历史遗留的 AppleDouble 垃圾，覆盖式部署不会自动删除旧文件）
 echo ""
 echo ">>> 服务器解压..."
-ssh agentsbin "cd /home/ubuntu/wtsj-backend && tar xzf /tmp/wtsj-backend.tar.gz && rm /tmp/wtsj-backend.tar.gz && find . -name '._*' -delete && find . -name '.DS_Store' -delete"
+ssh agentsbin "cd /home/ubuntu/wtsj-backend && tar xzf /tmp/tumaibiji-backend.tar.gz && rm /tmp/tumaibiji-backend.tar.gz && find . -name '._*' -delete && find . -name '.DS_Store' -delete"
 
 # 清理本地临时文件
-rm /tmp/wtsj-backend.tar.gz
+rm /tmp/tumaibiji-backend.tar.gz
 
 echo ""
 echo "=== 上传完成 ==="

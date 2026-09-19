@@ -28,7 +28,7 @@
     </view>
 
     <view class="card-footer">
-      <text class="footer-text">{{t.fromWtsj}}</text>
+      <text class="footer-text">{{t.fromTuMaiBiJi}}</text>
     </view>
   </view>
 </view>

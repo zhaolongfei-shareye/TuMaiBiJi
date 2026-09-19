@@ -29,11 +29,11 @@ RC=0
 # ---- 1. 语法闸门：坏代码不要推上去，否则 systemd 会反复拉起又崩溃 ----
 echo ""
 echo ">>> 语法检查..."
-if python -m compileall -q app > /tmp/wtsj_compile.err 2>&1; then
+if python -m compileall -q app > /tmp/tumaibiji_compile.err 2>&1; then
     echo "✓ 语法通过"
 else
     echo "✗ 语法错误，终止部署（未重启服务，线上保持旧版本继续运行）"
-    tail -20 /tmp/wtsj_compile.err
+    tail -20 /tmp/tumaibiji_compile.err
     exit 1
 fi
 

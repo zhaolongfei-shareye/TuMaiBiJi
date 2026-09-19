@@ -8,7 +8,7 @@ import asyncio
 import os
 import sys
 
-os.environ["DATABASE_URL"] = "sqlite:////tmp/wtsj_pytest.db"
+os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest.db"
 os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
 os.environ["DEEPSEEK_API_KEY"] = "sk-your-deepseek-api-key"  # 占位符：模拟生产未配置
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
