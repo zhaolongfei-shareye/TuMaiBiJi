@@ -2,6 +2,10 @@ __pycache__/
 *.py[cod]
 *.db
 .env
+# .env 的改名备份/临时副本同样带着明文密钥（部署当天就产出过一份 .env.bak-*），
+# 但 .env.example 是要入库的模板，故单独放行。
+.env.*
+!.env.example
 .venv/
 venv/
 node_modules/
