@@ -13,8 +13,10 @@ echo "=== 微图闪记后端上传 ==="
 cd "$(dirname "$0")/.."
 
 # 打包（排除虚拟环境、数据库、日志等）
+# COPYFILE_DISABLE=1 阻止 macOS bsdtar 为扩展属性生成 AppleDouble（._xxx.py）垃圾文件；
+# 这些文件会以二进制形式落进生产代码树，并被 python -m compileall 判为语法错误。
 echo ">>> 打包后端代码..."
-tar czf /tmp/wtsj-backend.tar.gz \
+COPYFILE_DISABLE=1 tar czf /tmp/wtsj-backend.tar.gz \
     --exclude='.venv' \
     --exclude='venv' \
     --exclude='*.db' \
@@ -23,6 +25,7 @@ tar czf /tmp/wtsj-backend.tar.gz \
     --exclude='__pycache__' \
     --exclude='*.pyc' \
     --exclude='.DS_Store' \
+    --exclude='._*' \
     --exclude='keys' \
     --exclude='.env' \
     -C backend .
@@ -34,10 +37,10 @@ echo ""
 echo ">>> 上传到 agentsbin..."
 scp /tmp/wtsj-backend.tar.gz agentsbin:/tmp/
 
-# 服务器解压
+# 服务器解压（解压后清掉历史遗留的 AppleDouble 垃圾，覆盖式部署不会自动删除旧文件）
 echo ""
 echo ">>> 服务器解压..."
-ssh agentsbin "cd /home/ubuntu/wtsj-backend && tar xzf /tmp/wtsj-backend.tar.gz && rm /tmp/wtsj-backend.tar.gz"
+ssh agentsbin "cd /home/ubuntu/wtsj-backend && tar xzf /tmp/wtsj-backend.tar.gz && rm /tmp/wtsj-backend.tar.gz && find . -name '._*' -delete && find . -name '.DS_Store' -delete"
 
 # 清理本地临时文件
 rm /tmp/wtsj-backend.tar.gz
