@@ -198,8 +198,9 @@ class TestBatchLimits:
 
         with pytest.raises(HTTPException) as exc:
             asyncio.run(self._stage(b"\x00\x00\x00\x18ftypheic" + b"\x00" * 200))
-        assert exc.value.status_code == 400 and "格式不支持" in exc.value.detail
-        assert "兼容性最佳" in exc.value.detail
+        assert exc.value.status_code == 400 and "不支持" in exc.value.detail
+        assert "JPG" in exc.value.detail
+        assert len(exc.value.detail) <= 30  # toast 只容得下两行，长了会被截断
         assert ingest_route._batch_staging == {}
 
     def test_over_batch_count_rejected(self, monkeypatch):

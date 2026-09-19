@@ -74,7 +74,7 @@ Page({
       console.error('URL 导入失败', err)
       const msg = err.timeout
         ? t('taskTimeout', lang)
-        : (err.error || t('taskFailed', lang))
+        : ((err.data && err.data.detail) || err.error || t('taskFailed', lang))
       wx.showToast({ title: msg, icon: 'none', duration: 3000 })
       this.setData({ submitting: false })
     }
@@ -121,7 +121,7 @@ Page({
       console.error('截图导入失败', err)
       const msg = err.timeout
         ? t('taskTimeout', lang)
-        : (err.error || t('taskFailed', lang))
+        : ((err.data && err.data.detail) || err.error || t('taskFailed', lang))
       wx.showToast({ title: msg, icon: 'none', duration: 3000 })
       this.setData({ submitting: false })
     }

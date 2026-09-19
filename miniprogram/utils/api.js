@@ -89,7 +89,13 @@ const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
             .then(resolve)
             .catch(reject)
         } else {
-          reject(res)
+          // wx.uploadFile 拿到的 data 是字符串，而 wx.request 的是对象。不统一成对象，
+          // 页面里 err.data.detail 这种取法在上传失败时会拿到 undefined，用户只能看到兜底文案。
+          try {
+            reject(Object.assign({}, res, { data: JSON.parse(res.data) }))
+          } catch (e) {
+            reject(res)
+          }
         }
       },
       fail(err) {

@@ -50,9 +50,9 @@ MAX_BATCH_BYTES = 40 * 1024 * 1024
 MAX_BATCHES_PER_USER = 2
 MAX_STAGING_BYTES = 120 * 1024 * 1024
 
-UNSUPPORTED_IMAGE_HINT = (
-    "图片格式不支持，请用 JPG 或 PNG（iPhone 可在「设置 → 相机 → 格式」选「兼容性最佳」）"
-)
+# 这句话是直接弹给用户的 toast：icon:'none' 只显示两行（约 30 个汉字），超了会被截断，
+# 所以只留"怎么办"，iPhone 的设置路径写在入口卡片的小字里。
+UNSUPPORTED_IMAGE_HINT = "暂不支持该图片格式，请改用 JPG 或 PNG"
 
 
 def _image_format(data: bytes) -> str | None:
