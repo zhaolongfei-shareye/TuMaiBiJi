@@ -170,10 +170,28 @@ async def ocr_image(image_data: bytes) -> str:
 
 
 async def ocr_images(images_data: list[bytes]) -> str:
-    """对多张图片依次 OCR，合并结果。"""
-    results = []
-    for i, img in enumerate(images_data):
+    """对多张图片依次 OCR，合并结果。
+
+    分页标记只在"认出字的页"有两页以上时才加：单张加标记会让"第一条正文"变成标记串，
+    而提炼降级时标题正是取正文首行，用户看到的标题就成了 `--- 第1页 ---`。
+    """
+    pages: list[str] = []
+    for img in images_data:
         text = await ocr_image(img)
         if text.strip():
-            results.append(f"--- 第{i + 1}页 ---\n{text}")
-    return "\n\n".join(results)
+            pages.append(text)
+    if len(pages) < 2:
+        return pages[0] if pages else ""
+    return "\n\n".join(f"--- 第{i + 1}页 ---\n{text}" for i, text in enumerate(pages))
+
+
+_PAGE_MARKER = re.compile(r"^--- 第\d+页 ---$")
+
+
+def title_hint(text: str, max_len: int = 30) -> str:
+    """给提炼当兜底标题：第一条正文行，跳过我们自己插的分页标记。"""
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not _PAGE_MARKER.match(line):
+            return line[:max_len]
+    return ""

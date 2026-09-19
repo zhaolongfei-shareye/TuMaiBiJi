@@ -4,7 +4,7 @@ import logging
 from app.core.errors import UserError
 from app.db.database import SessionLocal
 from app.models.note import Note
-from app.services.ocr import ocr_images
+from app.services.ocr import ocr_images, title_hint
 from app.services.scraper import scrape_url
 from app.services.llm import extract_knowledge
 from app.services.queue import set_task_status
@@ -71,7 +71,7 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
             set_task_status(task_id, "failed", {"error": "OCR 未识别到文字内容"})
             return
 
-        knowledge = asyncio.run(extract_knowledge(ocr_text))
+        knowledge = asyncio.run(extract_knowledge(ocr_text, fallback_title=title_hint(ocr_text)))
 
         db = SessionLocal()
         try:

@@ -198,6 +198,20 @@ class TestExtractionDegradation:
         tasks.process_screenshots_task("t-empty", uid, [b"fake-png"])
         assert statuses[-1][0] == "failed"
 
+    def test_multi_page_screenshot_title_is_not_the_page_marker(self, worker, db):
+        """R17：多张图仍带分页标记，降级标题必须跳过它取真正的正文行。"""
+        tasks, statuses, uid, mp = worker
+
+        async def fake_ocr(images_data):
+            return "--- 第1页 ---\n产品周会纪要\n第一条要点\n\n--- 第2页 ---\n第二页正文"
+
+        mp.setattr(tasks, "ocr_images", fake_ocr)
+        tasks.process_screenshots_task("t-title", uid, [b"a", b"b"])
+        status, result = statuses[-1]
+        assert (status, result["degraded"]) == ("completed", True)
+        note = db.get(Note, result["note_id"])
+        assert note.title == "产品周会纪要"
+
     def test_url_task_reports_degraded_flag(self, worker):
         tasks, statuses, uid, mp = worker
 

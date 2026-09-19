@@ -185,6 +185,45 @@ class TestSerialExecution:
         assert len(fake.seen) == 3
 
 
+class TestPageMarkers:
+    """R17：单张截图的正文首行曾是我们的分页标记，而降级标题取的就是首行。"""
+
+    def test_single_image_has_no_page_marker(self, engine_spy):
+        engine_spy(FakeEngine(out(["产品周会纪要"], [box(0, 0)], [0.9])))
+        text = asyncio.run(ocr.ocr_images([png(300, 200)]))
+        assert text == "产品周会纪要"
+        assert "--- 第" not in text
+
+    def test_blank_pages_do_not_create_a_second_page(self, monkeypatch):
+        async def one_page_of_text(data):
+            return "只有这一页认出了字" if data == b"a" else ""
+
+        monkeypatch.setattr(ocr, "ocr_image", one_page_of_text)
+        assert asyncio.run(ocr.ocr_images([b"a", b"b", b"c"])) == "只有这一页认出了字"
+
+    def test_two_recognized_pages_are_labeled(self, monkeypatch):
+        pages = {b"a": "第一页正文", b"b": "第二页正文"}
+
+        async def two_pages(data):
+            return pages[data]
+
+        monkeypatch.setattr(ocr, "ocr_image", two_pages)
+        assert asyncio.run(ocr.ocr_images([b"a", b"b"])) == (
+            "--- 第1页 ---\n第一页正文\n\n--- 第2页 ---\n第二页正文"
+        )
+
+
+class TestTitleHint:
+    def test_skips_our_own_page_marker(self):
+        assert ocr.title_hint("--- 第1页 ---\n产品周会纪要\n其余正文") == "产品周会纪要"
+
+    def test_marker_only_input_gives_no_hint(self):
+        assert ocr.title_hint("--- 第1页 ---") == ""
+
+    def test_capped_at_the_degraded_title_length(self):
+        assert len(ocr.title_hint("开" * 40)) == 30
+
+
 class TestBatchLimits:
     @pytest.fixture(autouse=True)
     def clear_staging(self):
