@@ -37,7 +37,48 @@ else
     exit 1
 fi
 
-# ---- 2. 记录重启前的 MainPID，用于确认「真的换了进程」----
+# ---- 2. OCR 运行期预检：依赖装没装对，只有真跑一张才知道 ----
+# 放在 restart 之前：这份自检会在独立进程里加载模型（本机峰值 RSS 实测 816~826MB），
+# 失败说明依赖有问题、新代码推上去只会让线上多一个坏掉的功能，因此直接终止、不重启。
+echo ""
+echo ">>> 自建 OCR 预检..."
+python <<'PY'
+import asyncio
+import io
+import resource
+import sys
+import time
+
+try:
+    import cv2  # noqa: F401  GUI 版 opencv 在无桌面 Ubuntu 上会在此抛 OSError: libGL.so.1
+except Exception as exc:
+    print(f"  !! import cv2 失败：{exc}")
+    print("     修复：sudo apt install -y libgl1（或把 requirements 里的 opencv-python 换成 opencv-python-headless）")
+    sys.exit(1)
+
+from PIL import Image, ImageDraw
+
+from app.services.ocr import ocr_image
+
+img = Image.new("RGB", (760, 140), "white")
+ImageDraw.Draw(img).text((16, 50), "TUMAIJI SELFTEST OCR 123", fill="black")
+buf = io.BytesIO()
+img.save(buf, format="PNG")
+
+t = time.perf_counter()
+text = asyncio.run(ocr_image(buf.getvalue()))
+dt = time.perf_counter() - t
+peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 if sys.platform != "darwin" else 1048576)
+print(f"  识别耗时 {dt:.2f}s  峰值 RSS {peak:.1f} MB  文本={text!r}")
+assert "OCR" in text and "123" in text, "自检图像未识别出预期文字"
+PY
+if [[ $? -ne 0 ]]; then
+    echo "✗ OCR 预检失败，终止部署（未重启服务，线上保持旧版本继续运行）"
+    exit 1
+fi
+echo "  ✓ OCR 链路可用（含首次模型加载；常驻进程复用同一引擎，后续单张更快）"
+
+# ---- 3. 记录重启前的 MainPID，用于确认「真的换了进程」----
 declare -A OLD_PID
 for u in "${UNITS[@]}"; do
     OLD_PID[$u]=$(systemctl show "$u" -p MainPID --value 2>/dev/null)
@@ -56,7 +97,7 @@ if ! sudo systemctl restart "${UNITS[@]}"; then
 fi
 sleep 5
 
-# ---- 3. 校验每个 unit：active、MainPID 是本次新起的 ----
+# ---- 4. 校验每个 unit：active、MainPID 是本次新起的 ----
 echo ""
 echo ">>> 验证服务..."
 for u in "${UNITS[@]}"; do
@@ -88,7 +129,7 @@ for u in "${UNITS[@]}"; do
     echo "✓ $u  active  PID $pid  NRestarts=$nrs  启动于 $(ps -o lstart= -p "$pid" 2>/dev/null | xargs)"
 done
 
-# ---- 4. 孤儿检测：本项目目录下不允许有游离于 systemd 之外的进程 ----
+# ---- 5. 孤儿检测：本项目目录下不允许有游离于 systemd 之外的进程 ----
 orphans=""
 for d in /proc/[0-9]*; do
     p=${d#/proc/}
@@ -111,7 +152,7 @@ else
     echo "✓ 无游离进程（进程数与 unit 数一致）"
 fi
 
-# ---- 5. 端口归属必须是 wtsj-api 的 MainPID ----
+# ---- 6. 端口归属必须是 wtsj-api 的 MainPID ----
 api_pid=$(systemctl show wtsj-api -p MainPID --value 2>/dev/null)
 port_pid=$(sudo ss -ltnp "sport = :$API_PORT" 2>/dev/null | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
 if [[ -n "$port_pid" && "$port_pid" == "$api_pid" ]]; then
@@ -121,13 +162,13 @@ else
     RC=1
 fi
 
-# ---- 6. HTTP 连通 ----
+# ---- 7. HTTP 连通 ----
 code_local=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$API_PORT/docs" || echo 000)
 [[ "$code_local" == "200" ]] && echo "✓ 本机 /docs HTTP $code_local" || { echo "✗ 本机 /docs HTTP $code_local"; RC=1; }
 code_pub=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_URL" || echo 000)
 [[ "$code_pub" == "200" ]] && echo "✓ 公网 $PUBLIC_URL HTTP $code_pub" || { echo "✗ 公网健康检查 HTTP $code_pub"; RC=1; }
 
-# ---- 7. 配置自检（只报有无，绝不打印明文密钥）----
+# ---- 8. 配置自检（只报有无，绝不打印明文密钥）----
 echo ""
 echo ">>> 配置自检..."
 python <<'PY'
@@ -145,7 +186,7 @@ FEATURE = {}
 DEGRADABLE = {
     "DEEPSEEK_API_KEY": "自动提炼摘要/要点/标签（缺失则只存原文，任务不再失败）",
 }
-# 截图 OCR 已无凭据依赖（自建 RapidOCR），改由下面的运行期自检覆盖。
+# 截图 OCR 已无凭据依赖（自建 RapidOCR），已在第 2 节做过运行期预检。
 
 
 def unusable(name):
@@ -170,46 +211,6 @@ if deg_missing:
     for d in deg_missing:
         print(f"     - {d}")
 PY
-
-# ---- 8. OCR 运行期自检：依赖装没装对，只有真跑一张才知道 ----
-echo ""
-echo ">>> 自建 OCR 自检..."
-python <<'PY'
-import asyncio
-import io
-import resource
-import sys
-import time
-
-try:
-    import cv2  # noqa: F401  GUI 版 opencv 在无桌面 Ubuntu 上会在此抛 OSError: libGL.so.1
-except Exception as exc:
-    print(f"  !! import cv2 失败：{exc}")
-    print("     修复：sudo apt install -y libgl1（或把 opencv-python 换成 opencv-python-headless）")
-    sys.exit(1)
-
-from PIL import Image, ImageDraw
-
-from app.services.ocr import ocr_image
-
-img = Image.new("RGB", (760, 140), "white")
-ImageDraw.Draw(img).text((16, 50), "TUMAIJI SELFTEST OCR 123", fill="black")
-buf = io.BytesIO()
-img.save(buf, format="PNG")
-
-t = time.perf_counter()
-text = asyncio.run(ocr_image(buf.getvalue()))
-dt = time.perf_counter() - t
-peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 if sys.platform != "darwin" else 1048576)
-print(f"  识别耗时 {dt:.2f}s  峰值 RSS {peak:.1f} MB  文本={text!r}")
-assert "OCR" in text and "123" in text, "自检图像未识别出预期文字"
-PY
-if [[ $? -eq 0 ]]; then
-    echo "  ✓ OCR 链路可用（含首次模型加载；常驻进程复用同一引擎，后续单张更快）"
-else
-    echo "  ✗ OCR 自检失败：截图转笔记在生产环境【不可用】"
-    RC=1
-fi
 
 echo ""
 if [[ "$RC" -eq 0 ]]; then
