@@ -20,7 +20,11 @@ slowapi==0.1.9
 # 若选 `apt install libgl1` 之外的另一条路，就把下面这行的包名换成 opencv-python-headless==5.0.0.93
 # （同版本号已确认有 cp37-abi3 的 manylinux x86_64/aarch64 wheel），别在别处再引一份 opencv。
 rapidocr==3.9.2
-onnxruntime==1.30.0
+# onnxruntime 故意不钉死：服务器（Ubuntu 22.04 / Python 3.10.12）装 `==1.30.0` 直接
+# "No matching distribution found"，境内镜像里 3.10 能用的最高版是 1.23.2，已实装该版；
+# 本机（Python 3.13）实装 1.30.0，两边都跑过同一条 OCR 链路。rapidocr 本身不声明对
+# onnxruntime 的依赖，所以这里的下限就是我们的运行下限。
+onnxruntime>=1.23.2,<2
 opencv-python==5.0.0.93
 # numpy 故意不钉版本：rapidocr 已限 >=1.19.5,<3.0.0，而本机解析到的 2.5.3 只发 cp312+ 的 wheel，
 # 钉死会把服务器 Python 的下限悄悄抬到 3.12。本机实测值：2.5.3。
