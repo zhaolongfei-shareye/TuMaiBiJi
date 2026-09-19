@@ -45,6 +45,14 @@ BATCH_TTL_SECONDS = 1800
 MAX_IMAGES_PER_BATCH = 10
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_BATCH_BYTES = 40 * 1024 * 1024
+# 只卡住"单批 40MB"是不够的：stage 限流 20 次/分钟、TTL 30 分钟，且不传 batch_id 就新建批次，
+# 一个客户端能在半小时内堆出几百个批次。下面两条卡的才是"批次数量"这个维度。
+MAX_BATCHES_PER_USER = 2
+MAX_STAGING_BYTES = 120 * 1024 * 1024
+
+
+def _staging_bytes() -> int:
+    return sum(batch["bytes"] for batch in _batch_staging.values())
 
 
 def _sweep_stale_batches():
@@ -52,6 +60,29 @@ def _sweep_stale_batches():
     for batch_id, batch in list(_batch_staging.items()):
         if now - batch["created_at"] > BATCH_TTL_SECONDS:
             _batch_staging.pop(batch_id, None)
+
+
+def _make_room_for_new_batch(incoming: int, user_id: str, is_new_batch: bool):
+    """新建批次前先腾出该用户最旧的那份；全局预算仍不足就直接拒，不动别人的批次。"""
+    if is_new_batch:
+        mine = sorted(
+            ((bid, b) for bid, b in _batch_staging.items() if b["user_id"] == user_id),
+            key=lambda item: item[1]["created_at"],
+        )
+        while len(mine) >= MAX_BATCHES_PER_USER:
+            victim_id, victim = mine.pop(0)
+            _batch_staging.pop(victim_id, None)
+            logger.info(
+                "超出每用户 %d 批上限，淘汰最旧批次 %s（%d 字节）",
+                MAX_BATCHES_PER_USER,
+                victim_id,
+                victim["bytes"],
+            )
+    if _staging_bytes() + incoming > MAX_STAGING_BYTES:
+        raise HTTPException(
+            status_code=429,
+            detail=f"服务器暂存已满（上限 {MAX_STAGING_BYTES // 1048576}MB），请稍后重试",
+        )
 
 
 @router.post("/screenshots/stage")
@@ -83,6 +114,8 @@ async def stage_screenshot(
         batch = _batch_staging.get(batch_id)
         if batch is None or batch["user_id"] != str(user.id):
             raise HTTPException(status_code=404, detail="批次不存在或已失效，请重新上传")
+
+    _make_room_for_new_batch(len(data), str(user.id), batch is None)
 
     if batch is None:
         batch_id = uuid.uuid4().hex
@@ -116,6 +149,8 @@ async def process_screenshots(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    _sweep_stale_batches()
+
     batch = _batch_staging.get(batch_id)
     if not batch or batch["user_id"] != str(user.id):
         raise HTTPException(status_code=404, detail="批次不存在或已失效，请重新上传")

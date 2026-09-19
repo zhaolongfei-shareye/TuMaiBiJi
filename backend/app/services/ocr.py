@@ -60,11 +60,21 @@ def _get_engine():
 
 def _prepare(image_data: bytes) -> Image.Image:
     """解码为 PIL 图像并缩放长边。交给 RapidOCR 时保持 RGB/RGBA，由它做 RGB→BGR。"""
-    img = Image.open(BytesIO(image_data))
-    img = ImageOps.exif_transpose(img) or img
-    if img.mode not in ("RGB", "RGBA", "L"):
-        # P 模式可能带调色板透明，转 RGBA 才能正确合成背景
-        img = img.convert("RGBA" if img.mode == "P" else "RGB")
+    try:
+        img = Image.open(BytesIO(image_data))
+        img = ImageOps.exif_transpose(img) or img
+        if img.mode not in ("RGB", "RGBA", "L"):
+            # P 模式可能带调色板透明，转 RGBA 才能正确合成背景
+            img = img.convert("RGBA" if img.mode == "P" else "RGB")
+        # PNG 的截断要在这里才暴露（open 是懒解析），否则拖到缩放处抛英文栈
+        img.load()
+    except Image.UnidentifiedImageError as exc:
+        raise RuntimeError(
+            "图片无法识别，可能是 HEIC 格式或已损坏。iPhone 可在"
+            "「设置 → 相机 → 格式」选「兼容性最佳」后重试。"
+        ) from exc
+    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError) as exc:
+        raise RuntimeError("图片已损坏或尺寸过大，请重新截图后上传") from exc
 
     width, height = img.size
     long_edge = max(width, height)

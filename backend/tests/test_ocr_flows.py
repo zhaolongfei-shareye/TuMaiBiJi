@@ -1,4 +1,4 @@
-"""F7 自建 OCR 的落地断言：缩放、串行、排序、降噪、批次上限、失败态。
+"""F7 自建 OCR 的落地断言：缩放、串行、排序、降噪、批次上限（含每用户批次数与全局预算）、坏图给出中文字段、失败态。
 
 不连真实模型、不依赖 Redis，可反复执行。
 
@@ -156,6 +156,8 @@ class TestBatchLimits:
         assert ingest_route.MAX_IMAGE_BYTES == 10 * 1024 * 1024
         assert ingest_route.MAX_BATCH_BYTES == 40 * 1024 * 1024
         assert ingest_route.BATCH_TTL_SECONDS == 1800
+        assert ingest_route.MAX_BATCHES_PER_USER == 2
+        assert ingest_route.MAX_STAGING_BYTES == 120 * 1024 * 1024
 
     class Upload:
         def __init__(self, data):
@@ -205,6 +207,61 @@ class TestBatchLimits:
         with pytest.raises(HTTPException) as exc:
             asyncio.run(self._stage(b"678901", staged["batch_id"]))
         assert exc.value.status_code == 400 and "分多次" in exc.value.detail
+
+    def test_per_user_batch_count_capped(self, monkeypatch):
+        """不传 batch_id 就是新建批次：只卡"单批 40MB"挡不住半小时里堆出几百批。"""
+        monkeypatch.setattr(ingest_route, "MAX_BATCHES_PER_USER", 2)
+        first = asyncio.run(self._stage(b"aa"))["batch_id"]
+        second = asyncio.run(self._stage(b"bb"))["batch_id"]
+        third = asyncio.run(self._stage(b"cc"))
+        assert first not in ingest_route._batch_staging
+        assert set(ingest_route._batch_staging) == {second, third["batch_id"]}
+        assert third["count"] == 1
+
+    def test_global_staging_budget_rejects_without_touching_others(self, monkeypatch):
+        from fastapi import HTTPException
+
+        monkeypatch.setattr(ingest_route, "MAX_BATCHES_PER_USER", 99)
+        monkeypatch.setattr(ingest_route, "MAX_STAGING_BYTES", 10)
+        ingest_route._batch_staging["other-user"] = {
+            "data": [b"xxx"],
+            "bytes": 3,
+            "user_id": "9999",
+            "created_at": time.time(),
+        }
+        asyncio.run(self._stage(b"12345"))
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(self._stage(b"67890"))
+        assert exc.value.status_code == 429 and "服务器暂存已满" in exc.value.detail
+        assert "other-user" in ingest_route._batch_staging
+
+
+class TestUnreadableImage:
+    """认不出的字节要说人话：这些串会经 str(e) 进任务 failed.error 直接给用户看。"""
+
+    def _expect_chinese(self, data):
+        with pytest.raises(RuntimeError) as exc:
+            asyncio.run(ocr.ocr_image(data))
+        msg = str(exc.value)
+        assert "Error" not in msg and "Traceback" not in msg
+        return msg
+
+    def test_unidentified_bytes_mention_heic_and_fix(self, engine_spy):
+        engine_spy(FakeEngine())
+        heic_like = b"\x00\x00\x00\x18ftypheic" + b"\x00" * 200
+        msg = self._expect_chinese(heic_like)
+        assert "无法识别" in msg and "HEIC" in msg and "兼容性最佳" in msg
+
+    def test_truncated_png_fails_before_engine(self, engine_spy):
+        fake = engine_spy(FakeEngine())
+        raw = png(300, 200)
+        msg = self._expect_chinese(raw[: len(raw) // 2])
+        assert "损坏" in msg
+        assert fake.seen == []
+
+    def test_valid_image_still_passes(self, engine_spy):
+        engine_spy(FakeEngine(out(["正常的图"], [box(0, 0)], [0.9])))
+        assert asyncio.run(ocr.ocr_image(png(300, 200))) == "正常的图"
 
 
 class TestFailureState:
