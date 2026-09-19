@@ -6,7 +6,6 @@ const SOURCE_TYPE_KEYS = {
   web_article: 'sourceWebArticle',
   screenshot: 'sourceScreenshot',
   manual: 'sourceManual',
-  voice: 'sourceVoice',
 }
 
 function formatTime(dateStr) {

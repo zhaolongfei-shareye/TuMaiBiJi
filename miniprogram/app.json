@@ -40,10 +40,5 @@
     ]
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json",
-  "permission": {
-    "scope.record": {
-      "desc": "用于语音转写功能，将您的语音转为文字笔记"
-    }
-  }
+  "sitemapLocation": "sitemap.json"
 }

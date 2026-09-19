@@ -99,53 +99,6 @@ const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
   })
 }
 
-const uploadFile = (url, filePath, name, retryCount = 0) => {
-  return new Promise((resolve, reject) => {
-    wx.uploadFile({
-      url: `${getApp().globalData.apiBase}${url}`,
-      filePath,
-      name: name || 'file',
-      header: _headers(),
-      success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(JSON.parse(res.data))
-        } else if (res.statusCode === 401) {
-          // Prevent infinite relogin loop: only retry once
-          if (retryCount >= 1) {
-            reject(new Error('认证失败，请重新登录'))
-            return
-          }
-          
-          // Handle 401 for uploads: clear auth and trigger re-login
-          const app = getApp()
-          app.globalData.token = ''
-          app.globalData.userId = ''
-          app.globalData.userInfo = null
-          app.globalData.isLoggedIn = false
-          app.globalData.loginPromise = null
-          
-          app.getLoginPromise()
-            .then(() => {
-              // Retry upload with new token (increment retry count)
-              return uploadFile(url, filePath, name, retryCount + 1)
-            })
-            .then(resolve)
-            .catch(reject)
-        } else {
-          reject(res)
-        }
-      },
-      fail(err) {
-        reject(err)
-      }
-    })
-  })
-}
-
-const ingestVoice = (filePath) => {
-  return uploadFile('/api/ingest/voice', filePath, 'audio')
-}
-
 const ingestScreenshots = async (filePaths) => {
   let batchId = null
   for (const filePath of filePaths) {
@@ -197,7 +150,6 @@ module.exports = {
   pinNote: (id, pin) => request(`/api/notes/${id}/pin?pin=${pin}`, 'POST'),
   ingestUrl: (url) => request('/api/ingest/url', 'POST', { url }, { contentType: 'application/x-www-form-urlencoded' }),
   ingestScreenshots,
-  ingestVoice,
   getTaskStatus,
   pollTask,
   getCategories: () => request('/api/categories/'),

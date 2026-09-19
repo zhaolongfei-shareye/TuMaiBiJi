@@ -129,12 +129,6 @@ const i18n = {
     taskProcessing: '正在处理...',
     taskFailed: '处理失败，请重试',
     taskTimeout: '处理超时，请稍后在笔记列表查看',
-    voiceImport: '语音转写',
-    voiceDesc: '录音转文字',
-    recording: '录音中...',
-    stopRecording: '点击停止',
-    voiceTooShort: '录音时间太短',
-    sourceVoice: '语音转写',
   },
   en: {
     tabNotes: 'Notes',
@@ -266,12 +260,6 @@ const i18n = {
     taskProcessing: 'Processing...',
     taskFailed: 'Processing failed, please retry',
     taskTimeout: 'Processing timeout, check notes list later',
-    voiceImport: 'Voice',
-    voiceDesc: 'Record and transcribe',
-    recording: 'Recording...',
-    stopRecording: 'Tap to stop',
-    voiceTooShort: 'Recording too short',
-    sourceVoice: 'Voice',
   },
 }
 

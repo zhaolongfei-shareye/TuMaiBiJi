@@ -20,25 +20,6 @@
       <text class="entry-label">{{t.writeNote}}</text>
       <text class="entry-desc">{{t.manualDesc}}</text>
     </view>
-
-    <view class="card entry-card" bindtap="onVoiceImport">
-      <text class="entry-icon">🎙️</text>
-      <text class="entry-label">{{t.voiceImport}}</text>
-      <text class="entry-desc">{{t.voiceDesc}}</text>
-    </view>
-  </view>
-
-  <!-- 录音面板 -->
-  <view wx:if="{{showRecorder}}" class="recorder-panel card">
-    <view class="recorder-indicator {{isRecording ? 'recording' : ''}}">
-      <view class="recorder-dot"></view>
-    </view>
-    <view class="recorder-timer">{{recorderTimeText}}</view>
-    <view class="recorder-status">{{isRecording ? t.recording : t.stopRecording}}</view>
-    <view class="recorder-actions">
-      <view wx:if="{{isRecording}}" class="btn-primary recorder-btn" bindtap="stopRecording">{{t.confirm}}</view>
-      <view class="btn-secondary recorder-btn" bindtap="cancelRecording">{{t.cancel}}</view>
-    </view>
   </view>
 
   <!-- URL 导入弹窗 -->

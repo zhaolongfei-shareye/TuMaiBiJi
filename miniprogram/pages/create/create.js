@@ -1,8 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 
-const recorderManager = wx.getRecorderManager()
-
 Page({
   data: {
     lang: 'zh',
@@ -12,10 +10,6 @@ Page({
     urlInput: '',
     previewImages: [],
     submitting: false,
-    showRecorder: false,
-    isRecording: false,
-    recorderTime: 0,
-    recorderTimeText: '00:00',
   },
 
   onShow() {
@@ -29,76 +23,11 @@ Page({
       previewImages: [],
       urlInput: '',
       showUrlDialog: false,
-      showRecorder: false,
-      isRecording: false,
-      recorderTime: 0,
-      recorderTimeText: '00:00',
     })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().setData({ selected: 1 })
     }
-  },
-
-  onHide() {
-    // Stop recording when page is hidden (e.g., switching tabs)
-    if (this.data.isRecording) {
-      this._stopAndDiscardRecording()
-    }
-  },
-
-  onLoad() {
-    recorderManager.onStart(() => {
-      this.setData({ isRecording: true, recorderTime: 0, recorderTimeText: '00:00' })
-      this._recorderTimer = setInterval(() => {
-        const sec = this.data.recorderTime + 1
-        const mm = String(Math.floor(sec / 60)).padStart(2, '0')
-        const ss = String(sec % 60).padStart(2, '0')
-        this.setData({ recorderTime: sec, recorderTimeText: `${mm}:${ss}` })
-      }, 1000)
-    })
-
-    recorderManager.onStop((res) => {
-      clearInterval(this._recorderTimer)
-      this._recorderTimer = null
-      if (this._voiceCancelled) {
-        this._voiceCancelled = false
-        this.setData({ showRecorder: false, isRecording: false, recorderTime: 0, recorderTimeText: '00:00' })
-        return
-      }
-      // Use actual recording duration from result instead of UI timer
-      const actualDuration = Math.floor(res.duration / 1000) || this.data.recorderTime
-      if (actualDuration < 1) {
-        this.setData({ showRecorder: false, isRecording: false })
-        wx.showToast({ title: t('voiceTooShort', this.data.lang), icon: 'none' })
-        return
-      }
-      this._uploadVoice(res.tempFilePath)
-    })
-
-    recorderManager.onError((err) => {
-      clearInterval(this._recorderTimer)
-      this._recorderTimer = null
-      this.setData({ showRecorder: false, isRecording: false })
-      wx.showToast({ title: err.errMsg || t('taskFailed', this.data.lang), icon: 'none' })
-    })
-  },
-
-  onUnload() {
-    clearInterval(this._recorderTimer)
-    this._recorderTimer = null
-    // Stop recording when page is unloaded
-    if (this.data.isRecording) {
-      this._stopAndDiscardRecording()
-    }
-  },
-
-  _stopAndDiscardRecording() {
-    this._voiceCancelled = true
-    clearInterval(this._recorderTimer)
-    this._recorderTimer = null
-    recorderManager.stop()
-    this.setData({ showRecorder: false, isRecording: false, recorderTime: 0, recorderTimeText: '00:00' })
   },
 
   // URL 导入
@@ -195,68 +124,6 @@ Page({
         : (err.error || t('taskFailed', lang))
       wx.showToast({ title: msg, icon: 'none', duration: 3000 })
       this.setData({ submitting: false })
-    }
-  },
-
-  // 语音转写
-  onVoiceImport() {
-    if (this.data.showRecorder && this.data.isRecording) {
-      this.stopRecording()
-      return
-    }
-    // Clear any pending start timer first
-    if (this._startTimer) {
-      clearTimeout(this._startTimer)
-      this._startTimer = null
-    }
-    this.setData({ showRecorder: true, isRecording: false, recorderTime: 0, recorderTimeText: '00:00' })
-    this._startTimer = setTimeout(() => {
-      this._startTimer = null
-      recorderManager.start({
-        duration: 60000,
-        sampleRate: 16000,
-        numberOfChannels: 1,
-        encodeBitRate: 48000,
-        format: 'aac',
-      })
-    }, 300)
-  },
-
-  stopRecording() {
-    recorderManager.stop()
-  },
-
-  cancelRecording() {
-    // Clear pending start timer if user cancels quickly
-    if (this._startTimer) {
-      clearTimeout(this._startTimer)
-      this._startTimer = null
-    }
-    this._stopAndDiscardRecording()
-  },
-
-  async _uploadVoice(filePath) {
-    const { lang } = this.data
-    this.setData({ submitting: true, isRecording: false })
-    wx.showLoading({ title: t('taskProcessing', lang), mask: true })
-
-    try {
-      const { task_id } = await api.ingestVoice(filePath)
-      const result = await api.pollTask(task_id)
-      wx.hideLoading()
-      wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
-      setTimeout(() => {
-        wx.navigateTo({ url: `/pages/detail/detail?id=${result.note_id}` })
-        this.setData({ showRecorder: false, submitting: false })
-      }, 1000)
-    } catch (err) {
-      wx.hideLoading()
-      console.error('语音转写失败', err)
-      const msg = err.timeout
-        ? t('taskTimeout', lang)
-        : (err.error || t('taskFailed', lang))
-      wx.showToast({ title: msg, icon: 'none', duration: 3000 })
-      this.setData({ showRecorder: false, submitting: false })
     }
   },
 

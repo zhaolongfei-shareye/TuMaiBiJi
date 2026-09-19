@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
 
 class Settings(BaseSettings):
@@ -6,8 +6,6 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: str = ""
     TENCENT_OCR_SECRET_ID: str = ""
     TENCENT_OCR_SECRET_KEY: str = ""
-    TENCENT_ASR_SECRET_ID: str = ""
-    TENCENT_ASR_SECRET_KEY: str = ""
     COS_SECRET_ID: str = ""
     COS_SECRET_KEY: str = ""
     COS_REGION: str = ""
@@ -29,7 +27,7 @@ class Settings(BaseSettings):
             )
         return self
 
-    class Config:
-        env_file = ".env"
+    # extra 默认为 forbid：.env 里残留已删除的字段（如 TENCENT_ASR_*）会让服务启动即崩溃
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()
