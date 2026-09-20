@@ -1,6 +1,6 @@
 <view class="container {{themeClass}}">
   <!-- 搜索栏 -->
-  <view class="search-bar card">
+  <view class="search-bar">
     <input 
       class="search-input" 
       placeholder="{{t.search}}" 
@@ -43,27 +43,26 @@
     <text>{{t.noNotes}}</text>
   </view>
 
-  <!-- 笔记列表 -->
+  <!-- 笔记列表：一条笔记就是一张色卡 -->
   <view wx:else class="notes-list">
     <view 
-      class="card note-card {{item.is_pinned ? 'pinned' : ''}}" 
+      class="card {{item.is_pinned ? 'pinned' : ''}}" 
+      style="{{item.cardStyle}}"
       wx:for="{{notes}}" 
       wx:key="id"
       bindtap="goToDetail"
       data-id="{{item.id}}"
     >
-      <view class="note-header">
-        <text class="title">{{item.title}}</text>
-        <text class="pin-badge" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>
+      <view class="card-top">
+        <view class="icon-chip">{{item.iconChar}}</view>
+        <text class="date">{{item.date_label}}{{item.is_pinned ? ' · ' + t.pinned : ''}}</text>
       </view>
-      <text class="summary" wx:if="{{item.summary}}">{{item.summary}}</text>
+      <view class="eyebrow">{{item.eyebrow}}</view>
+      <view class="title">{{item.title}}</view>
       <view class="tags" wx:if="{{item.tags && item.tags.length}}">
-        <text class="tag" wx:for="{{item.tags}}" wx:key="*this">{{item}}</text>
+        <text class="tag" wx:for="{{item.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
       </view>
-      <view class="note-footer">
-        <text class="source-type">{{item.source_type_label}}</text>
-        <text class="time">{{item.created_at_label}}</text>
-      </view>
+      <view class="motif {{item.motif}}"></view>
     </view>
   </view>
 </view>

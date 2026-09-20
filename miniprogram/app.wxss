@@ -1,125 +1,314 @@
+/* ------------------------------------------------------------------
+   设计令牌（V1 色卡流）。分工很明确：
+   ① 非色彩令牌——全局一份，不随主题变。
+   ② 主题（=用户选的壁纸）只管 chrome：页面底、导航、搜索框、chips、正文文字。
+   ③ 色卡的颜色不归主题管，由 utils/palette.js 按分类固定注入 --card-bg / --card-ink。
+      所以切到深色壁纸时，亮色卡浮在深底上反而更跳，卡片本身不需要出深色变体。
+   ------------------------------------------------------------------ */
+
 page {
-  --text-primary: #333333;
-  --text-secondary: #999999;
-  --bg-page: #f5f5f5;
-  --bg-card: rgba(255, 255, 255, 0.85);
-  --accent: #07c160;
-  --border: rgba(0, 0, 0, 0.06);
-  --card-radius: 20rpx;
-  --card-blur: 20rpx;
+  /* 字阶：六级。参考作品的层级差靠"特粗 + 收字距"拉开，不靠加档位 */
+  --fs-h1: 40rpx;
+  --fs-h2: 34rpx;
+  --fs-title: 33rpx;
+  --fs-body: 28rpx;
+  --fs-meta: 24rpx;
+  --fs-tiny: 21rpx;
+  --lh-body: 1.62;
+  --lh-tight: 1.34;
+
+  /* 间距模数：8rpx 一档 */
+  --sp-1: 8rpx;
+  --sp-2: 16rpx;
+  --sp-3: 24rpx;
+  --sp-4: 32rpx;
+  --sp-5: 48rpx;
+  --sp-6: 64rpx;
+
+  /* 圆角与阴影——大圆角是这套方向的骨架 */
+  --r-card: 44rpx;
+  --r-chip: 28rpx;
+  --r-pill: 999rpx;
+  --r-btn: 16rpx;
+  --sh-card: 0 4rpx 0 rgba(35, 37, 44, 0.05), 0 16rpx 44rpx rgba(35, 37, 44, 0.10);
+  --sh-chip: 0 4rpx 12rpx rgba(35, 37, 44, 0.16);
+  --sh-float: 0 16rpx 44rpx rgba(35, 37, 44, 0.22);
+  --motif-size: 180rpx;
+  --motif-shift: 30rpx;
+
+  /* chrome 色彩兜底 */
+  --text-primary: #23252c;
+  --text-secondary: #6b6f76;
+  --bg-page: #f4f2ec;
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --accent: #23252c;
+  --accent-soft: rgba(35, 37, 44, 0.07);
+  --border: rgba(35, 37, 44, 0.08);
+  --chip-idle: rgba(35, 37, 44, 0.07);
+  --card-radius: var(--r-card);
 
   background-color: var(--bg-page);
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  color: var(--text-primary);
 }
 
+/* 六套壁纸皮肤：只改 chrome，不改色卡。 */
+
 .theme-default {
-  --bg-page: #f5f5f5;
-  --bg-card: rgba(255, 255, 255, 0.85);
-  --text-primary: #333333;
-  --text-secondary: #999999;
-  --border: rgba(0, 0, 0, 0.06);
-  --accent: #07c160;
+  --bg-page: #f4f2ec;
+  --bg-card: rgba(255, 255, 255, 0.92);
+  --text-primary: #23252c;
+  --text-secondary: #6b6f76;
+  --border: rgba(35, 37, 44, 0.08);
+  --accent: #23252c;
+  --accent-soft: rgba(35, 37, 44, 0.07);
+  --chip-idle: rgba(35, 37, 44, 0.07);
 }
 
 .theme-blue {
-  --bg-page: #e8edf5;
-  --bg-card: rgba(255, 255, 255, 0.78);
-  --text-primary: #2c3e50;
-  --text-secondary: #6b7fa3;
-  --border: rgba(102, 126, 234, 0.12);
-  --accent: #667eea;
+  --bg-page: #eaeefb;
+  --bg-card: rgba(255, 255, 255, 0.86);
+  --text-primary: #23264f;
+  --text-secondary: #667099;
+  --border: rgba(63, 82, 214, 0.14);
+  --accent: #3f52d6;
+  --accent-soft: rgba(63, 82, 214, 0.1);
+  --chip-idle: rgba(63, 82, 214, 0.09);
 }
 
 .theme-green {
-  --bg-page: #e8f5f0;
-  --bg-card: rgba(255, 255, 255, 0.78);
-  --text-primary: #1a3a2a;
-  --text-secondary: #4a8a6a;
-  --border: rgba(17, 153, 142, 0.12);
-  --accent: #11998e;
+  --bg-page: #e7f3ea;
+  --bg-card: rgba(255, 255, 255, 0.86);
+  --text-primary: #12331f;
+  --text-secondary: #4c7a5b;
+  --border: rgba(70, 168, 99, 0.16);
+  --accent: #2f8a4d;
+  --accent-soft: rgba(70, 168, 99, 0.12);
+  --chip-idle: rgba(70, 168, 99, 0.1);
 }
 
 .theme-sunset {
-  --bg-page: #fce4ec;
-  --bg-card: rgba(255, 255, 255, 0.78);
-  --text-primary: #4a1942;
-  --text-secondary: #b85a8a;
-  --border: rgba(245, 87, 108, 0.12);
-  --accent: #f5576c;
+  --bg-page: #fdeee6;
+  --bg-card: rgba(255, 255, 255, 0.86);
+  --text-primary: #4a1f10;
+  --text-secondary: #a4664c;
+  --border: rgba(233, 114, 61, 0.16);
+  --accent: #d4562a;
+  --accent-soft: rgba(233, 114, 61, 0.12);
+  --chip-idle: rgba(233, 114, 61, 0.1);
 }
 
 .theme-purple {
   --bg-page: #0c0c1d;
-  --bg-card: rgba(255, 255, 255, 0.12);
-  --text-primary: #e8e8f0;
-  --text-secondary: #8888aa;
-  --border: rgba(255, 255, 255, 0.08);
+  --bg-card: rgba(255, 255, 255, 0.1);
+  --text-primary: #eceaf6;
+  --text-secondary: #9a95b8;
+  --border: rgba(255, 255, 255, 0.1);
   --accent: #a78bfa;
-  --card-blur: 24rpx;
+  --accent-soft: rgba(167, 139, 250, 0.18);
+  --chip-idle: rgba(255, 255, 255, 0.1);
+  --sh-card: 0 4rpx 0 rgba(0, 0, 0, 0.22), 0 16rpx 44rpx rgba(0, 0, 0, 0.4);
 }
 
 .theme-ocean {
   --bg-page: #0d1b2a;
   --bg-card: rgba(255, 255, 255, 0.1);
-  --text-primary: #d8e8f0;
-  --text-secondary: #6888a8;
-  --border: rgba(255, 255, 255, 0.06);
+  --text-primary: #e2eef6;
+  --text-secondary: #86a3bb;
+  --border: rgba(255, 255, 255, 0.09);
   --accent: #4fc3f7;
-  --card-blur: 24rpx;
+  --accent-soft: rgba(79, 195, 247, 0.18);
+  --chip-idle: rgba(255, 255, 255, 0.09);
+  --sh-card: 0 4rpx 0 rgba(0, 0, 0, 0.22), 0 16rpx 44rpx rgba(0, 0, 0, 0.4);
 }
 
 .container {
-  padding: 24rpx;
+  padding: 0 var(--sp-3);
+  /* 主题类挂在 .container 上而不是 page 上（小程序给不了 page 类名），
+     所以底色必须由容器自己画。真机实测：少了这两行，切壁纸只改导航条和 chip，整页底色永远不变。 */
+  background: var(--bg-page);
+  min-height: 100vh;
+  box-sizing: border-box;
 }
 
+/* ---------- 色卡：整面产品里唯一的大面积彩色 ---------- */
 .card {
-  background: var(--bg-card);
-  border-radius: var(--card-radius);
-  padding: 24rpx;
-  margin-bottom: 20rpx;
-  backdrop-filter: blur(var(--card-blur));
-  -webkit-backdrop-filter: blur(var(--card-blur));
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  position: relative;
+  display: block;
+  background: var(--card-bg, var(--bg-card));
+  color: var(--card-ink, var(--text-primary));
+  border-radius: var(--r-card);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  margin-bottom: var(--sp-2);
+  box-shadow: var(--sh-card);
+  overflow: hidden;
+}
+
+.card:active {
+  transform: scale(0.988);
+}
+
+.card.pinned {
+  box-shadow: var(--sh-card), inset 0 0 0 3rpx rgba(255, 255, 255, 0.22);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--sp-3);
+}
+
+/* 白色小图标块：参考作品里那个"浮在色卡上"的 chip */
+.icon-chip {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: var(--r-chip);
+  background: #ffffff;
+  box-shadow: var(--sh-chip);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  line-height: 1;
+  color: #23252c;
+}
+
+.icon-chip.on-dark {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.date {
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  letter-spacing: 0.6rpx;
+  opacity: 0.72;
+}
+
+.eyebrow {
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  letter-spacing: 1.6rpx;
+  opacity: 0.72;
+  margin-bottom: 6rpx;
 }
 
 .title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 12rpx;
+  font-size: var(--fs-title);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.6rpx;
+  margin-bottom: var(--sp-1);
 }
 
 .summary {
-  font-size: 28rpx;
-  color: var(--text-secondary);
-  line-height: 1.6;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  opacity: 0.78;
 }
 
 .tag {
   display: inline-block;
-  background: rgba(7, 193, 96, 0.08);
-  color: var(--accent);
-  font-size: 22rpx;
-  padding: 4rpx 16rpx;
-  border-radius: 8rpx;
-  margin-right: 12rpx;
-  margin-bottom: 8rpx;
+  background: var(--card-tag, var(--accent-soft));
+  color: var(--card-ink, var(--accent));
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  padding: 6rpx 16rpx;
+  border-radius: var(--r-btn);
+  margin-right: var(--sp-1);
+}
+
+/* ---------- 抽象母题：由 palette.js 按笔记 id 选一个，位置大小也从 id 派生 ---------- */
+.motif {
+  position: absolute;
+  right: calc(0px - var(--motif-shift));
+  bottom: calc(0px - var(--motif-shift));
+  width: var(--motif-size);
+  height: var(--motif-size);
+  pointer-events: none;
+  /* 母题永远在文字下面。真机实测过：不给这一层，长标题的后半句会被条纹盖掉。 */
+  z-index: 0;
+}
+
+.card-top, .eyebrow, .title, .summary, .tags {
+  position: relative;
+  z-index: 1;
+}
+
+.motif-circle {
+  border-radius: 50%;
+  background: var(--card-motif);
+}
+
+.motif-arc {
+  border-radius: 50%;
+  border: 14rpx solid var(--card-motif);
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.motif-stripes {
+  background: repeating-linear-gradient(
+    115deg,
+    var(--card-motif) 0 12rpx,
+    transparent 12rpx 28rpx
+  );
+}
+
+.motif-dots {
+  background-image: radial-gradient(var(--card-motif) 7rpx, transparent 8rpx);
+  background-size: 30rpx 30rpx;
+}
+
+.motif-pill {
+  width: calc(var(--motif-size) * 1.5);
+  height: calc(var(--motif-size) * 0.42);
+  border-radius: var(--r-pill);
+  background: var(--card-motif);
+}
+
+/* ---------- chrome ---------- */
+.search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border-radius: var(--r-pill);
+  padding: var(--sp-3) var(--sp-4);
+  box-shadow: var(--sh-card);
+}
+
+.chip {
+  display: inline-block;
+  padding: 14rpx 28rpx;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  background: var(--chip-idle);
+  color: var(--text-secondary);
+}
+
+.chip.active {
+  background: var(--accent);
+  color: var(--bg-page);
 }
 
 .btn-primary {
   background: var(--accent);
-  color: #ffffff;
-  border-radius: 12rpx;
+  color: var(--bg-page);
+  border-radius: var(--r-pill);
   font-size: 30rpx;
-  padding: 20rpx 0;
+  font-weight: 700;
+  padding: var(--sp-3) 0;
   text-align: center;
 }
 
 .btn-secondary {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--chip-idle);
   color: var(--text-primary);
-  border-radius: 12rpx;
+  border-radius: var(--r-pill);
   font-size: 30rpx;
-  padding: 20rpx 0;
+  font-weight: 600;
+  padding: var(--sp-3) 0;
   text-align: center;
 }

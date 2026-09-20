@@ -1,5 +1,15 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
+const { cardSkinFor } = require('../../utils/palette.js')
+
+// 白色图标块里放一个汉字而不是图标字体：项目没有 iconfont，tab 栏的图标也是 CSS 画的；
+// 单个汉字在苹方下必定渲染得出来，换成 ✎ ⌗ 这类符号就要赌设备字体。
+const SOURCE_ICON = {
+  wechat_article: '文',
+  web_article: '文',
+  screenshot: '图',
+  manual: '写',
+}
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
@@ -13,6 +23,14 @@ function formatTime(dateStr) {
   const d = new Date(dateStr)
   const pad = n => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// 色卡右上角只放"月-日"：年份在列表里是噪声，同一条笔记跨年时才需要看详情
+function formatShortDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const pad = n => String(n).padStart(2, '0')
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 Page({
@@ -55,9 +73,26 @@ Page({
     try {
       const categories = await api.getCategories()
       this.setData({ categories })
+      // 分类比笔记晚到是常态：到了就得给已在屏上的色卡补上分类名，否则 eyebrow 会一直停在"未分类"。
+      if (this.data.notes.length) this.setData({ notes: this.skin(this.data.notes) })
     } catch (err) {
       console.error('加载分类失败', err)
     }
+  },
+
+  skin(notes) {
+    const nameOf = {}
+    this.data.categories.forEach((c) => { nameOf[c.id] = c.name })
+    notes.forEach((n) => {
+      const s = cardSkinFor(n.category_id, n.id)
+      n.cardStyle = s.style
+      n.motif = s.motif
+      n.iconChar = SOURCE_ICON[n.source_type] || '文'
+      const cat = n.category_id == null ? '未分类' : (nameOf[n.category_id] || '')
+      // 分类查不到名字时宁可空着，也不要写成"未分类"——它明明归了类，只是这一批分类数据里没它。
+      n.eyebrow = [cat, n.source_type_label].filter(Boolean).join(' · ')
+    })
+    return notes
   },
 
   async loadNotes(reset = false) {
@@ -82,7 +117,9 @@ Page({
         const key = SOURCE_TYPE_KEYS[n.source_type]
         n.source_type_label = key ? t(key, lang) : n.source_type
         n.created_at_label = formatTime(n.created_at)
+        n.date_label = formatShortDate(n.created_at)
       })
+      this.skin(notes)
       
       const allNotes = reset ? notes : [...this.data.notes, ...notes]
       this.setData({ 
