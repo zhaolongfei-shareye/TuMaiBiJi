@@ -19,6 +19,16 @@ const UNCATEGORIZED = { name: '墨黑', bg: '#23252C', ink: '#FFFFFF' }
 
 const MOTIFS = ['motif-circle', 'motif-arc', 'motif-stripes', 'motif-dots', 'motif-pill']
 
+// 白色图标块里放一个汉字而不是图标字体：项目没有 iconfont，tab 栏的图标也是 CSS 画的；
+// 单个汉字在苹方下必定渲染得出来，换成 ✎ ⌗ 这类符号就要赌设备字体。
+// 首页和详情页共用这一张表，否则同一条笔记在两处会显示成不同符号。
+const SOURCE_ICON = {
+  wechat_article: '文',
+  web_article: '文',
+  screenshot: '图',
+  manual: '写',
+}
+
 function hexToRgb(hex) {
   const h = (hex || '').replace('#', '')
   const s = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
@@ -44,14 +54,20 @@ function hash(n) {
 }
 
 /**
+ * 分类对应的那组色。cardSkinFor 给的是 CSS 变量串，画布要的是裸色值，所以单独露一个。
+ */
+function toneFor(categoryId) {
+  return categoryId == null ? UNCATEGORIZED : TONES[Math.abs(Number(categoryId)) % TONES.length]
+}
+
+/**
  * 生成一条笔记的色卡外观。
  * @param categoryId 笔记所属分类；null 走墨黑
  * @param noteId 笔记 id，决定构图
  * @returns {{style: string, motif: string}} style 直接塞进 style 属性，motif 是元素类名
  */
 function cardSkinFor(categoryId, noteId) {
-  const uncat = categoryId == null
-  const tone = uncat ? UNCATEGORIZED : TONES[Math.abs(Number(categoryId)) % TONES.length]
+  const tone = toneFor(categoryId)
   const h = hash(noteId)
   const motif = MOTIFS[h % MOTIFS.length]
   // 母题只比底色暗/亮一点点，做质感不做主角
@@ -70,4 +86,60 @@ function cardSkinFor(categoryId, noteId) {
   return { style, motif }
 }
 
-module.exports = { TONES, UNCATEGORIZED, MOTIFS, cardSkinFor, mix, hexToRgb }
+/**
+ * 只取某一组色的 CSS 变量串。给非笔记类的界面元素用（比如新建页的色块徽标），
+ * 免得有人在 WXSS 里另抄一份十六进制。
+ */
+function toneStyle(i) {
+  const tone = TONES[Math.abs(Number(i) || 0) % TONES.length]
+  return `--card-bg:${tone.bg};--card-ink:${tone.ink}`
+}
+
+function toneColor(i) {
+  return TONES[Math.abs(Number(i) || 0) % TONES.length].bg
+}
+
+/**
+ * 只给一对裸色，不给 --card-bg。
+ * 中性面板里想借用分类色（比如详情页的序号圆点）时用这个：
+ * 直接贴 cardStyle 会把整块中性面板染成色卡。
+ */
+function toneVars(categoryId) {
+  const tone = toneFor(categoryId)
+  return `--tone-bg:${tone.bg};--tone-ink:${tone.ink}`
+}
+
+/**
+ * 六套壁纸（=主题）。这里的 page/card 必须和 app.wxss 里 .theme-* 的取值一致，
+ * 但 app.wxss 是 CSS、引不了 JS，所以改一边必须改另一边。
+ * 之所以在 JS 里再存一份：导航条颜色只能由 wx.setNavigationBarColor 传值，
+ * 壁纸选择器也要靠它画缩略图，两处都不能猜 CSS 变量。
+ */
+const THEMES = [
+  { key: 'default', cls: 'theme-default', label: '米白', page: '#f4f2ec', card: 'rgba(255, 255, 255, 0.92)', dark: false },
+  { key: 'gradient-blue', cls: 'theme-blue', label: '雾蓝', page: '#eaeefb', card: 'rgba(255, 255, 255, 0.86)', dark: false },
+  { key: 'gradient-green', cls: 'theme-green', label: '松绿', page: '#e7f3ea', card: 'rgba(255, 255, 255, 0.86)', dark: false },
+  { key: 'gradient-sunset', cls: 'theme-sunset', label: '暮橙', page: '#fdeee6', card: 'rgba(255, 255, 255, 0.86)', dark: false },
+  { key: 'gradient-purple', cls: 'theme-purple', label: '夜紫', page: '#0c0c1d', card: 'rgba(255, 255, 255, 0.10)', dark: true },
+  { key: 'gradient-ocean', cls: 'theme-ocean', label: '深海', page: '#0d1b2a', card: 'rgba(255, 255, 255, 0.10)', dark: true },
+]
+
+function themeOf(wallpaper) {
+  return THEMES.find((x) => x.key === wallpaper) || THEMES[0]
+}
+
+module.exports = {
+  TONES,
+  UNCATEGORIZED,
+  MOTIFS,
+  SOURCE_ICON,
+  THEMES,
+  cardSkinFor,
+  toneFor,
+  toneVars,
+  toneStyle,
+  toneColor,
+  themeOf,
+  mix,
+  hexToRgb,
+}

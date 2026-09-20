@@ -2,8 +2,7 @@
   <view class="me-header card">
     <image class="avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
     <view class="user-info">
-      <text class="nickname">{{userInfo.nickName || t.notLoggedIn}}</text>
-      <text class="login-hint" wx:if="{{!isLoggedIn}}" bindtap="onLogin">{{t.login}}</text>
+      <text class="nickname">{{displayName}}</text>
     </view>
   </view>
 

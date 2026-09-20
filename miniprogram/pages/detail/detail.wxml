@@ -2,37 +2,36 @@
   <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
   <view wx:elif="{{note}}" class="detail-wrapper">
-    <!-- 顶部操作栏 -->
-    <view class="action-bar card">
-      <view class="bar-left">
-        <text class="source-badge">{{note.source_type_label}}</text>
+    <!-- 头部色卡：颜色与构图和列表里那条完全一致（同一套 cardSkinFor） -->
+    <view class="card hero" style="{{note.cardStyle}}">
+      <view class="card-top">
+        <view class="icon-chip">{{note.iconChar}}</view>
+        <text class="date">{{note.created_at_label}}</text>
       </view>
-      <view class="bar-right">
-        <view class="icon-btn" bindtap="togglePin">
-          <text>{{note.is_pinned ? t.unpin : t.pin}}</text>
-        </view>
-        <view class="icon-btn" bindtap="onEdit">{{t.edit}}</view>
-        <view class="icon-btn danger" bindtap="onDelete">{{t.delete}}</view>
+      <view class="eyebrow">{{note.eyebrow}}</view>
+      <view class="title hero-title">{{note.title}}</view>
+      <view class="tags" wx:if="{{note.tags && note.tags.length}}">
+        <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
       </view>
+      <view class="motif {{note.motif}}"></view>
     </view>
 
-    <!-- 标题区 -->
-    <view class="card header-card">
-      <text class="title">{{note.title}}</text>
-      <view class="meta-row">
-        <text class="time">{{note.created_at_label}}</text>
-        <text class="category" wx:if="{{note.category_name}}">#{{note.category_name}}</text>
+    <!-- 操作条从色卡里拿出来：一排按钮压在饱和色上会互相抢 -->
+    <view class="action-bar">
+      <view class="icon-btn {{note.is_pinned ? 'on' : ''}}" bindtap="togglePin">
+        <text>{{note.is_pinned ? t.unpin : t.pin}}</text>
       </view>
+      <view class="icon-btn" bindtap="onEdit">{{t.edit}}</view>
+      <view class="icon-btn danger" bindtap="onDelete">{{t.delete}}</view>
     </view>
 
-    <!-- 摘要 -->
-    <view wx:if="{{note.summary}}" class="card section-card">
+    <!-- 长文本一律回中性卡：色卡只承担"这一条是什么"，不承担阅读 -->
+    <view wx:if="{{note.summary}}" class="panel">
       <text class="section-label">{{t.summaryLabel}}</text>
       <text class="summary-text">{{note.summary}}</text>
     </view>
 
-    <!-- 要点 -->
-    <view wx:if="{{note.key_points && note.key_points.length}}" class="card section-card">
+    <view wx:if="{{note.key_points && note.key_points.length}}" class="panel" style="{{note.toneStyle}}">
       <text class="section-label">{{t.keyPoints}}</text>
       <view class="points-list">
         <view class="point-item" wx:for="{{note.key_points}}" wx:key="index">
@@ -42,22 +41,12 @@
       </view>
     </view>
 
-    <!-- 标签 -->
-    <view wx:if="{{note.tags && note.tags.length}}" class="card section-card">
-      <text class="section-label">{{t.tagsLabel}}</text>
-      <view class="tags-wrap">
-        <text class="tag-chip" wx:for="{{note.tags}}" wx:key="*this">{{item}}</text>
-      </view>
-    </view>
-
-    <!-- 原文链接 -->
-    <view wx:if="{{note.source_url}}" class="card section-card">
+    <view wx:if="{{note.source_url}}" class="panel">
       <text class="section-label">{{t.sourceLink}}</text>
       <text class="link-text" bindtap="openSourceUrl">{{note.source_url}}</text>
     </view>
 
-    <!-- 原文内容（可折叠） -->
-    <view wx:if="{{note.original_content}}" class="card section-card">
+    <view wx:if="{{note.original_content}}" class="panel">
       <view class="original-header" bindtap="toggleOriginal">
         <text class="section-label">{{t.originalContent}}</text>
         <text class="expand-icon">{{showOriginal ? t.collapse : t.expand}}</text>
@@ -69,10 +58,7 @@
 
     <!-- 底部操作 -->
     <view class="bottom-actions">
-      <view class="btn-share" bindtap="onShare">
-        <text class="share-icon">📤</text>
-        <text>{{t.shareAsImage}}</text>
-      </view>
+      <view class="btn-share" bindtap="onShare">{{t.shareAsImage}}</view>
     </view>
   </view>
 </view>

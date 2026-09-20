@@ -1,3 +1,5 @@
+const { themeOf } = require('../utils/palette.js')
+
 Component({
   data: {
     selected: 0,
@@ -16,8 +18,9 @@ Component({
 
   methods: {
     applyTheme(wallpaper) {
-      const dark = wallpaper === 'gradient-purple' || wallpaper === 'gradient-ocean'
-      this.setData({ dark })
+      // 组件读不到 page 上的 CSS 变量，深色与否只能由 JS 判出来挂类名；
+      // 判定结果一律取 palette 里那份，不在这里另记一遍壁纸名单
+      this.setData({ dark: themeOf(wallpaper).dark })
     },
 
     updateLabels() {

@@ -26,7 +26,7 @@ Page({
     this.setData({
       lang,
       t: texts(lang),
-      themeClass: app.getThemeClass(app.globalData.userInfo?.wallpaper || 'default'),
+      themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
     await this.loadCategories()
 

@@ -28,7 +28,7 @@
         wx:key="id"
         bindtap="selectCategory"
         data-id="{{item.id}}"
-        style="--chip-color: {{item.color}}"
+        style="{{item.toneStyle}}"
       >
         {{item.name}}
       </view>

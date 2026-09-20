@@ -28,9 +28,8 @@
 }
 
 .chip.active {
-  background: var(--chip-color, var(--accent));
-  /* 分类自带色可能是亮色，白字撑不住时由这个规则兜到深字 */
-  color: var(--chip-ink, #ffffff);
+  background: var(--tone-bg, var(--accent));
+  color: var(--tone-ink, var(--bg-page));
 }
 
 .loading, .empty {

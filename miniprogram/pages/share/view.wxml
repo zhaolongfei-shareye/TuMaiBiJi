@@ -8,27 +8,22 @@
     <text class="error-text">{{error}}</text>
   </view>
 
-  <view wx:elif="{{share}}" class="share-card">
-    <view class="card-header">
+  <block wx:elif="{{share}}">
+    <text class="eyebrow">{{t.sharedNote}}</text>
+
+    <view class="share-card">
       <text class="card-title">{{share.title}}</text>
-      <view class="source-badge">
-        <text class="source-text">{{t.sharedNote}}</text>
-      </view>
-    </view>
 
-    <view wx:if="{{share.summary}}" class="card-section">
-      <text class="section-title">{{t.summary}}</text>
-      <text class="section-content">{{share.summary}}</text>
-    </view>
+      <text wx:if="{{share.summary}}" class="card-summary">{{share.summary}}</text>
 
-    <view wx:if="{{share.tags && share.tags.length > 0}}" class="card-section">
-      <view class="tags-row">
+      <view wx:if="{{share.tags && share.tags.length > 0}}" class="tags-row">
         <text wx:for="{{share.tags}}" wx:key="*this" class="tag">{{item}}</text>
       </view>
     </view>
 
-    <view class="card-footer">
-      <text class="footer-text">{{t.fromTuMaiBiJi}}</text>
+    <view class="brand-row">
+      <view class="brand-mark">麦</view>
+      <text class="brand-text">{{t.fromTuMaiBiJi}}</text>
     </view>
-  </view>
+  </block>
 </view>

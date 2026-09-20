@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
+const { toneFor, mix } = require('../../utils/palette.js')
 
 // 小程序 canvas 2d 的 roundRect 在部分基础库/机型上不存在，直接调用会抛 TypeError。
 // 而绘图代码一旦抛在这一步，后面的导出根本不会执行，所以这里补一个等价实现。
@@ -34,7 +35,7 @@ Page({
     this.setData({
       lang,
       t: texts(lang),
-      themeClass: app.getThemeClass(app.globalData.userInfo?.wallpaper || 'default'),
+      themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
     if (!options.id) {
       wx.navigateBack()
@@ -49,6 +50,17 @@ Page({
     try {
       const share = await api.createShare(noteId)
       const note = await api.getNote(noteId)
+      // 分类名不在笔记响应里，海报上那行小字要靠分类表查。
+      // 查不到就只写来源，不写成"未分类"——它明明归了类。
+      if (note.category_id) {
+        try {
+          const categories = await api.getCategories()
+          const category = categories.find((c) => c.id === note.category_id)
+          if (category) note.category_name = category.name
+        } catch (err) {
+          console.error('加载分类列表失败', err)
+        }
+      }
       const qrImagePath = await this.downloadQRImage(share.token)
       await this.renderToCanvas(note, share.token, qrImagePath)
     } catch (err) {
@@ -100,10 +112,17 @@ Page({
         canvas.width = width
         canvas.height = height
 
+        // 分类色定顶部条和序号，和首页/详情页同一条笔记同色
+        const tone = toneFor(note.category_id)
+        const INK = '#23252c'
+        const MUTED = '#6b6f76'
+
         // Background gradient
         const gradient = ctx.createLinearGradient(0, 0, 0, height)
-        gradient.addColorStop(0, '#f8f9fa')
-        gradient.addColorStop(1, '#e9ecef')
+        // mix 的第三个参数是"第一个颜色占多少"，所以这里要给白色大权重：
+        // 之前写成 0.88 / 0.94 等于整屏铺满分类色，实测海报底成了实心蓝块。
+        gradient.addColorStop(0, mix(tone.bg, '#ffffff', 0.08))
+        gradient.addColorStop(1, mix(tone.bg, '#ffffff', 0.22))
         ctx.fillStyle = gradient
         ctx.fillRect(0, 0, width, height)
 
@@ -112,48 +131,77 @@ Page({
         const cardY = 60
         const cardW = width - 80
         const cardH = height - 160
-        const contentX = cardX + 40
-        const contentW = cardW - 80
-        const qrTop = cardY + cardH - 180
-        const contentBottom = qrTop - 36
+        const contentX = cardX + 48
+        const contentW = cardW - 96
+        const qrSize = 120
+        const qrY = cardY + cardH - 175
+        const contentBottom = qrY - 30
 
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.08)'
-        ctx.shadowBlur = 20
-        ctx.shadowOffsetY = 4
+        ctx.shadowColor = 'rgba(35, 37, 44, 0.10)'
+        ctx.shadowBlur = 30
+        ctx.shadowOffsetY = 8
         ctx.fillStyle = '#ffffff'
-        ctx.roundRect(cardX, cardY, cardW, cardH, 24)
+        ctx.beginPath()
+        ctx.roundRect(cardX, cardY, cardW, cardH, 40)
         ctx.fill()
         ctx.shadowColor = 'transparent'
         ctx.shadowBlur = 0
         ctx.shadowOffsetY = 0
 
         // 内容驱动布局：y 随每块实际行数推进，装不下的块整块跳过
-        let y = cardY + 76
-
-        // Title，最多两行
-        ctx.fillStyle = '#333333'
-        ctx.font = 'bold 40px sans-serif'
+        //
+        // 顶部是一条分类色带，标题压在色带上——和首页/详情页的色卡同一套配色逻辑。
+        // 色带要用卡片的圆角切边，所以先把卡片路径裁出来再填色。
+        // 色带高度由标题实际行数算出来；标题最多四行，再长省略。
+        const TITLE_SIZE = 42
+        ctx.font = `bold ${TITLE_SIZE}px sans-serif`
         const allTitleLines = this.wrapText(note.title || '', contentW, ctx)
-        const titleLines = allTitleLines.slice(0, 2)
-        if (allTitleLines.length > 2) {
-          titleLines[1] = this.ellipsize(titleLines[1], contentW, ctx)
+        const titleLines = allTitleLines.slice(0, 4)
+        if (allTitleLines.length > 4) {
+          titleLines[3] = this.ellipsize(titleLines[3], contentW, ctx)
         }
+        const headerH = 56 + titleLines.length * 56 + 44
+
+        ctx.save()
+        ctx.beginPath()
+        ctx.roundRect(cardX, cardY, cardW, cardH, 40)
+        ctx.clip()
+        ctx.fillStyle = tone.bg
+        ctx.fillRect(cardX, cardY, cardW, headerH)
+        // 母题圆只许待在色带内，所以再套一层只到色带底边的裁剪
+        ctx.beginPath()
+        ctx.rect(cardX, cardY, cardW, headerH)
+        ctx.clip()
+        ctx.fillStyle = mix(tone.ink, tone.bg, 0.16)
+        ctx.beginPath()
+        ctx.arc(cardX + cardW - 10, cardY + headerH - 20, 128, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+
+        let y = cardY + 56
+        ctx.font = `bold ${TITLE_SIZE}px sans-serif`
+        ctx.fillStyle = tone.ink
         for (const line of titleLines) {
           ctx.fillText(line, contentX, y)
-          y += 52
+          y += 56
         }
 
-        // Source badge
-        ctx.font = '24px sans-serif'
-        ctx.fillStyle = '#07c160'
-        y += 6
-        ctx.fillText(this.getSourceLabel(note.source_type), contentX, y)
-        y += 46
+        y = cardY + headerH + 46
+
+        // 来源和分类并作一行小字。分类查不到名字时只写来源，不谎称"未分类"
+        ctx.font = 'bold 22px sans-serif'
+        ctx.fillStyle = MUTED
+        ctx.fillText(
+          [note.category_name, this.getSourceLabel(note.source_type)].filter(Boolean).join(' · '),
+          contentX,
+          y,
+        )
+        y += 44
 
         // Summary，最多四行
         if (note.summary) {
-          ctx.fillStyle = '#666666'
           ctx.font = '28px sans-serif'
+          ctx.fillStyle = '#4a4d55'
           const lines = this.wrapText(note.summary, contentW, ctx)
           const shown = lines.slice(0, 4)
           if (lines.length > 4) {
@@ -162,25 +210,35 @@ Page({
           for (const line of shown) {
             if (y > contentBottom) break
             ctx.fillText(line, contentX, y)
-            y += 40
+            y += 42
           }
-          y += 16
+          y += 14
         }
 
         // Key points，最多五条
         const points = (note.key_points || []).slice(0, 5)
-        if (points.length && y + 44 + points.length * 40 <= contentBottom) {
-          ctx.fillStyle = '#333333'
-          ctx.font = 'bold 28px sans-serif'
+        if (points.length && y + 44 + points.length * 42 <= contentBottom) {
+          ctx.fillStyle = INK
+          ctx.font = 'bold 26px sans-serif'
           ctx.fillText(t('keyPoints', this.data.lang), contentX, y)
           y += 44
-          ctx.font = '26px sans-serif'
-          ctx.fillStyle = '#555555'
           points.forEach((point, i) => {
-            ctx.fillText(this.ellipsize(`${i + 1}. ${point}`, contentW, ctx), contentX, y)
-            y += 40
+            // 序号做成分类色圆块，和详情页的圆形序号同款
+            ctx.fillStyle = tone.bg
+            ctx.beginPath()
+            ctx.arc(contentX + 16, y - 9, 16, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.fillStyle = tone.ink
+            ctx.font = 'bold 21px sans-serif'
+            ctx.textAlign = 'center'
+            ctx.fillText(String(i + 1), contentX + 16, y - 2)
+            ctx.textAlign = 'left'
+            ctx.fillStyle = '#4a4d55'
+            ctx.font = '26px sans-serif'
+            ctx.fillText(this.ellipsize(point, contentW - 46, ctx), contentX + 46, y)
+            y += 42
           })
-          y += 16
+          y += 14
         }
 
         // Tags，单行，放不下就少画几个
@@ -190,26 +248,24 @@ Page({
           for (const tag of note.tags.slice(0, 5)) {
             const tw = ctx.measureText(tag).width + 32
             if (tx + tw > contentX + contentW) break
-            ctx.fillStyle = 'rgba(7, 193, 96, 0.1)'
-            ctx.roundRect(tx, y - 24, tw, 36, 8)
+            ctx.fillStyle = mix(INK, '#ffffff', 0.07)
+            ctx.beginPath()
+            ctx.roundRect(tx, y - 26, tw, 38, 10)
             ctx.fill()
-            ctx.fillStyle = '#07c160'
+            ctx.fillStyle = INK
             ctx.fillText(tag, tx + 16, y)
             tx += tw + 12
           }
         }
 
         // Footer - QR code and scan text
-        ctx.fillStyle = '#999999'
+        const qrX = (width - qrSize) / 2
+        ctx.fillStyle = MUTED
         ctx.font = '22px sans-serif'
         ctx.textAlign = 'center'
-        ctx.fillText(t('scanToView', this.data.lang), width / 2, cardY + cardH - 40)
+        ctx.fillText(t('scanToView', this.data.lang), width / 2, qrY + qrSize + 34)
+        ctx.textAlign = 'left'
 
-        // Draw QR code image
-        const qrSize = 120
-        const qrX = (width - qrSize) / 2
-        const qrY = cardY + cardH - 180
-        
         if (qrImagePath) {
           const img = canvas.createImage()
           img.src = qrImagePath

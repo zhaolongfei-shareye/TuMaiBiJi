@@ -1,3 +1,7 @@
+// 接口地址属于前后端之间的那道边界，只在这里出现一次。
+// 之前它挂在 app.globalData.apiBase 上，页面拼 URL 时还得绕回 getApp() 去取。
+const API_BASE = 'https://api.agentsbin.cn/wtsj'
+
 function _headers(contentType, extra) {
   const h = {
     'content-type': contentType || 'application/json',
@@ -13,7 +17,7 @@ function _headers(contentType, extra) {
 const request = (url, method, data, options = {}, retryCount = 0) => {
   return new Promise((resolve, reject) => {
     wx.request({
-      url: `${getApp().globalData.apiBase}${url}`,
+      url: `${API_BASE}${url}`,
       method: method || 'GET',
       data: data || {},
       header: _headers(options.contentType, options.header),
@@ -58,7 +62,7 @@ const request = (url, method, data, options = {}, retryCount = 0) => {
 const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
   return new Promise((resolve, reject) => {
     wx.uploadFile({
-      url: `${getApp().globalData.apiBase}${url}`,
+      url: `${API_BASE}${url}`,
       filePath,
       name: 'images',
       header: _headers(),
@@ -164,7 +168,9 @@ module.exports = {
   deleteCategory: (id) => request(`/api/categories/${id}`, 'DELETE'),
   reorderCategories: (ids) => request('/api/categories/reorder', 'POST', { ids }),
   createShare: (noteId) => request('/api/shares/', 'POST', { note_id: noteId }),
-  getShareQRCodeUrl: (token) => `${getApp().globalData.apiBase}/api/shares/${token}/qrcode`,
+  // 分享落地页原来直接调 api.request 拼路径，等于绕过了这一层
+  getShare: (token) => request(`/api/shares/${encodeURIComponent(token)}`),
+  getShareQRCodeUrl: (token) => `${API_BASE}/api/shares/${token}/qrcode`,
   getWallpaperOptions: () => request('/api/user/wallpaper/options'),
   updateWallpaper: (wallpaper) => request('/api/user/wallpaper', 'PUT', { wallpaper }),
   updateLanguage: (language) => request('/api/user/language', 'PUT', { language }),

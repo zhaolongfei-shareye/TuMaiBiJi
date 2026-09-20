@@ -1,4 +1,6 @@
 <view class="container {{themeClass}}">
+  <text class="page-title">{{t.categories}}</text>
+
   <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
   <block wx:else>
@@ -17,8 +19,8 @@
           </view>
         </block>
         <block wx:else>
-          <view class="category-info">
-            <view class="category-color" style="background: {{item.color}}"></view>
+          <view class="category-info" style="{{item.toneStyle}}">
+            <view class="category-color"></view>
             <text class="category-name">{{item.name}}</text>
           </view>
           <view class="category-actions">
@@ -33,7 +35,7 @@
       </view>
     </view>
 
-    <view class="add-btn" bindtap="onAddTap">{{t.addCategoryBtn}}</view>
+    <view class="btn-primary add-btn" bindtap="onAddTap">{{t.addCategoryBtn}}</view>
   </block>
 
   <view wx:if="{{showAddDialog}}" class="dialog-mask" bindtap="onCloseDialog">

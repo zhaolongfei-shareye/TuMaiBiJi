@@ -1,56 +1,58 @@
 .page-title {
   display: block;
-  font-size: 36rpx;
+  font-size: var(--fs-h1);
   font-weight: 700;
+  letter-spacing: -1rpx;
   color: var(--text-primary);
-  margin-bottom: 40rpx;
+  margin: var(--sp-5) 0 var(--sp-4);
 }
 
 .lang-list {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: var(--sp-2);
 }
 
 .lang-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 32rpx;
-  border: 4rpx solid transparent;
-}
-
-.lang-item.active {
-  border-color: var(--accent);
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  margin-bottom: 0;
 }
 
 .lang-info {
   display: flex;
   flex-direction: column;
+  gap: 6rpx;
+  min-width: 0;
 }
 
 .lang-label {
-  font-size: 32rpx;
-  font-weight: 600;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  letter-spacing: -0.4rpx;
   color: var(--text-primary);
-  margin-bottom: 4rpx;
 }
 
 .lang-desc {
-  font-size: 24rpx;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-tight);
   color: var(--text-secondary);
 }
 
 .check-mark {
-  width: 44rpx;
-  height: 44rpx;
+  flex: none;
+  width: 48rpx;
+  height: 48rpx;
   border-radius: 50%;
   background: var(--accent);
-  color: #ffffff;
-  font-size: 26rpx;
+  color: var(--bg-page);
+  font-size: 28rpx;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  line-height: 44rpx;
+  line-height: 1;
 }

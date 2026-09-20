@@ -1,19 +1,8 @@
 const { request } = require('./utils/api')
-
-const WALLPAPER_THEME = {
-  'default': 'theme-default',
-  'gradient-blue': 'theme-blue',
-  'gradient-green': 'theme-green',
-  'gradient-sunset': 'theme-sunset',
-  'gradient-purple': 'theme-purple',
-  'gradient-ocean': 'theme-ocean',
-}
-
-const DARK_THEMES = ['theme-purple', 'theme-ocean']
+const { themeOf } = require('./utils/palette')
 
 App({
   globalData: {
-    apiBase: 'https://api.agentsbin.cn/wtsj',
     userInfo: null,
     isLoggedIn: false,
     userId: '',
@@ -64,24 +53,27 @@ App({
   },
 
   getThemeClass(wallpaper) {
-    return WALLPAPER_THEME[wallpaper] || 'theme-default'
+    return themeOf(wallpaper).cls
   },
 
   isDarkTheme(wallpaper) {
-    return DARK_THEMES.includes(this.getThemeClass(wallpaper))
+    return themeOf(wallpaper).dark
   },
 
   applyTheme(wallpaper) {
-    const themeClass = this.getThemeClass(wallpaper)
-    const dark = DARK_THEMES.includes(themeClass)
+    const theme = themeOf(wallpaper)
+    // 导航条必须和页面底色同值，否则卡片滚到顶部会看出一条色差。
+    // 之前这里写死 '#f5f5f5'，和六套主题的底色一个都对不上。
+    // 页面刚 onLoad 时这个接口可能直接 fail，忽略即可，底色由容器自己画。
     wx.setNavigationBarColor({
-      frontColor: dark ? '#ffffff' : '#000000',
-      backgroundColor: dark ? '#0c0c1d' : '#f5f5f5',
+      frontColor: theme.dark ? '#ffffff' : '#000000',
+      backgroundColor: theme.page,
+      fail() {},
     })
     const tabBar = this.getTabBar?.()
     if (tabBar) {
       tabBar.applyTheme?.(wallpaper)
     }
-    return themeClass
+    return theme.cls
   },
 })

@@ -5,8 +5,7 @@ const LANG_MAP = { zh: '中文', en: 'English' }
 
 Page({
   data: {
-    userInfo: {},
-    isLoggedIn: false,
+    displayName: '图麦用户',
     currentLang: '中文',
     lang: 'zh',
     themeClass: 'theme-default',
@@ -19,8 +18,9 @@ Page({
     const langLabel = LANG_MAP[lang] || '中文'
     const themeClass = app.applyTheme(userInfo.wallpaper || 'default')
     this.setData({
-      userInfo,
-      isLoggedIn: app.globalData.isLoggedIn || false,
+      // 昵称取不到是常态（微信已不返回资料），给一个稳定称谓，
+      // 不要显示"未登录"——登录是静默完成的，这里也没有可点的登录入口
+      displayName: userInfo.nickName || '图麦用户',
       currentLang: langLabel,
       lang,
       t: texts(lang),
@@ -30,19 +30,6 @@ Page({
       this.getTabBar().updateLabels()
       this.getTabBar().setData({ selected: 2 })
     }
-  },
-
-  async onLogin() {
-    await app.login()
-    const userInfo = app.globalData.userInfo || {}
-    const lang = userInfo.language || 'zh'
-    this.setData({
-      userInfo,
-      isLoggedIn: app.globalData.isLoggedIn || false,
-      currentLang: LANG_MAP[lang] || '中文',
-      lang,
-      t: texts(lang),
-    })
   },
 
   onNavigate(e) {

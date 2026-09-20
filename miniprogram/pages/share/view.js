@@ -24,7 +24,7 @@ Page({
     }
 
     try {
-      const share = await api.request(`/api/shares/${token}`)
+      const share = await api.getShare(token)
       this.setData({ share, loading: false })
     } catch (err) {
       console.error('获取分享失败', err)

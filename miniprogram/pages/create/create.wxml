@@ -1,24 +1,33 @@
 <view class="container {{themeClass}}">
-  <view class="page-title">{{t.tabCreate}}</view>
+  <view class="page-title">{{t.createHeading}}</view>
 
-  <!-- 三个入口卡片 -->
+  <!-- 三个入口：白卡 + 一个饱和色块徽标。大胆留给笔记列表，这里保持安静 -->
   <view class="entry-cards">
-    <view class="card entry-card" bindtap="onUrlImport">
-      <text class="entry-icon">🔗</text>
-      <text class="entry-label">{{t.importUrl}}</text>
-      <text class="entry-desc">{{t.linkDesc}}</text>
+    <view class="entry-card" bindtap="onUrlImport">
+      <view class="entry-badge" style="{{skinUrl}}"><text>链</text></view>
+      <view class="entry-text">
+        <text class="entry-label">{{t.importUrl}}</text>
+        <text class="entry-desc">{{t.linkDesc}}</text>
+      </view>
+      <text class="entry-arrow">›</text>
     </view>
 
-    <view class="card entry-card" bindtap="onScreenshotImport">
-      <text class="entry-icon">📸</text>
-      <text class="entry-label">{{t.importScreenshot}}</text>
-      <text class="entry-desc">{{t.albumDesc}}</text>
+    <view class="entry-card" bindtap="onScreenshotImport">
+      <view class="entry-badge" style="{{skinShot}}"><text>图</text></view>
+      <view class="entry-text">
+        <text class="entry-label">{{t.importScreenshot}}</text>
+        <text class="entry-desc">{{t.albumDesc}}</text>
+      </view>
+      <text class="entry-arrow">›</text>
     </view>
 
-    <view class="card entry-card" bindtap="onManualWrite">
-      <text class="entry-icon">✍️</text>
-      <text class="entry-label">{{t.writeNote}}</text>
-      <text class="entry-desc">{{t.manualDesc}}</text>
+    <view class="entry-card" bindtap="onManualWrite">
+      <view class="entry-badge" style="{{skinWrite}}"><text>写</text></view>
+      <view class="entry-text">
+        <text class="entry-label">{{t.writeNote}}</text>
+        <text class="entry-desc">{{t.manualDesc}}</text>
+      </view>
+      <text class="entry-arrow">›</text>
     </view>
   </view>
 

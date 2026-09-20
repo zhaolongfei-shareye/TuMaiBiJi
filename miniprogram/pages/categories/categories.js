@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
+const { toneVars } = require('../../utils/palette.js')
 
 Page({
   data: {
@@ -20,7 +21,7 @@ Page({
     this.setData({
       lang,
       t: texts(lang),
-      themeClass: app.getThemeClass(app.globalData.userInfo?.wallpaper || 'default'),
+      themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
     this.loadCategories()
   },
@@ -29,6 +30,8 @@ Page({
     this.setData({ loading: true })
     try {
       const categories = await api.getCategories()
+      // 色点用派生色，和首页那张色卡取同一个函数，两边不可能再对不上
+      categories.forEach((c) => { c.toneStyle = toneVars(c.id) })
       this.setData({ categories, loading: false })
     } catch (err) {
       console.error('加载分类失败', err)

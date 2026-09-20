@@ -1,15 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { cardSkinFor } = require('../../utils/palette.js')
-
-// 白色图标块里放一个汉字而不是图标字体：项目没有 iconfont，tab 栏的图标也是 CSS 画的；
-// 单个汉字在苹方下必定渲染得出来，换成 ✎ ⌗ 这类符号就要赌设备字体。
-const SOURCE_ICON = {
-  wechat_article: '文',
-  web_article: '文',
-  screenshot: '图',
-  manual: '写',
-}
+const { cardSkinFor, SOURCE_ICON, toneVars } = require('../../utils/palette.js')
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
@@ -72,6 +63,9 @@ Page({
   async loadCategories() {
     try {
       const categories = await api.getCategories()
+      // chip 选中态的颜色必须和该分类的色卡一致，所以取同一套派生规则，
+      // 不用后端那个 category.color——两者对不上时用户会以为分类乱了
+      categories.forEach((c) => { c.toneStyle = toneVars(c.id) })
       this.setData({ categories })
       // 分类比笔记晚到是常态：到了就得给已在屏上的色卡补上分类名，否则 eyebrow 会一直停在"未分类"。
       if (this.data.notes.length) this.setData({ notes: this.skin(this.data.notes) })

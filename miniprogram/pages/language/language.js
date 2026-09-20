@@ -22,7 +22,7 @@ Page({
       currentLang: lang,
       lang,
       t: texts(lang),
-      themeClass: app.getThemeClass(app.globalData.userInfo?.wallpaper || 'default'),
+      themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
   },
 

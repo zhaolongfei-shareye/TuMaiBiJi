@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
+const { cardSkinFor, SOURCE_ICON, toneVars } = require('../../utils/palette.js')
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
@@ -33,7 +34,7 @@ Page({
     this.setData({
       lang,
       t: texts(lang),
-      themeClass: app.getThemeClass(app.globalData.userInfo?.wallpaper || 'default'),
+      themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
     if (options.id) {
       this.setData({ noteId: options.id })
@@ -71,6 +72,19 @@ Page({
         }
       }
       note.category_name = categoryName
+
+      // 详情页头部就是同一张色卡：颜色与构图必须和列表里那条一模一样，
+      // 所以复用 cardSkinFor，不在这另写一套取色规则。
+      const skin = cardSkinFor(note.category_id, note.id)
+      note.cardStyle = skin.style
+      // 中性面板里的序号圆点要借分类色，但不能贴 cardStyle——那会把整块面板染成色卡
+      note.toneStyle = toneVars(note.category_id)
+      note.motif = skin.motif
+      note.iconChar = SOURCE_ICON[note.source_type] || '文'
+      note.eyebrow = [
+        note.category_name || (note.category_id == null ? '未分类' : ''),
+        note.source_type_label,
+      ].filter(Boolean).join(' · ')
       
       this.setData({ note, loading: false, _loaded: true })
     } catch (err) {
