@@ -110,4 +110,7 @@ async def get_share_qrcode(token: str, db: Session = Depends(get_db)):
         logger.exception("生成小程序码失败 token=%s: %s: %s", token, type(e).__name__, e)
         raise HTTPException(status_code=502, detail="小程序码生成失败，请稍后重试")
 
-    return Response(content=image_data, media_type="image/png")
+    # 微信 getUnlimitedQRCode 实测返回的是 JPEG（文件头 FF D8 FF E0 …JFIF），这里原先硬编码
+    # image/png，声明与实际字节不符。按文件头判定，PNG/JPEG 都能对上。
+    media_type = "image/png" if image_data[:4] == b"\x89PNG" else "image/jpeg"
+    return Response(content=image_data, media_type=media_type)

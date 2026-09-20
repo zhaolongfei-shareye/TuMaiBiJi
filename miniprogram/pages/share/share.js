@@ -1,6 +1,23 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 
+// 小程序 canvas 2d 的 roundRect 在部分基础库/机型上不存在，直接调用会抛 TypeError。
+// 而绘图代码一旦抛在这一步，后面的导出根本不会执行，所以这里补一个等价实现。
+function ensureRoundRect(ctx) {
+  if (typeof ctx.roundRect === 'function') return
+  ctx.roundRect = function (x, y, w, h, r) {
+    const rad = Math.max(0, Math.min(typeof r === 'number' ? r : 0, w / 2, h / 2))
+    this.beginPath()
+    this.moveTo(x + rad, y)
+    this.arcTo(x + w, y, x + w, y + h, rad)
+    this.arcTo(x + w, y + h, x, y + h, rad)
+    this.arcTo(x, y + h, x, y, rad)
+    this.arcTo(x, y, x + w, y, rad)
+    this.closePath()
+    return this
+  }
+}
+
 Page({
   data: {
     noteId: null,
@@ -57,13 +74,26 @@ Page({
     })
   },
 
-  async renderToCanvas(note, token, qrImagePath) {
-    const query = wx.createSelectorQuery()
-    query.select('#shareCanvas')
-      .fields({ node: true, size: true })
-      .exec(async (res) => {
-        const canvas = res[0].node
-        const ctx = canvas.getContext('2d')
+  renderToCanvas(note, token, qrImagePath) {
+    // createSelectorQuery 的 exec 回调是"被微信异步调用"的，回调里抛出的异常既不会冒泡到
+    // generateShareImage 的 try/catch，也不会被 await 感知（原实现 await 的是一个立刻 resolve
+    // 的 undefined）。结果是画布一旦出错，页面就永久停在"生成分享图…"且没有任何提示。
+    // 这里把回调包成 Promise，让异常能真正被上层捕获。
+    return new Promise((resolve, reject) => {
+      wx.createSelectorQuery()
+        .select('#shareCanvas')
+        .fields({ node: true, size: true })
+        .exec((res) => {
+          this.drawCard(res, note, qrImagePath).then(resolve, reject)
+        })
+    })
+  },
+
+  async drawCard(res, note, qrImagePath) {
+    const canvas = res && res[0] && res[0].node
+    if (!canvas) throw new Error('分享画布未就绪')
+    const ctx = canvas.getContext('2d')
+    ensureRoundRect(ctx)
         
         const width = 750
         const height = 1200
@@ -183,27 +213,33 @@ Page({
         if (qrImagePath) {
           const img = canvas.createImage()
           img.src = qrImagePath
-          await new Promise((resolve) => {
+          // 解码异常时 onload/onerror 可能一个都不触发，这里加超时兜底；
+          // 否则整个 await 永久挂住，页面就停在"生成分享图…"出不来。
+          await new Promise((done) => {
+            const timer = setTimeout(done, 3000)
             img.onload = () => {
+              clearTimeout(timer)
               ctx.drawImage(img, qrX, qrY, qrSize, qrSize)
-              resolve()
+              done()
             }
-            img.onerror = () => resolve()
+            img.onerror = () => {
+              clearTimeout(timer)
+              done()
+            }
           })
         }
 
         // Export image
-        wx.canvasToTempFilePath({
-          canvas,
-          success: (res) => {
-            this.setData({ imagePath: res.tempFilePath, generating: false })
-          },
-          fail: () => {
-            wx.showToast({ title: t('exportFailed', this.data.lang), icon: 'none' })
-            this.setData({ generating: false })
-          },
-        }, this)
-      })
+        await new Promise((done, fail) => {
+          wx.canvasToTempFilePath({
+            canvas,
+            success: (r) => {
+              this.setData({ imagePath: r.tempFilePath, generating: false })
+              done()
+            },
+            fail,
+          }, this)
+        })
   },
 
   ellipsize(text, maxWidth, ctx) {

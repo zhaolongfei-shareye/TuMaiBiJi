@@ -47,8 +47,9 @@ async def get_access_token() -> str:
 
 
 async def get_qr_code_image(scene: str, page: str = "") -> bytes:
-    """调用微信 getUnlimitedQRCode 接口，返回 PNG 图片字节。
+    """调用微信 getUnlimitedQRCode 接口，返回图片字节。
 
+    实测微信回的是 JPEG，调用方别按 PNG 声明硬编码。
     scene 最长 32 字符，page 必须是已发布的小程序页面路径。
     """
     token = await get_access_token()

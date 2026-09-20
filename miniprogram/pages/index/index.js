@@ -46,7 +46,9 @@ Page({
       this.getTabBar().setData({ selected: 0 })
     }
     this.loadCategories()
-    this.loadNotes()
+    // onShow 每次切回该 tab 都会触发，必须 reset：否则非 reset 分支会把结果追加到旧列表上，
+    // 同一条笔记被贴两遍。
+    this.loadNotes(true)
   },
 
   async loadCategories() {
@@ -65,9 +67,11 @@ Page({
     
     const { skip, limit, searchKeyword, selectedCategory, loadingMore } = this.data
     if (loadingMore) return
-    
-    this.setData({ 
-      loading: !reset,
+
+    // reset 走整表重载：显示加载态并清空，避免残留上一次的筛选结果；
+    // 翻页走追加：保持列表可见，用 loadingMore 单独提示。
+    this.setData({
+      loading: reset,
       loadingMore: reset ? false : true,
     })
     
