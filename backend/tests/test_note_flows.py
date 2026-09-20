@@ -10,7 +10,7 @@ import sys
 
 os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest.db"
 os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
-os.environ["DEEPSEEK_API_KEY"] = "sk-your-deepseek-api-key"  # 占位符：模拟生产未配置
+os.environ["EXTRACT_PROVIDER"] = "none"  # 提炼直接走降级，测试期间不发出任何出网请求
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
@@ -149,6 +149,7 @@ class TestExtractionDegradation:
 
         assert key_usable("") is False
         assert key_usable("sk-your-deepseek-api-key") is False
+        assert key_usable("your-cloud-function-key") is False
         assert key_usable("your-tencent-ocr-secret-id") is False
         assert key_usable("sk-8f3ab99c11d24e7fbb0d") is True
 

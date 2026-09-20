@@ -9,9 +9,19 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 MAX_RETRIES = 3
 INITIAL_BACKOFF = 1.0
+
+# 提炼供应商的唯一开关。三个取值的含义严格区分：
+#   hunyuan_cf —— 默认。打云函数的 HTTP 触发，云函数内部再用 cloud.ai() 走混元。
+#                 免费额度只有从这个来源调用才会被抵扣，所以不能由本服务直连混元端点。
+#   none       —— 强制降级。用于排查，以及提审期临时关能力。**不发起任何出网请求**。
+#   wechat_ai  —— 为微信自家 AI 预留的枚举位。官方明令禁止把相关代码合入正式版，
+#                 所以这里只占位、不写任何调用实现；命中时明确报"未实现"，不静默不崩。
+PROVIDER_HUNYUAN_CF = "hunyuan_cf"
+PROVIDER_NONE = "none"
+PROVIDER_WECHAT_AI = "wechat_ai"
+KNOWN_PROVIDERS = (PROVIDER_HUNYUAN_CF, PROVIDER_NONE, PROVIDER_WECHAT_AI)
 
 # .env 里遗留的示例值（sk-your-key / your-secret-xxx）非空但不是真凭据，
 # 若当作已配置会把每条任务变成 401 重试失败，比缺 key 更难排查。
@@ -23,6 +33,11 @@ _PLACEHOLDER = re.compile(
 def key_usable(key: str) -> bool:
     key = (key or "").strip()
     return bool(key) and not _PLACEHOLDER.match(key)
+
+
+def provider_implemented(provider: str) -> bool:
+    """给 deploy.sh 自检用：区分"没配凭据"与"这个 provider 本来就还没写"。"""
+    return provider in (PROVIDER_HUNYUAN_CF, PROVIDER_NONE)
 
 
 def _degraded(text: str, fallback_title: str) -> dict:
@@ -69,76 +84,104 @@ async def extract_knowledge(text: str, fallback_title: str = "") -> dict:
         return _degraded(text, fallback_title)
 
 
-async def _call_llm(text: str, fallback_title: str = "") -> dict:
-    """调用 DeepSeek API 提取结构化知识，返回 {title, summary, key_points, tags}。
-
-    包含重试逻辑：对 429（限流）、5xx（服务器错误）、超时自动重试，
-    最多重试 MAX_RETRIES 次，使用指数退避策略。
-    """
-    if not key_usable(settings.DEEPSEEK_API_KEY):
-        raise ValueError("DeepSeek API Key 未配置或仍为占位符，请设置 DEEPSEEK_API_KEY")
-
-    user_content = text
-    if len(user_content) > 12000:
-        user_content = user_content[:12000] + "\n\n[...内容过长，已截断...]"
-
+def _build_user_content(text: str, fallback_title: str) -> str:
+    content = text
+    if len(content) > 12000:
+        content = content[:12000] + "\n\n[...内容过长，已截断...]"
     if fallback_title:
-        user_content = f"参考标题：{fallback_title}\n\n{user_content}"
+        content = f"参考标题：{fallback_title}\n\n{content}"
+    return content
+
+
+async def _call_llm(text: str, fallback_title: str = "") -> dict:
+    """按 EXTRACT_PROVIDER 分发到具体供应商实现。
+
+    重试策略只作用于"可能自愈"的失败：429 限流、5xx、超时，最多 MAX_RETRIES 次指数退避。
+    云函数明确回了 error 字段、或 provider 本身不可用，属"重试也不会变好"，直接抛出。
+    """
+    provider = (settings.EXTRACT_PROVIDER or PROVIDER_HUNYUAN_CF).strip()
+
+    if provider == PROVIDER_NONE:
+        raise RuntimeError("EXTRACT_PROVIDER=none，已按配置跳过提炼")
+    if provider == PROVIDER_WECHAT_AI:
+        raise RuntimeError("EXTRACT_PROVIDER=wechat_ai 尚未实现（官方未开放提审），走降级")
+    if provider not in KNOWN_PROVIDERS:
+        raise RuntimeError(f"未知的 EXTRACT_PROVIDER={provider!r}，走降级")
+
+    return await _call_hunyuan_cloud_function(text, fallback_title)
+
+
+async def _call_hunyuan_cloud_function(text: str, fallback_title: str) -> dict:
+    url = (settings.HUNYUAN_CF_URL or "").strip()
+    key = (settings.HUNYUAN_CF_KEY or "").strip()
+
+    if not url:
+        raise RuntimeError("HUNYUAN_CF_URL 未配置，无法调用提炼云函数")
+    if not key_usable(key):
+        raise RuntimeError("HUNYUAN_CF_KEY 未配置或仍为占位符，请设置云函数触发凭据")
+
+    payload = {
+        "text": _build_user_content(text, fallback_title),
+        "fallback_title": fallback_title,
+        "system_prompt": SYSTEM_PROMPT,
+    }
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    timeout = settings.HUNYUAN_CF_TIMEOUT
 
     last_error = None
     for attempt in range(MAX_RETRIES + 1):
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{DEEPSEEK_BASE_URL}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "deepseek-chat",
-                        "messages": [
-                            {"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": user_content},
-                        ],
-                        "temperature": 0.3,
-                        "max_tokens": 2000,
-                    },
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+
+            if resp.status_code == 429:
+                raise httpx.HTTPStatusError(
+                    "Rate limit exceeded", request=resp.request, response=resp
                 )
-                
-                if resp.status_code == 429:
-                    raise httpx.HTTPStatusError(
-                        "Rate limit exceeded", request=resp.request, response=resp
-                    )
-                if resp.status_code >= 500:
-                    raise httpx.HTTPStatusError(
-                        f"Server error: {resp.status_code}", 
-                        request=resp.request, 
-                        response=resp
-                    )
-                
-                resp.raise_for_status()
+            if resp.status_code >= 500:
+                raise httpx.HTTPStatusError(
+                    f"Server error: {resp.status_code}", request=resp.request, response=resp
+                )
+            if resp.status_code >= 400:
+                # 4xx 里除 429 外都是"请求本身有问题"：地址写错、凭据被拒、body 不合法。
+                # 重试三次只会把降级推迟 1+2+4 秒，不会改变结果，所以按不可重试处理。
+                raise RuntimeError(
+                    f"提炼云函数返回 HTTP {resp.status_code}：{resp.text[:200]!r}"
+                )
+
+            try:
                 data = resp.json()
-                
-                content = data["choices"][0]["message"]["content"]
-                return _parse_response(content, fallback_title)
-                
+            except (json.JSONDecodeError, ValueError) as e:
+                # 网关在函数没部署/路径错时会回一段 HTML 错误页，这里不当可重试错误处理。
+                raise RuntimeError(
+                    f"提炼云函数返回非 JSON（{type(e).__name__}）：{resp.text[:200]!r}"
+                )
+
+            if not isinstance(data, dict):
+                raise RuntimeError(f"提炼云函数返回的不是对象：{type(data).__name__}")
+            if data.get("error"):
+                raise RuntimeError(f"提炼云函数报错：{str(data['error'])[:300]}")
+
+            return _parse_response(json.dumps(data, ensure_ascii=False), fallback_title)
+
         except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
             last_error = e
             if attempt < MAX_RETRIES:
                 backoff = INITIAL_BACKOFF * (2 ** attempt)
                 logger.warning(
-                    "LLM API 请求失败 (attempt %d/%d): %s，%0.1f 秒后重试",
-                    attempt + 1, MAX_RETRIES + 1, str(e), backoff
+                    "提炼云函数请求失败 (attempt %d/%d): %s，%0.1f 秒后重试",
+                    attempt + 1, MAX_RETRIES + 1, str(e), backoff,
                 )
                 await asyncio.sleep(backoff)
             else:
-                logger.error("LLM API 请求在 %d 次尝试后最终失败: %s", MAX_RETRIES + 1, str(e))
+                logger.error(
+                    "提炼云函数在 %d 次尝试后最终失败: %s", MAX_RETRIES + 1, str(e)
+                )
                 raise
         except Exception as e:
-            logger.error("LLM API 请求遇到非重试错误: %s", str(e))
+            logger.error("提炼云函数遇到非重试错误: %s", str(e))
             raise
-    
+
     raise last_error
 
 

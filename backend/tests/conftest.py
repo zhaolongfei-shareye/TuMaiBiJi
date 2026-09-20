@@ -15,14 +15,19 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 TEST_DB = "sqlite:////tmp/tumaibiji_pytest.db"
 TEST_JWT = "pytest-only-secret-not-a-real-one"
-# 故意用 config/llm 认得的"公开占位符"：提炼因此走降级分支，不会发出真实请求
-PLACEHOLDER_DEEPSEEK = "sk-your-deepseek-api-key"
+# 默认 provider=none：提炼分支直接抛错走降级，**整套测试不会发出任何出网请求**。
+# 需要测 hunyuan_cf 分支的用例各自 monkeypatch settings，不共用这里的全局值。
+PLACEHOLDER_CF_KEY = "your-cloud-function-key"
+FAKE_CF_URL = "https://pytest.invalid/functions/extract"
+TEST_EXTRACT_PROVIDER = "none"
 FAKE_WECHAT_APP_ID = "pytest-fake-appid"
 FAKE_WECHAT_APP_SECRET = "pytest-fake-appsecret"
 
 os.environ["DATABASE_URL"] = TEST_DB
 os.environ["JWT_SECRET_KEY"] = TEST_JWT
-os.environ["DEEPSEEK_API_KEY"] = PLACEHOLDER_DEEPSEEK
+os.environ["EXTRACT_PROVIDER"] = "none"
+os.environ["HUNYUAN_CF_URL"] = FAKE_CF_URL
+os.environ["HUNYUAN_CF_KEY"] = PLACEHOLDER_CF_KEY
 os.environ["WECHAT_APP_ID"] = FAKE_WECHAT_APP_ID
 os.environ["WECHAT_APP_SECRET"] = FAKE_WECHAT_APP_SECRET
 

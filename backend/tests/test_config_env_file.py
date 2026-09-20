@@ -91,7 +91,7 @@ def test_config_failure_message_carries_no_values_and_no_exception_link(monkeypa
 def test_startup_refuses_bad_config_without_printing_values(tmp_path):
     """子进程走真实通道：CPython 自己打印 traceback，那才是终端和 journal 会留下的东西。"""
     child_env = {k: v for k, v in os.environ.items() if not k.startswith(
-        ("DATABASE_", "WECHAT_", "JWT_", "DEEPSEEK_", "REDIS_", "CORS_"))}
+        ("DATABASE_", "WECHAT_", "JWT_", "HUNYUAN_", "EXTRACT_", "REDIS_", "CORS_"))}
     child_env.update({
         "DATABASE_URL": f"postgresql://postgres:{SENTINEL_DB_PASSWORD}@db.internal:5432/wtsj",
         "WECHAT_APP_SECRET": SENTINEL_APP_SECRET,
@@ -115,6 +115,7 @@ def test_this_process_holds_only_disposable_config_values():
     """`test_note_flows` 的夹具会 drop_all()，地址一旦被环境里的业务库污染就是在真库上删表。"""
     assert settings.DATABASE_URL == conftest.TEST_DB
     assert settings.JWT_SECRET_KEY == conftest.TEST_JWT
-    assert settings.DEEPSEEK_API_KEY == conftest.PLACEHOLDER_DEEPSEEK
+    assert settings.EXTRACT_PROVIDER == conftest.TEST_EXTRACT_PROVIDER
+    assert settings.HUNYUAN_CF_KEY == conftest.PLACEHOLDER_CF_KEY
     assert settings.WECHAT_APP_SECRET == conftest.FAKE_WECHAT_APP_SECRET
     assert settings.WECHAT_APP_ID == conftest.FAKE_WECHAT_APP_ID

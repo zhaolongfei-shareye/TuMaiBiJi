@@ -9,7 +9,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./tmbj.db"
-    DEEPSEEK_API_KEY: str = ""
+    # 提炼走云函数中转混元：只有云函数内部的 cloud.ai() 才抵扣成长计划的免费额度，
+    # 本服务直连混元端点会导致额度不抵扣、改扣套餐，所以这里只有云函数的触发信息。
+    EXTRACT_PROVIDER: str = "hunyuan_cf"
+    HUNYUAN_CF_URL: str = ""
+    HUNYUAN_CF_KEY: str = ""
+    # 官方文档在 5s/15s/60s/900s 之间互相矛盾，留成配置项以便实测后收敛。
+    HUNYUAN_CF_TIMEOUT: float = 60.0
     WECHAT_APP_ID: str = ""
     WECHAT_APP_SECRET: str = ""
     REDIS_URL: str = "redis://localhost:6379"

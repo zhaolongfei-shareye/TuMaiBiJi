@@ -1,0 +1,9 @@
+{
+  "name": "extract",
+  "version": "1.0.0",
+  "description": "图麦笔记提炼哑管道：文本进 → 4 字段 JSON 出（混元，只在云函数内调用才抵扣成长计划额度）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": ">=4.0.1"
+  }
+}

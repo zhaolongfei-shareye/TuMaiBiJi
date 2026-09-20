@@ -174,7 +174,7 @@ echo ""
 echo ">>> 配置自检..."
 python <<'PY'
 from app.core.config import settings as s
-from app.services.llm import key_usable
+from app.services.llm import KNOWN_PROVIDERS, key_usable, provider_implemented
 
 # 缺失即【功能完全不可用】
 REQUIRED = {
@@ -185,7 +185,8 @@ REQUIRED = {
 FEATURE = {}
 # 缺失只是【降级】：采集照常入库，少掉自动提炼
 DEGRADABLE = {
-    "DEEPSEEK_API_KEY": "自动提炼摘要/要点/标签（缺失则只存原文，任务不再失败）",
+    "HUNYUAN_CF_URL": "提炼云函数地址（缺失则只存原文，任务不再失败）",
+    "HUNYUAN_CF_KEY": "提炼云函数触发凭据（缺失则只存原文，任务不再失败）",
 }
 # 截图 OCR 已无凭据依赖（自建 RapidOCR），已在第 2 节做过运行期预检。
 
@@ -207,7 +208,15 @@ if missing:
 else:
     print("  ✓ 必需配置齐全（注意：这只是配置层面，接口是否真通仍需端到端验证）")
 
-if deg_missing:
+# provider 单独判：未实现与没配凭据是两件事，混在一起会让人去查一个不存在的问题。
+provider = (s.EXTRACT_PROVIDER or "hunyuan_cf").strip()
+if provider not in KNOWN_PROVIDERS:
+    print(f"  · EXTRACT_PROVIDER={provider!r} 不在已知取值内，该 provider 未实现，走降级")
+elif not provider_implemented(provider):
+    print(f"  · EXTRACT_PROVIDER={provider!r} 该 provider 未实现，走降级")
+elif provider == "none":
+    print("  · EXTRACT_PROVIDER=none，按配置跳过提炼，只存原文")
+elif deg_missing:
     print("  · 可降级项未配置（服务照常，功能降级）：")
     for d in deg_missing:
         print(f"     - {d}")
