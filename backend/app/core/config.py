@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     # 本服务直连混元端点会导致额度不抵扣、改扣套餐，所以这里只有云函数的触发信息。
     EXTRACT_PROVIDER: str = "hunyuan_cf"
     HUNYUAN_CF_URL: str = ""
+    # 必须是**长期有效的 API Key**，不是 access_token：后者默认 2 小时过期需 refresh，
+    # 而提炼跑在 RQ worker 里，过期只会变成静默全线降级。两者填法相同（Bearer 槽）。
     HUNYUAN_CF_KEY: str = ""
     # 官方文档在 5s/15s/60s/900s 之间互相矛盾，留成配置项以便实测后收敛。
     HUNYUAN_CF_TIMEOUT: float = 60.0
