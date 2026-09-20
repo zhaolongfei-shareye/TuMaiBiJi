@@ -12,3 +12,7 @@ node_modules/
 .DS_Store
 *.key
 backend/keys/
+
+# 微信开发者工具自动写出的本机设置（urlCheck/热重载等），换一台机器就该不一样，
+# 入库会让每个人的本地工具偏好互相覆盖。官方模板同样建议忽略。
+miniprogram/project.private.config.json
