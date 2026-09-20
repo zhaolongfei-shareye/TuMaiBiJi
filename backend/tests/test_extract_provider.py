@@ -210,6 +210,43 @@ class TestCloudFunctionOutcomes:
         _assert_degraded(result)
         assert len(client.calls) == 1
 
+    async def test_retryable_error_is_retried_to_limit(self, monkeypatch, cf_ready, fast_backoff):
+        """函数把模型侧 429 包成 HTTP 200 + {error, retryable:true} 时，必须重试而不是当不可重试。
+
+        这条来自现网实测：空闲之后的第一次调用必吃一个 429、紧接着几次全好。若不重试，
+        每条空闲后的第一条笔记就会静默丢掉摘要——正是"上线必被投诉"那一类。
+        """
+        client = _patch_transport(
+            monkeypatch,
+            lambda n: FakeResponse(200, {"error": "cloud.ai 返回 HTTP 429: rate limit", "retryable": True}),
+        )
+
+        result = await llm.extract_knowledge("正文", "")
+        _assert_degraded(result)
+        assert len(client.calls) == llm.MAX_RETRIES + 1
+
+    async def test_retryable_error_then_success_recovers(self, monkeypatch, cf_ready, fast_backoff):
+        good = FakeResponse(200, {"title": "T", "summary": "S", "key_points": ["a"], "tags": ["x"]})
+        _patch_transport(
+            monkeypatch,
+            lambda n: FakeResponse(200, {"error": "http 429", "retryable": True}) if n < 2 else good,
+        )
+
+        result = await llm.extract_knowledge("正文", "")
+        assert result["degraded"] is False
+        assert result["title"] == "T"
+
+    async def test_non_retryable_flag_stays_single(self, monkeypatch, cf_ready):
+        """retryable 显式为 false（如 AI_MODEL_NOT_ENABLED）→ 仍是一次就降级。"""
+        client = _patch_transport(
+            monkeypatch,
+            lambda n: FakeResponse(200, {"error": "AI_MODEL_NOT_ENABLED", "retryable": False}),
+        )
+
+        result = await llm.extract_knowledge("正文", "")
+        _assert_degraded(result)
+        assert len(client.calls) == 1
+
     async def test_429_retries_then_degrades(self, monkeypatch, cf_ready, fast_backoff):
         """F6 验收：429 重试 3 次仍失败则降级入库，而不是让任务 failed。"""
         client = _patch_transport(monkeypatch, lambda n: FakeResponse(429, {"detail": "rate limited"}))

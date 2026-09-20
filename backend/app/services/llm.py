@@ -30,6 +30,14 @@ _PLACEHOLDER = re.compile(
 )
 
 
+class TransientExtractError(RuntimeError):
+    """云函数说"这个错重试有可能好"（模型侧 429 / 5xx / 网络类）。
+
+    单独立一个类型，是因为函数把模型错误包成 HTTP 200 返回，状态码上分不出
+    "值得重试"和"重试也不会变好"，只能由函数用 retryable 字段显式带出来。
+    """
+
+
 def key_usable(key: str) -> bool:
     key = (key or "").strip()
     return bool(key) and not _PLACEHOLDER.match(key)
@@ -160,11 +168,15 @@ async def _call_hunyuan_cloud_function(text: str, fallback_title: str) -> dict:
             if not isinstance(data, dict):
                 raise RuntimeError(f"提炼云函数返回的不是对象：{type(data).__name__}")
             if data.get("error"):
-                raise RuntimeError(f"提炼云函数报错：{str(data['error'])[:300]}")
+                # 云函数把模型侧的错误包成 HTTP 200 + {error} 返回，状态码上看不出可不可重试，
+                # 所以可重试性由函数用 retryable 字段显式带出。实测空闲后的第一次调用必吃一个
+                # 429、紧接着几次全好——若不重试，每条空闲后的第一条笔记就会静默丢掉摘要。
+                msg = f"提炼云函数报错：{str(data['error'])[:300]}"
+                raise TransientExtractError(msg) if data.get("retryable") else RuntimeError(msg)
 
             return _parse_response(json.dumps(data, ensure_ascii=False), fallback_title)
 
-        except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
+        except (httpx.TimeoutException, httpx.HTTPStatusError, TransientExtractError) as e:
             last_error = e
             if attempt < MAX_RETRIES:
                 backoff = INITIAL_BACKOFF * (2 ** attempt)

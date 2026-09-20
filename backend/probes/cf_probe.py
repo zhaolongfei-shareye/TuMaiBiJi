@@ -14,6 +14,7 @@
 退出码：0=全部通过，1=有未通过项。不写库、不发短信、不产生任何用户可见副作用。
 """
 import json
+import re
 import statistics
 import sys
 import time
@@ -23,12 +24,45 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.config import settings  # noqa: E402
-from app.services.llm import SYSTEM_PROMPT, key_usable  # noqa: E402
+from app.services.llm import SYSTEM_PROMPT  # noqa: E402
+
+
+def env_lines(path):
+    """直接读 .env，不依赖 settings。
+
+    现网跑的仍是 v2.2，`config.py` 里还没有这两个字段，而 pydantic-settings 设了
+    `extra="ignore"`，多余键会被静默丢掉——用 settings 取就永远是空串，探针会误报
+    "未配置"。这个探针的存在意义正是"部署前先把通道验通"，所以必须绕开待部署的代码。
+    """
+    out = {}
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return out
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip().strip('"').strip("'")
+    return out
+
+
+_ENV = env_lines(Path(__file__).resolve().parents[1] / ".env")
+
+# 探针要能在"新代码还没部署"时先跑，所以这里不 import app.services.llm.key_usable
+# ——那正是待部署的东西；占位符判断自带一份即可。
+_PLACEHOLDER = re.compile(
+    r"(?i)^(sk-)?(your[-_]|example|placeholder|changeme|dummy|todo|test[-_]?key|x{3,}|<|\{\{)"
+)
+
+
+def usable(v):
+    v = (v or "").strip()
+    return bool(v) and not _PLACEHOLDER.match(v)
 
 FAILS = []
-URL = (settings.HUNYUAN_CF_URL or "").strip()
-KEY = (settings.HUNYUAN_CF_KEY or "").strip()
+URL = _ENV.get("HUNYUAN_CF_URL", "")
+KEY = _ENV.get("HUNYUAN_CF_KEY", "")
 
 
 def check(name, ok, extra=""):
@@ -59,15 +93,30 @@ def body(text, fallback=""):
 
 
 print(f"\n目标: {URL or '（HUNYUAN_CF_URL 未配置）'}")
-print(f"凭据: {'已配置且非占位符' if key_usable(KEY) else '未配置或仍是占位符 —— 探针无法继续'}")
-print(f"EXTRACT_PROVIDER={settings.EXTRACT_PROVIDER}  HUNYUAN_CF_TIMEOUT={settings.HUNYUAN_CF_TIMEOUT}\n")
+print(f"凭据: {'已配置且非占位符' if usable(KEY) else '未配置或仍是占位符 —— 探针无法继续'}")
+print(f"EXTRACT_PROVIDER={_ENV.get('EXTRACT_PROVIDER', '（.env 未写，取代码默认 hunyuan_cf）')}  "
+      f"HUNYUAN_CF_TIMEOUT={_ENV.get('HUNYUAN_CF_TIMEOUT', '（.env 未写，取代码默认 90）')}\n")
 
-if not URL or not key_usable(KEY):
+if not URL or not usable(KEY):
     print("结论：先在 .env 填 HUNYUAN_CF_URL 与长期 API Key（不是 access_token），再跑本探针。")
     sys.exit(1)
 
 print("[1 凭据与可达性]")
-dt, status, text = call(body("产品周会纪要：确定下周三发布 1.0.2，OCR 改用自建引擎。", "周会"), 30)
+body1 = body("产品周会纪要：确定下周三发布 1.0.2，OCR 改用自建引擎。", "周会")
+dt, status, text = call(body1, 30)
+# 现网实测：空闲后的第一次调用必吃一个模型侧 429，紧接着几次全好。函数把这种错包成
+# HTTP 200 + {error, retryable:true} 返回，后端会重试——所以探针也要重试着看，
+# 否则每次冷启动都报一个假红。
+for _ in range(3):
+    try:
+        _first = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        break
+    if not (isinstance(_first, dict) and _first.get("retryable")):
+        break
+    print(f"        收到可重试错误（{_first.get('error', '')[:70]}），2 秒后再试一次")
+    time.sleep(2)
+    dt, status, text = call(body1, 30)
 print(f"        首次调用 {dt:.2f}s → HTTP {status}")
 if status == 401:
     code = ""
@@ -77,7 +126,9 @@ if status == 401:
         pass
     hints = {
         "MISSING_CREDENTIALS": "Bearer 头没被认出来 —— 检查是否误用了 X-API-KEY 之类的头",
-        "INVALID_CREDENTIALS": "Key 值不对 —— 确认填的是「权限控制 → API Keys」的长期 Key",
+        "INVALID_CREDENTIALS": "Key 值不对 —— 确认填的是控制台「环境管理 → API Key 配置」"
+                               "里那块**服务端 API Key**（不是上面那个客户端 Publishable Key，"
+                               "也不是设置页的 CLI 秘钥，两者实测都不被网关接受）",
         "ACCESS_TOKEN_KID_INVALID": "填成了 access_token（2 小时过期那种）—— 必须换长期 API Key",
     }
     check("凭据被接受", False, f"{code} —— {hints.get(code, '未知子型')}")
@@ -120,8 +171,9 @@ ok_lat = [d for d, s in zip(lat, codes) if s == 200]
 if ok_lat:
     print(f"        → 最短 {min(ok_lat):.2f}s / 中位 {statistics.median(ok_lat):.2f}s / 最长 {max(ok_lat):.2f}s")
     check("全部 5 次成功", all(s == 200 for s in codes), f"状态码 {codes}")
-    if max(ok_lat) + 1 > settings.HUNYUAN_CF_TIMEOUT:
-        print(f"        ⚠️ 最长耗时已逼近 HUNYUAN_CF_TIMEOUT={settings.HUNYUAN_CF_TIMEOUT}s，建议上调")
+    client_timeout = float(_ENV.get("HUNYUAN_CF_TIMEOUT") or 90)
+    if max(ok_lat) + 1 > client_timeout:
+        print(f"        ⚠️ 最长耗时已逼近 HUNYUAN_CF_TIMEOUT={client_timeout}s，建议上调")
 else:
     check("至少有一次成功", False, f"状态码 {codes}")
 

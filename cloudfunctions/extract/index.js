@@ -69,6 +69,10 @@ exports.main = async (event) => {
     // 抛出来比返回 500 好定位：网关会把未捕获异常压成一个看不出原因的调用失败。
     // 但光有 e.message 不够——axios 的 message 只有 "Request failed with status code 429"，
     // 真正的拒绝原因在服务端返回体里，而 429 到底是"并发超限"还是"额度不可用"决定了下一步做法。
+    //
+    // retryable 这个字段是给后端的：模型侧的 429/5xx 是**间歇性的**（实测空闲后的第一次调用
+    // 必吃一个 429、紧接着的几次全好），而后端默认把"函数返回 error"当成不可重试错误直接降级，
+    // 结果就是每条空闲后的第一条笔记静默丢掉摘要。所以这里把可重试性显式带出去。
     const resp = e && e.response
     if (resp) {
       let body = resp.data
@@ -81,9 +85,13 @@ exports.main = async (event) => {
       }
       return {
         error: `cloud.ai 返回 HTTP ${resp.status}: ${(body || '').slice(0, 500)}`,
+        retryable: resp.status === 429 || resp.status >= 500,
       }
     }
-    return { error: `cloud.ai 调用异常: ${e && e.message ? e.message : String(e)}` }
+    return {
+      error: `cloud.ai 调用异常: ${e && e.message ? e.message : String(e)}`,
+      retryable: true,
+    }
   }
 
   if (result && result.error) {
