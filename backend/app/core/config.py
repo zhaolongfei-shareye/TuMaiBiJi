@@ -16,8 +16,10 @@ class Settings(BaseSettings):
     # 必须是**长期有效的 API Key**，不是 access_token：后者默认 2 小时过期需 refresh，
     # 而提炼跑在 RQ worker 里，过期只会变成静默全线降级。两者填法相同（Bearer 槽）。
     HUNYUAN_CF_KEY: str = ""
-    # 官方文档在 5s/15s/60s/900s 之间互相矛盾，留成配置项以便实测后收敛。
-    HUNYUAN_CF_TIMEOUT: float = 60.0
+    # 客户端等待上限必须**大于**云函数自己的执行超时（现网 extract 已设为 60 秒），
+    # 否则函数还会跑完、我们先放弃，看起来像失败。5.4 秒那个墙是微信
+    # /tcb/invokecloudfunction 的调用方限制，走网关不受它约束，但仍要实测一次。
+    HUNYUAN_CF_TIMEOUT: float = 90.0
     WECHAT_APP_ID: str = ""
     WECHAT_APP_SECRET: str = ""
     REDIS_URL: str = "redis://localhost:6379"
