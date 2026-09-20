@@ -7,8 +7,12 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 // 否则改了一处忘另一处，线上就会出现"后端以为换了 prompt、模型其实没换"。
 // 失败时只回 {error: "..."}，让后端区分「立刻降级」与「值得重试」。
 
-// 混元模型 id 与额度绑得很紧，官方未公布完整清单，留成环境变量便于当场改而不必重传 zip。
-const MODEL_ID = process.env.HUNYUAN_MODEL_ID || 'hy3'
+// 模型 id 留成环境变量，改它不必重传 zip。**默认值是 2026-09-20 实测出来的，不是文档抄来的**：
+// 控制台「AI 资源 → 生文模型」里带「免费额度」标记的 hy3 与 hy3-preview 行为完全不同——
+// hy3 一律 0.68s 内抛 HTTP 429 `AI_MODEL_NOT_ENABLED`（"To use HY3, please switch to the resource pack"，
+// 即要求先切换为资源点套餐）；hy3-preview 则正常返回 4 字段并带 usage，实测 1.27–2.87s。
+// 所以**不切计费也能用上成长计划的免费额度，走的是 hy3-preview 这一行**。别改回 hy3。
+const MODEL_ID = process.env.HUNYUAN_MODEL_ID || 'hy3-preview'
 const MAX_INPUT = 12000
 
 function stripFences(s) {
@@ -63,6 +67,22 @@ exports.main = async (event) => {
     })
   } catch (e) {
     // 抛出来比返回 500 好定位：网关会把未捕获异常压成一个看不出原因的调用失败。
+    // 但光有 e.message 不够——axios 的 message 只有 "Request failed with status code 429"，
+    // 真正的拒绝原因在服务端返回体里，而 429 到底是"并发超限"还是"额度不可用"决定了下一步做法。
+    const resp = e && e.response
+    if (resp) {
+      let body = resp.data
+      if (typeof body !== 'string') {
+        try {
+          body = JSON.stringify(body)
+        } catch (stringifyError) {
+          body = String(resp.data)
+        }
+      }
+      return {
+        error: `cloud.ai 返回 HTTP ${resp.status}: ${(body || '').slice(0, 500)}`,
+      }
+    }
     return { error: `cloud.ai 调用异常: ${e && e.message ? e.message : String(e)}` }
   }
 
