@@ -6,7 +6,7 @@
   margin-top: var(--sp-5);
 }
 
-.avatar {
+.brand-logo {
   flex: none;
   width: 128rpx;
   height: 128rpx;
@@ -14,18 +14,82 @@
   background: var(--chip-idle);
 }
 
-.user-info {
+.brand-text {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
+  gap: 10rpx;
   min-width: 0;
 }
 
-.nickname {
+.brand-name {
   font-size: var(--fs-h2);
   font-weight: 800;
   letter-spacing: -0.8rpx;
   color: var(--text-primary);
+}
+
+.brand-slogan {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-tight);
+  color: var(--text-secondary);
+}
+
+/* ---------- 额度卡 ---------- */
+.quota {
+  padding: var(--sp-4);
+}
+
+.quota-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14rpx;
+}
+
+.quota-title {
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: var(--text-tertiary);
+}
+
+.quota-num {
+  font-size: var(--fs-meta);
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.quota-rule {
+  display: block;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+}
+
+/* 小程序 button 默认带一堆样式，这里全部推平，只当一块可点的主按钮用。
+   配色跟 .btn-primary 同一对（--accent 底 + --bg-page 字）：不能用 --bg-card，
+   深色壁纸下它是半透明白，压在亮色按钮上等于把字抹掉。 */
+.quota-share {
+  margin-top: var(--sp-4);
+  padding: 0;
+  height: 88rpx;
+  line-height: 88rpx;
+  width: 100%;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--bg-page);
+  font-size: var(--fs-body);
+  font-weight: 800;
+  letter-spacing: -0.4rpx;
+  border: none;
+}
+
+.quota-share::after {
+  border: none;
+}
+
+.quota-share:active {
+  opacity: 0.86;
 }
 
 .menu-group {

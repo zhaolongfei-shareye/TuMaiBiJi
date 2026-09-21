@@ -74,7 +74,9 @@ Page({
       // 中性面板里的序号圆点要借分类色，但不能贴方块那串——那会把整块面板染成色块
       note.toneStyle = toneVars(note.category_id)
       note.motif = skin.motif
-      note.blockName = note.category_name || (note.category_id == null ? this.data.t.noCategory : '')
+      // 方块上的字跟列表那条保持同一规则：第一个标签优先，没标签才回退分类名
+      const firstTag = (note.tags || []).map((x) => (x || '').trim()).find(Boolean) || ''
+      note.blockName = firstTag || note.category_name || (note.category_id == null ? this.data.t.noCategory : '')
       note.date_label = formatShortDate(note.created_at)
       
       this.setData({ note, loading: false, _loaded: true })

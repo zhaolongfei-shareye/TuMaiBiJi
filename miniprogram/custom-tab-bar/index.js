@@ -2,6 +2,8 @@ const { themeOf } = require('../utils/palette.js')
 
 Component({
   data: {
+    // 0 新建 / 1 笔记 / 2 我的。新建放最左是刻意的：新用户第一次进来落到的就是
+    // 那三个色块，"往哪儿存"这件事不用先找入口。
     selected: 0,
     lang: 'zh',
     list: [],
@@ -30,14 +32,14 @@ Component({
         lang,
         list: [
           {
-            pagePath: '/pages/index/index',
-            text: t('tabNotes', lang),
-            icon: 'notes',
-          },
-          {
             pagePath: '/pages/create/create',
             text: t('tabCreate', lang),
             icon: 'create',
+          },
+          {
+            pagePath: '/pages/index/index',
+            text: t('tabNotes', lang),
+            icon: 'notes',
           },
           {
             pagePath: '/pages/me/me',

@@ -35,8 +35,11 @@ Page({
   // 真机实测：从相机或相册返回时小程序会补发一次 onShow，一旦在这里清 previewImages
   // 和 active，刚选好的图就凭空消失、卡片自己收起，界面上不留任何痕迹——
   // 这就是"选完照片没反应、也没提示"的成因。草稿改在保存成功后各自清。
-  onShow() {
+  async onShow() {
     const app = getApp()
+    // 新建页现在是启动页，冷启动时登录还没回来。不等一下就取 globalData，
+    // 英文用户会在第一屏看到中文，切个 tab 才变——所以先等登录这条链。
+    await app.getLoginPromise().catch(() => {})
     const lang = app.globalData.userInfo?.language || 'zh'
     this.setData({
       lang,
@@ -45,7 +48,7 @@ Page({
     })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
-      this.getTabBar().setData({ selected: 1 })
+      this.getTabBar().setData({ selected: 0 })
     }
   },
 

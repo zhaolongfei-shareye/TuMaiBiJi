@@ -2,10 +2,12 @@ const { t, texts } = require('../../utils/i18n.js')
 
 Page({
   data: {
-    version: '1.1.2',
+    version: '1.1.3',
     themeClass: '',
     lang: 'zh',
     t: texts('zh'),
+    contactEmail: 'jacky28471258@gmail.com',
+    officialAccount: '杰克AI日记',
   },
 
   onLoad() {
@@ -18,9 +20,11 @@ Page({
     })
   },
 
-  onCopyEmail() {
+  onCopy(e) {
+    const value = e.currentTarget.dataset.value
+    if (!value) return
     wx.setClipboardData({
-      data: 'support@tumaibiji.com',
+      data: value,
       success: () => {
         wx.showToast({ title: t('copied', this.data.lang), icon: 'success' })
       }

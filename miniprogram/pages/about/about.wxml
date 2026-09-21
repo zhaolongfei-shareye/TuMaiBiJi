@@ -36,9 +36,13 @@
 
   <view class="about-card card">
     <text class="card-title">{{t.contactUs}}</text>
-    <view class="contact-row" bindtap="onCopyEmail">
+    <view class="contact-row" bindtap="onCopy" data-value="{{contactEmail}}">
       <text class="contact-label">{{t.feedbackEmail}}</text>
-      <text class="contact-value">support@tumaibiji.com</text>
+      <text class="contact-value">{{contactEmail}}</text>
+    </view>
+    <view class="contact-row" bindtap="onCopy" data-value="{{officialAccount}}">
+      <text class="contact-label">{{t.officialAccount}}</text>
+      <text class="contact-value">{{officialAccount}}</text>
     </view>
   </view>
 

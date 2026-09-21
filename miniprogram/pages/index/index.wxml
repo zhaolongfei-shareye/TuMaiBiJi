@@ -8,7 +8,12 @@
       bindinput="onSearchInput"
       bindconfirm="onSearchConfirm"
     />
-    <text class="search-icon" wx:if="{{!searchKeyword}}">🔍</text>
+    <!-- 右边这颗不是装饰：色块圆点 + 抽象放大镜 + 文字，跟新建页那三张色卡同一套语言，
+         点它等于按键盘上的"搜索"。 -->
+    <view class="search-go" wx:if="{{!searchKeyword}}" style="{{searchSkin}}" bindtap="onSearchConfirm">
+      <view class="go-dot"><view class="go-glyph"></view></view>
+      <text class="go-label">{{t.searchBtn}}</text>
+    </view>
     <text class="clear-icon" wx:if="{{searchKeyword}}" bindtap="clearSearch">✕</text>
   </view>
 

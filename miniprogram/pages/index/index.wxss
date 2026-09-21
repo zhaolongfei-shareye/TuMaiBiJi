@@ -4,12 +4,51 @@
   color: var(--text-primary);
 }
 
-.search-icon, .clear-icon {
-  font-size: var(--fs-title);
+.search-go {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
   margin-left: var(--sp-1);
+  flex: none;
+}
+
+/* 色块圆点：底色和字色由 palette.toneStyle(1) 发下来（--blk-bg / --blk-ink），
+   跟新建页那三张卡是同一组蓝。放大镜几何取自 Lucide v1.50.0（ISC），
+   同样只把 SVG 当遮罩用，所以颜色不会在这里出现第二份。 */
+.go-dot {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: var(--blk-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.go-glyph {
+  width: 26rpx;
+  height: 26rpx;
+  background: var(--blk-ink);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+}
+
+.go-label {
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 1rpx;
+  color: var(--blk-bg);
 }
 
 .clear-icon {
+  font-size: var(--fs-title);
+  margin-left: var(--sp-1);
   color: var(--text-tertiary);
 }
 

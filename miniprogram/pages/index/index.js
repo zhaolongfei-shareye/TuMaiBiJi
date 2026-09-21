@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { blockSkinFor, toneVars } = require('../../utils/palette.js')
+const { blockSkinFor, toneVars, toneStyle } = require('../../utils/palette.js')
 const { formatShortDate } = require('../../utils/date.js')
 
 const SOURCE_TYPE_KEYS = {
@@ -24,6 +24,8 @@ Page({
     limit: 50,
     hasMore: true,
     loadingMore: false,
+    // 搜索按钮那颗色块圆点：跟新建页三张入口卡用同一个发色函数，颜色仍只从 palette 出
+    searchSkin: toneStyle(1),
   },
 
   async onShow() {
@@ -38,7 +40,7 @@ Page({
     })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
-      this.getTabBar().setData({ selected: 0 })
+      this.getTabBar().setData({ selected: 1 })
     }
     this.loadCategories()
     // onShow 每次切回该 tab 都会触发，必须 reset：否则非 reset 分支会把结果追加到旧列表上，
@@ -67,9 +69,12 @@ Page({
       const s = blockSkinFor(n.category_id, n.id)
       n.blockStyle = s.style
       n.motif = s.motif
-      // 分类查不到名字时宁可空着，也不要写成"未分类"——它明明归了类，只是这一批分类数据里没它。
-      // 空着的时候方块只剩颜色，识别照旧成立。
-      n.blockName = n.category_id == null ? this.data.t.noCategory : (nameOf[n.category_id] || '')
+      // 方块上的字改成"第一个标签"：标签是用户自己写的，比分类名更能说明这一条是什么；
+      // 颜色仍按分类走，所以"扫颜色分流、读字辨条"这两件事没有互相抢。
+      // 没有标签时退回分类名；分类也查不到名字时宁可空着，也不要写成"未分类"——
+      // 它明明归了类，只是这一批分类数据里没它，空着时方块只剩颜色，识别照旧成立。
+      const firstTag = (n.tags || []).map((x) => (x || '').trim()).find(Boolean) || ''
+      n.blockName = firstTag || (n.category_id == null ? this.data.t.noCategory : (nameOf[n.category_id] || ''))
       n.tagLine = (n.tags || []).join(' / ')
     })
     return notes

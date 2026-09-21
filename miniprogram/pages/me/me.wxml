@@ -1,9 +1,20 @@
 <view class="container {{themeClass}}">
+  <!-- 头部：logo 靠左，右侧应用名 + slogan，跟详情页"左块右文"那条母题一致 -->
   <view class="me-header card">
-    <image class="avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
-    <view class="user-info">
-      <text class="nickname">{{displayName}}</text>
+    <image class="brand-logo" src="/assets/logo.png" mode="aspectFill"></image>
+    <view class="brand-text">
+      <text class="brand-name">图麦笔记</text>
+      <text class="brand-slogan">{{t.slogan}}</text>
     </view>
+  </view>
+
+  <view class="quota card">
+    <view class="quota-top">
+      <text class="quota-title">{{t.quotaTitle}}</text>
+      <text class="quota-num">{{t.quotaBase}}</text>
+    </view>
+    <text class="quota-rule">{{t.quotaRule}}</text>
+    <button class="quota-share" open-type="share">{{t.shareToFriend}}</button>
   </view>
 
   <view class="menu-group card">
@@ -28,6 +39,20 @@
     <view class="menu-item" bindtap="onNavigate" data-page="about">
       <text class="menu-label">{{t.about}}</text>
       <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="onCopy" data-value="{{contactEmail}}">
+      <text class="menu-label">{{t.feedbackEmail}}</text>
+      <view class="menu-right">
+        <text class="menu-value">{{contactEmail}}</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+    <view class="menu-item" bindtap="onCopy" data-value="{{officialAccount}}">
+      <text class="menu-label">{{t.officialAccount}}</text>
+      <view class="menu-right">
+        <text class="menu-value">{{officialAccount}}</text>
+        <text class="menu-arrow">›</text>
+      </view>
     </view>
   </view>
 </view>

@@ -3,6 +3,9 @@ const { t, texts } = require('../../utils/i18n.js')
 
 const LANG_MAP = { zh: '中文', en: 'English' }
 
+const CONTACT_EMAIL = 'jacky28471258@gmail.com'
+const OFFICIAL_ACCOUNT = '杰克AI日记'
+
 Page({
   data: {
     displayName: '图麦用户',
@@ -10,6 +13,8 @@ Page({
     lang: 'zh',
     themeClass: 'theme-default',
     t: texts('zh'),
+    contactEmail: CONTACT_EMAIL,
+    officialAccount: OFFICIAL_ACCOUNT,
   },
 
   onShow() {
@@ -43,6 +48,26 @@ Page({
     const url = routes[page]
     if (url) {
       wx.navigateTo({ url })
+    }
+  },
+
+  onCopy(e) {
+    const value = e.currentTarget.dataset.value
+    if (!value) return
+    wx.setClipboardData({
+      data: value,
+      success: () => wx.showToast({ title: t('copied', this.data.lang), icon: 'success' }),
+    })
+  },
+
+  // 分享卡片落在新建页（新用户第一眼就是那三个色块），并带上邀请人 id。
+  // 邀请人 id 只是参数，微信不会告诉我们"对方到底收没收到"，
+  // 所以额度那一刀要等后端按"对方真的打开过"来记，这里不预先承诺已到账。
+  onShareAppMessage() {
+    const inviter = app.globalData.userId || ''
+    return {
+      title: t('shareCardTitle', this.data.lang),
+      path: `/pages/create/create${inviter ? `?inviter=${inviter}` : ''}`,
     }
   },
 })

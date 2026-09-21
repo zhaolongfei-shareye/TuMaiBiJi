@@ -1,7 +1,7 @@
 {
   "pages": [
-    "pages/index/index",
     "pages/create/create",
+    "pages/index/index",
     "pages/me/me",
     "pages/detail/detail",
     "pages/write/write",
@@ -26,12 +26,12 @@
     "borderStyle": "black",
     "list": [
       {
-        "pagePath": "pages/index/index",
-        "text": "笔记"
-      },
-      {
         "pagePath": "pages/create/create",
         "text": "新建"
+      },
+      {
+        "pagePath": "pages/index/index",
+        "text": "笔记"
       },
       {
         "pagePath": "pages/me/me",

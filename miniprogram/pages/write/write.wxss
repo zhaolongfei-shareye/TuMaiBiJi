@@ -59,6 +59,37 @@
   font-size: var(--fs-body);
 }
 
+.tag-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.tag-chip {
+  padding: 12rpx 22rpx;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+}
+
+/* 第一位就是列表方块上那个字，所以它用主按钮那对配色单独标出来
+   （--accent 底 + --bg-page 字，深浅两套壁纸都读得清；--bg-card 在深色下是半透明白，不能用） */
+.tag-chip.first {
+  background: var(--accent);
+  color: var(--bg-page);
+}
+
+.tag-order-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
 .container {
   padding-bottom: 60rpx;
 }

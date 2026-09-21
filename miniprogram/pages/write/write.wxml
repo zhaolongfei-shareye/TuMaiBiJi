@@ -43,6 +43,16 @@
         value="{{tagsText}}"
         bindinput="onTagsInput"
       />
+      <view class="tag-order" wx:if="{{tagList.length}}">
+        <view
+          class="tag-chip {{index === 0 ? 'first' : ''}}"
+          wx:for="{{tagList}}"
+          wx:key="index"
+          data-index="{{index}}"
+          bindtap="promoteTag"
+        >{{item}}</view>
+      </view>
+      <text class="tag-order-hint" wx:if="{{tagList.length > 1}}">{{t.tagOrderHint}}</text>
     </view>
 
     <view class="form-group">

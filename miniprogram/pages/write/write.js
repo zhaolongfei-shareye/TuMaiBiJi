@@ -14,6 +14,7 @@ Page({
     },
     keyPointsText: '',
     tagsText: '',
+    tagList: [],
     categories: [],
     categoryNames: ['不分类'],
     selectedCategoryIndex: -1,
@@ -61,6 +62,7 @@ Page({
         'formData.summary': note.summary || '',
         keyPointsText: (note.key_points || []).join('\n'),
         tagsText: (note.tags || []).join(', '),
+        tagList: (note.tags || []).map((s) => (s || '').trim()).filter(Boolean),
         selectedCategoryIndex: categoryIndex,
         originalCategoryId: note.category_id, // Preserve original even if categories fail to load
       })
@@ -83,7 +85,22 @@ Page({
   },
 
   onTagsInput(e) {
-    this.setData({ tagsText: e.detail.value })
+    const tagsText = e.detail.value
+    this.setData({ tagsText, tagList: this.splitTags(tagsText) })
+  },
+
+  // 标签顺序就是"色块上显示哪个字"的顺序：第一位上列表方块。
+  // 所以这里不让人拖拽，只给一个动作——点任意一个标签，它就到第一位去了。
+  splitTags(text) {
+    return (text || '').split(/[，,]/).map((s) => s.trim()).filter(Boolean)
+  },
+
+  promoteTag(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    if (!index) return
+    const tagList = this.data.tagList.slice()
+    tagList.unshift(tagList.splice(index, 1)[0])
+    this.setData({ tagList, tagsText: tagList.join(', ') })
   },
 
   onCategoryChange(e) {
