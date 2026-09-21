@@ -81,12 +81,20 @@ function blockSkinFor(categoryId, noteId) {
 }
 
 /**
- * 只取某一组色的 CSS 变量串。给非笔记类的方块用（比如新建页那三个入口徽标、
+ * 只取某一组色的 CSS 变量串。给非笔记类的色块用（比如新建页那三张大卡、
  * 分类管理那列色点），免得有人在 WXSS 里另抄一份十六进制。
+ * 连 --blk-motif 一起给：淡一层同色系图形要用的就是它，值仍从这一处派生。
  */
 function toneStyle(i) {
   const tone = TONES[Math.abs(Number(i) || 0) % TONES.length]
-  return `--blk-bg:${tone.bg};--blk-ink:${tone.ink}`
+  // --blk-glyph 比 --blk-motif 重一档（0.22 对 0.16）：新建页那三个图形要认得出来，
+  // 但仍是压在卡底的水印，不是贴在表面的贴纸。
+  return [
+    `--blk-bg:${tone.bg}`,
+    `--blk-ink:${tone.ink}`,
+    `--blk-motif:${mix(tone.ink, tone.bg, 0.16)}`,
+    `--blk-glyph:${mix(tone.ink, tone.bg, 0.22)}`,
+  ].join(';')
 }
 
 function toneColor(i) {

@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
+const { toneStyle } = require('../../utils/palette.js')
 
 Page({
   data: {
@@ -10,6 +11,10 @@ Page({
     urlInput: '',
     previewImages: [],
     submitting: false,
+    // 三张入口卡各自一组饱和色，色值和字色配对仍归 palette 管，这里只挑序号
+    skinUrl: toneStyle(1),
+    skinShot: toneStyle(2),
+    skinWrite: toneStyle(0),
   },
 
   onShow() {
