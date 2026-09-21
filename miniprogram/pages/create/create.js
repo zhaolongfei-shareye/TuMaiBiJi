@@ -27,6 +27,14 @@ Page({
     skinWrite: toneStyle(0),
   },
 
+  onLoad() {
+    this.setData({ shotDesc: t('albumDesc', this.data.lang) })
+  },
+
+  // onShow 只同步主题/语言/tab，**绝不重置草稿**。
+  // 真机实测：从相机或相册返回时小程序会补发一次 onShow，一旦在这里清 previewImages
+  // 和 active，刚选好的图就凭空消失、卡片自己收起，界面上不留任何痕迹——
+  // 这就是"选完照片没反应、也没提示"的成因。草稿改在保存成功后各自清。
   onShow() {
     const app = getApp()
     const lang = app.globalData.userInfo?.language || 'zh'
@@ -34,16 +42,6 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
-      active: '',
-      busy: '',
-      errLine: '',
-      errPerm: false,
-      urlInput: '',
-      urlHint: 'idle',
-      previewImages: [],
-      shotDesc: t('albumDesc', lang),
-      writeTitle: '',
-      writeBody: '',
     })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
@@ -135,8 +133,14 @@ Page({
       mediaType: ['image'],
       sourceType: [source],
       success: (res) => {
+        const files = (res && res.tempFiles) || []
+        if (files.length === 0) {
+          // 微信偶尔会回一个空列表（比如格式不被接受），不给提示就等于"点了没反应"
+          this.setData({ errLine: t('noImagePicked', lang), errPerm: false })
+          return
+        }
         const merged = this.data.previewImages
-          .concat(res.tempFiles.map(f => f.tempFilePath))
+          .concat(files.map(f => f.tempFilePath))
           .slice(0, 9)
         this.setData({
           previewImages: merged,
@@ -182,8 +186,13 @@ Page({
   },
 
   async submitScreenshots() {
-    if (this.data.previewImages.length === 0 || this.data.busy) return
     const { lang } = this.data
+    if (this.data.busy) return
+    if (this.data.previewImages.length === 0) {
+      // 灰按钮被点到也要给话，不能静默
+      this.setData({ errLine: t('pickFirst', lang) })
+      return
+    }
     this.setData({ busy: 'shot', errLine: '' })
     try {
       const { task_id } = await api.ingestScreenshots(this.data.previewImages)
