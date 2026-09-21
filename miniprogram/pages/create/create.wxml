@@ -1,29 +1,30 @@
 <view class="container {{themeClass}}">
   <view class="page-title">{{t.createHeading}}</view>
 
-  <!-- 三个入口：和笔记列表同一种行卡，只是方块缩到 112rpx、里面的字换成"链 / 图 / 写" -->
+  <!-- 三个入口：整张深色大卡，卡底压一个若隐若现的巨型抽象图形，文字用半透明白。
+       三个图形各不相同，所以去掉小徽标也不会三个入口长成一个样。 -->
   <view class="entry-cards">
-    <view class="card row entry" bindtap="onUrlImport">
-      <view class="blk sm" style="{{skinUrl}}"><text class="blk-name">链</text></view>
-      <view class="blk-body">
+    <view class="card entry" bindtap="onUrlImport">
+      <view class="glyph glyph-ring"></view>
+      <view class="entry-text">
         <view class="entry-label">{{t.importUrl}}</view>
         <view class="entry-desc">{{t.linkDesc}}</view>
       </view>
       <text class="entry-arrow">›</text>
     </view>
 
-    <view class="card row entry" bindtap="onScreenshotImport">
-      <view class="blk sm" style="{{skinShot}}"><text class="blk-name">图</text></view>
-      <view class="blk-body">
+    <view class="card entry" bindtap="onScreenshotImport">
+      <view class="glyph glyph-disc"></view>
+      <view class="entry-text">
         <view class="entry-label">{{t.importScreenshot}}</view>
         <view class="entry-desc">{{t.albumDesc}}</view>
       </view>
       <text class="entry-arrow">›</text>
     </view>
 
-    <view class="card row entry" bindtap="onManualWrite">
-      <view class="blk sm" style="{{skinWrite}}"><text class="blk-name">写</text></view>
-      <view class="blk-body">
+    <view class="card entry" bindtap="onManualWrite">
+      <view class="glyph glyph-bars"></view>
+      <view class="entry-text">
         <view class="entry-label">{{t.writeNote}}</view>
         <view class="entry-desc">{{t.manualDesc}}</view>
       </view>

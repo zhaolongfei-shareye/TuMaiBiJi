@@ -289,28 +289,11 @@ page {
   vertical-align: 2rpx;
 }
 
-/* 方块的三个尺寸变体：详情头（比列表那块高）、新建页那三个入口（方块里是一个字）、
-   分类管理那列色点。
-   字用汉字而不是图标字体——项目没有 iconfont，单个汉字在苹方下必定渲染得出来，
+/* 方块的小尺寸变体：分类管理那一列色点。
+   方块里的字用汉字而不是图标字体——项目没有 iconfont，单个汉字在苹方下必定渲染得出来，
    换成 ✎ ⌗ 这类符号就要赌设备字体。 */
 .blk.tall {
   height: 200rpx;
-}
-
-.blk.sm {
-  width: 112rpx;
-  height: 112rpx;
-  padding: 0;
-  align-items: center;
-  justify-content: center;
-}
-
-.blk.sm .blk-name {
-  font-size: 40rpx;
-  letter-spacing: 0;
-  text-align: center;
-  -webkit-mask-image: none;
-  mask-image: none;
 }
 
 .blk.dot {

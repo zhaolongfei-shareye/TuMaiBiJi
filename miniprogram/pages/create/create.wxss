@@ -9,34 +9,88 @@
 .entry-cards {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
 }
 
+/* 深色大卡：这一屏是三块墨黑重音，不吃壁纸（和笔记色卡同一套逻辑——
+   卡本身就是设计里最重的东西，主题只管它外面那层底）。 */
 .entry {
+  display: flex;
   align-items: center;
+  gap: var(--sp-3);
+  min-height: 210rpx;
+  padding: 40rpx var(--sp-4);
+  background: #23252c;
+}
+
+.entry:active {
+  transform: scale(0.985);
+}
+
+/* 巨型抽象图形：白色压到 7% 上下，落在文字底下、被卡片圆角裁掉一半，
+   要的是"若隐若现"，不是看得清——看得清就会跟文字抢。 */
+.glyph {
+  position: absolute;
+  right: -60rpx;
+  bottom: -110rpx;
+  width: 340rpx;
+  height: 340rpx;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glyph-ring {
+  border-radius: 50%;
+  border: 30rpx solid rgba(255, 255, 255, 0.09);
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(-24deg);
+}
+
+.glyph-disc {
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.glyph-bars {
+  border-radius: 50%;
+  background: repeating-linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.085) 0 22rpx,
+    transparent 22rpx 54rpx
+  );
+}
+
+.entry-text {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
 }
 
 .entry-label {
-  font-size: var(--fs-title);
+  font-size: 36rpx;
   font-weight: 800;
-  letter-spacing: -0.5rpx;
+  letter-spacing: -0.8rpx;
   line-height: var(--lh-tight);
-  color: var(--text-primary);
-  margin-bottom: 4rpx;
+  color: rgba(255, 255, 255, 0.94);
+  margin-bottom: 10rpx;
 }
 
 .entry-desc {
   font-size: var(--fs-meta);
   line-height: var(--lh-tight);
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.52);
 }
 
 .entry-arrow {
+  position: relative;
+  z-index: 1;
   flex: none;
-  font-size: 44rpx;
+  font-size: 48rpx;
   font-weight: 300;
   line-height: 1;
-  color: var(--text-tertiary);
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* URL Dialog */
