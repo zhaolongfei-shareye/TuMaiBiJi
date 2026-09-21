@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TuMaiBiJi · V2 Block-left (full app, English)</title>
+<style>
+  /* 与中文版同一份色值（utils/palette.js），只差文案语言。
+     这份的目的不是"做个英文版"，是把英文的长度压力压到版面上，看哪里先撑不住。 */
+  :root{
+    --y:#F6C445; --y-ink:#2A2005;
+    --b:#3F52D6; --b-ink:#FFFFFF;
+    --o:#E9723D; --o-ink:#2C1204;
+    --g:#46A863; --g-ink:#06260F;
+    --p:#6E4BD0; --p-ink:#FFFFFF;
+    --k:#23252C; --k-ink:#FFFFFF;
+    --paper:#F4F2EC;
+    --ink:#23252C; --ink-2:#5c6068; --ink-3:#9a9ea6;
+    --line:rgba(35,37,44,.10);
+    --r-card:20px; --r-pill:999px;
+    --sh-float:0 8px 24px rgba(35,37,44,.22);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#E4E3DD;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;padding:40px 34px 64px}
+  h1{font-size:26px;letter-spacing:-.4px;margin-bottom:8px}
+  .lede{font-size:14px;color:#4a4e55;line-height:1.7;max-width:112ch;margin-bottom:10px}
+  .lede b{color:var(--ink)}
+  h2{font-size:17px;letter-spacing:-.2px;margin:34px 0 4px}
+  .sub{font-size:12.5px;color:#7a7f87;line-height:1.65;max-width:112ch;margin-bottom:18px}
+  .phones{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+  .phones>div{width:375px;flex:none}
+  .cap{width:375px}
+  .phone{width:375px;flex:none;border-radius:38px;padding:10px;background:#111;box-shadow:0 18px 40px rgba(0,0,0,.26)}
+  .screen{border-radius:29px;overflow:hidden;height:748px;position:relative;background:#fff}
+  .dark .screen{background:#0d1b2a}
+  .statusbar{height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:700;color:var(--ink)}
+  .statusbar .sig{display:flex;gap:3px;align-items:flex-end}
+  .statusbar .sig i{display:block;width:3px;background:currentColor;border-radius:1px}
+  .statusbar .sig i:nth-child(1){height:4px}.statusbar .sig i:nth-child(2){height:7px}
+  .statusbar .sig i:nth-child(3){height:10px}.statusbar .sig i:nth-child(4){height:13px}
+  .navbar{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:16px;font-weight:800;letter-spacing:-.2px;color:var(--ink)}
+  .navbar .pill{font-size:10px;font-weight:800;background:var(--k);color:#fff;padding:5px 10px;border-radius:var(--r-pill);letter-spacing:.3px}
+  .dark .statusbar,.dark .navbar{color:#e2eef6}
+  .dark .navbar .pill{background:rgba(255,255,255,.14);color:#e2eef6}
+  .wrap{padding:2px 16px 76px}
+  .cap h3{font-size:16px;letter-spacing:-.2px;margin:10px 0 4px}
+  .cap .sub{margin-bottom:0}
+
+  .search{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;
+    border:1.5px solid var(--line);border-radius:var(--r-pill);padding:11px 16px;font-size:13px;color:var(--ink-3);margin-bottom:12px}
+  .dark .search{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.12);color:#86a3bb}
+  .chips{display:flex;gap:7px;overflow:hidden;margin-bottom:14px}
+  .chip{flex:none;padding:8px 13px;border-radius:var(--r-pill);font-size:11.5px;font-weight:600;
+    background:rgba(35,37,44,.06);color:var(--ink-2)}
+  .chip.on{background:var(--k);color:#fff}
+  .dark .chip{background:rgba(255,255,255,.08);color:#86a3bb}
+  .dark .chip.on{background:#4fc3f7;color:#0d1b2a}
+
+  .motif{position:absolute;pointer-events:none;overflow:hidden}
+  .m-circle{border-radius:50%;background:currentColor;opacity:.17}
+  .m-arc{border-radius:50%;border:6px solid currentColor;opacity:.24;border-right-color:transparent;border-bottom-color:transparent}
+  .m-stripes{background:repeating-linear-gradient(115deg,currentColor 0 6px,transparent 6px 14px);opacity:.2}
+  .m-dots{background-image:radial-gradient(currentColor 3.2px,transparent 3.6px);background-size:14px 14px;opacity:.3}
+  .m-pill{border-radius:var(--r-pill);background:currentColor;opacity:.2}
+
+  .row{display:grid;grid-template-columns:88px 1fr;gap:13px;border:1.5px solid var(--line);
+    border-radius:var(--r-card);padding:13px;margin-bottom:10px;position:relative;overflow:hidden;background:#fff}
+  .dark .row{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
+  .blk{width:88px;height:88px;border-radius:16px;position:relative;overflow:hidden;align-self:start;
+    display:flex;flex-direction:column;justify-content:space-between;padding:9px}
+  /* 英文比中文长，块里的分类名允许两行；这是中文版不需要的规则 */
+  .blk b{font-size:13.5px;font-weight:800;line-height:1.18;letter-spacing:-.1px;position:relative;z-index:2;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .blk span{font-size:9px;font-weight:800;letter-spacing:.7px;opacity:.72;position:relative;z-index:2}
+  .blk .motif{right:-16px;bottom:-16px;width:62px;height:62px}
+  .in{min-width:0;padding-right:2px}
+  .in h4{font-size:14.5px;font-weight:800;line-height:1.34;letter-spacing:0;margin-bottom:5px;color:var(--ink);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .dark .in h4{color:#e2eef6}
+  .in .s{font-size:11.5px;line-height:1.5;color:var(--ink-2);margin-bottom:8px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .dark .in .s{color:#86a3bb}
+  .in .f{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:700;color:var(--ink-3)}
+  .dark .in .f{color:#6f8ba3}
+  .in .f em{font-style:normal;color:var(--ink-2)}
+  .dark .in .f em{color:#86a3bb}
+  .pin{display:inline-block;font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:var(--k);color:#fff;margin-right:5px;letter-spacing:.4px;vertical-align:2px}
+
+  .panel{border:1.5px solid var(--line);border-radius:var(--r-card);padding:14px;margin-bottom:10px;background:#fff}
+  .dark .panel{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
+  .lab{font-size:9.5px;font-weight:800;letter-spacing:1.1px;color:var(--ink-3);margin-bottom:8px;text-transform:uppercase}
+  .dark .lab{color:#6f8ba3}
+  .body{font-size:13px;line-height:1.62;color:#3c4046}
+  .dark .body{color:#c6d7e4}
+  .pt{display:flex;gap:9px;align-items:flex-start;margin-bottom:9px}
+  .pt:last-child{margin-bottom:0}
+  .pt i{flex:none;width:19px;height:19px;border-radius:50%;font-style:normal;font-size:10.5px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .pt p{font-size:12.5px;line-height:1.55;color:#3c4046}
+  .dark .pt p{color:#c6d7e4}
+  .tag{display:inline-block;font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px;
+    background:rgba(35,37,44,.06);color:var(--ink);margin:0 5px 5px 0}
+  .dark .tag{background:rgba(255,255,255,.09);color:#e2eef6}
+  .btns{display:flex;gap:8px;margin-bottom:10px}
+  .btn{flex:1;text-align:center;padding:10px 0;border-radius:var(--r-pill);font-size:12px;font-weight:700;
+    background:rgba(35,37,44,.06);color:var(--ink)}
+  .dark .btn{background:rgba(255,255,255,.09);color:#e2eef6}
+  .btn.dark{background:var(--k);color:#fff}
+  .dark .btn.dark{background:#4fc3f7;color:#0d1b2a}
+  .btn.danger{color:#b4231f;background:rgba(180,35,31,.08)}
+  .dark .btn.danger{color:#ff8a80;background:rgba(255,138,128,.14)}
+  .btn.wide{flex:none;width:100%;padding:12px 0;font-size:13px}
+  .field{margin-bottom:16px}
+  .field:last-child{margin-bottom:0}
+  .field .lab{margin-bottom:6px}
+  .inp{background:rgba(35,37,44,.045);border-radius:9px;padding:11px 13px;font-size:13px;color:var(--ink);line-height:1.5}
+  .dark .inp{background:rgba(255,255,255,.08);color:#e2eef6}
+  .h1{font-size:20px;font-weight:800;letter-spacing:-.3px;margin:14px 0 12px}
+  .hint{font-size:11.5px;color:var(--ink-2);line-height:1.6;margin:-6px 0 14px}
+  .dark .hint{color:#86a3bb}
+  .menu{border:1.5px solid var(--line);border-radius:var(--r-card);background:#fff;margin-bottom:10px;overflow:hidden}
+  .dark .menu{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
+  .mi{display:flex;justify-content:space-between;align-items:center;padding:15px 14px;border-bottom:1.5px solid var(--line);font-size:13.5px;font-weight:700}
+  .dark .mi{border-color:rgba(255,255,255,.1)}
+  .mi:last-child{border-bottom:none}
+  .mi span.r{font-size:11.5px;font-weight:600;color:var(--ink-3)}
+  .dark .mi span.r{color:#6f8ba3}
+
+  .tabbar{position:absolute;left:10px;right:10px;bottom:10px;height:52px;display:flex;align-items:center;
+    justify-content:space-around;font-size:9.5px;font-weight:700;background:var(--k);color:rgba(255,255,255,.55);
+    border-radius:22px;box-shadow:var(--sh-float);letter-spacing:.2px}
+  .tabbar div{text-align:center}
+  .tabbar b{display:block;font-size:15px;margin-bottom:1px;font-weight:400;opacity:.85;letter-spacing:0}
+  .tabbar .on{color:#fff}
+  .dark .tabbar{background:#1a1c22;border:1.5px solid rgba(255,255,255,.1)}
+
+  .hero{display:grid;grid-template-columns:88px 1fr;gap:13px;border:1.5px solid var(--line);
+    border-radius:var(--r-card);padding:14px;margin-bottom:10px;background:#fff;position:relative;overflow:hidden}
+  .dark .hero{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
+  .hero .blk{height:100px}
+  .hero h4{font-size:16.5px;font-weight:800;line-height:1.3;letter-spacing:0;margin-bottom:6px;color:var(--ink);-webkit-line-clamp:3}
+  .dark .hero h4{color:#e2eef6}
+  .hero .meta{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--ink-3);margin-bottom:7px;text-transform:uppercase}
+  .dark .hero .meta{color:#6f8ba3}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .wp{border-radius:var(--r-card);padding:12px;position:relative;overflow:hidden;border:2px solid transparent;min-height:150px;display:flex;flex-direction:column}
+  .wp.on{border-color:var(--ink)}
+  .dark .wp.on{border-color:#e2eef6}
+  .wp .mini{display:grid;grid-template-columns:22px 1fr;gap:6px;margin-bottom:6px}
+  .wp .mini b,.wp .mini u{display:block;height:22px;border-radius:6px;text-decoration:none}
+  .wp .ln{height:7px;border-radius:3px;margin-bottom:4px}
+  .wp em{font-style:normal;font-size:11px;font-weight:800;margin-top:auto}
+  .wp .ck{position:absolute;right:10px;bottom:10px;width:19px;height:19px;border-radius:50%;background:var(--k);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center}
+
+  .poster{position:absolute;inset:0;background:linear-gradient(#f0f1fc,#d5d9f6);padding:16px 14px}
+  .pcard{background:#fff;border-radius:22px;overflow:hidden;height:100%;position:relative;box-shadow:0 8px 24px rgba(35,37,44,.14)}
+  .pband{display:grid;grid-template-columns:74px 1fr;gap:12px;padding:14px;background:var(--b);color:#fff}
+  .pband .blk2{width:74px;height:74px;border-radius:14px;background:rgba(255,255,255,.16);position:relative;overflow:hidden;
+    display:flex;flex-direction:column;justify-content:space-between;padding:8px}
+  .pband .blk2 b{font-size:12px;font-weight:800;line-height:1.18;position:relative;z-index:2}
+  .pband .blk2 span{font-size:8.5px;font-weight:800;letter-spacing:.6px;opacity:.75;position:relative;z-index:2}
+  .pband h4{font-size:15.5px;font-weight:800;line-height:1.3;position:relative;z-index:2}
+  .pbody{padding:14px}
+  .pq{font-size:10px;font-weight:800;letter-spacing:1px;color:var(--ink-3);margin-bottom:8px;text-transform:uppercase}
+  .pqr{position:absolute;left:0;right:0;bottom:14px;text-align:center}
+  .pqr .qr{width:56px;height:56px;margin:0 auto 5px;border-radius:10px;background:
+    repeating-conic-gradient(#23252C 0 25%,#fff 0 50%) 0 0/12px 12px;border:2px solid #fff;box-shadow:0 2px 8px rgba(35,37,44,.16)}
+  .pqr p{font-size:9.5px;font-weight:700;color:var(--ink-3)}
+
+  /* 溢出对照：故意把分类名写成 Uncategorised，看它在 88px 块里怎么塌 */
+  .warn{border:1.5px dashed #b4231f;background:rgba(180,35,31,.04)}
+  .warn .blk b{font-size:13.5px}
+  .note{max-width:1160px;background:#fff;border-left:3px solid var(--o);border-radius:0 12px 12px 0;
+    padding:16px 20px;box-shadow:0 2px 0 rgba(35,37,44,.06),0 8px 22px rgba(35,37,44,.1);margin-top:34px}
+  .note p{font-size:13px;line-height:1.75;color:#3c4046}
+  .note p+p{margin-top:9px}
+  .note b{color:var(--ink)}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(35,37,44,.06);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+
+<h1>V2 Block-left · full app, English copy</h1>
+<p class="lede">
+  Same six colours, same ink pairings, same CSS motifs as the Chinese sheet and as the shipped V1 — only the copy language changes.
+  <b>The point of this version is to see what breaks first under English's longer words</b>: the 88px block, the two-line title, and the chips row.
+</p>
+<p class="lede">
+  Three rules had to be added for English that Chinese does not need: the block label may now wrap to two lines, titles are clamped at two lines,
+  and letter-spacing goes back to <code>0</code> (the <code>-0.25px</code> squeeze that suits CJK makes long Latin words collide).
+</p>
+
+<h2>Light · main flow</h2>
+<p class="sub">Four to five rows per screen, two-line summary each. Below the fold the density is the same as the Chinese sheet — the title just runs out of lines sooner.</p>
+<div class="phones">
+
+  <div><div class="phone"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span></span><span>TuMaiBiJi</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <div class="search"><span>Search notes</span><span>🔍</span></div>
+      <div class="chips">
+        <span class="chip on">All</span><span class="chip">Product</span><span class="chip">Tech</span><span class="chip">Reading</span><span class="chip">Work</span><span class="chip">Ideas</span>
+      </div>
+      <div class="row">
+        <div class="blk" style="background:var(--b);color:var(--b-ink)"><b>Product</b><span>SEP 20</span><i class="motif m-circle" style="color:#fff"></i></div>
+        <div class="in">
+          <h4><span class="pin">PIN</span>Three things a content product has left after growth plateaus</h4>
+          <p class="s">A flat retention curve rarely means the market is full. Usually the supply structure aged first: top authors absorb the impressions.</p>
+          <div class="f"><span><em>WeChat article</em> · Strategy / Retention</span><span>›</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="blk" style="background:var(--o);color:var(--o-ink)"><b>Tech</b><span>SEP 20</span><i class="motif m-stripes" style="color:#2C1204"></i></div>
+        <div class="in">
+          <h4>After RAG: why retrieval quality beats model size</h4>
+          <p class="s">Swapping embeddings for a reranker, and fixed windows for paragraph-aligned chunks, usually pays more than a bigger model.</p>
+          <div class="f"><span><em>Web article</em> · RAG / Retrieval</span><span>›</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="blk" style="background:var(--g);color:var(--g-ink)"><b>Reading</b><span>SEP 20</span><i class="motif m-arc" style="color:#06260F"></i></div>
+        <div class="in">
+          <h4>On whitespace, from The Idea of Design</h4>
+          <p class="s">Whitespace is not emptiness, it is the distribution of attention. Every element pays for the room it takes.</p>
+          <div class="f"><span><em>Screenshot</em> · Design / Notes</span><span>›</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="blk" style="background:var(--k);color:var(--k-ink)"><b>Unsorted</b><span>SEP 20</span><i class="motif m-pill" style="color:#fff"></i></div>
+        <div class="in">
+          <h4>Three items for Monday's stand-up</h4>
+          <p class="s">Extraction is live in production; the UI rebuild is in progress; two items left in the privacy guideline.</p>
+          <div class="f"><span><em>Manual note</em> · Todo</span><span>›</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="blk" style="background:var(--p);color:var(--p-ink)"><b>Work</b><span>SEP 20</span><i class="motif m-dots" style="color:#fff"></i></div>
+        <div class="in">
+          <h4>A template for how teams write decision records</h4>
+          <p class="s">The value is not the conclusion. It is that someone six months later can find out why we chose this.</p>
+          <div class="f"><span><em>WeChat article</em> · Teamwork / Docs</span><span>›</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="tabbar"><div class="on"><b>▤</b>Notes</div><div><b>⊕</b>Create</div><div><b>◡</b>Me</div></div>
+  </div></div></div>
+  <div class="cap"><h3>Home · note wall</h3><div class="sub">Category name sits inside the block, so colour and word carry it together. "Unsorted" is 8 characters and just fits an 88px block at 13.5px.</div></div></div>
+
+  <div><div class="phone"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span>‹</span><span>Note</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <div class="hero">
+        <div class="blk" style="background:var(--b);color:var(--b-ink)"><b>Product</b><span>SEP 20</span><i class="motif m-circle" style="color:#fff"></i></div>
+        <div class="in">
+          <p class="meta">WeChat article · 2026-09-20 19:51</p>
+          <h4>Three things a content product has left after growth plateaus</h4>
+          <div><span class="tag">Strategy</span><span class="tag">Retention</span><span class="tag">Supply</span></div>
+        </div>
+      </div>
+      <div class="btns">
+        <div class="btn dark">Pin</div><div class="btn">Edit</div><div class="btn danger">Delete</div>
+      </div>
+      <div class="panel"><p class="lab">Summary</p><p class="body">A flat retention curve rarely means the market is full. Usually the supply structure aged first — top authors concentrate, topics repeat, and new authors never get their first signal.</p></div>
+      <div class="panel"><p class="lab">Key points</p>
+        <div class="pt"><i style="background:var(--b);color:#fff">1</i><p>Flat retention is usually supply ageing, not a demand ceiling.</p></div>
+        <div class="pt"><i style="background:var(--b);color:#fff">2</i><p>When top authors hold 70% of impressions, a newcomer's first like almost never comes from the system.</p></div>
+        <div class="pt"><i style="background:var(--b);color:#fff">3</i><p>Make "new authors discovered" its own metric and you see the ceiling half a year early.</p></div>
+      </div>
+      <div class="panel"><p class="lab">Source</p><p class="body" style="font-size:12px">https://mp.weixin.qq.com/s/AbCdEfGhIjKlMnOp</p></div>
+      <div class="panel"><p class="lab" style="display:flex;justify-content:space-between"><span>Original text</span><span style="letter-spacing:0;text-transform:none">Expand ›</span></p></div>
+      <div class="btn dark wide" style="padding:12px 0">Share as image</div>
+    </div>
+  </div></div></div>
+  <div class="cap"><h3>Note detail</h3><div class="sub">The header keeps the same block as the list row, so "this is the same note" doesn't break on tap. Labels are uppercase Latin here — that only pays off in English.</div></div></div>
+
+  <div><div class="phone"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span>‹</span><span>Capture</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <p class="h1">Choose a way to start</p>
+      <div class="row" style="grid-template-columns:56px 1fr;align-items:center">
+        <div class="blk" style="width:56px;height:56px;background:var(--b);color:#fff;justify-content:center;padding:0"><b style="font-size:17px;-webkit-line-clamp:1">URL</b><i class="motif m-circle" style="color:#fff;right:-12px;bottom:-12px;width:40px;height:40px"></i></div>
+        <div class="in"><h4 style="margin-bottom:2px">Import a link</h4><p class="s" style="-webkit-line-clamp:1;margin-bottom:0">WeChat article or web page</p></div>
+      </div>
+      <div class="row" style="grid-template-columns:56px 1fr;align-items:center">
+        <div class="blk" style="width:56px;height:56px;background:var(--o);color:#2C1204;justify-content:center;padding:0"><b style="font-size:19px">图</b><i class="motif m-stripes" style="color:#2C1204;right:-12px;bottom:-12px;width:40px;height:40px"></i></div>
+        <div class="in"><h4 style="margin-bottom:2px">Import a screenshot</h4><p class="s" style="-webkit-line-clamp:1;margin-bottom:0">From album or camera (JPG·PNG)</p></div>
+      </div>
+      <div class="row" style="grid-template-columns:56px 1fr;align-items:center">
+        <div class="blk" style="width:56px;height:56px;background:var(--y);color:#2A2005;justify-content:center;padding:0"><b style="font-size:12px;line-height:1.15;text-align:center">WRITE</b><i class="motif m-pill" style="color:#2A2005;right:-12px;bottom:-12px;width:40px;height:40px"></i></div>
+        <div class="in"><h4 style="margin-bottom:2px">Write it yourself</h4><p class="s" style="-webkit-line-clamp:1;margin-bottom:0">Type a title and a summary</p></div>
+      </div>
+      <p class="hint" style="margin-top:14px">The 56px badge only holds a single Latin word up to about 5 characters. "WRITE" fits, "SCREENSHOT" does not — that entry keeps a glyph instead.</p>
+    </div>
+    <div class="tabbar"><div><b>▤</b>Notes</div><div class="on"><b>⊕</b>Create</div><div><b>◡</b>Me</div></div>
+  </div></div></div>
+  <div class="cap"><h3>Create</h3><div class="sub">Same row card, badge shrunk to 56px. Note the middle badge still shows a Chinese glyph — in English there is no one-character word for "screenshot", so this is where the two languages genuinely diverge.</div></div></div>
+
+  <div><div class="phone"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span>‹</span><span>Categories</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <p class="h1">Categories</p>
+      <div class="row" style="grid-template-columns:26px 1fr;align-items:center;gap:11px;padding:12px 13px">
+        <div style="width:26px;height:26px;border-radius:9px;background:var(--b)"></div>
+        <div class="in"><h4 style="margin:0;font-size:14px">Product</h4></div>
+        <div style="display:flex;gap:5px;align-items:center;font-size:10.5px;font-weight:800;color:var(--ink-3)"><span>↑</span><span style="color:var(--ink)">↓</span><span style="padding:5px 10px;border-radius:99px;background:rgba(35,37,44,.06);color:var(--ink)">Edit</span><span style="padding:5px 10px;border-radius:99px;background:rgba(180,35,31,.08);color:#b4231f">Delete</span></div>
+      </div>
+      <div class="row" style="grid-template-columns:26px 1fr;align-items:center;gap:11px;padding:12px 13px">
+        <div style="width:26px;height:26px;border-radius:9px;background:var(--o)"></div>
+        <div class="in"><h4 style="margin:0;font-size:14px">Tech</h4></div>
+        <div style="display:flex;gap:5px;align-items:center;font-size:10.5px;font-weight:800;color:var(--ink-3)"><span>↑</span><span style="color:var(--ink)">↓</span><span style="padding:5px 10px;border-radius:99px;background:rgba(35,37,44,.06);color:var(--ink)">Edit</span><span style="padding:5px 10px;border-radius:99px;background:rgba(180,35,31,.08);color:#b4231f">Delete</span></div>
+      </div>
+      <div class="row" style="grid-template-columns:26px 1fr;align-items:center;gap:11px;padding:12px 13px">
+        <div style="width:26px;height:26px;border-radius:9px;background:var(--g)"></div>
+        <div class="in"><h4 style="margin:0;font-size:14px">Reading</h4></div>
+        <div style="display:flex;gap:5px;align-items:center;font-size:10.5px;font-weight:800;color:var(--ink-3)"><span>↑</span><span style="color:var(--ink)">↓</span><span style="padding:5px 10px;border-radius:99px;background:rgba(35,37,44,.06);color:var(--ink)">Edit</span><span style="padding:5px 10px;border-radius:99px;background:rgba(180,35,31,.08);color:#b4231f">Delete</span></div>
+      </div>
+      <div class="row" style="grid-template-columns:26px 1fr;align-items:center;gap:11px;padding:12px 13px">
+        <div style="width:26px;height:26px;border-radius:9px;background:var(--p)"></div>
+        <div class="in"><h4 style="margin:0;font-size:14px">Work</h4></div>
+        <div style="display:flex;gap:5px;align-items:center;font-size:10.5px;font-weight:800;color:var(--ink-3)"><span>↑</span><span style="color:var(--ink)">↓</span><span style="padding:5px 10px;border-radius:99px;background:rgba(35,37,44,.06);color:var(--ink)">Edit</span><span style="padding:5px 10px;border-radius:99px;background:rgba(180,35,31,.08);color:#b4231f">Delete</span></div>
+      </div>
+      <div class="row warn" style="grid-template-columns:26px 1fr;align-items:center;gap:11px;padding:12px 13px">
+        <div style="width:26px;height:26px;border-radius:9px;background:var(--y)"></div>
+        <div class="in"><h4 style="margin:0;font-size:14px">Uncategorised</h4></div>
+        <div style="display:flex;gap:5px;align-items:center;font-size:10.5px;font-weight:800;color:var(--ink-3)"><span style="opacity:.25">↑</span><span>↓</span><span style="padding:5px 10px;border-radius:99px;background:rgba(35,37,44,.06);color:var(--ink)">Edit</span><span style="padding:5px 10px;border-radius:99px;background:rgba(180,35,31,.08);color:#b4231f">Delete</span></div>
+      </div>
+      <p class="hint" style="margin:0 0 12px">This row is the failure case, marked on purpose: a 13-character name pushes the action buttons to the right edge and they start to collide. Chinese names are 2–3 glyphs and never do this.</p>
+      <div class="btn dark wide" style="padding:13px 0">Add category</div>
+    </div>
+  </div></div></div>
+  <div class="cap"><h3>Categories</h3><div class="sub">Long Latin names are the risk here, not the colour. The dashed row shows what a 13-character name does to the same layout.</div></div></div>
+
+  <div><div class="phone"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span></span><span>Me</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <div class="hero" style="grid-template-columns:64px 1fr;align-items:center">
+        <div style="width:64px;height:64px;border-radius:20px;background:rgba(35,37,44,.06)"></div>
+        <div class="in"><h4 style="margin:0;font-size:16px;-webkit-line-clamp:1">TuMaiBiJi user</h4></div>
+      </div>
+      <div class="menu">
+        <div class="mi"><span>Categories</span><span class="r">›</span></div>
+        <div class="mi"><span>Wallpaper</span><span class="r">›</span></div>
+        <div class="mi"><span>Language</span><span class="r">English ›</span></div>
+      </div>
+      <div class="menu">
+        <div class="mi"><span>About TuMaiBiJi</span><span class="r">›</span></div>
+      </div>
+    </div>
+    <div class="tabbar"><div><b>▤</b>Notes</div><div><b>⊕</b>Create</div><div class="on"><b>◡</b>Me</div></div>
+  </div></div></div>
+  <div class="cap"><h3>Me</h3><div class="sub">Identical structure to the Chinese sheet. Settings screens are where the two languages cost the same.</div></div></div>
+
+  <div><div class="phone"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span>‹</span><span>Write</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <div class="panel" style="padding:16px 14px">
+        <div class="field"><p class="lab">Title *</p><div class="inp">Three items for Monday's stand-up</div></div>
+        <div class="field"><p class="lab">Summary</p><div class="inp" style="min-height:74px">Extraction is live in production; the UI rebuild is in progress; two items are left in the privacy guideline.</div>
+          <p style="font-size:10px;font-weight:800;color:var(--ink-3);text-align:right;margin-top:5px">103/500</p></div>
+        <div class="field"><p class="lab">Key points (one per line)</p><div class="inp" style="min-height:64px">Write decisions down as records, not as chat history</div></div>
+        <div class="field"><p class="lab">Tags (comma separated)</p><div class="inp">todo, teamwork</div></div>
+        <div class="field"><p class="lab">Category</p><div class="inp">Uncategorised</div></div>
+      </div>
+      <div class="btns"><div class="btn">Cancel</div><div class="btn dark">Save</div></div>
+    </div>
+  </div></div></div>
+  <div class="cap"><h3>Manual note</h3><div class="sub">English hits the 500-character summary cap far sooner — 103 characters is already three lines here, where the Chinese text was 29.</div></div></div>
+
+  <div><div class="phone"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span>‹</span><span>Wallpaper</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <p class="h1" style="margin-bottom:4px">Wallpaper</p>
+      <p class="hint">Only the page background and text change. The colour blocks on your notes stay exactly as they are.</p>
+      <div class="grid2">
+        <div class="wp on" style="background:#F4F2EC">
+          <div class="mini"><b style="background:var(--b)"></b><u style="background:var(--o)"></u></div>
+          <div class="ln" style="background:#fff;box-shadow:0 0 0 1.5px rgba(35,37,44,.08)"></div>
+          <div class="ln" style="width:70%;background:#fff;box-shadow:0 0 0 1.5px rgba(35,37,44,.08)"></div>
+          <em style="color:var(--ink)">Paper</em><span class="ck">✓</span>
+        </div>
+        <div class="wp" style="background:#eaeefb">
+          <div class="mini"><b style="background:var(--o)"></b><u style="background:var(--g)"></u></div>
+          <div class="ln" style="background:#fff"></div><div class="ln" style="width:70%;background:#fff"></div>
+          <em style="color:var(--ink)">Mist</em>
+        </div>
+        <div class="wp" style="background:#e7f3ea">
+          <div class="mini"><b style="background:var(--g)"></b><u style="background:var(--p)"></u></div>
+          <div class="ln" style="background:#fff"></div><div class="ln" style="width:70%;background:#fff"></div>
+          <em style="color:var(--ink)">Pine</em>
+        </div>
+        <div class="wp" style="background:#fdeee6">
+          <div class="mini"><b style="background:var(--p)"></b><u style="background:var(--y)"></u></div>
+          <div class="ln" style="background:#fff"></div><div class="ln" style="width:70%;background:#fff"></div>
+          <em style="color:var(--ink)">Dusk</em>
+        </div>
+        <div class="wp" style="background:#0c0c1d">
+          <div class="mini"><b style="background:var(--y)"></b><u style="background:var(--b)"></u></div>
+          <div class="ln" style="background:rgba(255,255,255,.14)"></div><div class="ln" style="width:70%;background:rgba(255,255,255,.14)"></div>
+          <em style="color:#eceaf6">Midnight</em>
+        </div>
+        <div class="wp" style="background:#0d1b2a">
+          <div class="mini"><b style="background:var(--b)"></b><u style="background:var(--o)"></u></div>
+          <div class="ln" style="background:rgba(255,255,255,.14)"></div><div class="ln" style="width:70%;background:rgba(255,255,255,.14)"></div>
+          <em style="color:#e2eef6">Abyss</em>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+  <div class="cap"><h3>Wallpaper</h3><div class="sub">Names had to be re-picked for English: 米白/雾蓝/松绿/暮橙/夜紫/深海 become Paper / Mist / Pine / Dusk / Midnight / Abyss. "Midnight" is the longest and still fits a half-width tile.</div></div></div>
+
+  <div><div class="phone"><div class="screen"><div style="height:100%;position:relative">
+    <div class="poster">
+      <div class="pcard">
+        <div class="pband">
+          <div class="blk2"><b>Product</b><span>SEP 20</span></div>
+          <h4>Three things a content product has left after growth plateaus</h4>
+        </div>
+        <div class="pbody">
+          <p class="pq">WeChat article · Strategy / Retention / Supply</p>
+          <p style="font-size:12px;line-height:1.6;color:#4a4d55;margin-bottom:12px">A flat retention curve rarely means the market is full. Usually the supply structure aged first: top authors concentrate, topics repeat, new authors never get their first signal.</p>
+          <p class="pq">Key points</p>
+          <div class="pt"><i style="background:var(--b);color:#fff">1</i><p>Flat retention is usually supply ageing, not a demand ceiling.</p></div>
+          <div class="pt"><i style="background:var(--b);color:#fff">2</i><p>When top authors hold 70% of impressions, a newcomer's first like…</p></div>
+          <div class="pt"><i style="background:var(--b);color:#fff">3</i><p>Make "new authors discovered" its own metric and you see the…</p></div>
+        </div>
+        <div class="pqr"><div class="qr"></div><p>TuMaiBiJi · scan to read the original</p></div>
+      </div>
+    </div>
+  </div></div></div>
+  <div class="cap"><h3>Share poster</h3><div class="sub">The title takes three lines in English where it took two in Chinese, so the band grows and the summary loses a line. The poster's block label is the same 88px rule as the list.</div></div></div>
+
+</div>
+
+<h2>Dark · the same three screens</h2>
+<p class="sub">
+  English does not change the dark-theme cost, but this set is here because the dark variant is where V2 owes more than V1:
+  white cards with hairline borders must become translucent fills with light borders and light text, and the "Unsorted" ink block needs its own outline or it disappears into a navy page.
+</p>
+<div class="phones">
+
+  <div><div class="phone dark"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span></span><span>TuMaiBiJi</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <div class="search"><span>Search notes</span><span>🔍</span></div>
+      <div class="chips">
+        <span class="chip on">All</span><span class="chip">Product</span><span class="chip">Tech</span><span class="chip">Reading</span><span class="chip">Work</span><span class="chip">Ideas</span>
+      </div>
+      <div class="row">
+        <div class="blk" style="background:var(--b);color:#fff"><b>Product</b><span>SEP 20</span><i class="motif m-circle" style="color:#fff"></i></div>
+        <div class="in"><h4>Three things a content product has left after growth plateaus</h4>
+          <p class="s">A flat retention curve rarely means the market is full. Usually the supply structure aged first.</p>
+          <div class="f"><span><em>WeChat article</em> · Strategy / Retention</span><span>›</span></div></div>
+      </div>
+      <div class="row">
+        <div class="blk" style="background:var(--o);color:var(--o-ink)"><b>Tech</b><span>SEP 20</span><i class="motif m-stripes" style="color:#2C1204"></i></div>
+        <div class="in"><h4>After RAG: why retrieval quality beats model size</h4>
+          <p class="s">Swapping embeddings for a reranker usually pays more than a bigger model.</p>
+          <div class="f"><span><em>Web article</em> · RAG / Retrieval</span><span>›</span></div></div>
+      </div>
+      <div class="row">
+        <div class="blk" style="background:var(--k);color:#fff;border:1.5px solid rgba(255,255,255,.18)"><b>Unsorted</b><span>SEP 20</span><i class="motif m-pill" style="color:#fff"></i></div>
+        <div class="in"><h4>Three items for Monday's stand-up</h4>
+          <p class="s">Extraction is live; the UI rebuild is in progress; two items left in the privacy guideline.</p>
+          <div class="f"><span><em>Manual note</em> · Todo</span><span>›</span></div></div>
+      </div>
+      <div class="row">
+        <div class="blk" style="background:var(--g);color:var(--g-ink)"><b>Reading</b><span>SEP 20</span><i class="motif m-arc" style="color:#06260F"></i></div>
+        <div class="in"><h4>On whitespace, from The Idea of Design</h4>
+          <p class="s">Whitespace is not emptiness, it is the distribution of attention.</p>
+          <div class="f"><span><em>Screenshot</em> · Design / Notes</span><span>›</span></div></div>
+      </div>
+    </div>
+    <div class="tabbar"><div class="on"><b>▤</b>Notes</div><div><b>⊕</b>Create</div><div><b>◡</b>Me</div></div>
+  </div></div></div>
+  <div class="cap"><h3>Home · Abyss</h3><div class="sub">The Unsorted block carries an extra light outline — without it the ink square vanishes into the navy page. Same fix V1 already needed.</div></div></div>
+
+  <div><div class="phone dark"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span>‹</span><span>Note</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <div class="hero">
+        <div class="blk" style="background:var(--b);color:#fff"><b>Product</b><span>SEP 20</span><i class="motif m-circle" style="color:#fff"></i></div>
+        <div class="in"><p class="meta">WeChat article · 2026-09-20 19:51</p><h4>Three things a content product has left after growth plateaus</h4>
+          <div><span class="tag">Strategy</span><span class="tag">Retention</span><span class="tag">Supply</span></div></div>
+      </div>
+      <div class="btns"><div class="btn dark">Pin</div><div class="btn">Edit</div><div class="btn danger">Delete</div></div>
+      <div class="panel"><p class="lab">Summary</p><p class="body">A flat retention curve rarely means the market is full. Usually the supply structure aged first — top authors concentrate, topics repeat, new authors never get their first signal.</p></div>
+      <div class="panel"><p class="lab">Key points</p>
+        <div class="pt"><i style="background:var(--b);color:#fff">1</i><p>Flat retention is usually supply ageing, not a demand ceiling.</p></div>
+        <div class="pt"><i style="background:var(--b);color:#fff">2</i><p>When top authors hold 70% of impressions, a newcomer's first like almost never comes from the system.</p></div>
+        <div class="pt"><i style="background:var(--b);color:#fff">3</i><p>Make "new authors discovered" its own metric and you see the ceiling half a year early.</p></div>
+      </div>
+      <div class="btn dark wide" style="padding:12px 0">Share as image</div>
+    </div>
+  </div></div></div>
+  <div class="cap"><h3>Detail · Abyss</h3><div class="sub">Delete turns light red in dark themes; the deep red used on white is unreadable on navy. Already fixed in the shipped V1.</div></div></div>
+
+  <div><div class="phone dark"><div class="screen"><div style="height:100%;position:relative">
+    <div class="statusbar"><span>3:52</span><span class="sig"><i></i><i></i><i></i><i></i></span></div>
+    <div class="navbar"><span>‹</span><span>Categories</span><span class="pill">BETA</span></div>
+    <div class="wrap">
+      <p class="h1" style="color:#e2eef6">Categories</p>
+      <div class="row" style="grid-template-columns:26px 1fr;align-items:center;gap:11px;padding:12px 13px">
+        <div style="width:26px;height:26px;border-radius:9px;background:var(--b)"></div>
+        <div class="in"><h4 style="margin:0;font-size:14px">Product</h4></div>
+        <div style="display:flex;gap:5px;align-items:center;font-size:10.5px;font-weight:800;color:#6f8ba3"><span>↑</span><span style="color:#e2eef6">↓</span><span style="padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.09);color:#e2eef6">Edit</span><span style="padding:5px 10px;border-radius:99px;background:rgba(255,138,128,.14);color:#ff8a80">Delete</span></div>
+      </div>
+      <div class="row" style="grid-template-columns:26px 1fr;align-items:center;gap:11px;padding:12px 13px">
+        <div style="width:26px;height:26px;border-radius:9px;background:var(--o)"></div>
+        <div class="in"><h4 style="margin:0;font-size:14px">Tech</h4></div>
+        <div style="display:flex;gap:5px;align-items:center;font-size:10.5px;font-weight:800;color:#6f8ba3"><span>↑</span><span style="color:#e2eef6">↓</span><span style="padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.09);color:#e2eef6">Edit</span><span style="padding:5px 10px;border-radius:99px;background:rgba(255,138,128,.14);color:#ff8a80">Delete</span></div>
+      </div>
+      <div class="row" style="grid-template-columns:26px 1fr;align-items:center;gap:11px;padding:12px 13px">
+        <div style="width:26px;height:26px;border-radius:9px;background:var(--y)"></div>
+        <div class="in"><h4 style="margin:0;font-size:14px">Uncategorised</h4></div>
+        <div style="display:flex;gap:5px;align-items:center;font-size:10.5px;font-weight:800;color:#6f8ba3"><span>↑</span><span style="color:#e2eef6">↓</span><span style="padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.09);color:#e2eef6">Edit</span><span style="padding:5px 10px;border-radius:99px;background:rgba(255,138,128,.14);color:#ff8a80">Delete</span></div>
+      </div>
+      <div class="btn wide" style="padding:13px 0;margin-top:4px;background:#4fc3f7;color:#0d1b2a">Add category</div>
+    </div>
+  </div></div></div>
+  <div class="cap"><h3>Categories · Abyss</h3><div class="sub">The primary button follows the theme colour instead of staying ink-black. The third row again shows a long name squeezing the actions.</div></div></div>
+
+</div>
+
+<div class="note">
+  <p><b>What the English pass actually exposed, in order of how much it costs to fix.</b></p>
+  <p><b>One — the block label needs a length rule.</b> Chinese category names are 2–3 glyphs and always sit in an 88px block at one size. English needs ≤8 characters for that ("Product" is 7, "Reading" is 7, "Unsorted" is 8), so either the label auto-shrinks, or it wraps to two lines as drawn here, or the product caps category names. This is a rule to write down, not a translation detail.</p>
+  <p><b>Two — titles lose a line.</b> The same sentence is 1.6–2× longer in Latin letters, so a two-line clamp in English holds about 11 words. Either the list shows one title line and no summary, or two title lines and the summary drops to one. The sheet above keeps two + two and lets long titles clamp, which is the honest middle.</p>
+  <p><b>Three — three places where English genuinely cannot be a translation.</b> The 56px badge on Create ("链 / 图 / 写" is one character each; "URL" fits, "screenshot" does not), the "未分类" fallback wording, and the wallpaper names, which had to be re-invented rather than translated.</p>
+  <p><b>Four — the uppercase micro-labels only pay off in English.</b> The 9.5px letter-spaced eyebrows (SUMMARY / KEY POINTS) do nothing in Chinese, because Chinese has no case. They are a free improvement to the English build and should not be copied back as a Latin-letter-sized hack into the Chinese one.</p>
+</div>
+
+</body>
+</html>
