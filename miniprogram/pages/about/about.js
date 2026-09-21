@@ -2,7 +2,7 @@ const { t, texts } = require('../../utils/i18n.js')
 
 Page({
   data: {
-    version: '1.0.2',
+    version: '1.1.0',
     themeClass: '',
     lang: 'zh',
     t: texts('zh'),
