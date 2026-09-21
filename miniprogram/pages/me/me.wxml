@@ -8,13 +8,11 @@
     </view>
   </view>
 
-  <view class="quota card">
-    <view class="quota-top">
-      <text class="quota-title">{{t.quotaTitle}}</text>
-      <text class="quota-num">{{t.quotaBase}}</text>
-    </view>
-    <text class="quota-rule">{{t.quotaRule}}</text>
-    <button class="quota-share" open-type="share">{{t.shareToFriend}}</button>
+  <!-- 额度、邀请奖励这些服务端还没拦，界面上就先不写数字和"多 10 篇"这种承诺。
+       分享按钮本身是真的，所以只留动作。 -->
+  <view class="share-card card">
+    <text class="share-hint">{{t.shareHint}}</text>
+    <button class="share-btn" open-type="share">{{t.shareToFriend}}</button>
   </view>
 
   <view class="menu-group card">

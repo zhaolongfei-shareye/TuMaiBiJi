@@ -34,43 +34,24 @@
   color: var(--text-secondary);
 }
 
-/* ---------- 额度卡 ---------- */
-.quota {
+/* ---------- 分享卡 ---------- */
+.share-card {
   padding: var(--sp-4);
 }
 
-.quota-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 14rpx;
-}
-
-.quota-title {
-  font-size: var(--fs-label);
-  font-weight: 800;
-  letter-spacing: 2rpx;
-  color: var(--text-tertiary);
-}
-
-.quota-num {
-  font-size: var(--fs-meta);
-  font-weight: 800;
-  color: var(--text-secondary);
-}
-
-.quota-rule {
+.share-hint {
   display: block;
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--text-primary);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-tight);
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-3);
 }
 
 /* 小程序 button 默认带一堆样式，这里全部推平，只当一块可点的主按钮用。
    配色跟 .btn-primary 同一对（--accent 底 + --bg-page 字）：不能用 --bg-card，
    深色壁纸下它是半透明白，压在亮色按钮上等于把字抹掉。 */
-.quota-share {
-  margin-top: var(--sp-4);
+.share-btn {
+  margin: 0;
   padding: 0;
   height: 88rpx;
   line-height: 88rpx;
@@ -84,11 +65,11 @@
   border: none;
 }
 
-.quota-share::after {
+.share-btn::after {
   border: none;
 }
 
-.quota-share:active {
+.share-btn:active {
   opacity: 0.86;
 }
 

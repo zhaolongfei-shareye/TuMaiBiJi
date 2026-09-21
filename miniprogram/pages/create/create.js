@@ -2,8 +2,16 @@ const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { toneStyle } = require('../../utils/palette.js')
 
-// 链接规范：必须有协议头，域名里至少带一个点。后端拿到这个串直接抓，所以不在这里放水。
-const LINK_RE = /^https?:\/\/\S+\.\S+/i
+// 链接规范：必须有协议头、主机名里要有顶级域、整串不能出现空白。
+// 之前只判"以 http 开头且某处有个点"，`https://a.com 后面还有字` 和 `http:///a.b` 都能过，
+// 到了服务端才失败，用户在卡里看到的是一句和输入对不上的错。
+const LINK_RE = /^https?:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d{1,5})?(\/[^\s]*)?$/i
+
+function isLink(value) {
+  const s = (value || '').trim()
+  if (!s || /\s/.test(s)) return false
+  return LINK_RE.test(s)
+}
 
 Page({
   data: {
@@ -27,10 +35,6 @@ Page({
     skinWrite: toneStyle(0),
   },
 
-  onLoad() {
-    this.setData({ shotDesc: t('albumDesc', this.data.lang) })
-  },
-
   // onShow 只同步主题/语言/tab，**绝不重置草稿**。
   // 真机实测：从相机或相册返回时小程序会补发一次 onShow，一旦在这里清 previewImages
   // 和 active，刚选好的图就凭空消失、卡片自己收起，界面上不留任何痕迹——
@@ -45,6 +49,7 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
+      shotDesc: this.shotDescFor(this.data.previewImages.length),
     })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
@@ -55,7 +60,14 @@ Page({
   hintFor(value) {
     const s = (value || '').trim()
     if (!s) return 'idle'
-    return LINK_RE.test(s) ? 'ok' : 'bad'
+    return isLink(s) ? 'ok' : 'bad'
+  },
+
+  // 选图说明跟着语言重算：onLoad 时登录还没回来，写进去的是默认中文，
+  // 英文账号切回来会看到"卡里一行中文一行英文"。
+  shotDescFor(count) {
+    const { lang } = this.data
+    return count ? t('pickedCount', lang).replace('{n}', count) : t('albumDesc', lang)
   },
 
   // 卡片外任意空白都收起到默认态；忙的时候不收，别把进度藏起来
@@ -103,7 +115,9 @@ Page({
   async submitUrl() {
     const url = this.data.urlInput.trim()
     const { lang } = this.data
-    if (!LINK_RE.test(url)) {
+    // 按钮变灰只是视觉，点还是会进来：不挡第二下就会提两个任务、落两条重复笔记
+    if (this.data.busy) return
+    if (!isLink(url)) {
       this.setData({ urlHint: 'bad' })
       return
     }
@@ -131,6 +145,8 @@ Page({
   pickImage(e) {
     const source = e.currentTarget.dataset.source
     const { lang } = this.data
+    // 提炼进行中不能再改图：新加的图不在这次提交数组里，成功后却一起被清空
+    if (this.data.busy) return
     wx.chooseMedia({
       count: 9,
       mediaType: ['image'],
@@ -147,20 +163,24 @@ Page({
           .slice(0, 9)
         this.setData({
           previewImages: merged,
-          shotDesc: t('pickedCount', lang).replace('{n}', merged.length),
+          shotDesc: this.shotDescFor(merged.length),
           errLine: '',
           errPerm: false,
         })
       },
       // 原来这里只有 success：权限被拒或系统选择器起不来时界面静默无反应，
-      // 用户只能对着屏幕再点一次。fail 补上，并把"去设置"挂在提示行上。
+      // 用户只能对着屏幕再点一次。fail 补上。
       fail: (err) => {
         const msg = String((err && err.errMsg) || '')
         if (msg.indexOf('cancel') > -1) return
         console.error('chooseMedia 失败', msg)
+        // 只有真是权限问题才引导去设置，否则用户按提示开了权限还是好不了
+        const denied = /auth deny|authorize|permission/i.test(msg)
         this.setData({
-          errLine: source === 'camera' ? t('permCamera', lang) : t('permAlbum', lang),
-          errPerm: true,
+          errLine: denied
+            ? (source === 'camera' ? t('permCamera', lang) : t('permAlbum', lang))
+            : t('pickFailed', lang),
+          errPerm: denied,
         })
       },
     })
@@ -172,20 +192,19 @@ Page({
   },
 
   removeShot(e) {
+    if (this.data.busy) return
     const index = e.currentTarget.dataset.index
     const left = this.data.previewImages.slice()
     left.splice(index, 1)
-    const { lang } = this.data
     this.setData({
       previewImages: left,
-      shotDesc: left.length
-        ? t('pickedCount', lang).replace('{n}', left.length)
-        : t('albumDesc', lang),
+      shotDesc: this.shotDescFor(left.length),
     })
   },
 
   clearShots() {
-    this.setData({ previewImages: [], shotDesc: t('albumDesc', this.data.lang) })
+    if (this.data.busy) return
+    this.setData({ previewImages: [], shotDesc: this.shotDescFor(0) })
   },
 
   async submitScreenshots() {
@@ -197,10 +216,12 @@ Page({
       return
     }
     this.setData({ busy: 'shot', errLine: '' })
+    // 提交的是点下去那一刻的那批图，后面列表再怎么变都不影响这一单
+    const batch = this.data.previewImages.slice()
     try {
-      const { task_id } = await api.ingestScreenshots(this.data.previewImages)
+      const { task_id } = await api.ingestScreenshots(batch)
       const result = await api.pollTask(task_id)
-      this.setData({ busy: '', previewImages: [], shotDesc: t('albumDesc', lang) })
+      this.setData({ busy: '', previewImages: [], shotDesc: this.shotDescFor(0) })
       wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
       setTimeout(() => {
         wx.navigateTo({ url: `/pages/detail/detail?id=${result.note_id}` })
@@ -232,6 +253,7 @@ Page({
   async saveManual() {
     const title = this.data.writeTitle.trim()
     const { lang } = this.data
+    if (this.data.busy) return
     if (!title) {
       this.setData({ errLine: t('needTitle', lang) })
       return

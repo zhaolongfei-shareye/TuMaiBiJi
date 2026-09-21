@@ -38,12 +38,14 @@
       <view class="entry-label">{{t.importScreenshot}}</view>
       <view wx:if="{{active === 'shot'}}" class="entry-body">
         <view class="entry-desc">{{shotDesc}}</view>
-        <view wx:if="{{previewImages.length}}" class="shot-strip">
+        <!-- 一横排可滑，不给它换行：换行的话 9 张会撑到三行，超出卡片高度就被裁，
+             而裁掉的部分既看不见也点不到。 -->
+        <scroll-view wx:if="{{previewImages.length}}" class="shot-strip" scroll-x show-scrollbar="{{false}}">
           <view class="shot-cell" wx:for="{{previewImages}}" wx:key="*this">
             <image class="shot-img" src="{{item}}" mode="aspectFill" />
             <view class="shot-x" data-index="{{index}}" catchtap="removeShot">✕</view>
           </view>
-        </view>
+        </scroll-view>
         <view class="pick2">
           <view class="pk" data-source="camera" catchtap="pickImage">
             <view class="pk-glyph glyph-camera"></view>

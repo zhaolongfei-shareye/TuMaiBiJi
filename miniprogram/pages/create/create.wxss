@@ -41,8 +41,8 @@
 }
 
 .open-url { max-height: 560rpx; }
-.open-shot { max-height: 620rpx; }
-.open-shot.picked { max-height: 800rpx; }
+.open-shot { max-height: 540rpx; }
+.open-shot.picked { max-height: 760rpx; }
 .open-write { max-height: 780rpx; }
 
 .entry-label {
@@ -160,16 +160,19 @@
 
 /* ---------- 截图卡 ---------- */
 .shot-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
+  width: 100%;
+  height: 152rpx;
   margin-top: 22rpx;
+  white-space: nowrap;
 }
 
 .shot-cell {
   position: relative;
+  display: inline-block;
   width: 128rpx;
   height: 128rpx;
+  margin-top: 14rpx;
+  margin-right: var(--sp-2);
 }
 
 .shot-img {

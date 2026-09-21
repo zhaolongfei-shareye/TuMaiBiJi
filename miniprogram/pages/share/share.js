@@ -190,7 +190,10 @@ Page({
 
         ctx.fillStyle = tone.ink
         ctx.font = 'bold 28px sans-serif'
-        const blockName = note.category_name || (note.category_id == null ? t('noCategory', this.data.lang) : '')
+        // 方块上的字跟列表、详情同一条规则：第一个标签优先，没标签才回退分类名。
+        // 海报是发出去的门面，三处不一致的话别人转出去的图和自己在库里看到的就不是同一条。
+        const firstTag = (note.tags || []).map((x) => (x || '').trim()).find(Boolean) || ''
+        const blockName = firstTag || note.category_name || (note.category_id == null ? t('noCategory', this.data.lang) : '')
         ctx.fillText(this.ellipsize(blockName, BLK - 40, ctx), blkX + 20, blkY + 48)
         ctx.font = 'bold 17px sans-serif'
         ctx.globalAlpha = 0.75

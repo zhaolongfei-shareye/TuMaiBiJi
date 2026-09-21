@@ -15,6 +15,12 @@ App({
   },
 
   getLoginPromise() {
+    // 已经登录过就直接给一个已完成的 Promise。原来这里在登录成功后把
+    // loginPromise 置空，于是每次 onShow 等它都会重新走一遍 wx.login + 换票——
+    // 新建页当上启动页之后，从相机/相册返回也要等一次，纯属白跑。
+    if (this.globalData.isLoggedIn && this.globalData.token) {
+      return Promise.resolve()
+    }
     if (!this.globalData.loginPromise) {
       this.globalData.loginPromise = this._doLogin().finally(() => {
         this.globalData.loginPromise = null
