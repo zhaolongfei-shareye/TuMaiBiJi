@@ -67,9 +67,15 @@
   .dark .row{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
   .blk{width:88px;height:88px;border-radius:16px;position:relative;overflow:hidden;align-self:start;
     display:flex;flex-direction:column;justify-content:space-between;padding:9px}
-  /* 英文比中文长，块里的分类名允许两行；这是中文版不需要的规则 */
-  .blk b{font-size:13.5px;font-weight:800;line-height:1.18;letter-spacing:-.1px;position:relative;z-index:2;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  /* 块内分类名：单行，顶到边就用渐隐收掉，不打省略号。
+     渐隐只吃盒子最右 14%，而盒子宽度固定等于可用宽度，所以短名字的最后一个字落在
+     渐隐区之前、完全不受影响，只有真被裁掉的长名字会淡出。
+     这块只是提示：识别由颜色承担、阅读由右侧标题承担，所以裁掉尾巴不丢信息。
+     中文 2~3 字永远到不了渐隐区，这条规则实际上只对英文生效。 */
+  .blk b{display:block;white-space:nowrap;overflow:hidden;position:relative;z-index:2;
+    -webkit-mask-image:linear-gradient(90deg,#000 0 86%,transparent 100%);
+    mask-image:linear-gradient(90deg,#000 0 86%,transparent 100%)}
+  .blk b{font-size:13.5px;font-weight:800;line-height:1.18;letter-spacing:-.1px}
   .blk span{font-size:9px;font-weight:800;letter-spacing:.7px;opacity:.72;position:relative;z-index:2}
   .blk .motif{right:-16px;bottom:-16px;width:62px;height:62px}
   .in{min-width:0;padding-right:2px}
@@ -157,7 +163,9 @@
   .pband{display:grid;grid-template-columns:74px 1fr;gap:12px;padding:14px;background:var(--b);color:#fff}
   .pband .blk2{width:74px;height:74px;border-radius:14px;background:rgba(255,255,255,.16);position:relative;overflow:hidden;
     display:flex;flex-direction:column;justify-content:space-between;padding:8px}
-  .pband .blk2 b{font-size:12px;font-weight:800;line-height:1.18;position:relative;z-index:2}
+  .pband .blk2 b{font-size:12px;font-weight:800;line-height:1.18;position:relative;z-index:2;
+    white-space:nowrap;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,#000 0 84%,transparent 100%);
+    mask-image:linear-gradient(90deg,#000 0 84%,transparent 100%)}
   .pband .blk2 span{font-size:8.5px;font-weight:800;letter-spacing:.6px;opacity:.75;position:relative;z-index:2}
   .pband h4{font-size:15.5px;font-weight:800;line-height:1.3;position:relative;z-index:2}
   .pbody{padding:14px}
@@ -176,6 +184,12 @@
   .note p+p{margin-top:9px}
   .note b{color:var(--ink)}
   code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(35,37,44,.06);padding:1px 5px;border-radius:4px}
+  /* 渐隐到底咬在哪：并排三块，前两个名字完整，第三个 13 个字母被收掉 */
+  .fadedemo{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;flex-wrap:wrap}
+  .fadedemo figure{margin:0;text-align:center}
+  .fadedemo figcaption{font-size:10.5px;font-weight:700;color:var(--ink-3);margin-top:6px;letter-spacing:.2px}
+  .fadedemo .blk{width:88px;height:88px}
+
 </style>
 </head>
 <body>
@@ -530,9 +544,20 @@
 
 </div>
 
+<div style="max-width:1160px;margin-top:26px">
+  <p class="lab" style="margin-bottom:2px">Where the fade actually bites</p>
+  <div class="fadedemo">
+    <figure><div class="blk" style="background:var(--b);color:#fff"><b>Product</b><span>SEP 20</span><i class="motif m-circle" style="color:#fff"></i></div><figcaption>7 chars · whole</figcaption></figure>
+    <figure><div class="blk" style="background:var(--k);color:#fff"><b>Unsorted</b><span>SEP 20</span><i class="motif m-pill" style="color:#fff"></i></div><figcaption>8 chars · whole</figcaption></figure>
+    <figure><div class="blk" style="background:var(--y);color:#2A2005"><b>Uncategorised</b><span>SEP 20</span><i class="motif m-dots" style="color:#2A2005"></i></div><figcaption>13 chars · fades at the edge</figcaption></figure>
+    <figure><div class="blk" style="background:var(--p);color:#fff"><b>Collaboration</b><span>SEP 20</span><i class="motif m-stripes" style="color:#fff"></i></div><figcaption>13 chars · same treatment</figcaption></figure>
+  </div>
+  <p class="hint" style="margin-top:10px">Nothing is truncated in code and no name is rejected on input — the block just stops being readable where it runs out of room. The date line stays because it is the second thing the block has to say.</p>
+</div>
+
 <div class="note">
   <p><b>What the English pass actually exposed, in order of how much it costs to fix.</b></p>
-  <p><b>One — the block label needs a length rule.</b> Chinese category names are 2–3 glyphs and always sit in an 88px block at one size. English needs ≤8 characters for that ("Product" is 7, "Reading" is 7, "Unsorted" is 8), so either the label auto-shrinks, or it wraps to two lines as drawn here, or the product caps category names. This is a rule to write down, not a translation detail.</p>
+  <p><b>One — the block label is settled: one line, fade the tail.</b> An 88px block holds about 9 bold characters, so "Product", "Reading" and "Unsorted" fit whole and a long name simply fades out at the block edge — no ellipsis, because a half word with "…" reads as a broken word, while a fade reads as "there is more, you don't need it". Nothing is lost: the colour carries recognition, the title on the right carries reading. The fade sits in the last 14% of a fixed-width box, so short names end before it and are untouched. Chinese names are 2–3 glyphs and never reach it, which makes this an English-only rule that costs nothing to ship.</p>
   <p><b>Two — titles lose a line.</b> The same sentence is 1.6–2× longer in Latin letters, so a two-line clamp in English holds about 11 words. Either the list shows one title line and no summary, or two title lines and the summary drops to one. The sheet above keeps two + two and lets long titles clamp, which is the honest middle.</p>
   <p><b>Three — three places where English genuinely cannot be a translation.</b> The 56px badge on Create ("链 / 图 / 写" is one character each; "URL" fits, "screenshot" does not), the "未分类" fallback wording, and the wallpaper names, which had to be re-invented rather than translated.</p>
   <p><b>Four — the uppercase micro-labels only pay off in English.</b> The 9.5px letter-spaced eyebrows (SUMMARY / KEY POINTS) do nothing in Chinese, because Chinese has no case. They are a free improvement to the English build and should not be copied back as a Latin-letter-sized hack into the Chinese one.</p>

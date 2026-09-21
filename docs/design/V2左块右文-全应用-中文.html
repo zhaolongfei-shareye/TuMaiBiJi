@@ -68,7 +68,15 @@
   .dark .row{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
   .blk{width:88px;height:88px;border-radius:16px;position:relative;overflow:hidden;align-self:start;
     display:flex;flex-direction:column;justify-content:space-between;padding:9px}
-  .blk b{font-size:16px;font-weight:800;line-height:1.2;letter-spacing:-.3px;position:relative;z-index:2}
+  /* 块内分类名：单行，顶到边就用渐隐收掉，不打省略号。
+     渐隐只吃盒子最右 14%，而盒子宽度固定等于可用宽度，所以短名字的最后一个字落在
+     渐隐区之前、完全不受影响，只有真被裁掉的长名字会淡出。
+     这块只是提示：识别由颜色承担、阅读由右侧标题承担，所以裁掉尾巴不丢信息。
+     中文 2~3 字永远到不了渐隐区，这条规则实际上只对英文生效。 */
+  .blk b{display:block;white-space:nowrap;overflow:hidden;position:relative;z-index:2;
+    -webkit-mask-image:linear-gradient(90deg,#000 0 86%,transparent 100%);
+    mask-image:linear-gradient(90deg,#000 0 86%,transparent 100%)}
+  .blk b{font-size:16px;font-weight:800;line-height:1.2;letter-spacing:-.3px}
   .blk span{font-size:9px;font-weight:800;letter-spacing:.7px;opacity:.72;position:relative;z-index:2}
   .blk .motif{right:-16px;bottom:-16px;width:62px;height:62px}
   .in{min-width:0;padding-right:2px}
