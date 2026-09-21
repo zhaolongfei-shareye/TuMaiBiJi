@@ -11,7 +11,8 @@
   width: 128rpx;
   height: 128rpx;
   border-radius: 40rpx;
-  background: var(--chip-idle);
+  /* 原来这里垫了一层 --chip-idle 当底，因为旧 logo 自己不带底色。
+     新 logo 是透明底圆标，再垫就会在四个角露出一块圆角方板。 */
 }
 
 .brand-text {
