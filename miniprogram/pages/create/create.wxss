@@ -73,12 +73,13 @@
 }
 
 .entry-label {
-  font-size: 36rpx;
+  /* 功能名是这一屏最该被读到的东西，所以它不能比页面标题"选择一种方式"（--fs-h1 42rpx）小 */
+  font-size: 46rpx;
   font-weight: 800;
-  letter-spacing: -0.8rpx;
+  letter-spacing: -1rpx;
   line-height: var(--lh-tight);
   opacity: 0.96;
-  margin-bottom: 10rpx;
+  margin-bottom: 12rpx;
 }
 
 .entry-desc {
