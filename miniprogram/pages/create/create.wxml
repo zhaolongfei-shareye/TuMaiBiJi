@@ -1,72 +1,98 @@
-<view class="container {{themeClass}}">
+<view class="container {{themeClass}}" bindtap="collapse">
   <view class="page-title">{{t.createHeading}}</view>
 
-  <!-- 三个入口：整张饱和色大卡，卡底压一个若隐若现的功能图形：
-       链条=链接导入，相框山日=图片/截图，铅笔=手写。图形几何取自 Lucide，见 create.wxss。
-       字色跟着该组色走固定配对（黄/橙配白字实测只有 1.63/3.03，读不出来）。 -->
+  <!-- 手风琴：同一时刻最多一张卡展开。展开那张自己长高，把输入框/按钮装在自己肚子里；
+       另外两张缩成一条、功能名垂直居中，位置不跳。整页（.container）就是收起点击区，
+       卡片自己 catchtap，所以点卡内任何地方都不会把刚展开的东西收掉。 -->
   <view class="entry-cards">
-    <view class="card entry" style="{{skinUrl}}" bindtap="onUrlImport">
+
+    <view class="card entry {{active === 'url' ? 'open open-url' : ''}}" style="{{skinUrl}}" data-kind="url" catchtap="toggleCard">
       <view class="glyph glyph-link"></view>
-      <view class="entry-text">
-        <view class="entry-label">{{t.importUrl}}</view>
+      <view class="entry-label">{{t.importUrl}}</view>
+      <view wx:if="{{active === 'url'}}" class="entry-body">
         <view class="entry-desc">{{t.linkDesc}}</view>
+        <view class="face-box">
+          <input
+            class="face-input"
+            value="{{urlInput}}"
+            placeholder="https://mp.weixin.qq.com/…"
+            placeholder-class="face-ph"
+            confirm-type="done"
+            bindinput="onUrlInput"
+          />
+          <view wx:if="{{urlInput}}" class="face-x" catchtap="clearUrl">✕</view>
+        </view>
+        <view class="entry-acts">
+          <view class="act ghost" catchtap="pasteUrl">{{t.paste}}</view>
+          <view class="act {{urlHint === 'ok' && !busy ? 'solid' : 'off'}}" catchtap="submitUrl">{{busy === 'url' ? t.busyExtract : t.save}}</view>
+        </view>
+        <view wx:if="{{errLine}}" class="entry-err" catchtap="openPermSetting">{{errLine}}</view>
+        <view wx:elif="{{urlHint === 'bad'}}" class="entry-err">{{t.linkRule}}</view>
+        <view wx:elif="{{urlHint === 'ok'}}" class="entry-note">{{t.linkReady}}</view>
+        <view wx:else class="entry-note">{{t.urlHintIdle}}</view>
       </view>
     </view>
 
-    <view class="card entry" style="{{skinShot}}" bindtap="onScreenshotImport">
+    <view class="card entry {{active === 'shot' ? (previewImages.length ? 'open open-shot picked' : 'open open-shot') : ''}}" style="{{skinShot}}" data-kind="shot" catchtap="toggleCard">
       <view class="glyph glyph-image"></view>
-      <view class="entry-text">
-        <view class="entry-label">{{t.importScreenshot}}</view>
-        <view class="entry-desc">{{t.albumDesc}}</view>
+      <view class="entry-label">{{t.importScreenshot}}</view>
+      <view wx:if="{{active === 'shot'}}" class="entry-body">
+        <view class="entry-desc">{{shotDesc}}</view>
+        <view wx:if="{{previewImages.length}}" class="shot-strip">
+          <view class="shot-cell" wx:for="{{previewImages}}" wx:key="*this">
+            <image class="shot-img" src="{{item}}" mode="aspectFill" />
+            <view class="shot-x" data-index="{{index}}" catchtap="removeShot">✕</view>
+          </view>
+        </view>
+        <view class="pick2">
+          <view class="pk" data-source="camera" catchtap="pickImage">
+            <view class="pk-glyph glyph-camera"></view>
+            <view class="pk-label">{{t.takePhoto}}</view>
+            <view class="pk-hint">{{t.takePhotoHint}}</view>
+          </view>
+          <view class="pk" data-source="album" catchtap="pickImage">
+            <view class="pk-glyph glyph-album"></view>
+            <view class="pk-label">{{t.fromAlbum}}</view>
+            <view class="pk-hint">{{t.fromAlbumHint}}</view>
+          </view>
+        </view>
+        <view class="entry-acts">
+          <view wx:if="{{previewImages.length}}" class="act ghost" catchtap="clearShots">{{t.clear}}</view>
+          <view class="act {{previewImages.length && !busy ? 'solid' : 'off'}}" catchtap="submitScreenshots">{{busy === 'shot' ? t.busyExtract : t.startExtract}}</view>
+        </view>
+        <view wx:if="{{errLine}}" class="entry-err" catchtap="openPermSetting">{{errLine}}</view>
       </view>
     </view>
 
-    <view class="card entry" style="{{skinWrite}}" bindtap="onManualWrite">
+    <view class="card entry {{active === 'write' ? 'open open-write' : ''}}" style="{{skinWrite}}" data-kind="write" catchtap="toggleCard">
       <view class="glyph glyph-pencil"></view>
-      <view class="entry-text">
-        <view class="entry-label">{{t.writeNote}}</view>
+      <view class="entry-label">{{t.writeNote}}</view>
+      <view wx:if="{{active === 'write'}}" class="entry-body">
         <view class="entry-desc">{{t.manualDesc}}</view>
-      </view>
-    </view>
-  </view>
-
-  <!-- URL 导入弹窗 -->
-  <view wx:if="{{showUrlDialog}}" class="dialog-mask" catchtap="closeUrlDialog">
-    <view class="dialog-content" catchtap="stopPropagation">
-      <text class="dialog-title">{{t.pasteLink}}</text>
-      <input 
-        class="dialog-input" 
-        placeholder="https://mp.weixin.qq.com/..."
-        value="{{urlInput}}"
-        bindinput="onUrlInput"
-        focus="{{showUrlDialog}}"
-      />
-      <view class="dialog-actions">
-        <view class="btn-secondary" bindtap="closeUrlDialog">{{t.cancel}}</view>
-        <view class="btn-primary" bindtap="submitUrl">{{t.save}}</view>
-      </view>
-    </view>
-  </view>
-
-  <!-- 截图预览区（选择后显示） -->
-  <view wx:if="{{previewImages.length > 0}}" class="preview-section card">
-    <view class="preview-header">
-      <text class="preview-title">{{previewImages.length}} {{t.selectedCount}}</text>
-      <text class="preview-clear" bindtap="clearPreview">{{t.clear}}</text>
-    </view>
-    <scroll-view class="preview-scroll" scroll-x show-scrollbar="{{false}}">
-      <view class="preview-images">
-        <image 
-          class="preview-img" 
-          wx:for="{{previewImages}}" 
-          wx:key="*this"
-          src="{{item}}" 
-          mode="aspectFill"
+        <view class="face-box">
+          <input
+            class="face-input"
+            value="{{writeTitle}}"
+            placeholder="{{t.writeTitlePh}}"
+            placeholder-class="face-ph"
+            bindinput="onWriteTitle"
+          />
+        </view>
+        <textarea
+          class="face-area"
+          value="{{writeBody}}"
+          placeholder="{{t.writeBodyPh}}"
+          placeholder-class="face-ph"
+          maxlength="2000"
+          bindinput="onWriteBody"
         />
+        <view class="entry-acts">
+          <view class="act ghost" catchtap="cancelWrite">{{t.cancel}}</view>
+          <view class="act {{busy === 'write' ? 'off' : 'solid'}}" catchtap="saveManual">{{busy === 'write' ? t.busySave : t.save}}</view>
+        </view>
+        <view wx:if="{{errLine}}" class="entry-err">{{errLine}}</view>
       </view>
-    </scroll-view>
-    <view class="btn-primary submit-btn" bindtap="submitScreenshots">
-      {{submitting ? t.processing : t.startExtract}}
     </view>
+
   </view>
 </view>

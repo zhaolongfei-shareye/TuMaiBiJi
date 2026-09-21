@@ -89,11 +89,24 @@ function toneStyle(i) {
   const tone = TONES[Math.abs(Number(i) || 0) % TONES.length]
   // --blk-glyph 比 --blk-motif 重一档（0.22 对 0.16）：新建页那三个图形要认得出来，
   // 但仍是压在卡底的水印，不是贴在表面的贴纸。
+  //
+  // 后面这组是"卡内控件的面"。新建页把输入框和按钮装进了饱和色大卡，
+  // 面上用什么色取决于这块色本身是深还是浅：深底卡（字是白的）用半透明白面，
+  // 亮底卡（字是深墨）用近白面 + 该卡自己的墨色字，否则黄/橙上放白半透明面会糊成一片。
+  const onDark = tone.ink.toUpperCase() === '#FFFFFF'
   return [
     `--blk-bg:${tone.bg}`,
     `--blk-ink:${tone.ink}`,
     `--blk-motif:${mix(tone.ink, tone.bg, 0.16)}`,
     `--blk-glyph:${mix(tone.ink, tone.bg, 0.22)}`,
+    `--face:${onDark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.78)'}`,
+    `--face-ink:${onDark ? '#FFFFFF' : tone.ink}`,
+    `--face-off:${onDark ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.34)'}`,
+    `--face-off-ink:${onDark ? 'rgba(255,255,255,0.5)' : mix(tone.ink, tone.bg, 0.45)}`,
+    `--solid-bg:${onDark ? '#FFFFFF' : tone.ink}`,
+    `--solid-ink:${onDark ? tone.bg : '#FFFFFF'}`,
+    // 校验/权限提示那行字直接坐在卡色上，所以亮底卡用深红、深底卡用浅红，两边都够对比度
+    `--blk-err:${onDark ? '#FFD7D3' : '#8C2119'}`,
   ].join(';')
 }
 
