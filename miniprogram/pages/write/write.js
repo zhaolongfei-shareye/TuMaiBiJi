@@ -29,11 +29,12 @@ Page({
       t: texts(lang),
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
+    app.setNavTitle('writeNote', lang)
     await this.loadCategories()
 
     if (options.id && options.mode === 'edit') {
       this.setData({ noteId: parseInt(options.id), isEdit: true })
-      wx.setNavigationBarTitle({ title: t('editNote', this.data.lang) })
+      app.setNavTitle('editNote', this.data.lang)
       await this.loadNoteForEdit()
     }
   },

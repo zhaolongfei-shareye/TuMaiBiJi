@@ -1,5 +1,6 @@
 const { request } = require('./utils/api')
 const { themeOf } = require('./utils/palette')
+const { t } = require('./utils/i18n')
 
 App({
   globalData: {
@@ -81,5 +82,12 @@ App({
       tabBar.applyTheme?.(wallpaper)
     }
     return theme.cls
+  },
+
+  // 导航条标题原来只写在 pages/*/*.json 里，全是硬编码中文：英文用户在语言页切完，
+  // 满屏内容都变了、顶上那行还是中文。JSON 没法动态，所以统一由页面在同步 lang 时调这里。
+  setNavTitle(key, lang) {
+    const k = lang || this.globalData.userInfo?.language || 'zh'
+    wx.setNavigationBarTitle({ title: t(key, k), fail() {} })
   },
 })

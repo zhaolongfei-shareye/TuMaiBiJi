@@ -24,6 +24,7 @@ Page({
       t: texts(lang),
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
+    app.setNavTitle('language', lang)
   },
 
   async onSelect(e) {
@@ -44,8 +45,11 @@ Page({
         lang: key,
         t: texts(key),
       })
+      // 切完当场就得变：toast 是这一页自己弹的，标题也是这一页的，
+      // 等下一次 onShow 才改的话用户会先看到一行旧语言。
+      app.setNavTitle('language', key)
       wx.hideLoading()
-      wx.showToast({ title: t('switched', lang), icon: 'success' })
+      wx.showToast({ title: t('switched', key), icon: 'success' })
     } catch (err) {
       wx.hideLoading()
       wx.showToast({ title: t('switchFailed', lang), icon: 'none' })

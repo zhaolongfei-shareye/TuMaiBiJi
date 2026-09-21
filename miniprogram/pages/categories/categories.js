@@ -23,6 +23,7 @@ Page({
       t: texts(lang),
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
+    app.setNavTitle('categories', lang)
     this.loadCategories()
   },
 

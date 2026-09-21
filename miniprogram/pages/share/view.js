@@ -11,8 +11,10 @@ Page({
   },
 
   async onLoad(options) {
-    const lang = getApp().globalData.userInfo?.language || 'zh'
+    const app = getApp()
+    const lang = app.globalData.userInfo?.language || 'zh'
     this.setData({ lang, t: texts(lang) })
+    app.setNavTitle('navShareView', lang)
 
     const token = options.scene
       ? decodeURIComponent(options.scene)

@@ -30,6 +30,7 @@ Page({
       t: texts(lang),
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
+    app.setNavTitle('navDetail', lang)
     if (options.id) {
       this.setData({ noteId: options.id })
       this.loadNote(options.id)

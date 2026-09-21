@@ -38,6 +38,7 @@ Page({
       t: texts(lang),
       themeClass,
     })
+    app.setNavTitle('appName', lang)
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().setData({ selected: 1 })

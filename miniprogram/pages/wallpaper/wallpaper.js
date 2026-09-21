@@ -33,6 +33,7 @@ Page({
         stack: [toneColor(i), toneColor(i + 1)],
       })),
     })
+    app.setNavTitle('wallpaper', lang)
   },
 
   async onSelect(e) {

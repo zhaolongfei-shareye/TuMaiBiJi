@@ -51,6 +51,7 @@ Page({
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
       shotDesc: this.shotDescFor(this.data.previewImages.length),
     })
+    app.setNavTitle('navCreate', lang)
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().setData({ selected: 0 })

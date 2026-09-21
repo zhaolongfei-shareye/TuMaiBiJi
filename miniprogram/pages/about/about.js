@@ -2,7 +2,7 @@ const { t, texts } = require('../../utils/i18n.js')
 
 Page({
   data: {
-    version: '1.1.4',
+    version: '1.1.5',
     themeClass: '',
     lang: 'zh',
     t: texts('zh'),
@@ -18,6 +18,7 @@ Page({
       t: texts(lang),
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
+    app.setNavTitle('aboutApp', lang)
   },
 
   onCopy(e) {
