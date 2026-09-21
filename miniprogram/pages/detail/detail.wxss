@@ -9,15 +9,25 @@
   padding-top: var(--sp-2);
 }
 
-/* 头部色卡 */
+/* 头部行卡：方块比列表里那块高一点，给标题腾出三行的位置 */
 .hero {
-  padding-bottom: var(--sp-5);
+  padding: var(--sp-4);
+}
+
+.hero-meta {
+  font-size: var(--fs-tiny);
+  font-weight: 800;
+  letter-spacing: 1rpx;
+  color: var(--text-tertiary);
+  margin-bottom: 10rpx;
 }
 
 .hero-title {
-  font-size: var(--fs-h1);
+  font-size: 36rpx;
+  font-weight: 800;
   letter-spacing: -0.8rpx;
-  line-height: 1.3;
+  line-height: 1.34;
+  color: var(--text-primary);
   margin-bottom: 0;
 }
 
@@ -25,7 +35,7 @@
   margin-top: var(--sp-3);
 }
 
-/* 操作条：三个中性胶囊，不压在饱和色上 */
+/* 操作条：三个中性胶囊 */
 .action-bar {
   display: flex;
   gap: var(--sp-2);
@@ -35,12 +45,12 @@
 .icon-btn {
   flex: 1;
   text-align: center;
-  padding: var(--sp-2) 0;
+  padding: 20rpx 0;
   border-radius: var(--r-pill);
   background: var(--chip-idle);
   color: var(--text-primary);
-  font-size: var(--fs-meta);
-  font-weight: 600;
+  font-size: 25rpx;
+  font-weight: 700;
 }
 
 .icon-btn.on {
@@ -56,25 +66,24 @@
 /* 中性面板：长文本在这里读 */
 .panel {
   background: var(--bg-card);
-  border: 1rpx solid var(--card-edge, transparent);
+  border: var(--w-edge) solid var(--card-edge);
   border-radius: var(--r-card);
   padding: var(--sp-4);
   margin-bottom: var(--sp-2);
-  box-shadow: var(--sh-card);
 }
 
 .section-label {
   display: block;
-  font-size: var(--fs-tiny);
-  font-weight: 700;
-  letter-spacing: 1.6rpx;
-  color: var(--text-secondary);
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: var(--text-tertiary);
   margin-bottom: var(--sp-2);
 }
 
 .summary-text {
   font-size: var(--fs-body);
-  line-height: var(--lh-body);
+  line-height: 1.68;
   color: var(--text-primary);
 }
 
@@ -87,7 +96,7 @@
 .point-item {
   display: flex;
   align-items: flex-start;
-  gap: var(--sp-2);
+  gap: 18rpx;
 }
 
 .point-num {
@@ -95,11 +104,11 @@
   width: 38rpx;
   height: 38rpx;
   border-radius: 50%;
-  /* 序号用这条笔记的分类色，把中性面板和上面那张色卡接上 */
+  /* 序号用这条笔记的分类色，把中性面板和上面那块方块接上 */
   background: var(--tone-bg, var(--chip-idle));
   color: var(--tone-ink, var(--text-secondary));
   font-size: var(--fs-tiny);
-  font-weight: 700;
+  font-weight: 800;
   text-align: center;
   line-height: 38rpx;
   margin-top: 4rpx;
@@ -108,7 +117,7 @@
 .point-text {
   flex: 1;
   font-size: var(--fs-body);
-  line-height: var(--lh-body);
+  line-height: 1.6;
   color: var(--text-primary);
 }
 
@@ -131,8 +140,8 @@
 
 .expand-icon {
   font-size: var(--fs-meta);
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: var(--text-tertiary);
 }
 
 .original-scroll {
@@ -162,5 +171,4 @@
   font-size: var(--fs-body);
   font-weight: 700;
   padding: var(--sp-3) 0;
-  box-shadow: var(--sh-card);
 }

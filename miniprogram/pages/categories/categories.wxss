@@ -40,29 +40,20 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-  padding: var(--sp-4);
+  padding: var(--sp-row);
 }
 
 .category-info {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: 22rpx;
   min-width: 0;
-}
-
-/* 分类色是后端存的任意值，可能很浅。给一圈内描边，白色也能在卡片上看见 */
-.category-color {
-  flex: none;
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 14rpx;
-  background: var(--tone-bg, var(--chip-idle));
 }
 
 .category-name {
   font-size: var(--fs-body);
-  font-weight: 700;
-  letter-spacing: -0.4rpx;
+  font-weight: 800;
+  letter-spacing: -0.5rpx;
   color: var(--text-primary);
 }
 
@@ -162,7 +153,6 @@
 }
 
 .dialog-card {
-  border-color: var(--card-edge, transparent);
   width: 620rpx;
   padding: var(--sp-5) var(--sp-4) var(--sp-4);
   margin-bottom: 0;

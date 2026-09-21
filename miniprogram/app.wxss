@@ -1,21 +1,29 @@
 /* ------------------------------------------------------------------
-   设计令牌（V1 色卡流）。分工很明确：
+   设计令牌（V2 左块右文）。分工：
    ① 非色彩令牌——全局一份，不随主题变。
    ② 主题（=用户选的壁纸）只管 chrome：页面底、导航、搜索框、chips、正文文字。
-   ③ 色卡的颜色不归主题管，由 utils/palette.js 按分类固定注入 --card-bg / --card-ink。
-      所以切到深色壁纸时，亮色卡浮在深底上反而更跳，卡片本身不需要出深色变体。
+   ③ 方块的颜色不归主题管，由 utils/palette.js 按分类固定注入 --blk-bg / --blk-ink。
+
+   V1→V2 只改了承载方式：颜色从"整张卡"退到卡片左侧那块方块，卡本身回白底。
+   这一改带来两个后果，写清楚免得下一个人当成 bug：
+   ① 描边（--w-edge + --card-edge）取代投影成为卡片的边界语言，投影令牌已经删干净，
+      只有浮层（弹窗、tab 栏）还留着 --sh-float。
+   ② 卡不再是饱和色，所以深色壁纸必须自己出一套卡（半透明底 + 亮描边 + 亮字）。
+      --bg-card / --card-edge 因此从兜底值升级成主题变量，切壁纸时它们必须跟着变。
    ------------------------------------------------------------------ */
 
 page {
-  /* 字阶：六级。参考作品的层级差靠"特粗 + 收字距"拉开，不靠加档位 */
-  --fs-h1: 40rpx;
+  /* 字阶：八级。最下面两档只给"方块里的日期"和"小眉标"用，正文不下探到这里 */
+  --fs-h1: 42rpx;
   --fs-h2: 34rpx;
-  --fs-title: 33rpx;
+  --fs-title: 31rpx;
   --fs-body: 28rpx;
   --fs-meta: 24rpx;
   --fs-tiny: 21rpx;
-  --lh-body: 1.62;
-  --lh-tight: 1.34;
+  --fs-label: 20rpx;
+  --fs-micro: 18rpx;
+  --lh-body: 1.6;
+  --lh-tight: 1.38;
 
   /* 间距模数：8rpx 一档 */
   --sp-1: 8rpx;
@@ -24,55 +32,67 @@ page {
   --sp-4: 32rpx;
   --sp-5: 48rpx;
   --sp-6: 64rpx;
+  /* 行卡的三个数（块-文间距、上下留白、左右留白）在效果图里是同一个值，这里也锁成一个 */
+  --sp-row: 26rpx;
 
-  /* 圆角与阴影——大圆角是这套方向的骨架 */
-  --r-card: 44rpx;
+  /* 圆角与描边——描边是这套方向的骨架，投影已经退役 */
+  --r-card: 40rpx;
+  --r-block: 32rpx;
   --r-chip: 28rpx;
   --r-pill: 999rpx;
   --r-btn: 16rpx;
-  --sh-card: 0 4rpx 0 rgba(35, 37, 44, 0.05), 0 16rpx 44rpx rgba(35, 37, 44, 0.10);
-  --sh-chip: 0 4rpx 12rpx rgba(35, 37, 44, 0.16);
+  --w-edge: 3rpx;
   --sh-float: 0 16rpx 44rpx rgba(35, 37, 44, 0.22);
-  --motif-size: 180rpx;
-  --motif-shift: 30rpx;
+
+  /* 方块：176rpx 见方，母题住在它里面 */
+  --blk: 176rpx;
+  --blk-pad: 18rpx;
+  --fs-block: 32rpx;
+  --motif-size: 124rpx;
+  --motif-shift: 32rpx;
 
   /* chrome 色彩兜底 */
   --text-primary: #23252c;
-  --text-secondary: #6b6f76;
+  --text-secondary: #5c6068;
+  --text-tertiary: #9a9ea6;
   --bg-page: #f4f2ec;
-  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-card: #ffffff;
   --accent: #23252c;
   --accent-soft: rgba(35, 37, 44, 0.07);
   --border: rgba(35, 37, 44, 0.08);
-  --chip-idle: rgba(35, 37, 44, 0.07);
+  --card-edge: rgba(35, 37, 44, 0.1);
+  --chip-idle: rgba(35, 37, 44, 0.06);
   --danger: #b4231f;
   --danger-soft: rgba(180, 35, 31, 0.08);
-  --card-edge: transparent;
 
   background-color: var(--bg-page);
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
   color: var(--text-primary);
 }
 
-/* 六套壁纸皮肤：只改 chrome，不改色卡。 */
+/* 六套壁纸皮肤：只改 chrome，不改方块。card/line 的取值要和 palette.js 的 THEMES 一致。 */
 
 .theme-default {
   --bg-page: #f4f2ec;
-  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-card: #ffffff;
   --text-primary: #23252c;
-  --text-secondary: #6b6f76;
+  --text-secondary: #5c6068;
+  --text-tertiary: #9a9ea6;
   --border: rgba(35, 37, 44, 0.08);
+  --card-edge: rgba(35, 37, 44, 0.1);
   --accent: #23252c;
   --accent-soft: rgba(35, 37, 44, 0.07);
-  --chip-idle: rgba(35, 37, 44, 0.07);
+  --chip-idle: rgba(35, 37, 44, 0.06);
 }
 
 .theme-blue {
   --bg-page: #eaeefb;
-  --bg-card: rgba(255, 255, 255, 0.86);
+  --bg-card: #ffffff;
   --text-primary: #23264f;
-  --text-secondary: #667099;
+  --text-secondary: #5c6089;
+  --text-tertiary: #8b90bd;
   --border: rgba(63, 82, 214, 0.14);
+  --card-edge: rgba(63, 82, 214, 0.14);
   --accent: #3f52d6;
   --accent-soft: rgba(63, 82, 214, 0.1);
   --chip-idle: rgba(63, 82, 214, 0.09);
@@ -80,10 +100,12 @@ page {
 
 .theme-green {
   --bg-page: #e7f3ea;
-  --bg-card: rgba(255, 255, 255, 0.86);
+  --bg-card: #ffffff;
   --text-primary: #12331f;
   --text-secondary: #4c7a5b;
+  --text-tertiary: #7d9c88;
   --border: rgba(70, 168, 99, 0.16);
+  --card-edge: rgba(47, 138, 77, 0.16);
   --accent: #2f8a4d;
   --accent-soft: rgba(70, 168, 99, 0.12);
   --chip-idle: rgba(70, 168, 99, 0.1);
@@ -91,10 +113,12 @@ page {
 
 .theme-sunset {
   --bg-page: #fdeee6;
-  --bg-card: rgba(255, 255, 255, 0.86);
+  --bg-card: #ffffff;
   --text-primary: #4a1f10;
   --text-secondary: #a4664c;
+  --text-tertiary: #c0917c;
   --border: rgba(233, 114, 61, 0.16);
+  --card-edge: rgba(212, 86, 42, 0.18);
   --accent: #d4562a;
   --accent-soft: rgba(233, 114, 61, 0.12);
   --chip-idle: rgba(233, 114, 61, 0.1);
@@ -102,32 +126,32 @@ page {
 
 .theme-purple {
   --bg-page: #0c0c1d;
-  --bg-card: rgba(255, 255, 255, 0.1);
+  --bg-card: rgba(255, 255, 255, 0.05);
   --text-primary: #eceaf6;
-  --text-secondary: #9a95b8;
+  --text-secondary: #b3aecf;
+  --text-tertiary: #8d87ae;
   --border: rgba(255, 255, 255, 0.1);
+  --card-edge: rgba(255, 255, 255, 0.12);
   --accent: #a78bfa;
   --accent-soft: rgba(167, 139, 250, 0.18);
-  --chip-idle: rgba(255, 255, 255, 0.1);
-  --sh-card: 0 4rpx 0 rgba(0, 0, 0, 0.22), 0 16rpx 44rpx rgba(0, 0, 0, 0.4);
+  --chip-idle: rgba(255, 255, 255, 0.09);
   --danger: #ff8a80;
   --danger-soft: rgba(255, 138, 128, 0.14);
-  --card-edge: rgba(255, 255, 255, 0.14);
 }
 
 .theme-ocean {
   --bg-page: #0d1b2a;
-  --bg-card: rgba(255, 255, 255, 0.1);
+  --bg-card: rgba(255, 255, 255, 0.05);
   --text-primary: #e2eef6;
   --text-secondary: #86a3bb;
+  --text-tertiary: #6f8ba3;
   --border: rgba(255, 255, 255, 0.09);
+  --card-edge: rgba(255, 255, 255, 0.12);
   --accent: #4fc3f7;
   --accent-soft: rgba(79, 195, 247, 0.18);
   --chip-idle: rgba(255, 255, 255, 0.09);
-  --sh-card: 0 4rpx 0 rgba(0, 0, 0, 0.22), 0 16rpx 44rpx rgba(0, 0, 0, 0.4);
   --danger: #ff8a80;
   --danger-soft: rgba(255, 138, 128, 0.14);
-  --card-edge: rgba(255, 255, 255, 0.14);
 }
 
 .container {
@@ -142,17 +166,16 @@ page {
   box-sizing: border-box;
 }
 
-/* ---------- 色卡：整面产品里唯一的大面积彩色 ---------- */
+/* ---------- 卡：白底 + 描边，不投影 ---------- */
 .card {
   position: relative;
   display: block;
-  background: var(--card-bg, var(--bg-card));
-  color: var(--card-ink, var(--text-primary));
-  border: 1rpx solid var(--card-edge, transparent);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: var(--w-edge) solid var(--card-edge);
   border-radius: var(--r-card);
   padding: var(--sp-3) var(--sp-4) var(--sp-4);
   margin-bottom: var(--sp-2);
-  box-shadow: var(--sh-card);
   overflow: hidden;
 }
 
@@ -160,75 +183,141 @@ page {
   transform: scale(0.988);
 }
 
-.card.pinned {
-  box-shadow: var(--sh-card), inset 0 0 0 3rpx rgba(255, 255, 255, 0.22);
+/* ---------- 行卡：左侧方块 + 右侧正文。列表、详情头、入口列表共用这一套 ---------- */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-row);
+  padding: var(--sp-row);
 }
 
-.card-top {
+.blk {
+  flex: none;
+  position: relative;
+  width: var(--blk);
+  height: var(--blk);
+  box-sizing: border-box;
+  padding: var(--blk-pad);
+  border-radius: var(--r-block);
+  background: var(--blk-bg, var(--accent));
+  color: var(--blk-ink, #ffffff);
+  border: var(--w-edge) solid var(--blk-edge, transparent);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* 块内分类名：单行，顶到边就用渐隐收掉，不打省略号。
+   渐隐只吃盒子最右 14%，而盒子宽度固定，所以短名字的末字落在渐隐区之前、完全不受影响，
+   只有真被裁掉的长名字会淡出。这块只是提示：识别由颜色承担、阅读由右侧标题承担，
+   所以裁掉尾巴不丢信息——中文 2~3 字永远到不了渐隐区，这条规则实际上只对英文生效。
+   省略号会把一个被裁断的词变成半个词，渐隐是"这里还有，不必读"，所以选渐隐。 */
+.blk-name {
+  position: relative;
+  z-index: 2;
+  font-size: var(--fs-block, 32rpx);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.6rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #000 0 86%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0 86%, transparent 100%);
+}
+
+.blk-date {
+  position: relative;
+  z-index: 2;
+  font-size: var(--fs-micro);
+  font-weight: 800;
+  letter-spacing: 1.4rpx;
+  opacity: 0.72;
+}
+
+.blk-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-title {
+  font-size: var(--fs-title);
+  font-weight: 800;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.5rpx;
+  color: var(--text-primary);
+  margin-bottom: 10rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.row-foot {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: var(--sp-3);
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  color: var(--text-tertiary);
 }
 
-/* 白色小图标块：参考作品里那个"浮在色卡上"的 chip */
-.icon-chip {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: var(--r-chip);
-  background: #ffffff;
-  box-shadow: var(--sh-chip);
-  display: flex;
+.row-foot .src {
+  color: var(--text-secondary);
+}
+
+.row-foot .foot-l {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 置顶：墨黑小标签压在标题前面。字色用 --bg-page 而不是 #fff，
+   因为深色主题下 --accent 会变成亮色，白字压在上面就读不出来了。 */
+.pin {
+  display: inline-block;
+  font-size: 19rpx;
+  font-weight: 800;
+  letter-spacing: 0.6rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 10rpx;
+  background: var(--accent);
+  color: var(--bg-page);
+  margin-right: 10rpx;
+  vertical-align: 2rpx;
+}
+
+/* 方块的三个尺寸变体：详情头（比列表那块高）、新建页那三个入口（方块里是一个字）、
+   分类管理那列色点。
+   字用汉字而不是图标字体——项目没有 iconfont，单个汉字在苹方下必定渲染得出来，
+   换成 ✎ ⌗ 这类符号就要赌设备字体。 */
+.blk.tall {
+  height: 200rpx;
+}
+
+.blk.sm {
+  width: 112rpx;
+  height: 112rpx;
+  padding: 0;
   align-items: center;
   justify-content: center;
-  font-size: 30rpx;
-  line-height: 1;
-  color: #23252c;
 }
 
-.icon-chip.on-dark {
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
+.blk.sm .blk-name {
+  font-size: 40rpx;
+  letter-spacing: 0;
+  text-align: center;
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
-.date {
-  font-size: var(--fs-tiny);
-  font-weight: 700;
-  letter-spacing: 0.6rpx;
-  opacity: 0.72;
-}
-
-.eyebrow {
-  font-size: var(--fs-tiny);
-  font-weight: 700;
-  letter-spacing: 1.6rpx;
-  opacity: 0.72;
-  margin-bottom: 6rpx;
-}
-
-.title {
-  font-size: var(--fs-title);
-  font-weight: 700;
-  line-height: var(--lh-tight);
-  letter-spacing: -0.6rpx;
-  margin-bottom: var(--sp-1);
-}
-
-.summary {
-  font-size: var(--fs-meta);
-  line-height: var(--lh-body);
-  opacity: 0.78;
-}
-
-.tag {
-  display: inline-block;
-  background: var(--card-tag, var(--accent-soft));
-  color: var(--card-ink, var(--accent));
-  font-size: var(--fs-tiny);
-  font-weight: 700;
-  padding: 6rpx 16rpx;
-  border-radius: var(--r-btn);
-  margin-right: var(--sp-1);
+.blk.dot {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 18rpx;
+  padding: 0;
 }
 
 /* ---------- 抽象母题：由 palette.js 按笔记 id 选一个，位置大小也从 id 派生 ---------- */
@@ -243,19 +332,14 @@ page {
   z-index: 0;
 }
 
-.card-top, .eyebrow, .title, .summary, .tags {
-  position: relative;
-  z-index: 1;
-}
-
 .motif-circle {
   border-radius: 50%;
-  background: var(--card-motif);
+  background: var(--blk-motif);
 }
 
 .motif-arc {
   border-radius: 50%;
-  border: 14rpx solid var(--card-motif);
+  border: 12rpx solid var(--blk-motif);
   border-right-color: transparent;
   border-bottom-color: transparent;
 }
@@ -263,21 +347,21 @@ page {
 .motif-stripes {
   background: repeating-linear-gradient(
     115deg,
-    var(--card-motif) 0 12rpx,
-    transparent 12rpx 28rpx
+    var(--blk-motif) 0 12rpx,
+    transparent 12rpx 26rpx
   );
 }
 
 .motif-dots {
-  background-image: radial-gradient(var(--card-motif) 7rpx, transparent 8rpx);
-  background-size: 30rpx 30rpx;
+  background-image: radial-gradient(var(--blk-motif) 6rpx, transparent 7rpx);
+  background-size: 26rpx 26rpx;
 }
 
 .motif-pill {
   width: calc(var(--motif-size) * 1.5);
   height: calc(var(--motif-size) * 0.42);
   border-radius: var(--r-pill);
-  background: var(--card-motif);
+  background: var(--blk-motif);
 }
 
 /* ---------- chrome ---------- */
@@ -285,10 +369,9 @@ page {
   display: flex;
   align-items: center;
   background: var(--bg-card);
-  border: 1rpx solid var(--card-edge, transparent);
+  border: var(--w-edge) solid var(--card-edge);
   border-radius: var(--r-pill);
   padding: var(--sp-3) var(--sp-4);
-  box-shadow: var(--sh-card);
 }
 
 .chip {
@@ -302,8 +385,19 @@ page {
 }
 
 .chip.active {
-  background: var(--accent);
-  color: var(--bg-page);
+  background: var(--tone-bg, var(--accent));
+  color: var(--tone-ink, var(--bg-page));
+}
+
+.tag {
+  display: inline-block;
+  background: var(--chip-idle);
+  color: var(--text-primary);
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  padding: 6rpx 18rpx;
+  border-radius: 14rpx;
+  margin-right: var(--sp-1);
 }
 
 .btn-primary {

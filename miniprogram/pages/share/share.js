@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { toneFor, mix } = require('../../utils/palette.js')
+const { formatShortDate } = require('../../utils/date.js')
 
 // 小程序 canvas 2d 的 roundRect 在部分基础库/机型上不存在，直接调用会抛 TypeError。
 // 而绘图代码一旦抛在这一步，后面的导出根本不会执行，所以这里补一个等价实现。
@@ -112,10 +113,10 @@ Page({
         canvas.width = width
         canvas.height = height
 
-        // 分类色定顶部条和序号，和首页/详情页同一条笔记同色
+        // 分类色定顶部色带和序号，和首页/详情页同一条笔记同色
         const tone = toneFor(note.category_id)
-        const INK = '#23252c'
-        const MUTED = '#6b6f76'
+        const BODY = '#3c4046'
+        const MUTED = '#9a9ea6'
 
         // Background gradient
         const gradient = ctx.createLinearGradient(0, 0, 0, height)
@@ -131,8 +132,11 @@ Page({
         const cardY = 60
         const cardW = width - 80
         const cardH = height - 160
-        const contentX = cardX + 48
-        const contentW = cardW - 96
+        const R = 44
+        // 色带和正文用同一圈内边距，两边对不齐的话海报会显得是两块东西拼起来的
+        const PAD = 44
+        const contentX = cardX + PAD
+        const contentW = cardW - PAD * 2
         const qrSize = 120
         const qrY = cardY + cardH - 175
         const contentBottom = qrY - 30
@@ -142,7 +146,7 @@ Page({
         ctx.shadowOffsetY = 8
         ctx.fillStyle = '#ffffff'
         ctx.beginPath()
-        ctx.roundRect(cardX, cardY, cardW, cardH, 40)
+        ctx.roundRect(cardX, cardY, cardW, cardH, R)
         ctx.fill()
         ctx.shadowColor = 'transparent'
         ctx.shadowBlur = 0
@@ -150,58 +154,73 @@ Page({
 
         // 内容驱动布局：y 随每块实际行数推进，装不下的块整块跳过
         //
-        // 顶部是一条分类色带，标题压在色带上——和首页/详情页的色卡同一套配色逻辑。
+        // 顶部是一条分类色带，带里是"左半透明方块 + 标题"，和首页/详情页那一行同一套语法。
         // 色带要用卡片的圆角切边，所以先把卡片路径裁出来再填色。
-        // 色带高度由标题实际行数算出来；标题最多四行，再长省略。
-        const TITLE_SIZE = 42
+        // 色带高度由标题实际行数算出来；标题最多三行，再长省略。
+        const TITLE_SIZE = 34
+        const TITLE_LH = 46
+        const BLK = 148
+        const blkX = cardX + PAD
+        const blkY = cardY + PAD
+        const titleX = blkX + BLK + 24
+        const titleW = cardW - PAD * 2 - BLK - 24
+
         ctx.font = `bold ${TITLE_SIZE}px sans-serif`
-        const allTitleLines = this.wrapText(note.title || '', contentW, ctx)
-        const titleLines = allTitleLines.slice(0, 4)
-        if (allTitleLines.length > 4) {
-          titleLines[3] = this.ellipsize(titleLines[3], contentW, ctx)
+        const allTitleLines = this.wrapText(note.title || '', titleW, ctx)
+        const titleLines = allTitleLines.slice(0, 3)
+        if (allTitleLines.length > 3) {
+          titleLines[2] = this.ellipsize(titleLines[2], titleW, ctx)
         }
-        const headerH = 56 + titleLines.length * 56 + 44
+        const bandH = PAD * 2 + Math.max(BLK, titleLines.length * TITLE_LH)
 
         ctx.save()
         ctx.beginPath()
-        ctx.roundRect(cardX, cardY, cardW, cardH, 40)
+        ctx.roundRect(cardX, cardY, cardW, cardH, R)
         ctx.clip()
         ctx.fillStyle = tone.bg
-        ctx.fillRect(cardX, cardY, cardW, headerH)
-        // 母题圆只许待在色带内，所以再套一层只到色带底边的裁剪
+        ctx.fillRect(cardX, cardY, cardW, bandH)
+        // 方块是色带上的一层半透明白，不是第六种颜色，所以不引入 palette 之外的色值。
+        // 画布里做不出界面那套"末端渐隐"，所以超长的分类名只能截断加省略号；
+        // 方块内容宽 108px、字 28px，中文三四字以内不会走到这条分支。
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.16)'
         ctx.beginPath()
-        ctx.rect(cardX, cardY, cardW, headerH)
-        ctx.clip()
-        ctx.fillStyle = mix(tone.ink, tone.bg, 0.16)
-        ctx.beginPath()
-        ctx.arc(cardX + cardW - 10, cardY + headerH - 20, 128, 0, Math.PI * 2)
+        ctx.roundRect(blkX, blkY, BLK, BLK, 28)
         ctx.fill()
         ctx.restore()
 
-        let y = cardY + 56
+        ctx.fillStyle = tone.ink
+        ctx.font = 'bold 28px sans-serif'
+        const blockName = note.category_name || (note.category_id == null ? t('noCategory', this.data.lang) : '')
+        ctx.fillText(this.ellipsize(blockName, BLK - 40, ctx), blkX + 20, blkY + 48)
+        ctx.font = 'bold 17px sans-serif'
+        ctx.globalAlpha = 0.75
+        ctx.fillText(formatShortDate(note.created_at), blkX + 20, blkY + BLK - 22)
+        ctx.globalAlpha = 1
+
+        let y = blkY + TITLE_SIZE
         ctx.font = `bold ${TITLE_SIZE}px sans-serif`
         ctx.fillStyle = tone.ink
         for (const line of titleLines) {
-          ctx.fillText(line, contentX, y)
-          y += 56
+          ctx.fillText(line, titleX, y)
+          y += TITLE_LH
         }
 
-        y = cardY + headerH + 46
+        y = cardY + bandH + 56
 
-        // 来源和分类并作一行小字。分类查不到名字时只写来源，不谎称"未分类"
+        // 来源和标签并作一行小眉标。分类名已经在方块里了，这里不再重复一遍
         ctx.font = 'bold 22px sans-serif'
         ctx.fillStyle = MUTED
-        ctx.fillText(
-          [note.category_name, this.getSourceLabel(note.source_type)].filter(Boolean).join(' · '),
-          contentX,
-          y,
-        )
-        y += 44
+        const metaLine = [
+          this.getSourceLabel(note.source_type),
+          (note.tags || []).join(' / '),
+        ].filter(Boolean).join(' · ')
+        ctx.fillText(this.ellipsize(metaLine, contentW, ctx), contentX, y)
+        y += 48
 
         // Summary，最多四行
         if (note.summary) {
-          ctx.font = '28px sans-serif'
-          ctx.fillStyle = '#4a4d55'
+          ctx.font = '27px sans-serif'
+          ctx.fillStyle = BODY
           const lines = this.wrapText(note.summary, contentW, ctx)
           const shown = lines.slice(0, 4)
           if (lines.length > 4) {
@@ -210,52 +229,35 @@ Page({
           for (const line of shown) {
             if (y > contentBottom) break
             ctx.fillText(line, contentX, y)
-            y += 42
+            y += 40
           }
-          y += 14
+          y += 24
         }
 
         // Key points，最多五条
         const points = (note.key_points || []).slice(0, 5)
         if (points.length && y + 44 + points.length * 42 <= contentBottom) {
-          ctx.fillStyle = INK
-          ctx.font = 'bold 26px sans-serif'
+          ctx.fillStyle = MUTED
+          ctx.font = 'bold 22px sans-serif'
           ctx.fillText(t('keyPoints', this.data.lang), contentX, y)
           y += 44
           points.forEach((point, i) => {
             // 序号做成分类色圆块，和详情页的圆形序号同款
             ctx.fillStyle = tone.bg
             ctx.beginPath()
-            ctx.arc(contentX + 16, y - 9, 16, 0, Math.PI * 2)
+            ctx.arc(contentX + 18, y - 9, 18, 0, Math.PI * 2)
             ctx.fill()
             ctx.fillStyle = tone.ink
             ctx.font = 'bold 21px sans-serif'
             ctx.textAlign = 'center'
-            ctx.fillText(String(i + 1), contentX + 16, y - 2)
+            ctx.fillText(String(i + 1), contentX + 18, y - 2)
             ctx.textAlign = 'left'
-            ctx.fillStyle = '#4a4d55'
+            ctx.fillStyle = BODY
             ctx.font = '26px sans-serif'
-            ctx.fillText(this.ellipsize(point, contentW - 46, ctx), contentX + 46, y)
+            ctx.fillText(this.ellipsize(point, contentW - 50, ctx), contentX + 50, y)
             y += 42
           })
           y += 14
-        }
-
-        // Tags，单行，放不下就少画几个
-        if (note.tags && note.tags.length && y + 40 <= contentBottom) {
-          ctx.font = '22px sans-serif'
-          let tx = contentX
-          for (const tag of note.tags.slice(0, 5)) {
-            const tw = ctx.measureText(tag).width + 32
-            if (tx + tw > contentX + contentW) break
-            ctx.fillStyle = mix(INK, '#ffffff', 0.07)
-            ctx.beginPath()
-            ctx.roundRect(tx, y - 26, tw, 38, 10)
-            ctx.fill()
-            ctx.fillStyle = INK
-            ctx.fillText(tag, tx + 16, y)
-            tx += tw + 12
-          }
         }
 
         // Footer - QR code and scan text

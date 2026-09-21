@@ -19,8 +19,8 @@
           </view>
         </block>
         <block wx:else>
-          <view class="category-info" style="{{item.toneStyle}}">
-            <view class="category-color"></view>
+          <view class="category-info">
+            <view class="blk dot" style="{{item.blockStyle}}"></view>
             <text class="category-name">{{item.name}}</text>
           </view>
           <view class="category-actions">

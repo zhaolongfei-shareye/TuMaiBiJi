@@ -25,10 +25,12 @@ Page({
         key: theme.key,
         label: theme.label,
         active: theme.key === current,
-        // 主题在 CSS 里是类名，但缩略图必须画出六套各自的底色和字色，只能把值带到行内
-        itemStyle: `background: ${theme.page}; --wp-label: ${theme.dark ? '#f2f4fb' : '#23252c'}`,
-        neutral: theme.card,
-        stack: [toneColor(i), toneColor(i + 1), toneColor(i + 2)],
+        // 主题在 CSS 里是类名，但缩略图要同时画出六套各自的底色和字色，只能把值带到行内。
+        // --wp-opp 是给勾选圆点里的字用的：圆点本身取 --wp-label，正好和它形成对比。
+        itemStyle: `background: ${theme.page}; --wp-label: ${theme.dark ? '#f2f4fb' : '#23252c'}; --wp-opp: ${theme.page}`,
+        line: theme.line,
+        lineEdge: theme.lineEdge,
+        stack: [toneColor(i), toneColor(i + 1)],
       })),
     })
   },

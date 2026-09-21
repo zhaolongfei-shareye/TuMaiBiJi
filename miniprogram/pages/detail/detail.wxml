@@ -2,21 +2,23 @@
   <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
   <view wx:elif="{{note}}" class="detail-wrapper">
-    <!-- 头部色卡：颜色与构图和列表里那条完全一致（同一套 cardSkinFor） -->
-    <view class="card hero" style="{{note.cardStyle}}">
-      <view class="card-top">
-        <view class="icon-chip">{{note.iconChar}}</view>
-        <text class="date">{{note.created_at_label}}</text>
+    <!-- 头部方块：颜色和构图与列表里那条完全一致（同一套 blockSkinFor） -->
+    <view class="card row hero">
+      <view class="blk tall" style="{{note.blockStyle}}">
+        <text class="blk-name">{{note.blockName}}</text>
+        <text class="blk-date">{{note.date_label}}</text>
+        <view class="motif {{note.motif}}"></view>
       </view>
-      <view class="eyebrow">{{note.eyebrow}}</view>
-      <view class="title hero-title">{{note.title}}</view>
-      <view class="tags" wx:if="{{note.tags && note.tags.length}}">
-        <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
+      <view class="blk-body">
+        <view class="hero-meta">{{note.source_type_label}} · {{note.created_at_label}}</view>
+        <view class="hero-title">{{note.title}}</view>
+        <view class="tags" wx:if="{{note.tags && note.tags.length}}">
+          <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
+        </view>
       </view>
-      <view class="motif {{note.motif}}"></view>
     </view>
 
-    <!-- 操作条从色卡里拿出来：一排按钮压在饱和色上会互相抢 -->
+    <!-- 操作条单独一排：压在头卡里会和标题抢位置 -->
     <view class="action-bar">
       <view class="icon-btn {{note.is_pinned ? 'on' : ''}}" bindtap="togglePin">
         <text>{{note.is_pinned ? t.unpin : t.pin}}</text>
@@ -25,7 +27,7 @@
       <view class="icon-btn danger" bindtap="onDelete">{{t.delete}}</view>
     </view>
 
-    <!-- 长文本一律回中性卡：色卡只承担"这一条是什么"，不承担阅读 -->
+    <!-- 长文本一律回中性卡：方块只承担"这一条是什么"，不承担阅读 -->
     <view wx:if="{{note.summary}}" class="panel">
       <text class="section-label">{{t.summaryLabel}}</text>
       <text class="summary-text">{{note.summary}}</text>

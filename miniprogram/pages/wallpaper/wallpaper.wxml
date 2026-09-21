@@ -13,13 +13,14 @@
       bindtap="onSelect"
       data-key="{{item.key}}"
     >
-      <!-- 缩略预览：三块色卡 + 一条中性卡。色卡不随主题变，这正是这套语言要说的件事 -->
-      <view class="preview-stack">
-        <view class="preview-card" style="background: {{item.stack[0]}}"></view>
-        <view class="preview-card" style="background: {{item.stack[1]}}"></view>
-        <view class="preview-card" style="background: {{item.stack[2]}}"></view>
+      <!-- 缩略预览：一块色 + 一条中性块 + 两条描边行，就是首页那一行的缩影。
+           色块不随主题变，这正是这套语言要说的件事 -->
+      <view class="mini">
+        <view class="mini-blk" style="background: {{item.stack[0]}}"></view>
+        <view class="mini-blk wide" style="background: {{item.stack[1]}}"></view>
       </view>
-      <view class="preview-bar" style="background: {{item.neutral}}"></view>
+      <view class="mini-ln" style="background: {{item.line}}; border-color: {{item.lineEdge}}"></view>
+      <view class="mini-ln short" style="background: {{item.line}}; border-color: {{item.lineEdge}}"></view>
 
       <view class="wallpaper-foot">
         <text class="wallpaper-label">{{item.label}}</text>

@@ -1,19 +1,13 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { cardSkinFor, SOURCE_ICON, toneVars } = require('../../utils/palette.js')
+const { blockSkinFor, toneVars } = require('../../utils/palette.js')
+const { formatDateTime, formatShortDate } = require('../../utils/date.js')
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
   web_article: 'sourceWebArticle',
   screenshot: 'sourceScreenshot',
   manual: 'sourceManual',
-}
-
-function formatTime(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 Page({
@@ -56,7 +50,7 @@ Page({
       const lang = this.data.lang
       const key = SOURCE_TYPE_KEYS[note.source_type]
       note.source_type_label = key ? t(key, lang) : note.source_type
-      note.created_at_label = formatTime(note.created_at)
+      note.created_at_label = formatDateTime(note.created_at)
       
       // Resolve category name from categories list
       let categoryName = null
@@ -73,18 +67,15 @@ Page({
       }
       note.category_name = categoryName
 
-      // 详情页头部就是同一张色卡：颜色与构图必须和列表里那条一模一样，
-      // 所以复用 cardSkinFor，不在这另写一套取色规则。
-      const skin = cardSkinFor(note.category_id, note.id)
-      note.cardStyle = skin.style
-      // 中性面板里的序号圆点要借分类色，但不能贴 cardStyle——那会把整块面板染成色卡
+      // 详情页头部沿用列表那一行的方块：颜色与构图必须和列表里那条一模一样，
+      // 所以复用 blockSkinFor，不在这另写一套取色规则。
+      const skin = blockSkinFor(note.category_id, note.id)
+      note.blockStyle = skin.style
+      // 中性面板里的序号圆点要借分类色，但不能贴方块那串——那会把整块面板染成色块
       note.toneStyle = toneVars(note.category_id)
       note.motif = skin.motif
-      note.iconChar = SOURCE_ICON[note.source_type] || '文'
-      note.eyebrow = [
-        note.category_name || (note.category_id == null ? '未分类' : ''),
-        note.source_type_label,
-      ].filter(Boolean).join(' · ')
+      note.blockName = note.category_name || (note.category_id == null ? this.data.t.noCategory : '')
+      note.date_label = formatShortDate(note.created_at)
       
       this.setData({ note, loading: false, _loaded: true })
     } catch (err) {

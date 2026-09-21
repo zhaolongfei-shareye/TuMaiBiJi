@@ -14,10 +14,10 @@
 /* 标签做成眉标：小字 + 收字距，让输入框自己当主角 */
 .label {
   display: block;
-  font-size: var(--fs-tiny);
-  font-weight: 700;
-  letter-spacing: 1.6rpx;
-  color: var(--text-secondary);
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: var(--text-tertiary);
   margin-bottom: var(--sp-2);
 }
 

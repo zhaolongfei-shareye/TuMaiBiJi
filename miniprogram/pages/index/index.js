@@ -1,27 +1,13 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { cardSkinFor, SOURCE_ICON, toneVars } = require('../../utils/palette.js')
+const { blockSkinFor, toneVars } = require('../../utils/palette.js')
+const { formatShortDate } = require('../../utils/date.js')
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
   web_article: 'sourceWebArticle',
   screenshot: 'sourceScreenshot',
   manual: 'sourceManual',
-}
-
-function formatTime(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-// 色卡右上角只放"月-日"：年份在列表里是噪声，同一条笔记跨年时才需要看详情
-function formatShortDate(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const pad = n => String(n).padStart(2, '0')
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 Page({
@@ -63,11 +49,11 @@ Page({
   async loadCategories() {
     try {
       const categories = await api.getCategories()
-      // chip 选中态的颜色必须和该分类的色卡一致，所以取同一套派生规则，
+      // chip 选中态的颜色必须和该分类的方块一致，所以取同一套派生规则，
       // 不用后端那个 category.color——两者对不上时用户会以为分类乱了
       categories.forEach((c) => { c.toneStyle = toneVars(c.id) })
       this.setData({ categories })
-      // 分类比笔记晚到是常态：到了就得给已在屏上的色卡补上分类名，否则 eyebrow 会一直停在"未分类"。
+      // 分类比笔记晚到是常态：到了就得给已在屏上的行卡补上块内分类名，否则方块会一直空着。
       if (this.data.notes.length) this.setData({ notes: this.skin(this.data.notes) })
     } catch (err) {
       console.error('加载分类失败', err)
@@ -78,13 +64,13 @@ Page({
     const nameOf = {}
     this.data.categories.forEach((c) => { nameOf[c.id] = c.name })
     notes.forEach((n) => {
-      const s = cardSkinFor(n.category_id, n.id)
-      n.cardStyle = s.style
+      const s = blockSkinFor(n.category_id, n.id)
+      n.blockStyle = s.style
       n.motif = s.motif
-      n.iconChar = SOURCE_ICON[n.source_type] || '文'
-      const cat = n.category_id == null ? '未分类' : (nameOf[n.category_id] || '')
       // 分类查不到名字时宁可空着，也不要写成"未分类"——它明明归了类，只是这一批分类数据里没它。
-      n.eyebrow = [cat, n.source_type_label].filter(Boolean).join(' · ')
+      // 空着的时候方块只剩颜色，识别照旧成立。
+      n.blockName = n.category_id == null ? this.data.t.noCategory : (nameOf[n.category_id] || '')
+      n.tagLine = (n.tags || []).join(' / ')
     })
     return notes
   },
@@ -110,7 +96,6 @@ Page({
       notes.forEach(n => {
         const key = SOURCE_TYPE_KEYS[n.source_type]
         n.source_type_label = key ? t(key, lang) : n.source_type
-        n.created_at_label = formatTime(n.created_at)
         n.date_label = formatShortDate(n.created_at)
       })
       this.skin(notes)

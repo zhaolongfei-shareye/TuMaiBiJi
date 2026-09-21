@@ -2,15 +2,15 @@
   display: flex;
   align-items: center;
   gap: var(--sp-4);
-  padding: var(--sp-5) var(--sp-4);
+  padding: var(--sp-4);
   margin-top: var(--sp-5);
 }
 
 .avatar {
   flex: none;
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 36rpx;
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 40rpx;
   background: var(--chip-idle);
 }
 
@@ -23,8 +23,8 @@
 
 .nickname {
   font-size: var(--fs-h2);
-  font-weight: 700;
-  letter-spacing: -0.6rpx;
+  font-weight: 800;
+  letter-spacing: -0.8rpx;
   color: var(--text-primary);
 }
 
@@ -33,12 +33,13 @@
   overflow: hidden;
 }
 
+/* 分组内的分隔线和卡片外描边同色同粗，不然一行里会出现两种"线" */
 .menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--sp-4) 0;
-  border-bottom: 1rpx solid var(--border);
+  padding: 30rpx 0;
+  border-bottom: var(--w-edge) solid var(--card-edge);
 }
 
 .menu-item:last-child {
@@ -47,14 +48,14 @@
 
 .menu-label {
   font-size: var(--fs-body);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.3rpx;
   color: var(--text-primary);
 }
 
 .menu-value {
   font-size: var(--fs-meta);
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   margin-right: var(--sp-1);
 }
 
@@ -67,8 +68,7 @@
   font-size: 40rpx;
   font-weight: 300;
   line-height: 1;
-  color: var(--text-secondary);
-  opacity: 0.5;
+  color: var(--text-tertiary);
 }
 
 .container {

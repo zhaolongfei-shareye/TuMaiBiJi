@@ -10,7 +10,7 @@
 }
 
 .clear-icon {
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
 }
 
 .search-bar {
@@ -27,11 +27,6 @@
   gap: 12rpx;
 }
 
-.chip.active {
-  background: var(--tone-bg, var(--accent));
-  color: var(--tone-ink, var(--bg-page));
-}
-
 .loading, .empty {
   text-align: center;
   padding: var(--sp-6) 0;
@@ -39,8 +34,22 @@
   font-size: var(--fs-body);
 }
 
-.tags {
-  margin-top: var(--sp-2);
+.summary {
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.chev {
+  flex: none;
+  font-size: var(--fs-body);
+  font-weight: 400;
+  line-height: 1;
 }
 
 .container {

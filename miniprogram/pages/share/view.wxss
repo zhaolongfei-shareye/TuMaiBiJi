@@ -1,4 +1,4 @@
-/* 分享落地页：外人打开的，不吃用户壁纸，所以整套颜色写死成 V1 的中性壳。 */
+/* 分享落地页：外人打开的，不吃用户壁纸，所以整套颜色写死成 V2 的中性壳。 */
 .container {
   min-height: 100vh;
   box-sizing: border-box;
@@ -12,7 +12,7 @@
   text-align: center;
   padding: var(--sp-6) 0;
   font-size: var(--fs-body);
-  color: #6b6f76;
+  color: #5c6068;
 }
 
 .error-state {
@@ -40,29 +40,29 @@
 
 .error-text {
   font-size: var(--fs-body);
-  color: #6b6f76;
+  color: #5c6068;
 }
 
 .eyebrow {
   display: block;
-  font-size: var(--fs-tiny);
-  font-weight: 700;
-  letter-spacing: 1.6rpx;
-  color: #6b6f76;
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: #9a9ea6;
   margin-bottom: var(--sp-2);
 }
 
 .share-card {
   background: #ffffff;
+  border: var(--w-edge) solid rgba(35, 37, 44, 0.1);
   border-radius: var(--r-card);
   padding: var(--sp-5) var(--sp-4) var(--sp-5);
-  box-shadow: var(--sh-card);
 }
 
 .card-title {
   display: block;
   font-size: var(--fs-h1);
-  font-weight: 700;
+  font-weight: 800;
   line-height: var(--lh-tight);
   letter-spacing: -1rpx;
   color: #23252c;
@@ -71,8 +71,8 @@
 .card-summary {
   display: block;
   font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: #4a4d55;
+  line-height: 1.68;
+  color: #3c4046;
   margin-top: var(--sp-4);
 }
 
@@ -87,9 +87,9 @@
   font-size: var(--fs-tiny);
   font-weight: 700;
   color: #23252c;
-  background: rgba(35, 37, 44, 0.07);
+  background: rgba(35, 37, 44, 0.06);
   padding: 8rpx 18rpx;
-  border-radius: var(--r-btn);
+  border-radius: 14rpx;
 }
 
 .brand-row {
@@ -116,5 +116,5 @@
 .brand-text {
   font-size: var(--fs-meta);
   font-weight: 600;
-  color: #6b6f76;
+  color: #5c6068;
 }

@@ -43,26 +43,33 @@
     <text>{{t.noNotes}}</text>
   </view>
 
-  <!-- 笔记列表：一条笔记就是一张色卡 -->
+  <!-- 笔记列表：一条笔记 = 一张描边行卡，颜色集中在左侧方块 -->
   <view wx:else class="notes-list">
-    <view 
-      class="card {{item.is_pinned ? 'pinned' : ''}}" 
-      style="{{item.cardStyle}}"
-      wx:for="{{notes}}" 
+    <view
+      class="card row"
+      wx:for="{{notes}}"
       wx:key="id"
       bindtap="goToDetail"
       data-id="{{item.id}}"
     >
-      <view class="card-top">
-        <view class="icon-chip">{{item.iconChar}}</view>
-        <text class="date">{{item.date_label}}{{item.is_pinned ? ' · ' + t.pinned : ''}}</text>
+      <view class="blk" style="{{item.blockStyle}}">
+        <text class="blk-name">{{item.blockName}}</text>
+        <text class="blk-date">{{item.date_label}}</text>
+        <view class="motif {{item.motif}}"></view>
       </view>
-      <view class="eyebrow">{{item.eyebrow}}</view>
-      <view class="title">{{item.title}}</view>
-      <view class="tags" wx:if="{{item.tags && item.tags.length}}">
-        <text class="tag" wx:for="{{item.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
+      <view class="blk-body">
+        <view class="row-title">
+          <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
+        </view>
+        <view class="summary" wx:if="{{item.summary}}">{{item.summary}}</view>
+        <view class="row-foot">
+          <view class="foot-l">
+            <text class="src">{{item.source_type_label}}</text>
+            <text wx:if="{{item.tagLine}}"> · {{item.tagLine}}</text>
+          </view>
+          <text class="chev">›</text>
+        </view>
       </view>
-      <view class="motif {{item.motif}}"></view>
     </view>
   </view>
 </view>

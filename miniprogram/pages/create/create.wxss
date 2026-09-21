@@ -12,51 +12,17 @@
   gap: var(--sp-2);
 }
 
-.entry-card {
-  display: flex;
+.entry {
   align-items: center;
-  gap: var(--sp-3);
-  background: var(--bg-card);
-  border: 1rpx solid var(--card-edge, transparent);
-  border-radius: var(--r-card);
-  padding: var(--sp-4);
-  box-shadow: var(--sh-card);
-  cursor: pointer;
-  transition: transform 0.15s;
-}
-
-.entry-card:active {
-  transform: scale(0.98);
-}
-
-.entry-badge {
-  flex: none;
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 32rpx;
-  background: var(--card-bg);
-  color: var(--card-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 38rpx;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.entry-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
 }
 
 .entry-label {
-  font-size: var(--fs-body);
-  font-weight: 700;
-  letter-spacing: -0.4rpx;
+  font-size: var(--fs-title);
+  font-weight: 800;
+  letter-spacing: -0.5rpx;
+  line-height: var(--lh-tight);
   color: var(--text-primary);
+  margin-bottom: 4rpx;
 }
 
 .entry-desc {
@@ -70,8 +36,7 @@
   font-size: 44rpx;
   font-weight: 300;
   line-height: 1;
-  color: var(--text-secondary);
-  opacity: 0.5;
+  color: var(--text-tertiary);
 }
 
 /* URL Dialog */
@@ -91,9 +56,7 @@
 .dialog-content {
   width: 620rpx;
   background: var(--bg-card);
-  border: 1rpx solid var(--card-edge, transparent);
-  backdrop-filter: blur(20rpx);
-  -webkit-backdrop-filter: blur(20rpx);
+  border: var(--w-edge) solid var(--card-edge);
   border-radius: var(--r-card);
   padding: var(--sp-5) var(--sp-4) var(--sp-4);
   box-shadow: var(--sh-float);
