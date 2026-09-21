@@ -1,111 +1,246 @@
+/* ---------- 头部：和"我的"页同一条母题 ---------- */
 .about-header {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: var(--sp-6) 0 var(--sp-5);
-}
-
-/* 墨黑块 + 白字。原来是微信绿渐变，那是默认皮肤，不是这套设计的颜色 */
-.app-icon {
-  width: 148rpx;
-  height: 148rpx;
-  border-radius: 44rpx;
-  background: #23252c;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--sp-4);
-}
-
-.icon-text {
-  font-size: 68rpx;
-  font-weight: 700;
-  line-height: 1;
-  color: #ffffff;
-}
-
-.app-name {
-  font-size: var(--fs-h1);
-  font-weight: 700;
-  letter-spacing: -1rpx;
-  color: var(--text-primary);
-  margin-bottom: var(--sp-1);
-}
-
-.app-version {
-  font-size: var(--fs-meta);
-  font-weight: 600;
-  letter-spacing: 1rpx;
-  color: var(--text-secondary);
-}
-
-.about-card {
+  gap: var(--sp-4);
   padding: var(--sp-4);
+  margin-top: var(--sp-5);
 }
 
-.card-title {
-  display: block;
-  font-size: var(--fs-label);
-  font-weight: 800;
-  letter-spacing: 2rpx;
-  color: var(--text-tertiary);
-  margin-bottom: var(--sp-3);
+.brand-logo {
+  flex: none;
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 40rpx;
 }
 
-.card-text {
-  display: block;
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--text-primary);
-}
-
-.feature-list {
+.brand-text {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: 10rpx;
+  min-width: 0;
 }
 
-.feature-item {
+.brand-line {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--sp-2);
 }
 
-.feature-dot {
-  flex: none;
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
-  background: var(--accent);
-  /* 用色块做圆点，不用 • 字符——字符的位置跟不齐行高 */
-  color: transparent;
-  overflow: hidden;
-  margin-top: 12rpx;
+.brand-name {
+  font-size: var(--fs-h2);
+  font-weight: 800;
+  letter-spacing: -0.8rpx;
+  color: var(--text-primary);
 }
 
-.feature-text {
-  flex: 1;
+.brand-ver {
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.5rpx;
+  color: var(--text-secondary);
+  background: var(--chip-idle);
+  border-radius: var(--r-pill);
+  padding: 4rpx 14rpx;
+}
+
+.brand-slogan {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-tight);
+  color: var(--text-secondary);
+}
+
+/* ---------- 三栏切换：文字 + 下划线，不做按钮态 ---------- */
+.tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 56rpx;
+  padding: 0 var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+
+.tab {
+  position: relative;
+  padding: 26rpx 0 22rpx;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  letter-spacing: -0.3rpx;
+  color: var(--text-tertiary);
+}
+
+.tab.on {
+  color: var(--text-primary);
+}
+
+/* 下划线只铺在字下面，宽度跟着标签走；卡片本身 overflow:hidden，不会漏出圆角 */
+.tab.on::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6rpx;
+  border-radius: 3rpx;
+  background: var(--accent);
+}
+
+/* ---------- 介绍 ---------- */
+.block-card {
+  padding: var(--sp-4);
+}
+
+.lead {
+  display: block;
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   color: var(--text-primary);
 }
 
-.contact-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--sp-3);
+.menu-group {
+  padding: 0 var(--sp-4);
 }
 
-.contact-label {
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 28rpx 0;
+  border-bottom: var(--w-edge) solid var(--card-edge);
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-label {
+  flex: none;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  letter-spacing: -0.3rpx;
+  color: var(--text-primary);
+}
+
+.menu-right {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.menu-value {
   font-size: var(--fs-meta);
+  color: var(--text-tertiary);
+  margin-right: var(--sp-1);
+  max-width: 420rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.menu-arrow {
+  flex: none;
+  font-size: 40rpx;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--text-tertiary);
+}
+
+/* ---------- 功能：左块右文，色块取自全应用那张色板 ---------- */
+.feature {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-row);
+  padding: var(--sp-row);
+}
+
+.f-block {
+  flex: none;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: var(--r-chip);
+  background: var(--blk-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.f-mark {
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.5rpx;
+  color: var(--blk-ink);
+}
+
+.f-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.f-title {
+  font-size: var(--fs-body);
+  font-weight: 800;
+  letter-spacing: -0.3rpx;
+  color: var(--text-primary);
+}
+
+.f-text {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
   color: var(--text-secondary);
 }
 
-.contact-value {
+/* ---------- 隐私条款 ---------- */
+.policy {
+  padding: var(--sp-4);
+}
+
+.p-section {
+  margin-bottom: var(--sp-4);
+}
+
+.p-title {
+  display: block;
   font-size: var(--fs-body);
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: -0.3rpx;
   color: var(--text-primary);
+  margin-bottom: 12rpx;
+}
+
+.p-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-bottom: 10rpx;
+}
+
+/* 圆点而不是 • 字符：字符跟不齐行高，全应用都是这个画法 */
+.p-dot {
+  flex: none;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: 15rpx;
+}
+
+.p-text {
+  flex: 1;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+.p-updated {
+  display: block;
+  padding-top: var(--sp-3);
+  border-top: var(--w-edge) solid var(--card-edge);
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
 }
 
 .copyright {

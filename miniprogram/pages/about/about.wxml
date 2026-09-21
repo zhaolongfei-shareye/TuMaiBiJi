@@ -1,50 +1,68 @@
 <view class="container {{themeClass}}">
-  <view class="about-header">
-    <view class="app-icon">
-      <text class="icon-text">麦</text>
-    </view>
-    <text class="app-name">图麦笔记</text>
-    <text class="app-version">v{{version}}</text>
-  </view>
-
-  <view class="about-card card">
-    <text class="card-title">{{t.aboutApp}}</text>
-    <text class="card-text">{{t.appDesc}}</text>
-  </view>
-
-  <view class="about-card card">
-    <text class="card-title">{{t.features}}</text>
-    <view class="feature-list">
-      <view class="feature-item">
-        <text class="feature-dot">•</text>
-        <text class="feature-text">{{t.featureUrl}}</text>
+  <!-- 头部沿用"我的"页那条母题：logo 靠左，右侧名称 + slogan，版本做角标 -->
+  <view class="about-header card">
+    <image class="brand-logo" src="/assets/logo.png" mode="aspectFill"></image>
+    <view class="brand-text">
+      <view class="brand-line">
+        <text class="brand-name">图麦笔记</text>
+        <text class="brand-ver">v{{version}}</text>
       </view>
-      <view class="feature-item">
-        <text class="feature-dot">•</text>
-        <text class="feature-text">{{t.featureOcr}}</text>
-      </view>
-      <view class="feature-item">
-        <text class="feature-dot">•</text>
-        <text class="feature-text">{{t.featureCategory}}</text>
-      </view>
-      <view class="feature-item">
-        <text class="feature-dot">•</text>
-        <text class="feature-text">{{t.featureShare}}</text>
-      </view>
+      <text class="brand-slogan">{{t.slogan}}</text>
     </view>
   </view>
 
-  <view class="about-card card">
-    <text class="card-title">{{t.contactUs}}</text>
-    <view class="contact-row" bindtap="onCopy" data-value="{{contactEmail}}">
-      <text class="contact-label">{{t.feedbackEmail}}</text>
-      <text class="contact-value">{{contactEmail}}</text>
-    </view>
-    <view class="contact-row" bindtap="onCopy" data-value="{{officialAccount}}">
-      <text class="contact-label">{{t.officialAccount}}</text>
-      <text class="contact-value">{{officialAccount}}</text>
-    </view>
+  <!-- 三栏在同一页里切，不再往下开新页面。文字 + 下划线，不做按钮态 -->
+  <view class="tabs card">
+    <view class="tab {{tab === 'intro' ? 'on' : ''}}" bindtap="onTab" data-key="intro">介绍</view>
+    <view class="tab {{tab === 'features' ? 'on' : ''}}" bindtap="onTab" data-key="features">功能</view>
+    <view class="tab {{tab === 'privacy' ? 'on' : ''}}" bindtap="onTab" data-key="privacy">隐私</view>
   </view>
+
+  <block wx:if="{{tab === 'intro'}}">
+    <view class="card block-card">
+      <text class="lead">{{introLead}}</text>
+    </view>
+
+    <!-- 没有值的行点了不会复制：onCopy 里对空值直接返回 -->
+    <view class="menu-group card">
+      <view class="menu-item" wx:for="{{infoRows}}" wx:key="label" bindtap="onCopy" data-value="{{item.copy}}">
+        <text class="menu-label">{{item.label}}</text>
+        <view class="menu-right">
+          <text class="menu-value">{{item.value}}</text>
+          <text class="menu-arrow" wx:if="{{item.copy}}">›</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <block wx:elif="{{tab === 'features'}}">
+    <view class="card feature" wx:for="{{features}}" wx:key="title" style="{{item.skin}}">
+      <view class="f-block">
+        <text class="f-mark">{{item.mark}}</text>
+      </view>
+      <view class="f-body">
+        <text class="f-title">{{item.title}}</text>
+        <text class="f-text">{{item.body}}</text>
+      </view>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="card block-card">
+      <text class="lead">这一栏说清我们收集什么、你的截图经过哪里、以及怎么删掉。口径与提交给微信后台的《隐私保护指引》保持一致。</text>
+    </view>
+
+    <view class="card policy">
+      <view class="p-section" wx:for="{{privacy}}" wx:key="title">
+        <text class="p-title">{{index + 1 }}. {{item.title}}</text>
+        <view class="p-line" wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this">
+          <view class="p-dot"></view>
+          <text class="p-text">{{line}}</text>
+        </view>
+      </view>
+      <text class="p-updated">最后更新时间：{{updatedAt}}</text>
+    </view>
+  </block>
 
   <text class="copyright">{{t.copyright}}</text>
 </view>
