@@ -7,14 +7,14 @@
   margin: var(--sp-5) 0 var(--sp-4);
 }
 
-/* ---------- 搜索卡 ----------
-   底色 / 面 / 按钮色全由 palette.toneStyle(1) 发下来（--blk-bg / --face / --solid-bg），
-   输入框和按钮本身用 app.wxss 里那份共享定义——和新建页是同一份 CSS，不是"照着再写一遍"。
-   字阶也向新建页看齐：功能名 46rpx，搜索是这一屏的主角，不是一行小灰字。 */
+/* ---------- 搜索条 ----------
+   矮到一行：上下各 16rpx 的留白 + 88rpx 的控件，总高比新建页那三张卡折叠时（144rpx）还矮。
+   底色由 palette.toneStyle(1) 发下来，和新建页 URL 卡同一块蓝；输入框和按钮用 app.wxss
+   里那份共享定义，这里只把它们摆成一行，并给按钮改宽度（.act 默认 flex:1 是通栏用的）。 */
 .sc-card {
   background: var(--blk-bg);
   color: var(--blk-ink);
-  padding: var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
   margin-bottom: var(--sp-3);
 }
 
@@ -23,37 +23,21 @@
   transform: none;
 }
 
-.sc-body {
-  position: relative;
-  z-index: 1;
+.sc-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
 }
 
-.sc-label {
-  font-size: 46rpx;
-  font-weight: 800;
-  letter-spacing: -1rpx;
-  line-height: var(--lh-tight);
-  opacity: 0.96;
+.sc-box {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
 }
 
-.sc-desc {
-  font-size: var(--fs-meta);
-  line-height: var(--lh-tight);
-  opacity: 0.72;
-  margin-top: 10rpx;
-}
-
-/* 放大镜水印：几何取自 Lucide v1.50.0（ISC），和新建页那三个图形同一套 24 格、
-   同一描边重量。形状压在卡底，颜色仍只是一块 var(--blk-glyph)。
-   比新建页那三个小一档、也更往外推：这张卡的输入框和按钮是通栏的，
-   264rpx 的圈会正好压在框内那颗清空 ✕ 底下，两样东西叠在一起就都读不清了。 */
-.glyph-search {
-  width: 188rpx;
-  height: 188rpx;
-  right: -54rpx;
-  bottom: -64rpx;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+.sc-btn {
+  flex: none;
+  padding: 0 var(--sp-3);
 }
 
 .category-scroll {

@@ -1,17 +1,13 @@
 <view class="container {{themeClass}}">
   <view class="page-title">{{t.notesHeading}}</view>
 
-  <!-- 搜索卡：整块饱和色，和新建页那张 URL 卡同一块蓝、共用 app.wxss 里同一套
-       .face-box / .act 定义，所以输入框和按钮在两页必须是一样高的。
-       放大镜只做卡底水印，不进按钮——按钮上只有"搜索"两个字。
-       清空放在输入框内的 ✕，跟新建页那条链接框同一做法。 -->
+  <!-- 搜索条：矮到只有一行，和新建页那三张卡折叠时同一个体量。
+       卡上唯一的文字就是按钮那几个字——标题行和"能搜到哪些字段"那行小字都撤了，
+       这一屏的空间要让给笔记本身。输入框和按钮并排，共用 app.wxss 里那份
+       .face-box / .act 定义，所以和新建页的输入框、"保存"按钮是同一种控件。 -->
   <view class="card sc-card" style="{{searchSkin}}">
-    <!-- 这一层要压在水印图形上面。.glyph 是定位元素（z-index:0），
-         不包一层带 position 的容器，卡里的输入框和按钮会被图形盖住。 -->
-    <view class="sc-body">
-      <view class="sc-label">{{t.search}}</view>
-      <view class="sc-desc">{{t.searchScope}}</view>
-      <view class="face-box">
+    <view class="sc-row">
+      <view class="face-box sc-box">
         <input
           class="face-input"
           value="{{searchKeyword}}"
@@ -23,11 +19,8 @@
         />
         <view wx:if="{{searchKeyword}}" class="face-x" catchtap="clearSearch">✕</view>
       </view>
-      <view class="acts">
-        <view class="act solid" bindtap="onSearchConfirm">{{t.searchBtn}}</view>
-      </view>
+      <view class="act solid sc-btn" bindtap="onSearchConfirm">{{t.search}}</view>
     </view>
-    <view class="glyph glyph-search"></view>
   </view>
 
   <!-- 分类筛选 -->
