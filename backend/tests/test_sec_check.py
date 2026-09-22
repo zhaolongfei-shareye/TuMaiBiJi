@@ -200,3 +200,42 @@ def test_编辑已有笔记的正文也会复检(client, db_session, person, mon
     _stub_verdicts(monkeypatch, {"改脏了": "risky"})
     r = client.put(f"/api/notes/{nid}", headers=_hdr(person.id), json={"content": "这段改脏了"})
     assert r.status_code == 400
+
+def test_请求体必须是原样UTF8不能转义中文(monkeypatch):
+    """微信 msgSecCheck 不解析 \\uXXXX：转义过的体它当普通字符串看，永远判正常。
+
+    这条不是风格问题，是"内容安全到底有没有在生效"的分水岭——httpx 的 json= 参数
+    默认 ensure_ascii=True，用它就等于把这道机制静默关掉。实测同一段赌博引流文本：
+    原样 UTF-8 体判 risky(20006)，转义体判 pass。
+    """
+    import json
+
+    captured = {}
+
+    class Resp:
+        def json(self):
+            return {"errcode": 0, "result": {"suggest": "pass", "label": 100}}
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def post(self, url, content=None, headers=None, **kw):
+            captured["body"] = content
+            captured["kw"] = kw
+            return Resp()
+
+    monkeypatch.setattr(settings, "SEC_CHECK_ENABLED", True)
+    monkeypatch.setattr(wechat, "_access_token_sync", lambda: "fake-token")
+    monkeypatch.setattr(wechat.httpx, "Client", lambda *a, **k: FakeClient())
+    assert wechat.check_text("openid-x", "线上赌场 六合彩 特码") == "pass"
+
+    body = captured["body"]
+    assert isinstance(body, bytes), "必须显式给字节体，不能用 json= 让 httpx 自己序列化"
+    assert not captured["kw"], f"不该再传 {list(captured['kw'])} 给 post"
+    assert "线上赌场" in body.decode("utf-8")
+    assert b"\\u7ebf" not in body, "中文被转义了，微信会一律判正常"
+    assert json.loads(body.decode("utf-8"))["content"] == "线上赌场 六合彩 特码"

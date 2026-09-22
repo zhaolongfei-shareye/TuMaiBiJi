@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 
@@ -103,10 +104,15 @@ def check_text(openid: str, content: str) -> str:
         return "pass"
     try:
         token = _access_token_sync()
+        payload = {"content": content, "version": 2, "scene": 1, "openid": openid}
         with httpx.Client(timeout=10) as client:
+            # 不能用 client.post(json=...)：httpx 默认 ensure_ascii=True，中文会被转义成
+            # \uXXXX，而微信这个接口**不解析转义**——实测同一段赌博引流文本，原样 UTF-8 体
+            # 判 risky(20006)，转义体判 pass。用 json= 就等于把内容安全静默关掉。
             resp = client.post(
                 f"{WX_SEC_CHECK_URL}?access_token={token}",
-                json={"content": content, "version": 2, "scene": 1, "openid": openid},
+                content=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
             )
         data = resp.json()
     except Exception as exc:

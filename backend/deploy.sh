@@ -239,10 +239,12 @@ if not settings.SEC_CHECK_ENABLED:
     raise SystemExit(1)
 
 db = sqlite3.connect(settings.DATABASE_URL.split(":///")[-1] if "sqlite" in settings.DATABASE_URL else "")
-row = db.execute("select openid from users order by id desc limit 1").fetchone()
+# 只要真 openid：微信的是 28 位，deploy-test 那种手写短串会被接口判 40003，
+# 拿它自检会得到"机制没生效"的假警报。
+row = db.execute("select openid from users where length(openid) >= 20 order by id desc limit 1").fetchone()
 db.close()
-if not row or not row[0]:
-    print("  ✗ 库里取不到任何 openid，无法自检（msgSecCheck v2 的 openid 是必填）")
+if not row:
+    print("  ✗ 库里没有可用的真 openid，无法自检（msgSecCheck v2 的 openid 必填且必须真实）")
     raise SystemExit(1)
 openid = row[0]
 print(f"  用最新一个账号的 openid 自检（长度 {len(openid)}，值不打印）")
