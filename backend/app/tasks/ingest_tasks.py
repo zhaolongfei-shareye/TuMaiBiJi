@@ -20,6 +20,22 @@ def failure_message(exc: Exception) -> str:
     return str(exc) if isinstance(exc, UserError) else GENERIC_TASK_ERROR
 
 
+def credit_first_note(db, user_id: str, note: Note) -> None:
+    """worker 这边也是"写下笔记"的一条路，邀请奖励同样要在这一条上结。
+
+    到账失败不该让整条笔记算处理失败——笔记已经落库了，用户看到的必须是成功。
+    """
+    from app.models.user import User
+    from app.services import quota
+
+    try:
+        user = db.get(User, int(user_id))
+        if user is not None:
+            quota.credit_first_note(note, db, user)
+    except Exception:
+        logger.exception("邀请奖励到账失败（笔记已保存）：user=%s", user_id)
+
+
 def process_url_task(task_id: str, user_id: str, url: str):
     """RQ worker 同步任务：抓取 URL → LLM 提取 → 写入数据库。"""
     try:
@@ -48,6 +64,7 @@ def process_url_task(task_id: str, user_id: str, url: str):
             db.add(note)
             db.commit()
             db.refresh(note)
+            credit_first_note(db, user_id, note)
             set_task_status(
                 task_id,
                 "completed",
@@ -87,6 +104,7 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
             db.add(note)
             db.commit()
             db.refresh(note)
+            credit_first_note(db, user_id, note)
             set_task_status(
                 task_id,
                 "completed",

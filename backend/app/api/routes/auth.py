@@ -11,6 +11,9 @@ router = APIRouter()
 
 class LoginRequest(BaseModel):
     code: str
+    # 分享卡片带在路径上的邀请人 id（?inviter=123）。客户端把它存本地、每次登录带上，
+    # 服务端只在自己名下认一次：已有归属或已有笔记的账号一律忽略，见 quota.attribute_inviter。
+    inviter: int | None = None
 
 
 class LoginResponse(BaseModel):
@@ -25,7 +28,7 @@ class LoginResponse(BaseModel):
 @router.post("/wechat", response_model=LoginResponse)
 @limiter.limit("5/minute")
 async def wechat_login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
-    user, token = await login_or_register(req.code, db)
+    user, token = await login_or_register(req.code, db, req.inviter)
     return LoginResponse(
         token=token,
         user_id=user.id,

@@ -109,6 +109,13 @@
   color: var(--text-tertiary);
 }
 
+/* 注销这一行只给文字着色，不铺色块：一屏里只有一个动作是不可逆的，
+   它要看得见，但不该抢过"分享好友"那行的位置。 */
+.menu-item.menu-danger .menu-label,
+.menu-item.menu-danger .menu-arrow {
+  color: var(--danger);
+}
+
 .container {
   padding-bottom: 140rpx;
 }

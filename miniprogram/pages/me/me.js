@@ -1,8 +1,14 @@
 const app = getApp()
+const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 
 const CONTACT_EMAIL = 'jacky28471258@gmail.com'
 const OFFICIAL_ACCOUNT = '杰克AI日记'
+
+// {n} 这类占位由服务端给的数字填，界面里不自己写死额度规则
+function fmt(tpl, map) {
+  return String(tpl).replace(/\{(\w+)\}/g, (t, k) => (map[k] == null ? '' : map[k]))
+}
 
 Page({
   data: {
@@ -12,6 +18,9 @@ Page({
     t: texts('zh'),
     contactEmail: CONTACT_EMAIL,
     officialAccount: OFFICIAL_ACCOUNT,
+    // 额度没读回来之前这两行留空：宁可少一行字，也不先写一个服务端不认的数
+    quotaText: '',
+    shareValue: '',
   },
 
   onShow() {
@@ -32,6 +41,25 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().setData({ selected: 2 })
+    }
+    this.loadQuota()
+  },
+
+  // 额度和邀请进度都读这一个接口：数字只有一个来源，页面不再自己算 100。
+  async loadQuota() {
+    const lang = this.data.lang
+    try {
+      const q = await api.getQuota()
+      this.setData({
+        quotaText: `${q.used}/${q.limit}`,
+        shareValue: q.invites_left > 0
+          ? fmt(t('shareRewardN', lang), { n: q.reward_each })
+          : t('shareRewardMax', lang),
+      })
+      this.quota = q
+    } catch (err) {
+      // 读不到就把这两行留空，绝不显示一个猜的数
+      console.error('额度读取失败', err)
     }
   },
 
@@ -58,8 +86,8 @@ Page({
   },
 
   // 分享卡片固定落在新建页（新用户第一眼就是那三个色块），并带上邀请人 id。
-  // 邀请人 id 只是参数，微信不会告诉我们"对方到底收没收到"，
-  // 所以额度那一刀要等后端按"对方真的打开过"来记，这里不预先承诺已到账。
+  // 归因到这里就结束了：对方打没打开、算不算邀请成功，服务端按"他真的写下第一篇笔记"
+  // 来记（backend/app/services/quota.py），所以这行写的是一笔真实的兑换，不是许愿。
   // 封面是自己画的一张 5:4 图（assets/share-card.png，80KB，微信上限 128KB）：
   // 不给 imageUrl 的话微信会截当前页，截到的是一屏菜单，推广位就废了。
   onShareAppMessage() {
@@ -78,6 +106,62 @@ Page({
     return {
       title: t('shareCardTitle', this.data.lang),
       query: inviter ? `inviter=${inviter}` : '',
+    }
+  },
+
+  // 注销：先现读一次额度，为的是第一道确认里那两个条数是真的，不是"你的全部数据"这种含糊话。
+  // 读不到就停在这里——看不清要删什么的时候不该往下走。
+  async onDeleteAccount() {
+    if (this.deleting) return
+    const lang = this.data.lang
+    let q
+    try {
+      q = await api.getQuota()
+    } catch (err) {
+      wx.showToast({ title: t('loadFailed', lang), icon: 'none' })
+      return
+    }
+    this.quota = q
+    wx.showModal({
+      title: t('deleteTitle', lang),
+      content: fmt(t('deleteStep1', lang), { notes: q.used, cats: q.categories }),
+      confirmText: t('deleteConfirm', lang),
+      cancelText: t('deleteCancel', lang),
+      success: (r1) => {
+        if (!r1.confirm) return
+        // 第二道只问一句：第一道讲的是"删哪些"，这一道讲的是"回不来"。
+        wx.showModal({
+          title: t('deleteTitle', lang),
+          content: t('deleteStep2', lang),
+          confirmText: t('deleteConfirm', lang),
+          cancelText: t('deleteCancel', lang),
+          success: (r2) => {
+            if (r2.confirm) this.doDeactivate()
+          },
+        })
+      },
+    })
+  },
+
+  async doDeactivate() {
+    const lang = this.data.lang
+    this.deleting = true
+    wx.showLoading({ title: t('deletingAccount', lang), mask: true })
+    try {
+      await api.deactivateAccount()
+      wx.hideLoading()
+      // 本地这套 token/userId 必须跟着清：留着下一个请求就带着一个已经不存在的身份去敲门。
+      app.clearSession()
+      wx.showToast({ title: t('accountDeleted', lang), icon: 'success' })
+      setTimeout(() => wx.reLaunch({ url: '/pages/index/index' }), 900)
+    } catch (err) {
+      wx.hideLoading()
+      wx.showToast({
+        title: (err && err.data && err.data.detail) || t('deleteAccountFailed', lang),
+        icon: 'none',
+      })
+    } finally {
+      this.deleting = false
     }
   },
 })

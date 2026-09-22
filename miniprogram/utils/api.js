@@ -26,6 +26,12 @@ const request = (url, method, data, options = {}, retryCount = 0) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
         } else if (res.statusCode === 401) {
+          // 注销这一类不可逆的写操作不带静默重登：401 之后换一个新账号重试，删掉的就是
+          // 那个新号，用户看到"已注销"而自己的旧数据还在原地。宁可让他重进一次小程序。
+          if (options.noRelogin) {
+            reject(res)
+            return
+          }
           // Prevent infinite relogin loop: only retry once
           if (retryCount >= 1) {
             reject(new Error('认证失败，请重新登录'))
@@ -172,6 +178,10 @@ module.exports = {
   getShare: (token) => request(`/api/shares/${encodeURIComponent(token)}`),
   getShareQRCodeUrl: (token) => `${API_BASE}/api/shares/${token}/qrcode`,
   getWallpaperOptions: () => request('/api/user/wallpaper/options'),
+  getQuota: () => request('/api/user/quota'),
+  // 确认标志必须在服务端看得见的地方，所以是 POST 带 body，不是 DELETE 带 body
+  deactivateAccount: () =>
+    request('/api/user/deactivate', 'POST', { confirm: true }, { noRelogin: true }),
   updateWallpaper: (wallpaper) => request('/api/user/wallpaper', 'PUT', { wallpaper }),
   updateLanguage: (language) => request('/api/user/language', 'PUT', { language }),
 }

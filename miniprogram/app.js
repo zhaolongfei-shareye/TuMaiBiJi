@@ -2,6 +2,19 @@ const { request } = require('./utils/api')
 const { themeOf } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
+// 分享卡片的路径上带着邀请人的 user id（?inviter=123）。落到本地存储是因为它必须活到
+// "这个人真的写下第一篇笔记"那一刻：冷启、热启、从分享卡片直接落到新建页，都只有这里
+// 能一次接住。到底认不认、什么时候给额度，全在服务端判（见 backend/app/services/quota.py）。
+const INVITER_KEY = 'inviterId'
+
+function rememberInviter(options) {
+  const raw = options && options.query ? options.query.inviter : ''
+  const id = parseInt(raw, 10)
+  if (!id || id <= 0) return
+  if (wx.getStorageSync(INVITER_KEY) === id) return
+  wx.setStorageSync(INVITER_KEY, id)
+}
+
 App({
   globalData: {
     userInfo: null,
@@ -11,8 +24,14 @@ App({
     loginPromise: null,
   },
 
-  onLaunch() {
+  onLaunch(options) {
+    rememberInviter(options)
     this.login()
+  },
+
+  // 小程序已经活着的时候点开分享卡片只补发 onShow，不会走 onLaunch。
+  onShow(options) {
+    rememberInviter(options)
   },
 
   getLoginPromise() {
@@ -38,7 +57,10 @@ App({
           fail: reject,
         })
       })
-      const res = await request('/api/auth/wechat', 'POST', { code: loginRes.code })
+      const body = { code: loginRes.code }
+      const inviter = wx.getStorageSync(INVITER_KEY)
+      if (inviter) body.inviter = inviter
+      const res = await request('/api/auth/wechat', 'POST', body)
       this.globalData.token = res.token
       this.globalData.userId = res.user_id
       this.globalData.userInfo = {
@@ -57,6 +79,17 @@ App({
 
   async login() {
     return this.getLoginPromise()
+  },
+
+  // 注销之后本地这一整套都要跟着清掉：留着旧 token 会让每一个请求都去撞 401，
+  // 留着 inviter 会让一个已经注销过的号再去成就别人一次。
+  clearSession() {
+    this.globalData.token = ''
+    this.globalData.userId = ''
+    this.globalData.userInfo = null
+    this.globalData.isLoggedIn = false
+    this.globalData.loginPromise = null
+    wx.removeStorageSync(INVITER_KEY)
   },
 
   getThemeClass(wallpaper) {

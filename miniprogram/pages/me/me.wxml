@@ -13,12 +13,22 @@
        为什么不用"透明按钮盖在一行普通菜单上"那种做法：实测那颗绝对定位的 button
        在这套 flex 行里只量到半行宽（184/332），点右半边不触发——命中面积反而变小了。
        行即按钮，命中面积天然就是整行，也不用再对齐两层。
-       额度与邀请奖励服务端还没做，所以这行只写动作，不写"分享得几篇"这种承诺。 -->
+       右边那句奖励承诺取自 /api/user/quota，服务端认账才写；额度读回来之前留空。 -->
   <view class="menu-group card">
     <button class="menu-item share-row" open-type="share" aria-label="{{t.shareToFriend}}">
       <text class="menu-label">{{t.shareToFriend}}</text>
-      <text class="menu-arrow">›</text>
+      <view class="menu-right">
+        <text class="menu-value">{{shareValue}}</text>
+        <text class="menu-arrow">›</text>
+      </view>
     </button>
+    <!-- 额度这行只能看不能点，所以不给箭头；数字没读回来时整行不占位 -->
+    <view class="menu-item" wx:if="{{quotaText}}">
+      <text class="menu-label">{{t.quotaLabel}}</text>
+      <view class="menu-right">
+        <text class="menu-value">{{quotaText}}</text>
+      </view>
+    </view>
     <view class="menu-item" bindtap="onNavigate" data-page="categories">
       <text class="menu-label">{{t.categories}}</text>
       <text class="menu-arrow">›</text>
@@ -47,6 +57,10 @@
         <text class="menu-value">{{officialAccount}}</text>
         <text class="menu-arrow">›</text>
       </view>
+    </view>
+    <view class="menu-item menu-danger" bindtap="onDeleteAccount">
+      <text class="menu-label">{{t.deleteAccount}}</text>
+      <text class="menu-arrow">›</text>
     </view>
   </view>
 </view>

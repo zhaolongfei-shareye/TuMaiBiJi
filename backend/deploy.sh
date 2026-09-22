@@ -69,6 +69,49 @@ else
     exit 1
 fi
 
+# ---- 1.6 schema 迁移：表和列只有这一条路会长出来 ----
+# main.py 里没有 create_all，测试用例建表走 create_all、线上建表走 alembic，两条路对不上
+# 时测试全绿而线上在第一条写入时报 no such column —— 所以这一步既跑迁移，也按模型点一次名。
+# 放在备份之后：万一迁移出问题，1.5 那份快照就是唯一的回退点。
+echo ""
+echo ">>> 数据库迁移（alembic upgrade head）..."
+echo "  迁移前: $(python -m alembic current 2>&1 | tail -1)"
+if python -m alembic upgrade head 2>&1 | sed 's/^/  /'; then
+    echo "  迁移后: $(python -m alembic current 2>&1 | tail -1)"
+else
+    echo "✗ 迁移失败，终止部署（服务未重启，线上仍是旧版本；库可用 1.5 的快照还原）"
+    exit 1
+fi
+
+python <<'PY'
+from sqlalchemy import create_engine, inspect
+
+from app.core.config import settings
+
+insp = inspect(create_engine(settings.DATABASE_URL))
+cols = {c["name"] for c in insp.get_columns("users")}
+tables = set(insp.get_table_names())
+missing = sorted({"quota_bonus", "invited_by"} - cols)
+if "invitations" not in tables:
+    missing.append("invitations 表")
+if missing:
+    print(f"  ✗ 迁移后仍缺：{'、'.join(missing)} —— 模型和库对不上，第一条写入就会炸")
+    raise SystemExit(1)
+# 邀请台账的幂等是数据库挡的，不是应用层记得住的：唯一约束必须在。
+uniq = [
+    u for u in insp.get_unique_constraints("invitations")
+    if u["column_names"] == ["invitee_id"]
+]
+if not uniq:
+    print("  ✗ invitations.invitee_id 上没有唯一约束，同一个被邀请人可能被结好几次")
+    raise SystemExit(1)
+print("  ✓ users.quota_bonus / users.invited_by / invitations（含 invitee 唯一约束）到位")
+PY
+if [[ $? -ne 0 ]]; then
+    echo "✗ schema 校验未通过，终止部署"
+    exit 1
+fi
+
 # ---- 2. OCR 运行期预检：依赖装没装对，只有真跑一张才知道 ----
 # 放在 restart 之前：这份自检会在独立进程里加载模型（本机两次读数 789.8MB / 816~826MB，
 # 这块常驻开销本身有几十 MB 抖动），失败说明依赖有问题、新代码推上去只会让线上多一个

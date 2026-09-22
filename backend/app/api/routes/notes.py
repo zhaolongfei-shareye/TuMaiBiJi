@@ -8,9 +8,11 @@ from app.db.database import get_db
 from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.core.quota_gate import require_note_room
 from app.core.timefmt import UTCDatetime, UTCDatetimeOrNone
 from app.core.errors import UserError
 from app.services.wechat import enforce_text_safety
+from app.services import quota
 
 router = APIRouter()
 
@@ -144,7 +146,7 @@ def get_note(
 def create_note(
     note: NoteCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_note_room),
 ):
     from app.models.category import Category
     
@@ -164,6 +166,7 @@ def create_note(
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
+    quota.credit_first_note(db_note, db, user)
     return db_note
 
 

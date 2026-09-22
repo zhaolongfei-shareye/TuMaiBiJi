@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.database import get_db
 from app.models.user import User
+from app.services import quota
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ def get_current_user(
     return user
 
 
-async def login_or_register(code: str, db: Session) -> tuple[User, str]:
+async def login_or_register(code: str, db: Session, inviter: int | None = None) -> tuple[User, str]:
     data = await _wechat_code2session(code)
     openid = data["openid"]
 
@@ -96,6 +97,11 @@ async def login_or_register(code: str, db: Session) -> tuple[User, str]:
         db.add(user)
         db.commit()
         db.refresh(user)
+
+    # 归因放在拿到 user 之后、发token之前：新老用户都会走到这一行，attribute_inviter
+    # 内部自己判"要不要认"（已有归属、名下已有笔记、自己邀自己都不认）。
+    if inviter is not None:
+        quota.attribute_inviter(user, db, inviter)
 
     token = _create_token(user.id)
     return user, token
