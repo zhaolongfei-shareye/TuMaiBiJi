@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     HUNYUAN_CF_TIMEOUT: float = 90.0
     WECHAT_APP_ID: str = ""
     WECHAT_APP_SECRET: str = ""
+    # 内容安全（msgSecCheck）总开关。生产必须为 true；测试环境关掉是为了**根本不出网**
+    # （conftest 里那条不变量），而不是为了让用例好写——部署自检会拿一段已知违规的
+    # 文本打一次，断言必须被拦下来，所以这里不存在"关了也没人发现"的静默失效。
+    SEC_CHECK_ENABLED: bool = True
     REDIS_URL: str = "redis://localhost:6379"
     CORS_ORIGINS: str = "*"
     JWT_SECRET_KEY: str = ""

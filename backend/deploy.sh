@@ -222,6 +222,48 @@ elif deg_missing:
         print(f"     - {d}")
 PY
 
+# ---- 9. 内容安全端到端自检 ----
+# 这条必须是"真打一次"而不是"看配置有没有"：代码里 unavailable 一律放行（不能让微信侧
+# 抖动变成用户存不了笔记），所以一旦 openid 传错、凭据失效或接口没开通，机制会**静默失效**，
+# 只有这里能发现。断言两头：正常文本要 pass，已知违规文本必须被判下来。
+echo ""
+echo ">>> 内容安全自检（真打 msgSecCheck）..."
+python <<'PY'
+import sqlite3
+
+from app.core.config import settings
+from app.services.wechat import check_text
+
+if not settings.SEC_CHECK_ENABLED:
+    print("  ✗ SEC_CHECK_ENABLED=false —— 生产环境内容安全被关掉，公开出口等于没有过滤")
+    raise SystemExit(1)
+
+db = sqlite3.connect(settings.DATABASE_URL.split(":///")[-1] if "sqlite" in settings.DATABASE_URL else "")
+row = db.execute("select openid from users order by id desc limit 1").fetchone()
+db.close()
+if not row or not row[0]:
+    print("  ✗ 库里取不到任何 openid，无法自检（msgSecCheck v2 的 openid 是必填）")
+    raise SystemExit(1)
+openid = row[0]
+print(f"  用最新一个账号的 openid 自检（长度 {len(openid)}，值不打印）")
+
+ok_pass = check_text(openid, "厦门三日路线：鼓浪屿要早去早回，傍晚去沙坡尾拍照。")
+ok_risky = check_text(openid, "线上赌场 六合彩 特码 内部资料 稳赚 下注网址")
+print(f"  正常文本 → {ok_pass}；已知违规文本 → {ok_risky}")
+
+bad = []
+if ok_pass != "pass":
+    bad.append(f"正常文本被判成 {ok_pass}（接口或凭据有问题）")
+if ok_risky not in ("risky", "review"):
+    bad.append(f"违规文本没被判下来（{ok_risky}）——内容安全机制实际没在生效")
+if bad:
+    for b in bad:
+        print(f"  ✗ {b}")
+    raise SystemExit(1)
+print("  ✓ 内容安全在生效：正常放行、违规拦得下")
+PY
+[[ $? -eq 0 ]] || RC=1
+
 echo ""
 if [[ "$RC" -eq 0 ]]; then
     echo "=== 部署完成：服务已由 systemd 重启并确认为新进程 ==="

@@ -30,6 +30,9 @@ os.environ["HUNYUAN_CF_URL"] = FAKE_CF_URL
 os.environ["HUNYUAN_CF_KEY"] = PLACEHOLDER_CF_KEY
 os.environ["WECHAT_APP_ID"] = FAKE_WECHAT_APP_ID
 os.environ["WECHAT_APP_SECRET"] = FAKE_WECHAT_APP_SECRET
+# 内容安全同理：这套用例一条出网请求都不该发。生产不走这个分支——见 config 里那条注释，
+# 部署自检会拿真凭据打一次已知违规的文本，断言必须被拦下。
+os.environ["SEC_CHECK_ENABLED"] = "false"
 
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))

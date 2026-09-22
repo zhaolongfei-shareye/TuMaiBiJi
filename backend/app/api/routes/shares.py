@@ -13,7 +13,7 @@ from app.db.database import get_db
 from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
-from app.services.wechat import get_qr_code_image
+from app.services.wechat import enforce_text_safety, get_qr_code_image
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,21 @@ def create_share(
     )
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
+
+    # 分享是这条笔记第一次"别人也能看到"的时刻，所以公开出口在这里被过滤，
+    # 而不是在抓取/识别那一步——外部原文里出现一个敏感词，不该让笔记存不下来。
+    try:
+        enforce_text_safety(
+            user.openid,
+            note.title,
+            note.summary,
+            note.tags,
+            note.key_points,
+            note.content,
+            note.original_content,
+        )
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     token = secrets.token_urlsafe(16)
     share = Share(

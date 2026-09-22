@@ -8,8 +8,32 @@ from app.db.database import get_db
 from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.core.errors import UserError
+from app.services.wechat import enforce_text_safety
 
 router = APIRouter()
+
+
+def _guard_manual_text(user: User, note) -> None:
+    """用户自己写的内容在落库前过一遍微信内容安全；命中违规回 400 + 中文。
+
+    只卡 manual：链接抓取和截图识别带进来的是外部原文，一篇旧文章里出现一个
+    敏感词就让整条笔记存不下来，是误伤。真正需要过滤的是"公开可见"那一刻，
+    所以那条放在创建分享里（shares.create_share 会校验整条笔记）。
+    """
+    if getattr(note, "source_type", None) != "manual":
+        return
+    try:
+        enforce_text_safety(
+            user.openid,
+            getattr(note, "title", None),
+            getattr(note, "summary", None),
+            getattr(note, "key_points", None),
+            getattr(note, "tags", None),
+            getattr(note, "content", None),
+        )
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 class NoteBrief(BaseModel):
@@ -132,7 +156,9 @@ def create_note(
         )
         if not category:
             raise HTTPException(status_code=400, detail="分类不存在或无权使用")
-    
+
+    _guard_manual_text(user, note)
+
     db_note = Note(**note.model_dump(), user_id=str(user.id))
     db.add(db_note)
     db.commit()
@@ -168,9 +194,18 @@ def update_note(
         )
         if not category:
             raise HTTPException(status_code=400, detail="分类不存在或无权使用")
-    
+
     for key, value in update_data.items():
         setattr(db_note, key, value)
+
+    # 复检必须在赋值之后：要检的是"这次改完之后的样子"，不是改之前的旧正文。
+    # 被拦下时显式 rollback，否则脏对象还挂在会话上。
+    if any(k in update_data for k in ("title", "summary", "key_points", "tags", "content")):
+        try:
+            _guard_manual_text(user, db_note)
+        except HTTPException:
+            db.rollback()
+            raise
     db.commit()
     db.refresh(db_note)
     return db_note
