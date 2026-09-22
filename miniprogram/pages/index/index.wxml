@@ -1,5 +1,9 @@
 <view class="container {{themeClass}}">
-  <view class="page-title">{{t.notesHeading}}</view>
+  <view class="page-head">
+    <view class="page-title">{{t.notesHeading}}</view>
+    <!-- 三个数按全量算，不受搜索词和分类筛选影响 -->
+    <text class="page-stats" wx:if="{{statsText}}">{{statsText}}</text>
+  </view>
 
   <!-- 搜索条：一块饱和色，里面只有一条横线——输入框不再有"盒子"，
        字直接坐在色块上，靠一条下划线表示可写。右侧"搜索笔记"是纯文字动作，

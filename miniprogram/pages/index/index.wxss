@@ -1,10 +1,26 @@
-/* 页标题：字号字重与新建页「选择一种方式」那一行完全一致 */
+/* 页头：左边大标题，右边三个数。标题本身的字号字重与新建页「选择一种方式」一致，
+   只是这里被包进一条 flex 行，所以外边距交给 .page-head 统一给。 */
+.page-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin: var(--sp-5) 0 var(--sp-4);
+}
+
 .page-title {
   font-size: var(--fs-h1);
   font-weight: 700;
   letter-spacing: -1rpx;
   color: var(--text-primary);
-  margin: var(--sp-5) 0 var(--sp-4);
+}
+
+.page-stats {
+  flex: none;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: -0.2rpx;
+  color: var(--text-secondary);
 }
 
 /* ---------- 搜索条 ----------
@@ -43,24 +59,24 @@
   opacity: 0.42;
 }
 
+/* 字号与新建页那条"标题"输入框完全一致（app.wxss 的 .face-input：--fs-body、不加粗）。
+   这条线上的字是用户输入的内容，不是标题，比它大只会把色卡压成一块背景板。 */
 .sc-input {
   flex: 1;
   min-width: 0;
-  font-size: var(--fs-title);
-  font-weight: 700;
+  font-size: var(--fs-body);
   color: var(--blk-ink);
 }
 
 .sc-ph {
   color: var(--blk-ink);
-  opacity: 0.62;
-  font-weight: 600;
+  opacity: 0.6;
 }
 
 .sc-x {
   flex: none;
   padding: 0 6rpx;
-  font-size: var(--fs-body);
+  font-size: var(--fs-meta);
   opacity: 0.7;
 }
 

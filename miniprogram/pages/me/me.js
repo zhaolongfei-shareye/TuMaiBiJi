@@ -1,6 +1,5 @@
 const app = getApp()
 const { t, texts } = require('../../utils/i18n.js')
-const { toneStyle } = require('../../utils/palette.js')
 
 const LANG_MAP = { zh: '中文', en: 'English' }
 
@@ -16,8 +15,6 @@ Page({
     t: texts('zh'),
     contactEmail: CONTACT_EMAIL,
     officialAccount: OFFICIAL_ACCOUNT,
-    // 分享行那颗小色块：与首页搜索条、新建页 URL 卡同一块蓝，颜色仍只从 palette 出
-    shareSkin: toneStyle(1),
   },
 
   onShow() {

@@ -3,6 +3,19 @@ const { t, texts } = require('../../utils/i18n.js')
 const { blockSkinFor, toneVars, toneStyle } = require('../../utils/palette.js')
 const { formatShortDate } = require('../../utils/date.js')
 
+// 统计看板一次读多少条：后端 /api/notes 的 limit 上限就是 100，
+// 而计划中的额度也正好是 100 篇，所以这一趟能覆盖"全部"。
+// 真到了一百篇，总数只能显示"100+"——接口没给 count，不能假装知道。
+const STATS_LIMIT = 100
+
+// 周一为一周起点（国内习惯）。用"本地零点"而不是把毫秒减 7 天，
+// 否则跨月的那几天会算错。
+function startOfWeek(now) {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
   web_article: 'sourceWebArticle',
@@ -24,6 +37,8 @@ Page({
     limit: 50,
     hasMore: true,
     loadingMore: false,
+    // 「我的笔记」右上角那三个数：本周 / 本月 / 总数
+    statsText: '',
     // 搜索卡那一整块色：跟新建页那张 URL 卡同一个发色函数、同一块蓝，颜色仍只从 palette 出
     searchSkin: toneStyle(1),
   },
@@ -44,9 +59,40 @@ Page({
       this.getTabBar().setData({ selected: 1 })
     }
     this.loadCategories()
+    this.loadStats()
     // onShow 每次切回该 tab 都会触发，必须 reset：否则非 reset 分支会把结果追加到旧列表上，
     // 同一条笔记被贴两遍。
     this.loadNotes(true)
+  },
+
+  // 统计走一趟不带筛选条件的全量读：列表那一趟是按搜索词和分类过滤过的，
+  // 拿它算出来的"总数"其实是"当前筛出来的条数"，会被搜索框里的词改数。
+  async loadStats() {
+    const lang = this.data.lang
+    try {
+      const all = await api.getNotes(0, STATS_LIMIT)
+      const now = new Date()
+      const ws = startOfWeek(now)
+      const ms = new Date(now.getFullYear(), now.getMonth(), 1)
+      // 时间按客户端本地解释，和列表方块上那个 MM-DD 用的是同一条转换
+      // （utils/date.js 里也是 new Date(created_at)）——看板必须和它下面那些日期对得上，
+      // 所以这里不另起一套时区口径。
+      let week = 0
+      let month = 0
+      all.forEach((n) => {
+        const d = new Date(n.created_at)
+        if (d >= ws) week++
+        if (d >= ms) month++
+      })
+      const total = all.length >= STATS_LIMIT ? `${STATS_LIMIT}+` : all.length
+      this.setData({
+        // 分隔符两侧各留一个全角空格：半角空格在这行字号下几乎看不出来，三段会糊成一串数字
+        statsText: `${t('statWeek', lang)}：${week}　|　${t('statMonth', lang)}：${month}　|　${t('statTotal', lang)}：${total}`,
+      })
+    } catch (err) {
+      // 这三个数是装饰，拿不到就整块不显示，绝不能把列表一起拖挂
+      console.error('加载统计失败', err)
+    }
   },
 
   async loadCategories() {

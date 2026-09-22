@@ -16,10 +16,7 @@
        额度与邀请奖励服务端还没做，所以这行只写动作，不写"分享得几篇"这种承诺。 -->
   <view class="menu-group card">
     <button class="menu-item share-row" open-type="share" aria-label="{{t.shareToFriend}}">
-      <view class="menu-left">
-        <view class="blk dot" style="{{shareSkin}}"><text class="dot-name">荐</text></view>
-        <text class="menu-label">{{t.shareToFriend}}</text>
-      </view>
+      <text class="menu-label">{{t.shareToFriend}}</text>
       <text class="menu-arrow">›</text>
     </button>
     <view class="menu-item" bindtap="onNavigate" data-page="categories">
