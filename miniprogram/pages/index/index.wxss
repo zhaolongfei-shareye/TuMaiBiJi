@@ -1,59 +1,59 @@
-.search-input {
-  flex: 1;
-  font-size: var(--fs-body);
+/* 页标题：字号字重与新建页「选择一种方式」那一行完全一致 */
+.page-title {
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -1rpx;
   color: var(--text-primary);
+  margin: var(--sp-5) 0 var(--sp-4);
 }
 
-.search-go {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  margin-left: var(--sp-1);
-  flex: none;
-}
-
-/* 色块圆点：底色和字色由 palette.toneStyle(1) 发下来（--blk-bg / --blk-ink），
-   跟新建页那三张卡是同一组蓝。放大镜几何取自 Lucide v1.50.0（ISC），
-   同样只把 SVG 当遮罩用，所以颜色不会在这里出现第二份。 */
-.go-dot {
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 50%;
+/* ---------- 搜索卡 ----------
+   底色 / 面 / 按钮色全由 palette.toneStyle(1) 发下来（--blk-bg / --face / --solid-bg），
+   输入框和按钮本身用 app.wxss 里那份共享定义——和新建页是同一份 CSS，不是"照着再写一遍"。
+   字阶也向新建页看齐：功能名 46rpx，搜索是这一屏的主角，不是一行小灰字。 */
+.sc-card {
   background: var(--blk-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: var(--blk-ink);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-3);
 }
 
-.go-glyph {
-  width: 26rpx;
-  height: 26rpx;
-  background: var(--blk-ink);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+/* 卡不是整块点下去的按钮（点它是为了打字），所以不跟着 .card 一起缩放 */
+.sc-card:active {
+  transform: none;
 }
 
-.go-label {
-  font-size: var(--fs-label);
+.sc-body {
+  position: relative;
+  z-index: 1;
+}
+
+.sc-label {
+  font-size: 46rpx;
   font-weight: 800;
-  letter-spacing: 1rpx;
-  color: var(--blk-bg);
+  letter-spacing: -1rpx;
+  line-height: var(--lh-tight);
+  opacity: 0.96;
 }
 
-.clear-icon {
-  font-size: var(--fs-title);
-  margin-left: var(--sp-1);
-  color: var(--text-tertiary);
+.sc-desc {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-tight);
+  opacity: 0.72;
+  margin-top: 10rpx;
 }
 
-.search-bar {
-  margin: var(--sp-2) 0 var(--sp-3);
+/* 放大镜水印：几何取自 Lucide v1.50.0（ISC），和新建页那三个图形同一套 24 格、
+   同一描边重量。形状压在卡底，颜色仍只是一块 var(--blk-glyph)。
+   比新建页那三个小一档、也更往外推：这张卡的输入框和按钮是通栏的，
+   264rpx 的圈会正好压在框内那颗清空 ✕ 底下，两样东西叠在一起就都读不清了。 */
+.glyph-search {
+  width: 188rpx;
+  height: 188rpx;
+  right: -54rpx;
+  bottom: -64rpx;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
 }
 
 .category-scroll {

@@ -22,7 +22,7 @@
           />
           <view wx:if="{{urlInput}}" class="face-x" catchtap="clearUrl">✕</view>
         </view>
-        <view class="entry-acts">
+        <view class="acts">
           <view class="act ghost" catchtap="pasteUrl">{{t.paste}}</view>
           <view class="act {{urlHint === 'ok' && !busy ? 'solid' : 'off'}}" catchtap="submitUrl">{{busy === 'url' ? t.busyExtract : t.save}}</view>
         </view>
@@ -58,7 +58,7 @@
             <view class="pk-hint">{{t.fromAlbumHint}}</view>
           </view>
         </view>
-        <view class="entry-acts">
+        <view class="acts">
           <view wx:if="{{previewImages.length}}" class="act ghost" catchtap="clearShots">{{t.clear}}</view>
           <view class="act {{previewImages.length && !busy ? 'solid' : 'off'}}" catchtap="submitScreenshots">{{busy === 'shot' ? t.busyExtract : t.startExtract}}</view>
         </view>
@@ -88,7 +88,7 @@
           maxlength="2000"
           bindinput="onWriteBody"
         />
-        <view class="entry-acts">
+        <view class="acts">
           <view class="act ghost" catchtap="cancelWrite">{{t.cancel}}</view>
           <view class="act {{busy === 'write' ? 'off' : 'solid'}}" catchtap="saveManual">{{busy === 'write' ? t.busySave : t.save}}</view>
         </view>

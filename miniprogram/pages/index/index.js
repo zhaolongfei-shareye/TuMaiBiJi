@@ -24,7 +24,7 @@ Page({
     limit: 50,
     hasMore: true,
     loadingMore: false,
-    // 搜索按钮那颗色块圆点：跟新建页三张入口卡用同一个发色函数，颜色仍只从 palette 出
+    // 搜索卡那一整块色：跟新建页那张 URL 卡同一个发色函数、同一块蓝，颜色仍只从 palette 出
     searchSkin: toneStyle(1),
   },
 

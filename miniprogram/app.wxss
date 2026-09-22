@@ -348,15 +348,6 @@ page {
 }
 
 /* ---------- chrome ---------- */
-.search-bar {
-  display: flex;
-  align-items: center;
-  background: var(--bg-card);
-  border: var(--w-edge) solid var(--card-edge);
-  border-radius: var(--r-pill);
-  padding: var(--sp-3) var(--sp-4);
-}
-
 .chip {
   display: inline-block;
   padding: 14rpx 28rpx;
@@ -401,4 +392,97 @@ page {
   font-weight: 600;
   padding: var(--sp-3) 0;
   text-align: center;
+}
+
+/* ---------- 卡内控件的面 ----------
+   饱和色大卡里的输入框、按钮、多行区长什么样。--face / --face-ink / --solid-bg /
+   --solid-ink 由 utils/palette.js 的 toneStyle 按这块色的深浅发下来，这里只写形状。
+   深底卡（蓝）用半透明白面，亮底卡（橙/黄）用近白面 + 该卡墨色字。
+
+   这份定义从 pages/create 提到全局，是因为首页的搜索卡要用同一套控件：
+   两个页面各写一遍，早晚会走样成两种输入框，而"和新建那几张卡一致"恰恰是要求本身。 */
+.face-box {
+  display: flex;
+  align-items: center;
+  height: 88rpx;
+  margin-top: 26rpx;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-btn);
+  background: var(--face);
+  color: var(--face-ink);
+}
+
+.face-input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-body);
+  color: var(--face-ink);
+}
+
+.face-ph {
+  color: var(--face-ink);
+  opacity: 0.5;
+}
+
+.face-x {
+  flex: none;
+  padding: 0 8rpx;
+  font-size: var(--fs-meta);
+  opacity: 0.6;
+}
+
+.face-area {
+  width: 100%;
+  height: 180rpx;
+  margin-top: 16rpx;
+  padding: 18rpx var(--sp-3);
+  box-sizing: border-box;
+  border-radius: var(--r-btn);
+  background: var(--face);
+  color: var(--face-ink);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.acts {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: 20rpx;
+}
+
+.act {
+  flex: 1;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.act.ghost { background: var(--face); color: var(--face-ink); }
+.act.solid { background: var(--solid-bg); color: var(--solid-ink); }
+/* 不可用：面变薄、字变淡，且和 solid 的差别一眼看得出来，不靠文字解释 */
+.act.off { background: var(--face-off); color: var(--face-off-ink); }
+
+/* ---------- 卡底功能图形 ----------
+   几何取自 Lucide v1.50.0（ISC）：这里只放公共的"怎么把一张 SVG 变成压在水印位置的色"，
+   具体形状（mask-image）由各页自己给。图形本体是一块 var(--blk-glyph) 的色，
+   SVG 只当遮罩用，所以换分类色时图形跟着变，颜色不会在 WXSS 里出现第二份。 */
+.glyph {
+  position: absolute;
+  right: -30rpx;
+  bottom: -46rpx;
+  width: 264rpx;
+  height: 264rpx;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--blk-glyph);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
 }
