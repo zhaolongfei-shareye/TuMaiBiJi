@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.core.timefmt import UTCDatetime, UTCDatetimeOrNone
 from app.core.errors import UserError
 from app.services.wechat import enforce_text_safety
 
@@ -45,7 +46,7 @@ class NoteBrief(BaseModel):
     source_url: str | None
     category_id: int | None
     is_pinned: bool
-    created_at: datetime
+    created_at: UTCDatetime
 
     class Config:
         from_attributes = True
@@ -56,7 +57,7 @@ class NoteDetail(NoteBrief):
     key_links: list | None
     content: str | None
     original_content: str | None
-    updated_at: datetime | None
+    updated_at: UTCDatetimeOrNone
 
 
 class NoteCreate(BaseModel):

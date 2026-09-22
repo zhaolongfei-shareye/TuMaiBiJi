@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.core.errors import UserError
+from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
 from app.models.note import Note
 from app.models.share import Share
@@ -30,7 +31,7 @@ class ShareResponse(BaseModel):
     summary: str | None
     tags: list | None
     key_links: list | None
-    created_at: datetime
+    created_at: UTCDatetime
 
     class Config:
         from_attributes = True

@@ -8,6 +8,7 @@ from app.models.category import Category
 from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.core.timefmt import UTCDatetime
 
 router = APIRouter()
 
@@ -17,7 +18,7 @@ class CategoryResponse(BaseModel):
     name: str
     color: str
     sort_order: int
-    created_at: datetime
+    created_at: UTCDatetime
 
     class Config:
         from_attributes = True

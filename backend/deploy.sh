@@ -37,6 +37,38 @@ else
     exit 1
 fi
 
+# ---- 1.5 系统库预检 + 数据库快照 ----
+# libGL / libglib 是当时手工 apt 装的，不在任何脚本里：换机器或重装系统后 opencv 会
+# 以 "ImportError: libGL.so.1" 复发（R13）。先查这两样，缺了就停下给命令，
+# 别让下面那个 OCR 预检抛一句看不懂的 import 错。
+echo ""
+echo ">>> 系统库预检（opencv 运行期依赖）..."
+MISS=""
+ldconfig -p 2>/dev/null | grep -q 'libGL\.so\.1' || MISS="$MISS libgl1"
+ldconfig -p 2>/dev/null | grep -q 'libglib-2\.0\.so\.0' || MISS="$MISS libglib2.0-0"
+if [[ -n "$MISS" ]]; then
+    echo "✗ 缺系统库：${MISS# }"
+    echo "  先装再部署：sudo apt-get install -y${MISS}"
+    exit 1
+fi
+echo "✓ libGL / libglib 在位"
+
+# 重启前给数据库留一份可恢复的快照。deploy.sh 本身不跑迁移，但一旦这次带上去的代码
+# 有意外（比如误删数据的路径），这份就是唯一能回头的东西；备不出来就别重启。
+echo ""
+echo ">>> 重启前数据库快照..."
+if [[ -x "$PROJECT_DIR/backup.sh" ]]; then
+    if "$PROJECT_DIR/backup.sh" | sed 's/^/  /'; then
+        echo "✓ 快照与恢复演练通过"
+    else
+        echo "✗ 备份/恢复演练失败，终止部署（服务未重启，线上仍是旧版本）"
+        exit 1
+    fi
+else
+    echo "✗ 找不到 $PROJECT_DIR/backup.sh，终止部署（不允许在没有回退点的情况下重启）"
+    exit 1
+fi
+
 # ---- 2. OCR 运行期预检：依赖装没装对，只有真跑一张才知道 ----
 # 放在 restart 之前：这份自检会在独立进程里加载模型（本机两次读数 789.8MB / 816~826MB，
 # 这块常驻开销本身有几十 MB 抖动），失败说明依赖有问题、新代码推上去只会让线上多一个

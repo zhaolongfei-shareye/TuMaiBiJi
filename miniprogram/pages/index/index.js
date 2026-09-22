@@ -65,6 +65,16 @@ Page({
     this.loadNotes(true)
   },
 
+  // 下拉刷新：人停在列表页不动时 onShow 不会再触发，采集在后台完成的那条就一直不出现。
+  // 三趟一起等完再收菊花，否则下拉框还转着、列表已经换了一批，看着像没刷出来。
+  async onPullDownRefresh() {
+    try {
+      await Promise.all([this.loadCategories(), this.loadStats(), this.loadNotes(true)])
+    } finally {
+      wx.stopPullDownRefresh()
+    }
+  },
+
   // 统计走一趟不带筛选条件的全量读：列表那一趟是按搜索词和分类过滤过的，
   // 拿它算出来的"总数"其实是"当前筛出来的条数"，会被搜索框里的词改数。
   async loadStats() {
