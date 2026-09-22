@@ -266,6 +266,32 @@ class Test邀请到账:
         assert inviter.quota_bonus == 0
         assert db.query(Invitation).count() == 0
 
+    def test_自己指向自己的台账也不结(self, db):
+        """登录那条路写不出这种状态（attribute_inviter 先拒），但结钱不该依赖上游不漏。
+
+        集成探针就是直接改库摆出这个状态时把它抓出来的。
+        """
+        u = mk_user(db, "self-credit")
+        u.invited_by = u.id
+        db.commit()
+        note = Note(user_id=str(u.id), title="自己的第一篇", source_type="manual")
+        db.add(note)
+        db.commit()
+        assert quota.credit_first_note(note, db, u) == 0
+        db.refresh(u)
+        assert u.quota_bonus == 0
+        assert db.query(Invitation).count() == 0
+
+    def test_指向不存在账号的归因不结也不报错(self, db):
+        u = mk_user(db, "ghost-credit")
+        u.invited_by = 987654
+        db.commit()
+        note = Note(user_id=str(u.id), title="第一篇", source_type="manual")
+        db.add(note)
+        db.commit()
+        assert quota.credit_first_note(note, db, u) == 0
+        assert db.query(Invitation).count() == 0
+
     def test_邀请人次数上限封住收益(self, client, db, monkeypatch):
         monkeypatch.setattr(quota, "BASE_QUOTA", 100)
         inviter = mk_user(db, "cap-inviter")

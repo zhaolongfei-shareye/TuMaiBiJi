@@ -111,7 +111,9 @@ def credit_first_note(note: Note, db: Session, user: User) -> int:
         return 0
 
     inviter = db.get(User, user.invited_by)
-    if inviter is None:
+    if inviter is None or inviter.id == user.id:
+        # 自己指向自己这种状态，登录那条路（attribute_inviter）本来就写不出来；
+        # 这里再挡一次是因为结钱的判定不该依赖"上游不会漏"。
         return 0
     if rewarded_invites(db, inviter.id) >= MAX_REWARDED_INVITES:
         logger.info("邀请奖励已达上限，未到账：inviter=%s invitee=%s", inviter.id, user.id)
