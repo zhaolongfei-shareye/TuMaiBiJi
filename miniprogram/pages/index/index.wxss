@@ -8,13 +8,15 @@
 }
 
 /* ---------- 搜索条 ----------
-   矮到一行：上下各 16rpx 的留白 + 88rpx 的控件，总高比新建页那三张卡折叠时（144rpx）还矮。
-   底色由 palette.toneStyle(1) 发下来，和新建页 URL 卡同一块蓝；输入框和按钮用 app.wxss
-   里那份共享定义，这里只把它们摆成一行，并给按钮改宽度（.act 默认 flex:1 是通栏用的）。 */
+   一块饱和色 + 一条横线。输入框不再有"面"（原来那层半透明白盒子撤了），
+   字直接坐在卡色上，靠一条下划线表示这里能写；"搜索笔记"是线上的纯文字动作，
+   不是按钮——同"获取验证码"那种做法。底色仍由 palette.toneStyle(1) 发下来。
+   横线单独画一个元素而不是 border-bottom：这样能给它自己的透明度，
+   又不会连带把字也调淡，而且颜色仍只是 --blk-ink 的一份，不引入第二个色值。 */
 .sc-card {
   background: var(--blk-bg);
   color: var(--blk-ink);
-  padding: var(--sp-2) var(--sp-3);
+  padding: 26rpx var(--sp-3) 20rpx;
   margin-bottom: var(--sp-3);
 }
 
@@ -23,21 +25,57 @@
   transform: none;
 }
 
-.sc-row {
+.sc-line {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  height: 64rpx;
 }
 
-.sc-box {
+.sc-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3rpx;
+  background: var(--blk-ink);
+  opacity: 0.42;
+}
+
+.sc-input {
   flex: 1;
   min-width: 0;
-  margin-top: 0;
+  font-size: var(--fs-title);
+  font-weight: 700;
+  color: var(--blk-ink);
 }
 
-.sc-btn {
+.sc-ph {
+  color: var(--blk-ink);
+  opacity: 0.62;
+  font-weight: 600;
+}
+
+.sc-x {
   flex: none;
-  padding: 0 var(--sp-3);
+  padding: 0 6rpx;
+  font-size: var(--fs-body);
+  opacity: 0.7;
+}
+
+/* 线上的文字动作：没有底色、没有圆角框，靠字重和位置表示可点 */
+.sc-go {
+  flex: none;
+  padding-left: var(--sp-1);
+  font-size: var(--fs-title);
+  font-weight: 800;
+  letter-spacing: -0.5rpx;
+  color: var(--blk-ink);
+}
+
+.sc-go:active {
+  opacity: 0.66;
 }
 
 .category-scroll {

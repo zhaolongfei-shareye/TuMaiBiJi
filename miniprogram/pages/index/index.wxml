@@ -1,25 +1,23 @@
 <view class="container {{themeClass}}">
   <view class="page-title">{{t.notesHeading}}</view>
 
-  <!-- 搜索条：矮到只有一行，和新建页那三张卡折叠时同一个体量。
-       卡上唯一的文字就是按钮那几个字——标题行和"能搜到哪些字段"那行小字都撤了，
-       这一屏的空间要让给笔记本身。输入框和按钮并排，共用 app.wxss 里那份
-       .face-box / .act 定义，所以和新建页的输入框、"保存"按钮是同一种控件。 -->
+  <!-- 搜索条：一块饱和色，里面只有一条横线——输入框不再有"盒子"，
+       字直接坐在色块上，靠一条下划线表示可写。右侧"搜索笔记"是纯文字动作，
+       不是按钮（同"获取验证码"那种做法）。底色仍与新建页 URL 卡同一块蓝。 -->
   <view class="card sc-card" style="{{searchSkin}}">
-    <view class="sc-row">
-      <view class="face-box sc-box">
-        <input
-          class="face-input"
-          value="{{searchKeyword}}"
-          placeholder="{{t.searchPh}}"
-          placeholder-class="face-ph"
-          confirm-type="search"
-          bindinput="onSearchInput"
-          bindconfirm="onSearchConfirm"
-        />
-        <view wx:if="{{searchKeyword}}" class="face-x" catchtap="clearSearch">✕</view>
-      </view>
-      <view class="act solid sc-btn" bindtap="onSearchConfirm">{{t.search}}</view>
+    <view class="sc-line">
+      <input
+        class="sc-input"
+        value="{{searchKeyword}}"
+        placeholder="{{t.searchPh}}"
+        placeholder-class="sc-ph"
+        confirm-type="search"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchConfirm"
+      />
+      <view wx:if="{{searchKeyword}}" class="sc-x" catchtap="clearSearch">✕</view>
+      <view class="sc-go" catchtap="onSearchConfirm">{{t.search}}</view>
+      <view class="sc-rule"></view>
     </view>
   </view>
 
