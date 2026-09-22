@@ -8,14 +8,20 @@
     </view>
   </view>
 
-  <!-- 额度、邀请奖励这些服务端还没拦，界面上就先不写数字和"多 10 篇"这种承诺。
-       分享按钮本身是真的，所以只留动作。 -->
-  <view class="share-card card">
-    <text class="share-hint">{{t.shareHint}}</text>
-    <button class="share-btn" open-type="share">{{t.shareToFriend}}</button>
-  </view>
-
+  <!-- 分享入口退化成菜单里的一行：这一行本身就是 button[open-type=share]，
+       点它直接弹微信原生分享面板。
+       为什么不用"透明按钮盖在一行普通菜单上"那种做法：实测那颗绝对定位的 button
+       在这套 flex 行里只量到半行宽（184/332），点右半边不触发——命中面积反而变小了。
+       行即按钮，命中面积天然就是整行，也不用再对齐两层。
+       额度与邀请奖励服务端还没做，所以这行只写动作，不写"分享得几篇"这种承诺。 -->
   <view class="menu-group card">
+    <button class="menu-item share-row" open-type="share" aria-label="{{t.shareToFriend}}">
+      <view class="menu-left">
+        <view class="blk dot" style="{{shareSkin}}"><text class="dot-name">荐</text></view>
+        <text class="menu-label">{{t.shareToFriend}}</text>
+      </view>
+      <text class="menu-arrow">›</text>
+    </button>
     <view class="menu-item" bindtap="onNavigate" data-page="categories">
       <text class="menu-label">{{t.categories}}</text>
       <text class="menu-arrow">›</text>

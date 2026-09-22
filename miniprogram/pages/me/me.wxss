@@ -35,43 +35,58 @@
   color: var(--text-secondary);
 }
 
-/* ---------- 分享卡 ---------- */
-.share-card {
-  padding: var(--sp-4);
-}
-
-.share-hint {
-  display: block;
-  font-size: var(--fs-meta);
-  line-height: var(--lh-tight);
-  color: var(--text-secondary);
-  margin-bottom: var(--sp-3);
-}
-
-/* 小程序 button 默认带一堆样式，这里全部推平，只当一块可点的主按钮用。
-   配色跟 .btn-primary 同一对（--accent 底 + --bg-page 字）：不能用 --bg-card，
-   深色壁纸下它是半透明白，压在亮色按钮上等于把字抹掉。 */
-.share-btn {
+/* ---------- 分享行 ----------
+   入口退化成菜单里的一行：这一行本身就是 button[open-type=share]，
+   所以要把小程序 button 的那堆默认样式（灰底、圆角、::after 描边、居中、行高）全部推平，
+   让它和下面四行列表项长得一模一样——一个按钮态混进来就把节奏打断了。
+   选择器写成 .menu-item.share-row：两条规则同为单类时后写的赢，
+   .menu-item 在这个文件里更靠后，不加类名组合就会被它的 padding 盖掉。 */
+.menu-item.share-row {
   margin: 0;
-  padding: 0;
-  height: 88rpx;
-  line-height: 88rpx;
+  /* 上下 24rpx：色块 52rpx 比一行字高，用别的行的 30rpx 会把整行顶高 7px */
+  padding: 24rpx 0;
   width: 100%;
-  border-radius: var(--r-pill);
-  background: var(--accent);
-  color: var(--bg-page);
+  box-sizing: border-box;
+  border: none;
+  border-bottom: var(--w-edge) solid var(--card-edge);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
   font-size: var(--fs-body);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  text-align: left;
+  letter-spacing: -0.3rpx;
+  white-space: normal;
+}
+
+.menu-item.share-row::after {
+  border: none;
+}
+
+.menu-item.share-row:active {
+  background: var(--accent-soft);
+}
+
+.menu-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+/* 52rpx 的小色块里只放一个汉字（项目没有 iconfont，单个汉字在苹方下必定出得来）。
+   .blk 基础样式是"上下两端对齐"（给行卡的分类名 + 日期用的），这里只有一个字，
+   所以要改成居中，否则字会顶在色块上沿。 */
+.share-row .blk.dot {
+  align-items: center;
+  justify-content: center;
+}
+
+.dot-name {
+  font-size: 26rpx;
   font-weight: 800;
-  letter-spacing: -0.4rpx;
-  border: none;
-}
-
-.share-btn::after {
-  border: none;
-}
-
-.share-btn:active {
-  opacity: 0.86;
+  line-height: 1;
 }
 
 .menu-group {
