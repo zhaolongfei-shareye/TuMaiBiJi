@@ -81,6 +81,10 @@ Page({
       note.date_label = formatShortDate(note.created_at)
       
       this.setData({ note, loading: false, _loaded: true })
+      // 搜一搜索引页面标题：用笔记真实标题替代静态"笔记详情"
+      if (note.title) {
+        wx.setNavigationBarTitle({ title: note.title })
+      }
     } catch (err) {
       console.error('加载笔记失败', err)
       this.setData({ loading: false })

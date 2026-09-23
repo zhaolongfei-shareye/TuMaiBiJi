@@ -28,6 +28,9 @@ Page({
     try {
       const share = await api.getShare(token)
       this.setData({ share, loading: false })
+      if (share.title) {
+        wx.setNavigationBarTitle({ title: share.title })
+      }
     } catch (err) {
       console.error('获取分享失败', err)
       this.setData({
