@@ -34,7 +34,7 @@ DB_FILE = Path("/tmp/tumaibiji_integration.db")
 PORT = 8123
 BASE = f"http://127.0.0.1:{PORT}"
 SECRET = "integration-only-secret-not-a-real-one"
-HEAD = "7c3f1a90d2b4"
+HEAD = "ecba9801b98a"
 
 ENV = dict(
     os.environ,
@@ -73,19 +73,19 @@ def sql(statement, args=(), fetch=None):
         conn.close()
 
 
-def add_user(openid, invited_by=None):
+def add_user(openid, invited_by=None, generation=1):
     sql(
-        "insert into users (openid, language, wallpaper, quota_bonus, invited_by, created_at)"
-        " values (?, 'zh', 'default', 0, ?, CURRENT_TIMESTAMP)",
-        (openid, invited_by),
+        "insert into users (openid, language, wallpaper, quota_bonus, invited_by, generation, created_at)"
+        " values (?, 'zh', 'default', 0, ?, ?, CURRENT_TIMESTAMP)",
+        (openid, invited_by, generation),
     )
     return sql("select id from users where openid=?", (openid,), fetch="one")[0]
 
 
-def token(uid):
+def token(uid, generation=1):
     return {
         "Authorization": "Bearer " + jwt.encode(
-            {"sub": str(uid), "exp": int(time.time()) + 3600, "jti": uuid.uuid4().hex},
+            {"sub": str(uid), "gen": generation, "exp": int(time.time()) + 3600, "jti": uuid.uuid4().hex},
             SECRET,
             algorithm="HS256",
         )
@@ -295,7 +295,7 @@ def run_http(c):
     check("五类数据与账号本身都清空", all(count(t, victim) == 0 for t in ("notes", "categories", "shares", "jobs", "assets")) and sql("select count(*) from users where id=?", (victim,), fetch="one")[0] == 0)
     check("邀请台账两个方向都跟着删", sql("select count(*) from invitations where invitee_id=? or inviter_id=?", (victim, victim), fetch="one")[0] == 0)
     check("别人指向他的归因被清空", sql("select invited_by from users where id=?", (follower,), fetch="one")[0] is None)
-    check("邀请人已到手的奖励不追讨", bonus(inviter) == 50, bonus(inviter))
+    check("没结过钱的注销不动邀请人余额", bonus(inviter) == 50, bonus(inviter))
     check("路人的数据不受影响", count("notes", bystander) == 1 and sql("select count(*) from users where id=?", (bystander,), fetch="one")[0] == 1)
     check("发出去的分享页扫不开", c.get(f"{BASE}/api/shares/{vshare}").status_code == 404)
     codes = {
@@ -317,6 +317,60 @@ def run_http(c):
     check("同 openid 重注册是个空号", nq["used"] == 0 and nq["bonus"] == 0 and nq["limit"] == 100 and nq["invites_rewarded"] == 0, nq)
     check("新号读不到旧笔记", c.get(f"{BASE}/api/notes/{vnote}", headers=token(new_id)).status_code == 404)
     check("新号没带着旧归因", sql("select invited_by from users where id=?", (new_id,), fetch="one")[0] is None)
+
+    # ---- 8. 账号代数：id 被复用之后，旧 token 不能冒充新号 ----
+    # 上面那条"同 openid 重注册"是 add_user 直接插的，两个号 generation 都是 1，所以它
+    # 测不到这一层。这里按线上真实的样子摆：老号 gen=1 被删，新号拿到同一个 id 但 gen=2。
+    reuse_old = add_user("it-reuse-old", generation=1)
+    stale_tok = token(reuse_old, generation=1)
+    check("代数对得上时 token 可用", c.get(f"{BASE}/api/user/quota", headers=stale_tok).status_code == 200)
+    sql("delete from users where id=?", (reuse_old,))
+    reuse_new = add_user("it-reuse-new", generation=2)
+    check("新号确实复用了同一个 id", reuse_new == reuse_old, f"old={reuse_old} new={reuse_new}")
+    stale = c.get(f"{BASE}/api/user/quota", headers=stale_tok)
+    check("旧 token 打复用后的 id 被拒 401", stale.status_code == 401, stale.status_code)
+    stale_detail = stale.json().get("detail", "") if stale.status_code == 401 else ""
+    check("拒的理由是'已失效'（不是'不存在'）", "失效" in stale_detail, stale_detail)
+    check("旧 token 连写操作一起被拒", c.post(f"{BASE}/api/notes/", headers=stale_tok, json={"title": "x", "source_type": "manual"}).status_code == 401)
+    check("新号自己的 token 照常可用", c.get(f"{BASE}/api/user/quota", headers=token(reuse_new, generation=2)).status_code == 200)
+    check("没带 gen 的老格式 token 仍按第 1 代处理", c.get(f"{BASE}/api/user/quota", headers={
+        "Authorization": "Bearer " + jwt.encode(
+            {"sub": str(reuse_old), "exp": int(time.time()) + 3600, "jti": uuid.uuid4().hex},
+            SECRET, algorithm="HS256",
+        )
+    }).status_code == 401)
+
+    # ---- 9. 注销追回奖励：反复"注册小号 → 写一篇 → 注销"刷不出额度 ----
+    farmer = add_user("it-farmer")
+    throwaway = add_user("it-throwaway", invited_by=farmer)
+    r = c.post(f"{BASE}/api/notes/", headers=token(throwaway), json={"title": "成就一次", "source_type": "manual"})
+    check("小号写下第一篇，邀请人到账 +10", r.status_code == 200 and bonus(farmer) == 10, bonus(farmer))
+    check("台账落了一行", rewarded(farmer) == 1, rewarded(farmer))
+    dresp = c.post(f"{BASE}/api/user/deactivate", headers=token(throwaway), json={"confirm": True})
+    check("小号注销 200", dresp.status_code == 200, dresp.status_code)
+    check("注销把那 10 篇追了回来", bonus(farmer) == 0, bonus(farmer))
+    check("台账跟着清空", rewarded(farmer) == 0, rewarded(farmer))
+    throwaway2 = add_user("it-throwaway2", invited_by=farmer)
+    c.post(f"{BASE}/api/notes/", headers=token(throwaway2), json={"title": "再来一次", "source_type": "manual"})
+    c.post(f"{BASE}/api/user/deactivate", headers=token(throwaway2), json={"confirm": True})
+    check("刷第二轮之后 farmer 仍是 0（这条路走不通）", bonus(farmer) == 0, bonus(farmer))
+    check("farmer 的上限还是 100", c.get(f"{BASE}/api/user/quota", headers=token(farmer)).json()["limit"] == 100)
+
+    # ---- 10. 热启动补报邀请人：已登录的人从分享卡片进来那条路 ----
+    late_inviter = add_user("it-late-inviter")
+    late = add_user("it-late")
+    lr = c.post(f"{BASE}/api/user/inviter", headers=token(late), json={"inviter": late_inviter})
+    check("补报邀请人 200 且如实回报已认", lr.status_code == 200 and lr.json()["applied"] is True, lr.text[:80])
+    check("归因落到账号上", sql("select invited_by from users where id=?", (late,), fetch="one")[0] == late_inviter)
+    c.post(f"{BASE}/api/notes/", headers=token(late), json={"title": "补报之后的第一篇", "source_type": "manual"})
+    check("补报过的归因能正常结账 +10", bonus(late_inviter) == 10, bonus(late_inviter))
+    again = c.post(f"{BASE}/api/user/inviter", headers=token(late), json={"inviter": bystander})
+    check("已有归属时改不动，且如实回报未认", again.status_code == 200 and again.json()["applied"] is False, again.text[:80])
+    check("归属没被改写", sql("select invited_by from users where id=?", (late,), fetch="one")[0] == late_inviter)
+    self_inv = c.post(f"{BASE}/api/user/inviter", headers=token(late), json={"inviter": late})
+    check("自己邀自己不认", self_inv.json()["applied"] is False)
+    check("没登录时补报 401", c.post(f"{BASE}/api/user/inviter", json={"inviter": 1}).status_code == 401)
+    check("inviter 不是整数时 422", c.post(f"{BASE}/api/user/inviter", headers=token(late), json={"inviter": "abc"}).status_code == 422)
 
 
 def finish():

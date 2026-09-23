@@ -23,16 +23,12 @@ HEADERS = {
 
 MAX_RESPONSE_SIZE = 5 * 1024 * 1024
 ALLOWED_SCHEMES = {"https", "http"}
-BLOCKED_NETWORKS = [
-    ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("169.254.0.0/16"),
-    ipaddress.ip_network("0.0.0.0/8"),
-    ipaddress.ip_network("::1/128"),
-    ipaddress.ip_network("fc00::/7"),
-    ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
+# ipaddress 的 is_private 已经把 RFC1918、回环、链路本地、各类文档/保留段（192.0.2.0/24、
+# 198.18.0.0/15、198.51.100.0/24、203.0.113.0/24、240.0.0.0/4 及其 IPv6 对位）都算进去了，
+# 但按 IANA 的定义 CGNAT 属于"共享地址空间"而不是"私有"，Python 会放行——云厂商的内网服务
+# 常落在这段，所以单独列出来。
+EXTRA_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("100.64.0.0/10"),  # CGNAT / 云内网常用
 ]
 
 # 兜底文案：httpx 的异常文本是英文且带完整 URL，直接 str(e) 会进用户 toast（只两行，约 30 汉字）
@@ -40,6 +36,12 @@ GENERIC_FETCH_ERROR = "读取网页失败，请稍后重试或改用截图"
 
 
 def _is_private_ip(ip_str: str) -> bool:
+    """判定一个 IP 是否属于"不该让抓取器去连"的范围。解析不了一律当危险处理。
+
+    不再手写网段清单：原先那份漏了 IPv6 未指定地址 `::`（Linux 上连它等于连本机）、
+    组播、以及 CGNAT，实测 `http://[::]:6379/` 能直接过闸门打到本机 Redis。改用
+    ipaddress 自带的语义判定，它跟着 IANA 特殊用途地址表走，新出的保留段自动覆盖。
+    """
     try:
         addr = ipaddress.ip_address(ip_str)
         # Normalize IPv4-mapped IPv6 addresses
@@ -47,7 +49,16 @@ def _is_private_ip(ip_str: str) -> bool:
             addr = addr.ipv4_mapped
     except ValueError:
         return True
-    return any(addr in net for net in BLOCKED_NETWORKS)
+    if (
+        addr.is_private
+        or addr.is_loopback
+        or addr.is_link_local
+        or addr.is_reserved
+        or addr.is_multicast
+        or addr.is_unspecified
+    ):
+        return True
+    return any(addr in net for net in EXTRA_BLOCKED_NETWORKS)
 
 
 def _validate_url(url: str) -> str:

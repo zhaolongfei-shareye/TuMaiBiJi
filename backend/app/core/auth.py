@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import Depends, HTTPException, Header
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -15,9 +16,10 @@ from app.services import quota
 logger = logging.getLogger(__name__)
 
 
-def _create_token(user_id: int) -> str:
+def _create_token(user_id: int, generation: int = 1) -> str:
     payload = {
         "sub": str(user_id),
+        "gen": generation,
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES),
         "jti": str(uuid.uuid4()),
@@ -79,9 +81,12 @@ def get_current_user(
     token = authorization.split(" ", 1)[1]
     payload = _decode_token(token)
     user_id = int(payload["sub"])
+    token_gen = payload.get("gen", 1)
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="用户不存在，请重新登录")
+    if user.generation != token_gen:
+        raise HTTPException(status_code=401, detail="Token 已失效，请重新登录")
     return user
 
 
@@ -93,7 +98,10 @@ async def login_or_register(code: str, db: Session, inviter: int | None = None) 
     if user:
         pass
     else:
-        user = User(openid=openid)
+        # 新账号的 generation 取全表最大值 +1。用全表而不是"这个 id 上一代是多少"，
+        # 是因为旧行已经被删掉了、查不到；全表严格递增同样能保证复用 id 时新旧不撞。
+        max_gen = db.query(func.coalesce(func.max(User.generation), 0)).scalar() or 0
+        user = User(openid=openid, generation=max_gen + 1)
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -103,5 +111,5 @@ async def login_or_register(code: str, db: Session, inviter: int | None = None) 
     if inviter is not None:
         quota.attribute_inviter(user, db, inviter)
 
-    token = _create_token(user.id)
+    token = _create_token(user.id, user.generation)
     return user, token

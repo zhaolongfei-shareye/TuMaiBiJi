@@ -4,6 +4,7 @@
 ① 判 risky/review 才拒；**接口没检成（unavailable）一律放行**——微信侧抖动不能变成
    "用户存不了自己的笔记"。
 ② 只有 manual 在落库前检；外部抓取/识别的原文不检，公开出口（创建分享）才检。
+   **而 source_type 由服务端钉死，不是客户端能填的**——否则"我不检"就成了一个入参。
 ③ 长文本分段送，段与段之间不能漏字。
 
 整套不出网：conftest 已把 SEC_CHECK_ENABLED 置 false，需要走判定逻辑的用例
@@ -71,6 +72,16 @@ def _stub_verdicts(monkeypatch, table):
 
 
 # ---------------------------------------------------------------- 服务层
+@pytest.fixture(autouse=True)
+def _fresh_pass_memo():
+    """check_text 会记住"这段文本判过正常"，用例之间必须各起各的账。
+
+    不清的话，前一条用例喂进去的 pass 会让后一条根本走不到假 httpx，
+    看起来像"断言没生效"，其实是被缓存短路了——这一轮的 QR 缓存就踩过一次。
+    """
+    wechat._sec_pass_cache.clear()
+
+
 def test_开关关掉时不出网并且算作未检成(monkeypatch):
     called = []
     monkeypatch.setattr(wechat.httpx, "Client", lambda *a, **k: called.append(1))
@@ -115,6 +126,119 @@ def test_非零错误码按类型分流(monkeypatch):
     monkeypatch.setattr(wechat.httpx, "Client",
                         lambda *a, **k: FakeClient({"errcode": 0, "result": {"suggest": "risky", "label": 20006}}))
     assert wechat.check_text("ok", "内容") == "risky"
+
+
+# -------------------------------------------------- 判定结果缓存（按次配额的接口）
+_PASS = {"errcode": 0, "result": {"suggest": "pass", "label": 100}}
+_RISKY = {"errcode": 0, "result": {"suggest": "risky", "label": 20006}}
+_QUOTA_OUT = {"errcode": 45009, "errmsg": "reach max api daily quota limit"}
+
+
+class _Fixed:
+    """假 httpx client：回固定 payload，并数真打了几次。"""
+
+    def __init__(self, payload, calls):
+        self.payload = payload
+        self.calls = calls
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def post(self, *a, **k):
+        self.calls.append(1)
+        payload = self.payload
+
+        class Resp:
+            def json(self):
+                return payload
+
+        return Resp()
+
+
+def _wire_transport(monkeypatch, payload):
+    calls = []
+    monkeypatch.setattr(settings, "SEC_CHECK_ENABLED", True)
+    monkeypatch.setattr(wechat, "_access_token_sync", lambda: "fake-token")
+    monkeypatch.setattr(wechat.httpx, "Client", lambda *a, **k: _Fixed(payload, calls))
+    return calls
+
+
+def test_同一段正常文本不重复问微信(monkeypatch):
+    """msgSecCheck 是按次配额的接口：未上架小程序 100 次/天（实测 2026-09-23 打到过上限）。
+
+    一次保存原本按字段打 6 趟，而移动端保存常把没改过的字段一起 PUT 回来——
+    记住判过的 pass 才谈得上有额度可用。
+    """
+    calls = _wire_transport(monkeypatch, _PASS)
+    assert wechat.check_text("openid-m", "厦门三日路线：鼓浪屿要早去早回") == "pass"
+    for _ in range(4):
+        assert wechat.check_text("openid-m", "厦门三日路线：鼓浪屿要早去早回") == "pass"
+    assert len(calls) == 1, f"同一段文本问了微信 {len(calls)} 次"
+
+
+def test_判过正常的内容换个人要重新问(monkeypatch):
+    calls = _wire_transport(monkeypatch, _PASS)
+    wechat.check_text("openid-A", "同一段文本")
+    wechat.check_text("openid-B", "同一段文本")
+    assert len(calls) == 2, "缓存按内容共用了，绕过了另一个人的风控上下文"
+
+
+def test_违规判定不缓存错了下次还能纠正(monkeypatch):
+    calls = _wire_transport(monkeypatch, _RISKY)
+    assert wechat.check_text("openid-m", "线上赌场 六合彩 特码") == "risky"
+    assert wechat.check_text("openid-m", "线上赌场 六合彩 特码") == "risky"
+    assert len(calls) == 2, "risky 进了缓存：一次误判就会跟着这段文本一辈子"
+
+
+def test_没检成绝不缓存否则配额永远恢复不了(monkeypatch):
+    """这条是缓存最危险的失效模式。
+
+    45009 之后如果把"没问题"记下来，第二天额度恢复了也不会再检——内容安全从此静默关掉，
+    而日志里干干净净。所以 unavailable 必须每次都真打。
+    """
+    calls = _wire_transport(monkeypatch, _QUOTA_OUT)
+    for _ in range(3):
+        assert wechat.check_text("openid-m", "一段正常文本") == "unavailable"
+    assert len(calls) == 3, "unavailable 被缓存了，配额恢复之后将永远不再送检"
+
+    monkeypatch.setattr(wechat.httpx, "Client", lambda *a, **k: _Fixed(_PASS, calls))
+    assert wechat.check_text("openid-m", "一段正常文本") == "pass"
+    assert len(calls) == 4, "额度恢复后第一次没有真的重新检"
+
+
+def test_判定缓存有上限(monkeypatch):
+    calls = _wire_transport(monkeypatch, _PASS)
+    for i in range(wechat._SEC_PASS_CACHE_MAX + 30):
+        wechat.check_text("openid-big", f"第 {i} 段各不相同的正常文本")
+    assert len(wechat._sec_pass_cache) == wechat._SEC_PASS_CACHE_MAX
+    # 最老的那条已经被挤出去，再问一次就是真打
+    before = len(calls)
+    wechat.check_text("openid-big", "第 0 段各不相同的正常文本")
+    assert len(calls) == before + 1, "最老的没被挤掉，上限没生效"
+    # 而最近用过的那条还在，不该再打
+    wechat.check_text("openid-big", f"第 {wechat._SEC_PASS_CACHE_MAX + 29} 段各不相同的正常文本")
+    assert len(calls) == before + 1, "刚用过的被判掉了，缓存留的不是最近使用的"
+
+
+def test_额度打光时日志要说清这件事(monkeypatch, caplog):
+    """45009 和一次网络抖动在日志里长得一样的话，就等于没有告警。
+
+    按"会不会让机制静默失效"分级：额度打光是 ERROR，不是 warning。
+    """
+    import logging
+
+    _wire_transport(monkeypatch, _QUOTA_OUT)
+    with caplog.at_level(logging.DEBUG, logger="app.services.wechat"):
+        assert wechat.check_text("openid-x", "一段文本") == "unavailable"
+    lines = [r for r in caplog.records if "内容安全" in r.getMessage()]
+    assert lines, "额度打光这件事在日志里没留下任何痕迹"
+    assert all(r.levelno >= logging.ERROR for r in lines), \
+        "额度打光只是 warning：今天的检查看作没做，没人会注意到"
+    assert "100 次/天" in lines[0].getMessage()
+    assert "access_token" not in lines[0].getMessage()
 
 
 def test_命中违规抛中文错误给得到toast(monkeypatch):
@@ -171,12 +295,42 @@ def test_手动笔记命中违规时存不下来(client, db_session, person, mon
     assert db_session.query(Note).filter(Note.title.like("%脏内容%")).count() == 0
 
 
-def test_抓取来源的笔记落库时不检(client, db_session, person, monkeypatch):
+def test_客户端自称抓取来源也没用_照检不误(client, db_session, person, monkeypatch):
+    """source_type 曾是客户端可填字段，而它正是"要不要过内容安全"的开关。
+
+    那时只要 POST 时写 source_type:"url"，随便什么违规文本都能 200 存进去，
+    _guard_manual_text 一句 != "manual" 就直接 return 了。现在这个字段由服务端钉死，
+    入参里多带的会被 Pydantic 忽略。
+    """
     seen = _stub_verdicts(monkeypatch, {"脏内容": "risky"})
     r = client.post("/api/notes/", headers=_hdr(person.id),
-                    json={"title": "抓来的文章里有脏内容", "source_type": "url"})
-    assert r.status_code == 200
-    assert seen == []
+                    json={"title": "自称抓来的脏内容", "source_type": "url"})
+    assert r.status_code == 400, f"客户端自称抓取来源就绕过了内容安全：{r.status_code}"
+    assert seen, "内容安全一次都没被调用"
+    assert db_session.query(Note).filter(Note.title.like("%脏内容%")).count() == 0
+
+
+@pytest.mark.parametrize("st,should_check", [
+    ("manual", True),
+    ("web_article", False),
+    ("wechat_article", False),
+    ("screenshot", False),
+    ("", False),
+])
+def test_只有manual在落库前检_抓取与截图来源不检(st, should_check):
+    """这条口径本身没变，变的是"谁说了算"——判定依据只能是服务端写进去的值。
+
+    外部原文里出现一个敏感词就让整条笔记存不下来是误伤，所以 worker 落库的
+    web_article / wechat_article / screenshot 不过这道闸，真正要检的是公开出口。
+    """
+    from app.api.routes import notes as notes_route
+
+    calls = []
+    note = Note(title="一段文本", source_type=st)
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(notes_route, "enforce_text_safety", lambda *a, **kw: calls.append(a))
+        notes_route._guard_manual_text(User(openid="o"), note)
+    assert bool(calls) is should_check, f"source_type={st!r} 检了 {len(calls)} 次"
 
 
 def test_公开分享那一刻必须检(client, db_session, person, monkeypatch):

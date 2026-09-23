@@ -32,6 +32,24 @@ App({
   // 小程序已经活着的时候点开分享卡片只补发 onShow，不会走 onLaunch。
   onShow(options) {
     rememberInviter(options)
+    // 冷启由 _doLogin 带着 inviter 一起走；这里只管"已经登录着"的热启那条路。
+    if (this.globalData.isLoggedIn && wx.getStorageSync(INVITER_KEY)) {
+      this._reportInviter()
+    }
+  },
+
+  async _reportInviter() {
+    const inviter = wx.getStorageSync(INVITER_KEY)
+    if (!inviter) return
+    try {
+      await request('/api/user/inviter', 'POST', { inviter })
+      // 认不认都由服务端判，而且判过就不会再改（已有归属/名下已有笔记都挡着），
+      // 所以只要这一趟通了就把本地这份扔掉——留着它每次启动都要白跑一次请求。
+      wx.removeStorageSync(INVITER_KEY)
+    } catch (err) {
+      // 网络这一类失败要留着下次再报，不然这次归因就永久丢了。
+      console.error('邀请归因上报失败，保留待下次重试:', err)
+    }
   },
 
   getLoginPromise() {

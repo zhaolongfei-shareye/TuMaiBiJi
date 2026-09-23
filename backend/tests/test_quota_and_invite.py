@@ -52,8 +52,8 @@ def db():
     session.close()
 
 
-def mk_user(db, openid, bonus=0):
-    u = User(openid=openid, quota_bonus=bonus)
+def mk_user(db, openid, bonus=0, generation=1):
+    u = User(openid=openid, quota_bonus=bonus, generation=generation)
     db.add(u)
     db.commit()
     db.refresh(u)
@@ -61,7 +61,9 @@ def mk_user(db, openid, bonus=0):
 
 
 def hdr(user):
-    return {"Authorization": f"Bearer {_create_token(user.id)}"}
+    # 走真实登录注册出来的号，generation 是全局递增的（防 id 复用冒充），
+    # 所以这里必须带上它自己的那一份，不能默认第 1 代。
+    return {"Authorization": f"Bearer {_create_token(user.id, user.generation)}"}
 
 
 def mk_notes(db, user, n):
@@ -145,6 +147,88 @@ class Test额度闸门:
         assert create_note(client, u, "第三条").status_code == 200
 
 
+class Test入队带上账号代数:
+    """worker 那道串号闸门，靠的是入队时把 generation 一起塞进 payload。
+
+    路由这里漏传的话，worker 收到 generation=None，会当成"部署切换期的存量 job"退回
+    只查存在性——A6 整条修复就静默失效，而且一路不报错。所以这段接线得自己断一次，
+    不能指望 worker 那边的用例替它兜（那些用例都是直接调函数、显式传 generation）。
+    """
+
+    class _Recorder:
+        def __init__(self):
+            self.calls = []
+
+        def enqueue(self, *args, **kwargs):
+            self.calls.append((args, kwargs))
+
+    @pytest.fixture()
+    def rec(self, monkeypatch):
+        r = self._Recorder()
+        monkeypatch.setattr(ingest_route, "get_queue", lambda: r)
+        # set_task_status 要连 Redis，pytest 环境里没有；这里断的是入队参数，不是任务状态。
+        monkeypatch.setattr(ingest_route, "set_task_status", lambda *a, **kw: None)
+        return r
+
+    def test_链接入口入队时带上generation(self, client, db, monkeypatch, rec):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        u = mk_user(db, "wire-url", generation=7)
+
+        resp = client.post("/api/ingest/url", data={"url": "https://example.com/a"}, headers=hdr(u))
+        assert resp.status_code == 200, resp.text
+
+        assert len(rec.calls) == 1
+        args = rec.calls[0][0]
+        assert args[0] == "app.tasks.ingest_tasks.process_url_task"
+        assert args[2] == str(u.id)
+        assert 7 in args, f"入队参数里没带上账号代数，worker 会退回只查存在性：{args}"
+
+    def test_截图入口入队时带上generation(self, client, db, monkeypatch, rec):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        u = mk_user(db, "wire-shot", generation=9)
+
+        staged = client.post(
+            "/api/ingest/screenshots/stage",
+            files={"images": ("a.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+            headers=hdr(u),
+        )
+        assert staged.status_code == 200, staged.text
+        batch_id = staged.json()["batch_id"]
+
+        resp = client.post("/api/ingest/screenshots/process", data={"batch_id": batch_id}, headers=hdr(u))
+        assert resp.status_code == 200, resp.text
+
+        assert len(rec.calls) == 1
+        args = rec.calls[0][0]
+        assert args[0] == "app.tasks.ingest_tasks.process_screenshots_task"
+        assert args[2] == str(u.id)
+        assert 9 in args, f"入队参数里没带上账号代数，worker 会退回只查存在性：{args}"
+
+
+class Test限流挂没挂:
+    """限流是 Redis 那一层的事，测试夹具里 limiter 是关掉的，所以这里只能断"挂没挂上"。
+
+    读 _route_limits 这个私有注册表是没法里的办法：真跑出一次 429 得有 Redis 在。
+    私有属性意味着 slowapi 升版本时这条会红——那正是要的失败方式（逼人回来看一眼），
+    比悄悄放行强。同文件的 deactivate 也是这个待遇，两个都是不可逆/可刷的写口子。
+    """
+
+    def _limits(self, func_name):
+        from app.core.rate_limit import limiter
+
+        return limiter._route_limits.get(f"app.api.routes.user.{func_name}") or []
+
+    def test_补报邀请人挂了限流(self):
+        got = [str(x.limit) for x in self._limits("update_inviter")]
+        assert got, "/api/user/inviter 上没挂 limiter.limit，可以被无限打"
+        assert "10 per 1 minute" in got, got
+
+    def test_注销也还挂着限流(self):
+        got = [str(x.limit) for x in self._limits("deactivate_account")]
+        assert got, "/api/user/deactivate 的限流被摘掉了"
+        assert "5 per 1 minute" in got, got
+
+
 class Test额度接口:
     def test_返回的就是客户端要的那几个数(self, client, db, monkeypatch):
         monkeypatch.setattr(quota, "BASE_QUOTA", 100)
@@ -201,6 +285,73 @@ class Test邀请归因:
         login(client, db, monkeypatch, "stable", i1.id)
         login(client, db, monkeypatch, "stable", i2.id)
         assert db.query(User).filter_by(openid="stable").first().invited_by == i1.id
+
+
+class Test热启动补报归因:
+    """已经登录着的人从分享卡片进来，只走 onShow、不走 onLaunch。
+
+    登录那条路带不上 inviter，所以他写下第一篇时服务端根本不知道有这回事；等他下次
+    冷启再报，名下已经有笔记了，attribute_inviter 又会照规矩拒掉——这笔奖励就永久丢了。
+    POST /api/user/inviter 是补那一次的口子。
+    """
+
+    def post_inviter(self, client, user, inviter_id):
+        return client.post("/api/user/inviter", headers=hdr(user), json={"inviter": inviter_id})
+
+    def test_补报成功并且如实回报已认(self, client, db, monkeypatch):
+        inviter = mk_user(db, "late-inviter")
+        late = login(client, db, monkeypatch, "late-user", None)
+        assert late.invited_by is None
+
+        resp = self.post_inviter(client, late, inviter.id)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["applied"] is True
+        db.expire_all()
+        assert db.get(User, late.id).invited_by == inviter.id
+
+    def test_补报过之后写第一篇能正常结账(self, client, db, monkeypatch):
+        """这条才是补报的意义所在：光把 invited_by 写上不算，钱要能结出来。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        inviter = mk_user(db, "late-pay-inviter")
+        late = login(client, db, monkeypatch, "late-pay-user", None)
+        assert self.post_inviter(client, late, inviter.id).json()["applied"] is True
+
+        assert create_note(client, late, "补报之后的第一篇").status_code == 200
+        db.refresh(inviter)
+        assert inviter.quota_bonus == quota.INVITE_REWARD
+
+    def test_已有归属时改不动(self, client, db, monkeypatch):
+        i1 = mk_user(db, "late-i1")
+        i2 = mk_user(db, "late-i2")
+        u = login(client, db, monkeypatch, "late-stable", i1.id)
+
+        resp = self.post_inviter(client, u, i2.id)
+        assert resp.json()["applied"] is False
+        db.expire_all()
+        assert db.get(User, u.id).invited_by == i1.id
+
+    def test_名下已有笔记的人补不回来(self, client, db, monkeypatch):
+        inviter = mk_user(db, "late-inviter-3")
+        old = login(client, db, monkeypatch, "late-old", None)
+        mk_notes(db, old, 2)
+        db.expire_all()
+
+        assert self.post_inviter(client, old, inviter.id).json()["applied"] is False
+        assert db.get(User, old.id).invited_by is None
+
+    def test_自己邀自己和不存在的邀请人都不认(self, client, db, monkeypatch):
+        u = login(client, db, monkeypatch, "late-self", None)
+        assert self.post_inviter(client, u, u.id).json()["applied"] is False
+        assert self.post_inviter(client, u, 999999).json()["applied"] is False
+        db.expire_all()
+        assert db.get(User, u.id).invited_by is None
+
+    def test_没登录不能补报(self, client, db):
+        assert client.post("/api/user/inviter", json={"inviter": 1}).status_code == 401
+
+    def test_inviter不是整数时422(self, client, db, monkeypatch):
+        u = login(client, db, monkeypatch, "late-bad-payload", None)
+        assert self.post_inviter(client, u, "abc").status_code == 422
 
 
 class Test邀请到账:

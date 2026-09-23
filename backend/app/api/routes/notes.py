@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
-from pydantic import BaseModel, model_validator
+from typing import Annotated, List, Optional
+from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 from sqlalchemy import or_
 from app.db.database import get_db
@@ -12,9 +12,42 @@ from app.core.quota_gate import require_note_room
 from app.core.timefmt import UTCDatetime, UTCDatetimeOrNone
 from app.core.errors import UserError
 from app.services.wechat import enforce_text_safety
+from app.services.sharing import (
+    SNAPSHOT_COLUMNS,
+    active_shares,
+    public_fields,
+    sync_snapshot,
+)
 from app.services import quota
 
 router = APIRouter()
+
+# 模型上写的 String(500) 在 SQLite 上只是装饰：实测 500 万字的标题、2 千万字的正文
+# 都照样 200 存进去，三次请求就把库撑到 74MB。而 title 会进列表响应，一条超长标题
+# 足以让每个人的首页拉不动。长度只能在入口这一层卡。
+# MAX_BODY / MAX_SUMMARY 特意和内容安全的送检窗口（wechat.SEC_CHUNK * SEC_MAX_CHUNKS
+# = 16,000 字/字段）对齐：再长的话，超出那部分永远检不到，用户只要把违规内容垫在
+# 一万六千字之后就绕过了公开分享那道闸。抓取来的正文由 worker 直接落库、不走这里，
+# 所以这个上限只约束手打的量——一万六千字已经远超任何真人笔记。
+MAX_TITLE = 500
+MAX_SUMMARY = 16_000
+MAX_BODY = 16_000
+MAX_URL = 1000
+MAX_LIST_ITEMS = 50
+MAX_ITEM_LEN = 200
+
+Title = Annotated[str, Field(max_length=MAX_TITLE)]
+Summary = Annotated[str, Field(max_length=MAX_SUMMARY)]
+Body = Annotated[str, Field(max_length=MAX_BODY)]
+Url = Annotated[str, Field(max_length=MAX_URL)]
+Item = Annotated[str, Field(max_length=MAX_ITEM_LEN)]
+Items = Annotated[list[Item], Field(max_length=MAX_LIST_ITEMS)]
+
+
+# 手动笔记里"用户自己写的、落库前要过内容安全"的那几列。创建和编辑两条路共用这一份：
+# 少列一个字段，就等于"改那个字段时不复检"。key_links 原本就是这么漏掉的——它客户端
+# 可写，又会出现在公开分享页上，却一次都没进过 msgSecCheck。
+MANUAL_TEXT_FIELDS = ("title", "summary", "key_points", "tags", "key_links", "content")
 
 
 def _guard_manual_text(user: User, note) -> None:
@@ -29,11 +62,7 @@ def _guard_manual_text(user: User, note) -> None:
     try:
         enforce_text_safety(
             user.openid,
-            getattr(note, "title", None),
-            getattr(note, "summary", None),
-            getattr(note, "key_points", None),
-            getattr(note, "tags", None),
-            getattr(note, "content", None),
+            *(getattr(note, f, None) for f in MANUAL_TEXT_FIELDS),
         )
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -63,27 +92,29 @@ class NoteDetail(NoteBrief):
 
 
 class NoteCreate(BaseModel):
-    title: str
-    summary: str | None = None
-    key_points: list | None = None
-    key_links: list | None = None
-    tags: list | None = None
-    content: str | None = None
-    original_content: str | None = None
-    source_type: str = "manual"
-    source_url: str | None = None
+    title: Title
+    summary: Optional[Summary] = None
+    key_points: Optional[Items] = None
+    key_links: Optional[Items] = None
+    tags: Optional[Items] = None
+    content: Optional[Body] = None
+    original_content: Optional[Body] = None
+    # source_type 故意不在这个模型里：它是"要不要过内容安全"的开关（见 _guard_manual_text），
+    # 交给客户端填等于让客户端自己决定是否被审查。抓取/截图来的笔记由 worker 直接落库，
+    # 不走这个入口，所以 HTTP 建的一律是 manual。客户端多传的这个字段会被 Pydantic 忽略。
+    source_url: Optional[Url] = None
     category_id: int | None = None
 
 
 class NoteUpdate(BaseModel):
-    title: str | None = None
-    summary: str | None = None
-    key_points: list | None = None
-    key_links: list | None = None
-    tags: list | None = None
-    content: str | None = None
-    original_content: str | None = None
-    source_url: str | None = None
+    title: Optional[Title] = None
+    summary: Optional[Summary] = None
+    key_points: Optional[Items] = None
+    key_links: Optional[Items] = None
+    tags: Optional[Items] = None
+    content: Optional[Body] = None
+    original_content: Optional[Body] = None
+    source_url: Optional[Url] = None
     category_id: int | None = None
 
     @model_validator(mode="before")
@@ -138,7 +169,7 @@ def get_note(
         .first()
     )
     if not note:
-        raise HTTPException(status_code=404, detail="Note not found")
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
     return note
 
 
@@ -160,9 +191,12 @@ def create_note(
         if not category:
             raise HTTPException(status_code=400, detail="分类不存在或无权使用")
 
-    _guard_manual_text(user, note)
+    db_note = Note(**note.model_dump(), user_id=str(user.id), source_type="manual")
 
-    db_note = Note(**note.model_dump(), user_id=str(user.id))
+    # 检的是 db_note 而不是入参 note：_guard_manual_text 靠 source_type 决定要不要检，
+    # 而 source_type 刚在上面由服务端钉死，入参里已经没有这个字段了。
+    _guard_manual_text(user, db_note)
+
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
@@ -185,7 +219,7 @@ def update_note(
         .first()
     )
     if not db_note:
-        raise HTTPException(status_code=404, detail="Note not found")
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
     
     update_data = note.model_dump(exclude_unset=True)
     
@@ -204,12 +238,27 @@ def update_note(
 
     # 复检必须在赋值之后：要检的是"这次改完之后的样子"，不是改之前的旧正文。
     # 被拦下时显式 rollback，否则脏对象还挂在会话上。
-    if any(k in update_data for k in ("title", "summary", "key_points", "tags", "content")):
+    if set(update_data) & set(MANUAL_TEXT_FIELDS):
         try:
             _guard_manual_text(user, db_note)
         except HTTPException:
             db.rollback()
             raise
+
+    # 改一条已经分享出去的笔记，改的就是公开页上的内容。同步和重检必须绑在一起：
+    # 只同步不重检，抓取来源的笔记（上面那道 _guard_manual_text 对它直接放行）就能
+    # 靠"改一下标题"把没过公开审查的文本推上去；只重检不同步，就是这次修的那个洞——
+    # 用户把手机号从标题里删掉了，那张卡片扫开还是手机号。
+    # 判据取 SNAPSHOT_COLUMNS：公开页只给那几列，改正文不影响它。
+    if set(update_data) & set(SNAPSHOT_COLUMNS):
+        if active_shares(db, db_note.id):
+            try:
+                enforce_text_safety(user.openid, *public_fields(db_note))
+            except UserError as e:
+                db.rollback()
+                raise HTTPException(status_code=400, detail=str(e))
+            sync_snapshot(db, db_note)
+
     db.commit()
     db.refresh(db_note)
     return db_note
@@ -228,7 +277,7 @@ def pin_note(
         .first()
     )
     if not db_note:
-        raise HTTPException(status_code=404, detail="Note not found")
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
     from datetime import datetime, timezone
     db_note.is_pinned = pin
     db_note.pinned_at = datetime.now(timezone.utc) if pin else None
@@ -252,7 +301,7 @@ def delete_note(
         .first()
     )
     if not note:
-        raise HTTPException(status_code=404, detail="Note not found")
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
     
     # Delete related shares and jobs first to avoid foreign key constraint errors
     db.query(Share).filter(Share.note_id == note_id).delete()

@@ -1,22 +1,27 @@
 """账号自助注销：删干净、只删自己的、删完还能证明它真的没了。
 
-三条不变量：
+四条不变量：
 ① 只删自己名下的：每个删除查询都带着 user_id，别人的笔记/分类/分享一条不动。
 ② 注销后旧 token 立刻失效（用户行没了，get_current_user 自然回 401），公开分享页
    也必须扫不开——那张卡片图已经发出去了，留着就是泄漏。
 ③ 同一个 openid 重新登录是一个全新空账号，看不到旧数据。
+④ id 被新号复用之后，旧 token 依然失效。②靠的是"行没了"，可 SQLite 会把那个 id 发
+   给下一个注册的人，行又有了——这时候挡住的必须是账号代数，不是行的存在性。
+   见 Test账号代数。
 
 存在性断言一律走 query 而不是 db.get：这个夹具会话里已经缓存着那些对象，
 `db.get` 命中身份映射时会把"内存里还有"当成"库里还有"，删干净了也照样返回绿。
 """
 import os
 import sys
+import time
 
 os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest.db"
 os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
 os.environ["EXTRACT_PROVIDER"] = "none"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 
@@ -51,7 +56,7 @@ def db():
 
 
 def hdr(user):
-    return {"Authorization": f"Bearer {_create_token(user.id)}"}
+    return {"Authorization": f"Bearer {_create_token(user.id, user.generation)}"}
 
 
 def rows(db, model, uid):
@@ -207,13 +212,43 @@ class Test注销之后:
 
 
 class Test邀请台账跟着走:
-    def test_注销不追讨邀请人已到手的奖励(self, client, db, mine, other):
+    def test_注销要把邀请人已到手的奖励追回来(self, client, db, mine, other):
+        """注销 = 这笔邀请当成没发生过，奖励跟着退回去。
+
+        不追回的话，"注册小号 → 写一篇 → 注销 → 再注册"能把邀请人的额度刷到无穷大：
+        MAX_REWARDED_INVITES 是按 invitations 行数算的，而行数在注销时被清掉了。
+        """
         wipe(client, mine)
         db.expire_all()
-        assert db.get(User, mine["inviter"]).quota_bonus == quota.INVITE_REWARD
+        assert db.get(User, mine["inviter"]).quota_bonus == 0
         assert db.query(Invitation).filter(Invitation.invitee_id == mine["id"]).count() == 0
         # 他替别人成就的那一笔也一起没了：账号都不在了，台账不该继续记着他
         assert db.query(Invitation).filter(Invitation.inviter_id == mine["id"]).count() == 0
+
+    def test_追回不会把余额扣成负数(self, client, db, mine):
+        """台账说有 10 篇、余额却已经不够扣时，宁可不追也不能扣成负数。
+
+        负余额会把上限压到 BASE_QUOTA 以下，那个邀请人连自己的笔记都存不下了。
+        正常路径走不到这里（除了注销没有别的地方减 quota_bonus），这是给对不上账兜底。
+        """
+        inviter = db.get(User, mine["inviter"])
+        inviter.quota_bonus = 0
+        db.commit()
+        wipe(client, mine)
+        db.expire_all()
+        assert db.get(User, mine["inviter"]).quota_bonus == 0
+
+    def test_没结过钱的人注销不动邀请人余额(self, client, db):
+        """只有 invited_by、没有台账行（还没写下第一篇）→ 邀请人本来就没拿到钱，不该被扣。"""
+        inviter = User(openid="has-bonus", quota_bonus=30)
+        db.add(inviter)
+        db.commit()
+        u = User(openid="never-wrote", invited_by=inviter.id)
+        db.add(u)
+        db.commit()
+        wipe(client, u)
+        db.expire_all()
+        assert db.get(User, inviter.id).quota_bonus == 30
 
     def test_别人指向我的归因被清空(self, client, db, mine):
         follower = User(openid="knew-me", invited_by=mine["id"])
@@ -223,3 +258,89 @@ class Test邀请台账跟着走:
         wipe(client, mine)
         db.expire_all()
         assert db.get(User, fid).invited_by is None
+
+
+def register(client, db, monkeypatch, openid):
+    """打真实登录路由，只把 code2session 换成指定 openid。"""
+    from app.core import auth as auth_core
+
+    async def fake(code):
+        return {"openid": openid, "session_key": "k"}
+
+    monkeypatch.setattr(auth_core, "_wechat_code2session", fake)
+    resp = client.post("/api/auth/wechat", json={"code": "x"})
+    assert resp.status_code == 200, resp.text
+    uid = resp.json()["user_id"]
+    db.expire_all()
+    return db.get(User, uid)
+
+
+class Test账号代数:
+    """SQLite 的 INTEGER PRIMARY KEY 会复用已删除行的 id。
+
+    只认 id 的话，注销掉的那个人手里的旧 token 会直接变成新号的身份——新号一注册，
+    陌生人就能读能写他的笔记。generation 就是为此加的：token 里带着签发时那一代，
+    对不上就 401。
+    """
+
+    def test_注册出来的号代数递增(self, client, db, monkeypatch):
+        a = register(client, db, monkeypatch, "gen-a")
+        b = register(client, db, monkeypatch, "gen-b")
+        assert b.generation > a.generation
+
+    def test_同id重注册后旧token被拒(self, client, db, monkeypatch):
+        old = register(client, db, monkeypatch, "gen-victim")
+        uid, old_hdr = old.id, hdr(old)
+        assert client.get("/api/user/quota", headers=old_hdr).status_code == 200
+
+        db.delete(old)
+        db.commit()
+        # 摆成"id 被复用、代数往前走了一格"这个确定状态
+        fresh = User(id=uid, openid="gen-takeover", generation=old.generation + 1)
+        db.add(fresh)
+        db.commit()
+
+        resp = client.get("/api/user/quota", headers=old_hdr)
+        assert resp.status_code == 401
+        assert "失效" in resp.json()["detail"]
+
+    def test_旧token对复用后的id也写不进去(self, client, db, monkeypatch):
+        old = register(client, db, monkeypatch, "gen-writer")
+        uid, old_hdr = old.id, hdr(old)
+        db.delete(old)
+        db.commit()
+        fresh = User(id=uid, openid="gen-takeover2", generation=old.generation + 1)
+        db.add(fresh)
+        db.commit()
+
+        assert client.post("/api/notes/", headers=old_hdr, json={"title": "冒充写入"}).status_code == 401
+        db.expire_all()
+        assert db.query(Note).filter(Note.user_id == str(uid)).count() == 0
+
+    def test_新号自己的token照常可用(self, client, db, monkeypatch):
+        old = register(client, db, monkeypatch, "gen-old2")
+        uid, old_gen = old.id, old.generation
+        db.delete(old)
+        db.commit()
+        fresh = User(id=uid, openid="gen-fresh2", generation=old_gen + 1)
+        db.add(fresh)
+        db.commit()
+
+        assert client.get("/api/user/quota", headers=hdr(fresh)).status_code == 200
+
+    def test_没有gen字段的老token仍按第一代处理(self, client, db):
+        """升级那一刻，线上已发出去的 token 全都不带 gen。
+
+        库里的老号经迁移后 generation 也是 1，两边对得上，所以老 token 不该被一刀切失效
+        ——否则一部署就要全量用户重新登录。
+        """
+        u = User(openid="legacy-token", generation=1)
+        db.add(u)
+        db.commit()
+        legacy = jwt.encode(
+            {"sub": str(u.id), "exp": int(time.time()) + 3600, "jti": "legacy-jti"},
+            "pytest-only-secret-not-a-real-one",
+            algorithm="HS256",
+        )
+        resp = client.get("/api/user/quota", headers={"Authorization": f"Bearer {legacy}"})
+        assert resp.status_code == 200, resp.text

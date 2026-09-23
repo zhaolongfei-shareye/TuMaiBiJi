@@ -17,5 +17,7 @@ class User(Base):
     quota_bonus = Column(Integer, nullable=False, default=0, server_default="0")
     # 谁把这个账号邀进来的。只有 id、没有内容；归因发生在登录，到账发生在第一篇笔记
     invited_by = Column(Integer, nullable=True, index=True)
+    # 账号代数：防止 SQLite 重用 ID 后旧 token 冒充新用户
+    generation = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

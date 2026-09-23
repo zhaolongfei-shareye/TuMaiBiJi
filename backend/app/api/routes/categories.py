@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
-from pydantic import BaseModel, model_validator
+from typing import Annotated, List
+from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 from app.db.database import get_db
 from app.models.category import Category
@@ -11,6 +11,15 @@ from app.core.auth import get_current_user
 from app.core.timefmt import UTCDatetime
 
 router = APIRouter()
+
+# String(100) 在 SQLite 上不生效，实测百万字的分类名照样存进去；而分类名会出现在
+# 首页每一条笔记上，一条就能把列表撑爆。上限跟模型声明的列宽对齐。
+MAX_NAME = 100
+MAX_COLOR = 20
+MAX_REORDER = 200
+
+Name = Annotated[str, Field(min_length=1, max_length=MAX_NAME)]
+Color = Annotated[str, Field(max_length=MAX_COLOR)]
 
 
 class CategoryResponse(BaseModel):
@@ -25,13 +34,13 @@ class CategoryResponse(BaseModel):
 
 
 class CategoryCreate(BaseModel):
-    name: str
-    color: str = "#666666"
+    name: Name
+    color: Color = "#666666"
 
 
 class CategoryUpdate(BaseModel):
-    name: str | None = None
-    color: str | None = None
+    name: Name | None = None
+    color: Color | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -42,7 +51,7 @@ class CategoryUpdate(BaseModel):
 
 
 class CategoryReorder(BaseModel):
-    ids: list[int]
+    ids: Annotated[list[int], Field(max_length=MAX_REORDER)]
 
 
 @router.get("/", response_model=List[CategoryResponse])
@@ -93,7 +102,7 @@ def update_category(
         .first()
     )
     if not db_cat:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise HTTPException(status_code=404, detail="分类不存在或已删除")
     
     update_data = cat.model_dump(exclude_unset=True)
     
@@ -148,7 +157,7 @@ def delete_category(
         .first()
     )
     if not db_cat:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise HTTPException(status_code=404, detail="分类不存在或已删除")
     # Set related notes' category_id to NULL before deleting the category
     db.query(Note).filter(
         Note.category_id == category_id,

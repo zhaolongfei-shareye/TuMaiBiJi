@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # （conftest 里那条不变量），而不是为了让用例好写——部署自检会拿一段已知违规的
     # 文本打一次，断言必须被拦下来，所以这里不存在"关了也没人发现"的静默失效。
     SEC_CHECK_ENABLED: bool = True
+    # 分享卡片上那张小程序码指向哪个版本。微信的默认值是 release，而"page 必须存在于该版本"
+    # 这条只在正式版里成立——所以在过审之前，那张码扫开必然是打不开的。填 trial 可以让
+    # 它指向体验版（只有体验成员扫得动），**发布前必须改回 release**，否则真实用户扫到的
+    # 是体验版链接。deploy.sh 每次都会把这个值打出来，就是为了别让它悄悄留在 trial。
+    SHARE_QR_ENV_VERSION: str = "release"
     REDIS_URL: str = "redis://localhost:6379"
     CORS_ORIGINS: str = "*"
     JWT_SECRET_KEY: str = ""

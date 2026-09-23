@@ -34,6 +34,7 @@ async def ingest_url(
         task_id,
         str(user.id),
         url,
+        user.generation,
         job_id=task_id,
         job_timeout=600,
     )
@@ -189,6 +190,7 @@ async def process_screenshots(
         task_id,
         str(user.id),
         batch["data"],
+        user.generation,
         job_id=task_id,
         job_timeout=600,
     )

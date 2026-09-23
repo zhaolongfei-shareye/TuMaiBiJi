@@ -91,7 +91,7 @@ from app.core.config import settings
 insp = inspect(create_engine(settings.DATABASE_URL))
 cols = {c["name"] for c in insp.get_columns("users")}
 tables = set(insp.get_table_names())
-missing = sorted({"quota_bonus", "invited_by"} - cols)
+missing = sorted({"quota_bonus", "invited_by", "generation"} - cols)
 if "invitations" not in tables:
     missing.append("invitations 表")
 if missing:
@@ -105,7 +105,7 @@ uniq = [
 if not uniq:
     print("  ✗ invitations.invitee_id 上没有唯一约束，同一个被邀请人可能被结好几次")
     raise SystemExit(1)
-print("  ✓ users.quota_bonus / users.invited_by / invitations（含 invitee 唯一约束）到位")
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束）到位")
 PY
 if [[ $? -ne 0 ]]; then
     echo "✗ schema 校验未通过，终止部署"
@@ -215,6 +215,10 @@ for d in /proc/[0-9]*; do
     [[ -n "$cmd" ]] || continue
     # 命令行含 deploy.sh 的是本脚本自身的子 shell，跳过自匹配
     [[ "$cmd" == *deploy.sh* || "$cmd" == *"systemctl "* ]] && continue
+    # 只看真能抢端口/抢队列的那类：uvicorn 和 rq worker（两个 unit 的 argv[0] 都是
+    # .venv/bin/python3）。上一轮 `./deploy.sh | tail -60` 里的 tail 继承了本目录当 cwd，
+    # 被判成"游离进程"，脚本还让我去 kill 它——假红比漏报更坑，因为它把注意力引偏。
+    [[ "$cmd" == *python* || "$cmd" == *uvicorn* || "$cmd" == *rq* ]] || continue
     svc=$(awk -F/ '/0::/{gsub(/\.service$/,"",$NF); print $NF}' "$d/cgroup" 2>/dev/null)
     if [[ "$svc" != "wtsj-api" && "$svc" != "wtsj-worker" ]]; then
         orphans+="${p}(${svc:-非systemd}) "
@@ -295,6 +299,14 @@ elif deg_missing:
     print("  · 可降级项未配置（服务照常，功能降级）：")
     for d in deg_missing:
         print(f"     - {d}")
+
+# 分享码指向哪个版本。留在 trial 就发布，等于让真实用户扫到一张只有体验成员
+# 才打得开的码——这个错在服务器上看不出来，只有拿别人手机扫才发现，所以每次部署都念一遍。
+if s.SHARE_QR_ENV_VERSION == "release":
+    print("  ✓ 分享小程序码指向 release（正式版），真实用户扫得开")
+else:
+    print(f"  !! SHARE_QR_ENV_VERSION={s.SHARE_QR_ENV_VERSION!r} —— 分享码指向的是非正式版，"
+          f"只有体验/开发成员扫得开。测试完必须改回 release 再发布。")
 PY
 
 # ---- 9. 内容安全端到端自检 ----
@@ -302,12 +314,11 @@ PY
 # 抖动变成用户存不了笔记），所以一旦 openid 传错、凭据失效或接口没开通，机制会**静默失效**，
 # 只有这里能发现。断言两头：正常文本要 pass，已知违规文本必须被判下来。
 echo ""
-echo ">>> 内容安全自检（真打 msgSecCheck）..."
+echo ">>> 内容安全自检（真打 msgSecCheck，用的是 100 次/天额度里的 2 次）..."
 python <<'PY'
-import sqlite3
-
 from app.core.config import settings
-from app.services.wechat import check_text
+from app.services.wechat import probe_sec_check
+import sqlite3
 
 if not settings.SEC_CHECK_ENABLED:
     print("  ✗ SEC_CHECK_ENABLED=false —— 生产环境内容安全被关掉，公开出口等于没有过滤")
@@ -324,18 +335,30 @@ if not row:
 openid = row[0]
 print(f"  用最新一个账号的 openid 自检（长度 {len(openid)}，值不打印）")
 
-ok_pass = check_text(openid, "厦门三日路线：鼓浪屿要早去早回，傍晚去沙坡尾拍照。")
-ok_risky = check_text(openid, "线上赌场 六合彩 特码 内部资料 稳赚 下注网址")
-print(f"  正常文本 → {ok_pass}；已知违规文本 → {ok_risky}")
+CLEAN = "厦门三日路线：鼓浪屿要早去早回，傍晚去沙坡尾拍照。"
+RISKY = "线上赌场 六合彩 特码 内部资料 稳赚 下注网址"
+a = probe_sec_check(openid, CLEAN)
+b = probe_sec_check(openid, RISKY)
+print(f"  正常文本 → {a['verdict']}；已知违规文本 → {b['verdict']}")
+
+# 三种"没检成"分开处理：额度是会自己好的，配置错不会。
+QUOTA = (45009, 44991)
+if a["errcode"] in QUOTA or b["errcode"] in QUOTA:
+    print("  !! 今天的 msgSecCheck 额度已打光 —— 这不算这次部署失败（代码没问题），")
+    print("     但今天剩下的所有内容检查都是静默放行，公开出口等于没过滤。")
+    print("     官方口径：未上架小程序 100 次/天，上架后 200 万次/天。")
+    print("     **提审/发布当天必须先跑通这条自检**：审核员会拿违规文本试 UGC 功能，")
+    print("     额度被前面的测试用掉的话，拦不住就是驳回。")
+    raise SystemExit(0)
 
 bad = []
-if ok_pass != "pass":
-    bad.append(f"正常文本被判成 {ok_pass}（接口或凭据有问题）")
-if ok_risky not in ("risky", "review"):
-    bad.append(f"违规文本没被判下来（{ok_risky}）——内容安全机制实际没在生效")
+if a["verdict"] != "pass":
+    bad.append(f"正常文本被判成 {a['verdict']}（errcode={a['errcode']}，接口或凭据有问题）")
+if b["verdict"] not in ("risky", "review"):
+    bad.append(f"违规文本没被判下来（{b['verdict']}，errcode={b['errcode']}）——内容安全机制实际没在生效")
+for msg in bad:
+    print(f"  ✗ {msg}")
 if bad:
-    for b in bad:
-        print(f"  ✗ {b}")
     raise SystemExit(1)
 print("  ✓ 内容安全在生效：正常放行、违规拦得下")
 PY

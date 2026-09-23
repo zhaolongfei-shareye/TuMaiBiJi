@@ -3,7 +3,7 @@ const { toneStyle } = require('../../utils/palette.js')
 
 const CONTACT_EMAIL = 'jacky28471258@gmail.com'
 const OFFICIAL_ACCOUNT = '杰克AI日记'
-const VERSION = '1.1.14'
+const VERSION = '1.1.15'
 
 // 每条都写清"做什么"和"什么情况下做不到"。宁可写边界，不堆形容词：
 // 这些句子最后都要能拿代码对上，读者照着做不会撞墙。
