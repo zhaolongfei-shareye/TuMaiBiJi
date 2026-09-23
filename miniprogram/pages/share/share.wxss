@@ -5,7 +5,8 @@
   width: 750rpx;
   height: 1200rpx;
   margin-left: calc(var(--sp-3) * -1);
-  margin-bottom: 200rpx;
+  /* 底部固定条现在是"模板名一行 + 按钮一行"，预览让开的距离跟着加一档。 */
+  margin-bottom: 300rpx;
   background: transparent;
 }
 
@@ -30,14 +31,25 @@
   bottom: 0;
   left: 0;
   right: 0;
-  display: flex;
-  gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom));
+  padding: 0 var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom));
   background: var(--bg-page);
 }
 
-.actions-bar .btn-secondary,
-.actions-bar .btn-primary {
+/* 只是告知"这张用的是哪套模板、去哪儿改"，不做成入口——同一件事只留一个地方能改。 */
+.tpl-caption {
+  padding: var(--sp-2) 0 var(--sp-1);
+  font-size: var(--fs-meta);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.actions-row {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.actions-row .btn-secondary,
+.actions-row .btn-primary {
   flex: 1;
   text-align: center;
   padding: var(--sp-3) 0;

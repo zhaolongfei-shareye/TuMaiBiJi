@@ -1,0 +1,66 @@
+<view class="container {{themeClass}}">
+  <view class="face-block card">
+    <view class="face" bindtap="onPickAvatar">
+      <image wx:if="{{avatar}}" src="{{avatar}}" mode="aspectFill" class="face-img" />
+      <view wx:else class="face-empty">
+        <text class="face-plus">+</text>
+      </view>
+    </view>
+    <view class="face-actions">
+      <text class="act" bindtap="onPickAvatar">{{avatar ? t.avatarChange : t.avatarPick}}</text>
+      <text wx:if="{{avatar}}" class="act act-muted" bindtap="onDropAvatar">{{t.avatarDrop}}</text>
+    </view>
+    <view class="face-hint">{{t.avatarHint}}</view>
+  </view>
+
+  <view class="card field">
+    <text class="field-label">{{t.profileName}}</text>
+    <input
+      class="field-input"
+      value="{{name}}"
+      maxlength="16"
+      placeholder="{{t.profileNamePh}}"
+      placeholder-class="field-ph"
+      bindinput="onNameInput"
+    />
+  </view>
+
+  <view class="card field">
+    <text class="field-label">{{t.profileSlogan}}</text>
+    <input
+      class="field-input"
+      value="{{slogan}}"
+      maxlength="24"
+      placeholder="{{t.profileSloganPh}}"
+      placeholder-class="field-ph"
+      bindinput="onSloganInput"
+    />
+  </view>
+
+  <view class="grid-head">{{t.profileTemplates}}</view>
+  <view class="grid">
+    <view
+      wx:for="{{templates}}"
+      wx:for-index="i"
+      wx:key="id"
+      class="cell {{template === item.id ? 'cell-on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onPickTemplate"
+    >
+      <canvas
+        type="2d"
+        id="tpl-{{item.id}}"
+        class="cell-canvas"
+        style="height: {{(thumbs[i] && thumbs[i].h) || 448}}rpx"
+      ></canvas>
+      <view class="cell-label">
+        <text>{{item.label}}</text>
+        <text wx:if="{{template === item.id}}" class="cell-on-dot"></text>
+      </view>
+    </view>
+  </view>
+
+  <view class="save-bar">
+    <view class="btn-primary save-btn {{saving ? 'dim' : ''}}" bindtap="onSave">{{t.save}}</view>
+  </view>
+</view>

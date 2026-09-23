@@ -1,5 +1,6 @@
 const app = getApp()
 const api = require('../../utils/api.js')
+const poster = require('../../utils/poster.js')
 const { t, texts } = require('../../utils/i18n.js')
 
 const CONTACT_EMAIL = 'jacky28471258@gmail.com'
@@ -21,12 +22,16 @@ Page({
     // 额度没读回来之前这两行留空：宁可少一行字，也不先写一个服务端不认的数
     quotaText: '',
     shareValue: '',
+    profileSummary: '',
   },
 
   onShow() {
     const userInfo = app.globalData.userInfo || {}
     const lang = userInfo.language || 'zh'
     const themeClass = app.applyTheme(userInfo.wallpaper || 'default')
+    // 分享形象是本机设置，读一次很便宜；从那一页改完回到这里要能立刻看到用的是哪套
+    const prof = poster.readProfile()
+    const tpl = poster.TEMPLATES.find((x) => x.id === (prof.template || poster.DEFAULT_TEMPLATE))
     this.setData({
       // 昵称取不到是常态（微信已不返回资料），给一个稳定称谓，
       // 不要显示"未登录"——登录是静默完成的，这里也没有可点的登录入口
@@ -34,6 +39,7 @@ Page({
       lang,
       t: texts(lang),
       themeClass,
+      profileSummary: tpl ? tpl.label : '',
     })
     app.setNavTitle('tabMe', lang)
     // 朋友圈这一路只在本页开：它要的是"单页可被转发"，别处不铺入口
@@ -68,6 +74,7 @@ Page({
     const routes = {
       categories: '/pages/categories/categories',
       wallpaper: '/pages/wallpaper/wallpaper',
+      profile: '/pages/profile/profile',
       about: '/pages/about/about',
     }
     const url = routes[page]

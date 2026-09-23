@@ -1,0 +1,167 @@
+/* 分享形象页。头像这块是页面唯一的大色块，其余保持中性，免得抢小样的样子。 */
+
+.face-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: var(--sp-5);
+}
+
+.face {
+  width: 220rpx;
+  height: 220rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--chip-idle);
+  border: var(--w-edge) solid var(--card-edge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.face-img {
+  width: 100%;
+  height: 100%;
+}
+
+.face-plus {
+  font-size: 76rpx;
+  font-weight: 300;
+  color: var(--text-tertiary);
+  line-height: 1;
+}
+
+.face-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-3);
+}
+
+.act {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--accent);
+  /* 两个动作挤在一行，不写死不换行的话"换一张"会被拆成两行 */
+  white-space: nowrap;
+}
+
+.act-muted {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.face-hint {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+/* ---------- 名称 / 一句话 ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.field-label {
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.field-input {
+  font-size: var(--fs-title);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.field-ph {
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+/* ---------- 模板格子 ---------- */
+
+.grid-head {
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  /* 保存条是浮在底部的，最后一排格子要能滚到它上面去 */
+  padding-bottom: 200rpx;
+}
+
+.cell {
+  width: 320rpx;
+  box-sizing: border-box;
+  padding: var(--sp-2);
+  border-radius: var(--r-card);
+  border: var(--w-edge) solid var(--card-edge);
+  background: var(--bg-card);
+}
+
+.cell-on {
+  border-color: var(--accent);
+  border-width: 4rpx;
+}
+
+/* 画布位图 750 宽，格子只有 320，高度由 JS 按比例算好写进 style，
+   这里给个兜底值，别让它在小样画出来之前塌成 0。 */
+.cell-canvas {
+  width: 288rpx;
+  height: 403rpx;
+  border-radius: var(--r-chip);
+  background: var(--chip-idle);
+}
+
+.cell-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cell-on .cell-label {
+  color: var(--text-primary);
+}
+
+.cell-on-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ---------- 保存 ---------- */
+
+.save-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--sp-3) var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom));
+  background: var(--bg-page);
+}
+
+.save-btn {
+  text-align: center;
+  padding: var(--sp-3) 0;
+  font-size: var(--fs-body);
+}
+
+.dim {
+  opacity: 0.45;
+}

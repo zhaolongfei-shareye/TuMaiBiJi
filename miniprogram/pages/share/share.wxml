@@ -1,12 +1,15 @@
 <view class="container {{themeClass}}">
   <canvas type="2d" id="shareCanvas" class="share-canvas" style="height: {{canvasH}}rpx"></canvas>
-  
+
   <view wx:if="{{generating}}" class="loading-overlay">
     <text>{{t.generatingShare}}</text>
   </view>
 
   <view class="actions-bar">
-    <view class="btn-secondary" bindtap="onCancel">{{t.cancel}}</view>
-    <view class="btn-primary" bindtap="saveToAlbum" disabled="{{!imagePath}}">{{t.saveToAlbum}}</view>
+    <view wx:if="{{templateLabel && !generating}}" class="tpl-caption">{{t.posterUsing}} {{templateLabel}}</view>
+    <view class="actions-row">
+      <view class="btn-secondary" bindtap="onCancel">{{t.cancel}}</view>
+      <view class="btn-primary" bindtap="saveToAlbum" disabled="{{!imagePath}}">{{t.saveToAlbum}}</view>
+    </view>
   </view>
 </view>
