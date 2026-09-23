@@ -31,7 +31,6 @@ Page({
     const themeClass = app.applyTheme(userInfo.wallpaper || 'default')
     // 分享形象是本机设置，读一次很便宜；从那一页改完回到这里要能立刻看到用的是哪套
     const prof = poster.readProfile()
-    const tpl = poster.TEMPLATES.find((x) => x.id === (prof.template || poster.DEFAULT_TEMPLATE))
     this.setData({
       // 昵称取不到是常态（微信已不返回资料），给一个稳定称谓，
       // 不要显示"未登录"——登录是静默完成的，这里也没有可点的登录入口
@@ -39,7 +38,7 @@ Page({
       lang,
       t: texts(lang),
       themeClass,
-      profileSummary: tpl ? tpl.label : '',
+      profileSummary: poster.templateLabel(prof.template || poster.DEFAULT_TEMPLATE, lang),
     })
     app.setNavTitle('tabMe', lang)
     // 朋友圈这一路只在本页开：它要的是"单页可被转发"，别处不铺入口

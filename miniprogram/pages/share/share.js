@@ -83,15 +83,16 @@ Page({
 
     // 先量后画：两趟必须用同一套数，否则量出来的高度和画出来的位置对不上。
     // 改宽高会清掉画布状态，所以模板里每种字体都重新设过。
+    // 量那一趟只需要字体度量，不需要真画出内容，所以临时画布给 750×750 就够——
+    // 750×2600 已经超出部分机型单张画布的上限，安卓上有崩的风险。
     canvas.width = poster.W
-    canvas.height = 2600
+    canvas.height = 750
     const plan = poster.planPoster(ctx, this._note, profile.template, profile, lang)
     canvas.width = plan.width
     canvas.height = plan.height
     poster.paintLayers(ctx, plan.layers, images)
 
-    const tpl = poster.TEMPLATES.find((x) => x.id === plan.template)
-    this.setData({ canvasH: plan.height, templateLabel: tpl ? tpl.label : '' })
+    this.setData({ canvasH: plan.height, templateLabel: poster.templateLabel(plan.template, lang) })
 
     await new Promise((done, fail) => {
       wx.canvasToTempFilePath({

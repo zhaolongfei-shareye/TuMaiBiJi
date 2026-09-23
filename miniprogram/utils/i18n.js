@@ -48,7 +48,6 @@ const i18n = {
     profileNamePh: '你的名字或昵称',
     profileSlogan: '一句话',
     profileSloganPh: '想印在图上的一句话，可不填',
-    profileTemplates: '分享图模板',
     profileSaved: '已保存',
     posterUsing: '当前模板',
     selectWallpaper: '选择壁纸',

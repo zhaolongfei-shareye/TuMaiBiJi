@@ -37,28 +37,29 @@
     />
   </view>
 
-  <view class="grid-head">{{t.profileTemplates}}</view>
-  <view class="grid">
-    <view
-      wx:for="{{templates}}"
-      wx:for-index="i"
-      wx:key="id"
-      class="cell {{template === item.id ? 'cell-on' : ''}}"
-      data-id="{{item.id}}"
-      bindtap="onPickTemplate"
-    >
-      <canvas
-        type="2d"
-        id="tpl-{{item.id}}"
-        class="cell-canvas"
-        style="height: {{(thumbs[i] && thumbs[i].h) || 448}}rpx"
-      ></canvas>
-      <view class="cell-label">
-        <text>{{item.label}}</text>
-        <text wx:if="{{template === item.id}}" class="cell-on-dot"></text>
+  <block wx:for="{{groups}}" wx:for-item="g" wx:key="id">
+    <view class="grid-head">{{g.label}}</view>
+    <view class="grid">
+      <view
+        wx:for="{{g.items}}"
+        wx:key="id"
+        class="cell {{template === item.id ? 'cell-on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickTemplate"
+      >
+        <canvas
+          type="2d"
+          id="tpl-{{item.id}}"
+          class="cell-canvas"
+          style="height: {{item.h}}rpx"
+        ></canvas>
+        <view class="cell-label">
+          <text>{{item.label}}</text>
+          <text wx:if="{{template === item.id}}" class="cell-on-dot"></text>
+        </view>
       </view>
     </view>
-  </view>
+  </block>
 
   <view class="save-bar">
     <view class="btn-primary save-btn {{saving ? 'dim' : ''}}" bindtap="onSave">{{t.save}}</view>

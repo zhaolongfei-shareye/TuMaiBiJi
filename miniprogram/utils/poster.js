@@ -7,7 +7,7 @@
 //
 // 色只从 palette.js 出。头像、名称、slogan 全部来自本机 storage（见 readProfile），
 // 服务器不存任何一张用户图片。
-const { toneFor, mix } = require('./palette.js')
+const { toneFor, mix, schemeFor, plateColors, withAlpha } = require('./palette.js')
 const { formatShortDate } = require('./date.js')
 const { t } = require('./i18n.js')
 
@@ -16,6 +16,13 @@ const INK = '#23252C'
 const BODY = '#3C4046'
 const MUTED = '#9A9EA6'
 const PAPER = '#FFFFFF'
+// 下面三个是"结构色"，不参与分类配色：波普的描边与压底黑带、文艺的暖纸。
+const HARD = '#12121A'
+const WARM = '#FFF6E5'
+// 实测模拟器里 serif / sans-serif / Georgia 三种量出来的宽度互不相同，说明真能解析出
+// 衬线体；机型没有这个字族时会退回默认字体，属于可接受降级，不会报错。
+const SERIF = 'serif'
+const MONO = 'Courier New'
 
 const PROFILE_KEY = 'poster_profile'
 const AVATAR_NAME = 'poster-avatar.img'
@@ -23,11 +30,35 @@ const AVATAR_STAGED = 'poster-avatar-staged.img'
 const DEFAULT_TEMPLATE = 'card'
 
 const TEMPLATES = [
-  { id: 'card', label: '经典卡片' },
-  { id: 'quote', label: '金句大字' },
-  { id: 'block', label: '撞色块' },
-  { id: 'clean', label: '极简' },
+  { id: 'card', label: '经典卡片', labelEn: 'Classic Card', group: 'classic' },
+  { id: 'quote', label: '金句大字', labelEn: 'Big Quote', group: 'classic' },
+  { id: 'block', label: '撞色块', labelEn: 'Color Block', group: 'classic' },
+  { id: 'clean', label: '极简', labelEn: 'Minimal', group: 'classic' },
+  { id: 'popGrid', label: '波普分格', labelEn: 'Pop Panels', group: 'bold' },
+  { id: 'popDots', label: '网点漫画', labelEn: 'Ben-Day Comic', group: 'bold' },
+  { id: 'acid', label: '荧光渐变', labelEn: 'Acid Gradient', group: 'bold' },
+  { id: 'cover', label: '人像封面', labelEn: 'Portrait Cover', group: 'bold' },
+  { id: 'lit', label: '纸间文艺', labelEn: 'Paper & Ink', group: 'bold' },
+  { id: 'spec', label: '规格卡', labelEn: 'Spec Sheet', group: 'bold' },
 ]
+const TEMPLATE_GROUPS = [
+  { id: 'classic', label: '经典款', labelEn: 'Classic' },
+  { id: 'bold', label: '个性款', labelEn: 'Expressive' },
+]
+
+// 海报出中英文两版，模板名也就得跟着语言走。
+// 名字留在模板表里而不是 i18n 里：加一套模板只改一处，不会漏掉一半键值。
+function templateLabel(id, lang) {
+  const tpl = TEMPLATES.find((x) => x.id === id)
+  if (!tpl) return ''
+  return lang === 'en' ? tpl.labelEn || tpl.label : tpl.label
+}
+
+function groupName(id, lang) {
+  const g = TEMPLATE_GROUPS.find((x) => x.id === id)
+  if (!g) return ''
+  return lang === 'en' ? g.labelEn || g.label : g.label
+}
 
 // ---------------------------------------------------------------- 本地形象
 
@@ -87,11 +118,19 @@ function dropAvatar() {
 
 const L = {
   fill: (x, y, w, h, color) => ({ k: 'fill', x, y, w, h, color }),
-  grad: (x, y, w, h, c1, c2) => ({ k: 'grad', x, y, w, h, c1, c2 }),
+  // dir: 'v'(默认，上→下) | 'h'(左→右)。stops 给了就按多段画，否则 c1→c2。
+  grad: (x, y, w, h, c1, c2, o) => Object.assign({ k: 'grad', x, y, w, h, c1, c2 }, o || {}),
+  // 径向：圆心 (x,y)，从内半径 r0 到外半径 r1，只在 box=[x,y,w,h] 里落笔。
+  // 画"人像后面那圈光""渐变底的一团雾"用这个。
+  radial: (x, y, r0, r1, c1, c2, box) => ({ k: 'radial', x, y, r0, r1, c1, c2, box }),
   rrect: (x, y, w, h, r, o) => Object.assign({ k: 'rrect', x, y, w, h, r }, o || {}),
   // y 是第一行基线，与 canvas 的 fillText 语义一致
   text: (o) => Object.assign({ k: 'text', lines: [], lh: 40, size: 28, weight: 'normal', color: INK, align: 'left' }, o),
   circle: (x, y, r, o) => Object.assign({ k: 'circle', x, y, r }, o || {}),
+  // 两点线段（杂志封面那类细线、波普的斜切条）
+  line: (x1, y1, x2, y2, w, color) => ({ k: 'line', x1, y1, x2, y2, w, color }),
+  // 网点阵：波普/孔版印刷的质感来源。gap 是间距，r 是点半径，oddRowShift 让隔行错开。
+  dots: (x, y, w, h, o) => Object.assign({ k: 'dots', x, y, w, h, gap: 30, r: 5, color: 'rgba(0,0,0,0.12)', oddRowShift: 0 }, o || {}),
   image: (key, x, y, w, h, o) => Object.assign({ k: 'image', key, x, y, w, h }, o || {}),
   avatar: (x, y, d, o) => Object.assign({ k: 'avatar', x, y, d, ring: 0 }, o || {}),
 }
@@ -132,6 +171,40 @@ function ensureRoundRect(ctx) {
   }
 }
 
+// 一行的落笔。track（字距）是"高级感"里最便宜的一招，但 canvas 没有 letterSpacing，
+// 只能逐字量宽往后推；整行的对齐要先把加过距的总宽算出来。
+// stroke 是描边：先描后填，字就带一圈外发光式的边（波普贴纸那种）。
+function drawLine(ctx, line, ly, y) {
+  const align = ly.align || 'left'
+  if (!ly.track) {
+    ctx.textAlign = align
+    if (ly.stroke) {
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = ly.strokeWidth || 8
+      ctx.strokeStyle = ly.stroke
+      ctx.strokeText(line, ly.x, y)
+    }
+    ctx.fillText(line, ly.x, y)
+    ctx.textAlign = 'left'
+    return
+  }
+  const chars = Array.from(line)
+  const widths = chars.map((c) => ctx.measureText(c).width)
+  const total = widths.reduce((a, b) => a + b, 0) + ly.track * Math.max(0, chars.length - 1)
+  let x = align === 'center' ? ly.x - total / 2 : align === 'right' ? ly.x - total : ly.x
+  ctx.textAlign = 'left'
+  if (ly.stroke) {
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = ly.strokeWidth || 8
+    ctx.strokeStyle = ly.stroke
+  }
+  chars.forEach((c, i) => {
+    if (ly.stroke) ctx.strokeText(c, x, y)
+    ctx.fillText(c, x, y)
+    x += widths[i] + ly.track
+  })
+}
+
 function paintLayers(ctx, layers, images) {
   ensureRoundRect(ctx)
   for (const ly of layers) {
@@ -141,11 +214,24 @@ function paintLayers(ctx, layers, images) {
         ctx.fillRect(ly.x, ly.y, ly.w, ly.h)
         break
       case 'grad': {
-        const g = ctx.createLinearGradient(ly.x, ly.y, ly.x, ly.y + ly.h)
+        const g = ly.dir === 'h'
+          ? ctx.createLinearGradient(ly.x, ly.y, ly.x + ly.w, ly.y)
+          : ctx.createLinearGradient(ly.x, ly.y, ly.x, ly.y + ly.h)
+        if (ly.stops) ly.stops.forEach((s) => g.addColorStop(s.at, s.color))
+        else {
+          g.addColorStop(0, ly.c1)
+          g.addColorStop(1, ly.c2)
+        }
+        ctx.fillStyle = g
+        ctx.fillRect(ly.x, ly.y, ly.w, ly.h)
+        break
+      }
+      case 'radial': {
+        const g = ctx.createRadialGradient(ly.x, ly.y, Math.max(0, ly.r0), ly.x, ly.y, ly.r1)
         g.addColorStop(0, ly.c1)
         g.addColorStop(1, ly.c2)
         ctx.fillStyle = g
-        ctx.fillRect(ly.x, ly.y, ly.w, ly.h)
+        ctx.fillRect(ly.box[0], ly.box[1], ly.box[2], ly.box[3])
         break
       }
       case 'rrect':
@@ -184,18 +270,62 @@ function paintLayers(ctx, layers, images) {
           ctx.stroke()
         }
         break
-      case 'text': {
-        ctx.font = `${ly.weight === 'bold' ? 'bold ' : ''}${ly.size}px sans-serif`
+      case 'line':
+        ctx.beginPath()
+        ctx.moveTo(ly.x1, ly.y1)
+        ctx.lineTo(ly.x2, ly.y2)
+        ctx.lineWidth = ly.w
+        ctx.strokeStyle = ly.color
+        ctx.stroke()
+        break
+      case 'dots': {
+        // 点数按面积走，设置页一格一张、十张同屏，所以超过上限就自动放大间距：
+        // 网点是质感，不是分辨率，糊成一片比稀一点更难看。
+        let step = Math.max(12, ly.gap)
+        while ((ly.w / step) * (ly.h / step) > 1500) step += 4
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(ly.x, ly.y, ly.w, ly.h)
+        ctx.clip()
         ctx.fillStyle = ly.color
-        ctx.textAlign = ly.align
+        let row = 0
+        for (let yy = ly.y + step / 2; yy <= ly.y + ly.h; yy += step, row++) {
+          const off = row % 2 ? ly.oddRowShift : 0
+          for (let xx = ly.x + step / 2 + off; xx <= ly.x + ly.w; xx += step) {
+            ctx.beginPath()
+            ctx.arc(xx, yy, ly.r, 0, Math.PI * 2)
+            ctx.fill()
+          }
+        }
+        ctx.restore()
+        break
+      }
+      case 'text': {
+        ctx.font = `${ly.weight === 'bold' ? 'bold ' : ''}${ly.size}px ${ly.fam || 'sans-serif'}`
+        ctx.fillStyle = ly.color
         if (ly.alpha != null) ctx.globalAlpha = ly.alpha
-        let y = ly.y
-        for (const line of ly.lines) {
-          ctx.fillText(line, ly.x, y)
-          y += ly.lh
+        if (ly.vert) {
+          // 竖排：从右往左一列一列走（中文的传统读序），每列从上往下逐字落笔。
+          // 文艺/杂志那类版式没有竖排就立不住，而横排堆字做不到。
+          const step = ly.lh
+          ly.lines.forEach((line, col) => {
+            const cx = ly.x - col * (step + (ly.colGap || 0))
+            let cy = ly.y
+            ctx.textAlign = 'center'
+            for (const ch of Array.from(line)) {
+              ctx.fillText(ch, cx, cy)
+              cy += step
+            }
+          })
+          ctx.textAlign = 'left'
+        } else {
+          let y = ly.y
+          for (const line of ly.lines) {
+            drawLine(ctx, line, ly, y)
+            y += ly.lh
+          }
         }
         if (ly.alpha != null) ctx.globalAlpha = 1
-        ctx.textAlign = 'left'
         break
       }
       case 'image': {
@@ -214,16 +344,37 @@ function paintLayers(ctx, layers, images) {
           }
           break
         }
-        if (ly.clipCircle) {
-          ctx.save()
-          ctx.beginPath()
-          ctx.arc(ly.x + ly.w / 2, ly.y + ly.h / 2, Math.min(ly.w, ly.h) / 2, 0, Math.PI * 2)
-          ctx.clip()
+        ctx.save()
+        ctx.beginPath()
+        if (ly.clipCircle) ctx.arc(ly.x + ly.w / 2, ly.y + ly.h / 2, Math.min(ly.w, ly.h) / 2, 0, Math.PI * 2)
+        else if (ly.r) ctx.roundRect(ly.x, ly.y, ly.w, ly.h, ly.r)
+        else ctx.rect(ly.x, ly.y, ly.w, ly.h)
+        ctx.clip()
+        // 下面三样都在同一个裁剪区里做，所以只影响这张图，不会碰已画好的别的层。
+        // filter 万一某机型不认，图就还是彩色，属于能接受的降级，不报错。
+        if (ly.gray) {
+          ctx.filter = 'grayscale(1)'
           drawCover(ctx, im, ly.x, ly.y, ly.w, ly.h)
-          ctx.restore()
+          ctx.filter = 'none'
         } else {
           drawCover(ctx, im, ly.x, ly.y, ly.w, ly.h)
         }
+        if (ly.tint) {
+          ctx.fillStyle = ly.tint
+          ctx.fillRect(ly.x, ly.y, ly.w, ly.h)
+        }
+        if (ly.fadeFrom != null) {
+          // destination-in + 一条由实到透的渐变 = 照片下半截融进底色，
+          // 人像封面那种"从画面里长出来"的效果靠这个，不需要模糊也不需要混合模式。
+          ctx.globalCompositeOperation = 'destination-in'
+          const g = ctx.createLinearGradient(ly.x, ly.y, ly.x, ly.y + ly.h)
+          g.addColorStop(0, 'rgba(0,0,0,1)')
+          g.addColorStop(Math.max(0.05, Math.min(0.95, ly.fadeFrom)), 'rgba(0,0,0,1)')
+          g.addColorStop(1, 'rgba(0,0,0,0)')
+          ctx.fillStyle = g
+          ctx.fillRect(ly.x, ly.y, ly.w, ly.h)
+        }
+        ctx.restore()
         break
       }
       case 'avatar': {
@@ -273,18 +424,58 @@ function drawCover(ctx, im, x, y, w, h) {
 
 // ---------------------------------------------------------------- 排版原语
 
-function wrap(ctx, text, maxW) {
-  const lines = []
-  let cur = ''
-  for (const ch of String(text == null ? '' : text)) {
-    if (ctx.measureText(cur + ch).width > maxW && cur) {
-      lines.push(cur)
-      cur = ch
+// 断行单位：中日韩逐字，拉丁按词。
+// 原来是一个字符一个字符地切，中文没问题，但英文会被从单词中间腰斩成
+// "理 / 论"式的一地碎片——海报要出英文版，这一步必须按词。
+const CJK = /[\u2E80-\u9FFF\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFFEF\u3000-\u303F]/
+function units(text) {
+  const s = String(text == null ? '' : text)
+  const out = []
+  let i = 0
+  while (i < s.length) {
+    const ch = s[i]
+    if (/\s/.test(ch)) {
+      let j = i
+      while (j < s.length && /\s/.test(s[j])) j++
+      out.push(s.slice(i, j))
+      i = j
+    } else if (CJK.test(ch)) {
+      out.push(ch)
+      i += 1
     } else {
-      cur += ch
+      let j = i
+      while (j < s.length && !/\s/.test(s[j]) && !CJK.test(s[j])) j++
+      out.push(s.slice(i, j))
+      i = j
     }
   }
-  if (cur) lines.push(cur)
+  return out
+}
+
+function wrap(ctx, text, maxW) {
+  const us = units(text)
+  const lines = []
+  let cur = ''
+  const push = (s) => {
+    const t = s.replace(/\s+$/, '')
+    if (t) lines.push(t)
+  }
+  for (const u of us) {
+    if (ctx.measureText(cur + u).width > maxW && cur.trim()) {
+      push(cur)
+      cur = u.replace(/^\s+/, '')
+      // 一个词比整行还长（长 URL、长英文术语）：只能硬切，切不断就整张海报少一行
+      while (ctx.measureText(cur).width > maxW && cur.length > 1) {
+        let k = 1
+        while (k < cur.length && ctx.measureText(cur.slice(0, k + 1)).width <= maxW) k++
+        lines.push(cur.slice(0, k))
+        cur = cur.slice(k)
+      }
+    } else {
+      cur += u
+    }
+  }
+  if (cur.trim()) push(cur)
   return lines
 }
 
@@ -293,7 +484,10 @@ function clip(ctx, text, maxW) {
   if (ctx.measureText(s).width <= maxW) return s
   let out = s
   while (out.length > 1 && ctx.measureText(out + '…').width > maxW) out = out.slice(0, -1)
-  return out + '…'
+  // 英文截到半个词比截到半个字难看十倍：往回收到最后那个完整词
+  const sp = out.lastIndexOf(' ')
+  if (sp > out.length * 0.55) out = out.slice(0, sp)
+  return out.trim() + '…'
 }
 
 // 取满 n 行，超出部分在最后一行加省略号
@@ -305,8 +499,29 @@ function fit(ctx, text, maxW, n) {
   return out
 }
 
-function font(ctx, size, bold) {
-  ctx.font = `${bold ? 'bold ' : ''}${size}px sans-serif`
+function font(ctx, size, bold, fam) {
+  ctx.font = `${bold ? 'bold ' : ''}${size}px ${fam || 'sans-serif'}`
+}
+
+// 带字距的文字要占多宽：字距只加在字与字之间，所以是 n-1 段。
+// 不做这个的话，加了 tracking 的眉标会悄悄超出画布右边。
+function trackW(ctx, text, track) {
+  const s = String(text == null ? '' : text)
+  const chars = Array.from(s)
+  if (!track || chars.length < 2) return ctx.measureText(s).width
+  return chars.reduce((a, c) => a + ctx.measureText(c).width, 0) + track * (chars.length - 1)
+}
+
+// 同上，但超出时按字距一起裁掉尾巴
+function clipTrack(ctx, text, maxW, track) {
+  const chars = Array.from(String(text == null ? '' : text))
+  if (trackW(ctx, chars.join(''), track) <= maxW) return chars.join('')
+  const out = []
+  for (const c of chars) {
+    if (trackW(ctx, out.concat([c, '…']).join(''), track) > maxW) break
+    out.push(c)
+  }
+  return out.join('') + '…'
 }
 
 // 海报上"这条笔记属于哪儿"那行小字，和列表/详情同一条规则：第一个标签优先
@@ -642,7 +857,393 @@ function planClean(ctx, d) {
   return { width: W, height, layers, template: 'clean' }
 }
 
-const PLANNERS = { card: planCard, quote: planQuote, block: planBlock, clean: planClean }
+// ---------------------------------------------------------------- 出跳款
+//
+// 上面四套全部跟着分类色走，安静克制，代价是"人人都一样、转发出去不显眼"。
+// 这一批改的是情绪：波普、网点、荧光渐变、人像封面、文艺、规格卡。
+// 两条共同规矩：
+// ① 色不再从分类借，而是从 palette.js 的 POSTER_SCHEMES 里按风格取一组，
+//    同一条笔记在同一风格下取到哪一组是确定的（换分类才会换色）。
+// ② 字号整体抬一档（56~82，原来最大 46）。社交平台上图是被缩着看的，
+//    字小就等于没有。
+// ③ 再加模板时高度不许超过 1360：安卓对单张画布的大小有上限，9:16（750×1334）
+//    已经够竖版用，这批最高的一套是 1350。
+
+// 码不当补丁：白贴纸 + 一块硬偏移的同色底托 + 一行小字。
+// 硬偏移代替投影是这批模板统一的收口手法——投影在低分屏上会糊成脏影。
+function qrSticker({ layers, x, y, size, offset, ink, label }) {
+  const drop = Math.round(size * 0.09)
+  const r = size * 0.18
+  layers.push(L.rrect(x + drop, y + drop, size, size, r, { fill: offset }))
+  layers.push(L.rrect(x, y, size, size, r, { fill: PAPER }))
+  const padIn = Math.round(size * 0.09)
+  layers.push(L.image('qr', x + padIn, y + padIn, size - padIn * 2, size - padIn * 2, { placeholder: '#EFEEE8' }))
+  if (label) {
+    layers.push(L.text({
+      x: x + size + drop, y: y + size + drop + 26, lines: [label], size: 18, color: ink, align: 'right',
+    }))
+  }
+  return size + drop + (label ? 34 : 0)
+}
+
+// 没设形象时，人像位不能空着。取标题第一个字当"丝网版上的大字"，
+// 换色不换字，四格各转一次色，看着仍像一版印出来的。
+function glyphPlate(ctx, { x, y, w, h, note, color }) {
+  const ch = clip(ctx, (note.title || '记').trim().slice(0, 1), w - 60)
+  return L.text({
+    x: x + w / 2, y: y + h / 2 + Math.round(h * 0.18), lines: [ch],
+    size: Math.round(Math.min(w, h) * 0.72), weight: 'bold', color, align: 'center',
+  })
+}
+
+// 底行给"署名 + 码贴纸"占多高。码贴纸带一行引导语，比署名块高，所以取两者的大。
+function footH(qrSize) {
+  return qrSize + 46
+}
+
+function planPopGrid(ctx, d) {
+  const { note, profile, hasAvatar, lang } = d
+  const s = schemeFor('pop', note.category_id)
+  const pad = 44
+  const gut = 10
+  const cellW = (W - gut) / 2
+  const cellH = 296
+  const gridH = cellH * 2 + gut
+  const qrSize = 118
+  const plates = plateColors(note.category_id)
+
+  font(ctx, 58, true)
+  const titleLines = fit(ctx, note.title || '', W - pad * 2, 2)
+  font(ctx, 24, false)
+  const sumLines = note.summary ? fit(ctx, note.summary, W - pad * 2, 2) : []
+  font(ctx, 22, true)
+  const kicker = clipTrack(ctx, [blockNameOf(note, lang), formatShortDate(note.created_at)].filter(Boolean).join(' · '), W - pad * 2, 3)
+
+  const kickerY = gridH + 76
+  const titleTop = kickerY + 34
+  const titleBottom = titleTop + (titleLines.length - 1) * 70 + 58
+  const sumTop = sumLines.length ? titleBottom + 26 : 0
+  const sumBottom = sumLines.length ? sumTop + (sumLines.length - 1) * 36 + 24 : titleBottom
+  const signTop = sumBottom + 44
+  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 30, size: 28, avatarD: 74, onDark: true, profile, hasAvatar })
+  const height = signTop + Math.max(sign.h, footH(qrSize)) + 48
+
+  const layers = []
+  layers.push(L.fill(0, 0, W, height, HARD))
+  plates.forEach((c, i) => {
+    const x = (i % 2) * (cellW + gut)
+    const y = Math.floor(i / 2) * (cellH + gut)
+    layers.push(L.fill(x, y, cellW, cellH, c))
+    layers.push(hasAvatar
+      // 先转灰再压一层半透明的版色：四格是同一张脸的四次套印，不是四张不同的图
+      ? L.image('avatar', x, y, cellW, cellH, { gray: true, tint: withAlpha(c, 0.62) })
+      : glyphPlate(ctx, { x, y, w: cellW, h: cellH, note, color: withAlpha(HARD, 0.2) }))
+  })
+  layers.push(L.text({ x: pad, y: kickerY, lines: [kicker], size: 22, weight: 'bold', color: s.bg, track: 3 }))
+  layers.push(L.text({ x: pad, y: titleTop + 58, lines: titleLines, lh: 70, size: 58, weight: 'bold', color: PAPER }))
+  if (sumLines.length) {
+    layers.push(L.text({ x: pad, y: sumTop + 24, lines: sumLines, lh: 36, size: 24, color: 'rgba(255,255,255,0.7)' }))
+  }
+  layers.push(...sign.layers)
+  qrSticker({ layers, x: W - pad - qrSize, y: signTop, size: qrSize, offset: s.accent, ink: 'rgba(255,255,255,0.66)', label: t('scanToView', lang) })
+  return { width: W, height, layers, template: 'popGrid' }
+}
+
+function planPopDots(ctx, d) {
+  const { note, profile, hasAvatar, lang } = d
+  const s = schemeFor('pop', note.category_id)
+  const pad = 46
+  const avatarD = 200
+  const qrSize = 116
+  const light = mix(s.bg, '#FFFFFF', 0.66)
+  // 主墨不是纯黑：往 HARD 里渗一点这组的底色，描边和字就和画面是一版的。
+  // 权重是 HARD 的占比——写反过一次，结果描边成了亮蓝，漫画的"黑框"就没了。
+  const dark = mix(HARD, s.bg, 0.85)
+
+  font(ctx, 22, true)
+  const kicker = clipTrack(ctx, [blockNameOf(note, lang), sourceLabelOf(note, lang)].filter(Boolean).join(' · '), W - pad * 2 - avatarD - 24, 2)
+  font(ctx, 76, true)
+  const titleLines = fit(ctx, note.title || '', W - pad * 2, 3)
+  font(ctx, 26, false)
+  const sumLines = note.summary ? fit(ctx, note.summary, W - pad * 2 - 56, 3) : []
+  font(ctx, 25, false)
+  const points = (note.key_points || []).slice(0, 2).map((p) => clip(ctx, p, W - pad * 2 - 120))
+
+  const kickerY = 100
+  const titleTop = Math.max(kickerY + 60, avatarD + 56) + 76
+  const titleBottom = titleTop + (titleLines.length - 1) * 88 + 76
+  const cardTop = titleBottom + 40
+  const cardH = 44 + (sumLines.length ? (sumLines.length - 1) * 40 + 34 + 22 : 0) + (points.length ? points.length * 44 : 0) + 20
+  const signTop = cardTop + cardH + 44
+  // 上面已经有一枚大头像了，署名行只留字：同一张脸上出现两次自己很难看
+  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 30, size: 28, avatarD: 74, profile, hasAvatar: false })
+  const height = signTop + Math.max(sign.h, footH(qrSize)) + 48
+
+  const layers = []
+  layers.push(L.fill(0, 0, W, height, light))
+  layers.push(L.dots(0, 0, W, cardTop - 20, { gap: 26, r: 4.5, color: s.dot, oddRowShift: 13 }))
+  // 套印错位：同一句标题先按强调色往右下偏 9px 画一遍，再用主墨色压在原位画
+  layers.push(L.text({ x: pad + 13, y: titleTop + 89, lines: titleLines, lh: 88, size: 76, weight: 'bold', color: s.accent }))
+  layers.push(L.text({ x: pad, y: titleTop + 76, lines: titleLines, lh: 88, size: 76, weight: 'bold', color: dark }))
+  layers.push(L.rrect(pad - 8, kickerY - 30, trackW(ctx, kicker, 2) + 32, 44, 22, { fill: s.accent }))
+  layers.push(L.text({ x: pad + 8, y: kickerY, lines: [kicker], size: 22, weight: 'bold', color: s.accentInk, track: 2 }))
+  if (hasAvatar) {
+    layers.push(L.avatar(W - pad - avatarD, 40, avatarD, { ring: 10, ringColor: dark, fallback: withAlpha(dark, 0.16) }))
+  } else {
+    layers.push(glyphPlate(ctx, { x: W - pad - avatarD, y: 40, w: avatarD, h: avatarD, note, color: withAlpha(dark, 0.18) }))
+  }
+  const drop = 12
+  layers.push(L.rrect(pad + drop, cardTop + drop, W - pad * 2, cardH, 28, { fill: withAlpha(dark, 0.9) }))
+  layers.push(L.rrect(pad, cardTop, W - pad * 2, cardH, 28, { fill: PAPER, stroke: dark, strokeWidth: 4 }))
+  let cy = cardTop + 44
+  if (sumLines.length) {
+    layers.push(L.text({ x: pad + 28, y: cy, lines: sumLines, lh: 40, size: 26, color: BODY }))
+    cy += (sumLines.length - 1) * 40 + 56
+  }
+  points.forEach((p, i) => {
+    // 序号点用白底：这组的底色本身就有浅的，蓝底压蓝字的"1"根本认不出来
+    layers.push(L.circle(pad + 46, cy - 9, 18, { fill: PAPER, stroke: dark, strokeWidth: 3 }))
+    layers.push(L.text({ x: pad + 46, y: cy - 2, lines: [String(i + 1)], size: 20, weight: 'bold', color: dark, align: 'center' }))
+    layers.push(L.text({ x: pad + 78, y: cy, lines: [p], size: 25, color: INK }))
+    cy += 44
+  })
+  layers.push(...sign.layers)
+  qrSticker({ layers, x: W - pad - qrSize, y: signTop, size: qrSize, offset: s.accent, ink: dark, label: t('scanToView', lang) })
+  return { width: W, height, layers, template: 'popDots' }
+}
+
+function planAcid(ctx, d) {
+  const { note, profile, hasAvatar, lang } = d
+  const s = schemeFor('neon', note.category_id)
+  const pad = 48
+  const avatarD = 380
+  const qrSize = 118
+  const topH = 540
+  const pillGap = 84
+
+  font(ctx, 22, true)
+  const kicker = clipTrack(ctx, [blockNameOf(note, lang), formatShortDate(note.created_at)].filter(Boolean).join(' · '), W - pad * 2, 4)
+  font(ctx, 72, true)
+  const titleLines = fit(ctx, note.title || '', W - pad * 2, 2)
+  font(ctx, 25, false)
+  const points = (note.key_points || []).slice(0, 3).map((p) => clip(ctx, p, W - pad * 2 - 76))
+
+  const avatarTop = 76
+  const kickerY = topH + 74
+  const titleTop = kickerY + 44
+  const titleBottom = titleTop + (titleLines.length - 1) * 88 + 72
+  const pointsTop = titleBottom + 44
+  const signTop = pointsTop + points.length * pillGap + (points.length ? 24 : 0)
+  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 30, size: 28, avatarD: 74, onDark: true, profile, hasAvatar: false })
+  const height = signTop + Math.max(sign.h, footH(qrSize)) + 48
+
+  const layers = []
+  layers.push(L.grad(0, 0, W, height, s.c1, s.c2, {
+    stops: [{ at: 0, color: s.c1 }, { at: 0.52, color: mix(s.c1, s.c2, 0.5) }, { at: 1, color: s.c2 }],
+  }))
+  // 人像后面那团光：径向渐变从半透明白走到全透，把大圆从渐变里"托"出来
+  layers.push(L.radial(W - pad - avatarD / 2, avatarTop + avatarD / 2, 0, avatarD * 1.05,
+    withAlpha('#FFFFFF', 0.38), withAlpha('#FFFFFF', 0), [0, 0, W, topH]))
+  layers.push(L.fill(0, topH - 1, W, height - topH + 1, withAlpha(HARD, 0.28)))
+  if (hasAvatar) {
+    layers.push(L.avatar(W - pad - avatarD, avatarTop, avatarD, { ring: 6, ringColor: withAlpha('#FFFFFF', 0.6), fallback: withAlpha('#FFFFFF', 0.2) }))
+  } else {
+    layers.push(glyphPlate(ctx, { x: W - pad - avatarD, y: avatarTop, w: avatarD, h: avatarD, note, color: withAlpha('#FFFFFF', 0.28) }))
+  }
+  layers.push(L.text({ x: pad, y: kickerY, lines: [kicker], size: 22, weight: 'bold', color: s.sub, track: 4 }))
+  layers.push(L.text({ x: pad, y: titleTop + 72, lines: titleLines, lh: 88, size: 72, weight: 'bold', color: s.ink }))
+  points.forEach((p, i) => {
+    const py = pointsTop + i * pillGap
+    layers.push(L.rrect(pad, py - 34, W - pad * 2, 76, 38, { fill: withAlpha('#FFFFFF', 0.14) }))
+    layers.push(L.circle(pad + 30, py, 22, { fill: s.accent }))
+    layers.push(L.text({ x: pad + 30, y: py + 8, lines: [String(i + 1)], size: 22, weight: 'bold', color: s.accentInk, align: 'center' }))
+    layers.push(L.text({ x: pad + 66, y: py + 9, lines: [p], size: 25, color: s.panelInk }))
+  })
+  layers.push(...sign.layers)
+  qrSticker({ layers, x: W - pad - qrSize, y: signTop, size: qrSize, offset: s.accent, ink: 'rgba(255,255,255,0.72)', label: t('scanToView', lang) })
+  return { width: W, height, layers, template: 'acid' }
+}
+
+function planCover(ctx, d) {
+  const { note, profile, hasAvatar, lang } = d
+  const s = schemeFor('mono', note.category_id)
+  const pad = 48
+  const photoH = 720
+  const qrSize = 116
+
+  font(ctx, 20, true)
+  const mast = clipTrack(ctx, [blockNameOf(note, lang), formatShortDate(note.created_at)].filter(Boolean).join(' · '), W - pad * 2 - 40, 4)
+  font(ctx, 76, true)
+  const titleLines = fit(ctx, note.title || '', W - pad * 2, 2)
+  font(ctx, 26, false)
+  const sumLines = note.summary ? fit(ctx, note.summary, W - pad * 2, 2) : []
+
+  const mastY = pad + 20
+  const titleTop = photoH + 76
+  const titleBottom = titleTop + (titleLines.length - 1) * 90 + 76
+  const sumTop = sumLines.length ? titleBottom + 30 : 0
+  const sumBottom = sumLines.length ? sumTop + (sumLines.length - 1) * 40 + 26 : titleBottom
+  const signTop = sumBottom + 52
+  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 30, size: 30, avatarD: 80, onDark: true, profile, hasAvatar })
+  const height = signTop + Math.max(sign.h, footH(qrSize)) + 48
+
+  const layers = []
+  layers.push(L.fill(0, 0, W, height, s.bg))
+  if (hasAvatar) {
+    // 整幅人像 + 灰度 + 从 58% 处往下淡出到底色：人是"从画面里长出来"的，
+    // 不是贴在上方的一张贴纸。淡出走 destination-in，不需要模糊也不需要混合模式。
+    layers.push(L.image('avatar', 0, 0, W, photoH, { gray: true, fadeFrom: 0.58 }))
+    layers.push(L.fill(0, 0, W, 150, withAlpha(s.bg, 0.34)))
+  } else {
+    layers.push(L.radial(W / 2, photoH * 0.42, 0, photoH * 0.72, withAlpha(s.accent, 0.3), withAlpha(s.bg, 0), [0, 0, W, photoH]))
+    layers.push(glyphPlate(ctx, { x: 0, y: 0, w: W, h: photoH, note, color: withAlpha(s.ink, 0.1) }))
+  }
+  const mastW = trackW(ctx, mast, 4) + 40
+  layers.push(L.rrect(pad, mastY - 30, mastW, 44, 22, { fill: withAlpha(HARD, 0.5) }))
+  layers.push(L.text({ x: pad + 20, y: mastY, lines: [mast], size: 20, weight: 'bold', color: '#FFFFFF', track: 4 }))
+  layers.push(L.text({ x: pad, y: titleTop + 76, lines: titleLines, lh: 90, size: 76, weight: 'bold', color: s.ink }))
+  layers.push(L.fill(pad, titleTop - 26, 84, 8, s.accent))
+  if (sumLines.length) {
+    layers.push(L.text({ x: pad, y: sumTop + 26, lines: sumLines, lh: 40, size: 26, color: s.sub }))
+  }
+  layers.push(...sign.layers)
+  qrSticker({ layers, x: W - pad - qrSize, y: signTop, size: qrSize, offset: s.accent, ink: s.sub, label: t('scanToView', lang) })
+  return { width: W, height, layers, template: 'cover' }
+}
+
+function planLit(ctx, d) {
+  const { note, profile, hasAvatar, lang } = d
+  const s = schemeFor('riso', note.category_id)
+  const pad = 56
+  const archW = 380
+  const archH = 380
+  const archX = (W - archW) / 2
+  const vertX = W - 44
+  const contentCx = (W - 68) / 2
+  const qrSize = 108
+
+  font(ctx, 20, true, SERIF)
+  const kicker = clipTrack(ctx, [blockNameOf(note, lang), formatShortDate(note.created_at)].filter(Boolean).join(' · '), W - pad * 2, 6)
+  font(ctx, 52, true, SERIF)
+  const titleLines = fit(ctx, note.title || '', W - pad * 2 - 60, 3)
+  font(ctx, 27, false)
+  const sumLines = note.summary ? fit(ctx, note.summary, W - pad * 2 - 50, 3) : []
+  // 竖排那一列写来源。不写 slogan：slogan 已经在署名行里，同一句话出现两次很廉价。
+  const vertText = (sourceLabelOf(note, lang) || formatShortDate(note.created_at)).slice(0, 10)
+  const vertStep = 40
+  const archTop = 92
+  const kickerY = archTop + archH + 76
+  const titleTop = kickerY + 40
+  const vertTop = titleTop
+  const titleBottom = titleTop + (titleLines.length - 1) * 74 + 52
+  const ruleY = titleBottom + 46
+  const sumTop = sumLines.length ? ruleY + 44 : 0
+  const sumBottom = sumLines.length ? sumTop + (sumLines.length - 1) * 42 + 27 : ruleY
+  const signTop = Math.max(sumBottom, vertTop + Array.from(vertText).length * vertStep) + 52
+  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 30, size: 28, avatarD: 72, profile, hasAvatar: false })
+  const height = signTop + Math.max(sign.h, footH(qrSize)) + 48
+
+  const layers = []
+  layers.push(L.fill(0, 0, W, height, s.bg))
+  // 拱门：四角全圆的长条 + 一条方角矩形盖住下半截的圆角
+  layers.push(L.rrect(archX, archTop, archW, archH, archW / 2, { fill: s.accent }))
+  layers.push(L.fill(archX, archTop + archH - archW / 2, archW, archW / 2, s.accent))
+  const badge = 220
+  if (hasAvatar) {
+    layers.push(L.avatar(archX + (archW - badge) / 2, archTop + 56, badge, { ring: 8, ringColor: s.bg, fallback: withAlpha(s.bg, 0.3) }))
+  } else {
+    layers.push(glyphPlate(ctx, { x: archX, y: archTop, w: archW, h: archH, note, color: withAlpha(s.accentInk, 0.22) }))
+  }
+  layers.push(L.text({ x: contentCx, y: kickerY, lines: [kicker], size: 20, weight: 'bold', color: s.sub, track: 6, align: 'center', fam: SERIF }))
+  layers.push(L.text({
+    x: contentCx, y: titleTop + 52, lines: titleLines, lh: 74, size: 52, weight: 'bold', color: s.ink, align: 'center', fam: SERIF,
+  }))
+  layers.push(L.line(pad, ruleY, W - pad, ruleY, 2, withAlpha(s.ink, 0.18)))
+  if (sumLines.length) {
+    layers.push(L.text({ x: pad, y: sumTop + 27, lines: sumLines, lh: 42, size: 27, color: mix(s.ink, s.bg, 0.78) }))
+  }
+  layers.push(L.text({
+    x: vertX, y: vertTop, lines: [vertText], vert: true, lh: vertStep, size: 28, color: withAlpha(s.ink, 0.62), fam: SERIF,
+  }))
+  layers.push(...sign.layers)
+  qrSticker({ layers, x: W - pad - qrSize, y: signTop, size: qrSize, offset: s.accent, ink: s.sub, label: t('scanToView', lang) })
+  return { width: W, height, layers, template: 'lit' }
+}
+
+function planSpec(ctx, d) {
+  const { note, profile, hasAvatar, lang } = d
+  const s = schemeFor('spec', note.category_id)
+  const pad = 52
+  const qrSize = 112
+  const rule = withAlpha(s.ink, 0.14)
+  const SPEC_MIN_H = 1040
+
+  font(ctx, 20, false, MONO)
+  const meta = clipTrack(ctx, [
+    `NO.${String((note.id || 0) % 1000).padStart(3, '0')}`,
+    formatShortDate(note.created_at),
+    sourceLabelOf(note, lang),
+  ].filter(Boolean).join('  /  '), W - pad * 2, 1)
+  font(ctx, 20, true)
+  const kicker = clipTrack(ctx, blockNameOf(note, lang), W - pad * 2, 5)
+  font(ctx, 60, true)
+  const titleLines = fit(ctx, note.title || '', W - pad * 2, 3)
+  font(ctx, 26, false)
+  const sumLines = note.summary ? fit(ctx, note.summary, W - pad * 2 - 60, 3) : []
+  font(ctx, 26, false)
+  const points = (note.key_points || []).slice(0, 4).map((p) => clip(ctx, p, W - pad * 2 - 150))
+
+  const metaY = pad + 20
+  const barY = metaY + 26
+  const kickerY = barY + 56
+  const titleTop = kickerY + 34
+  const titleBottom = titleTop + (titleLines.length - 1) * 74 + 60
+  let y = titleBottom + 44
+  const sumTop = sumLines.length ? y : 0
+  if (sumLines.length) y += (sumLines.length - 1) * 40 + 76
+  const listTop = points.length ? y : 0
+  if (points.length) y += points.length * 74
+  const foot = Math.max(
+    signRow({ ctx, x: pad, y: 0, maxW: W - pad * 2 - qrSize - 30, size: 28, avatarD: 76, profile, hasAvatar }).h,
+    footH(qrSize),
+  )
+  // 只有一条要点的笔记会让这张变成横图，所以给一个竖版下限。
+  // 多出来的空白对半分：一半进正文上方，一半留在正文与底行之间，底行贴住画布下沿，
+  // 看着像一张摊开的表格，而不是像缺了半页内容。
+  const natural = y + 40 + foot + 48
+  const height = Math.max(natural, SPEC_MIN_H)
+  const bodyShift = Math.round((height - natural) * 0.5)
+  const signTop = height - 48 - foot
+  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 30, size: 28, avatarD: 76, profile, hasAvatar })
+
+  const layers = []
+  layers.push(L.fill(0, 0, W, height, s.bg))
+  layers.push(L.grad(pad, barY, W - pad * 2, 10, s.accent, withAlpha(s.accent, 0.1), { dir: 'h' }))
+  layers.push(L.text({ x: pad, y: metaY, lines: [meta], size: 20, color: s.sub, fam: MONO, track: 1 }))
+  layers.push(L.text({ x: pad, y: kickerY, lines: [kicker], size: 20, weight: 'bold', color: s.accent, track: 5 }))
+  layers.push(L.text({ x: pad, y: titleTop + 60, lines: titleLines, lh: 74, size: 60, weight: 'bold', color: s.ink }))
+  if (sumLines.length) {
+    layers.push(L.text({ x: pad, y: sumTop + 26 + bodyShift, lines: sumLines, lh: 40, size: 26, color: mix(s.ink, s.bg, 0.78) }))
+  }
+  points.forEach((p, i) => {
+    const py = listTop + bodyShift + i * 74
+    layers.push(L.line(pad, py - 30, W - pad, py - 30, 1.5, rule))
+    layers.push(L.text({ x: pad, y: py + 4, lines: [String(i + 1).padStart(2, '0')], size: 22, color: s.accent, fam: MONO, weight: 'bold' }))
+    layers.push(L.text({ x: pad + 62, y: py + 4, lines: [p], size: 26, color: mix(s.ink, s.bg, 0.86) }))
+  })
+  if (points.length) {
+    const endY = listTop + bodyShift + points.length * 74 - 30
+    layers.push(L.line(pad, endY, W - pad, endY, 1.5, rule))
+  }
+  layers.push(...sign.layers)
+  qrSticker({ layers, x: W - pad - qrSize, y: signTop, size: qrSize, offset: s.accent, ink: s.sub, label: t('scanToView', lang) })
+  return { width: W, height, layers, template: 'spec' }
+}
+
+const PLANNERS = {
+  card: planCard, quote: planQuote, block: planBlock, clean: planClean,
+  popGrid: planPopGrid, popDots: planPopDots, acid: planAcid, cover: planCover, lit: planLit, spec: planSpec,
+}
 
 // ---------------------------------------------------------------- 入口
 
@@ -652,7 +1253,8 @@ function planPoster(ctx, note, templateId, profile, lang) {
   return PLANNERS[tpl](ctx, { note, profile: p, hasAvatar: !!p.avatarPath, lang: lang || 'zh' })
 }
 
-// 设置页那几格小样用的内置笔记：不依赖用户数据，四套模板都能立刻看到效果
+// 设置页那几格小样用的内置笔记：不依赖用户数据，每套模板都能立刻看到效果。
+// 中英文各一份，是因为英文的断行、字距、行高和中文不是一回事，只看中文会漏。
 const SAMPLE_NOTE = {
   id: 0,
   title: '把读过的东西存成能转发的笔记',
@@ -664,11 +1266,24 @@ const SAMPLE_NOTE = {
   created_at: '2026-09-23T10:00:00Z',
 }
 
+const SAMPLE_NOTE_EN = {
+  id: 0,
+  title: 'Turn anything you read into a note worth forwarding',
+  summary: 'A link, a screenshot, or two lines of your own — it comes back as something you can share.',
+  key_points: ['One line, set big enough to remember', 'Your own avatar and name printed on it'],
+  tags: ['Reading'],
+  category_id: 1,
+  source_type: 'manual',
+  created_at: '2026-09-23T10:00:00Z',
+}
+
 module.exports = {
   W,
   TEMPLATES,
+  TEMPLATE_GROUPS,
   DEFAULT_TEMPLATE,
   SAMPLE_NOTE,
+  SAMPLE_NOTE_EN,
   PROFILE_KEY,
   readProfile,
   writeProfile,
@@ -677,6 +1292,8 @@ module.exports = {
   commitAvatar,
   dropAvatar,
   planPoster,
+  templateLabel,
+  groupName,
   paintLayers,
   loadImage,
   quoteOf,
