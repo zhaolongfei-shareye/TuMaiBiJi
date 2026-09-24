@@ -42,6 +42,15 @@ Page({
     }
   },
 
+  copySource() {
+    const url = this.data.share && this.data.share.source_url
+    if (!url) return
+    wx.setClipboardData({
+      data: url,
+      success: () => wx.showToast({ title: t('linkCopied', this.data.lang), icon: 'success' }),
+    })
+  },
+
   onShareAppMessage() {
     const { share } = this.data
     if (!share) return {}

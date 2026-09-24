@@ -105,7 +105,14 @@ uniq = [
 if not uniq:
     print("  ✗ invitations.invitee_id 上没有唯一约束，同一个被邀请人可能被结好几次")
     raise SystemExit(1)
-print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束）到位")
+# 分享快照这两列是公开页要点/原文链接的唯一来源；缺一列就是扫码的人又只能看摘要。
+# 顺带确认老行上那个 7 天时间戳真的被清了——码印在纸上，不该一周就失效。
+sh_cols = {c["name"] for c in insp.get_columns("shares")}
+missing = sorted({"key_points", "source_url"} - sh_cols)
+if missing:
+    print(f"  ✗ shares 表迁移后仍缺：{'、'.join(missing)}")
+    raise SystemExit(1)
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束）/ shares.key_points / shares.source_url 到位")
 PY
 if [[ $? -ne 0 ]]; then
     echo "✗ schema 校验未通过，终止部署"

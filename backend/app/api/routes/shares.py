@@ -38,7 +38,9 @@ class ShareResponse(BaseModel):
     title: str | None
     summary: str | None
     tags: list | None
+    key_points: list | None
     key_links: list | None
+    source_url: str | None
     created_at: UTCDatetime
 
     class Config:
@@ -82,11 +84,12 @@ def create_share(
         return existing
 
     token = secrets.token_urlsafe(16)
+    # 不设 expires_at：这张码是印在海报上的纸，别人一周后扫到也应该能看到那条笔记。
+    # 原来给 7 天，等于每张发出去的海报都会在一周之后变成"分享已过期"。
     share = Share(
         user_id=str(user.id),
         note_id=note.id,
         token=token,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         **visible_fields(note),
     )
     db.add(share)

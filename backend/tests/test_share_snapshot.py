@@ -293,6 +293,33 @@ def test_过期之后重新建会给新码(client, db_session, person, monkeypat
     assert client.get(f"/api/shares/{new}").status_code == 200
 
 
+def test_公开页给得出要点和原文链接(client, db_session, person, monkeypatch):
+    """扫码的人要看到的是"这篇笔记"，不是只看到一段摘要。
+
+    之前公开页只有标题/摘要/标签，key_points 连快照都没进，source_url 也没有，
+    所以用户反馈"扫码后仍然看不到原文"——不是鉴权问题，是页面上确实没有内容。
+    """
+    _pass_all(monkeypatch)
+    nid = _mknote(
+        db_session, person.id, "带要点和链接的笔记",
+        summary="摘要一段", key_points=["要点甲", "要点乙"], source_url="https://example.com/a",
+    )
+    token = client.post("/api/shares/", headers=_hdr(person.id), json={"note_id": nid}).json()["token"]
+    body = client.get(f"/api/shares/{token}").json()
+    assert body["key_points"] == ["要点甲", "要点乙"]
+    assert body["source_url"] == "https://example.com/a"
+
+
+def test_新建分享不带过期时间(client, db_session, person, monkeypatch):
+    """这张码印在海报上，是纸。一周后失效等于每张发出去的海报都会变成死码。"""
+    _pass_all(monkeypatch)
+    nid = _mknote(db_session, person.id, "永不过期的码")
+    token = client.post("/api/shares/", headers=_hdr(person.id), json={"note_id": nid}).json()["token"]
+    s = db_session.query(Share).filter(Share.token == token).first()
+    assert s.expires_at is None
+    assert client.get(f"/api/shares/{token}").status_code == 200
+
+
 # ------------------------------------------- ④ 公开页显示的字段必须在送检范围内
 def test_公开页显示的列全部在送检范围内():
     """这条是防"清单再次漂移"的兜底，不是重复上面的用例。
@@ -301,7 +328,7 @@ def test_公开页显示的列全部在送检范围内():
     """
     note = Note(
         title="哨兵-标题", summary="哨兵-摘要", tags=["哨兵-标签"],
-        key_points=["哨兵-要点"], key_links=["哨兵-链接"],
+        key_points=["哨兵-要点"], key_links=["哨兵-链接"], source_url="哨兵-来源链接",
         content="哨兵-正文", original_content="哨兵-原文",
     )
     checked = set(map(str, sharing.public_fields(note)))

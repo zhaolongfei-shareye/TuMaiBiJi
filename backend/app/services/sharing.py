@@ -16,7 +16,9 @@ from app.models.note import Note
 from app.models.share import Share
 
 # 公开页上真正显示的那几列（= ShareResponse 除 token/created_at 之外的全部字段）。
-SNAPSHOT_COLUMNS = ("title", "summary", "tags", "key_links")
+# 原来只有 title/summary/tags/key_links，缺了 key_points 和 source_url——扫码的人
+# 只能看到一段摘要，既读不到要点，也拿不到原文链接，观感上就是"看不到原文"。
+SNAPSHOT_COLUMNS = ("title", "summary", "tags", "key_links", "key_points", "source_url")
 
 
 def public_fields(note: Note) -> tuple:
@@ -32,6 +34,7 @@ def public_fields(note: Note) -> tuple:
         note.tags,
         note.key_points,
         note.key_links,
+        note.source_url,
         note.content,
         note.original_content,
     )

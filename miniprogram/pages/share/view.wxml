@@ -16,6 +16,20 @@
 
       <text wx:if="{{share.summary}}" class="card-summary">{{share.summary}}</text>
 
+      <view wx:if="{{share.key_points && share.key_points.length}}" class="points">
+        <text class="section-label">{{t.keyPoints}}</text>
+        <view class="point-item" wx:for="{{share.key_points}}" wx:key="index">
+          <text class="point-num">{{index + 1}}</text>
+          <text class="point-text">{{item}}</text>
+        </view>
+      </view>
+
+      <!-- 小程序打不开任意外链，所以"去看原文"= 复制链接，和详情页同一套动作 -->
+      <view wx:if="{{share.source_url}}" class="source" bindtap="copySource">
+        <text class="section-label">{{t.sourceLink}}</text>
+        <text class="source-url">{{share.source_url}}</text>
+      </view>
+
       <view wx:if="{{share.tags && share.tags.length > 0}}" class="tags-row">
         <text wx:for="{{share.tags}}" wx:key="*this" class="tag">{{item}}</text>
       </view>
