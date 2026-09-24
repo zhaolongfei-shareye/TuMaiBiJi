@@ -70,9 +70,11 @@
   background: var(--bg-card);
 }
 
+/* 选中态只改颜色 + 描一圈外发光似的外环，边框粗细不能变：
+   变粗会让这一格高出去 2px，整排跟着抖一下，而他要求这排是"固定样式"。 */
 .pick-on {
   border-color: var(--accent);
-  border-width: 4rpx;
+  box-shadow: 0 0 0 3rpx var(--accent);
 }
 
 /* 位图 750 宽、这一格只有 176，高度由 JS 按比例算好写进 style，
