@@ -20,6 +20,9 @@ Page({
     canvasH: 1200,
     tpls: [],
     picked: '',
+    // 码要不要印在图上。发微信以外的平台（微博、小红书那类）常常看见第三方码就屏蔽整张图，
+    // 所以这一页允许只留文字。默认带码——在自己群里转发时码才是入口。
+    noQr: false,
   },
 
   async onLoad(options) {
@@ -111,7 +114,7 @@ Page({
     canvas.width = poster.W
     canvas.height = 750
     // 默认沿用「卡片模板」里选的那套；这一页手动换过之后以这一页的为准（不回写设置）
-    const plan = poster.planPoster(ctx, this._note, this.data.picked || profile.template, profile, lang)
+    const plan = poster.planPoster(ctx, this._note, this.data.picked || profile.template, profile, lang, { showQr: !this.data.noQr })
     canvas.width = plan.width
     canvas.height = plan.height
     poster.paintLayers(ctx, plan.layers, images)
@@ -183,6 +186,16 @@ Page({
       }
     }
     this.setData({ tpls: tpls.slice() })
+  },
+
+  // 开关只管上面那张成品图；下面那排小图按他说的保持固定样式，不跟着变。
+  onToggleQr() {
+    if (this.data.generating) return
+    this.setData({ noQr: !this.data.noQr })
+    this.render().catch((err) => {
+      console.error('换码之后重画失败', err)
+      wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
+    })
   },
 
   // 换一套模板 = 上面那张重画一遍（码、头像、正文都复用，只是排法换）

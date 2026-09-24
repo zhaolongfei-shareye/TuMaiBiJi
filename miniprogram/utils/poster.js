@@ -1282,10 +1282,62 @@ const PLANNERS = {
 
 // ---------------------------------------------------------------- 入口
 
-function planPoster(ctx, note, templateId, profile, lang) {
+// 关掉二维码：微信以外的平台看见第三方码就直接屏蔽这张图，所以宁可留字不留码。
+// 十套模板码位各不相同（有的在右下贴纸、有的在底部居中、有的在左下配一行侧标），
+// 与其十处各写一遍，不如从图层里把"这一张码 + 给它垫底的块 + 它下面那行引导语"摘掉，
+// 原地换成两行纯文字。摘的条件是中心离码中心近、面积不超过码的四倍，
+// 所以整张卡的大底不会被误摘。
+// 文字不许截成"图麦笔…"：那种位置宁可字号小一档，所以按框宽往下试字号而不是裁字。
+function fitSize(ctx, text, maxW, want, floor) {
+  let s = Math.max(want, floor)
+  for (;;) {
+    font(ctx, s, false)
+    if (ctx.measureText(text).width <= maxW || s <= floor) return s
+    s = Math.max(Math.round(s * 0.9), floor)
+  }
+}
+
+function stripQr(plan, ctx, lang) {
+  const qr = plan.layers.filter((l) => l.k === 'image' && l.key === 'qr').pop()
+  if (!qr) return plan
+  const cx = qr.x + qr.w / 2
+  const cy = qr.y + qr.h / 2
+  const qrArea = qr.w * qr.h
+  const scan = t('scanToView', lang)
+  const belongsToQr = (l) => {
+    if (l.k === 'text') return (l.lines || []).some((s) => String(s) === scan)
+    if (l.k !== 'rrect' && l.k !== 'circle') return false
+    const w = l.k === 'circle' ? l.r * 2 : l.w
+    const h = l.k === 'circle' ? l.r * 2 : l.h
+    const x = l.k === 'circle' ? l.x - l.r : l.x
+    const y = l.k === 'circle' ? l.y - l.r : l.y
+    return Math.abs(x + w / 2 - cx) < qr.w * 0.6 &&
+      Math.abs(y + h / 2 - cy) < qr.h * 0.6 &&
+      w * h <= qrArea * 4
+  }
+  const kept = plan.layers.filter((l) => l !== qr && !belongsToQr(l))
+  const cap = plan.layers.find((l) => l.k === 'text' && (l.lines || []).some((s) => String(s) === scan))
+  const ink = cap ? cap.color : INK
+  const name = t('appName', lang)
+  const hint = t('noQrMark', lang)
+  const maxW = qr.w - 8
+  const s1 = fitSize(ctx, name, maxW, Math.round(qr.w * 0.22), Math.round(qr.w * 0.1))
+  const s2 = fitSize(ctx, hint, maxW, Math.round(qr.w * 0.115), Math.round(qr.w * 0.06))
+  kept.push(L.text({
+    x: cx, y: cy - qr.w * 0.04 + s1 * 0.34, lines: [name], size: s1, weight: 'bold', color: ink, align: 'center',
+  }))
+  kept.push(L.text({
+    x: cx, y: cy + qr.w * 0.2 + s2 * 0.34, lines: [hint], size: s2, color: ink, align: 'center',
+  }))
+  return { width: plan.width, height: plan.height, layers: kept, template: plan.template }
+}
+
+function planPoster(ctx, note, templateId, profile, lang, opts) {
   const tpl = PLANNERS[templateId] ? templateId : DEFAULT_TEMPLATE
   const p = profile || {}
-  return PLANNERS[tpl](ctx, { note, profile: p, hasAvatar: !!p.avatarPath, lang: lang || 'zh' })
+  const o = opts || {}
+  const plan = PLANNERS[tpl](ctx, { note, profile: p, hasAvatar: !!p.avatarPath, lang: lang || 'zh' })
+  return o.showQr === false ? stripQr(plan, ctx, lang || 'zh') : plan
 }
 
 // 设置页那几格小样用的内置笔记：不依赖用户数据，每套模板都能立刻看到效果。

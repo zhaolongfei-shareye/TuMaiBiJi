@@ -1,6 +1,17 @@
 <view class="container {{themeClass}}">
   <canvas type="2d" id="shareCanvas" class="share-canvas" style="height: {{canvasH}}rpx"></canvas>
 
+  <!-- 码的开关。只影响上面这张成品图；下面那排小图按"固定样式"办，不跟着变。 -->
+  <view class="qr-opt">
+    <view class="pill {{noQr ? '' : 'pill-on'}}" bindtap="onToggleQr">
+      <view class="pill-dot"></view>
+    </view>
+    <view class="qr-opt-text">
+      <text class="qr-opt-label">{{t.qrToggle}}</text>
+      <text class="qr-opt-hint">{{t.qrToggleHint}}</text>
+    </view>
+  </view>
+
     <!-- 模板一排：左右滚着挑，默认是「卡片模板」里选的那套 -->
     <scroll-view wx:if="{{!generating && tpls.length}}" class="tpl-strip" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="tpl-strip-inner">

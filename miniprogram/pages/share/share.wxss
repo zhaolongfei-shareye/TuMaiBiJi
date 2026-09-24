@@ -15,6 +15,65 @@
   background: transparent;
 }
 
+/* 码开关那一行：药丸在左，标题 + 一句备注在右。放在海报和模板小图之间，
+   读起来就是"这张图的一个选项"，不是页面级设置。 */
+.qr-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: 2rpx;
+}
+
+.pill {
+  flex: none;
+  position: relative;
+  width: 92rpx;
+  height: 52rpx;
+  border-radius: 26rpx;
+  background: var(--face);
+  transition: background 160ms ease-out;
+}
+
+.pill-on {
+  background: var(--accent);
+}
+
+.pill-dot {
+  position: absolute;
+  top: 6rpx;
+  left: 6rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.2);
+  transition: transform 160ms ease-out;
+}
+
+.pill-on .pill-dot {
+  transform: translateX(40rpx);
+}
+
+.qr-opt-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.qr-opt-label {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.qr-opt-hint {
+  display: block;
+  margin-top: 4rpx;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-tight);
+  color: var(--text-secondary);
+}
+
 .loading-overlay {
   position: fixed;
   top: 0;
