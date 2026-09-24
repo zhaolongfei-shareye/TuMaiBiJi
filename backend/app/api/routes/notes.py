@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.core.quota_gate import require_note_room
 from app.core.timefmt import UTCDatetime, UTCDatetimeOrNone
 from app.core.errors import UserError
 from app.services.wechat import enforce_text_safety
@@ -179,7 +180,7 @@ def get_note(
 def create_note(
     note: NoteCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_note_room),
 ):
     from app.models.category import Category
     
@@ -202,7 +203,7 @@ def create_note(
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
-    quota.record_first_note(db_note, db, user)
+    quota.credit_first_note(db_note, db, user)
     return db_note
 
 
@@ -322,7 +323,7 @@ class NoteFromShare(BaseModel):
 def import_from_share(
     req: NoteFromShare,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_note_room),
 ):
     """把别人分享页上的这一条整份抄进自己的库。
 
@@ -361,4 +362,8 @@ def import_from_share(
     db.add(note)
     db.commit()
     db.refresh(note)
+    # 转存也算"这个人真的开始用起来了"：他名下第一条如果是从别人那篇抄来的，
+    # 那份 +10 就记在原笔记作者头上（同一篇只挣一次，判定在 quota 里）。
+    # 和动笔那条一样，结不到账不能让转存本身失败。
+    quota.credit_import(db, user, share.note_id)
     return note

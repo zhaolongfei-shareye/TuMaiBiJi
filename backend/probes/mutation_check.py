@@ -2,7 +2,8 @@
 
 全绿本身不证明测到了——断言可能压根没经过被改的那行，或者观测量本身就是被修的东西。
 每条变异跑完立刻还原；任何一条"改坏了还全绿"都说明那处修复是裸奔的。
-前 11 条是额度/注销那一轮，S1~S10 是分享快照这一轮。
+前 11 条是额度/注销那一轮，S1~S10 是分享快照这一轮，N1~N7 是 09-24 那次改口径
+（100 篇基础 + 动笔首篇或转存都算激活 + 同一篇只挣一次 + 带来几个人不限）。
 """
 import subprocess
 import sys
@@ -44,24 +45,81 @@ MUTATIONS = [
         "",
         "tests/test_worker_identity.py",
     ),
-    # 2026-09-24 取消 100 篇闸门之后，原来那两条"落库前复查额度"和两条"注销追回邀请奖励"
-    # 的锚点随着代码一起没了（那是设计如此，不是漏修）。换成守现在这两条：台账要记得上、
-    # 注销要把台账两个方向一起删掉。
     (
-        "A3 worker 落库后不记邀请台账",
+        "A3 worker 落库前不再复查额度",
         "app/tasks/ingest_tasks.py",
-        "            record_first_note(db, user_id, note)\n",
+        "            quota.ensure_room(user, db)\n",
         "",
-        "tests/test_quota_and_invite.py tests/test_worker_identity.py",
+        "tests/test_worker_identity.py",
     ),
     (
-        "A5 注销不删邀请台账（已注销的人还在替别人凑数）",
+        "A5 注销不追回邀请奖励",
         "app/api/routes/user.py",
-        "    db.query(Invitation).filter(\n"
-        "        (Invitation.invitee_id == user.id) | (Invitation.inviter_id == user.id)\n"
-        "    ).delete()\n",
-        "",
+        "        before = inviter.quota_bonus\n"
+        "        inviter.quota_bonus = before - record.reward\n",
+        "        pass\n",
         "tests/test_account_deletion.py",
+    ),
+    (
+        "A5 追回时不防负数（余额不够也照扣）",
+        "app/api/routes/user.py",
+        "        if inviter.quota_bonus < record.reward:\n",
+        "        if False:\n",
+        "tests/test_account_deletion.py",
+    ),
+    (
+        "N1 转存这条入口整个不结邀请账",
+        "app/api/routes/notes.py",
+        "    quota.credit_import(db, user, share.note_id)\n",
+        "",
+        "tests/test_quota_and_invite.py::Test转存也激活",
+    ),
+    (
+        "N2 「同一篇只挣一次」的索引没建上（最后一道闸没了）",
+        "app/models/invitation.py",
+        "        Index(\n"
+        "            \"ux_invitations_one_reward_per_source_note\",\n"
+        "            \"source_note_id\",\n"
+        "            unique=True,\n"
+        "            sqlite_where=text(\"source_note_id IS NOT NULL\"),\n"
+        "        ),\n",
+        "",
+        "tests/test_quota_and_invite.py::Test转存也激活::test_一篇一次是数据库挡的_而且只管填得上源笔记的行",
+    ),
+    # 没有"N3 去掉索引的 WHERE source_note_id IS NOT NULL"这一条：SQLite 和 Postgres
+    # 的唯一索引本来就把多个 NULL 当成互不相等，去掉这个 where 子句行为一字不变，
+    # 打了等于没打。真正的并发防线是 _settle 里那个 except，由下面 N3 盯。
+    (
+        "N4 转存不看「是不是新用户」，老用户抄一篇也照给钱",
+        "app/services/quota.py",
+        "    if src is None or not _first_note_of(db, importer):\n",
+        "    if src is None:\n",
+        "tests/test_quota_and_invite.py::Test转存也激活",
+    ),
+    (
+        "N5 转存不判「作者就是转存人自己」",
+        "app/services/quota.py",
+        "    if author_pk == importer.id:\n        return 0\n",
+        "",
+        "tests/test_quota_and_invite.py::Test转存也激活",
+    ),
+    (
+        "N6 转存这条入口没挂额度闸门（从这儿绕开上限）",
+        "app/api/routes/notes.py",
+        "    req: NoteFromShare,\n"
+        "    db: Session = Depends(get_db),\n"
+        "    user: User = Depends(require_note_room),\n",
+        "    req: NoteFromShare,\n"
+        "    db: Session = Depends(get_db),\n"
+        "    user: User = Depends(get_current_user),\n",
+        "tests/test_quota_and_invite.py::Test转存也激活",
+    ),
+    (
+        "N7 结转账目不兜索引异常（真并发撞上来时整条转存报 500）",
+        "app/services/quota.py",
+        "    except IntegrityError:\n",
+        "    except ValueError:\n",
+        "tests/test_quota_and_invite.py::Test转存也激活::test_并发撞索引那一趟只回零不把转存弄失败",
     ),
     (
         "A10 补报端点恒回 applied=true",
