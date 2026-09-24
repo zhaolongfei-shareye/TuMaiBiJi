@@ -16,7 +16,7 @@ Page({
     tagsText: '',
     tagList: [],
     categories: [],
-    categoryNames: ['不分类'],
+    categoryNames: [],
     selectedCategoryIndex: -1,
     originalCategoryId: null, // Store original category ID to avoid clearing on failed load
   },
@@ -27,6 +27,7 @@ Page({
     this.setData({
       lang,
       t: texts(lang),
+      categoryNames: [t('noCategory', lang)],
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
     })
     app.setNavTitle('writeNote', lang)
@@ -42,9 +43,10 @@ Page({
   async loadCategories() {
     try {
       const categories = await api.getCategories()
-      this.setData({ 
+      this.setData({
         categories,
-        categoryNames: ['不分类', ...categories.map(c => c.name)],
+        // 第一项是"未分类"这个概念，跟着界面语言走；后面那些是用户自己起的名字，不翻
+        categoryNames: [t('noCategory', this.data.lang)].concat(categories.map((c) => c.name)),
       })
     } catch (err) {
       console.error('加载分类失败', err)

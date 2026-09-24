@@ -116,6 +116,33 @@ Page({
     this.setData({ catIndex: Math.min(i, Math.max(this.data.categoryNames.length - 1, 0)) })
   },
 
+  // 整页是"收起"点击区，这颗开关自己吃掉点击，切语言不该顺手把展开的卡收掉。
+  noop() {},
+
+  // 语言只切界面：不动账号、不重新登录，服务端那一栏由 PUT /api/user/language 记着。
+  // 失败就说失败，不改本地那一份——否则界面变英文而服务器记的是中文，
+  // 换设备登录又弹回中文，那比切不过去更难解释。
+  async onSwitchLang(e) {
+    const key = e.currentTarget.dataset.key
+    if (!key || key === this.data.lang || this.data.busy) return
+    try {
+      await api.updateLanguage(key)
+    } catch (err) {
+      console.error('语言切换失败', err)
+      wx.showToast({ title: t('switchFailed', this.data.lang), icon: 'none' })
+      return
+    }
+    const app = getApp()
+    if (app.globalData.userInfo) app.globalData.userInfo.language = key
+    this.setData({ lang: key, t: texts(key), categoryNames: this.categoryNamesFor(key) })
+    this.onShow()
+  },
+
+  // 分类那一列的首项是"未分类"这个概念，跟着语言走；后面是用户自己起的名字，不翻。
+  categoryNamesFor(lang) {
+    return [t('noCategory', lang)].concat(this.data.categories.map((c) => c.name))
+  },
+
   // ---------- URL 导入 ----------
   onUrlInput(e) {
     const value = e.detail.value

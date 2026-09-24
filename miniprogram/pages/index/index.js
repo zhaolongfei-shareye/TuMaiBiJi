@@ -95,9 +95,17 @@ Page({
         if (d >= ms) month++
       })
       const total = all.length >= STATS_LIMIT ? `${STATS_LIMIT}+` : all.length
+      // 分隔符两侧各留一个全角空格：半角空格在这行字号下几乎看不出来，三段会糊成一串数字。
+      // 英文那一档没有全角标点的位置，照抄会让 "Week：3" 这种半中半英的写法出现在英文界面上，
+      // 所以标点单独按语言取一份，中文那一版一字未动。
+      const colon = lang === 'zh' ? '：' : ': '
+      const gap = lang === 'zh' ? '　|　' : '  |  '
       this.setData({
-        // 分隔符两侧各留一个全角空格：半角空格在这行字号下几乎看不出来，三段会糊成一串数字
-        statsText: `${t('statWeek', lang)}：${week}　|　${t('statMonth', lang)}：${month}　|　${t('statTotal', lang)}：${total}`,
+        statsText: [
+          `${t('statWeek', lang)}${colon}${week}`,
+          `${t('statMonth', lang)}${colon}${month}`,
+          `${t('statTotal', lang)}${colon}${total}`,
+        ].join(gap),
       })
     } catch (err) {
       // 这三个数是装饰，拿不到就整块不显示，绝不能把列表一起拖挂
@@ -173,7 +181,7 @@ Page({
     } catch (err) {
       console.error('加载笔记失败', err)
       this.setData({ loading: false, loadingMore: false })
-      wx.showToast({ title: '加载失败', icon: 'none' })
+      wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
     }
   },
 

@@ -13,7 +13,6 @@ function fmt(tpl, map) {
 
 Page({
   data: {
-    displayName: '图麦用户',
     lang: 'zh',
     themeClass: 'theme-default',
     t: texts('zh'),
@@ -32,9 +31,6 @@ Page({
     // 分享形象是本机设置，读一次很便宜；从那一页改完回到这里要能立刻看到用的是哪套
     const prof = poster.readProfile()
     this.setData({
-      // 昵称取不到是常态（微信已不返回资料），给一个稳定称谓，
-      // 不要显示"未登录"——登录是静默完成的，这里也没有可点的登录入口
-      displayName: userInfo.nickName || '图麦用户',
       lang,
       t: texts(lang),
       themeClass,

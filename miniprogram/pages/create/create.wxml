@@ -1,5 +1,14 @@
 <view class="container {{themeClass}}" bindtap="collapse">
-  <view class="page-title">{{t.createHeading}}</view>
+  <view class="title-row">
+    <view class="page-title">{{t.createHeading}}</view>
+    <!-- 语言切换放在第一眼这一行：需要它的人正是刚进来、还没摸到「我的」页的人。
+         只切界面文案，不动账号也不重新登录；服务端那一栏由 PUT /api/user/language 记着，
+         换设备登录还是他选的那一门。整页是"收起"点击区，所以这两段用 catchtap 不吃进 collapse。 -->
+    <view class="lang-switch" catchtap="noop" aria-label="{{t.selectLanguage}}">
+      <view class="lang-seg {{lang === 'zh' ? 'lang-on' : ''}}" catchtap="onSwitchLang" data-key="zh">中</view>
+      <view class="lang-seg {{lang === 'en' ? 'lang-on' : ''}}" catchtap="onSwitchLang" data-key="en">EN</view>
+    </view>
+  </view>
 
   <!-- 手风琴：同一时刻最多一张卡展开。展开那张自己长高，把输入框/按钮装在自己肚子里；
        另外两张缩成一条、功能名垂直居中，位置不跳。整页（.container）就是收起点击区，

@@ -1,3 +1,40 @@
+/* 标题那一行：左边大标题，右边语言切换。标题自己的字号字重和上下留白一点没动，
+   只是从"独占一行"变成"和切换器同一行"，所以整页高度不变。 */
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin: var(--sp-5) 0 var(--sp-4);
+}
+
+.title-row .page-title {
+  margin: 0;
+}
+
+/* 两段纯文字 + 一条下划线，不做成按钮：这一行的主角是标题，切换器要能看见但不抢位。
+   两段都带透明下边框，选中与否只差颜色和下划线，切换时字不会跳。 */
+.lang-switch {
+  display: flex;
+  align-items: baseline;
+  flex: none;
+  gap: 20rpx;
+}
+
+.lang-seg {
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: var(--text-tertiary);
+  border-bottom: 4rpx solid transparent;
+  padding: 0 2rpx 4rpx;
+}
+
+.lang-on {
+  color: var(--text-primary);
+  font-weight: 700;
+  border-bottom-color: var(--accent);
+}
+
 .page-title {
   font-size: var(--fs-h1);
   font-weight: 700;

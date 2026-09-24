@@ -10,7 +10,6 @@
     "pages/categories/categories",
     "pages/wallpaper/wallpaper",
     "pages/profile/profile",
-    "pages/language/language",
     "pages/about/about"
   ],
   "window": {
