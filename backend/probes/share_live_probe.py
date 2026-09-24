@@ -10,13 +10,15 @@
 它只用 deploy-test 那个账号（user_id=1），跑完自己把建出来的笔记删掉；
 别的账号一行都不碰。全程只在结尾断言"我建的行都清了"。
 
-要看的五件事：
+要看的六件事：
 ① 改标题之后，公开分享页不再挂着旧内容（隐私泄漏本体）。
 ② 反复建分享只有一张码，而且第二次起不再多打内容安全。
 ③ key_links 里塞违规文本要拦（这一轮新补的送检字段）。
 ④ 同一张小程序码第二次拿不重复打微信（看耗时差）。
 ⑤ 撤掉分享（2026-09-24 这批）：状态接口说的是实话、撤掉之后旧码当场扫不开、
    重新分享换的是全新的一张码而旧码不会复活、新码不再有七天过期、落地页带要点与链接。
+⑥ 作者署名与转存（2026-09-24 下午这批）：昵称进公开快照、转存抄的是同一份字段、
+   来源那一栏任何写接口都改不动、原笔记没了转存那篇照旧、撤掉之后那张码也转存不进东西。
 """
 import json
 import sys
@@ -201,7 +203,63 @@ def main():
           live and live[0].expires_at is None,
           f"expires_at={getattr(live[0], 'expires_at', None) if live else '无行'}")
 
+    # ---- ⑥ 作者署名与转存（2026-09-24 下午这批）--------------------------------
+    src_note_id = note_id
+    r = client.post("/api/shares/revoke", headers=hdr, json={"note_id": note_id})
+    check("⑥ 先撤掉上一组那张码，给这一组腾位置", r.status_code == 200, r.text[:60])
+    AUTHOR = f"探针作者{MARK[:4]}"
+    r = client.post("/api/shares/", headers=hdr, json={"note_id": note_id, "author_name": AUTHOR})
+    tok6 = r.json().get("token", "")
+    check("⑥ 创建分享时把作者昵称带上", r.status_code == 200 and r.json().get("author_name") == AUTHOR,
+          f"HTTP {r.status_code} · author_name={r.json().get('author_name')}")
+    pub6 = client.get(f"/api/shares/{tok6}")
+    check("⑥ 匿名扫开也能看到是谁写的（昵称在公开响应里）",
+          pub6.status_code == 200 and pub6.json().get("author_name") == AUTHOR, f"HTTP {pub6.status_code}")
+    snap = pub6.json()
+
+    r = client.post("/api/notes/from-share", headers=hdr, json={"token": tok6})
+    copy = r.json()
+    check("⑥ 转存成功并落进自己库", r.status_code == 200 and bool(copy.get("id")),
+          f"HTTP {r.status_code} · id={copy.get('id')}")
+    copy_id = copy.get("id")
+    fields = ("title", "summary", "tags", "key_points", "key_links", "source_url")
+    diff = [f for f in fields if snap.get(f) != copy.get(f)]
+    check("⑥ 整条抄：公开页那六个字段逐字一致", not diff, f"不一致：{diff}" if diff else "全等")
+    src = copy.get("imported_from") or {}
+    check("⑥ 来源钉在笔记上：作者、原笔记、时间都在",
+          src.get("author_name") == AUTHOR and src.get("share_token") == tok6
+          and bool(src.get("imported_at")) and src.get("title_at_import") == snap.get("title"),
+          f"{ {k: src.get(k) for k in ('author_name', 'title_at_import', 'imported_at')} }")
+    check("⑥ 来源类型标成转存，不是手写", copy.get("source_type") == "share_import", copy.get("source_type"))
+
+    r = client.put(f"/api/notes/{copy_id}", headers=hdr,
+                   json={"title": "改过的标题", "source_type": "manual",
+                         "imported_from": {"author_name": "李鬼", "share_token": "伪造"}})
+    after = client.get(f"/api/notes/{copy_id}", headers=hdr).json()
+    check("⑥ 正文改得动（这条还是他自己的笔记）", r.status_code == 200 and after.get("title") == "改过的标题",
+          f"HTTP {r.status_code}")
+    check("⑥ 来源那一栏改不动：伪造的字段整个被忽略",
+          (after.get("imported_from") or {}).get("author_name") == AUTHOR
+          and (after.get("imported_from") or {}).get("share_token") == tok6,
+          f"改后={ {k: (after.get('imported_from') or {}).get(k) for k in ('author_name', 'share_token')} }")
+    check("⑥ 来源类型也改不回手写", after.get("source_type") == "share_import", after.get("source_type"))
+    db.expire_all()
+    check("⑥ 转存不新增分享行：这篇自己没开过码",
+          db.query(Share).filter(Share.note_id == copy_id).count() == 0)
+
+    client.post("/api/shares/revoke", headers=hdr, json={"note_id": note_id})
+    r = client.post("/api/notes/from-share", headers=hdr, json={"token": tok6})
+    check("⑥ 撤掉分享之后，那张码也转存不进东西", r.status_code == 404, f"HTTP {r.status_code} {r.text[:70]}")
+    r = client.delete(f"/api/notes/{note_id}", headers=hdr)
+    check("⑥ 删掉原笔记", r.status_code in (200, 204), f"HTTP {r.status_code}")
+    still = client.get(f"/api/notes/{copy_id}", headers=hdr)
+    check("⑥ 原笔记没了，转存那篇照旧读得到、来源照旧在",
+          still.status_code == 200 and (still.json().get("imported_from") or {}).get("share_token") == tok6,
+          f"HTTP {still.status_code}")
+    note_id = copy_id      # 收尾按这一条清（原笔记已经删掉了）
+
     # ---- 收尾：只清这一次建的东西 ---------------------------------------------
+
     r = client.delete(f"/api/notes/{note_id}", headers=hdr)
     check("删掉这条笔记", r.status_code in (200, 204), f"HTTP {r.status_code}")
     check("删掉的笔记，那张码扫开是 404",
@@ -210,8 +268,8 @@ def main():
           client.get(f"/api/shares/{token}").status_code == 404)
     db.expire_all()
     check("收尾：这次标记的笔记一条不留", count_rows() == 0)
-    check("收尾：这条笔记名下没有孤儿分享行",
-          db.query(Share).filter(Share.note_id == note_id).count() == 0)
+    check("收尾：两条笔记名下都没有孤儿分享行",
+          db.query(Share).filter(Share.note_id.in_([note_id, src_note_id])).count() == 0)
     return finish(client, db, user, MARK)
 
 
