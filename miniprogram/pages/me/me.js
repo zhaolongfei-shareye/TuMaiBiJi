@@ -50,16 +50,14 @@ Page({
     this.loadQuota()
   },
 
-  // 额度和邀请进度都读这一个接口：数字只有一个来源，页面不再自己算 100。
+  // 已记条数读这一个接口：数字只有一个来源，页面不再自己算，也不再显示上限。
   async loadQuota() {
     const lang = this.data.lang
     try {
       const q = await api.getQuota()
       this.setData({
-        quotaText: `${q.used}/${q.limit}`,
-        shareValue: q.invites_left > 0
-          ? fmt(t('shareRewardN', lang), { n: q.reward_each })
-          : t('shareRewardMax', lang),
+        quotaText: fmt(t('notesCountN', lang), { n: q.used }),
+        shareValue: t('shareReward', lang),
       })
       this.quota = q
     } catch (err) {

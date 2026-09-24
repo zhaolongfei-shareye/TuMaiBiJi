@@ -142,20 +142,19 @@ class Test整条任务不串号:
         assert notes_of(db, uid) == 0, "A 的抓取结果落进了复用同一 id 的 B 名下"
         assert statuses[-1][1] == "failed"
 
-    def test_额度满了任务不落库(self, db, statuses, stub_pipeline, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 3)
-        u = mk_user(db, "task-full")
-        for i in range(3):
+    def test_名下已有许多条时任务照样落库(self, db, statuses, stub_pipeline):
+        """2026-09-24 取消篇数上限：worker 落库前不再查额度，这一条钉住"没有这道坎"。"""
+        u = mk_user(db, "task-many")
+        for i in range(12):
             db.add(Note(user_id=str(u.id), title=f"占位{i}", source_type="manual"))
         db.commit()
 
         ingest_tasks.process_url_task("t7", str(u.id), "https://a.b/c", 1)
 
-        assert notes_of(db, u.id) == 3, "第 4 篇还是被写进去了"
-        assert statuses[-1][1] == "failed"
-        assert "上限" in statuses[-1][2]["error"]
+        assert notes_of(db, u.id) == 13
+        assert statuses[-1][1] == "completed", statuses[-1]
 
-    def test_有额度且代数对得上时正常落库(self, db, statuses, stub_pipeline):
+    def test_代数对得上时正常落库(self, db, statuses, stub_pipeline):
         u = mk_user(db, "task-ok", generation=4)
 
         ingest_tasks.process_url_task("t8", str(u.id), "https://a.b/c", 4)
@@ -163,7 +162,7 @@ class Test整条任务不串号:
         assert notes_of(db, u.id) == 1
         assert statuses[-1][1] == "completed"
 
-    def test_截图那条任务同样受这两道闸门管(self, db, statuses, monkeypatch):
+    def test_截图那条任务同样受代数这道闸门管(self, db, statuses, monkeypatch):
         async def fake_ocr(images):
             return "识别出来的文字"
 
@@ -185,6 +184,6 @@ class Test整条任务不串号:
 
 
 class Test入账也要看代数:
-    def test_credit_first_note在账号消失后不炸(self, db, statuses):
-        """奖励到账是笔记落库之后的附加动作，人没了就该安静跳过，不能把整条任务判失败。"""
-        ingest_tasks.credit_first_note(db, "999999", Note(title="x", user_id="999999"))
+    def test_record_first_note在账号消失后不炸(self, db, statuses):
+        """记账是笔记落库之后的附加动作，人没了就该安静跳过，不能把整条任务判失败。"""
+        ingest_tasks.record_first_note(db, "999999", Note(title="x", user_id="999999"))

@@ -8,7 +8,6 @@ from app.db.database import get_db
 from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
-from app.core.quota_gate import require_note_room
 from app.core.timefmt import UTCDatetime, UTCDatetimeOrNone
 from app.core.errors import UserError
 from app.services.wechat import enforce_text_safety
@@ -180,7 +179,7 @@ def get_note(
 def create_note(
     note: NoteCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_note_room),
+    user: User = Depends(get_current_user),
 ):
     from app.models.category import Category
     
@@ -203,7 +202,7 @@ def create_note(
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
-    quota.credit_first_note(db_note, db, user)
+    quota.record_first_note(db_note, db, user)
     return db_note
 
 
@@ -323,7 +322,7 @@ class NoteFromShare(BaseModel):
 def import_from_share(
     req: NoteFromShare,
     db: Session = Depends(get_db),
-    user: User = Depends(require_note_room),
+    user: User = Depends(get_current_user),
 ):
     """把别人分享页上的这一条整份抄进自己的库。
 

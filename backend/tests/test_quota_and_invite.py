@@ -1,16 +1,18 @@
-"""额度闸门 + 邀请奖励的行为用例。
+"""邀请归因 + 「没有篇数闸门」的行为用例。
 
 四条不变量：
-① 到顶之后，手写 / 链接 / 截图三条入口**全部**拦下，且拦在真正干活之前（不入库、
-   不出队、不解图）。
-② 奖励只在"被邀请人写下第一篇笔记"那一刻结，一个被邀请人一辈子只能成就一次；
-   重复登录、重复提交、第二条笔记都不会再给。
-③ 邀请人这边有次数上限，到顶后不再到账（小号自邀自写的收益是被封住的，不是被消除的）。
-④ 数字只有一个来源：客户端拿 /api/user/quota，不硬编码。
+① 手写 / 链接 / 截图三条入口**都不因条数拦人**。2026-09-24 站长取消 100 篇上限，
+   这条从"到顶要拦住"翻成"多少条都放行"，所以这里断的是"存得进来"，而且要有
+   人真去撞一次（写满一百多条）——不然谁都不知道闸门哪天又被悄悄加回去。
+② 邀请只在"被邀请人写下第一篇笔记"那一刻记一笔台账，一个被邀请人一辈子只成就一次；
+   重复登录、重复提交、第二条笔记都不会再记。台账不再兑换任何额度。
+③ 数字只有一个来源：客户端拿 /api/user/quota，不硬编码；这个接口也不再回上限类字段。
+④ 归因四条不认（没带参数 / 自己邀自己 / 已有归属 / 名下已有笔记）照旧。
 
 限流在测试里关掉：这几个用例要打 /api/auth/wechat（5 次/分钟），而那层是 Redis 的事，
 不是这里的判定逻辑。
 """
+import importlib
 import os
 import sys
 
@@ -76,75 +78,62 @@ def create_note(client, user, title="一条笔记"):
     return client.post("/api/notes/", json={"title": title}, headers=hdr(user))
 
 
-class Test口径常量:
-    def test_三个数字钉住_改了就是改产品口径(self):
-        assert quota.BASE_QUOTA == 100
-        assert quota.INVITE_REWARD == 10
-        assert quota.MAX_REWARDED_INVITES == 5
+class Test没有篇数闸门:
+    def test_写满一百零五条之后仍然存得进来(self, client, db):
+        u = mk_user(db, "no-cap")
+        mk_notes(db, u, 105)
+        assert create_note(client, u, "第106条").status_code == 200
+        assert db.query(Note).filter(Note.user_id == str(u.id)).count() == 106
 
-
-class Test额度闸门:
-    def test_到顶后手写入口回403并且中文(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 3)
-        u = mk_user(db, "gate-manual")
-        for i in range(3):
-            assert create_note(client, u, f"第{i}条").status_code == 200
-        resp = create_note(client, u, "第4条")
-        assert resp.status_code == 403
-        assert "上限" in resp.json()["detail"]
-        assert db.query(Note).filter(Note.user_id == str(u.id)).count() == 3
-
-    def test_奖励过的额度确实抬高(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 3)
-        u = mk_user(db, "gate-bonus", bonus=2)
-        for i in range(5):
-            assert create_note(client, u, f"第{i}条").status_code == 200
-        assert create_note(client, u, "第6条").status_code == 403
-
-    def test_链接入口拦在出队之前(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 1)
-        u = mk_user(db, "gate-url")
-        assert create_note(client, u, "占位").status_code == 200
-
-        def boom(*a, **kw):
-            raise AssertionError("额度已满还去排队，worker 会白跑一趟")
-
-        monkeypatch.setattr(ingest_route, "get_queue", boom)
+    def test_链接入口不再拦人(self, client, db, monkeypatch):
+        u = mk_user(db, "url-open")
+        mk_notes(db, u, 105)
+        enqueued = []
+        monkeypatch.setattr(ingest_route, "get_queue", lambda: _Q(enqueued))
+        # set_task_status 要连 Redis，测试环境没有；这里断的是"放行并且真的入了队"。
+        monkeypatch.setattr(ingest_route, "set_task_status", lambda *a, **kw: None)
         resp = client.post(
             "/api/ingest/url", data={"url": "https://example.com/a"}, headers=hdr(u)
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 200, resp.text
+        assert len(enqueued) == 1, "放行却没入队，用户会一直等一个不会跑的任务"
 
-    def test_截图暂存与提交两处都拦(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 0)
-        u = mk_user(db, "gate-shot")
+    def test_截图暂存与提交两处都不拦(self, client, db):
+        u = mk_user(db, "shot-open")
+        mk_notes(db, u, 105)
         staged = client.post(
             "/api/ingest/screenshots/stage",
             files={"images": ("a.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
             headers=hdr(u),
         )
-        assert staged.status_code == 403
+        assert staged.status_code == 200, staged.text
+        # 批次不存在回 404 就够说明问题了：403 才是闸门
         processed = client.post(
             "/api/ingest/screenshots/process", data={"batch_id": "nope"}, headers=hdr(u)
         )
-        assert processed.status_code == 403
+        assert processed.status_code == 404
 
-    def test_额度没满时截图提交仍走原逻辑_批次不存在回404(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
-        u = mk_user(db, "gate-ok")
-        resp = client.post(
-            "/api/ingest/screenshots/process", data={"batch_id": "nope"}, headers=hdr(u)
-        )
-        assert resp.status_code == 404
+    def test_闸门模块和那几个常量都不存在了(self):
+        """把"闸门已被拆除"钉成断言：谁想加回去，得先让这几条红一次。"""
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("app.core.quota_gate")
+        for gone in ("ensure_room", "quota_limit", "rewarded_invites", "BASE_QUOTA",
+                     "INVITE_REWARD", "MAX_REWARDED_INVITES"):
+            assert not hasattr(quota, gone), f"quota.{gone} 又回来了"
 
-    def test_删掉一条就能再存(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 2)
-        u = mk_user(db, "gate-delete")
-        first = create_note(client, u, "第一条")
-        assert create_note(client, u, "第二条").status_code == 200
-        assert create_note(client, u, "第三条").status_code == 403
-        assert client.delete(f"/api/notes/{first.json()['id']}", headers=hdr(u)).status_code == 200
-        assert create_note(client, u, "第三条").status_code == 200
+    def test_三条入口的路由里没有额度依赖(self):
+        for f in ("app/api/routes/ingest.py", "app/api/routes/notes.py"):
+            src = open(os.path.join(os.path.dirname(__file__), "..", f), encoding="utf-8").read()
+            assert "require_note_room" not in src, f"{f} 又挂回闸门了"
+            assert "quota_gate" not in src, f"{f} 又 import 回闸门模块了"
+
+
+class _Q:
+    def __init__(self, sink):
+        self.sink = sink
+
+    def enqueue(self, *args, **kwargs):
+        self.sink.append((args, kwargs))
 
 
 class Test入队带上账号代数:
@@ -170,8 +159,7 @@ class Test入队带上账号代数:
         monkeypatch.setattr(ingest_route, "set_task_status", lambda *a, **kw: None)
         return r
 
-    def test_链接入口入队时带上generation(self, client, db, monkeypatch, rec):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+    def test_链接入口入队时带上generation(self, client, db, rec):
         u = mk_user(db, "wire-url", generation=7)
 
         resp = client.post("/api/ingest/url", data={"url": "https://example.com/a"}, headers=hdr(u))
@@ -183,8 +171,7 @@ class Test入队带上账号代数:
         assert args[2] == str(u.id)
         assert 7 in args, f"入队参数里没带上账号代数，worker 会退回只查存在性：{args}"
 
-    def test_截图入口入队时带上generation(self, client, db, monkeypatch, rec):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+    def test_截图入口入队时带上generation(self, client, db, rec):
         u = mk_user(db, "wire-shot", generation=9)
 
         staged = client.post(
@@ -230,8 +217,7 @@ class Test限流挂没挂:
 
 
 class Test额度接口:
-    def test_返回的就是客户端要的那几个数(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+    def test_只回已记条数与分类数_没有上限类字段(self, client, db):
         u = mk_user(db, "quota-view", bonus=10)
         create_note(client, u, "一条")
         client.post("/api/categories/", json={"name": "旅行"}, headers=hdr(u))
@@ -240,14 +226,15 @@ class Test额度接口:
             "used": 1,
             # 分类条数一起给：注销那段确认文案要报出真实条数，不能含糊说"你的数据"
             "categories": 1,
-            "limit": 110,
-            "remaining": 109,
-            "base": 100,
-            "bonus": 10,
-            "reward_each": 10,
-            "invites_rewarded": 0,
-            "invites_left": 5,
         }
+        # bonus 列还在库里，但接口不再往外报，客户端也就无从显示一个没有意义的数
+        assert "limit" not in body and "remaining" not in body and "invites_left" not in body
+
+    def test_条数是真的_写多少回多少(self, client, db):
+        u = mk_user(db, "quota-count")
+        for i in range(3):
+            assert create_note(client, u, f"第{i}条").status_code == 200
+        assert client.get("/api/user/quota", headers=hdr(u)).json()["used"] == 3
 
 
 class Test邀请归因:
@@ -291,7 +278,7 @@ class Test热启动补报归因:
     """已经登录着的人从分享卡片进来，只走 onShow、不走 onLaunch。
 
     登录那条路带不上 inviter，所以他写下第一篇时服务端根本不知道有这回事；等他下次
-    冷启再报，名下已经有笔记了，attribute_inviter 又会照规矩拒掉——这笔奖励就永久丢了。
+    冷启再报，名下已经有笔记了，attribute_inviter 又会照规矩拒掉——这笔账就永久丢了。
     POST /api/user/inviter 是补那一次的口子。
     """
 
@@ -309,16 +296,14 @@ class Test热启动补报归因:
         db.expire_all()
         assert db.get(User, late.id).invited_by == inviter.id
 
-    def test_补报过之后写第一篇能正常结账(self, client, db, monkeypatch):
-        """这条才是补报的意义所在：光把 invited_by 写上不算，钱要能结出来。"""
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+    def test_补报过之后写第一篇能正常记账(self, client, db, monkeypatch):
+        """这条才是补报的意义所在：光把 invited_by 写上不算，账要能记上。"""
         inviter = mk_user(db, "late-pay-inviter")
         late = login(client, db, monkeypatch, "late-pay-user", None)
         assert self.post_inviter(client, late, inviter.id).json()["applied"] is True
 
         assert create_note(client, late, "补报之后的第一篇").status_code == 200
-        db.refresh(inviter)
-        assert inviter.quota_bonus == quota.INVITE_REWARD
+        assert db.query(Invitation).filter(Invitation.invitee_id == late.id).count() == 1
 
     def test_已有归属时改不动(self, client, db, monkeypatch):
         i1 = mk_user(db, "late-i1")
@@ -354,35 +339,29 @@ class Test热启动补报归因:
         assert self.post_inviter(client, u, "abc").status_code == 422
 
 
-class Test邀请到账:
-    def test_写下第一篇才到账_且只到一次(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+class Test邀请台账:
+    def test_写下第一篇才记账_且只记一次(self, client, db, monkeypatch):
         inviter = mk_user(db, "pay-inviter")
         invitee = login(client, db, monkeypatch, "pay-invitee", inviter.id)
-        assert inviter.quota_bonus == 0
+        assert db.query(Invitation).count() == 0, "人还没写笔记，账就先记上了"
         assert create_note(client, invitee, "第一篇").status_code == 200
-
-        db.refresh(inviter)
-        assert inviter.quota_bonus == 10
         assert db.query(Invitation).filter(Invitation.invitee_id == invitee.id).count() == 1
 
-        # 第二篇、以及重复调用都不该再加
+        # 第二篇、以及对第二篇的重复调用都不该再记
         assert create_note(client, invitee, "第二篇").status_code == 200
         note2 = db.query(Note).filter(Note.user_id == str(invitee.id)).order_by(Note.id.desc()).first()
-        assert quota.credit_first_note(note2, db, invitee) == 0
-        db.refresh(inviter)
-        assert inviter.quota_bonus == 10
+        assert quota.record_first_note(note2, db, invitee) is False
+        assert db.query(Invitation).count() == 1
 
-    def test_没被邀请的人写笔记不给任何人钱(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+    def test_没被邀请的人写笔记不记任何账(self, client, db, monkeypatch):
         lonely = login(client, db, monkeypatch, "lonely", None)
         assert create_note(client, lonely, "自己的第一篇").status_code == 200
         assert db.query(Invitation).count() == 0
 
-    def test_同一篇被连结两次不报错也不重复给钱(self, db):
-        """连点两次保存时，两趟结算可能都以为"这就是他的第一篇"。
+    def test_同一篇被连点两次不报错也不重复记(self, db):
+        """连点两次保存时，两趟都可能以为"这就是他的第一篇"。
 
-        这种交错下第二次结算必须静默返回 0，而不是把 IntegrityError 顶到接口上——
+        这种交错下第二次必须静默返回 False，而不是把 IntegrityError 顶到接口上——
         笔记已经存下来了，回 500 等于告诉用户"没存上"。
         """
         inviter = mk_user(db, "twice-inviter")
@@ -393,32 +372,27 @@ class Test邀请到账:
         db.add(note)
         db.commit()
 
-        assert quota.credit_first_note(note, db, invitee) == quota.INVITE_REWARD
-        assert quota.credit_first_note(note, db, invitee) == 0
-        db.refresh(inviter)
-        assert inviter.quota_bonus == quota.INVITE_REWARD
+        assert quota.record_first_note(note, db, invitee) is True
+        assert quota.record_first_note(note, db, invitee) is False
         assert db.query(Invitation).count() == 1
 
-    def test_名下已有笔记的人补不回来(self, client, db, monkeypatch):
-        """到账的触发条件是"写下第一篇"，不是"这人欠他一笔"。
+    def test_名下已有笔记的人补不回来(self, db):
+        """记账的触发条件是"写下第一篇"，不是"这人欠他一笔"。
 
         归因那一步本来就要求 0 篇，所以这个状态正常走不到；写出来是把规则钉在
         判定函数上，而不是钉在"上游应该不会漏进来"的指望上。
         """
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
         inviter = mk_user(db, "late-inviter")
         invitee = mk_user(db, "late-invitee")
         invitee.invited_by = inviter.id
         db.commit()
         mk_notes(db, invitee, 2)
         last = db.query(Note).filter(Note.user_id == str(invitee.id)).order_by(Note.id.desc()).first()
-        assert quota.credit_first_note(last, db, invitee) == 0
-        db.refresh(inviter)
-        assert inviter.quota_bonus == 0
+        assert quota.record_first_note(last, db, invitee) is False
         assert db.query(Invitation).count() == 0
 
-    def test_自己指向自己的台账也不结(self, db):
-        """登录那条路写不出这种状态（attribute_inviter 先拒），但结钱不该依赖上游不漏。
+    def test_自己指向自己的台账也不记(self, db):
+        """登录那条路写不出这种状态（attribute_inviter 先拒），但记账不该依赖上游不漏。
 
         集成探针就是直接改库摆出这个状态时把它抓出来的。
         """
@@ -428,48 +402,44 @@ class Test邀请到账:
         note = Note(user_id=str(u.id), title="自己的第一篇", source_type="manual")
         db.add(note)
         db.commit()
-        assert quota.credit_first_note(note, db, u) == 0
-        db.refresh(u)
-        assert u.quota_bonus == 0
+        assert quota.record_first_note(note, db, u) is False
         assert db.query(Invitation).count() == 0
 
-    def test_指向不存在账号的归因不结也不报错(self, db):
+    def test_指向不存在账号的归因不记也不报错(self, db):
         u = mk_user(db, "ghost-credit")
         u.invited_by = 987654
         db.commit()
         note = Note(user_id=str(u.id), title="第一篇", source_type="manual")
         db.add(note)
         db.commit()
-        assert quota.credit_first_note(note, db, u) == 0
+        assert quota.record_first_note(note, db, u) is False
         assert db.query(Invitation).count() == 0
 
-    def test_邀请人次数上限封住收益(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
-        inviter = mk_user(db, "cap-inviter")
-        for i in range(quota.MAX_REWARDED_INVITES + 2):
-            invitee = login(client, db, monkeypatch, f"cap-invitee-{i}", inviter.id)
+    def test_邀请多少个都只记账_不再抬任何人的额度(self, client, db, monkeypatch):
+        """取消额度之后这条取代原来的"次数上限封住收益"：台账不限笔数，但谁也不涨额度。"""
+        inviter = mk_user(db, "many-inviter", bonus=37)
+        for i in range(7):
+            invitee = login(client, db, monkeypatch, f"many-invitee-{i}", inviter.id)
             assert create_note(client, invitee, f"第{i}篇").status_code == 200
+        assert db.query(Invitation).filter(Invitation.inviter_id == inviter.id).count() == 7
+        assert all(r.reward == 0 for r in db.query(Invitation).all()), "台账里还写着奖励数"
         db.refresh(inviter)
-        assert inviter.quota_bonus == quota.INVITE_REWARD * quota.MAX_REWARDED_INVITES
-        assert db.query(Invitation).filter(Invitation.inviter_id == inviter.id).count() == 5
+        assert inviter.quota_bonus == 37, "bonus 列已停用，不该再被加减"
         body = client.get("/api/user/quota", headers=hdr(inviter)).json()
-        assert body["invites_rewarded"] == 5
-        assert body["invites_left"] == 0
-        assert body["limit"] == 150
+        assert set(body) == {"used", "categories"}
 
     def test_唯一约束是数据库挡的_不是应用层记得住(self, db):
-        db.add(Invitation(inviter_id=1, invitee_id=7, reward=10))
+        db.add(Invitation(inviter_id=1, invitee_id=7, reward=0))
         db.commit()
-        db.add(Invitation(inviter_id=2, invitee_id=7, reward=10))
+        db.add(Invitation(inviter_id=2, invitee_id=7, reward=0))
         with pytest.raises(IntegrityError):
             db.commit()
         db.rollback()
 
-    def test_链接与截图这两条路同样到账(self, db, monkeypatch):
+    def test_链接与截图这两条路同样记账(self, db, monkeypatch):
         """worker 那边也是"写下笔记"的一条路，必须接同一个函数。"""
         from app.tasks import ingest_tasks
 
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
         inviter = mk_user(db, "worker-inviter")
         invitee = mk_user(db, "worker-invitee")
         invitee.invited_by = inviter.id
@@ -499,7 +469,8 @@ class Test邀请到账:
 
         assert seen.get("completed"), seen
         db.expire_all()
-        assert db.get(User, inviter.id).quota_bonus == 10
+        assert db.query(Invitation).filter(Invitation.invitee_id == invitee.id).count() == 1
+        assert db.get(User, inviter.id).quota_bonus == 0
 
 
 class Test迁移与模型对齐:
@@ -535,6 +506,14 @@ class Test迁移与模型对齐:
         assert diffs == [], diffs
 
 
+class Test不泄漏:
+    def test_登录响应与额度响应里都没有openid(self, client, db, monkeypatch):
+        u = login(client, db, monkeypatch, "no-leak", None)
+        text = client.get("/api/user/quota", headers=hdr(u)).text
+        assert u.openid not in text
+        assert "openid" not in text
+
+
 def login(client, db, monkeypatch, openid, inviter):
     """打真实登录路由，只把 code2session 换成指定 openid。返回拿到的 User。"""
     from app.core import auth as auth_core
@@ -552,11 +531,3 @@ def login(client, db, monkeypatch, openid, inviter):
     user = db.get(User, uid)
     db.expire_all()
     return user
-
-
-class Test不泄漏:
-    def test_登录响应与额度响应里都没有openid(self, client, db, monkeypatch):
-        u = login(client, db, monkeypatch, "no-leak", None)
-        text = client.get("/api/user/quota", headers=hdr(u)).text
-        assert u.openid not in text
-        assert "openid" not in text

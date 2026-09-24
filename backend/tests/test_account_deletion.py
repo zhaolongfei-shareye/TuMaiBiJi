@@ -73,7 +73,8 @@ def mine(db):
     u = User(openid="del-me")
     db.add(u)
     db.commit()
-    inviter = User(openid="invited-him", quota_bonus=quota.INVITE_REWARD)
+    # bonus=10 是取消额度之前留下的历史值：现在没有任何代码读它，注销也不该动它
+    inviter = User(openid="invited-him", quota_bonus=10)
     db.add(inviter)
     db.commit()
     cat = Category(user_id=str(u.id), name="旅行", color="#F6C445")
@@ -85,8 +86,8 @@ def mine(db):
         share,
         Job(user_id=str(u.id), job_type="ingest_url", status="done", note_id=note.id),
         Asset(user_id=str(u.id), object_key="a/b.png"),
-        Invitation(inviter_id=inviter.id, invitee_id=u.id, reward=quota.INVITE_REWARD),
-        Invitation(inviter_id=u.id, invitee_id=999, reward=quota.INVITE_REWARD),
+        Invitation(inviter_id=inviter.id, invitee_id=u.id, reward=0),
+        Invitation(inviter_id=u.id, invitee_id=999, reward=0),
     ])
     db.commit()
     return {"user": u, "id": u.id, "note": note.id, "cat": cat.id, "share": share.id,
@@ -198,10 +199,7 @@ class Test注销之后:
         body = client.get(
             "/api/user/quota", headers={"Authorization": f"Bearer {token}"}
         ).json()
-        assert body["used"] == 0
-        assert body["bonus"] == 0
-        assert body["limit"] == quota.BASE_QUOTA
-        assert body["invites_rewarded"] == 0
+        assert body == {"used": 0, "categories": 0}
         # SQLite 在非 AUTOINCREMENT 主键上会复用刚空出来的 rowid，所以"新账号一定拿到
         # 新 id"是不能断的；能断的是这个号底下什么都没有了——旧笔记、旧归因都不跟过来。
         assert client.get(f"/api/notes/{old_note}", headers={"Authorization": f"Bearer {token}"}).status_code == 404
@@ -212,43 +210,22 @@ class Test注销之后:
 
 
 class Test邀请台账跟着走:
-    def test_注销要把邀请人已到手的奖励追回来(self, client, db, mine, other):
-        """注销 = 这笔邀请当成没发生过，奖励跟着退回去。
-
-        不追回的话，"注册小号 → 写一篇 → 注销 → 再注册"能把邀请人的额度刷到无穷大：
-        MAX_REWARDED_INVITES 是按 invitations 行数算的，而行数在注销时被清掉了。
-        """
+    def test_注销把两个方向的台账都删干净(self, client, db, mine, other):
+        """账号都没了，台账不该继续留着他那一头：被邀进来的那笔、他替别人成就的那笔。"""
         wipe(client, mine)
         db.expire_all()
-        assert db.get(User, mine["inviter"]).quota_bonus == 0
         assert db.query(Invitation).filter(Invitation.invitee_id == mine["id"]).count() == 0
-        # 他替别人成就的那一笔也一起没了：账号都不在了，台账不该继续记着他
         assert db.query(Invitation).filter(Invitation.inviter_id == mine["id"]).count() == 0
 
-    def test_追回不会把余额扣成负数(self, client, db, mine):
-        """台账说有 10 篇、余额却已经不够扣时，宁可不追也不能扣成负数。
+    def test_注销不再动任何人的额度(self, client, db, mine):
+        """2026-09-24 取消篇数上限：没有奖励可退，quota_bonus 注销前后必须一字不变。
 
-        负余额会把上限压到 BASE_QUOTA 以下，那个邀请人连自己的笔记都存不下了。
-        正常路径走不到这里（除了注销没有别的地方减 quota_bonus），这是给对不上账兜底。
+        这条是反向对照——谁把"回退邀请奖励"那段代码加回来，这里就会红。
         """
-        inviter = db.get(User, mine["inviter"])
-        inviter.quota_bonus = 0
-        db.commit()
+        before = db.get(User, mine["inviter"]).quota_bonus
         wipe(client, mine)
         db.expire_all()
-        assert db.get(User, mine["inviter"]).quota_bonus == 0
-
-    def test_没结过钱的人注销不动邀请人余额(self, client, db):
-        """只有 invited_by、没有台账行（还没写下第一篇）→ 邀请人本来就没拿到钱，不该被扣。"""
-        inviter = User(openid="has-bonus", quota_bonus=30)
-        db.add(inviter)
-        db.commit()
-        u = User(openid="never-wrote", invited_by=inviter.id)
-        db.add(u)
-        db.commit()
-        wipe(client, u)
-        db.expire_all()
-        assert db.get(User, inviter.id).quota_bonus == 30
+        assert db.get(User, mine["inviter"]).quota_bonus == before
 
     def test_别人指向我的归因被清空(self, client, db, mine):
         follower = User(openid="knew-me", invited_by=mine["id"])

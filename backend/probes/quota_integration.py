@@ -2,8 +2,8 @@
 
 和 pytest 的分工：单元测试用 TestClient + create_all 验"逻辑对不对"，这里验
 "三件事凑在一起还成不成立"——库由 alembic 从初始版本升到 head（线上就是这么建的）、
-请求真的过一遍网络栈、断言落在 SQL 读数上而不是函数返回值上。100 篇这条尤其需要：
-单元测试里把 BASE_QUOTA 改成了 3 才好写，这里铺的是真 100 篇。
+请求真的过一遍网络栈、断言落在 SQL 读数上而不是函数返回值上。篇数这条尤其需要：
+2026-09-24 取消了 100 篇上限，"多少条都存得进来"这种断言只有真铺一百二十条才算数。
 
 用法（本地或服务器都行，凭据一律不读）：
 
@@ -12,8 +12,8 @@
 它自己建临时库、自己起 uvicorn（127.0.0.1:8123）、自己收尾。全程 SEC_CHECK_ENABLED=false
 且 EXTRACT_PROVIDER=none，不发任何出网请求；也不碰现网那个库。退出码 0=全过。
 
-本机 Redis 没起，所以采集那条只断言到"闸门放行/拦下"为止：能回 403 就说明拦在出队之前，
-真出队之后的事属于 worker 链路，现网部署后另跑。
+闸门已经拆掉，所以采集那几条只断言"不回 403"：链接入口真出队之后的事属于 worker 链路，
+现网部署后另跑。
 """
 import argparse
 import atexit
@@ -34,7 +34,6 @@ DB_FILE = Path("/tmp/tumaibiji_integration.db")
 PORT = 8123
 BASE = f"http://127.0.0.1:{PORT}"
 SECRET = "integration-only-secret-not-a-real-one"
-HEAD = "ecba9801b98a"
 
 ENV = dict(
     os.environ,
@@ -104,6 +103,17 @@ def rewarded(uid):
     return sql("select count(*) from invitations where inviter_id=?", (uid,), fetch="one")[0]
 
 
+def alembic_head():
+    """迁移头版本号让 alembic 自己报。之前写死成一个具体 revision，97ff254 加了新迁移
+    之后这条就一直红——而红会被当成"探针坏了"，于是没人再看它。"""
+    r = subprocess.run(
+        [sys.executable, "-m", "alembic", "heads"],
+        cwd=str(BACKEND), env=ENV, capture_output=True, text=True,
+    )
+    # 输出形如 "b7d2f4a9c316 (head)"，取第一段
+    return r.stdout.strip().splitlines()[-1].split()[0]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--keep", action="store_true", help="跑完留着临时库和服务进程，便于手查")
@@ -142,7 +152,7 @@ def main():
         )
         check(f"alembic {step}", r.returncode == 0, (r.stderr.strip().splitlines() or [""])[-1][:90])
     ver = sql("select version_num from alembic_version", fetch="one")[0]
-    check("版本号停在 head", ver == HEAD, ver)
+    check("版本号停在 head", ver == alembic_head(), ver)
     cols = {c[1] for c in sql("pragma table_info(users)", fetch="all")}
     tables = {t[0] for t in sql("select name from sqlite_master where type='table'", fetch="all")}
     ddl = sql("select sql from sqlite_master where name='invitations'", fetch="one")[0]
@@ -182,81 +192,60 @@ def main():
 
 
 def run_http(c):
-    # ---- 3. 邀请链：归因写在库里，到账由"存下第一篇"触发 ----
+    # ---- 3. 邀请链：归因写在库里，台账由"存下第一篇"触发，不再兑换额度 ----
     inviter = add_user("it-inviter")
     invitee = add_user("it-invitee", invited_by=inviter)
     bystander = add_user("it-bystander")
     lonely = add_user("it-lonely")
 
     q = c.get(f"{BASE}/api/user/quota", headers=token(inviter)).json()
-    check("额度接口初值对", q["used"] == 0 and q["limit"] == 100 and q["remaining"] == 100 and q["invites_left"] == 5, q)
+    check("额度接口只回两个数", q == {"used": 0, "categories": 0}, q)
 
     r = c.post(f"{BASE}/api/notes/", headers=token(invitee), json={"title": "被邀请人的第一篇", "source_type": "manual"})
     check("被邀请人存下第一篇 200", r.status_code == 200, r.status_code)
-    check("邀请人到账 +10（库里读数）", bonus(inviter) == 10, bonus(inviter))
-    check("台账落一行且记的是 10", sql("select count(*), coalesce(sum(reward),0) from invitations where invitee_id=?", (invitee,), fetch="one") == (1, 10))
+    check("台账落一行且不再记奖励数", sql("select count(*), coalesce(sum(reward),-1) from invitations where invitee_id=?", (invitee,), fetch="one") == (1, 0))
+    check("邀请人额度一动不动（这列已停用）", bonus(inviter) == 0, bonus(inviter))
     q2 = c.get(f"{BASE}/api/user/quota", headers=token(inviter)).json()
-    check("邀请人上限抬到 110、剩余次数 4", q2["limit"] == 110 and q2["invites_rewarded"] == 1 and q2["invites_left"] == 4, {k: q2[k] for k in ("limit", "invites_rewarded", "invites_left")})
+    check("接口里没有上限类字段", set(q2) == {"used", "categories"}, q2)
 
     c.post(f"{BASE}/api/notes/", headers=token(invitee), json={"title": "第二篇", "source_type": "manual"})
-    check("第二篇不再重复给钱", bonus(inviter) == 10 and rewarded(inviter) == 1, bonus(inviter))
+    check("第二篇不重复记账", rewarded(inviter) == 1, rewarded(inviter))
 
-    # 第 2~6 个被邀请人正常结；第 7 个起被次数上限挡住
-    for i in range(2, 7):
+    # 邀请多少个都只记账：不再有"最多记 5 次"这种收益上限
+    for i in range(2, 9):
         u = add_user(f"it-invitee-{i}", invited_by=inviter)
         c.post(f"{BASE}/api/notes/", headers=token(u), json={"title": f"第{i}个人的第一篇", "source_type": "manual"})
-    check("五次奖励攒满 50", bonus(inviter) == 50 and rewarded(inviter) == 5, (bonus(inviter), rewarded(inviter)))
-    over = add_user("it-invitee-over", invited_by=inviter)
-    c.post(f"{BASE}/api/notes/", headers=token(over), json={"title": "第六个人的第一篇", "source_type": "manual"})
-    check("第六个人不结（次数上限封住收益）", bonus(inviter) == 50 and rewarded(inviter) == 5, (bonus(inviter), rewarded(inviter)))
-    check("总上限抬到 150", c.get(f"{BASE}/api/user/quota", headers=token(inviter)).json()["limit"] == 150)
+    check("第八个也照样记账（不限笔数）", rewarded(inviter) == 8, rewarded(inviter))
+    check("记了八笔也没人涨额度", bonus(inviter) == 0, bonus(inviter))
 
-    # 三种不该给钱的状态：没归因、自己邀自己、指向不存在的号
+    # 三种不该记的状态：没归因、自己邀自己、指向不存在的号
     lonely_note = c.post(f"{BASE}/api/notes/", headers=token(lonely), json={"title": "自己写的", "source_type": "manual"})
-    selfinv = add_user("it-selfinv")
-    sql("update users set invited_by=? where id=?", (selfinv, selfinv))
-    ghost = add_user("it-ghost", invited_by=999999)
-    for uid in (selfinv, ghost):
-        c.post(f"{BASE}/api/notes/", headers=token(uid), json={"title": "第一篇", "source_type": "manual"})
-    check("不该给钱的三种都不给", sql("select count(*) from invitations where invitee_id in (?,?,?)", (lonely, selfinv, ghost), fetch="one")[0] == 0)
-
-    # ---- 4. 真 100 篇的闸门（单元用例里改成 3 才好写，这里铺的是真数）----
+    # ---- 4. 真 120 篇一路放行（2026-09-24 取消篇数上限）----
     gate = add_user("it-gate")
     ids = []
-    for i in range(100):
-        rr = c.post(f"{BASE}/api/notes/", headers=token(gate), json={"title": f"铺满第{i}篇", "source_type": "manual"})
+    for i in range(120):
+        rr = c.post(f"{BASE}/api/notes/", headers=token(gate), json={"title": f"第{i+1}篇", "source_type": "manual"})
         if rr.status_code != 200:
-            check("铺到 100 篇一路 200", False, f"第 {i} 篇 → {rr.status_code} {rr.text[:80]}")
+            check("铺到 120 篇一路 200", False, f"第 {i+1} 篇 → {rr.status_code} {rr.text[:80]}")
             break
         ids.append(rr.json()["id"])
     else:
-        check("铺到 100 篇一路 200", True, f"{len(ids)} 篇")
+        check("铺到 120 篇一路 200", True, f"{len(ids)} 篇")
     qg = c.get(f"{BASE}/api/user/quota", headers=token(gate)).json()
-    check("额度读数 used=100 remaining=0", qg["used"] == 100 and qg["remaining"] == 0, {k: qg[k] for k in ("used", "remaining")})
-
-    over_resp = c.post(f"{BASE}/api/notes/", headers=token(gate), json={"title": "第 101 篇", "source_type": "manual"})
-    msg = over_resp.json().get("detail", "")
-    check("第 101 篇手写被拦 403", over_resp.status_code == 403, over_resp.status_code)
-    check("拦下时给的是中文且带出路", ("上限" in msg) and ("分享好友" in msg) and len(msg) <= 30, msg)
-    check("库里确实没进第 101 篇", count("notes", gate) == 100, count("notes", gate))
-
+    check("额度读数就是 120", qg["used"] == 120, qg)
+    over_resp = c.post(f"{BASE}/api/notes/", headers=token(gate), json={"title": "第121篇", "source_type": "manual"})
+    check("第 121 篇照样存得进来", over_resp.status_code == 200, f"{over_resp.status_code} {over_resp.text[:80]}")
+    check("库里真的进了 121 篇", count("notes", gate) == 121, count("notes", gate))
     url_resp = c.post(f"{BASE}/api/ingest/url", headers=token(gate), data={"url": "https://example.com/a"})
-    check("链接入口同样拦在 403", url_resp.status_code == 403, url_resp.status_code)
-    png = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001"
-                        "0d0a2db40000000049454e44ae426082")
-    st = c.post(f"{BASE}/api/ingest/screenshots/stage", headers=token(gate), files={"images": ("a.png", png, "image/png")})
-    check("截图暂存也拦（403，不是先收文件再拒）", st.status_code == 403, st.status_code)
+    check("链接入口不回 403", url_resp.status_code != 403, url_resp.status_code)
+    st = c.post(f"{BASE}/api/ingest/screenshots/stage", headers=token(gate),
+                files={"images": ("a.png", b"\x89PNG\r\n\x1a\nfake", "image/png")})
+    check("截图暂存不回 403", st.status_code != 403, st.status_code)
     pr = c.post(f"{BASE}/api/ingest/screenshots/process", headers=token(gate), data={"batch_id": "nope"})
-    check("截图提交也拦（批次不存在都轮不到报 404）", pr.status_code == 403, pr.status_code)
-
-    # 有额度的人走同一入口：闸门放行，于是撞到的是 Redis（本机故意没开）而不是 403
-    ok_user = add_user("it-under-quota")
-    pass_through = c.post(f"{BASE}/api/ingest/url", headers=token(ok_user), data={"url": "https://example.com/a"})
-    check("有额度时闸门放行（错误来自出队而不是额度）", pass_through.status_code != 403, pass_through.status_code)
-
+    check("截图提交不回 403（批次不存在该是 404）", pr.status_code == 404, pr.status_code)
     del_resp = c.delete(f"{BASE}/api/notes/{ids[0]}", headers=token(gate))
-    again = c.post(f"{BASE}/api/notes/", headers=token(gate), json={"title": "删一篇之后又能存", "source_type": "manual"})
-    check("删一篇就释放一个位置", del_resp.status_code == 200 and again.status_code == 200, (del_resp.status_code, again.status_code))
+    again = c.post(f"{BASE}/api/notes/", headers=token(gate), json={"title": "删完再存一篇", "source_type": "manual"})
+    check("删一篇之后仍然存得进来", del_resp.status_code == 200 and again.status_code == 200, (del_resp.status_code, again.status_code))
 
     # ---- 5. 时间戳口径没被这批改动带坏（今天刚修的时区那条）----
     created = again.json()["created_at"]
@@ -295,7 +284,7 @@ def run_http(c):
     check("五类数据与账号本身都清空", all(count(t, victim) == 0 for t in ("notes", "categories", "shares", "jobs", "assets")) and sql("select count(*) from users where id=?", (victim,), fetch="one")[0] == 0)
     check("邀请台账两个方向都跟着删", sql("select count(*) from invitations where invitee_id=? or inviter_id=?", (victim, victim), fetch="one")[0] == 0)
     check("别人指向他的归因被清空", sql("select invited_by from users where id=?", (follower,), fetch="one")[0] is None)
-    check("没结过钱的注销不动邀请人余额", bonus(inviter) == 50, bonus(inviter))
+    check("注销不动邀请人那一列（已停用）", bonus(inviter) == 0, bonus(inviter))
     check("路人的数据不受影响", count("notes", bystander) == 1 and sql("select count(*) from users where id=?", (bystander,), fetch="one")[0] == 1)
     check("发出去的分享页扫不开", c.get(f"{BASE}/api/shares/{vshare}").status_code == 404)
     codes = {
@@ -314,7 +303,7 @@ def run_http(c):
     # 同一个 openid 重新注册：SQLite 会复用 rowid，所以断的是"底下干净"而不是"号是新的"
     new_id = add_user("it-victim")
     nq = c.get(f"{BASE}/api/user/quota", headers=token(new_id)).json()
-    check("同 openid 重注册是个空号", nq["used"] == 0 and nq["bonus"] == 0 and nq["limit"] == 100 and nq["invites_rewarded"] == 0, nq)
+    check("同 openid 重注册是个空号", nq == {"used": 0, "categories": 0}, nq)
     check("新号读不到旧笔记", c.get(f"{BASE}/api/notes/{vnote}", headers=token(new_id)).status_code == 404)
     check("新号没带着旧归因", sql("select invited_by from users where id=?", (new_id,), fetch="one")[0] is None)
 
@@ -340,21 +329,20 @@ def run_http(c):
         )
     }).status_code == 401)
 
-    # ---- 9. 注销追回奖励：反复"注册小号 → 写一篇 → 注销"刷不出额度 ----
+    # ---- 9. 反复"注册小号 → 写一篇 → 注销"：台账会清，但谁也不涨额度 ----
     farmer = add_user("it-farmer")
     throwaway = add_user("it-throwaway", invited_by=farmer)
     r = c.post(f"{BASE}/api/notes/", headers=token(throwaway), json={"title": "成就一次", "source_type": "manual"})
-    check("小号写下第一篇，邀请人到账 +10", r.status_code == 200 and bonus(farmer) == 10, bonus(farmer))
-    check("台账落了一行", rewarded(farmer) == 1, rewarded(farmer))
+    check("小号写下第一篇，台账落一行", r.status_code == 200 and rewarded(farmer) == 1, rewarded(farmer))
     dresp = c.post(f"{BASE}/api/user/deactivate", headers=token(throwaway), json={"confirm": True})
     check("小号注销 200", dresp.status_code == 200, dresp.status_code)
-    check("注销把那 10 篇追了回来", bonus(farmer) == 0, bonus(farmer))
     check("台账跟着清空", rewarded(farmer) == 0, rewarded(farmer))
+    check("注销不追回任何东西（没有额度可退）", bonus(farmer) == 0, bonus(farmer))
     throwaway2 = add_user("it-throwaway2", invited_by=farmer)
     c.post(f"{BASE}/api/notes/", headers=token(throwaway2), json={"title": "再来一次", "source_type": "manual"})
     c.post(f"{BASE}/api/user/deactivate", headers=token(throwaway2), json={"confirm": True})
-    check("刷第二轮之后 farmer 仍是 0（这条路走不通）", bonus(farmer) == 0, bonus(farmer))
-    check("farmer 的上限还是 100", c.get(f"{BASE}/api/user/quota", headers=token(farmer)).json()["limit"] == 100)
+    check("刷两轮之后 farmer 的读数里仍然没有上限字段",
+          set(c.get(f"{BASE}/api/user/quota", headers=token(farmer)).json()) == {"used", "categories"})
 
     # ---- 10. 热启动补报邀请人：已登录的人从分享卡片进来那条路 ----
     late_inviter = add_user("it-late-inviter")
@@ -363,7 +351,7 @@ def run_http(c):
     check("补报邀请人 200 且如实回报已认", lr.status_code == 200 and lr.json()["applied"] is True, lr.text[:80])
     check("归因落到账号上", sql("select invited_by from users where id=?", (late,), fetch="one")[0] == late_inviter)
     c.post(f"{BASE}/api/notes/", headers=token(late), json={"title": "补报之后的第一篇", "source_type": "manual"})
-    check("补报过的归因能正常结账 +10", bonus(late_inviter) == 10, bonus(late_inviter))
+    check("补报过的归因照样记上台账", rewarded(late_inviter) == 1, rewarded(late_inviter))
     again = c.post(f"{BASE}/api/user/inviter", headers=token(late), json={"inviter": bystander})
     check("已有归属时改不动，且如实回报未认", again.status_code == 200 and again.json()["applied"] is False, again.text[:80])
     check("归属没被改写", sql("select invited_by from users where id=?", (late,), fetch="one")[0] == late_inviter)

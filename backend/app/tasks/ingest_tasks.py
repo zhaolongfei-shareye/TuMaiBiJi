@@ -22,17 +22,17 @@ def failure_message(exc: Exception) -> str:
     return str(exc) if isinstance(exc, UserError) else GENERIC_TASK_ERROR
 
 
-def credit_first_note(db, user_id: str, note: Note) -> None:
-    """worker 这边也是"写下笔记"的一条路，邀请奖励同样要在这一条上结。
+def record_first_note(db, user_id: str, note: Note) -> None:
+    """worker 这边也是"写下笔记"的一条路，邀请台账同样要在这一条上记。
 
-    到账失败不该让整条笔记算处理失败——笔记已经落库了，用户看到的必须是成功。
+    记账失败不该让整条笔记算处理失败——笔记已经落库了，用户看到的必须是成功。
     """
     try:
         user = db.get(User, int(user_id))
         if user is not None:
-            quota.credit_first_note(note, db, user)
+            quota.record_first_note(note, db, user)
     except Exception:
-        logger.exception("邀请奖励到账失败（笔记已保存）：user=%s", user_id)
+        logger.exception("邀请台账记账失败（笔记已保存）：user=%s", user_id)
 
 
 def _load_task_user(db, task_id: str, user_id: str, generation):
@@ -81,10 +81,6 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
             user = _load_task_user(db, task_id, user_id, generation)
             if user is None:
                 return
-            # 落库前再查一次额度：提交时那道闸门到这儿已经过去了几十秒（抓取 + 提炼），
-            # 中间用户可能又手写了几篇。UserError 会冒到下面那个 except，文案原样进 toast。
-            quota.ensure_room(user, db)
-
             note = Note(
                 user_id=user_id,
                 title=knowledge["title"],
@@ -98,7 +94,7 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
             db.add(note)
             db.commit()
             db.refresh(note)
-            credit_first_note(db, user_id, note)
+            record_first_note(db, user_id, note)
             set_task_status(
                 task_id,
                 "completed",
@@ -129,8 +125,6 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
             user = _load_task_user(db, task_id, user_id, generation)
             if user is None:
                 return
-            quota.ensure_room(user, db)
-
             note = Note(
                 user_id=user_id,
                 title=knowledge["title"],
@@ -143,7 +137,7 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
             db.add(note)
             db.commit()
             db.refresh(note)
-            credit_first_note(db, user_id, note)
+            record_first_note(db, user_id, note)
             set_task_status(
                 task_id,
                 "completed",

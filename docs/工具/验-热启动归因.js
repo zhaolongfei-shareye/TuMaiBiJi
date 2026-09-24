@@ -88,7 +88,7 @@ async function main() {
         g.__calls.push({ url: opts.url, method: opts.method, data: opts.data })
         const body = g.__mode === 'ok'
           ? { applied: true }
-          : g.__mode === 'http403' ? { detail: '已达 100 篇上限' } : null
+          : g.__mode === 'http403' ? { detail: '服务器拒绝了这个请求' } : null
         if (g.__mode === 'netfail' || g.__mode === 'http403') {
           if (opts.fail) opts.fail({ errMsg: 'request:fail mock' })
           return

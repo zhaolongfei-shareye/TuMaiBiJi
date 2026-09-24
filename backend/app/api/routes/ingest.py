@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.user import User
-from app.core.quota_gate import require_note_room
+from app.core.auth import get_current_user
 from app.core.rate_limit import limiter
 from app.services.queue import get_queue, set_task_status
 
@@ -24,7 +24,7 @@ async def ingest_url(
     request: Request,
     url: str = Form(...),
     db: Session = Depends(get_db),
-    user: User = Depends(require_note_room),
+    user: User = Depends(get_current_user),
 ):
     task_id = uuid.uuid4().hex
     set_task_status(task_id, "queued", user_id=str(user.id))
@@ -113,7 +113,7 @@ async def stage_screenshot(
     request: Request,
     images: UploadFile = File(...),
     batch_id: str | None = Form(None),
-    user: User = Depends(require_note_room),
+    user: User = Depends(get_current_user),
 ):
     chunks: list[bytes] = []
     total = 0
@@ -172,7 +172,7 @@ async def process_screenshots(
     request: Request,
     batch_id: str = Form(...),
     db: Session = Depends(get_db),
-    user: User = Depends(require_note_room),
+    user: User = Depends(get_current_user),
 ):
     _sweep_stale_batches()
 
