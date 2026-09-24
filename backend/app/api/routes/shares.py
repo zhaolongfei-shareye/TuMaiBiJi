@@ -1,6 +1,5 @@
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -17,9 +16,11 @@ from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
 from app.services.sharing import (
+    active_share_by_token,
     active_shares,
     close_shares,
-    public_fields,
+    is_expired,
+    public_check_fields,
     snapshot_matches,
     sync_snapshot,
     visible_fields,
@@ -33,6 +34,16 @@ router = APIRouter()
 
 class ShareCreateRequest(BaseModel):
     note_id: int
+    # 「分享形象」里那个名字，跟着这一次分享上服务器成为公开快照的一部分。
+    # 超长是截断而不是 422：昵称不该让"生成分享图"整个失败，客户端本来就限到 16 字。
+    author_name: str | None = None
+
+
+AUTHOR_NAME_MAX = 32
+
+
+def _author_name(req: "ShareCreateRequest") -> str | None:
+    return (req.author_name or "").strip()[:AUTHOR_NAME_MAX] or None
 
 
 class ShareResponse(BaseModel):
@@ -43,6 +54,7 @@ class ShareResponse(BaseModel):
     key_points: list | None
     key_links: list | None
     source_url: str | None
+    author_name: str | None
     created_at: UTCDatetime
 
     class Config:
@@ -56,27 +68,32 @@ def create_share(
     user: User = Depends(get_current_user),
 ):
     note = _owned_note(db, user, req.note_id)
+    author = _author_name(req)
 
     # 一条笔记只留一个有效分享：卡片上的码是按 token 生成的，反复点"生成分享图"
     # 再各发一个新 token，等于同一篇笔记散出去好几张互不相干的码，旧的那些还一直有效。
     # 这条不再只是注释——shares 上有个部分唯一索引只允许每篇笔记留一行 is_active=1，
     # 真撞上了走下面那个 IntegrityError 分支。
-    existing = next((s for s in active_shares(db, note.id) if not _is_expired(s)), None)
-    if existing is not None and snapshot_matches(existing, note):
+    existing = next((s for s in active_shares(db, note.id) if not is_expired(s)), None)
+    if existing is not None and snapshot_matches(existing, note) and existing.author_name == author:
         # 公开页上的内容和上次送检时一字不差，就不要再打一遍 msgSecCheck。
         # 顺序很关键：先判"要不要检"再做检，反过来这个接口就成了一个刷配额的路径
         # ——每次调用最多 7 个字段 × 分段，而它烧的是我们自己的微信接口额度。
+        # 作者名也一起比：它现在同样出现在公开页上，改了名就要重检一次。
         return existing
 
     # 分享是这条笔记第一次"别人也能看到"的时刻，所以公开出口在这里被过滤，
     # 而不是在抓取/识别那一步——外部原文里出现一个敏感词，不该让笔记存不下来。
+    # 作者名一并进这一次送检：它是这次新增的对外可见字段，漏了它就等于开了一条
+    # 不经内容安全的公开出口（key_links 当初就是这么漏的）。
     try:
-        enforce_text_safety(user.openid, *public_fields(note))
+        enforce_text_safety(user.openid, *public_check_fields(note, author))
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     if existing is not None:
         sync_snapshot(db, note)
+        existing.author_name = author
         db.commit()
         db.refresh(existing)
         return existing
@@ -86,7 +103,7 @@ def create_share(
     # 已经是 404，占着的却是"这篇笔记唯一那张开着的码"这个位置，新码建不进来。
     # 所以发新码之前先把它关严——反正它本来就没人看得见。
     for stale in active_shares(db, note.id):
-        if _is_expired(stale):
+        if is_expired(stale):
             stale.is_active = False
     # 不设 expires_at：这张码是印在海报上的纸，别人一周后扫到也应该能看到那条笔记。
     # 收回来靠用户主动撤（/revoke），不靠一个他自己没同意过的倒计时。
@@ -94,6 +111,7 @@ def create_share(
         user_id=str(user.id),
         note_id=note.id,
         token=token,
+        author_name=author,
         **visible_fields(note),
     )
     db.add(share)
@@ -104,7 +122,7 @@ def create_share(
         # 这里把它领回先落库的那张码：内容一模一样，只是 token 用对方的。
         # 绝不能在这里重新送检——检的是同一份内容，白烧一遍额度。
         db.rollback()
-        raced = next((s for s in active_shares(db, req.note_id) if not _is_expired(s)), None)
+        raced = next((s for s in active_shares(db, req.note_id) if not is_expired(s)), None)
         if raced is None:
             raise HTTPException(status_code=409, detail="这篇笔记的分享状态刚变过，请再试一次")
         return raced
@@ -140,7 +158,7 @@ def get_share_status(
     会被当成一个 token 来查，回一个莫名其妙的 404。
     """
     note = _owned_note(db, user, note_id)
-    live = next((s for s in active_shares(db, note.id) if not _is_expired(s)), None)
+    live = next((s for s in active_shares(db, note.id) if not is_expired(s)), None)
     return {"active": live is not None, "token": live.token if live else None}
 
 
@@ -166,22 +184,11 @@ def revoke_share(
     return {"closed": closed}
 
 
-def _is_expired(share: Share) -> bool:
-    if not share.expires_at:
-        return False
-    expires = share.expires_at
-    if expires.tzinfo is None:
-        expires = expires.replace(tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) >= expires
 
 
 def _get_active_share(token: str, db: Session) -> Share:
-    share = (
-        db.query(Share)
-        .filter(Share.token == token, Share.is_active == True)
-        .first()
-    )
-    if not share or _is_expired(share):
+    share = active_share_by_token(db, token)
+    if share is None:
         raise HTTPException(status_code=404, detail="分享不存在或已过期")
     return share
 

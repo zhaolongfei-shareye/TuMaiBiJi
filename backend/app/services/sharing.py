@@ -12,6 +12,10 @@
 字段清单曾经漏掉过 key_links：它客户端可写、又显示在公开页上，却一次都没进过
 msgSecCheck。所以下面这几个函数都从常量取字段，不再各写一份元组。
 """
+from datetime import datetime, timezone
+
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from app.models.note import Note
@@ -21,6 +25,12 @@ from app.models.share import Share
 # 原来只有 title/summary/tags/key_links，缺了 key_points 和 source_url——扫码的人
 # 只能看到一段摘要，既读不到要点，也拿不到原文链接，观感上就是"看不到原文"。
 SNAPSHOT_COLUMNS = ("title", "summary", "tags", "key_links", "key_points", "source_url")
+
+# 公开页上显示、但**不是**从笔记搬过来的字段。目前只有分享者昵称：它来自「分享形象」，
+# 不进 SNAPSHOT_COLUMNS（那几列会被 sync_snapshot 从笔记覆盖，昵称不该被笔记内容带跑），
+# 但它和快照字段一样是"因为这一次分享才对外可见"的内容，所以必须进送检。
+# 加这一列而不是一句注释，是为了让用例能拿它和 ShareResponse 的字段集对账。
+NON_NOTE_PUBLIC_COLUMNS = ("author_name",)
 
 
 def public_fields(note: Note) -> tuple:
@@ -40,6 +50,16 @@ def public_fields(note: Note) -> tuple:
         note.content,
         note.original_content,
     )
+
+
+def public_check_fields(note: Note, author_name: str | None = None) -> tuple:
+    """建分享这一次真正送检的全部字段：笔记那几列 + 分享者昵称。
+
+    公开页上出现而没进这道闸的字段，就是一条绕过内容安全直接上公开页的路
+    （key_links 当初就是这么漏的）。所以新增 NON_NOTE_PUBLIC_COLUMNS 里的任何一列，
+    都必须从这里出去，而不是在调用方各写一份参数列表。
+    """
+    return (*public_fields(note), author_name)
 
 
 def visible_fields(note: Note) -> dict:
@@ -91,3 +111,30 @@ def close_shares(db: Session, note_id: int) -> int:
         .filter(Share.note_id == note_id, Share.is_active == True)  # noqa: E712
         .update({"is_active": False}, synchronize_session=False)
     )
+
+
+def is_expired(share: Share) -> bool:
+    """这张码按它自己那个过期时间算死了没有。
+
+    只有上线前建的那批带 `expires_at`，新建的一律为 None（= 不过期）。判过期时间的
+    口径必须只有一份：库里存过 '…+00:00' 和不带时区两种写法，不带时区的按 UTC 读，
+    和公开页那侧的行为一致。
+    """
+    if not share.expires_at:
+        return False
+    expires = share.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) >= expires
+
+
+def active_share_by_token(db: Session, token: str) -> Share | None:
+    """按 token 找到那张**此刻真的还对外开着**的码，找不到或已过期都返回 None。
+
+    公开页读分享、把分享转存成别人的笔记，两条路问的是同一个问题，所以这个判断
+    只能有一个出处——否则很容易出现"落地页显示 404 但转存接口照样抄走内容"。
+    """
+    share = db.query(Share).filter(Share.token == token, Share.is_active == True).first()  # noqa: E712
+    if not share or is_expired(share):
+        return None
+    return share

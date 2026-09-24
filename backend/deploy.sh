@@ -110,9 +110,16 @@ if not uniq:
 # 再确认"一篇笔记一张有效码"那个部分唯一索引真的建上了：没有它，并发建分享还是会
 # 给同一篇笔记发出好几张码，而用户撤的时候只关得掉他手里那一张。
 sh_cols = {c["name"] for c in insp.get_columns("shares")}
-missing = sorted({"key_points", "source_url"} - sh_cols)
+missing = sorted({"key_points", "source_url", "author_name"} - sh_cols)
 if missing:
     print(f"  ✗ shares 表迁移后仍缺：{'、'.join(missing)}")
+    raise SystemExit(1)
+# notes.imported_from 是"转存进来的那条把来源钉住"唯一的落点：没有它，接口会
+# 把来源信息静默丢掉，转存出来的笔记看不出是谁的哪篇，而这条不会报错。
+note_cols = {c["name"] for c in insp.get_columns("notes")}
+missing = sorted({"imported_from"} - note_cols)
+if missing:
+    print(f"  ✗ notes 表迁移后仍缺：{'、'.join(missing)}")
     raise SystemExit(1)
 with engine.connect() as conn:
     one_code_idx = conn.execute(text(
@@ -122,7 +129,7 @@ with engine.connect() as conn:
 if not one_code_idx or "is_active" not in one_code_idx:
     print("  ✗ shares 上缺 ux_shares_one_active_per_note（或它没带 is_active 条件）")
     raise SystemExit(1)
-print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束）/ shares.key_points / shares.source_url / 一篇笔记一张有效码的索引 到位")
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / 一篇笔记一张有效码的索引 到位")
 PY
 if [[ $? -ne 0 ]]; then
     echo "✗ schema 校验未通过，终止部署"

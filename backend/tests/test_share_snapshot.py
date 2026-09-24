@@ -426,9 +426,16 @@ def test_快照列与对外响应字段是同一份():
     from app.api.routes.shares import ShareResponse
 
     exposed = set(ShareResponse.model_fields) - {"token", "created_at"}
-    assert exposed == set(sharing.SNAPSHOT_COLUMNS), (
-        f"公开响应给了 {sorted(exposed)}，快照同步的却是 {sorted(sharing.SNAPSHOT_COLUMNS)}"
+    must_check = set(sharing.SNAPSHOT_COLUMNS) | set(sharing.NON_NOTE_PUBLIC_COLUMNS)
+    assert exposed == must_check, (
+        f"公开响应给了 {sorted(exposed)}，快照同步的却是 {sorted(sharing.SNAPSHOT_COLUMNS)}，"
+        f"另有不是从笔记搬的 {sorted(sharing.NON_NOTE_PUBLIC_COLUMNS)}"
     )
+    # 这些列还必须真的从 public_check_fields 出去，否则就是"公开页可见但没送检"。
+    # 昵称单独走这条：它不在 SNAPSHOT_COLUMNS 里，sync_snapshot 不搬它，容易漏。
+    probe = Note(user_id="0", title="T", source_type="manual")
+    sent = sharing.public_check_fields(probe, author_name="阿飞")
+    assert "阿飞" in sent, "分享者昵称没进送检范围"
 
 
 def test_手动笔记复检覆盖所有可写文本列():
@@ -456,3 +463,167 @@ def test_小程序码接口挂了限流():
 
     limits = limiter._route_limits.get("app.api.routes.shares.get_share_qrcode") or []
     assert limits, "/api/shares/{token}/qrcode 上没挂 limiter.limit，可以被匿名无限打"
+
+
+# ------------------------------------------------- 分享者昵称（跟着分享上服务器的那一份）
+def _share(client, hdr, note_id, author=None):
+    body = {"note_id": note_id}
+    if author is not None:
+        body["author_name"] = author
+    r = client.post("/api/shares/", headers=hdr, json=body)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_建分享把昵称存进快照并对外给出(client, db_session, person):
+    nid = _mknote(db_session, person.id, "带作者的笔记")
+    payload = _share(client, _hdr(person.id), nid, author="阿飞")
+    assert payload["author_name"] == "阿飞", payload
+    db_session.expire_all()
+    share = db_session.query(Share).filter_by(token=payload["token"]).first()
+    assert share.author_name == "阿飞"
+    # 匿名公开页也要给，落地页那行"原创作者：阿飞"靠的就是它
+    assert client.get(f"/api/shares/{payload['token']}").json()["author_name"] == "阿飞"
+
+
+def test_没填昵称时对外是空而不是一个假名字(client, db_session, person):
+    nid = _mknote(db_session, person.id, "没形象的一页")
+    payload = _share(client, _hdr(person.id), nid)
+    assert payload["author_name"] is None, payload
+
+
+def test_昵称超长走截断而不是让生成分享图失败(client, db_session, person):
+    """昵称不该把整个海报流程打死，所以是截断；上限和模型那列一致。"""
+    from app.api.routes.shares import AUTHOR_NAME_MAX
+
+    nid = _mknote(db_session, person.id, "长名字的一篇")
+    payload = _share(client, _hdr(person.id), nid, author="名" * (AUTHOR_NAME_MAX + 20))
+    assert len(payload["author_name"]) == AUTHOR_NAME_MAX, payload
+
+
+def test_只改昵称也会重检一次并跟着更新快照(client, db_session, person, monkeypatch):
+    """昵称现在也是对外可见内容，改了不检就是一条绕过内容安全的公开出口。"""
+    seen = _pass_all(monkeypatch)
+    nid = _mknote(db_session, person.id, "改个作者名")
+    first = _share(client, _hdr(person.id), nid, author="甲")
+    gates = len(seen)
+    again = _share(client, _hdr(person.id), nid, author="乙")
+    assert again["token"] == first["token"], "同一篇还是那张码"
+    assert again["author_name"] == "乙"
+    assert len(seen) > gates, "只改昵称也应当过一次闸"
+
+
+def test_昵称命中违规时分享建不成(client, db_session, person, monkeypatch):
+    _verdicts(monkeypatch, {"脏词": "risky"})
+    nid = _mknote(db_session, person.id, "脏词昵称的一篇")
+    r = client.post("/api/shares/", headers=_hdr(person.id),
+                    json={"note_id": nid, "author_name": "含脏词的名字"})
+    assert r.status_code == 400, r.text
+    db_session.expire_all()
+    assert db_session.query(Share).filter_by(note_id=nid).count() == 0
+
+
+# ------------------------------------------------------------------ 转存到"我的笔记"
+def _other(db_session):
+    u = db_session.query(User).filter_by(openid="pytest-openid-reader").first()
+    if not u:
+        u = User(openid="pytest-openid-reader")
+        db_session.add(u)
+        db_session.commit()
+    return u
+
+
+def _import(client, hdr, token):
+    return client.post("/api/notes/from-share", headers=hdr, json={"token": token})
+
+
+def test_转存整条抄公开内容但不带私有字段(client, db_session, person):
+    reader = _other(db_session)
+    nid = _mknote(db_session, person.id, "原标题", summary="原摘要",
+                  tags=["甲"], key_points=["要点一", "要点二"],
+                  key_links=["https://example.com/a"], source_url="https://example.com/src",
+                  content="正文，不公开", original_content="识别出的原文，不公开")
+    payload = _share(client, _hdr(person.id), nid, author="阿飞")
+
+    r = _import(client, _hdr(reader.id), payload["token"])
+    assert r.status_code == 200, r.text
+    got = r.json()
+    assert got["title"] == "原标题" and got["summary"] == "原摘要"
+    assert got["key_points"] == ["要点一", "要点二"] and got["tags"] == ["甲"]
+    assert got["key_links"] == ["https://example.com/a"]
+    assert got["source_url"] == "https://example.com/src"
+    # 公开页上看不到的东西一样都不该跟过来
+    assert got["content"] is None and got["original_content"] is None
+    assert got["category_id"] is None
+    assert got["source_type"] == "share_import"
+    assert got["imported_from"]["author_name"] == "阿飞"
+    assert got["imported_from"]["source_note_id"] == nid
+    assert got["imported_from"]["share_token"] == payload["token"]
+
+    # 落在读者名下、他自己读得到；作者读不到（归属没串）
+    assert client.get(f"/api/notes/{got['id']}", headers=_hdr(reader.id)).status_code == 200
+    assert client.get(f"/api/notes/{got['id']}", headers=_hdr(person.id)).status_code == 404
+
+
+def test_转存之后来源改不掉也删不掉(client, db_session, person):
+    reader = _other(db_session)
+    nid = _mknote(db_session, person.id, "钉住的来源")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    mine = _import(client, _hdr(reader.id), token).json()
+
+    # 编辑接口压根不认识这一列：传了它，值不变
+    r = client.put(f"/api/notes/{mine['id']}", headers=_hdr(reader.id),
+                   json={"title": "我自己改的标题", "imported_from": None})
+    assert r.status_code == 200, r.text
+    assert r.json()["title"] == "我自己改的标题"
+    assert r.json()["imported_from"]["share_token"] == token, "来源被编辑接口改掉了"
+
+    # 内容能改，来源那一栏永远是转存当时的样子
+    assert r.json()["imported_from"]["title_at_import"] == "钉住的来源"
+
+
+def test_原分享撤掉或删掉都不影响已转存的副本(client, db_session, person):
+    reader = _other(db_session)
+    nid = _mknote(db_session, person.id, "会被收回的一篇")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    mine = _import(client, _hdr(reader.id), token).json()
+
+    client.post("/api/shares/revoke", headers=_hdr(person.id), json={"note_id": nid})
+    assert client.get(f"/api/shares/{token}").status_code == 404, "前提：那张码已经扫不开了"
+    got = client.get(f"/api/notes/{mine['id']}", headers=_hdr(reader.id))
+    assert got.status_code == 200 and got.json()["title"] == "会被收回的一篇"
+
+    client.delete(f"/api/notes/{nid}", headers=_hdr(person.id))
+    got = client.get(f"/api/notes/{mine['id']}", headers=_hdr(reader.id))
+    assert got.status_code == 200, "原笔记删了，转存的那份不该跟着没"
+    assert got.json()["imported_from"]["author_name"] == "阿飞"
+
+
+def test_转存不再打一遍内容安全(client, db_session, person, monkeypatch):
+    """抄的是服务端既有的快照，没有任何用户可写文本进来；再检一遍只是烧额度。"""
+    seen = _pass_all(monkeypatch)
+    gates = len(seen)
+    nid = _mknote(db_session, person.id, "抄一份不再检")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    after_share = len(seen)
+    assert after_share > gates, "前提：建分享那一步确实检过"
+    assert _import(client, _hdr(_other(db_session).id), token).status_code == 200
+    assert len(seen) == after_share, "转存这一步不该再打闸"
+
+
+def test_已关闭或不存在的码转存不了(client, db_session, person):
+    reader = _other(db_session)
+    assert _import(client, _hdr(reader.id), "根本没有这个码").status_code == 404
+    nid = _mknote(db_session, person.id, "撤回后转不了")
+    token = _share(client, _hdr(person.id), nid)["token"]
+    client.post("/api/shares/revoke", headers=_hdr(person.id), json={"note_id": nid})
+    assert _import(client, _hdr(reader.id), token).status_code == 404
+
+
+def test_转存自己分享的也走同一条路(client, db_session, person):
+    """不设"不能转自己的"这种特例：它就是公开页上那一份内容。"""
+    nid = _mknote(db_session, person.id, "自己抄自己")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    r = _import(client, _hdr(person.id), token)
+    assert r.status_code == 200, r.text
+    assert r.json()["imported_from"]["source_note_id"] == nid

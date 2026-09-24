@@ -17,6 +17,10 @@ class Note(Base):
     original_content = Column(Text, nullable=True)
     source_type = Column(String(50), nullable=False)
     source_url = Column(String(1000), nullable=True)
+    # 从别人的分享页转存进来的那一条，钉住"抄自谁的哪篇、当时标题是什么、什么时候抄的"。
+    # 它故意不出现在 NoteCreate / NoteUpdate 里：编辑接口碰不到它，所以转存之后来源改不掉，
+    # 原分享被撤掉或删掉也不影响这一份副本。
+    imported_from = Column(JSON, nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     cover_asset_id = Column(Integer, ForeignKey("assets.id"), nullable=True)
     is_pinned = Column(Boolean, default=False, nullable=False)

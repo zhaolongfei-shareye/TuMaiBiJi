@@ -28,6 +28,9 @@ class Share(Base):
     key_points = Column(JSON, nullable=True)
     key_links = Column(JSON, nullable=True)
     source_url = Column(String(1000), nullable=True)
+    # 分享者在"分享形象"里填的那个名字。它平时只存在他自己手机本地，只有在他
+    # 主动建分享的这一刻才作为公开快照的一部分上服务器——和 title/summary 同一性质。
+    author_name = Column(String(32), nullable=True)
     cover_asset_id = Column(Integer, ForeignKey("assets.id"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=True)

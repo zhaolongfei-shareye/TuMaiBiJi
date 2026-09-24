@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Annotated, List, Optional
 from pydantic import BaseModel, Field, model_validator
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import or_
 from app.db.database import get_db
 from app.models.note import Note
@@ -89,6 +89,9 @@ class NoteDetail(NoteBrief):
     content: str | None
     original_content: str | None
     updated_at: UTCDatetimeOrNone
+    # 转存进来的那一条才有的来源信息。只出不进：NoteCreate / NoteUpdate 里都没有它，
+    # 所以编辑接口碰不到这一栏，转存之后来源改不掉。
+    imported_from: dict | None = None
 
 
 class NoteCreate(BaseModel):
@@ -310,3 +313,53 @@ def delete_note(
     db.delete(note)
     db.commit()
     return {"message": "Note deleted"}
+
+
+class NoteFromShare(BaseModel):
+    token: str
+
+
+@router.post("/from-share", response_model=NoteDetail)
+def import_from_share(
+    req: NoteFromShare,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_note_room),
+):
+    """把别人分享页上的这一条整份抄进自己的库。
+
+    抄的是 `shares` 上那份**公开快照**，不是原笔记：正文、识别出的原文、分类、
+    置顶都不在公开范围内，也不该跟着过来。来源钉在 `imported_from` 上，
+    而它不在 NoteCreate / NoteUpdate 里，所以这一栏转存之后编辑不掉、只能整条删。
+
+    这里不再送一次 msgSecCheck：这份内容在建分享时已经按公开口径检过一遍，
+    而这一趟没有任何用户可写的自由文本进库（每个字段都是服务端从既有快照搬的）。
+    再检一遍等于把别人写的内容算到转存者头上，顺带烧掉我们一天 100 次的额度。
+    """
+    from app.services.sharing import active_share_by_token
+
+    share = active_share_by_token(db, req.token)
+    if share is None:
+        raise HTTPException(status_code=404, detail="这条分享不存在、已关闭或已删除")
+
+    note = Note(
+        user_id=str(user.id),
+        title=share.title or "（未命名笔记）",
+        summary=share.summary,
+        tags=share.tags,
+        key_points=share.key_points,
+        key_links=share.key_links,
+        source_type="share_import",
+        source_url=share.source_url,
+        imported_from={
+            "share_token": share.token,
+            "source_note_id": share.note_id,
+            "author_user_id": share.user_id,
+            "author_name": share.author_name,
+            "title_at_import": share.title,
+            "imported_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return note
