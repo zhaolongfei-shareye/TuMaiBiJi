@@ -41,6 +41,8 @@ Page({
 
   onLoad() {
     const app = getApp()
+    // 上一回选完没点保存、或者中途被系统杀掉，暂存那张会一直留在这里，进来先收掉
+    poster.dropStaged()
     const lang = app.globalData.userInfo?.language || 'zh'
     const saved = poster.readProfile()
     // 小样要等骨架落到视图层之后再画，否则按选择器取不到画布节点
@@ -156,6 +158,8 @@ Page({
 
   onDropAvatar() {
     this.setData({ avatar: '', avatarStaged: true })
+    // "去掉"就是连本次刚选的那张也不要留：暂存那份当场删掉
+    poster.dropStaged()
     this.renderThumbs()
   },
 
@@ -171,6 +175,8 @@ Page({
 
   onUnload() {
     if (this._thumbTimer) clearTimeout(this._thumbTimer)
+    // 没点保存就走了：这张他随口选的图不该留在本机
+    poster.dropStaged()
   },
 
   onNameInput(e) {

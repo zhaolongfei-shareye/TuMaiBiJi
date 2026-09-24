@@ -103,7 +103,11 @@ function stageAvatar(tempPath) {
 }
 
 function commitAvatar(stagedPath) {
-  return copyTo(stagedPath, AVATAR_NAME)
+  return copyTo(stagedPath, AVATAR_NAME).then((dest) => {
+    // 正式文件已经在了，暂存那份就是纯多余的一份拷贝
+    dropStaged()
+    return dest
+  })
 }
 
 function dropAvatar() {
@@ -111,6 +115,16 @@ function dropAvatar() {
     wx.getFileSystemManager().unlinkSync(`${wx.env.USER_DATA_PATH}/${AVATAR_NAME}`)
   } catch (e) {
     // 没存过就会走到这里，不是错误
+  }
+}
+
+// 暂存那张只"在这页还没点保存"这段时间里有意义：点了保存上面就会删它，没点保存
+// 也要删（用户没要这张图）。让它留着，等于用户随口选的一张图一直躺在本机里。
+function dropStaged() {
+  try {
+    wx.getFileSystemManager().unlinkSync(`${wx.env.USER_DATA_PATH}/${AVATAR_STAGED}`)
+  } catch (e) {
+    // 十有八九是本来就没有暂存文件，不是错误
   }
 }
 
@@ -1300,6 +1314,7 @@ module.exports = {
   stageAvatar,
   commitAvatar,
   dropAvatar,
+  dropStaged,
   planPoster,
   templateLabel,
   groupName,
