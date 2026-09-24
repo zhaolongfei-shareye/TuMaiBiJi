@@ -72,7 +72,7 @@ Page({
     } catch (err) {
       console.error('转存失败', err)
       this.setData({ saving: false })
-      // 服务端这类失败带的是中文原因（额度满了、这条已经关了），照实说比"没存上"有用
+      // 服务端这类失败带的是中文原因（这条已经关了、内容没过检），照实说比"没存上"有用
       const reason = (err && (err.detail || (err.data && err.data.detail))) || ''
       wx.showToast({ title: reason || t('saveMineFailed', lang), icon: 'none' })
     }

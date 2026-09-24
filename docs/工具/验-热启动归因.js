@@ -244,25 +244,33 @@ async function main() {
     check('app 层 _reportInviter 真打成功后把本地清掉了', flow.put > 0 && !flowAfter.left,
       { put: flow.put, left: flowAfter.left })
 
-    // 「我的」页：后端上线后这两行第一次该有真数字
-    console.log('\n=== 9. 「我的」页额度行（后端刚上线，这是它第一次能显示真数）===')
+    // 「我的」页：这一行显示的是真数字。2026-09-24 取消额度之后不再有别的那半截。
+    console.log('\n=== 9. 「我的」页那一行条数（数字来自 /api/user/quota，不是界面写死）===')
     await mp.switchTab('/pages/me/me')
     await sleep(3000)
     const me = await mp.evaluate(() => {
       const pages = getCurrentPages()
       const p = pages[pages.length - 1]
       const d = p.data || {}
+      const q = p.quota || null
       return {
         route: p.route,
         quotaText: d.quotaText,
         shareValue: d.shareValue,
+        used: q && q.used,
+        keys: q && Object.keys(q).sort().join(','),
       }
     })
     console.log('  ', JSON.stringify(me))
     check('切到了「我的」页', /\/me$/.test(me.route || ''), me.route)
-    check('额度行是真数字而不是留空（后端 /api/user/quota 通了）',
-      /^\d+\/\d+$/.test(me.quotaText || ''), me.quotaText)
-    check('分享那一行也有内容', !!(me.shareValue && String(me.shareValue).length), me.shareValue)
+    check('那一行是「N 条」而不是留空（后端 /api/user/quota 通了）',
+      /^\d+ 条$/.test(me.quotaText || ''), me.quotaText)
+    check('界面上的条数就是接口给的那一个数（页面没自己算）',
+      /^\d+ 条$/.test(me.quotaText || '') && me.quotaText === `${me.used} 条`,
+      { quotaText: me.quotaText, used: me.used })
+    check('接口只回 used 与 categories，没有上限字段回流到界面',
+      me.keys === 'categories,used', me.keys)
+    check('分享那一行不吹额度也不写死数字', me.shareValue === '不限量 · 免费', me.shareValue)
     await mp.screenshot({ path: SHOT + '/15-我的-额度.png' })
     console.log('  截图：' + SHOT + '/15-我的-额度.png')
 

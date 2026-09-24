@@ -4,7 +4,7 @@ const { t } = require('./utils/i18n')
 
 // 分享卡片的路径上带着邀请人的 user id（?inviter=123）。落到本地存储是因为它必须活到
 // "这个人真的写下第一篇笔记"那一刻：冷启、热启、从分享卡片直接落到新建页，都只有这里
-// 能一次接住。到底认不认、什么时候给额度，全在服务端判（见 backend/app/services/quota.py）。
+// 能一次接住。到底认不认、这笔账什么时候结，全在服务端判（见 backend/app/services/quota.py）。
 const INVITER_KEY = 'inviterId'
 
 function rememberInviter(options) {

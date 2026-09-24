@@ -3,9 +3,9 @@ const { t, texts } = require('../../utils/i18n.js')
 const { blockSkinFor, toneVars, toneStyle } = require('../../utils/palette.js')
 const { formatShortDate } = require('../../utils/date.js')
 
-// 统计看板一次读多少条：后端 /api/notes 的 limit 上限就是 100，
-// 而计划中的额度也正好是 100 篇，所以这一趟能覆盖"全部"。
-// 真到了一百篇，总数只能显示"100+"——接口没给 count，不能假装知道。
+// 统计看板一次读多少条：后端 /api/notes 的 limit 上限就是 100，写不了更大。
+// 所以笔记超过一百篇之后，看板上的总数只能显示"100+"——接口没给 count，不能假装知道。
+// （2026-09-24 起笔记不限量，这一条从"到顶之前够用"变成"重度用户迟早撞到显示上限"。）
 const STATS_LIMIT = 100
 
 // 周一为一周起点（国内习惯）。用"本地零点"而不是把毫秒减 7 天，
