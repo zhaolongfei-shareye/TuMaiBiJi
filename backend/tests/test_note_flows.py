@@ -300,6 +300,12 @@ def _stub_wechat_http(monkeypatch, module, status=200, body="", payload=None):
             sent.append(f"{url}?{urlencode(params or {})}")
             return resp
 
+        async def post(self, url, json=None, **k):
+            # 稳定版 token 接口把凭据放在 POST body 里，所以这里也要把 body 记下来，
+            # 断言才覆盖得住"secret 会不会从异常文本出去"。
+            sent.append(f"{url}?{urlencode(json or {})}")
+            return resp
+
     monkeypatch.setattr(module.httpx, "AsyncClient", _Client)
     monkeypatch.setattr(module.settings, "WECHAT_APP_SECRET", SECRET_SENTINEL)
     return sent

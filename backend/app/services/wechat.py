@@ -11,9 +11,16 @@ from app.core.errors import UserError
 
 logger = logging.getLogger(__name__)
 
-WX_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token"
+# 不用 /cgi-bin/token：那个接口是"轮转"的，任何第二个进程（本地调试、另一台机器、
+# 甚至同项目的 worker）拿一次凭据去要 token，就会把前一个进程手里那份挤成
+# "invalid credential / not latest"（40001），而本进程的缓存还要抱着旧 token 到过期为止。
+# 2026-09-24 现网就被这么打断过：二维码和内容安全两条一起 502/降级。
+# 稳定版接口按凭据回同一份"当前有效"的 token，不轮转，所以多进程不再互相踢。
+WX_STABLE_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/stable_token"
 WX_QRCODE_URL = "https://api.weixin.qq.com/wxa/getwxacodeunlimit"
 WX_SEC_CHECK_URL = "https://api.weixin.qq.com/wxa/msg_sec_check"
+# 这三种都是"token 这一环不对"，不是我们送的内容有问题：清缓存重取一次再判。
+TOKEN_ERRORS = {40001, 42001, 40014}
 
 # 实测（2026-09-22，现网凭据）：v2 送 2,501 字和 6,000 字都正常返回，不报错。
 # 但文档口径是单次 2,500 字符，而且模型到底看了前 2,500 还是全文无从验证——
@@ -44,23 +51,37 @@ _SEC_PASS_CACHE_MAX = 4000
 _sec_pass_cache: "OrderedDict[tuple, bool]" = OrderedDict()
 
 
+def _invalidate_access_token() -> None:
+    """丢掉缓存的 token。拿到 40001 这一类"凭据不对"时必须调，否则旧值会一直抱到过期。"""
+    _access_token_cache["token"] = None
+    _access_token_cache["expires_at"] = 0
+
+
+def _token_body() -> dict:
+    # 凭据走 POST body，不进 URL：httpx 的异常文本会把整条 URL 拼进去，
+    # 而日志里只要出现过一次这种异常，AppSecret 就出去了。
+    return {
+        "grant_type": "client_credential",
+        "appid": settings.WECHAT_APP_ID,
+        "secret": settings.WECHAT_APP_SECRET,
+    }
+
+
+def _store_token(data: dict) -> str:
+    _access_token_cache["token"] = data["access_token"]
+    _access_token_cache["expires_at"] = time.time() + data.get("expires_in", 7200)
+    logger.info("微信 access_token 已刷新")
+    return data["access_token"]
+
+
 async def get_access_token() -> str:
-    """获取微信 access_token，带内存缓存（提前 5 分钟刷新）。"""
+    """获取微信 access_token（稳定版接口），带内存缓存（提前 5 分钟刷新）。"""
     now = time.time()
     if _access_token_cache["token"] and _access_token_cache["expires_at"] > now + 300:
         return _access_token_cache["token"]
 
     async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            WX_TOKEN_URL,
-            params={
-                "grant_type": "client_credential",
-                "appid": settings.WECHAT_APP_ID,
-                "secret": settings.WECHAT_APP_SECRET,
-            },
-        )
-        # 这里不用 raise_for_status：httpx 的异常文本会把请求 URL 整条拼进去，而这个 URL 的
-        # query 里带着 AppSecret。状态码和响应体单独记日志，往外只抛不含凭据的固定文案。
+        resp = await client.post(WX_STABLE_TOKEN_URL, json=_token_body())
         if resp.status_code >= 400:
             logger.error("获取 access_token 失败：HTTP %s，响应=%s", resp.status_code, resp.text[:200])
             raise UserError("微信接口暂不可用，请稍后重试")
@@ -70,10 +91,7 @@ async def get_access_token() -> str:
         logger.error("获取 access_token 被拒：%s", data)
         raise UserError("微信接口暂不可用，请稍后重试")
 
-    _access_token_cache["token"] = data["access_token"]
-    _access_token_cache["expires_at"] = now + data.get("expires_in", 7200)
-    logger.info("微信 access_token 已刷新")
-    return data["access_token"]
+    return _store_token(data)
 
 
 def _access_token_sync() -> str:
@@ -88,15 +106,7 @@ def _access_token_sync() -> str:
         return _access_token_cache["token"]
 
     with httpx.Client(timeout=10) as client:
-        resp = client.get(
-            WX_TOKEN_URL,
-            params={
-                "grant_type": "client_credential",
-                "appid": settings.WECHAT_APP_ID,
-                "secret": settings.WECHAT_APP_SECRET,
-            },
-        )
-        # 同异步版：不用 raise_for_status，异常文本会带上含 AppSecret 的整条 URL
+        resp = client.post(WX_STABLE_TOKEN_URL, json=_token_body())
         if resp.status_code >= 400:
             logger.error("获取 access_token 失败：HTTP %s，响应=%s", resp.status_code, resp.text[:200])
             raise UserError("微信接口暂不可用，请稍后重试")
@@ -106,10 +116,7 @@ def _access_token_sync() -> str:
         logger.error("获取 access_token 被拒：%s", data)
         raise UserError("微信接口暂不可用，请稍后重试")
 
-    _access_token_cache["token"] = data["access_token"]
-    _access_token_cache["expires_at"] = now + data.get("expires_in", 7200)
-    logger.info("微信 access_token 已刷新")
-    return data["access_token"]
+    return _store_token(data)
 
 
 def check_text(openid: str, content: str) -> str:
@@ -156,18 +163,27 @@ def probe_sec_check(openid: str, content: str) -> dict:
 def _ask_sec_check(openid: str, content: str) -> dict:
     """真打一趟 msgSecCheck，回 {"verdict": ..., "errcode": ...}。"""
     try:
-        token = _access_token_sync()
         payload = {"content": content, "version": 2, "scene": 1, "openid": openid}
-        with httpx.Client(timeout=10) as client:
+        data = None
+        for attempt in (1, 2):
+            token = _access_token_sync()
             # 不能用 client.post(json=...)：httpx 默认 ensure_ascii=True，中文会被转义成
             # \uXXXX，而微信这个接口**不解析转义**——实测同一段赌博引流文本，原样 UTF-8 体
             # 判 risky(20006)，转义体判 pass。用 json= 就等于把内容安全静默关掉。
-            resp = client.post(
-                f"{WX_SEC_CHECK_URL}?access_token={token}",
-                content=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-            )
-        data = resp.json()
+            with httpx.Client(timeout=10) as client:
+                resp = client.post(
+                    f"{WX_SEC_CHECK_URL}?access_token={token}",
+                    content=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                )
+            data = resp.json()
+            # 40001 这一类是"这一份 token 不算数了"，不是配置错：清掉缓存再要一次，
+            # 只重试一趟，避免凭据真的错了的时候来回打。
+            if data.get("errcode") in TOKEN_ERRORS and attempt == 1:
+                _invalidate_access_token()
+                logger.warning("内容安全拿到 %s（token 已失效），清缓存重试一趟", data.get("errcode"))
+                continue
+            break
     except Exception as exc:
         # httpx 异常文本可能带整条含 token 的 URL，只进日志
         logger.error("内容安全接口异常 %s: %s", type(exc).__name__, exc)
@@ -254,28 +270,35 @@ async def get_qr_code_image(scene: str, page: str = "") -> bytes:
         _qr_cache.move_to_end(key)
         return cached
 
-    token = await get_access_token()
     body = {"scene": scene, "check_path": False, "width": 280, "env_version": env_version}
     if page:
         body["page"] = page
 
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.post(
-            f"{WX_QRCODE_URL}?access_token={token}",
-            json=body,
-        )
-        
+    for attempt in (1, 2):
+        token = await get_access_token()
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{WX_QRCODE_URL}?access_token={token}",
+                json=body,
+            )
+
         # Check HTTP status first
         if resp.status_code != 200:
             raise RuntimeError(f"生成小程序码失败: HTTP {resp.status_code}")
-        
+
         content_type = resp.headers.get("content-type", "")
-        
+
         # Handle JSON error responses
         if content_type.startswith("application/json"):
             data = resp.json()
+            # 40001 这一类是 token 这一环失效（别的进程轮转过凭据也会造成），
+            # 清掉缓存重来一趟；配置真错了第二趟还是同样的错，就照原样抛。
+            if data.get("errcode") in TOKEN_ERRORS and attempt == 1:
+                _invalidate_access_token()
+                logger.warning("小程序码拿到 %s（token 已失效），清缓存重试一趟", data.get("errcode"))
+                continue
             raise RuntimeError(f"生成小程序码失败: errcode={data.get('errcode')}, errmsg={data.get('errmsg')}")
-        
+
         # Verify we got an image
         if "image" not in content_type and content_type:
             raise RuntimeError(f"生成小程序码失败: 非图片响应 (content-type: {content_type})")
