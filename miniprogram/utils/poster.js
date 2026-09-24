@@ -92,7 +92,10 @@ function avatarPath() {
 function copyTo(src, name) {
   const dest = `${wx.env.USER_DATA_PATH}/${name}`
   return new Promise((resolve, reject) => {
-    wx.getFileSystemManager().copyFile({ filePath: src, destPath: dest, success: () => resolve(dest), fail: reject })
+    // 参数名是 srcPath，不是 filePath——真机上写错的表现是 errno 1001
+    // "parameter.srcPath should be String instead of Undefined"，
+    // 而开发者工具的替身不校验这个，模拟器里一路都是绿的。
+    wx.getFileSystemManager().copyFile({ srcPath: src, destPath: dest, success: () => resolve(dest), fail: reject })
   })
 }
 
