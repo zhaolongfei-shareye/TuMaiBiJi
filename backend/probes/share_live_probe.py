@@ -1,4 +1,4 @@
-"""现网探针：分享快照这一轮的四条修复，在真库真接口上过一遍。
+"""现网探针：分享这一路的五条修复，在真库真接口上过一遍（快照同步 + 撤回分享）。
 
 和 pytest 的分工：单元用例证明"逻辑对不对"，这里证明"部署到现网的那份字节真的是它"，
 而且用的是真 msgSecCheck——SEC_CHECK_ENABLED 在测试里是关掉的，绕审那条只有现网能验。
@@ -10,11 +10,13 @@
 它只用 deploy-test 那个账号（user_id=1），跑完自己把建出来的笔记删掉；
 别的账号一行都不碰。全程只在结尾断言"我建的行都清了"。
 
-要看的四件事：
+要看的五件事：
 ① 改标题之后，公开分享页不再挂着旧内容（隐私泄漏本体）。
 ② 反复建分享只有一张码，而且第二次起不再多打内容安全。
 ③ key_links 里塞违规文本要拦（这一轮新补的送检字段）。
 ④ 同一张小程序码第二次拿不重复打微信（看耗时差）。
+⑤ 撤掉分享（2026-09-24 这批）：状态接口说的是实话、撤掉之后旧码当场扫不开、
+   重新分享换的是全新的一张码而旧码不会复活、新码不再有七天过期、落地页带要点与链接。
 """
 import json
 import sys
@@ -158,10 +160,53 @@ def main():
               median < first / 5,
               f"首次 {first:.0f}ms，其余中位数 {median:.0f}ms（全部 {[round(x) for x in timings]}）")
 
+    # ---- ⑤ 撤掉分享：关的是"这张纸"，不是"这扇门" ----------------------------
+    def status():
+        return client.get("/api/shares/status", params={"note_id": note_id}, headers=hdr)
+
+    st = status()
+    check("⑤ 状态接口如实报「已公开」，并给回当前那张码",
+          st.status_code == 200 and st.json().get("active") is True and st.json().get("token") == token,
+          f"HTTP {st.status_code} · {st.text[:90]}")
+
+    # 撤之前先给这篇补上要点和链接——撤回之后重新分享走的是同一份公开字段，
+    # 正好一次验两件事：门关上、开着的时侯内容是全的。
+    client.put(f"/api/notes/{note_id}", headers=hdr,
+               json={"key_points": [f"探针要点{MARK}", "第二条要点"],
+                     "source_url": f"https://example.com/src/{MARK}"})
+    r = client.post("/api/shares/revoke", headers=hdr, json={"note_id": note_id})
+    check("⑤ 点撤掉：关掉一行", r.status_code == 200 and r.json().get("closed") == 1, r.text[:90])
+    check("⑤ 已经发出去那张码当场扫不开", client.get(f"/api/shares/{token}").status_code == 404)
+    st = status()
+    check("⑤ 状态接口跟着改口：不公开、也没有码",
+          st.json().get("active") is False and st.json().get("token") is None, st.text[:90])
+    r = client.post("/api/shares/revoke", headers=hdr, json={"note_id": note_id})
+    check("⑤ 再点一次撤掉不报错、也不重复关行", r.status_code == 200 and r.json().get("closed") == 0,
+          r.text[:90])
+
+    r = client.post("/api/shares/", headers=hdr, json={"note_id": note_id})
+    new_token = r.json().get("token", "")
+    check("⑤ 重新分享给的是全新的一张码", bool(new_token) and new_token != token,
+          f"旧 {token[:8]}… → 新 {new_token[:8]}…")
+    check("⑤ 旧码不会因为「又分享了一次」被救活",
+          client.get(f"/api/shares/{token}").status_code == 404)
+    pub = client.get(f"/api/shares/{new_token}")
+    check("⑤ 新码扫得开，且落地页带着要点与来源链接",
+          pub.status_code == 200 and f"探针要点{MARK}" in pub.text
+          and f"/src/{MARK}" in pub.text, f"HTTP {pub.status_code}")
+    db.expire_all()
+    live = db.query(Share).filter(Share.note_id == note_id, Share.is_active == True).all()
+    check("⑤ 这篇名下开着的码仍然只有一张", len(live) == 1, f"{len(live)} 张")
+    check("⑤ 新码不带过期时间（印在海报上的那张纸不会一周作废）",
+          live and live[0].expires_at is None,
+          f"expires_at={getattr(live[0], 'expires_at', None) if live else '无行'}")
+
     # ---- 收尾：只清这一次建的东西 ---------------------------------------------
     r = client.delete(f"/api/notes/{note_id}", headers=hdr)
     check("删掉这条笔记", r.status_code in (200, 204), f"HTTP {r.status_code}")
     check("删掉的笔记，那张码扫开是 404",
+          client.get(f"/api/shares/{new_token}").status_code == 404)
+    check("收尾：撤掉过的旧码也仍然是 404",
           client.get(f"/api/shares/{token}").status_code == 404)
     db.expire_all()
     check("收尾：这次标记的笔记一条不留", count_rows() == 0)
