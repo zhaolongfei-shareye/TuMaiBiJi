@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
@@ -17,6 +18,7 @@ from app.models.share import Share
 from app.models.user import User
 from app.services.sharing import (
     active_shares,
+    close_shares,
     public_fields,
     snapshot_matches,
     sync_snapshot,
@@ -53,16 +55,12 @@ def create_share(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    note = (
-        db.query(Note)
-        .filter(Note.id == req.note_id, Note.user_id == str(user.id))
-        .first()
-    )
-    if not note:
-        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
+    note = _owned_note(db, user, req.note_id)
 
     # 一条笔记只留一个有效分享：卡片上的码是按 token 生成的，反复点"生成分享图"
     # 再各发一个新 token，等于同一篇笔记散出去好几张互不相干的码，旧的那些还一直有效。
+    # 这条不再只是注释——shares 上有个部分唯一索引只允许每篇笔记留一行 is_active=1，
+    # 真撞上了走下面那个 IntegrityError 分支。
     existing = next((s for s in active_shares(db, note.id) if not _is_expired(s)), None)
     if existing is not None and snapshot_matches(existing, note):
         # 公开页上的内容和上次送检时一字不差，就不要再打一遍 msgSecCheck。
@@ -84,8 +82,14 @@ def create_share(
         return existing
 
     token = secrets.token_urlsafe(16)
+    # 库里可能还躺着一张"过期时间到了但标记还开着"的老码（上线之前建的那批）。它扫开
+    # 已经是 404，占着的却是"这篇笔记唯一那张开着的码"这个位置，新码建不进来。
+    # 所以发新码之前先把它关严——反正它本来就没人看得见。
+    for stale in active_shares(db, note.id):
+        if _is_expired(stale):
+            stale.is_active = False
     # 不设 expires_at：这张码是印在海报上的纸，别人一周后扫到也应该能看到那条笔记。
-    # 原来给 7 天，等于每张发出去的海报都会在一周之后变成"分享已过期"。
+    # 收回来靠用户主动撤（/revoke），不靠一个他自己没同意过的倒计时。
     share = Share(
         user_id=str(user.id),
         note_id=note.id,
@@ -93,9 +97,73 @@ def create_share(
         **visible_fields(note),
     )
     db.add(share)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 两个请求同时进来，各自都没查到已有分享，于是都往下建。索引让后到的那个失败，
+        # 这里把它领回先落库的那张码：内容一模一样，只是 token 用对方的。
+        # 绝不能在这里重新送检——检的是同一份内容，白烧一遍额度。
+        db.rollback()
+        raced = next((s for s in active_shares(db, req.note_id) if not _is_expired(s)), None)
+        if raced is None:
+            raise HTTPException(status_code=409, detail="这篇笔记的分享状态刚变过，请再试一次")
+        return raced
     db.refresh(share)
     return share
+
+
+def _owned_note(db: Session, user: User, note_id: int) -> Note:
+    note = (
+        db.query(Note)
+        .filter(Note.id == note_id, Note.user_id == str(user.id))
+        .first()
+    )
+    if not note:
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
+    return note
+
+
+class ShareStatusResponse(BaseModel):
+    active: bool
+    token: str | None
+
+
+@router.get("/status", response_model=ShareStatusResponse)
+def get_share_status(
+    note_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """这篇笔记现在对外还是不对外。详情页拿它决定显示"撤掉分享"还是什么都不显示。
+
+    路径必须注册在 /{token} 之前：FastAPI 按声明顺序匹配，不然 GET /api/shares/status
+    会被当成一个 token 来查，回一个莫名其妙的 404。
+    """
+    note = _owned_note(db, user, note_id)
+    live = next((s for s in active_shares(db, note.id) if not _is_expired(s)), None)
+    return {"active": live is not None, "token": live.token if live else None}
+
+
+class ShareRevokeRequest(BaseModel):
+    note_id: int
+
+
+@router.post("/revoke")
+def revoke_share(
+    req: ShareRevokeRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """撤掉分享：把这篇笔记名下开着的码全关掉，扫开就是"分享已关闭"。
+
+    关而不删——token 留着，事后还能对账"这张海报当时是谁的哪篇"。
+    撤回之后用户再点分享会拿到一张**新码**（旧码不会复活）：他既然说过这篇不公开，
+    那已经印出去的那张纸就该一直作废，不能因为后来又分享了一次别的笔记而翻案。
+    """
+    note = _owned_note(db, user, req.note_id)
+    closed = close_shares(db, note.id)
+    db.commit()
+    return {"closed": closed}
 
 
 def _is_expired(share: Share) -> bool:

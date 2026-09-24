@@ -1,9 +1,10 @@
 const poster = require('../../utils/poster.js')
 const { t, texts } = require('../../utils/i18n.js')
 
-// 小样格子的显示宽度。画布位图固定 750 宽，格子只有 320，所以 CSS 高度要按同比例缩，
-// 否则预览会被拉扁。
-const THUMB_W = 320
+// 画布自己的显示宽度，必须和 profile.wxss 里 .cell-canvas 的 width 是同一个数。
+// 之前这里填的是 320——那是格子的外宽，含内边距。拿它折算高度等于把每张预览纵向
+// 拉长 750/675≈11%，圆形头像在小样里被画成椭圆，而成品海报是对的：预览骗人。
+const THUMB_W = 288
 // 十格同屏，每格都按 750 全尺寸开位图要吃三十多兆显存，低端安卓会直接崩画布。
 // 小样只是挑样式，0.46 倍落笔在 320rpx 的格子里看不出差别。
 const THUMB_SCALE = 0.46
@@ -72,6 +73,11 @@ Page({
   },
 
   async renderThumbs() {
+    // 两遍重画会打架：连点两次换图，前一遍解码头像慢、后落盘，界面就停在旧内容上
+    // （实测过一次：头像已经去掉了，画布上却又把旧头像画回来）。每轮领一个号，
+    // 落盘前对号，号不对的那轮直接放弃。
+    const gen = (this._renderGen || 0) + 1
+    this._renderGen = gen
     const { lang } = this.data
     const profile = this.draftProfile()
     // 英文界面下小样得用英文笔记：断行、字距、行高在两种语言下不是一套数
@@ -79,6 +85,7 @@ Page({
     const groups = this.data.groups.map((g) => ({ id: g.id, label: g.label, items: g.items.slice() }))
     for (let gi = 0; gi < groups.length; gi++) {
       for (let ii = 0; ii < groups[gi].items.length; ii++) {
+        if (this._renderGen !== gen) return
         const tpl = groups[gi].items[ii]
         try {
           const canvas = await this.getCanvas(`#tpl-${tpl.id}`)
@@ -102,6 +109,7 @@ Page({
         }
       }
     }
+    if (this._renderGen !== gen) return
     this.setData({ groups })
   },
 
@@ -151,12 +159,28 @@ Page({
     this.renderThumbs()
   },
 
+  // 改了名称/一句话，十格小样上印的还是旧的那一份——保存之后成品才变，预览就是骗人。
+  // 但逐字重画太贵（十张画布，每张都要重排一遍、解一遍头像），所以输入停下 400ms 画一次。
+  scheduleThumbs() {
+    if (this._thumbTimer) clearTimeout(this._thumbTimer)
+    this._thumbTimer = setTimeout(() => {
+      this._thumbTimer = null
+      this.renderThumbs()
+    }, 400)
+  },
+
+  onUnload() {
+    if (this._thumbTimer) clearTimeout(this._thumbTimer)
+  },
+
   onNameInput(e) {
     this.setData({ name: e.detail.value })
+    this.scheduleThumbs()
   },
 
   onSloganInput(e) {
     this.setData({ slogan: e.detail.value })
+    this.scheduleThumbs()
   },
 
   onPickTemplate(e) {

@@ -84,11 +84,12 @@ else
 fi
 
 python <<'PY'
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 from app.core.config import settings
 
-insp = inspect(create_engine(settings.DATABASE_URL))
+engine = create_engine(settings.DATABASE_URL)
+insp = inspect(engine)
 cols = {c["name"] for c in insp.get_columns("users")}
 tables = set(insp.get_table_names())
 missing = sorted({"quota_bonus", "invited_by", "generation"} - cols)
@@ -106,13 +107,22 @@ if not uniq:
     print("  ✗ invitations.invitee_id 上没有唯一约束，同一个被邀请人可能被结好几次")
     raise SystemExit(1)
 # 分享快照这两列是公开页要点/原文链接的唯一来源；缺一列就是扫码的人又只能看摘要。
-# 顺带确认老行上那个 7 天时间戳真的被清了——码印在纸上，不该一周就失效。
+# 再确认"一篇笔记一张有效码"那个部分唯一索引真的建上了：没有它，并发建分享还是会
+# 给同一篇笔记发出好几张码，而用户撤的时候只关得掉他手里那一张。
 sh_cols = {c["name"] for c in insp.get_columns("shares")}
 missing = sorted({"key_points", "source_url"} - sh_cols)
 if missing:
     print(f"  ✗ shares 表迁移后仍缺：{'、'.join(missing)}")
     raise SystemExit(1)
-print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束）/ shares.key_points / shares.source_url 到位")
+with engine.connect() as conn:
+    one_code_idx = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND name='ux_shares_one_active_per_note'"
+    )).scalar()
+if not one_code_idx or "is_active" not in one_code_idx:
+    print("  ✗ shares 上缺 ux_shares_one_active_per_note（或它没带 is_active 条件）")
+    raise SystemExit(1)
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束）/ shares.key_points / shares.source_url / 一篇笔记一张有效码的索引 到位")
 PY
 if [[ $? -ne 0 ]]; then
     echo "✗ schema 校验未通过，终止部署"

@@ -6,6 +6,8 @@
 - `public_fields`：会因为一次分享而对外可见的全部内容，也就是送检范围。
 - `sync_snapshot` / `snapshot_matches`：快照是冗余存的，公开页读的是它而不是笔记本身。
   笔记一改就得跟着同步，否则用户把隐私内容改掉之后，已经发出去的那张卡片仍然挂着旧内容。
+- `close_shares`：公开/不公开只由 `shares.is_active` 这一列说话。海报上的码不设过期，
+  所以"关掉这扇门"是用户能做的唯一下线动作——它必须存在，否则发出去就再也收不回来。
 
 字段清单曾经漏掉过 key_links：它客户端可写、又显示在公开页上，却一次都没进过
 msgSecCheck。所以下面这几个函数都从常量取字段，不再各写一份元组。
@@ -65,7 +67,7 @@ def snapshot_matches(share: Share, note: Note) -> bool:
 def sync_snapshot(db: Session, note: Note) -> int:
     """把这条笔记名下所有仍然有效的分享快照刷成当前内容，返回刷了几条。
 
-    不 commit——调用方决定这一笔和它自己的改动是不是一次提交。编辑笔记时如果送检
+    不 commit——调用方决定这一笔和它自己的改动是一次提交。编辑笔记时如果送检
     没过，回滚要连这次同步一起回滚，否则会出现"公开页拿到了没过审的新内容"。
     """
     shares = active_shares(db, note.id)
@@ -75,3 +77,17 @@ def sync_snapshot(db: Session, note: Note) -> int:
     if shares:
         db.flush()
     return len(shares)
+
+
+def close_shares(db: Session, note_id: int) -> int:
+    """把这篇笔记名下还开着的分享全关掉，返回关掉几条。撤回分享走的就是这里。
+
+    关而不删：token 留着，哪张海报上的码被谁扫过还能对账（回 404"分享已关闭"），
+    而 is_active 是唯一那扇"用户愿不愿意让别人看"的门——有效期已经不当这个用了。
+    不 commit，和调用方的其它改动同一次提交。
+    """
+    return (
+        db.query(Share)
+        .filter(Share.note_id == note_id, Share.is_active == True)  # noqa: E712
+        .update({"is_active": False}, synchronize_session=False)
+    )

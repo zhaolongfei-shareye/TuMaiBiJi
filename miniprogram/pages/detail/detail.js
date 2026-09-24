@@ -19,6 +19,7 @@ Page({
     lang: 'zh',
     t: texts('zh'),
     noteId: null,
+    shared: false,
     _loaded: false,
   },
 
@@ -81,6 +82,7 @@ Page({
       note.date_label = formatShortDate(note.created_at)
       
       this.setData({ note, loading: false, _loaded: true })
+      this.loadShareStatus(note.id)
       // 搜一搜索引页面标题：用笔记真实标题替代静态"笔记详情"
       if (note.title) {
         wx.setNavigationBarTitle({ title: note.title })
@@ -90,6 +92,38 @@ Page({
       this.setData({ loading: false })
       wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
     }
+  },
+
+  // 这篇对外不对外，只有服务端知道（海报可能是在另一台手机上生成的）。
+  async loadShareStatus(noteId) {
+    try {
+      const s = await api.getShareStatus(noteId)
+      this.setData({ shared: !!(s && s.active) })
+    } catch (err) {
+      // 读不到就不显示这一行。绝不能猜一个"没在公开"给人看——那等于把该收的东西留着。
+      console.error('分享状态读取失败', err)
+    }
+  },
+
+  onUnshare() {
+    const { noteId, lang } = this.data
+    wx.showModal({
+      title: t('unshare', lang),
+      content: t('unshareBody', lang),
+      confirmText: t('unshareConfirm', lang),
+      cancelText: t('cancel', lang),
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await api.revokeShare(noteId)
+          this.setData({ shared: false })
+          wx.showToast({ title: t('unshared', lang), icon: 'success' })
+        } catch (err) {
+          console.error('撤掉分享失败', err)
+          wx.showToast({ title: t('unshareFailed', lang), icon: 'none' })
+        }
+      },
+    })
   },
 
   async togglePin() {

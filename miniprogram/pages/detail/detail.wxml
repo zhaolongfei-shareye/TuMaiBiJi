@@ -61,6 +61,11 @@
     <!-- 底部操作 -->
     <view class="bottom-actions">
       <view class="btn-share" bindtap="onShare">{{t.shareAsImage}}</view>
+      <!-- 海报上的码不过期，所以这一行是用户唯一能把已公开内容收回来的入口；只在真的公开着时出现 -->
+      <view wx:if="{{shared}}" class="share-state" bindtap="onUnshare">
+        <text class="state-hint">{{t.sharedNow}}</text>
+        <text class="state-act">{{t.unshare}}</text>
+      </view>
     </view>
   </view>
 </view>

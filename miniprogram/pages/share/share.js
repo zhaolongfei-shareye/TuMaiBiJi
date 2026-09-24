@@ -49,6 +49,7 @@ Page({
         }
       }
       this._note = note
+      this._token = share.token
       this._qrPath = await this.downloadQRImage(share.token)
       await this.render()
     } catch (err) {
@@ -71,6 +72,18 @@ Page({
     })
   },
 
+  // 码没解码成功就出一张"留了个空白方块"的海报：看上去是完整的，谁也扫不开。
+  // 先重新下一趟再试；还不行就直接失败让他重试，不静默出一张废图。
+  async loadQr(canvas) {
+    let qr = await poster.loadImage(canvas, this._qrPath, 3000)
+    if (!qr) {
+      this._qrPath = await this.downloadQRImage(this._token)
+      qr = await poster.loadImage(canvas, this._qrPath, 3000)
+    }
+    if (!qr) throw new Error('小程序码解不开')
+    return qr
+  },
+
   async render() {
     const { lang } = this.data
     const profile = poster.readProfile()
@@ -78,7 +91,7 @@ Page({
     const canvas = await this.getCanvas()
     const ctx = canvas.getContext('2d')
 
-    const images = { qr: await poster.loadImage(canvas, this._qrPath, 3000) }
+    const images = { qr: await this.loadQr(canvas) }
     if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 5000)
 
     // 先量后画：两趟必须用同一套数，否则量出来的高度和画出来的位置对不上。

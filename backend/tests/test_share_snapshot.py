@@ -11,6 +11,8 @@
    msgSecCheck（那个接口每次真打都要花自己的配额）。
 ④ 公开页显示的字段必须全部落在送检范围内。key_links 曾经客户端可写、公开页可见，
    却一次都没进过内容安全。
+⑤ 公开/不公开由用户说了算：码不设过期，所以必须有一扇关得上的门（/revoke），
+   而且每篇笔记只留一张开着的码——这条由部分唯一索引兜，不靠注释。
 
 不出网：conftest 已把 SEC_CHECK_ENABLED 置 false，需要走判定逻辑的用例各自 stub check_text。
 """
@@ -318,6 +320,88 @@ def test_新建分享不带过期时间(client, db_session, person, monkeypatch)
     s = db_session.query(Share).filter(Share.token == token).first()
     assert s.expires_at is None
     assert client.get(f"/api/shares/{token}").status_code == 200
+
+
+# ------------------------- 撤回这条链：码不过期，那"关掉"这扇门必须存在
+def test_撤掉分享之后旧码扫不开再分享是新码(client, db_session, person, monkeypatch):
+    """码不设过期，那"关掉这扇门"就必须存在。
+
+    审计查出来的原话是：全仓库没有任何一处把 is_active 置成 false，而这一轮又把 7 天
+    有效期拿掉了——发出去的码既收不回也关不掉，唯一下线途径是删笔记或注销账号。
+    还有半边是"已经撤过的旧海报不会因为你又分享了一次就复活"。
+    """
+    _pass_all(monkeypatch)
+    hdr = _hdr(person.id)
+    nid = _mknote(db_session, person.id, "要撤掉的笔记", summary="可以被公开")
+    old = client.post("/api/shares/", headers=hdr, json={"note_id": nid}).json()["token"]
+    assert client.get(f"/api/shares/{old}").status_code == 200
+
+    r = client.post("/api/shares/revoke", headers=hdr, json={"note_id": nid})
+    assert r.status_code == 200
+    assert r.json()["closed"] == 1
+    assert client.get(f"/api/shares/{old}").status_code == 404
+
+    status = client.get("/api/shares/status", params={"note_id": nid}, headers=hdr).json()
+    assert status == {"active": False, "token": None}
+
+    new = client.post("/api/shares/", headers=hdr, json={"note_id": nid}).json()["token"]
+    assert new != old
+    assert client.get(f"/api/shares/{old}").status_code == 404, "撤过的码不能因为再次分享而复活"
+    assert client.get(f"/api/shares/{new}").status_code == 200
+    assert client.get("/api/shares/status", params={"note_id": nid}, headers=hdr).json()["token"] == new
+
+
+def test_撤回是幂等的(client, db_session, person, monkeypatch):
+    """没在公开的东西再撤一次不该报错，也不该假装关掉了什么。"""
+    _pass_all(monkeypatch)
+    hdr = _hdr(person.id)
+    nid = _mknote(db_session, person.id, "撤两次的笔记")
+    client.post("/api/shares/", headers=hdr, json={"note_id": nid})
+    assert client.post("/api/shares/revoke", headers=hdr, json={"note_id": nid}).json()["closed"] == 1
+    again = client.post("/api/shares/revoke", headers=hdr, json={"note_id": nid})
+    assert again.status_code == 200
+    assert again.json()["closed"] == 0
+
+
+def test_别人名下的笔记撤不动也查不到(client, db_session, person, monkeypatch):
+    """两个接口都带归属：note_id 是自增的，不能拿它去碰别人的分享。"""
+    _pass_all(monkeypatch)
+    mine = _mknote(db_session, person.id, "我的公开笔记")
+    client.post("/api/shares/", headers=_hdr(person.id), json={"note_id": mine})
+
+    other = User(openid="pytest-openid-other-owner")
+    db_session.add(other)
+    db_session.commit()
+    hdr = _hdr(other.id)
+    assert client.post("/api/shares/revoke", headers=hdr, json={"note_id": mine}).status_code == 404
+    assert client.get("/api/shares/status", params={"note_id": mine}, headers=hdr).status_code == 404
+
+
+def test_一篇笔记只留一张开着的码(client, db_session, person, monkeypatch):
+    """路由那句"一条笔记只留一个有效分享"由数据库兜，不靠应用层记得住。
+
+    没上索引时的实测样子：八个并发 POST 打出三张不同的 token，三张都能匿名读到 200。
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    _pass_all(monkeypatch)
+    nid = _mknote(db_session, person.id, "只留一张码")
+    client.post("/api/shares/", headers=_hdr(person.id), json={"note_id": nid})
+
+    db_session.add(Share(
+        user_id=str(person.id), note_id=nid, token="第二张不该存在的码",
+        title="只留一张码", is_active=True,
+    ))
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+    # 关掉的行不受约束：撤回的历史、被取代的老码都要留档
+    db_session.add(Share(
+        user_id=str(person.id), note_id=nid, token="关掉的那张",
+        title="只留一张码", is_active=False,
+    ))
+    db_session.commit()
 
 
 # ------------------------------------------- ④ 公开页显示的字段必须在送检范围内

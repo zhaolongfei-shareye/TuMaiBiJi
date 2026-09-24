@@ -172,3 +172,22 @@
   font-weight: 700;
   padding: var(--sp-3) 0;
 }
+
+/* 已公开那一行：小字说明 + 一个文字按钮，不跟主按钮抢位置 */
+.share-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-tertiary);
+}
+
+.state-act {
+  font-weight: 700;
+  color: var(--accent);
+  /* 和分享形象页那两个动作同一个毛病：不写死不换行会被拆成两行 */
+  white-space: nowrap;
+}

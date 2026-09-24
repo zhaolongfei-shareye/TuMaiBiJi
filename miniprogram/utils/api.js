@@ -174,6 +174,10 @@ module.exports = {
   deleteCategory: (id) => request(`/api/categories/${id}`, 'DELETE'),
   reorderCategories: (ids) => request('/api/categories/reorder', 'POST', { ids }),
   createShare: (noteId) => request('/api/shares/', 'POST', { note_id: noteId }),
+  // 分享状态：详情页拿它决定要不要显示"撤掉分享"这一行
+  getShareStatus: (noteId) => request(`/api/shares/status?note_id=${noteId}`),
+  // 撤掉之后那张码扫开就是"分享已关闭"，再点分享会给一张新码
+  revokeShare: (noteId) => request('/api/shares/revoke', 'POST', { note_id: noteId }),
   // 分享落地页原来直接调 api.request 拼路径，等于绕过了这一层
   getShare: (token) => request(`/api/shares/${encodeURIComponent(token)}`),
   getShareQRCodeUrl: (token) => `${API_BASE}/api/shares/${token}/qrcode`,
