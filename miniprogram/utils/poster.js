@@ -28,6 +28,8 @@ const PROFILE_KEY = 'poster_profile'
 const AVATAR_NAME = 'poster-avatar.img'
 const AVATAR_STAGED = 'poster-avatar-staged.img'
 const DEFAULT_TEMPLATE = 'card'
+// 没设形象时人像位上的那个字。用品牌字而不是笔记标题的首字，见 glyphPlate 上方。
+const BRAND_GLYPH = '麦'
 
 const TEMPLATES = [
   { id: 'card', label: '经典卡片', labelEn: 'Classic Card', group: 'classic' },
@@ -37,7 +39,7 @@ const TEMPLATES = [
   { id: 'popGrid', label: '波普分格', labelEn: 'Pop Panels', group: 'bold' },
   { id: 'popDots', label: '网点漫画', labelEn: 'Ben-Day Comic', group: 'bold' },
   { id: 'acid', label: '荧光渐变', labelEn: 'Acid Gradient', group: 'bold' },
-  { id: 'cover', label: '人像封面', labelEn: 'Portrait Cover', group: 'bold' },
+  { id: 'cover', label: '杂志封面', labelEn: 'Magazine Cover', group: 'bold' },
   { id: 'lit', label: '纸间文艺', labelEn: 'Paper & Ink', group: 'bold' },
   { id: 'spec', label: '规格卡', labelEn: 'Spec Sheet', group: 'bold' },
 ]
@@ -390,7 +392,7 @@ function paintLayers(ctx, layers, images) {
         }
         if (ly.fadeFrom != null) {
           // destination-in + 一条由实到透的渐变 = 照片下半截融进底色，
-          // 人像封面那种"从画面里长出来"的效果靠这个，不需要模糊也不需要混合模式。
+          // 杂志封面那种"从画面里长出来"的效果靠这个，不需要模糊也不需要混合模式。
           ctx.globalCompositeOperation = 'destination-in'
           const g = ctx.createLinearGradient(ly.x, ly.y, ly.x, ly.y + ly.h)
           g.addColorStop(0, 'rgba(0,0,0,1)')
@@ -880,7 +882,7 @@ function planClean(ctx, d) {
 // ---------------------------------------------------------------- 出跳款
 //
 // 上面四套全部跟着分类色走，安静克制，代价是"人人都一样、转发出去不显眼"。
-// 这一批改的是情绪：波普、网点、荧光渐变、人像封面、文艺、规格卡。
+// 这一批改的是情绪：波普、网点、荧光渐变、杂志封面、文艺、规格卡。
 // 两条共同规矩：
 // ① 色不再从分类借，而是从 palette.js 的 POSTER_SCHEMES 里按风格取一组，
 //    同一条笔记在同一风格下取到哪一组是确定的（换分类才会换色）。
@@ -917,12 +919,12 @@ function qrStickerH(size) {
   return size + Math.round(size * 0.09) + 34
 }
 
-// 没设形象时，人像位不能空着。取标题第一个字当"丝网版上的大字"，
-// 换色不换字，四格各转一次色，看着仍像一版印出来的。
-function glyphPlate(ctx, { x, y, w, h, note, color }) {
-  const ch = clip(ctx, (note.title || '记').trim().slice(0, 1), w - 60)
+// 没设形象时，人像位不能空着。占位字固定用品牌字「麦」，站长 09-24 定的：
+// 原来取标题第一个字，设置页十个小样里有一片"把"（内置小样的标题以"把"开头），
+// 看着像错字而不是设计。换色不换字，四格各转一次色，看着仍像一版印出来的。
+function glyphPlate(ctx, { x, y, w, h, color }) {
   return L.text({
-    x: x + w / 2, y: y + h / 2 + Math.round(h * 0.18), lines: [ch],
+    x: x + w / 2, y: y + h / 2 + Math.round(h * 0.18), lines: [BRAND_GLYPH],
     size: Math.round(Math.min(w, h) * 0.72), weight: 'bold', color, align: 'center',
   })
 }
@@ -968,7 +970,7 @@ function planPopGrid(ctx, d) {
     layers.push(hasAvatar
       // 先转灰再压一层半透明的版色：四格是同一张脸的四次套印，不是四张不同的图
       ? L.image('avatar', x, y, cellW, cellH, { gray: true, tint: withAlpha(c, 0.62) })
-      : glyphPlate(ctx, { x, y, w: cellW, h: cellH, note, color: withAlpha(HARD, 0.2) }))
+      : glyphPlate(ctx, { x, y, w: cellW, h: cellH, color: withAlpha(HARD, 0.2) }))
   })
   layers.push(L.text({ x: pad, y: kickerY, lines: [kicker], size: 22, weight: 'bold', color: s.bg, track: 3 }))
   layers.push(L.text({ x: pad, y: titleTop + 58, lines: titleLines, lh: 70, size: 58, weight: 'bold', color: PAPER }))
@@ -1021,7 +1023,7 @@ function planPopDots(ctx, d) {
   if (hasAvatar) {
     layers.push(L.avatar(W - pad - avatarD, 40, avatarD, { ring: 10, ringColor: dark, fallback: withAlpha(dark, 0.16) }))
   } else {
-    layers.push(glyphPlate(ctx, { x: W - pad - avatarD, y: 40, w: avatarD, h: avatarD, note, color: withAlpha(dark, 0.18) }))
+    layers.push(glyphPlate(ctx, { x: W - pad - avatarD, y: 40, w: avatarD, h: avatarD, color: withAlpha(dark, 0.18) }))
   }
   const drop = 12
   layers.push(L.rrect(pad + drop, cardTop + drop, W - pad * 2, cardH, 28, { fill: withAlpha(dark, 0.9) }))
@@ -1079,7 +1081,7 @@ function planAcid(ctx, d) {
   if (hasAvatar) {
     layers.push(L.avatar(W - pad - avatarD, avatarTop, avatarD, { ring: 6, ringColor: withAlpha('#FFFFFF', 0.6), fallback: withAlpha('#FFFFFF', 0.2) }))
   } else {
-    layers.push(glyphPlate(ctx, { x: W - pad - avatarD, y: avatarTop, w: avatarD, h: avatarD, note, color: withAlpha('#FFFFFF', 0.28) }))
+    layers.push(glyphPlate(ctx, { x: W - pad - avatarD, y: avatarTop, w: avatarD, h: avatarD, color: withAlpha('#FFFFFF', 0.28) }))
   }
   layers.push(L.text({ x: pad, y: kickerY, lines: [kicker], size: 22, weight: 'bold', color: s.sub, track: 4 }))
   layers.push(L.text({ x: pad, y: titleTop + 72, lines: titleLines, lh: 88, size: 72, weight: 'bold', color: s.ink }))
@@ -1136,7 +1138,7 @@ function planCover(ctx, d) {
     }))
   } else {
     layers.push(L.radial(W / 2, height * 0.34, 0, height * 0.62, withAlpha(s.accent, 0.34), withAlpha(s.bg, 0), [0, 0, W, height]))
-    layers.push(glyphPlate(ctx, { x: 0, y: 0, w: W, h: height, note, color: withAlpha(s.ink, 0.1) }))
+    layers.push(glyphPlate(ctx, { x: 0, y: 0, w: W, h: height, color: withAlpha(s.ink, 0.1) }))
   }
   const mastW = trackW(ctx, mast, 4) + 40
   layers.push(L.rrect(pad, mastY - 30, mastW, 44, 22, { fill: withAlpha(HARD, 0.5) }))
@@ -1192,7 +1194,7 @@ function planLit(ctx, d) {
   if (hasAvatar) {
     layers.push(L.avatar(archX + (archW - badge) / 2, archTop + 56, badge, { ring: 8, ringColor: s.bg, fallback: withAlpha(s.bg, 0.3) }))
   } else {
-    layers.push(glyphPlate(ctx, { x: archX, y: archTop, w: archW, h: archH, note, color: withAlpha(s.accentInk, 0.22) }))
+    layers.push(glyphPlate(ctx, { x: archX, y: archTop, w: archW, h: archH, color: withAlpha(s.accentInk, 0.22) }))
   }
   layers.push(L.text({ x: contentCx, y: kickerY, lines: [kicker], size: 20, weight: 'bold', color: s.sub, track: 6, align: 'center', fam: SERIF }))
   layers.push(L.text({
@@ -1349,7 +1351,9 @@ function planPoster(ctx, note, templateId, profile, lang, opts) {
 // 中英文各一份，是因为英文的断行、字距、行高和中文不是一回事，只看中文会漏。
 const SAMPLE_NOTE = {
   id: 0,
-  title: '把读过的东西存成能转发的笔记',
+  // 这句原来以"把"开头，十个小样每一张都顶着一个"把"字，站长 09-24 点名要改。
+  // 中文的"把字句"在这里读着像错字（品牌叫图麦），换个说法意思一样。
+  title: '读过的东西，存成能转发的笔记',
   summary: '一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。',
   key_points: ['一句话顶做大字，别人扫一眼就记得住', '自己的头像和名字印在图上'],
   tags: ['阅读'],
@@ -1374,6 +1378,7 @@ module.exports = {
   TEMPLATES,
   TEMPLATE_GROUPS,
   DEFAULT_TEMPLATE,
+  BRAND_GLYPH,
   SAMPLE_NOTE,
   SAMPLE_NOTE_EN,
   PROFILE_KEY,

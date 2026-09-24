@@ -3,6 +3,9 @@ const { toneStyle } = require('../../utils/palette.js')
 
 const CONTACT_EMAIL = 'jacky28471258@gmail.com'
 const OFFICIAL_ACCOUNT = '杰克AI日记'
+// 官网地址以站点自己的 canonical 为准（curl 读到的 <link rel=canonical> 是不带 www 的那个）。
+// 只能复制、点不开：web-view 组件个人主体用不了，小程序里打不开外部网页。
+const SITE = 'agentsbin.cn'
 const VERSION = '1.4.0'
 
 // 每条都写清"做什么"和"什么情况下做不到"。宁可写边界，不堆形容词：
@@ -129,6 +132,7 @@ Page({
       '图麦笔记做的事很窄：把看到的好东西变成能用的笔记。公众号文章、网页链接、手机截图丢进来，出来就是一条带摘要、要点和标签的笔记，之后能搜、能归类、能存成一张卡片图随时调用。',
     infoRows: [
       { label: '当前版本', value: `v${VERSION}` },
+      { label: '产品官网', value: SITE, copy: SITE },
       { label: '开发主体', value: '个人开发者' },
       { label: '反馈邮箱', value: CONTACT_EMAIL, copy: CONTACT_EMAIL },
       { label: '公众号', value: OFFICIAL_ACCOUNT, copy: OFFICIAL_ACCOUNT },

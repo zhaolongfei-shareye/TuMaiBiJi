@@ -46,6 +46,16 @@ const txt = async (els) => {
   try {
     jwt = (await wait(() => mp.evaluate(() => getApp().globalData.token || ''), 30000)) || ''
     ck('模拟器已登录', jwt.length > 30, `JWT 长度 ${jwt.length}`)
+    // 下面这一整套期望值全是中文串。账号停在英文态时会一次红七条（踩过），
+    // 所以先量语言、不对就当场停，别让人去查根本不存在的回归。
+    const lang = await mp.evaluate(() => getApp().globalData.userInfo?.language || 'zh')
+    if (lang !== 'zh') {
+      ck('账号语言＝中文', false, `现在是 ${lang}；到新建页标题右边点「中」再跑`)
+      console.log('\n语言不是中文，这套脚本的中文期望值没有参考价值，提前结束')
+      process.exitCode = 4
+      return
+    }
+    ck('账号语言＝中文', true)
     if (!jwt) throw new Error('没登录，后面全是空跑')
     const H = { 'content-type': 'application/json', Authorization: `Bearer ${jwt}` }
 
