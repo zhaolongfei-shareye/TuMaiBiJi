@@ -44,26 +44,23 @@ MUTATIONS = [
         "",
         "tests/test_worker_identity.py",
     ),
+    # 2026-09-24 取消 100 篇闸门之后，原来那两条"落库前复查额度"和两条"注销追回邀请奖励"
+    # 的锚点随着代码一起没了（那是设计如此，不是漏修）。换成守现在这两条：台账要记得上、
+    # 注销要把台账两个方向一起删掉。
     (
-        "A3 worker 落库前不再复查额度",
+        "A3 worker 落库后不记邀请台账",
         "app/tasks/ingest_tasks.py",
-        "            quota.ensure_room(user, db)\n",
+        "            record_first_note(db, user_id, note)\n",
         "",
-        "tests/test_worker_identity.py",
+        "tests/test_quota_and_invite.py tests/test_worker_identity.py",
     ),
     (
-        "A5 注销不追回邀请奖励",
+        "A5 注销不删邀请台账（已注销的人还在替别人凑数）",
         "app/api/routes/user.py",
-        "        before = inviter.quota_bonus\n"
-        "        inviter.quota_bonus = before - record.reward\n",
-        "        pass\n",
-        "tests/test_account_deletion.py",
-    ),
-    (
-        "A5 追回时不防负数（余额不够也照扣）",
-        "app/api/routes/user.py",
-        "        if inviter.quota_bonus < record.reward:\n",
-        "        if False:\n",
+        "    db.query(Invitation).filter(\n"
+        "        (Invitation.invitee_id == user.id) | (Invitation.inviter_id == user.id)\n"
+        "    ).delete()\n",
+        "",
         "tests/test_account_deletion.py",
     ),
     (
@@ -146,14 +143,14 @@ MUTATIONS = [
     (
         "S8 内容没变也照样再打一遍 msgSecCheck",
         "app/api/routes/shares.py",
-        "    if existing is not None and snapshot_matches(existing, note):\n",
+        "    if existing is not None and snapshot_matches(existing, note) and existing.author_name == author:\n",
         "    if False:\n",
         "tests/test_share_snapshot.py",
     ),
     (
         "S9 复用分享时不看有效期（过期那张继续发出去）",
         "app/api/routes/shares.py",
-        "    existing = next((s for s in active_shares(db, note.id) if not _is_expired(s)), None)\n",
+        "    existing = next((s for s in active_shares(db, note.id) if not is_expired(s)), None)\n",
         "    existing = next(iter(active_shares(db, note.id)), None)\n",
         "tests/test_share_snapshot.py",
     ),
