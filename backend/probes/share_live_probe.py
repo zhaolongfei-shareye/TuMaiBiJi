@@ -10,7 +10,7 @@
 它只用 deploy-test 那个账号（user_id=1），跑完自己把建出来的笔记删掉；
 别的账号一行都不碰。全程只在结尾断言"我建的行都清了"。
 
-要看的六件事：
+要看的七件事：
 ① 改标题之后，公开分享页不再挂着旧内容（隐私泄漏本体）。
 ② 反复建分享只有一张码，而且第二次起不再多打内容安全。
 ③ key_links 里塞违规文本要拦（这一轮新补的送检字段）。
@@ -19,6 +19,10 @@
    重新分享换的是全新的一张码而旧码不会复活、新码不再有七天过期、落地页带要点与链接。
 ⑥ 作者署名与转存（2026-09-24 下午这批）：昵称进公开快照、转存抄的是同一份字段、
    来源那一栏任何写接口都改不动、原笔记没了转存那篇照旧、撤掉之后那张码也转存不进东西。
+⑦ 额度改回 100 + 转存也算激活（2026-09-24 深夜这批）：接口形状、闸门挂在几条入口上、
+   source_note_id 与那条部分唯一索引真在库里、自己转存自己那一趟一分钱都不结。
+   现网只有 deploy-test 一个可写的号，"给作者结 10 篇"那条真给钱的分支在这里证不了，
+   由 backend/tests/test_quota_and_invite.py 的 Test转存也激活 那 10 条守着。
 """
 import json
 import sys
@@ -32,6 +36,7 @@ import httpx
 
 from app.core.auth import _create_token
 from app.db.database import SessionLocal
+from app.models.invitation import Invitation
 from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
@@ -257,6 +262,66 @@ def main():
           still.status_code == 200 and (still.json().get("imported_from") or {}).get("share_token") == tok6,
           f"HTTP {still.status_code}")
     note_id = copy_id      # 收尾按这一条清（原笔记已经删掉了）
+
+    # ---- ⑦ 额度这一轮（09-24 晚口径：100 篇基础 + 带来一个新写作者 +10 + 同一篇只挣一次）----
+    # 现网只有 deploy-test 这一个可以写的号，所以"给作者结 10 篇"那条真给钱的分支在这里
+    # 证不了（要两个账号），它由 backend/tests 那 12 条新用例守着。这里证的是：
+    # 接口形状、闸门确实挂在五条入口上、表结构到位、自己转存自己那一趟一分钱都不结。
+    inv_before = db.query(Invitation).count()
+    db.expire_all()
+    bonus_before = int(db.get(User, user.id).quota_bonus or 0)
+
+    r = client.get("/api/user/quota", headers=hdr)
+    body = r.json() if r.status_code == 200 else {}
+    want = ["base", "bonus", "categories", "invites_rewarded", "limit", "remaining", "reward_each", "used"]
+    check("⑦ /api/user/quota 回的就是界面要的那八个字段",
+          r.status_code == 200 and sorted(body) == want, f"HTTP {r.status_code} · {sorted(body)}")
+    check("⑦ 没有「还剩几次」这一档（带来几个人不限，回它就是假话）", "invites_left" not in body)
+    check("⑦ 上限那半截 = 100 基础 + 已到手的奖励，remaining 与两者自洽",
+          body.get("limit") == body.get("base") + body.get("bonus")
+          and body.get("remaining") == max(0, (body.get("limit") or 0) - (body.get("used") or 0)),
+          f"used={body.get('used')} limit={body.get('limit')} bonus={body.get('bonus')}")
+    check("⑦ 每个新写作者给的就是 10 篇", body.get("reward_each") == 10, f"reward_each={body.get('reward_each')}")
+
+    from sqlalchemy import text as sa_text
+    cols = [row[1] for row in db.execute(sa_text("pragma table_info(invitations)")).fetchall()]
+    check("⑦ 台账有 source_note_id 这一列（转存那条要指名是哪篇带来的）", "source_note_id" in cols, f"{cols}")
+    idx_sql = [row[0] for row in db.execute(sa_text(
+        "select sql from sqlite_master where type='index' and name='ux_invitations_one_reward_per_source_note'"
+    )).fetchall()]
+    check("⑦ 那条部分唯一索引真在库里（同一篇只挣一次是数据库挡的）",
+          bool(idx_sql) and "source_note_id IS NOT NULL" in idx_sql[0] and "UNIQUE" in idx_sql[0].upper(),
+          f"{idx_sql[0] if idx_sql else '索引不存在'}")
+
+    from app.main import app as fastapi_app
+
+    def dep_names(dep, acc):
+        for d in dep.dependencies:
+            if d.call is not None:
+                acc.add(d.call.__name__)
+            dep_names(d, acc)
+        return acc
+
+    wired = {}
+    for route in fastapi_app.routes:
+        p = getattr(route, "path", "")
+        if p in ("/api/notes/", "/api/ingest/url", "/api/ingest/screenshots/stage",
+                 "/api/ingest/screenshots/process", "/api/notes/from-share"):
+            wired[p] = dep_names(route.dependant, set())
+    missing = [k for k, v in wired.items() if "require_note_room" not in v]
+    check("⑦ 五条入库入口全都还挂着额度闸门（漏一条就是从那儿绕开上限）",
+          len(wired) == 5 and not missing,
+          f"查到 {len(wired)} 条，缺闸门：{missing or '无'}")
+
+    check("⑦ ⑥ 那一趟是「自己转存自己那篇」，一分钱都不该结",
+          db.query(Invitation).count() == inv_before, f"台账 {inv_before} → {db.query(Invitation).count()}")
+    r = client.post("/api/notes/", headers=hdr, json={"title": f"额度基线核对{MARK}"})
+    check("⑦ 存一条笔记不影响已到手的奖励（额度这一轮没把钱乱发）",
+          r.status_code == 200 and (db.query(Invitation).count() == inv_before) and
+          int(db.get(User, user.id).quota_bonus or 0) == bonus_before,
+          f"HTTP {r.status_code} · bonus={bonus_before}→{db.get(User, user.id).quota_bonus}")
+    if r.status_code == 200:
+        client.delete(f"/api/notes/{r.json()['id']}", headers=hdr)
 
     # ---- 收尾：只清这一次建的东西 ---------------------------------------------
 

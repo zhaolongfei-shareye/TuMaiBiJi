@@ -129,7 +129,21 @@ with engine.connect() as conn:
 if not one_code_idx or "is_active" not in one_code_idx:
     print("  ✗ shares 上缺 ux_shares_one_active_per_note（或它没带 is_active 条件）")
     raise SystemExit(1)
-print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / 一篇笔记一张有效码的索引 到位")
+# 转存那条路给作者结的账要能回答"是哪篇笔记带来的"，而"同一篇只挣一次"是这条索引挡的：
+# 没有它，把一篇热门笔记发给一百个人转存就是一百笔 +10，应用层那道先查在并发下拦不住。
+inv_cols = {c["name"] for c in insp.get_columns("invitations")}
+if "source_note_id" not in inv_cols:
+    print("  ✗ invitations 缺 source_note_id 列，转存那条激活记不到是哪篇带来的")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    once_idx = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND name='ux_invitations_one_reward_per_source_note'"
+    )).scalar()
+if not once_idx or "UNIQUE" not in once_idx.upper():
+    print("  ✗ invitations 缺 ux_invitations_one_reward_per_source_note（同一篇只挣一次没人挡）")
+    raise SystemExit(1)
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束 + 一篇只挣一次的部分唯一索引 + source_note_id）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / 一篇笔记一张有效码的索引 到位")
 PY
 if [[ $? -ne 0 ]]; then
     echo "✗ schema 校验未通过，终止部署"
