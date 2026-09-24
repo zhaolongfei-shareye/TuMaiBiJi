@@ -29,6 +29,11 @@ Page({
     shotDesc: '',
     writeTitle: '',
     writeBody: '',
+    // 「亲自撰写」的分类：0 是「未分类」，往后依次是用户自己的分类。
+    // 只在第一次展开这张卡时取一次，这一页是启动页，冷启动就去拉没意义。
+    categories: [],
+    categoryNames: [],
+    catIndex: 0,
     // 三张卡各自的饱和色，色值和字色配对仍归 palette 管
     skinUrl: toneStyle(1),
     skinShot: toneStyle(2),
@@ -86,6 +91,29 @@ Page({
       errPerm: false,
       urlHint: this.hintFor(this.data.urlInput),
     })
+    if (kind === 'write') this.loadCategories()
+  },
+
+  // 手写这条路上原本只有标题和正文，分类要等保存完再进「编辑」才挑得到；
+  // 所以在卡片里给一个选择器，当场归类。取失败不拦人——大不了回头在编辑里补。
+  async loadCategories() {
+    if (this.data.categories.length) return
+    const { lang } = this.data
+    try {
+      const categories = await api.getCategories()
+      this.setData({
+        categories,
+        categoryNames: [t('noCategory', lang)].concat(categories.map((c) => c.name)),
+      })
+    } catch (err) {
+      console.error('加载分类失败', err)
+    }
+  },
+
+  onPickCategory(e) {
+    const i = Number(e.detail.value)
+    if (!(i >= 0)) return
+    this.setData({ catIndex: Math.min(i, Math.max(this.data.categoryNames.length - 1, 0)) })
   },
 
   // ---------- URL 导入 ----------
@@ -261,12 +289,14 @@ Page({
     }
     this.setData({ busy: 'write', errLine: '' })
     try {
+      const picked = this.data.catIndex > 0 ? this.data.categories[this.data.catIndex - 1] : null
       const note = await api.createNote({
         title,
         summary: this.data.writeBody.trim() || null,
+        category_id: picked ? picked.id : null,
         source_type: 'manual',
       })
-      this.setData({ busy: '', writeTitle: '', writeBody: '', active: '' })
+      this.setData({ busy: '', writeTitle: '', writeBody: '', catIndex: 0, active: '' })
       wx.showToast({ title: t('saveSucceeded', lang), icon: 'success' })
       setTimeout(() => {
         wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}` })

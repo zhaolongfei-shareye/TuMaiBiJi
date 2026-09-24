@@ -199,3 +199,45 @@
 .container {
   padding-bottom: 140rpx;
 }
+
+/* 「亲自撰写」卡里的归类那一行：和 .face-box 同一块面、同一个高度，
+   只是右边多一个值和一个尖角，看起来是同一族控件里的"挑一个"而不是"输一段"。 */
+.cat-pick {
+  display: block;
+}
+
+.cat-row {
+  display: flex;
+  align-items: center;
+  height: 88rpx;
+  margin-top: 16rpx;
+  padding: 0 var(--sp-3);
+  box-sizing: border-box;
+  border-radius: var(--r-btn);
+  background: var(--face);
+  color: var(--face-ink);
+}
+
+.cat-key {
+  flex: none;
+  font-size: var(--fs-body);
+  opacity: 0.72;
+}
+
+.cat-val {
+  flex: 1;
+  min-width: 0;
+  margin-right: 10rpx;
+  text-align: right;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cat-caret {
+  flex: none;
+  font-size: var(--fs-body);
+  opacity: 0.5;
+}

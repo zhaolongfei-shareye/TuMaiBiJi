@@ -88,6 +88,20 @@
           maxlength="2000"
           bindinput="onWriteBody"
         />
+        <picker
+          wx:if="{{categoryNames.length}}"
+          class="cat-pick"
+          mode="selector"
+          range="{{categoryNames}}"
+          value="{{catIndex}}"
+          bindchange="onPickCategory"
+        >
+          <view class="cat-row">
+            <text class="cat-key">{{t.categoryLabel}}</text>
+            <text class="cat-val">{{categoryNames[catIndex]}}</text>
+            <text class="cat-caret">›</text>
+          </view>
+        </picker>
         <view class="acts">
           <view class="act ghost" catchtap="cancelWrite">{{t.cancel}}</view>
           <view class="act {{busy === 'write' ? 'off' : 'solid'}}" catchtap="saveManual">{{busy === 'write' ? t.busySave : t.save}}</view>
