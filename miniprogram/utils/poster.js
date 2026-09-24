@@ -1068,8 +1068,9 @@ function planCover(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
   const s = schemeFor('mono', note.category_id)
   const pad = 48
-  const photoH = 720
   const qrSize = 116
+  // 文字块从哪儿开始压住人像：这一段以下渐变已经压到 0.88 以上，够白字站住
+  const textTop = 720
 
   font(ctx, 20, true)
   const mast = clipTrack(ctx, [blockNameOf(note, lang), formatShortDate(note.created_at)].filter(Boolean).join(' · '), W - pad * 2 - 40, 4)
@@ -1079,7 +1080,7 @@ function planCover(ctx, d) {
   const sumLines = note.summary ? fit(ctx, note.summary, W - pad * 2, 2) : []
 
   const mastY = pad + 20
-  const titleTop = photoH + 76
+  const titleTop = 796
   const titleBottom = titleTop + (titleLines.length - 1) * 90 + 76
   const sumTop = sumLines.length ? titleBottom + 30 : 0
   const sumBottom = sumLines.length ? sumTop + (sumLines.length - 1) * 40 + 26 : titleBottom
@@ -1090,13 +1091,21 @@ function planCover(ctx, d) {
   const layers = []
   layers.push(L.fill(0, 0, W, height, s.bg))
   if (hasAvatar) {
-    // 整幅人像 + 灰度 + 从 58% 处往下淡出到底色：人是"从画面里长出来"的，
-    // 不是贴在上方的一张贴纸。淡出走 destination-in，不需要模糊也不需要混合模式。
-    layers.push(L.image('avatar', 0, 0, W, photoH, { gray: true, fadeFrom: 0.58 }))
-    layers.push(L.fill(0, 0, W, 150, withAlpha(s.bg, 0.34)))
+    // 彩色整幅人像铺满全张，眉标、标题、署名、码全部压在图上。
+    // 压得住靠这条渐变：脸那一段（上半张）几乎不加暗，到标题那一段已经到 0.88，
+    // 白字落在浅色衣服或白墙上也不会糊掉。
+    layers.push(L.image('avatar', 0, 0, W, height))
+    layers.push(L.grad(0, 0, W, height, withAlpha(s.bg, 0.2), withAlpha(s.bg, 0.97), {
+      stops: [
+        { at: 0, color: withAlpha(s.bg, 0.2) },
+        { at: 0.5, color: withAlpha(s.bg, 0.42) },
+        { at: 0.66, color: withAlpha(s.bg, 0.88) },
+        { at: 1, color: withAlpha(s.bg, 0.97) },
+      ],
+    }))
   } else {
-    layers.push(L.radial(W / 2, photoH * 0.42, 0, photoH * 0.72, withAlpha(s.accent, 0.3), withAlpha(s.bg, 0), [0, 0, W, photoH]))
-    layers.push(glyphPlate(ctx, { x: 0, y: 0, w: W, h: photoH, note, color: withAlpha(s.ink, 0.1) }))
+    layers.push(L.radial(W / 2, height * 0.34, 0, height * 0.62, withAlpha(s.accent, 0.34), withAlpha(s.bg, 0), [0, 0, W, height]))
+    layers.push(glyphPlate(ctx, { x: 0, y: 0, w: W, h: height, note, color: withAlpha(s.ink, 0.1) }))
   }
   const mastW = trackW(ctx, mast, 4) + 40
   layers.push(L.rrect(pad, mastY - 30, mastW, 44, 22, { fill: withAlpha(HARD, 0.5) }))
