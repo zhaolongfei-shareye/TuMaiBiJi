@@ -1,7 +1,12 @@
 <view class="container {{themeClass}}">
-  <canvas type="2d" id="shareCanvas" class="share-canvas" style="height: {{canvasH}}rpx"></canvas>
+  <!-- 预览框定高：成品图按内容定高，图一换下面那排小图就会上下跳。
+       框子高度固定，图在框里等比缩放居中，小图的位子就永远不动。
+       （试过把小图那排钉进底部固定条——画布是原生层，放进 fixed 里会整体错位，已回退。） -->
+  <view class="preview-box">
+    <canvas type="2d" id="shareCanvas" class="share-canvas" style="width: {{canvasW}}rpx; height: {{canvasH}}rpx"></canvas>
+  </view>
 
-  <!-- 码的开关。只影响上面这张成品图；下面那排小图按"固定样式"办，不跟着变。 -->
+  <!-- 码的开关。只影响上面这张成品图。 -->
   <view class="qr-opt">
     <view class="pill {{noQr ? '' : 'pill-on'}}" bindtap="onToggleQr">
       <view class="pill-dot"></view>
@@ -12,29 +17,27 @@
     </view>
   </view>
 
-    <!-- 模板一排：左右滚着挑，默认是「卡片模板」里选的那套 -->
-    <scroll-view wx:if="{{!generating && tpls.length}}" class="tpl-strip" scroll-x enhanced show-scrollbar="{{false}}">
-      <view class="tpl-strip-inner">
-        <view
-          wx:for="{{tpls}}"
-          wx:key="id"
-          class="pick {{picked === item.id ? 'pick-on' : ''}}"
-          data-id="{{item.id}}"
-          bindtap="onPickTemplate"
-        >
-          <canvas type="2d" id="pick-{{item.id}}" class="pick-canvas" style="height: {{item.h}}rpx"></canvas>
-          <text class="pick-label">{{item.label}}</text>
-        </view>
+  <!-- 模板一排：左右滚着挑，默认是「卡片模板」里选的那套 -->
+  <scroll-view wx:if="{{!generating && tpls.length}}" class="tpl-strip" scroll-x enhanced show-scrollbar="{{false}}">
+    <view class="tpl-strip-inner">
+      <view
+        wx:for="{{tpls}}"
+        wx:key="id"
+        class="pick {{picked === item.id ? 'pick-on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickTemplate"
+      >
+        <canvas type="2d" id="pick-{{item.id}}" class="pick-canvas" style="height: {{item.h}}rpx"></canvas>
+        <text class="pick-label">{{item.label}}</text>
       </view>
-    </scroll-view>
+    </view>
+  </scroll-view>
 
   <view wx:if="{{generating}}" class="loading-overlay">
     <text>{{t.generatingShare}}</text>
   </view>
 
   <view class="actions-bar">
-
-
     <view class="actions-row">
       <view class="btn-secondary" bindtap="onCancel">{{t.cancel}}</view>
       <view class="btn-primary" bindtap="saveToAlbum" disabled="{{!imagePath}}">{{t.saveToAlbum}}</view>

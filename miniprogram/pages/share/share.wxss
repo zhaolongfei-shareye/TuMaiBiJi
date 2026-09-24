@@ -3,15 +3,21 @@
   padding-bottom: 260rpx;
 }
 
-/* 海报预览：画布位图 750 宽，1 位图像素 = 1rpx，所以高度由 wxml 按算出来的
-   行内 rpx 给就是等比。原来写死 80vh，高度改成随内容之后预览会被压扁。
+/* 预览框定高，图在框里等比缩放居中：换模板时框子不变高，下面那排小图就不跟着上下跳。
+   （试过把小图那排钉进底部固定条——画布是原生层，放进 fixed 容器里整排会错位到正文上，已回退。）
    容器左右各有 --sp-3 的内边距，这里用负 margin 铺满屏宽，预览才和存出去的图一致。 */
-.share-canvas {
+.preview-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 750rpx;
-  height: 1200rpx;
+  height: 900rpx;
   margin-left: calc(var(--sp-3) * -1);
-  /* 让开的距离写在容器的 padding-bottom 上，不写在这里：最后一子的 margin
-     会穿透出容器（顶部那 2rpx 就是为同一个坑加的），实测滚不到底、码仍被压住。 */
+}
+
+/* 画布位图 750 宽，1 位图像素 = 1rpx，所以宽高由 wxml 按算出来的行内 rpx 给就是等比。
+   存出去的图取的是画布位图，和这里显示的尺寸无关。 */
+.share-canvas {
   background: transparent;
 }
 

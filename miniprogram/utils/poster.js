@@ -30,6 +30,8 @@ const AVATAR_STAGED = 'poster-avatar-staged.img'
 const DEFAULT_TEMPLATE = 'card'
 // 没设形象时人像位上的那个字。用品牌字而不是笔记标题的首字，见 glyphPlate 上方。
 const BRAND_GLYPH = '麦'
+// 饱和度混合模式下，这个颜色的饱和度正好是 0：用它压一层等于把下面的图去色。
+const GRAY_ZERO_SAT = '#808080'
 
 const TEMPLATES = [
   { id: 'card', label: '经典卡片', labelEn: 'Classic Card', group: 'classic' },
@@ -377,12 +379,23 @@ function paintLayers(ctx, layers, images) {
         else if (ly.r) ctx.roundRect(ly.x, ly.y, ly.w, ly.h, ly.r)
         else ctx.rect(ly.x, ly.y, ly.w, ly.h)
         ctx.clip()
-        // 下面三样都在同一个裁剪区里做，所以只影响这张图，不会碰已画好的别的层。
-        // filter 万一某机型不认，图就还是彩色，属于能接受的降级，不报错。
+        // 下面几样都在同一个裁剪区里做，所以只影响这张图，不会碰已画好的别的层。
         if (ly.gray) {
+          // 第一道：filter。安卓和模拟器认，iOS 的 canvas 会静默忽略（站长 09-25 真机反馈
+          // 波普四格仍是彩色），所以它只能当加速，不能当依据。
           ctx.filter = 'grayscale(1)'
           drawCover(ctx, im, ly.x, ly.y, ly.w, ly.h)
           ctx.filter = 'none'
+          // 第二道：拿"饱和度=0"的灰再压一遍，把颜色真正抽掉、亮度留着。
+          // 已经是灰的图再走这一步不变，所以两道一起用是幂等的。
+          // 不支持 saturation 的机型赋值会被静默忽略，那时填下去就是一块实心灰，
+          // 所以先把值读回来确认这一步真的被接住了才敢填。
+          ctx.globalCompositeOperation = 'saturation'
+          if (ctx.globalCompositeOperation === 'saturation') {
+            ctx.fillStyle = GRAY_ZERO_SAT
+            ctx.fillRect(ly.x, ly.y, ly.w, ly.h)
+          }
+          ctx.globalCompositeOperation = 'source-over'
         } else {
           drawCover(ctx, im, ly.x, ly.y, ly.w, ly.h)
         }

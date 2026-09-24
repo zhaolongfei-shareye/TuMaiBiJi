@@ -4,6 +4,14 @@ const PICK_W = 176
 const PICK_SCALE = 0.28
 const MEASURE_H = 750
 
+// 预览框定高（rpx，画布位图 1 像素 = 1rpx）。十套模板的成品图高度差得很多，
+// 让图在一个不动的框里等比缩放居中，下面那排模板小图才不会跟着上下跳。
+const PREVIEW_BOX = 900
+function previewBox(w, h) {
+  const scale = Math.min(1, PREVIEW_BOX / h)
+  return { canvasW: Math.round(w * scale), canvasH: Math.round(h * scale) }
+}
+
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const poster = require('../../utils/poster.js')
@@ -16,8 +24,10 @@ Page({
     themeClass: '',
     lang: 'zh',
     t: texts('zh'),
-    // 画布位图高度随内容和模板变，CSS 高度得跟着改，否则预览会被压扁
-    canvasH: 1200,
+    // 画布位图高度随内容和模板变，CSS 尺寸得跟着等比改，否则预览会被压扁。
+    // 两者都按 PREVIEW_BOX 缩到预览框里，换模板时框子不变，下面那排小图才不跳。
+    canvasW: 750,
+    canvasH: 900,
     tpls: [],
     picked: '',
     // 码要不要印在图上。发微信以外的平台（微博、小红书那类）常常看见第三方码就屏蔽整张图，
@@ -119,7 +129,7 @@ Page({
     canvas.height = plan.height
     poster.paintLayers(ctx, plan.layers, images)
 
-    this.setData({ canvasH: plan.height })
+    this.setData(previewBox(plan.width, plan.height))
 
     await new Promise((done, fail) => {
       wx.canvasToTempFilePath({

@@ -98,8 +98,10 @@ const txt = async (els) => {
     const heading = (await txt(await page.$$('.page-title'))).join('|')
     ck('新建页大标题＝「选择一种记录方式」', heading === '选择一种记录方式', heading)
     const labels = await txt(await page.$$('.entry-label'))
-    ck('三个入口＝拍照或截图 / URL链接 / 手写',
-      labels.includes('拍照或截图') && labels.includes('URL链接') && labels.includes('手写'), labels.join(' / '))
+    // 站长 09-25 定了：就叫这三个、就按这个次序（原来这条还写着"手写"，是 ce559fd
+    // 改名后一直没跟，红了好几天）。写死成整串对比，换名字或换次序都会红。
+    ck('三个入口＝URL链接 / 拍照或截图 / 亲自撰写（次序也要对）',
+      labels.join(' / ') === 'URL链接 / 拍照或截图 / 亲自撰写', labels.join(' / '))
     ck('导航条标题＝「新建笔记」', (await readNav()) === '新建笔记', await readNav())
     await mp.screenshot({ path: `${SHOT}/c1-新建页.png` })
 
@@ -143,7 +145,9 @@ const txt = async (els) => {
     const b0 = await settle()
     ck('这一排小图先长定（两轮取样尺寸完全一致）', !!b0, b0 ? b0.key : '20 秒内一直在变')
     const boxes0 = b0 ? b0.key : ''
-    void boxes0
+    // 手指底下那一排的"位子"也要取基线：只比尺寸会放过"整排往下挪 30px"这种。
+    const strip0 = await page.$('.tpl-strip')
+    const pos0 = { top: (await strip0.offset()).top, h: parseFloat((await strip0.size()).height) }
 
     const picked0 = await page.data('picked')
     const expect0 = profile.template || 'card'
@@ -181,11 +185,18 @@ const txt = async (els) => {
       await mp.screenshot({ path: `${SHOT}/c3-换成-${target}.png` })
     }
 
-    const boxes1 = await pickBoxes()
+    const b1 = await pickBoxes()
     const labels1 = (await txt(await page.$$('.pick-label'))).join('|')
-    ck('点小图只换上面那张，下面这一排不动（位置与名字完全一样）',
-      boxes1 === boxes0 && labels1 === pickLabels.join('|'),
-      boxes1 === boxes0 ? '位置未变' : '位置变了')
+    const strip1 = await page.$('.tpl-strip')
+    const pos1 = { top: (await strip1.offset()).top, h: parseFloat((await strip1.size()).height) }
+    const sameSize = b1.key === boxes0
+    const samePlace = Math.abs(pos1.top - pos0.top) < 1 && Math.abs(pos1.h - pos0.h) < 1
+    const sameName = labels1 === pickLabels.join('|')
+    ck('点小图只换上面那张，下面这一排不动（尺寸、位子、名字三样都不动）',
+      sameSize && samePlace && sameName,
+      sameSize && samePlace && sameName
+        ? `十张尺寸 ${b1.key}，整排 top ${Math.round(pos0.top)}→${Math.round(pos1.top)}`
+        : [!sameSize && `尺寸 ${boxes0} → ${b1.key}`, !samePlace && `位子 top ${Math.round(pos0.top)}→${Math.round(pos1.top)} 高 ${pos0.h}→${pos1.h}`, !sameName && `名字 ${pickLabels.join('|')} → ${labels1}`].filter(Boolean).join('；'))
 
     // 「转为笔记卡片」这个按钮在详情页上
     page = await mp.reLaunch(`/pages/detail/detail?id=${noteId}`)
