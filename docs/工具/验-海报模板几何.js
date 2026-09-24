@@ -71,6 +71,23 @@ for (const lang of ['zh', 'en']) {
         const hasMark = plan.layers.some((l) => l.k === 'text' && (l.lines || []).some((s) => String(s).indexOf(mark) === 0 || String(s) === mark))
         if (showQr) {
           if (qrCount !== 1) bad.push(`${tag}: 该有一张码，实际 ${qrCount}`)
+          // 十套模板统一"码在右下角"（站长 09-24 的口径），这条是它的可检验版本：
+          // 右边缘要贴到画布右边那一条，纵向必须落在下半截。居中一枚裸码、码靠左都算不合格。
+          const qr = plan.layers.find((l) => l.k === 'image' && l.key === 'qr')
+          if (qr) {
+            const rightGap = plan.width - (qr.x + qr.w)
+            // 上限给到 120 是因为量的是贴纸里那枚**图**，它比贴纸本体还缩一圈内边距；
+            // 居中一枚裸码（旧摆法）算下来是 320 左右，靠左是 500 往上，都在这个窗口外。
+            if (rightGap < 20 || rightGap > 120) bad.push(`${tag}: 码没收到右边，距右边界 ${Math.round(rightGap)}`)
+            if (qr.y < plan.height * 0.45) bad.push(`${tag}: 码不在下半截，y=${Math.round(qr.y)} 画布高=${plan.height}`)
+            const foot = plan.layers.filter((l) => l.k === 'text' && (l.lines || []).some((s) => String(s) === scan))
+            if (!foot.length) bad.push(`${tag}: 这套缺「${scan}」那行引导语`)
+            else {
+              const c = foot[0]
+              if (Math.abs(c.x - (qr.x + qr.w / 2)) > 2) bad.push(`${tag}: 引导语没跟着码居中，偏 ${Math.round(c.x - (qr.x + qr.w / 2))}`)
+              if (c.y <= qr.y) bad.push(`${tag}: 引导语不在码下面（y=${Math.round(c.y)} vs 码 y=${Math.round(qr.y)}）`)
+            }
+          }
         } else {
           if (qrCount !== 0) bad.push(`${tag}: 关了码还剩 ${qrCount} 张`)
           if (hasScanLine) bad.push(`${tag}: 关了码还留着「${scan}」那行`)

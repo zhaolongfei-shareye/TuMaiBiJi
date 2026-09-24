@@ -664,12 +664,12 @@ function planCard(ctx, d) {
     bottom = pointsTop + 44 + (points.length - 1) * pointLH + 8
   }
 
-  // 署名行放在码上方；没有形象信息时这块高度为 0，与改版前逐像素一致
-  const sign = signRow({ ctx, x: contentX, y: bottom + 40, maxW: contentW, size: 28, avatarD: 76, profile, hasAvatar })
-  bottom = sign.h ? bottom + 40 + sign.h : bottom
-
-  const qrY = bottom + 40
-  const cardBottom = qrY + qrSize + 34 + 24
+  // 底行是一条带：署名靠左、码贴纸靠右下角，两者同一顶边（十套模板都是这一种收口，
+  // 见 qrSticker 上方那段话）。所以署名那行的可用宽度要先把码的位置让出来。
+  const signTop = bottom + 40
+  const sign = signRow({ ctx, x: contentX, y: signTop, maxW: contentW - qrSize - 40, size: 28, avatarD: 76, profile, hasAvatar })
+  const qrX = contentX + contentW - qrSize
+  const cardBottom = signTop + Math.max(qrStickerH(qrSize), sign.h) + 24
   const height = cardBottom + cardY
 
   const layers = []
@@ -705,10 +705,7 @@ function planCard(ctx, d) {
     })
   }
   layers.push(...sign.layers)
-  layers.push(L.image('qr', (W - qrSize) / 2, qrY, qrSize, qrSize, { placeholder: '#EFEDE6' }))
-  layers.push(L.text({
-    x: W / 2, y: qrY + qrSize + 34, lines: [t('scanToView', lang)], size: metaSize, color: MUTED, align: 'center',
-  }))
+  qrSticker({ layers, x: qrX, y: signTop, size: qrSize, offset: tone.bg, ink: MUTED, label: t('scanToView', lang) })
   return { width: W, height, layers, template: 'card' }
 }
 
@@ -743,9 +740,9 @@ function planQuote(ctx, d) {
   const cardH = cardBottom - cardY
 
   const signTop = cardBottom + 56
-  const sign = signRow({ ctx, x: cardX + pad, y: signTop, maxW: innerW, size: 30, avatarD: 88, onDark: true, profile, hasAvatar })
-  const qrY = signTop + Math.max(sign.h, 88) + 40
-  const height = qrY + qrSize + 74
+  const sign = signRow({ ctx, x: cardX + pad, y: signTop, maxW: innerW - qrSize - 40, size: 30, avatarD: 88, onDark: true, profile, hasAvatar })
+  const qrX = W - cardX - pad - qrSize
+  const height = signTop + Math.max(qrStickerH(qrSize), sign.h) + 56
 
   const layers = []
   layers.push(L.fill(0, 0, W, height, tone.bg))
@@ -758,12 +755,9 @@ function planQuote(ctx, d) {
     layers.push(L.text({ x: cardX + pad, y: quoteBottom + 40 + tSize, lines: titleLine, size: tSize, color: MUTED }))
   }
   layers.push(...sign.layers)
-  layers.push(L.rrect(cardX + pad, qrY - 14, qrSize + 28, qrSize + 28, 28, { fill: PAPER }))
-  layers.push(L.image('qr', cardX + pad + 14, qrY, qrSize, qrSize))
-  // 引导语直接坐在分类色上，所以用它自己配好的那个字色，不写死白
-  layers.push(L.text({
-    x: cardX + pad + qrSize + 56, y: qrY + qrSize / 2 + 10, lines: [t('scanToView', lang)], size: 22, weight: 'bold', color: tone.ink,
-  }))
+  // 底托用分类色调暗的那一档：这张的底色就是分类色，同色托等于没有。
+  // 引导语直接坐在分类色上，所以用它自己配好的那个字色，不写死白。
+  qrSticker({ layers, x: qrX, y: signTop, size: qrSize, offset: mix(tone.bg, INK, 0.28), ink: tone.ink, label: t('scanToView', lang) })
   return { width: W, height, layers, template: 'quote' }
 }
 
@@ -804,7 +798,7 @@ function planBlock(ctx, d) {
   const sign = signRow({ ctx, x: cardX + pad, y: base + 36, maxW: innerW, size: 28, avatarD: 76, profile, hasAvatar: false })
   const cardBottom = (sign.h ? base + 36 + sign.h + 12 : base + 8) + pad
   const qrY = cardBottom + 44
-  const height = qrY + qrSize + 34 + 24
+  const height = qrY + qrStickerH(qrSize) + 24
 
   const layers = []
   layers.push(L.fill(0, 0, W, height, '#F5F4F0'))
@@ -827,8 +821,7 @@ function planBlock(ctx, d) {
     })
   }
   layers.push(...sign.layers)
-  layers.push(L.image('qr', (W - qrSize) / 2, qrY, qrSize, qrSize, { placeholder: '#EFEDE6' }))
-  layers.push(L.text({ x: W / 2, y: qrY + qrSize + 34, lines: [t('scanToView', lang)], size: 22, color: MUTED, align: 'center' }))
+  qrSticker({ layers, x: W - pad - qrSize, y: qrY, size: qrSize, offset: tone.bg, ink: MUTED, label: t('scanToView', lang) })
   return { width: W, height, layers, template: 'block' }
 }
 
@@ -847,7 +840,8 @@ function planClean(ctx, d) {
   const summaryLines = note.summary ? fit(ctx, note.summary, W - pad * 2, 5) : []
 
   const barH = 14
-  const signH = Math.max(84, qrSize)
+  // 底行高度按"码贴纸"算（含底托那截偏移和下面那行引导语），署名行比它矮，坐在这条带的顶边上
+  const signH = Math.max(84, qrStickerH(qrSize))
   // 先按"内容自然往下堆"算一遍位置
   const k0 = barH + 92
   const t0 = k0 + 62
@@ -878,7 +872,8 @@ function planClean(ctx, d) {
   }
   layers.push(L.fill(pad, ruleY, W - pad * 2, 2, 'rgba(35,37,44,0.10)'))
   layers.push(...sign.layers)
-  layers.push(L.image('qr', W - pad - qrSize, signTop, qrSize, qrSize, { placeholder: '#EFEDE6', r: 12 }))
+  // 这套以前只有一枚裸码、连一行引导语都没有——统一成右下角的码贴纸，这一行补齐了
+  qrSticker({ layers, x: W - pad - qrSize, y: signTop, size: qrSize, offset: tone.bg, ink: MUTED, label: t('scanToView', lang) })
   return { width: W, height, layers, template: 'clean' }
 }
 
@@ -896,6 +891,10 @@ function planClean(ctx, d) {
 
 // 码不当补丁：白贴纸 + 一块硬偏移的同色底托 + 一行小字。
 // 硬偏移代替投影是这批模板统一的收口手法——投影在低分屏上会糊成脏影。
+//
+// 十套模板现在只有这一种摆法：右下角、引导语居中在码下方。以前那四套稳重的各画各的
+// （居中一枚裸码、码靠左引导语坐在右边、干脆没有引导语），改一次要动四处，
+// 而且四处互相不一样——站长 09-24 的口径是"统一码在右下方，其他补齐，否则维护起来麻烦"。
 function qrSticker({ layers, x, y, size, offset, ink, label }) {
   const drop = Math.round(size * 0.09)
   const r = size * 0.18
@@ -909,7 +908,13 @@ function qrSticker({ layers, x, y, size, offset, ink, label }) {
       x: x + size / 2, y: y + size + drop + 26, lines: [label], size: 18, color: ink, align: 'center',
     }))
   }
-  return size + drop + (label ? 34 : 0)
+  return qrStickerH(size)
+}
+
+// 一枚码贴纸占多高（底托那截硬偏移 + 下面那行引导语）。布局得先知道高度才知道画布要多高，
+// 所以这个数必须和 qrSticker 里那三行一起改。
+function qrStickerH(size) {
+  return size + Math.round(size * 0.09) + 34
 }
 
 // 没设形象时，人像位不能空着。取标题第一个字当"丝网版上的大字"，

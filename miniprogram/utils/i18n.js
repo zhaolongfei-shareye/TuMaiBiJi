@@ -80,11 +80,11 @@ const i18n = {
     slogan: '看到的好东西，存成能用的笔记',
     shareToFriend: '分享好友',
     shareCardTitle: '图麦笔记 | 把链接和截图变成能用的笔记',
-    // 注销与「我的」页那两个数全部来自 /api/user/quota，界面不写死任何上限：
-    // 2026-09-24 起笔记不限量，服务端那个接口也只回已记条数与分类数。
-    quotaLabel: '已记笔记',
-    notesCountN: '{n} 条',
-    shareReward: '不限量 · 免费',
+    // 额度与注销：数字全部来自 /api/user/quota 和 /api/user/deactivate，
+    // 模板里不写死 100 和 10（{n} 由服务端给的 reward_each 填）。
+    // 09-24 定：动笔写第一篇、或把别人那篇转存进自己库里，两条都算"带来一个新写作者"。
+    quotaLabel: '笔记额度',
+    shareRewardN: '新写作者 +{n} 篇',
     deleteAccount: '注销账号',
     deleteTitle: '注销账号',
     deleteStep1: '将删除你名下的 {notes} 条笔记和 {cats} 个分类，已生成的分享链接一并失效，账号本身同时注销。',
@@ -276,9 +276,8 @@ const i18n = {
     slogan: 'Turn what you read into notes you can use',
     shareToFriend: 'Share with friends',
     shareCardTitle: 'TuMaiBiJi | Turn links and screenshots into notes',
-    quotaLabel: 'Notes saved',
-    notesCountN: '{n} notes',
-    shareReward: 'Unlimited · free',
+    quotaLabel: 'Note quota',
+    shareRewardN: '+{n} notes per new writer',
     deleteAccount: 'Delete account',
     deleteTitle: 'Delete account',
     deleteStep1: 'This deletes your {notes} notes and {cats} categories, revokes every share link you generated, and closes the account.',

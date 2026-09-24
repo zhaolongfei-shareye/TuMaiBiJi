@@ -50,19 +50,21 @@ Page({
     this.loadQuota()
   },
 
-  // 已记条数读这一个接口：数字只有一个来源，页面不再自己算，也不再显示上限。
+  // 额度和邀请进度都读这一个接口：数字只有一个来源，页面不再自己算 100。
+  // 右边那句是一笔真实的兑换（服务端真会给这 10 篇），所以必须等接口：读不到就留空，
+  // 不许在没拿到数的时候先写一句承诺。
   async loadQuota() {
     const lang = this.data.lang
-    // "不限量 · 免费"是产品口径，不是接口给的数，所以不等网络：
-    // 2026-09-24 之前这一行右边写的是服务端回的奖励数，读不到留空是对的；现在它跟接口无关了。
-    this.setData({ shareValue: t('shareReward', lang) })
     try {
       const q = await api.getQuota()
-      this.setData({ quotaText: fmt(t('notesCountN', lang), { n: q.used }) })
+      this.setData({
+        quotaText: `${q.used}/${q.limit}`,
+        shareValue: fmt(t('shareRewardN', lang), { n: q.reward_each }),
+      })
       this.quota = q
     } catch (err) {
-      // 条数读不到就留空那一行，绝不显示一个猜的数
-      console.error('已记条数读取失败', err)
+      // 读不到就把这两行留空，绝不显示一个猜的数
+      console.error('额度读取失败', err)
     }
   },
 
@@ -90,9 +92,10 @@ Page({
   },
 
   // 分享卡片固定落在新建页（新用户第一眼就是那三个色块），并带上邀请人 id。
-  // 归因到这里就结束了：对方打没打开、算不算邀请成功，服务端按"他真的写下第一篇笔记"
-  // 来记一行台账（backend/app/services/quota.py）。2026-09-24 起笔记不限量，这一行只是账，
-  // 不再兑换任何东西，所以这句文案里也就没有承诺。
+  // 归因到这里就结束了：对方打没打开、算不算邀请成功，服务端按"他真的存下第一条笔记"
+  // 来结账（backend/app/services/quota.py：自己动笔写第一篇、或把别人那篇转存进自己库里，
+  // 两条都算，一人一次、同一篇笔记一次，带来几个人不限），所以这行写的是一笔真实的兑换，
+  // 不是许愿。
   // 封面是自己画的一张 5:4 图（assets/share-card.png，80KB，微信上限 128KB）：
   // 不给 imageUrl 的话微信会截当前页，截到的是一屏菜单，推广位就废了。
   onShareAppMessage() {

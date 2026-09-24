@@ -13,7 +13,7 @@
        为什么不用"透明按钮盖在一行普通菜单上"那种做法：实测那颗绝对定位的 button
        在这套 flex 行里只量到半行宽（184/332），点右半边不触发——命中面积反而变小了。
        行即按钮，命中面积天然就是整行，也不用再对齐两层。
-       右边那一行"不限量 · 免费"是产品口径，不是从 /api/user/quota 读的——那个接口只回条数。 -->
+       右边那句奖励承诺取自 /api/user/quota，服务端认账才写；额度读回来之前留空。 -->
   <view class="menu-group card">
     <button class="menu-item share-row" open-type="share" aria-label="{{t.shareToFriend}}">
       <text class="menu-label">{{t.shareToFriend}}</text>
