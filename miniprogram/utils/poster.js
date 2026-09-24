@@ -905,7 +905,8 @@ function qrSticker({ layers, x, y, size, offset, ink, label }) {
   layers.push(L.image('qr', x + padIn, y + padIn, size - padIn * 2, size - padIn * 2, { placeholder: '#EFEEE8' }))
   if (label) {
     layers.push(L.text({
-      x: x + size + drop, y: y + size + drop + 26, lines: [label], size: 18, color: ink, align: 'right',
+      // 引导语跟着二维码本身居中：右对齐时它比那张码宽出一截，看上去就是挂歪的。
+      x: x + size / 2, y: y + size + drop + 26, lines: [label], size: 18, color: ink, align: 'center',
     }))
   }
   return size + drop + (label ? 34 : 0)

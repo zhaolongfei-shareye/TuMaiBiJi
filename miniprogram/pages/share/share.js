@@ -1,3 +1,9 @@
+// 模板小图一排：CSS 宽 176rpx，位图按 0.28 倍铺（和「卡片模板」页那 288rpx 的
+// 小样同一套算法，只是更小），高度由 JS 按比例算好写进 style。
+const PICK_W = 176
+const PICK_SCALE = 0.28
+const MEASURE_H = 750
+
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const poster = require('../../utils/poster.js')
@@ -12,7 +18,8 @@ Page({
     t: texts('zh'),
     // 画布位图高度随内容和模板变，CSS 高度得跟着改，否则预览会被压扁
     canvasH: 1200,
-    templateLabel: '',
+    tpls: [],
+    picked: '',
   },
 
   async onLoad(options) {
@@ -54,6 +61,7 @@ Page({
       this._token = share.token
       this._qrPath = await this.downloadQRImage(share.token)
       await this.render()
+      this.renderPicker()
     } catch (err) {
       console.error('生成分享图失败', err)
       wx.showToast({ title: t('generateFailed', lang), icon: 'none' })
@@ -102,12 +110,13 @@ Page({
     // 750×2600 已经超出部分机型单张画布的上限，安卓上有崩的风险。
     canvas.width = poster.W
     canvas.height = 750
-    const plan = poster.planPoster(ctx, this._note, profile.template, profile, lang)
+    // 默认沿用「卡片模板」里选的那套；这一页手动换过之后以这一页的为准（不回写设置）
+    const plan = poster.planPoster(ctx, this._note, this.data.picked || profile.template, profile, lang)
     canvas.width = plan.width
     canvas.height = plan.height
     poster.paintLayers(ctx, plan.layers, images)
 
-    this.setData({ canvasH: plan.height, templateLabel: poster.templateLabel(plan.template, lang) })
+    this.setData({ canvasH: plan.height })
 
     await new Promise((done, fail) => {
       wx.canvasToTempFilePath({
@@ -127,16 +136,66 @@ Page({
   // createSelectorQuery 的 exec 回调是"被微信异步调用"的，回调里抛出的异常既不会冒泡到
   // generateShareImage 的 try/catch，也不会被 await 感知（原实现 await 的是一个立刻 resolve
   // 的 undefined）。结果是画布一旦出错，页面就永久停在"生成分享图…"且没有任何提示。
-  getCanvas() {
+  getCanvas(selector) {
     return new Promise((resolve, reject) => {
       wx.createSelectorQuery()
-        .select('#shareCanvas')
+        .select(selector || '#shareCanvas')
         .fields({ node: true, size: true })
         .exec((res) => {
           const canvas = res && res[0] && res[0].node
           if (canvas) resolve(canvas)
           else reject(new Error('分享画布未就绪'))
         })
+    })
+  },
+
+  // 那一排小图只画一次：它的用处是"这一套长什么样"，画的是当前这条笔记的缩略版，
+  // 不跟着上面的点击变——跟着变就看不出每套的区别了。
+  async renderPicker() {
+    if (this._pickerDone || !this._note) return
+    this._pickerDone = true
+    const { lang } = this.data
+    const profile = poster.readProfile()
+    const picked = this.data.picked || profile.template || poster.DEFAULT_TEMPLATE
+    const avatar = poster.avatarPath()
+    const tpls = poster.TEMPLATES.map((x) => ({
+      id: x.id,
+      label: poster.templateLabel(x.id, lang),
+      h: Math.round((PICK_W * 4) / 3),
+    }))
+    this.setData({ tpls, picked })
+    for (const x of tpls) {
+      try {
+        const canvas = await this.getCanvas(`#pick-${x.id}`)
+        const ctx = canvas.getContext('2d')
+        const images = { qr: await poster.loadImage(canvas, this._qrPath, 3000) }
+        if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 4000)
+        canvas.width = poster.W
+        canvas.height = MEASURE_H
+        const plan = poster.planPoster(ctx, this._note, x.id, profile, lang)
+        canvas.width = Math.round(plan.width * PICK_SCALE)
+        canvas.height = Math.round(plan.height * PICK_SCALE)
+        ctx.scale(PICK_SCALE, PICK_SCALE)
+        poster.paintLayers(ctx, plan.layers, images)
+        x.h = Math.round((plan.height * PICK_W) / poster.W)
+      } catch (err) {
+        console.error('模板小图没画出来', x.id, err)
+      }
+    }
+    this.setData({ tpls: tpls.slice() })
+  },
+
+  // 换一套模板 = 上面那张重画一遍（码、头像、正文都复用，只是排法换）
+  onPickTemplate(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.picked) return
+    this.setData({
+      picked: id,
+      tpls: this.data.tpls.map((x) => Object.assign({}, x, { active: x.id === id })),
+    })
+    this.render().catch((err) => {
+      console.error('换模板后重画失败', err)
+      wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
     })
   },
 

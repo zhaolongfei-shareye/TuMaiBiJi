@@ -1,12 +1,29 @@
 <view class="container {{themeClass}}">
   <canvas type="2d" id="shareCanvas" class="share-canvas" style="height: {{canvasH}}rpx"></canvas>
 
+    <!-- 模板一排：左右滚着挑，默认是「卡片模板」里选的那套 -->
+    <scroll-view wx:if="{{!generating && tpls.length}}" class="tpl-strip" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="tpl-strip-inner">
+        <view
+          wx:for="{{tpls}}"
+          wx:key="id"
+          class="pick {{picked === item.id ? 'pick-on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onPickTemplate"
+        >
+          <canvas type="2d" id="pick-{{item.id}}" class="pick-canvas" style="height: {{item.h}}rpx"></canvas>
+          <text class="pick-label">{{item.label}}</text>
+        </view>
+      </view>
+    </scroll-view>
+
   <view wx:if="{{generating}}" class="loading-overlay">
     <text>{{t.generatingShare}}</text>
   </view>
 
   <view class="actions-bar">
-    <view wx:if="{{templateLabel && !generating}}" class="tpl-caption">{{t.posterUsing}} {{templateLabel}}</view>
+
+
     <view class="actions-row">
       <view class="btn-secondary" bindtap="onCancel">{{t.cancel}}</view>
       <view class="btn-primary" bindtap="saveToAlbum" disabled="{{!imagePath}}">{{t.saveToAlbum}}</view>

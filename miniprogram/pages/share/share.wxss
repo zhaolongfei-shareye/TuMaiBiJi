@@ -1,3 +1,8 @@
+/* 固定条只有按钮那一行，预览让开它就行。 */
+.container {
+  padding-bottom: 260rpx;
+}
+
 /* 海报预览：画布位图 750 宽，1 位图像素 = 1rpx，所以高度由 wxml 按算出来的
    行内 rpx 给就是等比。原来写死 80vh，高度改成随内容之后预览会被压扁。
    容器左右各有 --sp-3 的内边距，这里用负 margin 铺满屏宽，预览才和存出去的图一致。 */
@@ -5,8 +10,8 @@
   width: 750rpx;
   height: 1200rpx;
   margin-left: calc(var(--sp-3) * -1);
-  /* 底部固定条现在是"模板名一行 + 按钮一行"，预览让开的距离跟着加一档。 */
-  margin-bottom: 300rpx;
+  /* 让开的距离写在容器的 padding-bottom 上，不写在这里：最后一子的 margin
+     会穿透出容器（顶部那 2rpx 就是为同一个坑加的），实测滚不到底、码仍被压住。 */
   background: transparent;
 }
 
@@ -35,12 +40,58 @@
   background: var(--bg-page);
 }
 
-/* 只是告知"这张用的是哪套模板、去哪儿改"，不做成入口——同一件事只留一个地方能改。 */
-.tpl-caption {
-  padding: var(--sp-2) 0 var(--sp-1);
-  font-size: var(--fs-meta);
-  color: var(--text-tertiary);
+/* 模板一排：左右滚着挑。它坐在按钮条里、按钮上方那一行，跟着按钮条一起固定，
+   不然页面滚动起来会从小图中间穿过去。 */
+/* 这一排放在页面正常流里，不塞进底部那条 position: fixed 的条里：
+   canvas 是原生层，套在 fixed 容器里跟着页面滚动时合成会出错（实测滚到底会
+   留下一排空白格子 + 上面一层画过的残影）。 */
+.tpl-strip {
+  width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) 0;
+}
+
+.tpl-strip-inner {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--sp-2);
+}
+
+.pick {
+  flex: none;
+  width: 200rpx;
+  box-sizing: border-box;
+  padding: 8rpx;
+  border-radius: var(--r-card);
+  border: var(--w-edge) solid var(--card-edge);
+  background: var(--bg-card);
+}
+
+.pick-on {
+  border-color: var(--accent);
+  border-width: 4rpx;
+}
+
+/* 位图 750 宽、这一格只有 176，高度由 JS 按比例算好写进 style，
+   这里给个兜底值，别让它在小图画出来之前塌成 0。 */
+.pick-canvas {
+  width: 176rpx;
+  height: 235rpx;
+  border-radius: var(--r-chip);
+  background: var(--chip-idle);
+}
+
+.pick-label {
+  display: block;
+  margin-top: 6rpx;
   text-align: center;
+  font-size: var(--fs-tiny);
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .actions-row {
