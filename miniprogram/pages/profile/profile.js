@@ -132,8 +132,12 @@ Page({
     const { lang } = this.data
     wx.chooseMedia({
       count: 1,
-      mediaType: ['images'],
+      mediaType: ['image'],
       sourceType: ['album', 'camera'],
+      // 头像只要一张圆图，用不着原图。iPhone 直出的一张 12MP 照片能到 4~6MB，
+      // 而小程序本地用户文件目录一共只有 10MB——暂存一份、正式一份，选两次就满了；
+      // 再往画布上解码那种大图，低端安卓还会崩。压缩图 1~2MB，圆形头像完全看不出差别。
+      sizeType: ['compressed'],
       success: async (res) => {
         const temp = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
         if (!temp) return

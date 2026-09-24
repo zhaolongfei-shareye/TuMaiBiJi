@@ -110,6 +110,9 @@ Page({
     await new Promise((done, fail) => {
       wx.canvasToTempFilePath({
         canvas,
+        // 默认是 jpg。海报上是纯色块 + 小字 + 一张小程序码，JPEG 在码点边缘会压出
+        // 振铃，某些镜头下就扫得慢甚至扫不上；PNG 对这些内容本来也更小更干净。
+        fileType: 'png',
         success: (r) => {
           this.setData({ imagePath: r.tempFilePath, generating: false })
           done()
@@ -147,7 +150,11 @@ Page({
       },
       fail: (err) => {
         console.error('保存失败', err)
-        if (err.errMsg.includes('auth')) {
+        const msg = (err && err.errMsg) || ''
+        // 相册面板上按"取消"也会走 fail。真机每次保存都会先弹这个面板，
+        // 不认 cancel 的话，用户收起了面板就被判了一句"导出失败"。
+        if (msg.indexOf('cancel') >= 0) return
+        if (msg.indexOf('auth') >= 0) {
           wx.showModal({
             title: t('needAlbumPermission', lang),
             content: t('permissionHint', lang),

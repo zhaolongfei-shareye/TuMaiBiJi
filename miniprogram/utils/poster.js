@@ -91,6 +91,14 @@ function avatarPath() {
 
 function copyTo(src, name) {
   const dest = `${wx.env.USER_DATA_PATH}/${name}`
+  // 目标名是固定的（暂存/正式各一个），所以第二次覆盖时 dest 一定已经存在。
+  // 真机的 copyFile 在目标已存在时会回 EEXIST（errno 17），开发者工具的替身不报这个——
+  // 表现就是"第一张头像好好的，选第二张就存不下来"。先把老的删掉再拷，覆盖就变成一次纯新建。
+  try {
+    wx.getFileSystemManager().unlinkSync(dest)
+  } catch (e) {
+    // 头一次存，本来就没有旧文件
+  }
   return new Promise((resolve, reject) => {
     // 参数名是 srcPath，不是 filePath——真机上写错的表现是 errno 1001
     // "parameter.srcPath should be String instead of Undefined"，
