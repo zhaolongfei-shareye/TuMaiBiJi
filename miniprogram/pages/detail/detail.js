@@ -8,6 +8,7 @@ const SOURCE_TYPE_KEYS = {
   web_article: 'sourceWebArticle',
   screenshot: 'sourceScreenshot',
   manual: 'sourceManual',
+  share_import: 'sourceShareImport',
 }
 
 Page({
@@ -80,6 +81,8 @@ Page({
       const firstTag = (note.tags || []).map((x) => (x || '').trim()).find(Boolean) || ''
       note.blockName = firstTag || note.category_name || (note.category_id == null ? this.data.t.noCategory : '')
       note.date_label = formatShortDate(note.created_at)
+      // 转存进来的那一条才有：来源是服务端钉住的，编辑接口碰不到这一栏，所以这里只读。
+      note.imported_label = note.imported_from ? formatShortDate(note.imported_from.imported_at) : ''
       
       this.setData({ note, loading: false, _loaded: true })
       this.loadShareStatus(note.id)

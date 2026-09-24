@@ -173,7 +173,12 @@ module.exports = {
   updateCategory: (id, data) => request(`/api/categories/${id}`, 'PUT', data),
   deleteCategory: (id) => request(`/api/categories/${id}`, 'DELETE'),
   reorderCategories: (ids) => request('/api/categories/reorder', 'POST', { ids }),
-  createShare: (noteId) => request('/api/shares/', 'POST', { note_id: noteId }),
+  // 昵称是"分享形象"里用户自己填的，只在主动分享这一刻才跟着上服务器，
+  // 和标题摘要同性质——都是他选择公开的内容，不是我们采集的账号资料。
+  createShare: (noteId, authorName) =>
+    request('/api/shares/', 'POST', { note_id: noteId, author_name: authorName || null }),
+  // 把别人分享页上那一条整份抄进自己库。来源信息由服务端钉在笔记上，客户端碰不到它。
+  importFromShare: (token) => request('/api/notes/from-share', 'POST', { token }),
   // 分享状态：详情页拿它决定要不要显示"撤掉分享"这一行
   getShareStatus: (noteId) => request(`/api/shares/status?note_id=${noteId}`),
   // 撤掉之后那张码扫开就是"分享已关闭"，再点分享会给一张新码

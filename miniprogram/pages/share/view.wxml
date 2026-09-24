@@ -12,6 +12,12 @@
     <text class="eyebrow">{{t.sharedNote}}</text>
 
     <view class="share-card">
+      <!-- 作者行：昵称是分享者自己在「分享形象」里填的，只在他主动分享的那一刻才对外可见 -->
+      <view wx:if="{{share.author_name}}" class="author-row">
+        <view class="author-mark">{{authorInitial}}</view>
+        <text class="author-name">{{t.authorLabel}}：{{share.author_name}}</text>
+      </view>
+
       <text class="card-title">{{share.title}}</text>
 
       <text wx:if="{{share.summary}}" class="card-summary">{{share.summary}}</text>
@@ -33,6 +39,11 @@
       <view wx:if="{{share.tags && share.tags.length > 0}}" class="tags-row">
         <text wx:for="{{share.tags}}" wx:key="*this" class="tag">{{item}}</text>
       </view>
+    </view>
+
+    <!-- 转存：抄的是这份公开快照，存进自己库之后来源那一栏永久留着 -->
+    <view class="save-row {{saved ? 'done' : ''}}" bindtap="saveToMine">
+      <text class="save-text">{{saved ? t.alreadySaved : (saving ? t.savingMine : t.saveToMine)}}</text>
     </view>
 
     <view class="brand-row">

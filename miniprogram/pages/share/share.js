@@ -35,7 +35,9 @@ Page({
   async generateShareImage() {
     const { noteId, lang } = this.data
     try {
-      const share = await api.createShare(noteId)
+      // 海报上那个名字是本地画进图片的，服务器原本不知道；扫码落地页要显示"原创作者"
+      // 就得在建分享时把它带上去一次（服务端会截到 32 字并和正文一起过内容安全）。
+      const share = await api.createShare(noteId, poster.readProfile().name)
       const note = await api.getNote(noteId)
       // 分类名不在笔记响应里，海报上那行小字要靠分类表查。
       // 查不到就只写来源，不写成"未分类"——它明明归了类。

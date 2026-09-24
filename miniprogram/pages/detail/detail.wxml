@@ -58,6 +58,15 @@
       </scroll-view>
     </view>
 
+    <!-- 转存来源：这一栏由服务端钉在笔记上，编辑接口里没有它，界面上也没有任何改它的入口 -->
+    <view wx:if="{{note.imported_from}}" class="panel import-panel">
+      <text class="section-label">{{t.importedFromLabel}}</text>
+      <text class="import-line">{{t.authorLabel}}：{{note.imported_from.author_name || '—'}}</text>
+      <text class="import-line">{{t.importedTitle}}：{{note.imported_from.title_at_import || note.title}}</text>
+      <text class="import-line">{{t.importedAt}}：{{note.imported_label}}</text>
+      <text class="import-hint">{{t.importedFromHint}}</text>
+    </view>
+
     <!-- 底部操作 -->
     <view class="bottom-actions">
       <view class="btn-share" bindtap="onShare">{{t.shareAsImage}}</view>

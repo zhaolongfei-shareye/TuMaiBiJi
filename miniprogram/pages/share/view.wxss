@@ -172,3 +172,57 @@
   font-weight: 600;
   color: #5c6068;
 }
+
+/* 作者行：昵称前面那个圆形色块是这一行唯一的装饰，墨底白字，和错误态那颗同源。 */
+.author-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.author-mark {
+  flex: none;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #23252c;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.author-name {
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: #5c6068;
+}
+
+/* 转存按钮：通栏胶囊，和详情页那颗 btn-share 同一份量。 */
+.save-row {
+  margin-top: var(--sp-5);
+  height: 96rpx;
+  border-radius: 48rpx;
+  background: #23252c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.save-row.done {
+  background: rgba(35, 37, 44, 0.12);
+}
+
+.save-text {
+  font-size: var(--fs-body);
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.save-row.done .save-text {
+  color: #5c6068;
+}
