@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>界面字体可选 · 默认宋体</title>
+<style>
+  /* 壁纸一律用上一张图里的「素宣」，这一张只比字体这一个变量。
+     令牌（字号/圆角/间距）全部照抄 app.wxss，画布 750 宽，rpx→px 一比一。 */
+  :root{
+    --fs-h1:42px; --fs-h2:34px; --fs-title:31px; --fs-body:28px; --fs-meta:24px;
+    --fs-tiny:21px; --fs-label:20px; --fs-micro:18px; --lh-body:1.6; --lh-tight:1.38;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px; --sp-6:64px; --sp-row:26px;
+    --r-card:40px; --r-block:32px; --r-chip:28px; --r-pill:999px; --r-btn:16px; --w-edge:3px;
+    --blk:176px; --blk-pad:18px; --fs-block:32px; --motif-size:124px; --motif-shift:32px;
+    --ui:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC',sans-serif;
+    --bg-page:#F2EFE9; --bg-card:#FCFBF8; --text-primary:#14161A; --text-secondary:rgba(20,22,26,.64);
+    --text-tertiary:rgba(20,22,26,.42); --card-edge:rgba(20,22,26,.12); --accent:#14161A;
+    --accent-soft:rgba(20,22,26,.07); --chip-idle:rgba(20,22,26,.06);
+    /* 四档字体链：左边那串是效果图这台 Mac 命中的名字，括号里是手机上实测能命中的名字（上一轮量的） */
+    --f-song:'Songti SC','STSong',serif;
+    --f-fang:'STFangsong','Songti SC',serif;
+    --f-kai:'Kaiti SC','STKaiti',serif;
+    --f-hei:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;
+    --f-ui:var(--f-song);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#dcd9d2;font-family:var(--ui);padding:30px}
+  .sheet{display:flex;flex-direction:column;gap:30px;align-items:flex-start}
+  .tag{font:400 13px/1.6 var(--ui);letter-spacing:.14em;color:#4d4a44;text-transform:uppercase}
+  .tag b{display:inline-block;margin-right:8px;color:#14161A;font-weight:700;letter-spacing:.04em;text-transform:none;font-size:16px}
+  .row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+
+  .phone{width:750px;height:900px;position:relative;overflow:hidden;border-radius:56px;
+    box-shadow:0 20px 60px rgba(20,22,26,.28);background:var(--bg-page);font-family:var(--f-ui)}
+  .phone.tall{height:1624px}
+  .phone .label{position:absolute;left:0;right:0;top:0;height:88px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 44px;font:600 26px/1 var(--ui);color:var(--text-primary);z-index:5}
+  .phone .nav{position:absolute;left:0;right:0;top:88px;height:88px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 24px 0 32px;z-index:5}
+  .phone .nav .nt{font:500 30px/1 var(--ui);color:var(--text-primary)}
+  .capsule{width:174px;height:62px;border-radius:var(--r-pill);border:2px solid rgba(20,22,26,.14);
+    background:rgba(252,251,248,.72);display:flex;align-items:center;justify-content:space-around;
+    font:400 30px/1 var(--ui);color:#14161A}
+  .capsule .sep{width:2px;height:30px;background:rgba(20,22,26,.14)}
+  .screen{position:absolute;left:0;right:0;top:176px;bottom:0;padding:0 var(--sp-3) 40px;overflow:hidden}
+
+  .card{position:relative;background:var(--bg-card);color:var(--text-primary);border:var(--w-edge) solid var(--card-edge);
+    border-radius:var(--r-card);padding:var(--sp-3) var(--sp-4) var(--sp-4);margin-bottom:var(--sp-2);overflow:hidden}
+  .row-card{display:flex;align-items:flex-start;gap:var(--sp-row);padding:var(--sp-row)}
+  .blk{flex:none;position:relative;width:var(--blk);height:var(--blk);box-sizing:border-box;padding:var(--blk-pad);
+    border-radius:var(--r-block);background:var(--blk-bg);color:var(--blk-ink);overflow:hidden;
+    display:flex;flex-direction:column;justify-content:space-between}
+  .blk-name{position:relative;z-index:2;font-size:var(--fs-block);font-weight:800;line-height:1.2;letter-spacing:-.6px}
+  .blk-date{position:relative;z-index:2;font-size:var(--fs-micro);font-weight:800;letter-spacing:1.4px;opacity:.72}
+  .blk-body{flex:1;min-width:0}
+  .row-title{font-size:var(--fs-title);font-weight:800;line-height:var(--lh-tight);letter-spacing:-.5px;
+    color:var(--text-primary);margin-bottom:10px}
+  .summary{font-size:var(--fs-meta);line-height:1.55;color:var(--text-secondary);margin-bottom:var(--sp-2);
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .row-foot{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-tiny);font-weight:700;
+    color:var(--text-tertiary)}
+  .row-foot .src{color:var(--text-secondary)}
+  .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:4px 14px;border-radius:10px;
+    background:var(--accent);color:var(--bg-page);margin-right:10px;vertical-align:2px}
+  .motif{position:absolute;right:calc(0px - var(--motif-shift));bottom:calc(0px - var(--motif-shift));
+    width:var(--motif-size);height:var(--motif-size);z-index:0}
+  .m-circle{border-radius:50%;background:var(--blk-motif)}
+  .m-stripes{background:repeating-linear-gradient(115deg,var(--blk-motif) 0 12px,transparent 12px 26px)}
+  .m-dots{background-image:radial-gradient(var(--blk-motif) 6px,transparent 7px);background-size:26px 26px}
+  .page-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-2);
+    margin:var(--sp-5) 0 var(--sp-4)}
+  .page-title{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:var(--text-primary)}
+  .page-stats{flex:none;font-size:var(--fs-meta);font-weight:600;letter-spacing:-.2px;color:var(--text-secondary)}
+  .chip{display:inline-block;padding:14px 28px;border-radius:var(--r-pill);font-size:var(--fs-meta);font-weight:600;
+    background:var(--chip-idle);color:var(--text-secondary)}
+  .chip.active{background:var(--tone-bg,var(--accent));color:var(--tone-ink,var(--bg-page))}
+  .chips{display:inline-flex;gap:12px;white-space:nowrap;margin-bottom:var(--sp-3)}
+  .sc-card{background:#3F52D6;color:#fff;padding:26px var(--sp-3) 20px;margin-bottom:var(--sp-3)}
+  .sc-line{position:relative;display:flex;align-items:center;height:64px}
+  .sc-input{font-size:var(--fs-body);color:#fff;opacity:.6}
+  .sc-go{margin-left:auto;font-size:var(--fs-title);font-weight:800;letter-spacing:-.5px;color:#fff}
+  .sc-rule{position:absolute;left:0;right:0;bottom:0;height:3px;background:#fff;opacity:.42}
+  .tagx{display:inline-block;background:var(--chip-idle);color:var(--text-primary);font-size:var(--fs-tiny);
+    font-weight:700;padding:6px 18px;border-radius:14px;margin-right:var(--sp-1)}
+  .section-label{display:block;font-size:var(--fs-label);font-weight:800;letter-spacing:2px;color:var(--text-tertiary);
+    text-transform:uppercase;margin-bottom:14px}
+  .hero-meta{font-size:var(--fs-tiny);font-weight:700;color:var(--text-tertiary);margin-bottom:10px}
+  .hero-title{font-size:var(--fs-h1);font-weight:800;line-height:1.3;letter-spacing:-1px;margin-bottom:14px}
+  .body-text{font-size:29px;line-height:1.85;color:var(--text-primary)}
+  .point{display:flex;gap:16px;font-size:var(--fs-body);line-height:1.7;margin-top:14px}
+  .point b{flex:none;width:40px;height:40px;border-radius:12px;background:#F6C445;color:#2A2005;
+    display:flex;align-items:center;justify-content:center;font-size:var(--fs-meta);font-weight:800}
+  .blk.tall{height:200px}
+
+  /* 每格下面那行说明 */
+  .cap{width:750px;font:400 22px/1.6 var(--ui);color:#3f3c37;margin-top:14px}
+  .cap b{display:block;font-size:26px;font-weight:700;color:#14161A;margin-bottom:4px}
+  .cap code{font-family:ui-monospace,Menlo,monospace;font-size:19px;background:#fff;padding:2px 8px;border-radius:6px}
+  .col{display:flex;flex-direction:column}
+
+  /* 字重对照格：左边是现状（800 全保留），右边是宋体下把三处降档 */
+  .weight{width:750px;background:var(--bg-page);border-radius:40px;padding:40px 36px;font-family:var(--f-song)}
+  .weight.soft-w{font-weight:400}
+  .weight h3{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;margin-bottom:22px}
+  .weight .t8{font-size:var(--fs-title);font-weight:800;line-height:1.38}
+  .weight .t6{font-size:var(--fs-title);font-weight:600;line-height:1.38}
+  .weight .d8{font-size:var(--fs-micro);font-weight:800;letter-spacing:1.4px;color:var(--text-tertiary);margin-top:10px}
+  .weight .d6{font-size:var(--fs-micro);font-weight:600;letter-spacing:1.4px;color:var(--text-tertiary);margin-top:10px}
+  .fake{margin-top:26px;padding-top:22px;border-top:2px solid var(--card-edge);font-size:var(--fs-title);
+    font-weight:400;color:var(--text-primary);-webkit-text-stroke:.7px currentColor;line-height:1.5}
+  .note{width:1526px;background:#fff;border-radius:36px;padding:38px 40px;font-size:26px;line-height:1.85;color:#14161A}
+  .note b{font-weight:700}
+
+  /* 设置页：壁纸格子 + 新增「界面字体」一排 */
+  .wp-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin-bottom:var(--sp-4)}
+  .wp-item{position:relative;height:300px;padding:var(--sp-4);border-radius:var(--r-card);display:flex;
+    flex-direction:column;justify-content:space-between;border:4px solid transparent}
+  .wp-item.on{border-color:var(--wp-label)}
+  .mini{display:flex;gap:12px;margin-bottom:12px}
+  .mini-blk{width:44px;height:44px;border-radius:12px;background:#F6C445}
+  .mini-blk.wide{width:120px;background:#3F52D6}
+  .mini-ln{height:34px;border-radius:12px;background:#fff}
+  .mini-ln.short{width:62%;margin-top:10px}
+  .wp-foot{display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-body);font-weight:700}
+  .check{width:44px;height:44px;border-radius:50%;background:var(--wp-label);color:var(--wp-page);
+    display:flex;align-items:center;justify-content:center;font-size:var(--fs-meta);font-weight:800}
+  .sec-title{font-size:var(--fs-h2);font-weight:700;margin:0 0 8px}
+  .sec-hint{font-size:var(--fs-meta);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--sp-3)}
+  .font-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+  .font-item{position:relative;padding:28px 30px;border-radius:var(--r-card);background:var(--bg-card);
+    border:var(--w-edge) solid var(--card-edge)}
+  .font-item.on{border:5px solid var(--accent)}
+  .font-demo{display:block;font-size:52px;line-height:1.25}
+  .font-name{display:block;font:600 var(--fs-meta)/1.4 var(--ui);color:var(--text-secondary);margin-top:14px}
+  .font-badge{display:inline-block;margin-left:12px;font:700 var(--fs-label)/1 var(--ui);letter-spacing:1px;
+    padding:8px 12px;border-radius:8px;background:var(--accent);color:var(--bg-page);vertical-align:3px}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="tag"><b>第一组 · 四档字体，同一屏</b>底色都是素宣，只有字体这一个变量。默认那档是宋体，最后一档是现在的苹方（留着给嫌宋体细的人）</div>
+  <div class="row">
+
+    <div class="col">
+      <div class="phone" style="--f-ui:var(--f-song)">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+          <div class="card sc-card"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+          <div class="chips"><span class="chip active">全部</span><span class="chip" style="--tone-bg:#F6C445;--tone-ink:#2A2005">阅读</span><span class="chip" style="--tone-bg:#3F52D6;--tone-ink:#fff">工作</span><span class="chip">未分类</span></div>
+          <div class="card row-card" style="--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-motif:#E3B63F">
+            <div class="blk"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+            <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+              <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+              <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div>
+          </div>
+          <div class="card row-card" style="--blk-bg:#3F52D6;--blk-ink:#fff;--blk-motif:#5566DE">
+            <div class="blk"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+            <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+              <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+              <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b>① 宋体（默认）</b>设备链 <code>'STSong','Songti SC',serif</code>　上一轮实测：手机上 STSong 命中、Songti SC 命不中</div>
+    </div>
+
+    <div class="col">
+      <div class="phone" style="--f-ui:var(--f-fang)">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+          <div class="card sc-card"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+          <div class="chips"><span class="chip active">全部</span><span class="chip" style="--tone-bg:#F6C445;--tone-ink:#2A2005">阅读</span><span class="chip" style="--tone-bg:#3F52D6;--tone-ink:#fff">工作</span><span class="chip">未分类</span></div>
+          <div class="card row-card" style="--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-motif:#E3B63F">
+            <div class="blk"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+            <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+              <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+              <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div>
+          </div>
+          <div class="card row-card" style="--blk-bg:#3F52D6;--blk-ink:#fff;--blk-motif:#5566DE">
+            <div class="blk"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+            <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+              <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+              <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b>② 仿宋</b>设备链 <code>'STFangsong','Songti SC',serif</code>　实测命中；字比宋体更细更瘦，小字号下最吃亏</div>
+    </div>
+
+    <div class="col">
+      <div class="phone" style="--f-ui:var(--f-kai)">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+          <div class="card sc-card"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+          <div class="chips"><span class="chip active">全部</span><span class="chip" style="--tone-bg:#F6C445;--tone-ink:#2A2005">阅读</span><span class="chip" style="--tone-bg:#3F52D6;--tone-ink:#fff">工作</span><span class="chip">未分类</span></div>
+          <div class="card row-card" style="--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-motif:#E3B63F">
+            <div class="blk"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+            <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+              <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+              <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div>
+          </div>
+          <div class="card row-card" style="--blk-bg:#3F52D6;--blk-ink:#fff;--blk-motif:#5566DE">
+            <div class="blk"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+            <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+              <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+              <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b>③ 楷体</b>设备链 <code>'Kaiti SC','STKaiti',serif</code>　实测命中；笔形最软，和"笔记"这件事最贴，但列表里密集时最容易糊</div>
+    </div>
+
+    <div class="col">
+      <div class="phone" style="--f-ui:var(--f-hei)">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+          <div class="card sc-card"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+          <div class="chips"><span class="chip active">全部</span><span class="chip" style="--tone-bg:#F6C445;--tone-ink:#2A2005">阅读</span><span class="chip" style="--tone-bg:#3F52D6;--tone-ink:#fff">工作</span><span class="chip">未分类</span></div>
+          <div class="card row-card" style="--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-motif:#E3B63F">
+            <div class="blk"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+            <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+              <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+              <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div>
+          </div>
+          <div class="card row-card" style="--blk-bg:#3F52D6;--blk-ink:#fff;--blk-motif:#5566DE">
+            <div class="blk"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+            <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+              <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+              <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b>④ 黑体（现状苹方，保留可选）</b><code>-apple-system,'PingFang SC'</code>　上一轮量的落墨像素：黑体 9213 / 宋体 6645 / 仿宋 5825 / 楷体 5747</div>
+    </div>
+  </div>
+
+  <div class="tag"><b>第二组 · 字重这一处才是真代价</b>现状全站 86 处 font-weight，标题 800、块内日期 800、页头 700。宋体没有这么粗的一档，左格按现状不动，右格把三处降一档</div>
+  <div class="row">
+    <div class="col">
+      <div class="weight">
+        <h3>我的笔记</h3>
+        <div class="t8">读过的东西，存成能转发的笔记</div>
+        <div class="d8">09 / 23　·　阅读</div>
+        <div style="margin-top:24px" class="t8">会上记下的三条结论</div>
+        <div class="d8">09 / 21　·　手写</div>
+        <div class="fake">读过的东西，存成能转发的笔记</div>
+      </div>
+      <div class="cap"><b>左：字重原样（800 / 700 不动）</b>下面那行是<b style="display:inline">合成假粗的近似</b>（用描边模拟，不是实测）：这台 Mac 的宋体带真粗字面，所以效果图上半部分看着正常；手机命中的 STSong 只有一档字面，800 会被系统硬描粗，这一条只能真机判</div>
+    </div>
+    <div class="col">
+      <div class="weight" style="font-weight:400">
+        <h3 style="font-weight:600">我的笔记</h3>
+        <div class="t6">读过的东西，存成能转发的笔记</div>
+        <div class="d6">09 / 23　·　阅读</div>
+        <div style="margin-top:24px" class="t6">会上记下的三条结论</div>
+        <div class="d6">09 / 21　·　手写</div>
+        <div style="margin-top:26px;padding-top:22px;border-top:2px solid var(--card-edge);font-size:var(--fs-title);line-height:1.5;color:var(--text-primary)">读过的东西，存成能转发的笔记</div>
+      </div>
+      <div class="cap"><b>右：宋体下把三处降档</b>页头 700→600、行标题 800→600、块内日期 800→600。宋体靠"结构"就立得住，不需要靠粗；降档后黑体那档会变轻一点，所以字重也跟着字体走一套，不是全站一刀切</div>
+    </div>
+    <div class="col">
+      <div class="phone tall" style="--f-ui:var(--f-song);height:1624px">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">笔记详情</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="card row-card" style="margin-top:var(--sp-5);--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-motif:#E3B63F">
+            <div class="blk tall"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-dots"></div></div>
+            <div class="blk-body">
+              <div class="hero-meta">链接 · 2026-09-23 21:07</div>
+              <div class="hero-title" style="font-weight:700">读过的东西，存成能转发的笔记</div>
+              <div><span class="tagx">阅读</span><span class="tagx">方法论</span></div>
+            </div>
+          </div>
+          <div class="card"><span class="section-label">摘要</span>
+            <div class="body-text">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。存下来的东西要能被别人扫开，这才是记笔记的意义。</div></div>
+          <div class="card"><span class="section-label">要点</span>
+            <div class="point"><b>1</b><span>一句话顶做大字，别人扫一眼就记得住</span></div>
+            <div class="point"><b>2</b><span>自己的头像和名字印在图上</span></div>
+            <div class="point"><b>3</b><span>存下来的东西要能被别人扫开</span></div>
+          </div>
+          <div class="card"><span class="section-label">原文</span>
+            <div class="body-text" style="font-size:var(--fs-body);line-height:1.95;color:var(--text-secondary)">读过的东西如果不记下来，一周后能留下的不到三成。记下来又散在五个 app 里，等于没记。所以这一篇只讲一件事：把散的东西收到一处，并且收进来就能拿走。</div></div>
+        </div>
+      </div>
+      <div class="cap"><b>详情页 · 宋体（长文阅读这一屏最见字体）</b>正文 29px / 1.85 行距。宋体在长文里比苹方更"耐读"，这是这次想换字体的真正理由，列表页反而是次要的</div>
+    </div>
+    <div class="note">
+        <b>代价清单（还没动手，先摆出来）</b><br>
+        ① 界面字体：只改两行 <code>font-family</code>（app.wxss 第 69 行、pages/share/view.wxss 第 7 行）→ 换成一个跟着设置走的变量，再加一排选项和一处存储。布局一行不动。<br>
+        ② 字重：动的是 12 个 wxss 里 86 处 font-weight 中的一部分，且要按字体分两套。这是这件事真正的工作量。<br>
+        ③ 安卓：这三档字体在安卓上基本命不中，得给一条降级（回落到系统黑体），否则安卓用户看到的还是现状。<br>
+        ④ 想要"小楷"这种系统没有的字，只能走 <code>wx.loadFontFace</code> + https 字体文件；汉字字体动辄几 MB，主包上限 2M，得放外部存储并按需加载——这条最贵，先不做。<br>
+        ⑤ 默认从黑体改宋体是<b>全站可见的变化</b>，1.4.0 正在审核，这一刀要不要跟这次一起走，你定。<br>
+        ⑥ 改不到的地方：导航条上那一行标题是微信原生画的，字体选择管不着它；底部三个 tab 是我们自己画的，能跟着走。所以"整站换字体"其实会留一条尾巴在上面。
+      </div>
+  </div>
+
+  <div class="tag"><b>第三组 · 设置页：壁纸和字体并排放，不新开一页</b>「壁纸设置」这页本来就是换外观的地方，字体只是同一件事的另一半；标题改成「外观设置」，两排共用一页</div>
+  <div class="row">
+    <div class="phone tall" style="--f-ui:var(--f-song)">
+      <div class="label"><span>9:41</span><span>100%</span></div>
+      <div class="nav"><span class="nt">外观设置</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+      <div class="screen">
+        <div class="page-head" style="display:block;margin-bottom:var(--sp-4)">
+          <div class="page-title" style="margin-bottom:8px">外观设置</div>
+          <div class="page-stats" style="font-weight:400">只换底色和字体，卡片左侧那块颜色跟着分类走</div>
+        </div>
+        <div class="sec-title">界面字体</div>
+        <div class="sec-hint">换的是全站文字，包括列表、详情、设置页；海报模板里的字体另算，不受这里影响</div>
+        <div class="font-row">
+          <div class="font-item on">
+            <span class="font-demo" style="font-family:var(--f-song);font-weight:600">看到好内容</span>
+            <span class="font-name">宋体 · 最贴官网<span class="font-badge">默认</span></span>
+          </div>
+          <div class="font-item">
+            <span class="font-demo" style="font-family:var(--f-fang);font-weight:600">看到好内容</span>
+            <span class="font-name">仿宋 · 更瘦更淡</span>
+          </div>
+          <div class="font-item">
+            <span class="font-demo" style="font-family:var(--f-kai);font-weight:600">看到好内容</span>
+            <span class="font-name">楷体 · 手写感</span>
+          </div>
+          <div class="font-item">
+            <span class="font-demo" style="font-family:var(--f-hei);font-weight:600">看到好内容</span>
+            <span class="font-name">黑体 · 现状</span>
+          </div>
+        </div>
+        <div class="sec-title" style="margin-top:var(--sp-5)">页面壁纸</div>
+        <div class="sec-hint">新增两枚淡雅的排在最前面，现有六枚原样保留</div>
+        <div class="wp-grid">
+          <div class="wp-item on" style="background:#F2EFE9;--wp-label:#14161A;--wp-page:#F2EFE9">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln"></div><div class="mini-ln short"></div></div>
+            <div class="wp-foot"><span>素宣</span><span class="check">✓</span></div>
+          </div>
+          <div class="wp-item" style="background:#E9EEEA;--wp-label:#22322B;--wp-page:#E9EEEA">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln"></div><div class="mini-ln short"></div></div>
+            <div class="wp-foot"><span>雨过青</span></div>
+          </div>
+          <div class="wp-item" style="background:#f4f2ec;--wp-label:#23252c">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln"></div><div class="mini-ln short"></div></div>
+            <div class="wp-foot"><span>米白</span></div>
+          </div>
+          <div class="wp-item" style="background:#eaeefb;--wp-label:#23264f">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln"></div><div class="mini-ln short"></div></div>
+            <div class="wp-foot"><span>雾蓝</span></div>
+          </div>
+          <div class="wp-item" style="background:#e7f3ea;--wp-label:#12331f">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln"></div><div class="mini-ln short"></div></div>
+            <div class="wp-foot"><span>松绿</span></div>
+          </div>
+          <div class="wp-item" style="background:#fdeee6;--wp-label:#4a1f10">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln"></div><div class="mini-ln short"></div></div>
+            <div class="wp-foot"><span>暮橙</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col" style="gap:26px">
+      <div class="note">
+        <b>这一屏的取舍</b><br>
+        字体入口并进「外观设置」，不新开一页：一个功能只留一个入口，壁纸和字体本来就是同一件事。<br><br>
+        <b>格子里那四个字是用它自己的字体写的</b>，所以用户点之前就知道会换成什么样，不用点了再回来看。这一条比"宋体/仿宋"这种名字管用得多。<br><br>
+        <b>海报模板不受这里影响</b>：模板的字体是画进图里的，跟着模板走（竖排那套固定用楷体，小楷要另外下发字体文件）。界面字体只改界面。
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

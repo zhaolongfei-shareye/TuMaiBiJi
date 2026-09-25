@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>淡雅壁纸两款 · 铺到真实界面</title>
+<style>
+  /* 屏幕里的每一处尺寸/圆角/字阶都照抄 app.wxss 的令牌（画布 750 宽，rpx→px 一比一）。
+     新增的只有两组主题色：素宣、雨过青，取值来自线上 /assets/site.css 的 :root。
+     这一轮只换壁纸，界面字体仍是苹方——字体那件事在另一张图里单独看。 */
+  :root{
+    --fs-h1:42px; --fs-h2:34px; --fs-title:31px; --fs-body:28px; --fs-meta:24px;
+    --fs-tiny:21px; --fs-label:20px; --fs-micro:18px; --lh-body:1.6; --lh-tight:1.38;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px; --sp-6:64px; --sp-row:26px;
+    --r-card:40px; --r-block:32px; --r-chip:28px; --r-pill:999px; --r-btn:16px; --w-edge:3px;
+    --blk:176px; --blk-pad:18px; --fs-block:32px; --motif-size:124px; --motif-shift:32px;
+    --ui:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#dcd9d2;font-family:var(--ui);padding:30px}
+  .sheet{display:flex;flex-direction:column;gap:30px;align-items:flex-start}
+  .tag{font:400 13px/1.5 var(--ui);letter-spacing:.16em;color:#4d4a44;text-transform:uppercase}
+  .tag b{display:inline-block;margin-right:8px;color:#14161A;font-weight:700;letter-spacing:.04em;text-transform:none;font-size:16px}
+  .row{display:flex;gap:26px;align-items:flex-start}
+
+  /* ---------- 手机外壳 ---------- */
+  .phone{width:750px;height:1624px;position:relative;overflow:hidden;border-radius:56px;
+    box-shadow:0 20px 60px rgba(20,22,26,.28);background:var(--bg-page)}
+  .phone .label{position:absolute;left:0;right:0;top:0;height:88px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 44px;font:600 26px/1 var(--ui);color:var(--text-primary);z-index:5}
+  .phone .nav{position:absolute;left:0;right:0;top:88px;height:88px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 24px 0 32px;z-index:5}
+  .phone .nav .nt{font:500 30px/1 var(--ui);color:var(--text-primary)}
+  .capsule{width:174px;height:62px;border-radius:var(--r-pill);border:2px solid var(--nav-hair);
+    background:var(--nav-face);display:flex;align-items:center;justify-content:space-around;
+    font:400 30px/1 var(--ui);color:var(--nav-ink)}
+  .capsule i{font-style:normal}
+  .capsule .sep{width:2px;height:30px;background:var(--nav-hair)}
+  .screen{position:absolute;left:0;right:0;top:176px;bottom:0;padding:0 var(--sp-3) 150px;overflow:hidden}
+
+  /* 底部浮起胶囊导航（照 custom-tab-bar/index.wxss：写死的墨色，不随主题变） */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;background:#23252c;
+    border-radius:44px;display:flex;z-index:6;box-shadow:0 16rpx 44rpx rgba(35,37,44,.28)}
+  .tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font:500 20px/1 var(--ui);color:rgba(255,255,255,.52)}
+  .tabbar div.on{color:#fff}
+  .tabbar s{width:36px;height:36px;border-radius:10px;text-decoration:none;display:block}
+  .tabbar .on s{background:#F6C445}
+  .tabbar div:nth-child(2) s{border:3px solid rgba(255,255,255,.42);border-radius:50%}
+  .tabbar div:nth-child(3) s{border:3px solid rgba(255,255,255,.42);border-radius:10px}
+  .homebar{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;width:264px;height:10px;
+    border-radius:5px;background:var(--text-primary);opacity:.28;z-index:7}
+
+  /* ---------- 三套主题的 chrome 变量 ---------- */
+  .t-old{ --bg-page:#f4f2ec; --bg-card:#ffffff; --text-primary:#23252c; --text-secondary:#5c6068;
+    --text-tertiary:#9a9ea6; --card-edge:rgba(35,37,44,.10); --accent:#23252c; --accent-soft:rgba(35,37,44,.07);
+    --chip-idle:rgba(35,37,44,.06); --nav-face:rgba(255,255,255,.7); --nav-hair:rgba(35,37,44,.12); --nav-ink:#23252c; }
+  /* 素宣：官网首屏那张纸 #F2EFE9 + 墨 #14161A。卡不再用纯白，退到比纸亮一档的暖白，
+     免得白纸贴在米纸上像一张张贴纸——官网本身就没有"卡"，只有发丝线。 */
+  .t-paper{ --bg-page:#F2EFE9; --bg-card:#FCFBF8; --text-primary:#14161A; --text-secondary:rgba(20,22,26,.64);
+    --text-tertiary:rgba(20,22,26,.42); --card-edge:rgba(20,22,26,.12); --accent:#14161A; --accent-soft:rgba(20,22,26,.07);
+    --chip-idle:rgba(20,22,26,.06); --nav-face:rgba(252,251,248,.72); --nav-hair:rgba(20,22,26,.14); --nav-ink:#14161A; }
+  /* 雨过青：同明度、同低饱和，只是纸从暖转冷；强调色不用亮蓝，用墨绿，保持"纸+墨"一种语汇 */
+  .t-celadon{ --bg-page:#E9EEEA; --bg-card:#F7FAF7; --text-primary:#22322B; --text-secondary:rgba(34,50,43,.66);
+    --text-tertiary:rgba(34,50,43,.44); --card-edge:rgba(34,50,43,.13); --accent:#2C4736; --accent-soft:rgba(44,71,54,.09);
+    --chip-idle:rgba(34,50,43,.07); --nav-face:rgba(247,250,247,.72); --nav-hair:rgba(34,50,43,.14); --nav-ink:#22322B; }
+
+  /* ---------- 公共组件（照抄 app.wxss） ---------- */
+  .card{position:relative;background:var(--bg-card);color:var(--text-primary);border:var(--w-edge) solid var(--card-edge);
+    border-radius:var(--r-card);padding:var(--sp-3) var(--sp-4) var(--sp-4);margin-bottom:var(--sp-2);overflow:hidden}
+  .row-card{display:flex;align-items:flex-start;gap:var(--sp-row);padding:var(--sp-row)}
+  .blk{flex:none;position:relative;width:var(--blk);height:var(--blk);box-sizing:border-box;padding:var(--blk-pad);
+    border-radius:var(--r-block);background:var(--blk-bg);color:var(--blk-ink);overflow:hidden;
+    display:flex;flex-direction:column;justify-content:space-between}
+  .blk.tall{height:200px}
+  .blk-name{position:relative;z-index:2;font-size:var(--fs-block);font-weight:800;line-height:1.2;letter-spacing:-.6px;
+    white-space:nowrap;overflow:hidden}
+  .blk-date{position:relative;z-index:2;font-size:var(--fs-micro);font-weight:800;letter-spacing:1.4px;opacity:.72}
+  .blk-body{flex:1;min-width:0}
+  .row-title{font-size:var(--fs-title);font-weight:800;line-height:var(--lh-tight);letter-spacing:-.5px;
+    color:var(--text-primary);margin-bottom:10px}
+  .summary{font-size:var(--fs-meta);line-height:1.55;color:var(--text-secondary);margin-bottom:var(--sp-2);
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .row-foot{display:flex;justify-content:space-between;align-items:center;gap:var(--sp-2);
+    font-size:var(--fs-tiny);font-weight:700;color:var(--text-tertiary)}
+  .row-foot .src{color:var(--text-secondary)}
+  .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:4px 14px;border-radius:10px;
+    background:var(--accent);color:var(--bg-page);margin-right:10px;vertical-align:2px}
+
+  .motif{position:absolute;right:calc(0px - var(--motif-shift));bottom:calc(0px - var(--motif-shift));
+    width:var(--motif-size);height:var(--motif-size);z-index:0}
+  .m-circle{border-radius:50%;background:var(--blk-motif)}
+  .m-arc{border-radius:50%;border:12px solid var(--blk-motif);border-right-color:transparent;border-bottom-color:transparent}
+  .m-stripes{background:repeating-linear-gradient(115deg,var(--blk-motif) 0 12px,transparent 12px 26px)}
+  .m-dots{background-image:radial-gradient(var(--blk-motif) 6px,transparent 7px);background-size:26px 26px}
+  .m-pill{width:calc(var(--motif-size)*1.5);height:calc(var(--motif-size)*.42);border-radius:var(--r-pill);background:var(--blk-motif)}
+
+  .page-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-2);
+    margin:var(--sp-5) 0 var(--sp-4)}
+  .page-title{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:var(--text-primary)}
+  .page-stats{flex:none;font-size:var(--fs-meta);font-weight:600;letter-spacing:-.2px;color:var(--text-secondary)}
+  .chip{display:inline-block;padding:14px 28px;border-radius:var(--r-pill);font-size:var(--fs-meta);font-weight:600;
+    background:var(--chip-idle);color:var(--text-secondary)}
+  .chip.active{background:var(--tone-bg,var(--accent));color:var(--tone-ink,var(--bg-page))}
+  .chips{display:inline-flex;gap:12px;white-space:nowrap;margin-bottom:var(--sp-3)}
+  .tagx{display:inline-block;background:var(--chip-idle);color:var(--text-primary);font-size:var(--fs-tiny);
+    font-weight:700;padding:6px 18px;border-radius:14px;margin-right:var(--sp-1)}
+
+  /* 搜索卡与新建页三张大卡：饱和色块，V2 硬规则②——方块颜色由分类固定，不随壁纸变 */
+  .sc-card{background:#3F52D6;color:#fff;padding:26px var(--sp-3) 20px;margin-bottom:var(--sp-3)}
+  .sc-line{position:relative;display:flex;align-items:center;gap:var(--sp-2);height:64px}
+  .sc-input{font-size:var(--fs-body);color:#fff;opacity:.6}
+  .sc-go{margin-left:auto;font-size:var(--fs-title);font-weight:800;letter-spacing:-.5px;color:#fff}
+  .sc-rule{position:absolute;left:0;right:0;bottom:0;height:3px;background:#fff;opacity:.42}
+
+  .entry{display:flex;flex-direction:column;justify-content:center;min-height:144px;padding:0 var(--sp-4);
+    background:var(--blk-bg);color:var(--blk-ink);border-radius:var(--r-card);margin-bottom:var(--sp-3);position:relative;overflow:hidden}
+  .entry-label{font-size:var(--fs-h2);font-weight:800;letter-spacing:-.6px}
+  .entry-sub{font-size:var(--fs-meta);margin-top:8px;opacity:.72}
+  .glyph{position:absolute;right:-30px;bottom:-46px;width:264px;height:264px;z-index:0;background:var(--blk-glyph);
+    border-radius:50%}
+  .face-box{display:flex;align-items:center;height:88px;margin-top:26px;padding:0 var(--sp-3);border-radius:var(--r-btn);
+    background:var(--face);color:var(--face-ink);font-size:var(--fs-body)}
+  .acts{display:flex;gap:var(--sp-2);margin-top:20px}
+  .act{flex:1;height:88px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-pill);
+    font-size:var(--fs-body);font-weight:700}
+  .act.ghost{background:var(--face);color:var(--face-ink)}
+  .act.solid{background:var(--solid-bg);color:var(--solid-ink)}
+
+  /* 详情页的中性面板 */
+  .panel{background:var(--bg-card);border:var(--w-edge) solid var(--card-edge);border-radius:var(--r-card);
+    padding:var(--sp-3) var(--sp-4) var(--sp-4);margin-bottom:var(--sp-2)}
+  .section-label{display:block;font-size:var(--fs-label);font-weight:800;letter-spacing:2px;color:var(--text-tertiary);
+    text-transform:uppercase;margin-bottom:14px}
+  .hero-meta{font-size:var(--fs-tiny);font-weight:700;color:var(--text-tertiary);margin-bottom:10px}
+  .hero-title{font-size:var(--fs-h1);font-weight:800;line-height:1.3;letter-spacing:-1px;margin-bottom:14px}
+  .body-text{font-size:29px;line-height:1.85;color:var(--text-primary)}
+  .point{display:flex;gap:16px;font-size:var(--fs-body);line-height:1.7;color:var(--text-primary);margin-top:14px}
+  .point b{flex:none;width:40px;height:40px;border-radius:12px;background:var(--blk-bg);color:var(--blk-ink);
+    display:flex;align-items:center;justify-content:center;font-size:var(--fs-meta);font-weight:800}
+  .action-bar{display:flex;gap:var(--sp-2);margin:0 0 var(--sp-2)}
+  .icon-btn{font-size:var(--fs-meta);font-weight:700;color:var(--text-secondary);background:var(--accent-soft);
+    padding:16px 30px;border-radius:var(--r-pill)}
+
+  /* 「我的」页菜单 */
+  .me-header{display:flex;align-items:center;gap:var(--sp-3)}
+  .logo{width:108px;height:108px;border-radius:30px;background:#14161A;color:#fff;display:flex;align-items:center;
+    justify-content:center;font:500 54px/1 var(--ui);letter-spacing:-2px}
+  .brand-name{display:block;font-size:var(--fs-h2);font-weight:800;letter-spacing:-.6px}
+  .brand-slogan{display:block;font-size:var(--fs-meta);color:var(--text-secondary);margin-top:6px}
+  .menu-item{display:flex;align-items:center;justify-content:space-between;padding:30px 0;
+    border-bottom:2px solid var(--card-edge);font-size:var(--fs-body);color:var(--text-primary)}
+  .menu-item:last-child{border-bottom:none}
+  .menu-right{display:flex;align-items:center;gap:12px;font-size:var(--fs-meta);color:var(--text-tertiary)}
+
+  /* 壁纸设置页格子 */
+  .wp-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+  .wp-item{position:relative;height:300px;padding:var(--sp-4);border-radius:var(--r-card);display:flex;
+    flex-direction:column;justify-content:space-between;border:4px solid transparent}
+  .wp-item.on{border-color:var(--wp-label)}
+  .mini{display:flex;gap:12px;margin-bottom:12px}
+  .mini-blk{width:44px;height:44px;border-radius:12px;background:#F6C445}
+  .mini-blk.wide{width:120px;background:#3F52D6}
+  .mini-ln{height:34px;border-radius:12px;border:3px solid transparent}
+  .mini-ln.short{width:62%}
+  .wp-foot{display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-body);font-weight:700}
+  .wp-label{color:var(--wp-label)}
+  .check{width:44px;height:44px;border-radius:50%;background:var(--wp-label);color:var(--wp-page);
+    display:flex;align-items:center;justify-content:center;font-size:var(--fs-meta);font-weight:800}
+  .newflag{position:absolute;top:20px;right:20px;font-size:var(--fs-label);font-weight:800;letter-spacing:1px;
+    padding:6px 14px;border-radius:10px;background:var(--wp-label);color:var(--wp-page)}
+
+  /* 局部放大：不带手机壳，三块纸直接并排，免得在整屏比例下把差别看没了 */
+  .swatch{width:750px;padding:44px 40px;border-radius:36px}
+  .swatch h4{font-size:var(--fs-h2);font-weight:800;letter-spacing:-.6px;margin-bottom:6px}
+  .swatch .sub{font-size:var(--fs-meta);color:var(--text-secondary);margin-bottom:26px}
+  .swatch .mini-card{background:var(--bg-card);border:var(--w-edge) solid var(--card-edge);border-radius:var(--r-card);
+    padding:26px;display:flex;gap:22px;align-items:center}
+  .swatch .kv{font-size:var(--fs-tiny);color:var(--text-tertiary);margin-top:22px;line-height:1.9;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="tag"><b>第一组 · 首页三屏对照</b>左：现有米白（基准）　中：素宣（新，官网那张纸）　右：雨过青（新）　两枚新的都只做低饱和中性色，跟官网同一色系</div>
+  <div class="row">
+
+    <!-- 现有米白 -->
+    <div class="phone t-old">
+      <div class="label"><span>9:41</span><span>􀙇 􀛨 100%</span></div>
+      <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><i>⋯</i><div class="sep"></div><i>◎</i></div></div>
+      <div class="screen">
+        <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+        <div class="card sc-card"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+        <div class="chips">
+          <span class="chip active">全部</span>
+          <span class="chip" style="--tone-bg:#F6C445;--tone-ink:#2A2005">阅读</span>
+          <span class="chip" style="--tone-bg:#3F52D6;--tone-ink:#fff">工作</span>
+          <span class="chip" style="--tone-bg:#E9723D;--tone-ink:#2C1204">生活</span>
+          <span class="chip">未分类</span>
+        </div>
+        <div class="card row-card" style="--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-motif:#E3B63F">
+          <div class="blk"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+          <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+            <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+            <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div>
+        </div>
+        <div class="card row-card" style="--blk-bg:#3F52D6;--blk-ink:#fff;--blk-motif:#5566DE">
+          <div class="blk"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+          <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+            <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+            <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div>
+        </div>
+        <div class="card row-card" style="--blk-bg:#23252C;--blk-ink:#fff;--blk-motif:#3A3C45">
+          <div class="blk"><span class="blk-name">未</span><span class="blk-date">09 / 19</span><div class="motif m-dots"></div></div>
+          <div class="blk-body"><div class="row-title">周末市集的摊主名单</div>
+            <div class="summary">手冲、软曲奇、旧书摊，都在北门那一段。</div>
+            <div class="row-foot"><span class="src">截图 · 未分类</span><span>›</span></div></div>
+        </div>
+        <div class="card row-card" style="--blk-bg:#46A863;--blk-ink:#06260F;--blk-motif:#58A972">
+          <div class="blk"><span class="blk-name">生活</span><span class="blk-date">09 / 17</span><div class="motif m-pill"></div></div>
+          <div class="blk-body"><div class="row-title">番茄炒蛋的两个细节</div>
+            <div class="summary">糖只放一点点，蛋先盛出来再回锅。</div>
+            <div class="row-foot"><span class="src">手写 · 生活</span><span>›</span></div></div>
+        </div>
+      </div>
+      <div class="tabbar"><div class="on"><s></s>笔记</div><div><s></s>新建</div><div><s></s>我的</div></div>
+      <div class="homebar"></div>
+    </div>
+
+    <!-- 素宣 -->
+    <div class="phone t-paper">
+      <div class="label"><span>9:41</span><span>􀙇 􀛨 100%</span></div>
+      <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><i>⋯</i><div class="sep"></div><i>◎</i></div></div>
+      <div class="screen">
+        <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+        <div class="card sc-card"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+        <div class="chips">
+          <span class="chip active">全部</span>
+          <span class="chip" style="--tone-bg:#F6C445;--tone-ink:#2A2005">阅读</span>
+          <span class="chip" style="--tone-bg:#3F52D6;--tone-ink:#fff">工作</span>
+          <span class="chip" style="--tone-bg:#E9723D;--tone-ink:#2C1204">生活</span>
+          <span class="chip">未分类</span>
+        </div>
+        <div class="card row-card" style="--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-motif:#E3B63F">
+          <div class="blk"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+          <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+            <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+            <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div>
+        </div>
+        <div class="card row-card" style="--blk-bg:#3F52D6;--blk-ink:#fff;--blk-motif:#5566DE">
+          <div class="blk"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+          <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+            <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+            <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div>
+        </div>
+        <div class="card row-card" style="--blk-bg:#23252C;--blk-ink:#fff;--blk-motif:#3A3C45">
+          <div class="blk"><span class="blk-name">未</span><span class="blk-date">09 / 19</span><div class="motif m-dots"></div></div>
+          <div class="blk-body"><div class="row-title">周末市集的摊主名单</div>
+            <div class="summary">手冲、软曲奇、旧书摊，都在北门那一段。</div>
+            <div class="row-foot"><span class="src">截图 · 未分类</span><span>›</span></div></div>
+        </div>
+        <div class="card row-card" style="--blk-bg:#46A863;--blk-ink:#06260F;--blk-motif:#58A972">
+          <div class="blk"><span class="blk-name">生活</span><span class="blk-date">09 / 17</span><div class="motif m-pill"></div></div>
+          <div class="blk-body"><div class="row-title">番茄炒蛋的两个细节</div>
+            <div class="summary">糖只放一点点，蛋先盛出来再回锅。</div>
+            <div class="row-foot"><span class="src">手写 · 生活</span><span>›</span></div></div>
+        </div>
+      </div>
+      <div class="tabbar"><div class="on"><s></s>笔记</div><div><s></s>新建</div><div><s></s>我的</div></div>
+      <div class="homebar"></div>
+    </div>
+
+    <!-- 雨过青 -->
+    <div class="phone t-celadon">
+      <div class="label"><span>9:41</span><span>􀙇 􀛨 100%</span></div>
+      <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><i>⋯</i><div class="sep"></div><i>◎</i></div></div>
+      <div class="screen">
+        <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+        <div class="card sc-card"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+        <div class="chips">
+          <span class="chip active">全部</span>
+          <span class="chip" style="--tone-bg:#F6C445;--tone-ink:#2A2005">阅读</span>
+          <span class="chip" style="--tone-bg:#3F52D6;--tone-ink:#fff">工作</span>
+          <span class="chip" style="--tone-bg:#E9723D;--tone-ink:#2C1204">生活</span>
+          <span class="chip">未分类</span>
+        </div>
+        <div class="card row-card" style="--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-motif:#E3B63F">
+          <div class="blk"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+          <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+            <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+            <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div>
+        </div>
+        <div class="card row-card" style="--blk-bg:#3F52D6;--blk-ink:#fff;--blk-motif:#5566DE">
+          <div class="blk"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+          <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+            <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+            <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div>
+        </div>
+        <div class="card row-card" style="--blk-bg:#23252C;--blk-ink:#fff;--blk-motif:#3A3C45">
+          <div class="blk"><span class="blk-name">未</span><span class="blk-date">09 / 19</span><div class="motif m-dots"></div></div>
+          <div class="blk-body"><div class="row-title">周末市集的摊主名单</div>
+            <div class="summary">手冲、软曲奇、旧书摊，都在北门那一段。</div>
+            <div class="row-foot"><span class="src">截图 · 未分类</span><span>›</span></div></div>
+        </div>
+        <div class="card row-card" style="--blk-bg:#46A863;--blk-ink:#06260F;--blk-motif:#58A972">
+          <div class="blk"><span class="blk-name">生活</span><span class="blk-date">09 / 17</span><div class="motif m-pill"></div></div>
+          <div class="blk-body"><div class="row-title">番茄炒蛋的两个细节</div>
+            <div class="summary">糖只放一点点，蛋先盛出来再回锅。</div>
+            <div class="row-foot"><span class="src">手写 · 生活</span><span>›</span></div></div>
+        </div>
+      </div>
+      <div class="tabbar"><div class="on"><s></s>笔记</div><div><s></s>新建</div><div><s></s>我的</div></div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+
+  <div class="tag"><b>第二组 · 素宣铺到其它页</b>新建页（第一张卡展开态）、详情页、「我的」页。色块按 V2 硬规则不随壁纸变，所以纸底上它仍是最跳的一处——要不要为淡雅方向降一档，看了再定</div>
+  <div class="row">
+    <div class="phone t-paper">
+      <div class="label"><span>9:41</span><span>􀙇 􀛨 100%</span></div>
+      <div class="nav"><span class="nt">新建</span><div class="capsule"><i>⋯</i><div class="sep"></div><i>◎</i></div></div>
+      <div class="screen">
+        <div class="page-head" style="justify-content:flex-start;gap:20px;align-items:center">
+          <div class="page-title">看到好内容，随手记下来</div>
+        </div>
+        <div class="entry" style="--blk-bg:#3F52D6;--blk-ink:#fff;--blk-glyph:rgba(255,255,255,.22);--face:rgba(255,255,255,.16);--face-ink:#fff;--solid-bg:#fff;--solid-ink:#3F52D6;
+             min-height:auto;max-height:none;padding:var(--sp-4);justify-content:flex-start">
+          <div class="glyph"></div>
+          <div class="entry-label">链接</div>
+          <div class="entry-sub" style="position:relative;z-index:2">粘一条网址，存进来就分成笔记</div>
+          <div class="face-box" style="position:relative;z-index:2">https://mp.weixin.qq.com/…</div>
+          <div class="acts" style="position:relative;z-index:2">
+            <div class="act ghost">粘贴</div><div class="act solid">存笔记</div>
+          </div>
+        </div>
+        <div class="entry" style="--blk-bg:#E9723D;--blk-ink:#2C1204;--blk-glyph:rgba(44,18,4,.18)">
+          <div class="glyph"></div><div class="entry-label">截图</div>
+        </div>
+        <div class="entry" style="--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-glyph:rgba(42,32,5,.18)">
+          <div class="glyph"></div><div class="entry-label">手写</div>
+        </div>
+      </div>
+      <div class="tabbar"><div><s></s>笔记</div><div class="on"><s></s>新建</div><div><s></s>我的</div></div>
+      <div class="homebar"></div>
+    </div>
+
+    <div class="phone t-paper">
+      <div class="label"><span>9:41</span><span>􀙇 􀛨 100%</span></div>
+      <div class="nav"><span class="nt">笔记详情</span><div class="capsule"><i>⋯</i><div class="sep"></div><i>◎</i></div></div>
+      <div class="screen">
+        <div class="card row-card" style="margin-top:var(--sp-5);--blk-bg:#F6C445;--blk-ink:#2A2005;--blk-motif:#E3B63F">
+          <div class="blk tall"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-arc"></div></div>
+          <div class="blk-body">
+            <div class="hero-meta">链接 · 2026-09-23 21:07</div>
+            <div class="hero-title">读过的东西，存成能转发的笔记</div>
+            <div><span class="tagx">阅读</span><span class="tagx">方法论</span></div>
+          </div>
+        </div>
+        <div class="action-bar"><span class="icon-btn">置顶</span><span class="icon-btn">编辑</span><span class="icon-btn">删除</span></div>
+        <div class="panel"><span class="section-label">摘要</span>
+          <div class="body-text">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div></div>
+        <div class="panel" style="--blk-bg:#F6C445;--blk-ink:#2A2005">
+          <span class="section-label">要点</span>
+          <div class="point"><b>1</b><span>一句话顶做大字，别人扫一眼就记得住</span></div>
+          <div class="point"><b>2</b><span>自己的头像和名字印在图上</span></div>
+          <div class="point"><b>3</b><span>存下来的东西要能被别人扫开</span></div>
+        </div>
+        <div class="panel"><span class="section-label">原文</span>
+          <div class="body-text" style="color:var(--text-secondary);font-size:var(--fs-meta)">点开看全文，或者存成图片发到群里…</div></div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+
+    <div class="phone t-paper">
+      <div class="label"><span>9:41</span><span>􀙇 􀛨 100%</span></div>
+      <div class="nav"><span class="nt">我的</span><div class="capsule"><i>⋯</i><div class="sep"></div><i>◎</i></div></div>
+      <div class="screen">
+        <div class="card me-header" style="margin-top:var(--sp-5)">
+          <div class="logo">麦</div>
+          <div><span class="brand-name">图麦笔记</span><span class="brand-slogan">看到好内容，随手记下来</span></div>
+        </div>
+        <div class="card">
+          <div class="menu-item"><span>推荐给微信好友</span><span class="menu-right">+10 篇 ›</span></div>
+          <div class="menu-item"><span>笔记额度</span><span class="menu-right">110 / 110 篇</span></div>
+          <div class="menu-item"><span>分享形象</span><span class="menu-right">阿飞 ›</span></div>
+          <div class="menu-item"><span>分类管理</span><span class="menu-right">›</span></div>
+          <div class="menu-item"><span>壁纸设置</span><span class="menu-right">›</span></div>
+        </div>
+        <div class="card">
+          <div class="menu-item"><span>关于</span><span class="menu-right">›</span></div>
+          <div class="menu-item"><span>产品官网</span><span class="menu-right">agentsbin.cn ›</span></div>
+          <div class="menu-item"><span>意见反馈</span><span class="menu-right">›</span></div>
+        </div>
+      </div>
+      <div class="tabbar"><div><s></s>笔记</div><div><s></s>新建</div><div class="on"><s></s>我的</div></div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+
+  <div class="tag"><b>第三组 · 壁纸设置页 + 三块纸放大对照</b>左：新增两枚排在现有六枚后面，一格就是首页那一行的缩影　右：不带手机壳直接比底色</div>
+  <div class="row">
+    <div class="phone t-celadon">
+      <div class="label"><span>9:41</span><span>􀙇 􀛨 100%</span></div>
+      <div class="nav"><span class="nt">壁纸设置</span><div class="capsule"><i>⋯</i><div class="sep"></div><i>◎</i></div></div>
+      <div class="screen">
+        <div class="page-head" style="display:block">
+          <div class="page-title" style="margin-bottom:8px">壁纸设置</div>
+          <div class="page-stats" style="font-weight:400">只换页面底色和文字，卡片左侧那块颜色跟着分类走</div>
+        </div>
+        <div class="wp-grid">
+          <div class="wp-item" style="background:#f4f2ec;--wp-label:#23252c">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln" style="background:#fff"></div><div class="mini-ln short" style="background:#fff;margin-top:10px"></div></div>
+            <div class="wp-foot"><span class="wp-label">米白</span></div>
+          </div>
+          <div class="wp-item" style="background:#eaeefb;--wp-label:#23264f">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln" style="background:#fff"></div><div class="mini-ln short" style="background:#fff;margin-top:10px"></div></div>
+            <div class="wp-foot"><span class="wp-label">雾蓝</span></div>
+          </div>
+          <div class="wp-item" style="background:#e7f3ea;--wp-label:#12331f">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln" style="background:#fff"></div><div class="mini-ln short" style="background:#fff;margin-top:10px"></div></div>
+            <div class="wp-foot"><span class="wp-label">松绿</span></div>
+          </div>
+          <div class="wp-item" style="background:#fdeee6;--wp-label:#4a1f10">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln" style="background:#fff"></div><div class="mini-ln short" style="background:#fff;margin-top:10px"></div></div>
+            <div class="wp-foot"><span class="wp-label">暮橙</span></div>
+          </div>
+          <div class="wp-item" style="background:#0c0c1d;--wp-label:#eceaf6">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln" style="background:rgba(255,255,255,.14)"></div><div class="mini-ln short" style="background:rgba(255,255,255,.14);margin-top:10px"></div></div>
+            <div class="wp-foot"><span class="wp-label">夜紫</span></div>
+          </div>
+          <div class="wp-item" style="background:#0d1b2a;--wp-label:#e2eef6">
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln" style="background:rgba(255,255,255,.14)"></div><div class="mini-ln short" style="background:rgba(255,255,255,.14);margin-top:10px"></div></div>
+            <div class="wp-foot"><span class="wp-label">深海</span></div>
+          </div>
+          <div class="wp-item on" style="background:#F2EFE9;--wp-label:#14161A;--wp-page:#F2EFE9">
+            <span class="newflag">新</span>
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln" style="background:#FCFBF8;border-color:rgba(20,22,26,.12)"></div>
+              <div class="mini-ln short" style="background:#FCFBF8;border-color:rgba(20,22,26,.12);margin-top:10px"></div></div>
+            <div class="wp-foot"><span class="wp-label">素宣</span><span class="check">✓</span></div>
+          </div>
+          <div class="wp-item" style="background:#E9EEEA;--wp-label:#22322B;--wp-page:#E9EEEA">
+            <span class="newflag">新</span>
+            <div><div class="mini"><div class="mini-blk"></div><div class="mini-blk wide"></div></div>
+              <div class="mini-ln" style="background:#F7FAF7;border-color:rgba(34,50,43,.13)"></div>
+              <div class="mini-ln short" style="background:#F7FAF7;border-color:rgba(34,50,43,.13);margin-top:10px"></div></div>
+            <div class="wp-foot"><span class="wp-label">雨过青</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="homebar"></div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:26px;width:750px">
+      <div class="swatch t-old" style="background:var(--bg-page)">
+        <h4 style="color:var(--text-primary)">现有米白（基准）</h4>
+        <div class="sub">页面底 #f4f2ec · 卡纯白</div>
+        <div class="mini-card"><span class="wp-label" style="width:88px;height:88px;border-radius:22px;background:#F6C445;display:block"></span>
+          <div><div style="font-size:var(--fs-title);font-weight:800;color:var(--text-primary)">读过的东西，存成能转发的笔记</div>
+          <div style="font-size:var(--fs-meta);color:var(--text-secondary);margin-top:8px">一条链接、一张截图，存进来就分成能转发的样子</div></div></div>
+        <div class="kv" style="color:var(--text-tertiary)">page #f4f2ec　card #ffffff　edge rgba(35,37,44,.10)　ink #23252c</div>
+      </div>
+
+      <div class="swatch t-paper" style="background:var(--bg-page)">
+        <h4 style="color:var(--text-primary)">素宣（新 · 官网那张纸）</h4>
+        <div class="sub">页面底取线上 :root 的 --paper #F2EFE9；卡退到暖白，不用纯白</div>
+        <div class="mini-card"><span style="width:88px;height:88px;border-radius:22px;background:#F6C445;display:block"></span>
+          <div><div style="font-size:var(--fs-title);font-weight:800;color:var(--text-primary)">读过的东西，存成能转发的笔记</div>
+          <div style="font-size:var(--fs-meta);color:var(--text-secondary);margin-top:8px">一条链接、一张截图，存进来就分成能转发的样子</div></div></div>
+        <div class="kv" style="color:var(--text-tertiary)">page #F2EFE9　card #FCFBF8　edge rgba(20,22,26,.12)　ink #14161A</div>
+      </div>
+
+      <div class="swatch t-celadon" style="background:var(--bg-page)">
+        <h4 style="color:var(--text-primary)">雨过青（新 · 冷纸）</h4>
+        <div class="sub">同明度、同低饱和，只是纸从暖转冷；强调色用墨绿不用亮蓝</div>
+        <div class="mini-card"><span style="width:88px;height:88px;border-radius:22px;background:#F6C445;display:block"></span>
+          <div><div style="font-size:var(--fs-title);font-weight:800;color:var(--text-primary)">读过的东西，存成能转发的笔记</div>
+          <div style="font-size:var(--fs-meta);color:var(--text-secondary);margin-top:8px">一条链接、一张截图，存进来就分成能转发的样子</div></div></div>
+        <div class="kv" style="color:var(--text-tertiary)">page #E9EEEA　card #F7FAF7　edge rgba(34,50,43,.13)　ink #22322B　accent #2C4736</div>
+      </div>
+
+      <div style="background:#fff;border-radius:36px;padding:38px 40px;font-size:26px;line-height:1.85;color:#14161A">
+        <b>这一组才是三块纸的真实差距。</b>素宣和现有米白只差在暖度和卡片底那两档上，整屏看几乎分不出来；
+        雨过青是这两枚里唯一一眼看得出的差别。两枚新纸都只动 chrome（页面底、卡片底、描边、三档字色、强调色），
+        方块那五组分类色一枚都不改——所以新建页那三张大卡在纸底上仍然最跳，要不要为淡雅方向降一档是另一个决定。
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

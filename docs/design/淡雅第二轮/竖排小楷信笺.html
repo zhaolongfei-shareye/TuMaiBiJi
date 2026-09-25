@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>竖排小楷 · 宣纸信笺三变体</title>
+<style>
+  /* 画布 750×1200，与 poster 引擎同尺度；底色取线上 :root 的 --paper。
+     竖排用 writing-mode: vertical-rl（右起），汉字 upright；栏线、印章全部 CSS 画，不出文件。
+     栏线一律挂在每一列自己的左边，不用整块背景画等距线——列宽一旦不等于间距，
+     线和字就会错开（上一版就是这么错的）。
+     字体这台 Mac 命中 'Kaiti SC'，手机上实测命中的也是 Kaiti SC / STKaiti 这一族；
+     系统里没有"小楷"这一档，只有楷体，下面三张都是楷体近。 */
+  :root{
+    --paper:#F2EFE9; --ink:#14161A; --soft:rgba(20,22,26,.66); --faint:rgba(20,22,26,.42);
+    --hair:rgba(20,22,26,.16); --cinnabar:#B23A2E; --rule:rgba(178,58,46,.34);
+    --kai:'Kaiti SC','STKaiti','Songti SC',serif;
+    --cn:'Songti SC','STSong',serif;
+    --ui:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#dcd9d2;font-family:var(--ui);padding:30px}
+  .sheet{display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap}
+  .col{display:flex;flex-direction:column;gap:14px}
+  .tag{font:400 13px/1.6 var(--ui);letter-spacing:.14em;color:#4d4a44;text-transform:uppercase;width:100%}
+  .tag b{display:inline-block;margin-right:8px;color:#14161A;font-weight:700;letter-spacing:.04em;text-transform:none;font-size:16px}
+  .cap{width:750px;font:400 22px/1.7 var(--ui);color:#3f3c37}
+  .cap b{display:block;font-size:26px;font-weight:700;color:#14161A;margin-bottom:4px}
+
+  .card{width:750px;height:1200px;position:relative;overflow:hidden;background:var(--paper);color:var(--ink);
+    box-shadow:0 18px 50px rgba(20,22,26,.22)}
+  .paper-tex::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(120% 80% at 18% 8%,rgba(120,96,60,.05),transparent 60%),
+      radial-gradient(90% 70% at 88% 92%,rgba(120,96,60,.045),transparent 60%),
+      repeating-linear-gradient(94deg,rgba(120,96,60,.022) 0 2px,transparent 2px 7px),
+      repeating-linear-gradient(6deg,rgba(120,96,60,.018) 0 1px,transparent 1px 9px)}
+
+  /* 二维码：图案走 background-image，纸白走 background-color——写成 background 简写会把图案盖没 */
+  .qr{width:104px;height:104px;background-color:#F6F2EA;background-clip:content-box;
+    background-image:repeating-conic-gradient(from 0deg,var(--ink) 0% 25%,transparent 0% 50%);
+    background-size:13px 13px}
+  .seal{position:relative;display:flex;align-items:center;justify-content:center;background:var(--cinnabar);
+    color:#F6F1E6;font-family:var(--kai);border-radius:4px;box-shadow:inset 0 0 0 3px rgba(246,241,230,.5)}
+  .seal::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(28% 22% at 22% 30%,rgba(246,241,230,.5),transparent 70%),
+               radial-gradient(20% 26% at 78% 74%,rgba(178,58,46,.9),transparent 70%);
+    mix-blend-mode:screen}
+  .seal span{position:relative;z-index:2}
+
+  /* ── 一 · 朱丝栏信笺 ── 双边朱框 + 每列一条左栏线 + 上方版心堂号 + 下方留款
+     文字区：x 48→702（654 宽），6 列 × 96 = 576，左边自然空出 78 当留白 */
+  .v1 .frame{position:absolute;inset:36px;border:3px solid var(--cinnabar);opacity:.9}
+  .v1 .frame2{position:absolute;inset:48px;border:1.5px solid var(--cinnabar);opacity:.55}
+  .v1 .cols{position:absolute;inset:172px 48px 258px 48px;display:flex;flex-direction:row-reverse}
+  .v1 .cv{writing-mode:vertical-rl;text-orientation:upright;width:96px;flex:none;
+    display:flex;align-items:center;justify-content:flex-start;border-left:1px solid var(--rule)}
+  .v1 .cv:last-child{border-left:none}
+  .v1 .title{font:400 50px/1.34 var(--kai);letter-spacing:.16em}
+  .v1 .body{font:400 32px/1.7 var(--kai);letter-spacing:.1em}
+  .v1 .dim{color:var(--soft)}
+  .v1 .meta{font:400 24px/1.6 var(--kai);letter-spacing:.2em;color:var(--faint)}
+  .v1 .heart{position:absolute;top:78px;left:0;right:0;text-align:center;
+    font:400 24px/1 var(--kai);letter-spacing:.5em;color:var(--cinnabar);z-index:3}
+  .v1 .band{position:absolute;left:48px;right:48px;bottom:64px;height:170px;display:flex;align-items:flex-end;
+    justify-content:space-between;border-top:1px solid rgba(178,58,46,.28);padding-top:26px}
+  .v1 .who{font:400 27px/1.5 var(--kai);letter-spacing:.14em;color:var(--soft)}
+  .v1 .who i{display:block;font-style:normal;font:400 19px/1.7 var(--cn);letter-spacing:.26em;color:var(--faint)}
+  .v1 .seal{width:64px;height:64px;font-size:36px;margin-bottom:6px}
+  .v1 .qwrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .v1 .qwrap i{font:400 18px/1 var(--kai);font-style:normal;letter-spacing:.18em;color:var(--faint)}
+  .v1 .qr{border:2px solid var(--hair);padding:6px}
+
+  /* ── 二 · 素宣无栏 ── 一条栏线都不画，只靠留白和两枚印撑住
+     文字区右移让开引首章：x 从 150 起 */
+  .v2 .cols{position:absolute;inset:150px 150px 300px 250px;display:flex;flex-direction:row-reverse;gap:36px}
+  .v2 .cv{writing-mode:vertical-rl;text-orientation:upright;flex:none}
+  .v2 .title{font:400 62px/1.32 var(--kai);letter-spacing:.22em}
+  .v2 .sub{font:400 40px/1.4 var(--kai);letter-spacing:.26em;color:var(--soft)}
+  .v2 .body{font:400 32px/1.85 var(--kai);letter-spacing:.14em;margin-top:44px}
+  .v2 .dim{color:var(--soft)}
+  .v2 .head-seal{position:absolute;top:96px;right:96px;width:46px;height:126px;font-size:26px;
+    flex-direction:column;gap:2px}
+  .v2 .tail{position:absolute;left:112px;bottom:118px;display:flex;flex-direction:column;align-items:center;gap:20px}
+  .v2 .who{writing-mode:vertical-rl;text-orientation:upright;font:400 26px/1 var(--kai);letter-spacing:.24em;color:var(--soft)}
+  .v2 .seal{width:60px;height:60px;font-size:34px}
+  .v2 .qrbox{position:absolute;right:150px;bottom:118px;display:flex;flex-direction:column;align-items:center;gap:12px}
+  .v2 .qrbox i{font:400 18px/1 var(--kai);font-style:normal;letter-spacing:.18em;color:var(--faint)}
+  .v2 .qr{border:2px solid var(--hair);padding:6px}
+
+  /* ── 三 · 乌丝栏 + 横排题签 ── 栏线退成墨灰，右上贴一条黑底竖题签
+     文字区：x 56→694（638 宽），7 列 × 90 = 630 */
+  .v3 .slip{position:absolute;top:44px;right:56px;writing-mode:vertical-rl;text-orientation:upright;
+    background:rgba(20,22,26,.92);color:#F2EFE9;font:400 26px/1 var(--kai);letter-spacing:.34em;
+    padding:26px 15px;border-radius:3px;z-index:3}
+  .v3 .date{position:absolute;top:70px;left:64px;font:400 22px/1 var(--cn);letter-spacing:.3em;color:var(--faint)}
+  .v3 .top-rule{position:absolute;left:56px;right:56px;top:132px;height:1px;background:var(--hair)}
+  .v3 .cols{position:absolute;inset:168px 56px 196px 56px;display:flex;flex-direction:row-reverse}
+  .v3 .cv{writing-mode:vertical-rl;text-orientation:upright;width:90px;flex:none;
+    display:flex;align-items:center;justify-content:flex-start;border-left:1px solid rgba(20,22,26,.11)}
+  .v3 .cv:last-child{border-left:none}
+  .v3 .title{font:400 44px/1.34 var(--kai);letter-spacing:.14em}
+  .v3 .body{font:400 30px/1.66 var(--kai);letter-spacing:.1em}
+  .v3 .dim{color:var(--soft)}
+  .v3 .foot{position:absolute;left:56px;right:56px;bottom:56px;height:120px;display:flex;align-items:center;
+    justify-content:space-between;border-top:1px solid var(--hair);padding-top:24px}
+  .v3 .who{font:400 27px/1.4 var(--kai);letter-spacing:.14em;color:var(--soft)}
+  .v3 .who i{display:block;font-style:normal;font:400 18px/1.7 var(--cn);letter-spacing:.24em;color:var(--faint)}
+  .v3 .seal{width:58px;height:58px;font-size:32px}
+  .v3 .qr{width:96px;height:96px;border:2px solid var(--hair);padding:5px}
+
+  .note{width:1526px;background:#fff;border-radius:32px;padding:36px 40px;font-size:25px;line-height:1.85;color:#14161A}
+  .note b{font-weight:700}
+  .note code{font-family:ui-monospace,Menlo,monospace;font-size:21px;background:#F2EFE9;padding:2px 8px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="tag"><b>竖排三变体 · 都是"宣纸信笺"这一个方向</b>上一轮那三套（素纸/书眉/留白）确实只差在线条和居中方式上，这一轮换的是阅读方向本身：右起竖排 + 楷体 + 朱印。同一篇笔记，三种做法</div>
+
+  <!-- 一 · 朱丝栏 -->
+  <div class="col">
+    <div class="card v1 paper-tex">
+      <div class="frame"></div><div class="frame2"></div>
+      <div class="heart">图麦笔记</div>
+      <div class="cols">
+        <div class="cv title">读过的东西</div>
+        <div class="cv title">存成能转发的笔记</div>
+        <div class="cv body">一条链接一张截图</div>
+        <div class="cv body">或者自己写上两句</div>
+        <div class="cv body dim">存进来就分成能转发的样子</div>
+        <div class="cv meta">阿飞　记于丙午年九月廿三</div>
+      </div>
+      <div class="band">
+        <div class="who">每天读一点再走<i>图麦笔记 · 第 012 则</i></div>
+        <div class="seal"><span>麦</span></div>
+        <div class="qwrap"><div class="qr"></div><i>扫码读原文</i></div>
+      </div>
+    </div>
+    <div class="cap"><b>变体一 · 朱丝栏信笺</b>最"信笺"的一版：双边朱框、每列一条朱栏线、版心刻堂号、下方留款一条。信息量最大，也最像一张能寄出去的东西。代价：朱色是这一版唯一的新颜色，色板要开一档</div>
+  </div>
+
+  <!-- 二 · 无栏 -->
+  <div class="col">
+    <div class="card v2 paper-tex">
+      <div class="seal head-seal"><span>图</span><span>麦</span></div>
+      <div class="cols">
+        <div class="cv title">读过的东西</div>
+        <div class="cv sub">存成能转发的笔记</div>
+        <div class="cv body">一条链接、一张截图<br>或者自己写上两句</div>
+        <div class="cv body dim">存进来<br>就分成能转发的样子</div>
+      </div>
+      <div class="tail">
+        <div class="who">阿飞</div>
+        <div class="seal"><span>麦</span></div>
+      </div>
+      <div class="qrbox"><div class="qr"></div><i>扫码读原文</i></div>
+    </div>
+    <div class="cap"><b>变体二 · 素宣无栏</b>一条栏线都不画，只留四列字 + 右上引首章 + 左下落款印，左边空掉三分之一。三版里最克制、最"高级"的一版，也最少：要点、摘要都放不下，转出去别人只记得住一句话。适合当金句卡</div>
+  </div>
+
+  <!-- 三 · 乌丝栏 + 题签 -->
+  <div class="col">
+    <div class="card v3 paper-tex">
+      <div class="slip">阅读</div>
+      <div class="date">2026 · 09 · 23</div>
+      <div class="top-rule"></div>
+      <div class="cols">
+        <div class="cv title">读过的东西</div>
+        <div class="cv title">存成能转发的笔记</div>
+        <div class="cv body">一条链接一张截图</div>
+        <div class="cv body">自己写两句也行</div>
+        <div class="cv body dim">存进来就自动分成</div>
+        <div class="cv body dim">能转发的样子</div>
+        <div class="cv body">一句话顶做大字</div>
+      </div>
+      <div class="foot">
+        <div class="who">阿飞<i>每天读一点再走</i></div>
+        <div class="seal"><span>麦</span></div>
+        <div class="qr"></div>
+      </div>
+    </div>
+    <div class="cap"><b>变体三 · 乌丝栏加题签</b>栏线从朱退成墨灰，分类做成右上那条黑底竖题签（这块色就是首页方块那个分类色，认颜色的逻辑不断），底部一条横栏收尾：名字、印章、二维码并排。三版里最耐看、又最全的一版</div>
+  </div>
+
+  <div class="note">
+    <b>这三张要落地的话，动的是引擎哪一块（先说清楚，免得拍完板才发现坑）</b><br>
+    ① 现在的海报引擎是"图层清单 + 通用落笔器"，文字原语只会横着写：一个 <code>text</code> 层、一次 <code>fillText</code>、按 <code>measureText</code> 量宽再换行。竖排要新加一个原语（逐字沿 Y 轴落笔、自己算列高、列满换到左边一列、标点要旋转或换形），这是这一轮真正的开发量，不是改改坐标。<br>
+    ② 效果图这三张是浏览器用 CSS 画的，<b>不等于</b> canvas 能画成一模一样：字距、栏宽、印章那层做旧的混合模式，落到 canvas 都要重写一遍再逐张对图。所以定了方向之后我还要用真引擎渲一张给你对，不能拿这三张当成品。<br>
+    ③ 字体：系统里没有"小楷"，只有楷体（上一轮实测 Kaiti SC / STKaiti 在模拟器命中）。要真"小楷"必须下发字体文件，几 MB 起、走 https、主包上限 2M——这条最贵，建议先用楷体。<br>
+    ④ 竖排 + 二维码 + 印章凑在一起，安卓上楷体基本命不中，会回落成系统黑体：那时竖排还在、气质会掉一截。要不要给安卓单独退一条（比如退成横排），是另一个决定。<br>
+    ⑤ 上一轮那三套（素纸/书眉/留白）你说布局差异不大，我同意：它们只差在线条和居中方式。这一轮如果只留一套竖排，建议把"留白"那套撤掉，由变体二顶替它的位置。
+  </div>
+
+</div>
+</body>
+</html>

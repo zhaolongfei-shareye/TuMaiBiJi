@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>界面字体能不能调 · 模拟器实测</title>
+<style>
+  /* 这一张不是效果图，是微信开发者工具模拟器里真截的图。
+     做法：先截现状（苹方）→ 把 app.wxss 第 69 行那一处 font-family 临时换成
+     'STSong','Songti SC' 链 → 关掉自动化端口重启一次强制重编译 → 截同一屏 →
+     再把文件还原、重启、截第三张。三张全留着，还原那步也有凭据。 */
+  :root{ --ui:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC',sans-serif; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#dcd9d2;font-family:var(--ui);padding:30px}
+  .sheet{display:flex;flex-direction:column;gap:26px;align-items:flex-start}
+  .tag{font:400 13px/1.6 var(--ui);letter-spacing:.14em;color:#4d4a44;text-transform:uppercase;width:100%}
+  .tag b{display:inline-block;margin-right:8px;color:#14161A;font-weight:700;letter-spacing:.04em;text-transform:none;font-size:16px}
+  .row{display:flex;gap:26px;align-items:flex-start}
+  .cell{width:734px}
+  .cell img{width:734px;display:block;border-radius:18px;box-shadow:0 10px 30px rgba(20,22,26,.18)}
+  .hd{font:700 26px/1.4 var(--ui);color:#14161A;margin-bottom:8px}
+  .hd span{display:inline-block;margin-left:10px;font:600 19px/1 var(--ui);letter-spacing:.06em;color:#fff;
+    background:#241E16;padding:8px 14px;border-radius:8px;vertical-align:3px}
+  .hd.alt span{background:#8E2F22}
+  .note{width:1526px;background:#fff;border-radius:32px;padding:36px 40px;font:400 25px/1.9 var(--ui);color:#14161A}
+  .note b{font-weight:700}
+  .note code{font-family:ui-monospace,Menlo,monospace;font-size:21px;background:#F2EFE9;padding:2px 8px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="tag"><b>三屏对照 · 同一屏、同一个构建</b>左＝现状（苹方）　中＝把 app.wxss 那一行临时换成宋体链　右＝改回原样并重启编译后。中间那张不是画出来的，是模拟器渲的</div>
+  <div class="row">
+    <div class="cell"><div class="hd">① 现状 <span>苹方</span></div><img src="实测-基线-苹方/新建.png" alt="现状"></div>
+    <div class="cell"><div class="hd alt">② 临时换成宋体 <span>STSong</span></div><img src="实测-宋体/新建.png" alt="宋体"></div>
+    <div class="cell"><div class="hd">③ 已还原 <span>验证回滚</span></div><img src="实测-已还原-苹方/新建.png" alt="已还原"></div>
+  </div>
+
+  <div class="tag"><b>大标题放大 · 「看到好内容，随手记下来」</b>这行在代码里是 font-weight 700。左：苹方粗体，笔画很厚；中：宋体命中了，但 700 没有变成很粗的宋体，反而比左边轻——这就是上一轮我说"字重要配套改"的那件事，现在有凭据了</div>
+  <div class="row">
+    <div class="cell"><img src="实测-字体对照/title-base.png" alt=""></div>
+    <div class="cell"><img src="实测-字体对照/title-song.png" alt=""></div>
+    <div class="cell"><img src="实测-字体对照/title-back.png" alt=""></div>
+  </div>
+
+  <div class="tag"><b>入口卡标签放大 · 「拍照或截图」</b>卡片标题在代码里是 font-weight 800。同一件事：宋体在 800 下也没有变粗，只是笔画结构换了</div>
+  <div class="row">
+    <div class="cell"><img src="实测-字体对照/card-base.png" alt=""></div>
+    <div class="cell"><img src="实测-字体对照/card-song.png" alt=""></div>
+    <div class="cell"><img src="实测-字体对照/card-back.png" alt=""></div>
+  </div>
+
+  <div class="tag"><b>导航条标题 · 「新建笔记」</b>三张一模一样——这一行是微信原生画的，页面 CSS 管不到它。所以"整站换字体"必然留一条尾巴在上面</div>
+  <div class="row">
+    <div class="cell"><img src="实测-字体对照/nav-base.png" alt=""></div>
+    <div class="cell"><img src="实测-字体对照/nav-song.png" alt=""></div>
+    <div class="cell"><img src="实测-字体对照/nav-back.png" alt=""></div>
+  </div>
+
+  <div class="note">
+    <b>结论：能调，而且已经调通过一次。</b>改的就是 <code>app.wxss</code> 第 69 行那一处 <code>font-family</code>，把 <code>'STSong','Songti SC'</code> 放在链子最前面，模拟器立刻命中宋体；这一处改完，列表、卡片、按钮、tab 栏、设置页全部跟着变。代码我已经还原了（第三张就是还原后重编译截的，和第一张逐像素一致），现在仓库里 <code>git status</code> 对 <code>app.wxss</code> 是干净的。<br><br>
+    <b>三条实测出来的限制</b><br>
+    ① 导航条那一行标题改不到（上面第三排），这是平台行为，不是我没做。<br>
+    ② 宋体在 700 / 800 下不会变成"很粗的宋体"，视觉上比苹方粗体还轻一档——所以真要做默认宋体，字重必须配套调，否则标题会显得没劲。这一条上一轮我只是推断，现在是实测。<br>
+    ③ 这是 iOS 模拟器的结果。安卓命不中 STSong，会回落到系统黑体，得单独给一条降级链。<br><br>
+    <b>为什么还没提交这个改动</b>：默认从苹方改宋体是全站可见的变化，而 1.4.0 正在审核中；要不要跟这一批一起走、还是等这版发完再改，是他拍板的事。
+  </div>
+
+</div>
+</body>
+</html>

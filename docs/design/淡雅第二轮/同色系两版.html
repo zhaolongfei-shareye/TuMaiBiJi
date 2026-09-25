@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>同色系两版 · 米白一色 / 雨过青一色</title>
+<style>
+  /* 这两版和前一轮那两枚的区别是重点，写在最前面：
+     前一轮只换 chrome（页面底、卡底、描边、字色），方块那五组分类色一枚都没动，
+     所以看上去还是"高饱和大色块"。这两版把方块、按钮、色卡一起收进同一个色系，
+     分类之间只差明度档，不再差色相——这才是"整体感"。
+     代价也在这：分类识别从"看颜色"退成"看深浅"，色弱和户外反光下更难分。
+     界面字体按他定的"默认宋体"画，色和字一起看才是他要的那种感觉。 */
+  :root{
+    --fs-h1:42px; --fs-h2:34px; --fs-title:31px; --fs-body:28px; --fs-meta:24px;
+    --fs-tiny:21px; --fs-label:20px; --fs-micro:18px; --lh-body:1.6; --lh-tight:1.4;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px; --sp-6:64px; --sp-row:26px;
+    --r-card:40px; --r-block:32px; --r-chip:28px; --r-pill:999px; --r-btn:16px; --w-edge:3px;
+    --blk:176px; --blk-pad:18px; --fs-block:32px; --motif-size:124px; --motif-shift:32px;
+    --ui:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC',sans-serif;
+    --song:'Songti SC','STSong',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#dcd9d2;font-family:var(--ui);padding:30px}
+  .sheet{display:flex;flex-direction:column;gap:30px;align-items:flex-start}
+  .tag{font:400 13px/1.6 var(--ui);letter-spacing:.14em;color:#4d4a44;text-transform:uppercase;max-width:2900px}
+  .tag b{display:inline-block;margin-right:8px;color:#14161A;font-weight:700;letter-spacing:.04em;text-transform:none;font-size:16px}
+  .row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+
+  .phone{width:750px;height:1560px;position:relative;overflow:hidden;border-radius:56px;background:var(--bg-page);
+    font-family:var(--f-ui);box-shadow:0 20px 60px rgba(20,22,26,.26)}
+  .phone .label{position:absolute;left:0;right:0;top:0;height:88px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 44px;font:600 26px/1 var(--ui);color:var(--text-primary);z-index:5}
+  .phone .nav{position:absolute;left:0;right:0;top:88px;height:88px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 24px 0 32px;z-index:5}
+  .phone .nav .nt{font:500 30px/1 var(--ui);color:var(--text-primary)}
+  .capsule{width:174px;height:62px;border-radius:var(--r-pill);border:2px solid var(--nav-hair);
+    background:var(--nav-face);display:flex;align-items:center;justify-content:space-around;
+    font:400 30px/1 var(--ui);color:var(--nav-ink)}
+  .capsule .sep{width:2px;height:30px;background:var(--nav-hair)}
+  .screen{position:absolute;left:0;right:0;top:176px;bottom:0;padding:0 var(--sp-3) 150px;overflow:hidden}
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:44px;display:flex;z-index:6;
+    background:var(--tab-bg);box-shadow:0 16px 44px var(--tab-shadow)}
+  .tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font:500 21px/1 var(--ui);color:var(--tab-ink)}
+  .tabbar div.on{color:var(--tab-ink-on)}
+  .tabbar s{width:36px;height:36px;border-radius:10px;text-decoration:none;display:block;border:3px solid currentColor}
+  .tabbar div.on s{background:var(--tab-ink-on);border-color:var(--tab-ink-on)}
+  .homebar{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;width:264px;height:10px;
+    border-radius:5px;background:var(--text-primary);opacity:.26;z-index:7}
+
+  /* ---------- 现状（对照用）：V2 原样，方块走五组高饱和分类色 ---------- */
+  .t-now{ --bg-page:#f4f2ec; --bg-card:#ffffff; --text-primary:#23252c; --text-secondary:#5c6068;
+    --text-tertiary:#9a9ea6; --card-edge:rgba(35,37,44,.10); --accent:#23252c; --chip-idle:rgba(35,37,44,.06);
+    --nav-face:rgba(255,255,255,.7); --nav-hair:rgba(35,37,44,.12); --nav-ink:#23252c;
+    --tab-bg:#23252c; --tab-shadow:rgba(35,37,44,.28); --tab-ink:rgba(255,255,255,.5); --tab-ink-on:#fff;
+    --f-ui:var(--ui); }
+  /* ---------- 方案 A · 米白一色（暖）：全站只有 35° 这一个色相，靠五档明度分层 ---------- */
+  .sA{ --bg-page:#F2EFE9; --bg-card:#FCFBF8; --text-primary:#241E16; --text-secondary:rgba(36,30,22,.62);
+    --text-tertiary:rgba(36,30,22,.4); --card-edge:rgba(36,30,22,.12); --accent:#241E16;
+    --chip-idle:rgba(36,30,22,.07); --nav-face:rgba(252,251,248,.74); --nav-hair:rgba(36,30,22,.14);
+    --nav-ink:#241E16; --tab-bg:#241E16; --tab-shadow:rgba(36,30,22,.24); --tab-ink:rgba(242,239,233,.55);
+    --tab-ink-on:#F2EFE9; --f-ui:var(--song); }
+  /* ---------- 方案 B · 雨过青一色（冷）：同一青灰绿，同样只差明度 ---------- */
+  .sB{ --bg-page:#E9EEEA; --bg-card:#F7FAF7; --text-primary:#1B2A21; --text-secondary:rgba(27,42,33,.62);
+    --text-tertiary:rgba(27,42,33,.4); --card-edge:rgba(27,42,33,.13); --accent:#1B2A21;
+    --chip-idle:rgba(27,42,33,.07); --nav-face:rgba(247,250,247,.74); --nav-hair:rgba(27,42,33,.14);
+    --nav-ink:#1B2A21; --tab-bg:#1B2A21; --tab-shadow:rgba(27,42,33,.24); --tab-ink:rgba(233,238,234,.55);
+    --tab-ink-on:#E9EEEA; --f-ui:var(--song); }
+
+  /* 方块色阶：A 五档暖褐，B 五档青灰绿。每档自带字色，深两档翻亮字 */
+  .sA .k1{background:#EAE0CE;color:#3B2F1F} .sA .k2{background:#D9C9AE;color:#33291B}
+  .sA .k3{background:#C2AA85;color:#2A2114} .sA .k4{background:#9A7F5C;color:#FBF6EC}
+  .sA .k5{background:#6A5334;color:#FBF6EC} .sA .k0{background:#241E16;color:#F2EFE9}
+  .sB .k1{background:#DDE7DF;color:#1F2D25} .sB .k2{background:#C2D3C6;color:#1A271F}
+  .sB .k3{background:#9FB8A6;color:#14211A} .sB .k4{background:#6E8F77;color:#F3F7F2}
+  .sB .k5{background:#40604A;color:#F3F7F2} .sB .k0{background:#1B2A21;color:#E9EEEA}
+  /* 母题色：比底色深一档，仍同色相 */
+  .sA .k1{--m:#DFD1B9} .sA .k2{--m:#C9B493} .sA .k3{--m:#AE9269} .sA .k4{--m:#8A6F4E} .sA .k5{--m:#5B462C} .sA .k0{--m:#3A3027}
+  .sB .k1{--m:#CBD9CE} .sB .k2{--m:#AFC5B4} .sB .k3{--m:#87A48F} .sB .k4{--m:#5E7F68} .sB .k5{--m:#33503D} .sB .k0{--m:#33443A}
+
+  .card{position:relative;background:var(--bg-card);color:var(--text-primary);border:var(--w-edge) solid var(--card-edge);
+    border-radius:var(--r-card);padding:var(--sp-3) var(--sp-4) var(--sp-4);margin-bottom:var(--sp-2);overflow:hidden}
+  .row-card{display:flex;align-items:flex-start;gap:var(--sp-row);padding:var(--sp-row)}
+  .blk{flex:none;position:relative;width:var(--blk);height:var(--blk);box-sizing:border-box;padding:var(--blk-pad);
+    border-radius:var(--r-block);overflow:hidden;display:flex;flex-direction:column;justify-content:space-between}
+  .blk-name{position:relative;z-index:2;font-size:var(--fs-block);font-weight:700;line-height:1.2;letter-spacing:0}
+  .blk-date{position:relative;z-index:2;font-size:var(--fs-micro);font-weight:600;letter-spacing:1.6px;opacity:.7}
+  .blk-body{flex:1;min-width:0}
+  .row-title{font-size:var(--fs-title);font-weight:700;line-height:var(--lh-tight);color:var(--text-primary);margin-bottom:10px}
+  .summary{font-size:var(--fs-meta);line-height:1.6;color:var(--text-secondary);margin-bottom:var(--sp-2);
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .row-foot{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-tiny);font-weight:600;
+    color:var(--text-tertiary)}
+  .row-foot .src{color:var(--text-secondary)}
+  .pin{display:inline-block;font-size:19px;font-weight:700;letter-spacing:.6px;padding:4px 14px;border-radius:10px;
+    background:var(--accent);color:var(--bg-page);margin-right:10px;vertical-align:2px}
+  .motif{position:absolute;right:calc(0px - var(--motif-shift));bottom:calc(0px - var(--motif-shift));
+    width:var(--motif-size);height:var(--motif-size);z-index:0;background:var(--m)}
+  .m-circle{border-radius:50%}
+  .m-arc{border-radius:50%;background:transparent;border:12px solid var(--m);border-right-color:transparent;border-bottom-color:transparent}
+  .m-stripes{background:repeating-linear-gradient(115deg,var(--m) 0 12px,transparent 12px 26px)}
+  .m-dots{background:radial-gradient(var(--m) 6px,transparent 7px) 0 0/26px 26px}
+  .m-pill{width:calc(var(--motif-size)*1.5);height:calc(var(--motif-size)*.42);border-radius:var(--r-pill)}
+
+  .page-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-2);
+    margin:var(--sp-5) 0 var(--sp-4)}
+  .page-title{font-size:var(--fs-h1);font-weight:700;color:var(--text-primary)}
+  .page-stats{flex:none;font-size:var(--fs-meta);font-weight:600;color:var(--text-secondary)}
+  .chip{display:inline-block;padding:14px 28px;border-radius:var(--r-pill);font-size:var(--fs-meta);font-weight:600;
+    background:var(--chip-idle);color:var(--text-secondary)}
+  .chip.active{background:var(--accent);color:var(--bg-page)}
+  .chips{display:inline-flex;gap:12px;white-space:nowrap;margin-bottom:var(--sp-3)}
+  .tagx{display:inline-block;background:var(--chip-idle);color:var(--text-primary);font-size:var(--fs-tiny);
+    font-weight:600;padding:6px 18px;border-radius:14px;margin-right:var(--sp-1)}
+
+  /* 搜索卡：不再是宝蓝，改成同色系第二档底 + 墨字 + 一条墨下划线 */
+  .sc-card{padding:26px var(--sp-3) 20px;margin-bottom:var(--sp-3);border:none}
+  .sc-line{position:relative;display:flex;align-items:center;height:64px}
+  .sc-input{font-size:var(--fs-body);opacity:.55}
+  .sc-go{margin-left:auto;font-size:var(--fs-title);font-weight:700}
+  .sc-rule{position:absolute;left:0;right:0;bottom:0;height:2px;background:currentColor;opacity:.4}
+
+  .entry{display:flex;flex-direction:column;justify-content:center;min-height:144px;padding:0 var(--sp-4);
+    border-radius:var(--r-card);margin-bottom:var(--sp-3);position:relative;overflow:hidden}
+  .entry.open{justify-content:flex-start;padding:var(--sp-4);min-height:auto}
+  .entry-label{font-size:var(--fs-h2);font-weight:700;position:relative;z-index:2}
+  .entry-sub{font-size:var(--fs-meta);margin-top:8px;opacity:.7;position:relative;z-index:2}
+  .glyph{position:absolute;right:-30px;bottom:-46px;width:264px;height:264px;z-index:0;border-radius:50%;background:var(--m)}
+  .face-box{display:flex;align-items:center;height:88px;margin-top:26px;padding:0 var(--sp-3);border-radius:var(--r-btn);
+    background:var(--bg-card);color:var(--text-primary);font-size:var(--fs-body);position:relative;z-index:2;
+    border:var(--w-edge) solid var(--card-edge)}
+  .acts{display:flex;gap:var(--sp-2);margin-top:20px;position:relative;z-index:2}
+  .act{flex:1;height:88px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-pill);
+    font-size:var(--fs-body);font-weight:700}
+  .act.ghost{background:var(--bg-card);color:var(--text-primary);border:var(--w-edge) solid var(--card-edge)}
+  .act.solid{background:var(--accent);color:var(--bg-page)}
+
+  .section-label{display:block;font-size:var(--fs-label);font-weight:700;letter-spacing:2.4px;color:var(--text-tertiary);
+    margin-bottom:14px}
+  .hero-meta{font-size:var(--fs-tiny);font-weight:600;color:var(--text-tertiary);margin-bottom:10px}
+  .hero-title{font-size:var(--fs-h1);font-weight:700;line-height:1.34;margin-bottom:14px}
+  .body-text{font-size:29px;line-height:1.9;color:var(--text-primary)}
+  .point{display:flex;gap:16px;font-size:var(--fs-body);line-height:1.7;margin-top:14px;align-items:flex-start}
+  .point b{flex:none;width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    font-size:var(--fs-meta);font-weight:700}
+  .blk.tall{height:200px}
+  .action-bar{display:flex;gap:var(--sp-2);margin:0 0 var(--sp-2)}
+  .icon-btn{font-size:var(--fs-meta);font-weight:600;color:var(--text-secondary);background:var(--chip-idle);
+    padding:16px 30px;border-radius:var(--r-pill)}
+
+  /* 色阶条 */
+  .ramp{width:750px;background:#fff;border-radius:36px;padding:36px 40px;box-shadow:0 12px 36px rgba(20,22,26,.12)}
+  .ramp h4{font:700 30px/1.4 var(--song);margin-bottom:6px}
+  .ramp p{font:400 22px/1.7 var(--ui);color:#4d4a44;margin-bottom:24px}
+  .steps{display:flex;gap:10px}
+  .step{flex:1;height:170px;border-radius:26px;padding:18px;display:flex;flex-direction:column;justify-content:space-between;
+    font:600 20px/1.3 var(--ui)}
+  .step u{text-decoration:none;font:700 26px/1 var(--song)}
+  .step em{display:block;font-style:normal;font-size:17px;opacity:.72;font-family:ui-monospace,Menlo,monospace}
+  .k1 .step1{background:#EAE0CE}
+  .note{width:1526px;background:#fff;border-radius:32px;padding:36px 40px;font:400 25px/1.9 var(--ui);color:#14161A}
+  .note b{font-weight:700}
+  .cap{width:750px;font:400 22px/1.7 var(--ui);color:#3f3c37;margin-top:14px}
+  .cap b{display:block;font-size:26px;font-weight:700;color:#14161A;margin-bottom:4px}
+  .col{display:flex;flex-direction:column}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="tag"><b>先摆现状做对照</b>这一屏就是他现在看到的：方块走五组高饱和分类色（芥末黄/宝蓝/橙/草绿/墨黑），所以无论页面底换成多淡的纸，眼睛先抓到的还是那几个大色块</div>
+  <div class="row">
+    <div class="col">
+      <div class="phone t-now">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+          <div class="card sc-card" style="background:#3F52D6;color:#fff"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+          <div class="chips"><span class="chip active">全部</span><span class="chip" style="background:#F6C445;color:#2A2005">阅读</span><span class="chip" style="background:#3F52D6;color:#fff">工作</span><span class="chip">未分类</span></div>
+          <div class="card row-card"><div class="blk" style="background:#F6C445;color:#2A2005;--m:#E3B63F"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+            <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+              <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+              <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk" style="background:#3F52D6;color:#fff;--m:#5566DE"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+            <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+              <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+              <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk" style="background:#E9723D;color:#2C1204;--m:#D9662F"><span class="blk-name">生活</span><span class="blk-date">09 / 19</span><div class="motif m-dots"></div></div>
+            <div class="blk-body"><div class="row-title">周末市集的摊主名单</div>
+              <div class="summary">手冲、软曲奇、旧书摊，都在北门那一段。</div>
+              <div class="row-foot"><span class="src">截图 · 生活</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk" style="background:#23252C;color:#fff;--m:#3A3C45"><span class="blk-name">未</span><span class="blk-date">09 / 17</span><div class="motif m-pill"></div></div>
+            <div class="blk-body"><div class="row-title">番茄炒蛋的两个细节</div>
+              <div class="summary">糖只放一点点，蛋先盛出来再回锅。</div>
+              <div class="row-foot"><span class="src">手写 · 未分类</span><span>›</span></div></div></div>
+        </div>
+        <div class="tabbar"><div class="on"><s></s>笔记</div><div><s></s>新建</div><div><s></s>我的</div></div>
+        <div class="homebar"></div>
+      </div>
+      <div class="cap"><b>现状 · V2 左块右文</b>页面底其实已经是米白 #f4f2ec，但方块是五组高饱和色，所以"淡雅"这件事根本看不出来——这就是他这句反馈的根因</div>
+    </div>
+  </div>
+
+  <div class="tag"><b>方案 A · 米白一色（暖）</b>全站只留 35° 这一个色相：页面底、卡、方块、按钮、色阶、tab 栏，全部从同一支暖褐里取档。分类之间只差明度，不再差色相</div>
+  <div class="row">
+    <div class="col">
+      <div class="phone sA">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+          <div class="card sc-card k2"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+          <div class="chips"><span class="chip active">全部</span><span class="chip k1">阅读</span><span class="chip k3">工作</span><span class="chip">未分类</span></div>
+          <div class="card row-card"><div class="blk k1"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+            <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+              <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+              <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk k2"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+            <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+              <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+              <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk k3"><span class="blk-name">生活</span><span class="blk-date">09 / 19</span><div class="motif m-dots"></div></div>
+            <div class="blk-body"><div class="row-title">周末市集的摊主名单</div>
+              <div class="summary">手冲、软曲奇、旧书摊，都在北门那一段。</div>
+              <div class="row-foot"><span class="src">截图 · 生活</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk k4"><span class="blk-name">资讯</span><span class="blk-date">09 / 17</span><div class="motif m-pill"></div></div>
+            <div class="blk-body"><div class="row-title">番茄炒蛋的两个细节</div>
+              <div class="summary">糖只放一点点，蛋先盛出来再回锅。</div>
+              <div class="row-foot"><span class="src">手写 · 资讯</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk k0"><span class="blk-name">未</span><span class="blk-date">09 / 15</span><div class="motif m-arc"></div></div>
+            <div class="blk-body"><div class="row-title">旧书摊那本没买到的</div>
+              <div class="summary">封面是布面的，回去找不到了。</div>
+              <div class="row-foot"><span class="src">截图 · 未分类</span><span>›</span></div></div></div>
+        </div>
+        <div class="tabbar"><div class="on"><s></s>笔记</div><div><s></s>新建</div><div><s></s>我的</div></div>
+        <div class="homebar"></div>
+      </div>
+      <div class="cap"><b>A · 首页</b>五档明度从浅到深排下来，一屏之内是同一支颜色；分类名和母题构图仍在，识别改由"深浅档 + 汉字 + 母题"三件事一起担</div>
+    </div>
+
+    <div class="col">
+      <div class="phone sA">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">新建</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="page-head" style="align-items:center"><div class="page-title">看到好内容，随手记下来</div></div>
+          <div class="entry open k2"><div class="glyph"></div>
+            <div class="entry-label">链接</div>
+            <div class="entry-sub">粘一条网址，存进来就分成笔记</div>
+            <div class="face-box">https://mp.weixin.qq.com/…</div>
+            <div class="acts"><div class="act ghost">粘贴</div><div class="act solid">存笔记</div></div>
+          </div>
+          <div class="entry k3"><div class="glyph"></div><div class="entry-label">截图</div></div>
+          <div class="entry k1"><div class="glyph"></div><div class="entry-label">手写</div></div>
+          <div class="card" style="margin-top:var(--sp-4)"><span class="section-label">摘要</span>
+            <div class="body-text">这三张卡以前是蓝、橙、黄，现在改成同一支暖褐的三档：浅的那张最轻，深的那张压住整页。</div></div>
+        </div>
+        <div class="tabbar"><div><s></s>笔记</div><div class="on"><s></s>新建</div><div><s></s>我的</div></div>
+        <div class="homebar"></div>
+      </div>
+      <div class="cap"><b>A · 新建页</b>这是差别最大的一屏：三张入口卡从"宝蓝／橙／芥末黄"变成三档明度，主按钮只用墨黑一块，整页不再有任何彩色</div>
+    </div>
+
+    <div class="col">
+      <div class="ramp">
+        <h4>A · 色阶表（暖 35°）</h4>
+        <p>每一档自带字色；深两档翻亮字。母题色比底色深一档，仍在这支色相里。</p>
+        <div class="steps">
+          <div class="step" style="background:#EAE0CE;color:#3B2F1F"><div><u>浅</u><em>#EAE0CE</em></div><div>字 #3B2F1F</div></div>
+          <div class="step" style="background:#D9C9AE;color:#33291B"><div><u>次浅</u><em>#D9C9AE</em></div><div>字 #33291B</div></div>
+          <div class="step" style="background:#C2AA85;color:#2A2114"><div><u>中</u><em>#C2AA85</em></div><div>字 #2A2114</div></div>
+          <div class="step" style="background:#9A7F5C;color:#FBF6EC"><div><u>次深</u><em>#9A7F5C</em></div><div>字 #FBF6EC</div></div>
+          <div class="step" style="background:#6A5334;color:#FBF6EC"><div><u>深</u><em>#6A5334</em></div><div>字 #FBF6EC</div></div>
+        </div>
+        <div class="steps" style="margin-top:10px">
+          <div class="step" style="background:#241E16;color:#F2EFE9;flex:1"><div><u>未分类</u><em>#241E16</em></div><div>字 #F2EFE9</div></div>
+          <div class="step" style="background:#F2EFE9;color:#241E16;border:2px solid rgba(36,30,22,.14)"><div><u>页面底</u><em>#F2EFE9</em></div><div>官网 --paper</div></div>
+          <div class="step" style="background:#FCFBF8;color:#241E16;border:2px solid rgba(36,30,22,.12)"><div><u>卡片底</u><em>#FCFBF8</em></div><div>比纸亮一档</div></div>
+        </div>
+      </div>
+      <div class="note" style="width:750px;margin-top:26px">
+        <b>这一版真正动了什么</b><br>
+        方块、色卡、按钮、tab 栏全部收进一支色相，只靠明度分档——这是他要的"整体感"。
+        <br><br>
+        <b>代价（必须说清）</b><br>
+        ① 分类识别从"看色相"退成"看深浅"。五档之间明度差约 12~18%，色弱用户和户外反光下会更难分；
+        现在靠"方块里的汉字 + 母题构图"补，但这两样本来就比颜色弱。<br>
+        ② 代码上这两版<b>不是壁纸</b>。现在方块色由 palette.js 固定注入、明确"不随主题变"（V2 硬规则②），
+        要出这种效果得给主题配一整套方块色阶，palette 和六个页面的取色方式都要改——比前两轮只改 chrome 大一档。
+      </div>
+    </div>
+  </div>
+
+  <div class="tag"><b>方案 B · 雨过青一色（冷）</b>结构和 A 完全一样，只是整支色相换成青灰绿；两版的差别就在"暖纸"还是"冷纸"</div>
+  <div class="row">
+    <div class="col">
+      <div class="phone sB">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">我的笔记</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="page-head"><div class="page-title">我的笔记</div><div class="page-stats">12 篇 · 4 分类</div></div>
+          <div class="card sc-card k2"><div class="sc-line"><span class="sc-input">搜标题、摘要、标签…</span><span class="sc-go">搜索笔记</span><div class="sc-rule"></div></div></div>
+          <div class="chips"><span class="chip active">全部</span><span class="chip k1">阅读</span><span class="chip k3">工作</span><span class="chip">未分类</span></div>
+          <div class="card row-card"><div class="blk k1"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-circle"></div></div>
+            <div class="blk-body"><div class="row-title"><span class="pin">置顶</span>读过的东西，存成能转发的笔记</div>
+              <div class="summary">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+              <div class="row-foot"><span class="src">链接 · 阅读</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk k2"><span class="blk-name">工作</span><span class="blk-date">09 / 21</span><div class="motif m-stripes"></div></div>
+            <div class="blk-body"><div class="row-title">会上记下的三条结论</div>
+              <div class="summary">先把范围收窄到能验证的一小块，再谈扩展。</div>
+              <div class="row-foot"><span class="src">手写 · 工作</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk k3"><span class="blk-name">生活</span><span class="blk-date">09 / 19</span><div class="motif m-dots"></div></div>
+            <div class="blk-body"><div class="row-title">周末市集的摊主名单</div>
+              <div class="summary">手冲、软曲奇、旧书摊，都在北门那一段。</div>
+              <div class="row-foot"><span class="src">截图 · 生活</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk k4"><span class="blk-name">资讯</span><span class="blk-date">09 / 17</span><div class="motif m-pill"></div></div>
+            <div class="blk-body"><div class="row-title">番茄炒蛋的两个细节</div>
+              <div class="summary">糖只放一点点，蛋先盛出来再回锅。</div>
+              <div class="row-foot"><span class="src">手写 · 资讯</span><span>›</span></div></div></div>
+          <div class="card row-card"><div class="blk k0"><span class="blk-name">未</span><span class="blk-date">09 / 15</span><div class="motif m-arc"></div></div>
+            <div class="blk-body"><div class="row-title">旧书摊那本没买到的</div>
+              <div class="summary">封面是布面的，回去找不到了。</div>
+              <div class="row-foot"><span class="src">截图 · 未分类</span><span>›</span></div></div></div>
+        </div>
+        <div class="tabbar"><div class="on"><s></s>笔记</div><div><s></s>新建</div><div><s></s>我的</div></div>
+        <div class="homebar"></div>
+      </div>
+      <div class="cap"><b>B · 首页</b>青灰绿这一支更"冷"、更接近官网上那几处灰绿的分隔色；同一屏五档明度，最深那档压住视觉重心</div>
+    </div>
+
+    <div class="col">
+      <div class="phone sB">
+        <div class="label"><span>9:41</span><span>100%</span></div>
+        <div class="nav"><span class="nt">笔记详情</span><div class="capsule"><span>⋯</span><div class="sep"></div><span>◎</span></div></div>
+        <div class="screen">
+          <div class="card row-card" style="margin-top:var(--sp-5)"><div class="blk k2 tall"><span class="blk-name">阅读</span><span class="blk-date">09 / 23</span><div class="motif m-dots"></div></div>
+            <div class="blk-body">
+              <div class="hero-meta">链接 · 2026-09-23 21:07</div>
+              <div class="hero-title">读过的东西，存成能转发的笔记</div>
+              <div><span class="tagx">阅读</span><span class="tagx">方法论</span></div>
+            </div></div>
+          <div class="action-bar"><span class="icon-btn">置顶</span><span class="icon-btn">编辑</span><span class="icon-btn">删除</span></div>
+          <div class="card"><span class="section-label">摘要</span>
+            <div class="body-text">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div></div>
+          <div class="card"><span class="section-label">要点</span>
+            <div class="point"><b class="k3">1</b><span>一句话顶做大字，别人扫一眼就记得住</span></div>
+            <div class="point"><b class="k3">2</b><span>自己的头像和名字印在图上</span></div>
+            <div class="point"><b class="k3">3</b><span>存下来的东西要能被别人扫开</span></div>
+          </div>
+          <div class="card"><span class="section-label">原文</span>
+            <div class="body-text" style="font-size:var(--fs-body);color:var(--text-secondary)">读过的东西如果不记下来，一周后能留下的不到三成。记下来又散在五个 app 里，等于没记。</div></div>
+        </div>
+        <div class="homebar"></div>
+      </div>
+      <div class="cap"><b>B · 详情页</b>操作条、要点序号、标签全部收进同一支色相；这一屏文字最多，宋体 + 青灰底在这里最见"文艺范"</div>
+    </div>
+
+    <div class="col">
+      <div class="ramp">
+        <h4>B · 色阶表（冷青灰绿）</h4>
+        <p>和 A 一一对应，只换色相；这样两版可以并排挑，也可以只留一版。</p>
+        <div class="steps">
+          <div class="step" style="background:#DDE7DF;color:#1F2D25"><div><u>浅</u><em>#DDE7DF</em></div><div>字 #1F2D25</div></div>
+          <div class="step" style="background:#C2D3C6;color:#1A271F"><div><u>次浅</u><em>#C2D3C6</em></div><div>字 #1A271F</div></div>
+          <div class="step" style="background:#9FB8A6;color:#14211A"><div><u>中</u><em>#9FB8A6</em></div><div>字 #14211A</div></div>
+          <div class="step" style="background:#6E8F77;color:#F3F7F2"><div><u>次深</u><em>#6E8F77</em></div><div>字 #F3F7F2</div></div>
+          <div class="step" style="background:#40604A;color:#F3F7F2"><div><u>深</u><em>#40604A</em></div><div>字 #F3F7F2</div></div>
+        </div>
+        <div class="steps" style="margin-top:10px">
+          <div class="step" style="background:#1B2A21;color:#E9EEEA"><div><u>未分类</u><em>#1B2A21</em></div><div>字 #E9EEEA</div></div>
+          <div class="step" style="background:#E9EEEA;color:#1B2A21;border:2px solid rgba(27,42,33,.14)"><div><u>页面底</u><em>#E9EEEA</em></div><div>冷纸</div></div>
+          <div class="step" style="background:#F7FAF7;color:#1B2A21;border:2px solid rgba(27,42,33,.12)"><div><u>卡片底</u><em>#F7FAF7</em></div><div>比纸亮一档</div></div>
+        </div>
+      </div>
+      <div class="note" style="width:750px;margin-top:26px">
+        <b>两版怎么挑</b><br>
+        A 更贴官网现在那张纸（暖），对外说"和官网同色"最省事；B 更清爽、更像"雨过天青"，但官网目前没有一个冷底页面，选它等于新增一种气质。<br><br>
+        <b>还有一条路</b>：把 A、B 做成两枚新壁纸（各带自己那套方块色阶），现有六枚高饱和的留着不动——喜欢淡雅的人自己切，不冲突。这样"一个功能只留一个入口"仍然成立，只是壁纸这页从"只换底色"变成"换一整套色"。
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

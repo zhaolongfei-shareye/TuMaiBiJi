@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>淡雅两枚壁纸与界面字体 · 模拟器实测九屏</title>
+<style>
+  /* 这九张全是微信开发者工具模拟器里真截的图，不是效果图。
+     每行一套外观：切完壁纸和字体、重编译、逐屏截；最后把两份本机偏好放回默认。
+     括号里那串是切完之后 app.containerClass() 返回的实际类名，由自动化脚本读回来的。 */
+  :root{ --ui:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC',sans-serif; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#dcd9d2;font-family:var(--ui);padding:30px}
+  .sheet{display:flex;flex-direction:column;gap:28px;align-items:flex-start}
+  .tag{font:400 13px/1.6 var(--ui);letter-spacing:.14em;color:#4d4a44;text-transform:uppercase;width:100%}
+  .tag b{display:inline-block;margin-right:8px;color:#14161A;font-weight:700;letter-spacing:.04em;text-transform:none;font-size:16px}
+  .row{display:flex;gap:24px;align-items:flex-start}
+  .cell{width:500px}
+  .cell img{width:500px;display:block;border-radius:26px;box-shadow:0 12px 34px rgba(20,22,26,.2)}
+  .hd{font:700 24px/1.4 var(--ui);color:#14161A;margin-bottom:8px}
+  .hd code{font:500 17px/1 ui-monospace,Menlo,monospace;background:#fff;padding:5px 9px;border-radius:7px;color:#4d4a44;margin-left:6px}
+  .side{width:500px;display:flex;flex-direction:column;gap:12px}
+  .note{background:#fff;border-radius:26px;padding:30px 32px;font:400 22px/1.8 var(--ui);color:#14161A}
+  .note b{font-weight:700}
+  .note code{font-family:ui-monospace,Menlo,monospace;font-size:18px;background:#F2EFE9;padding:2px 7px;border-radius:6px}
+  .rowlab{width:500px;font:700 26px/1.4 var(--ui);color:#14161A;margin-bottom:2px}
+  .rowlab span{display:block;font:400 20px/1.5 var(--ui);color:#4d4a44;margin-top:4px}
+  .col{display:flex;flex-direction:column;gap:10px}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="tag"><b>三套外观 · 每套三屏</b>列：首页（笔记列表）／外观设置上半（界面字体那一排）／外观设置下半（壁纸格子，含新加的两枚）</div>
+
+  <div class="row">
+    <div class="col">
+      <div class="rowlab">① 现状<span>米白壁纸 + 苹方。左侧方块走五组高饱和分类色——这就是"看不出淡雅"的那个根子</span></div>
+      <div class="cell"><img src="实测-现状-米白壁纸/首页.png" alt=""></div>
+    </div>
+    <div class="col"><div class="rowlab">外观设置<span>页面标题从「壁纸设置」改成「外观设置」，上面新加一排界面字体</span></div>
+      <div class="cell"><img src="实测-现状-米白壁纸/外观设置.png" alt=""></div></div>
+    <div class="col"><div class="rowlab">壁纸格子<span>六枚原有的在后面，缩略图里那两个小色块仍是各自的分类色</span></div>
+      <div class="cell"><img src="实测-现状-米白壁纸/外观设置-下半.png" alt=""></div></div>
+  </div>
+
+  <div class="row">
+    <div class="col">
+      <div class="rowlab">② 米白一色 + 宋体<span>类名 <code style="font:500 18px ui-monospace,Menlo,monospace">theme-tint-paper font-song</code>（脚本读回来的实际值）。全站只剩一支暖褐，五档明度代替五支彩色</span></div>
+      <div class="cell"><img src="实测-米白一色-宋体/首页.png" alt=""></div>
+    </div>
+    <div class="col"><div class="rowlab">界面字体那一排<span>四格里那四个字各用自己的字体写，点之前就能看见会变成什么样</span></div>
+      <div class="cell"><img src="实测-米白一色-宋体/外观设置.png" alt=""></div></div>
+    <div class="col"><div class="rowlab">新加的两枚<span>打了「整套色阶」角标；这一格被选中所以有黑框和勾</span></div>
+      <div class="cell"><img src="实测-米白一色-宋体/外观设置-下半.png" alt=""></div></div>
+  </div>
+
+  <div class="row">
+    <div class="col">
+      <div class="rowlab">③ 雨过青 + 楷体<span>类名 <code style="font:500 18px ui-monospace,Menlo,monospace">theme-tint-celadon font-kai</code>。同一套做法，色相换成冷青灰绿</span></div>
+      <div class="cell"><img src="实测-雨过青-楷体/首页.png" alt=""></div>
+    </div>
+    <div class="col"><div class="rowlab">外观设置<span>楷体这一档的字形最软，标题和正文一眼能看出来</span></div>
+      <div class="cell"><img src="实测-雨过青-楷体/外观设置.png" alt=""></div></div>
+    <div class="col"><div class="rowlab">壁纸格子<span>两枚淡雅的缩略图各画自己那套色阶，不被当前主题染色（这条有断言钉着）</span></div>
+      <div class="cell"><img src="实测-雨过青-楷体/外观设置-下半.png" alt=""></div></div>
+  </div>
+
+  <div class="note" style="width:1548px">
+    <b>这一屏上哪些是真测出来的、哪些还没验</b><br>
+    已验：三套外观的类名由自动化脚本从 appservice 读回（不是猜的）；九屏全部是模拟器渲染后截的；
+    切完最后一步把两份本机偏好放回默认，并补截了一屏确认回到原样。
+    色板侧另有一把尺子 <code>docs/工具/验-色板零回归.js</code>，30 条断言全过，
+    其中一条是拿 <code>git show HEAD</code> 那份 palette.js 和新那份跑同一批输入逐字节比，证明现有六枚一个色都没变。<br><br>
+    <b>还没验的三件事</b>：① 真机上安卓命不中 STSong / Kaiti SC，会回落到系统黑体，这一条只能他手机上看；
+    ② 这三档字体下的字重（宋体 700 不合成重粗，上一轮已实测），现在按现状字重原样发出去，标题会比苹方轻一档；
+    ③ 淡雅两枚下"未分类"那一块深褐/深绿与卡底的对比度，截图里看着够，但没跑过对比度脚本。
+  </div>
+
+</div>
+</body>
+</html>
