@@ -25,9 +25,13 @@ const SERIF = 'serif'
 const MONO = 'Courier New'
 
 const PROFILE_KEY = 'poster_profile'
-const AVATAR_NAME = 'poster-avatar.img'
-const AVATAR_STAGED = 'poster-avatar-staged.img'
 const DEFAULT_TEMPLATE = 'card'
+// 头像文件的统一前缀，名字每次挑都换一个（见 stageAvatar）。
+// 之前是"暂存""正式"两个固定名字，1.4.0 真机报出：换第二张图预览还是第一张。
+// 原因是路径字符串一模一样，而 <image> 组件和 canvas 的 createImage() 都按路径缓存位图。
+const AVATAR_PREFIX = 'poster-avatar'
+// 本机存过哪些头像文件（见 trackedAvatars）
+const AVATAR_FILES_KEY = 'poster_avatar_files'
 // 没设形象时人像位上的那个字。用品牌字而不是笔记标题的首字，见 glyphPlate 上方。
 const BRAND_GLYPH = '麦'
 // 饱和度混合模式下，这个颜色的饱和度正好是 0：用它压一层等于把下面的图去色。
@@ -93,16 +97,55 @@ function avatarPath() {
   return exists(p) ? p : ''
 }
 
-function copyTo(src, name) {
-  const dest = `${wx.env.USER_DATA_PATH}/${name}`
-  // 目标名是固定的（暂存/正式各一个），所以第二次覆盖时 dest 一定已经存在。
-  // 真机的 copyFile 在目标已存在时会回 EEXIST（errno 17），开发者工具的替身不报这个——
-  // 表现就是"第一张头像好好的，选第二张就存不下来"。先把老的删掉再拷，覆盖就变成一次纯新建。
+let avatarSeq = 0
+let stagedAvatar = ''
+
+function avatarFilePath() {
+  avatarSeq += 1
+  // 毫秒 + 本进程内的序号：同一毫秒连点两次也不会撞名，进程重启后时间戳接着错开。
+  return `${wx.env.USER_DATA_PATH}/${AVATAR_PREFIX}-${Date.now()}-${avatarSeq}.img`
+}
+
+function unlinkFile(p) {
+  if (!p) return
   try {
-    wx.getFileSystemManager().unlinkSync(dest)
+    wx.getFileSystemManager().unlinkSync(p)
   } catch (e) {
-    // 头一次存，本来就没有旧文件
+    // 要删的本就不在（头一回存、或已被系统清掉），不是错误
   }
+}
+
+// 本机存过的头像文件，路径记在这里。名字改成一张一个之后，"这个目录里哪张是我存的"
+// 就没法再从命名规则推出来了——清扫时只认这份名单，名单外的一个都不碰。
+function trackedAvatars() {
+  const v = wx.getStorageSync(AVATAR_FILES_KEY)
+  return Array.isArray(v) ? v : []
+}
+
+function trackAvatar(p) {
+  const all = trackedAvatars()
+  if (all.indexOf(p) < 0) {
+    all.push(p)
+    wx.setStorageSync(AVATAR_FILES_KEY, all)
+  }
+}
+
+function untrackAvatar(p) {
+  const all = trackedAvatars()
+  const i = all.indexOf(p)
+  if (i >= 0) {
+    all.splice(i, 1)
+    wx.setStorageSync(AVATAR_FILES_KEY, all)
+  }
+}
+
+function removeAvatar(p) {
+  if (!p) return
+  unlinkFile(p)
+  untrackAvatar(p)
+}
+
+function copyTo(src, dest) {
   return new Promise((resolve, reject) => {
     // 参数名是 srcPath，不是 filePath——真机上写错的表现是 errno 1001
     // "parameter.srcPath should be String instead of Undefined"，
@@ -111,36 +154,47 @@ function copyTo(src, name) {
   })
 }
 
-// 选完先落到"暂存"这个名字，点保存才搬到正式名字。
-// 直接覆盖正式文件的话，用户选完图不点保存，海报也会跟着换成他没收的图。
+// 选完先存成一张全新的独立文件，点保存才把它记进 profile。
+// 文件名唯一，所以"没点保存的那一张"既顶不掉海报正在用的那一张，也不会和上次挑剩的撞名
+// （撞名怎么坑人的，见 AVATAR_PREFIX 上方）。先删上一张没保存的再写：本地目录一共 10MB。
 function stageAvatar(tempPath) {
-  return copyTo(tempPath, AVATAR_STAGED)
-}
-
-function commitAvatar(stagedPath) {
-  return copyTo(stagedPath, AVATAR_NAME).then((dest) => {
-    // 正式文件已经在了，暂存那份就是纯多余的一份拷贝
-    dropStaged()
-    return dest
+  removeAvatar(stagedAvatar)
+  const dest = avatarFilePath()
+  return copyTo(tempPath, dest).then((p) => {
+    trackAvatar(p)
+    stagedAvatar = p
+    return p
   })
 }
 
-function dropAvatar() {
-  try {
-    wx.getFileSystemManager().unlinkSync(`${wx.env.USER_DATA_PATH}/${AVATAR_NAME}`)
-  } catch (e) {
-    // 没存过就会走到这里，不是错误
-  }
+// "转正"只改 profile 里记着的那个路径，不搬文件、不再复制一份——
+// 本地任何时刻最多只有正式一张 + 暂存一张，被顶掉的那张当场删掉。
+function commitAvatar(stagedPath) {
+  stagedAvatar = ''
+  const prev = readProfile().avatarPath
+  // prev 就是新挑的那张时不能删：删了等于把刚要用的头像自己删了
+  if (prev && prev !== stagedPath) removeAvatar(prev)
+  return Promise.resolve(stagedPath)
 }
 
-// 暂存那张只"在这页还没点保存"这段时间里有意义：点了保存上面就会删它，没点保存
+function dropAvatar() {
+  removeAvatar(readProfile().avatarPath)
+}
+
+// 暂存那张只"在这页还没点保存"这段时间里有意义：点了保存上面就不认它了，没点保存
 // 也要删（用户没要这张图）。让它留着，等于用户随口选的一张图一直躺在本机里。
 function dropStaged() {
-  try {
-    wx.getFileSystemManager().unlinkSync(`${wx.env.USER_DATA_PATH}/${AVATAR_STAGED}`)
-  } catch (e) {
-    // 十有八九是本来就没有暂存文件，不是错误
-  }
+  removeAvatar(stagedAvatar)
+  stagedAvatar = ''
+}
+
+// 名字不固定之后多了一种留垃圾的可能：选完图没点保存就被系统杀掉，那份暂存在新进程里
+// 已经没人认得，dropStaged 手里没有它的路径。开页时按名单扫一遍，除正在用的那张之外全收掉。
+function pruneAvatars() {
+  const keep = [readProfile().avatarPath, stagedAvatar]
+  trackedAvatars()
+    .filter((p) => keep.indexOf(p) < 0)
+    .forEach(removeAvatar)
 }
 
 // ---------------------------------------------------------------- 图层
@@ -1402,6 +1456,7 @@ module.exports = {
   commitAvatar,
   dropAvatar,
   dropStaged,
+  pruneAvatars,
   planPoster,
   templateLabel,
   groupName,

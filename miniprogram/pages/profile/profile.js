@@ -41,8 +41,10 @@ Page({
 
   onLoad() {
     const app = getApp()
-    // 上一回选完没点保存、或者中途被系统杀掉，暂存那张会一直留在这里，进来先收掉
+    // 上一回选完没点保存、或者中途被系统杀掉，暂存那张会一直留在这里，进来先收掉；
+    // 再按本机那份"存过哪些头像"的名单扫一遍——名字不固定之后，光认一个名字扫不干净。
     poster.dropStaged()
+    poster.pruneAvatars()
     const lang = app.globalData.userInfo?.language || 'zh'
     const saved = poster.readProfile()
     // 小样要等骨架落到视图层之后再画，否则按选择器取不到画布节点
@@ -142,7 +144,7 @@ Page({
         const temp = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
         if (!temp) return
         try {
-          // 先落"暂存"文件名：没点保存之前不能动正式那张，否则海报会跟着换
+          // 存成一张带新名字的文件：没点保存之前不动 profile 里记着的那张，否则海报会跟着换
           const staged = await poster.stageAvatar(temp)
           this.setData({ avatar: staged, avatarStaged: true })
           this.renderThumbs()
@@ -208,7 +210,7 @@ Page({
         template: this.data.template,
       }
       if (this.data.avatar) {
-        // 只有本次新选的那张才需要搬到正式文件名
+        // 只有本次新选的那张才要转正：把它的路径记进 profile，顺手删掉被它顶替的那一张
         patch.avatarPath = this.data.avatarStaged
           ? await poster.commitAvatar(this.data.avatar)
           : this.data.avatar
