@@ -2,7 +2,7 @@ const i18n = {
   zh: {
     tabNotes: '笔记',
     tabCreate: '新建',
-    createHeading: '选择一种记录方式',
+    createHeading: '看到好内容，随手记下来',
     tabMe: '我的',
     appName: '图麦笔记',
     navCreate: '新建笔记',
@@ -200,7 +200,7 @@ const i18n = {
   en: {
     tabNotes: 'Notes',
     tabCreate: 'Create',
-    createHeading: 'Choose how to record',
+    createHeading: "Save what's worth saving",
     tabMe: 'Me',
     appName: 'TuMaiBiJi',
     navCreate: 'New note',

@@ -96,7 +96,9 @@ const txt = async (els) => {
     let page = await mp.reLaunch('/pages/create/create')
     await sleep(1800)
     const heading = (await txt(await page.$$('.page-title'))).join('|')
-    ck('新建页大标题＝「选择一种记录方式」', heading === '选择一种记录方式', heading)
+    // 09-25 站长定：这句要和 iPhone 版一致（TumarkNote `AppCopy.swift` 的 Create.headline），
+    // 中文「看到好内容，随手记下来」/ 英文 "Save what's worth saving"，两边不许各写一份。
+    ck('新建页大标题＝「看到好内容，随手记下来」', heading === '看到好内容，随手记下来', heading)
     const labels = await txt(await page.$$('.entry-label'))
     // 站长 09-25 定了：就叫这三个、就按这个次序（原来这条还写着"手写"，是 ce559fd
     // 改名后一直没跟，红了好几天）。写死成整串对比，换名字或换次序都会红。
