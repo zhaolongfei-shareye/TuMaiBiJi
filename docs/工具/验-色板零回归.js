@@ -1,7 +1,6 @@
-// 色板改动的零回归尺子：拿 git HEAD 那份 palette.js 和改完的这份跑同一批输入，逐个字符串比。
-// 用法（在仓库根跑）：
-//   git show HEAD:miniprogram/utils/palette.js > /tmp/palette-old.js
-//   node docs/工具/验-色板零回归.js
+// 色板改动的零回归尺子：拿改动前那份 palette.js 和改完的这份跑同一批输入，逐个字符串比。
+// 用法（在仓库根跑）：node docs/工具/验-色板零回归.js
+//   换基线：PALETTE_BASE=<commit> node docs/工具/验-色板零回归.js
 // 为什么这么验：这两枚新壁纸动的不是页面底，是"方块按分类取哪支色"——那是 V2 的硬规则②。
 // 一旦这条改坏，现有六枚壁纸下所有页面的颜色都会跟着漂，而那种错在截图上很难看出来
 // （色相没变、只是深浅差一档）。所以不靠眼睛，靠把改前那份拉出来逐字节比。
@@ -10,10 +9,13 @@ const { execFileSync } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 
-const OLD = '/tmp/palette-old.js'
+// 基线钉死在分叉点那个提交上，不写 HEAD：这批一提交，HEAD 里的 palette.js 就是"改后"那份，
+// 拿 HEAD 当基线会变成新对旧、永远全绿。
+const BASE = process.env.PALETTE_BASE || '2075d2f'
+const OLD = `/tmp/palette-old-${BASE.slice(0, 7)}.js`
 if (!fs.existsSync(OLD)) {
   // 走 argv 数组、不起 shell：这份文件本身就是被验的对象，不该再拼一次命令行
-  const src = execFileSync('git', ['show', 'HEAD:miniprogram/utils/palette.js'], {
+  const src = execFileSync('git', ['show', `${BASE}:miniprogram/utils/palette.js`], {
     cwd: path.resolve(__dirname, '../..'),
     maxBuffer: 8 * 1024 * 1024,
   })
@@ -21,6 +23,14 @@ if (!fs.existsSync(OLD)) {
 }
 const before = require(OLD)
 const after = require(path.resolve(__dirname, '../../miniprogram/utils/palette.js'))
+
+// 基线自检：改前那份不该带整套色阶。带上了说明基线取到了改动之后，
+// 下面①②两条就成了自己跟自己比——全绿是假的，宁可直接退出。
+if (before.THEMES.some((t) => t.ramp)) {
+  console.error(`✗ 基线取错：${BASE} 那份 palette.js 已含色阶主题，比对是空转。用 PALETTE_BASE 指定分叉点。`)
+  process.exit(1)
+}
+
 
 const results = []
 const ck = (name, ok, detail) => {
