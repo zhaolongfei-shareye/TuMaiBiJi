@@ -4,6 +4,32 @@
     <text class="page-hint">{{t.wallpaperHint}}</text>
   </view>
 
+  <!-- 界面字体：每一格那四个字用它自己的字体写，用户点之前就知道会换成什么样。
+       这一排比"宋体/仿宋"这种名字管用得多，所以不写成纯文字选项。 -->
+  <view class="sec-head">
+    <text class="sec-title">{{t.fontSection}}</text>
+    <text class="sec-hint">{{t.fontHint}}</text>
+  </view>
+  <view class="font-grid">
+    <view
+      class="font-item {{item.cls}} {{item.active ? 'active' : ''}}"
+      wx:for="{{fonts}}"
+      wx:key="key"
+      bindtap="onFont"
+      data-key="{{item.key}}"
+    >
+      <text class="font-demo">{{item.demo}}</text>
+      <view class="font-foot">
+        <text class="font-label">{{item.label}}</text>
+        <view wx:if="{{item.active}}" class="check-mark">✓</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="sec-head">
+    <text class="sec-title">{{t.wallpaperSection}}</text>
+    <text class="sec-hint">{{t.wallpaperSubHint}}</text>
+  </view>
   <view class="wallpaper-grid">
     <view
       class="wallpaper-item {{item.active ? 'active' : ''}}"
@@ -14,7 +40,9 @@
       data-key="{{item.key}}"
     >
       <!-- 缩略预览：一块色 + 一条中性块 + 两条描边行，就是首页那一行的缩影。
-           色块不随主题变，这正是这套语言要说的件事 -->
+           带色阶的那两枚会打一个"整套色阶"角标——它们和其他六枚不是一回事：
+           其他六枚只换页面底，这两枚连左侧方块一起换。 -->
+      <text wx:if="{{item.tinted}}" class="tint-flag">{{t.tintedFlag}}</text>
       <view class="mini">
         <view class="mini-blk" style="background: {{item.stack[0]}}"></view>
         <view class="mini-blk wide" style="background: {{item.stack[1]}}"></view>

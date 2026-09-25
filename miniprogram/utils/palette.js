@@ -68,17 +68,21 @@ function toneFor(categoryId) {
  */
 function blockSkinFor(categoryId, noteId) {
   const tone = toneFor(categoryId)
+  const ramp = rampFor(categoryId)
+  const bg = ramp ? ramp.bg : tone.bg
+  const ink = ramp ? ramp.ink : tone.ink
   const h = hash(noteId)
   const motif = MOTIFS[h % MOTIFS.length]
   // 母题只比底色暗/亮一点点，做质感不做主角
-  const motifColor = mix(tone.ink, tone.bg, 0.16)
+  const motifColor = mix(ink, bg, 0.16)
   // 墨黑这块在深色壁纸下会和卡片底糊在一起，只有它有描边；亮底上这条描边看不出来，所以两端都安全。
-  const edge = tone === UNCATEGORIZED ? 'rgba(255,255,255,0.16)' : 'transparent'
+  // 色阶主题下卡底是亮纸（不是夜紫/深海那种深色），所以不需要这条描边。
+  const edge = !ramp && tone === UNCATEGORIZED ? 'rgba(255,255,255,0.16)' : 'transparent'
   const size = 108 + (h % 4) * 16 // rpx：108~156，方块 176rpx 见 app.wxss --blk
   const shift = 24 + (h % 3) * 8 // rpx：出界多少，从 id 派生
   const style = [
-    `--blk-bg:${tone.bg}`,
-    `--blk-ink:${tone.ink}`,
+    `--blk-bg:${bg}`,
+    `--blk-ink:${ink}`,
     `--blk-motif:${motifColor}`,
     `--blk-edge:${edge}`,
     `--motif-size:${size}rpx`,
@@ -94,30 +98,43 @@ function blockSkinFor(categoryId, noteId) {
  */
 function toneStyle(i) {
   const tone = TONES[Math.abs(Number(i) || 0) % TONES.length]
+  const ramp = rampFor(i)
+  const bg = ramp ? ramp.bg : tone.bg
+  const ink = ramp ? ramp.ink : tone.ink
   // --blk-glyph 比 --blk-motif 重一档（0.22 对 0.16）：新建页那三个图形要认得出来，
   // 但仍是压在卡底的水印，不是贴在表面的贴纸。
   //
   // 后面这组是"卡内控件的面"。新建页把输入框和按钮装进了饱和色大卡，
   // 面上用什么色取决于这块色本身是深还是浅：深底卡（字是白的）用半透明白面，
   // 亮底卡（字是深墨）用近白面 + 该卡自己的墨色字，否则黄/橙上放白半透明面会糊成一片。
-  const onDark = tone.ink.toUpperCase() === '#FFFFFF'
+  const onDark = inkIsLighter(bg, ink)
   return [
-    `--blk-bg:${tone.bg}`,
-    `--blk-ink:${tone.ink}`,
-    `--blk-motif:${mix(tone.ink, tone.bg, 0.16)}`,
-    `--blk-glyph:${mix(tone.ink, tone.bg, 0.22)}`,
+    `--blk-bg:${bg}`,
+    `--blk-ink:${ink}`,
+    `--blk-motif:${mix(ink, bg, 0.16)}`,
+    `--blk-glyph:${mix(ink, bg, 0.22)}`,
     `--face:${onDark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.78)'}`,
-    `--face-ink:${onDark ? '#FFFFFF' : tone.ink}`,
+    `--face-ink:${onDark ? '#FFFFFF' : ink}`,
     `--face-off:${onDark ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.34)'}`,
-    `--face-off-ink:${onDark ? 'rgba(255,255,255,0.5)' : mix(tone.ink, tone.bg, 0.45)}`,
-    `--solid-bg:${onDark ? '#FFFFFF' : tone.ink}`,
-    `--solid-ink:${onDark ? tone.bg : '#FFFFFF'}`,
+    `--face-off-ink:${onDark ? 'rgba(255,255,255,0.5)' : mix(ink, bg, 0.45)}`,
+    `--solid-bg:${onDark ? '#FFFFFF' : ink}`,
+    `--solid-ink:${onDark ? bg : '#FFFFFF'}`,
     // 校验/权限提示那行字直接坐在卡色上，所以亮底卡用深红、深底卡用浅红，两边都够对比度
     `--blk-err:${onDark ? '#FFD7D3' : '#8C2119'}`,
   ].join(';')
 }
 
-function toneColor(i) {
+/**
+ * 某一档的裸底色。
+ * @param i 档号（和分类号同一套取模规则）
+ * @param themeKey 画"别的主题"时必须传：壁纸选择器那一排缩略图每格画的都是另一套主题，
+ *                 不传就会拿当前激活的主题去染色——停在米白时去看米白那一格，
+ *                 六枚普通壁纸的缩略图也会跟着变成色阶色（真机截图里抓到过）。
+ */
+function toneColor(i, themeKey) {
+  const theme = themeKey ? themeOf(themeKey) : ACTIVE_THEME
+  const ramp = theme && theme.ramp
+  if (ramp) return ramp.steps[Math.abs(Number(i) || 0) % ramp.steps.length]
   return TONES[Math.abs(Number(i) || 0) % TONES.length].bg
 }
 
@@ -128,11 +145,12 @@ function toneColor(i) {
  */
 function toneVars(categoryId) {
   const tone = toneFor(categoryId)
-  return `--tone-bg:${tone.bg};--tone-ink:${tone.ink}`
+  const ramp = rampFor(categoryId)
+  return `--tone-bg:${ramp ? ramp.bg : tone.bg};--tone-ink:${ramp ? ramp.ink : tone.ink}`
 }
 
 /**
- * 六套壁纸（=主题）。page 必须和 app.wxss 里 .theme-* 的 --bg-page 一致，
+ * 八套壁纸（=主题）。page 必须和 app.wxss 里 .theme-* 的 --bg-page 一致，
  * 但 app.wxss 是 CSS、引不了 JS，所以改一边必须改另一边。
  * 之所以在 JS 里再存一份：导航条颜色只能由 wx.setNavigationBarColor 传值，
  * 壁纸选择器也要靠它画缩略图，两处都不能猜 CSS 变量。
@@ -147,6 +165,45 @@ const THEMES = [
   { key: 'gradient-sunset', cls: 'theme-sunset', label: '暮橙', page: '#fdeee6', line: '#ffffff', lineEdge: 'transparent', dark: false },
   { key: 'gradient-purple', cls: 'theme-purple', label: '夜紫', page: '#0c0c1d', line: 'rgba(255,255,255,0.14)', lineEdge: 'transparent', dark: true },
   { key: 'gradient-ocean', cls: 'theme-ocean', label: '深海', page: '#0d1b2a', line: 'rgba(255,255,255,0.14)', lineEdge: 'transparent', dark: true },
+  // 下面两枚是"整套色阶"的淡雅主题：不只换页面底，连左侧方块、新建页那三张大卡、
+  // 按钮和标签都收进同一支色相，五档明度对应原来那五支彩色（索引公式一样，
+  // 所以同一个分类在这套里还是同一档，只是彩色换成了深浅）。
+  //
+  // 这两枚只存在本机（见 app.js 里 LOCAL_WALLPAPER_KEY）：后端的 WALLPAPER_PRESETS
+  // 白名单是现网代码，加两个 key 就要动后端并部署，所以这一轮不写库、不跨设备。
+  //
+  // steps/inks 一一对应，深两档的字翻成亮色；uncategorized 是"未分类"那一块。
+  // 母题色、面、按钮色一律由 mix() 和 inkIsLighter 从这两列派生，不另立色值。
+  {
+    key: 'tint-paper',
+    cls: 'theme-tint-paper',
+    label: '米白一色',
+    local: true,
+    page: '#F2EFE9',
+    line: '#FCFBF8',
+    lineEdge: 'rgba(36,30,22,0.12)',
+    dark: false,
+    ramp: {
+      steps: ['#EAE0CE', '#D9C9AE', '#C2AA85', '#9A7F5C', '#6A5334'],
+      inks: ['#3B2F1F', '#33291B', '#2A2114', '#FBF6EC', '#FBF6EC'],
+      uncategorized: { bg: '#241E16', ink: '#F2EFE9' },
+    },
+  },
+  {
+    key: 'tint-celadon',
+    cls: 'theme-tint-celadon',
+    label: '雨过青',
+    local: true,
+    page: '#E9EEEA',
+    line: '#F7FAF7',
+    lineEdge: 'rgba(27,42,33,0.13)',
+    dark: false,
+    ramp: {
+      steps: ['#DDE7DF', '#C2D3C6', '#9FB8A6', '#6E8F77', '#40604A'],
+      inks: ['#1F2D25', '#1A271F', '#14211A', '#F3F7F2', '#F3F7F2'],
+      uncategorized: { bg: '#1B2A21', ink: '#E9EEEA' },
+    },
+  },
 ]
 
 /**
@@ -226,6 +283,47 @@ function themeOf(wallpaper) {
   return THEMES.find((x) => x.key === wallpaper) || THEMES[0]
 }
 
+/**
+ * 当前生效的那套壁纸。由 app.applyTheme 在每次应用主题时写进来。
+ * 之所以做成模块状态而不是参数：新建页那三张卡、首页搜索卡的颜色是在 Page 的
+ * data 字面量里算出来的（模块加载时就定了），拿不到"这一页当前是哪套主题"。
+ */
+let ACTIVE_THEME = null
+
+function setActiveTheme(wallpaper) {
+  ACTIVE_THEME = themeOf(wallpaper)
+  return ACTIVE_THEME
+}
+
+/**
+ * 两套"整套色阶"主题（淡雅那两枚）的分类取档。
+ * 索引公式和 toneFor 逐字一致，所以切到这套主题时同一个分类还是同一档，
+ * 只是把五支彩色收成了一支色相、用深浅代替色相。
+ * 现有六枚没有 ramp，一律返回 null，调用方原样回落到 TONES——这个 if 就是零回归的闸门。
+ */
+function rampFor(categoryId) {
+  const ramp = ACTIVE_THEME && ACTIVE_THEME.ramp
+  if (!ramp) return null
+  if (categoryId == null) {
+    return { bg: ramp.uncategorized.bg, ink: ramp.uncategorized.ink }
+  }
+  const i = Math.abs(Number(categoryId)) % ramp.steps.length
+  return { bg: ramp.steps[i], ink: ramp.inks[i] }
+}
+
+/**
+ * 这块色算"深底"吗——判据是字比底亮，不是"字是不是纯白"。
+ * 原来那句 `ink === '#FFFFFF'` 对现有六组色的判定结果，和这条逐组一致（单测钉住）；
+ * 换成色阶之后深两档配的是米白字而不是纯白，只有这条判得对。
+ */
+function inkIsLighter(bg, ink) {
+  const lum = (hex) => {
+    const [r, g, b] = hexToRgb(hex)
+    return r * 0.299 + g * 0.587 + b * 0.114
+  }
+  return lum(ink) > lum(bg)
+}
+
 module.exports = {
   TONES,
   UNCATEGORIZED,
@@ -240,6 +338,9 @@ module.exports = {
   toneStyle,
   toneColor,
   themeOf,
+  setActiveTheme,
+  rampFor,
+  inkIsLighter,
   mix,
   withAlpha,
   hexToRgb,

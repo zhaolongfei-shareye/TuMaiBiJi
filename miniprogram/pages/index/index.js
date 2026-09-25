@@ -52,6 +52,9 @@ Page({
       lang,
       t: texts(lang),
       themeClass,
+      // 搜索卡那块色在 data 字面量里算过一次，那是模块加载时、主题还没落地的时候。
+      // 淡雅那两枚会把这块蓝换成同色阶的一档，所以每次进页都要按当前主题重算一遍。
+      searchSkin: toneStyle(1),
     })
     app.setNavTitle('appName', lang)
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {

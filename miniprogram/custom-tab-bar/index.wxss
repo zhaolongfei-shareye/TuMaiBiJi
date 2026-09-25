@@ -1,5 +1,10 @@
 /* 底部导航：浮起的墨色胶囊。
-   这里是自定义组件，拿不到 page 上的 CSS 变量，所以颜色一律写死，不用 var()。 */
+   这里是自定义组件，拿不到 page 上的 CSS 变量，所以颜色一律写死，不用 var()。
+   字体同理：app.wxss 里那三个 .font-* 类进不了组件，只能把类名递进来、
+   字体栈在这再写一遍。改字体栈要记得两边一起改（app.wxss 那份是主页面的）。 */
+.font-song { font-family: 'STSong', 'Songti SC', 'Noto Serif CJK SC', serif; }
+.font-fang { font-family: 'STFangsong', 'FangSong', 'Songti SC', serif; }
+.font-kai { font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', 'Songti SC', serif; }
 .tab-bar {
   display: flex;
   position: fixed;

@@ -54,6 +54,11 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
+      // 三张卡的颜色同样是在 data 字面量里定的（模块加载时主题还没落地），
+      // 每次进页按当前主题重算，淡雅那两枚才会真的把蓝/橙/黄换成同色阶的三档。
+      skinUrl: toneStyle(1),
+      skinShot: toneStyle(2),
+      skinWrite: toneStyle(0),
       shotDesc: this.shotDescFor(this.data.previewImages.length),
     })
     app.setNavTitle('navCreate', lang)

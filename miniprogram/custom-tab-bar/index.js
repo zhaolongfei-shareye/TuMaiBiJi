@@ -8,6 +8,7 @@ Component({
     lang: 'zh',
     list: [],
     dark: false,
+    fontCls: '',
   },
 
   attached() {
@@ -21,8 +22,11 @@ Component({
   methods: {
     applyTheme(wallpaper) {
       // 组件读不到 page 上的 CSS 变量，深色与否只能由 JS 判出来挂类名；
-      // 判定结果一律取 palette 里那份，不在这里另记一遍壁纸名单
-      this.setData({ dark: themeOf(wallpaper).dark })
+      // 判定结果一律取 palette 里那份，不在这里另记一遍壁纸名单。
+      // 界面字体也是同一个道理：app.wxss 里那些 .font-* 类进不了这个组件，
+      // 只能把类名递进来，字体栈在本组件 wxss 里再写一遍（见那边的注释）。
+      const app = getApp()
+      this.setData({ dark: themeOf(wallpaper).dark, fontCls: app.uiFontClass ? app.uiFontClass() : '' })
     },
 
     updateLabels() {

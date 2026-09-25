@@ -149,6 +149,9 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
+      // 那五个色块同样是在 data 字面量里算的（模块加载时主题还没落地），
+      // 淡雅两枚下它们要跟着换档，所以进页时按当前主题重算。
+      features: FEATURES.map((f) => Object.assign({}, f, { skin: toneStyle(f.tone) })),
     })
     app.setNavTitle('aboutApp', lang)
   },
