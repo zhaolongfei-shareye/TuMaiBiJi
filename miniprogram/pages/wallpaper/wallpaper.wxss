@@ -206,20 +206,33 @@
   line-height: 1;
 }
 
+/* 等接口那一瞬的遮罩。原来写死半透明白，深色壁纸下会闪一下白；
+   但直接给容器加 opacity 会把"应用中"那行字一起冲淡，所以底色放伪元素上。 */
 .applying-mask {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
 }
 
+.applying-mask::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-page);
+  opacity: 0.6;
+}
+
 .applying-text {
+  position: relative;
   font-size: var(--fs-body);
   font-weight: 600;
   color: var(--text-secondary);

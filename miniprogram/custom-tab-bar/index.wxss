@@ -12,10 +12,10 @@
   left: 24rpx;
   right: 24rpx;
   height: 108rpx;
-  background: #23252c;
+  background: var(--tab-ink, #23252c);
   border-radius: 44rpx;
   padding-bottom: 0;
-  box-shadow: 0 16rpx 44rpx rgba(35, 37, 44, 0.28);
+  box-shadow: 0 16rpx 44rpx var(--tab-shadow, rgba(35, 37, 44, 0.28));
   z-index: 999;
 }
 

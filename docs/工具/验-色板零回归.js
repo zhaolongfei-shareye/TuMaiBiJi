@@ -223,6 +223,14 @@ for (const t of ramped) {
 }
 ck('新建页三张卡的校验红字 ≥ 4.5:1', lowErr.length === 0, lowErr.join(' | '))
 
+// ⑭ tab 栏那颗胶囊：六枚普通壁纸下必须和改动前写死的值一模一样（#23252c + rgba(35,37,44,.28)），
+//    淡雅两枚下才换成自己那支墨色。组件读不到 page 的变量，所以值由 JS 递进来。
+const barJs = readSrc('custom-tab-bar/index.js')
+const barCss = fs.readFileSync(path.join(pageDir, 'custom-tab-bar/index.wxss'), 'utf8')
+ck('胶囊底色与投影改由 JS 递进来', /--tab-ink:/.test(barJs) && /--tab-shadow:/.test(barJs))
+ck('六枚下胶囊仍是原来那块墨（#23252c）', /var\(--tab-ink,\s*#23252c\)/.test(barCss) && after.UNCATEGORIZED.bg.toUpperCase() === '#23252C')
+ck('六枚下胶囊投影与改动前逐值相同', after.withAlpha(after.UNCATEGORIZED.bg, 0.28).replace(/\s/g, '') === 'rgba(35,37,44,0.28)')
+
 after.setActiveTheme('default')
 const bad = results.filter((r) => !r.ok)
 console.log(`\n${results.length - bad.length}/${results.length} 过`)

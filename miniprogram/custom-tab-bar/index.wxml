@@ -1,4 +1,4 @@
-<view class="tab-bar {{dark ? 'tab-bar-dark' : ''}} {{fontCls}}">
+<view class="tab-bar {{dark ? 'tab-bar-dark' : ''}} {{fontCls}}" style="{{inkStyle}}">
   <view
     wx:for="{{list}}"
     wx:key="index"

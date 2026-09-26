@@ -33,7 +33,9 @@ Page({
       t: texts(lang),
       currentWallpaper: current,
       uiFont,
-      themeClass: app.getThemeClass(current),
+      // 这一页自己也要走 applyTheme：只拿类名的话，导航条底色停在上一页那套主题，
+      // 换完壁纸"导航条必须和页面底同值"这条约束在本页是破的（选完才补上，进页那一瞬不对）。
+      themeClass: app.applyTheme(current),
       wallpapers: THEMES.map((theme, i) => ({
         key: theme.key,
         label: theme.label,
