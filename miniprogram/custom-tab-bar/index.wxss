@@ -2,9 +2,9 @@
    这里是自定义组件，拿不到 page 上的 CSS 变量，所以颜色一律写死，不用 var()。
    字体同理：app.wxss 里那三个 .font-* 类进不了组件，只能把类名递进来、
    字体栈在这再写一遍。改字体栈要记得两边一起改（app.wxss 那份是主页面的）。 */
-.font-song { font-family: 'STSong', 'Songti SC', 'Noto Serif CJK SC', serif; }
-.font-fang { font-family: 'STFangsong', 'FangSong', 'Songti SC', serif; }
-.font-kai { font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', 'Songti SC', serif; }
+.font-song { font-family: 'STSong', 'Songti SC', '宋体-简', 'Noto Serif CJK SC', 'Noto Serif SC', 'Source Han Serif SC', '思源宋体 CN', 'SimSun', 'Noto Serif', serif; }
+.font-fang { font-family: 'STFangsong', 'FangSong', '仿宋', 'FangSong_GB2312', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Noto Serif', serif; }
+.font-kai { font-family: 'Kaiti SC', 'STKaiti', 'Kaiti', '楷体', 'KaiTi', 'TW-Kai', 'AR PL KaitiM GB', 'Noto Serif CJK SC', 'Noto Serif', serif; }
 .tab-bar {
   display: flex;
   position: fixed;

@@ -57,11 +57,25 @@ for (const lang of ['zh', 'en']) {
 if (!glyphTemplates.length) bad.push(`没有任何一套模板画出品牌字「${poster.BRAND_GLYPH}」，占位字这条改动没生效`)
 
 // ③ 设了形象的人像位不该再要这个字：那几套画的是头像，不是占位字。
-const withAvatar = poster.TEMPLATES.filter((tpl) => {
+//    信笺（letter）是豁免：它那颗「麦」刻在左下角那枚落款印上，跟头像位无关，
+//    设没设形象都该在。豁免不能只是闭眼跳过，所以另加一条正向断言（下面 ③b）。
+const SEAL_TEMPLATES = ['letter']
+const withAvatar = poster.TEMPLATES.filter((tpl) => !SEAL_TEMPLATES.includes(tpl.id)).filter((tpl) => {
   const plan = poster.planPoster(ctx, poster.SAMPLE_NOTE, tpl.id, { name: '阿飞', slogan: '每天读一点', avatarPath: '/u/poster-avatar.img' }, 'zh', { showQr: true })
   return textsOf(plan).some((s) => s === poster.BRAND_GLYPH)
 }).map((x) => x.id)
 if (withAvatar.length) bad.push(`已经设了形象还画占位字：${withAvatar.join(' / ')}`)
+
+// ③b 落款印不许跟着形象消失：两种形象下都必须有那颗字，且画在头像位之外
+for (const id of SEAL_TEMPLATES) {
+  for (const avatarPath of ['', '/u/poster-avatar.img']) {
+    const plan = poster.planPoster(ctx, poster.SAMPLE_NOTE, id, { name: '阿飞', slogan: '每天读一点', avatarPath }, 'zh', { showQr: true })
+    const g = plan.layers.filter((l) => l.k === 'text' && (l.lines || []).some((s) => s === poster.BRAND_GLYPH))
+    if (!g.length) bad.push(`${id}${avatarPath ? '/有形象' : '/无形象'}: 落款印上那颗「${poster.BRAND_GLYPH}」没了`)
+    const av = plan.layers.find((l) => l.k === 'avatar')
+    if (av && g.some((l) => Math.abs(l.x - (av.x + av.d / 2)) < 4)) bad.push(`${id}: 落款印那颗字压在头像位上`)
+  }
+}
 
 console.log(`十套模板 × 中英 = 20 组小样；画到品牌字「${poster.BRAND_GLYPH}」的有 ${glyphTemplates.length} 组`)
 console.log(`模板名：${poster.TEMPLATES.map((x) => x.label).join(' / ')}`)

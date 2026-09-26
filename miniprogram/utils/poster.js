@@ -41,7 +41,7 @@ const TEMPLATES = [
   { id: 'card', label: '经典卡片', labelEn: 'Classic Card', group: 'classic' },
   { id: 'quote', label: '金句大字', labelEn: 'Big Quote', group: 'classic' },
   { id: 'block', label: '撞色块', labelEn: 'Color Block', group: 'classic' },
-  { id: 'clean', label: '极简', labelEn: 'Minimal', group: 'classic' },
+  { id: 'letter', label: '素宣信笺', labelEn: 'Vertical Letter', group: 'classic' },
   { id: 'popGrid', label: '波普分格', labelEn: 'Pop Panels', group: 'bold' },
   { id: 'popDots', label: '网点漫画', labelEn: 'Ben-Day Comic', group: 'bold' },
   { id: 'acid', label: '荧光渐变', labelEn: 'Acid Gradient', group: 'bold' },
@@ -288,6 +288,63 @@ function drawLine(ctx, line, ly, y) {
   })
 }
 
+// 一列竖排怎么落笔。三件事是横排那条做不到的，也不该让每个模板各写一遍：
+// ① 中日韩逐字一格；
+// ② 夹在中间的拉丁/数字整段转 90° 横躺——竖排里把 "2026" 拆成四个直立的字符号很难读，
+//    转过去才是通行做法（英文标题整条也就是一个横躺的段）；
+// ③ 开了 vpunct 的话，收束标点从格子正中挪到右上角，这才是信笺的样子：
+//    标点留在正中时一列下来像漏了字。只挪位置不转字形——「。」本来就是圆的，
+//    「，」挪到右上角之后和竖排逗号已经分不出来，转反而容易转出基线。
+const V_PUNCT = /[，。、；：！？）》」』】〉、·…]/
+// 中日韩字形从基线往上占多少字号。竖排里"这一格到哪里为止"要用它算：
+// 每格的盒子是 [基线-0.88字高, 基线]，下一格的顶就是上一格的底，这样两格才不咬。
+const V_ASC = 0.88
+
+// 一列拆成"落笔单位"：中日韩和标点各占一格，拉丁/数字整段转 90° 之后占它自己的字宽。
+// 分列（vcols）和落笔（drawVertColumn）必须共用这一份，否则列高预算和画出来的不是一回事。
+function vertUnits(ctx, text, step) {
+  const chars = Array.from(String(text == null ? '' : text))
+  const out = []
+  let i = 0
+  while (i < chars.length) {
+    if (CJK.test(chars[i]) || V_PUNCT.test(chars[i])) {
+      out.push({ s: chars[i], adv: step })
+      i += 1
+      continue
+    }
+    let j = i
+    while (j < chars.length && !CJK.test(chars[j]) && !V_PUNCT.test(chars[j])) j += 1
+    const run = chars.slice(i, j).join('')
+    out.push({ s: run, adv: Math.max(step, ctx.measureText(run).width) })
+    i = j
+  }
+  return out
+}
+
+function drawVertColumn(ctx, line, cx, top, ly) {
+  const step = ly.lh
+  const size = ly.size || 28
+  let cy = top
+  for (const u of vertUnits(ctx, line, step)) {
+    const solo = u.s.length === 1 && (CJK.test(u.s) || V_PUNCT.test(u.s))
+    if (solo && V_PUNCT.test(u.s) && ly.vpunct) {
+      ctx.fillText(u.s, cx + step * 0.26, cy - step * 0.24)
+    } else if (solo) {
+      ctx.fillText(u.s, cx, cy)
+    } else {
+      ctx.save()
+      // 转 90° 之后：局部 +x 朝下、局部 -y（基线以上那半截字形）朝右。
+      // 所以锚点 x 要往左收大半个字高才压在列心上，锚点 y 落在这一格盒子的顶。
+      ctx.translate(cx - size * 0.44, cy - size * V_ASC + u.adv / 2)
+      ctx.rotate(Math.PI / 2)
+      ctx.fillText(u.s, 0, 0)
+      ctx.restore()
+    }
+    cy += u.adv
+  }
+  return cy
+}
+
 function paintLayers(ctx, layers, images) {
   ensureRoundRect(ctx)
   for (const ly of layers) {
@@ -390,17 +447,12 @@ function paintLayers(ctx, layers, images) {
         if (ly.vert) {
           // 竖排：从右往左一列一列走（中文的传统读序），每列从上往下逐字落笔。
           // 文艺/杂志那类版式没有竖排就立不住，而横排堆字做不到。
-          const step = ly.lh
           ly.lines.forEach((line, col) => {
-            const cx = ly.x - col * (step + (ly.colGap || 0))
-            let cy = ly.y
+            const cx = ly.x - col * (ly.lh + (ly.colGap || 0))
             ctx.textAlign = 'center'
-            for (const ch of Array.from(line)) {
-              ctx.fillText(ch, cx, cy)
-              cy += step
-            }
+            drawVertColumn(ctx, String(line), cx, ly.y, ly)
+            ctx.textAlign = 'left'
           })
-          ctx.textAlign = 'left'
         } else {
           let y = ly.y
           for (const line of ly.lines) {
@@ -894,56 +946,123 @@ function planBlock(ctx, d) {
   return { width: W, height, layers, template: 'block' }
 }
 
-function planClean(ctx, d) {
+// 把一段文字切成竖排的列。预算单位是"占多长"而不是"几个字"：
+// 拉丁段转 90° 之后吃的是它自己的字宽，"WAICFuture" 一段顶三格，按字数分列会一路捅穿署名带
+// （模拟器实测过一次）。所以这里走 vertUnits，和落笔共用同一份数。
+// 返回 {cols, advs}：advs 是每列实际走了多长，画布高度由它反推（信笺按内容定高，不留大空洞）。
+function vcols(ctx, text, colH, step, maxCols) {
+  const units = vertUnits(ctx, text, step)
+  const pack = []
+  let i = 0
+  while (i < units.length && pack.length < maxCols) {
+    const cur = { parts: [], used: 0 }
+    while (i < units.length) {
+      const u = units[i]
+      // 列首不许站收束标点：宁可这一列多占一格（不超过一格），也不能让「，」顶在下一列最上面
+      if (cur.used && cur.used + u.adv > colH && !(V_PUNCT.test(u.s) && cur.used + u.adv <= colH + step)) break
+      cur.parts.push(u)
+      cur.used += u.adv
+      i += 1
+    }
+    pack.push(cur)
+  }
+  // 孤字不成列：最后一列只剩一个单位时从上一列挪一个下来（实测过：标题第二列孤零零一个"绍"，
+  // 读着像漏字而不是排版）。只在上一列还留得住至少一个单位时挪。
+  if (pack.length > 1 && pack[pack.length - 1].parts.length === 1 && pack[pack.length - 2].parts.length > 1) {
+    const last = pack[pack.length - 1]
+    const prev = pack[pack.length - 2]
+    const u = prev.parts.pop()
+    last.parts.unshift(u)
+    prev.used -= u.adv
+    last.used += u.adv
+  }
+  const cols = pack.map((c) => c.parts.map((u) => u.s).join(''))
+  const advs = pack.map((c) => c.used)
+  // 没吃完就补省略号；补不下就算了（宁可少个记号，也不能让它顶到列外）
+  if (i < units.length && cols.length) {
+    const n = cols.length - 1
+    if (advs[n] + step <= colH) {
+      cols[n] += '…'
+      advs[n] += step
+    }
+  }
+  return { cols, advs }
+}
+
+// 素宣信笺（竖排小楷）。站长 09-26 从三个变体里挑的是"无栏"这一版：一条栏线都不画，
+// 只靠列与列之间的空、一枚引首章、一枚落款印撑住，左边空掉三分之一。
+// 它顶掉的是原来那套「极简」——同为留白系，差异只剩线条和居中方式（他的原话是布局差异不大）。
+//
+// 列位统一走 60 的槽距（标题 46 字、正文 26 字都占同一个槽），标题和正文之间空一个槽，
+// 那一格空档就是信笺里"段"的意思；列数从右往左排，标题最多两列，正文吃掉剩下的槽。
+// 高度按内容走（和整套海报同一条规矩）：列区取"正文"和"款识+落款印"两路里更长的那条，
+// 底下再接署名带。写死一张高纸的话，短笔记会空出下半张。
+function planLetter(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
-  const tone = toneFor(note.category_id)
+  const s = schemeFor('riso', note.category_id)
   const pad = 56
-  const qrSize = 112
-  const MIN_H = 980
+  const qrSize = 108
+  const slot = 60
+  const x0 = W - 100
+  const slots = 7
+  const top = 176
+  const titleStep = 66
+  const bodyStep = 40
+  const kickStep = 32
+  const SEAL = '#9E3B2F'
+  const colH = 772
+  const gap = 44
 
-  font(ctx, 22, true)
-  const kicker = clip(ctx, [blockNameOf(note, lang), formatShortDate(note.created_at)].filter(Boolean).join(' · '), W - pad * 2)
-  font(ctx, 42, true)
-  const titleLines = fit(ctx, note.title || '', W - pad * 2, 4)
-  font(ctx, 27, false)
-  const summaryLines = note.summary ? fit(ctx, note.summary, W - pad * 2, 5) : []
-
-  const barH = 14
-  // 底行高度按"码贴纸"算（含底托那截偏移和下面那行引导语），署名行比它矮，坐在这条带的顶边上
+  font(ctx, 46, true, SERIF)
+  const T = vcols(ctx, note.title, colH, titleStep, 2)
+  const tN = T.cols.length
+  font(ctx, 26, false, SERIF)
+  const B = vcols(ctx, note.summary, colH, bodyStep, Math.max(1, slots - tN - (tN ? 1 : 0)))
+  font(ctx, 20, false, SERIF)
+  const kicker = [blockNameOf(note, lang), formatShortDate(note.created_at)].filter(Boolean).join(' · ').slice(0, 14)
+  const kickAdv = kicker ? vertUnits(ctx, kicker, kickStep).reduce((a, u) => a + u.adv, 0) : 0
   const signH = Math.max(84, qrStickerH(qrSize))
-  // 先按"内容自然往下堆"算一遍位置
-  const k0 = barH + 92
-  const t0 = k0 + 62
-  const tb0 = t0 + (titleLines.length - 1) * 58 + 42
-  const s0 = summaryLines.length ? tb0 + 34 : 0
-  const sb0 = summaryLines.length ? s0 + (summaryLines.length - 1) * 40 + 27 : tb0
-  const r0 = sb0 + 56
-  // 只有个标题的笔记会让这张变成横图，社交平台上横图很小，所以给一个竖版下限
-  const natural = r0 + 44 + signH + 56
-  const height = Math.max(natural, MIN_H)
-  // 撑出来的空白不能全堆在正文和署名之间，那样看着像少了一块；
-  // 上下对半分，整段正文往下挪一点，才像一张有意留白的海报。
-  const shift = Math.round((height - natural) * 0.45)
-  const kickerY = k0 + shift
-  const titleTop = t0 + shift
-  const summaryTop = s0 + shift
-  const ruleY = r0 + shift
+  const colLen = Math.max(0, ...T.advs, ...B.advs)
+  const height = Math.min(1360, top + Math.max(colLen, kicker ? kickAdv + 26 + 44 : 0) + gap + signH + 56)
   const signTop = height - 56 - signH
-  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 40, size: 30, avatarD: 84, profile, hasAvatar })
 
   const layers = []
-  layers.push(L.fill(0, 0, W, height, PAPER))
-  layers.push(L.fill(0, 0, W, barH, tone.bg))
-  layers.push(L.text({ x: pad, y: kickerY, lines: [kicker], size: 22, weight: 'bold', color: MUTED }))
-  layers.push(L.text({ x: pad, y: titleTop + 42, lines: titleLines, lh: 58, size: 42, weight: 'bold', color: INK }))
-  if (summaryLines.length) {
-    layers.push(L.text({ x: pad, y: summaryTop + 27, lines: summaryLines, lh: 40, size: 27, color: BODY }))
+  layers.push(L.fill(0, 0, W, height, s.bg))
+  // 引首章：右上那枚只有朱地、不刻字，刻字留给落款那枚，两枚都响就闹了
+  layers.push(L.rrect(x0 - 26, 52, 52, 52, 6, { fill: SEAL }))
+  layers.push(L.rrect(x0 - 20, 58, 40, 40, 4, { line: withAlpha(PAPER, 0.7), lineWidth: 2 }))
+  if (tN) {
+    // 槽距统一 60，所以列层的 colGap = 60 - 本层步距（标题 46 字那层是 -6）
+    layers.push(L.text({
+      x: x0, y: top, lines: T.cols, vert: true, lh: titleStep, colGap: slot - titleStep,
+      size: 46, weight: 'bold', color: s.ink, fam: SERIF, vpunct: true,
+    }))
   }
-  layers.push(L.fill(pad, ruleY, W - pad * 2, 2, 'rgba(35,37,44,0.10)'))
+  if (B.cols.length) {
+    layers.push(L.text({
+      x: tN ? x0 - (tN + 1) * slot : x0, y: top, lines: B.cols, vert: true, lh: bodyStep, colGap: slot - bodyStep,
+      size: 26, color: mix(s.ink, s.bg, 0.8), fam: SERIF, vpunct: true,
+    }))
+  }
+  // 最左那一细列是款识：分类和日期，小字、淡色，读完正文回头才看得见
+  const kickX = 120
+  if (kicker) {
+    layers.push(L.text({
+      x: kickX, y: top, lines: [kicker], vert: true, lh: kickStep, size: 20,
+      color: withAlpha(s.ink, 0.5), fam: SERIF, vpunct: true,
+    }))
+    const sealY = top + kickAdv + 26
+    layers.push(L.rrect(kickX - 22, sealY, 44, 44, 5, { fill: SEAL }))
+    font(ctx, 24, true, SERIF)
+    layers.push(L.text({
+      x: kickX, y: sealY + 33, lines: [BRAND_GLYPH], size: 24, weight: 'bold',
+      color: PAPER, align: 'center', fam: SERIF,
+    }))
+  }
+  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 40, size: 30, avatarD: 84, profile, hasAvatar })
   layers.push(...sign.layers)
-  // 这套以前只有一枚裸码、连一行引导语都没有——统一成右下角的码贴纸，这一行补齐了
-  qrSticker({ layers, x: W - pad - qrSize, y: signTop, size: qrSize, offset: tone.bg, ink: MUTED, label: t('scanToView', lang) })
-  return { width: W, height, layers, template: 'clean' }
+  qrSticker({ layers, x: W - pad - qrSize, y: signTop, size: qrSize, offset: s.accent, ink: s.sub, label: t('scanToView', lang) })
+  return { width: W, height, layers, template: 'letter' }
 }
 
 // ---------------------------------------------------------------- 出跳款
@@ -1350,7 +1469,7 @@ function planSpec(ctx, d) {
 }
 
 const PLANNERS = {
-  card: planCard, quote: planQuote, block: planBlock, clean: planClean,
+  card: planCard, quote: planQuote, block: planBlock, letter: planLetter,
   popGrid: planPopGrid, popDots: planPopDots, acid: planAcid, cover: planCover, lit: planLit, spec: planSpec,
 }
 

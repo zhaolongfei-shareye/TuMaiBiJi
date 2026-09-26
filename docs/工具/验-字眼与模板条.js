@@ -172,8 +172,8 @@ const txt = async (els) => {
     let path0 = await page.data('imagePath')
     ck('上面的海报已经出图', !!path0, String(path0).split('/').pop())
 
-    const IDS = ['card', 'quote', 'block', 'clean', 'popGrid', 'popDots', 'acid', 'cover', 'lit', 'spec']
-    for (const target of [expect0 === 'quote' ? 'block' : 'quote', 'clean', 'popGrid']) {
+    const IDS = ['card', 'quote', 'block', 'letter', 'popGrid', 'popDots', 'acid', 'cover', 'lit', 'spec']
+    for (const target of [expect0 === 'quote' ? 'block' : 'quote', 'letter', 'popGrid']) {
       all = await page.$$('.pick')
       await all[IDS.indexOf(target)].tap()
       await sleep(4500)

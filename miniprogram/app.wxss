@@ -187,20 +187,15 @@ page {
 }
 
 /* 界面字体：不挂这三个类就是上面 page 那条苹方链（默认）。
-   宋体把 STSong 放在 Songti SC 前面是实测出来的：iOS 上命中的是 STSong，
-   'Songti SC' 这个名字在小程序里点不中；Mac 上的模拟器两个都认。
-   安卓这三个名字基本都落空，会回落到系统黑体——这是设备本身没有这三套字，不是没生效。 */
-.font-song {
-  font-family: 'STSong', 'Songti SC', 'Noto Serif CJK SC', serif;
-}
+   宋体把 STSong 放在 Songti SC 前面：Mac 模拟器上实测命中的是 STSong，'Songti SC' 点不中；
+   iOS 真机没验过（站长那台是安卓），所以两个名字都留在链里，谁命中用谁。
+   这一排只承诺 iOS——这几套字是苹果系统自带的。安卓机型一律回落系统黑体，
+   站长 09-26 定的不为此内置字体包（"避免浪费开发资源"），界面文案直接写明仅 iPhone / iPad 可选。 */
+.font-song { font-family: 'STSong', 'Songti SC', '宋体-简', 'Noto Serif CJK SC', 'Noto Serif SC', 'Source Han Serif SC', '思源宋体 CN', 'SimSun', 'Noto Serif', serif; }
 
-.font-fang {
-  font-family: 'STFangsong', 'FangSong', 'Songti SC', serif;
-}
+.font-fang { font-family: 'STFangsong', 'FangSong', '仿宋', 'FangSong_GB2312', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Noto Serif', serif; }
 
-.font-kai {
-  font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', 'Songti SC', serif;
-}
+.font-kai { font-family: 'Kaiti SC', 'STKaiti', 'Kaiti', '楷体', 'KaiTi', 'TW-Kai', 'AR PL KaitiM GB', 'Noto Serif CJK SC', 'Noto Serif', serif; }
 
 .container {
   /* 顶部这 2rpx 不是间距，是堵外边距穿透的：子元素第一个的 margin-top 会和

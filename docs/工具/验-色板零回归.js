@@ -142,6 +142,27 @@ const fontCls = ['font-song', 'font-fang', 'font-kai']
 ck('字体类在 app.wxss 里齐全', fontCls.every((c) => css.includes(`.${c}`)))
 ck('字体类在 tab 栏组件里也齐全（组件样式隔离）', fontCls.every((c) => tabCss.includes(`.${c}`)))
 ck('宋体类把 STSong 放在 Songti SC 前面', /font-song\s*\{[^}]*'STSong',\s*'Songti SC'/.test(css))
+// 两边不只是"都有"，声明必须逐字节相同：组件那份是抄的，抄漏一个名字就会出现
+// "主页面换了字、底部 tab 没换"这种半截效果，而它只在部分机型上看得见。
+const decl = (src, cls) => {
+  const m = new RegExp(`\\.${cls}\\s*\\{[^}]*\\}`).exec(src)
+  return m ? m[0].replace(/\s+/g, ' ') : ''
+}
+const drift = fontCls.filter((c) => decl(css, c) !== decl(tabCss, c))
+ck('两份字体栈逐字节相同（组件那份不许自己漂）', drift.length === 0, drift.join(' '))
+// 字体这条只承诺 iOS（站长 09-26 定的：不再为安卓内置字体包，文案里直接注明"仅 iPhone / iPad 可选"）。
+// 原来那两条断言写的是"安卓可用的名字必须在链子里"，读起来像我们承诺了安卓；
+// 换成断言真正承诺的两件事：首位是苹果那几张字，末位是通用族兜底（命不中也不出错）。
+ck('三档首位都是 iOS 那几张字', fontCls.every((c) => {
+  const m = /^\.font-\w+ \{ font-family: '(STSong|STFangsong|Kaiti SC)'/.exec(decl(css, c))
+  return !!m
+}))
+ck('三档末位都是通用族兜底', fontCls.every((c) => /(serif|sans-serif); \}$/.test(decl(css, c))))
+// 机型口径钉在文案里：这排只承诺 iOS，说明必须写明白，不许含糊成"部分机型会回落"——
+// 含糊的说法会让人当成 bug 报上来（站长 09-26 就是因为安卓点了没反应才来问的）。
+const words = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js')).i18n
+ck('中文文案写明「仅 iPhone / iPad 可选」', /仅 iPhone \/ iPad 可选/.test(words.zh.fontHint))
+ck('英文文案同样写明 iPhone / iPad only', /iPhone \/ iPad only/i.test(words.en.fontHint))
 
 // ⑩ 缩略图取色不许被"当前主题"染色：壁纸选择器每一格画的是别的主题，必须显式带自己的 key。
 // 这条是真截图里抓到的：停在米白时，米白那一格之外的六格小色块也变成了色阶色。
