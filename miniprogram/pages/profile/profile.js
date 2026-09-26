@@ -52,7 +52,7 @@ Page({
       {
         lang,
         t: texts(lang),
-        themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
+        themeClass: app.applyTheme(app.getWallpaper()),
         name: saved.name || '',
         slogan: saved.slogan || '',
         template: saved.template || poster.DEFAULT_TEMPLATE,

@@ -46,7 +46,7 @@ Page({
   async onShow() {
     const app = getApp()
     await app.getLoginPromise().catch(() => {})
-    const themeClass = app.applyTheme(app.globalData.userInfo?.wallpaper || 'default')
+    const themeClass = app.applyTheme(app.getWallpaper())
     const lang = app.globalData.userInfo?.language || 'zh'
     this.setData({
       lang,
@@ -59,6 +59,7 @@ Page({
     app.setNavTitle('appName', lang)
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
+      this.getTabBar().applyTheme(app.getWallpaper())
       this.getTabBar().setData({ selected: 1 })
     }
     this.loadCategories()

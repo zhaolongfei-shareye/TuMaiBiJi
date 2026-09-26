@@ -76,8 +76,11 @@ function blockSkinFor(categoryId, noteId) {
   // 母题只比底色暗/亮一点点，做质感不做主角
   const motifColor = mix(ink, bg, 0.16)
   // 墨黑这块在深色壁纸下会和卡片底糊在一起，只有它有描边；亮底上这条描边看不出来，所以两端都安全。
-  // 色阶主题下卡底是亮纸（不是夜紫/深海那种深色），所以不需要这条描边。
-  const edge = !ramp && tone === UNCATEGORIZED ? 'rgba(255,255,255,0.16)' : 'transparent'
+  // 色阶主题反过来：卡底是亮纸，最浅那两档（与卡底只差 1.2~1.6 的对比）会直接在卡上化掉，
+  // 所以这里给一条"取 bg 和 ink 里更深那个"的细描边——浅档勾深边、深档勾深底边，都不刺眼。
+  const edge = ramp
+    ? withAlpha(lumOf(bg) < lumOf(ink) ? bg : ink, 0.22)
+    : tone === UNCATEGORIZED ? 'rgba(255,255,255,0.16)' : 'transparent'
   const size = 108 + (h % 4) * 16 // rpx：108~156，方块 176rpx 见 app.wxss --blk
   const shift = 24 + (h % 3) * 8 // rpx：出界多少，从 id 派生
   const style = [
@@ -119,8 +122,9 @@ function toneStyle(i) {
     `--face-off-ink:${onDark ? 'rgba(255,255,255,0.5)' : mix(ink, bg, 0.45)}`,
     `--solid-bg:${onDark ? '#FFFFFF' : ink}`,
     `--solid-ink:${onDark ? bg : '#FFFFFF'}`,
-    // 校验/权限提示那行字直接坐在卡色上，所以亮底卡用深红、深底卡用浅红，两边都够对比度
-    `--blk-err:${onDark ? '#FFD7D3' : '#8C2119'}`,
+    // 校验/权限提示那行字直接坐在卡色上，所以亮底卡用深红、深底卡用浅红，两边都够对比度。
+    // 色阶主题下浅三档比原来那五支彩色暗，同一个 #8C2119 掉到 4.0~4.2（要 4.5），所以另给一档深红。
+    `--blk-err:${onDark ? '#FFD7D3' : ramp ? '#7A1A13' : '#8C2119'}`,
   ].join(';')
 }
 
@@ -184,7 +188,9 @@ const THEMES = [
     lineEdge: 'rgba(36,30,22,0.12)',
     dark: false,
     ramp: {
-      steps: ['#EAE0CE', '#D9C9AE', '#C2AA85', '#9A7F5C', '#6A5334'],
+      // 第 4 档从 #9A7F5C 加深到 #85644A：原来那版配亮字只有 3.50，方块上那行分类名是 16px/800，
+      // 按 WCAG 要 4.5:1；加深后 4.97，且仍比第 5 档浅，色阶顺序没被打乱。
+      steps: ['#EAE0CE', '#D9C9AE', '#C2AA85', '#85644A', '#6A5334'],
       inks: ['#3B2F1F', '#33291B', '#2A2114', '#FBF6EC', '#FBF6EC'],
       uncategorized: { bg: '#241E16', ink: '#F2EFE9' },
     },
@@ -199,7 +205,8 @@ const THEMES = [
     lineEdge: 'rgba(27,42,33,0.13)',
     dark: false,
     ramp: {
-      steps: ['#DDE7DF', '#C2D3C6', '#9FB8A6', '#6E8F77', '#40604A'],
+      // 同上：第 4 档 #6E8F77 配亮字只有 3.31，加深到 #54745D 后 4.83。
+      steps: ['#DDE7DF', '#C2D3C6', '#9FB8A6', '#54745D', '#40604A'],
       inks: ['#1F2D25', '#1A271F', '#14211A', '#F3F7F2', '#F3F7F2'],
       uncategorized: { bg: '#1B2A21', ink: '#E9EEEA' },
     },
@@ -312,16 +319,21 @@ function rampFor(categoryId) {
 }
 
 /**
+ * 一块色的视觉轻重（亮度加权，和电视信号那套系数一致）。
+ * 只用来比"字和底谁更亮"，不当对比度用——那要另一条公式。
+ */
+function lumOf(hex) {
+  const [r, g, b] = hexToRgb(hex)
+  return r * 0.299 + g * 0.587 + b * 0.114
+}
+
+/**
  * 这块色算"深底"吗——判据是字比底亮，不是"字是不是纯白"。
  * 原来那句 `ink === '#FFFFFF'` 对现有六组色的判定结果，和这条逐组一致（单测钉住）；
  * 换成色阶之后深两档配的是米白字而不是纯白，只有这条判得对。
  */
 function inkIsLighter(bg, ink) {
-  const lum = (hex) => {
-    const [r, g, b] = hexToRgb(hex)
-    return r * 0.299 + g * 0.587 + b * 0.114
-  }
-  return lum(ink) > lum(bg)
+  return lumOf(ink) > lumOf(bg)
 }
 
 module.exports = {

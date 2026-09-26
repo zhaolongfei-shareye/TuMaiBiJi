@@ -3,6 +3,8 @@
    ① 非色彩令牌——全局一份，不随主题变。
    ② 主题（=用户选的壁纸）只管 chrome：页面底、导航、搜索框、chips、正文文字。
    ③ 方块的颜色不归主题管，由 utils/palette.js 按分类固定注入 --blk-bg / --blk-ink。
+      例外只有下面 .theme-tint-paper / .theme-tint-celadon 这两枚"整套色阶"：
+      它们自带 ramp，方块也收进同一支色相。其余六枚照③走。
 
    V1→V2 只改了承载方式：颜色从"整张卡"退到卡片左侧那块方块，卡本身回白底。
    这一改带来两个后果，写清楚免得下一个人当成 bug：
@@ -162,7 +164,7 @@ page {
   --bg-page: #F2EFE9;
   --bg-card: #FCFBF8;
   --text-primary: #241E16;
-  --text-secondary: rgba(36, 30, 22, 0.62);
+  --text-secondary: rgba(36, 30, 22, 0.66);
   --text-tertiary: rgba(36, 30, 22, 0.4);
   --border: rgba(36, 30, 22, 0.09);
   --card-edge: rgba(36, 30, 22, 0.12);
@@ -175,7 +177,7 @@ page {
   --bg-page: #E9EEEA;
   --bg-card: #F7FAF7;
   --text-primary: #1B2A21;
-  --text-secondary: rgba(27, 42, 33, 0.62);
+  --text-secondary: rgba(27, 42, 33, 0.66);
   --text-tertiary: rgba(27, 42, 33, 0.4);
   --border: rgba(27, 42, 33, 0.1);
   --card-edge: rgba(27, 42, 33, 0.13);

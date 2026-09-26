@@ -40,9 +40,9 @@
       data-key="{{item.key}}"
     >
       <!-- 缩略预览：一块色 + 一条中性块 + 两条描边行，就是首页那一行的缩影。
-           带色阶的那两枚会打一个"整套色阶"角标——它们和其他六枚不是一回事：
-           其他六枚只换页面底，这两枚连左侧方块一起换。 -->
-      <text wx:if="{{item.tinted}}" class="tint-flag">{{t.tintedFlag}}</text>
+           带色阶的那两枚要打个标记——它们和其他六枚不是一回事：
+           其他六枚只换页面底，这两枚连左侧方块一起换。
+           标记放在名字同一行：原先浮在右上角会咬掉那条长色块的右端（截图里看得见）。 -->
       <view class="mini">
         <view class="mini-blk" style="background: {{item.stack[0]}}"></view>
         <view class="mini-blk wide" style="background: {{item.stack[1]}}"></view>
@@ -51,7 +51,10 @@
       <view class="mini-ln short" style="background: {{item.line}}; border-color: {{item.lineEdge}}"></view>
 
       <view class="wallpaper-foot">
-        <text class="wallpaper-label">{{item.label}}</text>
+        <view class="wp-name">
+          <text class="wallpaper-label">{{item.label}}</text>
+          <text wx:if="{{item.tinted}}" class="tint-flag">{{t.tintedFlag}}</text>
+        </view>
         <view wx:if="{{item.active}}" class="check-mark">✓</view>
       </view>
     </view>

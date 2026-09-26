@@ -40,8 +40,8 @@ const FEATURES = [
   {
     mark: '外观',
     tone: 0,
-    title: '六张壁纸',
-    body: '含夜紫、深海两张深色，导航条、卡片和左侧色块会跟着一起换。界面语言在新建页标题右边切（中 / EN），切完当场就变；这一栏的三页说明目前只有中文。',
+    title: '八张壁纸',
+    body: '含夜紫、深海两张深色，导航条、卡片和左侧色块会跟着一起换。另有「米白一色」「雨过青」两枚是整套色阶：连左侧方块、按钮、标签一起收进同一支色相，只按深浅分层，这两枚只存在当前这台设备上。界面语言在新建页标题右边切（中 / EN），切完当场就变；这一栏的三页说明目前只有中文。',
   },
 ]
 
@@ -148,7 +148,7 @@ Page({
     this.setData({
       lang,
       t: texts(lang),
-      themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
+      themeClass: app.applyTheme(app.getWallpaper()),
       // 那五个色块同样是在 data 字面量里算的（模块加载时主题还没落地），
       // 淡雅两枚下它们要跟着换档，所以进页时按当前主题重算。
       features: FEATURES.map((f) => Object.assign({}, f, { skin: toneStyle(f.tone) })),

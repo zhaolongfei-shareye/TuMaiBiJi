@@ -15,7 +15,7 @@ Component({
     this.updateLabels()
     const app = getApp()
     if (app.globalData.userInfo) {
-      this.applyTheme(app.globalData.userInfo.wallpaper || 'default')
+      this.applyTheme(app.getWallpaper())
     }
   },
 

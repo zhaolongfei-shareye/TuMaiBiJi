@@ -184,10 +184,9 @@ App({
       backgroundColor: theme.page,
       fail() {},
     })
-    const tabBar = this.getTabBar?.()
-    if (tabBar) {
-      tabBar.applyTheme?.(wallpaper)
-    }
+    // tab 栏不在这里推：getTabBar 是 Page 的 API，App 实例上根本没有这个方法，
+    // 原来那句 this.getTabBar?.() 恒为 undefined，等于没人管过 tab 栏的颜色和字体。
+    // 三个 tab 页各自在 onShow 里已经有 this.getTabBar() 那一串，由它们推。
     return this.containerClass(wallpaper)
   },
 

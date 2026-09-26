@@ -27,7 +27,7 @@ Page({
   onShow() {
     const userInfo = app.globalData.userInfo || {}
     const lang = userInfo.language || 'zh'
-    const themeClass = app.applyTheme(userInfo.wallpaper || 'default')
+    const themeClass = app.applyTheme(app.getWallpaper())
     // 分享形象是本机设置，读一次很便宜；从那一页改完回到这里要能立刻看到用的是哪套
     const prof = poster.readProfile()
     this.setData({
@@ -41,6 +41,7 @@ Page({
     wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'], fail() {} })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
+      this.getTabBar().applyTheme(app.getWallpaper())
       this.getTabBar().setData({ selected: 2 })
     }
     this.loadQuota()

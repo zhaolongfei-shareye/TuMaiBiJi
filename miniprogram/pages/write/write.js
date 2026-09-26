@@ -28,7 +28,7 @@ Page({
       lang,
       t: texts(lang),
       categoryNames: [t('noCategory', lang)],
-      themeClass: app.applyTheme(app.globalData.userInfo?.wallpaper || 'default'),
+      themeClass: app.applyTheme(app.getWallpaper()),
     })
     app.setNavTitle('writeNote', lang)
     await this.loadCategories()

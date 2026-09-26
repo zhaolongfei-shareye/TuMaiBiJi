@@ -159,6 +159,70 @@ ck('缩略图按各自主题取色（不被当前主题染色）', thumbDiff.len
 after.setActiveTheme('tint-paper')
 ck('不带 key 时按当前主题取色', after.toneColor(0) === after.THEMES.find((x) => x.key === 'tint-paper').ramp.steps[0])
 
+// ⑪ 主题读法必须收口。这条是代码审查抓出来的：十处页面各写一遍
+// `app.globalData.userInfo?.wallpaper || 'default'`，而 401 那一路会把 userInfo 清成 null
+// （utils/api.js），那一瞬间任何页面 onShow 都会把 ACTIVE_THEME 写成 default，
+// 于是出现"页底是 default、方块是色阶"的混色屏；外观设置页自己却读本机那份，显示"已选淡雅"。
+// 所以：任何页面都不许再直接读 userInfo.wallpaper 当主题，只能走 app.getWallpaper()。
+const pageDir = path.resolve(__dirname, '../../miniprogram')
+// 只看代码行：这几条判据找的是"写法"，而注释里恰好要写下被禁的那种写法来说明为什么禁，
+// 不剥注释就会自己判自己红（第一版就是这么踩的）。
+const readSrc = (rel) =>
+  fs
+    .readFileSync(path.join(pageDir, rel), 'utf8')
+    .split('\n')
+    .filter((l) => !/^\s*\/\//.test(l))
+    .join('\n')
+const TAB_PAGES = ['pages/index/index.js', 'pages/create/create.js', 'pages/me/me.js']
+const scanned = ['app.js', 'custom-tab-bar/index.js'].concat(
+  fs.readdirSync(path.join(pageDir, 'pages')).flatMap((p) =>
+    fs.readdirSync(path.join(pageDir, 'pages', p)).filter((f) => f.endsWith('.js')).map((f) => `pages/${p}/${f}`)
+  )
+)
+const offenders = scanned.filter((rel) => /userInfo\??\.wallpaper\s*\|\|/.test(readSrc(rel)))
+ck(`没有任何文件自己拼 userInfo.wallpaper 当主题（扫 ${scanned.length} 个 js）`, offenders.length === 0, offenders.join(' '))
+
+// ⑫ tab 栏的 dark 和字体必须有人推。App 实例上没有 getTabBar（那是 Page 的 API），
+// 所以 app.applyTheme 里那句 this.getTabBar?.() 恒为 undefined——原来没人管过 tab 栏，
+// 换完壁纸/字体要等整个小程序重开才对。现在由三个 tab 页各自在 onShow 里推一次。
+ck('app.applyTheme 不再假装能拿到 tab 栏', !/this\.getTabBar\?\.\(\)/.test(readSrc('app.js')))
+const notPushing = TAB_PAGES.filter((rel) => !/getTabBar\(\)\.applyTheme\(/.test(readSrc(rel)))
+ck('三个 tab 页各自把壁纸推给 tab 栏', notPushing.length === 0, notPushing.join(' '))
+
+// ⑬ 淡雅两枚的可读性下限。这批的色是"同一支色相只差明度"手挑的，挑的时候只看截图，
+//    而方块上那行字是 32rpx（约 16px）粗体——按 WCAG 属于正文档，要 4.5:1。
+//    第一版第 4 档只有 3.50 / 3.31，是审查算出来才发现的（截图上看着挺清楚）。
+const lin = (v) => (v /= 255) <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+const luma = (h) => { const [r, g, b] = after.hexToRgb(h); return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) }
+const ratio = (a, b) => { const x = luma(a), y = luma(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05) }
+const lowText = []
+const lowEdge = []
+for (const t of ramped) {
+  t.ramp.steps.forEach((bg, i) => {
+    if (ratio(bg, t.ramp.inks[i]) < 4.5) lowText.push(`${t.key} 档${i} ${ratio(bg, t.ramp.inks[i]).toFixed(2)}`)
+    // 浅两档与卡底只差 1.2~1.6，方块轮廓全靠那条描边兜住；描边没了就是"方块化在卡上"
+    after.setActiveTheme(t.key)
+    const style = after.blockSkinFor(i, 1).style
+    if (!/--blk-edge:rgba\(/.test(style)) lowEdge.push(`${t.key} 档${i} 无描边`)
+  })
+  const u = t.ramp.uncategorized
+  if (ratio(u.bg, u.ink) < 4.5) lowText.push(`${t.key} 未分类 ${ratio(u.bg, u.ink).toFixed(2)}`)
+  if (ratio(u.bg, t.line) < 3) lowEdge.push(`${t.key} 未分类与卡底不足 3:1`)
+}
+ck('色阶每档字/底 ≥ 4.5:1', lowText.length === 0, lowText.join(' | '))
+ck('色阶每档方块都带描边（浅档不化在卡上）', lowEdge.length === 0, lowEdge.join(' | '))
+
+// 同一套里那行校验红字也是手挑的，浅档底上第一版只有 4.0 / 4.2
+const lowErr = []
+for (const t of ramped) {
+  after.setActiveTheme(t.key)
+  for (const i of [0, 1, 2]) {
+    const err = /--blk-err:(#[0-9a-fA-F]{6})/.exec(after.toneStyle(i))
+    if (err && ratio(err[1], t.ramp.steps[i]) < 4.5) lowErr.push(`${t.key} 档${i} ${ratio(err[1], t.ramp.steps[i]).toFixed(2)}`)
+  }
+}
+ck('新建页三张卡的校验红字 ≥ 4.5:1', lowErr.length === 0, lowErr.join(' | '))
+
 after.setActiveTheme('default')
 const bad = results.filter((r) => !r.ok)
 console.log(`\n${results.length - bad.length}/${results.length} 过`)

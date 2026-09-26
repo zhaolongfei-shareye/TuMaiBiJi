@@ -106,18 +106,23 @@
   color: var(--bg-page);
 }
 
-/* 带色阶的那两枚的角标：它们和另外六枚不是一回事，得先说清楚 */
+/* 带色阶那两枚的标记：跟名字同一行，不再浮在格子上面（浮着会盖住那条长色块）。
+   这里不跟界面字体走——它是压在某个具体主题的格子上的小标签，用系统链最稳。 */
+.wp-name {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  min-width: 0;
+}
+
 .tint-flag {
-  position: absolute;
-  top: 20rpx;
-  right: 20rpx;
-  z-index: 2;
+  flex: none;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
-  font-size: var(--fs-label);
+  font-size: var(--fs-micro);
   font-weight: 700;
-  letter-spacing: 1rpx;
-  padding: 6rpx 14rpx;
-  border-radius: 10rpx;
+  letter-spacing: 0.5rpx;
+  padding: 2rpx 8rpx;
+  border-radius: 8rpx;
   background: var(--wp-label);
   color: var(--wp-opp);
 }

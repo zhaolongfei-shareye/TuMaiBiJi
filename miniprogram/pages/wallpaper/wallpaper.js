@@ -45,7 +45,8 @@ Page({
         line: theme.line,
         lineEdge: theme.lineEdge,
         // 缩略图里那两个小色块画的是"这一格那套主题"下的方块色，不是当前主题下的，
-        // 所以主题 key 必须传给 toneColor：淡雅两枚取自己 ramp 的第 1、3 档，
+        // 所以主题 key 必须传给 toneColor：淡雅两枚按自己在 THEMES 里的下标取档
+        // （米白一色是第 7 格 → steps[1] 和 steps[2]，雨过青是第 8 格 → steps[2] 和 steps[3]），
         // 其余六枚仍取分类色板那五支彩色。
         stack: [toneColor(i, theme.key), toneColor(i + 1, theme.key)],
       })),
