@@ -7,7 +7,7 @@
 //
 // 色只从 palette.js 出。头像、名称、slogan 全部来自本机 storage（见 readProfile），
 // 服务器不存任何一张用户图片。
-const { toneFor, mix, schemeFor, plateColors, withAlpha } = require('./palette.js')
+const { toneFor, mix, schemeFor, plateColors, withAlpha, lumOf } = require('./palette.js')
 const { formatShortDate } = require('./date.js')
 const { t } = require('./i18n.js')
 
@@ -25,6 +25,21 @@ const SERIF = 'serif'
 const MONO = 'Courier New'
 
 const PROFILE_KEY = 'poster_profile'
+
+// 经典三款的纸色，站长 09-26 定："版式一格不动，只把分类蓝换成宣纸那一族"，两档都要。
+// 走哪一档由分类色自己的明暗决定（见 paperOf）：
+// A 纯宣——色带是旧宣纸的深一档，整套只有一枚朱印是饱和色；
+// B 黛青——页面和卡仍是纸色，只有那条大色带换成低饱和的黛青，层次更清楚。
+// plate 是色带上那枚方块的发色：浅带上必须比带子更深才看得见，暗带上才用白半透。
+const PAPER_A = { bg: '#E4DCC7', ink: '#2E2B24', plate: '#D6C8A9', drop: '#D2C6A8', onDark: false }
+const PAPER_B = { bg: '#55625C', ink: '#EEF0EB', plate: 'rgba(255,255,255,0.16)', drop: '#3E4A45', onDark: true }
+
+function paperOf(categoryId) {
+  // 分界取在五档分类色的中间（明度 137）：芥末黄、橙这两档偏亮走 A，
+  // 宝蓝、草绿、紫和未分类那块墨偏暗走 B。这样换分类时纸的深浅还会跟着动，
+  // 不至于经典三款全长成一张脸。
+  return lumOf(toneFor(categoryId).bg) >= 137 ? PAPER_A : PAPER_B
+}
 const DEFAULT_TEMPLATE = 'card'
 // 头像文件的统一前缀，名字每次挑都换一个（见 stageAvatar）。
 // 之前是"暂存""正式"两个固定名字，1.4.0 真机报出：换第二张图预览还是第一张。
@@ -38,9 +53,9 @@ const BRAND_GLYPH = '麦'
 const GRAY_ZERO_SAT = '#808080'
 
 const TEMPLATES = [
-  { id: 'card', label: '经典卡片', labelEn: 'Classic Card', group: 'classic' },
-  { id: 'quote', label: '金句大字', labelEn: 'Big Quote', group: 'classic' },
-  { id: 'block', label: '撞色块', labelEn: 'Color Block', group: 'classic' },
+  { id: 'card', label: '玉版宣', labelEn: 'Jade Paper', group: 'classic' },
+  { id: 'quote', label: '摘句', labelEn: 'Verse Slip', group: 'classic' },
+  { id: 'block', label: '叠翠', labelEn: 'Layered Paper', group: 'classic' },
   { id: 'letter', label: '素宣信笺', labelEn: 'Vertical Letter', group: 'classic' },
   { id: 'popGrid', label: '波普分格', labelEn: 'Pop Panels', group: 'bold' },
   { id: 'popDots', label: '网点漫画', labelEn: 'Ben-Day Comic', group: 'bold' },
@@ -738,7 +753,7 @@ function signRow({ ctx, x, y, maxW, size, avatarD, onDark, profile, hasAvatar })
 
 function planCard(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
-  const tone = toneFor(note.category_id)
+  const tone = paperOf(note.category_id)
   const cardX = 40
   const cardY = 60
   const pad = 44
@@ -800,7 +815,7 @@ function planCard(ctx, d) {
   // 盖掉它下半截的圆角，就得到"上圆下方"。
   layers.push(L.rrect(cardX, cardY, cardW, bandH, radius, { fill: tone.bg }))
   layers.push(L.fill(cardX, cardY + radius, cardW, bandH - radius, tone.bg))
-  layers.push(L.rrect(contentX, cardY + pad, block, block, 28, { fill: 'rgba(255, 255, 255, 0.16)' }))
+  layers.push(L.rrect(contentX, cardY + pad, block, block, 28, { fill: tone.plate }))
 
   font(ctx, 28, true)
   layers.push(L.text({
@@ -832,7 +847,7 @@ function planCard(ctx, d) {
 
 function planQuote(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
-  const tone = toneFor(note.category_id)
+  const tone = paperOf(note.category_id)
   const cardX = 40
   const cardY = 60
   const pad = 52
@@ -861,7 +876,7 @@ function planQuote(ctx, d) {
   const cardH = cardBottom - cardY
 
   const signTop = cardBottom + 56
-  const sign = signRow({ ctx, x: cardX + pad, y: signTop, maxW: innerW - qrSize - 40, size: 30, avatarD: 88, onDark: true, profile, hasAvatar })
+  const sign = signRow({ ctx, x: cardX + pad, y: signTop, maxW: innerW - qrSize - 40, size: 30, avatarD: 88, onDark: tone.onDark, profile, hasAvatar })
   const qrX = W - cardX - pad - qrSize
   const height = signTop + Math.max(qrStickerH(qrSize), sign.h) + 56
 
@@ -884,7 +899,7 @@ function planQuote(ctx, d) {
 
 function planBlock(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
-  const tone = toneFor(note.category_id)
+  const tone = paperOf(note.category_id)
   const pad = 44
   const qrSize = 120
   const avatarD = 132
@@ -1562,6 +1577,9 @@ const SAMPLE_NOTE_EN = {
 module.exports = {
   W,
   TEMPLATES,
+  paperOf,
+  PAPER_A,
+  PAPER_B,
   TEMPLATE_GROUPS,
   DEFAULT_TEMPLATE,
   BRAND_GLYPH,

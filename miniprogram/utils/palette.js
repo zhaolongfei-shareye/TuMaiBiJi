@@ -356,4 +356,5 @@ module.exports = {
   mix,
   withAlpha,
   hexToRgb,
+  lumOf,
 }

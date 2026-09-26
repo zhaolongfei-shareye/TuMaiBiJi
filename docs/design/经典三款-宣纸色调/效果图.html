@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>经典三款改宣纸色调 · 效果图</title>
+<style>
+  :root {
+    /* 方向 A：纯宣。整套只有一块朱（#9E3B2F）是饱和色，其余全是纸的深浅 */
+    --a-page1: #F3EFE3; --a-page2: #EAE3D2; --a-band: #E4DCC7; --a-card: #FFFDF7;
+    --a-ink: #2E2B24; --a-sub: #6A6357; --a-block-ink: #2E2B24; --a-drop: #D8CEB6; --a-line: #D2C8AF;
+    /* 方向 B：宣纸 + 黛青。大面积仍是纸，只有那条色带换成低饱和的黛青 */
+    --b-page1: #F3EFE3; --b-page2: #EAE3D2; --b-band: #55625C; --b-card: #FFFDF7;
+    --b-ink: #2E2B24; --b-sub: #6A6357; --b-block-ink: #EEF0EB; --b-drop: #3E4A45; --b-line: #D2C8AF;
+    --seal: #9E3B2F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 44px 56px; background: #F7F5EF; color: #23252c;
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: 1px; }
+  .lead { font-size: 14px; color: #6A6357; margin: 0 0 26px; line-height: 1.7; }
+  h2 { font-size: 17px; margin: 34px 0 4px; letter-spacing: .5px; }
+  h2 span { font-weight: 400; font-size: 13px; color: #8A8272; margin-left: 8px; }
+  .row { display: flex; gap: 26px; align-items: flex-start; flex-wrap: wrap; }
+  .slot { width: 468px; }
+  .cap { font-size: 14px; margin: 10px 2px 0; line-height: 1.7; }
+  .cap b { font-size: 16px; }
+  .cap em { font-style: normal; color: #8A8272; }
+  /* 海报按 750 设计宽画，再整体缩到 460 展示；版式尺寸全部照抄 poster.js 里那三套 */
+  .poster { width: 750px; transform: scale(.613); transform-origin: top left; }
+  .frame { width: 460px; height: 630px; overflow: hidden; border-radius: 14px; background: #EFEADC; }
+  .card-white { background: var(--a-card); border-radius: 44px; box-shadow: 0 10px 26px rgba(46,43,36,.10); }
+  .band { position: relative; }
+  .blk { position: absolute; border-radius: 28px; }
+  .qr { position: absolute; border-radius: 22px; background: #FFFDF7; box-shadow: 0 0 0 1px rgba(46,43,36,.06); }
+  .qr i { position: absolute; inset: 10px; border-radius: 14px; background:
+    repeating-conic-gradient(#2E2B24 0 25%, #FFFDF7 0 50%) 0 0 / 14px 14px; opacity: .8; }
+  .num { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+    border-radius: 50%; font-size: 21px; font-weight: 700; flex: none; }
+  .sign { display: flex; align-items: center; gap: 22px; }
+  .ava { width: 76px; height: 76px; border-radius: 50%; background: repeating-linear-gradient(45deg,#C9BFA6 0 8px,#B9AE92 8px 16px); flex: none; }
+  .sw { display: flex; gap: 10px; margin: 14px 0 22px; flex-wrap: wrap; }
+  .sw div { width: 116px; font-size: 11px; color: #6A6357; }
+  .sw b { display: block; height: 40px; border-radius: 8px; margin-bottom: 5px; border: 1px solid rgba(46,43,36,.08); }
+  .names { font-size: 14px; line-height: 2; color: #4A463E; background: #FFFDF7; border: 1px solid #E2DAC7;
+    border-radius: 12px; padding: 14px 18px; margin-top: 18px; }
+  .names s { color: #A79E8A; }
+</style>
+</head>
+<body>
+  <h1>经典三款：只换色调，版式一格没动</h1>
+  <p class="lead">
+    三张图里的尺寸、圆角、色块位置、编号圆点、码贴纸那套，全部照 <b>poster.js</b> 现在的 <code>planCard / planQuote / planBlock</code> 抄，
+    唯一变的是"分类蓝"那一档颜色。左边方向 A 是整套都退到纸的深浅里，只留一枚朱印当饱和色；
+    右边方向 B 是纸底不变、只把那条大色带换成低饱和的黛青。<b>两档都还沿用信笺那枚朱 #9E3B2F</b>，这样四套经典款是一家人。
+  </p>
+
+  <div class="sw">
+    <div><b style="background:#F3EFE3"></b>页面底 #F3EFE3</div>
+    <div><b style="background:#E4DCC7"></b>A 色带 #E4DCC7</div>
+    <div><b style="background:#55625C"></b>B 色带 #55625C</div>
+    <div><b style="background:#FFFDF7"></b>卡 #FFFDF7</div>
+    <div><b style="background:#2E2B24"></b>墨 #2E2B24</div>
+    <div><b style="background:#9E3B2F"></b>朱 #9E3B2F</div>
+  </div>
+
+  <h2>方向 A · 纯宣<span>色带 = 旧宣纸的深一档，字用墨</span></h2>
+  <div class="row" id="rowA"></div>
+
+  <h2>方向 B · 宣纸 + 黛青<span>色带换成低饱和黛青，其余同 A</span></h2>
+  <div class="row" id="rowB"></div>
+
+  <div class="names">
+    <b>模板名建议</b>（都收在"宣 / 笺"这一族里，和已有的「素宣信笺」连成一套）<br>
+    经典卡片 → <b>玉版宣</b>　<em>Jade Paper</em><br>
+    金句大字 → <b>摘句</b>　<em>Verse Slip</em><br>
+    撞色块 → <b>叠翠</b>　<em>Layered Paper</em><br>
+    素宣信笺 → 不改　<em>Vertical Letter</em><br>
+    <span style="color:#8A8272">「玉版」是宣纸里最细白的那一档，「摘句」是古人挑别人句子成集的旧称，「叠翠」指这张上面一层色、下面一层纸。</span>
+  </div>
+
+<script>
+const NOTE = {
+  cat: '阅读', date: '09-23', meta: '亲自撰写 · 阅读',
+  title: '读过的东西，存成能转发的笔记',
+  quote: '一句话顶做大字，别人扫一眼就记得住',
+  sum: '一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。',
+  pts: ['一句话顶做大字，别人扫一眼就记得住', '自己的头像和名字印在图上'],
+  name: '阿飞', slogan: '每天读一点再走',
+}
+const S = (dir) => ({
+  page1: `var(--${dir}-page1)`, page2: `var(--${dir}-page2)`, band: `var(--${dir}-band)`,
+  card: `var(--${dir}-card)`, ink: `var(--${dir}-ink)`, sub: `var(--${dir}-sub)`,
+  blk: `var(--${dir}-block-ink)`, drop: `var(--${dir}-drop)`,
+  // 色带上那枚方块：浅带用"更深一档纸"才看得见，暗带用产品里原有的白色半透
+  blkBg: dir === 'a' ? '#D6C8A9' : 'rgba(255,255,255,0.16)',
+  // 摘句笺整张底色就是色带那档：浅带下署名必须用墨，暗带下才用白
+  onDark: dir === 'b',
+})
+
+function sign(c, dark) {
+  return `<div class="sign" style="position:absolute;left:128px;bottom:34px">
+    <div class="ava"></div>
+    <div><div style="font-size:28px;font-weight:700;color:${dark ? '#FFFDF7' : c.ink}">${NOTE.name}</div>
+    <div style="font-size:22px;color:${dark ? 'rgba(255,253,247,.72)' : c.sub};margin-top:6px">${NOTE.slogan}</div></div>
+  </div>`
+}
+function qr(c, x, y, s, label) {
+  return `<div style="position:absolute;left:${x + s * .09}px;top:${y + s * .09}px;width:${s}px;height:${s}px;border-radius:${s * .18}px;background:${c.drop}"></div>
+  <div class="qr" style="left:${x}px;top:${y}px;width:${s}px;height:${s}px"><i></i></div>
+  <div style="position:absolute;left:${x - 60}px;top:${y + s + s * .09 + 8}px;width:${s + 120}px;text-align:center;font-size:18px;color:${c.sub}">${label}</div>`
+}
+
+// 经典卡片 → 玉版宣
+function card(c) {
+  return `<div class="poster" style="width:750px;height:1000px;background:linear-gradient(${c.page1},${c.page2});position:relative;padding:0">
+    <div style="position:absolute;left:40px;top:60px;right:40px;bottom:40px;background:${c.card};border-radius:44px;box-shadow:0 12px 30px rgba(46,43,36,.10)"></div>
+    <div class="band" style="left:40px;top:60px;right:40px;height:236px;background:${c.band};border-radius:44px 44px 0 0"></div>
+    <div class="blk" style="left:84px;top:104px;width:148px;height:148px;background:${c.blkBg}">
+      <div style="padding:20px 0 0 20px;font-size:28px;font-weight:700;color:${c.blk}">${NOTE.cat}</div>
+      <div style="padding:74px 0 0 20px;font-size:17px;font-weight:700;color:${c.blk};opacity:.75">${NOTE.date}</div>
+    </div>
+    <div style="position:absolute;left:256px;top:148px;width:390px;font-size:34px;font-weight:700;line-height:46px;color:${c.blk}">${NOTE.title}</div>
+    <div style="position:absolute;left:84px;top:340px;font-size:22px;font-weight:700;color:${c.sub}">${NOTE.meta}</div>
+    <div style="position:absolute;left:84px;top:396px;width:582px;font-size:27px;line-height:40px;color:${c.ink}">${NOTE.sum}</div>
+    <div style="position:absolute;left:84px;top:556px;font-size:22px;font-weight:700;color:${c.sub}">核心要点</div>
+    ${NOTE.pts.map((p, i) => `<div style="position:absolute;left:84px;top:${606 + i * 42}px;display:flex;align-items:center;gap:16px">
+      <span class="num" style="background:${c.band};color:${c.blk};border:1px solid ${c.drop}">${i + 1}</span>
+      <span style="font-size:26px;color:${c.ink}">${p}</span></div>`).join('')}
+    ${sign(c)}
+    ${qr(c, 566, 800, 120, '图麦笔记·扫码秒看')}
+  </div>`
+}
+
+// 金句大字 → 摘句笺
+function quote(c) {
+  return `<div class="poster" style="width:750px;height:1000px;background:${c.band};position:relative">
+    <div style="position:absolute;left:40px;top:60px;right:40px;height:560px;background:${c.card};border-radius:48px"></div>
+    <div style="position:absolute;left:92px;top:128px;font-size:24px;font-weight:700;color:${c.ink};opacity:.62">${NOTE.cat} · ${NOTE.date}</div>
+    <div style="position:absolute;left:92px;top:200px;width:566px;font-size:46px;font-weight:700;line-height:68px;color:#2E2B24">${NOTE.quote}</div>
+    <div style="position:absolute;left:92px;top:486px;font-size:26px;color:${c.sub}">${NOTE.title}</div>
+    ${sign(c, c.onDark)}
+    ${qr({ drop: c.drop, sub: c.blk, ink: c.ink }, 558, 700, 128, '图麦笔记·扫码秒看')}
+  </div>`
+}
+
+// 撞色块 → 叠翠笺
+function block(c) {
+  return `<div class="poster" style="width:750px;height:1000px;background:#F4F1E8;position:relative">
+    <div style="position:absolute;left:0;top:0;right:0;height:392px;background:${c.band}"></div>
+    <div style="position:absolute;left:44px;top:70px;font-size:22px;font-weight:700;color:${c.blk};opacity:.8">${NOTE.cat} · 亲自撰写</div>
+    <div style="position:absolute;left:44px;top:144px;width:662px;font-size:40px;font-weight:700;line-height:54px;color:${c.blk}">${NOTE.title}</div>
+    <div style="position:absolute;left:40px;top:432px;right:40px;height:404px;background:${c.card};border-radius:44px;box-shadow:0 12px 30px rgba(46,43,36,.10)"></div>
+    <div style="position:absolute;left:309px;top:326px;width:132px;height:132px;border-radius:50%;box-shadow:0 0 0 8px ${c.card};background:repeating-linear-gradient(45deg,#C9BFA6 0 8px,#B9AE92 8px 16px)"></div>
+    <div style="position:absolute;left:84px;top:500px;width:582px;font-size:27px;line-height:40px;color:${c.ink}">${NOTE.sum}</div>
+    ${NOTE.pts.map((p, i) => `<div style="position:absolute;left:84px;top:${676 + i * 42}px;display:flex;align-items:center;gap:16px">
+      <span class="num" style="background:${c.band};color:${c.blk}">${i + 1}</span>
+      <span style="font-size:26px;color:${c.ink}">${p}</span></div>`).join('')}
+    ${sign(c)}
+    ${qr({ drop: c.drop, sub: c.sub, ink: c.ink }, 566, 862, 120, '图麦笔记·扫码秒看')}
+  </div>`
+}
+
+const NAMES = { card: ['玉版宣', '原「经典卡片」· 版式没动，色带从分类蓝换成纸色'],
+  quote: ['摘句', '原「金句大字」· 整张底色换掉，白卡和那句大字的位置不变'],
+  block: ['叠翠', '原「撞色块」· 上面那层色、下面那层纸，叠法不变'] }
+
+for (const [dir, key] of [['a', 'A'], ['b', 'B']]) {
+  const c = S(dir)
+  const host = document.getElementById('row' + key)
+  for (const fn of [card, quote, block]) {
+    const id = fn === card ? 'card' : fn === quote ? 'quote' : 'block'
+    const d = document.createElement('div')
+    d.className = 'slot'
+    d.innerHTML = `<div class="frame">${fn(c)}</div>
+      <div class="cap"><b>${NAMES[id][0]}</b>　<em>${NAMES[id][1]}</em></div>`
+    host.appendChild(d)
+  }
+}
+</script>
+</body>
+</html>

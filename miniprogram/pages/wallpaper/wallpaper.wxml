@@ -4,27 +4,8 @@
     <text class="page-hint">{{t.wallpaperHint}}</text>
   </view>
 
-  <!-- 界面字体：每一格那四个字用它自己的字体写，用户点之前就知道会换成什么样。
-       这一排比"宋体/仿宋"这种名字管用得多，所以不写成纯文字选项。 -->
-  <view class="sec-head">
-    <text class="sec-title">{{t.fontSection}}</text>
-    <text class="sec-hint">{{t.fontHint}}</text>
-  </view>
-  <view class="font-grid">
-    <view
-      class="font-item {{item.cls}} {{item.active ? 'active' : ''}}"
-      wx:for="{{fonts}}"
-      wx:key="key"
-      bindtap="onFont"
-      data-key="{{item.key}}"
-    >
-      <text class="font-demo">{{item.demo}}</text>
-      <view class="font-foot">
-        <text class="font-label">{{item.label}}</text>
-        <view wx:if="{{item.active}}" class="check-mark">✓</view>
-      </view>
-    </view>
-  </view>
+  <!-- 界面字体那一排已撤（iOS 与安卓真机都证伪：微信不认这些系统字体名，点了不换字）。
+       字体栈和 app.js 里那套开关留着没删，走 wx.loadFontFace 挂自己的字体时再加回来。 -->
 
   <view class="sec-head">
     <text class="sec-title">{{t.wallpaperSection}}</text>

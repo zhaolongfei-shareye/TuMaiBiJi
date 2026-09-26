@@ -38,6 +38,9 @@ App({
 
   onLaunch(options) {
     rememberInviter(options)
+    // 字体那一排入口已撤（iOS 与安卓真机都不换字），但测试期可能在这台机器上留下过选择。
+    // 留着它就等于一个看不见的开关在生效，所以启动先清掉；重新做字体时删掉这一行即可。
+    wx.removeStorageSync(UI_FONT_KEY)
     this.login()
   },
 

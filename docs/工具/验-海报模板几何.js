@@ -150,5 +150,18 @@ for (const lang of ['zh', 'en']) {
   }
 }
 console.log(`${combos} 组排版+绘制（10 模板 × 6 笔记 × 中英 × 码开关），问题 ${bad.length} 处`)
+// 纸色那两档由分类明暗决定（站长 09-26：两档都要，走哪档别随机）。这里把映射钉死：
+// 偏亮的两档分类走 A 纯宣，偏暗的三档 + 未分类那块墨走 B 黛青。
+const { TONES, UNCATEGORIZED } = require('../../miniprogram/utils/palette.js')
+const wantA = [0, 2]
+const map = TONES.map((t, i) => `${i}:${poster.paperOf(i) === poster.PAPER_A ? 'A' : 'B'}`).join(' ')
+const nullSide = poster.paperOf(null) === poster.PAPER_A ? 'A' : 'B'
+TONES.forEach((t, i) => {
+  if ((wantA.includes(i) ? 'A' : 'B') !== (poster.paperOf(i) === poster.PAPER_A ? 'A' : 'B')) {
+    bad.push(`纸色映射变了：分类 ${i}（${t.name}）现在走 ${poster.paperOf(i) === poster.PAPER_A ? 'A' : 'B'}`)
+  }
+})
+if (nullSide !== 'B') bad.push(`未分类那块墨（${UNCATEGORIZED.bg}）应该走 B，现在走 ${nullSide}`)
+console.log(`纸色映射 ${map} / 未分类 ${nullSide}，问题 ${bad.length} 处`)
 bad.slice(0, 10).forEach((x) => console.log('  ✗', x))
 process.exit(bad.length ? 1 : 0)

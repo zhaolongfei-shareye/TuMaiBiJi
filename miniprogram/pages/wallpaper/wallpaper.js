@@ -2,20 +2,14 @@ const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { THEMES, toneColor, themeOf } = require('../../utils/palette.js')
 
-// 界面字体四档。cls 是挂在 .container 上的类名，具体字体栈在 app.wxss；
-// 空串＝不挂＝沿用默认那条苹方链。这一档只存在本机（见 app.js 里 UI_FONT_KEY 那段）。
-const FONTS = [
-  { key: 'default', cls: '', labelKey: 'fontDefault' },
-  { key: 'song', cls: 'font-song', labelKey: 'fontSong' },
-  { key: 'fang', cls: 'font-fang', labelKey: 'fontFang' },
-  { key: 'kai', cls: 'font-kai', labelKey: 'fontKai' },
-]
+// 这一页原来在壁纸下面还有一排「界面字体」，站长 09-26 撤掉了：iOS 和安卓真机都证伪——
+// 微信的 webview 不认这些系统字体名，点了不会换字（模拟器能换是假证据，它读的是 macOS 字体表）。
+// 开关和字体栈本身留着（app.js 的 uiFont/setUIFont、app.wxss 与 tab 栏组件里的三个 .font-* 类），
+// 哪天真要走 wx.loadFontFace 挂自己的字体文件，把这一排加回来就行。
 
 Page({
   data: {
     wallpapers: [],
-    fonts: [],
-    uiFont: 'default',
     currentWallpaper: 'default',
     applying: false,
     themeClass: '',
@@ -27,12 +21,10 @@ Page({
     const app = getApp()
     const lang = (app.globalData.userInfo && app.globalData.userInfo.language) || 'zh'
     const current = app.getWallpaper()
-    const uiFont = app.uiFont()
     this.setData({
       lang,
       t: texts(lang),
       currentWallpaper: current,
-      uiFont,
       // 这一页自己也要走 applyTheme：只拿类名的话，导航条底色停在上一页那套主题，
       // 换完壁纸"导航条必须和页面底同值"这条约束在本页是破的（选完才补上，进页那一瞬不对）。
       themeClass: app.applyTheme(current),
@@ -51,13 +43,6 @@ Page({
         // （米白一色是第 7 格 → steps[1] 和 steps[2]，雨过青是第 8 格 → steps[2] 和 steps[3]），
         // 其余六枚仍取分类色板那五支彩色。
         stack: [toneColor(i, theme.key), toneColor(i + 1, theme.key)],
-      })),
-      fonts: FONTS.map((f) => ({
-        key: f.key,
-        cls: f.cls,
-        label: t(f.labelKey, lang),
-        demo: t('fontDemo', lang),
-        active: f.key === uiFont,
       })),
     })
     app.setNavTitle('wallpaper', lang)
@@ -101,20 +86,5 @@ Page({
       this.setData({ applying: false })
       wx.showToast({ title: t('setFailed', lang), icon: 'none' })
     }
-  },
-
-  // 换字体只影响这一台设备。当前这一页立刻重挂类名，其余页面在各自 onShow 里
-  // 走 applyTheme 时跟上——不做跨页强制刷新，为这个再写一套事件总线不值当。
-  onFont(e) {
-    const key = e.currentTarget.dataset.key
-    const app = getApp()
-    if (key === this.data.uiFont) return
-    app.setUIFont(key)
-    app.applyTheme(this.data.currentWallpaper)
-    this.setData({
-      uiFont: app.uiFont(),
-      themeClass: app.getThemeClass(this.data.currentWallpaper),
-      fonts: this.data.fonts.map((f) => ({ ...f, active: f.key === app.uiFont() })),
-    })
   },
 })

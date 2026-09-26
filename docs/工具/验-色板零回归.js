@@ -158,11 +158,13 @@ ck('三档首位都是 iOS 那几张字', fontCls.every((c) => {
   return !!m
 }))
 ck('三档末位都是通用族兜底', fontCls.every((c) => /(serif|sans-serif); \}$/.test(decl(css, c))))
-// 机型口径钉在文案里：这排只承诺 iOS，说明必须写明白，不许含糊成"部分机型会回落"——
-// 含糊的说法会让人当成 bug 报上来（站长 09-26 就是因为安卓点了没反应才来问的）。
-const words = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js')).i18n
-ck('中文文案写明「仅 iPhone / iPad 可选」', /仅 iPhone \/ iPad 可选/.test(words.zh.fontHint))
-ck('英文文案同样写明 iPhone / iPad only', /iPhone \/ iPad only/i.test(words.en.fontHint))
+// 字体入口这条：站长 09-26 用 iPhone 11 真机证伪（iOS 微信同样不认这些系统字体名），
+// 那一排已经从外观设置页撤掉。撤得干净要能验出来：页面不许再出现那一排、
+// 启动时必须清掉测试期留下的存储，否则就是一个看不见却在生效的开关。
+const wpWxml = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/wallpaper/wallpaper.wxml'), 'utf8')
+ck('外观设置页已经没有字体那一排', !/font-grid|onFont/.test(wpWxml))
+ck('启动时清掉遗留的字体偏好', /removeStorageSync\(UI_FONT_KEY\)/.test(
+  fs.readFileSync(path.resolve(__dirname, '../../miniprogram/app.js'), 'utf8')))
 
 // ⑩ 缩略图取色不许被"当前主题"染色：壁纸选择器每一格画的是别的主题，必须显式带自己的 key。
 // 这条是真截图里抓到的：停在米白时，米白那一格之外的六格小色块也变成了色阶色。
@@ -251,6 +253,21 @@ const barCss = fs.readFileSync(path.join(pageDir, 'custom-tab-bar/index.wxss'), 
 ck('胶囊底色与投影改由 JS 递进来', /--tab-ink:/.test(barJs) && /--tab-shadow:/.test(barJs))
 ck('六枚下胶囊仍是原来那块墨（#23252c）', /var\(--tab-ink,\s*#23252c\)/.test(barCss) && after.UNCATEGORIZED.bg.toUpperCase() === '#23252C')
 ck('六枚下胶囊投影与改动前逐值相同', after.withAlpha(after.UNCATEGORIZED.bg, 0.28).replace(/\s/g, '') === 'rgba(35,37,44,0.28)')
+
+// ⑯ 经典三款的纸色（站长 09-26："版式一格不动，只把分类蓝换成宣纸那一族；两档都要"）。
+//    这两档是写死的常量，所以对比度可以一次算清；更要紧的是别哪天又有人在这三套里
+//    直接把分类彩色拿回来。
+const posterSrc = fs.readFileSync(path.join(pageDir, 'utils/poster.js'), 'utf8')
+const PAPER_A = { bg: '#E4DCC7', ink: '#2E2B24' }
+const PAPER_B = { bg: '#55625C', ink: '#EEF0EB' }
+ck('A 纯宣 墨/纸 ≥ 4.5:1', ratio(PAPER_A.bg, PAPER_A.ink) >= 4.5, ratio(PAPER_A.bg, PAPER_A.ink).toFixed(2))
+ck('B 黛青 纸/黛 ≥ 4.5:1', ratio(PAPER_B.bg, PAPER_B.ink) >= 4.5, ratio(PAPER_B.bg, PAPER_B.ink).toFixed(2))
+const leaked = ['planCard', 'planQuote', 'planBlock'].filter((fn) => {
+  const m = new RegExp(`function ${fn}\\(ctx, d\\) \\{[\\s\\S]*?\\n\\}`).exec(posterSrc)
+  return m && /toneFor\(note\.category_id\)/.test(m[0])
+})
+ck('经典三款不再直接取分类彩色（走 paperOf）', leaked.length === 0, leaked.join(' / '))
+ck('两档由分类明暗决定，不是随手挑', /lumOf\(toneFor\(categoryId\)\.bg\)/.test(posterSrc))
 
 after.setActiveTheme('default')
 const bad = results.filter((r) => !r.ok)
