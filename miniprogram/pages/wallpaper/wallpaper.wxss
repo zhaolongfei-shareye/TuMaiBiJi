@@ -185,7 +185,7 @@
   display: flex;
   flex-direction: column;
   gap: 6rpx;
-  height: 92rpx;
+  height: 100rpx;
   padding: 14rpx 12rpx;
   box-sizing: border-box;
   border: 2rpx solid var(--wp-edge);
@@ -206,30 +206,34 @@
   width: 100%;
 }
 
+/* 选中态和试看态都不许改 border-width：这一条是分享页那一排踩过的坑——
+   边框一粗，这一格就高出去 2px，整排跟着抖（他要求这一排是"固定样式"）。
+   所以选中用外环（box-shadow 不占布局），试看用同宽的虚线。 */
 .wp-chip-on .wp-tile {
   border-color: var(--wp-label);
-  border-width: 4rpx;
+  box-shadow: 0 0 0 3rpx var(--wp-label);
 }
 
-/* 虚线框 = 这一枚正在上面那部手机里试看，还没换上 */
 .wp-chip-prev .wp-tile {
   border-color: var(--wp-label);
   border-style: dashed;
-  border-width: 4rpx;
 }
 
+/* 勾放在格子内侧靠下：原来浮在角上（-10rpx）会被 scroll-view 的裁剪边切到，
+   最后一枚尤其明显。格子 100rpx 高是按这条量出来的：内容区从 16rpx 起，
+   两条色带到 50rpx 结束，勾顶在 100-2-8-32 = 58rpx，留出 8rpx 不压色带。 */
 .wp-dot {
   position: absolute;
-  top: -10rpx;
-  right: -10rpx;
-  width: 34rpx;
-  height: 34rpx;
+  bottom: 8rpx;
+  right: 8rpx;
+  width: 32rpx;
+  height: 32rpx;
   border-radius: 50%;
   background: var(--wp-label, #23252c);
   color: var(--wp-opp, #ffffff);
   font-size: 20rpx;
   font-weight: 700;
-  line-height: 34rpx;
+  line-height: 32rpx;
   text-align: center;
 }
 
@@ -247,11 +251,13 @@
   color: var(--text-primary);
 }
 
+/* 这一行是说整句话（怎么试、现在在用哪枚），不是标签，所以不用 18rpx 那一档；
+   也不叠 opacity：--text-secondary 已经是退让过的墨，再乘 0.75 在深色壁纸下就读不动了。 */
 .strip-foot {
   margin-top: var(--sp-2);
-  font-size: var(--fs-micro);
+  font-size: var(--fs-tiny);
+  line-height: var(--lh-body);
   color: var(--text-secondary);
-  opacity: 0.75;
 }
 
 /* 等接口那一瞬的遮罩。原来写死半透明白，深色壁纸下会闪一下白；

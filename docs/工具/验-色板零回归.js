@@ -331,6 +331,47 @@ for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker'], ['
     b ? `clip@${at} paint@${paint}` : `没抓到 ${fn} 函数体`)
 }
 
+// ⑲ 小样那一排的三件事，都是 09-26 代码审查里翻出来的：
+//    一、每格的真实高度必须在落笔之前交给视图层。骨架里那是个 4:3 的占位数，
+//        等整轮画完再一次性 setData，画的过程中这一格就被压在占位框里竖着挤——
+//        圆角是画进位图的（⑱），显示框一歪，圆角看着就是椭圆，正合站长圈的那类毛病。
+//    二、落笔前必须再对一次轮次号。解码头像慢到四秒，只在循环头对，
+//        旧那一遍可能后落笔，把新那一遍盖掉。
+//    三、画布底色要透明、选中态不许改 border-width。前者留着灰底就是在四个角外
+//        垫直角灰斑；后者一改，格子里定宽的画布整块挪 1rpx，一排跟着抖。
+const shareCss = fs.readFileSync(path.join(pageDir, 'pages/share/share.wxss'), 'utf8')
+const profCss = fs.readFileSync(path.join(pageDir, 'pages/profile/profile.wxss'), 'utf8')
+const cssRule = (src, sel) => {
+  const m = new RegExp(`\\n\\.${sel}\\s*\\{([^}]*)\\}`).exec(src)
+  return m ? m[1] : null
+}
+for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker'], ['卡片模板那十格', profJs, 'renderThumbs']]) {
+  const b = fnBody(src, fn)
+  // 逐格改高度写的是 `...].h`]:` 这种路径 key，找得到它才谈得上先后
+  const hSet = b ? b.indexOf('].h`]') : -1
+  const paint = b ? b.indexOf('paintLayers') : -1
+  ck(`${nm}：落笔前就把这一格的真实高度交给视图层`, hSet >= 0 && paint >= 0 && hSet < paint,
+    b ? `逐格高度@${hSet} 落笔@${paint}` : `没抓到 ${fn} 函数体`)
+}
+{
+  const b = fnBody(profJs, 'renderThumbs')
+  const paint = b ? b.indexOf('paintLayers') : -1
+  const at = b && paint >= 0 ? b.slice(0, paint).lastIndexOf('_renderGen !== gen') : -1
+  // 光"对过两次号"不够，要紧的是最后一次对号到落笔之间不能再有 await：
+  // 一 await 就让出主线程，旧那一遍完全可能在这缝里被新那一遍插队。
+  const gap = at >= 0 ? b.slice(at, paint) : ''
+  ck('卡片模板那十格：落笔前对号，且对完到落笔之间不让出主线程',
+    at >= 0 && !/await /.test(gap), b ? `最后一次对号@${at}，落笔@${paint}，中间${/await /.test(gap) ? '有 await' : '没有 await'}` : '没抓到 renderThumbs 函数体')
+}
+for (const [nm, css, canvasSel, onSel] of [['分享页那一排', shareCss, 'pick-canvas', 'pick-on'], ['卡片模板那十格', profCss, 'cell-canvas', 'cell-on']]) {
+  const rule = cssRule(css, canvasSel)
+  ck(`${nm}的画布底色透明（不留直角灰斑）`, !!rule && /background:\s*transparent/.test(rule),
+    rule ? rule.trim().replace(/\s+/g, ' ') : `没读到 .${canvasSel}`)
+  const on = cssRule(css, onSel)
+  ck(`${nm}的选中态不改 border-width`, !!on && !/border-width/.test(on) && /box-shadow/.test(on),
+    on ? on.trim().replace(/\s+/g, ' ') : `没读到 .${onSel}`)
+}
+
 after.setActiveTheme('default')
 const bad = results.filter((r) => !r.ok)
 console.log(`\n${results.length - bad.length}/${results.length} 过`)

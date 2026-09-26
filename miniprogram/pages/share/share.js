@@ -2,8 +2,13 @@
 // 小样同一套算法，只是更小），高度由 JS 按比例算好写进 style。
 const PICK_W = 176
 const PICK_SCALE = 0.28
-// 小图圆角，同 app.wxss 的 --r-chip；真机上原生画布不吃 CSS 圆角，得画进位图
-const PICK_R = 28
+// 小图圆角。不跟 app.wxss 的 --r-chip（28）：那一档换算到位图是 119 单位，
+// block 那套最长的笔记里最贴角的是码下面那行引导语（英文比中文宽，居中在码下面，
+// 会往右伸出码本身一圈），28 → 位图 119 时它的右下角越界 13.1 个单位。尺子
+// 验-海报模板几何.js 最后一段十模板×六笔记×中英都量一遍，18 → 位图 77 后最不利的一格还剩 4.6 个单位余量。
+// 真机上原生画布不吃 CSS 圆角，所以这个数才是最终外观；share.wxss 里的 border-radius
+// 只是让模拟器跟它一致。
+const PICK_R = 18
 const MEASURE_H = 750
 
 // 预览框定高（rpx，画布位图 1 像素 = 1rpx）。十套模板的成品图高度差得很多，
@@ -188,12 +193,18 @@ Page({
         canvas.width = poster.W
         canvas.height = MEASURE_H
         const plan = poster.planPoster(ctx, this._note, x.id, profile, lang)
+        const h = Math.round((plan.height * PICK_W) / poster.W)
+        // 先让视图层把这一格的高度改成真实比例，再落笔（同 profile.js 那条：
+        // 圆角是画进位图的，显示框还压在 4:3 占位里就会被看成一个竖扁的椭圆角）。
+        const i = tpls.indexOf(x)
+        this.setData({ [`tpls[${i}].h`]: h })
+        await new Promise((r) => wx.nextTick(r))
         canvas.width = Math.round(plan.width * PICK_SCALE)
         canvas.height = Math.round(plan.height * PICK_SCALE)
         ctx.scale(PICK_SCALE, PICK_SCALE)
         poster.clipRounded(ctx, plan.width, plan.height, PICK_R, PICK_W)
         poster.paintLayers(ctx, plan.layers, images)
-        x.h = Math.round((plan.height * PICK_W) / poster.W)
+        x.h = h
       } catch (err) {
         console.error('模板小图没画出来', x.id, err)
       }

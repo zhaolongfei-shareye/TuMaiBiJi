@@ -143,12 +143,16 @@
 }
 
 /* 位图 750 宽、这一格只有 176，高度由 JS 按比例算好写进 style，
-   这里给个兜底值，别让它在小图画出来之前塌成 0。 */
+   这里给个兜底值，别让它在小图画出来之前塌成 0。
+   底色透明，理由同 profile.wxss 的 .cell-canvas：圆角画在位图里，
+   真机上原生画布不吃 CSS 圆角，留着灰底就等于在四个角外垫四块直角灰斑。 */
 .pick-canvas {
   width: 176rpx;
   height: 235rpx;
-  border-radius: var(--r-chip);
-  background: var(--chip-idle);
+  /* 不写 var(--r-chip)：真机上是 share.js 的 PICK_R 说了算（圆角画在位图里），
+     这里跟它取同一个数，模拟器才不会比真机圆一圈。 */
+  border-radius: 18rpx;
+  background: transparent;
 }
 
 .pick-label {

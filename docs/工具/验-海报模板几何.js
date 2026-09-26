@@ -1,7 +1,8 @@
 // 十套海报模板的几何与图层自检：10 模板 × 6 种笔记 × 中英 × 码开/关 = 240 组，
 // 全部在 node 里用替身 ctx 跑真代码（poster.js 就是产品那份），不靠肉眼看图。
-// 查四件事：图层不许出画布、高度不许塌、开码时恰好一张码、关码时码和"扫码"那行都得没、
-// 换成的是那两行纯文字。跑法：node docs/工具/验-海报模板几何.js
+// 查五件事：图层不许出画布、高度不许塌、开码时恰好一张码、关码时码和"扫码"那行都得没、
+// 换成的是那两行纯文字；最后一段另量小样圆角画进位图后有没有咬到字和码。
+// 跑法：node docs/工具/验-海报模板几何.js
 const poster = require('../../miniprogram/utils/poster.js')
 const { i18n } = require('../../miniprogram/utils/i18n.js')
 
@@ -150,6 +151,126 @@ for (const lang of ['zh', 'en']) {
   }
 }
 console.log(`${combos} 组排版+绘制（10 模板 × 6 笔记 × 中英 × 码开关），问题 ${bad.length} 处`)
+
+// ---------- 小样的圆角不许咬掉内容 ----------
+// 真机上 canvas type="2d" 不吃 CSS 的 border-radius，所以分享页那一排和卡片模板那十格
+// 的圆角是画进位图的（poster.clipRounded）。圆角一画进位图，四个角就成了刀口：
+// 半径按 CSS 换算过去是位图单位（R = cssR × 750 ÷ cssW），176rpx 那一档算下来 119，
+// 而右下角正是码贴纸+引导语的固定位置。这一条量的就是"弧到底有没有啃到字和码"，
+// 判据用 layer 的真实坐标，不靠看图。半径那两个数从页面源码现读，抄在这里就会走偏。
+const fs = require('fs')
+const path = require('path')
+function readSrc(rel) {
+  return fs.readFileSync(path.join(__dirname, '../../miniprogram', rel), 'utf8')
+}
+function constOf(rel, name) {
+  const m = new RegExp(`^const ${name} = ([0-9.]+)`, 'm').exec(readSrc(rel))
+  if (!m) throw new Error(`${rel} 里没找到 const ${name}`)
+  return parseFloat(m[1])
+}
+// 从 WXSS 里读一条规则的一个属性，var(--x) 顺到 app.wxss 的 :root 取值。
+// 圆角和宽度这两处都是"JS 里一个数、CSS 里一个数，必须相等"的，光写注释拦不住改漏。
+function cssNumOf(rel, selector, prop) {
+  const src = readSrc(rel)
+  const i = src.search(new RegExp(`(^|\\n)${selector.replace(/[.-]/g, '\\$&')}\\s*\\{`))
+  if (i < 0) throw new Error(`${rel} 里没找到 ${selector} 这条规则`)
+  const body = src.slice(i, src.indexOf('}', i))
+  const m = new RegExp(`${prop}:\\s*([^;]+);`).exec(body)
+  if (!m) throw new Error(`${rel} 的 ${selector} 没设 ${prop}`)
+  const v = m[1].trim()
+  const vr = /^var\((--[a-z-]+)\)$/.exec(v)
+  let num = /^([0-9.]+)rpx$/.test(v) ? parseFloat(/^([0-9.]+)rpx$/.exec(v)[1]) : null
+  if (vr) {
+    const tok = new RegExp(`${vr[1]}:\\s*([0-9.]+)rpx`).exec(readSrc('app.wxss'))
+    if (!tok) throw new Error(`app.wxss 里没找到 ${vr[1]}`)
+    num = parseFloat(tok[1])
+  }
+  if (num == null) throw new Error(`${selector} 的 ${prop} 读不出 rpx 数：${v}`)
+  return num
+}
+const CLIP_SURFACES = [
+  { name: '分享页那一排', js: 'pages/share/share.js', wxss: 'pages/share/share.wxss', sel: '.pick-canvas', w: 'PICK_W', r: 'PICK_R' },
+  { name: '卡片模板那十格', js: 'pages/profile/profile.js', wxss: 'pages/profile/profile.wxss', sel: '.cell-canvas', w: 'THUMB_W', r: 'THUMB_R' },
+].map((s) => ({
+  ...s,
+  cssW: constOf(s.js, s.w),
+  r: constOf(s.js, s.r),
+  R: (constOf(s.js, s.r) * poster.W) / constOf(s.js, s.w),
+}))
+
+
+// 一个图层占的方框。文字给的是基线（drawLine 直接把它交给 fillText，textBaseline 没设过），
+// 所以往上留一个字高、往下留三分之一个字高。竖排列的几何另有一套（往左走、逐字累加），
+// 上面那段已经单独复算过列底，这里不参与。
+function boxOf(l) {
+  if (l.k === 'text') {
+    if (l.vert) return null
+    const size = l.size || 28
+    const wOf = (s) => Array.from(String(s)).reduce((a, c) => a + (c.codePointAt(0) > 0x2e80 ? size : size * 0.55), 0)
+    const widest = Math.max(0, ...(l.lines || []).map(wOf))
+    const align = l.align || 'left'
+    const x0 = align === 'center' ? l.x - widest / 2 : align === 'right' ? l.x - widest : l.x
+    const n = Math.max(1, (l.lines || []).length)
+    return { x: x0, y: l.y - size, w: widest, h: size * 1.3 + (n - 1) * (l.lh || size) }
+  }
+  if (l.k === 'image' || l.k === 'rect' || l.k === 'rrect' || l.k === 'dots') {
+    return { x: l.x, y: l.y, w: l.w, h: l.h == null ? l.w : l.h }
+  }
+  if (l.k === 'circle') return { x: l.x - l.r, y: l.y - l.r, w: l.r * 2, h: l.r * 2 }
+  return null
+}
+
+// 只查"方框离某个角最近的那个顶点"：弧往里凹，方框上离角最远的点被切到之前，
+// 最近的点一定先被切，所以量一个点就能判有没有啃到。返回越界多少（负数是还留着余量）。
+const QUAD = [[-1, -1], [1, -1], [-1, 1], [1, 1]]
+function clipBite(b, W, H, R) {
+  const corners = [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]]
+  const centers = [[R, R], [W - R, R], [R, H - R], [W - R, H - R]]
+  let worst = -Infinity
+  for (const [px, py] of corners) {
+    for (let i = 0; i < 4; i++) {
+      const dx = px - centers[i][0], dy = py - centers[i][1]
+      if (Math.sign(dx) !== QUAD[i][0] || Math.sign(dy) !== QUAD[i][1]) continue
+      worst = Math.max(worst, Math.hypot(dx, dy) - R)
+    }
+  }
+  return worst
+}
+
+let clipCombos = 0
+for (const surf of CLIP_SURFACES) {
+  // JS 里那两个数与 WXSS 必须相等：真机上只有画进位图的圆角算数，模拟器却会照 CSS 画，
+  // 两边不一致就成了"模拟器看着圆得对、真机是另一回事"。宽度更直接——半径是按宽度换算的。
+  const cssW = cssNumOf(surf.wxss, surf.sel, 'width')
+  const cssR = cssNumOf(surf.wxss, surf.sel, 'border-radius')
+  if (cssW !== surf.cssW) bad.push(`${surf.wxss} 的 ${surf.sel} width=${cssW}rpx，和 ${surf.js} 里的 ${surf.w}=${surf.cssW} 对不上`)
+  if (cssR !== surf.r) bad.push(`${surf.wxss} 的 ${surf.sel} border-radius=${cssR}rpx，和画进位图那层用的 ${surf.r}rpx 对不上`)
+  let worst = -Infinity
+  let worstTag = ''
+  // 两种语言都要量：引导语英文比中文长，它是居中在码下面的，越宽就往右边伸得越多，
+  // 离右下角那道弧更近——只量中文会放过这一档。
+  for (const lang of ['zh', 'en']) {
+    for (const note of notes) {
+      for (const tpl of poster.TEMPLATES) {
+        clipCombos++
+        const plan = poster.planPoster(ctx, note, tpl.id, { name: '阿飞', slogan: '每天读一点再走', template: tpl.id }, lang, { showQr: true })
+        for (const l of plan.layers) {
+          const b = boxOf(l)
+          if (!b) continue
+          // 通铺的东西（网点带、整幅色块）本来就该被圆角削掉，不进这条判据：
+          // 判据是"它自己四边都离画布边有距离"——贴着边的是有意通铺，不是被切的对象。
+          if (b.x <= 2 || b.y <= 2 || b.x + b.w >= plan.width - 2 || b.y + b.h >= plan.height - 2) continue
+          const bite = clipBite(b, plan.width, plan.height, surf.R)
+          if (bite > worst) { worst = bite; worstTag = `${lang}/${tpl.id} ${l.k}${l.lines ? `「${String(l.lines[0]).slice(0, 10)}」` : ''} 框=[${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.w)}x${Math.round(b.h)}] 画布=${plan.width}x${plan.height}` }
+        }
+      }
+    }
+  }
+  const slack = Number.isFinite(worst) ? `${(-worst).toFixed(1)} 单位余量（${worstTag}）` : '没有格子落进四个圆弧的管辖区'
+  console.log(`${surf.name}圆角 R=${Math.round(surf.R)}（${surf.r}rpx @ ${surf.cssW}rpx，CSS 同宽 ${cssW} 同圆 ${cssR}）：${worst > 0 ? `最不利越界 ${worst.toFixed(1)} ← ${worstTag}` : `最不利的一格距弧还留 ${slack}`}`)
+  if (worst > 0) bad.push(`${surf.name}的圆角咬掉了内容 ${worst.toFixed(1)} 单位：${worstTag}`)
+}
+
 // 纸色那两档由分类明暗决定（站长 09-26：两档都要，走哪档别随机）。这里把映射钉死：
 // 偏亮的两档分类走 A 纯宣，偏暗的三档 + 未分类那块墨走 B 黛青。
 const { TONES, UNCATEGORIZED } = require('../../miniprogram/utils/palette.js')

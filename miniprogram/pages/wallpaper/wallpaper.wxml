@@ -15,7 +15,8 @@
   <!-- 手机模拟预览：画的是"正在试看那一枚"下的笔记列表屏。点它才真的换上。
        里面每个颜色都来自 mock（JS 按被预览那套主题算出来的字面值），
        不吃本页的 CSS 变量，否则预览永远只能画出已经生效的那一套。 -->
-  <view class="stage" style="border-color: {{mock.edge}}" bindtap="onApply">
+  <!-- 外面这一圈是这一页的壳，颜色一律走当前主题的变量；只有 mock 里面那几块走被预览那套。 -->
+  <view class="stage" bindtap="onApply">
     <view class="mock" style="background: {{mock.frame}}">
       <view class="mock-screen" style="background: {{mock.page}}">
         <view class="mock-notch" style="background: {{mock.ink}}"></view>
@@ -25,7 +26,7 @@
           <view
             class="mock-row"
             wx:for="{{mock.rows}}"
-            wx:key="*this"
+            wx:key="index"
             style="background: {{mock.card}};border-color: {{mock.edge}}"
           >
             <view class="mock-blk" style="background: {{item}}"></view>

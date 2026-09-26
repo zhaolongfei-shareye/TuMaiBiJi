@@ -15,6 +15,11 @@ const ck = (name, ok, got) => {
 const readLocal = (mp) => mp.evaluate(() => wx.getStorageSync('localWallpaper') || '(空)')
 
 ;(async () => {
+  // 冷启动那一下最容易翻车：cli auto 刚编完，app 还在启动页，这时 reLaunch 会让 IDE 报
+  // "getPageMetaByWebviewId(...) is null"（它还没给这个 webview 登记页面元信息）。
+  // 所以进来先重试几次；同时兜住 uncaughtException——这个报错是从 WebSocket 回调里抛的，
+  // 没有待办的请求时它会直接掀掉进程，而不接住的话 node 会挂在活着端口上永远不退出。
+  process.on('uncaughtException', (e) => { console.error('探针挂了（未捕获）', e); process.exit(2) })
   let mp
   for (let i = 0; i < 6 && !mp; i++) {
     try { mp = await automator.connect({ wsEndpoint: 'ws://localhost:9431' }) } catch (e) { await sleep(12000) }
@@ -22,7 +27,11 @@ const readLocal = (mp) => mp.evaluate(() => wx.getStorageSync('localWallpaper') 
   if (!mp) throw new Error('连不上自动化端口，先跑 cli auto')
   fs.mkdirSync(OUT, { recursive: true })
 
-  const page = await mp.reLaunch('/pages/wallpaper/wallpaper')
+  let page
+  for (let i = 0; i < 5 && !page; i++) {
+    try { page = await mp.reLaunch('/pages/wallpaper/wallpaper') } catch (e) { console.log(`第 ${i + 1} 次进页没成：${e.message}`); await sleep(8000) }
+  }
+  if (!page) throw new Error('reLaunch 五次都没进这页')
   await sleep(4500)
   const start = await page.data()
   const startLocal = await readLocal(mp)
@@ -78,4 +87,4 @@ const readLocal = (mp) => mp.evaluate(() => wx.getStorageSync('localWallpaper') 
   console.log(bad.length ? `\n${bad.length} 条不过：${bad.join(' / ')}` : '\n全过')
   process.exitCode = bad.length ? 1 : 0
   mp.disconnect()
-})().catch((e) => { console.error('探针挂了', e); process.exitCode = 1 })
+})().catch((e) => { console.error('探针挂了', e); process.exit(1) })

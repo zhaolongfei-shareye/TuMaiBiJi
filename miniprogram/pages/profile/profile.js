@@ -7,6 +7,9 @@ const { t, texts } = require('../../utils/i18n.js')
 const THUMB_W = 288
 // 小样圆角。app.wxss 里 --r-chip 是 28rpx，但真机上原生画布不吃 CSS 圆角，
 // 所以这个值还要再画进位图一次（见 poster.clipRounded）。
+// 28 在这一档是安全的：换算到位图是 73 单位，验-海报模板几何.js 最后一段把十个模板
+// 乘六种笔记都量过，最不利的一格离弧还留着余量（分享页那一排更窄，同一档会咬到字，
+// 所以那边收到 20）。改这个数要跟着改 profile.wxss 的 .cell-canvas，尺子会核。
 const THUMB_R = 28
 // 十格同屏，每格都按 750 全尺寸开位图要吃三十多兆显存，低端安卓会直接崩画布。
 // 小样只是挑样式，0.46 倍落笔在 320rpx 的格子里看不出差别。
@@ -104,13 +107,24 @@ Page({
           canvas.width = poster.W
           canvas.height = MEASURE_H
           const plan = poster.planPoster(ctx, sample, tpl.id, profile, lang)
+          const h = Math.round((plan.height * THUMB_W) / poster.W)
+          // 高度必须在落笔之前逐格提交给视图层：这一格显示的真是 {{item.h}}rpx，
+          // 骨架里那是个 4:3 的占位数。等整轮画完再一次性 setData，画的过程中这十格
+          // 都被压在占位框里竖着挤一挤——圆角跟着挤成椭圆（clipRounded 是画进位图的，
+          // 位图不弯、显示弯）。一格里一次 setData 只改一个字段，代价比看到的问题小。
+          this.setData({ [`groups[${gi}].items[${ii}].h`]: h })
+          await new Promise((r) => wx.nextTick(r))
           // 改宽高会重置画布状态，所以 scale 必须在之后设
           canvas.width = Math.round(plan.width * THUMB_SCALE)
           canvas.height = Math.round(plan.height * THUMB_SCALE)
           ctx.scale(THUMB_SCALE, THUMB_SCALE)
           poster.clipRounded(ctx, plan.width, plan.height, THUMB_R, THUMB_W)
+          // 解码头像可以慢到四秒，落笔前必须再对一次号。
+          // 只在循环头对不够：那一遍等完回来，新的一遍可能已经画到同一张画布上，
+          // 后落笔的覆盖先落笔的——旧内容反而成了最终画面。
+          if (this._renderGen !== gen) return
           poster.paintLayers(ctx, plan.layers, images)
-          groups[gi].items[ii] = Object.assign({}, tpl, { h: Math.round((plan.height * THUMB_W) / poster.W) })
+          groups[gi].items[ii] = Object.assign({}, tpl, { h })
         } catch (err) {
           console.error('模板小样没画出来', tpl.id, err)
           groups[gi].items[ii] = Object.assign({}, tpl, { h: Math.round(THUMB_W * 1.4) })

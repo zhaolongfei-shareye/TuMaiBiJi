@@ -110,18 +110,23 @@
   background: var(--bg-card);
 }
 
+/* 选中态用外环，不改 border-width：格子里那张画布是定宽的，边框一粗内容就整块挪 1rpx，
+   一排格子跟着跳（分享页那一排早已踩过，结论写在 share.wxss 的 .pick-on 上）。 */
 .cell-on {
   border-color: var(--accent);
-  border-width: 4rpx;
+  box-shadow: 0 0 0 3rpx var(--accent);
 }
 
 /* 画布位图 750 宽，格子只有 320，高度由 JS 按比例算好写进 style，
-   这里给个兜底值，别让它在小样画出来之前塌成 0。 */
+   这里给个兜底值，别让它在小样画出来之前塌成 0。
+   底色只能透明：圆角现在是画进位图的（poster.clipRounded），而真机上原生画布不吃
+   CSS 的 border-radius，留着 --chip-idle 就是在四个角外各垫一块直角灰斑——
+   站长 09-26 圈的"四个角跟卡片叠在一起"正是这个形状。 */
 .cell-canvas {
   width: 288rpx;
   height: 403rpx;
   border-radius: var(--r-chip);
-  background: var(--chip-idle);
+  background: transparent;
 }
 
 .cell-label {
