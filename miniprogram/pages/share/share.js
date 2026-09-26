@@ -2,6 +2,8 @@
 // 小样同一套算法，只是更小），高度由 JS 按比例算好写进 style。
 const PICK_W = 176
 const PICK_SCALE = 0.28
+// 小图圆角，同 app.wxss 的 --r-chip；真机上原生画布不吃 CSS 圆角，得画进位图
+const PICK_R = 28
 const MEASURE_H = 750
 
 // 预览框定高（rpx，画布位图 1 像素 = 1rpx）。十套模板的成品图高度差得很多，
@@ -189,6 +191,7 @@ Page({
         canvas.width = Math.round(plan.width * PICK_SCALE)
         canvas.height = Math.round(plan.height * PICK_SCALE)
         ctx.scale(PICK_SCALE, PICK_SCALE)
+        poster.clipRounded(ctx, plan.width, plan.height, PICK_R, PICK_W)
         poster.paintLayers(ctx, plan.layers, images)
         x.h = Math.round((plan.height * PICK_W) / poster.W)
       } catch (err) {

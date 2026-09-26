@@ -5,6 +5,9 @@ const { t, texts } = require('../../utils/i18n.js')
 // 之前这里填的是 320——那是格子的外宽，含内边距。拿它折算高度等于把每张预览纵向
 // 拉长 750/675≈11%，圆形头像在小样里被画成椭圆，而成品海报是对的：预览骗人。
 const THUMB_W = 288
+// 小样圆角。app.wxss 里 --r-chip 是 28rpx，但真机上原生画布不吃 CSS 圆角，
+// 所以这个值还要再画进位图一次（见 poster.clipRounded）。
+const THUMB_R = 28
 // 十格同屏，每格都按 750 全尺寸开位图要吃三十多兆显存，低端安卓会直接崩画布。
 // 小样只是挑样式，0.46 倍落笔在 320rpx 的格子里看不出差别。
 const THUMB_SCALE = 0.46
@@ -105,6 +108,7 @@ Page({
           canvas.width = Math.round(plan.width * THUMB_SCALE)
           canvas.height = Math.round(plan.height * THUMB_SCALE)
           ctx.scale(THUMB_SCALE, THUMB_SCALE)
+          poster.clipRounded(ctx, plan.width, plan.height, THUMB_R, THUMB_W)
           poster.paintLayers(ctx, plan.layers, images)
           groups[gi].items[ii] = Object.assign({}, tpl, { h: Math.round((plan.height * THUMB_W) / poster.W) })
         } catch (err) {

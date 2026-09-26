@@ -32,7 +32,7 @@ function mockOf(key) {
     card: theme.line,
     edge: edgeOf(theme),
     bar,
-    rows: [1, 2, 3].map((n) => toneColor(n, theme.key)),
+    rows: [1, 2, 3, 4].map((n) => toneColor(n, theme.key)),
     // 预览画的是笔记列表那一屏，所以 tab 高亮左起第二格（左一是新建）
     tabs: [0, 1, 2, 3].map((n) => (n === 1 ? toneColor(0, theme.key) : bar)),
   }

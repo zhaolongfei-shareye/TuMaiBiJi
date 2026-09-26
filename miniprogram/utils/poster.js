@@ -269,6 +269,20 @@ function ensureRoundRect(ctx) {
   }
 }
 
+/**
+ * 把整张画布裁成圆角，之后所有落笔都被这个形状挡住。
+ * 真机上 `canvas type="2d"` 是原生层，CSS 的 border-radius 不吃（模拟器把它当 DOM 画，
+ * 所以圆角在模拟器里"看着有"）——小样那一排的圆角只能画进位图，否则四个直角会戳到
+ * 选中框的圆弧外面（站长 09-26 真机截图里就是这一条）。
+ * cssW / cssR 用同一个单位（rpx）：位图里的半径 = cssR × 画布逻辑宽 ÷ cssW。
+ */
+function clipRounded(ctx, w, h, cssR, cssW) {
+  ensureRoundRect(ctx)
+  ctx.beginPath()
+  ctx.roundRect(0, 0, w, h, (cssR * w) / cssW)
+  ctx.clip()
+}
+
 // 一行的落笔。track（字距）是"高级感"里最便宜的一招，但 canvas 没有 letterSpacing，
 // 只能逐字量宽往后推；整行的对齐要先把加过距的总宽算出来。
 // stroke 是描边：先描后填，字就带一圈外发光式的边（波普贴纸那种）。
@@ -1598,6 +1612,7 @@ module.exports = {
   templateLabel,
   groupName,
   paintLayers,
+  clipRounded,
   loadImage,
   quoteOf,
 }

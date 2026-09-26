@@ -75,7 +75,8 @@ const findInSandbox = (name, depth = 8) => {
     if (local) fs.copyFileSync(local, `${OUT}/${name}`)
     ck(`${cn} 成品已搬进仓库`, !!local, local || '没找到')
   }
-  await mp.reLaunch('/pages/index/index')
+  // 收尾别再 reLaunch 到 tab 页：automator 对"reLaunch 一个 tab 页"的回信本来就不稳
+  // （实测会 timeout waiting for automator response），断言早在上面跑完了，不值得为收尾挂一次红。
   mp.disconnect()
   console.log(`\n${bad.length ? `✗ ${bad.length} 处不过` : '全过'}　目录：${OUT}`)
   process.exit(bad.length ? 1 : 0)

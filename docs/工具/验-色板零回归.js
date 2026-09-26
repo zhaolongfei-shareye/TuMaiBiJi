@@ -314,6 +314,23 @@ ck('八枚各有 id，进来能滚到在用那枚', /id="wp-\{\{item\.key\}\}"/.
   && /intoView: `wp-\$\{current\}`/.test(wpJs))
 ck('在用和试看两个标记不重叠', /previewing && item\.key === previewKey/.test(wpWxml))
 
+// ⑱ 小样画布的圆角必须画进位图。真机上 `canvas type="2d"` 是原生层，CSS 的 border-radius
+//    不吃（模拟器把它当 DOM 画，所以模拟器里"看着是圆的"是假证据）——圆角不进位图，
+//    四个直角就会戳到选中框的圆弧外面（站长 09-26 真机截图里那条）。
+//    这条没法在模拟器里自证（两种圆角看着一样），所以钉的是"落笔前确实裁过"这个动作。
+const shareJs = readSrc('pages/share/share.js')
+const profJs = readSrc('pages/profile/profile.js')
+ck('poster 把 clipRounded 交出来了', /clipRounded,/.test(readSrc('utils/poster.js')))
+// 必须按"那一个画小样的函数"来比先后：分享页里 paintLayers 出现两次（大的预览也用它），
+// 全文找第一个会把顺序比反。
+for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker'], ['卡片模板那十格', profJs, 'renderThumbs']]) {
+  const b = fnBody(src, fn)
+  const at = b ? b.indexOf('clipRounded') : -1
+  const paint = b ? b.indexOf('paintLayers') : -1
+  ck(`${nm}：先裁圆角再落笔`, at >= 0 && paint >= 0 && at < paint,
+    b ? `clip@${at} paint@${paint}` : `没抓到 ${fn} 函数体`)
+}
+
 after.setActiveTheme('default')
 const bad = results.filter((r) => !r.ok)
 console.log(`\n${results.length - bad.length}/${results.length} 过`)
