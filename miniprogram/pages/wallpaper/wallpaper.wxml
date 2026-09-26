@@ -11,35 +11,70 @@
     <text class="sec-title">{{t.wallpaperSection}}</text>
     <text class="sec-hint">{{t.wallpaperSubHint}}</text>
   </view>
-  <view class="wallpaper-grid">
-    <view
-      class="wallpaper-item {{item.active ? 'active' : ''}}"
-      style="{{item.itemStyle}}"
-      wx:for="{{wallpapers}}"
-      wx:key="key"
-      bindtap="onSelect"
-      data-key="{{item.key}}"
-    >
-      <!-- 缩略预览：一块色 + 一条中性块 + 两条描边行，就是首页那一行的缩影。
-           带色阶的那两枚要打个标记——它们和其他六枚不是一回事：
-           其他六枚只换页面底，这两枚连左侧方块一起换。
-           标记放在名字同一行：原先浮在右上角会咬掉那条长色块的右端（截图里看得见）。 -->
-      <view class="mini">
-        <view class="mini-blk" style="background: {{item.stack[0]}}"></view>
-        <view class="mini-blk wide" style="background: {{item.stack[1]}}"></view>
-      </view>
-      <view class="mini-ln" style="background: {{item.line}}; border-color: {{item.lineEdge}}"></view>
-      <view class="mini-ln short" style="background: {{item.line}}; border-color: {{item.lineEdge}}"></view>
 
-      <view class="wallpaper-foot">
-        <view class="wp-name">
-          <text class="wallpaper-label">{{item.label}}</text>
-          <text wx:if="{{item.tinted}}" class="tint-flag">{{t.tintedFlag}}</text>
+  <!-- 手机模拟预览：画的是"正在试看那一枚"下的笔记列表屏。点它才真的换上。
+       里面每个颜色都来自 mock（JS 按被预览那套主题算出来的字面值），
+       不吃本页的 CSS 变量，否则预览永远只能画出已经生效的那一套。 -->
+  <view class="stage" style="border-color: {{mock.edge}}" bindtap="onApply">
+    <view class="mock" style="background: {{mock.frame}}">
+      <view class="mock-screen" style="background: {{mock.page}}">
+        <view class="mock-notch" style="background: {{mock.ink}}"></view>
+        <view class="mock-nav" style="color: {{mock.ink}}">{{t.appName}}</view>
+        <view class="mock-body">
+          <view class="mock-h1" style="color: {{mock.ink}}">{{t.notesHeading}}</view>
+          <view
+            class="mock-row"
+            wx:for="{{mock.rows}}"
+            wx:key="*this"
+            style="background: {{mock.card}};border-color: {{mock.edge}}"
+          >
+            <view class="mock-blk" style="background: {{item}}"></view>
+            <view class="mock-lines">
+              <view class="mock-ln" style="background: {{mock.bar}}"></view>
+              <view class="mock-ln mock-ln-short" style="background: {{mock.bar}}"></view>
+            </view>
+          </view>
         </view>
-        <view wx:if="{{item.active}}" class="check-mark">✓</view>
+        <view class="mock-tabs" style="background: {{mock.card}};border-color: {{mock.edge}}">
+          <view class="mock-tab" wx:for="{{mock.tabs}}" wx:key="index" style="background: {{item}}"></view>
+        </view>
       </view>
     </view>
+    <view class="stage-hint {{previewing ? 'stage-hint-on' : ''}}">
+      {{previewing ? t.stageHintPreview : t.stageHintIdle}}
+    </view>
   </view>
+
+  <!-- 八枚压成一条横滑：只剩色块和两字名。横滑那套结构照抄分享页的模板条
+       （scroll-view + nowrap + 内层 flex），那条真机验过。 -->
+  <scroll-view
+    class="wp-strip"
+    scroll-x
+    enhanced
+    show-scrollbar="{{false}}"
+    scroll-into-view="{{intoView}}"
+    scroll-with-animation
+  >
+    <view class="wp-strip-inner">
+      <view
+        class="wp-chip {{item.active ? 'wp-chip-on' : ''}} {{previewing && item.key === previewKey ? 'wp-chip-prev' : ''}}"
+        wx:for="{{wallpapers}}"
+        wx:key="key"
+        id="wp-{{item.key}}"
+        data-key="{{item.key}}"
+        bindtap="onPreview"
+      >
+        <view class="wp-tile" style="{{item.itemStyle}}">
+          <view class="wp-bar wp-bar-a" style="background: {{item.stack[0]}}"></view>
+          <view class="wp-bar wp-bar-b" style="background: {{item.stack[1]}}"></view>
+          <view wx:if="{{item.active}}" class="wp-dot">✓</view>
+        </view>
+        <text class="wp-name">{{item.label}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="strip-foot">{{t.stripHint}} · {{t.inUse}}：{{currentLabel}}</view>
 
   <view wx:if="{{applying}}" class="applying-mask">
     <text class="applying-text">{{t.applying}}</text>

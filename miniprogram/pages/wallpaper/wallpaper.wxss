@@ -18,15 +18,7 @@
   color: var(--text-secondary);
 }
 
-.wallpaper-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-3);
-}
-
-/* ---------- 分节标题 ----------
-   这一页现在管两件事（字体 + 壁纸），所以要有两节。原来那行说明挂在页头，
-   现在拆成每节各说一句，免得"只改页面底色"这句话被字体那节误读。 */
+/* ---------- 分节标题 ---------- */
 .sec-head {
   margin: var(--sp-4) 0 var(--sp-3);
 }
@@ -50,104 +42,216 @@
 /* 界面字体那一排的样式已随入口一起删掉（iOS 与安卓真机都证伪，见 wallpaper.wxml 那条注释）。
    字体类 .font-song / .font-fang / .font-kai 仍在 app.wxss 和 tab 栏组件里，没删。 */
 
-/* 带色阶那两枚的标记：跟名字同一行，不再浮在格子上面（浮着会盖住那条长色块）。
-   这里不跟界面字体走——它是压在某个具体主题的格子上的小标签，用系统链最稳。 */
-.wp-name {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  min-width: 0;
+/* ---------- 手机模拟预览 ----------
+   外框走当前主题的卡片色（它是这一页的壳），里面那一屏走被预览那套主题的字面值。
+   整块可点，点下去才调 applyTheme。 */
+.stage {
+  padding: 28rpx 0 20rpx;
+  border-radius: var(--r-card);
+  border: var(--w-edge) solid var(--card-edge);
+  background: var(--bg-card);
 }
 
-.tint-flag {
-  flex: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
-  font-size: var(--fs-micro);
-  font-weight: 700;
-  letter-spacing: 0.5rpx;
-  padding: 2rpx 8rpx;
-  border-radius: 8rpx;
-  background: var(--wp-label);
-  color: var(--wp-opp);
+.mock {
+  width: 396rpx;
+  margin: 0 auto;
+  padding: 12rpx;
+  border-radius: 54rpx;
 }
 
-.wallpaper-item {
-  position: relative;
+.mock-screen {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  height: 300rpx;
-  padding: var(--sp-4);
-  border-radius: var(--r-card);
-  border: 4rpx solid transparent;
-  box-sizing: border-box;
-  transition: border-color 0.2s;
+  height: 636rpx;
+  border-radius: 42rpx;
+  overflow: hidden;
 }
 
-/* 选中框的颜色取这一格自己画的那个主题的墨色，不取当前主题的 CSS 变量：
-   否则停在深海时去看米白那一格，勾和框会变成深海那套亮蓝。 */
-.wallpaper-item.active {
-  border-color: var(--wp-label);
+.mock-notch {
+  width: 100rpx;
+  height: 8rpx;
+  margin: 10rpx auto 0;
+  border-radius: 4rpx;
+  opacity: 0.3;
 }
 
-/* 缩略图：一块色 + 一条中性块 + 两条描边行，色块不随主题变——这正是这套语言的要点 */
-.mini {
+.mock-nav {
+  height: 46rpx;
+  line-height: 46rpx;
+  text-align: center;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.mock-body {
+  flex: 1;
+  padding: 12rpx 18rpx;
+}
+
+.mock-h1 {
+  margin: 4rpx 0 14rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+  letter-spacing: -0.6rpx;
+}
+
+.mock-row {
   display: flex;
+  align-items: center;
   gap: 12rpx;
+  padding: 12rpx;
   margin-bottom: 12rpx;
+  border: 1rpx solid;
+  border-radius: 14rpx;
+  box-sizing: border-box;
 }
 
-.mini-blk {
+.mock-blk {
   flex: none;
-  width: 44rpx;
-  height: 44rpx;
+  width: 48rpx;
+  height: 48rpx;
   border-radius: 12rpx;
 }
 
-.mini-blk.wide {
+.mock-lines {
   flex: 1;
-  width: auto;
 }
 
-.mini-ln {
-  height: 14rpx;
-  border: var(--w-edge) solid transparent;
-  border-radius: 6rpx;
+.mock-ln {
+  height: 10rpx;
   margin-bottom: 8rpx;
+  border-radius: 5rpx;
 }
 
-.mini-ln.short {
-  width: 70%;
+.mock-ln-short {
+  width: 56%;
+  margin-bottom: 0;
 }
 
-.wallpaper-foot {
-  margin-top: auto;
+.mock-tabs {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2);
+  justify-content: space-around;
+  height: 58rpx;
+  border-top: 1rpx solid;
 }
 
-.wallpaper-label {
+.mock-tab {
+  width: 40rpx;
+  height: 14rpx;
+  border-radius: 7rpx;
+}
+
+.stage-hint {
+  margin-top: 16rpx;
+  text-align: center;
   font-size: var(--fs-meta);
-  font-weight: 800;
-  letter-spacing: -0.2rpx;
-  color: var(--wp-label, #23252c);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
 }
 
-.check-mark {
+/* 有东西在试看时这行才提亮——它是"下一步该点哪儿"的唯一提示 */
+.stage-hint-on {
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+/* ---------- 壁纸条 ---------- */
+.wp-strip {
+  width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  margin-top: var(--sp-4);
+  padding: 10rpx 0 0;
+}
+
+.wp-strip-inner {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.wp-chip {
   flex: none;
-  width: 44rpx;
-  height: 44rpx;
+  width: 124rpx;
+  text-align: center;
+}
+
+/* 每一格画的是"另一套主题"，所以底、描边、勾的颜色全从 itemStyle 带进来（--wp-*）。
+   不取当前主题的变量：停在深海时去看米白那一格，勾和框会变成深海那套亮蓝。 */
+.wp-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  height: 92rpx;
+  padding: 14rpx 12rpx;
+  box-sizing: border-box;
+  border: 2rpx solid var(--wp-edge);
+  border-radius: 16rpx;
+  transition: border-color 0.2s;
+}
+
+.wp-bar {
+  height: 14rpx;
+  border-radius: 6rpx;
+}
+
+.wp-bar-a {
+  width: 30rpx;
+}
+
+.wp-bar-b {
+  width: 100%;
+}
+
+.wp-chip-on .wp-tile {
+  border-color: var(--wp-label);
+  border-width: 4rpx;
+}
+
+/* 虚线框 = 这一枚正在上面那部手机里试看，还没换上 */
+.wp-chip-prev .wp-tile {
+  border-color: var(--wp-label);
+  border-style: dashed;
+  border-width: 4rpx;
+}
+
+.wp-dot {
+  position: absolute;
+  top: -10rpx;
+  right: -10rpx;
+  width: 34rpx;
+  height: 34rpx;
   border-radius: 50%;
   background: var(--wp-label, #23252c);
   color: var(--wp-opp, #ffffff);
-  font-size: 26rpx;
+  font-size: 20rpx;
   font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
+  line-height: 34rpx;
+  text-align: center;
+}
+
+.wp-name {
+  display: block;
+  margin-top: 10rpx;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  letter-spacing: -0.2rpx;
+  color: var(--text-secondary);
+}
+
+.wp-chip-on .wp-name,
+.wp-chip-prev .wp-name {
+  color: var(--text-primary);
+}
+
+.strip-foot {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-micro);
+  color: var(--text-secondary);
+  opacity: 0.75;
 }
 
 /* 等接口那一瞬的遮罩。原来写死半透明白，深色壁纸下会闪一下白；

@@ -258,8 +258,15 @@ ck('六枚下胶囊投影与改动前逐值相同', after.withAlpha(after.UNCATE
 //    这两档是写死的常量，所以对比度可以一次算清；更要紧的是别哪天又有人在这三套里
 //    直接把分类彩色拿回来。
 const posterSrc = fs.readFileSync(path.join(pageDir, 'utils/poster.js'), 'utf8')
-const PAPER_A = { bg: '#E4DCC7', ink: '#2E2B24' }
-const PAPER_B = { bg: '#55625C', ink: '#EEF0EB' }
+// 两档的色值从 poster.js 现读，不在这里抄一份：抄的那份改不动，
+// 哪天 poster.js 换了纸色这条还是绿的，等于钉了个假值。
+const paperConst = (nm) => {
+  const m = new RegExp(`const ${nm} = \\{([^}]*)\\}`).exec(posterSrc)
+  const hex = (k) => '#' + ((m && new RegExp(`${k}:\\s*'#([0-9A-Fa-f]{6})'`).exec(m[1])) || [])[1]
+  return { bg: hex('bg'), ink: hex('ink') }
+}
+const PAPER_A = paperConst('PAPER_A')
+const PAPER_B = paperConst('PAPER_B')
 ck('A 纯宣 墨/纸 ≥ 4.5:1', ratio(PAPER_A.bg, PAPER_A.ink) >= 4.5, ratio(PAPER_A.bg, PAPER_A.ink).toFixed(2))
 ck('B 黛青 纸/黛 ≥ 4.5:1', ratio(PAPER_B.bg, PAPER_B.ink) >= 4.5, ratio(PAPER_B.bg, PAPER_B.ink).toFixed(2))
 const leaked = ['planCard', 'planQuote', 'planBlock'].filter((fn) => {
@@ -268,6 +275,44 @@ const leaked = ['planCard', 'planQuote', 'planBlock'].filter((fn) => {
 })
 ck('经典三款不再直接取分类彩色（走 paperOf）', leaked.length === 0, leaked.join(' / '))
 ck('两档由分类明暗决定，不是随手挑', /lumOf\(toneFor\(categoryId\)\.bg\)/.test(posterSrc))
+
+// ⑰ 外观设置这一屏改成"手机预览 + 横滑壁纸条"（站长 09-26：只留色块和名字（两个字），
+//    超出就左右滑；点条子只试看，点上面那部手机才换上）。
+//    名字这条得钉住：一格只有 124rpx 宽，三个字就开始挤。
+//    更要紧的是"点条子不许真换"——这条是这一屏的交互契约，一旦有人图省事把它接回
+//    applyTheme，预览就成了摆设，而且用户点一下整站变色，退都退不回来。
+const liveOf = (rel) =>
+  fs
+    .readFileSync(path.join(pageDir, rel), 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    .join('\n')
+// 抓方法体。抓不到要当成失败，不能当成"没有违例"——那是假绿。
+const fnBody = (src, name) => {
+  const m = new RegExp(`\\b${name}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\n  \\}`).exec(src)
+  return m ? m[1] : null
+}
+const wpJs = readSrc('pages/wallpaper/wallpaper.js')
+const wpCss = fs.readFileSync(path.join(pageDir, 'pages/wallpaper/wallpaper.wxss'), 'utf8')
+const i18nSrc = readSrc('utils/i18n.js')
+ck('八枚壁纸的名字全是两个字', after.THEMES.every((x) => [...x.label].length === 2),
+  after.THEMES.map((x) => x.label).join(' '))
+const staleName = scanned.concat('utils/palette.js', 'utils/i18n.js').filter((rel) => /米白一色|雨过青/.test(liveOf(rel)))
+ck('两枚的旧名在界面上改净（注释里留着当线索）', staleName.length === 0, staleName.join(' '))
+ck('「整套色阶」那个角标撤干净了', !/tint-flag|tintedFlag/.test(wpWxml + wpCss + i18nSrc))
+ck('预览那一屏的颜色由 JS 算字面值，不吃本页变量', /function mockOf/.test(wpJs) && /\{\{mock\.page\}\}/.test(wpWxml))
+ck('预览里那几块方块按被预览那套主题取档', /toneColor\([^)]*theme\.key[^)]*\)/.test(wpJs))
+const pvBody = fnBody(wpJs, 'onPreview')
+ck('点色块只试看：不碰主题也不写库', !!pvBody && !/applyTheme|setWallpaper|updateWallpaper/.test(pvBody),
+  pvBody ? '' : '没抓到 onPreview 函数体')
+const apBody = fnBody(wpJs, 'onApply')
+ck('点上面那部手机才真换', /bindtap="onApply"/.test(wpWxml) && !!apBody && /this\.applyWallpaper\(previewKey\)/.test(apBody),
+  apBody ? '' : '没抓到 onApply 函数体')
+ck('八枚各有 id，进来能滚到在用那枚', /id="wp-\{\{item\.key\}\}"/.test(wpWxml) && /scroll-into-view="\{\{intoView\}\}"/.test(wpWxml)
+  && /intoView: `wp-\$\{current\}`/.test(wpJs))
+ck('在用和试看两个标记不重叠', /previewing && item\.key === previewKey/.test(wpWxml))
 
 after.setActiveTheme('default')
 const bad = results.filter((r) => !r.ok)

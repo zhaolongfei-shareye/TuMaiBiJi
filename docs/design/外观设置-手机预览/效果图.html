@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<!--
+  外观设置页改版效果图：上面一部手机预览，下面压成一排"色块 + 两字名"的壁纸条。
+  站长 09-26 提的原话：只留色块和名字（两个字），超出就左右滑，像卡片模板那样；
+  点条子只试看，点上面的手机界面才真的换上。
+  这里画的是同一个设计的两个状态，不是两套方案。
+  色值全部取自 utils/palette.js 的 THEMES/TONES，没有另立色值。
+-->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
+    background: #E8E6E1; padding: 34px 30px 40px; color: #23252c;
+  }
+  h1 { font-size: 21px; font-weight: 800; letter-spacing: -.4px; }
+  .sub { font-size: 12.5px; color: #6b6d76; margin: 6px 0 22px; }
+  .row { display: flex; gap: 26px; align-items: flex-start; }
+  .state { width: 375px; }
+  .cap { font-size: 12px; color: #6b6d76; margin-bottom: 8px; font-weight: 700; }
+  .cap b { color: #23252c; }
+
+  .page { width: 375px; border-radius: 22px; overflow: hidden; box-shadow: 0 8px 26px rgba(0,0,0,.13); }
+  .nav { height: 44px; display: flex; align-items: center; justify-content: center; font-size: 15.5px; font-weight: 700; position: relative; }
+  .nav .back { position: absolute; left: 15px; font-size: 17px; opacity: .8; }
+  .body { padding: 14px 16px 16px; }
+  .sec-title { font-size: 17px; font-weight: 800; letter-spacing: -.4px; }
+  .sec-hint { font-size: 11.5px; line-height: 1.55; opacity: .62; margin-top: 4px; }
+
+  /* 手机模拟预览区 */
+  .stage { margin-top: 12px; border-radius: 16px; padding: 14px 0 10px; }
+  .phone { width: 198px; margin: 0 auto; border-radius: 26px; padding: 7px; position: relative; }
+  .screen { border-radius: 20px; overflow: hidden; height: 330px; display: flex; flex-direction: column; }
+  .notch { width: 52px; height: 4px; border-radius: 3px; margin: 4px auto 0; opacity: .3; }
+  .pnav { height: 26px; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; }
+  .pbody { flex: 1; padding: 8px 10px; }
+  .ptitle { font-size: 13px; font-weight: 800; letter-spacing: -.3px; margin: 2px 0 8px; }
+  .note { display: flex; gap: 7px; align-items: center; margin-bottom: 7px; padding: 8px 7px; border-radius: 9px; }
+  .blk { width: 27px; height: 27px; border-radius: 7px; flex: none; position: relative; }
+  .blk::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.4); }
+  .lines { flex: 1; }
+  .ln { height: 6px; border-radius: 3px; margin-bottom: 5px; }
+  .ln.s { width: 56%; margin-bottom: 0; }
+  .ptabs { height: 32px; display: flex; align-items: center; justify-content: space-around; }
+  .tab { width: 20px; height: 8px; border-radius: 4px; }
+  .stage-hint { text-align: center; font-size: 11.5px; margin-top: 9px; font-weight: 700; }
+
+  /* 壁纸条：色块 + 两字名，横向滑 */
+  .strip-wrap { margin-top: 14px; position: relative; overflow: hidden; }
+  .strip { display: flex; gap: 10px; }
+  .fade { position: absolute; top: 0; width: 26px; height: 76px; pointer-events: none; }
+  .fade.r { right: 0; }
+  .fade.l { left: 0; }
+  .wp { width: 62px; flex: none; text-align: center; }
+  .tile { height: 46px; border-radius: 11px; padding: 7px 6px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; position: relative; }
+  .tile i { display: block; border-radius: 4px; height: 9px; }
+  .tile i.a { width: 15px; }
+  .tile i.b { width: 100%; }
+  .nm { font-size: 11.5px; margin-top: 5px; font-weight: 700; }
+  .wp.on .nm { font-weight: 800; }
+  .dot { position: absolute; right: -3px; top: -3px; width: 15px; height: 15px; border-radius: 50%; font-size: 9px; line-height: 15px; text-align: center; }
+  .ring { position: absolute; inset: -4px; border-radius: 14px; border: 1.5px dashed; }
+  .edge-note { font-size: 11px; opacity: .55; margin-top: 8px; }
+  .notes { margin-top: 26px; font-size: 12.5px; line-height: 1.85; color: #4b4d55; max-width: 720px; }
+  .notes b { color: #23252c; }
+</style>
+</head>
+<body>
+  <h1>外观设置 · 手机预览 + 压缩壁纸条</h1>
+  <div class="sub">同一个设计的两个状态。左边是刚进页，右边是点了「天青」在试看、还没换。</div>
+  <div class="row" id="row"></div>
+  <div class="notes">
+    <b>这一屏改了什么。</b>原来八枚壁纸是两列大卡，一屏放不下要滚到底；现在上面给一部手机预览，下面压成一条横滑的"色块 + 两字名"，八枚一屏收完。<br>
+    <b>怎么点。</b>点条子上任意一枚 → 只换上面手机里的画面，这一页本身不动；觉得对了 → 点一下那部手机，才真的换上（导航条、tab 栏一起变）。点错不用回退，再点一枚就行。<br>
+    <b>条子进来先滚到"在用的那枚"。</b>不然米白那套排在最左、在用的象牙在最右，进来只看得见前五枚，会以为没存上。<br>
+    <b>名字收成两个字。</b>「米白一色」改叫<b>象牙</b>，「雨过青」改叫<b>天青</b>——都是釉色本名，和海报那三套（玉版宣 / 摘句 / 叠翠）一个路子。PRD 和官网交接文档里的旧名要一起改。<br>
+    <b>「整套色阶」那个角标没了，是换地方说。</b>象牙 / 天青这两枚连左侧方块一起换色，在手机预览里直接看得见（方块深浅跟着变），不必再挂角标解释；上面那行说明留着。
+  </div>
+<script>
+const TONES = ['#F6C445', '#3F52D6', '#E9723D', '#46A863', '#6E4BD0'];
+const THEMES = [
+  { key: 'default',         nm: '米白', page: '#f4f2ec', dark: false },
+  { key: 'gradient-blue',   nm: '雾蓝', page: '#eaeefb', dark: false },
+  { key: 'gradient-green',  nm: '松绿', page: '#e7f3ea', dark: false },
+  { key: 'gradient-sunset', nm: '暮橙', page: '#fdeee6', dark: false },
+  { key: 'gradient-purple', nm: '夜紫', page: '#0c0c1d', dark: true },
+  { key: 'gradient-ocean',  nm: '深海', page: '#0d1b2a', dark: true },
+  { key: 'tint-paper',      nm: '象牙', page: '#F2EFE9', dark: false,
+    steps: ['#EAE0CE', '#D9C9AE', '#C2AA85', '#85644A', '#6A5334'] },
+  { key: 'tint-celadon',    nm: '天青', page: '#E9EEEA', dark: false,
+    steps: ['#DDE7DF', '#C2D3C6', '#9FB8A6', '#54745D', '#40604A'] },
+];
+// 和 palette.js 的 toneColor(i, themeKey) 同一套取法：普通六枚走五支彩色，
+// 淡雅两枚走自己的色阶档（下标取模，所以第 7、8 格拿到 steps[1]/[2] 和 [2]/[3]）。
+const tone = (i, th) => (th.steps ? th.steps : TONES)[Math.abs(i) % 5];
+const cardBg = (th) => (th.dark ? 'rgba(255,255,255,.08)' : '#ffffff');
+const ink = (th) => (th.dark ? '#f2f4fb' : '#23252c');
+const bar = (th) => (th.dark ? 'rgba(255,255,255,.20)' : 'rgba(35,37,44,.13)');
+const edge = (th) => (th.dark ? 'rgba(255,255,255,.14)' : 'rgba(35,37,44,.09)');
+const accent = (th) => (th.dark ? '#FFFFFF' : '#23252c');
+
+// 手机里那一屏：三行笔记 + tab 栏。方块用"这一套主题下的分类色"，
+// 所以象牙/天青那两枚一预览，方块会整排换成深浅，这就是原来那个角标想说的话。
+function phone(th, tabOn) {
+  const rows = [1, 2, 3].map((n) => `
+    <div class="note" style="background:${cardBg(th)};box-shadow:0 0 0 1px ${edge(th)}">
+      <div class="blk" style="background:${tone(n, th)}"></div>
+      <div class="lines">
+        <div class="ln" style="background:${bar(th)}"></div>
+        <div class="ln s" style="background:${bar(th)}"></div>
+      </div>
+    </div>`).join('');
+  const tabs = [0, 1, 2, 3].map((n) => `<div class="tab" style="background:${
+    n === tabOn ? tone(0, th) : bar(th)}"></div>`).join('');
+  // 预览里画的是"我的笔记"那一屏，所以高亮左起第二格（左一是新建）。
+  return `<div class="phone" style="background:${ink(th)}">
+    <div class="screen" style="background:${th.page}">
+      <div class="notch" style="background:${ink(th)}"></div>
+      <div class="pnav" style="color:${ink(th)}">图麦笔记</div>
+      <div class="pbody">
+        <div class="ptitle" style="color:${ink(th)}">我的笔记</div>${rows}
+      </div>
+      <div class="ptabs" style="background:${cardBg(th)};box-shadow:0 -1px 0 ${edge(th)}">${tabs}</div>
+    </div>
+  </div>`;
+}
+
+function tile(th, i, st, cur) {
+  const a = tone(i, th), b = tone(i + 1, th);
+  return `<div class="wp ${st === 'on' ? 'on' : ''}">
+    <div class="tile" style="background:${th.page};box-shadow:0 0 0 1px ${edge(th)}${
+      st === 'on' ? `,outline:2px solid ${accent(cur)};outline-offset:1px` : ''}">
+      ${st === 'ring' ? `<div class="ring" style="border-color:${accent(cur)}"></div>` : ''}
+      ${st === 'on' ? `<div class="dot" style="background:${accent(cur)};color:${cur.page}">✓</div>` : ''}
+      <i class="a" style="background:${a}"></i><i class="b" style="background:${b}"></i>
+    </div>
+    <div class="nm" style="color:${ink(cur)};opacity:${st === null ? .66 : 1}">${th.nm}</div>
+  </div>`;
+}
+
+function screen(curIdx, previewIdx) {
+  const cur = THEMES[curIdx];
+  const pv = previewIdx === null ? cur : THEMES[previewIdx];
+  const chips = THEMES.map((th, i) => {
+    let st = null;
+    if (i === curIdx) st = 'on';
+    if (previewIdx !== null && i === previewIdx) st = 'ring';
+    return tile(th, i, st, cur);
+  }).join('');
+  // 进来先滚到"在用的那枚"：一枚 62 + 间距 10 = 72，留 200 给右边四枚半，
+  // 左边故意露出被切的一角，两头都加渐隐，看得出这条还能滑。
+  const shift = -(curIdx * 72 - 200);
+  const hint = previewIdx === null
+    ? `<div class="stage-hint" style="color:${ink(cur)};opacity:.6">点下面的色块先试看</div>`
+    : `<div class="stage-hint" style="color:${ink(cur)}">看着对了？点一下上面的手机就换上</div>`;
+  return `<div class="page" style="background:${cur.page};color:${ink(cur)}">
+    <div class="nav" style="background:${cur.page};color:${ink(cur)}"><span class="back">‹</span>外观设置</div>
+    <div class="body">
+      <div class="sec-title">页面壁纸</div>
+      <div class="sec-hint">带色阶的两枚连左侧方块一起换色，其余六枚只换页面底和文字</div>
+      <div class="stage" style="background:${cardBg(cur)};box-shadow:0 0 0 1px ${edge(cur)}">
+        ${phone(pv, 1)}${hint}
+      </div>
+      <div class="strip-wrap">
+        <div class="strip" style="transform:translateX(${shift}px)">${chips}</div>
+        <div class="fade l" style="background:linear-gradient(270deg,transparent,${cur.page})"></div>
+        <div class="fade r" style="background:linear-gradient(90deg,transparent,${cur.page})"></div>
+      </div>
+      <div class="edge-note" style="color:${ink(cur)}">左右滑挑一枚 · 现在在用：${cur.nm}</div>
+    </div>
+  </div>`;
+}
+
+document.getElementById('row').innerHTML = `
+  <div class="state"><div class="cap">状态一 · <b>刚进页</b>（在用：象牙）</div>${screen(6, null)}</div>
+  <div class="state"><div class="cap">状态二 · <b>点了天青在试看</b>（页面本身仍是象牙）</div>${screen(6, 7)}</div>
+`;
+</script>
+</body>
+</html>

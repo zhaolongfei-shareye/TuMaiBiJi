@@ -7,10 +7,46 @@ const { THEMES, toneColor, themeOf } = require('../../utils/palette.js')
 // 开关和字体栈本身留着（app.js 的 uiFont/setUIFont、app.wxss 与 tab 栏组件里的三个 .font-* 类），
 // 哪天真要走 wx.loadFontFace 挂自己的字体文件，把这一排加回来就行。
 
+// 描边取不到中性值的那四枚（lineEdge 是 transparent），按深浅给一条最淡的边。
+function edgeOf(theme) {
+  if (theme.lineEdge !== 'transparent') return theme.lineEdge
+  return theme.dark ? 'rgba(255,255,255,0.18)' : 'rgba(35,37,44,0.12)'
+}
+
+/**
+ * 手机模拟预览要画的那一屏。
+ * 这些颜色一律是从"被预览的那套主题"算出来的字面值，不吃当前主题的 CSS 变量——
+ * 吃了就永远只能画出已经生效的那一套，预览也就没意义了。
+ * 三行笔记左侧的方块是关键：带色阶的那两枚走自己那一支色相的深浅档，
+ * 其余六枚走分类彩色，这正是"整套色阶"唯一一眼看得出的差别，所以必须画进预览，
+ * 不再靠原来那个角标去解释。
+ */
+function mockOf(key) {
+  const theme = themeOf(key)
+  const ink = theme.dark ? '#f2f4fb' : theme.ramp ? theme.ramp.inks[0] : '#23252c'
+  const bar = theme.dark ? 'rgba(255,255,255,0.20)' : 'rgba(35,37,44,0.13)'
+  return {
+    frame: ink,
+    page: theme.page,
+    ink,
+    card: theme.line,
+    edge: edgeOf(theme),
+    bar,
+    rows: [1, 2, 3].map((n) => toneColor(n, theme.key)),
+    // 预览画的是笔记列表那一屏，所以 tab 高亮左起第二格（左一是新建）
+    tabs: [0, 1, 2, 3].map((n) => (n === 1 ? toneColor(0, theme.key) : bar)),
+  }
+}
+
 Page({
   data: {
     wallpapers: [],
     currentWallpaper: 'default',
+    currentLabel: '',
+    previewKey: 'default',
+    previewing: false,
+    mock: mockOf('default'),
+    intoView: '',
     applying: false,
     themeClass: '',
     lang: 'zh',
@@ -25,37 +61,57 @@ Page({
       lang,
       t: texts(lang),
       currentWallpaper: current,
+      currentLabel: themeOf(current).label,
       // 这一页自己也要走 applyTheme：只拿类名的话，导航条底色停在上一页那套主题，
       // 换完壁纸"导航条必须和页面底同值"这条约束在本页是破的（选完才补上，进页那一瞬不对）。
       themeClass: app.applyTheme(current),
+      ...this.previewState(current, current),
       wallpapers: THEMES.map((theme, i) => ({
         key: theme.key,
         label: theme.label,
         active: theme.key === current,
-        tinted: !!theme.ramp,
-        // 主题在 CSS 里是类名，但缩略图要同时画出每一套各自的底色和字色，只能把值带到行内。
-        // --wp-opp 是给勾选圆点里的字用的：圆点本身取 --wp-label，正好和它形成对比。
-        itemStyle: `background: ${theme.page}; --wp-label: ${theme.dark ? '#f2f4fb' : (theme.ramp ? theme.ramp.inks[0] : '#23252c')}; --wp-opp: ${theme.page}`,
-        line: theme.line,
-        lineEdge: theme.lineEdge,
-        // 缩略图里那两个小色块画的是"这一格那套主题"下的方块色，不是当前主题下的，
-        // 所以主题 key 必须传给 toneColor：淡雅两枚按自己在 THEMES 里的下标取档
-        // （米白一色是第 7 格 → steps[1] 和 steps[2]，雨过青是第 8 格 → steps[2] 和 steps[3]），
-        // 其余六枚仍取分类色板那五支彩色。
         stack: [toneColor(i, theme.key), toneColor(i + 1, theme.key)],
+        // 主题在 CSS 里是类名，但每一格画的是"另一套主题"，拿不到当前主题的变量，
+        // 底、描边、勾的颜色都得由 JS 带进行内。--wp-opp 是勾里的字，要和勾本身反色。
+        itemStyle:
+          `background:${theme.page};--wp-label:${theme.dark ? '#f2f4fb' : theme.ramp ? theme.ramp.inks[0] : '#23252c'};` +
+          `--wp-opp:${theme.page};--wp-edge:${edgeOf(theme)}`,
       })),
     })
-    app.setNavTitle('wallpaper', lang)
+    // 条子进来先滚到"在用的那一枚"：不带色阶那六枚排在前面，在用的若是最后两枚，
+    // 不滚过去就看不见，会以为没存上。scroll-into-view 要等节点建好，同一批 setData 里给不生效。
+    wx.nextTick(() => this.setData({ intoView: `wp-${current}` }))
   },
 
-  async onSelect(e) {
-    const key = e.currentTarget.dataset.key
-    if (key === this.data.currentWallpaper) return
+  // 预览态：点色块只改这里，页面本身的主题不动。
+  // 哪一枚在"试看"由 WXML 现算（previewing && item.key === previewKey），
+  // 不在数据里另存一份，免得两处状态对不上。
+  previewState(key, current) {
+    const cur = current === undefined ? this.data.currentWallpaper : current
+    return { previewKey: key, previewing: key !== cur, mock: mockOf(key) }
+  },
 
+  onPreview(e) {
+    const key = e.currentTarget.dataset.key
+    if (key === this.data.previewKey) return
+    this.setData({ ...this.previewState(key), intoView: `wp-${key}` })
+  },
+
+  // 点上面那部手机才算"就它了"。
+  onApply() {
+    const { previewKey, currentWallpaper, lang } = this.data
+    if (previewKey === currentWallpaper) {
+      wx.showToast({ title: t('sameWallpaper', lang), icon: 'none' })
+      return
+    }
+    this.applyWallpaper(previewKey)
+  },
+
+  async applyWallpaper(key) {
     const { lang } = this.data
     const app = getApp()
 
-    // 淡雅那两枚只存在本机：后端 PUT /api/user/wallpaper 有一张 WALLPAPER_PRESETS 白名单，
+    // 带色阶那两枚只存在本机：后端 PUT /api/user/wallpaper 有一张 WALLPAPER_PRESETS 白名单，
     // 那是现网代码，加 key 就要动后端并部署，所以这一类不写库、不跨设备。
     // 表现上的差别：换设备或删掉小程序重装，会回到服务端记着的那一枚。
     if (themeOf(key).local) {
@@ -75,12 +131,8 @@ Page({
       }
       // 导航条和 tab 栏由 applyTheme 统一负责，这里不再自己拼颜色
       app.applyTheme(key)
-      this.setData({
-        wallpapers: this.data.wallpapers.map((w) => ({ ...w, active: w.key === key })),
-        currentWallpaper: key,
-        themeClass: app.getThemeClass(key),
-        applying: false,
-      })
+      this.setData({ applying: false })
+      this.onShow()
       wx.showToast({ title: t('applied', lang), icon: 'success' })
     } catch (err) {
       this.setData({ applying: false })

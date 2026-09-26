@@ -178,10 +178,12 @@ const THEMES = [
   //
   // steps/inks 一一对应，深两档的字翻成亮色；uncategorized 是"未分类"那一块。
   // 母题色、面、按钮色一律由 mix() 和 inkIsLighter 从这两列派生，不另立色值。
+  // 名字收成两个字：壁纸条现在只有"色块 + 名字"那么大地方。象牙 / 天青是釉色本名，
+  // 和海报那三套（玉版宣 / 摘句 / 叠翠）一个路子；原名「米白一色」「雨过青」。
   {
     key: 'tint-paper',
     cls: 'theme-tint-paper',
-    label: '米白一色',
+    label: '象牙',
     local: true,
     page: '#F2EFE9',
     line: '#FCFBF8',
@@ -198,7 +200,7 @@ const THEMES = [
   {
     key: 'tint-celadon',
     cls: 'theme-tint-celadon',
-    label: '雨过青',
+    label: '天青',
     local: true,
     page: '#E9EEEA',
     line: '#F7FAF7',
