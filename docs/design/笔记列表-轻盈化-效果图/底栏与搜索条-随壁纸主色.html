@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 底栏与搜索条随壁纸主色走（2026-09-27）</title>
+<style>
+/* ==================================================================
+   用户 09-27 第四轮口径（原话）：
+     "下面tab背景色能否和背景风格主色进行关联，我看目前只有天青是接近，请参考模板主色进行修正。
+      另外，搜索条目前是固定蓝色，请修改与TAB同色，看下效果。"
+   于是这一稿把底栏从"固定两档褐"改成"跟着这套壁纸自己的色相走"，搜索条用同一个色。
+
+   派生规则（一条，不是八条）：拿这套壁纸的页面底 → 转 HSL → 色相 H 原样保留、
+   饱和度夹进 [30%,45%]（太低的如米白 18%、天青 20% 会洗成灰，得兜一层）、
+   明度按主题深浅定档：浅色壁纸 L=20.5%，深色壁纸 L=30%。
+   字色一律官网纸白 #F2EFE9；未选中 alpha 浅档 62%、深档 68%（深海那枚 62% 只有 4.12，不过 4.5）。
+
+   口径：px 当 rpx 用（设计宽 750）。纯 CSS，无外部资源、无图片、无网络请求。
+   圆角、字阶、描边、胶囊、置顶牌与现网逐值相同（app.wxss）；列表画法沿用已选定的 D2。
+   ================================================================== */
+
+  :root{
+    --tx1:#23252C; --tx2:#5C6068; --tx3:#9A9EA6;
+    --r-card:40px; --r-pill:999px; --w-edge:3px;
+    --paper:#F2EFE9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:var(--tx1);padding:26px 15px 70px;font-family:sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;gap:60px;width:2370px;align-items:flex-start}
+  .unit{width:750px;flex:none}
+
+  .cap{margin-bottom:14px;min-height:150px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;letter-spacing:.2px;
+    background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap b{color:#23252C}
+  .cap code{font:inherit;font-weight:800;color:#23252C}
+
+  /* ---- 每屏一套：--page 页面底、--ink1/2/3 三级字、--card 卡底、--edge 描边、--skin 主色（底栏+搜索条共用） ---- */
+  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:var(--page);
+    border-radius:52px;box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16);
+    --card:#FFFFFF;--edge:rgba(35,37,44,.10);--idle:rgba(35,37,44,.06);--accent:#23252C;
+    --tx1:#23252C;--tx2:#5C6068;--tx3:#9A9EA6;
+    --bar-idle:rgba(242,239,233,.62);--bar-line:rgba(242,239,233,.14);--bar-sh:0 16px 44px rgba(0,0,0,.22)}
+  .ph.doc{height:2790px;--skin:#443C25}
+  .ph.dark{--card:rgba(255,255,255,.05);--edge:rgba(255,255,255,.12);--idle:rgba(255,255,255,.09);
+    --tx1:#ECEAF6;--tx2:#B3AECF;--tx3:#8D87AE;--accent:#A78BFA;
+    --bar-idle:rgba(242,239,233,.68);--bar-line:rgba(242,239,233,.22);--bar-sh:0 16px 44px rgba(0,0,0,.42)}
+  /* 八套壁纸：页面底 + 派生主色（同一个值喂给搜索条和底栏） */
+  .w-rice {--page:#F4F2EC;--skin:#443C25}
+  .w-blue {--page:#EAEEFB;--skin:#1D284C}
+  .w-green{--page:#E7F3EA;--skin:#23462C}
+  .w-sun  {--page:#FDEEE6;--skin:#4C2D1D}
+  .w-purp {--page:#0C0C1D;--skin:#2D2D6C}
+  .w-ocean{--page:#0D1B2A;--skin:#2A4B6F}
+  .w-ivory{--page:#F2EFE9;--skin:#443A25}
+  .w-cela {--page:#E9EEEA;--skin:#25442B}
+
+  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:var(--tx1);position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}
+  .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .bat::before{content:'';position:absolute;right:-7px;top:6px;width:4px;height:8px;background:currentColor;border-radius:0 2px 2px 0}
+  .nb{height:88px;position:relative;z-index:12;border-bottom:var(--w-edge) solid var(--edge)}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:var(--tx1);letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+    background:var(--idle);box-shadow:inset 0 0 0 2px var(--edge);
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:var(--tx1)}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  .stage{position:absolute;left:0;right:0;top:179px;bottom:0;overflow:hidden;padding:2px 24px 0}
+  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:16px 0 14px}
+  .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:var(--tx1);line-height:1.15}
+  .hr{text-align:right;flex:none}
+  .stats{font-size:24px;font-weight:600;letter-spacing:-.2px;color:var(--tx2);line-height:1.7;white-space:nowrap}
+  .quota{font-size:19px;font-weight:700;letter-spacing:.4px;color:var(--tx3);white-space:nowrap}
+
+  /* 搜索条：本稿改成吃 --skin（和底栏同一个值）。现网是 toneStyle(1) 那块固定宝蓝。 */
+  .sc{background:var(--skin);color:var(--paper);border:var(--w-edge) solid var(--edge);
+    border-radius:var(--r-card);padding:26px 24px 20px;margin:0 0 24px}
+  .sc .line{position:relative;display:flex;align-items:center;height:64px}
+  .sc .ph-txt{flex:1;min-width:0;font-size:28px;color:rgba(242,239,233,.62);white-space:nowrap;overflow:hidden}
+  .sc .go{flex:none;font-size:31px;font-weight:800;letter-spacing:-.5px;color:var(--paper);padding-left:8px}
+  .sc .rule{position:absolute;left:0;right:0;bottom:0;height:var(--w-edge);background:rgba(242,239,233,.42)}
+
+  .chips{display:flex;gap:10px;margin:0 0 16px;white-space:nowrap;overflow:hidden}
+  .chip{flex:none;display:inline-flex;align-items:center;height:54px;padding:0 28px;border-radius:var(--r-pill);
+    font-size:24px;font-weight:600;background:var(--idle);color:var(--tx2)}
+  .chip.on{background:var(--accent);color:var(--page);font-weight:700}
+  .ph.dark .chip.on{background:rgba(255,255,255,.16);color:#FFFFFF}
+
+  .row{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:18px 26px;margin-bottom:10px;position:relative}
+  .ti{font-size:31px;font-weight:800;line-height:1.38;letter-spacing:-.5px;color:var(--tx1);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:4px 14px;border-radius:10px;
+    background:var(--accent);color:var(--page);margin-right:12px;vertical-align:3px}
+  .sm{font-size:24px;line-height:1.5;color:var(--tx2);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mt{display:flex;align-items:center;gap:11px;margin-top:11px;padding-top:11px;border-top:var(--w-edge) solid var(--edge)}
+  .mt .grp{display:flex;align-items:center;gap:11px;min-width:0;flex:1;overflow:hidden;white-space:nowrap}
+  .lb{display:inline-flex;align-items:center;gap:9px;flex:none;font-size:21px;font-weight:800;letter-spacing:-.2px;color:var(--txt)}
+  .lb .dot{width:14px;height:14px;border-radius:50%;background:var(--dot);flex:none}
+  .mt .src{font-size:21px;font-weight:700;color:var(--tx2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mt .sep{font-size:21px;font-weight:700;color:var(--tx3);flex:none}
+  .mt .tg{font-size:21px;font-weight:700;color:var(--tx3);flex:none}
+  .mt .dt{flex:none;font-size:21px;font-weight:700;letter-spacing:.4px;color:var(--tx3)}
+  .mt .cv{flex:none;font-size:28px;font-weight:400;line-height:1;color:var(--tx3)}
+  .t1{--dot:#F6C445;--txt:#856D30}.t2{--dot:#3F52D6;--txt:#3F52D6}.t3{--dot:#E9723D;--txt:#A35432}
+  .t4{--dot:#46A863;--txt:#35784B}.t5{--dot:#6E4BD0;--txt:#6E4BD0}.tk{--dot:#23252C;--txt:#23252C}
+  .dark .t1{--dot:#F6C445;--txt:#F6C445}.dark .t2{--dot:#7FA8FF;--txt:#7FA8FF}.dark .t3{--dot:#EF8C58;--txt:#EF8C58}
+  .dark .t4{--dot:#57B873;--txt:#57B873}.dark .t5{--dot:#B795FF;--txt:#B795FF}
+  .dark .tk{--dot:transparent;--txt:#B3AECF}
+  .dark .tk .dot{border:3px solid rgba(255,255,255,.42);background:transparent}
+
+  /* 底栏：吃同一个 --skin */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;background:var(--skin);
+    border-radius:44px;display:flex;align-items:center;box-shadow:var(--bar-sh);z-index:14;
+    border:var(--w-edge) solid var(--bar-line)}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    font-size:20px;font-weight:600;color:var(--bar-idle)}
+  .tb.on{color:var(--paper);font-weight:700}
+  .tb .u{width:26px;height:4px;border-radius:2px;background:currentColor;margin-top:2px}
+  .tbi{width:40px;height:40px;position:relative}
+  .i-new::before{content:'';position:absolute;top:8px;left:8px;width:24px;height:24px;border:var(--w-edge) solid currentColor;border-radius:50%}
+  .i-new::after{content:'+';position:absolute;left:50%;top:50%;transform:translate(-50%,-54%);font-size:26px;font-weight:400;color:currentColor;line-height:1}
+  .i-note::before{content:'';position:absolute;top:6px;left:8px;width:24px;height:28px;border:var(--w-edge) solid currentColor;border-radius:8px}
+  .i-note::after{content:'';position:absolute;top:14px;left:14px;width:12px;height:var(--w-edge);background:currentColor;box-shadow:0 6px 0 currentColor}
+  .i-me::before{content:'';position:absolute;top:4px;left:12px;width:16px;height:16px;border:var(--w-edge) solid currentColor;border-radius:50%}
+  .i-me::after{content:'';position:absolute;bottom:5px;left:6px;width:28px;height:14px;border:var(--w-edge) solid currentColor;border-bottom:none;border-radius:16px 16px 0 0}
+
+  /* ---------- ③ 八枚一览 ---------- */
+  .sp-h{font-size:34px;font-weight:800;letter-spacing:-.7px;color:var(--tx1);line-height:1.25;margin-top:16px}
+  .sp-sub{font-size:19px;font-weight:600;color:var(--tx3);margin-top:6px;letter-spacing:-.2px;line-height:1.5}
+  .sp-sub code{font:inherit;font-weight:800;color:var(--tx1)}
+  .wrow{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center;margin-top:12px}
+  .wlab{font-size:20px;font-weight:800;letter-spacing:-.3px;color:var(--tx1);line-height:1.3}
+  .wlab span{display:block;font-size:16px;font-weight:700;color:var(--tx3);letter-spacing:.1px;margin-top:3px}
+  .wprev{border-radius:22px;padding:10px 12px 12px;border:var(--w-edge) solid rgba(35,37,44,.10)}
+  .mini-sc{border-radius:16px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
+    font-size:19px;font-weight:800;color:var(--paper)}
+  .mini-sc .ph2{font-weight:600;opacity:.62;font-size:18px}
+  .mini-bar{margin-top:8px;border-radius:999px;height:56px;display:flex;align-items:center;
+    font-size:16px;font-weight:700}
+  .mini-bar i{flex:1;text-align:center;font-style:normal;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .mini-bar i b{font-weight:800}
+  .mini-bar .u{width:18px;height:3px;border-radius:2px;background:currentColor}
+  .mini-bar .ic{width:16px;height:16px;border:2px solid currentColor;border-radius:50%}
+  .mini-bar .ic2{width:14px;height:17px;border:2px solid currentColor;border-radius:4px}
+  .num{display:flex;gap:10px;margin-top:6px;font-size:15px;font-weight:800;color:var(--tx3);letter-spacing:.1px}
+  .num b{color:var(--tx1)}
+  .num.on-dark,.num.on-dark span{color:#8D87AE}
+  .num.on-dark b{color:#ECEAF6}
+
+  table{width:100%;border-collapse:collapse;font-size:17px;font-weight:700;margin-top:8px}
+  th{text-align:left;font-size:15px;font-weight:800;letter-spacing:.2px;color:var(--tx3);
+    padding:6px 3px;border-bottom:var(--w-edge) solid rgba(35,37,44,.10);white-space:nowrap}
+  td{padding:6px 3px;border-bottom:var(--w-edge) solid rgba(35,37,44,.10);color:var(--tx1);vertical-align:middle;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td .sw{display:inline-block;width:18px;height:18px;border-radius:5px;vertical-align:-3px;margin-right:6px;
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.16)}
+  td .ok{font-weight:800;color:#35784B}
+  td .no2{font-weight:800;color:#A35432}
+  th:last-child,td:last-child{white-space:normal;min-width:150px}
+  .foot-note{font-size:17px;font-weight:600;color:var(--tx3);line-height:1.55;margin:12px 0 0;letter-spacing:-.2px}
+  .foot-note b{color:var(--tx1)}
+  .foot-note code{font:inherit;font-weight:800;color:var(--tx2)}
+  .warn{margin-top:14px;background:rgba(233,114,61,.10);border:var(--w-edge) solid rgba(233,114,61,.28);
+    border-radius:16px;padding:14px 18px;font-size:18px;font-weight:700;line-height:1.6;color:#8A4522}
+  .warn code{font:inherit;font-weight:800}
+</style>
+</head>
+<body>
+<div class="flow">
+
+  <!-- ① 米白 -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">① 米白壁纸</span>
+      <h3>底栏和搜索条现在是同一个色：<code>#443C25</code>（米白那套自己的色相压深）</h3>
+      <p>规则只有一条：拿这套壁纸的页面底转 HSL，<b>色相原样保留</b>、饱和度夹进 30%~45%、明度压到 20.5%。
+      米白的页面底是暖米（H 45°），所以派出来是一支深暖橄榄褐，底栏和搜索条共用它。
+      纸白字压上去 <b>9.54</b>，未选中 62% 有 <b>4.78</b>；搜索条里那行"搜索笔记"同样 9.54。</p>
+    </div>
+    <div class="ph w-rice">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+      <div class="stage">
+        <div class="head"><div class="h1">我的笔记</div>
+          <div class="hr"><div class="stats">本周 2 · 本月 9 · 总数 23</div><div class="quota">额度 12/100</div></div></div>
+        <div class="sc"><div class="line"><span class="ph-txt">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+        <div class="chips"><span class="chip on">全部</span><span class="chip">产品</span><span class="chip">技术</span><span class="chip">阅读</span><span class="chip">工作</span><span class="chip">灵感</span></div>
+        <div class="row"><div class="ti"><span class="pin">置顶</span>别等状态好了才动笔</div>
+          <div class="sm">先做完，再谈做好。二十五分钟为一格。</div>
+          <div class="mt"><span class="grp"><span class="lb tk"><i class="dot"></i>未分类</span><span class="sep">·</span><span class="src">亲自撰写</span></span><span class="dt">09-23</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">额度这道闸门，是先长在后端上的</div>
+          <div class="sm">100 篇不是文案，是接口的上限，前端只能诚实显示。</div>
+          <div class="mt"><span class="grp"><span class="lb t2"><i class="dot"></i>产品</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">需求 / 版本</span></span><span class="dt">09-22</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">把海报引擎拆成模板和图层</div>
+          <div class="sm">一份图层清单加四个绘制原语，换风格不必再动绘制代码。</div>
+          <div class="mt"><span class="grp"><span class="lb t3"><i class="dot"></i>技术</span><span class="sep">·</span><span class="src">网页文章</span><span class="sep">·</span><span class="tg">重构 / 图层</span></span><span class="dt">09-21</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">读得慢一点，记得久一点</div>
+          <div class="sm">那句「不必追上所有新书」，我在地铁上读了三遍。</div>
+          <div class="mt"><span class="grp"><span class="lb t4"><i class="dot"></i>阅读</span><span class="sep">·</span><span class="src">截图识别</span><span class="sep">·</span><span class="tg">读书 / 摘录</span></span><span class="dt">09-20</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">周会只留三句话</div>
+          <div class="mt"><span class="grp"><span class="lb t5"><i class="dot"></i>工作</span><span class="sep">·</span><span class="src">亲自撰写</span><span class="sep">·</span><span class="tg">流程 / 周会</span></span><span class="dt">09-19</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">把八套壁纸想成八种天气</div>
+          <div class="sm">夜紫是雷雨前的屋里，深海是凌晨四点的海。</div>
+          <div class="mt"><span class="grp"><span class="lb t1"><i class="dot"></i>灵感</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">灵感 / 视觉</span></span><span class="dt">09-18</span><span class="cv">›</span></div></div>
+      </div>
+      <div class="tabbar"><span class="tb"><span class="tbi i-new"></span>新建</span>
+        <span class="tb on"><span class="tbi i-note"></span>笔记<span class="u"></span></span>
+        <span class="tb"><span class="tbi i-me"></span>我的</span></div>
+    </div>
+  </div>
+
+  <!-- ② 夜紫 -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">② 夜紫壁纸 · 深色那两枚要单独定档</span>
+      <h3>同一套色相压深会糊进页面底，所以深色壁纸只把明度抬到 30%：<code>#2D2D6C</code></h3>
+      <p>夜紫的页面底本身就是 H 240° 的极暗紫，派生时<b>色相不变、明度给两档</b>：浅色壁纸 20.5%、深色壁纸 30%。
+      抬到 30% 后压页面底 <b>1.57</b>，靠纸白@22% 那圈发丝边切边界；深海那枚同档是 1.93。
+      未选中字的 alpha 也跟着从 62% 抬到 68%（深海 62% 只有 4.12，不过 4.5 那条小字线）。</p>
+    </div>
+    <div class="ph dark w-purp">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+      <div class="stage">
+        <div class="head"><div class="h1">我的笔记</div>
+          <div class="hr"><div class="stats">本周 2 · 本月 9 · 总数 23</div><div class="quota">额度 12/100</div></div></div>
+        <div class="sc"><div class="line"><span class="ph-txt">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+        <div class="chips"><span class="chip on">全部</span><span class="chip">产品</span><span class="chip">技术</span><span class="chip">阅读</span><span class="chip">工作</span><span class="chip">灵感</span></div>
+        <div class="row"><div class="ti"><span class="pin">置顶</span>别等状态好了才动笔</div>
+          <div class="sm">先做完，再谈做好。二十五分钟为一格。</div>
+          <div class="mt"><span class="grp"><span class="lb tk"><i class="dot"></i>未分类</span><span class="sep">·</span><span class="src">亲自撰写</span></span><span class="dt">09-23</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">额度这道闸门，是先长在后端上的</div>
+          <div class="sm">100 篇不是文案，是接口的上限，前端只能诚实显示。</div>
+          <div class="mt"><span class="grp"><span class="lb t2"><i class="dot"></i>产品</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">需求 / 版本</span></span><span class="dt">09-22</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">把海报引擎拆成模板和图层</div>
+          <div class="sm">一份图层清单加四个绘制原语，换风格不必再动绘制代码。</div>
+          <div class="mt"><span class="grp"><span class="lb t3"><i class="dot"></i>技术</span><span class="sep">·</span><span class="src">网页文章</span><span class="sep">·</span><span class="tg">重构 / 图层</span></span><span class="dt">09-21</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">读得慢一点，记得久一点</div>
+          <div class="sm">那句「不必追上所有新书」，我在地铁上读了三遍。</div>
+          <div class="mt"><span class="grp"><span class="lb t4"><i class="dot"></i>阅读</span><span class="sep">·</span><span class="src">截图识别</span><span class="sep">·</span><span class="tg">读书 / 摘录</span></span><span class="dt">09-20</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">周会只留三句话</div>
+          <div class="mt"><span class="grp"><span class="lb t5"><i class="dot"></i>工作</span><span class="sep">·</span><span class="src">亲自撰写</span><span class="sep">·</span><span class="tg">流程 / 周会</span></span><span class="dt">09-19</span><span class="cv">›</span></div></div>
+        <div class="row"><div class="ti">把八套壁纸想成八种天气</div>
+          <div class="sm">夜紫是雷雨前的屋里，深海是凌晨四点的海。</div>
+          <div class="mt"><span class="grp"><span class="lb t1"><i class="dot"></i>灵感</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">灵感 / 视觉</span></span><span class="dt">09-18</span><span class="cv">›</span></div></div>
+      </div>
+      <div class="tabbar"><span class="tb"><span class="tbi i-new"></span>新建</span>
+        <span class="tb on"><span class="tbi i-note"></span>笔记<span class="u"></span></span>
+        <span class="tb"><span class="tbi i-me"></span>我的</span></div>
+    </div>
+  </div>
+
+  <!-- ③ 八枚一览 + 规则 -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">③ 八枚壁纸逐枚派生 · 规则 · 实测</span>
+      <h3>一个函数算出八支色，搜索条与底栏共用同一个值</h3>
+      <p>你说"目前只有天青接近"——对，因为上一版是<b>我固定给的两档褐</b>，只有天青那支冷档刚好撞对。
+      这一版改成<b>从每套壁纸自己的页面底派生</b>，八枚各有各的色相，但明度只有两档，所以不会花。</p>
+    </div>
+    <div class="ph doc">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+      <div class="stage">
+        <div class="sp-h">一、派生规则（一条）</div>
+        <div class="sp-sub">页面底 hex → HSL：<code>色相 H 不变</code>、<code>S 夹进 [30%,45%]</code>、<code>L = 浅色壁纸 20.5% / 深色壁纸 30%</code>。
+          字色一律 <code>#F2EFE9</code>（官网 --paper）；未选中 alpha 浅档 62%、深档 68%。</div>
+
+        <div class="blk" style="margin-top:6px">
+          <div class="wrow"><div class="wlab">米白<span>#F4F2EC · H45</span></div>
+            <div class="wprev" style="background:#F4F2EC"><div class="mini-sc" style="background:#443C25"><span class="ph2">输入关键词</span><span>搜索笔记</span></div>
+              <div class="mini-bar" style="background:#443C25;color:rgba(242,239,233,.62)"><i>新建</i><i style="color:#F2EFE9"><b>笔记</b><span class="u"></span></i><i>我的</i></div>
+              <div class="num"><span>#443C25</span><span>纸白字 <b>9.54</b></span><span>未选 <b>4.78</b></span><span>压页面底 <b>9.78</b></span></div></div></div>
+          <div class="wrow"><div class="wlab">雾蓝<span>#EAEEFB · H227</span></div>
+            <div class="wprev" style="background:#EAEEFB"><div class="mini-sc" style="background:#1D284C"><span class="ph2">输入关键词</span><span>搜索笔记</span></div>
+              <div class="mini-bar" style="background:#1D284C;color:rgba(242,239,233,.62)"><i>新建</i><i style="color:#F2EFE9"><b>笔记</b><span class="u"></span></i><i>我的</i></div>
+              <div class="num"><span>#1D284C</span><span>纸白字 <b>12.53</b></span><span>未选 <b>5.72</b></span><span>压页面底 <b>12.41</b></span></div></div></div>
+          <div class="wrow"><div class="wlab">松绿<span>#E7F3EA · H137</span></div>
+            <div class="wprev" style="background:#E7F3EA"><div class="mini-sc" style="background:#23462C"><span class="ph2">输入关键词</span><span>搜索笔记</span></div>
+              <div class="mini-bar" style="background:#23462C;color:rgba(242,239,233,.62)"><i>新建</i><i style="color:#F2EFE9"><b>笔记</b><span class="u"></span></i><i>我的</i></div>
+              <div class="num"><span>#23462C</span><span>纸白字 <b>9.22</b></span><span>未选 <b>4.64</b></span><span>压页面底 <b>9.28</b></span></div></div></div>
+          <div class="wrow"><div class="wlab">暮橙<span>#FDEEE6 · H21</span></div>
+            <div class="wprev" style="background:#FDEEE6"><div class="mini-sc" style="background:#4C2D1D"><span class="ph2">输入关键词</span><span>搜索笔记</span></div>
+              <div class="mini-bar" style="background:#4C2D1D;color:rgba(242,239,233,.62)"><i>新建</i><i style="color:#F2EFE9"><b>笔记</b><span class="u"></span></i><i>我的</i></div>
+              <div class="num"><span>#4C2D1D</span><span>纸白字 <b>10.76</b></span><span>未选 <b>5.16</b></span><span>压页面底 <b>10.91</b></span></div></div></div>
+          <div class="wrow"><div class="wlab">夜紫<span>#0C0C1D · H240 深色</span></div>
+            <div class="wprev" style="background:#0C0C1D;border-color:rgba(255,255,255,.12)"><div class="mini-sc" style="background:#2D2D6C"><span class="ph2">输入关键词</span><span>搜索笔记</span></div>
+              <div class="mini-bar" style="background:#2D2D6C;color:rgba(242,239,233,.68);box-shadow:inset 0 0 0 2px rgba(242,239,233,.22)"><i>新建</i><i style="color:#F2EFE9"><b>笔记</b><span class="u"></span></i><i>我的</i></div>
+              <div class="num on-dark"><span>#2D2D6C</span><span>纸白字 <b>10.74</b></span><span>未选 <b>5.13</b></span><span>压页面底 <span style="color:#A35432">1.57</span></span></div></div></div>
+          <div class="wrow"><div class="wlab">深海<span>#0D1B2A · H210 深色</span></div>
+            <div class="wprev" style="background:#0D1B2A;border-color:rgba(255,255,255,.12)"><div class="mini-sc" style="background:#2A4B6F"><span class="ph2">输入关键词</span><span>搜索笔记</span></div>
+              <div class="mini-bar" style="background:#2A4B6F;color:rgba(242,239,233,.68);box-shadow:inset 0 0 0 2px rgba(242,239,233,.22)"><i>新建</i><i style="color:#F2EFE9"><b>笔记</b><span class="u"></span></i><i>我的</i></div>
+              <div class="num on-dark"><span>#2A4B6F</span><span>纸白字 <b>7.84</b></span><span>未选 <b>4.62</b></span><span>压页面底 <span style="color:#A35432">1.93</span></span></div></div></div>
+          <div class="wrow"><div class="wlab">象牙<span>#F2EFE9 · 整套暖色阶</span></div>
+            <div class="wprev" style="background:#F2EFE9"><div class="mini-sc" style="background:#443A25"><span class="ph2">输入关键词</span><span>搜索笔记</span></div>
+              <div class="mini-bar" style="background:#443A25;color:rgba(242,239,233,.62)"><i>新建</i><i style="color:#F2EFE9"><b>笔记</b><span class="u"></span></i><i>我的</i></div>
+              <div class="num"><span>#443A25</span><span>纸白字 <b>9.75</b></span><span>未选 <b>4.84</b></span><span>压页面底 <b>9.75</b></span></div></div></div>
+          <div class="wrow"><div class="wlab">天青<span>#E9EEEA · 整套冷色阶</span></div>
+            <div class="wprev" style="background:#E9EEEA"><div class="mini-sc" style="background:#25442B"><span class="ph2">输入关键词</span><span>搜索笔记</span></div>
+              <div class="mini-bar" style="background:#25442B;color:rgba(242,239,233,.62)"><i>新建</i><i style="color:#F2EFE9"><b>笔记</b><span class="u"></span></i><i>我的</i></div>
+              <div class="num"><span>#25442B</span><span>纸白字 <b>9.43</b></span><span>未选 <b>4.71</b></span><span>压页面底 <b>9.22</b></span></div></div></div>
+        </div>
+
+        <div class="sp-h" style="margin-top:22px">二、八支色一览（同一个函数出来的）</div>
+        <table>
+          <thead><tr><th>壁纸</th><th>派生色</th><th>色相来源</th><th>纸白字</th><th>未选中</th><th>压页面底</th></tr></thead>
+          <tbody>
+            <tr><td>米白</td><td><span class="sw" style="background:#443C25"></span>#443C25</td><td>H45 暖米</td><td>9.54</td><td>4.78</td><td>9.78</td></tr>
+            <tr><td>雾蓝</td><td><span class="sw" style="background:#1D284C"></span>#1D284C</td><td>H227 冷蓝</td><td>12.53</td><td>5.72</td><td>12.41</td></tr>
+            <tr><td>松绿</td><td><span class="sw" style="background:#23462C"></span>#23462C</td><td>H137 绿</td><td>9.22</td><td>4.64</td><td>9.28</td></tr>
+            <tr><td>暮橙</td><td><span class="sw" style="background:#4C2D1D"></span>#4C2D1D</td><td>H21 橙</td><td>10.76</td><td>5.16</td><td>10.91</td></tr>
+            <tr><td>夜紫</td><td><span class="sw" style="background:#2D2D6C"></span>#2D2D6C</td><td>H240 紫 · 深档</td><td>10.74</td><td>5.13</td><td><span class="no2">1.57</span></td></tr>
+            <tr><td>深海</td><td><span class="sw" style="background:#2A4B6F"></span>#2A4B6F</td><td>H210 蓝 · 深档</td><td>7.84</td><td>4.62</td><td><span class="no2">1.93</span></td></tr>
+            <tr><td>象牙</td><td><span class="sw" style="background:#443A25"></span>#443A25</td><td>H41 暖米</td><td>9.75</td><td>4.84</td><td>9.75</td></tr>
+            <tr><td>天青</td><td><span class="sw" style="background:#25442B"></span>#25442B</td><td>H150 青</td><td>9.43</td><td>4.71</td><td>9.22</td></tr>
+          </tbody>
+        </table>
+        <div class="foot-note">八支全部过"纸白字 ≥7、未选中字 ≥4.5"这两条线。<b>深色那两枚压页面底只有 1.57 / 1.93，没到 3:1</b>，
+        这条我不粉饰：再往上抬明度到 3:1（夜紫要到 L≈45%），搜索条那一整块就会从"这套壁纸的深色"变成"一块亮蓝"，
+        反而不像同一个主题了。所以深色档靠那圈纸白@22% 发丝边切边界。</div>
+
+        <div class="warn">
+          搜索条改成跟底栏同色，有一件事会断：<b>现在这块蓝是和新建页第一张卡同一个值</b>
+          （<code>pages/index/index.js:43,57</code> 和 <code>pages/create/create.js:38</code> 都写死 <code>toneStyle(1)</code>，
+          <code>index.wxml:8-10</code> 的注释原话是"底色仍与新建页 URL 卡同一块蓝"）。
+          改成随主题之后，首页搜索条跟着壁纸走、新建页那三张卡还是蓝/橙/黄。<b>两条路</b>：
+          一、就这样分（搜索条算 chrome、新建页那三张算"三种录入方式的身份色"，本来就该不同）；
+          二、新建页那三张也一起随主题，那"URL / 拍照 / 亲自撰写"三种方式就没了颜色区分。我按第一条画的，你选。
+        </div>
+      </div>
+      <div class="tabbar"><span class="tb"><span class="tbi i-new"></span>新建</span>
+        <span class="tb on"><span class="tbi i-note"></span>笔记<span class="u"></span></span>
+        <span class="tb"><span class="tbi i-me"></span>我的</span></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
