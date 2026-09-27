@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 统一录入条（中英两版 · 2026-09-28）</title>
+<style>
+/* ==================================================================
+   用户 09-28 追加口径（原话）：
+     "我想记下来改为 动动手指，然后切换图片，按钮太重了，我只想要一个ICON，
+      例如一个上下相反的半箭头ICON，移到长条下面空白区，居中对齐。然后界面中英文给我看效果。"
+   于是三处改动：条身文案换字；换图从"胶囊+文字"退成一枚上下反向的半箭头（Lucide arrow-up-down），
+   挪到长条下面那段空白里居中；整套出中英两版（上排中文四态，下排英文四态 + 标注）。
+
+   英文一律优先复用现网 utils/i18n.js 里已有的串（Save what's worth saving / Paste / Save / Back /
+   Camera / Album / Category / Uncategorised / Title / Summary, one line is fine…）。
+   只有条身那句「动动手指」现网没有对应串，这一稿暂给 "Tap and jot"，标在 ⑤ 里等拍板。
+
+   口径：px 当 rpx 用（设计宽 750，一屏 1624；导航条 0..176，底栏顶 1496）。
+   圆角、字阶、描边、底栏几何与现网逐值相同（app.wxss）。人像沿用已上线那张 865×1670。
+   ================================================================== */
+
+  :root{
+    --r-chip:28px; --r-pill:999px; --r-btn:16px; --w-edge:3px;
+    --paper:#F2EFE9;
+    --m-write:#F6C445;  --m-write-ink:#2A2005;
+    --m-shot:#E9723D;   --m-shot-ink:#2C1204;
+    --m-album:#46A863;  --m-album-ink:#06260F;
+    --m-url:#3F52D6;    --m-url-ink:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:#23252C;padding:26px 15px 70px;font-family:-apple-system,'PingFang SC',sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;flex-wrap:wrap;gap:64px 56px;width:3974px;align-items:flex-start}
+  .brk{width:100%;height:0}
+  .unit{width:750px;flex:none}
+
+  .cap{margin-bottom:14px;min-height:150px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;letter-spacing:.2px;
+    background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap b{color:#23252C}
+  .cap code{font:inherit;font-weight:800;color:#23252C}
+
+  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:#F4F2EC;border-radius:52px;
+    box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16);
+    --skin:#443C25;--bar-idle:rgba(242,239,233,.62)}
+  .ph.doc{height:4300px}
+
+  .bg{position:absolute;left:0;top:176px;width:750px;height:1448px;background-size:100% 100%}
+  .scrim{position:absolute;left:0;top:176px;width:750px;height:1448px;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.58) 150px,
+      rgba(18,20,26,.44) 620px,rgba(18,20,26,.42) 900px,rgba(18,20,26,.52) 1200px,
+      rgba(18,20,26,.6) 1448px)}
+
+  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}
+  .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .nb{height:88px;background:#181A20;position:relative;z-index:12}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:#F2EFE9;letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+    background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);color:#F2EFE9;
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  .head-row{position:absolute;left:24px;right:24px;top:229px;display:flex;align-items:center;
+    justify-content:space-between;gap:20px;z-index:6}
+  .head-row .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96);line-height:1.15}
+  .head-row .h1.en{font-size:38px;letter-spacing:-.5px}
+  .head-row .lang{display:flex;align-items:baseline;gap:20px;flex:none}
+  .head-row .lang span{font-size:24px;line-height:1.4;color:rgba(242,239,233,.56);
+    border-bottom:4px solid transparent;padding:0 1px 4px}
+  .head-row .lang .on{color:#F2EFE9;font-weight:700;border-bottom-color:#F2EFE9}
+
+  .dateline{position:absolute;left:24px;right:24px;top:296px;display:flex;align-items:baseline;gap:16px;z-index:6}
+  .dateline .d{font-size:32px;font-weight:300;letter-spacing:1px;color:rgba(242,239,233,.95);line-height:1.3}
+  .dateline .w{font-size:26px;font-weight:400;letter-spacing:2px;color:rgba(242,239,233,.56)}
+
+  /* ---------- 统一录入条 ---------- */
+  .bar-wrap{position:absolute;left:24px;right:24px;z-index:8}
+  .bar-wrap.collapsed{top:1258px}
+  .bar-wrap.open{top:420px}
+  .bar{height:128px;border-radius:var(--r-pill);background:var(--paper);
+    box-shadow:0 18px 46px rgba(8,10,14,.42);display:flex;align-items:center;padding:0 20px 0 34px;gap:22px}
+  .bar-wrap.open .bar{border-radius:40px 40px 0 0;background:#fff;box-shadow:0 -6px 40px rgba(8,10,14,.34)}
+  .bar .lead{flex:none;width:52px;height:52px}
+  .bar .label{flex:1;min-width:0;font-size:46px;font-weight:800;letter-spacing:-1px;color:#23252C;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar .label.en{font-size:42px;letter-spacing:-.5px}
+  .bar .label .sub{font-size:26px;font-weight:500;color:#8A8E96;letter-spacing:0;margin-left:14px}
+  .dots{display:flex;align-items:center;gap:20px;flex:none}
+  .dot{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .dot i{width:38px;height:38px}
+  .dot.url{background:var(--m-url)} .dot.url i{background:#fff}
+  .dot.shot{background:var(--m-shot)} .dot.shot i{background:var(--m-shot-ink)}
+  .dot.album{background:var(--m-album)} .dot.album i{background:var(--m-album-ink)}
+
+  /* 换图：一枚裸图标，居中坐在长条下面那段空白里（1386..1496）。
+     视觉 44，热区 96×96——图标可以小，手指能落的地方不能小。 */
+  .swap{position:absolute;left:0;right:0;top:1386px;height:110px;z-index:8;
+    display:flex;align-items:center;justify-content:center}
+  .swap .hit{width:96px;height:96px;display:flex;align-items:center;justify-content:center}
+  .swap i{width:44px;height:44px;background:rgba(242,239,233,.72)}
+
+  /* ---------- 展开面板 ---------- */
+  .panel{background:#fff;border-radius:0 0 40px 40px;padding:8px 34px 34px;color:#23252C;
+    box-shadow:0 24px 52px rgba(8,10,14,.34)}
+  .modes{display:flex;align-items:center;gap:14px;padding:22px 0 4px;border-bottom:3px solid rgba(35,37,44,.07)}
+  .mode{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:700;color:#9A9EA6;
+    padding:0 4px 16px;border-bottom:5px solid transparent;margin-bottom:-3px;white-space:nowrap}
+  .mode .x{width:26px;height:26px;border-radius:50%;background:currentColor}
+  .mode.on{border-bottom-color:currentColor}
+  .mode.on.w{color:#B07F00}.mode.on.u{color:#3F52D6}.mode.on.a{color:#2E7A47}
+  .fld{margin-top:24px}
+  .box{height:88px;border-radius:var(--r-btn);background:rgba(35,37,44,.05);display:flex;align-items:center;
+    padding:0 24px;font-size:28px;color:#9A9EA6}
+  .area{height:236px;border-radius:var(--r-btn);background:rgba(35,37,44,.05);padding:20px 24px;
+    font-size:28px;line-height:1.5;color:#9A9EA6}
+  .row{display:flex;align-items:center;height:88px;margin-top:24px;padding:0 24px;border-radius:var(--r-btn);
+    background:rgba(35,37,44,.05);font-size:28px;color:#23252C}
+  .row .k{color:#8A8E96}.row .v{flex:1;text-align:right;font-weight:700}.row .c{opacity:.5;font-size:32px}
+  .acts{display:flex;gap:20px;margin-top:28px}
+  .act{flex:1;height:92px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;
+    font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .act.ghost{background:rgba(35,37,44,.06);color:#23252C}
+  .act.solid{background:#23252C;color:#F2EFE9}
+  .act.off{background:rgba(35,37,44,.06);color:#9A9EA6}
+  .note{margin-top:16px;font-size:22px;line-height:1.4;color:#8A8E96}
+  .strip{display:flex;gap:16px;margin-top:24px}
+  .cell{width:128px;height:128px;border-radius:var(--r-btn);position:relative;overflow:hidden;
+    background:linear-gradient(135deg,#D9DCE6,#BFC4D4)}
+  .cell:nth-child(2){background:linear-gradient(135deg,#E4DCCF,#C9BFAE)}
+  .cell .x{position:absolute;right:-4px;top:-4px;width:40px;height:40px;border-radius:50%;
+    background:rgba(20,20,28,.66);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
+  .cell.add{background:rgba(35,37,44,.05);display:flex;align-items:center;justify-content:center;
+    font-size:44px;color:#9A9EA6}
+  .pick2{display:flex;gap:20px;margin-top:24px}
+  .pk{flex:1;height:164px;border-radius:var(--r-chip);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:8px}
+  .pk .g{width:44px;height:44px}
+  .pk .l{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .pk .h{font-size:20px;opacity:.66}
+  .pk.s{background:var(--m-shot);color:var(--m-shot-ink)} .pk.s .g{background:var(--m-shot-ink)}
+  .pk.a{background:var(--m-album);color:var(--m-album-ink)} .pk.a .g{background:var(--m-album-ink)}
+
+  /* ---------- 底栏 ---------- */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:44px;
+    background:var(--skin);display:flex;z-index:10;box-shadow:0 16px 44px rgba(0,0,0,.26)}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font-size:20px;font-weight:700;color:var(--bar-idle);letter-spacing:.3px}
+  .tb.on{color:#F2EFE9}
+  .tb .ic{width:34px;height:34px;border-radius:9px;background:currentColor;opacity:.9}
+  .tb .ln{width:26px;height:5px;border-radius:99px;background:#F2EFE9;opacity:0}
+  .tb.on .ln{opacity:1}
+
+  /* ---------- 标注屏 ---------- */
+  .docbody{position:absolute;left:0;right:0;top:179px;bottom:0;padding:2px 34px 0;z-index:6}
+  .blk{background:#fff;border:3px solid rgba(35,37,44,.10);border-radius:32px;padding:26px 28px;margin-bottom:22px}
+  .blk h4{font-size:29px;font-weight:800;letter-spacing:-.5px;margin-bottom:12px}
+  .blk p{font-size:22px;line-height:1.62;color:#4B4F57;margin-bottom:9px}
+  .blk p:last-child{margin-bottom:0}
+  .blk b{color:#23252C}
+  .blk code{font-family:ui-monospace,Menlo,monospace;font-size:20px;background:#F1EFE9;border-radius:6px;padding:1px 7px}
+  table{width:100%;border-collapse:collapse;font-size:21px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:2px solid #ECEAE4;vertical-align:top}
+  th{font-size:19px;font-weight:800;color:#8A8E96;letter-spacing:.3px}
+  td b{color:#23252C}
+  .ok{color:#1D7A48;font-weight:800}.no{color:#B4231F;font-weight:800}
+  .warn{background:#FFF6EC;border:3px solid #E7C9A6;border-radius:26px;padding:22px 26px;margin-bottom:22px}
+  .warn h4{color:#8A4B12}.warn p{color:#6B4A2C}
+  .map{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:2px solid #ECEAE4}
+  .map:last-child{border-bottom:0}
+  .map .k{width:190px;font-size:22px;font-weight:800;color:#23252C;flex:none}
+  .map .v{font-size:21px;color:#4B4F57;line-height:1.5}
+  .map .sw{width:44px;height:44px;border-radius:50%;flex:none}
+
+  /* 图形：link / image / pencil / camera / images 沿用现网 create.wxss；
+     换图那枚是 Lucide arrow-up-down（上下两个反向的半箭头）。 */
+  .g-link{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/%3E%3C/svg%3E") center/contain no-repeat}
+  .g-image{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E") center/contain no-repeat}
+  .g-pencil{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E") center/contain no-repeat}
+  .g-camera{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E") center/contain no-repeat}
+  .g-album{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='7' x='3' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='14' rx='1.4'/%3E%3Crect width='7' height='7' x='3' y='14' rx='1.4'/%3E%3C/svg%3E") center/contain no-repeat}
+  .g-swap{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 16 4 4 4-4'/%3E%3Cpath d='M7 20V4'/%3E%3Cpath d='m15 8 4-4 4 4'/%3E%3Cpath d='M17 4v16'/%3E%3C/svg%3E") center/contain no-repeat}
+  .dot i,.lead,.pk .g,.swap i{-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;-webkit-mask-size:contain}
+</style>
+</head>
+<body>
+<div class="flow" id="flow"></div>
+
+<script>
+const IMG = '裁切A-微放大.jpg'
+
+/* 两套文案。右边那列全是从现网 utils/i18n.js 抄来的现成串；
+   只有 bar.write 那句现网没有对应，暂给 "Tap and jot"，等拍板。 */
+const L = {
+  zh: {
+    nav:'新建笔记', slogan:'看到好内容，随手记下来', sloganCls:'',
+    date:'9月28日', week:'周日',
+    write:'动动手指', link:'贴个链接', picked:'选了 2 张',
+    collapse:'点空白处收起',
+    mW:'直接写', mS:'拍照', mA:'相册', mU:'链接',
+    titlePh:'标题', bodyPh:'摘要，一行也行…',
+    cat:'分类', noCat:'未分类', cancel:'取消', save:'保存',
+    writeNote:'写完直接存，不用先想标题；归类随时能改。',
+    urlPh:'https://mp.weixin.qq.com/…', paste:'粘贴',
+    urlNote:'链接要以 http:// 或 https:// 开头。公众号文章、普通网页都行。',
+    shot1:'拍照', shot1h:'直接开相机', shot2:'相册', shot2h:'选已有截图',
+    clear:'清空', extract:'开始提炼',
+  },
+  en: {
+    nav:'New note', slogan:"Save what's worth saving", sloganCls:'en',
+    date:'Sep 28', week:'Sun',
+    write:'Tap and jot', link:'Paste a link', picked:'2 picked',
+    collapse:'Tap outside to close',
+    mW:'Write', mS:'Camera', mA:'Album', mU:'Link',
+    titlePh:'Title', bodyPh:'Summary, one line is fine…',
+    cat:'Category', noCat:'Uncategorised', cancel:'Back', save:'Save',
+    writeNote:'Save first, title later. Category can change anytime.',
+    urlPh:'https://mp.weixin.qq.com/…', paste:'Paste',
+    urlNote:'Link must start with http:// or https://. WeChat articles and web pages both work.',
+    shot1:'Camera', shot1h:'Open the camera', shot2:'Album', shot2h:'Pick a screenshot',
+    clear:'Clear', extract:'Extract',
+  }
+}
+
+const shell = (lang, inner) => `
+  <div class="bg" style="background-image:url('${IMG}')"></div>
+  <div class="scrim"></div>
+  <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb"><span class="t">${lang.nav}</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  <div class="head-row"><div class="h1 ${lang.sloganCls}">${lang.slogan}</div>
+    <div class="lang"><span class="${lang===L.zh?'on':''}">中</span><span class="${lang===L.en?'on':''}">EN</span></div></div>
+  <div class="dateline"><span class="d">${lang.date}</span><span class="w">${lang.week}</span></div>
+  ${inner}
+  <div class="tabbar">
+    <div class="tb on"><div class="ic"></div>${lang===L.zh?'新建':'New'}<div class="ln"></div></div>
+    <div class="tb"><div class="ic"></div>${lang===L.zh?'笔记':'Notes'}<div class="ln"></div></div>
+    <div class="tb"><div class="ic"></div>${lang===L.zh?'我的':'Mine'}<div class="ln"></div></div>
+  </div>`
+
+const swap = `<div class="swap"><div class="hit"><i class="g-swap"></i></div></div>`
+
+const collapsed = (l) => shell(l, `
+  <div class="bar-wrap collapsed"><div class="bar">
+    <div class="lead g-pencil" style="background:#B07F00"></div>
+    <div class="label ${l===L.en?'en':''}">${l.write}</div>
+    <div class="dots">
+      <div class="dot shot"><i class="g-camera"></i></div>
+      <div class="dot album"><i class="g-album"></i></div>
+      <div class="dot url"><i class="g-link"></i></div>
+    </div>
+  </div></div>${swap}`)
+
+const modes = (l, on) => `<div class="modes">
+  ${['w','s','a','u'].map(k=>{
+    const nm={w:l.mW,s:l.mS,a:l.mA,u:l.mU}[k]
+    const col={w:'#F6C445',s:'#E9723D',a:'#46A863',u:'#3F52D6'}[k]
+    const cls={w:'w',s:'',a:'a',u:'u'}[k]
+    return on===k
+      ? `<div class="mode on ${cls}"><span class="x"></span>${nm}</div>`
+      : `<div class="mode"><span class="x" style="background:${col}"></span>${nm}</div>`
+  }).join('')}
+</div>`
+
+const openWrite = (l) => shell(l, `
+  <div class="bar-wrap open">
+    <div class="bar"><div class="lead g-pencil" style="background:#B07F00"></div>
+      <div class="label ${l===L.en?'en':''}">${l.write}<span class="sub">${l.collapse}</span></div></div>
+    <div class="panel">${modes(l,'w')}
+      <div class="fld"><div class="box">${l.titlePh}</div></div>
+      <div class="fld"><div class="area">${l.bodyPh}</div></div>
+      <div class="row"><span class="k">${l.cat}</span><span class="v">${l.noCat}</span><span class="c">›</span></div>
+      <div class="acts"><div class="act ghost">${l.cancel}</div><div class="act solid">${l.save}</div></div>
+      <div class="note">${l.writeNote}</div>
+    </div>
+  </div>${swap}`)
+
+const openLink = (l) => shell(l, `
+  <div class="bar-wrap open">
+    <div class="bar"><div class="lead g-link" style="background:#3F52D6"></div>
+      <div class="label ${l===L.en?'en':''}">${l.link}<span class="sub">${l.collapse}</span></div></div>
+    <div class="panel">${modes(l,'u')}
+      <div class="fld"><div class="box">${l.urlPh}</div></div>
+      <div class="acts"><div class="act ghost">${l.paste}</div><div class="act off">${l.save}</div></div>
+      <div class="note">${l.urlNote}</div>
+    </div>
+  </div>${swap}`)
+
+const openAlbum = (l) => shell(l, `
+  <div class="bar-wrap open">
+    <div class="bar"><div class="lead g-album" style="background:#2E7A47"></div>
+      <div class="label ${l===L.en?'en':''}">${l.picked}<span class="sub">${l.collapse}</span></div></div>
+    <div class="panel">${modes(l,'a')}
+      <div class="strip"><div class="cell"><div class="x">✕</div></div><div class="cell"><div class="x">✕</div></div><div class="cell add">＋</div></div>
+      <div class="pick2">
+        <div class="pk s"><div class="g g-camera"></div><div class="l">${l.shot1}</div><div class="h">${l.shot1h}</div></div>
+        <div class="pk a"><div class="g g-album"></div><div class="l">${l.shot2}</div><div class="h">${l.shot2h}</div></div>
+      </div>
+      <div class="acts"><div class="act ghost">${l.clear}</div><div class="act solid">${l.extract}</div></div>
+    </div>
+  </div>${swap}`)
+
+const unit = (step, h3, p, body, tall) => `<div class="unit">
+  <div class="cap"><span class="step">${step}</span><h3>${h3}</h3><p>${p}</p></div>
+  <div class="ph${tall?' doc':''}">${body}</div></div>`
+
+const DOC = `
+  <div class="sb" style="background:#F4F2EC;color:#23252C"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb" style="background:#F4F2EC;border-bottom:3px solid rgba(35,37,44,.10)"><span class="t" style="color:#23252C">标注</span>
+    <span class="capsule" style="background:rgba(35,37,44,.06);box-shadow:inset 0 0 0 2px rgba(35,37,44,.10);color:#23252C"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  <div class="docbody">
+    <div class="blk">
+      <h4>这一轮改的三处</h4>
+      <p><b>条身换字</b>：「我想记下来」→「<b>动动手指</b>」，字号顺手从 44 提到 46（四个字比六个字短，得撑住那条）。英文这一句现网没有对应串，这一稿暂写 <code>Tap and jot</code>，等你定。</p>
+      <p><b>换图退成一枚图标</b>：撤掉原来那颗带底和描边的胶囊，只留<b>上下两个反向半箭头</b>（Lucide arrow-up-down），挪到长条下面那段空白里居中。</p>
+      <p><b>日期行回到左对齐</b>：右端腾出来后只剩「9月28日 周日」，不用再接别的东西。</p>
+    </div>
+
+    <div class="blk">
+      <h4>那枚图标的位置和手指</h4>
+      <table>
+        <tr><th></th><th>数值（rpx）</th></tr>
+        <tr><td>长条底边</td><td>1386</td></tr>
+        <tr><td>底栏顶边</td><td>1496</td></tr>
+        <tr><td>中间这段空白</td><td><b>110</b>，图标居中坐在里面</td></tr>
+        <tr><td>图标视觉大小</td><td>44 × 44，纸白 0.72（比日期淡，比背景亮一档）</td></tr>
+        <tr><td>可点热区</td><td><b>96 × 96</b>，比图标大一圈，超出空白也不吃亏（左右整行都是它的）</td></tr>
+      </table>
+      <p style="margin-top:14px">图标可以小，手指能落的地方不能小——微信的舒适触摸下限是 88，所以视觉 44、热区 96。它和长条不重叠，收起态点它是换图、点条身是展开，两件事不会撞。</p>
+    </div>
+
+    <div class="blk">
+      <h4>五个动作落在哪儿</h4>
+      <div class="map"><span class="sw" style="background:#F6C445"></span><span class="k">点条身</span><span class="v">直接写（默认态）。条身扣掉三枚小圆还剩 382 宽 × 128 高。</span></div>
+      <div class="map"><span class="sw" style="background:#E9723D"></span><span class="k">点橙圆</span><span class="v">相机现拍，走 <code>sourceType:['camera']</code>，和现网同一条。</span></div>
+      <div class="map"><span class="sw" style="background:#46A863"></span><span class="k">点绿圆</span><span class="v">从相册选，多选、最多 9 张、横滑可删，照旧。</span></div>
+      <div class="map"><span class="sw" style="background:#3F52D6"></span><span class="k">点蓝圆</span><span class="v">链接，校验、粘贴、报错行一个字不改。</span></div>
+      <div class="map"><span class="sw" style="background:rgba(242,239,233,.9);box-shadow:inset 0 0 0 3px #23252C"></span><span class="k">点条下那枚箭头</span><span class="v">跳到<b>「我的 → 卡片模板」</b>那一页换背景图。<b>它不弹相册</b>——只是导流，选图仍然只在那一页做一次。</span></div>
+    </div>
+
+    <div class="blk">
+      <h4>中英文两版对得上的地方</h4>
+      <table>
+        <tr><th>位置</th><th>中文</th><th>英文</th><th>来源</th></tr>
+        <tr><td>导航条</td><td>新建笔记</td><td>New note</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>slogan</td><td>看到好内容，随手记下来</td><td>Save what's worth saving</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>条身</td><td>动动手指</td><td>Tap and jot</td><td><span class="no">新串，等你定</span></td></tr>
+        <tr><td>模式</td><td>直接写 / 拍照 / 相册 / 链接</td><td>Write / Camera / Album / Link</td><td><span class="no">四个都要新写</span><br>现网是 亲自撰写 / 拍照或截图 / URL链接</td></tr>
+        <tr><td>写那态</td><td>标题 · 摘要，一行也行… · 分类 · 未分类 · 取消 · 保存</td><td>Title · Summary, one line is fine… · Category · Uncategorised · Back · Save</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>链接那态</td><td>粘贴 · 保存</td><td>Paste · Save</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>相册那态</td><td>拍照（直接开相机）· 相册（选已有截图）· 清空 · 开始提炼</td><td>Camera (Open the camera) · Album (Pick a screenshot) · Clear · Extract</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>日期</td><td>9月28日 周日</td><td>Sep 28 · Sun</td><td>跟着语言切</td></tr>
+        <tr><td>条身按模式换字</td><td>动动手指 / 贴个链接 / 选了 2 张</td><td>Tap and jot / Paste a link / 2 picked</td><td><span class="no">全是新串</span></td></tr>
+      </table>
+      <p style="margin-top:14px">英文比中文长，两处会顶到：<b>slogan</b>（"Save what's worth saving" 22 个字符）字号降到 38 才和右侧「中/EN」挤得下；<b>条身</b>英文用 42。两处都留了省略号兜底，真机上再溢出就截断而不是换行——一换行整条高度就变了。</p>
+    </div>
+
+    <div class="blk">
+      <h4>可读性复核（渲染出来逐像素量的）</h4>
+      <table>
+        <tr><th>这一行</th><th>取值</th><th>实测对比</th><th>小字 4.5</th></tr>
+        <tr><td>slogan（中英同一档）</td><td>纸白 0.96</td><td><b>5.34</b></td><td><span class="ok">过线</span></td></tr>
+        <tr><td>「9月28日」</td><td>纸白 0.95 / 细字重</td><td><b>4.90</b></td><td><span class="ok">过线</span></td></tr>
+        <tr><td>「周日」</td><td>纸白 0.56</td><td><b>2.80</b></td><td><span class="no">只当气氛</span></td></tr>
+        <tr><td>条下那枚箭头</td><td>纸白 0.72</td><td><b>3.42</b></td><td><span class="ok">图标按 3:1 判，过线</span></td></tr>
+      </table>
+      <p style="margin-top:14px">图标走的是 WCAG 对图形件的 <b>3:1</b>（非文本对比度），不是小字的 4.5，所以 0.72 这一档够用。箭头那一行取的是中英两台里较低的那个读数（中文那台 3.84）。</p>
+      <p style="margin-top:10px">但这一档只在<b>铺了背景图</b>时成立。用户在「我的」里把背景关掉之后，这页回到壁纸，纸白箭头会直接消失——那态得改用页面自己的 <code>--text-secondary</code>，也就是跟日期那行同一个色，不能把 0.72 写死。</p>
+    </div>
+
+    <div class="warn">
+      <h4>只剩两件等你点头</h4>
+      <p><b>一、条身那句英文。</b>「动动手指」我暂给 <code>Tap and jot</code>（四个音节、动作开头）。要更直白可以换 <code>Tap and note</code>，要更松可以换 <code>Just tap — start writing</code>。你定一个，我照写。</p>
+      <p><b>二、那枚箭头会不会太隐晦。</b>它现在没有文字、没有底，只靠"上下反向的半箭头"表达"换一张"。这个符号更常见的读法是"切换/交换"，第一次看见的人未必想到是换背景图。要加字就得回到胶囊那种带底的做法（你刚说太重），所以我先按纯图标画，真机上要是没人点，再考虑第一次进来给一句浮层提示。</p>
+    </div>
+  </div>`
+
+const flow = document.getElementById('flow')
+let html = ''
+const caps = {
+  zh: [
+    ['① 中文 · 收起','一条横条 + 三个小圆，换图退成条下一枚箭头','条身「动动手指」，右边三枚小圆：拍照（橙）· 相册（绿）· URL（蓝）。长条沉到视口 75%，它下面那段 110 的空白里居中一枚上下反向的半箭头。'],
+    ['② 中文 · 展开写','点条身就是写，条子先升起来再往下长','横条升到 420、下面长出表单，220ms 一起走。条身里三枚小圆换成四个模式标签，当前那枚带下划线。'],
+    ['③ 中文 · 展开链接','点蓝圆直接进那一态','链接这一态最矮，470 就够，下面还留着大半屏的图。'],
+    ['④ 中文 · 展开相册','已选两张','拍照 / 相册 两个按钮和字都没动，只是从"入口"变成"这一态里再选一次"。'],
+  ],
+  en: [
+    ['⑤ English · collapsed','Same layout, English strings','Slogan drops to 38 so it still fits beside 中 / EN. Bar label is a new string, not yet decided.'],
+    ['⑥ English · write','Tap the bar body','Existing i18n strings reused: Title / Category / Uncategorised / Back / Save.'],
+    ['⑦ English · link','Tap the blue dot','Paste / Save already exist in the dictionary; the placeholder URL is unchanged.'],
+    ['⑧ English · album','Two picked','Camera / Album / Clear / Extract all come from the current dictionary.'],
+  ],
+}
+caps.zh.forEach((c,i)=>{ html += unit(c[0],c[1],c[2], [collapsed(L.zh),openWrite(L.zh),openLink(L.zh),openAlbum(L.zh)][i]) })
+html += '<div class="brk"></div>'
+caps.en.forEach((c,i)=>{ html += unit(c[0],c[1],c[2], [collapsed(L.en),openWrite(L.en),openLink(L.en),openAlbum(L.en)][i]) })
+html += '<div class="brk"></div>'
+html += unit('⑨ 标注','位置、手指、中英对照、还剩两件要拍的','下面的数是从这张效果图的渲染结果里逐像素取的。', DOC, true)
+flow.innerHTML = html
+</script>
+</body>
+</html>
