@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 笔记列表轻盈化 · D2 修订「小圆角 + 轻底栏」</title>
+<style>
+/* ==================================================================
+   D2 修订版 —— 在已选定的 D2「圆点与淡标签」上，只追加用户 09-27 提的两条：
+     甲、按钮圆角再小一点（"会显得高级一点"）
+     乙、底部 tab 不要大黑块（"请参考咖啡人的设计，减少画面中纯黑的比重"）
+   另加一条自我修正：上一版 D2 顺手把首页那条饱和蓝搜索卡画成了横线，越界了。
+   本稿按现网原样画回来（pages/index/index.wxml:11-26 的 .card.sc-card + toneStyle(1) 宝蓝）。
+
+   咖啡人的底栏是照着 App Store 官方截图看的（id 6757520656，v1.3.0，截图 1 与截图 2 的最后一屏），
+   三条事实：① 浮起的胶囊条，底色比页面底**浅**（不是黑块）；② 只有图标、没有文字标签；
+   ③ 选中态是图标底下一块更亮一点的圆角垫块，不是白字压黑底。本稿照这三条做。
+
+   口径：px 当 rpx 用（设计宽 750）。纯 CSS —— 无外部资源、无图片标签、无网络请求。
+   字阶、色板、描边宽度沿用现网（app.wxss、utils/palette.js）；本稿动的只有圆角和底栏。
+   ================================================================== */
+
+  :root{
+    /* 五支分类原色 + 未分类墨黑（现网原样，一字未改） */
+    --y:#F6C445; --b:#3F52D6; --o:#E9723D; --g:#46A863; --p:#6E4BD0; --k:#23252C;
+
+    /* chrome：浅色那一套（深色在 .ph.d 里整组换掉） */
+    --page:#F4F2EC; --card:#FFFFFF; --edge:rgba(35,37,44,.10);
+    --tx1:#23252C; --tx2:#5C6068; --tx3:#9A9EA6;
+    --idle:rgba(35,37,44,.06); --accent:#23252C;
+
+    /* 圆角阶梯（甲）：现网是 卡40 / 控件28·16 / 胶囊999，本稿收成 卡24 / 控件14 / 小牌8。
+       999 那一档只留给底栏（浮起的胶囊条，咖啡人也是胶囊）。 */
+    --r-card:24px; --r-ctl:14px; --r-tag:8px; --r-pill:999px; --w-edge:3px;
+
+    /* 底栏（乙）：淡底 + 发丝边 + 浅投影，墨色只出现在"当前这一枚图标"那么大的面积上 */
+    --bar-bg:rgba(255,255,255,.86); --bar-edge:rgba(35,37,44,.13);
+    --bar-sh:0 10px 30px rgba(35,37,44,.16);
+    --bar-idle:rgba(35,37,44,.40); --bar-on:#23252C; --bar-plate:rgba(35,37,44,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:var(--tx1);padding:26px 15px 70px;
+    font-family:sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;gap:60px;width:2370px;align-items:flex-start}
+  .unit{width:750px;flex:none}
+
+  /* ---------- 每部手机上方的说明 ---------- */
+  .cap{margin-bottom:14px;min-height:150px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;letter-spacing:.2px;
+    background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap p b{color:#23252C}
+  .cap p code{font:inherit;font-weight:800;color:#23252C}
+
+  /* ---------- 机身 ---------- */
+  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:var(--page);
+    border-radius:52px;box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16)}
+  /* ③ 是说明屏，不是现网页面：四段内容装不进 1624，这一屏按内容加长（前两屏仍是真机 1624） */
+  .ph.doc{height:2240px}
+  .ph.d{--page:#0C0C1D;--card:rgba(255,255,255,.05);--edge:rgba(255,255,255,.12);
+    --tx1:#ECEAF6;--tx2:#B3AECF;--tx3:#8D87AE;--idle:rgba(255,255,255,.09);--accent:#A78BFA;
+    --bar-bg:rgba(255,255,255,.10); --bar-edge:rgba(255,255,255,.15);
+    --bar-sh:0 6px 20px rgba(0,0,0,.22);
+    --bar-idle:rgba(255,255,255,.46); --bar-on:#FFFFFF; --bar-plate:rgba(255,255,255,.16);
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.22),0 26px 62px rgba(0,0,0,.45)}
+
+  /* ---------- 系统状态栏 + 微信原生导航条（朴素系统样式） ---------- */
+  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:var(--tx1);position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}
+  .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .bat::before{content:'';position:absolute;right:-7px;top:6px;width:4px;height:8px;background:currentColor;border-radius:0 2px 2px 0}
+
+  .nb{height:88px;position:relative;z-index:12;border-bottom:var(--w-edge) solid var(--edge)}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:var(--tx1);letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+    background:var(--idle);box-shadow:inset 0 0 0 2px var(--edge);
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:var(--tx1)}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  /* ---------- 页面主体 ---------- */
+  .stage{position:absolute;left:0;right:0;top:179px;bottom:0;overflow:hidden;padding:2px 24px 0}
+
+  /* 页头：大标题 + 一行统计 */
+  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:16px 0 14px}
+  .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:var(--tx1);line-height:1.15}
+  .hr{text-align:right;flex:none}
+  .stats{font-size:24px;font-weight:600;letter-spacing:-.2px;color:var(--tx2);line-height:1.7;white-space:nowrap}
+  .quota{font-size:19px;font-weight:700;letter-spacing:.4px;color:var(--tx3);white-space:nowrap}
+
+  /* 搜索：现网原样 —— 一块饱和宝蓝卡（toneStyle(1)），里面只有字和一条横线。
+     本方向不动它（上一版顺手改成横线是越界），它只跟着圆角阶梯从 40 收到 24。 */
+  .sc{background:#3F52D6;color:#FFFFFF;border:var(--w-edge) solid var(--edge);
+    border-radius:var(--r-card);padding:26px 24px 20px;margin:0 0 24px}
+  .sc .line{position:relative;display:flex;align-items:center;height:64px}
+  .sc .ph-txt{flex:1;min-width:0;font-size:28px;color:rgba(255,255,255,.6);white-space:nowrap;overflow:hidden}
+  .sc .go{flex:none;font-size:31px;font-weight:800;letter-spacing:-.5px;color:#FFFFFF;padding-left:8px}
+  .sc .rule{position:absolute;left:0;right:0;bottom:0;height:var(--w-edge);background:rgba(255,255,255,.42)}
+
+  /* 分类筛选：胶囊 → 小圆角；选中态从"实心大色"改成"淡底 + 同色字"，
+     所以这一行里再没有一整块饱和色，也没有一整块墨黑。 */
+  .chips{display:flex;gap:6px;margin:0 0 16px;white-space:nowrap;overflow:hidden}
+  .chip{flex:none;display:inline-flex;align-items:center;gap:9px;height:54px;padding:0 16px;border-radius:var(--r-ctl);
+    font-size:24px;font-weight:600;color:var(--tx2)}
+  .chip .cd{width:12px;height:12px;border-radius:50%;background:var(--dot);flex:none}
+  .chip.on{color:var(--tx1);font-weight:700;background:var(--idle)}
+  .chip.on.t2,.chip.on.t3,.chip.on.t4,.chip.on.t5,.chip.on.t1{background:var(--fill);color:var(--txt)}
+  .d .chip.on{background:rgba(255,255,255,.10)}
+
+  /* ---------- 列表行卡：卡圆角 40 → 24 ---------- */
+  .row{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:18px 26px;margin-bottom:10px;position:relative}
+  .ti{font-size:31px;font-weight:800;line-height:1.38;letter-spacing:-.5px;color:var(--tx1);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 置顶：原来是一整块墨黑小牌。收成"描边 + 墨字"，牌本身不再填墨。 */
+  .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:3px 12px;border-radius:var(--r-tag);
+    border:2px solid rgba(35,37,44,.30);color:var(--tx1);margin-right:12px;vertical-align:3px}
+  .d .pin{border-color:rgba(255,255,255,.34);color:var(--tx1)}
+  .sm{font-size:24px;line-height:1.5;color:var(--tx2);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* meta 行：14rpx 点 + 分类名，再跟来源与标签；右边日期、箭头（沿用 D2，未动） */
+  .mt{display:flex;align-items:center;gap:11px;margin-top:11px;
+    padding-top:11px;border-top:var(--w-edge) solid var(--edge)}
+  .mt .grp{display:flex;align-items:center;gap:11px;min-width:0;flex:1;overflow:hidden;white-space:nowrap}
+  .lb{display:inline-flex;align-items:center;gap:9px;flex:none;font-size:21px;font-weight:800;
+    letter-spacing:-.2px;color:var(--txt)}
+  .lb .dot{width:14px;height:14px;border-radius:50%;background:var(--dot);flex:none}
+  .mt .src{font-size:21px;font-weight:700;color:var(--tx2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mt .sep{font-size:21px;font-weight:700;color:var(--tx3);flex:none}
+  .mt .tg{font-size:21px;font-weight:700;color:var(--tx3);flex:none}
+  .mt .dt{flex:none;font-size:21px;font-weight:700;letter-spacing:.4px;color:var(--tx3)}
+  .mt .cv{flex:none;font-size:28px;font-weight:400;line-height:1;color:var(--tx3)}
+
+  /* ---------- 两套分类值（沿用 D2 已定的那一份，未动） ---------- */
+  .t1{--dot:#F6C445;--txt:#856D30;--fill:rgba(246,196,69,.14);--line:rgba(246,196,69,.26)}
+  .t2{--dot:#3F52D6;--txt:#3F52D6;--fill:rgba(63,82,214,.14);--line:rgba(63,82,214,.24)}
+  .t3{--dot:#E9723D;--txt:#A35432;--fill:rgba(233,114,61,.14);--line:rgba(233,114,61,.26)}
+  .t4{--dot:#46A863;--txt:#35784B;--fill:rgba(70,168,99,.14);--line:rgba(70,168,99,.26)}
+  .t5{--dot:#6E4BD0;--txt:#6E4BD0;--fill:rgba(110,75,208,.14);--line:rgba(110,75,208,.24)}
+  .tk{--dot:#23252C;--txt:#23252C;--fill:rgba(35,37,44,.06);--line:rgba(35,37,44,.14)}
+
+  .d .t1{--dot:#F6C445;--txt:#F6C445;--fill:rgba(246,196,69,.20);--line:rgba(246,196,69,.34)}
+  .d .t2{--dot:#7FA8FF;--txt:#7FA8FF;--fill:rgba(127,168,255,.20);--line:rgba(127,168,255,.34)}
+  .d .t3{--dot:#EF8C58;--txt:#EF8C58;--fill:rgba(239,140,88,.20);--line:rgba(239,140,88,.34)}
+  .d .t4{--dot:#57B873;--txt:#57B873;--fill:rgba(87,184,115,.20);--line:rgba(87,184,115,.34)}
+  .d .t5{--dot:#B795FF;--txt:#B795FF;--fill:rgba(183,149,255,.20);--line:rgba(183,149,255,.34)}
+  .d .tk{--dot:transparent;--txt:#B3AECF;--fill:transparent;--line:rgba(255,255,255,.20)}
+  .d .tk .dot{border:3px solid rgba(255,255,255,.42);background:transparent}
+
+
+  /* ---------- 底部 tab：淡底浮起胶囊 + 图标垫块（乙） ----------
+     现网是 108rpx 高的墨黑胶囊（#23252c，深色壁纸下 #1a1c22）+ 三个白字标签。
+     本稿：底改纸白半透明、描发丝边、投影收成原来 1/3 的强度；文字标签撤掉；
+     选中态 = 图标底下一块 68×68 的圆角垫块 + 图标本身用墨色。
+     深色壁纸下同一套语义反过来：底 = 白@10%（比页面底**亮**，这样它就不是"一块黑"）。 */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;background:var(--bar-bg);
+    border:var(--w-edge) solid var(--bar-edge);border-radius:var(--r-pill);
+    display:flex;align-items:center;box-shadow:var(--bar-sh);z-index:14}
+  .tb{flex:1;height:100%;display:flex;align-items:center;justify-content:center}
+  .tb .slot{width:76px;height:76px;border-radius:26px;display:flex;align-items:center;justify-content:center;
+    color:var(--bar-idle)}
+  .tb.on .slot{background:var(--bar-plate);color:var(--bar-on)}
+  .ic{width:40px;height:40px;position:relative}
+  .ic-create::before{content:'';position:absolute;left:6px;top:6px;width:28px;height:28px;
+    border:var(--w-edge) solid currentColor;border-radius:50%}
+  .ic-create::after{content:'+';position:absolute;left:50%;top:50%;transform:translate(-50%,-53%);
+    font-size:27px;font-weight:300;color:currentColor;line-height:1}
+  .ic-notes::before{content:'';position:absolute;left:7px;top:5px;width:26px;height:30px;
+    border:var(--w-edge) solid currentColor;border-radius:8px}
+  .ic-notes::after{content:'';position:absolute;left:13px;top:13px;width:12px;height:var(--w-edge);
+    background:currentColor;box-shadow:0 6px 0 currentColor}
+  .ic-me::before{content:'';position:absolute;left:12px;top:5px;width:16px;height:16px;
+    border:var(--w-edge) solid currentColor;border-radius:50%}
+  .ic-me::after{content:'';position:absolute;bottom:6px;left:6px;width:28px;height:13px;
+    border:var(--w-edge) solid currentColor;border-bottom:none;border-radius:16px 16px 0 0}
+
+  /* ==================================================================
+     第 ③ 屏：这一稿到底改了什么（说明屏，不是现网页面）
+     ================================================================== */
+  .sp-h{font-size:34px;font-weight:800;letter-spacing:-.7px;color:var(--tx1);line-height:1.25;margin-top:20px}
+  .sp-sub{font-size:19px;font-weight:600;color:var(--tx3);margin-top:6px;letter-spacing:-.2px;line-height:1.45}
+  .blk-h{display:flex;align-items:center;gap:12px;margin:15px 0 8px}
+  .blk-h .no{font-size:19px;font-weight:800;color:#F4F2EC;background:#23252C;
+    padding:4px 12px;border-radius:8px;letter-spacing:.5px;flex:none}
+  .blk-h .tt{font-size:25px;font-weight:800;letter-spacing:-.5px;color:var(--tx1)}
+  .blk-h .note{font-size:18px;font-weight:700;color:var(--tx3);margin-left:auto;white-space:nowrap}
+  .pane{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);padding:20px 22px}
+
+  /* 圆角阶梯：同一枚控件画两遍，左边现网值、右边本稿值 */
+  .lad{display:grid;grid-template-columns:150px 1fr 1fr;gap:10px;align-items:center}
+  .lad .hd{font-size:18px;font-weight:800;color:var(--tx3);letter-spacing:-.2px}
+  .lad .lab{font-size:19px;font-weight:800;color:var(--tx2);letter-spacing:-.3px;line-height:1.35}
+  .lad .lab span{display:block;font-size:16px;font-weight:700;color:var(--tx3);letter-spacing:.1px;margin-top:3px}
+  .demo{height:88px;border:var(--w-edge) solid var(--edge);background:var(--card);
+    display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:var(--tx1)}
+  .demo.solid{background:#23252C;color:#F4F2EC;border-color:#23252C}
+  .demo.tint{background:rgba(63,82,214,.14);color:#3F52D6;border-color:rgba(63,82,214,.24)}
+  .demo .v{font-size:16px;font-weight:700;color:var(--tx3);margin-left:10px}
+  .demo.solid .v,.demo.tint .v{color:inherit;opacity:.62}
+
+  /* 底栏三态对照 */
+  .bars{display:flex;flex-direction:column;gap:14px}
+  .barrow{display:flex;align-items:center;gap:14px}
+  .barrow .tag2{width:126px;flex:none;font-size:18px;font-weight:800;color:var(--tx2);line-height:1.3}
+  .barrow .tag2 span{display:block;font-size:15px;font-weight:700;color:var(--tx3);margin-top:2px}
+  .barwrap{flex:1;height:108px;border-radius:20px;padding:0 12px;display:flex;align-items:center;
+    border:var(--w-edge) dashed var(--edge)}
+  .barwrap.ink{background:#F4F2EC}
+  .barwrap.night{background:#0C0C1D}
+  .mini{position:relative;width:100%;height:92px;border-radius:999px;display:flex;align-items:center}
+  .mini.old{background:#23252C;box-shadow:0 16px 44px rgba(35,37,44,.28)}
+  .mini.new{background:rgba(255,255,255,.86);border:var(--w-edge) solid rgba(35,37,44,.13);box-shadow:0 10px 30px rgba(35,37,44,.16)}
+  .mini.newd{background:rgba(255,255,255,.10);border:var(--w-edge) solid rgba(255,255,255,.15);box-shadow:0 6px 20px rgba(0,0,0,.22)}
+  .mini .m{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    font-size:19px;font-weight:700;color:rgba(255,255,255,.42)}
+  .mini .m .ic{width:34px;height:34px;transform:scale(.86)}
+  .mini .m.on{color:#fff}
+  .mini .m.on .ic{color:#fff}
+  .mini.new .m{color:rgba(35,37,44,.40)}
+  .mini.new .m.on{color:#23252C}
+  .mini .s{width:64px;height:64px;border-radius:22px;display:flex;align-items:center;justify-content:center}
+  .mini .m.on .s{background:rgba(255,255,255,.14)}
+  .mini.new .m.on .s{background:rgba(35,37,44,.08)}
+  .mini.newd .m.on .s{background:rgba(255,255,255,.16)}
+  .mini .ic{color:inherit}
+  .mini.nolab .m{gap:0}
+  .mini .uline{width:26px;height:4px;border-radius:2px;background:currentColor;margin-top:6px}
+
+  /* 实测数 */
+  table{width:100%;border-collapse:collapse;font-size:19px;font-weight:700}
+  th{text-align:left;font-size:16px;font-weight:800;letter-spacing:.3px;color:var(--tx3);
+    padding:7px 4px;border-bottom:var(--w-edge) solid var(--edge);white-space:nowrap}
+  td{padding:7px 4px;border-bottom:var(--w-edge) solid var(--edge);color:var(--tx1);vertical-align:middle;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td .hex{font-weight:800;letter-spacing:.1px}
+  td .cx{font-weight:600;color:var(--tx3)}
+  td .good{font-weight:800;color:#35784B}
+  td .bad{font-weight:800;color:#A35432}
+  th:last-child,td:last-child{white-space:normal;min-width:190px}
+  .colsep{border-left:var(--w-edge) solid var(--edge)}
+
+  .foot-note{font-size:17px;font-weight:600;color:var(--tx3);line-height:1.55;margin:10px 0 0;letter-spacing:-.2px}
+  .foot-note b{color:var(--tx1)}
+  .warn{margin-top:12px;background:rgba(233,114,61,.10);border:var(--w-edge) solid rgba(233,114,61,.28);
+    border-radius:var(--r-ctl);padding:14px 18px;font-size:18px;font-weight:700;line-height:1.6;color:#8A4522}
+  .warn code{font:inherit;font-weight:800}
+</style>
+</head>
+<body>
+<div class="flow">
+
+  <!-- ================= ① 米白 ================= -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">① 米白壁纸</span>
+      <h3>D2 原样保留，另动两处：圆角收一档、底栏撤掉墨黑</h3>
+      <p>列表部分与已选定的 D2 逐值相同（14rpx 点 + 21rpx 分类名、淡底 14%、未分类墨黑实心）。
+      这一稿只加两条：<b>甲</b> 圆角从 卡40 / 胶囊999 / 控件16 收到 <b>卡24 / 控件14 / 小牌8</b>，
+      分类胶囊的选中态从"实心大色"改成"淡底 + 同色字"，置顶牌从墨黑实心改成描边；
+      <b>乙</b> 底栏从 108rpx 高的墨黑胶囊改成<b>纸白半透明 + 发丝边 + 图标垫块</b>，文字标签撤掉。
+      搜索那条宝蓝卡按现网原样画回来了（上一版顺手改成横线，越界）。</p>
+    </div>
+    <div class="ph">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span>
+      </div>
+      <div class="stage">
+        <div class="head">
+          <div class="h1">我的笔记</div>
+          <div class="hr"><div class="stats">本周 2 · 本月 9 · 总数 23</div><div class="quota">额度 12/100</div></div>
+        </div>
+
+        <div class="sc"><div class="line"><span class="ph-txt">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+
+        <div class="chips">
+          <span class="chip on">全部</span>
+          <span class="chip t2"><i class="cd"></i>产品</span>
+          <span class="chip t3"><i class="cd"></i>技术</span>
+          <span class="chip t4"><i class="cd"></i>阅读</span>
+          <span class="chip t5"><i class="cd"></i>工作</span>
+          <span class="chip t1"><i class="cd"></i>灵感</span>
+        </div>
+
+        <div class="row">
+          <div class="ti"><span class="pin">置顶</span>别等状态好了才动笔</div>
+          <div class="sm">先做完，再谈做好。二十五分钟为一格。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb tk"><i class="dot"></i>未分类</span><span class="sep">·</span><span class="src">亲自撰写</span>
+          </span><span class="dt">09-23</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">额度这道闸门，是先长在后端上的</div>
+          <div class="sm">100 篇不是文案，是接口的上限，前端只能诚实显示。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t2"><i class="dot"></i>产品</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">需求 / 版本</span>
+          </span><span class="dt">09-22</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把海报引擎拆成模板和图层</div>
+          <div class="sm">一份图层清单加四个绘制原语，换风格不必再动绘制代码。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t3"><i class="dot"></i>技术</span><span class="sep">·</span><span class="src">网页文章</span><span class="sep">·</span><span class="tg">重构 / 图层</span>
+          </span><span class="dt">09-21</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">读得慢一点，记得久一点</div>
+          <div class="sm">那句「不必追上所有新书」，我在地铁上读了三遍。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t4"><i class="dot"></i>阅读</span><span class="sep">·</span><span class="src">截图识别</span><span class="sep">·</span><span class="tg">读书 / 摘录</span>
+          </span><span class="dt">09-20</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">周会只留三句话</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t5"><i class="dot"></i>工作</span><span class="sep">·</span><span class="src">亲自撰写</span><span class="sep">·</span><span class="tg">流程 / 周会</span>
+          </span><span class="dt">09-19</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把八套壁纸想成八种天气</div>
+          <div class="sm">夜紫是雷雨前的屋里，深海是凌晨四点的海。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t1"><i class="dot"></i>灵感</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">灵感 / 视觉</span>
+          </span><span class="dt">09-18</span><span class="cv">›</span></div>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <span class="tb"><span class="slot"><span class="ic ic-create"></span></span></span>
+        <span class="tb on"><span class="slot"><span class="ic ic-notes"></span></span></span>
+        <span class="tb"><span class="slot"><span class="ic ic-me"></span></span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ② 夜紫 ================= -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">② 夜紫壁纸 · 重点屏</span>
+      <h3>深色下底栏反过来处理：让底比页面底<b>更亮</b>，它就不再是"一块黑"</h3>
+      <p>现网深色那一档写的是 <code>#1a1c22</code>（custom-tab-bar/index.wxss:131）—— 压夜紫页面底 <code>#0C0C1D</code>
+      只差一档，等于在深色屏上又糊了一块更大面积的深色。本稿深色档改成 <code>白@10%</code> 的浮起面 +
+      <code>白@15%</code> 发丝边，投影强度从 <code>44rpx/.5</code> 收到 <code>20rpx/.22</code>。
+      选中态 = <code>白@16%</code> 垫块 + 图标取回白。列表那部分的深色两套值沿用已选定的 D2，一字未改
+      （点色=字色各抬一档、未分类改空心环）。</p>
+    </div>
+    <div class="ph d">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span>
+      </div>
+      <div class="stage">
+        <div class="head">
+          <div class="h1">我的笔记</div>
+          <div class="hr"><div class="stats">本周 2 · 本月 9 · 总数 23</div><div class="quota">额度 12/100</div></div>
+        </div>
+
+        <div class="sc"><div class="line"><span class="ph-txt">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+
+        <div class="chips">
+          <span class="chip on">全部</span>
+          <span class="chip t2"><i class="cd"></i>产品</span>
+          <span class="chip t3"><i class="cd"></i>技术</span>
+          <span class="chip t4"><i class="cd"></i>阅读</span>
+          <span class="chip t5"><i class="cd"></i>工作</span>
+          <span class="chip t1"><i class="cd"></i>灵感</span>
+        </div>
+
+        <div class="row">
+          <div class="ti"><span class="pin">置顶</span>别等状态好了才动笔</div>
+          <div class="sm">先做完，再谈做好。二十五分钟为一格。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb tk"><i class="dot"></i>未分类</span><span class="sep">·</span><span class="src">亲自撰写</span>
+          </span><span class="dt">09-23</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">额度这道闸门，是先长在后端上的</div>
+          <div class="sm">100 篇不是文案，是接口的上限，前端只能诚实显示。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t2"><i class="dot"></i>产品</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">需求 / 版本</span>
+          </span><span class="dt">09-22</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把海报引擎拆成模板和图层</div>
+          <div class="sm">一份图层清单加四个绘制原语，换风格不必再动绘制代码。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t3"><i class="dot"></i>技术</span><span class="sep">·</span><span class="src">网页文章</span><span class="sep">·</span><span class="tg">重构 / 图层</span>
+          </span><span class="dt">09-21</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">读得慢一点，记得久一点</div>
+          <div class="sm">那句「不必追上所有新书」，我在地铁上读了三遍。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t4"><i class="dot"></i>阅读</span><span class="sep">·</span><span class="src">截图识别</span><span class="sep">·</span><span class="tg">读书 / 摘录</span>
+          </span><span class="dt">09-20</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">周会只留三句话</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t5"><i class="dot"></i>工作</span><span class="sep">·</span><span class="src">亲自撰写</span><span class="sep">·</span><span class="tg">流程 / 周会</span>
+          </span><span class="dt">09-19</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把八套壁纸想成八种天气</div>
+          <div class="sm">夜紫是雷雨前的屋里，深海是凌晨四点的海。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t1"><i class="dot"></i>灵感</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">灵感 / 视觉</span>
+          </span><span class="dt">09-18</span><span class="cv">›</span></div>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <span class="tb"><span class="slot"><span class="ic ic-create"></span></span></span>
+        <span class="tb on"><span class="slot"><span class="ic ic-notes"></span></span></span>
+        <span class="tb"><span class="slot"><span class="ic ic-me"></span></span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ③ 这一稿改了什么 ================= -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">③ 两条改动的取值 · 底栏三态 · 纯黑比重实测</span>
+      <h3>圆角收到哪一档、底栏换成什么，以及"纯黑比重"降了多少的实测数</h3>
+      <p>下面三个数不是估的：两版各用无头 Chrome 渲成整张图，截出手机那一块 750×1624 逐像素数
+      "离墨黑 #23252C 在容差内"的点（两版文字逐字相同，所以差值就是那几块<b>面</b>的差）。</p>
+    </div>
+    <div class="ph doc">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span>
+      </div>
+      <div class="stage">
+        <div class="sp-h">一、圆角阶梯（甲）</div>
+        <div class="sp-sub">同一枚控件画两遍：左列现网值，右列本稿值。999 那一档只留给底栏。</div>
+
+        <div class="blk-h"><span class="no">档</span><span class="tt">四档取值</span><span class="note">rpx（÷2 才是 pt）</span></div>
+        <div class="pane">
+          <div class="lad">
+            <div class="hd"></div><div class="hd">现网</div><div class="hd">本稿</div>
+
+            <div class="lab">卡片 --r-card<span>app.wxss:41</span></div>
+            <div class="demo" style="border-radius:40px">40<span class="v">= 20pt</span></div>
+            <div class="demo" style="border-radius:24px">24<span class="v">= 12pt</span></div>
+
+            <div class="lab">分类胶囊<span>app.wxss:397 现用 --r-pill</span></div>
+            <div class="demo" style="border-radius:999px;background:rgba(35,37,44,.06);color:#5C6068">999<span class="v">整圆</span></div>
+            <div class="demo tint" style="border-radius:14px">14<span class="v">= 7pt</span></div>
+
+            <div class="lab">主按钮<span>app.wxss:423 / 433 --r-pill</span></div>
+            <div class="demo solid" style="border-radius:999px">999</div>
+            <div class="demo solid" style="border-radius:14px">14</div>
+
+            <div class="lab">小牌（置顶 / 标签）<span>app.wxss:328 / 416</span></div>
+            <div class="demo" style="border-radius:10px;background:#23252C;color:#F4F2EC;border-color:#23252C">10</div>
+            <div class="demo" style="border-radius:8px;border:2px solid rgba(35,37,44,.30)">8<span class="v">描边</span></div>
+          </div>
+        </div>
+
+        <div class="blk-h"><span class="no">栏</span><span class="tt">二、底栏三态</span><span class="note">现网 / 本稿 / 备选</span></div>
+        <div class="pane">
+          <div class="bars">
+            <div class="barrow">
+              <div class="tag2">现网<span>墨黑胶囊 + 三字</span></div>
+              <div class="barwrap ink">
+                <div class="mini old">
+                  <span class="m"><span class="ic ic-create"></span>新建</span>
+                  <span class="m on"><span class="ic ic-notes"></span>笔记</span>
+                  <span class="m"><span class="ic ic-me"></span>我的</span>
+                </div>
+              </div>
+            </div>
+            <div class="barrow">
+              <div class="tag2">本稿<span>淡底 + 图标垫块</span></div>
+              <div class="barwrap ink">
+                <div class="mini new nolab">
+                  <span class="m"><span class="s"><span class="ic ic-create"></span></span></span>
+                  <span class="m on"><span class="s"><span class="ic ic-notes"></span></span></span>
+                  <span class="m"><span class="s"><span class="ic ic-me"></span></span></span>
+                </div>
+              </div>
+            </div>
+            <div class="barrow">
+              <div class="tag2">备选<span>淡底 + 留文字</span></div>
+              <div class="barwrap ink">
+                <div class="mini new">
+                  <span class="m"><span class="ic ic-create"></span>新建</span>
+                  <span class="m on"><span class="ic ic-notes"></span>笔记<span class="uline"></span></span>
+                  <span class="m"><span class="ic ic-me"></span>我的</span>
+                </div>
+              </div>
+            </div>
+            <div class="barrow">
+              <div class="tag2">本稿 · 深色<span>夜紫底上</span></div>
+              <div class="barwrap night">
+                <div class="mini newd nolab">
+                  <span class="m" style="color:rgba(255,255,255,.46)"><span class="s"><span class="ic ic-create"></span></span></span>
+                  <span class="m on" style="color:#fff"><span class="s"><span class="ic ic-notes"></span></span></span>
+                  <span class="m" style="color:rgba(255,255,255,.46)"><span class="s"><span class="ic ic-me"></span></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="foot-note">咖啡人那三张官方截图里，底栏<b>只有图标、没有文字</b>，选中态是图标底下一块更亮的圆角垫块 ——
+          本稿照它做。要不要跟着撤掉"新建 / 笔记 / 我的"三个字，是这一屏唯一需要你拍的：撤字省 3 条文案，
+          但"最左那枚是新建"这件事就全靠那一个加号说清楚。</div>
+        </div>
+
+        <div class="blk-h"><span class="no">量</span><span class="tt">三、纯黑比重实测</span><span class="note">整屏 750×1624 逐像素</span></div>
+        <div class="pane">
+          <table>
+            <thead><tr>
+              <th>量什么</th><th>上一版 D2</th><th>本稿</th><th>怎么算的</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>米白屏 · 墨黑族像素</td><td><span class="bad">8.35%</span></td><td><span class="good">1.93%</span></td>
+                <td><span class="cx">离 #23252C ≤45 的点；两版字逐字相同，差值即"面"的差</span></td></tr>
+              <tr><td>米白屏 · 底栏那一条</td><td><span class="bad">94.6%</span></td><td><span class="good">0.5%</span></td>
+                <td><span class="cx">底栏矩形 702×108 内的占比</span></td></tr>
+              <tr><td>夜紫屏 · 底栏平均亮度</td><td><span class="bad">0.0295</span></td><td><span class="good">0.0596</span></td>
+                <td><span class="cx">同矩形相对亮度 L，抬一倍；页面底 0.0043</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="blk-h"><span class="no">闸</span><span class="tt">四、真要落地必须同批动的三处</span><span class="note">不动就红</span></div>
+        <div class="warn">
+          <code>--r-chip: 28</code> 不只是界面圆角：pages/profile/profile.js:13 的 <code>THUMB_R = 28</code> 必须与它相等，
+          docs/工具/验-海报模板几何.js:192-193 会把两边现读出来对一遍（这条是上一轮"CSS 与位图两个数"踩出来的闸门）。
+          卡片圆角 40→24、胶囊 999→14 都是<b>全站令牌</b>，一改就是所有页面，不只首页列表；
+          底栏换淡底要连 custom-tab-bar/index.wxss:44,55,66,78,89,100,107 那七处写死的
+          <code>rgba(255,255,255,.42)</code> 一起改 —— 图标现在是白描边，压在纸白底上会直接看不见。
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <span class="tb"><span class="slot"><span class="ic ic-create"></span></span></span>
+        <span class="tb on"><span class="slot"><span class="ic ic-notes"></span></span></span>
+        <span class="tb"><span class="slot"><span class="ic ic-me"></span></span></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
