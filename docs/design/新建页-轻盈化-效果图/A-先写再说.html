@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 新建页新方向 A：先写再说（纸面优先）</title>
+<style>
+  /* =====================================================================
+     方向 A「先写再说」：进入即是一张纸，光标已经在纸上。
+     链接 / 截图不再是"三种方式里的两种"，而是这张纸自己会认的两件事。
+     色值取自 utils/palette.js 的 TONES + 未分类墨黑，一字不改。
+     全稿界面只用系统黑体：文艺感靠纸的质感、墨色、留白、印章、竖排、饱和色块，
+     不靠 font-family 命中衬线（想上衬线的那两处已在稿上标明"需挂字体包"）。
+     纯 CSS 画：无 img、无 url()、无外部资源。设计宽 750，1px 当 1rpx 用。
+     ===================================================================== */
+  :root{
+    --y:#F6C445; --y-ink:#2A2005;
+    --b:#3F52D6; --b-ink:#FFFFFF;
+    --o:#E9723D; --o-ink:#2C1204;
+    --g:#46A863; --g-ink:#06260F;
+    --p:#6E4BD0; --p-ink:#FFFFFF;
+    --k:#23252C; --k-ink:#FFFFFF;
+    --paper:#f4f2ec;          /* 界面底色 米白 */
+    --sheet:#FFFDF6;          /* 纸 */
+    --ink:#23252C;            /* 正文墨色 */
+    --ink-2:#5c6068;
+    --ink-3:#9A9EA6;          /* 次级文字 */
+    --line:rgba(35,37,44,.10);
+    --rule:rgba(35,37,44,.075);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:2400px}
+  body{
+    background-image:radial-gradient(1400px 900px at 50% 8%, #E8E6DF 0%, #D8D6CE 60%, #CBC9C0 100%);
+    background-color:#DCDAD2;
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+    padding:10px 15px 8px;
+    overflow:hidden;
+    position:relative;
+  }
+
+  /* ---------- 画布头部一行 + 右上角「示意」水印 ---------- */
+  .head{height:26px;font-size:19px;line-height:26px;font-weight:800;letter-spacing:.2px;color:#3a3e45}
+  .head em{font-style:normal;font-weight:600;color:#7b7f86;margin-left:14px}
+  .wm{position:absolute;right:4px;top:4px;width:72px;transform:rotate(-6deg);z-index:9;text-align:center}
+  .wm .seal{width:64px;height:64px;margin:0 auto;background:var(--o);color:#fff;border-radius:9px 12px 8px 11px;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    box-shadow:inset 0 0 0 2.5px rgba(255,255,255,.82), 0 5px 14px rgba(35,37,44,.2);
+    font-size:23px;font-weight:900;line-height:26px}
+  .wm p{margin-top:2px;font-size:11px;line-height:13px;color:#7b7f86;font-weight:800}
+
+  /* ---------- 三部手机 ---------- */
+  .row{display:flex;gap:60px;width:2370px;margin-top:4px}
+  .unit{width:750px;flex:none}
+  .cap{height:52px;margin-bottom:6px;max-width:660px}
+  .cap b{display:block;font-size:24px;line-height:28px;font-weight:900;letter-spacing:-.3px}
+  .cap b i{font-style:normal;display:inline-flex;width:30px;height:30px;border-radius:9px;background:var(--k);
+    color:#fff;font-size:19px;font-weight:900;align-items:center;justify-content:center;margin-right:9px;
+    vertical-align:-4px}
+  .cap span{display:block;font-size:18px;line-height:20px;color:#6c7078;font-weight:600;margin-top:5px;
+    white-space:nowrap}
+
+  .phone{width:750px;height:1624px;background:var(--paper);border:2px solid rgba(35,37,44,.16);
+    border-radius:44px;overflow:hidden;position:relative;display:flex;flex-direction:column;
+    box-shadow:0 22px 46px rgba(35,37,44,.20)}
+
+  /* ---------- 系统壳（原生导航条：画成朴素系统样式，不是设计重点） ---------- */
+  .sb{height:88px;flex:none;display:flex;align-items:center;justify-content:space-between;
+    padding:0 40px;font-size:26px;font-weight:800;color:var(--ink)}
+  .sb .r{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:5px;background:var(--ink);border-radius:2px}
+  .sig i:nth-child(1){height:8px}.sig i:nth-child(2){height:13px}
+  .sig i:nth-child(3){height:18px}.sig i:nth-child(4){height:23px;opacity:.3}
+  .wifi{width:30px;height:23px;border:5px solid var(--ink);border-bottom:none;border-radius:30px 30px 0 0}
+  .batt{width:52px;height:26px;border:3px solid var(--ink);border-radius:7px;position:relative;padding:3px}
+  .batt u{display:block;height:100%;width:66%;background:var(--ink);border-radius:3px}
+  .batt::after{content:'';position:absolute;right:-8px;top:8px;width:4px;height:8px;background:var(--ink);border-radius:0 3px 3px 0}
+  .nav{height:88px;flex:none;display:flex;align-items:center;justify-content:center;position:relative;
+    font-size:34px;font-weight:700;color:var(--ink)}
+  .nav .cap2{position:absolute;right:24px;top:13px;width:174px;height:62px;border-radius:31px;
+    background:rgba(35,37,44,.045);border:1px solid rgba(35,37,44,.12);display:flex;align-items:center}
+  .nav .cap2 s{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none}
+  .nav .cap2 s i{width:9px;height:9px;border-radius:50%;background:var(--ink)}
+  .nav .cap2 hr{width:1px;height:30px;background:rgba(35,37,44,.16);border:0}
+  .nav .cap2 .circ{width:26px;height:26px;border:4px solid var(--ink);border-radius:50%;position:relative}
+  .nav .cap2 .circ::after{content:'';position:absolute;inset:7px;border-radius:50%;background:var(--ink)}
+  .native{position:absolute;left:26px;top:30px;font-size:17px;font-weight:700;color:rgba(35,37,44,.24);letter-spacing:.4px}
+
+  /* ---------- 主体 ---------- */
+  .body{flex:1;min-height:0;display:flex;flex-direction:column;padding:20px 24px 0}
+  .body.tabpad{padding-bottom:150px}
+
+  /* ---------- 纸 ---------- */
+  .sheet{flex:1;min-height:0;position:relative;overflow:hidden;background:var(--sheet);
+    background-image:
+      radial-gradient(120% 70% at 50% 0%, rgba(255,255,255,.92) 0%, rgba(252,247,234,.5) 60%, rgba(238,229,209,.62) 100%),
+      repeating-linear-gradient(to bottom, transparent 0 78px, var(--rule) 78px 80px);
+    border:1.5px solid var(--line);border-radius:20px;
+    box-shadow:0 12px 30px rgba(35,37,44,.09), inset 0 1px 0 rgba(255,255,255,.9);
+    padding:24px 56px 22px 32px}
+  /* 纸左一道"订口"细线：信笺的版心 */
+  .sheet::before{content:'';position:absolute;left:14px;top:0;bottom:0;width:1.5px;background:rgba(233,114,61,.24)}
+  .sheet::after{content:'';position:absolute;right:0;top:0;width:150px;height:100%;
+    background:linear-gradient(270deg, rgba(35,37,44,.03), transparent);pointer-events:none}
+
+  /* 竖排题签（文艺母题①：竖排） */
+  .tagv{position:absolute;right:16px;top:206px;writing-mode:vertical-rl;text-orientation:upright;
+    font-size:23px;font-weight:800;letter-spacing:9px;color:rgba(35,37,44,.26);z-index:3}
+  .tagv::before{content:'';display:block;width:1.5px;height:24px;background:rgba(35,37,44,.18);margin:0 auto 10px}
+
+  /* 印章（文艺母题②：一枚朱印） */
+  .seal{position:absolute;right:30px;top:20px;width:74px;height:74px;background:var(--o);z-index:4;
+    border-radius:9px 13px 8px 12px;transform:rotate(-5deg);
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.8), 0 4px 10px rgba(35,37,44,.14);
+    display:flex;flex-wrap:wrap;align-content:center;justify-content:center}
+  .seal em{font-style:normal;width:37px;text-align:center;font-size:22px;font-weight:900;color:#fff;line-height:25px}
+  .seal.mini{position:static;width:52px;height:52px;transform:rotate(-7deg);margin:6px 0 0 auto;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.8);border-radius:7px 9px 6px 8px}
+  .seal.mini em{width:26px;font-size:15px;line-height:17px}
+
+  /* 字体包标注：不许把衬线当免费 */
+  .fchip{position:absolute;z-index:6;font-style:normal;font-size:16px;line-height:21px;font-weight:800;
+    color:var(--o);border:1.5px dashed rgba(233,114,61,.6);border-radius:10px;padding:8px 12px;
+    background:rgba(255,253,246,.92);transform:rotate(-1.4deg)}
+
+  /* 纸的头一行元信息：分类块 + 额度 */
+  .meta{display:flex;align-items:center;gap:10px;height:40px;position:relative;z-index:3;padding-right:96px}
+  .cat{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px 0 9px;border-radius:12px;
+    background:rgba(35,37,44,.055);border:1.5px solid var(--line)}
+  .cat u{display:block;width:26px;height:26px;border-radius:8px;background:var(--k);text-decoration:none}
+  .cat b{font-size:22px;font-weight:800;color:var(--ink-2)}
+  .cat i{font-style:normal;font-size:19px;font-weight:700;color:var(--ink-3)}
+  .meta .q{margin-left:auto;font-size:22px;font-weight:800;color:var(--ink-3);letter-spacing:.5px}
+
+  /* 第一行＝标题 */
+  .tline{position:relative;z-index:3;margin-top:18px;font-size:42px;line-height:56px;font-weight:900;
+    letter-spacing:-.6px;color:var(--ink);padding-right:92px}
+  .tline.ph{color:#B7BBC1;font-weight:800}
+  .caret{display:inline-block;width:4px;height:44px;background:var(--k);vertical-align:-6px;margin-right:10px;
+    border-radius:1px;box-shadow:0 0 0 4px rgba(35,37,44,.05)}
+  .rule{height:1.5px;background:rgba(35,37,44,.16);margin:16px 0 0;position:relative;z-index:3}
+  .bline{position:relative;z-index:3;margin-top:18px;font-size:29px;line-height:52px;color:#B7BBC1;font-weight:600}
+
+  /* 纸边批注：这纸自己会干什么，一次说完 */
+  .notes{position:absolute;left:32px;right:64px;bottom:22px;z-index:3;display:flex;flex-direction:column;gap:12px}
+  .notes p{display:flex;gap:12px;font-size:23px;line-height:31px;color:var(--ink-3);font-weight:700}
+  .notes p b{color:var(--ink-2);font-weight:800}
+  .notes p u{flex:none;width:9px;height:9px;border-radius:50%;background:var(--o);margin-top:11px}
+
+  /* ---------- 纸自己认出来的（状态②） ---------- */
+  .linkbar{display:flex;align-items:center;gap:14px;height:84px;margin-top:16px;padding:0 12px;
+    border-radius:16px;background:rgba(63,82,214,.085);border:1.5px solid rgba(63,82,214,.26);position:relative;z-index:3}
+  .linkbar .ico{flex:none;width:44px;height:44px;border-radius:12px;background:var(--b);position:relative}
+  /* CSS 画的链条：两个空心椭圆斜搭 */
+  .linkbar .ico s{position:absolute;width:24px;height:15px;border:4px solid #fff;border-radius:999px;text-decoration:none}
+  .linkbar .ico s:nth-child(1){left:3px;top:14px;transform:rotate(-34deg)}
+  .linkbar .ico s:nth-child(2){right:3px;bottom:13px;transform:rotate(-34deg)}
+  .linkbar .url{flex:1;min-width:0;font-size:25px;font-weight:800;color:#2C3BA0;letter-spacing:-.3px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .linkbar .x{flex:none;width:40px;height:40px;border-radius:50%;background:rgba(35,37,44,.06);
+    display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--ink-3);font-weight:800}
+  .lstatus{display:flex;align-items:center;gap:12px;margin-top:10px;font-size:23px;font-weight:800;color:var(--b);
+    position:relative;z-index:3}
+  .lstatus .spin{width:20px;height:20px;border-radius:50%;border:3.5px solid rgba(63,82,214,.25);
+    border-top-color:var(--b);border-right-color:var(--b);flex:none}
+  .lstatus i{font-style:normal;font-weight:700;color:var(--ink-3);font-size:21px}
+
+  .lab{display:flex;align-items:center;gap:10px;margin-top:20px;font-size:21px;font-weight:900;
+    letter-spacing:2.5px;color:var(--ink-3);position:relative;z-index:3}
+  .lab s{display:block;width:20px;height:2px;background:var(--o);text-decoration:none}
+  .abs{position:relative;z-index:3;margin-top:8px;font-size:27px;line-height:44px;color:#3c4046;font-weight:600}
+  .pts{position:relative;z-index:3;margin-top:10px;display:flex;flex-direction:column;gap:10px}
+  .pts div{display:flex;gap:12px;align-items:flex-start;font-size:26px;line-height:36px;color:#3c4046;font-weight:600}
+  .pts i{flex:none;width:34px;height:34px;border-radius:10px;background:var(--b);color:#fff;font-style:normal;
+    font-size:20px;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .skel{position:relative;z-index:3;height:28px;border-radius:9px;margin-top:10px;width:72%;
+    background:linear-gradient(90deg, rgba(63,82,214,.18), rgba(63,82,214,.04))}
+  .tg{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;position:relative;z-index:3}
+  .tg span{font-size:22px;font-weight:800;color:var(--ink);background:rgba(35,37,44,.06);border-radius:9px;padding:6px 14px}
+
+  /* 附图条 */
+  .shots{position:relative;z-index:3;margin-top:12px;display:flex;align-items:center;gap:12px}
+  .th{width:96px;height:96px;border-radius:16px;position:relative;overflow:hidden;border:1.5px solid var(--line);flex:none}
+  .th.a{background:linear-gradient(140deg,#E4EAF4 0%,#B7C4D8 100%)}
+  .th.b{background:linear-gradient(140deg,#F5E7D3 0%,#DCC0A2 100%)}
+  .th s{position:absolute;left:14px;top:14px;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.82);text-decoration:none}
+  .th u{position:absolute;left:0;right:0;bottom:0;height:42px;background:rgba(35,37,44,.17);
+    clip-path:polygon(0 100%,0 44%,32% 6%,62% 48%,100% 12%,100% 100%)}
+  .th.add{border:2px dashed rgba(35,37,44,.26);background:transparent;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:2px;color:var(--ink-3)}
+  .th.add s{position:static;width:auto;height:auto;background:none;font-size:32px;line-height:32px}
+  .th.add b{font-size:18px;font-weight:800}
+  .shots .cap3{font-size:22px;line-height:30px;color:var(--ink-3);font-weight:700;flex:1;padding-left:4px}
+  .shots .cap3 b{display:block;color:var(--ink-2);font-size:24px;font-weight:800;margin-bottom:2px}
+
+  .foot{position:absolute;left:32px;right:56px;bottom:20px;z-index:3;display:flex;flex-direction:column;gap:8px}
+  .foot p{display:flex;gap:10px;font-size:22px;line-height:30px;color:var(--ink-3);font-weight:700}
+  .foot p u{flex:none;width:8px;height:8px;border-radius:50%;background:var(--o);margin-top:11px}
+  .foot p b{color:var(--o);font-weight:900}
+
+  /* ---------- 操作条：一个功能只一个入口 ---------- */
+  .dock{flex:none;height:112px;display:flex;align-items:center;gap:16px;padding:16px 0 12px}
+  .btn{height:84px;border-radius:42px;display:flex;align-items:center;justify-content:center;gap:10px;
+    font-size:29px;font-weight:900;padding:0 28px;background:#fff;color:var(--ink);
+    border:1.5px solid var(--line);box-shadow:0 4px 12px rgba(35,37,44,.06)}
+  .btn.clip{width:186px}
+  .btn.pic{width:186px}
+  .btn.save{margin-left:auto;width:206px;background:var(--k);color:#fff;border-color:var(--k);
+    box-shadow:0 8px 20px rgba(35,37,44,.24)}
+  .btn.save.off{background:rgba(35,37,44,.2);border-color:transparent;box-shadow:none}
+  /* CSS 画的剪贴板 / 相机 */
+  .ic{position:relative;width:38px;height:38px;flex:none}
+  .ic.clip::before{content:'';position:absolute;left:5px;top:7px;width:28px;height:27px;border:3.5px solid currentColor;border-radius:8px}
+  .ic.clip::after{content:'';position:absolute;left:13px;top:1px;width:12px;height:11px;border:3.5px solid currentColor;border-radius:4px;background:#fff}
+  .ic.cam::before{content:'';position:absolute;left:1px;top:10px;width:36px;height:25px;border:3.5px solid currentColor;border-radius:8px}
+  .ic.cam::after{content:'';position:absolute;left:12px;top:3px;width:14px;height:8px;border:3.5px solid currentColor;border-bottom:0;border-radius:5px 5px 0 0}
+  .ic.cam s{position:absolute;left:14px;top:16px;width:10px;height:10px;border-radius:50%;background:currentColor}
+
+  /* ---------- 键盘（只画形状，键面无字：界面不露英文） ---------- */
+  .kb{flex:none;height:556px;background:#D6D4CD;border-top:1px solid rgba(35,37,44,.12);
+    padding:22px 16px 26px;display:flex;flex-direction:column;gap:14px}
+  .kb .r{display:flex;gap:12px}
+  .kb .k{flex:1;height:74px;background:#fff;border-radius:12px;box-shadow:0 2px 0 rgba(35,37,44,.16)}
+  .kb .r2{padding:0 22px}
+  .kb .r3{padding:0 44px}
+  .kb .r4{margin-top:4px}
+  .kb .r4 .sp{flex:5}
+  .kb .r4 .fn{flex:1.6;background:rgba(35,37,44,.1);box-shadow:none;display:flex;align-items:center;
+    justify-content:center;font-size:25px;font-weight:800;color:var(--ink-2)}
+
+  /* ---------- tabBar（自定义画的） ---------- */
+  .tabbar{position:absolute;left:20px;right:20px;bottom:20px;height:110px;background:var(--k);border-radius:55px;
+    display:flex;align-items:center;box-shadow:0 12px 28px rgba(35,37,44,.28);z-index:8}
+  .tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:rgba(255,255,255,.5);
+    font-size:21px;font-weight:700}
+  .tabbar div b{font-size:32px;font-weight:400;line-height:32px}
+  .tabbar div.on{color:#fff}
+
+  /* ---------- 列表页（状态③）：母题＝左块右文 ---------- */
+  .search{flex:none;height:92px;background:#fff;border:1.5px solid var(--line);border-radius:20px;
+    display:flex;align-items:center;padding:0 22px;gap:14px;color:var(--ink-3);font-size:27px;font-weight:700}
+  .glass{position:relative;width:34px;height:34px;flex:none}
+  .glass::before{content:'';position:absolute;left:0;top:0;width:24px;height:24px;border:3.5px solid currentColor;border-radius:50%}
+  .glass::after{content:'';position:absolute;right:1px;bottom:2px;width:14px;height:3.5px;background:currentColor;border-radius:2px;transform:rotate(45deg)}
+  .search .q{margin-left:auto;font-size:24px;font-weight:800;color:var(--ink-3)}
+  .chips{flex:none;display:flex;gap:12px;margin:16px 0 0}
+  .chips span{height:60px;display:flex;align-items:center;padding:0 22px;border-radius:30px;background:#fff;
+    border:1.5px solid var(--line);font-size:25px;font-weight:800;color:var(--ink-2);flex:none}
+  .chips span.on{background:var(--k);color:#fff;border-color:var(--k)}
+
+  /* 纸飞进列表：缩小带印章的纸 + 三道飞痕 */
+  .flyzone{position:relative;height:132px;flex:none;margin-top:8px}
+  .fly{position:absolute;right:64px;top:0;width:196px;height:120px;background:var(--sheet);
+    border:1.5px solid var(--line);border-radius:14px;transform:rotate(-8deg);z-index:6;overflow:hidden;
+    box-shadow:0 16px 30px rgba(35,37,44,.2);padding:8px 10px}
+  .fly .ln{position:absolute;left:10px;right:60px;height:2px;background:rgba(35,37,44,.08)}
+  .fly .txt{font-size:19px;font-weight:900;color:rgba(35,37,44,.4);line-height:24px;letter-spacing:-.2px}
+  .trail{position:absolute;height:4px;border-radius:4px;transform-origin:right center;
+    background:linear-gradient(270deg,rgba(35,37,44,.34),rgba(35,37,44,0))}
+
+  .list{flex:1;min-height:0;overflow:hidden}
+  .card{display:grid;grid-template-columns:150px 1fr;gap:22px;background:#fff;border:1.5px solid var(--line);
+    border-radius:20px;padding:20px;margin-bottom:16px;position:relative}
+  .blk{width:150px;border-radius:14px;position:relative;overflow:hidden;display:flex;flex-direction:column;
+    justify-content:space-between;padding:14px}
+  .blk b{font-size:29px;font-weight:900;line-height:33px;position:relative;z-index:2}
+  .blk span{font-size:19px;font-weight:800;letter-spacing:1.2px;opacity:.78;position:relative;z-index:2}
+  /* 抽象母题：圆 / 弧 / 条带 / 点阵 / 药丸 */
+  .mo{position:absolute;z-index:1;text-decoration:none}
+  .mo.circle{width:96px;height:96px;border:12px solid currentColor;border-radius:50%;right:-30px;bottom:-30px;opacity:.26}
+  .mo.arc{width:120px;height:120px;border:12px solid currentColor;border-radius:50%;
+    clip-path:polygon(0 0,100% 0,100% 50%,0 50%);right:-34px;top:-24px;opacity:.24}
+  .mo.stripes{width:150px;height:150px;left:-14px;bottom:-40px;opacity:.2;
+    background:repeating-linear-gradient(48deg,currentColor 0 12px,transparent 12px 28px)}
+  .mo.dots{width:120px;height:120px;right:-18px;bottom:-24px;opacity:.3;
+    background:radial-gradient(currentColor 5px,transparent 5.5px) 0 0/26px 26px}
+  .mo.pill{width:110px;height:44px;border:10px solid currentColor;border-radius:999px;right:-26px;bottom:4px;
+    transform:rotate(-24deg);opacity:.24}
+  .in h4{font-size:31px;line-height:40px;font-weight:900;letter-spacing:-.4px;color:var(--ink)}
+  .in p{font-size:24px;line-height:36px;color:#5c6068;font-weight:600;margin-top:6px}
+  .in .f{display:flex;justify-content:space-between;align-items:center;font-size:21px;font-weight:800;
+    color:var(--ink-3);margin-top:10px;letter-spacing:.3px}
+  .in .f em{font-style:normal;color:var(--ink-2)}
+  .card.new{box-shadow:0 14px 30px rgba(35,37,44,.12);border-color:rgba(35,37,44,.18)}
+  .card.new .blk{box-shadow:0 0 0 4px rgba(233,114,61,.26);outline:2px dashed rgba(233,114,61,.8);outline-offset:5px}
+  .just{height:36px;padding:0 12px;border-radius:18px;background:var(--o);color:#fff;font-size:19px;
+    font-weight:900;display:inline-flex;align-items:center;letter-spacing:.5px;margin-right:10px}
+  .pick{font-size:22px;font-weight:900;color:var(--o);margin-top:8px}
+  .toast{position:absolute;left:50%;transform:translateX(-50%);bottom:158px;z-index:9;background:rgba(20,22,28,.93);
+    color:#fff;font-size:27px;font-weight:800;padding:16px 30px;border-radius:999px;display:flex;align-items:center;
+    gap:14px;white-space:nowrap;box-shadow:0 10px 24px rgba(35,37,44,.3)}
+  .toast s{width:34px;height:34px;border-radius:50%;background:var(--g);text-decoration:none;position:relative;flex:none}
+  .toast s::after{content:'';position:absolute;left:11px;top:9px;width:12px;height:7px;border:3px solid #fff;
+    border-top:0;border-right:0;transform:rotate(-45deg);border-radius:2px}
+
+  /* ---------- 页脚说明一行 ---------- */
+  .foot2{display:flex;align-items:center;gap:16px;margin-top:6px;height:32px;font-size:17px;font-weight:700;color:#6c7078}
+  .foot2 i{font-style:normal;display:inline-flex;align-items:center;gap:8px}
+  .foot2 i u{width:16px;height:16px;border-radius:5px;text-decoration:none}
+  .foot2 .sep{width:1px;height:18px;background:rgba(35,37,44,.18)}
+</style>
+</head>
+<body>
+
+<div class="wm">
+  <div class="seal"><span>示</span><span>意</span></div>
+  <p>非真机截图</p>
+</div>
+
+<div class="head">图麦笔记 · 新建页新方向 A「先写再说」——进入即是纸，光标已在纸上；链接与截图是这张纸自己会认的两件事，不是两个入口<em>三屏 = 同一套界面的三个状态 · 750×1624</em></div>
+
+<div class="row">
+
+  <!-- ================= ① 打开就写 ================= -->
+  <div class="unit">
+    <div class="cap"><b><i>①</i>打开就写</b><span>不用先决定"我用哪种方式"：第一行就是标题，接着往下写就是正文。</span></div>
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span class="r"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="batt"><u></u></span></span></div>
+      <div class="nav"><span class="native">导航条／胶囊＝微信原生画的</span>新建
+        <span class="cap2"><s><i></i><i></i><i></i></s><hr><span class="circ"></span></span>
+      </div>
+
+      <div class="body">
+        <div class="sheet">
+          <div class="seal"><em>图</em><em>麦</em><em>笔</em><em>记</em></div>
+          <div class="tagv">九月廿一</div>
+          <i class="fchip" style="left:32px;top:296px;width:436px;font-size:15px;line-height:20px">这枚朱印、右边那列竖排题签，若要篆意印文或小楷衬线，得挂 @font-face 字体包——有包体代价，不算免费。</i>
+
+          <div class="meta">
+            <div class="cat"><u></u><b>未分类</b><i>点它挑分类</i></div>
+            <div class="q">22/100</div>
+          </div>
+
+          <div class="tline ph"><span class="caret"></span>先写一行，就是标题</div>
+          <div class="rule"></div>
+          <div class="bline">接着写正文。一行也行，几百字也行。</div>
+
+          <div class="notes">
+            <p><u></u><span>粘进来的 <b>http(s) 链接</b> → 纸自己去抓、自己提炼</span></p>
+            <p><u></u><span>贴上的<b>图</b> → 纸认完字就把图丢掉，一张不留</span></p>
+            <p><u></u><span>第一行空着就保存 → <b>「写个标题再保存」</b>，拦在原地</span></p>
+          </div>
+        </div>
+
+        <div class="dock">
+          <div class="btn clip"><span class="ic clip"></span>粘贴</div>
+          <div class="btn pic"><span class="ic cam"><s></s></span>加图</div>
+          <div class="btn save off">保存</div>
+        </div>
+
+        <div class="kb">
+          <div class="r"><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i></div>
+          <div class="r r2"><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i></div>
+          <div class="r r3"><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i><i class="k"></i></div>
+          <div class="r r4"><i class="k fn">一／文</i><i class="k sp"></i><i class="k fn">换行</i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ② 粘了链接，纸自己认出来了 ================= -->
+  <div class="unit">
+    <div class="cap"><b><i>②</i>粘了链接，纸自己认出来了</b><span>纸先看开头：是 http(s) 就自己抓、自己长出标题摘要；不是就当一句话。</span></div>
+    <div class="phone">
+      <div class="sb"><span>9:42</span><span class="r"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="batt"><u></u></span></span></div>
+      <div class="nav"><span class="native">导航条／胶囊＝微信原生画的</span>新建
+        <span class="cap2"><s><i></i><i></i><i></i></s><hr><span class="circ"></span></span>
+      </div>
+
+      <div class="body tabpad">
+        <div class="sheet">
+          <div class="meta" style="padding-right:0">
+            <div class="cat"><u></u><b>未分类</b><i>点它挑分类</i></div>
+            <div class="q">22/100</div>
+          </div>
+
+          <div class="linkbar">
+            <span class="ico"><s></s><s></s></span>
+            <span class="url">https://mp.weixin.qq.com/s/x7KdQm_9aT1v</span>
+            <span class="x">✕</span>
+          </div>
+          <div class="lstatus"><span class="spin"></span>认出来了 · 正在取正文<i>／ 不是链接就只当一句话，不弹错</i></div>
+
+          <div class="tline" style="padding-right:0;font-size:40px;line-height:52px">《设计的观念》里关于留白的一段</div>
+          <div class="rule"></div>
+
+          <div class="lab"><s></s>摘要</div>
+          <div class="abs">留白不是空，是把注意力分配出去。版面里每一个元素，都要为它所占的位置付出代价。</div>
+
+          <div class="lab"><s></s>要点</div>
+          <div class="pts">
+            <div><i>1</i>空着的位置也是设计，不是"还没做完"。</div>
+            <div><i>2</i>密排把读者的判断权收走了，谁都不肯先让步。</div>
+            <div class="skel"></div>
+          </div>
+
+          <div class="lab"><s></s>标签</div>
+          <div class="tg"><span>设计</span><span>留白</span><span>读后</span></div>
+
+          <div class="lab"><s></s>附了 2 张 · 一次最多 9 张</div>
+          <div class="shots">
+            <div class="th a"><s></s><u></u></div>
+            <div class="th b"><s></s><u></u></div>
+            <div class="th add"><s>＋</s><b>加图</b></div>
+            <div class="cap3"><b>认完字就把图丢掉</b>服务器不落盘、不入库；JPG·PNG，HEIC 拍不了。</div>
+          </div>
+
+          <div class="foot">
+            <p><u></u><span>开头写错 → <b>「链接要以 http:// 或 https:// 开头」</b>，改对就亮</span></p>
+            <p><u></u><span>提炼这回不成也不拦：<b>照存 + 标完成</b>，不弹错误、不跳走</span></p>
+          </div>
+        </div>
+
+        <div class="dock">
+          <div class="btn clip"><span class="ic clip"></span>粘贴</div>
+          <div class="btn pic"><span class="ic cam"><s></s></span>加图</div>
+          <div class="btn save">保存</div>
+        </div>
+      </div>
+
+      <div class="tabbar"><div class="on"><b>⊕</b>新建</div><div><b>▤</b>笔记</div><div><b>◡</b>我的</div></div>
+    </div>
+  </div>
+
+  <!-- ================= ③ 存好，纸飞进列表 ================= -->
+  <div class="unit">
+    <div class="cap"><b><i>③</i>存好，纸飞进列表</b><span>一句「已存入笔记」，纸缩成色块落进列表；没挑分类就是墨黑。</span></div>
+    <div class="phone">
+      <div class="sb"><span>9:43</span><span class="r"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="batt"><u></u></span></span></div>
+      <div class="nav"><span class="native">导航条／胶囊＝微信原生画的</span>笔记
+        <span class="cap2"><s><i></i><i></i><i></i></s><hr><span class="circ"></span></span>
+      </div>
+
+      <div class="body tabpad">
+        <div class="search"><span class="glass"></span>搜索笔记<span class="q">23/100</span></div>
+        <div class="chips"><span class="on">全部</span><span>产品</span><span>技术</span><span>阅读</span><span>工作</span><span>灵感</span></div>
+
+        <div class="flyzone">
+          <div class="trail" style="right:236px;top:62px;width:190px;transform:rotate(24deg)"></div>
+          <div class="trail" style="right:176px;top:92px;width:150px;transform:rotate(24deg);opacity:.8"></div>
+          <div class="trail" style="right:120px;top:118px;width:112px;transform:rotate(24deg);opacity:.55"></div>
+          <div class="fly">
+            <div class="txt">《设计的观念》<br>里关于留白的一段</div>
+            <div class="seal mini"><em>图</em><em>麦</em><em>笔</em><em>记</em></div>
+            <span class="ln" style="top:74px"></span><span class="ln" style="top:98px"></span>
+          </div>
+        </div>
+
+        <div class="list">
+          <div class="card new">
+            <div class="blk" style="background:var(--k);color:var(--k-ink)"><b>未分类</b><span>刚刚</span><i class="mo pill" style="color:#fff"></i></div>
+            <div class="in">
+              <h4>《设计的观念》里关于留白的一段</h4>
+              <p>留白不是空，是把注意力分配出去。</p>
+              <div class="f"><span><span class="just">刚到</span><em>网页链接</em> · 设计 / 留白 / 读后</span><span>›</span></div>
+              <div class="pick">点左边这块墨色，挑个分类</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="blk" style="background:var(--b);color:var(--b-ink)"><b>产品</b><span>09-20</span><i class="mo circle" style="color:#fff"></i></div>
+            <div class="in">
+              <h4>增长见顶之后，内容产品还剩的三件事</h4>
+              <p>留存曲线走平并不代表到顶，往往是供给结构先老化。</p>
+              <div class="f"><span><em>公众号文章</em> · 内容策略 / 留存</span><span>›</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="blk" style="background:var(--g);color:var(--g-ink)"><b>阅读</b><span>09-19</span><i class="mo arc" style="color:#06260F"></i></div>
+            <div class="in">
+              <h4>周三复盘：三条待办和一处风险</h4>
+              <p>把散在三个地方的待办并成一张表；风险只剩额度到期那条。</p>
+              <div class="f"><span><em>亲自撰写</em> · 复盘 / 待办</span><span>›</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="blk" style="background:var(--y);color:var(--y-ink)"><b>灵感</b><span>09-18</span><i class="mo dots" style="color:#2A2005"></i></div>
+            <div class="in">
+              <h4>截图里那行「秒记」，抄它的手势</h4>
+              <p>无需复杂表单，轻点几下就记完——首页只留时间线。</p>
+              <div class="f"><span><em>截图识别</em> · 交互 / 参照</span><span>›</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast"><s></s>已存入笔记</div>
+      <div class="tabbar"><div><b>⊕</b>新建</div><div class="on"><b>▤</b>笔记</div><div><b>◡</b>我的</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="foot2">
+  <i><u style="background:var(--o)"></u>示意稿 · 非真机截图 · 纯 CSS 绘制，无外部资源</i>
+  <span class="sep"></span>
+  <i>入口只剩三个：粘贴 / 加图 / 保存；分类走纸头那枚色块，进既有分类页（一功能一入口）</i>
+  <span class="sep"></span>
+  <i>界面只用系统黑体；两处若要衬线／印文已标"需挂字体包，有包体代价"</i>
+  <span class="sep"></span>
+  <i>保留既有：搜索 / 分类 / 外观（壁纸） / 分享形象 / 关于 / 额度 22/100</i>
+</div>
+
+</body>
+</html>

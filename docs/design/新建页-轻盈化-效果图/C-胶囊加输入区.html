@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 新建页轻盈化 · C 方向：胶囊 + 一整块输入区</title>
+<style>
+/* ============================================================
+   色值全部取自 utils/palette.js：五支分类色 + 墨黑，界面底米白。
+   报错红 #8C2119 取自新建页现有 --blk-err（亮底卡那一档），不另立新色。
+   字色配对沿用已上线那套：黄/橙/绿配深墨，蓝/紫/墨配白。
+   ============================================================ */
+:root{
+  --y:#F6C445;  --y-ink:#2A2005;
+  --b:#3F52D6;  --b-ink:#FFFFFF;
+  --o:#E9723D;  --o-ink:#2C1204;
+  --g:#46A863;  --g-ink:#06260F;
+  --p:#6E4BD0;  --p-ink:#FFFFFF;
+  --k:#23252C;
+  --paper:#f4f2ec;
+  --ink:#23252C; --ink-2:rgba(35,37,44,.62); --ink-3:#9A9EA6;
+  --err:#8C2119;
+  --line:rgba(35,37,44,.10);
+  --line-2:rgba(35,37,44,.16);
+  --face:#FFFFFF;
+  --r-card:40px; --r-in:24px; --r-pill:999px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* 界面字体一律用小程序现在那一套系统栈：这里不靠 font-family 命中任何衬线体，
+   文艺感全部由纸感横线 / 留白 / 印章 / 竖排 / 饱和色块承担。 */
+body{background:#E6E4DD;color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue',sans-serif;
+  padding:0 0 70px}
+.sheet{width:2400px;padding:18px 15px 0}
+
+/* ---------- 稿头：压到最扁，让三部手机落在 1780 的截图窗口里 ---------- */
+.head{display:flex;align-items:flex-end;gap:18px;margin-bottom:12px}
+.head h1{font-size:30px;letter-spacing:-.5px;line-height:1.15;font-weight:800}
+.head .lede{font-size:19px;color:#5d616a;line-height:1.4;padding-bottom:3px}
+.mark{display:inline-flex;align-items:center;height:30px;padding:0 14px;border-radius:999px;
+  background:var(--k);color:#fff;font-size:16px;font-weight:700;letter-spacing:1px}
+.phones{display:flex;gap:60px;align-items:flex-start}
+.unit{width:750px;flex:none}
+.cap{margin:0 0 10px;height:50px}
+.cap h3{font-size:24px;font-weight:800;letter-spacing:-.3px;line-height:1.2}
+.cap p{font-size:17px;color:var(--ink-3);line-height:1.3;margin-top:3px}
+.cap b{color:var(--ink-2);font-weight:700}
+
+/* ---------- 机身：750 × 1624（px 当 rpx 用） ---------- */
+.ph{width:750px;height:1624px;position:relative;border-radius:72px;overflow:hidden;
+  background:var(--paper);box-shadow:0 26px 60px rgba(35,37,44,.22),0 0 0 2px rgba(35,37,44,.34) inset}
+.screen{position:relative;height:100%;display:flex;flex-direction:column;z-index:1}
+/* 纸底：一层极淡的网点 + 一层从上方渗下来的暖色，做"纸"不做"后台" */
+.ph::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(rgba(35,37,44,.055) 1px,transparent 1.6px) 0 0/26px 26px,
+    linear-gradient(180deg,rgba(246,196,69,.10),rgba(246,196,69,0) 34%)}
+
+/* 微信水印（示意） */
+.wm{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%) rotate(-22deg);z-index:8;
+  text-align:center;pointer-events:none;opacity:.055;white-space:nowrap}
+.wm i{display:block;font-style:normal;font-size:74px;font-weight:900;letter-spacing:14px}
+.wm i:nth-child(2){font-size:26px;letter-spacing:9px;margin-top:6px}
+
+/* ---------- ① 原生区：状态条 + 导航条（页面 CSS 管不到，画成朴素系统样） ---------- */
+.status{height:94px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 40px}
+.status .t{font-size:29px;font-weight:700;letter-spacing:.5px}
+.status .rg{display:flex;align-items:center;gap:12px}
+.bars{display:flex;align-items:flex-end;gap:4px;height:22px}
+.bars s{display:block;width:6px;background:var(--ink);border-radius:2px}
+.bars s:nth-child(1){height:8px}.bars s:nth-child(2){height:13px}
+.bars s:nth-child(3){height:17px}.bars s:nth-child(4){height:22px}
+.batt{width:46px;height:22px;border:2.5px solid var(--ink);border-radius:6px;position:relative;opacity:.85}
+.batt::before{content:'';position:absolute;left:3px;top:3px;bottom:3px;width:60%;background:var(--ink);border-radius:2px}
+.batt::after{content:'';position:absolute;right:-7px;top:6px;width:3px;height:8px;background:var(--ink);border-radius:2px}
+.nav{height:88px;flex:none;display:flex;align-items:center;justify-content:center;position:relative}
+.nav .nt{font-size:34px;font-weight:700;letter-spacing:.5px}
+.capsule{position:absolute;right:28px;top:50%;transform:translateY(-50%);width:174px;height:62px;
+  border:2px solid var(--line-2);border-radius:999px;background:rgba(255,255,255,.62);
+  display:flex;align-items:center;justify-content:space-around}
+.capsule .d{display:flex;gap:7px}
+.capsule .d s{width:8px;height:8px;border-radius:50%;background:var(--ink);opacity:.8;display:block}
+.capsule em{width:1px;height:30px;background:var(--line-2);display:block}
+.capsule .o{width:24px;height:24px;border:3px solid var(--ink);border-radius:50%;position:relative;opacity:.8}
+.capsule .o::after{content:'';position:absolute;inset:6px;border-radius:50%;background:var(--ink)}
+
+/* ---------- ② 胶囊行：三枚降级成"换脸开关" ---------- */
+.body{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 30px 150px}
+.modes{flex:none;display:flex;align-items:flex-end;gap:16px;padding:22px 0 0;position:relative;z-index:3}
+.mode{height:80px;flex:none;display:flex;align-items:center;gap:12px;padding:0 30px;border-radius:999px;
+  background:rgba(255,255,255,.7);border:2px solid var(--line);
+  font-size:30px;font-weight:700;color:var(--ink-2);letter-spacing:.5px;position:relative}
+.mode .sq{width:20px;height:20px;border-radius:6px;flex:none;background:var(--sqc,var(--k));opacity:.55}
+.mode.on{background:var(--mc);border-color:var(--mc);color:var(--mi);box-shadow:0 10px 24px rgba(35,37,44,.14)}
+.mode.on .sq{background:var(--mi);opacity:.9}
+.mode.on::after{content:'';position:absolute;left:50%;bottom:-13px;transform:translateX(-50%);
+  width:0;height:0;border:13px solid transparent;border-bottom:0;border-top-color:var(--mc)}
+.modes .rail{margin-left:auto;align-self:center;font-size:19px;color:var(--ink-3);font-weight:600;letter-spacing:.4px}
+
+/* ---------- ③ 大输入区：一整块，占屏幕主体 ---------- */
+.card{flex:1;min-height:0;margin-top:20px;position:relative;display:flex;flex-direction:column;
+  background:var(--face);border:2px solid var(--line);border-radius:var(--r-card);
+  padding:34px 34px 0;overflow:hidden;box-shadow:0 18px 40px rgba(35,37,44,.07)}
+/* 卡片顶边压一道本模式的颜色，让"胶囊 → 这块地"的因果一眼可见 */
+.card::before{content:'';position:absolute;left:0;right:0;top:0;height:8px;background:var(--mc)}
+.card .eyebrow{flex:none;font-size:21px;font-weight:700;letter-spacing:1.5px;color:var(--ink-3);margin-bottom:20px}
+
+/* 印章 + 竖排：文艺母题，不靠字体 */
+.seal{position:absolute;right:30px;top:44px;width:96px;height:96px;border-radius:14px;
+  background:var(--y);color:var(--y-ink);display:flex;align-items:center;justify-content:center;
+  font-size:52px;font-weight:900;letter-spacing:0;transform:rotate(-7deg);z-index:4;
+  box-shadow:0 0 0 3px rgba(42,32,5,.22) inset,0 8px 20px rgba(35,37,44,.14)}
+.vcopy{position:absolute;right:46px;top:170px;writing-mode:vertical-rl;text-orientation:mixed;
+  font-size:21px;letter-spacing:6px;color:var(--ink-3);font-weight:600;z-index:2}
+
+/* 撰写：标题行 + 带横线的正文（字正好坐在横线上） */
+.f-title{flex:none;font-size:44px;font-weight:800;letter-spacing:-.5px;line-height:1.3;
+  width:calc(100% - 130px);color:var(--ink)}
+.f-title .caret{display:inline-block;width:4px;height:44px;background:var(--k);vertical-align:-4px;margin-left:8px}
+.rule{flex:none;height:2px;background:var(--line);margin:22px 66px 0 0}
+/* 正文右边留一条 66px 的"订口"，竖排那行字住在这条缝里，不压横线 */
+.f-body{flex:1;min-height:0;margin-top:0;font-size:31px;line-height:76px;color:#3a3e46;
+  margin-right:66px;
+  background-image:linear-gradient(transparent 0 75px,var(--line) 75px 76px);
+  background-size:100% 76px;background-position:0 0;padding-bottom:6px;overflow:hidden}
+.f-body .dim{color:var(--ink-3)}
+.f-body .caret{display:inline-block;width:3px;height:32px;background:var(--k);vertical-align:-3px}
+
+/* 分类：一个入口，一枚饱和方块代表它 */
+.cat{flex:none;margin:0 -34px;padding:24px 34px;border-top:2px solid var(--line);
+  display:flex;align-items:center;gap:16px;background:rgba(244,242,236,.55)}
+.cat .blk{width:44px;height:44px;border-radius:12px;background:var(--g);color:var(--g-ink);flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;
+  box-shadow:0 0 0 2px rgba(35,37,44,.06) inset}
+.cat .ck{font-size:23px;color:var(--ink-3);font-weight:700;letter-spacing:1px}
+.cat .cv{font-size:29px;font-weight:700;letter-spacing:-.2px}
+.cat .cc{margin-left:auto;font-size:34px;color:var(--ink-3);line-height:1}
+
+/* 链接：一个大方框 + 粘贴 + 存完预告（左块右文的母题） */
+.field{flex:none;height:110px;border:2px solid var(--line-2);border-radius:var(--r-in);
+  display:flex;align-items:center;padding:0 26px;gap:14px;background:rgba(244,242,236,.5)}
+.field .u{font-size:30px;letter-spacing:-.2px;color:var(--ink);white-space:nowrap;overflow:hidden}
+.field .caret{display:inline-block;width:3px;height:36px;background:var(--b);flex:none}
+.field .x{margin-left:auto;width:44px;height:44px;border-radius:50%;background:rgba(35,37,44,.08);
+  color:var(--ink-2);font-size:22px;display:flex;align-items:center;justify-content:center;flex:none}
+.chips{flex:none;display:flex;gap:14px;margin-top:22px;align-items:center}
+.chips .tip{font-size:22px;color:var(--ink-3);font-weight:600;margin-left:6px}
+.chip{height:76px;padding:0 32px;border-radius:999px;display:flex;align-items:center;gap:10px;
+  background:rgba(63,82,214,.10);color:#2A3794;font-size:27px;font-weight:700;border:2px solid rgba(63,82,214,.22)}
+.chip.gh{background:rgba(35,37,44,.05);color:var(--ink-2);border-color:var(--line)}
+.chip small{font-size:20px;font-weight:600;opacity:.72}
+.note-ok{flex:none;display:flex;align-items:center;gap:12px;margin-top:26px;font-size:24px;font-weight:700;color:#2F7A4C}
+.note-ok .d{width:16px;height:16px;border-radius:50%;background:var(--g);flex:none}
+.note-er{flex:none;display:flex;align-items:center;gap:12px;margin-top:26px;font-size:24px;font-weight:700;color:var(--err)}
+.note-er .d{width:16px;height:16px;border-radius:50%;background:var(--err);color:#fff;flex:none;
+  font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center}
+
+.pv{flex:none;margin-top:30px}
+.pv .lab{font-size:21px;font-weight:700;letter-spacing:1.5px;color:var(--ink-3);margin-bottom:14px}
+.pcard{display:flex;gap:18px;align-items:stretch;border:2px solid var(--line);border-radius:28px;padding:18px;background:#fff}
+.pcard .blk{width:132px;flex:none;border-radius:20px;background:var(--b);color:var(--b-ink);padding:14px;
+  display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+.pcard .blk s{position:absolute;right:-30px;bottom:-30px;width:96px;height:96px;border-radius:50%;
+  border:16px solid rgba(255,255,255,.14);display:block}
+.pcard .blk b{font-size:24px;font-weight:800;position:relative;z-index:2;line-height:1.2}
+.pcard .blk span{font-size:17px;font-weight:800;letter-spacing:1px;opacity:.7;position:relative;z-index:2}
+.pcard .r{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:12px}
+.pcard .r .tt{font-size:27px;font-weight:800;letter-spacing:-.3px;line-height:1.3}
+.pcard .r .ln{height:2px;background:var(--line);border-radius:2px}
+.pcard .r .ln.sh{width:62%}
+/* 提炼出来的四样东西，逐行点名：标题 / 摘要 / 要点 / 标签 */
+.prow{display:flex;align-items:flex-start;gap:16px;margin-top:16px}
+.prow .k{flex:none;width:74px;font-size:21px;font-weight:800;letter-spacing:1px;color:var(--ink-3);padding-top:2px}
+.prow .v{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;padding-top:6px}
+.prow .v s{display:block;height:2px;background:var(--line);border-radius:2px}
+.prow .v s:nth-child(1){width:100%}.prow .v s:nth-child(2){width:88%}.prow .v s:nth-child(3){width:56%}
+.prow .v b{font-size:23px;font-weight:700;color:var(--ink-2);letter-spacing:-.2px}
+.tags{display:flex;gap:10px;flex-wrap:wrap}
+.tags i{font-style:normal;font-size:20px;font-weight:800;color:var(--ink-3);
+  border:2px solid var(--line);border-radius:999px;padding:5px 16px}
+.prow .tags{flex:1;min-width:0;padding-top:2px}
+.gap{flex:1;min-height:0}
+
+/* 截图：九宫格正面摆满，不横滑 */
+.shot-head{flex:none;display:flex;align-items:center;margin-bottom:20px}
+.shot-head .c1{font-size:29px;font-weight:800;letter-spacing:-.3px}
+.shot-head .c2{margin-left:auto;font-size:23px;font-weight:800;color:var(--ink-3);letter-spacing:1px}
+.grid{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.cell{aspect-ratio:1/1;border-radius:20px;position:relative;overflow:hidden;
+  border:2px solid var(--line);background:#fff}
+/* 用纯 CSS 画"一张截图的样子"：顶部一条深色条 + 几行字 */
+.cell.shot{background:var(--paper)}
+.cell.shot::before{content:'';position:absolute;left:14px;right:14px;top:14px;height:18px;border-radius:5px;
+  background:var(--tone,#3a3e46);opacity:.75}
+.cell.shot::after{content:'';position:absolute;left:14px;right:20px;top:46px;height:calc(100% - 60px);
+  border-radius:4px;background-image:linear-gradient(rgba(35,37,44,.20) 0 8px,transparent 8px 22px);
+  background-size:100% 22px}
+.cell.shot.wide::after{background-image:linear-gradient(rgba(35,37,44,.20) 0 8px,transparent 8px 22px),
+  linear-gradient(90deg,rgba(233,114,61,.30),rgba(233,114,61,0))}
+.cell .x{position:absolute;right:8px;top:8px;width:34px;height:34px;border-radius:50%;
+  background:rgba(20,20,28,.66);color:#fff;font-size:19px;display:flex;align-items:center;justify-content:center;z-index:3}
+.cell.add{border:2.5px dashed rgba(35,37,44,.3);background:rgba(244,242,236,.6);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink-2)}
+.cell.add .p{font-size:44px;font-weight:300;line-height:1}
+.cell.add .a{font-size:22px;font-weight:800;letter-spacing:1px}
+.cell.void{border:2px dashed rgba(35,37,44,.12);background:transparent}
+.pick2{flex:none;display:flex;gap:16px;margin-top:24px}
+.pk{flex:1;height:88px;border-radius:22px;background:rgba(233,114,61,.10);border:2px solid rgba(233,114,61,.26);
+  display:flex;align-items:center;justify-content:center;gap:14px;color:#8A3D12;font-size:27px;font-weight:800}
+.pk small{font-size:20px;font-weight:600;opacity:.7}
+.pk .gl{width:30px;height:30px;flex:none;position:relative}
+.pk .gl.cam::before{content:'';position:absolute;left:0;right:0;bottom:2px;height:22px;border:3px solid currentColor;border-radius:7px}
+.pk .gl.cam::after{content:'';position:absolute;left:50%;top:2px;transform:translateX(-50%);width:14px;height:8px;border:3px solid currentColor;border-bottom:0;border-radius:5px 5px 0 0}
+.pk .gl.al::before{content:'';position:absolute;inset:0;border:3px solid currentColor;border-radius:7px}
+.pk .gl.al::after{content:'';position:absolute;left:6px;bottom:6px;border-left:8px solid transparent;
+  border-right:14px solid transparent;border-bottom:12px solid currentColor}
+.finep{flex:none;margin-top:22px;font-size:21px;line-height:1.55;color:var(--ink-3);font-weight:600}
+.finep b{color:var(--ink-2)}
+
+/* ---------- ④ 存：保存条 + 页脚 ---------- */
+.savebar{flex:none;display:flex;align-items:center;gap:20px;margin-top:26px}
+.save{flex:1;height:112px;border-radius:999px;background:var(--mc);color:var(--mi);
+  display:flex;align-items:center;justify-content:center;gap:14px;font-size:34px;font-weight:800;
+  letter-spacing:2px;box-shadow:0 14px 30px rgba(35,37,44,.16)}
+.save .n{font-size:22px;font-weight:700;letter-spacing:0;opacity:.78}
+.cancel{flex:none;width:132px;height:112px;border-radius:999px;border:2px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--ink-3);
+  background:rgba(255,255,255,.5)}
+.foot{flex:none;display:flex;align-items:center;justify-content:space-between;margin-top:20px;height:34px}
+.foot .q{font-size:22px;font-weight:700;color:var(--ink-3);letter-spacing:.5px}
+.foot .q b{color:var(--ink-2)}
+.foot .lang{font-size:20px;color:rgba(154,158,166,.85);font-weight:700;letter-spacing:1px}
+.foot .lang s{text-decoration:none;color:var(--ink-2)}
+
+/* toast：微信原生样式，成功勾 + 一行字。浮在输入区底部那条空档上，不压保存条 */
+.toast{position:absolute;left:50%;bottom:430px;transform:translateX(-50%);z-index:7;
+  background:rgba(20,20,28,.90);border-radius:22px;padding:26px 40px 24px;min-width:230px;text-align:center}
+.toast .ck{width:46px;height:46px;border-radius:50%;border:3px solid #fff;margin:0 auto 12px;position:relative}
+.toast .ck::after{content:'';position:absolute;left:12px;top:20px;width:16px;height:9px;
+  border-left:4px solid #fff;border-bottom:4px solid #fff;transform:rotate(-45deg)}
+.toast span{display:block;font-size:24px;font-weight:700;color:#fff;letter-spacing:1px;white-space:nowrap}
+
+/* ---------- tab 栏：自定义画的浮起墨色胶囊 ---------- */
+.tabbar{position:absolute;left:24px;right:24px;bottom:26px;height:108px;border-radius:54px;
+  background:var(--k);display:flex;z-index:6;box-shadow:0 16px 44px rgba(35,37,44,.28)}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  color:rgba(255,255,255,.42)}
+.tab .lb{font-size:21px;font-weight:700;letter-spacing:1px}
+.tab .ic{width:40px;height:40px;position:relative}
+.tab.on{color:#fff}
+.ic.create::before{content:'';position:absolute;inset:6px;border:3px solid currentColor;border-radius:50%}
+.ic.create::after{content:'+';position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-size:30px;font-weight:300;line-height:1}
+.ic.notes::before{content:'';position:absolute;left:8px;top:6px;width:24px;height:28px;border:3px solid currentColor;border-radius:8px}
+.ic.notes::after{content:'';position:absolute;left:14px;top:14px;width:12px;height:3px;background:currentColor;
+  box-shadow:0 6px 0 currentColor}
+.ic.me::before{content:'';position:absolute;left:50%;top:6px;transform:translateX(-50%);width:16px;height:16px;border:3px solid currentColor;border-radius:50%}
+.ic.me::after{content:'';position:absolute;left:50%;bottom:6px;transform:translateX(-50%);width:28px;height:14px;border:3px solid currentColor;border-radius:14px 14px 0 0}
+.tab.on .dotm{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:var(--y)}
+.tab{position:relative}
+
+/* ---------- 稿下说明（截图窗口外，交给看稿的人） ---------- */
+.notes{width:2370px;margin:34px auto 0;display:flex;gap:26px;align-items:flex-start}
+.nbox{flex:1;background:#fff;border:2px solid var(--line);border-radius:28px;padding:24px 26px}
+.nbox h4{font-size:19px;font-weight:800;letter-spacing:1.5px;color:var(--ink-3);margin-bottom:12px}
+.nbox li{font-size:19px;line-height:1.7;color:#3d4148;list-style:none;padding-left:20px;position:relative}
+.nbox li::before{content:'';position:absolute;left:0;top:11px;width:8px;height:8px;border-radius:2px;background:var(--kb,#9A9EA6)}
+.nbox b{color:var(--ink)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:17px;background:rgba(35,37,44,.07);padding:1px 6px;border-radius:5px}
+.steps{display:flex;gap:12px;margin-top:6px}
+.steps .st{flex:1;border:2px solid var(--line);border-radius:16px;padding:10px 12px;font-size:17px;font-weight:700;color:var(--ink-2);text-align:center}
+.steps .st i{display:block;font-style:normal;font-size:14px;color:var(--ink-3);font-weight:700;margin-top:2px}
+.steps .old .st{background:rgba(35,37,44,.05);color:var(--ink-3);text-decoration:line-through}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="head">
+    <h1>新建页 · C 方向：三张大卡压成一排胶囊</h1>
+    <div class="lede">默认落在「撰写」，光标已经在纸上了；胶囊只负责让下面那一整块换脸。<b>选方式 → 展开 → 填 → 存</b> 压成 <b>填 → 存</b>。</div>
+    <div class="mark">示意 · 非真机截图</div>
+  </div>
+
+  <div class="phones">
+
+    <!-- ============ ① 撰写（默认态） ============ -->
+    <div class="unit">
+      <div class="cap">
+        <h3>① 默认落在撰写，整块都是输入区</h3>
+        <p>进来不用决定任何事——<b>已经在写了</b>。分类就压在这块地最下面一行。</p>
+      </div>
+      <div class="ph" style="--mc:var(--y);--mi:var(--y-ink)">
+        <div class="wm"><i>示意</i><i>设计稿 · 非真机截图</i></div>
+        <div class="screen">
+          <div class="status">
+            <div class="t">9:41</div>
+            <div class="rg"><div class="bars"><s></s><s></s><s></s><s></s></div><div class="batt"></div></div>
+          </div>
+          <div class="nav"><div class="nt">新建</div>
+            <div class="capsule"><div class="d"><s></s><s></s><s></s></div><em></em><div class="o"></div></div>
+          </div>
+
+          <div class="body">
+            <div class="modes">
+              <div class="mode on" style="--mc:var(--y);--mi:var(--y-ink)"><i class="sq" style="--sqc:var(--y)"></i>撰写</div>
+              <div class="mode"><i class="sq" style="--sqc:var(--b)"></i>链接</div>
+              <div class="mode"><i class="sq" style="--sqc:var(--o)"></i>截图</div>
+              <div class="rail">轻点换脸 ›</div>
+            </div>
+
+            <div class="card" style="--mc:var(--y)">
+              <div class="seal">麦</div>
+              <div class="vcopy">随手写下，存成一张能转发的卡片</div>
+              <div class="f-title">夜航船里的六条冷知识<i class="caret"></i></div>
+              <div class="rule"></div>
+              <div class="f-body">明代人出门带什么？张岱列了六样：<i class="caret"></i><br>茶、砚、灯、伞、干粮，还有一册书。<br><span class="dim">接着写，或者一行就存也行…</span></div>
+              <div class="cat">
+                <div class="blk" style="background:var(--g);color:var(--g-ink)">读</div>
+                <div class="ck">分类</div>
+                <div class="cv">读书</div>
+                <div class="cc">›</div>
+              </div>
+            </div>
+
+            <div class="savebar">
+              <div class="cancel">取消</div>
+              <div class="save">保存<span class="n">存完就是一张卡片</span></div>
+            </div>
+            <div class="foot"><div class="q">已用 <b>12/100</b></div><div class="lang">中 / <s>EN</s></div></div>
+          </div>
+
+          <div class="tabbar">
+            <div class="tab on"><div class="ic create"></div><div class="lb">新建</div><div class="dotm"></div></div>
+            <div class="tab"><div class="ic notes"></div><div class="lb">笔记</div></div>
+            <div class="tab"><div class="ic me"></div><div class="lb">我的</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ② 链接 ============ -->
+    <div class="unit">
+      <div class="cap">
+        <h3>② 滑到链接，同一块换成贴链接</h3>
+        <p>位置没跳、块没变小，只是脸换了。<b>点保存的那一刻</b>：提示文案「已存入笔记」。</p>
+      </div>
+      <div class="ph" style="--mc:var(--b);--mi:var(--b-ink)">
+        <div class="wm"><i>示意</i><i>设计稿 · 非真机截图</i></div>
+        <div class="screen">
+          <div class="status">
+            <div class="t">9:41</div>
+            <div class="rg"><div class="bars"><s></s><s></s><s></s><s></s></div><div class="batt"></div></div>
+          </div>
+          <div class="nav"><div class="nt">新建</div>
+            <div class="capsule"><div class="d"><s></s><s></s><s></s></div><em></em><div class="o"></div></div>
+          </div>
+
+          <div class="body">
+            <div class="modes">
+              <div class="mode"><i class="sq" style="--sqc:var(--y)"></i>撰写</div>
+              <div class="mode on" style="--mc:var(--b);--mi:var(--b-ink)"><i class="sq" style="--sqc:var(--b)"></i>链接</div>
+              <div class="mode"><i class="sq" style="--sqc:var(--o)"></i>截图</div>
+              <div class="rail">还是这一块地 ›</div>
+            </div>
+
+            <div class="card" style="--mc:var(--b)">
+              <div class="eyebrow">贴一个链接，正文我们抓</div>
+              <div class="field">
+                <div class="u">https://mp.weixin.qq.com/s/iAPf8nQ</div>
+                <i class="caret"></i><div class="x">✕</div>
+              </div>
+              <div class="chips">
+                <div class="chip">粘贴</div>
+                <div class="tip">手打也行，要带 http 前缀</div>
+              </div>
+              <div class="note-ok"><div class="d"></div>链接可用 · 保存后自动提炼</div>
+
+              <div class="pv">
+                <div class="lab">存完大概长这样 · 列表里就是这条母题</div>
+                <div class="pcard">
+                  <div class="blk"><b>效率</b><span>09·27</span><s></s></div>
+                  <div class="r">
+                    <div class="tt">把微信文章变成能用的笔记</div>
+                    <div class="ln"></div><div class="ln sh"></div>
+                    <div class="tags"><i>效率</i><i>阅读</i><i>方法论</i></div>
+                  </div>
+                </div>
+              </div>
+              <div class="finep">服务端抓正文，大模型提炼出<b>标题 / 摘要 / 要点 / 标签</b>。<br>分类不在这里挑——存好后在笔记详情里改。</div>
+              <div class="gap"></div>
+            </div>
+
+            <div class="savebar">
+              <div class="cancel">取消</div>
+              <div class="save">保存<span class="n">抓正文 + 提炼</span></div>
+            </div>
+            <div class="foot"><div class="q">已用 <b>12/100</b></div><div class="lang">中 / <s>EN</s></div></div>
+          </div>
+
+          <div class="toast"><div class="ck"></div><span>已存入笔记</span></div>
+
+          <div class="tabbar">
+            <div class="tab on"><div class="ic create"></div><div class="lb">新建</div><div class="dotm"></div></div>
+            <div class="tab"><div class="ic notes"></div><div class="lb">笔记</div></div>
+            <div class="tab"><div class="ic me"></div><div class="lb">我的</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ③ 截图 ============ -->
+    <div class="unit">
+      <div class="cap">
+        <h3>③ 滑到截图，九宫格直接选</h3>
+        <p>9 张正面摆满 <b>3×3</b>，不横滑不折叠。拍照 / 相册两个入口都在这块地里。</p>
+      </div>
+      <div class="ph" style="--mc:var(--o);--mi:var(--o-ink)">
+        <div class="wm"><i>示意</i><i>设计稿 · 非真机截图</i></div>
+        <div class="screen">
+          <div class="status">
+            <div class="t">9:41</div>
+            <div class="rg"><div class="bars"><s></s><s></s><s></s><s></s></div><div class="batt"></div></div>
+          </div>
+          <div class="nav"><div class="nt">新建</div>
+            <div class="capsule"><div class="d"><s></s><s></s><s></s></div><em></em><div class="o"></div></div>
+          </div>
+
+          <div class="body">
+            <div class="modes">
+              <div class="mode"><i class="sq" style="--sqc:var(--y)"></i>撰写</div>
+              <div class="mode"><i class="sq" style="--sqc:var(--b)"></i>链接</div>
+              <div class="mode on" style="--mc:var(--o);--mi:var(--o-ink)"><i class="sq" style="--sqc:var(--o)"></i>截图</div>
+              <div class="rail">一次最多 9 张 ›</div>
+            </div>
+
+            <div class="card" style="--mc:var(--o)">
+              <div class="shot-head"><div class="c1">已选 4 张 · 可再加</div><div class="c2">4 / 9</div></div>
+              <div class="grid">
+                <div class="cell shot" style="--tone:#5c6068"><div class="x">✕</div></div>
+                <div class="cell shot wide" style="--tone:#3F52D6"><div class="x">✕</div></div>
+                <div class="cell shot" style="--tone:#46A863"><div class="x">✕</div></div>
+                <div class="cell shot" style="--tone:#6E4BD0"><div class="x">✕</div></div>
+                <div class="cell add"><div class="p">＋</div><div class="a">加图</div></div>
+                <div class="cell void"></div>
+                <div class="cell void"></div>
+                <div class="cell void"></div>
+                <div class="cell void"></div>
+              </div>
+              <div class="pick2">
+                <div class="pk"><span class="gl cam"></span>拍照<small>直接开相机</small></div>
+                <div class="pk"><span class="gl al"></span>相册<small>选已有截图</small></div>
+              </div>
+              <div class="finep"><b>图片只用来认字，认完立即丢弃，服务器不落盘、不入库。</b><br>支持 JPG·PNG；iPhone 拍的原图请先在系统相机里改成「兼容性最好」。</div>
+              <div class="gap"></div>
+            </div>
+
+            <div class="savebar">
+              <div class="cancel">取消</div>
+              <div class="save">开始提炼<span class="n">认字后自动整理</span></div>
+            </div>
+            <div class="foot"><div class="q">已用 <b>12/100</b></div><div class="lang">中 / <s>EN</s></div></div>
+          </div>
+
+          <div class="tabbar">
+            <div class="tab on"><div class="ic create"></div><div class="lb">新建</div><div class="dotm"></div></div>
+            <div class="tab"><div class="ic notes"></div><div class="lb">笔记</div></div>
+            <div class="tab"><div class="ic me"></div><div class="lb">我的</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ 稿下说明 ============ -->
+  <div class="notes">
+    <div class="nbox" style="--kb:#F6C445">
+      <h4>从打开到存下一条：四步压成两步</h4>
+      <div class="steps">
+        <div class="st">现状 4 步<i>选方式 → 展开 → 填 → 存</i></div>
+        <div class="st" style="background:rgba(246,196,69,.18)">新版 2 步<i>填 → 存</i></div>
+      </div>
+      <ul style="margin-top:12px">
+        <li>「选择一种方式」这行大标题<b>整行删掉</b>：它把一次决策塞在用户动手之前。胶囊不给标题，直接贴着输入区。</li>
+        <li>默认胶囊 = 撰写（三种方式里唯一"打开就能写"的一个），光标已经在标题行上；不碰胶囊也能一路存到底。</li>
+        <li>点胶囊只换输入区那张脸，<b>块的位置、大小、边缘全不动</b>——它读起来是"同一张纸的模式开关"，不是"再选一次"。</li>
+        <li>防误读三招：选中胶囊下面一个小三角指向这块地；卡片顶边渗同一支饱和色；保存按钮跟着换色。胶囊高度只有旧卡片的一半。</li>
+        <li>胶囊这一排在 750rpx 上三枚正好放下、<b>不需要横滑</b>；只有换到更窄的机型才滚，滚动条不画。真机留 <code>scroll-view scroll-x</code> 兜底。</li>
+      </ul>
+    </div>
+    <div class="nbox" style="--kb:#3F52D6">
+      <h4>这版必须砍掉 / 让步的地方</h4>
+      <ul>
+        <li>三块大色块缩成三枚小方块，<b>首屏的"色块冲击"变弱</b>：饱和色只留在选中的胶囊、卡片顶边那道 8px、保存按钮这三处。</li>
+        <li>「取消」从大按钮降级成小描边圈——它只是清草稿，不值得和保存同权重。</li>
+        <li>分类只在<b>撰写</b>那一格里出现（沿用现有那个 selector，一个入口）。链接 / 截图本来就没有分类输入，提炼出的标签在详情页改，这一版不在这里加口子。</li>
+        <li>9 张图用 <code>aspect-ratio</code> 三列等分，小屏上格子会自动变小，<b>不给它横滑</b>（横滑会藏图，藏掉的看不见也点不到）；满 9 张时「加图」自己消失，计数换成「9 / 9 已满」。</li>
+        <li>「中 / EN」从大标题右侧退到页脚最右，缩成一行 20rpx 灰字。英文半成品不外露，但入口不删。</li>
+      </ul>
+    </div>
+    <div class="nbox" style="--kb:#E9723D">
+      <h4>异常文案照抄现网，一条不改</h4>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+        <div style="width:520px;background:var(--paper);border:2px solid var(--line);border-radius:20px;padding:10px 18px">
+          <div class="note-ok" style="margin:0;font-size:20px"><div class="d"></div>链接可用 · 保存后自动提炼</div>
+        </div>
+        <div style="width:520px;background:var(--paper);border:2px solid var(--line);border-radius:20px;padding:10px 18px">
+          <div class="note-er" style="margin:0;font-size:20px"><div class="d">!</div>链接要以 http:// 或 https:// 开头</div>
+        </div>
+      </div>
+      <ul>
+        <li>链接校验失败：输入框下方那行绿点变红点（上面第二条），<b>保存同时压成不可点</b>，不用弹窗。</li>
+        <li>撰写标题为空被拦：同一位置 <code>写个标题再保存</code>（红字，不做 toast）。</li>
+        <li>提炼不可用：<b>照存 + 标完成，不报错</b>——所以稿子里没有"失败"这一态，只有 <code>已存入笔记</code>。</li>
+        <li>没相机 / 相册权限：在「拍照 / 相册」那两枚下面顶出 <code>没拿到相机权限，点这里去设置</code>。</li>
+        <li>没选图就点提炼：<code>先选一张截图再开始</code>。</li>
+      </ul>
+    </div>
+    <div class="nbox" style="--kb:#23252C">
+      <h4>字体口径（别拿这张稿当"已换字体"）</h4>
+      <ul>
+        <li>全稿仍用界面现在那套系统栈。<b>小程序 webview 只认 <code>@font-face</code> 挂进来的字体</b>，上一版"可选字体"因此整批撤了，这里不再画第二张饼。</li>
+        <li>文艺感全靠不吃字体的四件事：横线纸感 + 留白、印章「麦」、竖排一行小字、饱和色块；这三样在 CSS 里即刻可落。</li>
+        <li>真想要衬线观感（印章/竖排那两处最见效）<b>要挂字体包，有包体代价</b>：主包 2MB 上限，一个中文衬线子集包 300～800KB 起，得先决定砍哪几页共用。</li>
+        <li>顶部标题条「新建」是微信原生画的，页面 CSS 改不动它；tab 栏是自定义组件，颜色要在那份 wxss 里写死。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 方向 B：在列表页上「记一笔」（薄纸）</title>
+<style>
+  /* ==================================================================
+     色板、字阶、间距模数与已上线的 V2「左块右文」逐值相同（app.wxss 第 17~68 行、
+     utils/palette.js 的 TONES）。这一版不动任何色值、不动卡片结构，
+     动的只有一件事：录入不再是"一个要进去的页面"，而是当前页上的一层薄纸。
+     px 当 rpx 用（设计宽 750）。全篇纯 CSS：无外部资源、无 <img>、无网络请求。
+     ================================================================== */
+  :root{
+    --y:#F6C445; --y-ink:#2A2005;
+    --b:#3F52D6; --b-ink:#FFFFFF;
+    --o:#E9723D; --o-ink:#2C1204;
+    --g:#46A863; --g-ink:#06260F;
+    --p:#6E4BD0; --p-ink:#FFFFFF;
+    --k:#23252C; --k-ink:#FFFFFF;
+    --paper:#F4F2EC;
+    --ink:#23252C; --ink-2:#5C6068; --ink-3:#9A9EA6;
+    --edge:rgba(35,37,44,.10);
+    --r-card:40px; --r-block:32px; --r-pill:999px;
+    --sheet:#FFFDF8;          /* 薄纸：比卡片更"纸"一点，比页面底更亮一点 */
+    --notch:#A9A8A8;          /* 齿孔透出来的颜色 = 米白被墨黑遮罩压暗后的混色 */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#E4E3DD;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue',sans-serif;
+    padding:26px 15px 90px;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;gap:60px;width:2370px;align-items:flex-start}
+  .unit{width:750px;flex:none}
+
+  /* ---------- 每部手机上方的流程说明 ---------- */
+  .cap{margin-bottom:14px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;letter-spacing:.2px;
+    background:var(--k);color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.28;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.6;color:#585c64}
+  .cap p b{color:var(--ink)}
+
+  /* ---------- 机身 ---------- */
+  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:var(--paper);
+    border-radius:52px;box-shadow:inset 0 0 0 3px rgba(35,37,44,.5),0 26px 62px rgba(0,0,0,.18)}
+
+  /* ---------- 系统状态栏 ---------- */
+  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:var(--ink);position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}
+  .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:3px solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .bat::before{content:'';position:absolute;right:-7px;top:6px;width:4px;height:8px;background:currentColor;border-radius:0 2px 2px 0}
+
+  /* ---------- 微信原生导航条（页面 CSS 管不到，画成朴素系统样式） ---------- */
+  .nb{height:88px;position:relative;z-index:12}
+  .nb .t{position:absolute;left:0;right:0;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:var(--ink);letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+    background:rgba(255,255,255,.72);box-shadow:inset 0 0 0 2px rgba(35,37,44,.12);
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:var(--ink)}
+  .capsule .dv{width:2px;height:34px;background:rgba(35,37,44,.14)}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:3px solid var(--ink);position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:var(--ink)}
+
+  /* ---------- 页面主体（导航条以下） ---------- */
+  .stage{position:absolute;left:0;right:0;top:176px;bottom:0;overflow:hidden}
+  .head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:36px 24px 22px}
+  .head .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:var(--ink)}
+  .head .stats{font-size:24px;font-weight:600;letter-spacing:-.2px;color:var(--ink-2);white-space:nowrap}
+
+  /* 搜索条：一整块饱和蓝 + 一条横线（现网同一张卡，一字未改） */
+  .sc{background:var(--b);color:#fff;border-radius:var(--r-card);padding:26px 24px 20px;margin:0 24px 20px}
+  .sc .line{position:relative;display:flex;align-items:center;height:64px}
+  .sc .in{flex:1;min-width:0;font-size:28px;color:#fff;opacity:.62}
+  .sc .go{flex:none;font-size:31px;font-weight:800;letter-spacing:-.5px;color:#fff;padding-left:12px}
+  .sc .rule{position:absolute;left:0;right:0;bottom:0;height:3px;background:#fff;opacity:.42}
+
+  /* 分类筛选 */
+  .chips{display:flex;gap:12px;margin:0 24px 20px;white-space:nowrap;overflow:hidden}
+  .chip{flex:none;padding:14px 28px;border-radius:var(--r-pill);font-size:24px;font-weight:600;
+    background:rgba(35,37,44,.06);color:var(--ink-2)}
+  .chip.on{background:var(--k);color:var(--paper)}
+
+  /* ---------- 列表行卡：左块右文（现网同结构） ---------- */
+  .row{display:flex;align-items:flex-start;gap:26px;padding:26px;margin:0 24px 16px;background:#fff;
+    border:3px solid var(--edge);border-radius:var(--r-card);position:relative;overflow:hidden}
+  .blk{flex:none;width:176px;height:176px;box-sizing:border-box;padding:18px;border-radius:var(--r-block);
+    background:var(--bg);color:var(--ic);position:relative;overflow:hidden;
+    display:flex;flex-direction:column;justify-content:space-between}
+  .blk .nm{position:relative;z-index:2;font-size:32px;font-weight:800;line-height:1.2;letter-spacing:-.6px;white-space:nowrap}
+  .blk .dt{position:relative;z-index:2;font-size:18px;font-weight:800;letter-spacing:1.4px;opacity:.72}
+  .motif{position:absolute;z-index:0;right:-32px;bottom:-32px;width:124px;height:124px;pointer-events:none}
+  .m-circle{border-radius:50%;background:var(--mo)}
+  .m-arc{border-radius:50%;border:12px solid var(--mo);border-right-color:transparent;border-bottom-color:transparent}
+  .m-stripes{background:repeating-linear-gradient(115deg,var(--mo) 0 12px,transparent 12px 26px)}
+  .m-dots{background-image:radial-gradient(var(--mo) 6px,transparent 7px);background-size:26px 26px}
+  .m-pill{width:186px;height:52px;border-radius:var(--r-pill);background:var(--mo)}
+  .bd{flex:1;min-width:0;padding-right:6px}
+  .row .ti{font-size:31px;font-weight:800;line-height:1.38;letter-spacing:-.5px;color:var(--ink);margin-bottom:10px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:4px 14px;border-radius:10px;
+    background:var(--k);color:var(--paper);margin-right:10px;vertical-align:2px}
+  .sm{font-size:24px;line-height:1.55;color:var(--ink-2);margin-bottom:8px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .ft{display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:21px;font-weight:700;color:var(--ink-3)}
+  .ft .src{color:var(--ink-2)}
+  .ft .cv{font-size:28px;font-weight:400;line-height:1;flex:none}
+  /* 刚存进来那一条：入场瞬间一圈发丝虚线（真机 300ms 后消失） */
+  .row.fresh{box-shadow:0 0 0 3px rgba(35,37,44,.13)}
+  .row.fresh::after{content:'';position:absolute;inset:8px;border:2px dashed rgba(35,37,44,.2);border-radius:32px}
+
+  /* ---------- 底部 tabBar：只有两枚 ---------- */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;background:var(--k);
+    border-radius:44px;display:flex;align-items:center;box-shadow:0 16px 44px rgba(35,37,44,.28);z-index:14}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;color:rgba(255,255,255,.5)}
+  .tab.on{color:#fff}
+  .tab .lb{font-size:22px;font-weight:600}
+  .ic{width:40px;height:40px;position:relative}
+  .ic-notes::before{content:'';position:absolute;left:8px;top:5px;width:24px;height:30px;
+    border:3px solid currentColor;border-radius:8px}
+  .ic-notes::after{content:'';position:absolute;left:14px;top:14px;width:12px;height:3px;background:currentColor;
+    box-shadow:0 8px 0 currentColor}
+  .ic-me::before{content:'';position:absolute;left:13px;top:5px;width:14px;height:14px;border-radius:50%;border:3px solid currentColor}
+  .ic-me::after{content:'';position:absolute;left:8px;top:24px;width:24px;height:12px;border:3px solid currentColor;
+    border-bottom:none;border-radius:14px 14px 0 0}
+
+  /* ---------- 那枚印章：全页唯一的强调，也是唯一带浮影的东西 ---------- */
+  .seal{position:absolute;width:152px;height:152px;border-radius:42px;background:var(--k);color:var(--paper);
+    display:grid;place-items:center;font-size:64px;font-weight:800;letter-spacing:-2px;
+    box-shadow:0 0 0 16px rgba(244,242,236,.92),0 16px 40px rgba(35,37,44,.3);
+    transform:rotate(-2.5deg);z-index:16}
+  .seal::before{content:'';position:absolute;inset:11px;border:3px solid rgba(244,242,236,.34);border-radius:31px}
+  .seal.idle{right:38px;bottom:170px}
+  .seal.hint{outline:3px dashed rgba(35,37,44,.28);outline-offset:11px}
+  /* 一次性引导气泡：说清"这枚就是记"，新手期后不再出现 */
+  .bub{position:absolute;right:38px;bottom:342px;background:#fff;border:3px solid rgba(35,37,44,.16);
+    border-radius:26px;padding:16px 22px;font-size:25px;font-weight:700;line-height:1.4;color:var(--ink);
+    box-shadow:0 10px 26px rgba(35,37,44,.12);z-index:16;white-space:nowrap}
+  .bub i{font-style:normal;color:var(--ink-3);font-weight:800;font-size:21px;display:block;margin-bottom:3px;letter-spacing:1px}
+  .bub::after{content:'';position:absolute;right:52px;bottom:-13px;width:22px;height:22px;background:#fff;
+    border-bottom:3px solid rgba(35,37,44,.16);border-right:3px solid rgba(35,37,44,.16);transform:rotate(45deg)}
+
+  /* ---------- 遮罩 + 薄纸 ---------- */
+  .scrim{position:absolute;left:0;right:0;top:176px;bottom:0;background:rgba(35,37,44,.42);z-index:20}
+  .sheet{position:absolute;left:0;right:0;bottom:0;height:640px;background:
+      repeating-linear-gradient(0deg,rgba(35,37,44,.022) 0 2px,transparent 2px 6px),
+      repeating-linear-gradient(90deg,rgba(35,37,44,.016) 0 3px,transparent 3px 8px),
+      var(--sheet);
+    border-radius:48px 48px 0 0;box-shadow:0 -18px 60px rgba(35,37,44,.3);z-index:22}
+  /* 顶边齿孔：一枚邮票的撕边，和印章是一对 */
+  .sheet::before{content:'';position:absolute;left:0;right:0;top:0;height:28px;
+    background-image:radial-gradient(circle at 26px -2px,var(--notch) 0 12px,transparent 12.6px);
+    background-size:52px 28px;background-repeat:repeat-x}
+  .sheet .book{position:absolute;left:26px;top:58px;writing-mode:vertical-rl;font-size:19px;font-weight:600;
+    letter-spacing:7px;color:rgba(35,37,44,.34)}
+  .sheet .bookrule{position:absolute;left:60px;top:58px;width:1px;height:150px;background:rgba(35,37,44,.12)}
+  .sheet .in{position:absolute;left:74px;right:40px;top:28px}
+
+  /* 三枚贴纸 = 三种方式，默认落在「文字」 */
+  .stks{display:flex;align-items:center;gap:16px;height:84px;margin-top:30px}
+  .stk{position:relative;width:134px;height:84px;border-radius:20px;background:#fff;
+    border:3px solid rgba(35,37,44,.13);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:7px;color:var(--ink-2);transform:rotate(-1.6deg)}
+  .stk:nth-child(2){transform:rotate(1.2deg)}
+  .stk:nth-child(3){transform:rotate(-.8deg)}
+  .stk b{font-size:22px;font-weight:800;letter-spacing:.5px}
+  .stk::after{content:'';position:absolute;right:0;bottom:0;width:0;height:0;
+    border-left:15px solid transparent;border-bottom:15px solid rgba(35,37,44,.09)}
+  .stk.on{background:var(--k);border-color:var(--k);color:var(--paper);transform:rotate(1.8deg);
+    box-shadow:0 10px 24px rgba(35,37,44,.24)}
+  .stk.on::after{border-bottom-color:rgba(244,242,236,.22)}
+  /* 贴纸里的图形：全 CSS，没有图片也没有 iconfont */
+  .g{position:relative;width:44px;height:26px;flex:none}
+  .g i{position:absolute;display:block;background:currentColor;border-radius:3px}
+  .g-txt i:nth-child(1){left:0;top:0;width:44px;height:5px}
+  .g-txt i:nth-child(2){left:0;top:10px;width:31px;height:5px;opacity:.72}
+  .g-txt i:nth-child(3){left:0;top:20px;width:39px;height:5px;opacity:.5}
+  .g-link i{width:24px;height:13px;background:none;border:4px solid currentColor;border-radius:999px}
+  .g-link i:nth-child(1){left:0;top:8px;transform:rotate(-38deg)}
+  .g-link i:nth-child(2){left:19px;top:1px;transform:rotate(-38deg)}
+  .g-img i{background:none}
+  .g-img i:nth-child(1){left:0;top:0;width:44px;height:26px;border:4px solid currentColor;border-radius:8px}
+  .g-img i:nth-child(2){left:8px;top:5px;width:7px;height:7px;border-radius:50%;background:currentColor}
+  .g-img i:nth-child(3){left:16px;top:12px;width:0;height:0;border-radius:0;background:none;
+    border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:11px solid currentColor}
+  .mute{margin-left:auto;font-size:23px;font-weight:700;color:var(--ink-3);white-space:nowrap}
+  .mute em{font-style:normal;font-size:26px;margin-left:4px}
+
+  /* 手写区：标题一条横线，正文一袋 */
+  .w-t{margin-top:32px;height:66px;font-size:35px;font-weight:800;letter-spacing:-.6px;color:var(--ink);
+    line-height:52px;white-space:nowrap;overflow:hidden;position:relative;padding-bottom:14px}
+  .w-t .rule{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(35,37,44,.13)}
+  .w-b{margin-top:18px;font-size:28px;line-height:1.62;color:#3c4046;position:relative;padding-right:84px}
+  .w-b .cnt{position:absolute;right:0;top:2px;font-size:20px;font-weight:800;color:var(--ink-3);letter-spacing:.4px}
+  .car{display:inline-block;width:3px;height:34px;background:var(--k);vertical-align:-5px;margin-left:3px}
+  .car.sm{height:28px;vertical-align:-4px}
+
+  /* 一行提示（校验 / 说明）：写在纸上，不弹 toast、不跳走 */
+  .tip{margin-top:16px;font-size:22px;font-weight:700;color:var(--ink-3);display:flex;align-items:center;gap:9px}
+  .tip.bad{color:#B4231F}
+  .tip .d{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;
+    font-size:17px;font-weight:900;background:rgba(35,37,44,.08);color:var(--ink-2)}
+  .tip.bad .d{background:rgba(180,35,31,.1);color:#B4231F}
+
+  /* 分类：挑一枚色块，未分类是那枚墨黑 */
+  .cats{display:flex;align-items:center;gap:13px;margin-top:26px;height:48px}
+  .cats .lb{font-size:20px;font-weight:800;letter-spacing:1.2px;color:var(--ink-3);margin-right:3px}
+  .dot{width:46px;height:46px;border-radius:15px;background:var(--bg);position:relative;flex:none}
+  .dot.sel{box-shadow:0 0 0 3px var(--sheet),0 0 0 6px var(--k)}
+  .cats .nm{font-size:23px;font-weight:800;color:var(--ink);margin-left:5px;white-space:nowrap}
+  .cats .nx{margin-left:auto;font-size:21px;font-weight:700;color:var(--ink-3);white-space:nowrap}
+
+  /* 纸的页脚：一条撕口 + 额度 + 印章 */
+  .pfoot{position:absolute;left:0;right:0;bottom:0;height:156px;border-top:3px dashed rgba(35,37,44,.16);
+    display:flex;align-items:center}
+  .pfoot .q{padding-left:74px;font-size:22px;font-weight:700;color:var(--ink-3);letter-spacing:.2px}
+  .pfoot .q em{font-style:normal;color:var(--ink-2);font-weight:800}
+  .pfoot .seal{width:132px;height:132px;border-radius:38px;font-size:56px;right:34px;bottom:12px;
+    transform:rotate(2deg);box-shadow:0 14px 34px rgba(35,37,44,.3)}
+  .pfoot .seal::before{inset:9px;border-radius:28px}
+  .pfoot .lead{position:absolute;right:206px;bottom:62px;font-size:22px;font-weight:800;color:var(--ink-2);white-space:nowrap}
+  .pfoot .lead::after{content:'';position:absolute;right:-36px;top:14px;width:30px;border-top:3px dashed rgba(35,37,44,.3)}
+
+  /* ---------- 系统键盘：纸高不变、整张纸上抬，两者不抢地方 ---------- */
+  .kb{position:absolute;left:0;right:0;bottom:0;height:500px;background:#DBD8D1;z-index:24;
+    box-shadow:0 -3px 0 rgba(35,37,44,.12);padding:0 14px}
+  .kb .cand{height:66px;display:flex;align-items:center;gap:26px;padding:0 14px;border-bottom:1px solid rgba(35,37,44,.1)}
+  .kb .cand span{font-size:27px;color:var(--ink)}
+  .kb .cand span.hi{font-weight:800}
+  .kb .cand .x{margin-left:auto;width:36px;height:36px;border-radius:9px;background:rgba(35,37,44,.14);
+    display:grid;place-items:center;font-size:19px;color:#5a5c60}
+  .kb .rk{display:flex;justify-content:center;gap:9px;margin-top:14px}
+  .kb .kk{width:62px;height:76px;border-radius:10px;background:#fff;box-shadow:0 2px 0 rgba(35,37,44,.24);
+    display:grid;place-items:center;font-size:26px;color:var(--ink)}
+  .kb .kk.w2{width:80px}
+  .kb .kk.w3{width:84px;font-size:25px;font-weight:700}
+  .kb .kk.sp{width:300px}
+  .kb .kk.ret{width:200px;background:var(--k);color:#fff;font-size:26px;font-weight:700}
+  .kb .home{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;width:240px;height:9px;
+    border-radius:5px;background:rgba(35,37,44,.4)}
+
+  /* ---------- 存好那条的 toast ---------- */
+  .toast{position:absolute;left:50%;transform:translateX(-50%);bottom:128px;background:rgba(20,20,28,.92);
+    color:#fff;font-size:27px;font-weight:700;padding:20px 36px;border-radius:999px;white-space:nowrap;z-index:18;
+    box-shadow:0 12px 30px rgba(0,0,0,.22)}
+
+  /* ---------- 「示意」水印：压在每部手机最上层，不参与排版 ---------- */
+  .wm{position:absolute;inset:0;z-index:50;pointer-events:none;overflow:hidden}
+  .wm div{position:absolute;left:-24%;top:12%;width:150%;text-align:center;color:rgba(35,37,44,.04);
+    font-size:92px;font-weight:800;letter-spacing:36px;white-space:nowrap;transform:rotate(-27deg)}
+  .wm div:nth-child(2){top:44%}
+  .wm div:nth-child(3){top:76%}
+
+  /* ==================================================================
+     手机以下的说明区
+     ================================================================== */
+  .mast{width:2370px;margin:66px 0 34px}
+  .mast h1{font-size:40px;font-weight:800;letter-spacing:-1px;margin-bottom:12px}
+  .mast p{font-size:20px;line-height:1.75;color:#4a4e55;max-width:150ch}
+  .mast p b{color:var(--ink)}
+  .mast .tagline{display:inline-block;font-size:16px;font-weight:800;letter-spacing:2px;color:#fff;
+    background:var(--k);padding:7px 16px;border-radius:999px;margin-bottom:16px}
+  .notes{display:flex;gap:60px;width:2370px;align-items:flex-start}
+  .card{width:750px;flex:none;background:#fff;border:3px solid var(--edge);border-radius:36px;padding:32px 30px}
+  .card h2{font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
+  .card .sub{font-size:17px;color:var(--ink-3);line-height:1.62;margin-bottom:22px}
+  .card .sub b{color:var(--ink)}
+  .pt{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px}
+  .pt i{flex:none;width:28px;height:28px;border-radius:9px;font-style:normal;font-size:15px;font-weight:800;
+    display:grid;place-items:center;margin-top:3px;background:var(--k);color:#fff}
+  .pt p{font-size:19px;line-height:1.66;color:#3c4046}
+  .pt b{color:var(--ink)}
+  .pt code{font-family:ui-monospace,Menlo,monospace;font-size:16px;background:rgba(35,37,44,.07);padding:1px 7px;border-radius:6px}
+  .steps{display:flex;gap:14px;margin-bottom:14px}
+  .stp{flex:1;border:3px solid var(--edge);border-radius:24px;padding:18px 12px;text-align:center}
+  .stp b{display:block;font-size:36px;font-weight:800;letter-spacing:-1px}
+  .stp span{display:block;font-size:16px;color:var(--ink-3);margin-top:5px;line-height:1.45}
+  .stp.bad b{color:#B4231F}
+  .stp.good b{color:#1B7A3E}
+  .stp.flat b{font-size:29px;letter-spacing:1px;padding-top:5px}
+  .vs{font-size:17px;color:var(--ink-2);line-height:1.68;margin-bottom:8px}
+  .vs b{color:var(--ink)}
+  /* 小样：只截薄纸那一段，不套机身 */
+  .demo{position:relative;width:690px;background:
+      repeating-linear-gradient(0deg,rgba(35,37,44,.022) 0 2px,transparent 2px 6px),
+      repeating-linear-gradient(90deg,rgba(35,37,44,.016) 0 3px,transparent 3px 8px),var(--sheet);
+    border:2px solid rgba(35,37,44,.12);border-radius:34px;overflow:hidden;margin-bottom:14px}
+  .demo .in{padding:30px 30px 176px}
+  .demo .pfoot{display:none}
+  .demo .capline{position:absolute;left:0;right:0;bottom:0;height:156px;border-top:3px dashed rgba(35,37,44,.16)}
+  .demo .q{position:absolute;left:30px;bottom:58px;font-size:22px;font-weight:700;color:var(--ink-3)}
+  .demo .q em{font-style:normal;color:var(--ink-2);font-weight:800}
+  .demo .seal{position:absolute;right:26px;bottom:20px;width:132px;height:132px;border-radius:38px;font-size:56px;
+    transform:rotate(2deg);box-shadow:0 12px 30px rgba(35,37,44,.26)}
+  .demo .seal::before{inset:9px;border-radius:28px}
+  .demo .lead{display:none}
+  .ln-row{display:flex;align-items:center;gap:16px;margin-top:34px}
+  .ln-row .u{flex:1;min-width:0;font-size:25px;color:var(--ink);position:relative;padding-bottom:12px;
+    white-space:nowrap;overflow:hidden}
+  .ln-row .u .rule{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(35,37,44,.13)}
+  .ln-row .ps{flex:none;font-size:25px;font-weight:800;color:var(--ink)}
+  .picks{display:flex;gap:12px;margin-top:22px}
+  .pk2{flex:1;height:74px;border-radius:18px;background:#fff;border:3px solid rgba(35,37,44,.13);
+    display:flex;align-items:center;justify-content:center;gap:12px;font-size:24px;font-weight:800;color:var(--ink)}
+  .pk2 .cs{width:34px;height:24px;border:3px solid var(--ink);border-radius:6px;position:relative}
+  .pk2 .cs::before{content:'';position:absolute;left:8px;top:-10px;width:16px;height:8px;border:3px solid var(--ink);
+    border-bottom:none;border-radius:5px 5px 0 0}
+  .pk2 .cs::after{content:'';position:absolute;left:9px;top:4px;width:14px;height:14px;border-radius:50%;border:3px solid var(--ink)}
+  .pk2 .al{width:32px;height:26px;border:3px solid var(--ink);border-radius:7px;position:relative}
+  .pk2 .al::before{content:'';position:absolute;left:3px;top:3px;width:8px;height:8px;background:var(--ink);border-radius:50%}
+  .pk2 .al::after{content:'';position:absolute;left:4px;bottom:2px;width:0;height:0;
+    border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:10px solid var(--ink)}
+  /* 已选的图：一横排可滑，9 张不换行（沿用现网同一实现） */
+  .strip{display:flex;gap:10px;margin-top:16px;align-items:center;overflow:hidden}
+  .cell{flex:none;width:104px;height:104px;border-radius:18px;position:relative;overflow:hidden}
+  .cell .rm{position:absolute;right:5px;top:5px;width:24px;height:24px;border-radius:50%;
+    background:rgba(20,20,28,.6);color:#fff;font-size:14px;display:grid;place-items:center}
+  .cell.add{border:3px dashed rgba(35,37,44,.34);background:transparent;display:grid;place-items:center;
+    color:var(--ink-2);font-size:34px;font-weight:600}
+  .cell.add small{position:absolute;bottom:8px;left:0;right:0;font-size:16px;font-weight:800;letter-spacing:1px}
+  .strip .cut{flex:none;font-size:22px;font-weight:800;color:var(--ink-3);padding-left:4px}
+  .priv{margin-top:14px;font-size:19px;font-weight:700;color:var(--ink-2);line-height:1.6}
+  .priv em{font-style:normal;color:var(--ink-3);font-weight:600}
+  .warn{border-left:6px solid var(--y);background:rgba(246,196,69,.13);border-radius:0 20px 20px 0;
+    padding:18px 20px;margin-top:20px}
+  .warn h5{font-size:19px;font-weight:800;letter-spacing:.4px;color:#7a5c00;margin-bottom:8px}
+  .warn p{font-size:18px;line-height:1.68;color:#4a4230}
+  .warn b{color:#2f2a10}
+  .foot{width:2370px;margin-top:40px;font-size:17px;color:#6d717a;line-height:1.75;max-width:150ch}
+  .foot b{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<!-- =========================== 三部手机：同一套界面的三个状态 =========================== -->
+<div class="flow">
+
+  <!-- ============================== ① 列表页 + 那枚印章 ============================== -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">① 打开就在这一屏</span>
+      <h3>「笔记」列表页，右下角那枚印章</h3>
+      <p>没有第二屏、没有"选择一种方式"这一页。列表、搜索条、分类、色块<b>一个值都不动</b>，只多出右下角一枚会盖的印。
+        tabBar 从三枚变两枚——<b>「新建」那一格整格删掉</b>，不留第二入口。</p>
+    </div>
+    <div class="ph">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+
+      <div class="stage">
+        <div class="head"><span class="h1">我的笔记</span><span class="stats">本周 2 · 本月 9 · 总数 23</span></div>
+        <div class="sc"><div class="line"><span class="in">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+        <div class="chips">
+          <span class="chip on">全部</span><span class="chip">产品</span><span class="chip">技术</span>
+          <span class="chip">阅读</span><span class="chip">工作</span><span class="chip">灵感</span>
+        </div>
+
+        <div class="row">
+          <div class="blk" style="--bg:var(--b);--ic:#fff;--mo:rgba(255,255,255,.17)"><span class="nm">产品</span><span class="dt">09-24</span><span class="motif m-circle"></span></div>
+          <div class="bd">
+            <div class="ti"><span class="pin">置顶</span>增长见顶之后，内容产品还剩的三件事</div>
+            <div class="sm">留存曲线走平并不代表产品到顶，往往是供给结构先老化：头部作者集中、选题重复。</div>
+            <div class="ft"><span><span class="src">公众号文章</span> · 内容策略 / 留存</span><span class="cv">›</span></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="blk" style="--bg:var(--g);--ic:#06260F;--mo:rgba(6,38,15,.2)"><span class="nm">阅读</span><span class="dt">09-23</span><span class="motif m-arc"></span></div>
+          <div class="bd">
+            <div class="ti">一本讲版面的小书里，关于页边距的一段</div>
+            <div class="sm">页边距不是剩下的地方，它本身就是版面的一部分；先把边距定下来，字才有地方呼吸。</div>
+            <div class="ft"><span><span class="src">截图识别</span> · 设计 / 读后</span><span class="cv">›</span></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="blk" style="--bg:var(--k);--ic:#fff;--mo:rgba(255,255,255,.17)"><span class="nm">未分类</span><span class="dt">09-21</span><span class="motif m-pill"></span></div>
+          <div class="bd">
+            <div class="ti">站会要提的三件事</div>
+            <div class="ft"><span><span class="src">亲自撰写</span> · 待办</span><span class="cv">›</span></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="blk" style="--bg:var(--o);--ic:#2C1204;--mo:rgba(44,18,4,.22)"><span class="nm">技术</span><span class="dt">09-22</span><span class="motif m-stripes"></span></div>
+          <div class="bd">
+            <div class="ti">检索优先于模型</div>
+            <div class="sm">先修重排和切片。</div>
+            <div class="ft"><span><span class="src">网页文章</span> · 检索</span><span class="cv">›</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <div class="tab on"><span class="ic ic-notes"></span><span class="lb">笔记</span></div>
+        <div class="tab"><span class="ic ic-me"></span><span class="lb">我的</span></div>
+      </div>
+
+      <div class="bub"><i>新手期才出现 · 盖一次就消失</i>点这枚印，当场记一笔</div>
+      <div class="seal idle hint">记</div>
+
+      <div class="wm"><div>示意 · 非真机截图</div><div>示意 · 非真机截图</div><div>示意 · 非真机截图</div></div>
+    </div>
+  </div>
+
+  <!-- ============================== ② 薄纸升起，直接写 ============================== -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">② 点印章</span>
+      <h3>半屏薄纸从底部升起，纸上直接开写</h3>
+      <p>三种方式压成纸顶三枚小贴纸，<b>默认落在「文字」</b>——不用先回答"我用哪种"。键盘弹起时纸的高度不变、整张纸往上抬，
+        遮罩上面还剩 300 多 px 看得见列表：<b>纸和键盘不抢地方</b>。这时印章已经长在纸的右下角，点它=存。</p>
+    </div>
+    <div class="ph">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+
+      <div class="stage">
+        <div class="head"><span class="h1">我的笔记</span><span class="stats">本周 2 · 本月 9 · 总数 23</span></div>
+        <div class="sc"><div class="line"><span class="in">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+        <div class="chips">
+          <span class="chip on">全部</span><span class="chip">产品</span><span class="chip">技术</span>
+          <span class="chip">阅读</span><span class="chip">工作</span><span class="chip">灵感</span>
+        </div>
+        <div class="row">
+          <div class="blk" style="--bg:var(--b);--ic:#fff;--mo:rgba(255,255,255,.17)"><span class="nm">产品</span><span class="dt">09-24</span><span class="motif m-circle"></span></div>
+          <div class="bd">
+            <div class="ti"><span class="pin">置顶</span>增长见顶之后，内容产品还剩的三件事</div>
+            <div class="sm">留存曲线走平并不代表产品到顶，往往是供给结构先老化：头部作者集中、选题重复。</div>
+            <div class="ft"><span><span class="src">公众号文章</span> · 内容策略 / 留存</span><span class="cv">›</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scrim"></div>
+      <div class="sheet" style="bottom:500px">
+        <span class="book">薄纸一张 · 盖下即存</span><span class="bookrule"></span>
+        <div class="in">
+          <div class="stks">
+            <div class="stk on"><span class="g g-txt"><i></i><i></i><i></i></span><b>文字</b></div>
+            <div class="stk"><span class="g g-link"><i></i><i></i></span><b>链接</b></div>
+            <div class="stk"><span class="g g-img"><i></i><i></i><i></i></span><b>图</b></div>
+            <span class="mute">收起<em>⌄</em></span>
+          </div>
+
+          <div class="w-t">留白不是空，是把注意力分配出去<span class="rule"></span></div>
+          <div class="w-b">版面里每一个元素都要为它所占的位置付出代价——包括右下<span class="car sm"></span>
+            <span class="cnt">28/500</span></div>
+
+          <div class="cats">
+            <span class="lb">分类</span>
+            <span class="dot" style="--bg:var(--y)"></span>
+            <span class="dot" style="--bg:var(--b)"></span>
+            <span class="dot" style="--bg:var(--o)"></span>
+            <span class="dot sel" style="--bg:var(--g)"></span>
+            <span class="dot" style="--bg:var(--p)"></span>
+            <span class="dot" style="--bg:var(--k)"></span>
+            <span class="nm">阅读</span>
+            <span class="nx">不选即未分类</span>
+          </div>
+        </div>
+        <div class="pfoot">
+          <span class="q">笔记额度 <em>23/100</em></span>
+          <span class="lead">盖一下就存好</span>
+          <div class="seal">存</div>
+        </div>
+      </div>
+
+      <div class="kb">
+        <div class="cand"><span class="hi">包括</span><span>宝箱</span><span>抱拳</span><span class="x">⌫</span></div>
+        <div class="rk">
+          <span class="kk">Q</span><span class="kk">W</span><span class="kk">E</span><span class="kk">R</span><span class="kk">T</span>
+          <span class="kk">Y</span><span class="kk">U</span><span class="kk">I</span><span class="kk">O</span><span class="kk">P</span>
+        </div>
+        <div class="rk" style="padding:0 26px">
+          <span class="kk">A</span><span class="kk">S</span><span class="kk">D</span><span class="kk">F</span><span class="kk">G</span>
+          <span class="kk">H</span><span class="kk">J</span><span class="kk">K</span><span class="kk">L</span>
+        </div>
+        <div class="rk">
+          <span class="kk w2">⇧</span><span class="kk">Z</span><span class="kk">X</span><span class="kk">C</span><span class="kk">V</span>
+          <span class="kk">B</span><span class="kk">N</span><span class="kk">M</span><span class="kk w2">⌫</span>
+        </div>
+        <div class="rk" style="margin-top:16px">
+          <span class="kk w3">123</span><span class="kk w3">符号</span><span class="kk sp">空格</span><span class="kk ret">换行</span>
+        </div>
+        <span class="home"></span>
+      </div>
+
+      <div class="wm"><div>示意 · 非真机截图</div><div>示意 · 非真机截图</div><div>示意 · 非真机截图</div></div>
+    </div>
+  </div>
+
+  <!-- ============================== ③ 盖下即存 ============================== -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">③ 点「存」</span>
+      <h3>薄纸落下，刚那条已经排在最上面</h3>
+      <p>提示是现网那句原文<b>「已存入笔记」</b>。纸收起、印章换回「记」、列表顶端立刻多出刚写的那一条——
+        同一页 setData，<b>不切页、不 switchTab、不重新拉一遍</b>，所以也不会白那一下。</p>
+    </div>
+    <div class="ph">
+      <div class="sb"><span>9:42</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+
+      <div class="stage">
+        <div class="head"><span class="h1">我的笔记</span><span class="stats">本周 3 · 本月 10 · 总数 24</span></div>
+        <div class="sc"><div class="line"><span class="in">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+        <div class="chips">
+          <span class="chip on">全部</span><span class="chip">产品</span><span class="chip">技术</span>
+          <span class="chip">阅读</span><span class="chip">工作</span><span class="chip">灵感</span>
+        </div>
+
+        <div class="row fresh">
+          <div class="blk" style="--bg:var(--g);--ic:#06260F;--mo:rgba(6,38,15,.2)"><span class="nm">阅读</span><span class="dt">刚刚</span><span class="motif m-circle"></span></div>
+          <div class="bd">
+            <div class="ti"><span class="pin">刚刚</span>留白不是空，是把注意力分配出去</div>
+            <div class="sm">版面里每一个元素都要为它所占的位置付出代价——包括右下角那枚印章。</div>
+            <div class="ft"><span><span class="src">亲自撰写</span> · 读后</span><span class="cv">›</span></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="blk" style="--bg:var(--b);--ic:#fff;--mo:rgba(255,255,255,.17)"><span class="nm">产品</span><span class="dt">09-24</span><span class="motif m-circle"></span></div>
+          <div class="bd">
+            <div class="ti"><span class="pin">置顶</span>增长见顶之后，内容产品还剩的三件事</div>
+            <div class="sm">留存曲线走平并不代表产品到顶，往往是供给结构先老化：头部作者集中、选题重复。</div>
+            <div class="ft"><span><span class="src">公众号文章</span> · 内容策略 / 留存</span><span class="cv">›</span></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="blk" style="--bg:var(--g);--ic:#06260F;--mo:rgba(6,38,15,.2)"><span class="nm">阅读</span><span class="dt">09-23</span><span class="motif m-arc"></span></div>
+          <div class="bd">
+            <div class="ti">一本讲版面的小书里，关于页边距的一段</div>
+            <div class="sm">页边距不是剩下的地方，它本身就是版面的一部分；先把边距定下来，字才有地方呼吸。</div>
+            <div class="ft"><span><span class="src">截图识别</span> · 设计 / 读后</span><span class="cv">›</span></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="blk" style="--bg:var(--k);--ic:#fff;--mo:rgba(255,255,255,.17)"><span class="nm">未分类</span><span class="dt">09-21</span><span class="motif m-pill"></span></div>
+          <div class="bd">
+            <div class="ti">站会要提的三件事</div>
+            <div class="ft"><span><span class="src">亲自撰写</span> · 待办</span><span class="cv">›</span></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="blk" style="--bg:var(--o);--ic:#2C1204;--mo:rgba(44,18,4,.22)"><span class="nm">技术</span><span class="dt">09-22</span><span class="motif m-stripes"></span></div>
+          <div class="bd">
+            <div class="ti">检索优先于模型</div>
+            <div class="sm">先修重排和切片。</div>
+            <div class="ft"><span><span class="src">网页文章</span> · 检索</span><span class="cv">›</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <div class="tab on"><span class="ic ic-notes"></span><span class="lb">笔记</span></div>
+        <div class="tab"><span class="ic ic-me"></span><span class="lb">我的</span></div>
+      </div>
+
+      <div class="toast">已存入笔记</div>
+      <div class="seal idle">记</div>
+
+      <div class="wm"><div>示意 · 非真机截图</div><div>示意 · 非真机截图</div><div>示意 · 非真机截图</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================== 手机以下：把代价一次说清 =========================== -->
+<div class="mast">
+  <span class="tagline">方向 B · 打卡流 · 列表页上直接记一笔</span>
+  <h1>把「新建」从一个页面降成一枚印章</h1>
+  <p>用户抱怨的是<b>第一步就被迫做一次"我用哪种方式"的决策</b>。这一版把那个决策取消：印章长在列表页右下角，
+  掀开一张薄纸直接写，默认停在「文字」上（随手记八成就是写两句），另外两枚要时才点。开和存<b>共用同一枚印章</b>——
+  纸没掀开时它写「记」，掀开后同一个位置改成「存」。学「咖啡人」学的正是这一点：主流程不切页、不选方式，轻点几下就记完。</p>
+</div>
+
+<div class="notes">
+
+  <!-- 另两枚贴纸掀开 -->
+  <div class="card">
+    <h2>另外两枚贴纸掀开是什么样</h2>
+    <div class="sub">薄纸<b>高度固定 640，不跟着内容长</b>。换贴纸只换中间那一块，纸不跳、不重排。</div>
+
+    <div class="demo">
+      <div class="in">
+        <div class="stks" style="margin-top:0">
+          <div class="stk"><span class="g g-txt"><i></i><i></i><i></i></span><b>文字</b></div>
+          <div class="stk on"><span class="g g-link"><i></i><i></i></span><b>链接</b></div>
+          <div class="stk"><span class="g g-img"><i></i><i></i><i></i></span><b>图</b></div>
+          <span class="mute">收起<em>⌄</em></span>
+        </div>
+        <div class="ln-row">
+          <span class="u">https://mp.weixin.qq.com/s/AbCdEf<span class="car sm"></span><span class="rule"></span></span>
+          <span class="ps">粘贴</span>
+        </div>
+        <div class="tip"><span class="d">i</span>链接可用 · 盖下去自动提炼标题、摘要、要点、标签</div>
+        <div class="tip bad"><span class="d">!</span>少写协议头时这一行换成：链接要以 http:// 或 https:// 开头</div>
+      </div>
+      <span class="capline"></span>
+      <span class="q">笔记额度 <em>23/100</em></span>
+      <div class="seal">存</div>
+    </div>
+
+    <div class="demo">
+      <div class="in">
+        <div class="stks" style="margin-top:0">
+          <div class="stk"><span class="g g-txt"><i></i><i></i><i></i></span><b>文字</b></div>
+          <div class="stk"><span class="g g-link"><i></i><i></i></span><b>链接</b></div>
+          <div class="stk on"><span class="g g-img"><i></i><i></i><i></i></span><b>图</b></div>
+          <span class="mute">收起<em>⌄</em></span>
+        </div>
+        <div class="picks">
+          <span class="pk2"><span class="cs"></span>拍照</span>
+          <span class="pk2"><span class="al"></span>相册</span>
+        </div>
+        <div class="strip">
+          <span class="cell" style="background:linear-gradient(135deg,#dfe6ef,#b9c6d8)"><span class="rm">✕</span></span>
+          <span class="cell" style="background:linear-gradient(135deg,#f2e2cf,#d9bfa3)"><span class="rm">✕</span></span>
+          <span class="cell" style="background:linear-gradient(135deg,#e3ece4,#bccec0)"><span class="rm">✕</span></span>
+          <span class="cell add">＋<small>加图</small></span>
+          <span class="cut">滑 ›</span>
+        </div>
+        <div class="priv">已选 3 张 · 可再加（一次最多 9 张）<br><em>识别完立即丢弃，服务器不落盘、不入库 · 支持 JPG·PNG，不支持 HEIC</em></div>
+      </div>
+      <span class="capline"></span>
+      <span class="q">笔记额度 <em>23/100</em></span>
+      <div class="seal">存</div>
+    </div>
+
+    <div class="pt"><i>9</i><p><b>9 张图不换行。</b>沿用现网那条 <code>scroll-view</code> 横排可滑：换行会把 9 张撑成三行、超出纸高就被裁，裁掉的部分既看不见也点不到。末尾永远跟着那枚虚线「加图」，每张右上角一个 ✕ 单独删。</p></div>
+    <div class="pt"><i>图</i><p>这一枚<b>不弹键盘</b>：纸就落在 tabBar 那一格上（bottom:0），遮罩上面露出的列表更多。只有「文字 / 链接」两枚会用到键盘，那两枚才需要抬纸。</p></div>
+    <div class="pt"><i>炼</i><p>链接和图这两条盖下去之后<b>纸立刻落下、不把人留在纸上等</b>：先照存，提炼状态在那条笔记左侧色块的日期位上跑（<code>提炼中</code> → <code>09-24</code>）。提炼不可用时照存 + 标完成，不报错。</p></div>
+  </div>
+
+  <!-- 步数账 -->
+  <div class="card">
+    <h2>步数账：从打开到存下一条</h2>
+    <div class="sub">现网路径是"切到新建 tab → 在三张色块里挑一种 → 卡内展开 → 填 → 点保存"。</div>
+    <div class="steps">
+      <div class="stp bad"><b>5</b><span>现网 · 亲自撰写<br>切 tab / 选卡 / 标题 / 正文 / 保存</span></div>
+      <div class="stp good"><b>3</b><span>本版 · 文字<br>印章 / 写完 / 盖下</span></div>
+      <div class="stp flat"><b>持平</b><span>链接 4→4 · 图 5→5<br>一次点击都没多</span></div>
+    </div>
+    <div class="vs">
+      另外两条也照抄现网，一次点击都没多：<b>链接 4 步 → 4 步</b>（切 tab / 选卡 / 粘贴 / 保存 = 印章 / 贴纸 / 粘贴 / 盖下），
+      <b>图 5 步 → 5 步</b>。省下的不是数字，是三样东西：<b>①「选一种方式」那一整屏消失，②整页切换和随之而来的白一下消失，③存完的落点从"回列表找"变成"就在眼前排在最上面"</b>。
+      若再加一条"薄纸记住你上次用的是哪枚"（本机偏好，不算新能力），链接那条第二次起就是 3 步——这条要不要做由你定。
+    </div>
+
+    <h2 style="margin-top:36px">留下的文艺母题，一个没丢</h2>
+    <div class="sub">纸 / 墨 / 一枚印章 / 饱和色块 / 竖排，全部纯 CSS，<b>一处都没依赖字体包</b>。</div>
+    <div class="pt"><i>印</i><p><b>印章 = 全页唯一的强调。</b>圆角方石 + 里圈一道发丝白环 + 一个字（记 / 存），转歪 2.5° 像真盖的；底下衬一圈米白光晕把它从卡片上"抬"起来。只有它带浮影，眼睛一定先找到它。</p></div>
+    <div class="pt"><i>纸</i><p><b>薄纸不是弹窗。</b>底色 <code>#FFFDF8</code> 比卡片更纸一点，铺两层极淡的经纬纤维；顶边一排<b>邮票齿孔</b>（和印章是一对），页脚一条<b>虚线撕口</b>把"存"这一行分出来。遮罩只盖 webview，导航条不跟着变暗。</p></div>
+    <div class="pt"><i>竖</i><p><b>竖排小字。</b>纸左沟槽里一条竖排眉标「薄纸一张 · 盖下即存」+ 一根发丝竖线，只吃 60px 留白、不占正文。<code>writing-mode</code> 是排版不是字体，一定命中。</p></div>
+    <div class="pt"><i>块</i><p><b>左块右文照旧。</b>176 见方的饱和块 + 块里的分类名 + 白底描边卡 + 那条饱和蓝搜索横线，一个值都没改。录入换了地方，产品还是那个产品。</p></div>
+
+    <div class="warn">
+      <h5>字体这条要说死：这一稿没有靠 font-family 命中系统字体</h5>
+      <p>机身里所有字都按现网默认苹方画（和真机一致）。有<b>两处</b>如果要衬线/宋体观感——印章里那个「记 / 存」、以及「我的笔记」这个大标题——<b>必须挂字体包</b>：<code>wx.loadFontFace</code> 或 <code>@font-face</code>，中文 subset 实测 1.5~2.5MB，要自己托管并加下载域名白名单，包体和首屏下载都得算进来。上一版"可选字体"就是因为这个整体撤掉的。<b>我的建议：界面不挂，只给分享海报那类模板挂一套 subset 宋体</b>——海报是一次性出图、不承担交互，文艺感放那儿最划算。</p>
+    </div>
+  </div>
+
+  <!-- 砍掉与让步 -->
+  <div class="card">
+    <h2>必须砍掉 / 让步的地方</h2>
+    <div class="sub">这一版换走的是"单独一屏选择"，代价也得一次摊开。</div>
+    <div class="pt"><i style="background:#B4231F">1</i><p><b>「新建」tab 删掉，不留两头。</b>tabBar 只剩「笔记 / 我的」两枚（微信允许 2~5 枚，居中不空），<code>pages/create/create</code> 整页撤掉——tab 也留、印章也留等于把复杂度留在原地。原来挂在「新建」页标题右侧那枚<b>「中 / EN」语言切换跟着搬进「我的」第一组</b>；这一版界面只露中文，所以稿子里不出现它。</p></div>
+    <div class="pt"><i>2</i><p><b>薄纸上不放开"要点 / 标签 / 长正文"。</b>纸上只有标题一条线 + 正文一袋（500 字上限照旧）+ 分类一排。几百字的长文、以及链接图那条提炼出来的要点标签，<b>仍走详情 → 编辑那一条路</b>（现网 <code>pages/write</code> 已经只服务编辑，入口不变、不新增）。长文在纸里写会憋，这是"轻"的价钱。</p></div>
+    <div class="pt"><i>3</i><p><b>键盘和薄纸的规矩写死。</b>输入框 <code>adjust-position=false</code>，纸监听 <code>wx.onKeyboardHeightChange</code> 后整张纸上抬（纸高固定 640 不变）：键盘 500 → 纸顶落在 484，遮罩上面还剩 308 px 的列表头，看得见"我在往哪本里记"。<b>低端机上只做一次 220ms 的 transform，不做逐帧跟随</b>，否则每敲一个字抖一次。选完图回本页时纸要留在原地——现网那个"onShow 冲掉草稿"的坑必须一起防住。</p></div>
+    <div class="pt"><i>4</i><p><b>首屏变了，空状态要接住。</b>新用户打开不再看到三张大色块，而是空列表 + 一枚印。空状态那句改成「点右下角那枚印，记下第一条」，配新手期那圈虚线（盖一次永久消失）。这条不做，"看不见入口"会变成新的第一投诉。</p></div>
+    <div class="pt"><i>5</i><p><b>额度 <code>23/100</code> 是只读复用，不是第二个入口。</b>它仍然只在「我的」里管，纸上这一行只是盖之前看一眼，数字同一份 <code>/api/user/quota</code>。<b>额度用满时纸不掀</b>：点印章直接给现网那句拦截提示，别让人写完 200 字才告"存不下"。</p></div>
+    <div class="pt"><i>6</i><p><b>存的动作没有独立按钮了。</b>好处是少一个控件，代价是"点在纸上哪都是存"这个误解会出现一次——所以新手期纸右下角要挂一句「盖一下就存好」（图②那条虚线），并且<b>纸上的 ✕ / 收起永远在右上、和印章对角</b>，不会误收。标题为空时盖下去只顶出那句原文「写个标题再保存」。</p></div>
+    <div class="pt"><i>7</i><p><b>不新增任何东西。</b>没有协作、没有 AI 对话入口、没有语音、没有标签云、没有积分商城。保留的既有入口只有：搜索、分类筛选、外观设置（壁纸）、卡片模板（分享形象）、关于、额度。</p></div>
+  </div>
+</div>
+
+<p class="foot">
+  <b>本图为纯 CSS 画的示意稿，不是真机截图</b>——每部手机 750 × 1624（px 当 rpx 用），屏上那三条斜打的「示意 · 非真机截图」就是水印。
+  稿内所有图形（状态栏、胶囊、色块母题、三枚贴纸、齿孔、印章、键盘、缩略图）都是 CSS 形状与 Unicode 字符，<b>零外部资源、零 &lt;img&gt;、零网络请求</b>。
+  顶部导航条是微信原生画的，页面 CSS 管不到它，所以只画成朴素系统样式、不放设计重点。
+</p>
+
+</body>
+</html>
