@@ -47,15 +47,15 @@
   .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:#F4F2EC;border-radius:52px;
     box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16);
     --skin:#443C25;--bar-idle:rgba(242,239,233,.62);--tx1:#F2EFE9;--tx2:rgba(242,239,233,.78);--tx3:rgba(242,239,233,.56)}
-  .ph.doc{height:2970px;background:#F4F2EC;--tx1:#23252C;--tx2:#5C6068;--tx3:#9A9EA6}
+  .ph.doc{height:3300px;background:#F4F2EC;--tx1:#23252C;--tx2:#5C6068;--tx3:#9A9EA6}
 
   .bg{position:absolute;left:0;top:176px;width:750px;height:1448px;background-size:100% 100%}
-  /* 收口往下挪：62% 之前维持原档（脸那段不动），68%→74% 一路压到 0.74，
-     日期和横条坐在这一段上。衬衫本来就没有信息量，压深反而把注意力还给脸。 */
+  /* 罩层沿用上一批已上线的那档，不加深：日期挪到 slogan 下面之后，
+     它坐的是顶部墙面那一段（0.58），不是衬衫；底下没必要再压。 */
   .scrim{position:absolute;left:0;top:176px;width:750px;height:1448px;
-    background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.58) 148px,
-      rgba(18,20,26,.44) 620px,rgba(18,20,26,.42) 880px,rgba(18,20,26,.62) 960px,
-      rgba(18,20,26,.78) 1010px,rgba(18,20,26,.82) 1448px)}
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.58) 150px,
+      rgba(18,20,26,.44) 620px,rgba(18,20,26,.42) 900px,rgba(18,20,26,.52) 1200px,
+      rgba(18,20,26,.6) 1448px)}
 
   .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
     font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
@@ -78,12 +78,27 @@
   .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
   .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
 
-  /* ---------- 日期那一行 ---------- */
-  .date{position:absolute;left:0;right:0;text-align:center;z-index:6;pointer-events:none}
-  .date .d{font-size:34px;font-weight:300;letter-spacing:2px;color:rgba(242,239,233,.80);line-height:1.25}
-  .date .w{font-size:24px;font-weight:400;letter-spacing:6px;color:rgba(242,239,233,.52);margin-top:6px}
-  .pos-collapsed{top:1176px}
-  .pos-open{top:250px}
+  /* ---------- 左上 slogan + 它下面那行日期 ----------
+     现网的 title-row（slogan 左、中/EN 右）位置一个字不动；日期行排在它下面。
+     换图 ICON 挂在日期行的右端，不是 slogan 那一行——那一行右侧已经有中/EN，
+     再塞一枚圆进去，slogan 就会被 flex 挤成省略号，等于把他要的东西又弄丢了。 */
+  .head-row{position:absolute;left:24px;right:24px;top:229px;display:flex;align-items:center;
+    justify-content:space-between;gap:20px;z-index:6}
+  .head-row .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96);line-height:1.15}
+  .head-row .lang{display:flex;align-items:baseline;gap:20px;flex:none}
+  .head-row .lang span{font-size:24px;line-height:1.4;color:rgba(242,239,233,.56);
+    border-bottom:4px solid transparent;padding:0 1px 4px}
+  .head-row .lang .on{color:#F2EFE9;font-weight:700;border-bottom-color:#F2EFE9}
+
+  .dateline{position:absolute;left:24px;right:24px;top:296px;display:flex;align-items:center;
+    justify-content:space-between;gap:20px;z-index:6}
+  .dateline .l{display:flex;align-items:baseline;gap:16px;white-space:nowrap}
+  .dateline .d{font-size:32px;font-weight:300;letter-spacing:1px;color:rgba(242,239,233,.95);line-height:1.3}
+  .dateline .w{font-size:26px;font-weight:400;letter-spacing:2px;color:rgba(242,239,233,.56)}
+  .swap{flex:none;display:flex;align-items:center;gap:12px;padding:12px 24px;border-radius:999px;
+    background:rgba(18,20,26,.44);box-shadow:inset 0 0 0 2px rgba(242,239,233,.30);
+    font-size:22px;font-weight:700;letter-spacing:1px;color:rgba(242,239,233,.95)}
+  .swap i{width:32px;height:32px;flex:none;background:rgba(242,239,233,.95)}
 
   /* ---------- 统一录入条 ---------- */
   .bar-wrap{position:absolute;left:24px;right:24px;z-index:8}
@@ -185,14 +200,18 @@
     <div class="cap">
       <span class="step">① 收起 · 默认首屏</span>
       <h3>一条横条 + 三个小圆，其余全是图</h3>
-      <p>横条顶边在 <code>y=1258</code>（视口 75%），比现在那三块（900 起）整整低了 <b>358</b>；人像从导航条到横条一气呵成。条上左边铅笔图形 +「我想记下来」，右边三枚小圆：<b>拍照（橙）· 相册（绿）· URL（蓝）</b>，颜色就是现网那三张卡自己的色，没引入新色。日期在条子上方 82 那一段。</p>
+      <p>横条顶边在 <code>y=1258</code>（视口 75%），比现在那三块（900 起）整整低了 <b>358</b>，人像从日期行下面一直到横条，整段都是图。条身左边铅笔图形 +「我想记下来」，右边三枚小圆：<b>拍照（橙）· 相册（绿）· URL（蓝）</b>，颜色就是现网那三张卡自己的色。左上 slogan 和右上「中/EN」是现网原样，一个字没动；日期星期并成一行排在 slogan 下面，同一行右端是那枚<b>换图</b>。</p>
+
     </div>
     <div class="ph">
       <div class="bg" style="background-image:url('裁切A-微放大.jpg')"></div>
       <div class="scrim"></div>
       <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
       <div class="nb"><span class="t">新建笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
-      <div class="date pos-collapsed"><div class="d">9月28日</div><div class="w">周日</div></div>
+      <div class="head-row"><div class="h1">看到好内容，随手记下来</div>
+        <div class="lang"><span class="on">中</span><span>EN</span></div></div>
+      <div class="dateline"><div class="l"><span class="d">9月28日</span><span class="w">周日</span></div>
+        <div class="swap"><i class="g-image"></i>换图</div></div>
       <div class="bar-wrap collapsed">
         <div class="bar">
           <div class="lead g-pencil" style="background:#B07F00"></div>
@@ -224,7 +243,10 @@
       <div class="scrim"></div>
       <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
       <div class="nb"><span class="t">新建笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
-      <div class="date pos-open"><div class="d">9月28日</div><div class="w">周日</div></div>
+      <div class="head-row"><div class="h1">看到好内容，随手记下来</div>
+        <div class="lang"><span class="on">中</span><span>EN</span></div></div>
+      <div class="dateline"><div class="l"><span class="d">9月28日</span><span class="w">周日</span></div>
+        <div class="swap"><i class="g-image"></i>换图</div></div>
       <div class="bar-wrap open">
         <div class="bar">
           <div class="lead g-pencil" style="background:#B07F00"></div>
@@ -264,7 +286,10 @@
       <div class="scrim"></div>
       <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
       <div class="nb"><span class="t">新建笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
-      <div class="date pos-open"><div class="d">9月28日</div><div class="w">周日</div></div>
+      <div class="head-row"><div class="h1">看到好内容，随手记下来</div>
+        <div class="lang"><span class="on">中</span><span>EN</span></div></div>
+      <div class="dateline"><div class="l"><span class="d">9月28日</span><span class="w">周日</span></div>
+        <div class="swap"><i class="g-image"></i>换图</div></div>
       <div class="bar-wrap open">
         <div class="bar">
           <div class="lead g-link" style="background:#3F52D6"></div>
@@ -302,7 +327,10 @@
       <div class="scrim"></div>
       <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
       <div class="nb"><span class="t">新建笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
-      <div class="date pos-open"><div class="d">9月28日</div><div class="w">周日</div></div>
+      <div class="head-row"><div class="h1">看到好内容，随手记下来</div>
+        <div class="lang"><span class="on">中</span><span>EN</span></div></div>
+      <div class="dateline"><div class="l"><span class="d">9月28日</span><span class="w">周日</span></div>
+        <div class="swap"><i class="g-image"></i>换图</div></div>
       <div class="bar-wrap open">
         <div class="bar">
           <div class="lead g-album" style="background:#2E7A47"></div>
@@ -354,6 +382,7 @@
           <div class="map"><span class="sw" style="background:#E9723D"></span><span class="k">点橙圆</span><span class="v">相机现拍 → 落到④那一态的相机分支。现拍走的是 <code>sourceType:['camera']</code>，和现网同一条。</span></div>
           <div class="map"><span class="sw" style="background:#46A863"></span><span class="k">点绿圆</span><span class="v">从相册选 → 现网「拍照或截图」里那个 album 分支。多选、最多 9 张、横滑可删，全照旧。</span></div>
           <div class="map"><span class="sw" style="background:#3F52D6"></span><span class="k">点蓝圆</span><span class="v">链接 → 现网 URL 那条卡，校验、粘贴、报错行一个字不改。</span></div>
+          <div class="map"><span class="sw" style="background:rgba(242,239,233,.9);box-shadow:inset 0 0 0 3px #23252C"></span><span class="k">点右上「换图」</span><span class="v">跳到<b>「我的 → 卡片模板」</b>那一页，选图仍然只在那一页做。这枚胶囊<b>不弹相册</b>——它只是导流，不是第二个上传入口（上一批刚把上传口收成一个，这里不能再开回去）。</span></div>
           <p style="margin-top:14px">三枚小圆 <b>72 直径 + 20 间距</b>，够指头；展开后条身里的圆换成四个文字标签（②③④那样），当前那枚带下划线——这样"换模式"和"收起"两件事不打架。</p>
         </div>
 
@@ -365,31 +394,37 @@
             <tr><td>横条底边</td><td>1386</td><td>548</td></tr>
             <tr><td>面板底边</td><td>—</td><td>写 <b>1250</b> / 链接 <b>890</b> / 相册 <b>1120</b></td></tr>
             <tr><td>离底栏</td><td><b>110</b></td><td>写那态剩 <b>246</b>（最紧的一态）</td></tr>
-            <tr><td>日期行中心</td><td><b>1218</b></td><td>292</td></tr>
+            <tr><td>slogan（现网原样）</td><td colspan="2"><b>229..277</b>，左上；右上还是「中 / EN」</td></tr>
+            <tr><td>日期 + 星期（一行）</td><td colspan="2"><b>296..338</b>，slogan 下面；同一行右端挂「换图」胶囊</td></tr>
+            <tr><td>换图胶囊</td><td colspan="2">96 高 × 约 200 宽，触摸目标够；<b>点了不弹相册，跳「我的 → 卡片模板」</b></td></tr>
             <tr><td>人像露出比例</td><td>导航条到横条<b>整段都是图</b>，头顶 326、下巴 866 全露</td><td>图只剩条子上方一条，靠升起来换表单空间</td></tr>
           </table>
           <p style="margin-top:14px">对比现在：三块手风琴占 <code>900..1380</code>，合并后收起态只剩 <code>1258..1386</code> 一条，<b>480 高的画面还给图</b>。</p>
         </div>
 
         <div class="blk">
-          <h4>日期为什么不能"再淡一点"</h4>
-          <p>下巴以下整片是白衬衫，是这张图里最亮的地方（原值 253/253/255）。按现在上线那层罩（那一段 0.42）压完仍有 <b>154</b>，纸白字放在上面<b>最多只有 1.78</b>，淡一点就更看不见。所以这一稿把罩的收口往下挪：从视口 49% 起一路压到 <b>0.78</b>，日期正好坐在 0.78 那一段上（衬衫是平的，压深看不出来，注意力反而还给脸）。</p>
+          <h4>日期：先量到"放在条子上方"读不了，才挪到 slogan 下面</h4>
+          <p>你原话说日期放在"按钮上方空白区"。那一块正好是白衬衫——这张图里最亮的地方（原值 253/253/255），按已上线那层罩压完仍有 <b>154</b>，纸白字放上去<b>最多 2.07</b>，淡一点就更看不见；要救它只能把下半屏罩压到 0.78，图就闷了。</p>
+          <p>这一稿改成排在 <b>slogan 下面</b>：那一段是墙面，罩只有 0.58，同样的字直接过线，于是底下那圈加深的罩<b>撤掉了</b>，图回到上一批那个亮度。顺带一个好处——日期和 slogan 同属"这一页的抬头"，读序也顺。</p>
           <table>
-            <tr><th>日期那一行</th><th>纸白 alpha</th><th>对比</th><th>小字 4.5 门槛</th></tr>
-            <tr><td>现网那层罩（0.42，不改）</td><td>0.80</td><td><b>2.07</b></td><td><span class="no">看不清</span></td></tr>
-            <tr><td>本稿（日期那一行 0.78）</td><td>0.52（星期）</td><td><b>3.75</b></td><td><span class="no">只当装饰</span></td></tr>
-            <tr><td>本稿（日期那一行 0.78）</td><td>0.80（日期）</td><td><b>6.37</b></td><td><span class="ok">过线</span></td></tr>
+            <tr><th>这一行</th><th>取值</th><th>实测对比</th><th>小字 4.5 门槛</th></tr>
+            <tr><td>「9月28日」（原方案：条子上方，衬衫上）</td><td>纸白 0.80</td><td><b>2.07</b></td><td><span class="no">看不清</span></td></tr>
+            <tr><td>「9月28日」（本稿：slogan 下面）</td><td>纸白 0.95 / 细字重</td><td><b>4.66</b></td><td><span class="ok">过线</span></td></tr>
+            <tr><td>「周日」</td><td>纸白 0.56</td><td><b>2.80</b></td><td><span class="no">只当气氛</span></td></tr>
+            <tr><td>slogan（现网原样）</td><td>纸白 0.96</td><td><b>5.04</b></td><td><span class="ok">过线</span></td></tr>
+            <tr><td>「换图」胶囊里的字</td><td>纸白 0.95 + 深底</td><td><b>4.86</b></td><td><span class="ok">过线</span></td></tr>
           </table>
-          <p style="margin-top:14px">结论：<b>日期 0.80、星期 0.52</b> 是这一稿的取值——日期是提醒，得读；星期是气氛，淡着没关系。字号 34 / 24，细字重（300 / 400），字距拉开，走"水印"而不是"标签"的路子。想更淡就得给它垫一块自己的小暗底，那样反而更重，我没选。</p>
+          <p style="margin-top:14px">日期 32 / 星期 26，日期用细字重（300）+ 字距拉开，所以写到 0.95 也不抢；星期故意淡着，它是气氛不是信息。</p>
         </div>
 
         <div class="warn">
-          <h4>要你拍的五条</h4>
-          <p><b>一、"再往下"和"向下展开"是冲突的。</b>这一稿的解法是收起态沉到 75%、点下去升到 17% 再长开。备选是原地展开＋页面自动滚到顶，实现更省，但每次点开都会"跳一下"，大图也白让了。我推荐前者。</p>
-          <p><b>二、拍照和截图拆成两枚圆。</b>现网是一张卡里两个按钮，语义上"拍照"和"从相册选"确实是两件事，拆开更准；但这一改会让老用户找不到"拍照或截图"那五个字。要不要在绿圆旁边留两个字，你定。</p>
-          <p><b>三、三张卡的饱和色没了。</b>合并后横条是纸白的（像输入框），宝蓝/橙/黄/绿退成四枚小圆的身份色。这是这一稿最大的视觉变化，也是"继续简化"的代价——你要是想保住那三块色，横条就得改回彩色，但一条只能一个色，反而更怪。</p>
-          <p><b>四、日期是公历。</b>只画了「9月28日 周日」。要不要带农历/节气，没提我就不加。</p>
-          <p><b>五、这一稿会动到已经上线的东西。</b>三块手风琴、上一批刚做的 42vh 下移和展开让位，都会被这条替换掉（让位的思路还在，只是从"收留白"变成"条子升起来"）。所以它得单独一批走，不能和背景图那批混着提审。</p>
+          <h4>这五条你已经拍了，按这个落</h4>
+          <p><b>一、"再往下"和"向下展开"的冲突</b>——按推荐的来：收起态沉到视口 75%，点下去升到 17% 再往下长开，220ms 一起走。</p>
+          <p><b>二、拍照和截图拆两枚圆</b>——拆。绿圆旁边不另留文字，展开后那一态里「现拍一张 / 从相册选」两个按钮本来就在，够认。</p>
+          <p><b>三、三张卡的饱和色退成四枚小圆的身份色</b>——接受，横条走纸白。</p>
+          <p><b>四、日期只走公历</b>——不加农历节气。</p>
+          <p><b>五、单独一批走</b>——它会替掉上一批刚做的三块手风琴和 42vh 下移（让位的思路还在，只是从"收留白"变成"条子升起来"），不混着提审。</p>
+          <p style="margin-top:12px"><b>这一轮新增两条，一并落：</b>slogan 和「中/EN」保持现网原位不动；日期星期并成一行排在 slogan 下面，同一行右端挂「换图」，它只导流、不弹相册。</p>
         </div>
       </div>
     </div>
@@ -405,7 +440,7 @@
 .g-pencil{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E") center/contain no-repeat}
 .g-camera{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E") center/contain no-repeat}
 .g-album{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='7' x='3' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='14' rx='1.4'/%3E%3Crect width='7' height='7' x='3' y='14' rx='1.4'/%3E%3C/svg%3E") center/contain no-repeat}
-.dot i,.lead,.pk .g{-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;-webkit-mask-size:contain}
+.dot i,.lead,.pk .g,.swap i{-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;-webkit-mask-size:contain}
 </style>
 </body>
 </html>
