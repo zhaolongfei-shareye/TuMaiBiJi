@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 笔记列表铺背景图（中英两版 · 2026-09-28）</title>
+<style>
+/* ==================================================================
+   用户 09-28 口径（原话）：
+     "笔记列表，你看下是否可以按照这种带背景图的简约风格优化，你生成效果图，
+      中英文各一套，继续推进下去。务必与上面的风格一致，元素可以借鉴。"
+
+   两件事分开：这一稿只画列表，不动代码。
+   方向给两条，都沿用首页那套（人像铺底 + 压暗 + 纸白字 + 白底描边行卡 + 同一条录入胶囊的形）：
+     A 全页铺图（推荐）：图 fixed 铺满整页，行卡浮在图上，卡片之间露出图。
+     C 只铺头部（保守）：图只铺头部那一段，列表落在一张纸上，纸压住图。
+   B 是 A 滚到中段的样子，用来看"卡片密起来之后图还成不成立"。
+
+   口径：px 当 rpx 用（设计宽 750，一屏 1624；导航条 0..176，底栏顶 1496）。
+   圆角、字阶、描边、方块尺寸、底栏几何与现网逐值相同（app.wxss）；
+   颜色只从 utils/palette.js 那五块 + 墨黑取，不新造色。
+   压暗层与首页同一串（含 09-28 新加的底部 0.72 那一段）。
+   ================================================================== */
+
+  :root{
+    --r-card:40px; --r-block:32px; --r-chip:28px; --r-pill:999px; --r-btn:16px; --w-edge:3px;
+    --paper:#F2EFE9; --ink:#23252C;
+    --blk:176px; --blk-pad:18px; --sp-row:26px;
+    --t-yellow:#F6C445; --i-yellow:#2A2005;
+    --t-blue:#3F52D6;   --i-blue:#FFFFFF;
+    --t-orange:#E9723D; --i-orange:#2C1204;
+    --t-green:#46A863;  --i-green:#06260F;
+    --t-purple:#6E4BD0; --i-purple:#FFFFFF;
+    --t-ink:#23252C;    --i-ink:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:#23252C;padding:26px 15px 70px;font-family:-apple-system,'PingFang SC',sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;flex-wrap:wrap;gap:64px 56px;width:2400px;align-items:flex-start}
+  .brk{width:100%;height:0}
+  .unit{width:750px;flex:none}
+
+  .cap{margin-bottom:14px;min-height:150px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;letter-spacing:.2px;
+    background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap b{color:#23252C}
+  .cap code{font:inherit;font-weight:800;color:#23252C}
+
+  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:#F4F2EC;border-radius:52px;
+    box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16);
+    --skin:#443C25;--bar-idle:rgba(242,239,233,.62)}
+  .ph.doc{height:4280px}
+
+  /* 铺底：整页（A/B）或只有头部那一段（C） */
+  .bg{position:absolute;left:0;top:176px;width:750px;height:1448px;background-size:100% 100%}
+  .bg.band{height:636px}
+  .scrim{position:absolute;left:0;top:176px;width:750px;height:1448px;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.58) 150px,
+      rgba(18,20,26,.44) 620px,rgba(18,20,26,.42) 900px,rgba(18,20,26,.52) 1200px,rgba(18,20,26,.62) 1250px,
+      rgba(18,20,26,.72) 1448px)}
+  .scrim.band{height:636px;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.5) 300px,rgba(18,20,26,.44) 636px)}
+
+  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}
+  .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .nb{height:88px;background:#181A20;position:relative;z-index:12}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:#F2EFE9;letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+    background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);color:#F2EFE9;
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  /* ---------- 页头（图上的纸白字，档位与首页 slogan / 日期那两行同一套） ---------- */
+  .hero{position:absolute;left:24px;right:24px;top:229px;z-index:6}
+  .hero .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96);line-height:1.15}
+  .hero .h1.en{font-size:38px;letter-spacing:-.5px}
+  .hero .stats{margin-top:12px;font-size:26px;font-weight:600;letter-spacing:-.2px;color:rgba(242,239,233,.95)}
+
+  /* ---------- 搜索：借首页那条录入胶囊的形（同高 128、同圆角、同投影、同纸白） ---------- */
+  .spill{position:absolute;left:24px;right:24px;top:392px;height:128px;border-radius:var(--r-pill);
+    background:var(--paper);box-shadow:0 18px 46px rgba(8,10,14,.42);
+    display:flex;align-items:center;padding:0 22px 0 34px;gap:20px;z-index:7}
+  .spill i{width:44px;height:44px;background:rgba(35,37,44,.52);flex:none}
+  .spill .q{flex:1;min-width:0;font-size:30px;color:#9A9EA6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .spill .go{flex:none;font-size:30px;font-weight:800;letter-spacing:-.5px;color:var(--ink)}
+
+  /* ---------- 分类筛选 ---------- */
+  .chips{position:absolute;left:24px;right:24px;top:552px;height:56px;display:flex;gap:12px;z-index:6;overflow:hidden}
+  .chip{height:56px;flex:none;border-radius:var(--r-pill);display:flex;align-items:center;padding:0 26px;
+    font-size:24px;font-weight:600;white-space:nowrap}
+  .chip.idle{background:rgba(18,20,26,.42);color:#F2EFE9;box-shadow:inset 0 0 0 var(--w-edge) rgba(242,239,233,.30)}
+  .chip.on{background:var(--paper);color:var(--ink);font-weight:700}
+
+  /* ---------- 行卡：结构一字不改（白底 + 3px 描边 + 左块 176 + 右正文） ---------- */
+  .list{position:absolute;left:24px;right:24px;z-index:5}
+  .card{position:relative;background:#fff;border:var(--w-edge) solid rgba(35,37,44,.10);
+    border-radius:var(--r-card);margin-bottom:16px;overflow:hidden}
+  .on-photo .card{box-shadow:0 12px 30px rgba(8,10,14,.28)}
+  .r{display:flex;align-items:flex-start;gap:var(--sp-row);padding:var(--sp-row)}
+  .blk{flex:none;position:relative;width:var(--blk);height:var(--blk);box-sizing:border-box;
+    padding:var(--blk-pad);border-radius:var(--r-block);background:var(--cbg);color:var(--cink);
+    display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+  .blk .n{position:relative;z-index:2;font-size:32px;font-weight:800;line-height:1.2;letter-spacing:-.6px;
+    white-space:nowrap;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,#000 0 86%,transparent 100%)}
+  .blk .d{position:relative;z-index:2;font-size:18px;font-weight:800;letter-spacing:1.4px;opacity:.72}
+  .blk .m{position:absolute;z-index:1;background:var(--cmot)}
+  .m-circle{width:120px;height:120px;border-radius:50%;right:-34px;bottom:-30px}
+  .m-arc{width:150px;height:150px;border-radius:50%;right:-52px;top:-58px}
+  .m-stripes{width:200px;height:14px;right:-40px;bottom:34px;transform:rotate(-24deg)}
+  .m-dots{width:96px;height:96px;right:-18px;bottom:-14px;border-radius:14px;
+    background-image:radial-gradient(var(--cmot) 34%,transparent 36%);background-size:24px 24px}
+  .m-pill{width:132px;height:44px;border-radius:999px;left:-30px;bottom:26px;transform:rotate(18deg)}
+  .body{flex:1;min-width:0;padding-top:4px}
+  .ti{font-size:31px;font-weight:800;line-height:1.38;letter-spacing:-.5px;color:var(--ink);
+    margin-bottom:10px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:4px 14px;
+    border-radius:10px;background:var(--ink);color:var(--paper);margin-right:10px;vertical-align:2px}
+  .su{font-size:24px;line-height:1.55;color:#5A5E66;margin-bottom:14px;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .ft{display:flex;justify-content:space-between;align-items:center;gap:16px;
+    font-size:21px;font-weight:700;color:#9A9EA6}
+  .ft .l{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .ft .src{color:#6B6F77}
+  .ft .cv{flex:none;font-size:28px;font-weight:400;line-height:1}
+
+  /* C 方案：列表落在一张纸上，纸从 700 起、圆角朝上压住图 */
+  .sheet{position:absolute;left:0;right:0;top:700px;bottom:0;background:#F4F2EC;
+    border-top:var(--w-edge) solid rgba(35,37,44,.10);border-radius:40px 40px 0 0;z-index:4}
+  .sheet .list{top:40px}
+
+  /* ---------- 底栏 ---------- */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:44px;
+    background:var(--skin);display:flex;z-index:10;box-shadow:0 16px 44px rgba(0,0,0,.26)}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font-size:20px;font-weight:700;color:var(--bar-idle);letter-spacing:.3px}
+  .tb.on{color:#F2EFE9}
+  .tb .ic{width:34px;height:34px;border-radius:9px;background:currentColor;opacity:.9}
+  .tb .ln{width:26px;height:5px;border-radius:99px;background:#F2EFE9;opacity:0}
+  .tb.on .ln{opacity:1}
+
+  /* ---------- 标注屏 ---------- */
+  .docbody{position:absolute;left:0;right:0;top:179px;bottom:0;padding:2px 34px 0;z-index:6}
+  .blk2{background:#fff;border:3px solid rgba(35,37,44,.10);border-radius:32px;padding:26px 28px;margin-bottom:22px}
+  .blk2 h4{font-size:29px;font-weight:800;letter-spacing:-.5px;margin-bottom:12px}
+  .blk2 p{font-size:22px;line-height:1.62;color:#4B4F57;margin-bottom:9px}
+  .blk2 p:last-child{margin-bottom:0}
+  .blk2 b{color:#23252C}
+  .blk2 code{font-family:ui-monospace,Menlo,monospace;font-size:20px;background:#F1EFE9;border-radius:6px;padding:1px 7px}
+  table{width:100%;border-collapse:collapse;font-size:21px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:2px solid #ECEAE4;vertical-align:top}
+  th{font-size:19px;font-weight:800;color:#8A8E96;letter-spacing:.3px}
+  td b{color:#23252C}
+  .ok{color:#1D7A48;font-weight:800}.no{color:#B4231F;font-weight:800}
+  .warn{background:#FFF6EC;border:3px solid #E7C9A6;border-radius:26px;padding:22px 26px;margin-bottom:22px}
+  .warn h4{color:#8A4B12}.warn p{color:#6B4A2C}
+  .map{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:2px solid #ECEAE4}
+  .map:last-child{border-bottom:0}
+  .map .k{width:190px;font-size:22px;font-weight:800;color:#23252C;flex:none}
+  .map .v{font-size:21px;color:#4B4F57;line-height:1.5}
+  .map .sw{width:44px;height:44px;border-radius:12px;flex:none}
+
+  .g-search{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.9-3.9'/%3E%3C/svg%3E") center/contain no-repeat}
+  .spill i{-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;-webkit-mask-size:contain}
+</style>
+</head>
+<body>
+<div class="flow" id="flow"></div>
+
+<script>
+const IMG = '裁切A-微放大.jpg'
+
+/* 界面串一律从 miniprogram/utils/i18n.js 抄，行内内容（分类名 / 标题 / 摘要 / 标签）
+   是用户自己写的数据，不走字典——所以英文那一版是"一个英文用户自己写的内容"，不是翻译。 */
+const L = {
+  zh: {
+    nav:'图麦笔记', head:'我的笔记', stats:'本周：3　|　本月：12　|　总数：48',
+    ph:'输入关键词', go:'搜索笔记', all:'全部', noCat:'未分类',
+    tab:['新建','笔记','我的'],
+    src:{wx:'公众号文章', web:'网页文章', shot:'截图识别', manual:'亲自撰写'},
+  },
+  en: {
+    nav:'TuMaiBiJi', head:'My notes', stats:'Week: 3  |  Month: 12  |  Total: 48',
+    ph:'Enter keywords', go:'Search notes', all:'All', noCat:'Uncategorised',
+    tab:['New','Notes','Mine'],
+    src:{wx:'WeChat Article', web:'Web Article', shot:'Screenshot', manual:'Written by me'},
+  }
+}
+
+const ROWS = [
+  { tone:'purple', motif:'arc',     cat:'阅读', catEn:'Reading', tag:['阅读'], tagEn:['Reading'],
+    ti:'卡片不该比内容更抢眼', tiEn:'The card must not outshine the note',
+    su:'详情页一屏要能读完，颜色只负责定位，不负责抢戏。所以色块退到左边一小块，正文回到白纸上。',
+    suEn:'One screen should hold the whole note. Colour is for finding, not for showing off — so the block moved left and the text moved back onto paper.',
+    src:'wx', date:'09-28', pin:true },
+  { tone:'blue',   motif:'circle',  cat:'产品', catEn:'Product', tag:['产品','界面'], tagEn:['Product','UI'],
+    ti:'三个入口合成一条横条', tiEn:'Three entries into one bar',
+    su:'默认只有一条"动动手指"，点开才长表单。首页安静了，录入这件事也只剩一个入口。',
+    suEn:'One bar by default, the form only grows after you tap it. The home screen got quiet and there is exactly one way in.',
+    src:'manual', date:'09-27' },
+  { tone:'ink',    motif:'stripes', cat:null,  catEn:null, tag:[], tagEn:[],
+    ti:'提炼超时从 3 秒抬到 60 秒', tiEn:'Extraction timeout: 3s became 60s',
+    su:'云函数默认超时太短，长文提炼会被掐在中间，前端只看到"失败了"三个字。',
+    suEn:'The default cloud-function timeout cut long articles mid-flight, and all the client could say was "failed".',
+    src:'shot', date:'09-26' },
+  { tone:'orange', motif:'dots',    cat:'生活', catEn:'Life', tag:['周末'], tagEn:['Weekend'],
+    ti:'市集那三家咖啡都在东门第二排', tiEn:'Three coffee stalls, second row past the east gate',
+    su:'自带杯减五块，一家只卖浅焙。周末十点前人少，可以坐着聊。',
+    suEn:'Bring-your-own-cup gets a discount; one shop sells light roasts only. Quiet before ten on weekends.',
+    src:'web', date:'09-25' },
+  { tone:'green',  motif:'pill',    cat:'工作', catEn:'Work', tag:['周会'], tagEn:['Standup'],
+    ti:'周会记下来的三件事', tiEn:'Three things from standup',
+    su:'列表要能下拉刷新；隐私指引补摄像头那一项；官网加一个下载入口。',
+    suEn:'Pull to refresh on the list; add the camera item to the privacy notice; put a download link on the site.',
+    src:'manual', date:'09-24' },
+  { tone:'yellow', motif:'circle',  cat:'阅读', catEn:'Reading', tag:['令牌'], tagEn:['Tokens'],
+    ti:'设计系统分三层，别在组件里写死色号', tiEn:'Three token layers, no hard-coded hex in components',
+    su:'原始值 → 语义 → 组件。换一套皮只动中间那层，组件自己不该知道十六进制长什么样。',
+    suEn:'Primitive → semantic → component. Reskinning touches the middle layer only; components never see a hex string.',
+    src:'wx', date:'09-23' },
+]
+
+const TONE = {
+  yellow:{bg:'#F6C445',ink:'#2A2005'}, blue:{bg:'#3F52D6',ink:'#FFFFFF'},
+  orange:{bg:'#E9723D',ink:'#2C1204'}, green:{bg:'#46A863',ink:'#06260F'},
+  purple:{bg:'#6E4BD0',ink:'#FFFFFF'}, ink:{bg:'#23252C',ink:'#FFFFFF'},
+}
+
+const card = (lang, n) => {
+  const t = TONE[n.tone]
+  const blockName = (lang === L.zh ? n.tag[0] : n.tagEn[0])
+    || (n.cat == null ? lang.noCat : (lang === L.zh ? n.cat : n.catEn))
+  const tagLine = (lang === L.zh ? n.tag : n.tagEn).join(' / ')
+  const style = `--cbg:${t.bg};--cink:${t.ink};--cmot:${t.ink}2b`
+  return `<div class="card"><div class="r">
+    <div class="blk" style="${style}"><div class="m m-${n.motif}"></div>
+      <div class="n">${blockName}</div><div class="d">${n.date}</div></div>
+    <div class="body">
+      <div class="ti">${n.pin ? `<span class="pin">${lang === L.zh ? '置顶' : 'Pinned'}</span>` : ''}${lang === L.zh ? n.ti : n.tiEn}</div>
+      <div class="su">${lang === L.zh ? n.su : n.suEn}</div>
+      <div class="ft"><div class="l"><span class="src">${lang.src[n.src]}</span>${tagLine ? ' · ' + tagLine : ''}</div><div class="cv">›</div></div>
+    </div>
+  </div></div>`
+}
+
+const hero = (lang) => `<div class="hero"><div class="h1 ${lang === L.en ? 'en' : ''}">${lang.head}</div>
+  <div class="stats">${lang.stats}</div></div>`
+
+const pill = (lang) => `<div class="spill"><i class="g-search"></i>
+  <div class="q">${lang.ph}</div><div class="go">${lang.go}</div></div>`
+
+const chips = (lang) => `<div class="chips">
+  <div class="chip on">${lang.all}</div>
+  ${['阅读','产品','生活','工作'].map((c, i) =>
+    `<div class="chip idle">${lang === L.zh ? c : ['Reading','Product','Life','Work'][i]}</div>`).join('')}
+</div>`
+
+const shell = (lang, inner) => `
+  <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb"><span class="t">${lang.nav}</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  ${inner}
+  <div class="tabbar">
+    ${lang.tab.map((s, i) => `<div class="tb ${i === 1 ? 'on' : ''}"><div class="ic"></div>${s}<div class="ln"></div></div>`).join('')}
+  </div>`
+
+/* A：整页铺图，首屏 */
+const A = (lang) => shell(lang, `
+  <div class="bg" style="background-image:url('${IMG}')"></div><div class="scrim"></div>
+  ${hero(lang)}${pill(lang)}${chips(lang)}
+  <div class="list on-photo" style="top:632px">${[0,1,2,3].map(i => card(lang, ROWS[i])).join('')}</div>`)
+
+/* B：A 滚到中段，页头/搜索/筛选都滚走了，只剩行卡浮在图上 */
+const B = (lang) => shell(lang, `
+  <div class="bg" style="background-image:url('${IMG}')"></div><div class="scrim"></div>
+  <div class="list on-photo" style="top:150px">${[1,2,3,4,5].map(i => card(lang, ROWS[i])).join('')}</div>`)
+
+/* C：只铺头部，列表落在一张纸上 */
+const C = (lang) => shell(lang, `
+  <div class="bg band" style="background-image:url('${IMG}')"></div><div class="scrim band"></div>
+  ${hero(lang)}${pill(lang)}${chips(lang)}
+  <div class="sheet"><div class="list">${[0,1,2].map(i => card(lang, ROWS[i])).join('')}</div></div>`)
+
+const DOC = `
+  <div class="sb" style="background:#F4F2EC;color:#23252C"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb" style="background:#F4F2EC;border-bottom:3px solid rgba(35,37,44,.10)"><span class="t" style="color:#23252C">标注</span>
+    <span class="capsule" style="background:rgba(35,37,44,.06);box-shadow:inset 0 0 0 2px rgba(35,37,44,.10);color:#23252C"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  <div class="docbody">
+    <div class="blk2">
+      <h4>两条路，你挑一条</h4>
+      <p><b>A 整页铺图</b>（① ②）：人像 fixed 在整页底下，行卡是白底描边、自己带一层投影浮在图上，卡片之间露出图。跟首页是同一句话——这一页也铺你上传的那张图。<b>代价</b>：卡片密起来之后，图只剩卡片缝里那几条，"背景图"这件事会被列表吃掉（② 就是滚到中段的样子）。</p>
+      <p><b>C 只铺头部</b>（③）：图只铺头部那一段（页头 + 搜索 + 分类），列表落在一张纸上，纸从 700 起、圆角朝上压住图。图永远在、不会被列表盖掉，行卡的阅读环境也还是白纸。</p>
+      <p>我推荐 <b>C</b>：列表页的主角是笔记本身，图在这里是氛围不是内容；A 那张图在首屏好看，滚两屏就变成噪声了。</p>
+    </div>
+
+    <div class="blk2">
+      <h4>借了首页哪些元素</h4>
+      <div class="map"><span class="sw" style="background:#F2EFE9;box-shadow:inset 0 0 0 3px rgba(35,37,44,.14)"></span><span class="k">搜索那条</span><span class="v">直接借录入胶囊的形：同高 128、同圆角 999、同纸白、同 <code>0 18px 46px rgba(8,10,14,.42)</code> 投影。里面只有放大镜 + 占位字 + "搜索笔记"一个文字动作，不再有第二个盒子。</span></div>
+      <div class="map"><span class="sw" style="background:linear-gradient(180deg,rgba(18,20,26,.58),rgba(18,20,26,.44))"></span><span class="k">压暗层</span><span class="v">与首页同一串数值，包括 09-28 新加的底部 0.72 那一段。C 方案里图只有 636 高，所以那一串按头部重排（0.58 → 0.44）。</span></div>
+      <div class="map"><span class="sw" style="background:#F2EFE9"></span><span class="k">页头两行</span><span class="v">「我的笔记」用首页 slogan 那一档（42 / 纸白 0.96），三个数用日期那一档（26 / 纸白 0.78）。字号字重不新造。</span></div>
+      <div class="map"><span class="sw" style="background:#6E4BD0"></span><span class="k">行卡</span><span class="v">结构一字不改：白底 + 3px 描边 + 左块 176 + 块里第一个标签和日期 + 右侧标题两行、摘要两行、来源与标签一行。颜色仍只从 <code>palette.js</code> 那五块 + 墨黑取。</span></div>
+    </div>
+
+    <div class="blk2">
+      <h4>尺寸（rpx）</h4>
+      <table>
+        <tr><th>位置</th><th>数值</th></tr>
+        <tr><td>导航条</td><td>0 .. 176</td></tr>
+        <tr><td>页头</td><td>229 起，标题一行 + 三个数一行</td></tr>
+        <tr><td>搜索胶囊</td><td>392 .. 520</td></tr>
+        <tr><td>分类筛选</td><td>552 .. 608，横滑照旧</td></tr>
+        <tr><td>A 的行卡</td><td>632 起，每张 228 高 + 16 间距</td></tr>
+        <tr><td>C 的纸</td><td>700 起，圆角 40 朝上；行卡从纸内 40 起</td></tr>
+        <tr><td>底栏顶边</td><td>1496</td></tr>
+      </table>
+      <p style="margin-top:14px">行卡高度 = 块 176 + 上下内边距 26 × 2 = 228，和现网同一套，没改。</p>
+    </div>
+
+    <div class="blk2">
+      <h4>可读性复核（渲染出来逐像素量的）</h4>
+      <table>
+        <tr><th>这一行</th><th>取值</th><th>实测对比</th><th>判据</th></tr>
+        <tr><td>「我的笔记」</td><td>纸白 0.96 / 42</td><td><b>5.02</b></td><td><span class="ok">过线</span></td></tr>
+        <tr><td>三个数那行</td><td>纸白 0.95 / 26</td><td><b>4.73</b></td><td><span class="ok">过线</span></td></tr>
+        <tr><td>分类胶囊（未选中）</td><td>纸白实字 / 墨底 0.42</td><td><b>6.95</b></td><td><span class="ok">过线</span></td></tr>
+        <tr><td>行卡标题</td><td>墨字 / 白纸</td><td><b>15.30</b></td><td><span class="ok">过线</span></td></tr>
+        <tr><td>行卡摘要</td><td>#5A5E66 / 白纸</td><td><b>6.51</b></td><td><span class="ok">过线</span></td></tr>
+        <tr><td>行卡最底那行（来源 · 标签）</td><td>现网 <code>--text-tertiary</code></td><td><b>2.69</b></td><td><span class="no">现网就不够</span></td></tr>
+      </table>
+      <p style="margin-top:14px">量的都是<b>它背后那一小块里最亮的 5% 像素</b>，不是平均底色——照片上平均数会骗人。中英两版各自量过，取的是两台里低的那个。</p>
+      <p style="margin-top:10px">两处被这两个数逼着改了：三个数从首页日期那档的 0.78 抬到 <b>0.95</b>（0.78 只有 3.78）；未选中的分类胶囊原来是"纸白描边 + 半透明白底"，白底压在亮衬衫上只剩 3.96，改成<b>墨底半透明 + 实白字</b>之后到 6.95，而且和"全部"那颗实心白胶囊正好一深一浅。</p>
+      <p style="margin-top:10px">最后一行<b>不是这一稿改出来的</b>：来源和标签那行现网用的就是 <code>--text-tertiary</code>，压在白卡上实测 2.69，本来就够不上小字的 4.5。这一稿没动它，要不要顺手抬一下你定。
+    </div>
+
+    <div class="blk2">
+      <h4>中英两版对得上的地方</h4>
+      <table>
+        <tr><th>位置</th><th>中文</th><th>英文</th><th>来源</th></tr>
+        <tr><td>导航条</td><td>图麦笔记</td><td>TuMaiBiJi</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>页头</td><td>我的笔记</td><td>My notes</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>三个数</td><td>本周：3　|　本月：12　|　总数：48</td><td>Week: 3 | Month: 12 | Total: 48</td><td><span class="ok">现网有</span><br>分隔符按语言取两份</td></tr>
+        <tr><td>搜索</td><td>输入关键词 · 搜索笔记</td><td>Enter keywords · Search notes</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>筛选</td><td>全部</td><td>All</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>来源</td><td>公众号文章 / 网页文章 / 截图识别 / 亲自撰写</td><td>WeChat Article / Web Article / Screenshot / Written by me</td><td><span class="ok">现网有</span></td></tr>
+        <tr><td>方块上那两个字</td><td>阅读 / 产品 / 周末 / 未分类</td><td>Reading / Product / Weekend / Uncategorised</td><td>用户自己写的内容<br>只有"未分类"走字典</td></tr>
+      </table>
+      <p style="margin-top:14px">分类名、标题、摘要、标签都是<b>用户数据</b>，字典翻不了。英文那一屏画的是"一个英文用户自己写下的内容"，不是把中文翻译过去——这一点先说清楚，免得真机上看到中文分类名以为是漏翻。</p>
+    </div>
+
+    <div class="warn">
+      <h4>这一稿没有动的东西</h4>
+      <p>下拉刷新、翻页、空态、搜索态都没画（现网已有，改了结构才需要重画）。列表的排序、置顶、方块母题按 id 派生那套规则一个字没动。这一稿只回答一个问题：<b>背景图铺到哪为止</b>。</p>
+    </div>
+  </div>`
+
+const unit = (step, h3, p, body, tall) =>
+  `<div class="unit"><div class="cap"><span class="step">${step}</span><h3>${h3}</h3><p>${p}</p></div>
+   <div class="${tall ? 'ph doc' : 'ph'}">${body}</div></div>`
+
+const caps = {
+  zh: [
+    ['① 中文 · A 整页铺图','首屏','页头、搜索、筛选压在图上，行卡浮在图前。'],
+    ['② 中文 · A 滚到中段','只剩行卡','滚两屏之后图只剩卡片缝里那几条——这是 A 的代价。'],
+    ['③ 中文 · C 只铺头部','推荐','图守住头部那一段，列表落在纸上。'],
+  ],
+  en: [
+    ['④ English · A full bleed','First screen','Same layout, English strings.'],
+    ['⑤ English · A scrolled','Rows only','After two screens the photo is only visible in the gaps.'],
+    ['⑥ English · C header only','Recommended','The photo keeps the header; rows sit on paper.'],
+  ],
+}
+
+const flow = document.getElementById('flow')
+let html = ''
+caps.zh.forEach((c, i) => { html += unit(c[0], c[1], c[2], [A(L.zh), B(L.zh), C(L.zh)][i]) })
+html += '<div class="brk"></div>'
+caps.en.forEach((c, i) => { html += unit(c[0], c[1], c[2], [A(L.en), B(L.en), C(L.en)][i]) })
+html += '<div class="brk"></div>'
+html += unit('⑦ 标注','两条路、借了什么、尺寸、可读性、中英对照','下面的对比度是从这张效果图的渲染结果里逐像素取的。', DOC, true)
+flow.innerHTML = html
+</script>
+</body>
+</html>
