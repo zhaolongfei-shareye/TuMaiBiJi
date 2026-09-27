@@ -53,7 +53,7 @@ const ck = (name, ok, got) => {
   // 几何：图铺满整个视口、三块压在图之上（automator 的 Element 没有 boundingBox，走 selectorQuery）
   const rects = await mp.evaluate(() => new Promise((resolve) => {
     wx.createSelectorQuery().select('.page-bg').boundingClientRect()
-      .select('.entry-cards').boundingClientRect()
+      .select('.entry-wrap').boundingClientRect()
       .select('.page-scrim').boundingClientRect()
       .exec((r) => resolve(r.map((x) => x ? { y: (x.y === undefined ? x.top : x.y), h: x.height, w: x.width, raw: JSON.stringify(x) } : null)))
   }))
@@ -81,18 +81,18 @@ const ck = (name, ok, got) => {
   d = await page.data()
   ck('设过形象后 bgSrc 换成用户那张', d.bgSrc === userImg, d.bgSrc)
   await mp.screenshot({ path: `${OUT}/实测-2-用用户的形象.png` })
-  // ---------- ②b 展开一张卡：留白必须让出来 ----------
-  await (await page.$('.entry')).tap()
+  // ---------- ②b 展开录入条：留白必须让出来 ----------
+  await (await page.$('.bar')).tap()
   await sleep(1200)
   const openRect = await mp.evaluate(() => new Promise((resolve) => {
-    wx.createSelectorQuery().select('.entry-cards').boundingClientRect()
+    wx.createSelectorQuery().select('.entry-wrap').boundingClientRect()
       .select('.page-bg').boundingClientRect()
       .exec((r) => resolve(r.map((x) => x ? { y: (x.y === undefined ? x.top : x.y), h: x.height } : null)))
   }))
-  ck('展开卡后三块回到标题下面（留白让出来）',
+  ck('展开后录入条回到标题下面（留白让出来）',
     !!openRect[0] && openRect[0].y < 120, openRect[0] && `块顶 ${openRect[0].y}`)
   await mp.screenshot({ path: `${OUT}/实测-2b-展开让位.png` })
-  await (await page.$('.title-row')).tap()   // 点卡片以外的空白收起，回到常态
+  await (await page.$('.title-row')).tap()   // 点条以外的空白收起，回到常态
   await sleep(900)
 
   // ---------- ③ 外观设置里那个开关 ----------

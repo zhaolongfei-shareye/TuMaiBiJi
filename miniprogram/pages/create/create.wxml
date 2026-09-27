@@ -2,7 +2,7 @@
   <!-- 首页背景。图就是「我的 → 卡片模板」最上面那张形象图，没设过就用包里这张站长人像。
        必须用 <image> 组件而不是 wxss 的 background-image：后者不认小程序包里的
        本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
-       两个都 fixed，跟着视口不跟着滚；点它们等于点容器空白处，照样收手风琴。 -->
+       两个都 fixed，跟着视口不跟着滚；点它们等于点容器空白处，照样收条。 -->
   <image wx:if="{{bgSrc}}" class="page-bg" src="{{bgSrc}}" mode="aspectFill" />
   <view wx:if="{{bgSrc}}" class="page-scrim"></view>
 
@@ -17,14 +17,45 @@
     </view>
   </view>
 
-  <!-- 手风琴：同一时刻最多一张卡展开。展开那张自己长高，把输入框/按钮装在自己肚子里；
-       另外两张缩成一条、功能名垂直居中，位置不跳。整页（.container）就是收起点击区，
-       卡片自己 catchtap，所以点卡内任何地方都不会把刚展开的东西收掉。 -->
-  <view class="entry-cards">
+  <!-- 统一录入条：收起时只有这一条，右边三枚小圆是拍照 / 相册 / 链接三个入口；
+       点条身或任意一枚小圆都向下展开成一张面板，面板里四个模式标签可以互切。
+       原来那三张饱和色大卡没有消失，只是被收进同一条肚子里——功能名、控件、
+       校验、报错行、忙态全部照旧，改的只有承载方式。 -->
+  <view class="entry-wrap">
+    <view class="bar" catchtap="openBar">
+      <view class="bar-lead glyph-{{lead}}"></view>
+      <view class="bar-label">{{barTitle}}</view>
+      <view wx:if="{{active}}" class="bar-hint">{{t.barCollapse}}</view>
+      <view wx:else class="bar-dots">
+        <view class="dot" style="{{skinShot}}" catchtap="onDotShot" data-source="camera" aria-label="{{t.takePhoto}}">
+          <view class="dot-glyph glyph-camera"></view>
+        </view>
+        <view class="dot" style="{{skinAlbum}}" catchtap="onDotShot" data-source="album" aria-label="{{t.fromAlbum}}">
+          <view class="dot-glyph glyph-album"></view>
+        </view>
+        <view class="dot" style="{{skinUrl}}" catchtap="onDotUrl" aria-label="{{t.importUrl}}">
+          <view class="dot-glyph glyph-link"></view>
+        </view>
+      </view>
+    </view>
 
-    <view class="card entry {{active === 'url' ? 'open open-url' : ''}}" style="{{skinUrl}}" data-kind="url" catchtap="toggleCard">
-      <view class="glyph glyph-link"></view>
-      <view class="entry-label">{{t.importUrl}}</view>
+    <view wx:if="{{active}}" class="panel" catchtap="noop">
+      <view class="modes">
+        <view class="mode {{mode === 'write' ? 'on' : ''}}" catchtap="onMode" data-mode="write">
+          <view class="mode-dot" style="{{skinWrite}}"></view>{{t.modeWrite}}
+        </view>
+        <view class="mode {{mode === 'camera' ? 'on' : ''}}" catchtap="onMode" data-mode="camera">
+          <view class="mode-dot" style="{{skinShot}}"></view>{{t.takePhoto}}
+        </view>
+        <view class="mode {{mode === 'album' ? 'on' : ''}}" catchtap="onMode" data-mode="album">
+          <view class="mode-dot" style="{{skinAlbum}}"></view>{{t.fromAlbum}}
+        </view>
+        <view class="mode {{mode === 'url' ? 'on' : ''}}" catchtap="onMode" data-mode="url">
+          <view class="mode-dot" style="{{skinUrl}}"></view>{{t.modeUrl}}
+        </view>
+      </view>
+
+      <!-- 下面三段就是原来那三张卡的 entry-body，一行没改逻辑 -->
       <view wx:if="{{active === 'url'}}" class="entry-body">
         <view class="entry-desc">{{t.linkDesc}}</view>
         <view class="face-box">
@@ -47,14 +78,10 @@
         <view wx:elif="{{urlHint === 'ok'}}" class="entry-note">{{t.linkReady}}</view>
         <view wx:else class="entry-note">{{t.urlHintIdle}}</view>
       </view>
-    </view>
 
-    <view class="card entry {{active === 'shot' ? (previewImages.length ? 'open open-shot picked' : 'open open-shot') : ''}}" style="{{skinShot}}" data-kind="shot" catchtap="toggleCard">
-      <view class="glyph glyph-image"></view>
-      <view class="entry-label">{{t.importScreenshot}}</view>
-      <view wx:if="{{active === 'shot'}}" class="entry-body">
+      <view wx:elif="{{active === 'shot'}}" class="entry-body">
         <view class="entry-desc">{{shotDesc}}</view>
-        <!-- 一横排可滑，不给它换行：换行的话 9 张会撑到三行，超出卡片高度就被裁，
+        <!-- 一横排可滑，不给它换行：换行的话 9 张会撑到三行，超出面板高度就被裁，
              而裁掉的部分既看不见也点不到。 -->
         <scroll-view wx:if="{{previewImages.length}}" class="shot-strip" scroll-x show-scrollbar="{{false}}">
           <view class="shot-cell" wx:for="{{previewImages}}" wx:key="*this">
@@ -63,12 +90,12 @@
           </view>
         </scroll-view>
         <view class="pick2">
-          <view class="pk" data-source="camera" catchtap="pickImage">
+          <view class="pk" style="{{skinShot}}" data-source="camera" catchtap="pickImage">
             <view class="pk-glyph glyph-camera"></view>
             <view class="pk-label">{{t.takePhoto}}</view>
             <view class="pk-hint">{{t.takePhotoHint}}</view>
           </view>
-          <view class="pk" data-source="album" catchtap="pickImage">
+          <view class="pk" style="{{skinAlbum}}" data-source="album" catchtap="pickImage">
             <view class="pk-glyph glyph-album"></view>
             <view class="pk-label">{{t.fromAlbum}}</view>
             <view class="pk-hint">{{t.fromAlbumHint}}</view>
@@ -80,12 +107,8 @@
         </view>
         <view wx:if="{{errLine}}" class="entry-err" catchtap="openPermSetting">{{errLine}}</view>
       </view>
-    </view>
 
-    <view class="card entry {{active === 'write' ? 'open open-write' : ''}}" style="{{skinWrite}}" data-kind="write" catchtap="toggleCard">
-      <view class="glyph glyph-pencil"></view>
-      <view class="entry-label">{{t.writeNote}}</view>
-      <view wx:if="{{active === 'write'}}" class="entry-body">
+      <view wx:else class="entry-body">
         <view class="entry-desc">{{t.manualDesc}}</view>
         <view class="face-box">
           <input
@@ -126,5 +149,11 @@
       </view>
     </view>
 
+    <!-- 换背景图：只是导流到「我的 → 卡片模板」那一页，选图仍然只在那一页做一次，
+         这里不弹相册——一个功能只留一个入口。 -->
+    <view wx:if="{{bgSrc}}" class="home-swap" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}">
+      <view class="swap-glyph glyph-image"></view>
+      <text class="swap-text">{{t.homeBgSwap}}</text>
+    </view>
   </view>
 </view>

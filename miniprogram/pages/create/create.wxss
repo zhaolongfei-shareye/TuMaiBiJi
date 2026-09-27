@@ -43,54 +43,164 @@
   margin: var(--sp-5) 0 var(--sp-4);
 }
 
-.entry-cards {
+/* 条子固定沉在下半屏，铺不铺图都一样：
+   默认那张图里头顶在视口 10%、下巴在 48%，再往下是胸口和书桌，那一段本来就没东西可看，
+   条子压上去正好把脸让出来；关掉背景时这条线也不动，落点不随开关变，肌肉记忆只有一套。
+   66vh 是照效果图反推的：条底要落在「底栏顶 − 换背景那一行」的位置，实测条底 617 / 底栏顶 686。
+   （上一版三张卡的时候是 42vh，那时整组高 480rpx，压到同样的位置。） */
+.entry-wrap {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  margin-top: 66vh;
+  transition: margin-top 0.22s ease;
 }
 
-/* ---------- 手风琴卡 ----------
-   高度不写死：用 min/max-height 夹住，中间是内容自己撑出来的自然高度。
-   为什么不用固定 height：英文文案比中文长（"链接要以 http:// 或 https:// 开头"
-   那句换行就多一行），固定档位一旦低估就把控件裁在卡里，而且裁掉的部分点不到。
-   max-height 是可插值的，所以展开/收起仍然有 220ms 过渡，只是尾巴上有一小段空跑。 */
-.entry {
+/* ---------- 统一录入条 ----------
+   收起态是一枚纸白胶囊：左边条身（唯一的动词），右边三枚小圆就是三个入口。
+   展开态胶囊换成"上圆角 40 + 下面接面板"，面板和它同一块白，中间不留缝。
+   这条为什么固定用纸白而不是壁纸的 --bg-card：淡雅那两枚壁纸下 --bg-card 也是白的，
+   深色壁纸下它又是半透明白，同一条控件在八套壁纸里会变成两种面；而这条肚子里
+   装的是输入框和按钮，面必须稳定。描边沿用 .card 那一条 3px。 */
+.bar {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 144rpx;
-  max-height: 144rpx;
-  padding: 0 var(--sp-4);
-  background: var(--blk-bg);
-  color: var(--blk-ink);
-  overflow: hidden;
-  margin-bottom: 0;
-  transition: max-height 0.22s ease, padding 0.22s ease;
+  align-items: center;
+  gap: 22rpx;
+  height: 128rpx;
+  padding: 0 20rpx 0 34rpx;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  background: #f2efe9;
+  color: #23252c;
+  border: var(--w-edge) solid rgba(35, 37, 44, 0.10);
 }
 
-.entry:active {
+.container.has-bg .bar {
+  box-shadow: 0 18rpx 46rpx rgba(8, 10, 14, 0.42);
+}
+
+.bar:active {
   transform: scale(0.99);
 }
 
-.entry.open {
-  justify-content: flex-start;
-  padding: var(--sp-4);
+.bar.open {
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  background: #fff;
+  padding-bottom: 4rpx;
 }
 
-.open-url { max-height: 560rpx; }
-.open-shot { max-height: 540rpx; }
-.open-shot.picked { max-height: 760rpx; }
-.open-write { max-height: 780rpx; }
+.bar-lead {
+  flex: none;
+  width: 52rpx;
+  height: 52rpx;
+  background: #23252c;
+}
 
-.entry-label {
-  /* 功能名是这一屏最该被读到的东西，不能比页面标题（--fs-h1 42rpx）小 */
+.bar-label {
+  /* 条身是这一屏最该被读到的东西，不能比页面标题（--fs-h1 42rpx）小 */
+  flex: 1;
+  min-width: 0;
   font-size: 46rpx;
   font-weight: 800;
   letter-spacing: -1rpx;
   line-height: var(--lh-tight);
-  opacity: 0.96;
-  position: relative;
-  z-index: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 展开后条身右边那一行小字：告诉你点哪儿能收回去。它是说明不是按钮，
+   所以不吃底色、不加圆角，只比条身淡一档。 */
+.bar-hint {
+  flex: none;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: rgba(35, 37, 44, 0.42);
+}
+
+.bar-dots {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  flex: none;
+}
+
+.dot {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--blk-bg);
+}
+
+.dot:active {
+  opacity: 0.82;
+}
+
+.dot-glyph {
+  width: 38rpx;
+  height: 38rpx;
+  background: var(--blk-ink);
+}
+
+/* ---------- 展开面板 ----------
+   面板自己发一套"纸面上的控件面"：输入框是淡墨面、主按钮是墨底纸字、
+   不可用那档更薄。原来这套面由 toneStyle 按饱和卡色发下来，现在卡退成了白纸，
+   面就得按纸重算——键名一个没改，所以 app.wxss 里那批 .face-* / .act 照常工作。 */
+.panel {
+  --blk-ink: #23252c;
+  --blk-err: #8c2119;
+  --face: rgba(35, 37, 44, 0.05);
+  --face-ink: #23252c;
+  --face-off: rgba(35, 37, 44, 0.06);
+  --face-off-ink: rgba(35, 37, 44, 0.42);
+  --solid-bg: #23252c;
+  --solid-ink: #f2efe9;
+  background: #fff;
+  color: #23252c;
+  border-radius: 0 0 var(--r-card) var(--r-card);
+  padding: 8rpx var(--sp-4) var(--sp-4);
+}
+
+.container.has-bg .panel {
+  box-shadow: 0 24rpx 52rpx rgba(8, 10, 14, 0.34);
+}
+
+/* 四个模式标签：色点用那四个入口各自的颜色（和收起态的三枚小圆同一套），
+   当前那枚只把字和 underline 转成墨色——不给色块加底，标签行才不会比表单更抢眼。 */
+.modes {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 22rpx 0 4rpx;
+  border-bottom: 3rpx solid rgba(35, 37, 44, 0.07);
+}
+
+.mode {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  flex: none;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: rgba(35, 37, 44, 0.42);
+  padding: 0 4rpx 16rpx;
+  border-bottom: 5rpx solid transparent;
+  margin-bottom: -3rpx;
+  white-space: nowrap;
+}
+
+.mode.on {
+  color: #23252c;
+  border-bottom-color: #23252c;
+}
+
+.mode-dot {
+  width: 26rpx;
+  height: 26rpx;
+  border-radius: 50%;
+  background: var(--blk-bg);
 }
 
 .entry-body {
@@ -107,21 +217,16 @@
 .entry-desc {
   font-size: var(--fs-meta);
   line-height: var(--lh-tight);
-  opacity: 0.72;
+  color: rgba(35, 37, 44, 0.62);
   margin-top: 10rpx;
 }
 
-/* ---------- 卡内控件的面 ----------
-   .face-box / .face-input / .face-ph / .face-x / .face-area / .acts / .act
-   都在 app.wxss（首页搜索卡共用同一份），这里不再重复。 */
-
-/* 提示行与报错行直接坐在卡色上，所以取 --blk-ink / --blk-err */
+/* 提示行与报错行直接坐在纸上 */
 .entry-note {
   margin-top: 14rpx;
   font-size: var(--fs-label);
   line-height: var(--lh-tight);
-  color: var(--blk-ink);
-  opacity: 0.66;
+  color: rgba(35, 37, 44, 0.56);
 }
 
 .entry-err {
@@ -132,7 +237,7 @@
   color: var(--blk-err);
 }
 
-/* ---------- 截图卡 ---------- */
+/* ---------- 截图区 ---------- */
 .shot-strip {
   width: 100%;
   height: 152rpx;
@@ -177,6 +282,8 @@
   margin-top: 22rpx;
 }
 
+/* 拍照 / 相册这两块仍是饱和色（橙、绿），由 wxml 上的 toneStyle 发下来；
+   白面板上放两块真色，比四个灰框更容易认哪块是按下去会开相机的。 */
 .pk {
   flex: 1;
   height: 164rpx;
@@ -185,24 +292,36 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--r-chip);
-  background: var(--face);
-  color: var(--face-ink);
+  background: var(--blk-bg);
+  color: var(--blk-ink);
 }
 
 .pk:active { opacity: 0.82; }
 
 .pk-label { font-size: var(--fs-title); font-weight: 800; letter-spacing: -0.5rpx; }
-.pk-hint { font-size: var(--fs-micro); opacity: 0.62; margin-top: 4rpx; }
+.pk-hint { font-size: var(--fs-micro); opacity: 0.72; margin-top: 4rpx; }
 
 .pk-glyph {
   width: 44rpx;
   height: 44rpx;
   margin-bottom: 8rpx;
-  background: var(--face-ink);
+  background: var(--blk-ink);
 }
 
-/* ---------- 卡底功能图形 ----------
-   公共的"色 + 遮罩"做法在 app.wxss 的 .glyph，这里只给形状。
+/* ---------- 小图形公共面 ----------
+   .glyph 那一档是"压在卡底的水印"（264rpx、绝对定位），条身前面这三枚和
+   拍照/相册按钮里那两枚要的是"读得清的小图标"，所以另起一组：只借同一批
+   mask 形状，尺寸和颜色自己定。 */
+.bar-lead, .dot-glyph, .pk-glyph, .swap-glyph {
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+/* ---------- 图形 ----------
    几何取自 Lucide v1.50.0（ISC 授权）：link / image / pencil / camera / images。
    同一套 24 格、同一描边重量、圆头线帽——自己手画的形状之所以显廉价，
    就是因为空心与实心混用、线宽不统一。 */
@@ -222,7 +341,7 @@
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
 }
 
-/* 拍照 / 相册两个小图形走同一套遮罩做法，尺寸由 .pk-glyph 定 */
+/* 拍照 / 相册两个小图形走同一套遮罩做法，尺寸由外层定 */
 .glyph-camera {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E");
@@ -235,7 +354,9 @@
 
 /* ---------- 首页背景图 ----------
    上厚下薄再收口：标题那一段压到 0.58（纸白字对比实测 4.95，不压只有 1.23），
-   往下到脸上只剩 0.42~0.44，脸还认得出来。档位按百分比给，换机型跟着视口走。 */
+   往下到脸上只剩 0.42~0.44，脸还认得出来。档位按百分比给，换机型跟着视口走。
+   最下面那两段（0.62 / 0.72）是 09-28 加的：条下那枚「换背景」正压在白衬衫上，
+   实测只有 3.45，收到 0.72 之后图标 4.98、字 4.54。 */
 .page-bg {
   position: fixed;
   left: 0;
@@ -254,12 +375,12 @@
   z-index: 1;
   background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%, rgba(18, 20, 26, 0.58) 10%,
     rgba(18, 20, 26, 0.44) 43%, rgba(18, 20, 26, 0.42) 62%,
-    rgba(18, 20, 26, 0.52) 83%, rgba(18, 20, 26, 0.6) 100%);
+    rgba(18, 20, 26, 0.52) 83%, rgba(18, 20, 26, 0.62) 88%, rgba(18, 20, 26, 0.72) 100%);
 }
 
 /* 铺了图，这一页的三级字必须翻白，且 --accent 跟着翻（「中/EN」那条下划线吃它，
    米白壁纸下它是深墨，压在暗图上等于没有）。只改本容器的变量：壁纸系统不动，
-   三张卡的颜色走 toneStyle 发下来的 --blk-*，和这里无关。 */
+   录入条和面板是自带的纸白面，不吃这套翻转。 */
 .container.has-bg {
   --text-primary: #f2efe9;
   --text-secondary: rgba(242, 239, 233, 0.78);
@@ -267,31 +388,53 @@
   --accent: #f2efe9;
 }
 
-/* 三块下移：默认那张图里，头顶在视口 10% 处、下巴在 48% 处，
-   所以把整组块推到视口 42vh 之下（加上标题那一行的自然高度，块顶正好落在半屏线上）。
-   按 vh 而不是按 rpx 推，换机型不会推过头、也不会推不够。 */
-.container.has-bg .entry-cards {
-  margin-top: 42vh;
-  transition: margin-top 0.22s ease;
-}
-
-/* 展开任何一张卡就把这段留白让出来：卡里的输入框和按钮有 300~400px 高，
+/* 展开就把这段留白让出来：面板里的输入框和按钮有 300~400px 高，
    不让位的话它们正好处在底栏底下，滚也滚不利索——填东西的人不该为构图买单。 */
-.container.bg-give-way .entry-cards {
+.container.bg-give-way .entry-wrap {
   margin-top: 0;
 }
 
 .container.has-bg .title-row,
-.container.has-bg .entry-cards {
+.container.has-bg .entry-wrap {
   position: relative;
   z-index: 2;
+}
+
+/* 换背景：一枚照片图标 + 两个字，居中坐在条子下面那段空白里。
+   字是必需的——纯图标没人读得出"换背景"这层意思，而让人知道图能换正是这一枚的全部目的。
+   整行都是热区（左右到边、上下 110），图标本身只有 38。
+   这两个数只在铺了背景图时成立：没铺图这一行本来就不渲染（wx:if="{{bgSrc}}"）。 */
+.home-swap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  height: 110rpx;
+  margin-top: 22rpx;
+}
+
+.swap-glyph {
+  width: 38rpx;
+  height: 38rpx;
+  background: rgba(242, 239, 233, 0.92);
+}
+
+.swap-text {
+  font-size: 28rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+  color: rgba(242, 239, 233, 0.85);
+}
+
+.home-swap:active {
+  opacity: 0.66;
 }
 
 .container {
   padding-bottom: 140rpx;
 }
 
-/* 「亲自撰写」卡里的归类那一行：和 .face-box 同一块面、同一个高度，
+/* 「直接写」里的归类那一行：和 .face-box 同一块面、同一个高度，
    只是右边多一个值和一个尖角，看起来是同一族控件里的"挑一个"而不是"输一段"。 */
 .cat-pick {
   display: block;

@@ -65,8 +65,10 @@ ck('图和罩都 fixed，跟着视口不跟着滚',
 ck('铺图时三级字翻白', /\.container\.has-bg\s*{[^}]*--text-primary:\s*#f2efe9/.test(wxss))
 ck('语言切换那条下划线也跟着翻白', /\.container\.has-bg\s*{[^}]*--accent:\s*#f2efe9/.test(wxss))
 ck('内容压在罩之上', /\.container\.has-bg \.title-row,[\s\S]{0,80}?z-index:\s*2/.test(wxss))
-ck('三块按视口比例下移（不是写死 rpx）', /\.container\.has-bg \.entry-cards\s*{[^}]*margin-top:\s*\d+vh/.test(wxss))
-ck('展开卡时把留白让出来', /\.container\.bg-give-way \.entry-cards\s*{[^}]*margin-top:\s*0/.test(wxss))
+ck('整组按视口比例下移（不是写死 rpx；09-28 起 .entry-cards 改名叫 .entry-wrap，且这段不再挂在 has-bg 上）',
+  /\.entry-wrap\s*{[^}]*margin-top:\s*\d+vh/.test(wxss)
+  && !/\.container\.has-bg \.entry-wrap\s*{[^}]*margin-top/.test(wxss))
+ck('展开时把留白让出来', /\.container\.bg-give-way \.entry-(cards|wrap)\s*{[^}]*margin-top:\s*0/.test(wxss))
 ck('让位挂在容器上（active 一翻就跟着翻）',
   /bg-give-way/.test(read('pages/create/create.wxml')))
 ck('没把本地图写成 wxss 的 background-image（那条微信不认）',

@@ -19,8 +19,13 @@ Page({
     lang: 'zh',
     t: texts('zh'),
     themeClass: 'theme-default',
-    // 手风琴：'' | 'url' | 'shot' | 'write'，同一时刻最多一个
+    // 展开的是哪一段：'' | 'url' | 'shot' | 'write'，同一时刻最多一个。
+    // mode 是条身上那四个标签里当前哪一个（write | camera | album | url）：
+    // camera 和 album 共用 shot 那一段表单，分开记只为了高亮和条身前面那枚图形。
     active: '',
+    mode: 'write',
+    lead: 'pencil',
+    barTitle: '',
     busy: '',
     errLine: '',
     errPerm: false,
@@ -35,9 +40,10 @@ Page({
     categories: [],
     categoryNames: [],
     catIndex: 0,
-    // 三张卡各自的饱和色，色值和字色配对仍归 palette 管
+    // 四个入口各自的饱和色，色值和字色配对仍归 palette 管
     skinUrl: toneStyle(1),
     skinShot: toneStyle(2),
+    skinAlbum: toneStyle(3),
     skinWrite: toneStyle(0),
     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
     bgSrc: '',
@@ -57,15 +63,17 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
-      // 三张卡的颜色同样是在 data 字面量里定的（模块加载时主题还没落地），
-      // 每次进页按当前主题重算，淡雅那两枚才会真的把蓝/橙/黄换成同色阶的三档。
+      // 四个入口的颜色同样是在 data 字面量里定的（模块加载时主题还没落地），
+      // 每次进页按当前主题重算，淡雅那两枚才会真的把蓝/橙/绿/黄换成同色阶的四档。
       skinUrl: toneStyle(1),
       skinShot: toneStyle(2),
+      skinAlbum: toneStyle(3),
       skinWrite: toneStyle(0),
       shotDesc: this.shotDescFor(this.data.previewImages.length),
       // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
       bgSrc: poster.homeBg(),
     })
+    this.setData({ barTitle: this.barTitleFor(this.data.active, this.data.previewImages.length) })
     app.setNavTitle('navCreate', lang)
     // 导航条跟着背景图走，刷成罩层顶部那一档的墨色，否则深导航条压着浅图、白标题悬在暗图上会脱节。
     // 没铺图时不碰它——上面 applyTheme 已经按壁纸底色设过了，别在这儿把主题色改丢。
@@ -92,22 +100,73 @@ Page({
     return count ? t('pickedCount', lang).replace('{n}', count) : t('albumDesc', lang)
   },
 
-  // 卡片外任意空白都收起到默认态；忙的时候不收，别把进度藏起来
-  collapse() {
-    if (this.data.busy || !this.data.active) return
-    this.setData({ active: '', errLine: '', errPerm: false })
+  // 条身前面那枚图形跟着模式走：写=铅笔、拍照=相机、相册=四格、链接=链环。
+  // 图形只说明"现在这一条是干什么的"，不承担颜色识别——颜色在三枚小圆上。
+  leadFor(mode) {
+    return { write: 'pencil', camera: 'camera', album: 'album', url: 'link' }[mode] || 'pencil'
   },
 
-  toggleCard(e) {
-    const kind = e.currentTarget.dataset.kind
-    if (this.data.busy || this.data.active === kind) return
+  // 条身那句话就是这一屏唯一的动词：收起态一律「动动手指」，
+  // 展开后按模式换成「贴个链接」「选了 2 张」，让收起之前也能从条身读出当前进度。
+  // 传参而不是读 this.data：setData 之前这一份还是旧值，切换那一瞬间条身会慢一拍。
+  barTitleFor(active, count) {
+    const { t } = this.data
+    if (active === 'url') return t.barUrl
+    if (active === 'shot') return count ? t.barShot.replace('{n}', count) : t.importScreenshot
+    return t.barIdle
+  },
+
+  open(mode) {
+    const active = mode === 'camera' || mode === 'album' ? 'shot' : mode
     this.setData({
-      active: kind,
+      mode,
+      active,
+      lead: this.leadFor(mode),
+      barTitle: this.barTitleFor(active, this.data.previewImages.length),
       errLine: '',
       errPerm: false,
       urlHint: this.hintFor(this.data.urlInput),
     })
-    if (kind === 'write') this.loadCategories()
+    if (active === 'write') this.loadCategories()
+  },
+
+  // 点条身 = 直接写（默认那一段）。已经展开时再点条身等于点空白，收回去。
+  openBar() {
+    if (this.data.busy) return
+    if (this.data.active) { this.collapse(); return }
+    this.open('write')
+  },
+
+  // 三枚小圆是三个入口本身，不只是"展开到那一态"：橙=开相机、绿=开相册、蓝=进链接那一态。
+  // 选完图返回时面板已经停在对应那一态，刚选的图就在眼前。
+  onDotShot(e) {
+    if (this.data.busy) return
+    const source = e.currentTarget.dataset.source
+    this.open(source)
+    this.pickImage({ currentTarget: { dataset: { source } } })
+  },
+
+  onDotUrl() {
+    if (this.data.busy) return
+    this.open('url')
+  },
+
+  // 面板里的四个标签只切视图，不顺手开相机：进来挑模式的人不该被系统选择器打断，
+  // 真要开相机有点按钮、也有条身那枚小圆。
+  onMode(e) {
+    if (this.data.busy) return
+    this.open(e.currentTarget.dataset.mode)
+  },
+
+  // 换背景图只是导流：选图这件事仍然只在「我的 → 卡片模板」那一页做一次。
+  goHomeBg() {
+    wx.navigateTo({ url: '/pages/profile/profile' })
+  },
+
+  // 条外任意空白都收回到默认那条；忙的时候不收，别把进度藏起来
+  collapse() {
+    if (this.data.busy || !this.data.active) return
+    this.setData({ active: '', mode: 'write', lead: 'pencil', barTitle: this.barTitleFor('', 0), errLine: '', errPerm: false })
   },
 
   // 手写这条路上原本只有标题和正文，分类要等保存完再进「编辑」才挑得到；
@@ -236,6 +295,7 @@ Page({
         this.setData({
           previewImages: merged,
           shotDesc: this.shotDescFor(merged.length),
+          barTitle: this.barTitleFor(this.data.active, merged.length),
           errLine: '',
           errPerm: false,
         })
@@ -271,12 +331,13 @@ Page({
     this.setData({
       previewImages: left,
       shotDesc: this.shotDescFor(left.length),
+      barTitle: this.barTitleFor(this.data.active, left.length),
     })
   },
 
   clearShots() {
     if (this.data.busy) return
-    this.setData({ previewImages: [], shotDesc: this.shotDescFor(0) })
+    this.setData({ previewImages: [], shotDesc: this.shotDescFor(0), barTitle: this.barTitleFor(this.data.active, 0) })
   },
 
   async submitScreenshots() {
@@ -293,7 +354,7 @@ Page({
     try {
       const { task_id } = await api.ingestScreenshots(batch)
       const result = await api.pollTask(task_id)
-      this.setData({ busy: '', previewImages: [], shotDesc: this.shotDescFor(0) })
+      this.setData({ busy: '', previewImages: [], shotDesc: this.shotDescFor(0), barTitle: this.barTitleFor('shot', 0) })
       wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
       setTimeout(() => {
         wx.navigateTo({ url: `/pages/detail/detail?id=${result.note_id}` })
@@ -319,7 +380,7 @@ Page({
   },
 
   cancelWrite() {
-    this.setData({ active: '', errLine: '', errPerm: false })
+    this.collapse()
   },
 
   async saveManual() {
@@ -339,7 +400,7 @@ Page({
         category_id: picked ? picked.id : null,
         source_type: 'manual',
       })
-      this.setData({ busy: '', writeTitle: '', writeBody: '', catIndex: 0, active: '' })
+      this.setData({ busy: '', writeTitle: '', writeBody: '', catIndex: 0, active: '', mode: 'write', lead: 'pencil', barTitle: '' })
       wx.showToast({ title: t('saveSucceeded', lang), icon: 'success' })
       setTimeout(() => {
         wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}` })
