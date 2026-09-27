@@ -77,6 +77,24 @@
 
   <view class="strip-foot">{{t.stripHint}} · {{t.inUse}}：{{currentLabel}}</view>
 
+  <!-- 首页背景图。这里只有开关，没有选图按钮——图就是「我的 → 卡片模板」最上面那张，
+       再摆一个上传入口就是同一件事两个门。缩略图走 <image> 组件，理由和新建页一样：
+       wxss 的 background-image 不认包里的本地文件。 -->
+  <view class="sec-head">
+    <text class="sec-title">{{t.homeBgSection}}</text>
+    <text class="sec-hint">{{t.homeBgHint}}</text>
+  </view>
+  <view class="bg-cells">
+    <view class="bg-cell {{bgOn ? 'bg-on' : ''}}" data-off="0" bindtap="onSetHomeBg">
+      <image class="bg-thumb" src="{{bgThumb}}" mode="aspectFill" />
+      <text class="bg-name">{{t.homeBgUse}}</text>
+    </view>
+    <view class="bg-cell {{bgOn ? '' : 'bg-on'}}" data-off="1" bindtap="onSetHomeBg">
+      <view class="bg-thumb bg-plain"></view>
+      <text class="bg-name">{{t.homeBgNone}}</text>
+    </view>
+  </view>
+
   <view wx:if="{{applying}}" class="applying-mask">
     <text class="applying-text">{{t.applying}}</text>
   </view>

@@ -45,7 +45,7 @@
   .ph.dark{--page:#0C0C1D;--card:rgba(255,255,255,.05);--edge:rgba(255,255,255,.12);--idle:rgba(255,255,255,.09);
     --tx1:#ECEAF6;--tx2:#B3AECF;--tx3:#8D87AE;--accent:#A78BFA;--skin:var(--skin-purp);
     --bar-idle:rgba(242,239,233,.68);--bar-line:rgba(242,239,233,.22)}
-  .ph.doc{height:2500px}
+  .ph.doc{height:2720px}
 
   /* 背景图层：人像在导航条以下（176）铺到屏底，尺寸就是资源自己的尺寸 */
   .bg{position:absolute;left:0;top:176px;width:750px;height:1448px;background-size:100% 100%;
@@ -136,6 +136,15 @@
   .foot{font-size:22px;line-height:1.6;color:var(--tx2);margin-top:20px}
   .newtag{display:inline-block;font-size:17px;font-weight:800;letter-spacing:.6px;color:#fff;
     background:#D2683F;border-radius:99px;padding:3px 11px;vertical-align:4px;margin-left:10px}
+
+  .bg-cells{display:flex;gap:16px}
+  .bg-cell{width:180px;text-align:center}
+  .bg-cell .bg-thumb{width:180px;height:180px;border-radius:var(--r-chip);border:3px solid rgba(35,37,44,.10);
+    box-sizing:border-box;background-color:rgba(35,37,44,.05)}
+  .bg-cell .bg-thumb.plain{background-image:repeating-linear-gradient(45deg,rgba(35,37,44,.06) 0 12px,rgba(35,37,44,.12) 12px 24px)}
+  .bg-cell .bg-name{display:block;font-size:24px;font-weight:700;color:var(--tx2);margin-top:10px}
+  .bg-cell.on .bg-thumb{border-color:var(--tx1)}
+  .bg-cell.on .bg-name{color:var(--tx1)}
 
   /* ---------- 标注屏 ---------- */
   .docbody{position:absolute;left:0;right:0;top:179px;bottom:0;padding:2px 34px 0;z-index:6}
@@ -269,8 +278,8 @@
   <div class="unit">
     <div class="cap">
       <span class="step">④ 我的 → 外观设置</span>
-      <h3>换图入口加在已有那一页，不另开一页</h3>
-      <p>现网这一页已经是「手机预览 + 八枚壁纸横滑条」。往下滑，在壁纸条下面加一节<b>背景图</b>：默认人像 / 从相册挑一张 / 不用背景图，三枚同一条横滑。选完只记在本机，和壁纸偏好同一个存法。<b>只影响首页</b>，别的页照旧。</p>
+      <h3>不新增上传入口——图就是「我的 → 卡片模板」最上面那张</h3>
+      <p>站长 09-27 第七轮口径：<b>"首页背景图能否与卡片模板的图打通，不需要再重新上传入口"</b>。于是这一屏只剩一个开关，选图那件事仍然只在卡片模板页做一次；卡片模板页原来那句提示也补上了这层关系：「…会自动裁成圆形，<b>还会铺在首页当背景</b>」。只铺首页，开关也只影响首页。</p>
     </div>
     <div class="ph">
       <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
@@ -279,7 +288,7 @@
       </div>
       <div class="p2">
         <div class="sec">
-          <span class="st">界面壁纸</span>
+          <span class="st">页面壁纸</span>
           <span class="sh">八枚横滑，点一下先在预览台里试看，再点屏幕才换上（这一屏是从预览台往下滑之后的样子，只画到第五枚）</span>
         </div>
         <div class="strip">
@@ -292,26 +301,19 @@
         <div class="foot">使用中：天青</div>
 
         <div class="sec" style="margin-top:44px">
-          <span class="st">背景图<span class="newtag">本稿新增</span></span>
-          <span class="sh">只铺在首页，压在内容下面</span>
+          <span class="st">首页背景图<span class="newtag">本稿新增</span></span>
+          <span class="sh">图就是「我的 → 卡片模板」最上面那张，没设过就用站长这张。只铺首页，开关也只影响首页。</span>
         </div>
-        <div class="strip">
-          <div class="chip on">
-            <div class="tile" style="background-image:url('裁切A-微放大.jpg');background-size:cover">
-              <div class="tint" style="background:rgba(18,20,26,.45)"></div><div class="dot">✓</div>
-            </div>
-            <span class="nm">站长</span>
+        <div class="bg-cells">
+          <div class="bg-cell on">
+            <div class="bg-thumb" style="background-image:url('裁切A-微放大.jpg');background-size:cover"></div>
+            <span class="bg-name">用人像</span>
           </div>
-          <div class="chip">
-            <div class="tile add" style="background:rgba(35,37,44,.05)">＋</div>
-            <span class="nm">相册选</span>
-          </div>
-          <div class="chip">
-            <div class="tile" style="background:repeating-linear-gradient(45deg,#EFEDE6 0 12px,#E4E1D8 12px 24px)"></div>
-            <span class="nm">不用</span>
+          <div class="bg-cell">
+            <div class="bg-thumb plain"></div>
+            <span class="bg-name">不用</span>
           </div>
         </div>
-        <div class="foot">从相册挑的图存在这台手机上，换设备不同步；图太大时会自动裁到合适大小</div>
       </div>
     </div>
   </div>
@@ -354,22 +356,24 @@
             <tr><td>三块起点</td><td><b>900</b></td><td>1012</td></tr>
             <tr><td>三块终点</td><td><b>1380</b></td><td>1492</td></tr>
             <tr><td>离底栏（1496）</td><td><b class="ok">116</b></td><td><b class="no">4</b></td></tr>
+            <tr><td>实现怎么推这段留白</td><td colspan="2"><b>margin-top: 42vh</b>（按视口比例推，不写死 rpx）；展开任意一张卡时让回 0，输入框不至于躲到底栏后面</td></tr>
+            <tr><td>模拟器实测（390×753 视口）</td><td colspan="2">块顶 <b>370.8</b>（视口的 49%）、块底 <b>623</b>、底栏顶 <b>689</b>；展开卡让位后块顶回到 <b>70.5</b></td></tr>
           </table>
           <p style="margin-top:14px">标题那一行没动，还在 <code>229..277</code>，落在头顶上面那截墙上。三块之间的间距、块高 144、圆角、色板，全和现网一样。</p>
         </div>
 
         <div class="blk">
           <h4>资源体积（真数出来的）</h4>
-          <p>原图 1280×1920 = <b>772 KB</b>。压到 <b>1125 宽 / JPEG 72</b> = <b>104 KB</b>，压到 <b>750 宽 / 72</b> = <b>59 KB</b>。主包上限 2 MB，这一张占 3%~5%，可以进包。</p>
-          <p>默认那张按 <b>750:1448</b> 的窗口取景后另存，代码里就不用在样式上凑构图；用户从相册挑的那张走 <code>aspectFill</code> 居中裁，构图由他自己负责。</p>
+          <p>原图 1280×1920 = <b>772 KB</b>。按 750:1448 的窗口取景后是 865×1670（就是取景窗口的原生分辨率，不放大也不缩小），JPEG 74 渐进式 = <b>89 KB</b>，落在 <code>miniprogram/assets/home-bg-portrait.jpg</code>。主包上限 2 MB，这一张占 <b>4%</b>。</p>
+          <p>取景烘进资源里，代码就不用在样式上凑构图；用户在卡片模板页挑的那张走 <code>mode="aspectFill"</code> 居中裁，构图由他自己负责——所以那张图必须靠压暗罩兜住可读性，这也是罩层不给"轻一档"选项的原因。</p>
         </div>
 
         <div class="warn">
-          <h4>实现前必须先钉的四条</h4>
-          <p><b>一、WXSS 的 <code>background-image</code> 不认小程序包里的本地文件</b>（只认 base64 和网络地址），所以这张图必须用绝对定位的 <code>&lt;image&gt;</code> 组件铺，不能写成页面背景。772KB 转 base64 会把包撑爆，别走那条。</p>
-          <p><b>二、开着背景图时首页的 chrome 字色必须翻白。</b>现网首页标题吃的是 <code>--text-primary #23252C</code>（app.wxss:57），压在暗图上只有 1.5 左右，看不清。做法是给首页容器加一个类，只改这一页的三级字色 + 导航条刷成 <code>#181A20</code>（<code>wx.setNavigationBarColor</code>），不动壁纸系统。</p>
-          <p><b>三、用户挑的图怎么留住。</b><code>chooseMedia</code> 给的是临时路径，杀掉就没了，得用 <code>FileSystemManager.saveFile</code> 落到本地用户文件再存路径。本地文件目录的容量上限我没实测，落地前先在真机上打一遍。跨设备同步要上传+内容安全审核，是另一件事，这一轮不做。</p>
-          <p><b>四、首页有真人照片这件事，提审时审核员第一眼就看到。</b>图是你本人、官网在用，但要不要让全量用户在首屏看到这张脸，这个得你点头，不是技术问题。</p>
+          <h4>实现时钉下的四条</h4>
+          <p><b>一、WXSS 的 <code>background-image</code> 不认小程序包里的本地文件</b>（只认 base64 和网络地址），所以这张图由绝对定位的 <code>&lt;image&gt;</code> 组件铺，图和罩都 <code>position:fixed</code>，跟着视口不跟着滚。默认那张按 750:1448 的窗口取景后另存，<b>865×1670 / 89KB</b>，主包 2MB 里占 4%。</p>
+          <p><b>二、开着背景图时首页的 chrome 字色翻白。</b>给首页容器加一个 <code>has-bg</code> 类，只改这一页的三级字色和 <code>--accent</code>（「中/EN」那条下划线吃它），导航条刷成 <code>#181A20</code>；没铺图时一个都不碰，主题色留给 applyTheme。三张卡的色走 toneStyle 发下来的 <code>--blk-*</code>，不受影响。</p>
+          <p><b>三、"用户挑的图怎么留住"这条被打通消掉了。</b>首页背景就是「我的 → 卡片模板」最上面那张形象图，落盘走已经跑通的那条链路：暂存一份、正式一份、一张一个新文件名（避开"同名换内容、界面还是第一张"那个按路径缓存位图的坑），不再造第二个上传口。</p>
+          <p><b>四、首屏这张脸。</b>没设过形象的用户看到的是站长本人这张（图是你本人、官网在用），设过形象的用户看到的是他自己那张；不想铺的人在外观设置里一按就关。</p>
         </div>
       </div>
     </div>

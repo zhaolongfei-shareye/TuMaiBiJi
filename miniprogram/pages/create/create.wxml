@@ -1,4 +1,11 @@
-<view class="container {{themeClass}}" bindtap="collapse">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{active ? 'bg-give-way' : ''}}" bindtap="collapse">
+  <!-- 首页背景。图就是「我的 → 卡片模板」最上面那张形象图，没设过就用包里这张站长人像。
+       必须用 <image> 组件而不是 wxss 的 background-image：后者不认小程序包里的
+       本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
+       两个都 fixed，跟着视口不跟着滚；点它们等于点容器空白处，照样收手风琴。 -->
+  <image wx:if="{{bgSrc}}" class="page-bg" src="{{bgSrc}}" mode="aspectFill" />
+  <view wx:if="{{bgSrc}}" class="page-scrim"></view>
+
   <view class="title-row">
     <view class="page-title">{{t.createHeading}}</view>
     <!-- 语言切换放在第一眼这一行：需要它的人正是刚进来、还没摸到「我的」页的人。

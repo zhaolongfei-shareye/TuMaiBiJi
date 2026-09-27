@@ -42,6 +42,49 @@
 /* 界面字体那一排的样式已随入口一起删掉（iOS 与安卓真机都证伪，见 wallpaper.wxml 那条注释）。
    字体类 .font-song / .font-fang / .font-kai 仍在 app.wxss 和 tab 栏组件里，没删。 */
 
+/* ---------- 首页背景图那一排 ---------- */
+.bg-cells {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.bg-cell {
+  width: 180rpx;
+}
+
+.bg-thumb {
+  display: block;
+  width: 180rpx;
+  height: 180rpx;
+  box-sizing: border-box;
+  border-radius: var(--r-chip);
+  border: var(--w-edge) solid var(--card-edge);
+  background: rgba(35, 37, 44, 0.05);
+}
+
+/* "不用"那一格画斜纹，和纯色壁纸区分开：它表示的是"这里没有图"，不是某一种颜色。 */
+.bg-plain {
+  background: repeating-linear-gradient(45deg, rgba(35, 37, 44, 0.06) 0 12rpx,
+    rgba(35, 37, 44, 0.12) 12rpx 24rpx);
+}
+
+.bg-name {
+  display: block;
+  margin-top: 10rpx;
+  text-align: center;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.bg-on .bg-thumb {
+  border-color: var(--text-primary);
+}
+
+.bg-on .bg-name {
+  color: var(--text-primary);
+}
+
 /* ---------- 手机模拟预览 ----------
    外框走当前主题的卡片色（它是这一页的壳），里面那一屏走被预览那套主题的字面值。
    整块可点，点下去才调 applyTheme。 */

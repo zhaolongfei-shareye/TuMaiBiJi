@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { THEMES, toneColor, themeOf } = require('../../utils/palette.js')
+const poster = require('../../utils/poster.js')
 
 // 这一页原来在壁纸下面还有一排「界面字体」，站长 09-26 撤掉了：iOS 和安卓真机都证伪——
 // 微信的 webview 不认这些系统字体名，点了不会换字（模拟器能换是假证据，它读的是 macOS 字体表）。
@@ -55,6 +56,9 @@ Page({
     mock: mockOf('default'),
     intoView: '',
     applying: false,
+    // 首页背景：开关状态 + 那一格该画的缩略图（缩略图不看开关，永远画"会用哪张"）
+    bgOn: true,
+    bgThumb: '',
     themeClass: '',
     lang: 'zh',
     t: texts('zh'),
@@ -79,6 +83,8 @@ Page({
       // 先清成空串再在下一拍给目标 id：值没变的话 scroll-into-view 不会重新滚
       // （从别处切回这一页时，条子该停在"在用那一枚"，不是停在用户上次滑走的位置）。
       intoView: '',
+      bgOn: poster.homeBgOn(),
+      bgThumb: poster.homeBgImage(),
       ...this.previewState(current, current),
       wallpapers: THEMES.map((theme, i) => ({
         key: theme.key,
@@ -96,6 +102,14 @@ Page({
     // 不滚过去就看不见，会以为没存上。scroll-into-view 要等节点建好，同一批 setData 里给不生效。
     wx.nextTick(() => this.setData({ intoView: `wp-${current}` }))
     app.setNavTitle('wallpaper', lang)
+  },
+
+  // 首页背景只有"用/不用"这一个决定，落本机就行，和服务端无关（图本来就不上传）。
+  onSetHomeBg(e) {
+    const off = e.currentTarget.dataset.off === '1'
+    if (off === !this.data.bgOn) return
+    poster.setHomeBgOff(off)
+    this.setData({ bgOn: !off })
   },
 
   // 预览态：点色块只改这里，页面本身的主题不动。

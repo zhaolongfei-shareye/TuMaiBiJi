@@ -112,6 +112,35 @@ function avatarPath() {
   return exists(p) ? p : ''
 }
 
+// ---------- 首页背景：就是上面那张形象，不另开上传入口 ----------
+// 站长那张默认图是包内资源。放这儿而不是写进 wxss：WXSS 的 background-image
+// 不认小程序包里的本地文件（只认 base64 和网络地址），只能由 <image> 组件铺。
+const HOME_BG_DEFAULT = '/assets/home-bg-portrait.jpg'
+const HOME_BG_OFF_KEY = 'home_bg_off'
+
+/**
+ * 首页背景用哪张图（不看开关）。空串表示没有可用的图——实际上永远有，
+ * 因为最差也还有包里那张站长人像。
+ * 形象文件被系统清掉时 avatarPath() 自己回退成空，所以这里会落回默认那张，
+ * 不会出现"背景没了、字色还留着翻白"的半截状态。
+ */
+function homeBgImage() {
+  return avatarPath() || HOME_BG_DEFAULT
+}
+
+function homeBgOn() {
+  return !wx.getStorageSync(HOME_BG_OFF_KEY)
+}
+
+/** 首页真正要铺的那张：开关关掉就没有。 */
+function homeBg() {
+  return homeBgOn() ? homeBgImage() : ''
+}
+
+function setHomeBgOff(off) {
+  wx.setStorageSync(HOME_BG_OFF_KEY, !!off)
+}
+
 let avatarSeq = 0
 let stagedAvatar = ''
 
@@ -1603,6 +1632,10 @@ module.exports = {
   readProfile,
   writeProfile,
   avatarPath,
+  homeBg,
+  homeBgOn,
+  homeBgImage,
+  setHomeBgOff,
   stageAvatar,
   commitAvatar,
   dropAvatar,

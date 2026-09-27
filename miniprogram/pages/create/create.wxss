@@ -233,6 +233,60 @@
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='7' x='3' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='14' rx='1.4'/%3E%3Crect width='7' height='7' x='3' y='14' rx='1.4'/%3E%3C/svg%3E");
 }
 
+/* ---------- 首页背景图 ----------
+   上厚下薄再收口：标题那一段压到 0.58（纸白字对比实测 4.95，不压只有 1.23），
+   往下到脸上只剩 0.42~0.44，脸还认得出来。档位按百分比给，换机型跟着视口走。 */
+.page-bg {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 750rpx;
+  height: 100vh;
+  z-index: 0;
+}
+
+.page-scrim {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 750rpx;
+  height: 100vh;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%, rgba(18, 20, 26, 0.58) 10%,
+    rgba(18, 20, 26, 0.44) 43%, rgba(18, 20, 26, 0.42) 62%,
+    rgba(18, 20, 26, 0.52) 83%, rgba(18, 20, 26, 0.6) 100%);
+}
+
+/* 铺了图，这一页的三级字必须翻白，且 --accent 跟着翻（「中/EN」那条下划线吃它，
+   米白壁纸下它是深墨，压在暗图上等于没有）。只改本容器的变量：壁纸系统不动，
+   三张卡的颜色走 toneStyle 发下来的 --blk-*，和这里无关。 */
+.container.has-bg {
+  --text-primary: #f2efe9;
+  --text-secondary: rgba(242, 239, 233, 0.78);
+  --text-tertiary: rgba(242, 239, 233, 0.56);
+  --accent: #f2efe9;
+}
+
+/* 三块下移：默认那张图里，头顶在视口 10% 处、下巴在 48% 处，
+   所以把整组块推到视口 42vh 之下（加上标题那一行的自然高度，块顶正好落在半屏线上）。
+   按 vh 而不是按 rpx 推，换机型不会推过头、也不会推不够。 */
+.container.has-bg .entry-cards {
+  margin-top: 42vh;
+  transition: margin-top 0.22s ease;
+}
+
+/* 展开任何一张卡就把这段留白让出来：卡里的输入框和按钮有 300~400px 高，
+   不让位的话它们正好处在底栏底下，滚也滚不利索——填东西的人不该为构图买单。 */
+.container.bg-give-way .entry-cards {
+  margin-top: 0;
+}
+
+.container.has-bg .title-row,
+.container.has-bg .entry-cards {
+  position: relative;
+  z-index: 2;
+}
+
 .container {
   padding-bottom: 140rpx;
 }

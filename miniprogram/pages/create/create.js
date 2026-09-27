@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { toneStyle } = require('../../utils/palette.js')
+const poster = require('../../utils/poster.js')
 
 // 链接规范：必须有协议头、主机名里要有顶级域、整串不能出现空白。
 // 之前只判"以 http 开头且某处有个点"，`https://a.com 后面还有字` 和 `http:///a.b` 都能过，
@@ -38,6 +39,8 @@ Page({
     skinUrl: toneStyle(1),
     skinShot: toneStyle(2),
     skinWrite: toneStyle(0),
+    // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
+    bgSrc: '',
   },
 
   // onShow 只同步主题/语言/tab，**绝不重置草稿**。
@@ -60,8 +63,15 @@ Page({
       skinShot: toneStyle(2),
       skinWrite: toneStyle(0),
       shotDesc: this.shotDescFor(this.data.previewImages.length),
+      // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
+      bgSrc: poster.homeBg(),
     })
     app.setNavTitle('navCreate', lang)
+    // 导航条跟着背景图走，刷成罩层顶部那一档的墨色，否则深导航条压着浅图、白标题悬在暗图上会脱节。
+    // 没铺图时不碰它——上面 applyTheme 已经按壁纸底色设过了，别在这儿把主题色改丢。
+    if (this.data.bgSrc) {
+      wx.setNavigationBarColor({ frontColor: '#ffffff', backgroundColor: '#181a20', fail() {} })
+    }
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().applyTheme(app.getWallpaper())
