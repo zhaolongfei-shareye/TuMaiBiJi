@@ -6,7 +6,9 @@ const OFFICIAL_ACCOUNT = '杰克AI日记'
 // 官网地址以站点自己的 canonical 为准（curl 读到的 <link rel=canonical> 是不带 www 的那个）。
 // 只能复制、点不开：web-view 组件个人主体用不了，小程序里打不开外部网页。
 const SITE = 'agentsbin.cn'
-const VERSION = '1.4.0'
+// 出包时三个地方必须是这一个数：关于页显示的、`cli upload --version` 填的、后台开发版本列的。
+// 踩过三次（都是上传完才想起来改），所以改号只改这一行，`验-关于页版本号.js` 直接读这里当期望值。
+const VERSION = '1.5.0'
 
 // 每条都写清"做什么"和"什么情况下做不到"。宁可写边界，不堆形容词：
 // 这些句子最后都要能拿代码对上，读者照着做不会撞墙。
