@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 笔记列表轻盈化 · D2「圆点与淡标签」</title>
+<style>
+/* ==================================================================
+   D2 · 小圆点 + 低饱和标签（深色优先设计的老本行）
+   ------------------------------------------------------------------
+   要解决的两件事（用户原话）：
+     1) 太重：一屏 5~6 条就是 5~6 块 176rpx 见方的实心饱和色，焦点被色块抢走。
+     2) 深色壁纸下糊成一片：分类色由 JS 固定注入、不随主题变。
+        卡实底 = rgba(255,255,255,.05) 压夜紫页面底 #0C0C1D ≈ #181828。
+        未分类墨黑 #23252C 压这块卡实测对比 1.14（等于没画）；
+        紫 #6E4BD0 压这块卡 2.98，且与夜紫底同色系；宝蓝 #3F52D6 只有 2.8。
+   这一版的答法：
+     · 左侧那块面积整块撤掉。分类身份降到 meta 行里 —— 一枚 14rpx 小圆点 + 分类名文字（21rpx/800）。
+     · 需要"块感"的地方（分类多、要分组扫）才上淡底标签：底 = 分类色 @14%、字 = 同色压深的值。
+       颜色只以"点"和"淡底"出现，不以"实心大色"出现。
+     · 深色不沿用浅色那套值：淡底 alpha 抬一档（14%→20%）、点色与字色各自抬白一档、
+       未分类从"墨黑实心"改成"空心环 + 次级亮字"。数值与理由全在第 ③ 屏。
+     · 阅读重心回到标题：卡的第一行就是标题，31rpx/800 是整张卡最重的一笔。
+   口径：px 当 rpx 用（设计宽 750）。纯 CSS —— 无外部资源、无图片标签、无网络请求，图标一律 CSS 形状。
+   分类色板、字阶、描边宽度、卡圆角与已上线的 V2「左块右文」逐值相同（app.wxss、utils/palette.js），
+   这一版只动"颜色落在多大面积上"。
+   界面字体：不靠 font-family 命中系统字体（这条 webview 只认 @font-face 挂进来的包），
+   所以图上就是系统默认无衬线。文艺感由留白、字重、色、发丝描边做；
+   要宋体/小楷那种衬线观感 → 必须在小程序里挂字体包，有包体代价，本稿不假设它命中。
+   ================================================================== */
+
+  :root{
+    /* 五支分类原色 + 未分类墨黑（现网原样，一字未改） */
+    --y:#F6C445; --b:#3F52D6; --o:#E9723D; --g:#46A863; --p:#6E4BD0; --k:#23252C;
+
+    /* chrome：浅色那一套（深色在 .ph.d 里整组换掉） */
+    --page:#F4F2EC; --card:#FFFFFF; --edge:rgba(35,37,44,.10);
+    --tx1:#23252C; --tx2:#5C6068; --tx3:#9A9EA6;
+    --idle:rgba(35,37,44,.06); --accent:#23252C;
+
+    --r-card:40px; --r-pill:999px; --w-edge:3px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:var(--tx1);padding:26px 15px 70px;
+    font-family:sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;gap:60px;width:2370px;align-items:flex-start}
+  .unit{width:750px;flex:none}
+
+  /* ---------- 每部手机上方的说明 ---------- */
+  .cap{margin-bottom:14px;min-height:150px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;letter-spacing:.2px;
+    background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap p b{color:#23252C}
+  .cap p code{font:inherit;font-weight:800;color:#23252C}
+
+  /* ---------- 机身 ---------- */
+  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:var(--page);
+    border-radius:52px;box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16)}
+  .ph.d{--page:#0C0C1D;--card:rgba(255,255,255,.05);--edge:rgba(255,255,255,.12);
+    --tx1:#ECEAF6;--tx2:#B3AECF;--tx3:#8D87AE;--idle:rgba(255,255,255,.09);--accent:#A78BFA;
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.22),0 26px 62px rgba(0,0,0,.45)}
+
+  /* ---------- 系统状态栏 + 微信原生导航条（朴素系统样式） ---------- */
+  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:var(--tx1);position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}
+  .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .bat::before{content:'';position:absolute;right:-7px;top:6px;width:4px;height:8px;background:currentColor;border-radius:0 2px 2px 0}
+
+  .nb{height:88px;position:relative;z-index:12;border-bottom:var(--w-edge) solid var(--edge)}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:var(--tx1);letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+    background:var(--idle);box-shadow:inset 0 0 0 2px var(--edge);
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:var(--tx1)}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  /* ---------- 页面主体 ---------- */
+  .stage{position:absolute;left:0;right:0;top:179px;bottom:0;overflow:hidden;padding:2px 24px 0}
+
+  /* 页头：大标题 + 一行统计（额度取自「我的」那一行的同一个数） */
+  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:16px 0 14px}
+  .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:var(--tx1);line-height:1.15}
+  .hr{text-align:right;flex:none}
+  .stats{font-size:24px;font-weight:600;letter-spacing:-.2px;color:var(--tx2);line-height:1.7;white-space:nowrap}
+  .quota{font-size:19px;font-weight:700;letter-spacing:.4px;color:var(--tx3);white-space:nowrap}
+
+  /* 搜索：现网是一整块宝蓝实心卡（palette.toneStyle(1)）。本方向的题眼就是"取消实心大色"，
+     所以这一屏把它降到"一条横线"：字直接坐在页面底上，靠一条 3rpx 下划线表示可写。
+     不想动它也行的 —— 把 .sc 换回蓝底白字即可，列表那部分的设计不受影响。 */
+  .sc{margin:0 0 14px}
+  .sc .line{position:relative;display:flex;align-items:center;height:52px}
+  .sc .ph-txt{flex:1;min-width:0;font-size:28px;color:var(--tx3);white-space:nowrap;overflow:hidden}
+  .sc .go{flex:none;font-size:31px;font-weight:800;letter-spacing:-.5px;color:var(--tx1);padding-left:18px}
+  .sc .rule{position:absolute;left:0;right:0;bottom:0;height:var(--w-edge);background:var(--edge)}
+
+  /* 分类筛选胶囊：每枚前面带同一支分类色的点（深色下这点也换成抬白那一档） */
+  .chips{display:flex;gap:10px;margin:0 0 16px;white-space:nowrap;overflow:hidden}
+  .chip{flex:none;display:inline-flex;align-items:center;gap:9px;height:54px;padding:0 18px;border-radius:var(--r-pill);
+    font-size:24px;font-weight:600;background:var(--idle);color:var(--tx2);border:var(--w-edge) solid transparent}
+  .chip .cd{width:12px;height:12px;border-radius:50%;background:var(--dot);flex:none}
+  .chip.on{background:var(--accent);color:var(--page);font-weight:700}
+  .d .chip.on{background:rgba(255,255,255,.16);color:#FFFFFF;box-shadow:inset 0 0 0 var(--w-edge) rgba(255,255,255,.34)}
+
+  /* ---------- 列表行卡：左侧方块整块撤掉，第一行就是标题 ---------- */
+  .row{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:18px 26px;margin-bottom:10px;position:relative}
+  .ti{font-size:31px;font-weight:800;line-height:1.38;letter-spacing:-.5px;color:var(--tx1);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:3px 13px;border-radius:10px;
+    background:var(--accent);color:var(--page);margin-right:12px;vertical-align:3px}
+  .sm{font-size:24px;line-height:1.5;color:var(--tx2);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* meta 行：分类身份落在这里 —— 14rpx 点 + 分类名，再跟来源与标签；右边日期、箭头 */
+  .mt{display:flex;align-items:center;gap:11px;margin-top:11px;
+    padding-top:11px;border-top:var(--w-edge) solid var(--edge)}
+  .mt .grp{display:flex;align-items:center;gap:11px;min-width:0;flex:1;overflow:hidden;white-space:nowrap}
+  .lb{display:inline-flex;align-items:center;gap:9px;flex:none;font-size:21px;font-weight:800;
+    letter-spacing:-.2px;color:var(--txt)}
+  .lb .dot{width:14px;height:14px;border-radius:50%;background:var(--dot);flex:none}
+  .mt .src{font-size:21px;font-weight:700;color:var(--tx2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mt .sep{font-size:21px;font-weight:700;color:var(--tx3);flex:none}
+  .mt .tg{font-size:21px;font-weight:700;color:var(--tx3);flex:none}
+  .mt .dt{flex:none;font-size:21px;font-weight:700;letter-spacing:.4px;color:var(--tx3)}
+  .mt .cv{flex:none;font-size:28px;font-weight:400;line-height:1;color:var(--tx3)}
+
+  /* ---------- 两套值（淡底标签 / 点色 / 字色 / 发丝边） ----------
+     浅色：淡底 = 分类色 @14%；字 = 分类色往近墨 #14161B 里压，压到"压在自己的淡底上 ≥4.6"就停，
+           所以压幅逐支不同（黄 50%、橙/绿 33%、蓝紫 0%——原色本来就够读，别动它）。
+     深色：淡底 = 抬白后的点色 @20%；点色 = 字色（同一档抬白值，14rpx 那么小的东西压不住暗卡）；
+           未分类不用墨黑（压卡 1.14）→ 空心环 白@.42 + 次级亮字。 */
+  .t1{--dot:#F6C445;--txt:#856D30;--fill:rgba(246,196,69,.14);--line:rgba(246,196,69,.26)}
+  .t2{--dot:#3F52D6;--txt:#3F52D6;--fill:rgba(63,82,214,.14);--line:rgba(63,82,214,.24)}
+  .t3{--dot:#E9723D;--txt:#A35432;--fill:rgba(233,114,61,.14);--line:rgba(233,114,61,.26)}
+  .t4{--dot:#46A863;--txt:#35784B;--fill:rgba(70,168,99,.14);--line:rgba(70,168,99,.26)}
+  .t5{--dot:#6E4BD0;--txt:#6E4BD0;--fill:rgba(110,75,208,.14);--line:rgba(110,75,208,.24)}
+  .tk{--dot:#23252C;--txt:#23252C;--fill:rgba(35,37,44,.06);--line:rgba(35,37,44,.14)}
+
+  .d .t1{--dot:#F6C445;--txt:#F6C445;--fill:rgba(246,196,69,.20);--line:rgba(246,196,69,.34)}
+  .d .t2{--dot:#7FA8FF;--txt:#7FA8FF;--fill:rgba(127,168,255,.20);--line:rgba(127,168,255,.34)}
+  .d .t3{--dot:#EF8C58;--txt:#EF8C58;--fill:rgba(239,140,88,.20);--line:rgba(239,140,88,.34)}
+  .d .t4{--dot:#57B873;--txt:#57B873;--fill:rgba(87,184,115,.20);--line:rgba(87,184,115,.34)}
+  .d .t5{--dot:#B795FF;--txt:#B795FF;--fill:rgba(183,149,255,.20);--line:rgba(183,149,255,.34)}
+  .d .tk{--dot:transparent;--txt:#B3AECF;--fill:transparent;--line:rgba(255,255,255,.20)}
+  .d .tk .dot{border:3px solid rgba(255,255,255,.42);background:transparent}
+
+
+  /* ---------- 底部自定义 tab 栏（浮起的墨色胶囊，现网原样） ---------- */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;background:#23252C;
+    border-radius:44px;display:flex;align-items:center;box-shadow:0 16px 44px rgba(35,37,44,.28);z-index:14}
+  .ph.d .tabbar{box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font-size:20px;font-weight:700;color:rgba(255,255,255,.42)}
+  .tb.on{color:#FFFFFF}
+  .tbi{width:40px;height:40px;position:relative}
+  .i-new::before{content:'';position:absolute;top:8px;left:8px;width:24px;height:24px;
+    border:var(--w-edge) solid currentColor;border-radius:50%}
+  .i-new::after{content:'+';position:absolute;left:50%;top:50%;transform:translate(-50%,-54%);
+    font-size:26px;font-weight:400;color:currentColor;line-height:1}
+  .i-note::before{content:'';position:absolute;top:6px;left:8px;width:24px;height:28px;
+    border:var(--w-edge) solid currentColor;border-radius:8px}
+  .i-note::after{content:'';position:absolute;top:14px;left:14px;width:12px;height:var(--w-edge);
+    background:currentColor;box-shadow:0 6px 0 currentColor}
+  .i-me::before{content:'';position:absolute;top:4px;left:12px;width:16px;height:16px;
+    border:var(--w-edge) solid currentColor;border-radius:50%}
+  .i-me::after{content:'';position:absolute;bottom:5px;left:6px;width:28px;height:14px;
+    border:var(--w-edge) solid currentColor;border-bottom:none;border-radius:16px 16px 0 0}
+
+  /* ==================================================================
+     第 ③ 屏：结构标注 + 两套值 + 深色自查（说明屏，不是现网页面）
+     ================================================================== */
+  .sp-h{font-size:34px;font-weight:800;letter-spacing:-.7px;color:var(--tx1);line-height:1.25;margin-top:20px}
+  .sp-sub{font-size:19px;font-weight:600;color:var(--tx3);margin-top:6px;letter-spacing:-.2px;line-height:1.45}
+  .blk-h{display:flex;align-items:center;gap:12px;margin:15px 0 8px}
+  .blk-h .no{font-size:19px;font-weight:800;color:#F4F2EC;background:#23252C;
+    padding:4px 12px;border-radius:8px;letter-spacing:.5px;flex:none}
+  .blk-h .tt{font-size:25px;font-weight:800;letter-spacing:-.5px;color:var(--tx1)}
+  .blk-h .note{font-size:18px;font-weight:700;color:var(--tx3);margin-left:auto;white-space:nowrap}
+  .pane{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:32px;padding:20px 22px}
+
+  /* 两档 × 两主题 四宫格（1.5 倍放大） */
+  .quad{display:grid;grid-template-columns:108px 1fr 1fr;gap:8px}
+  .quad .hd{font-size:18px;font-weight:800;color:var(--tx3);letter-spacing:-.2px;display:flex;align-items:flex-end;padding-bottom:2px}
+  .quad .rowlab{font-size:17px;font-weight:800;color:var(--tx3);letter-spacing:.1px;line-height:1.3;
+    display:flex;flex-direction:column;justify-content:center;gap:5px}
+  .quad .rowlab .sw{width:100%;height:26px;border-radius:9px;border:var(--w-edge) solid var(--edge)}
+  .cell{border-radius:20px;border:var(--w-edge) solid var(--edge);padding:11px 14px;display:flex;flex-direction:column;gap:7px}
+  .cell.dk{background:#181828;border-color:rgba(255,255,255,.12)}
+  .cell.dk2{background:#192635;border-color:rgba(255,255,255,.12)}
+  .z{display:flex;align-items:center;gap:11px;line-height:1}
+  .z .dot{width:19px;height:19px;border-radius:50%;background:var(--dot);flex:none}
+  .z .nm{font-size:28px;font-weight:800;letter-spacing:-.7px;color:var(--txt);white-space:nowrap}
+  .z.pill{align-self:flex-start;padding:6px 16px;border-radius:var(--r-pill);
+    background:var(--fill);border:var(--w-edge) solid var(--line)}
+  .z.ring .dot{background:transparent;border:5px solid rgba(255,255,255,.42)}
+  .z .spec{font-size:16px;font-weight:700;color:var(--tx3);margin-left:auto;white-space:nowrap;letter-spacing:.1px}
+  .cell.dk .spec,.cell.dk2 .spec{color:#8D87AE}
+  .cell.dk2 .spec{color:#6F8BA3}
+
+  /* 两套值表 */
+  table{width:100%;border-collapse:collapse;font-size:18px;font-weight:700}
+  th{text-align:left;font-size:16px;font-weight:800;letter-spacing:.3px;color:var(--tx3);
+    padding:6px 4px;border-bottom:var(--w-edge) solid var(--edge);white-space:nowrap}
+  td{padding:6px 4px;border-bottom:var(--w-edge) solid var(--edge);color:var(--tx1);vertical-align:middle;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td .swatch{display:inline-block;width:19px;height:19px;border-radius:6px;vertical-align:-3px;margin-right:7px;
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.14)}
+  td .hex{font-weight:800;letter-spacing:.1px}
+  td .cx{font-weight:600;color:var(--tx3)}
+  .colsep{border-left:var(--w-edge) solid var(--edge)}
+
+  /* 现状对照 */
+  .test{display:flex;gap:14px}
+  .tcell{flex:1;border-radius:20px;border:var(--w-edge) solid var(--edge);padding:13px 16px 15px;
+    display:flex;flex-direction:column;gap:10px}
+  .tcell .cap2{font-size:18px;font-weight:800;letter-spacing:.2px}
+  .tcell .lb2{display:inline-flex;align-items:center;gap:9px;font-size:24px;font-weight:800;letter-spacing:-.5px}
+  .tcell .lb2 .dot{width:18px;height:18px;border-radius:50%;flex:none}
+  .tcell .bad{font-size:16px;font-weight:700;letter-spacing:.1px}
+  .c-night{background:#181828;border-color:rgba(255,255,255,.12)}
+  .c-ocean{background:#192635;border-color:rgba(255,255,255,.12)}
+
+
+  .foot-note{font-size:17px;font-weight:600;color:var(--tx3);line-height:1.5;margin:10px 0 0;letter-spacing:-.2px}
+</style>
+</head>
+<body>
+<div class="flow">
+
+  <!-- ================= ① 米白 ================= -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">① 米白壁纸</span>
+      <h3>176rpx 实心方块 → 14rpx 点 + 分类名（同一条 meta 行）</h3>
+      <p>卡的第一行就是标题，颜色退到最后一行：<b>点 14rpx · 分类名 21rpx/800 · 淡底 14%</b>。
+      一屏六条的饱和色总面积从 6×176² 降到 6×14²，<b>约原来的 1/158</b>。
+      界面字体不假设能命中系统字体（这条 webview 只认 <code>@font-face</code> 挂包），文艺感靠留白、字重、发丝描边。
+      屏内六条正好覆盖五支分类色 + 一枚未分类，第一条是置顶。</p>
+    </div>
+    <div class="ph">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span>
+      </div>
+      <div class="stage">
+        <div class="head">
+          <div class="h1">我的笔记</div>
+          <div class="hr"><div class="stats">本周 2 · 本月 9 · 总数 23</div><div class="quota">额度 12/100</div></div>
+        </div>
+
+        <div class="sc"><div class="line"><span class="ph-txt">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+
+        <div class="chips">
+          <span class="chip on">全部</span>
+          <span class="chip t2"><i class="cd"></i>产品</span>
+          <span class="chip t3"><i class="cd"></i>技术</span>
+          <span class="chip t4"><i class="cd"></i>阅读</span>
+          <span class="chip t5"><i class="cd"></i>工作</span>
+          <span class="chip t1"><i class="cd"></i>灵感</span>
+        </div>
+
+        <div class="row">
+          <div class="ti"><span class="pin">置顶</span>别等状态好了才动笔</div>
+          <div class="sm">先做完，再谈做好。二十五分钟为一格。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb tk"><i class="dot"></i>未分类</span><span class="sep">·</span><span class="src">亲自撰写</span>
+          </span><span class="dt">09-23</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">额度这道闸门，是先长在后端上的</div>
+          <div class="sm">100 篇不是文案，是接口的上限，前端只能诚实显示。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t2"><i class="dot"></i>产品</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">需求 / 版本</span>
+          </span><span class="dt">09-22</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把海报引擎拆成模板和图层</div>
+          <div class="sm">一份图层清单加四个绘制原语，换风格不必再动绘制代码。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t3"><i class="dot"></i>技术</span><span class="sep">·</span><span class="src">网页文章</span><span class="sep">·</span><span class="tg">重构 / 图层</span>
+          </span><span class="dt">09-21</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">读得慢一点，记得久一点</div>
+          <div class="sm">那句「不必追上所有新书」，我在地铁上读了三遍。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t4"><i class="dot"></i>阅读</span><span class="sep">·</span><span class="src">截图识别</span><span class="sep">·</span><span class="tg">读书 / 摘录</span>
+          </span><span class="dt">09-20</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">周会只留三句话</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t5"><i class="dot"></i>工作</span><span class="sep">·</span><span class="src">亲自撰写</span><span class="sep">·</span><span class="tg">流程 / 周会</span>
+          </span><span class="dt">09-19</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把八套壁纸想成八种天气</div>
+          <div class="sm">夜紫是雷雨前的屋里，深海是凌晨四点的海。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t1"><i class="dot"></i>灵感</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">灵感 / 视觉</span>
+          </span><span class="dt">09-18</span><span class="cv">›</span></div>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <span class="tb"><span class="tbi i-new"></span>新建</span>
+        <span class="tb on"><span class="tbi i-note"></span>笔记</span>
+        <span class="tb"><span class="tbi i-me"></span>我的</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ② 夜紫 ================= -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">② 夜紫壁纸 · 重点屏</span>
+      <h3>同内容、同分类，只换主题：深色不沿用浅色的值，各自重定一档</h3>
+      <p>卡实底 <code>rgba(255,255,255,.05)</code> 压 <code>#0C0C1D</code> ≈ <code>#181828</code>。三条改动：
+      <b>一、点色与字色同取抬白那一档</b>（宝蓝原色压卡 2.8、紫 3.0 —— 14rpx 那么小的东西看不见；抬白后 7.46 / 7.30）。
+      <b>二、未分类不再用墨黑</b>（墨黑压卡 1.14，等于没画）→ <b>空心环</b> 白@.42（3.78）+ 次级亮字 <code>#B3AECF</code>（8.23），
+      "没填色"正好说"没归类"。<b>三、紫与夜紫底同色系</b> → 宝蓝往青偏一档（#7FA8FF），紫留偏红的一端（#B795FF）；
+      这两支亮度几乎相同、只剩色相可分，所以<b>点从来不是唯一线索，分类名永远在它旁边</b>。</p>
+    </div>
+    <div class="ph d">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span>
+      </div>
+      <div class="stage">
+        <div class="head">
+          <div class="h1">我的笔记</div>
+          <div class="hr"><div class="stats">本周 2 · 本月 9 · 总数 23</div><div class="quota">额度 12/100</div></div>
+        </div>
+
+        <div class="sc"><div class="line"><span class="ph-txt">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+
+        <div class="chips">
+          <span class="chip on">全部</span>
+          <span class="chip t2"><i class="cd"></i>产品</span>
+          <span class="chip t3"><i class="cd"></i>技术</span>
+          <span class="chip t4"><i class="cd"></i>阅读</span>
+          <span class="chip t5"><i class="cd"></i>工作</span>
+          <span class="chip t1"><i class="cd"></i>灵感</span>
+        </div>
+
+        <div class="row">
+          <div class="ti"><span class="pin">置顶</span>别等状态好了才动笔</div>
+          <div class="sm">先做完，再谈做好。二十五分钟为一格。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb tk"><i class="dot"></i>未分类</span><span class="sep">·</span><span class="src">亲自撰写</span>
+          </span><span class="dt">09-23</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">额度这道闸门，是先长在后端上的</div>
+          <div class="sm">100 篇不是文案，是接口的上限，前端只能诚实显示。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t2"><i class="dot"></i>产品</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">需求 / 版本</span>
+          </span><span class="dt">09-22</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把海报引擎拆成模板和图层</div>
+          <div class="sm">一份图层清单加四个绘制原语，换风格不必再动绘制代码。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t3"><i class="dot"></i>技术</span><span class="sep">·</span><span class="src">网页文章</span><span class="sep">·</span><span class="tg">重构 / 图层</span>
+          </span><span class="dt">09-21</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">读得慢一点，记得久一点</div>
+          <div class="sm">那句「不必追上所有新书」，我在地铁上读了三遍。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t4"><i class="dot"></i>阅读</span><span class="sep">·</span><span class="src">截图识别</span><span class="sep">·</span><span class="tg">读书 / 摘录</span>
+          </span><span class="dt">09-20</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">周会只留三句话</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t5"><i class="dot"></i>工作</span><span class="sep">·</span><span class="src">亲自撰写</span><span class="sep">·</span><span class="tg">流程 / 周会</span>
+          </span><span class="dt">09-19</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把八套壁纸想成八种天气</div>
+          <div class="sm">夜紫是雷雨前的屋里，深海是凌晨四点的海。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t1"><i class="dot"></i>灵感</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">灵感 / 视觉</span>
+          </span><span class="dt">09-18</span><span class="cv">›</span></div>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <span class="tb"><span class="tbi i-new"></span>新建</span>
+        <span class="tb on"><span class="tbi i-note"></span>笔记</span>
+        <span class="tb"><span class="tbi i-me"></span>我的</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ③ 结构标注 + 两套值 + 深色自查 ================= -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">③ 结构标注 · 两套值 · 深色自查</span>
+      <h3>淡底标签的浅色/深色两套值，和"低饱和淡底在深色卡上会不会变脏灰"的实测答复</h3>
+      <p>结论先说：<b>淡底在深色卡上撑不起"标签"这个形状</b> —— @20% 压 #181828 只有 1.3~1.6 对比（非文字要 3.0）。
+      所以深色下淡底只当"这几枚是同一类东西"的氛围边，认出分类靠<b>抬白的点色 + 抬白的字</b>；
+      alpha 只从 14% 抬到 20%，不敢再抬：<b>黄 @22% 合成 #493E2E、彩度只剩 27，那就是脏灰本灰</b>。</p>
+    </div>
+    <div class="ph">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span>
+      </div>
+      <div class="stage">
+        <div class="sp-h">一、分类身份的两档（1.5 倍）</div>
+        <div class="sp-sub">列表默认走「裸点 + 文字」；分类多、要靠块感分组时才上「淡底标签」。</div>
+
+        <div class="blk-h"><span class="no">档</span><span class="tt">两档 × 两主题</span><span class="note">淡底 浅 14% / 深 20%</span></div>
+        <div class="quad">
+          <div class="hd"></div>
+          <div class="hd">裸点 + 文字（默认）</div>
+          <div class="hd">淡底标签（可选）</div>
+
+          <div class="rowlab"><span class="sw" style="background:#FFFFFF"></span>米白卡<br>#FFFFFF</div>
+          <div class="cell">
+            <div class="z t2"><i class="dot"></i><span class="nm">产品</span><span class="spec">#3F52D6</span></div>
+            <div class="z t1"><i class="dot"></i><span class="nm">灵感</span><span class="spec">#856D30</span></div>
+            <div class="z tk"><i class="dot"></i><span class="nm">未分类</span><span class="spec">实心墨黑</span></div>
+          </div>
+          <div class="cell">
+            <div class="z pill t2"><i class="dot"></i><span class="nm">产品</span></div>
+            <div class="z pill t1"><i class="dot"></i><span class="nm">灵感</span></div>
+            <div class="z pill tk"><i class="dot"></i><span class="nm">未分类</span></div>
+          </div>
+
+          <div class="rowlab"><span class="sw" style="background:#181828"></span>夜紫卡<br>≈ #181828</div>
+          <div class="cell dk d">
+            <div class="z t2"><i class="dot"></i><span class="nm">产品</span><span class="spec">#7FA8FF</span></div>
+            <div class="z t5"><i class="dot"></i><span class="nm">工作</span><span class="spec">#B795FF</span></div>
+            <div class="z tk ring"><i class="dot"></i><span class="nm">未分类</span><span class="spec">空心环</span></div>
+          </div>
+          <div class="cell dk d">
+            <div class="z pill t2"><i class="dot"></i><span class="nm">产品</span></div>
+            <div class="z pill t5"><i class="dot"></i><span class="nm">工作</span></div>
+            <div class="z pill tk" style="background:transparent"><i class="dot"></i><span class="nm">未分类</span></div>
+          </div>
+        </div>
+
+        <div class="blk-h"><span class="no">表</span><span class="tt">二、两套值一览</span><span class="note">对比度 = 字压自己的淡底</span></div>
+        <div class="pane" style="padding:10px 20px 4px">
+          <table>
+            <thead><tr>
+              <th>分类</th><th>浅 · 点 / 字</th><th>浅底</th><th>浅比</th>
+              <th class="colsep">深 · 点 = 字</th><th>深底</th><th>深比</th>
+            </tr></thead>
+            <tbody>
+              <tr><td><span class="swatch" style="background:#F6C445"></span>灵感 黄</td>
+                <td><span class="hex">#F6C445 / #856D30</span></td><td>14%</td><td><span class="cx">4.6</span></td>
+                <td class="colsep"><span class="hex">#F6C445</span></td><td>20%</td><td><span class="cx">10.8</span></td></tr>
+              <tr><td><span class="swatch" style="background:#3F52D6"></span>产品 蓝</td>
+                <td><span class="hex">#3F52D6</span></td><td>14%</td><td><span class="cx">5.0</span></td>
+                <td class="colsep"><span class="hex">#7FA8FF</span></td><td>20%</td><td><span class="cx">7.5</span></td></tr>
+              <tr><td><span class="swatch" style="background:#E9723D"></span>技术 橙</td>
+                <td><span class="hex">#E9723D / #A35432</span></td><td>14%</td><td><span class="cx">4.7</span></td>
+                <td class="colsep"><span class="hex">#EF8C58</span></td><td>20%</td><td><span class="cx">7.1</span></td></tr>
+              <tr><td><span class="swatch" style="background:#46A863"></span>阅读 绿</td>
+                <td><span class="hex">#46A863 / #35784B</span></td><td>14%</td><td><span class="cx">4.7</span></td>
+                <td class="colsep"><span class="hex">#57B873</span></td><td>20%</td><td><span class="cx">7.1</span></td></tr>
+              <tr><td><span class="swatch" style="background:#6E4BD0"></span>工作 紫</td>
+                <td><span class="hex">#6E4BD0</span></td><td>14%</td><td><span class="cx">4.8</span></td>
+                <td class="colsep"><span class="hex">#B795FF</span></td><td>20%</td><td><span class="cx">7.3</span></td></tr>
+              <tr><td><span class="swatch" style="background:#23252C"></span>未分类</td>
+                <td><span class="hex">#23252C 实心</span></td><td>6%</td><td><span class="cx">14.6</span></td>
+                <td class="colsep"><span class="hex">空心环 白@.42</span></td><td>无底</td><td><span class="cx">8.2</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="blk-h"><span class="no">糊</span><span class="tt">三、糊不糊：现状 / 本方案</span><span class="note">夜紫卡 · 深海卡</span></div>
+        <div class="test">
+          <div class="tcell c-night">
+            <div class="cap2" style="color:#8D87AE">现状：色值直接搬</div>
+            <span class="lb2" style="color:#9A9EA6"><i class="dot" style="background:#23252C;box-shadow:inset 0 0 0 2px rgba(255,255,255,.16)"></i>未分类</span>
+            <span class="lb2" style="color:#6E4BD0"><i class="dot" style="background:#6E4BD0"></i>工作</span>
+            <span class="lb2" style="color:#3F52D6"><i class="dot" style="background:#3F52D6"></i>产品</span>
+            <span class="bad" style="color:#8D87AE">墨黑 1.14 · 紫 2.98 · 蓝 2.80 —— 三枚全糊</span>
+          </div>
+          <div class="tcell c-night d">
+            <div class="cap2" style="color:#8D87AE">本方案：深色重定一档</div>
+            <span class="lb2 tk" style="color:#B3AECF"><i class="dot" style="background:transparent;border:4px solid rgba(255,255,255,.42)"></i>未分类</span>
+            <span class="lb2 t5" style="color:#B795FF"><i class="dot" style="background:#B795FF"></i>工作</span>
+            <span class="lb2 t2" style="color:#7FA8FF"><i class="dot" style="background:#7FA8FF"></i>产品</span>
+            <span class="bad" style="color:#8D87AE">环 3.78 · 紫 7.30 · 蓝 7.46 —— 分得开</span>
+          </div>
+          <div class="tcell c-ocean d">
+            <div class="cap2" style="color:#6F8BA3">深海卡复核 #192635</div>
+            <span class="lb2 tk" style="color:#86A3BB"><i class="dot" style="background:transparent;border:4px solid rgba(255,255,255,.42)"></i>未分类</span>
+            <span class="lb2 t5" style="color:#B795FF"><i class="dot" style="background:#B795FF"></i>工作</span>
+            <span class="lb2 t2" style="color:#7FA8FF"><i class="dot" style="background:#7FA8FF"></i>产品</span>
+            <span class="bad" style="color:#6F8BA3">同一套值，最低 6.39 起</span>
+          </div>
+        </div>
+        <div class="foot-note">深色那一列不是"把浅色值调亮一点"：宝蓝和紫<b>换了色相</b>（蓝往青、紫留红端），黄橙绿只抬亮度 ——
+        两个主题下不再是同一个色值，但永远是同一个色相家族，而且名字就贴在点旁边。</div>
+      </div>
+
+      <div class="tabbar">
+        <span class="tb"><span class="tbi i-new"></span>新建</span>
+        <span class="tb on"><span class="tbi i-note"></span>笔记</span>
+        <span class="tb"><span class="tbi i-me"></span>我的</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
