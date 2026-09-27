@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 笔记列表轻盈化 · D2 定稿「焙色底栏」</title>
+<style>
+/* ==================================================================
+   D2 定稿 —— 用户 09-27 第三轮口径（原话）：
+     "底部只是不能纯黑，例如黑褐色，这个色阶可以你来设计，与我们官网色调关联，
+      不是完全变成透明，这样根本看不清，文字还是要保留的。圆角改动太大就不改了。"
+   于是这一稿只做一件事：底栏从纯墨黑换成暖褐那一族，文字标签留着，形状/圆角/尺寸一个不动。
+   上一稿（D2修订-小圆角与轻底栏）里的圆角阶梯和半透明底栏 **全部作废**。
+
+   色从哪来（三个锚点都是现成的，不是新造的）：
+     官网 agentsbin.cn 的 /assets/site.css 里 --paper #F2EFE9、--ink #14161A、--clay #D2683F；
+     产品自己那套宣纸海报的字色 #2E2B24 本来就在暖褐那一侧；
+     淡雅「象牙」那枚的未分类底 #241E16 也是暖黑（但它比现网墨黑还暗，压页面底只有 1.26，不能直接拿来当底栏）。
+   一个关键事实：现网那块 #23252C 的 R−B = -9，**它偏冷蓝**，所以它压在任何深色壁纸上都像"一块黑"。
+   换成 R−B = +20 / +30 的暖褐，同一个位置、同一个明度量级，观感从"黑"变成"焙"。
+
+   口径：px 当 rpx 用（设计宽 750）。纯 CSS —— 无外部资源、无图片、无网络请求。
+   圆角、字阶、色板、描边、搜索卡、胶囊、置顶牌，全部与现网逐值相同（app.wxss、utils/palette.js）。
+   ================================================================== */
+
+  :root{
+    /* 五支分类原色 + 未分类墨黑（现网原样） */
+    --y:#F6C445; --b:#3F52D6; --o:#E9723D; --g:#46A863; --p:#6E4BD0; --k:#23252C;
+
+    /* chrome：浅色那一套（深色在 .ph.d 里整组换掉） */
+    --page:#F4F2EC; --card:#FFFFFF; --edge:rgba(35,37,44,.10);
+    --tx1:#23252C; --tx2:#5C6068; --tx3:#9A9EA6;
+    --idle:rgba(35,37,44,.06); --accent:#23252C;
+
+    /* 圆角与描边：**一个都没动**（app.wxss:41-46 原值） */
+    --r-card:40px; --r-block:32px; --r-chip:28px; --r-pill:999px; --r-btn:16px; --w-edge:3px;
+
+    /* 底栏（本稿唯一改动）：焙一 = 浅色壁纸那档 */
+    --bar-bg:#3E322A; --bar-line:rgba(242,239,233,.14);
+    --bar-sh:0 16px 44px rgba(62,50,42,.30);
+    --bar-on:#F2EFE9; --bar-idle:rgba(242,239,233,.62);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:var(--tx1);padding:26px 15px 70px;
+    font-family:sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;gap:60px;width:2370px;align-items:flex-start}
+  .unit{width:750px;flex:none}
+
+  .cap{margin-bottom:14px;min-height:150px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;letter-spacing:.2px;
+    background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap p b{color:#23252C}
+  .cap p code{font:inherit;font-weight:800;color:#23252C}
+
+  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:var(--page);
+    border-radius:52px;box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16)}
+  .ph.doc{height:2980px}
+  .ph.d{--page:#0C0C1D;--card:rgba(255,255,255,.05);--edge:rgba(255,255,255,.12);
+    --tx1:#ECEAF6;--tx2:#B3AECF;--tx3:#8D87AE;--idle:rgba(255,255,255,.09);--accent:#A78BFA;
+    /* 深色页面底上必须再抬一档，否则又糊成一块黑：焙二 */
+    --bar-bg:#574639; --bar-line:rgba(242,239,233,.20);
+    --bar-sh:0 16px 44px rgba(0,0,0,.42);
+    --bar-idle:rgba(242,239,233,.68);
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.22),0 26px 62px rgba(0,0,0,.45)}
+
+  /* ---------- 系统状态栏 + 微信原生导航条 ---------- */
+  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:var(--tx1);position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}
+  .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .bat::before{content:'';position:absolute;right:-7px;top:6px;width:4px;height:8px;background:currentColor;border-radius:0 2px 2px 0}
+
+  .nb{height:88px;position:relative;z-index:12;border-bottom:var(--w-edge) solid var(--edge)}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:var(--tx1);letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+    background:var(--idle);box-shadow:inset 0 0 0 2px var(--edge);
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px;color:var(--tx1)}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  .stage{position:absolute;left:0;right:0;top:179px;bottom:0;overflow:hidden;padding:2px 24px 0}
+
+  .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:16px 0 14px}
+  .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:var(--tx1);line-height:1.15}
+  .hr{text-align:right;flex:none}
+  .stats{font-size:24px;font-weight:600;letter-spacing:-.2px;color:var(--tx2);line-height:1.7;white-space:nowrap}
+  .quota{font-size:19px;font-weight:700;letter-spacing:.4px;color:var(--tx3);white-space:nowrap}
+
+  /* 搜索：现网原样（pages/index/index.wxml:11-26 的 .card.sc-card + toneStyle(1) 宝蓝）。
+     上一版越界改成横线了，这一稿画回来，圆角也跟着现网的 40 不动。 */
+  .sc{background:#3F52D6;color:#FFFFFF;border:var(--w-edge) solid var(--edge);
+    border-radius:var(--r-card);padding:26px 24px 20px;margin:0 0 24px}
+  .sc .line{position:relative;display:flex;align-items:center;height:64px}
+  .sc .ph-txt{flex:1;min-width:0;font-size:28px;color:rgba(255,255,255,.6);white-space:nowrap;overflow:hidden}
+  .sc .go{flex:none;font-size:31px;font-weight:800;letter-spacing:-.5px;color:#FFFFFF;padding-left:8px}
+  .sc .rule{position:absolute;left:0;right:0;bottom:0;height:var(--w-edge);background:rgba(255,255,255,.42)}
+
+  /* 分类胶囊：现网原样（--r-pill 999、选中态 = 那一支分类色实底） */
+  .chips{display:flex;gap:10px;margin:0 0 16px;white-space:nowrap;overflow:hidden}
+  .chip{flex:none;display:inline-flex;align-items:center;height:54px;padding:0 28px;border-radius:var(--r-pill);
+    font-size:24px;font-weight:600;background:var(--idle);color:var(--tx2)}
+  .chip.on{background:var(--accent);color:var(--page);font-weight:700}
+  .chip.on.t2{background:#3F52D6;color:#FFFFFF}
+  .d .chip.on{background:rgba(255,255,255,.16);color:#FFFFFF}
+
+  /* ---------- 行卡：与已选定的 D2 逐值相同；圆角回到现网的 40 ---------- */
+  .row{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:18px 26px;margin-bottom:10px;position:relative}
+  .ti{font-size:31px;font-weight:800;line-height:1.38;letter-spacing:-.5px;color:var(--tx1);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:4px 14px;border-radius:10px;
+    background:var(--accent);color:var(--page);margin-right:12px;vertical-align:3px}
+  .sm{font-size:24px;line-height:1.5;color:var(--tx2);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .mt{display:flex;align-items:center;gap:11px;margin-top:11px;
+    padding-top:11px;border-top:var(--w-edge) solid var(--edge)}
+  .mt .grp{display:flex;align-items:center;gap:11px;min-width:0;flex:1;overflow:hidden;white-space:nowrap}
+  .lb{display:inline-flex;align-items:center;gap:9px;flex:none;font-size:21px;font-weight:800;
+    letter-spacing:-.2px;color:var(--txt)}
+  .lb .dot{width:14px;height:14px;border-radius:50%;background:var(--dot);flex:none}
+  .mt .src{font-size:21px;font-weight:700;color:var(--tx2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mt .sep{font-size:21px;font-weight:700;color:var(--tx3);flex:none}
+  .mt .tg{font-size:21px;font-weight:700;color:var(--tx3);flex:none}
+  .mt .dt{flex:none;font-size:21px;font-weight:700;letter-spacing:.4px;color:var(--tx3)}
+  .mt .cv{flex:none;font-size:28px;font-weight:400;line-height:1;color:var(--tx3)}
+
+  /* 两套分类值：沿用已选定的 D2，一字未改 */
+  .t1{--dot:#F6C445;--txt:#856D30;--fill:rgba(246,196,69,.14);--line:rgba(246,196,69,.26)}
+  .t2{--dot:#3F52D6;--txt:#3F52D6;--fill:rgba(63,82,214,.14);--line:rgba(63,82,214,.24)}
+  .t3{--dot:#E9723D;--txt:#A35432;--fill:rgba(233,114,61,.14);--line:rgba(233,114,61,.26)}
+  .t4{--dot:#46A863;--txt:#35784B;--fill:rgba(70,168,99,.14);--line:rgba(70,168,99,.26)}
+  .t5{--dot:#6E4BD0;--txt:#6E4BD0;--fill:rgba(110,75,208,.14);--line:rgba(110,75,208,.24)}
+  .tk{--dot:#23252C;--txt:#23252C;--fill:rgba(35,37,44,.06);--line:rgba(35,37,44,.14)}
+  .d .t1{--dot:#F6C445;--txt:#F6C445;--fill:rgba(246,196,69,.20);--line:rgba(246,196,69,.34)}
+  .d .t2{--dot:#7FA8FF;--txt:#7FA8FF;--fill:rgba(127,168,255,.20);--line:rgba(127,168,255,.34)}
+  .d .t3{--dot:#EF8C58;--txt:#EF8C58;--fill:rgba(239,140,88,.20);--line:rgba(239,140,88,.34)}
+  .d .t4{--dot:#57B873;--txt:#57B873;--fill:rgba(87,184,115,.20);--line:rgba(87,184,115,.34)}
+  .d .t5{--dot:#B795FF;--txt:#B795FF;--fill:rgba(183,149,255,.20);--line:rgba(183,149,255,.34)}
+  .d .tk{--dot:transparent;--txt:#B3AECF;--fill:transparent;--line:rgba(255,255,255,.20)}
+  .d .tk .dot{border:3px solid rgba(255,255,255,.42);background:transparent}
+
+
+  /* ---------- 底部 tab：焙色两档，文字标签保留，形状一个不动 ----------
+     现网：底 #23252c（深色档 #1a1c22）+ 白@42% 图标/文字 + 白 100% 选中。
+     本稿：底换暖褐两档（浅底壁纸 焙一 / 深底壁纸 焙二），字色一律取官网 --paper #F2EFE9，
+           选中态 = 纸白 100% + 文字下面一条 26rpx 短线（不加垫块，避免变成按钮）。
+     形状、高度、圆角、左右留白、离底距离：与现网逐值相同。 */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;background:var(--bar-bg);
+    border-radius:44px;display:flex;align-items:center;box-shadow:var(--bar-sh);z-index:14;
+    border:var(--w-edge) solid var(--bar-line)}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    font-size:20px;font-weight:600;color:var(--bar-idle)}
+  .tb.on{color:var(--bar-on);font-weight:700}
+  .tb .u{width:26px;height:4px;border-radius:2px;background:currentColor;margin-top:2px}
+  .tbi{width:40px;height:40px;position:relative}
+  .i-new::before{content:'';position:absolute;top:8px;left:8px;width:24px;height:24px;
+    border:var(--w-edge) solid currentColor;border-radius:50%}
+  .i-new::after{content:'+';position:absolute;left:50%;top:50%;transform:translate(-50%,-54%);
+    font-size:26px;font-weight:400;color:currentColor;line-height:1}
+  .i-note::before{content:'';position:absolute;top:6px;left:8px;width:24px;height:28px;
+    border:var(--w-edge) solid currentColor;border-radius:8px}
+  .i-note::after{content:'';position:absolute;top:14px;left:14px;width:12px;height:var(--w-edge);
+    background:currentColor;box-shadow:0 6px 0 currentColor}
+  .i-me::before{content:'';position:absolute;top:4px;left:12px;width:16px;height:16px;
+    border:var(--w-edge) solid currentColor;border-radius:50%}
+  .i-me::after{content:'';position:absolute;bottom:5px;left:6px;width:28px;height:14px;
+    border:var(--w-edge) solid currentColor;border-bottom:none;border-radius:16px 16px 0 0}
+
+  /* ==================================================================
+     ③ 标注屏：色阶五档、八枚壁纸各走哪档、对比度实测
+     ================================================================== */
+  .sp-h{font-size:34px;font-weight:800;letter-spacing:-.7px;color:var(--tx1);line-height:1.25;margin-top:20px}
+  .sp-sub{font-size:19px;font-weight:600;color:var(--tx3);margin-top:6px;letter-spacing:-.2px;line-height:1.45}
+  .blk-h{display:flex;align-items:center;gap:12px;margin:15px 0 8px}
+  .blk-h .no{font-size:19px;font-weight:800;color:#F4F2EC;background:#23252C;
+    padding:4px 12px;border-radius:8px;letter-spacing:.5px;flex:none}
+  .blk-h .tt{font-size:25px;font-weight:800;letter-spacing:-.5px;color:var(--tx1)}
+  .blk-h .note{font-size:18px;font-weight:700;color:var(--tx3);margin-left:auto;white-space:nowrap}
+  .pane{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);padding:20px 22px}
+
+  /* 色阶五档 */
+  .ramp{display:flex;flex-direction:column;gap:8px}
+  .rung{display:flex;align-items:center;gap:14px}
+  .rung .sw{width:104px;height:56px;border-radius:14px;border:var(--w-edge) solid var(--edge);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;letter-spacing:.2px}
+  .rung .nm{width:150px;flex:none;font-size:20px;font-weight:800;letter-spacing:-.4px;color:var(--tx1)}
+  .rung .ds{font-size:17px;font-weight:600;color:var(--tx3);line-height:1.4}
+  .rung .ds code{font:inherit;font-weight:800;color:var(--tx2)}
+
+  /* 八枚壁纸各走哪档 */
+  .wall{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .wcell{border-radius:18px;border:var(--w-edge) solid var(--edge);padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px}
+  .wcell .wl{font-size:17px;font-weight:800;color:var(--tx2);letter-spacing:-.2px}
+  .wcell .wl span{font-weight:700;color:var(--tx3)}
+  .wstrip{height:64px;border-radius:16px;display:flex;align-items:center;justify-content:space-around;
+    font-size:16px;font-weight:800}
+  .wstrip i{display:flex;flex-direction:column;align-items:center;gap:3px;font-style:normal}
+  .wstrip i b{font-weight:800}
+  .wstrip i .d2{width:16px;height:3px;border-radius:2px;background:currentColor}
+
+  /* 表 */
+  table{width:100%;border-collapse:collapse;font-size:18px;font-weight:700}
+  th{text-align:left;font-size:15px;font-weight:800;letter-spacing:.3px;color:var(--tx3);
+    padding:6px 3px;border-bottom:var(--w-edge) solid var(--edge);white-space:nowrap}
+  td{padding:6px 3px;border-bottom:var(--w-edge) solid var(--edge);color:var(--tx1);vertical-align:middle;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td .swatch{display:inline-block;width:19px;height:19px;border-radius:6px;vertical-align:-3px;margin-right:6px;
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.14)}
+  td .hex{font-weight:800;letter-spacing:.1px}
+  td .cx{font-weight:600;color:var(--tx3)}
+  td .ok{font-weight:800;color:#35784B}
+  td .no2{font-weight:800;color:#A35432}
+  th:last-child,td:last-child{white-space:normal;min-width:150px}
+
+  .foot-note{font-size:17px;font-weight:600;color:var(--tx3);line-height:1.55;margin:10px 0 0;letter-spacing:-.2px}
+  .foot-note b{color:var(--tx1)}
+  .warn{margin-top:12px;background:rgba(233,114,61,.10);border:var(--w-edge) solid rgba(233,114,61,.28);
+    border-radius:var(--r-btn);padding:14px 18px;font-size:18px;font-weight:700;line-height:1.6;color:#8A4522}
+  .warn code{font:inherit;font-weight:800}
+</style>
+</head>
+<body>
+<div class="flow">
+
+  <!-- ================= ① 米白 ================= -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">① 米白壁纸</span>
+      <h3>列表照已选定的 D2 画，圆角一律不动；底栏从纯墨黑换成暖褐「焙一」</h3>
+      <p>这一稿只动底栏那一块面：<code>#23252C → #3E322A</code>，形状、高度 108rpx、圆角 44rpx、
+      左右 24rpx、离底 20rpx 全部原样；<b>新建 / 笔记 / 我的 三个字留着</b>，不透明、不半透。
+      字色取官网那支纸白 <code>#F2EFE9</code>（也是淡雅「象牙」那套的字色），选中态加一条 26rpx 短线，
+      没加垫块——加了就变成按钮式。上一稿的圆角阶梯和半透明底栏按你的话作废。</p>
+    </div>
+    <div class="ph">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span>
+      </div>
+      <div class="stage">
+        <div class="head">
+          <div class="h1">我的笔记</div>
+          <div class="hr"><div class="stats">本周 2 · 本月 9 · 总数 23</div><div class="quota">额度 12/100</div></div>
+        </div>
+
+        <div class="sc"><div class="line"><span class="ph-txt">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+
+        <div class="chips">
+          <span class="chip on">全部</span>
+          <span class="chip">产品</span>
+          <span class="chip">技术</span>
+          <span class="chip">阅读</span>
+          <span class="chip">工作</span>
+          <span class="chip">灵感</span>
+        </div>
+
+        <div class="row">
+          <div class="ti"><span class="pin">置顶</span>别等状态好了才动笔</div>
+          <div class="sm">先做完，再谈做好。二十五分钟为一格。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb tk"><i class="dot"></i>未分类</span><span class="sep">·</span><span class="src">亲自撰写</span>
+          </span><span class="dt">09-23</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">额度这道闸门，是先长在后端上的</div>
+          <div class="sm">100 篇不是文案，是接口的上限，前端只能诚实显示。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t2"><i class="dot"></i>产品</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">需求 / 版本</span>
+          </span><span class="dt">09-22</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把海报引擎拆成模板和图层</div>
+          <div class="sm">一份图层清单加四个绘制原语，换风格不必再动绘制代码。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t3"><i class="dot"></i>技术</span><span class="sep">·</span><span class="src">网页文章</span><span class="sep">·</span><span class="tg">重构 / 图层</span>
+          </span><span class="dt">09-21</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">读得慢一点，记得久一点</div>
+          <div class="sm">那句「不必追上所有新书」，我在地铁上读了三遍。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t4"><i class="dot"></i>阅读</span><span class="sep">·</span><span class="src">截图识别</span><span class="sep">·</span><span class="tg">读书 / 摘录</span>
+          </span><span class="dt">09-20</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">周会只留三句话</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t5"><i class="dot"></i>工作</span><span class="sep">·</span><span class="src">亲自撰写</span><span class="sep">·</span><span class="tg">流程 / 周会</span>
+          </span><span class="dt">09-19</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把八套壁纸想成八种天气</div>
+          <div class="sm">夜紫是雷雨前的屋里，深海是凌晨四点的海。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t1"><i class="dot"></i>灵感</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">灵感 / 视觉</span>
+          </span><span class="dt">09-18</span><span class="cv">›</span></div>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <span class="tb"><span class="tbi i-new"></span>新建</span>
+        <span class="tb on"><span class="tbi i-note"></span>笔记<span class="u"></span></span>
+        <span class="tb"><span class="tbi i-me"></span>我的</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ② 夜紫 ================= -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">② 夜紫壁纸 · 重点屏</span>
+      <h3>深色页面底上必须再抬一档（焙二），否则"不纯黑"这句话等于没说</h3>
+      <p>焙一压夜紫页面底只有 <b>1.56</b>，肉眼还是"一块黑"；焙二 <code>#574639</code> 抬到 <b>2.16</b>，
+      再加一圈纸白@20% 发丝边把它从背景里切出来（现网深色档本来就靠这圈描边，只是描边宽度从 1rpx 提到 3rpx）。
+      深海那枚页面底更暗一点，同一档实测 1.94，走同一规则。
+      未选中字的 alpha 跟着从 .62 抬到 .68，才保住 4.5:1 这条小字线。</p>
+    </div>
+    <div class="ph d">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span>
+      </div>
+      <div class="stage">
+        <div class="head">
+          <div class="h1">我的笔记</div>
+          <div class="hr"><div class="stats">本周 2 · 本月 9 · 总数 23</div><span class="quota">额度 12/100</span></div>
+        </div>
+
+        <div class="sc"><div class="line"><span class="ph-txt">输入关键词</span><span class="go">搜索笔记</span><span class="rule"></span></div></div>
+
+        <div class="chips">
+          <span class="chip on">全部</span>
+          <span class="chip">产品</span>
+          <span class="chip">技术</span>
+          <span class="chip">阅读</span>
+          <span class="chip">工作</span>
+          <span class="chip">灵感</span>
+        </div>
+
+        <div class="row">
+          <div class="ti"><span class="pin">置顶</span>别等状态好了才动笔</div>
+          <div class="sm">先做完，再谈做好。二十五分钟为一格。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb tk"><i class="dot"></i>未分类</span><span class="sep">·</span><span class="src">亲自撰写</span>
+          </span><span class="dt">09-23</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">额度这道闸门，是先长在后端上的</div>
+          <div class="sm">100 篇不是文案，是接口的上限，前端只能诚实显示。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t2"><i class="dot"></i>产品</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">需求 / 版本</span>
+          </span><span class="dt">09-22</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把海报引擎拆成模板和图层</div>
+          <div class="sm">一份图层清单加四个绘制原语，换风格不必再动绘制代码。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t3"><i class="dot"></i>技术</span><span class="sep">·</span><span class="src">网页文章</span><span class="sep">·</span><span class="tg">重构 / 图层</span>
+          </span><span class="dt">09-21</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">读得慢一点，记得久一点</div>
+          <div class="sm">那句「不必追上所有新书」，我在地铁上读了三遍。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t4"><i class="dot"></i>阅读</span><span class="sep">·</span><span class="src">截图识别</span><span class="sep">·</span><span class="tg">读书 / 摘录</span>
+          </span><span class="dt">09-20</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">周会只留三句话</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t5"><i class="dot"></i>工作</span><span class="sep">·</span><span class="src">亲自撰写</span><span class="sep">·</span><span class="tg">流程 / 周会</span>
+          </span><span class="dt">09-19</span><span class="cv">›</span></div>
+        </div>
+
+        <div class="row">
+          <div class="ti">把八套壁纸想成八种天气</div>
+          <div class="sm">夜紫是雷雨前的屋里，深海是凌晨四点的海。</div>
+          <div class="mt"><span class="grp">
+            <span class="lb t1"><i class="dot"></i>灵感</span><span class="sep">·</span><span class="src">公众号文章</span><span class="sep">·</span><span class="tg">灵感 / 视觉</span>
+          </span><span class="dt">09-18</span><span class="cv">›</span></div>
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <span class="tb"><span class="tbi i-new"></span>新建</span>
+        <span class="tb on"><span class="tbi i-note"></span>笔记<span class="u"></span></span>
+        <span class="tb"><span class="tbi i-me"></span>我的</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ③ 色阶与实测 ================= -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">③ 焙色五档 · 八枚壁纸各走哪档 · 对比度实测</span>
+      <h3>色阶是从官网那三个锚点提出来的，每一档都量过压页面底和压字</h3>
+      <p>关键发现：现网那块墨黑 <code>#23252C</code> 的 R−B 是 <b>−9</b>，它其实<b>偏冷蓝</b>——
+      这就是"一块黑"的来源。焙一 / 焙二的 R−B 是 <b>+20 / +30</b>，明度只抬了 1.9~3.6 倍，
+      观感就从"黑"变成"焙"。字色直接取官网 <code>--paper #F2EFE9</code>，不新造色。</p>
+    </div>
+    <div class="ph doc">
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">图麦笔记</span>
+        <span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span>
+      </div>
+      <div class="stage">
+        <div class="sp-h">一、焙色五档（自上而下 = 从最亮的一层到面）</div>
+        <div class="sp-sub">锚点：官网 <code>/assets/site.css</code> 的 --paper #F2EFE9 / --ink #14161A / --clay #D2683F。</div>
+
+        <div class="blk-h"><span class="no">阶</span><span class="tt">五档</span><span class="note">R−B = 暖度</span></div>
+        <div class="pane">
+          <div class="ramp">
+            <div class="rung"><span class="sw" style="background:#F2EFE9;color:#3E322A;border-color:#E4DECF">F2EFE9</span>
+              <span class="nm">S1 纸白</span><span class="ds">选中态的图标、文字、短线。<code>官网 --paper</code>，也是「象牙」那套的字色。</span></div>
+            <div class="rung"><span class="sw" style="background:#3E322A;color:rgba(242,239,233,.62)">62%</span>
+              <span class="nm">S2 未选中字</span><span class="ds">纸白压焙一 = <code>5.21</code>；压焙二要把 alpha 抬到 68% 才有 <code>4.62</code>。</span></div>
+            <div class="rung"><span class="sw" style="background:#574639;color:#F2EFE9">焙二</span>
+              <span class="nm">S3 面 · 深底档</span><span class="ds"><code>#574639</code> R−B +30，压夜紫 2.16 / 深海 1.94，再靠 S5 发丝边切开。</span></div>
+            <div class="rung"><span class="sw" style="background:#3E322A;color:#F2EFE9">焙一</span>
+              <span class="nm">S4 面 · 浅底档</span><span class="ds"><code>#3E322A</code> R−B +20，压六枚浅色页面底 10.55~11.07，纸白字 10.80。</span></div>
+            <div class="rung"><span class="sw" style="background:#6E5A48;color:#F2EFE9">焙三</span>
+              <span class="nm">S5 描边 / 按下</span><span class="ds">描边用<code>纸白@14%（浅底）/ @20%（深底）</code>；按下态那一瞬间走焙三 <code>#6E5A48</code>。</span></div>
+          </div>
+        </div>
+
+        <div class="blk-h"><span class="no">壁</span><span class="tt">二、八枚壁纸各走哪档</span><span class="note">一条规则，不是一张表</span></div>
+        <div class="pane">
+          <div class="wall">
+            <div class="wcell"><div class="wl">米白 <span>#F4F2EC</span></div>
+              <div class="wstrip" style="background:#3E322A"><i style="color:rgba(242,239,233,.62)">新建</i><i style="color:#F2EFE9">笔记<span class="d2"></span></i><i style="color:rgba(242,239,233,.62)">我的</i></div></div>
+            <div class="wcell"><div class="wl">雾蓝 <span>#EAEEFB</span></div>
+              <div class="wstrip" style="background:#3E322A"><i style="color:rgba(242,239,233,.62)">新建</i><i style="color:#F2EFE9">笔记<span class="d2"></span></i><i style="color:rgba(242,239,233,.62)">我的</i></div></div>
+            <div class="wcell"><div class="wl">松绿 <span>#E7F3EA</span></div>
+              <div class="wstrip" style="background:#3E322A"><i style="color:rgba(242,239,233,.62)">新建</i><i style="color:#F2EFE9">笔记<span class="d2"></span></i><i style="color:rgba(242,239,233,.62)">我的</i></div></div>
+            <div class="wcell"><div class="wl">暮橙 <span>#FDEEE6</span></div>
+              <div class="wstrip" style="background:#3E322A"><i style="color:rgba(242,239,233,.62)">新建</i><i style="color:#F2EFE9">笔记<span class="d2"></span></i><i style="color:rgba(242,239,233,.62)">我的</i></div></div>
+            <div class="wcell"><div class="wl">夜紫 <span>#0C0C1D</span></div>
+              <div class="wstrip" style="background:#574639;box-shadow:inset 0 0 0 2px rgba(242,239,233,.20)"><i style="color:rgba(242,239,233,.68)">新建</i><i style="color:#F2EFE9">笔记<span class="d2"></span></i><i style="color:rgba(242,239,233,.68)">我的</i></div></div>
+            <div class="wcell"><div class="wl">深海 <span>#0D1B2A</span></div>
+              <div class="wstrip" style="background:#574639;box-shadow:inset 0 0 0 2px rgba(242,239,233,.20)"><i style="color:rgba(242,239,233,.68)">新建</i><i style="color:#F2EFE9">笔记<span class="d2"></span></i><i style="color:rgba(242,239,233,.68)">我的</i></div></div>
+            <div class="wcell"><div class="wl">象牙 <span>#F2EFE9 · 整套暖色阶</span></div>
+              <div class="wstrip" style="background:#3E322A"><i style="color:rgba(242,239,233,.62)">新建</i><i style="color:#F2EFE9">笔记<span class="d2"></span></i><i style="color:rgba(242,239,233,.62)">我的</i></div></div>
+            <div class="wcell"><div class="wl">天青 <span>#E9EEEA · 整套冷色阶</span></div>
+              <div class="wstrip" style="background:#33403A"><i style="color:rgba(233,238,234,.66)">新建</i><i style="color:#E9EEEA">笔记<span class="d2"></span></i><i style="color:rgba(233,238,234,.66)">我的</i></div></div>
+          </div>
+          <div class="foot-note">规则只有一句：<b>页面底是浅色就走焙一，是深色就走焙二</b>——判定用现成的 <code>theme.dark</code>，
+          不新增名单。唯一破例是「天青」：它整套是冷釉色，底栏跟着走冷档 <code>#33403A</code>（R−B 转成 −7，压天青页面底 9.24、它的白字压上去也是 9.24，未选中 66% 有 5.06），
+          否则满屏同色系里就它一块跳暖。现网代码本来就在做这件事（<code>custom-tab-bar/index.js:36</code> 取这套主题自己的墨色）。</div>
+        </div>
+
+        <div class="blk-h"><span class="no">量</span><span class="tt">三、对比度与"纯黑比重"实测</span><span class="note">本机算，非估</span></div>
+        <div class="pane">
+          <table>
+            <thead><tr><th>量什么</th><th>现网 #23252C</th><th>焙一 #3E322A</th><th>焙二 #574639</th></tr></thead>
+            <tbody>
+              <tr><td>相对亮度 L</td><td><span class="hex">0.0186</span></td><td><span class="hex">0.0347</span></td><td><span class="hex">0.0670</span></td></tr>
+              <tr><td>暖度 R−B</td><td><span class="no2">−9 偏冷</span></td><td><span class="ok">+20</span></td><td><span class="ok">+30</span></td></tr>
+              <tr><td>压米白页面底</td><td><span class="hex">13.67</span></td><td><span class="hex">11.07</span></td><td><span class="hex">8.02</span></td></tr>
+              <tr><td>压夜紫页面底</td><td><span class="no2">1.26</span></td><td><span class="no2">1.56</span></td><td><span class="hex">2.16</span></td></tr>
+              <tr><td>压深海页面底</td><td><span class="no2">1.14</span></td><td><span class="no2">1.40</span></td><td><span class="hex">1.94</span></td></tr>
+              <tr><td>纸白字压它</td><td><span class="hex">13.33</span></td><td><span class="ok">10.80</span></td><td><span class="ok">7.82</span></td></tr>
+              <tr><td>未选中字压它</td><td><span class="hex">6.00（62%）</span></td><td><span class="ok">5.21（62%）</span></td><td><span class="ok">4.62（68%）</span></td></tr>
+            </tbody>
+          </table>
+          <div class="foot-note">深色那两格（1.94~2.16）没到 WCAG 非文本要的 3:1，这一条我不粉饰：
+          真要压到 3:1 得走到 <b>#7A6450</b>（压夜紫 3.47），但那一档下纸白字只剩 4.86，
+          未选中字 alpha 提到 100% 也才 4.86 —— <b>选中与未选中根本拉不开层次</b>。
+          所以深色档停在焙二 + 一圈发丝边，把"边界"交给描边、"可读"交给字。
+          现网深色那一档 <code>#1a1c22</code> 压夜紫只有 <b>1.14</b>，比这版差得多。</div>
+
+          <div class="blk-h" style="margin:16px 0 6px"><span class="no">比</span><span class="tt">纯黑比重：整屏逐像素</span><span class="note">两版各渲一张整图后数</span></div>
+          <table>
+            <thead><tr><th>量什么</th><th>现网（黑底栏）</th><th>本稿（焙色底栏）</th></tr></thead>
+            <tbody>
+              <tr><td>米白屏 整屏纯墨点占比</td><td><span class="no2">8.12%</span></td><td><span class="ok">2.15%</span> <span class="cx">再没有一整块墨</span></td></tr>
+              <tr><td>夜紫屏 整屏纯墨点占比</td><td><span class="no2">9.07%</span></td><td><span class="ok">2.96%</span></td></tr>
+              <tr><td>底栏那一条（702×108）</td><td><span class="no2">94.2%</span></td><td><span class="ok">0.0%</span></td></tr>
+              <tr><td>底栏那一条平均亮度</td><td><span class="cx">0.0457 / 0.0295</span></td><td><span class="ok">0.0669 / 0.0848</span> <span class="cx">米白 / 夜紫</span></td></tr>
+            </tbody>
+          </table>
+          <div class="foot-note">"纯墨点"= 离现网那块 <code>#23252C</code> 距离 ≤12 的像素（容差收得比上一稿小，
+          免得把暖褐也算进去）。剩下的 2.15% 是正文文字、选中那枚胶囊和置顶牌 ——
+          <b>这三处本稿一律没动</b>，因为你说的是底部，圆角那条也撤了。</div>
+        </div>
+
+        <div class="blk-h"><span class="no">闸</span><span class="tt">四、落地要同批动的，只有底栏组件自己</span><span class="note">圆角不动 = 那把尺子不用碰</span></div>
+        <div class="warn">
+          这一稿<b>没有</b>改 <code>--r-card</code> / <code>--r-chip</code> / <code>--r-pill</code>，
+          所以 <code>pages/profile/profile.js</code> 的 <code>THUMB_R</code> 和 <code>验-海报模板几何.js</code> 那把尺子一行都不用动。
+          要改的集中在 <code>custom-tab-bar/</code> 三处：<code>index.wxss:15</code> 的底色、<code>:131</code> 的深色档底色、
+          以及 <code>:44,55,66,78,89,100,107</code> 那七处写死的 <code>rgba(255,255,255,.42)</code>——
+          图标和文字改成吃 <code>currentColor</code>，颜色由 <code>index.js:37-41</code> 那串 <code>inkStyle</code> 递进来（组件拿不到 page 上的变量，这条规矩不变）。
+        </div>
+      </div>
+
+      <div class="tabbar">
+        <span class="tb"><span class="tbi i-new"></span>新建</span>
+        <span class="tb on"><span class="tbi i-note"></span>笔记<span class="u"></span></span>
+        <span class="tb"><span class="tbi i-me"></span>我的</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
