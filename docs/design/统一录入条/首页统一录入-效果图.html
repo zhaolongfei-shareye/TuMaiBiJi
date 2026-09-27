@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 统一录入条（2026-09-28）</title>
+<style>
+/* ==================================================================
+   用户 09-28 口径（原话）：
+     "首页三个入口合并成一个，继续简化。就是看上去一个横条，上面写 我想记下来，后面有几个小圆ICON，
+      拍照，截图，URL，点击横条，向下展开，默认直接写。然后点击ICON，分别对应之前的横条入口功能。
+      就是一个统一的录入。所以横条在首页的位置可以再往下一点，突出背景大图。
+      按钮上方空白区，显示当期日期和星期，字体淡淡的，提醒作用。"
+
+   这一稿画四态 + 一张标注：① 收起（默认首屏）② 展开·直接写 ③ 展开·URL ④ 展开·截图（已选两张）⑤ 标注。
+
+   一个必须先解决的矛盾：他说"横条再往下"又说"向下展开"。写那一态要 830rpx 高，
+   横条真停在 1258 的话展开就顶穿底栏。所以这一稿的做法是：点下去横条先升到 420、再往下长开
+   （220ms 一起走），收起时它确实很靠下、大图完整。备选（原地展开＋页面自动滚）在 ⑤ 里说明。
+
+   口径：px 当 rpx 用（设计宽 750，一屏 1624；导航条 0..176，底栏顶 1496）。
+   圆角、字阶、描边、底栏几何与现网逐值相同（app.wxss）。人像取景沿用已上线那张 865×1670。
+   ================================================================== */
+
+  :root{
+    --r-card:40px; --r-chip:28px; --r-pill:999px; --r-btn:16px; --w-edge:3px;
+    --paper:#F2EFE9;
+    --tx1:#23252C; --tx2:#5C6068; --tx3:#9A9EA6;
+    /* 四个模式的身份色，全部取自现网色板（palette.js TONES），不引入新色 */
+    --m-write:#F6C445;  --m-write-ink:#2A2005;
+    --m-shot:#E9723D;   --m-shot-ink:#2C1204;
+    --m-album:#46A863;  --m-album-ink:#06260F;
+    --m-url:#3F52D6;    --m-url-ink:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:var(--tx1);padding:26px 15px 70px;font-family:-apple-system,'PingFang SC',sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;gap:56px;width:3974px;align-items:flex-start}
+  .unit{width:750px;flex:none}
+
+  .cap{margin-bottom:14px;min-height:186px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;letter-spacing:.2px;
+    background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap b{color:#23252C}
+  .cap code{font:inherit;font-weight:800;color:#23252C}
+
+  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:#F4F2EC;border-radius:52px;
+    box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16);
+    --skin:#443C25;--bar-idle:rgba(242,239,233,.62);--tx1:#F2EFE9;--tx2:rgba(242,239,233,.78);--tx3:rgba(242,239,233,.56)}
+  .ph.doc{height:2970px;background:#F4F2EC;--tx1:#23252C;--tx2:#5C6068;--tx3:#9A9EA6}
+
+  .bg{position:absolute;left:0;top:176px;width:750px;height:1448px;background-size:100% 100%}
+  /* 收口往下挪：62% 之前维持原档（脸那段不动），68%→74% 一路压到 0.74，
+     日期和横条坐在这一段上。衬衫本来就没有信息量，压深反而把注意力还给脸。 */
+  .scrim{position:absolute;left:0;top:176px;width:750px;height:1448px;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.58) 148px,
+      rgba(18,20,26,.44) 620px,rgba(18,20,26,.42) 880px,rgba(18,20,26,.62) 960px,
+      rgba(18,20,26,.78) 1010px,rgba(18,20,26,.82) 1448px)}
+
+  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}
+  .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .nb{height:88px;background:#181A20;position:relative;z-index:12}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:#F2EFE9;letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+    background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);color:#F2EFE9;
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  /* ---------- 日期那一行 ---------- */
+  .date{position:absolute;left:0;right:0;text-align:center;z-index:6;pointer-events:none}
+  .date .d{font-size:34px;font-weight:300;letter-spacing:2px;color:rgba(242,239,233,.80);line-height:1.25}
+  .date .w{font-size:24px;font-weight:400;letter-spacing:6px;color:rgba(242,239,233,.52);margin-top:6px}
+  .pos-collapsed{top:1176px}
+  .pos-open{top:250px}
+
+  /* ---------- 统一录入条 ---------- */
+  .bar-wrap{position:absolute;left:24px;right:24px;z-index:8}
+  .bar-wrap.collapsed{top:1258px}
+  .bar-wrap.open{top:420px}
+  .bar{height:128px;border-radius:var(--r-pill);background:var(--paper);
+    box-shadow:0 18px 46px rgba(8,10,14,.42);display:flex;align-items:center;padding:0 20px 0 34px;gap:22px}
+  .bar-wrap.open .bar{border-radius:40px 40px 0 0;background:#fff;box-shadow:0 -6px 40px rgba(8,10,14,.34)}
+  .bar .lead{flex:none;width:52px;height:52px}
+  .bar .label{flex:1;min-width:0;font-size:44px;font-weight:800;letter-spacing:-1px;color:#23252C;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar .label .sub{font-size:26px;font-weight:500;color:#8A8E96;letter-spacing:0;margin-left:14px}
+  .dots{display:flex;align-items:center;gap:20px;flex:none}
+  .dot{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .dot i{width:38px;height:38px}
+  .dot.url{background:var(--m-url)} .dot.url i{background:#fff}
+  .dot.shot{background:var(--m-shot)} .dot.shot i{background:var(--m-shot-ink)}
+  .dot.album{background:var(--m-album)} .dot.album i{background:var(--m-album-ink)}
+  .dot.idle{background:rgba(35,37,44,.07)} .dot.idle i{background:rgba(35,37,44,.42)}
+
+  /* 展开面板 */
+  .panel{background:#fff;border-radius:0 0 40px 40px;padding:8px 34px 34px;color:#23252C;
+    box-shadow:0 24px 52px rgba(8,10,14,.34)}
+  .modes{display:flex;align-items:center;gap:14px;padding:22px 0 4px;border-bottom:3px solid rgba(35,37,44,.07)}
+  .mode{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:700;color:#9A9EA6;
+    padding:0 4px 16px;border-bottom:5px solid transparent;margin-bottom:-3px}
+  .mode i{width:26px;height:26px;border-radius:50%;background:currentColor}
+  .mode.on{border-bottom-color:currentColor}
+  .mode.on.w{color:#B07F00}.mode.on.s{color:#C25A25}.mode.on.a{color:#2E7A47}.mode.on.u{color:#3F52D6}
+  .mode .x{width:26px;height:26px;border-radius:50%;background:currentColor}
+  .fld{margin-top:24px}
+  .box{height:88px;border-radius:var(--r-btn);background:rgba(35,37,44,.05);display:flex;align-items:center;
+    padding:0 24px;font-size:28px;color:#23252C}
+  .box.ph{color:#9A9EA6}
+  .area{height:236px;border-radius:var(--r-btn);background:rgba(35,37,44,.05);padding:20px 24px;
+    font-size:28px;line-height:1.5;color:#9A9EA6}
+  .row{display:flex;align-items:center;height:88px;margin-top:24px;padding:0 24px;border-radius:var(--r-btn);
+    background:rgba(35,37,44,.05);font-size:28px;color:#23252C}
+  .row .k{color:#8A8E96}.row .v{flex:1;text-align:right;font-weight:700}.row .c{opacity:.5;font-size:32px}
+  .acts{display:flex;gap:20px;margin-top:28px}
+  .act{flex:1;height:92px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;
+    font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .act.ghost{background:rgba(35,37,44,.06);color:#23252C}
+  .act.solid{background:#23252C;color:#F2EFE9}
+  .act.off{background:rgba(35,37,44,.06);color:#9A9EA6}
+  .note{margin-top:16px;font-size:22px;line-height:1.4;color:#8A8E96}
+  .strip{display:flex;gap:16px;margin-top:24px}
+  .cell{width:128px;height:128px;border-radius:var(--r-btn);position:relative;overflow:hidden;
+    background:linear-gradient(135deg,#D9DCE6,#BFC4D4)}
+  .cell:nth-child(2){background:linear-gradient(135deg,#E4DCCF,#C9BFAE)}
+  .cell .x{position:absolute;right:-4px;top:-4px;width:40px;height:40px;border-radius:50%;
+    background:rgba(20,20,28,.66);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
+  .pick2{display:flex;gap:20px;margin-top:24px}
+  .pk{flex:1;height:164px;border-radius:var(--r-chip);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:8px}
+  .pk .g{width:44px;height:44px}
+  .pk .l{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .pk .h{font-size:20px;opacity:.66}
+  .pk.s{background:var(--m-shot);color:var(--m-shot-ink)} .pk.s .g{background:var(--m-shot-ink)}
+  .pk.a{background:var(--m-album);color:var(--m-album-ink)} .pk.a .g{background:var(--m-album-ink)}
+
+  /* ---------- 底栏 ---------- */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:44px;
+    background:var(--skin);display:flex;z-index:10;box-shadow:0 16px 44px rgba(0,0,0,.26)}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font-size:20px;font-weight:700;color:var(--bar-idle);letter-spacing:.3px}
+  .tb.on{color:#F2EFE9}
+  .tb .ic{width:34px;height:34px;border-radius:9px;background:currentColor;opacity:.9}
+  .tb .ln{width:26px;height:5px;border-radius:99px;background:#F2EFE9;opacity:0}
+  .tb.on .ln{opacity:1}
+
+  /* ---------- 标注屏 ---------- */
+  .docbody{position:absolute;left:0;right:0;top:179px;bottom:0;padding:2px 34px 0;z-index:6}
+  .blk{background:#fff;border:3px solid rgba(35,37,44,.10);border-radius:32px;padding:26px 28px;margin-bottom:22px}
+  .blk h4{font-size:29px;font-weight:800;letter-spacing:-.5px;margin-bottom:12px}
+  .blk p{font-size:22px;line-height:1.62;color:#4B4F57;margin-bottom:9px}
+  .blk p:last-child{margin-bottom:0}
+  .blk b{color:#23252C}
+  .blk code{font-family:ui-monospace,Menlo,monospace;font-size:20px;background:#F1EFE9;border-radius:6px;padding:1px 7px}
+  table{width:100%;border-collapse:collapse;font-size:21px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:2px solid #ECEAE4;vertical-align:top}
+  th{font-size:19px;font-weight:800;color:#8A8E96;letter-spacing:.3px}
+  td b{color:#23252C}
+  .ok{color:#1D7A48;font-weight:800}.no{color:#B4231F;font-weight:800}
+  .warn{background:#FFF6EC;border:3px solid #E7C9A6;border-radius:26px;padding:22px 26px;margin-bottom:22px}
+  .warn h4{color:#8A4B12}.warn p{color:#6B4A2C}
+  .map{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:2px solid #ECEAE4}
+  .map:last-child{border-bottom:0}
+  .map .k{width:210px;font-size:22px;font-weight:800;color:#23252C;flex:none}
+  .map .v{font-size:21px;color:#4B4F57;line-height:1.5}
+  .map .sw{width:44px;height:44px;border-radius:50%;flex:none}
+</style>
+</head>
+<body>
+<div class="flow">
+
+  <!-- ============ ① 收起态 ============ -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">① 收起 · 默认首屏</span>
+      <h3>一条横条 + 三个小圆，其余全是图</h3>
+      <p>横条顶边在 <code>y=1258</code>（视口 75%），比现在那三块（900 起）整整低了 <b>358</b>；人像从导航条到横条一气呵成。条上左边铅笔图形 +「我想记下来」，右边三枚小圆：<b>拍照（橙）· 相册（绿）· URL（蓝）</b>，颜色就是现网那三张卡自己的色，没引入新色。日期在条子上方 82 那一段。</p>
+    </div>
+    <div class="ph">
+      <div class="bg" style="background-image:url('裁切A-微放大.jpg')"></div>
+      <div class="scrim"></div>
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">新建笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+      <div class="date pos-collapsed"><div class="d">9月28日</div><div class="w">周日</div></div>
+      <div class="bar-wrap collapsed">
+        <div class="bar">
+          <div class="lead g-pencil" style="background:#B07F00"></div>
+          <div class="label">我想记下来</div>
+          <div class="dots">
+            <div class="dot shot"><i class="g-camera"></i></div>
+            <div class="dot album"><i class="g-album"></i></div>
+            <div class="dot url"><i class="g-link"></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tb on"><div class="ic"></div>新建<div class="ln"></div></div>
+        <div class="tb"><div class="ic"></div>笔记<div class="ln"></div></div>
+        <div class="tb"><div class="ic"></div>我的<div class="ln"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ② 展开·直接写 ============ -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">② 展开 · 直接写（默认态）</span>
+      <h3>点条身就是写，条子先升起来再往下长</h3>
+      <p>横条升到 <code>y=420</code>、下面长出表单，<b>220ms 一起走</b>，落点正好是原来三块手风琴的位置一带。写这一态要 <code>830</code> 高，横条若留在 1258 展开就顶穿底栏（1496），所以"再往下"只在收起态成立。条身里的三枚小圆换成四个模式的文字标签，当前那枚带下划线——切换不用先收起。</p>
+    </div>
+    <div class="ph">
+      <div class="bg" style="background-image:url('裁切A-微放大.jpg')"></div>
+      <div class="scrim"></div>
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">新建笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+      <div class="date pos-open"><div class="d">9月28日</div><div class="w">周日</div></div>
+      <div class="bar-wrap open">
+        <div class="bar">
+          <div class="lead g-pencil" style="background:#B07F00"></div>
+          <div class="label">我想记下来<span class="sub">点空白处收起</span></div>
+        </div>
+        <div class="panel">
+          <div class="modes">
+            <div class="mode on w"><span class="x"></span>直接写</div>
+            <div class="mode"><span class="x" style="background:#E9723D"></span>拍照</div>
+            <div class="mode"><span class="x" style="background:#46A863"></span>相册</div>
+            <div class="mode"><span class="x" style="background:#3F52D6"></span>链接</div>
+          </div>
+          <div class="fld"><div class="box ph">标题（可留空，会自动起）</div></div>
+          <div class="fld"><div class="area">正文，想到什么写什么…</div></div>
+          <div class="row"><span class="k">归类</span><span class="v">未分类</span><span class="c">›</span></div>
+          <div class="acts"><div class="act ghost">取消</div><div class="act solid">保存</div></div>
+          <div class="note">写完直接存，不用先想标题；归类随时能改。</div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tb on"><div class="ic"></div>新建<div class="ln"></div></div>
+        <div class="tb"><div class="ic"></div>笔记<div class="ln"></div></div>
+        <div class="tb"><div class="ic"></div>我的<div class="ln"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ③ 展开·URL ============ -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">③ 展开 · 链接</span>
+      <h3>点小圆直接进那一态，不用再点第二次</h3>
+      <p>收起态点<b>蓝色那枚</b>，横条升起来的同时就落在链接态（不是先展开成"写"、再让人切）。链接这一态最矮，<code>470</code> 就够，下面还留着大半屏的图。校验规则、粘贴按钮、报错行都照现网那条卡原样搬，一个字不改。</p>
+    </div>
+    <div class="ph">
+      <div class="bg" style="background-image:url('裁切A-微放大.jpg')"></div>
+      <div class="scrim"></div>
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">新建笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+      <div class="date pos-open"><div class="d">9月28日</div><div class="w">周日</div></div>
+      <div class="bar-wrap open">
+        <div class="bar">
+          <div class="lead g-link" style="background:#3F52D6"></div>
+          <div class="label">贴个链接<span class="sub">点空白处收起</span></div>
+        </div>
+        <div class="panel">
+          <div class="modes">
+            <div class="mode"><span class="x" style="background:#F6C445"></span>直接写</div>
+            <div class="mode"><span class="x" style="background:#E9723D"></span>拍照</div>
+            <div class="mode"><span class="x" style="background:#46A863"></span>相册</div>
+            <div class="mode on u"><span class="x"></span>链接</div>
+          </div>
+          <div class="fld"><div class="box ph">https://mp.weixin.qq.com/…</div></div>
+          <div class="acts"><div class="act ghost">粘贴</div><div class="act off">保存</div></div>
+          <div class="note">链接要以 http:// 或 https:// 开头。公众号文章、普通网页都行。</div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tb on"><div class="ic"></div>新建<div class="ln"></div></div>
+        <div class="tb"><div class="ic"></div>笔记<div class="ln"></div></div>
+        <div class="tb"><div class="ic"></div>我的<div class="ln"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ④ 展开·相册（已选两张） ============ -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">④ 展开 · 相册（已选两张）</span>
+      <h3>截图这一态：缩略图一排，按钮跟着往下走</h3>
+      <p>现网「拍照或截图」是一张卡里两个大按钮，这里拆成<b>橙=相机现拍</b>、<b>绿=从相册选</b>两枚小圆，展开后两个按钮仍然都在（只是从"入口"变成"这一态里再选一次"）。选完的图横滑可删，「开始提炼」亮起来。这一态 <code>700</code> 高，是四态里第二高的。</p>
+    </div>
+    <div class="ph">
+      <div class="bg" style="background-image:url('裁切A-微放大.jpg')"></div>
+      <div class="scrim"></div>
+      <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb"><span class="t">新建笔记</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+      <div class="date pos-open"><div class="d">9月28日</div><div class="w">周日</div></div>
+      <div class="bar-wrap open">
+        <div class="bar">
+          <div class="lead g-album" style="background:#2E7A47"></div>
+          <div class="label">选了 2 张<span class="sub">点空白处收起</span></div>
+        </div>
+        <div class="panel">
+          <div class="modes">
+            <div class="mode"><span class="x" style="background:#F6C445"></span>直接写</div>
+            <div class="mode"><span class="x" style="background:#E9723D"></span>拍照</div>
+            <div class="mode on a"><span class="x"></span>相册</div>
+            <div class="mode"><span class="x" style="background:#3F52D6"></span>链接</div>
+          </div>
+          <div class="strip">
+            <div class="cell"><div class="x">✕</div></div>
+            <div class="cell"><div class="x">✕</div></div>
+            <div class="cell" style="background:rgba(35,37,44,.05);display:flex;align-items:center;justify-content:center;font-size:44px;color:#9A9EA6">＋</div>
+          </div>
+          <div class="pick2">
+            <div class="pk s"><div class="g g-camera"></div><div class="l">现拍一张</div><div class="h">对准纸页直接拍</div></div>
+            <div class="pk a"><div class="g g-album"></div><div class="l">从相册选</div><div class="h">可多选，最多 9 张</div></div>
+          </div>
+          <div class="acts"><div class="act ghost">清空</div><div class="act solid">开始提炼</div></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tb on"><div class="ic"></div>新建<div class="ln"></div></div>
+        <div class="tb"><div class="ic"></div>笔记<div class="ln"></div></div>
+        <div class="tb"><div class="ic"></div>我的<div class="ln"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ⑤ 标注 ============ -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">⑤ 标注</span>
+      <h3>映射、位置、日期可读性实测、要你拍的五条</h3>
+      <p>下面这些数是从这张效果图的渲染结果里逐像素取的，不是估的。</p>
+    </div>
+    <div class="ph doc">
+      <div class="sb" style="background:#F4F2EC;color:#23252C"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+      <div class="nb" style="background:#F4F2EC;border-bottom:3px solid rgba(35,37,44,.10)"><span class="t" style="color:#23252C">标注</span>
+        <span class="capsule" style="background:rgba(35,37,44,.06);box-shadow:inset 0 0 0 2px rgba(35,37,44,.10);color:#23252C"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+      <div class="docbody">
+
+        <div class="blk">
+          <h4>四个动作怎么落在一条上</h4>
+          <div class="map"><span class="sw" style="background:#F6C445"></span><span class="k">点条身</span><span class="v">直接写（默认态）。条身扣掉三枚小圆之后还剩 <b>382 宽 × 128 高</b>，比 88 的触摸下限宽裕。</span></div>
+          <div class="map"><span class="sw" style="background:#E9723D"></span><span class="k">点橙圆</span><span class="v">相机现拍 → 落到④那一态的相机分支。现拍走的是 <code>sourceType:['camera']</code>，和现网同一条。</span></div>
+          <div class="map"><span class="sw" style="background:#46A863"></span><span class="k">点绿圆</span><span class="v">从相册选 → 现网「拍照或截图」里那个 album 分支。多选、最多 9 张、横滑可删，全照旧。</span></div>
+          <div class="map"><span class="sw" style="background:#3F52D6"></span><span class="k">点蓝圆</span><span class="v">链接 → 现网 URL 那条卡，校验、粘贴、报错行一个字不改。</span></div>
+          <p style="margin-top:14px">三枚小圆 <b>72 直径 + 20 间距</b>，够指头；展开后条身里的圆换成四个文字标签（②③④那样），当前那枚带下划线——这样"换模式"和"收起"两件事不打架。</p>
+        </div>
+
+        <div class="blk">
+          <h4>位置（单位 rpx，一屏 750×1624；导航条底 176，底栏顶 1496）</h4>
+          <table>
+            <tr><th></th><th>收起</th><th>展开</th></tr>
+            <tr><td>横条顶边</td><td><b>1258</b>（视口 75%）</td><td>420（视口 17%）</td></tr>
+            <tr><td>横条底边</td><td>1386</td><td>548</td></tr>
+            <tr><td>面板底边</td><td>—</td><td>写 <b>1250</b> / 链接 <b>890</b> / 相册 <b>1120</b></td></tr>
+            <tr><td>离底栏</td><td><b>110</b></td><td>写那态剩 <b>246</b>（最紧的一态）</td></tr>
+            <tr><td>日期行中心</td><td><b>1218</b></td><td>292</td></tr>
+            <tr><td>人像露出比例</td><td>导航条到横条<b>整段都是图</b>，头顶 326、下巴 866 全露</td><td>图只剩条子上方一条，靠升起来换表单空间</td></tr>
+          </table>
+          <p style="margin-top:14px">对比现在：三块手风琴占 <code>900..1380</code>，合并后收起态只剩 <code>1258..1386</code> 一条，<b>480 高的画面还给图</b>。</p>
+        </div>
+
+        <div class="blk">
+          <h4>日期为什么不能"再淡一点"</h4>
+          <p>下巴以下整片是白衬衫，是这张图里最亮的地方（原值 253/253/255）。按现在上线那层罩（那一段 0.42）压完仍有 <b>154</b>，纸白字放在上面<b>最多只有 1.78</b>，淡一点就更看不见。所以这一稿把罩的收口往下挪：从视口 49% 起一路压到 <b>0.78</b>，日期正好坐在 0.78 那一段上（衬衫是平的，压深看不出来，注意力反而还给脸）。</p>
+          <table>
+            <tr><th>日期那一行</th><th>纸白 alpha</th><th>对比</th><th>小字 4.5 门槛</th></tr>
+            <tr><td>现网那层罩（0.42，不改）</td><td>0.80</td><td><b>2.07</b></td><td><span class="no">看不清</span></td></tr>
+            <tr><td>本稿（日期那一行 0.78）</td><td>0.52（星期）</td><td><b>3.75</b></td><td><span class="no">只当装饰</span></td></tr>
+            <tr><td>本稿（日期那一行 0.78）</td><td>0.80（日期）</td><td><b>6.37</b></td><td><span class="ok">过线</span></td></tr>
+          </table>
+          <p style="margin-top:14px">结论：<b>日期 0.80、星期 0.52</b> 是这一稿的取值——日期是提醒，得读；星期是气氛，淡着没关系。字号 34 / 24，细字重（300 / 400），字距拉开，走"水印"而不是"标签"的路子。想更淡就得给它垫一块自己的小暗底，那样反而更重，我没选。</p>
+        </div>
+
+        <div class="warn">
+          <h4>要你拍的五条</h4>
+          <p><b>一、"再往下"和"向下展开"是冲突的。</b>这一稿的解法是收起态沉到 75%、点下去升到 17% 再长开。备选是原地展开＋页面自动滚到顶，实现更省，但每次点开都会"跳一下"，大图也白让了。我推荐前者。</p>
+          <p><b>二、拍照和截图拆成两枚圆。</b>现网是一张卡里两个按钮，语义上"拍照"和"从相册选"确实是两件事，拆开更准；但这一改会让老用户找不到"拍照或截图"那五个字。要不要在绿圆旁边留两个字，你定。</p>
+          <p><b>三、三张卡的饱和色没了。</b>合并后横条是纸白的（像输入框），宝蓝/橙/黄/绿退成四枚小圆的身份色。这是这一稿最大的视觉变化，也是"继续简化"的代价——你要是想保住那三块色，横条就得改回彩色，但一条只能一个色，反而更怪。</p>
+          <p><b>四、日期是公历。</b>只画了「9月28日 周日」。要不要带农历/节气，没提我就不加。</p>
+          <p><b>五、这一稿会动到已经上线的东西。</b>三块手风琴、上一批刚做的 42vh 下移和展开让位，都会被这条替换掉（让位的思路还在，只是从"收留白"变成"条子升起来"）。所以它得单独一批走，不能和背景图那批混着提审。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+/* 图形：全部沿用现网 create.wxss 里那三个 Lucide 遮罩（link / image / pencil / camera / images），
+   只是换了承载：小圆里是 38 的实心块，条身左侧是 52 的 lead。 */
+.g-link{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/%3E%3C/svg%3E") center/contain no-repeat}
+.g-image{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E") center/contain no-repeat}
+.g-pencil{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E") center/contain no-repeat}
+.g-camera{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E") center/contain no-repeat}
+.g-album{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='7' x='3' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='14' rx='1.4'/%3E%3Crect width='7' height='7' x='3' y='14' rx='1.4'/%3E%3C/svg%3E") center/contain no-repeat}
+.dot i,.lead,.pk .g{-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;-webkit-mask-size:contain}
+</style>
+</body>
+</html>
