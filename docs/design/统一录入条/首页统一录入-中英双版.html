@@ -44,13 +44,13 @@
   .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:#F4F2EC;border-radius:52px;
     box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16);
     --skin:#443C25;--bar-idle:rgba(242,239,233,.62)}
-  .ph.doc{height:4300px}
+  .ph.doc{height:4620px}
 
   .bg{position:absolute;left:0;top:176px;width:750px;height:1448px;background-size:100% 100%}
   .scrim{position:absolute;left:0;top:176px;width:750px;height:1448px;
     background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.58) 150px,
-      rgba(18,20,26,.44) 620px,rgba(18,20,26,.42) 900px,rgba(18,20,26,.52) 1200px,
-      rgba(18,20,26,.6) 1448px)}
+      rgba(18,20,26,.44) 620px,rgba(18,20,26,.42) 900px,rgba(18,20,26,.52) 1200px,rgba(18,20,26,.62) 1250px,
+      rgba(18,20,26,.72) 1448px)}
 
   .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
     font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
@@ -105,12 +105,13 @@
   .dot.shot{background:var(--m-shot)} .dot.shot i{background:var(--m-shot-ink)}
   .dot.album{background:var(--m-album)} .dot.album i{background:var(--m-album-ink)}
 
-  /* 换图：一枚裸图标，居中坐在长条下面那段空白里（1386..1496）。
-     视觉 44，热区 96×96——图标可以小，手指能落的地方不能小。 */
+  /* 换图：一枚"照片"图标 + 一行极淡的字，居中坐在长条下面那段空白里（1386..1496）。
+     字是必需的：纯图标没人读得出"换背景"这层意思，而那正是这一枚要办的事。
+     整行都是热区（左右到边、上下 110），图标本身只有 38。 */
   .swap{position:absolute;left:0;right:0;top:1386px;height:110px;z-index:8;
-    display:flex;align-items:center;justify-content:center}
-  .swap .hit{width:96px;height:96px;display:flex;align-items:center;justify-content:center}
-  .swap i{width:44px;height:44px;background:rgba(242,239,233,.72)}
+    display:flex;align-items:center;justify-content:center;gap:12px}
+  .swap i{width:38px;height:38px;background:rgba(242,239,233,.92);flex:none}
+  .swap span{font-size:28px;font-weight:700;letter-spacing:1px;color:rgba(242,239,233,.85)}
 
   /* ---------- 展开面板 ---------- */
   .panel{background:#fff;border-radius:0 0 40px 40px;padding:8px 34px 34px;color:#23252C;
@@ -191,7 +192,7 @@
   .g-pencil{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E") center/contain no-repeat}
   .g-camera{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E") center/contain no-repeat}
   .g-album{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='7' x='3' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='14' rx='1.4'/%3E%3Crect width='7' height='7' x='3' y='14' rx='1.4'/%3E%3C/svg%3E") center/contain no-repeat}
-  .g-swap{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 16 4 4 4-4'/%3E%3Cpath d='M7 20V4'/%3E%3Cpath d='m15 8 4-4 4 4'/%3E%3Cpath d='M17 4v16'/%3E%3C/svg%3E") center/contain no-repeat}
+  .g-swap{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='3.4'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E") center/contain no-repeat}
   .dot i,.lead,.pk .g,.swap i{-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;-webkit-mask-size:contain}
 </style>
 </head>
@@ -216,7 +217,7 @@ const L = {
     urlPh:'https://mp.weixin.qq.com/…', paste:'粘贴',
     urlNote:'链接要以 http:// 或 https:// 开头。公众号文章、普通网页都行。',
     shot1:'拍照', shot1h:'直接开相机', shot2:'相册', shot2h:'选已有截图',
-    clear:'清空', extract:'开始提炼',
+    clear:'清空', extract:'开始提炼', swap:'换背景',
   },
   en: {
     nav:'New note', slogan:"Save what's worth saving", sloganCls:'en',
@@ -230,7 +231,7 @@ const L = {
     urlPh:'https://mp.weixin.qq.com/…', paste:'Paste',
     urlNote:'Link must start with http:// or https://. WeChat articles and web pages both work.',
     shot1:'Camera', shot1h:'Open the camera', shot2:'Album', shot2h:'Pick a screenshot',
-    clear:'Clear', extract:'Extract',
+    clear:'Clear', extract:'Extract', swap:'Change photo',
   }
 }
 
@@ -249,7 +250,7 @@ const shell = (lang, inner) => `
     <div class="tb"><div class="ic"></div>${lang===L.zh?'我的':'Mine'}<div class="ln"></div></div>
   </div>`
 
-const swap = `<div class="swap"><div class="hit"><i class="g-swap"></i></div></div>`
+const swap = (l) => `<div class="swap"><i class="g-swap"></i><span>${l.swap}</span></div>`
 
 const collapsed = (l) => shell(l, `
   <div class="bar-wrap collapsed"><div class="bar">
@@ -260,7 +261,7 @@ const collapsed = (l) => shell(l, `
       <div class="dot album"><i class="g-album"></i></div>
       <div class="dot url"><i class="g-link"></i></div>
     </div>
-  </div></div>${swap}`)
+  </div></div>${swap(l)}`)
 
 const modes = (l, on) => `<div class="modes">
   ${['w','s','a','u'].map(k=>{
@@ -284,7 +285,7 @@ const openWrite = (l) => shell(l, `
       <div class="acts"><div class="act ghost">${l.cancel}</div><div class="act solid">${l.save}</div></div>
       <div class="note">${l.writeNote}</div>
     </div>
-  </div>${swap}`)
+  </div>${swap(l)}`)
 
 const openLink = (l) => shell(l, `
   <div class="bar-wrap open">
@@ -295,7 +296,7 @@ const openLink = (l) => shell(l, `
       <div class="acts"><div class="act ghost">${l.paste}</div><div class="act off">${l.save}</div></div>
       <div class="note">${l.urlNote}</div>
     </div>
-  </div>${swap}`)
+  </div>${swap(l)}`)
 
 const openAlbum = (l) => shell(l, `
   <div class="bar-wrap open">
@@ -309,7 +310,7 @@ const openAlbum = (l) => shell(l, `
       </div>
       <div class="acts"><div class="act ghost">${l.clear}</div><div class="act solid">${l.extract}</div></div>
     </div>
-  </div>${swap}`)
+  </div>${swap(l)}`)
 
 const unit = (step, h3, p, body, tall) => `<div class="unit">
   <div class="cap"><span class="step">${step}</span><h3>${h3}</h3><p>${p}</p></div>
@@ -323,7 +324,7 @@ const DOC = `
     <div class="blk">
       <h4>这一轮改的三处</h4>
       <p><b>条身换字</b>：「我想记下来」→「<b>动动手指</b>」，字号顺手从 44 提到 46（四个字比六个字短，得撑住那条）。英文这一句现网没有对应串，这一稿暂写 <code>Tap and jot</code>，等你定。</p>
-      <p><b>换图退成一枚图标</b>：撤掉原来那颗带底和描边的胶囊，只留<b>上下两个反向半箭头</b>（Lucide arrow-up-down），挪到长条下面那段空白里居中。</p>
+      <p><b>换图退成一枚图标</b>：撤掉原来那颗带底和描边的胶囊。半箭头你看着不对——换成一枚<b>照片图标</b>（相框里一座山一个太阳）加两个字「<b>换背景</b>」，仍旧居中坐在长条下面那段空白里。图标管认意，字管说清，两个都不抢。</p>
       <p><b>日期行回到左对齐</b>：右端腾出来后只剩「9月28日 周日」，不用再接别的东西。</p>
     </div>
 
@@ -334,10 +335,10 @@ const DOC = `
         <tr><td>长条底边</td><td>1386</td></tr>
         <tr><td>底栏顶边</td><td>1496</td></tr>
         <tr><td>中间这段空白</td><td><b>110</b>，图标居中坐在里面</td></tr>
-        <tr><td>图标视觉大小</td><td>44 × 44，纸白 0.72（比日期淡，比背景亮一档）</td></tr>
-        <tr><td>可点热区</td><td><b>96 × 96</b>，比图标大一圈，超出空白也不吃亏（左右整行都是它的）</td></tr>
+        <tr><td>图标视觉大小</td><td>38 × 38，纸白 0.92；旁边那两个字 28 / 700 字重、纸白 0.85</td></tr>
+        <tr><td>可点热区</td><td><b>整行 750 × 110</b>——图标和字一起算一个点，不必瞄准 38 那小块</td></tr>
       </table>
-      <p style="margin-top:14px">图标可以小，手指能落的地方不能小——微信的舒适触摸下限是 88，所以视觉 44、热区 96。它和长条不重叠，收起态点它是换图、点条身是展开，两件事不会撞。</p>
+      <p style="margin-top:14px">图标可以小，手指能落的地方不能小——微信的舒适触摸下限是 88，所以干脆把这一整条空白都给了它。它和长条不重叠，点它是换图、点条身是展开，两件事不会撞。字用 28 加粗、纸白 0.85，比图标只淡一档，扫一眼是提示不是第二个按钮。</p>
     </div>
 
     <div class="blk">
@@ -346,7 +347,7 @@ const DOC = `
       <div class="map"><span class="sw" style="background:#E9723D"></span><span class="k">点橙圆</span><span class="v">相机现拍，走 <code>sourceType:['camera']</code>，和现网同一条。</span></div>
       <div class="map"><span class="sw" style="background:#46A863"></span><span class="k">点绿圆</span><span class="v">从相册选，多选、最多 9 张、横滑可删，照旧。</span></div>
       <div class="map"><span class="sw" style="background:#3F52D6"></span><span class="k">点蓝圆</span><span class="v">链接，校验、粘贴、报错行一个字不改。</span></div>
-      <div class="map"><span class="sw" style="background:rgba(242,239,233,.9);box-shadow:inset 0 0 0 3px #23252C"></span><span class="k">点条下那枚箭头</span><span class="v">跳到<b>「我的 → 卡片模板」</b>那一页换背景图。<b>它不弹相册</b>——只是导流，选图仍然只在那一页做一次。</span></div>
+      <div class="map"><span class="sw" style="background:rgba(242,239,233,.9);box-shadow:inset 0 0 0 3px #23252C"></span><span class="k">点条下「换背景」</span><span class="v">跳到<b>「我的 → 卡片模板」</b>那一页换背景图。<b>它不弹相册</b>——只是导流，选图仍然只在那一页做一次。</span></div>
     </div>
 
     <div class="blk">
@@ -361,6 +362,7 @@ const DOC = `
         <tr><td>链接那态</td><td>粘贴 · 保存</td><td>Paste · Save</td><td><span class="ok">现网有</span></td></tr>
         <tr><td>相册那态</td><td>拍照（直接开相机）· 相册（选已有截图）· 清空 · 开始提炼</td><td>Camera (Open the camera) · Album (Pick a screenshot) · Clear · Extract</td><td><span class="ok">现网有</span></td></tr>
         <tr><td>日期</td><td>9月28日 周日</td><td>Sep 28 · Sun</td><td>跟着语言切</td></tr>
+        <tr><td>条下那枚</td><td>换背景</td><td>Change photo</td><td><span class="no">新串</span></td></tr>
         <tr><td>条身按模式换字</td><td>动动手指 / 贴个链接 / 选了 2 张</td><td>Tap and jot / Paste a link / 2 picked</td><td><span class="no">全是新串</span></td></tr>
       </table>
       <p style="margin-top:14px">英文比中文长，两处会顶到：<b>slogan</b>（"Save what's worth saving" 22 个字符）字号降到 38 才和右侧「中/EN」挤得下；<b>条身</b>英文用 42。两处都留了省略号兜底，真机上再溢出就截断而不是换行——一换行整条高度就变了。</p>
@@ -373,16 +375,17 @@ const DOC = `
         <tr><td>slogan（中英同一档）</td><td>纸白 0.96</td><td><b>5.34</b></td><td><span class="ok">过线</span></td></tr>
         <tr><td>「9月28日」</td><td>纸白 0.95 / 细字重</td><td><b>4.90</b></td><td><span class="ok">过线</span></td></tr>
         <tr><td>「周日」</td><td>纸白 0.56</td><td><b>2.80</b></td><td><span class="no">只当气氛</span></td></tr>
-        <tr><td>条下那枚箭头</td><td>纸白 0.72</td><td><b>3.42</b></td><td><span class="ok">图标按 3:1 判，过线</span></td></tr>
+        <tr><td>条下那枚照片图标</td><td>纸白 0.92</td><td><b>4.98</b></td><td><span class="ok">图标按 3:1 判，过线</span></td></tr>
+        <tr><td>条下「换背景」</td><td>纸白 0.85 / 28 / 700</td><td><b>4.54</b></td><td><span class="ok">小字 4.5 过线</span></td></tr>
       </table>
-      <p style="margin-top:14px">图标走的是 WCAG 对图形件的 <b>3:1</b>（非文本对比度），不是小字的 4.5，所以 0.72 这一档够用。箭头那一行取的是中英两台里较低的那个读数（中文那台 3.84）。</p>
-      <p style="margin-top:10px">但这一档只在<b>铺了背景图</b>时成立。用户在「我的」里把背景关掉之后，这页回到壁纸，纸白箭头会直接消失——那态得改用页面自己的 <code>--text-secondary</code>，也就是跟日期那行同一个色，不能把 0.72 写死。</p>
+      <p style="margin-top:14px">图标走的是 WCAG 对图形件的 <b>3:1</b>（非文本对比度），那行字按小字 <b>4.5</b> 判。两行取的都是它背后那一小块里<b>最亮的 5%</b>像素，不是平均底色——照片上平均数会骗人。为了让这两行过线，压暗层在 1200 以下从 0.60 收到 <b>0.72</b>，只动最下面那一段，slogan 和日期那两档没碰。</p>
+      <p style="margin-top:10px">但这两档只在<b>铺了背景图</b>时成立。用户在「我的」里把背景关掉之后，这页回到壁纸，纸白的图标和字会直接化掉——那态得改用页面自己的 <code>--text-secondary</code>，也就是跟日期那行同一个色，不能把 0.92 / 0.85 写死。</p>
     </div>
 
     <div class="warn">
       <h4>只剩两件等你点头</h4>
       <p><b>一、条身那句英文。</b>「动动手指」我暂给 <code>Tap and jot</code>（四个音节、动作开头）。要更直白可以换 <code>Tap and note</code>，要更松可以换 <code>Just tap — start writing</code>。你定一个，我照写。</p>
-      <p><b>二、那枚箭头会不会太隐晦。</b>它现在没有文字、没有底，只靠"上下反向的半箭头"表达"换一张"。这个符号更常见的读法是"切换/交换"，第一次看见的人未必想到是换背景图。要加字就得回到胶囊那种带底的做法（你刚说太重），所以我先按纯图标画，真机上要是没人点，再考虑第一次进来给一句浮层提示。</p>
+      <p><b>二、英文那两个字。</b>「换背景」我暂给 <code>Change photo</code>。现网字典里没有这条，另外三条新串（条身、贴个链接、选了 N 张）也一样，等你把英文口径定了我一次写进 <code>i18n.js</code>。</p>
     </div>
   </div>`
 
@@ -390,7 +393,7 @@ const flow = document.getElementById('flow')
 let html = ''
 const caps = {
   zh: [
-    ['① 中文 · 收起','一条横条 + 三个小圆，换图退成条下一枚箭头','条身「动动手指」，右边三枚小圆：拍照（橙）· 相册（绿）· URL（蓝）。长条沉到视口 75%，它下面那段 110 的空白里居中一枚上下反向的半箭头。'],
+    ['① 中文 · 收起','一条横条 + 三个小圆，换图退成条下一枚照片图标','条身「动动手指」，右边三枚小圆：拍照（橙）· 相册（绿）· URL（蓝）。长条沉到视口 75%，它下面那段 110 的空白里居中一枚照片图标加「换背景」两个字。'],
     ['② 中文 · 展开写','点条身就是写，条子先升起来再往下长','横条升到 420、下面长出表单，220ms 一起走。条身里三枚小圆换成四个模式标签，当前那枚带下划线。'],
     ['③ 中文 · 展开链接','点蓝圆直接进那一态','链接这一态最矮，470 就够，下面还留着大半屏的图。'],
     ['④ 中文 · 展开相册','已选两张','拍照 / 相册 两个按钮和字都没动，只是从"入口"变成"这一态里再选一次"。'],
