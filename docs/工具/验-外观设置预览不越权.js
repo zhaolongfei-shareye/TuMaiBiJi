@@ -41,36 +41,42 @@ const readLocal = (mp) => mp.evaluate(() => wx.getStorageSync('localWallpaper') 
   ck('预览里画了四行笔记', (await page.$$('.mock-row')).length === 4)
   await mp.screenshot({ path: `${OUT}/实测-进页.png` })
 
-  // ① 点最后那一枚（天青，带色阶、只存本机）——只该改预览
-  await chips[7].tap()
+  // ① 点那两枚"带色阶、只存本机"之一——只该改预览。
+  // 挑哪一枚要看进来时在用哪枚：previewing 的语义是 key !== 在用（wallpaper.js:120），
+  // 固定点天青而进来时正好是天青，这一条怎么点都是 false——上一把那条红就是这个原因，
+  // 不是代码坏了，是探针把"起点不是天青"这个前提写死了。
+  const targetKey = (start.currentWallpaper === 'tint-celadon' ? 'tint-paper' : 'tint-celadon')
+  const targetIdx = (start.wallpapers || []).findIndex((x) => x.key === targetKey)
+  ck('试看那一枚在条子里', targetIdx >= 0 && !!chips[targetIdx], `index=${targetIdx}`)
+  await chips[targetIdx].tap()
   await sleep(1200)
   const p1 = await page.data()
-  ck('点色块后 previewKey 是天青', p1.previewKey === 'tint-celadon', p1.previewKey)
+  ck(`点色块后 previewKey 是${targetKey === 'tint-celadon' ? '天青' : '象牙'}`, p1.previewKey === targetKey, p1.previewKey)
   ck('点色块后标记成"在试看"', p1.previewing === true)
   ck('点色块不许改在用的壁纸', p1.currentWallpaper === start.currentWallpaper,
     `${start.currentWallpaper} → ${p1.currentWallpaper}`)
   ck('点色块不许改本页主题（themeClass 原样）', p1.themeClass === start.themeClass, p1.themeClass)
   const midLocal = await readLocal(mp)
   ck('点色块不许写本机偏好', midLocal === startLocal, `${startLocal} → ${midLocal}`)
-  ck('条子滚到试看那一枚', p1.intoView === 'wp-tint-celadon', p1.intoView)
-  await mp.screenshot({ path: `${OUT}/实测-试看天青.png` })
+  ck('条子滚到试看那一枚', p1.intoView === `wp-${targetKey}`, p1.intoView)
+  await mp.screenshot({ path: `${OUT}/实测-试看${targetKey}.png` })
 
   // ② 点上面那部手机——这才算选定
   await (await page.$('.stage')).tap()
   await sleep(2000)
   const p2 = await page.data()
-  ck('点手机预览才换上', p2.currentWallpaper === 'tint-celadon', p2.currentWallpaper)
-  ck('换上了主题类名跟着走', /theme-tint-celadon/.test(p2.themeClass || ''), p2.themeClass)
+  ck('点手机预览才换上', p2.currentWallpaper === targetKey, p2.currentWallpaper)
+  ck('换上了主题类名跟着走', new RegExp('theme-' + targetKey).test(p2.themeClass || ''), p2.themeClass)
   ck('换完不再是"试看"态', p2.previewing === false)
   const nowLocal = await readLocal(mp)
-  ck('带色阶那枚只写本机', nowLocal === 'tint-celadon', nowLocal)
-  await mp.screenshot({ path: `${OUT}/实测-换上象牙天青那枚.png` })
+  ck('带色阶那枚只写本机', nowLocal === targetKey, nowLocal)
+  await mp.screenshot({ path: `${OUT}/实测-换上${targetKey}.png` })
 
   // ③ 预览和在用是同一枚时再点，不该重复走一遍
   await (await page.$('.stage')).tap()
   await sleep(1200)
   const p3 = await page.data()
-  ck('重复点同一枚不再走一次换壁纸', p3.currentWallpaper === 'tint-celadon' && p3.applying === false)
+  ck('重复点同一枚不再走一次换壁纸', p3.currentWallpaper === targetKey && p3.applying === false)
 
   // 还原：把进来时那枚点回去，别把模拟器的偏好留在试看态
   const idx = (p2.wallpapers || []).findIndex((x) => x.key === start.currentWallpaper)
