@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 笔记列表堆叠卡（中英双版 · 2026-09-28）</title>
+<style>
+/* ==================================================================
+   站长 09-28 深夜口径（原话）：
+     "默认卡片在屏幕中央，然后前后笔记，折叠收在后面，只需露出标题，
+      用户可以上下滑动，或者点击切换笔记。然后点击当前笔记就放大窗口看完整详情。
+      再点击就缩回。"
+
+   这一稿只画，不动代码。四条屏：① 默认堆叠 ② 上下滑切换中 ③ 点开放大 ④ 英文默认态。
+
+   口径与代码同一把尺子（沿用上一版那套，别再各画各的）：
+     px 当 rpx 用，设计宽 750；一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690。
+     背景引线上原图 miniprogram/assets/home-bg-portrait.jpg（865×1670），放法 cover，
+     和 <image mode="aspectFill"> 同一条裁切；压暗停点逐字抄 create.wxss。
+     圆角、字阶、描边、底栏几何与现网 app.wxss 逐值相同；
+     底栏那支色是 palette.chromeOf('tint-celadon') 现算的 #25442B（他这台在用天青）。
+     屏上每一句界面中文都从 utils/i18n.js 抄，新造的串在标注表里单列。
+   ================================================================== */
+  :root{
+    --r-card:40px; --r-chip:28px; --r-pill:999px; --r-btn:16px; --w-edge:3px;
+    --paper:#F2EFE9; --ink:#23252C;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px; --fs-label:20px;
+    --chrome:#25442B; --chrome-line:rgba(242,239,233,.22); --chrome-idle:rgba(242,239,233,.68);
+    --card:#FCFBF8; --card-edge:rgba(36,30,22,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:#23252C;padding:26px 15px 70px;font-family:-apple-system,'PingFang SC',sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;flex-wrap:wrap;gap:64px 56px;width:2400px;align-items:flex-start}
+  .brk{width:100%;height:0}
+  .unit{width:750px;flex:none}
+  .cap{margin-bottom:14px;min-height:130px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap b{color:#23252C}
+
+  .ph{width:750px;height:1690px;position:relative;overflow:hidden;background:#E9EEEA;border-radius:52px;
+    box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16)}
+  .ph.doc{height:auto;padding-bottom:26px}
+  .bg{position:absolute;left:0;top:184px;width:750px;height:1506px;background-size:cover;background-position:center;z-index:0}
+  .scrim{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:1;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)}
+  .lay{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:2}
+
+  .sb{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}.sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .nb{height:90px;background:#181A20;position:relative;z-index:12}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:#F2EFE9;letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:13px;width:174px;height:64px;border-radius:34px;
+    background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);color:#F2EFE9;
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  .hero{position:absolute;left:24px;right:24px;top:45px;display:flex;align-items:baseline;justify-content:space-between}
+  .hero .h1{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96);line-height:1.15}
+  .hero .h1.en{font-size:38px;letter-spacing:-.5px}
+  .hero .stats{font-size:var(--fs-meta);font-weight:600;color:rgba(242,239,233,.95);white-space:nowrap}
+
+  .spill{position:absolute;left:24px;right:24px;top:146px;height:128px;border-radius:var(--r-pill);
+    background:var(--paper);box-shadow:0 18px 46px rgba(8,10,14,.42);
+    display:flex;align-items:center;padding:0 22px 0 34px;gap:20px}
+  .spill .q{flex:1;min-width:0;font-size:var(--fs-body);color:#9A9EA6;white-space:nowrap;overflow:hidden}
+  .spill .go{flex:none;font-size:var(--fs-title);font-weight:800;letter-spacing:-.5px;color:var(--ink)}
+  .spill .rule{position:absolute;left:34px;right:120px;bottom:24px;height:3px;background:var(--ink);opacity:.42}
+
+  .chips{position:absolute;left:24px;right:24px;top:306px;height:56px;display:flex;gap:12px;overflow:hidden}
+  .chip{height:56px;flex:none;border-radius:var(--r-pill);display:flex;align-items:center;padding:0 26px;
+    font-size:var(--fs-meta);font-weight:600;white-space:nowrap}
+  .chip.idle{background:rgba(18,20,26,.42);color:#F2EFE9;box-shadow:inset 0 0 0 var(--w-edge) rgba(242,239,233,.30)}
+  .chip.on{background:var(--paper);color:var(--ink);font-weight:700}
+
+  /* ---------- 堆叠：一列居中，中心卡自然高，前后各收一条 ---------- */
+  .stack{position:absolute;left:0;right:0;top:396px;bottom:128px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+  .fold{width:604px;height:74px;border-radius:var(--r-card);flex:none;
+    background:rgba(252,251,248,.78);box-shadow:inset 0 0 0 var(--w-edge) rgba(242,239,233,.34);
+    display:flex;align-items:center;padding:0 30px;gap:14px;overflow:hidden;
+    transition:transform .2s ease}
+  .fold .dot{width:14px;height:14px;border-radius:50%;flex:none}
+  .fold .ti{flex:1;min-width:0;font-size:var(--fs-body);font-weight:700;letter-spacing:-.5px;color:#23252C;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fold .dt{flex:none;font-size:var(--fs-tiny);font-weight:800;letter-spacing:.4px;color:rgba(35,37,44,.5)}
+  .center{width:690px;border-radius:var(--r-card);flex:none;
+    background:var(--card);border:var(--w-edge) solid var(--card-edge);
+    box-shadow:0 22px 54px rgba(8,10,14,.34);padding:32px 30px 26px}
+  .center .ti{font-size:36px;font-weight:800;letter-spacing:-.8px;line-height:1.3;color:#23252C}
+  .center .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:4px 14px;
+    border-radius:10px;background:#23252C;color:#E9EEEA;margin-right:10px;vertical-align:3px}
+  .center .su{margin-top:16px;font-size:var(--fs-body);line-height:1.62;color:#5c6068}
+  .center .foot{margin-top:24px;padding-top:18px;border-top:var(--w-edge) solid rgba(35,37,44,.10);
+    display:flex;align-items:center;gap:11px;white-space:nowrap;font-size:var(--fs-meta);color:#5c6068}
+  .center .foot .cat{display:flex;align-items:center;gap:9px;font-weight:800;color:#23252C;flex:none}
+  .center .foot .cat i{width:14px;height:14px;border-radius:50%;background:#23252C;flex:none}
+  .center .foot .sep{color:rgba(35,37,44,.35)}
+  .center .foot .tg{overflow:hidden;text-overflow:ellipsis;color:rgba(35,37,44,.42);min-width:0}
+  .center .foot .dt{margin-left:auto;font-weight:800;letter-spacing:.4px;flex:none}
+  .center .foot .cv{font-size:var(--fs-body);color:rgba(35,37,44,.42)}
+  .hint{margin-top:14px;font-size:var(--fs-tiny);font-weight:600;letter-spacing:.4px;
+    color:rgba(242,239,233,.62);flex:none}
+  .pager{display:flex;justify-content:center;gap:12px;flex:none}
+  .pager i{width:12px;height:12px;border-radius:50%;background:rgba(242,239,233,.34)}
+  .pager i.on{background:var(--paper);width:34px;border-radius:999px}
+
+  /* ② 切换中：中心卡往上退、下一张正在长大，整叠用 transform 表达，不动布局 */
+  .stack.mid{gap:14px}
+  .stack.mid .center{transform:translateY(-46px) scale(.9);opacity:.42}
+  .stack.mid .fold.up{transform:translateY(-108px) scale(.9);opacity:.28}
+  .stack.mid .fold.dn{transform:translateY(-58px) scale(1.045);
+    background:var(--card);opacity:1;box-shadow:inset 0 0 0 var(--w-edge) var(--card-edge),0 22px 54px rgba(8,10,14,.34)}
+
+  /* 展开态 */
+  .open .scrim{background:linear-gradient(180deg,rgba(18,20,26,.66) 0%,rgba(18,20,26,.6) 100%)}
+  /* 展开那一态：页头/搜索/分类整块淡掉，让这张卡自己占住屏幕——
+     半遮着标题比让开更难看，第一稿就是被卡的圆角切掉半个「我的笔记」。 */
+  .lay.dim{opacity:.14}
+  .bigcard{position:absolute;left:24px;right:24px;top:40px;bottom:120px;border-radius:var(--r-card);
+    background:var(--card);border:var(--w-edge) solid var(--card-edge);box-shadow:0 26px 64px rgba(8,10,14,.5);
+    padding:38px 34px 26px;overflow:hidden}
+  .bigcard .ti{font-size:40px;font-weight:800;letter-spacing:-1px;line-height:1.34;color:#23252C}
+  .bigcard .lab{margin-top:30px;font-size:var(--fs-label);font-weight:800;letter-spacing:1.6px;color:rgba(35,37,44,.42)}
+  .bigcard .su{margin-top:12px;font-size:var(--fs-body);line-height:1.7;color:#3a3e46}
+  .bigcard .kpl{margin-top:14px;display:flex;flex-direction:column;gap:14px}
+  .bigcard .kpl .row{display:flex;gap:14px;font-size:var(--fs-body);line-height:1.55;color:#23252C}
+  .bigcard .kpl .row i{width:10px;height:10px;border-radius:50%;background:#54745D;flex:none;margin-top:16px}
+  .bigcard .src{margin-top:22px;display:flex;align-items:center;gap:12px;font-size:var(--fs-meta);color:rgba(35,37,44,.55)}
+  .bigcard .src b{font-weight:700;color:#23252C}
+  .bigcard .close{margin-top:26px;padding-top:20px;border-top:var(--w-edge) solid rgba(35,37,44,.10);
+    display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-meta);font-weight:700;color:rgba(35,37,44,.5)}
+  .bigcard .close .chev{font-size:34px;line-height:1}
+
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:44px;
+    background:var(--chrome);display:flex;z-index:10;box-shadow:0 16px 44px rgba(0,0,0,.42);
+    border:var(--w-edge) solid var(--chrome-line)}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font-size:20px;font-weight:600;color:var(--chrome-idle);letter-spacing:.3px}
+  .tb .ic{width:40px;height:40px;position:relative;border:3px solid currentColor}
+  .tb.notes .ic{border-radius:8px}.tb.notes .ic::after{content:'';position:absolute;left:7px;right:7px;top:11px;height:3px;background:currentColor;box-shadow:0 8px 0 currentColor}
+  .tb.create .ic{border-radius:50%}.tb.create .ic::after{content:'+';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:300;line-height:1}
+  .tb.me .ic{border-radius:50%;height:20px;width:20px;margin-top:10px;border-bottom:none}
+  .tb.on{color:#F2EFE9;font-weight:700}
+  .tb .ln{width:26px;height:4px;border-radius:2px;background:currentColor;opacity:0}
+  .tb.on .ln{opacity:1}
+
+  .docbody{padding:26px 30px 0}
+  .blk2{margin-bottom:26px}
+  .blk2 h4{font-size:22px;font-weight:800;letter-spacing:-.4px;margin-bottom:10px}
+  .blk2 p{font-size:16.5px;line-height:1.75;color:#4c5058;margin-bottom:8px}
+  .blk2 b{color:#23252C}
+  table{width:100%;border-collapse:collapse;font-size:15.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid rgba(35,37,44,.12);vertical-align:top;line-height:1.5}
+  th{font-weight:800;background:rgba(35,37,44,.05)}
+  .new{display:inline-block;font-size:12px;font-weight:800;color:#8c2119;background:rgba(140,33,25,.09);border-radius:6px;padding:1px 7px}
+  .live{display:inline-block;font-size:12px;font-weight:800;color:#1d5c34;background:rgba(29,92,52,.10);border-radius:6px;padding:1px 7px}
+</style>
+</head>
+<body>
+<div class="flow" id="flow"></div>
+<script>
+const IMG = '../../miniprogram/assets/home-bg-portrait.jpg'
+
+// 三条笔记是他手机上那三条真数据（标题/来源/日期/标签都照 09-28 那几张实测截图抄），
+// 摘要照屏上读得到的那一截；核心要点那几行是示意，标注表里单列了。
+const NOTES = [
+  { ti:'2026微信小程序开发大赛介绍', su:'微信小程序团队联合 WAICFutureTech 启动 2026 微信小程序开发大赛，以"与AI共生"为主题面向全球征集 AI 小程序作品。',
+    dot:'#23252C', cat:'未分类', src:'截图识别', tag:'微信小程序 / 开发大赛 / 人工智能', dt:'09-23', pin:true,
+    kp:['主题"与AI共生"，面向全球征集','报名与提交都在小程序赛道内完成','获奖作品可进入微信 AI 能力名单'] },
+  { ti:'TVB新晋HiFi女歌手——侯静伊', su:'侯静伊（Connie Hau）是香港 HiFi 女歌手及 TVB 签约艺人，自幼学声乐并获逾 60 项歌唱奖项。她自 2019 年出道已推出三张专辑。',
+    dot:'#23252C', cat:'未分类', src:'公众号文章', tag:'侯静伊 / TVB / HiFi歌手 / 中年好声音', dt:'09-25',
+    kp:['自幼学声乐，获逾 60 项歌唱奖项','2019 年出道，已推出三张专辑','录音以真声为主，编曲留白多'] },
+  { ti:'2026年中秋节祝福语与问候图片大全', su:'本文汇集了 2026 年中秋节的多条温馨祝福语，配合最美问候图片，传达花好月圆、阖家团圆的美好祝愿。内容以月圆人安、顺问夏安这类短句为主。',
+    dot:'#23252C', cat:'未分类', src:'公众号文章', tag:'平安喜乐 / 中秋节 / 祝福语 / 问候图片', dt:'09-25',
+    kp:['按对象分：长辈、同事、客户','每条配一张 1080 见方的问候图','可直接复制，也可存图发朋友圈'] },
+]
+
+const L = {
+  zh:{ nav:'图麦笔记', head:'我的笔记', stats:'本周：0　|　本月：3　|　总数：3',
+    ph:'输入关键词', go:'搜索笔记', all:'全部', pin:'置顶', tab:['新建','笔记','我的'],
+    hint:'上下滑切换 · 点卡片放大', summary:'摘要', keyPoints:'核心要点', tags:'标签',
+    source:'来源链接', close:'再点一下收起', more:'点开看全文' },
+  en:{ nav:'TuMaiBiJi', head:'My notes', stats:'Week: 0  |  Month: 3  |  Total: 3',
+    ph:'Enter keywords', go:'Search notes', all:'All', pin:'Pinned', tab:['Create','Notes','Me'],
+    hint:'Swipe to switch · tap to expand', summary:'Summary', keyPoints:'Key Points', tags:'Tags',
+    source:'Source Link', close:'Tap again to collapse', more:'Tap to read all' },
+}
+
+const shell = (lang, inner) => `
+  <div class="sb"><span>23:03</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb"><span class="t">${lang.nav}</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  <div class="bg" style="background-image:url('${IMG}')"></div><div class="scrim"></div>
+  ${inner}
+  <div class="tabbar">
+    <div class="tb create"><div class="ic"></div>${lang.tab[0]}<div class="ln"></div></div>
+    <div class="tb notes on"><div class="ic"></div>${lang.tab[1]}<div class="ln"></div></div>
+    <div class="tb me"><div class="ic"></div>${lang.tab[2]}<div class="ln"></div></div>
+  </div>`
+
+const head = (lang) => `
+  <div class="lay">
+    <div class="hero"><div class="h1 ${lang === L.en ? 'en' : ''}">${lang.head}</div><div class="stats">${lang.stats}</div></div>
+    <div class="spill"><div class="q">${lang.ph}</div><div class="go">${lang.go}</div><div class="rule"></div></div>
+    <div class="chips"><div class="chip on">${lang.all}</div><div class="chip idle">旅游</div><div class="chip idle">生活</div></div>
+  </div>`
+
+const fold = (n, cls) => `<div class="fold ${cls}"><span class="dot" style="background:${n.dot}"></span><span class="ti">${n.ti}</span><span class="dt">${n.dt}</span></div>`
+
+const center = (lang, n, i) => `
+  <div class="center">
+    <div class="ti">${n.pin ? `<span class="pin">${lang.pin}</span>` : ''}${n.ti}</div>
+    <div class="su">${n.su}</div>
+    <div class="foot">
+      <span class="cat"><i style="background:${n.dot}"></i>${n.cat}</span><span class="sep">·</span>
+      <span>${n.src}</span><span class="sep">·</span><span class="tg">${n.tag}</span>
+      <span class="dt">${n.dt}</span><span class="cv">›</span>
+    </div>
+  </div>`
+
+// ① 默认堆叠：中心是第 2 条，前后各收一张只露标题，再外一层更矮更淡
+const S1 = (lang) => shell(lang, head(lang) + `
+  <div class="lay"><div class="stack">
+    ${fold(NOTES[0], 'up')}
+    ${center(lang, NOTES[1], 1)}
+    ${fold(NOTES[2], 'dn')}
+    <div class="hint">${lang.hint}</div>
+    <div class="pager"><i></i><i class="on"></i><i></i></div>
+  </div></div>`)
+
+// ② 上下滑切换中：中心卡往上让位、下一张正在长大，前后条跟着挪
+const S2 = (lang) => shell(lang, head(lang) + `
+  <div class="lay"><div class="stack mid">
+    ${fold(NOTES[0], 'up')}
+    ${center(lang, NOTES[1], 1)}
+    ${fold(NOTES[2], 'dn')}
+    <div class="hint" style="opacity:.4">${lang.hint}</div>
+    <div class="pager"><i></i><i></i><i class="on"></i></div>
+  </div></div>`)
+
+// ③ 点开：中心卡铺满，其余全部淡掉，只留一条"再点收起"
+const S3 = (lang) => shell(lang, `
+  <div class="open"></div>` + head(lang).replace('class="lay"','class="lay dim"') + `
+  <div class="lay" style="z-index:9">
+    <div class="bigcard">
+      <div class="ti">${NOTES[1].ti}</div>
+      <div class="lab">${lang.summary}</div>
+      <div class="su">${NOTES[1].su}</div>
+      <div class="lab">${lang.keyPoints}</div>
+      <div class="kpl">${NOTES[1].kp.map((k) => `<div class="row"><i></i><span>${k}</span></div>`).join('')}</div>
+      <div class="lab">${lang.tags}</div>
+      <div class="src"><b>${NOTES[1].tag}</b></div>
+      <div class="src">${lang.source} · mp.weixin.qq.com/s/xxxx</div>
+      <div class="close"><span>${lang.close}</span><span class="chev">⌄</span></div>
+    </div>
+  </div>`)
+
+const UNIT = (step, title, note, inner) => `
+  <div class="unit"><div class="cap"><span class="step">${step}</span><h3>${title}</h3><p>${note}</p></div>
+  <div class="ph">${inner}</div></div>`
+
+const DOC = `
+  <div class="sb" style="background:#E9EEEA;color:#23252C"><span>23:03</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb" style="background:#E9EEEA;border-bottom:3px solid rgba(35,37,44,.10)"><span class="t" style="color:#23252C">标注</span>
+    <span class="capsule" style="background:rgba(35,37,44,.06);box-shadow:inset 0 0 0 2px rgba(35,37,44,.10);color:#23252C"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  <div class="docbody">
+    <div class="blk2"><h4>这一版换掉的是什么</h4>
+      <p>列表不再是一列等高卡片往下排，而是<b>一叠卡</b>：中间那张是当前的，前后各收一条只露标题，再外一层更矮更淡。上下滑或点前后那两条 = 换当前；点中间那张 = 放大看完整内容，再点收回。</p>
+      <p>背景图、底栏、搜索条、分类筛选、行卡内部那套画法（点 + 分类名 + 来源 · 标签 · 日期）<b>一条都不改</b>，改的只是"怎么排"。</p>
+      <p>一屏只叠三层（中心 + 前后各一），<b>不再往外加"更淡的第三层"</b>——上一稿试过，两条几乎重叠的淡条读起来像没对齐，不是像叠着。</p></div>
+    <div class="blk2"><h4>尺寸（rpx，视口从 184 起算）</h4>
+      <table>
+        <tr><th>位置</th><th>数值</th></tr>
+        <tr><td>页头 / 搜索 / 分类</td><td>45 · 146..274 · 306..362（与现网逐值相同，没动）</td></tr>
+        <tr><td>堆叠区</td><td>396 起到底栏顶（1378）之间</td></tr>
+        <tr><td>堆叠列</td><td>从 396 到底栏顶 1378 之间垂直居中，条目间距 16</td></tr>
+        <tr><td>中心卡</td><td>宽 690、圆角 40、投影 0 22 54；高度跟着内容走（摘要两行时约 330）</td></tr>
+        <tr><td>前后折叠条</td><td>宽 604、高 74、不透明度 .78，只有一行标题 + 那枚分类点 + 日期</td></tr>
+        <tr><td>提示行 / 位置点</td><td>折叠条下面依次排，点 12、当前那枚拉成 34 宽的胶囊</td></tr>
+        <tr><td>展开态那张</td><td>左右 24、上 40、下留 120 给底栏，圆角 40；页头/搜索/分类整块淡到 .14</td></tr>
+        <tr><td>底栏</td><td>左右 24、高 108、下沿离底 20、圆角 44；色 chromeOf('tint-celadon') = #25442B</td></tr>
+      </table></div>
+    <div class="blk2"><h4>屏上每一句中文的来源</h4>
+      <table>
+        <tr><th>串</th><th>来源</th></tr>
+        <tr><td>我的笔记 / 本周·本月·总数 / 输入关键词 / 搜索笔记 / 全部 / 置顶 / 未分类</td><td><span class="live">现网</span> utils/i18n.js（notesHeading、stat*、searchPh、search、allCategories、pinned、noCategory）</td></tr>
+        <tr><td>截图识别 / 公众号文章 / 摘要 / 核心要点 / 标签 / 来源链接</td><td><span class="live">现网</span> source*、summaryLabel、keyPoints、tagsLabel、sourceLink</td></tr>
+        <tr><td>「上下滑切换 · 点卡片放大」「再点一下收起」</td><td><span class="new">新串</span> 字典里没有，落地要新增两个键（中英各一份）</td></tr>
+        <tr><td>三条笔记的标题、来源、日期、标签</td><td><span class="live">真数据</span> 照 09-28 那几张实测截图抄的三条</td></tr>
+        <tr><td>展开态那三条核心要点、来源链接那串</td><td><span class="new">示意</span> 库里没有对应内容，只为看排布</td></tr>
+      </table></div>
+    <div class="blk2"><h4>三处要你拍</h4>
+      <p><b>一、展开态和现有详情页是什么关系。</b>现在点一条笔记是跳 <code>pages/detail/detail</code> 那一页。这一版把"看完整"收进列表里就地放大，那详情页是留着（分享落地页、搜索直达都要它）还是从这条路径上退掉？<b>我的建议是留着</b>：详情页还挂着编辑、存相册、撤分享三个动作，列表里那张放大的卡只做"读"，不重复做那三个动作。</p>
+      <p><b>二、折叠条上露不露摘要。</b>现在只露标题一行（照你说的"只需露出标题"）。标题长的会被裁——图里那条「2026年中秋节祝福语与问候图片大全」在折叠条上正好到边。要不要给折叠条加一行淡摘要（会占高，一屏就少露一条）。</p>
+      <p><b>三、一屏叠几条。</b>这版画的是「中心 + 前后各一 + 前后各一（淡）」= 一屏看得见 5 条。前后各一只留一条的话更清爽，但"我一共 3 条"这件事就看不出来了。位置点那三个圆是补这个的。</p></div>
+    <div class="blk2"><h4>落地要动的地方（先说清，等你拍完再动）</h4>
+      <p>数据侧不用改接口：<code>/api/notes</code> 已经按 <code>is_pinned</code> 倒序回，前端只要把"当前下标"放进 data，列表从 <code>wx:for</code> 全量渲染改成按下标取 5 条渲染。上下滑用 <code>movable-area</code> + <code>movable-view</code>，或者直接 <code>bindtouchstart/touchend</code> 判方向——后者更轻，我倾向后者。分页加载（现在是一页 50 条往下滚）在堆叠形态下要改成"滑到倒数第二条时提前取下一页"，这一条是这一版唯一动到取数逻辑的地方。</p></div>
+  </div>`
+
+const flow = document.getElementById('flow')
+flow.innerHTML =
+  UNIT('①', '默认态 · 一叠卡，中间这张是当前的', '中心这张是当前的，前后各收一条、只露标题。中心卡里就是行卡那一套画法，一点没改。', S1(L.zh))
+  + UNIT('②', '上下滑切换中', '往下滑：下面那条正在长大、上面那条和当前这张一起往上退，位置点跟着走。点前后那两条也能直接切过去。', S2(L.zh))
+  + UNIT('③', '点中间这张 → 放大看完整', '其余整叠淡掉，这张铺到接近全屏：摘要、核心要点、标签、来源链接都在里面。再点一下收回原位。', S3(L.zh))
+  + UNIT('④', '默认态 · 英文', '同一屏的英文那一版。提示行那两句字典里没有，是这一版要新增的串。', S1(L.en))
+  + `<div class="unit"><div class="cap"><span class="step">标注</span><h3>口径、来源、三处待拍</h3><p>尺寸全部按现网令牌；屏上每一句中文都标了是现网字典里的还是新造的。</p></div>
+     <div class="ph doc">${DOC}</div></div>`
+</script>
+</body>
+</html>
