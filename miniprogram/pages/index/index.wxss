@@ -215,18 +215,19 @@
   padding-bottom: 160rpx;
 }
 
-/* ---------- 头部铺图（效果图里的 C 方案，09-28 深夜落地） ----------
+/* ---------- 整页铺图（09-28 深夜他看完 C 那版之后改口：图要贯穿全屏） ----------
    图和新建页是同一张、同一个开关、同一个取图口（utils/poster.js 的 homeBg()），
-   这里只铺头部那一段：列表一行行压在照片上，滚起来字和图打架，那是 A 的代价。
-   band 高 700rpx 而不是效果图上那个 636——头部高度随语言变（英文标题会折行），
-   留 64 的余量；"纸顶必须落在带内"由真跑那把尺子钉，不靠这个数刚好。
-   两层都是 fixed：滚到哪儿图都守在头部那一段，纸从下面盖上来。 */
+   这一页不再开第二个上传入口。
+   上一版是 C：图只守头部那一段，列表落在一张圆角朝上的纸上。真机反馈"两层框"——
+   纸自己一圈描边，每条笔记又一圈描边，读起来是框套框。现在那张纸撤了：
+   一条笔记一个框，图从导航条底下一直铺到屏底，卡片之间露的就是图。
+   两层都是 fixed：滚到哪儿图都在原地不动，动的是卡片。 */
 .page-bg {
   position: fixed;
   left: 0;
   top: 0;
   width: 750rpx;
-  height: 700rpx;
+  height: 100vh;
   z-index: 0;
 }
 
@@ -235,20 +236,21 @@
   left: 0;
   top: 0;
   width: 750rpx;
-  height: 700rpx;
+  height: 100vh;
   z-index: 1;
-  /* 停点用新建页那一串的头两档（0.58 起、0.44 收）。下面那三档是给整页铺图准备的，
-     这一段只有 700 高，套满会在纸上沿压出一道明显的亮暗接缝。 */
-  background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%,
-    rgba(18, 20, 26, 0.50) 300rpx, rgba(18, 20, 26, 0.44) 700rpx);
+  /* 停点逐字抄新建页那一条。同一张图、同一个视口，两页的明暗必须是一个连续体，
+     不然切 tab 时背景会跳一档。 */
+  background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%, rgba(18, 20, 26, 0.58) 10%,
+    rgba(18, 20, 26, 0.44) 43%, rgba(18, 20, 26, 0.42) 62%,
+    rgba(18, 20, 26, 0.52) 83%, rgba(18, 20, 26, 0.62) 88%, rgba(18, 20, 26, 0.72) 100%);
 }
 
-/* 头部三块和那张纸都要压在罩之上。纸这条尤其不是可选的：
-   fixed 的图有 z-index，静态内容会被它整个盖住。 */
+/* 头部三块和列表都要压在罩之上。列表这条不是可选的：fixed 的图有 z-index，
+   静态内容会被它整个盖住。这一层只管层序，自己不画任何面。 */
 .container.has-bg .page-head,
 .container.has-bg .sc-card,
 .container.has-bg .category-scroll,
-.container.has-bg .sheet {
+.container.has-bg .list-layer {
   position: relative;
   z-index: 2;
 }
@@ -289,16 +291,7 @@
   box-shadow: none;
 }
 
-/* 那张纸：满宽（容器自己有 24 的内缩，所以左右负出去），圆角朝上压住图。
-   没铺图时上面这些一条都不生效，这一屏还是 D2 定稿那个样子。 */
-.sheet {
-  background: transparent;
-}
-
-.container.has-bg .sheet {
-  background: var(--bg-page);
-  border-top: var(--w-edge) solid var(--card-edge);
-  border-radius: var(--r-card) var(--r-card) 0 0;
-  margin: 0 calc(0px - var(--sp-3));
-  padding: 40rpx var(--sp-3) 0;
-}
+/* 那层 .list-layer 只剩一件事：当铺图那一态的层序容器（见上面那条 z-index）。
+   它以前是"一张纸"——满宽、圆角朝上、自己一圈描边，把列表整块托起来。
+   那条描边和每条笔记自己的描边叠在一起就是框套框，09-28 深夜撤掉了。
+   这里刻意不留任何声明：写一条 background: transparent 反而会让人以为还有面要翻。 */

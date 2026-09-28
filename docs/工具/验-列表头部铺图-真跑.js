@@ -1,7 +1,7 @@
-// 笔记列表"头部铺图（C 方案）"的真跑自证：在模拟器里真读计算样式、真量几何、真截图。
+// 笔记列表"整页铺图 + 一条笔记一个框"的真跑自证：在模拟器里真读计算样式、真量几何、真截图。
 // 跑法：NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-列表头部铺图-真跑.js
 // 前置：微信开发者工具已开；改过 WXSS 要先 cli close 再 cli auto --auto-port 9431。
-// 一把量两个状态：开关开着（头部是照片 + 纸白搜索条 + 暗玻璃 chip + 一张纸）
+// 一把量两个状态：开关开着（整屏是照片 + 纸白搜索条 + 暗玻璃 chip，列表只有行卡那一个框）
 // 和开关关掉（这一屏必须逐条退回 D2 那一版）。只量前一个状态等于没量——
 // "关掉开关还剩一半铺图痕迹"是这类改动最容易漏的那件事。
 const automator = require('miniprogram-automator')
@@ -85,28 +85,43 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   await sleep(4500)
   const cls = (await (await page.$('.container')).attribute('class')) || ''
   ck('铺图时容器带 has-bg', /has-bg/.test(cls), cls)
-  const [bgRect, scrimRect, sheetRect] = await rects(['.page-bg', '.page-scrim', '.sheet'])
-  ck('图带从视口顶起、高 700rpx', bgRect && closeTo(bgRect.top, 0) && closeTo(bgRect.h, 700 * R),
-    bgRect && `顶 ${Math.round(bgRect.top)} 高 ${(bgRect.h / R).toFixed(0)}rpx`)
+  const [bgRect, scrimRect] = await rects(['.page-bg', '.page-scrim'])
+  ck('图从视口顶铺到屏底（100vh，卡片之间露的就是它）',
+    bgRect && closeTo(bgRect.top, 0) && closeTo(bgRect.bottom, win.h, 3),
+    bgRect && `顶 ${Math.round(bgRect.top)} 底 ${Math.round(bgRect.bottom)}｜视口高 ${Math.round(win.h)}`)
   ck('罩层和图带同一块地', scrimRect && closeTo(scrimRect.top, bgRect.top) && closeTo(scrimRect.h, bgRect.h))
-  ck('纸是满宽的（左右负出容器的 24 内缩）',
-    sheetRect && Math.abs(sheetRect.left) < 1 && Math.abs(sheetRect.w - win.w) < 2,
-    sheetRect && `左 ${Math.round(sheetRect.left)} 宽 ${(sheetRect.w / R).toFixed(0)}rpx`)
-  ck('纸顶落在图带之内，图不会在纸下面漏出来',
-    sheetRect && sheetRect.top > 0 && sheetRect.top < 700 * R,
-    `纸顶 ${(sheetRect.top / R).toFixed(0)}rpx / 带底 700rpx`)
-  const num = (s) => Number(String(s).match(/[\d.]+/)?.[0] || NaN)
-  const rTL = num(await styleOf(page, '.sheet', 'border-top-left-radius'))
-  const rBL = num(await styleOf(page, '.sheet', 'border-bottom-left-radius'))
-  ck('纸上沿两个角是 40rpx 圆角、下面直角',
-    Math.abs(rTL - 40 * R) < 1.5 && rBL === 0, `上 ${rTL}px（应≈${(40 * R).toFixed(1)}）下 ${rBL}px`)
-  ck('纸底吃的是壁纸底色（和容器无缝）',
-    near(rgbOf(await styleOf(page, '.sheet', 'background-color')),
-      hexArr(p.themeOf(wall).page)),
-    await styleOf(page, '.sheet', 'background-color'))
+  const num = (x) => Number(String(x).match(/[\d.]+/)?.[0] || NaN)
+  // 这一层必须"什么都不是"：没有面、没有圆角、没有描边——它以前是一张托着列表的纸，
+  // 那圈描边和每条笔记自己的描边叠起来就是他说的"两层框"。
+  ck('列表那一层没有面（透出底下的图）',
+    /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list-layer', 'background-color')),
+    await styleOf(page, '.list-layer', 'background-color'))
+  // await 不能写在 .every 的回调用里（那不是 async 回调），先读成一串再比
+  const readAll = async (props) => {
+    const out = {}
+    for (const k of props) out[k] = num(await styleOf(page, '.list-layer', k))
+    return out
+  }
+  const radii = await readAll(['border-top-left-radius', 'border-top-right-radius',
+    'border-bottom-left-radius', 'border-bottom-right-radius'])
+  ck('列表那一层四个角都是直角', Object.values(radii).every((v) => v === 0), JSON.stringify(radii))
+  const edges = await readAll(['border-top-width', 'border-bottom-width',
+    'border-left-width', 'border-right-width'])
+  ck('列表那一层没有描边（框只有行卡那一个）', Object.values(edges).every((v) => v === 0), JSON.stringify(edges))
+  // 卡底不是恒白：淡雅那两枚壁纸下 --bg-card 是比纸亮一档的暖白/冷白。
+  // 这个值只写在 app.wxss 的主题类里（themeOf 给的是 page/line，没有 card），所以从那里现读。
+  const themeCls = p.themeOf(wall).cls
+  const APP = fs.readFileSync(P('app.wxss'), 'utf8')
+  const cardHex = (/--bg-card:\s*(#[0-9A-Fa-f]{6}|rgba?\([^)]*\))/
+    .exec(new RegExp(`\\.${themeCls}\\s*\\{([\\s\\S]*?)\\}`).exec(APP)[1]) || [])[1]
+  const rowBg = await styleOf(page, '.note-row', 'background-color')
+  ck('行卡自己有且只有一个框（框只有这一层，卡底对得上主题那一档）',
+    (near(rgbOf(rowBg), hexArr(cardHex)) || rgbOf(rowBg).join() === rgbOf(cardHex).join())
+    && num(await styleOf(page, '.note-row', 'border-top-width')) > 0,
+    `底 ${rowBg}（app.wxss=${cardHex}）｜描边 ${await styleOf(page, '.note-row', 'border-top-width')}`)
   const rowRect = (await rects(['.note-row']))[0]
-  if (rowRect) ck('第一张行卡在纸内（不是浮在图上）', rowRect.top >= sheetRect.top,
-    `卡顶 ${(rowRect.top / R).toFixed(0)}rpx / 纸顶 ${(sheetRect.top / R).toFixed(0)}rpx`)
+  if (rowRect) ck('第一张行卡落在图的范围里（卡片之间露图）',
+    rowRect.top > 0 && rowRect.top < win.h, `卡顶 ${(rowRect.top / R).toFixed(0)}rpx`)
   ck('搜索条翻成纸白那一面',
     near(rgbOf(await styleOf(page, '.sc-card', 'background-color')), hexArr(PAPER)),
     await styleOf(page, '.sc-card', 'background-color'))
@@ -149,11 +164,9 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   ck('关掉后搜索条回到壁纸派生那一支色（和底栏同一个函数）',
     near(rgbOf(await styleOf(page, '.sc-card', 'background-color')), hexArr(chrome.bg)),
     `${await styleOf(page, '.sc-card', 'background-color')}｜chromeOf=${chrome.bg}`)
-  ck('关掉后那张纸是透明的（不留一块色板在列表底下）',
-    /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.sheet', 'background-color')),
-    await styleOf(page, '.sheet', 'background-color'))
-  ck('关掉后纸没有圆角', num(await styleOf(page, '.sheet', 'border-top-left-radius')) === 0,
-    await styleOf(page, '.sheet', 'border-top-left-radius'))
+  ck('关掉后这一层同样是透明的（两态一致，它本来就没有面）',
+    /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list-layer', 'background-color')),
+    await styleOf(page, '.list-layer', 'background-color'))
   ck('关掉后 chip 回到壁纸那一档（不再是暗玻璃）',
     !/rgba\(18, 20, 26/.test(await styleOf(page, '.chip', 'background-color')),
     await styleOf(page, '.chip', 'background-color'))

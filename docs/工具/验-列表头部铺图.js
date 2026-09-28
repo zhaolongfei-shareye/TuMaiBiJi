@@ -1,7 +1,8 @@
-// 笔记列表"头部铺图（效果图里的 C 方案）"这一批的静态尺子（不连模拟器，纯读文件）。
+// 笔记列表"整页铺图 + 一条笔记一个框"这一批的静态尺子（不连模拟器，纯读文件）。
 // 跑法：node docs/工具/验-列表头部铺图.js
 // 要守的东西：① 图和新建页同一个取图口、同一个开关，这一页不再开第二个上传入口；
-// ② 只铺头部那一段，列表落在一张圆角朝上的纸上；③ 关掉开关这一屏必须一字不差回到 D2；
+// ② 图贯穿全屏，列表这一层只有行卡那一个框——不许再有第二圈描边，那是"两层框"的成因；
+// ③ 压暗那一串必须和新建页同一条；④ 关掉开关这一屏必须一字不差回到 D2；
 // ④ 界面上每一句提到这张图范围的话，都要跟着改成"首页 + 笔记页头部"。
 const fs = require('fs')
 const path = require('path')
@@ -39,10 +40,11 @@ ok('这一页铺了 <image> 组件（wxss 的 background-image 不认包内本�
   /<image wx:if="\{\{bgSrc\}\}" class="page-bg" src="\{\{bgSrc\}\}" mode="aspectFill" \/>/.test(wxml))
 ok('有压暗罩那一层', /<view wx:if="\{\{bgSrc\}\}" class="page-scrim"><\/view>/.test(wxml))
 ok('铺图时容器带 has-bg', /\{\{bgSrc \? 'has-bg' : ''\}\}/.test(wxml))
-ok('列表被包进一张纸里', /<view class="sheet">[\s\S]*class="notes-list"[\s\S]*<\/view>\s*<\/view>\s*<\/view>/.test(wxml))
-ok('三个状态（加载/空/列表）都在这张纸上，一个都没落在纸外',
+ok('列表被包进那一层里（铺图时靠它抬层序）',
+  /<view class="list-layer">[\s\S]*class="notes-list"/.test(wxml))
+ok('三个状态（加载/空/列表）都在这一层里，一个都没落在外面',
   (wxml.match(/class="(loading|empty|notes-list)"/g) || []).length === 3
-  && wxml.indexOf('class="sheet"') < wxml.indexOf('class="loading"'))
+  && wxml.indexOf('class="list-layer"') < wxml.indexOf('class="loading"'))
 
 // ---------- 2. 取图口只有一个 ----------
 ok('取图走 poster.homeBg()，和新建页是同一个函数',
@@ -59,36 +61,29 @@ ok('导航条只在铺图时刷墨色',
 ok('墨色那一档和新建页是同一个值',
   /#181a20/.test(read('pages/create/create.js')) && /#181a20/.test(cjs))
 
-// ---------- 3. 只铺头部那一段 ----------
+// ---------- 3. 图贯穿全屏，列表这一层不许有第二个框 ----------
 const bg = seg(wxss, '.page-bg')
 const scrim = seg(wxss, '.page-scrim')
-const BAND = Number(/height:\s*(\d+)rpx/.exec(bg)[1])
-ok('图带是 fixed（滚到哪儿都守在头部那一段）', /position: fixed/.test(bg) && /position: fixed/.test(scrim))
-ok('图带从视口顶起、高 700rpx', BAND === 700 && /top: 0/.test(bg), `实得 ${BAND}`)
-ok('罩层和图带同高', Number(/height:\s*(\d+)rpx/.exec(scrim)[1]) === BAND)
-ok('图在 0、罩在 1（顺序不能反，否则纸压不住图）', /z-index: 0/.test(bg) && /z-index: 1/.test(scrim))
-ok('头部三块 + 纸都被抬到罩之上',
-  /\.container\.has-bg \.page-head,[\s\S]{0,200}?\.container\.has-bg \.sheet\s*\{[^}]*position: relative[^}]*z-index: 2/.test(wxss))
-ok('罩层停点用新建页那串的头两档（0.58 起 0.44 收）',
-  /rgba\(18, 20, 26, 0\.58\)/.test(scrim) && /rgba\(18, 20, 26, 0\.44\)/.test(scrim)
-  && !/0\.72/.test(scrim))
-
-// ---------- 4. 纸：满宽、圆角朝上、只有铺图时才有面 ----------
-const sheetPlain = seg(wxss, '.sheet')
-const sheetBg = (hint) => seg(wxss, '.container.has-bg .sheet', hint)
-ok('不铺图时这张纸是透明的（这一屏还是 D2 那一版）', /background: transparent/.test(sheetPlain))
-ok('不铺图时不带圆角和描边',
-  !/border-radius/.test(sheetPlain) && !/border-top/.test(sheetPlain))
-ok('铺图时纸吃壁纸底色，和容器无缝',
-  /background: var\(--bg-page\)/.test(sheetBg('--bg-page')))
-ok('圆角只朝上，两个上角 40、下面直角',
-  /border-radius: var\(--r-card\) var\(--r-card\) 0 0/.test(sheetBg('border-radius')))
-ok('纸满宽：左右负出容器的 24 内缩',
-  /margin: 0 calc\(0px - var\(--sp-3\)\)/.test(sheetBg('margin')))
-ok('纸内上沿留 40rpx（与效果图同）',
-  /padding: 40rpx var\(--sp-3\) 0/.test(sheetBg('padding')))
-ok('纸上沿有一条描边（和行卡同一档）',
-  /border-top: var\(--w-edge\) solid var\(--card-edge\)/.test(sheetBg('border-top')))
+ok('图和罩都是 fixed（滚到哪儿都在原地，动的是卡片）',
+  /position: fixed/.test(bg) && /position: fixed/.test(scrim))
+ok('图铺满整个视口（100vh，不再是头部那一段）',
+  /height: 100vh/.test(bg) && /top: 0/.test(bg) && !/height: 700rpx/.test(bg))
+ok('罩层同高', /height: 100vh/.test(scrim))
+ok('图在 0、罩在 1（顺序不能反，否则卡片会被图盖住）',
+  /z-index: 0/.test(bg) && /z-index: 1/.test(scrim))
+// 两页压的是同一张图、同一个视口：明暗得是一个连续体，否则切 tab 时背景跳一档
+const gradOf = (src) => (/(?:^|\n)\.page-scrim\s*\{[\s\S]*?background: (linear-gradient\([^;]*\))/.exec(src) || [])[1]
+const gHere = (gradOf(wxssRaw) || '').replace(/\s+/g, ' ').trim()
+const gThere = (gradOf(createWxss) || '').replace(/\s+/g, ' ').trim()
+ok('压暗那一串和新建页逐字相同', !!gHere && gHere === gThere,
+  `${gHere.slice(0, 34)}… vs ${gThere.slice(0, 34)}…`)
+ok('列表那一层不再自称"纸"（.sheet 这个类整个没了）',
+  !/sheet/.test(wxml + wxssRaw), (wxml.match(/sheet/g) || []).join(','))
+ok('列表层只剩层序，自己不画任何面（一条笔记一个框）',
+  !/(?:^|\n)\.list-layer\s*\{/.test(wxss)
+  && !/\.container\.has-bg \.list-layer\s*\{[^}]*(background|border)/.test(wxss))
+ok('头部三块 + 列表层一起抬到罩之上',
+  /\.container\.has-bg \.page-head,[\s\S]{0,200}?\.container\.has-bg \.list-layer\s*\{[^}]*position: relative[^}]*z-index: 2/.test(wxss))
 
 // ---------- 5. 压在图上的那三块面 ----------
 const cardBg = seg(wxss, '.container.has-bg .sc-card', '--chrome-bg')
@@ -124,6 +119,6 @@ ok('新建页的整页铺图仍在（这一批只加列表头部，没改首页�
 ok('新建页的罩层仍是完整七档（含底部 0.72）', /0\.72/.test(createWxss))
 
 console.log(`${fails.length ? '✗' : '✓'} 列表头部铺图 静态：${pass}/${pass + fails.length} 条通过`
-  + `　图带高 ${BAND}rpx`)
+  + `　图 100vh`)
 fails.forEach((f) => console.log('  ✗ ' + f))
 process.exit(fails.length ? 1 : 0)
