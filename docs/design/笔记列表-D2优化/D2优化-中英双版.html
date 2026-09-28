@@ -78,6 +78,44 @@
   .capsule .c::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
 
   .stage{position:absolute;left:0;right:0;top:184px;bottom:0;overflow:hidden;padding:2px 24px 0}
+
+  /* ---------- 铺背景图那一档 ----------
+     照片和罩层全部照抄首页 create.wxss:360-379：同一张 home-bg-portrait.jpg、
+     同一串 rgba(18,20,26,…) 梯度、同一个 184/1506 视口。列表这边不另调罩层，
+     否则两张屏的"铺图"根本不是同一件事，没法比。
+     C（只铺头部）用 background-size/position 钉成和 A 同一份裁切，只是 816 以下淡出——
+     两个数由 JS 按原图尺寸现算，不手写。 */
+  .bg{position:absolute;left:0;top:184px;width:750px;height:1506px;background-size:cover;
+    background-position:center;z-index:0;
+    background-image:url("../../../miniprogram/assets/home-bg-portrait.jpg")}
+  .bg.band{height:816px;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 636px,transparent 816px)}
+  .scrim{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:1;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)}
+  .scrim.band{height:816px;background:linear-gradient(180deg,rgba(18,20,26,.58) 0,
+    rgba(18,20,26,.5) 300px,rgba(18,20,26,.44) 636px,rgba(18,20,26,0) 816px)}
+  .ph.hasbg .stage{z-index:2}
+  /* 铺图后页头翻纸白（同 .container.has-bg）；卡片里的字不翻，它坐在白卡上 */
+  .ph.hasbg .h1{color:#F2EFE9}
+  /* 首页那条 78% 在照片上不够：24rpx 半粗按 4.5 判，最差一格只有 3.69（A）/3.47（C）。
+     抬到纸白 100% 就过（A 要 94%、C 要 100%），所以这一档不给它加底、只抬字色。 */
+  .ph.hasbg .stats{color:#F2EFE9}
+  .ph.hasbg .chip{background:rgba(18,20,26,.42);color:#F2EFE9;
+    box-shadow:inset 0 0 0 var(--w-edge) rgba(242,239,233,.30)}
+  .ph.hasbg .chip.on{background:#F2EFE9;color:#23252C;box-shadow:none}
+  /* 铺图时这两块面不能照抄派生色：实测派生色压照片只有 1.00~1.01，边界直接消失。
+     改纸白面 + 墨黑字，就是首页那条录入条同一张脸（数字见 ⑫ 屏那张表）。
+     C 的底栏在淡出段以下、压的是纯色页面底，所以它留派生色——换纸白反而掉到 1.03。 */
+  .ph.hasbg .sc{background:#F2EFE9;color:#23252C}
+  .ph.hasbg .sc .val,.ph.hasbg .sc .go{color:#23252C}
+  .ph.hasbg .sc .ph-txt{color:rgba(35,37,44,.42)}
+  .ph.hasbg .sc .x{color:rgba(35,37,44,.7)}
+  .ph.hasbg .sc .rule{background:rgba(35,37,44,.42)}
+  .ph.hasbg[data-photo="full"] .tabbar{background:#F2EFE9;border-color:rgba(35,37,44,.14);
+    box-shadow:0 16px 44px rgba(0,0,0,.28)}
+  .ph.hasbg[data-photo="full"] .tb{color:rgba(35,37,44,.62)}
+  .ph.hasbg[data-photo="full"] .tb.on{color:#23252C}
   .ph.doc .stage{position:relative;top:0;padding:24px 34px 0}
 
   /* ---------- 页头：标题左、三个数右，一行基线对齐（现网 .page-head）---------- */
@@ -167,6 +205,7 @@
 </style>
 </head>
 <body>
+<img id="probe" src="../../../miniprogram/assets/home-bg-portrait.jpg" style="display:none" alt="">
 <div class="flow" id="flow"></div>
 
 <script>
@@ -289,6 +328,22 @@ const screen = (step, h3, p, l, inner, wall, cls) => {
   return unit(step, h3, p, `<div class="ph${dark?' dark':''}" style="--page:${page};--skin:${skin(page,dark)}">${body}</div>`)
 }
 
+/* 铺图那一档：壁纸的页面底只在罩层下面露个缝，底栏/搜索条那块色仍按壁纸派生 */
+const photoScreen = (step, h3, p, l, inner, wall, mode) => {
+  const [name, page, dark] = wall
+  const band = mode === 'band' ? ' band' : ''
+  const body = `<div class="bg${band}"></div><div class="scrim${band}"></div>
+    <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+    <div class="nb"><span class="t">${l.nav}</span><span class="capsule"><span class="d"><i></i><i></i><i></i></span><span class="v"></span><span class="c"></span></span></div>
+    <div class="stage">${inner}</div>
+    <div class="tabbar">
+      <div class="tb"><div class="tbi i-new"></div>${l===L.zh?'新建':'New'}<div class="u" style="opacity:0"></div></div>
+      <div class="tb on"><div class="tbi i-note"></div>${l===L.zh?'笔记':'Notes'}<div class="u"></div></div>
+      <div class="tb"><div class="tbi i-me"></div>${l===L.zh?'我的':'Mine'}<div class="u" style="opacity:0"></div></div>
+    </div>`
+  return unit(step, h3, p, `<div class="ph hasbg" data-photo="${mode}" style="--page:${page};--skin:${skin(page,dark)}">${body}</div>`)
+}
+
 /* ---------- 标注屏：每一张表都由上面那些函数现算 ---------- */
 const skinRows = WALLS.map(([n,page,dark]) => {
   const s = skin(page,dark), idle = dark ? 'rgba(242,239,233,.68)' : 'rgba(242,239,233,.62)'
@@ -363,7 +418,28 @@ const DOC = `
     </div>
   </div>`
 
-/* ---------- 装配：七屏 + 一张标注 ---------- */
+/* ---------- ⑫ 铺图那一屏的标注：数字全部由 measurePhotos() 现填 ---------- */
+const DOC2 = `
+  <div class="blk">
+    <h4>逐像素量出来的（照片 + 罩层 + 字色，取格子里最差那个像素）</h4>
+    <table><tr><th>位置</th><th>A 整页铺</th><th>C 只铺头部</th><th>判据</th></tr><tbody id="ptb"></tbody></table>
+    <p style="margin-top:14px" id="pgeo"></p>
+    <p style="margin-top:10px">这一档的字色不是新定的：页头翻纸白、三级字 78%，抄的是首页 <code>create.wxss:384-389</code> 那段 <code>.container.has-bg</code> 的翻转；罩层那串 <code>rgba(18,20,26,…)</code> 也是同一条。<b>卡片里面的字不翻</b>——它坐在白卡上，压的是 <code>#FFFFFF</code>，和铺不铺图无关。所以受影响的面只有四块：页头那行、分类胶囊、搜索条这块面、卡与卡之间那道 16 的缝。</p>
+  </div>
+  <div class="blk">
+    <h4>A 和 C 差在哪</h4>
+    <p><b>A 整页铺</b>：照片铺满 184..1690 整个视口，六张卡一张张压在图上，滚动时缝里全是照片。<b>C 只铺头部</b>：图到胶囊下面 636 收尾，再 180rpx 淡出（不淡出就是一条硬边），列表落在纯页面底上。两张用的是<b>同一份裁切</b>，只是 C 短一截——不然"铺不铺"和"怎么裁"两件事会混在一起比。</p>
+    <p>C 的淡出段正好压在<b>第一张卡</b>（第一行顶边 721，淡出区间 636..816），所以 C 里第一张卡的下半截坐在纯色上、上半截坐在淡出中的照片上。这是 C 的代价，画在 ⑨ 屏上看得见。</p>
+  </div>
+  <div class="warn">
+    <h4>量完之后，铺图这一档要拍的四件事</h4>
+    <p><b>一、这块面在铺图时不能用派生色——这条是量出来的，不是审美。</b>"底栏 = 搜索条 = 壁纸派生"那条规则的前提是这块面压在<b>页面底</b>上（规划 §1.2 判据写的就是"压页面底 ≥3"）。铺图之后它压的是照片，米白派生 <code>#443C25</code> 压照片最差那一格只有 <b>1.00~1.01</b>，边界等于没有。所以这一稿画成：<b>A 里搜索条和底栏都改纸白面 + 墨黑字</b>（就是首页那条录入条同一张脸），<b>C 里只有搜索条改纸白，底栏留派生色</b>——C 的底栏本来就在淡出段以下、压的是纯色页面底，那里派生色 9.78、换纸白反而掉到 1.03。同一张表左边两列就是这两组数。</p>
+    <p><b>二、三个数（本周 / 本月 / 总数）在照片上照抄首页那档 78% 不够。</b>它是 24rpx 半粗，按 4.5 判，最差那一格 A <b>3.69</b> / C <b>3.47</b>。这一稿的处理是<b>抬到纸白 100%</b>（算出来 A 要 94%、C 要 100% 才过，所以直接给满），不给它加新元素。另一条路是保持 78% 但自己垫一层淡底（同胶囊那块 <code>rgba(18,20,26,.42)</code>，表里第三行量过：垫完 5.90 / 5.62 也过）——多一块面，少一分干净，我倾向前者。</p>
+    <p><b>三、卡片跟不跟着翻。</b>现在画的是白卡压在暗照片上——最跳，也最好认（内容区一眼分得出来）。另一条路是卡片也翻成深色玻璃（<code>rgba(255,255,255,.05)</code>，和夜紫壁纸同一套），整页更统一，代价是六支分类色压深卡要重新一档一档量。</p>
+    <p><b>四、开关挂在哪、管几页。</b>那张图是"分享形象"那张，开关在首页（条下那枚「换背景」）。列表铺图只是<b>复用同一张图和同一个开关</b>，列表页不加第二个入口——一个功能只留一个入口。要拍的是这个开关的语义：只管首页，还是"首页和列表一起铺"。按前一条的规矩我倾向一起铺（同一个开关管两页），列表页不再多一个开关。</p>
+  </div>`
+
+/* ---------- 装配：十屏 + 两张标注 ---------- */
 const flow = document.getElementById('flow')
 const RICE = WALLS[0], PURP = WALLS[4]
 let html = ''
@@ -381,9 +457,117 @@ html += screen('⑥ English · 米白','Same rules, English strings','"Uncategor
   L.en, `${head(L.en)}${search(L.en)}${chips(L.en)}${list(L.en,6)}`, RICE)
 html += screen('⑦ English · 夜紫','Dark tier','Category names and note content are user data, not dictionary strings — only 未分类 is ours.',
   L.en, `${head(L.en)}${search(L.en)}${chips(L.en)}${list(L.en,6)}`, PURP)
+html += photoScreen('⑧ 中文 · 米白 · A 整页铺','照片铺满视口，卡片一张张压在图上','罩层、裁切、184/1506 全部沿用首页那一套；页头翻纸白，卡片里不翻。',
+  L.zh, `${head(L.zh)}${search(L.zh)}${chips(L.zh)}${list(L.zh,6)}`, RICE, 'full')
+html += photoScreen('⑨ 中文 · 米白 · C 只铺头部','图只到胶囊下面，列表落在纸上','带子 636 收尾、再 180 淡出，避免一条硬边；第一张卡正好压在淡出段里（顶边 721）。',
+  L.zh, `${head(L.zh)}${search(L.zh)}${chips(L.zh)}${list(L.zh,6)}`, RICE, 'band')
+html += photoScreen('⑩ English · 米白 · A 整页铺','Same strings, photo behind','英文下照片和罩层是同一串数；页头翻纸白，卡片里的字不翻。',
+  L.en, `${head(L.en)}${search(L.en)}${chips(L.en)}${list(L.en,6)}`, RICE, 'full')
 html += '<div class="brk"></div>'
-html += unit('⑧ 标注','六处修正的出处、八支派生色对表、分类两档实测、还欠什么','表里每一个数都是这页 JS 现算的，不是我抄进稿子的。', DOC, true)
+html += unit('⑪ 标注','六处修正的出处、八支派生色对表、分类两档实测、还欠什么','表里每一个数都是这页 JS 现算的，不是我抄进稿子的。', DOC, true)
+html += unit('⑫ 铺图实测','逐像素量：照片 + 罩层压出来的底，字能不能读','判据不是估的——把 home-bg-portrait.jpg 按 cover 画进 750×1506 画布，逐像素叠上 create.wxss 那串罩层，再叠字色，取这一格里最差的那个像素。', DOC2, true)
 flow.innerHTML = html
+
+/* ---------- ⑫ 那一屏：铺图后的对比度逐像素量 ----------
+   判据取"格子里最差的那个像素"，不是平均——照片上有一块亮衬衫，平均数会把它糊过去。 */
+const SCRIM_STOPS = { full: [[0,.58],[150.6,.58],[647.6,.44],[933.7,.42],[1250,.52],[1325.3,.62],[1506,.72]],
+  band: [[0,.58],[300,.50],[636,.44],[816,0]] }
+const BAND_H = { full: 1506, band: 816 }
+const scrimAt = (mode, y) => {
+  const st = SCRIM_STOPS[mode]
+  if (y <= st[0][0]) return st[0][1]
+  for (let i = 1; i < st.length; i++) if (y <= st[i][0])
+    return st[i-1][1] + (st[i][1]-st[i-1][1]) * (y-st[i-1][0]) / (st[i][0]-st[i-1][0])
+  return st[st.length-1][1]
+}
+const mixpx = (a, b, t) => a.map((v,i) => v*(1-t) + b[i]*t)
+/* rgba(...) 得按十进制拆，不能塞给那个十六进制解析器——第一版这么写，
+   "242,239,233" 被 parseInt(…,16) 截成 0x242，纸白变成了近黑，整张表跟着错 */
+const col = (c) => {
+  if (c[0] === '#') return [rgb(c), 1]
+  const n = c.match(/[\d.]+/g).map(Number)
+  return [[n[0], n[1], n[2]], n.length > 3 ? n[3] : 1]
+}
+const RING = 8   // 这块面往外取 8rpx 那一圈
+const TARGETS = [
+  { sel:'.h1', name:'页头大标题 我的笔记', fg:'#F2EFE9', need:3.0 },
+  { sel:'.stats', name:'三个数 · 这稿画的：纸白 100%', fg:'#F2EFE9', need:4.5 },
+  { sel:'.stats', name:'三个数 · 照抄首页那档 78%', fg:'rgba(242,239,233,.78)', need:4.5, tune:1 },
+  { sel:'.stats', name:'三个数 · 另一条路：78% 再自己垫一层淡底', fg:'rgba(242,239,233,.78)', pad:'rgba(18,20,26,.42)', need:4.5 },
+  { sel:'.chip:not(.on)', name:'未选中胶囊字', fg:'#F2EFE9', pad:'rgba(18,20,26,.42)', need:4.5 },
+  { sel:'.chip.on', name:'选中胶囊字', fg:'#23252C', pad:'#F2EFE9', need:4.5 },
+  { sel:'.sc', name:'搜索条这块面 压背后（非文本按 3:1）', face:1, need:3.0 },
+  { sel:'.tabbar', name:'底栏这块面 压背后（非文本按 3:1）', face:1, need:3.0 },
+]
+function measurePhotos(){
+  const img = document.getElementById('probe')
+  if (!img.naturalWidth) return
+  const cv = document.createElement('canvas'); cv.width = 750; cv.height = 1506
+  const ctx = cv.getContext('2d')
+  const sc = Math.max(750/img.naturalWidth, 1506/img.naturalHeight)
+  const dw = img.naturalWidth*sc, dh = img.naturalHeight*sc
+  const dx = (750-dw)/2, dy = (1506-dh)/2
+  ctx.drawImage(img, dx, dy, dw, dh)
+  const px = ctx.getImageData(0,0,750,1506).data
+  /* C 那条带子钉成和 A 同一份裁切，只是短一截：几何由这里发，不手写进 CSS */
+  document.querySelectorAll('.bg.band').forEach(el => {
+    el.style.backgroundSize = dw+'px '+dh+'px'; el.style.backgroundPosition = dx+'px '+dy+'px'
+  })
+  const base = (mode, page, x, y) => {
+    if (mode === 'band' && y > BAND_H.band) return rgb(page)
+    const a = scrimAt(mode, y)
+    const i = (Math.min(1505,Math.max(0,Math.round(y)))*750 + Math.min(749,Math.max(0,Math.round(x)))) * 4
+    return mixpx([px[i],px[i+1],px[i+2]], [18,20,26], a)
+  }
+  const cell = (ph, mode, t) => {
+    const pr = ph.getBoundingClientRect(), r = ph.querySelector(t.sel).getBoundingClientRect()
+    const st = getComputedStyle(ph)
+    const skinHex = st.getPropertyValue('--skin').trim(), page = st.getPropertyValue('--page').trim()
+    const [fgc0, fga0] = col(t.fg || '#fff')
+    const scan = (fga, over) => {
+      const [fgc] = col(over || t.fg || '#fff')
+      let worst = 99, seen = 0
+      const y0 = r.top-pr.top-184, y1 = y0 + r.height, x0 = r.left-pr.left, x1 = x0 + r.width
+      for (let yy = Math.max(0, Math.floor(t.face ? y0-RING : y0)); yy < Math.min(1506, Math.ceil(t.face ? y1+RING : y1)); yy += 2)
+        for (let xx = Math.max(0, Math.floor(t.face ? x0-RING : x0)); xx < Math.min(750, Math.ceil(t.face ? x1+RING : x1)); xx += 2) {
+          /* 这块面压不压得住，看它四周一圈；身子底下必然撞得上同色的像素，那样量出来永远是 1 */
+          if (t.face && xx > x0 && xx < x1 && yy > y0 && yy < y1) continue
+          let b = base(mode, page, xx, yy)
+          seen++
+          if (t.face) { worst = Math.min(worst, cr(hex(b), over || skinHex)); continue }
+          if (t.pad) { const pv = col(t.pad); b = mixpx(b, pv[0], pv[1]) }
+          const f = fga < 1 ? mixpx(b, fgc, fga) : fgc
+          worst = Math.min(worst, cr(hex(b), hex(f)))
+        }
+      return seen ? r2(worst) : '—'
+    }
+    let v = scan(fga0)
+    /* 不过线的那一档，顺手算出要抬到多少才过；抬到头还不过就照实说不过 */
+    if (t.tune && typeof v === 'number' && v < t.need) {
+      const full = scan(1)
+      let a = fga0
+      while (a < 1 && scan(a) < t.need) a = Math.round((a + 0.02) * 100) / 100
+      v = full >= t.need ? `${v}｜抬到 ${Math.round(a*100)}% 才过`
+        : `<span class="no">${v}</span>｜纸白 100% 也只有 ${full}，抬字色救不回来`
+    }
+    if (t.face && typeof v === 'number') {
+      const paper = scan(1, '#F2EFE9')
+      v = `派生 ${v}｜纸白 ${r2(paper)}`
+    }
+    return v
+  }
+  const A = document.querySelector('[data-photo="full"]'), C = document.querySelector('[data-photo="band"]')
+  document.getElementById('ptb').innerHTML = TARGETS.map(t => {
+    const a = cell(A,'full',t), c = cell(C,'band',t)
+    const mk = v => typeof v === 'number' ? `<span class="${v>=t.need?'ok':'no'}">${v}</span>` : v
+    return `<tr><td>${t.name}</td><td>${mk(a)}</td><td>${mk(c)}</td><td>${t.need}:1</td></tr>`
+  }).join('')
+  document.getElementById('pgeo').textContent =
+    `原图 ${img.naturalWidth}×${img.naturalHeight} → cover 铺进 750×1506：缩放 ${r2(sc)}、画成 ${Math.round(dw)}×${Math.round(dh)}、横向各裁 ${r2(-dx)}rpx。A 与 C 用的是同一份裁切，C 只是 816 以下淡出。`
+}
+
+window.addEventListener('load', () => { try { measurePhotos() } catch (e) {
+  document.getElementById('ptb').innerHTML = '<tr><td colspan="4">量失败：' + e.message + '</td></tr>' } })
 
 /* 行卡尺寸与一屏几条：从渲染结果里量 */
 const m = rowsPerScreen()
