@@ -99,11 +99,19 @@ const txt = async (els) => {
     // 09-25 站长定：这句要和 iPhone 版一致（TumarkNote `AppCopy.swift` 的 Create.headline），
     // 中文「看到好内容，随手记下来」/ 英文 "Save what's worth saving"，两边不许各写一份。
     ck('新建页大标题＝「看到好内容，随手记下来」', heading === '看到好内容，随手记下来', heading)
-    const labels = await txt(await page.$$('.entry-label'))
-    // 站长 09-25 定了：就叫这三个、就按这个次序（原来这条还写着"手写"，是 ce559fd
-    // 改名后一直没跟，红了好几天）。写死成整串对比，换名字或换次序都会红。
-    ck('三个入口＝URL链接 / 拍照或截图 / 亲自撰写（次序也要对）',
-      labels.join(' / ') === 'URL链接 / 拍照或截图 / 亲自撰写', labels.join(' / '))
+    // 09-28 凌晨那一批把三张入口卡合成了一条录入条（PRD §8.50），`.entry-label` 这个类整个没了，
+    // 原来这条读的是那个类，于是一路读成空串、红了好几天。改成钉现在这一版：
+    // 收起态条身那句话、展开后四个模式标签的**文字和次序**、以及旧类名不许复活。
+    const idle = (await txt(await page.$$('.bar-label'))).join('|')
+    ck('收起态条身＝「动动手指」', idle === '动动手指', idle)
+    ck('旧的三张入口卡没有复活', (await page.$$('.entry-label')).length === 0)
+    await (await page.$('.bar')).tap()
+    await sleep(1200)
+    const labels = await txt(await page.$$('.mode'))
+    // 站长 09-25 定过「就叫这三个、就按这个次序」，合并成一条之后语义变成四个模式标签；
+    // 写死成整串对比，换名字或换次序都会红（原来这条还写着"手写"，是 ce559fd 改名后一直没跟）。
+    ck('展开后四个模式＝直接写 / 拍照 / 相册 / 链接（次序也要对）',
+      labels.join(' / ') === '直接写 / 拍照 / 相册 / 链接', labels.join(' / '))
     ck('导航条标题＝「新建笔记」', (await readNav()) === '新建笔记', await readNav())
     await mp.screenshot({ path: `${SHOT}/c1-新建页.png` })
 

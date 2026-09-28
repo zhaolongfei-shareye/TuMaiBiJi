@@ -41,8 +41,15 @@ const findInSandbox = (name, depth = 8) => {
   const wp = await mp.reLaunch('/pages/wallpaper/wallpaper')
   await sleep(3500)
   ck('外观设置页已经没有字体那一排', (await wp.$$('.font-grid')).length === 0)
-  const secs = (await wp.$$('.sec-title')).length
-  ck('这一页只剩「页面壁纸」一节', secs === 1, `${secs} 个小节标题`)
+  const secs = await wp.$$('.sec-title')
+  // 原来是数个数（==1）。09-27 晚上外观设置页加了「首页背景图」那一节，个数就不是 1 了——
+  // 光数个数既抓不住多出来的节，也抓不住被谁顶掉的节。改成逐字比：拿本页 data.t 里那两个键的
+  // 当前语言文案，和屏上真的渲染出来的两行对，中英文账号下都成立。
+  const wd = await wp.data()
+  const want = [wd.t.wallpaperSection, wd.t.homeBgSection]
+  const got = []
+  for (const el of secs) got.push((await el.text()).trim())
+  ck('这一页正好两节：页面壁纸 + 首页背景图，顺序也对', got.join('|') === want.join('|'), got.join(' | '))
   await mp.screenshot({ path: `${OUT}/实拍-外观设置已无字体排.png` })
 
   // ② 卡片模板页：十格小样，前三格应该已经是纸色，名字也换了
