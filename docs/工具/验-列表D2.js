@@ -80,7 +80,9 @@ ok('底栏和搜索条吃的是同一串 --chrome-*',
   /var\(--chrome-bg\)/.test(barWxss) && /var\(--chrome-bg\)/.test(idxWxss))
 ok('底栏那一块面由 chromeOf 递进来', /chromeOf\(/.test(barJs) && /style="\{\{chromeStyle\}\}"/.test(barWxml))
 ok('搜索条每次进页重算，不吃模块加载那一次的兜底',
-  /searchSkin: chromeOf\(app\.getWallpaper\(\)\)\.style/.test(idxJs))
+  /const wallpaper = app\.getWallpaper\(\)/.test(idxJs)
+  // 09-28 深夜起多一个条件：头部铺了图就整串不发，让 CSS 那条"图上换纸白"生效
+  && /searchSkin: bgSrc \? '' : chromeOf\(wallpaper\)\.style/.test(idxJs))
 ok('搜索条不再是一支固定的蓝（toneStyle 在这个页面已经不用了）',
   !/toneStyle\(/.test(idxJs), (idxJs.match(/toneStyle\([^)]*\)/g) || []).join(' '))
 ok('占位符给带 alpha 的色，不靠 opacity（textarea/input 的 placeholder 不吃 opacity）',

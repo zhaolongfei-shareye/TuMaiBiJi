@@ -86,7 +86,11 @@ const ck = (name, ok, got) => {
     (await page.$$('.face-input')).length === 1 && (await page.$$('.face-area')).length === 1
     && (await page.$$('.cat-row')).length === 1 && (await page.$$('.act')).length === 2)
   g = await rects(['.entry-wrap', '.panel', '.bar'])
-  ck('展开后让出留白，整组回到标题下面', g[0] && g[0].top < metric.h * 0.3, g[0] && `组顶 ${Math.round(g[0].top)}`)
+  // 09-28 深夜改判据：展开后整组不再"回到标题下面"，而是从流里拿出来贴到底栏上方
+  // （真机反馈原来那一版把照片和标题整个盖住了）。152 = 底栏那 128 + 一条 24 的缝。
+  ck('展开后整组贴底（组底 = 视口高 − 152rpx，压在底栏上方那条缝上）',
+    g[0] && Math.abs(g[0].bottom - (metric.h - 152 * R)) < 2,
+    g[0] && `组底 ${Math.round(g[0].bottom)}｜应在 ${Math.round(metric.h - 152 * R)} 上下`)
   ck('面板真的接在条下面（同一块白、无缝）', g[1] && g[2] && Math.abs(g[1].top - g[2].bottom) < 2,
     g[1] && `条底 ${Math.round(g[2].bottom)}｜面板顶 ${Math.round(g[1].top)}`)
   /* 09-28 他对着截图问"是不是和效果图不一致"——就是这两条没断过：几何相邻是真的，

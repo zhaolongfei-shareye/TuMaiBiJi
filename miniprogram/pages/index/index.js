@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { catSkinFor, chromeOf, toneVars } = require('../../utils/palette.js')
+const poster = require('../../utils/poster.js')
 const { formatShortDate } = require('../../utils/date.js')
 
 // 统计看板一次读多少条：后端 /api/notes 的 limit 上限就是 100，写不了更大。
@@ -43,6 +44,9 @@ Page({
     // data 字面量里这一次是模块加载时算的，主题还没落地，所以按 default 走——
     // 和 themeOf 拿不到 key 时回落 THEMES[0] 是同一条规则，不是另写一份兜底色。
     searchSkin: chromeOf().style,
+    // 头部那一段铺不铺图：'' 表示不铺（用户在外观设置里关掉了，或形象文件被系统清了）。
+    // 取图和新建页同一个口，不在这页另开一份判断。
+    bgSrc: '',
   },
 
   async onShow() {
@@ -50,15 +54,26 @@ Page({
     await app.getLoginPromise().catch(() => {})
     const themeClass = app.applyTheme(app.getWallpaper())
     const lang = app.globalData.userInfo?.language || 'zh'
+    const wallpaper = app.getWallpaper()
+    // 每次进页重取：在卡片模板页换完形象返回，这一屏的头部就该跟着换。
+    const bgSrc = poster.homeBg()
     this.setData({
       lang,
       t: texts(lang),
       themeClass,
-      // 每次进页按当前主题重算：换壁纸时这块面和底部导航那条胶囊必须同步改色，
-      // 留着 data 字面量那份就等于永远停在米白那一档。
-      searchSkin: chromeOf(app.getWallpaper()).style,
+      bgSrc,
+      // 搜索条那一块面由当前壁纸的页面底派生（palette.chromeOf），和底部导航那条胶囊同一个值；
+      // 每次进页重算，留着 data 字面量那份就等于永远停在米白那一档。
+      // 但铺了图就整串不发：style 上的自定义属性优先级高于任何选择器，
+      // 带着它，CSS 里那条"图上换成纸白面"的规则一行都翻不动。
+      searchSkin: bgSrc ? '' : chromeOf(wallpaper).style,
     })
     app.setNavTitle('appName', lang)
+    // 铺了图才把导航条刷成罩层顶部那一档墨色，和新建页是同一条规则；
+    // 没铺图时不碰它——上面 applyTheme 已经按壁纸底色设过了。
+    if (this.data.bgSrc) {
+      wx.setNavigationBarColor({ frontColor: '#ffffff', backgroundColor: '#181a20', fail() {} })
+    }
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().applyTheme(app.getWallpaper())

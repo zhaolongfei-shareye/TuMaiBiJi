@@ -92,7 +92,11 @@ ok('旧的 .entry-cards 改成了 .entry-wrap', !/\.entry-cards/.test(wxss) && /
 // 关键是这段留白挂在 .entry-wrap 本身、不带 has-bg：关掉背景图时条子也在同一条线上。
 ok('留白 66vh，且不随背景开关变', /\.entry-wrap\s*\{[^}]*margin-top: 66vh/.test(wxss)
   && !/\.container\.has-bg \.entry-wrap\s*\{[^}]*margin-top/.test(wxss))
-ok('展开让位规则还在', /\.container\.bg-give-way \.entry-wrap\s*\{[^}]*margin-top: 0/.test(wxss))
+// 09-28 深夜起展开不再"让位到顶"，而是整块 fixed 贴到底栏上方（真机反馈：从顶上挂下来
+// 把照片和标题全盖住了）。留白那条 margin-top:0 仍在，但只是"从流里拿出来"的副作用。
+ok('展开时整块 fixed 贴底，且不再吃那 66vh',
+  /\.container\.entry-dock \.entry-wrap\s*\{[^}]*position: fixed/.test(wxss)
+  && /\.container\.entry-dock \.entry-wrap\s*\{[^}]*margin-top: 0/.test(wxss))
 ok('旧手风琴的高度档全部清掉了', !/\.open-url|\.open-shot|\.open-write|\.entry-label/.test(wxss))
 ok('条身 128 高、胶囊圆角', /\.bar\s*\{[^}]*height: 128rpx/.test(wxss) && /\.bar\s*\{[^}]*--r-pill/.test(wxss))
 ok('展开时条与面板同一块白、接缝圆角对上', /\.bar\.open\s*\{[^}]*--r-card/.test(wxss) && /\.panel\s*\{[^}]*0 0 var\(--r-card\)/.test(wxss))

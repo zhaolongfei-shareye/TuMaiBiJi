@@ -1,4 +1,10 @@
-<view class="container {{themeClass}}">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}}">
+  <!-- 头部那一段铺形象图（和新建页同一张、同一个开关、同一个取图口）。
+       列表不铺：一行行字压在照片上，滚起来字和图打架——这是 09-28 那版效果图里
+       A/C 两条路选下来的 C。图做成 fixed，滚到哪儿它都在头部那一段。 -->
+  <image wx:if="{{bgSrc}}" class="page-bg" src="{{bgSrc}}" mode="aspectFill" />
+  <view wx:if="{{bgSrc}}" class="page-scrim"></view>
+
   <view class="page-head">
     <view class="page-title">{{t.notesHeading}}</view>
     <!-- 三个数按全量算，不受搜索词和分类筛选影响 -->
@@ -48,41 +54,45 @@
     </view>
   </scroll-view>
 
-  <!-- 加载状态 -->
-  <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
+  <!-- 列表落在一张纸上：铺图时这张纸圆角朝上压住图（C 方案），
+       没铺图时它只是一层透明容器，这一屏的样子和昨天定稿的 D2 一字不差。 -->
+  <view class="sheet">
+    <!-- 加载状态 -->
+    <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
-  <!-- 空状态 -->
-  <view wx:elif="{{notes.length === 0 && !loading}}" class="empty">
-    <text>{{t.noNotes}}</text>
-  </view>
+    <!-- 空状态 -->
+    <view wx:elif="{{notes.length === 0 && !loading}}" class="empty">
+      <text>{{t.noNotes}}</text>
+    </view>
 
-  <!-- 笔记列表：一条笔记 = 一张描边行卡。D2 把左侧那块 176 方块撤了，
-       分类身份退到 meta 行最前面的一枚点 + 分类名（颜色仍由 palette 派生）。 -->
-  <view wx:else class="notes-list">
-    <view
-      class="card note-row"
-      wx:for="{{notes}}"
-      wx:key="id"
-      bindtap="goToDetail"
-      data-id="{{item.id}}"
-    >
-      <view class="row-title">
-        <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
-      </view>
-      <view class="summary" wx:if="{{item.summary}}">{{item.summary}}</view>
-      <view class="row-foot">
-        <view class="cat {{item.catRing ? 'is-ring' : ''}}" style="{{item.catStyle}}">
-          <view class="cat-dot"></view>
-          <text>{{item.catLabel}}</text>
+    <!-- 笔记列表：一条笔记 = 一张描边行卡。D2 把左侧那块 176 方块撤了，
+         分类身份退到 meta 行最前面的一枚点 + 分类名（颜色仍由 palette 派生）。 -->
+    <view wx:else class="notes-list">
+      <view
+        class="card note-row"
+        wx:for="{{notes}}"
+        wx:key="id"
+        bindtap="goToDetail"
+        data-id="{{item.id}}"
+      >
+        <view class="row-title">
+          <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
         </view>
-        <text class="sep">·</text>
-        <text class="src">{{item.source_type_label}}</text>
-        <block wx:if="{{item.tagLine}}">
+        <view class="summary" wx:if="{{item.summary}}">{{item.summary}}</view>
+        <view class="row-foot">
+          <view class="cat {{item.catRing ? 'is-ring' : ''}}" style="{{item.catStyle}}">
+            <view class="cat-dot"></view>
+            <text>{{item.catLabel}}</text>
+          </view>
           <text class="sep">·</text>
-          <text class="tg">{{item.tagLine}}</text>
-        </block>
-        <text class="dt">{{item.date_label}}</text>
-        <text class="chev">›</text>
+          <text class="src">{{item.source_type_label}}</text>
+          <block wx:if="{{item.tagLine}}">
+            <text class="sep">·</text>
+            <text class="tg">{{item.tagLine}}</text>
+          </block>
+          <text class="dt">{{item.date_label}}</text>
+          <text class="chev">›</text>
+        </view>
       </view>
     </view>
   </view>

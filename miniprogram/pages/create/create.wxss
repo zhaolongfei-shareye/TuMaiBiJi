@@ -52,7 +52,6 @@
   display: flex;
   flex-direction: column;
   margin-top: 66vh;
-  transition: margin-top 0.22s ease;
 }
 
 /* ---------- 统一录入条 ----------
@@ -64,6 +63,7 @@
 .bar {
   display: flex;
   align-items: center;
+  flex: none;
   gap: 22rpx;
   height: 128rpx;
   padding: 0 20rpx 0 34rpx;
@@ -165,6 +165,22 @@
   color: #23252c;
   border-radius: 0 0 var(--r-card) var(--r-card);
   padding: 8rpx var(--sp-4) var(--sp-4);
+  box-sizing: border-box;
+  /* 四屏等高。700 是量出来的不是拍的：三种内容在最坏情况下的自然高度（中文那排模式标签
+     比英文高 5rpx，取中文那一档）——直接写带报错 608、拍照带三张缩略图带报错 660、
+     链接带提示 413。最大 660 再留一行折行的余量（服务端 detail 是任意长度的一句话），
+     得 700。量法在 docs/工具/量-面板四态自然高.js，改任一模式的内容要重跑它。
+     短的那几屏空出来的位置由 margin-top:auto 的按钮行吸收：保存/粘贴永远落在同一处。 */
+  height: 700rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 按钮行往下沉：auto 边距把富余的那一段留在它上面，而不是堆在面板底下。
+   padding-top 单独给 20rpx，保证内容刚好填满时按钮行和上面那格之间仍有一条缝。 */
+.panel .acts {
+  margin-top: auto;
+  padding-top: 20rpx;
 }
 
 .container.has-bg .panel {
@@ -176,6 +192,7 @@
 .modes {
   display: flex;
   align-items: center;
+  flex: none;
   gap: 14rpx;
   padding: 22rpx 0 4rpx;
   border-bottom: 3rpx solid rgba(35, 37, 44, 0.07);
@@ -211,6 +228,22 @@
   position: relative;
   z-index: 1;
   animation: unfold 0.22s ease;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 面板定高之后，肚子里每一段都不许被压扁：flex 子项默认 shrink，
+   88rpx 的输入框被挤成 70 属于看不出来但点着别扭的那类错。
+   富余的那一段整段留给按钮行上面的 auto 边距（见下面 .panel .acts），
+   连摘要区也不放大：CSS 弹性布局里 auto 外边距优先吃掉富余，
+   给 textarea 写 flex:1 它一寸都长不了，写了只是骗下一读这段的人。 */
+.entry-body > view,
+.entry-body > picker,
+.entry-body > textarea,
+.entry-body > scroll-view {
+  flex: none;
 }
 
 @keyframes unfold {
@@ -392,14 +425,32 @@
   --accent: #f2efe9;
 }
 
-/* 展开就把这段留白让出来：面板里的输入框和按钮有 300~400px 高，
-   不让位的话它们正好处在底栏底下，滚也滚不利索——填东西的人不该为构图买单。 */
-.container.bg-give-way .entry-wrap {
+/* 展开：整块从流里拿出来，沉到底栏上方，面板向上长。
+   上一版是"把 66vh 那段留白让回 0、面板从顶上挂下来"，真机反馈两件事：
+   ① 它把上半屏的照片和标题整个盖住了；② 四个模式的面板自然高度不一样
+   （直接写带报错 608、拍照带三张缩略图带报错 660、链接带提示 413），切一次窗口跳一次。
+   现在贴底 + 定高：窗口不动，只换肚子里的内容，照片始终露着。
+   bottom 152 = 底栏占的那 128（bottom 20 + height 108）+ 24 的缝，和底栏同一基准；
+   底栏几何改了这里要跟着改。左右 24 是抄 .container 的 --sp-3 内缩，
+   fixed 不吃父级 padding，不写就会比收起态那枚胶囊宽一圈。 */
+.container.entry-dock .entry-wrap {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 152rpx;
   margin-top: 0;
+  z-index: 6;
 }
 
+/* 换背景那一行坐在面板下面：贴底之后它正好压在底栏上，所以展开时整个不渲染。 */
+.container.entry-dock .home-swap {
+  display: none;
+}
+
+/* 铺图时把标题和条子抬到罩层之上。展开那一态排除在外：它的 position 由上面
+   那条 fixed 规则给，这里再写一遍 relative 会按源码顺序把它盖回去。 */
 .container.has-bg .title-row,
-.container.has-bg .entry-wrap {
+.container.has-bg:not(.entry-dock) .entry-wrap {
   position: relative;
   z-index: 2;
 }
