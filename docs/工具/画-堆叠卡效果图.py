@@ -17,7 +17,7 @@ HTML = os.path.join(DIR, NAME)
 OUT = os.path.join(DIR, os.path.splitext(NAME)[0] + '.png')
 CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 BODY_BG = (222, 221, 216)
-W, H = 2460, 8000
+W, H = 2460, 12000
 
 subprocess.run([CHROME, '--headless', '--disable-gpu', '--hide-scrollbars',
                 '--force-device-scale-factor=1', '--allow-file-access-from-files',
