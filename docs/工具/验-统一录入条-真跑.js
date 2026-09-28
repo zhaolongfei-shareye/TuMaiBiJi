@@ -89,6 +89,18 @@ const ck = (name, ok, got) => {
   ck('展开后让出留白，整组回到标题下面', g[0] && g[0].top < metric.h * 0.3, g[0] && `组顶 ${Math.round(g[0].top)}`)
   ck('面板真的接在条下面（同一块白、无缝）', g[1] && g[2] && Math.abs(g[1].top - g[2].bottom) < 2,
     g[1] && `条底 ${Math.round(g[2].bottom)}｜面板顶 ${Math.round(g[1].top)}`)
+  /* 09-28 他对着截图问"是不是和效果图不一致"——就是这两条没断过：几何相邻是真的，
+     但条身还挂着纸白胶囊（.bar.open 那条规则在 wxss 里躺着，wxml 从没挂上类）。 */
+  const barCls = (await (await page.$('.bar')).attribute('class')) || ''
+  ck('展开时条身挂上 open', /(^|\s)bar open(\s|$)/.test(barCls), barCls)
+  const barEl = await page.$('.bar'), panEl = await page.$('.panel')
+  /* 属性名必须写成 CSS 那种 kebab-case：style('backgroundColor') 一律回 null，
+     而 null === null 会被上一版当成"过"，是假绿。圆角这个 API 读不出来（试了
+     border-radius / borderBottomLeftRadius 都是 null），所以"下沿是直角"不在这里断，
+     由上面那条"条底 = 面板顶"的几何判据兜着。 */
+  const barBg = await barEl.style('background-color'), panBg = await panEl.style('background-color')
+  ck('展开时条身和面板同一块白（两边都读到值才算）',
+    !!barBg && !!panBg && barBg === panBg, `${barBg} vs ${panBg}`)
   await mp.screenshot({ path: `${OUT}/实测-3-展开写.png` })
 
   // ---------- ④ 模式标签互切 ----------

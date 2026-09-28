@@ -107,7 +107,7 @@
   .bar .label{flex:1;min-width:0;font-size:46px;font-weight:800;letter-spacing:-1px;color:#23252C;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .bar .label.en{font-size:42px;letter-spacing:-.5px}
-  .bar .label .sub{font-size:24px;font-weight:600;color:rgba(35,37,44,.42);letter-spacing:0;margin-left:14px}
+  .bar .hint{flex:none;font-size:24px;font-weight:600;color:rgba(35,37,44,.42)}
   .dots{display:flex;align-items:center;gap:20px;flex:none}
   .dot{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center}
   .dot i{width:38px;height:38px}
@@ -281,7 +281,7 @@ const modes = (l, on) => `<div class="modes">
 const openWrite = (l) => shell(l, `
   <div class="bar-wrap open">
     <div class="bar"><div class="lead g-pencil" style="background:#23252C"></div>
-      <div class="label ${l===L.en?'en':''}">${l.write}<span class="sub">${l.collapse}</span></div></div>
+      <div class="label ${l===L.en?'en':''}">${l.write}</div><div class="hint">${l.collapse}</div></div>
     <div class="panel">${modes(l,'w')}
       <div class="fld"><div class="box">${l.titlePh}</div></div>
       <div class="fld"><div class="area">${l.bodyPh}</div></div>
@@ -295,7 +295,7 @@ const openWrite = (l) => shell(l, `
 const openLink = (l) => shell(l, `
   <div class="bar-wrap open">
     <div class="bar"><div class="lead g-link" style="background:#23252C"></div>
-      <div class="label ${l===L.en?'en':''}">${l.link}<span class="sub">${l.collapse}</span></div></div>
+      <div class="label ${l===L.en?'en':''}">${l.link}</div><div class="hint">${l.collapse}</div></div>
     <div class="panel">${modes(l,'u')}
       <div class="fld"><div class="box">${l.urlPh}</div></div>
       <div class="acts"><div class="act ghost">${l.paste}</div><div class="act off">${l.save}</div></div>
@@ -307,7 +307,7 @@ const openLink = (l) => shell(l, `
 const openAlbum = (l) => shell(l, `
   <div class="bar-wrap open">
     <div class="bar"><div class="lead g-album" style="background:#23252C"></div>
-      <div class="label ${l===L.en?'en':''}">${l.picked}<span class="sub">${l.collapse}</span></div></div>
+      <div class="label ${l===L.en?'en':''}">${l.picked}</div><div class="hint">${l.collapse}</div></div>
     <div class="panel">${modes(l,'a')}
       <div class="strip"><div class="cell"><div class="x">✕</div></div><div class="cell"><div class="x">✕</div></div><div class="cell add">＋</div></div>
       <div class="pick2">

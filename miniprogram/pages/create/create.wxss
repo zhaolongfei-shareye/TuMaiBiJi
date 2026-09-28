@@ -153,6 +153,10 @@
   --blk-err: #8c2119;
   --face: rgba(35, 37, 44, 0.05);
   --face-ink: #23252c;
+  /* 占位符那一档单独给一个带 alpha 的色，不用 opacity：<textarea> 的 placeholder 不吃
+     opacity，实测 摘要 那格压出来是 #23252c 全墨、标题 那格才是 50% 的 8c8c8f，
+     同一个 .face-ph 在两种控件上就成了两种字色。 */
+  --face-ph: rgba(35, 37, 44, 0.5);
   --face-off: rgba(35, 37, 44, 0.06);
   --face-off-ink: rgba(35, 37, 44, 0.42);
   --solid-bg: #23252c;

@@ -44,7 +44,12 @@ ok('收起态正好三枚小圆', (wxml.match(/class="dot"/g) || []).length === 
 ok('展开态正好四个模式标签', (wxml.match(/class="mode /g) || []).length === 4)
 ok('三枚小圆分别指向 camera / album / url',
   /data-source="camera"/.test(wxml) && /data-source="album"/.test(wxml) && /onDotUrl/.test(wxml))
-ok('点条身 = 直接写', /class="bar" catchtap="openBar"/.test(wxml))
+ok('点条身 = 直接写', /class="bar \{\{active \? 'open' : ''\}\}" catchtap="openBar"/.test(wxml))
+/* 这条是补 09-28 那个真 bug：wxss 里 .bar.open 的规则一直写着，wxml 却从来没挂过这个类，
+   于是展开态还是纸白胶囊 + 下面一块独立的白面板，和效果图不是一套。
+   只查 CSS 有规则等于没查——规则和挂载必须一起断。 */
+ok('展开态那条规则真的被挂上了（CSS 有规则 + WXML 有绑定，缺一即红）',
+  /\.bar\.open\s*\{/.test(wxss) && /class="bar \{\{active \? 'open' : ''\}\}"/.test(wxml))
 ok('面板自己吃掉点击，不会一点输入框就收起', /class="panel" catchtap="noop"/.test(wxml))
 ok('整页仍是收起点击区', /bindtap="collapse"/.test(wxml))
 
@@ -91,8 +96,13 @@ ok('展开让位规则还在', /\.container\.bg-give-way \.entry-wrap\s*\{[^}]*m
 ok('旧手风琴的高度档全部清掉了', !/\.open-url|\.open-shot|\.open-write|\.entry-label/.test(wxss))
 ok('条身 128 高、胶囊圆角', /\.bar\s*\{[^}]*height: 128rpx/.test(wxss) && /\.bar\s*\{[^}]*--r-pill/.test(wxss))
 ok('展开时条与面板同一块白、接缝圆角对上', /\.bar\.open\s*\{[^}]*--r-card/.test(wxss) && /\.panel\s*\{[^}]*0 0 var\(--r-card\)/.test(wxss))
-ok('面板自带一套"纸面"控件变量', ['--face:', '--face-ink:', '--solid-bg:', '--solid-ink:', '--blk-err:']
+ok('面板自带一套"纸面"控件变量', ['--face:', '--face-ink:', '--face-ph:', '--solid-bg:', '--solid-ink:', '--blk-err:']
   .every((v) => new RegExp('\\.panel\\s*\\{[\\s\\S]*?' + v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(wxss)))
+/* <textarea> 的 placeholder 不吃 opacity：实测 摘要 那格是全墨 #23252c、标题 那格才是 50%。
+   所以这一档必须由带 alpha 的色发下来，谁哪天把 opacity 加回去，两种输入框又会分家。 */
+const appwxss = fs.readFileSync(P('app.wxss'), 'utf8')
+ok('占位符那一档改用 --face-ph 发色，不再靠 opacity',
+  /\.face-ph\s*\{[^}]*var\(--face-ph/.test(appwxss) && !/\.face-ph\s*\{[^}]*opacity/.test(appwxss))
 ok('压暗层收到底部 0.72', /0\.72\)\s*100%/.test(wxss))
 ok('换背景那行 110 高、图标 38、字 28', /height: 110rpx/.test(wxss)
   && /\.swap-glyph\s*\{[^}]*width: 38rpx/.test(wxss) && /\.swap-text\s*\{[^}]*font-size: 28rpx/.test(wxss))

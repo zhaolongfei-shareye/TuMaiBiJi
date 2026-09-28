@@ -463,8 +463,7 @@ page {
 }
 
 .face-ph {
-  color: var(--face-ink);
-  opacity: 0.5;
+  color: var(--face-ph, var(--face-ink));
 }
 
 .face-x {
