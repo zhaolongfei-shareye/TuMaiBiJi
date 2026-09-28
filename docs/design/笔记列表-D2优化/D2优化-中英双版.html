@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 笔记列表 D2 优化稿（2026-09-28）</title>
+<style>
+/* ==================================================================
+   他 09-28 口径：「笔记列表，在之前 D2 定稿版基础上优化」。
+   也就是：列表**不铺背景图**（A 整页铺 / C 只铺头部 那两条就此关掉），
+   回到已定稿的 D2 那一版，在它基础上把细节做对。
+
+   这一稿相对 D2 定稿（`底栏与搜索条-随壁纸主色.html`）只动六处，每条都有出处：
+     ① 分类点、分类名、标签三段的关系修正（详见标注 ①）
+     ② meta 行那三个字的字色（现网吃 --text-tertiary，压白卡实测 2.69，不过 4.5）
+     ③ 超长时谁被裁：分类那段永不被裁，被裁的是标签段
+     ④ 撤掉稿子里那行"额度"——现网根本没有，而且笔记已定为不限量
+     ⑤ 空态、加载态、搜索中三屏补画（现网有这些态，之前所有稿子都只画了有数据那一屏）
+     ⑥ 底栏与搜索条那块色改成**函数现算**，和规划 §1.2 那八支逐一对表
+
+   口径（和录入条那版同一条尺子）：px 当 rpx 用，设计宽 750。
+     一屏 = 外框 184（状态栏 94 + 导航条 90，实测截图标定的）+ 页面视口 1506 = 1690。
+   圆角、字阶、描边、行卡结构与现网逐值相同（app.wxss、pages/index/index.wxss）；
+   **圆角一个没动**（--r-card 40 / --r-pill 999 / --r-btn 16），文字标签三个全留。
+   屏上每一句中文都从 utils/i18n.js 抄的；分类名和笔记内容是用户数据，不是字典串。
+   ================================================================== */
+
+  :root{
+    --tx1:#23252C; --tx2:#5C6068; --tx3:#9A9EA6;
+    --paper:#F2EFE9;
+    --r-card:40px; --r-chip:28px; --r-pill:999px; --w-edge:3px;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:var(--tx1);padding:26px 15px 70px;
+    font-family:-apple-system,'PingFang SC',sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;flex-wrap:wrap;gap:64px 56px;width:3192px;align-items:flex-start}
+  .brk{width:100%;height:0}
+  .unit{width:750px;flex:none}
+
+  .cap{margin-bottom:14px;min-height:150px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;background:#23252C;color:#fff;
+    padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap b{color:#23252C}
+
+  .ph{width:750px;height:1690px;position:relative;overflow:hidden;background:var(--page);
+    border-radius:52px;box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16);
+    --page:#F4F2EC;--card:#FFFFFF;--edge:rgba(35,37,44,.10);--idle:rgba(35,37,44,.06);
+    --accent:#23252C;--tx:var(--tx1);--txs:var(--tx2);--txt:var(--tx3);
+    --bar-idle:rgba(242,239,233,.62);--bar-line:rgba(242,239,233,.14);--bar-sh:0 16px 44px rgba(0,0,0,.22)}
+  .ph.doc{height:auto;padding-bottom:26px}
+  /* 深色那两枚：卡片底是 rgba(255,255,255,.05) 叠页面底（现网 app.wxss 原值，这稿不动它） */
+  .ph.dark{--card:rgba(255,255,255,.05);--edge:rgba(255,255,255,.12);--idle:rgba(255,255,255,.09);
+    --tx:#ECEAF6;--txs:#B3AECF;--txt:#8D87AE;--accent:#A78BFA;
+    --bar-idle:rgba(242,239,233,.68);--bar-line:rgba(242,239,233,.22);--bar-sh:0 16px 44px rgba(0,0,0,.42)}
+
+  /* ---------- 外框：状态栏 94 + 导航条 90 = 184 ---------- */
+  .sb{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:var(--tx);position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}
+  .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .nb{height:90px;position:relative;z-index:12;border-bottom:var(--w-edge) solid var(--edge)}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:90px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:var(--tx);letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:13px;width:174px;height:64px;border-radius:34px;
+    background:var(--idle);box-shadow:inset 0 0 0 2px var(--edge);color:var(--tx);
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+  .capsule .d{display:flex;gap:6px}
+  .capsule .d i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .v{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .c{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .c::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  .stage{position:absolute;left:0;right:0;top:184px;bottom:0;overflow:hidden;padding:2px 24px 0}
+  .ph.doc .stage{position:relative;top:0;padding:24px 34px 0}
+
+  /* ---------- 页头：标题左、三个数右，一行基线对齐（现网 .page-head）---------- */
+  .head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:48px 0 32px}
+  .h1{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:var(--tx);line-height:1.4}
+  .h1.en{font-size:38px;letter-spacing:-.5px}
+  .stats{flex:none;font-size:var(--fs-meta);font-weight:600;letter-spacing:-.2px;color:var(--txs);white-space:nowrap}
+
+  /* ---------- 搜索条：吃 --skin（和底栏同一个值，由函数现算）---------- */
+  .sc{background:var(--skin);color:var(--paper);border-radius:var(--r-card);
+    padding:26px 24px 20px;margin-bottom:24px}
+  .sc .line{position:relative;display:flex;align-items:center;height:64px;gap:16px}
+  .sc .val{flex:1;min-width:0;font-size:var(--fs-body);color:var(--paper);white-space:nowrap;overflow:hidden}
+  .sc .ph-txt{flex:1;min-width:0;font-size:var(--fs-body);color:rgba(242,239,233,.62);white-space:nowrap}
+  .sc .x{flex:none;padding:0 6px;font-size:var(--fs-meta);color:rgba(242,239,233,.7)}
+  .sc .go{flex:none;font-size:var(--fs-title);font-weight:800;letter-spacing:-.5px;color:var(--paper)}
+  .sc .rule{position:absolute;left:0;right:0;bottom:0;height:var(--w-edge);background:rgba(242,239,233,.42)}
+
+  /* ---------- 分类筛选胶囊（现网原样：54 高、24 字、选中吃 --accent）---------- */
+  .chips{display:flex;gap:12px;margin-bottom:24px;white-space:nowrap;overflow:hidden}
+  .chip{flex:none;display:inline-flex;align-items:center;height:54px;padding:0 28px;border-radius:var(--r-pill);
+    font-size:var(--fs-meta);font-weight:600;background:var(--idle);color:var(--txs)}
+  .chip.on{background:var(--accent);color:var(--page);font-weight:700}
+  .ph.dark .chip.on{background:rgba(255,255,255,.16);color:#FFFFFF}
+
+  /* ---------- 行卡：D2 画法（左侧 176 方块撤掉），圆角/描边/字阶一律没动 ---------- */
+  .row{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:26px;margin-bottom:16px}
+  .ti{font-size:var(--fs-title);font-weight:800;line-height:1.38;letter-spacing:-.5px;color:var(--tx);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:4px 14px;border-radius:10px;
+    background:var(--accent);color:var(--page);margin-right:12px;vertical-align:3px}
+  .sm{font-size:var(--fs-meta);line-height:1.55;color:var(--txs);margin-top:7px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mt{display:flex;align-items:center;gap:11px;margin-top:11px;padding-top:11px;border-top:var(--w-edge) solid var(--edge);
+    font-size:var(--fs-tiny);white-space:nowrap}
+  /* ③ 谁被裁：分类那段 flex:none 永不裁；被裁的是标签段（min-width:0 + ellipsis） */
+  .lb{display:inline-flex;align-items:center;gap:9px;flex:none;font-weight:800;letter-spacing:-.2px;color:var(--cat-txt-l)}
+  .lb i{width:14px;height:14px;border-radius:50%;background:var(--cat-dot-l);flex:none}
+  /* 两档不是"深色那套改一下"，是同一段字在两种卡底上各有一个值；选哪档由 .ph.dark 决定 */
+  .ph.dark .lb{color:var(--cat-txt-d)}
+  .ph.dark .lb i{background:var(--cat-dot-d)}
+  .ph.dark .lb.uncat i{background:transparent;border:var(--w-edge) solid var(--cat-txt-d)}
+  .mt .src{flex:none;font-weight:700;color:var(--txs)}
+  .mt .tg{min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:700;color:var(--txt)}
+  .mt .sep{flex:none;font-weight:700;color:var(--txt)}
+  /* ② 日期从 --text-tertiary 抬到 --text-secondary（旧值压白卡只有 2.69，见标注） */
+  .mt .dt{flex:none;margin-left:auto;font-weight:700;letter-spacing:.4px;color:var(--txs)}
+  .mt .cv{flex:none;font-size:28px;font-weight:400;line-height:1;color:var(--txt)}
+
+  .empty{text-align:center;padding:64px 0;color:var(--txs);font-size:var(--fs-body)}
+  .spin{width:44px;height:44px;margin:0 auto 20px;border-radius:50%;
+    border:var(--w-edge) solid var(--edge);border-top-color:var(--txs);animation:r 1s linear infinite}
+  @keyframes r{to{transform:rotate(360deg)}}
+
+  /* ---------- 底栏：三个文字标签全留，选中态 = 纸白字 + 一条短线，不加垫块 ---------- */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;background:var(--skin);
+    border-radius:44px;display:flex;border:var(--w-edge) solid var(--bar-line);box-shadow:var(--bar-sh);z-index:14}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    font-size:20px;font-weight:600;color:var(--bar-idle)}
+  .tb.on{color:var(--paper);font-weight:700}
+  .tb .u{width:26px;height:4px;border-radius:2px;background:currentColor;margin-top:2px}
+  .tbi{width:40px;height:40px;position:relative;color:inherit}
+  .i-new::before{content:'';position:absolute;top:8px;left:8px;width:24px;height:24px;border:var(--w-edge) solid currentColor;border-radius:50%}
+  .i-new::after{content:'+';position:absolute;left:50%;top:50%;transform:translate(-50%,-54%);font-size:26px;line-height:1}
+  .i-note::before{content:'';position:absolute;top:6px;left:8px;width:24px;height:28px;border:var(--w-edge) solid currentColor;border-radius:8px}
+  .i-note::after{content:'';position:absolute;top:14px;left:14px;width:12px;height:var(--w-edge);background:currentColor;box-shadow:0 6px 0 currentColor}
+  .i-me::before{content:'';position:absolute;top:4px;left:12px;width:16px;height:16px;border:var(--w-edge) solid currentColor;border-radius:50%}
+  .i-me::after{content:'';position:absolute;bottom:5px;left:6px;width:28px;height:14px;border:var(--w-edge) solid currentColor;border-bottom:none;border-radius:16px 16px 0 0}
+
+  /* ---------- 标注屏 ---------- */
+  .blk{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:32px;padding:26px 28px;margin-bottom:22px}
+  .blk h4{font-size:29px;font-weight:800;letter-spacing:-.5px;margin-bottom:12px;color:var(--tx)}
+  .blk p{font-size:22px;line-height:1.62;color:var(--txs);margin-bottom:9px}
+  .blk p:last-child{margin-bottom:0}
+  .blk b{color:var(--tx)}
+  .blk code{font-family:ui-monospace,Menlo,monospace;font-size:20px;background:var(--idle);border-radius:6px;padding:1px 7px;color:var(--tx)}
+  table{width:100%;border-collapse:collapse;font-size:21px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:2px solid var(--edge);vertical-align:top;color:var(--txs)}
+  th{font-size:19px;font-weight:800;color:var(--txt);letter-spacing:.3px}
+  td b{color:var(--tx)}
+  td i{display:inline-block;width:26px;height:26px;border-radius:7px;vertical-align:-5px;margin-right:8px;
+    border:2px solid var(--edge)}
+  .ok{color:#1D7A48;font-weight:800}.no{color:#B4231F;font-weight:800}
+  .warn{background:#FFF6EC;border:3px solid #E7C9A6;border-radius:26px;padding:22px 26px;margin-bottom:22px}
+  .warn h4{color:#8A4B12}.warn p{color:#6B4A2C}
+</style>
+</head>
+<body>
+<div class="flow" id="flow"></div>
+
+<script>
+/* ---------- 颜色数学：这稿里所有对比度和派生色都由这里算，不手填 ---------- */
+const rgb = (h) => { const s = h.replace('#',''); const n = parseInt(s.slice(0,6),16); return [(n>>16)&255,(n>>8)&255,n&255] }
+const hex = (a) => '#' + a.map(v => Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('')
+const toHsl = (h) => {
+  let [r,g,b] = rgb(h).map(v => v/255)
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), d = mx-mn, l = (mx+mn)/2
+  let hh = 0
+  if (d) { hh = mx===r ? ((g-b)/d + (g<b?6:0)) : mx===g ? (b-r)/d+2 : (r-g)/d+4; hh *= 60 }
+  const s = d ? d/(1 - Math.abs(2*l-1)) : 0
+  return [hh, s*100, l*100]
+}
+const fromHsl = (H,S,L) => {
+  const s = S/100, l = L/100, c = (1-Math.abs(2*l-1))*s, x = c*(1-Math.abs(((H/60)%2)-1)), m = l-c/2
+  const t = H<60?[c,x,0]:H<120?[x,c,0]:H<180?[0,c,x]:H<240?[0,x,c]:H<300?[x,0,c]:[c,0,x]
+  return hex(t.map(v => (v+m)*255))
+}
+const lum = (h) => { const f = (v) => { v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4) }
+  const [r,g,b] = rgb(h); return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b) }
+const cr = (a,b) => { const x = lum(a), y = lum(b), [hi,lo] = x>y ? [x,y] : [y,x]; return (hi+0.05)/(lo+0.05) }
+const over = (fg, bg, a) => hex(rgb(fg).map((v,i) => v*a + rgb(bg)[i]*(1-a)))   // 半透明白叠在页面底上
+const r2 = (n) => Math.round(n*100)/100
+
+/* ⑥ 派生规则（规划 §1.2 那一条）：色相原样、饱和度夹进 [30,45]、明度按深浅定档 */
+const skin = (page, dark) => { const [H,S] = toHsl(page); return fromHsl(H, Math.min(45,Math.max(30,S)), dark?30:20.5) }
+
+/* 八套壁纸：page 与 dark 全部从 utils/palette.js 的 THEMES 抄来（改一边必须改另一边） */
+const WALLS = [
+  ['米白','#F4F2EC',false], ['雾蓝','#EAEEFB',false], ['松绿','#E7F3EA',false], ['暮橙','#FDEEE6',false],
+  ['夜紫','#0C0C1D',true], ['深海','#0D1B2A',true], ['象牙','#F2EFE9',false], ['天青','#E9EEEA',false],
+]
+/* 规划 §1.2 表里那八支（拿它对表，不是拿来直接用——真正的值由 skin() 现算） */
+const DOC_SKIN = { '米白':'#443C25','雾蓝':'#1D284C','松绿':'#23462C','暮橙':'#4C2D1D',
+  '夜紫':'#2D2D6C','深海':'#2A4B6F','象牙':'#443A25','天青':'#25442B' }
+
+/* 分类两档：点色 + 文字色。浅色档 = 定稿里那六档；深色档同理。
+   注意这是"分类身份"的两档定值（锚点 2），不是第五支彩色。 */
+const CATS = [
+  ['芥末黄','#F6C445','#856D30','#F6C445','#F6C445'],
+  ['宝蓝','#3F52D6','#3F52D6','#7FA8FF','#7FA8FF'],
+  ['橙','#E9723D','#A35432','#EF8C58','#EF8C58'],
+  ['草绿','#46A863','#35784B','#57B873','#57B873'],
+  ['紫','#6E4BD0','#6E4BD0','#B795FF','#B795FF'],
+  ['未分类','#23252C','#23252C',null,'#B3AECF'],
+]
+
+const L = {
+  zh: { nav:'图麦笔记', head:'我的笔记', stats:'本周：3　|　本月：12　|　总数：48',
+    ph:'输入关键词', go:'搜索笔记', all:'全部', pin:'置顶', date:'09-28', uncat:'未分类',
+    rows:[
+      {c:4, pin:true,  t:'卡片不该比内容更抢眼', s:'详情页一屏要能读完，颜色只负责定位，不负责抢戏。', src:'公众号文章', tg:'阅读 / 排版'},
+      {c:1, t:'三个入口合成一条横条', s:'默认只有一条"动动手指"，点开才长表单；首页安静了。', src:'亲自撰写', tg:'产品 / 界面'},
+      {c:2, t:'提炼超时从 3 秒抬到 60 秒', s:'云函数默认超时太短，长文提炼会被掐在中间。', src:'截图识别', tg:''},
+      {c:0, t:'市集那三家咖啡都在东门第二排', s:'自带杯减五块，一家只卖浅焙，周末十点前人少。', src:'亲自撰写', tg:'周末 / 咖啡 / 探店 / 市集'},
+      {c:5, t:'先记着，回头再归类', s:'', src:'网页文章', tg:''},
+      {c:3, t:'周报里那句"基本完成"是怎么来的', s:'三条需求两条只做了前半段，剩下半段没人接。', src:'公众号文章', tg:'工作'},
+    ],
+    empty:'暂无笔记', loading:'加载中...' },
+  en: { nav:'Tumai Notes', head:'My notes', stats:'Week: 3  |  Month: 12  |  Total: 48',
+    ph:'Enter keywords', go:'Search notes', all:'All', pin:'Pinned', date:'09-28', uncat:'Uncategorised',
+    rows:[
+      {c:4, pin:true,  t:'The card should not outshine the note', s:'A detail screen must be readable in one view; colour only locates.', src:'WeChat Article', tg:'Reading / Layout'},
+      {c:1, t:'Three entries became one bar', s:'By default there is only "Tap and jot"; the form grows on tap.', src:'Written by me', tg:'Product / UI'},
+      {c:2, t:'Extraction timeout raised from 3s to 60s', s:'The default was too short — long articles were cut mid-way.', src:'Screenshot', tg:''},
+      {c:0, t:'Three coffee stalls, all on the second row', s:'Bring your own cup, minus five. One only roasts light.', src:'Written by me', tg:'Weekend / Coffee / Markets'},
+      {c:5, t:'Jot it first, categorise later', s:'', src:'Web Article', tg:''},
+      {c:3, t:'Where "mostly done" in a weekly report comes from', s:'Two of three items are half built and nobody owns the rest.', src:'WeChat Article', tg:'Work'},
+    ],
+    empty:'No notes yet', loading:'Loading...' },
+}
+
+const shell = (lang, inner, skinHex, page, dark) => `
+  <div class="ph${dark?' dark':''}" style="--page:${page};--skin:${skinHex}">
+    <div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+    <div class="nb"><span class="t">${lang.nav}</span><span class="capsule"><span class="d"><i></i><i></i><i></i></span><span class="v"></span><span class="c"></span></span></div>
+    ${inner}
+    <div class="tabbar">
+      <div class="tb"><div class="tbi i-new"></div>${lang===L.zh?'新建':'New'}<div class="u" style="opacity:0"></div></div>
+      <div class="tb on"><div class="tbi i-note"></div>${lang===L.zh?'笔记':'Notes'}<div class="u"></div></div>
+      <div class="tb"><div class="tbi i-me"></div>${lang===L.zh?'我的':'Mine'}<div class="u" style="opacity:0"></div></div>
+    </div>
+  </div>`
+
+const head = (l) => `<div class="head"><div class="h1 ${l===L.en?'en':''}">${l.head}</div><div class="stats">${l.stats}</div></div>`
+/* 只有「未分类」是字典串（i18n.js:377 noCategory），其余五支是用户自己起的名字，英文界面下也还是原样 */
+const catName = (i, l) => i === 5 ? l.uncat : CATS[i][0]
+const chips = (l) => `<div class="chips"><div class="chip on">${l.all}</div>${[...new Set(l.rows.map(r=>r.c))].map(i=>`<div class="chip">${catName(i,l)}</div>`).join('')}</div>`
+const search = (l, typing) => `<div class="sc"><div class="line">
+    <div class="${typing?'val':'ph-txt'}">${typing?'咖啡':l.ph}</div>${typing?'<div class="x">✕</div>':''}
+    <div class="go">${l.go}</div><div class="rule"></div></div></div>`
+const row = (l, r) => {
+  const [,dotL,txtL,dotD,txtD] = CATS[r.c]
+  const skinVars = `--cat-dot-l:${dotL};--cat-txt-l:${txtL};--cat-dot-d:${dotD||'transparent'};--cat-txt-d:${txtD}`
+  return `<div class="row">
+    <div class="ti">${r.pin?`<span class="pin">${l.pin}</span>`:''}${r.t}</div>
+    ${r.s?`<div class="sm">${r.s}</div>`:''}
+    <div class="mt"><span class="lb${r.c===5?' uncat':''}" style="${skinVars}"><i></i>${catName(r.c,l)}</span><span class="sep">·</span><span class="src">${r.src}</span>
+      ${r.tg?`<span class="sep">·</span><span class="tg">${r.tg}</span>`:''}
+      <span class="dt">${l.date}</span><span class="cv">›</span></div></div>`
+}
+const list = (l, n) => l.rows.slice(0,n).map(r=>row(l,r)).join('')
+
+const unit = (step, h3, p, body, tall) => `<div class="unit">
+  <div class="cap"><span class="step">${step}</span><h3>${h3}</h3><p>${p}</p></div>
+  <div class="ph${tall?' doc':''}">${body}</div></div>`
+
+/* 一屏 = 外框（状态栏 + 导航条）+ 页面视口 + 底栏；壁纸决定 --page 和 --skin */
+const screen = (step, h3, p, l, inner, wall, cls) => {
+  const [name, page, dark] = wall
+  const body = `<div class="sb"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+    <div class="nb"><span class="t">${l.nav}</span><span class="capsule"><span class="d"><i></i><i></i><i></i></span><span class="v"></span><span class="c"></span></span></div>
+    <div class="stage${cls?' '+cls:''}">${inner}</div>
+    <div class="tabbar">
+      <div class="tb"><div class="tbi i-new"></div>${l===L.zh?'新建':'New'}<div class="u" style="opacity:0"></div></div>
+      <div class="tb on"><div class="tbi i-note"></div>${l===L.zh?'笔记':'Notes'}<div class="u"></div></div>
+      <div class="tb"><div class="tbi i-me"></div>${l===L.zh?'我的':'Mine'}<div class="u" style="opacity:0"></div></div>
+    </div>`
+  return unit(step, h3, p, `<div class="ph${dark?' dark':''}" style="--page:${page};--skin:${skin(page,dark)}">${body}</div>`)
+}
+
+/* ---------- 标注屏：每一张表都由上面那些函数现算 ---------- */
+const skinRows = WALLS.map(([n,page,dark]) => {
+  const s = skin(page,dark), idle = dark ? 'rgba(242,239,233,.68)' : 'rgba(242,239,233,.62)'
+  const idleHex = over('#F2EFE9', s, dark?0.68:0.62)
+  return `<tr><td><i style="background:${s}"></i><b>${n}</b></td><td><code>${page}</code></td>
+    <td><code>${s}</code> ${s.toLowerCase()===DOC_SKIN[n].toLowerCase()?'<span class="ok">与 §1.2 同值</span>':'<span class="no">与 §1.2 不符（'+DOC_SKIN[n]+'）</span>'}</td>
+    <td>${r2(cr('#F2EFE9',s))}</td><td>${r2(cr(idleHex,s))}</td><td>${r2(cr(s,page))}</td></tr>`
+}).join('')
+
+const cardLight = '#FFFFFF', cardDark = over('#FFFFFF','#0C0C1D',0.05)
+const catRows = CATS.map(([n,dotL,txtL,dotD,txtD]) => {
+  const dl = dotL ? cr(dotL,cardLight) : cr('#23252C',cardLight)
+  const dd = dotD ? cr(dotD,cardDark) : cr('#FFFFFF',cardDark)
+  return `<tr><td><i style="background:${dotL||'transparent'};border-color:${dotL?'transparent':'rgba(35,37,44,.35)'}"></i><b>${n}</b></td>
+    <td><code>${dotL||'实心墨黑'}</code> / <code>${txtL}</code></td><td>${r2(dl)}</td><td>${r2(cr(txtL,cardLight))}</td>
+    <td><i style="background:${dotD||'transparent'};border-color:rgba(255,255,255,.42)"></i><code>${dotD||'空心环'}</code> / <code>${txtD}</code></td>
+    <td>${r2(dd)}</td><td>${r2(cr(txtD,cardDark))}</td></tr>`
+}).join('')
+
+/* 一屏能放几条：从渲染结果里量，不是估的 */
+function rowsPerScreen(){
+  const stage = document.querySelector('.u1'), ph = stage.closest('.ph')
+  const tab = ph.querySelector('.tabbar').getBoundingClientRect()
+  const rows = [...ph.querySelectorAll('.row')]
+  const h = rows.map(r => Math.round(r.getBoundingClientRect().height))
+  const fit = rows.filter(r => r.getBoundingClientRect().bottom <= tab.top).length
+  return { h, fit, first: rows[0].getBoundingClientRect().top - stage.getBoundingClientRect().top + 184 }
+}
+
+const DOC = `
+  <div class="stage" style="padding-top:0">
+    <div class="blk">
+      <h4>这一稿相对 D2 定稿只动六处</h4>
+      <p><b>① 分类点、分类名、标签这三段的关系修正。</b>现网左侧那块方块里写的字其实是<b>第一个标签</b>（<code>pages/index/index.js:146</code> 的 <code>blockName = firstTag || 分类名</code>），而块的颜色是按<b>分类 id</b> 取的（<code>blockSkinFor(categoryId)</code>）——颜色和文字对不上，一条笔记归在「产品」却写着「界面」。D2 撤掉方块之后，点色和它旁边那三个字都归分类，标签退回 meta 行最后那段。这条不是审美，是把一处错位改对。</p>
+      <p><b>② meta 行那三个字的字色。</b>现网 <code>.row-foot</code> 吃 <code>--text-tertiary</code>（米白下 <code>#9A9EA6</code>），压白卡实测只有 <b>2.69</b>，而它是 21rpx 的小字、按 4.5 判。D2 之后这一行成了分类身份的一部分，不能还是灰不溜秋——来源和日期抬到 <code>--text-secondary</code>（<code>#5C6068</code>，压白卡 <b>6.79</b>），分类名吃两档定值（下表逐支量过）。</p>
+      <p><b>③ 超长时谁被裁。</b>定稿那版把三段塞进一个 <code>overflow:hidden</code> 的容器，英文长标签一挤，<b>分类名会被整段裁掉</b>——而"颜色 + 文字同时出现"是锚点 3 的硬约束。这一稿把分类那段设成 <code>flex:none</code>，被裁的只有标签段（第 ① 屏第四条那行挂了四个标签，就是留给这一刀撞的）。</p>
+      <p><b>④ 撤掉稿子里那行"额度"。</b>定稿的页头右侧画了两行：三个数 + 一行额度。现网 <code>index.wxml:5</code> 只有一个 <code>statsText</code>，而且笔记已定为<b>不限量</b>，那行字本来就不该存在。这跟上一批那行"日期"是同一类错（效果图自己长出来的元素）。</p>
+      <p><b>⑤ 空态、加载态、搜索中三屏补画。</b>之前所有稿子只画了"有数据"那一屏。第 ③④⑤ 屏补上：搜索中输入的字和占位符是两个色（62% 那档只用于占位符）；空态那行字要过 4.5；加载态没有内容可看，所以只有那枚转圈。</p>
+      <p><b>⑥ 底栏与搜索条那块色改成函数现算。</b>规则还是规划 §1.2 那一条：页面底转 HSL，<b>色相原样保留</b>、饱和度夹进 [30%,45%]、明度浅档 20.5% / 深档 30%。这张稿子里那八支不是我抄的，是这个函数算出来的，并且逐个和 §1.2 表对了一遍（下表八行全绿才算过）。</p>
+      <p><b>没动的：</b>圆角（<code>--r-card</code> 40 / <code>--r-pill</code> 999 / <code>--r-btn</code> 16 原样）、三个文字标签、选中态那条 26 短线、行卡结构（标题 / 摘要 / meta 三段）、摘要两行改一行的截法、置顶牌、胶囊。深色那两枚的卡片底（<code>rgba(255,255,255,.05)</code> 压页面底只有 <b>1.11</b>）也<b>不动</b>——那是阶段 2 外观系统的事，这次顺手改会把两批风险叠一起。</p>
+    </div>
+
+    <div class="blk">
+      <h4>八支派生色（函数算的，和 §1.2 对表）</h4>
+      <table><tr><th>壁纸</th><th>页面底</th><th>派生色 = 底栏 = 搜索条</th><th>纸白字</th><th>未选中字</th><th>压页面底</th></tr>${skinRows}</table>
+      <p style="margin-top:14px">判据：纸白字 ≥7、未选中字 ≥4.5、这块面压页面底 ≥3。<b>深色那两枚（夜紫 / 深海）压页面底不到 3</b>，这条不粉饰：再抬到 3 那一整块就从"这套壁纸的深色"变成"一块亮蓝"，反而不像同一个主题，所以边界交给那一圈纸白 @22% 发丝边、可读交给字。现网那块 <code>#23252C</code> 压夜紫只有 <b>1.14</b>，比这版差得多。</p>
+    </div>
+
+    <div class="blk">
+      <h4>分类两档（点色 / 文字色）压卡底实测</h4>
+      <table><tr><th>分类</th><th>浅色档 点 / 字</th><th>点压白卡</th><th>字压白卡</th><th>深色档 点 / 字</th><th>点压深卡</th><th>字压深卡</th></tr>${catRows}</table>
+      <p style="margin-top:14px">浅色卡底 <code>#FFFFFF</code>，深色卡底是 <code>rgba(255,255,255,.05)</code> 叠夜紫页面底算出来的 <code>${cardDark}</code>。那三个字是 21rpx 小字，<b>按 4.5:1 判：浅色档 4.97~15.30、深色档 7.09~10.75，两档六支全过</b>。那枚 14rpx 的点按图形对象判 3:1，<b>浅色档下 芥末黄 1.63、草绿 2.98 这两枚不过</b>——这一条我不改点色：点在这里不是唯一编码，紧挨着它的分类名已经过了 4.5，去掉颜色也不影响读出"这是哪一类"（1.4.1 要的是"只靠颜色才能理解"的那些信息）。深色档那六枚点 7.09~17.50 全过。未分类在浅色下是实心墨黑点（压白卡 15.30），在深色下改成<b>空心环</b>——"没归类"这件事本来就该长得不一样，硬给一块深色只会糊掉。</p>
+    </div>
+
+    <div class="blk">
+      <h4>行卡尺寸与一屏几条（从这张渲染结果里量的）</h4>
+      <table><tr><th></th><th>数值（rpx）</th></tr>
+        <tr><td>行卡高（标题 + 摘要 + meta）</td><td id="rh"></td></tr>
+        <tr><td>行间距</td><td>16（<code>--sp-2</code>，没动）</td></tr>
+        <tr><td>第一行顶边</td><td id="ft"></td></tr>
+        <tr><td>一屏放得下</td><td id="fp"></td></tr>
+        <tr><td>卡片左右内缩 / 内边距</td><td>24 / 26（现网 <code>.row</code> 原值）</td></tr>
+      </table>
+      <p style="margin-top:14px">撤掉左侧那块 176 之后，正文从 468 宽变成 698 宽，<b>摘要基本不用再折第二行</b>——行高是"内容放得下"带来的，不是我调内边距调出来的。我试过把 <code>.row</code> 的 26 收到 24：每行只省 4rpx，一屏多不出半条，所以这稿<b>不改内边距</b>。</p>
+    </div>
+
+    <div class="warn">
+      <h4>要你拍的三件事</h4>
+      <p><b>一、meta 行字色抬档（②）要不要。</b>抬了以后 21rpx 那行字全部达标，代价是"淡"的味道少一点——现网那种灰是刻意压低的。</p>
+      <p><b>二、未分类改空心环（深色下）认不认。</b>浅色下还是实心墨黑点，只有深色下换成环。</p>
+      <p><b>三、落地范围。</b>这一版要一起改的有四处：列表页行卡、分类筛选胶囊、详情页那行分类身份、底栏与搜索条那块色（<code>custom-tab-bar/</code> 里七处写死的 <code>rgba(255,255,255,.42)</code> 改成吃 <code>currentColor</code>）。规矩是"同一个分类在全应用只有一张脸"，拆开做就会出现列表是新的、详情是旧的样子。<b>派生色必须是 <code>palette.js</code> 里那个函数，不许抄成一张八行表</b>（后端还会加壁纸）。</p>
+    </div>
+  </div>`
+
+/* ---------- 装配：七屏 + 一张标注 ---------- */
+const flow = document.getElementById('flow')
+const RICE = WALLS[0], PURP = WALLS[4]
+let html = ''
+html += screen('① 中文 · 米白 首屏','D2 画法 + 这一稿六处修正','左侧 176 方块撤掉，分类退到 meta 行那枚 14rpx 点加三个字；底栏和搜索条同一块色，由壁纸派生。',
+  L.zh, `${head(L.zh)}${search(L.zh)}${chips(L.zh)}${list(L.zh,6)}`, RICE, 'u1')
+html += screen('② 中文 · 夜紫 首屏','深色那一档，同一条规则','卡片底仍是现网那层 5% 白（压页面底 1.11，这条留给阶段 2）；分类字吃深色档，未分类换成空心环。',
+  L.zh, `${head(L.zh)}${search(L.zh)}${chips(L.zh)}${list(L.zh,6)}`, PURP)
+html += screen('③ 中文 · 搜索中','输入的字和占位符是两个色','占位符那档 62% 只管"还没输入"；一旦有字就是纸白 100%，右边多一个 ✕。结果只剩两条。',
+  L.zh, `${head(L.zh)}${search(L.zh,true)}${chips(L.zh)}${list(L.zh,2)}`, RICE)
+html += screen('④ 中文 · 空态','之前每一版稿子都漏的一屏','一条笔记都没有时页面长这样。那行字吃 --text-secondary，压页面底实测见标注，要过 4.5。',
+  L.zh, `${head(L.zh)}${search(L.zh)}${chips(L.zh)}<div class="empty">${L.zh.empty}</div>`, RICE)
+html += screen('⑤ 中文 · 加载','首屏进来之那一瞬','没有内容可看，所以只有那枚转圈加一行字——不画骨架屏（现网没有，也不该顺手加）。',
+  L.zh, `${head(L.zh)}${search(L.zh)}${chips(L.zh)}<div class="empty" style="padding:120px 0"><div class="spin"></div>${L.zh.loading}</div>`, RICE)
+html += screen('⑥ English · 米白','Same rules, English strings','"Uncategorised" 13 个字符，是 meta 行最宽的一格——所以第 ③ 处那条裁切规则在英文下更要紧。',
+  L.en, `${head(L.en)}${search(L.en)}${chips(L.en)}${list(L.en,6)}`, RICE)
+html += screen('⑦ English · 夜紫','Dark tier','Category names and note content are user data, not dictionary strings — only 未分类 is ours.',
+  L.en, `${head(L.en)}${search(L.en)}${chips(L.en)}${list(L.en,6)}`, PURP)
+html += '<div class="brk"></div>'
+html += unit('⑧ 标注','六处修正的出处、八支派生色对表、分类两档实测、还欠什么','表里每一个数都是这页 JS 现算的，不是我抄进稿子的。', DOC, true)
+flow.innerHTML = html
+
+/* 行卡尺寸与一屏几条：从渲染结果里量 */
+const m = rowsPerScreen()
+document.getElementById('rh').textContent = m.h.join(' / ')
+document.getElementById('ft').textContent = Math.round(m.first)
+document.getElementById('fp').textContent = m.fit + ' 条（底栏压住的那一行不计）'
+
+</script>
+</body>
+</html>
