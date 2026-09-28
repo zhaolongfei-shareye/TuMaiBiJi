@@ -15,8 +15,14 @@
    Camera / Album / Category / Uncategorised / Title / Summary, one line is fine…）。
    只有条身那句「动动手指」现网没有对应串，这一稿暂给 "Tap and jot"，标在 ⑤ 里等拍板。
 
-   口径：px 当 rpx 用（设计宽 750，一屏 1624；导航条 0..176，底栏顶 1496）。
-   圆角、字阶、描边、底栏几何与现网逐值相同（app.wxss）。人像沿用已上线那张 865×1670。
+   口径（09-28 第二次改，改成和代码同一把尺子）：px 当 rpx 用，设计宽 750。
+     一屏 = 外框 184（状态栏 94 + 导航条 90，从实测截图标定出来的）+ 页面视口 1506 = 1690。
+     条顶 1286（= 184 + 1102，那 1102 是 66vh 加标题行推出来的实测值）、条高 128、
+     换背景行跟着条流下来（margin-top 22、高 110），底栏 bottom 20 / 高 108。
+   背景图直接引用线上那张原图 miniprogram/assets/home-bg-portrait.jpg（865×1670），
+     放法用 background-size:cover —— 和 <image mode="aspectFill"> 是同一条裁切规则。
+     （上一版这里用的是我另外裁过的 750×1448 假图，那是"实测和效果图差很多"的头号原因。）
+   圆角、字阶、描边、底栏几何与现网逐值相同（app.wxss）。
    ================================================================== */
 
   :root{
@@ -41,18 +47,20 @@
   .cap b{color:#23252C}
   .cap code{font:inherit;font-weight:800;color:#23252C}
 
-  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:#F4F2EC;border-radius:52px;
+  .ph{width:750px;height:1690px;position:relative;overflow:hidden;background:#F4F2EC;border-radius:52px;
     box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16);
-    --skin:#443C25;--bar-idle:rgba(242,239,233,.62)}
-  .ph.doc{height:4620px}
+    --skin:#241E16;--bar-idle:rgba(242,239,233,.62)}
+  .ph.doc{height:auto;padding-bottom:26px}
 
-  .bg{position:absolute;left:0;top:176px;width:750px;height:1448px;background-size:100% 100%}
-  .scrim{position:absolute;left:0;top:176px;width:750px;height:1448px;
-    background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.58) 150px,
-      rgba(18,20,26,.44) 620px,rgba(18,20,26,.42) 900px,rgba(18,20,26,.52) 1200px,rgba(18,20,26,.62) 1250px,
-      rgba(18,20,26,.72) 1448px)}
+  /* 背景层和罩层都按真机那一条来：从外框以下铺满视口 1506，图用 cover（= aspectFill 同规则），
+     罩层停点直接抄 create.wxss 的百分比，不换成手写的像素值。 */
+  .bg{position:absolute;left:0;top:184px;width:750px;height:1506px;background-size:cover;background-position:center}
+  .scrim{position:absolute;left:0;top:184px;width:750px;height:1506px;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)}
 
-  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+  .sb{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
     font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
   .sb .right{display:flex;align-items:center;gap:10px}
   .sig{display:flex;gap:4px;align-items:flex-end}
@@ -61,10 +69,10 @@
   .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
   .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
   .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
-  .nb{height:88px;background:#181A20;position:relative;z-index:12}
-  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+  .nb{height:90px;background:#181A20;position:relative;z-index:12}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:90px;display:flex;align-items:center;justify-content:center;
     font-size:31px;font-weight:600;color:#F2EFE9;letter-spacing:-.3px}
-  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+  .capsule{position:absolute;right:26px;top:13px;width:174px;height:64px;border-radius:34px;
     background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);color:#F2EFE9;
     display:flex;align-items:center;justify-content:space-between;padding:0 20px}
   .capsule .dots{display:flex;gap:6px}
@@ -73,31 +81,33 @@
   .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
   .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
 
-  .head-row{position:absolute;left:24px;right:24px;top:229px;display:flex;align-items:center;
+  /* 标题那一行：真机是 .container 的 2rpx 上补 + .page-title 的 48rpx 上外边距 = 50，
+     再往下是 42 字、1.4 倍行高的那一个盒子（实测字形顶在 58）。 */
+  .head-row{position:absolute;left:24px;right:24px;top:234px;display:flex;align-items:center;
     justify-content:space-between;gap:20px;z-index:6}
-  .head-row .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96);line-height:1.15}
+  .head-row .h1{font-size:42px;font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96);line-height:1.4}
   .head-row .h1.en{font-size:38px;letter-spacing:-.5px}
   .head-row .lang{display:flex;align-items:baseline;gap:20px;flex:none}
   .head-row .lang span{font-size:24px;line-height:1.4;color:rgba(242,239,233,.56);
     border-bottom:4px solid transparent;padding:0 1px 4px}
   .head-row .lang .on{color:#F2EFE9;font-weight:700;border-bottom-color:#F2EFE9}
 
-  .dateline{position:absolute;left:24px;right:24px;top:296px;display:flex;align-items:baseline;gap:16px;z-index:6}
-  .dateline .d{font-size:32px;font-weight:300;letter-spacing:1px;color:rgba(242,239,233,.95);line-height:1.3}
-  .dateline .w{font-size:26px;font-weight:400;letter-spacing:2px;color:rgba(242,239,233,.56)}
-
-  /* ---------- 统一录入条 ---------- */
+  /* ---------- 统一录入条 ----------
+     条顶 1286 = 外框 184 + 1102（代码里那条 margin-top:66vh 加标题行推出来的实测值）。
+     换背景那一行不再绝对定位，改成跟着条流下来（margin-top 22 + 高 110），
+     这样收起态和展开态都自动跟着代码走，不用两处各写一个数。 */
   .bar-wrap{position:absolute;left:24px;right:24px;z-index:8}
-  .bar-wrap.collapsed{top:1258px}
-  .bar-wrap.open{top:420px}
+  .bar-wrap.collapsed{top:1286px}
+  .bar-wrap.open{top:330px}
   .bar{height:128px;border-radius:var(--r-pill);background:var(--paper);
+    border:var(--w-edge) solid rgba(35,37,44,.10);
     box-shadow:0 18px 46px rgba(8,10,14,.42);display:flex;align-items:center;padding:0 20px 0 34px;gap:22px}
   .bar-wrap.open .bar{border-radius:40px 40px 0 0;background:#fff;box-shadow:0 -6px 40px rgba(8,10,14,.34)}
   .bar .lead{flex:none;width:52px;height:52px}
   .bar .label{flex:1;min-width:0;font-size:46px;font-weight:800;letter-spacing:-1px;color:#23252C;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .bar .label.en{font-size:42px;letter-spacing:-.5px}
-  .bar .label .sub{font-size:26px;font-weight:500;color:#8A8E96;letter-spacing:0;margin-left:14px}
+  .bar .label .sub{font-size:24px;font-weight:600;color:rgba(35,37,44,.42);letter-spacing:0;margin-left:14px}
   .dots{display:flex;align-items:center;gap:20px;flex:none}
   .dot{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center}
   .dot i{width:38px;height:38px}
@@ -105,11 +115,10 @@
   .dot.shot{background:var(--m-shot)} .dot.shot i{background:var(--m-shot-ink)}
   .dot.album{background:var(--m-album)} .dot.album i{background:var(--m-album-ink)}
 
-  /* 换图：一枚"照片"图标 + 一行极淡的字，居中坐在长条下面那段空白里（1386..1496）。
+  /* 换图：一枚"照片"图标 + 一行极淡的字，居中坐在长条下面那段空白里。
      字是必需的：纯图标没人读得出"换背景"这层意思，而那正是这一枚要办的事。
-     整行都是热区（左右到边、上下 110），图标本身只有 38。 */
-  .swap{position:absolute;left:0;right:0;top:1386px;height:110px;z-index:8;
-    display:flex;align-items:center;justify-content:center;gap:12px}
+     热区 = 条所在的这一列（702 宽，不是整屏 750），图标本身只有 38。 */
+  .swap{display:flex;align-items:center;justify-content:center;gap:12px;height:110px;margin-top:22px;z-index:8;position:relative}
   .swap i{width:38px;height:38px;background:rgba(242,239,233,.92);flex:none}
   .swap span{font-size:28px;font-weight:700;letter-spacing:1px;color:rgba(242,239,233,.85)}
 
@@ -117,11 +126,11 @@
   .panel{background:#fff;border-radius:0 0 40px 40px;padding:8px 34px 34px;color:#23252C;
     box-shadow:0 24px 52px rgba(8,10,14,.34)}
   .modes{display:flex;align-items:center;gap:14px;padding:22px 0 4px;border-bottom:3px solid rgba(35,37,44,.07)}
-  .mode{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:700;color:#9A9EA6;
+  .mode{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:700;color:rgba(35,37,44,.42);
     padding:0 4px 16px;border-bottom:5px solid transparent;margin-bottom:-3px;white-space:nowrap}
   .mode .x{width:26px;height:26px;border-radius:50%;background:currentColor}
-  .mode.on{border-bottom-color:currentColor}
-  .mode.on.w{color:#B07F00}.mode.on.u{color:#3F52D6}.mode.on.a{color:#2E7A47}
+  /* 当前那一枚的文字和下划线都是墨黑，颜色只在左边那颗 26 的小点上——和 create.wxss 同一条 */
+  .mode.on{color:#23252c;border-bottom-color:#23252c}
   .fld{margin-top:24px}
   .box{height:88px;border-radius:var(--r-btn);background:rgba(35,37,44,.05);display:flex;align-items:center;
     padding:0 24px;font-size:28px;color:#9A9EA6}
@@ -165,7 +174,7 @@
   .tb.on .ln{opacity:1}
 
   /* ---------- 标注屏 ---------- */
-  .docbody{position:absolute;left:0;right:0;top:179px;bottom:0;padding:2px 34px 0;z-index:6}
+  .docbody{position:relative;padding:24px 34px 0;z-index:6}
   .blk{background:#fff;border:3px solid rgba(35,37,44,.10);border-radius:32px;padding:26px 28px;margin-bottom:22px}
   .blk h4{font-size:29px;font-weight:800;letter-spacing:-.5px;margin-bottom:12px}
   .blk p{font-size:22px;line-height:1.62;color:#4B4F57;margin-bottom:9px}
@@ -200,14 +209,14 @@
 <div class="flow" id="flow"></div>
 
 <script>
-const IMG = '裁切A-微放大.jpg'
+/* 背景就是线上那张原图，不再用另裁的假图（上一版这里放的是我手裁的 750×1448） */
+const IMG = '../../../miniprogram/assets/home-bg-portrait.jpg'
 
 /* 两套文案。右边那列全是从现网 utils/i18n.js 抄来的现成串；
    只有 bar.write 那句现网没有对应，暂给 "Tap and jot"，等拍板。 */
 const L = {
   zh: {
     nav:'新建笔记', slogan:'看到好内容，随手记下来', sloganCls:'',
-    date:'9月28日', week:'周日',
     write:'动动手指', link:'贴个链接', picked:'选了 2 张',
     collapse:'点空白处收起',
     mW:'直接写', mS:'拍照', mA:'相册', mU:'链接',
@@ -221,7 +230,6 @@ const L = {
   },
   en: {
     nav:'New note', slogan:"Save what's worth saving", sloganCls:'en',
-    date:'Sep 28', week:'Sun',
     write:'Tap and jot', link:'Paste a link', picked:'2 picked',
     collapse:'Tap outside to close',
     mW:'Write', mS:'Camera', mA:'Album', mU:'Link',
@@ -242,7 +250,6 @@ const shell = (lang, inner) => `
   <div class="nb"><span class="t">${lang.nav}</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
   <div class="head-row"><div class="h1 ${lang.sloganCls}">${lang.slogan}</div>
     <div class="lang"><span class="${lang===L.zh?'on':''}">中</span><span class="${lang===L.en?'on':''}">EN</span></div></div>
-  <div class="dateline"><span class="d">${lang.date}</span><span class="w">${lang.week}</span></div>
   ${inner}
   <div class="tabbar">
     <div class="tb on"><div class="ic"></div>${lang===L.zh?'新建':'New'}<div class="ln"></div></div>
@@ -254,29 +261,26 @@ const swap = (l) => `<div class="swap"><i class="g-swap"></i><span>${l.swap}</sp
 
 const collapsed = (l) => shell(l, `
   <div class="bar-wrap collapsed"><div class="bar">
-    <div class="lead g-pencil" style="background:#B07F00"></div>
+    <div class="lead g-pencil" style="background:#23252C"></div>
     <div class="label ${l===L.en?'en':''}">${l.write}</div>
     <div class="dots">
       <div class="dot shot"><i class="g-camera"></i></div>
       <div class="dot album"><i class="g-album"></i></div>
       <div class="dot url"><i class="g-link"></i></div>
     </div>
-  </div></div>${swap(l)}`)
+  </div>${swap(l)}</div>`)
 
 const modes = (l, on) => `<div class="modes">
   ${['w','s','a','u'].map(k=>{
     const nm={w:l.mW,s:l.mS,a:l.mA,u:l.mU}[k]
     const col={w:'#F6C445',s:'#E9723D',a:'#46A863',u:'#3F52D6'}[k]
-    const cls={w:'w',s:'',a:'a',u:'u'}[k]
-    return on===k
-      ? `<div class="mode on ${cls}"><span class="x"></span>${nm}</div>`
-      : `<div class="mode"><span class="x" style="background:${col}"></span>${nm}</div>`
+    return `<div class="mode${on===k?' on':''}"><span class="x" style="background:${col}"></span>${nm}</div>`
   }).join('')}
 </div>`
 
 const openWrite = (l) => shell(l, `
   <div class="bar-wrap open">
-    <div class="bar"><div class="lead g-pencil" style="background:#B07F00"></div>
+    <div class="bar"><div class="lead g-pencil" style="background:#23252C"></div>
       <div class="label ${l===L.en?'en':''}">${l.write}<span class="sub">${l.collapse}</span></div></div>
     <div class="panel">${modes(l,'w')}
       <div class="fld"><div class="box">${l.titlePh}</div></div>
@@ -285,22 +289,24 @@ const openWrite = (l) => shell(l, `
       <div class="acts"><div class="act ghost">${l.cancel}</div><div class="act solid">${l.save}</div></div>
       <div class="note">${l.writeNote}</div>
     </div>
-  </div>${swap(l)}`)
+    ${swap(l)}
+  </div>`)
 
 const openLink = (l) => shell(l, `
   <div class="bar-wrap open">
-    <div class="bar"><div class="lead g-link" style="background:#3F52D6"></div>
+    <div class="bar"><div class="lead g-link" style="background:#23252C"></div>
       <div class="label ${l===L.en?'en':''}">${l.link}<span class="sub">${l.collapse}</span></div></div>
     <div class="panel">${modes(l,'u')}
       <div class="fld"><div class="box">${l.urlPh}</div></div>
       <div class="acts"><div class="act ghost">${l.paste}</div><div class="act off">${l.save}</div></div>
       <div class="note">${l.urlNote}</div>
     </div>
-  </div>${swap(l)}`)
+    ${swap(l)}
+  </div>`)
 
 const openAlbum = (l) => shell(l, `
   <div class="bar-wrap open">
-    <div class="bar"><div class="lead g-album" style="background:#2E7A47"></div>
+    <div class="bar"><div class="lead g-album" style="background:#23252C"></div>
       <div class="label ${l===L.en?'en':''}">${l.picked}<span class="sub">${l.collapse}</span></div></div>
     <div class="panel">${modes(l,'a')}
       <div class="strip"><div class="cell"><div class="x">✕</div></div><div class="cell"><div class="x">✕</div></div><div class="cell add">＋</div></div>
@@ -310,40 +316,58 @@ const openAlbum = (l) => shell(l, `
       </div>
       <div class="acts"><div class="act ghost">${l.clear}</div><div class="act solid">${l.extract}</div></div>
     </div>
-  </div>${swap(l)}`)
+    ${swap(l)}
+  </div>`)
 
 const unit = (step, h3, p, body, tall) => `<div class="unit">
   <div class="cap"><span class="step">${step}</span><h3>${h3}</h3><p>${p}</p></div>
   <div class="ph${tall?' doc':''}">${body}</div></div>`
 
 const DOC = `
-  <div class="sb" style="background:#F4F2EC;color:#23252C"><span>9:41</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
-  <div class="nb" style="background:#F4F2EC;border-bottom:3px solid rgba(35,37,44,.10)"><span class="t" style="color:#23252C">标注</span>
-    <span class="capsule" style="background:rgba(35,37,44,.06);box-shadow:inset 0 0 0 2px rgba(35,37,44,.10);color:#23252C"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
   <div class="docbody">
     <div class="blk">
-      <h4>这一轮改的三处</h4>
-      <p><b>条身换字</b>：「我想记下来」→「<b>动动手指</b>」，字号顺手从 44 提到 46（四个字比六个字短，得撑住那条）。英文这一句现网没有对应串，这一稿暂写 <code>Tap and jot</code>，等你定。</p>
-      <p><b>换图退成一枚图标</b>：撤掉原来那颗带底和描边的胶囊。半箭头你看着不对——换成一枚<b>照片图标</b>（相框里一座山一个太阳）加两个字「<b>换背景</b>」，仍旧居中坐在长条下面那段空白里。图标管认意，字管说清，两个都不抢。</p>
-      <p><b>日期行回到左对齐</b>：右端腾出来后只剩「9月28日 周日」，不用再接别的东西。</p>
+      <h4>这一版把效果图改成和代码同一把尺子</h4>
+      <p>上一版效果图和实测差得明显，量下来是<b>四条我自己造成的口径差</b>，没有一条是平台做不到：</p>
+      <p><b>一、照片是我另裁的。</b>上一版这里放的是我手裁的一张 <code>750×1448</code> 假图；线上那张原图是 <code>865×1670</code>，真机用 <code>mode="aspectFill"</code> 从原图里等比裁。同一张脸两种放法，当然不像。这一版直接引原图，放法改成 <code>background-size:cover</code>——和 aspectFill 同一条规则。</p>
+      <p><b>二、屏高是我拍的。</b>上一版按一屏 1624 画，真机这一档视口是 <code>753pt = 1506rpx</code>，差 7.3%；所有按 vh 走的东西都跟着这块屏。</p>
+      <p><b>三、外框画矮了。</b>上一版状态栏加导航条按 88+88=176 画，拿实测截图标定出来是 <b>184</b>（47pt + 44pt）。</p>
+      <p><b>四、条和换背景那行各摆各的。</b>上一版两个绝对坐标（1258 / 1386）是手写的、中间不留缝；代码里那行是跟着条流下来的（margin-top 22、高 110）。这一版改成同样的流式，绝对坐标只剩条顶一个。</p>
+      <p>还撤了一行<b>现网根本没有的东西</b>：日期「9月28日 周日」是我早先稿子里加的，代码里没有，删了。</p>
+      <p><b>五、两处颜色我涂错了。</b>条身那枚图形和当前那个模式标签，代码里都是<b>墨黑</b>（<code>#23252c</code>），颜色只留给标签左边那枚 26 的小点；效果图上一版把它们涂成了分类色（写=芥末黄、链=宝蓝、册=草绿）。底栏那块也照真机改成了象牙派生出来的 <code>#241E16</code>。这三处都是"效果图自己发明了一套配色"，代码是对的，改效果图。</p>
+    </div>
+
+    <div class="blk">
+      <h4>对账（页面坐标，0 = 导航条下沿）</h4>
+      <table>
+        <tr><th></th><th>效果图</th><th>实测</th><th>差</th></tr>
+        <tr><td>视口高</td><td>1506</td><td>1506</td><td><span class="ok">0</span></td></tr>
+        <tr><td>条顶</td><td>1102</td><td>1102</td><td><span class="ok">0</span></td></tr>
+        <tr><td>条底</td><td>1230</td><td>1234</td><td>4</td></tr>
+        <tr><td>换背景行</td><td>1252..1362</td><td>1256..1370</td><td>4 / 8</td></tr>
+        <tr><td>底栏顶</td><td>1378</td><td>1372</td><td>6</td></tr>
+        <tr><td>条左右内缩</td><td>24</td><td>24</td><td><span class="ok">0</span></td></tr>
+      </table>
+      <p style="margin-top:14px">剩下的这几 rpx 来自两处：rpx→px 取整（128rpx 在真机是 66px，折回来 127.4），以及底栏那 <code>bottom:20rpx</code> 在真机是贴着安全区算的。<b>实测那一列全部是 <code>验-统一录入条-真跑.js</code> 在模拟器里用 <code>createSelectorQuery</code> 读出来的数</b>，不是目测。</p>
+      <p style="margin-top:10px">两处<b>不属于这一屏</b>：状态栏和右上角那枚胶囊是系统画的（这里 9:41 和信号格是仿的，真机还有那道刘海）；<b>底栏那块色</b>由壁纸派生——<code>custom-tab-bar/index.js</code> 读 <code>palette.themeOf(壁纸).ramp.uncategorized.bg</code>，象牙这一档算出来是 <code>#241E16</code>，效果图就照这个值填（上一版这里写死了一档焙色 <code>#443C25</code>，那是 D2 早期稿的数，真机上早就不是它了）。换一枚壁纸它就跟着变，这块归底栏那一屏管。</p>
+      <p style="margin-top:10px"><b>这张表怎么复核：</b><code>python3 docs/工具/画-效果图对实测.py</code> 会把这张效果图重渲染、按和实测同一套像素判据量出条的上下沿，再和 <code>实测/实测-1-收起态.png</code> 拼成 <code>效果图对实测-收起态.png</code>。渲染回来量到的纸白内区是 <b>1105..1226</b>，和表里的 1102..1230 差的就是那一圈 3rpx 描边。</p>
     </div>
 
     <div class="blk">
       <h4>那枚图标的位置和手指</h4>
       <table>
         <tr><th></th><th>数值（rpx）</th></tr>
-        <tr><td>长条底边</td><td>1386</td></tr>
-        <tr><td>底栏顶边</td><td>1496</td></tr>
-        <tr><td>中间这段空白</td><td><b>110</b>，图标居中坐在里面</td></tr>
+        <tr><td>长条底边</td><td>1234（实测）</td></tr>
+        <tr><td>底栏顶边</td><td>1372（实测）</td></tr>
+        <tr><td>中间这段</td><td>留白 22 + 那一行 110</td></tr>
         <tr><td>图标视觉大小</td><td>38 × 38，纸白 0.92；旁边那两个字 28 / 700 字重、纸白 0.85</td></tr>
-        <tr><td>可点热区</td><td><b>整行 750 × 110</b>——图标和字一起算一个点，不必瞄准 38 那小块</td></tr>
+        <tr><td>可点热区</td><td><b>702 × 110</b>——和条同一列宽，不是整屏 750</td></tr>
       </table>
-      <p style="margin-top:14px">图标可以小，手指能落的地方不能小——微信的舒适触摸下限是 88，所以干脆把这一整条空白都给了它。它和长条不重叠，点它是换图、点条身是展开，两件事不会撞。字用 28 加粗、纸白 0.85，比图标只淡一档，扫一眼是提示不是第二个按钮。</p>
+      <p style="margin-top:14px">图标可以小，手指能落的地方不能小——微信的舒适触摸下限是 88，所以把整行 110 都给了它，图标和字算一个点。它和长条不重叠，点它是换图、点条身是展开，两件事不会撞。字用 28 加粗、纸白 0.85，比图标只淡一档，扫一眼是提示不是第二个按钮。</p>
     </div>
 
     <div class="blk">
       <h4>五个动作落在哪儿</h4>
-      <div class="map"><span class="sw" style="background:#F6C445"></span><span class="k">点条身</span><span class="v">直接写（默认态）。条身扣掉三枚小圆还剩 382 宽 × 128 高。</span></div>
+      <div class="map"><span class="sw" style="background:#F6C445"></span><span class="k">点条身</span><span class="v">直接写（默认态）。条身文字区 290 宽 × 128 高（702 扣掉描边、左右内缩、那枚图形和三枚小圆之后）。</span></div>
       <div class="map"><span class="sw" style="background:#E9723D"></span><span class="k">点橙圆</span><span class="v">相机现拍，走 <code>sourceType:['camera']</code>，和现网同一条。</span></div>
       <div class="map"><span class="sw" style="background:#46A863"></span><span class="k">点绿圆</span><span class="v">从相册选，多选、最多 9 张、横滑可删，照旧。</span></div>
       <div class="map"><span class="sw" style="background:#3F52D6"></span><span class="k">点蓝圆</span><span class="v">链接，校验、粘贴、报错行一个字不改。</span></div>
@@ -351,41 +375,41 @@ const DOC = `
     </div>
 
     <div class="blk">
-      <h4>中英文两版对得上的地方</h4>
+      <h4>中英文两版对得上的地方（这一列已经全部落进 <code>i18n.js</code>）</h4>
       <table>
-        <tr><th>位置</th><th>中文</th><th>英文</th><th>来源</th></tr>
+        <tr><th>位置</th><th>中文</th><th>英文</th><th>键</th></tr>
         <tr><td>导航条</td><td>新建笔记</td><td>New note</td><td><span class="ok">现网有</span></td></tr>
         <tr><td>slogan</td><td>看到好内容，随手记下来</td><td>Save what's worth saving</td><td><span class="ok">现网有</span></td></tr>
-        <tr><td>条身</td><td>动动手指</td><td>Tap and jot</td><td><span class="no">新串，等你定</span></td></tr>
-        <tr><td>模式</td><td>直接写 / 拍照 / 相册 / 链接</td><td>Write / Camera / Album / Link</td><td><span class="no">四个都要新写</span><br>现网是 亲自撰写 / 拍照或截图 / URL链接</td></tr>
+        <tr><td>条身（收起）</td><td>动动手指</td><td>Tap and jot</td><td><span class="ok">新写，已入库</span> <code>barIdle</code></td></tr>
+        <tr><td>条身（链接态）</td><td>贴个链接</td><td>Paste a link</td><td><span class="ok">已入库</span> <code>barUrl</code></td></tr>
+        <tr><td>条身（选了图）</td><td>选了 N 张</td><td>N picked</td><td><span class="ok">已入库</span> <code>barShot</code></td></tr>
+        <tr><td>条身（展开）</td><td>点空白处收起</td><td>Tap outside to close</td><td><span class="ok">已入库</span> <code>barCollapse</code></td></tr>
+        <tr><td>模式标签</td><td>直接写 / 拍照 / 相册 / 链接</td><td>Write / Camera / Album / Link</td><td><span class="ok">两条新写 + 两条复用</span><br><code>modeWrite</code> <code>takePhoto</code> <code>fromAlbum</code> <code>modeUrl</code></td></tr>
         <tr><td>写那态</td><td>标题 · 摘要，一行也行… · 分类 · 未分类 · 取消 · 保存</td><td>Title · Summary, one line is fine… · Category · Uncategorised · Back · Save</td><td><span class="ok">现网有</span></td></tr>
         <tr><td>链接那态</td><td>粘贴 · 保存</td><td>Paste · Save</td><td><span class="ok">现网有</span></td></tr>
         <tr><td>相册那态</td><td>拍照（直接开相机）· 相册（选已有截图）· 清空 · 开始提炼</td><td>Camera (Open the camera) · Album (Pick a screenshot) · Clear · Extract</td><td><span class="ok">现网有</span></td></tr>
-        <tr><td>日期</td><td>9月28日 周日</td><td>Sep 28 · Sun</td><td>跟着语言切</td></tr>
-        <tr><td>条下那枚</td><td>换背景</td><td>Change photo</td><td><span class="no">新串</span></td></tr>
-        <tr><td>条身按模式换字</td><td>动动手指 / 贴个链接 / 选了 2 张</td><td>Tap and jot / Paste a link / 2 picked</td><td><span class="no">全是新串</span></td></tr>
+        <tr><td>条下那枚</td><td>换背景</td><td>Change photo</td><td><span class="ok">新写，已入库</span> <code>homeBgSwap</code></td></tr>
       </table>
-      <p style="margin-top:14px">英文比中文长，两处会顶到：<b>slogan</b>（"Save what's worth saving" 22 个字符）字号降到 38 才和右侧「中/EN」挤得下；<b>条身</b>英文用 42。两处都留了省略号兜底，真机上再溢出就截断而不是换行——一换行整条高度就变了。</p>
+      <p style="margin-top:14px">中英两边键数相等（<b>214 / 214</b>），这条由 <code>验-统一录入条.js</code> 钉着。英文比中文长，两处会顶到：<b>slogan</b> 字号降到 38 才和右侧「中/EN」挤得下；<b>条身</b>英文用 42。两处都留了省略号兜底，真机上再溢出就截断而不是换行——一换行整条高度就变了。</p>
     </div>
 
     <div class="blk">
       <h4>可读性复核（渲染出来逐像素量的）</h4>
       <table>
-        <tr><th>这一行</th><th>取值</th><th>实测对比</th><th>小字 4.5</th></tr>
-        <tr><td>slogan（中英同一档）</td><td>纸白 0.96</td><td><b>5.34</b></td><td><span class="ok">过线</span></td></tr>
-        <tr><td>「9月28日」</td><td>纸白 0.95 / 细字重</td><td><b>4.90</b></td><td><span class="ok">过线</span></td></tr>
-        <tr><td>「周日」</td><td>纸白 0.56</td><td><b>2.80</b></td><td><span class="no">只当气氛</span></td></tr>
-        <tr><td>条下那枚照片图标</td><td>纸白 0.92</td><td><b>4.98</b></td><td><span class="ok">图标按 3:1 判，过线</span></td></tr>
-        <tr><td>条下「换背景」</td><td>纸白 0.85 / 28 / 700</td><td><b>4.54</b></td><td><span class="ok">小字 4.5 过线</span></td></tr>
+        <tr><th>这一行</th><th>取值</th><th>实测对比</th><th>判据</th></tr>
+        <tr><td>slogan（中英同一档）</td><td>纸白 0.96</td><td><b>5.34</b></td><td>小字 4.5 <span class="ok">过线</span></td></tr>
+        <tr><td>条下那枚照片图标</td><td>纸白 0.92</td><td><b>4.98</b></td><td>图形件 3:1 <span class="ok">过线</span></td></tr>
+        <tr><td>条下「换背景」</td><td>纸白 0.85 / 28 / 700</td><td><b>4.54</b></td><td>小字 4.5 <span class="ok">过线</span></td></tr>
       </table>
-      <p style="margin-top:14px">图标走的是 WCAG 对图形件的 <b>3:1</b>（非文本对比度），那行字按小字 <b>4.5</b> 判。两行取的都是它背后那一小块里<b>最亮的 5%</b>像素，不是平均底色——照片上平均数会骗人。为了让这两行过线，压暗层在 1200 以下从 0.60 收到 <b>0.72</b>，只动最下面那一段，slogan 和日期那两档没碰。</p>
-      <p style="margin-top:10px">但这两档只在<b>铺了背景图</b>时成立。用户在「我的」里把背景关掉之后，这页回到壁纸，纸白的图标和字会直接化掉——那态得改用页面自己的 <code>--text-secondary</code>，也就是跟日期那行同一个色，不能把 0.92 / 0.85 写死。</p>
+      <p style="margin-top:14px">图标走的是 WCAG 对图形件的 <b>3:1</b>（非文本对比度），那行字按小字 <b>4.5</b> 判。两行取的都是它背后那一小块里<b>最亮的 5%</b>像素，不是平均底色——照片上平均数会骗人。为了让这两行过线，压暗层最下面一段收到 <b>0.72</b>，上面几档没碰。</p>
+      <p style="margin-top:10px">上一版这里写过一条担心：「关掉背景图之后纸白的图标和字会化在壁纸上」。这条<b>不成立</b>——那一行本来就 <code>wx:if="{{bgSrc}}"</code>，没铺图时整个不渲染，真跑尺子里钉着这一条。所以它不需要另一套配色。</p>
     </div>
 
     <div class="warn">
-      <h4>只剩两件等你点头</h4>
-      <p><b>一、条身那句英文。</b>「动动手指」我暂给 <code>Tap and jot</code>（四个音节、动作开头）。要更直白可以换 <code>Tap and note</code>，要更松可以换 <code>Just tap — start writing</code>。你定一个，我照写。</p>
-      <p><b>二、英文那两个字。</b>「换背景」我暂给 <code>Change photo</code>。现网字典里没有这条，另外三条新串（条身、贴个链接、选了 N 张）也一样，等你把英文口径定了我一次写进 <code>i18n.js</code>。</p>
+      <h4>还欠的</h4>
+      <p><b>一、真机复看两条。</b>罩层收到 0.72 之后人脸还认不认得出；三枚小圆 72rpx（折下来约 36pt，比 Apple 推荐的 44pt 小一档）点着顺不顺手。这两条模拟器给不了答案。</p>
+      <p><b>二、这一批没上传、没提审。</b>1.5.0 还在审核中，线上是 1.4.0；要真机看得先传体验版。</p>
+      <p><b>三、列表那一屏的方向没挑。</b>A 整页铺图 / C 只铺头部，见 <code>笔记列表-背景图/</code>。</p>
     </div>
   </div>`
 
@@ -393,13 +417,13 @@ const flow = document.getElementById('flow')
 let html = ''
 const caps = {
   zh: [
-    ['① 中文 · 收起','一条横条 + 三个小圆，换图退成条下一枚照片图标','条身「动动手指」，右边三枚小圆：拍照（橙）· 相册（绿）· URL（蓝）。长条沉到视口 75%，它下面那段 110 的空白里居中一枚照片图标加「换背景」两个字。'],
-    ['② 中文 · 展开写','点条身就是写，条子先升起来再往下长','横条升到 420、下面长出表单，220ms 一起走。条身里三枚小圆换成四个模式标签，当前那枚带下划线。'],
-    ['③ 中文 · 展开链接','点蓝圆直接进那一态','链接这一态最矮，470 就够，下面还留着大半屏的图。'],
+    ['① 中文 · 收起','一条横条 + 三个小圆，换图退成条下一枚照片图标','条身「动动手指」，右边三枚小圆：拍照（橙）· 相册（绿）· URL（蓝）。长条顶在页面视口 1102rpx（实测同值，占视口 73.2%），它下面留白 22 再接那一行 110，照片图标加「换背景」两个字居中。'],
+    ['② 中文 · 展开写','点条身就是写，条子先升起来再往下长','留白一让开，整组回到标题下面（条顶 146rpx，实测 146），下面长出表单，220ms 一起走。条身里三枚小圆换成四个模式标签，当前那枚带下划线。'],
+    ['③ 中文 · 展开链接','点蓝圆直接进那一态','链接这一态最矮，表单下面还留着大半屏的图；那一行「换背景」跟着面板流到最下面。'],
     ['④ 中文 · 展开相册','已选两张','拍照 / 相册 两个按钮和字都没动，只是从"入口"变成"这一态里再选一次"。'],
   ],
   en: [
-    ['⑤ English · collapsed','Same layout, English strings','Slogan drops to 38 so it still fits beside 中 / EN. Bar label is a new string, not yet decided.'],
+    ['⑤ English · collapsed','Same layout, English strings','Slogan drops to 38 so it still fits beside 中 / EN. All five English strings are in i18n.js now (214 keys each side).'],
     ['⑥ English · write','Tap the bar body','Existing i18n strings reused: Title / Category / Uncategorised / Back / Save.'],
     ['⑦ English · link','Tap the blue dot','Paste / Save already exist in the dictionary; the placeholder URL is unchanged.'],
     ['⑧ English · album','Two picked','Camera / Album / Clear / Extract all come from the current dictionary.'],
@@ -409,7 +433,7 @@ caps.zh.forEach((c,i)=>{ html += unit(c[0],c[1],c[2], [collapsed(L.zh),openWrite
 html += '<div class="brk"></div>'
 caps.en.forEach((c,i)=>{ html += unit(c[0],c[1],c[2], [collapsed(L.en),openWrite(L.en),openLink(L.en),openAlbum(L.en)][i]) })
 html += '<div class="brk"></div>'
-html += unit('⑨ 标注','位置、手指、中英对照、还剩两件要拍的','下面的数是从这张效果图的渲染结果里逐像素取的。', DOC, true)
+html += unit('⑨ 标注','口径怎么对齐的、逐条对账、手指、中英对照、还欠什么','实测那一列来自模拟器真点，不是目测；效果图这一列的每个数都由代码同一套公式推出来。', DOC, true)
 flow.innerHTML = html
 </script>
 </body>

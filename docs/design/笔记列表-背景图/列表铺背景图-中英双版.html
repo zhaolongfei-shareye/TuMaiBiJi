@@ -15,7 +15,10 @@
      C 只铺头部（保守）：图只铺头部那一段，列表落在一张纸上，纸压住图。
    B 是 A 滚到中段的样子，用来看"卡片密起来之后图还成不成立"。
 
-   口径：px 当 rpx 用（设计宽 750，一屏 1624；导航条 0..176，底栏顶 1496）。
+   口径（09-28 和录入条那版一起改成与代码同一把尺子）：px 当 rpx 用，设计宽 750。
+     一屏 = 外框 184（状态栏 94 + 导航条 90，实测截图标定出来的）+ 页面视口 1506 = 1690。
+     背景直接引线上原图 miniprogram/assets/home-bg-portrait.jpg（865×1670），放法 cover
+     ——和 <image mode="aspectFill"> 同一条裁切规则；罩层停点抄 create.wxss 的百分比。
    圆角、字阶、描边、方块尺寸、底栏几何与现网逐值相同（app.wxss）；
    颜色只从 utils/palette.js 那五块 + 墨黑取，不新造色。
    压暗层与首页同一串（含 09-28 新加的底部 0.72 那一段）。
@@ -46,22 +49,22 @@
   .cap b{color:#23252C}
   .cap code{font:inherit;font-weight:800;color:#23252C}
 
-  .ph{width:750px;height:1624px;position:relative;overflow:hidden;background:#F4F2EC;border-radius:52px;
+  .ph{width:750px;height:1690px;position:relative;overflow:hidden;background:#F4F2EC;border-radius:52px;
     box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16);
-    --skin:#443C25;--bar-idle:rgba(242,239,233,.62)}
-  .ph.doc{height:4280px}
+    --skin:#241E16;--bar-idle:rgba(242,239,233,.62)}
+  .ph.doc{height:auto;padding-bottom:26px}
 
   /* 铺底：整页（A/B）或只有头部那一段（C） */
-  .bg{position:absolute;left:0;top:176px;width:750px;height:1448px;background-size:100% 100%}
+  .bg{position:absolute;left:0;top:184px;width:750px;height:1506px;background-size:cover;background-position:center}
   .bg.band{height:636px}
-  .scrim{position:absolute;left:0;top:176px;width:750px;height:1448px;
-    background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.58) 150px,
-      rgba(18,20,26,.44) 620px,rgba(18,20,26,.42) 900px,rgba(18,20,26,.52) 1200px,rgba(18,20,26,.62) 1250px,
-      rgba(18,20,26,.72) 1448px)}
+  .scrim{position:absolute;left:0;top:184px;width:750px;height:1506px;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)}
   .scrim.band{height:636px;
     background:linear-gradient(180deg,rgba(18,20,26,.58) 0,rgba(18,20,26,.5) 300px,rgba(18,20,26,.44) 636px)}
 
-  .sb{height:88px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+  .sb{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
     font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
   .sb .right{display:flex;align-items:center;gap:10px}
   .sig{display:flex;gap:4px;align-items:flex-end}
@@ -70,10 +73,10 @@
   .sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
   .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
   .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
-  .nb{height:88px;background:#181A20;position:relative;z-index:12}
+  .nb{height:90px;background:#181A20;position:relative;z-index:12}
   .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
     font-size:31px;font-weight:600;color:#F2EFE9;letter-spacing:-.3px}
-  .capsule{position:absolute;right:26px;top:12px;width:174px;height:64px;border-radius:34px;
+  .capsule{position:absolute;right:26px;top:13px;width:174px;height:64px;border-radius:34px;
     background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);color:#F2EFE9;
     display:flex;align-items:center;justify-content:space-between;padding:0 20px}
   .capsule .dots{display:flex;gap:6px}
@@ -151,7 +154,7 @@
   .tb.on .ln{opacity:1}
 
   /* ---------- 标注屏 ---------- */
-  .docbody{position:absolute;left:0;right:0;top:179px;bottom:0;padding:2px 34px 0;z-index:6}
+  .docbody{position:relative;padding:24px 34px 0;z-index:6}
   .blk2{background:#fff;border:3px solid rgba(35,37,44,.10);border-radius:32px;padding:26px 28px;margin-bottom:22px}
   .blk2 h4{font-size:29px;font-weight:800;letter-spacing:-.5px;margin-bottom:12px}
   .blk2 p{font-size:22px;line-height:1.62;color:#4B4F57;margin-bottom:9px}
@@ -179,7 +182,7 @@
 <div class="flow" id="flow"></div>
 
 <script>
-const IMG = '裁切A-微放大.jpg'
+const IMG = '../../../miniprogram/assets/home-bg-portrait.jpg'
 
 /* 界面串一律从 miniprogram/utils/i18n.js 抄，行内内容（分类名 / 标题 / 摘要 / 标签）
    是用户自己写的数据，不走字典——所以英文那一版是"一个英文用户自己写的内容"，不是翻译。 */
@@ -315,15 +318,16 @@ const DOC = `
       <h4>尺寸（rpx）</h4>
       <table>
         <tr><th>位置</th><th>数值</th></tr>
-        <tr><td>导航条</td><td>0 .. 176</td></tr>
+        <tr><td>导航条</td><td>0 .. 184（状态栏 94 + 导航条 90，从实测截图标定）</td></tr>
+        <tr><td>页面视口</td><td>184 .. 1690（高 1506rpx，和录入条那版同一把尺子）</td></tr>
         <tr><td>页头</td><td>229 起，标题一行 + 三个数一行</td></tr>
         <tr><td>搜索胶囊</td><td>392 .. 520</td></tr>
         <tr><td>分类筛选</td><td>552 .. 608，横滑照旧</td></tr>
         <tr><td>A 的行卡</td><td>632 起，每张 228 高 + 16 间距</td></tr>
         <tr><td>C 的纸</td><td>700 起，圆角 40 朝上；行卡从纸内 40 起</td></tr>
-        <tr><td>底栏顶边</td><td>1496</td></tr>
+        <tr><td>底栏顶边</td><td>1562（= 1690 − 128；实测 1555，差 6 是安全区）</td></tr>
       </table>
-      <p style="margin-top:14px">行卡高度 = 块 176 + 上下内边距 26 × 2 = 228，和现网同一套，没改。</p>
+      <p style="margin-top:14px">行卡高度 = 块 176 + 上下内边距 26 × 2 = 228，和现网同一套，没改。背景那张就是线上原图 865×1670，放法 cover（= <code>aspectFill</code> 同一条裁切规则），不再用手裁的假图。</p>
     </div>
 
     <div class="blk2">
