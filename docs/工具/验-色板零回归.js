@@ -246,13 +246,20 @@ for (const t of ramped) {
 }
 ck('新建页三张卡的校验红字 ≥ 4.5:1', lowErr.length === 0, lowErr.join(' | '))
 
-// ⑭ tab 栏那颗胶囊：六枚普通壁纸下必须和改动前写死的值一模一样（#23252c + rgba(35,37,44,.28)），
-//    淡雅两枚下才换成自己那支墨色。组件读不到 page 的变量，所以值由 JS 递进来。
+// ⑭ tab 栏那颗胶囊：底色不再是一块写死的墨，而是壁纸页面底的派生值（palette.chromeOf）。
+//    这一条是 09-28 站长拍板的 D2 改版，覆盖了它原来那条"六枚下必须还是 #23252c"的零回归断言：
+//    米白那枚现在是 #443C25（暖墨），八枚各一支，具体值和规划 §1.2 那张表逐一对，
+//    对表的那把尺子在 验-列表D2.js，这里只钉"改完之后仍然成立"的三件事。
+//    组件读不到 page 的变量，所以值还是由 JS 递进来，这条规矩没变。
 const barJs = readSrc('custom-tab-bar/index.js')
 const barCss = fs.readFileSync(path.join(pageDir, 'custom-tab-bar/index.wxss'), 'utf8')
-ck('胶囊底色与投影改由 JS 递进来', /--tab-ink:/.test(barJs) && /--tab-shadow:/.test(barJs))
-ck('六枚下胶囊仍是原来那块墨（#23252c）', /var\(--tab-ink,\s*#23252c\)/.test(barCss) && after.UNCATEGORIZED.bg.toUpperCase() === '#23252C')
-ck('六枚下胶囊投影与改动前逐值相同', after.withAlpha(after.UNCATEGORIZED.bg, 0.28).replace(/\s/g, '') === 'rgba(35,37,44,0.28)')
+// 注释里会引用旧那七处 rgba(255,255,255,.42) 当线索，扫之前先把它剥掉：
+// 这条断言要管的是"声明里还有没有硬编码"，不是"文件里有没有这串字"。
+const barRule = barCss.replace(/\/\*[\s\S]*?\*\//g, '')
+ck('胶囊那一块面由 chromeOf 递进来', /chromeOf\(/.test(barJs) && /var\(--chrome-bg\)/.test(barRule))
+ck('胶囊里不再有任何写死的 rgba(255,255,255,…)（图标和文字吃 currentColor）',
+  !/rgba\(255,\s*255,\s*255/.test(barRule), (barRule.match(/rgba\(255[^)]*\)/g) || []).join(' '))
+ck('深色那两枚不再有第二块胶囊底（#1a1c22 那种本地常量）', !/\.tab-bar-dark/.test(barRule))
 
 // ⑯ 经典三款的纸色（站长 09-26："版式一格不动，只把分类蓝换成宣纸那一族；两档都要"）。
 //    这两档是写死的常量，所以对比度可以一次算清；更要紧的是别哪天又有人在这三套里

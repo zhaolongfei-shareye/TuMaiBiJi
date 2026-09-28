@@ -1,4 +1,4 @@
-<view class="tab-bar {{dark ? 'tab-bar-dark' : ''}} {{fontCls}}" style="{{inkStyle}}">
+<view class="tab-bar {{fontCls}}" style="{{chromeStyle}}">
   <view
     wx:for="{{list}}"
     wx:key="index"
@@ -8,5 +8,7 @@
   >
     <view class="tab-icon icon-{{item.icon}}"></view>
     <text class="tab-label">{{item.text}}</text>
+    <!-- 选中态那条短线常驻，未选中只是不显示：三个标签的位置因此不随选没选动 -->
+    <view class="tab-mark"></view>
   </view>
 </view>

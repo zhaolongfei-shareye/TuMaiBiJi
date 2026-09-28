@@ -56,32 +56,33 @@
     <text>{{t.noNotes}}</text>
   </view>
 
-  <!-- 笔记列表：一条笔记 = 一张描边行卡，颜色集中在左侧方块 -->
+  <!-- 笔记列表：一条笔记 = 一张描边行卡。D2 把左侧那块 176 方块撤了，
+       分类身份退到 meta 行最前面的一枚点 + 分类名（颜色仍由 palette 派生）。 -->
   <view wx:else class="notes-list">
     <view
-      class="card row"
+      class="card note-row"
       wx:for="{{notes}}"
       wx:key="id"
       bindtap="goToDetail"
       data-id="{{item.id}}"
     >
-      <view class="blk" style="{{item.blockStyle}}">
-        <text class="blk-name">{{item.blockName}}</text>
-        <text class="blk-date">{{item.date_label}}</text>
-        <view class="motif {{item.motif}}"></view>
+      <view class="row-title">
+        <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
       </view>
-      <view class="blk-body">
-        <view class="row-title">
-          <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
+      <view class="summary" wx:if="{{item.summary}}">{{item.summary}}</view>
+      <view class="row-foot">
+        <view class="cat {{item.catRing ? 'is-ring' : ''}}" style="{{item.catStyle}}">
+          <view class="cat-dot"></view>
+          <text>{{item.catLabel}}</text>
         </view>
-        <view class="summary" wx:if="{{item.summary}}">{{item.summary}}</view>
-        <view class="row-foot">
-          <view class="foot-l">
-            <text class="src">{{item.source_type_label}}</text>
-            <text wx:if="{{item.tagLine}}"> · {{item.tagLine}}</text>
-          </view>
-          <text class="chev">›</text>
-        </view>
+        <text class="sep">·</text>
+        <text class="src">{{item.source_type_label}}</text>
+        <block wx:if="{{item.tagLine}}">
+          <text class="sep">·</text>
+          <text class="tg">{{item.tagLine}}</text>
+        </block>
+        <text class="dt">{{item.date_label}}</text>
+        <text class="chev">›</text>
       </view>
     </view>
   </view>

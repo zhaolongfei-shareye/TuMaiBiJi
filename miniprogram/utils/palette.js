@@ -309,9 +309,12 @@ function setActiveTheme(wallpaper) {
  * 索引公式和 toneFor 逐字一致，所以切到这套主题时同一个分类还是同一档，
  * 只是把五支彩色收成了一支色相、用深浅代替色相。
  * 现有六枚没有 ramp，一律返回 null，调用方原样回落到 TONES——这个 if 就是零回归的闸门。
+ * wallpaper 那一个参数是给底部导航组件用的：它拿不到 page 上的 CSS 变量，也不能依赖
+ * ACTIVE_THEME（那是 app.applyTheme 给页面写的）。不传就是老行为，一处调用没改。
  */
-function rampFor(categoryId) {
-  const ramp = ACTIVE_THEME && ACTIVE_THEME.ramp
+function rampFor(categoryId, wallpaper) {
+  const theme = wallpaper ? themeOf(wallpaper) : ACTIVE_THEME
+  const ramp = theme && theme.ramp
   if (!ramp) return null
   if (categoryId == null) {
     return { bg: ramp.uncategorized.bg, ink: ramp.uncategorized.ink }
@@ -338,6 +341,105 @@ function inkIsLighter(bg, ink) {
   return lumOf(ink) > lumOf(bg)
 }
 
+/* ---------- 下面这一段是 D2 那批的取色规则（docs/规划-笔记列表轻盈化-20260927.md §1.2） ----------
+   两条都是函数不是表：后端还会加壁纸、分类数也会变，写成常量表就是每加一枚改一次代码。 */
+
+const PAPER = '#F2EFE9'   // 官网那支纸白，压在派生出来的深色面上
+
+function rgbToHsl(hexStr) {
+  const [rr, gg, bb] = hexToRgb(hexStr)
+  const r = rr / 255, g = gg / 255, b = bb / 255
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn
+  let h = 0
+  if (d) {
+    h = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4
+    h *= 60
+  }
+  const l = (mx + mn) / 2
+  const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0
+  return [h, s * 100, l * 100]
+}
+
+function hslToHex(h, s, l) {
+  const ss = s / 100, ll = l / 100
+  const c = (1 - Math.abs(2 * ll - 1)) * ss
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = ll - c / 2
+  const seg = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+    : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
+  return toHex(seg.map((v) => (v + m) * 255))
+}
+
+/** WCAG 相对亮度与对比度。lumOf 那条是"轻重"，不能拿来判达标。 */
+function crOf(a, b) {
+  const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
+  const one = (hexStr) => { const [r, g, b2] = hexToRgb(hexStr); return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b2) }
+  const x = one(a), y = one(b)
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+}
+
+/**
+ * 把一支色调到能压住某块底：色相 H 与饱和度 S 都不动，只挪明度 L。
+ * 方向看底——白卡上把色压深，深卡上把色抬亮；本来就过线就原样返回。
+ * 不往墨/纸的方向混：那样宝蓝会灰成一片 #97A0DF。分类身份要的是
+ * "还是这支色，只是深浅变了"，所以只动 L。
+ */
+function enforce(color, on, need) {
+  if (crOf(color, on) >= need) return color
+  const [h, s, l] = rgbToHsl(color)
+  const up = lumOf(on) < lumOf(color)
+  let lo = up ? l : 0, hi = up ? 100 : l
+  for (let k = 0; k < 26; k += 1) {
+    const mid = (lo + hi) / 2
+    const hit = crOf(hslToHex(h, s, mid), on) >= need
+    if (up) { if (hit) hi = mid; else lo = mid } else { if (hit) lo = mid; else hi = mid }
+  }
+  return hslToHex(h, s, up ? hi : lo)
+}
+
+/**
+ * 底栏和搜索条那一块面：由壁纸的页面底派生。
+ * 色相 H 原样保留（不然就不是这套壁纸了），饱和度夹进 [30,45]（低于 30 灰成一块脏、
+ * 高于 45 抢内容），明度按深浅定两档：浅壁纸 20.5%、深壁纸 30%。
+ * 字一律纸白，未选中那一档靠 alpha 分深浅（浅 .62 / 深 .68）。
+ * 返回的 style 串直接塞进 style 属性——组件拿不到 page 上的 CSS 变量。
+ */
+function chromeOf(wallpaper) {
+  const theme = themeOf(wallpaper)
+  const [h, s] = rgbToHsl(theme.page)
+  const bg = hslToHex(h, Math.min(45, Math.max(30, s)), theme.dark ? 30 : 20.5)
+  const idle = withAlpha(PAPER, theme.dark ? 0.68 : 0.62)
+  const line = withAlpha(PAPER, theme.dark ? 0.22 : 0.14)
+  const shadow = withAlpha('#000000', theme.dark ? 0.42 : 0.22)
+  return {
+    bg, ink: PAPER, idle, line, shadow,
+    style: `--chrome-bg:${bg};--chrome-ink:${PAPER};--chrome-idle:${idle};--chrome-line:${line};--chrome-shadow:${shadow}`,
+  }
+}
+
+/**
+ * 分类身份在行卡 meta 行上的两档取色（D2：一块 14rpx 的点 + 二十几个 rpx 的三个字）。
+ * 点色 = 这支色本身。浅色卡下它不单独达标是允许的（芥末黄压白卡 1.63）：紧挨着的
+ * 分类名已经过了门槛，去掉颜色也不影响读出"这是哪一类"，WCAG 1.4.1 管的是
+ * "只靠颜色才能理解"的那些信息。深色卡下原色会化掉，所以那档点和字同值。
+ * 门槛两档：浅壁纸按 5、深壁纸按 7（效果图实测到的最低值就是 4.97 / 7.09，
+ * 往 round 数靠）。这两个数都比 WCAG 的 4.5 严——这一行是分类身份，不是正文。
+ * 卡底由这里算，不在页面里写死：深色那两枚的卡面是 rgba(255,255,255,.05) 叠页面底，
+ * 浅色那六枚各吃自己主题的 line（象牙那块其实是 #FCFBF8，不是纯白）。
+ */
+function catSkinFor(categoryId, wallpaper) {
+  const theme = themeOf(wallpaper)
+  const ramp = rampFor(categoryId, wallpaper)
+  const raw = ramp ? ramp.bg : toneFor(categoryId).bg
+  const card = theme.dark ? mix('#FFFFFF', theme.page, 0.05) : theme.line
+  const text = enforce(raw, card, theme.dark ? 7 : 5)
+  // 未分类在深色下连点都撤掉，换成空心环——"没归类"该长得不一样。
+  // 点什么时候用原色、什么时候跟着字走：淡雅那两枚和深色那两枚都是"原色在这块卡上会化掉"
+  // （#EAE0CE 压 #FCFBF8 只有 1.13），所以点换成算出来的字色；其余六枚的原色点是一块能看见的
+  // 色，就照效果图留原色——包括芥末黄那枚压白卡只有 1.63 的点，理由见上面那段 1.4.1。
+  return { dot: theme.dark || ramp ? text : raw, text, ring: categoryId == null && theme.dark, card }
+}
+
 module.exports = {
   TONES,
   UNCATEGORIZED,
@@ -354,6 +456,9 @@ module.exports = {
   themeOf,
   setActiveTheme,
   rampFor,
+  chromeOf,
+  catSkinFor,
+  crOf,
   inkIsLighter,
   mix,
   withAlpha,

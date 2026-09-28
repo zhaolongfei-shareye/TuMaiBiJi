@@ -1,21 +1,25 @@
-/* 底部导航：浮起的墨色胶囊。
-   这里是自定义组件，拿不到 page 上的 CSS 变量，所以颜色一律写死，不用 var()。
-   字体同理：app.wxss 里那三个 .font-* 类进不了组件，只能把类名递进来、
-   字体栈在这再写一遍。改字体栈要记得两边一起改（app.wxss 那份是主页面的）。 */
+/* 底部导航：浮起的胶囊。
+   这里是自定义组件，拿不到 page 上的 CSS 变量，所以颜色一律由 JS 递进来（style 上那串
+   --chrome-*，值来自 palette.chromeOf），字体栈同理：app.wxss 里那三个 .font-* 类进不了组件，
+   只能把类名递进来、字体栈在这再写一遍。改字体栈要记得两边一起改（app.wxss 那份是主页面的）。 */
 .font-song { font-family: 'STSong', 'Songti SC', '宋体-简', 'Noto Serif CJK SC', 'Noto Serif SC', 'Source Han Serif SC', '思源宋体 CN', 'SimSun', 'Noto Serif', serif; }
 .font-fang { font-family: 'STFangsong', 'FangSong', '仿宋', 'FangSong_GB2312', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Noto Serif', serif; }
 .font-kai { font-family: 'Kaiti SC', 'STKaiti', 'Kaiti', '楷体', 'KaiTi', 'TW-Kai', 'AR PL KaitiM GB', 'Noto Serif CJK SC', 'Noto Serif', serif; }
 .tab-bar {
   display: flex;
   position: fixed;
+  box-sizing: border-box;
   bottom: 20rpx;
   left: 24rpx;
   right: 24rpx;
   height: 108rpx;
-  background: var(--tab-ink, #23252c);
+  background: var(--chrome-bg);
+  border: 3rpx solid var(--chrome-line);
   border-radius: 44rpx;
   padding-bottom: 0;
-  box-shadow: 0 16rpx 44rpx var(--tab-shadow, rgba(35, 37, 44, 0.28));
+  /* 描边宽用 3rpx 而不是 var(--w-edge)：组件读不到 page 上的令牌，这个数在 app.wxss 里也是 3。
+     深壁纸下这块面压页面底不到 3，边界靠的就是这一圈纸白 @22%，不是靠投影。 */
+  box-shadow: 0 16rpx 44rpx var(--chrome-shadow);
   z-index: 999;
 }
 
@@ -25,7 +29,16 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6rpx;
+  gap: 4rpx;
+  /* 选中/未选中只换 currentColor 这一件事：图标那三条描边、那根横杠、那个加号全部吃它，
+     所以不再有七处写死的 rgba(255,255,255,.42)，也不再有 .active 那四条覆盖。 */
+  color: var(--chrome-idle);
+  font-weight: 600;
+}
+
+.tab-item.active {
+  color: var(--chrome-ink);
+  font-weight: 700;
 }
 
 .tab-icon {
@@ -41,7 +54,7 @@
   left: 8rpx;
   width: 24rpx;
   height: 28rpx;
-  border: 3rpx solid rgba(255, 255, 255, 0.42);
+  border: 3rpx solid currentColor;
   border-radius: 8rpx;
 }
 
@@ -52,8 +65,8 @@
   left: 14rpx;
   width: 12rpx;
   height: 3rpx;
-  background: rgba(255, 255, 255, 0.42);
-  box-shadow: 0 6rpx 0 rgba(255, 255, 255, 0.42);
+  background: currentColor;
+  box-shadow: 0 6rpx 0 currentColor;
 }
 
 .icon-create::before {
@@ -63,7 +76,7 @@
   left: 8rpx;
   width: 24rpx;
   height: 24rpx;
-  border: 3rpx solid rgba(255, 255, 255, 0.42);
+  border: 3rpx solid currentColor;
   border-radius: 50%;
 }
 
@@ -75,7 +88,7 @@
   transform: translate(-50%, -50%);
   font-size: 28rpx;
   font-weight: 300;
-  color: rgba(255, 255, 255, 0.42);
+  color: currentColor;
   line-height: 1;
 }
 
@@ -86,7 +99,7 @@
   left: 12rpx;
   width: 16rpx;
   height: 16rpx;
-  border: 3rpx solid rgba(255, 255, 255, 0.42);
+  border: 3rpx solid currentColor;
   border-radius: 50%;
 }
 
@@ -97,38 +110,25 @@
   left: 4rpx;
   width: 32rpx;
   height: 14rpx;
-  border: 3rpx solid rgba(255, 255, 255, 0.42);
+  border: 3rpx solid currentColor;
   border-radius: 16rpx 16rpx 0 0;
   border-bottom: none;
 }
 
 .tab-label {
   font-size: 20rpx;
-  color: rgba(255, 255, 255, 0.42);
+  color: currentColor;
 }
 
-.active .tab-icon::before,
-.active .tab-icon::after {
-  border-color: #ffffff;
+/* 选中态是这一条短线，不是垫块：三个文字标签全留，加粗只重一档 */
+.tab-mark {
+  width: 26rpx;
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  opacity: 0;
 }
 
-.active .icon-notes::after {
-  background: #ffffff;
-  box-shadow: 0 6rpx 0 #ffffff;
-}
-
-.active .icon-create::after,
-.active .tab-label {
-  color: #ffffff;
-}
-
-.active .tab-label {
-  font-weight: 600;
-}
-
-/* 深色壁纸下页面底和胶囊几乎同色，靠一圈描边把它从背景里分出来 */
-.tab-bar-dark {
-  background: #1a1c22;
-  box-shadow: 0 16rpx 44rpx rgba(0, 0, 0, 0.5);
-  border: 1rpx solid rgba(255, 255, 255, 0.1);
+.tab-item.active .tab-mark {
+  opacity: 1;
 }

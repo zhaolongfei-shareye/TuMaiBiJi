@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { blockSkinFor, toneVars, toneStyle } = require('../../utils/palette.js')
+const { catSkinFor, chromeOf, toneVars } = require('../../utils/palette.js')
 const { formatShortDate } = require('../../utils/date.js')
 
 // 统计看板一次读多少条：后端 /api/notes 的 limit 上限就是 100，写不了更大。
@@ -39,8 +39,10 @@ Page({
     loadingMore: false,
     // 「我的笔记」右上角那三个数：本周 / 本月 / 总数
     statsText: '',
-    // 搜索卡那一整块色：跟新建页那张 URL 卡同一个发色函数、同一块蓝，颜色仍只从 palette 出
-    searchSkin: toneStyle(1),
+    // 搜索条那一块面不再是一支固定蓝，而是由当前壁纸的页面底派生（palette.chromeOf）。
+    // data 字面量里这一次是模块加载时算的，主题还没落地，所以按 default 走——
+    // 和 themeOf 拿不到 key 时回落 THEMES[0] 是同一条规则，不是另写一份兜底色。
+    searchSkin: chromeOf().style,
   },
 
   async onShow() {
@@ -52,9 +54,9 @@ Page({
       lang,
       t: texts(lang),
       themeClass,
-      // 搜索卡那块色在 data 字面量里算过一次，那是模块加载时、主题还没落地的时候。
-      // 淡雅那两枚会把这块蓝换成同色阶的一档，所以每次进页都要按当前主题重算一遍。
-      searchSkin: toneStyle(1),
+      // 每次进页按当前主题重算：换壁纸时这块面和底部导航那条胶囊必须同步改色，
+      // 留着 data 字面量那份就等于永远停在米白那一档。
+      searchSkin: chromeOf(app.getWallpaper()).style,
     })
     app.setNavTitle('appName', lang)
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
@@ -134,16 +136,16 @@ Page({
   skin(notes) {
     const nameOf = {}
     this.data.categories.forEach((c) => { nameOf[c.id] = c.name })
+    const wallpaper = getApp().getWallpaper()
     notes.forEach((n) => {
-      const s = blockSkinFor(n.category_id, n.id)
-      n.blockStyle = s.style
-      n.motif = s.motif
-      // 方块上的字改成"第一个标签"：标签是用户自己写的，比分类名更能说明这一条是什么；
-      // 颜色仍按分类走，所以"扫颜色分流、读字辨条"这两件事没有互相抢。
-      // 没有标签时退回分类名；分类也查不到名字时宁可空着，也不要写成"未分类"——
-      // 它明明归了类，只是这一批分类数据里没它，空着时方块只剩颜色，识别照旧成立。
-      const firstTag = (n.tags || []).map((x) => (x || '').trim()).find(Boolean) || ''
-      n.blockName = firstTag || (n.category_id == null ? this.data.t.noCategory : (nameOf[n.category_id] || ''))
+      // 分类身份退成"一枚点 + 分类名"，两档色由 palette 现算（浅色卡按 5、深色卡按 7）。
+      const s = catSkinFor(n.category_id, wallpaper)
+      n.catStyle = `--cat-dot:${s.dot};--cat-ink:${s.text}`
+      n.catRing = s.ring
+      // 这一格只写分类名，标签不再来顶替它：标签在下面自己有的一段（.tg），
+      // 两处都写就成了同一串字出现两遍。分类查不到名字时宁可空着，也不要写成"未分类"——
+      // 它明明归了类，只是这一批分类数据里没它。
+      n.catLabel = n.category_id == null ? this.data.t.noCategory : (nameOf[n.category_id] || '')
       n.tagLine = (n.tags || []).join(' / ')
     })
     return notes

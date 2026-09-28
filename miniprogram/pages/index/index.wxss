@@ -26,12 +26,14 @@
 /* ---------- 搜索条 ----------
    一块饱和色 + 一条横线。输入框不再有"面"（原来那层半透明白盒子撤了），
    字直接坐在卡色上，靠一条下划线表示这里能写；"搜索笔记"是线上的纯文字动作，
-   不是按钮——同"获取验证码"那种做法。底色仍由 palette.toneStyle(1) 发下来。
+   不是按钮——同"获取验证码"那种做法。
+   底色不再是一支固定的蓝，而是和底部导航那条胶囊同一个派生值（palette.chromeOf
+   发下来的 --chrome-*），由 JS 塞在 style 上：页面里一个色值都不写死。
    横线单独画一个元素而不是 border-bottom：这样能给它自己的透明度，
-   又不会连带把字也调淡，而且颜色仍只是 --blk-ink 的一份，不引入第二个色值。 */
+   又不会连带把字也调淡。 */
 .sc-card {
-  background: var(--blk-bg);
-  color: var(--blk-ink);
+  background: var(--chrome-bg);
+  color: var(--chrome-ink);
   padding: 26rpx var(--sp-3) 20rpx;
   margin-bottom: var(--sp-3);
 }
@@ -55,7 +57,7 @@
   right: 0;
   bottom: 0;
   height: 3rpx;
-  background: var(--blk-ink);
+  background: var(--chrome-ink);
   opacity: 0.42;
 }
 
@@ -65,12 +67,14 @@
   flex: 1;
   min-width: 0;
   font-size: var(--fs-body);
-  color: var(--blk-ink);
+  color: var(--chrome-ink);
 }
 
+/* 占位符给的是带 alpha 的色而不是 opacity：placeholder 那一档不吃 opacity
+   （统一录入条那条教训，见 app.wxss 的 .face-ph）。值取 chrome 的 idle 档，
+   和底部导航未选中那三个字是同一个深浅。 */
 .sc-ph {
-  color: var(--blk-ink);
-  opacity: 0.6;
+  color: var(--chrome-idle);
 }
 
 .sc-x {
@@ -87,7 +91,7 @@
   font-size: var(--fs-title);
   font-weight: 800;
   letter-spacing: -0.5rpx;
-  color: var(--blk-ink);
+  color: var(--chrome-ink);
 }
 
 .sc-go:active {
@@ -111,15 +115,92 @@
   font-size: var(--fs-body);
 }
 
+/* ---------- 行卡（D2）：左侧那块 176 方块撤了 ----------
+   颜色退到 meta 行最前面的一枚 14rpx 点 + 分类名。两档色不写在这个文件里，
+   由 palette.catSkinFor 现算后走 style 递进来（--cat-dot / --cat-ink）：
+   同一支分类色在浅色卡和深色卡上各有一个值，写死就会在其中一档糊掉。 */
+.note-row {
+  padding: var(--sp-row);
+}
+
+/* 间距一律挂在"下面那一段"的 margin-top 上，不挂在上面那段的 margin-bottom：
+   摘要没内容时那一段整个不渲染，挂在下面就不会留一段没有主人的空白。 */
+.row-title {
+  margin-bottom: 0;
+}
+
 .summary {
   font-size: var(--fs-meta);
   line-height: 1.55;
   color: var(--text-secondary);
-  margin-bottom: var(--sp-2);
+  margin-top: 7rpx;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+}
+
+/* 现网这一行吃 --text-tertiary（米白下 #9A9EA6），压白卡实测 2.69，
+   而它是 21rpx 的小字、按 4.5 判——D2 之后它是分类身份的一部分，不能还是灰不溜秋。
+   来源和日期抬到 --text-secondary（6.79）；标签和那个尖角留在 tertiary：
+   被裁的是标签串，它本来就是"这里还有，不必读"。 */
+.row-foot {
+  justify-content: flex-start;
+  gap: 11rpx;
+  margin-top: 11rpx;
+  padding-top: 11rpx;
+  border-top: var(--w-edge) solid var(--card-edge);
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.cat {
+  display: flex;
+  align-items: center;
+  gap: 9rpx;
+  flex: none;
+  font-weight: 800;
+  letter-spacing: -0.2rpx;
+  color: var(--cat-ink);
+}
+
+.cat-dot {
+  box-sizing: border-box;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  flex: none;
+  background: var(--cat-dot);
+}
+
+/* 未分类在深色壁纸下撤掉实心点、换一圈空心环——"没归类"这件事该长得不一样 */
+.cat.is-ring .cat-dot {
+  background: transparent;
+  border: var(--w-edge) solid var(--cat-ink);
+}
+
+.sep {
+  flex: none;
+  color: var(--text-tertiary);
+}
+
+.src {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.tg {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-tertiary);
+}
+
+.dt {
+  flex: none;
+  margin-left: auto;
+  letter-spacing: 0.4rpx;
+  color: var(--text-secondary);
 }
 
 .chev {
@@ -127,6 +208,7 @@
   font-size: var(--fs-body);
   font-weight: 400;
   line-height: 1;
+  color: var(--text-tertiary);
 }
 
 .container {
