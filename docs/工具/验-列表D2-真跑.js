@@ -65,6 +65,10 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     return v
   }
   const before = await mp.evaluate(() => JSON.stringify(wx.getStorageSync('localWallpaper') || ''))
+  // 这一把量的是 D2 那一版：没有照片、只有壁纸底。09-28 深夜起笔记页头部也开始铺形象图，
+  // 两件事不能混在同一把尺子里——先把背景开关按到"不用"，收尾再还原回他原来那一档。
+  const bgOffBefore = await mp.evaluate(() => !!wx.getStorageSync('home_bg_off'))
+  await mp.evaluate(() => wx.setStorageSync('home_bg_off', true))
   // 这台机型的 rpx→px 比例（1rpx = windowWidth/750），几何断言全按它换算
   const R = (await mp.evaluate(() => wx.getSystemInfoSync().windowWidth)) / 750
 
@@ -167,6 +171,11 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     if (v) wx.setStorageSync('localWallpaper', v)
     else wx.removeStorageSync('localWallpaper')
   }, before)
+  // 背景开关也还原成进来之前那一档：探针借走的是他的真机偏好，不能留在"不用"
+  await mp.evaluate((wasOff) => {
+    if (wasOff) wx.setStorageSync('home_bg_off', true)
+    else wx.removeStorageSync('home_bg_off')
+  }, bgOffBefore)
   await enter('/pages/create/create')
   await sleep(2500)
   const restored = await mp.evaluate(() => JSON.stringify(wx.getStorageSync('localWallpaper') || ''))
