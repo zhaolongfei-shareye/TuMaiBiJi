@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 笔记列表堆叠卡 v2（层次压叠 + 分类色圆点 · 2026-09-28）</title>
+<style>
+/* ==================================================================
+   站长 09-28 深夜第二轮口径（原话）：
+     "再模拟多几个笔记折叠效果；前面的笔记边框压住后面的，看上去有上下层次关系；
+      每个标题前面的小圆点要有颜色区分，当前笔记标题前面也要有一个，
+      这个颜色和笔记分类关联，上面分类底图也用不同颜色，看起来不会太寡淡；
+      背景图不要漏了。"
+
+   四条屏：① 默认堆叠（中心 + 上下各三，一屏看得见 7 条，压叠关系画出来）
+           ② 点开放大看完整   ③ 上下滑切换中   ④ 英文默认态
+
+   口径与代码同一把尺子：px 当 rpx 用，设计宽 750；
+     一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690。
+     背景引线上原图 miniprogram/assets/home-bg-portrait.jpg（865×1670），cover，
+     压暗停点逐字抄 create.wxss；底栏那支色是 palette.chromeOf('tint-celadon') = #25442B。
+     圆角、字阶、描边、底栏几何与现网 app.wxss 逐值相同。
+     分类那六支色全部从 palette.TONES / UNCATEGORIZED 现取（见标注页那张对照表），
+     屏上每一句界面中文都从 utils/i18n.js 抄，新造的串单列。
+   ================================================================== */
+  :root{
+    --r-card:40px; --r-pill:999px; --w-edge:3px;
+    --paper:#F2EFE9; --ink:#23252C;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px; --fs-label:20px;
+    --chrome:#25442B; --chrome-line:rgba(242,239,233,.22); --chrome-idle:rgba(242,239,233,.68);
+    --card:#FCFBF8; --card-edge:rgba(36,30,22,.12);
+    /* 分类六支：palette.js 的 TONES + UNCATEGORIZED，一字未改 */
+    --c-yellow:#F6C445; --i-yellow:#2A2005;
+    --c-blue:#3F52D6;   --i-blue:#FFFFFF;
+    --c-orange:#E9723D; --i-orange:#2C1204;
+    --c-green:#46A863;  --i-green:#06260F;
+    --c-purple:#6E4BD0; --i-purple:#FFFFFF;
+    --c-ink:#23252C;    --i-ink:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:#23252C;padding:26px 15px 70px;font-family:-apple-system,'PingFang SC',sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;flex-wrap:wrap;gap:64px 56px;width:2400px;align-items:flex-start}
+  .unit{width:750px;flex:none}
+  .cap{margin-bottom:14px;min-height:130px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap b{color:#23252C}
+
+  .ph{width:750px;height:1690px;position:relative;overflow:hidden;background:#E9EEEA;border-radius:52px;
+    box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16)}
+  .ph.doc{height:auto;padding-bottom:26px}
+  .bg{position:absolute;left:0;top:184px;width:750px;height:1506px;background-size:cover;background-position:center;z-index:0}
+  .scrim{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:1;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)}
+  .lay{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:2}
+
+  .sb{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}.sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .nb{height:90px;background:#181A20;position:relative;z-index:12}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:#F2EFE9;letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:13px;width:174px;height:64px;border-radius:34px;
+    background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);color:#F2EFE9;
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  .hero{position:absolute;left:24px;right:24px;top:45px;display:flex;align-items:baseline;justify-content:space-between}
+  .hero .h1{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96);line-height:1.15}
+  .hero .h1.en{font-size:38px;letter-spacing:-.5px}
+  .hero .stats{font-size:var(--fs-meta);font-weight:600;color:rgba(242,239,233,.95);white-space:nowrap}
+
+  .spill{position:absolute;left:24px;right:24px;top:146px;height:128px;border-radius:var(--r-pill);
+    background:var(--paper);box-shadow:0 18px 46px rgba(8,10,14,.42);
+    display:flex;align-items:center;padding:0 22px 0 34px;gap:20px}
+  .spill .q{flex:1;min-width:0;font-size:var(--fs-body);color:#9A9EA6;white-space:nowrap;overflow:hidden}
+  .spill .go{flex:none;font-size:var(--fs-title);font-weight:800;letter-spacing:-.5px;color:var(--ink)}
+  .spill .rule{position:absolute;left:34px;right:120px;bottom:24px;height:3px;background:var(--ink);opacity:.42}
+
+  /* 分类筛选：每一枚直接穿自己那一支分类色（他要的"不寡淡"就是这个）。
+     枚内不再画小圆点——底色已经是那一支色，点同色等于没有；六枚要在一行内排满 702。 */
+  .chips{position:absolute;left:24px;right:24px;top:306px;height:56px;display:flex;gap:12px;overflow:hidden}
+  .chip{height:56px;flex:none;border-radius:var(--r-pill);display:flex;align-items:center;
+    font-size:var(--fs-meta);font-weight:700;white-space:nowrap;padding:0 26px;
+    box-shadow:0 6px 16px rgba(8,10,14,.28)}
+  .chip.all{background:var(--paper);color:var(--ink)}
+  .chip.on{background:var(--paper);color:var(--ink);box-shadow:inset 0 0 0 var(--w-edge) var(--tone),0 6px 16px rgba(8,10,14,.28)}
+
+  /* ---------- 堆叠：靠中心的压住靠外的，中心压住全部 ---------- */
+  .stack{position:absolute;left:0;right:0;top:420px;height:792px}
+  .card{position:absolute;border-radius:var(--r-card);background:var(--card);
+    border:var(--w-edge) solid var(--card-edge);display:flex;align-items:center;padding:0 30px;gap:14px;overflow:hidden}
+  .card .dot{width:16px;height:16px;border-radius:50%;flex:none}
+  .card .ti{flex:1;min-width:0;font-size:var(--fs-body);font-weight:700;letter-spacing:-.5px;color:#23252C;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .dt{flex:none;font-size:var(--fs-tiny);font-weight:800;letter-spacing:.4px;color:rgba(35,37,44,.5)}
+  /* 折叠条：只露一行标题。左右往里收、往下/往上叠，越远越小越淡 */
+  .f1{left:56px;right:56px;height:76px;z-index:4;opacity:.9;transform:scale(.975)}
+  .f2{left:88px;right:88px;height:76px;z-index:2;opacity:.68;transform:scale(.95)}
+  .f3{left:118px;right:118px;height:76px;z-index:1;opacity:.45;transform:scale(.925)}
+  .u3{top:0}
+  .u2{top:62px}
+  .u1{top:124px}
+  .d1{top:592px}
+  .d2{top:654px}
+  .d3{top:716px}
+  /* 中心卡：最高一层，上下两条边各压住相邻折叠条 14 */
+  .center{left:24px;right:24px;top:186px;height:420px;z-index:6;opacity:1;transform:none;
+    flex-direction:column;align-items:stretch;padding:32px 30px 26px;
+    box-shadow:0 24px 56px rgba(8,10,14,.4)}
+  .center .hd{display:flex;align-items:flex-start;gap:14px}
+  .center .dot{margin-top:14px}
+  .center .ti{font-size:36px;font-weight:800;letter-spacing:-.8px;line-height:1.3;color:#23252C;white-space:normal;overflow:hidden}
+  .center .pin{display:inline-block;font-size:19px;font-weight:800;letter-spacing:.6px;padding:4px 14px;
+    border-radius:10px;background:#23252C;color:#E9EEEA;margin-right:10px;vertical-align:3px}
+  .center .su{margin-top:16px;font-size:var(--fs-body);line-height:1.65;color:#5c6068;
+    display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .center .foot{margin-top:auto;padding-top:18px;border-top:var(--w-edge) solid rgba(35,37,44,.10);
+    display:flex;align-items:center;gap:11px;white-space:nowrap;font-size:var(--fs-meta);color:#5c6068}
+  .center .foot .cat{display:flex;align-items:center;gap:9px;font-weight:800;color:var(--tone);flex:none}
+  .center .foot .cat i{width:14px;height:14px;border-radius:50%;background:var(--tone);flex:none}
+  .center .foot .sep{color:rgba(35,37,44,.35)}
+  .center .foot .tg{overflow:hidden;text-overflow:ellipsis;color:rgba(35,37,44,.42);min-width:0}
+  .center .foot .dt{margin-left:auto;font-weight:800;letter-spacing:.4px;flex:none;color:#5c6068}
+  .center .foot .cv{font-size:var(--fs-body);color:rgba(35,37,44,.42)}
+
+  .hint{position:absolute;left:0;right:0;top:838px;text-align:center;font-size:var(--fs-tiny);
+    font-weight:600;letter-spacing:.4px;color:rgba(242,239,233,.62)}
+  .pager{position:absolute;left:0;right:0;top:880px;display:flex;justify-content:center;gap:12px}
+  .pager i{width:12px;height:12px;border-radius:50%;background:rgba(242,239,233,.34)}
+  .pager i.on{background:var(--paper);width:34px;border-radius:999px}
+
+  /* 展开态：这张按内容定高，不铺满整屏——铺满就得拿假留白去填，照片反而又被盖掉了 */
+  .lay.dim{opacity:.14}
+  .bigcard{position:absolute;left:24px;right:24px;top:120px;border-radius:var(--r-card);
+    background:var(--card);border:var(--w-edge) solid var(--card-edge);box-shadow:0 26px 64px rgba(8,10,14,.5);
+    padding:38px 34px 26px;overflow:hidden}
+  .bigcard .hd{display:flex;align-items:flex-start;gap:16px}
+  .bigcard .dot{width:20px;height:20px;border-radius:50%;flex:none;margin-top:14px;background:var(--tone)}
+  .bigcard .ti{font-size:40px;font-weight:800;letter-spacing:-1px;line-height:1.34;color:#23252C}
+  .bigcard .band{margin-top:22px;height:8px;border-radius:999px;background:var(--tone);opacity:.85}
+  .bigcard .lab{margin-top:26px;font-size:var(--fs-label);font-weight:800;letter-spacing:1.6px;color:rgba(35,37,44,.42)}
+  .bigcard .su{margin-top:12px;font-size:var(--fs-body);line-height:1.7;color:#3a3e46}
+  .bigcard .kpl{margin-top:14px;display:flex;flex-direction:column;gap:14px}
+  .bigcard .kpl .row{display:flex;gap:14px;font-size:var(--fs-body);line-height:1.55;color:#23252C}
+  .bigcard .kpl .row i{width:10px;height:10px;border-radius:50%;background:var(--tone);flex:none;margin-top:16px}
+  .bigcard .src{margin-top:14px;font-size:var(--fs-meta);color:rgba(35,37,44,.55)}
+  .bigcard .src b{font-weight:700;color:var(--tone)}
+  .bigcard .close{margin-top:28px;padding-top:20px;border-top:var(--w-edge) solid rgba(35,37,44,.10);
+    display:flex;align-items:center;justify-content:space-between;font-size:var(--fs-meta);font-weight:700;color:rgba(35,37,44,.5)}
+  .bigcard .close .chev{font-size:34px;line-height:1}
+
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:44px;
+    background:var(--chrome);display:flex;z-index:10;box-shadow:0 16px 44px rgba(0,0,0,.42);
+    border:var(--w-edge) solid var(--chrome-line)}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font-size:20px;font-weight:600;color:var(--chrome-idle);letter-spacing:.3px}
+  .tb .ic{width:40px;height:40px;position:relative;border:3px solid currentColor}
+  .tb.notes .ic{border-radius:8px}.tb.notes .ic::after{content:'';position:absolute;left:7px;right:7px;top:11px;height:3px;background:currentColor;box-shadow:0 8px 0 currentColor}
+  .tb.create .ic{border-radius:50%}.tb.create .ic::after{content:'+';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:300;line-height:1}
+  .tb.me .ic{border-radius:50%;height:20px;width:20px;margin-top:10px;border-bottom:none}
+  .tb.on{color:#F2EFE9;font-weight:700}
+  .tb .ln{width:26px;height:4px;border-radius:2px;background:currentColor;opacity:0}
+  .tb.on .ln{opacity:1}
+
+  .docbody{padding:26px 30px 0}
+  .blk2{margin-bottom:26px}
+  .blk2 h4{font-size:22px;font-weight:800;letter-spacing:-.4px;margin-bottom:10px}
+  .blk2 p{font-size:16.5px;line-height:1.75;color:#4c5058;margin-bottom:8px}
+  .blk2 b{color:#23252C}
+  table{width:100%;border-collapse:collapse;font-size:15.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid rgba(35,37,44,.12);vertical-align:top;line-height:1.5}
+  th{font-weight:800;background:rgba(35,37,44,.05)}
+  .sw{display:inline-block;width:22px;height:22px;border-radius:50%;vertical-align:-5px;margin-right:8px;
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.12)}
+  .new{display:inline-block;font-size:12px;font-weight:800;color:#8c2119;background:rgba(140,33,25,.09);border-radius:6px;padding:1px 7px}
+  .live{display:inline-block;font-size:12px;font-weight:800;color:#1d5c34;background:rgba(29,92,52,.10);border-radius:6px;padding:1px 7px}
+</style>
+</head>
+<body>
+<div class="flow" id="flow"></div>
+<script>
+const IMG = '../../../miniprogram/assets/home-bg-portrait.jpg'
+
+/* 分类与色：色值全部从 palette.js 现取（TONES + UNCATEGORIZED），
+   折叠条那个点、中心卡那个点、分类筛选那枚底，三处必须是同一支——同一个功能只有一张脸。 */
+const CAT = {
+  ink:    { name:'未分类', bg:'#23252C', ink:'#FFFFFF' },
+  orange: { name:'生活',   bg:'#E9723D', ink:'#2C1204' },
+  green:  { name:'旅游',   bg:'#46A863', ink:'#06260F' },
+  blue:   { name:'阅读',   bg:'#3F52D6', ink:'#FFFFFF' },
+  purple: { name:'工作',   bg:'#6E4BD0', ink:'#FFFFFF' },
+}
+
+/* 前 3 条是他手机上那三条真数据（标题/来源/日期/标签照 09-28 实测截图抄，都还在未分类）；
+   后 4 条是示意，只为看分类色与压叠层次，标注页单列了。 */
+const NOTES = [
+  { ti:'2026微信小程序开发大赛介绍', cat:'ink', src:'截图识别', tag:'微信小程序 / 开发大赛 / 人工智能', dt:'09-23', pin:true,
+    su:'微信小程序团队联合 WAICFutureTech 启动 2026 微信小程序开发大赛，以"与AI共生"为主题面向全球征集 AI 小程序作品。' },
+  { ti:'TVB新晋HiFi女歌手——侯静伊', cat:'ink', src:'公众号文章', tag:'侯静伊 / TVB / HiFi歌手 / 中年好声音', dt:'09-25',
+    su:'侯静伊（Connie Hau）是香港 HiFi 女歌手及 TVB 签约艺人，自幼学声乐并获逾 60 项歌唱奖项。她自 2019 年出道已推出三张专辑。' },
+  { ti:'2026年中秋节祝福语与问候图片大全', cat:'ink', src:'公众号文章', tag:'平安喜乐 / 中秋节 / 祝福语 / 问候图片', dt:'09-25',
+    su:'本文汇集了 2026 年中秋节的多条温馨祝福语，配合最美问候图片，传达花好月圆、阖家团圆的美好祝愿。' },
+  { ti:'淡路岛两天：海边美术馆与营地', cat:'green', src:'公众号文章', tag:'淡路岛 / 美术馆 / 露营', dt:'09-24',
+    su:'生驹的濑户内海眺望、安藤忠雄的图书馆，营地要提前一个月订。岛上公交两小时一班，末班五点半，错过就得打车，一段路约三千日元。南淡路的海上散步道留着半天，退潮时能看到底下的礁石。',
+    kp:['淡路岛两个营地都要提前一个月订，周末基本秒空','安藤忠雄的图书馆只在下午四点前开放，需预约','岛上公交两小时一班，末班 17:30，行程要按班车排','南淡路海上散步道退潮时段最好走，单程约 40 分钟'] },
+  { ti:'市集那三家咖啡都在东门第二排', cat:'orange', src:'亲自撰写', tag:'周末 / 咖啡', dt:'09-26',
+    su:'自带杯减五块，一家只卖浅焙。周末十点前人少，可以坐着聊。三家都在东门第二排，走到底左拐。第二排尽头那家有外摆位，下午三点后基本要等。' },
+  { ti:'《设计的规则》读到的一段', cat:'blue', src:'亲自撰写', tag:'阅读 / 排版', dt:'09-22',
+    su:'网格不是限制，是省心的地方：把决定留给内容，把重复交给规则。' },
+  { ti:'周会记的三件事：交付、复盘、排期', cat:'purple', src:'亲自撰写', tag:'工作 / 周会', dt:'09-21',
+    su:'交付按周五切；复盘只聊卡住的那一条；排期表下周换成两周一版。' },
+]
+
+const L = {
+  zh:{ nav:'图麦笔记', head:'我的笔记', stats:'本周：6　|　本月：7　|　总数：7',
+    ph:'输入关键词', go:'搜索笔记', all:'全部', pin:'置顶', tab:['新建','笔记','我的'],
+    hint:'上下滑切换 · 点卡片放大', summary:'摘要', keyPoints:'核心要点', tags:'标签',
+    source:'来源链接', close:'再点一下收起' },
+  en:{ nav:'TuMaiBiJi', head:'My notes', stats:'Week: 6  |  Month: 7  |  Total: 7',
+    ph:'Enter keywords', go:'Search notes', all:'All', pin:'Pinned', tab:['Create','Notes','Me'],
+    hint:'Swipe to switch · tap to expand', summary:'Summary', keyPoints:'Key Points', tags:'Tags',
+    source:'Source Link', close:'Tap again to collapse' },
+}
+
+const shell = (lang, inner) => `
+  <div class="sb"><span>23:03</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb"><span class="t">${lang.nav}</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  <div class="bg" style="background-image:url('${IMG}')"></div><div class="scrim"></div>
+  ${inner}
+  <div class="tabbar">
+    <div class="tb create"><div class="ic"></div>${lang.tab[0]}<div class="ln"></div></div>
+    <div class="tb notes on"><div class="ic"></div>${lang.tab[1]}<div class="ln"></div></div>
+    <div class="tb me"><div class="ic"></div>${lang.tab[2]}<div class="ln"></div></div>
+  </div>`
+
+const chip = (k, on) => `<div class="chip ${on}" style="--tone:${CAT[k].bg};${
+  on === 'on' ? '' : `background:${CAT[k].bg};color:${CAT[k].ink}`}">${CAT[k].name}</div>`
+
+const head = (lang, dim) => `
+  <div class="lay${dim ? ' dim' : ''}">
+    <div class="hero"><div class="h1 ${lang === L.en ? 'en' : ''}">${lang.head}</div><div class="stats">${lang.stats}</div></div>
+    <div class="spill"><div class="q">${lang.ph}</div><div class="go">${lang.go}</div><div class="rule"></div></div>
+    <div class="chips"><div class="chip all">${lang.all}</div>
+      ${chip('green','')}${chip('orange','')}${chip('blue','')}${chip('purple','')}
+    </div>
+  </div>`
+
+const fold = (n, cls) => `<div class="card ${cls}" style="border-color:${CAT[n.cat].bg}55">
+  <span class="dot" style="background:${CAT[n.cat].bg}"></span>
+  <span class="ti">${n.ti}</span><span class="dt">${n.dt}</span></div>`
+
+/* 来源类型是字典里的串，不是数据：英文态要说英文（现网 i18n 的 sourceWechatArticle / sourceScreenshot / sourceManual） */
+const SRC_EN = { '公众号文章':'WeChat Article', '截图识别':'Screenshot', '亲自撰写':'Written by me' }
+
+const center = (lang, n, extra) => `
+  <div class="card center" style="--tone:${CAT[n.cat].bg};${extra || ''}">
+    <div class="hd"><span class="dot" style="background:${CAT[n.cat].bg}"></span>
+      <div class="ti">${n.pin ? `<span class="pin">${lang.pin}</span>` : ''}${n.ti}</div></div>
+    <div class="su">${n.su}</div>
+    <div class="foot">
+      <span class="cat"><i></i>${CAT[n.cat].name}</span><span class="sep">·</span>
+      <span>${lang === L.en ? SRC_EN[n.src] : n.src}</span><span class="sep">·</span><span class="tg">${n.tag}</span>
+      <span class="dt">${n.dt}</span><span class="cv">›</span>
+    </div>
+  </div>`
+
+// ① 默认：中心是第 4 条（生活·橙），上下各压三条，一屏看得见 7 条
+const S1 = (lang) => shell(lang, head(lang) + `
+  <div class="lay"><div class="stack">
+    ${fold(NOTES[0], 'f3 u3')}
+    ${fold(NOTES[1], 'f2 u2')}
+    ${fold(NOTES[2], 'f1 u1')}
+    ${center(lang, NOTES[3])}
+    ${fold(NOTES[4], 'f1 d1')}
+    ${fold(NOTES[5], 'f2 d2')}
+    ${fold(NOTES[6], 'f3 d3')}
+    <div class="hint">${lang.hint}</div>
+    <div class="pager"><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i></div>
+  </div></div>`)
+
+// ③ 切换中：整叠往上走半格，当前这张往上退、变淡，下面那条从底下盖上来正在长大
+const S3 = (lang) => shell(lang, head(lang) + `
+  <div class="lay"><div class="stack" style="transform:translateY(-31px)">
+    ${fold(NOTES[0], 'f3 u3')}
+    ${fold(NOTES[1], 'f2 u2')}
+    ${fold(NOTES[2], 'f1 u1')}
+    ${center(lang, NOTES[3], 'transform:translateY(-22px) scale(.95);opacity:.5')}
+    ${center(lang, NOTES[4], 'top:300px;height:330px;z-index:7')}
+    ${fold(NOTES[5], 'f2 d2')}
+    ${fold(NOTES[6], 'f3 d3')}
+    <div class="hint" style="opacity:.4">${lang.hint}</div>
+    <div class="pager"><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i></div>
+  </div></div>`)
+
+// ② 展开：中心卡铺满，其余整叠淡掉
+const S2 = (lang, n) => shell(lang, head(lang, true) + `
+  <div class="lay" style="z-index:9">
+    <div class="bigcard" style="--tone:${CAT[n.cat].bg}">
+      <div class="hd"><span class="dot"></span><div class="ti">${n.ti}</div></div>
+      <div class="band"></div>
+      <div class="lab">${lang.summary}</div>
+      <div class="su">${n.su}</div>
+      <div class="lab">${lang.keyPoints}</div>
+      <div class="kpl">${(n.kp || ['示意：这一栏取库里 key_points 那几条要点','示意：每条一行，行首是同一支分类色','示意：没有要点时这一栏整块不渲染']).map((k) => `<div class="row"><i></i><span>${k}</span></div>`).join('')}</div>
+      <div class="lab">${lang.tags}</div>
+      <div class="src"><b>${n.tag}</b></div>
+      <div class="src">${lang.source} · mp.weixin.qq.com/s/xxxx</div>
+      <div class="close"><span>${lang.close}</span><span class="chev">⌄</span></div>
+    </div>
+  </div>`)
+
+const UNIT = (step, title, note, inner) => `
+  <div class="unit"><div class="cap"><span class="step">${step}</span><h3>${title}</h3><p>${note}</p></div>
+  <div class="ph">${inner}</div></div>`
+
+const DOC = `
+  <div class="sb" style="background:#E9EEEA;color:#23252C"><span>23:03</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb" style="background:#E9EEEA;border-bottom:3px solid rgba(35,37,44,.10)"><span class="t" style="color:#23252C">标注</span>
+    <span class="capsule" style="background:rgba(35,37,44,.06);box-shadow:inset 0 0 0 2px rgba(35,37,44,.10);color:#23252C"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  <div class="docbody">
+    <div class="blk2"><h4>这一稿按你四句话改了四件事</h4>
+      <p><b>叠得更多：</b>一屏看得见 <b>7 条</b>（中心 + 上下各三条），位置点画出 7 个圆。上一版只有 5 条、中间还空着一大截照片，这一版把堆叠区从 396 抬到 420 起、拉到 792 高，正好落在提示行与位置点之上。</p>
+      <p><b>压出层次：</b>靠中心的压住靠外的，中心压住全部。上下相邻两条各重叠 14，所以每条的前边框都实实压在前一张上，不是各摆各的。越往外越往里收（702 / 638 / 574 / 514 宽）、越小（1 / .975 / .95 / .925）、越淡（1 / .9 / .68 / .45）、层级越低（z 6 / 4 / 2 / 1）。</p>
+      <p><b>圆点带分类色：</b>折叠条、中心卡标题前、中心卡底下那行分类名、展开卡标题前与那条色带，用的都是<b>同一支色</b>，全部从 <code>palette.js</code> 现取，界面里不出现第二份色值。上面那排分类筛选枚改成直接穿分类实色底——底色已经是那一支色，枚内再画一个同色小圆点是白占位置，所以撤了。</p>
+      <p><b>背景图还在：</b>照片 + 压暗那一串一字没改（和新建页同一条），卡片左右各留 24~118 的缝，两侧和卡片之间都露得到图。<b>上一版这张照片其实没渲染出来</b>——效果图里图片相对路径少写了一层目录，整屏是一片死灰，你看到的"寡淡"有一半是这个。这一版路径已按 <code>docs/design/笔记列表-堆叠卡/</code> 到 <code>miniprogram/assets/</code> 的真实层数改对，v1 那份也一并改了重出。</p></div>
+    <div class="blk2"><h4>分类色对照（现取 palette.js）</h4>
+      <table>
+        <tr><th>分类</th><th>色值</th><th>用在哪儿</th></tr>
+        <tr><td>旅游</td><td><span class="sw" style="background:#46A863"></span>#46A863 草绿</td><td>筛选枚 · 折叠条点 · 中心卡点与分类名 · 展开卡那条色带（这一稿中心卡和展开卡都是这一支）</td></tr>
+        <tr><td>生活</td><td><span class="sw" style="background:#E9723D"></span>#E9723D 橙</td><td>同上（画在下面第一条折叠条上）</td></tr>
+        <tr><td>阅读</td><td><span class="sw" style="background:#3F52D6"></span>#3F52D6 宝蓝</td><td>同上</td></tr>
+        <tr><td>工作</td><td><span class="sw" style="background:#6E4BD0"></span>#6E4BD0 紫</td><td>同上</td></tr>
+        <tr><td>未分类</td><td><span class="sw" style="background:#23252C"></span>#23252C 墨黑</td><td>只用在折叠条的点上（他那三条真笔记现在都在这一档）。<b>筛选那一排没有"未分类"这一枚</b>——现网那排就是 全部 + 自建分类，这一稿没加新入口</td></tr>
+        <tr><td>芥末黄</td><td><span class="sw" style="background:#F6C445"></span>#F6C445</td><td>色板里还有这一支，分类多到第六个时用它</td></tr>
+      </table>
+      <p>压暗之上放这六支实色，对比会掉：宝蓝压罩层实测 3.4 左右、芥末黄只有 2.2。所以筛选枚的字<b>不是恒白</b>，按 palette 里配好的 <code>ink</code> 走（黄/橙/绿配深墨字，蓝/紫/墨黑配纸白字）——这套配对现网方块上已经在用，不新造。</p></div>
+    <div class="blk2"><h4>这条是画这一稿时才查出来的：他现在的壁纸会把五色点压成同一支绿</h4>
+      <p>他现在用的是<b>天青</b>那枚壁纸。现网列表那枚点走的是 <code>catSkinFor(分类id, 壁纸)</code>，这个函数在天青下会把每一支分类色都换成"这套主题自己的加深绿"。拿真函数跑出来的结果是：</p>
+      <table>
+        <tr><th>分类（色板原色）</th><th>天青下实测点色</th></tr>
+        <tr><td><span class="sw" style="background:#F6C445"></span>芥末黄 #F6C445</td><td><span class="sw" style="background:#527358"></span>#527358</td></tr>
+        <tr><td><span class="sw" style="background:#3F52D6"></span>宝蓝 #3F52D6</td><td><span class="sw" style="background:#53735b"></span>#53735b</td></tr>
+        <tr><td><span class="sw" style="background:#E9723D"></span>橙 #E9723D</td><td><span class="sw" style="background:#55725d"></span>#55725d</td></tr>
+        <tr><td><span class="sw" style="background:#46A863"></span>草绿 #46A863</td><td><span class="sw" style="background:#54735d"></span>#54735d</td></tr>
+        <tr><td><span class="sw" style="background:#6E4BD0"></span>紫 #6E4BD0</td><td><span class="sw" style="background:#40604A"></span>#40604A</td></tr>
+        <tr><td><span class="sw" style="background:#23252C"></span>墨黑 #23252C</td><td><span class="sw" style="background:#1B2A21"></span>#1B2A21</td></tr>
+      </table>
+      <p>右边这一列<b>肉眼是同一支绿</b>。也就是说"每个标题前的点要有颜色区分"这件事，在天青壁纸下用现成的函数是<b>做不到的</b>——不是没做，是被这套"整套色阶"主题有意压成同调的（那两枚淡雅壁纸的卖点就是整屏一个色系）。换成米白/象牙那两枚，点才是左边这一列原色。</p>
+      <p>所以这一稿屏上画的是<b>原色</b>，等于提议：<b>列表这一处的点改吃 <code>toneFor(id).bg</code>（原色），不再吃 <code>catSkinFor</code> 的加深档</b>；分类名那一行文字仍走 <code>catSkinFor.text</code>，对比不塌。这条一改，天青下也五色分明；不改，就得接受"换天青=点同色"。这是第一件要拍的事，比下面那三件都大。</p></div>
+    <div class="blk2"><h4>尺寸（rpx，视口从 184 起算）</h4>
+      <table>
+        <tr><th>位置</th><th>数值</th></tr>
+        <tr><td>页头 / 搜索 / 分类</td><td>45 · 146..274 · 306..362（与现网逐值相同，没动）</td></tr>
+        <tr><td>堆叠区</td><td>420 起，高 792（到 1212）；底栏顶 1378，中间放提示行与位置点</td></tr>
+        <tr><td>中心卡</td><td>左右 24（宽 702）、区内 top 186、高 420、圆角 40、投影 0 24 56、z 最高</td></tr>
+        <tr><td>第一层折叠条</td><td>左右 56（宽 638）、高 76、缩放 .975、不透明度 .9、z 4</td></tr>
+        <tr><td>第二层折叠条</td><td>左右 88（宽 574）、高 76、缩放 .95、不透明度 .68、z 2</td></tr>
+        <tr><td>第三层折叠条</td><td>左右 118（宽 514）、高 76、缩放 .925、不透明度 .45、z 1</td></tr>
+        <tr><td>重叠量</td><td>上下相邻各压 14（中心压第一层、一层压二层、二层压三层）</td></tr>
+        <tr><td>提示行 / 位置点</td><td>区内 838 · 880（点 12，当前那枚拉成 34 宽的胶囊）</td></tr>
+        <tr><td>展开态那张</td><td>左右 24、上 120、<b>按内容定高</b>（不铺满整屏：铺满就得拿假留白去填，照片也又被盖回去了）；页头/搜索/分类整块淡到 .14</td></tr>
+      </table></div>
+    <div class="blk2"><h4>屏上每一句中文的来源</h4>
+      <table>
+        <tr><th>串</th><th>来源</th></tr>
+        <tr><td>我的笔记 / 本周·本月·总数 / 输入关键词 / 搜索笔记 / 全部 / 置顶 / 未分类 / 摘要 / 核心要点 / 标签 / 来源链接 / 截图识别 / 公众号文章 / 亲自撰写</td><td><span class="live">现网</span> utils/i18n.js 原键；那行统计的分隔符也照 index.js 里 <code>colon='：' / gap='　|　'</code> 拼的</td></tr>
+        <tr><td>「上下滑切换 · 点卡片放大」「再点一下收起」</td><td><span class="new">新串</span> 字典里没有，落地要新增两个键（中英各一份）</td></tr>
+        <tr><td>来源类型那一格（公众号文章 / 截图识别 / 亲自撰写）</td><td><span class="live">现网</span> <code>sourceWechatArticle / sourceScreenshot / sourceManual</code>；英文态那屏翻成 WeChat Article / Screenshot / Written by me，也是这三个键</td></tr>
+        <tr><td>分类名（旅游 / 生活 / 阅读 / 工作）</td><td><span class="live">现网口径</span> 分类是他自建的串，<b>英文态下也照中文原样显示</b>，这一稿没改这条规则</td></tr>
+        <tr><td>筛选那一排的枚</td><td><span class="live">现网</span> 只有 全部 + 自建分类，<b>没有"未分类"这一枚</b>（上一版误加了一枚，这一版撤了）</td></tr>
+        <tr><td>旅游 / 生活</td><td><span class="live">真数据</span> 他库里已有的两个分类</td></tr>
+        <tr><td>阅读 / 工作</td><td><span class="new">示意</span> 库里还没有这两个分类，只为把四支色画出来</td></tr>
+        <tr><td>前 3 条笔记的标题、来源、日期、标签、摘要</td><td><span class="live">真数据</span> 照 09-28 那几张实测截图抄</td></tr>
+        <tr><td>后 4 条笔记、展开态那三条要点、来源链接那串</td><td><span class="new">示意</span> 库里没有，只为看排布</td></tr>
+        <tr><td>页头那行「本周：6　|　本月：7　|　总数：7」</td><td><span class="new">示意</span> 他库里现在真只有 3 条；画 7 张是为了看压叠层次，不是说要给他加 7 条笔记。这一行跟着示意改的，不是现网读数</td></tr>
+      </table></div>
+    <div class="blk2"><h4>另外三处要你拍（点吃原色还是吃加深档，是上面那一整块，最要紧）</h4>
+      <p><b>一、分类筛选枚穿实色之后，选中态怎么区分。</b>这版画的是：未选中 = 该分类实色底 + 配好的字色；选中 = 纸白底 + 该色字 + 该色描边。反过来（选中的更饱和、未选中的淡一档）也成立，但淡一档就又回到"寡淡"。<b>我按前者画的。</b></p>
+      <p><b>二、墨黑那一档怎么不被当成"没上色"。</b>他那三条真笔记现在都在未分类，点全是墨黑，看上去还是灰的。要么给未分类也换一支色，要么就是让他把这几条归个类。<b>我倾向后者</b>（不改色板，界面上未分类那枚点本来就该长得不一样——现网深色壁纸下它已经是空心环）。</p>
+      <p><b>三、展开态那条色带要不要。</b>标题下面那条 8 高的分类色带是这一稿新加的，作用是"这一张属于哪一类"在放大态里也说得清。嫌多就撤，撤了标题前那个点还在。</p></div>
+    <div class="blk2"><h4>落地要动的地方（先说清，等你拍完再动）</h4>
+      <p>接口不用改：<code>/api/notes</code> 已经按 <code>is_pinned</code> 倒序回，<code>/api/categories</code> 已经带 <code>id</code>。色这一头，分类枚和圆点都从 <code>toneFor(id)</code> 取原色（现网列表那枚点取的是 <code>catSkinFor</code> 的加深档，见上面那一整块），文字仍走 <code>catSkinFor.text</code>。前端把"当前下标"放进 data，列表从全量 <code>wx:for</code> 改成按下标取 7 条渲染，压叠用 <code>position:absolute</code> + <code>z-index</code> + <code>transform:scale()</code>。上下滑用 <code>bindtouchstart/touchend</code> 判方向。<b>唯一动到取数逻辑的是分页</b>：现在一页 50 条往下滚，堆叠形态要改成滑到倒数第二条时提前取下一页。</p>
+      <p>另外一条现网事实要说清：分类色现在是<b>按分类 id 取模</b>分配的（<code>toneFor</code>），不是每个分类固定一支。所以"旅游永远是草绿"这句话要落地，得把 id→色 存成一条固定映射，否则他删一个分类，后面所有分类的颜色都会挪位。这一条是这一稿带出来的真问题，等你点头再改。</p></div>
+  </div>`
+
+const flow = document.getElementById('flow')
+flow.innerHTML =
+  UNIT('①', '默认态 · 一屏看得见 7 条，靠中心的压住靠外的', '中心这张是当前的；上下各三条折叠收在后面，只露一行标题，前边框实压在前一张上。圆点带分类色，和上面那排筛选枚同一支。', S1(L.zh))
+  + UNIT('②', '点中间这张 → 放大看完整', '后面的整叠淡掉，这张按内容放大：分类色带、摘要、核心要点、标签、来源链接都在里面。不铺满整屏，是为了让照片还在，也不拿假留白去填。再点一下收回原位。', S2(L.zh, NOTES[3]))
+  + UNIT('③', '上下滑切换中（半格那一瞬）', '整叠往上走半格：当前这张往上退、缩一点、变淡；下面那条从底下盖上来，正在长大成中心卡。点上下那两条也能直接切过去。', S3(L.zh))
+  + UNIT('④', '默认态 · 英文', '同一屏的英文那一版。提示行那两句字典里没有，是这一版要新增的串。', S1(L.en))
+  + `<div class="unit"><div class="cap"><span class="step">标注</span><h3>四件事怎么改的、色从哪来、三处待拍</h3><p>尺寸按现网令牌；分类六支色现取 palette.js；屏上每一句中文都标了是现网字典里的还是新造的。</p></div>
+     <div class="ph doc">${DOC}</div></div>`
+</script>
+</body>
+</html>

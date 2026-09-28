@@ -1,6 +1,7 @@
 """渲染"笔记列表 · 堆叠卡"那版效果图：headless Chrome 出图 → 按内容裁边 → 存同名 PNG。
 
-用法：python3 docs/工具/画-堆叠卡效果图.py
+用法：python3 docs/工具/画-堆叠卡效果图.py [文件名.html]
+不写文件名就是 v1 那版；渲染哪版就存成同名 PNG，两版各自留档。
 裁边判据抄 画-效果图对实测.py：body 底色是 #DEDDD8，最底一行还是底色才说明窗口给够了高度；
 不够会打印一句提醒，而不是默默把最后一屏切掉。
 """
@@ -10,11 +11,13 @@ import sys
 from PIL import Image
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-HTML = os.path.join(ROOT, 'docs/design/笔记列表-堆叠卡/堆叠卡-中英双版.html')
-OUT = os.path.join(ROOT, 'docs/design/笔记列表-堆叠卡/堆叠卡-中英双版.png')
+DIR = os.path.join(ROOT, 'docs/design/笔记列表-堆叠卡')
+NAME = sys.argv[1] if len(sys.argv) > 1 else '堆叠卡-中英双版.html'
+HTML = os.path.join(DIR, NAME)
+OUT = os.path.join(DIR, os.path.splitext(NAME)[0] + '.png')
 CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 BODY_BG = (222, 221, 216)
-W, H = 2460, 6200
+W, H = 2460, 8000
 
 subprocess.run([CHROME, '--headless', '--disable-gpu', '--hide-scrollbars',
                 '--force-device-scale-factor=1', '--allow-file-access-from-files',
