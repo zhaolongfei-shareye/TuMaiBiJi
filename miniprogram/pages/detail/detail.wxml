@@ -2,19 +2,12 @@
   <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
   <view wx:elif="{{note}}" class="detail-wrapper">
-    <!-- 头部方块：颜色和构图与列表里那条完全一致（同一套 blockSkinFor） -->
-    <view class="card row hero">
-      <view class="blk tall" style="{{note.blockStyle}}">
-        <text class="blk-name">{{note.blockName}}</text>
-        <text class="blk-date">{{note.date_label}}</text>
-        <view class="motif {{note.motif}}"></view>
-      </view>
-      <view class="blk-body">
-        <view class="hero-meta">{{note.source_type_label}} · {{note.created_at_label}}</view>
-        <view class="hero-title">{{note.title}}</view>
-        <view class="tags" wx:if="{{note.tags && note.tags.length}}">
-          <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
-        </view>
+    <!-- 抬头：v4 那条口径——详情页不要色彩方块，纯文字抬头 -->
+    <view class="card hero-flat">
+      <view class="hero-meta">{{note.source_type_label}} · {{note.created_at_label}}</view>
+      <view class="hero-title">{{note.title}}</view>
+      <view class="tags" wx:if="{{note.tags && note.tags.length}}">
+        <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
       </view>
     </view>
 

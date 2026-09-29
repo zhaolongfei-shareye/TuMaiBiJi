@@ -14,6 +14,11 @@
   padding: var(--sp-4);
 }
 
+/* v4 那条口径：详情页不要色彩方块，纯文字抬头 */
+.hero-flat {
+  padding: var(--sp-4);
+}
+
 .hero-meta {
   font-size: var(--fs-tiny);
   font-weight: 800;
