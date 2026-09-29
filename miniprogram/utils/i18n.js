@@ -410,7 +410,9 @@ const i18n = {
     originalContent: 'Original Content',
     expand: 'Expand',
     collapse: 'Collapse',
-    shareAsImage: 'Generate note card',
+    // 四枚并排一行，英文必须短：Generate note card 会折成两行。
+    // 与同排的 Pin / Edit / Delete 同一个语法：动词 + 名词。
+    shareAsImage: 'Make card',
     editNote: 'Edit note',
     titlePlaceholder: 'Enter note title',
     summaryPlaceholder: 'Enter summary...',

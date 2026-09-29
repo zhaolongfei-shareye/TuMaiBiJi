@@ -431,6 +431,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 一行四枚，谁都不许折行：折一行这排按钮就高低不齐了。
+     英文文案因此必须短（Make card，不是 Generate note card）。 */
+  white-space: nowrap;
   font-size: var(--fs-meta);
   font-weight: 700;
   color: #23252C;

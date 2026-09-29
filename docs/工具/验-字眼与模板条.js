@@ -213,8 +213,10 @@ const txt = async (els) => {
     page = await mp.reLaunch(`/pages/detail/detail?id=${noteId}`)
     await sleep(2000)
     const barBtns = (await txt(await page.$$('.action-bar .icon-btn'))).join('|')
-    ck('详情页上方一排四枚，末枚＝「生成笔记卡片」',
-      barBtns === '置顶|编辑|删除|生成笔记卡片', barBtns || '没找到 .action-bar .icon-btn')
+    // 期望值从这一屏自己那份 t 里取：账号切了英文也不会把这条尺子判成假红
+    const tt = await page.data('t')
+    const want = [tt.pin, tt.edit, tt.delete, tt.shareAsImage].join('|')
+    ck('详情页上方一排四枚，末枚就是 shareAsImage 那颗', barBtns === want, `${barBtns} ≠ ${want}`)
     ck('文末不再有底部操作区', !(await page.$('.bottom-actions')))
     await mp.screenshot({ path: `${SHOT}/c6-详情页.png` })
   } catch (err) {
