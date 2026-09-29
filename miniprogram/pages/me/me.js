@@ -2,8 +2,7 @@ const app = getApp()
 const api = require('../../utils/api.js')
 const poster = require('../../utils/poster.js')
 const { t, texts } = require('../../utils/i18n.js')
-
-const CONTACT_EMAIL = 'jacky28471258@gmail.com'
+const { CONTACT_EMAIL } = require('../../utils/contact.js')
 
 // {n} 这类占位由服务端给的数字填，界面里不自己写死额度规则
 function fmt(tpl, map) {
@@ -20,6 +19,11 @@ Page({
     quotaText: '',
     shareValue: '',
     profileSummary: '',
+    // 私密密码：设没设只吃服务端读数；面板两格输入，第二次要和第一次对得上
+    privateSet: false,
+    pwdPanel: false,
+    pwd1: '',
+    pwd2: '',
   },
 
   onShow() {
@@ -43,6 +47,7 @@ Page({
       this.getTabBar().setData({ selected: 2 })
     }
     this.loadQuota()
+    this.loadPwdStatus()
   },
 
   // 额度和邀请进度都读这一个接口：数字只有一个来源，页面不再自己算 100。
@@ -86,27 +91,67 @@ Page({
     })
   },
 
-  onSetPrivatePassword() {
+  onOpenPwdPanel() {
+    this.setData({ pwdPanel: true, pwd1: '', pwd2: '' })
+  },
+
+  onClosePwdPanel() {
+    this.setData({ pwdPanel: false, pwd1: '', pwd2: '' })
+  },
+
+  onPwdInput1(e) { this.setData({ pwd1: e.detail.value }) },
+  onPwdInput2(e) { this.setData({ pwd2: e.detail.value }) },
+
+  // 两格都过一遍"6 位数字"，再比一致；不一致就一个字节都不发，第二格清空让人重输。
+  async onPwdSave() {
+    const { pwd1, pwd2, lang } = this.data
+    if (!/^\d{6}$/.test(pwd1)) {
+      wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
+      return
+    }
+    if (pwd1 !== pwd2) {
+      this.setData({ pwd2: '' })
+      wx.showToast({ title: t('privatePasswordMismatch', lang), icon: 'none' })
+      return
+    }
+    try {
+      await api.setPrivatePassword(pwd1)
+      this.setData({ pwdPanel: false, pwd1: '', pwd2: '', privateSet: true })
+      wx.showToast({ title: t('privatePasswordSaved', lang), icon: 'success' })
+    } catch (err) {
+      wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })
+    }
+  },
+
+  // 重置只清密码这一列，笔记和分类一个字不动；清完面板留着，下一步就是重新设一条。
+  onPwdReset() {
     const { lang } = this.data
     wx.showModal({
-      title: t('privatePassword', lang),
-      editable: true,
-      placeholderText: t('privatePasswordHint', lang),
+      title: t('privatePasswordReset', lang),
+      content: t('privatePasswordResetBody', lang),
+      confirmText: t('privatePasswordResetConfirm', lang),
+      cancelText: t('cancel', lang),
       success: async (res) => {
         if (!res.confirm) return
-        const pwd = (res.content || '').trim()
-        if (!/^\d{6}$/.test(pwd)) {
-          wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
-          return
-        }
         try {
-          await api.setPrivatePassword(pwd)
-          wx.showToast({ title: t('privatePasswordSet', lang), icon: 'success' })
+          await api.resetPrivatePassword()
+          this.setData({ privateSet: false, pwd1: '', pwd2: '' })
+          wx.showToast({ title: t('privatePasswordResetDone', lang), icon: 'none' })
         } catch (err) {
           wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })
         }
       },
     })
+  },
+
+  // 设没设只认服务端那一条：本机记一份"已设置"会在换设备后说谎。
+  async loadPwdStatus() {
+    try {
+      const s = await api.getPrivatePasswordStatus()
+      this.setData({ privateSet: !!(s && s.is_set) })
+    } catch (err) {
+      console.error('私密密码状态读取失败', err)
+    }
   },
 
   // 分享卡片固定落在新建页（新用户第一眼就是那三个色块），并带上邀请人 id。

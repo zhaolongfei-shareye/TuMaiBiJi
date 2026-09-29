@@ -68,6 +68,13 @@
   background: var(--danger-soft);
 }
 
+/* 第四枚「生成笔记卡片」宽一点：六个字压在等宽的一枚里会顶到边 */
+.icon-btn.primary {
+  flex: 1.4;
+  background: var(--accent);
+  color: var(--bg-page);
+}
+
 /* 中性面板：长文本在这里读 */
 .panel {
   background: var(--bg-card);
@@ -161,30 +168,14 @@
   word-break: break-all;
 }
 
-.bottom-actions {
-  padding: var(--sp-3) 0 var(--sp-6);
-}
-
-.btn-share {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-1);
-  background: var(--accent);
-  color: var(--bg-page);
-  border-radius: var(--r-pill);
-  font-size: var(--fs-body);
-  font-weight: 700;
-  padding: var(--sp-3) 0;
-}
-
-/* 已公开那一行：小字说明 + 一个文字按钮，不跟主按钮抢位置 */
+/* 已公开那一行：小字说明 + 一个文字按钮，不跟主按钮抢位置。
+   它现在紧跟操作条（条自带下间距），所以自己不再加上间距。 */
 .share-state {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-  margin-top: var(--sp-3);
+  margin-top: 0;
   font-size: var(--fs-meta);
   line-height: var(--lh-body);
   color: var(--text-tertiary);

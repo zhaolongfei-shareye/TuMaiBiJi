@@ -77,8 +77,11 @@ const gHere = (gradOf(wxssRaw) || '').replace(/\s+/g, ' ').trim()
 const gThere = (gradOf(createWxss) || '').replace(/\s+/g, ' ').trim()
 ok('压暗那一串和新建页逐字相同', !!gHere && gHere === gThere,
   `${gHere.slice(0, 34)}… vs ${gThere.slice(0, 34)}…`)
+// 口径是"那个叫 .sheet 的类整个没了"，不是"不许出现 sheet 这串字母"——
+// v7 之后的浮窗类叫 .float-sheet / .tpl-sheet，跟"纸"那个类无关。
 ok('列表那一层不再自称"纸"（.sheet 这个类整个没了）',
-  !/sheet/.test(wxml + wxssRaw), (wxml.match(/sheet/g) || []).join(','))
+  !/\.sheet(?![\w-])/.test(wxml + wxssRaw),
+  (wxssRaw.match(/\.[\w-]*sheet\w*/g) || []).join(','))
 ok('列表层只剩层序，自己不画任何面（一条笔记一个框）',
   !/(?:^|\n)\.list-layer\s*\{/.test(wxss)
   && !/\.container\.has-bg \.list-layer\s*\{[^}]*(background|border)/.test(wxss))
@@ -92,13 +95,23 @@ ok('翻的是变量不是逐条覆盖（子元素一条都不用改）',
   !/\.container\.has-bg \.sc-input\s*\{/.test(wxss) && !/\.container\.has-bg \.sc-go\s*\{/.test(wxss))
 ok('搜索条在图上有一条投影，和录入胶囊同档',
   /box-shadow: 0 18rpx 46rpx rgba\(8, 10, 14, 0\.42\)/.test(cardBg))
-const chipIdle = seg(wxss, '.container.has-bg .chip')
-ok('未选中的分类 chip 在图上垫一层暗玻璃',
+// 09-30 起暗玻璃那一态只管「全部」那一枚（.chip.all）：分类那几枚穿自己的分类色，
+// 再压一层暗玻璃等于把整排分类身份洗掉（站长原话"分类按钮是有颜色的"）。
+const chipIdle = seg(wxss, '.container.has-bg .chip.all')
+ok('「全部」那枚在图上垫一层暗玻璃',
   /background: rgba\(18, 20, 26, 0\.42\)/.test(chipIdle) && /color: #f2efe9/.test(chipIdle))
 ok('描边用 inset，不会把 56 那一档撑高', /box-shadow: inset 0 0 0 var\(--w-edge\)/.test(chipIdle))
-ok('选中的 chip 换成纸白、并撤掉那圈 inset',
-  /background: #f2efe9/.test(seg(wxss, '.container.has-bg .chip.active'))
-  && /box-shadow: none/.test(seg(wxss, '.container.has-bg .chip.active')))
+ok('选中的「全部」换成纸白、并撤掉那圈 inset',
+  /background: #f2efe9/.test(seg(wxss, '.container.has-bg .chip.all.active'))
+  && /box-shadow: none/.test(seg(wxss, '.container.has-bg .chip.all.active')))
+const chipTone = seg(wxss, '.chip.tone')
+ok('分类 chip 吃自己的分类色一对（底与字都来自 toneVars）',
+  /background: var\(--tone-bg\)/.test(chipTone) && /color: var\(--tone-ink\)/.test(chipTone))
+ok('铺图那一态不再有一条通吃所有 chip 的暗玻璃（那会把分类色洗掉）',
+  !/^\.container\.has-bg \.chip\s*\{/m.test(wxss))
+ok('分类 chip 选中那枚反过来：纸白底 + 该色字 + 该色描边',
+  /color: var\(--tone-bg\)/.test(seg(wxss, '.chip.tone.active'))
+  && /box-shadow: inset 0 0 0 var\(--w-edge\) var\(--tone-bg\)/.test(seg(wxss, '.chip.tone.active')))
 ok('页头两行是纸白，档位抄新建页那两行',
   /color: rgba\(242, 239, 233, 0\.96\)/.test(seg(wxss, '.container.has-bg .page-title'))
   && /color: rgba\(242, 239, 233, 0\.95\)/.test(seg(wxss, '.container.has-bg .page-stats')))

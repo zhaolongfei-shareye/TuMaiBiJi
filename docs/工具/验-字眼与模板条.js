@@ -208,11 +208,14 @@ const txt = async (els) => {
         ? `十张尺寸 ${b1.key}，整排 top ${Math.round(pos0.top)}→${Math.round(pos1.top)}`
         : [!sameSize && `尺寸 ${boxes0} → ${b1.key}`, !samePlace && `位子 top ${Math.round(pos0.top)}→${Math.round(pos1.top)} 高 ${pos0.h}→${pos1.h}`, !sameName && `名字 ${pickLabels.join('|')} → ${labels1}`].filter(Boolean).join('；'))
 
-    // 「转为笔记卡片」这个按钮在详情页上
+    // 「生成笔记卡片」这枚在详情页**上方那一排**（09-30：改名 + 并排 + 全部功能搬上文，
+    // 原来它是一枚通栏 .btn-share 落在长文末尾，要滚到底才看得见）
     page = await mp.reLaunch(`/pages/detail/detail?id=${noteId}`)
     await sleep(2000)
-    const shareBtn = (await txt(await page.$$('.btn-share'))).join('|')
-    ck('详情页按钮＝「转为笔记卡片」', shareBtn === '转为笔记卡片', shareBtn || '没找到 .btn-share')
+    const barBtns = (await txt(await page.$$('.action-bar .icon-btn'))).join('|')
+    ck('详情页上方一排四枚，末枚＝「生成笔记卡片」',
+      barBtns === '置顶|编辑|删除|生成笔记卡片', barBtns || '没找到 .action-bar .icon-btn')
+    ck('文末不再有底部操作区', !(await page.$('.bottom-actions')))
     await mp.screenshot({ path: `${SHOT}/c6-详情页.png` })
   } catch (err) {
     ck('过程未抛异常', false, String((err && err.message) || err))

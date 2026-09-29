@@ -2,6 +2,7 @@ const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { toneStyle } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
+const { allowPrivate } = require('../../utils/privateGate.js')
 
 // 链接规范：必须有协议头、主机名里要有顶级域、整串不能出现空白。
 // 之前只判"以 http 开头且某处有个点"，`https://a.com 后面还有字` 和 `http:///a.b` 都能过，
@@ -185,9 +186,11 @@ Page({
     }
   },
 
-  onPickCategory(e) {
+  async onPickCategory(e) {
     const i = Number(e.detail.value)
     if (!(i >= 0)) return
+    // 私密分类要先设密码才让选；挡下时不改 catIndex，那一行显示的还是原来那格
+    if (!(await allowPrivate(this.data.categoryNames[i], this.data.lang))) return
     this.setData({ catIndex: Math.min(i, Math.max(this.data.categoryNames.length - 1, 0)) })
   },
 

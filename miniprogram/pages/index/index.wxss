@@ -448,18 +448,13 @@
   box-shadow: inset 0 0 0 var(--w-edge) rgba(140, 33, 25, 0.24);
 }
 
-.ds-pbtn {
-  margin-top: 16rpx;
-  height: 96rpx;
-  border-radius: var(--r-pill);
+/* 第四枚「生成笔记卡片」比另三枚宽一点：六个字压在一枚里，等宽就顶到边。
+   站长 09-30 拍的四枚并排，覆盖效果图 v3-v7 那版"通栏 96 高"的画法。 */
+.ds-ibtn.primary {
+  flex: 1.4;
   background: #23252C;
   color: #F2EFE9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--fs-title);
-  font-weight: 800;
-  letter-spacing: -0.4rpx;
+  box-shadow: none;
 }
 
 .ds-pub {
@@ -731,15 +726,31 @@
   box-shadow: 0 18rpx 46rpx rgba(8, 10, 14, 0.42);
 }
 
+/* 分类筛选：v2 起每枚穿自己分类的实色（站长原话"分类底图也用不同颜色"）。
+   底与字成对吃 toneVars 的 --tone-bg/--tone-ink——这一对是 palette 里配好对比度的组合，
+   黄/橙/绿是深字、蓝/紫是纸白字，不写死白字。选中那枚反过来：纸白底、该色字、该色描边。 */
+.chip.tone {
+  background: var(--tone-bg);
+  color: var(--tone-ink);
+}
+
+.chip.tone.active {
+  background: var(--bg-card);
+  color: var(--tone-bg);
+  box-shadow: inset 0 0 0 var(--w-edge) var(--tone-bg);
+}
+
 /* 分类筛选：未选中那几枚在图上要有一层暗玻璃垫着才读得清，选中那枚换成纸白。
-   描边用 inset 而不是 border——border 会把 56 那一档撑成 62，chips 整排会往下跳。 */
-.container.has-bg .chip {
+   描边用 inset 而不是 border——border 会把 56 那一档撑成 62，chips 整排会往下跳。
+   这一态只管「全部」那枚（它没有自己的色）；分类那几枚照旧吃实色，
+   再压一层暗玻璃等于把整排分类身份洗掉。 */
+.container.has-bg .chip.all {
   background: rgba(18, 20, 26, 0.42);
   color: #f2efe9;
   box-shadow: inset 0 0 0 var(--w-edge) rgba(242, 239, 233, 0.30);
 }
 
-.container.has-bg .chip.active {
+.container.has-bg .chip.all.active {
   background: #f2efe9;
   color: #23252c;
   box-shadow: none;

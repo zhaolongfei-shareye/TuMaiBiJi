@@ -44,6 +44,15 @@
       <text class="menu-label">{{t.wallpaper}}</text>
       <text class="menu-arrow">›</text>
     </view>
+    <!-- 私密密码紧跟外观设置：两条都是"这台手机上的我的设置"，
+         原来排在邮箱下面，跟"关于/反馈邮箱/注销"那组混在一起不好找。 -->
+    <view class="menu-item" bindtap="onOpenPwdPanel">
+      <text class="menu-label">{{t.privatePassword}}</text>
+      <view class="menu-right">
+        <text class="menu-value">{{privateSet ? t.privatePasswordSet : t.privatePasswordNotSet}}</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
   </view>
 
   <view class="menu-group card">
@@ -58,15 +67,40 @@
         <text class="menu-arrow">›</text>
       </view>
     </view>
-    <view class="menu-item" bindtap="onSetPrivatePassword">
-      <text class="menu-label">{{t.privatePassword}}</text>
-      <view class="menu-right">
-        <text class="menu-arrow">›</text>
-      </view>
-    </view>
     <view class="menu-item menu-danger" bindtap="onDeleteAccount">
       <text class="menu-label">{{t.deleteAccount}}</text>
       <text class="menu-arrow">›</text>
     </view>
+  </view>
+
+  <!-- 私密密码面板：自绘两层，不用 wx.showModal(editable)——
+       那条只有一个输入框、数字明文可见，也没有"再输一次"的位置。 -->
+  <view wx:if="{{pwdPanel}}" class="pwd-mask" bindtap="onClosePwdPanel"></view>
+  <view wx:if="{{pwdPanel}}" class="pwd-sheet card">
+    <view class="pwd-title">{{t.privatePassword}}</view>
+    <view class="pwd-hint">{{t.privatePasswordHint}}</view>
+    <input
+      class="pwd-input"
+      type="number"
+      maxlength="6"
+      password="{{true}}"
+      value="{{pwd1}}"
+      placeholder="{{t.privatePasswordNew}}"
+      placeholder-class="pwd-ph"
+      bindinput="onPwdInput1"
+    />
+    <input
+      class="pwd-input"
+      type="number"
+      maxlength="6"
+      password="{{true}}"
+      value="{{pwd2}}"
+      placeholder="{{t.privatePasswordAgain}}"
+      placeholder-class="pwd-ph"
+      bindinput="onPwdInput2"
+    />
+    <view class="pwd-save" bindtap="onPwdSave">{{t.privatePasswordOk}}</view>
+    <view wx:if="{{privateSet}}" class="pwd-reset" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
+    <view class="pwd-cancel" bindtap="onClosePwdPanel">{{t.cancel}}</view>
   </view>
 </view>

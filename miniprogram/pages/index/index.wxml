@@ -35,14 +35,14 @@
   <scroll-view class="category-scroll" scroll-x show-scrollbar="{{false}}">
     <view class="category-chips">
       <view 
-        class="chip {{selectedCategory === null ? 'active' : ''}}"
+        class="chip all {{selectedCategory === null ? 'active' : ''}}"
         bindtap="selectCategory"
         data-id="{{null}}"
       >
         {{t.allCategories}}
       </view>
       <view 
-        class="chip {{selectedCategory === item.id ? 'active' : ''}}"
+        class="chip tone {{selectedCategory === item.id ? 'active' : ''}}"
         wx:for="{{categories}}"
         wx:key="id"
         bindtap="selectCategory"
@@ -153,15 +153,16 @@
       </view>
     </scroll-view>
 
-    <!-- 动作条：三枚成行 + 通栏「转为笔记卡片」+ 那行公开状态。
-         私密笔记这一整块不给转卡片，也不给撤掉分享（与详情页同一条口径）。 -->
+    <!-- 动作条：四枚并排一行（站长 09-30 拍的，覆盖 v3-v7 效果图上"通栏一枚"的画法）。
+         「转为笔记卡片」改名「生成笔记卡片」——原名让人以为点完详情页就没了。
+         私密笔记那枚不渲染，剩下三枚自动等宽；也不给公开状态那一行。 -->
     <view class="ds-dock">
       <view class="ds-irow">
         <view class="ds-ibtn {{detailNote.is_pinned ? 'on' : ''}}" catchtap="onSheetPin">{{detailNote.is_pinned ? t.unpin : t.pin}}</view>
         <view class="ds-ibtn" catchtap="onSheetEdit">{{t.edit}}</view>
         <view class="ds-ibtn danger" catchtap="onSheetDelete">{{t.delete}}</view>
+        <view wx:if="{{!detailNote.is_private}}" class="ds-ibtn primary" catchtap="onSheetToPoster">{{t.shareAsImage}}</view>
       </view>
-      <view wx:if="{{!detailNote.is_private}}" class="ds-pbtn" catchtap="onSheetToPoster">{{t.shareAsImage}}</view>
       <view wx:if="{{shared && !detailNote.is_private}}" class="ds-pub">
         <text class="ds-pub-l">{{t.sharedNow}}</text>
         <text class="ds-pub-act" catchtap="onSheetUnshare">{{t.unshare}}</text>

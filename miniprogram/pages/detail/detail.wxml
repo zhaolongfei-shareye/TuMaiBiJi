@@ -11,13 +11,21 @@
       </view>
     </view>
 
-    <!-- 操作条单独一排：压在头卡里会和标题抢位置 -->
+    <!-- 操作条：四枚并排一行，全部钉在文档上方（站长 09-30："详情页所有功能都要在文档上方而不是下方"）。
+         原来「生成笔记卡片」和公开状态那两行落在长文末尾，得滚到底才看得见。
+         私密笔记那枚不给，公开状态那行也不给（与列表详情窗同一条口径）。 -->
     <view class="action-bar">
       <view class="icon-btn {{note.is_pinned ? 'on' : ''}}" bindtap="togglePin">
         <text>{{note.is_pinned ? t.unpin : t.pin}}</text>
       </view>
       <view class="icon-btn" bindtap="onEdit">{{t.edit}}</view>
       <view class="icon-btn danger" bindtap="onDelete">{{t.delete}}</view>
+      <view wx:if="{{!note.is_private}}" class="icon-btn primary" bindtap="onShare">{{t.shareAsImage}}</view>
+    </view>
+    <!-- 海报上的码不过期，所以这一行是用户唯一能把已公开内容收回来的入口；只在真的公开着时出现 -->
+    <view wx:if="{{shared && !note.is_private}}" class="share-state">
+      <text class="state-hint">{{t.sharedNow}}</text>
+      <text class="state-act" bindtap="onUnshare">{{t.unshare}}</text>
     </view>
 
     <!-- 长文本一律回中性卡：方块只承担"这一条是什么"，不承担阅读 -->
@@ -60,14 +68,5 @@
       <text class="import-hint">{{t.importedFromHint}}</text>
     </view>
 
-    <!-- 底部操作 -->
-    <view class="bottom-actions">
-      <view wx:if="{{!note.is_private}}" class="btn-share" bindtap="onShare">{{t.shareAsImage}}</view>
-      <!-- 海报上的码不过期，所以这一行是用户唯一能把已公开内容收回来的入口；只在真的公开着时出现 -->
-      <view wx:if="{{shared && !note.is_private}}" class="share-state" bindtap="onUnshare">
-        <text class="state-hint">{{t.sharedNow}}</text>
-        <text class="state-act">{{t.unshare}}</text>
-      </view>
-    </view>
   </view>
 </view>

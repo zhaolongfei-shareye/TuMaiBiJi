@@ -1,7 +1,7 @@
 const { t, texts } = require('../../utils/i18n.js')
 const { toneStyle } = require('../../utils/palette.js')
 
-const CONTACT_EMAIL = 'jacky28471258@gmail.com'
+const { CONTACT_EMAIL } = require('../../utils/contact.js')
 const OFFICIAL_ACCOUNT = '杰克AI日记'
 // 官网地址以站点自己的 canonical 为准（curl 读到的 <link rel=canonical> 是不带 www 的那个）。
 // 只能复制、点不开：web-view 组件个人主体用不了，小程序里打不开外部网页。

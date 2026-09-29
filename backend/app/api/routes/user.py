@@ -145,6 +145,16 @@ def verify_private_password(
     return {"ok": True}
 
 
+@router.post("/private-password/reset")
+def reset_private_password(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 不校验旧密码：能拿到这条接口的前提是 Bearer token 有效，而拿得到 token 的人
+    # 本来就能直接删掉整篇笔记——密码只防"手机在别人手里时被人翻开"，不防 token。
+    # 重置只清那一列，笔记与分类一个字不动；清完要重新输两遍才再上锁。
+    user.private_password_hash = None
+    db.commit()
+    return {"ok": True, "is_set": False}
+
+
 @router.post("/deactivate")
 @limiter.limit("5/minute")
 def deactivate_account(

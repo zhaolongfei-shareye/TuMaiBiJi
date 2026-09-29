@@ -2,6 +2,7 @@ const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { catSkinFor, chromeOf, toneVars, withAlpha } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
+const { isPrivate } = require('../../utils/privateGate.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 
 // 统计看板一次读多少条：后端 /api/notes 的 limit 上限就是 100，写不了更大。
@@ -184,8 +185,8 @@ Page({
       // 它明明归了类，只是这一批分类数据里没它。
       n.catLabel = n.category_id == null ? this.data.t.noCategory : (nameOf[n.category_id] || '')
       n.tagLine = (n.tags || []).join(' / ')
-      // 私密判据：分类名等于"私密"。跟后端 get_note 是同一条口径，两处一致。
-      n.is_private = !!(n.category_id != null && nameOf[n.category_id] === '私密')
+      // 私密判据：分类名等于"私密"。跟后端 get_note、录入侧那道拦截是同一条口径（utils/privateGate.js）。
+      n.is_private = isPrivate(nameOf[n.category_id])
     })
     return notes
   },

@@ -119,3 +119,90 @@
 .container {
   padding-bottom: 140rpx;
 }
+
+/* ---------- 私密密码面板 ----------
+   自绘两层，不用 wx.showModal(editable)：那条只有一个输入框、数字明文，
+   也没有"再输一次"的位置。这一页没铺背景图，遮罩按常规压暗一档就够。 */
+.pwd-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(18, 20, 26, 0.55);
+  z-index: 100;
+}
+
+.pwd-sheet {
+  position: fixed;
+  left: 48rpx;
+  right: 48rpx;
+  top: 200rpx;
+  z-index: 101;
+  padding: 40rpx 40rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.pwd-title {
+  font-size: var(--fs-title);
+  font-weight: 800;
+  letter-spacing: -0.5rpx;
+  color: var(--text-primary);
+}
+
+.pwd-hint {
+  margin-top: 10rpx;
+  font-size: var(--fs-meta);
+  color: var(--text-secondary);
+}
+
+.pwd-input {
+  margin-top: 28rpx;
+  height: 88rpx;
+  font-size: var(--fs-body);
+  letter-spacing: 6rpx;
+  color: var(--text-primary);
+  border-bottom: var(--w-edge) solid var(--card-edge);
+}
+
+.pwd-ph {
+  color: var(--text-tertiary);
+  letter-spacing: 0;
+}
+
+.pwd-save {
+  margin-top: 40rpx;
+  height: 96rpx;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--bg-page);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-title);
+  font-weight: 800;
+}
+
+.pwd-reset {
+  margin-top: 20rpx;
+  height: 80rpx;
+  border-radius: var(--r-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--danger);
+  box-shadow: inset 0 0 0 var(--w-edge) var(--danger-soft);
+}
+
+.pwd-cancel {
+  margin-top: 12rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-meta);
+  color: var(--text-tertiary);
+}

@@ -195,4 +195,7 @@ module.exports = {
   updateLanguage: (language) => request('/api/user/language', 'PUT', { language }),
   setPrivatePassword: (password) => request('/api/user/private-password', 'PUT', { password }),
   verifyPrivatePassword: (password) => request('/api/user/private-password/verify', 'POST', { password }),
+  getPrivatePasswordStatus: () => request('/api/user/private-password'),
+  // 重置走 POST 不走 DELETE：与注销那条同一条理由——动作要在服务端日志里看得见实体。
+  resetPrivatePassword: () => request('/api/user/private-password/reset', 'POST', {}),
 }

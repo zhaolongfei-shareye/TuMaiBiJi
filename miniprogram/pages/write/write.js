@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
+const { allowPrivate } = require('../../utils/privateGate.js')
 
 Page({
   data: {
@@ -106,9 +107,14 @@ Page({
     this.setData({ tagList, tagsText: tagList.join(', ') })
   },
 
-  onCategoryChange(e) {
+  async onCategoryChange(e) {
     const idx = parseInt(e.detail.value)
-    this.setData({ selectedCategoryIndex: idx === 0 ? -1 : idx - 1 })
+    const next = idx === 0 ? -1 : idx - 1
+    const name = next >= 0 ? (this.data.categories[next] || {}).name : ''
+    // 私密分类要先设密码才让选；被挡下时不改 selectedCategoryIndex，
+    // 界面上那一行还是原来那格，不会出现"提示没设密码、分类却已经变了"。
+    if (!(await allowPrivate(name, this.data.lang))) return
+    this.setData({ selectedCategoryIndex: next })
   },
 
   onCancel() {
