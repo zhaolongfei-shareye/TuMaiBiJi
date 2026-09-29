@@ -248,7 +248,7 @@ const i18n = {
   en: {
     tabNotes: 'Notes',
     tabCreate: 'Create',
-    createHeading: "Save what's worth saving",
+    createHeading: 'Save what matters',
     tabMe: 'Me',
     appName: 'TuMaiBiJi',
     navCreate: 'New note',
@@ -277,7 +277,9 @@ const i18n = {
     importUrl: 'URL link',
     importScreenshot: 'Photo or screenshot',
     writeNote: 'Write it myself',
-    barIdle: 'Tap and jot',
+    // 英文不翻"动动手指"——直译成 Tap and jot 没人这么说。这一屏旁边就是拍照/相册/链接
+    // 三枚图标，动词只留一个就够；同排的 Paste a link / Photo or screenshot 都是平实祈使句。
+    barIdle: 'Jot it down',
     barUrl: 'Paste a link',
     barShot: '{n} picked',
     barCollapse: 'Tap outside to close',
