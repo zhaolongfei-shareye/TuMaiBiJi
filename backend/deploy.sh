@@ -92,7 +92,7 @@ engine = create_engine(settings.DATABASE_URL)
 insp = inspect(engine)
 cols = {c["name"] for c in insp.get_columns("users")}
 tables = set(insp.get_table_names())
-missing = sorted({"quota_bonus", "invited_by", "generation"} - cols)
+missing = sorted({"quota_bonus", "invited_by", "generation", "private_password_hash"} - cols)
 if "invitations" not in tables:
     missing.append("invitations 表")
 if missing:
