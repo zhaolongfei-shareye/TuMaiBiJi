@@ -67,14 +67,16 @@
     </view>
 
     <!-- 笔记列表：一条笔记 = 一张描边行卡。D2 把左侧那块 176 方块撤了，
-         分类身份退到 meta 行最前面的一枚点 + 分类名（颜色仍由 palette 派生）。 -->
+         分类身份退到 meta 行最前面的一枚点 + 分类名（颜色仍由 palette 派生）。
+         v5+v6 手风琴：一次开一条；展开行的画法照 v3 中心卡（36 号粗标题 + 4 行概要 +
+         脚注 + 操作条），私密笔记展开前弹密码。展开即详情，不再跳独立详情页。 -->
     <view wx:else class="notes-list">
       <view
-        class="card note-row"
+        class="card note-row {{openIdx === index ? 'open' : ''}}"
         wx:for="{{notes}}"
         wx:key="id"
-        bindtap="goToDetail"
-        data-id="{{item.id}}"
+        bindtap="onRowTap"
+        data-idx="{{index}}"
       >
         <view class="row-title">
           <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
@@ -93,6 +95,13 @@
           </block>
           <text class="dt">{{item.date_label}}</text>
           <text class="chev">›</text>
+        </view>
+        <!-- 展开态才出现的操作条；catchtap 让点它不冒泡回 onRowTap（否则一点就收起） -->
+        <view class="row-actions" wx:if="{{openIdx === index}}" catchtap="noop">
+          <view class="act-btn {{item.is_pinned ? 'on' : ''}}" catchtap="onRowTogglePin" data-idx="{{index}}">{{item.is_pinned ? t.unpin : t.pin}}</view>
+          <view class="act-btn" catchtap="onRowEdit" data-idx="{{index}}">{{t.edit}}</view>
+          <view class="act-btn danger" catchtap="onRowDelete" data-idx="{{index}}">{{t.del}}</view>
+          <view class="act-btn primary" wx:if="{{!item.is_private}}" catchtap="onRowShare" data-idx="{{index}}">{{t.shareAsImage}}</view>
         </view>
       </view>
     </view>

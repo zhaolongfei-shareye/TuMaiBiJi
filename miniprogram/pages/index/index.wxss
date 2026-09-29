@@ -211,6 +211,64 @@
   color: var(--text-tertiary);
 }
 
+/* ---------- 手风琴展开态（v5+v6 落地的画法） ----------
+   展开那条按 v3 中心卡：36 号粗黑标题跳大一档、概要 4 行、脚注一行；
+   底下操作条钉在最下沿，四个动作一行装完。 */
+.note-row.open .row-title {
+  font-size: 36rpx;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: -0.8rpx;
+}
+
+.note-row.open .summary {
+  font-size: 28rpx;
+  line-height: 1.65;
+  color: #5c6068;
+  margin-top: 15rpx;
+  -webkit-line-clamp: 4;
+}
+
+.note-row.open .row-foot {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  line-height: 34rpx;
+}
+
+.row-actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 18rpx;
+  flex-wrap: wrap;
+}
+
+.act-btn {
+  flex: 1;
+  min-width: 120rpx;
+  text-align: center;
+  padding: 16rpx 0;
+  border-radius: var(--r-pill);
+  background: var(--chip-idle);
+  color: var(--text-primary);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.act-btn.on {
+  background: var(--accent);
+  color: var(--bg-page);
+}
+
+.act-btn.danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.act-btn.primary {
+  background: var(--accent);
+  color: var(--bg-page);
+}
+
 .container {
   padding-bottom: 160rpx;
 }

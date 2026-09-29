@@ -40,6 +40,10 @@ Page({
     loadingMore: false,
     // 「我的笔记」右上角那三个数：本周 / 本月 / 总数
     statsText: '',
+    // 手风琴：一次只开一条；-1 = 全收起
+    openIdx: -1,
+    // 私密笔记：本会话里已经验过密码就不再重问
+    _privateVerified: false,
     // 搜索条那一块面不再是一支固定蓝，而是由当前壁纸的页面底派生（palette.chromeOf）。
     // data 字面量里这一次是模块加载时算的，主题还没落地，所以按 default 走——
     // 和 themeOf 拿不到 key 时回落 THEMES[0] 是同一条规则，不是另写一份兜底色。
@@ -162,6 +166,8 @@ Page({
       // 它明明归了类，只是这一批分类数据里没它。
       n.catLabel = n.category_id == null ? this.data.t.noCategory : (nameOf[n.category_id] || '')
       n.tagLine = (n.tags || []).join(' / ')
+      // 私密判据：分类名等于"私密"。跟后端 get_note 是同一条口径，两处一致。
+      n.is_private = !!(n.category_id != null && nameOf[n.category_id] === '私密')
     })
     return notes
   },
@@ -235,6 +241,110 @@ Page({
     const id = e.currentTarget.dataset.id
     wx.navigateTo({ url: `/pages/detail/detail?id=${id}` })
   },
+
+  // 手风琴：点收起的行=展开该行并收起之前那条；点已经展开的行=收起。
+  // 私密笔记的行展开前先验密码（会话里验过一次就不再问），密码不对不展开。
+  async onRowTap(e) {
+    const idx = e.currentTarget.dataset.idx
+    const note = this.data.notes[idx]
+    if (!note) return
+    if (this.data.openIdx === idx) {
+      this.setData({ openIdx: -1 })
+      return
+    }
+    if (note.is_private && !this.data._privateVerified) {
+      const ok = await this._promptPrivatePassword()
+      if (!ok) return
+      this.setData({ _privateVerified: true })
+    }
+    this.setData({ openIdx: idx })
+  },
+
+  _promptPrivatePassword() {
+    const { lang } = this.data
+    return new Promise((resolve) => {
+      wx.showModal({
+        title: t('privatePasswordTitle', lang),
+        editable: true,
+        placeholderText: t('privatePasswordHint', lang),
+        confirmText: t('privatePasswordOk', lang),
+        cancelText: t('cancel', lang),
+        success: async (res) => {
+          if (!res.confirm) { resolve(false); return }
+          const pwd = (res.content || '').trim()
+          if (!/^\d{6}$/.test(pwd)) {
+            wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
+            resolve(false); return
+          }
+          try {
+            await api.verifyPrivatePassword(pwd)
+            resolve(true)
+          } catch (err) {
+            const msg = (err.data && err.data.detail) || t('privatePasswordWrong', lang)
+            wx.showToast({ title: msg, icon: 'none' })
+            resolve(false)
+          }
+        },
+        fail: () => resolve(false),
+      })
+    })
+  },
+
+  // 展开行底部三个动作，事件不冒泡回 onRowTap（catchtap），点了不收起该行。
+  async onRowTogglePin(e) {
+    const idx = e.currentTarget.dataset.idx
+    const note = this.data.notes[idx]
+    if (!note) return
+    try {
+      await api.pinNote(note.id, !note.is_pinned)
+      wx.showToast({ title: note.is_pinned ? t('unpin', this.data.lang) : t('pin', this.data.lang), icon: 'success' })
+      this.loadNotes(true)
+    } catch (err) {
+      wx.showToast({ title: t('operationFailed', this.data.lang), icon: 'none' })
+    }
+  },
+
+  onRowEdit(e) {
+    const idx = e.currentTarget.dataset.idx
+    const note = this.data.notes[idx]
+    if (!note) return
+    wx.navigateTo({ url: `/pages/write/write?id=${note.id}&mode=edit` })
+  },
+
+  onRowDelete(e) {
+    const idx = e.currentTarget.dataset.idx
+    const note = this.data.notes[idx]
+    if (!note) return
+    const { lang } = this.data
+    wx.showModal({
+      title: t('confirmDelete', lang),
+      content: t('cannotRestore', lang),
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await api.deleteNote(note.id)
+          wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
+          this.setData({ openIdx: -1 })
+          this.loadNotes(true)
+          this.loadStats()
+        } catch (err) {
+          wx.showToast({ title: t('deleteFailed', lang), icon: 'none' })
+        }
+      },
+    })
+  },
+
+  // 展开行"转为笔记卡片"= 走独立分享页。v7 那稿要把它改成页内独浮弹窗，
+  // 这一轮先复用现有 share 页，架构改动留到下一次。私密笔记整按钮就不渲染。
+  onRowShare(e) {
+    const idx = e.currentTarget.dataset.idx
+    const note = this.data.notes[idx]
+    if (!note || note.is_private) return
+    wx.navigateTo({ url: `/pages/share/share?id=${note.id}` })
+  },
+
+  // catchtap 需要一个真函数才不吃事件；操作条本身点了不该收起该行。
+  noop() {},
 
   onReachBottom() {
     this.onLoadMore()
