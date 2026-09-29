@@ -123,10 +123,32 @@
   padding: var(--sp-row);
 }
 
+/* 收起态那一行：点 + 标题 + 日期，三样，一行装完（v7 原话）。
+   标题吃剩下的宽度，超长就单行省略——日期永远靠右，不能被挤掉。 */
+.row-line {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.row-line .row-title {
+  flex: 1;
+  min-width: 0;
+}
+
 /* 间距一律挂在"下面那一段"的 margin-top 上，不挂在上面那段的 margin-bottom：
    摘要没内容时那一段整个不渲染，挂在下面就不会留一段没有主人的空白。 */
 .row-title {
   margin-bottom: 0;
+}
+
+/* 两种状态都是单行截断（app.wxss 那条全局 .row-title 是两行夹，这里盖掉它）：
+   收起行只有一行高，展开卡要留出概要和脚注的位置。 */
+.note-row .row-title {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .summary {
@@ -235,88 +257,281 @@
   line-height: 34rpx;
 }
 
-.row-actions {
+/* ---------- v7 ③ 详情浮窗（点已展开那行才浮它） ----------
+   行内不再有操作条：置顶/编辑/删除/转卡片 全部钉在这个窗口的下沿 dock 里。
+   窗口的底色是写死的纸白（和上面模板弹窗同一张卡），所以里面的字色一律用十六进制
+   实值、不吃 --text-primary——深色壁纸主题下那个变量是浅色，压在纸白上就读不出来了。 */
+.grip {
+  flex: none;
+  /* 海报那一屏的 .tpl-sheet 是 align-items:center，不写死宽度这行会缩到内容宽，
+     「点一下收起」就被挤成竖排、压到把手上。两个浮窗都要占满整条。 */
+  width: 100%;
+  box-sizing: border-box;
+  height: 56rpx;
   display: flex;
-  gap: 12rpx;
-  margin-top: 18rpx;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
-.act-btn {
-  flex: 1;
-  min-width: 120rpx;
-  text-align: center;
-  padding: 16rpx 0;
-  border-radius: var(--r-pill);
-  background: var(--chip-idle);
-  color: var(--text-primary);
-  font-size: 24rpx;
+.grip-bar {
+  width: 88rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: rgba(35, 37, 44, 0.16);
+}
+
+.grip-tx {
+  position: absolute;
+  right: 34rpx;
+  top: 0;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-tiny);
   font-weight: 700;
+  letter-spacing: 0.4rpx;
+  color: rgba(35, 37, 44, 0.42);
 }
 
-.act-btn.on {
-  background: var(--accent);
-  color: var(--bg-page);
+.ds-body {
+  flex: 1;
+  min-height: 0;
 }
 
-.act-btn.danger {
-  color: var(--danger);
-  background: var(--danger-soft);
+/* 内缩挂在内容层，不挂在 scroll-view 自己身上：
+   挂在它身上时右侧要给滚动条留位，左右就不等宽了（实测右移 12rpx）。 */
+.ds-in {
+  padding: 0 34rpx;
 }
 
-.act-btn.primary {
-  background: var(--accent);
-  color: var(--bg-page);
+.ds-meta {
+  margin-top: 10rpx;
+  font-size: var(--fs-meta);
+  color: rgba(35, 37, 44, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* ---------- v7 模板独浮弹窗 ----------
-   弹窗与底页分层：详情窗（展开行）在 templateOpen 时靠 openIdx=-1 整块收掉，
-   页面上只剩这一个 fixed 浮层。背后什么都不垫——搜索条、分类块、列表、tab 都在
-   遮罩层以下一字不虚（v7 前两轮被否的关键就在这条，见 §8.64）。
-   画布不进 fixed：canvas 藏在屏幕外 left:-9999rpx，只用来生成图片；
-   弹窗里放 canvasToTempFilePath 出的成品 <image>，绕开 share.wxml 顶部注释
-   记的那条"画布放进 fixed 会整体错位"的坑。 */
+.ds-h2 {
+  margin-top: 8rpx;
+  font-size: 38rpx;
+  font-weight: 800;
+  letter-spacing: -0.9rpx;
+  line-height: 1.3;
+  color: #23252C;
+}
+
+.ds-tags {
+  margin-top: 14rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.ds-tag {
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  color: var(--cat-ink);
+  background: var(--cat-chip);
+  border-radius: 8rpx;
+  padding: 5rpx 12rpx;
+}
+
+.ds-lab {
+  margin-top: 30rpx;
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 1.6rpx;
+  color: rgba(35, 37, 44, 0.42);
+}
+
+.ds-para {
+  margin-top: 12rpx;
+  font-size: var(--fs-body);
+  line-height: 1.7;
+  color: #3a3e46;
+}
+
+.ds-pt {
+  margin-top: 14rpx;
+  display: flex;
+  gap: 16rpx;
+  align-items: flex-start;
+}
+
+.ds-pt + .ds-pt {
+  margin-top: 16rpx;
+}
+
+/* 序号圆点吃分类色：深色壁纸下 --cat-dot 会被 palette 换成算出来的字色，
+   所以前景用窗口自己的纸白，两头都不糊。 */
+.ds-pt-n {
+  flex: none;
+  width: 38rpx;
+  height: 38rpx;
+  border-radius: 50%;
+  background: var(--cat-dot);
+  color: #FCFBF8;
+  font-size: var(--fs-tiny);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4rpx;
+}
+
+.ds-pt-x {
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: #23252C;
+}
+
+.ds-link {
+  margin-top: 12rpx;
+  font-size: var(--fs-meta);
+  color: #3F52D6;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.ds-orig {
+  margin-top: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ds-sw {
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.ds-pad {
+  height: 24rpx;
+}
+
+.ds-dock {
+  flex: none;
+  border-top: var(--w-edge) solid rgba(35, 37, 44, 0.10);
+  padding: 22rpx 30rpx 30rpx;
+}
+
+.ds-irow {
+  display: flex;
+  gap: 14rpx;
+}
+
+.ds-ibtn {
+  flex: 1;
+  height: 72rpx;
+  border-radius: var(--r-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: #23252C;
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.16);
+}
+
+.ds-ibtn.on {
+  background: #23252C;
+  color: #F2EFE9;
+  box-shadow: none;
+}
+
+.ds-ibtn.danger {
+  color: #8c2119;
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(140, 33, 25, 0.24);
+}
+
+.ds-pbtn {
+  margin-top: 16rpx;
+  height: 96rpx;
+  border-radius: var(--r-pill);
+  background: #23252C;
+  color: #F2EFE9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-title);
+  font-weight: 800;
+  letter-spacing: -0.4rpx;
+}
+
+.ds-pub {
+  margin-top: 14rpx;
+  display: flex;
+  align-items: flex-start;
+  gap: 14rpx;
+  font-size: var(--fs-tiny);
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.ds-pub-l {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+}
+
+.ds-pub-act {
+  flex: none;
+  text-decoration: underline;
+  font-weight: 700;
+  color: rgba(35, 37, 44, 0.62);
+}
+
+/* ---------- v7 ③④：两个浮窗共用同一条几何 ----------
+   详情窗（点已展开那行浮它）和模板预览弹窗（点「转为笔记卡片」浮它）是同一条窗口：
+   左右 24、上沿停在搜索条上方 130、下沿离底栏 24、同一张纸白、同一个圆角、同一枚把手。
+   拉弹窗时上一层窗口整个藏掉（detailOpen 与 templateOpen 互斥），页面上永远只有一个浮层，
+   背后什么都不垫——搜索条、分类块、列表、三个 tab 在遮罩以下一字不虚
+   （v7 前两轮被否的关键就在这条，见 §8.64）。遮罩透明，只挡穿透点击（点窗外=收起）。
+   画布不进 fixed：canvas 藏在屏幕外 left:-9999rpx 只用来生成图片，
+   弹窗里放 canvasToTempFilePath 出的成品 <image>，绕开 share.wxml 顶部记的那条错位坑。 */
 .poster-canvas-offscreen {
   position: absolute;
   left: -9999rpx;
   top: 0;
 }
 
-.tpl-mask {
+.float-mask {
   position: fixed;
   left: 0;
   top: 0;
   right: 0;
   bottom: 0;
-  /* v7 那条口径："我的笔记"、搜索条、分类块、列表、三个 tab 全部原样清晰，
-     弹窗身后什么都不垫。透明遮罩只用来挡穿透点击（点弹窗外=取消），不遮暗任何东西。 */
   background: transparent;
   z-index: 100;
 }
 
-.tpl-sheet {
+.float-sheet {
   position: fixed;
   left: 24rpx;
   right: 24rpx;
   top: 130rpx;
-  bottom: 152rpx;  /* 24 (离底栏 24 + 底栏高 ~128) */
+  bottom: 152rpx;  /* 离底栏 24 + 底栏高 ~128 */
   background: #FCFBF8;
   border-radius: 32rpx;
   box-shadow: 0 30rpx 60rpx rgba(8, 10, 14, 0.32);
   z-index: 101;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* 海报那一屏要上下左右居中，所以在共用几何上再叠这两条 */
+.tpl-sheet {
   align-items: center;
   padding: 20rpx 0 24rpx;
 }
 
-.tpl-handle {
-  width: 96rpx;
-  height: 12rpx;
-  border-radius: 6rpx;
-  background: rgba(35, 37, 44, 0.22);
-  margin-bottom: 16rpx;
-  flex: none;
+/* 「原文内容」那一行是标签和开关并排，标签不再要它自己的上间距 */
+.ds-orig .ds-lab {
+  margin-top: 0;
 }
 
 .tpl-body {
@@ -350,25 +565,95 @@
   flex: none;
 }
 
-.tpl-actions {
-  display: flex;
-  gap: 20rpx;
-  padding: 0 32rpx;
-  margin-top: 16rpx;
+/* 弹窗下沿：二维码开关一行 + 取消/保存一行，左右内缩交给 dock */
+.tpl-dock {
   flex: none;
   width: 100%;
+  padding: 0 32rpx;
   box-sizing: border-box;
 }
 
+.tpl-qr {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.tpl-qr-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.tpl-qr-label {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: 800;
+  color: #23252C;
+}
+
+.tpl-qr-hint {
+  display: block;
+  margin-top: 2rpx;
+  font-size: var(--fs-tiny);
+  line-height: 1.45;
+  color: rgba(35, 37, 44, 0.52);
+}
+
+.pill {
+  flex: none;
+  position: relative;
+  width: 92rpx;
+  height: 52rpx;
+  border-radius: 999rpx;
+  background: rgba(35, 37, 44, 0.16);
+  transition: background 160ms ease-out;
+}
+
+.pill-on {
+  background: #23252C;
+}
+
+.pill-dot {
+  position: absolute;
+  top: 6rpx;
+  left: 6rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #F2EFE9;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.2);
+  transition: transform 160ms ease-out;
+}
+
+.pill-on .pill-dot {
+  transform: translateX(40rpx);
+}
+
+.tpl-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 20rpx;
+  flex: none;
+}
+
+/* 两张浮窗都是写死的纸白底，所以按钮用实值色、不吃 --text-primary：
+   深色壁纸主题下那个变量是浅色，压在纸白上就读不出来了。 */
 .tpl-btn {
   flex: 1;
   text-align: center;
   padding: 22rpx 0;
   border-radius: var(--r-pill);
-  background: var(--chip-idle);
-  color: var(--text-primary);
+  background: rgba(35, 37, 44, 0.06);
+  color: #23252C;
   font-size: 26rpx;
   font-weight: 700;
+}
+
+.tpl-btn.ghost {
+  background: transparent;
+  color: rgba(35, 37, 44, 0.62);
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.16);
 }
 
 .tpl-btn.primary {

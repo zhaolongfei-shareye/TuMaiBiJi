@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { catSkinFor, chromeOf, toneVars } = require('../../utils/palette.js')
+const { catSkinFor, chromeOf, toneVars, withAlpha } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 
@@ -44,7 +44,12 @@ Page({
     openIdx: -1,
     // 私密笔记：本会话里已经验过密码就不再重问
     _privateVerified: false,
-    // v7 模板独浮弹窗：详情窗（展开行）藏起来、只浮一个海报图 + 关闭/保存
+    // v7 ③：详情浮窗——点已展开那行才浮它，窗内滚正文、动作钉在下沿 dock
+    detailOpen: false,
+    detailNote: null,
+    shared: false,
+    origOpen: false,
+    // v7 ④⑤：模板独浮弹窗——拉它时详情窗整个藏掉，页面上只留这一个浮层
     templateOpen: false,
     posterNote: null,
     posterTpl: '',
@@ -52,6 +57,8 @@ Page({
     posterW: 750,
     posterH: 900,
     posterBusy: false,
+    // 弹窗里那个二维码开关：只影响这一张成品图，与海报页同一条语义
+    noQr: false,
     // 搜索条那一块面不再是一支固定蓝，而是由当前壁纸的页面底派生（palette.chromeOf）。
     // data 字面量里这一次是模块加载时算的，主题还没落地，所以按 default 走——
     // 和 themeOf 拿不到 key 时回落 THEMES[0] 是同一条规则，不是另写一份兜底色。
@@ -95,12 +102,14 @@ Page({
     this.loadStats()
     // onShow 每次切回该 tab 都会触发，必须 reset：否则非 reset 分支会把结果追加到旧列表上，
     // 同一条笔记被贴两遍。
+    this._closeFloats()
     this.loadNotes(true)
   },
 
   // 下拉刷新：人停在列表页不动时 onShow 不会再触发，采集在后台完成的那条就一直不出现。
   // 三趟一起等完再收菊花，否则下拉框还转着、列表已经换了一批，看着像没刷出来。
   async onPullDownRefresh() {
+    this._closeFloats()
     try {
       await Promise.all([this.loadCategories(), this.loadStats(), this.loadNotes(true)])
     } finally {
@@ -167,7 +176,8 @@ Page({
     notes.forEach((n) => {
       // 分类身份退成"一枚点 + 分类名"，两档色由 palette 现算（浅色卡按 5、深色卡按 7）。
       const s = catSkinFor(n.category_id, wallpaper)
-      n.catStyle = `--cat-dot:${s.dot};--cat-ink:${s.text}`
+      // --cat-chip 只给详情窗里的那几枚标签当底色（分类色 12% 铺在纸白卡上）。
+      n.catStyle = `--cat-dot:${s.dot};--cat-ink:${s.text};--cat-chip:${withAlpha(s.dot, 0.12)}`
       n.catRing = s.ring
       // 这一格只写分类名，标签不再来顶替它：标签在下面自己有的一段（.tg），
       // 两处都写就成了同一串字出现两遍。分类查不到名字时宁可空着，也不要写成"未分类"——
@@ -231,41 +241,96 @@ Page({
   },
 
   onSearchConfirm() {
+    this._closeFloats()
     this.loadNotes(true)
   },
 
   clearSearch() {
     this.setData({ searchKeyword: '' })
+    this._closeFloats()
     this.loadNotes(true)
   },
 
   selectCategory(e) {
     const id = e.currentTarget.dataset.id
     this.setData({ selectedCategory: id === null ? null : parseInt(id) })
+    this._closeFloats()
     this.loadNotes(true)
   },
 
-  goToDetail(e) {
-    const id = e.currentTarget.dataset.id
-    wx.navigateTo({ url: `/pages/detail/detail?id=${id}` })
-  },
-
-  // 手风琴：点收起的行=展开该行并收起之前那条；点已经展开的行=收起。
-  // 私密笔记的行展开前先验密码（会话里验过一次就不再问），密码不对不展开。
+  // 手风琴：点收起的行=展开该行并收起之前那条；点已经展开的行=浮详情窗（v7 ③）。
+  // 私密笔记进门前先验密码（会话里验过一次就不再问），密码不对既不开条也不开窗。
   async onRowTap(e) {
     const idx = e.currentTarget.dataset.idx
     const note = this.data.notes[idx]
     if (!note) return
-    if (this.data.openIdx === idx) {
-      this.setData({ openIdx: -1 })
+    if (!note.is_private || this.data._privateVerified) {
+      if (this.data.openIdx === idx) this._openDetail(idx)
+      else this.setData({ openIdx: idx })
       return
     }
-    if (note.is_private && !this.data._privateVerified) {
-      const ok = await this._promptPrivatePassword()
-      if (!ok) return
-      this.setData({ _privateVerified: true })
+    const ok = await this._promptPrivatePassword()
+    if (!ok) return
+    this.setData({ _privateVerified: true, openIdx: idx })
+  },
+
+  // v7 ③：详情浮窗。列表项身上那些派生字段（分类色、来源、日期）这一屏早就算好了，
+  // 直接拿来当开窗的第一帧；窗里多出来的三块（核心要点、来源链接、原文）只有详情接口有，
+  // 所以再取一次全文。取失败不拦窗——列表上有的那几块照样能看，只是窗里没有要点和原文。
+  // 私密笔记照取：进展开态那一步已经验过密码，窗里的要点和原文本来就该看得见。
+  async _openDetail(idx) {
+    const row = this.data.notes[idx]
+    if (!row) return
+    this.setData({ detailOpen: true, detailNote: row, origOpen: false, shared: false })
+    try {
+      const full = await api.getNote(row.id)
+      if (!this.data.detailOpen) return
+      const note = Object.assign({}, row, full)
+      note.source_type_label = row.source_type_label
+      note.date_label = row.date_label
+      note.created_at_label = formatDateTime(full.created_at)
+      this.setData({ detailNote: note })
+    } catch (err) {
+      console.error('详情窗取全文失败', err)
     }
-    this.setData({ openIdx: idx })
+    // 私密笔记不给分享这条线，公开状态那行也就不查了。
+    if (!row.is_private) this._loadShareStatus(row.id)
+  },
+
+  // 这篇对外不对外，只有服务端知道（码可能是在另一台手机上生成的）。
+  async _loadShareStatus(noteId) {
+    try {
+      const s = await api.getShareStatus(noteId)
+      if (this.data.detailOpen) this.setData({ shared: !!(s && s.active) })
+    } catch (err) {
+      // 读不到就不显示那一行公开状态。绝不能猜一个"没在公开"给人看——那等于把该收的东西留着。
+      console.error('分享状态读取失败', err)
+    }
+  },
+
+  // 换筛选词、换分类、下拉刷新、切回这一屏——这四条都会重排整张列表。
+  // 行号一指错，展开的那条和浮着的窗就成了别人的笔记，所以先把两层浮态收掉。
+  _closeFloats() {
+    if (this.data.openIdx !== -1 || this.data.detailOpen) {
+      this.setData({ openIdx: -1, detailOpen: false })
+    }
+  },
+
+  onCloseDetail() {
+    this.setData({ detailOpen: false })
+  },
+
+  onToggleOrig() {
+    this.setData({ origOpen: !this.data.origOpen })
+  },
+
+  openSourceUrl() {
+    const url = (this.data.detailNote || {}).source_url
+    if (!url) return
+    wx.setClipboardData({
+      data: url,
+      success: () => wx.showToast({ title: t('linkCopied', this.data.lang), icon: 'success' }),
+    })
   },
 
   _promptPrivatePassword() {
@@ -298,30 +363,32 @@ Page({
     })
   },
 
-  // 展开行底部三个动作，事件不冒泡回 onRowTap（catchtap），点了不收起该行。
-  async onRowTogglePin(e) {
-    const idx = e.currentTarget.dataset.idx
-    const note = this.data.notes[idx]
+  // 详情窗下沿 dock 的四个动作 + 那行公开状态。
+  // 置顶会把这条跳到队列第一条，所以重载后要把行号找回来，否则展开态会指到别的笔记上。
+  async onSheetPin() {
+    const note = this.data.detailNote
     if (!note) return
     try {
       await api.pinNote(note.id, !note.is_pinned)
       wx.showToast({ title: note.is_pinned ? t('unpin', this.data.lang) : t('pin', this.data.lang), icon: 'success' })
-      this.loadNotes(true)
+      await this.loadNotes(true)
+      const idx = this.data.notes.findIndex((x) => x.id === note.id)
+      this.setData({ openIdx: idx, 'detailNote.is_pinned': !note.is_pinned })
     } catch (err) {
       wx.showToast({ title: t('operationFailed', this.data.lang), icon: 'none' })
     }
   },
 
-  onRowEdit(e) {
-    const idx = e.currentTarget.dataset.idx
-    const note = this.data.notes[idx]
+  onSheetEdit() {
+    const note = this.data.detailNote
     if (!note) return
+    // 改完回来 onShow 会重载列表，窗留着就是读旧内容，所以出门前把窗和展开态一起收掉。
+    this.setData({ detailOpen: false, openIdx: -1 })
     wx.navigateTo({ url: `/pages/write/write?id=${note.id}&mode=edit` })
   },
 
-  onRowDelete(e) {
-    const idx = e.currentTarget.dataset.idx
-    const note = this.data.notes[idx]
+  onSheetDelete() {
+    const note = this.data.detailNote
     if (!note) return
     const { lang } = this.data
     wx.showModal({
@@ -332,7 +399,7 @@ Page({
         try {
           await api.deleteNote(note.id)
           wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
-          this.setData({ openIdx: -1 })
+          this.setData({ openIdx: -1, detailOpen: false })
           this.loadNotes(true)
           this.loadStats()
         } catch (err) {
@@ -342,21 +409,43 @@ Page({
     })
   },
 
-  // 展开行"转为笔记卡片" = 关掉展开行 + 打开 v7 独浮弹窗；
-  // 详情窗藏起来（openIdx=-1）、弹窗里只浮海报图。关闭时把展开行还原。
-  async onRowShare(e) {
-    const idx = e.currentTarget.dataset.idx
-    const note = this.data.notes[idx]
+  onSheetUnshare() {
+    const note = this.data.detailNote
+    if (!note) return
+    const { lang } = this.data
+    wx.showModal({
+      title: t('unshare', lang),
+      content: t('unshareBody', lang),
+      confirmText: t('unshareConfirm', lang),
+      cancelText: t('cancel', lang),
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await api.revokeShare(note.id)
+          this.setData({ shared: false })
+          wx.showToast({ title: t('unshared', lang), icon: 'success' })
+        } catch (err) {
+          console.error('撤掉分享失败', err)
+          wx.showToast({ title: t('unshareFailed', lang), icon: 'none' })
+        }
+      },
+    })
+  },
+
+  // v7 ④：dock 的「转为笔记卡片」= 详情窗整个藏掉、只浮模板预览这一个弹窗（两层不叠）。
+  // 列表那条保持展开，所以关掉弹窗后详情窗回来、里面内容还是这篇。
+  async onSheetToPoster() {
+    const note = this.data.detailNote
     if (!note || note.is_private) return
-    this._prevOpenIdx = this.data.openIdx
     const profile = poster.readProfile()
     this.setData({
-      openIdx: -1,
+      detailOpen: false,
       templateOpen: true,
       posterNote: note,
       posterTpl: profile.template || poster.DEFAULT_TEMPLATE,
       posterImagePath: '',
       posterBusy: true,
+      noQr: false,
     })
     try {
       await this._ensurePosterAssets(note.id)
@@ -417,7 +506,7 @@ Page({
     if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 5000)
     canvas.width = poster.W
     canvas.height = 750
-    const plan = poster.planPoster(ctx, a.note, this.data.posterTpl, profile, lang)
+    const plan = poster.planPoster(ctx, a.note, this.data.posterTpl, profile, lang, { showQr: !this.data.noQr })
     canvas.width = plan.width
     canvas.height = plan.height
     poster.paintLayers(ctx, plan.layers, images)
@@ -445,11 +534,12 @@ Page({
     this._advanceTemplate(dx < 0 ? 1 : -1)
   },
 
+  // v7 ⑤：按 poster.js 里那十套的顺序走，走到头就滑不动、不循环（效果图原话）。
   async _advanceTemplate(delta) {
     const list = poster.TEMPLATES
     const cur = list.findIndex((x) => x.id === this.data.posterTpl)
-    const next = list[((cur < 0 ? 0 : cur) + delta + list.length) % list.length]
-    if (next.id === this.data.posterTpl) return
+    const next = list[(cur < 0 ? 0 : cur) + delta]
+    if (!next) return
     this.setData({ posterTpl: next.id, posterBusy: true })
     wx.showToast({ title: poster.templateLabel(next.id, this.data.lang), icon: 'none', duration: 1200 })
     try {
@@ -461,15 +551,33 @@ Page({
     }
   },
 
+  // 码的开关只影响这一张成品图：翻一下重画一次（与海报页同一条语义）。
+  async onToggleQr() {
+    if (this.data.posterBusy) return
+    this.setData({ noQr: !this.data.noQr, posterBusy: true })
+    try {
+      await this._renderPoster()
+    } catch (err) {
+      console.error('重画失败', err)
+      wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
+      this.setData({ posterBusy: false })
+    }
+  },
+
+  // v7 ⑥：取消、保存成功、点把手三个口都收掉弹窗，回来的还是详情窗那一屏（不是列表）。
+  // 生成失败也走这里——人留在原地，只是多一枚吐司。
   _closeTemplate() {
+    const note = this.data.posterNote
     this.setData({
       templateOpen: false,
       posterImagePath: '',
       posterBusy: false,
       posterNote: null,
-      openIdx: typeof this._prevOpenIdx === 'number' ? this._prevOpenIdx : -1,
+      detailOpen: !!note,
     })
-    this._prevOpenIdx = undefined
+    // 生成海报这一步已经把这篇的码建出来了，公开状态得跟着刷新，
+    // 否则详情窗里那行「已经公开」永远不显示。
+    if (note) this._loadShareStatus(note.id)
   },
 
   onCancelTemplate() { this._closeTemplate() },
@@ -499,9 +607,6 @@ Page({
       },
     })
   },
-
-  // catchtap 需要一个真函数才不吃事件；操作条本身点了不该收起该行。
-  noop() {},
 
   onReachBottom() {
     this.onLoadMore()

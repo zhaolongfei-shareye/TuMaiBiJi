@@ -66,10 +66,10 @@
       <text>{{t.noNotes}}</text>
     </view>
 
-    <!-- 笔记列表：一条笔记 = 一张描边行卡。D2 把左侧那块 176 方块撤了，
-         分类身份退到 meta 行最前面的一枚点 + 分类名（颜色仍由 palette 派生）。
-         v5+v6 手风琴：一次开一条；展开行的画法照 v3 中心卡（36 号粗标题 + 4 行概要 +
-         脚注 + 操作条），私密笔记展开前弹密码。展开即详情，不再跳独立详情页。 -->
+    <!-- 笔记列表：一条笔记 = 一张描边行卡。
+         v7 收起态只有三样：分类点 + 标题 + 日期（分类名/来源/标签/尖角只在展开态出现）。
+         v5+v6 手风琴：一次开一条；展开行照 v3 中心卡（36 号单行标题 + 4 行概要 + meta 脚注），
+         行内不再有动作按钮——动作全在 ③ 那层详情浮窗的 dock 里。私密笔记展开前弹密码。 -->
     <view wx:else class="notes-list">
       <view
         class="card note-row {{openIdx === index ? 'open' : ''}}"
@@ -78,32 +78,93 @@
         bindtap="onRowTap"
         data-idx="{{index}}"
       >
-        <view class="row-title">
-          <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
-        </view>
-        <!-- 折叠条不露摘要（v5 那条口径）：summary 只在展开态渲染 -->
-        <view class="summary" wx:if="{{openIdx === index && item.summary}}">{{item.summary}}</view>
-        <view class="row-foot">
+        <view wx:if="{{openIdx !== index}}" class="row-line">
           <view class="cat {{item.catRing ? 'is-ring' : ''}}" style="{{item.catStyle}}">
             <view class="cat-dot"></view>
-            <text>{{item.catLabel}}</text>
           </view>
-          <text class="sep">·</text>
-          <text class="src">{{item.source_type_label}}</text>
-          <block wx:if="{{item.tagLine}}">
-            <text class="sep">·</text>
-            <text class="tg">{{item.tagLine}}</text>
-          </block>
+          <view class="row-title">
+            <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
+          </view>
           <text class="dt">{{item.date_label}}</text>
-          <text class="chev">›</text>
         </view>
-        <!-- 展开态才出现的操作条；catchtap 让点它不冒泡回 onRowTap（否则一点就收起） -->
-        <view class="row-actions" wx:if="{{openIdx === index}}" catchtap="noop">
-          <view class="act-btn {{item.is_pinned ? 'on' : ''}}" catchtap="onRowTogglePin" data-idx="{{index}}">{{item.is_pinned ? t.unpin : t.pin}}</view>
-          <view class="act-btn" catchtap="onRowEdit" data-idx="{{index}}">{{t.edit}}</view>
-          <view class="act-btn danger" catchtap="onRowDelete" data-idx="{{index}}">{{t.delete}}</view>
-          <view class="act-btn primary" wx:if="{{!item.is_private}}" catchtap="onRowShare" data-idx="{{index}}">{{t.shareAsImage}}</view>
+
+        <block wx:else>
+          <view class="row-title">
+            <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
+          </view>
+          <!-- 折叠条不露摘要（v5 那条口径）：summary 只在展开态渲染 -->
+          <view class="summary" wx:if="{{item.summary}}">{{item.summary}}</view>
+          <view class="row-foot">
+            <view class="cat {{item.catRing ? 'is-ring' : ''}}" style="{{item.catStyle}}">
+              <view class="cat-dot"></view>
+              <text>{{item.catLabel}}</text>
+            </view>
+            <text class="sep">·</text>
+            <text class="src">{{item.source_type_label}}</text>
+            <block wx:if="{{item.tagLine}}">
+              <text class="sep">·</text>
+              <text class="tg">{{item.tagLine}}</text>
+            </block>
+            <text class="dt">{{item.date_label}}</text>
+            <text class="chev">›</text>
+          </view>
+        </block>
+      </view>
+    </view>
+  </view>
+
+  <!-- v7 ③：详情浮窗。点已展开那行才浮它，浮上来时列表和搜索、分类块被它盖严（同宽 24 内缩），
+       「我的笔记」和三个 tab 在窗外原样清晰——背后什么都不垫，只有这一个是活的窗口。
+       顶部把手（含「点一下收起」）是回列表的口；动作条钉在窗口下沿。 -->
+  <view wx:if="{{detailOpen}}" class="float-mask" bindtap="onCloseDetail"></view>
+  <view wx:if="{{detailOpen}}" class="float-sheet" style="{{detailNote.catStyle}}">
+    <view class="grip" bindtap="onCloseDetail">
+      <view class="grip-bar"></view>
+      <text class="grip-tx">{{t.grip}}</text>
+    </view>
+    <scroll-view class="ds-body" scroll-y show-scrollbar="{{false}}">
+      <view class="ds-in">
+      <view class="ds-meta">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</view>
+      <view class="ds-h2">{{detailNote.title}}</view>
+      <view class="ds-tags" wx:if="{{detailNote.tags && detailNote.tags.length}}">
+        <text class="ds-tag" wx:for="{{detailNote.tags}}" wx:key="*this" wx:for-item="tg">{{tg}}</text>
+      </view>
+
+      <view class="ds-lab" wx:if="{{detailNote.summary}}">{{t.summaryLabel}}</view>
+      <view class="ds-para" wx:if="{{detailNote.summary}}">{{detailNote.summary}}</view>
+
+      <block wx:if="{{detailNote.key_points && detailNote.key_points.length}}">
+        <view class="ds-lab">{{t.keyPoints}}</view>
+        <view class="ds-pt" wx:for="{{detailNote.key_points}}" wx:key="index" wx:for-item="kp">
+          <view class="ds-pt-n">{{index + 1}}</view>
+          <view class="ds-pt-x">{{kp}}</view>
         </view>
+      </block>
+
+      <view class="ds-lab" wx:if="{{detailNote.source_url}}">{{t.sourceLink}}</view>
+      <view class="ds-link" wx:if="{{detailNote.source_url}}" catchtap="openSourceUrl">{{detailNote.source_url}}</view>
+
+      <view class="ds-orig" wx:if="{{detailNote.original_content}}">
+        <view class="ds-lab">{{t.originalContent}}</view>
+        <view class="ds-sw" catchtap="onToggleOrig">{{origOpen ? t.collapse : t.expand}} ⌄</view>
+      </view>
+      <view class="ds-para" wx:if="{{origOpen && detailNote.original_content}}">{{detailNote.original_content}}</view>
+      <view class="ds-pad"></view>
+      </view>
+    </scroll-view>
+
+    <!-- 动作条：三枚成行 + 通栏「转为笔记卡片」+ 那行公开状态。
+         私密笔记这一整块不给转卡片，也不给撤掉分享（与详情页同一条口径）。 -->
+    <view class="ds-dock">
+      <view class="ds-irow">
+        <view class="ds-ibtn {{detailNote.is_pinned ? 'on' : ''}}" catchtap="onSheetPin">{{detailNote.is_pinned ? t.unpin : t.pin}}</view>
+        <view class="ds-ibtn" catchtap="onSheetEdit">{{t.edit}}</view>
+        <view class="ds-ibtn danger" catchtap="onSheetDelete">{{t.delete}}</view>
+      </view>
+      <view wx:if="{{!detailNote.is_private}}" class="ds-pbtn" catchtap="onSheetToPoster">{{t.shareAsImage}}</view>
+      <view wx:if="{{shared && !detailNote.is_private}}" class="ds-pub">
+        <text class="ds-pub-l">{{t.sharedNow}}</text>
+        <text class="ds-pub-act" catchtap="onSheetUnshare">{{t.unshare}}</text>
       </view>
     </view>
   </view>
@@ -112,19 +173,32 @@
        弹窗里显示的是 canvasToTempFilePath 出的成品 <image>，image 进 fixed 是常规做法。 -->
   <canvas id="posterCanvas" type="2d" class="poster-canvas-offscreen" style="width: {{posterW}}rpx; height: {{posterH}}rpx"></canvas>
 
-  <!-- v7：模板独浮弹窗——拉弹窗时上面的展开行已经通过 openIdx=-1 收掉了，页面上只剩这一个浮层。
-       搜索条、分类块、列表行、tab 栏在弹窗身后一字不虚；弹窗左右内缩 24、离 tab 留 24。 -->
-  <view wx:if="{{templateOpen}}" class="tpl-mask" bindtap="onCancelTemplate"></view>
-  <view wx:if="{{templateOpen}}" class="tpl-sheet">
-    <view class="tpl-handle" bindtap="onHandleTap"></view>
+  <!-- v7 ④⑤：模板独浮弹窗——拉弹窗时详情窗整个藏起来，页面上只剩这一个浮层，
+       背后什么都不垫。取消 / 保存成功 / 点把手三个口收掉弹窗后回到详情窗那一屏（不是回列表）。 -->
+  <view wx:if="{{templateOpen}}" class="float-mask" bindtap="onCancelTemplate"></view>
+  <view wx:if="{{templateOpen}}" class="float-sheet tpl-sheet">
+    <view class="grip" bindtap="onHandleTap">
+      <view class="grip-bar"></view>
+      <text class="grip-tx">{{t.grip}}</text>
+    </view>
     <view class="tpl-body" bindtouchstart="onPosterTouchStart" bindtouchend="onPosterTouchEnd">
       <image wx:if="{{posterImagePath}}" class="tpl-poster" src="{{posterImagePath}}" mode="widthFix" style="width: {{posterW}}rpx" />
       <view wx:else class="tpl-loading">{{t.loading}}</view>
       <view class="tpl-swipe-hint">{{t.swipeHint}}</view>
     </view>
-    <view class="tpl-actions">
-      <view class="tpl-btn" bindtap="onCancelTemplate">{{t.cancel}}</view>
-      <view class="tpl-btn primary {{posterImagePath ? '' : 'disabled'}}" bindtap="onSavePoster">{{t.saveToAlbum}}</view>
+    <view class="tpl-dock">
+      <!-- 码的开关：只影响这一张成品图，与海报页那条是同一个开关语义 -->
+      <view class="tpl-qr" catchtap="onToggleQr">
+        <view class="pill {{noQr ? '' : 'pill-on'}}"><view class="pill-dot"></view></view>
+        <view class="tpl-qr-text">
+          <text class="tpl-qr-label">{{t.qrToggle}}</text>
+          <text class="tpl-qr-hint">{{t.qrToggleHint}}</text>
+        </view>
+      </view>
+      <view class="tpl-actions">
+        <view class="tpl-btn ghost" bindtap="onCancelTemplate">{{t.cancel}}</view>
+        <view class="tpl-btn primary {{posterImagePath ? '' : 'disabled'}}" bindtap="onSavePoster">{{t.saveToAlbum}}</view>
+      </view>
     </view>
   </view>
 </view>
