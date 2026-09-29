@@ -12,6 +12,29 @@
   margin: 0;
 }
 
+/* slogan 下面靠左那一行：日期 + 星期。字号跟右边「中」一致（--fs-meta），
+   颜色吃 --text-secondary / --text-tertiary——铺了背景图时这两个变量本身就是
+   半透明纸白（.95 那档由 secondary 给、.56 那档由 tertiary 给），没铺图时是灰字，
+   两头都不用再写一条 has-bg 覆盖。星期故意比日期淡：它是气氛不是信息。 */
+.date-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14rpx;
+  margin: -14rpx 0 var(--sp-4);
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+}
+
+.date-row .d {
+  color: var(--text-secondary);
+  letter-spacing: 1rpx;
+}
+
+.date-row .w {
+  color: var(--text-tertiary);
+  letter-spacing: 2rpx;
+}
+
 /* 两段纯文字 + 一条下划线，不做成按钮：这一行的主角是标题，切换器要能看见但不抢位。
    两段都带透明下边框，选中与否只差颜色和下划线，切换时字不会跳。 */
 .lang-switch {
@@ -450,6 +473,7 @@
 /* 铺图时把标题和条子抬到罩层之上。展开那一态排除在外：它的 position 由上面
    那条 fixed 规则给，这里再写一遍 relative 会按源码顺序把它盖回去。 */
 .container.has-bg .title-row,
+.container.has-bg .date-row,
 .container.has-bg:not(.entry-dock) .entry-wrap {
   position: relative;
   z-index: 2;

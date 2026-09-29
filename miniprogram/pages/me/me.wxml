@@ -73,34 +73,43 @@
     </view>
   </view>
 
-  <!-- 私密密码面板：自绘两层，不用 wx.showModal(editable)——
-       那条只有一个输入框、数字明文可见，也没有"再输一次"的位置。 -->
+  <!-- 私密密码面板：自绘两层，不用 wx.showModal(editable)——那条只有一个输入框、
+       数字明文可见，也没有"再输一次"的位置。
+       两种态：没设过=两格输入 + 取消/确定；已设过=只给「返回 / 重置密码」，
+       重置完自动切回前一态（他要换密码就是重置→再输两遍，一步不用退出去找入口）。 -->
   <view wx:if="{{pwdPanel}}" class="pwd-mask" bindtap="onClosePwdPanel"></view>
   <view wx:if="{{pwdPanel}}" class="pwd-sheet card">
     <view class="pwd-title">{{t.privatePassword}}</view>
-    <view class="pwd-hint">{{t.privatePasswordHint}}</view>
-    <input
-      class="pwd-input"
-      type="number"
-      maxlength="6"
-      password="{{true}}"
-      value="{{pwd1}}"
-      placeholder="{{t.privatePasswordNew}}"
-      placeholder-class="pwd-ph"
-      bindinput="onPwdInput1"
-    />
-    <input
-      class="pwd-input"
-      type="number"
-      maxlength="6"
-      password="{{true}}"
-      value="{{pwd2}}"
-      placeholder="{{t.privatePasswordAgain}}"
-      placeholder-class="pwd-ph"
-      bindinput="onPwdInput2"
-    />
-    <view class="pwd-save" bindtap="onPwdSave">{{t.privatePasswordOk}}</view>
-    <view wx:if="{{privateSet}}" class="pwd-reset" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
-    <view class="pwd-cancel" bindtap="onClosePwdPanel">{{t.cancel}}</view>
+    <view class="pwd-hint">{{privateSet ? t.privatePasswordSetHint : t.privatePasswordScene}}</view>
+
+    <block wx:if="{{!privateSet}}">
+      <input
+        class="pwd-input"
+        type="number"
+        maxlength="6"
+        password="{{true}}"
+        value="{{pwd1}}"
+        placeholder="{{t.privatePasswordNew}}"
+        placeholder-class="pwd-ph"
+        bindinput="onPwdInput1"
+      />
+      <input
+        class="pwd-input"
+        type="number"
+        maxlength="6"
+        password="{{true}}"
+        value="{{pwd2}}"
+        placeholder="{{t.privatePasswordAgain}}"
+        placeholder-class="pwd-ph"
+        bindinput="onPwdInput2"
+      />
+    </block>
+
+    <!-- 一行两个：左边永远是退出（取消 / 返回），右边是这一态的主操作（确定 / 重置密码） -->
+    <view class="pwd-two">
+      <view class="pwd-btn ghost" bindtap="onClosePwdPanel">{{privateSet ? t.privatePasswordBack : t.cancel}}</view>
+      <view wx:if="{{!privateSet}}" class="pwd-btn primary" bindtap="onPwdSave">{{t.privatePasswordOk}}</view>
+      <view wx:else class="pwd-btn danger" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
+    </view>
   </view>
 </view>

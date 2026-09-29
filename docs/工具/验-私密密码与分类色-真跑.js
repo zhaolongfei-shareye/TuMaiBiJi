@@ -42,29 +42,66 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await sleep(1200)
     d = await me.data()
     ck('点那一行浮出密码面板', d.pwdPanel === true)
+    ck('第二行小字说的是使用场景，不重复"6 位数字"',
+      /内容|笔记卡片/.test(d.t.privatePasswordScene) && !/6 位/.test(d.t.privatePasswordScene),
+      d.t.privatePasswordScene)
+    // 这个账号已经设过密码 → 面板应是"重置态"：没有输入格，只有 返回 / 重置密码
+    ck('已设过时面板不再给输入格', (await me.$$('.pwd-input')).length === 0)
+    let two = []
+    for (const b of await me.$$('.pwd-btn')) two.push(await b.text())
+    ck('已设过那一态一行两枚：返回 + 重置密码', two.join('|') === '返回|重置密码', two.join('|'))
+    await mp.screenshot({ path: path.join(OUT, '01a-面板已设过态.png') })
+
+    // 没设过那一态（只翻本地视图状态，不发请求）：两格输入 + 取消 / 确定
+    await me.setData({ privateSet: false })
+    await sleep(900)
     const inputs = await me.$$('.pwd-input')
-    ck('面板里有两格输入（新密码 + 再输一次）', inputs.length === 2)
-    ck('两格都是数字键盘且最多 6 位', (await inputs[0].attribute('maxlength')) === '6' || (await inputs[0].attribute('maxlength')) === 6)
+    ck('没设过那一态有两格输入（新密码 + 再输一次）', inputs.length === 2)
+    ck('两格都是数字键盘且最多 6 位', (await inputs[0].attribute('maxlength')) + '' === '6')
     ck('输入是掩码的（不吃明文）', (await inputs[0].attribute('password')) !== '')
-    ck('重置那一枚在（因为已设置过）', !!(await me.$('.pwd-reset')))
+    two = []
+    for (const b of await me.$$('.pwd-btn')) two.push(await b.text())
+    ck('没设过那一态一行两枚：取消 + 确定', two.join('|') === '取消|确定', two.join('|'))
+    await mp.screenshot({ path: path.join(OUT, '01b-面板设置态.png') })
 
     // 不足 6 位：不发请求、面板留着
     await me.setData({ pwd1: '12345', pwd2: '12345' })
-    await (await me.$('.pwd-save')).tap()
+    await (await me.$('.pwd-btn.primary')).tap()
     await sleep(900)
     d = await me.data()
-    ck('不到 6 位不保存、面板不关', d.pwdPanel === true && d.privateSet === true)
+    ck('不到 6 位不保存、面板不关', d.pwdPanel === true && d.privateSet === false)
     // 两格不一样：不发请求、第二格清空
     await me.setData({ pwd1: '135790', pwd2: '246801' })
-    await (await me.$('.pwd-save')).tap()
+    await (await me.$('.pwd-btn.primary')).tap()
     await sleep(900)
     d = await me.data()
     ck('两次不一样不保存', d.pwdPanel === true)
     ck('不一致时第二格清空让人重输', d.pwd2 === '', `pwd2=${d.pwd2}`)
-    await mp.screenshot({ path: path.join(OUT, '01-密码面板.png') })
-    await (await me.$('.pwd-cancel')).tap()
+    await (await me.$('.pwd-btn.ghost')).tap()
     await sleep(800)
     ck('取消能收掉面板', (await me.data()).pwdPanel === false)
+
+    /* ---------- 首页 slogan 下面那行日期 + 星期 ---------- */
+    await mp.switchTab('/pages/create/create')
+    await sleep(3500)
+    const home = await mp.currentPage()
+    const hd = await home.$('.date-row .d')
+    const hw = await home.$('.date-row .w')
+    const now = new Date()
+    ck('slogan 下面有日期那一行', !!hd, hd ? await hd.text() : '没找到 .date-row .d')
+    ck('日期是今天', hd && (await hd.text()) === `${now.getMonth() + 1}月${now.getDate()}日`, hd ? await hd.text() : '')
+    ck('星期跟着今天', hw && (await hw.text()) === ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()], hw ? await hw.text() : '')
+    const seg = await home.$('.lang-seg')
+    ck('字号与右边「中」一致', await hd.style('font-size') === await seg.style('font-size'),
+      `${await hd.style('font-size')} vs ${await seg.style('font-size')}`)
+    const cd = await hd.style('color')
+    const dh = await home.data()
+    if (dh.bgSrc) ck('铺了图时是半透明的纸白', /rgba\(242, 239, 233/.test(cd), cd)
+    else console.log('— 这一屏没铺背景图，颜色走灰字那一档（半透明白那条只在铺图时成立）')
+    const posD = await hd.offset()
+    const posT = await (await home.$('.page-title')).offset()
+    ck('靠左坐在 slogan 下面', posD.left < 40 && posD.top > posT.top, `left=${posD.left} top=${posD.top} 标题 top=${posT.top}`)
+    await mp.screenshot({ path: path.join(OUT, '01c-首页日期行.png') })
 
     /* ---------- 分类那一排上颜色 ---------- */
     await mp.switchTab('/pages/index/index')

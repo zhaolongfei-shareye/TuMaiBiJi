@@ -48,6 +48,23 @@ Page({
     skinWrite: toneStyle(0),
     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
     bgSrc: '',
+    // slogan 下面那行：onShow 里现算，这里先给空串免得第一帧闪一个空行
+    dateText: '',
+    weekText: '',
+  },
+
+  // slogan 下面那行日期 + 星期（效果图「统一录入条」那一稿就有，之前落地时漏了）。
+  // 它是提醒、不是信息主体：字号跟右边「中」一致，颜色吃 --text-secondary/--text-tertiary
+  // ——铺了背景图时这两个变量本身就是半透明纸白，没铺时是灰字，两头都不用另写规则。
+  dateLineFor(lang) {
+    const n = new Date()
+    if (lang === 'en') {
+      const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      const W = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      return { dateText: `${M[n.getMonth()]} ${n.getDate()}`, weekText: W[n.getDay()] }
+    }
+    const W = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+    return { dateText: `${n.getMonth() + 1}月${n.getDate()}日`, weekText: W[n.getDay()] }
   },
 
   // onShow 只同步主题/语言/tab，**绝不重置草稿**。
@@ -73,6 +90,8 @@ Page({
       shotDesc: this.shotDescFor(this.data.previewImages.length),
       // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
       bgSrc: poster.homeBg(),
+      // 日期 + 星期：跨零点回来也要跟着翻，所以每次进页现算
+      ...this.dateLineFor(lang),
     })
     this.setData({ barTitle: this.barTitleFor(this.data.active, this.data.previewImages.length) })
     app.setNavTitle('navCreate', lang)
