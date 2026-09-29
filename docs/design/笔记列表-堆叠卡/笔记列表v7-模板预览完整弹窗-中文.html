@@ -2,24 +2,22 @@
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<title>图麦笔记 · 笔记列表 v7（模板预览独浮弹窗+垫板毛玻璃 · 中文 · 2026-09-29）</title>
+<title>图麦笔记 · 笔记列表 v7（模板预览独浮弹窗 · 中文 · 2026-09-29）</title>
 <style>
 /* ==================================================================
-   站长 09-29 第六轮纠正（这一稿改的）：
-   "完全错了，我没叫你把tab都毛玻璃，我只是让你把详情页和开片模板区分开，不要粘在一起。
-    卡片模板的弹窗不要与其他的混在一起。我的笔记和下方三个tab不能全虚化。
-    只是把上一层的详情页隐藏，只出现卡片模板预览和选择的弹窗。不用与其他层级重叠。"
-   → 改④⑤两屏：详情窗整个藏起来，页面上只浮模板预览这一个弹窗，跟别的层级不混——
-     「我的笔记」、搜索条、分类色块、列表、三个 tab 全部原样清晰。
-     毛玻璃只垫在弹窗身后当分隔：一块圆角垫板（比弹窗四周各大 12），里面放一份整页内容的
-     拷贝按原坐标对齐、整体虚化 blur 24，再蒙纸色薄雾 62%——背后的笔记只剩柔和色影、不露脸。
-     怎么关：取消 / 保存成功 / 点一下把手，三个口都收掉垫板与弹窗回详情（⑥）。
+   站长 09-29 第七轮纠正（这一稿改的）：
+   "还是看到两层叠加在一起，我不是说了不行吗？你以后确认后，与需求对照后再发给我。"
+   → 上一稿"两层感"的两个来源都撤：弹窗身后那块毛玻璃垫板（里面拷了一份整页内容再虚化，
+     内容影子从弹窗四周露出来）整个删掉；⑤屏中间卡两侧的相邻模板淡影也删掉。
+     现在弹窗背后什么都不垫：搜索条、分类块、列表行、弹窗四者左右同宽（都是 24–726），
+     弹窗一浮上来正好盖严，四周只剩背景图。「我的笔记」和三个 tab 在弹窗外面，原样清晰。
+     怎么关：取消 / 保存成功 / 点一下把手，三个口都收掉弹窗回详情（⑥）。
    这一轮只出中文六屏（站长原话"只生成中文版"）；英文字串出处与第五/六稿同一条，落地照抄。
    其余一字未动：预览整卡（第六稿）、收起行 124、动感横条、详情窗、海报内容、字符串零新串。
 
    六屏：① 默认（列表顶，第一条整卡展开） ② 点第二条 → 卡片挪过去
-         ③ 点开着的卡 → 详情窗口  ④ 转为笔记卡片 → 只浮模板预览弹窗（垫板毛玻璃）
-         ⑤ 左右滑换模板（同一弹窗）  ⑥ 保存成功 → 弹窗消失回详情
+         ③ 点开着的卡 → 详情窗口  ④ 转为笔记卡片 → 只浮模板预览弹窗（背后不垫）
+         ⑤ 左右滑换模板（同一弹窗，整张换上下一套）  ⑥ 保存成功 → 弹窗消失回详情
 
    口径与代码同一把尺子：px 当 rpx 用，设计宽 750；一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690。
    背景引线上原图 miniprogram/assets/home-bg-portrait.jpg（865×1670），cover；压暗停点逐字抄 create.wxss。
@@ -60,17 +58,11 @@
       rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)}
   .lay{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:2}
 
-  /* ---------- 第七稿：模板预览 = 独浮弹窗 + 垫板毛玻璃 ----------
+  /* ---------- 第七稿：模板预览 = 只浮一个弹窗，背后什么都不垫 ----------
      页面原样清晰（head/rows/tabbar 照 ③ 的那一态，只少详情窗）；
-     毛玻璃只垫在弹窗身后：.stage 一块圆角垫板（比弹窗四周各大 12），overflow 裁圆角；
-     .stageIn 是整页内容的拷贝，按原坐标对齐（垫板在 (12,302)，拷贝反向位移 (-12,-302)，
-     两者原点重合在手机 (0,0)），整体虚化 blur 24；.tint 蒙纸色薄雾。
-     背后的笔记只剩柔和色影，任何文字不可辨；垫板外的页面一律清晰。
-     弹窗本体 z:9 压在垫板上，几何与详情窗同一条、一字未动。 */
-  .stage{position:absolute;left:12px;right:12px;top:302px;bottom:140px;z-index:8;border-radius:52px;
-    overflow:hidden;background:#E7E4DC;box-shadow:0 30px 80px rgba(8,10,14,.38)}
-  .stage .stageIn{position:absolute;left:-12px;top:-302px;width:750px;height:1690px;filter:blur(24px)}
-  .stage .tint{position:absolute;inset:0;background:rgba(252,251,248,.62)}
+     搜索条、分类块、列表行、弹窗四者左右同宽（都是 24–726）——弹窗一盖全严，
+     四周只剩背景图；「我的笔记」和三个 tab 在弹窗外面，原样清晰。
+     不垫板、不虚化：垫板里的内容影子、两侧模板淡影，都会被看成"两层叠在一起"。 */
 
   .sb{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
     font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
@@ -206,11 +198,6 @@
   .pbox{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;
     padding:0 30px;background:linear-gradient(180deg,#F1EEE7,#E7E3DA)}
   .pbox img{max-width:100%;max-height:100%;border-radius:14px;box-shadow:0 18px 40px rgba(8,10,14,.28);display:block}
-  .pbox .pair{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-  .pbox .pair img{position:absolute;left:50%;transform:translateX(-50%)}
-  .pbox .pair .a{transform:translateX(calc(-50% - 190px)) scale(.9);opacity:.42}
-  .pbox .pair .b{transform:translateX(calc(-50% + 190px)) scale(.9);opacity:.42}
-  .pbox .pair .c{z-index:2}
   .swipe{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:var(--fs-tiny);
     font-weight:700;letter-spacing:.4px;color:rgba(35,37,44,.42)}
   .swipe .ar{opacity:.55;margin:0 12px}
@@ -335,7 +322,7 @@ const mk = (T) => {
     ${tabbar}`
 
   /* ④/⑤ 专用：详情窗整个藏起来，页面照 ③ 的那一态原样清晰（tab 原样）；
-     .stage 垫板里放整页拷贝虚化 + 纸色薄雾，垫在弹窗（.sheet，z:9）身后。 */
+     弹窗背后什么都不垫：弹窗与搜索/分类/列表左右同宽，一盖全严，四周只剩背景图。 */
   const modalShell = (sheetInner) => `
     <div class="sb"><span>23:03</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
     <div class="nb"><span class="t">${T.nav}</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
@@ -343,14 +330,6 @@ const mk = (T) => {
     ${head()}
     <div class="lay"><div class="rows">${listRows(1)}</div></div>
     ${tabbar}
-    <div class="stage">
-      <div class="stageIn">
-        <div class="bg" style="background-image:url('${IMG}')"></div><div class="scrim"></div>
-        ${head()}
-        <div class="lay"><div class="rows">${listRows(1)}</div></div>
-      </div>
-      <div class="tint"></div>
-    </div>
     <div class="lay" style="z-index:9"><div class="sheet">${sheetInner}</div></div>`
 
   const chip = (k) => `<div class="chip" style="background:${CAT[k].bg};color:${CAT[k].ink}">${CAT[k].name}</div>`
@@ -405,8 +384,7 @@ const mk = (T) => {
     </div></div>`)
 
   /* ③ 详情那一屏：内容还是 pages/detail/detail.wxml 那几块，顺序一字不差；
-     差别三处——色彩方块撤掉换成纯文字抬头、操作条钉在窗口下沿、顶部多一条把手。
-     注意：这一步背景还是清晰的，毛玻璃只在模板预览弹窗那一步上。 */
+     差别三处——色彩方块撤掉换成纯文字抬头、操作条钉在窗口下沿、顶部多一条把手。 */
   const detailBody = `
     <div class="hd2">
       <div class="meta">${SRC[NOTES[3].src][0]} · 2026-09-24 21:14</div>
@@ -450,7 +428,7 @@ const mk = (T) => {
     </div>`
 
   /* ④ 点「转为笔记卡片」：详情窗整个藏起来，页面上只浮模板预览这一个弹窗；
-     弹窗身后垫 .stage 毛玻璃垫板，背后的笔记只剩柔和色影、不露脸。
+     弹窗背后什么都不垫——弹窗与搜索/分类/列表左右同宽，一盖全严。
      关掉弹窗的口：取消、保存成功、点一下把手，都回详情页。 */
   const S4 = modalShell(`
       <div class="grip"><i></i><em>${T.grip}</em></div>
@@ -460,20 +438,17 @@ const mk = (T) => {
       </div>
       ${dockPoster}`)
 
-  /* ⑤ 左右滑换模板中：三张并排，中间是当前的；吐司报出刚切到的名字。垫板毛玻璃不变 */
+  /* ⑤ 左右滑换模板：整张换上下一套（两侧淡影撤了——它们从弹窗两边探出头，
+     正是"两层叠在一起"的来源之一），吐司报出刚切到的名字 */
   const S5 = modalShell(`
       <div class="grip"><i></i><em>${T.grip}</em></div>
-      <div class="pbox"><div class="pair">
-        <img class="a" src="${POSTER}${TPLS[1].f}">
-        <img class="c" src="${POSTER}${TPLS[2].f}">
-        <img class="b" src="${POSTER}${TPLS[3].f}">
-      </div>
+      <div class="pbox"><img src="${POSTER}${TPLS[2].f}">
         <div class="swipe"><span class="ar">‹</span>${T.swipeHint}<span class="ar">›</span></div>
         <div class="toast">${TPLS[2].zh}</div>
       </div>
       ${dockPoster}`)
 
-  /* ⑥ 保存成功：弹窗连同垫板一起收掉，浮上来的还是详情窗（不是回列表），页面本来就清晰 */
+  /* ⑥ 保存成功：弹窗收掉，浮上来的还是详情窗（不是回列表），页面本来就清晰 */
   const S6 = shell(head() + `
     <div class="lay"><div class="rows">${listRows(1)}</div></div>
     <div class="lay" style="z-index:9"><div class="sheet">
@@ -497,17 +472,18 @@ const DOC = `
   <div class="nb" style="background:#E9EEEA;border-bottom:3px solid rgba(35,37,44,.10)"><span class="t" style="color:#23252C">标注</span>
     <span class="capsule" style="background:rgba(35,37,44,.06);box-shadow:inset 0 0 0 2px rgba(35,37,44,.10);color:#23252C"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
   <div class="docbody">
-    <div class="blk2"><h4>这一稿改的：详情窗藏起来，只浮模板预览这一个弹窗</h4>
-      <p><b>你的原话："完全错了，我没叫你把tab都毛玻璃，我只是让你把详情页和开片模板区分开，不要粘在一起。卡片模板的弹窗不要与其他的混在一起。我的笔记和下方三个tab不能全虚化。只是把上一层的详情页隐藏，只出现卡片模板预览和选择的弹窗。不用与其他层级重叠。"</b></p>
-      <p><b>改的是④⑤两屏：</b>上一稿把导航条以下整屏都虚了，虚过了头。这一稿详情窗整个藏起来，页面上只浮模板预览这一个弹窗，跟别的层级不混；「我的笔记」、搜索条、分类色块、列表、三个 tab 全部原样清晰。毛玻璃只垫在弹窗身后当分隔：一块圆角垫板，比弹窗四周各大 12，里面放一份整页内容的拷贝按原坐标对齐、整体虚化，再蒙一层纸色薄雾——背后的笔记只剩柔和色影、不露脸。弹窗本体几何一字未动（左右 24、上沿停在搜索上方、下沿离底栏 24）。</p>
-      <p><b>怎么关：</b>取消、保存成功、点一下窗口顶上的把手，三个口都收掉垫板和弹窗、回到详情页状态。⑥屏就是保存成功后那一眼——弹窗没了、详情窗回来，页面本来就清晰（这一屏与第六稿一字未动）。</p></div>
+    <div class="blk2"><h4>这一稿改的：弹窗背后什么都不垫，只浮模板预览这一个弹窗</h4>
+      <p><b>你的原话："还是看到两层叠加在一起，我不是说了不行吗？你以后确认后，与需求对照后再发给我。"</b></p>
+      <p><b>上一稿"两层感"的两个来源，这一稿都撤了：</b>① 弹窗身后那块毛玻璃垫板——垫板里放了一份整页内容的拷贝再虚化，内容影子（标题栏的灰影）从弹窗四周露出来，看着就是弹窗下面还压着一层；② ⑤屏中间卡两侧的相邻模板淡影——从弹窗两边探出头，又是一层。这一稿垫板整个不要，弹窗背后什么都不垫。</p>
+      <p><b>盖得住的道理：</b>搜索条、分类块、列表行、弹窗四者左右同宽（都是左右 24）——弹窗一浮上来，搜索、分类、笔记全部被盖严，四周只剩背景图；「我的笔记」和三个 tab 在弹窗外面，原样清晰。你说的"例如用毛玻璃"本意是把背后的笔记盖掉，这一稿干脆不让背后有任何东西，也不用虚化能力。</p>
+      <p><b>怎么关：</b>取消、保存成功、点一下窗口顶上的把手，三个口都收掉弹窗、回到详情页状态。⑥屏就是保存成功后那一眼——弹窗没了、详情窗回来（这一屏与第六稿一字未动）。</p></div>
     <div class="blk2"><h4>这一轮只出中文</h4>
       <p>你说"为了加快速度，效果图你只需要生成中文版即可"——这轮就只有中文六屏。英文骨架字的出处与第五/六稿同一条（<code>utils/i18n.js</code> en 段逐键照抄、模板名吐司取 <code>poster.js</code> 的 labelEn），落地时照抄即可，不再重复出图。</p></div>
     <div class="blk2"><h4>尺寸增量（rpx，其余照第六稿尺寸表）</h4>
       <table>
         <tr><th>位置</th><th>数值</th></tr>
-        <tr><td>毛玻璃垫板</td><td>只垫在弹窗身后：圆角 52、左右 12、上沿 302、下沿 140——比弹窗四周各大 12。两步画法：垫板里放一份整页内容的拷贝按原坐标对齐、整体虚化 blur 24 → 蒙纸色 <b>#FCFBF8 62%</b> 薄雾。背后的笔记只剩柔和色影，任何文字不可辨；垫板外的页面（「我的笔记」、三个 tab）一律清晰</td></tr>
-        <tr><td>弹窗几何</td><td>与详情窗口同一条：左右 24、上沿 130（停在搜索上方）、下沿离底栏 24；窗内把手 + 海报预览 + 带二维码 + 取消/保存到相册，与第六稿一字未动</td></tr>
+        <tr><td>弹窗几何</td><td>与详情窗口同一条，一字未动：左右 24、上沿 130（停在搜索上方）、下沿离底栏 24。背后不垫任何东西——弹窗与搜索条/分类块/列表行左右同宽（都是 24–726），一盖全严，四周只剩背景图</td></tr>
+        <tr><td>⑤屏换模板</td><td>撤掉中间卡两侧的相邻模板淡影，滑一下整张换上下一套（这屏是「叠翠」），吐司报名字；「左右滑换模板」提示条照旧</td></tr>
         <tr><td>其余</td><td>收起行 124 / 预览卡 362 / 动感横条 / 详情窗，全部照第六稿，一行没动</td></tr>
       </table></div>
     <div class="blk2"><h4>字符串</h4>
@@ -516,7 +492,7 @@ const DOC = `
       <p><b>预览这条线上的：</b>① 默认概要开在哪条（画的是进页面开在第一条/置顶）；② 概要几行截断（画的是整四行）；③ 点开着卡的行 = 进详情窗口；④ 标题 36 字阶现网没有（<code>--fs-h2</code> 是 34），加一档还是用 34。</p>
       <p><b>第四稿挂着的四条原样还在：</b>列表点吃原色还是加深档；筛选枚选中态；墨黑那一档；置顶图钉。这四条不拍不影响这一稿。</p></div>
     <div class="blk2"><h4>落地代价（只说这一稿的增量）</h4>
-      <p><b>真毛玻璃 = <code>backdrop-filter</code>（只挂在垫板那一个元素上）：</b>iOS 微信支持好；安卓端支持度参差，落地前实测——不支持就降级成纯半透明纸色蒙层（毛玻璃感弱一档，但"盖住背后"的目的达到），不引新能力。</p>
+      <p><b>不用任何虚化能力：</b>垫板撤了，<code>backdrop-filter</code> 这条安卓兼容风险整个消失——小程序里就是"详情窗藏起 + 弹窗盖在列表上"两个视图层动作，iOS/安卓同一套实现。</p>
       <p>海报<b>画布进 fixed 窗口会错位</b>那条坑照旧先实测再动手（上一稿挂着的）。</p></div>
   </div>`
 
@@ -525,10 +501,10 @@ flow.innerHTML =
   UNIT('①', '默认 · 进页面第一眼', '列表停在顶上：第一条（置顶那篇）整卡展开——大标题、整四行概要、脚下分类·来源·标签·日期一条 meta 行。这就是你拍的那张卡的画法（你截的是淡路岛那张，这里画在置顶这条上，同一套尺寸）。其余行还是三样：点、标题、日期。', C1)
   + UNIT('②', '点第二条 → 卡片挪过去', '概要一次只开一条：点了市集那条，整卡挪过来，置顶那条收回标题行，下面的行整体上移。列表没滚，还是顶上那一态。', C2)
   + UNIT('③', '点开着卡那条 → 详情窗口', '这条衔接你拍过的"展开就是详情页"：点收着的行 = 卡片挪过去；点开着卡的行 = 进详情。窗口几何、吸底操作与第四稿一字不差——这一步浮在页面上的只有详情窗这一个窗口，背景清晰。', C3)
-  + UNIT('④', '点「转为笔记卡片」→ 只浮模板预览这一个弹窗', '详情窗整个藏起来，页面上只浮模板预览这一个弹窗，跟别的层级不混。弹窗身后垫一块圆角毛玻璃垫板：背后的笔记只剩柔和色影、不露脸；「我的笔记」和三个 tab 原样清晰。这张是真成品图（玉版宣）。切模板还是海报上左右滑，小吐司报出当前模板名。', C4)
-  + UNIT('⑤', '左右滑换模板中（同一个弹窗）', '垫板毛玻璃不变。三张并排，中间是当前的，左右两张淡出。切一套弹一次吐司：这屏是「叠翠」。按 poster.js 里那十套的顺序走，到第十套滑不动、不循环。', C5)
-  + UNIT('⑥', '保存成功 → 弹窗消失，回到详情页', '吐司「已保存到相册」。弹窗连同垫板一起收掉，浮上来的还是详情窗那一屏（不是回列表、也不是关窗）。再点把手才收回到列表。', C6)
-  + `<div class="unit"><div class="cap"><span class="step">标注</span><h3>模板预览独浮弹窗：毛玻璃垫板、背后的笔记不露脸</h3><p>你点的两屏（④⑤）改成只浮一个弹窗、毛玻璃只垫弹窗身后；「我的笔记」和三个 tab 原样清晰；弹窗几何与窗内内容一字未动；这一轮只出中文。</p></div>
+  + UNIT('④', '点「转为笔记卡片」→ 只浮模板预览这一个弹窗', '详情窗整个藏起来，页面上只浮模板预览这一个弹窗，跟别的层级不混。弹窗背后什么都不垫：搜索、分类、笔记被弹窗盖得严严实实，四周只剩背景图；「我的笔记」和三个 tab 原样清晰。这张是真成品图（玉版宣）。切模板还是海报上左右滑，小吐司报出当前模板名。', C4)
+  + UNIT('⑤', '左右滑换模板（同一个弹窗）', '同一个弹窗，左右滑一下，整张换上下一套（这屏是「叠翠」），吐司报出刚切到的名字。上一稿中间卡两侧的相邻模板淡影撤了——它们从弹窗两边探出头，正是"两层叠在一起"的来源之一。按 poster.js 里那十套的顺序走，到第十套滑不动、不循环。', C5)
+  + UNIT('⑥', '保存成功 → 弹窗消失，回到详情页', '吐司「已保存到相册」。弹窗收掉，浮上来的还是详情窗那一屏（不是回列表、也不是关窗）。再点把手才收回到列表。', C6)
+  + `<div class="unit"><div class="cap"><span class="step">标注</span><h3>模板预览独浮弹窗：背后什么都不垫，笔记一点不露</h3><p>你点的两屏（④⑤）再改：垫板和两侧淡影都撤了，弹窗背后什么都不垫；「我的笔记」和三个 tab 原样清晰；弹窗几何与窗内内容一字未动；这一轮只出中文。</p></div>
      <div class="ph doc">${DOC}</div></div>`
 </script>
 </body>
