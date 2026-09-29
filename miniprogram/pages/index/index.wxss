@@ -288,7 +288,9 @@
   top: 0;
   right: 0;
   bottom: 0;
-  background: rgba(18, 20, 26, 0.55);
+  /* v7 那条口径："我的笔记"、搜索条、分类块、列表、三个 tab 全部原样清晰，
+     弹窗身后什么都不垫。透明遮罩只用来挡穿透点击（点弹窗外=取消），不遮暗任何东西。 */
+  background: transparent;
   z-index: 100;
 }
 

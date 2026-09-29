@@ -81,7 +81,8 @@
         <view class="row-title">
           <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
         </view>
-        <view class="summary" wx:if="{{item.summary}}">{{item.summary}}</view>
+        <!-- 折叠条不露摘要（v5 那条口径）：summary 只在展开态渲染 -->
+        <view class="summary" wx:if="{{openIdx === index && item.summary}}">{{item.summary}}</view>
         <view class="row-foot">
           <view class="cat {{item.catRing ? 'is-ring' : ''}}" style="{{item.catStyle}}">
             <view class="cat-dot"></view>
@@ -100,7 +101,7 @@
         <view class="row-actions" wx:if="{{openIdx === index}}" catchtap="noop">
           <view class="act-btn {{item.is_pinned ? 'on' : ''}}" catchtap="onRowTogglePin" data-idx="{{index}}">{{item.is_pinned ? t.unpin : t.pin}}</view>
           <view class="act-btn" catchtap="onRowEdit" data-idx="{{index}}">{{t.edit}}</view>
-          <view class="act-btn danger" catchtap="onRowDelete" data-idx="{{index}}">{{t.del}}</view>
+          <view class="act-btn danger" catchtap="onRowDelete" data-idx="{{index}}">{{t.delete}}</view>
           <view class="act-btn primary" wx:if="{{!item.is_private}}" catchtap="onRowShare" data-idx="{{index}}">{{t.shareAsImage}}</view>
         </view>
       </view>
