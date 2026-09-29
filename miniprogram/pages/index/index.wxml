@@ -106,4 +106,24 @@
       </view>
     </view>
   </view>
+
+  <!-- v7：海报画布藏在屏幕外、不进 fixed——这条是历史坑（fixed 里的原生 canvas 会整体错位）。
+       弹窗里显示的是 canvasToTempFilePath 出的成品 <image>，image 进 fixed 是常规做法。 -->
+  <canvas id="posterCanvas" type="2d" class="poster-canvas-offscreen" style="width: {{posterW}}rpx; height: {{posterH}}rpx"></canvas>
+
+  <!-- v7：模板独浮弹窗——拉弹窗时上面的展开行已经通过 openIdx=-1 收掉了，页面上只剩这一个浮层。
+       搜索条、分类块、列表行、tab 栏在弹窗身后一字不虚；弹窗左右内缩 24、离 tab 留 24。 -->
+  <view wx:if="{{templateOpen}}" class="tpl-mask" bindtap="onCancelTemplate"></view>
+  <view wx:if="{{templateOpen}}" class="tpl-sheet">
+    <view class="tpl-handle" bindtap="onHandleTap"></view>
+    <view class="tpl-body" bindtouchstart="onPosterTouchStart" bindtouchend="onPosterTouchEnd">
+      <image wx:if="{{posterImagePath}}" class="tpl-poster" src="{{posterImagePath}}" mode="widthFix" style="width: {{posterW}}rpx" />
+      <view wx:else class="tpl-loading">{{t.loading}}</view>
+      <view class="tpl-swipe-hint">{{t.swipeHint}}</view>
+    </view>
+    <view class="tpl-actions">
+      <view class="tpl-btn" bindtap="onCancelTemplate">{{t.cancel}}</view>
+      <view class="tpl-btn primary {{posterImagePath ? '' : 'disabled'}}" bindtap="onSavePoster">{{t.saveToAlbum}}</view>
+    </view>
+  </view>
 </view>

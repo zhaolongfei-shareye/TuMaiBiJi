@@ -269,6 +269,115 @@
   color: var(--bg-page);
 }
 
+/* ---------- v7 模板独浮弹窗 ----------
+   弹窗与底页分层：详情窗（展开行）在 templateOpen 时靠 openIdx=-1 整块收掉，
+   页面上只剩这一个 fixed 浮层。背后什么都不垫——搜索条、分类块、列表、tab 都在
+   遮罩层以下一字不虚（v7 前两轮被否的关键就在这条，见 §8.64）。
+   画布不进 fixed：canvas 藏在屏幕外 left:-9999rpx，只用来生成图片；
+   弹窗里放 canvasToTempFilePath 出的成品 <image>，绕开 share.wxml 顶部注释
+   记的那条"画布放进 fixed 会整体错位"的坑。 */
+.poster-canvas-offscreen {
+  position: absolute;
+  left: -9999rpx;
+  top: 0;
+}
+
+.tpl-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(18, 20, 26, 0.55);
+  z-index: 100;
+}
+
+.tpl-sheet {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  top: 130rpx;
+  bottom: 152rpx;  /* 24 (离底栏 24 + 底栏高 ~128) */
+  background: #FCFBF8;
+  border-radius: 32rpx;
+  box-shadow: 0 30rpx 60rpx rgba(8, 10, 14, 0.32);
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20rpx 0 24rpx;
+}
+
+.tpl-handle {
+  width: 96rpx;
+  height: 12rpx;
+  border-radius: 6rpx;
+  background: rgba(35, 37, 44, 0.22);
+  margin-bottom: 16rpx;
+  flex: none;
+}
+
+.tpl-body {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+}
+
+.tpl-poster {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 20rpx;
+  box-shadow: 0 12rpx 30rpx rgba(8, 10, 14, 0.18);
+}
+
+.tpl-loading {
+  color: #6b6f77;
+  font-size: var(--fs-body);
+}
+
+.tpl-swipe-hint {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #9a9ea6;
+  flex: none;
+}
+
+.tpl-actions {
+  display: flex;
+  gap: 20rpx;
+  padding: 0 32rpx;
+  margin-top: 16rpx;
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tpl-btn {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: var(--r-pill);
+  background: var(--chip-idle);
+  color: var(--text-primary);
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.tpl-btn.primary {
+  background: var(--accent);
+  color: var(--bg-page);
+}
+
+.tpl-btn.disabled {
+  opacity: 0.45;
+}
+
 .container {
   padding-bottom: 160rpx;
 }

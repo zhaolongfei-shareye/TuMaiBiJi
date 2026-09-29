@@ -2,7 +2,7 @@ const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { catSkinFor, chromeOf, toneVars } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
-const { formatShortDate } = require('../../utils/date.js')
+const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 
 // 统计看板一次读多少条：后端 /api/notes 的 limit 上限就是 100，写不了更大。
 // 所以总数超过一百篇只能显示"100+"——接口没给 count，不能假装知道。
@@ -44,6 +44,14 @@ Page({
     openIdx: -1,
     // 私密笔记：本会话里已经验过密码就不再重问
     _privateVerified: false,
+    // v7 模板独浮弹窗：详情窗（展开行）藏起来、只浮一个海报图 + 关闭/保存
+    templateOpen: false,
+    posterNote: null,
+    posterTpl: '',
+    posterImagePath: '',
+    posterW: 750,
+    posterH: 900,
+    posterBusy: false,
     // 搜索条那一块面不再是一支固定蓝，而是由当前壁纸的页面底派生（palette.chromeOf）。
     // data 字面量里这一次是模块加载时算的，主题还没落地，所以按 default 走——
     // 和 themeOf 拿不到 key 时回落 THEMES[0] 是同一条规则，不是另写一份兜底色。
@@ -334,13 +342,162 @@ Page({
     })
   },
 
-  // 展开行"转为笔记卡片"= 走独立分享页。v7 那稿要把它改成页内独浮弹窗，
-  // 这一轮先复用现有 share 页，架构改动留到下一次。私密笔记整按钮就不渲染。
-  onRowShare(e) {
+  // 展开行"转为笔记卡片" = 关掉展开行 + 打开 v7 独浮弹窗；
+  // 详情窗藏起来（openIdx=-1）、弹窗里只浮海报图。关闭时把展开行还原。
+  async onRowShare(e) {
     const idx = e.currentTarget.dataset.idx
     const note = this.data.notes[idx]
     if (!note || note.is_private) return
-    wx.navigateTo({ url: `/pages/share/share?id=${note.id}` })
+    this._prevOpenIdx = this.data.openIdx
+    const profile = poster.readProfile()
+    this.setData({
+      openIdx: -1,
+      templateOpen: true,
+      posterNote: note,
+      posterTpl: profile.template || poster.DEFAULT_TEMPLATE,
+      posterImagePath: '',
+      posterBusy: true,
+    })
+    try {
+      await this._ensurePosterAssets(note.id)
+      await this._renderPoster()
+    } catch (err) {
+      console.error('生成海报失败', err)
+      wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
+      this._closeTemplate()
+    }
+  },
+
+  async _ensurePosterAssets(noteId) {
+    if (this._posterAssets && this._posterAssets.noteId === noteId) return
+    const note = await api.getNote(noteId)
+    const share = await api.createShare(noteId, poster.readProfile().name)
+    const qrPath = await this._downloadQR(share.token)
+    // 分类名不在笔记响应里，海报上那行小字要靠分类表查——与 share.js 同一条口径。
+    if (note.category_id) {
+      try {
+        const categories = await api.getCategories()
+        const cat = categories.find((c) => c.id === note.category_id)
+        if (cat) note.category_name = cat.name
+      } catch (err) { /* 查不到就只写来源 */ }
+    }
+    this._posterAssets = { noteId, note, token: share.token, qrPath }
+  },
+
+  _downloadQR(token) {
+    return new Promise((resolve, reject) => {
+      wx.downloadFile({
+        url: api.getShareQRCodeUrl(token),
+        success: (r) => r.statusCode === 200 ? resolve(r.tempFilePath) : reject(new Error('QR ' + r.statusCode)),
+        fail: reject,
+      })
+    })
+  },
+
+  async _getCanvas() {
+    return new Promise((resolve, reject) => {
+      wx.createSelectorQuery().select('#posterCanvas').fields({ node: true, size: true }).exec((res) => {
+        const c = res && res[0] && res[0].node
+        if (c) resolve(c); else reject(new Error('海报画布未就绪'))
+      })
+    })
+  },
+
+  // 与 share.js render() 同一套：先量后画、canvas 尺寸切两次、paintLayers 落笔、canvasToTempFilePath 出成品。
+  // 画布藏在 left:-9999rpx 位置、不进 fixed，弹窗里只放成品 <image>——绕开 canvas-in-fixed 那条历史坑。
+  async _renderPoster() {
+    const a = this._posterAssets
+    if (!a) return
+    const lang = this.data.lang
+    const profile = poster.readProfile()
+    const canvas = await this._getCanvas()
+    const ctx = canvas.getContext('2d')
+    const images = { qr: await poster.loadImage(canvas, a.qrPath, 3000) }
+    const avatar = poster.avatarPath()
+    if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 5000)
+    canvas.width = poster.W
+    canvas.height = 750
+    const plan = poster.planPoster(ctx, a.note, this.data.posterTpl, profile, lang)
+    canvas.width = plan.width
+    canvas.height = plan.height
+    poster.paintLayers(ctx, plan.layers, images)
+    // 让图片在弹窗里等比缩到可视框（长图不能超过屏高）
+    const scale = Math.min(1, 1200 / plan.height)
+    this.setData({
+      posterW: Math.round(plan.width * scale),
+      posterH: Math.round(plan.height * scale),
+    })
+    const tmpPath = await new Promise((resolve, reject) => {
+      wx.canvasToTempFilePath({ canvas, fileType: 'png', success: (r) => resolve(r.tempFilePath), fail: reject }, this)
+    })
+    this.setData({ posterImagePath: tmpPath, posterBusy: false })
+  },
+
+  // v7 效果图里"左右滑换模板 / Swipe to change template"那条：横向滑过 60px 判定切换。
+  onPosterTouchStart(e) {
+    this._touchStartX = e.touches[0].clientX
+  },
+
+  onPosterTouchEnd(e) {
+    if (this.data.posterBusy) return
+    const dx = (e.changedTouches[0] || {}).clientX - this._touchStartX
+    if (Math.abs(dx) < 60) return
+    this._advanceTemplate(dx < 0 ? 1 : -1)
+  },
+
+  async _advanceTemplate(delta) {
+    const list = poster.TEMPLATES
+    const cur = list.findIndex((x) => x.id === this.data.posterTpl)
+    const next = list[((cur < 0 ? 0 : cur) + delta + list.length) % list.length]
+    if (next.id === this.data.posterTpl) return
+    this.setData({ posterTpl: next.id, posterBusy: true })
+    wx.showToast({ title: poster.templateLabel(next.id, this.data.lang), icon: 'none', duration: 1200 })
+    try {
+      await this._renderPoster()
+    } catch (err) {
+      console.error('换模板重画失败', err)
+      wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
+      this.setData({ posterBusy: false })
+    }
+  },
+
+  _closeTemplate() {
+    this.setData({
+      templateOpen: false,
+      posterImagePath: '',
+      posterBusy: false,
+      posterNote: null,
+      openIdx: typeof this._prevOpenIdx === 'number' ? this._prevOpenIdx : -1,
+    })
+    this._prevOpenIdx = undefined
+  },
+
+  onCancelTemplate() { this._closeTemplate() },
+  onHandleTap() { this._closeTemplate() },
+
+  onSavePoster() {
+    if (!this.data.posterImagePath) return
+    const { lang } = this.data
+    wx.saveImageToPhotosAlbum({
+      filePath: this.data.posterImagePath,
+      success: () => {
+        wx.showToast({ title: t('savedToAlbum', lang), icon: 'success' })
+        setTimeout(() => this._closeTemplate(), 800)
+      },
+      fail: (err) => {
+        const msg = (err && err.errMsg) || ''
+        if (msg.indexOf('cancel') >= 0) return
+        if (msg.indexOf('auth') >= 0) {
+          wx.showModal({
+            title: t('needAlbumPermission', lang),
+            content: t('permissionHint', lang),
+            success: (res) => { if (res.confirm) wx.openSetting() },
+          })
+        } else {
+          wx.showToast({ title: t('exportFailed', lang), icon: 'none' })
+        }
+      },
+    })
   },
 
   // catchtap 需要一个真函数才不吃事件；操作条本身点了不该收起该行。
