@@ -87,14 +87,15 @@ wxml.replace(/bind(change|input)="(\w+)"/g, (_, a, h) => handlers.add(h))
 
 // ---------- 5. 样式：条与面板的几何、以及"颜色不从 wxss 里长出来" ----------
 ok('旧的 .entry-cards 改成了 .entry-wrap', !/\.entry-cards/.test(wxss) && /\.entry-wrap/.test(wxss))
-// 66vh 是照效果图反推的：42vh 是三张卡（整组 480 高）时代的数，
-// 现在只剩一条 128 高的条，照旧数推上去条底会比底栏还低，所以真跑的几何断言才是尺子。
-// 关键是这段留白挂在 .entry-wrap 本身、不带 has-bg：关掉背景图时条子也在同一条线上。
-ok('留白 66vh，且不随背景开关变', /\.entry-wrap\s*\{[^}]*margin-top: 66vh/.test(wxss)
+// 62vh 是量出来的：42vh 是三张卡（整组 480 高）时代的数，只剩一条 128 高的条时照旧数推上去
+// 条底会比底栏还低；66vh 是 09-28 那一版的落点，09-30 标题下补了日期＋星期那一行之后整组被
+// 往下推了 26px（换背景那一行钻进底栏后面），收到 62vh 才回到「行底 681 / 底栏顶 689」。
+// 关键是这段留白挂在 .entry-wrap 本身、不带 has-bg：这一屏永远有图，也不会有第二种落点。
+ok('留白 62vh，且不随背景开关变', /\.entry-wrap\s*\{[^}]*margin-top: 62vh/.test(wxss)
   && !/\.container\.has-bg \.entry-wrap\s*\{[^}]*margin-top/.test(wxss))
 // 09-28 深夜起展开不再"让位到顶"，而是整块 fixed 贴到底栏上方（真机反馈：从顶上挂下来
 // 把照片和标题全盖住了）。留白那条 margin-top:0 仍在，但只是"从流里拿出来"的副作用。
-ok('展开时整块 fixed 贴底，且不再吃那 66vh',
+ok('展开时整块 fixed 贴底，且不再吃那 62vh',
   /\.container\.entry-dock \.entry-wrap\s*\{[^}]*position: fixed/.test(wxss)
   && /\.container\.entry-dock \.entry-wrap\s*\{[^}]*margin-top: 0/.test(wxss))
 ok('旧手风琴的高度档全部清掉了', !/\.open-url|\.open-shot|\.open-write|\.entry-label/.test(wxss))

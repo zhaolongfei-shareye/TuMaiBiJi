@@ -4,6 +4,11 @@
 // 所以这一把全部量视图层算出来的值，不量 data。
 // 底栏是组件，automator 的 page.$ 从页面树够不到（实测 .tab-bar / .tab-item 全是 null），
 // 那一面改成从截图采像素，采法在 采-底栏像素.py。
+//
+// 09-30 这一把跟着改了两处口径：① 外观设置里「用人像 / 不用」那一节整块撤了，
+// 这一屏永远铺图，所以搜索条那块面固定是纸白、不再吃 chromeOf——派生色现在只管底栏那枚胶囊；
+// ② 行内结构是 v4/v5 那一版（收起行只有点＋标题＋日期，分类名和 meta 行展开才出现），
+// 原来钉"收起行的 .cat 宽度"和"整行 meta 同色"的两条得挪到展开那一行去量。
 // 前置：微信开发者工具已开；改过 WXSS 要先 cli close 再 cli auto --auto-port 9431。
 // 跑法：NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-列表D2-真跑.js
 const automator = require('miniprogram-automator')
@@ -32,6 +37,10 @@ const css = (s) => String(s).replace(/\s+/g, '')
 // 纸白从源码现读，探针里不抄第二份表
 const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(
   fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/palette.js'), 'utf8'))[1]
+// 图上那一面搜索条的字色同理：从 index.wxss 现读那一条 --chrome-ink，别在探针里写第二份
+const INK = hexArr(/--chrome-ink:\s*(#[0-9A-Fa-f]{6})/i.exec(
+  fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/index/index.wxss'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ''))[1])
 const secondaryOf = (w) => {
   const m = new RegExp(`\\.${p.themeOf(w).cls}\\s*\\{([\\s\\S]*?)\\}`).exec(APP_WXSS)
   return /--text-secondary:\s*(#[0-9A-Fa-f]{6})/.exec(m[1])[1]
@@ -65,10 +74,6 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     return v
   }
   const before = await mp.evaluate(() => JSON.stringify(wx.getStorageSync('localWallpaper') || ''))
-  // 这一把量的是 D2 那一版：没有照片、只有壁纸底。09-28 深夜起笔记页头部也开始铺形象图，
-  // 两件事不能混在同一把尺子里——先把背景开关按到"不用"，收尾再还原回他原来那一档。
-  const bgOffBefore = await mp.evaluate(() => !!wx.getStorageSync('home_bg_off'))
-  await mp.evaluate(() => wx.setStorageSync('home_bg_off', true))
   // 这台机型的 rpx→px 比例（1rpx = windowWidth/750），几何断言全按它换算
   const R = (await mp.evaluate(() => wx.getSystemInfoSync().windowWidth)) / 750
 
@@ -77,17 +82,27 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     const label = p.themeOf(w).label
     const chrome = p.chromeOf(w)
     await mp.evaluate((key) => wx.setStorageSync('localWallpaper', key), w)
-    await enter('/pages/index/index')
-    await sleep(4000)
-    const page = await enter('/pages/index/index')
-    await sleep(4500)
-    const d = await page.data()
+    // 刚 cli auto 完，头一次 reLaunch 会撞上 "getPageMetaByWebviewId(...) is null"：
+    // 页面进去了、data 却是空的。上一把带着 0 条往下量，最后在一行几何断言上崩掉，
+    // 白跑六分钟。所以这里重试到真拿到笔记为止，拿不到就大声停，不往下算。
+    let page, d
+    for (let i = 0; i < 3; i++) {
+      page = await enter('/pages/index/index')
+      await sleep(4500)
+      d = await page.data()
+      if ((d.notes || []).length) break
+      console.log(`第 ${i + 1} 次进列表只拿到 0 条，重进一次`)
+    }
+    if (!(d.notes || []).length) throw new Error('列表三次都是空的：这一把没法量（先确认登录态与网络）')
 
-    // ---------- ① 搜索条：这块面的值必须就是派生出来的那一支 ----------
+    // ---------- ① 搜索条：这一屏永远铺图，这块面固定是纸白那一档 ----------
+    // 原来这条钉的是"搜索条底色 = chromeOf"，那是背景开关还活着、这一屏能退回纯壁纸底时的口径。
+    // 09-30 起那一节整块撤了，chromeOf 只剩底栏胶囊一个消费者。
     const scBg = await styleOf(page, '.sc-card', 'background-color')
-    ck(`${label}：搜索条底色 = chromeOf 算出来的那支`, near(rgbOf(scBg), hexArr(chrome.bg)), `${scBg} vs ${chrome.bg}`)
+    ck(`${label}：搜索条底色 = 纸白（图上那一面，八套壁纸都是它）`,
+      near(rgbOf(scBg), hexArr(PAPER), 2), `${scBg} vs ${PAPER}`)
     const scInk = await styleOf(page, '.sc-go', 'color')
-    ck(`${label}：搜索条上的字 = 纸白`, near(rgbOf(scInk), hexArr(PAPER), 2), scInk)
+    ck(`${label}：搜索条上的字 = 墨色（纸白面上不能再压白字）`, near(rgbOf(scInk), INK, 2), scInk)
     const ph = await styleOf(page, '.sc-input', 'background-color') // 只用来确认读到值；占位符见截图
     ck(`${label}：搜索条上占位符不吃 opacity（样式里没有这条）`,
       !/\.sc-ph\s*\{[^}]*opacity/.test(fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/index/index.wxss'), 'utf8')))
@@ -124,16 +139,24 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
         : near(rgbOf(dotBg), hexArr(want0.dot), 2))
     ck(`${label}：那枚点渲染对了（${want0.ring ? '空心环：透明底 + 描边取字色' : '实心：点色 ' + want0.dot}）且 14rpx 见方`,
       dotOk, `${dotBg} / ${ds && ds.width}x${ds && ds.height}`)
-    const cs = cats.length ? await cats[0].size() : null
-    ck(`${label}：分类那一段没被压扁（flex:none 生效）`, !!cs && cs.width > 60 * R, cs && `${cs.width}px`)
-
-    // ---------- ③ meta 行那三个字不再灰不溜秋 ----------
-    const footColor = await styleOf(page, '.row-foot', 'color')
-    const dtColor = await styleOf(page, '.dt', 'color')
+    // ---------- ②b／③ 分类名和 meta 行只在展开那一行里有 ----------
+    // v4 起收起行只剩「点＋标题＋日期」：原来这两条拿收起行的 .cat 量宽度，量到的是那枚 7px 的点；
+    // .row-foot 在收起态整个不渲染，styleOf 读到 null，再被 "null === null" 判成"整行同色"——假绿。
+    const firstRow = (await page.$$('.note-row'))[0]
+    await firstRow.tap()          // 第一下展开手风琴（第二下才会开详情浮窗）
+    await sleep(1400)
+    const openCat = await page.$('.note-row.open .row-foot .cat')
+    const cs = openCat && await openCat.size()
+    ck(`${label}：展开行分类那一段没被压扁（flex:none 生效）`, !!cs && cs.width > 60 * R, cs && `${cs.width}px`)
+    const footColor = await styleOf(page, '.note-row.open .row-foot', 'color')
+    const dtColor = await styleOf(page, '.note-row.open .row-foot .dt', 'color')
     const sec = secondaryOf(w)
     ck(`${label}：日期吃 --text-secondary（不再是 tertiary 那一档）`,
       near(rgbOf(dtColor), hexArr(sec), 2), `${dtColor} vs ${sec}`)
-    ck(`${label}：meta 行整行同一个色`, css(footColor) === css(dtColor), `${footColor} / ${dtColor}`)
+    ck(`${label}：meta 行整行同一个色（两值都得真读到，null 不算）`,
+      !!footColor && !!dtColor && css(footColor) === css(dtColor), `${footColor} / ${dtColor}`)
+    await page.setData({ openIdx: -1 })   // 收回去：下一枚壁纸量的是同一批收起行
+    await sleep(700)
 
     // ---------- ④ 底栏（组件够不到，采像素）----------
     // 像素比对留 ±6：截图落盘带一次色彩管理，实测同一支 #2D2D6C 采回来是 (45,45,104)，
@@ -143,8 +166,9 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     const s = sampleBar(png)
     ck(`${label}：胶囊填充色 = chromeOf 那一支（像素）`, near(s.fill, hexArr(chrome.bg), 6),
       `${s.fill} vs ${hexArr(chrome.bg)}，占这条线 ${Math.round(s.fill_ratio * 100)}%`)
-    ck(`${label}：胶囊和搜索条同色（同一个函数，两块面必须一个值）`,
-      near(s.fill, rgbOf(scBg), 6), `${scBg} / ${s.fill}`)
+    // 原来这里还钉一条"胶囊和搜索条同色（同一个函数，两块面必须一个值）"。09-30 起两块面各走各的：
+    // 搜索条永远在图上、固定纸白，chromeOf 只剩底栏胶囊一个消费者，这条配对判据已经不成立。
+    // 上面那条"胶囊填充色 = chromeOf（像素）"仍在钉这个函数，判据没有丢。
     const idleWant = blend(PAPER, chrome.bg, p.themeOf(w).dark ? 0.68 : 0.62)
     const onCol = s.stroke[1]  // 中间那一格是「笔记」= 选中
     ck(`${label}：选中的字/图标采到纸白（笔画众数）`, near(onCol, hexArr(PAPER), 10), `${onCol} vs ${hexArr(PAPER)}`)
@@ -157,12 +181,15 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
       near(s.fill, s.page, 6) === false, `胶囊 ${s.fill} / 页面底 ${s.page}`)
     ck(`${label}：底栏样式里已经没有写死的 rgba(255,255,255,…)`,
       !/rgba\(255,\s*255,\s*255/.test(BAR_WXSS.replace(/\/\*[\s\S]*?\*\//g, '')))
-    // 几何从像素反推：box_rpx = [左, 上, 右, 下]（单位 rpx）。左右 24、高 108、下沿离底 20——这四个数是这一版的尺子
+    // 几何从像素反推：box_rpx = [左, 上, 右, 下]（单位 rpx）。左右 24、下沿离底 20 这两个还量得动。
+    // 高度这一档 09-30 起从像素里读不准了：胶囊背后现在是照片（这一屏永远铺图），
+    // 浅壁纸下照片那块深色和胶囊那支派生色在 ±6 容差里连成一片，米白那一档量出来是 178。
+    // 108 那个数仍然钉着，只是换了地方——验-列表D2.js 第 137 行从 custom-tab-bar 的 WXSS 读。
     const b = s.box_rpx
-    ck(`${label}：胶囊几何 = 左右各 24rpx、高 108rpx、下沿离底 20rpx`,
+    ck(`${label}：胶囊左右各内缩 24rpx、下沿离底 20rpx（fixed 不吃父级 padding 那条）`,
       !!b && Math.abs(b[0] - 24) <= 4 && Math.abs(b[2] - 726) <= 4
-      && Math.abs((b[3] - b[1]) - 108) <= 8 && Math.abs((s.image_rpx[1] - b[3]) - 20) <= 8,
-      b && `左 ${b[0]} 右 ${b[2]} 高 ${Math.round(b[3] - b[1])} 离底 ${Math.round(s.image_rpx[1] - b[3])}`)
+      && Math.abs((s.image_rpx[1] - b[3]) - 20) <= 8,
+      b && `左 ${b[0]} 右 ${b[2]} 离底 ${Math.round(s.image_rpx[1] - b[3])}（高 ${Math.round(b[3] - b[1])} 只作记录）`)
   }
 
   // 还原：这一台模拟器原来用哪枚壁纸，量完还回去
@@ -171,11 +198,6 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     if (v) wx.setStorageSync('localWallpaper', v)
     else wx.removeStorageSync('localWallpaper')
   }, before)
-  // 背景开关也还原成进来之前那一档：探针借走的是他的真机偏好，不能留在"不用"
-  await mp.evaluate((wasOff) => {
-    if (wasOff) wx.setStorageSync('home_bg_off', true)
-    else wx.removeStorageSync('home_bg_off')
-  }, bgOffBefore)
   await enter('/pages/create/create')
   await sleep(2500)
   const restored = await mp.evaluate(() => JSON.stringify(wx.getStorageSync('localWallpaper') || ''))

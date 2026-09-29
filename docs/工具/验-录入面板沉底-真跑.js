@@ -139,7 +139,7 @@ fs.mkdirSync(OUT, { recursive: true })
     }
   }
 
-  // 收起态：贴底那条规则整个不生效，条子回到流里坐在 66vh 那段留白上。
+  // 收起态：贴底那条规则整个不生效，条子回到流里坐在 62vh 那段留白上。
   // 不量绝对坐标——offset() 对流内元素给的是文档坐标，和 fixed 那套视口坐标不同源，
   // 拿它反推 vh 会把两把尺子混成一把。判据改成"position 不再是 fixed"这一条本身。
   await page.setData({ active: '', mode: 'write', lead: 'pencil', previewImages: [], errLine: '' })

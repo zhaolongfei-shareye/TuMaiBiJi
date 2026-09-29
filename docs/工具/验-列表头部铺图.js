@@ -122,7 +122,8 @@ ok('行卡那一段没被顺手改色（分类两档仍从 palette 递进来）'
 ok('外观设置那句话不再写"只铺首页"', !/只铺首页|Home page only/.test(i18n))
 ok('那句话提了笔记页头部', /笔记页头部/.test(i18n) && /head of the notes list/.test(i18n))
 ok('卡片模板那句也提了笔记页', /垫在笔记页头部/.test(i18n))
-ok('开关那一格的名字不再自称"首页背景图"', /homeBgSection: '背景图'/.test(i18n))
+// 09-30：外观设置里那一节整块撤了，"背景图"这三个字在字典里不再出现
+ok('字典里已经没有「背景图」那一节的文案', !/homeBgSection/.test(i18n))
 ok('中英文键数仍然相等',
   (i18n.match(/^ {4}[a-zA-Z]+: /gm) || []).length % 2 === 0)
 

@@ -1,9 +1,10 @@
 // 笔记列表"整页铺图 + 一条笔记一个框"的真跑自证：在模拟器里真读计算样式、真量几何、真截图。
 // 跑法：NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-列表头部铺图-真跑.js
 // 前置：微信开发者工具已开；改过 WXSS 要先 cli close 再 cli auto --auto-port 9431。
-// 一把量两个状态：开关开着（整屏是照片 + 纸白搜索条 + 暗玻璃 chip，列表只有行卡那一个框）
-// 和开关关掉（这一屏必须逐条退回 D2 那一版）。只量前一个状态等于没量——
-// "关掉开关还剩一半铺图痕迹"是这类改动最容易漏的那件事。
+// 一把量两个状态：铺图（整屏是照片 + 纸白搜索条 + 分类实色 chip，列表只有行卡那一个框）
+// 和"本机还留着旧开关"（09-30 那一节整块撤了，键还在 storage 里也必须照常铺图）。
+// 第二态不是可有可无——以前关过开关的人升级后不会去点任何设置，
+// 那一档要是静默退回"半铺半不铺"，没人会主动发现。
 const automator = require('miniprogram-automator')
 const fs = require('fs')
 const path = require('path')
@@ -71,13 +72,13 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   }
 
   // 壁纸键要原样读回来。上一版套了一层 JSON.stringify，拿到的是 '"tint-celadon"'（带引号），
-  // themeOf/chromeOf 认不出这个键就静默回落到米白那一档，于是"和底栏同一个函数"这条
-  // 判据其实是在拿另一支色比另一支色——两边都不红才怪。
+  // themeOf 认不出这个键就静默回落到米白那一档——这一屏现在永远铺图，字色翻白那一条
+  // 判的是主题类而不是壁纸派生色，但键读歪了照样会拿错的那一档去比。
   const wall = await mp.evaluate(() => wx.getStorageSync('localWallpaper') || 'default')
+  // 探针进来前他本机可能正留着那个已作废的旧开关；先清干净，量完再原样还回去。
   const bgOffBefore = await mp.evaluate(() => !!wx.getStorageSync('home_bg_off'))
-  const chrome = p.chromeOf(wall)
 
-  // ---------- ① 开关开着：头部是照片，纸在下面盖住它 ----------
+  // ---------- ① 铺图态：头部是照片，纸在下面盖住它 ----------
   await mp.evaluate(() => wx.removeStorageSync('home_bg_off'))
   let page = await enter('/pages/index/index')
   await sleep(4500)
@@ -135,46 +136,61 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
     near(rgbOf(await styleOf(page, '.page-title', 'color')), hexArr(PAPER), 6),
     await styleOf(page, '.page-title', 'color'))
   const chips = await page.$$('.chip')
-  ck('这一趟至少有两枚 chip（"全部" + 一枚分类），暗玻璃那条才量得到', chips.length > 1, `${chips.length} 枚`)
-  // 未选中那一枚：默认停在"全部"上，所以"全部"是 active，往后找第一枚不带 active 的
-  let idleBg = null
+  ck('这一趟至少有两枚 chip（"全部" + 一枚分类），颜色那条才量得到', chips.length > 1, `${chips.length} 枚`)
+  // 09-30 这一批起，分类那几枚吃自己分类的实色（站长原话"分类按钮是有颜色的"），
+  // 暗玻璃只留给没有自己色的「全部」那一枚。拿"未选中那枚＝暗玻璃"去量，
+  // 量到的其实是第一枚分类 chip——上一把的红就是这么来的，不是渲染错。
+  let idle = null
   let chipH = 0
   for (const el of chips) {
-    if (!/active/.test((await el.attribute('class')) || '')) {
-      idleBg = await el.style('background-color')
+    const cls = (await el.attribute('class')) || ''
+    if (/tone/.test(cls) && !/active/.test(cls)) {
+      const style = (await el.attribute('style')) || ''
+      idle = {
+        bg: await el.style('background-color'),
+        want: (/--tone-bg:\s*(#[0-9A-Fa-f]{6})/.exec(style) || [])[1] || '',
+      }
       chipH = ((await rects(['.chip']))[0] || {}).h || 0
       break
     }
   }
-  ck('未选中的分类 chip 在图上垫了一层暗玻璃', /rgba\(18, 20, 26/.test(idleBg || ''), idleBg)
+  ck('未选中的分类 chip 吃它自己那一档分类色（inline 的 --tone-bg）',
+    !!idle && near(rgbOf(idle.bg), hexArr(idle.want)),
+    idle ? `${idle.bg}｜--tone-bg=${idle.want}` : '没找到未选中的分类 chip')
+  ck('「全部」那一枚才垫暗玻璃（它没有自己的色）',
+    /\.container\.has-bg \.chip\.all\s*\{[^}]*background:\s*rgba\(18, 20, 26/.test(
+      fs.readFileSync(P('pages/index/index.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')))
   ck('选中那枚换成纸白',
     near(rgbOf(await styleOf(page, '.chip.active', 'background-color')), hexArr(PAPER)),
     await styleOf(page, '.chip.active', 'background-color'))
   await mp.screenshot({ path: path.join(OUT, '实测-列表头部铺图.png') })
 
-  // ---------- ② 开关关掉：逐条退回 D2 那一版 ----------
+  // ---------- ② 旧开关还写在 storage 里：也必须照常铺图 ----------
+  // 这一节以前量的是"关掉后逐条退回 D2"。09-30 那一节整块撤了，"没铺图"这一档
+  // 在这条链路上已经不存在（homeBg() 最差也返回包里那张），所以判据反过来：
+  // 键还在、值还是 true，图带／罩层／has-bg／纸白搜索条四样一样都不能少。
   await mp.evaluate(() => wx.setStorageSync('home_bg_off', true))
   page = await enter('/pages/index/index')
   await sleep(4500)
   page = await enter('/pages/index/index')
   await sleep(4500)
-  ck('关掉后图带整个不在了', (await page.$('.page-bg')) === null)
-  ck('关掉后罩层也不在', (await page.$('.page-scrim')) === null)
-  ck('关掉后容器不再带 has-bg', !/has-bg/.test(((await page.$('.container')).attribute('class')) || ''))
-  ck('关掉后搜索条回到壁纸派生那一支色（和底栏同一个函数）',
-    near(rgbOf(await styleOf(page, '.sc-card', 'background-color')), hexArr(chrome.bg)),
-    `${await styleOf(page, '.sc-card', 'background-color')}｜chromeOf=${chrome.bg}`)
-  ck('关掉后这一层同样是透明的（两态一致，它本来就没有面）',
+  ck('旧开关写着 true，图带还在', !!(await page.$('.page-bg')))
+  ck('罩层也还在（不会图没了、字色还翻着白）', !!(await page.$('.page-scrim')))
+  // attribute() 是异步的：漏掉 await 会把 Promise 对象本身拼进字符串，
+  // 于是 !/has-bg/ 永远成立——原来那条"关掉后容器不再带 has-bg"就是这么假绿的。
+  const cls2 = ((await (await page.$('.container')).attribute('class')) || '')
+  ck('容器照样带 has-bg', /has-bg/.test(cls2), cls2 || '(class 读成空)')
+  ck('搜索条照旧是纸白那一面（不再退回壁纸派生那支）',
+    near(rgbOf(await styleOf(page, '.sc-card', 'background-color')), hexArr(PAPER)),
+    await styleOf(page, '.sc-card', 'background-color'))
+  ck('列表那一层照旧透明（透出底下的图）',
     /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list-layer', 'background-color')),
     await styleOf(page, '.list-layer', 'background-color'))
-  ck('关掉后 chip 回到壁纸那一档（不再是暗玻璃）',
-    !/rgba\(18, 20, 26/.test(await styleOf(page, '.chip', 'background-color')),
-    await styleOf(page, '.chip', 'background-color'))
   // 那圈描边写成 inset 而不是 border：border 会把整排 chips 撑高，一撑高纸顶就往下挪
-  ck('两态下 chip 同一档高度（inset 描边没把它撑高）',
+  ck('这一档下 chip 同一档高度（inset 描边没把它撑高）',
     Math.abs(((await rects(['.chip']))[0] || {}).h - chipH) < 1.5,
-    `铺图 ${(chipH / R).toFixed(1)}rpx / 不铺 ${(((await rects(['.chip']))[0] || {}).h / R).toFixed(1)}rpx`)
-  await mp.screenshot({ path: path.join(OUT, '实测-列表不铺图.png') })
+    `铺图 ${(chipH / R).toFixed(1)}rpx / 现在 ${(((await rects(['.chip']))[0] || {}).h / R).toFixed(1)}rpx`)
+  await mp.screenshot({ path: path.join(OUT, '实测-列表旧开关已作废.png') })
 
   // ---------- 还原：借走的是他的真机偏好 ----------
   await mp.evaluate((wasOff) => {
@@ -182,7 +198,7 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
     else wx.removeStorageSync('home_bg_off')
   }, bgOffBefore)
   const after = await mp.evaluate(() => !!wx.getStorageSync('home_bg_off'))
-  ck('背景开关已还原', after === bgOffBefore, `${after} vs ${bgOffBefore}`)
+  ck('旧开关那键已还原（代码不读它，但别留探针痕迹）', after === bgOffBefore, `${after} vs ${bgOffBefore}`)
 
   console.log(`\n${bad.length ? '✗ ' + bad.length + ' 条不过：' + bad.join('、') : '列表头部铺图 真跑：全过'}`)
   mp.close()

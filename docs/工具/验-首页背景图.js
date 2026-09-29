@@ -35,19 +35,18 @@ const poster = require(path.join(MP, 'utils/poster.js'))
 const DEFAULT_BG = '/assets/home-bg-portrait.jpg'
 
 ck('没设形象时落回站长那张', poster.homeBg() === DEFAULT_BG, poster.homeBg() || '(空)')
-ck('取图函数导出了', ['homeBg', 'homeBgOn', 'homeBgImage', 'setHomeBgOff']
-  .every((k) => typeof poster[k] === 'function'))
+ck('取图函数导出了', typeof poster.homeBg === 'function')
+// 09-30 站长把外观设置里那一节整块撤了：这一屏不再有"用/不用"这个状态，
+// 缩略图那个别名函数也一并删了——首页和外观设置只剩同一个出口，不会再有第二份口径。
+ck('开关那两个函数已经从导出里拿掉',
+  poster.homeBgOn === undefined && poster.setHomeBgOff === undefined)
+ck('缩略图别名也已经删掉，只剩 homeBg 这一个出口', poster.homeBgImage === undefined)
 
 const mine = '/usrdata/poster-avatar-1-1.img'
 files.add(mine)
 poster.writeProfile({ avatarPath: mine })
 ck('设过形象就用用户那张', poster.homeBg() === mine, poster.homeBg())
-poster.setHomeBgOff(true)
-ck('关掉开关就没有背景', poster.homeBg() === '', poster.homeBg() || '(空)')
-ck('关掉时缩略图仍画"会用哪张"', poster.homeBgImage() === mine, poster.homeBgImage())
-ck('开关状态读得回来', poster.homeBgOn() === false)
-poster.setHomeBgOff(false)
-ck('再打开就回来了', poster.homeBg() === mine)
+ck('没有任何一条路径能取到空背景', poster.homeBg() !== '')
 
 // 形象文件被系统清掉：不能出现"图没了、字色还翻着白"的半截状态
 files.delete(mine)
@@ -83,9 +82,15 @@ ck('没铺图时不碰导航条（主题色留给 applyTheme）',
 
 // ---------- ④ 入口唯一 ----------
 ck('外观设置里不出现选图接口', !/chooseMedia|chooseImage/.test(read('pages/wallpaper/wallpaper.js')))
-ck('外观设置只有开关', /onSetHomeBg/.test(read('pages/wallpaper/wallpaper.js'))
-  && /data-off="0"[\s\S]*data-off="1"/.test(read('pages/wallpaper/wallpaper.wxml')))
-ck('开关那一格画的是 <image> 不是背景图', /<image class="bg-thumb" src="{{bgThumb}}"/.test(read('pages/wallpaper/wallpaper.wxml')))
+// 外观设置这一页现在只管壁纸那一横条，背景图那一节整块没了
+const wpJs = read('pages/wallpaper/wallpaper.js')
+const wpWx = read('pages/wallpaper/wallpaper.wxml')
+const wpCss = read('pages/wallpaper/wallpaper.wxss')
+ck('外观设置里没有背景图那一节', !/onSetHomeBg|bg-cell|bgThumb|homeBgSection/.test(wpJs + wpWx))
+ck('那一节的样式也没留下', !/\.bg-cell|\.bg-thumb|\.bg-plain/.test(wpCss))
+ck('首页那枚「换背景」是导流、不弹相册',
+  /goHomeBg\(\)[\s\S]{0,120}navigateTo[\s\S]{0,60}pages\/profile\/profile/.test(read('pages/create/create.js'))
+  && !/chooseMedia/.test(wpJs))
 ck('唯一的选图口还在卡片模板页', /wx\.chooseMedia/.test(read('pages/profile/profile.js')))
 ck('卡片模板页那句话提了首页背景', /还会铺在首页当背景/.test(read('utils/i18n.js')))
 
@@ -94,10 +99,11 @@ const { texts } = require(path.join(MP, 'utils/i18n.js'))
 const zh = texts('zh'), en = texts('en')
 ck('中英文键数相等', Object.keys(zh).length === Object.keys(en).length,
   `${Object.keys(zh).length} / ${Object.keys(en).length}`)
-ck('四段新文案中英都有',
-  ['homeBgSection', 'homeBgHint', 'homeBgUse', 'homeBgNone'].every((k) => zh[k] && en[k]))
-ck('提示语指的入口名字是真的',
-  zh.homeBgHint.includes(zh.navProfile), `navProfile=${zh.navProfile}`)
+ck('那一节的四条文案中英都撤干净了',
+  ['homeBgSection', 'homeBgHint', 'homeBgUse', 'homeBgNone']
+    .every((k) => !zh[k] && !en[k]))
+ck('首页导流那枚的文案还在（中英各一份）', !!zh.homeBgSwap && !!en.homeBgSwap,
+  `${zh.homeBgSwap} / ${en.homeBgSwap}`)
 
 console.log(bad.length ? `\n${bad.length} 条没过：${bad.join('、')}` : '\n全过')
 process.exit(bad.length ? 1 : 0)

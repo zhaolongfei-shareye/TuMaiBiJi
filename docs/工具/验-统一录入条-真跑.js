@@ -181,19 +181,22 @@ const ck = (name, ok, got) => {
   ck('点换背景走到卡片模板那一页', now === 'pages/profile/profile', now)
   ck('换背景只是换了个页面，没有弹系统面板', await mp.evaluate(() => !!getCurrentPages().slice(-1)[0]) === true, now)
 
-  // ---------- ⑨ 关掉背景图：那一行不该存在 ----------
+  // ---------- ⑨ 那个旧开关已经作废：本机还留着它，也照样铺图 ----------
+  // 09-30 站长把外观设置里「用人像 / 不用」那一节整块撤了，`home_bg_off` 这个键
+  // 代码里再没人读。留这条断言是为了钉住"以前关过的人不会停在半截状态"：
+  // 键还在 storage 里，图、换背景那一行、条子落点三样都得和平时一模一样。
   await mp.evaluate(() => wx.setStorageSync('home_bg_off', true))
   page = await enter('/pages/create/create')
   await sleep(4000)
   d = await page.data()
-  ck('关掉背景后 bgSrc 是空', d.bgSrc === '', JSON.stringify(d.bgSrc))
-  ck('没铺图时不渲染换背景那一行', (await page.$$('.home-swap')).length === 0)
-  ck('没铺图时条还在', (await page.$$('.bar')).length === 1)
-  // 落点不随背景开关变：关掉图条子也沉在同一条线上，不然就成了"上头一条、下面一片空"
+  ck('旧开关还写着 true，图照样铺着', !!d.bgSrc, d.bgSrc || '(空)')
+  ck('换背景那一行照样在（它只跟"有没有图"走）', (await page.$$('.home-swap')).length === 1)
+  ck('条还在', (await page.$$('.bar')).length === 1)
+  // 落点只有一条线：这一屏不存在"没铺图"那一档，所以条顶不该随任何东西挪。
   g = await rects(['.bar'])
-  ck('没铺图时条子仍沉在下半屏（和铺图时同一档）',
-    g[0] && Math.abs(g[0].top - bar.top) < 2, g[0] && `条顶 ${Math.round(g[0].top)}｜铺图时 ${Math.round(bar.top)}`)
-  await mp.screenshot({ path: `${OUT}/实测-9-关掉背景.png` })
+  ck('条子仍沉在下半屏（和铺图时同一档）',
+    g[0] && Math.abs(g[0].top - bar.top) < 2, g[0] && `条顶 ${Math.round(g[0].top)}｜先前 ${Math.round(bar.top)}`)
+  await mp.screenshot({ path: `${OUT}/实测-9-旧开关已作废.png` })
   await mp.evaluate(() => wx.removeStorageSync('home_bg_off'))
 
   // ---------- ⑩ 英文那一版 ----------
@@ -204,7 +207,9 @@ const ck = (name, ok, got) => {
   page = await enter('/pages/create/create')
   await sleep(4000)
   d = await page.data()
-  ck('英文条身是 Tap and jot', d.barTitle === 'Tap and jot', d.barTitle)
+  // 钉字典不钉字面量：这句微文案这一版改过两轮（Tap and jot → Jot it down），
+  // 硬编码在这里就会变成"改文案必红一条"的假故障。
+  ck('英文条身吃的就是字典里那条', d.barTitle === require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js')).texts('en').barIdle, d.barTitle)
   await (await page.$('.bar')).tap()
   await sleep(1000)
   const labels = []

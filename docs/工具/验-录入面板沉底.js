@@ -34,7 +34,7 @@ const seg = (sel) => {
 ok('展开态挂的是 entry-dock', /\{\{active \? 'entry-dock' : ''\}\}/.test(wxml))
 ok('旧的 bg-give-way 全项目清零', !/bg-give-way/.test(
   [wxml, wxssRaw, fs.readFileSync(P('pages/create/create.js'), 'utf8')].join('\n')))
-ok('收起态那条留白还在（66vh 没被顺手删掉）', /\.entry-wrap\s*\{[^}]*margin-top:\s*66vh/.test(wxss))
+ok('收起态那条留白还在（62vh 没被顺手删掉）', /\.entry-wrap\s*\{[^}]*margin-top:\s*62vh/.test(wxss))
 ok('那条 margin-top 过渡已撤（贴底是 position 切换，过渡不动它）',
   !/transition:\s*margin-top/.test(wxss))
 

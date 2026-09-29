@@ -81,47 +81,48 @@ const ck = (name, ok, got) => {
   d = await page.data()
   ck('设过形象后 bgSrc 换成用户那张', d.bgSrc === userImg, d.bgSrc)
   await mp.screenshot({ path: `${OUT}/实测-2-用用户的形象.png` })
-  // ---------- ②b 展开录入条：留白必须让出来 ----------
+  // ---------- ②b 展开录入条：整块贴底，换背景那一行让位 ----------
+  // 09-28 起展开态不再是"回到标题下面"，而是 fixed 贴底（bottom 152rpx）：窗口不动，
+  // 只换肚子里的内容。所以这里量的是"块底还压不压底栏"，不再是"块顶有没有抬到 120 以上"。
   await (await page.$('.bar')).tap()
   await sleep(1200)
   const openRect = await mp.evaluate(() => new Promise((resolve) => {
     wx.createSelectorQuery().select('.entry-wrap').boundingClientRect()
       .select('.page-bg').boundingClientRect()
+      .select('.home-swap').boundingClientRect()
       .exec((r) => resolve(r.map((x) => x ? { y: (x.y === undefined ? x.top : x.y), h: x.height } : null)))
   }))
-  ck('展开后录入条回到标题下面（留白让出来）',
-    !!openRect[0] && openRect[0].y < 120, openRect[0] && `块顶 ${openRect[0].y}`)
+  ck('展开后整块贴底，底边不压住底栏',
+    !!openRect[0] && !!openRect[1] && (openRect[0].y + openRect[0].h) <= openRect[1].h - 64,
+    openRect[0] && openRect[1] && `块底 ${Math.round(openRect[0].y + openRect[0].h)}，底栏顶 ${openRect[1].h - 64}`)
+  ck('展开时换背景那一行整个不渲染（不跟底栏抢位置）',
+    openRect[2] === null || openRect[2].h === 0,
+    openRect[2] && openRect[2].h ? `还在，块顶 ${Math.round(openRect[2].y)}、高 ${openRect[2].h}` : '')
   await mp.screenshot({ path: `${OUT}/实测-2b-展开让位.png` })
   await (await page.$('.title-row')).tap()   // 点条以外的空白收起，回到常态
   await sleep(900)
 
-  // ---------- ③ 外观设置里那个开关 ----------
+  // ---------- ③ 换图入口只有一个：首页那枚「换背景」导流到卡片模板页 ----------
+  // 09-30 站长把外观设置里那一节整块撤了（图本来就和卡片形象同一个来源，
+  // 不该有第二个门，也不给"关掉背景"这个状态）。
   page = await enter('/pages/wallpaper/wallpaper')
   await sleep(4000)
-  let cells = await page.$$('.bg-cell')
-  ck('外观设置里有两格开关', cells.length === 2, `${cells.length} 格`)
-  let wd = await page.data()
-  ck('进来显示"在用"', wd.bgOn === true)
-  ck('缩略图画的是用户那张（不是默认）', wd.bgThumb === userImg, wd.bgThumb)
-  await mp.screenshot({ path: `${OUT}/实测-3-外观设置开关.png` })
-  await cells[1].tap()   // 不用
-  await sleep(1200)
-  wd = await page.data()
-  ck('点"不用"后状态翻过去', wd.bgOn === false)
-  ck('开关真的落到本机存储', (await readKey('home_bg_off')) === 'true', await readKey('home_bg_off'))
+  ck('外观设置里那一节真的没了', (await page.$$('.bg-cell')).length === 0)
+  const wd = await page.data()
+  ck('页面数据里也不再挂开关状态', wd.bgOn === undefined && wd.bgThumb === undefined)
+  await mp.screenshot({ path: `${OUT}/实测-3-外观设置没有背景图那一节.png` })
+
   page = await enter('/pages/create/create')
   await sleep(4000)
   d = await page.data()
-  ck('关掉后首页不铺图', d.bgSrc === '' && (await page.$$('.page-bg')).length === 0, d.bgSrc || '(空)')
-  await mp.screenshot({ path: `${OUT}/实测-4-关掉背景图.png` })
-
-  // 再打开，确认能回去
-  page = await enter('/pages/wallpaper/wallpaper')
-  await sleep(3500)
-  cells = await page.$$('.bg-cell')
-  await cells[0].tap()
-  await sleep(1200)
-  ck('点"用人像"能开回来', (await page.data()).bgOn === true)
+  ck('首页一直铺着图（没有"关掉"这条路）', !!d.bgSrc, d.bgSrc || '(空)')
+  await (await page.$('.home-swap')).tap()
+  await sleep(2500)
+  const now = await mp.currentPage()
+  ck('点「换背景」落在卡片模板页', now.path === 'pages/profile/profile', now.path)
+  await mp.screenshot({ path: `${OUT}/实测-4-换图入口在卡片模板页.png` })
+  await mp.navigateBack().catch(() => {})
+  await sleep(800)
 
   // ---------- ④ 还原这台模拟器的状态 ----------
   await mp.evaluate((profileRaw, offRaw) => {

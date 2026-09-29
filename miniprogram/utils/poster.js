@@ -112,33 +112,21 @@ function avatarPath() {
   return exists(p) ? p : ''
 }
 
-// ---------- 首页背景：就是上面那张形象，不另开上传入口 ----------
+// ---------- 首页背景：就是上面那张形象，不另开上传入口、也不给"关掉" ----------
 // 站长那张默认图是包内资源。放这儿而不是写进 wxss：WXSS 的 background-image
 // 不认小程序包里的本地文件（只认 base64 和网络地址），只能由 <image> 组件铺。
 const HOME_BG_DEFAULT = '/assets/home-bg-portrait.jpg'
-const HOME_BG_OFF_KEY = 'home_bg_off'
 
 /**
- * 首页背景用哪张图（不看开关）。空串表示没有可用的图——实际上永远有，
- * 因为最差也还有包里那张站长人像。
+ * 首页与笔记页头部铺的那张图：设过形象就用形象，没设过就用包里这张默认。
  * 形象文件被系统清掉时 avatarPath() 自己回退成空，所以这里会落回默认那张，
  * 不会出现"背景没了、字色还留着翻白"的半截状态。
+ * 09-30 站长把外观设置里那个"用人像 / 不用"开关整块撤了——换图只有一个入口
+ * （卡片模板页那张形象），这一屏没有"关掉背景"这个状态，storage 里那个
+ * home_bg_off 也一并作废，之前关过的人现在自动回到"有图"。
  */
-function homeBgImage() {
-  return avatarPath() || HOME_BG_DEFAULT
-}
-
-function homeBgOn() {
-  return !wx.getStorageSync(HOME_BG_OFF_KEY)
-}
-
-/** 首页真正要铺的那张：开关关掉就没有。 */
 function homeBg() {
-  return homeBgOn() ? homeBgImage() : ''
-}
-
-function setHomeBgOff(off) {
-  wx.setStorageSync(HOME_BG_OFF_KEY, !!off)
+  return avatarPath() || HOME_BG_DEFAULT
 }
 
 let avatarSeq = 0
@@ -1633,9 +1621,6 @@ module.exports = {
   writeProfile,
   avatarPath,
   homeBg,
-  homeBgOn,
-  homeBgImage,
-  setHomeBgOff,
   stageAvatar,
   commitAvatar,
   dropAvatar,
