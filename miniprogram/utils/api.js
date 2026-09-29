@@ -193,4 +193,6 @@ module.exports = {
     request('/api/user/deactivate', 'POST', { confirm: true }, { noRelogin: true }),
   updateWallpaper: (wallpaper) => request('/api/user/wallpaper', 'PUT', { wallpaper }),
   updateLanguage: (language) => request('/api/user/language', 'PUT', { language }),
+  setPrivatePassword: (password) => request('/api/user/private-password', 'PUT', { password }),
+  verifyPrivatePassword: (password) => request('/api/user/private-password/verify', 'POST', { password }),
 }

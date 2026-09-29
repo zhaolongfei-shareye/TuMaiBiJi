@@ -1,7 +1,8 @@
+import hashlib
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
@@ -104,6 +105,44 @@ def update_inviter(
 class DeleteAccountRequest(BaseModel):
     # 必须是 true。注销是这条链路上唯一不可逆的动作，别让一个漏了字段的请求就把它执行了。
     confirm: bool
+
+
+def _hash_pin(pin: str) -> str:
+    return hashlib.sha256(pin.encode()).hexdigest()
+
+
+class PrivatePasswordRequest(BaseModel):
+    password: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+@router.put("/private-password")
+def set_private_password(
+    req: PrivatePasswordRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user.private_password_hash = _hash_pin(req.password)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/private-password")
+def get_private_password_status(user: User = Depends(get_current_user)):
+    return {"is_set": user.private_password_hash is not None}
+
+
+@router.post("/private-password/verify")
+@limiter.limit("10/minute")
+def verify_private_password(
+    request: Request,
+    req: PrivatePasswordRequest,
+    user: User = Depends(get_current_user),
+):
+    if user.private_password_hash is None:
+        raise HTTPException(status_code=400, detail="尚未设置私密密码")
+    if _hash_pin(req.password) != user.private_password_hash:
+        raise HTTPException(status_code=403, detail="密码不正确")
+    return {"ok": True}
 
 
 @router.post("/deactivate")

@@ -50,6 +50,15 @@ Page({
     this.setData({ loading: true })
     try {
       const note = await api.getNote(id)
+      if (note.is_private && !this._privateVerified) {
+        const ok = await this._promptPrivatePassword()
+        if (!ok) {
+          this.setData({ loading: false })
+          wx.navigateBack()
+          return
+        }
+        this._privateVerified = true
+      }
       const lang = this.data.lang
       const key = SOURCE_TYPE_KEYS[note.source_type]
       note.source_type_label = key ? t(key, lang) : note.source_type
@@ -95,6 +104,36 @@ Page({
       this.setData({ loading: false })
       wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
     }
+  },
+
+  _promptPrivatePassword() {
+    const { lang } = this.data
+    return new Promise((resolve) => {
+      wx.showModal({
+        title: t('privatePasswordTitle', lang),
+        editable: true,
+        placeholderText: t('privatePasswordHint', lang),
+        confirmText: t('privatePasswordOk', lang),
+        cancelText: t('cancel', lang),
+        success: async (res) => {
+          if (!res.confirm) { resolve(false); return }
+          const pwd = (res.content || '').trim()
+          if (!/^\d{6}$/.test(pwd)) {
+            wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
+            resolve(false); return
+          }
+          try {
+            await api.verifyPrivatePassword(pwd)
+            resolve(true)
+          } catch (err) {
+            const msg = (err.data && err.data.detail) || t('privatePasswordWrong', lang)
+            wx.showToast({ title: msg, icon: 'none' })
+            resolve(false)
+          }
+        },
+        fail: () => resolve(false),
+      })
+    })
   },
 
   // 这篇对外不对外，只有服务端知道（海报可能是在另一台手机上生成的）。
@@ -186,6 +225,7 @@ Page({
 
   onShare() {
     const { note } = this.data
+    if (note.is_private) return
     wx.navigateTo({ url: `/pages/share/share?id=${note.id}` })
   },
 })

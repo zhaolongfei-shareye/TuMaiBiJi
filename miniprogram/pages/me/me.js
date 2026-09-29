@@ -4,7 +4,6 @@ const poster = require('../../utils/poster.js')
 const { t, texts } = require('../../utils/i18n.js')
 
 const CONTACT_EMAIL = 'jacky28471258@gmail.com'
-const OFFICIAL_ACCOUNT = '杰克AI日记'
 
 // {n} 这类占位由服务端给的数字填，界面里不自己写死额度规则
 function fmt(tpl, map) {
@@ -17,7 +16,6 @@ Page({
     themeClass: 'theme-default',
     t: texts('zh'),
     contactEmail: CONTACT_EMAIL,
-    officialAccount: OFFICIAL_ACCOUNT,
     // 条数没读回来之前那一行留空：宁可少一行字，也不先写一个服务端不认的数
     quotaText: '',
     shareValue: '',
@@ -85,6 +83,29 @@ Page({
     wx.setClipboardData({
       data: value,
       success: () => wx.showToast({ title: t('copied', this.data.lang), icon: 'success' }),
+    })
+  },
+
+  onSetPrivatePassword() {
+    const { lang } = this.data
+    wx.showModal({
+      title: t('privatePassword', lang),
+      editable: true,
+      placeholderText: t('privatePasswordHint', lang),
+      success: async (res) => {
+        if (!res.confirm) return
+        const pwd = (res.content || '').trim()
+        if (!/^\d{6}$/.test(pwd)) {
+          wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
+          return
+        }
+        try {
+          await api.setPrivatePassword(pwd)
+          wx.showToast({ title: t('privatePasswordSet', lang), icon: 'success' })
+        } catch (err) {
+          wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })
+        }
+      },
     })
   },
 

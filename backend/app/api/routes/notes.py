@@ -89,9 +89,8 @@ class NoteDetail(NoteBrief):
     content: str | None
     original_content: str | None
     updated_at: UTCDatetimeOrNone
-    # 转存进来的那一条才有的来源信息。只出不进：NoteCreate / NoteUpdate 里都没有它，
-    # 所以编辑接口碰不到这一栏，转存之后来源改不掉。
     imported_from: dict | None = None
+    is_private: bool = False
 
 
 class NoteCreate(BaseModel):
@@ -173,6 +172,11 @@ def get_note(
     )
     if not note:
         raise HTTPException(status_code=404, detail="笔记不存在或已删除")
+    if note.category_id:
+        from app.models.category import Category
+        cat = db.query(Category).filter(Category.id == note.category_id).first()
+        if cat and cat.name == "私密":
+            note.is_private = True
     return note
 
 

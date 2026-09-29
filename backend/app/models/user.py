@@ -19,5 +19,7 @@ class User(Base):
     invited_by = Column(Integer, nullable=True, index=True)
     # 账号代数：防止 SQLite 重用 ID 后旧 token 冒充新用户
     generation = Column(Integer, nullable=False, default=1, server_default="1")
+    # 私密笔记的 6 位数字密码哈希（sha256）；null 表示未设置
+    private_password_hash = Column(String(64), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
