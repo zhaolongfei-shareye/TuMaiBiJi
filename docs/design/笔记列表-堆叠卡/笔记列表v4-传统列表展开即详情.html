@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 笔记列表 v4（传统上下列表 · 展开即详情 · 页内出海报 · 2026-09-29）</title>
+<style>
+/* ==================================================================
+   站长 09-29 两轮拍板：
+   第一轮（上一稿已落，这稿原样保留）：
+     展开就是详情页、窗口内滚、操作吸底；分享图就在这页里渲染；左右滑切模板、小吐司报名字；
+     保存成功回到详情页。折叠条不露摘要、一屏 5 条、上下动感横条、拖到头就不动。
+   第二轮（这一稿改的）：
+     "卡片折叠还是不好看，恢复传统的上下展示。所有卡片左右都对齐，不要缩减；
+      未在当前页面，就只有圆点、标题和日期。"
+     → 撤掉整个堆叠（中心卡、缩放、探边），恢复普通上下列表；
+       每条左右同用 24 的边距（宽 702），谁也不压谁、不缩放；
+       没展开的行只有三样：分类色点、标题、日期。
+
+   六屏：① 传统列表（一屏 5 条 + 两端动感横条）  ② 拖到最顶那一态（上端横条停住）
+         ③ 点一条 → 展开＝详情页（窗口内滚、操作吸底）  ④ 点「转为笔记卡片」→ 同一窗口出海报
+         ⑤ 左右滑换模板（两张错位 + 模板名小吐司）  ⑥ 保存成功 → 回到详情页
+   这一稿只画中文：结构还没定，先不出英文版。
+
+   口径与代码同一把尺子：px 当 rpx 用，设计宽 750；一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690。
+   背景引线上原图 miniprogram/assets/home-bg-portrait.jpg（865×1670），cover；压暗停点逐字抄 create.wxss。
+   底栏那支色是 palette.chromeOf('tint-celadon') = #25442B。
+   详情页里那几块的顺序、按钮、每一句文案，逐条对 miniprogram/pages/detail/detail.wxml；
+   海报预览用的是 docs/design/模板成品-1.5.0/ 里那 10 张真成品图（各自真实宽高比），不是手画的假海报。
+   ================================================================== */
+  :root{
+    --r-card:40px; --r-pill:999px; --w-edge:3px;
+    --paper:#F2EFE9; --ink:#23252C;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px; --fs-label:20px;
+    --chrome:#25442B; --chrome-line:rgba(242,239,233,.22); --chrome-idle:rgba(242,239,233,.68);
+    --card:#FCFBF8; --card-edge:rgba(36,30,22,.12);
+    --c-yellow:#F6C445; --i-yellow:#2A2005;
+    --c-blue:#3F52D6;   --i-blue:#FFFFFF;
+    --c-orange:#E9723D; --i-orange:#2C1204;
+    --c-green:#46A863;  --i-green:#06260F;
+    --c-purple:#6E4BD0; --i-purple:#FFFFFF;
+    --c-ink:#23252C;    --i-ink:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:#23252C;padding:26px 15px 70px;font-family:-apple-system,'PingFang SC',sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;flex-wrap:wrap;gap:64px 56px;width:2400px;align-items:flex-start}
+  .unit{width:750px;flex:none}
+  .cap{margin-bottom:14px;min-height:130px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap b{color:#23252C}
+
+  .ph{width:750px;height:1690px;position:relative;overflow:hidden;background:#E9EEEA;border-radius:52px;
+    box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16)}
+  .ph.doc{height:auto;padding-bottom:26px}
+  .bg{position:absolute;left:0;top:184px;width:750px;height:1506px;background-size:cover;background-position:center;z-index:0}
+  .scrim{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:1;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)}
+  .lay{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:2}
+
+  .sb{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
+  .sb .right{display:flex;align-items:center;gap:10px}
+  .sig{display:flex;gap:4px;align-items:flex-end}
+  .sig i{display:block;width:7px;background:currentColor;border-radius:2px}
+  .sig i:nth-child(1){height:9px}.sig i:nth-child(2){height:14px}.sig i:nth-child(3){height:19px}.sig i:nth-child(4){height:24px}
+  .bat{width:46px;height:23px;border:var(--w-edge) solid currentColor;border-radius:7px;position:relative;opacity:.85}
+  .bat::after{content:'';position:absolute;left:3px;top:3px;bottom:3px;right:14px;background:currentColor;border-radius:2px}
+  .nb{height:90px;background:#181A20;position:relative;z-index:12}
+  .nb .t{position:absolute;left:0;right:174px;top:0;height:88px;display:flex;align-items:center;justify-content:center;
+    font-size:31px;font-weight:600;color:#F2EFE9;letter-spacing:-.3px}
+  .capsule{position:absolute;right:26px;top:13px;width:174px;height:64px;border-radius:34px;
+    background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22);color:#F2EFE9;
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+  .capsule .dots{display:flex;gap:6px}
+  .capsule .dots i{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .capsule .dv{width:2px;height:34px;background:currentColor;opacity:.2}
+  .capsule .cls{width:30px;height:30px;border-radius:50%;border:var(--w-edge) solid currentColor;position:relative}
+  .capsule .cls::after{content:'';position:absolute;inset:8px;border-radius:50%;background:currentColor}
+
+  .hero{position:absolute;left:24px;right:24px;top:45px;display:flex;align-items:baseline;justify-content:space-between}
+  .hero .h1{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96);line-height:1.15}
+  .hero .stats{font-size:var(--fs-meta);font-weight:600;color:rgba(242,239,233,.95);white-space:nowrap}
+
+  .spill{position:absolute;left:24px;right:24px;top:146px;height:128px;border-radius:var(--r-pill);
+    background:var(--paper);box-shadow:0 18px 46px rgba(8,10,14,.42);
+    display:flex;align-items:center;padding:0 22px 0 34px;gap:20px}
+  .spill .q{flex:1;min-width:0;font-size:var(--fs-body);color:#9A9EA6;white-space:nowrap;overflow:hidden}
+  .spill .go{flex:none;font-size:var(--fs-title);font-weight:800;letter-spacing:-.5px;color:var(--ink)}
+  .spill .rule{position:absolute;left:34px;right:120px;bottom:24px;height:3px;background:var(--ink);opacity:.42}
+
+  .chips{position:absolute;left:24px;right:24px;top:306px;height:56px;display:flex;gap:12px;overflow:hidden}
+  .chip{height:56px;flex:none;border-radius:var(--r-pill);display:flex;align-items:center;
+    font-size:var(--fs-meta);font-weight:700;white-space:nowrap;padding:0 26px;
+    box-shadow:0 6px 16px rgba(8,10,14,.28)}
+  .chip.all{background:var(--paper);color:var(--ink)}
+
+  /* ---------- 传统上下列表：全部同宽、上下排开，谁也不压谁 ----------
+     行内只有三样：分类色点、标题（长了省略）、日期（他这一轮定的）。
+     行位 48 / 191 / 334 / 477 / 620，行高 124、行距 19，一屏 5 行，区高 792 正好放满。 */
+  .rows{position:absolute;left:0;right:0;top:420px;height:792px}
+  .row{position:absolute;left:24px;right:24px;height:124px;border-radius:var(--r-card);
+    background:var(--card);border:var(--w-edge) solid var(--card-edge);
+    display:flex;align-items:center;padding:0 30px;gap:14px;overflow:hidden}
+  .row .dot{width:16px;height:16px;border-radius:50%;flex:none}
+  .row .ti{flex:1;min-width:0;font-size:var(--fs-body);font-weight:700;letter-spacing:-.5px;color:#23252C;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .dt{flex:none;font-size:var(--fs-tiny);font-weight:800;letter-spacing:.4px;color:rgba(35,37,44,.5)}
+
+  /* 动感横条：上下各一根，"这一头还有东西"。呼吸 = 透明度与 4rpx 微移，1.6s 一轮。
+     箭头朝外是指向"还有"的那个方向：上端那根朝上、下端那根朝下——横着会读成左右滑。
+     横条不随行宽拉通，就是居中 260 一根提示。 */
+  .mb{position:absolute;left:245px;right:245px;height:28px;border-radius:var(--r-pill);
+    background:linear-gradient(90deg,rgba(242,239,233,0),rgba(242,239,233,.62),rgba(242,239,233,0))}
+  .mb.mt{top:0}
+  .mb.mb2{top:764px}
+  .mb::before{content:'';position:absolute;left:50%;margin-left:-11px;width:20px;height:20px;
+    border-left:3px solid rgba(242,239,233,.7);border-top:3px solid rgba(242,239,233,.7);
+    transform:rotate(45deg)}
+  .mb.mt::before{top:-26px}
+  .mb.mb2::before{top:14px;border-left:3px solid rgba(242,239,233,.7);border-top:0;
+    border-bottom:3px solid rgba(242,239,233,.7);border-right:3px solid rgba(242,239,233,.7);transform:rotate(45deg)}
+  /* 到头那一端：停在原地、淡一档、箭头撤掉（截图里画静止态，动效参数写在标注页） */
+  .mb.stay{opacity:.22;background:linear-gradient(90deg,rgba(242,239,233,0),rgba(242,239,233,.5),rgba(242,239,233,0))}
+  .mb.stay::before{display:none}
+
+  /* ---------- 展开即详情：窗口内滚，操作钉在窗口下沿 ----------
+     窗口上沿停在搜索条上方：「我的笔记」那一行始终露着（他 09-29 要的）；
+     下沿和底栏之间留 24，不粘住底栏——和录入面板沉底是同一条数。 */
+  .sheet{position:absolute;left:24px;right:24px;top:130px;bottom:152px;border-radius:var(--r-card);
+    background:var(--card);border:var(--w-edge) solid var(--card-edge);box-shadow:0 26px 64px rgba(8,10,14,.5);
+    overflow:hidden;display:flex;flex-direction:column}
+  .grip{flex:none;height:56px;display:flex;align-items:center;justify-content:center;position:relative}
+  .grip i{width:88px;height:8px;border-radius:999px;background:rgba(35,37,44,.16)}
+  .grip em{position:absolute;right:34px;top:0;height:56px;display:flex;align-items:center;
+    font-style:normal;font-size:var(--fs-tiny);font-weight:700;color:rgba(35,37,44,.42);letter-spacing:.4px}
+  .body{flex:1;min-height:0;padding:0 34px;position:relative;overflow:hidden}
+  .body .fade{position:absolute;left:0;right:0;bottom:0;height:120px;
+    background:linear-gradient(180deg,rgba(252,251,248,0),rgba(252,251,248,.97))}
+  /* 抬头不放分类色方块（他上一轮要的简洁）：来源类型·时间 / 标题 / 标签三行，纯文字 */
+  .hd2{margin-top:10px}
+  .meta{font-size:var(--fs-meta);color:rgba(35,37,44,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .h2{margin-top:8px;font-size:38px;font-weight:800;letter-spacing:-.9px;line-height:1.3;color:#23252C}
+  .tags{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px}
+  .tags span{font-size:var(--fs-tiny);font-weight:700;color:var(--tone);
+    background:color-mix(in srgb,var(--tone) 12%,transparent);border-radius:8px;padding:5px 12px}
+  .lab{margin-top:30px;font-size:var(--fs-label);font-weight:800;letter-spacing:1.6px;color:rgba(35,37,44,.42)}
+  .para{margin-top:12px;font-size:var(--fs-body);line-height:1.7;color:#3a3e46}
+  .pts{margin-top:14px;display:flex;flex-direction:column;gap:16px}
+  .pts .r{display:flex;gap:16px;align-items:flex-start}
+  .pts .n{flex:none;width:38px;height:38px;border-radius:50%;background:var(--tone);color:#fff;
+    font-size:var(--fs-tiny);font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:4px}
+  .pts .x{font-size:var(--fs-body);line-height:1.55;color:#23252C}
+  .link{margin-top:12px;font-size:var(--fs-meta);color:#3F52D6;text-decoration:underline;word-break:break-all}
+  .orig{margin-top:12px;display:flex;align-items:center;justify-content:space-between}
+  .orig .sw{font-size:var(--fs-meta);font-weight:700;color:rgba(35,37,44,.5)}
+  .orig .ln{margin-top:0}
+  /* 吸底操作区：滚动时它不动（他这一条是硬要求）；左右下各留够，别顶着圆角 */
+  .dock{flex:none;border-top:var(--w-edge) solid rgba(35,37,44,.10);padding:22px 30px 30px;background:var(--card)}
+  .dock .irow{display:flex;gap:14px}
+  .ibtn{flex:1;height:72px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;gap:9px;
+    font-size:var(--fs-meta);font-weight:700;color:#23252C;box-shadow:inset 0 0 0 var(--w-edge) rgba(35,37,44,.16)}
+  .ibtn.on{background:#23252C;color:#F2EFE9;box-shadow:none}
+  .ibtn.danger{color:#8c2119;box-shadow:inset 0 0 0 var(--w-edge) rgba(140,33,25,.24)}
+  .pbtn{margin-top:16px;height:96px;border-radius:var(--r-pill);background:var(--ink);color:#F2EFE9;
+    display:flex;align-items:center;justify-content:center;font-size:var(--fs-title);font-weight:800;letter-spacing:-.4px}
+  .pbtn.ghost{background:transparent;color:rgba(35,37,44,.62);box-shadow:inset 0 0 0 var(--w-edge) rgba(35,37,44,.16)}
+  .pub{margin-top:14px;display:flex;align-items:center;justify-content:space-between;
+    font-size:var(--fs-tiny);color:rgba(35,37,44,.5)}
+  .pub b{color:#1d5c34;font-weight:800}
+  .pub .act{text-decoration:underline;font-weight:700;color:rgba(35,37,44,.62)}
+  .two{display:flex;gap:14px}
+  .two .pbtn{flex:1;margin-top:0}
+
+  /* 海报预览：用真成品图，preview-box 定高、图在里面等比居中（和 share.wxml 那条注释同一条规则） */
+  .pbox{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;
+    padding:0 30px;background:linear-gradient(180deg,#F1EEE7,#E7E3DA)}
+  .pbox img{max-width:100%;max-height:100%;border-radius:14px;box-shadow:0 18px 40px rgba(8,10,14,.28);display:block}
+  .pbox .pair{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  .pbox .pair img{position:absolute;left:50%;transform:translateX(-50%)}
+  .pbox .pair .a{transform:translateX(calc(-50% - 190px)) scale(.9);opacity:.42}
+  .pbox .pair .b{transform:translateX(calc(-50% + 190px)) scale(.9);opacity:.42}
+  .pbox .pair .c{z-index:2}
+  .swipe{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:var(--fs-tiny);
+    font-weight:700;letter-spacing:.4px;color:rgba(35,37,44,.42)}
+  .swipe .ar{opacity:.55;margin:0 12px}
+  /* 微信原生 toast 的样子：居中一块深灰圆角，白字，无图标 */
+  .toast{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);z-index:6;
+    background:rgba(17,19,24,.90);color:#fff;border-radius:20px;padding:24px 30px;min-width:220px;
+    display:flex;flex-direction:column;align-items:center;gap:12px;
+    font-size:var(--fs-meta);font-weight:600;letter-spacing:.3px;box-shadow:0 14px 34px rgba(0,0,0,.32)}
+  .toast .tick{width:44px;height:44px;border-radius:50%;border:4px solid #fff;position:relative}
+  .toast .tick::after{content:'';position:absolute;left:11px;top:20px;width:20px;height:10px;
+    border-left:4px solid #fff;border-bottom:4px solid #fff;transform:rotate(-45deg)}
+  .qr{display:flex;align-items:center;gap:16px}
+  .qr .pill{flex:none;width:92px;height:52px;border-radius:999px;background:#23252C;position:relative}
+  .qr .pill i{position:absolute;right:6px;top:6px;width:40px;height:40px;border-radius:50%;background:#F2EFE9}
+  .qr .tx{min-width:0}
+  .qr .tx b{display:block;font-size:var(--fs-body);font-weight:800;color:#23252C}
+  .qr .tx span{display:block;margin-top:2px;font-size:var(--fs-tiny);line-height:1.45;color:rgba(35,37,44,.52)}
+
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:44px;
+    background:var(--chrome);display:flex;z-index:10;box-shadow:0 16px 44px rgba(0,0,0,.42);
+    border:var(--w-edge) solid var(--chrome-line)}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font-size:20px;font-weight:600;color:var(--chrome-idle);letter-spacing:.3px}
+  .tb .ic{width:40px;height:40px;position:relative;border:3px solid currentColor}
+  .tb.notes .ic{border-radius:8px}.tb.notes .ic::after{content:'';position:absolute;left:7px;right:7px;top:11px;height:3px;background:currentColor;box-shadow:0 8px 0 currentColor}
+  .tb.create .ic{border-radius:50%}.tb.create .ic::after{content:'+';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:300;line-height:1}
+  .tb.me .ic{border-radius:50%;height:20px;width:20px;margin-top:10px;border-bottom:none}
+  .tb.on{color:#F2EFE9;font-weight:700}
+  .tb .ln{width:26px;height:4px;border-radius:2px;background:currentColor;opacity:0}
+  .tb.on .ln{opacity:1}
+
+  .docbody{padding:26px 30px 0}
+  .blk2{margin-bottom:26px}
+  .blk2 h4{font-size:22px;font-weight:800;letter-spacing:-.4px;margin-bottom:10px}
+  .blk2 p{font-size:16.5px;line-height:1.75;color:#4c5058;margin-bottom:8px}
+  .blk2 b{color:#23252C}
+  .blk2 code{font-size:15px;background:rgba(35,37,44,.06);padding:1px 6px;border-radius:6px}
+  table{width:100%;border-collapse:collapse;font-size:15.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid rgba(35,37,44,.12);vertical-align:top;line-height:1.5}
+  th{font-weight:800;background:rgba(35,37,44,.05)}
+  .sw2{display:inline-block;width:22px;height:22px;border-radius:50%;vertical-align:-5px;margin-right:8px;
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.12)}
+  .new{display:inline-block;font-size:12px;font-weight:800;color:#8c2119;background:rgba(140,33,25,.09);border-radius:6px;padding:1px 7px}
+  .live{display:inline-block;font-size:12px;font-weight:800;color:#1d5c34;background:rgba(29,92,52,.10);border-radius:6px;padding:1px 7px}
+</style>
+</head>
+<body>
+<div class="flow" id="flow"></div>
+<script>
+const IMG = '../../../miniprogram/assets/home-bg-portrait.jpg'
+const POSTER = '../模板成品-1.5.0/'
+
+/* 分类六支：palette.js 的 TONES + UNCATEGORIZED，一字未改 */
+const CAT = {
+  ink:    { name:'未分类', bg:'#23252C', ink:'#FFFFFF' },
+  orange: { name:'生活',   bg:'#E9723D', ink:'#2C1204' },
+  green:  { name:'旅游',   bg:'#46A863', ink:'#06260F' },
+  blue:   { name:'阅读',   bg:'#3F52D6', ink:'#FFFFFF' },
+  purple: { name:'工作',   bg:'#6E4BD0', ink:'#FFFFFF' },
+}
+
+/* 前 3 条是他库里那三条真数据（照 09-28 实测截图抄，都在未分类）；
+   淡路岛、市集两条是早几稿就有的示意；置身事内、评审会两条是这一稿新编的示意，
+   只为把蓝、紫两支点色画出来（行内只用到标题和日期）。 */
+const NOTES = [
+  { ti:'2026微信小程序开发大赛介绍', cat:'ink', src:'截图识别', tag:'微信小程序 / 开发大赛 / 人工智能', dt:'09-23', pin:true,
+    su:'微信小程序团队联合 WAICFutureTech 启动 2026 微信小程序开发大赛，以"与AI共生"为主题面向全球征集 AI 小程序作品。' },
+  { ti:'TVB新晋HiFi女歌手——侯静伊', cat:'ink', src:'公众号文章', tag:'侯静伊 / TVB / HiFi歌手 / 中年好声音', dt:'09-25',
+    su:'侯静伊（Connie Hau）是香港 HiFi 女歌手及 TVB 签约艺人，自幼学声乐并获逾 60 项歌唱奖项。她自 2019 年出道已推出三张专辑。' },
+  { ti:'2026年中秋节祝福语与问候图片大全', cat:'ink', src:'公众号文章', tag:'平安喜乐 / 中秋节 / 祝福语 / 问候图片', dt:'09-25',
+    su:'本文汇集了 2026 年中秋节的多条温馨祝福语，配合最美问候图片，传达花好月圆、阖家团圆的美好祝愿。' },
+  { ti:'淡路岛两天：海边美术馆与营地', cat:'green', src:'公众号文章', tag:'淡路岛 / 美术馆 / 露营', dt:'09-24',
+    su:'生驹的濑户内海眺望、安藤忠雄的图书馆，营地要提前一个月订。岛上公交两小时一班，末班五点半，错过就得打车，一段路约三千日元。南淡路的海上散步道留着半天，退潮时能看到底下的礁石。',
+    url:'mp.weixin.qq.com/s/8kQ2vRm4pLxY' },
+  { ti:'市集那三家咖啡都在东门第二排', cat:'orange', src:'亲自撰写', tag:'周末 / 咖啡', dt:'09-26',
+    su:'自带杯减五块，一家只卖浅焙。周末十点前人少，可以坐着聊。三家都在东门第二排，走到底左拐。第二排尽头那家有外摆位，下午三点后基本要等。' },
+  { ti:'《置身事内》第三章读书摘记', cat:'blue', src:'截图识别', tag:'置身事内 / 经济 / 读书笔记', dt:'09-22' },
+  { ti:'周三评审会要带的三份材料', cat:'purple', src:'亲自撰写', tag:'工作 / 例会', dt:'09-21' },
+]
+/* 列表顺序：置顶在最上，其余按日期倒序——和现网首页同一条规则 */
+const ORDER = [0, 4, 1, 2, 3, 5, 6]
+const KP = ['两个营地都要提前一个月订，周末基本秒空','安藤忠雄的图书馆只在下午四点前开放，需预约',
+            '岛上公交两小时一班，末班 17:30，行程要按班车排','南淡路海上散步道退潮时段最好走，单程约 40 分钟']
+
+const L = {
+  zh:{ nav:'图麦笔记', head:'我的笔记', stats:'本周：3　|　本月：5　|　总数：7',
+    ph:'输入关键词', go:'搜索笔记', all:'全部', pin:'置顶', unpin:'取消置顶', edit:'编辑', del:'删除',
+    summary:'摘要', keyPoints:'核心要点', tags:'标签', sourceLink:'来源链接',
+    original:'原文内容', expand:'展开', collapse:'收起',
+    shareAsImage:'转为笔记卡片', sharedNow:'这篇已经公开，别人扫码能看', unshare:'撤掉分享',
+    qr:'带二维码', qrHint:'发到微信以外的平台容易被屏蔽，可关掉只留文字',
+    cancel:'取消', save:'保存到相册', saved:'已保存到相册', gen:'生成分享图...',
+    tab:['新建','笔记','我的'], swipeHint:'左右滑换模板',
+  },
+}
+const T = L.zh
+
+/* utils/poster.js 的 TEMPLATES，十条、按数组顺序，模板名逐字抄 */
+const TPLS = [
+  { id:'card', name:'玉版宣', f:'模板-card.png' },
+  { id:'quote', name:'摘句', f:'模板-quote.png' },
+  { id:'block', name:'叠翠', f:'模板-block.png' },
+  { id:'letter', name:'素宣信笺', f:'模板-letter.png' },
+  { id:'popGrid', name:'波普分格', f:'模板-popGrid.png' },
+  { id:'popDots', name:'网点漫画', f:'模板-popDots.png' },
+  { id:'acid', name:'荧光渐变', f:'模板-acid.png' },
+  { id:'cover', name:'杂志封面', f:'模板-cover.png' },
+  { id:'lit', name:'纸间文艺', f:'模板-lit.png' },
+  { id:'spec', name:'规格卡', f:'模板-spec.png' },
+]
+
+const shell = (inner) => `
+  <div class="sb"><span>23:03</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb"><span class="t">${T.nav}</span><span class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  <div class="bg" style="background-image:url('${IMG}')"></div><div class="scrim"></div>
+  ${inner}
+  <div class="tabbar">
+    <div class="tb create"><div class="ic"></div>${T.tab[0]}<div class="ln"></div></div>
+    <div class="tb notes on"><div class="ic"></div>${T.tab[1]}<div class="ln"></div></div>
+    <div class="tb me"><div class="ic"></div>${T.tab[2]}<div class="ln"></div></div>
+  </div>`
+
+const chip = (k) => `<div class="chip" style="background:${CAT[k].bg};color:${CAT[k].ink}">${CAT[k].name}</div>`
+
+const head = () => `
+  <div class="lay">
+    <div class="hero"><div class="h1">${T.head}</div><div class="stats">${T.stats}</div></div>
+    <div class="spill"><div class="q">${T.ph}</div><div class="go">${T.go}</div><div class="rule"></div></div>
+    <div class="chips"><div class="chip all">${T.all}</div>${chip('green')}${chip('orange')}${chip('blue')}${chip('purple')}</div>
+  </div>`
+
+/* 传统列表的一行：只有点 + 标题 + 日期（他这一轮定的），全部同宽，top 由外部给 */
+const row = (n, top) => `
+  <div class="row" style="top:${top}px">
+    <span class="dot" style="background:${CAT[n.cat].bg}"></span>
+    <span class="ti">${n.ti}</span><span class="dt">${n.dt}</span></div>`
+const rowAt = (i, n) => row(n, 48 + i * 143)
+
+/* ① 默认：滚动到列表中间那一段（置顶那条在上面屏幕外），上下各一根动感横条 */
+const S1 = shell(head() + `
+  <div class="lay"><div class="rows">
+    <div class="mb mt"></div>
+    ${ORDER.slice(1, 6).map((idx, i) => rowAt(i, NOTES[idx])).join('')}
+    <div class="mb mb2"></div>
+  </div></div>`)
+
+// ② 拖到最顶：置顶那条就是第一行，上面没有内容了，上端那根横条停在原地
+const S2 = shell(head() + `
+  <div class="lay"><div class="rows">
+    <div class="mb mt stay"></div>
+    ${ORDER.slice(0, 5).map((idx, i) => rowAt(i, NOTES[idx])).join('')}
+    <div class="mb mb2"></div>
+  </div></div>`)
+
+/* 展开那一屏：内容还是 pages/detail/detail.wxml 那几块，顺序一字不差；
+   差别三处——色彩方块撤掉换成纯文字抬头、操作条抬出来钉在窗口下沿、顶部多一条把手。 */
+const detailBody = `
+  <div class="hd2">
+    <div class="meta">${NOTES[3].src} · 2026-09-24 21:14</div>
+    <div class="h2">${NOTES[3].ti}</div>
+    <div class="tags">${NOTES[3].tag.split(' / ').map((x) => `<span>${x}</span>`).join('')}</div>
+  </div>
+  <div class="lab">${T.summary}</div>
+  <div class="para">${NOTES[3].su}</div>
+  <div class="lab">${T.keyPoints}</div>
+  <div class="pts">${KP.map((k, i) => `<div class="r"><div class="n">${i + 1}</div><div class="x">${k}</div></div>`).join('')}</div>
+  <div class="lab">${T.sourceLink}</div>
+  <div class="link">${NOTES[3].url}</div>
+  <div class="orig"><div class="lab ln">${T.original}</div><div class="sw">${T.expand} ⌄</div></div>`
+
+const dockDetail = `
+  <div class="dock">
+    <div class="irow">
+      <div class="ibtn">${T.unpin}</div>
+      <div class="ibtn">${T.edit}</div>
+      <div class="ibtn danger">${T.del}</div>
+    </div>
+    <div class="pbtn">${T.shareAsImage}</div>
+    <div class="pub"><span><b>·</b> ${T.sharedNow}</span><span class="act">${T.unshare}</span></div>
+  </div>`
+
+// ③ 点一条 → 展开＝详情页：窗口内滚（底部压一道渐隐说明下面还有），操作吸底
+const S3 = shell(head() + `
+  <div class="lay"><div class="rows">
+    ${ORDER.slice(1, 6).map((idx, i) => rowAt(i, NOTES[idx])).join('')}
+  </div></div>
+  <div class="lay" style="z-index:9"><div class="sheet">
+    <div class="grip"><i></i><em>${'点一下收起'}</em></div>
+    <div class="body" style="--tone:${CAT.green.bg}">${detailBody}<div class="fade"></div></div>
+    ${dockDetail}
+  </div></div>`)
+
+// ④ 点「转为笔记卡片」：同一个窗口换成海报预览，操作区换成 取消 / 保存到相册
+const posterBox = (cls, src) => `<img class="${cls}" src="${POSTER}${src}">`
+const S4 = shell(head() + `
+  <div class="lay" style="z-index:9"><div class="sheet">
+    <div class="grip"><i></i><em>${'点一下收起'}</em></div>
+    <div class="pbox">${posterBox('c', TPLS[0].f)}
+      <div class="swipe"><span class="ar">‹</span>${T.swipeHint}<span class="ar">›</span></div>
+      <div class="toast">${TPLS[0].name}</div>
+    </div>
+    <div class="dock">
+      <div class="qr"><div class="pill"><i></i></div><div class="tx"><b>${T.qr}</b><span>${T.qrHint}</span></div></div>
+      <div class="two" style="margin-top:20px">
+        <div class="pbtn ghost">${T.cancel}</div>
+        <div class="pbtn">${T.save}</div>
+      </div>
+    </div>
+  </div></div>`)
+
+// ⑤ 左右滑换模板中：三张并排，中间那张是当前的，左右两张淡出；吐司报出刚切到的名字
+const S5 = shell(head() + `
+  <div class="lay" style="z-index:9"><div class="sheet">
+    <div class="grip"><i></i><em>${'点一下收起'}</em></div>
+    <div class="pbox"><div class="pair">
+      ${posterBox('a', TPLS[1].f)}
+      ${posterBox('c', TPLS[2].f)}
+      ${posterBox('b', TPLS[3].f)}
+    </div>
+      <div class="swipe"><span class="ar">‹</span>${T.swipeHint}<span class="ar">›</span></div>
+      <div class="toast">${TPLS[2].name}</div>
+    </div>
+    <div class="dock">
+      <div class="qr"><div class="pill"><i></i></div><div class="tx"><b>${T.qr}</b><span>${T.qrHint}</span></div></div>
+      <div class="two" style="margin-top:20px">
+        <div class="pbtn ghost">${T.cancel}</div>
+        <div class="pbtn">${T.save}</div>
+      </div>
+    </div>
+  </div></div>`)
+
+// ⑥ 保存成功：吐司"已保存到相册"，窗口回到详情页（不是回列表）
+const S6 = shell(head() + `
+  <div class="lay" style="z-index:9"><div class="sheet">
+    <div class="grip"><i></i><em>${'点一下收起'}</em></div>
+    <div class="body" style="--tone:${CAT.green.bg}">${detailBody}<div class="fade"></div></div>
+    ${dockDetail}
+    <div class="toast" style="top:46%"><div class="tick"></div>${T.saved}</div>
+  </div></div>`)
+
+const UNIT = (step, title, note, inner) => `
+  <div class="unit"><div class="cap"><span class="step">${step}</span><h3>${title}</h3><p>${note}</p></div>
+  <div class="ph">${inner}</div></div>`
+
+const DOC = `
+  <div class="sb" style="background:#E9EEEA;color:#23252C"><span>23:03</span><span class="right"><span class="sig"><i></i><i></i><i></i><i></i></span><span class="bat"></span></span></div>
+  <div class="nb" style="background:#E9EEEA;border-bottom:3px solid rgba(35,37,44,.10)"><span class="t" style="color:#23252C">标注</span>
+    <span class="capsule" style="background:rgba(35,37,44,.06);box-shadow:inset 0 0 0 2px rgba(35,37,44,.10);color:#23252C"><span class="dots"><i></i><i></i><i></i></span><span class="dv"></span><span class="cls"></span></span></div>
+  <div class="docbody">
+    <div class="blk2"><h4>你这一轮撤掉堆叠之后，这一稿长什么样</h4>
+      <p><b>折叠改回传统上下列表。</b>你的原话是"卡片折叠还是不好看，恢复传统的上下展示，所有卡片左右都对齐，不要缩减"。这一稿把堆叠整个拆了：没有中心卡、没有缩放、没有探出来的边，七条笔记从上到下排开，<b>每条左右都是 24 的同一把尺，宽全是 702</b>，谁也不压谁。一屏 5 条没变，行与行之间 19 的缝。</p>
+      <p><b>没展开的行只有三样东西：点、标题、日期。</b>分类色点在左，标题长了省略号收尾，日期靠右。摘要、分类名、来源、标签一概不上行——按你说的执行。点其中任何一条，展开成详情页（第三屏）。</p>
+      <p><b>动感横条照旧。</b>上端下端各一根，居中 260 一根（不随行宽拉通，就是一根提示），说"这一头还有"；拖到最顶（第二屏）上端那根停在原地、淡一档、箭头撤掉，拖到最底反过来。</p>
+      <p><b>展开即详情、页内出海报、左右滑切模板、保存回详情——四样原样保留</b>，和上一稿一字不差，那几条你已经拍过。副产品一条：上一稿风险清单里"窗口内滚动和上下滑切笔记手势打架"那条，跟着堆叠一起消失了——现在列表就是普通滚动，点谁展开谁。</p></div>
+    <div class="blk2"><h4>你上一轮拍的两条是怎么落的（这稿没动）</h4>
+      <p><b>展开就是详情页。</b>第三屏那几块的顺序、每一栏的名字、底下那排按钮，全部照现网 <code>pages/detail/detail.wxml</code> 搬：来源类型·时间 + 标题 + 标签 → 摘要 → 核心要点（带圈数字）→ 来源链接 → 原文内容（展开/收起）。差别三处：<b>操作条从页面流里抬出来钉在窗口下沿</b>（取消置顶 / 编辑 / 删除 一排 + 转为笔记卡片 主按钮 + 已公开·撤掉分享 那一行），窗口里滚多少它都不动；顶部多一条把手；<b>详情里那块分类色方块撤掉</b>（你要的简洁），抬头就三行纯文字。</p>
+      <p><b>窗口高度按你改的。</b>上沿 130——停在搜索条上方，「我的笔记」那一行始终露着；下沿留 152，和底栏之间空 24，不粘在一起。窗口高 1224，内容区 908，长的照样窗口内滚。</p>
+      <p><b>分享图直接在这页里渲染。</b>点「转为笔记卡片」，同一个窗口把详情内容换成海报预览（第四屏），底部操作换成 取消 / 保存到相册，现网那排横滑小图整条撤掉——改成<b>在海报上左右滑</b>切模板（第五屏），切一次弹一个小吐司报模板名。保存成功后回到展开的详情页（第六屏），不跳回列表、也不跳页。</p></div>
+    <div class="blk2"><h4>这一版撤掉的东西（做减法，逐条列清）</h4>
+      <table>
+        <tr><th>撤掉</th><th>为什么</th></tr>
+        <tr><td>整个堆叠：中心卡、两层折叠条、缩放、探边</td><td>你说折叠不好看，恢复传统上下展示。全部行同宽、顺序排</td></tr>
+        <tr><td>手势提示行「上下滑切换 · 点卡片放大」</td><td>传统列表不用教怎么用，这条<span class="new">新串</span>也不用落地了</td></tr>
+        <tr><td>独立详情页 <code>pages/detail/detail</code> 的跳转</td><td>展开就是它。编辑、删除、置顶、转卡片都在窗口里做</td></tr>
+        <tr><td>分享海报页 <code>pages/share/share</code> 的整屏跳转</td><td>海报改成窗口里的一块预览，横滑小图条换成海报上左右滑</td></tr>
+        <tr><td>折叠行的摘要（现在连分类名、标签也不上行）</td><td>你两轮都收紧行内内容：最后定格在 点 + 标题 + 日期</td></tr>
+        <tr><td>详情抬头那块分类色方块</td><td>你要简洁。列表的行上有支点了，展开态不必再摆一块大色</td></tr>
+        <tr><td>英文版那一屏</td><td>结构还没定，先不出英文，省一轮返工</td></tr>
+      </table>
+      <p>注意这是<b>效果图层面的减法</b>，代码一行没动。真要按这一版落地，两个页面（detail、share）会从"页面"降级成"首页里的一个态"，路由、返回栈、埋点都要跟着改——代价写在最后一段。</p></div>
+    <div class="blk2"><h4>动感横条的动效参数（截图是静止的，落地照这个做）</h4>
+      <p>一根 260×28 的圆角条，居中放（不随行宽拉通），中间亮两头透明；条外正中一个小箭头——上端那根朝上、下端那根朝下（横着指会读成左右滑，故意不这么画）。呼吸一轮 1.6s：透明度 .35 ↔ .75，同时朝外微移 4——上端那根往上呼吸、下端那根往下呼吸，读起来是"外面还有"。列表滚动时两根钉在列表区的上下沿，不跟着行走。</p>
+      <p>到头规则：<b>拖到最顶时上端那根停在原地</b>（不再呼吸、淡到 .22、撤箭头），下端照常；拖到最底反过来。中间位置两根都动。这样"还能不能滑"这件事不用看数字也知道。</p></div>
+    <div class="blk2"><h4>模板切换：左右滑的顺序与到头</h4>
+      <p>现网 <code>utils/poster.js</code> 的 <code>TEMPLATES</code> 一共十套，分两组（经典款四套、个性款六套），名字逐字是：<b>玉版宣、摘句、叠翠、素宣信笺</b>（经典款）｜<b>波普分格、网点漫画、荧光渐变、杂志封面、纸间文艺、规格卡</b>（个性款）。左右滑就按这个数组顺序走，<b>不循环</b>——到第十套再往左滑不动，和列表那根横条是同一条规则。每切一套弹一个小吐司报名字（现网 <code>wx.showToast</code> 那种居中深灰块，无图标）。</p>
+      <p>屏上那三张海报<b>不是手画的假图</b>，是 <code>docs/design/模板成品-1.5.0/</code> 里模拟器出的真成品（玉版宣 750×1077、叠翠 750×1154、素宣信笺 750×1188，各自真实比例），按现网那条规则放进定高框里等比居中——所以切模板时框子不跳、图自己变大小。<b>有一条要交代清</b>：那三张成品图当时是拿「2026微信小程序开发大赛介绍」那条笔记画的，而这一稿展开的是淡路岛那条，<b>海报上的文字和屏上这条笔记对不上</b>。版位、比例、模板长相是真的，文字内容不是同一篇，落地时同一篇重画就一致了。</p></div>
+    <div class="blk2"><h4>落地前必须先解的一个坑（现网注释里已经踩过）</h4>
+      <p><code>pages/share/share.wxml</code> 顶上那段注释写着：<b>"试过把小图那排钉进底部固定条——画布是原生层，放进 fixed 里会整体错位，已回退。"</b> 这一版要做的正是把海报塞进一个吸底的窗口里，撞的就是这条。所以落地时预览<b>不能直接放 <code>canvas type="2d"</code></b>：改成把画布挪到窗口外（或 <code>position:fixed</code> 之外）离屏画完，<code>canvasToTempFilePath</code> 出图，窗口里用 <code>&lt;image&gt;</code> 显示成品。这样左右滑切模板 = 换 image 的 src + 重画下一张，原生层不参与布局，就不会错位。<b>代价是切模板那一瞬会先看到上一张、再跳到新图</b>，所以吐司要盖住这一瞬，或者先出一张同底色的占位。这条要在动手前实测一遍能不能真的不错位——我说的"改成 image 就干净"目前只是推断，没跑过。</p></div>
+    <div class="blk2"><h4>尺寸（rpx，视口从 184 起算）</h4>
+      <table>
+        <tr><th>位置</th><th>数值</th></tr>
+        <tr><td>页头 / 搜索 / 分类</td><td>45 · 146..274 · 306..362（与现网逐值相同，没动）</td></tr>
+        <tr><td>列表区</td><td>420 起，高 792（到 1212）；底栏顶 1378</td></tr>
+        <tr><td>列表行</td><td>左右 24（宽 <b>702，全部同宽</b>）、高 124、行距 19、一屏 5 行；行位 48 / 191 / 334 / 477 / 620；圆角 40；行内 = 点 16 + 标题 28 + 日期 21，左右内缩 30</td></tr>
+        <tr><td>动感横条</td><td>260×28，居中；上端 top 0、下端 top 764；箭头 20×20，在条外正中 26</td></tr>
+        <tr><td>展开窗口</td><td>左右 24、上 130（停在搜索条上方，「我的笔记」那行不盖）、下留 152（底栏占 20..128，再留 24 不粘住），高 1224；把手 56、内容区 908、吸底操作区 260</td></tr>
+        <tr><td>详情内容</td><td>抬头纯文字三行（来源类型·时间 24 / 标题 38·800 / 标签 21），不放分类色方块；栏名 20/800/字距 1.6；要点序号圆 38；左右内缩 34</td></tr>
+        <tr><td>吸底操作区</td><td>图标排 72、主按钮 96、公开那行 30，左右内缩 24、上内缩 20</td></tr>
+        <tr><td>海报预览框</td><td>定高、图在里面等比居中；框底色是渐变米灰（现网 preview-box 同一条规则）</td></tr>
+        <tr><td>小吐司</td><td>居中深灰 <code>rgba(17,19,24,.90)</code>、圆角 20、内缩 24×30、字 24；保存成功那条多一个 44 的勾</td></tr>
+      </table></div>
+    <div class="blk2"><h4>屏上每一句中文的来源</h4>
+      <table>
+        <tr><th>串</th><th>来源</th></tr>
+        <tr><td>我的笔记 / 全部 / 输入关键词 / 搜索笔记 / 摘要 / 核心要点 / 来源链接 / 原文内容 / 展开 / 编辑 / 删除 / 置顶 / 取消置顶 / 转为笔记卡片 / 这篇已经公开，别人扫码能看 / 撤掉分享 / 带二维码 + 那行提示 / 取消 / 保存到相册 / 已保存到相册 / 生成分享图...</td><td><span class="live">现网</span> utils/i18n.js 原键（<code>shareAsImage</code> 中文是「转为笔记卡片」，不是"分享图"；<code>cancel</code> 在分享页英文是 Back）</td></tr>
+        <tr><td>十个模板名</td><td><span class="live">现网</span> utils/poster.js 的 <code>TEMPLATES.label</code>，逐字照抄</td></tr>
+        <tr><td>分类名（旅游 / 生活 / 阅读 / 工作）</td><td><span class="live">真数据</span> 前两个是他库里已有的；后两个是<span class="new">示意</span>，只为把四支色画出来</td></tr>
+        <tr><td>「点一下收起」（把手右边那几个字）</td><td><span class="new">新串</span> 字典里没有。也可以干脆不要字、只留那根把手</td></tr>
+        <tr><td>「左右滑换模板」（海报框底下那行）</td><td><span class="new">新串</span> 字典里没有。第一次进预览提示、之后不再出现也行，你挑</td></tr>
+        <tr><td>前 3 条笔记的标题 / 日期</td><td><span class="live">真数据</span> 照 09-28 那几张实测截图抄</td></tr>
+        <tr><td>《置身事内》第三章读书摘记 / 周三评审会要带的三份材料（标题、日期）</td><td><span class="new">示意</span> 库里没有这两条，只为把蓝、紫两支点色画出来</td></tr>
+        <tr><td>淡路岛那条的摘要、四条核心要点、来源链接、21:14 那个时间点</td><td><span class="new">示意</span> 库里没有这条笔记，只为把详情页那几栏填满</td></tr>
+        <tr><td>页头统计「本周：3　|　本月：5　|　总数：7」</td><td><span class="new">示意</span> 分隔符照 <code>index.js</code> 里 <code>colon='：' / gap='　|　'</code> 拼；为了把列表滚动的两头都演示出来，条数比真库多</td></tr>
+        <tr><td>「已公开」那一行前面那个绿点</td><td><span class="new">示意</span> 现网那一行没有点，只有两段文字，落地按现网</td></tr>
+      </table></div>
+    <div class="blk2"><h4>还等你拍的</h4>
+      <p><b>一、列表那枚点吃原色还是吃加深档。</b>这条最要紧：你现在用天青壁纸，现网 <code>catSkinFor</code> 会把五支分类色全压成同一支绿（芥末黄→#527358、宝蓝→#53735b、橙→#55725d、草绿→#54735d、紫→#40604A、墨黑→#1B2A21），"点要颜色区分"用现成函数做不到。这一稿屏上画的还是<b>色板原色</b>，等于默认你同意"列表这点改吃 <code>toneFor(id).bg</code>、文字仍吃 <code>catSkinFor.text</code>"。不同意我就把屏上的点全换成右边那一列绿。</p>
+      <p><b>二、筛选枚穿实色后，选中态怎么区分。</b>这版画的还是前两稿那套：未选中 = 该分类实色底 + 配好的字色；选中 = 纸白底 + 该色字 + 该色描边。</p>
+      <p><b>三、墨黑那一档。</b>他那三条真笔记都在未分类，点全是墨黑，看着还是灰的。我倾向不改色板，让他把这几条归类。</p>
+      <p><b>四、置顶在列表上没有任何标记。</b>你定了行内只有点、标题、日期，那么置顶和普通在列表上分不出来（点开详情才看得到「取消置顶」）。要是不想丢这个信息，最小改法是日期前面加一个小图钉——算例外加第四样东西，加不加你拍。</p>
+      <p>上一稿问过的"操作条钉下沿还是上沿""展开态那条色带"，按你后来"其他按你建议做"和"要简洁"已经落定：钉下沿、无色块，这稿不再问。</p></div>
+    <div class="blk2"><h4>落地代价（先说清，等你拍完再动）</h4>
+      <p>比上一稿轻了。列表回归普通滚动的 <code>scroll-view</code>，展开窗口、页内海报两样不变。要动的还是那三块：首页 data 里加"展开哪一条 + 海报预览开/关 + 当前模板 id"；detail 页那套取数与渲染逻辑（含原文折叠、撤分享、置顶）搬进首页组件；share 页的画海报流程改成离屏画 + image 显示。<code>app.json</code> 里 detail 和 share 两个路由<b>先留着别删</b>——分享落地页、通知跳转、以及"从别处直接打开某篇"都还指着它们，删了会断链。</p>
+      <p>风险剩两条：① 原生 canvas 与吸底窗口的错位（前面整块讲的那条，动手前先实测）；② 数据这条松了——不再需要一次备 5 条的全文，点开哪条按现网 detail 的方式现取那一条就行，<code>/api/notes</code> 字段够不够只影响展开那一瞬要不要先转个圈。上一稿的"滚动和换条手势打架"已随堆叠一起撤掉。</p></div>
+  </div>`
+
+const flow = document.getElementById('flow')
+flow.innerHTML =
+  UNIT('①', '传统列表 · 上下排开，左右一宽到底', '七条全部同宽 702，不缩放、不压叠、不探边。没展开的行只有三样：分类色点、标题、日期。上下各一根动感横条说"这头还有"。', S1)
+  + UNIT('②', '拖到最顶那一态 · 上端横条停住', '置顶那条到了顶，上面没有内容；上端那根停在原地、淡一档、箭头撤掉，下端照常呼吸。行不缩、不放、不动。', S2)
+  + UNIT('③', '点一条 → 展开，就是详情页', '内容照现网详情那一屏搬进来，长就窗口内滚（底下压一道渐隐说明还有）；取消置顶 / 编辑 / 删除 / 转为笔记卡片 / 撤掉分享 全部钉在窗口下沿，滚多少都不动。', S3)
+  + UNIT('④', '点「转为笔记卡片」→ 同一个窗口出海报', '详情内容整块换成海报预览（这张是真成品图，玉版宣）。现网那排横滑小图撤了，改成在海报上左右滑。小吐司报出当前模板名。', S4)
+  + UNIT('⑤', '左右滑换模板中', '三张并排，中间是当前的，左右两张淡出。切一套弹一次吐司：这屏是「叠翠」。按 poster.js 里那十套的顺序走，到第十套滑不动、不循环。', S5)
+  + UNIT('⑥', '保存成功 → 回到展开的详情页', '吐司「已保存到相册」，窗口退回详情页那一屏（不是回列表、也不是关窗）。再点把手才收回到列表。', S6)
+  + `<div class="unit"><div class="cap"><span class="step">标注</span><h3>撤了什么、留了什么、四条还等你拍的</h3><p>尺寸按现网令牌；文案逐条对 detail.wxml / share.wxml / i18n.js；海报用的是模拟器真成品图。</p></div>
+     <div class="ph doc">${DOC}</div></div>`
+</script>
+</body>
+</html>
