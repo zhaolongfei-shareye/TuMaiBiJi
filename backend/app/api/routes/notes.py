@@ -1,13 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import Annotated, List, Optional
 from pydantic import BaseModel, Field, model_validator
 from datetime import datetime, timezone
-from sqlalchemy import or_
+import logging
+from sqlalchemy import and_, or_
 from app.db.database import get_db
 from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.core.private_access import (
+    LOCKED_DROP_DETAIL,
+    LOCKED_DROP_LIST,
+    NOTE_BRIEF_FIELDS,
+    NOTE_DETAIL_FIELDS,
+    is_private_note,
+    locked_view,
+    private_category_ids,
+    unlocked,
+)
 from app.core.quota_gate import require_note_room
 from app.core.timefmt import UTCDatetime, UTCDatetimeOrNone
 from app.core.errors import UserError
@@ -15,12 +26,14 @@ from app.services.wechat import enforce_text_safety
 from app.services.sharing import (
     SNAPSHOT_COLUMNS,
     active_shares,
+    close_shares,
     public_fields,
     sync_snapshot,
 )
 from app.services import quota
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # 模型上写的 String(500) 在 SQLite 上只是装饰：实测 500 万字的标题、2 千万字的正文
 # 都照样 200 存进去，三次请求就把库撑到 74MB。而 title 会进列表响应，一条超长标题
@@ -129,6 +142,7 @@ class NoteUpdate(BaseModel):
 
 @router.get("/", response_model=List[NoteBrief])
 def list_notes(
+    request: Request,
     skip: int = 0,
     limit: int = Query(20, ge=1, le=100),
     category_id: int | None = None,
@@ -136,31 +150,64 @@ def list_notes(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    private_ids = private_category_ids(db, user.id)
+    # 这一条路由上"解没解锁"只判一次，下面裁字段和搜索条件共用同一个答案。
+    # 分开判会漏：搜索那支要是自己按"未解锁"判，裁字段却按另一个答案走，
+    # 就等于留了一条"用搜索探正文"的旁路。
+    locked = bool(private_ids) and not unlocked(request, user)
     q = db.query(Note).filter(Note.user_id == str(user.id))
     if category_id is not None:
         q = q.filter(Note.category_id == category_id)
     if search:
         escaped = search.replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
-        q = q.filter(
-            or_(
-                Note.title.ilike(pattern, escape="\\"),
-                Note.summary.ilike(pattern, escape="\\"),
-                Note.content.ilike(pattern, escape="\\"),
-                Note.original_content.ilike(pattern, escape="\\"),
-            )
+        title_like = Note.title.ilike(pattern, escape="\\")
+        body_like = or_(
+            Note.summary.ilike(pattern, escape="\\"),
+            Note.content.ilike(pattern, escape="\\"),
+            Note.original_content.ilike(pattern, escape="\\"),
         )
+        if locked:
+            # 锁着的时候私密笔记只有标题参与搜索——"这篇里有没有某个词"这个问题，
+            # 原来的搜索会老老实实用命中与否来回答，那本身就是正文的旁漏。
+            # 未分类的 category_id 是 NULL，而 `NULL NOT IN (...)` 判的是 NULL 不是真，
+            # 所以要把 NULL 显式并进来，否则普通笔记会从搜索结果里凭空消失。
+            q = q.filter(
+                or_(
+                    title_like,
+                    and_(
+                        body_like,
+                        or_(Note.category_id.is_(None), Note.category_id.notin_(private_ids)),
+                    ),
+                )
+            )
+        else:
+            q = q.filter(or_(title_like, body_like))
     notes = (
         q.order_by(Note.is_pinned.desc(), Note.pinned_at.desc().nullslast(), Note.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
-    return notes
+    if not locked:
+        return notes
+    # 概要跟着正文一起裁：界面上它只在验过密码、展开那一行时才画，所以裁掉不影响
+    # 正常流程；不裁才是原来的样子——列表响应里直接躺着私密笔记的概要。
+    out = []
+    for n in notes:
+        if not is_private_note(n, private_ids):
+            out.append(n)
+            continue
+        row = {f: getattr(n, f) for f in NOTE_BRIEF_FIELDS}
+        for f in LOCKED_DROP_LIST:
+            row[f] = None
+        out.append(row)
+    return out
 
 
 @router.get("/{note_id}", response_model=NoteDetail)
 def get_note(
+    request: Request,
     note_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -172,11 +219,11 @@ def get_note(
     )
     if not note:
         raise HTTPException(status_code=404, detail="笔记不存在或已删除")
-    if note.category_id:
-        from app.models.category import Category
-        cat = db.query(Category).filter(Category.id == note.category_id).first()
-        if cat and cat.name == "私密":
-            note.is_private = True
+    note.is_private = is_private_note(note, private_category_ids(db, user.id))
+    if note.is_private and not unlocked(request, user):
+        # 回 200 + 裁过的正文，而不是 403：详情页要先拿到这条笔记的形状才知道
+        # "这是一篇私密的、该弹密码框"。is_private 仍然如实带着，客户端拿它决定弹哪一层。
+        return locked_view(note, NOTE_DETAIL_FIELDS, LOCKED_DROP_DETAIL)
     return note
 
 
@@ -252,13 +299,22 @@ def update_note(
             db.rollback()
             raise
 
+    # 改成私密 = 用户说过这篇不给人看。已经发出去的码当场关掉：不关的话公开落地页会
+    # 继续供正文，而界面上「撤掉分享」那一枚对私密笔记整个不渲染——他再没有别的入口
+    # 能收回它。close_shares 不自己 commit，跟着下面那次一起提交。
+    now_private = is_private_note(db_note, private_category_ids(db, user.id))
+    if now_private:
+        closed = close_shares(db, db_note.id)
+        if closed:
+            logger.info("笔记 %s 归入私密，顺手关掉 %s 条在跑的分享", db_note.id, closed)
+
     # 改一条已经分享出去的笔记，改的就是公开页上的内容。同步和重检必须绑在一起：
     # 只同步不重检，抓取来源的笔记（上面那道 _guard_manual_text 对它直接放行）就能
     # 靠"改一下标题"把没过公开审查的文本推上去；只重检不同步，就是这次修的那个洞——
     # 用户把手机号从标题里删掉了，那张卡片扫开还是手机号。
     # 判据取 SNAPSHOT_COLUMNS：公开页只给那几列，改正文不影响它。
     if set(update_data) & set(SNAPSHOT_COLUMNS):
-        if active_shares(db, db_note.id):
+        if not now_private and active_shares(db, db_note.id):
             try:
                 enforce_text_safety(user.openid, *public_fields(db_note))
             except UserError as e:

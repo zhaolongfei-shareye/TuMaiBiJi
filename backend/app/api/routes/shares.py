@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.core.errors import UserError
+from app.core.private_access import is_private_note, private_category_ids
 from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
@@ -68,6 +69,11 @@ def create_share(
     user: User = Depends(get_current_user),
 ):
     note = _owned_note(db, user, req.note_id)
+    # 私密笔记不给开分享。这条必须卡在服务端：界面上那枚按钮对私密笔记整个不渲染，
+    # 可接口原本是照发的——`POST /api/shares {note_id}` 就能把一篇私密笔记变成
+    # 一个匿名可读的公开页，"私密"这句承诺当场作废，而且撤不回来（详情页也进不去）。
+    if is_private_note(note, private_category_ids(db, user.id)):
+        raise HTTPException(status_code=400, detail="私密笔记不能分享")
     author = _author_name(req)
 
     # 一条笔记只留一个有效分享：卡片上的码是按 token 生成的，反复点"生成分享图"

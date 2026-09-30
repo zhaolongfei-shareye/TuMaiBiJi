@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    # 私密笔记的解锁凭证活多久（app/core/private_access.py）。故意比登录 token 短得多：
+    # 登录 token 管"是不是这台设备的账号"，这条只管"接下来这几分钟里可以看私密内容"。
+    # 15 分钟够翻完十几篇再重新验一次；再长就变成"解锁一次、整天敞着"，
+    # 而这一闸防的恰恰是手机在别人手里那一会儿。
+    PRIVATE_UNLOCK_MINUTES: int = 15
 
     @model_validator(mode="after")
     def _require_jwt_secret(self) -> "Settings":

@@ -60,6 +60,29 @@ const ck = (name, ok, got) => {
   ck('列表页判据已收到同一个函数里（不再各写一遍"私密"）', /isPrivate\(/.test(idx) && !/=== '私密'/.test(idx))
   ck('新建页与编辑页都接了这道拦截', /allowPrivate\(/.test(write) && /allowPrivate\(/.test(wr))
 
+  // ---------- 服务端那道闸在客户端的四条接线 ----------
+  // 后端 09-30 起真的会裁字段（backend/app/core/private_access.py）：没解锁时私密笔记的
+  // 概要、要点、正文一律 null。这四条任何一条断了，症状都是"笔记看起来是空的"，
+  // 而且编辑页那条断了会进一步把空壳存回去、真把概要清掉——所以钉死在这里。
+  const apiJs = fs.readFileSync(path.join(__dirname, '../../miniprogram/utils/api.js'), 'utf8')
+  const detailJs = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/detail/detail.js'), 'utf8')
+  ck('每个请求都带上解锁凭证（X-Private-Token）', /X-Private-Token/.test(apiJs))
+  ck('verify 成功就地存下凭证，不靠各页面自己记得存',
+    /unlock_token/.test(apiJs) && /setPrivateUnlock\(r\.unlock_token\)/.test(apiJs))
+  ck('设密与重置都清掉本机凭证（服务端那边旧凭证当场作废）',
+    (apiJs.match(/clearPrivateUnlock\(\)/g) || []).length >= 2)
+  ck('详情页验完密码重取一次（第一份是裁过的空壳）',
+    /this\._privateVerified = true[\s\S]{0,400}note = await api\.getNote\(id\)/.test(detailJs))
+  ck('列表页验完密码重载列表并按 id 找回行号（不然展开那行是空的）',
+    /await this\.loadNotes\(true\)[\s\S]{0,200}notes\.findIndex/.test(idx))
+  ck('编辑页没解锁就不进编辑器（PUT 是整份回写，会清掉真概要）',
+    /is_private[\s\S]{0,200}hasPrivateUnlock\(\)/.test(wr) && /privateUnlockFirst/.test(wr))
+  ck('凭证只存内存不落 storage（杀了重进要重新输）',
+    !/setStorageSync\([^)]*[Uu]nlock/.test(apiJs))
+  const appJs = fs.readFileSync(path.join(__dirname, '../../miniprogram/app.js'), 'utf8')
+  ck('globalData 上有那一格，且 401 重登时跟着清',
+    /privateUnlock: null/.test(appJs) && /globalData\.privateUnlock = null/.test(apiJs))
+
   console.log(`\n${bad.length ? '未通过 ' + bad.length + ' 条：' + bad.join(' / ') : '全部通过'}`)
   process.exitCode = bad.length ? 1 : 0
 })()

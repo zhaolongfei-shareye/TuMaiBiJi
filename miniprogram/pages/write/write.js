@@ -57,6 +57,15 @@ Page({
   async loadNoteForEdit() {
     try {
       const note = await api.getNote(this.data.noteId)
+      // 没解锁时服务端把私密笔记的概要、要点、正文都裁成 null（后端 app/core/private_access.py）。
+      // 这一页保存是整份 PUT 回去的：拿一份裁过的空壳去存，等于把他真正的概要和要点清空。
+      // 正常路径走不到这里——要点到「编辑」得先在列表或详情里输过一次密码；
+      // 真走到了只有一种可能：那 15 分钟的解锁凭证刚好在这中间过期了。
+      if (note.is_private && !api.hasPrivateUnlock()) {
+        wx.showToast({ title: t('privateUnlockFirst', this.data.lang), icon: 'none' })
+        wx.navigateBack()
+        return
+      }
       const categoryIndex = note.category_id 
         ? this.data.categories.findIndex(c => c.id === note.category_id)
         : -1

@@ -49,7 +49,7 @@ Page({
   async loadNote(id) {
     this.setData({ loading: true })
     try {
-      const note = await api.getNote(id)
+      let note = await api.getNote(id)
       if (note.is_private && !this._privateVerified) {
         const ok = await this._promptPrivatePassword()
         if (!ok) {
@@ -58,6 +58,10 @@ Page({
           return
         }
         this._privateVerified = true
+        // 验完密码必须重取一次：第一份是服务端裁过的空壳（正文、要点、概要都是 null），
+        // 直接渲染会渲染出一篇"什么都没有"的笔记。解锁凭证已经在 api.js 里存好了，
+        // 这一次带上请求头，服务端才发全文。
+        note = await api.getNote(id)
       }
       const lang = this.data.lang
       const key = SOURCE_TYPE_KEYS[note.source_type]

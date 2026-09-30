@@ -272,7 +272,13 @@ Page({
     }
     const ok = await this._promptPrivatePassword()
     if (!ok) return
-    this.setData({ _privateVerified: true, openIdx: idx })
+    this.setData({ _privateVerified: true })
+    // 验完密码重取列表：服务端锁着的时候私密笔记那行的 summary 是裁掉的，
+    // 不重取的话展开这一行是一片空白，看着像"这篇没有概要"。
+    // 重取会整表重排，所以按 id 把行号找回来再展开（和置顶那条同一个做法）。
+    await this.loadNotes(true)
+    const at = this.data.notes.findIndex((n) => n.id === note.id)
+    if (at >= 0) this.setData({ openIdx: at })
   },
 
   // v7 ③：详情浮窗。列表项身上那些派生字段（分类色、来源、日期）这一屏早就算好了，

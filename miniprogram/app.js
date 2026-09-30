@@ -34,6 +34,9 @@ App({
     userId: '',
     token: '',
     loginPromise: null,
+    // 私密笔记的解锁凭证（{ token, expireAt }）。只存内存：杀了重进就要重新输密码，
+    // 这一闸防的正是"手机在别人手里"那一段时间。读写都在 utils/api.js 里收口。
+    privateUnlock: null,
   },
 
   onLaunch(options) {

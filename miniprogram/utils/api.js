@@ -2,6 +2,39 @@
 // 之前它挂在 app.globalData.apiBase 上，页面拼 URL 时还得绕回 getApp() 去取。
 const API_BASE = 'https://api.agentsbin.cn/wtsj'
 
+// 私密笔记的解锁凭证。服务端在"验对密码"那一步发一条 15 分钟短命的 token，
+// 之后每个请求带上它，服务端才把私密笔记的正文和概要发下来——以前这道锁只在界面里，
+// 同一个登录令牌直接打 GET /api/notes/{id} 就能拿到整篇正文。
+// 只存内存（挂在 globalData 上，不落 storage）：杀了小程序重进就要重新输，
+// 这一闸防的恰恰是"手机在别人手里"那一段时间。
+// 本机判的有效期故意比服务端那 15 分钟短一分钟：卡在边界上时宁可多问一次密码，
+// 也不要出现"客户端以为还解锁着、服务端已判未解锁"，那会让详情页拿到一份裁过的空壳。
+const UNLOCK_TTL_MS = 14 * 60 * 1000
+
+function _unlockToken() {
+  const app = getApp()
+  const u = app.globalData.privateUnlock
+  if (!u || !u.token) return ''
+  if (Date.now() > u.expireAt) {
+    app.globalData.privateUnlock = null
+    return ''
+  }
+  return u.token
+}
+
+function setPrivateUnlock(token) {
+  const app = getApp()
+  app.globalData.privateUnlock = token ? { token, expireAt: Date.now() + UNLOCK_TTL_MS } : null
+}
+
+function clearPrivateUnlock() {
+  getApp().globalData.privateUnlock = null
+}
+
+function hasPrivateUnlock() {
+  return !!_unlockToken()
+}
+
 function _headers(contentType, extra) {
   const h = {
     'content-type': contentType || 'application/json',
@@ -10,6 +43,8 @@ function _headers(contentType, extra) {
   if (app.globalData.token) {
     h['Authorization'] = `Bearer ${app.globalData.token}`
   }
+  const unlock = _unlockToken()
+  if (unlock) h['X-Private-Token'] = unlock
   if (extra) Object.assign(h, extra)
   return h
 }
@@ -45,6 +80,9 @@ const request = (url, method, data, options = {}, retryCount = 0) => {
           app.globalData.userInfo = null
           app.globalData.isLoggedIn = false
           app.globalData.loginPromise = null // Reset login promise to allow retry
+          // 解锁凭证跟着登录态一起清：重登之后可能是另一个 generation 的账号，
+          // 留着旧凭证只会让下一次读私密笔记拿到一份裁过的空壳。
+          app.globalData.privateUnlock = null
           
           // Trigger login and retry after successful authentication
           app.getLoginPromise()
@@ -193,9 +231,30 @@ module.exports = {
     request('/api/user/deactivate', 'POST', { confirm: true }, { noRelogin: true }),
   updateWallpaper: (wallpaper) => request('/api/user/wallpaper', 'PUT', { wallpaper }),
   updateLanguage: (language) => request('/api/user/language', 'PUT', { language }),
-  setPrivatePassword: (password) => request('/api/user/private-password', 'PUT', { password }),
-  verifyPrivatePassword: (password) => request('/api/user/private-password/verify', 'POST', { password }),
+  setPrivatePassword: async (password) => {
+    // 换密码会让服务端手上那批解锁凭证当场作废（凭证绑在旧密码摘要上），
+    // 本机这份也跟着清掉，别留一条"界面以为还解锁着、服务端已经不认"的凭证。
+    const r = await request('/api/user/private-password', 'PUT', { password })
+    clearPrivateUnlock()
+    return r
+  },
+  // 验对密码 = 拿到解锁凭证。收口在这里而不是让各页面自己记得存，
+  // 是因为漏存的那一处症状很隐蔽：详情页能打开，但正文和概要是空的。
+  verifyPrivatePassword: async (password) => {
+    const r = await request('/api/user/private-password/verify', 'POST', { password })
+    if (r && r.unlock_token) setPrivateUnlock(r.unlock_token)
+    return r
+  },
   getPrivatePasswordStatus: () => request('/api/user/private-password'),
   // 重置走 POST 不走 DELETE：与注销那条同一条理由——动作要在服务端日志里看得见实体。
-  resetPrivatePassword: () => request('/api/user/private-password/reset', 'POST', {}),
+  resetPrivatePassword: async () => {
+    const r = await request('/api/user/private-password/reset', 'POST', {})
+    clearPrivateUnlock()
+    return r
+  },
+  // 解锁凭证这一头一尾三个口：详情页验完密码要重取列表时用它判"现在解没解锁"，
+  // 退出登录那一步要清掉它，别把上一账号的解锁状态留给下一个。
+  setPrivateUnlock,
+  clearPrivateUnlock,
+  hasPrivateUnlock,
 }

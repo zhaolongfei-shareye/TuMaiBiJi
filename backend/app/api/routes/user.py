@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
+from app.core.private_access import create_unlock_token
 from app.core.rate_limit import limiter
 from app.db.database import get_db
 from app.models.asset import Asset
@@ -123,6 +124,8 @@ def set_private_password(
 ):
     user.private_password_hash = _hash_pin(req.password)
     db.commit()
+    # 换密码会连带作废之前发出去的解锁凭证：凭证里绑着旧摘要的指纹（pk），
+    # 校验时按新摘要算，对不上就判"没解锁"。这条不用另存状态，也不会漏。
     return {"ok": True}
 
 
@@ -137,12 +140,18 @@ def verify_private_password(
     request: Request,
     req: PrivatePasswordRequest,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     if user.private_password_hash is None:
         raise HTTPException(status_code=400, detail="尚未设置私密密码")
     if _hash_pin(req.password) != user.private_password_hash:
         raise HTTPException(status_code=403, detail="密码不正确")
-    return {"ok": True}
+    # 验对了就发一条短命解锁凭证。以前这条接口只回 ok:True，然后客户端在本页内存里
+    # 记一个 _privateVerified 就放行——可是服务端从来不要密码：同一个账号的 token
+    # 直接打 GET /api/notes/{id} 就能拿到整篇正文，列表里还连着带 summary。
+    # 现在正文由那一条凭证决定给不给（见 app/core/private_access.py），
+    # 所以"验过密码"这件事必须变成一个服务端认得的东西，而不是界面里的一个布尔值。
+    return {"ok": True, "unlock_token": create_unlock_token(user)}
 
 
 @router.post("/private-password/reset")
@@ -150,6 +159,7 @@ def reset_private_password(user: User = Depends(get_current_user), db: Session =
     # 不校验旧密码：能拿到这条接口的前提是 Bearer token 有效，而拿得到 token 的人
     # 本来就能直接删掉整篇笔记——密码只防"手机在别人手里时被人翻开"，不防 token。
     # 重置只清那一列，笔记与分类一个字不动；清完要重新输两遍才再上锁。
+    # 清掉这一列同时也作废了手上所有解锁凭证（private_password_hash 为空 → 判未解锁）。
     user.private_password_hash = None
     db.commit()
     return {"ok": True, "is_set": False}
