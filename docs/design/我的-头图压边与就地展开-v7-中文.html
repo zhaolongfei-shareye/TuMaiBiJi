@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 「我的」v7 · 按站长口径：三分之一头图 + 圆 LOGO 压边 + 就地展开</title>
+<style>
+/* ==================================================================
+   v7 = 完全按站长 09-30 口述的七条画的，不再沿用 v1–v6 的任何结构：
+     ① 头图和其他页同一张（poster.homeBg()），但只占三分之一；
+     ② 下面是设置 / 关于两块区域；
+     ③ 头图与设置区之间的留白：默认放应用 LOGO + 应用 Slogan，
+        用户选了卡片头像→换成卡片头像，设了名称/一句话→换成用户的；
+     ④ 圆 LOGO 压住头图一半（圆心正好落在头图下沿）；
+     ⑤ 设置区条状：左菜单名，右「小圆点 + 箭头」，点击在设置区内就地展开；
+     ⑥ 关于的入口是头图右侧的药丸切换，默认「设置」；切到「关于」，
+        内容直接在 LOGO 下方生成，不再分二级；
+     ⑦ 风格与其他页统一：白卡 + 3rpx 描边（投影已退役）、字阶/间距/圆角全部
+        吃 app.wxss 的令牌，色点吃 utils/palette.js。
+   口径与代码一致：一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690，
+   px 当 rpx 用，设计宽 750。三分之一 = 1506/3 = 502。
+   ================================================================== */
+  :root{
+    --paper:#f4f2ec; --ink:#23252C; --card:#ffffff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06); --sec:#5C6068; --ter:#9A9EA6; --danger:#B4231F;
+    --t0:#F6C445; --t0i:#2A2005; --t1:#3F52D6; --t1i:#fff; --t2:#E9723D; --t2i:#2C1204;
+    --t3:#46A863; --t3i:#06260F; --t4:#6E4BD0; --t4i:#fff;
+    --fs-h1:42px; --fs-h2:34px; --fs-title:31px; --fs-body:28px; --fs-meta:24px;
+    --fs-tiny:21px; --fs-label:20px; --fs-micro:18px;
+    --r-card:40px; --r-block:32px; --r-chip:28px; --r-pill:999px;
+    --w-edge:3px; --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px;
+    --bg:var(--paper);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.6 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  h1{font-size:22px;margin-bottom:6px}
+  .lead{color:#4a4d55;margin-bottom:8px;max-width:1720px;font-size:15px;line-height:1.9}
+  .lead b{color:#1d1f20}
+  .notes{max-width:1720px;font-size:15px;line-height:1.9;color:#4a4d55;background:#efece4;
+    border:1px solid #ddd8cc;border-radius:12px;padding:14px 18px;margin:14px 0 26px}
+  .notes b{color:#1d1f20}
+  .notes code{background:#e3dfd4;padding:1px 6px;border-radius:5px;font-size:13px}
+  .row{display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:14px;font-size:15px;color:#4a4d55;line-height:1.7;max-width:750px}
+  .cap b{display:block;font-size:17px;color:#1d1f20;margin-bottom:2px}
+
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);position:relative;display:flex;flex-direction:column}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:26px;font-weight:600;color:var(--ink);flex:none}
+  .status .r{font-size:22px;font-weight:500;letter-spacing:1px}
+  .nav{height:90px;flex:none;display:flex;align-items:center;justify-content:center;
+    font-size:32px;font-weight:600;color:var(--ink);background:var(--paper)}
+  .view{flex:1;position:relative;overflow:hidden;background:var(--paper)}
+
+  /* ---------- ① 头图：三分之一 = 502，同一张 homeBg() ---------- */
+  .band{position:relative;height:502px;flex:none;overflow:hidden;
+    background:url('../../miniprogram/assets/home-bg-portrait.jpg') center 15%/cover no-repeat}
+  .band .scrim{position:absolute;inset:0;background:linear-gradient(180deg,
+    rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 14%,rgba(18,20,26,.50) 58%,rgba(18,20,26,.44) 100%)}
+  /* 明暗停点是从首页那条 scrim 的前 33% 里取的，同一张图两页不能跳档。
+     锚点 center 15% 是这一页新加的一处口径，见页面上方说明第 3 条。 */
+
+  /* ---------- ⑥ 药丸切换：钉在头图右上 ---------- */
+  .pill{position:absolute;right:32px;top:26px;display:flex;gap:4px;padding:5px;
+    border-radius:var(--r-pill);background:rgba(242,239,233,.92)}
+  .seg{height:58px;line-height:58px;padding:0 28px;border-radius:var(--r-pill);
+    font-size:var(--fs-meta);font-weight:700;color:var(--sec)}
+  .seg.on{background:var(--ink);color:var(--paper)}
+
+  /* ---------- ③④ 留白区：圆 LOGO 圆心压头图下沿 ---------- */
+  .hero{position:relative;z-index:3;margin-top:-100px;display:flex;flex-direction:column;align-items:center}
+  .av{width:200px;height:200px;border-radius:50%;border:8px solid var(--paper);overflow:hidden;
+    background:var(--ink) center 12%/cover no-repeat}
+  .av.brand{background-image:url('../../miniprogram/assets/logo.png')}
+  .hname{margin-top:20px;font-size:36px;line-height:1.2;font-weight:800;letter-spacing:-.6px;color:var(--ink);
+    display:flex;align-items:baseline;gap:14px}
+  .hver{font-size:var(--fs-label);font-weight:700;color:var(--sec);background:var(--idle);
+    padding:4px 14px;border-radius:var(--r-pill);letter-spacing:0}
+  .hslog{margin-top:6px;font-size:var(--fs-meta);color:var(--sec);max-width:620px;text-align:center;
+    line-height:1.4}
+
+  /* ---------- ⑤ 条状列表：左名称，右圆点 + 箭头 ---------- */
+  .list{margin:34px 32px 0;background:var(--card);border:var(--w-edge) solid var(--edge);
+    border-radius:var(--r-card);overflow:hidden}
+  .r{display:flex;align-items:center;justify-content:space-between;height:118px;padding:0 34px;
+    border-bottom:var(--w-edge) solid var(--edge)}
+  .r:last-child{border-bottom:none}
+  .rn{font-size:var(--fs-body);font-weight:700;color:var(--ink)}
+  .rn.dg{color:var(--danger)}
+  .rs{display:flex;align-items:center;gap:18px}
+  .dot{width:22px;height:22px;border-radius:50%}
+  .dot.on{background:var(--ink)}
+  .dot.off{border:var(--w-edge) solid rgba(35,37,44,.26)}
+  .cv{font-size:34px;font-weight:600;line-height:1;color:var(--ter)}
+  .r.open{background:var(--idle)}
+  .r.open .cv{transform:rotate(90deg);color:var(--ink)}
+  .rv{font-size:var(--fs-meta);color:var(--sec)}
+
+  /* ---------- 就地展开的面板（长在条状列表里面） ---------- */
+  .p{border-top:var(--w-edge) solid var(--edge);padding:26px 34px 28px}
+  .ph{font-size:var(--fs-meta);color:var(--sec);line-height:1.6}
+  .inp{height:96px;margin-top:16px;border-radius:var(--r-chip);background:var(--idle);
+    display:flex;align-items:center;padding:0 28px;font-size:var(--fs-body);color:var(--ink)}
+  .inp .ph2{color:var(--ter)}
+  .bio{display:flex;align-items:center;justify-content:space-between;gap:24px;
+    margin-top:20px;padding-top:20px;border-top:var(--w-edge) solid var(--edge)}
+  .bio .bt{font-size:var(--fs-body);font-weight:700;color:var(--ink)}
+  .bio .bx{display:block;margin-top:6px;font-size:var(--fs-tiny);color:var(--sec);line-height:1.5}
+  .sw{flex:none;width:88px;height:52px;border-radius:var(--r-pill);background:var(--ink);position:relative}
+  .sw i{position:absolute;right:5px;top:5px;width:42px;height:42px;border-radius:50%;background:#fff}
+  .two{display:flex;gap:16px;margin-top:24px}
+  .btn{flex:1;height:100px;border-radius:var(--r-pill);display:flex;align-items:center;
+    justify-content:center;font-size:30px;font-weight:700}
+  .btn.g{background:var(--idle);color:var(--ink)}
+  .btn.p{background:var(--ink);color:var(--paper)}
+
+  /* 标注条：不是界面里的东西，是"这一屏是从上面滑下来的"这句说明。
+     画成虚线灰条，免得被当成一个真组件。 */
+  .mk{margin:0 32px 24px;padding:14px 20px;border:2px dashed #cfc9bb;border-radius:20px;
+    text-align:center;font-size:var(--fs-tiny);color:#8b8578;line-height:1.6}
+
+  /* ---------- 外观设置就地展开：八枚横滑 ---------- */
+  .sec{font-size:var(--fs-label);font-weight:700;letter-spacing:.8px;color:var(--sec)}
+  .wp{display:flex;gap:16px;margin-top:18px}
+  .wt{flex:none;width:104px;text-align:center}
+  .tile{height:142px;border-radius:var(--r-chip);border:var(--w-edge) solid var(--edge);
+    padding:14px 12px;display:flex;flex-direction:column;gap:9px;position:relative;overflow:hidden}
+  .bar{height:16px;border-radius:8px}
+  .wt .nm{margin-top:10px;font-size:var(--fs-label);color:var(--sec)}
+  .wt.on .tile{border:4px solid var(--ink)}
+  .wt.on .nm{color:var(--ink);font-weight:700}
+  .wt .ck{position:absolute;right:8px;bottom:8px;width:34px;height:34px;border-radius:50%;
+    background:var(--ink);color:#fff;font-size:20px;line-height:34px}
+  .foot{margin-top:18px;font-size:var(--fs-tiny);color:var(--ter)}
+
+  /* ---------- 关于：LOGO 下方直接生成，不分二级 ---------- */
+  .lead-card{margin:26px 32px 0;background:var(--card);border:var(--w-edge) solid var(--edge);
+    border-radius:var(--r-card);padding:28px 32px}
+  .lead-card p{font-size:var(--fs-body);line-height:1.55;color:var(--ink)}
+  .info{margin-top:16px}
+  .info .r{height:84px}
+  /* 关于那几行的右值是内容本体（官网、邮箱），不是可有可无的辅助字，
+     所以吃 --text-secondary 而不是现网菜单值用的 --text-tertiary（后者对白卡只有 2.7:1）。 */
+  .info .rv{color:var(--sec);font-size:var(--fs-meta)}
+  .f{display:flex;gap:26px;margin:0 32px 20px;background:var(--card);border:var(--w-edge) solid var(--edge);
+    border-radius:var(--r-card);padding:26px}
+  .fb{flex:none;width:176px;height:176px;border-radius:var(--r-block);display:flex;align-items:center;
+    justify-content:center;font-size:32px;font-weight:800}
+  .ft{font-size:var(--fs-title);font-weight:800;color:var(--ink);letter-spacing:-.4px}
+  .fx{margin-top:8px;font-size:var(--fs-meta);line-height:1.6;color:var(--sec)}
+  .copy{margin:26px 0 0;text-align:center;font-size:var(--fs-tiny);color:var(--ter)}
+
+  /* ---------- 底部浮起胶囊（现网 custom-tab-bar 同口径） ---------- */
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;background:#fff;
+    border:var(--w-edge) solid var(--edge);border-radius:44px;display:flex;z-index:9}
+  .ti{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+  .ti .g{width:44px;height:44px;border-radius:50%;border:4px solid var(--ter);position:relative}
+  .ti .lb{font-size:20px;color:var(--ter)}
+  .ti.on .g{border-color:var(--ink)}
+  .ti.on .lb{color:var(--ink);font-weight:700}
+  .ti.on::after{content:'';width:24px;height:4px;border-radius:2px;background:var(--ink)}
+  .ti:not(.on)::after{content:'';width:24px;height:4px}
+
+  /* ---------- 头部两态对比（只截头图 + 留白区） ---------- */
+  .cmp{width:750px;background:var(--paper);border:1px solid #ddd8cc;border-radius:36px;overflow:hidden;
+    box-shadow:0 14px 34px rgba(0,0,0,.10)}
+  .cmp .band{height:380px}
+  .cmp .hero{margin-top:-100px;padding-bottom:34px}
+  .cmp .pill{top:24px}
+</style>
+</head>
+<body>
+<h1>「我的」v7 · 按你口述的七条重画（代码一行没动）</h1>
+<p class="lead">
+当前真机跑的是 <b>1.8.9</b>：「我的」还是两张白卡菜单 + 点行进别的页面，头图没有、药丸没有、就地展开也没有——这一稿全是要改的，画的是新方案。
+下面六屏：① 设置收起态（默认首屏）② 私密密码就地展开 ③ 外观设置就地展开 ④ 药丸切到关于（内容长在 LOGO 下方）⑤ 关于往下滚到尾部（分享好友 → 笔记额度）⑥ 头部留白区的两态替换（默认应用 LOGO/Slogan ↔ 用户卡片头像/名称/一句话）。
+</p>
+
+<div class="notes">
+<b>画的时候撞出来的七处，其中②③必须你点头，其余是我先替你拍的（可以改）：</b><br>
+① <b>三分之一 = 视口 1506 的三分之一 = 502 高</b>，导航条按现网的默认条（纸白底 + 黑字「我的」），头图从导航条底下开始——和首页那条完全一致。<br>
+② <b>展开态会把内容顶出首屏</b>：私密密码那一格展开后要 560 高，四条收在上面的列表放不下，所以第②③屏画的是"页面已经往上滑、头图滚出视野"之后的样子。<b>药丸跟着头图一起滚走</b>，还是钉在顶上？这条要你定。<br>
+③ <b>头图只占三分之一，aspectFill 会把画面中段裁出来</b>（这张 865×1670 的原图，中带正好落在胸口和那只手，脸被切掉）。所以这一屏我用了锚点 <code>center 15%</code>（等效小程序里 overflow 盒子 + 图片上移）。要么认这个锚点，要么把头图抬到 40%。<br>
+④ <b>圆 LOGO 居中压边</b>。现网列表、详情、关于页的母题是"左块右文"，左对齐也说得通；我按居中断的，你要左对齐说一声。<br>
+⑤ <b>小圆点=这一行的状态</b>：实心=已经有值、空心=还没设（现在只有私密密码是空的）；箭头=可点开。注销那行不给点，它没有状态。壁纸那枚颜色点我试过，米白放在白卡上和"空心"分不开，所以退成统一实心。<br>
+⑥ <b>就地展开只画了两格</b>。卡片模板（四槽 + 模板条 + 预览）和分类管理（增删改）内容量大，内嵌是这一版最大的一块工程量；也可以这两格保留跳页、只有私密密码和外观设置就地展开。<br>
+⑦ 指纹／面容那一行是<b>新串</b>（现网字典里没有），而且<b>代码里一行都没实现</b>：微信 SOTER 的文档只写明支持指纹，iOS 能不能走面容要拿真机探一次才知道，所以界面上这行必须"探到才出现"。
+</div>
+
+<div class="row">
+
+<!-- ============ 屏 1：设置 · 收起（默认首屏） ============ -->
+<div class="shot">
+  <div class="frame">
+    <div class="status"><span>9:41</span><span class="r">●●●● 5G &nbsp;100%</span></div>
+    <div class="nav">我的</div>
+    <div class="view">
+      <div class="band"><div class="scrim"></div>
+        <div class="pill"><div class="seg on">设置</div><div class="seg">关于</div></div>
+      </div>
+      <div class="hero">
+        <div class="av brand"></div>
+        <div class="hname">图麦笔记</div>
+        <div class="hslog">看到的好东西，存成能用的笔记</div>
+      </div>
+      <div class="list">
+        <div class="r"><span class="rn">卡片模板</span><span class="rs"><span class="dot on"></span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn">外观设置</span><span class="rs"><span class="dot on"></span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn">分类管理</span><span class="rs"><span class="dot on"></span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn">私密密码</span><span class="rs"><span class="dot off"></span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn dg">注销账号</span><span class="rs"><span class="cv">›</span></span></div>
+      </div>
+      <div class="tabbar">
+        <div class="ti"><div class="g"></div><div class="lb">新建</div></div>
+        <div class="ti"><div class="g"></div><div class="lb">笔记</div></div>
+        <div class="ti on"><div class="g"></div><div class="lb">我的</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b>① 设置 · 收起（默认首屏）</b>头图三分之一，圆 LOGO 圆心压在它下沿；留白区放应用 LOGO + Slogan；右上药丸默认「设置」；下面五条条条，右边只有状态点 + 箭头，没有第二行字。实心=已有值，空心=没设过。</div>
+</div>
+
+<!-- ============ 屏 2：私密密码就地展开 ============ -->
+<div class="shot">
+  <div class="frame">
+    <div class="status"><span>9:41</span><span class="r">●●●● 5G &nbsp;100%</span></div>
+    <div class="nav">我的</div>
+    <div class="view">
+      <div style="padding-top:26px">
+      <div class="mk">↑ 头图已滚走：点完这一行往上滑一点后的样子</div>
+      <div class="list" style="margin-top:0">
+        <div class="r"><span class="rn">卡片模板</span><span class="rs"><span class="dot on"></span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn">外观设置</span><span class="rs"><span class="dot on"></span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn">分类管理</span><span class="rs"><span class="dot on"></span><span class="cv">›</span></span></div>
+        <div class="r open"><span class="rn">私密密码</span><span class="rs"><span class="dot off"></span><span class="cv">›</span></span></div>
+        <div class="p">
+          <div class="ph">看私密笔记的内容时要输这串；归到私密的笔记不出笔记卡片。</div>
+          <div class="inp"><span class="ph2">新密码（6 位数字）</span></div>
+          <div class="inp">•&nbsp;•&nbsp;•&nbsp;•&nbsp;•&nbsp;•</div>
+          <div class="bio">
+            <div><span class="bt">用指纹或面容解锁</span><span class="bx">开了之后看私密笔记不再输这串，改用这台手机自己的指纹／面容。</span></div>
+            <div class="sw"><i></i></div>
+          </div>
+          <div class="two"><div class="btn g">取消</div><div class="btn p">确定</div></div>
+        </div>
+      </div>
+      </div>
+      <div class="tabbar">
+        <div class="ti"><div class="g"></div><div class="lb">新建</div></div>
+        <div class="ti"><div class="g"></div><div class="lb">笔记</div></div>
+        <div class="ti on"><div class="g"></div><div class="lb">我的</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b>② 设置 · 私密密码就地展开</b>箭头转成向下、底色变浅，面板长在列表里面，不跳页；两格输入沿用现网文案，下面那枚开关是<b>新串 + 新能力</b>（本机探到指纹／面容才出现这一节）。</div>
+</div>
+
+<!-- ============ 屏 3：外观设置就地展开 ============ -->
+<div class="shot">
+  <div class="frame">
+    <div class="status"><span>9:41</span><span class="r">●●●● 5G &nbsp;100%</span></div>
+    <div class="nav">我的</div>
+    <div class="view">
+      <div style="padding-top:26px">
+      <div class="mk">↑ 头图已滚走：点「外观设置」往上滑一点后的样子</div>
+      <div class="list" style="margin-top:0">
+        <div class="r"><span class="rn">卡片模板</span><span class="rs"><span class="dot on"></span><span class="cv">›</span></span></div>
+        <div class="r open"><span class="rn">外观设置</span><span class="rs"><span class="dot on"></span><span class="cv">›</span></span></div>
+        <div class="p">
+          <div class="ph">这台设备上的外观都在这里，换完当场生效</div>
+          <div class="sec" style="margin-top:24px">页面壁纸</div>
+          <div class="wp">
+            <div class="wt on"><div class="tile" style="background:#f4f2ec"><div class="bar" style="background:#fff"></div><div class="bar" style="background:#fff;width:62%"></div><div class="ck">✓</div></div><div class="nm">米白</div></div>
+            <div class="wt"><div class="tile" style="background:#eaeefb"><div class="bar" style="background:#fff"></div><div class="bar" style="background:#fff;width:62%"></div></div><div class="nm">雾蓝</div></div>
+            <div class="wt"><div class="tile" style="background:#e7f3ea"><div class="bar" style="background:#fff"></div><div class="bar" style="background:#fff;width:62%"></div></div><div class="nm">松绿</div></div>
+            <div class="wt"><div class="tile" style="background:#fdeee6"><div class="bar" style="background:#fff"></div><div class="bar" style="background:#fff;width:62%"></div></div><div class="nm">暮橙</div></div>
+            <div class="wt"><div class="tile" style="background:#0c0c1d"><div class="bar" style="background:rgba(255,255,255,.14)"></div><div class="bar" style="background:rgba(255,255,255,.14);width:62%"></div></div><div class="nm">夜紫</div></div>
+            <div class="wt"><div class="tile" style="background:#0d1b2a"><div class="bar" style="background:rgba(255,255,255,.14)"></div><div class="bar" style="background:rgba(255,255,255,.14);width:62%"></div></div><div class="nm">深海</div></div>
+            <div class="wt"><div class="tile" style="background:#F2EFE9"><div class="bar" style="background:#fff"></div><div class="bar" style="background:#fff;width:62%"></div></div><div class="nm">象牙</div></div>
+          </div>
+          <div class="foot">左右滑挑一枚 · 现在在用：米白</div>
+        </div>
+        <div class="r"><span class="rn">分类管理</span><span class="rs"><span class="dot on"></span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn">私密密码</span><span class="rs"><span class="dot off"></span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn dg">注销账号</span><span class="rs"><span class="cv">›</span></span></div>
+      </div>
+      </div>
+      <div class="tabbar">
+        <div class="ti"><div class="g"></div><div class="lb">新建</div></div>
+        <div class="ti"><div class="g"></div><div class="lb">笔记</div></div>
+        <div class="ti on"><div class="g"></div><div class="lb">我的</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b>③ 设置 · 外观设置就地展开</b>八枚压成一条横滑（结构和分享页那条模板条一样），点一枚当场换色；外观页原来那块"手机预览"太大放不下，这一格要不要留预览得你定。</div>
+</div>
+
+<!-- ============ 屏 4：关于 · 首屏 ============ -->
+<div class="shot">
+  <div class="frame">
+    <div class="status"><span>9:41</span><span class="r">●●●● 5G &nbsp;100%</span></div>
+    <div class="nav">我的</div>
+    <div class="view">
+      <div class="band"><div class="scrim"></div>
+        <div class="pill"><div class="seg">设置</div><div class="seg on">关于</div></div>
+      </div>
+      <div class="hero">
+        <div class="av brand"></div>
+        <div class="hname">图麦笔记 <span class="hver">v1.8.9</span></div>
+        <div class="hslog">看到的好东西，存成能用的笔记</div>
+      </div>
+      <div class="lead-card">
+        <p>图麦笔记做的事很窄：把看到的好东西变成能用的笔记。公众号文章、网页链接、手机截图丢进来，出来就是一条带摘要、要点和标签的笔记，之后能搜、能归类、能存成一张卡片图随时调用。</p>
+      </div>
+      <div class="list info">
+        <div class="r"><span class="rn">产品官网</span><span class="rs"><span class="rv">agentsbin.cn</span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn">开发主体</span><span class="rs"><span class="rv">个人开发者</span></span></div>
+        <div class="r"><span class="rn">反馈邮箱</span><span class="rs"><span class="rv">18509828@qq.com</span><span class="cv">›</span></span></div>
+        <div class="r"><span class="rn">公众号</span><span class="rs"><span class="rv">杰克AI日记</span><span class="cv">›</span></span></div>
+      </div>
+      <div class="tabbar">
+        <div class="ti"><div class="g"></div><div class="lb">新建</div></div>
+        <div class="ti"><div class="g"></div><div class="lb">笔记</div></div>
+        <div class="ti on"><div class="g"></div><div class="lb">我的</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b>④ 关于 · 药丸切过去之后</b>头图、留白、圆 LOGO 都不动，只有下面换成关于的内容：介绍一段 + 四行信息（带箭头的点一下复制），版本号挪到名称右边当角标，<b>不再有介绍／功能／隐私三个二级栏</b>，全部往下顺排。</div>
+</div>
+
+<!-- ============ 屏 5：关于 · 往下滚到尾部 ============ -->
+<div class="shot">
+  <div class="frame">
+    <div class="status"><span>9:41</span><span class="r">●●●● 5G &nbsp;100%</span></div>
+    <div class="nav">我的</div>
+    <div class="view">
+      <div style="padding-top:26px">
+        <div class="mk">↑ 往上还有：介绍一段 + 四行信息（官网／主体／邮箱／公众号）</div>
+        <div class="f">
+          <div class="fb" style="background:var(--t1);color:var(--t1i)">链接</div>
+          <div><div class="ft">链接转笔记</div><div class="fx">粘贴公众号文章或网页链接，服务器抓取正文后整理成摘要、核心要点和标签，多数在十几秒内完成。</div></div>
+        </div>
+        <div class="f">
+          <div class="fb" style="background:var(--t2);color:var(--t2i)">截图</div>
+          <div><div class="ft">截图转笔记</div><div class="fx">拍照或从相册选，一次最多 9 张。文字识别在我们自己的服务器上完成，不交给第三方 OCR 接口。</div></div>
+        </div>
+        <div class="mk">功能另 3 条（整理／归档／外观）+ 隐私条款 9 节，都按这个块-文节奏往下排，中间不再开二级 —— 往下到底就是这两行：</div>
+        <div class="list" style="margin-top:0">
+          <div class="r"><span class="rn">分享好友</span><span class="rs"><span class="rv">新写作者 +10 篇</span><span class="cv">›</span></span></div>
+          <div class="r"><span class="rn">笔记额度</span><span class="rs"><span class="rv">37/100</span></span></div>
+        </div>
+        <div class="copy">© 2026 图麦笔记 All Rights Reserved</div>
+      </div>
+      <div class="tabbar">
+        <div class="ti"><div class="g"></div><div class="lb">新建</div></div>
+        <div class="ti"><div class="g"></div><div class="lb">笔记</div></div>
+        <div class="ti on"><div class="g"></div><div class="lb">我的</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b>⑤ 关于 · 滚到底</b>按你定的顺序收口：关于内容 → 分享好友（这一行本身就是微信分享按钮）→ 笔记额度（只能看、不给箭头），最后版权一行。额度那串数字是样例。</div>
+</div>
+
+</div>
+
+<!-- ============ 屏 6：头部两态对比 ============ -->
+<h1 style="margin:44px 0 10px;font-size:19px">⑥ 留白区的两态替换（只截头图 + 留白，同一套尺寸）</h1>
+<div class="row">
+
+<div class="shot">
+  <div class="cmp">
+    <div class="band"><div class="scrim"></div>
+      <div class="pill"><div class="seg on">设置</div><div class="seg">关于</div></div>
+    </div>
+    <div class="hero">
+      <div class="av brand"></div>
+      <div class="hname">图麦笔记</div>
+      <div class="hslog">看到的好东西，存成能用的笔记</div>
+    </div>
+  </div>
+  <div class="cap"><b>默认态</b>圆里是应用 LOGO（/assets/logo.png），字是应用名 + 应用 Slogan——新用户没设过任何东西时就是这一屏。</div>
+</div>
+
+<div class="shot">
+  <div class="cmp">
+    <div class="band"><div class="scrim"></div>
+      <div class="pill"><div class="seg on">设置</div><div class="seg">关于</div></div>
+    </div>
+    <div class="hero">
+      <div class="av" style="background-image:url('../../miniprogram/assets/home-bg-portrait.jpg')"></div>
+      <div class="hname">阿麦 <span class="hver">v1.8.9</span></div>
+      <div class="hslog">读过的都会忘，记下来的才归我</div>
+    </div>
+  </div>
+  <div class="cap"><b>已设态</b>圆里换成打了「卡片」标记那张图（poster.cardPath()），名称吃卡片模板页的「名称」、Slogan 吃「一句话」；没填的那一项各自退回默认，不整块消失。</div>
+</div>
+
+</div>
+</body>
+</html>
