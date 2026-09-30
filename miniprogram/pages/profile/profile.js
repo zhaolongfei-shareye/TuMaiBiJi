@@ -36,8 +36,9 @@ Page({
     lang: 'zh',
     t: texts('zh'),
     themeClass: '',
-    avatar: '',
-    avatarStaged: false,
+    // 四个形象槽（null=空位，画那枚虚线 ➕）。这一块即时生效，不等下面的「保存」。
+    slots: poster.blankSlots(),
+    allFull: false,
     name: '',
     slogan: '',
     template: 'card',
@@ -47,12 +48,13 @@ Page({
 
   onLoad() {
     const app = getApp()
-    // 上一回选完没点保存、或者中途被系统杀掉，暂存那张会一直留在这里，进来先收掉；
-    // 再按本机那份"存过哪些头像"的名单扫一遍——名字不固定之后，光认一个名字扫不干净。
-    poster.dropStaged()
+    // 上一回挑完没落盘的、或者中途被系统杀掉留下的那些张，本机里已经没人认得它们了；
+    // 先按这一页手上的名单收一遍，再按"这台手机存过哪些头像文件"的名单扫一遍。
+    poster.dropUncommitted()
     poster.pruneAvatars()
     const lang = app.globalData.userInfo?.language || 'zh'
     const saved = poster.readProfile()
+    const slots = poster.readSlots()
     // 小样要等骨架落到视图层之后再画，否则按选择器取不到画布节点
     this.setData(
       {
@@ -62,7 +64,8 @@ Page({
         name: saved.name || '',
         slogan: saved.slogan || '',
         template: saved.template || poster.DEFAULT_TEMPLATE,
-        avatar: poster.avatarPath(),
+        slots,
+        allFull: !slots.some((s) => !s),
         groups: groupSkeleton(lang),
       },
       () => this.renderThumbs()
@@ -72,14 +75,16 @@ Page({
 
   // 这里故意没有 onShow：从相册回来时真机会补发一次 onShow，那时候读一遍 storage
   // 会把用户刚填还没保存的名称、slogan 冲掉（新建页选完图没反应就是这个成因）。
+  // 形象那一块不受这条影响——它是即时生效的，重读 storage 读到的就是刚写进去的。
 
+  // 十格小样要的那份：名称/一句话/模板用这一页还没保存的输入，头像取「卡片」那张
+  // （posterProfile 里现算，见 utils/poster.js 那条注释——直接 readProfile 会让小样没头像）
   draftProfile() {
-    return {
+    return Object.assign(poster.posterProfile(), {
       name: this.data.name,
       slogan: this.data.slogan,
       template: this.data.template,
-      avatarPath: this.data.avatar,
-    }
+    })
   },
 
   async renderThumbs() {
@@ -148,43 +153,85 @@ Page({
     })
   },
 
-  onPickAvatar() {
+  // 落盘 + 同步界面。这一块即时生效（点芯片、删图都当场写），不像名称/一句话那样等
+  // 「保存」——因为删除那一步有二次确认，确认完还要等保存才真删，那句确认就是假话。
+  _commitSlots(next) {
+    poster.writeSlots(next)
+    this.setData({ slots: next, allFull: !next.some((s) => !s) })
+    this.renderThumbs()
+  },
+
+  // 只有空槽响应整枚圆的点击。已经放了图的那一格，动作全在芯片和垃圾桶上，
+  // 点照片本身什么都不做——误一下就把在用的图换掉，代价太大。
+  onTapSlot(e) {
+    const i = Number(e.currentTarget.dataset.i)
+    if (!(i >= 0) || this.data.slots[i]) return
     const { lang } = this.data
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
-      // 头像只要一张圆图，用不着原图。iPhone 直出的一张 12MP 照片能到 4~6MB，
-      // 而小程序本地用户文件目录一共只有 10MB——暂存一份、正式一份，选两次就满了；
-      // 再往画布上解码那种大图，低端安卓还会崩。压缩图 1~2MB，圆形头像完全看不出差别。
+      // 只要一张圆图，用不着原图。iPhone 直出的一张 12MP 照片能到 4~6MB，而小程序本地
+      // 用户文件目录一共只有 10MB——四个槽就是十几兆，挑四张原图直接写满；再往画布上
+      // 解码那种大图，低端安卓还会崩。压缩图 1~2MB，圆形看不出差别。
       sizeType: ['compressed'],
       success: async (res) => {
         const temp = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
         if (!temp) return
         try {
-          // 存成一张带新名字的文件：没点保存之前不动 profile 里记着的那张，否则海报会跟着换
-          const staged = await poster.stageAvatar(temp)
-          this.setData({ avatar: staged, avatarStaged: true })
-          this.renderThumbs()
+          this._commitSlots(poster.placeSlot(this.data.slots, i, await poster.mintAvatar(temp)))
         } catch (err) {
-          console.error('头像存不下来', err)
+          console.error('形象图存不下来', err)
+          poster.dropUncommitted()
           wx.showToast({ title: t('avatarSaveFailed', lang), icon: 'none' })
         }
       },
       fail: (err) => {
         console.error('选图失败', err)
-        const msg = (err && err.errMsg) || ''
-        if (msg.indexOf('cancel') >= 0) return
+        if (((err && err.errMsg) || '').indexOf('cancel') >= 0) return
         wx.showToast({ title: t('pickFailed', lang), icon: 'none' })
       },
     })
   },
 
-  onDropAvatar() {
-    this.setData({ avatar: '', avatarStaged: true })
-    // "去掉"就是连本次刚选的那张也不要留：暂存那份当场删掉
-    poster.dropStaged()
-    this.renderThumbs()
+  // 两个角色各自单选：点亮这一张的「卡片」，别的张那枚自己灭掉（takeRole 在 poster.js）。
+  // 再点一次已经亮着的那枚就是关掉它——关掉之后这个位置没人占，
+  // 不会自动挪给别的张（站长 09-30 拍板：不挪）。
+  onToggleRole(e) {
+    const { i, role } = e.currentTarget.dataset
+    const at = Number(i)
+    const cur = this.data.slots[at]
+    if (!cur) return
+    const key = role === 'card' ? 'card' : 'bg'
+    const next = cur[key]
+      ? this.data.slots.map((s, j) => (j === at ? Object.assign({}, s, { [key]: false }) : s))
+      : poster.takeRole(this.data.slots, at, key)
+    this._commitSlots(next)
+  },
+
+  onDropSlot(e) {
+    const at = Number(e.currentTarget.dataset.i)
+    const cur = this.data.slots[at]
+    if (!cur) return
+    const { lang } = this.data
+    // 删之前把后果说全：它要是正当着首页背景，删完首页会跳回包里那张默认图——
+    // 这个跳变是当场看得见的，不提前讲一句，看起来像界面自己坏了。
+    // 中文每句自带句号，接着写就行；英文要留空格，不然 "uploaded.Your poster" 粘成一坨。
+    const parts = [t('slotDropBody', lang)]
+    if (cur.card) parts.push(t('slotDropWasCard', lang))
+    if (cur.bg) parts.push(t('slotDropWasBg', lang))
+    wx.showModal({
+      title: t('slotDropTitle', lang),
+      content: parts.join(lang === 'zh' ? '' : ' '),
+      confirmText: t('slotDropOk', lang),
+      cancelText: t('cancel', lang),
+      success: (res) => {
+        if (!res.confirm) return
+        const next = this.data.slots.slice()
+        next[at] = null
+        this._commitSlots(next)
+      },
+    })
   },
 
   // 改了名称/一句话，十格小样上印的还是旧的那一份——保存之后成品才变，预览就是骗人。
@@ -199,8 +246,9 @@ Page({
 
   onUnload() {
     if (this._thumbTimer) clearTimeout(this._thumbTimer)
-    // 没点保存就走了：这张他随口选的图不该留在本机
-    poster.dropStaged()
+    // 四个槽那一块是即时落盘的，走到这里通常已经没东西可收；留着这一句是为了
+    // 唯一那种漏网：复制成功、写 storage 之前抛了异常，那张谁都没用上的图。
+    poster.dropUncommitted()
   },
 
   onNameInput(e) {
@@ -227,15 +275,7 @@ Page({
         slogan: (this.data.slogan || '').trim().slice(0, 24),
         template: this.data.template,
       }
-      if (this.data.avatar) {
-        // 只有本次新选的那张才要转正：把它的路径记进 profile，顺手删掉被它顶替的那一张
-        patch.avatarPath = this.data.avatarStaged
-          ? await poster.commitAvatar(this.data.avatar)
-          : this.data.avatar
-      } else {
-        patch.avatarPath = ''
-        poster.dropAvatar()
-      }
+      // 形象那一块不在这里：四个槽当场就写了，这一句只管名称/一句话/模板
       poster.writeProfile(patch)
       wx.showToast({ title: t('profileSaved', lang), icon: 'success' })
       setTimeout(() => wx.navigateBack(), 900)

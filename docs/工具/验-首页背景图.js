@@ -92,7 +92,10 @@ ck('首页那枚「换背景」是导流、不弹相册',
   /goHomeBg\(\)[\s\S]{0,120}navigateTo[\s\S]{0,60}pages\/profile\/profile/.test(read('pages/create/create.js'))
   && !/chooseMedia/.test(wpJs))
 ck('唯一的选图口还在卡片模板页', /wx\.chooseMedia/.test(read('pages/profile/profile.js')))
-ck('卡片模板页那句话提了首页背景', /还会铺在首页当背景/.test(read('utils/i18n.js')))
+// 09-30 形象图改成四槽，「换一张/去掉」那两行字没了，那句说明重写进 slotHint。
+// 口径没变：卡片模板页那页必须自己讲清"这张还会铺在首页"，两种语言都得讲。
+ck('卡片模板页那句话提了首页背景', /「背景」铺在首页/.test(read('utils/i18n.js'))
+  && /Home lays it behind the home page/.test(read('utils/i18n.js')))
 
 // ---------- ⑤ 文案 ----------
 const { texts } = require(path.join(MP, 'utils/i18n.js'))

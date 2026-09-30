@@ -1,15 +1,31 @@
 /* 分享形象页。头像这块是页面唯一的大色块，其余保持中性，免得抢小样的样子。 */
 
+/* 四个形象槽：两行两列。圆径 248 是照"两字芯片要 160 宽、四槽并排会撞"退回来的——
+   一行放四个就只能写单字，站长要两字，所以改成 2×2，圆径反而比原来那枚 220 还大一点。
+   248×2 + 40 = 536 ≤ 卡内宽 632，两列居中后两侧各余 48。 */
 .face-block {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: var(--sp-5);
+  padding-top: var(--sp-4);
 }
 
-.face {
-  width: 220rpx;
-  height: 220rpx;
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4) 40rpx;
+  justify-content: center;
+  width: 100%;
+}
+
+.slot {
+  position: relative;
+  width: 248rpx;
+}
+
+.disc {
+  width: 248rpx;
+  height: 248rpx;
   border-radius: 50%;
   overflow: hidden;
   background: var(--chip-idle);
@@ -19,40 +35,139 @@
   justify-content: center;
 }
 
-.face-img {
+.slot.empty .disc {
+  border: 3rpx dashed rgba(35, 37, 44, 0.22);
+  background: transparent;
+}
+
+.disc-img {
   width: 100%;
   height: 100%;
 }
 
-.face-plus {
+.plus {
   font-size: 76rpx;
   font-weight: 300;
   color: var(--text-tertiary);
   line-height: 1;
 }
 
-.face-actions {
+/* 图上那两枚开关：贴在圆的下沿、一半压在外头。全压在照片里面的话，
+   人像的脸下面会糊一片底，反而看不清这一格挑的是谁。
+   字用 --fs-micro 18（现网最底一档），就是站长要的"按钮字体可以小点"。 */
+.chips {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4rpx;
   display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  margin-top: var(--sp-3);
+  gap: 6rpx;
+  justify-content: center;
 }
 
-.act {
-  font-size: var(--fs-body);
-  font-weight: 600;
-  color: var(--accent);
-  /* 两个动作挤在一行，不写死不换行的话"换一张"会被拆成两行 */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5rpx;
+  height: 34rpx;
+  padding: 0 11rpx;
+  border-radius: var(--r-pill);
+  border: 2rpx solid rgba(35, 37, 44, 0.16);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text-secondary);
+  font-size: var(--fs-micro);
+  font-weight: 700;
   white-space: nowrap;
 }
 
-.act-muted {
-  color: var(--text-tertiary);
-  font-weight: 500;
+.chip-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  border: 2rpx solid rgba(92, 96, 104, 0.45);
+  flex: none;
+}
+
+.chip.on {
+  background: var(--accent);
+  color: var(--bg-page);
+  border-color: var(--accent);
+}
+
+.chip.on .chip-dot {
+  border-color: transparent;
+  background: var(--bg-page);
+  position: relative;
+}
+
+.chip.on .chip-dot::after {
+  content: "";
+  position: absolute;
+  left: 3.5rpx;
+  top: 1rpx;
+  width: 4rpx;
+  height: 8rpx;
+  border: solid var(--accent);
+  border-width: 0 2rpx 2rpx 0;
+  transform: rotate(42deg);
+}
+
+/* 右上角小垃圾桶：三段分开画（提手、盖、桶身）。
+   先前想用一条 ::after 同时当盖和提手，渲出来是一团糊的方块，认不出是什么。 */
+.bin {
+  position: absolute;
+  right: 2rpx;
+  top: 2rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: rgba(20, 22, 26, 0.72);
+  border: 2rpx solid rgba(255, 255, 255, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bin-glyph {
+  position: relative;
+  width: 18rpx;
+  height: 17rpx;
+}
+
+.bin-lid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4rpx;
+  height: 2rpx;
+  background: #fff;
+  border-radius: 1rpx;
+}
+
+.bin-lid::before {
+  content: "";
+  position: absolute;
+  left: 5rpx;
+  right: 5rpx;
+  top: -3rpx;
+  height: 2rpx;
+  background: #fff;
+  border-radius: 2rpx;
+}
+
+.bin-body {
+  position: absolute;
+  left: 2rpx;
+  right: 2rpx;
+  top: 6rpx;
+  bottom: 0;
+  border: 2rpx solid #fff;
+  border-top: none;
+  border-radius: 0 0 4rpx 4rpx;
 }
 
 .face-hint {
-  margin-top: var(--sp-2);
+  margin-top: var(--sp-4);
   font-size: var(--fs-meta);
   line-height: var(--lh-body);
   color: var(--text-tertiary);

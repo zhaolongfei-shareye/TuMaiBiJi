@@ -467,7 +467,7 @@ Page({
   async onSheetToPoster() {
     const note = this.data.detailNote
     if (!note || note.is_private) return
-    const profile = poster.readProfile()
+    const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
     this.setData({
       detailOpen: false,
       templateOpen: true,
@@ -542,11 +542,11 @@ Page({
     const a = this._posterAssets
     if (!a) return
     const lang = this.data.lang
-    const profile = poster.readProfile()
+    const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
     const canvas = await this._getCanvas()
     const ctx = canvas.getContext('2d')
     const images = { qr: await poster.loadImage(canvas, a.qrPath, 3000) }
-    const avatar = poster.avatarPath()
+    const avatar = poster.cardPath()
     if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 5000)
     canvas.width = poster.W
     canvas.height = 750

@@ -1,16 +1,28 @@
 <view class="container {{themeClass}}">
-  <view class="face-block card">
-    <view class="face" bindtap="onPickAvatar">
-      <image wx:if="{{avatar}}" src="{{avatar}}" mode="aspectFill" class="face-img" />
-      <view wx:else class="face-empty">
-        <text class="face-plus">+</text>
+  <view class="card face-block">
+    <view class="slots">
+      <view wx:for="{{slots}}" wx:key="index" class="slot {{item ? 'filled' : 'empty'}}">
+        <view class="disc" data-i="{{index}}" catchtap="onTapSlot">
+          <image wx:if="{{item}}" src="{{item.path}}" mode="aspectFill" class="disc-img" />
+          <text wx:else class="plus">+</text>
+        </view>
+        <view wx:if="{{item}}" class="bin" data-i="{{index}}" catchtap="onDropSlot">
+          <view class="bin-glyph">
+            <view class="bin-lid"></view>
+            <view class="bin-body"></view>
+          </view>
+        </view>
+        <view wx:if="{{item}}" class="chips">
+          <view class="chip {{item.card ? 'on' : ''}}" data-i="{{index}}" data-role="card" catchtap="onToggleRole">
+            <view class="chip-dot"></view><text>{{t.slotCard}}</text>
+          </view>
+          <view class="chip {{item.bg ? 'on' : ''}}" data-i="{{index}}" data-role="bg" catchtap="onToggleRole">
+            <view class="chip-dot"></view><text>{{t.slotBg}}</text>
+          </view>
+        </view>
       </view>
     </view>
-    <view class="face-actions">
-      <text class="act" bindtap="onPickAvatar">{{avatar ? t.avatarChange : t.avatarPick}}</text>
-      <text wx:if="{{avatar}}" class="act act-muted" bindtap="onDropAvatar">{{t.avatarDrop}}</text>
-    </view>
-    <view class="face-hint">{{t.avatarHint}}</view>
+    <view class="face-hint">{{allFull ? t.slotHintFull : t.slotHint}}</view>
   </view>
 
   <view class="card field">

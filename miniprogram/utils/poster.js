@@ -41,7 +41,7 @@ function paperOf(categoryId) {
   return lumOf(toneFor(categoryId).bg) >= 137 ? PAPER_A : PAPER_B
 }
 const DEFAULT_TEMPLATE = 'card'
-// 头像文件的统一前缀，名字每次挑都换一个（见 stageAvatar）。
+// 头像文件的统一前缀，名字每次挑都换一个（见 mintAvatar）。
 // 之前是"暂存""正式"两个固定名字，1.4.0 真机报出：换第二张图预览还是第一张。
 // 原因是路径字符串一模一样，而 <image> 组件和 canvas 的 createImage() 都按路径缓存位图。
 const AVATAR_PREFIX = 'poster-avatar'
@@ -106,31 +106,94 @@ function exists(p) {
   }
 }
 
-// 已经存下来的那张头像。文件被系统清掉时回退成空，海报就退回"没有头像"的样子。
-function avatarPath() {
-  const p = readProfile().avatarPath
-  return exists(p) ? p : ''
+// ---------- 四个槽的形象图（09-30 站长第二轮改的这块） ----------
+// 以前这里只有一张：profile.avatarPath 一个字符串，它同时当卡片头像和首页背景，
+// 所以换头像必然连首页一起换。现在四个槽，每槽 {path, card, bg}，两个角色各自单选——
+// 「卡片」勾在哪张上，海报的头像就是那张；「背景」勾在哪张上，首页铺的就是那张。
+// 允许同一张两个都勾（那就是老行为），也允许都不勾（见下面两个 *Path 的兜底）。
+const SLOT_COUNT = 4
+
+function blankSlots() {
+  return [null, null, null, null]
 }
 
-// ---------- 首页背景：就是上面那张形象，不另开上传入口、也不给"关掉" ----------
-// 站长那张默认图是包内资源。放这儿而不是写进 wxss：WXSS 的 background-image
-// 不认小程序包里的本地文件（只认 base64 和网络地址），只能由 <image> 组件铺。
-const HOME_BG_DEFAULT = '/assets/home-bg-portrait.jpg'
+// 读出来永远是四个位置：没放图的槽是 null，界面上就是那枚虚线 ➕ 圆。
+// 老版本升上来（storage 里只有 avatarPath、没有 images）时，那张同时勾上两个角色，
+// 行为跟他今天看到的一模一样，不需要他重设。
+function readSlots() {
+  const p = readProfile()
+  let list
+  if (Array.isArray(p.images)) {
+    list = p.images.slice(0, SLOT_COUNT)
+  } else if (p.avatarPath) {
+    list = [{ path: p.avatarPath, card: true, bg: true }]
+  } else {
+    list = []
+  }
+  const out = blankSlots()
+  list.forEach((s, i) => {
+    if (s && s.path && exists(s.path)) out[i] = { path: s.path, card: !!s.card, bg: !!s.bg }
+  })
+  return out
+}
+
+// 两个角色各自单选：点亮某张的「卡片」，别的张那枚自己灭掉。返回新数组，不改传入的那份。
+function takeRole(slots, at, role) {
+  return slots.map((s, i) => {
+    if (!s) return s
+    if (i === at) return Object.assign({}, s, { [role]: true })
+    if (s[role]) return Object.assign({}, s, { [role]: false })
+    return s
+  })
+}
 
 /**
- * 首页与笔记页头部铺的那张图：设过形象就用形象，没设过就用包里这张默认。
- * 形象文件被系统清掉时 avatarPath() 自己回退成空，所以这里会落回默认那张，
- * 不会出现"背景没了、字色还留着翻白"的半截状态。
- * 09-30 站长把外观设置里那个"用人像 / 不用"开关整块撤了——换图只有一个入口
- * （卡片模板页那张形象），这一屏没有"关掉背景"这个状态，storage 里那个
- * home_bg_off 也一并作废，之前关过的人现在自动回到"有图"。
+ * 把新挑的一张放进第 i 格。第一张自动接住两个角色：老版本升上来、或者全新账号放
+ * 第一张时，看到的效果跟他今天一模一样（那张既当卡片头像又当首页背景）。
+ * 从第二张起不再自动接——用户要的是"自己在图上勾"，自动抢会让勾选失去意义。
  */
+function placeSlot(slots, at, path) {
+  const next = slots.slice()
+  const live = next.filter(Boolean)
+  next[at] = { path, card: !live.some((s) => s.card), bg: !live.some((s) => s.bg) }
+  return next
+}
+
+function rolePath(slots, role) {
+  const hit = slots.find((s) => s && s[role])
+  return hit ? hit.path : ''
+}
+
+// 卡片头像取「卡片」那张；没人的时候回空——海报本来就有不画头像那一支
+// （hasAvatar=false 时签名行不留头像位，杂志封面那套退成占位字「麦」）。
+function cardPath() {
+  return rolePath(readSlots(), 'card')
+}
+
+/**
+ * 画海报、画小样之前要拿的那一份 profile。
+ * 名称/一句话/模板直接来自 storage，但 avatarPath 这一栏必须现算成"勾了「卡片」的那一张"——
+ * storage 里那一栏早就清空了（见 writeSlots），谁要是图省事把 readProfile() 直接传进
+ * planPoster，hasAvatar 会永远是 false：十个模板统统不画头像，而且一声不响。
+ */
+function posterProfile() {
+  return Object.assign({}, readProfile(), { avatarPath: cardPath() })
+}
+
+/**
+ * 首页与笔记页头部铺的那张：取勾了「背景」的那张，没人勾就用包里这张默认。
+ * 站长那张默认图是包内资源。放这儿而不是写进 wxss：WXSS 的 background-image
+ * 不认小程序包里的本地文件（只认 base64 和网络地址），只能由 <image> 组件铺。
+ * 槽里的文件被系统清掉时 readSlots 已经把那一格当空的，所以这里自然落回默认那张，
+ * 不会出现"背景没了、字色还留着翻白"的半截状态。
+ */
+const HOME_BG_DEFAULT = '/assets/home-bg-portrait.jpg'
+
 function homeBg() {
-  return avatarPath() || HOME_BG_DEFAULT
+  return rolePath(readSlots(), 'bg') || HOME_BG_DEFAULT
 }
 
 let avatarSeq = 0
-let stagedAvatar = ''
 
 function avatarFilePath() {
   avatarSeq += 1
@@ -186,44 +249,46 @@ function copyTo(src, dest) {
   })
 }
 
-// 选完先存成一张全新的独立文件，点保存才把它记进 profile。
-// 文件名唯一，所以"没点保存的那一张"既顶不掉海报正在用的那一张，也不会和上次挑剩的撞名
-// （撞名怎么坑人的，见 AVATAR_PREFIX 上方）。先删上一张没保存的再写：本地目录一共 10MB。
-function stageAvatar(tempPath) {
-  removeAvatar(stagedAvatar)
+// 选完先存成一张带新名字的独立文件，再记进槽里。
+// 文件名唯一，所以"同一张图被系统按路径缓存"那一坑不会再踩（见 AVATAR_PREFIX 上方）。
+// 本地目录一共 10MB，所以这一页临时生成、最后没留下的那些张必须收掉——见 dropUncommitted。
+let minted = []
+
+function mintAvatar(tempPath) {
   const dest = avatarFilePath()
   return copyTo(tempPath, dest).then((p) => {
     trackAvatar(p)
-    stagedAvatar = p
+    minted.push(p)
     return p
   })
 }
 
-// "转正"只改 profile 里记着的那个路径，不搬文件、不再复制一份——
-// 本地任何时刻最多只有正式一张 + 暂存一张，被顶掉的那张当场删掉。
-function commitAvatar(stagedPath) {
-  stagedAvatar = ''
-  const prev = readProfile().avatarPath
-  // prev 就是新挑的那张时不能删：删了等于把刚要用的头像自己删了
-  if (prev && prev !== stagedPath) removeAvatar(prev)
-  return Promise.resolve(stagedPath)
+// 把这一页的四个槽落进 storage，并删掉"这次不再被任何槽引用"的文件。
+// 四槽这一块是即时生效的（点芯片、删图都当场落盘），不像名称/一句话那样等「保存」——
+// 因为删除那一步有二次确认，确认完却还要等保存才真删，那句确认就是假话。
+function writeSlots(slots) {
+  const before = readSlots()
+  // avatarPath 这一栏一并清成空串：留着它就是第二条真相来源，早晚跟 images 漂开
+  writeProfile({ images: slots, avatarPath: '' })
+  const live = readSlots().filter(Boolean).map((s) => s.path)
+  before.filter(Boolean).map((s) => s.path)
+    .filter((p) => live.indexOf(p) < 0)
+    .forEach(removeAvatar)
+  minted = minted.filter((p) => live.indexOf(p) >= 0)
 }
 
-function dropAvatar() {
-  removeAvatar(readProfile().avatarPath)
+// 这一页临时生成、但没被任何槽用上的那些张（挑完没点、或者当场又删了）收掉。
+function dropUncommitted() {
+  const live = readSlots().filter(Boolean).map((s) => s.path)
+  minted.filter((p) => live.indexOf(p) < 0).forEach(removeAvatar)
+  minted = minted.filter((p) => live.indexOf(p) >= 0)
 }
 
-// 暂存那张只"在这页还没点保存"这段时间里有意义：点了保存上面就不认它了，没点保存
-// 也要删（用户没要这张图）。让它留着，等于用户随口选的一张图一直躺在本机里。
-function dropStaged() {
-  removeAvatar(stagedAvatar)
-  stagedAvatar = ''
-}
-
-// 名字不固定之后多了一种留垃圾的可能：选完图没点保存就被系统杀掉，那份暂存在新进程里
-// 已经没人认得，dropStaged 手里没有它的路径。开页时按名单扫一遍，除正在用的那张之外全收掉。
+// 名字不固定之后多了一种留垃圾的可能：选完图没存就被系统杀掉，那份临时文件在新进程里
+// 已经没人认得，dropUncommitted 手里没有它的路径。开页时按名单扫一遍，除四个槽正在用的
+// 那些张之外全收掉。
 function pruneAvatars() {
-  const keep = [readProfile().avatarPath, stagedAvatar]
+  const keep = readSlots().filter(Boolean).map((s) => s.path).concat(minted)
   trackedAvatars()
     .filter((p) => keep.indexOf(p) < 0)
     .forEach(removeAvatar)
@@ -1619,12 +1684,17 @@ module.exports = {
   PROFILE_KEY,
   readProfile,
   writeProfile,
-  avatarPath,
+  posterProfile,
+  SLOT_COUNT,
+  blankSlots,
+  readSlots,
+  writeSlots,
+  takeRole,
+  placeSlot,
+  cardPath,
   homeBg,
-  stageAvatar,
-  commitAvatar,
-  dropAvatar,
-  dropStaged,
+  mintAvatar,
+  dropUncommitted,
   pruneAvatars,
   planPoster,
   templateLabel,

@@ -116,8 +116,8 @@ Page({
 
   async render() {
     const { lang } = this.data
-    const profile = poster.readProfile()
-    const avatar = poster.avatarPath()
+    const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
+    const avatar = poster.cardPath()
     const canvas = await this.getCanvas()
     const ctx = canvas.getContext('2d')
 
@@ -175,9 +175,9 @@ Page({
     if (this._pickerDone || !this._note) return
     this._pickerDone = true
     const { lang } = this.data
-    const profile = poster.readProfile()
+    const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
     const picked = this.data.picked || profile.template || poster.DEFAULT_TEMPLATE
-    const avatar = poster.avatarPath()
+    const avatar = poster.cardPath()
     const tpls = poster.TEMPLATES.map((x) => ({
       id: x.id,
       label: poster.templateLabel(x.id, lang),

@@ -108,7 +108,10 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await sleep(3500)
     const list = await mp.currentPage()
     const chips = await list.$$('.chip')
-    ck('筛选排有「全部」+ 两枚分类', chips.length === 3, `chips=${chips.length}`)
+    // 枚数从页面自己手上的分类表读，不钉死"两枚"：09-30 起「私密」那一格由服务端补出来，
+    // 这个账号现在有三枚分类，钉死数字的判据会把它当成 BUG。
+    const nCat = ((await list.data()).categories || []).length
+    ck('筛选排一枚「全部」+ 每枚分类各一枚', chips.length === nCat + 1, `chips=${chips.length} 分类=${nCat}`)
     const bg = []
     const fg = []
     for (const c of chips) { bg.push(await c.style('background-color')); fg.push(await c.style('color')) }
