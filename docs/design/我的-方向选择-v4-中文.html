@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 「我的」方向选择 v4（沿用本 App 自己的图文语言）</title>
+<style>
+/* 这一版不再从外面搬风格。先把我麦笔记代码里已有的"图文语言"取证出来，再让「我的」这一屏
+   说同一套话——这样"整体感"是有依据的，不是我换个画风。
+   取证来源（全部是现网代码，不是效果图）：
+   · app.wxss page{}：字阶 8 档 / 间距模数 8rpx / 圆角 40·32·28·16 / 描边 3rpx；
+     注释原文写着"描边是这套方向的骨架，投影已经退役"。
+   · app.wxss .blk / .blk.dot / .motif + 五个母题：方块 176 见方、小色块 52×52 圆角 18，
+     母题由 palette.js 按 id 取模选一个，颜色"只比底色暗/亮一点点，做质感不做主角"。
+   · utils/palette.js TONES：芥末黄 #F6C445 / 宝蓝 #3F52D6 / 橙 #E9723D / 草绿 #46A863 / 紫 #6E4BD0，
+     未分类是墨黑 #23252C。颜色在这套系统里永远带语义（分类、当前壁纸、当前模板），不做装饰分配。
+   · 首页/列表/详情/新建都是"左块右文"这一条母题；「我的」是全站唯一一块不遵守的地方——
+     它只有一张 logo 位图 + 清一色文字行。这就是"乱、不搭"的技术原因。
+   共同点（上一轮已定，不随方向变）：LOGO + 名称固定在头部；设置 / 关于 是第二层 tab；
+   大卡片和实心大按钮撤掉；分享挪到关于最后、额度在它下面一行。 */
+  :root{
+    --paper:#F4F2EC; --ink:#23252C; --card:#fff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06); --sec:#5C6068; --ter:#9A9EA6; --clay:#D2683F;
+    --danger:#B4231F; --ok:#46A863;
+    --t0:#F6C445; --t1:#3F52D6; --t2:#E9723D; --t3:#46A863; --t4:#6E4BD0;
+    --fs-h1:42px; --fs-h2:34px; --fs-title:31px; --fs-body:28px; --fs-meta:24px;
+    --fs-tiny:21px; --fs-label:20px; --fs-micro:18px;
+    --r-card:40px; --r-block:32px; --r-pill:999px; --w-edge:3px;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.5 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  h1{font-size:22px;margin-bottom:6px}
+  .lead{color:#4a4d55;margin-bottom:24px;max-width:1600px;font-size:15px;line-height:1.8}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:16px;font-size:15px;color:#4a4d55;line-height:1.7;max-width:750px}
+  .cap b{display:block;font-size:18px;color:#1d1f24;margin-bottom:4px}
+  .cap code{background:#efece4;padding:1px 6px;border-radius:5px;font-size:13px}
+
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);position:relative}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:26px;font-weight:600;color:var(--ink)}
+  .status .r{font-size:22px;font-weight:500}
+  .nav{height:90px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600}
+  .view{height:1506px;padding:2px var(--sp-3) 0}
+
+  /* 头部：LOGO + 名称，固定在两栏之上 */
+  .head{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-4) 4px var(--sp-3)}
+  .logo{flex:none;width:76px;height:76px;border-radius:24px;position:relative;overflow:hidden;
+    background:var(--ink)}
+  .logo .m{position:absolute;right:-14px;bottom:-14px;width:64px;height:64px;border-radius:50%;
+    background:rgba(255,255,255,.14)}
+  .logo::after{content:"麦";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:34px;font-weight:800;letter-spacing:-1px}
+  .hname{font-size:var(--fs-h2);font-weight:800;letter-spacing:-.8px;color:var(--ink);line-height:1.2}
+  .hslog{display:block;margin-top:2px;font-size:var(--fs-tiny);color:var(--sec)}
+
+  /* 第二层 tab：文字 + 下划线（现网 about 页那一条），下划线用墨黑不吃主色 */
+  .tabs{display:flex;gap:56px;padding:0 4px;margin-bottom:var(--sp-3)}
+  .tab{position:relative;padding:18px 0 16px;font-size:var(--fs-body);font-weight:700;color:var(--ter)}
+  .tab.on{color:var(--ink)}
+  .tab.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:6px;border-radius:3px;background:var(--ink)}
+
+  .ghead{display:flex;align-items:center;gap:var(--sp-2);margin:var(--sp-4) 0 var(--sp-2);padding-left:4px;
+    font-size:var(--fs-label);font-weight:700;letter-spacing:.6px;color:var(--ter)}
+  .ghead.first{margin-top:var(--sp-1)}
+  .ghead .d{width:14px;height:14px;border-radius:5px;background:var(--idle)}
+
+  .card{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:0 var(--sp-4);margin-bottom:var(--sp-2)}
+  .item{display:flex;align-items:center;gap:var(--sp-3);padding:26px 0;
+    border-bottom:var(--w-edge) solid var(--edge)}
+  .item:last-child{border-bottom:none}
+  /* 小色块：现网 .blk.dot 就是 52×52、圆角 18，列表页行前那个点就是它 */
+  .dot{flex:none;width:52px;height:52px;border-radius:18px;position:relative;overflow:hidden}
+  .dot .m{position:absolute;right:-12px;bottom:-12px;width:44px;height:44px}
+  .dot.stripe .m{background:repeating-linear-gradient(115deg,rgba(0,0,0,.16) 0 8px,transparent 8px 17px)}
+  .dot.arc .m{border-radius:50%;border:8px solid rgba(255,255,255,.26);border-right-color:transparent;border-bottom-color:transparent}
+  .dot.dots .m{background-image:radial-gradient(rgba(0,0,0,.18) 4px,transparent 5px);background-size:17px 17px}
+  .dot.circle .m{border-radius:50%;background:rgba(255,255,255,.20)}
+  .dot.pill .m{width:60px;height:18px;border-radius:999px;background:rgba(0,0,0,.14);right:-16px;bottom:8px}
+  .tx{flex:1;min-width:0}
+  .lbl{font-size:var(--fs-body);font-weight:700;letter-spacing:-.3px;color:var(--ink);line-height:1.3}
+  .lbl.d{color:var(--danger)}
+  .sub{display:block;margin-top:4px;font-size:var(--fs-tiny);font-weight:400;color:var(--ter)}
+  .right{display:flex;align-items:center;gap:var(--sp-1);flex:none}
+  .val{font-size:var(--fs-meta);color:var(--ter)}
+  .arw{font-size:30px;color:var(--ter);line-height:1}
+  .st{display:inline-flex;align-items:center;gap:8px;font-size:var(--fs-meta);color:var(--ter)}
+  .st i{width:14px;height:14px;border-radius:50%;background:var(--ok)}
+
+  /* 丙：头部一枚 176 见方的母题方块（现网 .blk），我的页就它一块 */
+  .head3{display:flex;align-items:center;gap:var(--sp-4);padding:var(--sp-4) 4px}
+  .blk{flex:none;width:176px;height:176px;border-radius:var(--r-block);position:relative;overflow:hidden;
+    background:var(--ink);color:#fff}
+  .blk .m{position:absolute;right:-32px;bottom:-32px;width:124px;height:124px;border-radius:50%;
+    background:rgba(255,255,255,.13)}
+  .blk .g{position:absolute;left:18px;bottom:14px;font-size:32px;font-weight:800;letter-spacing:-.6px;z-index:2}
+  .blk .s{position:absolute;left:18px;top:16px;font-size:var(--fs-micro);font-weight:800;letter-spacing:1.4px;opacity:.7;z-index:2}
+  .head3 .hname{font-size:var(--fs-h1)}
+
+  .legend{margin-top:44px;background:#fff;border-radius:16px;padding:22px 26px;max-width:1600px;
+    font-size:15px;line-height:2;color:#3a3d44}
+  .legend b{color:#1d1f24}
+  .legend .k{display:inline-block;min-width:150px;font-weight:600;color:#1d1f24}
+</style>
+</head>
+<body>
+<h1>「我的」· 先挑一个方向（v4）</h1>
+<p class="lead">这一版不再从外面的 App 搬画风。<b>图麦笔记自己已经有一套图文语言：左块右文 + 描边卡（投影已退役）+ 五个抽象母题 + 一套带语义的分类色</b>——首页、列表、详情、新建四屏全在说这套话，只有「我的」这一屏没说：一张 logo 位图加清一色文字行。它看着"乱、不搭"的技术原因就在这儿。下面三个方向都是让这一屏回去说这套话，差别只在<b>图给多少</b>。共同的改动已经定死：LOGO 和名称固定在头部、设置 / 关于 是第二层、大卡片和实心大按钮撤掉、分享在关于最后、额度在分享下面。</p>
+
+<div class="row">
+
+  <!-- ============ 甲 ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:41</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"><span class="m"></span></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+
+        <div class="ghead first"><span class="d"></span>内容与外观</div>
+        <div class="card">
+          <div class="item"><span class="dot" style="background:var(--t0)"><span class="m stripe"></span></span>
+            <span class="tx"><span class="lbl">卡片模板</span><span class="sub">形象图 · 名称 · 一句话</span></span>
+            <span class="right"><span class="val">玉版宣</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot" style="background:var(--t4)"><span class="m circle"></span></span>
+            <span class="tx"><span class="lbl">外观</span><span class="sub">壁纸和文字深浅</span></span>
+            <span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot" style="background:var(--t1)"><span class="m dots"></span></span>
+            <span class="tx"><span class="lbl">分类</span><span class="sub">给笔记归堆</span></span>
+            <span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead"><span class="d"></span>私密</div>
+        <div class="card">
+          <div class="item"><span class="dot" style="background:var(--ink)"><span class="m arc"></span></span>
+            <span class="tx"><span class="lbl">私密</span><span class="sub">这一格的笔记要解锁才看得到</span></span>
+            <span class="right"><span class="st"><i></i>已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot" style="background:var(--t3)"><span class="m pill"></span></span>
+            <span class="tx"><span class="lbl">解锁方式</span><span class="sub">开了就不用每次输密码</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead"><span class="d"></span>账号</div>
+        <div class="card">
+          <div class="item"><span class="dot" style="background:var(--idle)"></span>
+            <span class="tx"><span class="lbl d">注销</span><span class="sub">删掉账号和全部笔记</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>甲 · 每行一枚小色块（推荐）</b>
+      色块就是现网列表页行前那个点：<code>.blk.dot</code> 52×52、圆角 18，里面一枚母题。
+      <b>颜色不随便分</b>——卡片模板吃当前模板的纸色、外观吃当前壁纸色、私密用墨黑，其余走色板，
+      跟"颜色在这套系统里永远带语义"这条一致。整体感最强，图文也最足。</div>
+  </div>
+
+  <!-- ============ 乙 ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:41</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"><span class="m"></span></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+
+        <div class="ghead first"><span class="d" style="width:22px;height:22px;border-radius:7px;background:var(--t0)"></span>内容与外观</div>
+        <div class="card">
+          <div class="item"><span class="tx"><span class="lbl">卡片模板</span><span class="sub">形象图 · 名称 · 一句话</span></span>
+            <span class="right"><span class="val">玉版宣</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="tx"><span class="lbl">外观</span><span class="sub">壁纸和文字深浅</span></span>
+            <span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="tx"><span class="lbl">分类</span><span class="sub">给笔记归堆</span></span>
+            <span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead"><span class="d" style="width:22px;height:22px;border-radius:7px;background:var(--ink)"></span>私密</div>
+        <div class="card">
+          <div class="item"><span class="tx"><span class="lbl">私密</span><span class="sub">这一格的笔记要解锁才看得到</span></span>
+            <span class="right"><span class="st"><i></i>已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="tx"><span class="lbl">解锁方式</span><span class="sub">开了就不用每次输密码</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead"><span class="d" style="width:22px;height:22px;border-radius:7px;background:var(--idle)"></span>账号</div>
+        <div class="card">
+          <div class="item"><span class="tx"><span class="lbl d">注销</span><span class="sub">删掉账号和全部笔记</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>乙 · 色块只给分组标题</b>
+      行本身纯文字，只有「内容与外观 / 私密 / 账号」三个组标题左边一枚 22 的小方块。
+      最接近 iOS 设置页，最安静；代价是"图文结合"这一条基本没做，年轻感弱一些。</div>
+  </div>
+
+  <!-- ============ 丙 ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:41</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head3"><div class="blk"><span class="m"></span><span class="s">MAI</span><span class="g">图麦笔记</span></div></div>
+        <div class="hslog" style="padding:0 4px 8px;font-size:var(--fs-tiny);color:var(--sec)">看到的好东西，存成能用的笔记</div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+
+        <div class="ghead first"><span class="d"></span>内容与外观</div>
+        <div class="card">
+          <div class="item"><span class="tx"><span class="lbl">卡片模板</span><span class="sub">形象图 · 名称 · 一句话</span></span>
+            <span class="right"><span class="val">玉版宣</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="tx"><span class="lbl">外观</span><span class="sub">壁纸和文字深浅</span></span>
+            <span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="tx"><span class="lbl">分类</span><span class="sub">给笔记归堆</span></span>
+            <span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead"><span class="d"></span>私密</div>
+        <div class="card">
+          <div class="item"><span class="tx"><span class="lbl">私密</span><span class="sub">这一格的笔记要解锁才看得到</span></span>
+            <span class="right"><span class="st"><i></i>已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="tx"><span class="lbl">解锁方式</span><span class="sub">开了就不用每次输密码</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead"><span class="d"></span>账号</div>
+        <div class="card">
+          <div class="item"><span class="tx"><span class="lbl d">注销</span><span class="sub">删掉账号和全部笔记</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>丙 · 图集中在头部那一块大方块</b>
+      行纯文字，把 logo 升级成现网详情页同款的那枚 <code>.blk</code>（176 见方、母题在右下、名称压在块里），
+      一屏只有这一块有图。品牌感最强，但它占高度，第一条可操作项比甲乙低一截。</div>
+  </div>
+
+  <!-- ============ 关于栏（甲的配色） ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:41</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"><span class="m"></span></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab">设置</div><div class="tab on">关于</div></div>
+
+        <div class="ghead first"><span class="d"></span>这个产品</div>
+        <div class="card">
+          <div class="item"><span class="dot" style="background:var(--t2)"><span class="m circle"></span></span>
+            <span class="tx"><span class="lbl">介绍</span><span class="sub">这App做什么、怎么用</span></span>
+            <span class="right"><span class="val">v1.8.9</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot" style="background:var(--t1)"><span class="m stripe"></span></span>
+            <span class="tx"><span class="lbl">功能</span><span class="sub">逐条对着界面看</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot" style="background:var(--ink)"><span class="m dots"></span></span>
+            <span class="tx"><span class="lbl">隐私</span><span class="sub">存什么、传什么、删什么</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead"><span class="d"></span>联系</div>
+        <div class="card">
+          <div class="item"><span class="dot" style="background:var(--t3)"><span class="m arc"></span></span>
+            <span class="tx"><span class="lbl">反馈</span><span class="sub">点一下复制</span></span>
+            <span class="right"><span class="val">18509828@qq.com</span></span></div>
+          <div class="item"><span class="dot" style="background:var(--t4)"><span class="m pill"></span></span>
+            <span class="tx"><span class="lbl">官网</span><span class="sub">点一下复制</span></span>
+            <span class="right"><span class="val">agentsbin.cn</span></span></div>
+        </div>
+
+        <div class="ghead"><span class="d"></span>分享这个产品</div>
+        <div class="card">
+          <div class="item"><span class="dot" style="background:var(--t0)"><span class="m stripe"></span></span>
+            <span class="tx"><span class="lbl">分享好友</span><span class="sub">点一下弹微信的分享面板</span></span>
+            <span class="right"><span class="val">+10 篇 / 人</span></span></div>
+          <div class="item"><span class="dot" style="background:var(--idle)"></span>
+            <span class="tx"><span class="lbl">笔记额度</span><span class="sub">每让 1 位好友用一次 +10 篇</span></span>
+            <span class="right"><span class="val">37 / 100</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>关于这一栏（甲乙丙共用，不随方向变）</b>
+      分享和额度就是两行普通行，跟上面一模一样；两行都不给箭头——一个弹原生面板、一个只能看。
+      原来那行「关于图麦笔记」整行撤掉，它的三块内容提到这一栏来。</div>
+  </div>
+</div>
+
+<div class="legend">
+<b>右侧那三种写法就是"交互清晰"的全部规则，三屏共用：</b><br>
+<span class="k">名字 + 箭头 ›</span>点了进入另一个页面（卡片模板 / 外观 / 分类 / 私密 / 介绍 / 功能 / 隐私）<br>
+<span class="k">名字 + 灰值，无箭头</span>点了不换页，只是复制（反馈 / 官网）或弹系统面板（分享好友）<br>
+<span class="k">名字 + 绿点 + 已设</span>这是一项状态，不是一次跳转；状态点只用在"开没开"这类二元上<br>
+<span class="k">名字下面那行小字</span>只回答"点进去会动什么"，不复述名字（这条是上一版说明太啰嗦的教训）<br>
+<br>
+<b>一处冲突我按现有系统判了，你可以推翻：</b>你上一轮说过"不要加 ICON"，这一轮要"图文结合"。
+我的处理是<b>不引任何图标资源</b>（这项目从不为一个符号引图片，放大镜、把手、母题全是 CSS 画的），
+用系统里已有的<b>色块 + 母题</b>当"图"。所以甲乙丙三版都不含 icon 位图。
+</div>
+</body>
+</html>
