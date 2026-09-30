@@ -368,6 +368,13 @@
   color: rgba(35, 37, 44, 0.42);
 }
 
+/* 挂在把手行左端的那一句：与右边「点一下收起」同字号同字重同色，只换一边。
+   左右都留 34rpx，两句在同一行两端对称。 */
+.grip-tx-l {
+  right: auto;
+  left: 34rpx;
+}
+
 .ds-body {
   flex: 1;
   min-height: 0;
@@ -632,11 +639,28 @@
   font-size: var(--fs-body);
 }
 
-.tpl-swipe-hint {
-  margin-top: 12rpx;
-  font-size: 22rpx;
-  color: #9a9ea6;
+/* 一共多少套、现在第几套。10 枚各吃分类那同一套色板的一档（toneColor 按序号取模），
+   当前那枚从 10 抬到 16 并去掉淡——只靠"大一点"在十枚里认不出来，得再差一档亮度。 */
+.tpl-dots {
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  margin-top: var(--sp-2);
+}
+
+.tpl-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+.tpl-dot-on {
+  width: 16rpx;
+  height: 16rpx;
+  opacity: 1;
 }
 
 /* 弹窗下沿：二维码开关一行 + 取消/保存一行，左右内缩交给 dock */

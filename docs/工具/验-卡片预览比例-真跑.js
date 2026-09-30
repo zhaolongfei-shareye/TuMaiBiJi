@@ -1,7 +1,9 @@
-// 模板预览弹窗里那张卡片的比例自证（模拟器 + 现网后端）。
+// 模板预览弹窗这一屏的几何自证（模拟器 + 现网后端）：卡片比例、底部圆点分页、把手行两句对称。
 // 为什么要有：09-30 站长真机截图打回——"卡片预览选择时候，变形了，要修正，比例不要改，
 // 展示要看实际比例"。变形的原因是展示框只按宽度算，高被 flex-shrink 与 max-height
 // 压回可视框，宽留着、高被挤，于是整张卡扁了。静态尺子看不出这个，必须量渲染出来的盒子。
+// 同一天追加的两条也在这里量：「左右滑换模板」挪到把手行左端、与「点一下收起」对称；
+// 卡片下面那一排彩色圆点要"几套模板就几枚、当前那枚大一点、且停在当前位置"。
 // 前置：微信开发者工具已开；改过 WXML/WXSS/JS 要先 cli close 再
 //   cli auto --project <仓库>/miniprogram --auto-port 9431，等十秒端口起来。
 // 跑法：NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-卡片预览比例-真跑.js
@@ -26,7 +28,13 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
   const q = wx.createSelectorQuery()
   q.select('.tpl-body').boundingClientRect()
   q.select('.tpl-poster').boundingClientRect()
-  q.exec((res) => resolve({ body: res[0], box: res[1], windowWidth: wx.getWindowInfo().windowWidth }))
+  q.selectAll('.tpl-dot').boundingClientRect()
+  q.selectAll('.grip-tx').boundingClientRect()
+  q.select('.grip').boundingClientRect()
+  q.exec((res) => resolve({
+    body: res[0], box: res[1], dots: res[2] || [], gripTx: res[3] || [], grip: res[4],
+    windowWidth: wx.getWindowInfo().windowWidth,
+  }))
 }))
 
 const toRpx = (px, windowWidth) => px * 750 / windowWidth
@@ -114,6 +122,44 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
       // 也不能小得离谱：短边至少占框的一半，否则"看实际比例"等于看不清
       ck(`第 ${round + 1} 套：缩得不过分`, Math.min(shown.w / 702, shown.h / toRpx(body.height, windowWidth)) > 0.5,
         `占宽 ${(shown.w / 702 * 100).toFixed(0)}%`)
+
+      /* ---------- 圆点分页：一共多少套、现在第几套 ---------- */
+      const m2 = await measure(mp)
+      const dots = m2.dots || []
+      ck(`第 ${round + 1} 套：底部圆点有几套模板就几枚`, dots.length === d.tplIds.length,
+        `${dots.length} 枚 / ${d.tplIds.length} 套`)
+      if (dots.length) {
+        const sizes = dots.map((x) => Math.round(x.width))
+        const big = sizes.indexOf(Math.max(...sizes))
+        const want = d.tplIds.findIndex((x) => x.id === d.posterTpl)
+        ck(`第 ${round + 1} 套：当前那一枚确实比其他大一点`,
+          sizes[big] - Math.max(...sizes.filter((_, i) => i !== big)) >= 3,
+          `各枚 ${sizes.join(',')}`)
+        ck(`第 ${round + 1} 套：大的那枚停在当前模板的位置`, big === want, `第 ${big + 1} 枚 / 应在第 ${want + 1} 枚`)
+        // 判据取"同一根中线"而不是"同一个 top"：这一行是 align-items:center，
+        // 当前那枚大 6rpx，top  naturally 会比别人小半个身位——按 top 判会永远红。
+        const mid = dots.map((x) => Math.round(x.top + x.height / 2))
+        ck(`第 ${round + 1} 套：十枚排在同一根中线上（没有错位或掉行）`,
+          Math.max(...mid) - Math.min(...mid) <= 1, `中线 ${mid.join(',')}`)
+      }
+
+      /* ---------- 「左右滑换模板」挪到把手行左端，与「点一下收起」对称 ---------- */
+      const gt = m2.gripTx || []
+      ck('第 1 句提示挪到了把手行：这一行有两个文本', gt.length === 2, `读到 ${gt.length} 个`)
+      if (gt.length === 2 && m2.grip) {
+        const [L, R] = gt
+        const edge = 34 * windowWidth / 750   // 样式里那 34rpx 折回 px
+        ck('两句在同一行、同一顶边、同一高度',
+          Math.abs(L.top - R.top) < 1 && Math.abs(L.height - R.height) < 1,
+          `top ${Math.round(L.top)}/${Math.round(R.top)} 高 ${Math.round(L.height)}/${Math.round(R.height)}`)
+        ck('左右各留 34rpx，两句真的对称',
+          Math.abs(L.left - (m2.grip.left + edge)) < 2
+          && Math.abs((m2.grip.left + m2.grip.width - edge) - (R.left + R.width)) < 2,
+          `左距 ${Math.round(L.left - m2.grip.left)}px 右距 ${Math.round(m2.grip.left + m2.grip.width - R.left - R.width)}px`)
+        ck('两句都在把手行里、没压到把手上',
+          L.top >= m2.grip.top - 1 && L.top + L.height <= m2.grip.top + m2.grip.height + 1)
+      }
+      ck('卡片下面那句旧提示已经撤掉', !(await page.$('.tpl-swipe-hint')))
 
       await mp.screenshot({ path: path.join(OUT, `实测-卡片预览比例-${d.posterTpl || round}.png`) })
       if (round === 0) {

@@ -193,12 +193,20 @@
   <view wx:if="{{templateOpen}}" class="float-sheet tpl-sheet">
     <view class="grip" bindtap="onHandleTap">
       <view class="grip-bar"></view>
+      <!-- 左右各一句、同一行同一档：右边收窗，左边告诉他这一屏能左右滑。
+           原来那句挂在卡片下面，卡片一高就被顶到看不见。 -->
+      <text class="grip-tx grip-tx-l">{{t.swipeHint}}</text>
       <text class="grip-tx">{{t.grip}}</text>
     </view>
     <view class="tpl-body" bindtouchstart="onPosterTouchStart" bindtouchend="onPosterTouchEnd">
       <image wx:if="{{posterImagePath}}" class="tpl-poster" src="{{posterImagePath}}" mode="aspectFit" style="width: {{posterW}}rpx; height: {{posterH}}rpx" />
       <view wx:else class="tpl-loading">{{t.loading}}</view>
-      <view class="tpl-swipe-hint">{{t.swipeHint}}</view>
+      <!-- 一共多少套、现在第几套：每套一枚，当前那枚大一点、其余淡一档 -->
+      <view class="tpl-dots">
+        <view wx:for="{{tplIds}}" wx:key="id"
+          class="tpl-dot {{item.id === posterTpl ? 'tpl-dot-on' : ''}}"
+          style="background: {{item.color}}"></view>
+      </view>
     </view>
     <view class="tpl-dock">
       <!-- 码的开关：只影响这一张成品图，与海报页那条是同一个开关语义 -->

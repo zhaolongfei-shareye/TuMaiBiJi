@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { catSkinFor, chromeOf, toneVars, withAlpha } = require('../../utils/palette.js')
+const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const { isPrivate } = require('../../utils/privateGate.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
@@ -55,6 +55,9 @@ Page({
     templateOpen: false,
     posterNote: null,
     posterTpl: '',
+    // 弹窗底部那一排圆点：每套模板一枚，颜色吃分类那同一套色板（toneColor），
+    // 谁被选中由 wxml 现比 posterTpl，所以换模板时不用再 setData 一次这个数组。
+    tplIds: [],
     posterImagePath: '',
     posterW: 750,
     posterH: 900,
@@ -470,6 +473,7 @@ Page({
       templateOpen: true,
       posterNote: note,
       posterTpl: profile.template || poster.DEFAULT_TEMPLATE,
+      tplIds: poster.TEMPLATES.map((x, i) => ({ id: x.id, color: toneColor(i) })),
       posterImagePath: '',
       posterBusy: true,
       noQr: false,
@@ -528,8 +532,8 @@ Page({
     })
     if (!rect || !rect.width || !rect.height) return null
     const toRpx = (px) => px * 750 / wx.getWindowInfo().windowWidth
-    // 左右各 24rpx 的 padding，和下面那条"左右滑换模板"的提示（12 上间距 + 22 字高）
-    return { w: Math.round(toRpx(rect.width)) - 48, h: Math.round(toRpx(rect.height)) - 34 }
+    // 左右各 24rpx 的 padding，和下面那一排圆点（16 上间距 + 16 当前那枚的直径）
+    return { w: Math.round(toRpx(rect.width)) - 48, h: Math.round(toRpx(rect.height)) - 32 }
   },
 
   // 与 share.js render() 同一套：先量后画、canvas 尺寸切两次、paintLayers 落笔、canvasToTempFilePath 出成品。
