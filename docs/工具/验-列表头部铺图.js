@@ -85,16 +85,47 @@ ok('列表那一层不再自称"纸"（.sheet 这个类整个没了）',
 ok('列表层只剩层序，自己不画任何面（一条笔记一个框）',
   !/(?:^|\n)\.list-layer\s*\{/.test(wxss)
   && !/\.container\.has-bg \.list-layer\s*\{[^}]*(background|border)/.test(wxss))
-ok('头部三块 + 列表层一起抬到罩之上',
-  /\.container\.has-bg \.page-head,[\s\S]{0,200}?\.container\.has-bg \.list-layer\s*\{[^}]*position: relative[^}]*z-index: 2/.test(wxss))
+ok('头部三块 + 那一行工具 + 列表层一起抬到罩之上',
+  /\.container\.has-bg \.page-head,[\s\S]{0,320}?\.container\.has-bg \.list-layer\s*\{[^}]*position: relative[^}]*z-index: 2/.test(wxss)
+  && /\.container\.has-bg \.head-tools/.test(wxss))
 
 // ---------- 5. 压在图上的那三块面 ----------
-const cardBg = seg(wxss, '.container.has-bg .sc-card', '--chrome-bg')
-ok('搜索条在图上翻成纸白那一面', /--chrome-bg: #f2efe9/.test(cardBg) && /--chrome-ink: #23252c/.test(cardBg))
+// 09-30 v8：搜索条收成分类行最右那一枚圆钮，两块面共用同一条翻色规则。
+// 分成两条各写一份 #f2efe9 迟早走样（这个项目为这类事已经红过好几轮），
+// 所以这里钉的是"两个选择器在同一条规则里"，而不是"两处都恰好是那个值"。
+const chromeBlock = seg(wxss, '.container.has-bg .sc-btn', '--chrome-bg')
+ok('搜索条与那枚圆钮吃同一条翻色规则（纸白面 + 墨字）',
+  /\.container\.has-bg \.sc-card,\s*\n\.container\.has-bg \.sc-btn\s*\{/.test(wxss)
+  && /--chrome-bg: #f2efe9/.test(chromeBlock) && /--chrome-ink: #23252c/.test(chromeBlock))
 ok('翻的是变量不是逐条覆盖（子元素一条都不用改）',
   !/\.container\.has-bg \.sc-input\s*\{/.test(wxss) && !/\.container\.has-bg \.sc-go\s*\{/.test(wxss))
 ok('搜索条在图上有一条投影，和录入胶囊同档',
-  /box-shadow: 0 18rpx 46rpx rgba\(8, 10, 14, 0\.42\)/.test(cardBg))
+  /\.container\.has-bg \.sc-card\s*\{[^}]*box-shadow: 0 18rpx 46rpx rgba\(8, 10, 14, 0\.42\)/.test(wxss))
+ok('圆钮的阴影单独一档（110 高的条子那个扩散照搬到 59 的圆上会糊成一团黑）',
+  /\.container\.has-bg \.sc-btn\s*\{[^}]*box-shadow: 0 6rpx 18rpx/.test(wxss))
+
+// ---------- 5b. 搜索收进分类那一行（v8） ----------
+ok('展开态与收起态各一条，用 searchOpen 二选一',
+  /wx:if="\{\{searchOpen\}\}" class="card sc-card"/.test(wxml) && /wx:else class="head-tools"/.test(wxml))
+ok('展开时输入框自动聚焦（focus 跟着那一态走，不写死 true）',
+  /focus="\{\{searchOpen\}\}"/.test(wxml))
+ok('圆钮和 chip 同一档高度（59，实测 chip 是 58.7）',
+  /\.sc-btn\s*\{[^}]*width: 59rpx[^}]*height: 59rpx/.test(wxss)
+  && /\.head-tools\s*\{[^}]*height: 59rpx/.test(wxss))
+ok('圆钮吃 --chrome-bg/--chrome-ink，不另立色值',
+  /background: var\(--chrome-bg\)/.test(seg(wxss, '.sc-btn')) && /color: var\(--chrome-ink\)/.test(seg(wxss, '.sc-btn')))
+ok('有词又缩回时那枚翻成墨底纸白（列表被筛过这件事得有地方说）',
+  /\.sc-btn\.on\s*\{[^}]*background: var\(--chrome-ink\)[^}]*color: var\(--chrome-bg\)/.test(wxss))
+ok('放大镜是 CSS 画的，这一页没为一枚钮引图标',
+  /\.glyph-search::before/.test(wxss) && /\.glyph-search::after/.test(wxss)
+  && !/\.glyph-search\s*\{[^}]*background-image/.test(wxss))
+ok('点空白缩回挂在容器上，条子内部靠 catchtap 挡住冒泡',
+  /class="container[^"]*" bindtap="onBlankTap"/.test(wxml) && /catchtap="noop"/.test(wxml))
+ok('那一行的外边距挂在行上，不挂在里面的 scroll-view（展开态没有它，间距还得一样）',
+  /\.head-tools\s*\{[^}]*margin-bottom: var\(--sp-3\)/.test(wxss)
+  && !/\.category-scroll\s*\{[^}]*margin-bottom/.test(wxss))
+ok('分类多到放不下时照旧左滑，圆钮不参与滚动（flex:none 钉在最右）',
+  /\.sc-btn\s*\{[^}]*flex: none/.test(wxss) && /\.category-scroll\s*\{[^}]*flex: 1/.test(wxss))
 // 09-30 起暗玻璃那一态只管「全部」那一枚（.chip.all）：分类那几枚穿自己的分类色，
 // 再压一层暗玻璃等于把整排分类身份洗掉（站长原话"分类按钮是有颜色的"）。
 const chipIdle = seg(wxss, '.container.has-bg .chip.all')

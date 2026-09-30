@@ -98,9 +98,79 @@
   opacity: 0.66;
 }
 
+/* ---------- 搜索与分类共用的那一行（09-30 v8） ----------
+   高 59rpx 不是拍的：现网一枚 chip 实测就是 58.7（padding 14 上下 + 24 那档字），
+   圆钮取同一档，两种控件并排才会像"一排"而不是"两个东西挤在一起"。
+   原来 .category-scroll 上那条 margin-bottom 挪到这里——它是这一行的外边距，
+   挂在行上比挂在里面那个 scroll-view 上清楚：展开那一态没有 scroll-view，
+   间距还得一样。 */
+.head-tools {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  height: 59rpx;
+  margin-bottom: var(--sp-3);
+}
+
+.sc-btn {
+  flex: none;
+  width: 59rpx;
+  height: 59rpx;
+  border-radius: 50%;
+  background: var(--chrome-bg);
+  color: var(--chrome-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 有词但条子已缩回：整枚翻成墨底纸白。这是"列表现在是筛过的"唯一看得见的地方，
+   不做的话用户只会看到一排想不通为什么只剩一条的结果。 */
+.sc-btn.on {
+  background: var(--chrome-ink);
+  color: var(--chrome-bg);
+}
+
+.sc-btn:active {
+  opacity: 0.7;
+}
+
+/* 放大镜纯 CSS 画（这一页没有图标资源，也不为一枚钮引一张图）：
+   一颗圈加一道斜柄，圈 22、柄 13，都吃 currentColor，翻色时跟着 .sc-btn.on 走。 */
+.glyph-search {
+  position: relative;
+  width: 30rpx;
+  height: 30rpx;
+}
+
+.glyph-search::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 21rpx;
+  height: 21rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+}
+
+.glyph-search::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 1rpx;
+  width: 13rpx;
+  height: 3rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  transform: rotate(45deg);
+  transform-origin: 100% 50%;
+}
+
 .category-scroll {
   white-space: nowrap;
-  margin-bottom: var(--sp-3);
+  flex: 1;
+  min-width: 0;
 }
 
 .category-chips {
@@ -701,6 +771,7 @@
    静态内容会被它整个盖住。这一层只管层序，自己不画任何面。 */
 .container.has-bg .page-head,
 .container.has-bg .sc-card,
+.container.has-bg .head-tools,
 .container.has-bg .category-scroll,
 .container.has-bg .list-layer {
   position: relative;
@@ -721,12 +792,23 @@
    翻的是 --chrome-* 这三个变量本身：卡里那些读它们的子元素（输入字、占位符、
    "搜索笔记"、那条横线）一条都不用改，也不会改一半留一半。
    前提是这一态下 style 上那串 chrome 变量整串没发（见 index.js 的 searchSkin）——
-   内联的自定义属性优先级高于任何选择器，带着它这三行一行都翻不动。 */
-.container.has-bg .sc-card {
+   内联的自定义属性优先级高于任何选择器，带着它这三行一行都翻不动。
+   09-30 起这条同时管那枚圆钮：收起态它就是搜索条的替身，两块面必须一个值，
+   所以共用同一条规则而不是各写一份 #f2efe9（两份迟早走样）。
+   阴影分开写：110 高的条子配 46 的扩散合适，59 的圆钮照抄会糊成一团黑。 */
+.container.has-bg .sc-card,
+.container.has-bg .sc-btn {
   --chrome-bg: #f2efe9;
   --chrome-ink: #23252c;
   --chrome-idle: rgba(35, 37, 44, 0.5);
+}
+
+.container.has-bg .sc-card {
   box-shadow: 0 18rpx 46rpx rgba(8, 10, 14, 0.42);
+}
+
+.container.has-bg .sc-btn {
+  box-shadow: 0 6rpx 18rpx rgba(8, 10, 14, 0.28);
 }
 
 /* 分类筛选：v2 起每枚穿自己分类的实色（站长原话"分类底图也用不同颜色"）。

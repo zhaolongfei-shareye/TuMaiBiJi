@@ -1,4 +1,4 @@
-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}}">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}}" bindtap="onBlankTap">
   <!-- 头部那一段铺形象图（和新建页同一张、同一个开关、同一个取图口）。
        列表不铺：一行行字压在照片上，滚起来字和图打架——这是 09-28 那版效果图里
        A/C 两条路选下来的 C。图做成 fixed，滚到哪儿它都在头部那一段。 -->
@@ -11,13 +11,19 @@
     <text class="page-stats" wx:if="{{statsText}}">{{statsText}}</text>
   </view>
 
-  <!-- 搜索条：一块饱和色，里面只有一条横线——输入框不再有"盒子"，
-       字直接坐在色块上，靠一条下划线表示可写。右侧"搜索笔记"是纯文字动作，
-       不是按钮（同"获取验证码"那种做法）。底色仍与新建页 URL 卡同一块蓝。 -->
-  <view class="card sc-card" style="{{searchSkin}}">
+  <!-- 搜索和分类共用这一行（09-30 v8，站长："搜索条目前看起来太大，不美观"）。
+       默认只有分类，最右一枚 59 圆钮；点它整行换成搜索条、分类暂时收起；
+       点这一行以外的空白缩回来。条子里面一个字没改，仍是原来那套（纸白面 +
+       一条横线 + 右边纯文字「搜索笔记」）。
+       缩回不清词：「收起」和「清空」是两件事，清词要点 ✕——
+       否则他往下一滑想看结果、不小心点到空白，词就没了。
+       catchtap 挂在那枚 noop 上：条子内部（含输入框那片空白）的点击不该冒泡到
+       容器去触发缩回，只有条子以外才算"点了空白"。 -->
+  <view wx:if="{{searchOpen}}" class="card sc-card" style="{{searchSkin}}" catchtap="noop">
     <view class="sc-line">
       <input
         class="sc-input"
+        focus="{{searchOpen}}"
         value="{{searchKeyword}}"
         placeholder="{{t.searchPh}}"
         placeholder-class="sc-ph"
@@ -31,28 +37,35 @@
     </view>
   </view>
 
-  <!-- 分类筛选 -->
-  <scroll-view class="category-scroll" scroll-x show-scrollbar="{{false}}">
-    <view class="category-chips">
-      <view 
-        class="chip all {{selectedCategory === null ? 'active' : ''}}"
-        bindtap="selectCategory"
-        data-id="{{null}}"
-      >
-        {{t.allCategories}}
+  <!-- 分类筛选 + 搜索入口。多到一排放不下时照旧左滑，圆钮不参与滚动、一直钉在最右。 -->
+  <view wx:else class="head-tools">
+    <scroll-view class="category-scroll" scroll-x show-scrollbar="{{false}}">
+      <view class="category-chips">
+        <view 
+          class="chip all {{selectedCategory === null ? 'active' : ''}}"
+          bindtap="selectCategory"
+          data-id="{{null}}"
+        >
+          {{t.allCategories}}
+        </view>
+        <view 
+          class="chip tone {{selectedCategory === item.id ? 'active' : ''}}"
+          wx:for="{{categories}}"
+          wx:key="id"
+          bindtap="selectCategory"
+          data-id="{{item.id}}"
+          style="{{item.toneStyle}}"
+        >
+          {{item.name}}
+        </view>
       </view>
-      <view 
-        class="chip tone {{selectedCategory === item.id ? 'active' : ''}}"
-        wx:for="{{categories}}"
-        wx:key="id"
-        bindtap="selectCategory"
-        data-id="{{item.id}}"
-        style="{{item.toneStyle}}"
-      >
-        {{item.name}}
-      </view>
+    </scroll-view>
+    <!-- 有词但已缩回时这枚翻成墨底纸白：列表是筛过的，得有个地方说这件事，
+         否则只剩一排看不出原因的过滤结果。 -->
+    <view class="sc-btn {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">
+      <view class="glyph-search"></view>
     </view>
-  </scroll-view>
+  </view>
 
   <!-- 这一层只干一件事：铺图时把列表抬到罩层之上（fixed 的图有 z-index，
        静态内容会被它整个盖住）。它以前是"一张纸"，圆角朝上托着列表，

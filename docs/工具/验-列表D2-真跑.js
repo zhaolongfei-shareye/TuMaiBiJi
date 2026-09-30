@@ -43,8 +43,12 @@ const INK = hexArr(/--chrome-ink:\s*(#[0-9A-Fa-f]{6})/i.exec(
     .replace(/\/\*[\s\S]*?\*\//g, ''))[1])
 const secondaryOf = (w) => {
   const m = new RegExp(`\\.${p.themeOf(w).cls}\\s*\\{([\\s\\S]*?)\\}`).exec(APP_WXSS)
-  return /--text-secondary:\s*(#[0-9A-Fa-f]{6})/.exec(m[1])[1]
+  // 十六进制和 rgba 两种写法都要认：淡雅那两枚的 --text-secondary 是
+  // `rgba(27, 42, 33, 0.66)`，原来这里只匹配 #rrggbb，拿到天青就 null[1] 崩掉。
+  return (/--text-secondary:\s*(#[0-9A-Fa-f]{6}|rgba?\([^)]*\))/.exec(m[1]) || [])[1] || ''
 }
+// 计算样式回的是 rgb()/rgba()，源码里可能是 #hex 也可能是 rgba()——两边都拆成三个数再比
+const anyRgb = (v) => (/^#/.test(String(v)) ? hexArr(v) : rgbOf(v))
 // 未选中那一档屏幕上是"纸白按 alpha 叠在胶囊上"的结果，判像素要先把这层混出来
 const blend = (fgHex, bgHex, alpha) => hexArr(fgHex).map((v, i) => Math.round(alpha * v + (1 - alpha) * hexArr(bgHex)[i]))
 const sampleBar = (png) => JSON.parse(execFileSync('python3',
@@ -98,15 +102,16 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     }
     if (!(d.notes || []).length) throw new Error('列表三次都是空的：这一把没法量（先确认登录态与网络）')
 
-    // ---------- ① 搜索条：这一屏永远铺图，这块面固定是纸白那一档 ----------
+    // ---------- ① 搜索那一面：这一屏永远铺图，固定纸白 ----------
     // 原来这条钉的是"搜索条底色 = chromeOf"，那是背景开关还活着、这一屏能退回纯壁纸底时的口径。
     // 09-30 起那一节整块撤了，chromeOf 只剩底栏胶囊一个消费者。
-    const scBg = await styleOf(page, '.sc-card', 'background-color')
-    ck(`${label}：搜索条底色 = 纸白（图上那一面，八套壁纸都是它）`,
+    // 同一天 v8 又把搜索条收成分类行最右那枚圆钮：收起态量不到 .sc-card，这块面由 .sc-btn
+    // 代表（两条吃同一条翻色规则），展开态里条子与字色的那三条在 验-列表头部铺图-真跑.js 量。
+    const scBg = await styleOf(page, '.sc-btn', 'background-color')
+    ck(`${label}：搜索那枚圆钮底色 = 纸白（图上那一面，与哪套壁纸无关）`,
       near(rgbOf(scBg), hexArr(PAPER), 2), `${scBg} vs ${PAPER}`)
-    const scInk = await styleOf(page, '.sc-go', 'color')
-    ck(`${label}：搜索条上的字 = 墨色（纸白面上不能再压白字）`, near(rgbOf(scInk), INK, 2), scInk)
-    const ph = await styleOf(page, '.sc-input', 'background-color') // 只用来确认读到值；占位符见截图
+    const scInk = await styleOf(page, '.sc-btn', 'color')
+    ck(`${label}：圆钮上的放大镜 = 墨色（纸白面上不能再压白字）`, near(rgbOf(scInk), INK, 2), scInk)
     ck(`${label}：搜索条上占位符不吃 opacity（样式里没有这条）`,
       !/\.sc-ph\s*\{[^}]*opacity/.test(fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/index/index.wxss'), 'utf8')))
 
@@ -155,19 +160,21 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     const dtColor = await styleOf(page, '.note-row.open .row-foot .dt', 'color')
     const sec = secondaryOf(w)
     ck(`${label}：日期吃 --text-secondary（不再是 tertiary 那一档）`,
-      near(rgbOf(dtColor), hexArr(sec), 2), `${dtColor} vs ${sec}`)
+      near(rgbOf(dtColor), anyRgb(sec), 2), `${dtColor} vs ${sec}`)
     ck(`${label}：meta 行整行同一个色（两值都得真读到，null 不算）`,
       !!footColor && !!dtColor && css(footColor) === css(dtColor), `${footColor} / ${dtColor}`)
     await page.setData({ openIdx: -1 })   // 收回去：下一枚壁纸量的是同一批收起行
     await sleep(700)
 
     // ---------- ④ 底栏（组件够不到，采像素）----------
-    // 像素比对留 ±6：截图落盘带一次色彩管理，实测同一支 #2D2D6C 采回来是 (45,45,104)，
-    // 差的这四个不在 CSS 里，计算样式那一头读到的是精确值（上面①已经钉过）。
+    // 像素比对留 ±8：截图落盘带一次色彩管理，偏差不在 CSS 里——计算样式那一头读到的是
+    // 精确值（上面①已经钉过）。这个容差是拿三枚壁纸实测出来的，不是猜的：
+    // 米白 #443C25 → (67,60,40)｜夜紫 #2D2D6C → (45,45,104)｜天青 #25442B → (44,67,45)，
+    // 单通道最大偏 7（天青那一支的红）。原来留 ±6 是只按夜紫那一档定的，换一枚就假红。
     const png = `${OUT}/实测-${label}.png`
     await mp.screenshot({ path: png })
     const s = sampleBar(png)
-    ck(`${label}：胶囊填充色 = chromeOf 那一支（像素）`, near(s.fill, hexArr(chrome.bg), 6),
+    ck(`${label}：胶囊填充色 = chromeOf 那一支（像素）`, near(s.fill, hexArr(chrome.bg), 8),
       `${s.fill} vs ${hexArr(chrome.bg)}，占这条线 ${Math.round(s.fill_ratio * 100)}%`)
     // 原来这里还钉一条"胶囊和搜索条同色（同一个函数，两块面必须一个值）"。09-30 起两块面各走各的：
     // 搜索条永远在图上、固定纸白，chromeOf 只剩底栏胶囊一个消费者，这条配对判据已经不成立。

@@ -123,15 +123,6 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   const rowRect = (await rects(['.note-row']))[0]
   if (rowRect) ck('第一张行卡落在图的范围里（卡片之间露图）',
     rowRect.top > 0 && rowRect.top < win.h, `卡顶 ${(rowRect.top / R).toFixed(0)}rpx`)
-  ck('搜索条翻成纸白那一面',
-    near(rgbOf(await styleOf(page, '.sc-card', 'background-color')), hexArr(PAPER)),
-    await styleOf(page, '.sc-card', 'background-color'))
-  ck('「搜索笔记」那几个字在纸白面上是墨色',
-    near(rgbOf(await styleOf(page, '.sc-go', 'color')), INK),
-    await styleOf(page, '.sc-go', 'color'))
-  ck('占位符那一档也跟着翻（读的是同一个 --chrome-idle）',
-    near(rgbOf(await styleOf(page, '.sc-input', 'color')), INK),
-    await styleOf(page, '.sc-input', 'color'))
   ck('页头那行大字是纸白',
     near(rgbOf(await styleOf(page, '.page-title', 'color')), hexArr(PAPER), 6),
     await styleOf(page, '.page-title', 'color'))
@@ -163,6 +154,31 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   ck('选中那枚换成纸白',
     near(rgbOf(await styleOf(page, '.chip.active', 'background-color')), hexArr(PAPER)),
     await styleOf(page, '.chip.active', 'background-color'))
+  // ---------- 1b. 搜索条：09-30 v8 起默认不在，点最右那枚圆钮才展开 ----------
+  // 原来这三条是在收起态直接量 .sc-card——那一态现在根本没有这块节点了，
+  // 所以判据挪到"点开之后"，并且补上两态互斥与点空白缩回。
+  const btnRect = (await rects(['.sc-btn']))[0]
+  ck('收起态有那枚圆钮，且和 chip 同一档高度',
+    !!btnRect && Math.abs(btnRect.h - chipH) < 2, btnRect && `钮 ${btnRect.h}｜chip ${chipH}`)
+  ck('收起态量不到搜索条（整个不在树上，不是被藏起来）', (await page.$('.sc-card')) === null)
+  await (await page.$('.sc-btn')).tap()
+  await sleep(1400)
+  ck('点完圆钮分类那一排整个收起（两态互斥，不叠在一起）', (await page.$$('.chip')).length === 0)
+  ck('搜索条翻成纸白那一面',
+    near(rgbOf(await styleOf(page, '.sc-card', 'background-color')), hexArr(PAPER)),
+    await styleOf(page, '.sc-card', 'background-color'))
+  ck('「搜索笔记」那几个字在纸白面上是墨色',
+    near(rgbOf(await styleOf(page, '.sc-go', 'color')), INK),
+    await styleOf(page, '.sc-go', 'color'))
+  ck('输入框那一档也跟着翻（读的是同一个 --chrome-ink）',
+    near(rgbOf(await styleOf(page, '.sc-input', 'color')), INK),
+    await styleOf(page, '.sc-input', 'color'))
+  await mp.screenshot({ path: path.join(OUT, '实测-列表搜索展开态.png') })
+  // 点条以外的空白（这里点页头那行大字，它自己没有任何 tap 处理）→ 缩回
+  await (await page.$('.page-title')).tap()
+  await sleep(1000)
+  ck('点条以外的空白缩回圆钮那一态',
+    (await page.$('.sc-card')) === null && !!(await page.$('.sc-btn')))
   await mp.screenshot({ path: path.join(OUT, '实测-列表头部铺图.png') })
 
   // ---------- ② 旧开关还写在 storage 里：也必须照常铺图 ----------
@@ -180,9 +196,11 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   // 于是 !/has-bg/ 永远成立——原来那条"关掉后容器不再带 has-bg"就是这么假绿的。
   const cls2 = ((await (await page.$('.container')).attribute('class')) || '')
   ck('容器照样带 has-bg', /has-bg/.test(cls2), cls2 || '(class 读成空)')
-  ck('搜索条照旧是纸白那一面（不再退回壁纸派生那支）',
-    near(rgbOf(await styleOf(page, '.sc-card', 'background-color')), hexArr(PAPER)),
-    await styleOf(page, '.sc-card', 'background-color'))
+  // 这一态量的是圆钮（v8 起收起态没有 .sc-card 了）——它和搜索条吃同一条翻色规则，
+  // 所以这一条仍然在钉同一件事：铺图那一态下这块面是纸白，不是壁纸派生那支深色。
+  ck('那枚圆钮照旧是纸白那一面（不再退回壁纸派生那支）',
+    near(rgbOf(await styleOf(page, '.sc-btn', 'background-color')), hexArr(PAPER)),
+    await styleOf(page, '.sc-btn', 'background-color'))
   ck('列表那一层照旧透明（透出底下的图）',
     /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list-layer', 'background-color')),
     await styleOf(page, '.list-layer', 'background-color'))

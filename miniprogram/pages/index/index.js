@@ -31,6 +31,7 @@ Page({
     categories: [],
     loading: true,
     searchKeyword: '',
+    searchOpen: false,
     selectedCategory: null,
     lang: 'zh',
     themeClass: 'theme-default',
@@ -240,6 +241,22 @@ Page({
   onSearchInput(e) {
     this.setData({ searchKeyword: e.detail.value })
   },
+
+  // 搜索条收在分类那一行里（09-30 v8，站长："搜索条目前看起来太大，不美观"）。
+  // 展开时 `focus="{{searchOpen}}"` 直接把键盘带起来；点条子以外的任何空白就收回——
+  // 包括点中某条笔记：那一行该开还是开，条子收起来正好把结果让出来。
+  // 缩回不清词，清词是 ✕ 那一枚的活，两件事不捆在一起。
+  onOpenSearch() {
+    this.setData({ searchOpen: true })
+  },
+
+  onBlankTap() {
+    if (this.data.searchOpen) this.setData({ searchOpen: false })
+  },
+
+  // 挂在展开的条子上专门挡冒泡：条子里头（包括输入框右边那片空白）的点击
+  // 不该被当成"点了条以外的空白"。
+  noop() {},
 
   onSearchConfirm() {
     this._closeFloats()
