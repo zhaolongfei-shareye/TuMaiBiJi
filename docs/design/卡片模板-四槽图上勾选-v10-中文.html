@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 卡片模板四槽与图上勾选 v10（中文 · 2026-09-30）</title>
+<style>
+/* ==================================================================
+   站长 09-30 第二轮原话："设为卡片，设为背景，要把按钮做在原图上，按钮字体可以小点。
+   就是交互流程是，先上传图片，然后用户在图片上勾选为卡片，背景。这样可以节省空间，
+   并且能一目了然，目前那个图片是背景。然后默认，时候，4个空圆框，里面都是➕号，
+   然后点击空槽上传图片。然后，下方的换一张，去掉文字链接去掉。删除，用图片上小垃圾桶icon代替。"
+
+   四屏：
+     ① 默认：四个空圆框，每个里面一个 ➕（还没有任何图）
+     ② 传了两张：第 1 张勾上「背景」、第 2 张勾上「卡片」；每张右上角一枚小垃圾桶
+     ③ 满四张：第 1 张「卡·景」同时勾着，第 2 张只勾「景」，后两张勾了但没派角色
+     ④ 同一屏画两种圆径：左 144、右 124（124 = 现网外观设置那一排小样的宽度），
+        让他挑哪种尺寸下图上那两个芯片还点得动
+
+   这一稿比 v9 少掉的东西（都是他这次点名要撤的）：
+   · 撤「选中即打勾」那一层——每张图自带开关，不需要先选一张再操作，选择态整个不存在了
+   · 撤下方那一行「设为背景 / 设为卡片」胶囊开关
+   · 撤文字链接「换一张」「去掉」；删除改成图上的小垃圾桶
+   · 上限也不用吐司了：只有这四个槽，满了就是满了，"最多 4 张"变成结构本身，
+     不用弹一句"先去掉一张再加"
+
+   口径全从代码侧取，不另造数：
+   · 一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690；px 当 rpx 用，设计宽 750。
+   · 页面底 #f4f2ec、卡片白、描边 rgba(35,37,44,.10) 3px、圆角 --r-card 40、
+     .container 左右 24、.card 内边距 24 32 32 —— 逐字抄 app.wxss / profile.wxss。
+   · 字阶：动作 --fs-body 28/600、说明 --fs-meta 24、图上的芯片用 --fs-micro 18
+     （现网最底一档就是它，app.wxss 里注释写着"只给方块里的日期和小眉标用"——
+     这次多一处用它，就是他要的"按钮字体可以小点"）。
+   · 圆径两个候选：144（4×144 + 3×16 = 624 ≤ 卡内宽 632，四个都放得下、不用滑）
+     与 124（现网 .wp-chip 就是 124，和外观设置那一排同档）。
+   · 垃圾桶、➕、芯片里的勾，全部 CSS 画——这个项目不为一个符号引图标资源（放大镜、
+     把手、母题都是这么画的）。
+   · 屏上每一句现网串：卡片模板（页面标题）/ 名称 / 一句话 / 经典款 / 玉版宣 / 摘句 / 保存。
+     新串（还没进字典，等他认）：卡片、背景、卡·景、"四个位置，先点 ➕ 放一张图进来；
+     勾『背景』的铺在首页，勾『卡片』的画在卡片里。只存在这台手机上，不会上传。"
+   · 第 1 张用的是真素材 miniprogram/assets/home-bg-portrait.jpg（就是他现在那张形象）；
+     其余是 CSS 抽象色块，不拿 AI 图冒充他的照片。
+   ================================================================== */
+  :root{
+    --paper:#F2EFE9; --ink:#23252C; --card:#ffffff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06);
+    --sec:#5C6068; --ter:#9A9EA6;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px;
+    --fs-label:20px; --fs-micro:18px; --r-card:40px; --r-chip:28px; --r-pill:999px; --w-edge:3px;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px;
+    --c-blue:#3F52D6; --c-orange:#E9723D; --c-green:#46A863; --c-purple:#6E4BD0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.5 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:18px;font-size:15px;color:#4a4d55;line-height:1.75}
+  .cap .ttl{display:block;font-size:17px;color:#1d1f24;margin-bottom:6px}
+  .cap .new{color:#B4552A;font-weight:600}
+  .cap .gone{color:#8A8F98;text-decoration:line-through}
+
+  /* ---------- 机框 ---------- */
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    position:relative;box-shadow:0 24px 60px rgba(0,0,0,.18)}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:28px;font-weight:600;color:var(--ink)}
+  .nav{height:90px;display:flex;align-items:center;justify-content:center;position:relative;
+    font-size:32px;font-weight:600;color:var(--ink);background:var(--paper)}
+  .nav .pill{position:absolute;right:26px;top:17px;width:190px;height:56px;border-radius:999px;
+    background:rgba(0,0,0,.10);display:flex;align-items:center;justify-content:center;gap:22px}
+  .nav .pill i{width:34px;height:34px;border-radius:50%;border:3px solid #111;display:block}
+  .nav .pill i.dots::before{content:"";display:block;width:6px;height:6px;border-radius:50%;background:#111;
+    box-shadow:10px 0 0 #111,-10px 0 0 #111;margin:11px auto 0}
+  .view{height:1506px;overflow:hidden;background:var(--paper);padding:2px var(--sp-3) 0;position:relative}
+
+  /* ---------- 卡片容器（抄 app.wxss .card） ---------- */
+  .card{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:var(--sp-3) var(--sp-4) var(--sp-4);margin-bottom:var(--sp-2);position:relative;overflow:hidden}
+  .face-block{display:flex;flex-direction:column;align-items:center;padding-top:var(--sp-4)}
+
+  /* ---------- 四槽 ---------- */
+  .slots{display:flex;gap:var(--sp-2);justify-content:center;width:100%}
+  .slots.tight{gap:var(--sp-1)}
+  .slot{width:144px;flex:none;position:relative}
+  .slots.s124 .slot{width:124px}
+  .disc{position:relative;width:100%;aspect-ratio:1;border-radius:50%;overflow:hidden;
+    background:var(--idle);border:var(--w-edge) solid var(--edge)}
+  .disc img{width:100%;height:100%;object-fit:cover;display:block}
+  .disc.abs{background:var(--c-blue)}
+  .disc.abs2{background:var(--c-orange)}
+  .disc.abs3{background:var(--c-green)}
+  .slot.empty .disc{border:3px dashed rgba(35,37,44,.22);background:transparent;
+    display:flex;align-items:center;justify-content:center}
+  .plus{font-size:56px;font-weight:300;color:var(--ter);line-height:1}
+  .slot.empty .plus{font-size:48px}
+  .slots.s124 .slot.empty .plus{font-size:42px}
+
+  /* 图上那两枚芯片：贴在圆的下沿，一半压在照片上（全压在里面的话，
+     人像的脸下面会糊一片黑底，反而看不清他挑的是哪张） */
+  .chips{position:absolute;left:0;right:0;bottom:-4px;display:flex;gap:4px;justify-content:center}
+  .chip{display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 11px;border-radius:var(--r-pill);
+    font-size:var(--fs-micro);font-weight:700;letter-spacing:.3px;white-space:nowrap;
+    background:rgba(255,255,255,.94);color:var(--sec);border:2px solid rgba(35,37,44,.16)}
+  .chip i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(92,96,104,.45);display:block;flex:none}
+  .chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .chip.on i{border-color:transparent;background:var(--paper);position:relative}
+  .chip.on i::after{content:"";position:absolute;left:3.5px;top:1px;width:4px;height:8px;
+    border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(42deg)}
+  /* 两字版只出现在 ④ 的对比里，用 .wide 临时撑宽，好让他看见为什么会撞 */
+  .chip.wide{padding:0 9px;gap:4px}
+  .chips.wide{gap:4px}
+
+  /* 右上角小垃圾桶：CSS 画，不引图标资源 */
+  .bin{position:absolute;right:2px;top:2px;width:44px;height:44px;border-radius:50%;
+    background:rgba(20,22,26,.72);border:2px solid rgba(255,255,255,.92);
+    display:flex;align-items:center;justify-content:center}
+  /* 提手 + 盖 + 桶身三段分开画：一个 ::after 想同时当盖和提手，出来是一团糊的方块 */
+  .bin span{position:relative;width:18px;height:17px;display:block}
+  .bin span::before{content:"";position:absolute;left:2px;right:2px;top:6px;bottom:0;
+    border:2px solid #fff;border-top:none;border-radius:0 0 4px 4px}
+  .bin span::after{content:"";position:absolute;left:0;right:0;top:4px;height:2px;background:#fff;
+    border-radius:1px;box-shadow:0 -3px 0 0 #fff}
+  .bin span i{position:absolute;left:6px;right:6px;top:-1px;height:2px;background:#fff;border-radius:2px}
+
+  .face-hint{margin-top:var(--sp-4);font-size:var(--fs-meta);line-height:1.6;color:var(--ter);
+    text-align:center;padding:0 8px}
+
+  /* ---------- 名称 / 模板格（现网原样） ---------- */
+  .field{display:flex;flex-direction:column;gap:var(--sp-2)}
+  .field-label{font-size:var(--fs-meta);font-weight:700;color:var(--sec)}
+  .field-input{font-size:var(--fs-title);font-weight:600;color:var(--ink)}
+  .grid-head{margin:var(--sp-4) 0 var(--sp-2);font-size:var(--fs-meta);font-weight:700;color:var(--sec)}
+  .grid{display:flex;gap:var(--sp-3)}
+  .cell{width:320px;padding:var(--sp-2);border-radius:var(--r-card);border:var(--w-edge) solid var(--edge);
+    background:var(--card)}
+  .cell .ph{width:288px;height:300px;border-radius:var(--r-chip);background:linear-gradient(160deg,#F7F4EC,#E9E4D8)}
+  .cell .ph.dark{background:linear-gradient(160deg,#4B5A50,#2E3A33)}
+  .cell-label{display:flex;align-items:center;justify-content:space-between;margin-top:var(--sp-2);
+    font-size:var(--fs-meta);font-weight:600;color:var(--sec)}
+  .cell-on{border-color:var(--ink);box-shadow:0 0 0 3px var(--ink)}
+  .cell-on .cell-label{color:var(--ink)}
+  .cell-on-dot{width:20px;height:20px;border-radius:50%;background:var(--ink)}
+  .save-bar{position:absolute;left:0;right:0;bottom:0;padding:var(--sp-3);background:var(--paper)}
+  .btn-primary{background:var(--ink);color:var(--paper);border-radius:var(--r-pill);font-size:30px;
+    font-weight:700;padding:var(--sp-3) 0;text-align:center}
+
+  /* ---------- ④ 尺寸对比 ---------- */
+  .vs{display:flex;flex-direction:column;gap:var(--sp-4)}
+  .vs .lab{font-size:var(--fs-label);font-weight:700;color:var(--sec);letter-spacing:.5px;text-align:center}
+  .vs .sub{font-size:var(--fs-micro);color:var(--ter);text-align:center;margin-top:2px}
+</style>
+</head>
+<body>
+<h1 style="font-size:22px;margin-bottom:6px">卡片模板 · 四槽 + 图上勾选「卡片 / 背景」· v10</h1>
+<p style="color:#4a4d55;margin-bottom:26px">图麦笔记 · 2026-09-30 · 一屏 750×1690，px 当 rpx 用；口径全部取自 app.wxss / profile.wxss / wallpaper.wxss，未另造数。<b>这一稿只是图，代码一行没动。</b></p>
+
+<div class="row">
+
+  <!-- ================= ① 默认：四个空槽 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>14:30</span><span>图麦笔记 &nbsp;⌁ 5G &nbsp;100%</span></div>
+      <div class="nav">卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block">
+          <div class="slots">
+            <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+            <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+            <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+            <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+          </div>
+          <div class="face-hint">四个位置，先点 ➕ 放一张图进来。<br>图下面两枚小开关：「景」铺在首页，「卡」画在卡片里。</div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input">平安喜乐</span>
+        </div>
+        <div class="card field">
+          <span class="field-label">一句话</span>
+          <span class="field-input">记点有用的，别存一堆</span>
+        </div>
+        <div class="grid-head">经典款</div>
+        <div class="grid">
+          <div class="cell cell-on"><div class="ph"></div><div class="cell-label">玉版宣<span class="cell-on-dot"></span></div></div>
+          <div class="cell"><div class="ph dark"></div><div class="cell-label">摘句</div></div>
+        </div>
+        <div class="save-bar"><div class="btn-primary">保存</div></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>① 默认态：四个空圆框，里面都是 ➕</b></span>
+      还没有任何图时就是这一屏。点哪个空槽，就从相册挑一张放进<b>那个槽</b>——槽的位置固定，
+      不会出现"新图把旧图挤到哪儿去了"。<br>
+      四个槽就是上限，所以<span class="gone">"最多 4 张，先去掉一张再加"那句吐司</span>不需要了：
+      满了就是满了，第五张没有地方点。<br>
+      <span class="new">新串</span>：那句说明（四个位置，先点 ➕ 放一张图进来。勾「背景」的铺在首页，
+      勾「卡片」的画在卡片里。）
+    </div>
+  </div>
+
+  <!-- ================= ② 传了两张 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>14:32</span><span>图麦笔记 &nbsp;⌁ 5G &nbsp;100%</span></div>
+      <div class="nav">卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block">
+          <div class="slots">
+            <div class="slot">
+              <div class="disc"><img src="../../miniprogram/assets/home-bg-portrait.jpg" alt=""></div>
+              <span class="bin"><span><i></i></span></span>
+              <div class="chips"><span class="chip"><i></i>卡</span><span class="chip on"><i></i>景</span></div>
+            </div>
+            <div class="slot">
+              <div class="disc abs"></div>
+              <span class="bin"><span><i></i></span></span>
+              <div class="chips"><span class="chip on"><i></i>卡</span><span class="chip"><i></i>景</span></div>
+            </div>
+            <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+            <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+          </div>
+          <div class="face-hint">四个位置，先点 ➕ 放一张图进来。<br>图下面两枚小开关：「景」铺在首页，「卡」画在卡片里。</div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input">平安喜乐</span>
+        </div>
+        <div class="grid-head">经典款</div>
+        <div class="grid">
+          <div class="cell cell-on"><div class="ph"></div><div class="cell-label">玉版宣<span class="cell-on-dot"></span></div></div>
+          <div class="cell"><div class="ph dark"></div><div class="cell-label">摘句</div></div>
+        </div>
+        <div class="save-bar"><div class="btn-primary">保存</div></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>② 传了两张：一眼看出哪张在当背景</b></span>
+      两枚芯片贴在圆的下沿、一半压在照片上——全压在里面的话，人像的脸下面会糊一片底，
+      反而看不清他挑的是哪张。<span class="new">芯片字用 --fs-micro 18</span>（现网最底那一档），
+      就是他要的"按钮字体可以小点"。<br>
+      <b>一目了然</b>这件事由芯片的亮灭承担：第 1 张「背景」亮 → 首页铺的就是它；
+      第 2 张「卡片」亮 → 卡片里那个圆头像是它。不用点进去试。<br>
+      右上角那枚小垃圾桶 = 删掉这一张（CSS 画的，不引图标资源）。
+      <span class="gone">「换一张」</span><span class="gone">「去掉」</span>两行文字链接按他说的撤了。
+    </div>
+  </div>
+
+  <!-- ================= ③ 满四张 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>14:34</span><span>图麦笔记 &nbsp;⌁ 5G &nbsp;100%</span></div>
+      <div class="nav">卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block">
+          <div class="slots">
+            <div class="slot">
+              <div class="disc"><img src="../../miniprogram/assets/home-bg-portrait.jpg" alt=""></div>
+              <span class="bin"><span><i></i></span></span>
+              <div class="chips"><span class="chip on"><i></i>卡</span><span class="chip on"><i></i>景</span></div>
+            </div>
+            <div class="slot">
+              <div class="disc abs"></div>
+              <span class="bin"><span><i></i></span></span>
+              <div class="chips"><span class="chip"><i></i>卡</span><span class="chip on"><i></i>景</span></div>
+            </div>
+            <div class="slot">
+              <div class="disc abs2"></div>
+              <span class="bin"><span><i></i></span></span>
+              <div class="chips"><span class="chip"><i></i>卡</span><span class="chip"><i></i>景</span></div>
+            </div>
+            <div class="slot">
+              <div class="disc abs3"></div>
+              <span class="bin"><span><i></i></span></span>
+              <div class="chips"><span class="chip"><i></i>卡</span><span class="chip"><i></i>景</span></div>
+            </div>
+          </div>
+          <div class="face-hint">四个位置都放满了。要换一张，先点哪张右上角的垃圾桶删掉。</div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input">平安喜乐</span>
+        </div>
+        <div class="grid-head">经典款</div>
+        <div class="grid">
+          <div class="cell cell-on"><div class="ph"></div><div class="cell-label">玉版宣<span class="cell-on-dot"></span></div></div>
+          <div class="cell"><div class="ph dark"></div><div class="cell-label">摘句</div></div>
+        </div>
+        <div class="save-bar"><div class="btn-primary">保存</div></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>③ 满四张：「同时」和「分别」都在这一屏</b></span>
+      第 1 张两枚芯片都亮 = <b>同时</b>当卡片头像和首页背景（也就是他今天的行为）；
+      第 2 张只亮「背景」= <b>分别</b>。第 3、4 张放了图但还没派角色，两枚都不亮。<br>
+      <b>规则</b>：「卡片」和「背景」各自只有一张能亮——点亮第 3 张的「背景」，
+      第 1 张那枚自己灭掉，不会出现两张抢同一个位置。<br>
+      <span class="new">新串</span>：满四张那句说明换成"四个位置都放满了。要换一张，
+      先点哪张右上角的垃圾桶。"
+    </div>
+  </div>
+
+  <!-- ================= ④ 单字 vs 两字 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>14:38</span><span>图麦笔记 &nbsp;⌁ 5G &nbsp;100%</span></div>
+      <div class="nav">卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block">
+          <div class="vs">
+            <div>
+              <div class="lab">A 芯片写单字「卡」「景」（这一稿用的）</div>
+              <div class="sub">一枚 44 宽、两枚加间距 92，槽与槽之间还剩 52 的空</div>
+              <div class="slots" style="margin-top:16px">
+                <div class="slot">
+                  <div class="disc"><img src="../../miniprogram/assets/home-bg-portrait.jpg" alt=""></div>
+                  <span class="bin"><span><i></i></span></span>
+                  <div class="chips"><span class="chip"><i></i>卡</span><span class="chip on"><i></i>景</span></div>
+                </div>
+                <div class="slot">
+                  <div class="disc abs"></div>
+                  <span class="bin"><span><i></i></span></span>
+                  <div class="chips"><span class="chip on"><i></i>卡</span><span class="chip"><i></i>景</span></div>
+                </div>
+                <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+                <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="lab">B 芯片写两字「卡片」「背景」</div>
+              <div class="sub">一枚 66 宽、两枚 136 ≥ 槽宽 144 → 四槽并排时连成一条，分不清谁是谁</div>
+              <div class="slots tight" style="margin-top:16px">
+                <div class="slot">
+                  <div class="disc"><img src="../../miniprogram/assets/home-bg-portrait.jpg" alt=""></div>
+                  <span class="bin"><span><i></i></span></span>
+                  <div class="chips wide"><span class="chip wide"><i></i>卡片</span><span class="chip wide on"><i></i>背景</span></div>
+                </div>
+                <div class="slot">
+                  <div class="disc abs"></div>
+                  <span class="bin"><span><i></i></span></span>
+                  <div class="chips wide"><span class="chip wide on"><i></i>卡片</span><span class="chip wide"><i></i>背景</span></div>
+                </div>
+                <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+                <div class="slot empty"><div class="disc"><span class="plus">+</span></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="face-hint">图下面两枚小开关：「景」铺在首页，「卡」画在卡片里。<br>
+            这句说明就是给单字版兜底的——第一次用看这句，之后就只认芯片。</div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input">平安喜乐</span>
+        </div>
+        <div class="save-bar"><div class="btn-primary">保存</div></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>④ 芯片上写一个字还是两个字（这一屏要你挑）</b></span>
+      你原话是"勾选为卡片，背景"、"按钮字体可以小点"。字已经下探到现网最底一档
+      <span class="new">--fs-micro 18</span>；但<b>就算只有 18 的字，两枚两字芯片加进圆点也要 136 宽，
+      槽宽只有 144</b> —— 四个槽并排时它们会连成一条，分不清哪两枚属于哪张图（B 那一栏就是那个样子）。<br>
+      所以这一稿画的是单字「卡」「景」，靠卡片里那句说明把全称交代清楚。<b>你要两字，
+      我就得把四个槽改成两行两列</b>（圆径能回到 220 那一档，但这一块会高出 180 左右）。
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:44px;max-width:1500px;font-size:15px;line-height:1.9;color:#3a3d44">
+  <b style="font-size:18px">三处等他拍的，都写在屏下，不替他决定</b><br>
+  <b>A 芯片一个字还是两个字。</b>④ 那一屏两版都画了。单字这一稿能排开；要两字，
+  四个槽就得改成<b>两行两列</b>，圆径可以回到 220 那一档、更好点，代价是这一块高出 180 左右，
+  名称与模板格要往下挪。<br>
+  <b>B 点垃圾桶要不要二次确认。</b>这一稿画的是<b>直接删</b>（图只存在这台手机上，删了从相册再挑一张就行，
+  不是不可逆的数据）。但它要是正好在当首页背景，删掉的一瞬间首页会跳回包里那张默认图——
+  觉得这个跳变该问一句，我就加一道确认。<br>
+  <b>C 删掉一张之后，它占的角色要不要自动挪给别的张。</b>建议<b>不挪</b>：没人勾「景」时首页落回
+  包里那张默认图（poster.js 里 HOME_BG_DEFAULT 现成的），没人勾「卡」时海报不画头像
+  （引擎本来就有这一支，杂志封面那套退成占位字「麦」）。自动补位会出现"我没点它怎么换了"。<br>
+  <b>圆径这一稿定 144</b>（4×144 + 3×16 = 624 ≤ 卡内宽 632，四个正好排满、不用滑）。
+  没沿用现网外观设置那一排的 124，是因为 124 上还要压两枚芯片，字只能到 16、高只剩 26，
+  低于小程序建议的点击尺寸，真机会误触到旁边那枚。<br>
+  <b>已经按你原话钉死、不在这轮讨论里：</b>四个空圆框 + ➕；点空槽上传；勾选做到图上、字变小；
+  撤掉「换一张」「去掉」两行文字链接；删除改成图上的小垃圾桶；
+  上限由"只有四个槽"这件事本身保证，不再弹吐司。<b>代码一行没动</b>——这一稿只是图。
+</div>
+</body>
+</html>
