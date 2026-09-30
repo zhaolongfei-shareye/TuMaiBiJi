@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 方向 F：D 那版（深色荧光）的右半空白区填上三步操作指引。
+   同样：「URL链接 / 拍照或截图 / 亲自撰写」逐字取自现网字典；渠道那一排是新串。 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; height: 1024px; overflow: hidden; }
+.card { position: relative; width: 1280px; height: 1024px; overflow: hidden;
+  background: radial-gradient(120% 90% at 78% 8%, #241A45 0%, #14161A 52%, #0C0D11 100%);
+  font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif; color: #F2EFE9; }
+.glow { position: absolute; width: 620px; height: 620px; border-radius: 50%; filter: blur(90px); }
+.g1 { left: -220px; bottom: -260px; background: #6E4BD0; opacity: .5; }
+.g2 { right: -180px; top: -180px; background: #3F52D6; opacity: .42; }
+.g3 { right: 60px; bottom: -260px; background: #E9723D; opacity: .3; }
+
+.brand { position: absolute; left: 80px; top: 74px; display: flex; align-items: center; gap: 18px; z-index: 3; }
+.brand img { width: 54px; height: 54px; }
+.brand span { font-size: 32px; font-weight: 600; letter-spacing: 3px; }
+.h1 { position: absolute; left: 80px; top: 216px; width: 560px; font-size: 92px; line-height: 1.14;
+  font-weight: 700; letter-spacing: -2px; z-index: 3;
+  background: linear-gradient(180deg, #F6C445 0%, #E9723D 46%, #B98CFF 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.chan { position: absolute; left: 80px; top: 660px; width: 600px; z-index: 3; }
+.chan .lb { font-size: 23px; letter-spacing: 2px; color: rgba(242,239,233,.55); margin-bottom: 14px; }
+.chan .row { display: flex; flex-wrap: wrap; gap: 10px; }
+.chan .c { padding: 11px 22px; border-radius: 999px; font-size: 24px; font-weight: 600;
+  border: 2px solid rgba(242,239,233,.26); color: #F2EFE9; }
+.foot { position: absolute; left: 80px; bottom: 60px; z-index: 3; font-size: 25px; color: rgba(242,239,233,.6); }
+.foot b { color: #F6C445; font-weight: 600; }
+
+.steps { position: absolute; right: 76px; top: 190px; width: 500px; z-index: 3; }
+.steps .hd { font-size: 24px; letter-spacing: 4px; color: rgba(242,239,233,.5); margin-bottom: 26px; }
+.st { display: flex; gap: 20px; padding: 26px 0; border-top: 2px solid rgba(242,239,233,.14); }
+.st:last-child { border-bottom: 2px solid rgba(242,239,233,.14); }
+.st .n { flex: none; width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center;
+  justify-content: center; font-size: 28px; font-weight: 700; color: #14161A; }
+.st.a .n { background: #F6C445; } .st.b .n { background: #E9723D; color: #fff; } .st.c .n { background: #46A863; color: #fff; }
+.st .t { font-size: 32px; font-weight: 700; line-height: 1.3; }
+.st .d { margin-top: 8px; font-size: 23px; line-height: 1.6; color: rgba(242,239,233,.72); }
+.st .d em { font-style: normal; font-weight: 600; color: #F2EFE9; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="glow g2"></div><div class="glow g1"></div><div class="glow g3"></div>
+  <div class="brand"><img src="/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/logo.png" alt=""><span>图麦笔记</span></div>
+  <div class="h1">把图文<br>提炼成<br>有用的知识</div>
+  <div class="chan">
+    <div class="lb">这些地方看到的，都能存进来</div>
+    <div class="row"><div class="c">公众号</div><div class="c">小红书</div><div class="c">微博</div><div class="c">知乎</div></div>
+  </div>
+  <div class="foot">微信搜「图麦笔记」 · 零广告 · 不埋点 · <b>免费不限量</b></div>
+
+  <div class="steps">
+    <div class="hd">三步用起来</div>
+    <div class="st a"><div class="n">1</div><div><div class="t">丢进来</div>
+      <div class="d"><em>URL链接</em>粘贴、<em>拍照或截图</em>、<em>亲自撰写</em></div></div></div>
+    <div class="st b"><div class="n">2</div><div><div class="t">AI 提炼</div>
+      <div class="d">图里的字也读得懂，出<em>摘要、要点、标签</em></div></div></div>
+    <div class="st c"><div class="n">3</div><div><div class="t">存下来用</div>
+      <div class="d">按主题归类，<em>关键词</em>搜得回来；还能出卡片图存进相册</div></div></div>
+  </div>
+</div>
+</body>
+</html>

@@ -5,7 +5,7 @@
 <style>
 /* 四张方向图放一起挑。每张原图都是 1280×1024（微信分享封面 5:4），这里缩到 620 宽看版式。 */
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { width: 1340px; height: 1500px; background: #E7E3DA; font-family: 'PingFang SC', sans-serif; color: #14161A; padding: 40px; }
+body { width: 1340px; height: 2260px; background: #E7E3DA; font-family: 'PingFang SC', sans-serif; color: #14161A; padding: 40px; }
 .hd { font-size: 34px; font-weight: 700; margin-bottom: 8px; }
 .sub { font-size: 22px; color: #5C6068; line-height: 1.7; margin-bottom: 26px; }
 .grid { display: grid; grid-template-columns: 620px 620px; gap: 26px 40px; }
@@ -15,16 +15,19 @@ body { width: 1340px; height: 1500px; background: #E7E3DA; font-family: 'PingFan
 </style>
 </head>
 <body>
-<div class="hd">分享封面重设计 · 四个方向（每张都是 1280×1024，微信 5:4）</div>
-<div class="sub">
-  四张共用同一句应用标题「图麦笔记 | 把图文提炼成有用的知识」；色值全部取自 <code>utils/palette.js</code> 的五枚高饱和色 + 官网 <code>site.css</code> 的米白/墨/陶土；人像那张用的是官网 <code>/assets/screens/person.jpg</code>（和小程序首页同一张形象图）。<br>
-  现网那张 49.7 KB，微信上限 128 KB —— 四张里只有带照片和深色渐变的会到 600–700 KB，定稿后我会压到 128 KB 以内再入库。
+<div class="hd">分享封面重设计 · 六个方向（每张都是 1280×1024，微信 5:4）</div>
+<div class="sub" style="margin-bottom:22px">
+  六张共用同一句应用标题「图麦笔记 | 把图文提炼成有用的知识」；色值全部取自 <code>utils/palette.js</code> 的五枚高饱和色 + 官网 <code>site.css</code> 的米白/墨/陶土；人像那张用的是官网 <code>/assets/screens/person.jpg</code>（和小程序首页同一张形象图）。<br>
+  E、F 用的是同一套三步文案：第 1 步里的「URL链接 / 拍照或截图 / 亲自撰写」逐字取自现网字典，渠道那一排（公众号·小红书·微博·知乎）是新串、界面里没有。<br>
+  现网那张 49.7 KB，微信上限 128 KB —— 带照片和深色渐变那几张现在 600–700 KB，定稿后我会压到 128 KB 以内再入库。
 </div>
 <div class="grid">
   <div class="cell"><img src="方向A-人像与左大字.png" alt=""><div class="cap">A 人像压右、左侧大字 <span>· 信息流里最抓眼（有真人脸），也最像"有人在用"</span></div></div>
   <div class="cell"><img src="方向B-四色风车主体.png" alt=""><div class="cap">B 四色风车当主体 <span>· 不放照片，直接放大 LOGO 那四枚色，最贴品牌本身</span></div></div>
   <div class="cell"><img src="方向C-提炼前后对照.png" alt=""><div class="cap">C 提炼前后对照 <span>· 一眼看懂产品干什么：左边一叠原文，右边一条干净笔记</span></div></div>
   <div class="cell"><img src="方向D-深色荧光渐变.png" alt=""><div class="cap">D 深色 + 荧光渐变 <span>· 走海报十套里「荧光渐变」那套的气质，暗底最跳</span></div></div>
+  <div class="cell"><img src="方向E-风车加三步指引.png" alt=""><div class="cap">E 风车 + 三步指引 <span>· B 的空白区填上分步操作说明和渠道那一排</span></div></div>
+  <div class="cell"><img src="方向F-深色加三步指引.png" alt=""><div class="cap">F 深色 + 三步指引 <span>· D 的右半空白区填上同一套三步说明</span></div></div>
 </div>
 </body>
 </html>

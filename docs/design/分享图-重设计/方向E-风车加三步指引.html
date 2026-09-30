@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 方向 E：B 那版（四色风车）的空白区填上三步操作指引。
+   文案里「URL链接 / 拍照或截图 / 亲自撰写」是现网字典 importUrl·importScreenshot·writeNote 三个叫法，逐字照抄；
+   渠道那一排（公众号/小红书/微博/知乎）是新串——界面里没有，等站长认。 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; height: 1024px; overflow: hidden; }
+.card { position: relative; width: 1280px; height: 1024px; background: #F2EFE9;
+  font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif; color: #14161A; }
+
+/* 风车缩到右下角，给右上让出指引的位置 */
+.wheel { position: absolute; right: -210px; bottom: -210px; width: 560px; height: 560px; border-radius: 50%;
+  background: conic-gradient(#3F52D6 0 90deg, #46A863 90deg 180deg, #E9723D 180deg 270deg, #6E4BD0 270deg 360deg); }
+.wheel::after { content: ''; position: absolute; inset: 200px; border-radius: 50%; background: #F2EFE9; }
+.sheet { position: absolute; right: 96px; bottom: 96px; width: 190px; height: 190px; background: #fff;
+  border-radius: 30px; box-shadow: 0 20px 46px rgba(20,22,26,.16); padding: 30px 26px; }
+.sheet .ln { height: 10px; border-radius: 999px; background: #C9CBD1; margin-bottom: 14px; }
+.sheet .ln.s { width: 60%; }
+.sheet .tick { position: absolute; right: 24px; bottom: 20px; font-size: 30px; font-weight: 700; }
+
+.brand { position: absolute; left: 80px; top: 66px; display: flex; align-items: center; gap: 16px; }
+.brand img { width: 50px; height: 50px; }
+.brand span { font-size: 32px; font-weight: 600; letter-spacing: 2px; }
+.h1 { position: absolute; left: 80px; top: 190px; width: 620px; font-size: 96px; line-height: 1.14;
+  font-weight: 700; letter-spacing: -2px; }
+.h1 .k1 { color: #3F52D6; } .h1 .k2 { color: #E9723D; }
+
+.chan { position: absolute; left: 80px; top: 560px; width: 660px; }
+.chan .lb { font-size: 24px; color: #9A9EA6; letter-spacing: 2px; margin-bottom: 14px; }
+.chan .row { display: flex; flex-wrap: wrap; gap: 12px; }
+.chan .c { padding: 12px 24px; border-radius: 999px; font-size: 25px; font-weight: 600; background: #fff;
+  border: 3px solid rgba(20,22,26,.12); }
+.foot { position: absolute; left: 80px; bottom: 62px; font-size: 26px; color: #14161A; font-weight: 600; }
+.foot b { color: #D2683F; }
+
+/* 右列：三步 */
+.steps { position: absolute; right: 76px; top: 176px; width: 500px; }
+.steps .hd { font-size: 26px; letter-spacing: 3px; color: #9A9EA6; margin-bottom: 22px; }
+.st { display: flex; gap: 20px; margin-bottom: 26px; }
+.st .n { flex: none; width: 56px; height: 56px; border-radius: 18px; color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 700; }
+.st.a .n { background: #3F52D6; } .st.b .n { background: #E9723D; } .st.c .n { background: #46A863; }
+.st .t { font-size: 33px; font-weight: 700; line-height: 1.3; }
+.st .d { margin-top: 8px; font-size: 24px; line-height: 1.55; color: #5C6068; }
+.st .d em { font-style: normal; font-weight: 600; color: #14161A; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="wheel"></div>
+  <div class="sheet"><div class="ln"></div><div class="ln"></div><div class="ln s"></div><div class="tick">✓</div></div>
+
+  <div class="brand">
+    <img src="/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/logo.png" alt=""><span>图麦笔记</span>
+  </div>
+  <div class="h1">把<span class="k1">图文</span><br>提炼成<br><span class="k2">有用的知识</span></div>
+  <div class="chan">
+    <div class="lb">这些地方看到的，都能存进来</div>
+    <div class="row"><div class="c">公众号</div><div class="c">小红书</div><div class="c">微博</div><div class="c">知乎</div></div>
+  </div>
+  <div class="foot">微信搜「图麦笔记」 · 零广告 · 不埋点 · <b>免费不限量</b></div>
+
+  <div class="steps">
+    <div class="hd">三步用起来</div>
+    <div class="st a"><div class="n">1</div><div><div class="t">丢进来</div>
+      <div class="d"><em>URL链接</em>粘贴、<em>拍照或截图</em>、<em>亲自撰写</em></div></div></div>
+    <div class="st b"><div class="n">2</div><div><div class="t">AI 提炼</div>
+      <div class="d">图里的字也读得懂，出<em>摘要、要点、标签</em></div></div></div>
+    <div class="st c"><div class="n">3</div><div><div class="t">存下来用</div>
+      <div class="d">按主题归类，<em>关键词</em>搜得回来；还能出卡片图存进相册</div></div></div>
+  </div>
+</div>
+</body>
+</html>
