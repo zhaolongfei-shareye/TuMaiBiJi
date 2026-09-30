@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 方向 A：官网那张形象图压右半屏，左半屏留给大字。
+   色值全部取自 utils/palette.js 的 TONES 与官网 site.css 的 --paper/--ink/--clay。 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; height: 1024px; overflow: hidden; }
+.card {
+  position: relative; width: 1280px; height: 1024px; background: #F2EFE9;
+  font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif; color: #14161A;
+}
+.photo { position: absolute; right: 0; top: 0; width: 560px; height: 1024px; overflow: hidden; }
+.photo img { width: 560px; height: 914px; object-fit: cover; object-position: 50% 12%; }
+/* 照片左边缘洗进米白，不让它像贴上去的一块 */
+.fade { position: absolute; right: 400px; top: 0; width: 200px; height: 1024px;
+  background: linear-gradient(90deg, #F2EFE9 0%, rgba(242,239,233,0) 100%); }
+.brand { position: absolute; left: 84px; top: 78px; display: flex; align-items: center; gap: 18px; }
+.brand img { width: 56px; height: 56px; }
+.brand span { font-size: 34px; font-weight: 600; letter-spacing: 2px; }
+.h1 { position: absolute; left: 84px; top: 258px; width: 700px; font-size: 104px; line-height: 1.16;
+  font-weight: 700; letter-spacing: -1px; color: #3F52D6; }
+.h1 em { font-style: normal; color: #14161A; }
+.chips { position: absolute; left: 84px; top: 668px; display: flex; gap: 16px; }
+.chip { height: 62px; padding: 0 30px; border-radius: 999px; font-size: 30px; font-weight: 600;
+  display: flex; align-items: center; }
+.chip.a { background: #F6C445; color: #2A2005; }
+.chip.b { background: #46A863; color: #06260F; }
+.chip.c { background: #6E4BD0; color: #FFFFFF; }
+.foot { position: absolute; left: 84px; bottom: 74px; width: 700px; }
+.foot .l1 { font-size: 32px; font-weight: 600; color: #14161A; }
+.foot .l2 { margin-top: 12px; font-size: 26px; color: #5C6068; letter-spacing: 1px; }
+.foot .l2 b { font-weight: 600; color: #D2683F; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="photo"><img src="../分享图素材-官网/person.jpg" alt=""></div>
+  <div class="fade"></div>
+  <div class="brand">
+    <img src="/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/logo.png" alt="">
+    <span>图麦笔记</span>
+  </div>
+  <div class="h1">把<em>图文</em><br>提炼成<br>有用的知识</div>
+  <div class="chips"><div class="chip a">摘要</div><div class="chip b">要点</div><div class="chip c">标签</div></div>
+  <div class="foot">
+    <div class="l1">链接、截图、随手一句话，丢进来就是笔记</div>
+    <div class="l2">微信搜「图麦笔记」 · 零广告 · 不埋点 · <b>免费不限量</b></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 方向 D：深色 + 荧光渐变标题，走海报十套里「荧光渐变」那套个性款的气质。
+   四个色相仍是 palette.js 的紫/蓝/橙 + 草绿，只是搬到暗底上发光。 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; height: 1024px; overflow: hidden; }
+.card { position: relative; width: 1280px; height: 1024px; overflow: hidden;
+  background: radial-gradient(120% 90% at 78% 8%, #241A45 0%, #14161A 52%, #0C0D11 100%);
+  font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif; color: #F2EFE9; }
+.glow { position: absolute; width: 620px; height: 620px; border-radius: 50%; filter: blur(90px); opacity: .55; }
+.g1 { left: -180px; bottom: -220px; background: #6E4BD0; }
+.g2 { right: -140px; bottom: -60px; background: #E9723D; opacity: .38; }
+.g3 { right: 180px; top: -240px; background: #3F52D6; opacity: .5; }
+.brand { position: absolute; left: 92px; top: 88px; display: flex; align-items: center; gap: 18px; z-index: 3; }
+.brand img { width: 56px; height: 56px; }
+.brand span { font-size: 33px; font-weight: 600; letter-spacing: 3px; color: #F2EFE9; }
+.h1 { position: absolute; left: 92px; top: 252px; width: 1100px; font-size: 104px; line-height: 1.14;
+  font-weight: 700; letter-spacing: -2px; z-index: 3;
+  background: linear-gradient(96deg, #F6C445 0%, #E9723D 34%, #B98CFF 68%, #4ED0C9 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.sub { position: absolute; left: 92px; top: 626px; font-size: 36px; line-height: 1.55; color: rgba(242,239,233,.82); z-index: 3; }
+.trace { position: absolute; left: 92px; top: 786px; display: flex; align-items: center; gap: 18px; z-index: 3; }
+.trace .nd { padding: 14px 28px; border-radius: 999px; border: 2px solid rgba(242,239,233,.28);
+  font-size: 28px; color: #F2EFE9; }
+.trace .nd.on { border-color: #F6C445; color: #F6C445; }
+.trace .ar { font-size: 30px; color: rgba(242,239,233,.5); }
+.foot { position: absolute; left: 92px; bottom: 82px; z-index: 3; font-size: 27px; letter-spacing: 1px;
+  color: rgba(242,239,233,.62); }
+.foot b { color: #F6C445; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="glow g3"></div><div class="glow g1"></div><div class="glow g2"></div>
+  <div class="brand">
+    <img src="/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/logo.png" alt=""><span>图麦笔记</span>
+  </div>
+  <div class="h1">把图文<br>提炼成<br>有用的知识</div>
+  <div class="sub">刷到的文章、拍下的截图、随手一句话<br>两三下就存成一条笔记，以后按关键词搜得回来</div>
+  <div class="trace">
+    <div class="nd">链接</div><div class="ar">→</div>
+    <div class="nd">截图</div><div class="ar">→</div>
+    <div class="nd on">摘要 · 要点 · 标签</div>
+  </div>
+  <div class="foot">微信搜「图麦笔记」 · 零广告 · 不埋点 · <b>免费不限量</b></div>
+</div>
+</body>
+</html>
