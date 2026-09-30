@@ -36,7 +36,11 @@ const readLocal = (mp) => mp.evaluate(() => wx.getStorageSync('localWallpaper') 
   const start = await page.data()
   const startLocal = await readLocal(mp)
   const chips = await page.$$('.wp-chip')
-  ck('条子里是八枚', chips.length === 8, `${chips.length} 枚`)
+  // 09-30 深色那两枚（夜紫 / 深海）整条链路屏蔽，条子里只剩六枚。理由见 app.js 的 getWallpaper。
+  ck('条子里是六枚', chips.length === 6, `${chips.length} 枚`)
+  ck('深色那两枚不在条子里',
+    !(start.wallpapers || []).some((x) => /purple|ocean/.test(x.key)),
+    (start.wallpapers || []).map((x) => x.key).join(','))
   ck('上面有一块手机预览', (await page.$$('.stage')).length === 1)
   ck('预览里画了四行笔记', (await page.$$('.mock-row')).length === 4)
   await mp.screenshot({ path: `${OUT}/实测-进页.png` })
@@ -77,6 +81,24 @@ const readLocal = (mp) => mp.evaluate(() => wx.getStorageSync('localWallpaper') 
   await sleep(1200)
   const p3 = await page.data()
   ck('重复点同一枚不再走一次换壁纸', p3.currentWallpaper === targetKey && p3.applying === false)
+
+  // ④ 已经存过深色的人要能自愈。站长真机现在就是夜紫——只把两枚从条子里拿掉、
+  // 不迁偏好，他扫新码进来还是那张透明的卡，所以这条必须真量：
+  // 本机硬写 gradient-purple，重进这一页，在用的那枚得是米白。
+  await mp.evaluate(() => wx.setStorageSync('localWallpaper', 'gradient-purple'))
+  for (let i = 0; i < 4; i++) {
+    try { page = await mp.reLaunch('/pages/wallpaper/wallpaper'); break } catch (e) { await sleep(8000) }
+  }
+  await sleep(4000)
+  const p4 = await page.data()
+  ck('本机存着夜紫，进页读到的在用壁纸落回米白', p4.currentWallpaper === 'default', p4.currentWallpaper)
+  ck('本页主题类名也不再是 theme-purple', !/theme-purple/.test(p4.themeClass || ''), p4.themeClass)
+  ck('条子里仍是六枚（屏蔽不是把格子画空）', (await page.$$('.wp-chip')).length === 6)
+  await mp.screenshot({ path: `${OUT}/实测-深色已屏蔽.png` })
+  await mp.evaluate((raw) => {
+    if (raw) wx.setStorageSync('localWallpaper', raw)
+    else wx.removeStorageSync('localWallpaper')
+  }, startLocal)
 
   // 还原：把进来时那枚点回去，别把模拟器的偏好留在试看态
   const idx = (p2.wallpapers || []).findIndex((x) => x.key === start.currentWallpaper)

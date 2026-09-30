@@ -77,8 +77,11 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
   // 这台机型的 rpx→px 比例（1rpx = windowWidth/750），几何断言全按它换算
   const R = (await mp.evaluate(() => wx.getSystemInfoSync().windowWidth)) / 750
 
-  // 两枚代表：浅壁纸走浅档（点留原色、字压白卡按 5），深壁纸走深档（点与字同值、按 7、未分类换空心环）
-  for (const w of ['default', 'gradient-purple']) {
+  // 两枚代表：米白是"只换页面底"那一族，天青是"整套色阶"那一族（方块、卡、按钮一起收进一支色相）。
+  // 原来第二枚是夜紫——09-30 深色那两枚整条链路屏蔽了（列表永远铺背景图，而深色卡底是 5% 白薄膜，
+  // 贴在照片上等于没有），页面上再也走不到那一档，拿它当代表就是拿一个渲染不出来的状态做判据。
+  // 深色那两档的取色规则仍然由静态尺子 验-色板零回归.js 直接调 palette 函数钉着。
+  for (const w of ['default', 'tint-celadon']) {
     const label = p.themeOf(w).label
     const chrome = p.chromeOf(w)
     await mp.evaluate((key) => wx.setStorageSync('localWallpaper', key), w)

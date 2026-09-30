@@ -128,11 +128,17 @@ App({
   /**
    * 当前该用哪套壁纸：本机那份优先，没有才用服务端的。
    * @param fromServer 登录接口返回的原值，只在 _doLogin 那一步传进来
+   *
+   * 深色那两枚（夜紫 / 深海）09-30 起整条链路屏蔽：这一屏永远铺背景图，而深色主题的
+   * 卡底是 rgba(255,255,255,.05) 那层薄膜——贴在纯色页底上读得出"一张卡"，贴在照片上就
+   * 等于没有，展开那行的概要字还硬写着 #5c6068，站长真机反馈"卡片是透明的、完全看不清"。
+   * 为了赶上线先做减法：选择条里不再出现（见 wallpaper.js），已经存过深色的人在这里
+   * 落回米白。判据只看 palette 里那个 `dark` 标记，别再各处抄一份 key 清单。
    */
   getWallpaper(fromServer) {
     const local = wx.getStorageSync(LOCAL_WALLPAPER_KEY)
-    if (local) return local
-    return fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper) || 'default'
+    const wanted = local || fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper) || 'default'
+    return themeOf(wanted).dark ? 'default' : wanted
   },
 
   /**

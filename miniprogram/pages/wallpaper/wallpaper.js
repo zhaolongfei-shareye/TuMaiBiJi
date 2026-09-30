@@ -80,17 +80,24 @@ Page({
       // （从别处切回这一页时，条子该停在"在用那一枚"，不是停在用户上次滑走的位置）。
       intoView: '',
       ...this.previewState(current, current),
-      wallpapers: THEMES.map((theme, i) => ({
-        key: theme.key,
-        label: theme.label,
-        active: theme.key === current,
-        stack: [toneColor(i, theme.key), toneColor(i + 1, theme.key)],
-        // 主题在 CSS 里是类名，但每一格画的是"另一套主题"，拿不到当前主题的变量，
-        // 底、描边、勾的颜色都得由 JS 带进行内。--wp-opp 是勾里的字，要和勾本身反色。
-        itemStyle:
-          `background:${theme.page};--wp-label:${inkOf(theme)};` +
-          `--wp-opp:${theme.page};--wp-edge:${edgeOf(theme)}`,
-      })),
+      // 深色那两枚（夜紫 / 深海）不再出现在条子里，09-30 屏蔽，理由见 app.js 里
+      // getWallpaper 那段注释。先按原下标算色块、再滤，顺序不能反：那一格里的两枚小色块
+      // 吃的是 THEMES 里的下标（toneColor(i)），先滤掉会让象牙/天青从第 7、8 档跳到第 5、6 档，
+      // 那是另一件事，不该被这次屏蔽顺手改掉。
+      wallpapers: THEMES
+        .map((theme, i) => ({ theme, i }))
+        .filter(({ theme }) => !theme.dark)
+        .map(({ theme, i }) => ({
+          key: theme.key,
+          label: theme.label,
+          active: theme.key === current,
+          stack: [toneColor(i, theme.key), toneColor(i + 1, theme.key)],
+          // 主题在 CSS 里是类名，但每一格画的是"另一套主题"，拿不到当前主题的变量，
+          // 底、描边、勾的颜色都得由 JS 带进行内。--wp-opp 是勾里的字，要和勾本身反色。
+          itemStyle:
+            `background:${theme.page};--wp-label:${inkOf(theme)};` +
+            `--wp-opp:${theme.page};--wp-edge:${edgeOf(theme)}`,
+        })),
     })
     // 条子进来先滚到"在用的那一枚"：不带色阶那六枚排在前面，在用的若是最后两枚，
     // 不滚过去就看不见，会以为没存上。scroll-into-view 要等节点建好，同一批 setData 里给不生效。

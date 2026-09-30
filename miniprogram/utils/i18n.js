@@ -264,7 +264,7 @@ const i18n = {
     wallpaperSubHint: 'The two ramped wallpapers also recolour the block beside each note; the other six only change the page',
     stageHintIdle: 'Tap a swatch below to preview — nothing changes yet',
     stageHintPreview: 'Looks right? Tap the phone above to apply it',
-    stripHint: 'Swipe for all eight',
+    stripHint: 'Swipe to pick one',
     inUse: 'In use',
     sameWallpaper: 'This one is already applied',
     language: 'Language',
