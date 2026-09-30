@@ -618,9 +618,11 @@
   box-sizing: border-box;
 }
 
+/* 宽高都由 js 按海报自己的比例算好写进 style，所以这里两件事都不能做：
+   flex-shrink（默认是 1）会把这一格压回可视框，max-height 同理——压的是高、宽留着，
+   卡片就扁了。09-30 站长真机截图打回的就是这个。 */
 .tpl-poster {
-  max-width: 100%;
-  max-height: 100%;
+  flex: none;
   border-radius: 20rpx;
   box-shadow: 0 12rpx 30rpx rgba(8, 10, 14, 0.18);
 }

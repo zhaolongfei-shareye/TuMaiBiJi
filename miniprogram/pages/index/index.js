@@ -58,6 +58,9 @@ Page({
     posterImagePath: '',
     posterW: 750,
     posterH: 900,
+    // 藏起来的画布那一格：永远等于海报本身，不跟着弹窗的展示框走
+    canvasW: poster.W,
+    canvasH: 750,
     posterBusy: false,
     // 弹窗里那个二维码开关：只影响这一张成品图，与海报页同一条语义
     noQr: false,
@@ -516,6 +519,19 @@ Page({
     })
   },
 
+  // 弹窗里那一格实际能给多大，只有量了才知道：十套模板的 plan.height 各不相同，
+  // 而浮窗是 top 130 / bottom 152 跟着屏高走的，同一套模板在不同机型上可视高也不一样。
+  // boundingClientRect 回的是 px，而样式里写的是 rpx，所以拿 windowWidth 换算一次。
+  async _tplBoxRpx() {
+    const rect = await new Promise((resolve) => {
+      wx.createSelectorQuery().select('.tpl-body').boundingClientRect((r) => resolve(r)).exec()
+    })
+    if (!rect || !rect.width || !rect.height) return null
+    const toRpx = (px) => px * 750 / wx.getWindowInfo().windowWidth
+    // 左右各 24rpx 的 padding，和下面那条"左右滑换模板"的提示（12 上间距 + 22 字高）
+    return { w: Math.round(toRpx(rect.width)) - 48, h: Math.round(toRpx(rect.height)) - 34 }
+  },
+
   // 与 share.js render() 同一套：先量后画、canvas 尺寸切两次、paintLayers 落笔、canvasToTempFilePath 出成品。
   // 画布藏在 left:-9999rpx 位置、不进 fixed，弹窗里只放成品 <image>——绕开 canvas-in-fixed 那条历史坑。
   async _renderPoster() {
@@ -533,13 +549,19 @@ Page({
     const plan = poster.planPoster(ctx, a.note, this.data.posterTpl, profile, lang, { showQr: !this.data.noQr })
     canvas.width = plan.width
     canvas.height = plan.height
+    // 画布那一格永远等于海报本身，不跟着展示框走：出的是 750 宽的成品，
+    // 而不是"缩到弹窗里那么大"的一张。
+    this.setData({ canvasW: plan.width, canvasH: plan.height })
     poster.paintLayers(ctx, plan.layers, images)
-    // 让图片在弹窗里等比缩到可视框（长图不能超过屏高）
-    const scale = Math.min(1, 1200 / plan.height)
-    this.setData({
-      posterW: Math.round(plan.width * scale),
-      posterH: Math.round(plan.height * scale),
-    })
+    // 展示框按海报自己的比例算，宽和高吃同一个 scale——分开定就会变形。
+    const box = await this._tplBoxRpx()
+    if (box) {
+      const scale = Math.min(1, box.w / plan.width, box.h / plan.height)
+      this.setData({
+        posterW: Math.round(plan.width * scale),
+        posterH: Math.round(plan.height * scale),
+      })
+    }
     const tmpPath = await new Promise((resolve, reject) => {
       wx.canvasToTempFilePath({ canvas, fileType: 'png', success: (r) => resolve(r.tempFilePath), fail: reject }, this)
     })

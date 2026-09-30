@@ -185,7 +185,7 @@
 
   <!-- v7：海报画布藏在屏幕外、不进 fixed——这条是历史坑（fixed 里的原生 canvas 会整体错位）。
        弹窗里显示的是 canvasToTempFilePath 出的成品 <image>，image 进 fixed 是常规做法。 -->
-  <canvas id="posterCanvas" type="2d" class="poster-canvas-offscreen" style="width: {{posterW}}rpx; height: {{posterH}}rpx"></canvas>
+  <canvas id="posterCanvas" type="2d" class="poster-canvas-offscreen" style="width: {{canvasW}}rpx; height: {{canvasH}}rpx"></canvas>
 
   <!-- v7 ④⑤：模板独浮弹窗——拉弹窗时详情窗整个藏起来，页面上只剩这一个浮层，
        背后什么都不垫。取消 / 保存成功 / 点把手三个口收掉弹窗后回到详情窗那一屏（不是回列表）。 -->
@@ -196,7 +196,7 @@
       <text class="grip-tx">{{t.grip}}</text>
     </view>
     <view class="tpl-body" bindtouchstart="onPosterTouchStart" bindtouchend="onPosterTouchEnd">
-      <image wx:if="{{posterImagePath}}" class="tpl-poster" src="{{posterImagePath}}" mode="widthFix" style="width: {{posterW}}rpx" />
+      <image wx:if="{{posterImagePath}}" class="tpl-poster" src="{{posterImagePath}}" mode="aspectFit" style="width: {{posterW}}rpx; height: {{posterH}}rpx" />
       <view wx:else class="tpl-loading">{{t.loading}}</view>
       <view class="tpl-swipe-hint">{{t.swipeHint}}</view>
     </view>
