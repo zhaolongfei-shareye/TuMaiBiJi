@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 卡片模板四槽 v11：加小标题 + 精简说明（中文 · 2026-09-30）</title>
+<style>
+/* ==================================================================
+   站长 09-30 晚原话："功能可以，但下方的文字太啰嗦，要精简。然后四个圈上面要加个
+   小标题。配图。"
+
+   三屏：
+     ① 现状：代码里就是这两句（说明 57 字，四个圈上面什么都没有）
+     ② 方案 A：小标题「形象图」纯文字（吃现网 .grid-head 那一档）+ 说明压到 24 字
+     ③ 方案 B：同 A，但小标题左边带一枚 CSS 画的小标记，说明换成另一种写法（20 字）
+
+   口径全从代码侧取，不另造数：
+   · 一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690；px 当 rpx 用，设计宽 750。
+   · 页面底 #f4f2ec、卡片白、描边 rgba(35,37,44,.10) 3px、圆角 --r-card 40、
+     .card 内边距 24 32 32、.face-block 顶 32 —— 逐字抄 app.wxss / profile.wxss。
+   · 四个圈 200、间距 24（--sp-3）、芯片压在圆下沿出界 4、芯片高 34 字 18（--fs-micro）
+     —— 这三档都是 1.8.9 真跑量出来的数（可视 638、内容 915、芯片 164 宽）。
+   · 小标题吃 .grid-head：--fs-meta 24 / 700 / --text-secondary #5C6068，
+     现网「经典款」「个性款」那两行就是它，所以这一行不另立字阶。
+   · 说明吃 .face-hint：--fs-meta 24 / 行高 1.6 / --text-tertiary #9A9EA6 / 居中。
+   · 屏上现网串：卡片模板（页面标题）/ 名称 / 你的昵称 / 一句话 / 想印在图上的一句话 /
+     经典款 / 玉版宣 / 摘句 / 保存 / 卡片 / 背景。
+   · 新串（还没进字典，等他认）：小标题「形象图」；方案 A 说明「『卡片』= 卡片头像，
+     『背景』= 首页和笔记页头部。」；方案 B 说明「勾『卡片』当头像，勾『背景』铺首页和列表头部。」；
+     满了那句「最多四张，先删一张再加。」
+   · 第 1 张用的是真素材 miniprogram/assets/home-bg-portrait.jpg（他现在那张形象），
+     其余是 CSS 抽象色块，不拿 AI 图冒充他的照片。
+   · 两枚芯片里的勾、➕、垃圾桶全部 CSS 画——这个项目不为一个符号引图标资源。
+   ================================================================== */
+  :root{
+    --paper:#F2EFE9; --ink:#23252C; --card:#ffffff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06);
+    --sec:#5C6068; --ter:#9A9EA6;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px;
+    --fs-label:20px; --fs-micro:18px; --r-card:40px; --r-chip:28px; --r-pill:999px; --w-edge:3px;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.5 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:18px;font-size:15px;color:#4a4d55;line-height:1.75}
+  .cap .ttl{display:block;font-size:17px;color:#1d1f24;margin-bottom:6px}
+  .cap .new{color:#B4552A;font-weight:600}
+  .cap .gone{color:#8A8F98;text-decoration:line-through}
+  .cap b{font-weight:600;color:#1d1f24}
+
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);position:relative}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:26px;font-weight:600;color:var(--ink)}
+  .status .r{display:flex;align-items:center;gap:12px;font-size:22px;font-weight:500}
+  .nav{height:90px;display:flex;align-items:center;justify-content:center;position:relative;
+    font-size:32px;font-weight:600;color:var(--ink)}
+  .nav .back{position:absolute;left:26px;top:15px;width:60px;height:60px;border-radius:50%;
+    background:rgba(35,37,44,.10);display:flex;align-items:center;justify-content:center}
+  .nav .back::before{content:"";width:18px;height:18px;border:solid var(--ink);
+    border-width:0 0 3px 3px;transform:rotate(45deg);margin-left:5px}
+  .nav .pill{position:absolute;right:26px;top:17px;width:190px;height:56px;border-radius:999px;
+    background:rgba(0,0,0,.10);display:flex;align-items:center;justify-content:center;gap:22px}
+  .nav .pill i{width:34px;height:34px;border-radius:50%;border:3px solid #111;display:block}
+  .nav .pill i.dots::before{content:"";display:block;width:6px;height:6px;border-radius:50%;background:#111;
+    box-shadow:12px 0 0 #111,24px 0 0 #111;margin:11px 0 0 4px}
+  .view{height:1506px;overflow:hidden;background:var(--paper);padding:2px var(--sp-3) 0;position:relative}
+  .card{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:var(--sp-3) var(--sp-4) var(--sp-4);margin-bottom:var(--sp-2);position:relative;overflow:hidden}
+  .face-block{display:flex;flex-direction:column;align-items:center;padding-top:var(--sp-4)}
+  .face-block.tight{padding-top:var(--sp-3)}
+
+  /* 小标题：完全照现网 .grid-head 那一档，不另立字阶。
+     左边留 24 = 滑条内层的 padding，这样它跟第一枚圆的左沿对齐，不会看着偏出去。 */
+  .sec-head{align-self:flex-start;display:flex;align-items:center;gap:10px;margin-left:var(--sp-3);
+    font-size:var(--fs-meta);font-weight:700;color:var(--sec);margin-bottom:var(--sp-2)}
+  /* 方案 B 那枚小标记：一枚小圆里画个人像肩线，跟下面四个圈同形，纯 CSS */
+  .sec-head .mark{width:26px;height:26px;border-radius:50%;border:2px solid var(--sec);
+    position:relative;overflow:hidden;flex:none}
+  .sec-head .mark::before{content:"";position:absolute;left:8px;top:5px;width:10px;height:10px;
+    border-radius:50%;background:var(--sec)}
+  .sec-head .mark::after{content:"";position:absolute;left:2px;bottom:-6px;width:22px;height:14px;
+    border-radius:50% 50% 0 0;background:var(--sec)}
+
+  .strip{width:100%;overflow:hidden;white-space:nowrap}
+  .slots{display:inline-flex;gap:var(--sp-3);padding:0 var(--sp-3) 16px}
+  .slot{width:200px;flex:none;position:relative}
+  .disc{position:relative;width:200px;height:200px;border-radius:50%;overflow:hidden;
+    background:var(--idle);border:var(--w-edge) solid var(--edge)}
+  .disc img{width:100%;height:100%;object-fit:cover;display:block}
+  .empty .disc{border:3px dashed rgba(35,37,44,.22);background:transparent;
+    display:flex;align-items:center;justify-content:center}
+  .plus{font-size:64px;font-weight:300;color:var(--ter);line-height:1}
+  .chips{position:absolute;left:0;right:0;bottom:-4px;display:flex;gap:6px;justify-content:center}
+  .chip{display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 11px;border-radius:var(--r-pill);
+    border:2px solid rgba(35,37,44,.16);background:rgba(255,255,255,.94);color:var(--sec);
+    font-size:var(--fs-micro);font-weight:700;white-space:nowrap}
+  .chip i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(92,96,104,.45);display:block;flex:none}
+  .chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .chip.on i{border-color:transparent;background:var(--paper);position:relative}
+  .chip.on i::after{content:"";position:absolute;left:3.5px;top:1px;width:4px;height:8px;
+    border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(42deg)}
+  .bin{position:absolute;right:2px;top:2px;width:44px;height:44px;border-radius:50%;
+    background:rgba(20,22,26,.72);border:2px solid rgba(255,255,255,.92);
+    display:flex;align-items:center;justify-content:center}
+  .bin span{position:relative;width:18px;height:17px;display:block}
+  .bin span::before{content:"";position:absolute;left:0;right:0;top:4px;height:2px;background:#fff;border-radius:1px}
+  .bin span::after{content:"";position:absolute;left:2px;right:2px;top:6px;bottom:0;
+    border:2px solid #fff;border-top:none;border-radius:0 0 4px 4px}
+  .bin i{position:absolute;left:5px;right:5px;top:1px;height:2px;background:#fff;border-radius:2px}
+
+  .hint{align-self:stretch;margin-top:var(--sp-4);font-size:var(--fs-meta);line-height:1.6;
+    color:var(--ter);text-align:center}
+  .field{display:flex;flex-direction:column;gap:var(--sp-2)}
+  .field-label{font-size:var(--fs-meta);font-weight:700;color:var(--sec)}
+  .field-input{font-size:var(--fs-body);color:var(--ink)}
+  .field-input.ph{color:var(--ter)}
+  .grid-head{margin:var(--sp-4) 0 var(--sp-2);font-size:var(--fs-meta);font-weight:700;color:var(--sec)}
+  .grid{display:flex;gap:var(--sp-3)}
+  .cell{width:320px;padding:var(--sp-2);border-radius:var(--r-card);border:var(--w-edge) solid var(--edge);
+    background:var(--card)}
+  .cell .ph{width:288px;height:300px;border-radius:var(--r-chip);background:linear-gradient(160deg,#F7F4EC,#E9E4D8)}
+  .cell-label{display:flex;align-items:center;justify-content:space-between;margin-top:var(--sp-2);
+    font-size:var(--fs-meta);font-weight:600;color:var(--sec)}
+  .save-bar{position:absolute;left:0;right:0;bottom:0;background:var(--paper);padding:var(--sp-3)}
+  .btn-primary{background:var(--ink);color:var(--paper);border-radius:var(--r-pill);
+    text-align:center;padding:var(--sp-3) 0;font-size:var(--fs-body);font-weight:600}
+
+  /* 下面那张对照表：字数从代码里数字符数得来，不估 */
+  table{border-collapse:collapse;margin-top:40px;background:#fff;border-radius:16px;overflow:hidden;
+    font-size:15px;max-width:1500px}
+  th,td{padding:12px 16px;border-bottom:1px solid #e6e2d8;text-align:left;vertical-align:top;line-height:1.7}
+  th{background:#f6f3ec;font-weight:600;color:#1d1f24}
+  td.n{font-variant-numeric:tabular-nums;color:#B4552A;font-weight:600;white-space:nowrap}
+</style>
+</head>
+<body>
+<h1 style="font-size:22px;margin-bottom:6px">卡片模板 · 四槽 v11 · 加小标题 + 精简说明</h1>
+<p style="color:#4a4d55;margin-bottom:26px">图麦笔记 · 2026-09-30 晚 · 一屏 750×1690，px 当 rpx 用；口径全部取自 app.wxss / profile.wxss，未另造数。<b>这一稿只是图，代码一行没动。</b></p>
+
+<div class="row">
+
+  <!-- ================= ① 现状 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>18:52</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav"><span class="back"></span>卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block">
+          <div class="strip"><div class="slots">
+            <div class="slot"><div class="disc"><img src="../../miniprogram/assets/home-bg-portrait.jpg"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip on"><i></i>卡片</span><span class="chip on"><i></i>背景</span></div></div>
+            <div class="slot"><div class="disc" style="background:linear-gradient(150deg,#3F52D6,#8FA0FF)"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip"><i></i>卡片</span><span class="chip"><i></i>背景</span></div></div>
+            <div class="slot"><div class="disc" style="background:linear-gradient(150deg,#46A863,#B9E4C6)"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip"><i></i>卡片</span><span class="chip"><i></i>背景</span></div></div>
+            <div class="slot"><div class="disc" style="background:linear-gradient(150deg,#E9723D,#F7C9A9)"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip"><i></i>卡片</span><span class="chip"><i></i>背景</span></div></div>
+          </div></div>
+          <div class="hint">四个位置，先点 ＋ 放一张图进来。图下面两枚开关：「背景」铺在首页、也垫在笔记页头部，「卡片」画在卡片头像上。</div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input ph">你的昵称</span>
+        </div>
+        <div class="card field">
+          <span class="field-label">一句话</span>
+          <span class="field-input ph">想印在图上的一句话，可不填</span>
+        </div>
+        <div class="grid-head">经典款</div>
+        <div class="grid">
+          <div class="cell"><div class="ph"></div><div class="cell-label">玉版宣</div></div>
+          <div class="cell"><div class="ph"></div><div class="cell-label">摘句</div></div>
+        </div>
+        <div class="save-bar"><div class="btn-primary">保存</div></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>① 现状（1.8.9 真机就是这一屏）</b></span>
+      四个圈上面什么都没有，那一块直接顶到卡片上沿，看不出这一坨是干什么的。<br>
+      下面那句 <b>57 字</b>，把"怎么放图""图下面有什么""两个位置各铺在哪"三件事写在一行里——
+      第一件有 ➕ 自己会说话，第二件眼睛扫到芯片就知道，<span class="gone">啰嗦的是前两件</span>。
+    </div>
+  </div>
+
+  <!-- ================= ② 方案 A ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>18:52</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav"><span class="back"></span>卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block tight">
+          <div class="sec-head">形象图</div>
+          <div class="strip"><div class="slots">
+            <div class="slot"><div class="disc"><img src="../../miniprogram/assets/home-bg-portrait.jpg"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip on"><i></i>卡片</span><span class="chip on"><i></i>背景</span></div></div>
+            <div class="slot"><div class="disc" style="background:linear-gradient(150deg,#3F52D6,#8FA0FF)"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip"><i></i>卡片</span><span class="chip"><i></i>背景</span></div></div>
+            <div class="slot"><div class="disc" style="background:linear-gradient(150deg,#46A863,#B9E4C6)"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip"><i></i>卡片</span><span class="chip"><i></i>背景</span></div></div>
+            <div class="slot"><div class="disc" style="background:linear-gradient(150deg,#E9723D,#F7C9A9)"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip"><i></i>卡片</span><span class="chip"><i></i>背景</span></div></div>
+          </div></div>
+          <div class="hint">「卡片」= 卡片头像，「背景」= 首页和笔记页头部。</div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input ph">你的昵称</span>
+        </div>
+        <div class="card field">
+          <span class="field-label">一句话</span>
+          <span class="field-input ph">想印在图上的一句话，可不填</span>
+        </div>
+        <div class="grid-head">经典款</div>
+        <div class="grid">
+          <div class="cell"><div class="ph"></div><div class="cell-label">玉版宣</div></div>
+          <div class="cell"><div class="ph"></div><div class="cell-label">摘句</div></div>
+        </div>
+        <div class="save-bar"><div class="btn-primary">保存</div></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>② 方案 A：小标题纯文字 + 说明压到 24 字</b></span>
+      小标题<span class="new">新串「形象图」</span>，字阶直接吃现网 .grid-head（就是「经典款」「个性款」那两行），
+      不另立一档。<br>
+      说明<span class="new">新串「『卡片』= 卡片头像，『背景』= 首页和笔记页头部。」</span>
+      ——只留"这两个位置各自是什么"，因为这句是芯片本身答不了的唯一一件事；
+      "先点 ➕ 放图""图下面两枚开关"两句撤掉（➕ 和芯片就在眼前）。<br>
+      满了那句跟着压成<span class="new">新串「最多四张，先删一张再加。」</span>
+    </div>
+  </div>
+
+  <!-- ================= ③ 方案 B ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>18:52</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav"><span class="back"></span>卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block tight">
+          <div class="sec-head"><span class="mark"></span>形象图</div>
+          <div class="strip"><div class="slots">
+            <div class="slot"><div class="disc"><img src="../../miniprogram/assets/home-bg-portrait.jpg"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip on"><i></i>卡片</span><span class="chip on"><i></i>背景</span></div></div>
+            <div class="slot"><div class="disc" style="background:linear-gradient(150deg,#3F52D6,#8FA0FF)"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip"><i></i>卡片</span><span class="chip"><i></i>背景</span></div></div>
+            <div class="slot"><div class="disc" style="background:linear-gradient(150deg,#46A863,#B9E4C6)"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip"><i></i>卡片</span><span class="chip"><i></i>背景</span></div></div>
+            <div class="slot"><div class="disc" style="background:linear-gradient(150deg,#E9723D,#F7C9A9)"></div>
+              <div class="bin"><i></i><span></span></div>
+              <div class="chips"><span class="chip"><i></i>卡片</span><span class="chip"><i></i>背景</span></div></div>
+          </div></div>
+          <div class="hint">勾「卡片」当头像，勾「背景」铺首页和列表头部。</div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input ph">你的昵称</span>
+        </div>
+        <div class="card field">
+          <span class="field-label">一句话</span>
+          <span class="field-input ph">想印在图上的一句话，可不填</span>
+        </div>
+        <div class="grid-head">经典款</div>
+        <div class="grid">
+          <div class="cell"><div class="ph"></div><div class="cell-label">玉版宣</div></div>
+          <div class="cell"><div class="ph"></div><div class="cell-label">摘句</div></div>
+        </div>
+        <div class="save-bar"><div class="btn-primary">保存</div></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>③ 方案 B：小标题带一枚小标记 + 说明换成动词句（20 字）</b></span>
+      小标记是一枚 26 的小圆里画个人像肩线，<b>纯 CSS 画的</b>（跟下面四个圈同形，不引图标资源——
+      这项目的放大镜、把手、母题都是这么画的）。<br>
+      说明<span class="new">新串「勾『卡片』当头像，勾『背景』铺首页和列表头部。」</span>
+      —— 跟 A 的区别只在语气：A 是"是什么"，B 是"怎么做"。<br>
+      <b>这一屏的小标记要不要，你说一句就行</b>；A / B 的说明两版挑一版。
+    </div>
+  </div>
+</div>
+
+<table>
+  <tr><th style="width:190px">屏上这句</th><th style="width:430px">现在</th><th>改成</th><th style="width:90px">字数</th></tr>
+  <tr><td>四个圈上面的小标题</td><td>没有</td>
+      <td><span class="new">新串</span> 形象图（字阶吃现网 .grid-head，与「经典款」同档）</td><td class="n">0 → 3</td></tr>
+  <tr><td>四个圈下面那句说明</td><td>四个位置，先点 ＋ 放一张图进来。图下面两枚开关：「背景」铺在首页、也垫在笔记页头部，「卡片」画在卡片头像上。</td>
+      <td>A：「卡片」= 卡片头像，「背景」= 首页和笔记页头部。<br>B：勾「卡片」当头像，勾「背景」铺首页和列表头部。</td><td class="n">57 → 24<br>或 25</td></tr>
+  <tr><td>放满四张时那句</td><td>四个位置都放满了。要换一张，先点哪张右上角的垃圾桶删掉一个。</td>
+      <td><span class="new">新串</span> 最多四张，先删一张再加。</td><td class="n">29 → 12</td></tr>
+  <tr><td>两枚芯片</td><td>卡片 / 背景</td><td>不动（你上一轮拍的两个字）</td><td class="n">2 / 2</td></tr>
+</table>
+
+<p style="margin-top:22px;max-width:1500px;font-size:15px;line-height:1.9;color:#3a3d44">
+<b>一处要你认的取舍：</b>那句说明里"<b>首页和笔记页头部</b>"这半句不能省。09-26 你定过一次口径——
+凡是提到这张图范围的话，都得同时讲清首页和笔记页头部两处，界面上还留了两条尺子钉着它
+（<code>验-首页背景图.js</code>、<code>验-列表头部铺图.js</code>）。所以精简只能砍"怎么放图"那两件废话，
+砍到这半句就得停下来问你：<b>要不要连"笔记页头部"一起省掉，只说"首页"？</b>
+省掉的话那两条尺子跟着改，一句话就行。
+</p>
+</body>
+</html>
