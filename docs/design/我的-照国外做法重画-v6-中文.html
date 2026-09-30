@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 「我的」v6 · 照国外成熟 App 的三条做法重画</title>
+<style>
+/* ==================================================================
+   这一版是看着真东西画的。取证四张 App Store 官方截图（高清原图，链接在聊天里给了）：
+
+   · Duolingo「Courses」列表 —— 每一行左边一枚**圆角方块彩色图标**（国旗/图形），
+     行名单行粗黑，右侧只有一枚很淡的 chevron，分隔线通栏，整张列表装在
+     一个离屏幕边有留白的圆角卡里。→ 抄：**行首彩色圆角方块 + 通栏细分隔 + 卡片离边**。
+   · Monzo 首页 —— 顶部一块**实心品牌色数据卡**放余额和大数字，下面是 Activity 列表，
+     每行左侧商户小方块、中间名字+灰字副行、右侧金额，**进账是绿的、出账是黑的**。
+     → 抄：**顶部那块卡装的是真数据不是装饰**；**右值用颜色表达语义**。
+   · Airbnb —— 顶部一个**胶囊搜索条浮在白底上**，分类是一排**插画图标 + 标签 + NEW 角标**，
+     往下是**照片卡横滑**，卡片没有描边、圆角很大、靠极淡阴影分层。
+     → 抄：**大圆角 + 无描边 + 照片当主角**（这一条跟我们现网"描边骨架、投影退役"冲突，
+       所以做成 A/B 两版让他判，见下）。
+   · Cal AI —— 深色头部一个**大数字 1250 + 环形进度**，下面三枚**小环形仪表**（蛋白质/碳水/脂肪），
+     再往下"Recently uploaded"每行是**照片缩略图 + 名称 + 三个属性 chip**。
+     → 抄：**额度用大数字 + 环形进度**；**属性用 chip 而不是括号里的字**。
+
+   两版只差"表面语言"这一层，内容、行序、图标、配色完全一样：
+     A = 沿用现网的描边骨架（白卡 + 3rpx 描边，无阴影）
+     B = 换成 Airbnb/Cal AI 那种无描边大圆角 + 极淡阴影
+   ================================================================== */
+  :root{
+    --paper:#F4F2EC; --ink:#23252C; --card:#fff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06); --sec:#5C6068; --ter:#9A9EA6; --clay:#D2683F;
+    --danger:#B4231F; --ok:#2E7D4F;
+    --t0:#F6C445; --t1:#3F52D6; --t2:#E9723D; --t3:#46A863; --t4:#6E4BD0;
+    --fs-h1:42px; --fs-h2:34px; --fs-title:31px; --fs-body:28px; --fs-meta:24px;
+    --fs-tiny:21px; --fs-label:20px; --fs-micro:18px;
+    --r-card:40px; --r-pill:999px; --w-edge:3px;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.5 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  h1{font-size:22px;margin-bottom:6px}
+  .lead{color:#4a4d55;margin-bottom:22px;max-width:1700px;font-size:15px;line-height:1.85}
+  .lead b{color:#1d1f20}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:16px;font-size:15px;color:#4a4d55;line-height:1.7;max-width:750px}
+  .cap b{display:block;font-size:18px;color:#1d1f20;margin-bottom:4px}
+  .cap code{background:#efece4;padding:1px 6px;border-radius:5px;font-size:13px}
+
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);position:relative}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:26px;font-weight:600;color:var(--ink)}
+  .status .r{font-size:22px;font-weight:500}
+  .nav{height:90px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600}
+  .view{height:1506px;padding:2px var(--sp-4) 0}
+
+  /* ---- 头部：LOGO + 名称固定在两栏之上 ---- */
+  .head{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-2) 0 var(--sp-3)}
+  .logo{flex:none;width:72px;height:72px;border-radius:22px;position:relative;overflow:hidden;background:var(--ink)}
+  .logo::after{content:"麦";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:32px;font-weight:800}
+  .logo .m{position:absolute;right:-12px;bottom:-12px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.15)}
+  .hname{font-size:var(--fs-h2);font-weight:800;letter-spacing:-.8px;color:var(--ink);line-height:1.2}
+  .hslog{display:block;margin-top:2px;font-size:var(--fs-tiny);color:var(--sec)}
+
+  .tabs{display:flex;gap:56px;padding:0 2px;margin-bottom:var(--sp-3)}
+  .tab{position:relative;padding:16px 0 14px;font-size:var(--fs-body);font-weight:700;color:var(--ter)}
+  .tab.on{color:var(--ink)}
+  .tab.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:6px;border-radius:3px;background:var(--ink)}
+
+  /* ---- 顶部数据卡（Monzo 的 balance 卡 / Cal AI 的大数字环，同构）---- */
+  .stat{background:var(--ink);color:#fff;border-radius:44px;padding:var(--sp-4);display:flex;align-items:center;gap:var(--sp-4);
+    margin-bottom:var(--sp-3);position:relative;overflow:hidden}
+  .stat .n{font-size:76px;font-weight:800;letter-spacing:-3px;line-height:.95}
+  .stat .u{font-size:var(--fs-meta);color:rgba(255,255,255,.7);margin-top:6px}
+  .stat .lbl2{font-size:var(--fs-label);letter-spacing:1.2px;color:rgba(255,255,255,.62);font-weight:700}
+  .ring{flex:none;width:120px;height:120px;border-radius:50%;
+    background:conic-gradient(var(--t0) 0 37%, rgba(255,255,255,.18) 37% 100%);
+    display:flex;align-items:center;justify-content:center}
+  .ring i{width:88px;height:88px;border-radius:50%;background:var(--ink);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;font-style:normal;font-size:var(--fs-micro);color:rgba(255,255,255,.7);line-height:1.3}
+  .ring i b{font-size:var(--fs-body);font-weight:800;color:#fff;letter-spacing:-.5px}
+  .stat .go{position:absolute;right:var(--sp-4);bottom:18px;font-size:var(--fs-tiny);color:rgba(255,255,255,.66)}
+
+  /* ---- 形象条（Cal AI 的缩略图行 / Duolingo 的图标行，同构）---- */
+  .face{display:flex;align-items:center;gap:var(--sp-3);padding:22px var(--sp-4)}
+  .face .av{flex:none;width:88px;height:88px;border-radius:28px;overflow:hidden;background:var(--idle)}
+  .face .av img{width:100%;height:100%;object-fit:cover}
+  .face .nm{font-size:var(--fs-body);font-weight:800;color:var(--ink);letter-spacing:-.3px}
+  .face .sl{display:block;margin-top:4px;font-size:var(--fs-tiny);color:var(--sec)}
+  .chips{display:flex;gap:8px;margin-top:8px}
+  .chip{font-size:var(--fs-micro);font-weight:700;padding:4px 12px;border-radius:10px;background:var(--idle);color:var(--sec)}
+  .chip.b{background:rgba(63,82,214,.12);color:var(--t1)}
+
+  .ghead{margin:var(--sp-4) 0 var(--sp-1) var(--sp-2);font-size:var(--fs-label);font-weight:700;
+    letter-spacing:.8px;color:var(--sec)}
+  .ghead.first{margin-top:var(--sp-1)}
+  .list{border-radius:36px;overflow:hidden;background:var(--card)}
+  .A .list{border:var(--w-edge) solid var(--edge)}
+  .B .list{box-shadow:0 2px 4px rgba(35,37,44,.04),0 10px 26px rgba(35,37,44,.06)}
+  .item{display:flex;align-items:center;gap:var(--sp-3);height:112px;padding:0 var(--sp-4);
+    border-bottom:var(--w-edge) solid var(--edge);position:relative}
+  .B .item{border-bottom:2px solid rgba(35,37,44,.06)}
+  .item:last-child{border-bottom:none}
+  .item.tall{height:128px}
+
+  /* ---- 行首彩色圆角方块 + 里面一枚 CSS 画的具形符号（Duolingo / Monzo 那条）---- */
+  .ic{flex:none;width:64px;height:64px;border-radius:20px;position:relative;display:flex;
+    align-items:center;justify-content:center}
+  .c0{background:var(--t0)} .c1{background:var(--t1)} .c2{background:var(--t2)}
+  .c3{background:var(--t3)} .c4{background:var(--t4)} .c5{background:var(--ink)} .c6{background:var(--idle)}
+  .g{position:absolute}
+  /* 卡片模板：一张小卡 + 顶部标题条 */
+  .g-card{width:30px;height:38px;border-radius:7px;background:#fff}
+  .c0 .g-card{background:var(--paperA,#E4DCC7)}
+  .g-card::before{content:'';position:absolute;left:5px;top:6px;right:5px;height:9px;border-radius:3px;background:rgba(46,43,36,.55)}
+  .c1 .g-card,.c4 .g-card{background:#fff}.c1 .g-card::before,.c4 .g-card::before{background:rgba(63,82,214,.55)}
+  /* 外观：对角两色的圆（配色） */
+  .g-half{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#fff 0 50%,rgba(255,255,255,.32) 50% 100%)}
+  /* 分类：2×2 四格 */
+  .g-grid{width:34px;height:34px;display:grid;grid-template:1fr 1fr/1fr 1fr;gap:5px}
+  .g-grid s{background:#fff;border-radius:5px;text-decoration:none}
+  .g-grid s:nth-child(2){opacity:.55}.g-grid s:nth-child(3){opacity:.75}
+  /* 私密：锁 */
+  .g-lock{width:34px;height:26px;border-radius:8px;background:#fff;margin-top:12px}
+  .g-lock::before{content:'';position:absolute;left:8px;top:-13px;width:18px;height:20px;border:5px solid #fff;
+    border-bottom:none;border-radius:9px 9px 0 0}
+  /* 指纹：同心弧 */
+  .g-fp{width:38px;height:38px}
+  .g-fp i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:4px solid #fff;border-radius:50%;
+    border-bottom-color:transparent}
+  .g-fp i:nth-child(1){width:36px;height:36px}.g-fp i:nth-child(2){width:22px;height:22px}
+  .g-fp i:nth-child(3){width:8px;height:8px;background:#fff;border:none}
+  /* 分享：出盒箭头 */
+  .g-sh{width:34px;height:34px;border:5px solid #fff;border-top:none;border-radius:0 0 9px 9px}
+  .g-sh::before{content:'';position:absolute;left:50%;top:-16px;transform:translateX(-50%);width:5px;height:34px;background:#fff}
+  .g-sh::after{content:'';position:absolute;left:50%;top:-20px;transform:translate(-50%,0) rotate(45deg);
+    width:14px;height:14px;border-top:5px solid #fff;border-right:5px solid #fff}
+  /* 额度：环 */
+  .g-ring{width:36px;height:36px;border-radius:50%;border:5px solid rgba(255,255,255,.35);border-top-color:#fff}
+  /* 介绍 i / 功能 九格 / 隐私 盾 / 反馈 信封 / 官网 地球 / 注销 垃圾桶 */
+  .g-i{width:36px;height:36px;border-radius:50%;border:5px solid #fff;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:22px;font-weight:800;font-style:normal}
+  /* 隐私条款是一份文件，不是盾牌：盾牌在 64px 上认不出来，改成带折角的文档 + 两道字行 */
+  .g-doc{width:30px;height:36px;background:#fff;border-radius:6px 6px 6px 6px}
+  .g-doc::before{content:'';position:absolute;right:0;top:0;width:12px;height:12px;
+    background:var(--ink);clip-path:polygon(100% 0,0 0,100% 100%)}
+  .g-doc::after{content:'';position:absolute;left:6px;top:14px;width:14px;height:3px;box-shadow:0 7px 0 0 var(--ink);
+    background:var(--ink);border-radius:2px}
+  /* 信封：白框 + 两道斜线当翻盖（上一版用 border 拼，渲出来是个认不出的 U） */
+  .g-mail{width:38px;height:28px;background:#fff;border-radius:7px}
+  .g-mail::before,.g-mail::after{content:'';position:absolute;top:3px;width:17px;height:3px;border-radius:2px;background:var(--t4)}
+  .g-mail::before{left:1px;transform:rotate(32deg);transform-origin:left center}
+  .g-mail::after{right:1px;transform:rotate(-32deg);transform-origin:right center}
+  .g-web{width:36px;height:36px;border-radius:50%;border:5px solid #fff}
+  .g-web::before{content:'';position:absolute;inset:-5px;border-radius:50%;border:5px solid transparent;
+    border-left-color:#fff;border-right-color:#fff;transform:scaleX(.52)}
+  .g-web::after{content:'';position:absolute;left:-5px;right:-5px;top:11px;height:4px;background:#fff}
+  .g-bin{width:30px;height:32px;border:5px solid var(--danger);border-top:none;border-radius:0 0 8px 8px}
+  .g-bin::before{content:'';position:absolute;left:-9px;right:-9px;top:-11px;height:5px;background:var(--danger);border-radius:3px}
+  .g-bin::after{content:'';position:absolute;left:7px;right:7px;top:-18px;height:8px;border:5px solid var(--danger);
+    border-bottom:none;border-radius:6px 6px 0 0}
+  .c6 .g-i,.c6 .g-ring{border-color:var(--sec)}
+
+  .tx{flex:1;min-width:0}
+  .lbl{display:block;font-size:var(--fs-body);font-weight:700;letter-spacing:-.3px;color:var(--ink);line-height:1.3}
+  .lbl.d{color:var(--danger)}
+  .sub{display:block;margin-top:4px;font-size:var(--fs-tiny);font-weight:400;color:var(--sec);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub b{font-weight:700}
+  .sub b.g{color:var(--ok)}
+  .right{display:flex;align-items:center;gap:var(--sp-1);flex:none}
+  .val{font-size:var(--fs-meta);color:var(--sec);white-space:nowrap}
+  .val.g{color:var(--ok);font-weight:700}
+  .arw{font-size:30px;color:var(--ter);line-height:1;width:18px;text-align:right}
+  .st{display:inline-flex;align-items:center;gap:8px;font-size:var(--fs-meta);color:var(--sec)}
+  .st i{width:14px;height:14px;border-radius:50%;background:var(--ok)}
+</style>
+</head>
+<body>
+<h1>「我的」v6 · 照国外成熟 App 的三条做法重画</h1>
+<p class="lead">
+取证四张 App Store 官方截图，抄的是这四条：<b>Duolingo</b> 的行首彩色圆角方块 + 通栏细分隔 + 列表装在离边有留白的圆角卡里；
+<b>Monzo</b> 的顶部实心数据卡（卡上放的是真数据）和"进账绿、出账黑"的右值配色；
+<b>Airbnb</b> 的大圆角、无描边、极淡阴影、照片当主角；
+<b>Cal AI</b> 的大数字加环形进度、属性用 chip 不用括号字。<br>
+A / B 两版内容完全一样，只差表面语言：A 沿用现网"描边骨架、投影退役"，B 换成 Airbnb 那种无描边 + 极淡阴影。这条是我们系统里的真冲突，得你判。
+</p>
+
+<div class="row">
+
+  <!-- ================= A ================= -->
+  <div class="shot A">
+    <div class="frame">
+      <div class="status"><span>20:16</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"><span class="m"></span></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+
+        <div class="stat">
+          <div><div class="lbl2">笔记额度</div><div class="n">37</div><div class="u">/ 100 篇</div></div>
+          <div class="ring"><i><b>37%</b>已用</i></div>
+          <div class="go">点一下分享，+10 篇 / 人 ›</div>
+        </div>
+
+        <div class="list">
+          <div class="face"><div class="av"><img src="../../miniprogram/assets/home-bg-portrait.jpg"></div>
+            <div><div class="nm">平安喜乐</div><span class="sl">记点有用的，别存一堆</span>
+              <div class="chips"><span class="chip b">玉版宣</span><span class="chip">已设形象</span></div></div>
+            <span class="arw">›</span></div>
+        </div>
+
+        <div class="ghead first">内容与外观</div>
+        <div class="list">
+          <div class="item"><span class="ic c0"><span class="g g-card"></span></span>
+            <span class="tx"><span class="lbl">卡片模板</span></span>
+            <span class="right"><span class="val">玉版宣</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="ic c4"><span class="g g-half"></span></span>
+            <span class="tx"><span class="lbl">外观</span></span>
+            <span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="ic c1"><span class="g g-grid"><s></s><s></s><s></s><s></s></span></span>
+            <span class="tx"><span class="lbl">分类</span></span>
+            <span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">私密</div>
+        <div class="list">
+          <div class="item"><span class="ic c5"><span class="g g-lock"></span></span>
+            <span class="tx"><span class="lbl">私密</span></span>
+            <span class="right"><span class="st"><i></i>已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="ic c3"><span class="g g-fp"><i></i><i></i><i></i></span></span>
+            <span class="tx"><span class="lbl">解锁方式</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">账号</div>
+        <div class="list">
+          <div class="item"><span class="ic c6"><span class="g g-bin"></span></span>
+            <span class="tx"><span class="lbl d">注销</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>A · 描边骨架（现网语言）</b>
+      白卡 + 3rpx 描边、无阴影——<code>app.wxss</code> 注释原文："描边是这套方向的骨架，投影已经退役"。
+      选它就跟其余四屏完全一致。</div>
+  </div>
+
+  <!-- ================= B ================= -->
+  <div class="shot B">
+    <div class="frame">
+      <div class="status"><span>20:16</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"><span class="m"></span></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+
+        <div class="stat">
+          <div><div class="lbl2">笔记额度</div><div class="n">37</div><div class="u">/ 100 篇</div></div>
+          <div class="ring"><i><b>37%</b>已用</i></div>
+          <div class="go">点一下分享，+10 篇 / 人 ›</div>
+        </div>
+
+        <div class="list">
+          <div class="face"><div class="av"><img src="../../miniprogram/assets/home-bg-portrait.jpg"></div>
+            <div><div class="nm">平安喜乐</div><span class="sl">记点有用的，别存一堆</span>
+              <div class="chips"><span class="chip b">玉版宣</span><span class="chip">已设形象</span></div></div>
+            <span class="arw">›</span></div>
+        </div>
+
+        <div class="ghead first">内容与外观</div>
+        <div class="list">
+          <div class="item"><span class="ic c0"><span class="g g-card"></span></span>
+            <span class="tx"><span class="lbl">卡片模板</span></span>
+            <span class="right"><span class="val">玉版宣</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="ic c4"><span class="g g-half"></span></span>
+            <span class="tx"><span class="lbl">外观</span></span>
+            <span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="ic c1"><span class="g g-grid"><s></s><s></s><s></s><s></s></span></span>
+            <span class="tx"><span class="lbl">分类</span></span>
+            <span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">私密</div>
+        <div class="list">
+          <div class="item"><span class="ic c5"><span class="g g-lock"></span></span>
+            <span class="tx"><span class="lbl">私密</span></span>
+            <span class="right"><span class="st"><i></i>已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="ic c3"><span class="g g-fp"><i></i><i></i><i></i></span></span>
+            <span class="tx"><span class="lbl">解锁方式</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">账号</div>
+        <div class="list">
+          <div class="item"><span class="ic c6"><span class="g g-bin"></span></span>
+            <span class="tx"><span class="lbl d">注销</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>B · 无描边 + 极淡阴影（Airbnb / Cal AI 那种）</b>
+      卡片靠圆角和一层很轻的阴影浮起来，线更少、更"软"。
+      <b>代价要说清</b>：这一改是全站表面语言的改向，不是这一屏的事——列表、详情、新建、外观四屏的
+      描边都得跟着换，否则只有这一屏不一样。所以它得单独拍板。</div>
+  </div>
+
+  <!-- ================= 关于 ================= -->
+  <div class="shot A">
+    <div class="frame">
+      <div class="status"><span>20:16</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"><span class="m"></span></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab">设置</div><div class="tab on">关于</div></div>
+
+        <div class="ghead first">这个产品</div>
+        <div class="list">
+          <div class="item"><span class="ic c2"><span class="g g-i">i</span></span>
+            <span class="tx"><span class="lbl">介绍</span></span>
+            <span class="right"><span class="val">v1.8.9</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="ic c1"><span class="g g-grid"><s></s><s></s><s></s><s></s></span></span>
+            <span class="tx"><span class="lbl">功能</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+          <div class="item"><span class="ic c5"><span class="g g-doc"></span></span>
+            <span class="tx"><span class="lbl">隐私</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">联系</div>
+        <div class="list">
+          <div class="item"><span class="ic c4"><span class="g g-mail"></span></span>
+            <span class="tx"><span class="lbl">反馈</span><span class="sub">点一下复制</span></span>
+            <span class="right"><span class="val">18509828@qq.com</span></span></div>
+          <div class="item"><span class="ic c3"><span class="g g-web"></span></span>
+            <span class="tx"><span class="lbl">官网</span><span class="sub">点一下复制</span></span>
+            <span class="right"><span class="val">agentsbin.cn</span></span></div>
+        </div>
+
+        <div class="ghead">分享这个产品</div>
+        <div class="list">
+          <div class="item"><span class="ic c0"><span class="g g-sh"></span></span>
+            <span class="tx"><span class="lbl">分享好友</span><span class="sub">点一下弹微信分享面板 · <b class="g">每 1 人 +10 篇</b></span></span></div>
+          <div class="item"><span class="ic c6"><span class="g g-ring"></span></span>
+            <span class="tx"><span class="lbl">笔记额度</span><span class="sub">基础 100 篇，分享激活 +10</span></span>
+            <span class="right"><span class="val">37 / 100</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>关于这一栏（A 的表面语言）</b>
+      「+10 篇 / 人」用绿色粗字——这是 Monzo 那条"进账是绿的"：这一行讲的是<b>能赚到的额度</b>，
+      颜色就该是收益色；额度本身"37 / 100"用灰字，它只是一个现状。</div>
+  </div>
+</div>
+</body>
+</html>
