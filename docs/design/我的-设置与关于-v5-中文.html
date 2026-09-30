@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 「我的」v5 · 按无障碍与层级纪律再收一遍</title>
+<style>
+/* v5 = v4 的甲，再按"大厂标准"里可量化的那几条收一遍。不是换画风，是把四处松掉的地方拧紧。
+   这一版改的六件事，全部有出处：
+   ① 小字对比度：现网 --text-tertiary #9A9EA6 压白卡实测 2.69:1、压页面底 2.40:1，
+      而右值和组标题是 24/20rpx（≈12px/10px）常规字重，WCAG 要 4.5:1 —— 不合格。
+      这一版全部改吃 --text-secondary #5C6068（实测 6.31 / 5.64）。
+   ② 色块不乱给色：palette.js 里 TONES 每一档自带 ink（芥末黄配白字实测只有 1.63:1，
+      所以它配的是 #2A2005），说明"块上的字用哪个颜色"这件事色板已经回答过了，
+      我不另判。这一版只给"当前值本身有颜色"的两行上色：
+      卡片模板 = 当前模板纸色 PAPER_A #E4DCC7（poster.js 里的真实值）、
+      外观 = 当前壁纸那套的 --accent #1B2A21（app.wxss .theme-tint-celadon 真实值）。
+      其余一律 --chip-idle 中性底 + 母题，靠母题区分不靠彩虹。
+   ③ 副标只给"第一次见会问这是什么"的行（私密 / 解锁方式 / 分享好友 / 笔记额度），
+      卡片模板、外观、分类、介绍、功能这些名字自明的不给——v4 每行都挂一行小字，
+      等于没有层级。
+   ④ 对齐：组标题的左沿从"卡片 padding 4"挪到跟色块左沿同一根 x（32），
+      右侧值统一右对齐、箭头统一占位宽，没有值的行箭头也不跳。
+   ⑤ 行高分两档并写死：无副标 104rpx、有副标 128rpx（都在 88rpx 最小触控之上）。
+   ⑥ 补空态：新用户第一次进来这一屏长什么样，v4 没画。空态不是"值留白"，
+      而是把"未设置 / 未设 / 0 个"如实写出来，绿点不出现。
+   共同的、上一轮已定的：LOGO + 名称固定在头部；设置 / 关于 是第二层（文字 + 下划线，
+   不是按钮式，这条他 09-25 定过）；大卡片和实心大按钮撤掉；分享在关于最后、额度在它下面。 */
+  :root{
+    --paper:#F4F2EC; --ink:#23252C; --card:#fff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06); --sec:#5C6068; --ter:#9A9EA6; --clay:#D2683F;
+    --danger:#B4231F; --ok:#46A863; --paperA:#E4DCC7; --paperAInk:#2E2B24; --celadon:#1B2A21;
+    --fs-h1:42px; --fs-h2:34px; --fs-title:31px; --fs-body:28px; --fs-meta:24px;
+    --fs-tiny:21px; --fs-label:20px; --fs-micro:18px;
+    --r-card:40px; --r-block:32px; --r-pill:999px; --w-edge:3px;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.5 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  h1{font-size:22px;margin-bottom:6px}
+  .lead{color:#4a4d55;margin-bottom:24px;max-width:1600px;font-size:15px;line-height:1.85}
+  .lead b{color:#1d1f24}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:16px;font-size:15px;color:#4a4d55;line-height:1.7;max-width:750px}
+  .cap b{display:block;font-size:18px;color:#1d1f24;margin-bottom:4px}
+  .cap code{background:#efece4;padding:1px 6px;border-radius:5px;font-size:13px}
+
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);position:relative}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:26px;font-weight:600;color:var(--ink)}
+  .status .r{font-size:22px;font-weight:500}
+  .nav{height:90px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600}
+  .view{height:1506px;padding:2px var(--sp-3) 0}
+
+  .head{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) var(--sp-4) var(--sp-3) 0}
+  .logo{flex:none;width:76px;height:76px;border-radius:24px;position:relative;overflow:hidden;background:var(--ink)}
+  .logo .m{position:absolute;right:-14px;bottom:-14px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.14)}
+  .logo::after{content:"麦";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:34px;font-weight:800;letter-spacing:-1px}
+  .hname{font-size:var(--fs-h2);font-weight:800;letter-spacing:-.8px;color:var(--ink);line-height:1.2}
+  .hslog{display:block;margin-top:2px;font-size:var(--fs-tiny);color:var(--sec)}
+
+  .tabs{display:flex;gap:56px;padding:0 var(--sp-4);margin-bottom:var(--sp-3)}
+  .tab{position:relative;padding:18px 0 16px;font-size:var(--fs-body);font-weight:700;color:var(--ter)}
+  .tab.on{color:var(--ink)}
+  .tab.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:6px;border-radius:3px;background:var(--ink)}
+
+  /* 组标题：左沿跟色块对齐（同一根 x=32），颜色从 tertiary 提到 secondary */
+  .ghead{display:flex;align-items:center;gap:var(--sp-2);margin:var(--sp-4) 0 var(--sp-1) var(--sp-4);
+    font-size:var(--fs-label);font-weight:700;letter-spacing:.8px;color:var(--sec)}
+  .ghead.first{margin-top:var(--sp-2)}
+
+  .card{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:0 var(--sp-4);margin-bottom:var(--sp-2)}
+  .item{display:flex;align-items:center;gap:var(--sp-3);height:104px;border-bottom:var(--w-edge) solid var(--edge)}
+  .item:last-child{border-bottom:none}
+  .item.tall{height:128px}
+  .dot{flex:none;width:52px;height:52px;border-radius:18px;position:relative;overflow:hidden;background:var(--idle)}
+  .dot .m{position:absolute;right:-12px;bottom:-12px;width:44px;height:44px}
+  .dot.stripe .m{background:repeating-linear-gradient(115deg,rgba(35,37,44,.14) 0 8px,transparent 8px 17px)}
+  .dot.arc .m{border-radius:50%;border:8px solid rgba(35,37,44,.13);border-right-color:transparent;border-bottom-color:transparent}
+  .dot.dots .m{background-image:radial-gradient(rgba(35,37,44,.16) 4px,transparent 5px);background-size:17px 17px}
+  .dot.circle .m{border-radius:50%;background:rgba(35,37,44,.12)}
+  .dot.pill .m{width:60px;height:18px;border-radius:999px;background:rgba(35,37,44,.13);right:-16px;bottom:8px}
+  /* 上色那两行的母题改吃各自纸色/主题自己的 ink，值从代码里取 */
+  .dot.on-paperA{background:var(--paperA)}
+  .dot.on-paperA .m{background:rgba(46,43,36,.16)}
+  .dot.on-celadon{background:var(--celadon)}
+  .dot.on-celadon .m{background:rgba(255,255,255,.16)}
+  .tx{flex:1;min-width:0}
+  .lbl{display:block;font-size:var(--fs-body);font-weight:700;letter-spacing:-.3px;color:var(--ink);line-height:1.3}
+  .lbl.d{color:var(--danger)}
+  .sub{display:block;margin-top:5px;font-size:var(--fs-tiny);font-weight:400;color:var(--sec)}
+  .right{display:flex;align-items:center;gap:var(--sp-1);flex:none}
+  .val{font-size:var(--fs-meta);color:var(--sec)}
+  .arw{font-size:30px;color:var(--ter);line-height:1;width:20px;text-align:right}
+  .st{display:inline-flex;align-items:center;gap:8px;font-size:var(--fs-meta);color:var(--sec)}
+  .st i{width:14px;height:14px;border-radius:50%;background:var(--ok)}
+  .st.off i{background:var(--idle);border:2px solid rgba(35,37,44,.14)}
+
+  /* 私密面板 */
+  .mask{position:absolute;inset:0;background:rgba(20,22,26,.42)}
+  .sheet{position:absolute;left:var(--sp-3);right:var(--sp-3);bottom:var(--sp-3);background:var(--card);
+    border-radius:48px;padding:var(--sp-5) var(--sp-4) var(--sp-4)}
+  .s-title{font-size:var(--fs-h1);font-weight:800;letter-spacing:-1px;color:var(--ink);text-align:center}
+  .s-hint{margin-top:12px;font-size:var(--fs-meta);line-height:1.6;color:var(--sec);text-align:center}
+  .bio{margin-top:var(--sp-5);display:flex;flex-direction:column;align-items:center;gap:var(--sp-3)}
+  .ring{width:168px;height:168px;border-radius:50%;background:var(--ink);display:flex;align-items:center;justify-content:center}
+  .fp{position:relative;width:80px;height:80px}
+  .fp i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:5px solid #fff;border-radius:50%;border-bottom-color:transparent}
+  .fp i:nth-child(1){width:76px;height:76px}.fp i:nth-child(2){width:54px;height:54px}
+  .fp i:nth-child(3){width:32px;height:32px}.fp i:nth-child(4){width:12px;height:12px;background:#fff;border:none}
+  .bt{font-size:var(--fs-body);font-weight:700;color:var(--ink)}
+  .bs{font-size:var(--fs-tiny);color:var(--sec)}
+  .s-two{display:flex;gap:var(--sp-2);margin-top:var(--sp-5)}
+  .s-btn{flex:1;text-align:center;padding:26px 0;border-radius:var(--r-pill);font-size:var(--fs-body);font-weight:600}
+  .s-btn.ghost{background:var(--idle);color:var(--ink)}
+  .s-btn.link{background:transparent;color:var(--sec);font-weight:400;font-size:var(--fs-meta)}
+
+  .rules{margin-top:44px;background:#fff;border-radius:16px;padding:24px 28px;max-width:1600px;
+    font-size:15px;line-height:1.95;color:#3a3d44}
+  .rules b{color:#1d1f24}
+  .rules .n{display:inline-block;min-width:26px;font-weight:700;color:var(--clay)}
+  .rules code{background:#f3f0e9;padding:1px 7px;border-radius:6px;font-size:13.5px}
+</style>
+</head>
+<body>
+<h1>「我的」v5 · 甲方向，再按可量化的标准收一遍</h1>
+<p class="lead">这一版不换个画风了事，是把 v4 里四处松掉的地方拧紧：<b>小字对比度不够、色块给得太随意、每行都挂副标等于没有层级、组标题跟色块没对齐、没画新用户空态</b>。改完的每一条都有出处，写在最后那块。</p>
+
+<div class="row">
+
+  <!-- ============ ① 设置 · 有内容 ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:58</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"><span class="m"></span></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+
+        <div class="ghead first">内容与外观</div>
+        <div class="card">
+          <div class="item"><span class="dot on-paperA"><span class="m"></span></span>
+            <span class="tx"><span class="lbl">卡片模板</span></span>
+            <span class="right"><span class="val">玉版宣</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot on-celadon"><span class="m stripe"></span></span>
+            <span class="tx"><span class="lbl">外观</span></span>
+            <span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot"><span class="m dots"></span></span>
+            <span class="tx"><span class="lbl">分类</span></span>
+            <span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">私密</div>
+        <div class="card">
+          <div class="item tall"><span class="dot"><span class="m arc"></span></span>
+            <span class="tx"><span class="lbl">私密</span><span class="sub">这一格的笔记要解锁才看得到</span></span>
+            <span class="right"><span class="st"><i></i>已设</span><span class="arw">›</span></span></div>
+          <div class="item tall"><span class="dot"><span class="m pill"></span></span>
+            <span class="tx"><span class="lbl">解锁方式</span><span class="sub">开了就不用每次输密码</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">账号</div>
+        <div class="card">
+          <div class="item"><span class="dot"></span>
+            <span class="tx"><span class="lbl d">注销</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>① 设置 · 用了一阵子</b>
+      只有两枚色块带颜色，因为它们的颜色<b>就是当前值本身</b>：模板纸色、当前壁纸色。
+      其余走中性底 + 母题，靠形状区分。副标只留在需要解释的两行。</div>
+  </div>
+
+  <!-- ============ ② 设置 · 新用户空态 ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:58</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"><span class="m"></span></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+
+        <div class="ghead first">内容与外观</div>
+        <div class="card">
+          <div class="item"><span class="dot"><span class="m"></span></span>
+            <span class="tx"><span class="lbl">卡片模板</span></span>
+            <span class="right"><span class="val">未设置</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot on-celadon"><span class="m stripe"></span></span>
+            <span class="tx"><span class="lbl">外观</span></span>
+            <span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot"><span class="m dots"></span></span>
+            <span class="tx"><span class="lbl">分类</span></span>
+            <span class="right"><span class="val">0 个</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">私密</div>
+        <div class="card">
+          <div class="item tall"><span class="dot"><span class="m arc"></span></span>
+            <span class="tx"><span class="lbl">私密</span><span class="sub">这一格的笔记要解锁才看得到</span></span>
+            <span class="right"><span class="st off"><i></i>未设</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">账号</div>
+        <div class="card">
+          <div class="item"><span class="dot"></span>
+            <span class="tx"><span class="lbl d">注销</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>② 设置 · 第一次进来</b>
+      空态不是留白，是把"未设置 / 0 个 / 未设"如实写出来。没设私密密码时那行<b>不给绿点</b>，
+      灰圈才是真状态；「解锁方式」这一行整个不出现——没设密码就没有解锁方式可言。</div>
+  </div>
+
+  <!-- ============ ③ 关于 ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:58</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"><span class="m"></span></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab">设置</div><div class="tab on">关于</div></div>
+
+        <div class="ghead first">这个产品</div>
+        <div class="card">
+          <div class="item"><span class="dot"><span class="m circle"></span></span>
+            <span class="tx"><span class="lbl">介绍</span></span>
+            <span class="right"><span class="val">v1.8.9</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot"><span class="m stripe"></span></span>
+            <span class="tx"><span class="lbl">功能</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+          <div class="item"><span class="dot"><span class="m dots"></span></span>
+            <span class="tx"><span class="lbl">隐私</span></span>
+            <span class="right"><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">联系</div>
+        <div class="card">
+          <div class="item"><span class="dot"><span class="m arc"></span></span>
+            <span class="tx"><span class="lbl">反馈</span></span>
+            <span class="right"><span class="val">18509828@qq.com</span><span class="arw"></span></span></div>
+          <div class="item"><span class="dot"><span class="m pill"></span></span>
+            <span class="tx"><span class="lbl">官网</span></span>
+            <span class="right"><span class="val">agentsbin.cn</span><span class="arw"></span></span></div>
+        </div>
+
+        <div class="ghead">分享这个产品</div>
+        <div class="card">
+          <div class="item tall"><span class="dot"><span class="m dots"></span></span>
+            <span class="tx"><span class="lbl">分享好友</span><span class="sub">点一下弹微信的分享面板</span></span>
+            <span class="right"><span class="val">+10 篇 / 人</span><span class="arw"></span></span></div>
+          <div class="item tall"><span class="dot"><span class="m circle"></span></span>
+            <span class="tx"><span class="lbl">笔记额度</span><span class="sub">每让 1 位好友用一次 +10 篇</span></span>
+            <span class="right"><span class="val">37 / 100</span><span class="arw"></span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>③ 关于 · 只能看的那一栏</b>
+      没有一行是彩色块——这一栏没有任何"当前值有颜色"的东西，所以它天然比设置安静，
+      两栏的性格就分开了。箭头只给进页的行，复制和弹面板的行<b>留一个同宽的占位</b>，
+      这样右边缘那根线是齐的。</div>
+  </div>
+
+  <!-- ============ ④ 解锁面板 ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:58</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">笔记详情</div>
+      <div class="view" style="padding:0">
+        <div style="height:1506px;background:var(--paper);padding:var(--sp-3)">
+          <div class="card" style="padding:var(--sp-4)">
+            <div style="font-size:var(--fs-h2);font-weight:800;color:var(--ter);letter-spacing:-.8px">这篇是私密的</div>
+            <div style="margin-top:14px;font-size:var(--fs-meta);line-height:1.6;color:var(--sec)">
+              正文、概要和要点在解锁之前不会从服务器取——不是界面藏起来了，是根本没发过来。</div>
+          </div>
+        </div>
+        <div class="mask"></div>
+        <div class="sheet">
+          <div class="s-title">解锁「私密」</div>
+          <div class="s-hint">用指纹，或者直接输 6 位密码</div>
+          <div class="bio">
+            <div class="ring"><div class="fp"><i></i><i></i><i></i><i></i></div></div>
+            <div class="bt">按下指纹</div>
+            <div class="bs">认证通过才取回这篇的正文</div>
+          </div>
+          <div class="s-two">
+            <div class="s-btn ghost">改用密码</div>
+            <div class="s-btn link">取消</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>④ 打开私密笔记时（探测到生物解锁才长这样）</b>
+      指纹优先、旁边一行退到密码。<b>凭证还是服务端那条 15 分钟短命 JWT，只存内存不落 storage</b>，
+      杀了重进照样要解锁，所以开指纹不会让"手机在别人手里翻不开"这句承诺变弱。</div>
+  </div>
+</div>
+
+<div class="rules">
+<b>这一版按什么标准收的，六条，每条都有出处：</b><br>
+<span class="n">①</span> <b>小字对比度。</b>现网右值和组标题用的 <code>--text-tertiary #9A9EA6</code>，压白卡实测 <b>2.69:1</b>、压页面底 <b>2.40:1</b>；这两处是 24/20rpx（≈12px / 10px）常规字重，WCAG 要求 4.5:1，<b>不合格</b>。这一版全改 <code>--text-secondary #5C6068</code>，实测 <b>6.31 / 5.64</b>。这不是这一屏的事——列表页、详情页、关于页的右值今天都用着这一档，属于全站要一起判的一条。<br>
+<span class="n">②</span> <b>颜色只在有语义时出现。</b>只有「卡片模板」「外观」两枚块上色，值取自代码里的真实常量：模板纸色 <code>PAPER_A #E4DCC7</code>（poster.js）、当前壁纸那套的 <code>--accent #1B2A21</code>（app.wxss <code>.theme-tint-celadon</code>）。块上的母题颜色也跟着用该色自己的 ink——<code>palette.js</code> 里 TONES 每档都自带 ink（芥末黄配白字实测只有 <b>1.63:1</b>，所以它配 <code>#2A2005</code>），这件事色板早就回答过了，我不另判。<br>
+<span class="n">③</span> <b>层级要有对比。</b>v4 九行全挂副标，等于每行都强调、结果谁都没被强调。这一版只给"第一次见会问这是什么"的四行副标，其余行干净。<br>
+<span class="n">④</span> <b>对齐。</b>组标题左沿从卡片 padding 挪到跟色块左沿同一根 x；右侧箭头统一占位宽，没箭头的行留同宽空位，右边缘那根线才齐。<br>
+<span class="n">⑤</span> <b>行高写死两档。</b>无副标 104rpx、有副标 128rpx，都在 88rpx 最小触控之上；不再靠 padding 撑出第三种高度。<br>
+<span class="n">⑥</span> <b>补空态。</b>新用户那一屏画了（第②屏）：空值如实写"未设置 / 0 个 / 未设"，状态点在没开的时候是灰圈不是绿点，「解锁方式」整行不出现。<br>
+<br>
+<b>还有一处我没自己做主：</b>上一轮你说"不要加 ICON"，这一轮要"图文结合"。我按<b>不引任何图标资源</b>处理——用系统里已有的色块 + 母题当图，跟放大镜、把手、海报母题一样全是 CSS 画的。如果你想更活泼，只要一句"中性块换成色板轮换"，那一版每行都会有颜色，但语义就没这么干净了。
+</div>
+</body>
+</html>
