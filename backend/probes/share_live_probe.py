@@ -19,10 +19,10 @@
    重新分享换的是全新的一张码而旧码不会复活、新码不再有七天过期、落地页带要点与链接。
 ⑥ 作者署名与转存（2026-09-24 下午这批）：昵称进公开快照、转存抄的是同一份字段、
    来源那一栏任何写接口都改不动、原笔记没了转存那篇照旧、撤掉之后那张码也转存不进东西。
-⑦ 额度改回 100 + 转存也算激活（2026-09-24 深夜这批）：接口形状、闸门挂在几条入口上、
-   source_note_id 与那条部分唯一索引真在库里、自己转存自己那一趟一分钱都不结。
-   现网只有 deploy-test 一个可写的号，"给作者结 10 篇"那条真给钱的分支在这里证不了，
-   由 backend/tests/test_quota_and_invite.py 的 Test转存也激活 那 10 条守着。
+⑦ MIND（2026-10-01 改口径）：笔记不限量，所以这里断的是"五条入口都不再挂闸门"；
+   接口形状、那两条部分唯一索引真在库里、自己转存自己那一趟一分都不结。
+   现网只有 deploy-test 一个可写的号，"给别人转存结 1 分"那条真给钱的分支在这里证不了，
+   由 backend/tests/test_quota_and_invite.py 的 Test转存加分 那 8 条守着。
 """
 import json
 import sys
@@ -308,10 +308,10 @@ def main():
         if p in ("/api/notes/", "/api/ingest/url", "/api/ingest/screenshots/stage",
                  "/api/ingest/screenshots/process", "/api/notes/from-share"):
             wired[p] = dep_names(route.dependant, set())
-    missing = [k for k, v in wired.items() if "require_note_room" not in v]
-    check("⑦ 五条入库入口全都还挂着额度闸门（漏一条就是从那儿绕开上限）",
-          len(wired) == 5 and not missing,
-          f"查到 {len(wired)} 条，缺闸门：{missing or '无'}")
+    still = [k for k, v in wired.items() if "require_note_room" in v or "quota_gate" in v]
+    check("⑦ 五条入库入口都不再挂额度闸门（笔记不限量，2026-10-01 起）",
+          len(wired) == 5 and not still,
+          f"查到 {len(wired)} 条，还挂着闸门的：{still or '无'}")
 
     check("⑦ ⑥ 那一趟是「自己转存自己那篇」，一分钱都不该结",
           db.query(Invitation).count() == inv_before, f"台账 {inv_before} → {db.query(Invitation).count()}")

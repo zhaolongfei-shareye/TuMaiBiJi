@@ -1,15 +1,15 @@
-"""worker 落库前那道身份 + 额度闸门的用例。
+"""worker 落库前那道身份闸门的用例。
 
-要挡的是两件在 HTTP 那条路上看不见的事：
+2026-10-10 更正：是 2026-10-01。要挡的原来有两件，现在只剩一件：
 
 ① **账号代数**。SQLite 的 INTEGER PRIMARY KEY 会复用已删除行的 id，所以"这个 id 上有人"
    不等于"还是提交任务那个人"。A 提交任务后注销、B 注册拿到同一个 id，少了 generation
    这层校验，A 抓回来的网页内容就会出现在 B 的笔记列表里——那是把一个人的内容递给另一个人。
 
-② **额度复查**。提交时那道闸门到 worker 落库之间隔着抓取 + 提炼的几十秒，中间用户可能又
-   手写了几篇。只在提交时查，100 篇的上限就是个软约束。
+② ~~额度复查~~ **这一档整个取消了**（站长 2026-10-01："拆掉后端100篇"）。笔记不限量，
+   worker 落库前不再看任何人存了几篇。下面专门留一条用例钉"不许再加回来"。
 
-这两条都只能在这里测：集成探针不起 worker，HTTP 用例走不到这条分支。
+身份这条只能在这里测：集成探针不起 worker，HTTP 用例走不到这条分支。
 """
 import os
 import sys
@@ -142,20 +142,24 @@ class Test整条任务不串号:
         assert notes_of(db, uid) == 0, "A 的抓取结果落进了复用同一 id 的 B 名下"
         assert statuses[-1][1] == "failed"
 
-    def test_额度满了任务不落库(self, db, statuses, stub_pipeline, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 3)
-        u = mk_user(db, "task-full")
+    def test_存了多少篇都不影响任务落库(self, db, statuses, stub_pipeline, monkeypatch):
+        """闸门撤了：起始值压到 1、他名下已经三篇，第四条任务照样要正常写完。
+
+        这条是反向钉——哪天有人在 worker 里顺手加回一句"到顶就失败"，这里会红。
+        """
+        monkeypatch.setattr(quota, "BASE_QUOTA", 1)
+        assert not hasattr(quota, "ensure_room")
+        u = mk_user(db, "task-free")
         for i in range(3):
             db.add(Note(user_id=str(u.id), title=f"占位{i}", source_type="manual"))
         db.commit()
 
         ingest_tasks.process_url_task("t7", str(u.id), "https://a.b/c", 1)
 
-        assert notes_of(db, u.id) == 3, "第 4 篇还是被写进去了"
-        assert statuses[-1][1] == "failed"
-        assert "上限" in statuses[-1][2]["error"]
+        assert notes_of(db, u.id) == 4, '任务被额度这一档拦住了，而它已经取消了'
+        assert statuses[-1][1] == "completed", statuses[-1]
 
-    def test_有额度且代数对得上时正常落库(self, db, statuses, stub_pipeline):
+    def test_代数对得上时正常落库(self, db, statuses, stub_pipeline):
         u = mk_user(db, "task-ok", generation=4)
 
         ingest_tasks.process_url_task("t8", str(u.id), "https://a.b/c", 4)
@@ -163,7 +167,7 @@ class Test整条任务不串号:
         assert notes_of(db, u.id) == 1
         assert statuses[-1][1] == "completed"
 
-    def test_截图那条任务同样受这两道闸门管(self, db, statuses, monkeypatch):
+    def test_截图那条任务同样受这道身份闸门管(self, db, statuses, monkeypatch):
         async def fake_ocr(images):
             return "识别出来的文字"
 

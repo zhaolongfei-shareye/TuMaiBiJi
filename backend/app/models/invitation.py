@@ -1,28 +1,39 @@
-from sqlalchemy import Column, Integer, String, DateTime, UniqueConstraint, Index, text
+from sqlalchemy import Column, Integer, String, DateTime, Index, text
 from sqlalchemy.sql import func
 from app.db.database import Base
 
 
 class Invitation(Base):
-    """一条"邀请成功"的凭据：有人因为谁的分享留下来，并且写下了他名下第一条笔记。
+    """一条"谁给谁加了分"的凭据。两档奖励都记在这里，用 `source_note_id` 空不空分开。
 
-    两条路都会记在这里：他自己动笔（`credit_first_note`），或者他把别人那篇转存进
-    自己库里（`credit_import`）。
+    - `source_note_id` 为空 = **动笔首篇**那一路：被邀请人自己写下名下第一条，
+      给邀请人 +10。一个人一辈子只成就一次，由 `invitee_id` 上的部分唯一索引
+      （只钉空行）挡；
+    - `source_note_id` 非空 = **转存**那一路：这个人把某一抄进了自己库，
+      给那篇的作者 +1。**不同用户各算一次，同一个用户对同一篇只算一次**，
+      由 `(source_note_id, invitee_id)` 的复合部分唯一索引挡（2026-10-01 改定：
+      原来是"一篇一辈子只挣一次"，那样一篇热门笔记发给一百个人转存作者只得 1 分，
+      和"不同用户都加分"这句话对不上）。
 
-    - `invitee_id` 唯一 = 一个账号一辈子只能替别人成就一次，重复归因和重复到账
-      在这一层就被数据库挡住，不靠应用层记得住；
-    - `source_note_id` 上的部分唯一索引 = 转存这一条路要指名是**哪篇笔记**把人带来的，
-      而同一篇笔记只给作者挣一次。只有转存填得上的行参与约束，动笔那一路没有
-      "哪篇笔记"可指，留空。
+    两档都不设次数上限：能挡的是"同一个人对同一篇反复转存"，挡不掉的是注册小号互转
+    （微信 openid 人手一个），所以防线放在去重而不是总量上。
     """
 
     __tablename__ = "invitations"
     __table_args__ = (
-        UniqueConstraint("invitee_id", name="uq_invitations_invitee"),
         Index("ix_invitations_inviter", "inviter_id"),
+        # 动笔那一路：一个人只替别人成就一次（只管源笔记为空的行）
         Index(
-            "ux_invitations_one_reward_per_source_note",
+            "ux_invitations_first_note_per_invitee",
+            "invitee_id",
+            unique=True,
+            sqlite_where=text("source_note_id IS NULL"),
+        ),
+        # 转存那一路：同一篇 × 同一个人只算一次（不同用户各算一次）
+        Index(
+            "ux_invitations_import_once_per_pair",
             "source_note_id",
+            "invitee_id",
             unique=True,
             sqlite_where=text("source_note_id IS NOT NULL"),
         ),

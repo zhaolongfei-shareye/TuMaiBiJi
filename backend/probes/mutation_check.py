@@ -46,13 +46,6 @@ MUTATIONS = [
         "tests/test_worker_identity.py",
     ),
     (
-        "A3 worker 落库前不再复查额度",
-        "app/tasks/ingest_tasks.py",
-        "            quota.ensure_room(user, db)\n",
-        "",
-        "tests/test_worker_identity.py",
-    ),
-    (
         "A5 注销不追回邀请奖励",
         "app/api/routes/user.py",
         "        before = inviter.quota_bonus\n"
@@ -72,7 +65,7 @@ MUTATIONS = [
         "app/api/routes/notes.py",
         "    quota.credit_import(db, user, share.note_id)\n",
         "",
-        "tests/test_quota_and_invite.py::Test转存也激活",
+        "tests/test_quota_and_invite.py::Test转存加分",
     ),
     (
         "N2 「同一篇只挣一次」的索引没建上（最后一道闸没了）",
@@ -84,7 +77,7 @@ MUTATIONS = [
         "            sqlite_where=text(\"source_note_id IS NOT NULL\"),\n"
         "        ),\n",
         "",
-        "tests/test_quota_and_invite.py::Test转存也激活::test_一篇一次是数据库挡的_而且只管填得上源笔记的行",
+        "tests/test_quota_and_invite.py::Test转存加分::test_去重是数据库挡的_而且两条路各管各的",
     ),
     # 没有"N3 去掉索引的 WHERE source_note_id IS NOT NULL"这一条：SQLite 和 Postgres
     # 的唯一索引本来就把多个 NULL 当成互不相等，去掉这个 where 子句行为一字不变，
@@ -94,32 +87,21 @@ MUTATIONS = [
         "app/services/quota.py",
         "    if src is None or not _first_note_of(db, importer):\n",
         "    if src is None:\n",
-        "tests/test_quota_and_invite.py::Test转存也激活",
+        "tests/test_quota_and_invite.py::Test转存加分",
     ),
     (
         "N5 转存不判「作者就是转存人自己」",
         "app/services/quota.py",
         "    if author_pk == importer.id:\n        return 0\n",
         "",
-        "tests/test_quota_and_invite.py::Test转存也激活",
-    ),
-    (
-        "N6 转存这条入口没挂额度闸门（从这儿绕开上限）",
-        "app/api/routes/notes.py",
-        "    req: NoteFromShare,\n"
-        "    db: Session = Depends(get_db),\n"
-        "    user: User = Depends(require_note_room),\n",
-        "    req: NoteFromShare,\n"
-        "    db: Session = Depends(get_db),\n"
-        "    user: User = Depends(get_current_user),\n",
-        "tests/test_quota_and_invite.py::Test转存也激活",
+        "tests/test_quota_and_invite.py::Test转存加分",
     ),
     (
         "N7 结转账目不兜索引异常（真并发撞上来时整条转存报 500）",
         "app/services/quota.py",
         "    except IntegrityError:\n",
         "    except ValueError:\n",
-        "tests/test_quota_and_invite.py::Test转存也激活::test_并发撞索引那一趟只回零不把转存弄失败",
+        "tests/test_quota_and_invite.py::Test转存加分::test_并发撞索引那一趟只回零不把转存弄失败",
     ),
     (
         "A10 补报端点恒回 applied=true",

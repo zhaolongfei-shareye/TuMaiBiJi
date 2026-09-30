@@ -116,14 +116,14 @@ Page({
     })
   },
 
-  // 脑力值 = 服务端给的底数 + 攒下的奖励，两个数都从 /api/user/quota 读，界面不写死 100。
-  // 读不到就整块不占位：宁可空着，也不摆一个猜的数。
+  // MIND 只读服务端那一个数（规则整条写在 backend/app/services/quota.py，界面不再自己相加，
+  // 免得两边各算一套）。读不到就整块不占位：宁可空着，也不摆一个猜的数。
   async loadQuota() {
     const lang = this.data.lang
     try {
       const q = await api.getQuota()
       this.setData({
-        scoreText: String((q.base || 0) + (q.bonus || 0)),
+        scoreText: q.mind == null ? '' : String(q.mind),
         shareValue: fmt(t('shareRewardN', lang), { n: q.reward_each }),
       })
       this.quota = q

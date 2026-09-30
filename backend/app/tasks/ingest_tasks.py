@@ -81,10 +81,6 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
             user = _load_task_user(db, task_id, user_id, generation)
             if user is None:
                 return
-            # 落库前再查一次额度：提交时那道闸门到这儿已经过去了几十秒（抓取 + 提炼），
-            # 中间用户可能又手写了几篇。UserError 会冒到下面那个 except，文案原样进 toast。
-            quota.ensure_room(user, db)
-
             note = Note(
                 user_id=user_id,
                 title=knowledge["title"],
@@ -129,8 +125,6 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
             user = _load_task_user(db, task_id, user_id, generation)
             if user is None:
                 return
-            quota.ensure_room(user, db)
-
             note = Note(
                 user_id=user_id,
                 title=knowledge["title"],
