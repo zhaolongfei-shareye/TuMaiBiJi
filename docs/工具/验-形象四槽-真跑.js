@@ -35,9 +35,11 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
   q.selectAll('.bin').boundingClientRect()
   q.selectAll('.plus').boundingClientRect()
   q.select('.face-hint').boundingClientRect()
+  q.select('.slots-scroll').boundingClientRect()
+  q.select('.slots-scroll').scrollOffset()
   q.exec((res) => resolve({
     slots: res[0] || [], discs: res[1] || [], chipsBox: res[2] || [], chips: res[3] || [],
-    bins: res[4] || [], plus: res[5] || [], hint: res[6],
+    bins: res[4] || [], plus: res[5] || [], hint: res[6], strip: res[7], scroll: res[8],
     windowWidth: wx.getWindowInfo().windowWidth,
   }))
 }))
@@ -145,7 +147,7 @@ async function gotoProfile(mp) {
     ck('提示那一行在格子下面且真的高度（不满时是"怎么放图"那句）', !!m.hint && m.hint.height > 0
       && m.hint.top > m.slots[3].top - 10)
 
-    // ---------- ② 满态：2×2 ----------
+    // ---------- ② 满态：一行四个、左右滑 ----------
     const first = [{ card: true, bg: true }, {}, {}, {}]
     const seeded = await seedSlots(mp, first)
     if (seeded.fatal) throw new Error(seeded.fatal)
@@ -157,15 +159,45 @@ async function gotoProfile(mp) {
     ck('四个格子摆满了（每张都有图，没有 ➕）', m.slots.length === 4 && m.plus.length === 0
       && m.discs.length === 4, `➕ ${m.plus.length}`)
     const topOf = m.slots.map((r) => Math.round(toRpx(r.top, w)))
-    ck('确实是 2×2：前两枚一行、后两枚第二行',
-      Math.abs(m.slots[0].top - m.slots[1].top) < 4 && Math.abs(m.slots[2].top - m.slots[3].top) < 4
-      && m.slots[2].top > m.slots[1].top + 40, `top(rpx)=${topOf.join(',')}`)
+    ck('确实是一行：四枚同一条基线（不是两行）',
+      Math.max(...m.slots.map((r) => r.top)) - Math.min(...m.slots.map((r) => r.top)) < 4,
+      `top(rpx)=${topOf.join(',')}`)
     const slotW = toRpx(m.slots[0].width, w)
-    ck('每格宽 248rpx（两字芯片一行放不下，所以是 2×2 不是 1×4）',
-      Math.abs(slotW - 248) <= 3, `${Math.round(slotW)}rpx`)
-    ck('四个格子横着没超出屏幕（最右那枚的右边还在可视区里）',
-      m.slots[1].right <= w + 1 && m.slots[3].right <= w + 1,
-      `屏宽 ${Math.round(w)}px，右缘 ${Math.round(m.slots[3].right)}px`)
+    ck('每格 200rpx（两字芯片并排要 160，这是不放下的最小档）',
+      Math.abs(slotW - 200) <= 3, `${Math.round(slotW)}rpx`)
+    // 一行放不下四格 ⇒ 必须真滑得动。先用 scrollWidth 判"有东西可滑"，
+    // 再真滑到底，判"最后一枚滑得到"——只判前者等于没判（内容超宽但滑不动是另一种坏法）。
+    ck('这一条的内容比它自己的可视宽还宽（所以确实要滑）',
+      m.scroll.scrollWidth > m.strip.width + 1,
+      `内容 ${Math.round(toRpx(m.scroll.scrollWidth, w))}rpx / 可视 ${Math.round(toRpx(m.strip.width, w))}rpx`)
+    ck('没滑之前最后一枚在可视区外', m.slots[3].right > m.strip.right + 1,
+      `第 4 格右 ${Math.round(m.slots[3].right)}px / 条右 ${Math.round(m.strip.right)}px`)
+    const scrolled = await mp.evaluate(() => new Promise((resolve) => {
+      wx.createSelectorQuery().select('#slotsScroll').node().exec((res) => {
+        const n = res && res[0] && res[0].node
+        if (!n || typeof n.scrollTo !== 'function') return resolve('scrollTo 不可用')
+        n.scrollTo({ left: 9999, animated: false })
+        setTimeout(() => resolve(true), 500)
+      })
+    }))
+    ck('滑到底这一下真执行了', scrolled === true, String(scrolled))
+    m = await measure(mp)
+    ck('滑到底能看见最后一枚（它整个进了可视区）',
+      m.slots[3].right <= m.strip.right + 1 && m.slots[3].left >= m.strip.left - 1,
+      `第 4 格 ${Math.round(m.slots[3].left)}~${Math.round(m.slots[3].right)}px / 条 ${Math.round(m.strip.left)}~${Math.round(m.strip.right)}px`)
+    await mp.evaluate(() => new Promise((resolve) => {
+      wx.createSelectorQuery().select('#slotsScroll').node().exec((res) => {
+        const n = res && res[0] && res[0].node
+        if (n && typeof n.scrollTo === 'function') n.scrollTo({ left: 0, animated: false })
+        setTimeout(resolve, 400)
+      })
+    }))
+    // 回到最左再重量一遍：③ 那几条量的是"相邻两格会不会撞"，
+    // 拿着滑到最右那一档的坐标去比，等于在比两个都不在视野里的盒子，判不出真问题。
+    m = await measure(mp)
+    ck('滑回最左之后第一枚又完整回到视野里',
+      m.slots[0].left >= m.strip.left - 1 && m.slots[0].right <= m.strip.right + 1,
+      `第 1 格 ${Math.round(m.slots[0].left)}~${Math.round(m.slots[0].right)}px / 条 ${Math.round(m.strip.left)}~${Math.round(m.strip.right)}px`)
 
     // ---------- ③ 芯片与垃圾桶的落位 ----------
     ck('八枚芯片：每格两枚', m.chips.length === 8, `${m.chips.length} 枚`)
@@ -176,13 +208,21 @@ async function gotoProfile(mp) {
     ck('芯片条压在圆的下沿：顶在圆里、底略微出（出界只那几 px）',
       cb0.top > disc0.top && cb0.bottom > disc0.bottom && (cb0.bottom - disc0.bottom) < 8,
       `出界 ${Math.round(cb0.bottom - disc0.bottom)}px`)
+    // 这一条是"挪进 scroll-view"带来的新风险：越出格子的东西会被那条边裁掉，
+    // 壁纸那一排的勾就是这么被切过的（留白没给够 ⇒ 最后一枚芯片少半截）。
+    ck('越出格子的那几 px 没被 scroll-view 裁掉（每格芯片底边都还在条子里）',
+      m.chipsBox.every((c) => c.bottom <= m.strip.bottom + 0.5),
+      `最底 ${Math.round(Math.max(...m.chipsBox.map((c) => c.bottom)))}px / 条子底 ${Math.round(m.strip.bottom)}px`)
+    ck('垃圾桶也没被裁（四枚顶边都在条子内）',
+      m.bins.every((b) => b.top >= m.strip.top - 0.5 && b.bottom <= m.strip.bottom + 0.5),
+      `${m.bins.length} 枚`)
     const gapPx = 6 * w / 750
     const twoChips = m.chips[0].width + gapPx + m.chips[1].width
     ck('同一格两枚并排没超过格宽（超了就是字太大或该换行）',
       twoChips <= m.slots[0].width + 1, `${Math.round(toRpx(twoChips, w))}rpx / 格 ${Math.round(slotW)}rpx`)
-    ck('相邻两格的芯片条没重叠（第二枚的右边 ≤ 下一格芯片的左边）',
-      m.chips[1].right <= m.chips[2].left + 1 || Math.abs(m.slots[0].top - m.slots[2].top) > 4,
-      `第 1 格右 ${Math.round(m.chips[1].right)}px / 第 3 格左 ${Math.round(m.chips[2].left)}px`)
+    ck('相邻两格的芯片条没重叠',
+      m.chips[1].right <= m.chips[2].left + 1,
+      `第 1 格右 ${Math.round(m.chips[1].right)}px / 第 2 格左 ${Math.round(m.chips[2].left)}px`)
     ck('四枚垃圾桶都在，且没越出各自那一格',
       m.bins.length === 4 && m.bins.every((b, i) => b.right <= m.slots[i].right + 1
         && b.left >= m.slots[i].left - 1 && b.top >= m.slots[i].top - 1), `${m.bins.length} 枚`)

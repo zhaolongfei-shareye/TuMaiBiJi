@@ -181,7 +181,15 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
     !/avatarChange|avatarDrop|avatarPick|avatarHint/.test(wxml + i18n))
   ck('芯片字号用现网最底一档 --fs-micro（他要的"按钮字体可以小点"）',
     /\.chip\s*\{[^}]*font-size:\s*var\(--fs-micro\)/.test(wxss))
-  ck('四个槽是 2×2：一行放不下两字芯片，所以换行', /\.slots\s*\{[^}]*flex-wrap:\s*wrap/.test(wxss))
+  // 只掐 .slots 这一条规则：整份 wxss 里模板小样那一排（.grid）本来就合法地换行，
+  // 拿全文件判"没有 flex-wrap"会把它一起算进来，红得没道理。
+  const slotsCss = (wxss.match(/\n\.slots\s*\{[\s\S]*?\n\}/) || [''])[0]
+  ck('四个槽是一行 + 左右滑（站长 09-30 打回：两行太占地方）',
+    /scroll-x/.test(wxml) && /display:\s*inline-flex/.test(slotsCss) && !/flex-wrap/.test(slotsCss),
+    slotsCss.replace(/\s+/g, ' ').trim().slice(0, 60))
+  ck('滑出界的那 4rpx 芯片有留白接着（scroll-view 会裁越界的内层）',
+    /\.slots\s*\{[^}]*padding:[^}]*16rpx/.test(wxss))
+  ck('每一格 flex:none（漏了这条四格会被挤扁成四个窄圈）', /\.slot\s*\{[^}]*flex:\s*none/.test(wxss))
   const keys = ['slotCard', 'slotBg', 'slotHint', 'slotHintFull', 'slotDropTitle', 'slotDropOk', 'slotDropBody', 'slotDropWasCard', 'slotDropWasBg']
   keys.forEach((k) => {
     const n = (i18n.match(new RegExp(`\\b${k}:`, 'g')) || []).length
