@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 「我的」方向选择 v3（中文 · 2026-09-30）</title>
+<style>
+/* 只给三个方向挑，不展开细节。共同点：LOGO + 名称固定在头部，设置 / 关于 是第二层 tab，
+   分享和额度都是普通文字行（不再有大色块、不再有实心大按钮）。
+   口径照旧从代码侧取：一屏 = 外框 184 + 视口 1506 = 1690，px 当 rpx 用，设计宽 750；
+   行 30rpx 上下、分隔线 3px rgba(35,37,44,.10)、左字 28/700、右值 24 灰；
+   tab 抄现网 about 页那一条文字 + 6rpx 下划线；卡片圆角 40、内边距 24 32 32。 */
+  :root{
+    --paper:#F2EFE9; --ink:#23252C; --card:#fff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06); --sec:#5C6068; --ter:#9A9EA6; --clay:#D2683F; --danger:#C24A3F;
+    --fs-h1:42px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px; --fs-label:20px;
+    --r-card:40px; --r-pill:999px; --w-edge:3px;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.5 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:16px;font-size:15px;color:#4a4d55;line-height:1.7;max-width:750px}
+  .cap b{display:block;font-size:18px;color:#1d1f24;margin-bottom:4px}
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);position:relative}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:26px;font-weight:600;color:var(--ink)}
+  .status .r{font-size:22px;font-weight:500}
+  .nav{height:90px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600}
+  .view{height:1506px;background:var(--paper);padding:2px var(--sp-3) 0}
+  .head{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-4) 4px var(--sp-3)}
+  .logo{flex:none;width:76px;height:76px;border-radius:24px;
+    background:conic-gradient(from 210deg,#E08354,#A94A22,#E08354);position:relative}
+  .logo::after{content:"麦";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:36px;font-weight:700}
+  .hname{font-size:34px;font-weight:700;letter-spacing:-.6px;color:var(--ink)}
+  .hslog{display:block;margin-top:2px;font-size:var(--fs-tiny);color:var(--sec)}
+  .tabs{display:flex;gap:56px;padding:0 4px;margin-bottom:var(--sp-3)}
+  .tab{position:relative;padding:18px 0 16px;font-size:var(--fs-body);font-weight:700;color:var(--ter)}
+  .tab.on{color:var(--ink)}
+  .tab.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:6px;border-radius:3px;background:var(--clay)}
+  .ghead{margin:var(--sp-4) 0 var(--sp-2);padding-left:8px;font-size:var(--fs-label);font-weight:700;
+    letter-spacing:.6px;color:var(--ter)}
+  .ghead.first{margin-top:var(--sp-1)}
+  .card{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:0 var(--sp-4);margin-bottom:var(--sp-2)}
+  .item{display:flex;align-items:center;justify-content:space-between;padding:30px 0;
+    border-bottom:var(--w-edge) solid var(--edge)}
+  .item:last-child{border-bottom:none}
+  .lbl{font-size:var(--fs-body);font-weight:700;letter-spacing:-.3px;color:var(--ink)}
+  .lbl.d{color:var(--danger)}
+  .sub{display:block;margin-top:5px;font-size:var(--fs-tiny);font-weight:400;color:var(--ter);letter-spacing:0}
+  .right{display:flex;align-items:center;gap:8px}
+  .val{font-size:var(--fs-meta);color:var(--ter)}
+  .arw{font-size:30px;color:var(--ter);line-height:1}
+  .dot{width:14px;height:14px;border-radius:50%;background:#46A863;display:inline-block}
+
+  /* B：顶部一条窄摘要行（白底，跟其他行同族，只是带一枚小圆头像） */
+  .peek{display:flex;align-items:center;gap:var(--sp-3);padding:26px var(--sp-4)}
+  .peek .av{flex:none;width:76px;height:76px;border-radius:50%;overflow:hidden;background:var(--idle)}
+  .peek .av img{width:100%;height:100%;object-fit:cover}
+  .peek .nm{font-size:var(--fs-body);font-weight:700;color:var(--ink)}
+  .peek .sl{display:block;margin-top:3px;font-size:var(--fs-tiny);color:var(--ter);font-weight:400}
+  .card.tight{padding:0}
+  /* C：同 B，只把名称点一下主色，不铺色块 */
+  .clayname .nm{color:var(--clay)}
+</style>
+</head>
+<body>
+<h1 style="font-size:22px;margin-bottom:6px">「我的」· 先挑一个方向</h1>
+<p style="color:#4a4d55;margin-bottom:24px;max-width:1500px">2026-09-30 晚 · 一屏 750×1690，px 当 rpx 用。<b>三个方向共同的改动已经定下了：LOGO 和名称固定在头部、设置 / 关于 是第二层 tab、分享挪到关于最后并且就是普通一行、额度在分享下面一行。大卡片和实心大按钮都撤了。</b>下面只差一件事要你挑：顶部那一块要不要留一条"我现在用的是哪套卡片"的摘要。</p>
+
+<div class="row">
+
+  <!-- ============ A ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:26</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+        <div class="ghead first">内容与外观</div>
+        <div class="card">
+          <div class="item"><span class="lbl">卡片模板</span><span class="right"><span class="val">玉版宣</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">外观</span><span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">分类</span><span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead">私密</div>
+        <div class="card">
+          <div class="item"><span class="lbl">私密<span class="sub">「私密」这一格要解锁才看得到</span></span>
+            <span class="right"><span class="dot"></span><span class="val">已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">解锁方式<span class="sub">开了就不用每次输密码</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead">账号</div>
+        <div class="card"><div class="item"><span class="lbl d">注销</span><span class="arw">›</span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>甲 · 纯文字列表</b>
+      最克制的一版：整屏只有白卡、文字、灰字右值，一个色块都没有。跟 iOS 设置页同一路子。
+      代价是"我现在用的是哪套卡片、形象长什么样"要进「卡片模板」才看得到。</div>
+  </div>
+
+  <!-- ============ B ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:26</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+        <div class="card tight">
+          <div class="peek"><div class="av"><img src="../../miniprogram/assets/home-bg-portrait.jpg"></div>
+            <div><div class="nm">平安喜乐</div><span class="sl">玉版宣 · 卡片模板</span></div>
+            <span class="arw" style="margin-left:auto">›</span></div>
+        </div>
+        <div class="ghead first">内容与外观</div>
+        <div class="card">
+          <div class="item"><span class="lbl">外观</span><span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">分类</span><span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead">私密</div>
+        <div class="card">
+          <div class="item"><span class="lbl">私密<span class="sub">「私密」这一格要解锁才看得到</span></span>
+            <span class="right"><span class="dot"></span><span class="val">已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">解锁方式<span class="sub">开了就不用每次输密码</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead">账号</div>
+        <div class="card"><div class="item"><span class="lbl d">注销</span><span class="arw">›</span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>乙 · 顶部一条窄摘要（白底）</b>
+      甲 的列表原样，只把「卡片模板」那一行换成一条带小圆头像的摘要：他的形象 + 名称 + 当前模板名，
+      一行高（约 128rpx），点它进的就是原来那一页。<b>白底、同圆角、同描边</b>，跟下面的行是一族，
+      不是独立的一块装饰。这一条顶掉了原来那一行菜单，所以列表总数没变多。</div>
+  </div>
+
+  <!-- ============ C ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:26</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+        <div class="card tight clayname">
+          <div class="peek"><div class="av"><img src="../../miniprogram/assets/home-bg-portrait.jpg"></div>
+            <div><div class="nm">平安喜乐</div><span class="sl">玉版宣 · 卡片模板</span></div>
+            <span class="arw" style="margin-left:auto">›</span></div>
+        </div>
+        <div class="ghead first">内容与外观</div>
+        <div class="card">
+          <div class="item"><span class="lbl">外观</span><span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">分类</span><span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead">私密</div>
+        <div class="card">
+          <div class="item"><span class="lbl">私密<span class="sub">「私密」这一格要解锁才看得到</span></span>
+            <span class="right"><span class="dot"></span><span class="val">已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">解锁方式<span class="sub">开了就不用每次输密码</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead">账号</div>
+        <div class="card"><div class="item"><span class="lbl d">注销</span><span class="arw">›</span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>丙 · 同乙，只把名称点一下品牌色</b>
+      结构跟乙完全一样，只多一处：摘要里那个名称用砖橙 <code>#D2683F</code>（跟 tab 下划线同色），
+      让这一条在满屏黑字里能被眼睛先抓到。<b>不铺色块、不加描边</b>，所以不会像上一版那样跳出来。
+      喜欢更素就退回乙。</div>
+  </div>
+
+  <!-- ============ 关于栏 ============ -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:26</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head"><div class="logo"></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div></div>
+        <div class="tabs"><div class="tab">设置</div><div class="tab on">关于</div></div>
+        <div class="ghead first">这个产品</div>
+        <div class="card">
+          <div class="item"><span class="lbl">介绍</span><span class="right"><span class="val">v1.8.9</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">功能</span><span class="arw">›</span></div>
+          <div class="item"><span class="lbl">隐私</span><span class="arw">›</span></div>
+        </div>
+        <div class="ghead">联系</div>
+        <div class="card">
+          <div class="item"><span class="lbl">反馈</span><span class="val">18509828@qq.com</span></div>
+          <div class="item"><span class="lbl">官网</span><span class="val">agentsbin.cn</span></div>
+        </div>
+        <div class="ghead">分享这个产品</div>
+        <div class="card">
+          <div class="item"><span class="lbl">分享好友<span class="sub">点一下弹微信的分享面板</span></span><span class="val">+10 篇 / 人</span></div>
+          <div class="item"><span class="lbl">笔记额度<span class="sub">每让 1 位好友用一次 +10 篇</span></span>
+            <span class="right"><span class="val">37 / 100</span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>关于这一栏（甲乙丙共用，不随方向变）</b>
+      分享和额度就是<b>两行普通文字菜单</b>，跟上面「介绍 / 功能 / 隐私」一模一样，没有任何特殊处理：
+      分享那行右侧给"+10 篇 / 人"，额度那行给"37 / 100"，两行都不给箭头（一个弹原生面板、一个只能看）。
+      原来那行「关于图麦笔记」整行撤掉，它的三块内容提到这一栏来。</div>
+  </div>
+</div>
+</body>
+</html>
