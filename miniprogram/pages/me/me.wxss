@@ -8,6 +8,12 @@
    可见高度 502 = 视口 1506 的三分之一；卡片往上盖住 40，所以这块盒子是 542。 */
 .head {
   position: relative;
+  /* .container 自带 24rpx 左右内边距，而这一块的口径是"图贴屏边、只有下方两角收圆"，
+     所以自己把那份内边距顶回去。这里写死 24rpx 而不是 calc(-var(--sp-3))：
+     真跑尺子量过，带 calc 的这条在这份编译里整条规则被丢掉，页面直接不渲染。
+     改了 --sp-3 要记得同步这里——`验-我的页改版-真跑.js` 有一条钉"留白卡左右贴屏边"。 */
+  margin-left: -24rpx;
+  margin-right: -24rpx;
 }
 
 .head-band {
@@ -63,34 +69,45 @@
   color: var(--bg-page);
 }
 
-/* ---------- 脑力值：压在图右下角的大数字 ----------
-   瘦长那一族是系统自带的英文体，拿不到就退回系统体：数字仍然读得出，只是没那么窄。
-   半透明是站长点名的（不要糊在照片上）。 */
+/* ---------- MIND 那个大数字：Poppins Thin，压在图右下角 ----------
+   站长要的是 iPhone 锁屏时钟那种"细、长、圆"。那版真身是 SF Pro Rounded，
+   苹果许可只允许在苹果设备上用、不能打进包分发，所以走开源最接近的一支：
+   Poppins Thin 100（OFL，可商用可内嵌）。字体只裁 0-9 十个数字、base64 内嵌，
+   1.9KB 进包，不占域名、不会出现"字体还没到、数字先跳一下"。
+   数字比上一版收 8 成（126 到 100），英文字跟着收到最小一档字阶 18，并与数字居中。 */
+@font-face {
+  font-family: 'WtsjMind';
+  src: url(data:font/ttf;base64,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) format('truetype');
+  font-weight: 100;
+}
+
 .score {
   position: absolute;
   right: 30rpx;
   bottom: 56rpx;
   z-index: 4;
-  text-align: right;
 }
 
 .score-n {
   display: block;
-  font-family: 'Avenir Next Condensed', 'DIN Alternate', 'HelveticaNeue-CondensedBold', sans-serif;
-  font-size: 126rpx;
-  font-weight: 600;
-  letter-spacing: -2rpx;
-  line-height: 0.82;
-  color: rgba(242, 239, 233, 0.72);
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-size: 100rpx;
+  font-weight: 100;
+  line-height: 0.86;
+  color: rgba(242, 239, 233, 0.74);
 }
 
 .score-l {
   display: block;
   margin-top: 10rpx;
-  font-size: var(--fs-label);
+  /* 字距是加在每个字母后面的，整串会比视觉宽度多出一个字距的尾巴；
+     补一个同宽的左内边距，居中才真的对到数字中间 */
+  padding-left: 6rpx;
+  text-align: center;
+  font-size: var(--fs-micro);
   font-weight: 700;
-  letter-spacing: 5rpx;
-  color: rgba(242, 239, 233, 0.66);
+  letter-spacing: 6rpx;
+  color: rgba(242, 239, 233, 0.62);
 }
 
 /* ---------- 留白区：圆 LOGO 与右边两行字等高（80 = 31×1.25 + 7 + 24×1.4） ---------- */

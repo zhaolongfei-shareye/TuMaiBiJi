@@ -7,8 +7,8 @@
 /* ==================================================================
    v10 = v9 + 站长 10-01 凌晨这五条：
      ① 「积分」改名「脑力值」；
-     ② 那个大数值换英文字体（瘦长那一族：Avenir Next Condensed / DIN Alternate），
-        并改成半透明；
+     ② 大数值用 Poppins Thin 100（iPhone 时钟那种细圆长，只裁 0-9 内嵌 1.9KB），
+        半透明、比上一版收 8 成，下面那行英文字跟着缩小并与数字居中；
      ③ LOGO 再缩小，高度与右边两行文字一致（31×1.25 + 7 + 24×1.4 ≈ 80 → 圆 80）；
      ④ 留白区与底图之间那条缝，左右两个角要做成弧度（做法：图往下多铺 40，
         留白区整块用圆角卡盖在它上面，于是四个角都是弧、缝也是弧）；
@@ -66,12 +66,12 @@
   .seg.on{background:var(--ink);color:var(--paper)}
 
   /* ---------- ①② 脑力值：背景图右下角一个大数值 ---------- */
-  .score{position:absolute;right:30px;bottom:56px;z-index:4;text-align:right;
-    color:rgba(242,239,233,.72)}
-  .score b{display:block;font-family:var(--num);font-size:126px;font-weight:600;
-    letter-spacing:-2px;line-height:.82;font-variant-numeric:tabular-nums}
-  .score span{display:block;margin-top:10px;font-size:var(--fs-label);font-weight:700;
-    letter-spacing:5px;color:rgba(242,239,233,.66)}
+  @font-face{font-family:'WtsjMind';src:url(data:font/ttf;base64,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) format('truetype');font-weight:100}
+  .score{position:absolute;right:30px;bottom:56px;z-index:4}
+  .score b{display:block;font-family:'WtsjMind','Poppins',sans-serif;font-size:100px;
+    font-weight:100;line-height:.86;color:rgba(242,239,233,.74)}
+  .score span{display:block;margin-top:10px;padding-left:6px;text-align:center;
+    font-size:var(--fs-micro);font-weight:700;letter-spacing:6px;color:rgba(242,239,233,.62)}
 
   /* ---------- ③ 留白区：圆 80 = 右边两行字的高度，缝的左右两角是弧 ---------- */
   .ident{position:relative;margin-top:-40px;height:144px;padding:0 32px;display:flex;
@@ -166,8 +166,8 @@
   .cmp{width:750px;background:var(--paper);border:1px solid #ddd8cc;border-radius:36px;overflow:hidden;
     box-shadow:0 14px 34px rgba(0,0,0,.10);padding:24px 0}
   .cmp .band{height:380px}
-  .cmp .score b{font-size:104px}
-  .cmp .score{bottom:64px}
+  .cmp .score b{font-size:100px}
+  .cmp .score{bottom:56px}
 </style>
 </head>
 <body>
@@ -199,7 +199,7 @@
       <div class="head-card">
         <div class="band"><div class="scrim"></div>
           <div class="pill"><div class="seg on">设置</div><div class="seg">关于</div></div>
-          <div class="score"><b>100</b><span>脑力值</span></div>
+          <div class="score"><b>100</b><span>MIND</span></div>
         </div>
         <div class="ident">
           <div class="av brand"></div>
@@ -360,7 +360,7 @@
       <div class="head-card">
         <div class="band"><div class="scrim"></div>
           <div class="pill"><div class="seg">设置</div><div class="seg on">关于</div></div>
-          <div class="score"><b>100</b><span>脑力值</span></div>
+          <div class="score"><b>100</b><span>MIND</span></div>
         </div>
         <div class="ident">
           <div class="av brand"></div>
@@ -378,7 +378,7 @@
         <div class="r"><span class="rn">产品官网</span><span class="rs"><span class="rv">agentsbin.cn</span><span class="ico"><i></i></span></span></div>
         <div class="r"><span class="rn">反馈邮箱</span><span class="rs"><span class="rv">18509828@qq.com</span><span class="ico"><i></i></span></span></div>
         <div class="r"><span class="rn">分享好友</span><span class="rs"><span class="rv">新写作者 +10，被转存 +1</span><span class="ico"><i></i></span></span></div>
-        <div class="r"><span class="rn">脑力值</span><span class="rs"><span class="rv">100</span></span></div>
+        <div class="r"><span class="rn">MIND</span><span class="rs"><span class="rv">100</span></span></div>
       </div>
       <div class="tabbar">
         <div class="ti"><div class="g"></div><div class="lb">新建</div></div>
@@ -401,7 +401,7 @@
     <div class="head-card">
       <div class="band"><div class="scrim"></div>
         <div class="pill"><div class="seg on">设置</div><div class="seg">关于</div></div>
-        <div class="score"><b>100</b><span>脑力值</span></div>
+        <div class="score"><b>100</b><span>MIND</span></div>
       </div>
       <div class="ident">
         <div class="av brand"></div>
@@ -420,7 +420,7 @@
     <div class="head-card">
       <div class="band"><div class="scrim"></div>
         <div class="pill"><div class="seg on">设置</div><div class="seg">关于</div></div>
-        <div class="score"><b>148</b><span>脑力值</span></div>
+        <div class="score"><b>148</b><span>MIND</span></div>
       </div>
       <div class="ident">
         <div class="av" style="background-image:url('../../miniprogram/assets/home-bg-portrait.jpg')"></div>
