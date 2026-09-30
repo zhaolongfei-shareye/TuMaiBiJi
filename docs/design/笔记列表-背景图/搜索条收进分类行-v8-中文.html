@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 搜索条收进分类那一行 v8（中文 · 2026-09-30）</title>
+<style>
+/* ==================================================================
+   站长 09-30 原话："搜索条目前看起来太大，不美观，你改为默认按钮在，分类按钮同一行，
+   在最右侧，点击按钮就向左弹出，占满整行，如果用户点击其他空白区，就缩回。你出效果图。"
+
+   三屏：① 收起（默认）——搜索条整块不占一行，只在分类那排的最右留一枚圆钮
+         ② 点开——整行向左弹出占满 24–726，分类那排暂时收起
+         ③ 输入中——右边多一枚 ✕（现网 .sc-x 本来就有，只在有词时出现）；点空白处缩回 ①
+
+   口径全从代码侧取，不另造数：
+   · 一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690；px 当 rpx 用，设计宽 750。
+   · 背景 = miniprogram/assets/home-bg-portrait.jpg（865×1670），cover，
+     压暗停点逐字抄 create.wxss / index.wxss 的 .page-scrim。
+   · 搜索条在图上固定纸白 #f2efe9 + 墨 #23252c + 阴影 0 18 46 rgba(8,10,14,.42)
+     ——这三条是 index.wxss:725 `.container.has-bg .sc-card` 现成的，一个字没改。
+   · 卡内几何照抄 .sc-card：padding 26/24/20、里面那条线高 64、下划线 3 不透明度 .42、
+     输入字 --fs-body 28、"搜索笔记" --fs-title 31 / 800、✕ --fs-meta 24 / .7。
+   · 分类那排照抄 .chip：padding 14 28、圆角 --r-pill、字 --fs-meta 24 / 600；
+     实测一枚高 58.7 → 收起态那枚圆钮就取 59×59，和分类同一档高度，不另立一档。
+   · 分类色与底栏色都是 palette.js 现跑的值（不是抄的）：
+     toneVars → 旅游 #3F52D6/白字、生活 #E9723D/#2C1204；「全部」选中态在图上=纸白底墨字；
+     底栏 chromeOf('default') = #443C25，选中字 #F2EFE9、未选中 rgba(242,239,233,.62)。
+   · 屏上每一句中文都是现网字典里的串：我的笔记 / 输入关键词 / 搜索笔记 / 全部 /
+     置顶 / 未分类 / 公众号文章。零新串。
+
+   两处等他拍的，都写在屏下，不替他决定：
+   A 收起态那枚钮：只放放大镜，还是放大镜 + "搜索"两个字（他撤过"换背景"的纯图标，
+     理由是没人读得出动作；但放大镜是通用符号，和"换"不一样）。这一稿画的是只放图标。
+   B 展开时列表面动不动：这一稿画的是"整行换进去、列表往下挪 51"；
+     另一条路是浮在列表上、列表一寸不动，代价是盖住第一条笔记。
+   ================================================================== */
+  :root{
+    --r-card:40px; --r-pill:999px; --w-edge:3px;
+    --paper:#F2EFE9; --ink:#23252C;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px;
+    --chrome:#443C25; --chrome-ink:#F2EFE9; --chrome-idle:rgba(242,239,233,.62);
+    --card:#ffffff; --card-edge:rgba(35,37,44,.10);
+    --sc-bg:#f2efe9; --sc-ink:#23252c; --sc-ph:rgba(35,37,44,.5);
+    --c-blue:#3F52D6; --i-blue:#FFFFFF;
+    --c-orange:#E9723D; --i-orange:#2C1204;
+    --c-ink:#23252C;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#DEDDD8;color:#23252C;padding:26px 15px 70px;font-family:-apple-system,'PingFang SC',sans-serif;-webkit-font-smoothing:antialiased}
+  .flow{display:flex;flex-wrap:wrap;gap:64px 56px;width:2400px;align-items:flex-start}
+  .unit{width:750px;flex:none}
+  .cap{margin-bottom:14px;min-height:150px}
+  .cap .step{display:inline-block;font-size:15px;font-weight:800;background:#23252C;color:#fff;padding:6px 15px;border-radius:999px;margin-bottom:9px}
+  .cap h3{font-size:26px;font-weight:800;letter-spacing:-.6px;line-height:1.3;margin-bottom:6px}
+  .cap p{font-size:16px;line-height:1.62;color:#55595f}
+  .cap b{color:#23252C}
+
+  .ph{width:750px;height:1690px;position:relative;overflow:hidden;background:#f4f2ec;border-radius:52px;
+    box-shadow:inset 0 0 0 3px rgba(35,37,44,.45),0 26px 62px rgba(0,0,0,.16)}
+  .bg{position:absolute;left:0;top:184px;width:750px;height:1506px;
+    background-image:url('../../../miniprogram/assets/home-bg-portrait.jpg');background-size:cover;background-position:center;z-index:0}
+  .scrim{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:1;
+    background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)}
+  .lay{position:absolute;left:0;top:184px;width:750px;height:1506px;z-index:2;padding:0 24px}
+
+  .sb{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 40px 0 48px;
+    font-size:27px;font-weight:700;color:#F2EFE9;background:#181A20;position:relative;z-index:12}
+  .nb{height:90px;background:#181A20;position:relative;z-index:12;display:flex;align-items:center;justify-content:center;
+    font-size:32px;font-weight:600;color:#F2EFE9}
+
+  .head{display:flex;align-items:baseline;justify-content:space-between;padding:24px 0 22px}
+  .head .h{font-size:var(--fs-h1);font-weight:800;letter-spacing:-1.2px;color:rgba(242,239,233,.96)}
+  .head .s{font-size:var(--fs-meta);color:rgba(242,239,233,.95)}
+
+  /* ---------- 分类那一行（收起态：右边多一枚圆钮） ---------- */
+  .row-chips{display:flex;align-items:center;gap:12px;height:59px}
+  .chips{display:flex;gap:12px;flex:1;min-width:0;overflow:hidden}
+  .chip{flex:none;height:59px;display:inline-flex;align-items:center;padding:0 28px;border-radius:var(--r-pill);
+    font-size:var(--fs-meta);font-weight:600}
+  .chip.all{background:rgba(18,20,26,.42);color:#f2efe9;box-shadow:inset 0 0 0 var(--w-edge) rgba(242,239,233,.30)}
+  .chip.all.on{background:var(--sc-bg);color:var(--ink);box-shadow:none}
+  .chip.tone{background:var(--tone-bg);color:var(--tone-ink)}
+  .sbtn{flex:none;width:59px;height:59px;border-radius:50%;background:var(--sc-bg);
+    display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(8,10,14,.28)}
+  .sbtn svg{width:30px;height:30px;display:block}
+
+  /* ---------- 展开态：整行换成搜索条（几何全抄 .sc-card） ---------- */
+  .sc{height:110px;background:var(--sc-bg);color:var(--sc-ink);border-radius:var(--r-card);
+    padding:26px 24px 20px;box-shadow:0 18px 46px rgba(8,10,14,.42);position:relative}
+  .sc .line{display:flex;align-items:center;gap:16px;height:64px;position:relative}
+  .sc input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:var(--fs-body);color:var(--sc-ink)}
+  .sc input::placeholder{color:var(--sc-ph)}
+  /* 光标画在占位符后面而不是输入框右端：真机上聚焦时闪的就在那个位置，
+     放在右端会被读成一条分隔线（上一版就是这么错的） */
+  .sc .fake{flex:1;min-width:0;display:flex;align-items:center;font-size:var(--fs-body);color:var(--sc-ph)}
+  .sc .x{flex:none;padding:0 6px;font-size:var(--fs-meta);opacity:.7;color:var(--sc-ink)}
+  .sc .go{flex:none;padding-left:8px;font-size:var(--fs-title);font-weight:800;letter-spacing:-.5px;color:var(--sc-ink)}
+  .sc .rule{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--sc-ink);opacity:.42}
+  .caret{display:inline-block;width:2px;height:30px;margin-left:3px;background:var(--sc-ink);animation:bl 1.1s steps(1) infinite}
+  @keyframes bl{50%{opacity:0}}
+
+  /* ---------- 列表行 ---------- */
+  .rows{margin-top:24px;display:flex;flex-direction:column;gap:16px}
+  .r{background:var(--card);border:var(--w-edge) solid var(--card-edge);border-radius:var(--r-card);padding:24px}
+  .r .l{display:flex;align-items:center;gap:14px;height:44px}
+  .dot{flex:none;width:14px;height:14px;border-radius:50%;background:var(--c-ink)}
+  .dot.u{background:transparent;box-shadow:inset 0 0 0 3px var(--c-ink)}
+  .pt{flex:none;font-size:var(--fs-tiny);font-weight:700;background:var(--c-ink);color:#fff;padding:6px 18px;border-radius:14px}
+  .t{flex:1;min-width:0;font-size:var(--fs-body);font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .d{flex:none;font-size:var(--fs-meta);color:rgba(35,37,44,.62)}
+  .r.open .t{font-size:36px;font-weight:800;line-height:1.3;letter-spacing:-.8px;white-space:normal}
+  .r.open .l{height:auto}
+  .sum{margin-top:15px;font-size:var(--fs-body);line-height:1.65;color:#5c6068}
+  /* 脚注这一排真机是一行装完、超长那一段自己省略（.row-foot 里 flex:none + .dt 靠右），
+     所以这里也必须不许换行：一换行就会把"未分类"拆成两列，看着像画错了 */
+  .foot{margin-top:16px;padding-top:16px;border-top:2px solid rgba(35,37,44,.07);
+    display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden;
+    font-size:var(--fs-meta);color:rgba(35,37,44,.62);line-height:34px}
+  .foot .cn{display:inline-flex;align-items:center;gap:8px;flex:none}
+  /* 标签那一段是这一排里唯一可以让它缩的：缩了才轮得到省略号，
+     写 flex:none 会把右边的 › 一起挤出可视区（上一版就是这么丢的） */
+  .foot .tg{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .foot .chev{margin-left:auto;font-size:30px;opacity:.5;flex:none}
+
+  /* ---------- 底栏 ---------- */
+  .bar{position:absolute;left:0;bottom:0;width:750px;height:128px;z-index:9}
+  .cap2{position:absolute;left:24px;bottom:20px;width:702px;height:108px;border-radius:44px;background:var(--chrome);
+    display:flex;align-items:stretch}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    font-size:22px;color:var(--chrome-idle)}
+  .tb.on{color:var(--chrome-ink);font-weight:700}
+  .tb i{display:block;width:40px;height:40px;position:relative}
+  /* 三枚图形就是现网 custom-tab-bar 里那三个：新建=圆里一个加号，笔记=带两行字的方卡，
+     我的=一颗头加一道肩线。只用边框画，不引外部图标。 */
+  .tb.plus i{border:3px solid currentColor;border-radius:50%}
+  .tb.plus i::after{content:'';position:absolute;left:50%;top:50%;width:18px;height:3px;background:currentColor;transform:translate(-50%,-50%)}
+  .tb.plus i::before{content:'';position:absolute;left:50%;top:50%;width:3px;height:18px;background:currentColor;transform:translate(-50%,-50%)}
+  .tb.doc i{border:3px solid currentColor;border-radius:9px}
+  .tb.doc i::after{content:'';position:absolute;left:8px;right:8px;top:11px;height:3px;background:currentColor;box-shadow:0 9px 0 0 currentColor}
+  .tb.me i::before{content:'';position:absolute;left:50%;top:4px;width:16px;height:16px;transform:translateX(-50%);
+    border:3px solid currentColor;border-radius:50%}
+  .tb.me i::after{content:'';position:absolute;left:50%;bottom:2px;width:30px;height:17px;transform:translateX(-50%);
+    border:3px solid currentColor;border-bottom:0;border-radius:17px 17px 0 0}
+  .tb.on::after{content:'';width:22px;height:4px;border-radius:2px;background:currentColor}
+
+  .tagline{margin-top:16px;font-size:15px;line-height:1.7;color:#55595f}
+</style>
+</head>
+<body>
+<div class="flow">
+
+  <!-- ==================== ① 收起 ==================== -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">① 收起 · 默认这一屏</span>
+      <h3>搜索不再单独占一行，只在分类那排最右留一枚圆钮</h3>
+      <p>现在这块纸白大条整行占着（高 <b>110</b>，含上下内边距），下面才是分类。<b>改后大条整个撤掉</b>：分类那一排还是 59 高，最右多一枚 <b>59×59</b> 的圆钮，放大镜取现网那支墨色。列表因此<b>往上长出一整条笔记的高度</b>——这才是"太大、不美观"的根因：那一行 110 加上下间距 24，等于凭空吃掉 134。</p>
+    </div>
+    <div class="ph">
+      <div class="bg"></div><div class="scrim"></div>
+      <div class="sb"><span>2:07</span><span class="right"></span></div>
+      <div class="nb">图麦笔记</div>
+      <div class="lay">
+        <div class="head"><span class="h">我的笔记</span><span class="s">本周：0 ｜ 本月：3 ｜ 总数：3</span></div>
+        <div class="row-chips">
+          <div class="chips">
+            <span class="chip all on">全部</span>
+            <span class="chip tone" style="--tone-bg:#3F52D6;--tone-ink:#FFFFFF">旅游</span>
+            <span class="chip tone" style="--tone-bg:#E9723D;--tone-ink:#2C1204">生活</span>
+          </div>
+          <div class="sbtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#23252c" stroke-width="2.4" stroke-linecap="round">
+              <circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.4 15.4 L20 20"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="rows">
+          <div class="r open">
+            <div class="t">2026年中秋节祝福语与问候图片大全</div>
+            <div class="sum">本文汇集了2026年中秋节的多条温馨祝福语，配合最美问候图片，传达花好月圆、阖家团圆的美好祝愿。内容以月圆人安、平安喜乐、岁岁圆满为核心，适合向亲友表达中秋问候。</div>
+            <div class="foot">
+              <span class="cn"><span class="dot u"></span>未分类</span><span>·</span><span>公众号文章</span><span>·</span>
+              <span class="tg">平安喜乐 / 中秋节 / 祝福语 / 问候图片</span><span>·</span><span>09-25</span><span class="chev">›</span>
+            </div>
+          </div>
+          <div class="r"><div class="l"><span class="dot u"></span><span class="pt">置顶</span><span class="t">2026微信小程序开发大赛介绍</span><span class="d">09-23</span></div></div>
+          <div class="r"><div class="l"><span class="dot u"></span><span class="t">TVB新晋HiFi女歌手——侯静伊</span><span class="d">09-25</span></div></div>
+        </div>
+      </div>
+      <div class="bar"><div class="cap2">
+        <div class="tb plus"><i></i><span>新建</span></div>
+        <div class="tb doc on"><i></i><span>笔记</span></div>
+        <div class="tb me"><i></i><span>我的</span></div>
+      </div></div>
+    </div>
+    <div class="tagline">分类多到一排放不下时照旧左滑（现网就是 <code>scroll-view scroll-x</code>），圆钮不参与滚动、一直钉在最右。</div>
+  </div>
+
+  <!-- ==================== ② 点开 ==================== -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">② 点那枚圆钮 · 向左弹出占满整行</span>
+      <h3>整行换成搜索条，分类那一排暂时收起</h3>
+      <p>点一下，圆钮所在的整行<b>向左展开成一条完整的搜索条</b>（24 → 726，和列表同宽），分类那三枚暂时收起来。条子里面<b>一个字都不改</b>：占位符「输入关键词」、右边纯文字动作「搜索笔记」、底下一条 3 不透明度 .42 的横线——全是现网 <code>.sc-card</code> 那套。自动聚焦弹键盘；键盘会盖住下面两行笔记，这是搜索的正常行为。</p>
+    </div>
+    <div class="ph">
+      <div class="bg"></div><div class="scrim"></div>
+      <div class="sb"><span>2:07</span><span class="right"></span></div>
+      <div class="nb">图麦笔记</div>
+      <div class="lay">
+        <div class="head"><span class="h">我的笔记</span><span class="s">本周：0 ｜ 本月：3 ｜ 总数：3</span></div>
+        <div class="sc">
+          <div class="line">
+            <span class="fake">输入关键词<span class="caret"></span></span>
+            <span class="go">搜索笔记</span>
+            <span class="rule"></span>
+          </div>
+        </div>
+        <div class="rows" style="margin-top:24px">
+          <div class="r"><div class="l"><span class="dot u"></span><span class="pt">置顶</span><span class="t">2026微信小程序开发大赛介绍</span><span class="d">09-23</span></div></div>
+          <div class="r"><div class="l"><span class="dot u"></span><span class="t">TVB新晋HiFi女歌手——侯静伊</span><span class="d">09-25</span></div></div>
+        </div>
+      </div>
+      <div class="bar"><div class="cap2">
+        <div class="tb plus"><i></i><span>新建</span></div>
+        <div class="tb doc on"><i></i><span>笔记</span></div>
+        <div class="tb me"><i></i><span>我的</span></div>
+      </div></div>
+    </div>
+    <div class="tagline">列表往下挪 <b>51</b>（110 的条子换掉 59 的一排）。另一条路是浮在列表上、列表不动，代价是盖住第一条笔记——<b>这条等你拍</b>。</div>
+  </div>
+
+  <!-- ==================== ③ 输入中 / 缩回 ==================== -->
+  <div class="unit">
+    <div class="cap">
+      <span class="step">③ 输入中 · 点空白缩回</span>
+      <h3>有词时右边多一枚 ✕，点条以外的空白就收回圆钮那一态</h3>
+      <p>✕ 是现网 <code>.sc-x</code> 本来的行为（<code>wx:if="{{searchKeyword}}"</code>），点它清词、不清掉展开态。<b>点列表任意空白处 → 收回 ①</b>：这条上的词保留（列表还是筛过的结果），下次点开还在。要清掉得点 ✕——"缩回"和"清词"是两件事，不捆在一起。</p>
+    </div>
+    <div class="ph">
+      <div class="bg"></div><div class="scrim"></div>
+      <div class="sb"><span>2:07</span><span class="right"></span></div>
+      <div class="nb">图麦笔记</div>
+      <div class="lay">
+        <div class="head"><span class="h">我的笔记</span><span class="s">本周：0 ｜ 本月：3 ｜ 总数：3</span></div>
+        <div class="sc">
+          <div class="line">
+            <input value="中秋"><span class="x">✕</span>
+            <span class="go">搜索笔记</span>
+            <span class="rule"></span>
+          </div>
+        </div>
+        <div class="rows" style="margin-top:24px">
+          <div class="r"><div class="l"><span class="dot u"></span><span class="t">2026年中秋节祝福语与问候图片大全</span><span class="d">09-25</span></div></div>
+        </div>
+      </div>
+      <div class="bar"><div class="cap2">
+        <div class="tb plus"><i></i><span>新建</span></div>
+        <div class="tb doc on"><i></i><span>笔记</span></div>
+        <div class="tb me"><i></i><span>我的</span></div>
+      </div></div>
+    </div>
+    <div class="tagline">另有一条要你拍的：<b>收起态那枚钮只放放大镜，还是放大镜 + 「搜索」两个字。</b>这一稿画的是只放图标（放大镜是通用符号，和"换背景"那枚纯图标不是一回事）。要加字我就换成 59 高的一枚胶囊。</div>
+  </div>
+
+</div>
+</body>
+</html>
