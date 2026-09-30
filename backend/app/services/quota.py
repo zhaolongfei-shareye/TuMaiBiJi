@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 BASE_QUOTA = 100        # MIND 的起始值（不再是"每人几篇"的上限）
 INVITE_REWARD = 10      # 带来一个新的写作者
-IMPORT_REWARD = 1       # 有人把某一转存进自己库里
+IMPORT_REWARD = 1       # 有人把某一篇转存进自己库里
 
 
 def mind_score(user: User) -> int:

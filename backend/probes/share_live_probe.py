@@ -263,35 +263,49 @@ def main():
           f"HTTP {still.status_code}")
     note_id = copy_id      # 收尾按这一条清（原笔记已经删掉了）
 
-    # ---- ⑦ 额度这一轮（09-24 晚口径：100 篇基础 + 带来一个新写作者 +10 + 同一篇只挣一次）----
-    # 现网只有 deploy-test 这一个可以写的号，所以"给作者结 10 篇"那条真给钱的分支在这里
-    # 证不了（要两个账号），它由 backend/tests 那 12 条新用例守着。这里证的是：
-    # 接口形状、闸门确实挂在五条入口上、表结构到位、自己转存自己那一趟一分钱都不结。
+    # ---- ⑦ MIND 这一轮（2026-10-01 口径：笔记不限量 + 动笔 +10 + 转存按"这篇×人" +1）----
+    # 现网只有 deploy-test 这一个可以写的号，所以"给别人转存结 1 分""带来新写作者结 10 分"
+    # 这两条真给钱的分支在这里证不了（要两个账号），它们由 backend/tests 的
+    # Test转存加分 / Test邀请到账 守着。这里证的是：接口形状、五条入口都不再挂闸门、
+    # 那两条部分唯一索引真在库里、自己转存自己那一趟一分都不结。
     inv_before = db.query(Invitation).count()
     db.expire_all()
     bonus_before = int(db.get(User, user.id).quota_bonus or 0)
 
     r = client.get("/api/user/quota", headers=hdr)
     body = r.json() if r.status_code == 200 else {}
-    want = ["base", "bonus", "categories", "invites_rewarded", "limit", "remaining", "reward_each", "used"]
-    check("⑦ /api/user/quota 回的就是界面要的那八个字段",
+    want = ["base", "bonus", "categories", "import_each", "invites_rewarded",
+            "limit", "mind", "remaining", "reward_each", "used"]
+    check("⑦ /api/user/quota 回的就是界面要的那十个字段",
           r.status_code == 200 and sorted(body) == want, f"HTTP {r.status_code} · {sorted(body)}")
     check("⑦ 没有「还剩几次」这一档（带来几个人不限，回它就是假话）", "invites_left" not in body)
-    check("⑦ 上限那半截 = 100 基础 + 已到手的奖励，remaining 与两者自洽",
+    check("⑦ mind = 100 基础 + 已到手的奖励（界面右下角那个大数字读的就是它）",
+          body.get("mind") == body.get("base") + body.get("bonus"),
+          f"mind={body.get('mind')} base={body.get('base')} bonus={body.get('bonus')}")
+    check("⑦ 过渡字段 limit/remaining 仍与 base+bonus 自洽（闸门已撤，这两个数只喂线上 1.5.0，不再拦人）",
           body.get("limit") == body.get("base") + body.get("bonus")
           and body.get("remaining") == max(0, (body.get("limit") or 0) - (body.get("used") or 0)),
           f"used={body.get('used')} limit={body.get('limit')} bonus={body.get('bonus')}")
-    check("⑦ 每个新写作者给的就是 10 篇", body.get("reward_each") == 10, f"reward_each={body.get('reward_each')}")
+    check("⑦ 两档奖励就是 10 和 1",
+          body.get("reward_each") == 10 and body.get("import_each") == 1,
+          f"reward_each={body.get('reward_each')} import_each={body.get('import_each')}")
 
     from sqlalchemy import text as sa_text
     cols = [row[1] for row in db.execute(sa_text("pragma table_info(invitations)")).fetchall()]
     check("⑦ 台账有 source_note_id 这一列（转存那条要指名是哪篇带来的）", "source_note_id" in cols, f"{cols}")
-    idx_sql = [row[0] for row in db.execute(sa_text(
-        "select sql from sqlite_master where type='index' and name='ux_invitations_one_reward_per_source_note'"
-    )).fetchall()]
-    check("⑦ 那条部分唯一索引真在库里（同一篇只挣一次是数据库挡的）",
-          bool(idx_sql) and "source_note_id IS NOT NULL" in idx_sql[0] and "UNIQUE" in idx_sql[0].upper(),
-          f"{idx_sql[0] if idx_sql else '索引不存在'}")
+    idx = {row[0]: (row[1] or "") for row in db.execute(sa_text(
+        "select name, sql from sqlite_master where type='index' and tbl_name='invitations'"
+    )).fetchall()}
+    pair = idx.get("ux_invitations_import_once_per_pair", "")
+    per_person = idx.get("ux_invitations_first_note_per_invitee", "")
+    check("⑦ 转存那半边的部分唯一索引真在库里（同一个用户对同一篇只算一次，数据库挡）",
+          "UNIQUE" in pair.upper() and "source_note_id IS NOT NULL" in pair
+          and "invitee_id" in pair, pair or "索引不存在")
+    check("⑦ 动笔那半边的部分唯一索引真在库里（一个人只成就一次，数据库挡）",
+          "UNIQUE" in per_person.upper() and "source_note_id IS NULL" in per_person,
+          per_person or "索引不存在")
+    check("⑦ 老的 invitee_id 全局唯一已经撤掉（不撤的话动笔之后再也结不了转存）",
+          "uq_invitations_invitee" not in " ".join(idx.values()), sorted(idx))
 
     from app.main import app as fastapi_app
 

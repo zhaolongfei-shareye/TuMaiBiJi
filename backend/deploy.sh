@@ -98,13 +98,29 @@ if "invitations" not in tables:
 if missing:
     print(f"  ✗ 迁移后仍缺：{'、'.join(missing)} —— 模型和库对不上，第一条写入就会炸")
     raise SystemExit(1)
-# 邀请台账的幂等是数据库挡的，不是应用层记得住的：唯一约束必须在。
-uniq = [
-    u for u in insp.get_unique_constraints("invitations")
-    if u["column_names"] == ["invitee_id"]
-]
-if not uniq:
-    print("  ✗ invitations.invitee_id 上没有唯一约束，同一个被邀请人可能被结好几次")
+# 邀请台账的幂等是数据库挡的，不是应用层记得住的。2026-10-01 起这本账拆成两半：
+# 动笔 +10 按"一个人一次"、转存 +1 按"这篇 × 这个人一次"，所以原来是 `invitee_id`
+# 全局 UNIQUE + 一篇一次，现在是两条各管一半的部分唯一索引。缺任何一条，
+# 应用层那道"先查一遍"在并发下都拦不住。
+with engine.connect() as conn:
+    inv_idx = {
+        r[0]: (r[1] or "") for r in conn.execute(text(
+            "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='invitations'"
+        ))
+    }
+for name, need in (
+    ("ux_invitations_first_note_per_invitee", "invitee_id"),
+    ("ux_invitations_import_once_per_pair", "source_note_id"),
+):
+    sql = inv_idx.get(name)
+    if not sql or "UNIQUE" not in sql.upper():
+        print(f"  ✗ invitations 缺部分唯一索引 {name}（去重没人挡，重复到账只是时间问题）")
+        raise SystemExit(1)
+    if need not in sql:
+        print(f"  ✗ {name} 建上了但钉的不是 {need}：{sql}")
+        raise SystemExit(1)
+if "uq_invitations_invitee" in {u["name"] or "" for u in insp.get_unique_constraints("invitations")}:
+    print("  ✗ invitations 上还挂着老的 invitee_id 全局唯一——那会让同一个人动笔之后再也结不了转存")
     raise SystemExit(1)
 # 分享快照这两列是公开页要点/原文链接的唯一来源；缺一列就是扫码的人又只能看摘要。
 # 再确认"一篇笔记一张有效码"那个部分唯一索引真的建上了：没有它，并发建分享还是会
@@ -129,21 +145,12 @@ with engine.connect() as conn:
 if not one_code_idx or "is_active" not in one_code_idx:
     print("  ✗ shares 上缺 ux_shares_one_active_per_note（或它没带 is_active 条件）")
     raise SystemExit(1)
-# 转存那条路给作者结的账要能回答"是哪篇笔记带来的"，而"同一篇只挣一次"是这条索引挡的：
-# 没有它，把一篇热门笔记发给一百个人转存就是一百笔 +10，应用层那道先查在并发下拦不住。
+# 转存那条路给作者结的账要能回答"是哪篇笔记带来的"——这一列是那条去重的左半边。
 inv_cols = {c["name"] for c in insp.get_columns("invitations")}
 if "source_note_id" not in inv_cols:
     print("  ✗ invitations 缺 source_note_id 列，转存那条激活记不到是哪篇带来的")
     raise SystemExit(1)
-with engine.connect() as conn:
-    once_idx = conn.execute(text(
-        "SELECT sql FROM sqlite_master WHERE type='index' "
-        "AND name='ux_invitations_one_reward_per_source_note'"
-    )).scalar()
-if not once_idx or "UNIQUE" not in once_idx.upper():
-    print("  ✗ invitations 缺 ux_invitations_one_reward_per_source_note（同一篇只挣一次没人挡）")
-    raise SystemExit(1)
-print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（含 invitee 唯一约束 + 一篇只挣一次的部分唯一索引 + source_note_id）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / 一篇笔记一张有效码的索引 到位")
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / 一篇笔记一张有效码的索引 到位")
 PY
 if [[ $? -ne 0 ]]; then
     echo "✗ schema 校验未通过，终止部署"
