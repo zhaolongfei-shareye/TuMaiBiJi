@@ -1,115 +1,132 @@
 <view class="container {{themeClass}}">
-  <!-- 头部：logo 靠左，右侧应用名 + slogan，跟详情页"左块右文"那条母题一致 -->
-  <view class="me-header card">
-    <image class="brand-logo" src="/assets/logo.png" mode="aspectFill"></image>
-    <view class="brand-text">
-      <text class="brand-name">图麦笔记</text>
-      <text class="brand-slogan">{{t.slogan}}</text>
-    </view>
-  </view>
-
-  <!-- 分享入口退化成菜单里的一行：这一行本身就是 button[open-type=share]，
-       点它直接弹微信原生分享面板。
-       为什么不用"透明按钮盖在一行普通菜单上"那种做法：实测那颗绝对定位的 button
-       在这套 flex 行里只量到半行宽（184/332），点右半边不触发——命中面积反而变小了。
-       行即按钮，命中面积天然就是整行，也不用再对齐两层。
-       右边那句奖励承诺取自 /api/user/quota，服务端认账才写；额度读回来之前留空。 -->
-  <view class="menu-group card">
-    <button class="menu-item share-row" open-type="share" aria-label="{{t.shareToFriend}}">
-      <text class="menu-label">{{t.shareToFriend}}</text>
-      <view class="menu-right">
-        <text class="menu-value">{{shareValue}}</text>
-        <text class="menu-arrow">›</text>
+  <!-- 头部两块：底图贴屏边铺满，留白区是一张盖在图下沿的圆角卡。
+       盖住 40rpx 这一条是接缝那道弧的来源——图的左右下角被卡的圆角切掉，
+       于是"图与留白之间"和"留白与页面之间"都是弧，没有直线。 -->
+  <view class="head">
+    <view class="head-band">
+      <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
+      <view wx:if="{{bgSrc}}" class="head-scrim"></view>
+      <view class="pill">
+        <view class="seg {{tab === 'set' ? 'on' : ''}}" bindtap="onTab" data-key="set">{{t.pillSettings}}</view>
+        <view class="seg {{tab === 'about' ? 'on' : ''}}" bindtap="onTab" data-key="about">{{t.pillAbout}}</view>
       </view>
-    </button>
-    <!-- 额度这行只能看不能点，所以不给箭头；数字没读回来时整行不占位 -->
-    <view class="menu-item" wx:if="{{quotaText}}">
-      <text class="menu-label">{{t.quotaLabel}}</text>
-      <view class="menu-right">
-        <text class="menu-value">{{quotaText}}</text>
+      <!-- 数字没从 /api/user/quota 读回来之前整块不占位：宁可空着，也不先摆一个猜的数 -->
+      <view wx:if="{{scoreText}}" class="score">
+        <text class="score-n">{{scoreText}}</text>
+        <text class="score-l">{{t.brainScore}}</text>
       </view>
     </view>
-    <view class="menu-item" bindtap="onNavigate" data-page="profile">
-      <text class="menu-label">{{t.navProfile}}</text>
-      <view class="menu-right">
-        <text class="menu-value">{{profileSummary}}</text>
-        <text class="menu-arrow">›</text>
-      </view>
-    </view>
-    <view class="menu-item" bindtap="onNavigate" data-page="categories">
-      <text class="menu-label">{{t.categories}}</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="onNavigate" data-page="wallpaper">
-      <text class="menu-label">{{t.wallpaper}}</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <!-- 私密密码紧跟外观设置：两条都是"这台手机上的我的设置"，
-         原来排在邮箱下面，跟"关于/反馈邮箱/注销"那组混在一起不好找。 -->
-    <view class="menu-item" bindtap="onOpenPwdPanel">
-      <text class="menu-label">{{t.privatePassword}}</text>
-      <view class="menu-right">
-        <text class="menu-value">{{privateSet ? t.privatePasswordSet : t.privatePasswordNotSet}}</text>
-        <text class="menu-arrow">›</text>
+    <view class="sheet">
+      <image class="sheet-logo" src="{{logoSrc}}" mode="aspectFill" />
+      <view class="sheet-text">
+        <text class="sheet-name">{{nameText}}</text>
+        <text class="sheet-slogan">{{sloganText}}</text>
       </view>
     </view>
   </view>
 
-  <view class="menu-group card">
-    <view class="menu-item" bindtap="onNavigate" data-page="about">
-      <text class="menu-label">{{t.about}}</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="onCopy" data-value="{{contactEmail}}">
-      <text class="menu-label">{{t.feedbackEmail}}</text>
-      <view class="menu-right">
-        <text class="menu-value">{{contactEmail}}</text>
-        <text class="menu-arrow">›</text>
+  <!-- ---------------- 设置：能操作的那几样 ---------------- -->
+  <block wx:if="{{tab === 'set'}}">
+    <view class="menu-group card">
+      <view class="menu-item" bindtap="onNavigate" data-page="profile">
+        <text class="menu-label">{{t.navProfile}}</text>
+        <view class="ico"><view class="cv"></view></view>
+      </view>
+      <view class="menu-item" bindtap="onNavigate" data-page="wallpaper">
+        <text class="menu-label">{{t.wallpaper}}</text>
+        <view class="ico"><view class="cv"></view></view>
+      </view>
+      <view class="menu-item" bindtap="onNavigate" data-page="categories">
+        <text class="menu-label">{{t.categories}}</text>
+        <view class="ico"><view class="cv"></view></view>
+      </view>
+      <!-- 私密密码本来就是本页的面板，就地展开；另外三格要搬进来等于重写三个整页，先保留跳页 -->
+      <view class="menu-item {{pwdOpen ? 'open' : ''}}" bindtap="onTogglePwd">
+        <text class="menu-label">{{t.privatePassword}}</text>
+        <view class="ico"><view class="cv"></view></view>
+      </view>
+      <view wx:if="{{pwdOpen}}" class="pwd-inline">
+        <text class="pwd-hint">{{privateSet ? t.privatePasswordSetHint : t.privatePasswordScene}}</text>
+
+        <block wx:if="{{!privateSet}}">
+          <input
+            class="pwd-input"
+            type="number"
+            maxlength="6"
+            password="{{true}}"
+            value="{{pwd1}}"
+            placeholder="{{t.privatePasswordNew}}"
+            placeholder-class="pwd-ph"
+            bindinput="onPwdInput1"
+          />
+          <input
+            class="pwd-input"
+            type="number"
+            maxlength="6"
+            password="{{true}}"
+            value="{{pwd2}}"
+            placeholder="{{t.privatePasswordAgain}}"
+            placeholder-class="pwd-ph"
+            bindinput="onPwdInput2"
+          />
+        </block>
+
+        <!-- 一行两个：左边永远是退出（取消 / 返回），右边是这一态的主操作（确定 / 重置密码） -->
+        <view class="pwd-two">
+          <view class="pwd-btn ghost" bindtap="onClosePwdPanel">{{privateSet ? t.privatePasswordBack : t.cancel}}</view>
+          <view wx:if="{{!privateSet}}" class="pwd-btn primary" bindtap="onPwdSave">{{t.privatePasswordOk}}</view>
+          <view wx:else class="pwd-btn danger" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
+        </view>
+      </view>
+      <view class="menu-item menu-danger" bindtap="onDeleteAccount">
+        <text class="menu-label">{{t.deleteAccount}}</text>
+        <view class="ico"><view class="cv"></view></view>
       </view>
     </view>
-    <view class="menu-item menu-danger" bindtap="onDeleteAccount">
-      <text class="menu-label">{{t.deleteAccount}}</text>
-      <text class="menu-arrow">›</text>
+  </block>
+
+  <!-- ---------------- 关于：只能看的那几样，直接在头部下面生成，不分二级 ---------------- -->
+  <block wx:else>
+    <view class="card about-lead">
+      <view class="about-who">
+        <text class="about-name">图麦笔记</text>
+        <text class="about-ver">v{{version}}</text>
+      </view>
+      <text class="about-p">{{introLead}}</text>
     </view>
-  </view>
 
-  <!-- 私密密码面板：自绘两层，不用 wx.showModal(editable)——那条只有一个输入框、
-       数字明文可见，也没有"再输一次"的位置。
-       两种态：没设过=两格输入 + 取消/确定；已设过=只给「返回 / 重置密码」，
-       重置完自动切回前一态（他要换密码就是重置→再输两遍，一步不用退出去找入口）。 -->
-  <view wx:if="{{pwdPanel}}" class="pwd-mask" bindtap="onClosePwdPanel"></view>
-  <view wx:if="{{pwdPanel}}" class="pwd-sheet card">
-    <view class="pwd-title">{{t.privatePassword}}</view>
-    <view class="pwd-hint">{{privateSet ? t.privatePasswordSetHint : t.privatePasswordScene}}</view>
-
-    <block wx:if="{{!privateSet}}">
-      <input
-        class="pwd-input"
-        type="number"
-        maxlength="6"
-        password="{{true}}"
-        value="{{pwd1}}"
-        placeholder="{{t.privatePasswordNew}}"
-        placeholder-class="pwd-ph"
-        bindinput="onPwdInput1"
-      />
-      <input
-        class="pwd-input"
-        type="number"
-        maxlength="6"
-        password="{{true}}"
-        value="{{pwd2}}"
-        placeholder="{{t.privatePasswordAgain}}"
-        placeholder-class="pwd-ph"
-        bindinput="onPwdInput2"
-      />
-    </block>
-
-    <!-- 一行两个：左边永远是退出（取消 / 返回），右边是这一态的主操作（确定 / 重置密码） -->
-    <view class="pwd-two">
-      <view class="pwd-btn ghost" bindtap="onClosePwdPanel">{{privateSet ? t.privatePasswordBack : t.cancel}}</view>
-      <view wx:if="{{!privateSet}}" class="pwd-btn primary" bindtap="onPwdSave">{{t.privatePasswordOk}}</view>
-      <view wx:else class="pwd-btn danger" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
+    <view class="menu-group card">
+      <view class="menu-item" bindtap="onCopy" data-value="{{site}}">
+        <text class="menu-label">{{t.officialSite}}</text>
+        <view class="menu-right">
+          <text class="menu-value">{{site}}</text>
+          <view class="ico"><view class="cv"></view></view>
+        </view>
+      </view>
+      <view class="menu-item" bindtap="onCopy" data-value="{{contactEmail}}">
+        <text class="menu-label">{{t.feedbackEmail}}</text>
+        <view class="menu-right">
+          <text class="menu-value">{{contactEmail}}</text>
+          <view class="ico"><view class="cv"></view></view>
+        </view>
+      </view>
+      <!-- 这一行本身就是 button[open-type=share]：点它直接弹微信分享面板。
+           右边那句是一笔真实的兑换（服务端真会给这 10 分），所以必须等接口，读不到就留空。 -->
+      <button class="menu-item share-row" open-type="share" aria-label="{{t.shareToFriend}}">
+        <text class="menu-label">{{t.shareToFriend}}</text>
+        <view class="menu-right">
+          <text class="menu-value">{{shareValue}}</text>
+          <view class="ico"><view class="cv"></view></view>
+        </view>
+      </button>
+      <view class="menu-item">
+        <text class="menu-label">{{t.brainScore}}</text>
+        <view class="menu-right">
+          <text class="menu-value">{{scoreText}}</text>
+        </view>
+      </view>
     </view>
-  </view>
+
+    <text class="copyright">{{t.copyright}}</text>
+  </block>
 </view>

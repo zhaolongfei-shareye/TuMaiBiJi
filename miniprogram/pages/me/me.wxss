@@ -1,50 +1,230 @@
-.me-header {
+.container {
+  padding-bottom: 140rpx;
+}
+
+/* ---------- 头部：底图 + 盖在它下沿的圆角留白卡 ----------
+   图用的是「卡片模板」最上面那四个位置里勾了「背景」的那一张（poster.homeBg()），
+   和首页、新建页同一个来源、同一个取图口，这一页不开第二个上传入口。
+   可见高度 502 = 视口 1506 的三分之一；卡片往上盖住 40，所以这块盒子是 542。 */
+.head {
+  position: relative;
+}
+
+.head-band {
+  position: relative;
+  height: 542rpx;
+  overflow: hidden;
+  background: var(--bg-page);
+}
+
+/* 图按"这一页单独定锚点"摆：aspectFill 只会把画面正中间那一条留在框里，
+   人像照的中段是胸口和手，脸会被裁掉。所以图按宽铺满算出真实高度，
+   再往上顶 15% 的余量（见 me.js 的 bandGeom），首页和新建页那条不动。 */
+.head-img {
+  position: absolute;
+}
+
+.head-scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  /* 停点取首页那条罩子的前三分之一，同一张图两页的明暗要是一个连续体 */
+  background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%, rgba(18, 20, 26, 0.58) 14%,
+    rgba(18, 20, 26, 0.5) 58%, rgba(18, 20, 26, 0.44) 100%);
+}
+
+/* ---------- 药丸：关于的入口。默认「设置」 ---------- */
+.pill {
+  position: absolute;
+  right: 32rpx;
+  top: 24rpx;
+  z-index: 4;
   display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-4);
-  margin-top: var(--sp-5);
+  gap: 4rpx;
+  padding: 5rpx;
+  border-radius: var(--r-pill);
+  background: rgba(242, 239, 233, 0.92);
 }
 
-.brand-logo {
-  flex: none;
-  width: 128rpx;
-  height: 128rpx;
-  border-radius: 40rpx;
-  /* 原来这里垫了一层 --chip-idle 当底，因为旧 logo 自己不带底色。
-     新 logo 是透明底圆标，再垫就会在四个角露出一块圆角方板。 */
-}
-
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-  min-width: 0;
-}
-
-.brand-name {
-  font-size: var(--fs-h2);
-  font-weight: 800;
-  letter-spacing: -0.8rpx;
-  color: var(--text-primary);
-}
-
-.brand-slogan {
+.seg {
+  height: 58rpx;
+  line-height: 58rpx;
+  padding: 0 28rpx;
+  border-radius: var(--r-pill);
   font-size: var(--fs-meta);
-  line-height: var(--lh-tight);
+  font-weight: 700;
   color: var(--text-secondary);
 }
 
-/* ---------- 分享行 ----------
-   入口退化成菜单里的一行：这一行本身就是 button[open-type=share]，
-   所以要把小程序 button 的那堆默认样式（灰底、圆角、::after 描边、居中、行高）全部推平，
-   让它和下面几行列表项长得一模一样——一个按钮态混进来就把节奏打断了。
-   选择器写成 .menu-item.share-row：两条规则同为单类时后写的赢，
-   .menu-item 在这个文件里更靠后，不加类名组合就会被它的 padding 盖掉。 */
+.seg.on {
+  background: var(--accent);
+  color: var(--bg-page);
+}
+
+/* ---------- 脑力值：压在图右下角的大数字 ----------
+   瘦长那一族是系统自带的英文体，拿不到就退回系统体：数字仍然读得出，只是没那么窄。
+   半透明是站长点名的（不要糊在照片上）。 */
+.score {
+  position: absolute;
+  right: 30rpx;
+  bottom: 56rpx;
+  z-index: 4;
+  text-align: right;
+}
+
+.score-n {
+  display: block;
+  font-family: 'Avenir Next Condensed', 'DIN Alternate', 'HelveticaNeue-CondensedBold', sans-serif;
+  font-size: 126rpx;
+  font-weight: 600;
+  letter-spacing: -2rpx;
+  line-height: 0.82;
+  color: rgba(242, 239, 233, 0.72);
+}
+
+.score-l {
+  display: block;
+  margin-top: 10rpx;
+  font-size: var(--fs-label);
+  font-weight: 700;
+  letter-spacing: 5rpx;
+  color: rgba(242, 239, 233, 0.66);
+}
+
+/* ---------- 留白区：圆 LOGO 与右边两行字等高（80 = 31×1.25 + 7 + 24×1.4） ---------- */
+.sheet {
+  position: relative;
+  margin-top: -40rpx;
+  height: 144rpx;
+  padding: 0 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  /* 深色壁纸那几套的 --bg-card 是半透明的，直接铺在照片上会透出图来。
+     这里把同一张卡的颜色叠在自己的页面底色上画一遍，得到的是同一个色、但不透明。 */
+  background-color: var(--bg-page);
+  background-image: linear-gradient(var(--bg-card), var(--bg-card));
+  border-radius: var(--r-card);
+}
+
+.sheet-logo {
+  flex: none;
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+}
+
+.sheet-text {
+  display: flex;
+  flex-direction: column;
+  gap: 7rpx;
+  min-width: 0;
+}
+
+.sheet-name {
+  font-size: var(--fs-title);
+  font-weight: 800;
+  letter-spacing: -0.4rpx;
+  line-height: 1.25;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-slogan {
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 条状列表：左名称，右一枚"圆点里住箭头"的一体 icon ---------- */
+.menu-group {
+  padding: 0 var(--sp-4);
+  overflow: hidden;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 106rpx;
+  border-bottom: var(--w-edge) solid var(--card-edge);
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-label {
+  font-size: var(--fs-body);
+  font-weight: 700;
+  letter-spacing: -0.3rpx;
+  color: var(--text-primary);
+}
+
+.menu-right {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-width: 0;
+}
+
+.menu-value {
+  font-size: var(--fs-meta);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ico {
+  flex: none;
+  width: 46rpx;
+  height: 46rpx;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 箭头是圆点里的一根折角，不另起一枚：两者永远对齐、永远同一套色 */
+.ico .cv {
+  width: 13rpx;
+  height: 13rpx;
+  border-right: 4rpx solid var(--bg-page);
+  border-bottom: 4rpx solid var(--bg-page);
+  transform: rotate(-45deg);
+  margin-left: -4rpx;
+}
+
+.menu-item.open {
+  background: var(--accent-soft);
+}
+
+.menu-item.open .ico .cv {
+  transform: rotate(45deg);
+  margin-left: 0;
+  margin-top: -6rpx;
+}
+
+/* 注销这一行只给文字着色，不铺色块：一屏里只有一个动作是不可逆的，
+   它要看得见，但不该抢过别人的位置。 */
+.menu-item.menu-danger .menu-label {
+  color: var(--danger);
+}
+
+/* ---------- 分享行：这一行本身就是 button[open-type=share] ----------
+   要把小程序 button 的默认样式（灰底、圆角、::after 描边、居中、行高）全部推平。 */
 .menu-item.share-row {
   margin: 0;
   width: 100%;
   box-sizing: border-box;
+  padding: 0;
   border: none;
   border-bottom: var(--w-edge) solid var(--card-edge);
   border-radius: 0;
@@ -66,104 +246,28 @@
   background: var(--accent-soft);
 }
 
-.menu-group {
-  padding: 0 var(--sp-4);
-  overflow: hidden;
-}
-
-/* 分组内的分隔线和卡片外描边同色同粗，不然一行里会出现两种"线" */
-.menu-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 30rpx 0;
+/* ---------- 私密密码：就地展开，长在列表里面，不再浮一层 ---------- */
+.pwd-inline {
+  padding: 4rpx 0 30rpx;
   border-bottom: var(--w-edge) solid var(--card-edge);
 }
 
-.menu-item:last-child {
-  border-bottom: none;
-}
-
-.menu-label {
-  font-size: var(--fs-body);
-  font-weight: 700;
-  letter-spacing: -0.3rpx;
-  color: var(--text-primary);
-}
-
-.menu-value {
-  font-size: var(--fs-meta);
-  color: var(--text-tertiary);
-  margin-right: var(--sp-1);
-}
-
-.menu-right {
-  display: flex;
-  align-items: center;
-}
-
-.menu-arrow {
-  font-size: 40rpx;
-  font-weight: 300;
-  line-height: 1;
-  color: var(--text-tertiary);
-}
-
-/* 注销这一行只给文字着色，不铺色块：一屏里只有一个动作是不可逆的，
-   它要看得见，但不该抢过"分享好友"那行的位置。 */
-.menu-item.menu-danger .menu-label,
-.menu-item.menu-danger .menu-arrow {
-  color: var(--danger);
-}
-
-.container {
-  padding-bottom: 140rpx;
-}
-
-/* ---------- 私密密码面板 ----------
-   自绘两层，不用 wx.showModal(editable)：那条只有一个输入框、数字明文，
-   也没有"再输一次"的位置。这一页没铺背景图，遮罩按常规压暗一档就够。 */
-.pwd-mask {
-  position: fixed;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(18, 20, 26, 0.55);
-  z-index: 100;
-}
-
-.pwd-sheet {
-  position: fixed;
-  left: 48rpx;
-  right: 48rpx;
-  top: 200rpx;
-  z-index: 101;
-  padding: 40rpx 40rpx 32rpx;
-  display: flex;
-  flex-direction: column;
-}
-
-.pwd-title {
-  font-size: var(--fs-title);
-  font-weight: 800;
-  letter-spacing: -0.5rpx;
-  color: var(--text-primary);
-}
-
 .pwd-hint {
-  margin-top: 10rpx;
+  display: block;
   font-size: var(--fs-meta);
+  line-height: var(--lh-body);
   color: var(--text-secondary);
 }
 
 .pwd-input {
-  margin-top: 28rpx;
-  height: 88rpx;
+  margin-top: 16rpx;
+  height: 96rpx;
+  padding: 0 28rpx;
+  border-radius: var(--r-chip);
+  background: var(--chip-idle);
   font-size: var(--fs-body);
   letter-spacing: 6rpx;
   color: var(--text-primary);
-  border-bottom: var(--w-edge) solid var(--card-edge);
 }
 
 .pwd-ph {
@@ -171,11 +275,10 @@
   letter-spacing: 0;
 }
 
-/* 一行两个动作：等宽、同一高度，左边退出右边主操作 */
 .pwd-two {
-  margin-top: 40rpx;
+  margin-top: 24rpx;
   display: flex;
-  gap: 20rpx;
+  gap: 16rpx;
 }
 
 .pwd-btn {
@@ -206,4 +309,48 @@
   font-weight: 700;
   color: var(--danger);
   box-shadow: inset 0 0 0 var(--w-edge) var(--danger-soft);
+}
+
+/* ---------- 关于：头部下面直接生成，不分二级 ---------- */
+.about-lead {
+  padding: 24rpx 28rpx;
+}
+
+.about-who {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  margin-bottom: 10rpx;
+}
+
+.about-name {
+  font-size: var(--fs-title);
+  font-weight: 800;
+  letter-spacing: -0.5rpx;
+  color: var(--text-primary);
+}
+
+.about-ver {
+  font-size: var(--fs-label);
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--chip-idle);
+  padding: 3rpx 14rpx;
+  border-radius: var(--r-pill);
+}
+
+.about-p {
+  display: block;
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+/* 「脑力值」那一行只能看，所以不给 icon（icon 的意思是"点得进去"） */
+.copyright {
+  display: block;
+  margin-top: 26rpx;
+  text-align: center;
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
 }

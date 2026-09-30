@@ -2,13 +2,9 @@ const { t, texts } = require('../../utils/i18n.js')
 const { toneStyle } = require('../../utils/palette.js')
 
 const { CONTACT_EMAIL } = require('../../utils/contact.js')
-const OFFICIAL_ACCOUNT = '杰克AI日记'
-// 官网地址以站点自己的 canonical 为准（curl 读到的 <link rel=canonical> 是不带 www 的那个）。
-// 只能复制、点不开：web-view 组件个人主体用不了，小程序里打不开外部网页。
-const SITE = 'agentsbin.cn'
-// 出包时三个地方必须是这一个数：关于页显示的、`cli upload --version` 填的、后台开发版本列的。
-// 踩过三次（都是上传完才想起来改），所以改号只改这一行，`验-关于页版本号.js` 直接读这里当期望值。
-const VERSION = '1.8.9'
+// 版本号、官网、公众号、介绍语——「我的」那一页现在也要说这几句，
+// 所以它们搬到 utils/appInfo.js 里只留一份。
+const { VERSION, SITE, OFFICIAL_ACCOUNT, INTRO_LEAD } = require('../../utils/appInfo.js')
 
 // 每条都写清"做什么"和"什么情况下做不到"。宁可写边界，不堆形容词：
 // 这些句子最后都要能拿代码对上，读者照着做不会撞墙。
@@ -130,8 +126,7 @@ Page({
     t: texts('zh'),
     tab: 'intro',
     updatedAt: '2026 年 9 月 22 日',
-    introLead:
-      '图麦笔记做的事很窄：把看到的好东西变成能用的笔记。公众号文章、网页链接、手机截图丢进来，出来就是一条带摘要、要点和标签的笔记，之后能搜、能归类、能存成一张卡片图随时调用。',
+    introLead: INTRO_LEAD,
     infoRows: [
       { label: '当前版本', value: `v${VERSION}` },
       { label: '产品官网', value: SITE, copy: SITE },

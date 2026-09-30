@@ -3,10 +3,50 @@ const api = require('../../utils/api.js')
 const poster = require('../../utils/poster.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { CONTACT_EMAIL } = require('../../utils/contact.js')
+const { VERSION, SITE, INTRO_LEAD } = require('../../utils/appInfo.js')
 
 // {n} 这类占位由服务端给的数字填，界面里不自己写死额度规则
 function fmt(tpl, map) {
-  return String(tpl).replace(/\{(\w+)\}/g, (t, k) => (map[k] == null ? '' : map[k]))
+  return String(tpl).replace(/\{(\w+)\}/g, (m, k) => (map[k] == null ? '' : map[k]))
+}
+
+/* 头图在这一页要单独定锚点：aspectFill 只会把画面正中间那一条留在框里，
+   人像照的中段是胸口和手，脸会被裁掉。所以先按宽铺满算出图的真实高度，
+   再把"超出盒子的那截余量"按 15% 分给上面——也就是留 15% 的头顶空间。 */
+const BAND_H = 542
+const BG_ANCHOR = 0.15
+function bandGeom(w, h) {
+  if (!w || !h) return ''
+  const byWidth = (750 * h) / w
+  if (byWidth >= BAND_H) {
+    const top = -Math.round((byWidth - BAND_H) * BG_ANCHOR)
+    return `width:750rpx;height:${Math.round(byWidth)}rpx;left:0;top:${top}rpx`
+  }
+  const bw = Math.round((BAND_H * w) / h)
+  return `width:${bw}rpx;height:${BAND_H}rpx;left:${Math.round((750 - bw) / 2)}rpx;top:0`
+}
+
+/* 这台手机能不能用指纹／面容，只能问它自己：文档写明的只有指纹，
+   iOS 走面容没写在文档里，所以探不到就当没有——探不到时重置退回普通确认，
+   绝不因为"没有生物识别"就把人堵在门外。 */
+function probeBio() {
+  return new Promise((resolve) => {
+    if (!wx.checkIsSupportSoterAuthentication) return resolve('')
+    wx.checkIsSupportSoterAuthentication({
+      success: (r) => {
+        const modes = r.supportMode || []
+        const mode = modes.indexOf('fingerPrint') >= 0 ? 'fingerPrint'
+          : modes.indexOf('facial') >= 0 ? 'facial' : ''
+        if (!mode || !wx.checkIsSoterEnrolledInDevice) return resolve('')
+        wx.checkIsSoterEnrolledInDevice({
+          checkAuthMode: mode,
+          success: (e) => resolve(e && e.isEnrolled ? mode : ''),
+          fail: () => resolve(''),
+        })
+      },
+      fail: () => resolve(''),
+    })
+  })
 }
 
 Page({
@@ -14,30 +54,45 @@ Page({
     lang: 'zh',
     themeClass: 'theme-default',
     t: texts('zh'),
-    contactEmail: CONTACT_EMAIL,
-    // 条数没读回来之前那一行留空：宁可少一行字，也不先写一个服务端不认的数
-    quotaText: '',
+    // 药丸：默认停在「设置」，「关于」的内容直接长在头部下面，不分二级
+    tab: 'set',
+    // 头部那一块：底图、圆 LOGO、昵称与口号、脑力值
+    bgSrc: '',
+    imgStyle: '',
+    logoSrc: '/assets/logo.png',
+    nameText: '',
+    sloganText: '',
+    scoreText: '',
     shareValue: '',
-    profileSummary: '',
-    // 私密密码：设没设只吃服务端读数；面板两格输入，第二次要和第一次对得上
+    // 私密密码：设没设只吃服务端读数；面板就地展开在列表里
     privateSet: false,
-    pwdPanel: false,
+    pwdOpen: false,
     pwd1: '',
     pwd2: '',
+    // 关于那几行只读，值全部来自现成的两处来源
+    version: VERSION,
+    site: SITE,
+    contactEmail: CONTACT_EMAIL,
+    introLead: INTRO_LEAD,
   },
 
   onShow() {
     const userInfo = app.globalData.userInfo || {}
     const lang = userInfo.language || 'zh'
     const themeClass = app.applyTheme(app.getWallpaper())
-    // 分享形象是本机设置，读一次很便宜；从那一页改完回到这里要能立刻看到用的是哪套
+    // 形象与昵称都是本机设置，读一次很便宜；从「卡片模板」改完回到这里要立刻看到
     const prof = poster.readProfile()
     this.setData({
       lang,
       t: texts(lang),
       themeClass,
-      profileSummary: poster.templateLabel(prof.template || poster.DEFAULT_TEMPLATE, lang),
+      bgSrc: poster.homeBg(),
+      logoSrc: poster.cardPath() || '/assets/logo.png',
+      nameText: (prof.name && String(prof.name).trim()) || t('meGreeting', lang),
+      // 口号只填了一项时另一项各自退回默认，不整块消失
+      sloganText: (prof.slogan && String(prof.slogan).trim()) || t('slogan', lang),
     })
+    this.fitBand()
     app.setNavTitle('tabMe', lang)
     // 朋友圈这一路只在本页开：它要的是"单页可被转发"，别处不铺入口
     wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'], fail() {} })
@@ -50,22 +105,39 @@ Page({
     this.loadPwdStatus()
   },
 
-  // 额度和邀请进度都读这一个接口：数字只有一个来源，页面不再自己算 100。
-  // 右边那句是一笔真实的兑换（服务端真会给这 10 篇），所以必须等接口：读不到就留空，
-  // 不许在没拿到数的时候先写一句承诺。
+  // 图的尺寸要问出来才知道往上顶多少；读不到就退回 aspectFill 的默认居中
+  fitBand() {
+    const src = this.data.bgSrc
+    if (!src) return
+    wx.getImageInfo({
+      src,
+      success: (info) => this.setData({ imgStyle: bandGeom(info.width, info.height) }),
+      fail: () => this.setData({ imgStyle: '' }),
+    })
+  },
+
+  // 脑力值 = 服务端给的底数 + 攒下的奖励，两个数都从 /api/user/quota 读，界面不写死 100。
+  // 读不到就整块不占位：宁可空着，也不摆一个猜的数。
   async loadQuota() {
     const lang = this.data.lang
     try {
       const q = await api.getQuota()
       this.setData({
-        quotaText: `${q.used}/${q.limit}`,
+        scoreText: String((q.base || 0) + (q.bonus || 0)),
         shareValue: fmt(t('shareRewardN', lang), { n: q.reward_each }),
       })
       this.quota = q
     } catch (err) {
-      // 读不到就把这两行留空，绝不显示一个猜的数
       console.error('额度读取失败', err)
     }
+  },
+
+  onTab(e) {
+    const key = e.currentTarget.dataset.key
+    if (key === this.data.tab) return
+    // 切走之前把展开着的面板收掉：两层内容叠在一起会读成"这一格里还有一格"
+    this.setData({ tab: key, pwdOpen: false, pwd1: '', pwd2: '' })
+    wx.pageScrollTo({ scrollTop: 0, duration: 120 })
   },
 
   onNavigate(e) {
@@ -91,12 +163,13 @@ Page({
     })
   },
 
-  onOpenPwdPanel() {
-    this.setData({ pwdPanel: true, pwd1: '', pwd2: '' })
+  onTogglePwd() {
+    const open = !this.data.pwdOpen
+    this.setData({ pwdOpen: open, pwd1: '', pwd2: '' })
   },
 
   onClosePwdPanel() {
-    this.setData({ pwdPanel: false, pwd1: '', pwd2: '' })
+    this.setData({ pwdOpen: false, pwd1: '', pwd2: '' })
   },
 
   onPwdInput1(e) { this.setData({ pwd1: e.detail.value }) },
@@ -116,7 +189,7 @@ Page({
     }
     try {
       await api.setPrivatePassword(pwd1)
-      this.setData({ pwdPanel: false, pwd1: '', pwd2: '', privateSet: true })
+      this.setData({ pwdOpen: false, pwd1: '', pwd2: '', privateSet: true })
       wx.showToast({ title: t('privatePasswordSaved', lang), icon: 'success' })
     } catch (err) {
       wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })
@@ -124,24 +197,49 @@ Page({
   },
 
   // 重置只清密码这一列，笔记和分类一个字不动；清完面板留着，下一步就是重新设一条。
-  onPwdReset() {
-    const { lang } = this.data
+  // 生物识别只卡在这一道门上：看私密笔记仍然只认密码（指纹只能证明"是本人按的"，
+  // 换不来笔记内容）。探到可用才先识别再重置；探不到就照原来的两步确认走。
+  async onPwdReset() {
+    const lang = this.data.lang
+    const mode = this.bioMode === undefined ? (this.bioMode = await probeBio()) : this.bioMode
+    if (!mode) {
+      wx.showModal({
+        title: t('privatePasswordReset', lang),
+        content: `${t('bioUnavailable', lang)}${t('privatePasswordResetBody', lang)}`,
+        confirmText: t('privatePasswordResetConfirm', lang),
+        cancelText: t('cancel', lang),
+        success: (res) => { if (res.confirm) this.doPwdReset() },
+      })
+      return
+    }
     wx.showModal({
-      title: t('privatePasswordReset', lang),
-      content: t('privatePasswordResetBody', lang),
-      confirmText: t('privatePasswordResetConfirm', lang),
+      title: t('resetWithBioTitle', lang),
+      content: t('resetWithBioBody', lang),
+      confirmText: t('resetWithBioOk', lang),
       cancelText: t('cancel', lang),
-      success: async (res) => {
+      success: (res) => {
         if (!res.confirm) return
-        try {
-          await api.resetPrivatePassword()
-          this.setData({ privateSet: false, pwd1: '', pwd2: '' })
-          wx.showToast({ title: t('privatePasswordResetDone', lang), icon: 'none' })
-        } catch (err) {
-          wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })
-        }
+        wx.startSoterAuthentication({
+          requestAuthModes: [mode],
+          challenge: `wtsj-pwd-reset-${Date.now()}`,
+          authContent: t('privatePasswordReset', lang),
+          success: () => this.doPwdReset(),
+          // 识别没过就当什么都没发生：密码留着，用户随时可以再点一次
+          fail: () => wx.showToast({ title: t('operationFailed', lang), icon: 'none' }),
+        })
       },
     })
+  },
+
+  async doPwdReset() {
+    const { lang } = this.data
+    try {
+      await api.resetPrivatePassword()
+      this.setData({ privateSet: false, pwd1: '', pwd2: '' })
+      wx.showToast({ title: t('privatePasswordResetDone', lang), icon: 'none' })
+    } catch (err) {
+      wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })
+    }
   },
 
   // 设没设只认服务端那一条：本机记一份"已设置"会在换设备后说谎。
