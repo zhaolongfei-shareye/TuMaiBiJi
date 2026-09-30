@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 「我的」重设计 v2：头部固定 + 设置 / 关于 两级（中文 · 2026-09-30）</title>
+<style>
+/* ==================================================================
+   v1 被打回的原因（他原话）："设计风格还不行，请参考附件。另外，应用LOGO和名称必须
+   固定在头部，设置和关于是第二层级。分享应该是在关于后面（就是分享这个产品），
+   查看额度不应该再设置里面，在分享下面。……密码设置，之前不是说要加生物指纹吗？
+   或者扫脸，这部分有打通吗？一并优化。"
+
+   参考图（那张学院 App 的两屏）真正值得抄的不是紫色，是这四条结构：
+     · 顶部一块**实心主色的身份卡**，把"我是谁"一次说完，右下角一枚反色胶囊放最硬的那个数值；
+     · 白卡圆角很大、卡与卡之间留白很松，分组靠**粗体小标题**而不是靠框；
+     · 一个**主色大按钮**承担这一屏唯一的重动作；
+     · 数值用大字、标签用小字灰，层级一眼分得出。
+   这四条全部落到我们自己的品牌色上（宣纸米白 #F2EFE9 / 墨黑 #23252C / 砖橙 #D2683F），
+   **不跟参考图改配色**——那是它的品牌，不是我们的。
+
+   四屏：
+     ① 我的 · 设置（这台机器探测到生物解锁）
+     ② 我的 · 关于
+     ③ 我的 · 设置（这台机器探测不到 → 「解锁方式」整行不出现，只剩密码）
+     ④ 打开一篇私密笔记时（探测到就直接弹指纹，弹不过去才回落到键盘）
+
+   口径全从代码侧取，不另造数：
+   · 一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690；px 当 rpx 用，设计宽 750。
+   · 页面底 --bg-page #f4f2ec、卡白底、描边 rgba(35,37,44,.10) 3px、圆角 --r-card 40、
+     内边距 24 32 32、组间距 --sp-2 16 —— 逐字抄 app.wxss。
+   · Tab 抄现网 about 页那一条（文字 + 6rpx 下划线，间距 56，--fs-body 28/700），不是按钮式。
+   · 行抄 .menu-item：上下 30rpx、分隔线与卡片描边同色同粗、左字 28/700、右值 24 灰、箭头 ›。
+   · 组标题吃现网已有的 --fs-label 20 + --text-tertiary，不新立字阶。
+   · 身份卡里那枚反色胶囊 = 参考图右下角「63 SKS」的同构物，放的是当前模板名。
+   · 屏上每一句现网串：我的 / 图麦笔记 / 看到的好东西，存成能用的笔记 / 卡片模板 / 玉版宣 /
+     外观 / 分类 / 私密 / 密码已设置 / 未设置 / 分享好友 / 笔记额度 / 注销 / 介绍 / 功能 / 隐私 /
+     反馈邮箱 / 产品官网 / 当前版本 / 开发主体。
+   · 新串（还没进字典，等他认）：Tab 名「设置」「关于」；组标题「内容与外观」「私密」「账号」
+     「这个产品」「联系」「分享这个产品」；行名「外观」「分类」「私密」「反馈」「注销」「解锁方式」；
+     右值「已设」「3 个」「指纹」「面容」「不支持」；大按钮「分享图麦笔记」。
+   · 生物认证这三条接口名和合法值是从官方文档原文抄的，不是凭印象：
+     checkIsSupportSoterAuthentication → supportMode ∈ {fingerPrint, facial, speech(暂未支持)}；
+     startSoterAuthentication 基础库 1.5.0 起、小程序插件不支持、微信鸿蒙 OS 版支持；
+     resultJSON 里"本次认证的指纹ID"文档明写**仅 Android 支持**。
+     iOS 面容能否走这条路官方那一页没写 → 界面上不做承诺，探测到什么才显示什么。
+   ================================================================== */
+  :root{
+    --paper:#F2EFE9; --ink:#23252C; --card:#fff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06); --sec:#5C6068; --ter:#9A9EA6; --clay:#D2683F;
+    --danger:#C24A3F; --ok:#46A863;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px;
+    --fs-label:20px; --fs-micro:18px; --r-card:40px; --r-chip:28px; --r-pill:999px; --w-edge:3px;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px; --sp-6:64px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.5 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:18px;font-size:15px;color:#4a4d55;line-height:1.75;max-width:750px}
+  .cap .ttl{display:block;font-size:17px;color:#1d1f24;margin-bottom:6px}
+  .cap .new{color:#B4552A;font-weight:600}
+  .cap .gone{color:#8A8F98;text-decoration:line-through}
+  .cap b{font-weight:600;color:#1d1f24}
+  .cap code{background:#efece4;padding:1px 6px;border-radius:5px;font-size:13px}
+
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);position:relative}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:26px;font-weight:600;color:var(--ink)}
+  .status .r{font-size:22px;font-weight:500}
+  .nav{height:90px;display:flex;align-items:center;justify-content:center;position:relative;
+    font-size:32px;font-weight:600;color:var(--ink)}
+  .view{height:1506px;overflow:hidden;background:var(--paper);padding:2px var(--sp-3) 0;position:relative}
+  .card{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:var(--sp-3) var(--sp-4) var(--sp-4);margin-bottom:var(--sp-2);position:relative;overflow:hidden}
+  .menu{padding:0 var(--sp-4)}
+
+  /* ---------- 头部：LOGO + 名称，固定在两栏之上 ---------- */
+  .head{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-4) 4px var(--sp-3)}
+  .logo{flex:none;width:88px;height:88px;border-radius:28px;
+    background:conic-gradient(from 210deg,#E08354,#A94A22,#E08354);position:relative}
+  .logo::after{content:"麦";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:40px;font-weight:700}
+  .hname{font-size:36px;font-weight:700;letter-spacing:-.8px;color:var(--ink);line-height:1.15}
+  .hslog{display:block;margin-top:4px;font-size:var(--fs-tiny);color:var(--sec)}
+
+  /* ---------- Tab：第二层级 ---------- */
+  .tabs{display:flex;gap:56px;padding:0 4px;margin-bottom:var(--sp-3)}
+  .tab{position:relative;padding:20px 0 18px;font-size:var(--fs-body);font-weight:700;
+    letter-spacing:-.3px;color:var(--ter)}
+  .tab.on{color:var(--ink)}
+  .tab.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:6px;border-radius:3px;background:var(--clay)}
+
+  /* ---------- 身份卡（参考图那块实心主色卡的同构物）---------- */
+  .idcard{background:var(--clay);border:none;border-radius:48px;padding:var(--sp-5) var(--sp-5) var(--sp-5);
+    color:#fff;position:relative;overflow:hidden;margin-bottom:var(--sp-3)}
+  .idcard .who{display:flex;align-items:center;gap:var(--sp-4)}
+  .idcard .av{flex:none;width:132px;height:132px;border-radius:50%;overflow:hidden;
+    border:4px solid rgba(255,255,255,.5);background:rgba(255,255,255,.18)}
+  .idcard .av img{width:100%;height:100%;object-fit:cover;display:block}
+  .idcard .nm{font-size:38px;font-weight:700;letter-spacing:-.6px;line-height:1.2}
+  .idcard .sl{display:block;margin-top:8px;font-size:var(--fs-meta);color:rgba(255,255,255,.86);line-height:1.5}
+  .idcard .foot{display:flex;align-items:center;justify-content:space-between;margin-top:var(--sp-4)}
+  .idcard .cap1{font-size:var(--fs-label);letter-spacing:1px;color:rgba(255,255,255,.72)}
+  .idcard .pill{background:#fff;color:var(--clay);border-radius:var(--r-pill);padding:14px 26px;
+    font-size:var(--fs-meta);font-weight:700}
+  .idcard::after{content:'';position:absolute;right:-90px;top:-90px;width:300px;height:300px;border-radius:50%;
+    background:rgba(255,255,255,.10)}
+
+  .ghead{margin:var(--sp-4) 0 var(--sp-2);padding-left:8px;font-size:var(--fs-label);
+    font-weight:700;letter-spacing:.6px;color:var(--ter)}
+  .ghead.first{margin-top:var(--sp-1)}
+
+  .item{display:flex;align-items:center;justify-content:space-between;padding:30px 0;
+    border-bottom:var(--w-edge) solid var(--edge)}
+  .item:last-child{border-bottom:none}
+  .lbl{font-size:var(--fs-body);font-weight:700;letter-spacing:-.3px;color:var(--ink)}
+  .lbl.d{color:var(--danger)}
+  .sub{display:block;margin-top:6px;font-size:var(--fs-tiny);font-weight:400;color:var(--ter);letter-spacing:0}
+  .right{display:flex;align-items:center;gap:8px}
+  .val{font-size:var(--fs-meta);color:var(--ter)}
+  .arw{font-size:30px;color:var(--ter);line-height:1}
+  .dot{width:14px;height:14px;border-radius:50%;background:var(--ok);display:inline-block}
+
+  /* ---------- 主色大按钮（参考图 Download File 的同构物）---------- */
+  .cta{background:var(--ink);color:#fff;border-radius:var(--r-pill);text-align:center;
+    padding:34px 0;font-size:var(--fs-body);font-weight:700;letter-spacing:-.3px;margin-bottom:var(--sp-2)}
+  .cta.clay{background:var(--clay)}
+  .metric{display:flex;gap:var(--sp-2);align-items:baseline}
+  .metric .big{font-size:44px;font-weight:700;color:var(--ink);letter-spacing:-1px;line-height:1}
+  .metric .u{font-size:var(--fs-meta);color:var(--ter)}
+
+  .copy{position:absolute;left:0;right:0;bottom:0;padding:var(--sp-4) var(--sp-3) var(--sp-5);
+    text-align:center;font-size:var(--fs-micro);color:var(--ter)}
+
+  /* ---------- 私密面板（第④屏）---------- */
+  .mask{position:absolute;inset:0;background:rgba(20,22,26,.42)}
+  .sheet{position:absolute;left:var(--sp-3);right:var(--sp-3);bottom:var(--sp-3);background:var(--card);
+    border-radius:48px;padding:var(--sp-5) var(--sp-4) var(--sp-4)}
+  .s-title{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:var(--ink);text-align:center}
+  .s-hint{margin-top:12px;font-size:var(--fs-meta);line-height:1.6;color:var(--sec);text-align:center}
+  .bio{margin-top:var(--sp-5);display:flex;flex-direction:column;align-items:center;gap:var(--sp-3)}
+  .bio .ring{width:172px;height:172px;border-radius:50%;background:var(--clay);
+    display:flex;align-items:center;justify-content:center;position:relative}
+  /* 指纹：四条同心弧，纯 CSS，不引图标资源 */
+  .fp{position:relative;width:82px;height:82px}
+  .fp i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:5px solid #fff;
+    border-radius:50%;border-bottom-color:transparent}
+  .fp i:nth-child(1){width:76px;height:76px}
+  .fp i:nth-child(2){width:54px;height:54px}
+  .fp i:nth-child(3){width:32px;height:32px}
+  .fp i:nth-child(4){width:12px;height:12px;background:#fff;border:none}
+  .bio .bt{font-size:var(--fs-body);font-weight:700;color:var(--ink)}
+  .bio .bs{font-size:var(--fs-tiny);color:var(--ter)}
+  .s-two{display:flex;gap:var(--sp-2);margin-top:var(--sp-5)}
+  .s-btn{flex:1;text-align:center;padding:26px 0;border-radius:var(--r-pill);font-size:var(--fs-body);font-weight:600}
+  .s-btn.ghost{background:var(--idle);color:var(--sec)}
+  .s-btn.link{background:transparent;color:var(--ter);font-weight:400;font-size:var(--fs-meta)}
+
+  table{border-collapse:collapse;margin-top:44px;background:#fff;border-radius:16px;overflow:hidden;
+    font-size:15px;max-width:2418px}
+  th,td{padding:13px 18px;border-bottom:1px solid #e6e2d8;text-align:left;vertical-align:top;line-height:1.75}
+  th{background:#f6f3ec;font-weight:600;color:#1d1f24}
+  td.old{color:#8A8F98}
+  td.new{color:#B4552A;font-weight:600}
+  .note{margin-top:26px;max-width:2418px;font-size:15px;line-height:1.9;color:#3a3d44}
+  .note b{color:#1d1f24}
+</style>
+</head>
+<body>
+<h1 style="font-size:22px;margin-bottom:6px">「我的」重设计 v2 · 头部固定，设置 / 关于 第二级</h1>
+<p style="color:#4a4d55;margin-bottom:26px;max-width:1500px">图麦笔记 · 2026-09-30 晚 · 一屏 750×1690，px 当 rpx 用；口径全部取自 me.wxss / about.wxss / app.wxss，未另造数。<b>这一稿只是图，代码一行没动；入口一个不增不减。</b></p>
+
+<div class="row">
+
+  <!-- ================= ① 设置 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:12</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head">
+          <div class="logo"></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div>
+        </div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+
+        <div class="idcard">
+          <div class="who">
+            <div class="av"><img src="../../miniprogram/assets/home-bg-portrait.jpg"></div>
+            <div><div class="nm">平安喜乐</div><span class="sl">记点有用的，别存一堆</span></div>
+          </div>
+          <div class="foot"><span class="cap1">卡片模板</span><span class="pill">玉版宣 ›</span></div>
+        </div>
+
+        <div class="ghead first">内容与外观</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">外观</span><span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">分类</span><span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">私密</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">私密<span class="sub">「私密」这一格里的笔记要解锁才看得到</span></span>
+            <span class="right"><span class="dot"></span><span class="val">已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">解锁方式<span class="sub">这台机器支持，开了就不用每次输密码</span></span>
+            <span class="right"><span class="val">指纹</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">账号</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl d">注销</span><span class="arw">›</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>① 设置这一栏</b></span>
+      LOGO 和名称<b>固定在头部</b>，两个 tab 是第二层级——tab 换的是下面这一块，头部不动。<br>
+      头部下面那块实心砖橙是<b>身份卡</b>：他的形象图、名称、一句话、当前模板，右下角那枚白胶囊放模板名
+      （参考图右下角「63 SKS」的同构物）。点整块进「卡片模板」那一页，<b>不新增功能</b>，
+      只是把原来那行「卡片模板 · 玉版宣 · 已设」从列表里提出来变成一块能看的卡。<br>
+      配色<b>没跟参考图改成紫色</b>——那是它的品牌。我们的主色是砖橙 <code>#D2683F</code>，
+      跟官网和宣纸那一族同源；抄的是它的<b>结构</b>：实心主色卡、大圆角、松留白、粗体小标题、一枚主色大按钮。<br>
+      「解锁方式」这一行<span class="new">新串</span>，值是从 <code>checkIsSupportSoterAuthentication</code> 探测回来的
+      （<code>fingerPrint</code>→指纹、<code>facial</code>→面容）。<b>探测不到就整行不出现</b>，见第③屏。
+    </div>
+  </div>
+
+  <!-- ================= ② 关于 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:12</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head">
+          <div class="logo"></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div>
+        </div>
+        <div class="tabs"><div class="tab">设置</div><div class="tab on">关于</div></div>
+
+        <div class="ghead first">这个产品</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">介绍</span><span class="right"><span class="val">v1.8.9</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">功能</span><span class="arw">›</span></div>
+          <div class="item"><span class="lbl">隐私</span><span class="arw">›</span></div>
+        </div>
+
+        <div class="ghead">联系</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">反馈<span class="sub">点一下复制，有问必答</span></span>
+            <span class="val">18509828@qq.com</span></div>
+          <div class="item"><span class="lbl">官网</span><span class="right"><span class="val">agentsbin.cn</span></span></div>
+        </div>
+
+        <div class="ghead">分享这个产品</div>
+        <div class="cta clay">分享图麦笔记</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">笔记额度<span class="sub">每让 1 位好友用一次 +10 篇</span></span>
+            <span class="metric"><span class="big">37</span><span class="u">/ 100</span></span></div>
+        </div>
+
+        <div class="copy">© 2026 图麦笔记 · 个人开发者</div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>② 关于这一栏：只能看，点下去也只是复制或换到对应那一页</b></span>
+      「分享好友」那一行按你说的<b>挪到关于后面</b>，语义跟着改清楚：<span class="new">新串</span>组标题
+      「分享这个产品」+ 一枚实心砖橙大按钮<span class="new">新串</span>「分享图麦笔记」——
+      这就是参考图那块 <b>Download File</b> 的同构物，一屏只留一个重动作。<br>
+      <b>点它还是弹现在这个微信原生分享面板</b>（<code>open-type="share"</code>），功能一点没改，
+      只是从"列表里一行带箭头的菜单"升格成"这一栏最后那枚按钮"。<br>
+      「笔记额度」按你说的<b>从设置挪到分享下面</b>，跟按钮挨着——它俩本来就是一件事：分享换额度。
+      数字改成大字、灰字标签，是参考图 <b>3.62 / IP Semester</b> 那种层级写法。<br>
+      介绍 / 功能 / 隐私 是现网关于页那三个 tab 的名字，<b>字不变、内容不变、页不变</b>，
+      只是从"进去以后自己挑"变成"在这排直接点要的那一个"。反馈和官网右侧就是值本身，点一下复制，所以都不给箭头。
+    </div>
+  </div>
+
+  <!-- ================= ③ 不支持生物解锁 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:12</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="head">
+          <div class="logo"></div>
+          <div><div class="hname">图麦笔记</div><span class="hslog">看到的好东西，存成能用的笔记</span></div>
+        </div>
+        <div class="tabs"><div class="tab on">设置</div><div class="tab">关于</div></div>
+
+        <div class="idcard">
+          <div class="who">
+            <div class="av"><img src="../../miniprogram/assets/home-bg-portrait.jpg"></div>
+            <div><div class="nm">平安喜乐</div><span class="sl">记点有用的，别存一堆</span></div>
+          </div>
+          <div class="foot"><span class="cap1">卡片模板</span><span class="pill">玉版宣 ›</span></div>
+        </div>
+
+        <div class="ghead first">内容与外观</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">外观</span><span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">分类</span><span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">私密</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">私密<span class="sub">「私密」这一格里的笔记要解锁才看得到</span></span>
+            <span class="right"><span class="dot"></span><span class="val">已设</span><span class="arw">›</span></span></div>
+        </div>
+
+        <div class="ghead">账号</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl d">注销</span><span class="arw">›</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>③ 同一栏，这台机器探测不到生物解锁</b></span>
+      <b>「解锁方式」那一行整条不出现</b>，私密组就剩一行，跟第①屏比只少一行，不会留一个点不动的死开关，
+      也不会写一句"你的机型不支持"。这是他定过的口径：机型不支持就注明、不硬做兼容，
+      而"注明"在这种场景里的正确形态是<b>不出现</b>。<br>
+      为什么这么设计：官方文档只写了 <code>supportMode</code> 的三个合法值，
+      以及"本次认证的指纹ID <b>仅 Android 支持</b>"；<b>iOS 面容能不能走 SOTER 这条路，文档那一页没写</b>。
+      所以这一行必须<b>探测完再决定渲不渲染</b>，不能凭"应该都支持"写死。<br>
+      另外两条硬约束也记在这儿：<code>startSoterAuthentication</code> 基础库 1.5.0 起才有，
+      <b>小程序插件不支持</b>（我们不用插件，无影响）；<code>speech</code> 声纹官方标着<b>暂未支持</b>，界面上不会出现。
+    </div>
+  </div>
+
+  <!-- ================= ④ 解锁面板 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:12</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">笔记详情</div>
+      <div class="view" style="padding:0">
+        <div style="height:1506px;background:var(--paper);padding:var(--sp-3) var(--sp-3) 0">
+          <div class="card" style="padding:var(--sp-4)">
+            <div style="font-size:34px;font-weight:700;color:#9A9EA6;letter-spacing:-.6px">这篇是私密的</div>
+            <div style="margin-top:14px;font-size:var(--fs-meta);color:#9A9EA6;line-height:1.6">
+              正文、概要和要点在解锁之前不会从服务器取——不是界面藏起来了，是根本没发过来。</div>
+          </div>
+        </div>
+        <div class="mask"></div>
+        <div class="sheet">
+          <div class="s-title">解锁「私密」</div>
+          <div class="s-hint">用指纹，或者直接输 6 位密码</div>
+          <div class="bio">
+            <div class="ring"><div class="fp"><i></i><i></i><i></i><i></i></div></div>
+            <div class="bt">按下指纹</div>
+            <div class="bs">认证通过才能取回这篇的正文</div>
+          </div>
+          <div class="s-two">
+            <div class="s-btn ghost">改用密码</div>
+            <div class="s-btn link">取消</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>④ 打开一篇私密笔记时（探测到生物解锁才长这样）</b></div>
+      现在是弹键盘输 6 位；开了生物之后弹的是这一层：<b>指纹优先、一行退路直接改密码</b>，
+      不用先把这层关掉再找入口。<br>
+      <b>安全边界要说清楚，别把这件事说大：</b>生物识别只替掉"输密码"这一下，
+      <b>解锁凭证还是服务端发的那条 15 分钟短命 JWT</b>（<code>scope=private</code>、绑密码摘要指纹 <code>pk</code>，
+      改密或重置当场作废），而且<b>只存内存、不落 storage</b>——杀了重进照样要重新解锁。
+      所以开了指纹不会让"手机在别人手里翻不开私密内容"这句承诺变弱：
+      指纹过不了就是拿不到那台机器的解锁凭证，服务端那一闸一行都不用改。<br>
+      探测不到生物解锁的机器，这一层还是现在那个键盘面板，跟今天一模一样。
+    </div>
+  </div>
+</div>
+
+<table>
+  <tr><th style="width:210px">这一处</th><th style="width:250px">现网（1.8.9）</th><th>v2 怎么办</th><th style="width:120px">功能面</th></tr>
+  <tr><td>LOGO + 名称</td><td class="old">一块大卡，占在列表最上面，切 tab 会跟着滚走</td>
+      <td>保留在头部，但压扁成一条（logo 88 + 名称 36 + slogan 小字），<b>固定在两栏之上</b>，切 tab 不动。</td><td>不动</td></tr>
+  <tr><td>设置 / 关于</td><td class="old">没有，9 行分两张无名卡</td>
+      <td>第二层级两个 tab，样式抄现网关于页那一条文字 + 下划线（下划线用砖橙）。<span class="new">新串</span>「设置」「关于」。</td><td>只挪位置</td></tr>
+  <tr><td>卡片模板</td><td class="old">列表里一行，右值「玉版宣 · 已设」</td>
+      <td>提成头部下面那块<b>实心砖橙身份卡</b>：形象图 + 名称 + 一句话 + 模板名胶囊。点它还是进那一页。</td><td>不动</td></tr>
+  <tr><td>外观设置 / 分类管理 / 私密密码 / 注销账号</td><td class="old">四个行名都带动作冗词</td>
+      <td>砍成「外观」「分类」「私密」「注销」。<b>点进去那页的标题仍叫全称</b>——列表要短好扫，页头要全好定位。</td><td>改叫法</td></tr>
+  <tr><td>解锁方式</td><td class="old">没有这个功能</td>
+      <td><span class="new">新串</span> 一行，值是指探测回来的「指纹 / 面容」；<b>探测不到整行不渲染</b>（见③）。开与不开都在这一行里切。</td><td><b>唯一一处新增</b></td></tr>
+  <tr><td>分享好友</td><td class="old">设置里第一行，带箭头</td>
+      <td>按他说的挪到<b>关于最后</b>，组标题「分享这个产品」，升成一枚实心砖橙大按钮「分享图麦笔记」，箭头撤掉。</td><td>不动（还是原生分享面板）</td></tr>
+  <tr><td>笔记额度</td><td class="old">设置里第二行，右值「37 / 100」</td>
+      <td>按他说的<b>从设置挪出来，放在分享下面</b>；数字改大字。理由跟分享挨着才对：分享换额度。</td><td>不动</td></tr>
+  <tr><td>关于图麦笔记</td><td class="old">列表里一行，点进去还有三个小 tab</td>
+      <td><b>整行撤掉</b>，那三个 tab（介绍 / 功能 / 隐私）提到关于这一栏，三层压成两层。</td><td>不动（还是那三块内容）</td></tr>
+  <tr><td>反馈邮箱</td><td class="old">「我的」一行 + 关于页介绍栏一行，两个入口</td>
+      <td>收成关于栏一处，砍成「反馈」，右侧就是邮箱，点一下复制、不给箭头。</td><td>并入口</td></tr>
+  <tr><td>产品官网 / 开发主体 / 当前版本</td><td class="old">关于页介绍栏三行</td>
+      <td>官网提到「联系」组；版本号挪到「介绍」那行右值；开发主体沉到页底一行小字。内容一个字不改。</td><td>不动</td></tr>
+  <tr><td>四槽那句说明</td><td class="old">57 字：四个位置，先点 ＋ 放一张图进来。图下面两枚开关：「背景」铺在首页、也垫在笔记页头部，「卡片」画在卡片头像上。</td>
+      <td>按他选的 C 收：<span class="new">新串</span>「「卡片」= 卡片头像，「背景」= 首页。」<b>小标题纯文字，不加图标</b>。
+        钉"笔记页头部"那两条尺子跟着改。</td><td>不动</td></tr>
+</table>
+
+<p class="note">
+<b>生物认证这块，先把"有没有打通"说准。</b>没有，一行代码都没写过——之前只回过你一句可行性，没排进任何版本。
+现在能确认的事实（都是官方文档原文，不是凭印象）：接口有三条
+<code>checkIsSupportSoterAuthentication</code>（问本机支持什么）、<code>checkIsSoterEnrolledInDevice</code>（问这台机录没录）、
+<code>startSoterAuthentication</code>（发起一次认证，返回 TEE 里签好的 resultJSON + 签名）；
+合法认证方式只有 <code>fingerPrint</code> 和 <code>facial</code>，<code>speech</code> 官方标着暂未支持；
+基础库 1.5.0 起，小程序插件不支持，微信鸿蒙 OS 版支持；<b>resultJSON 里"本次认证的指纹ID"文档明写仅 Android 支持</b>；
+<b>iOS 面容能不能走这条路，官方那一页没写</b>——这一条我不猜，等你 iPhone 上真机跑一次探测就知道，
+而界面上已经按"探测到什么显示什么"来设计，探测不到就整行不出现，所以无论结果是哪一种都不用返工。<br><br>
+<b>要你点的三处：</b>一、身份卡这块砖橙大卡要不要（它把「卡片模板」那一行吃掉了，列表少一行、多一块能看的东西；
+不要的话退回成一行菜单）。二、分享升成大按钮要不要（不要就还是关于栏里一行）。
+三、生物解锁这一行<b>要不要现在就做</b>——做的话我先在你两台真机上把探测跑通再谈代码，
+因为它牵到的是"私密"那道锁，改完要把服务端那 16 条用例和现网探针一起重跑，不是加一行 UI 的量。
+</p>
+</body>
+</html>
