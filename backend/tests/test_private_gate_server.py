@@ -203,6 +203,19 @@ class Test凭证作废:
         r = client.get(f"/api/notes/{n.id}", headers={**hdr(u), "X-Private-Token": _create_token(u.id, u.generation)})
         assert r.json()["content"] is None, "登录 token 没有 scope=private，不能当解锁凭证用"
 
+    def test_解锁凭证也当不成登录令牌(self, client, db):
+        """上一条钉的是反方向，这一条钉的是现网探针 09-30 真打出来的那个洞：
+        两条 token 同一个签名密钥、同一套 sub/gen/jti，只差 scope 一个字段。
+        _decode_token 不看 scope，那条 15 分钟的凭证就同时是一把全账号的钥匙——
+        拿它能列全部笔记、改密码、注销。判据只拒"带 scope 的"，不要求登录 token
+        必须有 scope：现网那批老 token 没有这个字段，反过来判等于把所有人踢下线。"""
+        u = new_user(db, "t10b")
+        token = unlock(client, u)
+        for path in ("/api/notes/", "/api/user/quota", "/api/categories/"):
+            r = client.get(path, headers={"Authorization": f"Bearer {token}"})
+            assert r.status_code == 401, f"{path} 竟然认了这把只该管私密正文的钥匙：HTTP {r.status_code}"
+        assert client.get("/api/notes/", headers=hdr(u)).status_code == 200, "没有 scope 的登录 token 照旧要认"
+
 
 class Test分享出口:
     def test_私密笔记开不出分享(self, client, db):

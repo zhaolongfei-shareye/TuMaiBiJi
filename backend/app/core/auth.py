@@ -35,11 +35,18 @@ def _decode_token(token: str) -> dict:
             algorithms=[settings.JWT_ALGORITHM],
             options={"require": ["sub", "exp", "jti"]},
         )
-        return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token 已过期，请重新登录")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="无效的 Token")
+    # 解锁凭证（app/core/private_access.py）和登录 token 用同一个签名密钥，区别只在
+    # 多带了一个 scope。这里不认 scope，那条 15 分钟的凭证就同时是一把全账号的钥匙——
+    # 拿着它能删笔记、改密码、注销，而它存在的意义恰恰是"只买这几分钟看私密正文"。
+    # 只拒"带 scope 的"，不要求登录 token 必须有 scope：现网那批老登录 token 没有这个字段，
+    # 反过来判等于把所有人当场踢下线。
+    if payload.get("scope") is not None:
+        raise HTTPException(status_code=401, detail="无效的 Token")
+    return payload
 
 
 async def _wechat_code2session(code: str) -> dict:
