@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 卡片模板多图与「设为卡片 / 设为背景」v9（中文 · 2026-09-30）</title>
+<style>
+/* ==================================================================
+   站长 09-30 原话（第三件）："在卡片模板上传图片，要支持多张，圆形左右滑动选择，
+   选中即打勾，（最多4张，超过要用户删掉才能继续换），然后用户可以在不同的图片左右
+   切换选择，可以分别或者同时设为，卡片，背景，（在换一张前面加，设为背景，设为卡片）
+   场景使用。你再优化下。"
+
+   四屏：
+     ① 已有 3 张：选中第 2 张，它是卡片头像、不是背景 → 「设为卡片」亮、"设为背景"不亮
+     ② 满 4 张：第 5 个位置还在（虚线加位），点它 → 吐司"最多 4 张，先去掉一张再加"
+     ③ 只有 1 张（老用户升级后看到的就是这一屏）：一枚圆，两个开关都亮，等于现在的行为
+     ④ 效果对照：左半是首页/笔记页头部铺的那张（标「景」的第 1 张），
+        右半是卡片里那个圆头像（标「卡」的第 2 张）——两张可以不是同一张
+
+   口径全从代码侧取，不另造数：
+   · 一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690；px 当 rpx 用，设计宽 750。
+   · 页面底 #f4f2ec、卡片白、描边 rgba(35,37,44,.10) 3px、圆角 --r-card 40
+     —— 逐字抄 app.wxss 的 page 变量与 .card。
+   · .container 左右 24、.card 内边距 24 32 32、.face-block 顶 48 —— 抄 app.wxss / profile.wxss。
+   · 字阶：动作 --fs-body 28/600、说明 --fs-meta 24、微标签 --fs-label 20、
+     标题 --fs-title 31/600；色 --text-primary #23252C / secondary #5C6068 / tertiary #9A9EA6。
+   · 原来那枚大圆 220 是现网 .face 的数；这一稿缩略图取 168、间距 24，
+     4 张 + 1 个加位 = 5×168 + 4×24 = 936 > 卡内宽 632，所以确实要左右滑（他说的那个滑）。
+   · 选中态沿用现网 .cell-on 那条结论：**描边加粗会让内容跳位，所以用外环不用粗边**
+     （profile.wxss 里 .cell-on 的注释就是这条，share.wxss 早踩过）。
+   · 屏上每一句现网串：卡片模板（页面标题）/ 换一张 / 去掉 / 名称 / 一句话 / 保存 /
+     经典款 / 玉版宣 / 我的笔记 / 本周 本月 总数 / 未分类。
+     新串（还没进字典，等他认）：设为卡片、设为背景、形象图片（页面标题，可选）、
+     那句说明、满 4 张的吐司、圆下那两枚微标签"卡""景"。
+   · 第 1 张用的是真素材 miniprogram/assets/home-bg-portrait.jpg（就是他现在那张形象）；
+     第 2/3/4 张是 CSS 画的抽象色块，标"示意"——不拿 AI 图冒充他的照片。
+   ================================================================== */
+  :root{
+    --paper:#F2EFE9; --ink:#23252C; --card:#ffffff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06);
+    --sec:#5C6068; --ter:#9A9EA6;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px;
+    --fs-label:20px; --r-card:40px; --r-chip:28px; --r-pill:999px; --w-edge:3px;
+    --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px;
+    --c-blue:#3F52D6; --c-orange:#E9723D; --c-green:#46A863; --c-purple:#6E4BD0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.5 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:18px;font-size:15px;color:#4a4d55;line-height:1.75}
+  .cap .ttl{display:block;font-size:17px;color:#1d1f24;margin-bottom:6px}
+  .cap .new{color:#B4552A;font-weight:600}
+  .cap .live{color:#3d6b4a}
+
+  /* ---------- 机框 ---------- */
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    position:relative;box-shadow:0 24px 60px rgba(0,0,0,.18)}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:28px;font-weight:600;color:var(--ink)}
+  .nav{height:90px;display:flex;align-items:center;justify-content:center;position:relative;
+    font-size:32px;font-weight:600;color:var(--ink);background:var(--paper)}
+  .nav .pill{position:absolute;right:26px;top:17px;width:190px;height:56px;border-radius:999px;
+    background:rgba(0,0,0,.10);display:flex;align-items:center;justify-content:center;gap:22px}
+  .nav .pill i{width:34px;height:34px;border-radius:50%;border:3px solid #111;display:block}
+  .nav .pill i.dots::before{content:"";display:block;width:6px;height:6px;border-radius:50%;background:#111;
+    box-shadow:10px 0 0 #111,-10px 0 0 #111;margin:11px auto 0}
+  .view{height:1506px;overflow:hidden;background:var(--paper);padding:2px var(--sp-3) 0;position:relative}
+
+  /* ---------- 卡片容器（抄 app.wxss .card） ---------- */
+  .card{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:var(--sp-3) var(--sp-4) var(--sp-4);margin-bottom:var(--sp-2);position:relative;overflow:hidden}
+  .face-block{display:flex;flex-direction:column;align-items:center;padding-top:var(--sp-5)}
+
+  /* ---------- 多图横滑条（新） ---------- */
+  .strip-wrap{width:100%;overflow:hidden;position:relative}
+  .strip{display:flex;gap:var(--sp-3);width:max-content;padding:6px 4px 2px}
+  .slot{width:168px;flex:none;position:relative;display:flex;flex-direction:column;align-items:center}
+  .thumb{width:168px;height:168px;border-radius:50%;overflow:hidden;background:var(--idle);
+    border:var(--w-edge) solid var(--edge);display:block}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb.abs{background:var(--c-blue)}
+  .thumb.abs2{background:var(--c-orange)}
+  .thumb.abs3{background:var(--c-green)}
+  .slot-on .thumb{box-shadow:0 0 0 4px var(--ink)}
+  .tick{position:absolute;right:12px;bottom:12px;width:44px;height:44px;border-radius:50%;
+    background:var(--ink);color:var(--paper);display:none;align-items:center;justify-content:center;
+    font-size:24px;font-weight:700;border:3px solid var(--card)}
+  .slot-on .tick{display:flex}
+  .role{margin-top:10px;height:26px;font-size:var(--fs-label);font-weight:700;letter-spacing:.5px;
+    color:var(--ter);white-space:nowrap}
+  .role b{color:var(--sec);font-weight:700}
+  .add{width:168px;height:168px;border-radius:50%;border:3px dashed rgba(35,37,44,.22);
+    background:transparent;display:flex;align-items:center;justify-content:center;color:var(--ter);
+    font-size:64px;font-weight:300;line-height:1}
+  .fade-r{position:absolute;right:0;top:0;width:96px;height:100%;
+    background:linear-gradient(90deg,rgba(255,255,255,0),#fff 78%);pointer-events:none}
+  .fade-l{position:absolute;left:0;top:0;width:96px;height:100%;
+    background:linear-gradient(270deg,rgba(255,255,255,0),#fff 78%);pointer-events:none}
+  /* ② 那一屏要"滑到最右才看得见加位"：整条 936 宽、可视 632，挪 -(936-632) = -304 */
+  .strip--end{margin-left:-304px}
+
+  /* ---------- 两个开关（新） ---------- */
+  .toggles{display:flex;gap:var(--sp-2);margin-top:var(--sp-4);flex-wrap:nowrap}
+  .tg{display:inline-flex;align-items:center;gap:12px;height:64px;padding:0 26px;border-radius:var(--r-pill);
+    border:var(--w-edge) solid var(--edge);background:transparent;color:var(--sec);
+    font-size:var(--fs-body);font-weight:600;white-space:nowrap;flex:none}
+  .tg i{width:26px;height:26px;border-radius:50%;border:3px solid rgba(92,96,104,.4);display:block;flex:none}
+  .tg.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .tg.on i{border-color:transparent;background:var(--paper);position:relative}
+  .tg.on i::after{content:"";position:absolute;left:7px;top:3px;width:7px;height:13px;
+    border:solid var(--ink);border-width:0 3px 3px 0;transform:rotate(42deg)}
+
+  /* ---------- 原有一行文字动作 ---------- */
+  .face-actions{display:flex;align-items:center;gap:var(--sp-4);margin-top:var(--sp-3)}
+  .act{font-size:var(--fs-body);font-weight:600;color:var(--ink);white-space:nowrap}
+  .act-muted{color:var(--ter);font-weight:500}
+  .face-hint{margin-top:var(--sp-2);font-size:var(--fs-meta);line-height:1.6;color:var(--ter);
+    text-align:center;padding:0 8px}
+
+  /* ---------- 名称 / 模板格（现网原样，只画到能认出是这页） ---------- */
+  .field{display:flex;flex-direction:column;gap:var(--sp-2)}
+  .field-label{font-size:var(--fs-meta);font-weight:700;color:var(--sec)}
+  .field-input{font-size:var(--fs-title);font-weight:600;color:var(--ink)}
+  .grid-head{margin:var(--sp-4) 0 var(--sp-2);font-size:var(--fs-meta);font-weight:700;color:var(--sec)}
+  .grid{display:flex;gap:var(--sp-3)}
+  .cell{width:320px;padding:var(--sp-2);border-radius:var(--r-card);border:var(--w-edge) solid var(--edge);
+    background:var(--card)}
+  .cell .ph{width:288px;height:300px;border-radius:var(--r-chip);background:linear-gradient(160deg,#F7F4EC,#E9E4D8)}
+  .cell .ph.dark{background:linear-gradient(160deg,#4B5A50,#2E3A33)}
+  .cell-label{display:flex;align-items:center;justify-content:space-between;margin-top:var(--sp-2);
+    font-size:var(--fs-meta);font-weight:600;color:var(--sec)}
+  .cell-on{border-color:var(--ink);box-shadow:0 0 0 3px var(--ink)}
+  .cell-on .cell-label{color:var(--ink)}
+  .cell-on-dot{width:20px;height:20px;border-radius:50%;background:var(--ink)}
+  .save-bar{position:absolute;left:0;right:0;bottom:0;padding:var(--sp-3);background:var(--paper)}
+  .btn-primary{background:var(--ink);color:var(--paper);border-radius:var(--r-pill);font-size:30px;
+    font-weight:700;padding:var(--sp-3) 0;text-align:center}
+
+  /* ---------- 吐司 ---------- */
+  .toast{position:absolute;left:50%;bottom:340px;transform:translateX(-50%);max-width:600px;
+    background:rgba(20,22,26,.9);color:#fff;font-size:var(--fs-body);line-height:1.5;
+    padding:22px 30px;border-radius:20px;text-align:center}
+
+  /* ---------- 第 4 屏：效果对照 ---------- */
+  .cmp{display:flex;flex-direction:column;gap:var(--sp-2);align-items:stretch}
+  .half{flex:1;background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    overflow:hidden}
+  .half .hd{padding:20px 22px;line-height:1.5;font-size:var(--fs-label);font-weight:700;color:var(--sec);letter-spacing:.6px}
+  .bgcrop{height:340px;background-image:url('../../miniprogram/assets/home-bg-portrait.jpg');
+    background-size:cover;background-position:center 22%;position:relative}
+  .bgcrop .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(20,22,26,.30),rgba(20,22,26,.62))}
+  .bgcrop .t{position:absolute;left:24px;bottom:22px;color:#F6F3EC;font-size:34px;font-weight:800;letter-spacing:1px}
+  .pcrop{height:200px;background:var(--c-blue);position:relative;display:flex;align-items:flex-start;
+    justify-content:flex-end;padding:26px}
+  .pcrop .av{width:104px;height:104px;border-radius:50%;border:4px solid rgba(255,255,255,.85);
+    background:conic-gradient(from 210deg,#F6C445,#E9723D,#6E4BD0,#F6C445)}
+  .pcrop .bar{position:absolute;left:26px;right:150px;top:52px;height:16px;border-radius:8px;background:rgba(255,255,255,.72)}
+  .pcrop .bar.s{top:80px;right:230px;height:12px;opacity:.5}
+  .note{font-size:var(--fs-meta);line-height:1.6;color:var(--ter);margin-top:14px}
+</style>
+</head>
+<body>
+<h1 style="font-size:22px;margin-bottom:6px">卡片模板：多图 + 设为卡片 / 设为背景 · v9</h1>
+<p style="color:#4a4d55;margin-bottom:26px">图麦笔记 · 2026-09-30 · 一屏 750×1690，px 当 rpx 用；口径全部取自 app.wxss / profile.wxss / poster.js，未另造数</p>
+
+<div class="row">
+
+  <!-- ================= ① 已有三张 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>14:20</span><span>图麦笔记 &nbsp;⌁ 5G &nbsp;100%</span></div>
+      <div class="nav">卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block">
+          <div class="strip-wrap">
+            <div class="strip">
+              <div class="slot">
+                <span class="thumb"><img src="../../miniprogram/assets/home-bg-portrait.jpg" alt=""></span>
+                <span class="tick">✓</span>
+                <span class="role"><b>景</b></span>
+              </div>
+              <div class="slot slot-on">
+                <span class="thumb abs"></span>
+                <span class="tick">✓</span>
+                <span class="role"><b>卡</b></span>
+              </div>
+              <div class="slot">
+                <span class="thumb abs2"></span>
+                <span class="role">未使用</span>
+              </div>
+              <div class="slot">
+                <span class="add">+</span>
+                <span class="role">加一张</span>
+              </div>
+            </div>
+            <div class="fade-r"></div>
+          </div>
+
+          <div class="toggles">
+            <span class="tg"><i></i>设为背景</span>
+            <span class="tg on"><i></i>设为卡片</span>
+          </div>
+
+          <div class="face-actions">
+            <span class="act">换一张</span>
+            <span class="act act-muted">去掉</span>
+          </div>
+          <div class="face-hint">最多存 4 张在这一台手机上。<br>哪张当卡片头像、哪张铺在首页，各点一下开关就行。</div>
+        </div>
+
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input">平安喜乐</span>
+        </div>
+        <div class="grid-head">经典款</div>
+        <div class="grid">
+          <div class="cell cell-on"><div class="ph"></div><div class="cell-label">玉版宣<span class="cell-on-dot"></span></div></div>
+          <div class="cell"><div class="ph dark"></div><div class="cell-label">摘句</div></div>
+        </div>
+        <div class="save-bar"><div class="btn-primary">保存</div></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>① 已有 3 张，选中第 2 张</b></span>
+      圆条横滑、<span class="live">选中即打勾</span>（现网 .cell-on 那条结论照搬：用外环不用加粗边，否则内容整块跳位）。
+      每张圆下面一枚微标签写清它在干什么：<b>景</b> / <b>卡</b> / <b>卡·景</b> / 未使用。<br>
+      开关行按他给的顺序在「换一张」前面：<span class="new">设为背景</span> · <span class="new">设为卡片</span>。
+      这一张只有"设为卡片"亮着 → 它是卡片头像，首页那张还是第 1 张。<br>
+      <span class="new">新串</span>：设为背景 / 设为卡片 / 加一张 / 景 / 卡 / 未使用 / 那句说明。
+      其余（卡片模板、换一张、去掉、名称、经典款、玉版宣、摘句、保存）都是现网字典里的。
+    </div>
+  </div>
+
+  <!-- ================= ② 满四张 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>14:21</span><span>图麦笔记 &nbsp;⌁ 5G &nbsp;100%</span></div>
+      <div class="nav">卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block">
+          <div class="strip-wrap">
+            <div class="strip strip--end">
+              <div class="slot">
+                <span class="thumb"><img src="../../miniprogram/assets/home-bg-portrait.jpg" alt=""></span>
+                <span class="role"><b>景</b></span>
+              </div>
+              <div class="slot">
+                <span class="thumb abs"></span>
+                <span class="role"><b>卡</b></span>
+              </div>
+              <div class="slot">
+                <span class="thumb abs2"></span>
+                <span class="role">未使用</span>
+              </div>
+              <div class="slot slot-on">
+                <span class="thumb abs3"></span>
+                <span class="tick">✓</span>
+                <span class="role">未使用</span>
+              </div>
+              <div class="slot">
+                <span class="add">+</span>
+                <span class="role">加一张</span>
+              </div>
+            </div>
+            <div class="fade-l"></div>
+          </div>
+          <div class="toggles">
+            <span class="tg"><i></i>设为背景</span>
+            <span class="tg"><i></i>设为卡片</span>
+          </div>
+          <div class="face-actions">
+            <span class="act">换一张</span>
+            <span class="act act-muted">去掉</span>
+          </div>
+          <div class="face-hint">最多存 4 张在这一台手机上。<br>哪张当卡片头像、哪张铺在首页，各点一下开关就行。</div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input">平安喜乐</span>
+        </div>
+        <div class="grid-head">经典款</div>
+        <div class="grid">
+          <div class="cell cell-on"><div class="ph"></div><div class="cell-label">玉版宣<span class="cell-on-dot"></span></div></div>
+          <div class="cell"><div class="ph dark"></div><div class="cell-label">摘句</div></div>
+        </div>
+        <div class="toast">最多 4 张，先去掉一张再加</div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>② 满 4 张，点第 5 个「+」位</b></span>
+      加位一直留着（不然他不知道有上限、也找不到入口）；满 4 张时点它不弹相册，
+      直接吐一句 <span class="new">「最多 4 张，先去掉一张再加」</span>——要删哪张他自己挑，
+      不替他删。<br>
+      这一屏选中的是<b>滑到最右才看得见</b>的第 4 张（左缘那道渐隐就是"左边还有"的意思），
+      它两个角色都没占 → 两个开关都不亮、标签写"未使用"。<b>「同时」</b>那一档画在 ③：
+      一张圆同时亮着两个开关、标签写 <b>卡·景</b>。
+    </div>
+  </div>
+
+  <!-- ================= ③ 只有一张（升级后） ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>14:22</span><span>图麦笔记 &nbsp;⌁ 5G &nbsp;100%</span></div>
+      <div class="nav">卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card face-block">
+          <div class="strip-wrap">
+            <div class="strip">
+              <div class="slot slot-on">
+                <span class="thumb"><img src="../../miniprogram/assets/home-bg-portrait.jpg" alt=""></span>
+                <span class="tick">✓</span>
+                <span class="role"><b>卡·景</b></span>
+              </div>
+              <div class="slot">
+                <span class="add">+</span>
+                <span class="role">加一张</span>
+              </div>
+            </div>
+          </div>
+          <div class="toggles">
+            <span class="tg on"><i></i>设为背景</span>
+            <span class="tg on"><i></i>设为卡片</span>
+          </div>
+          <div class="face-actions">
+            <span class="act">换一张</span>
+            <span class="act act-muted">去掉</span>
+          </div>
+          <div class="face-hint">最多存 4 张在这一台手机上。<br>哪张当卡片头像、哪张铺在首页，各点一下开关就行。</div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input">平安喜乐</span>
+        </div>
+        <div class="card field">
+          <span class="field-label">一句话</span>
+          <span class="field-input">记点有用的，别存一堆</span>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>③ 只有 1 张：老用户升级后看到的就是这一屏</b></span>
+      现在只有这一张图的人升上来之后，<b>它自动同时是卡片头像和首页背景</b>——
+      跟他今天的行为一模一样，不用重设、界面也不多东西。这条是升级口径，不是新规则。<br>
+      圆条这里没满 4 张，所以不出现右缘那道渐隐（提示"还能滑"的那个）。
+    </div>
+  </div>
+
+  <!-- ================= ④ 效果对照 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>14:24</span><span>图麦笔记 &nbsp;⌁ 5G &nbsp;100%</span></div>
+      <div class="nav">卡片模板<span class="pill"><i class="dots"></i><i></i></span></div>
+      <div class="view">
+        <div class="card" style="padding-top:var(--sp-4)">
+          <div style="font-size:var(--fs-meta);font-weight:700;color:var(--sec)">这一改解决的是什么</div>
+          <div style="font-size:var(--fs-body);line-height:1.6;color:var(--sec);margin-top:var(--sp-2)">
+            以前只有这一张形象：换头像会连首页背景一起换掉。现在两张可以各管一处。</div>
+        </div>
+        <div class="cmp" style="margin-top:var(--sp-2)">
+          <div class="half">
+            <div class="hd">标「景」的那张<br>铺在首页与笔记页头部</div>
+            <div class="bgcrop"><span class="t">首页背景</span></div>
+          </div>
+          <div class="half">
+            <div class="hd">标「卡」的那张<br>画在卡片里那个圆</div>
+            <div class="pcrop"><span class="bar"></span><span class="bar s"></span><span class="av"></span></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:var(--sp-2)">
+          <div class="field">
+            <span class="field-label">两张都没标的时候</span>
+            <span style="font-size:var(--fs-body);line-height:1.6;color:var(--sec);margin-top:6px">
+              没人标「景」→ 首页落回包里那张默认图；<br>
+              没人标「卡」→ 卡片不画头像（引擎本来就有这一支，杂志封面那套退成占位字「麦」）。
+            </span>
+          </div>
+        </div>
+        <div class="card field">
+          <span class="field-label">名称</span>
+          <span class="field-input">平安喜乐</span>
+        </div>
+        <div class="save-bar"><div class="btn-primary">保存</div></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>④ 效果对照：一张管背景、一张管卡片</b></span>
+      左半是首页/笔记页头部那一段（现网 .page-bg 铺的就是"背景"那张），右半是卡片里的圆头像。
+      两块分别对应 ① 里的第 1 枚与第 2 枚圆。<br>
+      <b>规则（等他认）</b>：没有任何一张标「景」→ 首页落回包里那张默认图（poster.js 里
+      HOME_BG_DEFAULT 现成的）；没有任何一张标「卡」→ 海报不画头像（引擎本来就有 hasAvatar=false
+      那一支，杂志封面那套会退成占位字「麦」）。
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:44px;max-width:1500px;font-size:15px;line-height:1.9;color:#3a3d44">
+  <b style="font-size:18px">三处等他拍的，都写在屏下，不替他决定</b><br>
+  <b>A「换一张」和「加一张」怎么分工。</b>这一稿画的是：圆条末尾那枚虚线「+」= <b>新增一张</b>；
+  「换一张」= <b>替换当前选中的这张</b>。两个动作各有归属，不会都叫"换"而分不清。
+  另一条路是只留「换一张」一个入口，点它先问"新增还是替换"——多一步，但屏上少一个符号。<br>
+  <b>B 删掉一张时，它占的角色怎么办。</b>建议：删「卡」那张之后卡片头像位空出来（海报退成无头像），
+  <b>不会</b>自动挪到别的张上——自动补位会出现"我没点它怎么换了"。删掉标着「景」的那张同理，首页落回默认图。<br>
+  <b>C 页面标题要不要跟着改。</b>现网这一页的标题是「卡片模板」（pages/profile/profile.json），
+  而它现在管的不只是卡片模板，还管首页背景那一整屏。要不要改成 <span class="new">「形象图片」</span>
+  （四字，与「外观设置」「分类管理」「关于应用」同一档）？不改也能用，只是名字略窄。<br>
+  <b>另外三条已经按他原话钉死、不在这轮讨论里：</b>圆形 + 左右滑；选中即打勾；上限 4 张、
+  要删了才能再加；两个开关放在「换一张」前面、顺序是 设为背景 → 设为卡片。
+</div>
+</body>
+</html>
