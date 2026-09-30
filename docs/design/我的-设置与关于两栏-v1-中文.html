@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 「我的」重设计 v1：设置 / 关于 两个 Tab（中文 · 2026-09-30）</title>
+<style>
+/* ==================================================================
+   站长 09-30 晚原话："我的里面，菜单很多也很乱……把『设置』类（可以操作）分为一组，
+   『关于』类（就是只能查看，不能操作）分为一组，做两个 Tab。然后里面的大标题，小标题，
+   要提炼统一，我看现在很多大小标题有重复现象，例如外观设置，界面有重复字眼。
+   用专家级来分析，重新设计这一部分的 UI 及交互……先生成效果图，暂不改代码，
+   并且具体功能也不要大改。我只想改菜单的交互设计，要符合目前，简洁，轻盈，国际大厂的风格。"
+
+   四屏：
+     ① 现状（1.8.9 真机就是这一屏）——两组共 8 行，组没有名字，页头是一块产品广告
+     ② 新 · 设置这一栏
+     ③ 新 · 关于这一栏
+     ④ 命名的账：现网哪几句在重复、各砍成什么
+
+   口径全从代码侧取，不另造数：
+   · 一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690；px 当 rpx 用，设计宽 750。
+   · Tab 直接抄现网 about 页那一条（.tabs / .tab / .tab.on::after）：字 --fs-body 28 / 700，
+     未选 --text-tertiary、选中 --text-primary，下划线 6rpx 只铺在字下面、宽跟着标签走，
+     间距 56rpx。**不是按钮式**——这条他 09-25 就否过按钮式 tab。
+   · 行抄 .menu-item：上下 30rpx、分隔线 3px rgba(35,37,44,.10) 与卡片外描边同色同粗、
+     左字 --fs-body 28/700、右值 --fs-meta 24 --text-tertiary、箭头 ›。
+   · 卡片抄 .card：白底、描边 3px、圆角 --r-card 40、内边距 24 32 32、组间距 --sp-2 16。
+   · 组标题吃现网已有的 --fs-label 20 + --text-tertiary（不新立字阶）。
+   · 屏上每一句现网串：我的 / 图麦笔记 / 看到的好东西，存成能用的笔记 / 分享好友 /
+     笔记额度 / 卡片模板 / 分类管理 / 外观设置 / 私密密码 / 关于图麦笔记 / 反馈邮箱 /
+     注销账号 / 密码已设置 / 未设置 / 介绍 / 功能 / 隐私 / 当前版本 / 产品官网 /
+     开发主体 / 公众号 / 页面壁纸 / 这台设备上的外观都在这里，换完当场生效。
+   · 新串（还没进字典，等他认）：Tab 名「设置」「关于」；组标题「内容」「这台设备」「账号」；
+     行名砍短后的「外观」「分类」「私密」「反馈」「注销」；右值「已设」；
+     关于栏那三行的副说明「这台上的一切」「这个产品」「这个账号」。
+   · 邮箱、官网、版本号是现网常量：18509828@qq.com / agentsbin.cn / v1.8.9。
+   · 所有色块、图标、下划线一律 CSS 画——这个项目不为一个符号引图标资源。
+   ================================================================== */
+  :root{
+    --paper:#F2EFE9; --ink:#23252C; --card:#ffffff; --edge:rgba(35,37,44,.10);
+    --idle:rgba(35,37,44,.06); --sec:#5C6068; --ter:#9A9EA6; --danger:#C24A3F;
+    --fs-h1:42px; --fs-title:31px; --fs-body:28px; --fs-meta:24px; --fs-tiny:21px;
+    --fs-label:20px; --fs-micro:18px; --r-card:40px; --r-chip:28px; --r-pill:999px; --w-edge:3px;
+    --sp-1:8px; --sp-2:16px; --sp-3:24px; --sp-4:32px; --sp-5:48px; --sp-6:64px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.5 -apple-system,"PingFang SC",sans-serif;padding:40px}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  .shot{width:750px}
+  .cap{margin-top:18px;font-size:15px;color:#4a4d55;line-height:1.75;max-width:750px}
+  .cap .ttl{display:block;font-size:17px;color:#1d1f24;margin-bottom:6px}
+  .cap .new{color:#B4552A;font-weight:600}
+  .cap .gone{color:#8A8F98;text-decoration:line-through}
+  .cap b{font-weight:600;color:#1d1f24}
+
+  .frame{width:750px;height:1690px;background:var(--paper);border-radius:56px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);position:relative}
+  .status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    font-size:26px;font-weight:600;color:var(--ink)}
+  .status .r{display:flex;align-items:center;gap:12px;font-size:22px;font-weight:500}
+  .nav{height:90px;display:flex;align-items:center;justify-content:center;position:relative;
+    font-size:32px;font-weight:600;color:var(--ink)}
+  .nav .back{position:absolute;left:26px;top:15px;width:60px;height:60px;border-radius:50%;
+    background:rgba(35,37,44,.10);display:flex;align-items:center;justify-content:center}
+  .nav .back::before{content:"";width:18px;height:18px;border:solid var(--ink);
+    border-width:0 0 3px 3px;transform:rotate(45deg);margin-left:5px}
+  .nav .pill{position:absolute;right:26px;top:17px;width:190px;height:56px;border-radius:999px;
+    background:rgba(0,0,0,.10);display:flex;align-items:center;justify-content:center;gap:22px}
+  .nav .pill i{width:34px;height:34px;border-radius:50%;border:3px solid #111;display:block}
+  .nav .pill i.dots::before{content:"";display:block;width:6px;height:6px;border-radius:50%;background:#111;
+    box-shadow:12px 0 0 #111,24px 0 0 #111;margin:11px 0 0 4px}
+  .view{height:1506px;overflow:hidden;background:var(--paper);padding:2px var(--sp-3) 0;position:relative}
+  .card{background:var(--card);border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);
+    padding:var(--sp-3) var(--sp-4) var(--sp-4);margin-bottom:var(--sp-2);position:relative;overflow:hidden}
+  .menu{padding:0 var(--sp-4)}
+
+  /* ---- 现状那块页头（logo + 名称 + slogan），照 me.wxss ---- */
+  .me-header{display:flex;align-items:center;gap:var(--sp-4);padding:var(--sp-4);margin-top:var(--sp-5)}
+  .logo{flex:none;width:128px;height:128px;border-radius:40px;
+    background:conic-gradient(from 210deg,#D2683F,#8A4F2C,#D2683F)}
+  .logo.s{width:96px;height:96px;border-radius:30px}
+  .brand-name{display:block;font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:var(--ink)}
+  .brand-slogan{display:block;margin-top:6px;font-size:var(--fs-meta);color:var(--sec)}
+
+  /* ---- Tab：抄现网 about 页那一条 ---- */
+  .tabs{display:flex;gap:56px;padding:0 var(--sp-4);margin:var(--sp-3) 0 var(--sp-3)}
+  .tab{position:relative;padding:26px 0 22px;font-size:var(--fs-body);font-weight:700;
+    letter-spacing:-.3px;color:var(--ter)}
+  .tab.on{color:var(--ink)}
+  .tab.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:6px;border-radius:3px;background:var(--ink)}
+
+  .ghead{margin:var(--sp-4) 0 var(--sp-2);padding-left:8px;font-size:var(--fs-label);
+    font-weight:600;letter-spacing:.5px;color:var(--ter)}
+  .ghead.first{margin-top:var(--sp-1)}
+
+  .item{display:flex;align-items:center;justify-content:space-between;padding:30px 0;
+    border-bottom:var(--w-edge) solid var(--edge)}
+  .item:last-child{border-bottom:none}
+  .lbl{font-size:var(--fs-body);font-weight:700;letter-spacing:-.3px;color:var(--ink)}
+  .lbl.d{color:var(--danger)}
+  .right{display:flex;align-items:center;gap:8px}
+  .val{font-size:var(--fs-meta);color:var(--ter)}
+  .arw{font-size:30px;color:var(--ter);line-height:1}
+  .dot{width:14px;height:14px;border-radius:50%;background:#46A863;display:inline-block;margin-right:8px}
+
+  .copy{position:absolute;left:0;right:0;bottom:0;padding:var(--sp-4) var(--sp-3) var(--sp-5);
+    text-align:center;font-size:var(--fs-micro);color:var(--ter)}
+
+  table{border-collapse:collapse;margin-top:44px;background:#fff;border-radius:16px;overflow:hidden;
+    font-size:15px;max-width:2418px}
+  th,td{padding:13px 18px;border-bottom:1px solid #e6e2d8;text-align:left;vertical-align:top;line-height:1.75}
+  th{background:#f6f3ec;font-weight:600;color:#1d1f24}
+  td.old{color:#8A8F98}
+  td.new{color:#B4552A;font-weight:600}
+  td.w{white-space:nowrap;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<h1 style="font-size:22px;margin-bottom:6px">「我的」重设计 v1 · 设置 / 关于 两个 Tab</h1>
+<p style="color:#4a4d55;margin-bottom:26px;max-width:1500px">图麦笔记 · 2026-09-30 晚 · 一屏 750×1690，px 当 rpx 用；口径全部取自 me.wxss / about.wxss / app.wxss，未另造数。<b>这一稿只是图，代码一行没动；八行的功能一条都不增减，只挪位置、改叫法。</b></p>
+
+<div class="row">
+
+  <!-- ================= ① 现状 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:04</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="card me-header">
+          <div class="logo"></div>
+          <div><span class="brand-name">图麦笔记</span>
+            <span class="brand-slogan">看到的好东西，存成能用的笔记</span></div>
+        </div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">分享好友</span><span class="right"><span class="val">每邀 1 位 +10 篇</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">笔记额度</span><span class="right"><span class="val">37 / 100</span></span></div>
+          <div class="item"><span class="lbl">卡片模板</span><span class="right"><span class="val">玉版宣 · 已设</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">分类管理</span><span class="arw">›</span></div>
+          <div class="item"><span class="lbl">外观设置</span><span class="arw">›</span></div>
+          <div class="item"><span class="lbl">私密密码</span><span class="right"><span class="val">密码已设置</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">关于图麦笔记</span><span class="arw">›</span></div>
+          <div class="item"><span class="lbl">反馈邮箱</span><span class="right"><span class="val">18509828@qq.com</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl d">注销账号</span><span class="arw">›</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>① 现状：9 行、两组、组没有名字</b></span>
+      第一组六行其实是"这台手机上的我的设置"，第二组三行是"关于 + 注销"——
+      <span class="gone">这个分法只有写代码的人知道，界面上一个字都没说</span>，用户只能逐行读过去。
+      顶部那一整块 logo + 产品名 + slogan 是<b>"关于"的内容</b>，占在"设置"最上面，
+      把第一条能操作的东西推到 480rpx 以下；而且它跟 tabBar 那个「我的」、跟「关于图麦笔记」那一行、
+      跟点进去那页的页头，<b>同一个产品名说了四遍</b>。
+    </div>
+  </div>
+
+  <!-- ================= ② 新 · 设置 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:04</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="card tabs" style="margin-bottom:0">
+          <div class="tab on">设置</div><div class="tab">关于</div>
+        </div>
+        <div class="ghead first">内容</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">卡片模板</span><span class="right"><span class="val">玉版宣</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">分类</span><span class="right"><span class="val">3 个</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead">这台设备</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">外观</span><span class="right"><span class="val">天青</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">私密</span><span class="right"><span class="dot"></span><span class="val">已设</span><span class="arw">›</span></span></div>
+        </div>
+        <div class="ghead">账号</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">分享好友</span><span class="right"><span class="val">+10 篇 / 人</span></span></div>
+          <div class="item"><span class="lbl">笔记额度</span><span class="right"><span class="val">37 / 100</span></span></div>
+          <div class="item"><span class="lbl d">注销</span><span class="arw">›</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>② 新 · 设置这一栏：6 行、三小组、每组有名字</b></span>
+      页头那块产品广告整块搬去"关于"，第一条能操作的东西从 480rpx 提到 <b>300rpx</b>。<br>
+      组标题<span class="new">新串「内容」「这台设备」「账号」</span>——
+      这九个字的分组依据就是原来那两个无名卡片之间的实际分界，只是以前没写出来。<br>
+      行名全部砍到 2–4 字：<span class="new">新串「外观」「分类」「私密」「注销」</span>（现网是外观设置 / 分类管理 / 私密密码 / 注销账号）。
+      右值跟着收：私密那行不再写「密码已设置」（同一行里"密码"出现两次），改成一枚 14rpx 的小绿点 + <span class="new">新串「已设」</span>。<br>
+      <b>功能一条没动</b>：卡片模板进原页、分类进原页、外观进原页、私密弹原来那个两层面板、
+      分享那行还是 <code>open-type="share"</code> 的原生分享、额度还是读 <code>/api/user/quota</code>、注销还是那两道确认。
+      分享那行的箭头撤了——它不进入任何页面，点它是弹面板，箭头在这里是撒谎。
+    </div>
+  </div>
+
+  <!-- ================= ③ 新 · 关于 ================= -->
+  <div class="shot">
+    <div class="frame">
+      <div class="status"><span>19:04</span><span class="r">图麦笔记 ⌁ 5G 100%</span></div>
+      <div class="nav">我的</div>
+      <div class="view">
+        <div class="card tabs" style="margin-bottom:0">
+          <div class="tab">设置</div><div class="tab on">关于</div>
+        </div>
+        <div class="card me-header" style="margin-top:var(--sp-3)">
+          <div class="logo s"></div>
+          <div><span class="brand-name" style="font-size:34px">图麦笔记</span>
+            <span class="brand-slogan">看到的好东西，存成能用的笔记</span></div>
+        </div>
+        <div class="ghead first">这个产品</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">介绍</span><span class="right"><span class="val">v1.8.9</span><span class="arw">›</span></span></div>
+          <div class="item"><span class="lbl">功能</span><span class="arw">›</span></div>
+          <div class="item"><span class="lbl">隐私</span><span class="arw">›</span></div>
+        </div>
+        <div class="ghead">联系</div>
+        <div class="card menu" style="padding-top:0;padding-bottom:0">
+          <div class="item"><span class="lbl">反馈</span><span class="right"><span class="val">18509828@qq.com</span></span></div>
+          <div class="item"><span class="lbl">官网</span><span class="right"><span class="val">agentsbin.cn</span></span></div>
+        </div>
+        <div class="copy">© 2026 图麦笔记 · 个人开发者</div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="ttl"><b>③ 新 · 关于这一栏：只能看，点下去也只是复制或换到对应那一页</b></span>
+      原来「关于图麦笔记」那一行<b>整行撤掉</b>——它存在的唯一理由是"关于"没地方放，现在它是一栏了。
+      少一层：原来 我的 → 关于图麦笔记 → 三个小 tab，现在 我的 · 关于 → 三行。<br>
+      介绍 / 功能 / 隐私 就是现网关于页那三个 tab 的名字，<b>字不变、内容不变、页不变</b>，
+      只是从"进去以后自己挑 tab"变成"在这排直接点要的那一个"，进去落在对应那一栏。<br>
+      反馈和官网这两行<b>右侧就是值本身</b>，点一下复制、弹一句已复制，所以都不给箭头——
+      这也顺手解掉一个违规：邮箱原来在"我的"那一行和关于页介绍栏<b>各出现一次，两个入口</b>，
+      现在只剩这一处。<br>
+      logo + 名称 + slogan 从"设置"顶上搬到这里，版本 v1.8.9 做在「介绍」那行的右值上，
+      不再单占一行。
+    </div>
+  </div>
+</div>
+
+<table>
+  <tr><th style="width:230px">位置</th><th style="width:250px">现网这句</th><th>改成什么 / 为什么</th><th style="width:110px">性质</th></tr>
+  <tr><td>页内 Tab</td><td class="old">没有（两组无名卡片）</td>
+      <td><span class="new">新串</span> 设置 / 关于。样式直接抄现网关于页那一条文字 + 下划线，不新立一档，也不是按钮式。</td><td>结构</td></tr>
+  <tr><td>页头那块 logo + 名称 + slogan</td><td class="old">图麦笔记 / 看到的好东西，存成能用的笔记</td>
+      <td>整块从「设置」顶搬到「关于」顶。它是关于类内容，占在可操作列表上面既挡地方又把产品名说了第二遍。</td><td>挪位置</td></tr>
+  <tr><td>组标题（三处）</td><td class="old">没有</td>
+      <td><span class="new">新串</span> 内容 / 这台设备 / 账号。原来两组无名卡片之间的实际分界就是这个，只是没写出来。</td><td><span class="new">新串</span></td></tr>
+  <tr><td>外观设置</td><td class="old">外观设置</td><td>砍成 <span class="new">新串</span>「外观」。点进去那页的标题仍叫「外观设置」——列表是扫描场景要短，页头是定位场景要全。那页里第二行说明"这台设备上的外观都在这里"跟着改口，避免"外观"在页头两行里出现三次。</td><td>改叫法</td></tr>
+  <tr><td>分类管理</td><td class="old">分类管理</td><td>砍成 <span class="new">新串</span>「分类」，右值补一个「3 个」——原来这行只有字和箭头，看不出里面有没有东西。</td><td>改叫法</td></tr>
+  <tr><td>私密密码</td><td class="old">私密密码 / 密码已设置</td>
+      <td>行名砍成 <span class="new">新串</span>「私密」，右值「已设」+ 一枚小绿点。现网这一行里"密码"出现两次。</td><td>改叫法</td></tr>
+  <tr><td>分享好友</td><td class="old">分享好友 / 每邀 1 位 +10 篇 ›</td>
+      <td>字不动，<b>箭头撤掉</b>：它弹的是微信原生分享面板，不进入任何页面。右值收短成「+10 篇 / 人」。</td><td>收箭头</td></tr>
+  <tr><td>笔记额度</td><td class="old">笔记额度 / 37 / 100</td>
+      <td>不动，跟分享并到「账号」这一组——这两行本来就是一件事的两面（分享换额度）。</td><td>挪位置</td></tr>
+  <tr><td>关于图麦笔记</td><td class="old">关于图麦笔记 ›</td>
+      <td><b>整行撤掉</b>。"关于"已经是一栏，不需要再有一行领进另一页；顺带把 我的→关于→小 tab 三层压成两层。</td><td>撤行</td></tr>
+  <tr><td>反馈邮箱</td><td class="old">反馈邮箱 / 18509828@qq.com ›</td>
+      <td>挪进「关于 · 联系」，砍成 <span class="new">新串</span>「反馈」，箭头撤掉（点它是复制）。现网这行在"我的"和关于页介绍栏各有一份，是两个入口，收成一个。</td><td>改叫法 + 并入口</td></tr>
+  <tr><td>注销账号</td><td class="old">注销账号 ›</td>
+      <td>砍成 <span class="new">新串</span>「注销」，留在「账号」组最后一行、红色不动。它确实是可操作，所以归设置不归关于。</td><td>改叫法</td></tr>
+  <tr><td>关于页那三个小 tab</td><td class="old">介绍 / 功能 / 隐私</td>
+      <td>字不动，从"进去以后自己挑"提到「关于」这一栏的三行；点哪行就落在那一栏。这三条现在是 about.wxml 里硬写的中文、没进字典，顺手补进字典。</td><td>提层</td></tr>
+  <tr><td>关于页介绍栏的五行</td><td class="old">当前版本 / 产品官网 / 开发主体 / 反馈邮箱 / 公众号</td>
+      <td>版本挪到「介绍」那行的右值；官网提到「联系」组；反馈跟上面合成一处；开发主体和版权沉到页底一行小字。<b>内容一个字不改，只是不再占五行。</b></td><td>收行</td></tr>
+</table>
+
+<p style="margin-top:26px;max-width:2418px;font-size:15px;line-height:1.9;color:#3a3d44">
+<b>三条要你点的判断，我按推荐写在了图上，不认可直接说哪一条：</b><br>
+<b>一、「笔记额度」算设置还是关于。</b>按你给的定义它是"只能查看"，该去关于；但它是<b>你这个账号</b>的状态，不是<b>这个产品</b>的信息，
+放进关于会被埋在版本号旁边找不到。我放在设置的「账号」组、跟分享并排。<br>
+<b>二、组标题要不要。</b>加了就能一眼看出分界，代价是列表多三行小字。你要"轻盈"，我压到 --fs-label 20 + 最淡那档灰，
+比正文小两档、不抢。<b>不要的话整块撤</b>，只留两个 tab 也成立。<br>
+<b>三、「介绍 / 功能 / 隐私」提到这一栏以后，还要不要保留那个独立的关于页。</b>
+图上按"保留"画的（点这三行还是进那一页，只是直接落在对应那一栏），这样功能面零改动。
+要更彻底就把那一页的内容直接摊在这一栏里，页面撤掉——那是<b>结构改动</b>，得你点头我才动。
+</p>
+</body>
+</html>
