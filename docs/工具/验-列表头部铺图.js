@@ -124,6 +124,25 @@ ok('点空白缩回挂在容器上，条子内部靠 catchtap 挡住冒泡',
 ok('那一行的外边距挂在行上，不挂在里面的 scroll-view（展开态没有它，间距还得一样）',
   /\.head-tools\s*\{[^}]*margin-bottom: var\(--sp-3\)/.test(wxss)
   && !/\.category-scroll\s*\{[^}]*margin-bottom/.test(wxss))
+// ---------- 5c. 展开条的高度对齐笔记行（09-30 他："展开的高度太高了"） ----------
+// 条子和笔记行同高这件事，靠的是"同一套内边距 + 同一根内容线高"，不是各写一个总高：
+// 笔记行实测 96.3 = 26 + 44 + 26，条子按同一个式子拼出来才会跟着 --sp-row 一起动。
+ok('条子上下内边距直接吃笔记行那一个量（不另写一份 26/20）',
+  /\.sc-card\s*\{[^}]*padding: var\(--sp-row\) var\(--sp-3\)/.test(wxss))
+ok('条子里那根内容线收到 44rpx（笔记行内容线实测就是这个数）',
+  /\.sc-line\s*\{[^}]*height: 44rpx/.test(wxss))
+ok('下横线撤了（改由最前面那枚放大镜提示可输入）',
+  !/class="sc-rule"/.test(wxml) && !/\.sc-rule\s*\{/.test(wxss))
+ok('展开条最前面有那枚放大镜，且排在输入框之前',
+  /class="sc-glyph glyph-search"><\/view>[\s\S]{0,120}<input[\s\S]{0,40}class="sc-input"/.test(wxml))
+ok('放大镜停在"提示"那一档（.55，比输入字浅，不跟内容抢）',
+  /\.sc-glyph\s*\{[^}]*opacity: 0\.55/.test(wxss))
+// 「搜索笔记」与笔记标题同档这件事原来是被效果图误导的：稿子里行卡标题画成 --fs-body 28，
+// 现网 .row-title 其实是 --fs-title 31。两边实测都是 16px，所以这里钉住"同一条令牌"，
+// 谁再想改字号必须同时改两处才不红。
+ok('「搜索笔记」与笔记标题吃同一条字号令牌',
+  /\.sc-go\s*\{[^}]*font-size: var\(--fs-title\)/.test(wxss)
+  && /\.row-title\s*\{[^}]*font-size: var\(--fs-title\)/.test(read('app.wxss')))
 ok('分类多到放不下时照旧左滑，圆钮不参与滚动（flex:none 钉在最右）',
   /\.sc-btn\s*\{[^}]*flex: none/.test(wxss) && /\.category-scroll\s*\{[^}]*flex: 1/.test(wxss))
 // 09-30 起暗玻璃那一态只管「全部」那一枚（.chip.all）：分类那几枚穿自己的分类色，

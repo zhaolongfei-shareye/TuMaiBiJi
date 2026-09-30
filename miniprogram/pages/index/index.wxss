@@ -34,7 +34,10 @@
 .sc-card {
   background: var(--chrome-bg);
   color: var(--chrome-ink);
-  padding: 26rpx var(--sp-3) 20rpx;
+  /* 上下内边距直接吃笔记行那一个量（--sp-row 26），不另写一份数：
+     这一条要和笔记行长得一样高，靠的就是"同一套内边距 + 同一根内容线高"。
+     原来这里是 26/24/20 三档配 64 的线，实测 111.5rpx，比笔记行的 96.3 高出一截。 */
+  padding: var(--sp-row) var(--sp-3);
   margin-bottom: var(--sp-3);
 }
 
@@ -43,22 +46,23 @@
   transform: none;
 }
 
+/* 44rpx = 笔记行里那根内容线实测的高度（96.3 − 26 − 26）。
+   条子总高因此落在 26+44+26 = 96，和上下那些笔记行同一条节奏。 */
 .sc-line {
   position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  height: 64rpx;
+  height: 44rpx;
 }
 
-.sc-rule {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3rpx;
-  background: var(--chrome-ink);
-  opacity: 0.42;
+/* 条子里最前面那枚放大镜就是"这里能打字"的提示。
+   原来靠一条下划线表示可写（.sc-rule），条子压到笔记行那么高之后那条线既占位又多余：
+   输入框自动聚焦、光标已经在闪，加上一枚搜索符号是各家搜索框的通用读法。
+   不透明度 .55 是让它停在"提示"那一档——比输入字浅，不跟内容抢。 */
+.sc-glyph {
+  flex: none;
+  opacity: 0.55;
 }
 
 /* 字号与新建页那条"标题"输入框完全一致（app.wxss 的 .face-input：--fs-body、不加粗）。

@@ -21,6 +21,7 @@
        容器去触发缩回，只有条子以外才算"点了空白"。 -->
   <view wx:if="{{searchOpen}}" class="card sc-card" style="{{searchSkin}}" catchtap="noop">
     <view class="sc-line">
+      <view class="sc-glyph glyph-search"></view>
       <input
         class="sc-input"
         focus="{{searchOpen}}"
@@ -33,7 +34,6 @@
       />
       <view wx:if="{{searchKeyword}}" class="sc-x" catchtap="clearSearch">✕</view>
       <view class="sc-go" catchtap="onSearchConfirm">{{t.search}}</view>
-      <view class="sc-rule"></view>
     </view>
   </view>
 

@@ -86,10 +86,18 @@
     display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(8,10,14,.28)}
   .sbtn svg{width:30px;height:30px;display:block}
 
-  /* ---------- 展开态：整行换成搜索条（几何全抄 .sc-card） ---------- */
-  .sc{height:110px;background:var(--sc-bg);color:var(--sc-ink);border-radius:var(--r-card);
-    padding:26px 24px 20px;box-shadow:0 18px 46px rgba(8,10,14,.42);position:relative}
-  .sc .line{display:flex;align-items:center;gap:16px;height:64px;position:relative}
+  /* ---------- 展开态：整行换成搜索条（几何全抄 .sc-card） ----------
+     09-30 他回："展开的高度太高了，占用太多地方，高度与其他笔记标题条一样。"
+     笔记行实测 96.3 = 26 + 44 + 26，条子按同一个式子拼，所以总高 96。
+     下横线撤了，改由最前面那枚放大镜提示"这里能打字"。 */
+  .sc{height:96px;background:var(--sc-bg);color:var(--sc-ink);border-radius:var(--r-card);
+    padding:26px 24px;box-shadow:0 18px 46px rgba(8,10,14,.42);position:relative}
+  .sc .line{display:flex;align-items:center;gap:16px;height:44px;position:relative}
+  .sc .mag{flex:none;width:29px;height:29px;position:relative;opacity:.55}
+  .sc .mag::before{content:'';position:absolute;left:0;top:0;width:21px;height:21px;
+    border:3px solid currentColor;border-radius:50%}
+  .sc .mag::after{content:'';position:absolute;right:0;bottom:1px;width:13px;height:3px;border-radius:2px;
+    background:currentColor;transform:rotate(45deg);transform-origin:100% 50%}
   .sc input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:var(--fs-body);color:var(--sc-ink)}
   .sc input::placeholder{color:var(--sc-ph)}
   /* 光标画在占位符后面而不是输入框右端：真机上聚焦时闪的就在那个位置，
@@ -97,7 +105,6 @@
   .sc .fake{flex:1;min-width:0;display:flex;align-items:center;font-size:var(--fs-body);color:var(--sc-ph)}
   .sc .x{flex:none;padding:0 6px;font-size:var(--fs-meta);opacity:.7;color:var(--sc-ink)}
   .sc .go{flex:none;padding-left:8px;font-size:var(--fs-title);font-weight:800;letter-spacing:-.5px;color:var(--sc-ink)}
-  .sc .rule{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--sc-ink);opacity:.42}
   .caret{display:inline-block;width:2px;height:30px;margin-left:3px;background:var(--sc-ink);animation:bl 1.1s steps(1) infinite}
   @keyframes bl{50%{opacity:0}}
 
@@ -108,7 +115,10 @@
   .dot{flex:none;width:14px;height:14px;border-radius:50%;background:var(--c-ink)}
   .dot.u{background:transparent;box-shadow:inset 0 0 0 3px var(--c-ink)}
   .pt{flex:none;font-size:var(--fs-tiny);font-weight:700;background:var(--c-ink);color:#fff;padding:6px 18px;border-radius:14px}
-  .t{flex:1;min-width:0;font-size:var(--fs-body);font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 行卡标题吃现网那一条：app.wxss 的 .row-title = --fs-title 31 / 800。
+     上一稿这里写成 --fs-body 28 / 700，于是稿子里「搜索笔记」(31) 看着比行卡标题大，
+     他据此说"字体可以小点"——现网两个都是 16px，本来一样大。口径错在稿子这边。 */
+  .t{flex:1;min-width:0;font-size:var(--fs-title);font-weight:800;letter-spacing:-.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .d{flex:none;font-size:var(--fs-meta);color:rgba(35,37,44,.62)}
   .r.open .t{font-size:36px;font-weight:800;line-height:1.3;letter-spacing:-.8px;white-space:normal}
   .r.open .l{height:auto}
@@ -203,7 +213,7 @@
     <div class="cap">
       <span class="step">② 点那枚圆钮 · 向左弹出占满整行</span>
       <h3>整行换成搜索条，分类那一排暂时收起</h3>
-      <p>点一下，圆钮所在的整行<b>向左展开成一条完整的搜索条</b>（24 → 726，和列表同宽），分类那三枚暂时收起来。条子里面<b>一个字都不改</b>：占位符「输入关键词」、右边纯文字动作「搜索笔记」、底下一条 3 不透明度 .42 的横线——全是现网 <code>.sc-card</code> 那套。自动聚焦弹键盘；键盘会盖住下面两行笔记，这是搜索的正常行为。</p>
+      <p>点一下，圆钮所在的整行<b>向左展开成一条完整的搜索条</b>（24 → 726，和列表同宽），分类那三枚暂时收起来。条子总高 <b>96</b>，与笔记行实测的 96.3 同一条节奏（26 + 44 + 26 同一个式子拼出来，不是各写一个总高）。条子里面：最前一枚<b>放大镜</b>提示这里能打字、占位符「输入关键词」、右边纯文字动作「搜索笔记」——原来那条下横线撤了。自动聚焦弹键盘；键盘会盖住下面两行笔记，这是搜索的正常行为。</p>
     </div>
     <div class="ph">
       <div class="bg"></div><div class="scrim"></div>
@@ -213,9 +223,9 @@
         <div class="head"><span class="h">我的笔记</span><span class="s">本周：0 ｜ 本月：3 ｜ 总数：3</span></div>
         <div class="sc">
           <div class="line">
+            <span class="mag"></span>
             <span class="fake">输入关键词<span class="caret"></span></span>
             <span class="go">搜索笔记</span>
-            <span class="rule"></span>
           </div>
         </div>
         <div class="rows" style="margin-top:24px">
@@ -247,9 +257,9 @@
         <div class="head"><span class="h">我的笔记</span><span class="s">本周：0 ｜ 本月：3 ｜ 总数：3</span></div>
         <div class="sc">
           <div class="line">
+            <span class="mag"></span>
             <input value="中秋"><span class="x">✕</span>
             <span class="go">搜索笔记</span>
-            <span class="rule"></span>
           </div>
         </div>
         <div class="rows" style="margin-top:24px">
@@ -262,7 +272,7 @@
         <div class="tb me"><i></i><span>我的</span></div>
       </div></div>
     </div>
-    <div class="tagline">另有一条要你拍的：<b>收起态那枚钮只放放大镜，还是放大镜 + 「搜索」两个字。</b>这一稿画的是只放图标（放大镜是通用符号，和"换背景"那枚纯图标不是一回事）。要加字我就换成 59 高的一枚胶囊。</div>
+    <div class="tagline"><b>09-30 已拍：</b>收起态那枚只放放大镜（不加「搜索」两个字）；展开时整行换进去、列表往下挪。<b>同一天第二轮改的：</b>条子从 110 压到 96（与笔记行同高）、下横线撤掉换成前置放大镜，见②。</div>
   </div>
 
 </div>
