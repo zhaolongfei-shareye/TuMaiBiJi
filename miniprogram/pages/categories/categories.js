@@ -124,7 +124,9 @@ Page({
             this.loadCategories()
           } catch (err) {
             wx.hideLoading()
-            wx.showToast({ title: t('deleteFailed', lang), icon: 'none' })
+            // 服务端那句原因要如实报出来：删「私密」那一格被拦下时它说的是"里还有几篇、
+            // 先挪走"，只回一句"删除失败"会让人以为按钮坏了，然后反复点。
+            wx.showToast({ title: (err.data && err.data.detail) || t('deleteFailed', lang), icon: 'none' })
           }
         }
       }

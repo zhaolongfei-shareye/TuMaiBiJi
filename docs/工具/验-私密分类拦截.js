@@ -83,6 +83,35 @@ const ck = (name, ok, got) => {
   ck('globalData 上有那一格，且 401 重登时跟着清',
     /privateUnlock: null/.test(appJs) && /globalData\.privateUnlock = null/.test(apiJs))
 
+  // ---------- 「私密」那一格得跟着密码一起出现（09-30 站长真机撞到的那一步） ----------
+  // 他的原话："密码已经设了，但分类看不到私密分类，写笔记时候也看不到可以选私密。"
+  // 判据是分类名，可全项目没有一处会造出这一格，只能自己去分类管理手打"私密"两个字。
+  // 这一组钉的是后端那两处补齐（设密码时 + 存量账号问状态时自愈），以及"这一格不许被
+  // 静默删掉"那道闸——删分类的通用逻辑会把名下笔记的 category_id 置空，对这一格等于解锁。
+  const userPy = fs.readFileSync(path.join(__dirname, '../../backend/app/api/routes/user.py'), 'utf8')
+  const catsPy = fs.readFileSync(path.join(__dirname, '../../backend/app/api/routes/categories.py'), 'utf8')
+  // 每条都截到"下一个空行或文件尾"：delete_category 是这个文件的最后一个函数，
+  // 后面没有空行，只写 \n\n 会整段匹配不到、于是那两条红得像是实现没了。
+  const body = (src, name) => (src.match(new RegExp(`def ${name}\\([\\s\\S]*?(?:\\n\\n|$)`)) || [''])[0]
+  const setPwd = body(userPy, 'set_private_password')
+  const getStatus = body(userPy, 'get_private_password_status')
+  const delCat = body(catsPy, 'delete_category')
+  ck('设完密码就地补出「私密」那一格', /_ensure_private_category\(db, user\)/.test(setPwd))
+  ck('存量账号（闸门上线前就设过密码的）问一次状态也补上',
+    /private_password_hash is not None[\s\S]{0,120}_ensure_private_category/.test(getStatus))
+  ck('补格判据吃那个常量，不再抄第二份"私密"字面量',
+    /from app\.core\.private_access import[^\n]*PRIVATE_CATEGORY_NAME/.test(userPy)
+    && !/name\s*=\s*["']私密["']/.test(userPy))
+  ck('幂等：补之前先查这个用户名下有没有那个名字',
+    /def _ensure_private_category[\s\S]{0,600}\.first\(\)[\s\S]{0,80}return False/.test(userPy))
+  ck('「私密」格里还有笔记时删不掉（删了就是静默解锁）',
+    /PRIVATE_CATEGORY_NAME/.test(delCat) && /status_code\s*=\s*400/.test(delCat))
+  ck('空的一格照旧能删，别的分类行为一个字没改',
+    /Note\.category_id == category_id[\s\S]{0,120}category_id: None/.test(delCat))
+  const catJs = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/categories/categories.js'), 'utf8')
+  ck('删失败时把服务端那句原因报出来，不是只回"删除失败"',
+    /err\.data && err\.data\.detail[\s\S]{0,60}deleteFailed/.test(catJs))
+
   console.log(`\n${bad.length ? '未通过 ' + bad.length + ' 条：' + bad.join(' / ') : '全部通过'}`)
   process.exitCode = bad.length ? 1 : 0
 })()

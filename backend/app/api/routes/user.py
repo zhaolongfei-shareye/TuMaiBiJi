@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
-from app.core.private_access import create_unlock_token
+from app.core.private_access import PRIVATE_CATEGORY_NAME, create_unlock_token
 from app.core.rate_limit import limiter
 from app.db.database import get_db
 from app.models.asset import Asset
@@ -116,6 +116,28 @@ class PrivatePasswordRequest(BaseModel):
     password: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
+def _ensure_private_category(db: Session, user: User) -> bool:
+    """设了私密密码，就该有一格「私密」能放东西——这一条在这里补齐，返回是否新建了。
+
+    锁的判据是分类名（app/core/private_access.py），可界面上从来没有任何一处会凭空造出
+    这个分类：原来只能自己去分类管理里手打"私密"两个字，而密码面板设完只回一句"已保存"，
+    于是设完密码的人根本不知道去哪儿放私密笔记。补齐放在服务端而不是让客户端顺手建，
+    是因为这条属于"上锁这件事的一部分"，换设备、换版本都得成立。
+
+    幂等：这一列没有唯一约束，按"这个用户名下已有那个名字"判，重复调用不会造出第二格。
+    """
+    exists = (
+        db.query(Category)
+        .filter(Category.user_id == str(user.id), Category.name == PRIVATE_CATEGORY_NAME)
+        .first()
+    )
+    if exists:
+        return False
+    max_order = db.query(Category).filter(Category.user_id == str(user.id)).count()
+    db.add(Category(user_id=str(user.id), name=PRIVATE_CATEGORY_NAME, sort_order=max_order))
+    return True
+
+
 @router.put("/private-password")
 def set_private_password(
     req: PrivatePasswordRequest,
@@ -123,6 +145,7 @@ def set_private_password(
     db: Session = Depends(get_db),
 ):
     user.private_password_hash = _hash_pin(req.password)
+    _ensure_private_category(db, user)
     db.commit()
     # 换密码会连带作废之前发出去的解锁凭证：凭证里绑着旧摘要的指纹（pk），
     # 校验时按新摘要算，对不上就判"没解锁"。这条不用另存状态，也不会漏。
@@ -130,7 +153,16 @@ def set_private_password(
 
 
 @router.get("/private-password")
-def get_private_password_status(user: User = Depends(get_current_user)):
+def get_private_password_status(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # 这条 GET 会补那一格分类，看着别扭但是这里最划算：它是"我的"页每次进、录入页每次
+    # 想选私密时都会问的那一句。放这儿，① 已经设过密码的存量账号（包括闸门上线之前
+    # 设的）不必手工刷数据就自愈；② 没设过密码的账号走到这里也不会被凭空塞一格分类。
+    # 只在真缺那一格时才写一次，平时就是一条 SELECT。
+    if user.private_password_hash is not None and _ensure_private_category(db, user):
+        db.commit()
     return {"is_set": user.private_password_hash is not None}
 
 

@@ -62,20 +62,27 @@ def main():
 
     check("起点干净：这次标记的笔记一条没有", marked() == 0, f"标记={MARK}")
 
-    # ---- 前置：设密码 + 建私密分类 + 一篇带全五个字段的笔记 --------------------
+    # ---- 前置：设密码（那一格私密应当跟着出现）+ 一篇带全五个字段的笔记 --------
+    # 09-30 站长真机撞到的就是这一步：密码设完了，界面上既看不到「私密」分类，
+    # 写笔记时也选不到——判据是分类名，可全项目没有一处会造出这一格。现在由服务端补。
+    cats0 = [c["name"] for c in client.get("/api/categories/", headers=hdr).json()]
+    check("起点：这个账号名下本来没有「私密」那一格（否则测不出是不是密码给补上的）",
+          PRIVATE_CAT not in cats0, f"本来就有：{cats0}")
     r = client.put("/api/user/private-password", headers=hdr, json={"password": PIN_A})
     check("设上私密密码", r.status_code == 200, f"HTTP {r.status_code}")
     r = client.get("/api/user/private-password", headers=hdr)
     check("状态接口如实报「已设置」", r.json().get("is_set") is True, r.text[:60])
 
-    r = client.post("/api/categories/", headers=hdr, json={"name": PRIVATE_CAT})
-    if r.status_code == 400 and "已存在" in r.text:
-        cat_id = next(c["id"] for c in client.get("/api/categories/", headers=hdr).json()
-                      if c["name"] == PRIVATE_CAT)
-        made_cat = False
-    else:
-        cat_id, made_cat = r.json().get("id"), True
-    check("有一个名为「私密」的分类", bool(cat_id), f"id={cat_id} 新建={made_cat}")
+    cats = client.get("/api/categories/", headers=hdr).json()
+    cat_id = next((c["id"] for c in cats if c["name"] == PRIVATE_CAT), None)
+    check("设完密码，分类接口里就有「私密」那一格了（录入页选得到）",
+          cat_id is not None, f"现在是 {[c['name'] for c in cats]}")
+    if cat_id is None:
+        return finish(client, db, user)
+    r = client.put("/api/user/private-password", headers=hdr, json={"password": PIN_B})
+    cats2 = [c["name"] for c in client.get("/api/categories/", headers=hdr).json()]
+    check("再设一次不会造出第二格", cats2.count(PRIVATE_CAT) == 1, f"{cats2}")
+    r = client.put("/api/user/private-password", headers=hdr, json={"password": PIN_A})
 
     body = {
         "title": f"探针私密{MARK}",
@@ -198,10 +205,23 @@ def main():
           db.get(User, user.id).private_password_hash is None
           and db.get(Note, priv_id) is not None, "hash=NULL 且笔记还在")
 
-    return finish(client, db, user, cat_id=cat_id, made_cat=made_cat)
+    # ---- ⑩ 「私密」那一格不许被静默删掉 --------------------------------------
+    # 删分类的通用逻辑会把名下笔记的 category_id 置空——对别的分类那叫取消归类，
+    # 对这一格等于把一批笔记静默解锁（判据就是分类名）。
+    r = client.delete(f"/api/categories/{cat_id}", headers=hdr)
+    check("⑩ 格里还有笔记时删不掉，并且把原因说清楚",
+          r.status_code == 400 and "挪走" in r.text, f"HTTP {r.status_code} {r.text[:70]}")
+    still = [c["id"] for c in client.get("/api/categories/", headers=hdr).json()
+             if c["id"] == cat_id]
+    check("⑩ 拦下了那一格就还在", still == [cat_id], f"{still}")
+    d2 = client.get(f"/api/notes/{priv_id}", headers=hdr)
+    check("⑩ 那篇笔记仍然判为私密（没被这一趟删格动作解掉锁）",
+          d2.json().get("is_private") is True, str(d2.json().get("is_private")))
+
+    return finish(client, db, user, cat_id=cat_id)
 
 
-def finish(client, db, user, cat_id=None, made_cat=False):
+def finish(client, db, user, cat_id=None):
     auth = {"Authorization": "Bearer " + _create_token(user.id, user.generation)}
     # 不管前面走到哪一步红了，密码这一列都要抹回去：deploy-test 留着私密密码，
     # 下一次跑探针会在入口直接拒绝，看起来像"探针坏了"而不是"上一次没收尾"。
@@ -213,11 +233,15 @@ def finish(client, db, user, cat_id=None, made_cat=False):
     db.expire_all()
     left = db.query(Note).filter(Note.user_id == str(user.id), Note.title.like(f"%{MARK}%")).count()
     check("收尾：标记的笔记一条不留", left == 0, f"还剩 {left} 条")
-    if cat_id and made_cat:
-        client.delete(f"/api/categories/{cat_id}", headers=auth)
+    if cat_id:
+        # 上面那条"格里有笔记删不掉"的闸此时已经放行——标记的笔记刚被清完，这一格是空的。
+        # 顺手也证了一次：空的一格照旧删得掉，那道闸没有把人锁死。
+        dr = client.delete(f"/api/categories/{cat_id}", headers=auth)
         db.expire_all()
-        check("收尾：探针建的私密分类删掉了（现网不该留一个空的）",
-              db.query(Category).filter(Category.id == cat_id).count() == 0)
+        check("收尾：探针那格私密分类删掉了（现网不该留一个空的）",
+              dr.status_code == 200
+              and db.query(Category).filter(Category.id == cat_id).count() == 0,
+              f"HTTP {dr.status_code} {dr.text[:60]}")
     db.expire_all()
     u = db.get(User, user.id)
     check("收尾：deploy-test 的私密密码回到未设置", u.private_password_hash is None)

@@ -8,6 +8,7 @@ from app.models.category import Category
 from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.core.private_access import PRIVATE_CATEGORY_NAME
 from app.core.timefmt import UTCDatetime
 
 router = APIRouter()
@@ -158,6 +159,21 @@ def delete_category(
     )
     if not db_cat:
         raise HTTPException(status_code=404, detail="分类不存在或已删除")
+    # 「私密」这一格是那道锁的把手：判据就是分类名（app/core/private_access.py），
+    # 而下面那条通用逻辑会把名下笔记的 category_id 置空——对别的分类那叫"取消归类"，
+    # 对这一格等于把一批笔记静默解锁，正文立刻不用密码就读得到。所以名下还有东西就不让删，
+    # 要撤锁得他自己一条条挪出去，那才是他真的点过的动作。空的一格照旧可以删。
+    if db_cat.name == PRIVATE_CATEGORY_NAME:
+        still = (
+            db.query(Note)
+            .filter(Note.category_id == category_id, Note.user_id == str(user.id))
+            .count()
+        )
+        if still:
+            raise HTTPException(
+                status_code=400,
+                detail=f"「私密」里还有 {still} 篇笔记，先把它们挪走再删这一格",
+            )
     # Set related notes' category_id to NULL before deleting the category
     db.query(Note).filter(
         Note.category_id == category_id,
