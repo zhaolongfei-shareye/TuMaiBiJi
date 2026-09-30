@@ -96,6 +96,10 @@ const gotoMe = async (mp) => {
   let page = await gotoMe(mp)
   const originalProfile = await readProfileRaw(mp)
   await seedProfile(mp, { name: '', slogan: '' })
+  // tab / 展开态是**页面实例**上的，switchTab 出去再回来不会把它们复位（上一轮跑完
+  // 停在「关于」，这一轮就红在"默认停在设置"上——那是顺序依赖的假红，不是代码坏了）。
+  // 所以每次开跑先把这一页按回出厂那一态。
+  await page.setData({ tab: 'set', pwdOpen: false, pwd1: '', pwd2: '' })
   await mp.switchTab('/pages/index/index')
   await sleep(1200)
   page = await gotoMe(mp)
