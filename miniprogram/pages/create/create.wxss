@@ -85,6 +85,29 @@
    这条为什么固定用纸白而不是壁纸的 --bg-card：淡雅那两枚壁纸下 --bg-card 也是白的，
    深色壁纸下它又是半透明白，同一条控件在八套壁纸里会变成两种面；而这条肚子里
    装的是输入框和按钮，面必须稳定。描边沿用 .card 那一条 3px。 */
+/* 横条上面那一行轮播 Tips（站长 10-01 晚）：字号吃 --fs-meta，和上面那行「10月1日 周四」
+   同一档；居左、前面空两格（首行缩进 2×24=48rpx）。
+   ⚠️ 那两个 68 是刻意的，不是遗留：.entry-wrap 整块靠 62vh 那条流内 margin 定位，
+   在它肚子里多一行就会把横条、换背景、底栏整组往下顶（正是"上面多一行就得改这里"那条老账，
+   日期那行当年就是这么把换背景顶进底栏的）。所以这一行要**整块从流里抵掉**：
+   盒子高 68 = 文字那 34 + 它下面留的一行 34，负 margin 也 68，两者互相抵干净，
+   横条顶边仍然等于整组顶边（这条由 `验-统一录入条-真跑.js` 量：条顶 == 组顶）。
+   文字落在这只盒子的上沿，于是它离横条是"一行"而不是零——上一版把 height 写成 34、
+   margin 写 -68，条子被往上顶了 34rpx，而文字底紧贴条顶，两头都不对。
+   改这一行的字号或行距，要连着改这个负 margin 和这只盒子的高。 */
+.tips {
+  flex: none;
+  margin-top: -68rpx;
+  height: 68rpx;
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  text-indent: 48rpx;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .bar {
   display: flex;
   align-items: center;
@@ -121,10 +144,12 @@
 }
 
 .bar-label {
-  /* 条身是这一屏最该被读到的东西，不能比页面标题（--fs-h1 42rpx）小 */
+  /* 站长 10-01 晚：这一档从 46rpx 收到笔记标题那一档（--fs-title 31）——
+     他说"标题字体过大，与笔记标题字体一样大就行"。原来那句"不能比页面标题小"作废：
+     页面标题 42 是整屏的门面，这一句只是横条里的动词，横条右边还有三枚入口要位置。 */
   flex: 1;
   min-width: 0;
-  font-size: 46rpx;
+  font-size: var(--fs-title);
   font-weight: 800;
   letter-spacing: -1rpx;
   line-height: var(--lh-tight);
@@ -434,34 +459,34 @@
 }
 
 /* ---------- 图形 ----------
-   几何取自 Lucide v1.50.0（ISC 授权）：link / image / pencil / camera / images。
-   同一套 24 格、同一描边重量、圆头线帽——自己手画的形状之所以显廉价，
-   就是因为空心与实心混用、线宽不统一。 */
+   几何取自 Lucide v1.49.0（ISC 授权）：pen-line / camera / images / link / chevron-right。
+   同一套 24 格、同一描边重量（1.6，原来这组里 1.5 和 1.6 混着，小尺寸上粗细不齐）、
+   圆头线帽——自己手画的形状之所以显廉价，就是因为空心与实心混用、线宽不统一。
+   底栏那三枚（plus / rows-3 / user-round）在 custom-tab-bar/index.wxss，同一支描边重量。 */
 
 .glyph-link {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' /%3E %3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' /%3E %3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' /%3E%3C/svg%3E");
 }
 
-.glyph-image {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E");
+.glyph-pen {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 21h8' /%3E %3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 21h8' /%3E %3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z' /%3E%3C/svg%3E");
 }
 
-.glyph-pencil {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
-}
-
-/* 拍照 / 相册两个小图形走同一套遮罩做法，尺寸由外层定 */
 .glyph-camera {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z' /%3E %3Ccircle cx='12' cy='13' r='3' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z' /%3E %3Ccircle cx='12' cy='13' r='3' /%3E%3C/svg%3E");
 }
 
-.glyph-album {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='7' x='3' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='14' rx='1.4'/%3E%3Crect width='7' height='7' x='3' y='14' rx='1.4'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='7' x='3' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='3' rx='1.4'/%3E%3Crect width='7' height='7' x='14' y='14' rx='1.4'/%3E%3Crect width='7' height='7' x='3' y='14' rx='1.4'/%3E%3C/svg%3E");
+.glyph-images {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16' /%3E %3Cpath d='M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2' /%3E %3Ccircle cx='13' cy='7' r='1' fill='%23000' /%3E %3Crect x='8' y='2' width='14' height='14' rx='2' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16' /%3E %3Cpath d='M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2' /%3E %3Ccircle cx='13' cy='7' r='1' fill='%23000' /%3E %3Crect x='8' y='2' width='14' height='14' rx='2' /%3E%3C/svg%3E");
+}
+
+.glyph-chev {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6' /%3E%3C/svg%3E");
 }
 
 /* ---------- 首页背景图 ----------
@@ -544,14 +569,18 @@
   margin-top: 22rpx;
 }
 
+/* 站长 10-01 晚：前面那枚照片图标撤掉，换一枚小箭头（ ">" 那一档）——
+   这一行本来就是"点进去换"，箭头把这件事说得更直白，也少一块和横条抢眼的实心面。
+   整行还是热区（左右到边、上下 110），箭头本身只有 24。 */
 .swap-glyph {
-  width: 38rpx;
-  height: 38rpx;
-  background: rgba(242, 239, 233, 0.92);
+  width: 24rpx;
+  height: 24rpx;
+  background: rgba(242, 239, 233, 0.85);
 }
 
 .swap-text {
-  font-size: 28rpx;
+  /* 字号并到 Tips 那一档（--fs-meta 24），两行小字在照片上是一个体量 */
+  font-size: var(--fs-meta);
   font-weight: 700;
   letter-spacing: 1rpx;
   color: rgba(242, 239, 233, 0.85);

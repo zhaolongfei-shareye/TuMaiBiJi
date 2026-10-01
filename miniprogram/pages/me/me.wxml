@@ -9,10 +9,6 @@
       <!-- 左上角这行大字与首页那一行是同一档量（--fs-h1 / 700 / -1rpx / left 32 top 22），
            站长 10-01：三个 tab 的首页风格要一致，这一页原来只有右上角那枚药丸。 -->
       <view class="h1">{{t.tabMe}}</view>
-      <view class="pill">
-        <view class="seg {{tab === 'set' ? 'on' : ''}}" bindtap="onTab" data-key="set">{{t.pillSettings}}</view>
-        <view class="seg {{tab === 'about' ? 'on' : ''}}" bindtap="onTab" data-key="about">{{t.pillAbout}}</view>
-      </view>
       <!-- 数字没从 /api/user/quota 读回来之前整块不占位：宁可空着，也不先摆一个猜的数 -->
       <view wx:if="{{scoreText}}" class="score">
         <text class="score-n">{{scoreText}}</text>
@@ -24,6 +20,12 @@
       <view class="sheet-text">
         <text class="sheet-name">{{nameText}}</text>
         <text class="sheet-slogan">{{sloganText}}</text>
+      </view>
+      <!-- 站长 10-01 晚：这枚药丸从图上搬进 LOGO 这一行的最右。原来它浮在照片右上角，
+           和左上角那行「我的」抢同一条视线；搬进来之后这一行就是「圆 LOGO + 两行字 + 两个档」。 -->
+      <view class="pill">
+        <view class="seg {{tab === 'set' ? 'on' : ''}}" bindtap="onTab" data-key="set">{{t.pillSettings}}</view>
+        <view class="seg {{tab === 'about' ? 'on' : ''}}" bindtap="onTab" data-key="about">{{t.pillAbout}}</view>
       </view>
     </view>
   </view>

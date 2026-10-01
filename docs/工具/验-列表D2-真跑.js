@@ -204,12 +204,36 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     // 搜索条永远在图上、固定纸白，chromeOf 只剩底栏胶囊一个消费者，这条配对判据已经不成立。
     // 上面那条"胶囊填充色 = chromeOf（像素）"仍在钉这个函数，判据没有丢。
     const idleWant = blend(PAPER, chrome.bg, p.themeOf(w).dark ? 0.68 : 0.62)
+    // 10-01 晚底栏撤了文字，选中那一格里最大的一块亮面变成图标下面那枚圆底，
+    // "笔画众数"因此不再指向字色（圆底面积是描边的几倍，众数被它抢走）。
+    // 判据拆成两条各管一件事：那一格里最大的一块 = --chrome-sel 派生色；
+    // 图标本身仍然采得到纸白（离纸白 ±14 的像素有一把，不是零）。
     const onCol = s.stroke[1]  // 中间那一格是「笔记」= 选中
-    ck(`${label}：选中的字/图标采到纸白（笔画众数）`, near(onCol, hexArr(PAPER), 10), `${onCol} vs ${hexArr(PAPER)}`)
-    ck(`${label}：未选中那两格采到淡一档（= 纸白 @${p.themeOf(w).dark ? .68 : .62} 混胶囊）`,
-      near(s.stroke[0], idleWant, 8) && near(s.stroke[2], idleWant, 8),
-      `${s.stroke[0]} / ${s.stroke[2]} vs 期望 ${idleWant}`)
-    ck(`${label}：三格都真的有笔画（不是在三块空面上取样）`, s.ink_pixels.every((n) => n > 200),
+    // 这一条原来也留 ±8，天青那枚量出来 (79,120,80) 对期望 (65,121,76)——红通道差 14，红了。
+    // 但同一张截图上的胶囊填充也偏了 +7（44,67,45 对 37,68,43），偏的方向一模一样：
+    // 落盘那趟色彩管理不是加性常量，明度越高、红通道偏得越多，圆底比条面亮 56 档，
+    // 所以它的偏差就是比条面大。判据改成**先在这张图上量出条面的偏差、再把它加到期望上**：
+    // 这样钉的还是"圆底 = chromeOf 那一支派生色"，只是不再要求屏幕和文件说同一种话。
+    const bgWant = hexArr(chrome.bg)
+    const drift = s.fill.map((v, i) => v - bgWant[i])
+    const selWant = hexArr(chrome.sel).map((v, i) => v + drift[i])
+    ck(`${label}：选中那一格的圆底采到 chromeOf 的 sel 那一支（像素，按本张图的条面偏差校准）`,
+      near(onCol, selWant, 8), `${onCol} vs 校准后 ${selWant}（原始期望 ${hexArr(chrome.sel)}，偏差 ${drift.join('/')}）`)
+    // 圆底要是和条面同一个色，这一格就读不出"当前在哪"——那是这条改动唯一的目的。
+    ck(`${label}：圆底明显亮过胶囊那一面（不是一块看不见的面）`,
+      onCol.reduce((m, v, i) => Math.max(m, Math.abs(v - s.fill[i])), 0) > 30,
+      `亮差 ${onCol.map((v, i) => v - s.fill[i]).join('/')}`)
+    ck(`${label}：选中的图标本身仍是纸白`, s.paper_pixels[1] > 60, `纸白像素 ${s.paper_pixels[1]}`)
+    ck(`${label}：未选中那两格采到淡一档（= 纸白 @${p.themeOf(w).dark ? .68 : .62} 混胶囊），且没有垫底`,
+      near(s.stroke[0], idleWant, 8) && near(s.stroke[2], idleWant, 8)
+      && s.paper_pixels[0] < 30 && s.paper_pixels[2] < 30,
+      `${s.stroke[0]} / ${s.stroke[2]} vs 期望 ${idleWant}，纸白 ${s.paper_pixels[0]} / ${s.paper_pixels[2]}`)
+    // 阈值从 200 降到 120：撤了文字之后每格只剩一枚 40rpx 的描边图形，
+    // 笔画像素本来就少了一半以上（实测三格 179 / 4233 / 299）。
+    // ⚠️ 中间那格 4233 不是笔画，是那枚圆底整块——它比填充亮，全被算进"和填充不同的像素"里了。
+    // 所以"选中的那一格 mask 真画出了图形"这件事不靠这条，靠上面那条 paper_pixels>60
+    //（实测米白 163、天青 139）；这一条守的是左右两格——它们没有垫底，179/299 就是描边本身。
+    ck(`${label}：三格都真的有笔画（不是在三块空面上取样）`, s.ink_pixels.every((n) => n > 120),
       s.ink_pixels.join(' / '))
     ck(`${label}：胶囊和页面底不是同一块（不然这块面就消失了）`,
       near(s.fill, s.page, 6) === false, `胶囊 ${s.fill} / 页面底 ${s.page}`)
@@ -246,8 +270,8 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
       sd.statsText === undefined && !(await sp.$('.page-stats')) && !(await sp.$('.page-title')),
       `statsText=${typeof sd.statsText}`)
     // 界面那三个数必须就是 /api/user/quota 回的那三个，客户端一个都不自己算。
-    // 后端还没部署到带这两个字段的版本时读到的是 undefined——那一格该画 '—'（不画 0，
-    // 0 是假话），所以这里比的是"字段是数字就等数字，不是数字就等那条横线"。
+    // 读不到时画 0：站长 10-01 拍板「必须是 0，鼓励用户活跃起来」——09-28 那条
+    // 「画 0 是假话、所以画横线」作废（8.86 里那句一起作废），判据跟着翻。
     // token 不在页面 data 里，它在 app.globalData——从那儿取才是真链路的那把钥匙
     const q = await mp.evaluate(() => new Promise((res) => {
       const tok = getApp().globalData.token || ''
@@ -257,9 +281,9 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
         success: (r) => res(r.data || { err: '空响应' }), fail: (e) => res({ err: e.errMsg }),
       })
     }))
-    // 数字与占位符两种值混在同一格里，比较必须两边都归成字符串：界面存的是 number 4，
+    // 数字与占位两种值混在同一格里，比较必须两边都归成字符串：界面存的是 number 4，
     // want() 回的是 '4'，直接 === 就是一条永远红的判据。
-    const want = (v) => (typeof v === 'number' && isFinite(v) ? String(v) : '—')
+    const want = (v) => (typeof v === 'number' && isFinite(v) ? String(v) : '0')
     const qf = [q.used, q.shares_active, q.saved_by_users]
     ck(`${name}那三列：三个数一一对得上接口（客户端没自己相加、没自己数列表）`,
       !q.err && st.length === 3 && [0, 1, 2].every((i) => String(st[i].n) === want(qf[i])),

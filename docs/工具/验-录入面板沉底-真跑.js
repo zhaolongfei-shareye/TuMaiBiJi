@@ -38,8 +38,21 @@ fs.mkdirSync(OUT, { recursive: true })
   const win = await mp.systemInfo()
   const rpx = (v) => (v * win.windowWidth) / 750
   const near = (a, b, tol) => Math.abs(a - b) <= (tol === undefined ? 1.5 : tol)
-  const page = await mp.reLaunch('/pages/create/create')
-  await sleep(1400)
+  // 冷启动那一档要重试：跑尺子.sh 里 `cli auto` 之后只等 45 秒，模拟器这时可能还没把
+  // 首页渲染出来。原来这里一把 `reLaunch` 就往下走，`.panel` 读到 null，第一条判据
+  // 直接 TypeError 把整把尺子带崩（10-01 就是这么红了一次，重跑立刻全绿——那是连接红，
+  // 不是回归）。别处那把尺子都有这个 for 重试，这里补上同一个姿势。
+  let page
+  for (let i = 0; i < 6; i++) {
+    try {
+      page = await mp.reLaunch('/pages/create/create')
+      await sleep(1400)
+      if (await page.$('.bar')) break
+      page = null
+    } catch (e) { page = null }
+    await sleep(3000)
+  }
+  if (!page) { console.log('✗ 进不了 /pages/create/create（模拟器没渲染出来），重跑一次'); process.exit(1) }
 
   const geo = async (sel) => {
     const el = await page.$(sel)

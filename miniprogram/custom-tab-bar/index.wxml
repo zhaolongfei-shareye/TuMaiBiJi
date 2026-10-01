@@ -1,14 +1,15 @@
-<view class="tab-bar {{fontCls}}" style="{{chromeStyle}}">
+<view class="tab-bar" style="{{chromeStyle}}">
   <view
     wx:for="{{list}}"
     wx:key="index"
     class="tab-item {{selected === index ? 'active' : ''}}"
     data-index="{{index}}"
     bindtap="switchTab"
+    aria-role="button"
+    aria-label="{{item.text}}"
   >
-    <view class="tab-icon icon-{{item.icon}}"></view>
-    <text class="tab-label">{{item.text}}</text>
-    <!-- 选中态那条短线常驻，未选中只是不显示：三个标签的位置因此不随选没选动 -->
-    <view class="tab-mark"></view>
+    <!-- 站长 10-01：三个按钮去掉文字，选中态从"文字下面一条短线"改成"图标垫一枚圆底"。
+         文字没有丢，它挪到 aria-label 上——读屏还问得出"这是哪一格"，屏幕上不再占一排。 -->
+    <view class="tab-icon glyph-{{item.icon}}"></view>
   </view>
 </view>

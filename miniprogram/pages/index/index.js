@@ -84,13 +84,12 @@ Page({
       // 带着它，CSS 里那条"图上换成纸白面"的规则一行都翻不动。
       searchSkin: bgSrc ? '' : chromeOf(wallpaper).style,
     })
+    // 三个 tab 的导航条标题统一成应用名（站长 10-01 晚）：原来这一页是「图麦笔记」、
+    // 新建页是「新建笔记」、「我的」页是「我的」，顶上跳来跳去读起来像三个应用。
+    // 页面里本来就有左上角那行大字说"这是哪一页"，导航条不必再报一遍。
     app.setNavTitle('appName', lang)
     this.fitHead(bgSrc)
-    // 铺了图才把导航条刷成罩层顶部那一档墨色，和新建页是同一条规则；
-    // 没铺图时不碰它——上面 applyTheme 已经按壁纸底色设过了。
-    if (this.data.bgSrc) {
-      wx.setNavigationBarColor({ frontColor: '#ffffff', backgroundColor: '#181a20', fail() {} })
-    }
+    app.applyNavForBand(this.data.bgSrc)
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().applyTheme(app.getWallpaper())
@@ -136,9 +135,11 @@ Page({
     const lang = this.data.lang
     try {
       const q = await api.getQuota()
-      // 后端没部署到带这两个字段的版本时读到的是 undefined——画成 0 是假话（那可能不是 0），
-      // 画成空白又像坏了，所以给一个明确的占位符，和「我的」页那两行同一条口径。
-      const n = (v) => (typeof v === 'number' && isFinite(v) ? v : '—')
+      // 后端没部署到带这两个字段的版本时读到的是 undefined——站长 10-01 拍板：画 0。
+      // 早先那版画「—」的理由是"0 是假话"，他把这一条翻过来了：这三格是给人看的进度，
+      // 空着或画杠读起来像坏了，画 0 才是在鼓励"去分享、去被收藏"。
+      // 所以这一档的口径是"读不到就当还没有"，不是"读到了 0"。
+      const n = (v) => (typeof v === 'number' && isFinite(v) ? v : 0)
       this.setData({
         stats: [
           { key: 'notes', n: n(q.used), l: t('statNotes', lang) },

@@ -80,7 +80,10 @@ Page({
       sloganText: t('slogan', lang),
     })
     this.fitBand()
-    app.setNavTitle('tabMe', lang)
+    // 这一页原来只有导航条标题跟着语言走、底色永远吃壁纸：另外两页铺了图会翻成深底白字，
+    // 于是三个 tab 顶上两深一浅。站长 10-01 晚要"按背景深浅自动反差"，这里补上同一条出口。
+    app.setNavTitle('appName', lang)
+    app.applyNavForBand(this.data.bgSrc)
     // 朋友圈这一路只在本页开：它要的是"单页可被转发"，别处不铺入口
     wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'], fail() {} })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {

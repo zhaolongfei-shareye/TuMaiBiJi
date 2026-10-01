@@ -79,12 +79,44 @@ const ck = (name, ok, got) => {
   ck('整组压在效果图那条线上（条底≈底栏顶减一行）', bar && Math.abs(bar.bottom - (tabTop - 110 * R - 22 * R)) < 14,
     `条底 ${Math.round(bar.bottom)}｜应在 ${Math.round(tabTop - 110 * R - 22 * R)} 上下`)
 
+  // ---------- ②b 横条上面那一行轮播 Tips（站长 10-01 晚加）----------
+  // 这一行整块是靠一个 -68rpx 的负 margin 塞进横条上方那段空档的（见 create.wxss 那段注释）：
+  // 负 margin 写错一格，横条就带着「换背景」一起往下移、顶进底栏。
+  // 所以这里既量 Tips 自己，也回头量横条有没有原地不动（上面那两条已经钉过一次位置）。
+  const tipEl = await page.$('.tips')
+  const tipRect = (await rects(['.tips']))[0]
+  const tipFs = tipEl && await tipEl.style('font-size')
+  const tipIndent = tipEl && await tipEl.style('text-indent')
+  const tipText = tipEl && await tipEl.text()
+  ck('收起态有这一行，且真的排出了高度', !!tipEl && !!tipRect && tipRect.w > 100 && tipRect.h > 0,
+    tipRect && `宽 ${(tipRect.w / R).toFixed(0)} 高 ${(tipRect.h / R).toFixed(0)}rpx`)
+  ck('Tips 字号 = --fs-meta（24rpx），和上面那行日期同一档',
+    Math.abs(parseFloat(tipFs || '0') / R - 24) <= 2, tipFs)
+  ck('Tips 前面空两格（首行缩进 48rpx = 2 个字）',
+    Math.abs(parseFloat(tipIndent || '0') / R - 48) <= 2, tipIndent)
+  ck('这一行的盒子把自己从流里抵掉了（高 68 = 34 文字 + 34 间距）',
+    !!tipRect && Math.abs(tipRect.h / R - 68) <= 3, tipRect && `${(tipRect.h / R).toFixed(1)}rpx`)
+  ck('横条一动不动：条顶就是整组顶（负 margin 与盒子高等值）',
+    !!tipRect && Math.abs(bar.top - wrap.top) <= 1, bar && `条顶 ${bar.top}／组顶 ${wrap.top}`)
+  ck('Tips 那一行文字离横条留一行（盒子顶到条顶 68，文字占上沿 34）',
+    !!tipRect && Math.abs((bar.top - tipRect.top) / R - 68) <= 3,
+    tipRect && `${((bar.top - tipRect.top) / R).toFixed(1)}rpx`)
+  ck('Tips 前面带「Tips：」这一头', !!tipText && /^Tips：/.test(tipText), tipText)
+  const tipText0 = tipText
+  await sleep(4600)
+  d = await page.data()
+  const tipText1 = (await page.$('.tips')) && await (await page.$('.tips')).text()
+  ck('池里是六句', (d.tips || []).length === 6, (d.tips || []).length)
+  ck('过了 4 秒换成下一句（真的在轮播，不是死的一行）',
+    !!tipText1 && tipText1 !== tipText0, `${tipText0} → ${tipText1}`)
+
   // ---------- ③ 点条身 = 直接写 ----------
   await (await page.$('.bar')).tap()
   await sleep(1200)
   d = await page.data()
   ck('点条身进「直接写」', d.active === 'write' && d.mode === 'write', `${d.active}/${d.mode}`)
   ck('面板出来了', (await page.$$('.panel')).length === 1)
+  ck('展开态这一行整个不渲染（站长拍的：不跟表单抢眼睛）', (await page.$$('.tips')).length === 0)
   ck('四个模式标签都在', (await page.$$('.mode')).length === 4)
   ck('当前标签是直接写', /直接写/.test((await (await page.$('.mode.on')).text()) || ''), await (await page.$('.mode.on')).text())
   ck('写那态有标题框、正文框、归类、取消、保存',
@@ -136,7 +168,7 @@ const ck = (name, ok, got) => {
   await sleep(900)
   d = await page.data()
   ck('相册标签也共用那一段', d.active === 'shot' && d.mode === 'album', `${d.active}/${d.mode}`)
-  ck('前面那枚图形跟着换成四格', d.lead === 'album', d.lead)
+  ck('前面那枚图形跟着换成叠图', d.lead === 'images', d.lead)
 
   // ---------- ⑤ 点条身以外收起 ----------
   await (await page.$('.title-row')).tap()

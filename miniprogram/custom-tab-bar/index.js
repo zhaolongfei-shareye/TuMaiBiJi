@@ -7,10 +7,10 @@ Component({
     selected: 0,
     lang: 'zh',
     list: [],
-    fontCls: '',
-    // 胶囊那一块面连同字色、发丝边、投影：由 JS 递进来（组件读不到 page 上的 CSS 变量），
-    // 值全部来自 palette.chromeOf——和首页那条搜索条是同一个函数，所以这两块面永远同色。
-    // 以前这里是"墨黑常量 + 深色壁纸换一块写死的 #1a1c22"，八枚壁纸只有两种胶囊。
+    // 胶囊那一块面连同字色、发丝边、投影、选中那枚圆底：由 JS 递进来（组件读不到 page 上的
+    // CSS 变量），值全部来自 palette.chromeOf——和首页那条搜索条是同一个函数，
+    // 所以这两块面永远同色。以前这里是"墨黑常量 + 深色壁纸换一块写死的 #1a1c22"，
+    // 八枚壁纸只有两种胶囊。
     chromeStyle: '',
   },
 
@@ -26,13 +26,7 @@ Component({
     applyTheme(wallpaper) {
       // 组件读不到 page 上的 CSS 变量，颜色只能由 JS 算好递进来；
       // 判定结果一律取 palette 里那份，不在这里另记一遍壁纸名单。
-      // 界面字体也是同一个道理：app.wxss 里那些 .font-* 类进不了这个组件，
-      // 只能把类名递进来，字体栈在本组件 wxss 里再写一遍（见那边的注释）。
-      const app = getApp()
-      this.setData({
-        fontCls: app.uiFontClass ? app.uiFontClass() : '',
-        chromeStyle: chromeOf(wallpaper).style,
-      })
+      this.setData({ chromeStyle: chromeOf(wallpaper).style })
     },
 
     updateLabels() {
@@ -40,21 +34,23 @@ Component({
       const lang = getApp().globalData.userInfo?.language || 'zh'
       this.setData({
         lang,
+        // text 不再上屏（三个标签 10-01 撤了），但它是 aria-label 和读屏的那一份，
+        // 所以照旧跟着语言走，别处不读它。
         list: [
           {
             pagePath: '/pages/create/create',
             text: t('tabCreate', lang),
-            icon: 'create',
+            icon: 'plus',
           },
           {
             pagePath: '/pages/index/index',
             text: t('tabNotes', lang),
-            icon: 'notes',
+            icon: 'rows3',
           },
           {
             pagePath: '/pages/me/me',
             text: t('tabMe', lang),
-            icon: 'me',
+            icon: 'user',
           },
         ],
       })

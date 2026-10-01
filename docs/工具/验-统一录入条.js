@@ -61,8 +61,16 @@ ok('换背景那一行只在铺了图时存在', /wx:if="\{\{bgSrc\}\}" class="h
 
 // ---------- 4. 状态机：mode 与 active 的对应 ----------
 ok('camera / album 都落到 shot 那一段', /mode === 'camera' \|\| mode === 'album' \? 'shot' : mode/.test(js))
-ok('四个模式各自的图形都给了', /leadFor\(mode\)/.test(js)
-  && /write: 'pencil', camera: 'camera', album: 'album', url: 'link'/.test(js))
+// 10-01 晚整套换成 Lucide 那一支：写=pen-line、相册=images（原来那枚"四格"读的是"网格"，
+// 不是"从相册挑照片"）。四支都必须在这页 wxss 里有对应的 mask 形状。
+ok('四个模式各自的图形都给了（pen / camera / images / link 四支都在）', /leadFor\(mode\)/.test(js)
+  && /write: 'pen', camera: 'camera', album: 'images', url: 'link'/.test(js)
+  && ['glyph-pen', 'glyph-camera', 'glyph-images', 'glyph-link'].every((c) => wxss.includes('.' + c))
+  && !/glyph-pencil|glyph-album/.test(js + wxss))
+// 描边重量整套只留一个值：原来这组里 1.5（link/image/pencil）和 1.6（camera/album）混着，
+// 同一排小图形在 38~52rpx 上粗细不齐——这正是"自己画的显廉价"的那一半原因。
+const sw = [...new Set((wxss.match(/stroke-width='[\d.]+'/g) || []).map((x) => x.slice(14, -1)))]
+ok('这一页的图形描边只有一个重量，且是 1.6', sw.length === 1 && sw[0] === '1.6', sw.join(','))
 // setData 之前 this.data 还是旧值，所以条身文案必须由调用方把新状态传进来
 ok('barTitleFor 收参数、不偷读 this.data.active',
   /barTitleFor\(active, count\)/.test(js) && !/barTitleFor\(\)/.test(js))
@@ -109,8 +117,40 @@ const appwxss = fs.readFileSync(P('app.wxss'), 'utf8')
 ok('占位符那一档改用 --face-ph 发色，不再靠 opacity',
   /\.face-ph\s*\{[^}]*var\(--face-ph/.test(appwxss) && !/\.face-ph\s*\{[^}]*opacity/.test(appwxss))
 ok('压暗层收到底部 0.72', /0\.72\)\s*100%/.test(wxss))
-ok('换背景那行 110 高、图标 38、字 28', /height: 110rpx/.test(wxss)
-  && /\.swap-glyph\s*\{[^}]*width: 38rpx/.test(wxss) && /\.swap-text\s*\{[^}]*font-size: 28rpx/.test(wxss))
+// 站长 10-01 晚：那枚照片图标撤掉、换成一枚小箭头，字号并到 Tips 那一档（--fs-meta 24）。
+// 整行热区 110 高没动——撤的是图形，不是可点的那一条。
+ok('换背景那行仍是 110 高，图标换成 24 的小箭头、字并到 Tips 那一档',
+  /height: 110rpx/.test(wxss)
+  && /\.swap-glyph\s*\{[^}]*width: 24rpx/.test(wxss)
+  && /glyph-chev/.test(wxml) && /\.glyph-chev\s*\{/.test(wxss)
+  && /\.swap-text\s*\{[^}]*font-size: var\(--fs-meta\)/.test(wxss))
+ok('条身那一档收到笔记标题同一档（--fs-title 31，原来 46）',
+  /\.bar-label\s*\{[^}]*font-size: var\(--fs-title\)/.test(wxss) && !/font-size: 46rpx/.test(wxss))
+ok('Tips 那一行：字号吃 --fs-meta、前面空两格，且展开态不渲染',
+  /\.tips\s*\{[^}]*font-size: var\(--fs-meta\)/.test(wxss)
+  && /text-indent: 48rpx/.test(wxss)
+  && /wx:if="\{\{!active && tips\.length\}\}"/.test(wxml))
+// 这一行整块是从流里"抵掉"的：盒子高 = 负 margin 的绝对值时，横条才一动不动。
+// 上一版写成 height:34 / margin:-68，两个数不等，横条被往上顶了 34rpx，
+// 而 Tips 的文字底紧贴条顶（他要的是"离下方横条保留一行距离"）。
+// 这里不钉 68 这个具体数（那是"文字 34 + 间距 34"的和），钉的是这两个数必须相等。
+const tipsSeg = /\.tips\s*\{([^}]*)\}/.exec(wxss) || [, '']
+const tipsH = parseFloat((/height:\s*(-?[\d.]+)rpx/.exec(tipsSeg[1]) || [NaN, NaN])[1])
+const tipsM = parseFloat((/margin-top:\s*(-?[\d.]+)rpx/.exec(tipsSeg[1]) || [NaN, NaN])[1])
+ok('Tips 那只盒子的高 == 负 margin 的绝对值（不等就会把横条整组顶走）',
+  Number.isFinite(tipsH) && Number.isFinite(tipsM) && tipsM < 0 && Math.abs(tipsH + tipsM) < 0.01,
+  `高 ${tipsH} / margin ${tipsM}`)
+// 盒子里除了文字那一行，还要剩下一行的空隙，否则 Tips 会贴在横条上。
+ok('Tips 盒子比文字那一行高出一档（68 = 文字 34 + 下方留一行 34）',
+  Math.abs(tipsH - 68) <= 1, tipsH)
+// 可用宽 = 750 − 24×2（页边）− 48（空两格）= 654rpx，24rpx 字号下放得下 27 个汉字；
+// 卡在这条线上，句子才不会在照片上折成两行、把横条顶下去。
+ok('Tips 六句中英各一份、句数相等', Array.isArray(zh.tips) && Array.isArray(en.tips)
+  && zh.tips.length === 6 && en.tips.length === zh.tips.length)
+ok('每条中文 Tips 不超过 24 个汉字（一句都不折行）',
+  zh.tips.every((x) => x.length <= 24), zh.tips.map((x) => x.length).join(','))
+ok('前缀两门各按自己的冒号（中文全角、英文半角带空格）',
+  zh.tipsPrefix === 'Tips：' && en.tipsPrefix === 'Tips: ')
 
 // 饱和色必须由 palette 发下来，wxss 里不许出现第二份色板
 const TONE_HEXES = palette.TONES ? palette.TONES.map((t) => t.bg.toUpperCase()) : []

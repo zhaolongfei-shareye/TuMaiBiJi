@@ -25,7 +25,7 @@ Page({
     // camera 和 album 共用 shot 那一段表单，分开记只为了高亮和条身前面那枚图形。
     active: '',
     mode: 'write',
-    lead: 'pencil',
+    lead: 'pen',
     barTitle: '',
     busy: '',
     errLine: '',
@@ -51,6 +51,11 @@ Page({
     // slogan 下面那行：onShow 里现算，这里先给空串免得第一帧闪一个空行
     dateText: '',
     weekText: '',
+    // 横条上面那一行轮播 Tips（站长 10-01 晚）：句子整批从 i18n 取，界面按 tipIdx 指哪一句。
+    // 空数组是"这一档还没有可提示的"，模板整行不渲染，不会留一条空行。
+    tips: [],
+    tipIdx: 0,
+    tipsPrefix: t('tipsPrefix', 'zh'),
   },
 
   // slogan 下面那行日期 + 星期（效果图「统一录入条」那一稿就有，之前落地时漏了）。
@@ -65,6 +70,41 @@ Page({
     }
     const W = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
     return { dateText: `${n.getMonth() + 1}月${n.getDate()}日`, weekText: W[n.getDay()] }
+  },
+
+  // 横条上面那一行轮播 Tips：六句教人用现成的能力（拍照提炼、链接、分享选模板、
+  // 卡片保存并分享、私密那一格、外观）。句子全在 i18n，这里只管取和切。
+  tipsFor(lang) {
+    const arr = t('tips', lang)
+    return Array.isArray(arr) ? arr : []
+  },
+
+  // 一句停 4 秒。小于两句就不起表（只有一句时它不该自己跳，也没有可跳的）。
+  // 定时器挂在实例上、不进 data：它是节奏不是状态，进 data 只会多一堆无意义的 setData。
+  startTips() {
+    this.stopTips()
+    const n = this.data.tips.length
+    if (n < 2) return
+    this._tipTimer = setInterval(() => {
+      this.setData({ tipIdx: (this.data.tipIdx + 1) % n })
+    }, 4000)
+  },
+
+  // 离开这一页就停：切到别的 tab 之后这一屏不再渲染，表还在跑就是白耗电，
+  // 而且回来时第一句会是随机某一条、不像"从头讲起"。
+  stopTips() {
+    if (this._tipTimer) {
+      clearInterval(this._tipTimer)
+      this._tipTimer = null
+    }
+  },
+
+  onHide() {
+    this.stopTips()
+  },
+
+  onUnload() {
+    this.stopTips()
   },
 
   // onShow 只同步主题/语言/tab，**绝不重置草稿**。
@@ -92,14 +132,15 @@ Page({
       bgSrc: poster.homeBg(),
       // 日期 + 星期：跨零点回来也要跟着翻，所以每次进页现算
       ...this.dateLineFor(lang),
+      // Tips 跟着语言整批换（英文态不能看到六句中文），并从第 1 句起重播
+      tips: this.tipsFor(lang),
+      tipIdx: 0,
+      tipsPrefix: t('tipsPrefix', lang),
     })
     this.setData({ barTitle: this.barTitleFor(this.data.active, this.data.previewImages.length) })
-    app.setNavTitle('navCreate', lang)
-    // 导航条跟着背景图走，刷成罩层顶部那一档的墨色，否则深导航条压着浅图、白标题悬在暗图上会脱节。
-    // 没铺图时不碰它——上面 applyTheme 已经按壁纸底色设过了，别在这儿把主题色改丢。
-    if (this.data.bgSrc) {
-      wx.setNavigationBarColor({ frontColor: '#ffffff', backgroundColor: '#181a20', fail() {} })
-    }
+    app.setNavTitle('appName', lang)
+    app.applyNavForBand(this.data.bgSrc)
+    this.startTips()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().applyTheme(app.getWallpaper())
@@ -120,10 +161,12 @@ Page({
     return count ? t('pickedCount', lang).replace('{n}', count) : t('albumDesc', lang)
   },
 
-  // 条身前面那枚图形跟着模式走：写=铅笔、拍照=相机、相册=四格、链接=链环。
+  // 条身前面那枚图形跟着模式走：写=钢笔、拍照=相机、相册=两张叠图、链接=链环。
   // 图形只说明"现在这一条是干什么的"，不承担颜色识别——颜色在三枚小圆上。
+  // 这四支和底栏那三支是同一套 Lucide 几何（见 create.wxss 那一段注释）；
+  // 原来相册那枚是"四格"，那是"网格"的意思不是"照片"的意思，换成叠图才读得出"从相册里挑"。
   leadFor(mode) {
-    return { write: 'pencil', camera: 'camera', album: 'album', url: 'link' }[mode] || 'pencil'
+    return { write: 'pen', camera: 'camera', album: 'images', url: 'link' }[mode] || 'pen'
   },
 
   // 条身那句话就是这一屏唯一的动词：收起态一律「动动手指」，
@@ -186,7 +229,7 @@ Page({
   // 条外任意空白都收回到默认那条；忙的时候不收，别把进度藏起来
   collapse() {
     if (this.data.busy || !this.data.active) return
-    this.setData({ active: '', mode: 'write', lead: 'pencil', barTitle: this.barTitleFor('', 0), errLine: '', errPerm: false })
+    this.setData({ active: '', mode: 'write', lead: 'pen', barTitle: this.barTitleFor('', 0), errLine: '', errPerm: false })
   },
 
   // 手写这条路上原本只有标题和正文，分类要等保存完再进「编辑」才挑得到；
@@ -426,7 +469,7 @@ Page({
         category_id: picked ? picked.id : null,
         source_type: 'manual',
       })
-      this.setData({ busy: '', writeTitle: '', writeBody: '', catIndex: 0, active: '', mode: 'write', lead: 'pencil', barTitle: '' })
+      this.setData({ busy: '', writeTitle: '', writeBody: '', catIndex: 0, active: '', mode: 'write', lead: 'pen', barTitle: '' })
       wx.showToast({ title: t('saveSucceeded', lang), icon: 'success' })
       setTimeout(() => {
         wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}` })

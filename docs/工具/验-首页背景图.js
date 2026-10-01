@@ -76,9 +76,10 @@ ck('贴底挂在容器上（active 一翻就跟着翻）',
 ck('没把本地图写成 wxss 的 background-image（那条微信不认）',
   !/background-image:\s*url\(['"]?\/(assets|images)\//.test(wxss))
 ck('新建页每次进页重取图', cjs.includes('bgSrc: poster.homeBg()'))
-ck('铺图时导航条刷成墨色', /setNavigationBarColor\(\{[^}]*#181a20/.test(cjs))
-ck('没铺图时不碰导航条（主题色留给 applyTheme）',
-  /if \(this\.data\.bgSrc\) \{\s*\n\s*wx\.setNavigationBarColor/.test(cjs))
+// 10-01 晚：三页共用 app.applyNavForBand 这一个出口（判据是"铺没铺图"，
+// 因为罩层顶部那档压完照片永远是深），没铺图时它整个不碰，主题色留给 applyTheme。
+ck('铺图时导航条走共用出口', /app\.applyNavForBand\(this\.data\.bgSrc\)/.test(cjs))
+ck('这一页不自己写 setNavigationBarColor（值只有一份）', !/setNavigationBarColor/.test(cjs))
 
 // ---------- ④ 入口唯一 ----------
 ck('外观设置里不出现选图接口', !/chooseMedia|chooseImage/.test(read('pages/wallpaper/wallpaper.js')))

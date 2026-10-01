@@ -169,8 +169,19 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   }))
   ck('三列都在，且顶部对在同一条线上', statTops.length === 3
     && statTops.every((v) => Math.abs(v - statTops[0]) <= 1), statTops.join(' / '))
-  ck('数字那一档就是 100rpx、字重 100（与「我的」那枚 MIND 同一个量）',
-    Math.abs(num(await styleOf(page, '.stat .n', 'font-size')) / R - 100) <= 2
+  // 整块真的落在右上角（站长 10-01 晚：原来横贯整块太占地方）。
+  // ⚠️ 这把尺子自带的 rects() 只回 top/bottom/h/w/left，**没有 right**——
+  // 直接写 `.right` 会拿到 undefined，算出来是 NaN，而 NaN 参与任何比较都是 false，
+  // 于是一条几何量对了的判据红成"没对齐"。右边界一律用 left + width 自己加出来。
+  const [statsRect, bandRect2] = await rects(['.stats', '.head'])
+  ck('整块真的落在右上角：离屏右 32、离图区顶 24（与「我的」那枚 MIND 同一锚点）',
+    !!statsRect && Math.abs((bandRect2.left + bandRect2.w - (statsRect.left + statsRect.w)) / R - 32) <= 2
+    && Math.abs((statsRect.top - bandRect2.top) / R - 24) <= 2,
+    statsRect && `右 ${((bandRect2.left + bandRect2.w - statsRect.left - statsRect.w) / R).toFixed(1)} 顶 ${((statsRect.top - bandRect2.top) / R).toFixed(1)}`)
+  ck('整块宽度收到 312 上下（三格各 104，不再横贯）',
+    !!statsRect && Math.abs(statsRect.w / R - 312) <= 4, statsRect && `${(statsRect.w / R).toFixed(1)}rpx`)
+  ck('数字那一档就是 64rpx、字重 100（与「我的」那枚 MIND 同一个量）',
+    Math.abs(num(await styleOf(page, '.stat .n', 'font-size')) / R - 64) <= 2
     && (await styleOf(page, '.stat .n', 'font-weight')) === '100',
     await styleOf(page, '.stat .n', 'font-size'))
   ck('数字用的就是那支 WtsjMind（声明挪进 app.wxss 之后两页都还命中）',

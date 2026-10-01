@@ -28,6 +28,11 @@
        原来那三张饱和色大卡没有消失，只是被收进同一条肚子里——功能名、控件、
        校验、报错行、忙态全部照旧，改的只有承载方式。 -->
   <view class="entry-wrap">
+    <!-- 站长 10-01 晚：横条上面加一行轮播 Tips，教人用拍照提炼、分享选模板这些现成能力。
+         展开态整行不渲染（和「换背景」同一规矩：面板已经贴底了，上面再滚一行提示会跟表单抢眼睛）。
+         字号、前面空两格、离横条那一行的距离全在 wxss 的 .tips 上，这里只递一句文本。
+         中文是「Tips：」、英文是「Tips: 」——冒号那档跟着语言走，不硬贴一个全角冒号到英文上。 -->
+    <view wx:if="{{!active && tips.length}}" class="tips">{{tipsPrefix}}{{tips[tipIdx]}}</view>
     <view class="bar {{active ? 'open' : ''}}" catchtap="openBar">
       <view class="bar-lead glyph-{{lead}}"></view>
       <view class="bar-label">{{barTitle}}</view>
@@ -37,7 +42,7 @@
           <view class="dot-glyph glyph-camera"></view>
         </view>
         <view class="dot" style="{{skinAlbum}}" catchtap="onDotShot" data-source="album" aria-label="{{t.fromAlbum}}">
-          <view class="dot-glyph glyph-album"></view>
+          <view class="dot-glyph glyph-images"></view>
         </view>
         <view class="dot" style="{{skinUrl}}" catchtap="onDotUrl" aria-label="{{t.importUrl}}">
           <view class="dot-glyph glyph-link"></view>
@@ -103,7 +108,7 @@
             <view class="pk-hint">{{t.takePhotoHint}}</view>
           </view>
           <view class="pk" style="{{skinAlbum}}" data-source="album" catchtap="pickImage">
-            <view class="pk-glyph glyph-album"></view>
+            <view class="pk-glyph glyph-images"></view>
             <view class="pk-label">{{t.fromAlbum}}</view>
             <view class="pk-hint">{{t.fromAlbumHint}}</view>
           </view>
@@ -160,7 +165,7 @@
     <!-- 换背景图：只是导流到「我的 → 卡片模板」那一页，选图仍然只在那一页做一次，
          这里不弹相册——一个功能只留一个入口。 -->
     <view wx:if="{{bgSrc}}" class="home-swap" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}">
-      <view class="swap-glyph glyph-image"></view>
+      <view class="swap-glyph glyph-chev"></view>
       <text class="swap-text">{{t.homeBgSwap}}</text>
     </view>
   </view>

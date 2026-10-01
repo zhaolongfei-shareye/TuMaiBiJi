@@ -87,10 +87,21 @@ ok('铺图时那串 chrome 变量整串不发（searchSkin 留空）',
 ok('这一页不出现选图接口（一个功能只留一个入口）', !/chooseMedia|chooseImage/.test(cjs))
 ok('这一页不出现"写死的图片路径"', !/['"]\/assets\/home-bg/.test(cjs + wxml))
 ok('data 里 bgSrc 起手是空串（模块加载时存储还没读）', /bgSrc: ''/.test(cjs))
-ok('导航条只在铺图时刷墨色',
-  /if \(this\.data\.bgSrc\) \{\s*wx\.setNavigationBarColor\(\{[^}]*#181a20/.test(cjs))
-ok('墨色那一档和新建页是同一个值',
-  /#181a20/.test(read('pages/create/create.js')) && /#181a20/.test(cjs))
+// 10-01 晚：这条判断从"每页各写一份"收进 app.applyNavForBand 一个出口
+// （三页原来两深一浅，就是因为「我的」页漏抄了那两行）。
+// 所以判据跟着换：这一页调那个出口，且全工程只有 app.js 里出现那支墨色一次。
+ok('导航条那一档交给共用出口（本页不再自己写 setNavigationBarColor）',
+  /app\.applyNavForBand\(this\.data\.bgSrc\)/.test(cjs)
+  && !/setNavigationBarColor/.test(cjs))
+ok('墨色那支值全工程只有一份（在 app.js 的出口里）',
+  (read('app.js').match(/#181a20/g) || []).length === 1
+  && !/#181a20/.test(read('pages/create/create.js'))
+  && !/#181a20/.test(read('pages/me/me.js')))
+ok('三个 tab 的导航条标题都吃 appName（顶部不再一页一个名字）',
+  /setNavTitle\('appName', lang\)/.test(cjs)
+  && /setNavTitle\('appName', lang\)/.test(read('pages/create/create.js'))
+  && /setNavTitle\('appName', lang\)/.test(read('pages/me/me.js'))
+  && i18n.includes("appName: '图麦笔记'") && i18n.includes("appName: 'TumarkNote'"))
 
 // ---------- 3. v12：图守头部一段，圆角卡不描边 ----------
 const head = seg(wxss, '.head')
@@ -200,17 +211,32 @@ ok('压在图上的那三行是纸白（标题 + 数字 + 小字各一档）',
 ok('没铺图那一态这三行退回各自主题的墨色（不是写死白）',
   /color: var\(--text-primary\)/.test(seg(wxss, '.h1'))
   && /color: var\(--text-secondary\)/.test(seg(wxss, '.stat .l')))
-ok('三列的数字与小字吃「我的」页那两个量（100rpx / 18rpx，不另立一档）',
-  /font-size: 100rpx/.test(seg(wxss, '.stat .n')) && /line-height: 0\.86/.test(seg(wxss, '.stat .n'))
+// 站长 10-01 晚：三列从"横贯整块"改成钉右上角、整块变窄，数字跟着从 100 收到 64。
+// 这一档不是新造的：「我的」页那枚 MIND 改成同一个数，两页的右上角才是同一个东西。
+ok('三列的数字与小字吃「我的」页那两个量（64rpx / 18rpx，两页同一个数）',
+  /font-size: 64rpx/.test(seg(wxss, '.stat .n')) && /line-height: 0\.86/.test(seg(wxss, '.stat .n'))
   && /font-size: var\(--fs-micro\)/.test(seg(wxss, '.stat .l'))
-  && /letter-spacing: 6rpx/.test(seg(wxss, '.stat .l')))
+  && /letter-spacing: 4rpx/.test(seg(wxss, '.stat .l'))
+  && /font-size: 64rpx/.test(seg(read('pages/me/me.wxss'), '.score-n'))
+  && /letter-spacing: 4rpx/.test(seg(read('pages/me/me.wxss'), '.score-l')))
+ok('三列钉右上角：right 32 / top 24，且不再横贯（没有 left 那条）',
+  /right: 32rpx/.test(seg(wxss, '.stats')) && /top: 24rpx/.test(seg(wxss, '.stats'))
+  && !/left:/.test(seg(wxss, '.stats')))
+ok('整块宽度收到 312（三格各 104、flex:none 不被挤扁）',
+  (seg(wxss, '.stat').match(/width: 104rpx/) || []).length === 1
+  && /flex: none/.test(seg(wxss, '.stat')))
+ok('「我的」那枚 MIND 与这三列同一个锚点（right 32 / top 24）',
+  /right: 32rpx/.test(seg(read('pages/me/me.wxss'), '.score'))
+  && /top: 24rpx/.test(seg(read('pages/me/me.wxss'), '.score')))
+ok('读不到字段画 0，不再画「—」（站长：这三格是进度，画杠读起来像坏了）',
+  /isFinite\(v\) \? v : 0/.test(cjs) && !/: '—'/.test(cjs))
 ok('数字那支字体族就是 WtsjMind，且声明在 app.wxss 只有一份（两页共用，不抄第二份 base64）',
   /font-family: 'WtsjMind'/.test(seg(wxss, '.stat .n'))
   && (read('app.wxss').match(/@font-face/g) || []).length === 1
   && !/@font-face/.test(read('pages/me/me.wxss')))
 ok('三列顶对齐（align-items:flex-start），不是底对齐', /align-items: flex-start/.test(seg(wxss, '.stats')))
-ok('细线只画在两道分隔处，且上下不顶满', /\.stat \+ \.stat::before/.test(wxss)
-  && /height: 118rpx/.test(seg(wxss, '.stat + .stat::before')))
+ok('细线只画在两道分隔处，且上下不顶满（数字 64 之后线跟着收到 78）', /\.stat \+ \.stat::before/.test(wxss)
+  && /height: 78rpx/.test(seg(wxss, '.stat + .stat::before')))
 ok('行卡那一段没被顺手改色（分类两档仍从 palette 递进来）',
   /color: var\(--cat-ink\)/.test(seg(wxss, '.cat')) && /background: var\(--cat-dot\)/.test(seg(wxss, '.cat-dot')))
 

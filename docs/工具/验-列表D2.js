@@ -135,13 +135,22 @@ ok('卡片圆角还是那三档', /--r-card: 40rpx/.test(fs.readFileSync(P('app.
   && /--r-btn: 16rpx/.test(fs.readFileSync(P('app.wxss'), 'utf8')))
 ok('胶囊圆角/高度/位置逐值没动',
   /border-radius: 44rpx/.test(barWxss) && /height: 108rpx/.test(barWxss) && /bottom: 20rpx/.test(barWxss))
-ok('三个文字标签全留（新建/笔记/我的）',
-  (barWxml.match(/tab-label/g) || []).length === 1 && /tab-label">\{\{item\.text\}\}/.test(barWxml)
-  && ['tabCreate', 'tabNotes', 'tabMe'].every((k) => barJs.includes(k)))
-ok('选中态是那条短线，不是垫块',
-  /\.tab-mark\s*\{[^}]*width: 26rpx/.test(barWxss) && /\.tab-item\.active \.tab-mark/.test(barWxss))
-ok('未选中的标签也占着那条线的位置（切 tab 不抖）',
-  !/wx:if/.test(/tab-mark[^>]*/.exec(barWxml)[0]) && /opacity: 0/.test(rule(barWxss, 'tab-mark')))
+// 站长 10-01 晚：底栏三个按钮去掉文字，选中态从"文字下面一条短线"改成"图标垫一枚圆底"。
+// 所以原来钉"标签全留"和"是短线不是垫块"这两条一起作废——现在要守的变成：
+// 三个槽一个不少、名字仍然跟着语言走（只是挪到 aria-label 上）、三枚形状互不重复。
+ok('三个槽都在，标签名跟着语言走、只出现在 aria-label 上',
+  (barWxml.match(/class="tab-icon/g) || []).length === 1
+  && /glyph-\{\{item\.icon\}\}/.test(barWxml) && /aria-label="\{\{item\.text\}\}"/.test(barWxml)
+  && ['tabCreate', 'tabNotes', 'tabMe'].every((k) => barJs.includes(k))
+  && !/tab-label|tab-mark/.test(barWxss + barWxml))
+ok('三枚图形各有各的 mask，不重复也不缺（plus / rows3 / user）',
+  ['glyph-plus', 'glyph-rows3', 'glyph-user'].every((c) => barWxss.includes('.' + c + '::before {'))
+  && (barWxss.match(/-webkit-mask-image/g) || []).length === 3)
+ok('选中态就是那枚圆底，未选中整个透明（切 tab 只有这一件事在变）',
+  /\.tab-item\.active \.tab-icon \{\s*background: var\(--chrome-sel\)/.test(barWxss)
+  && /\.tab-icon \{[\s\S]*?background: transparent/.test(barWxss))
+ok('三格等宽、图标居中（去文字之后不再有"标签宽度差"这种抖）',
+  /\.tab-item \{\s*flex: 1/.test(barWxss) && /justify-content: center/.test(barWxss))
 // 这一行还是 21rpx 那一档：页面里那串覆盖不重写 font-size，字号仍由 app.wxss 那条给
 ok('meta 行字阶仍是 --fs-tiny（21rpx 那一档）',
   /font-size: var\(--fs-tiny\)/.test(appWxssRule('row-foot')) && !/font-size/.test(rule(idxWxss, 'row-foot')))

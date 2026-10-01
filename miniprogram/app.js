@@ -202,6 +202,20 @@ App({
     return this.containerClass(wallpaper)
   },
 
+  // 铺了形象图的那三页（新建／笔记／我的），导航条跟着翻成深底白字。
+  // 「按背景深浅自动反差」这条为什么不用去读那张图：图上面压的那层罩子顶部是
+  // rgba(18,20,26,.58)，不管用户换哪张形象图，压完都是 #181A20 这一档的深，字就得是纸白。
+  // 没铺图的态不碰导航条——上面 applyTheme 已经按壁纸底色设过了，别在这里把主题色改丢。
+  // 原来这条判断在笔记页和新建页里各写一份，「我的」页漏了，于是三页的导航条两深一浅。
+  applyNavForBand(hasBg) {
+    if (!hasBg) return
+    wx.setNavigationBarColor({
+      frontColor: '#ffffff',
+      backgroundColor: '#181a20',
+      fail() {},
+    })
+  },
+
   // 导航条标题原来只写在 pages/*/*.json 里，全是硬编码中文：英文用户在语言页切完，
   // 满屏内容都变了、顶上那行还是中文。JSON 没法动态，所以统一由页面在同步 lang 时调这里。
   setNavTitle(key, lang) {

@@ -1,8 +1,8 @@
 /* ---------- v12 头部那一段：图 + 罩 + 标题 + 三列数字 ----------
    站长 10-01 的口径逐条落成数：块高 542（= 现网「我的」那条 .band 同一个量），
-   三列顶对齐（.stat 全部从同一条顶线起），整块离标题留距离、离下面那道接缝留空间。
-   数字那两档字号不是新定的：100rpx / weight 100 / 行高 .86 与小字 18rpx + 字距 6rpx
-   就是 pages/me 那枚 MIND 和「脑力值」那一行，字体族 WtsjMind 已从 me.wxss 挪进 app.wxss
+   三列顶对齐（.stat 全部从同一条顶线起），整块钉右上角、离标题留距离。
+   数字那两档字号在「我的」页那枚 MIND 上是同一个数（weight 100 / 行高 .86 +
+   小字 --fs-micro + 字距），字体族 WtsjMind 已从 me.wxss 挪进 app.wxss
    （一份声明两页用，不再抄第二份 base64）。 */
 .head {
   position: relative;
@@ -42,28 +42,34 @@
   color: var(--text-primary);
 }
 
+/* 三列钉在图区右上角（站长 10-01 晚：原来横贯整块太占地方）。
+   锚点 right 32 / top 24 和「我的」页那枚 MIND 是同一个数——两个 tab 的右上角对齐，
+   这一格读起来就是"这页的状态数字"，不是三条并排的报表。
+   整块宽 3×104 = 312（原来 702），数字 100→64：右上角这块地方要让给照片里的脸，
+   数字小一档仍然比下面那行 18 的小字大 3.5 倍，读不出错。 */
 .stats {
   position: absolute;
-  left: var(--sp-3);
-  right: var(--sp-3);
-  top: 272rpx;
+  right: 32rpx;
+  top: 24rpx;
   display: flex;
   align-items: flex-start;
 }
 
 .stat {
-  flex: 1;
+  flex: none;
+  width: 104rpx;
   position: relative;
   text-align: center;
 }
 
-/* 细白线只画在两道分隔处，上下都不顶满——顶满就读成三条竖线而不是分隔。 */
+/* 细白线只画在两道分隔处，上下都不顶满——顶满就读成三条竖线而不是分隔。
+   数字收到 64 之后整格高约 66，线跟着从 118 收到 78。 */
 .stat + .stat::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 4rpx;
-  height: 118rpx;
+  top: 2rpx;
+  height: 78rpx;
   width: 1rpx;
   background: var(--card-edge);
 }
@@ -72,19 +78,19 @@
   display: block;
   font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-weight: 100;
-  font-size: 100rpx;
+  font-size: 64rpx;
   line-height: 0.86;
   color: var(--text-primary);
 }
 
 .stat .l {
   display: block;
-  margin-top: 12rpx;
-  padding-left: 6rpx;
+  margin-top: 10rpx;
+  padding-left: 4rpx;
   text-align: center;
   font-size: var(--fs-micro);
   font-weight: 700;
-  letter-spacing: 6rpx;
+  letter-spacing: 4rpx;
   color: var(--text-secondary);
 }
 

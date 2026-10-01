@@ -403,17 +403,26 @@ function enforce(color, on, need) {
  * 高于 45 抢内容），明度按深浅定两档：浅壁纸 20.5%、深壁纸 30%。
  * 字一律纸白，未选中那一档靠 alpha 分深浅（浅 .62 / 深 .68）。
  * 返回的 style 串直接塞进 style 属性——组件拿不到 page 上的 CSS 变量。
+ *
+ * sel 是选中态那枚圆底：站长 10-01 把底栏的文字撤干净之后，"哪一格是当前页"只剩
+ * 图标下面这一块面可以说。它不另起一支色——同一支 HSL 只把明度抬 16 档，
+ * 于是"同色阶"这件事是算出来的、不是挑出来的。四套壁纸都量过（抬 16 之后：
+ * 象牙 #796641、天青 #41794C、夜紫 #4545A6、深海 #4173AA），浅底深底都看得见，
+ * 又不会亮过图标本身（图标是纸白 @98%，这一档仍在它下面）。
  */
 function chromeOf(wallpaper) {
   const theme = themeOf(wallpaper)
   const [h, s] = rgbToHsl(theme.page)
-  const bg = hslToHex(h, Math.min(45, Math.max(30, s)), theme.dark ? 30 : 20.5)
+  const sat = Math.min(45, Math.max(30, s))
+  const light = theme.dark ? 30 : 20.5
+  const bg = hslToHex(h, sat, light)
+  const sel = hslToHex(h, sat, Math.min(92, light + 16))
   const idle = withAlpha(PAPER, theme.dark ? 0.68 : 0.62)
   const line = withAlpha(PAPER, theme.dark ? 0.22 : 0.14)
   const shadow = withAlpha('#000000', theme.dark ? 0.42 : 0.22)
   return {
-    bg, ink: PAPER, idle, line, shadow,
-    style: `--chrome-bg:${bg};--chrome-ink:${PAPER};--chrome-idle:${idle};--chrome-line:${line};--chrome-shadow:${shadow}`,
+    bg, ink: PAPER, idle, line, shadow, sel,
+    style: `--chrome-bg:${bg};--chrome-ink:${PAPER};--chrome-idle:${idle};--chrome-line:${line};--chrome-shadow:${shadow};--chrome-sel:${sel}`,
   }
 }
 

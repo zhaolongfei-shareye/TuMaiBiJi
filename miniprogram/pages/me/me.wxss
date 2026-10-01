@@ -58,23 +58,22 @@
     rgba(18, 20, 26, 0.5) 58%, rgba(18, 20, 26, 0.44) 100%);
 }
 
-/* ---------- 药丸：关于的入口。默认「设置」 ---------- */
+/* ---------- 药丸：关于的入口。默认「设置」 ----------
+   10-01 晚从照片上搬进留白卡（见 me.wxml 那段），所以这一块面不再吃纸白 @92%——
+   它现在坐在卡底上，面改成淡墨一档，选中那枚仍是墨底纸字，和「我的」页别处的按钮同两档。 */
 .pill {
-  position: absolute;
-  right: 32rpx;
-  top: 24rpx;
-  z-index: 4;
+  flex: none;
   display: flex;
   gap: 4rpx;
   padding: 5rpx;
   border-radius: var(--r-pill);
-  background: rgba(242, 239, 233, 0.92);
+  background: rgba(35, 37, 44, 0.055);
 }
 
 .seg {
   height: 58rpx;
   line-height: 58rpx;
-  padding: 0 28rpx;
+  padding: 0 24rpx;
   border-radius: var(--r-pill);
   font-size: var(--fs-meta);
   font-weight: 700;
@@ -86,17 +85,20 @@
   color: var(--bg-page);
 }
 
+/* MIND 钉右上角（站长 10-01 晚：和笔记页那三列同一个锚点、同一档数字，
+   两个 tab 的右上角对齐，这一格读起来就是"这页的状态数字"）。
+   原来它在照片右下角 bottom 56，被下面那张卡的上沿压着。 */
 .score {
   position: absolute;
-  right: 30rpx;
-  bottom: 56rpx;
+  right: 32rpx;
+  top: 24rpx;
   z-index: 4;
 }
 
 .score-n {
   display: block;
   font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-size: 100rpx;
+  font-size: 64rpx;
   font-weight: 100;
   line-height: 0.86;
   color: rgba(242, 239, 233, 0.74);
@@ -107,11 +109,11 @@
   margin-top: 10rpx;
   /* 字距是加在每个字母后面的，整串会比视觉宽度多出一个字距的尾巴；
      补一个同宽的左内边距，居中才真的对到数字中间 */
-  padding-left: 6rpx;
+  padding-left: 4rpx;
   text-align: center;
   font-size: var(--fs-micro);
   font-weight: 700;
-  letter-spacing: 6rpx;
+  letter-spacing: 4rpx;
   color: rgba(242, 239, 233, 0.62);
 }
 
@@ -142,6 +144,9 @@
   display: flex;
   flex-direction: column;
   gap: 7rpx;
+  /* 药丸搬进来之后这一行是「LOGO + 两行字 + 药丸」：字那一格吃掉剩下的宽度并顶到药丸前，
+     药丸才真的钉在最右。两行字本来就是单行截断，宽度不够是省号，不会把药丸挤走。 */
+  flex: 1;
   min-width: 0;
 }
 

@@ -15,6 +15,10 @@ from PIL import Image
 path = sys.argv[1]
 im = Image.open(path).convert('RGB')
 W, H = im.size
+# 纸白从 palette 现读，不在这份脚本里另记一遍（它变了这里要跟着变，否则判据会假绿）
+PAL = open(path and __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)),
+    '../../miniprogram/utils/palette.js'), encoding='utf-8').read()
+PAPER = [int(x, 16) for x in __import__('re').search(r"const PAPER = '#(..)(..)(..)'", PAL).groups()]
 r = W / 750.0            # 1rpx 在这张图上是多少像素（图就是按 750 设计宽出的）
 left, right = int(24 * r), int(W - 24 * r)
 top, bottom = int(H - (20 + 108) * r), int(H - 20 * r)
@@ -26,21 +30,28 @@ fill = [im.getpixel((x, line_y)) for x in range(left + 4, right - 4)]
 mode, count = Counter(fill).most_common(1)[0]
 
 third = (right - left) // 3
-stroke, ink_pixels = [], []
+stroke, ink_pixels, paper_pixels = [], [], []
+# 纸白那一档单独数：10-01 晚底栏去掉文字之后，选中那一格里最大的一块亮面是
+# 图标下面那枚圆底（--chrome-sel），它会把"笔画众数"抢走。所以判"图标是不是纸白"
+# 不能再看众数，要数离纸白 ±14 的像素有多少个。
 for i in range(3):
     c = Counter()
+    npap = 0
     for x in range(left + i * third + xpad, left + (i + 1) * third - xpad):
         for y in range(top + ypad, bottom - ypad):
             px = im.getpixel((x, y))
             # 只数"和填充色明显不同"的那些像素 = 笔画
             if max(abs(px[k] - mode[k]) for k in range(3)) > 24:
                 c[px] += 1
+            if max(abs(px[k] - PAPER[k]) for k in range(3)) <= 14:
+                npap += 1
     # 取众数而不是最亮：取最亮会被两条笔画叠在一起的那个点骗到——
     # 「我的」那个图标是圆头 + 肩膀两道 3rpx 描边挨着放，同一像素被覆两层 alpha，
     # 叠出来的值比真正的字色还亮（实测 195 vs 175），上一把的红就是这么来的。
     # 笔画内部的平色像素才是字色本身。
     stroke.append(list(c.most_common(1)[0][0]) if c else None)
     ink_pixels.append(sum(c.values()))
+    paper_pixels.append(npap)
 
 # 胶囊自己的矩形：在图下方 200rpx 这条带里找填充色（往上找会撞上同样颜色的搜索条）
 band_top = int(H - 200 * r)
@@ -65,6 +76,7 @@ print(json.dumps({
     "fill_ratio": round(count / max(1, len(fill)), 3),
     "stroke": stroke,
     "ink_pixels": ink_pixels,
+    "paper_pixels": paper_pixels,
     "box_rpx": [round(box[0] / r, 1), round(box[1] / r, 1), round(box[2] / r, 1), round(box[3] / r, 1)] if box else None,
     "page": list(outside),
 }))

@@ -140,7 +140,22 @@ ck('app.wxss 的 --bg-page 与 palette 的 page 同值', cssPageMismatch.length 
 const tabCss = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/custom-tab-bar/index.wxss'), 'utf8')
 const fontCls = ['font-song', 'font-fang', 'font-kai']
 ck('字体类在 app.wxss 里齐全', fontCls.every((c) => css.includes(`.${c}`)))
-ck('字体类在 tab 栏组件里也齐全（组件样式隔离）', fontCls.every((c) => tabCss.includes(`.${c}`)))
+// 10-01 晚底栏三个标签的文字全撤，只留图标——组件里一个字都不排，
+// 那份"为了组件样式隔离而抄的字体栈"就此作废，跟着撤干净（留着就是没人读的抄件）。
+const tabWxml = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/custom-tab-bar/index.wxml'), 'utf8')
+// 屏幕上不再排字 = 组件里既没有 <text> 也没有裸文字；item.text 只许出现在 aria-label 上
+//（那是读屏那一路的标签名，撤了它三个图标就没人报得出"这是哪一格"）。
+ck('tab 栏组件里不再排字，也不再留那份字体栈抄件',
+  !/font-family/.test(tabCss) && !fontCls.some((c) => tabCss.includes(c)) && !/tab-label/.test(tabCss)
+  && !/<text/.test(tabWxml)
+  && (tabWxml.match(/\{\{item\.text\}\}/g) || []).length === 1
+  && /aria-label="\{\{item\.text\}\}"/.test(tabWxml))
+// 去文字之后"当前在哪一页"只剩图标下面那枚圆底可说，所以那一档必须真的派生出来、
+// 并且仍然只由 chromeOf 一处给（组件里不许写死一支色）。
+ck('选中那枚圆底吃 --chrome-sel，且这支色只在 chromeOf 里算一次',
+  /var\(--chrome-sel\)/.test(tabCss) && !/\.tab-item\.active \.tab-icon \{[^}]*#[0-9a-f]{6}/i.test(tabCss)
+  && (fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/palette.js'), 'utf8')
+    .match(/--chrome-sel/g) || []).length === 1)
 ck('宋体类把 STSong 放在 Songti SC 前面', /font-song\s*\{[^}]*'STSong',\s*'Songti SC'/.test(css))
 // 两边不只是"都有"，声明必须逐字节相同：组件那份是抄的，抄漏一个名字就会出现
 // "主页面换了字、底部 tab 没换"这种半截效果，而它只在部分机型上看得见。
@@ -148,8 +163,8 @@ const decl = (src, cls) => {
   const m = new RegExp(`\\.${cls}\\s*\\{[^}]*\\}`).exec(src)
   return m ? m[0].replace(/\s+/g, ' ') : ''
 }
-const drift = fontCls.filter((c) => decl(css, c) !== decl(tabCss, c))
-ck('两份字体栈逐字节相同（组件那份不许自己漂）', drift.length === 0, drift.join(' '))
+const drift = fontCls.filter((c) => decl(css, c) === '')
+ck('app.wxss 那三份声明一份都没被误删（组件那份撤了不等于两边都没了）', drift.length === 0, drift.join(' '))
 // 字体这条只承诺 iOS（站长 09-26 定的：不再为安卓内置字体包，文案里直接注明"仅 iPhone / iPad 可选"）。
 // 原来那两条断言写的是"安卓可用的名字必须在链子里"，读起来像我们承诺了安卓；
 // 换成断言真正承诺的两件事：首位是苹果那几张字，末位是通用族兜底（命不中也不出错）。

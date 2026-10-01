@@ -153,13 +153,18 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     `${h1Style['font-size']}/${h1Style['font-weight']}/${h1Style['letter-spacing']}`)
   ck('铺了图这行翻成纸白（与首页 .has-bg .h1 同一档）',
     /rgba\(242,\s*239,\s*233,\s*0?\.96/.test(h1Style.color || ''), h1Style.color)
-  ck('这行没盖住右上角那枚药丸', m.h1.right <= m.pill.left + 1, `${m.h1.right} vs ${m.pill.left}`)
+  // 右上角那一枚现在住的是 MIND 数字（药丸搬进 LOGO 那一行了）。先钉它在不在：
+  // 数字整块是 wx:if="{{scoreText}}"，接口没通时节点根本没有，后面几条会 TypeError
+  // 把整把尺子带崩——上一条踩过一次"正则回 null 把整把尺子打死"，这里先挡住。
+  ck('右上角那枚数字在（积分从服务端读回来了）', !!m.score, JSON.stringify(m.score))
+  ck('这行没盖住右上角那枚数字', !!m.score && m.h1.right <= m.score.left + 1, `${m.h1.right} vs ${m.score && m.score.left}`)
 
-  /* ---------- ③ MIND 那个大数字：Poppins Thin、收 80%、英文字居中 ---------- */
+  /* ---------- ③ MIND 那个大数字：Poppins Thin、和笔记页那三列同一个锚点 ---------- */
   const numStyle = await styleOf(page, '.score-n', ['font-family', 'font-size', 'font-weight', 'color'])
   const labStyle = await styleOf(page, '.score-l', ['font-size', 'text-align', 'letter-spacing'])
   ck('数字用内嵌的 WtsjMind（Poppins Thin 子集）', /WtsjMind/.test(numStyle['font-family'] || ''), numStyle['font-family'])
-  ck('数字字号收到 100（上一版 126 的八折）', Math.abs(toRpx(parseFloat(numStyle['font-size']), W) - 100) <= 2, numStyle['font-size'])
+  // 100 → 64：站长 10-01 晚要把这两个 tab 的右上角对齐成同一档量，笔记页那三列也是 64。
+  ck('数字字号 64（与笔记页那三列同一个量）', Math.abs(toRpx(parseFloat(numStyle['font-size']), W) - 64) <= 2, numStyle['font-size'])
   ck('数字是 100 号字重（Thin）', parseFloat(numStyle['font-weight']) <= 100, numStyle['font-weight'])
   ck('数字保持半透明', /rgba\(242,\s*239,\s*233,\s*0?\.7/.test(numStyle.color || ''), numStyle.color)
   ck('英文字收到最小一档字阶 18', Math.abs(toRpx(parseFloat(labStyle['font-size']), W) - 18) <= 1, labStyle['font-size'])
@@ -167,13 +172,29 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   const cNum = m.num.left + m.num.width / 2
   const cLab = m.lab.left + m.lab.width / 2
   ck('英文字真的对到数字中间（±3rpx）', Math.abs(toRpx(cLab - cNum, W)) <= 3, `Δ${toRpx(cLab - cNum, W).toFixed(1)}`)
-  ck('数字整块没被留白卡盖住', m.score.bottom <= m.sheet.top + 2, `${m.score.bottom} vs ${m.sheet.top}`)
-  ck('数字在底图右下角以内', m.score.right <= m.band.right + 1 && m.score.bottom <= m.band.bottom + 1)
+  // 原来钉的是"在底图右下角以内、不被留白卡盖住"（bottom 56 那一版）。10-01 晚整块搬到右上角，
+  // 旧判据作废——现在要守的是锚点本身：离屏右 32、离图区顶 24，和笔记页那三列逐字同一个数。
+  ck('数字整块钉在右上角：离屏右 32、离图区顶 24',
+    !!m.score && Math.abs(toRpx(m.band.right - m.score.right, W) - 32) <= 2
+    && Math.abs(toRpx(m.score.top - m.band.top, W) - 24) <= 2,
+    m.score && `右 ${toRpx(m.band.right - m.score.right, W).toFixed(1)} 顶 ${toRpx(m.score.top - m.band.top, W).toFixed(1)}`)
+  ck('数字整块在图区以内，不落进留白卡', !!m.score && m.score.top >= m.band.top && m.score.bottom <= m.band.bottom,
+    m.score && `${m.score.top}~${m.score.bottom} in ${m.band.top}~${m.band.bottom}`)
 
   /* ---------- ④ 药丸：默认设置，切关于 ---------- */
   let d = await page.data()
   ck('药丸两枚：设置 / 关于', m.segs.length === 2, m.segs.length)
-  ck('药丸钉在底图右上（在 band 里）', m.pill.top >= m.band.top && m.pill.right <= m.band.right + 1)
+  // 原来钉"药丸钉在底图右上（在 band 里）"。10-01 晚站长要它搬到 LOGO 那一行的最右，
+  // 因为它和左上角那行「我的」抢同一条视线——旧判据作废，跟着换成下面这四条。
+  ck('药丸在留白卡里（不再浮在照片上）', m.pill.top >= m.sheet.top - 1 && m.pill.bottom <= m.sheet.bottom + 1,
+    `${m.pill.top}~${m.pill.bottom} in ${m.sheet.top}~${m.sheet.bottom}`)
+  ck('药丸钉在这一行最右：离屏边 32（和左右内缩同一档）',
+    Math.abs(toRpx(W - m.pill.right, W) - 32) <= 2, toRpx(W - m.pill.right, W).toFixed(1))
+  ck('药丸与 LOGO 垂直居中对齐（align-items:center 真生效）',
+    Math.abs(toRpx((m.logo.top + m.logo.height / 2) - (m.pill.top + m.pill.height / 2), W)) <= 2,
+    `圆心差 ${toRpx((m.logo.top + m.logo.height / 2) - (m.pill.top + m.pill.height / 2), W).toFixed(1)}rpx`)
+  ck('两行字没顶到药丸（.sheet-text 是 flex:1 + min-width:0，药丸才钉得住）',
+    m.text.right <= m.pill.left + 1, `${m.text.right} vs ${m.pill.left}`)
   ck('默认停在「设置」', d.tab === 'set', d.tab)
   ck('没设过昵称时第一行是问候语', d.nameText === '你好！我是图麦笔记', d.nameText)
   // Slogan 这句从 utils/i18n.js 现读，不抄第二份：10-01 那句换成「把图文，提炼成有用的干货」时，
