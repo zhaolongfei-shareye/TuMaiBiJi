@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 新建页录入面板 · 中间空白填三步操作指引（两态：相册档 / 链接档）
+   口径全部从代码侧取：一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690；
+   设计宽 750，px 当 rpx 用；面板定高 700（create.wxss:199），按钮行 margin-top:auto 沉底，
+   所以空白那一截本来就归 .acts 上面这一段；字号吃 app.wxss 的 --fs-* 令牌。
+   屏上每一句中文都是现网字典里的原话，只有三步指引是新串（下面标了）。 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #DDD9D0; padding: 40px; font-family: 'PingFang SC', sans-serif; }
+.sheet { display: flex; gap: 48px; align-items: flex-start; }
+.wrap { width: 750px; }
+.note { margin-top: 18px; font-size: 22px; line-height: 1.6; color: #3A3D44; }
+.note b { font-size: 24px; }
+
+.phone { width: 750px; height: 1690px; position: relative; overflow: hidden; background: #1D1F24; }
+.status { height: 94px; display: flex; align-items: center; justify-content: space-between; padding: 0 40px;
+  color: #fff; font-size: 30px; font-weight: 600; }
+.island { position: absolute; left: 50%; top: 22px; transform: translateX(-50%); width: 250px; height: 62px;
+  background: #000; border-radius: 999px; }
+.nav { height: 90px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px;
+  color: #fff; font-size: 32px; font-weight: 600; position: relative; }
+.capsule { width: 174px; height: 62px; border-radius: 999px; background: rgba(0,0,0,.5);
+  border: 2px solid rgba(255,255,255,.28); display: flex; align-items: center; justify-content: space-evenly;
+  color: #fff; font-size: 26px; }
+.stage { position: absolute; left: 0; top: 184px; width: 750px; height: 1506px; overflow: hidden; }
+.bg { position: absolute; left: 0; top: -150px; width: 750px; height: 1225px; object-fit: cover; object-position: 50% 22%; }
+.scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,22,26,.42) 0%, rgba(20,22,26,.18) 42%, rgba(20,22,26,.34) 100%); }
+
+.h1row { position: absolute; left: 24px; right: 24px; top: 44px; display: flex; justify-content: space-between; align-items: baseline; }
+.h1 { color: #F2EFE9; font-size: 42px; font-weight: 700; letter-spacing: 1px; }
+.lang { color: rgba(242,239,233,.72); font-size: 24px; }
+.lang u { text-decoration: underline; text-underline-offset: 6px; color: #F2EFE9; }
+.date { position: absolute; left: 24px; top: 108px; color: rgba(242,239,233,.7); font-size: 24px; letter-spacing: 2px; }
+
+/* 面板：下方两角 40 圆角，白底 */
+.panel { position: absolute; left: 0; bottom: 148px; width: 750px; height: 700px; background: #fff;
+  border-radius: 0 0 40px 40px; padding: 8px 32px 32px; display: flex; flex-direction: column; }
+.bar { height: 90px; display: flex; align-items: center; gap: 16px; }
+.bar .gl { width: 44px; height: 44px; border-radius: 12px; border: 4px solid #23252C; }
+.bar .gl.link { border-radius: 999px; width: 52px; border-width: 5px; }
+.bar .lb { font-size: 34px; font-weight: 700; color: #23252C; }
+.bar .hint { margin-left: auto; font-size: 24px; color: rgba(35,37,44,.42); }
+.modes { display: flex; gap: 14px; padding: 22px 0 4px; border-bottom: 3px solid rgba(35,37,44,.07); }
+.mode { display: flex; align-items: center; gap: 10px; padding: 0 4px 16px; font-size: 24px; font-weight: 700;
+  color: rgba(35,37,44,.42); border-bottom: 5px solid transparent; margin-bottom: -3px; }
+.mode i { width: 26px; height: 26px; border-radius: 50%; display: inline-block; }
+.mode.on { color: #23252C; border-bottom-color: #23252C; }
+.desc { font-size: 24px; line-height: 1.2; color: rgba(35,37,44,.62); margin-top: 10px; }
+
+.pick2 { display: flex; gap: 24px; margin-top: 22px; }
+.pk { flex: 1; height: 190px; border-radius: 24px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 6px; }
+.pk.a { background: #C9AE7C; color: #2C2411; }
+.pk.b { background: #8A6A4F; color: #FFF7EC; }
+.pk .g { width: 44px; height: 44px; border: 4px solid currentColor; border-radius: 10px; }
+.pk .t { font-size: 31px; font-weight: 700; }
+.pk .h { font-size: 18px; opacity: .8; }
+.field { margin-top: 22px; height: 88px; border-radius: 20px; background: rgba(35,37,44,.05);
+  display: flex; align-items: center; padding: 0 26px; font-size: 28px; color: rgba(35,37,44,.5); }
+
+/* ↓ 新增：三步指引，坐在内容和按钮行之间那段空白里 */
+.guide { margin-top: 22px; padding: 18px 22px; border-radius: 24px; background: rgba(35,37,44,.035); }
+.gstep { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.gstep:last-child { margin-bottom: 0; }
+.gnum { flex: none; width: 40px; height: 40px; border-radius: 12px; color: #fff; font-size: 22px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; }
+.g1 .gnum { background: #3F52D6; } .g2 .gnum { background: #E9723D; } .g3 .gnum { background: #46A863; }
+.gtxt { font-size: 24px; line-height: 1.35; color: rgba(35,37,44,.78); }
+.gtxt b { font-weight: 700; color: #23252C; font-size: 26px; }
+
+.acts { margin-top: auto; display: flex; gap: 20px; padding-top: 20px; }
+.act { flex: 1; height: 96px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  font-size: 30px; font-weight: 700; }
+.act.ghost { background: rgba(35,37,44,.06); color: #23252C; }
+.act.off { background: rgba(35,37,44,.06); color: rgba(35,37,44,.42); }
+.small { margin-top: 14px; font-size: 20px; color: rgba(35,37,44,.42); }
+.tabbar { position: absolute; left: 24px; bottom: 20px; width: 702px; height: 108px; border-radius: 44px;
+  background: #4A4029; display: flex; align-items: center; }
+.tab { flex: 1; text-align: center; color: rgba(242,239,233,.66); font-size: 22px; }
+.tab.on { color: #F2EFE9; font-weight: 700; }
+.tab .ic { display: block; width: 34px; height: 34px; margin: 0 auto 4px; border: 3px solid currentColor; border-radius: 8px; }
+.tab.on .ic { border-radius: 50%; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="wrap">
+    <div class="phone">
+      <div class="island"></div>
+      <div class="status"><span>7:43</span><span>5G ▮</span></div>
+      <div class="stage">
+        <img class="bg" src="../分享图素材-官网/person.jpg" alt="">
+        <div class="scrim"></div>
+        <div class="h1row"><div class="h1">看到好内容，随手记下来</div><div class="lang"><u>中</u> EN</div></div>
+        <div class="date">10月1日  周四</div>
+        <div class="panel">
+          <div class="bar"><div class="gl"></div><div class="lb">拍照或截图</div><div class="hint">点空白处收起</div></div>
+          <div class="modes">
+            <div class="mode"><i style="background:#C9AE7C"></i>直接写</div>
+            <div class="mode"><i style="background:#C9AE7C"></i>拍照</div>
+            <div class="mode on"><i style="background:#8A6A4F"></i>相册</div>
+            <div class="mode"><i style="background:#C9AE7C"></i>链接</div>
+          </div>
+          <div class="desc">相册选择 / 拍照（JPG·PNG）</div>
+          <div class="pick2">
+            <div class="pk a"><div class="g"></div><div class="t">拍照</div><div class="h">直接开相机</div></div>
+            <div class="pk b"><div class="g"></div><div class="t">相册</div><div class="h">选已有截图</div></div>
+          </div>
+          <div class="guide">
+            <div class="gstep g1"><div class="gnum">1</div><div class="gtxt"><b>丢进来</b> 公众号 / 小红书 / 微博 / 知乎的链接或截图</div></div>
+            <div class="gstep g2"><div class="gnum">2</div><div class="gtxt"><b>AI 提炼</b> 图里的字也读得懂，出摘要、要点</div></div>
+            <div class="gstep g3"><div class="gnum">3</div><div class="gtxt"><b>存成知识点</b> 能搜、能归类，还能出卡片图</div></div>
+          </div>
+          <div class="acts"><div class="act off">开始提炼</div></div>
+        </div>
+        <div class="tabbar"><div class="tab on"><span class="ic"></span>新建</div><div class="tab"><span class="ic"></span>笔记</div><div class="tab"><span class="ic"></span>我的</div></div>
+      </div>
+      <div class="nav" style="position:absolute;left:0;top:94px;"><span style="margin-left:190px">新建笔记</span><div class="capsule"><span>●●●</span><span>◎</span></div></div>
+    </div>
+    <div class="note"><b>① 相册档</b>：指引填在两枚大按钮和「开始提炼」之间那段空白。三枚数字方块吃 palette.js 的宝蓝 / 橙 / 草绿，底色只用现网已有的 .035 淡墨面，不新增描边。</div>
+  </div>
+
+  <div class="wrap">
+    <div class="phone">
+      <div class="island"></div>
+      <div class="status"><span>7:44</span><span>5G ▮</span></div>
+      <div class="stage">
+        <img class="bg" src="../分享图素材-官网/person.jpg" alt="">
+        <div class="scrim"></div>
+        <div class="h1row"><div class="h1">看到好内容，随手记下来</div><div class="lang"><u>中</u> EN</div></div>
+        <div class="date">10月1日  周四</div>
+        <div class="panel">
+          <div class="bar"><div class="gl link"></div><div class="lb">贴个链接</div><div class="hint">点空白处收起</div></div>
+          <div class="modes">
+            <div class="mode"><i style="background:#C9AE7C"></i>直接写</div>
+            <div class="mode"><i style="background:#C9AE7C"></i>拍照</div>
+            <div class="mode"><i style="background:#8A6A4F"></i>相册</div>
+            <div class="mode on"><i style="background:#C9AE7C"></i>链接</div>
+          </div>
+          <div class="desc">公众号文章 / 网页链接</div>
+          <div class="field">https://mp.weixin.qq.com/…</div>
+          <div class="guide">
+            <div class="gstep g1"><div class="gnum">1</div><div class="gtxt"><b>丢进来</b> 公众号 / 小红书 / 微博 / 知乎的链接或截图</div></div>
+            <div class="gstep g2"><div class="gnum">2</div><div class="gtxt"><b>AI 提炼</b> 图里的字也读得懂，出摘要、要点</div></div>
+            <div class="gstep g3"><div class="gnum">3</div><div class="gtxt"><b>存成知识点</b> 能搜、能归类，还能出卡片图</div></div>
+          </div>
+          <div class="acts"><div class="act ghost">粘贴</div><div class="act off">保存</div></div>
+          <div class="small">输入或粘贴链接后可保存</div>
+        </div>
+        <div class="tabbar"><div class="tab on"><span class="ic"></span>新建</div><div class="tab"><span class="ic"></span>笔记</div><div class="tab"><span class="ic"></span>我的</div></div>
+      </div>
+      <div class="nav" style="position:absolute;left:0;top:94px;"><span style="margin-left:190px">新建笔记</span><div class="capsule"><span>●●●</span><span>◎</span></div></div>
+    </div>
+    <div class="note"><b>② 链接档</b>：同一套指引，位置跟着内容往下长。<br><b>直接写那一档不放</b>——它本来就顶满 700（标题 + 正文 + 分类 + 按钮），塞进去就把正文框挤扁了。</div>
+  </div>
+
+</div>
+</body>
+</html>
