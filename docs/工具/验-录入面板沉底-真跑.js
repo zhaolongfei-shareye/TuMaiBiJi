@@ -88,9 +88,17 @@ fs.mkdirSync(OUT, { recursive: true })
         errLine: '',
       })
       await sleep(280)
-      const panel = await geo('.panel')
+      // 整份字典一次换掉（中英两态各一次）之后，视图层那一拍偶尔比 280ms 慢，`.panel`
+      // 会读成 null。这里只重读节点、不改页面状态——读到 null 报 ✗ 并跳过这一档，
+      // 而不是抛 TypeError 把后面几十条一起带崩（那是时序红，不是回归）。
+      let panel = await geo('.panel')
+      for (let i = 0; i < 6 && !panel; i++) { await sleep(300); panel = await geo('.panel') }
       const bar = await geo('.bar')
       const tag = `${lang} ${label}`
+      if (!panel || !bar) {
+        ck(`${tag}：面板与条身都读得到`, false, `panel=${!!panel} bar=${!!bar}`)
+        continue
+      }
       ck(`${tag}：面板高 = 源码那个数（${PANEL_H}rpx）`,
         near(panel.h, rpx(PANEL_H)), `${(panel.h * 750 / win.windowWidth).toFixed(1)}rpx`)
       ck(`${tag}：面板底边落在底栏上方那条缝上`,
@@ -159,15 +167,27 @@ fs.mkdirSync(OUT, { recursive: true })
     /* 相册档空态专测：这一步循环里 shot 一直带着 3 张缩略图（那是最坏情况），
        指引真正会出现的"一张都没选"那一屏得单独摆出来量。
        断的是渲染出来的文字——<template is> 不继承页面 data，漏了 data="{{t}}" 时
-       数字方块照样画、三行字全空，只看 .guide 在不在是抓不到这种事的。 */
+       方块照样画、几行字全空，只看 .guide 在不在是抓不到这种事的。
+       站长 10-01 深夜：三步改四步（种草转存那条），所以这里四句都得在。 */
     await page.setData({ active: 'shot', mode: 'album', lead: 'album', previewImages: [], errLine: '' })
     await sleep(320)
     const gEl = await page.$('.guide')
     const gTxt = gEl ? (await gEl.text()).replace(/\s+/g, '') : ''
     const need = [i18n.t('guide1T', lang), i18n.t('guide2T', lang), i18n.t('guide3T', lang),
-      i18n.t('guide3D', lang)].map((x) => String(x).replace(/\s+/g, ''))
-    ck(`${lang} 相册空态：三步指引在，且三行文字真渲染出来了（不只是数字方块）`,
+      i18n.t('guide4T', lang), i18n.t('guide4D', lang)].map((x) => String(x).replace(/\s+/g, ''))
+    ck(`${lang} 相册空态：四步指引在，且四行文字真渲染出来了（不只是小方块）`,
       !!gEl && need.every((x) => gTxt.indexOf(x) >= 0), `${gEl ? '在' : '不在'}｜${gTxt.slice(0, 20)}`)
+    const gRows = await page.$$('.gstep')
+    ck(`${lang} 指引正好四行（多一行少一行都是改版没跟到）`, gRows.length === 4, gRows.length)
+    // 他打的第二处：「方块加 1,2,3 这种风格喧宾夺主，弱化成小黄点」。所以钉的是
+    // 那一档里不再有数字方块，只有一枚点；点的颜色吃 palette.TIP_DOT（唯一色源）。
+    ck(`${lang} 前面的 1/2/3 方块撤了，换成小黄点`,
+      (await page.$$('.gnum')).length === 0 && (await page.$$('.gdot')).length === 4,
+      `gnum=${(await page.$$('.gnum')).length} gdot=${(await page.$$('.gdot')).length}`)
+    const dotEl = await page.$('.gdot')
+    const dotStyle = dotEl ? await dotEl.style('background-color') : ''
+    ck('小黄点吃 palette 的那个色（不另起一处色）',
+      /rgb\(246,\s*196,\s*69\)/.test(dotStyle), dotStyle)
     const g2 = await geo('.guide'); const a2 = await geo('.acts'); const p2 = await geo('.panel')
     ck(`${lang} 相册空态：指引坐在按钮行上面，两样都还在面板里`,
       !!g2 && !!a2 && g2.bottom <= a2.top + 1 && a2.bottom <= p2.bottom + 1,

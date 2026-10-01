@@ -51,14 +51,15 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('那一行右边不再有状态文字', !/未设置|密码已设置/.test(labels[iPwd] || ''), labels[iPwd])
     ck('关于/反馈邮箱/注销那组里不再有私密密码', !labels.slice(iPwd + 1).some((x) => x.startsWith('私密密码')))
 
-    /* ---------- 私密密码：底部 1/3 弹层 + 六格（站长 10-01 晚第八条） ----------
-       口径变了：「不在原菜单处理方式，改为前端下方弹出 1/3 窗口，里面是功能名称，
-       然后下方是 6 个输入方格，输入一次后，再输入一次 6 个方格，方格上方文字提醒校验」。
-       所以旧的那批判据（就地展开、两格 .pwd-input、pwd1/pwd2）整块作废，改判据不改代码去迁就它。 */
+    /* ---------- 私密密码：整屏遮罩 + 居中卡 + 六格（站长 10-01 深夜第二次改口径） ----------
+       「秘密弹窗高度不够，下方的按钮被遮挡，改为与分类管理页面相同的全屏展示方式，取消半屏
+        弹窗方式；6 个框太大不精致，稍微聚集中间；密码使用场景说明要在页面里面写清楚。」
+       上一版的判据（1/3 高、贴屏幕底边、33vh）整块作废——那正是他截图里按钮被切掉那一版。
+       改判据，不回头动代码去迁就旧尺子。 */
     await (await (await me.$$('.menu-item'))[iPwd]).tap()
     await sleep(1200)
     d = await me.data()
-    ck('点那一行是从底部弹出独立一层，不是就地展开', d.pwdOpen === true && !(await me.$('.pwd-inline')))
+    ck('点那一行弹出独立一层，不是就地展开', d.pwdOpen === true && !(await me.$('.pwd-inline')))
     // 这一层进"设置态"还是"重置态"只由服务端那条读数决定，而**这个账号设没设是会变的**
     // （上一把尺子跑完密码就没了）。所以这里不许钉死哪一态，只钉"翻得对"：
     // 没设过 → entering（给六格）；设过 → 只给重置那一枚。两态都往下用 openPwdSheet 显式摆出来测。
@@ -71,15 +72,31 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
       cellsNow === (d.pwdEntering ? 6 : 0), `cells=${cellsNow}`)
     ck('两态右边那枚分别是确定 / 重置密码',
       (await btnOf()).join('|') === (d.pwdEntering ? '取消|确定' : '取消|重置密码'), (await btnOf()).join('|'))
-    const layer = await me.$('.pwd-layer')
-    const sheet = await me.$('.pwd-sheet')
-    ck('弹层真的存在（命中区 + 那一份 1/3 高的层）', !!layer && !!sheet)
-    const sys = await mp.evaluate(() => wx.getSystemInfoSync().windowHeight)
-    const sheetH = parseFloat(await sheet.style('height'))
-    ck('那一份是屏幕的三分之一档（33vh，容 ±3 个点）',
-      sheetH / sys > 0.29 && sheetH / sys < 0.37, `${sheetH}/${sys}=${(sheetH / sys).toFixed(3)}`)
-    const sheetPos = await sheet.offset()
-    ck('贴着屏幕底边', Math.abs(sheetPos.top + sheetH - sys) < 6, `top=${sheetPos.top} h=${sheetH} 窗高=${sys}`)
+    const rect = (sel) => mp.evaluate((s) => new Promise((done) => {
+      wx.createSelectorQuery().select(s).boundingClientRect((r) => done(r)).exec()
+    }), sel)
+    const rects = (sel) => mp.evaluate((s) => new Promise((done) => {
+      wx.createSelectorQuery().selectAll(s).boundingClientRect((r) => done(r || [])).exec()
+    }), sel)
+    const win = await mp.evaluate(() => wx.getWindowInfo())
+    const mask = await rect('.pwd-mask')
+    const card = await rect('.pwd-card')
+    ck('遮罩 + 居中卡两层都在（旧的 .pwd-layer/.pwd-sheet 那一版已撤）', !!mask && !!card)
+    ck('遮罩铺满整屏（与分类管理同一口径）',
+      !!mask && Math.abs(mask.height - win.windowHeight) <= 1 && Math.abs(mask.width - win.windowWidth) <= 1,
+      mask && `${mask.width}×${mask.height}`)
+    ck('卡以屏心为中心（不再贴底，所以按钮不会再被切）',
+      !!card && Math.abs((card.left + card.right) / 2 - win.windowWidth / 2) <= 2 &&
+      Math.abs((card.top + card.bottom) / 2 - win.windowHeight / 2) <= 2,
+      card && `圆心 ${((card.left + card.right) / 2).toFixed(1)}/${((card.top + card.bottom) / 2).toFixed(1)} 屏心 ${(win.windowWidth / 2).toFixed(1)}/${(win.windowHeight / 2).toFixed(1)}`)
+    // 他打回的那一条就是"下方的按钮被遮挡"——所以这一条是这块的核心判据。
+    const btnRects = await rects('.pwd-btn')
+    ck('两枚按钮整枚在卡以内（图三那个被切掉的事故不再出现）',
+      btnRects.length === 2 && btnRects.every((b) => b.bottom <= card.bottom + 1 && b.top >= card.top - 1),
+      btnRects.map((b) => `${b.top.toFixed(0)}~${b.bottom.toFixed(0)}`).join(' ') + ` | 卡 ${card && card.bottom.toFixed(0)}`)
+    const sceneTx = await tx(await me.$('.pwd-scene'))
+    ck('使用场景那句写在页面里面（不是只在弹窗标题）',
+      /私密/.test(sceneTx) && sceneTx.length > 12, sceneTx)
     const nameTx = await tx(await me.$('.pwd-name'))
     ck('从上到下第一样是功能名称', nameTx.indexOf('私密密码') === 0, nameTx)
     ck('方格上方有一行校验提醒', (await tx(await me.$('.pwd-tip'))).length > 6, await tx(await me.$('.pwd-tip')))
@@ -144,7 +161,7 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('收起时缓冲区一起清掉（不留明文）',
       d.pwdBuf === '' && d.pwdFirst === '' && d.pwdStep === 1 && d.pwdFocus === false,
       `buf=${d.pwdBuf} first=${d.pwdFirst} step=${d.pwdStep} focus=${d.pwdFocus}`)
-    ck('收起后弹层整层从屏上拿掉', !(await me.$('.pwd-layer')))
+    ck('收起后遮罩整层从屏上拿掉', !(await me.$('.pwd-mask')))
 
     /* ---------- 首页 slogan 下面那行日期 + 星期 ---------- */
     await mp.switchTab('/pages/create/create')

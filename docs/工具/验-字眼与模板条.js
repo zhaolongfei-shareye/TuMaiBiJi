@@ -17,6 +17,8 @@ const BASE = 'https://api.agentsbin.cn/wtsj'
 const MARK = Date.now().toString(36).slice(-6)
 const TITLE = `验收-客户端 ${MARK}`
 const SHOT = '/tmp/mp-accept'
+// 导航条标题吃 i18n 的 appName，判据从同一处现读（zh 态由这把尺子自己钉）
+const navAppName = require('../../miniprogram/utils/i18n.js').t('appName', 'zh')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
 const ck = (name, ok, detail) => {
@@ -120,7 +122,11 @@ const txt = async (els) => {
     // 写死成整串对比，换名字或换次序都会红（原来这条还写着"手写"，是 ce559fd 改名后一直没跟）。
     ck('展开后四个模式＝直接写 / 拍照 / 相册 / 链接（次序也要对）',
       labels.join(' / ') === '直接写 / 拍照 / 相册 / 链接', labels.join(' / '))
-    ck('导航条标题＝「新建笔记」', (await readNav()) === '新建笔记', await readNav())
+    // 1.9.7 站长把三个 tab 的导航条标题统一成应用名（哪一页由页面左上角那行大字说，
+    // 见 create.js:146 / index.js:90 / me.js:94 三处都调 setNavTitle('appName')）。
+    // 旧判据"＝新建笔记"是 ce559fd 之前的口径，作废；值现读 i18n，不抄第二份。
+    ck('导航条标题＝应用名（三个 tab 同一个，旧值「新建笔记」已废）',
+      (await readNav()) === navAppName, `${await readNav()} ← i18n.appName`)
     await mp.screenshot({ path: `${SHOT}/c1-新建页.png` })
 
     // ---------- 卡片模板页 ----------

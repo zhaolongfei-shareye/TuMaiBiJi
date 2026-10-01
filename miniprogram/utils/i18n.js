@@ -109,6 +109,10 @@ const i18n = {
     profileNamePh: '你的名字或昵称',
     profileSlogan: '一句话',
     profileSloganPh: '想印在图上的一句话，可不填',
+    // 卡片模板页分区（站长 10-01 深夜：「保存」上移之后，下面那一块要读得出是成品样子，
+    // 不是另一组还能设置的区域）。
+    previewTitle: '卡片预览',
+    previewHint: '下面是成品样子；改完记得点上面的保存。',
     profileSaved: '已保存',
     // 海报上的码不设过期，所以"撤掉"是用户唯一能把已公开内容收回来的动作。
     sharedNow: '这篇已经公开，别人扫码能看',
@@ -172,7 +176,15 @@ const i18n = {
     swipeHint: '左右滑换模板',
     grip: '点一下收起',
     slogan: '把图文，提炼成有用的干货',
-    shareToFriend: '分享好友',
+    shareToFriend: '推荐图麦',
+    // 魅力值规则（站长 10-01 深夜：MIND 那一行撤掉，换成这块一条一行）。
+    // 三个数一个都不写死：读 /api/user/quota 的 base / reward_each / import_each，
+    // 规则本体只在 backend/app/services/quota.py 那一处。
+    mindRulesTitle: '魅力值规则',
+    mindRuleNewUser: '新用户',
+    mindRuleInvite: '推荐朋友使用',
+    mindRuleSaved: '笔记被朋友种草',
+    mindPlusN: '+{n}',
     shareCardTitle: '图麦笔记 | 把图文提炼成有用的干货',
     // 额度与注销：数字全部来自 /api/user/quota 和 /api/user/deactivate，
     // 模板里不写死 100 和 10（{n} 由服务端给的 reward_each 填）。
@@ -230,12 +242,15 @@ const i18n = {
     // 新建页录入面板中间那段空白的三步指引：只在"这一档还没东西"时出现（链接档等 urlInput、
     // 相册档等 previewImages），一旦选了图/输了链接就让位给内容。直接写那一档不放——它本来就
     // 顶满面板定高，再塞会把正文框挤扁。渠道那四个名字是站长 10-01 点名要突出的。
-    guide1T: '丢进来',
-    guide1D: '公众号 / 小红书 / 微博 / 知乎的链接或截图',
-    guide2T: 'AI 提炼',
+    // 四步指引（站长 10-01 深夜：三步→四步，四句照他给的原话，前面那三枚彩色序号方块撤掉）
+    guide1T: '粘贴各类图文',
+    guide1D: '公众号 / 小红书 / 豆瓣 的链接或截图',
+    guide2T: 'AI自动提炼',
     guide2D: '图里的字也读得懂，出摘要、要点',
-    guide3T: '存成知识点',
-    guide3D: '能搜、能归类，还能出卡片图',
+    guide3T: '存成笔记卡片',
+    guide3D: '能搜、能归类，能分享到朋友圈',
+    guide4T: '种草转存',
+    guide4D: '别人看到你分享卡片图，一键扫码转存',
     busyExtract: '提炼中…',
     busySave: '保存中…',
     linkDesc: '公众号文章 / 网页链接',
@@ -399,6 +414,8 @@ const i18n = {
     profileNamePh: 'Your name or nickname',
     profileSlogan: 'One line',
     profileSloganPh: 'A line to print on the image, optional',
+    previewTitle: 'Card preview',
+    previewHint: 'This is the finished card. Tap Save above to apply.',
     profileSaved: 'Saved',
     posterUsing: 'Current template',
     // 撤掉分享：码不过期，这一条就是唯一的收回动作
@@ -458,7 +475,12 @@ const i18n = {
     swipeHint: 'Swipe to change template',
     grip: 'Tap to close',
     slogan: 'Make every read useful',
-    shareToFriend: 'Share with friends',
+    shareToFriend: 'Recommend Tumark',
+    mindRulesTitle: 'How MIND works',
+    mindRuleNewUser: 'New account',
+    mindRuleInvite: 'Friend writes',
+    mindRuleSaved: 'Friend saves',
+    mindPlusN: '+{n}',
     shareCardTitle: 'TumarkNote | Make every read useful',
     shareRewardN: '+{n} per new writer',
     deleteAccount: 'Delete account',
@@ -512,12 +534,14 @@ const i18n = {
     pasteEmpty: 'Nothing to paste yet',
     clear: 'Clear',
     startExtract: 'Extract',
-    guide1T: 'Add it',
-    guide1D: 'A link or a screenshot from any app',
+    guide1T: 'Paste anything',
+    guide1D: 'Link or screenshot',
     guide2T: 'AI extracts',
-    guide2D: 'It reads text in images: summary and key points',
-    guide3T: 'Keep it',
-    guide3D: 'Searchable, or export as a card',
+    guide2D: 'Summary and key points',
+    guide3T: 'Keep as card',
+    guide3D: 'Search, file, share',
+    guide4T: 'Card gets saved',
+    guide4D: 'A friend scans, saves',
     busyExtract: 'Extracting…',
     busySave: 'Saving…',
     linkDesc: 'WeChat articles / Web pages',

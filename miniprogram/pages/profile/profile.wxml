@@ -54,10 +54,23 @@
     />
   </view>
 
-  <!-- 模板小样：一组一条、左右滑着挑（站长 10-01 晚：原来是上下两列，十格排五行，
-       「保存」被顶到整页最底下，用户看不见）。承载方式抄笔记选模板那一排（share 页
-       .tpl-strip）与这一页自己上面那排形象槽：scroll-view + nowrap + 内层 flex，
-       两条真机都验过。格子本身一个字没改：还是 320rpx 宽、画布仍按各自比例定高。 -->
+  <!-- 保存上移（站长 10-01 深夜：原来它在整页最底下，人先看到那一排模板、
+       以为那一片也是设置区）。它下面整片是"成品预览"，另起一条分区头说明这是看的地方。
+       ⚠️ 这一条不许改回 position:fixed——下面那些格子是 type="2d" 画布（原生层），
+       fixed 的东西盖不住它，反而会被画布穿出来（那条历史坑见 docs/产品需求.md）。 -->
+  <view class="save-bar">
+    <view class="btn-primary save-btn {{saving ? 'dim' : ''}}" bindtap="onSave">{{t.save}}</view>
+  </view>
+
+  <view class="preview-head">
+    <text class="preview-title">{{t.previewTitle}}</text>
+    <text class="preview-hint">{{t.previewHint}}</text>
+  </view>
+
+  <!-- 模板小样：一组一条、左右滑着挑（站长 10-01 晚：原来是上下两列，十格排五行）。
+       承载方式抄笔记选模板那一排（share 页 .tpl-strip）与这一页上面那排形象槽：
+       scroll-view + nowrap + 内层 flex，两条真机都验过。格子本身一个字没改：
+       还是 320rpx 宽、画布仍按各自比例定高。 -->
   <block wx:for="{{groups}}" wx:for-item="g" wx:key="id">
     <view class="grid-head">{{g.label}}</view>
     <scroll-view class="grid" scroll-x enhanced show-scrollbar="{{false}}">
@@ -83,8 +96,4 @@
       </view>
     </scroll-view>
   </block>
-
-  <view class="save-bar">
-    <view class="btn-primary save-btn {{saving ? 'dim' : ''}}" bindtap="onSave">{{t.save}}</view>
-  </view>
 </view>

@@ -19,6 +19,9 @@ const PAPER = '#FFFFFF'
 // 下面三个是"结构色"，不参与分类配色：波普的描边与压底黑带、文艺的暖纸。
 const HARD = '#12121A'
 const WARM = '#FFF6E5'
+// 递给微信图片面板的那张成品外圈留一档纯黑（站长 10-01 深夜：面板本身是全黑底，
+// 卡片直边贴上去像被裁了一半；加一圈黑后看着就是一整块）。只在导出那一步用。
+const MATTE = 40
 // 实测模拟器里 serif / sans-serif / Georgia 三种量出来的宽度互不相同，说明真能解析出
 // 衬线体；机型没有这个字族时会退回默认字体，属于可接受降级，不会报错。
 const SERIF = 'serif'
@@ -1690,6 +1693,7 @@ const SAMPLE_NOTE_EN = {
 
 module.exports = {
   W,
+  MATTE,
   TEMPLATES,
   paperOf,
   PAPER_A,

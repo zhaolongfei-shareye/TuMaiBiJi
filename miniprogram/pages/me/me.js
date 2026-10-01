@@ -51,7 +51,8 @@ Page({
     sloganText: '',
     scoreText: '',
     shareValue: '',
-    // 私密密码：设没设只吃服务端读数；输入那一块浮在屏幕下方 1/3 屏（见上面那组方法）
+    mindRules: [],
+    // 私密密码：设没设只吃服务端读数；输入那一层是整屏遮罩 + 居中卡（见上面那组方法）
     privateSet: false,
     pwdOpen: false,
     pwdEntering: false,
@@ -60,6 +61,7 @@ Page({
     pwdFirst: '',
     pwdFocus: false,
     pwdName: '',
+    pwdScene: '',
     pwdTip: '',
     // 关于那几行只读，值全部来自现成的两处来源
     version: VERSION,
@@ -122,6 +124,15 @@ Page({
       this.setData({
         scoreText: q.mind == null ? '' : String(q.mind),
         shareValue: fmt(t('shareRewardN', lang), { n: q.reward_each }),
+        // 三个数缺任何一个就整块不占位——宁可空着，也不摆半套猜的规则。
+        mindRules:
+          q.base == null || q.reward_each == null || q.import_each == null
+            ? []
+            : [
+                { label: t('mindRuleNewUser', lang), value: String(q.base) },
+                { label: t('mindRuleInvite', lang), value: fmt(t('mindPlusN', lang), { n: q.reward_each }) },
+                { label: t('mindRuleSaved', lang), value: fmt(t('mindPlusN', lang), { n: q.import_each }) },
+              ],
       })
     } catch (err) {
       console.error('额度读取失败', err)
@@ -192,7 +203,10 @@ Page({
       // 差额全在右边那枚按钮和提醒那句上——要是标题也跟着换成"重置密码"，
       // 就和右边那枚撞成同一句话了。
       pwdName: t('privatePassword', lang),
-      pwdTip: entering ? t('privatePasswordNew', lang) : t('privatePasswordSetHint', lang),
+      // 功能名下面那句是"这串密码用在哪"（他原话「密码使用场景说明要在页面里面写清楚」）；
+      // 格子上方那句才是校验提醒，只在要输的那两态出现。
+      pwdScene: entering ? t('privatePasswordScene', lang) : t('privatePasswordSetHint', lang),
+      pwdTip: t('privatePasswordNew', lang),
     })
   },
 

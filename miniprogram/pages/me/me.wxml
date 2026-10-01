@@ -93,27 +93,31 @@
           <view class="ico"><view class="cv"></view></view>
         </view>
       </button>
-      <view wx:if="{{scoreText}}" class="menu-item">
-        <text class="menu-label">{{t.brainScore}}</text>
-        <view class="menu-right">
-          <text class="menu-value num">{{scoreText}}</text>
-        </view>
+    </view>
+
+    <!-- 魅力值规则（站长 10-01 深夜：原来这一组最底下那行「魅力 + 数字」撤掉，换成一块规则，
+         一条一行、不要太拥挤）。三个数由 loadQuota 从 /api/user/quota 填，读不到整块不出现。 -->
+    <view wx:if="{{mindRules.length}}" class="card rules">
+      <text class="rules-title">{{t.mindRulesTitle}}</text>
+      <view class="rule" wx:for="{{mindRules}}" wx:key="label">
+        <text class="rule-label">{{item.label}}</text>
+        <text class="rule-value">{{item.value}}</text>
       </view>
     </view>
 
     <text class="copyright">{{t.copyright}}</text>
   </block>
 
-  <!-- 私密密码这一层（站长 10-01 晚：「不在原菜单处理方式，改为前端下方弹出 1/3 窗口」）。
-       从上到下四样：功能名 → 校验提醒 → 六个方格 → 一行两枚（左退出、右动作）。
-       六个格子是同一只隐藏 input 的显示面（六只 input 要点六次才起键盘）。
-       输完第一遍自动跳到第二遍（「输入一次后，再输入一次 6 个方格」），
-       第二遍输满六位才真的发请求。 -->
-  <view wx:if="{{pwdOpen}}" class="pwd-layer">
-    <view class="pwd-hit" catchtap="onClosePwdPanel"></view>
-    <view class="pwd-sheet">
-      <view class="pwd-name">{{pwdName}}</view>
-      <view class="pwd-tip">{{pwdTip}}</view>
+  <!-- 私密密码这一层（站长 10-01 深夜第二次改口径：撤掉底部 1/3 那一份，照「分类管理」
+       改成整屏遮罩 + 居中卡）。从上到下：功能名 → 使用场景说明 → 校验提醒 + 六个方格 →
+       一行两枚（左退出、右动作）。六个格子是同一只隐藏 input 的显示面（六只 input 要点六次
+       才起键盘）。输完第一遍自动跳到第二遍，第二遍输满六位才真的发请求。
+       点遮罩空白处收回，和分类管理那一页一个手势（卡自己 catchtap 挡住，不冒泡）。 -->
+  <view wx:if="{{pwdOpen}}" class="pwd-mask" bindtap="onClosePwdPanel">
+    <view class="pwd-card card" catchtap="">
+      <text class="pwd-name">{{pwdName}}</text>
+      <text class="pwd-scene">{{pwdScene}}</text>
+      <text wx:if="{{pwdEntering}}" class="pwd-tip">{{pwdTip}}</text>
       <view wx:if="{{pwdEntering}}" class="pwd-boxes">
         <view wx:for="{{[0, 1, 2, 3, 4, 5]}}" wx:key="index"
           class="pwd-cell {{pwdBuf.length > index ? 'fill' : ''}}"></view>

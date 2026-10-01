@@ -14,6 +14,8 @@ const path = require('path')
 
 const PORT = process.env.MP_PORT || 9431
 const OUT = path.resolve(__dirname, '../design/笔记列表-背景图/实测')
+// 黑边那一档的宽度只有一份真相：界面加的是 poster.MATTE，判据也读同一个数。
+const posterLib = require(path.resolve(__dirname, '../../miniprogram/utils/poster.js'))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const bad = []
@@ -115,6 +117,10 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
       ck(`第 ${round + 1} 套：js 算给 style 的那两个数也同比例`,
         Math.abs(d.posterW / d.posterH - trueRatio) < 0.01,
         `style ${d.posterW}×${d.posterH}rpx`)
+      // 站长 10-01 深夜：递给微信那个图片面板的成品，外圈要留一档纯黑（面板本身全黑底，
+      // 卡片直边贴上去像被裁一半）。canvasW 就是这张成品的宽，少那一档就是黑边没加上。
+      ck(`第 ${round + 1} 套：成品外圈带着那一档纯黑（宽 = ${posterLib.W} + ${posterLib.MATTE}×2）`,
+        d.canvasW === posterLib.W + posterLib.MATTE * 2, `${d.canvasW}`)
       // 不能溢出可视框，否则又会被压回去
       ck(`第 ${round + 1} 套：整张卡都在可视框里（没有溢出被裁）`,
         box.height <= body.height + 1 && box.width <= body.width + 1,

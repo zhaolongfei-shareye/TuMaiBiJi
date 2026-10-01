@@ -40,20 +40,21 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
   q.selectAll('.ico').boundingClientRect()
   q.selectAll('.pwd-cell').boundingClientRect()
   q.selectAll('.pwd-btn').boundingClientRect()
-  q.select('.pwd-sheet').boundingClientRect()
+  q.select('.pwd-card').boundingClientRect()
   q.select('.menu-group').boundingClientRect()
   q.select('.about-lead').boundingClientRect()
   q.select('.h1').boundingClientRect()
-  q.select('.pwd-hit').boundingClientRect()
+  q.select('.pwd-scene').boundingClientRect()
   q.select('.pwd-name').boundingClientRect()
-  q.select('.pwd-layer').boundingClientRect()
+  q.select('.pwd-mask').boundingClientRect()
+  q.selectAll('.rule').boundingClientRect()
   q.exec((res) => resolve({
     band: res[0], sheet: res[1], logo: res[2], text: res[3],
     score: res[4], num: res[5], lab: res[6], pill: res[7],
     segs: res[8] || [], items: res[9] || [], icos: res[10] || [],
-    cells: res[11] || [], btns: res[12] || [], pwdSheet: res[13],
+    cells: res[11] || [], btns: res[12] || [], pwdCard: res[13],
     group: res[14], aboutLead: res[15], h1: res[16],
-    hit: res[17], pwdName: res[18], layer: res[19],
+    scene: res[17], pwdName: res[18], mask: res[19], rules: res[20] || [],
     windowWidth: wx.getWindowInfo().windowWidth,
     windowHeight: wx.getWindowInfo().windowHeight,
   }))
@@ -207,6 +208,8 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   // 抄死的判据红了而界面是对的——判据吃的是字典，界面吃的也是字典，那就只该有一份。
   const i18nSrc = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'), 'utf8')
   const zhSlogan = /slogan: '([^']+)'/.exec(i18nSrc)
+  // 规则块那三句、以及「推荐图麦」这个新名字，都从字典现读——写第二份进尺子，改了字典就假红。
+  const zhRule = (k) => (new RegExp(`\\n\\s+${k}: '([^']+)'`).exec(i18nSrc) || [])[1]
   ck('第二行是应用 Slogan（值现读 i18n.js 的 zh 段）', !!zhSlogan && d.sloganText === zhSlogan[1],
     `${d.sloganText} ← ${zhSlogan && zhSlogan[1]}`)
   ck('圆里是应用 LOGO（没设卡片头像时）', d.logoSrc === '/assets/logo.png', d.logoSrc)
@@ -256,41 +259,84 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   await sleep(1200)
   d = await page.data()
   m = await measure(mp)
-  ck('点那一行弹出底部那一层', d.pwdOpen === true, `open=${d.pwdOpen} set=${d.privateSet}`)
-  // 站长 10-01 晚：「不在原菜单处理方式，改为前端下方弹出 1/3 窗口」。
-  // 旧判据"展开的内容长在列表里面"是上一版的，作废；这里钉的是"独立一层、铺满视口、那份贴底"。
-  ck('弹的是独立一层（.pwd-layer 铺满整屏），不是菜单里多出来的一坨',
-    !!m.layer && Math.abs(m.layer.height - m.windowHeight) <= 1,
-    m.layer ? `层高=${m.layer.height} 窗高=${m.windowHeight}` : '没有 .pwd-layer')
+  ck('点那一行弹出遮罩那一层', d.pwdOpen === true, `open=${d.pwdOpen} set=${d.privateSet}`)
+  // 站长 10-01 深夜第二次改口径：撤掉「底部 1/3 弹层」，照「分类管理」那一页改成整屏遮罩 + 居中卡。
+  // 旧判据（.pwd-layer 铺满 + .pwd-sheet 约 1/3 高 + 贴屏幕底边 + "这一版没有遮罩那一层"）四把全部作废。
+  ck('遮罩铺满整屏（与分类管理同口径），不再是一张贴底的板',
+    !!m.mask && Math.abs(m.mask.height - m.windowHeight) <= 1 && Math.abs(m.mask.width - m.windowWidth) <= 1,
+    m.mask ? `${m.mask.width}×${m.mask.height} 窗 ${m.windowWidth}×${m.windowHeight}` : '没有 .pwd-mask')
   // 这一条才是"不在原菜单处理方式"的正解：打开之后，菜单那一行本身不许长高。
   ck('打开时菜单行没被顶高（内容不就地展开）',
     m.items.length === 5 && Math.abs(toRpx(m.items[iPwd].height, W) - 106) <= 2,
     m.items[iPwd] ? toRpx(m.items[iPwd].height, W).toFixed(0) : '读不到那一行')
-  ck('那一份约屏幕 1/3 高', m.pwdSheet && Math.abs(m.pwdSheet.height / m.windowHeight - 1 / 3) < 0.04,
-    m.pwdSheet ? `${m.pwdSheet.height}/${m.windowHeight}=${(m.pwdSheet.height / m.windowHeight).toFixed(3)}` : '没有 .pwd-sheet')
-  ck('贴住屏幕底边', m.pwdSheet && Math.abs(m.pwdSheet.bottom - m.windowHeight) <= 1,
-    m.pwdSheet ? `${m.pwdSheet.bottom} vs ${m.windowHeight}` : '')
-  const hitStyle = await styleOf(page, '.pwd-hit', ['background-color'])
-  ck('上面那截命中区是空的（背后不垫一层，跟弹窗分层那条一个口径）',
-    /rgba\(0, 0, 0, 0\)|transparent/.test(hitStyle['background-color'] || ''),
-    hitStyle['background-color'])
-  ck('这一版没有遮罩那一层', (await page.$$('.pwd-mask')).length === 0)
+  const cardCx = m.pwdCard && m.pwdCard.left + m.pwdCard.width / 2
+  const cardCy = m.pwdCard && m.pwdCard.top + m.pwdCard.height / 2
+  // 「与分类管理相同」这句怎么钉？钉一个渲染出来的绝对宽数会假红：那张卡声明的是
+  // `width:620rpx` 而 `.card` 的左右内边距是内容之外（box-sizing 没设 border-box），
+  // 所以外沿读出来是 684.6 而不是 620。钉两条更实在的：声明逐字与那张对话框一致（静态），
+  // 外沿 = 声明宽 + 左右各一档 --sp-4（运行时，容 ±8 吸收描边与取整）。
+  const cssOf = (rel, sel) => {
+    const src = fs.readFileSync(path.resolve(__dirname, '../../miniprogram', rel), 'utf8')
+    return ((src.match(new RegExp(`\\n\\.${sel}\\s*\\{([\\s\\S]*?)\\n\\}`)) || [])[1] || '')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim()
+  }
+  const SP4 = Number(/--sp-4:\s*(\d+)rpx/.exec(fs.readFileSync(
+    path.resolve(__dirname, '../../miniprogram/app.wxss'), 'utf8'))[1])
+  const mine = cssOf('pages/me/me.wxss', 'pwd-card')
+  const theirs = cssOf('pages/categories/categories.wxss', 'dialog-card')
+  ck('这张卡的宽与内边距逐字抄分类管理那张对话框（不留第二份尺寸）',
+    !!mine && !!theirs && mine.replace(/box-shadow:[^;]+;/, '') === theirs.replace(/box-shadow:[^;]+;/, ''),
+    `${mine.slice(0, 52)} ↔ ${theirs.slice(0, 52)}`)
+  ck(`卡外沿 = 620 + 左右各一档 --sp-4（${620 + 2 * SP4}rpx）`,
+    !!m.pwdCard && Math.abs(toRpx(m.pwdCard.width, W) - (620 + 2 * SP4)) <= 8,
+    m.pwdCard && toRpx(m.pwdCard.width, W).toFixed(1))
+  ck('卡在屏正中（不贴底，所以下面那两枚按钮不会再被切掉）',
+    !!m.pwdCard && Math.abs(cardCx - m.windowWidth / 2) <= 2 && Math.abs(cardCy - m.windowHeight / 2) <= 2,
+    m.pwdCard && `圆心 ${(cardCx || 0).toFixed(1)}/${(cardCy || 0).toFixed(1)} 屏心 ${(W / 2).toFixed(1)}/${(m.windowHeight / 2).toFixed(1)}`)
+  ck('卡整块在屏以内', !!m.pwdCard && m.pwdCard.top >= 0 && m.pwdCard.bottom <= m.windowHeight + 1,
+    m.pwdCard && `${m.pwdCard.top}~${m.pwdCard.bottom} / ${m.windowHeight}`)
+  ck('使用场景这句写在卡里面（不是只有弹窗标题）',
+    !!m.scene && m.scene.top > m.pwdCard.top && m.scene.bottom < m.pwdCard.bottom,
+    m.scene && `${m.scene.top}~${m.scene.bottom}`)
   const nameEl = await page.$('.pwd-name')
   const nameTx = nameEl ? (await nameEl.text()).trim() : ''
-  ck('从上到下第一样是功能名称（且排在最上）',
-    /私密密码/.test(nameTx) && !!m.pwdName && !!m.pwdSheet && m.pwdName.top < m.pwdSheet.top + 90,
+  ck('从上到下第一样是功能名称（且排在卡里最上）',
+    /私密密码/.test(nameTx) && !!m.pwdName && !!m.pwdCard && m.pwdName.top < m.pwdCard.top + 90,
     `${nameTx} top=${m.pwdName && m.pwdName.top}`)
   ck('功能名称就一行，不和右边按钮撞成同一句', nameTx !== '重置密码', nameTx)
   // 这个测试号设没设过密码是会变的（上一把尺子把密码撤了就变 false），
   // 所以这里不钉"哪一态"，只钉两态互斥这条规则（同一件事在 `验-私密密码与分类色-真跑` 里两态各测一遍）。
   ck('格子只跟着那一态走：设置态六格、重置态零格',
     m.cells.length === (d.pwdEntering ? 6 : 0), `cells=${m.cells.length} entering=${d.pwdEntering}`)
+  // 站长 10-01 深夜：「6 个框太大，不精致，可以稍微聚集中间」。旧判据"铺满内宽"作废，
+  // 换成钉这一条：一整排比卡的内宽窄（收在中间），且整排以卡的中线对称。
+  if (m.cells.length === 6) {
+    const rowL = m.cells[0].left, rowR = m.cells[5].left + m.cells[5].width
+    const rowW = toRpx(rowR - rowL, W)
+    const inner = toRpx(m.pwdCard.width, W) - 64   // 卡左右各 var(--sp-4)=32
+    ck('六格收小了：一整排比卡的内宽窄', rowW < inner, `${rowW.toFixed(0)} < ${inner.toFixed(0)}`)
+    ck('一整排在卡里居中（不是靠左堆着）',
+      Math.abs((rowL + rowR) / 2 - cardCx) <= 3,
+      `Δ${toRpx((rowL + rowR) / 2 - cardCx, W).toFixed(1)}rpx`)
+    ck('单格 78×96（比原来那一档收小）',
+      Math.abs(toRpx(m.cells[0].width, W) - 78) <= 2 && Math.abs(toRpx(m.cells[0].height, W) - 96) <= 2,
+      `${toRpx(m.cells[0].width, W).toFixed(0)}×${toRpx(m.cells[0].height, W).toFixed(0)}`)
+  }
   const btnTexts = []
   for (const b of await page.$$('.pwd-btn')) btnTexts.push(await b.text())
   ck('一行两枚：左是取消，右按那一态分别是确定 / 重置密码',
     btnTexts.join('|') === (d.pwdEntering ? '取消|确定' : '取消|重置密码'), btnTexts.join('|'))
-  ck('按钮高 96（与其他页面的 .pwd-btn 同值，没做成超大块）',
-    Math.abs(toRpx(m.btns[0].height, W) - 96) <= 2, toRpx(m.btns[0].height, W).toFixed(0))
+  // 原来钉"高 96"，那是底部弹层那一版自己定的大块头；这一版两枚抄 categories 的
+  // .dialog-btn（padding 一档、不写死高），所以钉的是"同一行、各占一半、右边那枚
+  // 离卡内边沿正好一档内边距"。注意单位：坐标是 px，卡内边距是 rpx，必须换算后再比。
+  ck('两枚坐在同一行、各占约一半内宽（照分类管理那两个按钮）',
+    m.btns.length === 2 && Math.abs(m.btns[0].top - m.btns[1].top) <= 1 &&
+    Math.abs(m.btns[0].width - m.btns[1].width) <= 1 &&
+    Math.abs(toRpx(m.pwdCard.right - m.btns[1].right, W) - SP4) <= 4 &&
+    Math.abs(toRpx(m.btns[0].left - m.pwdCard.left, W) - SP4) <= 4,
+    m.btns.length === 2 && m.pwdCard
+      ? `两枚 ${toRpx(m.btns[0].width, W).toFixed(0)}/${toRpx(m.btns[1].width, W).toFixed(0)}rpx　左内缩 ${toRpx(m.btns[0].left - m.pwdCard.left, W).toFixed(0)} 右内缩 ${toRpx(m.pwdCard.right - m.btns[1].right, W).toFixed(0)}`
+      : '读不到两枚')
   const cvStyle = await styleOf(page, '.menu-item.open .ico .cv', ['transform'])
   // rotate(45deg) 在计算样式里回的是 matrix(.707,.707,-.707,.707)，不是字面 45
   const down = /matrix\(\s*0?\.707[^,]*,\s*0?\.707/.test(cvStyle.transform || '')
@@ -307,16 +353,36 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   const aboutLabels = []
   for (const r of await page.$$('.menu-item')) aboutLabels.push((await r.text()).replace(/\s+/g, ''))
   // .text() 拿到的是一整行（标签 + 右值），所以按"以这几个字开头"判，不比全等
-  // 第四行中文侧 10-01 晚叫「魅力」（站长拍的：MIND 要有中文名），英文侧继续叫 MIND。
-  // 这一把尺子跑的是中文态，所以钉的是 魅力；旧的那条"以 MIND 开头"作废。
-  ck('关于只有四行：产品官网/反馈邮箱/分享好友/魅力',
-    aboutLabels.length === 4 && aboutLabels[0].indexOf('产品官网') === 0 &&
-    aboutLabels[1].indexOf('反馈邮箱') === 0 && aboutLabels[2].indexOf('分享好友') === 0 &&
-    aboutLabels[3].indexOf('魅力') === 0, aboutLabels.join('|'))
-  ck('脑力值那一行右边是服务端那个数', /魅力1\d\d/.test(aboutLabels[3] || ''), aboutLabels[3])
+  // 站长 10-01 深夜：「分享好友」改名「推荐图麦」，最底下那行 MIND 撤掉、换成一块规则。
+  // 旧判据"四行、第四行以魅力开头"作废。
+  const ruleLabels = []
+  for (const r of await page.$$('.rule')) {
+    ruleLabels.push((await r.text()).replace(/\s+/g, ''))
+  }
+  ck('关于只有三行：产品官网/反馈邮箱/推荐图麦',
+    aboutLabels.length === 3 && aboutLabels[0].indexOf('产品官网') === 0 &&
+    aboutLabels[1].indexOf('反馈邮箱') === 0 && aboutLabels[2].indexOf(zhRule('shareToFriend')) === 0,
+    aboutLabels.join('|'))
+  ck('那一行不再叫「分享好友」', !aboutLabels.some((x) => /分享好友/.test(x)), aboutLabels.join('|'))
+  ck('MIND 那一整行撤掉了（关于里不再有一行以「魅力」开头）',
+    !aboutLabels.some((x) => /^魅力/.test(x)), aboutLabels.join('|'))
+  ck('规则块三行，一条一行（三句标签现读 i18n.js 的 zh 段，不抄第二份）',
+    ruleLabels.length === 3 && ruleLabels.every((x, i) => x.indexOf([zhRule('mindRuleNewUser'), zhRule('mindRuleInvite'), zhRule('mindRuleSaved')][i]) === 0),
+    ruleLabels.join('|'))
+  ck('三个数全吃服务端：第一行是纯数字，后两行是「+数字」',
+    d.mindRules.length === 3 && /^\d+$/.test(d.mindRules[0].value) &&
+    /^\+\d+$/.test(d.mindRules[1].value) && /^\+\d+$/.test(d.mindRules[2].value),
+    d.mindRules.map((r) => `${r.label}=${r.value}`).join(' '))
+  // 「推荐图麦」那行的右值与规则第二行必须同源（都吃 reward_each），不一致就是有一处写死了
+  ck('分享那行的数 = 规则第二行的数（同一个服务端字段）',
+    /(\+\d+)$/.test(d.shareValue || '') && d.shareValue.match(/(\+\d+)$/)[1] === d.mindRules[1].value,
+    `${d.shareValue} vs ${d.mindRules[1].value}`)
+  ck('规则行不拥挤：每行至少 106 高（跟菜单行同一档）',
+    m.rules.length === 3 && m.rules.every((r) => toRpx(r.height, W) >= 104),
+    m.rules.map((r) => toRpx(r.height, W).toFixed(0)).join('/'))
   ck('介绍卡在最上面（紧跟留白卡，不分二级）', !!m.aboutLead && !!m.sheet && m.aboutLead.top <= m.sheet.bottom + 2)
   ck('功能介绍和隐私条款不在这一页', !aboutLabels.some((x) => /功能|隐私/.test(x)))
-  await mp.screenshot({ path: path.join(OUT, '02-关于-四行.png') })
+  await mp.screenshot({ path: path.join(OUT, '02-关于-三行加规则块.png') })
 
   /* ---------- ⑦ 本机填过名称/一句话/形象图：这一格也不跟着走（站长 10-01 拍） ----------
      原来这两条钉的是"头部换成用户填的那两行"，方向正好反了：这一格说的是**应用**是谁，

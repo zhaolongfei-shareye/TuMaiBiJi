@@ -208,11 +208,38 @@
   white-space: nowrap;
 }
 
-/* 「关于」那一行右边是纯数字（魅力值），跟着全局那一档走。
-   同一个 .menu-value 还装官网地址、邮箱、"+10 篇"这些含字母和汉字的值，
-   所以另起一格，不往公共那条里塞 font-family。字号与字重一条没改。 */
-.menu-value.num {
+/* ---------- 魅力值规则（站长 10-01 深夜：这一组最底下那行「魅力 + 数字」撤掉，换成一块规则）
+   一条一行、行高与上面那组菜单行同一档（106rpx），数字右对齐吃全局那支数字字形。
+   三个数不写死在模板里：由 me.js 的 loadQuota 从 /api/user/quota 填，读不到整块不出现。 */
+.rules {
+  padding-bottom: 0;
+}
+
+.rules-title {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  letter-spacing: -0.2rpx;
+}
+
+.rule {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 106rpx;
+  border-top: 1rpx solid var(--card-edge);
+}
+
+.rule-label {
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+.rule-value {
+  margin-left: auto;
   font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-size: var(--fs-title);
+  white-space: nowrap;
 }
 
 .ico {
@@ -281,64 +308,74 @@
 }
 
 /* ---------- 私密密码：就地展开，长在列表里面，不再浮一层 ---------- */
-/* ---------- 私密密码那一层（站长 10-01 晚：不在原菜单里处理，改屏幕下方浮起 1/3 屏）----------
-   背后不垫板、不加淡影（详情浮窗那一轮连打两轮的同一条口径：垫了就读成"两层叠加"），
-   上面那半屏只做"点这里收回"的命中区，透明。
-   键盘：这只 input 没写 adjust-position，走微信默认那条——焦点起来整页（含 fixed 层）
-   被顶到键盘上方，和新建页那张贴底面板同一机制。真机复看要看的是这一层没被键盘吞掉。 */
-.pwd-layer {
+/* ---------- 私密密码这一层（站长 10-01 深夜第二次改口径：撤掉底部 1/3 那一份，
+   照「分类管理」那一页改成整屏遮罩 + 居中卡）----------
+   几何一项都不自己发明：遮罩 rgba(20,20,28,.55) / 卡宽 620rpx / 内边距 48·32·32 /
+   一行两枚各占一半 —— 与 categories.wxss 的 .dialog-mask / .dialog-card / .dialog-actions 同值。
+   原来那 1/3 高的那份为什么不行：卡里的按钮贴在层底，键盘一顶就把「确定」盖住了（他截图里那条）。
+   居中卡不吃屏幕底边，键盘从下面顶上来时整张卡一起走，按钮永远在。 */
+.pwd-mask {
   position: fixed;
+  top: 0;
   left: 0;
   right: 0;
-  top: 0;
   bottom: 0;
-  z-index: 20;
+  background: rgba(20, 20, 28, 0.55);
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
 }
 
-.pwd-hit {
-  flex: 1;
-}
-
-.pwd-sheet {
-  flex: none;
-  height: 33vh;
-  box-sizing: border-box;
-  padding: 40rpx var(--sp-4) 24rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-card);
-  border-top: var(--w-edge) solid var(--card-edge);
-  border-radius: var(--r-card) var(--r-card) 0 0;
+.pwd-card {
+  width: 620rpx;
+  padding: var(--sp-5) var(--sp-4) var(--sp-4);
+  margin-bottom: 0;
+  box-shadow: var(--sh-float);
 }
 
 /* 第一行是这一格的功能名（他要的"里面是功能名称"） */
 .pwd-name {
+  display: block;
   font-size: var(--fs-h2);
   font-weight: 700;
+  letter-spacing: -0.6rpx;
   color: var(--text-primary);
 }
 
-/* 格子上方那句就是"提醒校验"：第一遍说要 6 位数字，第二遍说要再输一次 */
-.pwd-tip {
-  margin-top: 12rpx;
+/* 功能名下面那句是"这串密码用在哪"——他要的"使用场景说明要写清楚"，
+   两态各一句：没设过说用途，已设过说"要换就得先重置"。 */
+.pwd-scene {
+  display: block;
+  margin-top: 14rpx;
   font-size: var(--fs-meta);
   line-height: var(--lh-body);
   color: var(--text-secondary);
 }
 
+/* 格子上方那句就是"提醒校验"：第一遍说要 6 位数字，第二遍说要再输一次 */
+.pwd-tip {
+  display: block;
+  margin-top: var(--sp-4);
+  text-align: center;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+/* 六格整组居中、每格 78×96：上一版 flex:1 摊满 556rpx 一行，单格 82 宽看着粗（他原话"不精致"） */
 .pwd-boxes {
   position: relative;
-  margin-top: 40rpx;
+  margin-top: 18rpx;
   display: flex;
-  gap: 16rpx;
+  justify-content: center;
+  gap: 14rpx;
 }
 
 .pwd-cell {
   position: relative;
-  flex: 1;
+  flex: none;
+  width: 78rpx;
   height: 96rpx;
   border-radius: var(--r-chip);
   background: var(--chip-idle);
@@ -377,25 +414,22 @@
 }
 
 .pwd-two {
-  margin-top: auto;
+  margin-top: var(--sp-5);
   display: flex;
-  gap: 16rpx;
+  gap: var(--sp-2);
 }
 
+/* 一行两枚各占一半，尺寸抄 categories.wxss 的 .dialog-btn（不再自己定一枚 96rpx 高的） */
 .pwd-btn {
   flex: 1;
-  height: 96rpx;
+  text-align: center;
+  padding: var(--sp-3) 0;
   border-radius: var(--r-pill);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--fs-title);
-  font-weight: 800;
+  font-size: var(--fs-body);
+  font-weight: 600;
 }
 
 .pwd-btn.ghost {
-  font-size: var(--fs-body);
-  font-weight: 700;
   color: var(--text-secondary);
   background: var(--chip-idle);
 }
@@ -406,8 +440,6 @@
 }
 
 .pwd-btn.danger {
-  font-size: var(--fs-body);
-  font-weight: 700;
   color: var(--danger);
   box-shadow: inset 0 0 0 var(--w-edge) var(--danger-soft);
 }

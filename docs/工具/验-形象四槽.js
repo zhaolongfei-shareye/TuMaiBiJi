@@ -207,7 +207,19 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   ck('保存条在流内（fixed 会被原生画布盖住，这条不许回退）',
     !/position:\s*fixed/.test(barCss), barCss.replace(/\s+/g, ' ').trim().slice(0, 70))
   ck('网格不再为浮层留那 200rpx', !/\.grid\s*\{[^}]*padding-bottom:\s*200rpx/.test(wxss))
-  const keys = ['slotCard', 'slotBg', 'slotHint', 'slotHintFull', 'slotDropTitle', 'slotDropOk', 'slotDropBody', 'slotDropWasCard', 'slotDropWasBg']
+  // 站长 10-01 深夜第四条：「保存按钮上移到输入一句话的下方，下面是卡片预览区域，
+  // 避免用户认为这区域可以设置，要突出卡片预览」。钉的是 DOM 顺序 + 那一行分区标题。
+  const iBar = wxml.indexOf('class="save-bar"')
+  const iHead = wxml.indexOf('class="preview-head"')
+  const iGrid = wxml.indexOf('wx:for="{{groups}}"')
+  ck('「保存」搬到模板小样上面（原来挂在整页最底下）',
+    iBar > -1 && iBar < iGrid, `save-bar=${iBar} groups=${iGrid}`)
+  ck('模板那一排前面有「卡片预览」标题 + 一句说明（把下面说成"看的地方"）',
+    iHead > iBar && iHead < iGrid && /previewTitle/.test(wxml) && /previewHint/.test(wxml),
+    `head=${iHead}`)
+  ck('分区那条分隔线吃现网已有的 --card-edge（不另起一种色）',
+    /\.preview-head\s*\{[^}]*border-top:\s*2rpx dashed var\(--card-edge\)/.test(wxss))
+  const keys = ['slotCard', 'slotBg', 'slotHint', 'slotHintFull', 'slotDropTitle', 'slotDropOk', 'slotDropBody', 'slotDropWasCard', 'slotDropWasBg', 'previewTitle', 'previewHint']
   keys.forEach((k) => {
     const n = (i18n.match(new RegExp(`\\b${k}:`, 'g')) || []).length
     ck(`新串 ${k} 中英文各一份`, n === 2, `出现 ${n} 次`)

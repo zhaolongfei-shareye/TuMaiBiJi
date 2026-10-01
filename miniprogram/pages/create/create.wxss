@@ -327,8 +327,9 @@
   margin-top: 10rpx;
 }
 
-/* 三步指引：坐在空态那截富余里。数字方块三枚吃 utils/palette.js 的宝蓝 / 橙 / 草绿，
-   底板用面板已有的那档 .035 淡墨面，不新增描边——"描边是骨架、投影已退役"那条照旧。 */
+/* 四步指引：坐在空态那截富余里。前面四枚统一是 Tips 那支小黄点（颜色由 tipDotStyle 从
+   palette.TIP_DOT 带进来，这里不写十六进制），底板用面板已有的那档 .035 淡墨面，
+   不新增描边——"描边是骨架、投影已退役"那条照旧。 */
 .guide {
   margin-top: 22rpx;
   padding: 18rpx 22rpx;
@@ -340,31 +341,23 @@
   display: flex;
   align-items: center;
   gap: 14rpx;
-  margin-bottom: 12rpx;
+  margin-bottom: 8rpx;
 }
 
 .gstep:last-child {
   margin-bottom: 0;
 }
 
-.gnum {
+/* 序号那一枚从"40×40 彩色方块"弱化成一枚小黄点（站长 10-01 深夜：方块喧宾夺主，
+   要"类似 Tips 那种"）。颜色不在这里写死：走 create.js 的 tipDotStyle，
+   和 Tips 行前那枚同一个来源 palette.TIP_DOT，改一处两枚一起改。
+   行距 12→8 是把第四步那一行挤回面板定高 700 的那一档（见上面 .panel 那段注释）。 */
+.gdot {
   flex: none;
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 12rpx;
-  color: #fff;
-  /* 三步指引那个序号也是纯数字，跟着全局那一档走（字号 22 不动） */
-  font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-size: 22rpx;
-  font-weight: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
 }
-
-.g1 .gnum { background: #3f52d6; }
-.g2 .gnum { background: #e9723d; }
-.g3 .gnum { background: #46a863; }
 
 .gtxt {
   font-size: var(--fs-meta);

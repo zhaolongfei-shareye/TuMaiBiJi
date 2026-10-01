@@ -70,7 +70,7 @@ FIELDS = [
     ('pages/index/index.wxss', '.ds-pt-n', 'var(--fs-tiny)', '', '首页展开态要点序号'),
     ('pages/detail/detail.wxss', '.point-num', 'var(--fs-tiny)', '', '详情页要点序号'),
     ('pages/share/view.wxss', '.point-num', '22rpx', '', '扫码落地页要点序号'),
-    ('pages/create/create.wxss', '.gnum', '22rpx', '', '三步指引的 1/2/3'),
+    ('pages/me/me.wxss', '.rule-value', 'var(--fs-title)', '+', '魅力值规则那三行的数（100 / +10 / +1）'),
     ('pages/write/write.wxss', '.char-count', 'var(--fs-tiny)', '/', '摘要字数 137/500'),
     ('pages/me/me.wxss', '.about-ver', 'var(--fs-label)', 'v.', '「我的」页那枚版本号 v1.9.7'),
     ('pages/about/about.wxss', '.brand-ver', 'var(--fs-micro)', 'v.', '关于页那枚版本号'),
@@ -91,17 +91,19 @@ for rel, sel, size, symbols, what in FIELDS:
     miss = sorted(need - have)
     ok(f'{what}（{sel}）用到的字符都在子集里：缺 {miss}', not miss, ''.join(miss))
 
-# 「关于」里那一行的数字单独起了一格：同一个 .menu-value 还装网址、邮箱、"+10 篇"，
-# 那些含字母和汉字，不许跟着走。
+# 「关于」那一组最底下的数字不再挂 .menu-value：站长 10-01 深夜把「魅力 + 数字」整行撤了，
+# 换成一块规则，数另起一格（.rule-value）。所以旧的那条"另起 .menu-value.num"跟着作废，
+# 反面判据也升级成"这一格整条不许再存在"——留着就是一条没人用的死样式。
 me = read('pages/me/me.wxss')
-ok('分数那一格用 .menu-value.num 单独吃这支',
-   re.search(r'\.menu-value\.num\s*\{[^}]*font-family: \'WtsjMind\'', me) is not None)
+ok('.menu-value.num 整条已随那一行撤掉（不留没人在用的样式）',
+   re.search(r'\.menu-value\.num\s*\{', me) is None)
 ok('公共那条 .menu-value 没有 font-family（含汉字和字母的值不许被带进去）',
    re.search(r'\.menu-value\s*\{[^}]*font-family', me) is None)
 me_wx = read('pages/me/me.wxml')
-ok('wxml 里只有魅力值那一格挂了 num',
-   me_wx.count('menu-value num') == 1 and me_wx.count('class="menu-value"') == 3,
-   f'num={me_wx.count("menu-value num")} 公共={me_wx.count(chr(34) + "menu-value" + chr(34))}')
+ok('wxml 里不再挂 num，规则块那一格挂 .rule-value',
+   'menu-value num' not in me_wx and me_wx.count('class="menu-value"') == 3
+   and me_wx.count('class="rule-value"') == 1,
+   f'num={"menu-value num" in me_wx} 公共={me_wx.count(chr(34) + "menu-value" + chr(34))} rule={me_wx.count(chr(34) + "rule-value" + chr(34))}')
 
 # ---------- ③ 反面：数字加中文的那些字段没被误伤 ----------
 MIXED = [

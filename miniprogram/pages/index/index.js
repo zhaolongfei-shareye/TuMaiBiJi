@@ -542,19 +542,28 @@ Page({
     canvas.width = poster.W
     canvas.height = 750
     const plan = poster.planPoster(ctx, a.note, this.data.posterTpl, profile, lang, { showQr: !this.data.noQr })
-    canvas.width = plan.width
-    canvas.height = plan.height
+    // 成品外圈那一档纯黑只加在这里（MATTE 见 poster.js）：微信的图片面板是全黑底，
+    // 卡片直边贴上去像被裁了一半。外圈跟着一起出，弹窗里预览到的就是递出去的那张。
+    const outW = plan.width + poster.MATTE * 2
+    const outH = plan.height + poster.MATTE * 2
+    canvas.width = outW
+    canvas.height = outH
     // 画布那一格永远等于海报本身，不跟着展示框走：出的是 750 宽的成品，
     // 而不是"缩到弹窗里那么大"的一张。
-    this.setData({ canvasW: plan.width, canvasH: plan.height })
+    this.setData({ canvasW: outW, canvasH: outH })
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, outW, outH)
+    ctx.save()
+    ctx.translate(poster.MATTE, poster.MATTE)
     poster.paintLayers(ctx, plan.layers, images)
+    ctx.restore()
     // 展示框按海报自己的比例算，宽和高吃同一个 scale——分开定就会变形。
     const box = await this._tplBoxRpx()
     if (box) {
-      const scale = Math.min(1, box.w / plan.width, box.h / plan.height)
+      const scale = Math.min(1, box.w / outW, box.h / outH)
       this.setData({
-        posterW: Math.round(plan.width * scale),
-        posterH: Math.round(plan.height * scale),
+        posterW: Math.round(outW * scale),
+        posterH: Math.round(outH * scale),
       })
     }
     const tmpPath = await new Promise((resolve, reject) => {

@@ -295,8 +295,35 @@
    浮着的元素压不住它（同一条坑在详情浮窗那次是靠"画布不进 fixed"绕开的，
    结论写在 share.wxss 的 .pick-on 与 docs/产品需求.md §8.60 附近）。
    这一页十张画布都在流内，所以让按钮也回到流内：谁都不浮在谁上面，就没有谁盖谁。 */
+/* 保存上移之后它不在整页末尾了，原来那条 safe-area 底部留白撤掉（留着会在卡与预览
+   之间凭空多出一大段，屏幕上就是"这两块不是一组"）。 */
 .save-bar {
-  padding: var(--sp-2) 0 calc(var(--sp-3) + env(safe-area-inset-bottom));
+  padding: var(--sp-2) 0 0;
+}
+
+/* 卡片预览分区头：一条虚线 + 小标 + 一句提示。虚线而不是实线——上面那几组卡片的
+   边界语言是描边实线，这里要读得出"分隔的是两块内容，不是一张卡的边"。 */
+.preview-head {
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-3);
+  border-top: 2rpx dashed var(--card-edge);
+}
+
+.preview-title {
+  display: block;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  letter-spacing: 0.6rpx;
+  color: var(--text-secondary);
+}
+
+.preview-hint {
+  display: block;
+  margin-top: 6rpx;
+  font-size: var(--fs-label);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+  opacity: 0.72;
 }
 
 .save-btn {
