@@ -119,7 +119,7 @@
           <view class="ico"><view class="cv"></view></view>
         </view>
       </button>
-      <view class="menu-item">
+      <view wx:if="{{scoreText}}" class="menu-item">
         <text class="menu-label">{{t.brainScore}}</text>
         <view class="menu-right">
           <text class="menu-value">{{scoreText}}</text>

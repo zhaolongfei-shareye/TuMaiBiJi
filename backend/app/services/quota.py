@@ -17,6 +17,7 @@
 """
 import logging
 
+from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -41,9 +42,14 @@ def used_count(db: Session, user: User) -> int:
 
 
 def rewarded_invites(db: Session, inviter_id: int) -> int:
+    """"这个人替我带来了几个新写作者"——只数动笔那一路。
+
+    2026-10-01 加了转存 +1 之后，台账里混着两种行；不加这个过滤，字段名就成了假话
+    （别人转存一次也会被算成"带来一个人"）。
+    """
     return (
         db.query(Invitation)
-        .filter(Invitation.inviter_id == inviter_id)
+        .filter(Invitation.inviter_id == inviter_id, Invitation.source_note_id.is_(None))
         .count()
     )
 
@@ -104,10 +110,15 @@ def _settle(db: Session, inviter: User, invitee: User, source_note_id, reward: i
     """两条路共用的那一段：记一笔台账，给收账的人加这一档分。
 
     唯一索引是最后一道闸。两个请求真同时进来时（同步路由跑在线程池里，确实会并发），
-    后到的那个会在 commit 撞上 IntegrityError——这里回滚掉的只有这一笔台账，
-    笔记本身早就 commit 过了，所以用户那边仍然只看见"存好了"。
+    后到的那个会在 commit 撞上 IntegrityError，由公开入口那层 `_never_breaks` 兜住：
+    回滚的只有这一笔台账和这一笔加分，笔记本身早就 commit 过了，
+    所以用户那边仍然只看见"存好了"。这里不留 except——留了就成了两层一样的兜底，
+    而变异检查会告诉你其中一层删掉行为不变（那就是没在测东西）。
+
+    余额走 SQL 侧自增，不在 Python 里"读出来加完写回去"：那样两笔并发各自读到旧值、
+    后写的把先写的覆盖掉，台账记了 6 行而余额只加 1（临时库 6 线程真并发实测过）。
+    自增和 INSERT 在同一个事务里，撞索引时一起回滚，不会留下"分了加了、账没记"。
     """
-    inviter.quota_bonus = int(inviter.quota_bonus or 0) + reward
     db.add(
         Invitation(
             inviter_id=inviter.id,
@@ -116,15 +127,10 @@ def _settle(db: Session, inviter: User, invitee: User, source_note_id, reward: i
             reward=reward,
         )
     )
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        logger.info(
-            "这一笔已被并发的那趟记走，未重复到账：inviter=%s invitee=%s 源笔记=%s",
-            inviter.id, invitee.id, source_note_id,
-        )
-        return 0
+    db.execute(
+        update(User).where(User.id == inviter.id).values(quota_bonus=User.quota_bonus + reward)
+    )
+    db.commit()
     logger.info(
         "MIND 到账（%s）：收账人=%s +%d（现 %d）来人=%s 源笔记=%s",
         why, inviter.id, reward, mind_score(inviter), invitee.id, source_note_id,
@@ -132,7 +138,7 @@ def _settle(db: Session, inviter: User, invitee: User, source_note_id, reward: i
     return reward
 
 
-def credit_first_note(note: Note, db: Session, user: User) -> int:
+def _credit_first_note(note: Note, db: Session, user: User) -> int:
     """被邀请人自己动笔写下第一篇笔记 → 给邀请人 +10。返回本次实际到账分（0 = 没到账）。
 
     在笔记 commit 之后调用。一个人只成就一次这件事由数据库兜：动笔那一路
@@ -150,7 +156,7 @@ def credit_first_note(note: Note, db: Session, user: User) -> int:
     return _settle(db, inviter, user, None, INVITE_REWARD, "动笔首篇")
 
 
-def credit_import(db: Session, importer: User, source_note_id) -> int:
+def _credit_import(db: Session, importer: User, source_note_id) -> int:
     """有人把某一篇转存进自己库里 → 给那篇的作者 +1。
 
     口径（2026-10-01 改定）：**不同用户各算一次，同一个用户对同一篇只算一次**。
@@ -190,3 +196,33 @@ def credit_import(db: Session, importer: User, source_note_id) -> int:
         logger.info("这个人已经因为这篇得过分，未到账：源笔记=%s 作者=%s 来人=%s", src.id, inviter.id, importer.id)
         return 0
     return _settle(db, inviter, importer, src.id, IMPORT_REWARD, "转存")
+
+
+def credit_first_note(note: Note, db: Session, user: User) -> int:
+    """公开入口：结不到账绝不能把一个已经存好的笔记回成 500。判据在 `_credit_first_note`。"""
+    return _never_breaks(db, "动笔首篇", _credit_first_note, note, db, user)
+
+
+def credit_import(db: Session, importer: User, source_note_id) -> int:
+    """公开入口：同上，判据在 `_credit_import`。"""
+    return _never_breaks(db, "转存", _credit_import, db, importer, source_note_id)
+
+
+def _never_breaks(db: Session, what: str, fn, *args) -> int:
+    """只兜 `IntegrityError` 是不够的。
+
+    API 与 worker 共用同一个 SQLite 文件，`database is locked` 是 OperationalError：
+    那时候笔记已经 commit 过了，让它冒到路由上就是回 500——用户重试会多存一份，
+    而那笔分因为名下条数变了再也结不出来。所以这里把一切异常都收在"这笔没结成"，
+    原文只进日志。**笔记存好了这件事，比分数到没到账重要。**
+    """
+    try:
+        return fn(*args)
+    except IntegrityError:
+        db.rollback()
+        logger.info("这一笔已被并发的那趟记走，未重复到账：%s", what)
+        return 0
+    except Exception:
+        db.rollback()
+        logger.exception("MIND 结算失败（笔记已保存，不影响用户）：%s", what)
+        return 0

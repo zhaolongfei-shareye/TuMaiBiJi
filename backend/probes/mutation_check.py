@@ -68,11 +68,12 @@ MUTATIONS = [
         "tests/test_quota_and_invite.py::Test转存加分",
     ),
     (
-        "N2 「同一篇只挣一次」的索引没建上（最后一道闸没了）",
+        "N2 「这篇 × 这个人只算一次」的索引没建上（最后一道闸没了）",
         "app/models/invitation.py",
         "        Index(\n"
-        "            \"ux_invitations_one_reward_per_source_note\",\n"
+        "            \"ux_invitations_import_once_per_pair\",\n"
         "            \"source_note_id\",\n"
+        "            \"invitee_id\",\n"
         "            unique=True,\n"
         "            sqlite_where=text(\"source_note_id IS NOT NULL\"),\n"
         "        ),\n",
@@ -83,18 +84,30 @@ MUTATIONS = [
     # 的唯一索引本来就把多个 NULL 当成互不相等，去掉这个 where 子句行为一字不变，
     # 打了等于没打。真正的并发防线是 _settle 里那个 except，由下面 N3 盯。
     (
-        "N4 转存不看「是不是新用户」，老用户抄一篇也照给钱",
+        "N4 转存的去重只看「这篇」不看「这个人」（第二个人再转存就结不出账）",
         "app/services/quota.py",
-        "    if src is None or not _first_note_of(db, importer):\n",
-        "    if src is None:\n",
+        "        .filter(Invitation.source_note_id == src.id, Invitation.invitee_id == importer.id)\n",
+        "        .filter(Invitation.source_note_id == src.id)\n",
         "tests/test_quota_and_invite.py::Test转存加分",
     ),
     (
         "N5 转存不判「作者就是转存人自己」",
         "app/services/quota.py",
-        "    if author_pk == importer.id:\n        return 0\n",
+        "    if author_pk == importer.id:\n"
+        "        # 自己转自己那篇不算：转存入口本来就只给别人看的那篇才出现，\n"
+        "        # 但接口能直接被调，所以这一刀在这里补上。\n"
+        "        return 0\n",
         "",
         "tests/test_quota_and_invite.py::Test转存加分",
+    ),
+    (
+        "N8 余额又改回「读出来在 Python 里加完写回去」",
+        "app/services/quota.py",
+        "    db.execute(\n"
+        "        update(User).where(User.id == inviter.id).values(quota_bonus=User.quota_bonus + reward)\n"
+        "    )\n",
+        "    inviter.quota_bonus = int(inviter.quota_bonus or 0) + reward\n",
+        "tests/test_quota_and_invite.py::Test审查补的两条",
     ),
     (
         "N7 结转账目不兜索引异常（真并发撞上来时整条转存报 500）",
@@ -102,6 +115,13 @@ MUTATIONS = [
         "    except IntegrityError:\n",
         "    except ValueError:\n",
         "tests/test_quota_and_invite.py::Test转存加分::test_并发撞索引那一趟只回零不把转存弄失败",
+    ),
+    (
+        "N9 兜底外壳不再吞非索引异常（database is locked 会冒到接口上）",
+        "app/services/quota.py",
+        "    except Exception:\n",
+        "    except ZeroDivisionError:\n",
+        "tests/test_quota_and_invite.py::Test审查补的两条",
     ),
     (
         "A10 补报端点恒回 applied=true",
@@ -148,8 +168,8 @@ MUTATIONS = [
     (
         "S3 公开闸不看这条笔记有没有分享出去（白烧配额）",
         "app/api/routes/notes.py",
-        "        if active_shares(db, db_note.id):\n",
-        "        if True:\n",
+        "        if not now_private and active_shares(db, db_note.id):\n",
+        "        if not now_private:\n",
         "tests/test_share_snapshot.py",
     ),
     (

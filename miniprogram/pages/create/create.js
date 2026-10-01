@@ -247,10 +247,14 @@ Page({
   },
 
   clearUrl() {
+    if (this.data.busy) return
     this.setData({ urlInput: '', urlHint: 'idle' })
   },
 
   pasteUrl() {
+    // 忙态下这两条不改 urlInput：清空会让"这一档还没东西"重新成立，
+    // 三步指引在提炼进行中冒出来，而下面那颗按钮已经是灰的。
+    if (this.data.busy) return
     const { lang } = this.data
     wx.getClipboardData({
       success: (res) => {

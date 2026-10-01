@@ -24,7 +24,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import Session
 
 from app.api.routes import ingest as ingest_route
 from app.core.auth import _create_token
@@ -674,23 +675,30 @@ class Test转存加分:
         db.commit()
         assert db.query(Invitation).filter(Invitation.source_note_id.is_(None)).count() == 1
 
-    def test_并发撞索引那一趟只回零不把转存弄失败(self, db):
-        """同步路由跑在线程池里，两个人同时转存同一篇是真会撞上的；
-        同一个人连点两下也会撞。那一趟必须"这笔没结成"就算了，
-        不能让一个数据库异常冒到用户面前变成 500。
+    def test_索引真撞上来那一趟只回零不把请求弄失败(self, db):
+        """动笔那一路没有"先查一遍"，那条部分唯一索引是它唯一的闸——所以这里真撞索引。
+
+        原来这一条是拿转存那路测的，而它给的 `source_note_id=5` 在这个库里根本不存在：
+        `_credit_import` 第一句 `src is None` 就返回 0 了，索引一次都没碰过。
+        变异检查把兜底那个 except 摘掉，这条照样绿——2026-10-01 全面审查抓出来的假绿。
         """
-        author = mk_user(db, "race-author", bonus=quota.IMPORT_REWARD)
-        friend = mk_user(db, "race-friend")
-        db.add(Invitation(
-            inviter_id=author.id, invitee_id=friend.id, source_note_id=5, reward=quota.IMPORT_REWARD,
-        ))
+        inviter = mk_user(db, "idx-inviter")
+        invitee = mk_user(db, "idx-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        first = Note(user_id=str(invitee.id), title="他名下的第一条", source_type="manual")
+        db.add(first)
+        db.commit()
+        # 台账里先躺着一笔"这个人已经替别人成就过"（源笔记为空），换个人也挡：
+        # 索引钉的是 invitee_id，不是 inviter_id。
+        db.add(Invitation(inviter_id=999999, invitee_id=invitee.id, source_note_id=None, reward=quota.INVITE_REWARD))
         db.commit()
         db.expire_all()
 
-        again = quota.credit_import(db, db.get(User, friend.id), 5)
-        assert again == 0
+        assert quota.credit_first_note(db.get(Note, first.id), db, db.get(User, invitee.id)) == 0
+
         db.expire_all()
-        assert db.get(User, author.id).quota_bonus == quota.IMPORT_REWARD  # 没加第二次
+        assert db.get(User, inviter.id).quota_bonus == 0, "撞索引那一趟不该把分加上"
         assert db.query(Invitation).count() == 1
 
 
@@ -752,3 +760,57 @@ class Test不泄漏:
         text = client.get("/api/user/quota", headers=hdr(u)).text
         assert u.openid not in text
         assert "openid" not in text
+
+
+class Test审查补的两条:
+    """2026-10-01 全面审查查出来的两条，都是"看着对、并发下错"那一类。
+
+    ① 余额原来是 `inviter.quota_bonus = 读出来 + reward` 再写回：两笔并发各自读到旧值，
+       后写的把先写的覆盖掉——台账记了 6 行而余额只加 1。唯一索引只保证台账不重复，
+       保证不了余额不丢。
+    ② 原来只兜 IntegrityError。API 与 worker 共用同一个 SQLite 文件，
+       `database is locked` 是 OperationalError，它会冒到路由上把一个已经存好的
+       笔记回成 500。
+    """
+
+    def test_两笔并发各自读到旧余额_一笔都不能丢(self, db):
+        author = mk_user(db, "lost-author")
+        first = mk_user(db, "lost-friend-1")
+        second = mk_user(db, "lost-friend-2")
+        note = Note(user_id=str(author.id), title="一篇被很多人转存的笔记", source_type="manual")
+        db.add(note)
+        db.commit()
+
+        s1, s2 = Session(engine), Session(engine)
+        try:
+            # 交错点：两个会话都在对方提交之前把作者读进自己的 identity map，
+            # 于是两边手里那份 bonus 都还是 0。
+            a1, a2 = s1.get(User, author.id), s2.get(User, author.id)
+            assert a1.quota_bonus == 0 and a2.quota_bonus == 0
+            assert quota.credit_import(s1, s1.get(User, first.id), note.id) == 1
+            assert quota.credit_import(s2, s2.get(User, second.id), note.id) == 1
+            s1.commit()
+            s2.commit()
+        finally:
+            s1.close()
+            s2.close()
+
+        db.expire_all()
+        assert db.get(User, author.id).quota_bonus == 2, "并发的那一笔被覆盖掉了（余额不能读出来加完再写回去）"
+        assert db.query(Invitation).count() == 2
+
+    def test_结算抛非唯一约束的错也不冒到接口上(self, db, monkeypatch):
+        author = mk_user(db, "boom-author")
+        friend = mk_user(db, "boom-friend")
+        note = Note(user_id=str(author.id), title="那篇", source_type="manual")
+        db.add(note)
+        db.commit()
+
+        def locked(*args, **kwargs):
+            raise OperationalError("SELECT ...", {}, Exception("database is locked"))
+
+        monkeypatch.setattr(quota, "_credit_import", locked)
+        assert quota.credit_import(db, friend, note.id) == 0
+        db.expire_all()
+        assert db.get(User, author.id).quota_bonus == 0
+        assert db.query(Invitation).count() == 0

@@ -13,7 +13,7 @@ class User(Base):
     avatar_url = Column(String(500), nullable=True)
     language = Column(String(10), default="zh")
     wallpaper = Column(String(50), default="default")
-    # 邀请奖励攒下的额外篇数，篇数上限 = BASE_QUOTA + quota_bonus，不单独存"上限"
+    # 邀请与转存攒下的加分；MIND = BASE_QUOTA + 这一列。笔记不限量，这一列不是任何上限的一部分
     quota_bonus = Column(Integer, nullable=False, default=0, server_default="0")
     # 谁把这个账号邀进来的。只有 id、没有内容；归因发生在登录，到账发生在第一篇笔记
     invited_by = Column(Integer, nullable=True, index=True)

@@ -108,7 +108,6 @@ const i18n = {
     feedbackEmail: '反馈邮箱',
     privatePassword: '私密密码',
     privatePasswordHint: '请输入 6 位数字密码',
-    privatePasswordSet: '密码已设置',
     privatePasswordTitle: '输入密码',
     privatePasswordOk: '确定',
     privatePasswordWrong: '密码不正确',
@@ -121,14 +120,13 @@ const i18n = {
     privatePasswordNew: '新密码（6 位数字）',
     privatePasswordAgain: '再输一次',
     privatePasswordMismatch: '两次输入不一样，没保存',
-    privatePasswordNotSet: '未设置',
     privatePasswordReset: '重置密码',
     privatePasswordResetBody: '重置后这串密码就作废，要重新输两遍设一条新的。',
     privatePasswordResetConfirm: '重置',
     privatePasswordResetDone: '已重置，请重新设置',
     privatePasswordSaved: '密码已设好',
     /* ---------- 「我的」改版 v10：药丸、留白区那两行、脑力值、重置那道生物识别门 ----------
-       脑力值 = 100 + 服务端给的 bonus，数字仍然只从 /api/user/quota 读，界面不自己算。 */
+       脑力值只读服务端 /api/user/quota 的 mind 一个数（=100 起始 + 加分），界面不参与算。 */
     pillSettings: '设置',
     pillAbout: '关于',
     meGreeting: '你好！我是图麦笔记',
@@ -146,7 +144,6 @@ const i18n = {
     // 额度与注销：数字全部来自 /api/user/quota 和 /api/user/deactivate，
     // 模板里不写死 100 和 10（{n} 由服务端给的 reward_each 填）。
     // 09-24 定：动笔写第一篇、或把别人那篇转存进自己库里，两条都算"带来一个新写作者"。
-    quotaLabel: '笔记额度',
     shareRewardN: '新写作者 +{n}',
     deleteAccount: '注销账号',
     deleteTitle: '注销账号',
@@ -376,7 +373,6 @@ const i18n = {
     feedbackEmail: 'Feedback email',
     privatePassword: 'Private Password',
     privatePasswordHint: 'Enter a 6-digit password',
-    privatePasswordSet: 'Password set',
     privatePasswordTitle: 'Enter Password',
     privatePasswordOk: 'OK',
     privatePasswordWrong: 'Wrong password',
@@ -388,7 +384,6 @@ const i18n = {
     privatePasswordNew: 'New password (6 digits)',
     privatePasswordAgain: 'Type it again',
     privatePasswordMismatch: 'The two entries differ — not saved',
-    privatePasswordNotSet: 'Not set',
     privatePasswordReset: 'Reset password',
     privatePasswordResetBody: 'Resetting voids the current code. Set a new one by typing it twice.',
     // 英文确认键只能 3-4 个字符：微信 showModal 的 confirmText 超 4 会被静默截断
@@ -410,7 +405,6 @@ const i18n = {
     slogan: 'Turn what you read into useful notes',
     shareToFriend: 'Share with friends',
     shareCardTitle: 'TuMaiBiJi | Turn what you read into useful notes',
-    quotaLabel: 'Note quota',
     shareRewardN: '+{n} per new writer',
     deleteAccount: 'Delete account',
     deleteTitle: 'Delete account',
@@ -464,11 +458,11 @@ const i18n = {
     clear: 'Clear',
     startExtract: 'Extract',
     guide1T: 'Add it',
-    guide1D: 'A link or a screenshot — WeChat, Rednote, Weibo, Zhihu',
+    guide1D: 'A link or a screenshot from any app',
     guide2T: 'AI extracts',
-    guide2D: 'It reads the text inside images too: summary and key points',
+    guide2D: 'It reads text in images: summary and key points',
     guide3T: 'Keep it',
-    guide3D: 'Searchable, categorised, exportable as a card',
+    guide3D: 'Searchable, or export as a card',
     busyExtract: 'Extracting…',
     busySave: 'Saving…',
     linkDesc: 'WeChat articles / Web pages',

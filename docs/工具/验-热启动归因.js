@@ -244,37 +244,33 @@ async function main() {
     check('app 层 _reportInviter 真打成功后把本地清掉了', flow.put > 0 && !flowAfter.left,
       { put: flow.put, left: flowAfter.left })
 
-    // 「我的」页：额度那一行是 used/limit 两半，右边那句是服务端认账的兑换。
-    // 这一组只有部署了 100+10 那版服务端之后才可能全绿（现网回什么，界面就写什么）。
-    console.log('\n=== 9. 「我的」页那一行额度（数字来自 /api/user/quota，不是界面写死）===')
+    // 「我的」页那一枚 MIND：数字只有一个来源——接口回的 mind，界面不参与相加。
+    // 1.9.0 之前这一格是「已用/上限」两半；10-01 拆了闸门之后"上限"不再拦任何人，
+    // 界面只剩这一个数，所以这里改成拿页面那个数和接口那个数直接对。
+    console.log('\n=== 9. 「我的」页那枚 MIND（数字来自 /api/user/quota 的 mind）===')
     await mp.switchTab('/pages/me/me')
     await sleep(3000)
-    const me = await mp.evaluate(() => {
-      const pages = getCurrentPages()
-      const p = pages[pages.length - 1]
+    const me = await mp.evaluate(() => new Promise((resolve) => {
+      const p = getCurrentPages().slice(-1)[0]
       const d = p.data || {}
-      const q = p.quota || null
-      return {
-        route: p.route,
-        quotaText: d.quotaText,
-        shareValue: d.shareValue,
-        used: q && q.used,
-        limit: q && q.limit,
-        rewardEach: q && q.reward_each,
-        keys: q && Object.keys(q).sort().join(','),
-      }
-    })
-    console.log('  ', JSON.stringify(me))
+      wx.request({
+        url: 'https://api.agentsbin.cn/wtsj/api/user/quota',
+        header: { Authorization: 'Bearer ' + (getApp().globalData.token || '') },
+        success: (r) => resolve({ route: p.route, scoreText: d.scoreText, shareValue: d.shareValue, q: r.data }),
+        fail: (e) => resolve({ route: p.route, scoreText: d.scoreText, fail: e.errMsg }),
+      })
+    }))
+    console.log('  ', JSON.stringify({ scoreText: me.scoreText, keys: me.q && Object.keys(me.q).sort() }))
     check('切到了「我的」页', /\/me$/.test(me.route || ''), me.route)
-    check('那一行是「已用/上限」而不是留空（后端 /api/user/quota 通了）',
-      /^\d+\/\d+$/.test(me.quotaText || ''), me.quotaText)
-    check('界面上那两个数就是接口给的那两个（页面没自己算 100）',
-      me.quotaText === `${me.used}/${me.limit}`, { quotaText: me.quotaText, used: me.used, limit: me.limit })
-    check('接口回的是带上限那一套，而且没有"还剩几次"（次数不封顶，回它就是假话）',
-      me.keys === 'base,bonus,categories,invites_rewarded,limit,remaining,reward_each,used', me.keys)
+    check('那一枚是数字而不是空（后端 /api/user/quota 通了）', /^\d+$/.test(String(me.scoreText || '')), me.scoreText)
+    check('界面上那个数就是接口回的 mind（页面没自己算 100 + bonus）',
+      String((me.q && me.q.mind) || '') === String(me.scoreText), { scoreText: me.scoreText, mind: me.q && me.q.mind })
+    check('接口回的是不限量那一套十个字段，而且没有"还剩几次"（次数不封顶，回它就是假话）',
+      !!me.q && Object.keys(me.q).sort().join(',') === 'base,bonus,categories,import_each,invites_rewarded,limit,mind,remaining,reward_each,used',
+      me.q && Object.keys(me.q).sort().join(','))
     check('分享那一行那句承诺用的是服务端给的奖励数',
-      !!me.shareValue && me.shareValue.includes(String(me.rewardEach)),
-      { shareValue: me.shareValue, reward_each: me.rewardEach })
+      !!me.shareValue && me.shareValue.includes(String(me.q && me.q.reward_each)),
+      { shareValue: me.shareValue, reward_each: me.q && me.q.reward_each })
     await mp.screenshot({ path: SHOT + '/15-我的-额度.png' })
     console.log('  截图：' + SHOT + '/15-我的-额度.png')
 

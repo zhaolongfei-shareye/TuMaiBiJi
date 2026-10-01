@@ -33,15 +33,22 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     for (const r of await me.$$('.menu-item')) labels.push((await r.text()).replace(/\s+/g, ''))
     const iWall = labels.findIndex((x) => x.startsWith('外观设置'))
     const iPwd = labels.findIndex((x) => x.startsWith('私密密码'))
-    ck('私密密码那一行紧跟在外观设置下面', iPwd === iWall + 1, `外观=${iWall} 密码=${iPwd}`)
-    ck('那一行右边写着设没设', /密码已设置|未设置/.test(labels[iPwd] || ''), labels[iPwd])
+    const iCat = labels.findIndex((x) => x.startsWith('分类管理'))
+    const iDel = labels.findIndex((x) => x.startsWith('注销账号'))
+    // 判据跟着 v10 定稿改：那一排的顺序是效果图拍的（外观→分类→私密→注销），
+    // 09-30 那条"紧跟外观设置"是被 11092b2 换外壳作废的旧尺子，不动代码迁就它。
+    ck('设置那一排按 v10 定稿排：外观 → 分类 → 私密 → 注销',
+      iWall > -1 && iCat === iWall + 1 && iPwd === iCat + 1 && iDel === iPwd + 1,
+      labels.slice(iWall, iDel + 1).join('|'))
+    // 1.9.0 起这一行右边只剩一枚一体 icon，设没设不再用文字说（旧判据作废，改判据不改代码）
+    ck('那一行右边不再有状态文字', !/未设置|密码已设置/.test(labels[iPwd] || ''), labels[iPwd])
     ck('关于/反馈邮箱/注销那组里不再有私密密码', !labels.slice(iPwd + 1).some((x) => x.startsWith('私密密码')))
 
     /* ---------- 两次输入的面板 ---------- */
     await (await (await me.$$('.menu-item'))[iPwd]).tap()
     await sleep(1200)
     d = await me.data()
-    ck('点那一行浮出密码面板', d.pwdPanel === true)
+    ck('点那一行就地展开', d.pwdOpen === true)
     ck('第二行小字说的是使用场景，不重复"6 位数字"',
       /内容|笔记卡片/.test(d.t.privatePasswordScene) && !/6 位/.test(d.t.privatePasswordScene),
       d.t.privatePasswordScene)
@@ -69,17 +76,17 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await (await me.$('.pwd-btn.primary')).tap()
     await sleep(900)
     d = await me.data()
-    ck('不到 6 位不保存、面板不关', d.pwdPanel === true && d.privateSet === false)
+    ck('不到 6 位不保存、面板不关', d.pwdOpen === true && d.privateSet === false)
     // 两格不一样：不发请求、第二格清空
     await me.setData({ pwd1: '135790', pwd2: '246801' })
     await (await me.$('.pwd-btn.primary')).tap()
     await sleep(900)
     d = await me.data()
-    ck('两次不一样不保存', d.pwdPanel === true)
+    ck('两次不一样不保存', d.pwdOpen === true)
     ck('不一致时第二格清空让人重输', d.pwd2 === '', `pwd2=${d.pwd2}`)
     await (await me.$('.pwd-btn.ghost')).tap()
     await sleep(800)
-    ck('取消能收掉面板', (await me.data()).pwdPanel === false)
+    ck('取消能收掉面板', (await me.data()).pwdOpen === false)
 
     /* ---------- 首页 slogan 下面那行日期 + 星期 ---------- */
     await mp.switchTab('/pages/create/create')

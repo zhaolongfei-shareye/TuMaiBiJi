@@ -126,7 +126,6 @@ Page({
         scoreText: q.mind == null ? '' : String(q.mind),
         shareValue: fmt(t('shareRewardN', lang), { n: q.reward_each }),
       })
-      this.quota = q
     } catch (err) {
       console.error('额度读取失败', err)
     }
@@ -163,9 +162,16 @@ Page({
     })
   },
 
-  onTogglePwd() {
-    const open = !this.data.pwdOpen
-    this.setData({ pwdOpen: open, pwd1: '', pwd2: '' })
+  async onTogglePwd() {
+    if (this.data.pwdOpen) {
+      this.setData({ pwdOpen: false, pwd1: '', pwd2: '' })
+      return
+    }
+    // 设没设是服务端说了算的。冷启动或 401 重登时那条读数可能要一秒多才回来，
+    // 期间点这一行会先按"未设置"画出两个输入格，读数一到 privateSet 翻转，
+    // wx:if 把整块销毁——人已经输进去的六位数字当场蒸发，界面上也不说为什么。
+    if (!this.pwdReady) await this.loadPwdStatus()
+    this.setData({ pwdOpen: true, pwd1: '', pwd2: '' })
   },
 
   onClosePwdPanel() {
@@ -201,11 +207,11 @@ Page({
   // 换不来笔记内容）。探到可用才先识别再重置；探不到就照原来的两步确认走。
   async onPwdReset() {
     const lang = this.data.lang
-    const mode = this.bioMode === undefined ? (this.bioMode = await probeBio()) : this.bioMode
+    const mode = await probeBio()
     if (!mode) {
       wx.showModal({
         title: t('privatePasswordReset', lang),
-        content: `${t('bioUnavailable', lang)}${t('privatePasswordResetBody', lang)}`,
+        content: t('bioUnavailable', lang) + (lang === 'en' ? ' ' : '') + t('privatePasswordResetBody', lang),
         confirmText: t('privatePasswordResetConfirm', lang),
         cancelText: t('cancel', lang),
         success: (res) => { if (res.confirm) this.doPwdReset() },
@@ -249,6 +255,8 @@ Page({
       this.setData({ privateSet: !!(s && s.is_set) })
     } catch (err) {
       console.error('私密密码状态读取失败', err)
+    } finally {
+      this.pwdReady = true
     }
   },
 
@@ -257,7 +265,7 @@ Page({
   // 来结账（backend/app/services/quota.py：动笔写名下第一条 +10，别人把某一转存进自己库
   // 里作者 +1；带来几个人不限、同一篇被几个人转存就算几次，但同一个人对同一篇只算一次），
   // 所以这行写的是一笔真实的兑换，不是许愿。
-  // 封面是自己排的一张 5:4 杂志版式图（assets/share-card.jpg，113KB，微信上限 128KB）：
+  // 封面是自己排的一张 5:4 杂志版式图（assets/share-card.jpg，114KB / 117,090 字节，微信上限 128KB）：
   // 不给 imageUrl 的话微信会截当前页，截到的是一屏菜单，推广位就废了。
   // 源件在 docs/design/分享图-重设计/杂志版甲-纸白.html，改字改色都从它重出，别手改 PNG。
   onShareAppMessage() {

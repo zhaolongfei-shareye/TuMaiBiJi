@@ -119,6 +119,12 @@ for name, need in (
     if need not in sql:
         print(f"  ✗ {name} 建上了但钉的不是 {need}：{sql}")
         raise SystemExit(1)
+    # WHERE 子句是这两条索引的全部意义：丢了它，动笔那条就退化成"一个人一辈子只能结一笔"，
+    # 谁先转存过就再也结不了动笔的 +10——而索引名和列名照样全对，只有这条能发现。
+    want_where = "source_note_id IS NULL" if name.endswith("first_note_per_invitee") else "source_note_id IS NOT NULL"
+    if want_where not in sql:
+        print(f"  ✗ {name} 缺部分索引的 WHERE {want_where}：{sql}")
+        raise SystemExit(1)
 if "uq_invitations_invitee" in {u["name"] or "" for u in insp.get_unique_constraints("invitations")}:
     print("  ✗ invitations 上还挂着老的 invitee_id 全局唯一——那会让同一个人动笔之后再也结不了转存")
     raise SystemExit(1)

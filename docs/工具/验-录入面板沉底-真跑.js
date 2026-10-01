@@ -23,7 +23,7 @@ const BAR_TOP_GAP = Number(/bottom:\s*(\d+)rpx/.exec(barWxss)[1])
   + Number(/\.tab-bar\s*\{[\s\S]*?height:\s*(\d+)rpx/.exec(barWxss)[1])
 
 // 报错行用真串：从 i18n 里挑这一屏真会显示的那几条中最长的一条，不自己造一句话
-const ERR_KEYS = ['pasteEmpty', 'permCamera', 'permAlbum', 'pickFailed', 'needTitle', 'taskFailed', 'taskTimeout']
+const ERR_KEYS = ['taskTimeout', 'pasteEmpty', 'permCamera', 'permAlbum', 'pickFailed', 'needTitle', 'taskFailed', 'taskTimeout']
 const longestErr = (lang) => ERR_KEYS.map((k) => i18n.t(k, lang)).reduce((a, b) => (b.length > a.length ? b : a), '')
 
 const bad = []
@@ -162,6 +162,23 @@ fs.mkdirSync(OUT, { recursive: true })
     await page.setData({ previewImages: ['/assets/share-card.jpg'] })
     await sleep(320)
     ck(`${lang} 相册选上一张图之后：指引让位，不跟缩略图抢地方`, (await geo('.guide')) === null)
+
+    /* 最坏组合：空态（指引在）+ 最长报错串（多一行）。英文说明每条比中文长一半，
+       2026-10-01 审查就是这一格量出英文相册档溢出 40rpx——报错行画到面板外，
+       正下方就是底栏。上面主循环那条 shot 用例永远铺 3 张图，测不到这个组合。 */
+    const worst = i18n.t('taskTimeout', lang)
+    for (const [seg, extra] of [['相册', { mode: 'album', lead: 'album' }], ['链接', { mode: 'url', lead: 'url', urlInput: '' }]]) {
+      await page.setData({
+        active: seg === '相册' ? 'shot' : 'url', ...extra,
+        previewImages: seg === '相册' ? [] : undefined, errLine: worst,
+      })
+      await sleep(340)
+      const g3 = await geo('.guide'); const a3 = await geo('.acts'); const e3 = await geo('.entry-err'); const p3 = await geo('.panel')
+      ck(`${lang} ${seg}空态 + 最长报错串：指引、按钮行、报错行全在面板里`,
+        !!g3 && !!e3 && e3.bottom <= p3.bottom + 1 && a3.bottom <= p3.bottom + 1,
+        `指引 ${(g3 && g3.h * 750 / win.windowWidth).toFixed(0)}rpx　报错底 ${(e3.bottom * 750 / win.windowWidth).toFixed(0)} / 面板底 ${(p3.bottom * 750 / win.windowWidth).toFixed(0)}rpx`)
+    }
+    await page.setData({ errLine: '' })
   }
 
   // 收起态：贴底那条规则整个不生效，条子回到流里坐在 62vh 那段留白上。

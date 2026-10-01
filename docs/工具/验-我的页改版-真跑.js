@@ -84,6 +84,17 @@ const gotoMe = async (mp) => {
   throw new Error('进不了 /pages/me/me')
 }
 
+// 这一页的文字全跟着 `app.globalData.userInfo.language` 走，而这个字段是登录时从服务端
+// 带回来的。上一把尺子（验-热启动归因.js）真登录过一次，那个测试号在服务端存的是 'en'，
+// 于是这一整批中文判据会凭空红三条——和下面那条 tab 状态一样是顺序依赖的假红，不是代码坏了。
+// 所以开跑前把语言钉成 zh，收尾原样还回去。
+const readLang = (mp) => mp.evaluate(() => getApp().globalData.userInfo?.language || 'zh')
+const pinLang = (mp, lang) => mp.evaluate((l) => {
+  const app = getApp()
+  app.globalData.userInfo = Object.assign({}, app.globalData.userInfo, { language: l })
+  return app.globalData.userInfo.language
+}, lang)
+
 ;(async () => {
   if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true })
   let mp
@@ -93,6 +104,8 @@ const gotoMe = async (mp) => {
   }
   if (!mp) { console.log('✗ 连不上 9431，先跑 cli auto'); process.exit(1) }
 
+  const originalLang = await readLang(mp)
+  await pinLang(mp, 'zh')
   let page = await gotoMe(mp)
   const originalProfile = await readProfileRaw(mp)
   await seedProfile(mp, { name: '', slogan: '' })
@@ -234,6 +247,9 @@ const gotoMe = async (mp) => {
   ck('第二行换成用户填的「一句话」', d.sloganText === '读过的都会忘，记下来的才归我', d.sloganText)
   await mp.screenshot({ path: path.join(OUT, '03-头部-用户昵称与口号.png') })
   await putProfile(mp, originalProfile)   // 复原：别把尺子造的昵称留在这台手机上
+  // 语言钉回进场时那个值。中途崩了这份钉不回，但崩了留下的也是 zh——后面几把尺子
+  // 吃的正是中文，所以这条只是"不留下我的痕迹"，不是"不留就红"。
+  await pinLang(mp, originalLang)
 
   console.log(bad.length ? `\n✗ ${bad.length} 条不过：${bad.join('、')}` : '\n✓ 全过')
   await mp.close()
