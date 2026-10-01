@@ -17,12 +17,13 @@
 """
 import logging
 
-from sqlalchemy import update
+from sqlalchemy import distinct, func, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.invitation import Invitation
 from app.models.note import Note
+from app.models.share import Share
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,40 @@ def rewarded_invites(db: Session, inviter_id: int) -> int:
     )
 
 
+def shared_notes(db: Session, user: User) -> int:
+    """当前**公开中**的笔记有几篇（首页那一列「分享」）。
+
+    站长 10-01 定这句："数按照真实来算，避免用户刷量"。不数"累计发出过几张码"——
+    同一篇笔记开→撤→开就能把那个数自己刷大，而公开状态是个状态量，撤掉的码不该还算在脸上。
+    只认 `is_active`：分享可见性那一轮已经定死"公开不公开只由这一列说话"。
+    按笔记去重，一篇一张有效码是数据库索引保证的，去重只是把这层语义写在这句里。
+    """
+    return (
+        db.query(func.count(distinct(Share.note_id)))
+        .filter(Share.user_id == str(user.id), Share.is_active.is_(True))
+        .scalar()
+        or 0
+    )
+
+
+def saved_by_users(db: Session, user: User) -> int:
+    """有**多少个不同的人**把你名下的笔记存进了他们自己的库（首页那一列「收藏」）。
+
+    台账里的 `inviter_id` 就是那篇的作者（`credit_import` 结那 +1 分时就是这么指的），
+    所以这里不用去 join notes——何况 `source_note_id` 故意不带外键：源笔记后来被删掉，
+    不该把"曾经有人收藏过你"这笔账一起带走。
+
+    按人去掉重：同一个人存了你 10 篇只算 1 个人在收藏，不然一个人上头就能顶十个人。
+    挡不住的还是注册小号互转（微信 openid 人手一个），和 +1 分那条同一个 posture。
+    """
+    return (
+        db.query(func.count(distinct(Invitation.invitee_id)))
+        .filter(Invitation.inviter_id == user.id, Invitation.source_note_id.isnot(None))
+        .scalar()
+        or 0
+    )
+
+
 def quota_view(user: User, db: Session) -> dict:
     """`limit` / `remaining` 是留给线上老客户端的：1.5.0 那一版「我的」读的是
     `${used}/${limit}`，字段删了那一行会显示成 "37/undefined"。闸门已经撤了，
@@ -75,6 +110,10 @@ def quota_view(user: User, db: Session) -> dict:
         "reward_each": INVITE_REWARD,
         "import_each": IMPORT_REWARD,
         "invites_rewarded": rewarded,
+        # 首页顶部那三列的后两列（第一列就是上面的 used）。两个都是状态量 / 按人去重，
+        # 不给"自己开关一下就能 +1"留口子。
+        "shares_active": shared_notes(db, user),
+        "saved_by_users": saved_by_users(db, user),
     }
 
 

@@ -5,6 +5,7 @@
 // 会造一条临时笔记（分类=旅游）用来验圆点颜色，跑完删掉，不动他原有那三条。
 // 跑法：NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-私密密码与分类色-真跑.js
 const automator = require('miniprogram-automator')
+const lang = require('./尺子语言钉.js')
 const fs = require('fs')
 const path = require('path')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -21,6 +22,10 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
 ;(async () => {
   if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true })
   const mp = await automator.connect({ wsEndpoint: 'ws://localhost:9431' })
+  // 这一把通篇钉中文串，而语言是登录时从服务端带回的：上一把真登录的尺子会把测试号的 en
+  // 带进来，那 iPwd 就找成 -1、下面直接崩在 undefined.tap() 上。开跑前钉成 zh，收尾还回去。
+  const langBefore = await lang.read(mp)
+  await lang.pin(mp, 'zh')
   let tempNoteId = null
   try {
     /* ---------- 「我的」那一页 ---------- */
@@ -176,6 +181,7 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
         })
       }), API, tempNoteId).then((code) => console.log(`— 临时笔记已删（HTTP ${code}）`)).catch((e) => console.error('删临时笔记失败', e))
     }
+    try { await lang.pin(mp, langBefore) } catch (e) { /* 可能已经断了 */ }
     await mp.disconnect()
   }
   console.log(`\n${bad.length ? '未通过 ' + bad.length + ' 条：' + bad.join(' / ') : '全部通过'}（截图 → ${OUT}）`)

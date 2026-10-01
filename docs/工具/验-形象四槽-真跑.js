@@ -12,6 +12,7 @@
 // 跑完 mp.close() 会占掉端口，别在站长真机调试时跑。
 // 这支只动本机 storage 和本机 USER_DATA_PATH 里那几个 ruler-slot-*.jpg，不碰后端、不碰账号。
 const automator = require('miniprogram-automator')
+const lang = require('./尺子语言钉.js')
 
 const PORT = process.env.MP_PORT || 9431
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -131,6 +132,10 @@ async function gotoProfile(mp) {
     try { mp = await automator.connect({ wsEndpoint: `ws://localhost:${PORT}` }) } catch (e) { await sleep(12000) }
   }
   if (!mp) throw new Error(`连不上自动化端口，先跑 cli auto --auto-port ${PORT}`)
+  // 这一把通篇钉中文串（「删掉」「返回」、正文那两句），而语言是登录时从服务端带回的——
+  // 上一把真登录的尺子会把测试号的 en 带进来，那就是一次凭空红。开跑前钉成 zh，收尾还回去。
+  const langBefore = await lang.read(mp)
+  await lang.pin(mp, 'zh')
 
   try {
     // ---------- ① 空态 ----------
@@ -319,6 +324,7 @@ async function gotoProfile(mp) {
     ck('列表页头部铺的是勾了「背景」那一张（第 1 格），不是勾「卡片」的第 2 格',
       !!hd.bgSrc && /ruler-slot-0\.jpg$/.test(hd.bgSrc), hd.bgSrc)
   } finally {
+    try { await lang.pin(mp, langBefore) } catch (e) { /* 可能已经断了 */ }
     try { await disarmModal(mp) } catch (e) { /* 可能已经断了 */ }
     try { await clearSlots(mp) } catch (e) { console.error('收尾清理没做成', e) }
     try { await mp.close() } catch (e) { /* 已经断了 */ }

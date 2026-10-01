@@ -159,11 +159,14 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     // 这一组必须在收起态量：展开那一行也吃同一条背景规则，但脚注里另有一枚 .dt。
     const rowBg = await styleOf(page, '.note-row', 'background-color')
     const wantGlass = tokenOf(w, 'bg-card-glass')
-    ck(`${label}：横条底色 = 本主题 --bg-card-glass（95% 那一档，不再是实色卡底）`,
+    ck(`${label}：横条底色 = 本主题 --bg-card-glass（v12 起是 85% 那一档）`,
       near(rgbOf(rowBg), anyRgb(wantGlass), 2), `${rowBg} vs ${wantGlass}`)
+    // 模糊那一层 10-01 下午整块撤了：它把"透出那 5%"摊成"整块发灰"，站长要的是淡淡的图影。
+    // 这条判据因此反过来钉"没有 blur"——留着原来那条"必须挂上 blur"就是拿旧尺子量新代码。
     const glassEl = await page.$('.note-row')
     const bf = glassEl && await glassEl.style('backdrop-filter')
-    ck(`${label}：横条真挂了背景模糊（只调透明度不叫毛玻璃）`, /blur\(/.test(String(bf)), String(bf))
+    ck(`${label}：背景模糊确实撤掉了（不是只改了透明度那一半）`,
+      !/blur\(/.test(String(bf)), String(bf))
     const dtPx = parseFloat(await styleOf(page, '.note-row .dt', 'font-size'))
     const tiPx = parseFloat(await styleOf(page, '.note-row .row-title', 'font-size'))
     ck(`${label}：日期比标题小一档（收进 --fs-meta 24rpx，原来它跟标题同为 16px≈31rpx）`,
@@ -223,12 +226,12 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
       b && `左 ${b[0]} 右 ${b[2]} 离底 ${Math.round(s.image_rpx[1] - b[3])}（高 ${Math.round(b[3] - b[1])} 只作记录）`)
   }
 
-  // ---------- 页头那三个数：分隔符得是"折不掉"的那种空格 ----------
-  // 10-01 站长真截图：英文那档三段糊成 "Week: 1|Month: 0|Total: 4"。模拟器里两个半角空格
-  // 是照算宽度的（实测双空格串与整串同宽 133.2px、无空格版 117.7px），真机却把它折成一个——
-  // 所以这条判据钉不了"屏幕上开不开"，只能钉送进渲染器的那串字用的是 U+00A0：它不参与空白折叠。
+  // ---------- 头部那三列（v12）：中英两态都要对得上服务端的键 ----------
+  // 原来这一节钉的是「本周｜本月｜总数」那一行字符串（连同 U+00A0 那条空白折叠判据）。
+  // v12 把那一行整个撤了、换成三列状态量，判据跟着换——不留旧尺子去量新东西。
   const langBefore = await mp.evaluate(() => getApp().globalData.userInfo?.language || 'zh')
-  for (const [lg, sep, name] of [['zh', '　|　', '中文'], ['en', '\u00A0\u00A0|\u00A0\u00A0', '英文']]) {
+  for (const [lg, names, name] of [['zh', ['笔记', '分享', '收藏'], '中文'],
+    ['en', ['Notes', 'Shared', 'Saved'], '英文']]) {
     await mp.evaluate((l) => {
       const a = getApp()
       a.globalData.userInfo = Object.assign({}, a.globalData.userInfo, { language: l })
@@ -236,23 +239,43 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     const sp = await enter('/pages/index/index')
     await sleep(4500)
     const sd = await sp.data()
-    const txt = String(sd.statsText || '')
-    ck(`${name}那三个数：分隔符是折不掉的那一档（${name === '英文' ? 'U+00A0' : '全角空格'}）`,
-      txt.includes(sep), JSON.stringify(txt))
-    ck(`${name}那三个数：三段都还在（换分隔符没把谁吃掉）`,
-      ['statWeek', 'statMonth', 'statTotal'].every((k) => txt.includes(i18n.t(k, lg))), txt)
-    const sm = await mp.evaluate(() => new Promise((res) => {
-      wx.createSelectorQuery().select('.page-stats').boundingClientRect()
-        .select('.page-title').boundingClientRect().exec((r) => res({ stats: r[0], title: r[1] }))
+    const st = sd.stats || []
+    ck(`${name}那三列：标签就是字典里那三个，顺序是笔记→分享→收藏`,
+      st.map((x) => x.l).join('|') === names.join('|'), JSON.stringify(st))
+    ck(`${name}那三列：旧的那行「本周｜本月」整个不在了（data 里没有 statsText、树上没有 .page-stats）`,
+      sd.statsText === undefined && !(await sp.$('.page-stats')) && !(await sp.$('.page-title')),
+      `statsText=${typeof sd.statsText}`)
+    // 界面那三个数必须就是 /api/user/quota 回的那三个，客户端一个都不自己算。
+    // 后端还没部署到带这两个字段的版本时读到的是 undefined——那一格该画 '—'（不画 0，
+    // 0 是假话），所以这里比的是"字段是数字就等数字，不是数字就等那条横线"。
+    // token 不在页面 data 里，它在 app.globalData——从那儿取才是真链路的那把钥匙
+    const q = await mp.evaluate(() => new Promise((res) => {
+      const tok = getApp().globalData.token || ''
+      wx.request({
+        url: 'https://api.agentsbin.cn/wtsj/api/user/quota',
+        header: { Authorization: 'Bearer ' + tok },
+        success: (r) => res(r.data || { err: '空响应' }), fail: (e) => res({ err: e.errMsg }),
+      })
     }))
-    ck(`${name}那三个数：没顶到标题底下去（两块横向不相交）`,
-      !!sm.stats && !!sm.title && sm.stats.left >= sm.title.right - 1,
-      sm.stats && `数块左沿 ${sm.stats.left.toFixed(1)} / 标题右沿 ${sm.title.right.toFixed(1)}`)
+    // 数字与占位符两种值混在同一格里，比较必须两边都归成字符串：界面存的是 number 4，
+    // want() 回的是 '4'，直接 === 就是一条永远红的判据。
+    const want = (v) => (typeof v === 'number' && isFinite(v) ? String(v) : '—')
+    const qf = [q.used, q.shares_active, q.saved_by_users]
+    ck(`${name}那三列：三个数一一对得上接口（客户端没自己相加、没自己数列表）`,
+      !q.err && st.length === 3 && [0, 1, 2].every((i) => String(st[i].n) === want(qf[i])),
+      `界面 ${st.map((x) => x.n).join('/')}｜接口 ${qf.join('/')}${q.err ? ' ' + q.err : ''}`)
   }
   await mp.evaluate((l) => {
     const a = getApp()
     a.globalData.userInfo = Object.assign({}, a.globalData.userInfo, { language: l })
   }, langBefore)
+  // 这一屏不再整页滚：文档高度必须等于视口高，多出来的都在列表那一区里
+  const doc = await mp.evaluate(() => new Promise((res) => {
+    wx.createSelectorQuery().selectViewport().scrollOffset()
+      .exec((r) => res({ h: r[0] && r[0].scrollHeight, win: wx.getWindowInfo().windowHeight }))
+  }))
+  ck('页面自己不滚（列表改在区域内滚之后，文档高就该等于视口高）',
+    !!doc.h && Math.abs(doc.h - doc.win) <= 3, `文档 ${doc.h}／视口 ${doc.win}`)
 
   // 还原：这一台模拟器原来用哪枚壁纸，量完还回去
   await mp.evaluate((raw) => {

@@ -10,6 +10,7 @@
 // 小图那一排"固定样式、不动态刷新"也是量的：先等它长定（两轮取样尺寸一致），再连点三套，
 // 比 .pick-canvas 的尺寸和名字——只有选中态的外环可以变，格子本身不许动（曾经边框加粗抖 2px）。
 const automator = require('miniprogram-automator')
+const lang = require('./尺子语言钉.js')
 const fs = require('fs')
 
 const BASE = 'https://api.agentsbin.cn/wtsj'
@@ -41,21 +42,28 @@ const txt = async (els) => {
 ;(async () => {
   fs.mkdirSync(SHOT, { recursive: true })
   const mp = await automator.connect({ wsEndpoint: 'ws://localhost:9420' })
+  // 下面那一整套期望值是中文串，而语言是登录时从服务端带回的（测试号存的是 en）。
+  // 原来这里只做一次检查、不是中文就退 4 让人手工切——现在自己钉成 zh，收尾还回去。
+  // 钉的时机必须在登录之后：app.js:102 那一句是登录回包里盖掉整个 userInfo 的，
+  // connect 完就钉等于白钉，等 token 的那几秒里已经被服务端那份 en 冲回去了。
+  let langBefore = 'zh'
   let noteId = null
   let jwt = ''
   try {
     jwt = (await wait(() => mp.evaluate(() => getApp().globalData.token || ''), 30000)) || ''
     ck('模拟器已登录', jwt.length > 30, `JWT 长度 ${jwt.length}`)
+    langBefore = await lang.read(mp)
+    await lang.pin(mp, 'zh')
     // 下面这一整套期望值全是中文串。账号停在英文态时会一次红七条（踩过），
     // 所以先量语言、不对就当场停，别让人去查根本不存在的回归。
-    const lang = await mp.evaluate(() => getApp().globalData.userInfo?.language || 'zh')
-    if (lang !== 'zh') {
-      ck('账号语言＝中文', false, `现在是 ${lang}；到新建页标题右边点「中」再跑`)
-      console.log('\n语言不是中文，这套脚本的中文期望值没有参考价值，提前结束')
+    const nowLang = await lang.read(mp)
+    if (nowLang !== 'zh') {
+      ck('账号语言＝中文', false, `现在是 ${nowLang}；钉过一遍还是它，说明中途又有登录把服务端语言带回来了`)
+      console.log('\n（理论上到不了这里：开头已经钉成 zh）')
       process.exitCode = 4
       return
     }
-    ck('账号语言＝中文', true)
+    ck('账号语言＝中文（开跑前由这把尺子自己钉的）', true)
     if (!jwt) throw new Error('没登录，后面全是空跑')
     const H = { 'content-type': 'application/json', Authorization: `Bearer ${jwt}` }
 
@@ -216,7 +224,8 @@ const txt = async (els) => {
     // 期望值从这一屏自己那份 t 里取：账号切了英文也不会把这条尺子判成假红
     const tt = await page.data('t')
     const want = [tt.pin, tt.edit, tt.delete, tt.shareAsImage].join('|')
-    ck('详情页上方一排四枚，末枚就是 shareAsImage 那颗', barBtns === want, `${barBtns} ≠ ${want}`)
+    ck('详情页上方一排四枚，末枚就是 shareAsImage 那颗', barBtns === want,
+      barBtns === want ? barBtns : `${barBtns} ≠ ${want}`)
     ck('文末不再有底部操作区', !(await page.$('.bottom-actions')))
     await mp.screenshot({ path: `${SHOT}/c6-详情页.png` })
   } catch (err) {
@@ -231,6 +240,8 @@ const txt = async (els) => {
       const dirty = (left.items || left).filter((x) => String(x.title || '').startsWith('验收-客户端'))
       ck('现网库里没留下验收垃圾', dirty.length === 0, `剩 ${dirty.length} 条`)
     }
+    // 语言钉回进场时那一份：这台模拟器上跑过的其他尺子吃的正是账号原本那个状态
+    try { await lang.pin(mp, langBefore) } catch (e) { /* 连接可能已经断了 */ }
   }
   const bad = results.filter((r) => !r.ok)
   console.log(`\n合计 ${results.length} 条，不过 ${bad.length} 条`)

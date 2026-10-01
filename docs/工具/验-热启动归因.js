@@ -265,8 +265,10 @@ async function main() {
     check('那一枚是数字而不是空（后端 /api/user/quota 通了）', /^\d+$/.test(String(me.scoreText || '')), me.scoreText)
     check('界面上那个数就是接口回的 mind（页面没自己算 100 + bonus）',
       String((me.q && me.q.mind) || '') === String(me.scoreText), { scoreText: me.scoreText, mind: me.q && me.q.mind })
-    check('接口回的是不限量那一套十个字段，而且没有"还剩几次"（次数不封顶，回它就是假话）',
-      !!me.q && Object.keys(me.q).sort().join(',') === 'base,bonus,categories,import_each,invites_rewarded,limit,mind,remaining,reward_each,used',
+    // v12 起多了两个键：shares_active（当前公开中的篇数）与 saved_by_users（收藏过你的不同人数），
+    // 首页顶部那三列就靠它们。没有"还剩几次"这一档（次数不封顶，回它就是假话）。
+    check('接口回的是不限量那一套十二个字段',
+      !!me.q && Object.keys(me.q).sort().join(',') === 'base,bonus,categories,import_each,invites_rewarded,limit,mind,remaining,reward_each,saved_by_users,shares_active,used',
       me.q && Object.keys(me.q).sort().join(','))
     check('分享那一行那句承诺用的是服务端给的奖励数',
       !!me.shareValue && me.shareValue.includes(String(me.q && me.q.reward_each)),
@@ -274,16 +276,27 @@ async function main() {
     await mp.screenshot({ path: SHOT + '/15-我的-额度.png' })
     console.log('  截图：' + SHOT + '/15-我的-额度.png')
 
-    console.log('\n=== 10. 首页冒烟（这一轮没碰首页，但上传前得确认没整体坏）===')
+    console.log('\n=== 10. 首页冒烟（v12 这一轮整个换了首页那一屏的结构）===')
     await mp.switchTab('/pages/index/index')
     await sleep(2500)
     const home = await mp.evaluate(() => {
       const p = getCurrentPages().slice(-1)[0]
       const d = p.data || {}
-      return { route: p.route, listLen: (d.list || d.notes || []).length, loadError: d.loadError || null }
+      return { route: p.route, listLen: (d.list || d.notes || []).length, loadError: d.loadError || null,
+        stats: (d.stats || []).map((x) => `${x.n}`).join('｜'),
+        keys: (d.stats || []).map((x) => x.key).join('｜'),
+        // 标签不写死中文：这一把会在第 8 节真登录一次，测试号在服务端存的是 en，
+        // 于是界面就是英文标签。比对页面自己那份 t，才既钉住顺序又钉住"用的是字典"。
+        labels: (d.stats || []).map((x) => (d.t || {})[{ notes: 'statNotes', shares: 'statShares', saved: 'statSaved' }[x.key]]).join('｜'),
+        lang: d.lang, bg: !!d.bgSrc }
     })
     console.log('  ', JSON.stringify(home))
     check('首页在且没报错', /index/.test(home.route) && !home.loadError, home)
+    check('头部那三列渲染出来了：顺序是笔记→分享→收藏，标签逐字等于页面字典那三个',
+      home.keys === 'notes｜shares｜saved' && /^\S+｜\S+｜\S+$/.test(home.stats || '')
+      && ['statNotes', 'statShares', 'statSaved'].every((k, i) => home.labels.split('｜')[i]),
+      `${home.keys} = ${home.stats}（${home.lang}）`)
+    check('图区那一段还在铺图（v12 只是收了高度，没撤掉图）', home.bg === true, home.bg)
     await mp.screenshot({ path: SHOT + '/15-首页.png' })
     console.log('  截图：' + SHOT + '/15-首页.png')
 

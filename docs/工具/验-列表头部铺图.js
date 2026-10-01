@@ -1,9 +1,11 @@
-// 笔记列表"整页铺图 + 一条笔记一个框"这一批的静态尺子（不连模拟器，纯读文件）。
+// 笔记列表"形象图 + 一条笔记一个框"这一批的静态尺子（不连模拟器，纯读文件）。
 // 跑法：node docs/工具/验-列表头部铺图.js
-// 要守的东西：① 图和新建页同一个取图口、同一个开关，这一页不再开第二个上传入口；
-// ② 图贯穿全屏，列表这一层只有行卡那一个框——不许再有第二圈描边，那是"两层框"的成因；
-// ③ 压暗那一串必须和新建页同一条；④ 关掉开关这一屏必须一字不差回到 D2；
-// ④ 界面上每一句提到这张图范围的话，都要跟着改成"首页 + 笔记页头部"。
+// 要守的东西：① 图和新建页同一个取图口，这一页不再开第二个上传入口；
+// ② v12（站长 10-01 拍）：图只守头部那一段 542，下面是一张圆角卡往上盖住它 40。
+//    09-28 那条"图贯穿全屏"到此作废，但**它真正在防的东西没作废**：一条笔记一个框——
+//    那张圆角卡可以有底色，不许有描边，否则又是框套框。所以这里钉的是 border 不出现。
+// ③ 压暗那一串仍在，只是画在 542 这一段里（不再和新建页逐字相同：那段是 100vh 的七档）。
+// ④ 界面上每一句提到这张图范围的话，都还得同时讲清首页和笔记页头部。
 const fs = require('fs')
 const path = require('path')
 
@@ -36,15 +38,22 @@ const seg = (src, sel, hint) => {
 }
 
 // ---------- 1. 结构 ----------
-ok('这一页铺了 <image> 组件（wxss 的 background-image 不认包内本地文件）',
-  /<image wx:if="\{\{bgSrc\}\}" class="page-bg" src="\{\{bgSrc\}\}" mode="aspectFill" \/>/.test(wxml))
-ok('有压暗罩那一层', /<view wx:if="\{\{bgSrc\}\}" class="page-scrim"><\/view>/.test(wxml))
+ok('图区里铺了 <image> 组件（wxss 的 background-image 不认包内本地文件）',
+  /<image wx:if="\{\{bgSrc\}\}" class="head-img" src="\{\{bgSrc\}\}" mode="aspectFill" \/>/.test(wxml))
+ok('图区里有压暗罩那一层', /class="head-scrim"><\/view>/.test(wxml))
 ok('铺图时容器带 has-bg', /\{\{bgSrc \? 'has-bg' : ''\}\}/.test(wxml))
-ok('列表被包进那一层里（铺图时靠它抬层序）',
-  /<view class="list-layer">[\s\S]*class="notes-list"/.test(wxml))
-ok('三个状态（加载/空/列表）都在这一层里，一个都没落在外面',
+ok('v12：列表在 scroll-view 里（区域内滚，不再整页滚）',
+  /<scroll-view[\s\S]{0,200}class="list"[\s\S]*?bindscrolltolower="onListToLower"/.test(wxml))
+ok('三个状态（加载/空/列表）都在这块滚动区里，一个都没落在外面',
   (wxml.match(/class="(loading|empty|notes-list)"/g) || []).length === 3
-  && wxml.indexOf('class="list-layer"') < wxml.indexOf('class="loading"'))
+  && wxml.indexOf('class="list"') < wxml.indexOf('class="loading"'))
+ok('图区 + 圆角卡 + 滚动区三块都在容器里，页面自己不滚',
+  /class="container[\s\S]*?<view class="head">[\s\S]*?<view class="sheet">/.test(wxml))
+// 判"有没有删干净"要看代码，不能连注释一起算——那条解释为什么删掉的注释里
+// 就写着这个函数名，算进来就是自己钉死自己。
+const cjsCode = cjs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+ok('取下一批挂在 scroll-view 上，Page.onReachBottom 那条已经删了（整页不滚，它永远不触发）',
+  /onListToLower\(\)/.test(cjs) && !/onReachBottom/.test(cjsCode))
 
 // ---------- 2. 取图口只有一个 ----------
 ok('取图走 poster.homeBg()，和新建页是同一个函数',
@@ -61,33 +70,33 @@ ok('导航条只在铺图时刷墨色',
 ok('墨色那一档和新建页是同一个值',
   /#181a20/.test(read('pages/create/create.js')) && /#181a20/.test(cjs))
 
-// ---------- 3. 图贯穿全屏，列表这一层不许有第二个框 ----------
-const bg = seg(wxss, '.page-bg')
-const scrim = seg(wxss, '.page-scrim')
-ok('图和罩都是 fixed（滚到哪儿都在原地，动的是卡片）',
-  /position: fixed/.test(bg) && /position: fixed/.test(scrim))
-ok('图铺满整个视口（100vh，不再是头部那一段）',
-  /height: 100vh/.test(bg) && /top: 0/.test(bg) && !/height: 700rpx/.test(bg))
-ok('罩层同高', /height: 100vh/.test(scrim))
-ok('图在 0、罩在 1（顺序不能反，否则卡片会被图盖住）',
-  /z-index: 0/.test(bg) && /z-index: 1/.test(scrim))
-// 两页压的是同一张图、同一个视口：明暗得是一个连续体，否则切 tab 时背景跳一档
-const gradOf = (src) => (/(?:^|\n)\.page-scrim\s*\{[\s\S]*?background: (linear-gradient\([^;]*\))/.exec(src) || [])[1]
-const gHere = (gradOf(wxssRaw) || '').replace(/\s+/g, ' ').trim()
-const gThere = (gradOf(createWxss) || '').replace(/\s+/g, ' ').trim()
-ok('压暗那一串和新建页逐字相同', !!gHere && gHere === gThere,
-  `${gHere.slice(0, 34)}… vs ${gThere.slice(0, 34)}…`)
-// 口径是"那个叫 .sheet 的类整个没了"，不是"不许出现 sheet 这串字母"——
-// v7 之后的浮窗类叫 .float-sheet / .tpl-sheet，跟"纸"那个类无关。
-ok('列表那一层不再自称"纸"（.sheet 这个类整个没了）',
-  !/\.sheet(?![\w-])/.test(wxml + wxssRaw),
-  (wxssRaw.match(/\.[\w-]*sheet\w*/g) || []).join(','))
-ok('列表层只剩层序，自己不画任何面（一条笔记一个框）',
-  !/(?:^|\n)\.list-layer\s*\{/.test(wxss)
-  && !/\.container\.has-bg \.list-layer\s*\{[^}]*(background|border)/.test(wxss))
-ok('头部三块 + 那一行工具 + 列表层一起抬到罩之上',
-  /\.container\.has-bg \.page-head,[\s\S]{0,320}?\.container\.has-bg \.list-layer\s*\{[^}]*position: relative[^}]*z-index: 2/.test(wxss)
-  && /\.container\.has-bg \.head-tools/.test(wxss))
+// ---------- 3. v12：图守头部一段，圆角卡不描边 ----------
+const head = seg(wxss, '.head')
+const headImg = seg(wxss, '.head-img')
+const scrim = seg(wxss, '.head-scrim')
+ok('图区高 542（= 现网「我的」那条 .band 同一个量）', /height: 542rpx/.test(head), head.trim().slice(0, 40))
+ok('图区自己 overflow:hidden，图与罩都是 absolute 铺满这一段（不再是 fixed 100vh）',
+  /overflow: hidden/.test(head) && /position: absolute/.test(headImg) && /position: absolute/.test(scrim)
+  && !/position: fixed/.test(headImg + scrim))
+ok('图与罩同高（都是 542 那一段，不是一屏）',
+  /height: 542rpx/.test(headImg) && !/height: 100vh/.test(headImg + scrim))
+// 新建页那一条仍是 100vh 七档——两页的图现在守的不是同一段，明暗只要求"同源不跳档"，
+// 逐字相同这条判据的前提（同一段、同一个视口）已经不存在了，所以撤。
+ok('压暗那一串仍在图区里（画在段内，不再画满一屏）',
+  /linear-gradient\(180deg/.test(scrim) && !/(?:^|\n)\.page-scrim\s*\{/.test(wxss))
+// 09-28 那次打回的是"纸一圈描边 + 每条笔记又一圈描边"。v12 把纸加回来了，
+// 所以真正要守的从"不许有这张纸"变成"这张纸不许有描边"——一条笔记一个框这条没变。
+const sheet = seg(wxss, '.sheet')
+ok('圆角卡回来了，但它不描边（框套框那条不变量还在）',
+  /\.sheet\s*\{/.test(wxss) && !/border(?!-radius)/.test(sheet), sheet.match(/border[^;]*/g))
+ok('圆角卡往上盖住图 40、半径吃 --r-card、底色吃 --bg-page（和「我的」那张 sheet 同一套量）',
+  /margin-top: -40rpx/.test(sheet) && /border-radius: var\(--r-card\)/.test(sheet)
+  && /background: var\(--bg-page\)/.test(sheet))
+ok('滚动区自己不画面（面是那张卡画的）',
+  !/(?:^|\n)\.list\s*\{[^}]*(background|border)/.test(wxss))
+ok('容器竖排撑满一屏，列表区 flex:1 + min-height:0（少了 min-height:0 就会整页滚）',
+  /display: flex/.test(seg(wxss, '.container')) && /height: 100vh/.test(seg(wxss, '.container'))
+  && /flex: 1/.test(seg(wxss, '.list')) && /min-height: 0/.test(seg(wxss, '.list')))
 
 // ---------- 5. 压在图上的那三块面 ----------
 // 09-30 v8：搜索条收成分类行最右那一枚圆钮，两块面共用同一条翻色规则。
@@ -162,9 +171,24 @@ ok('铺图那一态不再有一条通吃所有 chip 的暗玻璃（那会把分�
 ok('分类 chip 选中那枚反过来：纸白底 + 该色字 + 该色描边',
   /color: var\(--tone-bg\)/.test(seg(wxss, '.chip.tone.active'))
   && /box-shadow: inset 0 0 0 var\(--w-edge\) var\(--tone-bg\)/.test(seg(wxss, '.chip.tone.active')))
-ok('页头两行是纸白，档位抄新建页那两行',
-  /color: rgba\(242, 239, 233, 0\.96\)/.test(seg(wxss, '.container.has-bg .page-title'))
-  && /color: rgba\(242, 239, 233, 0\.95\)/.test(seg(wxss, '.container.has-bg .page-stats')))
+ok('压在图上的那三行是纸白（标题 + 数字 + 小字各一档）',
+  /color: rgba\(242, 239, 233, 0\.96\)/.test(seg(wxss, '.container.has-bg .h1'))
+  && /color: rgba\(242, 239, 233, 0\.8\)/.test(seg(wxss, '.container.has-bg .stat .n'))
+  && /color: rgba\(242, 239, 233, 0\.62\)/.test(seg(wxss, '.container.has-bg .stat .l')))
+ok('没铺图那一态这三行退回各自主题的墨色（不是写死白）',
+  /color: var\(--text-primary\)/.test(seg(wxss, '.h1'))
+  && /color: var\(--text-secondary\)/.test(seg(wxss, '.stat .l')))
+ok('三列的数字与小字吃「我的」页那两个量（100rpx / 18rpx，不另立一档）',
+  /font-size: 100rpx/.test(seg(wxss, '.stat .n')) && /line-height: 0\.86/.test(seg(wxss, '.stat .n'))
+  && /font-size: var\(--fs-micro\)/.test(seg(wxss, '.stat .l'))
+  && /letter-spacing: 6rpx/.test(seg(wxss, '.stat .l')))
+ok('数字那支字体族就是 WtsjMind，且声明在 app.wxss 只有一份（两页共用，不抄第二份 base64）',
+  /font-family: 'WtsjMind'/.test(seg(wxss, '.stat .n'))
+  && (read('app.wxss').match(/@font-face/g) || []).length === 1
+  && !/@font-face/.test(read('pages/me/me.wxss')))
+ok('三列顶对齐（align-items:flex-start），不是底对齐', /align-items: flex-start/.test(seg(wxss, '.stats')))
+ok('细线只画在两道分隔处，且上下不顶满', /\.stat \+ \.stat::before/.test(wxss)
+  && /height: 118rpx/.test(seg(wxss, '.stat + .stat::before')))
 ok('行卡那一段没被顺手改色（分类两档仍从 palette 递进来）',
   /color: var\(--cat-ink\)/.test(seg(wxss, '.cat')) && /background: var\(--cat-dot\)/.test(seg(wxss, '.cat-dot')))
 
@@ -184,6 +208,6 @@ ok('新建页的整页铺图仍在（这一批只加列表头部，没改首页�
 ok('新建页的罩层仍是完整七档（含底部 0.72）', /0\.72/.test(createWxss))
 
 console.log(`${fails.length ? '✗' : '✓'} 列表头部铺图 静态：${pass}/${pass + fails.length} 条通过`
-  + `　图 100vh`)
+  + `　图守头部 542`)
 fails.forEach((f) => console.log('  ✗ ' + f))
 process.exit(fails.length ? 1 : 0)

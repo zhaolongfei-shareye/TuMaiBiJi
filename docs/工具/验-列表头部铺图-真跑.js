@@ -86,29 +86,47 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   await sleep(4500)
   const cls = (await (await page.$('.container')).attribute('class')) || ''
   ck('铺图时容器带 has-bg', /has-bg/.test(cls), cls)
-  const [bgRect, scrimRect] = await rects(['.page-bg', '.page-scrim'])
-  ck('图从视口顶铺到屏底（100vh，卡片之间露的就是它）',
-    bgRect && closeTo(bgRect.top, 0) && closeTo(bgRect.bottom, win.h, 3),
-    bgRect && `顶 ${Math.round(bgRect.top)} 底 ${Math.round(bgRect.bottom)}｜视口高 ${Math.round(win.h)}`)
-  ck('罩层和图带同一块地', scrimRect && closeTo(scrimRect.top, bgRect.top) && closeTo(scrimRect.h, bgRect.h))
+  const [headRect, imgRect, scrimRect] = await rects(['.head', '.head-img', '.head-scrim'])
+  // v12（站长 10-01 拍）：图不再贯穿全屏，只守头部这一段 542，和「我的」那条 band 同一个量。
+  ck('图区从视口顶起、高 542rpx（不再铺到屏底）',
+    !!headRect && closeTo(headRect.top, 0) && Math.abs(headRect.h / R - 542) <= 4,
+    headRect && `顶 ${Math.round(headRect.top)} 高 ${(headRect.h / R).toFixed(1)}rpx`)
+  ck('图与罩同一块地、都只画这一段',
+    !!imgRect && !!scrimRect && closeTo(imgRect.top, headRect.top)
+    && closeTo(imgRect.h, headRect.h) && closeTo(scrimRect.h, headRect.h))
+  const vp = await mp.evaluate(() => new Promise((res) => {
+    wx.createSelectorQuery().selectViewport().scrollOffset().exec((r) => res(r[0]))
+  }))
+  ck('页面自己不滚（能滚的只剩列表那一区）',
+    !!vp && Math.abs(vp.scrollHeight - win.h) <= 3,
+    `文档高 ${vp && vp.scrollHeight}／视口 ${Math.round(win.h)}`)
   const num = (x) => Number(String(x).match(/[\d.]+/)?.[0] || NaN)
-  // 这一层必须"什么都不是"：没有面、没有圆角、没有描边——它以前是一张托着列表的纸，
-  // 那圈描边和每条笔记自己的描边叠起来就是他说的"两层框"。
-  ck('列表那一层没有面（透出底下的图）',
-    /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list-layer', 'background-color')),
-    await styleOf(page, '.list-layer', 'background-color'))
+  // 09-28 那次打回的是"纸一圈描边 + 每条笔记又一圈描边"。v12 把这张纸加回来了（圆角朝上、
+  // 往上盖住图 40），所以真正要守的从"不许有这张纸"变成"这张纸不许有描边"。
   // await 不能写在 .every 的回调用里（那不是 async 回调），先读成一串再比
-  const readAll = async (props) => {
+  const readAll = async (sel, props) => {
     const out = {}
-    for (const k of props) out[k] = num(await styleOf(page, '.list-layer', k))
+    for (const k of props) out[k] = num(await styleOf(page, sel, k))
     return out
   }
-  const radii = await readAll(['border-top-left-radius', 'border-top-right-radius',
+  const sheetRect = (await rects(['.sheet']))[0]
+  ck('圆角卡往上盖住图 40rpx（接缝那条线在 542−40 处）',
+    !!sheetRect && Math.abs((headRect.bottom - sheetRect.top) / R - 40) <= 2,
+    sheetRect && `图底 ${(headRect.bottom / R).toFixed(1)} / 卡顶 ${(sheetRect.top / R).toFixed(1)}rpx`)
+  const sRadii = await readAll('.sheet', ['border-top-left-radius', 'border-top-right-radius',
     'border-bottom-left-radius', 'border-bottom-right-radius'])
-  ck('列表那一层四个角都是直角', Object.values(radii).every((v) => v === 0), JSON.stringify(radii))
-  const edges = await readAll(['border-top-width', 'border-bottom-width',
+  ck('上面两个角是 40rpx 的弧、下面两个直角（它贴在屏底，不需要下弧）',
+    Math.abs(sRadii['border-top-left-radius'] / R - 40) <= 2
+    && Math.abs(sRadii['border-top-right-radius'] / R - 40) <= 2
+    && sRadii['border-bottom-left-radius'] === 0 && sRadii['border-bottom-right-radius'] === 0,
+    JSON.stringify(sRadii))
+  const sEdges = await readAll('.sheet', ['border-top-width', 'border-bottom-width',
     'border-left-width', 'border-right-width'])
-  ck('列表那一层没有描边（框只有行卡那一个）', Object.values(edges).every((v) => v === 0), JSON.stringify(edges))
+  ck('这张卡不描边（框套框那条不变量还在：一条笔记一个框）',
+    Object.values(sEdges).every((v) => v === 0), JSON.stringify(sEdges))
+  ck('滚动区自己不画面（面是那张卡画的）',
+    /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list', 'background-color')),
+    await styleOf(page, '.list', 'background-color'))
   // 卡底不是恒白：淡雅那两枚壁纸下 --bg-card 是比纸亮一档的暖白/冷白。
   // 这个值只写在 app.wxss 的主题类里（themeOf 给的是 page/line，没有 card），所以从那里现读。
   const themeCls = p.themeOf(wall).cls
@@ -121,11 +139,31 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
     && num(await styleOf(page, '.note-row', 'border-top-width')) > 0,
     `底 ${rowBg}（app.wxss=${cardHex}）｜描边 ${await styleOf(page, '.note-row', 'border-top-width')}`)
   const rowRect = (await rects(['.note-row']))[0]
-  if (rowRect) ck('第一张行卡落在图的范围里（卡片之间露图）',
-    rowRect.top > 0 && rowRect.top < win.h, `卡顶 ${(rowRect.top / R).toFixed(0)}rpx`)
-  ck('页头那行大字是纸白',
-    near(rgbOf(await styleOf(page, '.page-title', 'color')), hexArr(PAPER), 6),
-    await styleOf(page, '.page-title', 'color'))
+  if (rowRect) ck('第一张行卡在这块滚动区里（图区下面，没压在图上）',
+    !!sheetRect && rowRect.top >= sheetRect.top,
+    `卡顶 ${(rowRect.top / R).toFixed(0)}rpx / 卡片区顶 ${(sheetRect.top / R).toFixed(0)}rpx`)
+  ck('压在图上的大字是纸白',
+    near(rgbOf(await styleOf(page, '.h1', 'color')), hexArr(PAPER), 6),
+    await styleOf(page, '.h1', 'color'))
+  // ---------- 三列数字：顶对齐 + 吃「我的」那两个量 ----------
+  // 这把尺子自带的 rects() 用的是 select（一个选择器只回第一个），三列要 selectAll 才数得全，
+  // 所以这里单独走一趟——不然量到的是"第一列存在"，不是"三列顶对齐"。
+  const statTops = await mp.evaluate(() => new Promise((res) => {
+    wx.createSelectorQuery().selectAll('.stat').boundingClientRect()
+      .exec((r) => res((((r || [])[0]) || []).map((x) => +x.top.toFixed(1))))
+  }))
+  ck('三列都在，且顶部对在同一条线上', statTops.length === 3
+    && statTops.every((v) => Math.abs(v - statTops[0]) <= 1), statTops.join(' / '))
+  ck('数字那一档就是 100rpx、字重 100（与「我的」那枚 MIND 同一个量）',
+    Math.abs(num(await styleOf(page, '.stat .n', 'font-size')) / R - 100) <= 2
+    && (await styleOf(page, '.stat .n', 'font-weight')) === '100',
+    await styleOf(page, '.stat .n', 'font-size'))
+  ck('数字用的就是那支 WtsjMind（声明挪进 app.wxss 之后两页都还命中）',
+    /WtsjMind/.test(String(await styleOf(page, '.stat .n', 'font-family'))),
+    await styleOf(page, '.stat .n', 'font-family'))
+  const sd = await page.data()
+  ck('三列的标签是字典里那三个（笔记|分享|收藏），顺序没排错',
+    (sd.stats || []).map((x) => x.l).join('|') === '笔记|分享|收藏', JSON.stringify(sd.stats))
   const chips = await page.$$('.chip')
   ck('这一趟至少有两枚 chip（"全部" + 一枚分类），颜色那条才量得到', chips.length > 1, `${chips.length} 枚`)
   // 09-30 这一批起，分类那几枚吃自己分类的实色（站长原话"分类按钮是有颜色的"），
@@ -175,7 +213,7 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
     await styleOf(page, '.sc-input', 'color'))
   await mp.screenshot({ path: path.join(OUT, '实测-列表搜索展开态.png') })
   // 点条以外的空白（这里点页头那行大字，它自己没有任何 tap 处理）→ 缩回
-  await (await page.$('.page-title')).tap()
+  await (await page.$('.h1')).tap()
   await sleep(1000)
   ck('点条以外的空白缩回圆钮那一态',
     (await page.$('.sc-card')) === null && !!(await page.$('.sc-btn')))
@@ -190,8 +228,8 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   await sleep(4500)
   page = await enter('/pages/index/index')
   await sleep(4500)
-  ck('旧开关写着 true，图带还在', !!(await page.$('.page-bg')))
-  ck('罩层也还在（不会图没了、字色还翻着白）', !!(await page.$('.page-scrim')))
+  ck('旧开关写着 true，图带还在', !!(await page.$('.head-img')))
+  ck('罩层也还在（不会图没了、字色还翻着白）', !!(await page.$('.head-scrim')))
   // attribute() 是异步的：漏掉 await 会把 Promise 对象本身拼进字符串，
   // 于是 !/has-bg/ 永远成立——原来那条"关掉后容器不再带 has-bg"就是这么假绿的。
   const cls2 = ((await (await page.$('.container')).attribute('class')) || '')
@@ -201,9 +239,9 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   ck('那枚圆钮照旧是纸白那一面（不再退回壁纸派生那支）',
     near(rgbOf(await styleOf(page, '.sc-btn', 'background-color')), hexArr(PAPER)),
     await styleOf(page, '.sc-btn', 'background-color'))
-  ck('列表那一层照旧透明（透出底下的图）',
-    /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list-layer', 'background-color')),
-    await styleOf(page, '.list-layer', 'background-color'))
+  ck('滚动区照旧不画面（底色是那张圆角卡给的）',
+    /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list', 'background-color')),
+    await styleOf(page, '.list', 'background-color'))
   // 那圈描边写成 inset 而不是 border：border 会把整排 chips 撑高，一撑高纸顶就往下挪
   ck('这一档下 chip 同一档高度（inset 描边没把它撑高）',
     Math.abs(((await rects(['.chip']))[0] || {}).h - chipH) < 1.5,

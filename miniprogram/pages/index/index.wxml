@@ -1,16 +1,25 @@
 <view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}}" bindtap="onBlankTap">
-  <!-- 头部那一段铺形象图（和新建页同一张、同一个开关、同一个取图口）。
-       列表不铺：一行行字压在照片上，滚起来字和图打架——这是 09-28 那版效果图里
-       A/C 两条路选下来的 C。图做成 fixed，滚到哪儿它都在头部那一段。 -->
-  <image wx:if="{{bgSrc}}" class="page-bg" src="{{bgSrc}}" mode="aspectFill" />
-  <view wx:if="{{bgSrc}}" class="page-scrim"></view>
-
-  <view class="page-head">
-    <view class="page-title">{{t.notesHeading}}</view>
-    <!-- 三个数按全量算，不受搜索词和分类筛选影响 -->
-    <text class="page-stats" wx:if="{{statsText}}">{{statsText}}</text>
+  <!-- v12（站长 10-01 拍）：图只守头部这一段 542，下面整块是一张圆角卡往上盖住它 40，
+       于是接缝四个角都是弧——和「我的」页那张 sheet 同一画法、同一个量。
+       09-28 那版"图贯穿全屏"到此结束：当时打回的是"纸一圈描边 + 每条笔记又一圈描边"的框套框，
+       这张圆角卡不描边，只换底色，所以不会再框套框。
+       图取口仍是 utils/poster.js 的 homeBg()，和新建页同一张、同一个开关。 -->
+  <view class="head">
+    <image wx:if="{{bgSrc}}" class="head-img" src="{{bgSrc}}" mode="aspectFill" />
+    <view class="head-scrim"></view>
+    <view class="h1">{{t.notesHeading}}</view>
+    <!-- 三列：笔记 / 分享 / 收藏。数全部来自服务端那一次 /api/user/quota，
+         本页不自己相加（分享数=当前公开中的篇数、收藏数=收藏过你的不同人数，
+         两个都是状态量，客户端拿不到原始台账也算不出来）。 -->
+    <view class="stats">
+      <view class="stat" wx:for="{{stats}}" wx:key="key">
+        <text class="n">{{item.n}}</text>
+        <text class="l">{{item.l}}</text>
+      </view>
+    </view>
   </view>
 
+  <view class="sheet">
   <!-- 搜索和分类共用这一行（09-30 v8，站长："搜索条目前看起来太大，不美观"）。
        默认只有分类，最右一枚 59 圆钮；点它整行换成搜索条、分类暂时收起；
        点这一行以外的空白缩回来。条子里面一个字没改，仍是原来那套（纸白面 +
@@ -67,10 +76,17 @@
     </view>
   </view>
 
-  <!-- 这一层只干一件事：铺图时把列表抬到罩层之上（fixed 的图有 z-index，
-       静态内容会被它整个盖住）。它以前是"一张纸"，圆角朝上托着列表，
-       那条描边和每条笔记自己的描边叠成框套框，09-28 深夜撤了——一条笔记一个框。 -->
-  <view class="list-layer">
+  <!-- v12：列表不再整页滚，改在这块区域里自己滚、滚到底再取下一批。
+       内缩挂在 .sheet 的 padding 上，不挂在 scroll-view 自己身上——挂在它身上时
+       右侧要给滚动条留位，左右就不等宽了（详情浮窗那一层实测右移 12rpx，同一条坑）。 -->
+  <scroll-view
+    class="list"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    lower-threshold="160"
+    bindscrolltolower="onListToLower"
+  >
     <!-- 加载状态 -->
     <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
@@ -124,6 +140,7 @@
         </block>
       </view>
     </view>
+  </scroll-view>
   </view>
 
   <!-- v7 ③：详情浮窗。点已展开那行才浮它，浮上来时列表和搜索、分类块被它盖严（同宽 24 内缩），

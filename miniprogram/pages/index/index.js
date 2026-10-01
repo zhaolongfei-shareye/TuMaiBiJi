@@ -5,19 +5,6 @@ const poster = require('../../utils/poster.js')
 const { isPrivate } = require('../../utils/privateGate.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 
-// 统计看板一次读多少条：后端 /api/notes 的 limit 上限就是 100，写不了更大。
-// 所以总数超过一百篇只能显示"100+"——接口没给 count，不能假装知道。
-// （基础额度正好 100，靠邀请加成就可能超出一百，这一条从"到顶之前够用"变成"重度用户会撞到显示上限"。）
-const STATS_LIMIT = 100
-
-// 周一为一周起点（国内习惯）。用"本地零点"而不是把毫秒减 7 天，
-// 否则跨月的那几天会算错。
-function startOfWeek(now) {
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
-  return d
-}
-
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
   web_article: 'sourceWebArticle',
@@ -40,8 +27,8 @@ Page({
     limit: 50,
     hasMore: true,
     loadingMore: false,
-    // 「我的笔记」右上角那三个数：本周 / 本月 / 总数
-    statsText: '',
+    // 头部那三列：笔记 / 分享 / 收藏。值全来自 /api/user/quota，本页不自己相加
+    stats: [],
     // 手风琴：一次只开一条；-1 = 全收起
     openIdx: -1,
     // 私密笔记：本会话里已经验过密码就不再重问
@@ -107,7 +94,7 @@ Page({
       this.getTabBar().setData({ selected: 1 })
     }
     this.loadCategories()
-    this.loadStats()
+    this.loadQuota()
     // onShow 每次切回该 tab 都会触发，必须 reset：否则非 reset 分支会把结果追加到旧列表上，
     // 同一条笔记被贴两遍。
     this._closeFloats()
@@ -119,49 +106,34 @@ Page({
   async onPullDownRefresh() {
     this._closeFloats()
     try {
-      await Promise.all([this.loadCategories(), this.loadStats(), this.loadNotes(true)])
+      await Promise.all([this.loadCategories(), this.loadQuota(), this.loadNotes(true)])
     } finally {
       wx.stopPullDownRefresh()
     }
   },
 
-  // 统计走一趟不带筛选条件的全量读：列表那一趟是按搜索词和分类过滤过的，
-  // 拿它算出来的"总数"其实是"当前筛出来的条数"，会被搜索框里的词改数。
-  async loadStats() {
+  // 顶部那三列一次读回来：/api/user/quota 一趟给 used / shares_active / saved_by_users。
+  // 不再自己数列表那一趟（它被搜索词和分类筛过，数出来的是"当前筛出的条数"），也不再
+  // 读 100 条去凑总数——那趟读法撞得到 100 的显示上限，而这两个数本来就是服务端算好的状态量：
+  // 客户端拿不到原始台账，也就没有"自己开关一下把数字刷大"这条路。
+  async loadQuota() {
     const lang = this.data.lang
     try {
-      const all = await api.getNotes(0, STATS_LIMIT)
-      const now = new Date()
-      const ws = startOfWeek(now)
-      const ms = new Date(now.getFullYear(), now.getMonth(), 1)
-      // 时间按客户端本地解释，和列表方块上那个 MM-DD 用的是同一条转换
-      // （utils/date.js 里也是 new Date(created_at)）——看板必须和它下面那些日期对得上，
-      // 所以这里不另起一套时区口径。
-      let week = 0
-      let month = 0
-      all.forEach((n) => {
-        const d = new Date(n.created_at)
-        if (d >= ws) week++
-        if (d >= ms) month++
-      })
-      const total = all.length >= STATS_LIMIT ? `${STATS_LIMIT}+` : all.length
-      // 分隔符两侧各留一个全角空格：半角空格在这行字号下几乎看不出来，三段会糊成一串数字。
-      // 英文那一档没有全角标点的位置，照抄会让 "Week：3" 这种半中半英的写法出现在英文界面上。
-      // 10-01 站长真截图：英文那三个半角空格在真机上被折成一个、几乎看不见（"Week: 1|Month"），
-      // 模拟器里却是好的——所以这一档改用不换行空格 U+00A0，它不参与空白折叠，两端渲染一致。
-      const colon = lang === 'zh' ? '：' : ': '
-      const NB = ' '
-      const gap = lang === 'zh' ? '　|　' : `${NB}${NB}|${NB}${NB}`
+      const q = await api.getQuota()
+      // 后端没部署到带这两个字段的版本时读到的是 undefined——画成 0 是假话（那可能不是 0），
+      // 画成空白又像坏了，所以给一个明确的占位符，和「我的」页那两行同一条口径。
+      const n = (v) => (typeof v === 'number' && isFinite(v) ? v : '—')
       this.setData({
-        statsText: [
-          `${t('statWeek', lang)}${colon}${week}`,
-          `${t('statMonth', lang)}${colon}${month}`,
-          `${t('statTotal', lang)}${colon}${total}`,
-        ].join(gap),
+        stats: [
+          { key: 'notes', n: n(q.used), l: t('statNotes', lang) },
+          { key: 'shares', n: n(q.shares_active), l: t('statShares', lang) },
+          { key: 'saved', n: n(q.saved_by_users), l: t('statSaved', lang) },
+        ],
       })
     } catch (err) {
       // 这三个数是装饰，拿不到就整块不显示，绝不能把列表一起拖挂
-      console.error('加载统计失败', err)
+      console.error('加载三列数字失败', err)
+      this.setData({ stats: [] })
     }
   },
 
@@ -433,7 +405,7 @@ Page({
           wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
           this.setData({ openIdx: -1, detailOpen: false })
           this.loadNotes(true)
-          this.loadStats()
+          this.loadQuota()
         } catch (err) {
           wx.showToast({ title: t('deleteFailed', lang), icon: 'none' })
         }
@@ -677,7 +649,9 @@ Page({
     })
   },
 
-  onReachBottom() {
+  // v12：列表不再整页滚，Page.onReachBottom 这一辈子都不会再触发，
+  // 取下一批改挂在 scroll-view 的 bindscrolltolower 上。
+  onListToLower() {
     this.onLoadMore()
   },
 })

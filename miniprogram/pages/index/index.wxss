@@ -1,26 +1,119 @@
-/* 页头：左边大标题，右边三个数。标题本身的字号字重与新建页「选择一种方式」一致，
-   只是这里被包进一条 flex 行，所以外边距交给 .page-head 统一给。 */
-.page-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  margin: var(--sp-5) 0 var(--sp-4);
+/* ---------- v12 头部那一段：图 + 罩 + 标题 + 三列数字 ----------
+   站长 10-01 的口径逐条落成数：块高 542（= 现网「我的」那条 .band 同一个量），
+   三列顶对齐（.stat 全部从同一条顶线起），整块离标题留距离、离下面那道接缝留空间。
+   数字那两档字号不是新定的：100rpx / weight 100 / 行高 .86 与小字 18rpx + 字距 6rpx
+   就是 pages/me 那枚 MIND 和「脑力值」那一行，字体族 WtsjMind 已从 me.wxss 挪进 app.wxss
+   （一份声明两页用，不再抄第二份 base64）。 */
+.head {
+  position: relative;
+  height: 542rpx;
+  flex: none;
+  overflow: hidden;
+  background: var(--bg-page);
 }
 
-.page-title {
+.head-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 750rpx;
+  height: 542rpx;
+}
+
+/* 停点仍照新建页那条（同一张图、同一条明暗），只是收进这一段里；
+   底部压深一档，是为了让下面那张圆角卡的影子有着落、不飘在亮面上。 */
+.head-scrim {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%, rgba(18, 20, 26, 0.5) 30%,
+    rgba(18, 20, 26, 0.44) 62%, rgba(18, 20, 26, 0.52) 100%);
+}
+
+.h1 {
+  position: absolute;
+  left: var(--sp-4);
+  top: 22rpx;
   font-size: var(--fs-h1);
   font-weight: 700;
   letter-spacing: -1rpx;
   color: var(--text-primary);
 }
 
-.page-stats {
-  flex: none;
-  font-size: var(--fs-meta);
-  font-weight: 600;
-  letter-spacing: -0.2rpx;
+.stats {
+  position: absolute;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  top: 272rpx;
+  display: flex;
+  align-items: flex-start;
+}
+
+.stat {
+  flex: 1;
+  position: relative;
+  text-align: center;
+}
+
+/* 细白线只画在两道分隔处，上下都不顶满——顶满就读成三条竖线而不是分隔。 */
+.stat + .stat::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4rpx;
+  height: 118rpx;
+  width: 1rpx;
+  background: var(--card-edge);
+}
+
+.stat .n {
+  display: block;
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-weight: 100;
+  font-size: 100rpx;
+  line-height: 0.86;
+  color: var(--text-primary);
+}
+
+.stat .l {
+  display: block;
+  margin-top: 12rpx;
+  padding-left: 6rpx;
+  text-align: center;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 6rpx;
   color: var(--text-secondary);
+}
+
+/* ---------- v12 下方那一整块：圆角朝上、往上盖住图 40、不描边 ----------
+   和 pages/me 那张 .sheet 同一画法（margin-top:-40 + 半径 --r-card + 页面底色）。
+   刻意不给 border：09-28 那次"纸一圈描边 + 每条笔记又一圈描边"就是框套框。
+   横向内缩挂在这一层的 padding 上，不挂到 scroll-view 自己身上（挂在它身上时
+   右侧要给滚动条留位，实测左右差 12rpx）。 */
+.sheet {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: -40rpx;
+  padding: 0 var(--sp-3);
+  background: var(--bg-page);
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  box-shadow: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
+  overflow: hidden;
+}
+
+/* 列表这一区自己滚：flex:1 + min-height:0 是它拿不到"剩下的全部高度"时最常见的坑
+   （flex 子项默认 min-height:auto，内容一高就把父级顶开，于是整页滚、这一区不滚）。 */
+.list {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 
 /* ---------- 搜索条 ----------
@@ -766,68 +859,47 @@
   opacity: 0.45;
 }
 
+/* ---------- v12：这一屏不再整页滚 ----------
+   容器自己撑满一屏并竖排：图区固定 542，剩下的全给那张圆角卡，卡里再切分类行与列表。
+   原来这条只有 padding-bottom:160（给底栏胶囊让位）。那个让位现在改挂在 .notes-list
+   的下内边距上——挂在容器上，滚不滚都少那一截，列表区就永远差一块。 */
 .container {
-  padding-bottom: 160rpx;
-}
-
-/* ---------- 整页铺图（09-28 深夜他看完 C 那版之后改口：图要贯穿全屏） ----------
-   图和新建页是同一张、同一个开关、同一个取图口（utils/poster.js 的 homeBg()），
-   这一页不再开第二个上传入口。
-   上一版是 C：图只守头部那一段，列表落在一张圆角朝上的纸上。真机反馈"两层框"——
-   纸自己一圈描边，每条笔记又一圈描边，读起来是框套框。现在那张纸撤了：
-   一条笔记一个框，图从导航条底下一直铺到屏底，卡片之间露的就是图。
-   两层都是 fixed：滚到哪儿图都在原地不动，动的是卡片。 */
-.page-bg {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 750rpx;
+  display: flex;
+  flex-direction: column;
   height: 100vh;
-  z-index: 0;
+  box-sizing: border-box;
+  padding: 0;
 }
 
-.page-scrim {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 750rpx;
-  height: 100vh;
-  z-index: 1;
-  /* 停点逐字抄新建页那一条。同一张图、同一个视口，两页的明暗必须是一个连续体，
-     不然切 tab 时背景会跳一档。 */
-  background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%, rgba(18, 20, 26, 0.58) 10%,
-    rgba(18, 20, 26, 0.44) 43%, rgba(18, 20, 26, 0.42) 62%,
-    rgba(18, 20, 26, 0.52) 83%, rgba(18, 20, 26, 0.62) 88%, rgba(18, 20, 26, 0.72) 100%);
+/* 图只守头部那一段（v12）。09-28 到 10-01 中午之间它曾贯穿全屏，
+   那一版是"卡片之间露的就是图"，现在换成"横条里透出淡淡的图"。 */
+.notes-list {
+  padding-bottom: 150rpx;
 }
 
-/* 头部三块和列表都要压在罩之上。列表这条不是可选的：fixed 的图有 z-index，
-   静态内容会被它整个盖住。这一层只管层序，自己不画任何面。 */
-.container.has-bg .page-head,
-.container.has-bg .sc-card,
-.container.has-bg .head-tools,
-.container.has-bg .category-scroll,
-.container.has-bg .list-layer {
-  position: relative;
-  z-index: 2;
-}
-
-/* 页头两行不新造字色档：取新建页 slogan 与日期那两档的纸白 */
-.container.has-bg .page-title {
+/* 铺了图才把这三行翻成纸白；没铺图时它们吃各自主题的墨色——
+   和「我的」页那两块是同一条规则，不新造字色档。 */
+.container.has-bg .h1 {
   color: rgba(242, 239, 233, 0.96);
 }
 
-.container.has-bg .page-stats {
-  color: rgba(242, 239, 233, 0.95);
+.container.has-bg .stat .n {
+  color: rgba(242, 239, 233, 0.8);
 }
 
-/* 站长 10-01：列表那几条横条改 95% 不透明 + 背景模糊，模仿毛玻璃，让底下的形象图透一点出来。
-   只在铺了形象图那一态生效——没铺图时背后是纯色页面，模糊没有对象，白搭一层 GPU。
-   深色那两套主题的 --bg-card-glass 就等于它们原本的卡底，对它们只有模糊是新增的。
-   展开态那一头照到同一条规则：收起、展开是一根横条的两种高度，不该换一张脸。 */
+.container.has-bg .stat .l {
+  color: rgba(242, 239, 233, 0.62);
+}
+
+.container.has-bg .stat + .stat::before {
+  background: rgba(242, 239, 233, 0.34);
+}
+
+/* 站长 10-01 下午：95% 那一档"看不到背景图"，改 85%；背景模糊整层撤掉——
+   模糊会把"透出来那 5%"摊成"整块发灰"，他要的是淡淡的图影、不是灰。
+   四档的算法与对文字的影响都算在 docs/design/首页-统计三列与区内滚动/ 那份效果图里。 */
 .container.has-bg .note-row {
   background: var(--bg-card-glass);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
 }
 
 /* 搜索条在图上换成纸白那一面，和新建页那条录入胶囊同一句话——

@@ -59,7 +59,7 @@ page {
   --text-tertiary: #9a9ea6;
   --bg-page: #f4f2ec;
   --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.95);
+  --bg-card-glass: rgba(255, 255, 255, 0.85);
   --accent: #23252c;
   --accent-soft: rgba(35, 37, 44, 0.07);
   --border: rgba(35, 37, 44, 0.08);
@@ -73,12 +73,26 @@ page {
   color: var(--text-primary);
 }
 
+/* MIND 那枚大数字、以及首页顶部那三列的数字用的是同一支字体。声明放在这里
+   （原来在 pages/me/me.wxss），两页共用一份，不抄第二份 base64。 */
+/* ---------- MIND 那个大数字：Poppins Thin，压在图右下角 ----------
+   站长要的是 iPhone 锁屏时钟那种"细、长、圆"。那版真身是 SF Pro Rounded，
+   苹果许可只允许在苹果设备上用、不能打进包分发，所以走开源最接近的一支：
+   Poppins Thin 100（OFL，可商用可内嵌）。字体只裁 0-9 十个数字、base64 内嵌，
+   1.9KB 进包，不占域名、不会出现"字体还没到、数字先跳一下"。
+   数字比上一版收 8 成（126 到 100），英文字跟着收到最小一档字阶 18，并与数字居中。 */
+@font-face {
+  font-family: 'WtsjMind';
+  src: url(data:font/ttf;base64,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) format('truetype');
+  font-weight: 100;
+}
+
 /* 六套壁纸皮肤：只改 chrome，不改方块。card/line 的取值要和 palette.js 的 THEMES 一致。 */
 
 .theme-default {
   --bg-page: #f4f2ec;
   --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.95);
+  --bg-card-glass: rgba(255, 255, 255, 0.85);
   --text-primary: #23252c;
   --text-secondary: #5c6068;
   --text-tertiary: #9a9ea6;
@@ -92,7 +106,7 @@ page {
 .theme-blue {
   --bg-page: #eaeefb;
   --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.95);
+  --bg-card-glass: rgba(255, 255, 255, 0.85);
   --text-primary: #23264f;
   --text-secondary: #5c6089;
   --text-tertiary: #8b90bd;
@@ -106,7 +120,7 @@ page {
 .theme-green {
   --bg-page: #e7f3ea;
   --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.95);
+  --bg-card-glass: rgba(255, 255, 255, 0.85);
   --text-primary: #12331f;
   --text-secondary: #4c7a5b;
   --text-tertiary: #7d9c88;
@@ -120,7 +134,7 @@ page {
 .theme-sunset {
   --bg-page: #fdeee6;
   --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.95);
+  --bg-card-glass: rgba(255, 255, 255, 0.85);
   --text-primary: #4a1f10;
   --text-secondary: #a4664c;
   --text-tertiary: #c0917c;
@@ -170,7 +184,7 @@ page {
 .theme-tint-paper {
   --bg-page: #F2EFE9;
   --bg-card: #FCFBF8;
-  --bg-card-glass: rgba(252, 251, 248, 0.95);
+  --bg-card-glass: rgba(252, 251, 248, 0.85);
   --text-primary: #241E16;
   --text-secondary: rgba(36, 30, 22, 0.66);
   --text-tertiary: rgba(36, 30, 22, 0.4);
@@ -184,7 +198,7 @@ page {
 .theme-tint-celadon {
   --bg-page: #E9EEEA;
   --bg-card: #F7FAF7;
-  --bg-card-glass: rgba(247, 250, 247, 0.95);
+  --bg-card-glass: rgba(247, 250, 247, 0.85);
   --text-primary: #1B2A21;
   --text-secondary: rgba(27, 42, 33, 0.66);
   --text-tertiary: rgba(27, 42, 33, 0.4);

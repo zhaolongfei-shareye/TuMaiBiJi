@@ -5,6 +5,7 @@
 // 只点不会调起系统面板的东西：拍照 / 相册那两枚小圆按下去会开 chooseMedia，
 // 那个面板一开就把自动化端口占住，所以这两态走面板里的模式标签进（标签只切视图）。
 const automator = require('miniprogram-automator')
+const lang = require('./尺子语言钉.js')
 const fs = require('fs')
 const path = require('path')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -22,6 +23,10 @@ const ck = (name, ok, got) => {
     try { mp = await automator.connect({ wsEndpoint: 'ws://localhost:9431' }) } catch (e) { await sleep(12000) }
   }
   if (!mp) throw new Error('连不上自动化端口，先跑 cli auto')
+  // 这一把自己在第⑩节切到 en 再切回 zh，但**开头没钉**——账号停在 en 时前九节那些
+  // 中文判据会一次红四条（"当前标签是直接写""条身换成贴个链接"…）。补上开跑前的钉。
+  const langBefore = await lang.read(mp)
+  await lang.pin(mp, 'zh')
   fs.mkdirSync(OUT, { recursive: true })
 
   const enter = async (url) => {
@@ -221,6 +226,7 @@ const ck = (name, ok, got) => {
     if (app.globalData.userInfo) app.globalData.userInfo.language = 'zh'
   })
 
+  await lang.pin(mp, langBefore)
   await mp.close()
   console.log(bad.length ? `\n失败 ${bad.length} 条：\n  ✗ ` + bad.join('\n  ✗ ') : '\n真跑全过')
   process.exit(bad.length ? 1 : 0)

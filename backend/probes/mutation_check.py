@@ -117,6 +117,22 @@ MUTATIONS = [
         "tests/test_quota_and_invite.py::Test转存加分::test_并发撞索引那一趟只回零不把转存弄失败",
     ),
     (
+        # v12 首页那两列的新规则。两条各打一刀：一刀去掉状态量过滤，一刀去掉按人去重——
+        # 正好是站长那句"数按照真实来算，避免用户刷量"落成的两个技术动作。
+        "N10 分享数退回「累计发出过几张码」（开→撤→开就能自己刷大）",
+        "app/services/quota.py",
+        "        .filter(Share.user_id == str(user.id), Share.is_active.is_(True))\n",
+        "        .filter(Share.user_id == str(user.id))\n",
+        "tests/test_quota_and_invite.py::Test首页那三列",
+    ),
+    (
+        "N11 收藏数不再按人去重（一个人存十篇被数成十个人）",
+        "app/services/quota.py",
+        "        db.query(func.count(distinct(Invitation.invitee_id)))\n",
+        "        db.query(func.count(Invitation.invitee_id))\n",
+        "tests/test_quota_and_invite.py::Test首页那三列",
+    ),
+    (
         "N9 兜底外壳不再吞非索引异常（database is locked 会冒到接口上）",
         "app/services/quota.py",
         "    except Exception:\n",
