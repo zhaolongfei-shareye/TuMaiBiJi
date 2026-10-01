@@ -100,6 +100,11 @@ fs.mkdirSync(OUT, { recursive: true })
         block <= win.windowHeight * 0.6,
         `占 ${(block * 100 / win.windowHeight).toFixed(1)}% 屏高`)
 
+      // 三步指引该不该在，取决于"这一档此刻有没有东西要填"：链接档空着→在；
+      // 相册档这里铺了 3 张缩略图、直接写档本来就顶满→都不在。
+      const gNow = await geo('.guide')
+      ck(`${tag}：指引只在空着的那档出现`, (!!gNow) === (active === 'url'), gNow ? '有' : '无')
+
       // 控件没被 flex 压扁、也没被"顺手放大"：这几档高度是令牌定的。
       // 摘要区写的是等于 180 而不是不低于——富余按 CSS 规则全被按钮行的 auto 边距吃掉了，
       // 真哪天它自己长高了，说明有人给 body 加了 flex-grow，这条会当场报出来。
@@ -137,6 +142,26 @@ fs.mkdirSync(OUT, { recursive: true })
         await mp.screenshot({ path: path.join(OUT, `实测-贴底-${label}.png`) })
       }
     }
+
+    /* 相册档空态专测：这一步循环里 shot 一直带着 3 张缩略图（那是最坏情况），
+       指引真正会出现的"一张都没选"那一屏得单独摆出来量。
+       断的是渲染出来的文字——<template is> 不继承页面 data，漏了 data="{{t}}" 时
+       数字方块照样画、三行字全空，只看 .guide 在不在是抓不到这种事的。 */
+    await page.setData({ active: 'shot', mode: 'album', lead: 'album', previewImages: [], errLine: '' })
+    await sleep(320)
+    const gEl = await page.$('.guide')
+    const gTxt = gEl ? (await gEl.text()).replace(/\s+/g, '') : ''
+    const need = [i18n.t('guide1T', lang), i18n.t('guide2T', lang), i18n.t('guide3T', lang),
+      i18n.t('guide3D', lang)].map((x) => String(x).replace(/\s+/g, ''))
+    ck(`${lang} 相册空态：三步指引在，且三行文字真渲染出来了（不只是数字方块）`,
+      !!gEl && need.every((x) => gTxt.indexOf(x) >= 0), `${gEl ? '在' : '不在'}｜${gTxt.slice(0, 20)}`)
+    const g2 = await geo('.guide'); const a2 = await geo('.acts'); const p2 = await geo('.panel')
+    ck(`${lang} 相册空态：指引坐在按钮行上面，两样都还在面板里`,
+      !!g2 && !!a2 && g2.bottom <= a2.top + 1 && a2.bottom <= p2.bottom + 1,
+      `指引底 ${(g2.bottom * 750 / win.windowWidth).toFixed(0)} / 按钮行顶 ${(a2.top * 750 / win.windowWidth).toFixed(0)} / 面板底 ${(p2.bottom * 750 / win.windowWidth).toFixed(0)}rpx`)
+    await page.setData({ previewImages: ['/assets/share-card.jpg'] })
+    await sleep(320)
+    ck(`${lang} 相册选上一张图之后：指引让位，不跟缩略图抢地方`, (await geo('.guide')) === null)
   }
 
   // 收起态：贴底那条规则整个不生效，条子回到流里坐在 62vh 那段留白上。

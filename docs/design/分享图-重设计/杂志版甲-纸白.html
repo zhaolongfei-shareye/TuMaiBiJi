@@ -52,22 +52,21 @@ body { width: 1280px; height: 1024px; overflow: hidden; }
 
 /* 壳里那张 = 「杂志封面」模板：上图 46% + kicker + 大标题 + 三条要点 + 署名与码 */
 .cover { position: absolute; inset: 0; background: #14161A; color: #F2EFE9; }
-.cover .ph { position: relative; height: 372px; overflow: hidden; }
-.cover .ph img { width: 420px; height: 540px; object-fit: cover; object-position: 50% 16%; }
-.cover .ph::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,22,26,.1), rgba(20,22,26,.86)); }
-.cover .kick { position: absolute; left: 28px; top: 392px; font-family: 'Playfair'; font-size: 15px;
+.cover .ph { position: relative; height: 430px; overflow: hidden; }
+.cover .ph img { width: 420px; height: 685px; object-fit: cover; object-position: 50% 6%; }
+.cover .kick { position: absolute; left: 28px; top: 452px; font-family: 'Playfair'; font-size: 15px;
   letter-spacing: .3em; color: rgba(242,239,233,.62); }
-.cover .ct { position: absolute; left: 28px; right: 28px; top: 420px; font-size: 46px; line-height: 1.22; font-weight: 700; }
-.cover .pt { position: absolute; left: 28px; right: 28px; top: 552px; font-size: 20px; line-height: 1.55;
+.cover .ct { position: absolute; left: 28px; right: 28px; top: 476px; font-size: 46px; line-height: 1.22; font-weight: 700; }
+.cover .pt { position: absolute; left: 28px; right: 124px; top: 566px; font-size: 19px; line-height: 1.5;
   color: rgba(242,239,233,.8); }
-.cover .pt div { padding: 9px 0; border-top: 1px solid rgba(242,239,233,.16); }
+.cover .pt div { padding: 8px 0; border-top: 1px solid rgba(242,239,233,.16); }
 .cover .sign { position: absolute; left: 28px; bottom: 30px; display: flex; align-items: center; gap: 10px;
   font-size: 17px; color: rgba(242,239,233,.72); }
 .cover .sign i { width: 34px; height: 34px; border-radius: 50%; background: #F6C445; display: inline-block; }
-.cover .qr { position: absolute; right: 26px; bottom: 26px; width: 74px; height: 74px; border-radius: 12px;
-  background: #F2EFE9; display: grid; grid-template-columns: repeat(5,1fr); gap: 3px; padding: 7px; }
-.cover .qr b { background: #14161A; border-radius: 1px; }
-.cover .qr b.o { background: transparent; }
+/* 真码：微信 getwxacodeunlimit 回的 280×280（scene=sharecard, page=pages/create/create, env=release），
+   存在 docs/design/分享图-重设计/qr_sharecard.jpg，不是画的格子。 */
+.cover .qr { position: absolute; right: 24px; bottom: 24px; width: 84px; height: 84px; border-radius: 10px; }
+.cover .qr img { width: 84px; height: 84px; border-radius: 10px; display: block; }
 </style>
 </head>
 <body>
@@ -98,7 +97,7 @@ body { width: 1280px; height: 1024px; overflow: hidden; }
       <div class="ct">厦门三日路线</div>
       <div class="pt"><div>轮渡提前一天订，别现场排队</div><div>岛上骑车比走路省一半时间</div><div>傍晚五点后沙坡尾光线最好</div></div>
       <div class="sign"><i></i>阿麦 · 图麦笔记</div>
-      <div class="qr"><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b></div>
+      <div class="qr"><img src="qr_sharecard.jpg" alt=""></div>
     </div>
   </div></div>
 </div>

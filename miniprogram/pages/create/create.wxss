@@ -283,6 +283,56 @@
   margin-top: 10rpx;
 }
 
+/* 三步指引：坐在空态那截富余里。数字方块三枚吃 utils/palette.js 的宝蓝 / 橙 / 草绿，
+   底板用面板已有的那档 .035 淡墨面，不新增描边——"描边是骨架、投影已退役"那条照旧。 */
+.guide {
+  margin-top: 22rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 24rpx;
+  background: rgba(35, 37, 44, 0.035);
+}
+
+.gstep {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin-bottom: 12rpx;
+}
+
+.gstep:last-child {
+  margin-bottom: 0;
+}
+
+.gnum {
+  flex: none;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 12rpx;
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.g1 .gnum { background: #3f52d6; }
+.g2 .gnum { background: #e9723d; }
+.g3 .gnum { background: #46a863; }
+
+.gtxt {
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: rgba(35, 37, 44, 0.78);
+}
+
+.gtxt .gt-t {
+  font-size: var(--fs-body);
+  font-weight: 700;
+  color: #23252c;
+  margin-right: 10rpx;
+}
+
 /* 提示行与报错行直接坐在纸上 */
 .entry-note {
   margin-top: 14rpx;

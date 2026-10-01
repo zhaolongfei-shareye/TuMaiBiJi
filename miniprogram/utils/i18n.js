@@ -197,6 +197,15 @@ const i18n = {
     pasteEmpty: '剪贴板里还没有链接',
     clear: '清空',
     startExtract: '开始提炼',
+    // 新建页录入面板中间那段空白的三步指引：只在"这一档还没东西"时出现（链接档等 urlInput、
+    // 相册档等 previewImages），一旦选了图/输了链接就让位给内容。直接写那一档不放——它本来就
+    // 顶满面板定高，再塞会把正文框挤扁。渠道那四个名字是站长 10-01 点名要突出的。
+    guide1T: '丢进来',
+    guide1D: '公众号 / 小红书 / 微博 / 知乎的链接或截图',
+    guide2T: 'AI 提炼',
+    guide2D: '图里的字也读得懂，出摘要、要点',
+    guide3T: '存成知识点',
+    guide3D: '能搜、能归类，还能出卡片图',
     busyExtract: '提炼中…',
     busySave: '保存中…',
     linkDesc: '公众号文章 / 网页链接',
@@ -454,6 +463,12 @@ const i18n = {
     pasteEmpty: 'Nothing to paste yet',
     clear: 'Clear',
     startExtract: 'Extract',
+    guide1T: 'Add it',
+    guide1D: 'A link or a screenshot — WeChat, Rednote, Weibo, Zhihu',
+    guide2T: 'AI extracts',
+    guide2D: 'It reads the text inside images too: summary and key points',
+    guide3T: 'Keep it',
+    guide3D: 'Searchable, categorised, exportable as a card',
     busyExtract: 'Extracting…',
     busySave: 'Saving…',
     linkDesc: 'WeChat articles / Web pages',

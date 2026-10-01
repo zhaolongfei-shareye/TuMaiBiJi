@@ -75,6 +75,7 @@
           />
           <view wx:if="{{urlInput}}" class="face-x" catchtap="clearUrl">✕</view>
         </view>
+        <template is="entryGuide" wx:if="{{!urlInput}}" data="{{t}}" />
         <view class="acts">
           <view class="act ghost" catchtap="pasteUrl">{{t.paste}}</view>
           <view class="act {{urlHint === 'ok' && !busy ? 'solid' : 'off'}}" catchtap="submitUrl">{{busy === 'url' ? t.busyExtract : t.save}}</view>
@@ -107,6 +108,7 @@
             <view class="pk-hint">{{t.fromAlbumHint}}</view>
           </view>
         </view>
+        <template is="entryGuide" wx:if="{{!previewImages.length}}" data="{{t}}" />
         <view class="acts">
           <view wx:if="{{previewImages.length}}" class="act ghost" catchtap="clearShots">{{t.clear}}</view>
           <view class="act {{previewImages.length && !busy ? 'solid' : 'off'}}" catchtap="submitScreenshots">{{busy === 'shot' ? t.busyExtract : t.startExtract}}</view>
@@ -163,3 +165,18 @@
     </view>
   </view>
 </view>
+
+<!-- 三步指引：面板定高 700，空态中间那截富余原本被按钮行的 auto 边距吃掉，
+     现在拿来放这份操作说明。两个入口档各引一次，所以写成模板放一份。
+     ⚠️ <template is> 不继承页面 data，必须显式 data="{{t}}"——漏了它数字照样画出来、
+     文字整段是空的（模拟器实测就是这个现象）。 -->
+<template name="entryGuide">
+  <view class="guide">
+    <view class="gstep g1"><view class="gnum">1</view>
+      <view class="gtxt"><text class="gt-t">{{t.guide1T}}</text><text class="gt-d">{{t.guide1D}}</text></view></view>
+    <view class="gstep g2"><view class="gnum">2</view>
+      <view class="gtxt"><text class="gt-t">{{t.guide2T}}</text><text class="gt-d">{{t.guide2D}}</text></view></view>
+    <view class="gstep g3"><view class="gnum">3</view>
+      <view class="gtxt"><text class="gt-t">{{t.guide3T}}</text><text class="gt-d">{{t.guide3D}}</text></view></view>
+  </view>
+</template>
