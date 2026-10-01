@@ -140,9 +140,9 @@ const i18n = {
     bioUnavailable: '这台手机没有可用的指纹或面容，直接重置即可。',
     swipeHint: '左右滑换模板',
     grip: '点一下收起',
-    slogan: '看到的好东西，存成能用的笔记',
+    slogan: '把图文，提炼成有用的干货',
     shareToFriend: '分享好友',
-    shareCardTitle: '图麦笔记 | 把链接和截图变成能用的笔记',
+    shareCardTitle: '图麦笔记 | 把图文提炼成有用的干货',
     // 额度与注销：数字全部来自 /api/user/quota 和 /api/user/deactivate，
     // 模板里不写死 100 和 10（{n} 由服务端给的 reward_each 填）。
     // 09-24 定：动笔写第一篇、或把别人那篇转存进自己库里，两条都算"带来一个新写作者"。
@@ -398,9 +398,9 @@ const i18n = {
     bioUnavailable: 'This phone has no fingerprint or face unlock — reset directly.',
     swipeHint: 'Swipe to change template',
     grip: 'Tap to close',
-    slogan: 'Turn what you read into notes you can use',
+    slogan: 'Turn what you read into useful notes',
     shareToFriend: 'Share with friends',
-    shareCardTitle: 'TuMaiBiJi | Turn links and screenshots into notes',
+    shareCardTitle: 'TuMaiBiJi | Turn what you read into useful notes',
     quotaLabel: 'Note quota',
     shareRewardN: '+{n} per new writer',
     deleteAccount: 'Delete account',

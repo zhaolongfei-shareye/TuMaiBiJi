@@ -71,7 +71,7 @@ fs.mkdirSync(OUT, { recursive: true })
         mode,
         lead: mode,
         previewImages: active === 'shot'
-          ? ['/assets/share-card.png', '/assets/share-card.png', '/assets/share-card.png'] : [],
+          ? ['/assets/share-card.jpg', '/assets/share-card.jpg', '/assets/share-card.jpg'] : [],
         errLine: '',
       })
       await sleep(280)

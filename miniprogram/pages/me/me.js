@@ -253,18 +253,19 @@ Page({
   },
 
   // 分享卡片固定落在新建页（新用户第一眼就是那三个色块），并带上邀请人 id。
-  // 归因到这里就结束了：对方打没打开、算不算邀请成功，服务端按"他真的存下第一条笔记"
-  // 来结账（backend/app/services/quota.py：自己动笔写第一篇、或把别人那篇转存进自己库里，
-  // 两条都算，一人一次、同一篇笔记一次，带来几个人不限），所以这行写的是一笔真实的兑换，
-  // 不是许愿。
-  // 封面是自己画的一张 5:4 图（assets/share-card.png，80KB，微信上限 128KB）：
+  // 归因到这里就结束了：对方打没打开、算不算邀请成功，服务端按"他真的存下一条笔记"
+  // 来结账（backend/app/services/quota.py：动笔写名下第一条 +10，别人把某一转存进自己库
+  // 里作者 +1；带来几个人不限、同一篇被几个人转存就算几次，但同一个人对同一篇只算一次），
+  // 所以这行写的是一笔真实的兑换，不是许愿。
+  // 封面是自己排的一张 5:4 杂志版式图（assets/share-card.jpg，113KB，微信上限 128KB）：
   // 不给 imageUrl 的话微信会截当前页，截到的是一屏菜单，推广位就废了。
+  // 源件在 docs/design/分享图-重设计/杂志版甲-纸白.html，改字改色都从它重出，别手改 PNG。
   onShareAppMessage() {
     const inviter = app.globalData.userId || ''
     return {
       title: t('shareCardTitle', this.data.lang),
       path: `/pages/create/create${inviter ? `?inviter=${inviter}` : ''}`,
-      imageUrl: '/assets/share-card.png',
+      imageUrl: '/assets/share-card.jpg',
     }
   },
 

@@ -47,7 +47,7 @@ const i18n = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
         mode,
         lead: mode,
         previewImages: withShots
-          ? ['/assets/share-card.png', '/assets/share-card.png', '/assets/share-card.png']
+          ? ['/assets/share-card.jpg', '/assets/share-card.jpg', '/assets/share-card.jpg']
           : [],
         // 报错行是"最坏情况"：它只在出错时出现，一旦面板定高就得给它留位置
         errLine: withShots ? (lang === 'zh' ? '内容安全校验未通过，请换个说法再试' : 'Content check failed, please rephrase and try again') : '',

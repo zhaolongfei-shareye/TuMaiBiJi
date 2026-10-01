@@ -144,12 +144,33 @@ const gotoMe = async (mp) => {
   ck('药丸钉在底图右上（在 band 里）', m.pill.top >= m.band.top && m.pill.right <= m.band.right + 1)
   ck('默认停在「设置」', d.tab === 'set', d.tab)
   ck('没设过昵称时第一行是问候语', d.nameText === '你好！我是图麦笔记', d.nameText)
-  ck('第二行是应用 Slogan', d.sloganText === '看到的好东西，存成能用的笔记', d.sloganText)
+  // Slogan 这句从 utils/i18n.js 现读，不抄第二份：10-01 那句换成「把图文，提炼成有用的干货」时，
+  // 抄死的判据红了而界面是对的——判据吃的是字典，界面吃的也是字典，那就只该有一份。
+  const i18nSrc = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'), 'utf8')
+  const zhSlogan = /slogan: '([^']+)'/.exec(i18nSrc)
+  ck('第二行是应用 Slogan（值现读 i18n.js 的 zh 段）', !!zhSlogan && d.sloganText === zhSlogan[1],
+    `${d.sloganText} ← ${zhSlogan && zhSlogan[1]}`)
   ck('圆里是应用 LOGO（没设卡片头像时）', d.logoSrc === '/assets/logo.png', d.logoSrc)
   ck('底图取的是首页那一个出口', /home-bg-portrait|USER_DATA_PATH/.test(d.bgSrc || ''), d.bgSrc)
   ck('锚点算出来了：按宽铺满 1448 高、往上顶 136', /height:1448rpx/.test(d.imgStyle || '') && /top:-136rpx/.test(d.imgStyle || ''), d.imgStyle)
   ck('数字来自服务端（base+bonus，不是界面写死）', /^\d+$/.test(String(d.scoreText || '')) && Number(d.scoreText) >= 100, d.scoreText)
   ck('分享那行右值吃服务端 reward_each，单位不再写"篇"', /^\S+ \+\d+$/.test(String(d.shareValue || '')), d.shareValue)
+
+  /* ---------- ④b 分享载荷：封面换成新图之后，路径写错微信会静默退回"截当前页"，
+     那种事在界面上看不出来，只能把 onShareAppMessage 真调一次、再让包去解这张图。 ---------- */
+  const payload = await page.callMethod('onShareAppMessage')
+  ck('转发标题是新那句「把图文提炼成有用的干货」',
+    payload && payload.title === '图麦笔记 | 把图文提炼成有用的干货', payload && payload.title)
+  ck('封面指向 assets/share-card.jpg（旧的 .png 已删）',
+    payload && payload.imageUrl === '/assets/share-card.jpg', payload && payload.imageUrl)
+  const img = await mp.evaluate(() => new Promise((resolve) => {
+    wx.getImageInfo({
+      src: '/assets/share-card.jpg',
+      success: (r) => resolve({ ok: true, w: r.width, h: r.height }),
+      fail: (e) => resolve({ ok: false, why: (e && e.errMsg) || 'fail' }),
+    })
+  }))
+  ck('这张图真在包里、尺寸 1280×1024（5:4）', img.ok && img.w === 1280 && img.h === 1024, JSON.stringify(img))
 
   /* ---------- ⑤ 设置那五条：一体 icon + 就地展开 ---------- */
   const labels = []
