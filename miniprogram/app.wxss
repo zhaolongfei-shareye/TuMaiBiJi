@@ -59,6 +59,7 @@ page {
   --text-tertiary: #9a9ea6;
   --bg-page: #f4f2ec;
   --bg-card: #ffffff;
+  --bg-card-glass: rgba(255, 255, 255, 0.95);
   --accent: #23252c;
   --accent-soft: rgba(35, 37, 44, 0.07);
   --border: rgba(35, 37, 44, 0.08);
@@ -77,6 +78,7 @@ page {
 .theme-default {
   --bg-page: #f4f2ec;
   --bg-card: #ffffff;
+  --bg-card-glass: rgba(255, 255, 255, 0.95);
   --text-primary: #23252c;
   --text-secondary: #5c6068;
   --text-tertiary: #9a9ea6;
@@ -90,6 +92,7 @@ page {
 .theme-blue {
   --bg-page: #eaeefb;
   --bg-card: #ffffff;
+  --bg-card-glass: rgba(255, 255, 255, 0.95);
   --text-primary: #23264f;
   --text-secondary: #5c6089;
   --text-tertiary: #8b90bd;
@@ -103,6 +106,7 @@ page {
 .theme-green {
   --bg-page: #e7f3ea;
   --bg-card: #ffffff;
+  --bg-card-glass: rgba(255, 255, 255, 0.95);
   --text-primary: #12331f;
   --text-secondary: #4c7a5b;
   --text-tertiary: #7d9c88;
@@ -116,6 +120,7 @@ page {
 .theme-sunset {
   --bg-page: #fdeee6;
   --bg-card: #ffffff;
+  --bg-card-glass: rgba(255, 255, 255, 0.95);
   --text-primary: #4a1f10;
   --text-secondary: #a4664c;
   --text-tertiary: #c0917c;
@@ -129,6 +134,7 @@ page {
 .theme-purple {
   --bg-page: #0c0c1d;
   --bg-card: rgba(255, 255, 255, 0.05);
+  --bg-card-glass: rgba(255, 255, 255, 0.05);
   --text-primary: #eceaf6;
   --text-secondary: #b3aecf;
   --text-tertiary: #8d87ae;
@@ -144,6 +150,7 @@ page {
 .theme-ocean {
   --bg-page: #0d1b2a;
   --bg-card: rgba(255, 255, 255, 0.05);
+  --bg-card-glass: rgba(255, 255, 255, 0.05);
   --text-primary: #e2eef6;
   --text-secondary: #86a3bb;
   --text-tertiary: #6f8ba3;
@@ -163,6 +170,7 @@ page {
 .theme-tint-paper {
   --bg-page: #F2EFE9;
   --bg-card: #FCFBF8;
+  --bg-card-glass: rgba(252, 251, 248, 0.95);
   --text-primary: #241E16;
   --text-secondary: rgba(36, 30, 22, 0.66);
   --text-tertiary: rgba(36, 30, 22, 0.4);
@@ -176,6 +184,7 @@ page {
 .theme-tint-celadon {
   --bg-page: #E9EEEA;
   --bg-card: #F7FAF7;
+  --bg-card-glass: rgba(247, 250, 247, 0.95);
   --text-primary: #1B2A21;
   --text-secondary: rgba(27, 42, 33, 0.66);
   --text-tertiary: rgba(27, 42, 33, 0.4);

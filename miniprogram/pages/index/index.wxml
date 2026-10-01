@@ -219,7 +219,7 @@
       </view>
       <view class="tpl-actions">
         <view class="tpl-btn ghost" bindtap="onCancelTemplate">{{t.cancel}}</view>
-        <view class="tpl-btn primary {{posterImagePath ? '' : 'disabled'}}" bindtap="onSavePoster">{{t.saveToAlbum}}</view>
+        <view class="tpl-btn primary {{posterImagePath ? '' : 'disabled'}}" bindtap="onSavePoster">{{t.saveAndShare}}</view>
       </view>
     </view>
   </view>

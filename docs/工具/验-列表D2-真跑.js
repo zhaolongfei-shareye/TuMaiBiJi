@@ -18,6 +18,7 @@ const path = require('path')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/笔记列表-D2优化/实测')
 const p = require(path.resolve(__dirname, '../../miniprogram/utils/palette.js'))
+const i18n = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
 const APP_WXSS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/app.wxss'), 'utf8')
 const BAR_WXSS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/custom-tab-bar/index.wxss'), 'utf8')
 
@@ -46,6 +47,12 @@ const secondaryOf = (w) => {
   // 十六进制和 rgba 两种写法都要认：淡雅那两枚的 --text-secondary 是
   // `rgba(27, 42, 33, 0.66)`，原来这里只匹配 #rrggbb，拿到天青就 null[1] 崩掉。
   return (/--text-secondary:\s*(#[0-9A-Fa-f]{6}|rgba?\([^)]*\))/.exec(m[1]) || [])[1] || ''
+}
+// 同一个读法管所有令牌：横条那一层毛玻璃的 --bg-card-glass 也从各主题块里现读，
+// 探针不抄第二份表（改了主题忘了改判据，就是上一把 .sc-card 那条假绿的路子）。
+const tokenOf = (w, name) => {
+  const m = new RegExp(`\\.${p.themeOf(w).cls}\\s*\\{([\\s\\S]*?)\\}`).exec(APP_WXSS)
+  return (new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6}|rgba?\\([^)]*\\))`).exec(m[1]) || [])[1] || ''
 }
 // 计算样式回的是 rgb()/rgba()，源码里可能是 #hex 也可能是 rgba()——两边都拆成三个数再比
 const anyRgb = (v) => (/^#/.test(String(v)) ? hexArr(v) : rgbOf(v))
@@ -147,6 +154,20 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
         : near(rgbOf(dotBg), hexArr(want0.dot), 2))
     ck(`${label}：那枚点渲染对了（${want0.ring ? '空心环：透明底 + 描边取字色' : '实心：点色 ' + want0.dot}）且 14rpx 见方`,
       dotOk, `${dotBg} / ${ds && ds.width}x${ds && ds.height}`)
+
+    // ---------- ②a 横条那一层毛玻璃 + 日期字号（站长 10-01 两条） ----------
+    // 这一组必须在收起态量：展开那一行也吃同一条背景规则，但脚注里另有一枚 .dt。
+    const rowBg = await styleOf(page, '.note-row', 'background-color')
+    const wantGlass = tokenOf(w, 'bg-card-glass')
+    ck(`${label}：横条底色 = 本主题 --bg-card-glass（95% 那一档，不再是实色卡底）`,
+      near(rgbOf(rowBg), anyRgb(wantGlass), 2), `${rowBg} vs ${wantGlass}`)
+    const glassEl = await page.$('.note-row')
+    const bf = glassEl && await glassEl.style('backdrop-filter')
+    ck(`${label}：横条真挂了背景模糊（只调透明度不叫毛玻璃）`, /blur\(/.test(String(bf)), String(bf))
+    const dtPx = parseFloat(await styleOf(page, '.note-row .dt', 'font-size'))
+    const tiPx = parseFloat(await styleOf(page, '.note-row .row-title', 'font-size'))
+    ck(`${label}：日期比标题小一档（收进 --fs-meta 24rpx，原来它跟标题同为 16px≈31rpx）`,
+      Math.abs(dtPx - 24 * R) <= 0.8 && dtPx < tiPx, `日期 ${dtPx}px / 标题 ${tiPx}px（24rpx=${(24 * R).toFixed(1)}px）`)
     // ---------- ②b／③ 分类名和 meta 行只在展开那一行里有 ----------
     // v4 起收起行只剩「点＋标题＋日期」：原来这两条拿收起行的 .cat 量宽度，量到的是那枚 7px 的点；
     // .row-foot 在收起态整个不渲染，styleOf 读到 null，再被 "null === null" 判成"整行同色"——假绿。
@@ -201,6 +222,37 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
       && Math.abs((s.image_rpx[1] - b[3]) - 20) <= 8,
       b && `左 ${b[0]} 右 ${b[2]} 离底 ${Math.round(s.image_rpx[1] - b[3])}（高 ${Math.round(b[3] - b[1])} 只作记录）`)
   }
+
+  // ---------- 页头那三个数：分隔符得是"折不掉"的那种空格 ----------
+  // 10-01 站长真截图：英文那档三段糊成 "Week: 1|Month: 0|Total: 4"。模拟器里两个半角空格
+  // 是照算宽度的（实测双空格串与整串同宽 133.2px、无空格版 117.7px），真机却把它折成一个——
+  // 所以这条判据钉不了"屏幕上开不开"，只能钉送进渲染器的那串字用的是 U+00A0：它不参与空白折叠。
+  const langBefore = await mp.evaluate(() => getApp().globalData.userInfo?.language || 'zh')
+  for (const [lg, sep, name] of [['zh', '　|　', '中文'], ['en', '\u00A0\u00A0|\u00A0\u00A0', '英文']]) {
+    await mp.evaluate((l) => {
+      const a = getApp()
+      a.globalData.userInfo = Object.assign({}, a.globalData.userInfo, { language: l })
+    }, lg)
+    const sp = await enter('/pages/index/index')
+    await sleep(4500)
+    const sd = await sp.data()
+    const txt = String(sd.statsText || '')
+    ck(`${name}那三个数：分隔符是折不掉的那一档（${name === '英文' ? 'U+00A0' : '全角空格'}）`,
+      txt.includes(sep), JSON.stringify(txt))
+    ck(`${name}那三个数：三段都还在（换分隔符没把谁吃掉）`,
+      ['statWeek', 'statMonth', 'statTotal'].every((k) => txt.includes(i18n.t(k, lg))), txt)
+    const sm = await mp.evaluate(() => new Promise((res) => {
+      wx.createSelectorQuery().select('.page-stats').boundingClientRect()
+        .select('.page-title').boundingClientRect().exec((r) => res({ stats: r[0], title: r[1] }))
+    }))
+    ck(`${name}那三个数：没顶到标题底下去（两块横向不相交）`,
+      !!sm.stats && !!sm.title && sm.stats.left >= sm.title.right - 1,
+      sm.stats && `数块左沿 ${sm.stats.left.toFixed(1)} / 标题右沿 ${sm.title.right.toFixed(1)}`)
+  }
+  await mp.evaluate((l) => {
+    const a = getApp()
+    a.globalData.userInfo = Object.assign({}, a.globalData.userInfo, { language: l })
+  }, langBefore)
 
   // 还原：这一台模拟器原来用哪枚壁纸，量完还回去
   await mp.evaluate((raw) => {

@@ -146,10 +146,12 @@ Page({
       })
       const total = all.length >= STATS_LIMIT ? `${STATS_LIMIT}+` : all.length
       // 分隔符两侧各留一个全角空格：半角空格在这行字号下几乎看不出来，三段会糊成一串数字。
-      // 英文那一档没有全角标点的位置，照抄会让 "Week：3" 这种半中半英的写法出现在英文界面上，
-      // 所以标点单独按语言取一份，中文那一版一字未动。
+      // 英文那一档没有全角标点的位置，照抄会让 "Week：3" 这种半中半英的写法出现在英文界面上。
+      // 10-01 站长真截图：英文那三个半角空格在真机上被折成一个、几乎看不见（"Week: 1|Month"），
+      // 模拟器里却是好的——所以这一档改用不换行空格 U+00A0，它不参与空白折叠，两端渲染一致。
       const colon = lang === 'zh' ? '：' : ': '
-      const gap = lang === 'zh' ? '　|　' : '  |  '
+      const NB = ' '
+      const gap = lang === 'zh' ? '　|　' : `${NB}${NB}|${NB}${NB}`
       this.setData({
         statsText: [
           `${t('statWeek', lang)}${colon}${week}`,
@@ -633,7 +635,24 @@ Page({
   onCancelTemplate() { this._closeTemplate() },
   onHandleTap() { this._closeTemplate() },
 
+  // 站长 10-01：账号认证下来了，图片分享能力可以接。这枚按钮从"存进相册"换成弹微信那个
+  // 五枚一排的图片面板（发送给朋友 / 分享到朋友圈 / 收藏 / 保存图片 / 转发为贴图），存和发一次给完。
+  // 这个面板只在真机有——开发者工具里一定 fail，所以那条路退回"直接存相册"，不让人白点一次。
   onSavePoster() {
+    const path = this.data.posterImagePath
+    if (!path) return
+    wx.showShareImageMenu({
+      path,
+      success: () => this._closeTemplate(),
+      fail: (err) => {
+        const msg = (err && err.errMsg) || ''
+        if (msg.indexOf('cancel') >= 0) return
+        this._saveToAlbum()
+      },
+    })
+  },
+
+  _saveToAlbum() {
     if (!this.data.posterImagePath) return
     const { lang } = this.data
     wx.saveImageToPhotosAlbum({

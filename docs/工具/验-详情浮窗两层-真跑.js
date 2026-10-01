@@ -24,6 +24,14 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
 ;(async () => {
   if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true })
   const mp = await automator.connect({ wsEndpoint: 'ws://localhost:9431' })
+  // 这一把通篇钉的是中文串（「生成笔记卡片」「取消」），而这个字段是登录时从服务端带回来的：
+  // 上一把尺子（验-热启动归因.js）真登录过一次，测试号在服务端存的是 en，这里就会凭空红一片。
+  // 所以开跑前钉成 zh、收尾还回去——和 验-我的页改版-真跑.js 同一个处理。
+  const langBefore = await mp.evaluate(() => getApp().globalData.userInfo?.language || 'zh')
+  await mp.evaluate(() => {
+    const a = getApp()
+    a.globalData.userInfo = Object.assign({}, a.globalData.userInfo, { language: 'zh' })
+  })
   try {
     await sleep(2000)
     await mp.switchTab('/pages/index/index')
@@ -98,6 +106,24 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('弹窗里没有详情窗的 dock', !(await page.$('.ds-dock')))
     ck('弹窗 dock 有二维码开关', !!(await page.$('.tpl-qr')))
     ck('开关默认开着', d.noQr === false)
+    // 10-01 站长：账号认证下来了，这枚主操作从"存进相册"换成弹微信的图片分享面板
+    //（发送给朋友 / 朋友圈 / 收藏 / 保存图片 / 转发为贴图五枚都在里面），所以文案不能再只说存相册。
+    const tplBtns = []
+    for (const b of await page.$$('.tpl-btn')) tplBtns.push(await b.text())
+    ck('主操作那枚叫「保存并分享」（左那枚仍是取消）', tplBtns.join('|') === '取消|保存并分享', tplBtns.join('|'))
+    const menuApi = await mp.evaluate(() => typeof wx.showShareImageMenu)
+    ck('这一档环境里有微信图片分享面板这个 API（真机上那五枚才是它给的）',
+      menuApi === 'function', `typeof=${menuApi}`)
+    // 页面方法在逻辑层是代理过的原生函数，String(fn) 只能拿到 [native code]，读不到实现；
+    // 所以这一条从源码读：主路径必须只打面板，存相册那一枪只能出现在兜底那个函数里。
+    const IDX_JS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/index/index.js'), 'utf8')
+    const grab = (name) => (new RegExp(`${name}\\(\\)\\s*\\{([\\s\\S]*?)\\n  \\}`).exec(IDX_JS) || [])[1] || ''
+    const main = grab('onSavePoster'), fb = grab('_saveToAlbum')
+    ck('主路径只打图片分享面板（wx.showShareImageMenu），不再自己往相册里塞',
+      /wx\.showShareImageMenu\(/.test(main) && !/saveImageToPhotosAlbum/.test(main),
+      `onSavePoster 里 showShareImageMenu=${/showShareImageMenu/.test(main)} 直接存相册=${/saveImageToPhotosAlbum/.test(main)}`)
+    ck('面板打不开时才退回存相册（兜底那条路还在）',
+      /wx\.saveImageToPhotosAlbum\(/.test(fb) && /this\._saveToAlbum\(\)/.test(main), `兜底函数 ${fb.length} 字符`)
     await mp.screenshot({ path: path.join(OUT, '04-模板弹窗.png') })
 
     /* ---------- 关码 → 整张重画 ---------- */
@@ -176,6 +202,10 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     console.log(`\n${bad.length ? '未通过 ' + bad.length + ' 条：' + bad.join(' / ') : '全部通过'}（截图 → ${OUT}）`)
     process.exitCode = bad.length ? 1 : 0
   } finally {
+    await mp.evaluate((l) => {
+      const a = getApp()
+      a.globalData.userInfo = Object.assign({}, a.globalData.userInfo, { language: l })
+    }, langBefore)
     await mp.disconnect()
   }
 })().catch((e) => { console.error('脚本崩了', e); process.exit(2) })

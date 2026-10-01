@@ -231,6 +231,9 @@ const i18n = {
     generatingShare: '生成分享图...',
     generateFailed: '生成失败',
     saveToAlbum: '保存到相册',
+    // 「生成笔记卡片」那枚主操作按的是微信的图片分享面板（发送给朋友 / 朋友圈 / 收藏 / 保存图片
+    // 五枚都在里面），保存只是面板的一项，所以按钮不能再叫"保存到相册"。
+    saveAndShare: '保存并分享',
     savedToAlbum: '已保存到相册',
     needAlbumPermission: '需要相册权限',
     permissionHint: '请在设置中允许访问相册',
@@ -491,6 +494,7 @@ const i18n = {
     generatingShare: 'Generating share image...',
     generateFailed: 'Generate failed',
     saveToAlbum: 'Save to album',
+    saveAndShare: 'Save & share',
     savedToAlbum: 'Saved to album',
     needAlbumPermission: 'Album permission required',
     permissionHint: 'Please allow album access in settings',

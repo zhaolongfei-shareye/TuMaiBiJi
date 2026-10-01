@@ -297,6 +297,9 @@
   margin-left: auto;
   letter-spacing: 0.4rpx;
   color: var(--text-secondary);
+  /* 站长 10-01：日期比标题小一档。这一行原来没写字号，跟着容器落到 16px（≈31rpx），
+     和标题一样大，一行里两个主角。收进 --fs-meta 那一档，收起行和展开态脚注一起跟着走。 */
+  font-size: var(--fs-meta);
 }
 
 .chev {
@@ -815,6 +818,16 @@
 
 .container.has-bg .page-stats {
   color: rgba(242, 239, 233, 0.95);
+}
+
+/* 站长 10-01：列表那几条横条改 95% 不透明 + 背景模糊，模仿毛玻璃，让底下的形象图透一点出来。
+   只在铺了形象图那一态生效——没铺图时背后是纯色页面，模糊没有对象，白搭一层 GPU。
+   深色那两套主题的 --bg-card-glass 就等于它们原本的卡底，对它们只有模糊是新增的。
+   展开态那一头照到同一条规则：收起、展开是一根横条的两种高度，不该换一张脸。 */
+.container.has-bg .note-row {
+  background: var(--bg-card-glass);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
 }
 
 /* 搜索条在图上换成纸白那一面，和新建页那条录入胶囊同一句话——
