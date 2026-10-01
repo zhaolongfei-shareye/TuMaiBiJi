@@ -301,6 +301,12 @@
   padding: var(--sp-2) 0 0;
 }
 
+/* 「保存」上移之后它不再是整页最后一样的了：现在末尾是最后一条模板小样。
+   原来那档 safe-area 底部留白跟着搬到这里——少了它，iPhone 上最后一排小样会压在横条上。 */
+.container {
+  padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
+}
+
 /* 卡片预览分区头：一条虚线 + 小标 + 一句提示。虚线而不是实线——上面那几组卡片的
    边界语言是描边实线，这里要读得出"分隔的是两块内容，不是一张卡的边"。 */
 .preview-head {

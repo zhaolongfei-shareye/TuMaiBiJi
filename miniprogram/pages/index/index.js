@@ -548,8 +548,8 @@ Page({
     const outH = plan.height + poster.MATTE * 2
     canvas.width = outW
     canvas.height = outH
-    // 画布那一格永远等于海报本身，不跟着展示框走：出的是 750 宽的成品，
-    // 而不是"缩到弹窗里那么大"的一张。
+    // 画布那一格永远等于成品本身（含上面那圈黑），不跟着展示框走：
+    // 出的是 750 + 40×2 = 830 宽的一张，而不是"缩到弹窗里那么大"的那张。
     this.setData({ canvasW: outW, canvasH: outH })
     ctx.fillStyle = '#000'
     ctx.fillRect(0, 0, outW, outH)

@@ -10,6 +10,8 @@ const automator = require('miniprogram-automator')
 const lang = require('./尺子语言钉.js')
 const fs = require('fs')
 const path = require('path')
+// 「使用场景」那句判据吃字典，不抄第二份（界面读同一份 i18n）
+const i18n = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/笔记列表-堆叠卡/实测-0930')
 const API = 'https://api.agentsbin.cn/wtsj'
@@ -90,16 +92,28 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
       Math.abs((card.top + card.bottom) / 2 - win.windowHeight / 2) <= 2,
       card && `圆心 ${((card.left + card.right) / 2).toFixed(1)}/${((card.top + card.bottom) / 2).toFixed(1)} 屏心 ${(win.windowWidth / 2).toFixed(1)}/${(win.windowHeight / 2).toFixed(1)}`)
     // 他打回的那一条就是"下方的按钮被遮挡"——所以这一条是这块的核心判据。
+    // card 读不到的时候不许往下走：`card.bottom` 会把整把尺子炸掉，后面几十条一起没。
     const btnRects = await rects('.pwd-btn')
     ck('两枚按钮整枚在卡以内（图三那个被切掉的事故不再出现）',
-      btnRects.length === 2 && btnRects.every((b) => b.bottom <= card.bottom + 1 && b.top >= card.top - 1),
+      !!card && btnRects.length === 2 && btnRects.every((b) => b.bottom <= card.bottom + 1 && b.top >= card.top - 1),
       btnRects.map((b) => `${b.top.toFixed(0)}~${b.bottom.toFixed(0)}`).join(' ') + ` | 卡 ${card && card.bottom.toFixed(0)}`)
+    // 那句"使用场景"分两态：设置态讲这串用在哪，重置态讲怎么换。这一屏走到这里时是哪一态
+    // 由服务端那条读数决定（上一个账号跑完密码就没了），所以不钉字面值、钉"等于字典里对应那一态"。
     const sceneTx = await tx(await me.$('.pwd-scene'))
-    ck('使用场景那句写在页面里面（不是只在弹窗标题）',
-      /私密/.test(sceneTx) && sceneTx.length > 12, sceneTx)
+    const wantScene = i18n.t(d.pwdEntering ? 'privatePasswordScene' : 'privatePasswordSetHint', 'zh')
+    ck('使用场景那句写在卡里面，且吃的是字典里对应这一态的那句',
+      sceneTx.replace(/\s+/g, '') === wantScene.replace(/\s+/g, ''), `${sceneTx.slice(0, 24)} ← ${d.pwdEntering ? 'Scene' : 'SetHint'}`)
     const nameTx = await tx(await me.$('.pwd-name'))
     ck('从上到下第一样是功能名称', nameTx.indexOf('私密密码') === 0, nameTx)
-    ck('方格上方有一行校验提醒', (await tx(await me.$('.pwd-tip'))).length > 6, await tx(await me.$('.pwd-tip')))
+    // 原来这条只量「长度 > 6」，而 tx(null) 回的是「（元素不存在）」整整七个字——
+    // 那一格不存在的时候它反而绿。改成按那一态钉死：设置态必须是字典里那句，重置态整行不许挂。
+    const tipEl = await me.$('.pwd-tip')
+    const tipTx = (await tx(tipEl)).replace(/\s+/g, '')
+    const wantTip = [i18n.t('privatePasswordNew', 'zh'), i18n.t('privatePasswordAgain', 'zh')]
+      .map((x) => x.replace(/\s+/g, ''))
+    ck('校验提醒那一行：设置态给的是字典那句，重置态整行不挂',
+      d.pwdEntering ? wantTip.indexOf(tipTx) >= 0 : !tipEl,
+      `${d.pwdEntering ? '设置' : '重置'}态 "${tipTx}"`)
     await mp.screenshot({ path: path.join(OUT, `01a-私密密码弹层-${d.pwdEntering ? '设置' : '重置'}态.png`) })
 
     // 重置态（这一层的样子是 openPwdSheet(entering) 一次性算出来的，

@@ -296,7 +296,7 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck('卡整块在屏以内', !!m.pwdCard && m.pwdCard.top >= 0 && m.pwdCard.bottom <= m.windowHeight + 1,
     m.pwdCard && `${m.pwdCard.top}~${m.pwdCard.bottom} / ${m.windowHeight}`)
   ck('使用场景这句写在卡里面（不是只有弹窗标题）',
-    !!m.scene && m.scene.top > m.pwdCard.top && m.scene.bottom < m.pwdCard.bottom,
+    !!m.scene && !!m.pwdCard && m.scene.top > m.pwdCard.top && m.scene.bottom < m.pwdCard.bottom,
     m.scene && `${m.scene.top}~${m.scene.bottom}`)
   const nameEl = await page.$('.pwd-name')
   const nameTx = nameEl ? (await nameEl.text()).trim() : ''
@@ -310,10 +310,12 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     m.cells.length === (d.pwdEntering ? 6 : 0), `cells=${m.cells.length} entering=${d.pwdEntering}`)
   // 站长 10-01 深夜：「6 个框太大，不精致，可以稍微聚集中间」。旧判据"铺满内宽"作废，
   // 换成钉这一条：一整排比卡的内宽窄（收在中间），且整排以卡的中线对称。
-  if (m.cells.length === 6) {
+  // 卡读不到就不进这一段：下面三把都要用 m.pwdCard 和 cardCx，少一个判据会把整把尺子崩掉
+  // （cardCx 是 `m.pwdCard && …`，null 参与减法会被当成 0，量出来的数是假的）。
+  if (m.cells.length === 6 && m.pwdCard) {
     const rowL = m.cells[0].left, rowR = m.cells[5].left + m.cells[5].width
     const rowW = toRpx(rowR - rowL, W)
-    const inner = toRpx(m.pwdCard.width, W) - 64   // 卡左右各 var(--sp-4)=32
+    const inner = toRpx(m.pwdCard.width, W) - 2 * SP4   // 内宽 = 外沿 − 左右各一档 --sp-4
     ck('六格收小了：一整排比卡的内宽窄', rowW < inner, `${rowW.toFixed(0)} < ${inner.toFixed(0)}`)
     ck('一整排在卡里居中（不是靠左堆着）',
       Math.abs((rowL + rowR) / 2 - cardCx) <= 3,
@@ -330,7 +332,7 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   // .dialog-btn（padding 一档、不写死高），所以钉的是"同一行、各占一半、右边那枚
   // 离卡内边沿正好一档内边距"。注意单位：坐标是 px，卡内边距是 rpx，必须换算后再比。
   ck('两枚坐在同一行、各占约一半内宽（照分类管理那两个按钮）',
-    m.btns.length === 2 && Math.abs(m.btns[0].top - m.btns[1].top) <= 1 &&
+    !!m.pwdCard && m.btns.length === 2 && Math.abs(m.btns[0].top - m.btns[1].top) <= 1 &&
     Math.abs(m.btns[0].width - m.btns[1].width) <= 1 &&
     Math.abs(toRpx(m.pwdCard.right - m.btns[1].right, W) - SP4) <= 4 &&
     Math.abs(toRpx(m.btns[0].left - m.pwdCard.left, W) - SP4) <= 4,
@@ -373,10 +375,13 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     d.mindRules.length === 3 && /^\d+$/.test(d.mindRules[0].value) &&
     /^\+\d+$/.test(d.mindRules[1].value) && /^\+\d+$/.test(d.mindRules[2].value),
     d.mindRules.map((r) => `${r.label}=${r.value}`).join(' '))
-  // 「推荐图麦」那行的右值与规则第二行必须同源（都吃 reward_each），不一致就是有一处写死了
-  ck('分享那行的数 = 规则第二行的数（同一个服务端字段）',
-    /(\+\d+)$/.test(d.shareValue || '') && d.shareValue.match(/(\+\d+)$/)[1] === d.mindRules[1].value,
-    `${d.shareValue} vs ${d.mindRules[1].value}`)
+  // 「推荐图麦」那行的右值与规则第二行必须同源（都吃 reward_each），不一致就是有一处写死了。
+  // 两处一起空（服务端没给这个字段，整块规则不出现）也是一致的。取数别写 `d.mindRules[1].value`：
+  // 那一格不存在时它是 undefined，取 .value 会让整把尺子崩在这里。
+  const rule2 = (d.mindRules[1] || {}).value || ''
+  const m2 = /\+(\d+)/.exec(d.shareValue || '')
+  ck('分享那行的数 = 规则第二行的数（同一个服务端字段，两处一起空也算一致）',
+    (m2 ? '+' + m2[1] : '') === rule2, `${d.shareValue} vs ${rule2}`)
   ck('规则行不拥挤：每行至少 106 高（跟菜单行同一档）',
     m.rules.length === 3 && m.rules.every((r) => toRpx(r.height, W) >= 104),
     m.rules.map((r) => toRpx(r.height, W).toFixed(0)).join('/'))

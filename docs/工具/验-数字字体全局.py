@@ -72,7 +72,7 @@ FIELDS = [
     ('pages/share/view.wxss', '.point-num', '22rpx', '', '扫码落地页要点序号'),
     ('pages/me/me.wxss', '.rule-value', 'var(--fs-title)', '+', '魅力值规则那三行的数（100 / +10 / +1）'),
     ('pages/write/write.wxss', '.char-count', 'var(--fs-tiny)', '/', '摘要字数 137/500'),
-    ('pages/me/me.wxss', '.about-ver', 'var(--fs-label)', 'v.', '「我的」页那枚版本号 v1.9.7'),
+    ('pages/me/me.wxss', '.about-ver', 'var(--fs-label)', 'v.', '「我的」页那枚版本号（具体号由 appInfo.js 定，这里不钉）'),
     ('pages/about/about.wxss', '.brand-ver', 'var(--fs-micro)', 'v.', '关于页那枚版本号'),
 ]
 for rel, sel, size, symbols, what in FIELDS:

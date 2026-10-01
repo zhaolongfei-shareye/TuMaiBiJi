@@ -227,7 +227,7 @@
   align-items: center;
   gap: var(--sp-3);
   min-height: 106rpx;
-  border-top: 1rpx solid var(--card-edge);
+  border-top: var(--w-edge) solid var(--card-edge);
 }
 
 .rule-label {
