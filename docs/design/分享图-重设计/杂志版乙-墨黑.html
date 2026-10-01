@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 分享封面 · 杂志海报版（墨黑）：与甲同一套版式，只翻明暗：左半是杂志排版，右半用 iPhone 壳套住产品精华——
+   壳里那张就是小程序「转为笔记卡片」的「杂志封面」模板（poster.js 里 id='cover'）。
+   字体照官网 site.css 那一套：--display 'Playfair Display'（拉丁，从官网拉的字重）
+   + --cn 'Songti SC'（中文宋体）+ --paper/--ink/--clay 三个色锚点。
+   注意：宋体在这份 PNG 里是真命中的（Chrome 本机字体）；小程序界面里不认系统字体名，
+   所以这条只对导出图成立，别推论到界面上。 */
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-400-normal.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-500-normal.woff2') format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-500-italic.woff2') format('woff2'); font-weight: 500; font-style: italic; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; height: 1024px; overflow: hidden; }
+.card { position: relative; width: 1280px; height: 1024px;
+  background: radial-gradient(110% 90% at 82% 6%, #232533 0%, #16181D 46%, #101216 100%); color: #F2EFE9;
+  font-family: 'Songti SC', 'STSong', serif; }
+.cn { font-family: 'Songti SC', 'STSong', serif; letter-spacing: .03em; }
+.en { font-family: 'Playfair', Didot, Georgia, serif; }
+
+/* 报头 */
+.mast { position: absolute; left: 84px; top: 74px; right: 84px; display: flex; align-items: flex-end;
+  justify-content: space-between; padding-bottom: 16px; border-bottom: 3px solid rgba(242,239,233,.72); }
+.mast .mk { font-family: 'Playfair'; font-weight: 500; font-size: 21px; letter-spacing: .42em; }
+.mast .mr { font-family: 'Playfair'; font-size: 21px; letter-spacing: .18em; color: rgba(242,239,233,.55); }
+
+/* 主标题 */
+.h1 { position: absolute; left: 84px; top: 208px; width: 600px; font-size: 86px; line-height: 1.26;
+  font-weight: 700; letter-spacing: -.01em; }
+.h1 i { font-style: normal; color: #F6C445; }
+.sub { position: absolute; left: 84px; top: 452px; font-family: 'Playfair'; font-style: italic;
+  font-weight: 500; font-size: 29px; line-height: 1.3; color: rgba(242,239,233,.48); }
+
+/* 三条卖点 */
+.list { position: absolute; left: 84px; top: 528px; width: 580px; }
+.it { display: flex; gap: 24px; padding: 22px 0; border-top: 1px solid rgba(242,239,233,.18); }
+.it:last-child { border-bottom: 1px solid rgba(242,239,233,.18); }
+.no { flex: none; font-family: 'Playfair'; font-weight: 500; font-size: 36px; line-height: 1.05; width: 52px; color: #8A90FF; }
+.it:nth-child(2) .no { color: #F0915F; } .it:nth-child(3) .no { color: #86BE8B; }
+.tt { font-size: 31px; font-weight: 700; letter-spacing: .04em; }
+.dd { margin-top: 6px; font-size: 23px; line-height: 1.45; color: rgba(242,239,233,.66); }
+
+.foot { position: absolute; left: 84px; bottom: 46px; font-size: 22px; letter-spacing: .1em; color: rgba(242,239,233,.5); }
+
+/* 手机壳 */
+.phone { position: absolute; right: 96px; top: 118px; width: 452px; height: 828px; border-radius: 66px;
+  background: #06070A; padding: 16px; box-shadow: 0 46px 96px rgba(0,0,0,.6), inset 0 0 0 2px rgba(242,239,233,.16); }
+.scr { position: relative; width: 420px; height: 796px; border-radius: 52px; overflow: hidden; background: #fff; }
+.isl { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); width: 118px; height: 32px;
+  border-radius: 999px; background: #1B1D22; z-index: 5; }
+
+/* 壳里那张 = 「杂志封面」模板：上图 46% + kicker + 大标题 + 三条要点 + 署名与码 */
+.cover { position: absolute; inset: 0; background: #1A1C22; color: #F2EFE9; }
+.cover .ph { position: relative; height: 372px; overflow: hidden; }
+.cover .ph img { width: 420px; height: 540px; object-fit: cover; object-position: 50% 16%; }
+.cover .ph::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,22,26,.1), rgba(20,22,26,.86)); }
+.cover .kick { position: absolute; left: 28px; top: 392px; font-family: 'Playfair'; font-size: 15px;
+  letter-spacing: .3em; color: rgba(242,239,233,.62); }
+.cover .ct { position: absolute; left: 28px; right: 28px; top: 420px; font-size: 46px; line-height: 1.22; font-weight: 700; }
+.cover .pt { position: absolute; left: 28px; right: 28px; top: 552px; font-size: 20px; line-height: 1.55;
+  color: rgba(242,239,233,.8); }
+.cover .pt div { padding: 9px 0; border-top: 1px solid rgba(242,239,233,.16); }
+.cover .sign { position: absolute; left: 28px; bottom: 30px; display: flex; align-items: center; gap: 10px;
+  font-size: 17px; color: rgba(242,239,233,.72); }
+.cover .sign i { width: 34px; height: 34px; border-radius: 50%; background: #F6C445; display: inline-block; }
+.cover .qr { position: absolute; right: 26px; bottom: 26px; width: 74px; height: 74px; border-radius: 12px;
+  background: #F2EFE9; display: grid; grid-template-columns: repeat(5,1fr); gap: 3px; padding: 7px; }
+.cover .qr b { background: #14161A; border-radius: 1px; }
+.cover .qr b.o { background: transparent; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="mast">
+    <div class="mk">TUMARK · 图麦笔记</div>
+    <div class="mr">agentsbin.cn</div>
+  </div>
+
+  <div class="h1">把<i>图文</i>，提炼成<br>有用的知识</div>
+  <div class="sub">Notes from what you read.</div>
+
+  <div class="list">
+    <div class="it"><div class="no">01</div><div><div class="tt">AI 整理提炼</div>
+      <div class="dd">链接、截图丢进来，只留知识点</div></div></div>
+    <div class="it"><div class="no">02</div><div><div class="tt">精美卡片存档</div>
+      <div class="dd">十套模板，一键出图存进相册</div></div></div>
+    <div class="it"><div class="no">03</div><div><div class="tt">无广告零付费</div>
+      <div class="dd">不埋点，也不设会员墙</div></div></div>
+  </div>
+
+  <div class="foot">微信搜「图麦笔记」</div>
+
+  <div class="phone"><div class="scr"><div class="isl"></div>
+    <div class="cover">
+      <div class="ph"><img src="../分享图素材-官网/person.jpg" alt=""></div>
+      <div class="kick">旅行 · 10/01</div>
+      <div class="ct">厦门三日路线</div>
+      <div class="pt"><div>轮渡提前一天订，别现场排队</div><div>岛上骑车比走路省一半时间</div><div>傍晚五点后沙坡尾光线最好</div></div>
+      <div class="sign"><i></i>阿麦 · 图麦笔记</div>
+      <div class="qr"><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b><b class="o"></b><b></b></div>
+    </div>
+  </div></div>
+</div>
+</body>
+</html>
