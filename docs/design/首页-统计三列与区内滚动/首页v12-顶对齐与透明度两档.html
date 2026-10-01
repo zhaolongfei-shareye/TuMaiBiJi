@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 首页 v12 · 三列数字顶对齐 + 圆角接缝 + 行卡透明度两档</title>
+<style>
+/* ==================================================================
+   v12 = 站长 10-01 下午那四句决定，逐句落成数：
+     ① 「选择在背景上面的方案」→ 沿用 v11 甲：三列数字直接压在形象图上。
+     ② 「三个数字要顶对齐，但与上面留一些距离，与下方留一些空间」
+        → 三列的 .n 顶部对在同一条线（align-items:flex-start），整块从 band 顶往下 272rpx 起，
+          块本身高约 114rpx（100 的数字 + 10 的间距 + 18 的小字），
+          下面那道圆角接缝在 502rpx（= 542 − 被卡盖住的 40），于是数字下沿离接缝还有 116rpx。
+     ③ 「圆角方式与我的那页一致」→ 现网 pages/me/me.wxss：.band 高 542、.sheet margin-top:-40、
+        height 144、border-radius var(--r-card)=40 —— 首页这块照抄：图 542 + 下方整块圆角朝上、
+        往上盖住 40、半径 40、不描边（只换底色），于是接缝四个角都是弧。
+        ⚠️ 这一条等于把 09-28 那次"图贯穿全屏"（C 方案）改回"图只守头部一段"——
+        当时打回的是"纸一圈描边 + 每条笔记又一圈描边"的框套框；这张圆角卡不描边，
+        和「我的」页那张 sheet 同一画法，所以不会又变成框套框。
+     ④ 「数按照真实来算，避免用户刷量」→ 两列都取"状态量 / 按人去重"，不取累计：
+        笔记数 = /api/user/quota 的 used（现成）；
+        分享数 = 当前公开中的笔记条数（shares 里 is_active=1 去重 note_id）——
+                 不是"发出过几张码"，那样反复开关就能自己把数字刷大；
+        收藏数 = 有多少个<b>不同用户</b>把你的笔记存进了他自己的库
+                 （invitations 里 source_note_id 指向你的笔记、按 invitee_id 去重）——
+                 同一个人存你 10 篇只算 1 个人，小号互转那一档仍然挡不住（和 +1 分同一个 posture）。
+     ⑤ 「置顶功能还在，只是非置顶按日期倒序」→ 这正好就是现网那条 order_by
+        （notes.py:186：is_pinned desc → pinned_at desc → created_at desc），<b>后端一个字不用改</b>。
+        所以这一版列表顺序按真机数据重排：置顶两条浮在最前，其余 09-30、09-25 往下排。
+     ⑥ 「透明度好像不够，看不到背景图；希望淡淡的图影投在笔记条上、不影响文字」
+        → 从真机截图采到行卡背后（图 + 罩层）中位是 (103,107,114)、最暗一段 (38,42,44)。
+          算出来四档（卡内色 = α×纯卡底 + (1−α)×背后）：
+            95% → 卡内 (245,244,241)，比纯卡底暗 21 档 —— 就是现在这版，"看不到图影"说的就是它
+            90% → (237,237,235)，暗 42 档，标题 14.1:1、日期小字 5.0:1
+            85% → (230,229,228)，暗 64 档，标题 13.1:1、日期小字 4.8:1（最暗那段仍有 4.6:1）
+            80% → (222,222,221)，暗 86 档，日期小字在最暗那段掉到 4.4:1 —— 破 WCAG AA 的 4.5
+          所以两屏各画一档：<b>甲 85%（推荐）</b>、<b>乙 90%（更保守）</b>；80% 不画，因为它会把
+          日期那行小字推到读不清的边缘，而"不影响文字显示"是他给的前提。
+   口径与代码一致：一屏 = 外框 184（状态栏 94 + 导航条 90）+ 视口 1506 = 1690，px 当 rpx 用，
+   设计宽 750；外观取他真机那一档「象牙」（--bg-page #F2EFE9、卡底 #FCFBF8、墨 #241E16）。
+   ================================================================== */
+  :root{
+    --page:#F2EFE9; --card:#FCFBF8; --ink:#241E16;
+    --sec:rgba(36,30,22,.66); --ter:rgba(36,30,22,.40);
+    --edge:rgba(36,30,22,.12);
+    --fs-h1:42px; --fs-meta:24px; --fs-micro:18px;
+    --r-card:40px; --r-chip:28px; --r-pill:999px; --w-edge:3px;
+    --ui:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue',sans-serif;
+  }
+  @font-face {
+  font-family: 'WtsjMind';
+  src: url(data:font/ttf;base64,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) format('truetype');
+  font-weight: 100;
+}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e7e4dc;font:14px/1.6 var(--ui);padding:40px}
+  h1{font-size:22px;margin-bottom:6px}
+  .lead{color:#4a4d55;margin-bottom:8px;max-width:1760px;font-size:15px;line-height:1.9}
+  .lead b{color:#1d1f20}
+  .notes{max-width:1760px;font-size:15px;line-height:1.9;color:#4a4d55;background:#efece4;
+    border:1px solid #ddd8cc;border-radius:12px;padding:14px 18px;margin:14px 0 26px}
+  .notes b{color:#1d1f20}
+  .notes code{background:#e3dfd4;padding:1px 6px;border-radius:5px;font-size:13px}
+  .row{display:flex;gap:32px;align-items:flex-start;flex-wrap:wrap}
+  .cap{margin-top:14px;font-size:15px;color:#4a4d55;line-height:1.7;max-width:750px}
+  .cap b{display:block;font-size:17px;color:#1d1f20;margin-bottom:2px}
+  .shot{width:750px}
+
+  .frame{width:750px;height:1690px;background:var(--page);border-radius:56px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);position:relative;display:flex;flex-direction:column}
+  .status{height:94px;flex:none;display:flex;align-items:center;justify-content:space-between;
+    padding:0 44px;font-size:26px;font-weight:600;color:#fff;background:#14161a}
+  .status .r{font-size:22px;font-weight:500;letter-spacing:1px}
+  .nav{height:90px;flex:none;display:flex;align-items:center;justify-content:center;position:relative;
+    font-size:32px;font-weight:600;color:#f2efe9;background:#14161a}
+  .nav .capsule{position:absolute;right:24px;top:22px;width:174px;height:46px;border-radius:999px;
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
+    display:flex;align-items:center;justify-content:space-around;font-size:22px;color:#fff}
+  .view{flex:1;position:relative;overflow:hidden;background:var(--page);display:flex;flex-direction:column}
+
+  /* ---------- ① 图区 542：标题在上、三列顶对齐在中间、下沿留给接缝 ---------- */
+  .head{position:relative;height:542px;flex:none;overflow:hidden;
+    background:url('../../../miniprogram/assets/home-bg-portrait.jpg') center 10%/cover no-repeat}
+  .head .scrim{position:absolute;inset:0;background:linear-gradient(180deg,
+    rgba(18,20,26,.58) 0%,rgba(18,20,26,.52) 30%,rgba(18,20,26,.46) 58%,rgba(18,20,26,.52) 100%)}
+  .head .h1{position:absolute;left:32px;top:22px;font-size:var(--fs-h1);font-weight:700;
+    letter-spacing:-1px;color:rgba(242,239,233,.96)}
+  .stats{position:absolute;left:24px;right:24px;top:272px;display:flex;align-items:flex-start}
+  .stat{flex:1;text-align:center;position:relative}
+  /* 细白线：只从数字顶画到小字下面，上下都不顶满，免得读出三条竖线 */
+  .stat + .stat::before{content:'';position:absolute;left:0;top:4px;height:118px;
+    width:1px;background:rgba(242,239,233,.34)}
+  .stat .n{display:block;font-family:'WtsjMind','Poppins',sans-serif;font-weight:100;
+    font-size:100px;line-height:.86;color:rgba(242,239,233,.80)}
+  .stat .l{display:block;margin-top:12px;padding-left:6px;text-align:center;
+    font-size:var(--fs-micro);font-weight:700;letter-spacing:6px;
+    color:rgba(242,239,233,.62);font-family:var(--ui)}
+
+  /* ---------- ③ 下方整块：圆角朝上、往上盖住图 40、不描边（= 现网 .sheet 那套） ---------- */
+  .sheet{flex:1;position:relative;z-index:3;margin-top:-40px;background:var(--page);
+    border-radius:var(--r-card) var(--r-card) 0 0;box-shadow:0 -12px 28px rgba(18,20,26,.16);
+    display:flex;flex-direction:column;overflow:hidden;padding-top:14px}
+  .tools{flex:none;height:104px;display:flex;align-items:center;gap:14px;padding:0 24px}
+  .chips{flex:1;display:flex;gap:14px;overflow:hidden}
+  .chip{flex:none;height:60px;padding:0 26px;border-radius:var(--r-chip);display:flex;align-items:center;
+    font-size:var(--fs-meta);font-weight:700;letter-spacing:-.2px}
+  .chip.all{background:var(--page);color:var(--ink);box-shadow:inset 0 0 0 var(--w-edge) var(--edge)}
+  .c1{background:#D9C9AE;color:#33291B}.c2{background:#C2AA85;color:#2A2114}.c3{background:#B7C6A8;color:#22301C}
+  .scbtn{flex:none;width:60px;height:60px;border-radius:50%;background:#F2EFE9;
+    box-shadow:0 6px 18px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center}
+  .scbtn i{width:22px;height:22px;border:3px solid #23252C;border-radius:50%;position:relative}
+  .scbtn i::after{content:'';position:absolute;right:-9px;bottom:-6px;width:11px;height:3px;
+    background:#23252C;border-radius:2px;transform:rotate(45deg)}
+
+  /* ---------- ⑤⑥ 列表：区域内滚动（图与数字都不动），行卡透明度两档 ---------- */
+  .list{flex:1;overflow:hidden;padding:0 24px;position:relative}
+  .r{border:var(--w-edge) solid var(--edge);border-radius:var(--r-card);height:106px;margin-bottom:14px;
+    display:flex;align-items:center;gap:14px;padding:0 26px}
+  .a85 .r{background:rgba(252,251,248,.85)}
+  .a90 .r{background:rgba(252,251,248,.90)}
+  .dot{flex:none;width:14px;height:14px;border-radius:50%;background:#241E16}
+  .dot.t1{background:#8B693E}.dot.t2{background:#7D9C88}
+  .pin{flex:none;height:38px;padding:0 14px;border-radius:12px;background:#46A863;color:#fff;
+    font-size:var(--fs-micro);font-weight:700;letter-spacing:1px;display:flex;align-items:center}
+  .ti{flex:1;min-width:0;font-size:31px;font-weight:700;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dt{flex:none;font-size:var(--fs-meta);color:var(--sec);letter-spacing:.4px}
+  .fade{position:absolute;left:24px;right:24px;bottom:148px;height:110px;pointer-events:none;z-index:4;
+    background:linear-gradient(180deg,rgba(242,239,233,0),rgba(242,239,233,.72))}
+
+  .tabbar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:var(--r-pill);
+    background:#4A3F2A;display:flex;align-items:center;z-index:6}
+  .tab{flex:1;text-align:center;color:rgba(242,239,233,.62);font-size:var(--fs-micro);font-weight:700;letter-spacing:1px}
+  .tab .ic{display:block;width:34px;height:34px;margin:0 auto 6px;border:3px solid currentColor;border-radius:9px}
+  .tab.on{color:#F2EFE9}
+</style>
+</head>
+<body>
+<h1>首页 v12 · 三列顶对齐 + 与「我的」同款圆角接缝 + 行卡透明度两档</h1>
+<p class="lead">两屏结构完全一样，<b>只差行卡那一层透明度</b>：左 <b>85%</b>（推荐）、右 <b>90%</b>（更保守）。
+背后那张图 + 罩层的真实亮度是从你上一张真机截图里采的（中位 <code>(103,107,114)</code>、最暗段 <code>(38,42,44)</code>），
+不是估的。</p>
+
+<div class="notes">
+<b>这版把上一版两处说错/画错的地方改了：</b>
+① 排序——你说"置顶还在，非置顶按日期倒序"，<b>现网后端本来就是这个顺序</b>（<code>notes.py:186</code>：置顶 → 置顶时间 → 创建时间倒序），所以这一条<b>后端一个字不用改</b>；上一版列表顺序也画错了，这一版按你真机那四条重排（09-25 中秋、09-23 大赛 两条置顶浮在最前，然后 09-30、09-25）。
+② 圆角——上一版甲没有接缝那道弧，这一版下方整块改成 <code>margin-top:-40rpx</code>、半径 40rpx、不描边，和「我的」页那张 sheet 同一画法，接缝四个角都是弧。
+<br><br>
+<b>抗刷的口径（你一句"数按真实来算"落成两条规则）：</b>
+<code>分享数</code> 取<b>当前公开中的笔记条数</b>（<code>shares.is_active=1</code> 去重 <code>note_id</code>），不取"累计发出过几张码"——后者反复开关就能自己刷大。
+<code>收藏数</code> 取<b>多少个不同用户存过你的笔记</b>（<code>invitations</code> 按 <code>invitee_id</code> 去重），同一个人存你 10 篇只算 1 个人；注册小号互转那一档仍然挡不住，这和 +1 分那条是同一个 posture，不设总闸。
+两个数现在都没有接口字段，实现时给 <code>/api/user/quota</code> 加 <code>shares_active</code> 和 <code>saved_by_users</code> 两个键。
+<br><br>
+<b>为什么 80% 那一档没画：</b>算到 80% 时卡内是 <code>(222,222,221)</code>，图影更清楚，但日期那行小字（66% 墨）在最暗那段掉到 <b>4.41:1</b>，破了 WCAG AA 的 4.5 —— 你给的前提是"不影响文字显示"，所以只到 85%（最暗段仍有 4.62:1）。
+</div>
+
+<div class="row">
+  <div class="shot">
+    <div class="frame a85">
+      <div class="status"><span>13:35</span><span class="r">5G ▮▮</span></div>
+      <div class="nav">图麦笔记<span class="capsule"><span>•••</span><span>◎</span></span></div>
+      <div class="view">
+        <div class="head">
+          <div class="scrim"></div>
+          <div class="h1">我的笔记</div>
+          <div class="stats">
+            <div class="stat"><span class="n">4</span><span class="l">笔记</span></div>
+            <div class="stat"><span class="n">2</span><span class="l">分享</span></div>
+            <div class="stat"><span class="n">3</span><span class="l">收藏</span></div>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="tools">
+            <div class="chips"><div class="chip all">全部</div><div class="chip c1">旅游</div>
+              <div class="chip c2">生活</div><div class="chip c3">私密</div></div>
+            <div class="scbtn"><i></i></div>
+          </div>
+          <div class="list">
+            <div class="r"><span class="dot t1"></span><span class="pin">置顶</span><span class="ti">2026年中秋节祝福语与问候图片大全</span><span class="dt">09-25</span></div>
+            <div class="r"><span class="dot t1"></span><span class="pin">置顶</span><span class="ti">2026微信小程序开发大赛介绍</span><span class="dt">09-23</span></div>
+            <div class="r"><span class="dot"></span><span class="ti">测试环境可以了</span><span class="dt">09-30</span></div>
+            <div class="r"><span class="dot t2"></span><span class="ti">TVB新晋HiFi女歌手——侯静伊</span><span class="dt">09-25</span></div>
+            <div class="r"><span class="dot t1"></span><span class="ti">小红书上一篇讲胶片配色的收藏</span><span class="dt">09-20</span></div>
+            <div class="r"><span class="dot"></span><span class="ti">知乎回答：怎么把长文读成三句话</span><span class="dt">09-18</span></div>
+            <div class="r"><span class="dot t2"></span><span class="ti">微博上一条关于城市步道的图文</span><span class="dt">09-16</span></div>
+          </div>
+        </div>
+        <div class="fade"></div>
+        <div class="tabbar">
+          <div class="tab"><span class="ic"></span>新建</div>
+          <div class="tab on"><span class="ic" style="border-radius:50%"></span>笔记</div>
+          <div class="tab"><span class="ic"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>甲 · 行卡 85% 不透明（推荐）</b>卡内算出来是 <code>(230,229,228)</code>，比纯卡底暗 64 档——照片的明暗能淡淡地压在条子上（看第二条"2026微信小程序开发大赛介绍"下面那片头发、第五条那格偏蓝的窗），标题对比 13.1:1、日期小字 4.8:1，读字不受影响。</div>
+  </div>
+
+  <div class="shot">
+    <div class="frame a90">
+      <div class="status"><span>13:35</span><span class="r">5G ▮▮▮</span></div>
+      <div class="nav">图麦笔记<span class="capsule"><span>•••</span><span>◎</span></span></div>
+      <div class="view">
+        <div class="head">
+          <div class="scrim"></div>
+          <div class="h1">我的笔记</div>
+          <div class="stats">
+            <div class="stat"><span class="n">4</span><span class="l">笔记</span></div>
+            <div class="stat"><span class="n">2</span><span class="l">分享</span></div>
+            <div class="stat"><span class="n">3</span><span class="l">收藏</span></div>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="tools">
+            <div class="chips"><div class="chip all">全部</div><div class="chip c1">旅游</div>
+              <div class="chip c2">生活</div><div class="chip c3">私密</div></div>
+            <div class="scbtn"><i></i></div>
+          </div>
+          <div class="list">
+            <div class="r"><span class="dot t1"></span><span class="pin">置顶</span><span class="ti">2026年中秋节祝福语与问候图片大全</span><span class="dt">09-25</span></div>
+            <div class="r"><span class="dot t1"></span><span class="pin">置顶</span><span class="ti">2026微信小程序开发大赛介绍</span><span class="dt">09-23</span></div>
+            <div class="r"><span class="dot"></span><span class="ti">测试环境可以了</span><span class="dt">09-30</span></div>
+            <div class="r"><span class="dot t2"></span><span class="ti">TVB新晋HiFi女歌手——侯静伊</span><span class="dt">09-25</span></div>
+            <div class="r"><span class="dot t1"></span><span class="ti">小红书上一篇讲胶片配色的收藏</span><span class="dt">09-20</span></div>
+            <div class="r"><span class="dot"></span><span class="ti">知乎回答：怎么把长文读成三句话</span><span class="dt">09-18</span></div>
+            <div class="r"><span class="dot t2"></span><span class="ti">微博上一条关于城市步道的图文</span><span class="dt">09-16</span></div>
+          </div>
+        </div>
+        <div class="fade"></div>
+        <div class="tabbar">
+          <div class="tab"><span class="ic"></span>新建</div>
+          <div class="tab on"><span class="ic" style="border-radius:50%"></span>笔记</div>
+          <div class="tab"><span class="ic"></span>我的</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap"><b>乙 · 行卡 90% 不透明（更保守）</b>卡内 <code>(237,237,235)</code>、比纯卡底暗 42 档，图影比现在这版（95%，暗 21 档）明显一档但仍很淡，日期小字 5.0:1。觉得 85% 还是"抢字"就退到这档。</div>
+  </div>
+</div>
+</body>
+</html>
