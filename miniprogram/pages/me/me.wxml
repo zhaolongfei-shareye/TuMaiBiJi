@@ -3,9 +3,12 @@
        盖住 40rpx 这一条是接缝那道弧的来源——图的左右下角被卡的圆角切掉，
        于是"图与留白之间"和"留白与页面之间"都是弧，没有直线。 -->
   <view class="head">
-    <view class="head-band">
+    <view class="head-band {{bgSrc ? 'has-bg' : ''}}">
       <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
       <view wx:if="{{bgSrc}}" class="head-scrim"></view>
+      <!-- 左上角这行大字与首页那一行是同一档量（--fs-h1 / 700 / -1rpx / left 32 top 22），
+           站长 10-01：三个 tab 的首页风格要一致，这一页原来只有右上角那枚药丸。 -->
+      <view class="h1">{{t.tabMe}}</view>
       <view class="pill">
         <view class="seg {{tab === 'set' ? 'on' : ''}}" bindtap="onTab" data-key="set">{{t.pillSettings}}</view>
         <view class="seg {{tab === 'about' ? 'on' : ''}}" bindtap="onTab" data-key="about">{{t.pillAbout}}</view>

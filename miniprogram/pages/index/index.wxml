@@ -5,7 +5,7 @@
        这张圆角卡不描边，只换底色，所以不会再框套框。
        图取口仍是 utils/poster.js 的 homeBg()，和新建页同一张、同一个开关。 -->
   <view class="head">
-    <image wx:if="{{bgSrc}}" class="head-img" src="{{bgSrc}}" mode="aspectFill" />
+    <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
     <view class="head-scrim"></view>
     <view class="h1">{{t.notesHeading}}</view>
     <!-- 三列：笔记 / 分享 / 收藏。数全部来自服务端那一次 /api/user/quota，

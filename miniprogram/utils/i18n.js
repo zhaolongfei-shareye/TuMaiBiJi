@@ -397,7 +397,7 @@ const i18n = {
     privatePasswordSaved: 'Password saved',
     pillSettings: 'Settings',
     pillAbout: 'About',
-    meGreeting: 'Hi, I am TuMaiBiJi',
+    meGreeting: 'Hello! I am Tumark',
     brainScore: 'MIND',
     officialSite: 'Website',
     resetWithBioTitle: 'Reset password',

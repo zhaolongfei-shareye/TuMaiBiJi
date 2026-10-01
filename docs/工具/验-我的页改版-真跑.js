@@ -42,12 +42,13 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
   q.select('.pwd-inline').boundingClientRect()
   q.select('.menu-group').boundingClientRect()
   q.select('.about-lead').boundingClientRect()
+  q.select('.h1').boundingClientRect()
   q.exec((res) => resolve({
     band: res[0], sheet: res[1], logo: res[2], text: res[3],
     score: res[4], num: res[5], lab: res[6], pill: res[7],
     segs: res[8] || [], items: res[9] || [], icos: res[10] || [],
     inputs: res[11] || [], btns: res[12] || [], inline: res[13],
-    group: res[14], aboutLead: res[15],
+    group: res[14], aboutLead: res[15], h1: res[16],
     windowWidth: wx.getWindowInfo().windowWidth,
   }))
 }))
@@ -136,6 +137,24 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck('LOGO 高度 = 右边两行字的高度（±4）', Math.abs(toRpx(m.logo.height, W) - toRpx(m.text.height, W)) <= 4,
     toRpx(m.text.height, W).toFixed(0))
 
+  /* ---------- ②b 左上角那行大字（站长 10-01：三个 tab 的首页风格要一致） ---------- */
+  ck('头部左上角有这行大字，内容就是本页的 tab 名', !!m.h1 && m.h1.width > 0, JSON.stringify(m.h1))
+  const h1Style = await styleOf(page, '.h1', ['font-size', 'font-weight', 'letter-spacing', 'color'])
+  ck('位子与首页那一行同档：左 32、上 22',
+    Math.abs(toRpx(m.h1.left, W) - 32) <= 2 && Math.abs(toRpx(m.h1.top, W) - 22) <= 2,
+    `${toRpx(m.h1.left, W).toFixed(0)}/${toRpx(m.h1.top, W).toFixed(0)}`)
+  // 字距那条不写死 -1：`-1rpx` 在 375 宽的视口里是 -0.5px，微信把它报成 -1px，
+  // 拿换算值去比必然红。"两页这一行一模一样"由静态尺子逐字钉（验-列表头部铺图.js），
+  // 这里只量运行时确实是"负的一档小字距"。
+  const lsRpx = toRpx(parseFloat(h1Style['letter-spacing']), W)
+  ck('字号 42（--fs-h1）、字重 700、字距是负的一档',
+    Math.abs(toRpx(parseFloat(h1Style['font-size']), W) - 42) <= 2
+    && parseFloat(h1Style['font-weight']) === 700 && lsRpx < 0 && lsRpx >= -2.5,
+    `${h1Style['font-size']}/${h1Style['font-weight']}/${h1Style['letter-spacing']}`)
+  ck('铺了图这行翻成纸白（与首页 .has-bg .h1 同一档）',
+    /rgba\(242,\s*239,\s*233,\s*0?\.96/.test(h1Style.color || ''), h1Style.color)
+  ck('这行没盖住右上角那枚药丸', m.h1.right <= m.pill.left + 1, `${m.h1.right} vs ${m.pill.left}`)
+
   /* ---------- ③ MIND 那个大数字：Poppins Thin、收 80%、英文字居中 ---------- */
   const numStyle = await styleOf(page, '.score-n', ['font-family', 'font-size', 'font-weight', 'color'])
   const labStyle = await styleOf(page, '.score-l', ['font-size', 'text-align', 'letter-spacing'])
@@ -164,8 +183,17 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck('第二行是应用 Slogan（值现读 i18n.js 的 zh 段）', !!zhSlogan && d.sloganText === zhSlogan[1],
     `${d.sloganText} ← ${zhSlogan && zhSlogan[1]}`)
   ck('圆里是应用 LOGO（没设卡片头像时）', d.logoSrc === '/assets/logo.png', d.logoSrc)
-  ck('底图取的是首页那一个出口', /home-bg-portrait|USER_DATA_PATH/.test(d.bgSrc || ''), d.bgSrc)
-  ck('锚点算出来了：按宽铺满 1448 高、往上顶 136', /height:1448rpx/.test(d.imgStyle || '') && /top:-136rpx/.test(d.imgStyle || ''), d.imgStyle)
+  // 槽里那张在模拟器里落地成 `http://usr/…`（就是 USER_DATA_PATH 那批文件），
+  // 所以这一条不能只认包里那张的名字——它要钉的是"图从那个出口来、不是第二处"。
+  ck('底图取的是首页那一个出口（包里那张或本机形象文件，两样都算）',
+    /home-bg-portrait|USER_DATA_PATH|http:\/\/usr\//.test(d.bgSrc || ''), d.bgSrc)
+  // 原来这条把 1448/-136 写死了，那是"默认那张竖构图"的数；本机形象一换就红，
+  // 红得没道理。改成钉那条规则本身：按宽铺满、超出那截的 15% 顶到上面去。
+  const gHeight = parseFloat((/height:(\d+(?:\.\d+)?)rpx/.exec(d.imgStyle || ''))[1] || 0)
+  const gTop = parseFloat((/top:(-?\d+(?:\.\d+)?)rpx/.exec(d.imgStyle || ''))[1] || 0)
+  ck('锚点算出来了：按宽铺满、超出那截的 15% 顶给上面（不写死某一张的数）',
+    /width:750rpx/.test(d.imgStyle || '') && gHeight > 542 && Math.abs(gTop + (gHeight - 542) * 0.15) <= 1,
+    d.imgStyle)
   ck('数字来自服务端（base+bonus，不是界面写死）', /^\d+$/.test(String(d.scoreText || '')) && Number(d.scoreText) >= 100, d.scoreText)
   ck('分享那行右值吃服务端 reward_each，单位不再写"篇"', /^\S+ \+\d+$/.test(String(d.shareValue || '')), d.shareValue)
 
@@ -237,15 +265,20 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck('功能介绍和隐私条款不在这一页', !aboutLabels.some((x) => /功能|隐私/.test(x)))
   await mp.screenshot({ path: path.join(OUT, '02-关于-四行.png') })
 
-  /* ---------- ⑦ 昵称/口号设过之后：头部换成用户的那两行 ---------- */
+  /* ---------- ⑦ 本机填过名称/一句话/形象图：这一格也不跟着走（站长 10-01 拍） ----------
+     原来这两条钉的是"头部换成用户填的那两行"，方向正好反了：这一格说的是**应用**是谁，
+     不是用户是谁。判据跟着翻——填了真值之后仍必须是固定中英文与固定 LOGO。
+     那两栏本身没删，它们印在海报上（`验-形象四槽-真跑.js` 一路仍在钉那条链路）。 */
   await seedProfile(mp, { name: '阿麦', slogan: '读过的都会忘，记下来的才归我' })
   await mp.switchTab('/pages/index/index')
   await sleep(1500)
   page = await gotoMe(mp)
   d = await page.data()
-  ck('第一行换成用户填的「名称」', d.nameText === '阿麦', d.nameText)
-  ck('第二行换成用户填的「一句话」', d.sloganText === '读过的都会忘，记下来的才归我', d.sloganText)
-  await mp.screenshot({ path: path.join(OUT, '03-头部-用户昵称与口号.png') })
+  ck('本机填了「名称」，这一行仍是固定的问候语', d.nameText === '你好！我是图麦笔记', d.nameText)
+  ck('本机填了「一句话」，这一行仍是固定的 Slogan', !!zhSlogan && d.sloganText === zhSlogan[1],
+    `${d.sloganText} ← ${zhSlogan && zhSlogan[1]}`)
+  ck('本机设了卡片头像，圆里仍是应用 LOGO', d.logoSrc === '/assets/logo.png', d.logoSrc)
+  await mp.screenshot({ path: path.join(OUT, '03-头部-固定问候语与Slogan.png') })
   await putProfile(mp, originalProfile)   // 复原：别把尺子造的昵称留在这台手机上
   // 语言钉回进场时那个值。中途崩了这份钉不回，但崩了留下的也是 zh——后面几把尺子
   // 吃的正是中文，所以这条只是"不留下我的痕迹"，不是"不留就红"。

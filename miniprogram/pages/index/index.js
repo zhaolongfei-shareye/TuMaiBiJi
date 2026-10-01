@@ -61,6 +61,8 @@ Page({
     // 头部那一段铺不铺图：'' 表示不铺（用户在外观设置里关掉了，或形象文件被系统清了）。
     // 取图和新建页同一个口，不在这页另开一份判断。
     bgSrc: '',
+    // 头部那张图的摆法，由 fitHead() 问过图片尺寸之后现算（同一套数在 poster.bandGeom）
+    imgStyle: '',
   },
 
   async onShow() {
@@ -83,6 +85,7 @@ Page({
       searchSkin: bgSrc ? '' : chromeOf(wallpaper).style,
     })
     app.setNavTitle('appName', lang)
+    this.fitHead(bgSrc)
     // 铺了图才把导航条刷成罩层顶部那一档墨色，和新建页是同一条规则；
     // 没铺图时不碰它——上面 applyTheme 已经按壁纸底色设过了。
     if (this.data.bgSrc) {
@@ -99,6 +102,19 @@ Page({
     // 同一条笔记被贴两遍。
     this._closeFloats()
     this.loadNotes(true)
+  },
+
+  // 头部那张图的取景：先问出图片真实尺寸，再按「我的」页那套数摆（poster.bandGeom，
+  // 按宽铺满、往上顶 15% 留头顶空间）。原来这里只是裸 aspectFill 塞进 750x542，
+  // 同一个人在这页成了大特写、在「我的」页是半身——站长 10-01 真机对出来打回的。
+  // 问不到尺寸就退回 aspectFill 的默认居中，不猜。
+  fitHead(src) {
+    if (!src) { this.setData({ imgStyle: '' }); return }
+    wx.getImageInfo({
+      src,
+      success: (info) => this.setData({ imgStyle: poster.bandGeom(info.width, info.height) }),
+      fail: () => this.setData({ imgStyle: '' }),
+    })
   },
 
   // 下拉刷新：人停在列表页不动时 onShow 不会再触发，采集在后台完成的那条就一直不出现。

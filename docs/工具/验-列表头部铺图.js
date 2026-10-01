@@ -38,8 +38,30 @@ const seg = (src, sel, hint) => {
 }
 
 // ---------- 1. 结构 ----------
-ok('图区里铺了 <image> 组件（wxss 的 background-image 不认包内本地文件）',
-  /<image wx:if="\{\{bgSrc\}\}" class="head-img" src="\{\{bgSrc\}\}" mode="aspectFill" \/>/.test(wxml))
+ok('图区里铺了 <image> 组件（wxss 的 background-image 不认包内本地文件），且吃现算的摆位',
+  /<image wx:if="\{\{bgSrc\}\}" class="head-img" style="\{\{imgStyle\}\}" src="\{\{bgSrc\}\}" mode="aspectFill" \/>/.test(wxml))
+// 站长 10-01 真机对出来的：同一个人，这一页是大特写、「我的」页是半身。
+// 判据从"有没有铺图"升级成"铺的是不是同一套取景"——两页必须都从 poster.bandGeom 拿数，
+// 谁哪天退回裸 aspectFill，这一条就红。
+ok('这一页的取景走 poster.bandGeom（与「我的」页同一个函数，不再各摆各的）',
+  /poster\.bandGeom\(/.test(cjs))
+ok('bandGeom 只在 utils/poster.js 里有一份实现',
+  (read('utils/poster.js').match(/function bandGeom\(/g) || []).length === 1
+  && !/function bandGeom\(/.test(read('pages/me/me.js')))
+// 站长 10-01：「我的」页左上角补一行大字，"字体和大小都要一样"。两页各写一份迟早走样，
+// 所以这里不钉具体数值，钉的是"两页那三行声明一模一样"。
+const meWxss = read('pages/me/me.wxss').replace(/\/\*[\s\S]*?\*\//g, '')
+const h1Of = (src) => {
+  const b = (src.match(/(?:^|\n)\.h1\s*\{([^}]*)\}/) || [, ''])[1]
+  return ['font-size', 'font-weight', 'letter-spacing'].map((p) => {
+    const m = b.match(new RegExp(`${p}:\\s*([^;]+)`))
+    return m ? m[1].trim() : ''
+  }).join('/')
+}
+ok('本页 .h1 与「我的」页 .h1 三项声明逐字相同（字号/字重/字距）',
+  h1Of(wxss) === h1Of(meWxss) && !!h1Of(wxss), `${h1Of(wxss)} vs ${h1Of(meWxss)}`)
+ok('「我的」页那一行也钉了图上翻纸白这一档',
+  /\.head-band\.has-bg \.h1\s*\{[^}]*rgba\(242, 239, 233, 0\.96\)/.test(meWxss))
 ok('图区里有压暗罩那一层', /class="head-scrim"><\/view>/.test(wxml))
 ok('铺图时容器带 has-bg', /\{\{bgSrc \? 'has-bg' : ''\}\}/.test(wxml))
 ok('v12：列表在 scroll-view 里（区域内滚，不再整页滚）',

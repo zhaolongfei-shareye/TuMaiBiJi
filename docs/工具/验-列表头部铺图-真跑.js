@@ -91,9 +91,24 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   ck('图区从视口顶起、高 542rpx（不再铺到屏底）',
     !!headRect && closeTo(headRect.top, 0) && Math.abs(headRect.h / R - 542) <= 4,
     headRect && `顶 ${Math.round(headRect.top)} 高 ${(headRect.h / R).toFixed(1)}rpx`)
-  ck('图与罩同一块地、都只画这一段',
-    !!imgRect && !!scrimRect && closeTo(imgRect.top, headRect.top)
-    && closeTo(imgRect.h, headRect.h) && closeTo(scrimRect.h, headRect.h))
+  // 10-01 傍晚起这一页的图不再是"正好铺满这一段"：它和「我的」页共用 poster.bandGeom，
+  // 按宽铺满算出真实高度、超出那截的 15% 顶给上面，所以图**必然比这一段高**（人像照
+  // 的胸口和手被推下去、脸留在画面里）。要守的从"三块一样大"变成"图盖住这一段、罩层正好是这一段"。
+  ck('罩层正好是图区那一块；图按宽铺满、上下都盖过这一段',
+    !!imgRect && !!scrimRect && closeTo(scrimRect.top, headRect.top) && closeTo(scrimRect.h, headRect.h)
+    && closeTo(imgRect.w, headRect.w) && imgRect.top <= headRect.top + 1
+    && imgRect.top + imgRect.h >= headRect.top + headRect.h - 1,
+    imgRect && `图 顶 ${Math.round(imgRect.top)} 高 ${(imgRect.h / R).toFixed(0)}rpx／段高 ${(headRect.h / R).toFixed(0)}rpx`)
+  // attribute('style') 读回来的是**序列化后的计算值**，rpx 已经被换成 px（这里 750rpx→390px），
+  // 拿它比 rpx 数必然红。要比规则就吃页面自己那份 data.imgStyle（还是 rpx 原文）。
+  const headStyle = String((await page.data('imgStyle')) || '')
+  // 没算出摆位时这两个正则就是 null，直接 [1] 会把整把尺子崩掉（踩过：崩了之后
+  // 下一把连不上端口，看着像端口问题其实是这里）。先判空，让判据自己红。
+  const gH = parseFloat((/height:(\d+(?:\.\d+)?)rpx/.exec(headStyle) || [0, 0])[1])
+  const gT = parseFloat((/top:(-?\d+(?:\.\d+)?)rpx/.exec(headStyle) || [0, 0])[1])
+  ck('这一页的取景走的是那一条规则（按宽铺满 + 超出的 15% 顶给上面）',
+    /width:750rpx/.test(headStyle || '') && gH > 542 && Math.abs(gT + (gH - 542) * 0.15) <= 1,
+    headStyle || '(没算出摆位)')
   const vp = await mp.evaluate(() => new Promise((res) => {
     wx.createSelectorQuery().selectViewport().scrollOffset().exec((r) => res(r[0]))
   }))
@@ -162,8 +177,13 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
     /WtsjMind/.test(String(await styleOf(page, '.stat .n', 'font-family'))),
     await styleOf(page, '.stat .n', 'font-family'))
   const sd = await page.data()
-  ck('三列的标签是字典里那三个（笔记|分享|收藏），顺序没排错',
-    (sd.stats || []).map((x) => x.l).join('|') === '笔记|分享|收藏', JSON.stringify(sd.stats))
+  // 标签不写死中文：这一档账号语言是登录带回的，测试号存的是 en，写死就是一条假红。
+  // 比的是"这一屏自己那份字典"，既钉住顺序也钉住"用的是字典、不是抄的串"。
+  const wantL = ['statNotes', 'statShares', 'statSaved'].map((k) => (sd.t || {})[k]).join('|')
+  ck('三列的标签就是本页字典里那三个（笔记|分享|收藏那一档），顺序没排错',
+    !!wantL && !/undefined/.test(wantL) && (sd.stats || []).map((x) => x.l).join('|') === wantL
+    && (sd.stats || []).map((x) => x.key).join('|') === 'notes|shares|saved',
+    `${JSON.stringify(sd.stats)} ← ${wantL}`)
   const chips = await page.$$('.chip')
   ck('这一趟至少有两枚 chip（"全部" + 一枚分类），颜色那条才量得到', chips.length > 1, `${chips.length} 枚`)
   // 09-30 这一批起，分类那几枚吃自己分类的实色（站长原话"分类按钮是有颜色的"），
@@ -195,6 +215,13 @@ const INK = hexArr(/--chrome-ink: (#23252c)/i.exec(
   // ---------- 1b. 搜索条：09-30 v8 起默认不在，点最右那枚圆钮才展开 ----------
   // 原来这三条是在收起态直接量 .sc-card——那一态现在根本没有这块节点了，
   // 所以判据挪到"点开之后"，并且补上两态互斥与点空白缩回。
+  // 站长 10-01 傍晚（这一条他打回过一次，指的是这里不是列表底部）：
+  // 分类那一行右边那枚圆钮贴着圆角卡的上沿。参照物是他给的「我的」页圆 LOGO 距
+  // 留白卡上沿那一档 = (144-80)/2 = 32rpx。两页"内容离卡边"必须是同一个数。
+  const [toolsRect, sheetRect2] = await rects(['.head-tools', '.sheet'])
+  ck('分类那一行离这张圆角卡上沿 32rpx（与「我的」页 LOGO 离卡边同一档）',
+    !!toolsRect && !!sheetRect2 && Math.abs((toolsRect.top - sheetRect2.top) / R - 32) <= 2,
+    toolsRect && sheetRect2 && `${((toolsRect.top - sheetRect2.top) / R).toFixed(1)}rpx`)
   const btnRect = (await rects(['.sc-btn']))[0]
   ck('收起态有那枚圆钮，且和 chip 同一档高度',
     !!btnRect && Math.abs(btnRect.h - chipH) < 2, btnRect && `钮 ${btnRect.h}｜chip ${chipH}`)

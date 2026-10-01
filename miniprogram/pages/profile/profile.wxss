@@ -220,8 +220,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-3);
-  /* 保存条是浮在底部的，最后一排格子要能滚到它上面去 */
-  padding-bottom: 200rpx;
+  /* 原来这里垫了 200rpx，是给浮在底部的「保存」条让位。那条现在回到流内了，
+     再垫就是一大片空白——让位这件事不再需要两页各记一份数。 */
 }
 
 .cell {
@@ -275,13 +275,13 @@
 
 /* ---------- 保存 ---------- */
 
+/* 站长 10-01 真机：模板小样滚到下面那一排时把「保存」盖住了。
+   这不是 z-index 没写够——`type="2d"` 的画布是**原生层**，不按 CSS 的层级合成，
+   浮着的元素压不住它（同一条坑在详情浮窗那次是靠"画布不进 fixed"绕开的，
+   结论写在 share.wxss 的 .pick-on 与 docs/产品需求.md §8.60 附近）。
+   这一页十张画布都在流内，所以让按钮也回到流内：谁都不浮在谁上面，就没有谁盖谁。 */
 .save-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: var(--sp-3) var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom));
-  background: var(--bg-page);
+  padding: var(--sp-2) 0 calc(var(--sp-3) + env(safe-area-inset-bottom));
 }
 
 .save-btn {

@@ -190,6 +190,12 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   ck('滑出界的那 4rpx 芯片有留白接着（scroll-view 会裁越界的内层）',
     /\.slots\s*\{[^}]*padding:[^}]*16rpx/.test(wxss))
   ck('每一格 flex:none（漏了这条四格会被挤扁成四个窄圈）', /\.slot\s*\{[^}]*flex:\s*none/.test(wxss))
+  // 站长 10-01 真机：下面那一排的模板小样把「保存」盖住了。`type="2d"` 画布是原生层，
+  // 不按 CSS 层级合成，浮着的元素压不住它——所以这一页的按钮**不许再回到 fixed**。
+  const barCss = (wxss.match(/\n\.save-bar\s*\{[\s\S]*?\n\}/) || [''])[0]
+  ck('保存条在流内（fixed 会被原生画布盖住，这条不许回退）',
+    !/position:\s*fixed/.test(barCss), barCss.replace(/\s+/g, ' ').trim().slice(0, 70))
+  ck('网格不再为浮层留那 200rpx', !/\.grid\s*\{[^}]*padding-bottom:\s*200rpx/.test(wxss))
   const keys = ['slotCard', 'slotBg', 'slotHint', 'slotHintFull', 'slotDropTitle', 'slotDropOk', 'slotDropBody', 'slotDropWasCard', 'slotDropWasBg']
   keys.forEach((k) => {
     const n = (i18n.match(new RegExp(`\\b${k}:`, 'g')) || []).length

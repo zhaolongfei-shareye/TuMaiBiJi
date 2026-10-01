@@ -101,7 +101,10 @@
   display: flex;
   flex-direction: column;
   margin-top: -40rpx;
-  padding: 0 var(--sp-3);
+  /* 站长 10-01 傍晚：分类那一行右边那枚圆钮贴着这张卡的上沿。参照物他给了——
+     「我的」页圆 LOGO 距留白卡上沿那一档：卡 144、LOGO 80、垂直居中，(144-80)/2 = 32rpx。
+     这里就取同一个 32，两页的"内容离卡边"是同一个数。 */
+  padding: 32rpx var(--sp-3) 0;
   background: var(--bg-page);
   border-radius: var(--r-card) var(--r-card) 0 0;
   box-shadow: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);

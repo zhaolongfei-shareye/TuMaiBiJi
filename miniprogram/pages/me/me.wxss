@@ -30,6 +30,23 @@
   position: absolute;
 }
 
+/* 与首页 .h1 逐字同一档：字号、字重、字距、位子都一样，两页只差那一行字的内容。
+   铺了图才翻纸白（首页是 .container.has-bg .h1，这里盒子不同名，落在这块上）。 */
+.h1 {
+  position: absolute;
+  left: var(--sp-4);
+  top: 22rpx;
+  z-index: 4;
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -1rpx;
+  color: var(--text-primary);
+}
+
+.head-band.has-bg .h1 {
+  color: rgba(242, 239, 233, 0.96);
+}
+
 .head-scrim {
   position: absolute;
   left: 0;

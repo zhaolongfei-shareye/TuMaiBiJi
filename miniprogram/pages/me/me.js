@@ -10,21 +10,8 @@ function fmt(tpl, map) {
   return String(tpl).replace(/\{(\w+)\}/g, (m, k) => (map[k] == null ? '' : map[k]))
 }
 
-/* 头图在这一页要单独定锚点：aspectFill 只会把画面正中间那一条留在框里，
-   人像照的中段是胸口和手，脸会被裁掉。所以先按宽铺满算出图的真实高度，
-   再把"超出盒子的那截余量"按 15% 分给上面——也就是留 15% 的头顶空间。 */
-const BAND_H = 542
-const BG_ANCHOR = 0.15
-function bandGeom(w, h) {
-  if (!w || !h) return ''
-  const byWidth = (750 * h) / w
-  if (byWidth >= BAND_H) {
-    const top = -Math.round((byWidth - BAND_H) * BG_ANCHOR)
-    return `width:750rpx;height:${Math.round(byWidth)}rpx;left:0;top:${top}rpx`
-  }
-  const bw = Math.round((BAND_H * w) / h)
-  return `width:${bw}rpx;height:${BAND_H}rpx;left:${Math.round((750 - bw) / 2)}rpx;top:0`
-}
+/* 头图的摆法（按宽铺满、往上顶 15% 留头顶空间）已收进 utils/poster.js 的 bandGeom：
+   首页那一屏要的是同一个人、同一个取景，两页各留一份数迟早走样。 */
 
 /* 这台手机能不能用指纹／面容，只能问它自己：文档写明的只有指纹，
    iOS 走面容没写在文档里，所以探不到就当没有——探不到时重置退回普通确认，
@@ -80,17 +67,17 @@ Page({
     const userInfo = app.globalData.userInfo || {}
     const lang = userInfo.language || 'zh'
     const themeClass = app.applyTheme(app.getWallpaper())
-    // 形象与昵称都是本机设置，读一次很便宜；从「卡片模板」改完回到这里要立刻看到
-    const prof = poster.readProfile()
+    // 站长 10-01：这三样是**应用自己**的自我介绍，不是用户的签名——原来它吃本机填的
+    // 名称/一句话/形象图，英文态就把人自己写的"阿麦"顶到了这一屏最上面。
+    // 卡片模板页那两栏照旧留着，它们印在海报上；这一格不再跟着走。
     this.setData({
       lang,
       t: texts(lang),
       themeClass,
       bgSrc: poster.homeBg(),
-      logoSrc: poster.cardPath() || '/assets/logo.png',
-      nameText: (prof.name && String(prof.name).trim()) || t('meGreeting', lang),
-      // 口号只填了一项时另一项各自退回默认，不整块消失
-      sloganText: (prof.slogan && String(prof.slogan).trim()) || t('slogan', lang),
+      logoSrc: '/assets/logo.png',
+      nameText: t('meGreeting', lang),
+      sloganText: t('slogan', lang),
     })
     this.fitBand()
     app.setNavTitle('tabMe', lang)
@@ -111,7 +98,7 @@ Page({
     if (!src) return
     wx.getImageInfo({
       src,
-      success: (info) => this.setData({ imgStyle: bandGeom(info.width, info.height) }),
+      success: (info) => this.setData({ imgStyle: poster.bandGeom(info.width, info.height) }),
       fail: () => this.setData({ imgStyle: '' }),
     })
   },
