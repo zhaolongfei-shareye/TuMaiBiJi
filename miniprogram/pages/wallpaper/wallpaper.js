@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { THEMES, toneColor, themeOf } = require('../../utils/palette.js')
+const { THEMES, toneColor, themeOf, themeLabel } = require('../../utils/palette.js')
 
 // 这一页原来在壁纸下面还有一排「界面字体」，站长 09-26 撤掉了：iOS 和安卓真机都证伪——
 // 微信的 webview 不认这些系统字体名，点了不会换字（模拟器能换是假证据，它读的是 macOS 字体表）。
@@ -72,7 +72,7 @@ Page({
       lang,
       t: texts(lang),
       currentWallpaper: current,
-      currentLabel: themeOf(current).label,
+      currentLabel: themeLabel(current, lang),
       // 这一页自己也要走 applyTheme：只拿类名的话，导航条底色停在上一页那套主题，
       // 换完壁纸"导航条必须和页面底同值"这条约束在本页是破的（选完才补上，进页那一瞬不对）。
       themeClass: app.applyTheme(current),
@@ -89,7 +89,7 @@ Page({
         .filter(({ theme }) => !theme.dark)
         .map(({ theme, i }) => ({
           key: theme.key,
-          label: theme.label,
+          label: themeLabel(theme.key, lang),
           active: theme.key === current,
           stack: [toneColor(i, theme.key), toneColor(i + 1, theme.key)],
           // 主题在 CSS 里是类名，但每一格画的是"另一套主题"，拿不到当前主题的变量，

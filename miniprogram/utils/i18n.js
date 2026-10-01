@@ -23,6 +23,21 @@ const i18n = {
     stageHintPreview: '看着对了？点一下上面的手机就换上',
     stripHint: '左右滑挑一枚',
     inUse: '现在在用',
+    /* ---------- 冒号与「关于」那一页的骨架（站长 10-01 晚排查中英文缺口）----------
+       原来模板里把全角冒号硬拼在字典外（`{{t.authorLabel}}：xx`），英文态就印出 "Author："。
+       冒号这一档跟着语言走：中文全角、英文半角带一个空格。
+       「关于」三栏的名字、介绍那五行、隐私那一栏的领句和那五行信息位以前整块是硬编码中文。 */
+    colon: '：',
+    aboutTabIntro: '介绍',
+    aboutTabFeatures: '功能',
+    aboutTabPrivacy: '隐私',
+    aboutPrivacyLead: '这一栏说清我们收集什么、你的截图经过哪里、以及怎么删掉。口径与提交给微信后台的《隐私保护指引》保持一致。',
+    aboutUpdatedAtLabel: '最后更新时间',
+    aboutUpdatedAt: '2026 年 9 月 22 日',
+    aboutVersionRow: '当前版本',
+    aboutEntityRow: '开发主体',
+    aboutEntityValue: '个人开发者',
+    aboutAccountRow: '公众号',
     sameWallpaper: '这一枚已经在用了',
     language: '语言设置',
     about: '关于图麦笔记',
@@ -63,9 +78,11 @@ const i18n = {
     search: '搜索笔记',
     notesHeading: '我的笔记',
     // 头部那三列的小字（v12）。三个都是服务端算好的状态量，客户端只负责念名字
+    // 第三列站长 10-01 晚改口：「收藏」→「种草」。数是 saved_by_users（收藏过你的不同人数），
+    // 英文那列仍是 Saved——他要的是中文侧换个更贴近微信语境的叫法，不是换口径。
     statNotes: '笔记',
     statShares: '分享',
-    statSaved: '收藏',
+    statSaved: '种草',
     searchPh: '输入关键词',
     allCategories: '全部',
     addCategory: '添加分类',
@@ -144,7 +161,9 @@ const i18n = {
     pillSettings: '设置',
     pillAbout: '关于',
     meGreeting: '你好！我是图麦笔记',
-    brainScore: 'MIND',
+    // 站长 10-01 晚：这一枚中文侧要有中文名「魅力」，英文侧继续叫 MIND。
+    // 两个 tab 的右上角那档标签都是两格汉字（笔记/分享/种草），字距那条规则才不用另写一份。
+    brainScore: '魅力',
     officialSite: '产品官网',
     resetWithBioTitle: '重置密码',
     resetWithBioBody: '重置需要用这台手机的指纹或面容确认。识别通过后，再输两遍设一条新密码。',
@@ -307,6 +326,17 @@ const i18n = {
     stageHintPreview: 'Looks right? Tap the phone above to apply it',
     stripHint: 'Swipe to pick one',
     inUse: 'In use',
+    colon: ': ',
+    aboutTabIntro: 'Intro',
+    aboutTabFeatures: 'Features',
+    aboutTabPrivacy: 'Privacy',
+    aboutPrivacyLead: 'What we collect, where your screenshots go, and how to delete them — same wording as the privacy notice filed with WeChat.',
+    aboutUpdatedAtLabel: 'Last updated',
+    aboutUpdatedAt: 'Sep 22, 2026',
+    aboutVersionRow: 'Version',
+    aboutEntityRow: 'Developer',
+    aboutEntityValue: 'Independent developer',
+    aboutAccountRow: 'Official account',
     sameWallpaper: 'This one is already applied',
     language: 'Language',
     about: 'About',

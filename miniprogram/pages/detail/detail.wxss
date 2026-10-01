@@ -121,8 +121,11 @@
   /* 序号用这条笔记的分类色，把中性面板和上面那块方块接上 */
   background: var(--tone-bg, var(--chip-idle));
   color: var(--tone-ink, var(--text-secondary));
+  /* 纯数字序号吃全局那一档（首页要点序号同一写法）；这一支只出 Thin，
+     原来那条 800 留着就是让系统假加粗，两边平台还不一致。字号 21 没动。 */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-size: var(--fs-tiny);
-  font-weight: 800;
+  font-weight: 100;
   text-align: center;
   line-height: 38rpx;
   margin-top: 4rpx;

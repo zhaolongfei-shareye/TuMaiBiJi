@@ -15,7 +15,7 @@
       <!-- 作者行：昵称是分享者自己在「分享形象」里填的，只在他主动分享的那一刻才对外可见 -->
       <view wx:if="{{share.author_name}}" class="author-row">
         <view class="author-mark">{{authorInitial}}</view>
-        <text class="author-name">{{t.authorLabel}}：{{share.author_name}}</text>
+        <text class="author-name">{{t.authorLabel}}{{t.colon}}{{share.author_name}}</text>
       </view>
 
       <text class="card-title">{{share.title}}</text>

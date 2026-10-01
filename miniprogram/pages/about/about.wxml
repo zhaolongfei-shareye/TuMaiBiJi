@@ -4,7 +4,7 @@
     <image class="brand-logo" src="/assets/logo.png" mode="aspectFill"></image>
     <view class="brand-text">
       <view class="brand-line">
-        <text class="brand-name">图麦笔记</text>
+        <text class="brand-name">{{t.appName}}</text>
         <text class="brand-ver">v{{version}}</text>
       </view>
       <text class="brand-slogan">{{t.slogan}}</text>
@@ -13,9 +13,9 @@
 
   <!-- 三栏在同一页里切，不再往下开新页面。文字 + 下划线，不做按钮态 -->
   <view class="tabs card">
-    <view class="tab {{tab === 'intro' ? 'on' : ''}}" bindtap="onTab" data-key="intro">介绍</view>
-    <view class="tab {{tab === 'features' ? 'on' : ''}}" bindtap="onTab" data-key="features">功能</view>
-    <view class="tab {{tab === 'privacy' ? 'on' : ''}}" bindtap="onTab" data-key="privacy">隐私</view>
+    <view class="tab {{tab === 'intro' ? 'on' : ''}}" bindtap="onTab" data-key="intro">{{t.aboutTabIntro}}</view>
+    <view class="tab {{tab === 'features' ? 'on' : ''}}" bindtap="onTab" data-key="features">{{t.aboutTabFeatures}}</view>
+    <view class="tab {{tab === 'privacy' ? 'on' : ''}}" bindtap="onTab" data-key="privacy">{{t.aboutTabPrivacy}}</view>
   </view>
 
   <block wx:if="{{tab === 'intro'}}">
@@ -49,7 +49,7 @@
 
   <block wx:else>
     <view class="card block-card">
-      <text class="lead">这一栏说清我们收集什么、你的截图经过哪里、以及怎么删掉。口径与提交给微信后台的《隐私保护指引》保持一致。</text>
+      <text class="lead">{{t.aboutPrivacyLead}}</text>
     </view>
 
     <view class="card policy">
@@ -60,7 +60,7 @@
           <text class="p-text">{{line}}</text>
         </view>
       </view>
-      <text class="p-updated">最后更新时间：{{updatedAt}}</text>
+      <text class="p-updated">{{t.aboutUpdatedAtLabel}}{{t.colon}}{{updatedAt}}</text>
     </view>
   </block>
 

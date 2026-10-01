@@ -181,12 +181,23 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
     !/avatarChange|avatarDrop|avatarPick|avatarHint/.test(wxml + i18n))
   ck('芯片字号用现网最底一档 --fs-micro（他要的"按钮字体可以小点"）',
     /\.chip\s*\{[^}]*font-size:\s*var\(--fs-micro\)/.test(wxss))
-  // 只掐 .slots 这一条规则：整份 wxss 里模板小样那一排（.grid）本来就合法地换行，
-  // 拿全文件判"没有 flex-wrap"会把它一起算进来，红得没道理。
+  // 09-30 那轮立的"只掐 .slots"这条规矩到此作废：10-01 晚站长把下面那一排模板小样
+  // 也从上下换行改成了一行左右滑，所以这一页现在**整个不该再有 flex-wrap**。
   const slotsCss = (wxss.match(/\n\.slots\s*\{[\s\S]*?\n\}/) || [''])[0]
+  const gridCss = (wxss.match(/\n\.grid\s*\{[\s\S]*?\n\}/) || [''])[0]
   ck('四个槽是一行 + 左右滑（站长 09-30 打回：两行太占地方）',
     /scroll-x/.test(wxml) && /display:\s*inline-flex/.test(slotsCss) && !/flex-wrap/.test(slotsCss),
     slotsCss.replace(/\s+/g, ' ').trim().slice(0, 60))
+  ck('模板小样也是一行 + 左右滑（10-01 晚：十格排五行把「保存」顶到看不见）',
+    /class="grid" scroll-x/.test(wxml) && /\.grid\s*\{[^}]*white-space:\s*nowrap/.test(wxss)
+    && /\.grid-inner\s*\{[^}]*display:\s*inline-flex/.test(wxss),
+    gridCss.replace(/\s+/g, ' ').trim().slice(0, 60))
+  ck('这一页再没有 flex-wrap（上下选两条都算红）', !/flex-wrap/.test(wxss))
+  ck('模板那一格 flex:none（漏了这条十格会被挤成十条窄条）',
+    /\.cell\s*\{[^}]*flex:\s*none/.test(wxss))
+  ck('横滑条上下留白接住选中那格的外环（scroll-view 裁越界内层，壁纸那排的勾踩过）',
+    /\.grid\s*\{[^}]*padding:\s*var\(--sp-2\) 0/.test(wxss)
+    && /\.grid-inner\s*\{[^}]*padding:\s*0 8rpx/.test(wxss))
   ck('滑出界的那 4rpx 芯片有留白接着（scroll-view 会裁越界的内层）',
     /\.slots\s*\{[^}]*padding:[^}]*16rpx/.test(wxss))
   ck('每一格 flex:none（漏了这条四格会被挤扁成四个窄圈）', /\.slot\s*\{[^}]*flex:\s*none/.test(wxss))

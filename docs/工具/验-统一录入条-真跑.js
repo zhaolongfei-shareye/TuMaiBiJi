@@ -84,16 +84,38 @@ const ck = (name, ok, got) => {
   // 负 margin 写错一格，横条就带着「换背景」一起往下移、顶进底栏。
   // 所以这里既量 Tips 自己，也回头量横条有没有原地不动（上面那两条已经钉过一次位置）。
   const tipEl = await page.$('.tips')
-  const tipRect = (await rects(['.tips']))[0]
-  const tipFs = tipEl && await tipEl.style('font-size')
-  const tipIndent = tipEl && await tipEl.style('text-indent')
-  const tipText = tipEl && await tipEl.text()
+  const tipLine = await page.$('.tips-line')
+  const tipDot = await page.$('.tips-dot')
+  const [tipRect, dotRect] = await rects(['.tips', '.tips-dot'])
+  const tipFs = tipLine && await tipLine.style('font-size')
+  const tipPad = tipEl && await tipEl.style('padding-left')
+  const dotBg = tipDot && await tipDot.style('background-color')
+  // 简写那条 `border-radius` 这一档模拟器回 null（实测两次都是），分量那条才回话——
+  // 拿 `border-top-left-radius` 读到的值是 '50%'，那才是"渲染出来真的吃掉半边"的证据。
+  const dotRadius = tipDot && ((await tipDot.style('border-top-left-radius')) || (await tipDot.style('border-radius')))
+  const tipText = tipLine && await tipLine.text()
   ck('收起态有这一行，且真的排出了高度', !!tipEl && !!tipRect && tipRect.w > 100 && tipRect.h > 0,
     tipRect && `宽 ${(tipRect.w / R).toFixed(0)} 高 ${(tipRect.h / R).toFixed(0)}rpx`)
   ck('Tips 字号 = --fs-meta（24rpx），和上面那行日期同一档',
     Math.abs(parseFloat(tipFs || '0') / R - 24) <= 2, tipFs)
-  ck('Tips 前面空两格（首行缩进 48rpx = 2 个字）',
-    Math.abs(parseFloat(tipIndent || '0') / R - 48) <= 2, tipIndent)
+  ck('这一行左边留 48rpx（原来是首行缩进，句前加了点就改内边距，留空量不变）',
+    Math.abs(parseFloat(tipPad || '0') / R - 48) <= 2, tipPad)
+  // 站长 10-01 晚：「Tips 前面最好加个小黄点，象征小灯泡」。色值不许写进 wxss
+  // （静态尺子扫的是那条），所以这里验的是 style 递下来之后**真的渲染成这个色**。
+  // 14rpx 落在这一档视口上渲染成 13.5（微信按整像素取整），容 2。
+  const dotSize = !!dotRect && Math.abs(dotRect.w / R - 14) <= 2 && Math.abs(dotRect.h / R - 14) <= 2
+  const dotColor = /246,\s*196,\s*69/.test(dotBg || '')
+  ck('句前那枚小黄点：14rpx 见方、正方（宽高相等）、颜色是 palette 的 #F6C445',
+    dotSize && dotColor && Math.abs(dotRect.w - dotRect.h) <= 1,
+    dotRect && `${(dotRect.w / R).toFixed(1)}×${(dotRect.h / R).toFixed(1)}rpx ${dotBg}`)
+  // 正圆这条判的是渲染结果，不是源码：模拟器把 border-radius 回成字面 '50%'，
+  // 那就是"按半边取"的意思；有的档回具体 px，那就得等于宽高的一半。
+  const radiusIsCircle = dotRadius === '50%' ||
+    (dotRadius && /^\d/.test(dotRadius) && Math.abs(parseFloat(dotRadius) - dotRect.w / 2) <= 1)
+  ck('那一枚渲染出来是正圆（radius 吃掉半边）', !!dotRect && radiusIsCircle, String(dotRadius))
+  ck('点落在那行字的正中（不顶高、不底坠）',
+    !!dotRect && !!tipRect && Math.abs((dotRect.top + dotRect.h / 2 - tipRect.top) / R - 16.8) <= 4,
+    dotRect && tipRect && `${((dotRect.top + dotRect.h / 2 - tipRect.top) / R).toFixed(1)}rpx`)
   ck('这一行的盒子把自己从流里抵掉了（高 68 = 34 文字 + 34 间距）',
     !!tipRect && Math.abs(tipRect.h / R - 68) <= 3, tipRect && `${(tipRect.h / R).toFixed(1)}rpx`)
   ck('横条一动不动：条顶就是整组顶（负 margin 与盒子高等值）',
@@ -102,13 +124,25 @@ const ck = (name, ok, got) => {
     !!tipRect && Math.abs((bar.top - tipRect.top) / R - 68) <= 3,
     tipRect && `${((bar.top - tipRect.top) / R).toFixed(1)}rpx`)
   ck('Tips 前面带「Tips：」这一头', !!tipText && /^Tips：/.test(tipText), tipText)
-  const tipText0 = tipText
-  await sleep(4600)
+  // 节奏（站长：4 秒「还没看完就跳下一条」→ 慢一倍）。
+  // 不写成"等 4.6 秒看它没跳"：计时器是 onShow 起的，脚本插进来的相位不确定，
+  // 赶上周期尾巴就假红。两次跳变**之间**的间隔才是一个完整周期，那才是真凭据。
+  const marks = []
+  let lastTip = tipText
+  const tipStart = Date.now()
+  for (let i = 0; i < 42 && marks.length < 2; i++) {
+    await sleep(500)
+    const el = await page.$('.tips-line')
+    const cur = el && await el.text()
+    if (cur && cur !== lastTip) { marks.push(Date.now()); lastTip = cur }
+  }
+  const gap = marks.length === 2 ? (marks[1] - marks[0]) / 1000 : NaN
   d = await page.data()
-  const tipText1 = (await page.$('.tips')) && await (await page.$('.tips')).text()
   ck('池里是六句', (d.tips || []).length === 6, (d.tips || []).length)
-  ck('过了 4 秒换成下一句（真的在轮播，不是死的一行）',
-    !!tipText1 && tipText1 !== tipText0, `${tipText0} → ${tipText1}`)
+  ck('20 秒里换过两句（真的还在轮播，没被改死）', marks.length === 2,
+    `${marks.length} 次／等了 ${((Date.now() - tipStart) / 1000).toFixed(1)}s`)
+  ck('一句停 8 秒（不是 4 秒；500ms 采样，容 ±0.6s）',
+    Number.isFinite(gap) && gap >= 7.4 && gap <= 9.6, Number.isFinite(gap) ? `${gap.toFixed(1)}s` : '没量到')
 
   // ---------- ③ 点条身 = 直接写 ----------
   await (await page.$('.bar')).tap()

@@ -1,5 +1,7 @@
-// 09-30 这一批的真跑自证：邮箱换址、私密密码行上移、两次输入面板、分类 chip 上色、
+// 09-30 这一批的真跑自证：邮箱换址、私密密码行上移、分类 chip 上色、
 // 归类笔记的圆点吃分类色、详情页四个动作全在文档上方。
+// 10-01 晚改了私密密码那一块：不在菜单里就地展开，改成从底部弹上来的 1/3 一层 + 六个方格、
+// 输遍再输遍，所以这一把里密码那段的判据整块换过（旧的"两格输入 / pwd1 pwd2"作废）。
 // 前置：微信开发者工具已开；改过 WXSS/WXML 要先 cli close 再
 //   cli auto --project <repo>/miniprogram --auto-port 9431，等十秒端口起来。
 // 会造一条临时笔记（分类=旅游）用来验圆点颜色，跑完删掉，不动他原有那三条。
@@ -49,49 +51,100 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('那一行右边不再有状态文字', !/未设置|密码已设置/.test(labels[iPwd] || ''), labels[iPwd])
     ck('关于/反馈邮箱/注销那组里不再有私密密码', !labels.slice(iPwd + 1).some((x) => x.startsWith('私密密码')))
 
-    /* ---------- 两次输入的面板 ---------- */
+    /* ---------- 私密密码：底部 1/3 弹层 + 六格（站长 10-01 晚第八条） ----------
+       口径变了：「不在原菜单处理方式，改为前端下方弹出 1/3 窗口，里面是功能名称，
+       然后下方是 6 个输入方格，输入一次后，再输入一次 6 个方格，方格上方文字提醒校验」。
+       所以旧的那批判据（就地展开、两格 .pwd-input、pwd1/pwd2）整块作废，改判据不改代码去迁就它。 */
     await (await (await me.$$('.menu-item'))[iPwd]).tap()
     await sleep(1200)
     d = await me.data()
-    ck('点那一行就地展开', d.pwdOpen === true)
-    ck('第二行小字说的是使用场景，不重复"6 位数字"',
-      /内容|笔记卡片/.test(d.t.privatePasswordScene) && !/6 位/.test(d.t.privatePasswordScene),
-      d.t.privatePasswordScene)
-    // 这个账号已经设过密码 → 面板应是"重置态"：没有输入格，只有 返回 / 重置密码
-    ck('已设过时面板不再给输入格', (await me.$$('.pwd-input')).length === 0)
-    let two = []
-    for (const b of await me.$$('.pwd-btn')) two.push(await b.text())
-    ck('已设过那一态一行两枚：返回 + 重置密码', two.join('|') === '返回|重置密码', two.join('|'))
-    await mp.screenshot({ path: path.join(OUT, '01a-面板已设过态.png') })
+    ck('点那一行是从底部弹出独立一层，不是就地展开', d.pwdOpen === true && !(await me.$('.pwd-inline')))
+    // 这一层进"设置态"还是"重置态"只由服务端那条读数决定，而**这个账号设没设是会变的**
+    // （上一把尺子跑完密码就没了）。所以这里不许钉死哪一态，只钉"翻得对"：
+    // 没设过 → entering（给六格）；设过 → 只给重置那一枚。两态都往下用 openPwdSheet 显式摆出来测。
+    const btnOf = async () => { const a = []; for (const b of await me.$$('.pwd-btn')) a.push(await b.text()); return a }
+    const cellsOf = async () => (await me.$$('.pwd-cell')).length
+    ck('门吃的是服务端那条读数（没设过就走设置态、设过就走重置态）',
+      d.pwdEntering === !d.privateSet, `entering=${d.pwdEntering} privateSet=${d.privateSet}`)
+    const cellsNow = await cellsOf()
+    ck('设置态给六格、重置态不给，两边互斥',
+      cellsNow === (d.pwdEntering ? 6 : 0), `cells=${cellsNow}`)
+    ck('两态右边那枚分别是确定 / 重置密码',
+      (await btnOf()).join('|') === (d.pwdEntering ? '取消|确定' : '取消|重置密码'), (await btnOf()).join('|'))
+    const layer = await me.$('.pwd-layer')
+    const sheet = await me.$('.pwd-sheet')
+    ck('弹层真的存在（命中区 + 那一份 1/3 高的层）', !!layer && !!sheet)
+    const sys = await mp.evaluate(() => wx.getSystemInfoSync().windowHeight)
+    const sheetH = parseFloat(await sheet.style('height'))
+    ck('那一份是屏幕的三分之一档（33vh，容 ±3 个点）',
+      sheetH / sys > 0.29 && sheetH / sys < 0.37, `${sheetH}/${sys}=${(sheetH / sys).toFixed(3)}`)
+    const sheetPos = await sheet.offset()
+    ck('贴着屏幕底边', Math.abs(sheetPos.top + sheetH - sys) < 6, `top=${sheetPos.top} h=${sheetH} 窗高=${sys}`)
+    const nameTx = await tx(await me.$('.pwd-name'))
+    ck('从上到下第一样是功能名称', nameTx.indexOf('私密密码') === 0, nameTx)
+    ck('方格上方有一行校验提醒', (await tx(await me.$('.pwd-tip'))).length > 6, await tx(await me.$('.pwd-tip')))
+    await mp.screenshot({ path: path.join(OUT, `01a-私密密码弹层-${d.pwdEntering ? '设置' : '重置'}态.png`) })
 
-    // 没设过那一态（只翻本地视图状态，不发请求）：两格输入 + 取消 / 确定
-    await me.setData({ privateSet: false })
+    // 重置态（这一层的样子是 openPwdSheet(entering) 一次性算出来的，
+    // 只把 privateSet 翻过来不会改格子，所以直接走那个入口摆两态）
+    await me.callMethod('openPwdSheet', false)
     await sleep(900)
-    const inputs = await me.$$('.pwd-input')
-    ck('没设过那一态有两格输入（新密码 + 再输一次）', inputs.length === 2)
-    ck('两格都是数字键盘且最多 6 位', (await inputs[0].attribute('maxlength')) + '' === '6')
-    ck('输入是掩码的（不吃明文）', (await inputs[0].attribute('password')) !== '')
-    two = []
-    for (const b of await me.$$('.pwd-btn')) two.push(await b.text())
-    ck('没设过那一态一行两枚：取消 + 确定', two.join('|') === '取消|确定', two.join('|'))
-    await mp.screenshot({ path: path.join(OUT, '01b-面板设置态.png') })
+    ck('重置态不给输入格', (await cellsOf()) === 0)
+    ck('重置态那只隐藏 input 也不挂', !(await me.$('.pwd-capture')))
+    ck('重置态一行两枚：取消 + 重置密码', (await btnOf()).join('|') === '取消|重置密码', (await btnOf()).join('|'))
+    // 标题是功能名，不能和右边那枚撞成同一句（撞了就像页面上说了两遍"重置密码"）
+    ck('标题不与右边那枚按钮同词', nameTx !== '重置密码', nameTx)
+    await mp.screenshot({ path: path.join(OUT, '01a2-私密密码重置态弹层.png') })
 
-    // 不足 6 位：不发请求、面板留着
-    await me.setData({ pwd1: '12345', pwd2: '12345' })
-    await (await me.$('.pwd-btn.primary')).tap()
+    // 设置态：六格 + 一只隐藏的收字 input
+    await me.callMethod('openPwdSheet', true)
+    await sleep(900)
+    const cells = await me.$$('.pwd-cell')
+    ck('设置态是六个方格', cells.length === 6, `cells=${cells.length}`)
+    const capture = await me.$('.pwd-capture')
+    ck('六格背后只有一只 input（六只就要点六次才起键盘）', !!capture)
+    ck('那只 input 是数字键盘、最多 6 位、掩码',
+      (await capture.attribute('maxlength')) + '' === '6' &&
+      (await capture.attribute('password')) !== '' &&
+      (await capture.attribute('type')) === 'number')
+    const capStyle = await capture.style('opacity')
+    ck('input 自己是隐形的（屏上只看见方格）', parseFloat(capStyle) === 0, capStyle)
+    ck('设置态一行两枚：取消 + 确定', (await btnOf()).join('|') === '取消|确定', (await btnOf()).join('|'))
+    await mp.screenshot({ path: path.join(OUT, '01b-私密密码设置态弹层.png') })
+
+    /* 状态机直接喂 onPwdBuf（替身不会起系统键盘，喂事件流是同一入口） */
+    // 不满 6 位：不该自动跳第二遍、也不该存
+    await me.callMethod('onPwdBuf', { detail: { value: '12345' } })
+    await sleep(600)
+    d = await me.data()
+    ck('五位时还停在第一遍', d.pwdStep === 1 && d.pwdBuf === '12345', `step=${d.pwdStep} buf=${d.pwdBuf}`)
+    ck('五位时格子只亮五格', (await me.$$('.pwd-cell.fill')).length === 5)
+    // 输满 6 位 → 自动跳到第二遍，格子清空、提醒换成"再输一次"
+    await me.callMethod('onPwdBuf', { detail: { value: '123456' } })
+    await sleep(800)
+    d = await me.data()
+    ck('输满六位自动进第二遍', d.pwdStep === 2, `step=${d.pwdStep}`)
+    ck('第二遍格子是空的（重新输）', d.pwdBuf === '', `buf=${d.pwdBuf}`)
+    ck('第二遍上方提醒换成"再输一次"', /再输|再输入|确认一次/.test(d.pwdTip), d.pwdTip)
+    ck('第一遍那六位被留着比对', d.pwdFirst === '123456', d.pwdFirst)
+    ck('六格重新亮起来是零格', (await me.$$('.pwd-cell.fill')).length === 0)
+    await mp.screenshot({ path: path.join(OUT, '01c-私密密码第二遍.png') })
+    // 两遍不一样：不发请求、清空、面板留着
+    await me.callMethod('onPwdBuf', { detail: { value: '246801' } })
     await sleep(900)
     d = await me.data()
-    ck('不到 6 位不保存、面板不关', d.pwdOpen === true && d.privateSet === false)
-    // 两格不一样：不发请求、第二格清空
-    await me.setData({ pwd1: '135790', pwd2: '246801' })
-    await (await me.$('.pwd-btn.primary')).tap()
-    await sleep(900)
-    d = await me.data()
-    ck('两次不一样不保存', d.pwdOpen === true)
-    ck('不一致时第二格清空让人重输', d.pwd2 === '', `pwd2=${d.pwd2}`)
+    ck('两次不一样不保存（层还留着、第一遍那串也还在）',
+      d.pwdOpen === true && d.pwdFirst === '123456', `open=${d.pwdOpen} first=${d.pwdFirst}`)
+    ck('不一致时格子清空让人重输', d.pwdBuf === '' && d.pwdStep === 2, `buf=${d.pwdBuf} step=${d.pwdStep}`)
+    // 第二遍不一致之后点取消：整层收起，六格、两步、留着比对的那串一起清零
     await (await me.$('.pwd-btn.ghost')).tap()
     await sleep(800)
-    ck('取消能收掉面板', (await me.data()).pwdOpen === false)
+    d = await me.data()
+    ck('取消能收掉弹层', d.pwdOpen === false)
+    ck('收起时缓冲区一起清掉（不留明文）',
+      d.pwdBuf === '' && d.pwdFirst === '' && d.pwdStep === 1 && d.pwdFocus === false,
+      `buf=${d.pwdBuf} first=${d.pwdFirst} step=${d.pwdStep} focus=${d.pwdFocus}`)
+    ck('收起后弹层整层从屏上拿掉', !(await me.$('.pwd-layer')))
 
     /* ---------- 首页 slogan 下面那行日期 + 星期 ---------- */
     await mp.switchTab('/pages/create/create')

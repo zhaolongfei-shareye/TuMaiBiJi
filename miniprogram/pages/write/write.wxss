@@ -39,8 +39,10 @@
 .char-count {
   display: block;
   text-align: right;
+  /* 「137/500」是数字加斜杠，跟着全局那一档走；字号仍吃 --fs-tiny，一位没动 */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-size: var(--fs-tiny);
-  font-weight: 600;
+  font-weight: 100;
   color: var(--text-secondary);
   margin-top: var(--sp-1);
 }

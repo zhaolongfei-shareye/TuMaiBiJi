@@ -20,6 +20,22 @@ const TONES = [
 ]
 const UNCATEGORIZED = { name: '墨黑', bg: '#23252C', ink: '#FFFFFF' }
 
+// Tips 行前面那枚"小灯泡"用的黄。值与上面芥末黄同一支，但**不写成 TONES[0]**：
+// 那五支是"分类身份"，谁排第一随时会因排序调整而变，提示点不该跟着它走。
+// 也不许抄进 WXSS——`验-统一录入条.js` 有一条专门扫 wxss 里有没有色板里的饱和色。
+const TIP_DOT = '#F6C445'
+
+/**
+ * 壁纸名。中文是两字釉色本名（壁纸条只有"色块 + 名字"那么大地方），
+ * 英文侧站长 10-01 晚补的：这一排以前在英文态还是八个汉字。
+ * 一律收成单个词——那一格不放得下两行。
+ */
+function themeLabel(key, lang) {
+  const theme = themeOf(key)
+  if (!theme) return ''
+  return lang === 'en' ? theme.labelEn || theme.label : theme.label
+}
+
 const MOTIFS = ['motif-circle', 'motif-arc', 'motif-stripes', 'motif-dots', 'motif-pill']
 
 function hexToRgb(hex) {
@@ -163,12 +179,12 @@ function toneVars(categoryId) {
  * 它拿不到当前主题的 CSS 变量，六个值必须由 JS 一个个带进去。
  */
 const THEMES = [
-  { key: 'default', cls: 'theme-default', label: '米白', page: '#f4f2ec', line: '#ffffff', lineEdge: 'rgba(35,37,44,0.10)', dark: false },
-  { key: 'gradient-blue', cls: 'theme-blue', label: '雾蓝', page: '#eaeefb', line: '#ffffff', lineEdge: 'transparent', dark: false },
-  { key: 'gradient-green', cls: 'theme-green', label: '松绿', page: '#e7f3ea', line: '#ffffff', lineEdge: 'transparent', dark: false },
-  { key: 'gradient-sunset', cls: 'theme-sunset', label: '暮橙', page: '#fdeee6', line: '#ffffff', lineEdge: 'transparent', dark: false },
-  { key: 'gradient-purple', cls: 'theme-purple', label: '夜紫', page: '#0c0c1d', line: 'rgba(255,255,255,0.14)', lineEdge: 'transparent', dark: true },
-  { key: 'gradient-ocean', cls: 'theme-ocean', label: '深海', page: '#0d1b2a', line: 'rgba(255,255,255,0.14)', lineEdge: 'transparent', dark: true },
+  { key: 'default', cls: 'theme-default', label: '米白', labelEn: 'Paper', page: '#f4f2ec', line: '#ffffff', lineEdge: 'rgba(35,37,44,0.10)', dark: false },
+  { key: 'gradient-blue', cls: 'theme-blue', label: '雾蓝', labelEn: 'Mist', page: '#eaeefb', line: '#ffffff', lineEdge: 'transparent', dark: false },
+  { key: 'gradient-green', cls: 'theme-green', label: '松绿', labelEn: 'Pine', page: '#e7f3ea', line: '#ffffff', lineEdge: 'transparent', dark: false },
+  { key: 'gradient-sunset', cls: 'theme-sunset', label: '暮橙', labelEn: 'Dusk', page: '#fdeee6', line: '#ffffff', lineEdge: 'transparent', dark: false },
+  { key: 'gradient-purple', cls: 'theme-purple', label: '夜紫', labelEn: 'Violet', page: '#0c0c1d', line: 'rgba(255,255,255,0.14)', lineEdge: 'transparent', dark: true },
+  { key: 'gradient-ocean', cls: 'theme-ocean', label: '深海', labelEn: 'Ocean', page: '#0d1b2a', line: 'rgba(255,255,255,0.14)', lineEdge: 'transparent', dark: true },
   // 下面两枚是"整套色阶"的淡雅主题：不只换页面底，连左侧方块、新建页那三张大卡、
   // 按钮和标签都收进同一支色相，五档明度对应原来那五支彩色（索引公式一样，
   // 所以同一个分类在这套里还是同一档，只是彩色换成了深浅）。
@@ -184,6 +200,7 @@ const THEMES = [
     key: 'tint-paper',
     cls: 'theme-tint-paper',
     label: '象牙',
+    labelEn: 'Ivory',
     local: true,
     page: '#F2EFE9',
     line: '#FCFBF8',
@@ -201,6 +218,7 @@ const THEMES = [
     key: 'tint-celadon',
     cls: 'theme-tint-celadon',
     label: '天青',
+    labelEn: 'Celadon',
     local: true,
     page: '#E9EEEA',
     line: '#F7FAF7',
@@ -452,6 +470,7 @@ function catSkinFor(categoryId, wallpaper) {
 module.exports = {
   TONES,
   UNCATEGORIZED,
+  TIP_DOT,
   MOTIFS,
   THEMES,
   POSTER_SCHEMES,
@@ -463,6 +482,7 @@ module.exports = {
   toneStyle,
   toneColor,
   themeOf,
+  themeLabel,
   setActiveTheme,
   rampFor,
   chromeOf,

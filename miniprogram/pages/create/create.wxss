@@ -86,7 +86,10 @@
    深色壁纸下它又是半透明白，同一条控件在八套壁纸里会变成两种面；而这条肚子里
    装的是输入框和按钮，面必须稳定。描边沿用 .card 那一条 3px。 */
 /* 横条上面那一行轮播 Tips（站长 10-01 晚）：字号吃 --fs-meta，和上面那行「10月1日 周四」
-   同一档；居左、前面空两格（首行缩进 2×24=48rpx）。
+   同一档；左边留空 48rpx（原来靠首行缩进，现在这一行是"点 + 字"两个节点，缩进只作用在
+   第一个节点上、点会被顶到边，所以改成容器内边距，留空量一模一样）。
+   点是他要的那枚"小灯泡"象征：14rpx 圆，颜色由 palette.TIP_DOT 从 style 递进来，
+   这里绝对不写色值（`验-统一录入条.js` 有一条专门扫 wxss 里的饱和色）。
    ⚠️ 那两个 68 是刻意的，不是遗留：.entry-wrap 整块靠 62vh 那条流内 margin 定位，
    在它肚子里多一行就会把横条、换背景、底栏整组往下顶（正是"上面多一行就得改这里"那条老账，
    日期那行当年就是这么把换背景顶进底栏的）。所以这一行要**整块从流里抵掉**：
@@ -97,12 +100,28 @@
    改这一行的字号或行距，要连着改这个负 margin 和这只盒子的高。 */
 .tips {
   flex: none;
+  display: flex;
+  align-items: flex-start;
   margin-top: -68rpx;
   height: 68rpx;
+  padding-left: 48rpx;
   font-size: var(--fs-meta);
   line-height: 1.4;
-  text-indent: 48rpx;
   color: var(--text-secondary);
+}
+/* 点落在文字那一行的正中间：行高 24×1.4=33.6，(33.6−14)/2≈10。
+   14rpx 是刻意比 --fs-tiny 那一档还小一档：它是提示，不该比句子显眼。 */
+.tips-dot {
+  flex: none;
+  width: 14rpx;
+  height: 14rpx;
+  margin-top: 10rpx;
+  margin-right: 12rpx;
+  border-radius: 50%;
+}
+.tips-line {
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -334,8 +353,10 @@
   height: 40rpx;
   border-radius: 12rpx;
   color: #fff;
+  /* 三步指引那个序号也是纯数字，跟着全局那一档走（字号 22 不动） */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-size: 22rpx;
-  font-weight: 700;
+  font-weight: 100;
   display: flex;
   align-items: center;
   justify-content: center;

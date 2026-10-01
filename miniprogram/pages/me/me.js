@@ -3,7 +3,7 @@ const api = require('../../utils/api.js')
 const poster = require('../../utils/poster.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { CONTACT_EMAIL } = require('../../utils/contact.js')
-const { VERSION, SITE, INTRO_LEAD } = require('../../utils/appInfo.js')
+const { VERSION, SITE, introLead } = require('../../utils/appInfo.js')
 
 // {n} 这类占位由服务端给的数字填，界面里不自己写死额度规则
 function fmt(tpl, map) {
@@ -51,16 +51,21 @@ Page({
     sloganText: '',
     scoreText: '',
     shareValue: '',
-    // 私密密码：设没设只吃服务端读数；面板就地展开在列表里
+    // 私密密码：设没设只吃服务端读数；输入那一块浮在屏幕下方 1/3 屏（见上面那组方法）
     privateSet: false,
     pwdOpen: false,
-    pwd1: '',
-    pwd2: '',
+    pwdEntering: false,
+    pwdStep: 1,
+    pwdBuf: '',
+    pwdFirst: '',
+    pwdFocus: false,
+    pwdName: '',
+    pwdTip: '',
     // 关于那几行只读，值全部来自现成的两处来源
     version: VERSION,
     site: SITE,
     contactEmail: CONTACT_EMAIL,
-    introLead: INTRO_LEAD,
+    introLead: introLead('zh'),
   },
 
   onShow() {
@@ -78,6 +83,8 @@ Page({
       logoSrc: '/assets/logo.png',
       nameText: t('meGreeting', lang),
       sloganText: t('slogan', lang),
+      // 介绍卡那句话是这一页唯一不在 t 里的中文长句，所以跟着 lang 一起重取
+      introLead: introLead(lang),
     })
     this.fitBand()
     // 这一页原来只有导航条标题跟着语言走、底色永远吃壁纸：另外两页铺了图会翻成深底白字，
@@ -124,8 +131,9 @@ Page({
   onTab(e) {
     const key = e.currentTarget.dataset.key
     if (key === this.data.tab) return
-    // 切走之前把展开着的面板收掉：两层内容叠在一起会读成"这一格里还有一格"
-    this.setData({ tab: key, pwdOpen: false, pwd1: '', pwd2: '' })
+    // 切走之前把浮着的那一层收掉：两层内容叠在一起会读成"这一格里还有一格"
+    this.setData({ tab: key })
+    this.onClosePwdPanel()
     wx.pageScrollTo({ scrollTop: 0, duration: 120 })
   },
 
@@ -152,40 +160,91 @@ Page({
     })
   },
 
+  // ---------- 私密密码那一层（站长 10-01 晚：不在原菜单里就地展开，改屏幕下方浮起 1/3 屏）----------
+  // 六个方格是同一只隐藏 input 的显示面，所以状态只有"这一遍输到第几位"：
+  // 第一遍满六位自动跳到第二遍（他要的就是"输入一次后，再输入一次 6 个方格"），
+  // 第二遍满六位才比一致、才发请求。不一致只清第二遍，第一遍留着不用重打。
+
   async onTogglePwd() {
     if (this.data.pwdOpen) {
-      this.setData({ pwdOpen: false, pwd1: '', pwd2: '' })
+      this.onClosePwdPanel()
       return
     }
     // 设没设是服务端说了算的。冷启动或 401 重登时那条读数可能要一秒多才回来，
-    // 期间点这一行会先按"未设置"画出两个输入格，读数一到 privateSet 翻转，
+    // 期间点这一行会先按"未设置"画出六个格子，读数一到 privateSet 翻转，
     // wx:if 把整块销毁——人已经输进去的六位数字当场蒸发，界面上也不说为什么。
     if (!this.pwdReady) await this.loadPwdStatus()
-    this.setData({ pwdOpen: true, pwd1: '', pwd2: '' })
+    this.openPwdSheet(!this.data.privateSet)
+  },
+
+  // 弹层里那两行字（第一行功能名、格子上方那句校验）在这里现算，wxml 只递字段：
+  // 让模板去写三层三元，字典改一个词就得同时改两处。
+  openPwdSheet(entering) {
+    const lang = this.data.lang
+    this.setData({
+      pwdOpen: true,
+      pwdEntering: entering,
+      pwdStep: 1,
+      pwdBuf: '',
+      pwdFirst: '',
+      pwdFocus: entering,
+      // 第一行放的是**功能名**（他原话「里面是功能名称」），两态都一样；
+      // 差额全在右边那枚按钮和提醒那句上——要是标题也跟着换成"重置密码"，
+      // 就和右边那枚撞成同一句话了。
+      pwdName: t('privatePassword', lang),
+      pwdTip: entering ? t('privatePasswordNew', lang) : t('privatePasswordSetHint', lang),
+    })
   },
 
   onClosePwdPanel() {
-    this.setData({ pwdOpen: false, pwd1: '', pwd2: '' })
+    // 连 focus 一起撤：这只 input 是透明的，键盘只认 focus 这一个开关
+    this.setData({
+      pwdOpen: false, pwdEntering: false, pwdFocus: false,
+      pwdStep: 1, pwdBuf: '', pwdFirst: '',
+    })
   },
 
-  onPwdInput1(e) { this.setData({ pwd1: e.detail.value }) },
-  onPwdInput2(e) { this.setData({ pwd2: e.detail.value }) },
+  onPwdBuf(e) {
+    const v = String(e.detail.value || '').replace(/\D/g, '').slice(0, 6)
+    this.setData({ pwdBuf: v })
+    if (v.length === 6) this.advancePwd()
+  },
 
-  // 两格都过一遍"6 位数字"，再比一致；不一致就一个字节都不发，第二格清空让人重输。
-  async onPwdSave() {
-    const { pwd1, pwd2, lang } = this.data
-    if (!/^\d{6}$/.test(pwd1)) {
-      wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
+  advancePwd() {
+    const lang = this.data.lang
+    if (this.data.pwdStep === 1) {
+      this.setData({
+        pwdFirst: this.data.pwdBuf,
+        pwdStep: 2,
+        pwdBuf: '',
+        pwdTip: t('privatePasswordAgain', lang),
+      })
       return
     }
-    if (pwd1 !== pwd2) {
-      this.setData({ pwd2: '' })
+    if (this.data.pwdBuf !== this.data.pwdFirst) {
+      // 不一致就一个字节都不发（沿用旧那条）
+      this.setData({ pwdBuf: '' })
       wx.showToast({ title: t('privatePasswordMismatch', lang), icon: 'none' })
       return
     }
+    this.savePwd(this.data.pwdBuf)
+  },
+
+  // 确定那一枚是给"没输满"那一态用的：满六位本来会自动跳，按钮这时负责把规则讲出来。
+  onPwdOk() {
+    if (!/^\d{6}$/.test(this.data.pwdBuf)) {
+      wx.showToast({ title: t('privatePasswordHint', this.data.lang), icon: 'none' })
+      return
+    }
+    this.advancePwd()
+  },
+
+  async savePwd(pwd) {
+    const lang = this.data.lang
     try {
-      await api.setPrivatePassword(pwd1)
-      this.setData({ pwdOpen: false, pwd1: '', pwd2: '', privateSet: true })
+      await api.setPrivatePassword(pwd)
+      this.setData({ privateSet: true })
+      this.onClosePwdPanel()
       wx.showToast({ title: t('privatePasswordSaved', lang), icon: 'success' })
     } catch (err) {
       wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })
@@ -228,10 +287,13 @@ Page({
   },
 
   async doPwdReset() {
-    const { lang } = this.data
+    const lang = this.data.lang
     try {
       await api.resetPrivatePassword()
-      this.setData({ privateSet: false, pwd1: '', pwd2: '' })
+      this.setData({ privateSet: false })
+      // 重置只清密码这一列，笔记和分类一个字不动；清完这一层直接翻成"输两遍"那一态，
+      // 人不用退出再进来一次（站长 10-01：新增和重置是同一条路）
+      this.openPwdSheet(true)
       wx.showToast({ title: t('privatePasswordResetDone', lang), icon: 'none' })
     } catch (err) {
       wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })

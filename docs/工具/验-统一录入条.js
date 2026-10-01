@@ -126,9 +126,10 @@ ok('换背景那行仍是 110 高，图标换成 24 的小箭头、字并到 Tip
   && /\.swap-text\s*\{[^}]*font-size: var\(--fs-meta\)/.test(wxss))
 ok('条身那一档收到笔记标题同一档（--fs-title 31，原来 46）',
   /\.bar-label\s*\{[^}]*font-size: var\(--fs-title\)/.test(wxss) && !/font-size: 46rpx/.test(wxss))
-ok('Tips 那一行：字号吃 --fs-meta、前面空两格，且展开态不渲染',
+ok('Tips 那一行：字号吃 --fs-meta、左边留空 48rpx，且展开态不渲染',
   /\.tips\s*\{[^}]*font-size: var\(--fs-meta\)/.test(wxss)
-  && /text-indent: 48rpx/.test(wxss)
+  && /\.tips\s*\{[^}]*padding-left: 48rpx/.test(wxss)
+  && !/text-indent/.test(wxss)
   && /wx:if="\{\{!active && tips\.length\}\}"/.test(wxml))
 // 这一行整块是从流里"抵掉"的：盒子高 = 负 margin 的绝对值时，横条才一动不动。
 // 上一版写成 height:34 / margin:-68，两个数不等，横条被往上顶了 34rpx，
@@ -143,7 +144,8 @@ ok('Tips 那只盒子的高 == 负 margin 的绝对值（不等就会把横条�
 // 盒子里除了文字那一行，还要剩下一行的空隙，否则 Tips 会贴在横条上。
 ok('Tips 盒子比文字那一行高出一档（68 = 文字 34 + 下方留一行 34）',
   Math.abs(tipsH - 68) <= 1, tipsH)
-// 可用宽 = 750 − 24×2（页边）− 48（空两格）= 654rpx，24rpx 字号下放得下 27 个汉字；
+// 可用宽 = 750 − 24×2（页边）− 48（左边留空）− 14（点）− 12（点与字的间距）= 652rpx，
+// 24rpx 字号下放得下 27 个汉字（比加点前少半个字，最长那句 20 字仍然宽裕）；
 // 卡在这条线上，句子才不会在照片上折成两行、把横条顶下去。
 ok('Tips 六句中英各一份、句数相等', Array.isArray(zh.tips) && Array.isArray(en.tips)
   && zh.tips.length === 6 && en.tips.length === zh.tips.length)
@@ -151,6 +153,18 @@ ok('每条中文 Tips 不超过 24 个汉字（一句都不折行）',
   zh.tips.every((x) => x.length <= 24), zh.tips.map((x) => x.length).join(','))
 ok('前缀两门各按自己的冒号（中文全角、英文半角带空格）',
   zh.tipsPrefix === 'Tips：' && en.tipsPrefix === 'Tips: ')
+
+// 站长 10-01 晚两条：① 4 秒"还没看完就跳下一条"→ 慢一倍；② 句首加一枚小黄点当"小灯泡"。
+ok('一句停 8 秒（不是原来的 4 秒）',
+  /\}, 8000\)/.test(js) && !/\}, 4000\)/.test(js))
+ok('小黄点在文字前面，色值由 palette 经 style 递进来',
+  /<view class="tips-dot" style="\{\{tipDotStyle\}\}"><\/view>\s*<text class="tips-line">/.test(wxml)
+  && /tipDotStyle: 'background:' \+ TIP_DOT/.test(js)
+  && palette.TIP_DOT === '#F6C445')
+ok('点那一格：14rpx 正圆、离字 12rpx',
+  /\.tips-dot\s*\{[^}]*width: 14rpx[^}]*height: 14rpx[^}]*margin-right: 12rpx[^}]*border-radius: 50%/.test(wxss))
+ok('点必须排在点前面（顺序反了就成了"句子里嵌个点"）',
+  wxml.indexOf('class="tips-dot"') < wxml.indexOf('class="tips-line"'))
 
 // 饱和色必须由 palette 发下来，wxss 里不许出现第二份色板
 const TONE_HEXES = palette.TONES ? palette.TONES.map((t) => t.bg.toUpperCase()) : []

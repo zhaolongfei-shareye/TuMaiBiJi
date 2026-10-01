@@ -254,7 +254,9 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
   // 原来这一节钉的是「本周｜本月｜总数」那一行字符串（连同 U+00A0 那条空白折叠判据）。
   // v12 把那一行整个撤了、换成三列状态量，判据跟着换——不留旧尺子去量新东西。
   const langBefore = await mp.evaluate(() => getApp().globalData.userInfo?.language || 'zh')
-  for (const [lg, names, name] of [['zh', ['笔记', '分享', '收藏'], '中文'],
+  // 第三列中文 10-01 晚由「收藏」改「种草」（站长拍的），英文仍是 Saved——
+  // 所以这两行的中文名单要跟着字典走，不是抄屏幕上的字。
+  for (const [lg, names, name] of [['zh', ['笔记', '分享', '种草'], '中文'],
     ['en', ['Notes', 'Shared', 'Saved'], '英文']]) {
     await mp.evaluate((l) => {
       const a = getApp()

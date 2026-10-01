@@ -75,7 +75,7 @@
     </view>
   </scroll-view>
 
-  <view class="strip-foot">{{t.stripHint}} · {{t.inUse}}：{{currentLabel}}</view>
+  <view class="strip-foot">{{t.stripHint}} · {{t.inUse}}{{t.colon}}{{currentLabel}}</view>
 
   <!-- 这里原来有一排「背景图：用人像 / 不用」。站长 09-30 判它是错的：图本来就和
        「我的 → 卡片模板」最上面那张同一个来源（poster.homeBg()），这一页不该再有

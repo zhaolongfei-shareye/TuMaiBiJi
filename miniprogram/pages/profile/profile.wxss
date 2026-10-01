@@ -216,15 +216,30 @@
   color: var(--text-secondary);
 }
 
+/* 一组一条、左右滑（站长 10-01 晚：上下排成五行，「保存」被顶到页面最底下看不见）。
+   外壳抄这一页上面那排形象槽和分享页那排模板条：外壳只管横滚，格子内容不动。
+   上下各留 sp-2：选中那格描的是 3rpx 外环，scroll-view 会裁掉越界的内层——
+   壁纸那一排的勾就是被这么切掉过（结论写在 .slots 那条注释上）。 */
 .grid {
-  display: flex;
-  flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  padding: var(--sp-2) 0;
+}
+
+.grid-inner {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: flex-start;
   gap: var(--sp-3);
-  /* 原来这里垫了 200rpx，是给浮在底部的「保存」条让位。那条现在回到流内了，
-     再垫就是一大片空白——让位这件事不再需要两页各记一份数。 */
+  /* 左右各留 8rpx 是给选中那一格的 3rpx 外环：scroll-view 按自己的盒子裁内层，
+     不留这一点首格（滚到底时是末格）那圈环会被削掉一边——和壁纸那排被切掉的勾同一件事。
+     只留 8 不留 24：这一排的组名离容器边 24，横条再内缩 24 就成"标题和卡不对齐"了。 */
+  padding: 0 8rpx;
 }
 
 .cell {
+  flex: none;
   width: 320rpx;
   box-sizing: border-box;
   padding: var(--sp-2);

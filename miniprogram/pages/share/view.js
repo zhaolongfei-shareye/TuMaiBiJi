@@ -91,7 +91,8 @@ Page({
     const { share } = this.data
     if (!share) return {}
     return {
-      title: share.title || '图麦笔记',
+      // 标题缺失时兜到应用名，且跟着当前语言走（这一行是发给接收方看的）
+      title: share.title || t('appName', this.data.lang),
       path: `/pages/share/view?token=${share.token}`,
     }
   },

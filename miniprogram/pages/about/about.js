@@ -4,13 +4,18 @@ const { toneStyle } = require('../../utils/palette.js')
 const { CONTACT_EMAIL } = require('../../utils/contact.js')
 // 版本号、官网、公众号、介绍语——「我的」那一页现在也要说这几句，
 // 所以它们搬到 utils/appInfo.js 里只留一份。
-const { VERSION, SITE, OFFICIAL_ACCOUNT, INTRO_LEAD } = require('../../utils/appInfo.js')
+const { VERSION, SITE, OFFICIAL_ACCOUNT, introLead } = require('../../utils/appInfo.js')
 
 // 每条都写清"做什么"和"什么情况下做不到"。宁可写边界，不堆形容词：
 // 这些句子最后都要能拿代码对上，读者照着做不会撞墙。
 // tone 不按下标排，而是钉在语义上：链接和截图这两块的颜色必须和新建页那两张卡一致，
 // 同一个功能在全应用只有一张脸。
-const FEATURES = [
+//
+// 中英两份并列（站长 10-01 要求补齐英文缺口）。两份**条目数必须相等**，
+// `验-中英文缺口.js` 会盯着这一条——错位会让英文态底下空出一格。
+// 英文侧的 mark 只用一个词（Link/Shot/Sort/Card/Skin）：左侧那块只有 96rpx 宽，
+// 字 26rpx/800，两个词就折行。
+const FEATURES_ZH = [
   {
     mark: '链接',
     tone: 1,
@@ -39,11 +44,45 @@ const FEATURES = [
     mark: '外观',
     tone: 0,
     title: '八张壁纸',
-    body: '含夜紫、深海两张深色，导航条、卡片和左侧色块会跟着一起换。另有「象牙」「天青」两枚是整套色阶：连左侧方块、按钮、标签一起收进同一支色相，只按深浅分层，这两枚只存在当前这台设备上。界面语言在新建页标题右边切（中 / EN），切完当场就变；这一栏的三页说明目前只有中文。',
+    body: '含夜紫、深海两张深色，导航条、卡片和左侧色块会跟着一起换。另有「象牙」「天青」两枚是整套色阶：连左侧方块、按钮、标签一起收进同一支色相，只按深浅分层，这两枚只存在当前这台设备上。界面语言在新建页标题右边切（中 / EN），切完当场就变。',
   },
 ]
 
-const PRIVACY = [
+const FEATURES_EN = [
+  {
+    mark: 'Link',
+    tone: 1,
+    title: 'Link to note',
+    body: 'Paste a WeChat article or any web link. The server pulls the page and writes back a summary, key points and tags, usually within a few dozen seconds. The link has to be publicly reachable over http/https; pages behind a login, a paywall or an anti-crawler block fail plainly instead of dropping an empty note into your list.',
+  },
+  {
+    mark: 'Shot',
+    tone: 2,
+    title: 'Screenshot to note',
+    body: 'Take a photo or pick from the album, up to 9 at a time. Text recognition runs on our own server, not through a third-party OCR API. JPG and PNG are supported; HEIC from the iPhone camera needs Settings > Camera > Formats > Most Compatible first. Images forwarded through WeChat lose their capture metadata, so for those only the text on screen is read.',
+  },
+  {
+    mark: 'Sort',
+    tone: 3,
+    title: 'Categories, pinning and search',
+    body: 'Notes can be filed into your own categories, pinned and tagged. Search hits the title, summary, body text and the captured original. Tapping any tag on the edit page moves it to the front; the colour block on the left of a list row or card shows that first tag.',
+  },
+  {
+    mark: 'Card',
+    tone: 4,
+    title: 'Export a note card',
+    body: 'One note can be saved as a tall card image whose height follows the content: short notes get no blank block at the end, long ones keep every point. Each card carries its own mini-program code that opens exactly that note. Use it to archive and reuse: drop it into any article as a figure and come back to the note from that image later, or print it offline and paste it into a paper notebook, journal or travel plan.',
+  },
+  {
+    mark: 'Skin',
+    tone: 0,
+    title: 'Eight wallpapers',
+    body: 'Two are dark (Violet and Ocean); the nav bar, cards and left colour blocks switch with them. Ivory and Celadon are full tint ramps — the blocks, buttons and tags all collapse into one hue and only differ in lightness, and those two live on this phone only. The interface language switches to the right of the title on the new-note page, and applies immediately.',
+  },
+]
+
+// 隐私这一栏同样中英并列，十条一小节，两份顺序一一对应。
+const PRIVACY_ZH = [
   {
     title: '我们收集什么',
     lines: [
@@ -118,38 +157,123 @@ const PRIVACY = [
   },
 ]
 
-Page({
-  data: {
-    version: VERSION,
-    themeClass: '',
-    lang: 'zh',
-    t: texts('zh'),
-    tab: 'intro',
-    updatedAt: '2026 年 9 月 22 日',
-    introLead: INTRO_LEAD,
+const PRIVACY_EN = [
+  {
+    title: 'What we collect',
+    lines: [
+      'WeChat login id (OpenID): used only to put your notes under your account. It is never sent to the client and appears on no page.',
+      'What you save yourself: title, summary, key points, tags, category, source link, and the text recognised from your screenshots.',
+      'The nickname you type in "Card templates": it reaches the server only at the moment you generate a share image, so the scan page can show "Original author: …". Until you generate one it stays on this phone.',
+      'Screenshots you upload: used only to read the text inside them; see item 3 for how they are handled.',
+      'We do not collect contacts, location, microphone, device identifiers or browsing history.',
+    ],
+  },
+  {
+    title: 'Device permissions',
+    lines: [
+      'Camera and photo library: used for screenshot import (shoot or pick), for choosing an avatar image for the share poster, and for saving a generated poster into your album. The avatar stays on this phone and is never uploaded; our server holds no user images. Reading and searching notes works fine without these.',
+      'Clipboard: read once only when you tap the "Paste" button, to take the link you copied; written to only when you tap "Copy link".',
+      'You can revoke any permission in phone settings at any time. The matching feature then says so clearly instead of failing silently.',
+    ],
+  },
+  {
+    title: 'How your screenshots are handled',
+    lines: [
+      'Screenshots are uploaded to our own server over HTTPS and held only in the running process memory, discarded immediately after recognition.',
+      'The server never writes images to disk, never stores them in the database, and has no image object storage; any staging batch left unsubmitted for more than 30 minutes is dropped.',
+      'The recognised text and the summary built from it are saved as note content — that is the purpose of the product, not extra collection.',
+    ],
+  },
+  {
+    title: 'Third parties and models',
+    lines: [
+      'Turning text into a summary and key points sends that text to Tencent Hunyuan LLM (called through WeChat CloudBase), and only the text this one note needs.',
+      'Links you paste are fetched directly by our server, with no third-party parser or short-link service in between.',
+      'The mini-program has no ads, no analytics tracking, and no third-party share or push SDK.',
+    ],
+  },
+  {
+    title: 'Visibility and deletion',
+    lines: [
+      'Notes are private to you by default: the API isolates by logged-in identity, so another identity fetching your note gets a 404.',
+      'Deleting a note from its detail page removes its content, and the code printed on its card image then leads nowhere.',
+      'To stop exposure without deleting the content: tap "Revoke share" in the detail page. That note stops being public at once, and both the link already sent out and the code on the poster stop opening. Sharing again issues a brand-new link; the old one does not come back.',
+      'Someone opening your shared note can tap "Save to my notes" and copy what the public page shows (title, summary, key points, tags, original link, and your nickname) into their own library. That copy becomes theirs: revoking the share or deleting the note later does not touch it. Their side keeps a permanent "Saved from" line naming the original author and when it was copied, and they cannot edit that line.',
+      'But images already saved to an album or printed cannot be recalled: anyone holding that code can open that one note. Check that its content is OK to show others before generating a card image.',
+    ],
+  },
+  {
+    title: 'Server and logs',
+    lines: [
+      'The service runs on our own server and the whole site transfers over HTTPS.',
+      'The server keeps ordinary access logs (request path, time, source IP) for troubleshooting and rate limiting; note bodies are not logged.',
+    ],
+  },
+  {
+    title: 'Account and notes',
+    lines: [
+      'Notes are unlimited: how many you keep is your call, and deleting one affects only that one.',
+      'Referral records store two ids only — who invited whom, and which note the reward came from. No nickname or avatar is read and no user-info API is called; it exists solely to settle that one credit, never for push or marketing.',
+      '"Me → Delete account" is self-service at any time. After two confirmations it deletes every note, category and generated share link under your account, and the account itself, with no way back.',
+      'You can also delete notes one by one instead; those are unrecoverable too.',
+    ],
+  },
+  {
+    title: 'Minors',
+    lines: ['This service is for users of all ages. If you are a minor, please use it under a guardian\'s guidance.'],
+  },
+  {
+    title: 'Changes to this notice',
+    lines: ['We may update this notice from time to time; material changes will be announced inside the mini-program. Keeping on using it means accepting the updated terms.'],
+  },
+  {
+    title: 'Contact us',
+    lines: ['Questions about this notice: reach us by the feedback email or the official account — both are in the "Intro" tab, one tap copies either.'],
+  },
+]
+
+/** 一整个页面的内容按语言算出来。色块仍由 toneStyle 现算——
+ *  淡雅两枚（象牙/天青）下它们要跟着换档，所以进页时得重算一次。 */
+function content(lang, skin) {
+  const feats = lang === 'en' ? FEATURES_EN : FEATURES_ZH
+  const priv = lang === 'en' ? PRIVACY_EN : PRIVACY_ZH
+  return {
+    updatedAt: t('aboutUpdatedAt', lang),
+    introLead: introLead(lang),
     infoRows: [
-      { label: '当前版本', value: `v${VERSION}` },
-      { label: '产品官网', value: SITE, copy: SITE },
-      { label: '开发主体', value: '个人开发者' },
-      { label: '反馈邮箱', value: CONTACT_EMAIL, copy: CONTACT_EMAIL },
-      { label: '公众号', value: OFFICIAL_ACCOUNT, copy: OFFICIAL_ACCOUNT },
+      { label: t('aboutVersionRow', lang), value: `v${VERSION}` },
+      { label: t('officialSite', lang), value: SITE, copy: SITE },
+      { label: t('aboutEntityRow', lang), value: t('aboutEntityValue', lang) },
+      { label: t('feedbackEmail', lang), value: CONTACT_EMAIL, copy: CONTACT_EMAIL },
+      { label: t('aboutAccountRow', lang), value: OFFICIAL_ACCOUNT, copy: OFFICIAL_ACCOUNT },
     ],
     // 左侧色块和首页/详情/新建页同一张色板，按语义取色，不存图
-    features: FEATURES.map((f) => Object.assign({}, f, { skin: toneStyle(f.tone) })),
-    privacy: PRIVACY,
-  },
+    features: feats.map((f) => Object.assign({}, f, { skin: skin(f.tone) })),
+    privacy: priv,
+  }
+}
+
+Page({
+  data: Object.assign(
+    { version: VERSION, themeClass: '', lang: 'zh', t: texts('zh'), tab: 'intro' },
+    content('zh', toneStyle)
+  ),
 
   onLoad() {
     const app = getApp()
     const lang = app.globalData.userInfo?.language || 'zh'
-    this.setData({
-      lang,
-      t: texts(lang),
-      themeClass: app.applyTheme(app.getWallpaper()),
-      // 那五个色块同样是在 data 字面量里算的（模块加载时主题还没落地），
-      // 淡雅两枚下它们要跟着换档，所以进页时按当前主题重算。
-      features: FEATURES.map((f) => Object.assign({}, f, { skin: toneStyle(f.tone) })),
-    })
+    this.setData(
+      Object.assign(
+        {
+          lang,
+          t: texts(lang),
+          themeClass: app.applyTheme(app.getWallpaper()),
+        },
+        // 那五个色块在 data 字面量里算的是中文态（模块加载时主题还没落地），
+        // 淡雅两枚下它们要跟着换档，所以进页时按当前主题重算。
+        content(lang, toneStyle)
+      )
+    )
     app.setNavTitle('aboutApp', lang)
   },
 

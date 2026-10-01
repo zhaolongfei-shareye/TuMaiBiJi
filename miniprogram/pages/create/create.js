@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { toneStyle } = require('../../utils/palette.js')
+const { toneStyle, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const { allowPrivate } = require('../../utils/privateGate.js')
 
@@ -56,6 +56,9 @@ Page({
     tips: [],
     tipIdx: 0,
     tipsPrefix: t('tipsPrefix', 'zh'),
+    // Tips 前面那枚小黄点（站长 10-01 晚：象征小灯泡）。色值必须由 palette 发下来：
+    // `验-统一录入条.js` 专门扫 create.wxss 里有没有 #F6C445，写进样式表就红。
+    tipDotStyle: 'background:' + TIP_DOT,
   },
 
   // slogan 下面那行日期 + 星期（效果图「统一录入条」那一稿就有，之前落地时漏了）。
@@ -79,7 +82,9 @@ Page({
     return Array.isArray(arr) ? arr : []
   },
 
-  // 一句停 4 秒。小于两句就不起表（只有一句时它不该自己跳，也没有可跳的）。
+  // 一句停 8 秒（站长 10-01 晚：4 秒"还没看完就跳下一条了"，慢一倍）。
+  // 24rpx 一行最长 20 个汉字，8 秒够读完一遍还有余量；再长就成"卡住了"。
+  // 小于两句就不起表（只有一句时它不该自己跳，也没有可跳的）。
   // 定时器挂在实例上、不进 data：它是节奏不是状态，进 data 只会多一堆无意义的 setData。
   startTips() {
     this.stopTips()
@@ -87,7 +92,7 @@ Page({
     if (n < 2) return
     this._tipTimer = setInterval(() => {
       this.setData({ tipIdx: (this.data.tipIdx + 1) % n })
-    }, 4000)
+    }, 8000)
   },
 
   // 离开这一页就停：切到别的 tab 之后这一屏不再渲染，表还在跑就是白耗电，

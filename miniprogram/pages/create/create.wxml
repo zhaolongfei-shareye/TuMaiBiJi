@@ -30,9 +30,14 @@
   <view class="entry-wrap">
     <!-- 站长 10-01 晚：横条上面加一行轮播 Tips，教人用拍照提炼、分享选模板这些现成能力。
          展开态整行不渲染（和「换背景」同一规矩：面板已经贴底了，上面再滚一行提示会跟表单抢眼睛）。
-         字号、前面空两格、离横条那一行的距离全在 wxss 的 .tips 上，这里只递一句文本。
+         字号、左边留空、离横条那一行的距离全在 wxss 的 .tips 上，这里只递一枚点和一句文本。
+         点是他要的那枚"小灯泡"的象征，颜色由 palette.TIP_DOT 从 style 递进来——
+         写进 wxss 会被 `验-统一录入条.js` 那条"饱和色不许抄进样式表"打红。
          中文是「Tips：」、英文是「Tips: 」——冒号那档跟着语言走，不硬贴一个全角冒号到英文上。 -->
-    <view wx:if="{{!active && tips.length}}" class="tips">{{tipsPrefix}}{{tips[tipIdx]}}</view>
+    <view wx:if="{{!active && tips.length}}" class="tips">
+      <view class="tips-dot" style="{{tipDotStyle}}"></view>
+      <text class="tips-line">{{tipsPrefix}}{{tips[tipIdx]}}</text>
+    </view>
     <view class="bar {{active ? 'open' : ''}}" catchtap="openBar">
       <view class="bar-lead glyph-{{lead}}"></view>
       <view class="bar-label">{{barTitle}}</view>

@@ -208,6 +208,13 @@
   white-space: nowrap;
 }
 
+/* 「关于」那一行右边是纯数字（魅力值），跟着全局那一档走。
+   同一个 .menu-value 还装官网地址、邮箱、"+10 篇"这些含字母和汉字的值，
+   所以另起一格，不往公共那条里塞 font-family。字号与字重一条没改。 */
+.menu-value.num {
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+}
+
 .ico {
   flex: none;
   width: 46rpx;
@@ -274,36 +281,103 @@
 }
 
 /* ---------- 私密密码：就地展开，长在列表里面，不再浮一层 ---------- */
-.pwd-inline {
-  padding: 4rpx 0 30rpx;
-  border-bottom: var(--w-edge) solid var(--card-edge);
+/* ---------- 私密密码那一层（站长 10-01 晚：不在原菜单里处理，改屏幕下方浮起 1/3 屏）----------
+   背后不垫板、不加淡影（详情浮窗那一轮连打两轮的同一条口径：垫了就读成"两层叠加"），
+   上面那半屏只做"点这里收回"的命中区，透明。
+   键盘：这只 input 没写 adjust-position，走微信默认那条——焦点起来整页（含 fixed 层）
+   被顶到键盘上方，和新建页那张贴底面板同一机制。真机复看要看的是这一层没被键盘吞掉。 */
+.pwd-layer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
 }
 
-.pwd-hint {
-  display: block;
+.pwd-hit {
+  flex: 1;
+}
+
+.pwd-sheet {
+  flex: none;
+  height: 33vh;
+  box-sizing: border-box;
+  padding: 40rpx var(--sp-4) 24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-top: var(--w-edge) solid var(--card-edge);
+  border-radius: var(--r-card) var(--r-card) 0 0;
+}
+
+/* 第一行是这一格的功能名（他要的"里面是功能名称"） */
+.pwd-name {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* 格子上方那句就是"提醒校验"：第一遍说要 6 位数字，第二遍说要再输一次 */
+.pwd-tip {
+  margin-top: 12rpx;
   font-size: var(--fs-meta);
   line-height: var(--lh-body);
   color: var(--text-secondary);
 }
 
-.pwd-input {
-  margin-top: 16rpx;
-  height: 96rpx;
-  padding: 0 28rpx;
-  border-radius: var(--r-chip);
-  background: var(--chip-idle);
-  font-size: var(--fs-body);
-  letter-spacing: 6rpx;
-  color: var(--text-primary);
+.pwd-boxes {
+  position: relative;
+  margin-top: 40rpx;
+  display: flex;
+  gap: 16rpx;
 }
 
-.pwd-ph {
-  color: var(--text-tertiary);
-  letter-spacing: 0;
+.pwd-cell {
+  position: relative;
+  flex: 1;
+  height: 96rpx;
+  border-radius: var(--r-chip);
+  background: var(--chip-idle);
+  box-shadow: inset 0 0 0 var(--w-edge) var(--card-edge);
+}
+
+.pwd-cell.fill {
+  box-shadow: inset 0 0 0 var(--w-edge) var(--accent);
+}
+
+/* 输进去的那一位画成一枚点，不画数字：这一串是密码，屏幕前可能站着别人。
+   用 ::after 而不是往 wxml 里塞 text 节点，是因为六个格子本来就是空壳。 */
+.pwd-cell.fill::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20rpx;
+  height: 20rpx;
+  margin: -10rpx 0 0 -10rpx;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* 真正收键盘的是这一只，六个格子只是它的显示面：小程序没有"六格各收一个字符"的原生控件，
+   做六只 input 反而要点六次才起键盘、删一位还要跳格。
+   透明但不能 display:none——那样焦点和键盘都起不来。 */
+.pwd-capture {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  font-size: var(--fs-body);
 }
 
 .pwd-two {
-  margin-top: 24rpx;
+  margin-top: auto;
   display: flex;
   gap: 16rpx;
 }
@@ -358,8 +432,10 @@
 }
 
 .about-ver {
+  /* 版本号是"v + 数字 + 点"，整串跟着全局那一档走，不然半粗半细更难看（字体里有 v 和 .） */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 100;
   color: var(--text-secondary);
   background: var(--chip-idle);
   padding: 3rpx 14rpx;

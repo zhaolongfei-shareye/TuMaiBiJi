@@ -45,43 +45,12 @@
         <text class="menu-label">{{t.categories}}</text>
         <view class="ico"><view class="cv"></view></view>
       </view>
-      <!-- 私密密码本来就是本页的面板，就地展开；另外三格要搬进来等于重写三个整页，先保留跳页 -->
+      <!-- 私密密码：这一行只是门，输入整块搬到屏幕下方那一层（站长 10-01 晚：
+           「不在原菜单处理方式」——原来就地展开成两个长输入框，混在列表里像另一行菜单）。
+           门仍然只吃服务端那条读数，读没读回来决定右边按钮是「重置密码」还是「确定」。 -->
       <view class="menu-item {{pwdOpen ? 'open' : ''}}" bindtap="onTogglePwd">
         <text class="menu-label">{{t.privatePassword}}</text>
         <view class="ico"><view class="cv"></view></view>
-      </view>
-      <view wx:if="{{pwdOpen}}" class="pwd-inline">
-        <text class="pwd-hint">{{privateSet ? t.privatePasswordSetHint : t.privatePasswordScene}}</text>
-
-        <block wx:if="{{!privateSet}}">
-          <input
-            class="pwd-input"
-            type="number"
-            maxlength="6"
-            password="{{true}}"
-            value="{{pwd1}}"
-            placeholder="{{t.privatePasswordNew}}"
-            placeholder-class="pwd-ph"
-            bindinput="onPwdInput1"
-          />
-          <input
-            class="pwd-input"
-            type="number"
-            maxlength="6"
-            password="{{true}}"
-            value="{{pwd2}}"
-            placeholder="{{t.privatePasswordAgain}}"
-            placeholder-class="pwd-ph"
-            bindinput="onPwdInput2"
-          />
-        </block>
-
-        <!-- 一行两个：左边永远是退出（取消 / 返回），右边是这一态的主操作（确定 / 重置密码） -->
-        <view class="pwd-two">
-          <view class="pwd-btn ghost" bindtap="onClosePwdPanel">{{privateSet ? t.privatePasswordBack : t.cancel}}</view>
-          <view wx:if="{{!privateSet}}" class="pwd-btn primary" bindtap="onPwdSave">{{t.privatePasswordOk}}</view>
-          <view wx:else class="pwd-btn danger" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
-        </view>
       </view>
       <view class="menu-item menu-danger" bindtap="onDeleteAccount">
         <text class="menu-label">{{t.deleteAccount}}</text>
@@ -94,7 +63,7 @@
   <block wx:else>
     <view class="card about-lead">
       <view class="about-who">
-        <text class="about-name">图麦笔记</text>
+        <text class="about-name">{{t.appName}}</text>
         <text class="about-ver">v{{version}}</text>
       </view>
       <text class="about-p">{{introLead}}</text>
@@ -127,11 +96,35 @@
       <view wx:if="{{scoreText}}" class="menu-item">
         <text class="menu-label">{{t.brainScore}}</text>
         <view class="menu-right">
-          <text class="menu-value">{{scoreText}}</text>
+          <text class="menu-value num">{{scoreText}}</text>
         </view>
       </view>
     </view>
 
     <text class="copyright">{{t.copyright}}</text>
   </block>
+
+  <!-- 私密密码这一层（站长 10-01 晚：「不在原菜单处理方式，改为前端下方弹出 1/3 窗口」）。
+       从上到下四样：功能名 → 校验提醒 → 六个方格 → 一行两枚（左退出、右动作）。
+       六个格子是同一只隐藏 input 的显示面（六只 input 要点六次才起键盘）。
+       输完第一遍自动跳到第二遍（「输入一次后，再输入一次 6 个方格」），
+       第二遍输满六位才真的发请求。 -->
+  <view wx:if="{{pwdOpen}}" class="pwd-layer">
+    <view class="pwd-hit" catchtap="onClosePwdPanel"></view>
+    <view class="pwd-sheet">
+      <view class="pwd-name">{{pwdName}}</view>
+      <view class="pwd-tip">{{pwdTip}}</view>
+      <view wx:if="{{pwdEntering}}" class="pwd-boxes">
+        <view wx:for="{{[0, 1, 2, 3, 4, 5]}}" wx:key="index"
+          class="pwd-cell {{pwdBuf.length > index ? 'fill' : ''}}"></view>
+        <input class="pwd-capture" type="number" maxlength="6" password="{{true}}"
+          focus="{{pwdFocus}}" value="{{pwdBuf}}" bindinput="onPwdBuf" />
+      </view>
+      <view class="pwd-two">
+        <view class="pwd-btn ghost" bindtap="onClosePwdPanel">{{t.cancel}}</view>
+        <view wx:if="{{pwdEntering}}" class="pwd-btn primary" bindtap="onPwdOk">{{t.privatePasswordOk}}</view>
+        <view wx:else class="pwd-btn danger" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
+      </view>
+    </view>
+  </view>
 </view>

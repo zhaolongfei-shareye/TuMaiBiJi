@@ -3,10 +3,11 @@
  *  跑法：先 `cli auto --project .../miniprogram --auto-port 9431`，等约 30 秒，再
  *        NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-我的页改版-真跑.js
  *
- *  作废的两条旧判据（别再改代码去迁就它们）：
+ *  作废的旧判据（别再改代码去迁就它们）：
  *   ① 「私密密码那一行右边写着设没设」——这一版行右边只剩一枚一体 icon，状态不再用文字说；
- *   ② 「点那一行浮出密码面板（.pwd-mask + 固定层 .pwd-sheet）」——面板改成就地展开，
- *      浮层和遮罩整两层撤掉，这里改成钉"展开的内容长在列表里面"。
+ *   ② 密码面板的形状这一版又改了一次（站长 10-01 晚：「不在原菜单处理方式，改为前端下方弹出
+ *      1/3 窗口」）：v10 那批钉的是"就地展开、内容长在列表里面"，整批作废，
+ *      这里改成钉"独立一层铺满视口 + 那一份贴底约 1/3 高 + 菜单行自己不长高"。
  *
  *  evaluate 跑在逻辑层，那里没有 document/window，所以计算样式一律走 element.style()。
  */
@@ -37,19 +38,24 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
   q.selectAll('.seg').boundingClientRect()
   q.selectAll('.menu-item').boundingClientRect()
   q.selectAll('.ico').boundingClientRect()
-  q.selectAll('.pwd-input').boundingClientRect()
+  q.selectAll('.pwd-cell').boundingClientRect()
   q.selectAll('.pwd-btn').boundingClientRect()
-  q.select('.pwd-inline').boundingClientRect()
+  q.select('.pwd-sheet').boundingClientRect()
   q.select('.menu-group').boundingClientRect()
   q.select('.about-lead').boundingClientRect()
   q.select('.h1').boundingClientRect()
+  q.select('.pwd-hit').boundingClientRect()
+  q.select('.pwd-name').boundingClientRect()
+  q.select('.pwd-layer').boundingClientRect()
   q.exec((res) => resolve({
     band: res[0], sheet: res[1], logo: res[2], text: res[3],
     score: res[4], num: res[5], lab: res[6], pill: res[7],
     segs: res[8] || [], items: res[9] || [], icos: res[10] || [],
-    inputs: res[11] || [], btns: res[12] || [], inline: res[13],
+    cells: res[11] || [], btns: res[12] || [], pwdSheet: res[13],
     group: res[14], aboutLead: res[15], h1: res[16],
+    hit: res[17], pwdName: res[18], layer: res[19],
     windowWidth: wx.getWindowInfo().windowWidth,
+    windowHeight: wx.getWindowInfo().windowHeight,
   }))
 }))
 
@@ -113,7 +119,7 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   // tab / 展开态是**页面实例**上的，switchTab 出去再回来不会把它们复位（上一轮跑完
   // 停在「关于」，这一轮就红在"默认停在设置"上——那是顺序依赖的假红，不是代码坏了）。
   // 所以每次开跑先把这一页按回出厂那一态。
-  await page.setData({ tab: 'set', pwdOpen: false, pwd1: '', pwd2: '' })
+  await page.setData({ tab: 'set', pwdOpen: false, pwdEntering: false, pwdBuf: '', pwdFirst: '', pwdStep: 1 })
   await mp.switchTab('/pages/index/index')
   await sleep(1200)
   page = await gotoMe(mp)
@@ -234,7 +240,7 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   }))
   ck('这张图真在包里、尺寸 1280×1024（5:4）', img.ok && img.w === 1280 && img.h === 1024, JSON.stringify(img))
 
-  /* ---------- ⑤ 设置那五条：一体 icon + 就地展开 ---------- */
+  /* ---------- ⑤ 设置那五条：一体 icon + 从底部弹上来的那一层 ---------- */
   const labels = []
   for (const r of await page.$$('.menu-item')) labels.push((await r.text()).replace(/\s+/g, ''))
   ck('设置态是五条：卡片模板/外观设置/分类管理/私密密码/注销账号',
@@ -250,22 +256,46 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   await sleep(1200)
   d = await page.data()
   m = await measure(mp)
-  ck('点那一行就地展开', d.pwdOpen === true && d.privateSet === true, `open=${d.pwdOpen} set=${d.privateSet}`)
-  ck('展开的内容长在列表里面，不是浮层',
-    !!m.inline && !!m.group && m.inline.top >= m.group.top && m.inline.bottom <= m.group.bottom + 1,
-    m.inline ? `${m.inline.top}~${m.inline.bottom} in ${m.group.top}~${m.group.bottom}` : '没有 .pwd-inline')
+  ck('点那一行弹出底部那一层', d.pwdOpen === true, `open=${d.pwdOpen} set=${d.privateSet}`)
+  // 站长 10-01 晚：「不在原菜单处理方式，改为前端下方弹出 1/3 窗口」。
+  // 旧判据"展开的内容长在列表里面"是上一版的，作废；这里钉的是"独立一层、铺满视口、那份贴底"。
+  ck('弹的是独立一层（.pwd-layer 铺满整屏），不是菜单里多出来的一坨',
+    !!m.layer && Math.abs(m.layer.height - m.windowHeight) <= 1,
+    m.layer ? `层高=${m.layer.height} 窗高=${m.windowHeight}` : '没有 .pwd-layer')
+  // 这一条才是"不在原菜单处理方式"的正解：打开之后，菜单那一行本身不许长高。
+  ck('打开时菜单行没被顶高（内容不就地展开）',
+    m.items.length === 5 && Math.abs(toRpx(m.items[iPwd].height, W) - 106) <= 2,
+    m.items[iPwd] ? toRpx(m.items[iPwd].height, W).toFixed(0) : '读不到那一行')
+  ck('那一份约屏幕 1/3 高', m.pwdSheet && Math.abs(m.pwdSheet.height / m.windowHeight - 1 / 3) < 0.04,
+    m.pwdSheet ? `${m.pwdSheet.height}/${m.windowHeight}=${(m.pwdSheet.height / m.windowHeight).toFixed(3)}` : '没有 .pwd-sheet')
+  ck('贴住屏幕底边', m.pwdSheet && Math.abs(m.pwdSheet.bottom - m.windowHeight) <= 1,
+    m.pwdSheet ? `${m.pwdSheet.bottom} vs ${m.windowHeight}` : '')
+  const hitStyle = await styleOf(page, '.pwd-hit', ['background-color'])
+  ck('上面那截命中区是空的（背后不垫一层，跟弹窗分层那条一个口径）',
+    /rgba\(0, 0, 0, 0\)|transparent/.test(hitStyle['background-color'] || ''),
+    hitStyle['background-color'])
   ck('这一版没有遮罩那一层', (await page.$$('.pwd-mask')).length === 0)
-  ck('已设过那一态不给输入格', m.inputs.length === 0, m.inputs.length)
+  const nameEl = await page.$('.pwd-name')
+  const nameTx = nameEl ? (await nameEl.text()).trim() : ''
+  ck('从上到下第一样是功能名称（且排在最上）',
+    /私密密码/.test(nameTx) && !!m.pwdName && !!m.pwdSheet && m.pwdName.top < m.pwdSheet.top + 90,
+    `${nameTx} top=${m.pwdName && m.pwdName.top}`)
+  ck('功能名称就一行，不和右边按钮撞成同一句', nameTx !== '重置密码', nameTx)
+  // 这个测试号设没设过密码是会变的（上一把尺子把密码撤了就变 false），
+  // 所以这里不钉"哪一态"，只钉两态互斥这条规则（同一件事在 `验-私密密码与分类色-真跑` 里两态各测一遍）。
+  ck('格子只跟着那一态走：设置态六格、重置态零格',
+    m.cells.length === (d.pwdEntering ? 6 : 0), `cells=${m.cells.length} entering=${d.pwdEntering}`)
   const btnTexts = []
   for (const b of await page.$$('.pwd-btn')) btnTexts.push(await b.text())
-  ck('已设过那一态一行两枚：返回 + 重置密码', btnTexts.join('|') === '返回|重置密码', btnTexts.join('|'))
+  ck('一行两枚：左是取消，右按那一态分别是确定 / 重置密码',
+    btnTexts.join('|') === (d.pwdEntering ? '取消|确定' : '取消|重置密码'), btnTexts.join('|'))
   ck('按钮高 96（与其他页面的 .pwd-btn 同值，没做成超大块）',
     Math.abs(toRpx(m.btns[0].height, W) - 96) <= 2, toRpx(m.btns[0].height, W).toFixed(0))
   const cvStyle = await styleOf(page, '.menu-item.open .ico .cv', ['transform'])
   // rotate(45deg) 在计算样式里回的是 matrix(.707,.707,-.707,.707)，不是字面 45
   const down = /matrix\(\s*0?\.707[^,]*,\s*0?\.707/.test(cvStyle.transform || '')
-  ck('展开那行的箭头转成朝下（rotate 45°，b 分量为正）', down, cvStyle.transform)
-  await mp.screenshot({ path: path.join(OUT, '01-设置-私密密码展开.png') })
+  ck('那一行的箭头转成朝下（rotate 45°，b 分量为正）', down, cvStyle.transform)
+  await mp.screenshot({ path: path.join(OUT, '01-设置-私密密码弹层.png') })
 
   /* ---------- ⑥ 关于：切过去之后内容直接长在头部下面 ---------- */
   await (await (await page.$$('.seg'))[1]).tap()
@@ -277,11 +307,13 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   const aboutLabels = []
   for (const r of await page.$$('.menu-item')) aboutLabels.push((await r.text()).replace(/\s+/g, ''))
   // .text() 拿到的是一整行（标签 + 右值），所以按"以这几个字开头"判，不比全等
-  ck('关于只有四行：产品官网/反馈邮箱/分享好友/MIND',
+  // 第四行中文侧 10-01 晚叫「魅力」（站长拍的：MIND 要有中文名），英文侧继续叫 MIND。
+  // 这一把尺子跑的是中文态，所以钉的是 魅力；旧的那条"以 MIND 开头"作废。
+  ck('关于只有四行：产品官网/反馈邮箱/分享好友/魅力',
     aboutLabels.length === 4 && aboutLabels[0].indexOf('产品官网') === 0 &&
     aboutLabels[1].indexOf('反馈邮箱') === 0 && aboutLabels[2].indexOf('分享好友') === 0 &&
-    aboutLabels[3].indexOf('MIND') === 0, aboutLabels.join('|'))
-  ck('脑力值那一行右边是服务端那个数', /MIND1\d\d/.test(aboutLabels[3] || ''), aboutLabels[3])
+    aboutLabels[3].indexOf('魅力') === 0, aboutLabels.join('|'))
+  ck('脑力值那一行右边是服务端那个数', /魅力1\d\d/.test(aboutLabels[3] || ''), aboutLabels[3])
   ck('介绍卡在最上面（紧跟留白卡，不分二级）', !!m.aboutLead && !!m.sheet && m.aboutLead.top <= m.sheet.bottom + 2)
   ck('功能介绍和隐私条款不在这一页', !aboutLabels.some((x) => /功能|隐私/.test(x)))
   await mp.screenshot({ path: path.join(OUT, '02-关于-四行.png') })

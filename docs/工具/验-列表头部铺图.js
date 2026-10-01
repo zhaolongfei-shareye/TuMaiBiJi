@@ -230,10 +230,12 @@ ok('「我的」那枚 MIND 与这三列同一个锚点（right 32 / top 24）',
   && /top: 24rpx/.test(seg(read('pages/me/me.wxss'), '.score')))
 ok('读不到字段画 0，不再画「—」（站长：这三格是进度，画杠读起来像坏了）',
   /isFinite\(v\) \? v : 0/.test(cjs) && !/: '—'/.test(cjs))
+// 数的是**声明**的次数（`@font-face {`），不是这五个字出现的次数——
+// app.wxss 那段注释里要提到这条尺子就会带上这五个字，光数文字会把注释算成第二份。
 ok('数字那支字体族就是 WtsjMind，且声明在 app.wxss 只有一份（两页共用，不抄第二份 base64）',
   /font-family: 'WtsjMind'/.test(seg(wxss, '.stat .n'))
-  && (read('app.wxss').match(/@font-face/g) || []).length === 1
-  && !/@font-face/.test(read('pages/me/me.wxss')))
+  && (read('app.wxss').match(/@font-face\s*\{/g) || []).length === 1
+  && !/@font-face\s*\{/.test(read('pages/me/me.wxss')))
 ok('三列顶对齐（align-items:flex-start），不是底对齐', /align-items: flex-start/.test(seg(wxss, '.stats')))
 ok('细线只画在两道分隔处，且上下不顶满（数字 64 之后线跟着收到 78）', /\.stat \+ \.stat::before/.test(wxss)
   && /height: 78rpx/.test(seg(wxss, '.stat + .stat::before')))

@@ -35,8 +35,10 @@
 }
 
 .brand-ver {
+  /* 版本号整串吃全局那一档（v 和点都在子集里），与「我的」页那一枚同一个写法 */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-size: var(--fs-micro);
-  font-weight: 700;
+  font-weight: 100;
   letter-spacing: 0.5rpx;
   color: var(--text-secondary);
   background: var(--chip-idle);

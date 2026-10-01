@@ -399,6 +399,9 @@
   margin-left: auto;
   letter-spacing: 0.4rpx;
   color: var(--text-secondary);
+  /* 站长 10-01 晚：纯数字加符号的显示字段全局吃同一支（MM-DD 就是这一档）。
+     只换字形，字号与字距一条不动。 */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
   /* 站长 10-01：日期比标题小一档。这一行原来没写字号，跟着容器落到 16px（≈31rpx），
      和标题一样大，一行里两个主角。收进 --fs-meta 那一档，收起行和展开态脚注一起跟着走。 */
   font-size: var(--fs-meta);
@@ -560,8 +563,12 @@
   border-radius: 50%;
   background: var(--cat-dot);
   color: #FCFBF8;
+  /* 序号是纯数字，吃全局那一档。这一支只出了 Thin 一个字重，原来那条 800 留着
+     等于让系统给细体假加粗（iOS 会、部分安卓不会，两边数字粗细不一样）——
+     所以连着把字重写成 100，和首页那三列、MIND 那枚是同一个写法。字号没动。 */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-size: var(--fs-tiny);
-  font-weight: 800;
+  font-weight: 100;
   display: flex;
   align-items: center;
   justify-content: center;

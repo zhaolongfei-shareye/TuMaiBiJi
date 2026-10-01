@@ -54,28 +54,34 @@
     />
   </view>
 
+  <!-- 模板小样：一组一条、左右滑着挑（站长 10-01 晚：原来是上下两列，十格排五行，
+       「保存」被顶到整页最底下，用户看不见）。承载方式抄笔记选模板那一排（share 页
+       .tpl-strip）与这一页自己上面那排形象槽：scroll-view + nowrap + 内层 flex，
+       两条真机都验过。格子本身一个字没改：还是 320rpx 宽、画布仍按各自比例定高。 -->
   <block wx:for="{{groups}}" wx:for-item="g" wx:key="id">
     <view class="grid-head">{{g.label}}</view>
-    <view class="grid">
-      <view
-        wx:for="{{g.items}}"
-        wx:key="id"
-        class="cell {{template === item.id ? 'cell-on' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onPickTemplate"
-      >
-        <canvas
-          type="2d"
-          id="tpl-{{item.id}}"
-          class="cell-canvas"
-          style="height: {{item.h}}rpx"
-        ></canvas>
-        <view class="cell-label">
-          <text>{{item.label}}</text>
-          <text wx:if="{{template === item.id}}" class="cell-on-dot"></text>
+    <scroll-view class="grid" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="grid-inner">
+        <view
+          wx:for="{{g.items}}"
+          wx:key="id"
+          class="cell {{template === item.id ? 'cell-on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onPickTemplate"
+        >
+          <canvas
+            type="2d"
+            id="tpl-{{item.id}}"
+            class="cell-canvas"
+            style="height: {{item.h}}rpx"
+          ></canvas>
+          <view class="cell-label">
+            <text>{{item.label}}</text>
+            <text wx:if="{{template === item.id}}" class="cell-on-dot"></text>
+          </view>
         </view>
       </view>
-    </view>
+    </scroll-view>
   </block>
 
   <view class="save-bar">

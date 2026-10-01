@@ -109,8 +109,10 @@
   border-radius: 50%;
   background: #23252c;
   color: #ffffff;
+  /* 与详情页那一格同一写法：纯数字吃全局那一档，只出 Thin 的字体不许留着 700 让系统假加粗 */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-size: 22rpx;
-  font-weight: 700;
+  font-weight: 100;
   text-align: center;
   line-height: 40rpx;
 }
