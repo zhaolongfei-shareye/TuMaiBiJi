@@ -52,9 +52,12 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
 
   try {
     await sleep(2000)
-    // 头一次切页会撞上开发者工具那句 rawPath is null（页面元信息没就绪），重试到成功为止
+    // 头一次切页会撞上开发者工具那句 rawPath is null（页面元信息没就绪），重试到成功为止。
+    // 顺手清掉排布档：那是本机偏好，上一把尺子切过「一行」的话这一屏根本没有 .note，
+    // 按下标取会拿到 undefined（这一把第一回就是这么挂的）。
+    await mp.evaluate(() => wx.removeStorageSync('listMode'))
     for (let i = 0; ; i++) {
-      try { await mp.switchTab('/pages/index/index'); break } catch (e) {
+      try { await mp.reLaunch('/pages/index/index'); break } catch (e) {
         if (i >= 4) throw e
         console.log(`第 ${i + 1} 次进列表页没成：${e.message}`)
         await sleep(8000)
@@ -66,14 +69,21 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
     // 私密笔记进不了这个弹窗（dock 那枚不渲染），所以挑一条能用的
     const at = (d.notes || []).findIndex((n) => !n.is_private)
     if (at < 0) { console.log('!! 库里没有非私密笔记，无法自证'); process.exit(3) }
-    await page.setData({ openIdx: -1, detailOpen: false, templateOpen: false })
+    await page.setData({ detailOpen: false, templateOpen: false })
     await sleep(800)
 
-    const rows = await page.$$('.note-row')
-    // 列表是"两段式"的：第一下展开那一行，第二下才浮详情窗（照 验-详情浮窗两层 那条走）
-    await rows[at].tap()
-    await sleep(1500)
-    await (await page.$$('.note-row'))[at].tap()
+    // v18 起列表没有"就地展开"那一态：点一枚纸片就直接浮详情窗（原来要两下）。
+    // 而纸片在屏上的顺序不等于 notes 的下标（置顶筛选、错落都会挪位），
+    // 所以按 data-idx 找那一枚，不按下标取。
+    const paperOf = async (want) => {
+      for (const e of await page.$$('.note')) {
+        if (Number(await e.attribute('data-idx')) === want) return e
+      }
+      return null
+    }
+    const paper = await paperOf(at)
+    if (!paper) throw new Error(`屏上没有 data-idx=${at} 那枚纸片，进不去弹窗`)
+    await paper.tap()
     await sleep(3000)
     d = await page.data()
     ck('详情窗浮起来了', d.detailOpen === true, `detailOpen=${d.detailOpen}`)

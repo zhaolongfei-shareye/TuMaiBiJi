@@ -30,8 +30,13 @@ ck('越点越沉：veil 单调递增', D.every((d, i) => i === 0 || d.veil > D[i
 ck('循环是 满月→半月→弯月→满月，不是走到头停住',
   [0, 1, 2].map((v) => p.dimNext(v)).join(',') === '1,2,0',
   [0, 1, 2].map((v) => p.dimNext(v)).join(','))
-ck('脏值兜回弯月（本机键被别的版本写成别的数也不炸，也不会偷偷变亮）',
-  p.dimAt(77).v === 2 && p.dimScrimStyle(77) === '')
+// 默认档站长改过两次：10-02 下午定"升级后还是今天这个样子"=最沉那档，当晚夜里又改成
+// "三档默认中档就行了，把调亮度选择权给用户"。现在守的是中间那一档，别再拿旧那句当判据。
+ck('脏值兜回默认那一档（半月）——本机键被别的版本写成别的数也不炸',
+  p.dimAt(77).v === 1 && p.dimScrimStyle(77) === 'opacity:0.5',
+  `${p.dimAt(77).v} / ${p.dimScrimStyle(77)}`)
+ck('DIM_DEFAULT 就是中间那一档（首屏不最沉也不最亮，选择权在人手里）',
+  p.BG_DIMS.indexOf(p.dimAt(77)) === 1)
 ck('弯月不发样式串（CSS 里那层本来就全铺，再写个 opacity:1 是废话）', p.dimScrimStyle(2) === '')
 ck('满月发的是 opacity:0——拧的是现网那层罩子自己，不是再叠一层黑',
   p.dimScrimStyle(0) === 'opacity:0', p.dimScrimStyle(0))
@@ -82,7 +87,7 @@ for (const [rel, cls] of Object.entries(pages)) {
   const wxml = read(`${rel}.wxml`)
   const wxss = strip(read(`${rel}.wxss`))
   ck(`${name} 进页从 app.bgSkin() 取档（不各拼一份）`, /app\.bgSkin\(\)/.test(js))
-  ck(`${name} 初值停在弯月（升级后看到的还是今天这个样子，不会先闪一下原图亮度）`, /dimV: 2,/.test(js))
+  ck(`${name} 初值停在中间那一档（data 字面量与 app.bgSkin() 的兜底是同一个数，第一帧不闪）`, /dimV: 1,/.test(js))
   ck(`${name} 那层罩子吃 dimScrim（拧它自己的透明度）`,
     new RegExp(`class="${cls}" style="\\{\\{dimScrim\\}\\}"`).test(wxml))
   ck(`${name} 不再另叠第二层黑（上一版那种 .page-dim / .head-dim 撤干净了）`,

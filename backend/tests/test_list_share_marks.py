@@ -3,8 +3,9 @@
 三条不变量：
 ① 「已分享」只由"此刻有没有开着的码"说话。撤回之后当场就得灭——读的是 shares.is_active，
    不是"这篇曾经分享过"。
-② 昵称两头都有来源：自己分享出去的那篇取那张码上的快照，转存来的那篇取
-   notes.imported_from 里记的那份；两个都没有就留空，**不拿"图麦"这类假名去填**。
+② 昵称那一格说的是"这篇打哪儿来"，两头都有来源而**转存那份优先**：自己分享出去的那篇
+   取那张码上的快照，转存来的那篇取 notes.imported_from 里记的那份，两样同时可得时后者赢；
+   都没有就留空，**不拿"图麦"这类假名去填**。
 ③ 一次列表请求只打一次 shares。这条钉的是实现方式：一页 20 篇逐篇查，首页拉一次就是
    20 个来回，而这两样本来一条 IN 就能取完（shares 上有"一篇只一张活码"的部分唯一索引）。
 
@@ -107,6 +108,18 @@ def test_转存来的那篇即使我没分享也带对方昵称(client, db):
                  imported_from={"author_name": "原作者的昵称", "token": "tk-source"})
     row = rows(client, u)[n.id]
     assert row["has_active_share"] is False
+    assert row["share_author_name"] == "原作者的昵称"
+
+
+def test_转存又被我自己分享出去的那篇_昵称仍是原分享者那一份(client, db):
+    """两头同时可得时谁赢：这一格说的是"这篇打哪儿来"，所以来源那份赢。
+    码上快照的 author_name 就是用户自己——画在自己纸片上不说明任何事。"""
+    u = new_user(db, "both")
+    n = new_note(db, u, "转存来又被我分享的那篇", source_type="share_import",
+                 imported_from={"author_name": "原作者的昵称", "token": "tk-source"})
+    new_share(db, u, n, author_name="图麦站长")
+    row = rows(client, u)[n.id]
+    assert row["has_active_share"] is True
     assert row["share_author_name"] == "原作者的昵称"
 
 

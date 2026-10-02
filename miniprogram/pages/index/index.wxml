@@ -3,63 +3,89 @@
        于是接缝四个角都是弧——和「我的」页那张 sheet 同一画法、同一个量。
        09-28 那版"图贯穿全屏"到此结束：当时打回的是"纸一圈描边 + 每条笔记又一圈描边"的框套框，
        这张圆角卡不描边，只换底色，所以不会再框套框。
-       图取口仍是 utils/poster.js 的 homeBg()，和新建页同一张、同一个开关。 -->
+       图取口仍是 utils/poster.js 的 homeBg()，和新建页同一张、同一个开关。
+       v18（站长 10-02 夜里拍做减法）：右上角只剩「笔记」这一列，「分享」「种草」两列
+       跟着那两个屏一起撤；图上这一行由"分类 + 圆钮"换成"一句 Tips + 三枚裸 icon"。 -->
   <view class="head">
     <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
     <!-- 这一层就是「调亮度」那一枚点拧的东西：dimScrim 空串＝全铺（最沉那一档＝现网样子），
          opacity:0＝一点不压（＝原图亮度）。与新建页 .page-scrim 同一个数、同一个本机键。 -->
     <view class="head-scrim" style="{{dimScrim}}"></view>
     <view class="h1">{{t.notesHeading}}</view>
-    <!-- 三列：笔记 / 分享 / 收藏。数全部来自服务端那一次 /api/user/quota，
-         本页不自己相加（分享数=当前公开中的篇数、收藏数=收藏过你的不同人数，
-         两个都是状态量，客户端拿不到原始台账也算不出来）。 -->
+    <!-- 一列：笔记。数仍来自服务端那一次 /api/user/quota，本页不自己相加。 -->
     <view class="stats">
       <view class="stat" wx:for="{{stats}}" wx:key="key">
         <text class="n">{{item.n}}</text>
         <text class="l">{{item.l}}</text>
       </view>
     </view>
-  </view>
 
-  <view class="sheet">
-  <!-- 搜索和分类共用这一行（09-30 v8，站长："搜索条目前看起来太大，不美观"）。
-       默认只有分类，最右一枚 59 圆钮；点它整行换成搜索条、分类暂时收起；
-       点这一行以外的空白缩回来。条子里面一个字没改，仍是原来那套（纸白面 +
-       一条横线 + 右边纯文字「搜索笔记」）。
-       缩回不清词：「收起」和「清空」是两件事，清词要点 ✕——
-       否则他往下一滑想看结果、不小心点到空白，词就没了。
-       catchtap 挂在那枚 noop 上：条子内部（含输入框那片空白）的点击不该冒泡到
-       容器去触发缩回，只有条子以外才算"点了空白"。 -->
-  <view wx:if="{{searchOpen}}" class="card sc-card" style="{{searchSkin}}" catchtap="noop">
-    <view class="sc-line">
-      <view class="sc-glyph glyph-search"></view>
-      <input
-        class="sc-input"
-        focus="{{searchOpen}}"
-        value="{{searchKeyword}}"
-        placeholder="{{t.searchPh}}"
-        placeholder-class="sc-ph"
-        confirm-type="search"
-        bindinput="onSearchInput"
-        bindconfirm="onSearchConfirm"
-      />
-      <view wx:if="{{searchKeyword}}" class="sc-x" catchtap="clearSearch">✕</view>
-      <view class="sc-go" catchtap="onSearchConfirm">{{t.search}}</view>
+    <!-- 图上这一行（站长 10-02 第三轮）：左边一句轮播 Tips，右边三枚**裸 icon**——
+         圆底和描边整块撤掉，只留中间图形，之间一道竖线区隔，整组紧靠右。
+         点搜索：Tips 整条不渲染，搜索那枚就地向左摊成输入框，右边两枚切换 icon 照旧留着；
+         点这一行以外的空白缩回，Tips 又回来（缩回不清词，清词是 ✕ 那一枚的活）。
+         三枚 icon 一律 catchtap：它们在行内，不该被当成"点了空白"而把搜索收掉。
+         Tips 这里不带「Tips：」前缀——右边三枚占掉 216，可用宽只剩 20 个汉字，
+         前缀那五个字符会把句子本身吃掉（新建页那条仍然带前缀）。 -->
+    <view class="tools">
+      <view wx:if="{{searchOpen}}" class="srch" style="{{searchSkin}}" catchtap="noop">
+        <view class="glyph-search"></view>
+        <input
+          class="srch-input"
+          focus="{{searchOpen}}"
+          value="{{searchKeyword}}"
+          placeholder="{{t.searchPh}}"
+          placeholder-class="srch-ph"
+          confirm-type="search"
+          bindinput="onSearchInput"
+          bindconfirm="onSearchConfirm"
+        />
+        <view wx:if="{{searchKeyword}}" class="srch-x" catchtap="clearSearch">✕</view>
+        <view class="srch-go" catchtap="onSearchConfirm">{{t.search}}</view>
+      </view>
+      <view wx:else class="tp">
+        <block wx:if="{{tips.length}}">
+          <view class="tp-dot" style="{{tipDotStyle}}"></view>
+          <text class="tp-tx">{{tips[tipIdx]}}</text>
+        </block>
+      </view>
+      <view class="acts">
+        <view wx:if="{{!searchOpen}}" class="ic {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">
+          <view class="glyph-search"></view>
+        </view>
+        <view class="vr"></view>
+        <view class="ic {{listMode === 'desk' ? 'on' : ''}}" catchtap="onToggleMode" data-mode="desk" aria-label="{{t.viewDesk}}">
+          <view class="glyph-grid"><view class="q"></view><view class="q"></view><view class="q"></view><view class="q"></view></view>
+        </view>
+        <view class="vr"></view>
+        <view class="ic {{listMode === 'rows' ? 'on' : ''}}" catchtap="onToggleMode" data-mode="rows" aria-label="{{t.viewRows}}">
+          <view class="glyph-lines"></view>
+        </view>
+      </view>
     </view>
   </view>
 
-  <!-- 分类筛选 + 搜索入口。多到一排放不下时照旧左滑，圆钮不参与滚动、一直钉在最右。 -->
-  <view wx:else class="head-tools">
-    <scroll-view class="category-scroll" scroll-x show-scrollbar="{{false}}">
-      <view class="category-chips">
-        <view 
+  <view class="sheet">
+  <!-- 分类这一行钉在列表区顶上，不跟着月份滚（③）。左沿与下面时间轴同一条 24 内缩；
+       「置顶笔记」占住时间轴那一列的 126，chips 从这一列右边才起排——
+       多到一排放不下时照旧左右滚，但滚的那一节只从时间轴右侧开始（④）。
+       这一行与下面的笔记区之间一条浅虚线（⑤）。左右各外扩 24 再把内缩加回来，
+       为的是让那条虚线通到整块圆角卡的边，和效果图同一画法。
+       置顶这一档纯文字 + 选中那枚下面一条短黄杠，不做按钮壳（他一贯的口径）。 -->
+  <view class="cats">
+    <view class="pinb {{pinnedOnly ? 'on' : ''}}" style="{{tipVarStyle}}" catchtap="onTogglePinned">
+      <text class="pinb-t">{{t.pinFilter}}</text>
+    </view>
+    <scroll-view class="cat-scroll" scroll-x show-scrollbar="{{false}}">
+      <view class="cat-chips">
+        <view
           class="chip all {{selectedCategory === null ? 'active' : ''}}"
           bindtap="selectCategory"
           data-id="{{null}}"
         >
           {{t.allCategories}}
         </view>
-        <view 
+        <view
           class="chip tone {{selectedCategory === item.id ? 'active' : ''}}"
           wx:for="{{categories}}"
           wx:key="id"
@@ -71,16 +97,14 @@
         </view>
       </view>
     </scroll-view>
-    <!-- 有词但已缩回时这枚翻成墨底纸白：列表是筛过的，得有个地方说这件事，
-         否则只剩一排看不出原因的过滤结果。 -->
-    <view class="sc-btn {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">
-      <view class="glyph-search"></view>
-    </view>
+    <!-- 处在"只看置顶"这件事，除了左边那条短黄杠，唯一把话说出来的地方 -->
+    <text wx:if="{{pinnedOnly}}" class="pinn">{{t.pinnedOnly}}</text>
   </view>
 
   <!-- v12：列表不再整页滚，改在这块区域里自己滚、滚到底再取下一批。
        内缩挂在 .sheet 的 padding 上，不挂在 scroll-view 自己身上——挂在它身上时
-       右侧要给滚动条留位，左右就不等宽了（详情浮窗那一层实测右移 12rpx，同一条坑）。 -->
+       右侧要给滚动条留位，左右就不等宽了（详情浮窗那一层实测右移 12rpx，同一条坑）。
+       v18：这一区里是「左时间轴 + 右纸片墙 / 一行」，月份档和它旁边那枚小黄点跟着一起滚。 -->
   <scroll-view
     class="list"
     scroll-y
@@ -97,55 +121,79 @@
       <text>{{t.noNotes}}</text>
     </view>
 
-    <!-- 笔记列表：一条笔记 = 一张描边行卡。
-         v7 收起态只有三样：分类点 + 标题 + 日期（分类名/来源/标签/尖角只在展开态出现）。
-         v5+v6 手风琴：一次开一条；展开行照 v3 中心卡（36 号单行标题 + 4 行概要 + meta 脚注），
-         行内不再有动作按钮——动作全在 ③ 那层详情浮窗的 dock 里。私密笔记展开前弹密码。 -->
-    <view wx:else class="notes-list">
-      <view
-        class="card note-row {{openIdx === index ? 'open' : ''}}"
-        wx:for="{{notes}}"
-        wx:key="id"
-        bindtap="onRowTap"
-        data-idx="{{index}}"
-      >
-        <view wx:if="{{openIdx !== index}}" class="row-line">
-          <view class="cat {{item.catRing ? 'is-ring' : ''}}" style="{{item.catStyle}}">
-            <view class="cat-dot"></view>
-          </view>
-          <view class="row-title">
-            <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
-          </view>
-          <text class="dt">{{item.date_label}}</text>
+    <!-- 笔记这一屏（v18）。两种排布共用 index.js layout() 算出的同一份"月—行—枚"坐标：
+         纸片墙=同一日期必同一行、一行满 4 枚往下一行续、不同日期必另起一行，每枚再抖一点
+         竖向错位和角度；一行模式=一条 88、不画横线、连日期都不显示。
+         点一枚纸片 / 一行 = 直接浮详情窗（两档都不就地展开，理由见 index.js 的 onRowTap）；
+         私密笔记开窗前先验密码。动作全在详情窗下沿 dock 里。
+         一屏上唯一的状态标记是「已分享」那一小块色+白字（①）：置顶、来源这些状态这里
+         什么都不画，置顶那件事由分类行左边那一档说。 -->
+    <view wx:else class="bodyrow" style="height: {{stageH}}rpx">
+      <view class="rail">
+        <view class="rail-line"></view>
+        <view class="rm" wx:for="{{groups}}" wx:key="mk" style="top: {{item.top}}rpx">
+          <view class="rm-dot" style="{{tipDotStyle}}"></view>
+          <text class="rm-ym">{{item.ym}}</text>
         </view>
+      </view>
 
-        <block wx:else>
-          <view class="row-title">
-            <text class="pin" wx:if="{{item.is_pinned}}">{{t.pinned}}</text>{{item.title}}
-          </view>
-          <!-- 折叠条不露摘要（v5 那条口径）：summary 只在展开态渲染 -->
-          <view class="summary" wx:if="{{item.summary}}">{{item.summary}}</view>
-          <view class="row-foot">
-            <view class="cat {{item.catRing ? 'is-ring' : ''}}" style="{{item.catStyle}}">
-              <view class="cat-dot"></view>
-              <text>{{item.catLabel}}</text>
+      <view class="stage">
+        <view class="gp" wx:for="{{groups}}" wx:key="mk" style="top: {{item.top}}rpx; height: {{item.h}}rpx">
+          <block wx:if="{{listMode === 'desk'}}">
+            <view
+              class="note"
+              wx:for="{{item.cards}}"
+              wx:for-item="c"
+              wx:key="id"
+              style="left: {{c.x}}rpx; top: {{c.y}}rpx; transform: rotate({{c.r}}deg); z-index: {{c.z}}; {{c.paperStyle}}"
+              bindtap="onRowTap"
+              data-idx="{{c.i}}"
+            >
+              <text class="note-t">{{c.ptitle}}</text>
+              <view class="note-btm">
+                <!-- 头像只在有的时候进左下角，对方没设形象就整枚不渲染、不留空圈（②）；
+                     日期因此挪到下面那一行的右端，两件事不打架。 -->
+                <view class="note-who" wx:if="{{c.who}}">
+                  <view class="glyph-who"></view>
+                  <text class="note-name">{{c.who}}</text>
+                </view>
+                <view class="note-foot">
+                  <text class="shared-tag" wx:if="{{c.shared}}" style="{{c.sharedStyle}}">{{t.sharedTag}}</text>
+                  <text class="note-date">{{c.tail}}</text>
+                </view>
+              </view>
             </view>
-            <text class="sep">·</text>
-            <text class="src">{{item.source_type_label}}</text>
-            <block wx:if="{{item.tagLine}}">
-              <text class="sep">·</text>
-              <text class="tg">{{item.tagLine}}</text>
-            </block>
-            <text class="dt">{{item.date_label}}</text>
-            <text class="chev">›</text>
+          </block>
+
+          <view wx:else class="rows">
+            <view
+              class="rw"
+              wx:for="{{item.cards}}"
+              wx:for-item="c"
+              wx:key="id"
+              bindtap="onRowTap"
+              data-idx="{{c.i}}"
+            >
+              <text class="rw-t">{{c.title}}</text>
+              <!-- ②那处改口讲的是"这篇打哪儿来"，与排布无关：两种排布都得说同一句话，
+                   所以转存来的那篇在一行模式里同样带昵称 + 通用头像，不只在纸片上有。 -->
+              <view class="note-who" wx:if="{{c.who}}">
+                <view class="glyph-who"></view>
+                <text class="note-name">{{c.who}}</text>
+              </view>
+              <text class="shared-tag" wx:if="{{c.shared}}" style="{{c.sharedStyle}}">{{t.sharedTag}}</text>
+            </view>
           </view>
-        </block>
+        </view>
       </view>
     </view>
+
+    <!-- 翻页那一句挂在排布之外：它不该占掉一格的位置 -->
+    <view wx:if="{{loadingMore}}" class="loading-more">{{t.loading}}</view>
   </scroll-view>
   </view>
 
-  <!-- v7 ③：详情浮窗。点已展开那行才浮它，浮上来时列表和搜索、分类块被它盖严（同宽 24 内缩），
+  <!-- v7 ③：详情浮窗。点一枚纸片 / 一行才浮它，浮上来时列表和分类块被它盖严（同宽 24 内缩），
        「我的笔记」和三个 tab 在窗外原样清晰——背后什么都不垫，只有这一个是活的窗口。
        顶部把手（含「点一下收起」）是回列表的口；动作条钉在窗口下沿。 -->
   <view wx:if="{{detailOpen}}" class="float-mask" bindtap="onCloseDetail"></view>

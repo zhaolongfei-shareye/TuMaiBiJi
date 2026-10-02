@@ -158,9 +158,10 @@ def _attach_share_marks(db: Session, notes: list) -> None:
     一次 IN 查完，不逐篇查：一页 20 篇各自查一次，首页拉一次就是 20 个来回。
     shares 上有"一篇只留一张开着的码"那个部分唯一索引（models/share.py），所以一个
     note_id 至多命中一行，做成字典不会互相覆盖。
-    昵称两头都有来源：自己分享出去的那篇，用那张码上快照的 author_name（那是他建分享
-    那一刻主动公开过的名字）；转存别人的那篇，用 notes.imported_from 里记的那份。
-    两个都没有就留空——界面上那一格不画名字，不拿"图麦"这类假名去填。
+    昵称那一格说的是"这篇打哪儿来"，所以两头都有来源，而**转存那份优先**：
+    从别人那儿转存来、之后自己又分享出去的那一篇，两张名字同时可得，取的是原分享者那份
+    （码上快照的 author_name 是他自己，画在自己纸片上不说明任何事）。
+    两头都没有就留空——界面上那一格不画名字，不拿"图麦"这类假名去填。
     """
     ids = [n.id for n in notes]
     shared: dict = {}
@@ -174,7 +175,7 @@ def _attach_share_marks(db: Session, notes: list) -> None:
     for n in notes:
         n.has_active_share = n.id in shared
         imported = n.imported_from if isinstance(n.imported_from, dict) else {}
-        n.share_author_name = shared.get(n.id) or imported.get("author_name")
+        n.share_author_name = imported.get("author_name") or shared.get(n.id)
 
 
 @router.get("/", response_model=List[NoteListItem])

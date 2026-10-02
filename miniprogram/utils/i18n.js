@@ -84,9 +84,16 @@ const i18n = {
     // 第三列站长 10-01 晚改口：「收藏」→「种草」。数是 saved_by_users（收藏过你的不同人数），
     // 英文那列仍是 Saved——他要的是中文侧换个更贴近微信语境的叫法，不是换口径。
     statNotes: '笔记',
-    statShares: '分享',
-    statSaved: '种草',
     searchPh: '输入关键词',
+    // v18 这一屏新用的五串（站长 10-02 夜里定的口径）。
+    // 「分享」「种草」那两列跟着 v18 一起做减法撤了，两串字典键一并删净，不留没人用的值。
+    // pinnedOnly 没有照效果图那句「只看这两篇」写：置顶几篇是用户自己的事，
+    // 把数目写死在字典里，第二天就有三篇置顶的人对不上数。
+    pinFilter: '置顶笔记',
+    viewDesk: '纸片墙',
+    viewRows: '一行',
+    pinnedOnly: '只看置顶',
+    sharedTag: '已分享',
     allCategories: '全部',
     addCategory: '添加分类',
     categoryName: '分类名称',
@@ -392,9 +399,13 @@ const i18n = {
     search: 'Search notes',
     notesHeading: 'My notes',
     statNotes: 'Notes',
-    statShares: 'Shared',
-    statSaved: 'Saved',
     searchPh: 'Enter keywords',
+    // 与中文侧一一对应的五串。英文都短，放得进那一格（中文四字、英文一格最多九字）。
+    pinFilter: 'Pinned',
+    viewDesk: 'Wall',
+    viewRows: 'Rows',
+    pinnedOnly: 'Pinned only',
+    sharedTag: 'Shared',
     allCategories: 'All',
     addCategory: 'Add category',
     categoryName: 'Category name',

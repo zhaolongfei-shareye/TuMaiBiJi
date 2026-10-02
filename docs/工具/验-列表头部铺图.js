@@ -67,8 +67,8 @@ ok('图区里有压暗罩那一层，且它吃「调亮度」递进来的透明�
 ok('铺图时容器带 has-bg', /\{\{bgSrc \? 'has-bg' : ''\}\}/.test(wxml))
 ok('v12：列表在 scroll-view 里（区域内滚，不再整页滚）',
   /<scroll-view[\s\S]{0,200}class="list"[\s\S]*?bindscrolltolower="onListToLower"/.test(wxml))
-ok('三个状态（加载/空/列表）都在这块滚动区里，一个都没落在外面',
-  (wxml.match(/class="(loading|empty|notes-list)"/g) || []).length === 3
+ok('三个状态（加载/空/排布）都在这块滚动区里，一个都没落在外面',
+  (wxml.match(/class="(loading|empty|bodyrow)"/g) || []).length === 3
   && wxml.indexOf('class="list"') < wxml.indexOf('class="loading"'))
 ok('图区 + 圆角卡 + 滚动区三块都在容器里，页面自己不滚',
   /class="container[\s\S]*?<view class="head">[\s\S]*?<view class="sheet">/.test(wxml))
@@ -132,62 +132,69 @@ ok('容器竖排撑满一屏，列表区 flex:1 + min-height:0（少了 min-heig
   /display: flex/.test(seg(wxss, '.container')) && /height: 100vh/.test(seg(wxss, '.container'))
   && /flex: 1/.test(seg(wxss, '.list')) && /min-height: 0/.test(seg(wxss, '.list')))
 
-// ---------- 5. 压在图上的那三块面 ----------
-// 09-30 v8：搜索条收成分类行最右那一枚圆钮，两块面共用同一条翻色规则。
-// 分成两条各写一份 #f2efe9 迟早走样（这个项目为这类事已经红过好几轮），
-// 所以这里钉的是"两个选择器在同一条规则里"，而不是"两处都恰好是那个值"。
-const chromeBlock = seg(wxss, '.container.has-bg .sc-btn', '--chrome-bg')
-ok('搜索条与那枚圆钮吃同一条翻色规则（纸白面 + 墨字）',
-  /\.container\.has-bg \.sc-card,\s*\n\.container\.has-bg \.sc-btn\s*\{/.test(wxss)
-  && /--chrome-bg: #f2efe9/.test(chromeBlock) && /--chrome-ink: #23252c/.test(chromeBlock))
-ok('翻的是变量不是逐条覆盖（子元素一条都不用改）',
-  !/\.container\.has-bg \.sc-input\s*\{/.test(wxss) && !/\.container\.has-bg \.sc-go\s*\{/.test(wxss))
-ok('搜索条在图上有一条投影，和录入胶囊同档',
-  /\.container\.has-bg \.sc-card\s*\{[^}]*box-shadow: 0 18rpx 46rpx rgba\(8, 10, 14, 0\.42\)/.test(wxss))
-ok('圆钮的阴影单独一档（110 高的条子那个扩散照搬到 59 的圆上会糊成一团黑）',
-  /\.container\.has-bg \.sc-btn\s*\{[^}]*box-shadow: 0 6rpx 18rpx/.test(wxss))
-
-// ---------- 5b. 搜索收进分类那一行（v8） ----------
-ok('展开态与收起态各一条，用 searchOpen 二选一',
-  /wx:if="\{\{searchOpen\}\}" class="card sc-card"/.test(wxml) && /wx:else class="head-tools"/.test(wxml))
-ok('展开时输入框自动聚焦（focus 跟着那一态走，不写死 true）',
-  /focus="\{\{searchOpen\}\}"/.test(wxml))
-ok('圆钮和 chip 同一档高度（59，实测 chip 是 58.7）',
-  /\.sc-btn\s*\{[^}]*width: 59rpx[^}]*height: 59rpx/.test(wxss)
-  && /\.head-tools\s*\{[^}]*height: 59rpx/.test(wxss))
-ok('圆钮吃 --chrome-bg/--chrome-ink，不另立色值',
-  /background: var\(--chrome-bg\)/.test(seg(wxss, '.sc-btn')) && /color: var\(--chrome-ink\)/.test(seg(wxss, '.sc-btn')))
-ok('有词又缩回时那枚翻成墨底纸白（列表被筛过这件事得有地方说）',
-  /\.sc-btn\.on\s*\{[^}]*background: var\(--chrome-ink\)[^}]*color: var\(--chrome-bg\)/.test(wxss))
-ok('放大镜是 CSS 画的，这一页没为一枚钮引图标',
-  /\.glyph-search::before/.test(wxss) && /\.glyph-search::after/.test(wxss)
-  && !/\.glyph-search\s*\{[^}]*background-image/.test(wxss))
-ok('点空白缩回挂在容器上，条子内部靠 catchtap 挡住冒泡',
-  /class="container[^"]*" bindtap="onBlankTap"/.test(wxml) && /catchtap="noop"/.test(wxml))
-ok('那一行的外边距挂在行上，不挂在里面的 scroll-view（展开态没有它，间距还得一样）',
-  /\.head-tools\s*\{[^}]*margin-bottom: var\(--sp-3\)/.test(wxss)
-  && !/\.category-scroll\s*\{[^}]*margin-bottom/.test(wxss))
-// ---------- 5c. 展开条的高度对齐笔记行（09-30 他："展开的高度太高了"） ----------
-// 条子和笔记行同高这件事，靠的是"同一套内边距 + 同一根内容线高"，不是各写一个总高：
-// 笔记行实测 96.3 = 26 + 44 + 26，条子按同一个式子拼出来才会跟着 --sp-row 一起动。
-ok('条子上下内边距直接吃笔记行那一个量（不另写一份 26/20）',
-  /\.sc-card\s*\{[^}]*padding: var\(--sp-row\) var\(--sp-3\)/.test(wxss))
-ok('条子里那根内容线收到 44rpx（笔记行内容线实测就是这个数）',
-  /\.sc-line\s*\{[^}]*height: 44rpx/.test(wxss))
-ok('下横线撤了（改由最前面那枚放大镜提示可输入）',
-  !/class="sc-rule"/.test(wxml) && !/\.sc-rule\s*\{/.test(wxss))
-ok('展开条最前面有那枚放大镜，且排在输入框之前',
-  /class="sc-glyph glyph-search"><\/view>[\s\S]{0,120}<input[\s\S]{0,40}class="sc-input"/.test(wxml))
-ok('放大镜停在"提示"那一档（.55，比输入字浅，不跟内容抢）',
-  /\.sc-glyph\s*\{[^}]*opacity: 0\.55/.test(wxss))
-// 「搜索笔记」与笔记标题同档这件事原来是被效果图误导的：稿子里行卡标题画成 --fs-body 28，
-// 现网 .row-title 其实是 --fs-title 31。两边实测都是 16px，所以这里钉住"同一条令牌"，
-// 谁再想改字号必须同时改两处才不红。
-ok('「搜索笔记」与笔记标题吃同一条字号令牌',
-  /\.sc-go\s*\{[^}]*font-size: var\(--fs-title\)/.test(wxss)
+// ---------- 5. 压在图上的那一行（v18：一句 Tips + 三枚裸 icon，搜索摊开也在这条上） ----------
+// 站长 10-02 第三轮：圆底和描边整块撤掉，只留中间图形，之间一道竖线；搜索点开时
+// Tips 整条不渲染、搜索那枚向左摊成输入框。v8 那枚 59 圆钮和"搜索条与笔记行同高"
+// 那套对齐判据一起作废——现在钉的是"条子和那一行同高（88）"。
+const tools = seg(wxss, '.tools')
+ok('图上那一行：top 400、左右各 24、整行 88 高（下沿离列表区只留 14）',
+  /top: 400rpx/.test(tools) && /left: 24rpx/.test(tools) && /right: 24rpx/.test(tools)
+  && /height: 88rpx/.test(tools), tools.trim().slice(0, 60))
+ok('圆钮那种"圆底 + 描边"整个撤了（v18 只留裸图形）',
+  !/\.sc-btn/.test(wxss + wxml) && !/\.head-tools/.test(wxss + wxml))
+ok('三枚 icon 之间用一道竖线区隔，且这一组紧靠右（margin-left 26）',
+  /\.vr\s*\{[^}]*width: 2rpx/.test(wxss) && /\.acts\s*\{[^}]*margin-left: 26rpx/.test(wxss))
+ok('三枚图形同一条基准 38×38，谁都不比谁小一号',
+  [/glyph-search/, /glyph-grid/, /glyph-lines/].every((r) => new RegExp(r.source + '\\s*\\{[^}]*width: 38rpx').test(wxss)))
+ok('选中那一档比没选中重一档（颜色 + 笔画同时），只靠字重不算',
+  /\.ic\.on\s*\{[^}]*color/.test(wxss) && /\.ic\.on \.glyph-grid \.q\s*\{[^}]*border-width/.test(wxss))
+ok('Tips 那句一行放完就省略号，不折行把 icon 顶下去',
+  /text-overflow: ellipsis/.test(seg(wxss, '.tp-tx')) && /white-space: nowrap/.test(seg(wxss, '.tp-tx')))
+ok('Tips 前面那枚点的色从 style 递进来（TIP_DOT 不许抄进 wxss）',
+  /class="tp-dot" style="\{\{tipDotStyle\}\}"/.test(wxml) && !/#f6c445/i.test(wxss))
+ok('压在图上的那一行三档都是纸白（Tips / icon / 竖线各一档）',
+  /color: rgba\(242, 239, 233, 0\.82\)/.test(seg(wxss, '.container.has-bg .tp'))
+  && /color: rgba\(255, 255, 255, 0\.86\)/.test(seg(wxss, '.container.has-bg .ic'))
+  && /background: rgba\(255, 255, 255, 0\.28\)/.test(seg(wxss, '.container.has-bg .vr')))
+ok('没铺图那一态这三档退回各自主题的墨色（不是写死白）',
+  /color: var\(--text-secondary\)/.test(seg(wxss, '.tp'))
+  && !/rgba\(255, 255, 255/.test(seg(wxss, '.ic')))
+// 搜索那一态在图上是半透明白 pill（效果图那两条 rgba 是压着照片量的：派生深色压在自己的
+// 照片上只有 1.0 出头）；没铺图时仍吃 chromeOf 那串 --chrome-*。两处都是"一条规则一个值"，
+// 没有第二份实色。
+ok('搜索 pill：图上是半透明白 + 白描边，没铺图时吃 --chrome-*',
+  /\.container\.has-bg \.srch\s*\{[^}]*rgba\(255, 255, 255, 0\.18\)[^}]*rgba\(255, 255, 255, 0\.36\)/.test(wxss)
+  && /background: var\(--chrome-bg\)/.test(seg(wxss, '.srch')))
+ok('铺图时那串 chrome 变量整串不发（内联自定义属性优先级高于任何选择器）',
+  /searchSkin: bgSrc \? '' : chromeOf\(wallpaper\)\.style/.test(cjs))
+ok('占位符给带 alpha 的色，不靠 opacity（input 的 placeholder 不吃 opacity）',
+  !/\.srch-ph\s*\{[^}]*opacity/.test(wxss) && /--chrome-idle/.test(seg(wxss, '.srch-ph')))
+ok('「搜索笔记」与新建页那条标题吃同一条字号令牌（--fs-title）',
+  /font-size: var\(--fs-title\)/.test(seg(wxss, '.srch-go'))
   && /\.row-title\s*\{[^}]*font-size: var\(--fs-title\)/.test(read('app.wxss')))
-ok('分类多到放不下时照旧左滑，圆钮不参与滚动（flex:none 钉在最右）',
-  /\.sc-btn\s*\{[^}]*flex: none/.test(wxss) && /\.category-scroll\s*\{[^}]*flex: 1/.test(wxss))
+ok('放大镜 / 四块方 / 三根线都是 CSS 画的，这一页没为一枚 icon 引图标资源',
+  /\.glyph-search::before/.test(wxss) && /\.glyph-search::after/.test(wxss)
+  && /\.glyph-grid \.q\s*\{[^}]*border: 3rpx solid currentColor/.test(wxss)
+  && !/\.glyph-(search|grid)\s*\{[^}]*\burl\(/.test(wxss))
+ok('颜色全走 currentColor：翻色只改 .ic 一处，三枚图形一条都不用动',
+  /currentColor/.test(seg(wxss, '.glyph-search::before'))
+  && /currentColor/.test(wxss.match(/\.glyph-who::before\s*\{[^}]*\}/)?.[0] || '')
+  && !/\.ic [^}]*#[0-9a-fA-F]{6}/.test(wxss))
+
+// ---------- 5b. 搜索的两态与点击边界（v18） ----------
+ok('摊开那一条用 searchOpen 二选一：条子在、Tips 整条不渲染',
+  /wx:if="\{\{searchOpen\}\}" class="srch"/.test(wxml) && /wx:else class="tp"/.test(wxml))
+ok('摊开时搜索那枚 icon 自己让位（同一行不出现两枚搜索）',
+  /wx:if="\{\{!searchOpen\}\}" class="ic[^"]*" catchtap="onOpenSearch"/.test(wxml))
+ok('输入框自动聚焦（focus 跟着那一态走，不写死 true）',
+  /focus="\{\{searchOpen\}\}"/.test(wxml))
+ok('点空白缩回挂在容器上，条子内部和三枚 icon 都靠 catchtap 挡住冒泡',
+  /class="container[^"]*" bindtap="onBlankTap"/.test(wxml) && /catchtap="noop"/.test(wxml)
+  && (wxml.match(/catchtap="onToggleMode"/g) || []).length === 2)
+ok('条子与那一行同高（88），不再另写一份总高',
+  /\.srch\s*\{[^}]*height: 88rpx/.test(wxss) && /\.tools\s*\{[^}]*height: 88rpx/.test(wxss))
+ok('有词又缩回时那枚 icon 翻一档（列表被筛过这件事得有地方说）',
+  /class="ic \{\{searchKeyword \? 'on' : ''\}\}"/.test(wxml) && /\.ic\.on\s*\{/.test(wxss))
 // 09-30 起暗玻璃那一态只管「全部」那一枚（.chip.all）：分类那几枚穿自己的分类色，
 // 再压一层暗玻璃等于把整排分类身份洗掉（站长原话"分类按钮是有颜色的"）。
 const chipIdle = seg(wxss, '.container.has-bg .chip.all')
@@ -238,10 +245,15 @@ ok('数字那支字体族就是 WtsjMind，且声明在 app.wxss 只有一份（
   && (read('app.wxss').match(/@font-face\s*\{/g) || []).length === 1
   && !/@font-face\s*\{/.test(read('pages/me/me.wxss')))
 ok('三列顶对齐（align-items:flex-start），不是底对齐', /align-items: flex-start/.test(seg(wxss, '.stats')))
-ok('细线只画在两道分隔处，且上下不顶满（数字 64 之后线跟着收到 78）', /\.stat \+ \.stat::before/.test(wxss)
-  && /height: 78rpx/.test(seg(wxss, '.stat + .stat::before')))
-ok('行卡那一段没被顺手改色（分类两档仍从 palette 递进来）',
-  /color: var\(--cat-ink\)/.test(seg(wxss, '.cat')) && /background: var\(--cat-dot\)/.test(seg(wxss, '.cat-dot')))
+ok('只剩「笔记」这一列（v18 撤掉分享/种草两列，那道分隔细线跟着没有主人了）',
+  !/\.stat \+ \.stat/.test(wxss) && !/statShares|statSaved/.test(i18n)
+  && (cjs.match(/key: 'notes'/) || []).length === 1)
+ok('纸片那一枚不写死颜色（底与字成对从 palette.PAPERS 经 style 递进来）',
+  !/background|color:/.test(seg(wxss, '.note'))
+  && /n\.paperStyle = `background:\$\{p\.bg\};color:\$\{p\.ink\}`/.test(cjs))
+ok('「已分享」那一小块同理：色值只在 palette.SHARED_TAG 活一份',
+  !/background|color:/.test(seg(wxss, '.shared-tag'))
+  && /SHARED_TAG/.test(cjs))
 
 // ---------- 6. 界面上每一句话都要跟着改口径 ----------
 ok('外观设置那句话不再写"只铺首页"', !/只铺首页|Home page only/.test(i18n))

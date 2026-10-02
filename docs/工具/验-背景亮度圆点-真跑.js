@@ -2,7 +2,9 @@
 // 跑法：NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-背景亮度圆点-真跑.js
 // 前置：微信开发者工具已开；这批改过 WXSS，要先 cli close 再 cli auto --auto-port 9431。
 // 一把量四件事，都是静态尺子够不到的：
-//  ① 默认停在弯月（＝今天现网的样子），点一下走 满月→半月→弯月→满月；
+//  ① 默认停在半月（站长 10-02 夜里改的口：三档里默认中档，把选择权给用户），
+//    点一下走 满月→半月→弯月→满月；照片亮度采样那段把键钉回弯月起步，
+//    为的是三档之间真的分开——默认档本身由①那三条单独钉，不靠采样顺序；
 //  ② 满月那一档照片真的等于原图亮度——罩子的 opacity 实读必须是 0，照片均值必须亮回去
 //     （上一版栽在这条上：以为"不叠新层"＝"不压暗"，实测只有原图的 62%）；
 //  ③ 罩子撤干净之后字上没有那道投影（站长 10-02 夜里否掉了它）——这一档的对比只打数不判红，
@@ -65,7 +67,7 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   const dimBefore = await mp.evaluate(() => wx.getStorageSync('bgDim'))
   await mp.evaluate(() => wx.removeStorageSync('bgDim'))
 
-  // ---------- ① 默认＝弯月＝今天现网的样子 ----------
+  // ---------- ① 默认＝半月（站长 10-02 夜里改的口：三档里默认中档，把选择权给用户） ----------
   let page = await enter('/pages/create/create')
   await sleep(4500)
   let d = await page.data()
@@ -73,9 +75,21 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   const win = (await rects(['.page-bg']))[0]
   const R = win.width / 750                      // 截图就是视口：1rpx = R 个像素
   const rpx = (px) => px / R
-  ck('本机没有键时停在弯月那一档，罩子不发样式串（＝CSS 铺满）',
-    d.dimV === 2 && d.dimScrim === '', JSON.stringify([d.dimV, d.dimScrim]))
-  ck('罩子的 opacity 实读是 1', (await opacityOf(page, '.page-scrim')) === 1)
+  ck('本机没有键时停在中间那一档（罩子拧半档，不是铺满也不是全开）',
+    d.dimV === 1 && d.dimScrim === 'opacity:0.5', JSON.stringify([d.dimV, d.dimScrim]))
+  ck('罩子的 opacity 实读是 0.5', (await opacityOf(page, '.page-scrim')) === 0.5)
+  ck('那一枚点是中档那支灰（实心，没有 mask 也没有投影）',
+    d.dimDot === 'background:#A7ABB2', d.dimDot)
+  // 下面②③量的是"三档之间照片真的分开"，走的是 弯月→满月→半月→弯月 那一圈，
+  // 所以这里把本机键钉回弯月再进页——默认档已经由上面三条钉住了，
+  // 这一句只是让亮度采样的顺序和原来那把尺子对得上（截图文件名里的档名不用改）。
+  await mp.evaluate(() => wx.setStorageSync('bgDim', 2))
+  page = await enter('/pages/create/create')
+  await sleep(4500)
+  d = await page.data()
+  ck('钉到弯月之后罩子整层铺满（这一档才是改版前那一眼看到的样子）',
+    d.dimV === 2 && d.dimScrim === '' && (await opacityOf(page, '.page-scrim')) === 1,
+    JSON.stringify([d.dimV, d.dimScrim]))
   ck('那一枚点是最深那档的灰（实心，没有 mask 也没有投影）',
     d.dimDot === 'background:#5C6169', d.dimDot)
   const one = await rects(['.title-row', '.date-row', '.entry-wrap', '.dim-dot'])

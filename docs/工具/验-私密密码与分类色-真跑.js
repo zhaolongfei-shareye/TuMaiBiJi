@@ -243,7 +243,11 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('每枚字色跟着底色配对', fg[1] !== fg[2] || bg[1] === bg[2], `${fg[1]} vs ${fg[2]}`)
     ck('「全部」那枚仍吃这一态自己的底（没被误上色）', !!bg[0], bg[0])
 
-    /* ---------- 造一条归了类的笔记，验圆点吃分类色 ---------- */
+    /* ---------- 造一条归了类的笔记，验它那张纸的颜色跟着分类走 ---------- */
+    // v18 起行前那枚圆点撤了：分类身份改由**纸片底色**承担（palette.paperSkinFor 按
+    // 分类在列表里的序号发色，未分类固定第一枚炭灰蓝）。所以这条判据从"点色"翻成"纸色"，
+    // 钉的还是同一件事——归了类的笔记在屏上读得出它归了哪一类。
+    const pal = require('../../miniprogram/utils/palette.js')
     const made = await mp.evaluate(async (api) => {
       const token = getApp().globalData.token
       const send = (url, method, data) => new Promise((resolve) => wx.request({
@@ -251,7 +255,7 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
         header: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
         success: (r) => resolve(r.data), fail: (e) => resolve({ _fail: e.errMsg }),
       }))
-      return send('/api/notes/', 'POST', { title: '圆点颜色自证·临时', source_type: 'manual', content: '这条只用来验圆点吃分类色，跑完就删。', category_id: 1 })
+      return send('/api/notes/', 'POST', { title: '圆点颜色自证·临时', source_type: 'manual', content: '这条只用来验纸色跟分类走，跑完就删。', category_id: 1 })
     }, API)
     tempNoteId = made && (made.id || (made.note && made.note.id))
     ck('临时笔记建出来了（分类=旅游）', !!tempNoteId, JSON.stringify(made).slice(0, 90))
@@ -262,12 +266,26 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     const notes = (await list.data()).notes || []
     const rowOf = notes.findIndex((n) => n.id === tempNoteId)
     ck('它出现在列表里', rowOf >= 0, `row=${rowOf}`)
-    const rows = await list.$$('.note-row')
-    const dotNew = await (await rows[rowOf].$('.row-line .cat-dot')).style('background-color')
+    const paperBg = async (want) => {
+      for (const e of await list.$$('.note')) {
+        if (Number(await e.attribute('data-idx')) === want) return await e.style('background-color')
+      }
+      return ''
+    }
+    const cats = (await list.data()).categories || []
+    const pos = cats.findIndex((c) => c.id === 1) + 1
+    const asRgb = (h) => `rgb(${[1, 2, 3].map((i) => parseInt(h.slice(1 + (i - 1) * 2, 1 + i * 2), 16)).join(', ')})`
+    const wantCat = asRgb(pal.paperSkinFor(pos).bg)
+    const wantPlain = asRgb(pal.paperSkinFor(0).bg)
     const plainRow = notes.findIndex((n, i) => n.category_id == null && i !== rowOf)
-    const dotPlain = plainRow >= 0 ? await (await (await rows[plainRow].$('.row-line .cat-dot')).style('background-color')) : ''
-    ck('归了类的行前圆点吃分类色', !!dotNew && dotNew !== dotPlain, `归类=${dotNew} 未分类=${dotPlain}`)
-    await mp.screenshot({ path: path.join(OUT, '02-分类章与圆点.png') })
+    const dotNew = await paperBg(rowOf)
+    const dotPlain = plainRow >= 0 ? await paperBg(plainRow) : ''
+    ck(`归了类的纸片底色就是 palette.paperSkinFor(${pos}) 那一枚（分类身份在纸上，不在点上）`,
+      dotNew === wantCat, `实读=${dotNew} 期望=${wantCat}`)
+    ck('未分类那枚仍是第一枚炭灰蓝（序号 0，不跟着分类表挪）',
+      plainRow < 0 || (dotPlain === wantPlain && dotNew !== dotPlain),
+      `未分类=${dotPlain || '（屏上没有未分类的纸片，跳过）'} 归类=${dotNew}`)
+    await mp.screenshot({ path: path.join(OUT, '02-分类章与纸片色.png') })
 
     /* ---------- 详情页：四个动作全在上方 ---------- */
     await mp.navigateTo(`/pages/detail/detail?id=${tempNoteId}`)

@@ -1,6 +1,9 @@
-// 笔记列表 v7 这一层的真跑自证：详情浮窗与模板预览弹窗两层互斥、每层只浮一个窗口。
-// 静态尺子证不了的事都在这里量：点已展开的行到底是开窗还是收起、弹窗收掉后回来的是详情窗
-// 还是列表、模板滑到第十套会不会回卷、二维码开关按下去成品图真变没变。
+// 笔记列表这两层窗口的真跑自证：详情浮窗与模板预览弹窗两层互斥、每层只浮一个窗口。
+// 静态尺子证不了的事都在这里量：弹窗收掉后回来的是详情窗还是列表、模板滑到第十套会不会回卷、
+// 二维码开关按下去成品图真变没变。
+// v18 起列表没有"就地展开"那一态（纸片 150rpx 宽放不下摘要，月份档还是定高），
+// 点一枚直接浮详情窗——所以这一把原来钉的"第一下展开、第二下开窗"整批作废，
+// 改成反向钉"旧状态键 openIdx 与 .row-foot/.summary 都不许回来"。
 // 私密那两条用 setData 把 detailNote.is_private 钉成 true，验的是 dock 两块条件渲染；
 // 后端那个字段本身在现网验过（§8.65 那 12 条），这里不重复造数据。
 // 前置：微信开发者工具已开；改过 WXSS/WXML 要先 cli close 再
@@ -34,56 +37,68 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
   })
   try {
     await sleep(2000)
-    await mp.switchTab('/pages/index/index')
+    // 排布档是本机偏好：上一把尺子（验-列表v18-真跑）切过「一行」，
+    // 留着它这一把的 .note 就全不在树上——量到 0 枚会被读成"列表坏了"，其实是进错了态。
+    // 所以先清掉这个键再 reLaunch，钉住"这一把从纸片墙起步"。
+    await mp.evaluate(() => wx.removeStorageSync('listMode'))
+    await mp.reLaunch('/pages/index/index')
     await sleep(4000)
     const page = await mp.currentPage()
     let d = await page.data()
     if (!(d.notes || []).length) { console.log('!! 列表为空，无法自证'); process.exit(3) }
-    // 上一轮可能留着展开态/浮窗，先归零，否则断言全在比脏状态
-    await page.setData({ openIdx: -1, detailOpen: false, templateOpen: false })
+    ck('进页落在纸片墙（.note 在树上，这一把后面每一枚都从这里取）',
+      d.listMode === 'desk' && (await page.$$('.note')).length >= 2,
+      `listMode=${d.listMode} 枚数=${(await page.$$('.note')).length}`)
+    // 上一轮可能留着浮窗，先归零，否则断言全在比脏状态
+    await page.setData({ detailOpen: false, templateOpen: false })
     await sleep(800)
 
-    /* ---------- ① 收起态只有三样 ---------- */
-    const rows = await page.$$('.note-row')
-    ck('列表渲染出行卡', rows.length >= 2, `rows=${rows.length}`)
-    ck('收起态没有 meta 脚注行', (await page.$$('.row-foot')).length === 0)
-    ck('收起态不露摘要', (await page.$$('.summary')).length === 0)
-    ck('收起行走 .row-line（点+标题+日期）', (await page.$$('.row-line')).length === rows.length)
-    const line = await rows[0].$('.row-line')
-    ck('收起行含分类点', !!(await line.$('.cat-dot')))
-    const ti = await line.$('.row-title')
-    ck('收起行含标题', !!(await line.$('.row-title')))
-    ck('收起行含日期', !!(await line.$('.dt')), await tx(await line.$('.dt')))
-    ck('收起行里没有行内操作按钮', (await rows[0].$$('.act-btn')).length === 0)
-    // DevTools 不吐 white-space 的计算值，取同一条规则里可测的那条当证据
-    ck('收起标题单行截断', await ti.style('text-overflow') === 'ellipsis', await ti.style('text-overflow'))
+    // v18 起列表没有"就地展开"那一态：data-idx 才是列表里的行号，
+    // 而置顶筛选、分类筛选都可能让它指向私密那篇——点中私密要走密码闸，
+    // 这一把量的是两层窗口，所以挑第一篇**非私密**的纸片下手。
+    const papers = await page.$$('.note')
+    const dl = await page.data()
+    const pick = dl.notes.findIndex((n) => !n.is_private)
+    const paperOf = async (want) => {
+      for (const e of await page.$$('.note')) {
+        if (Number(await e.attribute('data-idx')) === want) return e
+      }
+      return null
+    }
+    const paper = await paperOf(pick)
+
+    /* ---------- ① 纸片上只有标题与脚注，摘要不在列表里 ---------- */
+    ck('列表渲染出纸片', papers.length >= 2, `papers=${papers.length}`)
+    // 手风琴那一态整块没了：旧状态键与那两个节点都不许留在树上（回来一次就是又一处"就地展开"）
+    ck('列表里没有"就地展开"那一态（摘要只在详情窗里，v18 撤了手风琴）',
+      dl.openIdx === undefined && (await page.$$('.row-foot')).length === 0
+      && (await page.$$('.summary')).length === 0, `openIdx=${typeof dl.openIdx}`)
+    ck('一枚纸片有标题', !!(await paper.$('.note-t')))
+    ck('纸片脚注是日期那一档（YY/MM/DD）', /^\d{2}\/\d{2}$/.test(await tx(await paper.$('.note-date'))),
+      await tx(await paper.$('.note-date')))
+    ck('纸片里没有行内操作按钮', (await paper.$$('.act-btn')).length === 0)
+    // v18 的纸片标题不是"一行省略号"那一套（行卡那版才是），是三行夹断：
+    // `-webkit-line-clamp` + overflow:hidden。所以这里读的是那一条，不是 text-overflow。
+    const clamp = await (await paper.$('.note-t')).style('-webkit-line-clamp')
+    ck('标题超出三行就夹断（纸片定高，长标题不许把下面两行脚注顶出去）',
+      String(clamp) === '3', `读到的 -webkit-line-clamp=${clamp}`)
     await mp.screenshot({ path: path.join(OUT, '01-列表收起.png') })
 
-    /* ---------- ② 点一条 → 卡片挪过去 ---------- */
-    await rows[0].tap()
-    await sleep(1200)
-    d = await page.data()
-    ck('点收起的行=展开该行', d.openIdx === 0, `openIdx=${d.openIdx}`)
-    ck('展开不等于开窗', d.detailOpen === false)
-    const openTi = await page.$('.note-row.open .row-title')
-    ck('展开标题单行截断', await openTi.style('text-overflow') === 'ellipsis')
-    ck('展开标题是 36rpx 那一档（屏上 18px）', await openTi.style('font-size') === '18px', await openTi.style('font-size'))
-    ck('展开态才有 meta 脚注行', (await page.$$('.note-row.open .row-foot')).length === 1)
-    await mp.screenshot({ path: path.join(OUT, '02-一条展开.png') })
-
-    /* ---------- ③ 点已展开那条 → 详情浮窗 ---------- */
-    await (await page.$$('.note-row'))[0].tap()
+    /* ---------- ②③ 点一枚 → 直接浮详情窗（原来要两下，v18 一下） ---------- */
+    await paper.tap()
     await sleep(3000)
     d = await page.data()
-    ck('点已展开的行=浮详情窗（不是收起）', d.detailOpen === true, `detailOpen=${d.detailOpen}`)
-    ck('列表那条保持展开', d.openIdx === 0, `openIdx=${d.openIdx}`)
+    ck('点一枚纸片=浮详情窗（列表不再"第一下展开、第二下开窗"）',
+      d.detailOpen === true, `detailOpen=${d.detailOpen}`)
+    ck('浮上来的就是点的那一篇', !!d.detailNote && d.detailNote.id === dl.notes[pick].id,
+      `${(d.detailNote || {}).title}`)
     ck('详情窗是浮层', !!(await page.$('.float-sheet')))
     ck('没跳独立详情页', page.path === 'pages/index/index', page.path)
     const gripTx = await page.$('.grip-tx')
     ck('把手带「点一下收起」', !!gripTx, await tx(gripTx))
     const gripW = parseFloat((await (await page.$('.grip')).size()).width)
     ck('把手行占满窗宽（文字不被挤成竖排）', gripW > 330, `${gripW}px`)
-    ck('窗里大标题就是这篇', (await (await page.$('.ds-h2')).text()) === d.notes[0].title)
+    ck('窗里大标题就是这篇', (await (await page.$('.ds-h2')).text()) === dl.notes[pick].title)
     const ibtn = []
     for (const b of await page.$$('.ds-ibtn')) ibtn.push(await b.text())
     ck('dock 四枚并排一行', ibtn.length === 4, ibtn.join('|'))
@@ -182,7 +197,8 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     d = await page.data()
     ck('弹窗收掉', d.templateOpen === false)
     ck('浮上来的还是详情窗', d.detailOpen === true)
-    ck('那条还是展开态', d.openIdx === 0, `openIdx=${d.openIdx}`)
+    ck('还是开窗那一篇（列表没有就地展开那一态，窗不会半路换篇）',
+      !!d.detailNote && d.detailNote.id === dl.notes[pick].id)
     ck('公开状态按服务端读数刷新', d.shared === true, `shared=${d.shared}`)
     ck('窗里那行「撤掉分享」在', !!(await page.$('.ds-pub-act')))
 
@@ -191,27 +207,31 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await sleep(1200)
     d = await page.data()
     ck('点把手收窗回列表', d.detailOpen === false)
-    ck('列表保持那条展开', d.openIdx === 0, `openIdx=${d.openIdx}`)
-    await (await page.$$('.note-row'))[0].tap()
-    await sleep(2500)
+    ck('收窗之后纸片墙还在（窗是浮层，不顶掉列表）', (await page.$$('.note')).length >= 2)
+    await (await paperOf(pick)).tap()
+    await sleep(3000)
+    ck('窗浮着时有一整层遮罩（分类那一行点不到，不存在"开着窗切分类"那个态）',
+      !!(await page.$('.float-mask')))
     await (await page.$('.float-mask')).tap()
     await sleep(1200)
     d = await page.data()
     ck('点窗外=收起详情窗', d.detailOpen === false && d.templateOpen === false)
 
-    /* ---------- 换筛选会重排行号，两层先收掉 ---------- */
-    await (await page.$$('.note-row'))[1].tap()
-    await sleep(1200)
-    ck('点另一条=卡片挪过去', (await page.data()).openIdx === 1)
-    await (await page.$('.chip')).tap()
+    /* ---------- 切分类：这一行在遮罩之外，点它时窗本来就该是收着的 ---------- */
+    const chipN = (await page.$$('.chip')).length
+    ck('分类那一排有得点（「全部」+ 各分类）', chipN >= 2, `${chipN} 枚`)
+    await (await page.$$('.chip'))[1].tap()
     await sleep(3500)
     d = await page.data()
-    ck('切分类后展开态与窗都收掉', d.openIdx === -1 && d.detailOpen === false, `openIdx=${d.openIdx}`)
+    ck('切分类走 selectCategory：窗收掉、列表按这一档重载',
+      d.detailOpen === false && d.selectedCategory !== null, `selectedCategory=${d.selectedCategory}`)
+    await (await page.$$('.chip'))[0].tap()
+    await sleep(3500)
+    ck('点回「全部」把列表还回来（这一把后面的判据都建立在"屏上有纸片"上）',
+      (await page.data()).selectedCategory === null && (await page.$$('.note')).length >= 2, '')
 
     /* ---------- 私密笔记：dock 两块整块不渲染 ---------- */
-    await (await page.$$('.note-row'))[0].tap()
-    await sleep(1200)
-    await (await page.$$('.note-row'))[0].tap()
+    await (await paperOf(pick)).tap()
     await sleep(3000)
     ck('普通笔记：生成卡片与公开状态都在', !!(await page.$('.ds-ibtn.primary')) && !!(await page.$('.ds-pub')))
     await page.setData({ 'detailNote.is_private': true })

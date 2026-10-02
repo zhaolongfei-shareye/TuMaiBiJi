@@ -26,6 +26,42 @@ const UNCATEGORIZED = { name: '墨黑', bg: '#23252C', ink: '#FFFFFF' }
 const TIP_DOT = '#F6C445'
 
 /**
+ * 纸片墙那一族莫兰迪（站长 10-02 指定"经典色卡里那四枚"）。
+ * 为什么单开一族而不吃 TONES 那五支：一枚 150rpx 见方的纸片整块铺饱和色会把标题抢掉，
+ * 而 TONES 是"分类身份"那一套小面（点、chip、模板圆点）共用的，改它等于改三个地方。
+ * 四组字/底对比实测 5.21 / 6.72 / 6.68 / 7.54，都在正文档那道 4.5 以上。
+ */
+const PAPERS = [
+  { name: '炭灰蓝', bg: '#5B6470', ink: '#EDEFF2' },
+  { name: '雾蓝', bg: '#A8BCC9', ink: '#23323C' },
+  { name: '灰绿', bg: '#A9BCA6', ink: '#22331F' },
+  { name: '藕荷', bg: '#D3B6B4', ink: '#3B2523' },
+]
+/**
+ * 取哪一枚：吃**序号**而不是 categoryId。序号≤0（或未给/非数）=未分类，钉死第一枚炭灰蓝；
+ * 分类按它们在分类表里的顺序往后排（第一个分类→雾蓝、第二个→灰绿、第三个→藕荷），
+ * 排到第四枚起在这三枚里循环——**不回到炭灰蓝**，那一枚是"没归类"专用身份，
+ * 让一个真分类跟它撞色，一屏上就分不清哪篇没归类了。
+ * 为什么不拿 id 取模：站长那四枚是按"未分类/旅游/生活/私密"这个顺序点的色，
+ * 而 id 是数据库自增的，取模会把 旅游 和 生活 撞成同一枚——同一屏两枚同色就不是分类身份了。
+ * 与 toneColor(i) 是同一条做法：序号进、色出，界面上不写第二份色值。
+ */
+const paperSkinFor = (ordinal) => {
+  const n = Number(ordinal)
+  const cyc = PAPERS.length - 1
+  const p = ordinal == null || isNaN(n) || n <= 0
+    ? PAPERS[0]
+    : PAPERS[1 + ((n - 1) % cyc)]
+  return { bg: p.bg, ink: p.ink, name: p.name }
+}
+/**
+ * 「已分享」那一枚色块（站长 10-02：一行模式右侧只留这一种状态，其他状态什么都不画）。
+ * 底色吃 TONES[1] 那支宝蓝——效果图上那架纸飞机用的就是它，飞机撤了、颜色留下。
+ * 白字压上去实测 6.2:1。和 TIP_DOT 同一条规矩：只从 palette 出，不许抄进 WXSS。
+ */
+const SHARED_TAG = { bg: TONES[1].bg, ink: '#FFFFFF' }
+
+/**
  * 背景形象图的深浅三档（站长 10-02 定：点一下换一档，走到最沉那档再回最亮；
  * 界面上就是一枚灰度实心点，不做形状——月相那版点他看过否了）。
  *
@@ -35,7 +71,9 @@ const TIP_DOT = '#F6C445'
  *        1 就是这半年一直在跑的那七个停点，一个字没改。
  * dot  = 界面上那一枚点的灰度：点本身就是当前档，越沉的档点越黑。
  *
- * 默认停在最沉那一档（DIM_DEFAULT）：老用户升级后看到的还是今天这个样子。
+ * 默认停在中档（DIM_DEFAULT，站长 10-02 夜里改的口径）：他原话"三档默认中档就行了，
+ * 把调亮度选择权给用户"。所以这一档既不压到最沉（现网那半年的样子），也不放到原图，
+ * 取中间那一格；本机键被别的版本写成脏值也兜回这一档。
  * 这一组数与 TIP_DOT 同一条规矩：只从 palette 出，不许抄进 WXSS。
  */
 const BG_DIMS = [
@@ -43,7 +81,7 @@ const BG_DIMS = [
   { v: 1, name: '半月', veil: 0.5, dot: '#A7ABB2' },
   { v: 2, name: '弯月', veil: 1, dot: '#5C6169' },
 ]
-const DIM_DEFAULT = BG_DIMS[2]
+const DIM_DEFAULT = BG_DIMS[1]
 
 const dimAt = (v) => BG_DIMS.find((d) => d.v === v) || DIM_DEFAULT
 // 点一下换到下一档：满月 → 半月 → 弯月 → 满月。
@@ -496,6 +534,9 @@ function catSkinFor(categoryId, wallpaper) {
 
 module.exports = {
   TONES,
+  PAPERS,
+  paperSkinFor,
+  SHARED_TAG,
   UNCATEGORIZED,
   TIP_DOT,
   BG_DIMS,
