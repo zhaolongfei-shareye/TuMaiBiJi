@@ -53,29 +53,22 @@
         <view wx:if="{{!searchOpen}}" class="ic {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">
           <view class="glyph-search"></view>
         </view>
-        <view class="vr"></view>
-        <view class="ic {{listMode === 'desk' ? 'on' : ''}}" catchtap="onToggleMode" data-mode="desk" aria-label="{{t.viewDesk}}">
-          <view class="glyph-grid"><view class="q"></view><view class="q"></view><view class="q"></view><view class="q"></view></view>
-        </view>
-        <view class="vr"></view>
-        <view class="ic {{listMode === 'rows' ? 'on' : ''}}" catchtap="onToggleMode" data-mode="rows" aria-label="{{t.viewRows}}">
-          <view class="glyph-lines"></view>
-        </view>
       </view>
     </view>
   </view>
 
   <view class="sheet">
-  <!-- 分类这一行钉在列表区顶上，不跟着月份滚（③）。左沿与下面时间轴同一条 24 内缩；
-       「置顶笔记」占住时间轴那一列的 126，chips 从这一列右边才起排——
-       多到一排放不下时照旧左右滚，但滚的那一节只从时间轴右侧开始（④）。
-       这一行与下面的笔记区之间一条浅虚线（⑤）。左右各外扩 24 再把内缩加回来，
-       为的是让那条虚线通到整块圆角卡的边，和效果图同一画法。
-       置顶这一档纯文字 + 选中那枚下面一条短黄杠，不做按钮壳（他一贯的口径）。 -->
+  <!-- v19（站长 10-03 拍）：区内顶上两枚 tab，小字、选中那枚深色并压一条墨色短杠在通栏横线上，
+       未选那枚同一字号只浅色。默认落第一枚。第二枚那两个字仍读现网 navShare（笔记卡片）。
+       排布切换那两枚 icon 的活交给这里，所以头部那一行只剩搜索一枚。 -->
+  <view class="vtabs">
+    <view class="vtab {{view === 'list' ? 'on' : ''}}" catchtap="onViewTap" data-view="list">{{t.tabList}}</view>
+    <view class="vtab {{view === 'cards' ? 'on' : ''}}" catchtap="onViewTap" data-view="cards">{{t.navShare}}</view>
+  </view>
+  <!-- 分类这一行紧跟在横线下面，两枚 tab 都留着：卡片那一格是从同一份筛选结果里出来的，
+       这里收掉分类，筛了「旅游」再切过去就会看到别的分类的卡片。
+       多到一排放不下时照旧左右滚（v18 那条"只能从时间轴右侧起排"随时间轴一起撤了）。 -->
   <view class="cats">
-    <view class="pinb {{pinnedOnly ? 'on' : ''}}" style="{{tipVarStyle}}" catchtap="onTogglePinned">
-      <text class="pinb-t">{{t.pinFilter}}</text>
-    </view>
     <scroll-view class="cat-scroll" scroll-x show-scrollbar="{{false}}">
       <view class="cat-chips">
         <view
@@ -97,14 +90,13 @@
         </view>
       </view>
     </scroll-view>
-    <!-- 处在"只看置顶"这件事，除了左边那条短黄杠，唯一把话说出来的地方 -->
-    <text wx:if="{{pinnedOnly}}" class="pinn">{{t.pinnedOnly}}</text>
   </view>
 
   <!-- v12：列表不再整页滚，改在这块区域里自己滚、滚到底再取下一批。
        内缩挂在 .sheet 的 padding 上，不挂在 scroll-view 自己身上——挂在它身上时
        右侧要给滚动条留位，左右就不等宽了（详情浮窗那一层实测右移 12rpx，同一条坑）。
-       v18：这一区里是「左时间轴 + 右纸片墙 / 一行」，月份档和它旁边那枚小黄点跟着一起滚。 -->
+       v19：这一区里两批屏共用同一份 rows / cells（同一份序、同一份筛选），
+       左边那一列不再有月份档，也不再有那根竖线。 -->
   <scroll-view
     class="list"
     scroll-y
@@ -113,79 +105,58 @@
     lower-threshold="160"
     bindscrolltolower="onListToLower"
   >
-    <!-- 加载状态 -->
     <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
-    <!-- 空状态 -->
     <view wx:elif="{{notes.length === 0 && !loading}}" class="empty">
       <text>{{t.noNotes}}</text>
     </view>
 
-    <!-- 笔记这一屏（v18）。两种排布共用 index.js layout() 算出的同一份"月—行—枚"坐标：
-         纸片墙=同一日期必同一行、一行满 4 枚往下一行续、不同日期必另起一行，每枚再抖一点
-         竖向错位和角度；一行模式=一条 88、不画横线、连日期都不显示。
-         点一枚纸片 / 一行 = 直接浮详情窗（两档都不就地展开，理由见 index.js 的 onRowTap）；
-         私密笔记开窗前先验密码。动作全在详情窗下沿 dock 里。
-         一屏上唯一的状态标记是「已分享」那一小块色+白字（①）：置顶、来源这些状态这里
-         什么都不画，置顶那件事由分类行左边那一档说。 -->
-    <view wx:else class="bodyrow" style="height: {{stageH}}rpx">
-      <view class="rail">
-        <view class="rail-line"></view>
-        <view class="rm" wx:for="{{groups}}" wx:key="mk" style="top: {{item.top}}rpx">
-          <view class="rm-dot" style="{{tipDotStyle}}"></view>
-          <text class="rm-ym">{{item.ym}}</text>
+    <!-- 笔记列表那一枚（X 那种排）：左列只有日期 + 一枚小黄点、整组竖向居中于这一条；
+         右列三档——标题 90% 黑一行放不下就省略号、摘要 70% 黑最多三行、末尾「显示更多」蓝字。
+         「显示更多」只在摘要真放不下三行那几条上画（判据见 index.js 的 SUM_LINES）；
+         点整行任意处（含这枚蓝字）都浮详情窗，所以它不另挂 handler。
+         转存来的那篇在最后一行右端带昵称 + 通用头像：标题那一行不留位置给它，
+         否则标题能吃掉的字数要先减掉一截昵称。 -->
+    <view wx:elif="{{view === 'list'}}" class="xlist">
+      <view class="xrow" wx:for="{{rows}}" wx:key="id" bindtap="onRowTap" data-idx="{{item.i}}">
+        <view class="xd">
+          <view class="xd-dot" style="{{tipDotStyle}}"></view>
+          <text class="xd-d">{{item.tail}}</text>
         </view>
-      </view>
-
-      <view class="stage">
-        <view class="gp" wx:for="{{groups}}" wx:key="mk" style="top: {{item.top}}rpx; height: {{item.h}}rpx">
-          <block wx:if="{{listMode === 'desk'}}">
-            <view
-              class="note"
-              wx:for="{{item.cards}}"
-              wx:for-item="c"
-              wx:key="id"
-              style="left: {{c.x}}rpx; top: {{c.y}}rpx; transform: rotate({{c.r}}deg); z-index: {{c.z}}; {{c.paperStyle}}"
-              bindtap="onRowTap"
-              data-idx="{{c.i}}"
-            >
-              <text class="note-t">{{c.ptitle}}</text>
-              <view class="note-btm">
-                <!-- 头像只在有的时候进左下角，对方没设形象就整枚不渲染、不留空圈（②）；
-                     日期因此挪到下面那一行的右端，两件事不打架。 -->
-                <view class="note-who" wx:if="{{c.who}}">
-                  <view class="glyph-who"></view>
-                  <text class="note-name">{{c.who}}</text>
-                </view>
-                <view class="note-foot">
-                  <text class="shared-tag" wx:if="{{c.shared}}" style="{{c.sharedStyle}}">{{t.sharedTag}}</text>
-                  <text class="note-date">{{c.tail}}</text>
-                </view>
-              </view>
-            </view>
-          </block>
-
-          <view wx:else class="rows">
-            <view
-              class="rw"
-              wx:for="{{item.cards}}"
-              wx:for-item="c"
-              wx:key="id"
-              bindtap="onRowTap"
-              data-idx="{{c.i}}"
-            >
-              <text class="rw-t">{{c.title}}</text>
-              <!-- ②那处改口讲的是"这篇打哪儿来"，与排布无关：两种排布都得说同一句话，
-                   所以转存来的那篇在一行模式里同样带昵称 + 通用头像，不只在纸片上有。 -->
-              <view class="note-who" wx:if="{{c.who}}">
-                <view class="glyph-who"></view>
-                <text class="note-name">{{c.who}}</text>
-              </view>
-              <text class="shared-tag" wx:if="{{c.shared}}" style="{{c.sharedStyle}}">{{t.sharedTag}}</text>
+        <view class="xm">
+          <text class="x-t">{{item.title}}</text>
+          <text class="x-s" wx:if="{{item.summary}}">{{item.summary}}</text>
+          <view class="x-m" wx:if="{{item.more || item.who}}">
+            <text wx:if="{{item.more}}" class="x-more">{{t.showMore}}</text>
+            <view wx:if="{{item.who}}" class="x-who">
+              <view class="glyph-who"></view>
+              <text class="x-name">{{item.who}}</text>
             </view>
           </view>
         </view>
       </view>
+    </view>
+
+    <!-- 笔记卡片那一枚：两列等宽、只画本机台账里有图的那几篇、顺序与上面那批完全一致。
+         白垫固定一档，图按 aspectFit 落在正中——比白垫扁的那几套上下各留一道白，
+         这样十套模板混排也排得齐（站长原话"排列整齐归一"）。
+         同一篇留过两张以上才有第二行 ‹ i/n ›，左右各一次点击换一张、走到头不循环。 -->
+    <view wx:elif="{{cells.length}}" class="grid2">
+      <view class="gc" wx:for="{{cells}}" wx:key="id">
+        <view class="pad" bindtap="onRowTap" data-idx="{{item.i}}">
+          <image class="pad-img" src="{{item.cards[item.cur].p}}" mode="aspectFit" />
+        </view>
+        <text class="g-cap" bindtap="onRowTap" data-idx="{{item.i}}">{{item.title}}</text>
+        <view class="g-pg" wx:if="{{item.cards.length > 1}}">
+          <view class="g-step" catchtap="onCardStep" data-k="{{index}}" data-step="{{-1}}"><view class="chev l"></view></view>
+          <text class="g-n">{{item.cur + 1}}/{{item.cards.length}}</text>
+          <view class="g-step" catchtap="onCardStep" data-k="{{index}}" data-step="{{1}}"><view class="chev r"></view></view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:else class="empty">
+      <text>{{t.noCards}}</text>
     </view>
 
     <!-- 翻页那一句挂在排布之外：它不该占掉一格的位置 -->
@@ -233,12 +204,12 @@
       </view>
     </scroll-view>
 
-    <!-- 动作条：四枚并排一行（站长 09-30 拍的，覆盖 v3-v7 效果图上"通栏一枚"的画法）。
+    <!-- 动作条：v19 起三枚并排一行（「置顶」那一枚随这一屏的置顶一起撤了；站长 09-30 拍的是
+         "并排一行、不要通栏一枚"，那条仍然成立，.ds-irow 是 flex:1 等宽，四枚变三枚不用改数法）。
          「转为笔记卡片」改名「生成笔记卡片」——原名让人以为点完详情页就没了。
-         私密笔记那枚不渲染，剩下三枚自动等宽；也不给公开状态那一行。 -->
+         私密笔记那枚不渲染，剩下两枚自动等宽；也不给公开状态那一行。 -->
     <view class="ds-dock">
       <view class="ds-irow">
-        <view class="ds-ibtn {{detailNote.is_pinned ? 'on' : ''}}" catchtap="onSheetPin">{{detailNote.is_pinned ? t.unpin : t.pin}}</view>
         <view class="ds-ibtn" catchtap="onSheetEdit">{{t.edit}}</view>
         <view class="ds-ibtn danger" catchtap="onSheetDelete">{{t.delete}}</view>
         <view wx:if="{{!detailNote.is_private}}" class="ds-ibtn primary" catchtap="onSheetToPoster">{{t.shareAsImage}}</view>

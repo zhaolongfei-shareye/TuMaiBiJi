@@ -142,20 +142,24 @@ ok('图上那一行：top 400、左右各 24、整行 88 高（下沿离列表�
   && /height: 88rpx/.test(tools), tools.trim().slice(0, 60))
 ok('圆钮那种"圆底 + 描边"整个撤了（v18 只留裸图形）',
   !/\.sc-btn/.test(wxss + wxml) && !/\.head-tools/.test(wxss + wxml))
-ok('三枚 icon 之间用一道竖线区隔，且这一组紧靠右（margin-left 26）',
-  /\.vr\s*\{[^}]*width: 2rpx/.test(wxss) && /\.acts\s*\{[^}]*margin-left: 26rpx/.test(wxss))
-ok('三枚图形同一条基准 38×38，谁都不比谁小一号',
-  [/glyph-search/, /glyph-grid/, /glyph-lines/].every((r) => new RegExp(r.source + '\\s*\\{[^}]*width: 38rpx').test(wxss)))
-ok('选中那一档比没选中重一档（颜色 + 笔画同时），只靠字重不算',
-  /\.ic\.on\s*\{[^}]*color/.test(wxss) && /\.ic\.on \.glyph-grid \.q\s*\{[^}]*border-width/.test(wxss))
+// v19（站长 10-03 第四轮）：图上那一行只留搜索一枚——纸片墙 / 一行那两枚随整个排布档
+// 一起撤了，中间那道竖线跟着没有主人。所以原来钉"三枚同基准""选中重一档靠笔画"这两条
+// 改成反向钉：留着就是又给人埋一枚点不动的 icon。
+ok('那一组只剩搜索一枚，紧靠右（margin-left 26）且中间那道竖线跟着撤净',
+  !/\.vr\s*\{/.test(wxss) && !/class="vr"/.test(wxml) && /\.acts\s*\{[^}]*margin-left: 26rpx/.test(wxss)
+  && (wxml.match(/class="ic /g) || []).length === 1)
+ok('两枚排布 icon（四块方 / 三根线）整个撤了，只留放大镜一枚 38×38',
+  !/glyph-(grid|lines)/.test(wxss + wxml)
+  && new RegExp('glyph-search\\s*\\{[^}]*width: 38rpx').test(wxss))
+ok('选中那一档只靠颜色跳出来（笔画那一档随纸片墙一起撤了）',
+  /\.ic\.on\s*\{[^}]*color/.test(wxss) && !/border-width/.test(seg(wxss, '.ic.on')))
 ok('Tips 那句一行放完就省略号，不折行把 icon 顶下去',
   /text-overflow: ellipsis/.test(seg(wxss, '.tp-tx')) && /white-space: nowrap/.test(seg(wxss, '.tp-tx')))
 ok('Tips 前面那枚点的色从 style 递进来（TIP_DOT 不许抄进 wxss）',
   /class="tp-dot" style="\{\{tipDotStyle\}\}"/.test(wxml) && !/#f6c445/i.test(wxss))
-ok('压在图上的那一行三档都是纸白（Tips / icon / 竖线各一档）',
+ok('压在图上的那一行两档都是纸白（Tips / icon；竖线那一档随它一起撤了）',
   /color: rgba\(242, 239, 233, 0\.82\)/.test(seg(wxss, '.container.has-bg .tp'))
-  && /color: rgba\(255, 255, 255, 0\.86\)/.test(seg(wxss, '.container.has-bg .ic'))
-  && /background: rgba\(255, 255, 255, 0\.28\)/.test(seg(wxss, '.container.has-bg .vr')))
+  && /color: rgba\(255, 255, 255, 0\.86\)/.test(seg(wxss, '.container.has-bg .ic')))
 ok('没铺图那一态这三档退回各自主题的墨色（不是写死白）',
   /color: var\(--text-secondary\)/.test(seg(wxss, '.tp'))
   && !/rgba\(255, 255, 255/.test(seg(wxss, '.ic')))
@@ -169,13 +173,15 @@ ok('铺图时那串 chrome 变量整串不发（内联自定义属性优先级�
   /searchSkin: bgSrc \? '' : chromeOf\(wallpaper\)\.style/.test(cjs))
 ok('占位符给带 alpha 的色，不靠 opacity（input 的 placeholder 不吃 opacity）',
   !/\.srch-ph\s*\{[^}]*opacity/.test(wxss) && /--chrome-idle/.test(seg(wxss, '.srch-ph')))
-ok('「搜索笔记」与新建页那条标题吃同一条字号令牌（--fs-title）',
-  /font-size: var\(--fs-title\)/.test(seg(wxss, '.srch-go'))
-  && /\.row-title\s*\{[^}]*font-size: var\(--fs-title\)/.test(read('app.wxss')))
-ok('放大镜 / 四块方 / 三根线都是 CSS 画的，这一页没为一枚 icon 引图标资源',
+// v19 第三条：那两个字压到与分类同一档（原来吃 --fs-title 31，比正文还大一级）。
+// 新建页那条标题不动，所以这里不再钉"两页同一个令牌"。
+ok('「搜索笔记」与分类那枚 chip 吃同一条字号令牌（--fs-meta 24，不再比正文大一级）',
+  /font-size: var\(--fs-meta\)/.test(seg(wxss, '.srch-go'))
+  && /font-size: var\(--fs-meta\)/.test(seg(read('app.wxss'), '.chip'))
+  && /font-weight: 600/.test(seg(wxss, '.srch-go')))
+ok('放大镜是 CSS 画的，这一页没为一枚 icon 引图标资源（四块方 / 三根线随排布档一起没了）',
   /\.glyph-search::before/.test(wxss) && /\.glyph-search::after/.test(wxss)
-  && /\.glyph-grid \.q\s*\{[^}]*border: 3rpx solid currentColor/.test(wxss)
-  && !/\.glyph-(search|grid)\s*\{[^}]*\burl\(/.test(wxss))
+  && !/\.glyph-(search|grid|lines)\s*\{[^}]*\burl\(/.test(wxss))
 ok('颜色全走 currentColor：翻色只改 .ic 一处，三枚图形一条都不用动',
   /currentColor/.test(seg(wxss, '.glyph-search::before'))
   && /currentColor/.test(wxss.match(/\.glyph-who::before\s*\{[^}]*\}/)?.[0] || '')
@@ -188,11 +194,16 @@ ok('摊开时搜索那枚 icon 自己让位（同一行不出现两枚搜索）'
   /wx:if="\{\{!searchOpen\}\}" class="ic[^"]*" catchtap="onOpenSearch"/.test(wxml))
 ok('输入框自动聚焦（focus 跟着那一态走，不写死 true）',
   /focus="\{\{searchOpen\}\}"/.test(wxml))
-ok('点空白缩回挂在容器上，条子内部和三枚 icon 都靠 catchtap 挡住冒泡',
+// v19 之后图上那一行只剩一枚搜索：条子内部与它都靠 catchtap 挡住冒泡，
+// 原来那两枚 onToggleMode 随排布档一起撤了——留着不撤，点空白就缩不回来了。
+ok('点空白缩回挂在容器上，条子内部和搜索那一枚都靠 catchtap 挡住冒泡',
   /class="container[^"]*" bindtap="onBlankTap"/.test(wxml) && /catchtap="noop"/.test(wxml)
-  && (wxml.match(/catchtap="onToggleMode"/g) || []).length === 2)
-ok('条子与那一行同高（88），不再另写一份总高',
-  /\.srch\s*\{[^}]*height: 88rpx/.test(wxss) && /\.tools\s*\{[^}]*height: 88rpx/.test(wxss))
+  && !/onToggleMode/.test(wxml + cjs)
+  && /class="ic [^"]*" catchtap="onOpenSearch"/.test(wxml))
+// v19 第三条：行仍 88，条子压到 60——"同高"这条到此作废，改钉"条子比行矮 28、由它自己居中"。
+ok('条子压到 60（与分类那枚 chip 实测 59 同一档），那一行仍 88、条子在行里竖向居中',
+  /\.srch\s*\{[^}]*height: 60rpx/.test(wxss) && /\.tools\s*\{[^}]*height: 88rpx/.test(wxss)
+  && /align-items: center/.test(seg(wxss, '.tools')))
 ok('有词又缩回时那枚 icon 翻一档（列表被筛过这件事得有地方说）',
   /class="ic \{\{searchKeyword \? 'on' : ''\}\}"/.test(wxml) && /\.ic\.on\s*\{/.test(wxss))
 // 09-30 起暗玻璃那一态只管「全部」那一枚（.chip.all）：分类那几枚穿自己的分类色，
@@ -248,12 +259,15 @@ ok('三列顶对齐（align-items:flex-start），不是底对齐', /align-items
 ok('只剩「笔记」这一列（v18 撤掉分享/种草两列，那道分隔细线跟着没有主人了）',
   !/\.stat \+ \.stat/.test(wxss) && !/statShares|statSaved/.test(i18n)
   && (cjs.match(/key: 'notes'/) || []).length === 1)
-ok('纸片那一枚不写死颜色（底与字成对从 palette.PAPERS 经 style 递进来）',
-  !/background|color:/.test(seg(wxss, '.note'))
-  && /n\.paperStyle = `background:\$\{p\.bg\};color:\$\{p\.ink\}`/.test(cjs))
-ok('「已分享」那一小块同理：色值只在 palette.SHARED_TAG 活一份',
-  !/background|color:/.test(seg(wxss, '.shared-tag'))
-  && /SHARED_TAG/.test(cjs))
+// v19：纸片墙那一族（.note 的底与字、.shared-tag 那一小块）整屏退了，
+// 这两条从"不写死颜色"改成反向钉——它们回来一次，就说明有人绕过 palette 抄了实色。
+// 扫的是剥掉注释的那一份（cjsCode，上面已经算好）：index.js 里留了一句
+// "这一族随 v19 一起撤了"的说明，拿原文扫会被自己的注释判成假红
+// （色值有没有落进样式表由 验-列表D2.js 那条管）。
+ok('纸片那一族整块退了（.note 与 paperStyle 在这一屏没有后代）',
+  !/class="note"|paperStyle|paperSkinFor|\.note\s*\{/.test(wxss + wxml + cjsCode))
+ok('「已分享」那一小块整屏不画（公开状态只在详情窗里说）',
+  !/shared-tag|SHARED_TAG/.test(wxss + wxml + cjsCode))
 
 // ---------- 6. 界面上每一句话都要跟着改口径 ----------
 ok('外观设置那句话不再写"只铺首页"', !/只铺首页|Home page only/.test(i18n))

@@ -1,9 +1,10 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, paperSkinFor, SHARED_TAG, TIP_DOT } = require('../../utils/palette.js')
+const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
+const cardLog = require('../../utils/cardLog.js')
 const { isPrivate } = require('../../utils/privateGate.js')
-const { formatShortDate, formatDateTime, formatYearMonth } = require('../../utils/date.js')
+const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
@@ -15,22 +16,17 @@ const SOURCE_TYPE_KEYS = {
   share_import: 'sourceShareImport',
 }
 
-/* v18 纸片墙的排布常量（1rpx 一比一照效果图那套数抄，见 docs/design/10-02三视图与背景亮度/画-v18.mjs）。
-   一枚纸片 150×200：横向步 142 只压掉右边那 14 的内白、标题一个字都不遮；
-   纵向步 176 压掉底边 24，日期抬到 bottom:30 正好躲开那 24。
-   一行模式一条 88（撤了横线，只靠行高分）；月与月之间空 56。 */
-const PER = 4
-const XS = 142
-const YS = 176
-const NOTE_H = 200
-const GROUP_GAP = 56
-const ROW_H = 88
-const JOG = [0, 10, 4, 13]     // 每行四枚各自的竖向错位
-const TILT = [-2.2, 1.6, -1.1, 2.4]  // 和倾角——不像贴出来的方阵
-const LIST_MODE_KEY = 'listMode'
-const dayKey = (iso) => (iso || '').slice(0, 10)
-const monthKey = (iso) => (iso || '').slice(0, 7)
-const cut = (s, n) => (s && s.length > n ? s.slice(0, n) + '…' : s || '')
+/* v19（站长 10-03 凌晨拍）：这一屏不再有两种排布，而是列表区顶上两枚 tab——
+   笔记列表（X 那种一行一条：左列日期 + 圆点，右列标题 / 摘要 /「显示更多」）
+   与笔记卡片（两列白垫网格，只画生成过的）。
+   上面那行 88 是搜索条压到 60 之后头部那一行的高，两枚 tab 那一行 70、通栏横线压在它下沿，
+   都写在 wxss 里；两枚 tab 每次进页都从第一枚起（他原话"默认第一个tab"），所以不落本机。 */
+/* 摘要那一列能放多少字：列宽 = 750 − 卡内缩 24×2 = 702，再减日期那一列 88 与间距 20 = 594，
+   字号 --fs-meta 24 → 一行 24 个汉字、三行 72。「显示更多」画不画就按这个估，
+   估的是汉字档（英文数字比汉字窄），所以这条线偏保守——宁可多给一枚出口，
+   也不要在真被截断的那条上什么都不给。 */
+const SUM_LINES = 3
+const SUM_CHARS = 24
 
 Page({
   data: {
@@ -52,18 +48,18 @@ Page({
     tips: [],
     tipIdx: 0,
     tipDotStyle: `background:${TIP_DOT}`,
-    // 「置顶笔记」选中那枚下面的短黄杠画在 ::after 上，递不进 style，
-    // 所以这一档改走自定义属性：色值仍只从 palette.TIP_DOT 出，WXSS 里只写 var(--tip)。
-    tipVarStyle: `--tip:${TIP_DOT}`,
+    // 小黄点仍由 palette.TIP_DOT 从 style 递进来（wxss 里不许抄饱和色）。
+    // 「置顶」那枚下面一条短黄杠用的 --tip 自定义属性随置顶一起撤了：
+    // v19 两枚 tab 选中那枚下面的短杠吃墨色，走 var(--text-primary) 就够。
     // 头部那一列数字：只有「笔记」。v18 做减法把「分享」「种草」两列撤了
     // （那两列是给分享/种草两屏回看用的，那两屏不做）。值仍来自 /api/user/quota，本页不自己相加。
     stats: [],
-    // v18 列表这一屏：纸片墙 / 一行两种排布 + 「只看置顶」那一档，都是本机偏好与视图态
-    listMode: 'desk',
-    pinnedOnly: false,
-    // 排布算完的结果（月份分组、每枚纸片的坐标与倾角、时间轴上那个月的位置）
-    groups: [],
-    stageH: 0,
+    // v19 这一屏的两枚 tab：'list' = 笔记列表（默认那一枚），'cards' = 笔记卡片。
+    // 这是视图态，不落本机——他原话"默认第一个 tab"，每次进这一屏都从第一枚起。
+    view: 'list',
+    // 两枚 tab 各自画的那两批，都由 arrange() 从同一份 notes 现算（同一份序、同一份筛选）
+    rows: [],
+    cells: [],
     // 私密笔记：本会话里已经验过密码就不再重问
     _privateVerified: false,
     // 点一枚纸片 / 一行 = 直接浮详情窗（v18 两档排布都不就地展开，理由见 onRowTap）
@@ -118,9 +114,9 @@ Page({
       t: texts(lang),
       themeClass,
       bgSrc,
-      // 排布那一档是本机偏好（纸片墙 / 一行），没存过就走 v18 的默认：纸片墙。
-      // 每次进页重读，和深浅那一档同一做法——在别的入口改过，回到这一屏就得跟着变。
-      listMode: wx.getStorageSync(LIST_MODE_KEY) === 'rows' ? 'rows' : 'desk',
+      // 两枚 tab 每次进这一屏都回到第一枚（他原话"默认第一个 tab"），不是本机偏好；
+      // 卡片那一格的台账在下面 loadNotes 里重读，从详情窗出完图回来就能看到新那一张。
+      view: 'list',
       // Tips 跟着语言整批换（英文态不能看到那六句中文），并从第 1 句起重播。
       tips: this.tipsFor(lang),
       tipIdx: 0,
@@ -241,7 +237,7 @@ Page({
       // 分类比笔记晚到是常态：到了就得给已在屏上的行卡补上块内分类名，否则方块会一直空着。
       if (this.data.notes.length) {
         const notes = this.skin(this.data.notes)
-        this.setData({ notes, ...this.layout(notes) })
+        this.setData({ notes, ...this.arrange(notes) })
       }
     } catch (err) {
       console.error('加载分类失败', err)
@@ -250,27 +246,18 @@ Page({
 
   skin(notes) {
     const nameOf = {}
-    const posOf = {}
-    // 纸片吃哪一枚莫兰迪由"这个分类在分类表里排第几"决定（见 palette.paperSkinFor 那段注释），
-    // 所以这里要的是序号，不是 id。序号从 1 起（0 那一档留给未分类）。
-    this.data.categories.forEach((c, i) => { nameOf[c.id] = c.name; posOf[c.id] = i + 1 })
+    // 分类色仍按 V2 那套派生（详情窗里那几枚标签和要点序号吃 --cat-ink/--cat-dot/--cat-chip）。
+    // 纸片墙那一族莫兰迪（paperSkinFor）与「已分享」那一小块（SHARED_TAG）随 v19 一起撤了：
+    // 列表不再按分类铺底色，状态标记也不在列表上画——公不公开只在详情窗下沿那一句里说。
+    this.data.categories.forEach((c) => { nameOf[c.id] = c.name })
     const wallpaper = getApp().getWallpaper()
     notes.forEach((n) => {
-      // 分类色仍按 V2 那套派生（详情窗里那几枚标签和要点序号吃 --cat-ink/--cat-dot/--cat-chip）。
       const s = catSkinFor(n.category_id, wallpaper)
       // --cat-chip 只给详情窗里的那几枚标签当底色（分类色 12% 铺在纸白卡上）。
       n.catStyle = `--cat-dot:${s.dot};--cat-ink:${s.text};--cat-chip:${withAlpha(s.dot, 0.12)}`
-      // v18 纸片墙那一枚的底色：吃莫兰迪那一族（palette.PAPERS），不吃行卡那套饱和分类色——
-      // 一枚 150rpx 见方的纸片整块铺饱和色会抢掉标题。唯一出口在 palette，这里只递字符串。
-      const p = paperSkinFor(n.category_id == null ? 0 : posOf[n.category_id])
-      n.paperStyle = `background:${p.bg};color:${p.ink}`
-      // 「已分享」是一屏上唯一一种状态标记（站长 10-02：其他状态什么都不画）。
-      // 判据是服务端那两样新字段之一：此刻有没有一张开着的码——撤回之后当场就不画了。
-      n.shared = !!n.has_active_share
-      n.sharedStyle = `background:${SHARED_TAG.bg};color:${SHARED_TAG.ink}`
       // 昵称那一格只在"这篇是别人那儿转存来的"时出现（②）。判据用 source_type，
       // 不用"有没有昵称"——自己分享出去的那篇，服务端那份快照是自己的名字，
-      // 画在自己纸片上是噪声。
+      // 画在自己那一行上是噪声。
       n.is_import = n.source_type === 'share_import'
       n.who = n.is_import ? (n.share_author_name || '') : ''
       // 私密判据：分类名等于"私密"。跟后端 get_note、录入侧那道拦截是同一条口径（utils/privateGate.js）。
@@ -279,75 +266,34 @@ Page({
     return notes
   },
 
-  /* v18 的排布：把这一屏的笔记算成"月—行—枚"三层坐标（算法照效果图那份 lay()/geom() 抄，
-     数从上面那组常量来，不在 wxss 里再写一份）。
-     三条硬规矩是站长 10-02 第三轮定的：同一日期必在同一行、一行满 4 枚往下一行续、
-     不同日期一定另起一行。服务端那一份是"置顶优先 + 时间倒序"，同一天可能被别的日期
-     插在中间，所以先按天聚堆再排行。z 取整（1 + y/10 出 18.6 这种值会被整条丢掉，
-     丢掉之后只有第一行拿到 z-index，反倒盖住后面所有行——效果图那轮真踩过）。
-     ⚠ mode / pinned 只能由调用方当参数递进来：setData 不是同步生效的，同一个 setData 里
-     现读 this.data 算到的还是切之前那一档（模拟器实测：切「一行」后月档高仍是墙的 552、
-     点「只看置顶」屏上枚数仍是全部 4 篇）。 */
-  layout(notes, mode = this.data.listMode, pinned = this.data.pinnedOnly) {
-    const at = new Map()
-    notes.forEach((n, i) => at.set(n.id, i))
-    const src = pinned ? notes.filter((n) => n.is_pinned) : notes
-    const gs = []
-    // 月份也按"聚堆"切，不按连续成段切（和下面那一天一行的规矩是同一件事）：
-    // 服务端那份序是"置顶优先 + 时间倒序"，一篇九月的置顶会把十月那几篇插到它前面，
-    // 按连续成段切就会在时间轴上画出 26/09 → 26/10 → 又一块 26/09（实测截图就是这个）。
-    // 堆与堆的先后仍按各堆头一条在原序里的位置，所以置顶那篇还在它那一月最前面。
-    const byMonth = new Map()
-    src.forEach((n) => {
-      const mk = monthKey(n.created_at)
-      if (!byMonth.has(mk)) {
-        byMonth.set(mk, { mk, ym: n.ym_label, cards: [] })
-        gs.push(byMonth.get(mk))
+  /* v19 的两批屏：两枚 tab 读同一份 notes，所以序、筛选、翻页天然同源（他那句"排列的顺序
+     与笔记列表排序一致"就是这么成立的）。
+     · rows = 笔记列表那一屏。一行一条，左列只有日期（MM/DD，现网 formatShortDate）+ 一枚
+       小黄点，右列标题 / 摘要 /「显示更多」。摘要真放不下三行才画「显示更多」（效果图
+       那一屏第三条就只有两行、没有那枚蓝字，他认的就是这一版）；放不下多少由下面那对
+       常量估，标题与摘要本身都交给 CSS 截（标题一行省略号、摘要三行折完）。
+     · cells = 笔记卡片那一屏。只有本机台账里有图的那几篇才进；一格一篇，格里的 ‹ i/n ›
+       由 cur 指当前那一张，n 是这篇留过档的张数。
+     ⚠ 只能由调用方把 notes 当参数递进来：setData 不是同步生效的，同一个 setData 里现读
+     this.data 算到的还是上一批（v18 那轮实测过）。 */
+  arrange(notes) {
+    const log = cardLog.all()
+    const rows = notes.map((n, i) => {
+      const s = n.summary || ''
+      return {
+        i, id: n.id, title: n.title, tail: n.date_label, who: n.who, summary: s,
+        more: s.replace(/\s/g, '').length > SUM_LINES * SUM_CHARS,
       }
-      byMonth.get(mk).cards.push(n)
     })
-    let y = 0
-    const groups = gs.map((g) => {
-      // 先按天聚堆再排行：服务端那一份是"置顶优先 + 时间倒序"，同一天可能被别的日期
-      // 插在中间（实测 09-25 / 09-23 / 09-30 / 09-25 就是这么来的），而硬规矩是
-      // "同一日期必在同一行"。天与天的先后按各堆头一条在原序里的位置，堆内保持原序，
-      // 所以置顶那篇仍然排在它那一天那一堆的最前面。
-      const order = []
-      const byDay = new Map()
-      g.cards.forEach((n) => {
-        const dk = dayKey(n.created_at)
-        if (!byDay.has(dk)) { byDay.set(dk, []); order.push(dk) }
-        byDay.get(dk).push(n)
-      })
-      const cells = []
-      let row = 0
-      let col = PER
-      order.forEach((dk) => {
-        const list = byDay.get(dk)
-        list.forEach((n, k) => {
-          if (k === 0) { if (cells.length) row += 1; col = 0 }   // 不同日期必另起一行
-          else if (col >= PER) { row += 1; col = 0 }             // 同一日期满 4 枚往下一行续
-          const c = col
-          col += 1
-          const jy = row * YS + JOG[c % PER]
-          cells.push({
-            i: at.get(n.id), id: n.id,
-            // 纸片只有 122 宽，标题只留前 12 字；一行模式吃满横向字数，交 CSS 省略
-            title: n.title, ptitle: cut(n.title, 12),
-            tail: n.date_label,
-            who: n.who, shared: n.shared, sharedStyle: n.sharedStyle, paperStyle: n.paperStyle,
-            x: (c % PER) * XS, y: jy, r: TILT[c % PER], z: 1 + Math.round(jy / 10),
-          })
-        })
-      })
-      // 一个月那一档占多高：墙按行数算（行步 176 + 最后一枚自己的 200），
-      // 一行模式按条数算（一条 88）。天数少的月份不会留下一段空白行。
-      const h = mode === 'rows' ? g.cards.length * ROW_H : row * YS + NOTE_H
-      const top = y
-      y += h + GROUP_GAP
-      return { mk: g.mk, ym: g.ym, top, h, cards: cells }
+    const cells = []
+    notes.forEach((n, i) => {
+      const list = log[n.id]
+      if (!list || !list.length) return
+      cells.push({ i, id: n.id, title: n.title, cards: list, cur: 0 })
     })
-    return { groups, stageH: Math.max(y - GROUP_GAP + 24, 0) }
+    // 两批都现算：切到卡片那一枚时台账可能刚被详情窗里那次出图改过，
+    // 而这一屏每次数据动过都会重算，不需要额外的脏标记。
+    return { rows, cells }
   },
 
   async loadNotes(reset = false) {
@@ -371,9 +317,8 @@ Page({
       notes.forEach(n => {
         const key = SOURCE_TYPE_KEYS[n.source_type]
         n.source_type_label = key ? t(key, lang) : n.source_type
-        // 纸片角上那档是 MM/DD，时间轴那一列是 YY/MM（同一族极简写法，年份不重复第二遍）
+        // 左边那一列只有这一档：MM/DD（年份在这条上没用，跨年看详情窗那一行完整日期）
         n.date_label = formatShortDate(n.created_at)
-        n.ym_label = formatYearMonth(n.created_at)
       })
       this.skin(notes)
       
@@ -384,8 +329,8 @@ Page({
         loadingMore: false,
         hasMore: notes.length === limit,
         skip: skip + notes.length,
-        // 排布跟着数据走：追加一批、筛一个分类、切一种排布都重算一遍（一次 setData 交出去）
-        ...this.layout(allNotes),
+        // 两批屏跟着数据走：追加一批、筛一个分类、搜一个词都重算一遍（一次 setData 交出去）
+        ...this.arrange(allNotes),
       })
     } catch (err) {
       console.error('加载笔记失败', err)
@@ -438,27 +383,30 @@ Page({
     this.loadNotes(true)
   },
 
-  // 纸片墙 / 一行两枚切换 icon：这一档和壁纸、界面字体同一性质（本机偏好，不上服务器），
-  // 换设备回到默认那一档就行。切完只重算排布，不重新拉数据——数据没变，变的是摆法。
-  onToggleMode(e) {
-    const mode = e.currentTarget.dataset.mode
-    if (mode === this.data.listMode) return
-    wx.setStorageSync(LIST_MODE_KEY, mode)
-    this.setData({ listMode: mode, ...this.layout(this.data.notes, mode) })
+  // 列表区顶上那两枚 tab：只换视图，不重新拉数据——数据没变，变的是这一屏画哪一批。
+  // 也不落本机（他原话"默认第一个 tab"），所以这一枚点了只管这一次停留。
+  // 详情窗浮着的时候这两枚被盖得严严实实，点不到，也就不用在收窗上做文章。
+  onViewTap(e) {
+    const view = e.currentTarget.dataset.view
+    if (view === this.data.view) return
+    this.setData({ view })
   },
 
-  // 「置顶笔记」那一档钉在分类行的最左边，点它=只看置顶、再点=回正常显示。
-  // 不新增接口：is_pinned 本来就在每行上，服务端也早就是置顶优先排。
-  // 效果图上那句写的是"只看这两篇"，字典里改成不带数目的说法——置顶几篇是用户自己的事。
-  onTogglePinned() {
-    const next = !this.data.pinnedOnly
-    this.setData({ pinnedOnly: next, ...this.layout(this.data.notes, undefined, next) })
-    this._closeFloats()
+  // 卡片那一格第二行的 ‹ i/n ›：左右各一次点击换一张，走到头就点不动、不循环
+  // （与模板弹窗那十套同一做法）。只动这一格的 cur，两批屏都不重算。
+  // catchtap 挂在两枚箭头上：它们在这一格里，不该被当成"点了这一篇"而浮详情窗。
+  onCardStep(e) {
+    const { k, step } = e.currentTarget.dataset
+    const c = this.data.cells[k]
+    if (!c) return
+    const next = c.cur + Number(step)
+    if (next < 0 || next >= c.cards.length) return
+    this.setData({ [`cells[${k}].cur`]: next })
   },
 
-  // v18：两档排布都不就地展开——点一枚纸片 / 一行 = 直接浮详情窗。
-  // 纸片只有 150×200，塞不下概要；一行模式的月份档是定高摆的（一组 n×88），
-  // 就地展开会把下一组顶歪。摘要、要点、原文本来就在详情窗里。
+  // v19：两枚 tab 那两批屏都不就地展开——点一行 / 点一格 = 直接浮详情窗。
+  // 列表那一行只给三行摘要的位置，就地展开会把下面那条顶歪、也把「显示更多」那枚的出口废掉；
+  // 摘要全文、要点、原文本来就在详情窗里。卡片那一格同理：白垫是固定一档，塞不下正文。
   // 私密笔记进门前先验密码（会话里验过一次就不再问），密码不对既不开窗也不重载。
   async onRowTap(e) {
     const idx = e.currentTarget.dataset.idx
@@ -563,21 +511,8 @@ Page({
     })
   },
 
-  // 详情窗下沿 dock 的四个动作 + 那行公开状态。
-  // 置顶会把这条挪到队列第一条，所以重载一次整屏重排；窗里那篇自己改标记就行。
-  async onSheetPin() {
-    const note = this.data.detailNote
-    if (!note) return
-    try {
-      await api.pinNote(note.id, !note.is_pinned)
-      wx.showToast({ title: note.is_pinned ? t('unpin', this.data.lang) : t('pin', this.data.lang), icon: 'success' })
-      await this.loadNotes(true)
-      this.setData({ 'detailNote.is_pinned': !note.is_pinned })
-    } catch (err) {
-      wx.showToast({ title: t('operationFailed', this.data.lang), icon: 'none' })
-    }
-  },
-
+  // 详情窗下沿 dock 的三个动作 + 那行公开状态（v19：「置顶」那一枚随这一屏的置顶一起撤了，
+  // 服务端那个 is_pinned 与「置顶」这一档在 pages/detail 那页还在用，字典里三串都留着）。
   onSheetEdit() {
     const note = this.data.detailNote
     if (!note) return
@@ -597,6 +532,7 @@ Page({
         if (!res.confirm) return
         try {
           await api.deleteNote(note.id)
+          cardLog.dropNote(note.id)
           wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
           this.setData({ detailOpen: false })
           this.loadNotes(true)
@@ -748,6 +684,12 @@ Page({
       wx.canvasToTempFilePath({ canvas, fileType: 'png', success: (r) => resolve(r.tempFilePath), fail: reject }, this)
     })
     this.setData({ posterImagePath: tmpPath, posterBusy: false })
+    // 「生成过卡片」这本账就记在这里：画布上真落出一张成品图的那一刻（见 cardLog.js）。
+    // 不记在"存出去"那一步——微信那个图片面板在开发者工具里一定 fail，存相册那一条又吃
+    // 相册授权，两条口都不是"这张图有没有被做出来"。同一篇同一套模板只留最新那一张，
+    // 所以来回滑模板、开关码都不会把这一格越滚越长。
+    await cardLog.record(a.noteId, this.data.posterTpl, canvas, this)
+    this.setData(this.arrange(this.data.notes))
   },
 
   // v7 效果图里"左右滑换模板 / Swipe to change template"那条：横向滑过 60px 判定切换。

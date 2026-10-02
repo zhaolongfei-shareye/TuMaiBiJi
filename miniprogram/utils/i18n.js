@@ -85,15 +85,14 @@ const i18n = {
     // 英文那列仍是 Saved——他要的是中文侧换个更贴近微信语境的叫法，不是换口径。
     statNotes: '笔记',
     searchPh: '输入关键词',
-    // v18 这一屏新用的五串（站长 10-02 夜里定的口径）。
-    // 「分享」「种草」那两列跟着 v18 一起做减法撤了，两串字典键一并删净，不留没人用的值。
-    // pinnedOnly 没有照效果图那句「只看这两篇」写：置顶几篇是用户自己的事，
-    // 把数目写死在字典里，第二天就有三篇置顶的人对不上数。
-    pinFilter: '置顶笔记',
-    viewDesk: '纸片墙',
-    viewRows: '一行',
-    pinnedOnly: '只看置顶',
-    sharedTag: '已分享',
+    // v19 这一屏（站长 10-03 凌晨拍）：列表区顶上两枚 tab + X 式列表 + 卡片网格。
+    // 第二枚那两个字不新造，仍读上面那串 navShare（现网原串「笔记卡片」）。
+    // 跟着撤掉的五串一并删净：纸片墙 / 一行（那两枚切换 icon 没了）、
+    // 置顶笔记 / 只看置顶（置顶这一档撤了）、已分享（列表里那枚色块撤了，
+    // 公开状态只在详情窗下沿那句 sharedNow 里说）。
+    tabList: '笔记列表',
+    showMore: '显示更多',
+    noCards: '还没有生成过卡片',
     allCategories: '全部',
     addCategory: '添加分类',
     categoryName: '分类名称',
@@ -400,12 +399,10 @@ const i18n = {
     notesHeading: 'My notes',
     statNotes: 'Notes',
     searchPh: 'Enter keywords',
-    // 与中文侧一一对应的五串。英文都短，放得进那一格（中文四字、英文一格最多九字）。
-    pinFilter: 'Pinned',
-    viewDesk: 'Wall',
-    viewRows: 'Rows',
-    pinnedOnly: 'Pinned only',
-    sharedTag: 'Shared',
+    // 与中文侧一一对应的三串（v19）。第二枚 tab 那两个字仍读 navShare。
+    tabList: 'List',
+    showMore: 'Show more',
+    noCards: 'No cards yet',
     allCategories: 'All',
     addCategory: 'Add category',
     categoryName: 'Category name',

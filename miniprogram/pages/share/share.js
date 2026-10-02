@@ -22,6 +22,7 @@ function previewBox(w, h) {
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const poster = require('../../utils/poster.js')
+const cardLog = require('../../utils/cardLog.js')
 
 Page({
   data: {
@@ -146,6 +147,9 @@ Page({
         fileType: 'png',
         success: (r) => {
           this.setData({ imagePath: r.tempFilePath, generating: false })
+          // 与首页详情窗同一本台账、同一个时机：这张成品图真落出来了就记一格
+          // （同一篇同一套模板只留最新那一张，见 utils/cardLog.js）
+          cardLog.record(this._note.id, this.data.picked || profile.template, canvas, this)
           done()
         },
         fail,

@@ -79,11 +79,11 @@
   color: var(--text-secondary);
 }
 
-/* ---------- v18 图上那一行：一句 Tips + 三枚裸 icon（站长 10-02 第三轮） ----------
+/* ---------- 图上那一行：一句 Tips + 一枚搜索（v19，站长 10-03） ----------
    位置 top 400、左右各内缩 24、整行 88 高——下沿离列表区只留 14，这一档是效果图给的。
-   圆底和描边整块撤掉（v12 那枚 59 圆钮在这里没有后代了），只留中间图形，
-   三枚之间用一道 2×38 的竖线区隔。颜色一律走 currentColor，所以"选中那枚白一档、
-   笔画粗一档"只翻一个 color 就够，不在三枚图形上各抄一份色值。 */
+   v18 那三枚裸 icon 里，纸片墙与一行那两枚连同中间的竖线一起撤了（排布切换上移到
+   列表区顶上那两枚 tab），这一行只剩搜索一枚。颜色仍一律走 currentColor，
+   "有搜索词那枚亮一档、笔画粗一档"只翻一个 color 就够。 */
 .tools {
   position: absolute;
   left: 24rpx;
@@ -150,13 +150,6 @@
   color: var(--text-primary);
 }
 
-.vr {
-  flex: none;
-  width: 2rpx;
-  height: 38rpx;
-  background: rgba(35, 37, 44, 0.18);
-}
-
 /* 三枚图形都纯 CSS 画（这一页没有图标资源，也不为一枚钮引一张图）。
    笔画基准 3rpx、选中那枚抬到 4rpx——效果图用 stroke-width 2.1→3 说"这是当前那一档"，
    在 CSS 边框这一档对应不上小数，就取最接近的两档整数。 */
@@ -200,7 +193,7 @@
   height: 4rpx;
 }
 
-/* 搜索条里那一枚收到 30：条子本身 88 高、里面还要放输入框和「搜索笔记」，
+/* 搜索条里那一枚收到 30：条子本身只有 60 高、里面还要放输入框和「搜索笔记」，
    38 的图形会把字挤走。这一档就是现网原来那枚放大镜的尺寸，不是新数。 */
 .srch .glyph-search {
   width: 30rpx;
@@ -218,46 +211,6 @@
   height: 2rpx;
 }
 
-/* 纸片墙那一枚 = 四块小方。元素自己当盒子、里面四枚 .q 用 flex-wrap 排，
-   15+8+15=38 正好铺满，不引图标资源也不写第二份色。 */
-.glyph-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8rpx;
-  width: 38rpx;
-  height: 38rpx;
-  flex: none;
-}
-
-.glyph-grid .q {
-  box-sizing: border-box;
-  width: 15rpx;
-  height: 15rpx;
-  border: 3rpx solid currentColor;
-  border-radius: 4rpx;
-}
-
-.ic.on .glyph-grid .q {
-  border-width: 4rpx;
-}
-
-/* 一行模式那一枚 = 三根横线，用三层渐变画（不引图标资源、也不多加三个元素） */
-.glyph-lines {
-  width: 38rpx;
-  height: 38rpx;
-  flex: none;
-  background-image: linear-gradient(currentColor, currentColor),
-    linear-gradient(currentColor, currentColor),
-    linear-gradient(currentColor, currentColor);
-  background-size: 30rpx 3rpx;
-  background-position: 4rpx 9rpx, 4rpx 18rpx, 4rpx 27rpx;
-  background-repeat: no-repeat;
-}
-
-.ic.on .glyph-lines {
-  background-size: 30rpx 4rpx;
-}
-
 /* ---------- 搜索那一态：搜索那枚就地向左摊成输入框 ----------
    块面本身照效果图："图上就是一层 rgba(255,255,255,.18) 的白 + 一道 .36 的白描边"，
    因为压在照片上，派生出来的深色压在自己的照片上对比只有 1.0 出头，读不了。
@@ -268,11 +221,14 @@
   box-sizing: border-box;
   flex: 1;
   min-width: 0;
-  height: 88rpx;
+  /* 88 → 60（站长 10-03：搜索展开的输入框太大）。60 不是新数：分类那一枚 chip 实测算高
+     59（app.wxss 的 .chip：14 上下内缩 + 24 字），压到同一档，这一条就不会从分类行上
+     高出来一截。头部那一行仍是 88 高，条子竖向居中坐在里面。 */
+  height: 60rpx;
   display: flex;
   align-items: center;
   gap: 16rpx;
-  padding: 0 26rpx;
+  padding: 0 22rpx;
   border-radius: var(--r-pill);
   border: 2rpx solid transparent;
   background: var(--chrome-bg);
@@ -300,9 +256,10 @@
 /* 线上的文字动作：没有底色、没有圆角框，靠字重和位置表示可点 */
 .srch-go {
   flex: none;
-  font-size: var(--fs-title);
-  font-weight: 800;
-  letter-spacing: -0.5rpx;
+  /* 与下面分类那几枚同字号同字重（.chip 是 --fs-meta 24 / 600）：站长原话
+     "搜索笔记字变成与下方分类字体大小"。原来那档 31/800 比正文还大一级。 */
+  font-size: var(--fs-meta);
+  font-weight: 600;
   color: inherit;
 }
 
@@ -316,6 +273,74 @@
    横向内缩挂在这一层的 padding 上，不挂到 scroll-view 自己身上（挂在它身上时
    右侧要给滚动条留位，实测左右差 12rpx）。
    下内缩 150 是给底栏胶囊让位；分类行自己带上下留白，所以这里 top 归零。 */
+/* ---------- 区内顶上那两枚 tab（站长 10-03 拍的图2 上面那一版） ----------
+   小字：字号吃 --fs-meta 24，与下面分类同一档（他一贯的"tab 用文字、不用按钮壳"）。
+   已选那枚 = 90% 黑 + 一条 4 的墨色短杠，短杠正压在通栏横线那一行上（bottom -2 把
+   横线自己那 2 吃掉，两条线不叠成 6 的粗杠）；未选那枚同一字号只降到 42% 黑。 */
+.vtabs {
+  position: relative;
+  flex: none;
+  display: flex;
+  gap: 44rpx;
+  /* 左右各外扩 24 把 .sheet 的内缩吃掉、再自己补回 32：那条通栏横线要像效果图一样
+     一直走到整块圆角卡的边，而两枚字仍落在离边 32 那一条线上。 */
+  margin: 0 -24rpx;
+  padding: 0 56rpx;
+  border-bottom: 2rpx solid rgba(35, 37, 44, 0.12);
+}
+
+.vtab {
+  position: relative;
+  flex: none;
+  padding: 22rpx 0 14rpx;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  color: rgba(35, 37, 44, 0.42);
+}
+
+.vtab.on {
+  font-weight: 700;
+  color: rgba(35, 37, 44, 0.9);
+}
+
+.vtab.on::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2rpx;
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: rgba(35, 37, 44, 0.9);
+}
+
+.vtab:active {
+  opacity: 0.7;
+}
+
+/* 分类这一行紧跟在横线下面（v18 那条浅虚线换成上面那条通栏横线，负外缩进因此不要了；
+   置顶那一档、右边那句「只看置顶」随置顶一起撤）。 */
+.cats {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 20rpx 0 8rpx;
+}
+
+/* 一排放不下就左右滚那一节（v18 之前就有，这轮只把"只能从时间轴右侧起排"那道 126 撤了） */
+.cat-scroll {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.cat-chips {
+  display: inline-flex;
+  gap: 14rpx;
+}
+
 .sheet {
   position: relative;
   z-index: 2;
@@ -331,80 +356,6 @@
   overflow: hidden;
 }
 
-/* ---------- 分类那一行（③④⑤）：钉在列表区顶，不跟着月份滚 ----------
-   左右各外扩 24 把 .sheet 的内缩吃掉、再自己补回 24，为的是那条浅虚线通到整块卡的边。
-   align-items:center = 置顶那一档在这行里竖向居中；行高由最矮的那档（chip 59）决定。 */
-.cats {
-  position: relative;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin: 0 -24rpx;
-  padding: 26rpx 24rpx 18rpx;
-  border-bottom: 2rpx dashed rgba(35, 37, 44, 0.14);
-}
-
-/* 置顶这一档占住下面时间轴那一列的 126（④：chips 只能从这一列右侧起排），
-   画法照他一贯的口径：纯文字，选中那枚下面一条短黄杠，不做按钮壳。
-   杠挂在字上（.pinb-t 是那一截字自己的盒子），不挂在 126 那一整列上——
-   挂在列上就成了"杠在列正中、字在列左边"，看着像排歪了。 */
-.pinb {
-  flex: none;
-  width: 126rpx;
-  display: flex;
-  align-items: center;
-}
-
-.pinb-t {
-  position: relative;
-  font-size: var(--fs-tiny);
-  font-weight: 700;
-  letter-spacing: 1rpx;
-  color: var(--text-secondary);
-}
-
-.pinb.on .pinb-t {
-  color: var(--text-primary);
-}
-
-.pinb.on .pinb-t::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -10rpx;
-  width: 36rpx;
-  height: 5rpx;
-  margin-left: -18rpx;
-  border-radius: 3rpx;
-  background: var(--tip);
-}
-
-.pinb:active {
-  opacity: 0.7;
-}
-
-.cat-scroll {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.cat-chips {
-  display: inline-flex;
-  gap: 14rpx;
-}
-
-/* 处在"只看置顶"那句提示钉在这一行最右；它占的宽度从可滚的那一节里让出来，
-   所以永远不会和 chips 叠字。 */
-.pinn {
-  flex: none;
-  margin-left: auto;
-  font-size: var(--fs-micro);
-  letter-spacing: 1rpx;
-  color: var(--text-tertiary);
-}
-
 /* ---------- 列表这一区自己滚 ---------- */
 .list {
   flex: 1;
@@ -412,148 +363,9 @@
   width: 100%;
 }
 
-/* 左时间轴 + 右内容两层，共用同一套纵坐标：layout() 算出的 group.top 两边都读它，
-   所以月份那一档的小黄点永远和它右边那一片纸片齐平。
-   height 由 style 递进来（=stageH），下方 150 的内缩留给滚到底时最后一片纸片喘气——
-   这段内缩挂在排布层而不是 scroll-view 上，理由和 .sheet 那条一样。 */
-.bodyrow {
-  display: flex;
-  align-items: stretch;
-  padding: 22rpx 0 150rpx;
-}
-
-.rail {
-  position: relative;
-  box-sizing: border-box;
-  width: 126rpx;
-  flex: none;
-  padding-right: 20rpx;
-}
-
-/* 时间轴那根竖线：离列右边 12，那枚小黄点正好压在它身上（点 16、中心落在线上）。
-   线的上下都在线条自己的列里，不跟月份档一起缩。 */
-.rail-line {
-  position: absolute;
-  right: 12rpx;
-  top: 10rpx;
-  bottom: 0;
-  width: 2rpx;
-  background: rgba(35, 37, 44, 0.14);
-}
-
-.rm {
-  position: absolute;
-  right: 26rpx;
-}
-
-.rm-dot {
-  position: absolute;
-  right: -21rpx;
-  top: 6rpx;
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
-}
-
-/* 月份那档是纯数字加斜杠，吃全局那一支（YY/MM）；28 就是 --fs-body 那一档 */
-.rm-ym {
-  font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-weight: 100;
-  font-size: var(--fs-body);
-  line-height: 1;
-  white-space: nowrap;
-  color: var(--text-secondary);
-}
-
-.stage {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-
-/* 一个月那一档占的那一格：位置与高度都从 layout() 递进来，不在这里再算一遍 */
-.gp {
-  position: absolute;
-  left: 0;
-  right: 0;
-}
-
-/* ---------- 纸片墙那一枚（150×200） ----------
-   底色与字色成对从 palette.PAPERS 递进来（style 上那条 background/color），这里只写形状。
-   叠法：横向步 142 只压到右边那 14 的内白，标题一个字都不遮；纵向步 176 压掉底边 24，
-   所以下面那一块脚注整体抬到 bottom 之上，日期不会被上一枚盖住。
-   字号没照效果图那 18——18rpx 在 375pt 的屏上是 9pt，纸片上的标题是唯一主体，
-   不能下探到 --fs-micro 那一档，取现网最小的正文档 --fs-tiny（21），
-   标题因此从"前 14 字"收到"前 12 字"（一行只放得下 5 个汉字，两句半就到底了）。 */
-.note {
-  position: absolute;
-  box-sizing: border-box;
-  width: 150rpx;
-  height: 200rpx;
-  /* 下内缩 30 不是随手加的：纵向步 176 让下一行压掉本行底边 24，脚注要是坐在 16 那一档，
-     「已分享」和日期就会被下面那枚压掉半截（模拟器实测就是这个样子）。
-     30 = 24 那道叠压 + 6 的余量，和效果图把日期抬到 bottom:30 是同一个数。 */
-  padding: 16rpx 14rpx 30rpx;
-  border-radius: 22rpx;
-  box-shadow: 0 8rpx 22rpx rgba(8, 10, 14, 0.15);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  font-size: var(--fs-tiny);
-  line-height: 1.3;
-  font-weight: 600;
-}
-
-.note:active {
-  transform: scale(0.988);
-}
-
-.note-t {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-}
-
-/* 脚注两行贴在纸片下沿：转存来的那篇第一行是头像 ICON + 对方昵称，
-   第二行左边是「已分享」那一小块、右边永远是日期。没得主的那一行整个不渲染。 */
-.note-btm {
-  margin-top: auto;
-}
-
-.note-who {
-  display: flex;
-  align-items: center;
-  gap: 5rpx;
-  opacity: 0.75;
-}
-
-.note-name {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: var(--fs-micro);
-  font-weight: 400;
-}
-
-.note-foot {
-  display: flex;
-  align-items: center;
-  margin-top: 6rpx;
-}
-
-.note-date {
-  margin-left: auto;
-  font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-weight: 100;
-  font-size: var(--fs-micro);
-  line-height: 1;
-  opacity: 0.6;
-}
-
 /* 通用头像 ICON（②：不引真头像图，就是一枚"头上顶一圈"的描线人形）。
-   两笔都在 currentColor 上，所以它自动吃这张纸片自己的墨色；
+   两笔都在 currentColor 上，所以它自动吃它所在那一档自己的墨色（v19 挂在列表那一行的
+   昵称左边，跟着昵称那档的 55% 黑）；
    人形那一圈肩膀超出盒子的部分由父级 overflow:hidden 裁掉，不引图也不描边第二层。 */
 .glyph-who {
   position: relative;
@@ -589,52 +401,217 @@
   border-radius: 13rpx 13rpx 0 0;
 }
 
-/* ---------- 一行模式（①的"右侧只留一种状态"就在这两档里成立） ----------
-   两条之间那条横线撤了（他：下面的横线也取消），只靠 88 的行高分；
-   日期也不显示——月份在左边那一列，同一行重复一遍是噪声。 */
-.rows {
-  position: relative;
+/* 下面那 150 的内缩挂在排布层而不是 scroll-view 上（和 .grid2 同一个数）：
+   滚到底时最后一条不被底栏那条胶囊压住，理由同 .sheet 那条。 */
+.xlist {
+  padding-bottom: 150rpx;
 }
 
-.rw {
+/* ---------- 笔记列表那一枚（X 那种排） ----------
+   左列只有日期 + 一枚小黄点，整组竖向居中于这一条（他原话"时间在左边居中对齐"），
+   上面那根竖线和月份档一起撤了。行高不固定：摘要两行还是三行由内容决定，
+   两条之间不画横线（v18 撤了那条就一直没回来）。 */
+.xrow {
   display: flex;
   align-items: center;
-  gap: 10rpx;
-  height: 88rpx;
+  gap: 20rpx;
+  /* 横向不写内缩：.sheet 那 24 就是效果图那 24，这里再补一份整行就往右缩 24 */
+  padding: 24rpx 0 20rpx;
 }
 
-.rw:active {
+.xrow:active {
   opacity: 0.66;
 }
 
-/* 标题吃满横向字数（约 17 个汉字），超长就省略号 */
-.rw-t {
+.xd {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9rpx;
+  width: 88rpx;
+  flex: none;
+}
+
+.xd-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  flex: none;
+}
+
+.xd-d {
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-weight: 100;
+  font-size: var(--fs-meta);
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(35, 37, 44, 0.55);
+}
+
+.xm {
   flex: 1;
   min-width: 0;
+}
+
+/* 标题 90% 黑、一行：放不下就省略号（这一列 546 宽、字 28 → 约 19 个汉字） */
+.x-t {
+  display: block;
   font-size: var(--fs-body);
-  font-weight: 400;
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(35, 37, 44, 0.9);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 一行模式里那截昵称跟纸片里用的是同一套节点（同一个"这篇打哪儿来"），
-   差别只在行是横的：它不参与抢宽，昵称太长就自己截断，剩下的宽度归标题。 */
-.rw .note-who {
-  flex: none;
-  max-width: 200rpx;
+/* 摘要 70% 黑、24 字（= 头部 Tips 那一档），最多三行 */
+.x-s {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin-top: 8rpx;
+  font-size: var(--fs-meta);
+  line-height: 1.62;
+  color: rgba(35, 37, 44, 0.7);
 }
 
-/* 「已分享」那一小块：色 + 白小字，底色与字色成对从 palette.SHARED_TAG 递进来。
-   它是这一屏唯一的状态标记，所以不描边、不带图标，只靠一块面跳出来。 */
-.shared-tag {
+.x-m {
+  display: flex;
+  align-items: baseline;
+  gap: 18rpx;
+  margin-top: 10rpx;
+}
+
+.x-more {
   flex: none;
-  font-size: var(--fs-micro);
-  font-weight: 700;
-  line-height: 1;
-  padding: 4rpx 8rpx;
-  border-radius: 8rpx;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: #3F52D6;
+}
+
+/* 转存那篇的昵称 + 通用头像钉在这一行右端（人形仍吃 .glyph-who，两笔都在 currentColor 上）。
+   挂在标题那一行会把标题能吃掉的字数先减掉一截，所以跟在「显示更多」同一行。 */
+.x-who {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  min-width: 0;
+  margin-left: auto;
+  color: rgba(35, 37, 44, 0.55);
+}
+
+.x-name {
+  min-width: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--fs-micro);
+  font-weight: 400;
+}
+
+/* ---------- 笔记卡片那一枚：两列等宽 + 白垫居中 ----------
+   列宽 = 区内净宽 702（.sheet 左右各内缩 24）− 一格 340 − 间距 22 = 另一格 340，
+   正好铺满、不留半个。白垫固定一档（340×474 = 效果图量出来的最竖那一套 0.717），
+   图按 aspectFit 落在正中：比它扁的那几套上下各留一道白，排列就归一了。
+   白垫给 #fff 而不是页面那张纸白：它要垫的是十套模板各不相同的底色，
+   纯白 + 一道淡影才读得出"这是一张图躺在这一格里"。 */
+.grid2 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22rpx;
+  padding: 22rpx 0 150rpx;
+}
+
+.gc {
+  flex: none;
+  width: 340rpx;
+}
+
+.pad {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 340rpx;
+  height: 474rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  box-shadow: 0 8rpx 22rpx rgba(8, 10, 14, 0.10);
+  overflow: hidden;
+}
+
+.pad:active {
+  opacity: 0.9;
+}
+
+/* 图贴着白垫各留 14 的边，不顶到圆角上 */
+.pad-img {
+  width: 312rpx;
+  height: 446rpx;
+}
+
+.g-cap {
+  display: block;
+  margin-top: 12rpx;
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: rgba(35, 37, 44, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.g-pg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  margin-top: 6rpx;
+}
+
+.g-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  flex: none;
+  color: rgba(35, 37, 44, 0.62);
+}
+
+.g-step:active {
+  opacity: 0.55;
+}
+
+/* 两枚箭头各画一笔：一个直角框转 45° / -135°，不引图标资源也不写第二份色 */
+.chev {
+  width: 14rpx;
+  height: 14rpx;
+  box-sizing: border-box;
+  border-left: 3rpx solid currentColor;
+  border-bottom: 3rpx solid currentColor;
+  border-radius: 2rpx;
+}
+
+.chev.l {
+  transform: rotate(45deg);
+}
+
+.chev.r {
+  transform: rotate(-135deg);
+}
+
+/* 纯数字加斜杠，吃全局那一支（与右上角那格、日期那一列同一写法） */
+.g-n {
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-weight: 100;
+  font-size: 26rpx;
+  line-height: 1;
+  letter-spacing: 1rpx;
+  color: rgba(35, 37, 44, 0.72);
 }
 
 .loading, .empty, .loading-more {
@@ -714,7 +691,8 @@
   font-weight: 800;
   letter-spacing: -0.9rpx;
   line-height: 1.3;
-  color: #23252C;
+  /* v19：与列表那一屏同一档墨色（标题 90% 黑）。窗口是纸白底，仍不吃 --text-primary */
+  color: rgba(35, 37, 44, 0.9);
 }
 
 .ds-tags {
@@ -745,7 +723,8 @@
   margin-top: 12rpx;
   font-size: var(--fs-body);
   line-height: 1.7;
-  color: #3a3e46;
+  /* 正文段落 = 摘要那一档的 70% 黑（原来是 #3a3e46 一支单独的灰） */
+  color: rgba(35, 37, 44, 0.7);
 }
 
 .ds-pt {
@@ -783,7 +762,7 @@
 .ds-pt-x {
   font-size: var(--fs-body);
   line-height: 1.55;
-  color: #23252C;
+  color: rgba(35, 37, 44, 0.9);
 }
 
 .ds-link {
@@ -1129,10 +1108,6 @@
 
 .container.has-bg .ic.on {
   color: #ffffff;
-}
-
-.container.has-bg .vr {
-  background: rgba(255, 255, 255, 0.28);
 }
 
 /* 搜索条在图上换成效果图那一层半透明白 + 一道白描边（派生深色压在自己的照片上读不了），

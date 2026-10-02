@@ -243,10 +243,12 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('每枚字色跟着底色配对', fg[1] !== fg[2] || bg[1] === bg[2], `${fg[1]} vs ${fg[2]}`)
     ck('「全部」那枚仍吃这一态自己的底（没被误上色）', !!bg[0], bg[0])
 
-    /* ---------- 造一条归了类的笔记，验它那张纸的颜色跟着分类走 ---------- */
-    // v18 起行前那枚圆点撤了：分类身份改由**纸片底色**承担（palette.paperSkinFor 按
-    // 分类在列表里的序号发色，未分类固定第一枚炭灰蓝）。所以这条判据从"点色"翻成"纸色"，
-    // 钉的还是同一件事——归了类的笔记在屏上读得出它归了哪一类。
+    /* ---------- 造一条归了类的笔记，验"归了哪一类"在屏上读得出来 ---------- */
+    // v18 那一版这一格量的是**纸片底色跟着分类走**（paperSkinFor 按分类序号发色）。
+    // v19 撤了纸片墙：列表那一行只剩日期 + 一枚点 + 标题 + 摘要，行自己既无底色也不上色，
+    // 左边那枚点退成全局那支 TIP_DOT（与 Tips 前面那一枚同一个色）。
+    // 分类身份这一轮由两件事说：①分类行那一枚章（上面一节已量）；②详情窗里 .ds-tag
+    // 吃的那一双（catSkinFor 现算，经 catStyle 递进来）。所以这里改成钉这三件事。
     const pal = require('../../miniprogram/utils/palette.js')
     const made = await mp.evaluate(async (api) => {
       const token = getApp().globalData.token
@@ -266,26 +268,37 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     const notes = (await list.data()).notes || []
     const rowOf = notes.findIndex((n) => n.id === tempNoteId)
     ck('它出现在列表里', rowOf >= 0, `row=${rowOf}`)
-    const paperBg = async (want) => {
-      for (const e of await list.$$('.note')) {
+    const bgOf = async (want) => {
+      for (const e of await list.$$('.xrow')) {
         if (Number(await e.attribute('data-idx')) === want) return await e.style('background-color')
       }
       return ''
     }
-    const cats = (await list.data()).categories || []
-    const pos = cats.findIndex((c) => c.id === 1) + 1
+    const dotOf = async (want) => {
+      for (const e of await list.$$('.xrow')) {
+        if (Number(await e.attribute('data-idx')) !== want) continue
+        const d = await e.$('.xd-dot')
+        return d ? await d.style('background-color') : ''
+      }
+      return ''
+    }
     const asRgb = (h) => `rgb(${[1, 2, 3].map((i) => parseInt(h.slice(1 + (i - 1) * 2, 1 + i * 2), 16)).join(', ')})`
-    const wantCat = asRgb(pal.paperSkinFor(pos).bg)
-    const wantPlain = asRgb(pal.paperSkinFor(0).bg)
     const plainRow = notes.findIndex((n, i) => n.category_id == null && i !== rowOf)
-    const dotNew = await paperBg(rowOf)
-    const dotPlain = plainRow >= 0 ? await paperBg(plainRow) : ''
-    ck(`归了类的纸片底色就是 palette.paperSkinFor(${pos}) 那一枚（分类身份在纸上，不在点上）`,
-      dotNew === wantCat, `实读=${dotNew} 期望=${wantCat}`)
-    ck('未分类那枚仍是第一枚炭灰蓝（序号 0，不跟着分类表挪）',
-      plainRow < 0 || (dotPlain === wantPlain && dotNew !== dotPlain),
-      `未分类=${dotPlain || '（屏上没有未分类的纸片，跳过）'} 归类=${dotNew}`)
-    await mp.screenshot({ path: path.join(OUT, '02-分类章与纸片色.png') })
+    const dotNew = await dotOf(rowOf)
+    const dotPlain = plainRow >= 0 ? await dotOf(plainRow) : ''
+    ck('归类那一行自己不垫底色（列表不再按分类铺色，屏上没有第二层框）',
+      /rgba\(0, 0, 0, 0\)|transparent/.test(await bgOf(rowOf)), await bgOf(rowOf))
+    ck('左边那枚点就是全局那支 TIP_DOT，归类与未分类同一支（分类身份不在点上）',
+      dotNew === asRgb(pal.TIP_DOT) && (plainRow < 0 || (dotPlain === dotNew && !!dotPlain)),
+      `归类=${dotNew} 未分类=${dotPlain || '（屏上没有未分类的行，只量归类那一行）'}`)
+    // catStyle 是详情窗里那几枚标签的取色口：这一串错一个字符，窗里的字色就跟分类脱钩。
+    const wallpaper = await mp.evaluate(() => getApp().getWallpaper())
+    const sk = pal.catSkinFor(1, wallpaper)
+    const wantStyle = `--cat-dot:${sk.dot};--cat-ink:${sk.text};--cat-chip:${pal.withAlpha(sk.dot, 0.12)}`
+    const gotStyle = ((notes[rowOf] || {}).catStyle) || ''
+    ck('归类那一行递进来的就是 catSkinFor(1, 现读壁纸) 那一双（窗里的标签靠它上色）',
+      gotStyle === wantStyle, `壁纸=${wallpaper}\n实读=${gotStyle}\n期望=${wantStyle}`)
+    await mp.screenshot({ path: path.join(OUT, '02-分类章与行前那枚点.png') })
 
     /* ---------- 详情页：四个动作全在上方 ---------- */
     await mp.navigateTo(`/pages/detail/detail?id=${tempNoteId}`)

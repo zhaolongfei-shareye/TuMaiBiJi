@@ -6,6 +6,7 @@
 // 第 1、2、4、5 节守的东西一条没动：底栏与搜索那块派生色、分类两档压卡底的门槛、
 // 圆角字阶与底栏三枚图形。
 const fs = require('fs')
+const io2 = require('fs')
 const path = require('path')
 
 const ROOT = path.resolve(__dirname, '../..')
@@ -27,6 +28,7 @@ const barWxssRaw = fs.readFileSync(P('custom-tab-bar/index.wxss'), 'utf8')
 // 注释里引用旧值当线索（那七处 rgba(255,255,255,.42)），扫硬编码之前先剥掉注释
 const barWxss = barWxssRaw.replace(/\/\*[\s\S]*?\*\//g, '')
 const p = require(P('utils/palette.js'))
+const ZH = require(P('utils/i18n.js')).texts('zh')
 
 // CSS 声明扫的是"这一个类自己那一段"，别的类里写了什么不算
 const rule = (src, sel) => {
@@ -90,96 +92,161 @@ ok('搜索条不再是一支固定的蓝（toneStyle 在这个页面已经不用
 ok('占位符给带 alpha 的色，不靠 opacity（textarea/input 的 placeholder 不吃 opacity）',
   !/\.srch-ph\s*\{[^}]*opacity/.test(idxWxss) && /--chrome-idle/.test(rule(idxWxss, 'srch-ph')))
 
-// ---------- 3. v18 这一屏：左时间轴 + 右纸片墙 / 一行 ----------
-// 数从 index.js 那组常量来，也从 wxss 来——两边对不上就是"效果图与代码不同口径"那一类坑。
+// ---------- 3. v19 这一屏：区内两枚 tab + X 式列表 + 卡片两列 ----------
+// 10-03 凌晨这一轮把 v18 那两种排布整个换掉了：纸片墙、一行、月份时间轴、置顶、
+// 「已分享」色块一起撤，列表区顶上改两枚 tab。所以这一节上一版钉的那些判据**前提已不存在**，
+// 留着就是自己钉死自己的假红——按新口径重写，并把撤掉的那几样反向钉住（回来一次红一次）。
+const vtRule = rule(idxWxss, 'vtabs'), vtabRule = rule(idxWxss, 'vtab')
+const xrowRule = rule(idxWxss, 'xrow'), xdRule = rule(idxWxss, 'xd')
+const xT = rule(idxWxss, 'x-t'), xS = rule(idxWxss, 'x-s'), xMore = rule(idxWxss, 'x-more')
+const padRule = rule(idxWxss, 'pad'), imgRule = rule(idxWxss, 'pad-img'), gcRule = rule(idxWxss, 'gc')
+const gridRule = rule(idxWxss, 'grid2'), catsRule = rule(idxWxss, 'cats')
+const srchRule = rule(idxWxss, 'srch'), goRule = rule(idxWxss, 'srch-go')
+const chipRule = appWxssRule('chip')
 const num = (src, name) => Number(new RegExp(`const ${name} = (\\d+)`).exec(src)[1])
-const PER = num(idxJs, 'PER'), XS = num(idxJs, 'XS'), YS = num(idxJs, 'YS')
-const NOTE_H = num(idxJs, 'NOTE_H'), ROW_H = num(idxJs, 'ROW_H'), GAP = num(idxJs, 'GROUP_GAP')
-const noteRule = rule(idxWxss, 'note'), rwRule = rule(idxWxss, 'rw')
-const railRule = rule(idxWxss, 'rail'), catsRule = rule(idxWxss, 'cats')
-const pinbRule = rule(idxWxss, 'pinb')
-ok('一枚纸片 150×200、圆角 22、内缩 16/14，JS 常量与样式逐字同一份数',
-  /width: 150rpx/.test(noteRule) && /height: 200rpx/.test(noteRule) && NOTE_H === 200
-  && /border-radius: 22rpx/.test(noteRule) && /padding: 16rpx 14rpx/.test(noteRule))
-ok('横向步 142 只压右边那 14 的内白（一枚都不遮另一枚的字）、纵向步 176 压掉底边 24',
-  XS === 142 && YS === 176 && XS + 8 === 150 && YS + 24 === NOTE_H)
-ok('排布三档都在 8 的模数上（月档空 56、一行 88），不是各拍一个数',
-  GAP % 8 === 0 && ROW_H % 8 === 0 && GAP === 56 && ROW_H === 88)
-// z 取整这条是效果图那轮真踩过的坑：1 + y/10 出 18.6 会被整条丢掉，
-// 丢掉之后只有第一行拿到 z-index，反倒盖住后面所有行。
-ok('z-index 取整（小数会被整条丢掉，届第一行盖住后面所有行）',
-  /z: 1 \+ Math\.round\(jy \/ 10\)/.test(idxJs))
-// 这条原来钉的是 `if (dk !== prev || col >= PER)` 那一支单趟扫法——**它本身就是个 bug**：
-// 服务端回来的顺序是「置顶在前、其余按日期倒序」，同一个日期的两篇会被置顶那篇插开，
-// 扫到第三篇时 dk 变了就另起一行，于是同一天摊在两行上（真跑那把自己撞出来的，
-// 见 验-列表v18-真跑.js「同一日期的纸片必在同一行」）。现在先按日期归堆再排行，
-// 所以这里钉的是新那两支，并把旧写法反向钉住——它回来一次，同一天就再摊一次。
-ok('同一日期必同一行（先按日期归堆，不按前后相邻判）、一行满 4 枚往下一行续、不同日期必另起一行',
-  /const byDay = new Map\(\)/.test(idxJs) && /if \(k === 0\) \{ if \(cells\.length\) row \+= 1; col = 0 \}/.test(idxJs)
-  && /else if \(col >= PER\) \{ row \+= 1; col = 0 \}/.test(idxJs) && PER === 4
-  && !/if \(dk !== prev \|\| col >= PER\)/.test(idxJs))
-// 同一族坑在"月"这一层又踩了一次（10-03 那把真跑撞的）：月份原来按"前后相邻成段"切，
-// 库里四篇全在九月时看不出差别，一旦造出两篇 10/03 的笔记，两篇置顶的九月笔记就会把
-// 十月那两篇夹在中间，时间轴上画出 26/09 → 26/10 → 又一块 26/09。改成与日期同一族写法。
-ok('一个月在时间轴上只有一块（月份那一层也按聚堆切，不按前后相邻成段切）',
-  /const byMonth = new Map\(\)/.test(idxJs) && /if \(!byMonth\.has\(mk\)\) \{/.test(idxJs)
-  && !/if \(!gs\.length \|\| gs\[gs\.length - 1\]\.mk !== mk\)/.test(idxJs))
-// ③④：置顶这一档和 chips 都在 scroll-view 之外（不跟着月份滚），
-// 而且 chips 的可滚区间从时间轴右侧才起排。
-ok('分类那一整行在滚动区之外（③：置顶永远看得见，不跟月份滚）',
-  idxWxss.indexOf('.cats') < idxWxss.indexOf('.list')
-  && /<view class="cats">/.test(idxWxml) && idxWxml.indexOf('class="cats"') < idxWxml.indexOf('class="list"'))
-ok('置顶那一档宽 126 = 时间轴那一列（④：chips 只能从这一列右侧起排）',
-  /width: 126rpx/.test(pinbRule) && /width: 126rpx/.test(railRule))
-ok('分类行与笔记区之间那条浅虚线（⑤）',
-  /border-bottom: 2rpx dashed rgba\(35, 37, 44, 0\.14\)/.test(catsRule))
-ok('一行模式两条之间那条横线撤了（只靠 88 行高分）',
-  !/border/.test(rwRule) && /height: 88rpx/.test(rwRule))
-// ②那处改口讲的是"这篇打哪儿来"，跟排布无关：昵称那一截两档都得有，
-// 但在行里不许抢标题的宽（标题才是 flex:1 + min-width:0 那一个，长昵称自己截断）。
-ok('一行模式也挂昵称，且那一截不抢标题的宽',
-  /class="rows"[\s\S]*?class="note-who" wx:if="\{\{c\.who\}\}"/.test(idxWxml)
-  && /flex: none/.test(rule(idxWxss, 'rw .note-who')))
-// ①：一屏上只剩一种状态标记。
-ok('唯一的状态标记就是「已分享」那一小块（三枚属性小 ICON 全撤）',
-  (idxWxml.match(/shared-tag/g) || []).length === 2 && !/glyph-(star|plane|sprout)/.test(idxWxss + idxWxml))
-ok('置顶不再在每一条上挂标记（这件事由分类行左边那一档说）',
-  !/class="pin"/.test(idxWxml) && /t\.pinFilter/.test(idxWxml))
-// ②：昵称只在转存那篇出现，头像用通用 ICON 而不是真图。
-ok('昵称只在"这篇是转存来的"时递进来（自己分享出去的那篇不画自己的名字）',
+const SUM_LINES = num(idxJs, 'SUM_LINES'), SUM_CHARS = num(idxJs, 'SUM_CHARS')
+const strip = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+const CODE_WXML = strip(idxWxml), CODE_JS = strip(idxJs), CODE_WXSS = strip(idxWxss)
+const dead = (re) => !re.test(CODE_WXSS) && !re.test(CODE_WXML) && !re.test(CODE_JS)
+
+// ①两枚 tab：默认第一枚、小字、已选深色未选浅色、下面一条通栏横线
+ok('两枚 tab 在滚动区之外，且默认那枚是「笔记列表」（view 初值 list）',
+  idxWxml.indexOf('class="vtabs"') < idxWxml.indexOf('class="cats"')
+  && idxWxml.indexOf('class="cats"') < idxWxml.indexOf('class="list"')
+  && /view: 'list'/.test(idxJs))
+ok('第一枚是新串 tabList、第二枚读现网 navShare（同一个词不在字典里抄第二份）',
+  /\{\{t\.tabList\}\}/.test(idxWxml) && /\{\{t\.navShare\}\}/.test(idxWxml)
+  && ZH.tabList === '笔记列表' && ZH.navShare === '笔记卡片', `${ZH.tabList} / ${ZH.navShare}`)
+ok('两枚都小字：tab 字号 = 分类那枚 chip 的字号（都是 --fs-meta）',
+  /font-size: var\(--fs-meta\)/.test(vtabRule) && /font-size: var\(--fs-meta\)/.test(chipRule))
+ok('已选那枚只靠颜色+字重+一条短杠跳出来，未选同字号浅色（不做按钮壳）',
+  /color: rgba\(35, 37, 44, 0\.42\)/.test(vtabRule)
+  && /color: rgba\(35, 37, 44, 0\.9\)/.test(rule(idxWxss, 'vtab\.on'))
+  && /font-weight: 700/.test(rule(idxWxss, 'vtab\.on'))
+  && /\.vtab\.on::after[\s\S]*?height: 4rpx/.test(idxWxss) && !/background/.test(vtabRule))
+ok('通栏横线挂在 .vtabs 上（2rpx 实线，替掉 v18 那条挂在分类行下面的浅虚线）',
+  /border-bottom: 2rpx solid rgba\(35, 37, 44, 0\.12\)/.test(vtRule) && !/dashed/.test(catsRule))
+ok('横线走到整块卡的边：.vtabs 负外扩把 .sheet 那 24 吃掉再补 32',
+  /margin: 0 -24rpx/.test(vtRule) && /padding: 0 56rpx/.test(vtRule))
+// ④置顶整个撤：分类行左边那一档、右边那句提示、详情窗那枚按钮、JS 那三个 handler
+ok('置顶这一屏整个撤净（档、提示句、窗里那枚按钮、handler 都不在）',
+  dead(/pinb|pinn|pinFilter|pinnedOnly|onTogglePinned|onSheetPin/) && !/is_pinned \? t\.unpin/.test(idxWxml))
+ok('字典里那五串跟着撤净，不留没人用的值（pin/unpin/pinned 另两页还在用，留着）',
+  !/pinFilter|viewDesk|viewRows|pinnedOnly|sharedTag/.test(io2.readFileSync(P('utils/i18n.js'), 'utf8')))
+// ④时间轴撤净：竖线、月份档、月/日两层聚堆、stageH 那一整套坐标
+ok('时间轴那一整层没了（竖线、月份档、月—行—枚三层坐标一起撤）',
+  dead(/rail|rm-ym|bodyrow|class="stage"|class="gp"/) && !/byMonth|byDay|monthKey|dayKey|stageH/.test(idxJs))
+ok('一行只剩日期与一枚圆点：那一列 88 宽、竖向居中、行高由内容定（不写死 88）',
+  /width: 88rpx/.test(xdRule) && /align-items: center/.test(xdRule)
+  && /justify-content: center/.test(xdRule) && !/height: 88rpx/.test(xrowRule)
+  && !/border/.test(xrowRule))
+ok('横向内缩只挂一次：行、格、两列区都不再补一份 24（补了整屏往右缩 24）',
+  !/padding: [\d.]+rpx 24rpx/.test(xrowRule + gcRule + gridRule))
+// ②列表那三档：标题 90% 黑一行、摘要 70% 黑三行、末尾蓝字
+ok('标题 90% 黑、一行、放不下就省略号',
+  /color: rgba\(35, 37, 44, 0\.9\)/.test(xT) && /white-space: nowrap/.test(xT)
+  && /text-overflow: ellipsis/.test(xT))
+ok('摘要 70% 黑、字号与 Tips 同档（--fs-meta）、最多三行',
+  /color: rgba\(35, 37, 44, 0\.7\)/.test(xS) && /font-size: var\(--fs-meta\)/.test(xS)
+  && /-webkit-line-clamp: 3/.test(xS))
+ok('「显示更多」那支蓝就是 palette 里那支（TONES[1]，与来源链接同一支，不新造蓝）',
+  xMore.toUpperCase().includes(p.TONES[1].bg.toUpperCase()) && /font-size: var\(--fs-meta\)/.test(xMore),
+  xMore.trim())
+ok('「显示更多」画不画的判据与代码同源：三行×每行字数，且从源码现读这两个常量',
+  /more: s\.replace\(\/\\s\/g, ''\)\.length > SUM_LINES \* SUM_CHARS/.test(idxJs)
+  && SUM_LINES === 3 && SUM_CHARS === 24, `${SUM_LINES}×${SUM_CHARS}`)
+ok('「显示更多」不另挂 handler：点整行浮详情窗（一个功能只留一个入口）',
+  !/onMoreTap/.test(idxJs + idxWxml) && /bindtap="onRowTap"/.test(idxWxml))
+ok('昵称那一截仍只在转存那篇出现，且挂在最后一行右端不抢标题的宽',
   /n\.is_import = n\.source_type === 'share_import'/.test(idxJs)
-  && /n\.who = n\.is_import \? \(n\.share_author_name \|\| ''\) : ''/.test(idxJs))
+  && /margin-left: auto/.test(rule(idxWxss, 'x-who')) && !/class="x-t"[\s\S]{0,80}x-who/.test(idxWxml))
 ok('头像是一枚 CSS 画的通用 ICON，这一页不引头像图',
   /\.glyph-who::before/.test(idxWxss) && /\.glyph-who::after/.test(idxWxss)
   && !/\.glyph-who\s*\{[^}]*background-image/.test(idxWxss))
-// 日期两档都从 utils/date.js 出，不在页面里抄第二份补零逻辑。
-ok('日期两档（纸片 MM/DD、时间轴 YY/MM）都走 utils/date.js',
-  /formatShortDate\(n\.created_at\)/.test(idxJs) && /formatYearMonth\(n\.created_at\)/.test(idxJs)
-  && !/padStart/.test(idxJs))
-// 两档排布都不就地展开：摘要在详情窗里，月分组是定高摆的。
-ok('列表里没有"就地展开"这一态（点一枚=开详情窗，两档同一交互）',
-  !/openIdx/.test(idxJs + idxWxml) && /this\._openDetail\(idx\)/.test(idxJs))
-ok('排布档是本机偏好，键名 listMode，不混进任何请求',
-  /const LIST_MODE_KEY = 'listMode'/.test(idxJs) && /wx\.setStorageSync\(LIST_MODE_KEY, mode\)/.test(idxJs)
-  && !/listMode/.test(require(P('utils/api.js'))))
-ok('莫兰迪那四枚只在 palette 活一份，没抄进样式表',
+ok('日期仍只走 utils/date.js 那一档 MM/DD，页面里不抄第二份补零',
+  /formatShortDate\(n\.created_at\)/.test(idxJs) && !/padStart/.test(idxJs)
+  && !/formatYearMonth/.test(idxJs))
+// ②bis 卡片那一枚：两列、白垫固定一档、图居中、第二行页码、只画生成过的
+ok('两列等宽铺满：340 + 22 + 340 = 区内净宽 702（.sheet 左右各内缩 24）',
+  /width: 340rpx/.test(gcRule) && /gap: 22rpx/.test(gridRule) && 340 * 2 + 22 === 702)
+ok('白垫固定一档 340×474、图 312×446 落在正中（比它扁的那几套上下各一道白）',
+  /width: 340rpx/.test(padRule) && /height: 474rpx/.test(padRule)
+  && /width: 312rpx/.test(imgRule) && /height: 446rpx/.test(imgRule)
+  && /align-items: center/.test(padRule) && /justify-content: center/.test(padRule))
+ok('图用 aspectFit（按宽贴合、不裁不拉），白垫 overflow:hidden 兜住圆角',
+  /mode="aspectFit"/.test(idxWxml) && /overflow: hidden/.test(padRule))
+ok('第二行 ‹ i/n › 只在两张以上才画，左右两枚箭头都是 catchtap（不冒泡成开详情窗）',
+  /g-pg" wx:if="\{\{item\.cards\.length > 1\}\}/.test(idxWxml)
+  && (idxWxml.match(/class="g-step" catchtap="onCardStep"/g) || []).length === 2)
+ok('页码那枚数字吃全局那支 WtsjMind（与右上角那格、日期那一列同一写法）',
+  /WtsjMind/.test(rule(idxWxss, 'g-n')) && /font-weight: 100/.test(rule(idxWxss, 'g-n')))
+ok('卡片那一格只从同一份 notes 里挑（顺序与列表天然一致，不另拉一次数据）',
+  /const cells = \[\][\s\S]*notes\.forEach\(\(n, i\)/.test(idxJs) && !/getCards|cardList/.test(idxJs))
+ok('空台账那一格画的是空态那一句（不是白板）',
+  /class="empty"[\s\S]*?\{\{t\.noCards\}\}/.test(idxWxml) && ZH.noCards === '还没有生成过卡片')
+// ③搜索条：压高度 + 那两个字降到分类那一档
+ok('搜索条压到 60（分类那枚 chip 实测算高 59，同一档）',
+  /height: 60rpx/.test(srchRule) && !/height: 88rpx/.test(srchRule))
+ok('「搜索笔记」与分类同字号同字重（原来 31/800 比正文还大一级）',
+  /font-size: var\(--fs-meta\)/.test(goRule) && /font-weight: 600/.test(goRule)
+  && !/fs-title/.test(goRule))
+ok('输入里的字没动（仍 --fs-body，这轮只压条子和那两个字）',
+  /font-size: var\(--fs-body\)/.test(appWxssRule('srch-input') || rule(idxWxss, 'srch-input')))
+// ②末尾：全文窗还是现网那一层，只把墨色对齐列表那两档
+ok('详情窗动作条三枚（置顶撤了），长文案那枚仍按 1 / 1 / 1.4 宽一档（09-30 拍的四枚并排留下的数）',
+  (idxWxml.match(/class="ds-ibtn/g) || []).length === 3
+  && /display: flex/.test(rule(idxWxss, 'ds-irow')) && /flex: 1/.test(rule(idxWxss, 'ds-ibtn'))
+  && /flex: 1\.4/.test(rule(idxWxss, 'ds-ibtn\.primary')))
+ok('窗里标题与要点前景 = 列表那档 90% 黑，正文段落 = 摘要那档 70% 黑',
+  /color: rgba\(35, 37, 44, 0\.9\)/.test(rule(idxWxss, 'ds-h2'))
+  && /color: rgba\(35, 37, 44, 0\.7\)/.test(rule(idxWxss, 'ds-para'))
+  && /color: rgba\(35, 37, 44, 0\.9\)/.test(rule(idxWxss, 'ds-pt-x')))
+ok('公开状态那一行留着（列表里那枚色块撤了之后，"这篇公不公开"只有这一处说）',
+  /ds-pub/.test(idxWxml) && /t\.sharedNow/.test(idxWxml))
+// 本机台账：出图那一刻就记（存相册那条路在开发者工具里必然 fail，钉在它上面就测不到）
+const shareJs = io2.readFileSync(P('pages/share/share.js'), 'utf8')
+ok('出图那一刻记台账：首页 _renderPoster 末尾 + 海报页 canvasToTempFilePath 成功回调里',
+  /await cardLog\.record\(a\.noteId, this\.data\.posterTpl, canvas, this\)/.test(CODE_JS)
+  && /cardLog\.record\(this\._note\.id, this\.data\.picked \|\| profile\.template, canvas, this\)/.test(strip(shareJs))
+  && dead(/_logCard/))
+ok('台账是本机的事：键名 cardLog、图落在用户文件目录、api.js 里一行都不提它',
+  /const KEY = 'cardLog'/.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8'))
+  && /USER_DATA_PATH/.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8'))
+  && !/cardLog/.test(io2.readFileSync(P('utils/api.js'), 'utf8')))
+ok('文件名带时间戳（本地图片按路径缓存位图，同名换内容界面仍是第一张）',
+  /\$\{DIR\}\/\$\{noteId\}-\$\{tplId\}-\$\{at\}\.jpg/.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8')))
+// copyFile 的目标键是 destPath 不是 filePath——写成 filePath 时微信不报"不认识的参数"，
+// 只回一句 `destPath … should be String instead of Undefined`，图静默不落盘（10-03 真跑抓的）。
+ok('copyFile 用的是 destPath（写成 filePath 位图就不落盘，只有真跑露得出来）',
+  /destPath: filePath/.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8'))
+  // 反向钉简写属性那一种写法（`filePath,` 单占一行）；`destPath: filePath,` 里也含 filePath，
+  // 所以只能按"整行就一个简写属性"来判，不能直接搜字面量。
+  && !/^\s*filePath,$/m.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8')))
+ok('同一篇同一套模板只留最新一张（旧的那张连文件一起删）',
+  /x\.tpl === tplId\) \{ dropFile\(x\.p\)/.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8')))
+ok('删笔记时那一格的台账与文件一起清（不留孤儿位图）',
+  /cardLog\.dropNote\(note\.id\)/.test(idxJs))
+// v18 那一族色仍在 palette 活一份（这一屏不读了，但别的效果图与回滚点还指着它）
+// SHARED_TAG.ink 是 #FFFFFF，这一页本来就有别处在用白字，拿它扫样式表是一句假红；
+// 那枚色块撤没撤由下面那条「不再读纸片那一族」和反向钉 shared-tag 一起管。
+ok('莫兰迪那四枚仍只在 palette 活一份，样式表里一个字都没有',
   p.PAPERS.every((x) => !new RegExp(x.bg, 'i').test(idxWxss))
   && p.PAPERS.every((x) => !new RegExp(x.ink, 'i').test(idxWxss)))
-ok('纸片取色吃序号不吃 id（拿 id 取模会让两个分类撞成同一枚）',
-  /paperSkinFor\(n\.category_id == null \? 0 : posOf\[n\.category_id\]\)/.test(idxJs)
-  && /posOf\[c\.id\] = i \+ 1/.test(idxJs))
-ok('未分类钉第一枚（炭灰蓝），真分类在第一枚之外循环',
-  p.paperSkinFor(0).bg === p.PAPERS[0].bg && p.paperSkinFor(4).bg !== p.PAPERS[0].bg
-  && p.paperSkinFor(1).bg === p.PAPERS[1].bg)
-ok('「已分享」那块压得住白字（对比 ≥ 4.5，色值只在 palette 一份）',
-  p.crOf(p.SHARED_TAG.ink, p.SHARED_TAG.bg) >= 4.5
-  && !/shared-tag\s*\{[^}]*(background|color):/.test(idxWxss.replace(/\s+/g, ' ')))
-// 左块那一套（点 + 分类名 + meta 行）整块退了，但两档色仍要给详情窗用，不许顺手删函数。
+ok('「显示更多」那支蓝在样式表里只出现一次，且值就是 palette.TONES[1]（与 .ds-link 同一处先例）',
+  (idxWxss.match(new RegExp(p.TONES[1].bg, 'i')) || []).length === 1
+  && /color: #3F52D6/.test(rule(idxWxss, 'x-more')) === /color: #3F52D6/.test(rule(idxWxss, 'ds-link')))
+// 扫的是剥掉注释之后的代码：index.js 里有一句"这一族随 v19 一起撤了"的说明，
+// 拿原文扫会被自己的注释判成假红。
+ok('这一屏不再读纸片那一族（paperSkinFor 在列表页没有后代了）',
+  dead(/paperSkinFor|SHARED_TAG|posOf|shared-tag/) && !/paperSkinFor|SHARED_TAG|posOf/.test(CODE_JS)
+  && typeof p.paperSkinFor === 'function')
+ok('排布档不再是本机偏好（listMode 那个键整个撤了，两枚 tab 不落本机）',
+  !/listMode|LIST_MODE_KEY/.test(idxJs) && !/setStorageSync\('view'\)/.test(idxJs))
+ok('列表里没有"就地展开"这一态（点一行 / 点一格 = 开详情窗）',
+  !/openIdx/.test(idxJs + idxWxml) && /this\._openDetail\(idx\)/.test(idxJs))
 ok('D2 那一排（点 + 分类名 + meta 行）从列表退了，分类两档仍从 palette 递进详情窗',
   !/class="cat[ "]/.test(idxWxml) && !/catLabel|tagLine|catRing/.test(idxJs + idxWxml)
   && /color: var\(--cat-ink\)/.test(rule(idxWxss, 'ds-tag')))
-ok('未分类那枚空心环不再有主人（列表不画点了），样式与绑定一起撤净',
-  !/is-ring/.test(idxWxss + idxWxml) && typeof p.catSkinFor(null, 'gradient-purple').ring === 'boolean')
 
 // ---------- 4. 分类两档压卡底：浅 5 / 深 7 ----------
 const CAT_IDS = [null, 0, 1, 2, 3, 4, 7, 12]

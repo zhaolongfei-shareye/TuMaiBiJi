@@ -7,10 +7,11 @@
 // 键还在 storage 里也必须照常铺图）。
 // 第二态不是可有可无——以前关过开关的人升级后不会去点任何设置，
 // 那一档要是静默退回"半铺半不铺"，没人会主动发现。
-// v18（10-02 夜）跟着改的三处：行卡退成纸片（"一个框"变成"一张带底色的纸、四边不描"）、
-// 右上角三列只剩「笔记」一列、搜索那枚圆钮换成裸 icon 那一行——
-// 三枚 icon 的几何与搜索两态由 验-列表v18-真跑.js 真点，这一把只补它不量的那一半：
-// 压在照片上那几块面渲染出来的到底是哪一支值。
+// v18（10-02 夜）跟着改的三处：行卡退成纸片、右上角三列只剩「笔记」一列、
+// 搜索那枚圆钮换成裸 icon 那一行；v19（10-03）又把纸片墙撤了——
+// "一条笔记一个框"落到行上就是**行既不垫底也不描边**（框只有圆角卡那一层），
+// 那一行也只剩搜索一枚。icon 的几何与搜索两态由 验-列表v19-真跑.js 真点，
+// 这一把只补它不量的那一半：压在照片上那几块面渲染出来的到底是哪一支值。
 const automator = require('miniprogram-automator')
 const fs = require('fs')
 const path = require('path')
@@ -83,9 +84,9 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   const bgOffBefore = await mp.evaluate(() => !!wx.getStorageSync('home_bg_off'))
 
   // ---------- ① 铺图态：头部是照片，纸在下面盖住它 ----------
-  await mp.evaluate(() => { wx.removeStorageSync('home_bg_off'); wx.removeStorageSync('listMode') })
-  // listMode 是上一把尺子留下的本机偏好：落在「一行」那一档时屏上没有 .note，
-  // 下面那两条"纸片是一个框"会读成 undefined/null，看着像渲染坏了。
+  await mp.evaluate(() => { wx.removeStorageSync('home_bg_off') })
+  // v19 起这一屏没有"排布档"了（纸片墙／一行随两枚 tab 换了语义，且 view 不落本机、
+  // 每次进页都回到「笔记列表」），所以这里不再清 listMode——本机也没有这个键要清了。
   let page = await enter('/pages/index/index')
   await sleep(4500)
   page = await enter('/pages/index/index')
@@ -101,9 +102,9 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
     d0 = await page.data()
   }
   if (!(d0.notes || []).length) throw new Error('列表三次都是空的：这一把没法量（先确认登录态与网络）')
-  ck('列表有笔记且落在纸片墙（下面"一条笔记一个框"那两条要有真纸片才量得到）',
-    d0.listMode === 'desk' && (await page.$$('.note')).length > 0,
-    `${(await page.$$('.note')).length} 枚 / listMode=${d0.listMode}`)
+  ck('列表有笔记且落在「笔记列表」那一枚（下面"一行不描边"那两条要有真行才量得到）',
+    d0.view === 'list' && (await page.$$('.xrow')).length > 0,
+    `${(await page.$$('.xrow')).length} 条 / view=${d0.view}`)
   const cls = (await (await page.$('.container')).attribute('class')) || ''
   ck('铺图时容器带 has-bg', /has-bg/.test(cls), cls)
   const [headRect, imgRect, scrimRect] = await rects(['.head', '.head-img', '.head-scrim'])
@@ -162,24 +163,24 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   ck('滚动区自己不画面（面是那张卡画的）',
     /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list', 'background-color')),
     await styleOf(page, '.list', 'background-color'))
-  // 卡底那一档（--bg-card）不管纸片了：v18 起每条笔记是一张自己带底色的纸，颜色由
-  // palette.PAPERS 按分类序号发（那一条由 验-列表v18-真跑.js 逐枚比对渲染值）。
-  // "一条笔记一个框"这条不变量落到新画法上就是：**有且只有一层底色，四边都不许描**——
-  // 09-28 打回的就是"纸一圈 + 每条又一圈"，框永远只有一层。
-  const paperEl = (await page.$$('.note'))[0]
-  ck('屏上真有纸片（下面那两条都建立在"渲染出来了一枚"之上，空列表不许往下算）',
-    !!paperEl, `${(await page.$$('.note')).length} 枚`)
-  const paperBg = paperEl && await paperEl.style('background-color')
-  const paperEdges = await readAll('.note', ['border-top-width', 'border-bottom-width',
+  // 卡底那一档（--bg-card）不管列表行了：v18 那版是"每条笔记一张带底色的纸"，
+  // v19 又退回去——行自己既不垫底也不描边，整屏那一层框就只有圆角卡那一个。
+  // "一条笔记一个框"这条不变量换画法之后落到这里：**列表里不许出现第二层框**，
+  // 所以钉的是行既无底色也无描边（09-28 打回的就是"纸一圈 + 每条又一圈"）。
+  const rowEl = (await page.$$('.xrow'))[0]
+  ck('屏上真有行（下面那两条都建立在"渲染出来了一条"之上，空列表不许往下算）',
+    !!rowEl, `${(await page.$$('.xrow')).length} 条`)
+  const rowBg = rowEl && await rowEl.style('background-color')
+  const rowEdges = await readAll('.xrow', ['border-top-width', 'border-bottom-width',
     'border-left-width', 'border-right-width'])
-  ck('一枚纸片就是那一个框（有自己的底色、四边都不描）',
-    !!paperBg && !/rgba\(0, 0, 0, 0\)|transparent/.test(paperBg)
-    && Object.values(paperEdges).every((v) => v === 0),
-    `底 ${paperBg}｜描边 ${JSON.stringify(paperEdges)}`)
-  const paperRect = (await rects(['.note']))[0]
-  if (paperRect) ck('第一枚纸片在这块滚动区里（图区下面，没压在图上）',
-    !!sheetRect && paperRect.top >= sheetRect.top,
-    `纸顶 ${(paperRect.top / R).toFixed(0)}rpx / 卡片区顶 ${(sheetRect.top / R).toFixed(0)}rpx`)
+  ck('一行不垫底也不描边（框只有圆角卡那一层，列表里不再出现第二层）',
+    !!rowEl && (!rowBg || /rgba\(0, 0, 0, 0\)|transparent/.test(rowBg))
+    && Object.values(rowEdges).every((v) => v === 0),
+    `底 ${rowBg}｜描边 ${JSON.stringify(rowEdges)}`)
+  const rowRect = (await rects(['.xrow']))[0]
+  if (rowRect) ck('第一条行在这块滚动区里（图区下面，没压在图上）',
+    !!sheetRect && rowRect.top >= sheetRect.top,
+    `行顶 ${(rowRect.top / R).toFixed(0)}rpx / 卡片区顶 ${(sheetRect.top / R).toFixed(0)}rpx`)
   ck('压在图上的大字是纸白',
     near(rgbOf(await styleOf(page, '.h1', 'color')), hexArr(PAPER), 6),
     await styleOf(page, '.h1', 'color'))
@@ -245,9 +246,9 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
     near(rgbOf(await styleOf(page, '.chip.active', 'background-color')), hexArr(PAPER)),
     await styleOf(page, '.chip.active', 'background-color'))
   // ---------- 1b. 图上那一行摊开后的那块面 ----------
-  // v8 那枚"分类行最右的圆钮 + 展开的搜索条"整块没了：v18 这一行是三枚裸 icon
-  // （搜索／纸片墙／一行），点最左那枚就地摊成输入条。三枚的几何、两态互斥、
-  // 缩回不清词那些都由 验-列表v18-真跑.js 真点真量；这一把只补它不量的一半——
+  // v8 那枚"分类行最右的圆钮 + 展开的搜索条"整块没了；v18 是三枚裸 icon，
+  // v19 又退成一枚（纸片墙／一行随两枚 tab 撤了）。摊开、两态互斥、
+  // 缩回不清词那些都由 验-列表v19-真跑.js 真点真量；这一把只补它不量的一半——
   // 这块面压在照片上，渲染出来的到底是不是 CSS 里那一条发的值。
   // 期望值从 index.wxss 现读，探针里不抄第二份 rgba。
   const IDX_WXSS = fs.readFileSync(P('pages/index/index.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
@@ -281,8 +282,8 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   // 点条以外的空白（这里点页头那行大字，它自己没有任何 tap 处理）→ 缩回
   await (await page.$('.h1')).tap()
   await sleep(1000)
-  ck('点空白缩回之后这一行还是三枚裸 icon（输入条整个不在树上，不是被藏起来）',
-    (await page.$('.srch')) === null && (await page.$$('.acts .ic')).length === 3,
+  ck('点空白缩回之后那一行还是搜索那一枚（输入条整个不在树上，不是被藏起来）',
+    (await page.$('.srch')) === null && (await page.$$('.acts .ic')).length === 1,
     `${(await page.$$('.acts .ic')).length} 枚`)
   await mp.screenshot({ path: path.join(OUT, '实测-列表头部铺图.png') })
 

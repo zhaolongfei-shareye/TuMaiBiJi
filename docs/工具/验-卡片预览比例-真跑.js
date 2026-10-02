@@ -53,9 +53,8 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
   try {
     await sleep(2000)
     // 头一次切页会撞上开发者工具那句 rawPath is null（页面元信息没就绪），重试到成功为止。
-    // 顺手清掉排布档：那是本机偏好，上一把尺子切过「一行」的话这一屏根本没有 .note，
-    // 按下标取会拿到 undefined（这一把第一回就是这么挂的）。
-    await mp.evaluate(() => wx.removeStorageSync('listMode'))
+    // v19 起这一屏没有排布档了（纸片墙／一行换成两枚 tab，且 view 不落本机、
+    // 每次进页都回到「笔记列表」），所以这里不再清 listMode，也就没有"按下标取到 undefined"那一坑。
     for (let i = 0; ; i++) {
       try { await mp.reLaunch('/pages/index/index'); break } catch (e) {
         if (i >= 4) throw e
@@ -72,18 +71,18 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
     await page.setData({ detailOpen: false, templateOpen: false })
     await sleep(800)
 
-    // v18 起列表没有"就地展开"那一态：点一枚纸片就直接浮详情窗（原来要两下）。
-    // 而纸片在屏上的顺序不等于 notes 的下标（置顶筛选、错落都会挪位），
-    // 所以按 data-idx 找那一枚，不按下标取。
-    const paperOf = async (want) => {
-      for (const e of await page.$$('.note')) {
+    // v18 起列表没有"就地展开"那一态：点一行就直接浮详情窗（原来要两下）。
+    // 而屏上那一批的顺序不等于 notes 的下标（分类筛选会挪位），
+    // 所以按 data-idx 找那一条，不按下标取。
+    const rowOf = async (want) => {
+      for (const e of await page.$$('.xrow')) {
         if (Number(await e.attribute('data-idx')) === want) return e
       }
       return null
     }
-    const paper = await paperOf(at)
-    if (!paper) throw new Error(`屏上没有 data-idx=${at} 那枚纸片，进不去弹窗`)
-    await paper.tap()
+    const row = await rowOf(at)
+    if (!row) throw new Error(`屏上没有 data-idx=${at} 那一条，进不去弹窗`)
+    await row.tap()
     await sleep(3000)
     d = await page.data()
     ck('详情窗浮起来了', d.detailOpen === true, `detailOpen=${d.detailOpen}`)
