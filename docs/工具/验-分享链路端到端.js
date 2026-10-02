@@ -17,6 +17,11 @@
 // 而确认之后的那段是产品代码本身（api.revokeShare → setData），所以这条缝只替掉了"用手指点一下"。
 // 状态行本身是真点的（page.$('.share-state').tap()），不是直接调 onUnshare。
 const automator = require('miniprogram-automator')
+const fs = require('fs')
+
+// 截图落在 /tmp，而 /tmp 会被系统清掉；目录不在的时候 mp.screenshot 直接 ENOENT，
+// 把整把尺子崩在最后一步（10-02 全量复跑红在这里，不是产品回归）。开跑先建回来。
+fs.mkdirSync('/tmp/mp-verify', { recursive: true })
 
 const BASE = 'https://api.agentsbin.cn/wtsj'
 const MARK = Date.now().toString(36).slice(-6)
@@ -117,7 +122,10 @@ const pub = async (token) => {
         return 'fail'
       }
     }).catch(() => { overrideOk = false })
-    const tapped = await p.$('.share-state')
+    // 点的是「撤掉」那三个字，不是整行：bindtap 挂在 .state-act 上（detail.wxml:27），
+    // 外层 .share-state 只是一格容器，点它什么也不会发生——10-02 全量复跑就是红在
+    // 这里点了容器，然后报"shared 还是 true"，看着像产品撤回坏了，其实是尺子点错了地方。
+    const tapped = await p.$('.share-state .state-act')
     if (tapped && overrideOk) await tapped.tap()
     else await mp.evaluate(() => getCurrentPages().slice(-1)[0].onUnshare())
     await sleep(2200)
