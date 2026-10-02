@@ -76,8 +76,6 @@ const i18n = {
     save: '保存',
     cancel: '取消',
     delete: '删除',
-    pin: '置顶',
-    unpin: '取消置顶',
     search: '搜索笔记',
     notesHeading: '我的笔记',
     // 头部那三列的小字（v12）。三个都是服务端算好的状态量，客户端只负责念名字
@@ -210,7 +208,6 @@ const i18n = {
     tagOrderHint: '点任意标签把它换到第一位，列表色块上显示的就是第一个标签',
     copied: '已复制',
     loading: '加载中...',
-    pinned: '置顶',
     edit: '编辑',
     confirm: '确定',
     loadFailed: '加载失败',
@@ -393,8 +390,6 @@ const i18n = {
     // 所以这里不能用 Cancel/Delete/Keep it 这种长词——超出的部分会被微信截掉。
     cancel: 'Back',
     delete: 'Delete',
-    pin: 'Pin',
-    unpin: 'Unpin',
     search: 'Search notes',
     notesHeading: 'My notes',
     statNotes: 'Notes',
@@ -505,7 +500,6 @@ const i18n = {
     tagOrderHint: 'Tap a tag to move it first — the colour block shows the first tag',
     copied: 'Copied',
     loading: 'Loading...',
-    pinned: 'Pinned',
     edit: 'Edit',
     confirm: 'OK',
     loadFailed: 'Load failed',

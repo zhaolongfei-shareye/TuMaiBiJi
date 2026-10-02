@@ -172,17 +172,6 @@ Page({
     })
   },
 
-  async togglePin() {
-    const { note, lang } = this.data
-    try {
-      await api.pinNote(note.id, !note.is_pinned)
-      wx.showToast({ title: note.is_pinned ? t('unpin', lang) : t('pin', lang), icon: 'success' })
-      this.loadNote(note.id)
-    } catch (err) {
-      wx.showToast({ title: t('operationFailed', lang), icon: 'none' })
-    }
-  },
-
   onEdit() {
     const { note } = this.data
     wx.navigateTo({ 

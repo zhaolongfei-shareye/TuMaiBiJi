@@ -56,13 +56,8 @@
   color: var(--text-primary);
   font-size: 25rpx;
   font-weight: 700;
-  /* 与详情窗那一排同一条规矩：一行四枚不许折行，所以英文写 Make card 不写 Generate note card */
+  /* 与详情窗那一排同一条规矩：一行三枚不许折行，所以英文写 Make card 不写 Generate note card */
   white-space: nowrap;
-}
-
-.icon-btn.on {
-  background: var(--accent);
-  color: var(--bg-page);
 }
 
 .icon-btn.danger {

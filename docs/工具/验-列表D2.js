@@ -131,8 +131,20 @@ ok('横线走到整块卡的边：.vtabs 负外扩把 .sheet 那 24 吃掉再补
 // ④置顶整个撤：分类行左边那一档、右边那句提示、详情窗那枚按钮、JS 那三个 handler
 ok('置顶这一屏整个撤净（档、提示句、窗里那枚按钮、handler 都不在）',
   dead(/pinb|pinn|pinFilter|pinnedOnly|onTogglePinned|onSheetPin/) && !/is_pinned \? t\.unpin/.test(idxWxml))
-ok('字典里那五串跟着撤净，不留没人用的值（pin/unpin/pinned 另两页还在用，留着）',
-  !/pinFilter|viewDesk|viewRows|pinnedOnly|sharedTag/.test(io2.readFileSync(P('utils/i18n.js'), 'utf8')))
+// 独立详情页那枚 10-03 跟着撤了：列表已经不显示置顶状态，按下去只有一句吐司回应、
+// 笔记却会一直顶在最前面且客户端再没有解开的地方——那是个只进不出的门。
+const detWxml = io2.readFileSync(P('pages/detail/detail.wxml'), 'utf8')
+const detJs = io2.readFileSync(P('pages/detail/detail.js'), 'utf8')
+const detWxss = io2.readFileSync(P('pages/detail/detail.wxss'), 'utf8')
+const apiJs = io2.readFileSync(P('utils/api.js'), 'utf8')
+const I18N = io2.readFileSync(P('utils/i18n.js'), 'utf8')
+ok('独立详情页也没有置顶了（那枚按钮、那个 handler、那次请求都不在）',
+  !/togglePin|is_pinned/.test(detWxml) && !/togglePin|pinNote/.test(strip(detJs))
+  && !/pinNote|\/pin\b/.test(apiJs) && !/\.icon-btn\.on/.test(detWxss))
+ok('字典里三串 + 全局那枚墨黑小标签一起删净（Poppins 里有 "pin"，所以只认行首键名和类选择器）',
+  !/^\s*(pin|unpin|pinned):/m.test(I18N) && !/^\s*\.pin\s*\{/m.test(appWxss))
+ok('字典里那五串跟着撤净，不留没人用的值',
+  !/pinFilter|viewDesk|viewRows|pinnedOnly|sharedTag/.test(I18N))
 // ④时间轴撤净：竖线、月份档、月/日两层聚堆、stageH 那一整套坐标
 ok('时间轴那一整层没了（竖线、月份档、月—行—枚三层坐标一起撤）',
   dead(/rail|rm-ym|bodyrow|class="stage"|class="gp"/) && !/byMonth|byDay|monthKey|dayKey|stageH/.test(idxJs))

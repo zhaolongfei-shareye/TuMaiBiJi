@@ -201,7 +201,6 @@ module.exports = {
   createNote: (data) => request('/api/notes/', 'POST', data),
   updateNote: (id, data) => request(`/api/notes/${id}`, 'PUT', data),
   deleteNote: (id) => request(`/api/notes/${id}`, 'DELETE'),
-  pinNote: (id, pin) => request(`/api/notes/${id}/pin?pin=${pin}`, 'POST'),
   ingestUrl: (url) => request('/api/ingest/url', 'POST', { url }, { contentType: 'application/x-www-form-urlencoded' }),
   ingestScreenshots,
   getTaskStatus,

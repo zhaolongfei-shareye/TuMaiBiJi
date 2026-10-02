@@ -229,9 +229,11 @@ const txt = async (els) => {
     const barBtns = (await txt(await page.$$('.action-bar .icon-btn'))).join('|')
     // 期望值从这一屏自己那份 t 里取：账号切了英文也不会把这条尺子判成假红
     const tt = await page.data('t')
-    const want = [tt.pin, tt.edit, tt.delete, tt.shareAsImage].join('|')
-    ck('详情页上方一排四枚，末枚就是 shareAsImage 那颗', barBtns === want,
+    // 10-03「置顶」那一枚跟着列表一起撤了（列表已不显示置顶状态，按下去只进不出）
+    const want = [tt.edit, tt.delete, tt.shareAsImage].join('|')
+    ck('详情页上方一排三枚，末枚就是 shareAsImage 那颗', barBtns === want,
       barBtns === want ? barBtns : `${barBtns} ≠ ${want}`)
+    ck('这一排里没有置顶', !/置顶|[Pp]in/.test(barBtns), barBtns)
     ck('文末不再有底部操作区', !(await page.$('.bottom-actions')))
     await mp.screenshot({ path: `${SHOT}/c6-详情页.png` })
   } catch (err) {

@@ -11,13 +11,12 @@
       </view>
     </view>
 
-    <!-- 操作条：四枚并排一行，全部钉在文档上方（站长 09-30："详情页所有功能都要在文档上方而不是下方"）。
+    <!-- 操作条：三枚并排一行，全部钉在文档上方（站长 09-30："详情页所有功能都要在文档上方而不是下方"）。
          原来「生成笔记卡片」和公开状态那两行落在长文末尾，得滚到底才看得见。
-         私密笔记那枚不给，公开状态那行也不给（与列表详情窗同一条口径）。 -->
+         私密笔记那枚不给，公开状态那行也不给（与列表详情窗同一条口径）。
+         「置顶」那一枚 10-03 跟着列表一起撤了——列表已经不再显示置顶状态，按了只有一句话回应、
+         笔记却会一直顶在最前面且没法解开，那是个只进不出的门。 -->
     <view class="action-bar">
-      <view class="icon-btn {{note.is_pinned ? 'on' : ''}}" bindtap="togglePin">
-        <text>{{note.is_pinned ? t.unpin : t.pin}}</text>
-      </view>
       <view class="icon-btn" bindtap="onEdit">{{t.edit}}</view>
       <view class="icon-btn danger" bindtap="onDelete">{{t.delete}}</view>
       <view wx:if="{{!note.is_private}}" class="icon-btn primary" bindtap="onShare">{{t.shareAsImage}}</view>

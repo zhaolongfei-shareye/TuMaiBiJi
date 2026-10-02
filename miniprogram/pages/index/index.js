@@ -418,7 +418,7 @@ Page({
     this.setData({ _privateVerified: true })
     // 验完密码重取列表：服务端锁着的时候私密笔记那行的 summary 是裁掉的，
     // 不重取的话窗里没有摘要，看着像"这篇没有概要"。
-    // 重取会整表重排，所以按 id 把行号找回来再开窗（和置顶那条同一个做法）。
+    // 重取会整表重排，所以按 id 把行号找回来再开窗。
     await this.loadNotes(true)
     const at = this.data.notes.findIndex((n) => n.id === note.id)
     if (at >= 0) this._openDetail(at)
@@ -512,7 +512,8 @@ Page({
   },
 
   // 详情窗下沿 dock 的三个动作 + 那行公开状态（v19：「置顶」那一枚随这一屏的置顶一起撤了，
-  // 服务端那个 is_pinned 与「置顶」这一档在 pages/detail 那页还在用，字典里三串都留着）。
+  // 独立详情页 pages/detail 那枚也在 10-03 跟着撤净——字典里 pin/unpin/pinned 三串一起删了，
+  // 服务端那个 is_pinned 与 /pin 接口还在，只是客户端再没有写它的路径）。
   onSheetEdit() {
     const note = this.data.detailNote
     if (!note) return

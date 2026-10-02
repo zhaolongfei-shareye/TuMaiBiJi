@@ -346,21 +346,6 @@ page {
   text-overflow: ellipsis;
 }
 
-/* 置顶：墨黑小标签压在标题前面。字色用 --bg-page 而不是 #fff，
-   因为深色主题下 --accent 会变成亮色，白字压在上面就读不出来了。 */
-.pin {
-  display: inline-block;
-  font-size: 19rpx;
-  font-weight: 800;
-  letter-spacing: 0.6rpx;
-  padding: 4rpx 14rpx;
-  border-radius: 10rpx;
-  background: var(--accent);
-  color: var(--bg-page);
-  margin-right: 10rpx;
-  vertical-align: 2rpx;
-}
-
 /* 方块的小尺寸变体：分类管理那一列色点。
    方块里的字用汉字而不是图标字体——项目没有 iconfont，单个汉字在苹方下必定渲染得出来，
    换成 ✎ ⌗ 这类符号就要赌设备字体。 */
