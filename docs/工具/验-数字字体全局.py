@@ -100,8 +100,10 @@ ok('.menu-value.num 整条已随那一行撤掉（不留没人在用的样式）
 ok('公共那条 .menu-value 没有 font-family（含汉字和字母的值不许被带进去）',
    re.search(r'\.menu-value\s*\{[^}]*font-family', me) is None)
 me_wx = read('pages/me/me.wxml')
+# 公共那一格从三处减到两处：站长 10-02 把「推荐图麦」右边的「新写作者 +10」也撤了
+# （同一个数下面规则块说一遍就够），现在只剩官网和邮箱两行挂它。
 ok('wxml 里不再挂 num，规则块那一格挂 .rule-value',
-   'menu-value num' not in me_wx and me_wx.count('class="menu-value"') == 3
+   'menu-value num' not in me_wx and me_wx.count('class="menu-value"') == 2
    and me_wx.count('class="rule-value"') == 1,
    f'num={"menu-value num" in me_wx} 公共={me_wx.count(chr(34) + "menu-value" + chr(34))} rule={me_wx.count(chr(34) + "rule-value" + chr(34))}')
 

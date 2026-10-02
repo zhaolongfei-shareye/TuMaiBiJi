@@ -256,7 +256,7 @@ async function main() {
       wx.request({
         url: 'https://api.agentsbin.cn/wtsj/api/user/quota',
         header: { Authorization: 'Bearer ' + (getApp().globalData.token || '') },
-        success: (r) => resolve({ route: p.route, scoreText: d.scoreText, shareValue: d.shareValue, q: r.data }),
+        success: (r) => resolve({ route: p.route, scoreText: d.scoreText, mindRules: d.mindRules, q: r.data }),
         fail: (e) => resolve({ route: p.route, scoreText: d.scoreText, fail: e.errMsg }),
       })
     }))
@@ -270,9 +270,12 @@ async function main() {
     check('接口回的是不限量那一套十二个字段',
       !!me.q && Object.keys(me.q).sort().join(',') === 'base,bonus,categories,import_each,invites_rewarded,limit,mind,remaining,reward_each,saved_by_users,shares_active,used',
       me.q && Object.keys(me.q).sort().join(','))
-    check('分享那一行那句承诺用的是服务端给的奖励数',
-      !!me.shareValue && me.shareValue.includes(String(me.q && me.q.reward_each)),
-      { shareValue: me.shareValue, reward_each: me.q && me.q.reward_each })
+    // 10-02：「推荐图麦」那一行右边的「新写作者 +10」撤了，服务端这个奖励数现在只在
+    // 「我的」页那块魅力值规则的第二行。旧那条"分享那一行那句承诺"整条作废。
+    const rule2 = (me.mindRules || [])[1] || {}
+    check('规则第二行那个奖励数用的是服务端给的 reward_each',
+      rule2.value === '+' + (me.q && me.q.reward_each),
+      { rule2: rule2.value, reward_each: me.q && me.q.reward_each })
     await mp.screenshot({ path: SHOT + '/15-我的-额度.png' })
     console.log('  截图：' + SHOT + '/15-我的-额度.png')
 

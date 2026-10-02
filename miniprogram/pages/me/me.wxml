@@ -85,11 +85,11 @@
         </view>
       </view>
       <!-- 这一行本身就是 button[open-type=share]：点它直接弹微信分享面板。
-           右边那句是一笔真实的兑换（服务端真会给这 10 分），所以必须等接口，读不到就留空。 -->
+           右边不再挂那句「新写作者 +10」（站长 10-02：撤掉）——同一个数下面那块规则
+           第二行已经说了，一行右边再摆一遍就是两张卡各说一遍。这一行只留箭头。 -->
       <button class="menu-item share-row" open-type="share" aria-label="{{t.shareToFriend}}">
         <text class="menu-label">{{t.shareToFriend}}</text>
         <view class="menu-right">
-          <text class="menu-value">{{shareValue}}</text>
           <view class="ico"><view class="cv"></view></view>
         </view>
       </button>

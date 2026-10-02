@@ -50,7 +50,6 @@ Page({
     nameText: '',
     sloganText: '',
     scoreText: '',
-    shareValue: '',
     mindRules: [],
     // 私密密码：设没设只吃服务端读数；输入那一层是整屏遮罩 + 居中卡（见上面那组方法）
     privateSet: false,
@@ -123,9 +122,6 @@ Page({
       const q = await api.getQuota()
       this.setData({
         scoreText: q.mind == null ? '' : String(q.mind),
-        // 这一格与下面规则第二行是同一个字段（reward_each），口径也照同一句：读不到就留空，
-        // 不摆「+undefined」这种猜出来的数（me.wxml 那行注释一直这么写的，代码之前没做到）。
-        shareValue: q.reward_each == null ? '' : fmt(t('shareRewardN', lang), { n: q.reward_each }),
         // 三个数缺任何一个就整块不占位——宁可空着，也不摆半套猜的规则。
         mindRules:
           q.base == null || q.reward_each == null || q.import_each == null

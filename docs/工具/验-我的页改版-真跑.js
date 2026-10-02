@@ -225,7 +225,11 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     /width:750rpx/.test(d.imgStyle || '') && gHeight > 542 && Math.abs(gTop + (gHeight - 542) * 0.15) <= 1,
     d.imgStyle)
   ck('数字来自服务端（base+bonus，不是界面写死）', /^\d+$/.test(String(d.scoreText || '')) && Number(d.scoreText) >= 100, d.scoreText)
-  ck('分享那行右值吃服务端 reward_each，单位不再写"篇"', /^\S+ \+\d+$/.test(String(d.shareValue || '')), d.shareValue)
+  // 站长 10-02：那一行右边的「新写作者 +10」撤了（同一个数下面那块规则说一遍就够）。
+  // 旧判据"右值吃 reward_each、单位不再写篇"整条作废；这里只断页面里连这一格字段都不留了，
+  // "+10 整页只出现一次"钉在下面关于那一屏——那里才读得到真正渲染出来的行。
+  ck('分享那一行不再算右值（页面里没有 shareValue 这一格了）',
+    d.shareValue === undefined, String(d.shareValue))
 
   /* ---------- ④b 分享载荷：封面换成新图之后，路径写错微信会静默退回"截当前页"，
      那种事在界面上看不出来，只能把 onShareAppMessage 真调一次、再让包去解这张图。 ---------- */
@@ -375,13 +379,14 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     d.mindRules.length === 3 && /^\d+$/.test(d.mindRules[0].value) &&
     /^\+\d+$/.test(d.mindRules[1].value) && /^\+\d+$/.test(d.mindRules[2].value),
     d.mindRules.map((r) => `${r.label}=${r.value}`).join(' '))
-  // 「推荐图麦」那行的右值与规则第二行必须同源（都吃 reward_each），不一致就是有一处写死了。
-  // 两处一起空（服务端没给这个字段，整块规则不出现）也是一致的。取数别写 `d.mindRules[1].value`：
-  // 那一格不存在时它是 undefined，取 .value 会让整把尺子崩在这里。
-  const rule2 = (d.mindRules[1] || {}).value || ''
-  const m2 = /\+(\d+)/.exec(d.shareValue || '')
-  ck('分享那行的数 = 规则第二行的数（同一个服务端字段，两处一起空也算一致）',
-    (m2 ? '+' + m2[1] : '') === rule2, `${d.shareValue} vs ${rule2}`)
+  // 站长 10-02：「推荐图麦」那行右边的「新写作者 +10」撤掉——同一个数在上下两张卡各说一遍。
+  // 原来那条"两处必须相等"的同源判据跟着作废，换成钉这一条：服务端那个奖励数整页只出现一次，
+  // 而且那一次在规则块里。（用 endsWith 不用 indexOf：'笔记被朋友种草+1' 里含 '+1'，会误判。）
+  const reward = (d.mindRules[1] || {}).value || ''
+  const dup = aboutLabels.concat(ruleLabels).filter((x) => x.endsWith(reward))
+  ck('那个奖励数（+10）整页只说一次，且说在规则块那一行',
+    !!reward && dup.length === 1 && ruleLabels.indexOf(dup[0]) >= 0,
+    `${reward}｜命中 ${dup.length} 行：${dup.join(' / ')}`)
   ck('规则行不拥挤：每行至少 106 高（跟菜单行同一档）',
     m.rules.length === 3 && m.rules.every((r) => toRpx(r.height, W) >= 104),
     m.rules.map((r) => toRpx(r.height, W).toFixed(0)).join('/'))

@@ -186,10 +186,9 @@ const i18n = {
     mindRuleSaved: '笔记被朋友种草',
     mindPlusN: '+{n}',
     shareCardTitle: '图麦笔记 | 把图文提炼成有用的干货',
-    // 额度与注销：数字全部来自 /api/user/quota 和 /api/user/deactivate，
-    // 模板里不写死 100 和 10（{n} 由服务端给的 reward_each 填）。
-    // 09-24 定：动笔写第一篇、或把别人那篇转存进自己库里，两条都算"带来一个新写作者"。
-    shareRewardN: '新写作者 +{n}',
+    // 额度与注销：数字全部来自 /api/user/quota 和 /api/user/deactivate，模板里不写死。
+    // 「新写作者 +10」那一串原来挂在分享那一行右边，10-02 撤了——同一个数只在上面
+    // 那块魅力值规则里说一次（见 mindRuleInvite）。
     deleteAccount: '注销账号',
     deleteTitle: '注销账号',
     deleteStep1: '将删除你名下的 {notes} 条笔记和 {cats} 个分类，已生成的分享链接一并失效，账号本身同时注销。',
@@ -482,7 +481,6 @@ const i18n = {
     mindRuleSaved: 'Friend saves',
     mindPlusN: '+{n}',
     shareCardTitle: 'TumarkNote | Make every read useful',
-    shareRewardN: '+{n} per new writer',
     deleteAccount: 'Delete account',
     deleteTitle: 'Delete account',
     deleteStep1: 'This deletes your {notes} notes and {cats} categories, revokes every share link you generated, and closes the account.',
