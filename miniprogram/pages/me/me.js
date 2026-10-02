@@ -4,6 +4,7 @@ const poster = require('../../utils/poster.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { CONTACT_EMAIL } = require('../../utils/contact.js')
 const { VERSION, SITE, introLead } = require('../../utils/appInfo.js')
+const { TIP_DOT } = require('../../utils/palette.js')
 
 // {n} 这类占位由服务端给的数字填，界面里不自己写死额度规则
 function fmt(tpl, map) {
@@ -51,6 +52,9 @@ Page({
     sloganText: '',
     scoreText: '',
     mindRules: [],
+    // 规则块每行前面那枚点：与新建页四步指引、Tips 同一枚黄点，色值只从 palette 发下来，
+    // 写进 me.wxss 就会被 `验-统一录入条` 那把尺子扫成"色板走了两份"。
+    ruleDotStyle: 'background:' + TIP_DOT,
     // 私密密码：设没设只吃服务端读数；输入那一层是整屏遮罩 + 居中卡（见上面那组方法）
     privateSet: false,
     pwdOpen: false,

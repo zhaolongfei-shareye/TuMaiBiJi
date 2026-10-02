@@ -720,6 +720,19 @@
   padding: 20rpx 0 24rpx;
 }
 
+/* 拉起微信图片面板时垫在它底下的一整屏纯黑（见 index.wxml 那条与 onSavePoster）。
+   1000 这个数是量出来的：底栏是自定义组件、自己的 .tab-bar 写死 z-index 999，
+   压过它才算盖住——那枚胶囊正是他截图里"杂乱"的一条。 */
+.share-dim {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  z-index: 1000;
+}
+
 /* 「原文内容」那一行是标签和开关并排，标签不再要它自己的上间距 */
 .ds-orig .ds-lab {
   margin-top: 0;

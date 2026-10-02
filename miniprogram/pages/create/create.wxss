@@ -359,16 +359,19 @@
   border-radius: 50%;
 }
 
+/* 站长 10-02 真机：这四行"太黑太重，喧宾夺主"。所以一律收到 --fs-meta 这一档、
+   粗体撤掉，主次只由两档色阶给（点那一枚已经是引导了）。
+   颜色留在这套 rgba 里、不换成 --text-secondary/tertiary：这一块的底是 .panel 写死的白纸，
+   而铺了背景图时那两个变量会翻成纸白（见下面 .container.has-bg 那段），翻完字就没了。 */
 .gtxt {
   font-size: var(--fs-meta);
-  line-height: 1.4;
-  color: rgba(35, 37, 44, 0.78);
+  line-height: 1.45;
+  color: rgba(35, 37, 44, 0.42);
 }
 
 .gtxt .gt-t {
-  font-size: var(--fs-body);
-  font-weight: 700;
-  color: #23252c;
+  font-weight: 400;
+  color: rgba(35, 37, 44, 0.72);
   margin-right: 10rpx;
 }
 

@@ -188,6 +188,25 @@ fs.mkdirSync(OUT, { recursive: true })
     const dotStyle = dotEl ? await dotEl.style('background-color') : ''
     ck('小黄点吃 palette 的那个色（不另起一处色）',
       /rgb\(246,\s*196,\s*69\)/.test(dotStyle), dotStyle)
+    // 站长 10-02 真机：这四行"字体太黑太重，喧宾夺主"，要的是"说明用小字、不加黑、
+    // 只用不同色阶区分"。所以钉三条：粗体撤了、两半同一档小字、主次只由两档色阶给。
+    const META = Number(/--fs-meta:\s*(\d+)rpx/.exec(appWxss)[1])
+    const BODY = Number(/--fs-body:\s*(\d+)rpx/.exec(appWxss)[1])
+    const tEl = await page.$('.gt-t')
+    const dEl = await page.$('.gt-d')
+    const rpxOf = (px) => (px * 750) / win.windowWidth
+    const tFS = parseFloat(await tEl.style('font-size'))
+    const dFS = parseFloat(await dEl.style('font-size'))
+    const tFW = Number(await tEl.style('font-weight'))
+    ck(`标题那半不再加黑、也降到 --fs-meta（${META} 而不是 ${BODY}），与说明同一档小字`,
+      tFW < 600 && Math.abs(rpxOf(tFS) - META) <= 1 && Math.abs(rpxOf(dFS) - META) <= 1,
+      `字重 ${tFW} 标题 ${rpxOf(tFS).toFixed(0)} 说明 ${rpxOf(dFS).toFixed(0)}rpx`)
+    const tCol = await tEl.style('color')
+    const dCol = await dEl.style('color')
+    const alphaOf = (s) => { const m = /rgba\([^)]*,\s*([\d.]+)\s*\)/.exec(s); return m ? Number(m[1]) : 1 }
+    ck('主次只由两档色阶给：同一支墨，说明比标题浅一档',
+      tCol !== dCol && alphaOf(dCol) < alphaOf(tCol) && alphaOf(tCol) <= 0.8,
+      `标题 ${tCol} / 说明 ${dCol}`)
     const g2 = await geo('.guide'); const a2 = await geo('.acts'); const p2 = await geo('.panel')
     ck(`${lang} 相册空态：指引坐在按钮行上面，两样都还在面板里`,
       !!g2 && !!a2 && g2.bottom <= a2.top + 1 && a2.bottom <= p2.bottom + 1,

@@ -83,14 +83,18 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     const win = await mp.evaluate(() => wx.getWindowInfo())
     const mask = await rect('.pwd-mask')
     const card = await rect('.pwd-card')
-    ck('遮罩 + 居中卡两层都在（旧的 .pwd-layer/.pwd-sheet 那一版已撤）', !!mask && !!card)
+    ck('遮罩 + 那张卡两层都在（旧的 .pwd-layer/.pwd-sheet 那一版已撤）', !!mask && !!card)
     ck('遮罩铺满整屏（与分类管理同一口径）',
       !!mask && Math.abs(mask.height - win.windowHeight) <= 1 && Math.abs(mask.width - win.windowWidth) <= 1,
       mask && `${mask.width}×${mask.height}`)
-    ck('卡以屏心为中心（不再贴底，所以按钮不会再被切）',
-      !!card && Math.abs((card.left + card.right) / 2 - win.windowWidth / 2) <= 2 &&
-      Math.abs((card.top + card.bottom) / 2 - win.windowHeight / 2) <= 2,
-      card && `圆心 ${((card.left + card.right) / 2).toFixed(1)}/${((card.top + card.bottom) / 2).toFixed(1)} 屏心 ${(win.windowWidth / 2).toFixed(1)}/${(win.windowHeight / 2).toFixed(1)}`)
+    // 站长 10-02 iPhone 11：居中那一版键盘还是把两枚按钮盖住了（微信只保证焦点框不被压住，
+    // 它不知道卡底下还有按钮）。这一层改成坐到上面，旧判据"卡以屏心为中心"作废，
+    // 换成钉这条功能：卡底下空出来的那一截高过系统数字键盘。
+    // 键盘是按 pt 长的、不是按 rpx，所以这一条用 px 比；离顶那一档是 rpx，两边都折成 rpx 看。
+    const rpx = (px) => (px * 750) / win.windowWidth
+    ck('卡坐到上面（离顶 180rpx），底下空出来那一截高过系统数字键盘（250pt 那一档）',
+      !!card && Math.abs(rpx(card.top) - 180) <= 6 && win.windowHeight - card.bottom >= 250,
+      card && `离顶 ${rpx(card.top).toFixed(0)}rpx 底下空 ${(win.windowHeight - card.bottom).toFixed(0)}px`)
     // 他打回的那一条就是"下方的按钮被遮挡"——所以这一条是这块的核心判据。
     // card 读不到的时候不许往下走：`card.bottom` 会把整把尺子炸掉，后面几十条一起没。
     const btnRects = await rects('.pwd-btn')
@@ -103,6 +107,18 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     const wantScene = i18n.t(d.pwdEntering ? 'privatePasswordScene' : 'privatePasswordSetHint', 'zh')
     ck('使用场景那句写在卡里面，且吃的是字典里对应这一态的那句',
       sceneTx.replace(/\s+/g, '') === wantScene.replace(/\s+/g, ''), `${sceneTx.slice(0, 24)} ← ${d.pwdEntering ? 'Scene' : 'SetHint'}`)
+    // 站长 10-02：这句一回行就把下面那排格子顶歪，所以要压字号。
+    // 钉两条与单位无关的相对判据，不钉"等于 --fs-tiny 那个绝对数"：实测替身回给
+    // `style('font-size')` 的字级值和声明里的 rpx 不是同一个折法（这里量到 19.2 而不是 21），
+    // 拿绝对数钉会假红，而这句真正要的两件事都是相对的——比下面那句提醒小一档、且只占一行。
+    const sceneEl = await me.$('.pwd-scene')
+    const sceneBox = await rect('.pwd-scene')
+    const tipElForFS = await me.$('.pwd-tip')
+    const sceneFS = parseFloat(await sceneEl.style('font-size'))
+    const tipFS = tipElForFS ? parseFloat(await tipElForFS.style('font-size')) : 0
+    ck('那句比下面「新密码（6 位数字）」那档还小（压过字号），且整句只占一行（没有回行）',
+      !!sceneBox && sceneFS > 0 && (!tipElForFS || sceneFS < tipFS) && sceneBox.height < sceneFS * 2,
+      `字 ${rpx(sceneFS).toFixed(1)} 提醒 ${tipFS && rpx(tipFS).toFixed(1)}rpx 高 ${rpx(sceneBox.height).toFixed(0)}rpx`)
     const nameTx = await tx(await me.$('.pwd-name'))
     ck('从上到下第一样是功能名称', nameTx.indexOf('私密密码') === 0, nameTx)
     // 原来这条只量「长度 > 6」，而 tx(null) 回的是「（元素不存在）」整整七个字——
@@ -134,12 +150,23 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('设置态是六个方格', cells.length === 6, `cells=${cells.length}`)
     const capture = await me.$('.pwd-capture')
     ck('六格背后只有一只 input（六只就要点六次才起键盘）', !!capture)
-    ck('那只 input 是数字键盘、最多 6 位、掩码',
+    // 站长 10-02 iPhone 11：这只原来挂 password="{{true}}"，iOS 的密文点是系统那一层画的、
+    // 不吃 CSS opacity，于是六个格子左边漏出一串点和光标（他说的"锚点错位"）。
+    // 现在改成普通数字输入 + 字和光标一律染透明；同时 adjust-position 关掉，键盘不再顶整页。
+    const meWx = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/me/me.wxml'), 'utf8')
+    const capTag = ((meWx.match(/<input class="pwd-capture"[\s\S]*?\/>/) || [])[0] || '')
+    ck('那只 input 是数字键盘、最多 6 位，且整只标签里不再挂 password（漏点的就是它）',
       (await capture.attribute('maxlength')) + '' === '6' &&
-      (await capture.attribute('password')) !== '' &&
-      (await capture.attribute('type')) === 'number')
-    const capStyle = await capture.style('opacity')
-    ck('input 自己是隐形的（屏上只看见方格）', parseFloat(capStyle) === 0, capStyle)
+      (await capture.attribute('type')) === 'number' &&
+      !!capTag && !/\bpassword=/.test(capTag),
+      `maxlength=${await capture.attribute('maxlength')} type=${await capture.attribute('type')} 标签里挂 password=${/password=/.test(capTag)}`)
+    ck('那只 input 自己不让微信顶页（adjust-position 关掉，键盘改由卡上移让）',
+      /adjust-position="\{\{false\}\}"/.test(capTag), capTag.slice(0, 78))
+    const capOpacity = await capture.style('opacity')
+    const capColor = await capture.style('color')
+    ck('input 整只隐形：opacity 0，字色也染透明（opacity 被哪个内核忽略都不会把密码露在屏上）',
+      parseFloat(capOpacity) === 0 && /rgba\(0, 0, 0, 0\)|transparent/i.test(capColor),
+      `opacity=${capOpacity} color=${capColor}`)
     ck('设置态一行两枚：取消 + 确定', (await btnOf()).join('|') === '取消|确定', (await btnOf()).join('|'))
     await mp.screenshot({ path: path.join(OUT, '01b-私密密码设置态弹层.png') })
 

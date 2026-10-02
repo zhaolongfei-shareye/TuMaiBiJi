@@ -209,8 +209,11 @@
 }
 
 /* ---------- 魅力值规则（站长 10-01 深夜：这一组最底下那行「魅力 + 数字」撤掉，换成一块规则）
-   一条一行、行高与上面那组菜单行同一档（106rpx），数字右对齐吃全局那支数字字形。
-   三个数不写死在模板里：由 me.js 的 loadQuota 从 /api/user/quota 填，读不到整块不出现。 */
+   站长 10-02 真机第二版：三行之间不要横线分隔——"这是一件事三个要点，是完整的论述，
+   不是区分三件事"。所以线撤了、行高从菜单那一档 106 收到 72，每行前面挂一枚点，
+   与新建页四步指引、Tips 同一枚黄点（色值由 me.js 的 ruleDotStyle 从 palette.TIP_DOT 递进来，
+   写进样式表就是第二份色板）。三个数不写死在模板里：由 me.js 的 loadQuota 从 /api/user/quota
+   填，读不到整块不出现。 */
 .rules {
   padding-bottom: 0;
 }
@@ -225,9 +228,15 @@
 .rule {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  min-height: 106rpx;
-  border-top: var(--w-edge) solid var(--card-edge);
+  gap: var(--sp-2);
+  min-height: 72rpx;
+}
+
+.rdot {
+  flex: none;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
 }
 
 .rule-label {
@@ -309,11 +318,12 @@
 
 /* ---------- 私密密码：就地展开，长在列表里面，不再浮一层 ---------- */
 /* ---------- 私密密码这一层（站长 10-01 深夜第二次改口径：撤掉底部 1/3 那一份，
-   照「分类管理」那一页改成整屏遮罩 + 居中卡）----------
-   几何一项都不自己发明：遮罩 rgba(20,20,28,.55) / 卡宽 620rpx / 内边距 48·32·32 /
-   一行两枚各占一半 —— 与 categories.wxss 的 .dialog-mask / .dialog-card / .dialog-actions 同值。
-   原来那 1/3 高的那份为什么不行：卡里的按钮贴在层底，键盘一顶就把「确定」盖住了（他截图里那条）。
-   居中卡不吃屏幕底边，键盘从下面顶上来时整张卡一起走，按钮永远在。 */
+   照「分类管理」那一页改成整屏遮罩 + 卡）----------
+   站长 10-02 iPhone 11：居中那一版键盘还是把两枚按钮盖住了——微信只保证"焦点框不被压住"，
+   它不知道这张卡底下还有按钮。所以这一层不再居中：卡自己坐到上面去（离顶 180rpx），
+   input 那边同时关掉 adjust-position（不让微信去顶整页），两枚按钮永远在键盘上面。
+   其余几何一项都不自己发明：遮罩 rgba(20,20,28,.55) / 卡宽 620rpx / 内边距 48·32·32 /
+   一行两枚各占一半 —— 与 categories.wxss 的 .dialog-mask / .dialog-card / .dialog-actions 同值。 */
 .pwd-mask {
   position: fixed;
   top: 0;
@@ -322,8 +332,9 @@
   bottom: 0;
   background: rgba(20, 20, 28, 0.55);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: 180rpx;
   z-index: 100;
 }
 
@@ -344,12 +355,15 @@
 }
 
 /* 功能名下面那句是"这串密码用在哪"——他要的"使用场景说明要写清楚"，
-   两态各一句：没设过说用途，已设过说"要换就得先重置"。 */
+   两态各一句：没设过说用途，已设过说"要换就得先重置"。
+   站长 10-02：这句一回行就压过格子，所以整句降到 --fs-tiny 并收字距——
+   中文那句（28 字）在 620 宽里正好走成一行，英文那句长，仍是两行，但已经淡一档。 */
 .pwd-scene {
   display: block;
-  margin-top: 14rpx;
-  font-size: var(--fs-meta);
-  line-height: var(--lh-body);
+  margin-top: 12rpx;
+  font-size: var(--fs-tiny);
+  letter-spacing: -0.2rpx;
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 
@@ -402,7 +416,10 @@
 
 /* 真正收键盘的是这一只，六个格子只是它的显示面：小程序没有"六格各收一个字符"的原生控件，
    做六只 input 反而要点六次才起键盘、删一位还要跳格。
-   透明但不能 display:none——那样焦点和键盘都起不来。 */
+   透明但不能 display:none——那样焦点和键盘都起不来。
+   站长 10-02 iPhone 11：原来这只挂的是 password，iOS 的密文点由系统那一层画、不吃 opacity，
+   于是格子左边漏出一串点和光标。现在改普通数字输入，字和光标一律染透明——
+   opacity 万一被哪个内核忽略，这一串也不会露在屏幕上（这一串是密码，屏幕前可能站着别人）。 */
 .pwd-capture {
   position: absolute;
   left: 0;
@@ -410,6 +427,9 @@
   width: 100%;
   height: 100%;
   opacity: 0;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: transparent;
   font-size: var(--fs-body);
 }
 

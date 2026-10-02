@@ -124,6 +124,30 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
       `onSavePoster 里 showShareImageMenu=${/showShareImageMenu/.test(main)} 直接存相册=${/saveImageToPhotosAlbum/.test(main)}`)
     ck('面板打不开时才退回存相册（兜底那条路还在）',
       /wx\.saveImageToPhotosAlbum\(/.test(fb) && /this\._saveToAlbum\(\)/.test(main), `兜底函数 ${fb.length} 字符`)
+    // 站长 10-02 iPhone 11：那五枚按钮所在的面板是半透明底，我们这一页（弹窗、取消/保存并分享、
+    // 底栏、另一张码）全从它背后透出来，"看到后面杂乱无章"。面板那一层是微信的、压不住，
+    // 能压的只有它底下这一页：拉起之前先铺一整屏纯黑。钉三件事——
+    // ① 铺在调面板之前、收在 complete（成功/取消/失败三条口最后都走它，漏了就是把人永久关在黑屏里）；
+    // ② 那一层真铺满整屏；③ 层序压得过底栏（底栏是自定义组件，automator 够不到，只能读它自己那份 z-index）。
+    const barSrc = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/custom-tab-bar/index.wxss'), 'utf8')
+    const barZ = Number((/\.tab-bar\s*\{[\s\S]*?z-index:\s*(\d+)/.exec(barSrc) || [])[1] || 0)
+    ck('拉起面板前先铺整屏纯黑，收在 complete（不会把人留在黑屏里）',
+      /shareDim:\s*true[\s\S]*wx\.showShareImageMenu/.test(main) &&
+      /complete:\s*\(\)\s*=>\s*this\.setData\(\{[\s\S]*shareDim:\s*false/.test(main))
+    await page.setData({ shareDim: true })
+    await sleep(320)
+    const dimBox = await mp.evaluate(() => new Promise((done) => {
+      wx.createSelectorQuery().select('.share-dim').boundingClientRect((r) => done(r || null)).exec()
+    }))
+    const win = await mp.evaluate(() => wx.getWindowInfo())
+    const dimZ = Number(await (await page.$('.share-dim')).style('z-index'))
+    ck('那一层铺满整屏，且层序压得过底栏（底栏那个数是它自己 wxss 里写的）',
+      !!dimBox && Math.abs(dimBox.width - win.windowWidth) <= 1 &&
+      Math.abs(dimBox.height - win.windowHeight) <= 1 && dimZ > barZ,
+      `${dimBox && dimBox.width}×${dimBox && dimBox.height} 窗 ${win.windowWidth}×${win.windowHeight} 层 ${dimZ} > 底栏 ${barZ}`)
+    await page.setData({ shareDim: false })
+    await sleep(320)
+    ck('面板一收就把这层撤掉（平时绝不在屏上）', !(await page.$('.share-dim')))
     await mp.screenshot({ path: path.join(OUT, '04-模板弹窗.png') })
 
     /* ---------- 关码 → 整张重画 ---------- */

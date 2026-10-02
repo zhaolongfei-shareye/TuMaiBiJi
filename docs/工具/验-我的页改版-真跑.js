@@ -14,6 +14,9 @@
 const automator = require('miniprogram-automator')
 const path = require('path')
 const fs = require('fs')
+// 规则块那枚点的颜色只认这一份真相：色值从 palette 读进来比在这里写死一个十六进制强
+// （写死了就是"尺子里还有第二份色板"，改了 palette 这一把不会跟着红）。
+const { TIP_DOT } = require(path.resolve(__dirname, '../../miniprogram/utils/palette.js'))
 
 const OUT = path.resolve(__dirname, '../design/我的-改版-实测')
 const APORT = 'ws://localhost:9431'
@@ -48,6 +51,7 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
   q.select('.pwd-name').boundingClientRect()
   q.select('.pwd-mask').boundingClientRect()
   q.selectAll('.rule').boundingClientRect()
+  q.selectAll('.rdot').boundingClientRect()
   q.exec((res) => resolve({
     band: res[0], sheet: res[1], logo: res[2], text: res[3],
     score: res[4], num: res[5], lab: res[6], pill: res[7],
@@ -55,6 +59,7 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
     cells: res[11] || [], btns: res[12] || [], pwdCard: res[13],
     group: res[14], aboutLead: res[15], h1: res[16],
     scene: res[17], pwdName: res[18], mask: res[19], rules: res[20] || [],
+    rdots: res[21] || [],
     windowWidth: wx.getWindowInfo().windowWidth,
     windowHeight: wx.getWindowInfo().windowHeight,
   }))
@@ -274,7 +279,6 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     m.items.length === 5 && Math.abs(toRpx(m.items[iPwd].height, W) - 106) <= 2,
     m.items[iPwd] ? toRpx(m.items[iPwd].height, W).toFixed(0) : '读不到那一行')
   const cardCx = m.pwdCard && m.pwdCard.left + m.pwdCard.width / 2
-  const cardCy = m.pwdCard && m.pwdCard.top + m.pwdCard.height / 2
   // 「与分类管理相同」这句怎么钉？钉一个渲染出来的绝对宽数会假红：那张卡声明的是
   // `width:620rpx` 而 `.card` 的左右内边距是内容之外（box-sizing 没设 border-box），
   // 所以外沿读出来是 684.6 而不是 620。钉两条更实在的：声明逐字与那张对话框一致（静态），
@@ -294,9 +298,15 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck(`卡外沿 = 620 + 左右各一档 --sp-4（${620 + 2 * SP4}rpx）`,
     !!m.pwdCard && Math.abs(toRpx(m.pwdCard.width, W) - (620 + 2 * SP4)) <= 8,
     m.pwdCard && toRpx(m.pwdCard.width, W).toFixed(1))
-  ck('卡在屏正中（不贴底，所以下面那两枚按钮不会再被切掉）',
-    !!m.pwdCard && Math.abs(cardCx - m.windowWidth / 2) <= 2 && Math.abs(cardCy - m.windowHeight / 2) <= 2,
-    m.pwdCard && `圆心 ${(cardCx || 0).toFixed(1)}/${(cardCy || 0).toFixed(1)} 屏心 ${(W / 2).toFixed(1)}/${(m.windowHeight / 2).toFixed(1)}`)
+  ck('卡不再居中，坐到上面去：水平居中 + 离顶 180rpx（站长 10-02：键盘盖住两枚按钮，窗口上移）',
+    !!m.pwdCard && Math.abs(cardCx - m.windowWidth / 2) <= 2 &&
+    Math.abs(toRpx(m.pwdCard.top - m.mask.top, W) - 180) <= 6,
+    m.pwdCard && `圆心x ${(cardCx || 0).toFixed(1)} 离顶 ${toRpx(m.pwdCard.top - m.mask.top, W).toFixed(0)}rpx`)
+  // 键盘那一截在模拟器里量不到（模拟器不起键盘），所以钉它的物理高度下界：
+  // iOS 的数字键盘连安全区约 250pt。键盘是按 pt 长的、不是按 rpx，所以这一条两边都用 px 比。
+  ck('卡底下空出来那一截高过系统数字键盘（250pt 那一档），按钮不会再被盖住',
+    !!m.pwdCard && m.windowHeight - m.pwdCard.bottom >= 250,
+    m.pwdCard && `空档 ${(m.windowHeight - m.pwdCard.bottom).toFixed(0)}px（= ${toRpx(m.windowHeight - m.pwdCard.bottom, W).toFixed(0)}rpx）`)
   ck('卡整块在屏以内', !!m.pwdCard && m.pwdCard.top >= 0 && m.pwdCard.bottom <= m.windowHeight + 1,
     m.pwdCard && `${m.pwdCard.top}~${m.pwdCard.bottom} / ${m.windowHeight}`)
   ck('使用场景这句写在卡里面（不是只有弹窗标题）',
@@ -387,9 +397,27 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck('那个奖励数（+10）整页只说一次，且说在规则块那一行',
     !!reward && dup.length === 1 && ruleLabels.indexOf(dup[0]) >= 0,
     `${reward}｜命中 ${dup.length} 行：${dup.join(' / ')}`)
-  ck('规则行不拥挤：每行至少 106 高（跟菜单行同一档）',
-    m.rules.length === 3 && m.rules.every((r) => toRpx(r.height, W) >= 104),
+  // 站长 10-02 真机：这三行不要横线分隔——"这是一件事三个要点，是完整的论述，不是区分三件事"。
+  // 旧判据"每行至少 106 高（跟菜单行同一档）"跟着作废：那一档是给一行一件事的菜单用的。
+  // 换成钉三条：整块收成一段话（每行明显低于菜单那一档）、每行前面一枚点且三枚成列、
+  // 样式表里那条 border-top 撤干净（不留没人用的死样式）。
+  ck('三行收成一段话：每行 60~90rpx，不再各占一格菜单（106 那一档）',
+    m.rules.length === 3 && m.rules.every((r) => {
+      const h = toRpx(r.height, W)
+      return h >= 60 && h <= 90
+    }),
     m.rules.map((r) => toRpx(r.height, W).toFixed(0)).join('/'))
+  ck('每行前面一枚点，三枚成列（左沿对齐）、14 见方',
+    m.rdots.length === 3 && Math.abs(toRpx(m.rdots[0].width, W) - 14) <= 2 &&
+    m.rdots.every((x) => Math.abs(x.left - m.rdots[0].left) <= 1),
+    `${m.rdots.length}枚 ${m.rdots.map((x) => toRpx(x.width, W).toFixed(0)).join('/')}`)
+  const tipRGB = ((h) => `rgb(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)})`)(
+    TIP_DOT.replace('#', ''))
+  const dotBg = (await styleOf(page, '.rdot', ['background-color']))['background-color'] || ''
+  ck('点的色值从 palette.TIP_DOT 递进来（与新建页四步、Tips 同一枚，不写进 me.wxss）',
+    dotBg.replace(/\s/g, '') === tipRGB.replace(/\s/g, ''), `${dotBg} ← palette ${TIP_DOT}`)
+  ck('三行之间不再画线（.rule 里那条 border-top 已随旧判据一起撤）',
+    !/border-top/.test(cssOf('pages/me/me.wxss', 'rule')), cssOf('pages/me/me.wxss', 'rule').slice(0, 60))
   ck('介绍卡在最上面（紧跟留白卡，不分二级）', !!m.aboutLead && !!m.sheet && m.aboutLead.top <= m.sheet.bottom + 2)
   ck('功能介绍和隐私条款不在这一页', !aboutLabels.some((x) => /功能|隐私/.test(x)))
   await mp.screenshot({ path: path.join(OUT, '02-关于-三行加规则块.png') })

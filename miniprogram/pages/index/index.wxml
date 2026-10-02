@@ -240,4 +240,10 @@
       </view>
     </view>
   </view>
+
+  <!-- 微信图片面板那五枚按钮是半透明底，会把我们这一页透出来（站长 10-02 iPhone 11：
+       "背景并没有全黑，看到后面杂乱无章"）。这一层盖在它底下那一页上：整屏纯黑，
+       连弹窗和底栏一起盖住（底栏是自定义组件、z-index 999，所以这里要压过它）。
+       面板一收就由 onSavePoster 的 complete 撤掉，不常驻。 -->
+  <view wx:if="{{shareDim}}" class="share-dim"></view>
 </view>

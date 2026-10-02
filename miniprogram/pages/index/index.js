@@ -52,6 +52,8 @@ Page({
     canvasW: poster.W,
     canvasH: 750,
     posterBusy: false,
+    // 微信那个五枚按钮的图片面板压不住自己半透明的底，能压的是它底下这一页（见 onSavePoster）
+    shareDim: false,
     // 弹窗里那个二维码开关：只影响这一张成品图，与海报页同一条语义
     noQr: false,
     // 搜索条那一块面不再是一支固定蓝，而是由当前壁纸的页面底派生（palette.chromeOf）。
@@ -636,9 +638,13 @@ Page({
   // 站长 10-01：账号认证下来了，图片分享能力可以接。这枚按钮从"存进相册"换成弹微信那个
   // 五枚一排的图片面板（发送给朋友 / 分享到朋友圈 / 收藏 / 保存图片 / 转发为贴图），存和发一次给完。
   // 这个面板只在真机有——开发者工具里一定 fail，所以那条路退回"直接存相册"，不让人白点一次。
+  // 站长 10-02 iPhone 11：面板自己是半透明的底，我们那一页（弹窗、取消/保存并分享、底栏、
+  // 另一张码）全从它背后透出来，看着杂乱无章。面板那层压不住（微信的），能压的只有它底下这一页：
+  // 拉起之前先整屏盖成纯黑，面板一收（成功、取消、失败三条口都走 complete）就把这层撤掉。
   onSavePoster() {
     const path = this.data.posterImagePath
     if (!path) return
+    this.setData({ shareDim: true })
     wx.showShareImageMenu({
       path,
       success: () => this._closeTemplate(),
@@ -647,6 +653,7 @@ Page({
         if (msg.indexOf('cancel') >= 0) return
         this._saveToAlbum()
       },
+      complete: () => this.setData({ shareDim: false }),
     })
   },
 

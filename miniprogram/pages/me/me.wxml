@@ -95,11 +95,14 @@
       </button>
     </view>
 
-    <!-- 魅力值规则（站长 10-01 深夜：原来这一组最底下那行「魅力 + 数字」撤掉，换成一块规则，
-         一条一行、不要太拥挤）。三个数由 loadQuota 从 /api/user/quota 填，读不到整块不出现。 -->
+    <!-- 魅力值规则（站长 10-01 深夜：原来这一组最底下那行「魅力 + 数字」撤掉，换成一块规则）。
+         站长 10-02 真机打回第二版：三行之间不要横线——"这是一件事三个要点，是完整的论述，
+         不是区分三件事"。所以线撤掉，每行前面挂一枚点，行高收回到一行的呼吸，读下来是一段话。
+         三个数仍由 loadQuota 从 /api/user/quota 填，读不到整块不出现。 -->
     <view wx:if="{{mindRules.length}}" class="card rules">
       <text class="rules-title">{{t.mindRulesTitle}}</text>
       <view class="rule" wx:for="{{mindRules}}" wx:key="label">
+        <view class="rdot" style="{{ruleDotStyle}}"></view>
         <text class="rule-label">{{item.label}}</text>
         <text class="rule-value">{{item.value}}</text>
       </view>
@@ -112,7 +115,11 @@
        改成整屏遮罩 + 居中卡）。从上到下：功能名 → 使用场景说明 → 校验提醒 + 六个方格 →
        一行两枚（左退出、右动作）。六个格子是同一只隐藏 input 的显示面（六只 input 要点六次
        才起键盘）。输完第一遍自动跳到第二遍，第二遍输满六位才真的发请求。
-       点遮罩空白处收回，和分类管理那一页一个手势（卡自己 catchtap 挡住，不冒泡）。 -->
+       点遮罩空白处收回，和分类管理那一页一个手势（卡自己 catchtap 挡住，不冒泡）。
+       站长 10-02 iPhone 11 真机两条：①这只 input 原来挂 password="{{true}}"，iOS 的密文点是
+       系统那一层画的，不吃 CSS opacity——所以六个格子左边漏出一串点和光标（他说的"锚点错位"）。
+       现在改成普通数字输入，字由样式染成透明，屏幕上只剩我们自己的六枚点；
+       ②键盘盖住了下面两枚按钮 → adjust-position 关掉（不让微信去顶整页），卡自己坐到上面去。 -->
   <view wx:if="{{pwdOpen}}" class="pwd-mask" bindtap="onClosePwdPanel">
     <view class="pwd-card card" catchtap="">
       <text class="pwd-name">{{pwdName}}</text>
@@ -121,7 +128,7 @@
       <view wx:if="{{pwdEntering}}" class="pwd-boxes">
         <view wx:for="{{[0, 1, 2, 3, 4, 5]}}" wx:key="index"
           class="pwd-cell {{pwdBuf.length > index ? 'fill' : ''}}"></view>
-        <input class="pwd-capture" type="number" maxlength="6" password="{{true}}"
+        <input class="pwd-capture" type="number" maxlength="6" adjust-position="{{false}}"
           focus="{{pwdFocus}}" value="{{pwdBuf}}" bindinput="onPwdBuf" />
       </view>
       <view class="pwd-two">
