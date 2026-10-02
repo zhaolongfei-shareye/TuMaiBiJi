@@ -185,6 +185,43 @@ const lum = (png, x0, x1, y0, y1) => JSON.parse(
   const now = await mp.evaluate(() => getCurrentPages().slice(-1)[0].route)
   ck('右半截照旧导流去卡片模板页', now === 'pages/profile/profile', now)
 
+  // ---------- ⑥ 英文那一版：两半挤不挤得下 ----------
+  // 「Dim photo」比「调亮度」宽三倍，而这行是居中排的两块，中间只有 34rpx 的缝。
+  // 文案不钉字面量、钉字典（那两串改过两轮），几何才是要量的东西。
+  await mp.evaluate(() => {
+    const app = getApp()
+    if (app.globalData.userInfo) app.globalData.userInfo.language = 'en'
+  })
+  page = await enter('/pages/create/create')
+  await sleep(4500)
+  const i18n = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
+  const halvesEn = await page.$$('.swap-half')
+  // 两半的矩形必须走 selectAll：`.select()` 只回第一个，写两遍拿到的是同一个元素的两份拷贝，
+  // "不重叠"那条永远绿（自己钉自己）。
+  const hrect = await mp.evaluate(() => new Promise((resolve) => {
+    wx.createSelectorQuery().selectAll('.swap-half').boundingClientRect().exec((r) => resolve(r[0]))
+  }))
+  ck('英文两半的文案就是字典那两条',
+    halvesEn.length === 2
+    && (await (await halvesEn[0].$('.swap-text')).text()) === i18n.texts('en').bgDimLabel
+    && (await (await halvesEn[1].$('.swap-text')).text()) === i18n.texts('en').homeBgSwap,
+    hrect.map((r) => r && Math.round(r.width)).join(' / '))
+  // 两半的矩形不能叠，且整组要在 .home-swap 那一行里（那一行左右各内缩 24，可用宽 702rpx）
+  const row = (await rects(['.home-swap']))[0]
+  ck('英文态两半不重叠、不撞行边',
+    hrect[0] && hrect[1] && row
+    && hrect[0].right <= hrect[1].left + 0.5
+    && hrect[0].left >= row.left - 0.5 && hrect[1].right <= row.right + 0.5,
+    hrect[0] && hrect[1] && row
+      ? `左 ${Math.round(rpx(hrect[0].left))}..${Math.round(rpx(hrect[0].right))} `
+        + `右 ${Math.round(rpx(hrect[1].left))}..${Math.round(rpx(hrect[1].right))} 行 ${Math.round(rpx(row.width))}`
+      : '量不到')
+  await mp.screenshot({ path: path.join(OUT, '实测-5-英文两半.png') })
+  await mp.evaluate(() => {
+    const app = getApp()
+    if (app.globalData.userInfo) app.globalData.userInfo.language = 'zh'
+  })
+
   // ---------- 还原 ----------
   await mp.evaluate((v) => {
     if (v === '' || v === undefined || v === null) wx.removeStorageSync('bgDim')
