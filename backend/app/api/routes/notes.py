@@ -7,6 +7,7 @@ import logging
 from sqlalchemy import and_, or_
 from app.db.database import get_db
 from app.models.note import Note
+from app.models.share import Share
 from app.models.user import User
 from app.core.auth import get_current_user
 from app.core.private_access import (
@@ -105,6 +106,18 @@ class NoteDetail(NoteBrief):
     is_private: bool = False
 
 
+class NoteListItem(NoteBrief):
+    """列表那一行比详情多出来的两样：这一篇此刻有没有开着的分享码、以及该显示谁的昵称。
+
+    只挂 GET /api/notes 这一条路由。详情页另走 getShareStatus，如果两处都发一份
+    同样的事实，早晚会出现"列表说已分享、详情说没有"这种对不上的样子——所以
+    NoteDetail 故意不继承这个类。
+    """
+
+    has_active_share: bool = False
+    share_author_name: str | None = None
+
+
 class NoteCreate(BaseModel):
     title: Title
     summary: Optional[Summary] = None
@@ -139,7 +152,32 @@ class NoteUpdate(BaseModel):
         return values
 
 
-@router.get("/", response_model=List[NoteBrief])
+def _attach_share_marks(db: Session, notes: list) -> None:
+    """给这一页的每条笔记挂上「此刻有没有开着的码」和「那一格该显示谁的昵称」。
+
+    一次 IN 查完，不逐篇查：一页 20 篇各自查一次，首页拉一次就是 20 个来回。
+    shares 上有"一篇只留一张开着的码"那个部分唯一索引（models/share.py），所以一个
+    note_id 至多命中一行，做成字典不会互相覆盖。
+    昵称两头都有来源：自己分享出去的那篇，用那张码上快照的 author_name（那是他建分享
+    那一刻主动公开过的名字）；转存别人的那篇，用 notes.imported_from 里记的那份。
+    两个都没有就留空——界面上那一格不画名字，不拿"图麦"这类假名去填。
+    """
+    ids = [n.id for n in notes]
+    shared: dict = {}
+    if ids:
+        shared = {
+            row[0]: row[1]
+            for row in db.query(Share.note_id, Share.author_name)
+            .filter(Share.note_id.in_(ids), Share.is_active == True)  # noqa: E712
+            .all()
+        }
+    for n in notes:
+        n.has_active_share = n.id in shared
+        imported = n.imported_from if isinstance(n.imported_from, dict) else {}
+        n.share_author_name = shared.get(n.id) or imported.get("author_name")
+
+
+@router.get("/", response_model=List[NoteListItem])
 def list_notes(
     request: Request,
     skip: int = 0,
@@ -188,6 +226,9 @@ def list_notes(
         .limit(limit)
         .all()
     )
+    # 挂在这一步而不是最后一步：下面 locked 那支只裁私密那几行，普通笔记仍是原对象，
+    # 两支出门都得带着这两样。
+    _attach_share_marks(db, notes)
     if not locked:
         return notes
     # 概要跟着正文一起裁：界面上它只在验过密码、展开那一行时才画，所以裁掉不影响
