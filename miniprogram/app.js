@@ -1,5 +1,5 @@
 const { request } = require('./utils/api')
-const { themeOf, setActiveTheme } = require('./utils/palette')
+const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimVeilStyle } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
 // 分享卡片的路径上带着邀请人的 user id（?inviter=123）。落到本地存储是因为它必须活到
@@ -18,6 +18,11 @@ const LOCAL_WALLPAPER_KEY = 'localWallpaper'
 // 也不该同步——安卓上这三档基本命不中，跟着账号跑到别人设备上只会让人看到"没生效"。
 const UI_FONT_KEY = 'uiFont'
 const UI_FONT_CLASS = { song: 'font-song', fang: 'font-fang', kai: 'font-kai' }
+
+// 背景形象图压多深，同样是本机偏好：它只改这一台设备上那张图的明暗，
+// 跟着账号跑到另一台设备上，只会让人看到"我的图怎么自己变黑了"。
+// 三档的值与那两枚灰度都在 utils/palette.js 的 BG_DIMS 里，这里只管存哪一个档被选中。
+const BG_DIM_KEY = 'bgDim'
 
 function rememberInviter(options) {
   const raw = options && options.query ? options.query.inviter : ''
@@ -169,6 +174,25 @@ App({
 
   uiFontClass() {
     return UI_FONT_CLASS[this.uiFont()] || ''
+  },
+
+  /**
+   * 背景形象图那一档深浅，三页（新建／笔记／我的）每次进页读一次。
+   * 返回的三样直接 setData：dimV 是当前档（页面自己判断要不要显示"最深"之类的说明），
+   * dimDot 是「调亮度」右边那一枚点的底色，dimVeil 是叠在现网罩子之上那层黑的样式串。
+   * 0 档时 dimVeil 是空串——那一层根本不渲染，不是叠了一层全透明，
+   * 这就是站长要的"纯白＝对原图不做处理"。
+   */
+  bgSkin() {
+    const v = dimAt(wx.getStorageSync(BG_DIM_KEY)).v
+    return { dimV: v, dimDot: dimDotStyle(v), dimVeil: dimVeilStyle(v) }
+  },
+
+  // 点一下换一档：纯白 → 25% → 50% → 回纯白。存完把新那档原样返回，页面 setData 就行。
+  cycleBgDim() {
+    const v = dimNext(dimAt(wx.getStorageSync(BG_DIM_KEY)).v)
+    wx.setStorageSync(BG_DIM_KEY, v)
+    return { dimV: v, dimDot: dimDotStyle(v), dimVeil: dimVeilStyle(v) }
   },
 
   // .container 上那一串类名 = 主题 + 界面字体。页面只管贴，不各自拼第二份规则。

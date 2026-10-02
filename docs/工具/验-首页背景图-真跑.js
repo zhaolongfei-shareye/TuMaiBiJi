@@ -116,7 +116,12 @@ const ck = (name, ok, got) => {
   await sleep(4000)
   d = await page.data()
   ck('首页一直铺着图（没有"关掉"这条路）', !!d.bgSrc, d.bgSrc || '(空)')
-  await (await page.$('.home-swap')).tap()
+  // 10-02 晚这一行拆成两半（左「调亮度」一枚点、右「换背景」一枚箭头），父节点身上
+  // 没有 tap 了：点 .home-swap 的正中会落在两半之间那道 34rpx 缝里，什么都不会发生。
+  // 所以这里按次序取第二半——顺序就是这一轮的约定，改顺序要连着改新建页。
+  const halves = await page.$$('.swap-half')
+  ck('换背景那一行是两半（调亮度 / 换背景）', halves.length === 2, `${halves.length} 半`)
+  await halves[1].tap()
   await sleep(2500)
   const now = await mp.currentPage()
   ck('点「换背景」落在卡片模板页', now.path === 'pages/profile/profile', now.path)

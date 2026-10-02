@@ -5,6 +5,11 @@
        两个都 fixed，跟着视口不跟着滚；点它们等于点容器空白处，照样收条。 -->
   <image wx:if="{{bgSrc}}" class="page-bg" src="{{bgSrc}}" mode="aspectFill" />
   <view wx:if="{{bgSrc}}" class="page-scrim"></view>
+  <!-- 「调亮度」那枚点选中的档：叠在上面那层现网罩子**之上**的一层黑，跟着视口不跟着滚。
+       0%（纯白）这一档 dimVeil 是空串，这一层根本不渲染——那一档就是"对原图不做处理"。
+       它坐在罩子之上、内容之下（罩子 z-index 1、标题和录入条 z-index 2），所以字不会被压黑，
+       只有照片变沉。 -->
+  <view wx:if="{{bgSrc && dimVeil}}" class="page-dim" style="{{dimVeil}}"></view>
 
   <view class="title-row">
     <view class="page-title">{{t.createHeading}}</view>
@@ -167,11 +172,19 @@
       </view>
     </view>
 
-    <!-- 换背景图：只是导流到「我的 → 卡片模板」那一页，选图仍然只在那一页做一次，
-         这里不弹相册——一个功能只留一个入口。 -->
-    <view wx:if="{{bgSrc}}" class="home-swap" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}">
-      <view class="swap-glyph glyph-chev"></view>
-      <text class="swap-text">{{t.homeBgSwap}}</text>
+    <!-- 这一行两件事，各一个入口：左边「调亮度」换深浅一档，右边「换背景」导流到
+         「我的 → 卡片模板」那一页选图（这里不弹相册——一个功能只留一个入口）。
+       两截都是 catchtap：点左边不能顺手把右边那条导流也触发，点整行也不该冒到
+       容器的 collapse 上去。 -->
+    <view wx:if="{{bgSrc}}" class="home-swap">
+      <view class="swap-half" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
+        <text class="swap-text">{{t.bgDimLabel}}</text>
+        <view class="dim-dot" style="{{dimDot}}"></view>
+      </view>
+      <view class="swap-half" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}" role="button">
+        <text class="swap-text">{{t.homeBgSwap}}</text>
+        <view class="swap-glyph glyph-chev"></view>
+      </view>
     </view>
   </view>
 </view>

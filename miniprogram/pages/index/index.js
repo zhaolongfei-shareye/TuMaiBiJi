@@ -65,6 +65,10 @@ Page({
     bgSrc: '',
     // 头部那张图的摆法，由 fitHead() 问过图片尺寸之后现算（同一套数在 poster.bandGeom）
     imgStyle: '',
+    // 背景深浅：与新建页同一档、同一个本机键。初值给 0 档（不叠），第一帧不出现 style="undefined"。
+    dimV: 0,
+    dimDot: '',
+    dimVeil: '',
   },
 
   async onShow() {
@@ -80,6 +84,8 @@ Page({
       t: texts(lang),
       themeClass,
       bgSrc,
+      // 深浅每次进页重读：在首页那枚点上换过档，回到这一屏头部就该跟着沉或跟着亮。
+      ...app.bgSkin(),
       // 搜索条那一块面由当前壁纸的页面底派生（palette.chromeOf），和底部导航那条胶囊同一个值；
       // 每次进页重算，留着 data 字面量那份就等于永远停在米白那一档。
       // 但铺了图就整串不发：style 上的自定义属性优先级高于任何选择器，

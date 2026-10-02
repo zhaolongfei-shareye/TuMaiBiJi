@@ -26,6 +26,28 @@ const UNCATEGORIZED = { name: '墨黑', bg: '#23252C', ink: '#FFFFFF' }
 const TIP_DOT = '#F6C445'
 
 /**
+ * 背景形象图的深浅三档（站长 10-02 定：新建页「换背景」左边一枚圆点，点一下换一档，
+ * 纯白 → 25% → 50% → 回纯白；值只存本机，铺了图的三页共用同一档）。
+ * dot  = 界面上那一枚点的灰度，点本身就是当前档，不再另画刻度或文字。
+ * veil = 叠在现网那层罩子**之上**的黑。0 档是 0 —— 这一档就是"对原图不做处理"，
+ *        现网 `.page-scrim` 那七个停点一个字不动（它保证标题在照片上读得清，撤了字就糊）。
+ * 这三枚灰度是这一轮新造的，和 TIP_DOT 同一条规矩：只从 palette 出，不许抄进 WXSS。
+ */
+const BG_DIMS = [
+  { v: 0, dot: '#FFFFFF', veil: 0 },
+  { v: 25, dot: '#A7ABB2', veil: 0.25 },
+  { v: 50, dot: '#5C6169', veil: 0.5 },
+]
+const BG_DIM_VEIL = '#08090C'
+
+const dimAt = (v) => BG_DIMS.find((d) => d.v === v) || BG_DIMS[0]
+// 点一下换到下一档，走到头回纯白。
+const dimNext = (v) => BG_DIMS[(BG_DIMS.indexOf(dimAt(v)) + 1) % BG_DIMS.length].v
+const dimDotStyle = (v) => `background:${dimAt(v).dot}`
+// 0 档返回空串：那一层根本不渲染，不是"叠了一层全透明"。
+const dimVeilStyle = (v) => (dimAt(v).veil ? `background:${withAlpha(BG_DIM_VEIL, dimAt(v).veil)}` : '')
+
+/**
  * 壁纸名。中文是两字釉色本名（壁纸条只有"色块 + 名字"那么大地方），
  * 英文侧站长 10-01 晚补的：这一排以前在英文态还是八个汉字。
  * 一律收成单个词——那一格不放得下两行。
@@ -471,6 +493,11 @@ module.exports = {
   TONES,
   UNCATEGORIZED,
   TIP_DOT,
+  BG_DIMS,
+  dimAt,
+  dimNext,
+  dimDotStyle,
+  dimVeilStyle,
   MOTIFS,
   THEMES,
   POSTER_SCHEMES,

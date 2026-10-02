@@ -7,6 +7,10 @@
   <view class="head">
     <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
     <view class="head-scrim"></view>
+    <!-- 「调亮度」选中那一档叠在罩子之上的那层黑，与新建页 .page-dim 同一份值、同一个开关。
+         0% 那一档 dimVeil 是空串，这一层不渲染＝对原图不做处理。标题和三列数字在它后面，
+         只被照片沉、不被字一起压黑。 -->
+    <view wx:if="{{bgSrc && dimVeil}}" class="head-dim" style="{{dimVeil}}"></view>
     <view class="h1">{{t.notesHeading}}</view>
     <!-- 三列：笔记 / 分享 / 收藏。数全部来自服务端那一次 /api/user/quota，
          本页不自己相加（分享数=当前公开中的篇数、收藏数=收藏过你的不同人数，

@@ -44,8 +44,13 @@ Page({
     t: texts('zh'),
     // 药丸：默认停在「设置」，「关于」的内容直接长在头部下面，不分二级
     tab: 'set',
-    // 头部那一块：底图、圆 LOGO、昵称与口号、脑力值
+    // 头部那一段铺不铺图：'' 表示不铺（形象文件被系统清了）。
     bgSrc: '',
+    // 「调亮度」当前档：'' 表示 0%（那一档不叠层）。onShow 从 app.bgSkin() 现取，
+    // 三页同一个本机键，所以在这页点过、回新建页也是那一档。
+    dimV: 0,
+    dimDot: '',
+    dimVeil: '',
     imgStyle: '',
     logoSrc: '/assets/logo.png',
     nameText: '',
@@ -85,6 +90,7 @@ Page({
       t: texts(lang),
       themeClass,
       bgSrc: poster.homeBg(),
+      ...app.bgSkin(),
       logoSrc: '/assets/logo.png',
       nameText: t('meGreeting', lang),
       sloganText: t('slogan', lang),

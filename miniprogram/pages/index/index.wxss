@@ -32,6 +32,16 @@
     rgba(18, 20, 26, 0.44) 62%, rgba(18, 20, 26, 0.52) 100%);
 }
 
+/* 「调亮度」那一档叠在罩子之上的黑：几何与 .head-scrim 完全一样，透明度由
+   utils/palette.js 的 BG_DIMS 走 style 递进来，这里不写死任何色值。 */
+.head-dim {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+
 .h1 {
   position: absolute;
   left: var(--sp-4);

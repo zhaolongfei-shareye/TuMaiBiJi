@@ -1,0 +1,408 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>v18 · 做减法</title><style>
+@font-face{font-family:'WtsjMind';src:url(data:font/ttf;base64,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) format('truetype');font-weight:100;font-style:normal}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{background:#DCDAD4;font-family:'PingFang SC','Helvetica Neue',sans-serif;color:#23252c;padding:48px 40px 64px}
+h1{font-size:34px;letter-spacing:-.6px;margin-bottom:10px}
+.lead{font-size:16px;line-height:1.7;color:#4a4f47;max-width:1560px;margin-bottom:34px}
+.lead code{background:#fff;padding:2px 7px;border-radius:5px;font-size:15px}
+.row{display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap;margin-bottom:44px}
+.cell{width:750px}
+.cap{font-size:15px;line-height:1.65;color:#4a4f47;margin-top:12px}
+.cap b{color:#23252c}
+.cap code{background:#fff;padding:1px 6px;border-radius:5px;font-size:14px}
+.tag{display:inline-block;font-size:13px;padding:2px 8px;border-radius:999px;background:#23252c;color:#F2EFE9;margin-right:6px;vertical-align:2px}
+.tag.new{background:#F6C445;color:#2A2005}
+.tag.cut{background:#b4231f;color:#fff}
+.ph{width:750px;height:1670px;border-radius:60px;overflow:hidden;position:relative;outline:2px solid #B9B6AF;
+  background:#f4f2ec;color:#23252c;
+  --fs-h1:42px;--fs-h2:34px;--fs-title:31px;--fs-body:28px;--fs-meta:24px;--fs-tiny:21px;--fs-label:20px;--fs-micro:18px;
+  --sp-2:16px;--sp-3:24px;--sp-4:32px;--sp-5:48px;--r-card:40px;--r-chip:28px;--r-pill:999px;--w-edge:3px;
+  --t2:#5c6068;--t3:#9a9ea6;--edge:rgba(35,37,44,.1);--chip:rgba(35,37,44,.06);--ink:#23252c}
+.status{height:94px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+  font-size:26px;font-weight:600;color:#fff;background:#181A20}
+.status .r{font-size:22px;font-weight:500;letter-spacing:1px}
+.nav{height:90px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600;position:relative;
+  color:#F2EFE9;background:#181A20}
+.nav .capsule{position:absolute;right:24px;top:22px;width:174px;height:46px;border-radius:999px;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
+  display:flex;align-items:center;justify-content:space-around;font-size:22px;color:#fff}
+.nav.paper{background:#f4f2ec;color:#23252c}
+.nav.paper .capsule{background:rgba(35,37,44,.06);border-color:rgba(35,37,44,.14);color:#23252c}
+.body{padding:0 24px;position:relative}
+.card{background:#fff;border:var(--w-edge) solid var(--edge);border-radius:var(--r-card)}
+/* 铺满屏的那张形象图（现网 create 页就是这个画法：图铺两页、永远铺）。
+   站长 10-02 下午：那根竖向滑块太重，撤了；晚上最后一条：三枚灰度小圆再收成**一枚**，
+   纯白 / 25% / 50% 三档，圆点直径与 Tips 字号同一档（--fs-meta 24）。 */
+.wall{position:absolute;inset:0;background:url(../../../miniprogram/assets/home-bg-portrait.jpg) center 15%/cover no-repeat}
+/* 0% 那一档 = 现网原样：这层渐变是 create.wxss 的 .page-scrim 逐字抄来的七个停点，
+   深浅控制不给它加任何东西。25% / 50% 才是在它之上再叠一层黑。 */
+.wall .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)}
+.wall.dim25 .scrim{background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%),rgba(8,9,12,.25)}
+.wall.dim50 .scrim{background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,rgba(18,20,26,.52) 83%,rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%),rgba(8,9,12,.5)}
+.top{position:relative;z-index:3;padding:26px 32px 0}
+.top .h1{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96)}
+.top .dt{font-size:var(--fs-meta);margin-top:12px;color:rgba(242,239,233,.72);letter-spacing:1px}
+.lang{position:absolute;right:32px;top:30px;display:flex;gap:20px;align-items:baseline;font-size:var(--fs-meta);color:rgba(242,239,233,.55)}
+.lang b{color:#F2EFE9;font-weight:700;border-bottom:4px solid #F2EFE9;padding:0 2px 4px}
+/* ① 新增：竖向亮度滑块。半透明，像浮在图上；下沿不越过面板上沿 */
+/* 一枚就够：点一下换一档（纯白 → 25% → 50% → 回纯白），点本身的深浅就是当前档。
+   可见直径 24（与 Tips 字号同档），透明热区撑到 48。 */
+.bric{display:flex;align-items:center;justify-content:center;width:48px;height:48px}
+.bric b{width:24px;height:24px;border-radius:50%;display:block;border:1px solid rgba(8,9,12,.28)}
+/* 底部录入这一带照抄现网 create.wxss：收起态 = Tips 一行 + 一枚纸白胶囊 + 换背景一行。
+   .entry-wrap{margin-top:62vh} 在 1486 的视口上把条顶落在 1105，Tips 那 68 高坐在它上面；
+   展开态 .entry-dock 把整块钉在 bottom:152，条身换成面板的圆头盖。 */
+.tips2{position:absolute;left:0;right:0;top:1037px;height:68px;display:flex;align-items:flex-start;
+  padding-left:48px;font-size:var(--fs-meta);line-height:1.4;color:rgba(242,239,233,.82);z-index:5}
+.tips2 i{width:14px;height:14px;margin:10px 12px 0 0;border-radius:50%;flex:none;background:#F6C445}
+.tips2 span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ebar{position:absolute;left:24px;right:24px;top:1105px;height:128px;border-radius:var(--r-pill);
+  background:#f2efe9;border:var(--w-edge) solid rgba(35,37,44,.1);display:flex;align-items:center;gap:22px;
+  padding:0 20px 0 34px;z-index:5}
+.ebar .lead{width:52px;height:52px;background:#23252c;flex:none}
+.ebar .lab{flex:1;min-width:0;font-size:var(--fs-title);font-weight:800;letter-spacing:-1px;color:#23252c;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ebar .hint{flex:none;font-size:var(--fs-meta);font-weight:600;color:rgba(35,37,44,.42)}
+.ebar .dots{display:flex;gap:20px;flex:none}
+.ebar .dots i{width:72px;height:72px;border-radius:50%}
+.swap{position:absolute;left:0;right:0;top:1255px;height:110px;display:flex;align-items:center;justify-content:center;
+  gap:12px;font-size:var(--fs-meta);font-weight:700;letter-spacing:1px;color:rgba(242,239,233,.85);z-index:5}
+.swap em{font-style:normal}
+.swap .bric{margin:0 4px 0 -12px}
+.swap i{width:24px;height:24px;background:rgba(242,239,233,.85);clip-path:polygon(0 0,100% 50%,0 100%)}
+.dock{position:absolute;left:24px;right:24px;bottom:152px;z-index:5}
+.dock .ebar{position:static;border-radius:var(--r-card) var(--r-card) 0 0;padding-bottom:4px}
+.panel{height:700px;background:#fff;border-radius:0 0 var(--r-card) var(--r-card);padding:28px 32px;position:relative;overflow:hidden}
+.p-head{display:flex;align-items:center;gap:18px}
+.p-head .ico{width:56px;height:56px;border-radius:16px;background:var(--ink);flex:none}
+.p-head b{font-size:var(--fs-h2);font-weight:700;flex:1}
+.p-head i{font-style:normal;font-size:var(--fs-meta);color:var(--t3)}
+.p-tabs{display:flex;gap:14px;align-items:center;padding:22px 0 8px;border-bottom:3px solid rgba(35,37,44,.07);font-size:var(--fs-body)}
+.p-tabs span{color:var(--t2);display:flex;align-items:center;gap:10px}
+.p-tabs span::before{content:'';width:16px;height:16px;border-radius:50%;background:var(--d,#ccc)}
+.p-tabs span.on{color:var(--ink);font-weight:700;border-bottom:5px solid var(--ink);padding-bottom:10px;margin-bottom:-8px}
+.p-body{padding-top:22px;font-size:var(--fs-meta);color:var(--t2)}
+.p-faces{display:flex;gap:22px;margin-top:22px}
+.p-faces div{flex:1;height:170px;border-radius:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:var(--fs-h2);font-weight:700}
+.p-faces div i{font-style:normal;font-size:var(--fs-tiny);font-weight:400;opacity:.72}
+.p-acts{position:absolute;left:32px;right:32px;bottom:30px;display:flex;gap:20px}
+.p-acts b{flex:1;height:96px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;font-size:var(--fs-body)}
+.p-acts b.g{background:var(--chip);color:var(--t2)}
+.p-acts b.s{background:var(--ink);color:#f2efe9}
+.guide{margin-top:24px;padding:18px 22px;border-radius:24px;background:rgba(35,37,44,.035)}
+.guide p{display:flex;align-items:center;gap:14px;font-size:var(--fs-meta);line-height:1.45;margin-bottom:8px}
+.guide p:last-child{margin-bottom:0}
+.guide em{font-style:normal;color:rgba(35,37,44,.72)}
+.guide s{color:rgba(35,37,44,.42);text-decoration:none}
+.guide i{width:14px;height:14px;border-radius:50%;flex:none;background:#F6C445}
+/* 底栏：纯图标 + 同色阶圆底（10-01 晚定稿），色从 chromeOf 现算 */
+.bar{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:44px;z-index:6;
+  background:#443c25;border:3px solid rgba(242,239,233,0.14);display:flex;align-items:center;justify-content:space-around;
+  box-shadow:0 16px 44px rgba(0,0,0,0.22)}
+.bar u{text-decoration:none;width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:rgba(242,239,233,0.62);color:#F2EFE9}
+.bar u.on{background:#796b41;color:#F2EFE9}
+.bar svg{width:36px;height:36px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+/* 「我的」页头部（band 542 + sheet 盖住 40） */
+.band{height:542px;position:relative;overflow:hidden;margin:0 -24px}
+.band .ph2{position:absolute;inset:0;background:url(../../../miniprogram/assets/home-bg-portrait.jpg) center 15%/cover no-repeat}
+.band .sc{position:absolute;inset:0;background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 14%,rgba(18,20,26,.5) 58%,rgba(18,20,26,.44) 100%)}
+.band .t1{position:absolute;left:32px;top:22px;font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96)}
+.band .mind{position:absolute;right:32px;top:24px;text-align:right;color:rgba(242,239,233,.74)}
+.band .mind b{display:block;font-family:'WtsjMind',sans-serif;font-weight:100;font-size:64px;line-height:.86}
+.band .mind i{font-style:normal;display:block;margin-top:10px;padding-left:4px;text-align:center;font-size:var(--fs-micro);font-weight:700;letter-spacing:4px;color:rgba(242,239,233,.62)}
+.sheet{position:relative;margin:-40px 0 0;height:144px;padding:0 32px;display:flex;align-items:center;gap:24px;
+  background:#fff;border-radius:var(--r-card)}
+.sheet .lg{width:80px;height:80px;border-radius:50%;flex:none;background:url(../../../miniprogram/assets/logo.png) center/cover no-repeat}
+.sheet .tx{flex:1;min-width:0}
+.sheet .tx b{display:block;font-size:var(--fs-title);font-weight:800;letter-spacing:-.4px;line-height:1.25}
+.sheet .tx i{display:block;font-style:normal;font-size:var(--fs-meta);color:var(--t2);line-height:1.4;margin-top:7px}
+.seg{display:flex;gap:4px;background:rgba(35,37,44,.055);border-radius:var(--r-pill);padding:5px;flex:none}
+.seg span{height:58px;line-height:58px;padding:0 24px;border-radius:var(--r-pill);font-size:var(--fs-meta);font-weight:700;color:var(--t2)}
+.seg span.on{background:var(--ink);color:#f4f2ec}
+.grp{margin-top:24px;padding:0 32px}
+.mi{display:flex;align-items:center;justify-content:space-between;height:106px;border-bottom:var(--w-edge) solid var(--edge);font-size:var(--fs-body);font-weight:700;letter-spacing:-.3px}
+.mi:last-child{border-bottom:none}
+.mi .ic{width:46px;height:46px;border-radius:50%;background:var(--ink);color:#f4f2ec;display:flex;align-items:center;justify-content:center;font-size:22px}
+/* ④ 右上角只剩「笔记」这一个数（分享、种草那两列随两个视图一起撤）；
+   只有一个屏，"当前在哪一屏"那条黄杠也不需要了。 */
+.stats{position:absolute;right:32px;top:24px;display:flex;z-index:4}
+.st{width:96px;text-align:center;color:rgba(242,239,233,.74)}
+.st b{display:block;font-family:'WtsjMind',sans-serif;font-weight:100;font-size:56px;line-height:.9}
+.st i{font-style:normal;display:block;margin-top:8px;font-size:var(--fs-micro);letter-spacing:2px;color:rgba(242,239,233,.62)}
+/* 背景图上这一行（站长 10-02 第三轮）：左边一条 Tips（该区那两条轮着显，一行只放得下一条），
+   右边三枚**裸 icon**——圆底和描边整块撤掉，只留中间图形，之间用一道竖线区隔；
+   整组紧靠右，下沿离列表区只留 14。点搜索：Tips 整条不渲染，搜索那枚就地向左摊成输入框，
+   点空白收回后 Tips 又回来。 */
+.tools{position:absolute;left:24px;right:24px;top:400px;height:88px;display:flex;align-items:center;
+  justify-content:space-between;z-index:5}
+.tp{display:flex;align-items:center;gap:14px;flex:1;min-width:0;font-size:var(--fs-meta);line-height:1.35;
+  color:rgba(242,239,233,.82)}
+.tp i{width:14px;height:14px;border-radius:50%;flex:none;background:#F6C445}
+.tp span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acts2{display:flex;align-items:center;gap:18px;flex:none;margin-left:26px}
+.acts2 svg{width:38px;height:38px;stroke:rgba(255,255,255,.86);fill:none;stroke-width:2.1;
+  stroke-linecap:round;stroke-linejoin:round}
+.acts2 a{display:flex;align-items:center}
+.acts2 a.on svg{stroke:#fff;stroke-width:3}
+.acts2 .vr{width:2px;height:38px;background:rgba(255,255,255,.28)}
+.srch{display:flex;align-items:center;gap:16px;height:88px}
+.srch.open{flex:1;min-width:0;border-radius:var(--r-pill);background:rgba(255,255,255,.18);
+  border:2px solid rgba(255,255,255,.36);padding:0 26px}
+.srch.open svg{width:34px;height:34px;stroke:rgba(255,255,255,.9);fill:none;stroke-width:2.1;
+  stroke-linecap:round;stroke-linejoin:round;flex:none}
+.srch span{flex:1;min-width:0;font-size:var(--fs-meta);color:rgba(242,239,233,.62);white-space:nowrap}
+/* ⑥ 列表区：「置顶」那一档钉在区顶（不跟月份滚）→ 下面左时间轴 + 右纸片墙 / 一行。
+   这里给 z-index:1 是为了造一个层叠上下文：纸片自己那几十级不能漏出去盖住黑底大图那一层。 */
+.list{position:absolute;left:0;right:0;top:686px;bottom:150px;background:#f4f2ec;z-index:1;
+  border-radius:var(--r-card) var(--r-card) 0 0;display:flex;flex-direction:column;overflow:hidden}
+/* 置顶上移到分类这一行的最左边（他：这样就不乱了）。画法走他一贯的口径：纯文字 + 选中那枚下面
+   一条短黄杠，不做按钮壳。右边那行小字是"当前处在只看置顶"的提示。 */
+.cats{display:flex;align-items:center;gap:14px;padding:26px 24px 18px;flex:none;
+  border-bottom:2px dashed rgba(35,37,44,.14)}
+.cats span{padding:8px 22px;border-radius:var(--r-pill);font-size:var(--fs-tiny)}
+.pinb{position:relative;font-size:var(--fs-tiny);font-weight:700;letter-spacing:1px;color:var(--t2);
+  padding-bottom:8px;flex:none;margin-right:10px}
+.pinb.on{color:var(--ink)}
+.pinb.on::after{content:'';position:absolute;left:50%;bottom:0;width:36px;height:5px;margin-left:-18px;
+  border-radius:3px;background:#F6C445}
+.pinn{font-style:normal;margin-left:auto;font-size:var(--fs-micro);letter-spacing:1px;color:var(--t3)}
+.bodyrow{flex:1;display:flex;min-height:0;position:relative;padding:22px 24px 0}
+.rail{width:126px;flex:none;position:relative;padding-right:20px}
+.rail .line{position:absolute;right:12px;top:10px;bottom:0;width:2px;background:rgba(35,37,44,.14)}
+.rm{position:absolute;right:26px}
+.rm .dot{position:absolute;right:-21px;top:6px;width:16px;height:16px;border-radius:50%;background:#F6C445}
+.rm .ym{font-family:'WtsjMind',sans-serif;font-weight:100;font-size:28px;color:var(--t2);line-height:1;white-space:nowrap}
+.stage2{flex:1;position:relative}
+.gp{position:absolute;left:0;right:0}
+.desk{position:absolute;inset:0}
+/* 分类那一排在列表区最上面，左右各内缩 24（不贴着区域边缘）；只有笔记视图有 */
+.cats{display:flex;gap:14px;padding:24px 24px 0;font-size:var(--fs-tiny);flex:none}
+.cats span{padding:8px 22px;border-radius:var(--r-pill)}
+/* 纸片：一枚 150×200。叠法按站长的话改过一轮——横向步 142（只压到右边那 14 的内白，
+   标题一个字都不遮），纵向步 176（压掉 24，只在底边上留一道），日期从 bottom:14 抬到 30，
+   正好躲在那 24 之外。每枚另加一点竖向错开和角度，才不像贴出来的方阵。 */
+.note{position:absolute;width:150px;height:200px;border-radius:22px;padding:16px 14px;
+  box-shadow:0 8px 22px rgba(8,10,14,.15);font-size:18px;line-height:1.3;font-weight:600}
+/* 头像只在"有的时候"进左下角（他这轮的口径）：对方没设形象就整枚不渲染，不留空圈。
+   日期挪到右下角，跟左下角那枚头像不打架。 */
+.note .av{position:absolute;left:14px;bottom:26px;width:32px;height:32px;border-radius:50%;
+  background:rgba(255,255,255,.92);background-size:cover}
+.note .tail{position:absolute;right:14px;bottom:30px;font-size:15px;font-weight:400;opacity:.6;
+  font-family:'WtsjMind',sans-serif}
+/* 一行模式：两条之间那条横线撤了（他：下面的横线也取消），只靠行高分；日期也不显示，
+   右侧那三枚属性标记改极简——圆底、描边圈、淡色填充全撤，只留一根描线图形，靠颜色分档。 */
+.rows{position:relative;padding-top:2px}
+.rw{display:flex;align-items:center;gap:10px;height:88px}
+.rw b{flex:1;min-width:0;font-size:var(--fs-body);font-weight:400;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.rw .mk{display:flex;align-items:center;flex:none}
+.rw .mk svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round}
+/* 大图那一层：整屏纯黑（与 1.9.11 的 shareDim 同口径） */
+.dark{position:absolute;inset:0;background:#000;z-index:8;display:flex;flex-direction:column;align-items:center;padding-top:0}
+.dark .art{width:430px;height:640px;border-radius:22px;overflow:hidden;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6);margin-top:auto}
+.dark .art .in{position:absolute;inset:0;padding:34px 30px;color:#17181C;font-size:24px;line-height:1.4;font-weight:600}
+.dark .art .in h4{font-size:34px;line-height:1.25;margin-bottom:14px;font-weight:800}
+.dark .hint{color:rgba(255,255,255,.5);font-size:var(--fs-tiny);margin-top:18px}
+.dark .wx{margin-top:auto;width:100%;padding:0 24px 40px}
+.dark .wxr{display:flex;justify-content:space-between;margin-bottom:26px}
+.dark .wxb{text-decoration:none;color:#fff;font-size:var(--fs-tiny);display:flex;flex-direction:column;align-items:center;gap:10px}
+.dark .wxb s{width:88px;height:88px;border-radius:26px;display:flex;align-items:center;justify-content:center}
+.dark .wxb svg{width:44px;height:44px;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.dark .acts{display:flex;gap:20px;margin-bottom:22px}
+.dark .acts b{flex:1;height:96px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;font-size:var(--fs-body);font-weight:600}
+.dark .acts b.g{background:rgba(255,255,255,.12);color:#fff}
+.dark .acts b.s{background:#fff;color:#17181C}
+.sheet2{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:40px 40px 0 0;padding:36px 32px 48px;z-index:9}
+.sheet2 h3{font-size:var(--fs-h2);font-weight:700;margin-bottom:12px}
+.sheet2 p{font-size:var(--fs-body);line-height:var(--lh-body,1.6);color:var(--t2);margin-bottom:30px}
+.sheet2 .two{display:flex;gap:20px}
+.sheet2 .two b{flex:1;height:96px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;font-size:var(--fs-body);font-weight:600}
+.sheet2 .two b.g{background:var(--chip);color:var(--t2)}
+.sheet2 .two b.d{background:#b4231f;color:#fff}
+/* 落地页（别人扫码） */
+.gone{position:absolute;left:0;right:0;top:184px;bottom:0;background:#f4f2ec;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:0 64px;text-align:center}
+.gone .mk{width:120px;height:120px;border-radius:50%;background:var(--chip);display:flex;align-items:center;justify-content:center;font-size:56px;color:var(--t3)}
+.gone p{font-size:var(--fs-body);line-height:1.6;color:var(--t2)}
+.gone b{font-size:var(--fs-h2);font-weight:700}
+/* 外观设置 */
+.phead{padding:24px 0 0;display:flex;flex-direction:column;gap:8px}
+.phead b{font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px}
+.phead i{font-style:normal;font-size:var(--fs-tiny);color:var(--t3)}
+.sec{margin:34px 0 14px;display:flex;align-items:baseline;gap:14px}
+.sec b{font-size:var(--fs-h2);font-weight:700;letter-spacing:-.4px;white-space:nowrap;flex:none}
+.sec i{font-style:normal;font-size:var(--fs-tiny);color:var(--t3);line-height:1.5}
+.stage{display:flex;flex-direction:column;align-items:center;padding:8px 0 0}
+.mock{width:430px;height:772px;border-radius:56px;background:#fff;border:3px solid var(--edge);padding:22px;position:relative}
+.mock .sc{width:100%;height:100%;border-radius:38px;background:#f4f2ec;overflow:hidden;position:relative}
+.mock .nt{position:absolute;left:50%;top:16px;width:120px;height:26px;margin-left:-60px;border-radius:14px;background:#23252c}
+.mock .nv{padding:52px 0 0;text-align:center;font-size:24px;font-weight:600}
+.mock .bd{padding:22px 20px}
+.mock .bd h5{font-size:30px;font-weight:700;margin-bottom:16px}
+.mock .rw{display:flex;gap:14px;align-items:center;background:#fff;border:2px solid var(--edge);border-radius:22px;padding:14px;margin-bottom:14px}
+.mock .rw .bk{width:56px;height:56px;border-radius:16px;flex:none}
+.mock .rw .ln{height:12px;border-radius:6px;background:rgba(35,37,44,.14)}
+.mock .tb{position:absolute;left:14px;right:14px;bottom:14px;height:72px;border-radius:36px;background:#fff;
+  border:2px solid var(--edge);display:flex;align-items:center;justify-content:space-around}
+.mock .tb u{width:50px;height:50px;border-radius:50%;background:rgba(35,37,44,.1);text-decoration:none}
+.mock .tb u.on{background:#23252c}
+.sfoot{text-align:center;font-size:var(--fs-tiny);color:var(--t3);padding:24px 0 0}
+.strip{display:flex;gap:18px;overflow:hidden;padding:26px 2px 0}
+.chip{width:118px;flex:none;text-align:center}
+.chip .tile{height:150px;border-radius:26px;position:relative;overflow:hidden;border:3px solid transparent}
+.chip .tile i{position:absolute;left:0;right:0;height:34%;display:block}
+.chip .tile u{position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;background:#23252c;color:#f2efe9;
+  display:flex;align-items:center;justify-content:center;font-size:22px;text-decoration:none;font-style:normal}
+.chip.on .tile{border-color:#23252c}
+.chip p{font-size:var(--fs-tiny);color:var(--t2);margin-top:10px}
+</style></head><body>
+<h1>v18 · 他 10-02 晚上这一轮：做减法（示意，代码一行没动）</h1>
+<p class="lead">六屏：<b>1-2</b> 首页调亮度<b>收成一枚圆点</b>，点一下换一档（纯白 → 25% → 50% → 回纯白）｜<b>3</b> 笔记纸片墙：置顶上移到分类那一行最左、下面一条浅虚线、日期改 26/10 与 10/02、头像进纸片左下角｜<b>4</b> 一行：撤横线、三枚属性标记改描线极简｜<b>5</b> 搜索摊开时 Tips 消失｜<b>6</b> 点置顶。<br>
+分享视图、种草视图、长按撤回那几屏这一轮整个撤掉，画法留在 <code>v17-三视图收口.html</code> 里，要做回来照那份抄。<br>
+屏高 <code>750×1670</code>（1px = 1rpx），主题吃现网 <code>theme-default</code> 令牌，底栏那格是
+<code>palette.chromeOf('default')</code> 现算的 <code>#443c25</code>；图上那层罩子的七个停点是 <code>create.wxss</code> 里 <code>.page-scrim</code> 的<b>原值</b>，0% 一档就是现网今天的样子，25% / 50% 才在它之上再叠一层黑；纸片吃<b>莫兰迪</b>那一族里的四枚（未分类炭灰蓝 / 旅游雾蓝 / 生活灰绿 / 私密藕荷），
+实现时这四枚和一行模式那三枚属性色（星 / 飞机 / 草上心）一起进 <code>palette.js</code> 当唯一出口，都不许抄进 wxss。<span class="tag">现网</span>那句在 <code>utils/i18n.js</code> 里逐字对过；
+<span class="tag.new">新串</span>这轮新造的，实现时中英各写一份进字典；<span class="tag cut">撤</span>这轮删掉的。</p>
+<div class="row"><div class="cell" id="s1"><div class="ph">
+  <div class="wall "><div class="scrim"></div></div>
+  <div class="status"><span>10:40</span><span class="r">100 ▮</span></div><div class="nav ">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="top"><div class="h1">看到好内容，随手记下来</div><div class="dt">10月2日 周五</div></div>
+  <div class="lang"><b>中</b><span>EN</span></div>
+  <div class="tips2"><i></i><span>Tips：分享时可选卡片模板，换套版式再发出去</span></div>
+       <div class="ebar"><div class="lead"></div><div class="lab">动动手指</div>
+         <div class="dots"><i style="background:#E9723D"></i><i style="background:#46A863"></i><i style="background:#3F52D6"></i></div></div>
+       <div class="swap"><em>调亮度</em><span class="bric"><b style="background:#FFFFFF"></b></span><span>换背景</span><i></i></div>
+  <div class="bar"><u class="on"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class=""><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag.new">改法</span>① 调亮度<b>收成一枚圆点</b>：点一下换一档，<b>纯白 → 25% → 50% → 回纯白</b>，点本身的深浅就是当前那一档。直径仍与 Tips 字号同档（24rpx），外面那圈透明热区撑到 48rpx（不然一根手指点不准）。位置不变：「换背景」左边、左边配三字「调亮度」，<b>那枚箭头在「换背景」右边</b>。<b>纯白＝0%＝对原图不做处理</b>：这一档画的就是现网今天的样子，图上那层渐变是 <code>create.wxss</code> 的 <code>.page-scrim</code> 七个停点<b>逐字抄过来的原值</b>。</div></div><div class="cell" id="s2"><div class="ph">
+  <div class="wall dim50"><div class="scrim"></div></div>
+  <div class="status"><span>10:40</span><span class="r">100 ▮</span></div><div class="nav ">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="top"><div class="h1">看到好内容，随手记下来</div><div class="dt">10月2日 周五</div></div>
+  <div class="lang"><b>中</b><span>EN</span></div>
+  <div class="tips2"><i></i><span>Tips：分享时可选卡片模板，换套版式再发出去</span></div>
+       <div class="ebar"><div class="lead"></div><div class="lab">动动手指</div>
+         <div class="dots"><i style="background:#E9723D"></i><i style="background:#46A863"></i><i style="background:#3F52D6"></i></div></div>
+       <div class="swap"><em>调亮度</em><span class="bric"><b style="background:#5C6169"></b></span><span>换背景</span><i></i></div>
+  <div class="bar"><u class="on"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class=""><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap">① 同一枚点两下之后到 50%：叠上去的那层黑加深，字仍读得清。<b>全局生效</b>——首页、笔记页、「我的」页共用同一张图、同一个值；值存本机，下次进来还是这一档。现网那层 <code>.page-scrim</code> 的七个停点是写死的字面量（<code>create.wxss:523-533</code>），实现时要改成吃一个档位变量，另两页各抄的那一份（<code>index.wxss:31-32</code>、<code>me.wxss:57-58</code>）一起收口到同一个出口。</div></div></div><div class="row"><div class="cell" id="s3"><div class="ph"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav ">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div><div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools">
+      <div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+        <div class="acts2">
+          <a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a><span class="vr"></span>
+          <a class="on"><svg viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="7.4" height="7.4" rx="2"/><rect x="13.2" y="3.4" width="7.4" height="7.4" rx="2"/><rect x="3.4" y="13.2" width="7.4" height="7.4" rx="2"/><rect x="13.2" y="13.2" width="7.4" height="7.4" rx="2"/></svg></a><span class="vr"></span>
+          <a class=""><svg viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg></a></div>
+    </div></div></div><div class="list">
+  <div class="cats"><b class="pinb ">置顶</b><span style="background:#23252c;color:#f2efe9">全部</span><span style="background:#F6C445;color:#2A2005">旅游</span><span style="background:#46A863;color:#06260F">生活</span><span style="background:#E9723D;color:#2C1204">私密</span></div>
+  <div class="bodyrow">
+    <div class="rail"><div class="line"></div><div class="rm" style="top:0px"><div class="dot"></div><div class="ym">26/10</div></div><div class="rm" style="top:432px"><div class="dot"></div><div class="ym">26/09</div></div></div>
+    <div class="stage2"><div class="gp" style="top:0px;height:376px"><div class="desk"><div class="note" style="left:0px;top:0px;transform:rotate(-2.2deg);background:#5B6470;color:#EDEFF2;z-index:1">
+    
+    Qwen3.8-Flash …<div class="tail">10/02</div></div><div class="note" style="left:142px;top:10px;transform:rotate(1.6deg);background:#A9BCA6;color:#22331F;z-index:2">
+    
+    把长文读成三条要点，设一个每…<div class="tail">10/02</div></div><div class="note" style="left:284px;top:4px;transform:rotate(-1.1deg);background:#A8BCC9;color:#23323C;z-index:1">
+    <div class="av" style="background-image:url(../../../miniprogram/assets/logo.png)"></div>
+    周末去顺义看那家旧书店，门口…<div class="tail">10/02</div></div><div class="note" style="left:426px;top:13px;transform:rotate(2.4deg);background:#A9BCA6;color:#22331F;z-index:2">
+    
+    摘句那一套的引号怎么排，半角…<div class="tail">10/02</div></div><div class="note" style="left:0px;top:176px;transform:rotate(-2.2deg);background:#D3B6B4;color:#3B2523;z-index:19">
+    
+    素宣信笺这一套试的那三种竖排…<div class="tail">10/01</div></div><div class="note" style="left:142px;top:186px;transform:rotate(1.6deg);background:#A8BCC9;color:#23323C;z-index:20">
+    
+    波普分格的四块色怎么分主次<div class="tail">10/01</div></div><div class="note" style="left:284px;top:180px;transform:rotate(-1.1deg);background:#A9BCA6;color:#22331F;z-index:19">
+    
+    赫本的电影院之夜，剪辑点都落…<div class="tail">10/01</div></div></div></div><div class="gp" style="top:432px;height:376px"><div class="desk"><div class="note" style="left:0px;top:0px;transform:rotate(-2.2deg);background:#A9BCA6;color:#22331F;z-index:1">
+    
+    网点漫画那一套的网点密度压到…<div class="tail">09/28</div></div><div class="note" style="left:142px;top:10px;transform:rotate(1.6deg);background:#A8BCC9;color:#23323C;z-index:2">
+    
+    纸间文艺：一句一行的呼吸感从…<div class="tail">09/28</div></div><div class="note" style="left:284px;top:4px;transform:rotate(-1.1deg);background:#5B6470;color:#EDEFF2;z-index:1">
+    <div class="av" style="background-image:url(../../../miniprogram/assets/logo.png)"></div>
+    把书读薄的一整套方法，先摘后…<div class="tail">09/28</div></div><div class="note" style="left:0px;top:176px;transform:rotate(-2.2deg);background:#D3B6B4;color:#3B2523;z-index:19">
+    
+    棋王里那一段吃的动词密度太高…<div class="tail">09/27</div></div><div class="note" style="left:142px;top:186px;transform:rotate(1.6deg);background:#A8BCC9;color:#23323C;z-index:20">
+    
+    旧书店的三张明信片，各配一句…<div class="tail">09/27</div></div><div class="note" style="left:284px;top:180px;transform:rotate(-1.1deg);background:#A9BCA6;color:#22331F;z-index:19">
+    
+    电影院那晚的排片表，拍下来存…<div class="tail">09/27</div></div><div class="note" style="left:426px;top:189px;transform:rotate(2.4deg);background:#A9BCA6;color:#22331F;z-index:20">
+    
+    杂志封面的标题压边，留白要压…<div class="tail">09/27</div></div></div></div></div>
+  </div></div><div class="bar"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag.new">改法</span>② 笔记这一屏默认：纸片墙。<b>「置顶」从单独一行上移，和分类同一行、放在最左边</b>（纯文字 + 选中那枚下面一条短黄杠，不做按钮壳）；<b>这一行与下面的笔记区之间一条浅虚线</b>（<code>2px dashed rgba(35,37,44,.14)</code>）。<b>日期全改成极简写法</b>：时间轴那列月份 <code>2026-10</code> → <b><code>26/10</code></b>，纸片角上 <code>10-02</code> → <b><code>10/02</code></b>（现网 <code>utils/date.js</code> 的 <code>formatShortDate</code> 一处把 <code>-</code> 换 <code>/</code>，再补一个 <code>YY/MM</code> 的月份档）。<b>头像只在有的时候进纸片左下角</b>（这一屏 10-02 那枚灰蓝、09-28 那枚炭灰蓝各带一枚；没带头像的纸片不留空圈），日期因此挪到右下角跟它分开。叠法不变：横叠 8 只压内白、竖叠 24、同一日期同一行。</div></div><div class="cell" id="s4"><div class="ph"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav ">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div><div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools">
+      <div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+        <div class="acts2">
+          <a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a><span class="vr"></span>
+          <a class=""><svg viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="7.4" height="7.4" rx="2"/><rect x="13.2" y="3.4" width="7.4" height="7.4" rx="2"/><rect x="3.4" y="13.2" width="7.4" height="7.4" rx="2"/><rect x="13.2" y="13.2" width="7.4" height="7.4" rx="2"/></svg></a><span class="vr"></span>
+          <a class="on"><svg viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg></a></div>
+    </div></div></div><div class="list">
+  <div class="cats"><b class="pinb ">置顶</b><span style="background:#23252c;color:#f2efe9">全部</span><span style="background:#F6C445;color:#2A2005">旅游</span><span style="background:#46A863;color:#06260F">生活</span><span style="background:#E9723D;color:#2C1204">私密</span></div>
+  <div class="bodyrow">
+    <div class="rail"><div class="line"></div><div class="rm" style="top:0px"><div class="dot"></div><div class="ym">26/10</div></div><div class="rm" style="top:672px"><div class="dot"></div><div class="ym">26/09</div></div></div>
+    <div class="stage2"><div class="gp" style="top:0px;height:616px"><div class="rows"><div class="rw"><b>Qwen3.8-Flash 限时免费，国际版先装上试</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span><span class="mk" style="color:#3F52D6"><svg viewBox="0 0 24 24"><path d="M20.6 4 4 10.4l6.2 2.3 2.3 6.2z"/><path d="M10.2 12.7 20.6 4"/></svg></span></div><div class="rw"><b>把长文读成三条要点，设一个每天归档的提醒</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span></div><div class="rw"><b>周末去顺义看那家旧书店，门口贴着写</b><span class="mk" style="color:#46A863"><svg viewBox="0 0 24 24"><path d="M12 20.4c0-5 2.8-8.3 6.9-9.2-.7 5.1-3 7.9-6.9 9.2z"/><path d="M12 20.4c0-3.8-2-6.2-5.1-6.9.5 3.8 2.1 5.9 5.1 6.9z"/><path d="M12 8.4c-.9-1.4-2.8-1.1-2.8.5 0 1.3 1.7 2.1 2.8 3.2 1.1-1.1 2.8-1.9 2.8-3.2 0-1.6-1.9-1.9-2.8-.5z"/></svg></span></div><div class="rw"><b>摘句那一套的引号怎么排，半角还是全角</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span></div><div class="rw"><b>素宣信笺这一套试的那三种竖排行距</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span></div><div class="rw"><b>波普分格的四块色怎么分主次</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span><span class="mk" style="color:#3F52D6"><svg viewBox="0 0 24 24"><path d="M20.6 4 4 10.4l6.2 2.3 2.3 6.2z"/><path d="M10.2 12.7 20.6 4"/></svg></span></div><div class="rw"><b>赫本的电影院之夜，剪辑点都落在雨声上</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span></div></div></div><div class="gp" style="top:672px;height:616px"><div class="rows"><div class="rw"><b>网点漫画那一套的网点密度压到多少不糊</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span></div><div class="rw"><b>纸间文艺：一句一行的呼吸感从哪来</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span><span class="mk" style="color:#3F52D6"><svg viewBox="0 0 24 24"><path d="M20.6 4 4 10.4l6.2 2.3 2.3 6.2z"/><path d="M10.2 12.7 20.6 4"/></svg></span></div><div class="rw"><b>把书读薄的一整套方法，先摘后问再写</b><span class="mk" style="color:#46A863"><svg viewBox="0 0 24 24"><path d="M12 20.4c0-5 2.8-8.3 6.9-9.2-.7 5.1-3 7.9-6.9 9.2z"/><path d="M12 20.4c0-3.8-2-6.2-5.1-6.9.5 3.8 2.1 5.9 5.1 6.9z"/><path d="M12 8.4c-.9-1.4-2.8-1.1-2.8.5 0 1.3 1.7 2.1 2.8 3.2 1.1-1.1 2.8-1.9 2.8-3.2 0-1.6-1.9-1.9-2.8-.5z"/></svg></span></div><div class="rw"><b>棋王里那一段吃的动词密度太高了</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span></div><div class="rw"><b>旧书店的三张明信片，各配一句短说明</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span><span class="mk" style="color:#3F52D6"><svg viewBox="0 0 24 24"><path d="M20.6 4 4 10.4l6.2 2.3 2.3 6.2z"/><path d="M10.2 12.7 20.6 4"/></svg></span></div><div class="rw"><b>电影院那晚的排片表，拍下来存成一条</b><span class="mk" style="color:#C9922B"><svg viewBox="0 0 24 24"><path d="M12 4.6l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L3.8 9.9l5-.7z"/></svg></span></div><div class="rw"><b>杂志封面的标题压边，留白要压在人物上</b><span class="mk" style="color:#46A863"><svg viewBox="0 0 24 24"><path d="M12 20.4c0-5 2.8-8.3 6.9-9.2-.7 5.1-3 7.9-6.9 9.2z"/><path d="M12 20.4c0-3.8-2-6.2-5.1-6.9.5 3.8 2.1 5.9 5.1 6.9z"/><path d="M12 8.4c-.9-1.4-2.8-1.1-2.8.5 0 1.3 1.7 2.1 2.8 3.2 1.1-1.1 2.8-1.9 2.8-3.2 0-1.6-1.9-1.9-2.8-.5z"/></svg></span></div></div></div></div>
+  </div></div><div class="bar"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag.new">改法</span>② 切成「一行」：<span class="tag cut">撤</span><b>两条之间那条横线</b>，只靠行高（88）分；<b>三枚属性标记改极简</b>——圆底、描边圈、淡色填充全撤，只留一根描线图形（<code>stroke-width 1.5</code>，30rpx），仍靠颜色分三档：原创＝<b>星</b>（压深的芥末黄 <code>#C9922B</code>）；已分享＝<b>星 + 纸飞机</b>两枚（飞机吃 <code>palette.TONES[1]</code> 宝蓝）；转存别人的＝<b>草上顶一颗心</b>（吃 <code>TONES[3]</code> 草绿）。标题仍吃满横向字数（约 17 个汉字）。</div></div></div><div class="row"><div class="cell" id="s5"><div class="ph"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav ">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div><div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools">
+      <div class="srch open"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg><span>输入关键词</span></div>
+        <div class="acts2"><span class="vr"></span>
+          <a class="on"><svg viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="7.4" height="7.4" rx="2"/><rect x="13.2" y="3.4" width="7.4" height="7.4" rx="2"/><rect x="3.4" y="13.2" width="7.4" height="7.4" rx="2"/><rect x="13.2" y="13.2" width="7.4" height="7.4" rx="2"/></svg></a><span class="vr"></span>
+          <a class=""><svg viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg></a></div>
+    </div></div></div><div class="list">
+  <div class="cats"><b class="pinb ">置顶</b><span style="background:#23252c;color:#f2efe9">全部</span><span style="background:#F6C445;color:#2A2005">旅游</span><span style="background:#46A863;color:#06260F">生活</span><span style="background:#E9723D;color:#2C1204">私密</span></div>
+  <div class="bodyrow">
+    <div class="rail"><div class="line"></div><div class="rm" style="top:0px"><div class="dot"></div><div class="ym">26/10</div></div><div class="rm" style="top:432px"><div class="dot"></div><div class="ym">26/09</div></div></div>
+    <div class="stage2"><div class="gp" style="top:0px;height:376px"><div class="desk"><div class="note" style="left:0px;top:0px;transform:rotate(-2.2deg);background:#5B6470;color:#EDEFF2;z-index:1">
+    
+    Qwen3.8-Flash …<div class="tail">10/02</div></div><div class="note" style="left:142px;top:10px;transform:rotate(1.6deg);background:#A9BCA6;color:#22331F;z-index:2">
+    
+    把长文读成三条要点，设一个每…<div class="tail">10/02</div></div><div class="note" style="left:284px;top:4px;transform:rotate(-1.1deg);background:#A8BCC9;color:#23323C;z-index:1">
+    <div class="av" style="background-image:url(../../../miniprogram/assets/logo.png)"></div>
+    周末去顺义看那家旧书店，门口…<div class="tail">10/02</div></div><div class="note" style="left:426px;top:13px;transform:rotate(2.4deg);background:#A9BCA6;color:#22331F;z-index:2">
+    
+    摘句那一套的引号怎么排，半角…<div class="tail">10/02</div></div><div class="note" style="left:0px;top:176px;transform:rotate(-2.2deg);background:#D3B6B4;color:#3B2523;z-index:19">
+    
+    素宣信笺这一套试的那三种竖排…<div class="tail">10/01</div></div><div class="note" style="left:142px;top:186px;transform:rotate(1.6deg);background:#A8BCC9;color:#23323C;z-index:20">
+    
+    波普分格的四块色怎么分主次<div class="tail">10/01</div></div><div class="note" style="left:284px;top:180px;transform:rotate(-1.1deg);background:#A9BCA6;color:#22331F;z-index:19">
+    
+    赫本的电影院之夜，剪辑点都落…<div class="tail">10/01</div></div></div></div><div class="gp" style="top:432px;height:376px"><div class="desk"><div class="note" style="left:0px;top:0px;transform:rotate(-2.2deg);background:#A9BCA6;color:#22331F;z-index:1">
+    
+    网点漫画那一套的网点密度压到…<div class="tail">09/28</div></div><div class="note" style="left:142px;top:10px;transform:rotate(1.6deg);background:#A8BCC9;color:#23323C;z-index:2">
+    
+    纸间文艺：一句一行的呼吸感从…<div class="tail">09/28</div></div><div class="note" style="left:284px;top:4px;transform:rotate(-1.1deg);background:#5B6470;color:#EDEFF2;z-index:1">
+    <div class="av" style="background-image:url(../../../miniprogram/assets/logo.png)"></div>
+    把书读薄的一整套方法，先摘后…<div class="tail">09/28</div></div><div class="note" style="left:0px;top:176px;transform:rotate(-2.2deg);background:#D3B6B4;color:#3B2523;z-index:19">
+    
+    棋王里那一段吃的动词密度太高…<div class="tail">09/27</div></div><div class="note" style="left:142px;top:186px;transform:rotate(1.6deg);background:#A8BCC9;color:#23323C;z-index:20">
+    
+    旧书店的三张明信片，各配一句…<div class="tail">09/27</div></div><div class="note" style="left:284px;top:180px;transform:rotate(-1.1deg);background:#A9BCA6;color:#22331F;z-index:19">
+    
+    电影院那晚的排片表，拍下来存…<div class="tail">09/27</div></div><div class="note" style="left:426px;top:189px;transform:rotate(2.4deg);background:#A9BCA6;color:#22331F;z-index:20">
+    
+    杂志封面的标题压边，留白要压…<div class="tail">09/27</div></div></div></div></div>
+  </div></div><div class="bar"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap">② 点搜索：<b>Tips 那一条整条消失</b>，搜索那枚就地向左摊成输入框（现网那句占位「输入关键词」），右边两枚切换 icon 用一道竖线隔开继续留着；点空白收回后 Tips 又回来。三枚 icon 无圆底、单色白半透明，整组紧靠右，下沿离列表区只留 14。</div></div><div class="cell" id="s6"><div class="ph"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav ">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div><div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools">
+      <div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+        <div class="acts2">
+          <a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a><span class="vr"></span>
+          <a class="on"><svg viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="7.4" height="7.4" rx="2"/><rect x="13.2" y="3.4" width="7.4" height="7.4" rx="2"/><rect x="3.4" y="13.2" width="7.4" height="7.4" rx="2"/><rect x="13.2" y="13.2" width="7.4" height="7.4" rx="2"/></svg></a><span class="vr"></span>
+          <a class=""><svg viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg></a></div>
+    </div></div></div><div class="list">
+  <div class="cats"><b class="pinb on">置顶</b><span style="background:#23252c;color:#f2efe9">全部</span><span style="background:#F6C445;color:#2A2005">旅游</span><span style="background:#46A863;color:#06260F">生活</span><span style="background:#E9723D;color:#2C1204">私密</span><i class="pinn">只看这两篇</i></div>
+  <div class="bodyrow">
+    <div class="rail"><div class="line"></div><div class="rm" style="top:0px"><div class="dot"></div><div class="ym">26/10</div></div></div>
+    <div class="stage2"><div class="gp" style="top:0px;height:200px"><div class="desk"><div class="note" style="left:0px;top:0px;transform:rotate(-2.2deg);background:#5B6470;color:#EDEFF2;z-index:1">
+    
+    Qwen3.8-Flash …<div class="tail">10/02</div></div><div class="note" style="left:142px;top:10px;transform:rotate(1.6deg);background:#A9BCA6;color:#22331F;z-index:2">
+    
+    把长文读成三条要点，设一个每…<div class="tail">10/02</div></div></div></div></div>
+  </div></div><div class="bar"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap">② 点「置顶」（现在就在分类那一行最左边）：那一枚下面亮起短黄杠、字变墨黑，右边只留置顶的那两篇，行尾多一句「只看这两篇」<span class="tag.new">新串</span>；<b>再点一次它、或拖时间轴上的月份就回正常显示</b>。</div></div></div>
+<h2 style="font-size:26px;margin:14px 0 10px">这一稿撤掉的（做减法）与一处口径等你认</h2>
+<p class="lead"><span class="tag cut">撤</span><b>分享视图、种草视图整个不做</b> → 连带撤掉：右上角那三列数字里的「分享 6」「种草 3」两列（只剩「笔记」一列，那一屏黄杠也不需要了）、黑底看大图那一屏和下面那五枚按钮、长按撤回的确认弹层、别人扫已撤回码那句改串、给十套模板各配一枚莫兰迪色（只剩笔记按分类那四枚）。<br>
+<span class="tag cut">撤</span>一行模式两条之间那条横线。<span class="tag cut">撤</span>三枚属性标记的圆底和描边圈（改一根描线）。<span class="tag cut">撤</span>「置顶」单独占的那一行（上移到分类那一行的最左边）。<br>
+<b>这批纯前端，不用部署后端</b>：上一稿那两条后端前提（<code>shares.poster_tpl</code> 加列、#228 那两格 <code>shares_active</code>／<code>saved_by_users</code>）都是给「分享、种草那两屏回看」用的，那两屏不做，这两条跟着一起挂回原处，不进这批。<br>
+要动的前端只有三处：① 列表版式与背景图上那一行控件（含分类行下面那条浅虚线）；② <code>utils/date.js</code> 加一个 <code>YY/MM</code> 的月份档、<code>formatShortDate</code> 的分隔符 <code>-</code> 换成 <code>/</code>；③ <code>utils/palette.js</code> 加四枚分类莫兰迪 + 三枚属性色。<b>置顶是笔记上已有的标记</b>（现网字典里 <code>pin</code>／<code>unpin</code>／<code>pinned</code> 三串都在），不新增字段、不加接口。<br>
+一处口径等你认：日期我按你给的 <code>26/10</code> 用在时间轴那列月份上，纸片角上那条写成 <code>10/02</code>（同一族极简写法，年份不重复第二遍）；你要纸片也写成 <code>26/10/02</code> 说一声，一处就改完。</p>
+</body></html>

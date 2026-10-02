@@ -54,6 +54,9 @@ const i18n = {
     modeWrite: '直接写',
     modeUrl: '链接',
     homeBgSwap: '换背景',
+    // 「换背景」左边那一枚：点一下换一档深浅（纯白 → 25% → 50% → 回纯白）。
+    // 英文侧跟着「Change photo」那档祈使语气写，别直译成 "Brightness" 那种名词堆。
+    bgDimLabel: '调亮度',
     // 横条上面那一行轮播 Tips（站长 10-01 晚）。冒号那档跟着语言走：
     // 中文用全角「：」，英文用半角「: 」，别把全角冒号硬贴到英文句子上。
     tipsPrefix: 'Tips：',
@@ -367,6 +370,7 @@ const i18n = {
     modeWrite: 'Write',
     modeUrl: 'Link',
     homeBgSwap: 'Change photo',
+    bgDimLabel: 'Dim photo',
     tipsPrefix: 'Tips: ',
     tips: [
       'Photos and screenshots turn into key points',

@@ -246,7 +246,11 @@ const ck = (name, ok, got) => {
   // ---------- ⑧ 换背景那枚只导流，不弹相册 ----------
   await (await page.$('.title-row')).tap()
   await sleep(600)
-  await (await page.$('.home-swap')).tap()
+  // 这一行 10-02 晚拆成两半，父节点不再带 tap：正中落在两半那道缝里，点了等于没点。
+  // 取第二半（「换背景」），第一半现在是「调亮度」。
+  const halves = await page.$$('.swap-half')
+  ck('录入条下面两半各一个热区', halves.length === 2, `${halves.length} 半`)
+  await halves[1].tap()
   await sleep(3500)
   const now = await mp.evaluate(() => getCurrentPages().slice(-1)[0].route)
   ck('点换背景走到卡片模板那一页', now === 'pages/profile/profile', now)

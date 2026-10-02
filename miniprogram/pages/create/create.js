@@ -48,6 +48,11 @@ Page({
     skinWrite: toneStyle(0),
     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
     bgSrc: '',
+    // 背景深浅：默认 0 档＝对原图不做处理。这三样每次进页由 app.bgSkin() 重读，
+    // 这里给初值只为第一帧不出现 style="undefined"。
+    dimV: 0,
+    dimDot: '',
+    dimVeil: '',
     // slogan 下面那行：onShow 里现算，这里先给空串免得第一帧闪一个空行
     dateText: '',
     weekText: '',
@@ -135,6 +140,8 @@ Page({
       shotDesc: this.shotDescFor(this.data.previewImages.length),
       // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
       bgSrc: poster.homeBg(),
+      // 背景深浅那一档也是每次进页重读：在「我的」页里改过、或别的 tab 点过那枚点，回到这一屏就该跟上。
+      ...app.bgSkin(),
       // 日期 + 星期：跨零点回来也要跟着翻，所以每次进页现算
       ...this.dateLineFor(lang),
       // Tips 跟着语言整批换（英文态不能看到六句中文），并从第 1 句起重播
@@ -224,6 +231,12 @@ Page({
   onMode(e) {
     if (this.data.busy) return
     this.open(e.currentTarget.dataset.mode)
+  },
+
+  // 点一下换一档深浅：纯白 → 25% → 50% → 回纯白。不给吐司也不给弹层——
+  // 那枚点本身的灰度就是当前档，照片跟着一起沉，用户看得见，多说一句反而挡画面。
+  onCycleDim() {
+    this.setData(getApp().cycleBgDim())
   },
 
   // 换背景图只是导流：选图这件事仍然只在「我的 → 卡片模板」那一页做一次。
