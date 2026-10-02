@@ -46,11 +46,11 @@ Page({
     tab: 'set',
     // 头部那一段铺不铺图：'' 表示不铺（形象文件被系统清了）。
     bgSrc: '',
-    // 「调亮度」当前档：'' 表示 0%（那一档不叠层）。onShow 从 app.bgSkin() 现取，
-    // 三页同一个本机键，所以在这页点过、回新建页也是那一档。
-    dimV: 0,
+    // 背景深浅那一档：初值给最沉那档（=今天现网的样子，也是 app.bgSkin() 在本机读不到键时
+    // 回落的那一档），免得第一帧先闪一下原图亮度再压暗。三样每次进页由 app.bgSkin() 重读。
+    dimV: 2,
     dimDot: '',
-    dimVeil: '',
+    dimScrim: '',
     imgStyle: '',
     logoSrc: '/assets/logo.png',
     nameText: '',

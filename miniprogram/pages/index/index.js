@@ -65,10 +65,11 @@ Page({
     bgSrc: '',
     // 头部那张图的摆法，由 fitHead() 问过图片尺寸之后现算（同一套数在 poster.bandGeom）
     imgStyle: '',
-    // 背景深浅：与新建页同一档、同一个本机键。初值给 0 档（不叠），第一帧不出现 style="undefined"。
-    dimV: 0,
+    // 背景深浅那一档：初值给最沉那档（=今天现网的样子，也是 app.bgSkin() 在本机读不到键时
+    // 回落的那一档），免得第一帧先闪一下原图亮度再压暗。三样每次进页由 app.bgSkin() 重读。
+    dimV: 2,
     dimDot: '',
-    dimVeil: '',
+    dimScrim: '',
   },
 
   async onShow() {

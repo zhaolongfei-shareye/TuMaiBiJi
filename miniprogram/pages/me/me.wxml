@@ -5,10 +5,9 @@
   <view class="head">
     <view class="head-band {{bgSrc ? 'has-bg' : ''}}">
       <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
-      <view wx:if="{{bgSrc}}" class="head-scrim"></view>
-      <!-- 「调亮度」那一档叠在罩子之上的黑：与新建页 .page-dim、笔记页 .head-dim 同一份值、
-           同一个本机键，三页一起沉一起亮。0% 那一档 dimVeil 是空串，这一层不渲染。 -->
-      <view wx:if="{{bgSrc && dimVeil}}" class="head-dim" style="{{dimVeil}}"></view>
+      <!-- 「调亮度」那一枚点拧的就是这一层：dimScrim 空串＝全铺（最沉那一档＝现网样子），
+           opacity:0＝一点不压（＝原图亮度）。三页同一个本机键，所以一起沉、一起亮。 -->
+      <view wx:if="{{bgSrc}}" class="head-scrim" style="{{dimScrim}}"></view>
       <!-- 左上角这行大字与首页那一行是同一档量（--fs-h1 / 700 / -1rpx / left 32 top 22），
            站长 10-01：三个 tab 的首页风格要一致，这一页原来只有右上角那枚药丸。 -->
       <view class="h1">{{t.tabMe}}</view>

@@ -4,12 +4,10 @@
        本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
        两个都 fixed，跟着视口不跟着滚；点它们等于点容器空白处，照样收条。 -->
   <image wx:if="{{bgSrc}}" class="page-bg" src="{{bgSrc}}" mode="aspectFill" />
-  <view wx:if="{{bgSrc}}" class="page-scrim"></view>
-  <!-- 「调亮度」那枚点选中的档：叠在上面那层现网罩子**之上**的一层黑，跟着视口不跟着滚。
-       0%（纯白）这一档 dimVeil 是空串，这一层根本不渲染——那一档就是"对原图不做处理"。
-       它坐在罩子之上、内容之下（罩子 z-index 1、标题和录入条 z-index 2），所以字不会被压黑，
-       只有照片变沉。 -->
-  <view wx:if="{{bgSrc && dimVeil}}" class="page-dim" style="{{dimVeil}}"></view>
+  <!-- 「调亮度」那一枚点拧的就是这一层的透明度：dimScrim 空串＝全铺（最沉那一档，
+       也就是这半年一直在跑的样子），opacity:0＝一点不压（＝原图亮度，站长拿原图对过才认的）。
+       不再另叠第二层黑——上一版那么做，"纯白"档实测只有原图亮度的 62%，压暗的其实一直是这层罩子。 -->
+  <view wx:if="{{bgSrc}}" class="page-scrim" style="{{dimScrim}}"></view>
 
   <view class="title-row">
     <view class="page-title">{{t.createHeading}}</view>

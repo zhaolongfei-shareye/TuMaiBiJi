@@ -62,7 +62,8 @@ ok('本页 .h1 与「我的」页 .h1 三项声明逐字相同（字号/字重/�
   h1Of(wxss) === h1Of(meWxss) && !!h1Of(wxss), `${h1Of(wxss)} vs ${h1Of(meWxss)}`)
 ok('「我的」页那一行也钉了图上翻纸白这一档',
   /\.head-band\.has-bg \.h1\s*\{[^}]*rgba\(242, 239, 233, 0\.96\)/.test(meWxss))
-ok('图区里有压暗罩那一层', /class="head-scrim"><\/view>/.test(wxml))
+ok('图区里有压暗罩那一层，且它吃「调亮度」递进来的透明度串',
+  /class="head-scrim" style="\{\{dimScrim\}\}"/.test(wxml))
 ok('铺图时容器带 has-bg', /\{\{bgSrc \? 'has-bg' : ''\}\}/.test(wxml))
 ok('v12：列表在 scroll-view 里（区域内滚，不再整页滚）',
   /<scroll-view[\s\S]{0,200}class="list"[\s\S]*?bindscrolltolower="onListToLower"/.test(wxml))

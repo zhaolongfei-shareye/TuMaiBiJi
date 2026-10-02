@@ -1,5 +1,5 @@
 const { request } = require('./utils/api')
-const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimVeilStyle } = require('./utils/palette')
+const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
 // 分享卡片的路径上带着邀请人的 user id（?inviter=123）。落到本地存储是因为它必须活到
@@ -178,21 +178,21 @@ App({
 
   /**
    * 背景形象图那一档深浅，三页（新建／笔记／我的）每次进页读一次。
-   * 返回的三样直接 setData：dimV 是当前档（页面自己判断要不要显示"最深"之类的说明），
-   * dimDot 是「调亮度」右边那一枚点的底色，dimVeil 是叠在现网罩子之上那层黑的样式串。
-   * 0 档时 dimVeil 是空串——那一层根本不渲染，不是叠了一层全透明，
-   * 这就是站长要的"纯白＝对原图不做处理"。
+   * dimV 是当前档（0 最亮 / 1 压一半 / 2 现网那一档），dimDot 是那一枚点的灰度，
+   * dimScrim 是**现网那层压暗罩自己**的透明度样式串——不是再叠一层黑。
+   * 最沉那一档 dimScrim 是空串（罩子照 CSS 全铺）；最亮那一档是 opacity:0，
+   * 照片就等于原图，站长拿原图对过才认的这一档。
    */
   bgSkin() {
     const v = dimAt(wx.getStorageSync(BG_DIM_KEY)).v
-    return { dimV: v, dimDot: dimDotStyle(v), dimVeil: dimVeilStyle(v) }
+    return { dimV: v, dimDot: dimDotStyle(v), dimScrim: dimScrimStyle(v) }
   },
 
-  // 点一下换一档：纯白 → 25% → 50% → 回纯白。存完把新那档原样返回，页面 setData 就行。
+  // 点一下换一档：最亮 → 压一半 → 全铺 → 回最亮。存完把新那档原样返回，页面 setData 就行。
   cycleBgDim() {
     const v = dimNext(dimAt(wx.getStorageSync(BG_DIM_KEY)).v)
     wx.setStorageSync(BG_DIM_KEY, v)
-    return { dimV: v, dimDot: dimDotStyle(v), dimVeil: dimVeilStyle(v) }
+    return { dimV: v, dimDot: dimDotStyle(v), dimScrim: dimScrimStyle(v) }
   },
 
   // .container 上那一串类名 = 主题 + 界面字体。页面只管贴，不各自拼第二份规则。

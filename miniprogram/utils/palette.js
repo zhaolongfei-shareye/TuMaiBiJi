@@ -26,26 +26,31 @@ const UNCATEGORIZED = { name: '墨黑', bg: '#23252C', ink: '#FFFFFF' }
 const TIP_DOT = '#F6C445'
 
 /**
- * 背景形象图的深浅三档（站长 10-02 定：新建页「换背景」左边一枚圆点，点一下换一档，
- * 纯白 → 25% → 50% → 回纯白；值只存本机，铺了图的三页共用同一档）。
- * dot  = 界面上那一枚点的灰度，点本身就是当前档，不再另画刻度或文字。
- * veil = 叠在现网那层罩子**之上**的黑。0 档是 0 —— 这一档就是"对原图不做处理"，
- *        现网 `.page-scrim` 那七个停点一个字不动（它保证标题在照片上读得清，撤了字就糊）。
- * 这三枚灰度是这一轮新造的，和 TIP_DOT 同一条规矩：只从 palette 出，不许抄进 WXSS。
+ * 背景形象图的深浅三档（站长 10-02 定：点一下换一档，走到最沉那档再回最亮；
+ * 界面上就是一枚灰度实心点，不做形状——月相那版点他看过否了）。
+ *
+ * veil = 现网那层压暗罩（`.page-scrim` / `.head-scrim`）铺几层，直接拧它的 opacity。
+ *        0 就是**一点不压**，照片等于原图（他拿原图对过：我上一版"纯白"档实测只有原图亮度的
+ *        62%，因为那层 0.42~0.72 的罩子还挂着——那一版把"不叠新层"当成了"不压暗"，是两回事）。
+ *        1 就是这半年一直在跑的那七个停点，一个字没改。
+ * dot  = 界面上那一枚点的灰度：点本身就是当前档，越沉的档点越黑。
+ *
+ * 默认停在最沉那一档（DIM_DEFAULT）：老用户升级后看到的还是今天这个样子。
+ * 这一组数与 TIP_DOT 同一条规矩：只从 palette 出，不许抄进 WXSS。
  */
 const BG_DIMS = [
-  { v: 0, dot: '#FFFFFF', veil: 0 },
-  { v: 25, dot: '#A7ABB2', veil: 0.25 },
-  { v: 50, dot: '#5C6169', veil: 0.5 },
+  { v: 0, name: '满月', veil: 0, dot: '#FFFFFF' },
+  { v: 1, name: '半月', veil: 0.5, dot: '#A7ABB2' },
+  { v: 2, name: '弯月', veil: 1, dot: '#5C6169' },
 ]
-const BG_DIM_VEIL = '#08090C'
+const DIM_DEFAULT = BG_DIMS[2]
 
-const dimAt = (v) => BG_DIMS.find((d) => d.v === v) || BG_DIMS[0]
-// 点一下换到下一档，走到头回纯白。
+const dimAt = (v) => BG_DIMS.find((d) => d.v === v) || DIM_DEFAULT
+// 点一下换到下一档：满月 → 半月 → 弯月 → 满月。
 const dimNext = (v) => BG_DIMS[(BG_DIMS.indexOf(dimAt(v)) + 1) % BG_DIMS.length].v
+// 弯月那一档不发样式：CSS 里那层罩子本来就是全铺的，写个 opacity:1 是废话。
+const dimScrimStyle = (v) => (dimAt(v).veil === 1 ? '' : `opacity:${dimAt(v).veil}`)
 const dimDotStyle = (v) => `background:${dimAt(v).dot}`
-// 0 档返回空串：那一层根本不渲染，不是"叠了一层全透明"。
-const dimVeilStyle = (v) => (dimAt(v).veil ? `background:${withAlpha(BG_DIM_VEIL, dimAt(v).veil)}` : '')
 
 /**
  * 壁纸名。中文是两字釉色本名（壁纸条只有"色块 + 名字"那么大地方），
@@ -497,7 +502,7 @@ module.exports = {
   dimAt,
   dimNext,
   dimDotStyle,
-  dimVeilStyle,
+  dimScrimStyle,
   MOTIFS,
   THEMES,
   POSTER_SCHEMES,

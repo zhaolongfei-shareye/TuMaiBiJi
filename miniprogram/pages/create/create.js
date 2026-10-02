@@ -48,11 +48,11 @@ Page({
     skinWrite: toneStyle(0),
     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
     bgSrc: '',
-    // 背景深浅：默认 0 档＝对原图不做处理。这三样每次进页由 app.bgSkin() 重读，
-    // 这里给初值只为第一帧不出现 style="undefined"。
-    dimV: 0,
+    // 背景深浅那一档：初值给最沉那档（=今天现网的样子，也是 app.bgSkin() 在本机读不到键时
+    // 回落的那一档），免得第一帧先闪一下原图亮度再压暗。三样每次进页由 app.bgSkin() 重读。
+    dimV: 2,
     dimDot: '',
-    dimVeil: '',
+    dimScrim: '',
     // slogan 下面那行：onShow 里现算，这里先给空串免得第一帧闪一个空行
     dateText: '',
     weekText: '',
