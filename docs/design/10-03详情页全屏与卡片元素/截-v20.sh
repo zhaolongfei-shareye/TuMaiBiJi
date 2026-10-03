@@ -7,7 +7,7 @@ CHROME='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 node 画-v20.mjs
 
 names=(
-  v20-s1-详情全屏已有卡片带页码 v20-s2-详情全屏无卡片右上生成按钮
+  v20-s1-详情全屏已有卡片带页码 v20-s2-详情全屏无卡片右上色块入口
   v20-s3-小弹窗首次四格空 v20-s4-小弹窗填过四格满先删一格
   v20-s5-成品弹窗三张封面墙 v20-s6-卡片模板四格改小不滚
 )
@@ -19,7 +19,8 @@ for f in "${names[@]}"; do
 done
 rm -f .薄页-s*.html
 # 整张的窗口高是量出来的（六屏三行 + 末尾那两段说明）；小了会把末尾截掉。
+# 10-03 这一稿末尾加了"三处要你认"和链接那条，量到内容最后一行是 6609，所以抬到 6660。
 "$CHROME" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
-  --allow-file-access-from-files --window-size=1660,5400 \
+  --allow-file-access-from-files --window-size=1660,6660 \
   --screenshot=v20-整张.png "file://$PWD/v20-详情全屏与卡片元素.html" >/dev/null 2>&1
 for f in "${names[@]}"; do printf '%s  ' "$f.png"; sips -g pixelWidth -g pixelHeight "$f.png" 2>/dev/null | awk '/pixel/{print $2}' | tr '\n' ' '; echo; done

@@ -54,7 +54,8 @@ const S = {
 }
 /* 这轮新造的（屏上会挂「新串」标） */
 const NEW = { info: '卡片上的信息', replace: '更换', upload: '上传',
-  sheetHint: '这几样会印在卡片上。改一次就留着用，下次打开还是这几样。' }
+  sheetHint: '这几样会印在卡片上。改一次就留着用，下次打开还是这几样。',
+  linkNote: '链接无法直接打开，可复制链接在浏览器打开' }
 
 const CSS = `
 @font-face{font-family:'WtsjMind';src:url(data:font/ttf;base64,${FONT}) format('truetype');font-weight:100;font-style:normal}
@@ -113,26 +114,25 @@ h1{font-size:34px;letter-spacing:-.6px;margin-bottom:10px}
 .pg u.r::before{transform:rotate(-135deg)}
 .pg b{font-family:'WtsjMind',sans-serif;font-weight:100;font-size:26px;line-height:1;letter-spacing:1px;
   color:rgba(35,37,44,.72)}
-.gen{width:280px;height:390px;border-radius:20px;position:relative;overflow:hidden;background:#23252C;
-  box-shadow:0 10px 26px rgba(8,10,14,.18)}
-.gen b{position:absolute;left:0;right:0;bottom:34px;text-align:center;font-size:var(--fs-meta);font-weight:700;
-  letter-spacing:.5px;color:#F2EFE9;z-index:3}
-.gen::after{content:'';position:absolute;left:0;right:0;bottom:0;height:170px;z-index:2;
-  background:linear-gradient(180deg,rgba(20,20,28,0),rgba(20,20,28,.78))}
-.gen em{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-style:normal;
-  font-size:var(--fs-micro);color:rgba(242,239,233,.72);z-index:3}
-/* 抽象色块：五支 TONES + 宣纸那族，只画形状不画字、不画具象图形（站长口径：抽象、国际化，不要吉祥物） */
-.blk{position:absolute;display:block;border-radius:14px}
+/* 站长 10-03 看过首版打回：那一整块抽象色块"太花哨、与整体简约文艺不搭"。
+   改成一小块分类色 + 中间一枚 + 号 + 两行小字，颜色仍从 palette 出（不新造一支）。 */
+.rt .empty{display:flex;flex-direction:column;align-items:center}
+.swatch{width:132px;height:132px;border-radius:28px;display:flex;align-items:center;justify-content:center;
+  font-size:58px;font-weight:200;line-height:1}
+.rt .e1{margin-top:20px;font-size:var(--fs-meta);font-weight:700;color:${I90};text-align:center}
+.rt .e2{margin-top:6px;font-size:var(--fs-micro);color:${META};text-align:center}
 /* ---- 正文（字号颜色照列表那两档；分区头沿用现网 .ds-lab 20/800 字距 1.6） ---- */
 .dbody{position:absolute;left:32px;right:32px;top:646px;bottom:190px;overflow:hidden}
 .dbody .lab{margin-top:34px;font-size:var(--fs-label);font-weight:800;letter-spacing:1.6px;color:${META}}
 .dbody .lab:first-child{margin-top:0}
 .dbody p{margin-top:12px;font-size:var(--fs-body);line-height:1.7;color:${I70}}
+/* 要点前面那枚：站长 10-03 打回——现网是 38 见方的带圈数字徽（太大、太抢），
+   改成头部 Tips 前面那种 14 实心小黄点（同一个 palette.TIP_DOT），精致一档。 */
 .dbody .pt{margin-top:14px;display:flex;gap:16px;align-items:flex-start}
-.dbody .pt b{flex:none;width:38px;height:38px;border-radius:50%;background:#A8BCC9;color:#FCFBF8;
-  font-family:'WtsjMind',sans-serif;font-weight:100;font-size:22px;display:flex;align-items:center;justify-content:center}
+.dbody .pt i{flex:none;width:14px;height:14px;border-radius:50%;background:${TIP};margin-top:12px}
 .dbody .pt span{font-size:var(--fs-body);line-height:1.55;color:${I90}}
 .dbody .link{margin-top:12px;font-size:var(--fs-meta);line-height:1.5;color:${BLUE}}
+.dbody .lnote{margin-top:8px;font-size:var(--fs-tiny);line-height:1.5;color:${META}}
 .dbody .orig{margin-top:34px;display:flex;align-items:center;justify-content:space-between}
 .dbody .sw{font-size:var(--fs-meta);font-weight:700;color:rgba(35,37,44,.55)}
 .rule{height:2px;background:rgba(35,37,44,.08);margin:0 -32px}
@@ -165,9 +165,10 @@ h1{font-size:34px;letter-spacing:-.6px;margin-bottom:10px}
 .d4 .rep{position:absolute;left:6px;right:6px;bottom:6px;height:34px;border-radius:0 0 62px 62px;
   background:rgba(20,20,28,.55);color:#F2EFE9;font-size:var(--fs-micro);font-weight:700;
   display:flex;align-items:center;justify-content:center}
-/* 四格已满 → 每枚右上角一枚 ×，让他先删一格（现网 slotHintFull 那句已经这么写了，不新造话） */
-.d4 .x{position:absolute;right:-2px;top:-2px;width:36px;height:36px;border-radius:50%;background:var(--danger);
-  color:#fff;font-size:22px;line-height:34px;text-align:center;z-index:3}
+/* 四格已满 → 每枚右上角一枚 ×，让他先删一格（现网 slotHintFull 那句已经这么写了，不新造话）。
+   画法与「我的→卡片模板」那页现网的垃圾桶逐寸相同（深色圆 + ×），所以那句"点右上角的垃圾桶"不用改口。 */
+.d4 .x{position:absolute;right:-2px;top:-2px;width:34px;height:34px;border-radius:50%;background:rgba(20,20,28,.5);
+  color:#fff;font-size:20px;line-height:34px;text-align:center;z-index:3}
 .d4 .sl.picking .disc{box-shadow:0 0 0 4px ${T[0].bg}}
 /* 两个输入框：现网 .field-input 是 --fs-title 31 + gap 16，这一稿压到 --fs-body 28 + gap 8 */
 .fld{margin-top:26px}
@@ -193,14 +194,18 @@ h1{font-size:34px;letter-spacing:-.6px;margin-bottom:10px}
 /* 封面墙：中间当前、左右各露一截（附件三那种）。同时最多三枚，十套靠左右滑走。 */
 .midwrap{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center;
   justify-content:center}
-.flow{flex:none;height:560px;width:100%;display:flex;align-items:center;justify-content:center;
+.flow{flex:none;height:500px;width:100%;display:flex;align-items:center;justify-content:center;
   position:relative;overflow:hidden}
 .flow .t{position:absolute;border-radius:20px;background:#fff;box-shadow:0 12px 30px rgba(8,10,14,.18);
   overflow:hidden;display:flex;align-items:center;justify-content:center}
-.flow .t.mid{width:380px;height:530px;z-index:3}
-.flow .t.side{width:300px;height:419px;z-index:2;opacity:.5;transform:scale(.96)}
-.flow .t.l{left:24px}
-.flow .t.r{right:24px}
+/* 站长 10-03：首版"只看到中间那张，左右那一截看不见"。根因是左右两枚也用了米白底 + opacity .5，
+   压在纸白弹窗上等于没画。这版：左右各让出 181（不是 137）、透明度抬到 .85、补一道描边，
+   并且左右两枚换成有颜色的那两套（荧光渐变／叠翠），中间留米白那套。 */
+.flow .t.mid{width:340px;height:474px;z-index:3}
+.flow .t.side{width:320px;height:446px;z-index:2;opacity:.85;transform:scale(.94);
+  border:var(--w-edge) solid rgba(35,37,44,.10)}
+.flow .t.l{left:0}
+.flow .t.r{right:0}
 .flow .nm{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:var(--fs-micro);
   letter-spacing:1px;color:rgba(35,37,44,.55);z-index:4}
 /* 一行「卡片上的信息」入口：缩略 + 当前昵称/一句话 + 右端 › ——点它拉起上面那枚小弹窗 */
@@ -328,15 +333,10 @@ const art = (kind, o, W) => {
 const thumb = (kind, o) => `<div class="pad">${art(kind, o)}</div>
   ${o && o.n > 1 ? `<div class="pg"><u class="l"></u><b>${o.i || 1}/${o.n}</b><u class="r"></u></div>` : ''}`
 
-/* 抽象色块：五支 palette 色 + 宣纸白，纯形状 */
-const abstract = `<div class="gen">
-  <s class="blk" style="left:-30px;top:34px;width:190px;height:150px;background:${T[1].bg};transform:rotate(-14deg)"></s>
-  <s class="blk" style="right:-40px;top:-20px;width:210px;height:190px;background:${T[0].bg};border-radius:50%;opacity:.92"></s>
-  <s class="blk" style="left:24px;top:210px;width:120px;height:120px;background:${T[2].bg};transform:rotate(18deg)"></s>
-  <s class="blk" style="right:20px;top:170px;width:150px;height:96px;background:${T[3].bg};border-radius:999px"></s>
-  <s class="blk" style="left:-10px;top:300px;width:300px;height:120px;background:rgba(242,239,233,.14)"></s>
-  <s class="blk" style="right:-30px;top:250px;width:160px;height:160px;background:${T[4].bg};border-radius:50%;opacity:.85"></s>
-  <b>${S.gen}</b><em>还没有生成过卡片</em></div>`
+/* 一小块分类色（与这一屏左上那枚点、列表那枚点同一个来源）+ 中间一枚 + 号 + 两行小字 */
+const abstract = `<div class="empty">
+  <div class="swatch" style="background:${T[0].bg};color:${T[0].ink}">+</div>
+  <div class="e1">${S.gen}</div><div class="e2">还没有生成过卡片</div></div>`
 
 const NOTE = {
   cat: '公众号文章 · 09/25', t: '2026年中秋节祝福语与问候图片大全',
@@ -345,21 +345,25 @@ const NOTE = {
   pts: ['提供18张2026年9月25日中秋节最美祝福问候图', '中秋祝福核心为花好月圆、月圆人圆、平安喜乐', '多条祝福语强调阖家安康、家人闲坐、灯火可亲', '借明月与秋风寄寓思念，愿所有牵挂皆有回响'],
   link: 'https://mp.weixin.qq.com/s/Qh7VdLm2pXw9Rt4Yc',
 }
-const body = () => `<div class="dbody">
+/* 正文起点跟着"左右谁更高"走：有缩略图那一版右格 390 + 页码 → 646；
+   只有小色块那一版左列（标题+标签）更高 → 抬到 500，中间不留一条空带。 */
+const body = (top) => `<div class="dbody" style="top:${top || 646}px">` + bodyHtml() + '</div>'
+function bodyHtml() { return `
   <div class="lab">${S.summary}</div><p>${NOTE.sum}</p>
   <div class="lab">${S.points}</div>
-  ${NOTE.pts.map((p, i) => `<div class="pt"><b>${i + 1}</b><span>${p}</span></div>`).join('')}
+  ${NOTE.pts.map((p) => `<div class="pt"><i></i><span>${p}</span></div>`).join('')}
   <div class="lab">${S.srcLink}</div><div class="link">${NOTE.link}</div>
+  <div class="lnote">${NEW.linkNote}</div>
   <div class="orig"><div class="lab" style="margin-top:34px">${S.orig}</div><div class="sw">${S.expand} ⌄</div></div>
-</div>`
+` }
 const dock = () => `<div class="dock"><div class="rule" style="margin-bottom:20px"></div>
   <div class="irow"><b>${S.edit}</b><b class="d">${S.del}</b></div>
   <div class="pub"><span>${S.pub}</span><s>${S.revoke}</s></div></div>`
 const heroLeft = () => `<div class="lt"><div class="cat"><i></i><span>${NOTE.cat}</span></div>
   <h2>${NOTE.t}</h2>
   <div class="tags">${NOTE.tags.map((x) => `<u>${x}</u>`).join('')}</div></div>`
-const detailPage = (right) => `<div class="page">${status('11:06')}${capsule}${back}
-  <div class="hero">${heroLeft()}<div class="rt">${right}</div></div>${body()}${dock()}</div>`
+const detailPage = (right, top) => `<div class="page">${status('11:06')}${capsule}${back}
+  <div class="hero">${heroLeft()}<div class="rt">${right}</div></div>${body(top)}${dock()}</div>`
 
 /* 小弹窗：外壳照密码那一层；四个位置 + 昵称 + 一句话；一次填完，下次读回来 */
 const mini = (discs, vals) => `<div class="mask"><div class="mini">
@@ -375,17 +379,17 @@ const mini = (discs, vals) => `<div class="mask"><div class="mini">
 const FACE = '../../../miniprogram/assets/home-bg-portrait.jpg'
 const discEmpty = (n) => `<div class="sl"><div class="disc"><span class="plus">+</span></div><div class="cap2">${n}</div></div>`
 const discFull = (n, picking) => `<div class="sl${picking ? ' picking' : ''}"><div class="disc">
-    <img src="${FACE}" style="object-position:50% 12%">${picking ? '<span class="x">×</span>' : ''}
-    <span class="rep">${NEW.replace}</span></div><div class="cap2">${n}</div></div>`
+    <img src="${FACE}" style="object-position:50% 12%">
+    <span class="rep">${NEW.replace}</span></div><span class="x">×</span><div class="cap2">${n}</div></div>`
 
 /* 成品弹窗：现网那一层，只把十枚小圆点换成三张可见的封面墙 + 一行「卡片上的信息」 */
 const sheet = (withInfo) => `<div class="sheet">
   <div class="grip"><span class="l">${S.swipe}</span><div class="bar"></div><span class="r">${S.grip}</span></div>
   <div class="midwrap">
   <div class="flow">
-    <div class="t side l">${art('verse', { q: '月圆人安，岁岁圆满。' }, 272)}</div>
-    <div class="t mid">${art('jade', { t: NOTE.t.slice(0, 14) + '…' }, 348)}</div>
-    <div class="t side r">${art('block', { t: '花好月圆' }, 272)}</div>
+    <div class="t side l">${art('acid', { t: '花好月圆' }, 296)}</div>
+    <div class="t mid">${art('jade', { t: NOTE.t.slice(0, 14) + '…' }, 316)}</div>
+    <div class="t side r">${art('block', { t: '月圆人安' }, 296)}</div>
     <div class="nm">玉版宣 · 3/10</div>
   </div>
   ${withInfo ? `<div class="info"><div class="av"><img src="${FACE}" style="object-position:50% 12%"></div>
@@ -397,13 +401,13 @@ const sheet = (withInfo) => `<div class="sheet">
   </div></div>`
 
 const SCREENS = [
-  ['s1', `<b>① 详情改成一整屏</b>（附件一那种左右关系）：左上角<span class="tag new">新画</span>一枚返回键，<b>右上那一格是这篇笔记的卡片缩略图</b>，多张时图下面挂一行小字 <code>‹ 1/3 ›</code>（左右各一次点击，读的就是本机那份卡片台账，与「笔记卡片」那一格同一本账）；<b>标题在左</b>（38/800 = 现网 <code>.ds-h2</code>，四行截断），<b>正文在下方整块铺开</b>。<br>字号与颜色<span class="tag">照列表</span>：前景 <code>rgba(35,37,44,.9)</code>、正文 <code>.7</code>、分区头 20/800 字距 1.6（现网 <code>.ds-lab</code> 那档）。<span class="tag cut">撤</span>列表点「显示更多」开的那层全文浮窗——直接进这一屏。<br>⚠️ 这一屏走 <code>navigationStyle: custom</code>（否则左上那枚返回键是系统的、位置不由我们定），代价是<b>微信胶囊仍钉在右上角（右 24、上 116、174×46）</b>，所以右上那一格必须从胶囊下面起（这稿落在 top 200）。`, detailPage(thumb('jade', { t: '2026年中秋节祝福语…', n: 3, i: 1 }))],
-  ['s2', `<b>② 这篇一张卡片都没有</b>：右上那一格改画<b>「${S.gen}」</b>（现网 <code>shareAsImage</code> 原串），底是<b>抽象色块</b>——五支 <code>palette.TONES</code> 叠形状，不画具象图形、不新造颜色（站长口径：抽象、国际化）。点它才出成品弹窗（屏⑤）。<br>底部那一排<span class="tag cut">撤</span>「生成笔记卡片」那枚：入口挪到右上这一格之后，同一件事不再有两个把手（剩 编辑／删除 + 公开状态那一行，都是现网原样）。<br>右上这一格<b>没有 <code>‹ 1/3 ›</code></b>——一张都没有，页码不画（与「笔记卡片」那一格同一条判据）。`, detailPage(abstract)],
-  ['s3', `<b>③ 统一的那枚小弹窗</b>（站长：大小照输入密码那一层）——外壳逐寸抄 <code>me.wxss</code>：<code>.pwd-mask</code> 遮罩 <code>rgba(20,20,28,.55)</code> + 顶 180、<code>.pwd-card</code> 宽 <b>620</b>、圆角 40、白底描边。<br>里面三样东西一次填完：<b>四个位置的配图</b>（卡内净宽 556 = <b>4×124 + 3×20</b>，一排放满不滚；空着的那枚就是<b>圆形 + 号</b>）、<b>名称</b>、<b>一句话</b>（现网 <code>profileName</code>／<code>profileSlogan</code> 两串，占位字照抄）。<br>下面一行两枚左退出右动作（密码那层的同一条口径，右按钮这两个字「确定」是现网 <code>privatePasswordOk</code> 原串）。<span class="tag new">新串</span>两处：标题「${NEW.info}」与格子上方那一句。<b>那一句没有照搬现网 <code>slotHint</code></b>——现网那句讲的是"图下面两枚开关（卡片／背景）"，而<b>开关只留在「我的→卡片模板」那一页</b>，小弹窗里不画，照搬就是骗人（要不要把开关也搬进来，见文末第二条）。`, detailPage(abstract) + mini([1, 2, 3, 4].map((i) => discEmpty('位置 ' + i)).join(''), { full: false, name: '', slogan: '' })],
-  ['s4', `<b>④ 填过之后再打开</b>：三样都<b>把上次的读回来</b>（名称、一句话回填；有图那枚显示<span class="tag new">新串</span>「${NEW.replace}」压在图下沿）。<br><b>四个位置都满了还要再传</b>（站长第 3 条）：不自动顶替——这一屏让他<b>先挑一格删</b>，被挑中那枚描一圈黄（<code>TONES[0]</code>）、右上角一枚红 ×，删掉之后那一格退回 + 号再传。⚠️ 那句现网话写的是"点右上角的<b>垃圾桶</b>"，这一稿在小弹窗里简化成一枚红 ×——<b>要么改那句、要么把垃圾桶搬进小弹窗</b>，二选一。<br>两个输入框<b>高度压一档</b>：现网 <code>.field-input</code> 是 <code>--fs-title 31</code> + 与标签间距 16，这稿压到 <code>--fs-body 28</code> + 间距 8（占位字跟着降，与新建页那条录入框同一档）。`, detailPage(thumb('jade', { t: '2026年中秋节祝福语…', n: 1 })) + mini(
+  ['s1', `<b>① 详情改成一整屏</b>（附件一那种左右关系）：左上角<span class="tag new">新画</span>一枚返回键，<b>右上那一格是这篇笔记的卡片缩略图</b>，多张时图下面挂一行小字 <code>‹ 1/3 ›</code>（左右各一次点击，读的就是本机那份卡片台账，与「笔记卡片」那一格同一本账）；<b>标题在左</b>（38/800 = 现网 <code>.ds-h2</code>，四行截断），<b>正文在下方整块铺开</b>。<br>字号与颜色<span class="tag">照列表</span>：前景 <code>rgba(35,37,44,.9)</code>、正文 <code>.7</code>、分区头 20/800 字距 1.6（现网 <code>.ds-lab</code> 那档）。<span class="tag cut">撤</span>列表点「显示更多」开的那层全文浮窗——直接进这一屏。<br><b>这一稿跟了你三条改口里的两条</b>：要点前面那枚<span class="tag cut">撤</span>现网 38 见方的带圈数字徽，改成<b>头部 Tips 前面那种 14 实心小黄点</b>（同一个 <code>palette.TIP_DOT</code>、与那枚点同一个数）——代价是<b>序号不再显示</b>，要留序号就得在文字前挂一个"1."，你说一声就加；来源链接下面加一行小字注明<span class="tag new">新串</span>「${NEW.linkNote}」（你的原话）。<br>⚠️ <b>这一行可能是多余的</b>：官方类型定义里有一条 <code>wx.openOfficialAccountArticle</code>，原文写"<b>通过小程序打开任意公众号文章</b>…必须有点击行为才能调用成功"，门槛是<b>基础库 3.4.8</b>（开发工具这边跑的是 <code>3.17.3</code>，见 <code>project.private.config.json</code>，够得上；线上「最低基础库版本」在后台设置里，仓库里查不到，真机验之前顺手后台瞄一眼）。也就是说 <code>mp.weixin.qq.com</code> 这种链接<b>有机会一点就开</b>，不用复制——但这条<b>模拟器点不出来，只有真机能判</b>。所以这一稿先按你说的画（注明打不开）；真机验通之后，这一行小字换成「点击打开原文」，那枚链接从"长按复制"改成"一点就开"。<br>⚠️ 这一屏走 <code>navigationStyle: custom</code>（否则左上那枚返回键是系统的、位置不由我们定），代价是<b>微信胶囊仍钉在右上角（右 24、上 116、174×46）</b>，所以右上那一格必须从胶囊下面起（这稿落在 top 200）。`, detailPage(thumb('jade', { t: '2026年中秋节祝福语…', n: 3, i: 1 }))],
+  ['s2', `<b>② 这篇一张卡片都没有</b>：右上那一格改成<b>一小块 132 见方的色块 + 中间一枚 + 号 + 两行小字</b>（第一行「${S.gen}」现网 <code>shareAsImage</code> 原串，第二行「还没有生成过卡片」现网 <code>noCards</code> 原串）。<span class="tag cut">撤</span>首版那一整块抽象色块——你的原话"太花哨、与整体简约文艺不搭"。<br>色块<b>吃这篇笔记分类那一支</b>（与这一屏左上那枚点、列表那枚点同一个来源 <code>palette.catSkinFor</code>），<b>不新造一支色</b>；+ 号用同一支的 <code>ink</code>。嫌艳就统一退成 <code>--chip-idle</code> 灰底 + 墨色 + 号，一处改完。点色块或那行字才出成品弹窗（屏⑤）。<br>底部那一排<span class="tag cut">撤</span>「生成笔记卡片」那枚：入口挪到右上这一格之后，同一件事不再有两个把手（剩 编辑／删除 + 公开状态那一行，都是现网原样）。右上这一格<b>没有 <code>‹ 1/3 ›</code></b>——一张都没有，页码不画。`, detailPage(abstract, 500)],
+  ['s3', `<b>③ 统一的那枚小弹窗</b>（站长：大小照输入密码那一层）——外壳逐寸抄 <code>me.wxss</code>：<code>.pwd-mask</code> 遮罩 <code>rgba(20,20,28,.55)</code> + 顶 180、<code>.pwd-card</code> 宽 <b>620</b>、圆角 40、白底描边。<br>里面三样东西一次填完：<b>四个位置的配图</b>（卡内净宽 556 = <b>4×124 + 3×20</b>，一排放满不滚；空着的那枚就是<b>圆形 + 号</b>）、<b>名称</b>、<b>一句话</b>（现网 <code>profileName</code>／<code>profileSlogan</code> 两串，占位字照抄）。<br>下面一行两枚左退出右动作（密码那层的同一条口径，右按钮这两个字「确定」是现网 <code>privatePasswordOk</code> 原串）。<span class="tag new">新串</span>两处：标题「${NEW.info}」与格子上方那一句。<b>那一句没有照搬现网 <code>slotHint</code></b>——现网那句讲的是"图下面两枚开关（卡片／背景）"，而<b>开关只留在「我的→卡片模板」那一页</b>，小弹窗里不画，照搬就是骗人（要不要把开关也搬进来，见文末第二条）。`, detailPage(abstract, 500) + mini([1, 2, 3, 4].map((i) => discEmpty('位置 ' + i)).join(''), { full: false, name: '', slogan: '' })],
+  ['s4', `<b>④ 填过之后再打开</b>：三样都<b>把上次的读回来</b>（名称、一句话回填；有图那枚显示<span class="tag new">新串</span>「${NEW.replace}」压在图下沿）。<br><b>四个位置都满了还要再传</b>（站长第 3 条）：不自动顶替——这一屏让他<b>先挑一格删</b>，四枚右上角各挂一枚垃圾桶，<b>画法与「我的→卡片模板」那页现网那枚逐寸相同</b>（深色圆 + ×，34 见方、出格 2），所以现网那句"点右上角的垃圾桶"<b>不用改口</b>；被挑中那枚再描一圈黄（<code>TONES[0]</code>），删掉之后那一格退回 + 号、右按钮变「上传」。<br>两个输入框<b>高度压一档</b>：现网 <code>.field-input</code> 是 <code>--fs-title 31</code> + 与标签间距 16，这稿压到 <code>--fs-body 28</code> + 间距 8（占位字跟着降，与新建页那条录入框同一档）。`, detailPage(thumb('jade', { t: '2026年中秋节祝福语…', n: 1 })) + mini(
       [discFull('卡片', false), discFull('背景', false), discFull('位置 3', true), discFull('位置 4', false)].join(''),
       { full: true, name: '平安喜乐', slogan: '月圆人安，岁岁圆满' })],
-  ['s5', `<b>⑤ 成品弹窗</b>：外壳、位置、把手那两句、带二维码、取消／保存并分享<b>全是现网那一层</b>（<code>.float-sheet</code> 左右 24、上 130、下 152、纸白 <code>#FCFBF8</code>、背后不垫遮罩）。<br>只换两处：<b>一</b> <span class="tag cut">撤</span>那排十枚小圆点 → 改成<b>同时最多看到三张</b>的封面墙（附件三那种）：中间是当前模板的成品图（<code>posterW×posterH</code> 那一档），左右各露出一截待选、淡一档并缩 6%，左右滑走十套；<b>二</b> 封面墙下面加一行<span class="tag new">新串</span>「${NEW.info}」——头像 + 当前昵称 + 当前一句话，点它就拉起屏③④那枚小弹窗（<b>这就是"不用跑去我的里面设置"那一条的落点</b>）。`, detailPage(thumb('jade', { t: '2026年中秋节祝福语…', n: 3, i: 1 })) + sheet(true)],
+  ['s5', `<b>⑤ 成品弹窗</b>：外壳、位置、把手那两句、带二维码、取消／保存并分享<b>全是现网那一层</b>（<code>.float-sheet</code> 左右 24、上 130、下 152、纸白 <code>#FCFBF8</code>、背后不垫遮罩）。<br>只换两处：<b>一</b> <span class="tag cut">撤</span>那排十枚小圆点 → 改成<b>同时最多看到三张</b>的封面墙（附件三那种）：中间是当前模板的成品图（<code>posterW×posterH</code> 那一档，这稿 340×474），左右各露出一截待选、左右滑走十套；<b>首版那两枚你看不见，根因查清了</b>：左右两枚也画成米白底、又压了 <code>opacity:.5</code>，落在纸白弹窗（<code>#FCFBF8</code>）上等于没画——这版左右各让出 <b>181</b>（原来 137）、透明度抬到 <b>.85</b>、补一道描边，并且左右换成<b>有颜色的那两套</b>（荧光渐变／叠翠），中间留米白那套，三张一眼分得开；<b>二</b> 封面墙下面加一行<span class="tag new">新串</span>「${NEW.info}」——头像 + 当前昵称 + 当前一句话，点它就拉起屏③④那枚小弹窗（<b>这就是"不用跑去我的里面设置"那一条的落点</b>）。`, detailPage(thumb('jade', { t: '2026年中秋节祝福语…', n: 3, i: 1 })) + sheet(true)],
   ['s6', `<b>⑥ 「我的」→「卡片模板」跟着改两处</b>（这一页留着，不是被小弹窗替掉——它多两样小弹窗没有的：每枚图下面的<b>「卡片」／「背景」两枚开关</b>和右上角的<b>垃圾桶</b>）：<br><b>一</b> 四个位置<b>改小、一行排满、不再横滑</b>——现网是 <code>.disc</code> 200×200 装在 <code>scroll-view</code> 里左右滑（1.8.9 定的），这稿跟小弹窗统一成<b>一枚 124</b>（卡内净宽 638 = 4×124 + 3×24，居中左右各余 35），<span class="tag cut">撤</span>那条 <code>scroll-x</code>；<b>二</b> 名称／一句话两个框<b>压高度</b>（同屏④那两处数）。<br><b>这一页与那枚小弹窗读同一份数据</b>（<code>poster.readSlots()</code> + <code>name</code>／<code>slogan</code>），改哪一处另一边都跟着变，不建第二份。`, `<div class="page">${status('11:06')}<div class="nav">图麦笔记${capsule}</div><div class="wrap">
     <div class="card"><div class="s4">${[discFull2('on', ''), discFull2('', 'on'), discEmpty2(), discEmpty2()].join('')}</div>
       <div class="hint">${S.slotHint}</div></div>
@@ -430,15 +434,15 @@ function pvInner(k) {
 }
 
 const PRE = `<h2 style="font-size:26px;margin:14px 0 10px">这一稿撤掉的、新造的，以及三处要你认</h2>
-<p class="lead"><span class="tag cut">撤</span><b>列表点「显示更多」开的那层全文浮窗</b>（改成整屏页）、<b>详情底排那枚「生成笔记卡片」</b>（入口挪到右上那一格，一个功能不留两个把手）、<b>成品弹窗里那排十枚小圆点</b>（换三张可见的封面墙）、<b>「我的→卡片模板」那排横滑</b>（四个位置改小、一行排满）。<br>
-<span class="tag.new">新串</span>一共三串：<b>「${NEW.info}」</b>（成品弹窗里那一行入口的名字，也是那枚小弹窗的标题——同一个东西一个名字）、<b>「${NEW.replace}」</b>（有图那枚压在图下沿的两个字）、<b>「${NEW.upload}」</b>（四格已满、删完一格之后右按钮那两个字）。<b>「四个位置都放满了，先删一张再传」那句不用新造</b>——现网 <code>slotHintFull</code> 早就这么写着；<b>「还没有生成过卡片」</b>也是现网 <code>noCards</code> 原串。<br>
-<b>数据这一轮不用动后端</b>：配图走 <code>poster.readSlots()</code>（本机），名称／一句话走 <code>profile</code> 那两格（现网 <code>PUT</code> 已通），右上那几张卡片走 1.9.13 那份本机台账 <code>cardLog.forNote(noteId)</code>（已按 <code>at</code> 倒序，第一张就是最近留下的）。</p>
+<p class="lead"><span class="tag cut">撤</span><b>首版那一整块抽象色块</b>（太花哨，改一小块分类色 + 号）、<b>要点前面那枚 38 见方的带圈数字徽</b>（换 Tips 那种 14 小黄点）、<b>列表点「显示更多」开的那层全文浮窗</b>（改成整屏页）、<b>详情底排那枚「生成笔记卡片」</b>（入口挪到右上那一格，一个功能不留两个把手）、<b>成品弹窗里那排十枚小圆点</b>（换三张可见的封面墙）、<b>「我的→卡片模板」那排横滑</b>（四个位置改小、一行排满）。<br>
+<span class="tag.new">新串</span>一共四串：<b>「${NEW.info}」</b>（成品弹窗里那一行入口的名字，也是那枚小弹窗的标题——同一个东西一个名字）、<b>「${NEW.replace}」</b>（有图那枚压在图下沿的两个字）、<b>「${NEW.upload}」</b>（四格已满、删完一格之后右按钮那两个字）、<b>「${NEW.linkNote}」</b>（来源链接下面那行小字，你的原话）。<b>「四个位置都放满了，先删一张再传」那句不用新造</b>——现网 <code>slotHintFull</code> 早就这么写着；<b>「还没有生成过卡片」</b>也是现网 <code>noCards</code> 原串。<br>
+<b>数据这一轮不用动后端</b>：配图走 <code>poster.readSlots()</code>（本机），名称／一句话走 <code>profile</code> 那两格（现网 <code>PUT</code> 已通），右上那几张卡片走 1.9.13 那份本机台账 <code>cardLog.forNote(noteId)</code>（已按 <code>at</code> 倒序，第一张就是最近留下的）。<b>微信头像昵称那套先不对接</b>（站长 10-03 定的）——所以小弹窗里三样全是要用户自己填／选的，没有"一键带出微信资料"那枚按钮，那两格也就不会凭空多出内容。</p>
 <p class="lead" style="margin-top:14px">三处要你认：<b>一</b> 这一屏要走 <code>navigationStyle: custom</code>（左上返回键才是我们画的那枚），而<b>微信胶囊右上角撤不掉</b>——所以右上那一格卡片只能从胶囊下面起（这稿顶到 200），标题区因此比附件一矮一截；不接受就把返回键交回系统、这一屏留原生导航条。<b>二</b> 小弹窗里那四枚<b>不带「卡片／背景」两枚开关</b>（角色只在「我的→卡片模板」那页设），要不要把开关也搬进小弹窗、让它成为唯一一处设置口？<b>三</b> 屏⑤那行「${NEW.info}」我放在<b>封面墙和带二维码之间</b>（它是"改内容"，模板是"选样子"，两者不同档）；你要是想让它贴着大图，说一声挪。</p>`
 
 fs.writeFileSync(path.join(DIR, 'v20-详情全屏与卡片元素.html'), `<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <title>v20 · 详情全屏 + 统一卡片元素小弹窗</title><style>${CSS}</style></head><body>
 <h1>v20 · 详情改成一整屏，卡片上要的三样收进一枚小弹窗（示意，代码一行没动）</h1>
-<p class="lead">六屏：<b>1</b> 详情全屏·已有卡片（右上缩略图 + <code>‹ 1/3 ›</code>）｜<b>2</b> 详情全屏·一张都没有（右上那一格＝「生成笔记卡片」，底是抽象色块）｜<b>3</b> 小弹窗·第一次（四个位置空、两个框空）｜<b>4</b> 小弹窗·填过（上次的读回来；四格已满 → 先挑一格删）｜<b>5</b> 成品弹窗（十枚小圆点换三张可见的封面墙 + 一行「${NEW.info}」）｜<b>6</b> 「我的→卡片模板」（四枚改小不滚 + 两个框压高度）。<br>
+<p class="lead">六屏：<b>1</b> 详情全屏·已有卡片（右上缩略图 + <code>‹ 1/3 ›</code>）｜<b>2</b> 详情全屏·一张都没有（右上那一格＝一小块分类色 + 中间 + 号 + 两行小字）｜<b>3</b> 小弹窗·第一次（四个位置空、两个框空）｜<b>4</b> 小弹窗·填过（上次的读回来；四格已满 → 先挑一格删）｜<b>5</b> 成品弹窗（十枚小圆点换三张可见的封面墙 + 一行「${NEW.info}」）｜<b>6</b> 「我的→卡片模板」（四枚改小不滚 + 两个框压高度）。<br>
 屏高 <code>750×1670</code>（1px = 1rpx），令牌逐字抄 <code>app.wxss</code> 的 <code>theme-default</code>；小弹窗那一层照 <code>me.wxss</code> 的 <code>.pwd-mask</code>／<code>.pwd-card</code>（620 宽、顶 180、遮罩 .55）；成品弹窗照 <code>index.wxss</code> 的 <code>.float-sheet</code>；卡片比例吃真跑量出来的 0.717／0.972；色块只出自 <code>palette.TONES</code>。<span class="tag">现网</span>那句在 <code>utils/i18n.js</code> 里逐字对过；<span class="tag.new">新串</span>这轮新造的；<span class="tag cut">撤</span>这轮删掉的。</p>
 ${[0, 2, 4].map((i) => `<div class="row">${SCREENS.slice(i, i + 2).map(([id, cap, html]) => cell(id, cap, html)).join('')}</div>`).join('')}
 ${PRE}
