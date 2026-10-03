@@ -121,6 +121,14 @@ const i18n = {
     previewTitle: '卡片预览',
     previewHint: '下面是成品样子；改完记得点上面的保存。',
     profileSaved: '已保存',
+    // 成品弹窗底下那枚「编辑个人名片」浮出来的一层（站长 10-03：出卡片这一屏要能就地改名片，
+    // 不必绕去「我的→卡片模板」）。四枚下面只写它当前的角色，角色开关仍只在那一页——
+    // 同一件事不留两个口。
+    editCard: '编辑个人名片',
+    cardInfo: '卡片上的信息',
+    cardInfoHint: '这四张就是卡片上的人和名字。换一张点「更换」，不想要了点右上角的垃圾桶。',
+    cardReplace: '更换',
+    slotPos: '位置',
     // 海报上的码不设过期，所以"撤掉"是用户唯一能把已公开内容收回来的动作。
     sharedNow: '这篇已经公开，别人扫码能看',
     unshare: '撤掉分享',
@@ -286,11 +294,6 @@ const i18n = {
     generatingShare: '生成分享图...',
     generateFailed: '生成失败',
     saveToAlbum: '保存到相册',
-    // 「生成笔记卡片」那枚主操作按的是微信的图片分享面板（发送给朋友 / 朋友圈 / 收藏 / 保存图片
-    // 五枚都在里面），保存只是面板的一项，所以按钮不能再叫"保存到相册"。
-    // 站长 10-03 再收一步：只叫「分享」——图已经生成过的人往往就是想再发一次，
-    // "保存并分享"读起来像必须先重存一遍，而存不存本来就是面板里那一枚的事。
-    saveAndShare: '分享',
     savedToAlbum: '已保存到相册',
     needAlbumPermission: '需要相册权限',
     permissionHint: '请在设置中允许访问相册',
@@ -300,6 +303,10 @@ const i18n = {
     noQrMark: '微信搜「图麦笔记」',
     qrToggle: '带二维码',
     qrToggleHint: '发到微信以外的平台容易被屏蔽，可关掉只留文字',
+    // 二维码药丸搬进主按钮之后，那行字要跟药丸一起说话（站长 10-03 第三稿）。
+    // 两态刻意都六个字：切开关时居中那行不跳位，按钮里的字不会闪一下宽度。
+    qrShareOn: '带二维码分享',
+    qrShareOff: '无二维码分享',
     sourceWechatArticle: '公众号文章',
     sourceWebArticle: '网页文章',
     sourceScreenshot: '截图识别',
@@ -427,6 +434,11 @@ const i18n = {
     previewTitle: 'Card preview',
     previewHint: 'This is the finished card. Tap Save above to apply.',
     profileSaved: 'Saved',
+    editCard: 'Edit my card',
+    cardInfo: 'Card details',
+    cardInfoHint: 'These four are the face and the name printed on your cards. Tap Replace to swap one, or the bin to remove it.',
+    cardReplace: 'Replace',
+    slotPos: 'Slot',
     posterUsing: 'Current template',
     // 撤掉分享：码不过期，这一条就是唯一的收回动作
     sharedNow: 'This note is public — anyone with the code can read it',
@@ -579,7 +591,6 @@ const i18n = {
     generatingShare: 'Generating share image...',
     generateFailed: 'Generate failed',
     saveToAlbum: 'Save to album',
-    saveAndShare: 'Share',
     savedToAlbum: 'Saved to album',
     needAlbumPermission: 'Album permission required',
     permissionHint: 'Please allow album access in settings',
@@ -588,6 +599,8 @@ const i18n = {
     noQrMark: 'in WeChat',
     qrToggle: 'With QR code',
     qrToggleHint: 'Other apps often block QR codes — switch it off to keep text only',
+    qrShareOn: 'Share with QR code',
+    qrShareOff: 'Share without QR code',
     sourceWechatArticle: 'WeChat Article',
     sourceWebArticle: 'Web Article',
     sourceScreenshot: 'Screenshot',

@@ -162,6 +162,19 @@ function placeSlot(slots, at, path) {
   return next
 }
 
+/**
+ * 换掉第 at 格那一张：角色跟着这一格走，不重算。
+ * 这条不能拿 placeSlot 顶——那个函数按"当前还有谁在当卡片"决定新这张要不要接住这个角色，
+ * 而被换掉那张在算 live 时还在数组里，于是换一张就把「卡片」换没了：全仓没人当卡片，
+ * 海报上的头像当场消失（node 里跑一遍就复现）。placeSlot 管的是"往空格放第一张"，
+ * 那一趟 live 里没有这一格，自动接角色才是对的。
+ */
+function replaceSlot(slots, at, path) {
+  const next = slots.slice()
+  next[at] = Object.assign({}, next[at], { path })
+  return next
+}
+
 function rolePath(slots, role) {
   const hit = slots.find((s) => s && s[role])
   return hit ? hit.path : ''
@@ -1716,6 +1729,7 @@ module.exports = {
   writeSlots,
   takeRole,
   placeSlot,
+  replaceSlot,
   cardPath,
   homeBg,
   bandGeom,

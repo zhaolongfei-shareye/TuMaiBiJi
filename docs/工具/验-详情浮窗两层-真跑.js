@@ -13,6 +13,11 @@
 // 后端那个字段本身在现网验过（§8.65 那 12 条），这里不重复造数据。
 // ③（站长 10-03 报的落点错）真跳一趟编辑页再回来：没保存点取消，回来的必须还是这扇窗、
 // 还是这一篇。标志挂在页面实例上（不是 data，它不是渲染状态），所以用 evaluate 读 getCurrentPages()[0]。
+// v25（站长 10-03 第三稿）成品弹窗底排改两行：第一行 取消｜编辑个人名片，第二行那枚通栏
+// 组合按钮把二维码药丸吃进去了，按钮上的字跟着 noQr 两态切「带二维码分享／无二维码分享」。
+// 于是这一把多钉三件事：药丸必须在 .tpl-main 里面（旧的单独一行 .tpl-qr 不许回来）、
+// 点药丸只切开关不能冒泡去分享（开发者工具里点主按钮会真走一次存相册+记台账，全程不碰）、
+// 以及「卡片上的信息」那一层浮在成品弹窗上面、收掉它成品弹窗还在。
 // 前置：微信开发者工具已开；改过 WXSS/WXML 要先 cli close 再
 //   cli auto --project <repo>/miniprogram --auto-port 9431，等十秒端口起来。
 // 跑法：bash docs/工具/跑尺子.sh 9431 验-详情浮窗两层-真跑
@@ -230,15 +235,21 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('成品图已出', !!d.posterImagePath)
     ck('弹窗里是模板预览', !!(await page.$('.tpl-sheet')) && !!(await page.$('.tpl-poster')))
     ck('弹窗里没有详情窗的 dock', !(await page.$('.ds-dock')))
-    ck('弹窗 dock 有二维码开关', !!(await page.$('.tpl-qr')))
+    // 10-03 第三稿：二维码药丸不再单独占一行，搬进那枚通栏主按钮里（站长原话
+    // "二维码药丸与分享做成组合按钮，通栏按钮"）。所以这里钉的是"药丸在主按钮里面"。
+    ck('开关在主按钮里面（不再单独一行 .tpl-qr）',
+      !!(await page.$('.tpl-main')) && !!(await page.$('.tpl-main .pill')) && !(await page.$('.tpl-qr')))
     ck('开关默认开着', d.noQr === false)
     // 10-01 站长：账号认证下来了，这枚主操作从"存进相册"换成弹微信的图片分享面板
     //（发送给朋友 / 朋友圈 / 收藏 / 保存图片 / 转发为贴图五枚都在里面），所以文案不能再只说存相册。
-    // 10-03 站长再收：只叫「分享」——图已经生成过的人往往就是想再发一次，"保存并分享"读着像要重存一遍。
+    // 10-03 站长再收两步：先只叫「分享」，第三稿把开关搬进来之后改叫「带二维码分享」／
+    // 「无二维码分享」——按钮上的字要跟药丸一起说话。两态刻意都是六个字，切开关时不跳位。
     const tplBtns = []
     for (const b of await page.$$('.tpl-btn')) tplBtns.push(await b.text())
-    ck('主操作那枚叫「分享」（左那枚仍是取消；旧名"保存并分享"不许回来）',
-      tplBtns.join('|') === '取消|分享', tplBtns.join('|'))
+    ck('第一行两枚是「取消｜编辑个人名片」（旧的"保存并分享"不许回来）',
+      tplBtns.join('|') === '取消|编辑个人名片', tplBtns.join('|'))
+    const mainTx = await (await page.$('.tpl-main')).text()
+    ck('通栏那枚开着码就叫「带二维码分享」', mainTx === '带二维码分享', mainTx)
     const menuApi = await mp.evaluate(() => typeof wx.showShareImageMenu)
     ck('这一档环境里有微信图片分享面板这个 API（真机上那五枚才是它给的）',
       menuApi === 'function', `typeof=${menuApi}`)
@@ -278,15 +289,23 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('面板一收就把这层撤掉（平时绝不在屏上）', !(await page.$('.share-dim')))
     await mp.screenshot({ path: path.join(OUT, '04-模板弹窗.png') })
 
-    /* ---------- 关码 → 整张重画 ---------- */
-    await (await page.$('.tpl-qr')).tap()
+    /* ---------- 关码 → 整张重画（点的是主按钮里那枚药丸，不是主按钮本身） ----------
+       药丸这层必须 catchtap：它现在整个泡在"分享"那一枚里面，冒泡上去就是关个码顺手把图发出去了。
+       ⚠️ 这一把全程不许点 .tpl-main 本体——开发者工具里 showShareImageMenu 一定 fail，
+       会顺着兜底那条路真存一次相册并记一次台账。 */
+    await (await page.$('.tpl-main .pill')).tap()
     await sleep(7000)
     d = await page.data()
     ck('点了开关就关码', d.noQr === true, `noQr=${d.noQr}`)
     ck('关码后重画完仍出图', !!d.posterImagePath && d.posterBusy === false)
+    ck('点药丸只切开关，没冒泡去分享（弹窗还开着、那层黑没铺）',
+      d.templateOpen === true && d.shareDim === false, `open=${d.templateOpen} dim=${d.shareDim}`)
+    ck('关着码那枚的字跟着换成「无二维码分享」',
+      (await (await page.$('.tpl-main')).text()) === '无二维码分享')
     await mp.screenshot({ path: path.join(OUT, '05-关码重画.png') })
-    await (await page.$('.tpl-qr')).tap()
+    await (await page.$('.tpl-main .pill')).tap()
     await sleep(7000)
+    ck('再点一下开回来，字也跟着回来', (await (await page.$('.tpl-main')).text()) === '带二维码分享')
 
     /* ---------- ⑤ 滑到第十套停住、不循环 ---------- */
     await page.setData({ posterTpl: 'lit' })
@@ -303,6 +322,52 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await sleep(7000)
     ck('第一套左滑也滑不动（不绕到末尾）', (await page.data()).posterTpl === 'card')
     await mp.screenshot({ path: path.join(OUT, '06-换模板.png') })
+
+    /* ---------- ⑦「卡片上的信息」：出卡片这一屏就地改名片（站长 10-03 第三稿） ----------
+       这一层读写的是「我的→卡片模板」同一份数据，所以这里只钉结构与"它浮在成品弹窗上面、
+       收掉它成品弹窗还在"，不去动相册（选图那两条路要真选一张文件，替身造不出来）。 */
+    const row1 = await page.$$('.tpl-btn')
+    await row1[1].tap()
+    await sleep(900)
+    d = await page.data()
+    ck('点「编辑个人名片」浮出小弹窗，成品弹窗仍在它底下',
+      d.cardInfoOpen === true && d.templateOpen === true, `ci=${d.cardInfoOpen} tpl=${d.templateOpen}`)
+    ck('标题是「卡片上的信息」', (await (await page.$('.ci-title')).text()) === '卡片上的信息')
+    ck('四枚位置格一行放满', (await page.$$('.ci-disc')).length === 4)
+    /* 圆必须是"圆"的：10-03 第一版这里挂的是裸 empty/filled 修饰类，撞上本页 642 行
+       列表空态那条 `.loading, .empty, .loading-more { padding: var(--sp-6) 0 }`，
+       四枚 124 的圆被撑成 124×254 的竖椭圆——结构判据全绿，只有截图是坏的。
+       所以这条量的是盒子形状（宽高、正方），类名对不对换不掉这一眼。 */
+    const sc = (await mp.evaluate(() => wx.getWindowInfo().windowWidth)) / 750
+    const discs = await mp.evaluate(() => new Promise((done) => {
+      wx.createSelectorQuery().selectAll('.ci-disc').boundingClientRect((r) => done(r || [])).exec()
+    }))
+    ck('四枚格子量出来是正圆：宽 124(+描边)、高与宽相差不超过 2rpx',
+      discs.length === 4 && discs.every((b) => {
+        const w = b.width / sc, h = b.height / sc
+        return w >= 120 && w <= 136 && Math.abs(h - w) <= 2
+      }),
+      discs.map((b) => `${Math.round(b.width / sc)}×${Math.round(b.height / sc)}rpx`).join(' '))
+    const filled = (await page.$$('.ci-disc.ci-filled')).length
+    const repl = (await page.$$('.ci-repl')).length
+    const bins = (await page.$$('.ci-bin')).length
+    ck('有图那几枚才挂「更换」和垃圾桶，空格两样都没有',
+      repl === filled && bins === filled, `有图 ${filled}／更换 ${repl}／垃圾桶 ${bins}`)
+    const caps = []
+    for (const c of await page.$$('.ci-cap')) caps.push(await c.text())
+    ck('每枚下面只写它当前是什么（角色开关只留在那一页，这里不给第二个口）',
+      caps.length === 4 && caps.every((x) => ['卡片', '背景', '位置 1', '位置 2', '位置 3', '位置 4'].indexOf(x) >= 0),
+      caps.join('|'))
+    ck('名称与一句话两栏都在', (await page.$$('.ci-input')).length === 2)
+    ck('底下两枚是取消｜保存',
+      (await (await page.$('.ci-btn.ghost')).text()) === '取消' &&
+      (await (await page.$('.ci-btn.pri')).text()) === '保存')
+    await mp.screenshot({ path: path.join(OUT, '06b-卡片上的信息.png') })
+    await (await page.$('.ci-btn.ghost')).tap()
+    await sleep(700)
+    d = await page.data()
+    ck('收掉小弹窗，成品弹窗还开着（不是连它一起收）',
+      d.cardInfoOpen === false && d.templateOpen === true, `ci=${d.cardInfoOpen} tpl=${d.templateOpen}`)
 
     /* ---------- ⑥ 取消 → 回详情窗，不是回列表 ---------- */
     await (await page.$('.tpl-btn.ghost')).tap()

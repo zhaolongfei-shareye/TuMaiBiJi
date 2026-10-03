@@ -289,17 +289,59 @@
       </view>
     </view>
     <view class="tpl-dock">
-      <!-- 码的开关：只影响这一张成品图，与海报页那条是同一个开关语义 -->
-      <view class="tpl-qr" catchtap="onToggleQr">
-        <view class="pill {{noQr ? '' : 'pill-on'}}"><view class="pill-dot"></view></view>
-        <view class="tpl-qr-text">
-          <text class="tpl-qr-label">{{t.qrToggle}}</text>
-          <text class="tpl-qr-hint">{{t.qrToggleHint}}</text>
-        </view>
-      </view>
       <view class="tpl-actions">
         <view class="tpl-btn ghost" bindtap="onCancelTemplate">{{t.cancel}}</view>
-        <view class="tpl-btn primary {{posterImagePath ? '' : 'disabled'}}" bindtap="onSavePoster">{{t.saveAndShare}}</view>
+        <view class="tpl-btn" bindtap="onOpenCardInfo">{{t.editCard}}</view>
+      </view>
+      <!-- 通栏这一枚是组合按钮：整条按下去就是分享，左边那枚药丸只切开关。
+           药丸这层必须留 catchtap（现网 `.tpl-qr` 上本来就是）——冒泡上去会连带触发分享，
+           等于关个二维码把图顺手发出去了。站长 10-03：「取消和编辑个人名片放同一行，
+           二维码药丸与分享做成组合按钮，通栏」。 -->
+      <view class="tpl-main {{posterImagePath ? '' : 'disabled'}}" bindtap="onSavePoster">
+        <view class="pill {{noQr ? '' : 'pill-on'}}" catchtap="onToggleQr"><view class="pill-dot"></view></view>
+        <text>{{noQr ? t.qrShareOff : t.qrShareOn}}</text>
+      </view>
+      <!-- 那句详细说明一个字没改，只是从药丸右边挪到按钮下面（它同时挂在海报页 share.wxml:16，
+           改短会连着那页一起变）。 -->
+      <text class="tpl-main-hint">{{t.qrToggleHint}}</text>
+    </view>
+  </view>
+
+  <!-- 「卡片上的信息」：站长 10-03 要的是出卡片这一屏就地改名片，不必绕去「我的→卡片模板」。
+       外壳照「我的」页密码那一层（遮罩 rgba(20,20,28,.55)、宽 620、离顶 180），读写的就是
+       那一页同一份数据（utils/poster.js 的四槽与名称/一句话）。四枚下面只写它当前的角色，
+       角色开关仍只留在那一页——同一件事不留两个口。 -->
+  <view wx:if="{{cardInfoOpen}}" class="ci-mask" bindtap="onCloseCardInfo">
+    <view class="ci-card" catchtap="">
+      <text class="ci-title">{{t.cardInfo}}</text>
+      <text class="ci-hint">{{t.cardInfoHint}}</text>
+      <view class="ci-slots">
+        <view wx:for="{{ciSlots}}" wx:key="index" class="ci-slot">
+          <view class="ci-disc {{item.path ? 'ci-filled' : 'ci-empty'}}" data-i="{{index}}" catchtap="onCiSlotTap">
+            <image wx:if="{{item.path}}" src="{{item.path}}" mode="aspectFill" class="ci-img" />
+            <text wx:else class="ci-plus">+</text>
+            <text wx:if="{{item.path}}" class="ci-repl" data-i="{{index}}" catchtap="onCiReplace">{{t.cardReplace}}</text>
+          </view>
+          <view wx:if="{{item.path}}" class="ci-bin" data-i="{{index}}" catchtap="onCiDrop">
+            <view class="ci-bin-lid"></view>
+            <view class="ci-bin-body"></view>
+          </view>
+          <text class="ci-cap {{item.role ? 'role' : ''}}">{{item.cap}}</text>
+        </view>
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileName}}</text>
+        <input class="ci-input" value="{{ciName}}" maxlength="16" placeholder="{{t.profileNamePh}}"
+          placeholder-class="ci-ph" bindinput="onCiName" />
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileSlogan}}</text>
+        <input class="ci-input" value="{{ciSlogan}}" maxlength="24" placeholder="{{t.profileSloganPh}}"
+          placeholder-class="ci-ph" bindinput="onCiSlogan" />
+      </view>
+      <view class="ci-acts">
+        <view class="ci-btn ghost" catchtap="onCloseCardInfo">{{t.cancel}}</view>
+        <view class="ci-btn pri" catchtap="onCiSave">{{t.save}}</view>
       </view>
     </view>
   </view>

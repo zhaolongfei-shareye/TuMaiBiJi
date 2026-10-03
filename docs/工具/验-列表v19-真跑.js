@@ -392,7 +392,7 @@ const COUNT_ALL = () => {
   ck('光把图画出来不记账：开一次弹窗、渲一张成品，台账一格都不许多（10-03 那五张就是这么来的）',
     afterRender === 0, `出图后台账已有 ${afterRender} 张`)
   await stubShare()
-  await (await $('.tpl-btn.primary')).tap()
+  await (await $('.tpl-main')).tap()
   const kept1 = await waitKept(1)
   ck('点了「分享」、面板回 success 之后，台账才多出这一格',
     kept1, kept1 ? '已记 1 格' : `面板成功后台账仍是 ${await countAll()} 张（${r1}）`)
@@ -455,7 +455,7 @@ const COUNT_ALL = () => {
     ck('开关一次码（也只是看图）同样不记账：台账仍是 1 张', (await countAll()) === 1,
       `台账 ${await countAll()} 张`)
     await stubShare()
-    await (await $('.tpl-btn.primary')).tap()
+    await (await $('.tpl-main')).tap()
     const kept2 = await waitKept(2)
     ck('第二套真"分享"之后，台账才两张', kept2,
       kept2 ? '已记 2 格' : `面板成功后仍是 ${await countAll()} 张`)

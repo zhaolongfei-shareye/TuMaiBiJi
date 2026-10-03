@@ -103,6 +103,12 @@ Page({
     shareDim: false,
     // 弹窗里那个二维码开关：只影响这一张成品图，与海报页同一条语义
     noQr: false,
+    // 「卡片上的信息」那一层：四格与名称/一句话都是「我的→卡片模板」同一份数据，
+    // 这里只是就地改（站长 10-03）。ciSlots 是装饰过的（带 cap/role），真相仍只在 storage。
+    cardInfoOpen: false,
+    ciSlots: [],
+    ciName: '',
+    ciSlogan: '',
     // 搜索条那一块面不再是一支固定蓝，而是由当前壁纸的页面底派生（palette.chromeOf）。
     // data 字面量里这一次是模块加载时算的，主题还没落地，所以按 default 走——
     // 和 themeOf 拿不到 key 时回落 THEMES[0] 是同一条规则，不是另写一份兜底色。
@@ -910,5 +916,145 @@ Page({
   // 取下一批改挂在 scroll-view 的 bindscrolltolower 上。
   onListToLower() {
     this.onLoadMore()
+  },
+
+  // ---------- 「卡片上的信息」（站长 10-03：出卡片这一屏要能就地改名片） ----------
+  // 读写的是「我的→卡片模板」那一页同一份数据。四格那一块跟那一页同一条口径：当场落盘，
+  // 不等「保存」——删除有二次确认，确认完还要等保存才真删，那句确认就是假话。
+  // 只有名称/一句话等「保存」。
+
+  // 一格下面那一行只说它当前是什么角色；没当上角色的就是第几个位置。
+  // 这一层不放角色开关——开关留在那一页，同一件事不留两个口。
+  _ciCaps(slots) {
+    const { lang } = this.data
+    return slots.map((s, i) => ({
+      path: s ? s.path : '',
+      card: !!(s && s.card),
+      bg: !!(s && s.bg),
+      role: !!(s && (s.card || s.bg)),
+      cap: s && (s.card || s.bg)
+        ? (s.card ? t('slotCard', lang) : t('slotBg', lang))
+        : `${t('slotPos', lang)} ${i + 1}`,
+    }))
+  },
+
+  onOpenCardInfo() {
+    const saved = poster.readProfile()
+    this._ciDirty = false
+    this.setData({
+      cardInfoOpen: true,
+      ciSlots: this._ciCaps(poster.readSlots()),
+      ciName: saved.name || '',
+      ciSlogan: saved.slogan || '',
+    })
+  },
+
+  onCloseCardInfo() {
+    this.setData({ cardInfoOpen: false })
+    if (!this._ciDirty) return
+    this._ciDirty = false
+    // 动过名片就得把这一张重画一次：弹窗里看到的还是旧头像旧名字就是预览骗人。
+    if (this.data.templateOpen) {
+      this.setData({ posterBusy: true })
+      this._renderPoster().catch((err) => {
+        console.error('改完名片重画失败', err)
+        wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
+        this.setData({ posterBusy: false })
+      })
+    }
+  },
+
+  _ciCommit(next) {
+    poster.writeSlots(next)
+    this._ciDirty = true
+    // 首页头部那张也吃这四个槽（「背景」那一枚），而 bgSrc 只在 onShow 重取——
+    // 这一层不跳页，不顺手带一下，收掉弹窗之后头部还是旧照片。
+    this.setData({ ciSlots: this._ciCaps(next), bgSrc: poster.homeBg() })
+  },
+
+  // 空格：整枚圆可点，就是"往这一格放一张"（与那一页同一条）。
+  onCiSlotTap(e) {
+    const at = Number(e.currentTarget.dataset.i)
+    if (!(at >= 0) || this.data.ciSlots[at].path) return
+    this._ciPick(at, false)
+  },
+
+  // 已填那一格的下沿一枚「更换」。现网那一页点已填的格子是故意不响应的（怕误一下把在用的
+  // 图换掉），这里给的是明确一枚，不是把整枚圆变成可点。
+  onCiReplace(e) {
+    const at = Number(e.currentTarget.dataset.i)
+    if (!(at >= 0) || !this.data.ciSlots[at].path) return
+    this._ciPick(at, true)
+  },
+
+  // 换一张走 poster.replaceSlot，不走 placeSlot：后者是给空格用的，往已填的格上放会把
+  // 那一格的角色重算一遍，实测算出来是"没人当卡片"——海报头像当场消失。规则本身连注释
+  // 都写在 utils/poster.js 那两个函数上，这里只是选对哪一个。
+  _ciPick(at, keep) {
+    const { lang } = this.data
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      // 只要一张圆图，用不着原图：本地用户文件目录一共 10MB（同 profile.js 那条）。
+      sizeType: ['compressed'],
+      success: async (res) => {
+        const temp = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+        if (!temp) return
+        try {
+          const path = await poster.mintAvatar(temp)
+          const next = poster.readSlots()
+          this._ciCommit(keep ? poster.replaceSlot(next, at, path) : poster.placeSlot(next, at, path))
+        } catch (err) {
+          console.error('形象图存不下来', err)
+          poster.dropUncommitted()
+          wx.showToast({ title: t('avatarSaveFailed', lang), icon: 'none' })
+        }
+      },
+      fail: (err) => {
+        console.error('选图失败', err)
+        if (((err && err.errMsg) || '').indexOf('cancel') >= 0) return
+        wx.showToast({ title: t('pickFailed', lang), icon: 'none' })
+      },
+    })
+  },
+
+  onCiDrop(e) {
+    const at = Number(e.currentTarget.dataset.i)
+    const cur = this.data.ciSlots[at]
+    if (!(at >= 0) || !cur.path) return
+    const { lang } = this.data
+    // 删之前把后果说全（跟那一页同一句）：它要是正当着首页背景，删完首页会跳回默认那张。
+    const parts = [t('slotDropBody', lang)]
+    if (cur.card) parts.push(t('slotDropWasCard', lang))
+    if (cur.bg) parts.push(t('slotDropWasBg', lang))
+    wx.showModal({
+      title: t('slotDropTitle', lang),
+      content: parts.join(lang === 'zh' ? '' : ' '),
+      confirmText: t('slotDropOk', lang),
+      cancelText: t('cancel', lang),
+      success: (res) => {
+        if (!res.confirm) return
+        const next = poster.readSlots()
+        next[at] = null
+        this._ciCommit(next)
+      },
+    })
+  },
+
+  onCiName(e) { this.setData({ ciName: e.detail.value }) },
+  onCiSlogan(e) { this.setData({ ciSlogan: e.detail.value }) },
+
+  onCiSave() {
+    const { lang } = this.data
+    const before = poster.readProfile()
+    const patch = {
+      name: (this.data.ciName || '').trim().slice(0, 16),
+      slogan: (this.data.ciSlogan || '').trim().slice(0, 24),
+    }
+    poster.writeProfile(patch)
+    if (patch.name !== (before.name || '') || patch.slogan !== (before.slogan || '')) this._ciDirty = true
+    wx.showToast({ title: t('profileSaved', lang), icon: 'success' })
+    this.onCloseCardInfo()
   },
 })

@@ -73,8 +73,12 @@ const ck = (name, ok, got) => {
     (apiJs.match(/clearPrivateUnlock\(\)/g) || []).length >= 2)
   ck('详情页验完密码重取一次（第一份是裁过的空壳）',
     /this\._privateVerified = true[\s\S]{0,400}note = await api\.getNote\(id\)/.test(detailJs))
+  // 10-03 #286 之后"找回行号"抽成了 _reopenDetail（验完密码重取与编辑页返回两条共用），
+  // 所以这一条不再要求 200 字以内出现 notes.findIndex——那量的是当时的代码形状。
+  // 现在钉两件事：重载完整表之后必须按 id 找回那一行，而找回那一步收在一个函数里。
   ck('列表页验完密码重载列表并按 id 找回行号（不然展开那行是空的）',
-    /await this\.loadNotes\(true\)[\s\S]{0,200}notes\.findIndex/.test(idx))
+    /await this\.loadNotes\(true\)[\s\S]{0,200}this\._reopenDetail\(/.test(idx)
+    && /_reopenDetail\(noteId\)\s*\{[\s\S]{0,200}notes\.findIndex/.test(idx))
   ck('编辑页没解锁就不进编辑器（PUT 是整份回写，会清掉真概要）',
     /is_private[\s\S]{0,200}hasPrivateUnlock\(\)/.test(wr) && /privateUnlockFirst/.test(wr))
   ck('凭证只存内存不落 storage（杀了重进要重新输）',

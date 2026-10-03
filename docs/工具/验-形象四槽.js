@@ -132,7 +132,36 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   ck('第一张仍然是两个位置的主人', s[0].card === true && s[0].bg === true)
 }
 
-// ---------------- ⑦ 删掉不补位 ----------------
+// ---------------- ⑥b 「更换」这一格：角色必须跟着走 ----------------
+// 10-03 加「卡片上的信息」那一层时才量出来的：往已填的格上放一张，placeSlot 会按
+// "当前还有谁在当卡片"重算角色，而被换掉那张在算 live 时还在数组里，于是新这张 card:false
+// ——全仓没人当卡片，海报头像当场消失。所以另开 replaceSlot 一条，规则钉在这里。
+{
+  const a = putFile('r1.img')
+  seed({ images: [{ path: a, card: true, bg: true }] }, [a])
+  // b 要在 seed 之后再落盘：seed 会清 disk，先 putFile 的话这张当场蒸发，
+  // 测出来就是"文件丢了"那一支，不是"换一张之后角色还在"这一支（这条坑注释里写着，我又踩一次）。
+  const b = putFile('r2.img')
+  const byPlace = poster.placeSlot(poster.readSlots(), 0, b)
+  ck('钉住这个坑：placeSlot 换已填那格会把两个角色都算没（所以「更换」不许用它）',
+    byPlace[0].card === false && byPlace[0].bg === false, JSON.stringify(byPlace[0]))
+  const byReplace = poster.replaceSlot(poster.readSlots(), 0, b)
+  ck('replaceSlot 换的那一格角色原样带过去',
+    byReplace[0].path === b && byReplace[0].card === true && byReplace[0].bg === true,
+    JSON.stringify(byReplace[0]))
+  const before = poster.readSlots()
+  const after = poster.replaceSlot(before, 0, b)
+  ck('replaceSlot 不改传入的那份（setData 要靠新数组触发）',
+    before[0].path === a && after[0].path === b)
+  poster.writeSlots(after)
+  ck('落盘之后「卡片」位还有人（海报不会一声不响没了头像）',
+    poster.cardPath() === b, poster.cardPath())
+  // 页面接线：成品弹窗里那一层走的是 replaceSlot，不许图省事改回 placeSlot
+  const idxJs = fs.readFileSync(path.join(MP, 'pages/index/index.js'), 'utf8')
+  ck('首页「更换」那一条走 replaceSlot', /keep \? poster\.replaceSlot\(/.test(idxJs))
+  ck('首页那一层与卡片模板页读写同一份四槽（都出自 poster 的两个读口）',
+    /poster\.readSlots\(\)/.test(idxJs) && /poster\.writeSlots\(/.test(idxJs))
+}
 {
   const a = putFile('p1.img'), b = putFile('p2.img')
   seed({ images: [{ path: a, card: true, bg: true }, { path: b, card: false, bg: false }] }, [a, b])
@@ -219,7 +248,8 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
     `head=${iHead}`)
   ck('分区那条分隔线吃现网已有的 --card-edge（不另起一种色）',
     /\.preview-head\s*\{[^}]*border-top:\s*2rpx dashed var\(--card-edge\)/.test(wxss))
-  const keys = ['slotCard', 'slotBg', 'slotHint', 'slotHintFull', 'slotDropTitle', 'slotDropOk', 'slotDropBody', 'slotDropWasCard', 'slotDropWasBg', 'previewTitle', 'previewHint']
+  const keys = ['slotCard', 'slotBg', 'slotHint', 'slotHintFull', 'slotDropTitle', 'slotDropOk', 'slotDropBody', 'slotDropWasCard', 'slotDropWasBg', 'previewTitle', 'previewHint',
+    'editCard', 'cardInfo', 'cardInfoHint', 'cardReplace', 'slotPos', 'qrShareOn', 'qrShareOff']
   keys.forEach((k) => {
     const n = (i18n.match(new RegExp(`\\b${k}:`, 'g')) || []).length
     ck(`新串 ${k} 中英文各一份`, n === 2, `出现 ${n} 次`)
