@@ -172,7 +172,12 @@ Page({
     // onShow 每次切回该 tab 都会触发，必须 reset：否则非 reset 分支会把结果追加到旧列表上，
     // 同一条笔记被贴两遍。
     this._closeFloats()
-    this.loadNotes(true)
+    // 去编辑那一趟回来要重新站到详情窗前（他 10-03：没保存点取消，回列表等于把人甩回原地找路）。
+    // 和验完密码那条同一个做法：等整表重排完再按 id 找回那一行，先开窗后重排会开成别人的笔记。
+    const reopen = this._backToDetail
+    this._backToDetail = 0
+    await this.loadNotes(true)
+    if (reopen) this._reopenDetail(reopen)
   },
 
   // 头部那一行的轮播 Tips：句子和新建页同一批（i18n 的 tips 池），这里只管取和切。
@@ -481,8 +486,7 @@ Page({
     // 不重取的话窗里没有摘要，看着像"这篇没有概要"。
     // 重取会整表重排，所以按 id 把行号找回来再开窗。
     await this.loadNotes(true)
-    const at = this.data.notes.findIndex((n) => n.id === note.id)
-    if (at >= 0) this._openDetail(at)
+    this._reopenDetail(note.id)
   },
 
   // v7 ③：详情浮窗。列表项身上那些派生字段（分类色、来源、日期）这一屏早就算好了，
@@ -509,6 +513,13 @@ Page({
     }
     // 私密笔记不给分享这条线，公开状态那行也就不查了。
     if (!row.is_private) this._loadShareStatus(row.id)
+  },
+
+  // 列表整表重排之后按 id 把那一行找回来再开窗。两条路共用：验完密码重取、从编辑页回来。
+  // 找不到就是不开了——那篇已在别处被删掉，硬开只能凭空造一份内容。
+  _reopenDetail(noteId) {
+    const at = this.data.notes.findIndex((n) => n.id === noteId)
+    if (at >= 0) this._openDetail(at)
   },
 
   // 这篇对外不对外，只有服务端知道（码可能是在另一台手机上生成的）。
@@ -596,7 +607,9 @@ Page({
   onSheetEdit() {
     const note = this.data.detailNote
     if (!note) return
-    // 改完回来 onShow 会重载列表，窗留着就是读旧内容，所以出门前把窗收掉。
+    // 出门前把窗收掉：改完回来 onShow 会重载列表，窗留着就是读旧内容。
+    // 但记下这一篇，重排完在 onShow 里把窗重新开回来（取消没改也一样回窗，不是回列表）。
+    this._backToDetail = note.id
     this.setData({ detailOpen: false })
     wx.navigateTo({ url: `/pages/write/write?id=${note.id}&mode=edit` })
   },

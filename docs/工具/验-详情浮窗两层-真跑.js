@@ -11,6 +11,8 @@
 // （带圈序号一枚不许剩）、来源链接下面那行提示在、第一屏有「显示更多」那个出口。
 // 私密那两条用 setData 把 detailNote.is_private 钉成 true，验的是 dock 两块条件渲染；
 // 后端那个字段本身在现网验过（§8.65 那 12 条），这里不重复造数据。
+// ③（站长 10-03 报的落点错）真跳一趟编辑页再回来：没保存点取消，回来的必须还是这扇窗、
+// 还是这一篇。标志挂在页面实例上（不是 data，它不是渲染状态），所以用 evaluate 读 getCurrentPages()[0]。
 // 前置：微信开发者工具已开；改过 WXSS/WXML 要先 cli close 再
 //   cli auto --project <repo>/miniprogram --auto-port 9431，等十秒端口起来。
 // 跑法：bash docs/工具/跑尺子.sh 9431 验-详情浮窗两层-真跑
@@ -371,6 +373,48 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await mp.screenshot({ path: path.join(OUT, '07-私密窗.png') })
     await (await page.$('.grip')).tap()
     await sleep(800)
+
+    /* ---------- ③ 去编辑那一趟，回来还站在这扇窗前（站长 10-03 报的落点错） ---------- */
+    // 出发前窗里是这一篇 → 点「编辑」出门 → 编辑页点「取消」回来，落点必须是同一扇窗。
+    // 原来 onSheetEdit 把窗收掉、onShow 又无条件 _closeFloats()，两头一夹人就回到列表了。
+    const flagOf = () => mp.evaluate(() => {
+      const p = getCurrentPages()[0]      // 栈是 [首页, 编辑页]，标志挂在首页那个实例上、不进 data
+      return p ? p._backToDetail : '（首页不在栈里）'
+    })
+    await (await rowOf(pick)).tap()
+    await sleep(3000)
+    const dB = await page.data()
+    const wantId = dB.detailNote && dB.detailNote.id
+    ck('出发前窗开着、拿得到这一篇的 id', dB.detailOpen === true && wantId !== undefined, `id=${wantId}`)
+    await page.callMethod('onSheetEdit').catch(() => {})
+    // 这一句必须吞：callMethod 回话时首页已经不在栈顶，automator 抛的是
+    // "page is not on top of page stack"，不是判据错。真跳没跳由下面那条读页面栈来钉。
+    await sleep(4000)
+    const stackNow = await mp.evaluate(() => getCurrentPages().map((p) => p.route).join(' → '))
+    const flagNow = await mp.evaluate(() => getCurrentPages()[0]._backToDetail)
+    ck('点「编辑」出门：落在编辑页、窗收掉、这一篇记在实例上',
+      stackNow === 'pages/index/index → pages/write/write' && flagNow === wantId,
+      `${stackNow} 标志=${flagNow}`)
+    await mp.navigateBack()
+    await sleep(4500)
+    const back = await mp.currentPage()
+    d = await back.data()
+    ck('没保存点取消回来：还是这扇窗、还是这一篇（不是列表）',
+      d.detailOpen === true && d.detailNote && d.detailNote.id === wantId,
+      `detailOpen=${d.detailOpen} 窗里=${d.detailNote && d.detailNote.id}`)
+    ck('回来那一趟标志当场清掉：下一次切 tab 不会又凭空开一扇', (await flagOf()) === 0,
+      `标志=${await flagOf()}`)
+    await mp.screenshot({ path: path.join(OUT, '08-编辑回来还在窗里.png') })
+    await back.callMethod('onCloseDetail')
+    await sleep(1000)
+    await mp.switchTab('/pages/me/me')
+    await sleep(2500)
+    await mp.switchTab('/pages/index/index')
+    await sleep(4500)
+    const again = await mp.currentPage()
+    d = await again.data()
+    ck('自己关掉窗之后切走再切回来，停在列表（这条只钉"不该常开窗"）',
+      d.detailOpen === false && (await flagOf()) === 0, `detailOpen=${d.detailOpen}`)
 
     console.log(`\n${bad.length ? '未通过 ' + bad.length + ' 条：' + bad.join(' / ') : '全部通过'}（截图 → ${OUT}）`)
     process.exitCode = bad.length ? 1 : 0
