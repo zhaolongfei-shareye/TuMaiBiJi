@@ -18,6 +18,10 @@
 // 于是这一把多钉三件事：药丸必须在 .tpl-main 里面（旧的单独一行 .tpl-qr 不许回来）、
 // 点药丸只切开关不能冒泡去分享（开发者工具里点主按钮会真走一次存相册+记台账，全程不碰）、
 // 以及「卡片上的信息」那一层浮在成品弹窗上面、收掉它成品弹窗还在。
+// 10-03 深夜他对着真机截图改了两条口径：那一层下面那行从"写角色名"变成**「卡片」的勾选器**
+// （点「位置 N」把这张指定为卡片，勾上那枚画 ✔ 而不是写"卡片"两个字），所以这一段先摆出
+// "三张有图 + 一格空"的现场，再真点四下：挪勾、连带另一个角色不许被碰、取消之后不自动补位、
+// 空格不给勾，最后把 storage 原样还回去。
 // 前置：微信开发者工具已开；改过 WXSS/WXML 要先 cli close 再
 //   cli auto --project <repo>/miniprogram --auto-port 9431，等十秒端口起来。
 // 跑法：bash docs/工具/跑尺子.sh 9431 验-详情浮窗两层-真跑
@@ -37,6 +41,40 @@ const ck = (name, ok, got) => {
 }
 // 元素查不到时把"查不到"打在断言行里，而不是让脚本半路崩
 const tx = async (el) => (el ? await el.text() : '（元素不存在）')
+
+/* 「卡片上的信息」那一层要点得动，先得有"已经有图"的现场：chooseImage 在模拟器里弹的是
+   工具自己的面板，不在页面树里，点不动（同 验-形象四槽-真跑.js 那把的处理）。所以绕开选图，
+   直接往 USER_DATA_PATH 写几张真 JPEG、把槽摆进 storage。列表里递 null 表示那一格留空——
+   "空格不给打勾"那一支也要有覆盖，不然就是空过。
+   跑完把整份 poster_profile 原样写回去：站长模拟器里那四张真图一张不少、角色一个不变。 */
+const JPG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVN//2Q=='
+
+const seedCi = (mp, roles) => mp.evaluate((list, b64) => {
+  const fsx = wx.getFileSystemManager()
+  const ud = wx.env.USER_DATA_PATH
+  const paths = list.map((r, i) => (r ? `${ud}/ci-ruler-${i}.jpg` : null))
+  paths.forEach((p) => { if (p) { try { fsx.writeFileSync(p, b64, 'base64') } catch (e) { /* 已存在就沿用 */ } } })
+  const miss = paths.filter((p) => { if (!p) return false; try { fsx.accessSync(p); return false } catch (e) { return true } })
+  if (miss.length) return { fatal: `这几张没造出来：${miss.join(',')}` }
+  const before = wx.getStorageSync('poster_profile') || {}
+  const prof = JSON.parse(JSON.stringify(before))
+  prof.images = list.map((r, i) => (r ? { path: paths[i], card: !!r.card, bg: !!r.bg } : null))
+  prof.avatarPath = ''
+  wx.setStorageSync('poster_profile', prof)
+  return { ok: true, before, paths }
+}, roles, JPG_1PX)
+
+const restoreCi = (mp, before, paths) => mp.evaluate((p, ps) => {
+  wx.setStorageSync('poster_profile', p)
+  const fsx = wx.getFileSystemManager()
+  ps.forEach((f) => { if (f) { try { fsx.unlinkSync(f) } catch (e) { /* 本来就没有 */ } } })
+  return true
+}, before, paths)
+
+const readCi = (mp) => mp.evaluate(() => {
+  const p = wx.getStorageSync('poster_profile') || {}
+  return (p.images || [null, null, null, null]).map((s) => ({ card: !!(s && s.card), bg: !!(s && s.bg), has: !!(s && s.path) }))
+})
 
 ;(async () => {
   if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true })
@@ -324,8 +362,10 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await mp.screenshot({ path: path.join(OUT, '06-换模板.png') })
 
     /* ---------- ⑦「卡片上的信息」：出卡片这一屏就地改名片（站长 10-03 第三稿） ----------
-       这一层读写的是「我的→卡片模板」同一份数据，所以这里只钉结构与"它浮在成品弹窗上面、
-       收掉它成品弹窗还在"，不去动相册（选图那两条路要真选一张文件，替身造不出来）。 */
+       这一层读写的是「我的→卡片模板」同一份数据。四格先摆成"已经有图"的现场（见上面 seedCi），
+       所以这一整段每一下都是真控件、真处理函数，包括"点下面那行打勾"那一族。 */
+    const seeded = await seedCi(mp, [{ card: true, bg: true }, {}, { bg: true }, null])
+    if (seeded.fatal) { console.log('!! ' + seeded.fatal); await mp.close(); process.exit(3) }
     const row1 = await page.$$('.tpl-btn')
     await row1[1].tap()
     await sleep(900)
@@ -349,20 +389,72 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
       }),
       discs.map((b) => `${Math.round(b.width / sc)}×${Math.round(b.height / sc)}rpx`).join(' '))
     const filled = (await page.$$('.ci-disc.ci-filled')).length
+    const empties = (await page.$$('.ci-disc.ci-empty')).length
+    ck('摆出来的现场对：三枚有图、一枚虚线空格',
+      filled === 3 && empties === 1, `有图 ${filled}／空 ${empties}`)
     const repl = (await page.$$('.ci-repl')).length
     const bins = (await page.$$('.ci-bin')).length
     ck('有图那几枚才挂「更换」和垃圾桶，空格两样都没有',
       repl === filled && bins === filled, `有图 ${filled}／更换 ${repl}／垃圾桶 ${bins}`)
-    const caps = []
-    for (const c of await page.$$('.ci-cap')) caps.push(await c.text())
-    ck('每枚下面只写它当前是什么（角色开关只留在那一页，这里不给第二个口）',
-      caps.length === 4 && caps.every((x) => ['卡片', '背景', '位置 1', '位置 2', '位置 3', '位置 4'].indexOf(x) >= 0),
-      caps.join('|'))
     ck('名称与一句话两栏都在', (await page.$$('.ci-input')).length === 2)
     ck('底下两枚是取消｜保存',
       (await (await page.$('.ci-btn.ghost')).text()) === '取消' &&
       (await (await page.$('.ci-btn.pri')).text()) === '保存')
+
+    /* 下面那一行就是「卡片」的勾选器（站长 10-03 看图改的口径：原来那枚写着"卡片"，
+       换成一个 ✔；勾是哪两条边转 −45° 画的，不赌系统字体里有没有 U+2713 那个字形）。 */
+    const tick0 = (await page.$$('.ci-tick')).length
+    const role0 = (await page.$$('.ci-cap.role')).length
+    ck('四枚里只有一枚打了勾，且只有那一枚套着现网"选中"芯片那个墨底壳',
+      tick0 === 1 && role0 === 1, `勾 ${tick0}／墨底壳 ${role0}`)
+    const caps0 = []
+    for (const c of await page.$$('.ci-cap')) caps0.push(await c.text())
+    ck('没勾上那三枚说的是它当前是什么（正当背景的那格仍写「背景」，这一层不给第二个角色的口）',
+      caps0.filter((x) => x).length === 3
+        && caps0.filter((x) => x).every((x) => ['位置 1', '位置 2', '位置 3', '位置 4', '背景'].indexOf(x) >= 0),
+      caps0.join('|'))
     await mp.screenshot({ path: path.join(OUT, '06b-卡片上的信息.png') })
+
+    /* 点第 3 枚下面那行（它正当背景、不当卡片）→ 勾挪过去，背景那一份不许被碰 */
+    let capsEl = await page.$$('.ci-cap')
+    await capsEl[2].tap()
+    await sleep(700)
+    let st = await readCi(mp)
+    const marks = (list, k) => list.map((x) => (x[k] ? (k === 'card' ? '✔' : 'B') : '·')).join('')
+    ck('点「位置 3」把「卡片」指定给第 3 枚：单选，第 1 枚那枚勾自己灭，屏上仍只有一个 ✔',
+      st[2].card === true && st[0].card === false && (await page.$$('.ci-tick')).length === 1,
+      marks(st, 'card'))
+    ck('另一个角色「背景」一个字没动（打勾只管卡片这一件事）',
+      st[0].bg === true && st[2].bg === true && st[1].bg === false && st[3].bg === false,
+      marks(st, 'bg'))
+    /* 再点已经勾着的那枚 → 取消；取消之后这个位置空着，不自动挪给还留着的别的张
+       （同「我的→卡片模板」那一页 09-30 拍板的那条口径，站长原话"不挪"） */
+    capsEl = await page.$$('.ci-cap')
+    await capsEl[2].tap()
+    await sleep(700)
+    st = await readCi(mp)
+    ck('再点已打勾那枚就是取消：勾灭了、卡片位空着，没有自动挪给别的张',
+      st.every((x) => x.card === false) && (await page.$$('.ci-tick')).length === 0,
+      marks(st, 'card'))
+    /* 空格不给勾：那一格没有图，勾上等于让海报去取一个不存在的文件 */
+    capsEl = await page.$$('.ci-cap')
+    await capsEl[3].tap()
+    await sleep(600)
+    st = await readCi(mp)
+    ck('空格下面那行点了不响应', st.every((x) => x.card === false), marks(st, 'card'))
+
+    await restoreCi(mp, seeded.before, seeded.paths)
+    await page.callMethod('onOpenCardInfo')
+    await sleep(600)
+    const want = [0, 1, 2, 3].map((i) => {
+      const s = (seeded.before.images || [])[i]
+      return { card: !!(s && s.card), bg: !!(s && s.bg), has: !!(s && s.path) }
+    })
+    // 变量名别叫 back：下面 ③ 那一段有一处 const back = await mp.currentPage()，
+    // 同一个块作用域里重名，node 直接 SyntaxError（这把尺子当场跑不起来）。
+    const ciBack = await readCi(mp)
+    ck('这一把动过的四格现场原样还回去（站长模拟器里那几张真图一张不少、角色一个不变）',
+      JSON.stringify(ciBack) === JSON.stringify(want), JSON.stringify(ciBack))
     await (await page.$('.ci-btn.ghost')).tap()
     await sleep(700)
     d = await page.data()

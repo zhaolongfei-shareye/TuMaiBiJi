@@ -326,7 +326,11 @@
             <view class="ci-bin-lid"></view>
             <view class="ci-bin-body"></view>
           </view>
-          <text class="ci-cap {{item.role ? 'role' : ''}}">{{item.cap}}</text>
+          <view class="ci-cap {{item.card ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetCard"
+            aria-label="{{item.card ? t.slotCard : ''}}">
+            <view wx:if="{{item.card}}" class="ci-tick"></view>
+            <text wx:else>{{item.cap}}</text>
+          </view>
         </view>
       </view>
       <view class="ci-field">

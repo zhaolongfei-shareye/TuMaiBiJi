@@ -923,17 +923,17 @@ Page({
   // 不等「保存」——删除有二次确认，确认完还要等保存才真删，那句确认就是假话。
   // 只有名称/一句话等「保存」。
 
-  // 一格下面那一行只说它当前是什么角色；没当上角色的就是第几个位置。
-  // 这一层不放角色开关——开关留在那一页，同一件事不留两个口。
+  // 一格下面那一行就是「卡片」的勾选器（站长 10-03 看图改的口径）：没勾上写「位置 N」，
+  // 点一下把这张指定为卡片；已经勾上那枚画一个 ✔，再点一下取消。
+  // 「背景」仍然只在那一页给——这一层叫「卡片上的信息」，不放第二个角色的口。
   _ciCaps(slots) {
     const { lang } = this.data
     return slots.map((s, i) => ({
       path: s ? s.path : '',
       card: !!(s && s.card),
       bg: !!(s && s.bg),
-      role: !!(s && (s.card || s.bg)),
-      cap: s && (s.card || s.bg)
-        ? (s.card ? t('slotCard', lang) : t('slotBg', lang))
+      cap: s && s.bg && !s.card
+        ? t('slotBg', lang)
         : `${t('slotPos', lang)} ${i + 1}`,
     }))
   },
@@ -970,6 +970,21 @@ Page({
     // 首页头部那张也吃这四个槽（「背景」那一枚），而 bgSrc 只在 onShow 重取——
     // 这一层不跳页，不顺手带一下，收掉弹窗之后头部还是旧照片。
     this.setData({ ciSlots: this._ciCaps(next), bgSrc: poster.homeBg() })
+  },
+
+  // 点下面那一行 = 把这一格指定为卡片：单选，别的张那枚自动灭。
+  // 再点已经打勾的那枚就是取消——取消之后没人当卡片，海报头像不画，
+  // **不会自动挪给还留着的别的张**（同「我的→卡片模板」那一页 09-30 拍板的口径）。
+  // 空格不给勾：那一格没图，勾上就是让海报去取一张不存在的文件。
+  onCiSetCard(e) {
+    const at = Number(e.currentTarget.dataset.i)
+    const cur = this.data.ciSlots[at]
+    if (!cur || !cur.path) return
+    const slots = poster.readSlots()
+    const next = cur.card
+      ? slots.map((s, j) => (j === at && s ? Object.assign({}, s, { card: false }) : s))
+      : poster.takeRole(slots, at, 'card')
+    this._ciCommit(next)
   },
 
   // 空格：整枚圆可点，就是"往这一格放一张"（与那一页同一条）。

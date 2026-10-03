@@ -1347,8 +1347,9 @@
   border-radius: 0 0 4rpx 4rpx;
 }
 
-/* 这一格当前是什么角色就说什么话：有角色的照现网那枚"选中"芯片（墨底纸白），
-   没角色的只是第几个位置，用淡字——不是一种东西两种长相。 */
+/* 下面这一行是「卡片」的勾选器：没勾上是一句淡字（位置 N，或它正当背景时写「背景」），
+   勾上换成现网那枚"选中"芯片的墨底纸白，里面画一个 ✔ 而不是写"卡片"两个字
+   （站长 10-03 看图改的口径）。 */
 .ci-cap {
   display: block;
   margin-top: 12rpx;
@@ -1360,13 +1361,24 @@
 }
 
 .ci-cap.role {
-  display: inline-block;
-  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
   border-radius: var(--r-pill);
   background: #23252C;
-  color: #F2EFE9;
   font-weight: 700;
+}
+
+/* 勾是两条边转 −45° 画出来的，跟底栏那三枚 icon 同一做法：
+   不赌系统字体里有没有 U+2713 这个字形，也不吃 emoji 在不同机型上的样子。 */
+.ci-tick {
+  width: 18rpx;
+  height: 10rpx;
+  border-left: 3rpx solid #F2EFE9;
+  border-bottom: 3rpx solid #F2EFE9;
+  transform: rotate(-45deg);
+  margin-top: -6rpx;
 }
 
 .ci-field {
