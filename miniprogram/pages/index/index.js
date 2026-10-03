@@ -351,16 +351,21 @@ Page({
     this.setData({ searchKeyword: e.detail.value })
   },
 
-  // 搜索条收在分类那一行里（09-30 v8，站长："搜索条目前看起来太大，不美观"）。
-  // 展开时 `focus="{{searchOpen}}"` 直接把键盘带起来；点条子以外的任何空白就收回——
-  // 包括点中某条笔记：那一行该开还是开，条子收起来正好把结果让出来。
-  // 缩回不清词，清词是 ✕ 那一枚的活，两件事不捆在一起。
   onOpenSearch() {
     this.setData({ searchOpen: true })
   },
 
+  // 搜索条收在分类那一行里（09-30 v8，站长："搜索条目前看起来太大，不美观"）。
+  // 展开时 `focus="{{searchOpen}}"` 直接把键盘带起来。
+  // 站长 10-03 改口（原来那条"缩回不清词"作废）：点条子以外的**真空白**就是退出搜索——
+  // 条子收回、关键字清掉、列表重拉回未搜的状态。不这么做的话条子一收，
+  // 下面还挂着上一次的结果，看着像没退出来。
+  // 点中某条笔记或某一枚分类不算"点空白"：那两处在自己的 handler 里收条子、词留着
+  // （icon 那枚亮着表示词还在，✕ 仍是就地清词的口）。
   onBlankTap() {
-    if (this.data.searchOpen) this.setData({ searchOpen: false })
+    if (!this.data.searchOpen) return
+    this.setData({ searchOpen: false, searchKeyword: '' })
+    this.loadNotes(true)
   },
 
   // 挂在展开的条子上专门挡冒泡：条子里头（包括输入框右边那片空白）的点击
@@ -379,6 +384,8 @@ Page({
   },
 
   selectCategory(e) {
+    // 同 onRowTap：分类是 catchtap，收条子但不清词，于是这一次筛的是"结果里再挑这一类"。
+    if (this.data.searchOpen) this.setData({ searchOpen: false })
     const id = e.currentTarget.dataset.id
     this.setData({ selectedCategory: id === null ? null : parseInt(id) })
     this._closeFloats()
@@ -411,6 +418,9 @@ Page({
   // 摘要全文、要点、原文本来就在详情窗里。卡片那一格同理：白垫是固定一档，塞不下正文。
   // 私密笔记进门前先验密码（会话里验过一次就不再问），密码不对既不开窗也不重载。
   async onRowTap(e) {
+    // 行是 catchtap：它不该被当成"点了空白"（那样会把关键字一起清掉）。
+    // 但条子要收——收起来正好把结果让给这一屏。词留着，✕ 才是清词的口。
+    if (this.data.searchOpen) this.setData({ searchOpen: false })
     const idx = e.currentTarget.dataset.idx
     const note = this.data.notes[idx]
     if (!note) return

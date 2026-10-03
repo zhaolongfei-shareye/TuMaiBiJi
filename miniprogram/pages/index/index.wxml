@@ -23,7 +23,9 @@
     <!-- 图上这一行（站长 10-02 第三轮）：左边一句轮播 Tips，右边三枚**裸 icon**——
          圆底和描边整块撤掉，只留中间图形，之间一道竖线区隔，整组紧靠右。
          点搜索：Tips 整条不渲染，搜索那枚就地向左摊成输入框，右边两枚切换 icon 照旧留着；
-         点这一行以外的空白缩回，Tips 又回来（缩回不清词，清词是 ✕ 那一枚的活）。
+         点这一行以外的**真空白**缩回并清词（等于退出搜索，站长 10-03 改口，原来那条"缩回不清词"作废）；
+         点中某条笔记或某一枚分类只缩条子、词留着（那两枚是 catchtap，icon 亮着表示词还在），
+         ✕ 仍是就地清词的口；条子缩回，Tips 又回来。
          三枚 icon 一律 catchtap：它们在行内，不该被当成"点了空白"而把搜索收掉。
          Tips 这里不带「Tips：」前缀——右边三枚占掉 216，可用宽只剩 20 个汉字，
          前缀那五个字符会把句子本身吃掉（新建页那条仍然带前缀）。 -->
@@ -73,7 +75,7 @@
       <view class="cat-chips">
         <view
           class="chip all {{selectedCategory === null ? 'active' : ''}}"
-          bindtap="selectCategory"
+          catchtap="selectCategory"
           data-id="{{null}}"
         >
           {{t.allCategories}}
@@ -82,7 +84,7 @@
           class="chip tone {{selectedCategory === item.id ? 'active' : ''}}"
           wx:for="{{categories}}"
           wx:key="id"
-          bindtap="selectCategory"
+          catchtap="selectCategory"
           data-id="{{item.id}}"
           style="{{item.toneStyle}}"
         >
@@ -118,7 +120,7 @@
          转存来的那篇在最后一行右端带昵称 + 通用头像：标题那一行不留位置给它，
          否则标题能吃掉的字数要先减掉一截昵称。 -->
     <view wx:elif="{{view === 'list'}}" class="xlist">
-      <view class="xrow" wx:for="{{rows}}" wx:key="id" bindtap="onRowTap" data-idx="{{item.i}}">
+      <view class="xrow" wx:for="{{rows}}" wx:key="id" catchtap="onRowTap" data-idx="{{item.i}}">
         <view class="xd">
           <view class="xd-dot" style="{{tipDotStyle}}"></view>
           <text class="xd-d">{{item.tail}}</text>
@@ -143,10 +145,10 @@
          同一篇留过两张以上才有第二行 ‹ i/n ›，左右各一次点击换一张、走到头不循环。 -->
     <view wx:elif="{{cells.length}}" class="grid2">
       <view class="gc" wx:for="{{cells}}" wx:key="id">
-        <view class="pad" bindtap="onRowTap" data-idx="{{item.i}}">
+        <view class="pad" catchtap="onRowTap" data-idx="{{item.i}}">
           <image class="pad-img" src="{{item.cards[item.cur].p}}" mode="aspectFit" />
         </view>
-        <text class="g-cap" bindtap="onRowTap" data-idx="{{item.i}}">{{item.title}}</text>
+        <text class="g-cap" catchtap="onRowTap" data-idx="{{item.i}}">{{item.title}}</text>
         <view class="g-pg" wx:if="{{item.cards.length > 1}}">
           <view class="g-step" catchtap="onCardStep" data-k="{{index}}" data-step="{{-1}}"><view class="chev l"></view></view>
           <text class="g-n">{{item.cur + 1}}/{{item.cards.length}}</text>

@@ -168,7 +168,7 @@ ok('「显示更多」画不画的判据与代码同源：三行×每行字数�
   /more: s\.replace\(\/\\s\/g, ''\)\.length > SUM_LINES \* SUM_CHARS/.test(idxJs)
   && SUM_LINES === 3 && SUM_CHARS === 24, `${SUM_LINES}×${SUM_CHARS}`)
 ok('「显示更多」不另挂 handler：点整行浮详情窗（一个功能只留一个入口）',
-  !/onMoreTap/.test(idxJs + idxWxml) && /bindtap="onRowTap"/.test(idxWxml))
+  !/onMoreTap/.test(idxJs + idxWxml) && /catchtap="onRowTap"/.test(idxWxml))
 ok('昵称那一截仍只在转存那篇出现，且挂在最后一行右端不抢标题的宽',
   /n\.is_import = n\.source_type === 'share_import'/.test(idxJs)
   && /margin-left: auto/.test(rule(idxWxss, 'x-who')) && !/class="x-t"[\s\S]{0,80}x-who/.test(idxWxml))

@@ -118,6 +118,19 @@ const COUNT_ALL = () => {
     return `rgb(${parseInt(x.slice(0, 2), 16)}, ${parseInt(x.slice(2, 4), 16)}, ${parseInt(x.slice(4, 6), 16)})`
   }
   const data = async (k) => (await page.data())[k]
+  // automator 的 screenshot 会滞后：连拍六张时前面那两张落盘的是后面那一帧
+  // （10-03 实测：v19-1「列表默认」拍出来是一张开着的详情窗，判据却全绿）。
+  // 所以每拍一张就等它真的被重写一次再往下走，宁可慢，不交假证据。
+  const shot = async (name) => {
+    const f = path.join(OUT, name)
+    const t0 = Date.now()
+    await mp.screenshot({ path: f })
+    for (let i = 0; i < 30; i++) {
+      await sleep(300)
+      try { if (fs.statSync(f).mtimeMs >= t0) break } catch (e) {}
+    }
+    await sleep(400)
+  }
   const tabAt = async (i) => (await $$('.vtab'))[i]
   const d0 = await page.data()
   const chipFs = await css('.chip', 'font-size')
@@ -216,7 +229,7 @@ const COUNT_ALL = () => {
   const whoRows = rows.filter((r) => r.who).length
   ck('屏上昵称那一截的条数 = 数据里转存来的条数（0 也是真值，不空过）',
     (await $$('.x-who')).length === whoRows, `数据 ${whoRows} 条 / 屏上 ${(await $$('.x-who')).length} 截`)
-  await mp.screenshot({ path: path.join(OUT, 'v19-1-列表默认.png') })
+  await shot('v19-1-列表默认.png')
 
   // ---------- ⑤ 搜索摊开：压到 60 ----------
   await ics[0].tap()
@@ -231,9 +244,50 @@ const COUNT_ALL = () => {
     `${await css('.srch-go', 'font-size')} vs chip ${chipFs}`)
   ck('输入里的字没动（仍 --fs-body 28：这轮只压条子和那两个字）',
     Math.abs((await fs2rpx('.srch-input')) - 28) <= 2, `${(await fs2rpx('.srch-input')).toFixed(1)}rpx`)
-  await mp.screenshot({ path: path.join(OUT, 'v19-2-搜索摊开60.png') })
+  await shot('v19-2-搜索摊开60.png')
+
+  // ---------- ⑤b 点空白＝退出搜索（站长 10-03 报的 BUG）----------
+  // 原来那条规则是"缩回不清词"，结果条子一收、下面还挂着上一次的结果，看着像没退出来。
+  // 这一把钉三样一起发生：条子收、词清、列表回到未搜的那一批。少一样就是那个 BUG 还在。
+  const firstTitle = ((await data('notes'))[0] || {}).title || ''
+  const kw = firstTitle.slice(0, 4)
+  await page.callMethod('onSearchInput', { detail: { value: kw } })
+  await page.callMethod('onSearchConfirm')
+  await sleep(3000)
+  const hit = (await data('notes')).length
+  ck('先真搜一次把状态摆出来：结果确实比全量少（不然是空过）',
+    !!kw && hit >= 1 && hit < ALL, `"${kw}" → ${hit} 条 / 全量 ${ALL}`)
+  ck('搜完这一刻：条子还开着、词还在',
+    (await page.data()).searchOpen === true && (await page.data()).searchKeyword === kw, '')
   await page.callMethod('onBlankTap')
+  await sleep(3000)
+  const dBlank = await page.data()
+  ck('点空白之后三样一起：条子收 + 关键字清 + 列表回到全量那一批',
+    dBlank.searchOpen === false && dBlank.searchKeyword === '' && dBlank.notes.length === ALL,
+    `open=${dBlank.searchOpen} kw="${dBlank.searchKeyword}" notes=${dBlank.notes.length} vs ${ALL}`)
+  await shot('v19-2b-点空白退出搜索.png')
+
+  // 反向钉：点中某条笔记只把条子让开，不许顺手清词——
+  // 搜完点开一篇、关掉窗口结果就没了，那是另一条坑（09-30 那条"让开看结果"仍然成立）。
+  await page.callMethod('onOpenSearch')
+  await sleep(600)
+  await page.callMethod('onSearchInput', { detail: { value: kw } })
+  await page.callMethod('onSearchConfirm')
+  await sleep(3000)
+  await (await page.$('.xrow')).tap()
+  await sleep(2500)
+  const dRow = await page.data()
+  ck('点一行：详情窗开着、条子让开、词仍留着（✕ 才是清词的口）',
+    dRow.detailOpen === true && dRow.searchOpen === false && dRow.searchKeyword === kw,
+    `detail=${dRow.detailOpen} open=${dRow.searchOpen} kw="${dRow.searchKeyword}"`)
+  await page.callMethod('onCloseDetail')
   await sleep(800)
+  const IDX_WXML = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/index/index.wxml'), 'utf8')
+  ck('那两枚分类与整行都改成 catchtap：它们不该被当成"点了空白"',
+    /catchtap="onRowTap"/.test(IDX_WXML) && /catchtap="selectCategory"/.test(IDX_WXML)
+    && !/bindtap="onRowTap"|bindtap="selectCategory"/.test(IDX_WXML), '')
+  await page.callMethod('clearSearch')
+  await sleep(3000)
 
   // ---------- ⑥ 第二枚：笔记卡片那一格（台账刚被清空 → 该是空态） ----------
   await (await tabAt(1)).tap()
@@ -266,7 +320,7 @@ const COUNT_ALL = () => {
     && (await css('.ds-para', 'color')) === 'rgba(35, 37, 44, 0.7)'
     && (await css('.ds-pt-x', 'color')) === 'rgba(35, 37, 44, 0.9)',
     `标题=${await css('.ds-h2', 'color')} 正文=${await css('.ds-para', 'color')}`)
-  await mp.screenshot({ path: path.join(OUT, 'v19-3-详情窗三枚.png') })
+  await shot('v19-3-详情窗三枚.png')
 
   // ---------- ⑧ 台账只记"我留下这张"那一步 ----------
   // 10-03 真机报的两条是同一个根因：账记在"画布落出一张成品图"那一刻，而打开弹窗、每滑一次
@@ -368,7 +422,7 @@ const COUNT_ALL = () => {
       await css('.g-cap', 'font-size'))
     ck('卡片那一格也留着分类那一行（切过去不会看到别的分类）',
       !!(await $('.cats')) && !!(await $('.chip')), '')
-    await mp.screenshot({ path: path.join(OUT, 'v19-4-卡片一格.png') })
+    await shot('v19-4-卡片一格.png')
 
     // 再走一次：开弹窗、滑到另一套模板、开关一次码——这三下都只是"看图"，一张都不该记；
     // 然后真点一次「保存并分享」，才要求台账变两张。
@@ -438,7 +492,7 @@ const COUNT_ALL = () => {
     await sleep(700)
     ck('已经在第一张时再点左箭头停在 1/2（走到头点不动、不循环）',
       (await txt('.g-n')) === '1/2', await txt('.g-n'))
-    await mp.screenshot({ path: path.join(OUT, 'v19-5-卡片两枚带页码.png') })
+    await shot('v19-5-卡片两枚带页码.png')
   }
 
   // ---------- ⑨ 收尾：把这一把自己造的那格连文件一起删干净 ----------
