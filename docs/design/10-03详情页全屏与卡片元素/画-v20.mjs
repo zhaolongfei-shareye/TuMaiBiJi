@@ -39,6 +39,9 @@ const BLUE = T[1].bg
 const I90 = 'rgba(35,37,44,.9)'
 const I70 = 'rgba(35,37,44,.7)'
 const META = 'rgba(35,37,44,.5)'
+/* 空态那一枚淡底：米白主题没有 ramp，所以从 --bg-page 掺 8% 墨。
+   数是用 palette.mix 现算的（mix(a,b,w)=a*w+b*(1-w)），不是手推的。 */
+const PALE = palette.mix('#23252C', '#f4f2ec', 0.08)
 
 /* 现网 i18n.js 里逐字对过的串（这一稿几乎不需要新串，"先删后传"那句 slotHintFull 早就在） */
 const S = {
@@ -114,13 +117,28 @@ h1{font-size:34px;letter-spacing:-.6px;margin-bottom:10px}
 .pg u.r::before{transform:rotate(-135deg)}
 .pg b{font-family:'WtsjMind',sans-serif;font-weight:100;font-size:26px;line-height:1;letter-spacing:1px;
   color:rgba(35,37,44,.72)}
-/* 站长 10-03 看过首版打回：那一整块抽象色块"太花哨、与整体简约文艺不搭"。
-   改成一小块分类色 + 中间一枚 + 号 + 两行小字，颜色仍从 palette 出（不新造一支）。 */
+/* 站长 10-03 第二轮：上一版那枚芥末黄方块"太明显"。改成淡淡一枚方形——
+   底 = 当前主题色阶最浅一档（象牙 #EAE0CE／天青 #DDE7DF）；米白那套没有 ramp，
+   就从 --bg-page 掺 8% 墨 = #E3E2DD（palette.mix(墨,页底,.08)，与现网 --chip-idle 同一族、只深一档）。
+   描边取 THEMES[0].lineEdge 那条 rgba(35,37,44,.10)；方块尺寸吃列表那枚 --blk 176rpx。 */
 .rt .empty{display:flex;flex-direction:column;align-items:center}
-.swatch{width:132px;height:132px;border-radius:28px;display:flex;align-items:center;justify-content:center;
-  font-size:58px;font-weight:200;line-height:1}
+.swatch{width:176px;height:176px;border-radius:28px;position:relative;
+  background:${PALE};border:var(--w-edge) solid rgba(35,37,44,.10);
+  display:flex;align-items:center;justify-content:center}
+.swatch b{font-weight:200;font-size:56px;line-height:1;color:rgba(35,37,44,.42)}
+/* 左上角那枚 LOGO：与卡片小样 .art.jade .hd 同一画法（深墨圆 + 麦 + 字距 图麦笔记），只是缩一档 */
+.swatch .lg{position:absolute;left:14px;top:14px;display:flex;align-items:center;gap:6px;
+  font-size:11px;letter-spacing:1.6px;color:rgba(35,37,44,.45)}
+.swatch .lg i{width:22px;height:22px;border-radius:50%;background:#23252C;color:#F2EFE9;
+  font-size:12px;display:flex;align-items:center;justify-content:center;font-style:normal}
 .rt .e1{margin-top:20px;font-size:var(--fs-meta);font-weight:700;color:${I90};text-align:center}
 .rt .e2{margin-top:6px;font-size:var(--fs-micro);color:${META};text-align:center}
+/* 甲乙对照里"乙"那一屏：系统导航条（现网 11 个页面全是这一种，零页走 custom） */
+.nbar{height:88px;position:relative;display:flex;align-items:center;justify-content:center;
+  font-size:32px;font-weight:600;color:#23252c;border-bottom:2px solid rgba(35,37,44,.06)}
+.nbar .capsule{top:21px}
+.nbar i.b{position:absolute;left:30px;top:24px;width:22px;height:22px;
+  border-left:4px solid #23252c;border-bottom:4px solid #23252c;border-radius:2px;transform:rotate(45deg)}
 /* ---- 正文（字号颜色照列表那两档；分区头沿用现网 .ds-lab 20/800 字距 1.6） ---- */
 .dbody{position:absolute;left:32px;right:32px;top:646px;bottom:190px;overflow:hidden}
 .dbody .lab{margin-top:34px;font-size:var(--fs-label);font-weight:800;letter-spacing:1.6px;color:${META}}
@@ -333,9 +351,9 @@ const art = (kind, o, W) => {
 const thumb = (kind, o) => `<div class="pad">${art(kind, o)}</div>
   ${o && o.n > 1 ? `<div class="pg"><u class="l"></u><b>${o.i || 1}/${o.n}</b><u class="r"></u></div>` : ''}`
 
-/* 一小块分类色（与这一屏左上那枚点、列表那枚点同一个来源）+ 中间一枚 + 号 + 两行小字 */
+/* 一张卡片都没有时右上那一格：淡淡一枚方形（主题色阶最浅一档）+ 左上角 LOGO + 中间 + 号 + 两行小字 */
 const abstract = `<div class="empty">
-  <div class="swatch" style="background:${T[0].bg};color:${T[0].ink}">+</div>
+  <div class="swatch"><span class="lg"><i>麦</i><span>图麦笔记</span></span><b>+</b></div>
   <div class="e1">${S.gen}</div><div class="e2">还没有生成过卡片</div></div>`
 
 const NOTE = {
@@ -363,6 +381,12 @@ const heroLeft = () => `<div class="lt"><div class="cat"><i></i><span>${NOTE.cat
   <h2>${NOTE.t}</h2>
   <div class="tags">${NOTE.tags.map((x) => `<u>${x}</u>`).join('')}</div></div>`
 const detailPage = (right, top) => `<div class="page">${status('11:06')}${capsule}${back}
+  <div class="hero">${heroLeft()}<div class="rt">${right}</div></div>${body(top)}${dock()}</div>`
+/* 乙（屏⑦）：同一屏改走系统导航条。状态条 94 + 导航条 88 = 182，
+   内容起点仍是 200——与甲（custom，胶囊压在 116~162）同一个数，所以两版谁也不比谁矮。
+   导航条中间那行现网就已经是笔记真标题（pages/detail/detail.js:104 wx.setNavigationBarTitle）。 */
+const detailPageSys = (right, top) => `<div class="page">${status('11:06')}
+  <div class="nbar"><i class="b"></i><span>${NOTE.t.slice(0, 8)}…</span>${capsule}</div>
   <div class="hero">${heroLeft()}<div class="rt">${right}</div></div>${body(top)}${dock()}</div>`
 
 /* 小弹窗：外壳照密码那一层；四个位置 + 昵称 + 一句话；一次填完，下次读回来 */
@@ -401,8 +425,8 @@ const sheet = (withInfo) => `<div class="sheet">
   </div></div>`
 
 const SCREENS = [
-  ['s1', `<b>① 详情改成一整屏</b>（附件一那种左右关系）：左上角<span class="tag new">新画</span>一枚返回键，<b>右上那一格是这篇笔记的卡片缩略图</b>，多张时图下面挂一行小字 <code>‹ 1/3 ›</code>（左右各一次点击，读的就是本机那份卡片台账，与「笔记卡片」那一格同一本账）；<b>标题在左</b>（38/800 = 现网 <code>.ds-h2</code>，四行截断），<b>正文在下方整块铺开</b>。<br>字号与颜色<span class="tag">照列表</span>：前景 <code>rgba(35,37,44,.9)</code>、正文 <code>.7</code>、分区头 20/800 字距 1.6（现网 <code>.ds-lab</code> 那档）。<span class="tag cut">撤</span>列表点「显示更多」开的那层全文浮窗——直接进这一屏。<br><b>这一稿跟了你三条改口里的两条</b>：要点前面那枚<span class="tag cut">撤</span>现网 38 见方的带圈数字徽，改成<b>头部 Tips 前面那种 14 实心小黄点</b>（同一个 <code>palette.TIP_DOT</code>、与那枚点同一个数）——代价是<b>序号不再显示</b>，要留序号就得在文字前挂一个"1."，你说一声就加；来源链接下面加一行小字注明<span class="tag new">新串</span>「${NEW.linkNote}」（你的原话）。<br>⚠️ <b>这一行可能是多余的</b>：官方类型定义里有一条 <code>wx.openOfficialAccountArticle</code>，原文写"<b>通过小程序打开任意公众号文章</b>…必须有点击行为才能调用成功"，门槛是<b>基础库 3.4.8</b>（开发工具这边跑的是 <code>3.17.3</code>，见 <code>project.private.config.json</code>，够得上；线上「最低基础库版本」在后台设置里，仓库里查不到，真机验之前顺手后台瞄一眼）。也就是说 <code>mp.weixin.qq.com</code> 这种链接<b>有机会一点就开</b>，不用复制——但这条<b>模拟器点不出来，只有真机能判</b>。所以这一稿先按你说的画（注明打不开）；真机验通之后，这一行小字换成「点击打开原文」，那枚链接从"长按复制"改成"一点就开"。<br>⚠️ 这一屏走 <code>navigationStyle: custom</code>（否则左上那枚返回键是系统的、位置不由我们定），代价是<b>微信胶囊仍钉在右上角（右 24、上 116、174×46）</b>，所以右上那一格必须从胶囊下面起（这稿落在 top 200）。`, detailPage(thumb('jade', { t: '2026年中秋节祝福语…', n: 3, i: 1 }))],
-  ['s2', `<b>② 这篇一张卡片都没有</b>：右上那一格改成<b>一小块 132 见方的色块 + 中间一枚 + 号 + 两行小字</b>（第一行「${S.gen}」现网 <code>shareAsImage</code> 原串，第二行「还没有生成过卡片」现网 <code>noCards</code> 原串）。<span class="tag cut">撤</span>首版那一整块抽象色块——你的原话"太花哨、与整体简约文艺不搭"。<br>色块<b>吃这篇笔记分类那一支</b>（与这一屏左上那枚点、列表那枚点同一个来源 <code>palette.catSkinFor</code>），<b>不新造一支色</b>；+ 号用同一支的 <code>ink</code>。嫌艳就统一退成 <code>--chip-idle</code> 灰底 + 墨色 + 号，一处改完。点色块或那行字才出成品弹窗（屏⑤）。<br>底部那一排<span class="tag cut">撤</span>「生成笔记卡片」那枚：入口挪到右上这一格之后，同一件事不再有两个把手（剩 编辑／删除 + 公开状态那一行，都是现网原样）。右上这一格<b>没有 <code>‹ 1/3 ›</code></b>——一张都没有，页码不画。`, detailPage(abstract, 500)],
+  ['s1', `<b>① 详情改成一整屏</b>（附件一那种左右关系）：左上角<span class="tag new">新画</span>一枚返回键，<b>右上那一格是这篇笔记的卡片缩略图</b>，多张时图下面挂一行小字 <code>‹ 1/3 ›</code>（左右各一次点击，读的就是本机那份卡片台账，与「笔记卡片」那一格同一本账）；<b>标题在左</b>（38/800 = 现网 <code>.ds-h2</code>，四行截断），<b>正文在下方整块铺开</b>。<br>字号与颜色<span class="tag">照列表</span>：前景 <code>rgba(35,37,44,.9)</code>、正文 <code>.7</code>、分区头 20/800 字距 1.6（现网 <code>.ds-lab</code> 那档）。<span class="tag cut">撤</span>列表点「显示更多」开的那层全文浮窗——直接进这一屏。<br><b>这一稿跟了你三条改口里的两条</b>：要点前面那枚<span class="tag cut">撤</span>现网 38 见方的带圈数字徽，改成<b>头部 Tips 前面那种 14 实心小黄点</b>（同一个 <code>palette.TIP_DOT</code>、与那枚点同一个数）——代价是<b>序号不再显示</b>，要留序号就得在文字前挂一个"1."，你说一声就加；来源链接下面加一行小字注明<span class="tag new">新串</span>「${NEW.linkNote}」（你的原话）。<br>⚠️ <b>这一行可能是多余的</b>：官方类型定义里有一条 <code>wx.openOfficialAccountArticle</code>，原文写"<b>通过小程序打开任意公众号文章</b>…必须有点击行为才能调用成功"，门槛是<b>基础库 3.4.8</b>（开发工具这边跑的是 <code>3.17.3</code>，见 <code>project.private.config.json</code>，够得上；线上「最低基础库版本」在后台设置里，仓库里查不到，真机验之前顺手后台瞄一眼）。也就是说 <code>mp.weixin.qq.com</code> 这种链接<b>有机会一点就开</b>，不用复制——但这条<b>模拟器点不出来，只有真机能判</b>。所以这一稿先按你说的画（注明打不开）；真机验通之后，这一行小字换成「点击打开原文」，那枚链接从"长按复制"改成"一点就开"。<br>⚠️ 这一屏是<b>甲</b>：走 <code>navigationStyle: custom</code>，左上那枚 ‹ 由我们画；<b>微信胶囊仍钉在右上角（右 24、上 116、174×46）</b>，所以右上那一格从它下面起（top 200）。<b>同一屏走系统导航条的样子画在屏⑦（乙），我建议走乙</b>——三条理由在屏⑦那条和文末第一条。`, detailPage(thumb('jade', { t: '2026年中秋节祝福语…', n: 3, i: 1 }))],
+  ['s2', `<b>② 这篇一张卡片都没有</b>：右上那一格是<b>一枚 176 见方的淡底方形 + 左上角图麦 LOGO + 中间一枚 + 号</b>，下面两行小字（第一行「${S.gen}」现网 <code>shareAsImage</code> 原串，第二行「还没有生成过卡片」现网 <code>noCards</code> 原串）。<span class="tag cut">撤</span>上一版那枚芥末黄方块——你的原话"太明显了，我不是说低调吗"。<br><b>淡底取哪一档（这条是规则，不是挑的一个色号）</b>：吃<b>当前壁纸那一套的主色阶最浅一档</b>——象牙 <code>#EAE0CE</code>、天青 <code>#DDE7DF</code>（<code>palette.THEMES[].ramp.steps[0]</code>）；米白那套没有 ramp，就从 <code>--bg-page #f4f2ec</code> 掺 8% 墨 = <b><code>#E3E2DD</code></b>（<code>palette.mix(墨, 页底, .08)</code> 现算），跟现网 <code>--chip-idle</code>（6%）同一族、只深一档，<b>不新造一支色</b>。描边走 <code>THEMES[0].lineEdge</code> 那条 <code>rgba(35,37,44,.10)</code>（浅底不勾边会直接化在页底上，<code>blockSkinFor</code> 里已经踩过一次）。<b>176 这个数吃列表那枚 <code>--blk</code> 176rpx</b>，+ 号用 <code>rgba(35,37,44,.42)</code>（与「我的」那四枚空槽的 + 号同一档）。<br>左上角 LOGO <b>与卡片小样「玉版宣」页眉那一枚同一画法</b>（深墨圆 + 麦 + 字距「图麦笔记」），只缩一档：圆 22、字 11。<br>底部那一排<span class="tag cut">撤</span>「生成笔记卡片」那枚：入口挪到右上这一格之后，同一件事不再有两个把手（剩 编辑／删除 + 公开状态那一行，都是现网原样）。右上这一格<b>没有 <code>‹ 1/3 ›</code></b>——一张都没有，页码不画。`, detailPage(abstract, 500)],
   ['s3', `<b>③ 统一的那枚小弹窗</b>（站长：大小照输入密码那一层）——外壳逐寸抄 <code>me.wxss</code>：<code>.pwd-mask</code> 遮罩 <code>rgba(20,20,28,.55)</code> + 顶 180、<code>.pwd-card</code> 宽 <b>620</b>、圆角 40、白底描边。<br>里面三样东西一次填完：<b>四个位置的配图</b>（卡内净宽 556 = <b>4×124 + 3×20</b>，一排放满不滚；空着的那枚就是<b>圆形 + 号</b>）、<b>名称</b>、<b>一句话</b>（现网 <code>profileName</code>／<code>profileSlogan</code> 两串，占位字照抄）。<br>下面一行两枚左退出右动作（密码那层的同一条口径，右按钮这两个字「确定」是现网 <code>privatePasswordOk</code> 原串）。<span class="tag new">新串</span>两处：标题「${NEW.info}」与格子上方那一句。<b>那一句没有照搬现网 <code>slotHint</code></b>——现网那句讲的是"图下面两枚开关（卡片／背景）"，而<b>开关只留在「我的→卡片模板」那一页</b>，小弹窗里不画，照搬就是骗人（要不要把开关也搬进来，见文末第二条）。`, detailPage(abstract, 500) + mini([1, 2, 3, 4].map((i) => discEmpty('位置 ' + i)).join(''), { full: false, name: '', slogan: '' })],
   ['s4', `<b>④ 填过之后再打开</b>：三样都<b>把上次的读回来</b>（名称、一句话回填；有图那枚显示<span class="tag new">新串</span>「${NEW.replace}」压在图下沿）。<br><b>四个位置都满了还要再传</b>（站长第 3 条）：不自动顶替——这一屏让他<b>先挑一格删</b>，四枚右上角各挂一枚垃圾桶，<b>画法与「我的→卡片模板」那页现网那枚逐寸相同</b>（深色圆 + ×，34 见方、出格 2），所以现网那句"点右上角的垃圾桶"<b>不用改口</b>；被挑中那枚再描一圈黄（<code>TONES[0]</code>），删掉之后那一格退回 + 号、右按钮变「上传」。<br>两个输入框<b>高度压一档</b>：现网 <code>.field-input</code> 是 <code>--fs-title 31</code> + 与标签间距 16，这稿压到 <code>--fs-body 28</code> + 间距 8（占位字跟着降，与新建页那条录入框同一档）。`, detailPage(thumb('jade', { t: '2026年中秋节祝福语…', n: 1 })) + mini(
       [discFull('卡片', false), discFull('背景', false), discFull('位置 3', true), discFull('位置 4', false)].join(''),
@@ -418,6 +442,7 @@ const SCREENS = [
     <div class="pvrow">${[['jade', '玉版宣'], ['verse', '摘句'], ['block', '叠翠'], ['acid', '荧光渐变']].map(([k, n]) =>
       `<div class="pv"><div class="art ${k}">${pvInner(k)}</div><u>${n}</u></div>`).join('')}</div>
   </div></div>`],
+  ['s7', `<b>⑦ 屏①那一屏的另一种走法：导航条交回系统</b>（这一屏是<b>专门画给你对照屏①的</b>，两屏内容、字号、颜色、卡片格全同，只差顶上那一条）。<br><b>我建议走这一版（乙），不走屏①那版（甲）</b>，三条理由都是查过的：<b>一</b> 全仓 11 个页面<b>零页用 <code>navigationStyle: custom</code></b>（grep 全仓 <code>navigationStyle</code> 无命中），开这一例就得自己接返回、状态栏字色、安全区，而这三样现在都是系统给的；<b>二</b> 现网这一页<b>本来就在导航条中间显示笔记真标题</b>（<code>pages/detail/detail.js:104</code> 那句 <code>wx.setNavigationBarTitle({ title: note.title })</code>，注释写明是给搜一搜索引用的），走 custom 等于把这条已上线的行为撤掉；<b>三</b> <b>两版内容起点是同一个数</b>——甲是胶囊压到 162、正文从 200 起，乙是状态条 94 + 导航条 88 = 182、正文也从 200 起。<span class="tag cut">撤</span>我上一稿写的"标题区因此比附件一矮一截"，那句是我没算就写，夸张了。<br><b>代价只有一条</b>：左上那枚返回键是系统那枚小的、跟着导航条走，不是附件一那种贴边的大 ‹。要那枚大的就得走甲，同时接受上面两条代价。`, detailPageSys(thumb('jade', { t: '2026年中秋节祝福语…', n: 3, i: 1 }))],
 ]
 
 function discFull2(cardOn, bgOn) {
@@ -433,18 +458,23 @@ function pvInner(k) {
     : '<div class="hd" style="font-size:9px"><i>麦</i><span>图麦笔记</span></div><h6 style="font-size:14px;margin-top:10px">花好月圆</h6>'
 }
 
-const PRE = `<h2 style="font-size:26px;margin:14px 0 10px">这一稿撤掉的、新造的，以及三处要你认</h2>
-<p class="lead"><span class="tag cut">撤</span><b>首版那一整块抽象色块</b>（太花哨，改一小块分类色 + 号）、<b>要点前面那枚 38 见方的带圈数字徽</b>（换 Tips 那种 14 小黄点）、<b>列表点「显示更多」开的那层全文浮窗</b>（改成整屏页）、<b>详情底排那枚「生成笔记卡片」</b>（入口挪到右上那一格，一个功能不留两个把手）、<b>成品弹窗里那排十枚小圆点</b>（换三张可见的封面墙）、<b>「我的→卡片模板」那排横滑</b>（四个位置改小、一行排满）。<br>
+const PRE = `<h2 style="font-size:26px;margin:14px 0 10px">这一稿撤掉的、新造的，以及五处要你拍（每处都写了我建议哪个）</h2>
+<p class="lead"><span class="tag cut">撤</span><b>首版那一整块抽象色块</b>（太花哨）→ 第二版那枚芥末黄方块（太明显）→ <b>这版：一枚淡底方形 + 左上角 LOGO + 中间 + 号</b>；<b>要点前面那枚 38 见方的带圈数字徽</b>（换 Tips 那种 14 小黄点）、<b>列表点「显示更多」开的那层全文浮窗</b>（改成整屏页）、<b>详情底排那枚「生成笔记卡片」</b>（入口挪到右上那一格，一个功能不留两个把手）、<b>成品弹窗里那排十枚小圆点</b>（换三张可见的封面墙）、<b>「我的→卡片模板」那排横滑</b>（四个位置改小、一行排满）。<br>
 <span class="tag.new">新串</span>一共四串：<b>「${NEW.info}」</b>（成品弹窗里那一行入口的名字，也是那枚小弹窗的标题——同一个东西一个名字）、<b>「${NEW.replace}」</b>（有图那枚压在图下沿的两个字）、<b>「${NEW.upload}」</b>（四格已满、删完一格之后右按钮那两个字）、<b>「${NEW.linkNote}」</b>（来源链接下面那行小字，你的原话）。<b>「四个位置都放满了，先删一张再传」那句不用新造</b>——现网 <code>slotHintFull</code> 早就这么写着；<b>「还没有生成过卡片」</b>也是现网 <code>noCards</code> 原串。<br>
 <b>数据这一轮不用动后端</b>：配图走 <code>poster.readSlots()</code>（本机），名称／一句话走 <code>profile</code> 那两格（现网 <code>PUT</code> 已通），右上那几张卡片走 1.9.13 那份本机台账 <code>cardLog.forNote(noteId)</code>（已按 <code>at</code> 倒序，第一张就是最近留下的）。<b>微信头像昵称那套先不对接</b>（站长 10-03 定的）——所以小弹窗里三样全是要用户自己填／选的，没有"一键带出微信资料"那枚按钮，那两格也就不会凭空多出内容。</p>
-<p class="lead" style="margin-top:14px">三处要你认：<b>一</b> 这一屏要走 <code>navigationStyle: custom</code>（左上返回键才是我们画的那枚），而<b>微信胶囊右上角撤不掉</b>——所以右上那一格卡片只能从胶囊下面起（这稿顶到 200），标题区因此比附件一矮一截；不接受就把返回键交回系统、这一屏留原生导航条。<b>二</b> 小弹窗里那四枚<b>不带「卡片／背景」两枚开关</b>（角色只在「我的→卡片模板」那页设），要不要把开关也搬进小弹窗、让它成为唯一一处设置口？<b>三</b> 屏⑤那行「${NEW.info}」我放在<b>封面墙和带二维码之间</b>（它是"改内容"，模板是"选样子"，两者不同档）；你要是想让它贴着大图，说一声挪。</p>`
+<p class="lead" style="margin-top:14px"><b>五处要你拍。每条最后一句是我的建议，你回"一乙二不搬三不动四不留五留"这种就行。</b></p>
+<p class="lead" style="margin-top:8px"><b>一 · 详情这一屏的导航条走甲还是乙。</b>甲＝屏①（<code>navigationStyle: custom</code>，左上那枚大 ‹ 我们自己画）；乙＝屏⑦（系统导航条，返回键交回系统）。<b>建议乙。</b>三条理由都是查过的：全仓 11 个页面零页走 custom（grep <code>navigationStyle</code> 无命中），开这一例要自己接返回、状态栏字色、安全区；现网这一页<b>本来就在导航条中间显示笔记真标题</b>（<code>pages/detail/detail.js:104</code>），走甲等于把这条已上线的行为撤掉；两版内容起点是同一个数（都是 200），乙不比甲矮。<b>代价</b>：左上那枚返回键是系统的小箭头，不是附件一那种贴边的大 ‹。</p>
+<p class="lead" style="margin-top:8px"><b>二 · 「卡片／背景」这两枚开关，搬不搬进小弹窗。</b>现在只在「我的→卡片模板」那页（屏⑥），小弹窗里没有。<b>建议不搬</b>，小弹窗只管"放哪张图 + 名字 + 一句话"，角色留在原页——一枚入口管一件事，你那条老规矩；而且 620 宽的卡里再塞四组两枚开关，两个输入框就得掉到屏外。<b>代价</b>：他只在小弹窗传过图、从没去过那一页，就会问"为什么卡片上没我的图"。<b>补一句带路的话就能堵上</b>：把屏③那句改成<span class="tag new">新串</span>「这几样会印在卡片上。哪张当卡片头像、哪张铺在背景，在「我的→卡片模板」里选。」（要不要采纳这半句，你定；不采纳就保留现在那句。）</p>
+<p class="lead" style="margin-top:8px"><b>三 · 屏⑤那行「${NEW.info}」放哪。</b>现在在<b>封面墙和带二维码之间</b>。<b>建议就放这儿、别动。</b>理由：它是"改内容"，模板那排是"选样子"，两件事不同档，挤在一起反而看不出哪个是改字；而且这一行点开的就是屏③那枚小弹窗，放在中间正好是"图—内容—出图"从上到下的顺序。<b>代价</b>：想让昵称头像更显眼的话，它现在这个灰底条确实压得比较靠下。</p>
+<p class="lead" style="margin-top:8px"><b>四 · 要点前面的序号还要不要。</b>换 14 小黄点后，<b>1.2.3.4 这四个序号就不显示了</b>。<b>建议不留。</b>理由：这四条是并列的要点、不是步骤，读的人不需要数到第几条；现网那枚带圈数字本来也只是装饰。<b>要留也行</b>：文字前挂一个"1."（用 WtsjMind 那套数字），点还是小黄点，两处不冲突——你说一句就加。</p>
+<p class="lead" style="margin-top:8px"><b>五 · 来源链接下面那行小字留不留。</b>现在画的是你那句原话「${NEW.linkNote}」。<b>建议先留着，等真机验过再撤。</b>官方类型定义里那条 <code>wx.openOfficialAccountArticle</code>（"通过小程序打开任意公众号文章"、必须有点击行为、基础库 3.4.8）说明<b>有机会一点就开</b>，但模拟器点不出来、只有真机能判（已记成任务 #280）。验通就把这行换成「点击打开原文」、链接从长按复制改成一点就开；验不通这行就是实话，留着。<b>不建议现在就把那行撤掉</b>——那等于拿一个没验过的能力对用户打包票。</p>`
 
 fs.writeFileSync(path.join(DIR, 'v20-详情全屏与卡片元素.html'), `<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <title>v20 · 详情全屏 + 统一卡片元素小弹窗</title><style>${CSS}</style></head><body>
 <h1>v20 · 详情改成一整屏，卡片上要的三样收进一枚小弹窗（示意，代码一行没动）</h1>
-<p class="lead">六屏：<b>1</b> 详情全屏·已有卡片（右上缩略图 + <code>‹ 1/3 ›</code>）｜<b>2</b> 详情全屏·一张都没有（右上那一格＝一小块分类色 + 中间 + 号 + 两行小字）｜<b>3</b> 小弹窗·第一次（四个位置空、两个框空）｜<b>4</b> 小弹窗·填过（上次的读回来；四格已满 → 先挑一格删）｜<b>5</b> 成品弹窗（十枚小圆点换三张可见的封面墙 + 一行「${NEW.info}」）｜<b>6</b> 「我的→卡片模板」（四枚改小不滚 + 两个框压高度）。<br>
+<p class="lead">七屏：<b>1</b> 详情全屏·已有卡片（右上缩略图 + <code>‹ 1/3 ›</code>）｜<b>2</b> 详情全屏·一张都没有（右上那一格＝一枚淡底方形 + 左上角图麦 LOGO + 中间 + 号 + 两行小字）｜<b>3</b> 小弹窗·第一次（四个位置空、两个框空）｜<b>4</b> 小弹窗·填过（上次的读回来；四格已满 → 先挑一格删）｜<b>5</b> 成品弹窗（十枚小圆点换三张可见的封面墙 + 一行「${NEW.info}」）｜<b>6</b> 「我的→卡片模板」（四枚改小不滚 + 两个框压高度）｜<b>7</b> 屏①那一屏走系统导航条的样子（与屏①只差顶上那一条，给第一条拍板用）。<br>
 屏高 <code>750×1670</code>（1px = 1rpx），令牌逐字抄 <code>app.wxss</code> 的 <code>theme-default</code>；小弹窗那一层照 <code>me.wxss</code> 的 <code>.pwd-mask</code>／<code>.pwd-card</code>（620 宽、顶 180、遮罩 .55）；成品弹窗照 <code>index.wxss</code> 的 <code>.float-sheet</code>；卡片比例吃真跑量出来的 0.717／0.972；色块只出自 <code>palette.TONES</code>。<span class="tag">现网</span>那句在 <code>utils/i18n.js</code> 里逐字对过；<span class="tag.new">新串</span>这轮新造的；<span class="tag cut">撤</span>这轮删掉的。</p>
-${[0, 2, 4].map((i) => `<div class="row">${SCREENS.slice(i, i + 2).map(([id, cap, html]) => cell(id, cap, html)).join('')}</div>`).join('')}
+${[0, 2, 4, 6].map((i) => `<div class="row">${SCREENS.slice(i, i + 2).map(([id, cap, html]) => cell(id, cap, html)).join('')}</div>`).join('')}
 ${PRE}
 </body></html>`)
 
