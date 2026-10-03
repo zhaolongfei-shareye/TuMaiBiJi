@@ -81,7 +81,7 @@ Page({
   },
 
   // 横条上面那一行轮播 Tips：六句教人用现成的能力（拍照提炼、链接、分享选模板、
-  // 卡片保存并分享、私密那一格、外观）。句子全在 i18n，这里只管取和切。
+  // 卡片那枚「分享」、私密那一格、外观）。句子全在 i18n，这里只管取和切。
   tipsFor(lang) {
     const arr = t('tips', lang)
     return Array.isArray(arr) ? arr : []

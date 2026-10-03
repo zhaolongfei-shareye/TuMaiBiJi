@@ -67,7 +67,7 @@ const i18n = {
       '拍照或截图存进来，会自动提炼成要点',
       '贴一个公众号链接，长文读成三句话',
       '分享时可选卡片模板，换套版式再发出去',
-      '笔记卡片可以「保存并分享」，直接发到微信',
+      '笔记卡片可以「分享」，直接发到微信',
       '设了密码的那一格是私密，锁着不发正文',
       '外观里能换壁纸，也能换界面字体',
     ],
@@ -288,7 +288,9 @@ const i18n = {
     saveToAlbum: '保存到相册',
     // 「生成笔记卡片」那枚主操作按的是微信的图片分享面板（发送给朋友 / 朋友圈 / 收藏 / 保存图片
     // 五枚都在里面），保存只是面板的一项，所以按钮不能再叫"保存到相册"。
-    saveAndShare: '保存并分享',
+    // 站长 10-03 再收一步：只叫「分享」——图已经生成过的人往往就是想再发一次，
+    // "保存并分享"读起来像必须先重存一遍，而存不存本来就是面板里那一枚的事。
+    saveAndShare: '分享',
     savedToAlbum: '已保存到相册',
     needAlbumPermission: '需要相册权限',
     permissionHint: '请在设置中允许访问相册',
@@ -381,7 +383,7 @@ const i18n = {
       'Photos and screenshots turn into key points',
       'Paste a link — get it down to three lines',
       'Pick a card template before you share',
-      'Save the card and send it to WeChat',
+      'Share the card straight into WeChat',
       'A category with a password stays private',
       'Change wallpaper and interface font',
     ],
@@ -577,7 +579,7 @@ const i18n = {
     generatingShare: 'Generating share image...',
     generateFailed: 'Generate failed',
     saveToAlbum: 'Save to album',
-    saveAndShare: 'Save & share',
+    saveAndShare: 'Share',
     savedToAlbum: 'Saved to album',
     needAlbumPermission: 'Album permission required',
     permissionHint: 'Please allow album access in settings',

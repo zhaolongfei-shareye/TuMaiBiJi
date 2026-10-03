@@ -326,7 +326,7 @@ const COUNT_ALL = () => {
   // ---------- ⑧ 台账只记"我留下这张"那一步 ----------
   // 10-03 真机报的两条是同一个根因：账记在"画布落出一张成品图"那一刻，而打开弹窗、每滑一次
   // 模板、每开关一次码都会重画一次，一篇能记出五张；格子里画的又是最早那一张，看着就是
-  // "小图跟大图完全不匹对"。现在记账挪到"保存并分享成功"那一步。
+  // "小图跟大图完全不匹对"。现在记账挪到"分享成功"那一步（那枚按钮 10-03 起只叫「分享」）。
   // 那个面板在开发者工具里一定 fail，所以这一节把微信那一环换成"直接回 success"的替身——
   // 剩下每一环（success 回调 → _keepPoster → cardLog → arrange → 屏上那一格）走的还是产品代码。
   const waitRendered = async (tag) => {
@@ -394,7 +394,7 @@ const COUNT_ALL = () => {
   await stubShare()
   await (await $('.tpl-btn.primary')).tap()
   const kept1 = await waitKept(1)
-  ck('点了「保存并分享」、面板回 success 之后，台账才多出这一格',
+  ck('点了「分享」、面板回 success 之后，台账才多出这一格',
     kept1, kept1 ? '已记 1 格' : `面板成功后台账仍是 ${await countAll()} 张（${r1}）`)
   const made1 = kept1
   if (!kept1) await dumpWhyEmpty()
@@ -426,7 +426,7 @@ const COUNT_ALL = () => {
     await shot('v19-4-卡片一格.png')
 
     // 再走一次：开弹窗、滑到另一套模板、开关一次码——这三下都只是"看图"，一张都不该记；
-    // 然后真点一次「保存并分享」，才要求台账变两张。
+    // 然后真点一次「分享」，才要求台账变两张。
     const waitIdle = async () => {
       for (let i = 0; i < 20; i++) {
         const d = await page.data()
@@ -457,7 +457,7 @@ const COUNT_ALL = () => {
     await stubShare()
     await (await $('.tpl-btn.primary')).tap()
     const kept2 = await waitKept(2)
-    ck('第二套真"保存并分享"之后，台账才两张', kept2,
+    ck('第二套真"分享"之后，台账才两张', kept2,
       kept2 ? '已记 2 格' : `面板成功后仍是 ${await countAll()} 张`)
     if (!kept2) await dumpWhyEmpty()
     const made2 = kept2

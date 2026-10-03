@@ -51,7 +51,7 @@ function copyIn(noteId, tplId, srcPath) {
         write(map)
         resolve(keep)
       },
-      // 存不下就不记这一张。绝不能让"保存并分享"那一步因为这一格失败。
+      // 存不下就不记这一张。绝不能让"分享"那一步因为这一格失败。
       fail: (e) => { console.error('卡片留档失败', e); resolve(null) },
     })
   })

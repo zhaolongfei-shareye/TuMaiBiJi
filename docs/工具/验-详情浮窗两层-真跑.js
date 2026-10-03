@@ -234,9 +234,11 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('开关默认开着', d.noQr === false)
     // 10-01 站长：账号认证下来了，这枚主操作从"存进相册"换成弹微信的图片分享面板
     //（发送给朋友 / 朋友圈 / 收藏 / 保存图片 / 转发为贴图五枚都在里面），所以文案不能再只说存相册。
+    // 10-03 站长再收：只叫「分享」——图已经生成过的人往往就是想再发一次，"保存并分享"读着像要重存一遍。
     const tplBtns = []
     for (const b of await page.$$('.tpl-btn')) tplBtns.push(await b.text())
-    ck('主操作那枚叫「保存并分享」（左那枚仍是取消）', tplBtns.join('|') === '取消|保存并分享', tplBtns.join('|'))
+    ck('主操作那枚叫「分享」（左那枚仍是取消；旧名"保存并分享"不许回来）',
+      tplBtns.join('|') === '取消|分享', tplBtns.join('|'))
     const menuApi = await mp.evaluate(() => typeof wx.showShareImageMenu)
     ck('这一档环境里有微信图片分享面板这个 API（真机上那五枚才是它给的）',
       menuApi === 'function', `typeof=${menuApi}`)
