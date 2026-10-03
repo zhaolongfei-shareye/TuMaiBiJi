@@ -255,6 +255,14 @@ ok('从卡片那一枚点进去带上"是第几张"：wxml 两枚都递 data-car
   && /_openDetail\(idx, e\.currentTarget\.dataset\.card\)/.test(CODE_JS)
   && /async _openDetail\(idx, cardIdx\)/.test(CODE_JS)
   && /detailCardIdx: list\.length \? at : 0/.test(CODE_JS))
+/* 真机（站长 10-03 20:42 两张截图）：「卡片上的信息」浮起来时被成品弹窗整个盖住，
+   只有输入框那行字漏出来（输入框是原生层）。在"卡片之外、成品弹窗白面板之内"取一条量，
+   修前是 251.0，和没开小弹窗的 19:54 基线一个数——遮罩那 55% 的黑一点没落上。
+   模拟器里 z-index 102>101 是好的（97 条真跑全绿），所以这条只能钉静态：这一态背后那层必须藏。 */
+ok('小弹窗浮起来时成品弹窗那一层必须藏掉：wxml 挂 ci-behind、透明遮罩不渲染、wxss 用 visibility 不是删节点',
+  /class="float-sheet tpl-sheet \{\{cardInfoOpen \? 'ci-behind' : ''\}\}/.test(CODE_WXML)
+  && /wx:if="\{\{templateOpen && !cardInfoOpen\}\}" class="float-mask"/.test(CODE_WXML)
+  && /\.tpl-sheet\.ci-behind\s*\{[^}]*visibility:\s*hidden/.test(CODE_WXSS))
 ok('1.9.12 那本按渲染时机记的旧账整个清一次、清完立标记（require 时就跑，只跑这一次）',
   /const MODE_KEY = 'cardLogKeepOnly'/.test(cardLogJs) && /^migrateKeepOnly\(\)$/m.test(cardLogJs))
 ok('台账是本机的事：键名 cardLog、图落在用户文件目录、api.js 里一行都不提它',

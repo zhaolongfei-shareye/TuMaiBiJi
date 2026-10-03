@@ -372,6 +372,17 @@ const readCi = (mp) => mp.evaluate(() => {
     d = await page.data()
     ck('点「编辑个人名片」浮出小弹窗，成品弹窗仍在它底下',
       d.cardInfoOpen === true && d.templateOpen === true, `ci=${d.cardInfoOpen} tpl=${d.templateOpen}`)
+    /* 真机（站长 10-03 20:42 两张截图）：这一层浮起来时，成品弹窗那层盖在它上面。
+       量法：在「小弹窗卡片之外、成品弹窗白面板之内」取一条（x 692~716rpx、y 900~1400px），
+       他那两张图这一条都是 251.0，和没开小弹窗的 19:54 基线一模一样——遮罩那层 55% 的黑
+       一点没落上，说明 102 整层画在 101 底下，只有输入框那行字（原生层）漏出来。
+       模拟器里 102>101 是好的，所以这一把我原来 97 条全绿。
+       修法不是跟它争 z-index，是这一态背后只留一层：小弹窗开着就把成品弹窗藏掉。 */
+    const ciSheetCls = String((await (await page.$('.tpl-sheet')).attribute('class')) || '')
+    ck('小弹窗开着时，成品弹窗那一层挂上 ci-behind（真机上 101 压过了 102）',
+      ciSheetCls.indexOf('ci-behind') >= 0, ciSheetCls)
+    ck('它那张透明遮罩这一态不渲染——留着会抢走「点窗外收小弹窗」那一下，变成收成品弹窗',
+      (await page.$$('.float-mask')).length === 0)
     ck('标题是「卡片上的信息」', (await (await page.$('.ci-title')).text()) === '卡片上的信息')
     ck('四枚位置格一行放满', (await page.$$('.ci-disc')).length === 4)
     /* 圆必须是"圆"的：10-03 第一版这里挂的是裸 empty/filled 修饰类，撞上本页 642 行
@@ -460,6 +471,10 @@ const readCi = (mp) => mp.evaluate(() => {
     d = await page.data()
     ck('收掉小弹窗，成品弹窗还开着（不是连它一起收）',
       d.cardInfoOpen === false && d.templateOpen === true, `ci=${d.cardInfoOpen} tpl=${d.templateOpen}`)
+    const ciSheetBack = String((await (await page.$('.tpl-sheet')).attribute('class')) || '')
+    ck('那一层立刻回来：class 里 ci-behind 撤掉，成品图节点还在（藏不是销毁，不用重出图）',
+      ciSheetBack.indexOf('ci-behind') < 0 && !!(await page.$('.tpl-poster')) && !!(await page.$('.float-mask')),
+      ciSheetBack)
 
     /* ---------- ⑥ 取消 → 回详情窗，不是回列表 ---------- */
     await (await page.$('.tpl-btn.ghost')).tap()

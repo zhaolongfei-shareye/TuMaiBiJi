@@ -1077,6 +1077,11 @@
   align-items: center;
   padding: 20rpx 0 24rpx;
 }
+/* 「卡片上的信息」浮起来时这一层必须藏掉：真机上 z-index 102 压不住它（见 wxml 那条注释）。
+   用 visibility 不用 wx:if——成品图那个 <image> 节点要留着，收掉小弹窗才不用重新出图。 */
+.tpl-sheet.ci-behind {
+  visibility: hidden;
+}
 
 /* 拉起微信图片面板时垫在它底下的一整屏纯黑（见 index.wxml 那条与 onSavePoster）。
    1000 这个数是量出来的：底栏是自定义组件、自己的 .tab-bar 写死 z-index 999，

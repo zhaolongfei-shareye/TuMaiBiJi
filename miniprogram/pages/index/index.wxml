@@ -269,8 +269,13 @@
 
   <!-- v7 ④⑤：模板独浮弹窗——拉弹窗时详情窗整个藏起来，页面上只剩这一个浮层，
        背后什么都不垫。取消 / 保存成功 / 点把手三个口收掉弹窗后回到详情窗那一屏（不是回列表）。 -->
-  <view wx:if="{{templateOpen}}" class="float-mask" catchtap="onCancelTemplate"></view>
-  <view wx:if="{{templateOpen}}" class="float-sheet tpl-sheet">
+  <!-- 真机（站长 10-03 20:42 两张截图）：小弹窗浮起来时这一层整个盖在它上面——遮罩不压暗、
+       面板看不见，只有输入框那行字漏出来（输入框是原生层，永远浮在最上）。模拟器里 102>101 是好的，
+       真机不吃这一套。所以这一态背后只留一层：小弹窗开着就把这一层藏掉（visibility 不是 wx:if，
+       成品图那个 <image> 节点留着，收掉小弹窗不用重画）。遮罩那一条直接不渲染——它透明，
+       留在上面会抢掉「点窗外收小弹窗」那一下，变成收成品弹窗。 -->
+  <view wx:if="{{templateOpen && !cardInfoOpen}}" class="float-mask" catchtap="onCancelTemplate"></view>
+  <view wx:if="{{templateOpen}}" class="float-sheet tpl-sheet {{cardInfoOpen ? 'ci-behind' : ''}}">
     <view class="grip" bindtap="onHandleTap">
       <view class="grip-bar"></view>
       <!-- 左右各一句、同一行同一档：右边收窗，左边告诉他这一屏能左右滑。
