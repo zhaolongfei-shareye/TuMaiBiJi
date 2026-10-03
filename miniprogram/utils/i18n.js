@@ -308,9 +308,9 @@ const i18n = {
     qrOn: '开启二维码',
     qrOff: '关闭二维码',
     posterMake: '生成分享图',
-    // 已生成态那枚通栏：把台账里这一张再发一次。面板里只有"发送给朋友／分享到朋友圈"这两条
-    // 落点（微信系统层，样式与文案都不给改），"发到公众号"不是这一格能做的事，所以不写进去。
-    cardShare: '分享卡片：微信好友 / 朋友圈',
+    // 已生成态那枚通栏：把台账里这一张再发一次。那三项是站长 10-04 的原话，一字不改照抄上来；
+    // 面板里实际给到哪几条落点由微信系统层决定（样式与文案都不给改），这一行只说"点它会拉起分享"。
+    cardShare: '分享卡片：微信好友 / 朋友圈 / 公众号',
     cardDrop: '删除',
     cardDropHint: '删除后可继续生成笔记卡片，已分享的依旧有效',
     sourceWechatArticle: '公众号文章',
@@ -608,7 +608,7 @@ const i18n = {
     qrOn: 'QR code on',
     qrOff: 'QR code off',
     posterMake: 'Make a share image',
-    cardShare: 'Share card: Chat / Moments',
+    cardShare: 'Share card: Chat / Moments / Official Account',
     cardDrop: 'Delete',
     cardDropHint: 'Delete it and you can make another; links you already shared stay valid',
     sourceWechatArticle: 'WeChat Article',

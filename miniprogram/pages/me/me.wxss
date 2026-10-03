@@ -462,8 +462,8 @@
 }
 
 .pwd-btn.primary {
-  background: var(--accent);
-  color: var(--bg-page);
+  background: var(--btn-bg);
+  color: var(--btn-ink);
 }
 
 .pwd-btn.danger {

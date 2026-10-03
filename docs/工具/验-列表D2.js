@@ -158,7 +158,7 @@ ok('横向内缩只挂一次：行、格、两列区都不再补一份 24（补�
 ok('标题 90% 黑、一行、放不下就省略号',
   /color: rgba\(35, 37, 44, 0\.9\)/.test(xT) && /white-space: nowrap/.test(xT)
   && /text-overflow: ellipsis/.test(xT))
-ok('摘要 70% 黑、字号与 Tips 同档（--fs-meta）、最多三行',
+ok('摘要 70% 黑、字号吃 --fs-meta 那一档（原来跟的是头部那句 Tips，10-04 撤了）、最多三行',
   /color: rgba\(35, 37, 44, 0\.7\)/.test(xS) && /font-size: var\(--fs-meta\)/.test(xS)
   && /-webkit-line-clamp: 3/.test(xS))
 ok('「显示更多」那支蓝就是 palette 里那支（TONES[1]，与来源链接同一支，不新造蓝）',
@@ -268,14 +268,16 @@ ok('已生成态不给换模板：滑动手势与那排圆点都跟着这一态�
   && /grip-tx-l" wx:if="\{\{!posterHasCard\}\}/.test(CODE_WXML))
 /* 站长 10-04 补的一枚：已生成态上面给一枚通栏「分享卡片」，把台账里那一张再发一次
    （没有它，一张卡发完就锁死了——只能删了重出才能再发）。三处要钉：
-   ① 它吃的是 .tpl-main 同一套样式，不另起色阶（他要"与背景同色阶、深底白字"）；
+   ① 它吃的是 .tpl-main 同一套样式，而这一套底色全站统一走 --btn-bg（＝底栏选中那一格那块圆底）；
    ② 它一次都不记账（记账只挂在"第一次真留下这张"那一步，重发不该多出文件、不该动排序）；
-   ③ 那行字只写面板真给的两项——`showShareImageMenu` 的落点是"发送给朋友／分享到朋友圈／
-      收藏／下载"，**没有"发到公众号"这一项**（官方类型定义原文），按钮不许承诺它做不到的事。 */
+   ③ 那行字三项照他 10-04 的原话：微信好友／朋友圈／公众号。他给的口径是"转发贴图本身就是
+      公众号的一条路，点了拉起自己的公众号发帖"；面板里实际给到哪几项由微信系统层决定。
+      **这一条我上一轮自己砍过一次（只写两项、还把它当结论写进注释），这次钉回去。** */
 const shareCardFn = (CODE_JS.split('onShareCard()')[1] || '').split('\n  },')[0]
-ok('已生成态上面那枚通栏绑的是 onShareCard，复用 .tpl-main（同一支 --accent 深墨底 + 纸白字）',
+ok('已生成态上面那枚通栏绑的是 onShareCard，复用 .tpl-main（底色吃 --btn-bg，字吃 --btn-ink）',
   /class="tpl-main \{\{posterImagePath \? '' : 'disabled'\}\}" bindtap="onShareCard"/.test(CODE_WXML)
-  && (CODE_WXML.indexOf('bindtap="onShareCard"') < CODE_WXML.indexOf('bindtap="onDropCard"')))
+  && (CODE_WXML.indexOf('bindtap="onShareCard"') < CODE_WXML.indexOf('bindtap="onDropCard"'))
+  && /\.tpl-main\s*\{[\s\S]*?background: var\(--btn-bg\);\s*color: var\(--btn-ink\)/.test(CODE_WXSS))
 ok('这一枚发的就是画布上那一张（直接递 posterImagePath，不重画、不再走 cardLog、也不走那条会记账的 _saveToAlbum）',
   /const path = this\.data\.posterImagePath/.test(shareCardFn)
   && /wx\.showShareImageMenu\(\{\s*path,/.test(shareCardFn)
@@ -283,11 +285,10 @@ ok('这一枚发的就是画布上那一张（直接递 posterImagePath，不重
   && /saveImageToPhotosAlbum/.test(shareCardFn))
 ok('面板走完那层黑一定撤（complete 那一环漏了就是把人关在黑屏里，1.9.13 栽过）',
   /complete:\s*\(\)\s*=>\s*this\.setData\(\{\s*shareDim:\s*false/.test(shareCardFn))
-ok('那行字只写「微信好友 / 朋友圈」，中英各一份；"公众号"不写在按钮上（这一格里做不到）',
-  /cardShare: '分享卡片：微信好友 \/ 朋友圈'/.test(I18N)
-  && /cardShare: 'Share card: Chat \/ Moments'/.test(I18N)
-  && /<text>\{\{t\.cardShare\}\}<\/text>/.test(CODE_WXML)
-  && !/cardShare.*公众号/.test(I18N))
+ok('那行字三项照站长原话：微信好友 / 朋友圈 / 公众号，中英各一份（上一轮我砍成两项，这条钉死别再砍）',
+  /cardShare: '分享卡片：微信好友 \/ 朋友圈 \/ 公众号'/.test(I18N)
+  && /cardShare: 'Share card: Chat \/ Moments \/ Official Account'/.test(I18N)
+  && /<text>\{\{t\.cardShare\}\}<\/text>/.test(CODE_WXML))
 ok('「删除」只动本机这本账：调 cardLog.dropNote 之后回详情窗，api 一行都不提它（服务端那张活码不碰）',
   /onDropCard\(\) \{[\s\S]{0,240}cardLog\.dropNote\(note\.id\)[\s\S]{0,120}this\._closeTemplate\(\)/.test(CODE_JS)
   && !/deleteCard|dropCard/ig.test(apiJs))

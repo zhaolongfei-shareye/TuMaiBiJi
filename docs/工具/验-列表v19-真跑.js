@@ -27,6 +27,9 @@ const p = require(path.resolve(__dirname, '../../miniprogram/utils/palette.js'))
 const i18n = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
 const ZH = i18n.texts('zh')
 const IDX_JS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/index/index.js'), 'utf8')
+const APP_CSS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/app.wxss'), 'utf8')
+// 字号档从令牌现读，不抄第二份数（改 app.wxss 那一行，这条判据跟着动）
+const META_RPX = Number(/--fs-meta:\s*(\d+)rpx/.exec(APP_CSS)[1])
 
 const bad = []
 const ck = (name, ok, got) => {
@@ -158,8 +161,13 @@ const COUNT_ALL = () => {
   ck('右边只剩搜索一枚（纸片墙 / 一行那两枚连同中间那道竖线一起撤了）',
     ics.length === 1 && (await $$('.acts .vr')).length === 0 && (await ics[0].attribute('data-mode')) == null,
     `${ics.length} 枚`)
-  ck('Tips 那一行有句子（没摊开搜索时才是它）',
-    d0.tips.length >= 2 && d0.tips.includes(await txt('.tp-tx')), await txt('.tp-tx'))
+  ck('左边那句轮播 Tips 整条撤净（节点、data 两样都不在，站长 10-04）',
+    (await $('.tp')) === null && (await $$('.tp-dot')).length === 0
+    && d0.tips === undefined && d0.tipIdx === undefined,
+    `节点=${(await $$('.tp,.tp-dot,.tp-tx')).length} 个、data.tips=${JSON.stringify(d0.tips)}`)
+  const icR = await rect('.acts .ic')
+  ck('Tips 撤了之后搜索那枚仍贴着行的右内缩（改成 flex-end 就是为守住这一条）',
+    icR && near(icR.right, 726, 3), `右沿=${icR && rpx(icR.right).toFixed(1)}rpx（行右内缩 726）`)
 
   // ---------- ③ 区内顶上那两枚 tab ----------
   const vt = await rect('.vtabs')
@@ -209,11 +217,11 @@ const COUNT_ALL = () => {
     xT3[0] === 'rgba(35, 37, 44, 0.9)' && xT3[2] === 'ellipsis'
     && Math.abs(xTH - 38) <= 6,
     `色=${xT3[0]} 省略=${xT3[2]} 行高实测=${xTH.toFixed(1)}rpx`)
-  ck('摘要是 70% 黑、字号与 Tips 同一档、最多三行',
+  ck('摘要是 70% 黑、字号吃令牌那一档（原来跟的是 Tips，那条 10-04 撤了）、最多三行',
     (await css('.x-s', 'color')) === 'rgba(35, 37, 44, 0.7)'
-    && (await css('.x-s', 'font-size')) === (await css('.tp-tx', 'font-size'))
+    && Math.abs((await fs2rpx('.x-s')) - META_RPX) <= 1
     && (await css('.x-s', '-webkit-line-clamp')) === '3',
-    `摘要=${await css('.x-s', 'font-size')} Tips=${await css('.tp-tx', 'font-size')}`)
+    `摘要=${(await fs2rpx('.x-s')).toFixed(1)}rpx 令牌 --fs-meta=${META_RPX}rpx`)
   ck('「显示更多」渲染出来就是 palette 那支蓝（不是页面里另抄的一份）',
     (await css('.x-more', 'color')) === rgbOfHex(p.TONES[1].bg),
     `${await css('.x-more', 'color')} vs ${rgbOfHex(p.TONES[1].bg)}`)
@@ -237,8 +245,10 @@ const COUNT_ALL = () => {
   const srch = await rect('.srch')
   ck('搜索条压到 60 高（分类那一枚 chip 实测算高 59，压到同一档）',
     srch && near(srch.h, 60, 2), srch ? `${rpx(srch.h).toFixed(1)}rpx` : '没摊开')
-  ck('摊开时 Tips 整条不渲染（现网那条规则没动）',
-    (await $('.tp')) === null && (await $$('.srch')).length === 1, '')
+  ck('摊开时输入框摊满整行（右边那 23rpx 是空 .acts 的 margin-left，撤 Tips 之前也一样占着）',
+    (await $$('.tp')).length === 0 && (await $$('.srch')).length === 1
+    && srch && near(srch.left, 24, 3) && near(srch.right, 702, 4),
+    `左=${srch && rpx(srch.left).toFixed(1)} 右=${srch && rpx(srch.right).toFixed(1)} 宽=${srch && rpx(srch.w).toFixed(1)}rpx`)
   ck('右侧「搜索笔记」与分类同字号同字重（原来那档 31/800 比正文还大一级）',
     (await css('.srch-go', 'font-size')) === chipFs && (await css('.srch-go', 'font-weight')) === '600',
     `${await css('.srch-go', 'font-size')} vs chip ${chipFs}`)
@@ -470,7 +480,7 @@ const COUNT_ALL = () => {
       dockGen === '取消|删除' && !(await $('.tpl-dots')) && !(await $('.pill-lab'))
       && (await txt('.tpl-main-hint')) === '删除后可继续生成笔记卡片，已分享的依旧有效', dockGen)
     /* 站长 10-04 补的那枚通栏（没有它，一张卡发完就锁死了）。量三样：文案、它在两枚**上面**、
-       以及吃的是 .tpl-main 同一套（深墨底 + 纸白字，跟他要的"与背景同色阶"对上了）。
+       以及它的底色是不是就等于底部导航"选中那一格"下面那块圆底。
        文字宽/高一起量：折行会让高度翻倍，那在这一屏是坏活。 */
     const shareTx = await $('.tpl-main text')
     const shareBox = await rect('.tpl-main')
@@ -478,21 +488,41 @@ const COUNT_ALL = () => {
       const s = await shareTx.size(), o = await shareTx.offset()
       return { w: s.width, h: s.height, top: o.top }
     })() : null
-    ck('已生成态上面那枚通栏是「分享卡片：微信好友 / 朋友圈」，且排在取消｜删除前面',
-      !!shareTx && (await shareTx.text()) === '分享卡片：微信好友 / 朋友圈'
+    ck('已生成态上面那枚通栏是「分享卡片：微信好友 / 朋友圈 / 公众号」，且排在取消｜删除前面',
+      !!shareTx && (await shareTx.text()) === ZH.cardShare
       && !!shareBox && shareBox.top < (await rect('.tpl-actions')).top,
       `${shareTx ? await shareTx.text() : '（没有这枚）'}`)
-    /* 他那句"与背景风格同色阶，深色背景白色字"落成真数字：底要暗、字要亮。
-       拿"同一个 class 跟自己比"是假绿（这句我自己先犯过一次），所以量亮度。 */
+    /* 底色不再自己挑：全站实心按钮都改吃 chromeOf(壁纸).sel，和底栏那一格同一个来源。
+       底栏是组件、automator 够不到它的节点，所以这里拿渲染之后的按钮底色去对 palette 现算的值；
+       八套主题的镜像值另有静态尺子逐枚钉（验-色板零回归），这一条守"当前这套真跑出来对不对"。
+       拿"同一个 class 跟自己比"是假绿（这条我自己先犯过一次），所以两侧来源必须不同。 */
     const lum = (c) => {
       const m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(String(c || ''))
       if (!m) return -1
       return (0.2126 * Number(m[1]) + 0.7152 * Number(m[2]) + 0.0722 * Number(m[3])) / 255
     }
-    const bgLum = lum(await css('.tpl-main', 'background-color'))
-    const fgLum = lum(await css('.tpl-main', 'color'))
-    ck('那枚通栏量出来就是"深底白字"：底亮度 < 0.3、字亮度 > 0.7（吃 .tpl-main 那一套，不另起色阶）',
-      bgLum >= 0 && bgLum < 0.3 && fgLum > 0.7, `底 ${bgLum.toFixed(3)} 字 ${fgLum.toFixed(3)}`)
+    /* 两侧格式不同：渲染回来的是 rgb(...)，palette 给的是 #rrggbb。
+       上一版这里只认 rgb，拿 '#875033' 去解析回空串，两条判据当场假红。 */
+    const hexOf = (c) => {
+      const s = String(c || '').trim()
+      const h = /^#?([0-9a-fA-F]{6})$/.exec(s)
+      if (h) return h[1].toLowerCase()
+      const m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(s)
+      return m ? [m[1], m[2], m[3]].map((v) => Number(v).toString(16).padStart(2, '0')).join('').toLowerCase() : ''
+    }
+    const bgCss = await css('.tpl-main', 'background-color')
+    const inkCss = await css('.tpl-main', 'color')
+    const bgLum = lum(bgCss)
+    const fgLum = lum(inkCss)
+    const clsNow = String(await data('themeClass') || '')
+    const wk = (p.THEMES.find((x) => clsNow.indexOf(x.cls) >= 0) || p.THEMES[0]).key
+    const chrome = p.chromeOf(wk)
+    const cr = p.crOf(`#${hexOf(bgCss)}`, `#${hexOf(inkCss)}`)
+    ck(`那枚通栏的底色＝底栏选中那一格的圆底色（壁纸 ${wk}：同一个 chromeOf.sel，且底比字暗）`,
+      hexOf(bgCss) === hexOf(chrome.sel) && bgLum >= 0 && bgLum < fgLum,
+      `按钮 #${hexOf(bgCss)} vs 底栏 #${hexOf(chrome.sel)}　底亮 ${bgLum.toFixed(3)} 字亮 ${fgLum.toFixed(3)}`)
+    ck('字吃底栏那一格同一支纸白，压上去的实测对比摆出来（两枚淡雅与深海在 4.3 上下，底栏今天也是这一对）',
+      hexOf(inkCss) === hexOf(chrome.ink) && cr >= 4.2, `字 #${hexOf(inkCss)} 对比 ${cr.toFixed(2)}:1`)
     ck('那行字一行走完（宽不越通栏内沿、高没翻倍＝没折行）',
       !!shareTxBox && !!shareBox && shareTxBox.w <= rpx(shareBox.w) - 8 && rpx(shareTxBox.h) <= 44,
       `字 ${shareTxBox && Math.round(rpx(shareTxBox.w))}×${shareTxBox && Math.round(rpx(shareTxBox.h))}rpx 条子 ${shareBox && Math.round(rpx(shareBox.w))}rpx`)

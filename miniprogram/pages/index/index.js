@@ -55,12 +55,9 @@ Page({
     limit: 50,
     hasMore: true,
     loadingMore: false,
-    // 头部那一行的轮播 Tips（v18 把这一行从"分类 + 圆钮"换成"Tips + 三枚 icon"）：
-    // 句子与新建页同一批（i18n 的 tips 池），小黄点颜色仍由 palette.TIP_DOT 从 style 递进来。
-    tips: [],
-    tipIdx: 0,
+    // 那枚小黄点的色仍由 palette.TIP_DOT 从 style 递进来（wxss 里不许抄饱和色）：
+    // 头部那一行轮播 Tips 站长 10-04 撤了，但搜索词下面那枚点和详情窗要点那四行还在吃它。
     tipDotStyle: `background:${TIP_DOT}`,
-    // 小黄点仍由 palette.TIP_DOT 从 style 递进来（wxss 里不许抄饱和色）。
     // 「置顶」那枚下面一条短黄杠用的 --tip 自定义属性随置顶一起撤了：
     // v19 两枚 tab 选中那枚下面的短杠吃墨色，走 var(--text-primary) 就够。
     // 头部那一列数字：只有「笔记」。v18 做减法把「分享」「种草」两列撤了
@@ -149,9 +146,6 @@ Page({
       // 两枚 tab 每次进这一屏都回到第一枚（他原话"默认第一个 tab"），不是本机偏好；
       // 卡片那一格的台账在下面 loadNotes 里重读，从详情窗出完图回来就能看到新那一张。
       view: 'list',
-      // Tips 跟着语言整批换（英文态不能看到那六句中文），并从第 1 句起重播。
-      tips: this.tipsFor(lang),
-      tipIdx: 0,
       // 深浅每次进页重读：在首页那枚点上换过档，回到这一屏头部就该跟着沉或跟着亮。
       ...app.bgSkin(),
       // 搜索条那一块面由当前壁纸的页面底派生（palette.chromeOf），和底部导航那条胶囊同一个值；
@@ -175,7 +169,6 @@ Page({
     }
     this.loadCategories()
     this.loadQuota()
-    this.startTips()
     // onShow 每次切回该 tab 都会触发，必须 reset：否则非 reset 分支会把结果追加到旧列表上，
     // 同一条笔记被贴两遍。
     this._closeFloats()
@@ -185,41 +178,6 @@ Page({
     this._backToDetail = 0
     await this.loadNotes(true)
     if (reopen) this._reopenDetail(reopen)
-  },
-
-  // 头部那一行的轮播 Tips：句子和新建页同一批（i18n 的 tips 池），这里只管取和切。
-  // 效果图那一行不带「Tips：」前缀——这一行右边还有三枚 icon，可用宽只剩 20 个汉字，
-  // 前缀那五个字符会把句子本身吃掉。
-  tipsFor(lang) {
-    const arr = t('tips', lang)
-    return Array.isArray(arr) ? arr : []
-  },
-
-  // 一句停 8 秒，和新建页同一档（他 10-01 晚：4 秒"还没看完就跳下一条了"）。
-  // 定时器挂在实例上、不进 data：它是节奏不是状态。
-  startTips() {
-    this.stopTips()
-    const n = this.data.tips.length
-    if (n < 2) return
-    this._tipTimer = setInterval(() => {
-      this.setData({ tipIdx: (this.data.tipIdx + 1) % n })
-    }, 8000)
-  },
-
-  // 离开这一屏就停：这一屏不再渲染，表还在跑就是白耗电，回来时第一句也会是随机某一条。
-  stopTips() {
-    if (this._tipTimer) {
-      clearInterval(this._tipTimer)
-      this._tipTimer = null
-    }
-  },
-
-  onHide() {
-    this.stopTips()
-  },
-
-  onUnload() {
-    this.stopTips()
   },
 
   // 头部那张图的取景：先问出图片真实尺寸，再按「我的」页那套数摆（poster.bandGeom，

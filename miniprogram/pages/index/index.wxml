@@ -20,15 +20,12 @@
       </view>
     </view>
 
-    <!-- 图上这一行（站长 10-02 第三轮）：左边一句轮播 Tips，右边三枚**裸 icon**——
-         圆底和描边整块撤掉，只留中间图形，之间一道竖线区隔，整组紧靠右。
-         点搜索：Tips 整条不渲染，搜索那枚就地向左摊成输入框，右边两枚切换 icon 照旧留着；
+    <!-- 图上这一行只剩搜索一枚**裸 icon**（站长 10-04：左边那句轮播 Tips 撤了）。
+         点搜索：搜索那枚就地向左摊成输入框；
          点这一行以外的**真空白**缩回并清词（等于退出搜索，站长 10-03 改口，原来那条"缩回不清词"作废）；
          点中某条笔记或某一枚分类只缩条子、词留着（那两枚是 catchtap，icon 亮着表示词还在），
-         ✕ 仍是就地清词的口；条子缩回，Tips 又回来。
-         三枚 icon 一律 catchtap：它们在行内，不该被当成"点了空白"而把搜索收掉。
-         Tips 这里不带「Tips：」前缀——右边三枚占掉 216，可用宽只剩 20 个汉字，
-         前缀那五个字符会把句子本身吃掉（新建页那条仍然带前缀）。 -->
+         ✕ 仍是就地清词的口。
+         icon 一律 catchtap：它在行内，不该被当成"点了空白"而把搜索收掉。 -->
     <view class="tools">
       <view wx:if="{{searchOpen}}" class="srch" style="{{searchSkin}}" catchtap="noop">
         <view class="glyph-search"></view>
@@ -44,12 +41,6 @@
         />
         <view wx:if="{{searchKeyword}}" class="srch-x" catchtap="clearSearch">✕</view>
         <view class="srch-go" catchtap="onSearchConfirm">{{t.search}}</view>
-      </view>
-      <view wx:else class="tp">
-        <block wx:if="{{tips.length}}">
-          <view class="tp-dot" style="{{tipDotStyle}}"></view>
-          <text class="tp-tx">{{tips[tipIdx]}}</text>
-        </block>
       </view>
       <view class="acts">
         <view wx:if="{{!searchOpen}}" class="ic {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">

@@ -125,6 +125,7 @@ for (const t of ramped) {
 const css = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/app.wxss'), 'utf8')
 const cssMissing = []
 const cssPageMismatch = []
+const cssBtnMismatch = []
 for (const t of after.THEMES) {
   const block = new RegExp(`\\.${t.cls}\\s*\\{([^}]*)\\}`).exec(css)
   if (!block) { cssMissing.push(t.cls); continue }
@@ -132,9 +133,35 @@ for (const t of after.THEMES) {
   if (!declared || declared[1].toLowerCase() !== t.page.toLowerCase()) {
     cssPageMismatch.push(`${t.cls}: css ${declared && declared[1]} ≠ js ${t.page}`)
   }
+  /* 站长 10-04：全站实心按钮的底色＝底部导航"选中那一格"那块圆底，两处同一个 chromeOf.sel。
+     底栏那份是 JS 现算的，按钮这份只能镜像进 CSS（CSS 引不了 JS），所以逐枚对答案——
+     少写一枚的症状是"换了壁纸，只有按钮还留着上一套的颜色"。 */
+  const btn = /--btn-bg:\s*(#[0-9a-fA-F]{6})/.exec(block[1])
+  const want = after.chromeOf(t.key).sel
+  if (!btn || btn[1].toLowerCase() !== want.toLowerCase()) {
+    cssBtnMismatch.push(`${t.cls}: css ${btn && btn[1]} ≠ chromeOf.sel ${want}`)
+  }
 }
 ck('每套主题在 app.wxss 里都有对应类名', cssMissing.length === 0, cssMissing.join(' '))
 ck('app.wxss 的 --bg-page 与 palette 的 page 同值', cssPageMismatch.length === 0, cssPageMismatch.join(' | '))
+ck('八套主题的 --btn-bg 全等于 chromeOf(该套).sel（实心按钮与底栏选中那一块面同源）',
+  cssBtnMismatch.length === 0, cssBtnMismatch.join(' | '))
+/* 令牌换了不等于按钮换了：漏改一处就是一枚还吃 --accent，在深色那两枚下会翻成"浅底深字"，
+   和其余按钮一屏两种脾气。这里逐枚点名，不数总数（数总数会漏掉新加的那一枚）。 */
+const BTN_RULES = [
+  ['app.wxss', '.btn-primary'], ['pages/index/index.wxss', '.tpl-main'],
+  ['pages/index/index.wxss', '.tpl-btn.primary'], ['pages/me/me.wxss', '.pwd-btn.primary'],
+  ['pages/detail/detail.wxss', '.icon-btn.primary'], ['pages/categories/categories.wxss', '.edit-confirm'],
+  ['pages/categories/categories.wxss', '.dialog-btn.confirm'],
+]
+const btnStale = BTN_RULES.filter(([f, sel]) => {
+  const src = fs.readFileSync(path.resolve(__dirname, `../../miniprogram/${f}`), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+  const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const body = new RegExp(`${esc}\\s*\\{([^}]*)\\}`).exec(src)
+  return !body || !/var\(--btn-bg\)/.test(body[1]) || /var\(--accent\)/.test(body[1])
+}).map(([, sel]) => sel)
+ck('七枚实心按钮全部改吃 --btn-bg / --btn-ink，一处都不留 --accent', btnStale.length === 0, btnStale.join(' '))
 
 // ⑨ 界面字体那三个类名要两边都在：app.wxss（主页面）+ tab 栏组件（样式隔离，引不过去）
 const tabCss = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/custom-tab-bar/index.wxss'), 'utf8')

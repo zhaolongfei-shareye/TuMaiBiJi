@@ -115,8 +115,8 @@
 .edit-confirm {
   font-size: var(--fs-meta);
   font-weight: 700;
-  color: var(--bg-page);
-  background: var(--accent);
+  color: var(--btn-ink);
+  background: var(--btn-bg);
   padding: 12rpx 26rpx;
   border-radius: var(--r-pill);
 }
@@ -199,7 +199,7 @@
 }
 
 .dialog-btn.confirm {
-  color: var(--bg-page);
-  background: var(--accent);
+  color: var(--btn-ink);
+  background: var(--btn-bg);
   font-weight: 700;
 }

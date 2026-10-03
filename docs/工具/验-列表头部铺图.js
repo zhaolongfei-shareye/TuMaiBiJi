@@ -95,7 +95,15 @@ ok('取图走 poster.homeBg()，和新建页是同一个函数',
 // 否则 CSS 里那三行"图上换纸白"一行都翻不动（真跑第一版就是这么红的）。
 ok('铺图时那串 chrome 变量整串不发（searchSkin 留空）',
   /searchSkin: bgSrc \? '' : chromeOf\(wallpaper\)\.style/.test(cjs))
-ok('这一页不出现选图接口（一个功能只留一个入口）', !/chooseMedia|chooseImage/.test(cjs))
+/* 这条写于 4a714d0（那一版这一页确实一处选图都没有），`9b42728` 给名片那四格加了换图，
+   把 wx.chooseMedia 带进这一页却没跟进这条——所以它从那天起一直红着，10-04 才发现。
+   它守的规矩仍然成立，只是范围要写准：**不许有的是"给笔记本身选图"的第二个入口**（那是
+   录入条那一个入口的活）；名片上那四格换的是卡片用的图，是另一件事。收窄成"只许出现在
+   _ciPick 里、且全页只有一处"，比原来那句一刀切更严，也还守得住。 */
+const ciPickFn = (cjs.split('\n  _ciPick(')[1] || '').split('\n  },')[0]
+ok('这一页不给笔记选图；唯一的 chooseMedia 只许挂在名片那四格的 _ciPick 里（全页一处）',
+  !/chooseImage/.test(cjs) && (cjs.match(/wx\.chooseMedia\(/g) || []).length === 1
+  && /wx\.chooseMedia\(/.test(ciPickFn))
 ok('这一页不出现"写死的图片路径"', !/['"]\/assets\/home-bg/.test(cjs + wxml))
 ok('data 里 bgSrc 起手是空串（模块加载时存储还没读）', /bgSrc: ''/.test(cjs))
 // 10-01 晚：这条判断从"每页各写一份"收进 app.applyNavForBand 一个出口
@@ -163,16 +171,19 @@ ok('两枚排布 icon（四块方 / 三根线）整个撤了，只留放大镜�
   && new RegExp('glyph-search\\s*\\{[^}]*width: 38rpx').test(wxss))
 ok('选中那一档只靠颜色跳出来（笔画那一档随纸片墙一起撤了）',
   /\.ic\.on\s*\{[^}]*color/.test(wxss) && !/border-width/.test(seg(wxss, '.ic.on')))
-ok('Tips 那句一行放完就省略号，不折行把 icon 顶下去',
-  /text-overflow: ellipsis/.test(seg(wxss, '.tp-tx')) && /white-space: nowrap/.test(seg(wxss, '.tp-tx')))
-ok('Tips 前面那枚点的色从 style 递进来（TIP_DOT 不许抄进 wxss）',
-  /class="tp-dot" style="\{\{tipDotStyle\}\}"/.test(wxml) && !/#f6c445/i.test(wxss))
-ok('压在图上的那一行两档都是纸白（Tips / icon；竖线那一档随它一起撤了）',
-  /color: rgba\(242, 239, 233, 0\.82\)/.test(seg(wxss, '.container.has-bg .tp'))
-  && /color: rgba\(255, 255, 255, 0\.86\)/.test(seg(wxss, '.container.has-bg .ic')))
-ok('没铺图那一态这三档退回各自主题的墨色（不是写死白）',
-  /color: var\(--text-secondary\)/.test(seg(wxss, '.tp'))
-  && !/rgba\(255, 255, 255/.test(seg(wxss, '.ic')))
+/* 站长 10-04：图上那一行左边那句轮播 Tips 整条撤了。"撤干净"是三处：节点、样式、data
+   （外加那个 8 秒定时器）——留一条没人挂的类，就是下一次改版的坑。 */
+ok('那句 Tips 整条撤净：节点、样式、data 与定时器四处都不在',
+  !/class="tp"/.test(wxml) && !/\.tp\s*\{/.test(wxss) && !/\.tp-tx|\.tp-dot/.test(wxss)
+  && !/tips: \[\]|tipIdx|startTips|stopTips|tipsFor/.test(read('pages/index/index.js')))
+ok('那枚小黄点还留着，但只服务搜索词那一行与详情窗要点（色仍从 style 递进来，不抄进 wxss）',
+  /class="xd-dot" style="\{\{tipDotStyle\}\}"/.test(wxml) && !/#f6c445/i.test(wxss))
+ok('压在图上的那一行只剩 icon 那一档纸白（Tips 那一档跟着撤净）',
+  /color: rgba\(255, 255, 255, 0\.86\)/.test(seg(wxss, '.container.has-bg .ic'))
+  && !/\.container\.has-bg \.tp\b/.test(wxss))
+ok('没铺图那一态不吃死白，且 Tips 撤了之后这一行改成贴着右沿（space-between 会把唯一那枚甩到左边）',
+  !/rgba\(255, 255, 255/.test(seg(wxss, '.ic'))
+  && /\.tools\s*\{[^}]*justify-content: flex-end/.test(wxss))
 // 搜索那一态在图上是半透明白 pill（效果图那两条 rgba 是压着照片量的：派生深色压在自己的
 // 照片上只有 1.0 出头）；没铺图时仍吃 chromeOf 那串 --chrome-*。两处都是"一条规则一个值"，
 // 没有第二份实色。
@@ -198,8 +209,8 @@ ok('颜色全走 currentColor：翻色只改 .ic 一处，三枚图形一条都�
   && !/\.ic [^}]*#[0-9a-fA-F]{6}/.test(wxss))
 
 // ---------- 5b. 搜索的两态与点击边界（v18） ----------
-ok('摊开那一条用 searchOpen 二选一：条子在、Tips 整条不渲染',
-  /wx:if="\{\{searchOpen\}\}" class="srch"/.test(wxml) && /wx:else class="tp"/.test(wxml))
+ok('摊开那一条仍由 searchOpen 那一态决定；对面那一支 Tips 已撤净（这一行只剩搜索）',
+  /wx:if="\{\{searchOpen\}\}" class="srch"/.test(wxml) && !/class="tp"/.test(wxml))
 ok('摊开时搜索那枚 icon 自己让位（同一行不出现两枚搜索）',
   /wx:if="\{\{!searchOpen\}\}" class="ic[^"]*" catchtap="onOpenSearch"/.test(wxml))
 ok('输入框自动聚焦（focus 跟着那一态走，不写死 true）',

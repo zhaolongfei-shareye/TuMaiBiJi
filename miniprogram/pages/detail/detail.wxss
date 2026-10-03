@@ -68,8 +68,8 @@
 /* 第四枚「生成笔记卡片」宽一点：六个字压在等宽的一枚里会顶到边 */
 .icon-btn.primary {
   flex: 1.4;
-  background: var(--accent);
-  color: var(--bg-page);
+  background: var(--btn-bg);
+  color: var(--btn-ink);
 }
 
 /* 中性面板：长文本在这里读 */
