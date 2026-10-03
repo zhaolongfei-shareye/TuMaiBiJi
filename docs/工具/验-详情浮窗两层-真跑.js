@@ -123,6 +123,33 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
       await tx(await page.$('.ds-hint')))
     ck('第一屏有「显示更多」那个出口（钉在正文与动作条之间）', !!(await page.$('.ds-more')),
       await tx(await page.$('.ds-more')))
+    /* 站长 10-03：「第一屏最好有个"显示更多"，用户点击可以跳到下面看原文」。
+       只钉"这一枚在"不够——他要么点了没反应，要么展开了但没滚过去，屏上看到的还是摘要。
+       所以真点两次：展开（原文那块真渲染出来 + 指针指到 #ds-orig + 文案换成「收起」）、
+       收回（三样一起退回去）。这一段跑完 origOpen 落回 false，后面几节的状态不受影响。 */
+    const noteNow = await page.data()
+    const origText = (noteNow.detailNote || {}).original_content || ''
+    // 原文里带换行，渲染出来的 text 会把它折掉——两边都先去空白再比，否则是一条假红
+    const flat = (s) => String(s).replace(/\s+/g, '')
+    ck('这一篇有原文，「显示更多」才画得出来（没有原文就不该给一个跳不到的口）', !!origText,
+      `原文 ${origText.length} 字`)
+    await (await page.$('.ds-more')).tap()
+    await sleep(1500)
+    let dm = await page.data()
+    const paras = await page.$$('.ds-para')
+    const last = paras.length ? await paras[paras.length - 1].text() : ''
+    ck('点一下=展开原文并把正文滚到那一段（不是只把字塞进去、人还停在摘要那一屏）',
+      dm.origOpen === true && dm.dsTo === 'ds-orig' && paras.length === 2
+      && flat(last).startsWith(flat(origText).slice(0, 12)),
+      `origOpen=${dm.origOpen} 指到=${dm.dsTo} 段落数=${paras.length}`)
+    ck('展开之后那一枚的话翻成「收起」（同一个口，不另起第二枚）',
+      (await tx(await page.$('.ds-more'))).includes('收起'), await tx(await page.$('.ds-more')))
+    await (await page.$('.ds-more')).tap()
+    await sleep(1500)
+    dm = await page.data()
+    ck('再点一下收回：原文撤掉、指针回顶上（两下之后和没点过一样）',
+      dm.origOpen === false && dm.dsTo === 'ds-top' && (await page.$$('.ds-para')).length === 1,
+      `origOpen=${dm.origOpen} 指到=${dm.dsTo}`)
     ck('原来挂在原文右边那枚 展开/收起 撤了（同一个功能不留第二个把手）', (await page.$$('.ds-sw')).length === 0)
     // size() 回的是 px 而样式里写的是 rpx（这一档差将近两倍），
     // 拿 252 去比 px 会把正常的格子判成"被挤成一条"——先换算再比。
