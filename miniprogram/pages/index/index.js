@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, TIP_DOT } = require('../../utils/palette.js')
+const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, themeOf, mix, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const { isPrivate } = require('../../utils/privateGate.js')
@@ -27,6 +27,18 @@ const SOURCE_TYPE_KEYS = {
    也不要在真被截断的那条上什么都不给。 */
 const SUM_LINES = 3
 const SUM_CHARS = 24
+
+/* 详情窗右上那枚淡底方形的底色（站长 10-03 原话："做一个淡淡方形，用背景风格的主色阶"）。
+   规则不是色号，三条：有色阶那两枚壁纸（象牙 / 天青）吃 steps[0]；浅色那四枚从**自己的页底**
+   掺 8% 墨（米白 → #E3E0DC、雾蓝 → 淡蓝、松绿 → 淡绿、暮橙 → 淡桃，效果图 s2 那格就是这个数）；
+   深色那两枚（夜紫 / 深海）不能照页底掺——页底是近黑，会把这块方染成近黑压在纸白窗上，
+   那就是他打回过的"太明显了"，所以参照物换成窗口自己的纸白（.float-sheet 那个 #FCFBF8）。 */
+const SHEET_PAPER = '#FCFBF8'
+function paleStep(wallpaper) {
+  const th = themeOf(wallpaper)
+  if (th.ramp && th.ramp.steps && th.ramp.steps.length) return th.ramp.steps[0]
+  return mix('#23252C', th.dark ? SHEET_PAPER : th.page, 0.08)
+}
 
 Page({
   data: {
@@ -67,6 +79,12 @@ Page({
     detailNote: null,
     shared: false,
     origOpen: false,
+    // v22（站长 10-03）：详情窗右上那一格读这篇在本机台账里留过的卡片，
+    // ‹ i/n › 由 detailCardIdx 指当前那一张；一篇一张时不画那一行（与卡片那一屏同一条口径）。
+    detailCards: [],
+    detailCardIdx: 0,
+    // 「显示更多」要把正文滚到原文那一段，靠 scroll-into-view 换值才真会滚
+    dsTo: '',
     // v7 ④⑤：模板独浮弹窗——拉它时详情窗整个藏掉，页面上只留这一个浮层
     templateOpen: false,
     posterNote: null,
@@ -92,8 +110,15 @@ Page({
     // 头部那一段铺不铺图：'' 表示不铺（用户在外观设置里关掉了，或形象文件被系统清了）。
     // 取图和新建页同一个口，不在这页另开一份判断。
     bgSrc: '',
+    // 淡底方形左上角那枚品牌字，与海报上无形象时的占位字是同一个常量（poster.BRAND_GLYPH）
+    brandGlyph: poster.BRAND_GLYPH,
+    // 右上那枚淡底方形的底：每次进页跟着壁纸重算（见 paleStep 那条规则）
+    swatchBg: paleStep('default'),
     // 头部那张图的摆法，由 fitHead() 问过图片尺寸之后现算（同一套数在 poster.bandGeom）
     imgStyle: '',
+    // 详情窗那一态要把同一张图铺满整屏（站长 10-03："形象图贯穿，与其他页面保持风格统一"），
+    // 盒子高换成 webview 实测高，算法与锚点仍是 bandGeom 那一条，不分第二条公式。
+    imgStyleThru: '',
     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
     // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
     dimV: 1,
@@ -127,6 +152,8 @@ Page({
       // 但铺了图就整串不发：style 上的自定义属性优先级高于任何选择器，
       // 带着它，CSS 里那条"图上换成纸白面"的规则一行都翻不动。
       searchSkin: bgSrc ? '' : chromeOf(wallpaper).style,
+      // 右上那枚淡底方形跟着壁纸走（象牙 #EAE0CE / 天青 #DDE7DF / 其余从窗口纸白掺 8% 墨）
+      swatchBg: paleStep(wallpaper),
     })
     // 三个 tab 的导航条标题统一成应用名（站长 10-01 晚）：原来这一页是「图麦笔记」、
     // 新建页是「新建笔记」、「我的」页是「我的」，顶上跳来跳去读起来像三个应用。
@@ -188,12 +215,22 @@ Page({
   // 同一个人在这页成了大特写、在「我的」页是半身——站长 10-01 真机对出来打回的。
   // 问不到尺寸就退回 aspectFill 的默认居中，不猜。
   fitHead(src) {
-    if (!src) { this.setData({ imgStyle: '' }); return }
+    if (!src) { this.setData({ imgStyle: '', imgStyleThru: '' }); return }
     wx.getImageInfo({
       src,
-      success: (info) => this.setData({ imgStyle: poster.bandGeom(info.width, info.height) }),
-      fail: () => this.setData({ imgStyle: '' }),
+      success: (info) => this.setData({
+        imgStyle: poster.bandGeom(info.width, info.height),
+        imgStyleThru: poster.bandGeom(info.width, info.height, this._webviewH()),
+      }),
+      fail: () => this.setData({ imgStyle: '', imgStyleThru: '' }),
     })
+  },
+
+  // webview 自己有多高（rpx）：样式里写的是 rpx，getWindowInfo 回的是 px，
+  // 换算那一次与 _tplBoxRpx 同一条式子。头部铺满整屏时盒子高就是它，不猜机型。
+  _webviewH() {
+    const wi = wx.getWindowInfo()
+    return Math.round((wi.windowHeight * 750) / wi.windowWidth)
   },
 
   // 下拉刷新：人停在列表页不动时 onShow 不会再触发，采集在后台完成的那条就一直不出现。
@@ -277,7 +314,6 @@ Page({
      ⚠ 只能由调用方把 notes 当参数递进来：setData 不是同步生效的，同一个 setData 里现读
      this.data 算到的还是上一批（v18 那轮实测过）。 */
   arrange(notes) {
-    const log = cardLog.all()
     const rows = notes.map((n, i) => {
       const s = n.summary || ''
       return {
@@ -287,15 +323,28 @@ Page({
     })
     const cells = []
     notes.forEach((n, i) => {
-      // 倒序：台账是按留下来的先后往后追加的，而这一格画的是 `cards[cur]`（cur 从 0 起）。
-      // 顺着放就会拿"最早那一张"当封面——他 10-03 报的"小图跟大图完全不匹对"就是这个错位。
-      const list = ((log[n.id] || []).slice()).sort((x, y) => (y.at || 0) - (x.at || 0))
+      const list = this._cardsOf(n.id)
       if (!list.length) return
       cells.push({ i, id: n.id, title: n.title, cards: list, cur: 0 })
     })
     // 两批都现算：切到卡片那一枚时台账可能刚被详情窗里那次出图改过，
     // 而这一屏每次数据动过都会重算，不需要额外的脏标记。
     return { rows, cells }
+  },
+
+  // 台账里这一篇留过的卡片，一律按"留下来的先后"倒序——最新那张排第一。
+  // 卡片那一屏的 cells 与详情窗右上那一格都走这一个口，两处不再各排各的：
+  // 顺着放就会拿"最早那一张"当封面，站长 10-03 报的"小图跟大图完全不匹对"就是这个错位。
+  // 文件已经不在的那一条不列：账在本机 storage 里，图在应用私有目录，系统清缓存能只清掉图
+  // （首页那张形象图同一处理，见 bgSrc 那一条）。指过去就是一块白板，看着像卡片坏了，
+  // 宁可退回空态那一格让人重新出一张。10-03 模拟器实测到这一态：src 递到了、文件不在。
+  _cardsOf(noteId) {
+    const fm = wx.getFileSystemManager()
+    const alive = (p) => { try { fm.accessSync(p); return true } catch (e) { return false } }
+    return (cardLog.forNote(noteId) || [])
+      .filter((x) => x && x.p && alive(x.p))
+      .slice()
+      .sort((x, y) => (y.at || 0) - (x.at || 0))
   },
 
   async loadNotes(reset = false) {
@@ -443,7 +492,10 @@ Page({
   async _openDetail(idx) {
     const row = this.data.notes[idx]
     if (!row) return
-    this.setData({ detailOpen: true, detailNote: row, origOpen: false, shared: false })
+    this.setData({
+      detailOpen: true, detailNote: row, origOpen: false, shared: false,
+      detailCards: this._cardsOf(row.id), detailCardIdx: 0, dsTo: '',
+    })
     try {
       const full = await api.getNote(row.id)
       if (!this.data.detailOpen) return
@@ -477,11 +529,26 @@ Page({
   },
 
   onCloseDetail() {
-    this.setData({ detailOpen: false })
+    this.setData({ detailOpen: false, dsTo: '' })
   },
 
-  onToggleOrig() {
-    this.setData({ origOpen: !this.data.origOpen })
+  // 右上那一格左右那两枚：换这篇留过的下一张 / 上一张，走到头不循环（与卡片那一屏同一条口径）。
+  onSheetCardStep(e) {
+    const list = this.data.detailCards
+    if (list.length < 2) return
+    const next = this.data.detailCardIdx + Number(e.currentTarget.dataset.step)
+    if (next < 0 || next >= list.length) return
+    this.setData({ detailCardIdx: next })
+  },
+
+  // 「显示更多」（站长 10-03：第一屏要有个口，点了能跳到下面看原文）：
+  // 展开原文并把正文滚到那一段；已经展开就收回去、滚回顶上。
+  // 原来挂在「原文内容」那一行右边那枚 展开/收起 撤掉了——同一个功能不留第二个把手。
+  onSheetMore() {
+    if (this.data.origOpen) { this.setData({ origOpen: false, dsTo: 'ds-top' }); return }
+    this.setData({ origOpen: true })
+    // 原文那一块是展开之后才占高度的，先让它排一帧再指过去，否则滚过去的位置是旧的
+    setTimeout(() => { if (this.data.origOpen) this.setData({ dsTo: 'ds-orig' }) }, 60)
   },
 
   openSourceUrl() {
@@ -580,8 +647,10 @@ Page({
     })
   },
 
-  // v7 ④：dock 的「转为笔记卡片」= 详情窗整个藏掉、只浮模板预览这一个弹窗（两层不叠）。
-  // 列表那条保持展开，所以关掉弹窗后详情窗回来、里面内容还是这篇。
+  // v7 ④：出卡片这一个动作 = 详情窗整个藏掉、只浮模板预览这一个弹窗（两层不叠）。
+  // 所以关掉弹窗后回来的是详情窗、里面内容还是这篇。
+  // v22（站长 10-03）：入口从底排那枚按钮挪到右上那一格（有卡片就是那张缩略图，
+  // 一张都没有就是那枚淡底方形），底排不再留第二个把手。
   async onSheetToPoster() {
     const note = this.data.detailNote
     if (!note || note.is_private) return
@@ -642,7 +711,7 @@ Page({
   },
 
   // 弹窗里那一格实际能给多大，只有量了才知道：十套模板的 plan.height 各不相同，
-  // 而浮窗是 top 130 / bottom 152 跟着屏高走的，同一套模板在不同机型上可视高也不一样。
+  // 而浮窗是 top 130 / bottom 192 跟着屏高走的，同一套模板在不同机型上可视高也不一样。
   // boundingClientRect 回的是 px，而样式里写的是 rpx，所以拿 windowWidth 换算一次。
   async _tplBoxRpx() {
     const rect = await new Promise((resolve) => {
@@ -763,6 +832,10 @@ Page({
       posterBusy: false,
       posterNote: null,
       detailOpen: !!note,
+      // 刚刚真留下来的那张要立刻出现在右上那一格（台账是 _keepPoster 里写的），
+      // 并把指针对到第一张——倒序之后第一张就是最新那张。
+      detailCards: note ? this._cardsOf(note.id) : [],
+      detailCardIdx: 0,
     })
     // 生成海报这一步已经把这篇的码建出来了，公开状态得跟着刷新，
     // 否则详情窗里那行「已经公开」永远不显示。

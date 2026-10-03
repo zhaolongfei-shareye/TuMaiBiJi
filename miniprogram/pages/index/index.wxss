@@ -356,6 +356,31 @@
   overflow: hidden;
 }
 
+/* ---------- v22（站长 10-03 第四轮）：浮窗开着这一态，背后只留一层 ----------
+   头部那一段从"图只守 542"改成铺满整屏（fixed 到 webview 四边），图本身换 imgStyleThru
+   那一串——同一套 poster.bandGeom，只是盒子高换成 webview 实测高，锚点公式不分第二条；
+   中间那批列表件（这张圆角纸卡本体、两枚 tab、通栏横线、分类行、行卡）整块藏掉。
+   藏用 visibility 不用 display：scroll-view 一旦被 display:none，收窗回来滚动位置就没了，
+   他会看到列表又跳回第一条。
+   头部 z-index 抬到 3（.sheet 本来就是 2）压住它，于是「我的笔记」和右上角那列数字
+   清清楚楚留在窗上面那一格里——他要的就是这个状态感。浮窗和遮罩在 100/101，
+   所以点在头部那两行字上照样落到 .float-mask，也就是"点窗外任意一处=收起"。
+   底栏不在这两条里：它是自定义组件、z-index 999，页面这一层本来就压不住它
+   （要盖住它得像 .share-dim 那样写到 1000，见 wxml 里那条注释）。 */
+.container.float-thru .head {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  height: auto;
+  z-index: 3;
+}
+
+.container.float-thru .sheet {
+  visibility: hidden;
+}
+
 /* ---------- 列表这一区自己滚 ---------- */
 .list {
   flex: 1;
@@ -738,25 +763,14 @@
   margin-top: 16rpx;
 }
 
-/* 序号圆点吃分类色：深色壁纸下 --cat-dot 会被 palette 换成算出来的字色，
-   所以前景用窗口自己的纸白，两头都不糊。 */
-.ds-pt-n {
+/* v22：带圈序号 1 2 3 撤了，换成头部 Tips 那种 14 小黄点（同一个 palette.TIP_DOT，
+   同一个 style 出口 tipDotStyle）。这四条是并列要点、不是步骤，序号本来就不显示。 */
+.ds-pt-dot {
   flex: none;
-  width: 38rpx;
-  height: 38rpx;
+  width: 14rpx;
+  height: 14rpx;
   border-radius: 50%;
-  background: var(--cat-dot);
-  color: #FCFBF8;
-  /* 序号是纯数字，吃全局那一档。这一支只出了 Thin 一个字重，原来那条 800 留着
-     等于让系统给细体假加粗（iOS 会、部分安卓不会，两边数字粗细不一样）——
-     所以连着把字重写成 100，和首页那一列、MIND 那枚是同一个写法。字号没动。 */
-  font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-size: var(--fs-tiny);
-  font-weight: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 4rpx;
+  margin-top: 18rpx;
 }
 
 .ds-pt-x {
@@ -773,21 +787,191 @@
   word-break: break-all;
 }
 
-.ds-orig {
-  margin-top: 30rpx;
+/* ---------- v22：窗内头一排两列（左标题那一叠 + 右这篇留过的卡片） ----------
+   窗内净宽 634 = 750 − 左右窗边 24×2 − .ds-in 内缩 34×2，分给 358 + 24 + 252。
+   私密笔记那一格不出（现网那条 wx:if 照搬），左列就摊满整宽。 */
+.ds-hero {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24rpx;
 }
 
-.ds-sw {
+.ds-hero .ds-lt {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-hero.solo .ds-lt {
+  flex: none;
+  width: 100%;
+}
+
+.ds-rt {
+  flex: none;
+  width: 252rpx;
+}
+
+/* 白垫与里面那张小图：逐寸按卡片那一屏的 .pad / .pad-img 缩到 252 宽
+   （340→252 是 0.7412，474→352、312→232、446→330 都是乘这同一个数）。
+   点这一整格就是出卡片——底排那枚按钮撤了之后，这是唯一入口。 */
+.ds-pad {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 252rpx;
+  height: 352rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  box-shadow: 0 8rpx 22rpx rgba(8, 10, 14, 0.10);
+}
+
+.ds-pad-img {
+  width: 232rpx;
+  height: 330rpx;
+}
+
+.ds-pg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  margin-top: 6rpx;
+}
+
+.ds-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  flex: none;
+  color: rgba(35, 37, 44, 0.62);
+}
+
+.ds-step:active {
+  opacity: 0.55;
+}
+
+/* 纯数字加斜杠，吃全局那一支（与右上角那格、日期那一列、卡片那一屏同一写法） */
+.ds-n {
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-weight: 100;
+  font-size: 26rpx;
+  line-height: 1;
+  letter-spacing: 1rpx;
+  color: rgba(35, 37, 44, 0.72);
+}
+
+/* 一篇都没有：那枚淡底方形。底色由 JS 现算（见 index.js 的 paleStep——有色阶的壁纸吃
+   steps[0]，其余从窗口那张纸白掺 8% 墨），尺寸吃列表那枚方块 --blk 的 176。 */
+.ds-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ds-swatch {
+  position: relative;
+  width: 176rpx;
+  height: 176rpx;
+  border-radius: 28rpx;
+  border: var(--w-edge) solid rgba(35, 37, 44, 0.10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-plus {
+  font-weight: 200;
+  font-size: 56rpx;
+  line-height: 1;
+  color: rgba(35, 37, 44, 0.42);
+}
+
+/* 左上角那枚品牌字：圆点 28 + 品牌名 18（--fs-micro 那一档，再小屏上就读不出了）。
+   圆点里那个字是 poster.BRAND_GLYPH，与海报无形象时的占位字同一个常量。 */
+.ds-logo {
+  position: absolute;
+  left: 14rpx;
+  top: 14rpx;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.ds-logo-n {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  background: #23252C;
+  color: #F2EFE9;
+  font-size: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-logo text {
+  font-size: var(--fs-micro);
+  letter-spacing: 1rpx;
+  color: rgba(35, 37, 44, 0.45);
+}
+
+.ds-e1 {
+  display: block;
+  margin-top: 18rpx;
   font-size: var(--fs-meta);
   font-weight: 700;
+  color: rgba(35, 37, 44, 0.9);
+}
+
+.ds-e2 {
+  display: block;
+  margin-top: 6rpx;
+  font-size: var(--fs-micro);
   color: rgba(35, 37, 44, 0.5);
 }
 
-.ds-pad {
+/* 来源链接下面那行小字（站长 10-03 原话："链接无法直接打开，可复制链接在浏览器打开"）。
+   现网那枚链接点了就是"已复制"，不说明的话人会以为是我们没做。 */
+.ds-hint {
+  margin-top: 8rpx;
+  font-size: var(--fs-tiny);
+  line-height: 1.5;
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.ds-pad-b {
   height: 24rpx;
+}
+
+/* 「显示更多」钉在正文与动作条之间（站长 10-03：第一屏要有个口，点了跳到下面看原文）。
+   它是这一屏唯一的展开出口，所以原来挂在「原文内容」右边那枚 展开/收起 撤了。
+   吃动作条上面那条线的语义：小字、居中、墨色五成，不与正文抢。 */
+.ds-more {
+  flex: none;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  font-size: var(--fs-tiny);
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.ds-more:active {
+  opacity: 0.55;
+}
+
+/* 箭头朝下＝还没看、朝上＝已经展开。复用卡片那一屏那两枚 .chev 的那一笔，
+   只多两个转角，不引图标资源也不写第二份色。 */
+.chev.down {
+  transform: rotate(-45deg);
+}
+
+.chev.up {
+  transform: rotate(135deg);
 }
 
 .ds-dock {
@@ -808,8 +992,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 一行四枚，谁都不许折行：折一行这排按钮就高低不齐了。
-     英文文案因此必须短（Make card，不是 Generate note card）。 */
+  /* 两枚等宽，谁都不许折行：折一行这排按钮就高低不齐了。
+     英文文案因此必须短（Edit / Delete，不是 Edit this note）。 */
   white-space: nowrap;
   font-size: var(--fs-meta);
   font-weight: 700;
@@ -817,24 +1001,9 @@
   box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.16);
 }
 
-.ds-ibtn.on {
-  background: #23252C;
-  color: #F2EFE9;
-  box-shadow: none;
-}
-
 .ds-ibtn.danger {
   color: #8c2119;
   box-shadow: inset 0 0 0 var(--w-edge) rgba(140, 33, 25, 0.24);
-}
-
-/* 第四枚「生成笔记卡片」比另三枚宽一点：六个字压在一枚里，等宽就顶到边。
-   站长 09-30 拍的四枚并排，覆盖效果图 v3-v7 那版"通栏 96 高"的画法。 */
-.ds-ibtn.primary {
-  flex: 1.4;
-  background: #23252C;
-  color: #F2EFE9;
-  box-shadow: none;
 }
 
 .ds-pub {
@@ -859,12 +1028,17 @@
   color: rgba(35, 37, 44, 0.62);
 }
 
-/* ---------- v7 ③④：两个浮窗共用同一条几何 ----------
-   详情窗（点一枚纸片浮它）和模板预览弹窗（点「生成笔记卡片」浮它）是同一条窗口：
-   左右 24、上沿停在头部那一段下方 130、下沿离底栏 24、同一张纸白、同一个圆角、同一枚把手。
-   拉弹窗时上一层窗口整个藏掉（detailOpen 与 templateOpen 互斥），页面上永远只有一个浮层，
-   背后什么都不垫——列表、分类块、三个 tab 在遮罩以下一字不虚
-   （v7 前两轮被否的关键就在这条，见 §8.64）。遮罩透明，只挡穿透点击（点窗外=收起）。
+/* ---------- v7 ③④ · v22：两个浮窗共用同一条几何 ----------
+   详情窗（点一行 / 点一格浮它）和模板预览弹窗（点右上那一格出卡片浮它）是同一条窗口：
+   左右 24、上沿 130（webview 内，也就是落在头部那一段 542 里面——「我的笔记」那行字
+   和右上角那列数字在它上面，露着）、下沿离底栏 64、同一张纸白、同一个圆角、同一枚把手。
+   detailOpen 与 templateOpen 互斥，页面上永远只有一个浮层。
+   v22（站长 10-03 第四轮）改了一条：这一态背后不再让列表原样透出来——中间那批
+   （圆角纸卡本体 + 两枚 tab + 通栏横线 + 分类行 + 行卡）整块 visibility 藏掉，
+   头部那一段 fixed 到铺满整屏，于是只看到形象图贯穿 + 头部那两样 + 底栏。
+   他要的是"避免看到两层结构"，但"我的笔记"和那列数字得留着，否则不知道自己在哪一层。
+   见下面 .container.float-thru 那三条。遮罩仍透明，只挡穿透点击（点窗外任意一处=收起，
+   绑的是 catchtap：不挡住冒泡的话会把 .container 的 onBlankTap 一起触发、连带清掉搜索词）。
    画布不进 fixed：canvas 藏在 left:-9999rpx 只用来生成图片，
    弹窗里放 canvasToTempFilePath 出的成品 <image>，绕开 share.wxml 顶部记的那条错位坑。 */
 .poster-canvas-offscreen {
@@ -888,7 +1062,7 @@
   left: 24rpx;
   right: 24rpx;
   top: 130rpx;
-  bottom: 152rpx;  /* 离底栏 24 + 底栏高 ~128 */
+  bottom: 192rpx;  /* 底栏顶到 128（离底 20 + 高 108）+ 64 空隙。站长 10-03：原来那 24 太贴 */
   background: #FCFBF8;
   border-radius: 32rpx;
   box-shadow: 0 30rpx 60rpx rgba(8, 10, 14, 0.32);
@@ -915,11 +1089,6 @@
   bottom: 0;
   background: #000;
   z-index: 1000;
-}
-
-/* 「原文内容」那一行是标签和开关并排，标签不再要它自己的上间距 */
-.ds-orig .ds-lab {
-  margin-top: 0;
 }
 
 .tpl-body {

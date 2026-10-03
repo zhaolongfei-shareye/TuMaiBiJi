@@ -200,18 +200,21 @@ function homeBg() {
    一个是大特写、一个是半身（站长 10-01 真机对出来打回的）。
    aspectFill 只会把画面正中间那一条留在框里，人像照的中段是胸口和手，脸会被裁掉。
    所以先按宽铺满算出图的真实高度，再把"超出盒子的那截余量"按 15% 分给上面——
-   也就是留 15% 的头顶空间。读不到图尺寸时返回空串，落回 aspectFill 的默认居中。 */
+   也就是留 15% 的头顶空间。读不到图尺寸时返回空串，落回 aspectFill 的默认居中。
+   boxH 默认就是头部那一段 542；首页详情窗那一态要把同一张图铺满整屏（站长 10-03：
+   "形象图贯穿，与其他页面保持风格统一"），所以盒子高由调用方递进来，
+   算法和锚点仍是这一套，不分第二条公式。 */
 const BAND_H = 542
 const BG_ANCHOR = 0.15
-function bandGeom(w, h) {
+function bandGeom(w, h, boxH = BAND_H) {
   if (!w || !h) return ''
   const byWidth = (750 * h) / w
-  if (byWidth >= BAND_H) {
-    const top = -Math.round((byWidth - BAND_H) * BG_ANCHOR)
+  if (byWidth >= boxH) {
+    const top = -Math.round((byWidth - boxH) * BG_ANCHOR)
     return `width:750rpx;height:${Math.round(byWidth)}rpx;left:0;top:${top}rpx`
   }
-  const bw = Math.round((BAND_H * w) / h)
-  return `width:${bw}rpx;height:${BAND_H}rpx;left:${Math.round((750 - bw) / 2)}rpx;top:0`
+  const bw = Math.round((boxH * w) / h)
+  return `width:${bw}rpx;height:${boxH}rpx;left:${Math.round((750 - bw) / 2)}rpx;top:0`
 }
 
 let avatarSeq = 0

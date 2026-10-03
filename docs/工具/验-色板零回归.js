@@ -394,6 +394,31 @@ for (const [nm, css, canvasSel, onSel] of [['分享页那一排', shareCss, 'pic
     on ? on.trim().replace(/\s+/g, ' ') : `没读到 .${onSel}`)
 }
 
+/* v22（站长 10-03）：详情窗右上那枚「淡底方形 + LOGO」的空态底。
+   他的原话是"用背景风格的主色阶"，所以这一色必须由壁纸现算、走 style 递进来；
+   三条规则钉在一起（少一条就会变成"换壁纸那一块不动"或者"深色下染出一块近黑"）。 */
+{
+  const idxWxml = fs.readFileSync(path.join(pageDir, 'pages/index/index.wxml'), 'utf8')
+  const bare = fs.readFileSync(path.join(pageDir, 'pages/index/index.wxss'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+  const idxJs = fs.readFileSync(path.join(pageDir, 'pages/index/index.js'), 'utf8')
+  const sw = cssRule(bare, 'ds-swatch') || ''
+  ck('淡底那格的色从 style 递进来，wxss 里不写死 background',
+    /class="ds-swatch" style="background:\{\{swatchBg\}\}/.test(idxWxml) && !/background:/.test(sw),
+    sw.trim().replace(/\s+/g, ' ') || '没读到 .ds-swatch')
+  ck('paleStep 三条都在：有色阶吃 steps[0]／浅色掺自己的页底／深色那两枚改用窗口纸白',
+    /th\.ramp && th\.ramp\.steps && th\.ramp\.steps\.length\) return th\.ramp\.steps\[0\]/.test(idxJs)
+    && /th\.dark \? SHEET_PAPER : th\.page/.test(idxJs),
+    (idxJs.match(/function paleStep[\s\S]*?\n}/) || ['没抓到 paleStep'])[0].replace(/\s+/g, ' ').slice(0, 140))
+  // 米白那一格就是效果图 s2 画的那个数；哪天动公式而对不上，画过的图和屏上就对不上了
+  ck('米白下那块淡底 = 效果图 s2 那个数 #e3e2dd（墨 8% 掺页底 #f4f2ec）',
+    after.mix('#23252C', after.themeOf('default').page, 0.08).toLowerCase() === '#e3e2dd')
+  ck('深色那两枚不照页底掺（照掺就染出近黑压在纸白窗上）',
+    after.mix('#23252C', after.themeOf('gradient-purple').page, 0.08).toLowerCase() !== '#ebeae8'
+    && /th\.dark/.test(idxJs),
+    `页底掺=${after.mix('#23252C', after.themeOf('gradient-purple').page, 0.08)} 窗口纸白掺=${after.mix('#23252C', '#FCFBF8', 0.08)}`)
+}
+
 after.setActiveTheme('default')
 const bad = results.filter((r) => !r.ok)
 console.log(`\n${results.length - bad.length}/${results.length} 过`)

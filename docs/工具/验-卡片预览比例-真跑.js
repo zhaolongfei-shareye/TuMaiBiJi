@@ -86,10 +86,11 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
     await sleep(3000)
     d = await page.data()
     ck('详情窗浮起来了', d.detailOpen === true, `detailOpen=${d.detailOpen}`)
-    const ibtn = await page.$('.ds-ibtn.primary')
-    ck('详情窗 dock 里有「生成笔记卡片」那枚', !!ibtn)
-    if (!ibtn) throw new Error('进不去弹窗，后面量不了')
-    await ibtn.tap()
+    // v22 起「生成笔记卡片」不是 dock 里的一枚按钮，是窗右上那一格（有卡片是缩略图、没有是淡底方块）。
+    const entry = await page.$('.ds-entry')
+    ck('详情窗右上有出卡片的入口（.ds-entry）', !!entry)
+    if (!entry) throw new Error('进不去弹窗，后面量不了')
+    await entry.tap()
     let prevCanvasW = 0
     let prevCanvasH = 0
 

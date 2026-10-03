@@ -66,8 +66,9 @@ ok('子集解得开、真的是一份 TTF', len(subset) > 500 and have, f'{len(s
 FIELDS = [
     ('pages/me/me.wxss', '.score-n', '64rpx', '', '我的页右上角那枚大数字（本来就是这支）'),
     ('pages/index/index.wxss', '.stat .n', '64rpx', '', '首页顶部三列的数字（本来就是这支）'),
-    ('pages/index/index.wxss', '.dt', 'var(--fs-meta)', '-', '列表行日期 MM-DD'),
-    ('pages/index/index.wxss', '.ds-pt-n', 'var(--fs-tiny)', '', '首页展开态要点序号'),
+    ('pages/index/index.wxss', '.xd-d', 'var(--fs-meta)', '/', '列表行日期 MM/DD'),
+    # v22 起详情窗里的要点带圈序号整块撤了（换成与列表同源的 .ds-pt-dot 那枚点），
+    # 窗里不再有任何数字要吃这支字体，所以旧的那一条判据作废——不是删了判据，是它钉的东西没了。
     ('pages/detail/detail.wxss', '.point-num', 'var(--fs-tiny)', '', '详情页要点序号'),
     ('pages/share/view.wxss', '.point-num', '22rpx', '', '扫码落地页要点序号'),
     ('pages/me/me.wxss', '.rule-value', 'var(--fs-title)', '+', '魅力值规则那三行的数（100 / +10 / +1）'),

@@ -4,11 +4,18 @@
 // v18 起列表没有"就地展开"那一态（v19 沿用：摘要与原文都只在详情窗里，行只有标题+三行摘要），
 // 点一枚直接浮详情窗——所以这一把原来钉的"第一下展开、第二下开窗"整批作废，
 // 改成反向钉"旧状态键 openIdx 与 .row-foot/.summary 都不许回来"。
+// v22（站长 10-03 第四轮）加了一整段 ②b：这一态背后只留一层——中间那批列表件必须
+// visibility:hidden（不是没渲染，收窗回来滚动位置要在）、头部那一段必须铺满整屏、
+// 「我的笔记」和右上角那列数字必须还在且没被窗盖住、窗下沿必须离底栏 64rpx 而不是 24。
+// 同一段还钉死：出卡片的入口只剩右上那一格（底排那枚撤净）、要点前是 14 小黄点
+// （带圈序号一枚不许剩）、来源链接下面那行提示在、第一屏有「显示更多」那个出口。
 // 私密那两条用 setData 把 detailNote.is_private 钉成 true，验的是 dock 两块条件渲染；
 // 后端那个字段本身在现网验过（§8.65 那 12 条），这里不重复造数据。
 // 前置：微信开发者工具已开；改过 WXSS/WXML 要先 cli close 再
 //   cli auto --project <repo>/miniprogram --auto-port 9431，等十秒端口起来。
-// 跑法：NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-详情浮窗两层-真跑.js
+// 跑法：bash docs/工具/跑尺子.sh 9431 验-详情浮窗两层-真跑
+//   （名字**不带** .js——那支脚本自己拼 `$f.js`，带了就变成找 `…真跑.js.js`，
+//    报的是 MODULE_NOT_FOUND、退出码 1，看着像这把尺子崩了其实是调用写错。）
 // 跑完自己 disconnect 释放端口，否则挡住站长的真机调试。
 const automator = require('miniprogram-automator')
 const fs = require('fs')
@@ -101,22 +108,96 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('窗里大标题就是这篇', (await (await page.$('.ds-h2')).text()) === dl.notes[pick].title)
     const ibtn = []
     for (const b of await page.$$('.ds-ibtn')) ibtn.push(await b.text())
-    // v19 撤了「置顶」那一枚（他那句"置顶功能去掉"），dock 从四枚变三枚。
-    ck('dock 三枚并排一行（置顶撤了）', ibtn.length === 3, ibtn.join('|'))
-    const primary = await page.$('.ds-ibtn.primary')
-    ck('末一枚是「生成笔记卡片」（不再叫转为）', !!primary && (await primary.text()) === '生成笔记卡片', primary ? await primary.text() : '')
-    const pw = primary ? parseFloat((await primary.size()).width) : 0
-    const w3 = parseFloat((await (await page.$$('.ds-ibtn'))[1].size()).width)
-    ck('它比另两枚宽一点（六个字不顶边）', pw > w3, `primary=${pw} 其余=${w3}`)
+    // v22（站长 10-03 第四轮）：底排从三枚减到两枚——「生成笔记卡片」那一枚整枚撤掉，
+    // 出卡片的入口挪进右上那一格（一个功能只留一个把手）。v19 撤「置顶」那条仍然成立。
+    ck('dock 只剩两枚并排一行（置顶、生成笔记卡片两枚都撤了）', ibtn.length === 2, ibtn.join('|'))
+    ck('底排不再有「生成笔记卡片」那枚（末枚是删除）', ibtn[ibtn.length - 1] === '删除', ibtn.join('|'))
+    ck('窗里右上那一格在，它就是出卡片的唯一入口', !!(await page.$('.ds-entry')))
+    ck('带圈序号那批整块撤净（.ds-pt-n 一个都不许留在树上）', (await page.$$('.ds-pt-n')).length === 0,
+      `${(await page.$$('.ds-pt-n')).length} 枚`)
+    const kpN = (((await page.data()).detailNote || {}).key_points || []).length
+    ck('要点前是 14 小黄点，数量跟要点条数一样（不是少画一条）',
+      (await page.$$('.ds-pt-dot')).length === kpN, `点 ${kpN ? (await page.$$('.ds-pt-dot')).length : 0} / 条 ${kpN}`)
+    ck('来源链接下面那行提示在（新串，一句都不许少）',
+      !!(await page.$('.ds-hint')) && (await tx(await page.$('.ds-hint'))) === '链接无法直接打开，可复制链接在浏览器打开',
+      await tx(await page.$('.ds-hint')))
+    ck('第一屏有「显示更多」那个出口（钉在正文与动作条之间）', !!(await page.$('.ds-more')),
+      await tx(await page.$('.ds-more')))
+    ck('原来挂在原文右边那枚 展开/收起 撤了（同一个功能不留第二个把手）', (await page.$$('.ds-sw')).length === 0)
+    // size() 回的是 px 而样式里写的是 rpx（这一档差将近两倍），
+    // 拿 252 去比 px 会把正常的格子判成"被挤成一条"——先换算再比。
+    const winInfo = await mp.evaluate(() => wx.getWindowInfo())
+    const rpx = (px) => px * 750 / winInfo.windowWidth
+    const boxOf = (sel) => mp.evaluate((s) => new Promise((done) => {
+      wx.createSelectorQuery().select(s).boundingClientRect((r) => done(r || null)).exec()
+    }), sel)
+    const hasThumb = !!(await page.$('.ds-pad'))
+    const pw = rpx(parseFloat((await (await page.$('.ds-entry')).size()).width))
+    ck(`右上那一格${hasThumb ? '（有卡片）是白垫那一档 252rpx' : '（空态）不窄于淡底那 176rpx'}，不是被挤成一条`,
+      hasThumb ? Math.abs(pw - 252) <= 3 : pw >= 173,
+      `${Math.round(pw)}rpx（窗宽 ${winInfo.windowWidth}px）`)
+    // 台账与屏上必须一起说话：图还在才画白垫，图被清掉（系统清缓存只清得掉文件，清不掉 storage
+    // 那本账）就退回淡底方形那一格。10-03 模拟器就是这么红过一次——src 递到了、文件不在，
+    // 屏上留下一块纯白板，看着像"卡片坏了"。判据不量文件在不在，就永远抓不到这一态。
+    const dNow = await page.data()
+    const led = await mp.evaluate((id) => (wx.getStorageSync('cardLog') || {})[String(id)] || [],
+      dl.notes[pick].id)
+    const dead = await mp.evaluate((list) => list.filter((x) => {
+      try { wx.getFileSystemManager().accessSync(x.p); return false } catch (e) { return true }
+    }).length, led)
+    ck(`右上那一格只列"文件真的在"那几张（台账 ${led.length} 张、图被清 ${dead} 张 → 窗里 ${dNow.detailCards.length} 张，屏上画的是${hasThumb ? '白垫' : '空态那一格'}）`,
+      dNow.detailCards.length === led.length - dead && hasThumb === (dNow.detailCards.length > 0))
+    if (hasThumb) {
+      const img = await page.$('.ds-pad-img')
+      const src = await img.attribute('src')
+      const rect = await img.size()
+      const want = (dNow.detailCards[dNow.detailCardIdx] || {}).p || ''
+      ck('白垫里画的就是台账那一张（src 递到了、图也有尺寸）',
+        !!src && src === want && parseFloat(rect.width) > 0 && parseFloat(rect.height) > 0,
+        `src=${src ? src.slice(-28) : '（空）'} 台账=${want.slice(-28)} 尺寸=${rect.width}×${rect.height}`)
+    }
     ck('正文区有实际高度（能滚）', parseFloat(((await (await page.$('.ds-body')).size()).height || '0')) > 200)
     await mp.screenshot({ path: path.join(OUT, '03-详情浮窗.png') })
 
-    /* ---------- ④ 生成笔记卡片 → 只浮模板预览弹窗 ---------- */
-    await (await page.$('.ds-ibtn.primary')).tap()
+    /* ---------- ②b v22：这一态背后只留一层（中间那批藏掉、图贯穿、头部那两样留着） ----------
+       站长原话："隐藏上一层的展示，就是只看到背景贯穿，避免看到两层结构"，
+       但「我的笔记」和右上角那列数字要留，"否则用户不知道自己处于那个状态下"。
+       automator 够不到底栏（自定义组件），那一头的距离从 .float-sheet 自己的 rect 量。
+       winInfo / boxOf / rpx 在上一节已经取过（同一块作用域，不重复声明）。 */
+    const headBox = await boxOf('.head')
+    const sheetBox = await boxOf('.float-sheet')
+    const statBox = await boxOf('.stats')
+    ck('头部那一段铺满整屏（图贯穿，不再是只守 542）',
+      !!headBox && Math.abs(headBox.height - winInfo.windowHeight) <= 2,
+      `${headBox && headBox.height} vs 窗 ${winInfo.windowHeight}`)
+    ck('中间那批列表件整块藏掉（.sheet 不可见，不是没渲染）',
+      (await (await page.$('.sheet')).style('visibility')) === 'hidden',
+      await (await page.$('.sheet')).style('visibility'))
+    ck('头部那两样还在屏上（「我的笔记」+ 右上角那列数字）',
+      !!(await page.$('.h1')) && !!(await page.$('.stats')) && !!(await page.$('.stat .n')),
+      await tx(await page.$('.h1')))
+    ck('那两样没被窗盖住（窗的上沿在它们下面）',
+      !!sheetBox && !!statBox && sheetBox.top > statBox.top,
+      `窗上沿 ${sheetBox && sheetBox.top} > 数字 ${statBox && statBox.top}`)
+    ck('窗下沿离屏底 192rpx（原来是 152；离底栏那一条从 24 变 64）',
+      !!sheetBox && Math.abs(rpx(winInfo.windowHeight - sheetBox.bottom) - 192) <= 3,
+      `离底 ${sheetBox && Math.round(rpx(winInfo.windowHeight - sheetBox.bottom))}rpx`)
+    await mp.screenshot({ path: path.join(OUT, '03b-窗开着只有一层.png') })
+
+    /* ---------- ④ 点右上那一格 → 只浮模板预览弹窗 ---------- */
+    await (await page.$('.ds-entry')).tap()
     await sleep(7000)
     d = await page.data()
     ck('弹窗浮起', d.templateOpen === true)
     ck('详情窗整个藏掉（两层不叠）', d.detailOpen === false)
+    // 站长 10-03 第二条："四个图的区，点开也是贯穿弹窗，保持一致性"。
+    // 卡片那一屏点一格走的是同一个详情窗（onRowTap），窗里再点右上那一格才到这一层，
+    // 所以贯穿这一态必须跟着弹窗一起成立，不能只在详情窗那一层做。
+    const thHead = await boxOf('.head')
+    ck('弹窗这一层背后同样是贯穿（头部还铺满整屏、中间那批还藏着）',
+      !!thHead && Math.abs(thHead.height - winInfo.windowHeight) <= 2
+      && (await (await page.$('.sheet')).style('visibility')) === 'hidden',
+      `${thHead && thHead.height} vs 窗 ${winInfo.windowHeight}`)
     ck('成品图已出', !!d.posterImagePath)
     ck('弹窗里是模板预览', !!(await page.$('.tpl-sheet')) && !!(await page.$('.tpl-poster')))
     ck('弹窗里没有详情窗的 dock', !(await page.$('.ds-dock')))
@@ -217,6 +298,21 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await sleep(1200)
     d = await page.data()
     ck('点窗外=收起详情窗', d.detailOpen === false && d.templateOpen === false)
+    // v22：遮罩从 bindtap 改成 catchtap。它原来会冒泡到 .container 的 onBlankTap，
+    // 于是"窗开着点一下外面"会连带把搜索词清掉——一次点击该只干一件事（词留着，✕ 才是清词的口）。
+    await page.setData({ searchOpen: true, searchKeyword: '留着' })
+    await sleep(600)
+    // 这时候列表那一层是藏着的（.sheet 被 visibility:hidden），点行点不到——直接调开窗那个方法，
+    // 量的只是"遮罩那一下会不会连带清词"这一件事。
+    await page.callMethod('_openDetail', pick)
+    await sleep(3000)
+    await (await page.$('.float-mask')).tap()
+    await sleep(1200)
+    d = await page.data()
+    ck('窗开着点外面只收窗，不连带清搜索词（遮罩是 catchtap，不冒泡到 onBlankTap）',
+      d.detailOpen === false && d.searchKeyword === '留着', `词="${d.searchKeyword}"`)
+    await page.setData({ searchOpen: false, searchKeyword: '' })
+    await sleep(600)
 
     /* ---------- 切分类：这一行在遮罩之外，点它时窗本来就该是收着的 ---------- */
     const chipN = (await page.$$('.chip')).length
@@ -234,14 +330,17 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     /* ---------- 私密笔记：dock 两块整块不渲染 ---------- */
     await (await rowOf(pick)).tap()
     await sleep(3000)
-    ck('普通笔记：生成卡片与公开状态都在', !!(await page.$('.ds-ibtn.primary')) && !!(await page.$('.ds-pub')))
+    ck('普通笔记：右上那一格与公开状态都在', !!(await page.$('.ds-entry')) && !!(await page.$('.ds-pub')))
     await page.setData({ 'detailNote.is_private': true })
     await sleep(1200)
-    ck('转成私密后「生成笔记卡片」整块不渲染', !(await page.$('.ds-ibtn.primary')))
+    ck('转成私密后右上那一格整块不渲染（私密不出卡片）', !(await page.$('.ds-entry')))
     ck('转成私密后公开状态那一行不渲染', !(await page.$('.ds-pub')))
-    // 私密那一态：dock 从三枚剩两枚（编辑／删除）——「生成笔记卡片」整块不渲染那条上面已钉。
-    ck('私密那一态剩下这两枚照常并排一行（dock 不空、不折行）', (await page.$$('.ds-ibtn')).length === 2,
+    // v22 起两枚本来就是常态（「生成笔记卡片」挪走了），私密这一态不再"少一枚"，
+    // 所以这条从"剩两枚"改成"左列摊满整宽、两枚照常并排一行"。
+    ck('私密那一态两枚照常并排一行（dock 不空、不折行）', (await page.$$('.ds-ibtn')).length === 2,
       `${(await page.$$('.ds-ibtn')).length} 枚`)
+    ck('私密那一态左列摊满整宽（右格没了就不留 252 的空位）',
+      !!(await page.$('.ds-hero.solo')))
     await mp.screenshot({ path: path.join(OUT, '07-私密窗.png') })
     await (await page.$('.grip')).tap()
     await sleep(800)

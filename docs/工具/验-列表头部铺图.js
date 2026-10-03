@@ -39,7 +39,17 @@ const seg = (src, sel, hint) => {
 
 // ---------- 1. 结构 ----------
 ok('图区里铺了 <image> 组件（wxss 的 background-image 不认包内本地文件），且吃现算的摆位',
-  /<image wx:if="\{\{bgSrc\}\}" class="head-img" style="\{\{imgStyle\}\}" src="\{\{bgSrc\}\}" mode="aspectFill" \/>/.test(wxml))
+  /<image wx:if="\{\{bgSrc\}\}" class="head-img" style="\{\{[^}]*\}\}" src="\{\{bgSrc\}\}" mode="aspectFill" \/>/.test(wxml))
+// v22（站长 10-03）：详情窗开着时同一张图要铺满整屏（"形象图贯穿，与其他页面保持风格统一"），
+// 所以那一枚 style 是随 detailOpen/templateOpen 换的，两个分支都得在；
+// 只钉"有没有现算的摆位"会让整个贯穿态静默丢掉（回来的是 542 那一档，图上沿被切）。
+ok('头部那一枚摆位分两态：窗开着吃 imgStyleThru、收起吃 imgStyle',
+  /style="\{\{detailOpen \|\| templateOpen \? imgStyleThru : imgStyle\}\}/.test(wxml))
+ok('两态都从 bandGeom 拿数（贯穿不换算法，只换盒子高）',
+  /poster\.bandGeom\(info\.width, info\.height\)/.test(cjs)
+  && /poster\.bandGeom\(info\.width, info\.height, this\._webviewH\(\)\)/.test(cjs))
+ok('贯穿那个盒子高是问过 webview 的（不写死机型）',
+  /getWindowInfo\(\)/.test(cjs) && /_webviewH\(\)/.test(cjs))
 // 站长 10-01 真机对出来的：同一个人，这一页是大特写、「我的」页是半身。
 // 判据从"有没有铺图"升级成"铺的是不是同一套取景"——两页必须都从 poster.bandGeom 拿数，
 // 谁哪天退回裸 aspectFill，这一条就红。

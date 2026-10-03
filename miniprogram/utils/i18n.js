@@ -225,6 +225,8 @@ const i18n = {
     keyPoints: '核心要点',
     tagsLabel: '标签',
     sourceLink: '来源链接',
+    // 站长 10-03 原话：链接点不开这件事要在窗里说一句，别让人以为是我们没做。
+    linkHint: '链接无法直接打开，可复制链接在浏览器打开',
     originalContent: '原文内容',
     expand: '展开',
     collapse: '收起',
@@ -517,6 +519,7 @@ const i18n = {
     keyPoints: 'Key Points',
     tagsLabel: 'Tags',
     sourceLink: 'Source Link',
+    linkHint: 'Links can’t open here — copy it and read it in a browser',
     originalContent: 'Original Content',
     expand: 'Expand',
     collapse: 'Collapse',

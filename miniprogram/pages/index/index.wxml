@@ -1,4 +1,4 @@
-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}}" bindtap="onBlankTap">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{detailOpen || templateOpen ? 'float-thru' : ''}}" bindtap="onBlankTap">
   <!-- v12（站长 10-01 拍）：图只守头部这一段 542，下面整块是一张圆角卡往上盖住它 40，
        于是接缝四个角都是弧——和「我的」页那张 sheet 同一画法、同一个量。
        09-28 那版"图贯穿全屏"到此结束：当时打回的是"纸一圈描边 + 每条笔记又一圈描边"的框套框，
@@ -7,7 +7,7 @@
        v18（站长 10-02 夜里拍做减法）：右上角只剩「笔记」这一列，「分享」「种草」两列
        跟着那两个屏一起撤；图上这一行由"分类 + 圆钮"换成"一句 Tips + 三枚裸 icon"。 -->
   <view class="head">
-    <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
+    <image wx:if="{{bgSrc}}" class="head-img" style="{{detailOpen || templateOpen ? imgStyleThru : imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
     <!-- 这一层就是「调亮度」那一枚点拧的东西：dimScrim 空串＝全铺（最沉那一档＝现网样子），
          opacity:0＝一点不压（＝原图亮度）。与新建页 .page-scrim 同一个数、同一个本机键。 -->
     <view class="head-scrim" style="{{dimScrim}}"></view>
@@ -166,21 +166,56 @@
   </scroll-view>
   </view>
 
-  <!-- v7 ③：详情浮窗。点一枚纸片 / 一行才浮它，浮上来时列表和分类块被它盖严（同宽 24 内缩），
-       「我的笔记」和三个 tab 在窗外原样清晰——背后什么都不垫，只有这一个是活的窗口。
-       顶部把手（含「点一下收起」）是回列表的口；动作条钉在窗口下沿。 -->
-  <view wx:if="{{detailOpen}}" class="float-mask" bindtap="onCloseDetail"></view>
+  <!-- v22（站长 10-03 第四轮）：详情窗这一态不再让列表从窗四周透出来。中间那批整块藏掉
+       （圆角纸卡本体 + 两枚 tab + 那条通栏横线 + 分类行 + 行卡），形象图贯穿到屏底，
+       只留头部那两样（「我的笔记」和右上角那列数字）、底栏和系统导航条——
+       他的原话：留头部那两样才知道自己还在哪一层，图贯穿才和别的页统一。
+       窗下沿从 152 抬到 192（离底栏 24 → 64）。
+       出卡片的入口挪到右上那一格（有卡片就是那张缩略图，一张都没有就是那枚淡底方形），
+       底排只剩 编辑／删除 + 公开状态那一行，不留第二个把手。
+       窗外任意一处都是回列表的口：那层罩子是铺满整屏的，点在头部那两行字上也算。
+       它绑的是 catchtap 不是 bindtap——冒泡到 .container 的 onBlankTap 会把搜索词一起清掉，
+       一次点击只干一件事（词留着，✕ 才是清词的口）。 -->
+  <view wx:if="{{detailOpen}}" class="float-mask" catchtap="onCloseDetail"></view>
   <view wx:if="{{detailOpen}}" class="float-sheet" style="{{detailNote.catStyle}}">
     <view class="grip" bindtap="onCloseDetail">
       <view class="grip-bar"></view>
       <text class="grip-tx">{{t.grip}}</text>
     </view>
-    <scroll-view class="ds-body" scroll-y show-scrollbar="{{false}}">
-      <view class="ds-in">
-      <view class="ds-meta">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</view>
-      <view class="ds-h2">{{detailNote.title}}</view>
-      <view class="ds-tags" wx:if="{{detailNote.tags && detailNote.tags.length}}">
-        <text class="ds-tag" wx:for="{{detailNote.tags}}" wx:key="*this" wx:for-item="tg">{{tg}}</text>
+    <scroll-view class="ds-body" scroll-y show-scrollbar="{{false}}"
+      scroll-into-view="{{dsTo}}" scroll-with-animation="{{true}}">
+      <view class="ds-in" id="ds-top">
+      <!-- 头一排两列：左标题那一叠，右这篇留过的卡片。窗内净宽 634 = 358 + 24 + 252。
+           私密笔记不出卡片（现网那条 wx:if 照搬），左列就摊满整宽。 -->
+      <view class="ds-hero {{detailNote.is_private ? 'solo' : ''}}">
+        <view class="ds-lt">
+          <view class="ds-meta">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</view>
+          <view class="ds-h2">{{detailNote.title}}</view>
+          <view class="ds-tags" wx:if="{{detailNote.tags && detailNote.tags.length}}">
+            <text class="ds-tag" wx:for="{{detailNote.tags}}" wx:key="*this" wx:for-item="tg">{{tg}}</text>
+          </view>
+        </view>
+        <view class="ds-rt" wx:if="{{!detailNote.is_private}}">
+          <block wx:if="{{detailCards.length}}">
+            <view class="ds-pad ds-entry" catchtap="onSheetToPoster">
+              <image class="ds-pad-img" src="{{detailCards[detailCardIdx].p}}" mode="aspectFit" />
+            </view>
+            <!-- 一篇留过两张以上才有这一行；左右各一次点击换一张、走到头不循环（与卡片那一屏同一条） -->
+            <view class="ds-pg" wx:if="{{detailCards.length > 1}}">
+              <view class="ds-step" data-step="{{-1}}" catchtap="onSheetCardStep"><view class="chev l"></view></view>
+              <text class="ds-n">{{detailCardIdx + 1}}/{{detailCards.length}}</text>
+              <view class="ds-step" data-step="{{1}}" catchtap="onSheetCardStep"><view class="chev r"></view></view>
+            </view>
+          </block>
+          <view wx:else class="ds-empty ds-entry" catchtap="onSheetToPoster">
+            <view class="ds-swatch" style="background:{{swatchBg}}">
+              <view class="ds-logo"><view class="ds-logo-n">{{brandGlyph}}</view><text>{{t.appName}}</text></view>
+              <view class="ds-plus">+</view>
+            </view>
+            <text class="ds-e1">{{t.shareAsImage}}</text>
+            <text class="ds-e2">{{t.noCards}}</text>
+          </view>
+        </view>
       </view>
 
       <view class="ds-lab" wx:if="{{detailNote.summary}}">{{t.summaryLabel}}</view>
@@ -189,32 +224,37 @@
       <block wx:if="{{detailNote.key_points && detailNote.key_points.length}}">
         <view class="ds-lab">{{t.keyPoints}}</view>
         <view class="ds-pt" wx:for="{{detailNote.key_points}}" wx:key="index" wx:for-item="kp">
-          <view class="ds-pt-n">{{index + 1}}</view>
+          <!-- v22：换头部 Tips 那种 14 小黄点，带圈序号 1 2 3 撤了、序号也不再显示
+               （这四条是并列要点、不是步骤，读的人不需要数到第几条）。 -->
+          <view class="ds-pt-dot" style="{{tipDotStyle}}"></view>
           <view class="ds-pt-x">{{kp}}</view>
         </view>
       </block>
 
       <view class="ds-lab" wx:if="{{detailNote.source_url}}">{{t.sourceLink}}</view>
       <view class="ds-link" wx:if="{{detailNote.source_url}}" catchtap="openSourceUrl">{{detailNote.source_url}}</view>
+      <view class="ds-hint" wx:if="{{detailNote.source_url}}">{{t.linkHint}}</view>
 
-      <view class="ds-orig" wx:if="{{detailNote.original_content}}">
-        <view class="ds-lab">{{t.originalContent}}</view>
-        <view class="ds-sw" catchtap="onToggleOrig">{{origOpen ? t.collapse : t.expand}} ⌄</view>
-      </view>
+      <view class="ds-lab" id="ds-orig" wx:if="{{detailNote.original_content}}">{{t.originalContent}}</view>
       <view class="ds-para" wx:if="{{origOpen && detailNote.original_content}}">{{detailNote.original_content}}</view>
-      <view class="ds-pad"></view>
+      <view class="ds-pad-b"></view>
       </view>
     </scroll-view>
 
-    <!-- 动作条：v19 起三枚并排一行（「置顶」那一枚随这一屏的置顶一起撤了；站长 09-30 拍的是
-         "并排一行、不要通栏一枚"，那条仍然成立，.ds-irow 是 flex:1 等宽，四枚变三枚不用改数法）。
-         「转为笔记卡片」改名「生成笔记卡片」——原名让人以为点完详情页就没了。
+    <!-- 「显示更多」钉在正文与动作条之间（站长 10-03：第一屏要有个口，点了跳到下面看原文）。
+         没有原文的这篇不画——那等于给一个跳不到的地方。 -->
+    <view class="ds-more" wx:if="{{detailNote.original_content}}" catchtap="onSheetMore">
+      <text>{{origOpen ? t.collapse : t.showMore}}</text>
+      <view class="chev {{origOpen ? 'up' : 'down'}}"></view>
+    </view>
+
+    <!-- 动作条：v22 起两枚并排一行（「生成笔记卡片」那一枚挪进右上那一格，入口只留一个；
+         「置顶」那枚 10-03 上午已随独立详情页一起撤净）。
          私密笔记那枚不渲染，剩下两枚自动等宽；也不给公开状态那一行。 -->
     <view class="ds-dock">
       <view class="ds-irow">
         <view class="ds-ibtn" catchtap="onSheetEdit">{{t.edit}}</view>
         <view class="ds-ibtn danger" catchtap="onSheetDelete">{{t.delete}}</view>
-        <view wx:if="{{!detailNote.is_private}}" class="ds-ibtn primary" catchtap="onSheetToPoster">{{t.shareAsImage}}</view>
       </view>
       <view wx:if="{{shared && !detailNote.is_private}}" class="ds-pub">
         <text class="ds-pub-l">{{t.sharedNow}}</text>
@@ -229,7 +269,7 @@
 
   <!-- v7 ④⑤：模板独浮弹窗——拉弹窗时详情窗整个藏起来，页面上只剩这一个浮层，
        背后什么都不垫。取消 / 保存成功 / 点把手三个口收掉弹窗后回到详情窗那一屏（不是回列表）。 -->
-  <view wx:if="{{templateOpen}}" class="float-mask" bindtap="onCancelTemplate"></view>
+  <view wx:if="{{templateOpen}}" class="float-mask" catchtap="onCancelTemplate"></view>
   <view wx:if="{{templateOpen}}" class="float-sheet tpl-sheet">
     <view class="grip" bindtap="onHandleTap">
       <view class="grip-bar"></view>

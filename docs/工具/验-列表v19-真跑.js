@@ -297,24 +297,25 @@ const COUNT_ALL = () => {
   ck('台账空着时那一格画的是空态那一句，不是白板',
     (await $$('.gc')).length === 0 && (await txt('.empty')) === ZH.noCards, await txt('.empty'))
 
-  // ---------- ⑦ 详情窗：动作条三枚、墨色对齐列表 ----------
+  // ---------- ⑦ 详情窗：动作条两枚、墨色对齐列表 ----------
   await (await tabAt(0)).tap()
   await sleep(700)
   await (await $$('.xrow'))[0].tap()
   await sleep(2500)
   const btns = await $$('.ds-ibtn')
   const labels = await Promise.all(btns.map(async (e) => String(await e.text())))
-  ck('详情窗动作条三枚：编辑 / 删除 / 生成笔记卡片（「置顶」那一枚整个撤了）',
-    labels.length === 3 && !labels.some((x) => /置顶/.test(x)), labels.join(' | '))
+  // v22（站长 10-03 第四轮）：底排从三枚减到两枚——「生成笔记卡片」整枚撤掉，
+  // 出卡片的入口挪进右上那一格（.ds-entry）。v19 撤「置顶」那条仍然成立。
+  ck('详情窗动作条两枚：编辑 / 删除（「置顶」「生成笔记卡片」两枚都撤了）',
+    labels.length === 2 && !labels.some((x) => /置顶|卡片/.test(x)), labels.join(' | '))
+  ck('右上那一格在，它是出卡片的唯一入口', !!(await $('.ds-entry')), '')
   // size() 回的是 { width, height }，没有 .w 这个键（写了就是 NaN，v18 那把红过一次）
   const bw = await Promise.all(btns.map(async (e) => Math.round(rpx((await e.size()).width))))
   const bh = await Promise.all(btns.map(async (e) => Math.round(rpx((await e.size()).height))))
-  // 原来这条钉的是"三枚等宽"——那是我对 flex:1 的推定，现网从 09-30 起就是 1 / 1 / 1.4：
-  // 「生成笔记卡片」六个字压在一枚里，等宽会顶到边。真跑量出来 182/182/255，
-  // 是设计值不是 bug，所以改口钉"等高不折行 + 宽的那枚就是文案长的那枚"。
-  ck('三枚等高（谁都没折行把这一排顶高低不齐），「生成笔记卡片」那枚按 1/1/1.4 宽一档',
-    Math.max(...bh) - Math.min(...bh) <= 1 && bw[2] > bw[0] && Math.abs(bw[0] - bw[1]) <= 1
-    && Math.abs(bw[2] / bw[0] - 1.4) <= 0.08, bw.join('/') + ' 高' + bh.join('/'))
+  // 原来这两条钉的是"三枚 1/1/1.4 宽一档"——那个 1.4 是给「生成笔记卡片」六个字留的，
+  // 那枚撤了之后 .ds-irow 就是两枚 flex:1 等宽，钉"等宽 + 等高不折行"。
+  ck('两枚等宽等高（谁都没折行把这一排顶高低不齐）',
+    Math.max(...bh) - Math.min(...bh) <= 1 && Math.abs(bw[0] - bw[1]) <= 1, bw.join('/') + ' 高' + bh.join('/'))
   ck('窗里的标题与要点前景 = 列表那档 90% 黑，正文段落 = 摘要那档 70% 黑',
     (await css('.ds-h2', 'color')) === 'rgba(35, 37, 44, 0.9)'
     && (await css('.ds-para', 'color')) === 'rgba(35, 37, 44, 0.7)'
@@ -380,9 +381,9 @@ const COUNT_ALL = () => {
     if (await page.$('.float-sheet')) await page.callMethod('onCloseDetail')
     await sleep(600)
   }
-  const madeBtn = !!(await $('.ds-ibtn.primary'))
-  ck('非私密笔记那一扇窗里有「生成笔记卡片」（下面两问全指着它）', madeBtn, madeBtn ? '有' : '没有')
-  await (await $('.ds-ibtn.primary')).tap()
+  const madeBtn = !!(await $('.ds-entry'))
+  ck('非私密笔记那一扇窗里有右上那一格（下面两问全指着它）', madeBtn, madeBtn ? '有' : '没有')
+  await (await $('.ds-entry')).tap()
   await sleep(1500)
   ck('浮得出模板弹窗', !!(await $('.tpl-sheet')), '')
   const r1 = await waitRendered('第一张')
@@ -438,7 +439,7 @@ const COUNT_ALL = () => {
     await sleep(700)
     await (await $$('.xrow'))[0].tap()
     await sleep(2200)
-    await (await $('.ds-ibtn.primary')).tap()
+    await (await $('.ds-entry')).tap()
     await sleep(1500)
     const r1b = await waitRendered('第二套开弹窗')
     ck('第二套：开弹窗先等上一张渲完（两套 _renderPoster 同时在同一枚 canvas 上跑会互相盖）',
