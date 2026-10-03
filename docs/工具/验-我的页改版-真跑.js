@@ -142,6 +142,18 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     sheetStyle['border-top-left-radius'])
   ck('留白卡底色不透明（深色壁纸下不会透出照片）', !/rgba/.test(sheetStyle['background-color'] || ''), sheetStyle['background-color'])
 
+  /* 站长 10-04 真机：这一页导航条底下多出一条白线，别的页没有。
+     拿他那张原图量过：白线 3px ÷ 1.488 = 正好 2rpx，就是 app.wxss 那条
+     `.container { padding: 2rpx var(--sp-3) 0 }` 里顶部那一档露出的页面底——
+     首页没这条，因为它整条覆盖成了 `padding: 0`，而这一页以前只覆盖了 bottom。
+     钉两层：容器顶内缩为 0，且底图盒子的顶边真的贴在视口上（留一条缝就又画出来）。
+     反向对照跑过：把 `padding-top: 0` 换成 `2rpx` 再跑这一把，只有这两条红
+     （实读 `1px` 与 band 顶 `1.92rpx`），其余 81 条照绿。 */
+  const contStyle = await styleOf(page, '.container', ['padding-top'])
+  ck('容器顶内缩收到 0（那 2rpx 会在深色导航条底下露成一条白线）',
+    parseFloat(contStyle['padding-top'] || '99') === 0, String(contStyle['padding-top']))
+  ck('底图顶边贴在视口上，不留缝', Math.abs(toRpx(m.band.top, W)) <= 1, toRpx(m.band.top, W).toFixed(2))
+
   /* ---------- ② 圆 LOGO 80、整枚在留白区里、与右边两行字等高 ---------- */
   ck('圆 LOGO 是 80 见方', Math.abs(toRpx(m.logo.width, W) - 80) <= 2 && Math.abs(toRpx(m.logo.height, W) - 80) <= 2,
     `${toRpx(m.logo.width, W).toFixed(0)}×${toRpx(m.logo.height, W).toFixed(0)}`)

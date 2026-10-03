@@ -22,7 +22,7 @@ function inkOf(theme) {
 
 /**
  * 手机模拟预览要画的那一屏。
- * 这些颜色一律是从"被预览的那套主题"算出来的字面值，不吃当前主题的 CSS 变量——
+ * 这些颜色一律是从"那一套主题"算出来的字面值，不吃当前主题的 CSS 变量——
  * 吃了就永远只能画出已经生效的那一套，预览也就没意义了。
  * 四行笔记左侧的方块是关键：带色阶的那两枚走自己那一支色相的深浅档，
  * 其余六枚走分类彩色，这正是"整套色阶"唯一一眼看得出的差别，所以必须画进预览，
@@ -50,10 +50,7 @@ Page({
     wallpapers: [],
     currentWallpaper: 'default',
     currentLabel: '',
-    previewKey: 'default',
-    previewing: false,
     mock: mockOf('default'),
-    intoView: '',
     applying: false,
     themeClass: '',
     lang: 'zh',
@@ -76,59 +73,39 @@ Page({
       // 这一页自己也要走 applyTheme：只拿类名的话，导航条底色停在上一页那套主题，
       // 换完壁纸"导航条必须和页面底同值"这条约束在本页是破的（选完才补上，进页那一瞬不对）。
       themeClass: app.applyTheme(current),
-      // 先清成空串再在下一拍给目标 id：值没变的话 scroll-into-view 不会重新滚
-      // （从别处切回这一页时，条子该停在"在用那一枚"，不是停在用户上次滑走的位置）。
-      intoView: '',
-      ...this.previewState(current, current),
-      // 深色那两枚（夜紫 / 深海）不再出现在条子里，09-30 屏蔽，理由见 app.js 里
-      // getWallpaper 那段注释。先按原下标算色块、再滤，顺序不能反：那一格里的两枚小色块
-      // 吃的是 THEMES 里的下标（toneColor(i)），先滤掉会让象牙/天青从第 7、8 档跳到第 5、6 档，
-      // 那是另一件事，不该被这次屏蔽顺手改掉。
+      // 上面那部手机永远画"已经生效的这一套"：点色块就直接生效，没有"先看一眼再说"的中间态。
+      mock: mockOf(current),
+      // 深色那两枚（夜紫 / 深海）不再出现在这一排，09-30 屏蔽，理由见 app.js 里
+      // getWallpaper 那段注释。先按原下标算色块、再滤，顺序不能反：象牙/天青本来排第 7、8 档，
+      // 先滤会让它们跳到第 5、6 档，那是另一件事，不该被这次屏蔽顺手改掉。
       wallpapers: THEMES
         .map((theme, i) => ({ theme, i }))
         .filter(({ theme }) => !theme.dark)
-        .map(({ theme, i }) => ({
+        .map(({ theme }) => ({
           key: theme.key,
           label: themeLabel(theme.key, lang),
           active: theme.key === current,
-          stack: [toneColor(i, theme.key), toneColor(i + 1, theme.key)],
-          // 主题在 CSS 里是类名，但每一格画的是"另一套主题"，拿不到当前主题的变量，
+          // 这一格画的是"另一套主题"，拿不到当前主题的变量，
           // 底、描边、勾的颜色都得由 JS 带进行内。--wp-opp 是勾里的字，要和勾本身反色。
           itemStyle:
             `background:${theme.page};--wp-label:${inkOf(theme)};` +
             `--wp-opp:${theme.page};--wp-edge:${edgeOf(theme)}`,
         })),
     })
-    // 条子进来先滚到"在用的那一枚"：不带色阶那六枚排在前面，在用的若是最后两枚，
-    // 不滚过去就看不见，会以为没存上。scroll-into-view 要等节点建好，同一批 setData 里给不生效。
-    wx.nextTick(() => this.setData({ intoView: `wp-${current}` }))
     app.setNavTitle('wallpaper', lang)
   },
 
-  // 预览态：点色块只改这里，页面本身的主题不动。
-  // 哪一枚在"试看"由 WXML 现算（previewing && item.key === previewKey），
-  // 不在数据里另存一份，免得两处状态对不上。
-  previewState(key, current) {
-    const cur = current === undefined ? this.data.currentWallpaper : current
-    return { previewKey: key, previewing: key !== cur, mock: mockOf(key) }
-  },
-
-  onPreview(e) {
+  // 点色块就直接生效（站长 10-04：不要"先试看、再点上面手机"那一步）。
+  // 遮罩要等 setData 落到视图层才挡手，同一帧里连点两下就会发两次 PUT，所以先挡掉。
+  onPick(e) {
     const key = e.currentTarget.dataset.key
-    if (key === this.data.previewKey) return
-    this.setData({ ...this.previewState(key), intoView: `wp-${key}` })
-  },
-
-  // 点上面那部手机才算"就它了"。
-  onApply() {
-    const { previewKey, currentWallpaper, applying, lang } = this.data
-    // 遮罩要等 setData 落到视图层才挡手，同一帧里连点两下就会发两次 PUT
+    const { currentWallpaper, applying, lang } = this.data
     if (applying) return
-    if (previewKey === currentWallpaper) {
+    if (key === currentWallpaper) {
       wx.showToast({ title: t('sameWallpaper', lang), icon: 'none' })
       return
     }
-    this.applyWallpaper(previewKey)
+    this.applyWallpaper(key)
   },
 
   async applyWallpaper(key) {

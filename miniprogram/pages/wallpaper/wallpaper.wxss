@@ -43,8 +43,8 @@
    字体类 .font-song / .font-fang / .font-kai 仍在 app.wxss 和 tab 栏组件里，没删。 */
 
 /* ---------- 手机模拟预览 ----------
-   外框走当前主题的卡片色（它是这一页的壳），里面那一屏走被预览那套主题的字面值。
-   整块可点，点下去才调 applyTheme。 */
+   外框走当前主题的卡片色（它是这一页的壳），里面那一屏走那一套主题的字面值。
+   站长 10-04 之后这一块只看不点：点下面的色块就直接生效了。 */
 .stage {
   padding: 28rpx 0 20rpx;
   border-radius: var(--r-card);
@@ -150,78 +150,53 @@
   color: var(--text-secondary);
 }
 
-/* 有东西在试看时这行才提亮——它是"下一步该点哪儿"的唯一提示 */
-.stage-hint-on {
-  font-weight: 800;
-  color: var(--text-primary);
+/* 这行只讲这一排怎么用。点了就生效，没有"下一步该点哪儿"了，所以不再提亮。 */
+.stage-hint {
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
 }
 
-/* ---------- 壁纸条 ---------- */
-.wp-strip {
-  width: 100%;
-  box-sizing: border-box;
-  white-space: nowrap;
-  margin-top: var(--sp-4);
-  padding: 10rpx 0 0;
-}
-
-.wp-strip-inner {
+/* ---------- 壁纸那一排：六枚一行，横向不滚（站长 10-04） ----------
+   内沿净宽 702 = 6 枚 × 102 + 5 条缝 × 18，但宽度不写死、交给 flex 分：
+   写死了换台机器（或改一次 --sp-3 内缩）又会滚起来。 */
+.wp-row {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: var(--sp-3);
+  gap: 18rpx;
+  margin-top: var(--sp-4);
 }
 
 .wp-chip {
-  flex: none;
-  width: 124rpx;
+  flex: 1;
+  min-width: 0;
   text-align: center;
 }
 
-/* 每一格画的是"另一套主题"，所以底、描边、勾的颜色全从 itemStyle 带进来（--wp-*）。
-   不取当前主题的变量：停在深海时去看米白那一格，勾和框会变成深海那套亮蓝。 */
+/* 一枚就是一个色块：底就是那一套主题的页面底，由 itemStyle 带进来。
+   描边和勾的颜色也一并从 JS 走，不取当前主题的变量——
+   停在象牙时去看雾蓝那一格，勾和框不能吃象牙的墨。 */
 .wp-tile {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-  height: 100rpx;
-  padding: 14rpx 12rpx;
+  height: 102rpx;
   box-sizing: border-box;
   border: 2rpx solid var(--wp-edge);
   border-radius: 16rpx;
   transition: border-color 0.2s;
 }
 
-.wp-bar {
-  height: 14rpx;
-  border-radius: 6rpx;
-}
-
-.wp-bar-a {
-  width: 30rpx;
-}
-
-.wp-bar-b {
-  width: 100%;
-}
-
-/* 选中态和试看态都不许改 border-width：这一条是分享页那一排踩过的坑——
-   边框一粗，这一格就高出去 2px，整排跟着抖（他要求这一排是"固定样式"）。
-   所以选中用外环（box-shadow 不占布局），试看用同宽的虚线。 */
+/* 选中态不许改 border-width：边框一粗，这一格就高出去 2px，整排跟着抖
+   （分享页那一排踩过的坑，他要求这一排是"固定样式"）。所以选中只用外环。 */
 .wp-chip-on .wp-tile {
   border-color: var(--wp-label);
   box-shadow: 0 0 0 3rpx var(--wp-label);
 }
 
-.wp-chip-prev .wp-tile {
-  border-color: var(--wp-label);
-  border-style: dashed;
-}
-
-/* 勾放在格子内侧靠下：原来浮在角上（-10rpx）会被 scroll-view 的裁剪边切到，
-   最后一枚尤其明显。格子 100rpx 高是按这条量出来的：内容区从 16rpx 起，
-   两条色带到 50rpx 结束，勾顶在 100-2-8-32 = 58rpx，留出 8rpx 不压色带。 */
+/* 勾放在格子内侧靠下，不浮在角上：原来那一排是横滑容器，浮出角去会被它的裁剪边切到；
+   现在整排在页面里，浮出去还会被选中那一格的外环切掉一半。 */
 .wp-dot {
   position: absolute;
   bottom: 8rpx;
@@ -246,12 +221,11 @@
   color: var(--text-secondary);
 }
 
-.wp-chip-on .wp-name,
-.wp-chip-prev .wp-name {
+.wp-chip-on .wp-name {
   color: var(--text-primary);
 }
 
-/* 这一行是说整句话（怎么试、现在在用哪枚），不是标签，所以不用 18rpx 那一档；
+/* 这一行只讲现在在用哪一枚，不是标签，所以不用 18rpx 那一档；
    也不叠 opacity：--text-secondary 已经是退让过的墨，再乘 0.75 在深色壁纸下就读不动了。 */
 .strip-foot {
   margin-top: var(--sp-2);

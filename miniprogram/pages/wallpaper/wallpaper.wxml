@@ -12,11 +12,12 @@
     <text class="sec-hint">{{t.wallpaperSubHint}}</text>
   </view>
 
-  <!-- 手机模拟预览：画的是"正在试看那一枚"下的笔记列表屏。点它才真的换上。
-       里面每个颜色都来自 mock（JS 按被预览那套主题算出来的字面值），
+  <!-- 手机模拟预览：画的是「当前生效那一套」下的笔记列表屏。站长 10-04 撤了
+       "再点一下上面手机才算"那一步，所以这一块只看不点。
+       里面每个颜色都来自 mock（JS 按那套主题算出来的字面值），
        不吃本页的 CSS 变量，否则预览永远只能画出已经生效的那一套。 -->
   <!-- 外面这一圈是这一页的壳，颜色一律走当前主题的变量；只有 mock 里面那几块走被预览那套。 -->
-  <view class="stage" bindtap="onApply">
+  <view class="stage">
     <view class="mock" style="background: {{mock.frame}}">
       <view class="mock-screen" style="background: {{mock.page}}">
         <view class="mock-notch" style="background: {{mock.ink}}"></view>
@@ -41,41 +42,29 @@
         </view>
       </view>
     </view>
-    <view class="stage-hint {{previewing ? 'stage-hint-on' : ''}}">
-      {{previewing ? t.stageHintPreview : t.stageHintIdle}}
+    <view class="stage-hint">{{t.swatchHint}}</view>
+  </view>
+
+  <!-- 六枚排成一行：一枚就是一个色块，横向不滚（站长 10-04）。
+       宽度交给 flex 分、不写死数字——写死了在窄一点的机上又会滚起来。
+       点哪一枚就定哪一枚，在用那一枚画勾加外环（外环走 box-shadow，不占布局，
+       免得选中那一格高出去、整排跟着抖）。 -->
+  <view class="wp-row">
+    <view
+      class="wp-chip {{item.active ? 'wp-chip-on' : ''}}"
+      wx:for="{{wallpapers}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="onPick"
+    >
+      <view class="wp-tile" style="{{item.itemStyle}}">
+        <view wx:if="{{item.active}}" class="wp-dot">✓</view>
+      </view>
+      <text class="wp-name">{{item.label}}</text>
     </view>
   </view>
 
-  <!-- 八枚压成一条横滑：只剩色块和两字名。横滑那套结构照抄分享页的模板条
-       （scroll-view + nowrap + 内层 flex），那条真机验过。 -->
-  <scroll-view
-    class="wp-strip"
-    scroll-x
-    enhanced
-    show-scrollbar="{{false}}"
-    scroll-into-view="{{intoView}}"
-    scroll-with-animation
-  >
-    <view class="wp-strip-inner">
-      <view
-        class="wp-chip {{item.active ? 'wp-chip-on' : ''}} {{previewing && item.key === previewKey ? 'wp-chip-prev' : ''}}"
-        wx:for="{{wallpapers}}"
-        wx:key="key"
-        id="wp-{{item.key}}"
-        data-key="{{item.key}}"
-        bindtap="onPreview"
-      >
-        <view class="wp-tile" style="{{item.itemStyle}}">
-          <view class="wp-bar wp-bar-a" style="background: {{item.stack[0]}}"></view>
-          <view class="wp-bar wp-bar-b" style="background: {{item.stack[1]}}"></view>
-          <view wx:if="{{item.active}}" class="wp-dot">✓</view>
-        </view>
-        <text class="wp-name">{{item.label}}</text>
-      </view>
-    </view>
-  </scroll-view>
-
-  <view class="strip-foot">{{t.stripHint}} · {{t.inUse}}{{t.colon}}{{currentLabel}}</view>
+  <view class="strip-foot">{{t.inUse}}{{t.colon}}{{currentLabel}}</view>
 
   <!-- 这里原来有一排「背景图：用人像 / 不用」。站长 09-30 判它是错的：图本来就和
        「我的 → 卡片模板」最上面那张同一个来源（poster.homeBg()），这一页不该再有

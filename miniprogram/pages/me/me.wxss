@@ -1,4 +1,11 @@
+/* app.wxss 那条 `padding: 2rpx var(--sp-3) 0` 里，顶部这 2rpx 是堵外边距穿透的，
+   但它在这一页会露出来：导航条铺了图会翻成深色（app.js applyNavForBand），而这一档
+   画的是页面底 --bg-page，于是深色导航条底下多出一条白线（站长 10-04 真机，
+   实测 3px ÷ 1.488 = 正好 2rpx）。首页没这条，因为它整条覆盖成了 `padding: 0`
+   （index.wxss 那条 .container）。这一页第一个子元素 .head 没有 margin-top，
+   穿透的前提本来就不成立，所以顶部这一档直接收掉，左右那 24 仍要吃。 */
 .container {
+  padding-top: 0;
   padding-bottom: 140rpx;
 }
 

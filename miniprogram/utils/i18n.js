@@ -18,10 +18,9 @@ const i18n = {
     fontFang: '仿宋',
     fontKai: '楷体',
     wallpaperSection: '页面壁纸',
-    wallpaperSubHint: '带色阶的两枚连左侧方块一起换色，其余六枚只换页面底和文字',
-    stageHintIdle: '点下面的色块先试看，这一步不改界面',
-    stageHintPreview: '看着对了？点一下上面的手机就换上',
-    stripHint: '左右滑挑一枚',
+    wallpaperSubHint: '带色阶的两枚连左侧方块一起换色，其余四枚只换页面底和文字',
+    // 站长 10-04：点色块直接生效，"先试看、再点上面手机"那两步撤了，原来那两句提示跟着删。
+    swatchHint: '点下面色块直接生效',
     inUse: '现在在用',
     /* ---------- 冒号与「关于」那一页的骨架（站长 10-01 晚排查中英文缺口）----------
        原来模板里把全角冒号硬拼在字典外（`{{t.authorLabel}}：xx`），英文态就印出 "Author："。
@@ -358,10 +357,8 @@ const i18n = {
     fontFang: 'FangSong',
     fontKai: 'Kai',
     wallpaperSection: 'Wallpaper',
-    wallpaperSubHint: 'The two ramped wallpapers also recolour the block beside each note; the other six only change the page',
-    stageHintIdle: 'Tap a swatch below to preview — nothing changes yet',
-    stageHintPreview: 'Looks right? Tap the phone above to apply it',
-    stripHint: 'Swipe to pick one',
+    wallpaperSubHint: 'The two ramped wallpapers also recolour the block beside each note; the other four only change the page',
+    swatchHint: 'Tap a swatch below to apply',
     inUse: 'In use',
     colon: ': ',
     aboutTabIntro: 'Intro',

@@ -353,15 +353,28 @@ ck('两枚的旧名在界面上改净（注释里留着当线索）', staleName.
 ck('「整套色阶」那个角标撤干净了', !/tint-flag|tintedFlag/.test(wpWxml + wpCss + i18nSrc))
 ck('预览那一屏的颜色由 JS 算字面值，不吃本页变量', /function mockOf/.test(wpJs) && /\{\{mock\.page\}\}/.test(wpWxml))
 ck('预览里那几块方块按被预览那套主题取档', /toneColor\([^)]*theme\.key[^)]*\)/.test(wpJs))
-const pvBody = fnBody(wpJs, 'onPreview')
-ck('点色块只试看：不碰主题也不写库', !!pvBody && !/applyTheme|setWallpaper|updateWallpaper/.test(pvBody),
-  pvBody ? '' : '没抓到 onPreview 函数体')
-const apBody = fnBody(wpJs, 'onApply')
-ck('点上面那部手机才真换', /bindtap="onApply"/.test(wpWxml) && !!apBody && /this\.applyWallpaper\(previewKey\)/.test(apBody),
-  apBody ? '' : '没抓到 onApply 函数体')
-ck('八枚各有 id，进来能滚到在用那枚', /id="wp-\{\{item\.key\}\}"/.test(wpWxml) && /scroll-into-view="\{\{intoView\}\}"/.test(wpWxml)
-  && /intoView: `wp-\$\{current\}`/.test(wpJs))
-ck('在用和试看两个标记不重叠', /previewing && item\.key === previewKey/.test(wpWxml))
+const pickBody = fnBody(wpJs, 'onPick')
+// 站长 10-04 把"先试看、再点上面手机"那两步撤了：点色块直接生效。
+// 这一条钉的是新契约（手机不许再带 bindtap），同时反向钉旧那一族标识整个撤净——
+// 名字里带"预览"的旧判据别再改代码去迁就它。
+ck('点色块就直接生效，上面那部手机不给点',
+  /bindtap="onPick"/.test(wpWxml) && !/bindtap="onApply"/.test(wpWxml)
+  && !!pickBody && /this\.applyWallpaper\(key\)/.test(pickBody),
+  pickBody ? '' : '没抓到 onPick 函数体')
+const oldTrail = ['onApply', 'onPreview', 'previewState', 'previewKey', 'previewing',
+  'intoView', 'scroll-into-view', 'scroll-x', 'wp-strip', 'wp-bar', 'wp-chip-prev', 'stageHint']
+  .filter((s) => (wpJs + wpWxml + wpCss + i18nSrc).includes(s))
+ck('旧的"试看"那一族撤净（handler／数据键／横滑容器／两条提示串都不留）',
+  oldTrail.length === 0, oldTrail.join(' '))
+// 六枚一行、横向不滚：结构上钉"不是滚动容器 + 宽度交给 flex 分"，
+// 真实盒宽由 `验-外观设置预览不越权.js` 在模拟器里量。
+ck('壁纸改成一行六枚、横向不滚（宽度交给 flex，不写死）',
+  /class="wp-row"/.test(wpWxml) && !/scroll-view/.test(wpWxml)
+  && /\.wp-row\s*\{[^}]*display: flex/.test(wpCss) && /\.wp-chip\s*\{[^}]*flex: 1/.test(wpCss))
+ck('在用那一枚只画勾，勾和框不吃当前主题的变量',
+  /class="wp-tile" style="\{\{item\.itemStyle\}\}"/.test(wpWxml)
+  && /wx:if="\{\{item\.active\}\}" class="wp-dot"/.test(wpWxml)
+  && /--wp-label:\$\{inkOf\(theme\)\}/.test(wpJs) && /--wp-edge:\$\{edgeOf\(theme\)\}/.test(wpJs))
 
 // ⑱ 小样画布的圆角必须画进位图。真机上 `canvas type="2d"` 是原生层，CSS 的 border-radius
 //    不吃（模拟器把它当 DOM 画，所以模拟器里"看着是圆的"是假证据）——圆角不进位图，
