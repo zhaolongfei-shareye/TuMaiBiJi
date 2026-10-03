@@ -266,6 +266,16 @@ ok('小弹窗这一态：成品弹窗两样都挂同一个 wx:if（整层不渲�
   && !/ci-behind/.test(CODE_WXML) && !/ci-behind/.test(CODE_WXSS))
 ok('名片小弹窗两只 input 都关掉 adjust-position（抄 me.wxml 私密密码那一层真机验过的口径）',
   (idxWxml.match(/class="ci-input"[^>]*adjust-position="\{\{false\}\}"/g) || []).length === 2)
+/* 第三轮（站长 10-03 22:47 真机两张）：整层看得见、选图也正常——**层序那一刀是修好的**。
+   新红的是"一网点到下面那栏输入框，屏上换回成品弹窗"。`cardInfoOpen` 全仓只有两处写
+   （onOpen 置 true／onClose 置 false），所以那一拍只能是被遮罩的 bindtap 收走的：
+   键盘弹起那一下原生输入层与 webview 的落点对不上，点输入框被算成"点空白收回"，
+   这一层一关，`templateOpen && !cardInfoOpen` 成立，成品弹窗就回来了。
+   修法是不再让遮罩管收回（它只挡穿透），收回只留「取消｜保存」两枚。 */
+ok('小弹窗的遮罩不绑收回（只 catchtap 挡穿透）：点空白不许把这一层关掉',
+  /class="ci-mask" catchtap=""/.test(CODE_WXML) && !/class="ci-mask"[^>]*onCloseCardInfo/.test(CODE_WXML))
+ok('收回这一层只剩一个口：wxml 里绑到 onCloseCardInfo 的只有「取消」那一枚（注释里提不算）',
+  (CODE_WXML.match(/(bind|catch)tap="onCloseCardInfo"/g) || []).length === 1)
 ok('1.9.12 那本按渲染时机记的旧账整个清一次、清完立标记（require 时就跑，只跑这一次）',
   /const MODE_KEY = 'cardLogKeepOnly'/.test(cardLogJs) && /^migrateKeepOnly\(\)$/m.test(cardLogJs))
 ok('台账是本机的事：键名 cardLog、图落在用户文件目录、api.js 里一行都不提它',

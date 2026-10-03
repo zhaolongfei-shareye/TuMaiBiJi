@@ -317,7 +317,12 @@
        外壳照「我的」页密码那一层（遮罩 rgba(20,20,28,.55)、宽 620、离顶 180），读写的就是
        那一页同一份数据（utils/poster.js 的四槽与名称/一句话）。四枚下面只写它当前的角色，
        角色开关仍只留在那一页——同一件事不留两个口。 -->
-  <view wx:if="{{cardInfoOpen}}" class="ci-mask" bindtap="onCloseCardInfo">
+  <!-- 遮罩这一层不绑收回（站长 10-03 22:47 真机两张：点之前整层好好的，一网点到下面那栏输入框，
+       屏上就换回成品弹窗）。收回只留「取消｜保存」两枚：`cardInfoOpen` 只有两处写，那一拍
+       就是被这只 bindtap 收走的——键盘弹起那一下原生输入层与 webview 的落点对不上，
+       点输入框会被算成"点空白"。这一层只留 catchtap 挡穿透（不挡住会冒到 .container 的
+       onBlankTap，连带清掉搜索词），点空白不再收它。 -->
+  <view wx:if="{{cardInfoOpen}}" class="ci-mask" catchtap="">
     <view class="ci-card" catchtap="">
       <text class="ci-title">{{t.cardInfo}}</text>
       <text class="ci-hint">{{t.cardInfoHint}}</text>

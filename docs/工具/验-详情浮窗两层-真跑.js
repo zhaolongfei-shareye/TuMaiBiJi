@@ -416,6 +416,21 @@ const readCi = (mp) => mp.evaluate(() => {
       (await (await page.$('.ci-btn.ghost')).text()) === '取消' &&
       (await (await page.$('.ci-btn.pri')).text()) === '保存')
 
+    /* 站长 10-03 22:47 真机两张：这一层整层看得见、选图也正常（**层序那一刀成了**），
+       但一网点到下面那栏输入框，屏上就换回成品弹窗——那一拍 `cardInfoOpen` 被遮罩的
+       bindtap 收走了，于是 `templateOpen && !cardInfoOpen` 成立、成品弹窗回来，
+       只有原生输入层那两个字留在外面。收回现在只留两枚按钮，这两条钉的就是
+       "点两栏输入框这一层不许消失、成品弹窗不许回来"。 */
+    for (const tapIdx of [0, 1]) {
+      const inpEl = (await page.$$('.ci-input'))[tapIdx]
+      await inpEl.tap()
+      await sleep(700)
+      const dTap = await page.data()
+      ck(`点第 ${tapIdx + 1} 栏输入框（${tapIdx ? '一句话' : '名称'}）之后，小弹窗还在、成品弹窗没回来`,
+        dTap.cardInfoOpen === true && !(await page.$('.tpl-sheet')),
+        JSON.stringify({ ci: dTap.cardInfoOpen, tpl: !!(await page.$('.tpl-sheet')) }))
+    }
+
     /* 下面那一行就是「卡片」的勾选器（站长 10-03 看图改的口径：原来那枚写着"卡片"，
        换成一个 ✔；勾是哪两条边转 −45° 画的，不赌系统字体里有没有 U+2713 那个字形）。 */
     const tick0 = (await page.$$('.ci-tick')).length
