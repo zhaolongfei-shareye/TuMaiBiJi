@@ -187,11 +187,13 @@ ok('白垫固定一档 340×474、图 312×446 落在正中（比它扁的那几
   && /align-items: center/.test(padRule) && /justify-content: center/.test(padRule))
 ok('图用 aspectFit（按宽贴合、不裁不拉），白垫 overflow:hidden 兜住圆角',
   /mode="aspectFit"/.test(idxWxml) && /overflow: hidden/.test(padRule))
-ok('第二行 ‹ i/n › 只在两张以上才画，左右两枚箭头都是 catchtap（不冒泡成开详情窗）',
-  /g-pg" wx:if="\{\{item\.cards\.length > 1\}\}/.test(idxWxml)
-  && (idxWxml.match(/class="g-step" catchtap="onCardStep"/g) || []).length === 2)
-ok('页码那枚数字吃全局那支 WtsjMind（与右上角那格、日期那一列同一写法）',
-  /WtsjMind/.test(rule(idxWxss, 'g-n')) && /font-weight: 100/.test(rule(idxWxss, 'g-n')))
+/* 站长 10-03 23:40 做减法：「一个笔记同一时间只能生成一张笔记卡片，要改存量的必须删除旧的
+   才能新增。原来的 <1/3> 去掉。」→ 翻页那一套整块撤净，不是隐藏。 */
+ok('一篇一张：‹ i/n › 那一行两处都撤净（卡片那一屏与详情窗那一格），箭头与页码的类名也不留',
+  !/g-pg|g-step|onCardStep|ds-pg|ds-step|onSheetCardStep|detailCardIdx/.test(CODE_WXML)
+  && !/\.g-pg|\.g-step|\.g-n|\.ds-pg|\.ds-step|\.ds-n/.test(CODE_WXSS))
+ok('一篇一张：js 里那个"当前第几张"的指针整个不存在（cells 也不再带 cur）',
+  !/detailCardIdx|cur: 0|\.cur\b|onCardStep|onSheetCardStep/.test(CODE_JS))
 ok('卡片那一格只从同一份 notes 里挑（顺序与列表天然一致，不另拉一次数据）',
   /const cells = \[\][\s\S]*notes\.forEach\(\(n, i\)/.test(idxJs) && !/getCards|cardList/.test(idxJs))
 ok('空台账那一格画的是空态那一句（不是白板）',
@@ -243,18 +245,30 @@ ok('格子里第一张＝最近留下的那张（台账按 at 倒序；顺着放
    无论点什么小图，都是同一个大图」）。两处根因：onSheetToPoster 读的是「我的→卡片模板」
    那套默认模板，跟台账里他刚点的这一张无关；而从卡片那一枚的格子点进去，指针一律归 0。 */
 const sheetFn = (CODE_JS.split('async onSheetToPoster()')[1] || '').split('\n  },')[0]
-ok('点开大图取的是「台账里当前那一张」的模板，不是卡片模板页那套默认（那套已不在 TEMPLATES 里才退回默认）',
-  /const cur = \(this\.data\.detailCards \|\| \[\]\)\[this\.data\.detailCardIdx\]/.test(sheetFn)
+ok('点开大图取的是「台账里那一张」的模板，不是卡片模板页那套默认（那套已不在 TEMPLATES 里才退回默认）',
+  /const cur = \(this\.data\.detailCards \|\| \[\]\)\[0\]/.test(sheetFn)
   && /posterTpl: known \? cur\.tpl : \(profile\.template \|\| poster\.DEFAULT_TEMPLATE\)/.test(sheetFn)
   && /poster\.TEMPLATES\.some\(\(x\) => x\.id === cur\.tpl\)/.test(sheetFn))
 ok('大图连二维码开关也照那一张摆（noQr 得先存进台账，两头才有一个共同来源）',
   /noQr: known \? !!cur\.noQr : false/.test(sheetFn)
   && /keep\.push\(\{ p: filePath, tpl: tplId, at, noQr: !!noQr \}\)/.test(cardLogJs))
-ok('从卡片那一枚点进去带上"是第几张"：wxml 两枚都递 data-card，_openDetail 收住并夹在范围内',
-  /data-card="\{\{item\.cur\}\}"/.test(CODE_WXML)
-  && /_openDetail\(idx, e\.currentTarget\.dataset\.card\)/.test(CODE_JS)
-  && /async _openDetail\(idx, cardIdx\)/.test(CODE_JS)
-  && /detailCardIdx: list\.length \? at : 0/.test(CODE_JS))
+ok('两态底排：未生成态是「取消｜编辑个人名片」+ 通栏「生成分享图」；已生成态只剩「取消｜删除」+ 一句说明',
+  /<block wx:if="\{\{posterHasCard\}\}">/.test(CODE_WXML)
+  && /tpl-btn danger" bindtap="onDropCard"/.test(CODE_WXML)
+  && /t\.cardDropHint/.test(CODE_WXML)
+  && /<block wx:else>/.test(CODE_WXML)
+  && /tpl-btn" bindtap="onOpenCardInfo"/.test(CODE_WXML))
+ok('药丸上面那行小字说的是状态、按钮中间那行只说干什么（旧那两句"带／无二维码分享"撤净，中英两份都撤）',
+  /pill-lab">\{\{noQr \? t\.qrOff : t\.qrOn\}\}/.test(CODE_WXML)
+  && /<text>\{\{t\.posterMake\}\}<\/text>/.test(CODE_WXML)
+  && !/qrShareOn|qrShareOff/.test(CODE_WXML) && !/qrShareOn|qrShareOff/.test(I18N))
+ok('已生成态不给换模板：滑动手势与那排圆点都跟着这一态关掉（留着会以为还能滑）',
+  /posterBusy \|\| this\.data\.posterHasCard/.test(CODE_JS)
+  && /tpl-dots" wx:if="\{\{!posterHasCard\}\}/.test(CODE_WXML)
+  && /grip-tx-l" wx:if="\{\{!posterHasCard\}\}/.test(CODE_WXML))
+ok('「删除」只动本机这本账：调 cardLog.dropNote 之后回详情窗，api 一行都不提它（服务端那张活码不碰）',
+  /onDropCard\(\) \{[\s\S]{0,240}cardLog\.dropNote\(note\.id\)[\s\S]{0,120}this\._closeTemplate\(\)/.test(CODE_JS)
+  && !/deleteCard|dropCard/ig.test(apiJs))
 /* 真机两轮（站长 10-03 20:42 与 21:20）：小弹窗浮起来时被成品弹窗整个盖住，只有输入框那行字
    漏出来（input 在 iOS 是原生层）。第一轮量出来是"102 画在 101 底下"，第二轮把那一层
    `visibility:hidden` 藏掉之后他原话「还没修好，依旧这样」——**所以这条只能钉静态，模拟器两轮都绿**。
@@ -276,6 +290,11 @@ ok('小弹窗的遮罩不绑收回（只 catchtap 挡穿透）：点空白不许
   /class="ci-mask" catchtap=""/.test(CODE_WXML) && !/class="ci-mask"[^>]*onCloseCardInfo/.test(CODE_WXML))
 ok('收回这一层只剩一个口：wxml 里绑到 onCloseCardInfo 的只有「取消」那一枚（注释里提不算）',
   (CODE_WXML.match(/(bind|catch)tap="onCloseCardInfo"/g) || []).length === 1)
+/* 站长 10-03 23:20 提的那条：大图改了形象和名字，台账里那枚小图还是旧的，人返回笔记以为没改成功。
+   补的是 cardLog.refresh——**只覆盖已有那一条、绝不新增**（在这儿多记一笔就把 #277 那条
+   "不许虚增"的口径破了），而且 `at` 保留原值（那一格按 at 倒序，刷新内容不该把它顶到最前）。 */
+ok('上一把那条"改完名片把台账就地覆盖"的链整个撤掉（一篇一张之后没有改存量这条路，不留死代码）',
+  !/refresh/.test(cardLogJs) && !/_ciSyncCard/.test(CODE_JS))
 ok('1.9.12 那本按渲染时机记的旧账整个清一次、清完立标记（require 时就跑，只跑这一次）',
   /const MODE_KEY = 'cardLogKeepOnly'/.test(cardLogJs) && /^migrateKeepOnly\(\)$/m.test(cardLogJs))
 ok('台账是本机的事：键名 cardLog、图落在用户文件目录、api.js 里一行都不提它',
@@ -290,8 +309,14 @@ ok('copyFile 用的是 destPath（写成 filePath 位图就不落盘，只有真
   // 反向钉简写属性那一种写法（`filePath,` 单占一行）；`destPath: filePath,` 里也含 filePath，
   // 所以只能按"整行就一个简写属性"来判，不能直接搜字面量。
   && !/^\s*filePath,$/m.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8')))
-ok('同一篇同一套模板只留最新一张（旧的那张连文件一起删）',
-  /x\.tpl === tplId\) \{ dropFile\(x\.p\)/.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8')))
+const cardLog2 = io2.readFileSync(P('utils/cardLog.js'), 'utf8')
+ok('同一篇只留最新一张——旧的不管出自哪套模板，连文件一起撤（要改存量只能先删）',
+  /\(map\[noteId\] \|\| \[\]\)\.filter\(\(x\) => \{ dropFile\(x\.p\); return false \}\)/.test(cardLog2))
+ok('存量归一只跑一次：立 cardLogOnePerNote 标记，留下按时间最新的那张、其余连文件删掉',
+  /const ONE_KEY = 'cardLogOnePerNote'/.test(cardLog2)
+  && /^migrateOnePerNote\(\)$/m.test(cardLog2)
+  && /if \(wx\.getStorageSync\(ONE_KEY\) === 1\) return false/.test(cardLog2)
+  && /map\[id\] = keep \? \[keep\] : \[\]/.test(cardLog2))
 ok('删笔记时那一格的台账与文件一起清（不留孤儿位图）',
   /cardLog\.dropNote\(note\.id\)/.test(idxJs))
 // v18 那一族色仍在 palette 活一份（这一屏不读了，但别的效果图与回滚点还指着它）

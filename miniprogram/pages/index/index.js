@@ -80,9 +80,10 @@ Page({
     shared: false,
     origOpen: false,
     // v22（站长 10-03）：详情窗右上那一格读这篇在本机台账里留过的卡片，
-    // ‹ i/n › 由 detailCardIdx 指当前那一张；一篇一张时不画那一行（与卡片那一屏同一条口径）。
+    // 一篇同时只有一张（站长 10-03 23:40 做减法）：这一组最多一条，‹ i/n › 那行随之撤掉，
+    // 不支持来回切换。posterHasCard 决定成品弹窗底排是"生成那一套"还是"删除｜取消"。
     detailCards: [],
-    detailCardIdx: 0,
+    posterHasCard: false,
     // 「显示更多」要把正文滚到原文那一段，靠 scroll-into-view 换值才真会滚
     dsTo: '',
     // v7 ④⑤：模板独浮弹窗——拉它时详情窗整个藏掉，页面上只留这一个浮层
@@ -336,7 +337,7 @@ Page({
     notes.forEach((n, i) => {
       const list = this._cardsOf(n.id)
       if (!list.length) return
-      cells.push({ i, id: n.id, title: n.title, cards: list, cur: 0 })
+      cells.push({ i, id: n.id, title: n.title, cards: list })
     })
     // 两批都现算：切到卡片那一枚时台账可能刚被详情窗里那次出图改过，
     // 而这一屏每次数据动过都会重算，不需要额外的脏标记。
@@ -461,18 +462,6 @@ Page({
     this.setData({ view })
   },
 
-  // 卡片那一格第二行的 ‹ i/n ›：左右各一次点击换一张，走到头就点不动、不循环
-  // （与模板弹窗那十套同一做法）。只动这一格的 cur，两批屏都不重算。
-  // catchtap 挂在两枚箭头上：它们在这一格里，不该被当成"点了这一篇"而浮详情窗。
-  onCardStep(e) {
-    const { k, step } = e.currentTarget.dataset
-    const c = this.data.cells[k]
-    if (!c) return
-    const next = c.cur + Number(step)
-    if (next < 0 || next >= c.cards.length) return
-    this.setData({ [`cells[${k}].cur`]: next })
-  },
-
   // v19：两枚 tab 那两批屏都不就地展开——点一行 / 点一格 = 直接浮详情窗。
   // 列表那一行只给三行摘要的位置，就地展开会把下面那条顶歪、也把「显示更多」那枚的出口废掉；
   // 摘要全文、要点、原文本来就在详情窗里。卡片那一格同理：白垫是固定一档，塞不下正文。
@@ -484,7 +473,7 @@ Page({
     const idx = e.currentTarget.dataset.idx
     const note = this.data.notes[idx]
     if (!note) return
-    if (!note.is_private || this.data._privateVerified) { this._openDetail(idx, e.currentTarget.dataset.card); return }
+    if (!note.is_private || this.data._privateVerified) { this._openDetail(idx); return }
     const ok = await this._promptPrivatePassword()
     if (!ok) return
     this.setData({ _privateVerified: true })
@@ -499,16 +488,12 @@ Page({
   // 直接拿来当开窗的第一帧；窗里多出来的三块（核心要点、来源链接、原文）只有详情接口有，
   // 所以再取一次全文。取失败不拦窗——列表上有的那几块照样能看，只是窗里没有要点和原文。
   // 私密笔记照取：进展开态那一步已经验过密码，窗里的要点和原文本来就该看得见。
-  // cardIdx 只有从「笔记卡片」那一枚的格子上进来才有：他点的是哪一格的小图，右上那一枚
-  // 就得先指着那一张（原来一律归 0，点第三张进去看到的是第一张，接着点开大图就更对不上）。
-  async _openDetail(idx, cardIdx) {
+  async _openDetail(idx) {
     const row = this.data.notes[idx]
     if (!row) return
-    const list = this._cardsOf(row.id)
-    const at = Math.max(0, Math.min(list.length - 1, Number(cardIdx) || 0))
     this.setData({
       detailOpen: true, detailNote: row, origOpen: false, shared: false,
-      detailCards: list, detailCardIdx: list.length ? at : 0, dsTo: '',
+      detailCards: this._cardsOf(row.id), dsTo: '',
     })
     try {
       const full = await api.getNote(row.id)
@@ -551,15 +536,6 @@ Page({
 
   onCloseDetail() {
     this.setData({ detailOpen: false, dsTo: '' })
-  },
-
-  // 右上那一格左右那两枚：换这篇留过的下一张 / 上一张，走到头不循环（与卡片那一屏同一条口径）。
-  onSheetCardStep(e) {
-    const list = this.data.detailCards
-    if (list.length < 2) return
-    const next = this.data.detailCardIdx + Number(e.currentTarget.dataset.step)
-    if (next < 0 || next >= list.length) return
-    this.setData({ detailCardIdx: next })
   },
 
   // 「显示更多」（站长 10-03：第一屏要有个口，点了能跳到下面看原文）：
@@ -682,7 +658,7 @@ Page({
     // 站长 10-03 真机报的"无论点哪张小图，大图都是同一张"——原来这里读的是「我的→卡片模板」
     // 存的那套默认模板，跟台账里这一张没有任何关系，所以 ‹ i/n › 滑得再欢，开出来还是那一套。
     // 台账里那套模板要是已经不在 TEMPLATES 里（改名／撤掉），退回默认那一套。
-    const cur = (this.data.detailCards || [])[this.data.detailCardIdx]
+    const cur = (this.data.detailCards || [])[0]
     const known = !!(cur && cur.tpl && poster.TEMPLATES.some((x) => x.id === cur.tpl))
     this.setData({
       detailOpen: false,
@@ -693,6 +669,8 @@ Page({
       posterImagePath: '',
       posterBusy: true,
       noQr: known ? !!cur.noQr : false,
+      // 台账里有这一篇那一张＝已生成态：底排只给「删除｜取消」，模板不能滑、名片不能改
+      posterHasCard: known,
     })
     try {
       await this._ensurePosterAssets(note.id)
@@ -806,7 +784,8 @@ Page({
     const a = this._posterAssets
     if (!a || !this._posterCanvas) return
     await cardLog.record(a.noteId, this.data.posterTpl, this.data.noQr, this._posterCanvas, this)
-    this.setData(this.arrange(this.data.notes))
+    // 记完这一张就"有了"：底排立刻换成「删除｜取消」，不给第二张的入口（一篇一张）
+    this.setData(Object.assign({ posterHasCard: true }, this.arrange(this.data.notes)))
   },
 
   // v7 效果图里"左右滑换模板 / Swipe to change template"那条：横向滑过 60px 判定切换。
@@ -815,7 +794,7 @@ Page({
   },
 
   onPosterTouchEnd(e) {
-    if (this.data.posterBusy) return
+    if (this.data.posterBusy || this.data.posterHasCard) return
     const dx = (e.changedTouches[0] || {}).clientX - this._touchStartX
     if (Math.abs(dx) < 60) return
     this._advanceTemplate(dx < 0 ? 1 : -1)
@@ -864,7 +843,7 @@ Page({
       // 刚刚真留下来的那张要立刻出现在右上那一格（台账是 _keepPoster 里写的），
       // 并把指针对到第一张——倒序之后第一张就是最新那张。
       detailCards: note ? this._cardsOf(note.id) : [],
-      detailCardIdx: 0,
+      posterHasCard: false,
     })
     // 生成海报这一步已经把这篇的码建出来了，公开状态得跟着刷新，
     // 否则详情窗里那行「已经公开」永远不显示。
@@ -972,6 +951,18 @@ Page({
         this.setData({ posterBusy: false })
       })
     }
+  },
+
+  // 「删除」这一枚：把这篇的本机留档整条撤掉（位图一起删），删完回详情窗，
+  // 右上那一格退回"没生成过卡片"那一态（淡底方形＋加号），想再要就重新生成一张。
+  // 只动本机这本账——shares 那张活码一行都不碰，所以"已分享的依旧有效"是白拿的，
+  // 也不用部署（站长 10-03 23:40 要的那句小字说的就是这件事）。
+  onDropCard() {
+    const note = this.data.posterNote
+    if (!note) return
+    cardLog.dropNote(note.id)
+    this._closeTemplate()
+    this.setData(this.arrange(this.data.notes))
   },
 
   _ciCommit(next) {

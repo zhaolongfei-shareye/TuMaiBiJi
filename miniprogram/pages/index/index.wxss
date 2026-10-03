@@ -589,27 +589,8 @@
   text-overflow: ellipsis;
 }
 
-.g-pg {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-  margin-top: 6rpx;
-}
 
-.g-step {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44rpx;
-  height: 44rpx;
-  flex: none;
-  color: rgba(35, 37, 44, 0.62);
-}
 
-.g-step:active {
-  opacity: 0.55;
-}
 
 /* 两枚箭头各画一笔：一个直角框转 45° / -135°，不引图标资源也不写第二份色 */
 .chev {
@@ -621,23 +602,8 @@
   border-radius: 2rpx;
 }
 
-.chev.l {
-  transform: rotate(45deg);
-}
 
-.chev.r {
-  transform: rotate(-135deg);
-}
 
-/* 纯数字加斜杠，吃全局那一支（与右上角那格、日期那一列同一写法） */
-.g-n {
-  font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-weight: 100;
-  font-size: 26rpx;
-  line-height: 1;
-  letter-spacing: 1rpx;
-  color: rgba(35, 37, 44, 0.72);
-}
 
 .loading, .empty, .loading-more {
   text-align: center;
@@ -831,37 +797,9 @@
   height: 330rpx;
 }
 
-.ds-pg {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-  margin-top: 6rpx;
-}
 
-.ds-step {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44rpx;
-  height: 44rpx;
-  flex: none;
-  color: rgba(35, 37, 44, 0.62);
-}
 
-.ds-step:active {
-  opacity: 0.55;
-}
 
-/* 纯数字加斜杠，吃全局那一支（与右上角那格、日期那一列、卡片那一屏同一写法） */
-.ds-n {
-  font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-weight: 100;
-  font-size: 26rpx;
-  line-height: 1;
-  letter-spacing: 1rpx;
-  color: rgba(35, 37, 44, 0.72);
-}
 
 /* 一篇都没有：那枚淡底方形。底色由 JS 现算（见 index.js 的 paleStep——有色阶的壁纸吃
    steps[0]，其余从窗口那张纸白掺 8% 墨），尺寸吃列表那枚方块 --blk 的 176。 */
@@ -1180,8 +1118,24 @@
   background: rgba(242, 239, 233, 0.16);
 }
 
+/* 站长 10-03 23:40：「药丸内部底色要有明显区别，代表开启和默认」。原来那两档是 .16 / .42
+   两层淡白，压在墨底上分不出来。现在开着那档直接给实心纸白，圆点反成墨色。 */
 .tpl-main .pill-on {
-  background: rgba(242, 239, 233, 0.42);
+  background: #F2EFE9;
+}
+
+.tpl-main .pill-on .pill-dot {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+/* 药丸上面那行小字说的是当前状态（开启／关闭二维码），左沿跟药丸同一档 28 */
+.pill-lab {
+  display: block;
+  margin: 20rpx 0 8rpx 28rpx;
+  font-size: var(--fs-tiny);
+  line-height: 1.4;
+  color: rgba(35, 37, 44, 0.52);
 }
 
 .tpl-main-hint {
@@ -1494,6 +1448,12 @@
 
 .tpl-btn.disabled {
   opacity: 0.45;
+}
+
+/* 「删除」那一枚吃全局那对危险色（与「我的」页私密密码重置同一写法），不另立色号 */
+.tpl-btn.danger {
+  color: var(--danger);
+  box-shadow: inset 0 0 0 var(--w-edge) var(--danger-soft);
 }
 
 /* ---------- v12：这一屏不再整页滚 ----------

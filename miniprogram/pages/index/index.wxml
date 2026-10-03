@@ -142,18 +142,13 @@
     <!-- 笔记卡片那一枚：两列等宽、只画本机台账里有图的那几篇、顺序与上面那批完全一致。
          白垫固定一档，图按 aspectFit 落在正中——比白垫扁的那几套上下各留一道白，
          这样十套模板混排也排得齐（站长原话"排列整齐归一"）。
-         同一篇留过两张以上才有第二行 ‹ i/n ›，左右各一次点击换一张、走到头不循环。 -->
+         一篇同时只留一张（站长 10-03 23:40 做减法）：第二行那枚 ‹ i/n › 整块撤掉，不支持来回切换。 -->
     <view wx:elif="{{cells.length}}" class="grid2">
       <view class="gc" wx:for="{{cells}}" wx:key="id">
-        <view class="pad" catchtap="onRowTap" data-idx="{{item.i}}" data-card="{{item.cur}}">
-          <image class="pad-img" src="{{item.cards[item.cur].p}}" mode="aspectFit" />
+        <view class="pad" catchtap="onRowTap" data-idx="{{item.i}}">
+          <image class="pad-img" src="{{item.cards[0].p}}" mode="aspectFit" />
         </view>
-        <text class="g-cap" catchtap="onRowTap" data-idx="{{item.i}}" data-card="{{item.cur}}">{{item.title}}</text>
-        <view class="g-pg" wx:if="{{item.cards.length > 1}}">
-          <view class="g-step" catchtap="onCardStep" data-k="{{index}}" data-step="{{-1}}"><view class="chev l"></view></view>
-          <text class="g-n">{{item.cur + 1}}/{{item.cards.length}}</text>
-          <view class="g-step" catchtap="onCardStep" data-k="{{index}}" data-step="{{1}}"><view class="chev r"></view></view>
-        </view>
+        <text class="g-cap" catchtap="onRowTap" data-idx="{{item.i}}">{{item.title}}</text>
       </view>
     </view>
 
@@ -197,14 +192,9 @@
         </view>
         <view class="ds-rt" wx:if="{{!detailNote.is_private}}">
           <block wx:if="{{detailCards.length}}">
+            <!-- 一篇一张，所以这一格没有 ‹ i/n ›：点它就是拉起这一张的大图（站长 10-03 23:40） -->
             <view class="ds-pad ds-entry" catchtap="onSheetToPoster">
-              <image class="ds-pad-img" src="{{detailCards[detailCardIdx].p}}" mode="aspectFit" />
-            </view>
-            <!-- 一篇留过两张以上才有这一行；左右各一次点击换一张、走到头不循环（与卡片那一屏同一条） -->
-            <view class="ds-pg" wx:if="{{detailCards.length > 1}}">
-              <view class="ds-step" data-step="{{-1}}" catchtap="onSheetCardStep"><view class="chev l"></view></view>
-              <text class="ds-n">{{detailCardIdx + 1}}/{{detailCards.length}}</text>
-              <view class="ds-step" data-step="{{1}}" catchtap="onSheetCardStep"><view class="chev r"></view></view>
+              <image class="ds-pad-img" src="{{detailCards[0].p}}" mode="aspectFit" />
             </view>
           </block>
           <view wx:else class="ds-empty ds-entry" catchtap="onSheetToPoster">
@@ -281,20 +271,31 @@
       <view class="grip-bar"></view>
       <!-- 左右各一句、同一行同一档：右边收窗，左边告诉他这一屏能左右滑。
            原来那句挂在卡片下面，卡片一高就被顶到看不见。 -->
-      <text class="grip-tx grip-tx-l">{{t.swipeHint}}</text>
+      <text class="grip-tx grip-tx-l" wx:if="{{!posterHasCard}}">{{t.swipeHint}}</text>
       <text class="grip-tx">{{t.grip}}</text>
     </view>
     <view class="tpl-body" bindtouchstart="onPosterTouchStart" bindtouchend="onPosterTouchEnd">
       <image wx:if="{{posterImagePath}}" class="tpl-poster" src="{{posterImagePath}}" mode="aspectFit" style="width: {{posterW}}rpx; height: {{posterH}}rpx" />
       <view wx:else class="tpl-loading">{{t.loading}}</view>
       <!-- 一共多少套、现在第几套：每套一枚，当前那枚大一点、其余淡一档 -->
-      <view class="tpl-dots">
+      <!-- 已生成态不给换模板，那排圆点跟着不画（留着会以为还能滑） -->
+      <view class="tpl-dots" wx:if="{{!posterHasCard}}">
         <view wx:for="{{tplIds}}" wx:key="id"
           class="tpl-dot {{item.id === posterTpl ? 'tpl-dot-on' : ''}}"
           style="background: {{item.color}}"></view>
       </view>
     </view>
     <view class="tpl-dock">
+      <!-- 已生成态（站长 10-03 23:40）：底排只有「取消｜删除」两枚，模板不能滑、名片不能改，
+           要换就先删这一张。下面那行小字说的是删完之后会怎样——服务端那张活码一行都不碰。 -->
+      <block wx:if="{{posterHasCard}}">
+        <view class="tpl-actions">
+          <view class="tpl-btn ghost" bindtap="onCancelTemplate">{{t.cancel}}</view>
+          <view class="tpl-btn danger" bindtap="onDropCard">{{t.cardDrop}}</view>
+        </view>
+        <text class="tpl-main-hint">{{t.cardDropHint}}</text>
+      </block>
+      <block wx:else>
       <view class="tpl-actions">
         <view class="tpl-btn ghost" bindtap="onCancelTemplate">{{t.cancel}}</view>
         <view class="tpl-btn" bindtap="onOpenCardInfo">{{t.editCard}}</view>
@@ -303,13 +304,15 @@
            药丸这层必须留 catchtap（现网 `.tpl-qr` 上本来就是）——冒泡上去会连带触发分享，
            等于关个二维码把图顺手发出去了。站长 10-03：「取消和编辑个人名片放同一行，
            二维码药丸与分享做成组合按钮，通栏」。 -->
+      <!-- 药丸上面那行小字说的是"现在开着还是关着"（默认开启，点药丸切成关闭二维码）；
+           按钮中间那行只说这一枚要干什么＝生成分享图，原来那两句"带／无二维码分享"随之撤掉。
+           原来挂在按钮下面那句长说明挪走了：它同时挂在海报页 share.wxml:16，那页照留。 -->
+      <text class="pill-lab">{{noQr ? t.qrOff : t.qrOn}}</text>
       <view class="tpl-main {{posterImagePath ? '' : 'disabled'}}" bindtap="onSavePoster">
         <view class="pill {{noQr ? '' : 'pill-on'}}" catchtap="onToggleQr"><view class="pill-dot"></view></view>
-        <text>{{noQr ? t.qrShareOff : t.qrShareOn}}</text>
+        <text>{{t.posterMake}}</text>
       </view>
-      <!-- 那句详细说明一个字没改，只是从药丸右边挪到按钮下面（它同时挂在海报页 share.wxml:16，
-           改短会连着那页一起变）。 -->
-      <text class="tpl-main-hint">{{t.qrToggleHint}}</text>
+      </block>
     </view>
   </view>
 

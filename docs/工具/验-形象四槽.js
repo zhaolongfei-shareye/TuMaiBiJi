@@ -249,11 +249,16 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   ck('分区那条分隔线吃现网已有的 --card-edge（不另起一种色）',
     /\.preview-head\s*\{[^}]*border-top:\s*2rpx dashed var\(--card-edge\)/.test(wxss))
   const keys = ['slotCard', 'slotBg', 'slotHint', 'slotHintFull', 'slotDropTitle', 'slotDropOk', 'slotDropBody', 'slotDropWasCard', 'slotDropWasBg', 'previewTitle', 'previewHint',
-    'editCard', 'cardInfo', 'cardInfoHint', 'cardReplace', 'slotPos', 'qrShareOn', 'qrShareOff']
+    'editCard', 'cardInfo', 'cardInfoHint', 'cardReplace', 'slotPos',
+    // 10-03 23:40：药丸那两句"带／无二维码分享"撤了，换成"状态小字＋按钮动词"三串，
+    // 已生成态那两枚又是一串——旧的 qrShareOn／qrShareOff 已从中英两份字典里删净。
+    'qrOn', 'qrOff', 'posterMake', 'cardDrop', 'cardDropHint']
   keys.forEach((k) => {
     const n = (i18n.match(new RegExp(`\\b${k}:`, 'g')) || []).length
     ck(`新串 ${k} 中英文各一份`, n === 2, `出现 ${n} 次`)
   })
+  ck('旧的「带／无二维码分享」两串中英两份都撤净（按钮上不再跟药丸联动）',
+    !/\bqrShareOn:|\bqrShareOff:/.test(i18n))
   // 真机上 showModal 的按钮只收 4 个字（替身不校验，这里当场量）
   // 真机上 showModal 只给按钮定了 4 字上限（替身不校验），标题没有这条，
   // 现网那两枚标题本来就比 7 个字长，所以这里只量按钮。

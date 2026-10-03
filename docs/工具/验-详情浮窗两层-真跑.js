@@ -223,7 +223,7 @@ const readCi = (mp) => mp.evaluate(() => {
       const img = await page.$('.ds-pad-img')
       const src = await img.attribute('src')
       const rect = await img.size()
-      const want = (dNow.detailCards[dNow.detailCardIdx] || {}).p || ''
+      const want = (dNow.detailCards[0] || {}).p || ''
       ck('白垫里画的就是台账那一张（src 递到了、图也有尺寸）',
         !!src && src === want && parseFloat(rect.width) > 0 && parseFloat(rect.height) > 0,
         `src=${src ? src.slice(-28) : '（空）'} 台账=${want.slice(-28)} 尺寸=${rect.width}×${rect.height}`)
@@ -256,11 +256,28 @@ const readCi = (mp) => mp.evaluate(() => {
       `离底 ${sheetBox && Math.round(rpx(winInfo.windowHeight - sheetBox.bottom))}rpx`)
     await mp.screenshot({ path: path.join(OUT, '03b-窗开着只有一层.png') })
 
-    /* ---------- ④ 点右上那一格 → 只浮模板预览弹窗 ---------- */
+    /* ---------- ④ 点右上那一格 → 只浮模板预览弹窗 ----------
+       一篇一张之后这一层分两态（未生成／已生成）。这一把量的是未生成态那一套：底排、药丸、
+       滑动不循环、名片小弹窗。所以开窗之前把这一篇那本账临时挪开（detailCards 也一起清空——
+       onSheetToPoster 读的就是它），跑完原样放回 storage；已生成态那两问（底排只剩取消｜删除、
+       左右滑不动）钉在 验-列表v19-真跑.js 的 ⑧b，不在这把里重复造现场。 */
+    const ledKeep = await mp.evaluate((id) => {
+      const m = wx.getStorageSync('cardLog') || {}
+      const k = String(id)
+      const v = m[k] || null
+      if (v) { delete m[k]; wx.setStorageSync('cardLog', m) }
+      return v
+    }, dl.notes[pick].id)
+    await page.setData({ detailCards: [] })
+    await sleep(400)
     await (await page.$('.ds-entry')).tap()
     await sleep(7000)
     d = await page.data()
-    ck('弹窗浮起', d.templateOpen === true)
+    ck('台账挪开之后开出来的这一层落在未生成态（底排有通栏那枚、能滑、能改名片）',
+      d.templateOpen === true && d.posterHasCard === false && !!(await page.$('.tpl-main')), '')
+    ck('药丸默认是"开着"那一档底色（点一下才退成淡底）',
+      (await page.$$('.tpl-main .pill-on')).length === 1 && d.noQr === false,
+      `pill-on ${(await page.$$('.tpl-main .pill-on')).length} 枚`)
     ck('详情窗整个藏掉（两层不叠）', d.detailOpen === false)
     // 站长 10-03 第二条："四个图的区，点开也是贯穿弹窗，保持一致性"。
     // 卡片那一屏点一格走的是同一个详情窗（onRowTap），窗里再点右上那一格才到这一层，
@@ -286,8 +303,12 @@ const readCi = (mp) => mp.evaluate(() => {
     for (const b of await page.$$('.tpl-btn')) tplBtns.push(await b.text())
     ck('第一行两枚是「取消｜编辑个人名片」（旧的"保存并分享"不许回来）',
       tplBtns.join('|') === '取消|编辑个人名片', tplBtns.join('|'))
+    /* 站长 10-03 23:40：按钮上的字不再跟药丸联动（那两句"带／无二维码分享"撤了），
+       主按钮只说干什么＝「生成分享图」，状态改由药丸上面那行小字说。 */
     const mainTx = await (await page.$('.tpl-main')).text()
-    ck('通栏那枚开着码就叫「带二维码分享」', mainTx === '带二维码分享', mainTx)
+    ck('通栏那枚只说「生成分享图」，状态交给药丸上面那行小字（默认「开启二维码」）',
+      mainTx === '生成分享图' && (await tx(await page.$('.pill-lab'))) === '开启二维码',
+      `${mainTx} / ${await tx(await page.$('.pill-lab'))}`)
     const menuApi = await mp.evaluate(() => typeof wx.showShareImageMenu)
     ck('这一档环境里有微信图片分享面板这个 API（真机上那五枚才是它给的）',
       menuApi === 'function', `typeof=${menuApi}`)
@@ -338,12 +359,16 @@ const readCi = (mp) => mp.evaluate(() => {
     ck('关码后重画完仍出图', !!d.posterImagePath && d.posterBusy === false)
     ck('点药丸只切开关，没冒泡去分享（弹窗还开着、那层黑没铺）',
       d.templateOpen === true && d.shareDim === false, `open=${d.templateOpen} dim=${d.shareDim}`)
-    ck('关着码那枚的字跟着换成「无二维码分享」',
-      (await (await page.$('.tpl-main')).text()) === '无二维码分享')
+    ck('关着码时药丸上面那行小字跟着换成「关闭二维码」（药丸内部底色也退了）',
+      (await tx(await page.$('.pill-lab'))) === '关闭二维码'
+      && (await page.$$('.tpl-main .pill-on')).length === 0, await tx(await page.$('.pill-lab')))
     await mp.screenshot({ path: path.join(OUT, '05-关码重画.png') })
     await (await page.$('.tpl-main .pill')).tap()
     await sleep(7000)
-    ck('再点一下开回来，字也跟着回来', (await (await page.$('.tpl-main')).text()) === '带二维码分享')
+    ck('再点一下开回来，那行小字也跟着回来',
+      (await tx(await page.$('.pill-lab'))) === '开启二维码', await tx(await page.$('.pill-lab')))
+    ck('主按钮上那行字从头到尾没跟着开关变（它只说这一枚干什么）',
+      (await (await page.$('.tpl-main')).text()) === '生成分享图')
 
     /* ---------- ⑤ 滑到第十套停住、不循环 ---------- */
     await page.setData({ posterTpl: 'lit' })
@@ -472,6 +497,18 @@ const readCi = (mp) => mp.evaluate(() => {
     await sleep(600)
     st = await readCi(mp)
     ck('空格下面那行点了不响应', st.every((x) => x.card === false), marks(st, 'card'))
+
+    /* 站长 10-03 23:20 提的那条（改了名片，台账里那枚小图还是旧的）这一把不再验了——不是修坏，
+       是这条路本身被撤了：10-03 23:40 定的一篇一张之下，「编辑个人名片」只存在于未生成态，
+       存量那张不许改，要改只能删掉重新生成。上一版为此加的 cardLog.refresh / _ciSyncCard
+       已经整条撤净（不留死代码），钉这一句的静态判据在 验-列表D2。 */
+    await mp.evaluate((id, v) => {
+      if (!v) return
+      const m = wx.getStorageSync('cardLog') || {}
+      m[String(id)] = v
+      wx.setStorageSync('cardLog', m)
+      return true
+    }, dl.notes[pick].id, ledKeep)
 
     await restoreCi(mp, seeded.before, seeded.paths)
     await page.callMethod('onOpenCardInfo')

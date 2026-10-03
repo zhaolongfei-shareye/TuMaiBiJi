@@ -47,7 +47,9 @@ function copyIn(noteId, tplId, noQr, srcPath) {
       destPath: filePath,
       success: () => {
         const map = read()
-        const keep = (map[noteId] || []).filter((x) => { if (x.tpl === tplId) { dropFile(x.p); return false } return true })
+        // 一篇同时只留一张（站长 10-03 23:40 做减法）：旧的不管出自哪套模板，连文件一起撤，
+        // 再放这张进去。所以"要改存量"只有一条路——先在大图里删掉这一张，再重新生成。
+        const keep = (map[noteId] || []).filter((x) => { dropFile(x.p); return false })
         keep.push({ p: filePath, tpl: tplId, at, noQr: !!noQr })
         map[noteId] = keep
         write(map)
@@ -72,9 +74,28 @@ function record(noteId, tplId, noQr, canvas, page) {
 
 function forNote(noteId) { return read()[noteId] || [] }
 
+// 站长 10-03 23:40：「一个笔记同一时间只能生成一张笔记卡片，要改存量的必须删除旧的才能新增」。
+// 台账本来就是一篇一套模板一条，所以这里把"一篇一条"落成硬规则：copyIn 一次只留最新那张，
+// 另外给一次性的归一（下面 migrateOnePerNote）——他手机上那几篇留过两张以上的，进页就归成
+// 最新那一张，其余连文件删掉。 ‹ 1/3 › 那一行随之撤净，不支持来回切换。
+function migrateOnePerNote() {
+  if (wx.getStorageSync(ONE_KEY) === 1) return false
+  const map = read()
+  Object.keys(map).forEach((id) => {
+    const list = map[id] || []
+    const keep = list.slice().sort((a, b) => (b.at || 0) - (a.at || 0))[0]
+    list.forEach((x) => { if (!keep || x.p !== keep.p) dropFile(x.p) })
+    map[id] = keep ? [keep] : []
+  })
+  write(map)
+  try { wx.setStorageSync(ONE_KEY, 1) } catch (e) { /* 标记立不上，下次进页再归一次而已 */ }
+  return true
+}
+
 // 1.9.12 那本账是按"画布落图"记的，里面每一格都分不清是他真留下的还是滑模板滑出来的，
 // 所以换时机的那一次整个清掉——只清这一次，清完立个标记，以后进页不再动它。
 const MODE_KEY = 'cardLogKeepOnly'
+const ONE_KEY = 'cardLogOnePerNote'
 function migrateKeepOnly() {
   if (wx.getStorageSync(MODE_KEY) === 1) return false
   const map = read()
@@ -84,6 +105,7 @@ function migrateKeepOnly() {
   return true
 }
 migrateKeepOnly()
+migrateOnePerNote()
 
 // 笔记删了，它那一格的文件与索引一起清掉：留着既没人看，也是这台设备上清不掉的孤儿
 function dropNote(noteId) {
@@ -94,4 +116,4 @@ function dropNote(noteId) {
   write(map)
 }
 
-module.exports = { record, forNote, dropNote, all: read, migrateKeepOnly, KEY, DIR, MODE_KEY }
+module.exports = { record, forNote, dropNote, all: read, migrateKeepOnly, migrateOnePerNote, KEY, DIR, MODE_KEY, ONE_KEY }

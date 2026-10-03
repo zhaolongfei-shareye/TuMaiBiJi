@@ -416,7 +416,7 @@ const COUNT_ALL = () => {
     ck('两列等宽：一格 340，两列那一区铺满 702（左右各内缩 24，和列表同一条线）',
       near(gc.w, 340, 3) && near((await rect('.grid2')).w, 702, 3),
       `格=${rpx(gc.w).toFixed(0)} 区=${rpx((await rect('.grid2')).w).toFixed(0)}`)
-    ck('只有一张时不画第二行那枚页码（他原话"如果同一个笔记生成多个卡片"）',
+    ck('格子里不再画第二行那枚页码（一篇一张，‹ i/n › 整块撤了）',
       (await $$('.g-pg')).length === 0, '')
     ck('那一格下面第一行是标题：与分类同字号、90% 黑、一行截断',
       (await css('.g-cap', 'font-size')) === chipFs && (await css('.g-cap', 'color')) === 'rgba(35, 37, 44, 0.9)',
@@ -425,8 +425,15 @@ const COUNT_ALL = () => {
       !!(await $('.cats')) && !!(await $('.chip')), '')
     await shot('v19-4-卡片一格.png')
 
-    // 再走一次：开弹窗、滑到另一套模板、开关一次码——这三下都只是"看图"，一张都不该记；
-    // 然后真点一次「分享」，才要求台账变两张。
+    // 站长 10-03 23:40 做减法：一篇同一时间只有一张，要改存量必须先删掉这一张。
+    // 所以这一节钉的东西整个换了一批：原来那三问（第二张记不记上、‹ 1/2 › 换得回来吗、
+    // 两张各自是哪套模板）全都不存在了，换成——
+    // ① 已生成态底排只有「取消｜删除」，通栏那枚和「编辑个人名片」都不在这一态；
+    // ② 这一态左右滑不动模板（不会"顺手把那张换掉"）；
+    // ③ 点删除：本机那一格与位图一起清掉，那一枚回到空态；
+    // ④ 未生成态滑模板／开关码依旧一张都不记，真按通栏才记，且记完台账只有一张。
+    // copyIn 里"旧的那张连文件一起撤"那一支，UI 走到已生成态就进不来了（只剩删除），
+    // 它是防存量与本机被手改的兜底，钉在验-列表D2 那条静态判据里，这里不硬造现场。
     const waitIdle = async () => {
       for (let i = 0; i < 20; i++) {
         const d = await page.data()
@@ -435,128 +442,116 @@ const COUNT_ALL = () => {
       }
       return false
     }
+    const filesLeft = () => mp.evaluate(() => {
+      try { return wx.getFileSystemManager().readdirSync(`${wx.env.USER_DATA_PATH}/cards`).length } catch (e) { return -1 }
+    })
+    const dockBtns = async () => {
+      const els = await $$('.tpl-btn')
+      return (await Promise.all(els.map(async (e) => String(await e.text() || '').trim()))).join('|')
+    }
+
+    /* ---------- ⑧b 一篇一张：已生成态只能删、不能改 ---------- */
+    await (await $('.pad')).tap()
+    await sleep(2200)
+    const opened = await page.data()
+    ck('点卡片那一格进详情窗：窗里带的就是台账里唯一那一条，"第几张"那个指针整个撤了',
+      opened.detailOpen === true && (opened.detailCards || []).length === 1
+      && opened.detailCardIdx === undefined,
+      `${(opened.detailCards || []).length} 条 / detailCardIdx=${opened.detailCardIdx}`)
+    ck('‹ i/n › 那一行两枚彻底没有（列表那一格与详情窗那一大格都没有页码行了）',
+      (await $$('.g-pg')).length === 0 && (await $$('.ds-pg')).length === 0, '')
+    await (await $('.ds-entry')).tap()
+    await sleep(1500)
+    const rGen = await waitRendered('已生成态开大图')
+    ck('台账里已有这一张 → 弹窗一开就落在已生成态（这一态是从台账读出来的，不是点出来的）',
+      rGen.endsWith('已出图') && (await data('posterHasCard')) === true, rGen)
+    const dockGen = await dockBtns()
+    ck('已生成态底排只剩「取消｜删除」+ 一句说明；通栏那枚与「编辑个人名片」都不在',
+      dockGen === '取消|删除' && !(await $('.tpl-main')) && !(await $('.tpl-dots'))
+      && (await txt('.tpl-main-hint')) === '删除后可继续生成笔记卡片，已分享的依旧有效', dockGen)
+    const tplGen = await data('posterTpl')
+    await page.callMethod('onPosterTouchStart', { touches: [{ clientX: 300 }] })
+    await page.callMethod('onPosterTouchEnd', { changedTouches: [{ clientX: 40 }] })
+    await sleep(900)
+    ck('已生成态左右滑不动模板（要换只能先删这一张，滑一下不该把它换掉）',
+      (await data('posterTpl')) === tplGen && (await countAll()) === 1,
+      `模板=${await data('posterTpl')}（原 ${tplGen}）、台账 ${await countAll()} 张`)
+
+    const delBtn = (await $$('.tpl-btn'))[1]
+    await delBtn.tap()
+    await sleep(1500)
+    const afterDel = await page.data()
+    ck('点「删除」：台账那一格与本机位图一起清掉，弹窗自己收（服务端那张活码一行都不碰）',
+      afterDel.templateOpen === false && (await countAll()) === 0 && (await filesLeft()) === 0,
+      `张数=${await countAll()}、目录里剩 ${await filesLeft()} 个文件`)
+    await (await tabAt(1)).tap()
+    await sleep(1200)
+    ck('删完之后卡片那一枚回到"这篇还没生成过卡片"（格没了、空态那句话在）',
+      (await $$('.gc')).length === 0 && !!(await $('.empty')), `${(await $$('.gc')).length} 格`)
+    await shot('v19-5-删掉后空态.png')
+
+    /* 删干净了才谈"重新生成"。这一回特意换一套模板并把码关掉：下面第 ⑩ 问咬的就是
+       他报的那句"小图跟大图完全不匹对"——挑一张跟默认不一样的，旧写法才会当场露馅。 */
+    const defTpl = await mp.evaluate(() => (wx.getStorageSync('poster_profile') || {}).template || '')
     await (await tabAt(0)).tap()
     await sleep(700)
     await (await $$('.xrow'))[0].tap()
     await sleep(2200)
     await (await $('.ds-entry')).tap()
     await sleep(1500)
-    const r1b = await waitRendered('第二套开弹窗')
-    ck('第二套：开弹窗先等上一张渲完（两套 _renderPoster 同时在同一枚 canvas 上跑会互相盖）',
-      r1b.endsWith('已出图'), r1b)
+    const rNew = await waitRendered('删除后重开大图')
+    ck('删完重开弹窗，底排回到未生成态（取消｜编辑个人名片 + 通栏「生成分享图」+ 药丸小字 + 圆点）',
+      rNew.endsWith('已出图') && (await data('posterHasCard')) === false
+      && !!(await $('.tpl-main')) && !!(await $('.pill-lab')) && !!(await $('.tpl-dots'))
+      && !(await $('.tpl-btn.danger')), `${await dockBtns()} / 小字=${await txt('.pill-lab')}`)
+    ck('未生成态那行小字默认说「开启二维码」（开关默认开着）',
+      (await data('noQr')) === false && (await txt('.pill-lab')) === '开启二维码', await txt('.pill-lab'))
+    const tplA = await data('posterTpl')
     await page.callMethod('onPosterTouchStart', { touches: [{ clientX: 300 }] })
     await page.callMethod('onPosterTouchEnd', { changedTouches: [{ clientX: 40 }] })
-    const r2 = await waitRendered('滑到第二套')
-    ck('滑到另一套模板（只是看图）不记账：台账仍是 1 张',
-      r2.endsWith('已出图') && (await countAll()) === 1, `台账 ${await countAll()} 张（${r2}）`)
+    const rSlide = await waitRendered('未生成态滑到另一套')
+    ck('未生成态左右滑照旧换模板，但一张都不记',
+      rSlide.endsWith('已出图') && (await data('posterTpl')) !== tplA && (await countAll()) === 0,
+      `${tplA} → ${await data('posterTpl')}、台账 ${await countAll()} 张（${rSlide}）`)
     await page.callMethod('onToggleQr')
-    await sleep(1500)
+    await sleep(1200)
     await waitIdle()
-    ck('开关一次码（也只是看图）同样不记账：台账仍是 1 张', (await countAll()) === 1,
-      `台账 ${await countAll()} 张`)
+    ck('药丸那一下只切开关、不越级触发分享；小字跟着变成「关闭二维码」',
+      (await countAll()) === 0 && (await data('noQr')) === true && (await txt('.pill-lab')) === '关闭二维码',
+      `台账 ${await countAll()} 张、小字=${await txt('.pill-lab')}`)
+    const wantTpl = await data('posterTpl')
     await stubShare()
     await (await $('.tpl-main')).tap()
-    const kept2 = await waitKept(2)
-    ck('第二套真"分享"之后，台账才两张', kept2,
-      kept2 ? '已记 2 格' : `面板成功后仍是 ${await countAll()} 张`)
-    if (!kept2) await dumpWhyEmpty()
-    const made2 = kept2
+    const keptNew = await waitKept(1)
+    ck('按通栏那枚「生成分享图」、面板回 success 之后才记账，且这篇只有一张',
+      keptNew && (await countAll()) === 1, keptNew ? `台账 ${await countAll()} 张` : '一张都没记上')
+    if (!keptNew) await dumpWhyEmpty()
+    const pickedOdd = !!wantTpl && wantTpl !== defTpl
+    ck('这一张挑的是「不是默认模板、而且关过码」的那一套（不挑开，第 ⑩ 问就咬不住旧写法）',
+      pickedOdd && (await data('noQr')) === true, `默认=${defTpl}、这一张=${wantTpl}`)
     await closeFloats()
     await (await tabAt(1)).tap()
     await sleep(1200)
-    const c0 = (await data('cells'))[0] || {}
-    ck('同一篇留到第二套模板之后台账里是两张', made2 && (c0.cards || []).length === 2,
-      `${(c0.cards || []).length} 张`)
-    // 这一条钉的就是他报的"小图完全不匹对"：格子画的是 cards[cur]，cur 从 0 起，
-    // 所以台账必须倒着排，第一格才是他最后留下的那一张。
-    const srcNow = String((await $('.pad-img')) ? await (await $('.pad-img')).attribute('src') : '')
-    ck('格子里那张小图＝最近留下的那一张（台账按 at 倒序，不是拿最早那张当封面）',
-      (c0.cards || []).length === 2 && (c0.cards[0].at || 0) >= (c0.cards[1].at || 0)
-      && srcNow.indexOf(String((c0.cards[0].p || '').split('/').pop())) >= 0,
-      `cards[0].at=${(c0.cards[0] || {}).at}、cards[1].at=${(c0.cards[1] || {}).at}、屏上画的是 ${(srcNow.split('/').pop() || '空')}`)
-    ck('第二行出现 ‹ 1/2 ›，数字吃全局那支 WtsjMind',
-      !!(await $('.g-pg')) && /^\d\/\d$/.test(String(await txt('.g-n')))
-      && /WtsjMind/.test(String(await css('.g-n', 'font-family'))), await txt('.g-n'))
-    // 左右两枚箭头在标记上没有 .l/.r（那两枚是里面的 .chev），按下标取：
-    // 第 0 枚 data-step=-1、第 1 枚 +1，顺序与 wxml 里那两行一致。
-    const stepAt = async (i) => (await $$('.g-step'))[i]
-    const before = await (await $('.pad-img')).attribute('src')
-    await (await stepAt(1)).tap()
-    await sleep(900)
-    const after = await (await $('.pad-img')).attribute('src')
-    ck('点右箭头换到另一张（读的是 image 的 src，不是自己算的下标）',
-      !!before && !!after && before !== after, `${String(before).slice(-12)} → ${String(after).slice(-12)}`)
-    await (await stepAt(0)).tap()
-    await sleep(900)
-    ck('点左箭头换得回来', (await (await $('.pad-img')).attribute('src')) === before, await txt('.g-n'))
-    await (await stepAt(0)).tap()
-    await sleep(700)
-    ck('已经在第一张时再点左箭头停在 1/2（走到头点不动、不循环）',
-      (await txt('.g-n')) === '1/2', await txt('.g-n'))
-    await shot('v19-5-卡片两枚带页码.png')
-
-    /* ---------- ⑧b 小图 ↔ 大图必须一一对上（站长 10-03 真机报的严重 BUG） ----------
-       原话：「点小图，和大图没有关联。无论点什么小图，都是同一个大图。」
-       根因两条，都在"点开大图"那一步：`onSheetToPoster` 读的是「我的→卡片模板」存的那套
-       默认模板，跟台账里他刚点的这一张毫无关系，所以 ‹ i/n › 滑得再欢，开出来还是那一套；
-       而从卡片那一枚的格子点进去，`_openDetail` 一律把指针归 0，看到的也不是刚点那一张。
-       现在模板和二维码开关两样都跟着台账那一条走（台账要多存一个 noQr，
-       否则同一套模板"带码／不带码"两种样子，小图跟大图还是对不上）。 */
-    const cardsNow = ((await data('cells'))[0] || {}).cards || []
-    ck('台账里那两条各自记着自己是哪套模板，而且两套不同（"关联"就靠这个字段）',
-      cardsNow.length === 2 && !!cardsNow[0].tpl && !!cardsNow[1].tpl && cardsNow[0].tpl !== cardsNow[1].tpl,
-      cardsNow.map((c) => c.tpl).join(' / '))
-    ck('台账还记着那一张带没带码（同一套模板两种样子，不记这一样照样对不上）',
-      cardsNow.some((c) => c.noQr === true) && cardsNow.some((c) => c.noQr === false),
-      cardsNow.map((c) => (c.noQr ? '无码' : '带码')).join(' / '))
-
-    /* 挑那一张"既不是默认模板、又关过码"的下手。反过来挑等于白测：旧写法写死的就是
-       默认模板 + noQr:false，两个值一旦撞上，断言改了实现也照样绿——19:5x 第一版就是这样，
-       跑完全绿而我回头一看它测的那一张恰好就是默认那一套。 */
-    const defTpl = await mp.evaluate(() => (wx.getStorageSync('poster_profile') || {}).template || '')
-    const odd = cardsNow.findIndex((c) => c.tpl && c.tpl !== defTpl && c.noQr === true)
-    ck('台账里确实有一张「不是默认模板、而且关过码」的（没这一张，下面两条咬不住旧写法）',
-      odd >= 0, `默认=${defTpl}、台账=${cardsNow.map((c) => `${c.tpl}${c.noQr ? '无码' : '带码'}`).join(' / ')}`)
-
-    const goTo = async (want) => {
-      for (let g = 0; g < 3; g++) {
-        const cur = Number(String(await txt('.g-n')).split('/')[0])
-        if (cur === want + 1) return true
-        await (await stepAt(cur === 1 ? 1 : 0)).tap()
-        await sleep(800)
-      }
-      return false
-    }
-    // 一轮＝从卡片那一枚点第 at 张进去 → 看详情窗指针指没指对 → 点开大图 → 看模板与开关跟没跟过去
-    const pairCheck = async (at) => {
-      const out = { idxOk: false, tplOk: false, qrOk: false, got: '' }
-      if (!(await goTo(at))) { out.got = `页码滑不到第 ${at + 1} 张`; return out }
-      await (await $('.pad')).tap()
-      await sleep(2200)
-      const dd = await page.data()
-      out.idxOk = dd.detailOpen === true && dd.detailCardIdx === at
-      const want = cardsNow[at] || {}
-      out.got = `idx=${dd.detailCardIdx}（该 ${at}）`
-      if (!out.idxOk) { await closeFloats(); await sleep(700); return out }
-      await (await $('.ds-entry')).tap()
-      await sleep(1500)
-      const r = await waitRendered(`按第 ${at + 1} 张开大图`)
-      const d2 = await page.data()
-      out.tplOk = r.endsWith('已出图') && d2.posterTpl === want.tpl
-      out.qrOk = d2.noQr === !!want.noQr
-      out.got += `、大图模板=${d2.posterTpl}（该 ${want.tpl}）、noQr=${d2.noQr}（该 ${!!want.noQr}）、${r}`
-      await closeFloats()
-      await sleep(900)
-      await (await tabAt(1)).tap()
-      await sleep(1200)
-      return out
-    }
-    const pOdd = await pairCheck(odd)
-    ck('点那一张（非默认模板 + 关过码）进去：详情窗指针＝它，大图模板与二维码开关都照它摆',
-      pOdd.idxOk && pOdd.tplOk && pOdd.qrOk, pOdd.got)
-    const pOther = await pairCheck(1 - odd)
-    ck('换点另一张，指针与大图跟着换过去（旧写法两下开出来是同一套，这条就是那一句原话）',
-      pOther.idxOk && pOther.tplOk && pOther.qrOk, pOther.got)
+    const cNew = (await data('cells'))[0] || {}
+    const srcNew = String((await $('.pad-img')) ? await (await $('.pad-img')).attribute('src') : '')
+    ck('屏上那枚小图画的就是台账里唯一那一条（不是最早那张、也不是被删掉的那张）',
+      (cNew.cards || []).length === 1 && srcNew.indexOf(String((cNew.cards[0] || {}).p || '').split('/').pop()) >= 0,
+      `${(cNew.cards || []).length} 张、屏上=${(srcNew.split('/').pop() || '空')}`)
+    /* 第 ⑩ 问：点小图 → 大图必须跟着这一张走。站长 10-03 真机原话「无论点什么小图，
+       都是同一个大图」的根因是 onSheetToPoster 读的是「我的→卡片模板」那套默认，
+       跟台账无关；一篇一张之后这个根因还在，所以这条判据得留着，只是不再谈"第几张"。 */
+    await (await $('.pad')).tap()
+    await sleep(2200)
+    await (await $('.ds-entry')).tap()
+    await sleep(1500)
+    const rPair = await waitRendered('从小图点开大图')
+    const dPair = await page.data()
+    ck('点小图开出来的大图：模板与二维码开关都照台账那一张摆（旧写法在这里会开出默认那套）',
+      rPair.endsWith('已出图') && dPair.posterTpl === wantTpl && dPair.noQr === true
+      && dPair.posterHasCard === true,
+      `大图模板=${dPair.posterTpl}（该 ${wantTpl}）、noQr=${dPair.noQr}（该 true）、${rPair}`)
+    await shot('v19-6-一篇一张已生成态.png')
+    await closeFloats()
   }
 
   // ---------- ⑨ 收尾：把这一把自己造的那格连文件一起删干净 ----------
