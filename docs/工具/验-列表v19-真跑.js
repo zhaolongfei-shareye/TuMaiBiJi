@@ -293,7 +293,10 @@ const COUNT_ALL = () => {
   }
   const stubShare = () => mp.evaluate(() => {
     if (!wx.__shareReal) wx.__shareReal = wx.showShareImageMenu
-    wx.showShareImageMenu = (o) => { o.success && o.success({}) }
+    // 真接口在 success 之后一定还有一趟 complete，而"拉起面板时整屏盖黑"那一层就是在
+    // complete 里撤的。替身少调这一环，后面几张截图会被那层黑全盖掉（10-03 这一把先废了两张图
+    // 才发现）——替身要像被替的那个东西，不然判据绿、证据黑。
+    wx.showShareImageMenu = (o) => { o.success && o.success({}); o.complete && o.complete({}) }
     return 'ok'
   })
   // 台账空着有两处可能：画布那张 jpg 没取出来，或者用户文件目录根本写不进去。
@@ -340,6 +343,8 @@ const COUNT_ALL = () => {
     kept1, kept1 ? '已记 1 格' : `面板成功后台账仍是 ${await countAll()} 张（${r1}）`)
   const made1 = kept1
   if (!kept1) await dumpWhyEmpty()
+  ck('面板走完那两条口，整屏那层黑撤掉了（还挂着就是 complete 那一环没人跑）',
+    !(await page.data()).shareDim, `shareDim=${(await page.data()).shareDim}`)
   await closeFloats()
   await (await tabAt(1)).tap()
   await sleep(1200)
