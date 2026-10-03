@@ -145,10 +145,10 @@
          同一篇留过两张以上才有第二行 ‹ i/n ›，左右各一次点击换一张、走到头不循环。 -->
     <view wx:elif="{{cells.length}}" class="grid2">
       <view class="gc" wx:for="{{cells}}" wx:key="id">
-        <view class="pad" catchtap="onRowTap" data-idx="{{item.i}}">
+        <view class="pad" catchtap="onRowTap" data-idx="{{item.i}}" data-card="{{item.cur}}">
           <image class="pad-img" src="{{item.cards[item.cur].p}}" mode="aspectFit" />
         </view>
-        <text class="g-cap" catchtap="onRowTap" data-idx="{{item.i}}">{{item.title}}</text>
+        <text class="g-cap" catchtap="onRowTap" data-idx="{{item.i}}" data-card="{{item.cur}}">{{item.title}}</text>
         <view class="g-pg" wx:if="{{item.cards.length > 1}}">
           <view class="g-step" catchtap="onCardStep" data-k="{{index}}" data-step="{{-1}}"><view class="chev l"></view></view>
           <text class="g-n">{{item.cur + 1}}/{{item.cards.length}}</text>

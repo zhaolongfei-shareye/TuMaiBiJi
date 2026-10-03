@@ -484,7 +484,7 @@ Page({
     const idx = e.currentTarget.dataset.idx
     const note = this.data.notes[idx]
     if (!note) return
-    if (!note.is_private || this.data._privateVerified) { this._openDetail(idx); return }
+    if (!note.is_private || this.data._privateVerified) { this._openDetail(idx, e.currentTarget.dataset.card); return }
     const ok = await this._promptPrivatePassword()
     if (!ok) return
     this.setData({ _privateVerified: true })
@@ -499,12 +499,16 @@ Page({
   // 直接拿来当开窗的第一帧；窗里多出来的三块（核心要点、来源链接、原文）只有详情接口有，
   // 所以再取一次全文。取失败不拦窗——列表上有的那几块照样能看，只是窗里没有要点和原文。
   // 私密笔记照取：进展开态那一步已经验过密码，窗里的要点和原文本来就该看得见。
-  async _openDetail(idx) {
+  // cardIdx 只有从「笔记卡片」那一枚的格子上进来才有：他点的是哪一格的小图，右上那一枚
+  // 就得先指着那一张（原来一律归 0，点第三张进去看到的是第一张，接着点开大图就更对不上）。
+  async _openDetail(idx, cardIdx) {
     const row = this.data.notes[idx]
     if (!row) return
+    const list = this._cardsOf(row.id)
+    const at = Math.max(0, Math.min(list.length - 1, Number(cardIdx) || 0))
     this.setData({
       detailOpen: true, detailNote: row, origOpen: false, shared: false,
-      detailCards: this._cardsOf(row.id), detailCardIdx: 0, dsTo: '',
+      detailCards: list, detailCardIdx: list.length ? at : 0, dsTo: '',
     })
     try {
       const full = await api.getNote(row.id)
@@ -674,15 +678,21 @@ Page({
     const note = this.data.detailNote
     if (!note || note.is_private) return
     const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
+    // 右上那一格现在指着台账里哪一张，这一趟就照那一张开：模板和二维码开关两样都跟它对齐。
+    // 站长 10-03 真机报的"无论点哪张小图，大图都是同一张"——原来这里读的是「我的→卡片模板」
+    // 存的那套默认模板，跟台账里这一张没有任何关系，所以 ‹ i/n › 滑得再欢，开出来还是那一套。
+    // 台账里那套模板要是已经不在 TEMPLATES 里（改名／撤掉），退回默认那一套。
+    const cur = (this.data.detailCards || [])[this.data.detailCardIdx]
+    const known = !!(cur && cur.tpl && poster.TEMPLATES.some((x) => x.id === cur.tpl))
     this.setData({
       detailOpen: false,
       templateOpen: true,
       posterNote: note,
-      posterTpl: profile.template || poster.DEFAULT_TEMPLATE,
+      posterTpl: known ? cur.tpl : (profile.template || poster.DEFAULT_TEMPLATE),
       tplIds: poster.TEMPLATES.map((x, i) => ({ id: x.id, color: toneColor(i) })),
       posterImagePath: '',
       posterBusy: true,
-      noQr: false,
+      noQr: known ? !!cur.noQr : false,
     })
     try {
       await this._ensurePosterAssets(note.id)
@@ -795,7 +805,7 @@ Page({
   async _keepPoster() {
     const a = this._posterAssets
     if (!a || !this._posterCanvas) return
-    await cardLog.record(a.noteId, this.data.posterTpl, this._posterCanvas, this)
+    await cardLog.record(a.noteId, this.data.posterTpl, this.data.noQr, this._posterCanvas, this)
     this.setData(this.arrange(this.data.notes))
   },
 

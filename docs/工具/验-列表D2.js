@@ -205,10 +205,14 @@ ok('「搜索笔记」与分类同字号同字重（原来 31/800 比正文还�
 ok('输入里的字没动（仍 --fs-body，这轮只压条子和那两个字）',
   /font-size: var\(--fs-body\)/.test(appWxssRule('srch-input') || rule(idxWxss, 'srch-input')))
 // ②末尾：全文窗还是现网那一层，只把墨色对齐列表那两档
-ok('详情窗动作条三枚（置顶撤了），长文案那枚仍按 1 / 1 / 1.4 宽一档（09-30 拍的四枚并排留下的数）',
-  (idxWxml.match(/class="ds-ibtn/g) || []).length === 3
+/* 枚数从 3 改 2 是 v22（站长 10-03 第四轮）定的：底排那枚「生成笔记卡片」整块挪进
+   右上那一格，底排只剩 编辑／删除，各 flex:1。原来这条钉的是"09-30 那批四枚并排留下的
+   三枚 + 1/1/1.4 那一档"，`.ds-ibtn.primary` 这个类早就跟着那枚按钮一起没了——
+   这条从 57227ff 起一直红着没人复跑，是判据过期，不是实现回退。 */
+ok('详情窗底排两枚（编辑／删除，出卡片的口已挪进右上那一格），等宽一档',
+  (idxWxml.match(/class="ds-ibtn/g) || []).length === 2
   && /display: flex/.test(rule(idxWxss, 'ds-irow')) && /flex: 1/.test(rule(idxWxss, 'ds-ibtn'))
-  && /flex: 1\.4/.test(rule(idxWxss, 'ds-ibtn\.primary')))
+  && !/ds-ibtn\.primary/.test(idxWxss) && !/class="ds-ibtn primary/.test(idxWxml))
 ok('窗里标题与要点前景 = 列表那档 90% 黑，正文段落 = 摘要那档 70% 黑',
   /color: rgba\(35, 37, 44, 0\.9\)/.test(rule(idxWxss, 'ds-h2'))
   && /color: rgba\(35, 37, 44, 0\.7\)/.test(rule(idxWxss, 'ds-para'))
@@ -223,17 +227,34 @@ const keepPoster = (CODE_JS.split('async _keepPoster()')[1] || '').split('\n  },
 const keepCard = (strip(shareJs).split('async _keepCard()')[1] || '').split('\n  },')[0]
 const renderPoster = (CODE_JS.split('async _renderPoster()')[1] || '').split('async _keepPoster()')[0]
 ok('首页记在两条"留下"的口上：图片面板 success 与存相册 success 都走 _keepPoster',
-  /cardLog\.record\(a\.noteId, this\.data\.posterTpl, this\._posterCanvas, this\)/.test(keepPoster)
+  /cardLog\.record\(a\.noteId, this\.data\.posterTpl, this\.data\.noQr, this\._posterCanvas, this\)/.test(keepPoster)
   && /success: async \(\) => \{ await this\._keepPoster\(\); this\._closeTemplate\(\) \}/.test(CODE_JS)
   && /success: async \(\) => \{\s*await this\._keepPoster\(\)/.test(CODE_JS))
-ok('海报页同一条：存相册成功才走 _keepCard，模板与画布是画那一趟存下来的',
-  /cardLog\.record\(this\._note\.id, this\._renderedTpl, this\._canvasNode, this\)/.test(keepCard)
+ok('海报页同一条：存相册成功才走 _keepCard，模板与带没带码都是画那一趟存下来的',
+  /cardLog\.record\(this\._note\.id, this\._renderedTpl, this\._renderedNoQr, this\._canvasNode, this\)/.test(keepCard)
   && /success: async \(\) => \{\s*await this\._keepCard\(\)/.test(strip(shareJs))
-  && /this\._renderedTpl = this\.data\.picked \|\| profile\.template/.test(strip(shareJs)))
+  && /this\._renderedTpl = this\.data\.picked \|\| profile\.template/.test(strip(shareJs))
+  && /this\._renderedNoQr = !!this\.data\.noQr/.test(strip(shareJs)))
 ok('画布落图那一步不再记账（_renderPoster 里不许出现 record，滑一次模板多一张就是它）',
   !/cardLog\.record/.test(renderPoster) && /this\._posterCanvas = canvas/.test(renderPoster))
 ok('格子里第一张＝最近留下的那张（台账按 at 倒序；顺着放就会拿最早那张当封面）',
   /sort\(\(x, y\) => \(y\.at \|\| 0\) - \(x\.at \|\| 0\)\)/.test(CODE_JS))
+/* 小图 ↔ 大图必须一一对上（站长 10-03 真机报的严重 BUG：「点小图，和大图没有关联。
+   无论点什么小图，都是同一个大图」）。两处根因：onSheetToPoster 读的是「我的→卡片模板」
+   那套默认模板，跟台账里他刚点的这一张无关；而从卡片那一枚的格子点进去，指针一律归 0。 */
+const sheetFn = (CODE_JS.split('async onSheetToPoster()')[1] || '').split('\n  },')[0]
+ok('点开大图取的是「台账里当前那一张」的模板，不是卡片模板页那套默认（那套已不在 TEMPLATES 里才退回默认）',
+  /const cur = \(this\.data\.detailCards \|\| \[\]\)\[this\.data\.detailCardIdx\]/.test(sheetFn)
+  && /posterTpl: known \? cur\.tpl : \(profile\.template \|\| poster\.DEFAULT_TEMPLATE\)/.test(sheetFn)
+  && /poster\.TEMPLATES\.some\(\(x\) => x\.id === cur\.tpl\)/.test(sheetFn))
+ok('大图连二维码开关也照那一张摆（noQr 得先存进台账，两头才有一个共同来源）',
+  /noQr: known \? !!cur\.noQr : false/.test(sheetFn)
+  && /keep\.push\(\{ p: filePath, tpl: tplId, at, noQr: !!noQr \}\)/.test(cardLogJs))
+ok('从卡片那一枚点进去带上"是第几张"：wxml 两枚都递 data-card，_openDetail 收住并夹在范围内',
+  /data-card="\{\{item\.cur\}\}"/.test(CODE_WXML)
+  && /_openDetail\(idx, e\.currentTarget\.dataset\.card\)/.test(CODE_JS)
+  && /async _openDetail\(idx, cardIdx\)/.test(CODE_JS)
+  && /detailCardIdx: list\.length \? at : 0/.test(CODE_JS))
 ok('1.9.12 那本按渲染时机记的旧账整个清一次、清完立标记（require 时就跑，只跑这一次）',
   /const MODE_KEY = 'cardLogKeepOnly'/.test(cardLogJs) && /^migrateKeepOnly\(\)$/m.test(cardLogJs))
 ok('台账是本机的事：键名 cardLog、图落在用户文件目录、api.js 里一行都不提它',
@@ -269,7 +290,7 @@ ok('这一屏不再读纸片那一族（paperSkinFor 在列表页没有后代了
 ok('排布档不再是本机偏好（listMode 那个键整个撤了，两枚 tab 不落本机）',
   !/listMode|LIST_MODE_KEY/.test(idxJs) && !/setStorageSync\('view'\)/.test(idxJs))
 ok('列表里没有"就地展开"这一态（点一行 / 点一格 = 开详情窗）',
-  !/openIdx/.test(idxJs + idxWxml) && /this\._openDetail\(idx\)/.test(idxJs))
+  !/openIdx/.test(idxJs + idxWxml) && /this\._openDetail\(idx[,)]/.test(idxJs))
 ok('D2 那一排（点 + 分类名 + meta 行）从列表退了，分类两档仍从 palette 递进详情窗',
   !/class="cat[ "]/.test(idxWxml) && !/catLabel|tagLine|catRing/.test(idxJs + idxWxml)
   && /color: var\(--cat-ink\)/.test(rule(idxWxss, 'ds-tag')))

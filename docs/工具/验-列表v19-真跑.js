@@ -494,6 +494,69 @@ const COUNT_ALL = () => {
     ck('已经在第一张时再点左箭头停在 1/2（走到头点不动、不循环）',
       (await txt('.g-n')) === '1/2', await txt('.g-n'))
     await shot('v19-5-卡片两枚带页码.png')
+
+    /* ---------- ⑧b 小图 ↔ 大图必须一一对上（站长 10-03 真机报的严重 BUG） ----------
+       原话：「点小图，和大图没有关联。无论点什么小图，都是同一个大图。」
+       根因两条，都在"点开大图"那一步：`onSheetToPoster` 读的是「我的→卡片模板」存的那套
+       默认模板，跟台账里他刚点的这一张毫无关系，所以 ‹ i/n › 滑得再欢，开出来还是那一套；
+       而从卡片那一枚的格子点进去，`_openDetail` 一律把指针归 0，看到的也不是刚点那一张。
+       现在模板和二维码开关两样都跟着台账那一条走（台账要多存一个 noQr，
+       否则同一套模板"带码／不带码"两种样子，小图跟大图还是对不上）。 */
+    const cardsNow = ((await data('cells'))[0] || {}).cards || []
+    ck('台账里那两条各自记着自己是哪套模板，而且两套不同（"关联"就靠这个字段）',
+      cardsNow.length === 2 && !!cardsNow[0].tpl && !!cardsNow[1].tpl && cardsNow[0].tpl !== cardsNow[1].tpl,
+      cardsNow.map((c) => c.tpl).join(' / '))
+    ck('台账还记着那一张带没带码（同一套模板两种样子，不记这一样照样对不上）',
+      cardsNow.some((c) => c.noQr === true) && cardsNow.some((c) => c.noQr === false),
+      cardsNow.map((c) => (c.noQr ? '无码' : '带码')).join(' / '))
+
+    /* 挑那一张"既不是默认模板、又关过码"的下手。反过来挑等于白测：旧写法写死的就是
+       默认模板 + noQr:false，两个值一旦撞上，断言改了实现也照样绿——19:5x 第一版就是这样，
+       跑完全绿而我回头一看它测的那一张恰好就是默认那一套。 */
+    const defTpl = await mp.evaluate(() => (wx.getStorageSync('poster_profile') || {}).template || '')
+    const odd = cardsNow.findIndex((c) => c.tpl && c.tpl !== defTpl && c.noQr === true)
+    ck('台账里确实有一张「不是默认模板、而且关过码」的（没这一张，下面两条咬不住旧写法）',
+      odd >= 0, `默认=${defTpl}、台账=${cardsNow.map((c) => `${c.tpl}${c.noQr ? '无码' : '带码'}`).join(' / ')}`)
+
+    const goTo = async (want) => {
+      for (let g = 0; g < 3; g++) {
+        const cur = Number(String(await txt('.g-n')).split('/')[0])
+        if (cur === want + 1) return true
+        await (await stepAt(cur === 1 ? 1 : 0)).tap()
+        await sleep(800)
+      }
+      return false
+    }
+    // 一轮＝从卡片那一枚点第 at 张进去 → 看详情窗指针指没指对 → 点开大图 → 看模板与开关跟没跟过去
+    const pairCheck = async (at) => {
+      const out = { idxOk: false, tplOk: false, qrOk: false, got: '' }
+      if (!(await goTo(at))) { out.got = `页码滑不到第 ${at + 1} 张`; return out }
+      await (await $('.pad')).tap()
+      await sleep(2200)
+      const dd = await page.data()
+      out.idxOk = dd.detailOpen === true && dd.detailCardIdx === at
+      const want = cardsNow[at] || {}
+      out.got = `idx=${dd.detailCardIdx}（该 ${at}）`
+      if (!out.idxOk) { await closeFloats(); await sleep(700); return out }
+      await (await $('.ds-entry')).tap()
+      await sleep(1500)
+      const r = await waitRendered(`按第 ${at + 1} 张开大图`)
+      const d2 = await page.data()
+      out.tplOk = r.endsWith('已出图') && d2.posterTpl === want.tpl
+      out.qrOk = d2.noQr === !!want.noQr
+      out.got += `、大图模板=${d2.posterTpl}（该 ${want.tpl}）、noQr=${d2.noQr}（该 ${!!want.noQr}）、${r}`
+      await closeFloats()
+      await sleep(900)
+      await (await tabAt(1)).tap()
+      await sleep(1200)
+      return out
+    }
+    const pOdd = await pairCheck(odd)
+    ck('点那一张（非默认模板 + 关过码）进去：详情窗指针＝它，大图模板与二维码开关都照它摆',
+      pOdd.idxOk && pOdd.tplOk && pOdd.qrOk, pOdd.got)
+    const pOther = await pairCheck(1 - odd)
+    ck('换点另一张，指针与大图跟着换过去（旧写法两下开出来是同一套，这条就是那一句原话）',
+      pOther.idxOk && pOther.tplOk && pOther.qrOk, pOther.got)
   }
 
   // ---------- ⑨ 收尾：把这一把自己造的那格连文件一起删干净 ----------

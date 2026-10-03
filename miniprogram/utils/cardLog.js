@@ -33,7 +33,9 @@ const ensureDir = () => { try { fm().mkdirSync(DIR, true) } catch (e) { /* 已�
 
 // 一台设备上的文件名必须带时间戳：本地图片是按路径缓存位图的，同名换内容时界面仍是第一张
 // （10-01 那轮踩过）。同一篇同一套模板只留最新那一张，旧的那张连文件一起删。
-function copyIn(noteId, tplId, srcPath) {
+// 那一格除了路径与模板还带 noQr：详情窗右上那一枚点开的是"这一张"，成品弹窗得照它把
+// 二维码开关摆回当初的位置，否则同一套模板带码/不带码两种样子，小图跟大图又对不上。
+function copyIn(noteId, tplId, noQr, srcPath) {
   return new Promise((resolve) => {
     ensureDir()
     const at = Date.now()
@@ -46,7 +48,7 @@ function copyIn(noteId, tplId, srcPath) {
       success: () => {
         const map = read()
         const keep = (map[noteId] || []).filter((x) => { if (x.tpl === tplId) { dropFile(x.p); return false } return true })
-        keep.push({ p: filePath, tpl: tplId, at })
+        keep.push({ p: filePath, tpl: tplId, at, noQr: !!noQr })
         map[noteId] = keep
         write(map)
         resolve(keep)
@@ -57,12 +59,12 @@ function copyIn(noteId, tplId, srcPath) {
   })
 }
 
-function record(noteId, tplId, canvas, page) {
+function record(noteId, tplId, noQr, canvas, page) {
   if (!noteId || !tplId || !canvas) return Promise.resolve(null)
   return new Promise((resolve) => {
     wx.canvasToTempFilePath({
       canvas, fileType: 'jpg', quality: 0.82,
-      success: (r) => copyIn(noteId, tplId, r.tempFilePath).then(resolve),
+      success: (r) => copyIn(noteId, tplId, noQr, r.tempFilePath).then(resolve),
       fail: (e) => { console.error('卡片留档取图失败', e); resolve(null) },
     }, page)
   })

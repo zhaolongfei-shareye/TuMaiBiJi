@@ -147,9 +147,11 @@ Page({
         fileType: 'png',
         success: (r) => {
           this.setData({ imagePath: r.tempFilePath, generating: false })
-          // 画布与这一张用的是哪套模板留着备用：台账只在人真存下这张时才记（见 _keepCard）。
+          // 画布与这一张用的是哪套模板、带没带码留着备用：台账只在人真存下这张时才记（见 _keepCard）。
+          // 这两样都要在画布落图这一趟取，不能等记账那一刻现读 data——中途换过就不匹了。
           this._canvasNode = canvas
           this._renderedTpl = this.data.picked || profile.template
+          this._renderedNoQr = !!this.data.noQr
           done()
         },
         fail,
@@ -244,7 +246,7 @@ Page({
   // 那样一篇能记出五张（10-03 真机报的，见 utils/cardLog.js 顶上那段）。
   async _keepCard() {
     if (!this._note || !this._canvasNode) return
-    await cardLog.record(this._note.id, this._renderedTpl, this._canvasNode, this)
+    await cardLog.record(this._note.id, this._renderedTpl, this._renderedNoQr, this._canvasNode, this)
   },
 
   saveToAlbum() {
