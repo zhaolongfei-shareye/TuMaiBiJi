@@ -287,8 +287,10 @@ Page({
     })
     const cells = []
     notes.forEach((n, i) => {
-      const list = log[n.id]
-      if (!list || !list.length) return
+      // 倒序：台账是按留下来的先后往后追加的，而这一格画的是 `cards[cur]`（cur 从 0 起）。
+      // 顺着放就会拿"最早那一张"当封面——他 10-03 报的"小图跟大图完全不匹对"就是这个错位。
+      const list = ((log[n.id] || []).slice()).sort((x, y) => (y.at || 0) - (x.at || 0))
+      if (!list.length) return
       cells.push({ i, id: n.id, title: n.title, cards: list, cur: 0 })
     })
     // 两批都现算：切到卡片那一枚时台账可能刚被详情窗里那次出图改过，
@@ -684,12 +686,18 @@ Page({
     const tmpPath = await new Promise((resolve, reject) => {
       wx.canvasToTempFilePath({ canvas, fileType: 'png', success: (r) => resolve(r.tempFilePath), fail: reject }, this)
     })
+    // 这张画布留着：人真留下这张时要拿它现出一张小图进台账（见 _keepPoster 与 utils/cardLog.js）。
+    this._posterCanvas = canvas
     this.setData({ posterImagePath: tmpPath, posterBusy: false })
-    // 「生成过卡片」这本账就记在这里：画布上真落出一张成品图的那一刻（见 cardLog.js）。
-    // 不记在"存出去"那一步——微信那个图片面板在开发者工具里一定 fail，存相册那一条又吃
-    // 相册授权，两条口都不是"这张图有没有被做出来"。同一篇同一套模板只留最新那一张，
-    // 所以来回滑模板、开关码都不会把这一格越滚越长。
-    await cardLog.record(a.noteId, this.data.posterTpl, canvas, this)
+  },
+
+  // 「生成过卡片」这本账记在这里——人真把这张留下来的那一刻：微信图片面板发出去（真机那条路），
+  // 或者存进相册成功（开发者工具里面板一定 fail，走的就是这条）。
+  // 不记在画布落图那一步：打开弹窗、每滑一次模板、每开关一次码都会重画一次，那样一篇能记出五张。
+  async _keepPoster() {
+    const a = this._posterAssets
+    if (!a || !this._posterCanvas) return
+    await cardLog.record(a.noteId, this.data.posterTpl, this._posterCanvas, this)
     this.setData(this.arrange(this.data.notes))
   },
 
@@ -766,7 +774,7 @@ Page({
     this.setData({ shareDim: true })
     wx.showShareImageMenu({
       path,
-      success: () => this._closeTemplate(),
+      success: async () => { await this._keepPoster(); this._closeTemplate() },
       fail: (err) => {
         const msg = (err && err.errMsg) || ''
         if (msg.indexOf('cancel') >= 0) return
@@ -781,7 +789,8 @@ Page({
     const { lang } = this.data
     wx.saveImageToPhotosAlbum({
       filePath: this.data.posterImagePath,
-      success: () => {
+      success: async () => {
+        await this._keepPoster()
         wx.showToast({ title: t('savedToAlbum', lang), icon: 'success' })
         setTimeout(() => this._closeTemplate(), 800)
       },

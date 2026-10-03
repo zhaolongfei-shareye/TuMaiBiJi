@@ -380,7 +380,9 @@
 /* 六格整组居中、每格 78×96：上一版 flex:1 摊满 556rpx 一行，单格 82 宽看着粗（他原话"不精致"） */
 .pwd-boxes {
   position: relative;
-  margin-top: 18rpx;
+  /* 定宽居中（6×78 + 5×14 = 538）：那枚取焦的 input 要按格算落点，行宽不定就没法算 */
+  width: 538rpx;
+  margin: 18rpx auto 0;
   display: flex;
   justify-content: center;
   gap: 14rpx;
@@ -422,15 +424,20 @@
    opacity 万一被哪个内核忽略，这一串也不会露在屏幕上（这一串是密码，屏幕前可能站着别人）。 */
 .pwd-capture {
   position: absolute;
+  /* 只盖住"当前该填的那一格"（left 由 wxml 按已填几位推过去，一格 78 + 一缝 14 = 92）。
+     原来它是整行铺开：iPhone 上那枚光标是微信画的原生层，不吃 opacity / color /
+     caret-color 任何一种（站长 10-03 真机看到的那根竖条就在六格左边的空档里），
+     所以只能把它的落点收进格子里，再用 1rpx 字号让光标本身塌掉。 */
   left: 0;
   top: 0;
-  width: 100%;
+  width: 78rpx;
   height: 100%;
   opacity: 0;
   color: transparent;
   -webkit-text-fill-color: transparent;
   caret-color: transparent;
-  font-size: var(--fs-body);
+  font-size: 1rpx;
+  text-align: left;
 }
 
 .pwd-two {

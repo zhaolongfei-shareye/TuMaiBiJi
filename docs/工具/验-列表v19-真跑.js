@@ -268,45 +268,37 @@ const COUNT_ALL = () => {
     `标题=${await css('.ds-h2', 'color')} 正文=${await css('.ds-para', 'color')}`)
   await mp.screenshot({ path: path.join(OUT, 'v19-3-详情窗三枚.png') })
 
-  // ---------- ⑧ 真出一张卡片，回来看那一格出现没有 ----------
-  // 台账记在"画布落出一张成品图"那一刻（_renderPoster 末尾），不是点"保存并分享"那一步，
-  // 所以这里等的是渲染那条链路：posterBusy 落回 false + posterImagePath 有值，
-  // 再去 storage 里摸那一格。固定 sleep(3500) 是第一版的写法，真跑起来出图要 6~10 秒，
-  // 等不够会把"还没渲完"读成"没记上"——红得像是 cardLog 坏了。
-  // 弹窗自己关掉 = _renderPoster 抛了（catch 里 _closeTemplate），那是另一件事，单报。
-  const waitRecorded = async (tag, want) => {
-    let idle = ''
+  // ---------- ⑧ 台账只记"我留下这张"那一步 ----------
+  // 10-03 真机报的两条是同一个根因：账记在"画布落出一张成品图"那一刻，而打开弹窗、每滑一次
+  // 模板、每开关一次码都会重画一次，一篇能记出五张；格子里画的又是最早那一张，看着就是
+  // "小图跟大图完全不匹对"。现在记账挪到"保存并分享成功"那一步。
+  // 那个面板在开发者工具里一定 fail，所以这一节把微信那一环换成"直接回 success"的替身——
+  // 剩下每一环（success 回调 → _keepPoster → cardLog → arrange → 屏上那一格）走的还是产品代码。
+  const waitRendered = async (tag) => {
     for (let i = 0; i < 20; i++) {
       const dd = await page.data()
       if (!dd.templateOpen) return `${tag}:渲染失败，弹窗自己关了`
-      if (!dd.posterBusy && dd.posterImagePath) { idle = 'ok'; break }
+      if (!dd.posterBusy && dd.posterImagePath) return `${tag}:已出图`
       await sleep(1000)
     }
-    if (!idle) return `${tag}:等 20 秒没渲完`
-    for (let k = 0; k < 10; k++) {
-      if ((await mp.evaluate(COUNT_ALL)) >= want) return `${tag}:已记`
+    return `${tag}:等 20 秒没渲完`
+  }
+  const countAll = () => mp.evaluate(COUNT_ALL)
+  const waitKept = async (want) => {
+    for (let k = 0; k < 12; k++) {
+      if ((await countAll()) >= want) return true
       await sleep(800)
     }
-    const dd = await page.data()
-    return `${tag}:图已出（${String(dd.posterImagePath).slice(-12)}）但台账是 ${await mp.evaluate(COUNT_ALL)} 张，要 ${want} 张`
+    return false
   }
-  const closeFloats = async () => {
-    if (await page.$('.tpl-sheet')) await page.callMethod('_closeTemplate')
-    if (await page.$('.float-sheet')) await page.callMethod('onCloseDetail')
-    await sleep(600)
-  }
-  const madeBtn = !!(await $('.ds-ibtn.primary'))
-  ck('非私密笔记那一扇窗里有「生成笔记卡片」（下面两问全指着它）', madeBtn, madeBtn ? '有' : '没有')
-  await (await $('.ds-ibtn.primary')).tap()
-  await sleep(1500)
-  ck('浮得出模板弹窗', !!(await $('.tpl-sheet')), '')
-  const r1 = await waitRecorded('第一张', 1)
-  const made1 = r1.endsWith('已记')
-  ck('画布真落出一张成品图的那一刻就往本机台账记了一格（不记在"存出去"那一步：图片面板在工具里一定 fail）',
-    made1, r1)
-  if (!made1) {
-    // 台账空着有两处可能：画布那张 jpg 没取出来，或者用户文件目录根本写不进去。
-    // 后面这一问单独量文件系统那一半（不碰产品代码）：能写进去 = 出问题的在画布那一步。
+  const stubShare = () => mp.evaluate(() => {
+    if (!wx.__shareReal) wx.__shareReal = wx.showShareImageMenu
+    wx.showShareImageMenu = (o) => { o.success && o.success({}) }
+    return 'ok'
+  })
+  // 台账空着有两处可能：画布那张 jpg 没取出来，或者用户文件目录根本写不进去。
+  // 光看断言只能看到"0 张"，所以把小程序侧那两半一起打出来。
+  const dumpWhyEmpty = async () => {
     const probe = await mp.evaluate(() => new Promise((res) => {
       const fm = wx.getFileSystemManager()
       const dir = `${wx.env.USER_DATA_PATH}/cards`
@@ -325,8 +317,29 @@ const COUNT_ALL = () => {
     console.log(`  · 台账为什么空——文件系统那一半：${probe}；USER_DATA_PATH=${await mp.evaluate(() => wx.env.USER_DATA_PATH)}`)
     const probeErr = await mp.evaluate(() => (getApp().__probe || []).slice(-8))
     console.log('  · 应用侧 console.error（末 8 条）：' + (probeErr.length ? '\n    ' + probeErr.join('\n    ') : '（一条都没有）'))
-    logs.length && console.log('  · on(console) 收到的末 6 条：' + logs.slice(-6).join(' ⏎ '))
   }
+  const closeFloats = async () => {
+    if (await page.$('.tpl-sheet')) await page.callMethod('_closeTemplate')
+    if (await page.$('.float-sheet')) await page.callMethod('onCloseDetail')
+    await sleep(600)
+  }
+  const madeBtn = !!(await $('.ds-ibtn.primary'))
+  ck('非私密笔记那一扇窗里有「生成笔记卡片」（下面两问全指着它）', madeBtn, madeBtn ? '有' : '没有')
+  await (await $('.ds-ibtn.primary')).tap()
+  await sleep(1500)
+  ck('浮得出模板弹窗', !!(await $('.tpl-sheet')), '')
+  const r1 = await waitRendered('第一张')
+  ck('第一张图渲出来了（下面几问全指着这一句）', r1.endsWith('已出图'), r1)
+  const afterRender = await countAll()
+  ck('光把图画出来不记账：开一次弹窗、渲一张成品，台账一格都不许多（10-03 那五张就是这么来的）',
+    afterRender === 0, `出图后台账已有 ${afterRender} 张`)
+  await stubShare()
+  await (await $('.tpl-btn.primary')).tap()
+  const kept1 = await waitKept(1)
+  ck('点了「保存并分享」、面板回 success 之后，台账才多出这一格',
+    kept1, kept1 ? '已记 1 格' : `面板成功后台账仍是 ${await countAll()} 张（${r1}）`)
+  const made1 = kept1
+  if (!kept1) await dumpWhyEmpty()
   await closeFloats()
   await (await tabAt(1)).tap()
   await sleep(1200)
@@ -352,30 +365,55 @@ const COUNT_ALL = () => {
       !!(await $('.cats')) && !!(await $('.chip')), '')
     await mp.screenshot({ path: path.join(OUT, 'v19-4-卡片一格.png') })
 
-    // 再出一张别的模板，验 ‹ 1/2 › 与左右各一次点击。
-    // 必须等第一套渲完再滑：两套 _renderPoster 同时在同一枚 canvas 上跑会互相盖，
-    // 量到的第二张其实是第一套的图。
+    // 再走一次：开弹窗、滑到另一套模板、开关一次码——这三下都只是"看图"，一张都不该记；
+    // 然后真点一次「保存并分享」，才要求台账变两张。
+    const waitIdle = async () => {
+      for (let i = 0; i < 20; i++) {
+        const d = await page.data()
+        if (!d.posterBusy) return true
+        await sleep(1000)
+      }
+      return false
+    }
     await (await tabAt(0)).tap()
     await sleep(700)
     await (await $$('.xrow'))[0].tap()
     await sleep(2200)
     await (await $('.ds-ibtn.primary')).tap()
     await sleep(1500)
-    if (await page.$('.tpl-sheet')) {
-      const r1b = await waitRecorded('第二套开弹窗', 1)
-      ck('第二套：开弹窗后先等第一张渲完（不渲完就滑，两套会盖同一枚 canvas）',
-        r1b.endsWith('已记'), r1b)
-      await page.callMethod('onPosterTouchStart', { touches: [{ clientX: 300 }] })
-      await page.callMethod('onPosterTouchEnd', { changedTouches: [{ clientX: 40 }] })
-    }
-    const r2 = await waitRecorded('第二张', 2)
-    const made2 = r2.endsWith('已记')
+    const r1b = await waitRendered('第二套开弹窗')
+    ck('第二套：开弹窗先等上一张渲完（两套 _renderPoster 同时在同一枚 canvas 上跑会互相盖）',
+      r1b.endsWith('已出图'), r1b)
+    await page.callMethod('onPosterTouchStart', { touches: [{ clientX: 300 }] })
+    await page.callMethod('onPosterTouchEnd', { changedTouches: [{ clientX: 40 }] })
+    const r2 = await waitRendered('滑到第二套')
+    ck('滑到另一套模板（只是看图）不记账：台账仍是 1 张',
+      r2.endsWith('已出图') && (await countAll()) === 1, `台账 ${await countAll()} 张（${r2}）`)
+    await page.callMethod('onToggleQr')
+    await sleep(1500)
+    await waitIdle()
+    ck('开关一次码（也只是看图）同样不记账：台账仍是 1 张', (await countAll()) === 1,
+      `台账 ${await countAll()} 张`)
+    await stubShare()
+    await (await $('.tpl-btn.primary')).tap()
+    const kept2 = await waitKept(2)
+    ck('第二套真"保存并分享"之后，台账才两张', kept2,
+      kept2 ? '已记 2 格' : `面板成功后仍是 ${await countAll()} 张`)
+    if (!kept2) await dumpWhyEmpty()
+    const made2 = kept2
     await closeFloats()
     await (await tabAt(1)).tap()
     await sleep(1200)
     const c0 = (await data('cells'))[0] || {}
-    ck('同一篇出到第二套模板之后台账里是两张', made2 && (c0.cards || []).length === 2,
-      `${(c0.cards || []).length} 张（${r2}）`)
+    ck('同一篇留到第二套模板之后台账里是两张', made2 && (c0.cards || []).length === 2,
+      `${(c0.cards || []).length} 张`)
+    // 这一条钉的就是他报的"小图完全不匹对"：格子画的是 cards[cur]，cur 从 0 起，
+    // 所以台账必须倒着排，第一格才是他最后留下的那一张。
+    const srcNow = String((await $('.pad-img')) ? await (await $('.pad-img')).attribute('src') : '')
+    ck('格子里那张小图＝最近留下的那一张（台账按 at 倒序，不是拿最早那张当封面）',
+      (c0.cards || []).length === 2 && (c0.cards[0].at || 0) >= (c0.cards[1].at || 0)
+      && srcNow.indexOf(String((c0.cards[0].p || '').split('/').pop())) >= 0,
+      `cards[0].at=${(c0.cards[0] || {}).at}、cards[1].at=${(c0.cards[1] || {}).at}、屏上画的是 ${(srcNow.split('/').pop() || '空')}`)
     ck('第二行出现 ‹ 1/2 ›，数字吃全局那支 WtsjMind',
       !!(await $('.g-pg')) && /^\d\/\d$/.test(String(await txt('.g-n')))
       && /WtsjMind/.test(String(await css('.g-n', 'font-family'))), await txt('.g-n'))
@@ -405,8 +443,9 @@ const COUNT_ALL = () => {
   const left = await mp.evaluate(CLEAR)
   ck('这一把造的卡片文件已删干净（不留孤儿位图给下一把）',
     (await mp.evaluate(COUNT)) === 0, `删掉 ${left} 张`)
-  // 收尾把探针摘掉：这台工具是长驻的，留着 console.error 会一路吃掉后面几把尺子的报错。
+  // 收尾把探针与那个面板替身都摘掉：这台工具是长驻的，留着会一路影响后面几把尺子。
   await mp.evaluate(() => {
+    if (wx.__shareReal) { wx.showShareImageMenu = wx.__shareReal; wx.__shareReal = null }
     const a = getApp()
     if (a.__errOld) console.error = a.__errOld
     a.__probe = []

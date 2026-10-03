@@ -147,9 +147,9 @@ Page({
         fileType: 'png',
         success: (r) => {
           this.setData({ imagePath: r.tempFilePath, generating: false })
-          // 与首页详情窗同一本台账、同一个时机：这张成品图真落出来了就记一格
-          // （同一篇同一套模板只留最新那一张，见 utils/cardLog.js）
-          cardLog.record(this._note.id, this.data.picked || profile.template, canvas, this)
+          // 画布与这一张用的是哪套模板留着备用：台账只在人真存下这张时才记（见 _keepCard）。
+          this._canvasNode = canvas
+          this._renderedTpl = this.data.picked || profile.template
           done()
         },
         fail,
@@ -240,13 +240,21 @@ Page({
     })
   },
 
+  // 台账记在"人真把这张存下来"那一刻，不记在画布落图那一步：换模板、开关码都会重画一次，
+  // 那样一篇能记出五张（10-03 真机报的，见 utils/cardLog.js 顶上那段）。
+  async _keepCard() {
+    if (!this._note || !this._canvasNode) return
+    await cardLog.record(this._note.id, this._renderedTpl, this._canvasNode, this)
+  },
+
   saveToAlbum() {
     if (!this.data.imagePath) return
     const { lang } = this.data
 
     wx.saveImageToPhotosAlbum({
       filePath: this.data.imagePath,
-      success: () => {
+      success: async () => {
+        await this._keepCard()
         wx.showToast({ title: t('savedToAlbum', lang), icon: 'success' })
         setTimeout(() => wx.navigateBack(), 1000)
       },

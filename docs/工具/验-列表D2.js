@@ -215,15 +215,29 @@ ok('窗里标题与要点前景 = 列表那档 90% 黑，正文段落 = 摘要�
   && /color: rgba\(35, 37, 44, 0\.9\)/.test(rule(idxWxss, 'ds-pt-x')))
 ok('公开状态那一行留着（列表里那枚色块撤了之后，"这篇公不公开"只有这一处说）',
   /ds-pub/.test(idxWxml) && /t\.sharedNow/.test(idxWxml))
-// 本机台账：出图那一刻就记（存相册那条路在开发者工具里必然 fail，钉在它上面就测不到）
+// 本机台账：记在"人真留下这张"那一刻。1.9.12 记的是"画布落出一张图"，而打开弹窗、每滑一次
+// 模板、每开关一次码都会重画一次——站长 10-03 真机两句："我明明没有生成 5 张" + "小图完全不匹对"。
 const shareJs = io2.readFileSync(P('pages/share/share.js'), 'utf8')
-ok('出图那一刻记台账：首页 _renderPoster 末尾 + 海报页 canvasToTempFilePath 成功回调里',
-  /await cardLog\.record\(a\.noteId, this\.data\.posterTpl, canvas, this\)/.test(CODE_JS)
-  && /cardLog\.record\(this\._note\.id, this\.data\.picked \|\| profile\.template, canvas, this\)/.test(strip(shareJs))
-  && dead(/_logCard/))
+const cardLogJs = io2.readFileSync(P('utils/cardLog.js'), 'utf8')
+const keepPoster = (CODE_JS.split('async _keepPoster()')[1] || '').split('\n  },')[0]
+const keepCard = (strip(shareJs).split('async _keepCard()')[1] || '').split('\n  },')[0]
+const renderPoster = (CODE_JS.split('async _renderPoster()')[1] || '').split('async _keepPoster()')[0]
+ok('首页记在两条"留下"的口上：图片面板 success 与存相册 success 都走 _keepPoster',
+  /cardLog\.record\(a\.noteId, this\.data\.posterTpl, this\._posterCanvas, this\)/.test(keepPoster)
+  && /success: async \(\) => \{ await this\._keepPoster\(\); this\._closeTemplate\(\) \}/.test(CODE_JS)
+  && /success: async \(\) => \{\s*await this\._keepPoster\(\)/.test(CODE_JS))
+ok('海报页同一条：存相册成功才走 _keepCard，模板与画布是画那一趟存下来的',
+  /cardLog\.record\(this\._note\.id, this\._renderedTpl, this\._canvasNode, this\)/.test(keepCard)
+  && /success: async \(\) => \{\s*await this\._keepCard\(\)/.test(strip(shareJs))
+  && /this\._renderedTpl = this\.data\.picked \|\| profile\.template/.test(strip(shareJs)))
+ok('画布落图那一步不再记账（_renderPoster 里不许出现 record，滑一次模板多一张就是它）',
+  !/cardLog\.record/.test(renderPoster) && /this\._posterCanvas = canvas/.test(renderPoster))
+ok('格子里第一张＝最近留下的那张（台账按 at 倒序；顺着放就会拿最早那张当封面）',
+  /sort\(\(x, y\) => \(y\.at \|\| 0\) - \(x\.at \|\| 0\)\)/.test(CODE_JS))
+ok('1.9.12 那本按渲染时机记的旧账整个清一次、清完立标记（require 时就跑，只跑这一次）',
+  /const MODE_KEY = 'cardLogKeepOnly'/.test(cardLogJs) && /^migrateKeepOnly\(\)$/m.test(cardLogJs))
 ok('台账是本机的事：键名 cardLog、图落在用户文件目录、api.js 里一行都不提它',
-  /const KEY = 'cardLog'/.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8'))
-  && /USER_DATA_PATH/.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8'))
+  /const KEY = 'cardLog'/.test(cardLogJs) && /USER_DATA_PATH/.test(cardLogJs)
   && !/cardLog/.test(io2.readFileSync(P('utils/api.js'), 'utf8')))
 ok('文件名带时间戳（本地图片按路径缓存位图，同名换内容界面仍是第一张）',
   /\$\{DIR\}\/\$\{noteId\}-\$\{tplId\}-\$\{at\}\.jpg/.test(io2.readFileSync(P('utils/cardLog.js'), 'utf8')))

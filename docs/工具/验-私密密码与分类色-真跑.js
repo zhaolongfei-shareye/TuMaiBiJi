@@ -167,6 +167,28 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('input 整只隐形：opacity 0，字色也染透明（opacity 被哪个内核忽略都不会把密码露在屏上）',
       parseFloat(capOpacity) === 0 && /rgba\(0, 0, 0, 0\)|transparent/i.test(capColor),
       `opacity=${capOpacity} color=${capColor}`)
+    // 站长 10-03 iPhone：字染透明之后那枚竖条还在——iOS 上 input 的光标是微信画的**原生层**，
+    // 不吃 opacity / color / caret-color 任何一种。藏不掉就把落点收进格子里：
+    // input 只盖"当前该填的那一格"（宽 78rpx），行定宽 538 居中，left 按已填几位推。
+    const cellRs = await rects('.pwd-cell')
+    const capR = await rect('.pwd-capture')
+    const rowR = await rect('.pwd-boxes')
+    ck('那只 input 只盖住第一格，不再整行铺开（铺开时光标就画在六格左边那条空档里）',
+      !!capR && !!cellRs[0] && Math.abs(capR.width - cellRs[0].width) <= 2
+      && capR.left >= cellRs[0].left - 2 && capR.right <= cellRs[0].right + 2,
+      `input 宽 ${(capR.width || 0).toFixed(1)}px、第一格 ${(cellRs[0].width || 0).toFixed(1)}px，input 左 ${capR.left.toFixed(1)}、第一格左 ${cellRs[0].left.toFixed(1)}`)
+    const ww = await mp.evaluate(() => wx.getWindowInfo().windowWidth)
+    const toRpx = (px) => px * 750 / ww
+    ck('六格那一行定宽居中：行宽与"六格铺开的宽"差不到 8rpx、行左与第一格左差不到 4rpx（行比格子宽就算不出光标落点）',
+      !!cellRs[5] && Math.abs(toRpx(rowR.width - (cellRs[5].right - cellRs[0].left))) <= 8
+      && Math.abs(toRpx(rowR.left - cellRs[0].left)) <= 4,
+      `行 ${toRpx(rowR.width).toFixed(1)}rpx、六格 ${toRpx(cellRs[5].right - cellRs[0].left).toFixed(1)}rpx，行左 ${toRpx(rowR.left).toFixed(1)} 第一格左 ${toRpx(cellRs[0].left).toFixed(1)}（窗口 ${ww}px）`)
+    ck('input 的 left 按已填几位推过去（一格 78 + 一缝 14 = 92），第六位时钉在最后一格不往外跑',
+      capTag.indexOf('left:{{(pwdBuf.length > 5 ? 5 : pwdBuf.length) * 92}}rpx') >= 0,
+      capTag.slice(0, 96))
+    const meWxss = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/me/me.wxss'), 'utf8')
+    ck('input 字号收到 1rpx（光标自己塌掉），宽度写死成一格那么宽',
+      /\.pwd-capture\s*\{[^}]*font-size: 1rpx/.test(meWxss) && /\.pwd-capture\s*\{[^}]*width: 78rpx/.test(meWxss))
     ck('设置态一行两枚：取消 + 确定', (await btnOf()).join('|') === '取消|确定', (await btnOf()).join('|'))
     await mp.screenshot({ path: path.join(OUT, '01b-私密密码设置态弹层.png') })
 

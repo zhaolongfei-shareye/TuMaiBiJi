@@ -11,6 +11,11 @@
  *
  * 存的是 JPEG 缩略那份，不是发出去的那张 PNG：台账这一格只用来认"这是哪一套模板"，
  * 要扫码的人走详情窗里那张成品（share.js:144 那条 PNG 的理由在这儿不成立）。
+ *
+ * ⚠ 记账时机＝**人真留下这张那一刻**（图片面板发出去／存进相册成功），不是画布落图那一刻。
+ * 1.9.12 曾记在画布落图那一步，结果打开弹窗、每滑一次模板、每开关一次码都各算一张——
+ * 站长 10-03 真机测出来两句："我明明没有生成 5 张，显示了我生成了 5 张同样内容的"、
+ * "笔记生成卡片大图，但小图完全不匹对"（那一格画的是台账里最早的一张，不是他最后留下的那张）。
  */
 const KEY = 'cardLog'
 const DIR = `${wx.env.USER_DATA_PATH}/cards`
@@ -65,6 +70,19 @@ function record(noteId, tplId, canvas, page) {
 
 function forNote(noteId) { return read()[noteId] || [] }
 
+// 1.9.12 那本账是按"画布落图"记的，里面每一格都分不清是他真留下的还是滑模板滑出来的，
+// 所以换时机的那一次整个清掉——只清这一次，清完立个标记，以后进页不再动它。
+const MODE_KEY = 'cardLogKeepOnly'
+function migrateKeepOnly() {
+  if (wx.getStorageSync(MODE_KEY) === 1) return false
+  const map = read()
+  Object.keys(map).forEach((id) => (map[id] || []).forEach((x) => dropFile(x.p)))
+  write({})
+  try { wx.setStorageSync(MODE_KEY, 1) } catch (e) { /* 标记立不上，下次进页再清一次而已 */ }
+  return true
+}
+migrateKeepOnly()
+
 // 笔记删了，它那一格的文件与索引一起清掉：留着既没人看，也是这台设备上清不掉的孤儿
 function dropNote(noteId) {
   const map = read()
@@ -74,4 +92,4 @@ function dropNote(noteId) {
   write(map)
 }
 
-module.exports = { record, forNote, dropNote, all: read, KEY, DIR }
+module.exports = { record, forNote, dropNote, all: read, migrateKeepOnly, KEY, DIR, MODE_KEY }

@@ -131,6 +131,7 @@
         <view wx:for="{{[0, 1, 2, 3, 4, 5]}}" wx:key="index"
           class="pwd-cell {{pwdBuf.length > index ? 'fill' : ''}}"></view>
         <input class="pwd-capture" type="number" maxlength="6" adjust-position="{{false}}"
+          style="left:{{(pwdBuf.length > 5 ? 5 : pwdBuf.length) * 92}}rpx"
           focus="{{pwdFocus}}" value="{{pwdBuf}}" bindinput="onPwdBuf" />
       </view>
       <view class="pwd-two">
