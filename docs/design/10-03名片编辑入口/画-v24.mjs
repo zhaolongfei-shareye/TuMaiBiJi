@@ -25,6 +25,7 @@ const DIR = __dirname
 const palette = require(path.join(DIR, '../../../miniprogram/utils/palette.js'))
 const i18n = require(path.join(DIR, '../../../miniprogram/utils/i18n.js'))
 const ZH = i18n.texts('zh')
+const TEN = i18n.texts('en')
 const T = palette.TONES
 const TIP = palette.TIP_DOT
 const FACE = '../../../miniprogram/assets/home-bg-portrait.jpg'
@@ -215,7 +216,7 @@ const SCREENS = [
 const cell = (id, cap, html) => `<div class="cell"><div class="ph">${html}</div><div class="cap">${cap}</div></div>`
 const TABLE = `<h2>这一稿屏上的字：改了一串现网的、新造四组，其余逐字从字典读</h2>
 <table><tr><th>串</th><th>出处</th><th>说明</th></tr>
-<tr><td>「${NEW.qrHint}」</td><td><span class="tag new">改串</span></td><td>替掉现网 <code>qrToggleHint</code>「${ZH.qrToggleHint}」。您的原话"下面小字压缩"。英文那份要跟着改短，否则第一行放不下（现在是 "QR code may be blocked off-WeChat, turn it off to keep text only"）</td></tr>
+<tr><td>「${NEW.qrHint}」</td><td><span class="tag new">改串</span></td><td>替掉现网 <code>qrToggleHint</code>「${ZH.qrToggleHint}」。您的原话"下面小字压缩"。英文那份要跟着改短，否则第一行放不下（现网英文是 <code>${TEN.qrToggleHint}</code>，${TEN.qrToggleHint.length} 个字符）；建议跟着压成 <code>Turn it off for non-WeChat apps</code></td></tr>
 <tr><td>「${NEW.editCard}」</td><td><span class="tag new">新串</span></td><td>您的原话。第一行那枚，321rpx 里放 156rpx 的字</td></tr>
 <tr><td>「${NEW.info}」／「${NEW.hint}」／「${NEW.replace}」／「位置 3」「位置 4」</td><td><span class="tag new">新串</span></td><td>小弹窗那一层（v20 起就是这几句，没改）</td></tr>
 <tr><td>「${ZH.cancel}」「${ZH.saveAndShare}」「${ZH.save}」「${ZH.qrToggle}」「${ZH.profileName}」「${ZH.profileSlogan}」「${ZH.slotCard}」「${ZH.slotBg}」「${ZH.swipeHint}」「${ZH.grip}」</td><td><span class="tag keep">现网原串</span></td><td>逐字从 <code>utils/i18n.js</code> 读</td></tr></table>
