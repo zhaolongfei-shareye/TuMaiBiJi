@@ -269,13 +269,14 @@
 
   <!-- v7 ④⑤：模板独浮弹窗——拉弹窗时详情窗整个藏起来，页面上只剩这一个浮层，
        背后什么都不垫。取消 / 保存成功 / 点把手三个口收掉弹窗后回到详情窗那一屏（不是回列表）。 -->
-  <!-- 真机（站长 10-03 20:42 两张截图）：小弹窗浮起来时这一层整个盖在它上面——遮罩不压暗、
-       面板看不见，只有输入框那行字漏出来（输入框是原生层，永远浮在最上）。模拟器里 102>101 是好的，
-       真机不吃这一套。所以这一态背后只留一层：小弹窗开着就把这一层藏掉（visibility 不是 wx:if，
-       成品图那个 <image> 节点留着，收掉小弹窗不用重画）。遮罩那一条直接不渲染——它透明，
-       留在上面会抢掉「点窗外收小弹窗」那一下，变成收成品弹窗。 -->
+  <!-- 真机两轮都没治好，第二轮（藏 visibility）他原话「还没修好，依旧这样」。所以这一态不再
+       跟层序讲道理：小弹窗开着时把成品弹窗这一整层**从渲染树里摘掉**（`wx:if`，不是 `visibility`），
+       这一态页面上就只剩小弹窗一个浮层——和「我的」页私密密码那一层一模一样，那一层在他
+       iPhone 11 真机上是好的。摘掉不会重出图：画布在屏幕外（上面那条 `posterCanvas`），
+       收掉小弹窗由 onCloseCardInfo 按 `_ciDirty` 决定要不要重画一次。
+       遮罩那一条本来就不渲染：它透明，留着会抢走「点窗外收小弹窗」那一下，变成收成品弹窗。 -->
   <view wx:if="{{templateOpen && !cardInfoOpen}}" class="float-mask" catchtap="onCancelTemplate"></view>
-  <view wx:if="{{templateOpen}}" class="float-sheet tpl-sheet {{cardInfoOpen ? 'ci-behind' : ''}}">
+  <view wx:if="{{templateOpen && !cardInfoOpen}}" class="float-sheet tpl-sheet">
     <view class="grip" bindtap="onHandleTap">
       <view class="grip-bar"></view>
       <!-- 左右各一句、同一行同一档：右边收窗，左边告诉他这一屏能左右滑。
@@ -340,13 +341,17 @@
       </view>
       <view class="ci-field">
         <text class="ci-label">{{t.profileName}}</text>
+        <!-- adjust-position 关掉是抄「我的」页私密密码那一层（me.wxml:133）在他 iPhone 11 上
+             验过的口径：微信只保证焦点框不被压住，它不知道这张卡底下还有别的控件，
+             一顶整页就把这种 fixed 浮层顶得跟原生输入层对不上。这张卡离顶 180、高 789，
+             他这台键盘上沿在 965rpx——不顶也已经放得下，顶一下反而出事。 -->
         <input class="ci-input" value="{{ciName}}" maxlength="16" placeholder="{{t.profileNamePh}}"
-          placeholder-class="ci-ph" bindinput="onCiName" />
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiName" />
       </view>
       <view class="ci-field">
         <text class="ci-label">{{t.profileSlogan}}</text>
         <input class="ci-input" value="{{ciSlogan}}" maxlength="24" placeholder="{{t.profileSloganPh}}"
-          placeholder-class="ci-ph" bindinput="onCiSlogan" />
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiSlogan" />
       </view>
       <view class="ci-acts">
         <view class="ci-btn ghost" catchtap="onCloseCardInfo">{{t.cancel}}</view>

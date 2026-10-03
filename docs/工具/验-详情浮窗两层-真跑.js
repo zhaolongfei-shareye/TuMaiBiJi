@@ -370,19 +370,23 @@ const readCi = (mp) => mp.evaluate(() => {
     await row1[1].tap()
     await sleep(900)
     d = await page.data()
-    ck('点「编辑个人名片」浮出小弹窗，成品弹窗仍在它底下',
+    ck('点「编辑个人名片」浮出小弹窗，成品弹窗那个开关状态还挂着（收掉小弹窗要回得来）',
       d.cardInfoOpen === true && d.templateOpen === true, `ci=${d.cardInfoOpen} tpl=${d.templateOpen}`)
-    /* 真机（站长 10-03 20:42 两张截图）：这一层浮起来时，成品弹窗那层盖在它上面。
-       量法：在「小弹窗卡片之外、成品弹窗白面板之内」取一条（x 692~716rpx、y 900~1400px），
-       他那两张图这一条都是 251.0，和没开小弹窗的 19:54 基线一模一样——遮罩那层 55% 的黑
-       一点没落上，说明 102 整层画在 101 底下，只有输入框那行字（原生层）漏出来。
-       模拟器里 102>101 是好的，所以这一把我原来 97 条全绿。
-       修法不是跟它争 z-index，是这一态背后只留一层：小弹窗开着就把成品弹窗藏掉。 */
-    const ciSheetCls = String((await (await page.$('.tpl-sheet')).attribute('class')) || '')
-    ck('小弹窗开着时，成品弹窗那一层挂上 ci-behind（真机上 101 压过了 102）',
-      ciSheetCls.indexOf('ci-behind') >= 0, ciSheetCls)
-    ck('它那张透明遮罩这一态不渲染——留着会抢走「点窗外收小弹窗」那一下，变成收成品弹窗',
-      (await page.$$('.float-mask')).length === 0)
+    /* 真机两轮：第一轮 z-index 102 压不过 101（站长 20:42 两张截图，量法见 PRD §8.106——
+       在"卡片之外、上层白面板之内"取一条，开与不开都是 251.0，那层 55% 的黑根本没落上去，
+       只有 input 那行字漏出来，因为它是原生层不吃 webview 层序）。第二轮换成"藏 visibility"，
+       他原话「还没修好，依旧这样」。所以这一态不再讲层序：成品弹窗整层从渲染树里摘掉，
+       页面上只剩小弹窗一个浮层——跟「我的」页私密密码那一层同构，那一层在他 iPhone 11 上是好的。
+       模拟器里两轮都是绿的，所以这两条只能算"结构上没东西可盖"，真机那一眼仍要他判。 */
+    const gone = {
+      sheet: !!(await page.$('.tpl-sheet')),
+      poster: !!(await page.$('.tpl-poster')),
+      mask: (await page.$$('.float-mask')).length,
+    }
+    ck('小弹窗开着时，成品弹窗整层不在渲染树里（面板、成品图、透明遮罩三样都查不到）',
+      !gone.sheet && !gone.poster && gone.mask === 0, JSON.stringify(gone))
+    ck('这一态该在的只有小弹窗自己：标题＋四枚格子＋两栏输入',
+      !!(await page.$('.ci-title')) && (await page.$$('.ci-disc')).length === 4 && (await page.$$('.ci-input')).length === 2)
     ck('标题是「卡片上的信息」', (await (await page.$('.ci-title')).text()) === '卡片上的信息')
     ck('四枚位置格一行放满', (await page.$$('.ci-disc')).length === 4)
     /* 圆必须是"圆"的：10-03 第一版这里挂的是裸 empty/filled 修饰类，撞上本页 642 行
@@ -471,10 +475,13 @@ const readCi = (mp) => mp.evaluate(() => {
     d = await page.data()
     ck('收掉小弹窗，成品弹窗还开着（不是连它一起收）',
       d.cardInfoOpen === false && d.templateOpen === true, `ci=${d.cardInfoOpen} tpl=${d.templateOpen}`)
-    const ciSheetBack = String((await (await page.$('.tpl-sheet')).attribute('class')) || '')
-    ck('那一层立刻回来：class 里 ci-behind 撤掉，成品图节点还在（藏不是销毁，不用重出图）',
-      ciSheetBack.indexOf('ci-behind') < 0 && !!(await page.$('.tpl-poster')) && !!(await page.$('.float-mask')),
-      ciSheetBack)
+    const tplBack = {
+      sheet: !!(await page.$('.tpl-sheet')),
+      poster: !!(await page.$('.tpl-poster')),
+      mask: (await page.$$('.float-mask')).length,
+    }
+    ck('收掉小弹窗，成品弹窗整层回来了（面板＋成品图＋透明遮罩都查得到，不用重新出图）',
+      tplBack.sheet && tplBack.poster && tplBack.mask === 1, JSON.stringify(tplBack))
 
     /* ---------- ⑥ 取消 → 回详情窗，不是回列表 ---------- */
     await (await page.$('.tpl-btn.ghost')).tap()
