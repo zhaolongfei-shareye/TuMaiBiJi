@@ -859,6 +859,29 @@ Page({
   // 站长 10-02 iPhone 11：面板自己是半透明的底，我们那一页（弹窗、取消/分享、底栏、
   // 另一张码）全从它背后透出来，看着杂乱无章。面板那层压不住（微信的），能压的只有它底下这一页：
   // 拉起之前先整屏盖成纯黑，面板一收（成功、取消、失败三条口都走 complete）就把这层撤掉。
+  // 已生成态那枚通栏：发的就是台账里那一张（弹窗这一态换不了模板，所以画布上这张＝留档那张），
+  // 因此**一次都不记账**——记账只挂在"第一次真留下这张"那一步（§8.99）。
+  // 面板打不开就退回存这张原图，不走 _saveToAlbum()：那一条会重画画布并再记一笔。
+  onShareCard() {
+    const path = this.data.posterImagePath
+    if (!path) return
+    const lang = this.data.lang
+    this.setData({ shareDim: true })
+    wx.showShareImageMenu({
+      path,
+      fail: (err) => {
+        const msg = (err && err.errMsg) || ''
+        if (msg.indexOf('cancel') >= 0) return
+        wx.saveImageToPhotosAlbum({
+          filePath: path,
+          success: () => wx.showToast({ title: t('savedToAlbum', lang), icon: 'success' }),
+          fail: () => wx.showToast({ title: t('exportFailed', lang), icon: 'none' }),
+        })
+      },
+      complete: () => this.setData({ shareDim: false }),
+    })
+  },
+
   onSavePoster() {
     const path = this.data.posterImagePath
     if (!path) return

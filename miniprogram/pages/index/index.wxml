@@ -289,6 +289,13 @@
       <!-- 已生成态（站长 10-03 23:40）：底排只有「取消｜删除」两枚，模板不能滑、名片不能改，
            要换就先删这一张。下面那行小字说的是删完之后会怎样——服务端那张活码一行都不碰。 -->
       <block wx:if="{{posterHasCard}}">
+        <!-- 站长 10-04：已生成态上面先给一枚通栏「分享卡片」，把台账里这一张再发一次。
+             吃的是 .tpl-main 同一套（--accent 深墨底 + --bg-page 纸白字），不另起色阶。
+             面板里那几枚是微信系统层，样式与文案都不给改；"发到公众号"不在这一格里，
+             所以这行字只写它真给的两项（微信好友／朋友圈）。 -->
+        <view class="tpl-main {{posterImagePath ? '' : 'disabled'}}" bindtap="onShareCard">
+          <text>{{t.cardShare}}</text>
+        </view>
         <view class="tpl-actions">
           <view class="tpl-btn ghost" bindtap="onCancelTemplate">{{t.cancel}}</view>
           <view class="tpl-btn danger" bindtap="onDropCard">{{t.cardDrop}}</view>

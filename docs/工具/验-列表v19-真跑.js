@@ -466,9 +466,36 @@ const COUNT_ALL = () => {
     ck('台账里已有这一张 → 弹窗一开就落在已生成态（这一态是从台账读出来的，不是点出来的）',
       rGen.endsWith('已出图') && (await data('posterHasCard')) === true, rGen)
     const dockGen = await dockBtns()
-    ck('已生成态底排只剩「取消｜删除」+ 一句说明；通栏那枚与「编辑个人名片」都不在',
-      dockGen === '取消|删除' && !(await $('.tpl-main')) && !(await $('.tpl-dots'))
+    ck('已生成态那两枚是「取消｜删除」+ 一句说明；「编辑个人名片」与那排圆点都不在这一态',
+      dockGen === '取消|删除' && !(await $('.tpl-dots')) && !(await $('.pill-lab'))
       && (await txt('.tpl-main-hint')) === '删除后可继续生成笔记卡片，已分享的依旧有效', dockGen)
+    /* 站长 10-04 补的那枚通栏（没有它，一张卡发完就锁死了）。量三样：文案、它在两枚**上面**、
+       以及吃的是 .tpl-main 同一套（深墨底 + 纸白字，跟他要的"与背景同色阶"对上了）。
+       文字宽/高一起量：折行会让高度翻倍，那在这一屏是坏活。 */
+    const shareTx = await $('.tpl-main text')
+    const shareBox = await rect('.tpl-main')
+    const shareTxBox = shareTx ? await (async () => {
+      const s = await shareTx.size(), o = await shareTx.offset()
+      return { w: s.width, h: s.height, top: o.top }
+    })() : null
+    ck('已生成态上面那枚通栏是「分享卡片：微信好友 / 朋友圈」，且排在取消｜删除前面',
+      !!shareTx && (await shareTx.text()) === '分享卡片：微信好友 / 朋友圈'
+      && !!shareBox && shareBox.top < (await rect('.tpl-actions')).top,
+      `${shareTx ? await shareTx.text() : '（没有这枚）'}`)
+    /* 他那句"与背景风格同色阶，深色背景白色字"落成真数字：底要暗、字要亮。
+       拿"同一个 class 跟自己比"是假绿（这句我自己先犯过一次），所以量亮度。 */
+    const lum = (c) => {
+      const m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(String(c || ''))
+      if (!m) return -1
+      return (0.2126 * Number(m[1]) + 0.7152 * Number(m[2]) + 0.0722 * Number(m[3])) / 255
+    }
+    const bgLum = lum(await css('.tpl-main', 'background-color'))
+    const fgLum = lum(await css('.tpl-main', 'color'))
+    ck('那枚通栏量出来就是"深底白字"：底亮度 < 0.3、字亮度 > 0.7（吃 .tpl-main 那一套，不另起色阶）',
+      bgLum >= 0 && bgLum < 0.3 && fgLum > 0.7, `底 ${bgLum.toFixed(3)} 字 ${fgLum.toFixed(3)}`)
+    ck('那行字一行走完（宽不越通栏内沿、高没翻倍＝没折行）',
+      !!shareTxBox && !!shareBox && shareTxBox.w <= rpx(shareBox.w) - 8 && rpx(shareTxBox.h) <= 44,
+      `字 ${shareTxBox && Math.round(rpx(shareTxBox.w))}×${shareTxBox && Math.round(rpx(shareTxBox.h))}rpx 条子 ${shareBox && Math.round(rpx(shareBox.w))}rpx`)
     const tplGen = await data('posterTpl')
     await page.callMethod('onPosterTouchStart', { touches: [{ clientX: 300 }] })
     await page.callMethod('onPosterTouchEnd', { changedTouches: [{ clientX: 40 }] })
@@ -477,6 +504,20 @@ const COUNT_ALL = () => {
       (await data('posterTpl')) === tplGen && (await countAll()) === 1,
       `模板=${await data('posterTpl')}（原 ${tplGen}）、台账 ${await countAll()} 张`)
 
+    /* 点那枚通栏真发一次（那个面板在开发者工具里一定 fail，前面已换成"直接回 success"的替身）。
+       这一枚和「生成分享图」那枚的分工就一句话：**再发一次不该多出账**。
+       判据盯三样：台账张数不变、那一条的路径与 at 一字没动（动了就是重记＋排序被顶）、弹窗不收。 */
+    const nidGen = (await data('posterNote') || {}).id
+    const led0 = await mp.evaluate((id) => ((wx.getStorageSync('cardLog') || {})[String(id)] || []).slice(), nidGen)
+    await (await $('.tpl-main')).tap()
+    await sleep(1800)
+    const led1 = await mp.evaluate((id) => ((wx.getStorageSync('cardLog') || {})[String(id)] || []).slice(), nidGen)
+    const dShare = await page.data()
+    ck('点「分享卡片」把面板拉起来再走完那两条口：台账一张没多、那一条的路径与时间戳一字没动、弹窗还开着',
+      led1.length === 1 && led1[0].p === led0[0].p && led1[0].at === led0[0].at
+      && dShare.templateOpen === true && dShare.shareDim === false,
+      `${led0.length}→${led1.length} 条、p ${led1[0].p === led0[0].p ? '没变' : '变了'}、at ${led1[0].at === led0[0].at ? '没变' : '被顶新了'}、open=${dShare.templateOpen} dim=${dShare.shareDim}`)
+    await shot('v19-5b-已生成态分享卡片.png')
     const delBtn = (await $$('.tpl-btn'))[1]
     await delBtn.tap()
     await sleep(1500)

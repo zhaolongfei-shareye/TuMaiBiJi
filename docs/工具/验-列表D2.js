@@ -252,7 +252,7 @@ ok('点开大图取的是「台账里那一张」的模板，不是卡片模板�
 ok('大图连二维码开关也照那一张摆（noQr 得先存进台账，两头才有一个共同来源）',
   /noQr: known \? !!cur\.noQr : false/.test(sheetFn)
   && /keep\.push\(\{ p: filePath, tpl: tplId, at, noQr: !!noQr \}\)/.test(cardLogJs))
-ok('两态底排：未生成态是「取消｜编辑个人名片」+ 通栏「生成分享图」；已生成态只剩「取消｜删除」+ 一句说明',
+ok('两态底排：未生成态是「取消｜编辑个人名片」+ 通栏「生成分享图」；已生成态是通栏「分享卡片」+「取消｜删除」+ 一句说明',
   /<block wx:if="\{\{posterHasCard\}\}">/.test(CODE_WXML)
   && /tpl-btn danger" bindtap="onDropCard"/.test(CODE_WXML)
   && /t\.cardDropHint/.test(CODE_WXML)
@@ -266,6 +266,28 @@ ok('已生成态不给换模板：滑动手势与那排圆点都跟着这一态�
   /posterBusy \|\| this\.data\.posterHasCard/.test(CODE_JS)
   && /tpl-dots" wx:if="\{\{!posterHasCard\}\}/.test(CODE_WXML)
   && /grip-tx-l" wx:if="\{\{!posterHasCard\}\}/.test(CODE_WXML))
+/* 站长 10-04 补的一枚：已生成态上面给一枚通栏「分享卡片」，把台账里那一张再发一次
+   （没有它，一张卡发完就锁死了——只能删了重出才能再发）。三处要钉：
+   ① 它吃的是 .tpl-main 同一套样式，不另起色阶（他要"与背景同色阶、深底白字"）；
+   ② 它一次都不记账（记账只挂在"第一次真留下这张"那一步，重发不该多出文件、不该动排序）；
+   ③ 那行字只写面板真给的两项——`showShareImageMenu` 的落点是"发送给朋友／分享到朋友圈／
+      收藏／下载"，**没有"发到公众号"这一项**（官方类型定义原文），按钮不许承诺它做不到的事。 */
+const shareCardFn = (CODE_JS.split('onShareCard()')[1] || '').split('\n  },')[0]
+ok('已生成态上面那枚通栏绑的是 onShareCard，复用 .tpl-main（同一支 --accent 深墨底 + 纸白字）',
+  /class="tpl-main \{\{posterImagePath \? '' : 'disabled'\}\}" bindtap="onShareCard"/.test(CODE_WXML)
+  && (CODE_WXML.indexOf('bindtap="onShareCard"') < CODE_WXML.indexOf('bindtap="onDropCard"')))
+ok('这一枚发的就是画布上那一张（直接递 posterImagePath，不重画、不再走 cardLog、也不走那条会记账的 _saveToAlbum）',
+  /const path = this\.data\.posterImagePath/.test(shareCardFn)
+  && /wx\.showShareImageMenu\(\{\s*path,/.test(shareCardFn)
+  && !/_keepPoster|cardLog|_saveToAlbum/.test(shareCardFn)
+  && /saveImageToPhotosAlbum/.test(shareCardFn))
+ok('面板走完那层黑一定撤（complete 那一环漏了就是把人关在黑屏里，1.9.13 栽过）',
+  /complete:\s*\(\)\s*=>\s*this\.setData\(\{\s*shareDim:\s*false/.test(shareCardFn))
+ok('那行字只写「微信好友 / 朋友圈」，中英各一份；"公众号"不写在按钮上（这一格里做不到）',
+  /cardShare: '分享卡片：微信好友 \/ 朋友圈'/.test(I18N)
+  && /cardShare: 'Share card: Chat \/ Moments'/.test(I18N)
+  && /<text>\{\{t\.cardShare\}\}<\/text>/.test(CODE_WXML)
+  && !/cardShare.*公众号/.test(I18N))
 ok('「删除」只动本机这本账：调 cardLog.dropNote 之后回详情窗，api 一行都不提它（服务端那张活码不碰）',
   /onDropCard\(\) \{[\s\S]{0,240}cardLog\.dropNote\(note\.id\)[\s\S]{0,120}this\._closeTemplate\(\)/.test(CODE_JS)
   && !/deleteCard|dropCard/ig.test(apiJs))
