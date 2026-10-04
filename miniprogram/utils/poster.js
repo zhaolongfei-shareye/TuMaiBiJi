@@ -1746,8 +1746,13 @@ const RECIPE_PRIMS = {
   noteDate: { keys: [], call: (env) => formatShortDate(env.note.created_at) },
   tagsJoined: { keys: ['sep'], call: (env, a) => (env.note.tags || []).join(a.sep) },
   paperOf: { keys: ['categoryId'], call: (env, a) => paperOf(a.categoryId) },
+  // 活泼那六套不吃宣纸那两档，吃 palette 里的"配色方案"：一个名字 + 一个分类 → 一组色。
+  scheme: { keys: ['name', 'categoryId'], call: (env, a) => schemeFor(a.name, a.categoryId) },
+  withAlpha: { keys: ['color', 'alpha'], call: (env, a) => withAlpha(a.color, a.alpha) },
   mix: { keys: ['c1', 'c2', 'w'], call: (env, a) => mix(a.c1, a.c2, a.w) },
-  joinNonEmpty: { keys: ['sep', 'parts'], call: (env, a) => (a.parts || []).map((s) => String(s == null ? '' : s).trim()).filter(Boolean).join(a.sep) },
+  // 不 trim：planner 那两处都是 `[a, b].filter(Boolean).join(' · ')`，
+  // 顺手 trim 会把"只有一个空格的标签"从有变成无，那是行为差，不是清理。
+  joinNonEmpty: { keys: ['sep', 'parts'], call: (env, a) => (a.parts || []).filter(Boolean).join(a.sep) },
   points: {
     keys: ['limit', 'maxW', 'size', 'bold', 'fam'],
     call: (env, a) => measureWithFont(env, a, (ctx) => (env.note.key_points || []).slice(0, a.limit).map((p) => clip(ctx, p, a.maxW))),
@@ -1763,10 +1768,13 @@ const RECIPE_PRIMS = {
   setFont: { keys: ['size', 'bold', 'fam'], call: (env, a) => { font(env.ctx, a.size, a.bold, a.fam); return null } },
   vertCols: { keys: ['text', 'colH', 'step', 'maxCols', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => vcols(ctx, a.text, a.colH, a.step, a.maxCols)) },
   signRow: {
-    keys: ['x', 'y', 'maxW', 'size', 'avatarD', 'onDark'],
+    keys: ['x', 'y', 'maxW', 'size', 'avatarD', 'onDark', 'hasAvatar'],
+    // hasAvatar 可省：省了就跟随用户到底设没设形象（九套都是这样）。
+    // 叠翠那一套显式给 false——它已经在色块与白卡交界画了一枚大头像，署名行再带一枚就成两个自己了。
     call: (env, a) => signRow({
       ctx: env.ctx, x: a.x, y: a.y, maxW: a.maxW, size: a.size, avatarD: a.avatarD,
-      onDark: a.onDark, profile: env.profile, hasAvatar: env.hasAvatar,
+      onDark: a.onDark, profile: env.profile,
+      hasAvatar: a.hasAvatar === undefined ? env.hasAvatar : a.hasAvatar,
     }),
   },
   glyphPlate: { keys: ['x', 'y', 'w', 'h', 'color'], call: (env, a) => glyphPlate(env.ctx, a) },
@@ -1831,7 +1839,7 @@ const PLANNERS = {
 
 // 已经转写成配方的那几套。包内自带的那份就是服务端下发失败时的兜底，
 // 名单在 poster.js、内容在 posterRecipes.js，两边对不上由 docs/工具/验-模板配方可执行.js 抓。
-const RECIPE_IDS = ['quote']
+const RECIPE_IDS = ['quote', 'card', 'block', 'lit', 'spec']
 
 function recipeOf(id) {
   return RECIPE_IDS.indexOf(id) < 0 ? null : RECIPES[id] || null

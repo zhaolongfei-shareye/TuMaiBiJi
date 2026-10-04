@@ -19,6 +19,10 @@ const VERSION = 1
 // 非整数结果照原样留着——画布坐标本来就允许小数，取不取整是配方自己的事（用 round）。
 const ARITH = { '+': -1, '-': -1, '*': -1, '/': 2, '%': 2, min: -1, max: -1, round: 1, floor: 1, ceil: 1, abs: 1, neg: 1 }
 const LOGIC = { '<': 2, '<=': 2, '>': 2, '>=': 2, '==': 2, '!=': 2, and: -1, or: -1, not: 1, len: 1, truthy: 1 }
+// 类型转换只有三条：
+// `str` —— 图层里的 lines 是字符串数组，交个数进去画面上看着一样、清单却是 number 与 string 两种；
+// `padStart` —— 规格卡那个「01 / 02」序号；`slice` —— 竖排那一列只取前十个字。
+const CONV = { str: 1, padStart: 2, slice: 3 }
 const STEPS = ['let', 'do', 'emit', 'emitOne', 'emitMany', 'if', 'each']
 
 function describe(v) {
@@ -107,6 +111,15 @@ function callOp(name, a, env, scope, where) {
       default: return -n[0]
     }
   }
+  if (CONV[name] !== undefined) {
+    arity(name, CONV[name], args.length, where)
+    const s = String(args[0] == null ? '' : args[0])
+    switch (name) {
+      case 'str': return s
+      case 'padStart': return s.padStart(num(args[1], `${where} padStart`), '0')
+      default: return s.slice(num(args[1], `${where} slice`), num(args[2], `${where} slice`))
+    }
+  }
   if (LOGIC[name] !== undefined) {
     arity(name, LOGIC[name], args.length, where)
     switch (name) {
@@ -119,7 +132,9 @@ function callOp(name, a, env, scope, where) {
       case 'and': return args.every(truthy)
       case 'or': return args.some(truthy)
       case 'not': return !truthy(args[0])
-      case 'len': return Array.isArray(args[0]) ? args[0].length : String(args[0] == null ? '' : args[0]).length
+      // 字符串按码点计数（和 planner 里那句 `Array.from(vertText).length` 同一条口径），
+      // 按 UTF-16 长度数会在 emoji 上少数。
+      case 'len': return Array.isArray(args[0]) ? args[0].length : Array.from(String(args[0] == null ? '' : args[0])).length
       default: return truthy(args[0])
     }
   }
@@ -248,8 +263,8 @@ function scanTerm(t, allow, bad, where) {
     s.a.forEach((x, i) => scanTerm(x, allow, bad, `${where} if[${i}]`))
     return
   }
-  if (ARITH[name] !== undefined || LOGIC[name] !== undefined) {
-    const want = ARITH[name] !== undefined ? ARITH[name] : LOGIC[name]
+  if (ARITH[name] !== undefined || LOGIC[name] !== undefined || CONV[name] !== undefined) {
+    const want = ARITH[name] !== undefined ? ARITH[name] : (LOGIC[name] !== undefined ? LOGIC[name] : CONV[name])
     const args = Array.isArray(s.a) ? s.a : [s.a]
     if (want >= 0 && args.length !== want) bad.push(`${where}: 算子「${name}」要 ${want} 个参数，给了 ${args.length} 个`)
     if (want < 0 && args.length < 1) bad.push(`${where}: 算子「${name}」至少要一个参数`)
