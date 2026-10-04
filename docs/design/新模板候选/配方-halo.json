@@ -1,0 +1,610 @@
+{
+ "id": "halo",
+ "min_version": 1,
+ "steps": [
+  {
+   "let": "s",
+   "value": {
+    "prim": "scheme",
+    "args": {
+     "name": "mono",
+     "categoryId": {
+      "var": "note.category_id"
+     }
+    }
+   }
+  },
+  {
+   "let": "pad",
+   "value": 60
+  },
+  {
+   "let": "qrSize",
+   "value": 118
+  },
+  {
+   "let": "innerW",
+   "value": {
+    "-": [
+     {
+      "var": "W"
+     },
+     {
+      "*": [
+       {
+        "var": "pad"
+       },
+       2
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "let": "cx",
+   "value": {
+    "/": [
+     {
+      "var": "W"
+     },
+     2
+    ]
+   }
+  },
+  {
+   "let": "kicker",
+   "value": {
+    "prim": "clipTrack",
+    "args": {
+     "text": {
+      "prim": "joinNonEmpty",
+      "args": {
+       "sep": " · ",
+       "parts": [
+        {
+         "prim": "blockName",
+         "args": {}
+        },
+        {
+         "prim": "sourceLabel",
+         "args": {}
+        }
+       ]
+      }
+     },
+     "maxW": {
+      "var": "innerW"
+     },
+     "track": 6,
+     "size": 22,
+     "bold": true
+    }
+   }
+  },
+  {
+   "let": "qLines",
+   "value": {
+    "prim": "fitLines",
+    "args": {
+     "text": {
+      "prim": "quoteText",
+      "args": {}
+     },
+     "maxW": {
+      "-": [
+       {
+        "var": "innerW"
+       },
+       40
+      ]
+     },
+     "n": 5,
+     "size": 46,
+     "bold": true
+    }
+   }
+  },
+  {
+   "let": "qLH",
+   "value": 68
+  },
+  {
+   "let": "kickerBase",
+   "value": 132
+  },
+  {
+   "let": "quoteTop",
+   "value": 184
+  },
+  {
+   "let": "quoteBottom",
+   "value": {
+    "+": [
+     {
+      "var": "quoteTop"
+     },
+     {
+      "*": [
+       {
+        "-": [
+         {
+          "len": {
+           "var": "qLines"
+          }
+         },
+         1
+        ]
+       },
+       {
+        "var": "qLH"
+       }
+      ]
+     },
+     46
+    ]
+   }
+  },
+  {
+   "let": "glowY",
+   "value": {
+    "+": [
+     {
+      "var": "quoteTop"
+     },
+     {
+      "*": [
+       {
+        "/": [
+         {
+          "len": {
+           "var": "qLines"
+          }
+         },
+         2
+        ]
+       },
+       {
+        "var": "qLH"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "let": "ruleY",
+   "value": {
+    "+": [
+     {
+      "var": "quoteBottom"
+     },
+     46
+    ]
+   }
+  },
+  {
+   "let": "sumLines",
+   "value": []
+  },
+  {
+   "if": {
+    "cond": {
+     "truthy": {
+      "var": "note.summary"
+     }
+    },
+    "then": [
+     {
+      "let": "sumLines",
+      "value": {
+       "prim": "fitLines",
+       "args": {
+        "text": {
+         "var": "note.summary"
+        },
+        "maxW": {
+         "var": "innerW"
+        },
+        "n": 4,
+        "size": 26
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "let": "sumBase",
+   "value": {
+    "if": [
+     {
+      "truthy": {
+       "var": "sumLines"
+      }
+     },
+     {
+      "+": [
+       {
+        "var": "ruleY"
+       },
+       72
+      ]
+     },
+     {
+      "+": [
+       {
+        "var": "ruleY"
+       },
+       30
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "let": "more",
+   "value": {
+    "max": [
+     0,
+     {
+      "-": [
+       {
+        "len": {
+         "var": "sumLines"
+        }
+       },
+       1
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "let": "bodyBottom",
+   "value": {
+    "+": [
+     {
+      "var": "sumBase"
+     },
+     {
+      "*": [
+       {
+        "var": "more"
+       },
+       42
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "let": "signTop",
+   "value": {
+    "+": [
+     {
+      "var": "bodyBottom"
+     },
+     58
+    ]
+   }
+  },
+  {
+   "let": "sign",
+   "value": {
+    "prim": "signRow",
+    "args": {
+     "x": {
+      "var": "pad"
+     },
+     "y": {
+      "var": "signTop"
+     },
+     "maxW": {
+      "-": [
+       {
+        "-": [
+         {
+          "var": "innerW"
+         },
+         {
+          "var": "qrSize"
+         }
+        ]
+       },
+       30
+      ]
+     },
+     "size": 26,
+     "avatarD": 80,
+     "onDark": true
+    }
+   }
+  },
+  {
+   "let": "foot",
+   "value": {
+    "max": [
+     {
+      "prim": "qrStickerH",
+      "args": {
+       "size": {
+        "var": "qrSize"
+       }
+      }
+     },
+     {
+      "var": "sign.h"
+     }
+    ]
+   }
+  },
+  {
+   "let": "height",
+   "value": {
+    "+": [
+     {
+      "var": "signTop"
+     },
+     {
+      "var": "foot"
+     },
+     60
+    ]
+   }
+  },
+  {
+   "let": "glowR",
+   "value": {
+    "max": [
+     {
+      "var": "glowY"
+     },
+     {
+      "-": [
+       {
+        "var": "height"
+       },
+       {
+        "var": "glowY"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "emit": {
+    "k": "fill",
+    "x": 0,
+    "y": 0,
+    "w": {
+     "var": "W"
+    },
+    "h": {
+     "var": "height"
+    },
+    "color": {
+     "var": "s.bg"
+    }
+   }
+  },
+  {
+   "emit": {
+    "k": "radial",
+    "x": {
+     "var": "cx"
+    },
+    "y": {
+     "var": "glowY"
+    },
+    "r0": 0,
+    "r1": {
+     "var": "glowR"
+    },
+    "c1": {
+     "prim": "withAlpha",
+     "args": {
+      "color": {
+       "var": "s.accent"
+      },
+      "alpha": 0.45
+     }
+    },
+    "c2": {
+     "prim": "withAlpha",
+     "args": {
+      "color": {
+       "var": "s.accent"
+      },
+      "alpha": 0
+     }
+    },
+    "box": [
+     0,
+     0,
+     {
+      "var": "W"
+     },
+     {
+      "var": "height"
+     }
+    ]
+   }
+  },
+  {
+   "emit": {
+    "k": "text",
+    "x": {
+     "var": "cx"
+    },
+    "y": {
+     "var": "kickerBase"
+    },
+    "lines": [
+     {
+      "var": "kicker"
+     }
+    ],
+    "size": 22,
+    "weight": "bold",
+    "color": {
+     "var": "s.sub"
+    },
+    "align": "center",
+    "track": 6
+   }
+  },
+  {
+   "emit": {
+    "k": "text",
+    "x": {
+     "var": "cx"
+    },
+    "y": {
+     "+": [
+      {
+       "var": "quoteTop"
+      },
+      46
+     ]
+    },
+    "lines": {
+     "var": "qLines"
+    },
+    "lh": {
+     "var": "qLH"
+    },
+    "size": 46,
+    "weight": "bold",
+    "color": {
+     "var": "s.ink"
+    },
+    "align": "center"
+   }
+  },
+  {
+   "emit": {
+    "k": "line",
+    "x1": {
+     "-": [
+      {
+       "var": "cx"
+      },
+      56
+     ]
+    },
+    "y1": {
+     "var": "ruleY"
+    },
+    "x2": {
+     "+": [
+      {
+       "var": "cx"
+      },
+      56
+     ]
+    },
+    "y2": {
+     "var": "ruleY"
+    },
+    "w": 6,
+    "color": {
+     "var": "s.accent"
+    }
+   }
+  },
+  {
+   "if": {
+    "cond": {
+     "truthy": {
+      "var": "sumLines"
+     }
+    },
+    "then": [
+     {
+      "emit": {
+       "k": "text",
+       "x": {
+        "var": "cx"
+       },
+       "y": {
+        "var": "sumBase"
+       },
+       "lines": {
+        "var": "sumLines"
+       },
+       "lh": 42,
+       "size": 26,
+       "color": {
+        "var": "s.sub"
+       },
+       "align": "center"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "emitMany": {
+    "var": "sign.layers"
+   }
+  },
+  {
+   "let": "qr",
+   "value": {
+    "prim": "qrSticker",
+    "args": {
+     "x": {
+      "-": [
+       {
+        "-": [
+         {
+          "var": "W"
+         },
+         {
+          "var": "pad"
+         }
+        ]
+       },
+       {
+        "var": "qrSize"
+       }
+      ]
+     },
+     "y": {
+      "var": "signTop"
+     },
+     "size": {
+      "var": "qrSize"
+     },
+     "offset": {
+      "var": "s.c2"
+     },
+     "ink": {
+      "prim": "withAlpha",
+      "args": {
+       "color": {
+        "prim": "token",
+        "args": {
+         "name": "paper"
+        }
+       },
+       "alpha": 0.72
+      }
+     },
+     "label": {
+      "prim": "i18n",
+      "args": {
+       "key": "scanToView"
+      }
+     }
+    }
+   }
+  },
+  {
+   "emitMany": {
+    "var": "qr.layers"
+   }
+  }
+ ]
+}
