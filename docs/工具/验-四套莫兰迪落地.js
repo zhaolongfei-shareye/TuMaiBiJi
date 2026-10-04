@@ -31,6 +31,12 @@ const alphaOf = (v) => {
   return m ? Number(m[1]) : null
 }
 const TABS = [['/pages/index/index', '笔记'], ['/pages/create/create', '新建'], ['/pages/me/me', '我的']]
+// 半透明的字压在实心底上，WCAG 要拿"合成之后的那个色"去算，不能拿原墨色：
+// crOf 只收两个 hex，所以先在这里按 alpha 合成成一支实心色再交给它。
+const mixOn = (bgHex, inkHex, a) => {
+  const b = p.hexToRgb(bgHex), k = p.hexToRgb(inkHex)
+  return '#' + k.map((v, i) => Math.round(v * a + b[i] * (1 - a)).toString(16).padStart(2, '0')).join('').toUpperCase()
+}
 
 ;(async () => {
   process.on('uncaughtException', (e) => { console.error('探针挂了（未捕获）', e); process.exit(2) })
@@ -46,7 +52,9 @@ const TABS = [['/pages/index/index', '笔记'], ['/pages/create/create', '新建
     }
     throw new Error(`进不去 ${url}`)
   }
-  const before = await mp.evaluate(() => wx.getStorageSync('localWallpaper') || '')
+  // 进来时那一枚从 app 自己那一层读（10-04 起四枚都由服务端当家，本机那份存储已经没人写了，
+  // 再读 localWallpaper 只会读到一个死键）。收尾时靠"点回这一格"还原，走的是真链路。
+  const before = await mp.evaluate(() => getApp().getWallpaper() || '')
   const langBefore = await lang.read(mp)
   await lang.pin(mp, 'zh')
 
@@ -64,9 +72,8 @@ const TABS = [['/pages/index/index', '笔记'], ['/pages/create/create', '新建
     wp = await enter('/pages/wallpaper/wallpaper')
     await sleep(3500)
     const picked = await wp.data()
-    ck(`${theme.label}：点下去当场生效（页面 data 与本机存储都是这一枚）`,
-      picked.currentWallpaper === theme.key,
-      `data ${picked.currentWallpaper}／本机 ${await mp.evaluate(() => wx.getStorageSync('localWallpaper') || '(空)')}`)
+    ck(`${theme.label}：点下去当场生效（页面 data 就是这一枚）`,
+      picked.currentWallpaper === theme.key, `data ${picked.currentWallpaper}`)
     ck(`${theme.label}：壁纸条上亮的是这一格（旧 key 的人不再一格都不亮）`,
       (picked.wallpapers.find((x) => x.active) || {}).key === theme.key,
       (picked.wallpapers || []).map((x) => `${x.key}${x.active ? '●' : ''}`).join(' '))
@@ -105,6 +112,21 @@ const TABS = [['/pages/index/index', '笔记'], ['/pages/create/create', '新建
     ck(`${theme.label}：三级字用的就是本套那支墨 ${theme.ramp.inks[0]}（没串色）`,
       rgb3.length === 3 && rgb3.every((v, i) => Math.abs(v - want3[i]) <= 1), `${rgb3.join(',')} vs ${want3.join(',')}`)
 
+    // ③b 二级字这一档 .66 → .72（站长 10-04 拍）：读「我的」页那行 slogan 的计算色，
+    //     它是真吃 --text-secondary 且**不压在照片上**的元素（首页 .stat .l 在铺图态被翻成纸白，
+    //     拿它测这一档会量到另一条规则）。.66 时象牙/天青压卡底只有 4.35/4.38，本来就不线。
+    const sl = await me.$('.sheet-slogan')
+    const secondary = sl ? String(await sl.style('color')) : '(没读到 .sheet-slogan)'
+    const a2 = alphaOf(secondary)
+    const want2 = p.hexToRgb(theme.ramp.inks[0])
+    const rgb2 = (String(secondary).match(/\d+/g) || []).slice(0, 3).map(Number)
+    ck(`${theme.label}：二级字 alpha = .72`, a2 !== null && Math.abs(a2 - 0.72) < 0.01, secondary)
+    ck(`${theme.label}：二级字用的就是本套那支墨 ${theme.ramp.inks[0]}（没串色）`,
+      rgb2.length === 3 && rgb2.every((v, i) => Math.abs(v - want2[i]) <= 1), `${rgb2.join(',')} vs ${want2.join(',')}`)
+    ck(`${theme.label}：二级字压本套卡底过正文门槛 4.5`,
+      p.crOf(mixOn(theme.line, theme.ramp.inks[0], 0.72), theme.line) >= 4.5,
+      p.crOf(mixOn(theme.line, theme.ramp.inks[0], 0.72), theme.line).toFixed(2))
+
     // ④ 按钮那一面（＝底栏选中那枚圆底）在真页面上的证据由另一把尺子采像素给：
     //    它是自绘组件，automator 的 $() 够不到，只能截图采点 —— 见 验-底栏像素-真跑.js
     //    （10-04 起那把从"挑两枚代表"改成四枚全跑）。这里只钉静态那一条钉不到的：
@@ -113,7 +135,18 @@ const TABS = [['/pages/index/index', '笔记'], ['/pages/create/create', '新建
       p.crOf('#F2EFE9', chrome.sel) >= 4.7, p.crOf('#F2EFE9', chrome.sel).toFixed(2))
   }
 
-  await mp.evaluate((v) => (v ? wx.setStorageSync('localWallpaper', v) : wx.removeStorageSync('localWallpaper')), before)
+  // 收尾：把进来那一枚**点**回去（四枚都走服务端，这一趟会真发 PUT），
+  // 不再往那个已经没人读的本机键里写值——那等于什么都没还原。
+  {
+    const wp = await enter('/pages/wallpaper/wallpaper')
+    await sleep(4000)
+    const list = (await wp.data()).wallpapers || []
+    const bi = list.findIndex((x) => x.key === before)
+    const els = await wp.$$('.wp-chip')
+    if (bi >= 0 && els[bi]) { await els[bi].tap(); await sleep(3500) }
+    ck('收尾把壁纸还原回进来那一枚（服务端也写回去了）',
+      (await wp.data()).currentWallpaper === before, `${before} ← ${(await wp.data()).currentWallpaper}`)
+  }
   await lang.pin(mp, langBefore)
   await mp.close()
   console.log(`\n${bad.length ? `✗ 红 ${bad.length} 条：${bad.join(' | ')}` : '全过'}`)

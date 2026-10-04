@@ -47,7 +47,27 @@ const enter = async (mp) => {
   await lang.pin(mp, 'zh')
   let page = await enter(mp)
   await sleep(4500)
+
+  // 10-04 起四枚壁纸都由服务端当家（站长拍「统一」，后端白名单加了那三个新 key），
+  // 所以点任何一枚都会真发一次 PUT。先把 PUT 记下来：后面"发没发、带的是哪一枚"全读这一份，
+  // 不靠类名和 data 猜。测试号写进去的外观，收尾那一步会原样点回去。
+  await mp.evaluate(() => {
+    const w = wx
+    w.__puts = []
+    const orig = w.request
+    w.request = function (o) {
+      if (o && String(o.method || '').toUpperCase() === 'PUT'
+        && /\/api\/user\/wallpaper$/.test(String(o.url || '').split('?')[0])) {
+        w.__puts.push(String((o.data || {}).wallpaper || ''))
+      }
+      return orig.apply(this, arguments)
+    }
+  })
+  const puts = () => mp.evaluate(() => (wx.__puts || []).slice())
+
   const start = await page.data()
+  // 旧版本可能在这台模拟器上留过本机那份；先清掉再跑，否则"它一直是空的"这条会因脏数据而假红。
+  await mp.evaluate(() => wx.removeStorageSync('localWallpaper'))
   const startLocal = await readLocal(mp)
   const R = (await mp.evaluate(() => wx.getWindowInfo().windowWidth)) / 750
   const rpx = (px) => px / R
@@ -85,8 +105,8 @@ const enter = async (mp) => {
   await mp.screenshot({ path: `${OUT}/实测-进页.png` })
 
   // ---------- ② 点色块当场生效；上面那部手机不给点 ----------
-  // 只挑"只存本机"那两枚（带色阶的象牙 / 天青）来验：那条支路不发 PUT，
-  // 免得这一把替测试号往服务端写一次外观。换服务端那四枚的链路是接口层的事，另两把尺子盯着。
+  // 挑象牙/天青这两枚来验（它们就是"原来只存本机"那一批）：现在点它们也会真发 PUT，
+  // 下面那条计数断言钉的正是这件事——旁路撤净之后不该再有任何一枚"只写本机"。
   const targetKey = start.currentWallpaper === 'tint-celadon' ? 'tint-paper' : 'tint-celadon'
   const targetLabel = themeOf(targetKey).label
   const idx = (start.wallpapers || []).findIndex((x) => x.key === targetKey)
@@ -96,8 +116,11 @@ const enter = async (mp) => {
   const p1 = await page.data()
   ck(`点色块当场就换成${targetLabel}`, p1.currentWallpaper === targetKey, p1.currentWallpaper)
   ck('换上了本页主题类名跟着走', new RegExp('theme-' + targetKey).test(p1.themeClass || ''), p1.themeClass)
+  const midPuts = await puts()
+  ck('点这一枚真发了一次 PUT，带的就是这枚 key（不再走"只存本机"那条旁路）',
+    midPuts.length === 1 && midPuts[0] === targetKey, JSON.stringify(midPuts))
   const midLocal = await readLocal(mp)
-  ck('带色阶那枚只写本机偏好', midLocal === targetKey, midLocal)
+  ck('本机那份不留副本（LOCAL_WALLPAPER_KEY 那条旁路已撤净）', midLocal === '(空)', midLocal)
   ck('上面那部手机跟着画这一套（预览底＝这套的页面底）',
     p1.mock.page === themeOf(targetKey).page, `${p1.mock.page} vs ${themeOf(targetKey).page}`)
   ck('勾只有一枚，且跟着挪到刚点那一枚', (await page.$$('.wp-dot')).length === 1
@@ -121,21 +144,24 @@ const enter = async (mp) => {
   ck('再点已在用的那一枚不重复走一遍', p3.currentWallpaper === targetKey && p3.applying === false)
 
   // ---------- ③ 存过旧值（含已被撤的深色两枚）的人要能自愈 ----------
-  // 10-04 之前这条判的是"深色那两枚打回 default"；现在四枚之外没有第五枚，
-  // 收口改在 WALLPAPER_ALIAS 那一层：gradient-purple → 象牙。症状一样（进页必须有一枚在用），
-  // 但落点变了，所以这里钉的是**解析后的 canonical key**，不是原样吐回存储里那个脏值。
-  await mp.evaluate(() => wx.setStorageSync('localWallpaper', 'gradient-purple'))
-  page = await enter(mp)
-  await sleep(4000)
-  const p4 = await page.data()
-  ck('本机存着旧那枚夜紫，进页读到的在用壁纸解析成象牙', p4.currentWallpaper === 'tint-paper', p4.currentWallpaper)
-  ck('本页主题类名也不再是 theme-purple', !/theme-purple/.test(p4.themeClass || ''), p4.themeClass)
-  ck(`这一排仍是 ${N} 枚（屏蔽不是把格子画空）`, (await page.$$('.wp-chip')).length === N)
+  // 这一节原来是往本机写一个 'localWallpaper' 脏值、再进页看它解析成什么。那条旁路 10-04 撤净了，
+  // 本机这个键已经没人读——再写它就是拿一段死代码当被测对象（会永真）。改成直接问 app.getWallpaper：
+  // 服务端存的那个原值（六枚旧值都还收得下）经 WALLPAPER_ALIAS 解析后必须是四枚之一的 key。
+  const resolved = await mp.evaluate(() => {
+    const g = getApp()
+    return {
+      purple: g.getWallpaper('gradient-purple'),
+      ocean: g.getWallpaper('gradient-ocean'),
+      legacy: g.getWallpaper('default'),
+      dirty: g.getWallpaper('not-a-theme-at-all'),
+    }
+  })
+  ck('旧值夜紫解析成象牙', resolved.purple === 'tint-paper', resolved.purple)
+  ck('旧值深海并到象牙（六枚压四枚那条）', resolved.ocean === 'tint-paper', resolved.ocean)
+  ck('default 也落到象牙，选择条才有一格亮着', resolved.legacy === 'tint-paper', resolved.legacy)
+  ck('脏值不报错、退到兜底那一枚', resolved.dirty === 'tint-paper', resolved.dirty)
+  ck('这一排仍是 ' + N + ' 枚（屏蔽不是把格子画空）', (await page.$$('.wp-chip')).length === N)
   await mp.screenshot({ path: `${OUT}/实测-深色已屏蔽.png` })
-  await mp.evaluate((raw) => {
-    if (raw) wx.setStorageSync('localWallpaper', raw)
-    else wx.removeStorageSync('localWallpaper')
-  }, startLocal)
 
   // ---------- ④ 英文态那一排的名字放不放得下（他截图就是英文） ----------
   await lang.pin(mp, 'en')
@@ -162,8 +188,8 @@ const enter = async (mp) => {
   await lang.pin(mp, langBefore)
 
   // ---------- 还原 ----------
-  // 把进来那一枚点回去。若它是服务端那四枚之一，这里会真发一次 PUT——
-  // 模拟器登的是测试号，写回的也正是它进来时那套，不留副作用。
+  // 把进来那一枚点回去。四枚现在都会真发一次 PUT（这一趟登的是测试号），
+  // 写回的也正是它进来时那套，不留副作用。
   const backIdx = (pEn.wallpapers || []).findIndex((x) => x.key === start.currentWallpaper)
   const chips2 = await page.$$('.wp-chip')
   if (backIdx >= 0 && backIdx < chips2.length) {
@@ -173,12 +199,16 @@ const enter = async (mp) => {
   const done = await page.data()
   ck('测完把壁纸还原回进页那一枚', done.currentWallpaper === start.currentWallpaper,
     `${start.currentWallpaper} ← ${done.currentWallpaper}`)
-  // 还原之后本机那份该落到什么值，是从 setWallpaper 那条规则算出来的，不是"进来时是什么就是什么"：
-  // 带 local 标记的两枚写回自己，其余那四枚要删掉本机这份、让服务端当家。
-  const expectLocal = themeOf(start.currentWallpaper).local ? start.currentWallpaper : '(空)'
+  // 这一把一共该发两次 PUT：点象牙/天青那一次、还原这一次，且第二次的值必须等于进来那一枚——
+  // 这条同时钉住两件事：四枚都走服务端（不再有"只存本机"那一支），以及测试号的外观被写回去了、
+  // 没留下我们造的状态。
+  const endPuts = await puts()
+  ck('全程正好两次 PUT，第二次把服务端写回进页那一枚',
+    endPuts.length === 2 && endPuts[0] === targetKey && endPuts[1] === start.currentWallpaper,
+    JSON.stringify(endPuts))
   const finalLocal = await readLocal(mp)
-  ck('本机偏好落到「进页那一枚」该有的值', finalLocal === expectLocal,
-    `${startLocal} → ${finalLocal}（期望 ${expectLocal}）`)
+  ck('本机那份从头到尾没被写过（那条旁路撤净了）', startLocal === '(空)' && finalLocal === '(空)',
+    `${startLocal} → ${finalLocal}`)
   console.log(bad.length ? `\n${bad.length} 条不过：${bad.join(' / ')}` : '\n全过')
   process.exitCode = bad.length ? 1 : 0
   mp.disconnect()

@@ -29,6 +29,12 @@ WALLPAPER_PRESETS = [
     "gradient-sunset",
     "gradient-purple",
     "gradient-ocean",
+    # 四套莫兰迪里那三枚原来只存本机（站长 10-04 拍「统一」）：加进白名单之后它们的持久化
+    # 和雨雾那枚走同一条路，换手机/重装不再丢。旧六个值一个都不能删——存量还得收得下，
+    # 否则那 18 个账号里存着 default / gradient-ocean 的人下次 PUT 直接 400。
+    "tint-paper",
+    "tint-celadon",
+    "tint-blush",
 ]
 
 LANGUAGE_OPTIONS = ["zh", "en"]

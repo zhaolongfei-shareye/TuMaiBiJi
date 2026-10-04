@@ -33,7 +33,6 @@ from app.db.database import Base, SessionLocal, engine
 from app.main import app
 from app.models.invitation import Invitation
 from app.models.note import Note
-from app.models.share import Share
 from app.models.user import User
 from app.services import quota
 
@@ -262,9 +261,6 @@ class Test额度接口:
             "reward_each": 10,
             "import_each": 1,
             "invites_rewarded": 0,
-            # 首页顶部那三列的后两列：公开中的笔记数、收藏过你的不同人数
-            "shares_active": 0,
-            "saved_by_users": 0,
         }
 
     def test_客户端只要读mind_不许自己相加(self, client, db, monkeypatch):
@@ -818,67 +814,3 @@ class Test审查补的两条:
         db.expire_all()
         assert db.get(User, author.id).quota_bonus == 0
         assert db.query(Invitation).count() == 0
-
-
-class Test首页那三列:
-    """首页顶部三列里后两列的口径。站长 10-01 原话"数按照真实来算，避免用户刷量"，
-    落成两条判据：一条不许"自己开关一下就能把数字刷大"，一条不许"一个人上头顶十个人"。"""
-
-    def share(self, client, user, note_id):
-        r = client.post("/api/shares/", json={"note_id": note_id}, headers=hdr(user))
-        assert r.status_code == 200, r.text
-        return r.json()["token"]
-
-    def revoke(self, client, user, note_id):
-        r = client.post("/api/shares/revoke", json={"note_id": note_id}, headers=hdr(user))
-        assert r.status_code == 200, r.text
-
-    def test_分享数只数当前公开中的那几篇(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
-        me = mk_user(db, "col-shares")
-        a = create_note(client, me, "甲篇").json()["id"]
-        b = create_note(client, me, "乙篇").json()["id"]
-        col = lambda: client.get("/api/user/quota", headers=hdr(me)).json()["shares_active"]
-
-        assert col() == 0, "一篇都没公开"
-        self.share(client, me, a)
-        assert col() == 1
-        self.revoke(client, me, a)
-        assert col() == 0, "撤掉的码不该还算在脸上"
-        self.share(client, me, a)
-        self.share(client, me, b)
-        assert col() == 2, "两篇各自公开中，数的是篇不是码"
-
-    def test_同一篇开撤开三次_脸上那个数不涨(self, client, db, monkeypatch):
-        """这一条就是"避免刷量"的本体：换成"累计发出过几张码"的口径，这里会是 4。"""
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
-        me = mk_user(db, "col-farm")
-        a = create_note(client, me, "就这一篇").json()["id"]
-        for _ in range(3):
-            self.share(client, me, a)
-            self.revoke(client, me, a)
-        self.share(client, me, a)
-
-        body = client.get("/api/user/quota", headers=hdr(me)).json()
-        assert body["shares_active"] == 1, body
-        assert db.query(Share).count() >= 4, "作废的码确实还留在表里（关而不删），但只数公开中的那一张"
-
-    def test_收藏数按人去重_一个人存三篇只算一个人(self, client, db, monkeypatch):
-        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
-        author = mk_user(db, "col-author")
-        fan = mk_user(db, "col-fan")
-        other = mk_user(db, "col-other")
-        tokens = [
-            self.share(client, author, create_note(client, author, f"第{i}篇").json()["id"])
-            for i in range(3)
-        ]
-        for tk in tokens:
-            assert client.post("/api/notes/from-share", json={"token": tk}, headers=hdr(fan)).status_code == 200
-
-        body = client.get("/api/user/quota", headers=hdr(author)).json()
-        assert body["saved_by_users"] == 1, "同一个人上头存了你三篇，也只算有一个人在收藏"
-        assert body["bonus"] == 3 * quota.IMPORT_REWARD, "加分那一头仍按篇算——两个数是两件事，别拿一个当两个用"
-
-        assert client.post("/api/notes/from-share", json={"token": tokens[0]}, headers=hdr(other)).status_code == 200
-        body = client.get("/api/user/quota", headers=hdr(author)).json()
-        assert body["saved_by_users"] == 2, "第二个人来了才 +1"

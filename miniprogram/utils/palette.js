@@ -255,17 +255,17 @@ function toneVars(categoryId) {
  *    那块 176rpx 的色块直接化在卡上（v3 就踩了这个，10-04 第二轮量出来才改）。
  * ③ 深两档按 WCAG 反解（方块上那行分类名 16px/800 算小字，门槛 4.5），第 5 档再压 6 档。
  *
- * local: true 的那三枚只存本机（见 app.js 里 LOCAL_WALLPAPER_KEY）：后端 WALLPAPER_PRESETS
- * 是现网代码，加 key 要动后端并部署。雨雾故意沿用 gradient-blue 这个旧 key——
- * 旧值还在白名单里、PUT 不报 400，所以这一版零部署。差别只在换手机或重装那一次：
- * 选雨雾的人保留，选另外三枚的人回到服务端记的那一枚（方案文档 §5.4 记着这条不一致）。
+ * 四枚一律走服务端持久化（站长 10-04 拍「统一」）：后端 WALLPAPER_PRESETS 已把这四个 key
+ * 都收进白名单，所以这里不再有 local 标记、app.js 里那套"只存本机"的旁路也撤干净了。
+ * 雨雾沿用 gradient-blue 那个旧 key，象牙/天青/樱落是新加的三枚——旧六个值一个都没删，
+ * 存量账号下次 PUT 不会被 400。（方案文档 §5.4 那条不一致到此结案。）
  *
  * line / lineEdge 只给缩略图里那两条中性描边行用：缩略图每一格画的都是"别的主题"，
  * 它拿不到当前主题的 CSS 变量，六个值必须由 JS 一个个带进去。
  */
 const THEMES = [
   {
-    key: 'tint-paper', cls: 'theme-tint-paper', label: '象牙', labelEn: 'Ivory', local: true,
+    key: 'tint-paper', cls: 'theme-tint-paper', label: '象牙', labelEn: 'Ivory',
     page: '#E2DED4', line: '#F3F3F1', lineEdge: 'rgba(53, 46, 29, 0.13)', dark: false,
     ramp: {
       steps: ['#DCD8CC', '#C9C1AE', '#AFA488', '#766B50', '#645B43'],
@@ -274,7 +274,7 @@ const THEMES = [
     },
   },
   {
-    key: 'tint-celadon', cls: 'theme-tint-celadon', label: '天青', labelEn: 'Celadon', local: true,
+    key: 'tint-celadon', cls: 'theme-tint-celadon', label: '天青', labelEn: 'Celadon',
     page: '#D4E2D7', line: '#F1F3F2', lineEdge: 'rgba(29, 53, 34, 0.13)', dark: false,
     ramp: {
       steps: ['#CCDCCF', '#AEC9B4', '#88AF91', '#4F7557', '#43634A'],
@@ -283,7 +283,7 @@ const THEMES = [
     },
   },
   {
-    key: 'tint-blush', cls: 'theme-tint-blush', label: '樱落', labelEn: 'Blush', local: true,
+    key: 'tint-blush', cls: 'theme-tint-blush', label: '樱落', labelEn: 'Blush',
     page: '#E2D4DB', line: '#F3F1F2', lineEdge: 'rgba(53, 29, 41, 0.13)', dark: false,
     ramp: {
       steps: ['#DCCCD4', '#C9AEBB', '#AF889C', '#8C5F76', '#7A5266'],

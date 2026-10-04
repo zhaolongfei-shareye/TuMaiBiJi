@@ -18,7 +18,7 @@ const i18n = {
     fontFang: '仿宋',
     fontKai: '楷体',
     wallpaperSection: '页面壁纸',
-    wallpaperSubHint: '带色阶的两枚连左侧方块一起换色，其余四枚只换页面底和文字',
+    wallpaperSubHint: '四枚都带整套色阶：页面底、卡底、左侧方块和墨色一起换',
     // 站长 10-04：点色块直接生效，"先试看、再点上面手机"那两步撤了，原来那两句提示跟着删。
     swatchHint: '点下面色块直接生效',
     inUse: '现在在用',
@@ -77,9 +77,8 @@ const i18n = {
     delete: '删除',
     search: '搜索笔记',
     notesHeading: '我的笔记',
-    // 头部那三列的小字（v12）。三个都是服务端算好的状态量，客户端只负责念名字
-    // 第三列站长 10-01 晚改口：「收藏」→「种草」。数是 saved_by_users（收藏过你的不同人数），
-    // 英文那列仍是 Saved——他要的是中文侧换个更贴近微信语境的叫法，不是换口径。
+    // 首页右上角那一列的小字。原来三列（笔记/分享/种草），10-04 站长拍板把后两列废掉：
+    // 分享与种草那两屏本就没做，服务端那两个字段一起撤了，所以这里只留「笔记」一串。
     statNotes: '笔记',
     searchPh: '输入关键词',
     // v19 这一屏（站长 10-03 凌晨拍）：列表区顶上两枚 tab + X 式列表 + 卡片网格。
@@ -149,7 +148,7 @@ const i18n = {
     unshareFailed: '撤掉失败，请稍后再试',
     posterUsing: '当前模板',
     selectWallpaper: '选择壁纸',
-    wallpaperHint: '这台设备上的外观都在这里，换完当场生效',
+    wallpaperHint: '外观都在这里，换完当场生效，下次换手机也还在',
     selectLanguage: '选择语言',
     switched: '已切换',
     applied: '已应用',
@@ -180,7 +179,7 @@ const i18n = {
     pillAbout: '关于',
     meGreeting: '你好！我是图麦笔记',
     // 站长 10-01 晚：这一枚中文侧要有中文名「魅力」，英文侧继续叫 MIND。
-    // 两个 tab 的右上角那档标签都是两格汉字（笔记/分享/种草），字距那条规则才不用另写一份。
+    // 两个 tab 右上角那一档标签都是两格汉字（首页「笔记」、本页「魅力」），字距那条规则不用另写一份。
     brainScore: '魅力',
     officialSite: '产品官网',
     resetWithBioTitle: '重置密码',
@@ -363,7 +362,7 @@ const i18n = {
     fontFang: 'FangSong',
     fontKai: 'Kai',
     wallpaperSection: 'Wallpaper',
-    wallpaperSubHint: 'The two ramped wallpapers also recolour the block beside each note; the other four only change the page',
+    wallpaperSubHint: 'All four are full ramps: the page, the cards, the block beside each note and the ink all change together',
     swatchHint: 'Tap a swatch below to apply',
     inUse: 'In use',
     colon: ': ',
@@ -468,7 +467,7 @@ const i18n = {
     unshared: 'Sharing stopped',
     unshareFailed: 'Could not stop sharing, please try later',
     selectWallpaper: 'Select wallpaper',
-    wallpaperHint: 'Everything here applies to this device and takes effect right away',
+    wallpaperHint: 'Applies right away and follows your account to a new phone',
     selectLanguage: 'Select language',
     switched: 'Switched',
     applied: 'Applied',

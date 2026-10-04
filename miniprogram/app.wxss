@@ -56,7 +56,10 @@ page {
   /* chrome 色彩兜底：这一份就是象牙那一套（THEMES[0]，未登录/脏值都落在这里）。
      下面四个 .theme-* 块各写一份镜像值，等值由色板那把尺子逐枚钉死。 */
   --text-primary: #352E1D;
-  --text-secondary: rgba(53, 46, 29, 0.66);
+  /* 二级字 0.66 → 0.72（站长 10-04 拍）：压在卡底实测象牙/天青只有 4.35/4.38，本来就不过
+     正文门槛 4.5；「我的」那行 LOGO／名称／Slogan 撤掉自己的框退到页底之后更暗（页底比卡底
+     低 ΔL 8 档），同一档只有 3.99~4.34。抬到 .72 是两面同时过线的最低值（.70 还差一点）。 */
+  --text-secondary: rgba(53, 46, 29, 0.72);
   /* 三级字（日期/计数）0.4 → 0.55：现值压在卡底只有 2.35~2.44，连 WCAG 大字门槛 3.0 都不过。
      抬到 0.55 实测 3.4~3.7，仍比二级字浅一档，"这行是次要信息"这件事没丢。 */
   --text-tertiary: rgba(53, 46, 29, 0.55);
@@ -115,7 +118,7 @@ page {
   --bg-card: #F3F3F1;
   --bg-card-glass: rgba(243, 243, 241, 0.85);
   --text-primary: #352E1D;
-  --text-secondary: rgba(53, 46, 29, 0.66);
+  --text-secondary: rgba(53, 46, 29, 0.72);
   --text-tertiary: rgba(53, 46, 29, 0.55);
   --border: rgba(53, 46, 29, 0.09);
   --card-edge: rgba(53, 46, 29, 0.12);
@@ -130,7 +133,7 @@ page {
   --bg-card: #F1F3F2;
   --bg-card-glass: rgba(241, 243, 242, 0.85);
   --text-primary: #1D3522;
-  --text-secondary: rgba(29, 53, 34, 0.66);
+  --text-secondary: rgba(29, 53, 34, 0.72);
   --text-tertiary: rgba(29, 53, 34, 0.55);
   --border: rgba(29, 53, 34, 0.09);
   --card-edge: rgba(29, 53, 34, 0.12);
@@ -145,7 +148,7 @@ page {
   --bg-card: #F3F1F2;
   --bg-card-glass: rgba(243, 241, 242, 0.85);
   --text-primary: #351D29;
-  --text-secondary: rgba(53, 29, 41, 0.66);
+  --text-secondary: rgba(53, 29, 41, 0.72);
   --text-tertiary: rgba(53, 29, 41, 0.55);
   --border: rgba(53, 29, 41, 0.09);
   --card-edge: rgba(53, 29, 41, 0.12);
@@ -163,7 +166,7 @@ page {
   --bg-card: #F1F2F3;
   --bg-card-glass: rgba(241, 242, 243, 0.85);
   --text-primary: #212431;
-  --text-secondary: rgba(33, 36, 49, 0.66);
+  --text-secondary: rgba(33, 36, 49, 0.72);
   --text-tertiary: rgba(33, 36, 49, 0.55);
   --border: rgba(33, 36, 49, 0.09);
   --card-edge: rgba(33, 36, 49, 0.12);

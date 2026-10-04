@@ -110,17 +110,6 @@ Page({
     const { lang } = this.data
     const app = getApp()
 
-    // 带色阶那两枚只存在本机：后端 PUT /api/user/wallpaper 有一张 WALLPAPER_PRESETS 白名单，
-    // 那是现网代码，加 key 就要动后端并部署，所以这一类不写库、不跨设备。
-    // 表现上的差别：换设备或删掉小程序重装，会回到服务端记着的那一枚。
-    if (themeOf(key).local) {
-      app.setWallpaper(key)
-      app.applyTheme(key)
-      this.onShow()
-      wx.showToast({ title: t('applied', lang), icon: 'success' })
-      return
-    }
-
     this.setData({ applying: true })
     try {
       await api.updateWallpaper(key)

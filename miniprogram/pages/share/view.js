@@ -96,4 +96,14 @@ Page({
       path: `/pages/share/view?token=${share.token}`,
     }
   },
+
+  // 朋友圈那条只能带 query、改不了路径，所以它开的就是本页；token 带上，点开看到的还是这一篇。
+  onShareTimeline() {
+    const { share } = this.data
+    if (!share) return {}
+    return {
+      title: share.title || t('appName', this.data.lang),
+      query: `token=${share.token}`,
+    }
+  },
 })

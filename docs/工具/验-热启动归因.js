@@ -265,10 +265,10 @@ async function main() {
     check('那一枚是数字而不是空（后端 /api/user/quota 通了）', /^\d+$/.test(String(me.scoreText || '')), me.scoreText)
     check('界面上那个数就是接口回的 mind（页面没自己算 100 + bonus）',
       String((me.q && me.q.mind) || '') === String(me.scoreText), { scoreText: me.scoreText, mind: me.q && me.q.mind })
-    // v12 起多了两个键：shares_active（当前公开中的篇数）与 saved_by_users（收藏过你的不同人数），
-    // 首页顶部那三列就靠它们。没有"还剩几次"这一档（次数不封顶，回它就是假话）。
-    check('接口回的是不限量那一套十二个字段',
-      !!me.q && Object.keys(me.q).sort().join(',') === 'base,bonus,categories,import_each,invites_rewarded,limit,mind,remaining,reward_each,saved_by_users,shares_active,used',
+    // 10-04：首页右上角那三列压成一列之后，「分享」「种草」两个数没有脸了，后端那两个键
+    // 也一起删掉（站长原话"已经废弃，可以干掉"）。没有"还剩几次"这一档（次数不封顶，回它就是假话）。
+    check('接口回的是不限量那一套十个字段',
+      !!me.q && Object.keys(me.q).sort().join(',') === 'base,bonus,categories,import_each,invites_rewarded,limit,mind,remaining,reward_each,used',
       me.q && Object.keys(me.q).sort().join(','))
     // 10-02：「推荐图麦」那一行右边的「新写作者 +10」撤了，服务端这个奖励数现在只在
     // 「我的」页那块魅力值规则的第二行。旧那条"分享那一行那句承诺"整条作废。
@@ -290,15 +290,17 @@ async function main() {
         keys: (d.stats || []).map((x) => x.key).join('｜'),
         // 标签不写死中文：这一把会在第 8 节真登录一次，测试号在服务端存的是 en，
         // 于是界面就是英文标签。比对页面自己那份 t，才既钉住顺序又钉住"用的是字典"。
-        labels: (d.stats || []).map((x) => (d.t || {})[{ notes: 'statNotes', shares: 'statShares', saved: 'statSaved' }[x.key]]).join('｜'),
+        labels: (d.stats || []).map((x) => (d.t || {})[{ notes: 'statNotes' }[x.key]]).join('｜'),
+        statNotes: (d.t || {}).statNotes,
         lang: d.lang, bg: !!d.bgSrc }
     })
     console.log('  ', JSON.stringify(home))
     check('首页在且没报错', /index/.test(home.route) && !home.loadError, home)
-    check('头部那三列渲染出来了：顺序是笔记→分享→收藏，标签逐字等于页面字典那三个',
-      home.keys === 'notes｜shares｜saved' && /^\S+｜\S+｜\S+$/.test(home.stats || '')
-      && ['statNotes', 'statShares', 'statSaved'].every((k, i) => home.labels.split('｜')[i]),
-      `${home.keys} = ${home.stats}（${home.lang}）`)
+    // labels 是"按 key 查字典"查出来的，statNotes 是字典里那个原值：两边都来自页面但走的是
+    // 两条路，key 写错或字典漏键就会一边空一边有——所以这个等式不是自己跟自己比。
+    check('右上角只剩「笔记」一列，标签取自页面字典（分享/种草两列已废）',
+      home.keys === 'notes' && /^\d+$/.test(home.stats || '') && !!home.statNotes && home.labels === home.statNotes,
+      `${home.keys} = ${home.stats}（${home.lang}／${home.labels}）`)
     check('图区那一段还在铺图（v12 只是收了高度，没撤掉图）', home.bg === true, home.bg)
     await mp.screenshot({ path: SHOT + '/15-首页.png' })
     console.log('  截图：' + SHOT + '/15-首页.png')
