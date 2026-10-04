@@ -171,10 +171,11 @@ Page({
       count: 1,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
-      // 只要一张圆图，用不着原图。iPhone 直出的一张 12MP 照片能到 4~6MB，而小程序本地
-      // 用户文件目录一共只有 10MB——四个槽就是十几兆，挑四张原图直接写满；再往画布上
-      // 解码那种大图，低端安卓还会崩。压缩图 1~2MB，圆形看不出差别。
-      sizeType: ['compressed'],
+      // 挑原图，不用微信那档 compressed：它给竖图只到 750 宽（实测存下来 750×1448），
+      // 而头部那一段是 `width:750rpx`＝整屏宽，真机 1116 物理像素，750 的源件被放大 1.49 倍
+      // ——站长 10-04 报的"底图看上去被拉伸"就是这一条。落盘前由 poster.mintAvatar
+      // 自己缩到 1440 宽（实测 300~500KB 一张），10MB 本机配额照样够四个槽用。
+      sizeType: ['original'],
       success: async (res) => {
         const temp = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
         if (!temp) return

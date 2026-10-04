@@ -16,6 +16,7 @@ const PREFIX = 'poster-avatar'
 
 function makeFs({ strictOverwrite }) {
   const files = new Set()
+  const copyCalls = []
   const fm = {
     accessSync(p) {
       if (!files.has(p)) throw { errMsg: 'accessSync:fail no such file or directory' }
@@ -37,19 +38,50 @@ function makeFs({ strictOverwrite }) {
       }
       files.delete(o.destPath)
       files.add(o.destPath)
+      copyCalls.push({ srcPath: o.srcPath, destPath: o.destPath })
       done(o.success, {})
     },
   }
   const store = {}
+  // 10-04 起 mintAvatar 落盘前要先过 wx.compressImage（把图缩到能铺满一屏的宽度）。
+  // 假机器没有真图可压，就回一个"压缩产物"的新临时名——微信给的正是这种跟输入无关的路径，
+  // 所以这一层能同时量到两件事：复制的是压缩后那份（不是挑来的那个名），以及传下去的参数。
+  // machine.cmp=false 那台用来钉"压不动时退回挑来的那一份"。
+  const machine = { cmp: true, sizes: {} }
+  const cmpCalls = []
+  let cmpN = 0
   global.wx = {
     env: { USER_DATA_PATH: UD },
     getFileSystemManager: () => fm,
+    // 10-04 那一步优化前先读宽度（微信的 compressImage 会把窄图放大，实测 865→1440）。
+    // 默认按"挑来的都是大图"给，只有 machine.sizes 里点名的路径才给别的宽度。
+    getImageInfo(o) {
+      const s = machine.sizes[o.src] || { width: 2400, height: 3200 }
+      setTimeout(() => o.success && o.success({ path: o.src, ...s }), 0)
+    },
+    compressImage(o) {
+      const done = (cb, arg) => setTimeout(() => cb && cb(arg), 0)
+      if (!o || typeof o.src !== 'string' || !files.has(o.src)) {
+        done(o && o.fail, { errMsg: 'compressImage:fail no such file or directory' })
+        return
+      }
+      if (!machine.cmp) {
+        done(o.fail, { errMsg: 'compressImage:fail 这台假机器没有压缩能力' })
+        return
+      }
+      cmpCalls.push({ src: o.src, width: o.compressedWidth, quality: o.quality })
+      // 微信回的是它自己的临时目录，不在本机那 10MB 配额里——路径要按这个来，
+      // 否则"没进槽的临时件不该算在头像名单里"这条就量不到。
+      const out = `/wxtemp/cmp-${++cmpN}.img`
+      files.add(out)
+      done(o.success, { tempFilePath: out, errMsg: 'compressImage:ok' })
+    },
     // 真机上 getStorageSync 对没写过的 key 回空串（不是 undefined），
     // 名单读出来说话不照这个来，就等于没验到那条 guard。
     getStorageSync: (k) => (k in store ? store[k] : ''),
     setStorageSync: (k, v) => { store[k] = JSON.parse(JSON.stringify(v)) },
   }
-  return { files, store, add: (p) => files.add(p) }
+  return { files, store, cmpCalls, copyCalls, machine, add: (p) => files.add(p) }
 }
 
 const posterPath = path.resolve(__dirname, '../../miniprogram/utils/poster.js')
@@ -84,6 +116,27 @@ const pick = async (poster, slots, i, src) => {
     )
     ck(rejected, '这台"真机"在目标已存在时确实回 fail（尺子有效）')
   }
+  {
+    // 压缩这一步在真机上有失败的可能（老基础库没有这个接口、HEIC、或微信自己拒了）。
+    // 这里把假机器的压缩关掉，走一次完整的 mintAvatar：既然要退回"挑来的那一份"，
+    // 复制的源件就必须是 temp9.img 本身——它要是被压缩产物顶掉，这条就红。
+    const fs2 = makeFs({ strictOverwrite: true })
+    fs2.machine.cmp = false
+    fs2.add(`${UD}/temp9.img`)
+    const p9 = await loadPoster().mintAvatar(`${UD}/temp9.img`)
+    ck(fs2.files.has(p9) && fs2.cmpCalls.length === 0, '压缩这一步不通时，退回挑来的那一份照样落盘', p9)
+  }
+  {
+    // 挑来的本来就不宽（比如从聊天记录里存下来的 800 宽的图）：这时压一次只是被微信放大，
+    // 细节没多、本机那 10MB 反而多吃一份。所以这条钉的是"根本不进压缩那一步"。
+    const fs3 = makeFs({ strictOverwrite: true })
+    fs3.machine.sizes[`${UD}/temp8.img`] = { width: 800, height: 1540 }
+    fs3.add(`${UD}/temp8.img`)
+    const p8 = await loadPoster().mintAvatar(`${UD}/temp8.img`)
+    ck(fs3.cmpCalls.length === 0, '挑来的窄于目标宽时不压（微信那一步会把它放大）', JSON.stringify(fs3.cmpCalls))
+    ck(fs3.copyCalls.length === 1 && fs3.copyCalls[0].srcPath === `${UD}/temp8.img`,
+      '窄图直接按挑来的那份落盘', fs3.copyCalls.map((c) => c.srcPath).join(','))
+  }
 
   const fs = makeFs({ strictOverwrite: true })
   const poster = loadPoster()
@@ -101,6 +154,20 @@ const pick = async (poster, slots, i, src) => {
   ck(p0 !== p1, `连着放两张，落到两个不同文件上（${p0} ≠ ${p1}）`)
   ck(p0.indexOf(PREFIX) >= 0 && p1.indexOf(PREFIX) >= 0, '两张都在头像前缀下，没跑到别的目录里')
   ck(fs.files.has(p0) && fs.files.has(p1), '两张都真在本机存着')
+
+  // 10-04 那一条：底图糊是因为源件只有 750 宽却铺 1116 的屏。落盘前自己缩一档，
+  // 这一层量的就是这个动作到底发生了、参数给对没有、复制的是压缩产物而不是挑来的那张。
+  const PHYS_W_FLOOR = 1116
+  ck(fs.cmpCalls.length === 2, '两张各过了一次压缩', fs.cmpCalls.length)
+  ck(fs.cmpCalls.every((c) => c.src === `${UD}/temp1.img` || c.src === `${UD}/temp2.img`),
+    '压缩吃的是挑来的那个临时路径', fs.cmpCalls.map((c) => c.src).join(','))
+  ck(fs.cmpCalls.every((c) => c.width >= PHYS_W_FLOOR), `压缩目标宽 ≥ 铺满一屏的下限 ${PHYS_W_FLOOR}`,
+    fs.cmpCalls.map((c) => c.width).join(','))
+  ck(fs.cmpCalls.every((c) => c.quality > 1 && c.quality <= 100),
+    'quality 落在官方那个 0～100 区间（0.82 这种写法是按 100 取最低画质，越压越糊）',
+    fs.cmpCalls.map((c) => c.quality).join(','))
+  ck(fs.copyCalls.length === 2 && fs.copyCalls.every((c, i) => c.srcPath === `/wxtemp/cmp-${i + 1}.img`),
+    '写进本机那份的是压缩产物，不是挑来的原图', fs.copyCalls.map((c) => c.srcPath).join(','))
   ck(poster.readProfile().avatarPath === '', 'storage 里那栏旧头像一直是空的（真相只有 images 一处）')
 
   // 第 3 格放第三张，再自己在图上勾「卡片」：顶上别人那张之后，被顶的不能跟着被删

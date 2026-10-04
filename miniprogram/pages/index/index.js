@@ -993,8 +993,9 @@ Page({
       count: 1,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
-      // 只要一张圆图，用不着原图：本地用户文件目录一共 10MB（同 profile.js 那条）。
-      sizeType: ['compressed'],
+      // 挑原图，落盘前由 poster.mintAvatar 自己缩到 1440 宽（同 profile.js 那一条，
+      // 微信的 compressed 那档竖图只给到 750 宽，铺满整屏会被放大 1.49 倍发糊）。
+      sizeType: ['original'],
       success: async (res) => {
         const temp = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
         if (!temp) return

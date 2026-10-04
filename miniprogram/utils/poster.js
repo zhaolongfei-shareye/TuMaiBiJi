@@ -291,13 +291,57 @@ function copyTo(src, dest) {
 // 本地目录一共 10MB，所以这一页临时生成、最后没留下的那些张必须收掉——见 dropUncommitted。
 let minted = []
 
+// 挑回来的图先自己缩一档再落盘，目标宽度＝铺满一屏还留余量。
+// 为什么不用 wx.chooseMedia 的 sizeType:['compressed'] 那一步替我们做：微信那档压缩是按
+// 它自己的标准来的，竖图实测只给到 750 宽（站长模拟器里存下来的那张就是 750×1448）。
+// 而头部那一段画的是 `width:750rpx`＝整屏宽，他真机屏宽 1116 物理像素——750 的源件被放大
+// 1.49 倍，这就是"上传了精致的底图，看上去却被拉伸"的全部原因（宽高比没坏，是分辨率不够）。
+// 1440 这一档覆盖到 3x 高密度机（1290/1440）；原图 4~6MB 只在临时目录过一下，落盘这份
+// 实测 300~500KB，四个槽不到 2MB，仍在 10MB 配额里，比挑原图直接落盘安全得多。
+const BG_TARGET_W = 1440
+
+function shrinkForBand(tempPath) {
+  return new Promise((resolve) => {
+    // 先读尺寸，只有比目标宽才压：实测 wx.compressImage 会把窄图放大（10-04 模拟器里
+    // 865 宽的源件给 compressedWidth:1440，回来的就是 1440 宽）。那一步只是把同一份
+    // 信息摊大——多不出细节，还白占本机那 10MB 配额。
+    wx.getImageInfo({
+      src: tempPath,
+      success: (info) => {
+        if (!info || !info.width || info.width <= BG_TARGET_W) { resolve(tempPath); return }
+        compress(tempPath).then(resolve)
+      },
+      // 读不出尺寸就按"不用压"处理：这一步是优化，不能把选图整个弄失败
+      fail: () => resolve(tempPath),
+    })
+  })
+}
+
+function compress(tempPath) {
+  return new Promise((resolve) => {
+    wx.compressImage({
+      src: tempPath,
+      // quality 的官方范围是 0～100（"仅对 jpg 有效"），不是 0～1——写成 0.82 会按 100 档
+      // 取到最低画质，反而更糊。
+      quality: 82,
+      // 只给宽，官方类型定义写明"若不填写 compressedHeight 则默认以 compressedWidth 为准等比缩放"
+      compressedWidth: BG_TARGET_W,
+      // 压不动就退回挑来的那一份：宁可大一点，也不因为一步优化把选图整个弄失败
+      success: (res) => resolve((res && res.tempFilePath) || tempPath),
+      fail: () => resolve(tempPath),
+    })
+  })
+}
+
 function mintAvatar(tempPath) {
   const dest = avatarFilePath()
-  return copyTo(tempPath, dest).then((p) => {
-    trackAvatar(p)
-    minted.push(p)
-    return p
-  })
+  return shrinkForBand(tempPath)
+    .then((src) => copyTo(src, dest))
+    .then((p) => {
+      trackAvatar(p)
+      minted.push(p)
+      return p
+    })
 }
 
 // 把这一页的四个槽落进 storage，并删掉"这次不再被任何槽引用"的文件。
