@@ -545,4 +545,378 @@ module.exports = {
       { emitMany: { var: 'qr.layers' } },
     ],
   },
+
+  // 波普四格：黑底上四块版色，形象图转灰后各自压一层半透明版色当四遍套印。
+  popGrid: {
+    id: 'popGrid',
+    min_version: 1,
+    steps: [
+      { let: 's', value: { prim: 'scheme', args: { name: 'pop', categoryId: { var: 'note.category_id' } } } },
+      { let: 'pad', value: 44 },
+      { let: 'gut', value: 10 },
+      { let: 'cellW', value: { '/': [{ '-': [{ var: 'W' }, { var: 'gut' }] }, 2] } },
+      { let: 'cellH', value: 296 },
+      { let: 'gridH', value: { '+': [{ '*': [{ var: 'cellH' }, 2] }, { var: 'gut' }] } },
+      { let: 'qrSize', value: 118 },
+      { let: 'plates', value: { prim: 'plateColors', args: { categoryId: { var: 'note.category_id' } } } },
+
+      { let: 'titleLines', value: { prim: 'fitLines', args: { text: { var: 'note.title' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] }, n: 2, size: 58, bold: true } } },
+      { do: { prim: 'setFont', args: { size: 24 } } },
+      { let: 'sumLines', value: [] },
+      { if: { cond: { truthy: { var: 'note.summary' } }, then: [{ let: 'sumLines', value: { prim: 'fitLines', args: { text: { var: 'note.summary' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] }, n: 2 } } }] } },
+      {
+        let: 'kicker',
+        value: {
+          prim: 'clipTrack',
+          args: {
+            text: { prim: 'joinNonEmpty', args: { sep: ' · ', parts: [{ prim: 'blockName' }, { prim: 'noteDate' }] } },
+            maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] },
+            track: 3,
+            size: 22,
+            bold: true,
+          },
+        },
+      },
+
+      { let: 'kickerY', value: { '+': [{ var: 'gridH' }, 76] } },
+      { let: 'titleTop', value: { '+': [{ var: 'kickerY' }, 34] } },
+      { let: 'titleBottom', value: { '+': [{ var: 'titleTop' }, { '*': [{ '-': [{ len: { var: 'titleLines' } }, 1] }, 70] }, 58] } },
+      { let: 'sumTop', value: { if: [{ truthy: { var: 'sumLines' } }, { '+': [{ var: 'titleBottom' }, 26] }, 0] } },
+      { let: 'sumBottom', value: { if: [{ truthy: { var: 'sumLines' } }, { '+': [{ var: 'sumTop' }, { '*': [{ '-': [{ len: { var: 'sumLines' } }, 1] }, 36] }, 24] }, { var: 'titleBottom' }] } },
+      { let: 'signTop', value: { '+': [{ var: 'sumBottom' }, 44] } },
+      { let: 'sign', value: { prim: 'signRow', args: { x: { var: 'pad' }, y: { var: 'signTop' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, { var: 'qrSize' }, 30] }, size: 28, avatarD: 74, onDark: true } } },
+      { let: 'height', value: { '+': [{ var: 'signTop' }, { max: [{ var: 'sign.h' }, { prim: 'footH', args: { qrSize: { var: 'qrSize' } } }] }, 48] } },
+
+      { emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: { prim: 'token', args: { name: 'hard' } } } },
+      {
+        each: {
+          over: { var: 'plates' }, as: 'c', index: 'pi',
+          do: [
+            { let: 'px', value: { '*': [{ '%': [{ var: 'pi' }, 2] }, { '+': [{ var: 'cellW' }, { var: 'gut' }] }] } },
+            { let: 'py', value: { '*': [{ floor: { '/': [{ var: 'pi' }, 2] } }, { '+': [{ var: 'cellH' }, { var: 'gut' }] }] } },
+            { emit: { k: 'fill', x: { var: 'px' }, y: { var: 'py' }, w: { var: 'cellW' }, h: { var: 'cellH' }, color: { var: 'c' } } },
+            {
+              if: {
+                cond: { var: 'hasAvatar' },
+                then: [{ emit: { k: 'image', key: 'avatar', x: { var: 'px' }, y: { var: 'py' }, w: { var: 'cellW' }, h: { var: 'cellH' }, gray: true, tint: { prim: 'withAlpha', args: { color: { var: 'c' }, alpha: 0.62 } } } }],
+                else: [{ emitOne: { prim: 'glyphPlate', args: { x: { var: 'px' }, y: { var: 'py' }, w: { var: 'cellW' }, h: { var: 'cellH' }, color: { prim: 'withAlpha', args: { color: { prim: 'token', args: { name: 'hard' } }, alpha: 0.2 } } } } }],
+              },
+            },
+          ],
+        },
+      },
+      { emit: { k: 'text', x: { var: 'pad' }, y: { var: 'kickerY' }, lines: [{ var: 'kicker' }], size: 22, weight: 'bold', color: { var: 's.bg' }, track: 3 } },
+      { emit: { k: 'text', x: { var: 'pad' }, y: { '+': [{ var: 'titleTop' }, 58] }, lines: { var: 'titleLines' }, lh: 70, size: 58, weight: 'bold', color: { prim: 'token', args: { name: 'paper' } } } },
+      // 这两处白不是 token：PAPER 是"纸"，这两处是"压在黑底上的一档白字色"，planner 里就是写死的 rgba。
+      { if: { cond: { truthy: { var: 'sumLines' } }, then: [{ emit: { k: 'text', x: { var: 'pad' }, y: { '+': [{ var: 'sumTop' }, 24] }, lines: { var: 'sumLines' }, lh: 36, size: 24, color: 'rgba(255,255,255,0.7)' } }] } },
+      { emitMany: { var: 'sign.layers' } },
+      { let: 'qr', value: { prim: 'qrSticker', args: { x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'qrSize' }] }, y: { var: 'signTop' }, size: { var: 'qrSize' }, offset: { var: 's.accent' }, ink: 'rgba(255,255,255,0.66)', label: { prim: 'i18n', args: { key: 'scanToView' } } } } },
+      { emitMany: { var: 'qr.layers' } },
+    ],
+  },
+
+  // 网点波普：上半截网点天，标题套印错位画两遍，白卡带硬偏移，序号点走白底。
+  popDots: {
+    id: 'popDots',
+    min_version: 1,
+    steps: [
+      { let: 's', value: { prim: 'scheme', args: { name: 'pop', categoryId: { var: 'note.category_id' } } } },
+      { let: 'pad', value: 46 },
+      { let: 'avatarD', value: 200 },
+      { let: 'qrSize', value: 116 },
+      { let: 'light', value: { prim: 'mix', args: { c1: { var: 's.bg' }, c2: '#FFFFFF', w: 0.66 } } },
+      // 主墨往 HARD 里渗这组的底色：权重是 HARD 的占比，写反过一次，描边就成了亮蓝。
+      { let: 'dark', value: { prim: 'mix', args: { c1: { prim: 'token', args: { name: 'hard' } }, c2: { var: 's.bg' }, w: 0.85 } } },
+
+      {
+        let: 'kicker',
+        value: {
+          prim: 'clipTrack',
+          args: {
+            text: { prim: 'joinNonEmpty', args: { sep: ' · ', parts: [{ prim: 'blockName' }, { prim: 'sourceLabel' }] } },
+            maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, { var: 'avatarD' }, 24] },
+            track: 2,
+            size: 22,
+            bold: true,
+          },
+        },
+      },
+      { let: 'titleLines', value: { prim: 'fitLines', args: { text: { var: 'note.title' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] }, n: 3, size: 76, bold: true } } },
+      { do: { prim: 'setFont', args: { size: 26 } } },
+      { let: 'sumLines', value: [] },
+      { if: { cond: { truthy: { var: 'note.summary' } }, then: [{ let: 'sumLines', value: { prim: 'fitLines', args: { text: { var: 'note.summary' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, 56] }, n: 3 } } }] } },
+      { let: 'points', value: { prim: 'points', args: { limit: 2, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, 120] }, size: 25 } } },
+
+      { let: 'kickerY', value: 100 },
+      { let: 'titleTop', value: { '+': [{ max: [{ '+': [{ var: 'kickerY' }, 60] }, { '+': [{ var: 'avatarD' }, 56] }] }, 76] } },
+      { let: 'titleBottom', value: { '+': [{ var: 'titleTop' }, { '*': [{ '-': [{ len: { var: 'titleLines' } }, 1] }, 88] }, 76] } },
+      { let: 'cardTop', value: { '+': [{ var: 'titleBottom' }, 40] } },
+      { let: 'cardH', value: { '+': [44, { if: [{ truthy: { var: 'sumLines' } }, { '+': [{ '*': [{ '-': [{ len: { var: 'sumLines' } }, 1] }, 40] }, 34, 22] }, 0] }, { if: [{ truthy: { var: 'points' } }, { '*': [{ len: { var: 'points' } }, 44] }, 0] }, 20] } },
+      { let: 'signTop', value: { '+': [{ var: 'cardTop' }, { var: 'cardH' }, 44] } },
+      // 上面已经有一枚大头像了，署名行只留字：同一张脸上出现两次自己很难看
+      { let: 'sign', value: { prim: 'signRow', args: { x: { var: 'pad' }, y: { var: 'signTop' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, { var: 'qrSize' }, 30] }, size: 28, avatarD: 74, hasAvatar: false } } },
+      { let: 'height', value: { '+': [{ var: 'signTop' }, { max: [{ var: 'sign.h' }, { prim: 'footH', args: { qrSize: { var: 'qrSize' } } }] }, 48] } },
+
+      { emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: { var: 'light' } } },
+      { emit: { k: 'dots', x: 0, y: 0, w: { var: 'W' }, h: { '-': [{ var: 'cardTop' }, 20] }, gap: 26, r: 4.5, color: { var: 's.dot' }, oddRowShift: 13 } },
+      // 套印错位：同一句标题先按强调色往右下偏 9px 画一遍，再用主墨色压在原位画
+      { emit: { k: 'text', x: { '+': [{ var: 'pad' }, 13] }, y: { '+': [{ var: 'titleTop' }, 89] }, lines: { var: 'titleLines' }, lh: 88, size: 76, weight: 'bold', color: { var: 's.accent' } } },
+      { emit: { k: 'text', x: { var: 'pad' }, y: { '+': [{ var: 'titleTop' }, 76] }, lines: { var: 'titleLines' }, lh: 88, size: 76, weight: 'bold', color: { var: 'dark' } } },
+      { emit: { k: 'rrect', x: { '-': [{ var: 'pad' }, 8] }, y: { '-': [{ var: 'kickerY' }, 30] }, w: { '+': [{ prim: 'trackWidth', args: { text: { var: 'kicker' }, track: 2 } }, 32] }, h: 44, r: 22, fill: { var: 's.accent' } } },
+      { emit: { k: 'text', x: { '+': [{ var: 'pad' }, 8] }, y: { var: 'kickerY' }, lines: [{ var: 'kicker' }], size: 22, weight: 'bold', color: { var: 's.accentInk' }, track: 2 } },
+      {
+        if: {
+          cond: { var: 'hasAvatar' },
+          then: [{ emit: { k: 'avatar', x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: 40, d: { var: 'avatarD' }, ring: 10, ringColor: { var: 'dark' }, fallback: { prim: 'withAlpha', args: { color: { var: 'dark' }, alpha: 0.16 } } } }],
+          else: [{ emitOne: { prim: 'glyphPlate', args: { x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: 40, w: { var: 'avatarD' }, h: { var: 'avatarD' }, color: { prim: 'withAlpha', args: { color: { var: 'dark' }, alpha: 0.18 } } } } }],
+        },
+      },
+      { emit: { k: 'rrect', x: { '+': [{ var: 'pad' }, 12] }, y: { '+': [{ var: 'cardTop' }, 12] }, w: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] }, h: { var: 'cardH' }, r: 28, fill: { prim: 'withAlpha', args: { color: { var: 'dark' }, alpha: 0.9 } } } },
+      { emit: { k: 'rrect', x: { var: 'pad' }, y: { var: 'cardTop' }, w: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] }, h: { var: 'cardH' }, r: 28, fill: { prim: 'token', args: { name: 'paper' } }, stroke: { var: 'dark' }, strokeWidth: 4 } },
+      { let: 'cy', value: { '+': [{ var: 'cardTop' }, 44] } },
+      {
+        if: {
+          cond: { truthy: { var: 'sumLines' } },
+          then: [
+            { emit: { k: 'text', x: { '+': [{ var: 'pad' }, 28] }, y: { var: 'cy' }, lines: { var: 'sumLines' }, lh: 40, size: 26, color: { prim: 'token', args: { name: 'body' } } } },
+            { let: 'cy', value: { '+': [{ var: 'cy' }, { '*': [{ '-': [{ len: { var: 'sumLines' } }, 1] }, 40] }, 56] } },
+          ],
+        },
+      },
+      {
+        each: {
+          over: { var: 'points' }, as: 'p', index: 'pi',
+          do: [
+            { let: 'py', value: { '+': [{ var: 'cy' }, { '*': [{ var: 'pi' }, 44] }] } },
+            // 序号点用白底：这组的底色本身就有浅的，蓝底压蓝字的"1"根本认不出来
+            { emit: { k: 'circle', x: { '+': [{ var: 'pad' }, 46] }, y: { '+': [{ var: 'py' }, -9] }, r: 18, fill: { prim: 'token', args: { name: 'paper' } }, stroke: { var: 'dark' }, strokeWidth: 3 } },
+            { emit: { k: 'text', x: { '+': [{ var: 'pad' }, 46] }, y: { '+': [{ var: 'py' }, -2] }, lines: [{ str: { '+': [{ var: 'pi' }, 1] } }], size: 20, weight: 'bold', color: { var: 'dark' }, align: 'center' } },
+            { emit: { k: 'text', x: { '+': [{ var: 'pad' }, 78] }, y: { var: 'py' }, lines: [{ var: 'p' }], size: 25, color: { prim: 'token', args: { name: 'ink' } } } },
+          ],
+        },
+      },
+      { emitMany: { var: 'sign.layers' } },
+      { let: 'qr', value: { prim: 'qrSticker', args: { x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'qrSize' }] }, y: { var: 'signTop' }, size: { var: 'qrSize' }, offset: { var: 's.accent' }, ink: { var: 'dark' }, label: { prim: 'i18n', args: { key: 'scanToView' } } } } },
+      { emitMany: { var: 'qr.layers' } },
+    ],
+  },
+
+  // 荧光渐变：人像后面托一团径向光，下半截压一层暗，要点走胶囊底。
+  acid: {
+    id: 'acid',
+    min_version: 1,
+    steps: [
+      { let: 's', value: { prim: 'scheme', args: { name: 'neon', categoryId: { var: 'note.category_id' } } } },
+      { let: 'pad', value: 48 },
+      { let: 'avatarD', value: 380 },
+      { let: 'qrSize', value: 118 },
+      { let: 'topH', value: 540 },
+      { let: 'pillGap', value: 84 },
+
+      {
+        let: 'kicker',
+        value: {
+          prim: 'clipTrack',
+          args: {
+            text: { prim: 'joinNonEmpty', args: { sep: ' · ', parts: [{ prim: 'blockName' }, { prim: 'noteDate' }] } },
+            maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] },
+            track: 4,
+            size: 22,
+            bold: true,
+          },
+        },
+      },
+      { let: 'titleLines', value: { prim: 'fitLines', args: { text: { var: 'note.title' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] }, n: 2, size: 72, bold: true } } },
+      { let: 'points', value: { prim: 'points', args: { limit: 3, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, 76] }, size: 25 } } },
+
+      { let: 'avatarTop', value: 76 },
+      { let: 'kickerY', value: { '+': [{ var: 'topH' }, 74] } },
+      { let: 'titleTop', value: { '+': [{ var: 'kickerY' }, 44] } },
+      { let: 'titleBottom', value: { '+': [{ var: 'titleTop' }, { '*': [{ '-': [{ len: { var: 'titleLines' } }, 1] }, 88] }, 72] } },
+      { let: 'pointsTop', value: { '+': [{ var: 'titleBottom' }, 44] } },
+      { let: 'signTop', value: { '+': [{ var: 'pointsTop' }, { '*': [{ len: { var: 'points' } }, { var: 'pillGap' }] }, { if: [{ truthy: { var: 'points' } }, 24, 0] }] } },
+      { let: 'sign', value: { prim: 'signRow', args: { x: { var: 'pad' }, y: { var: 'signTop' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, { var: 'qrSize' }, 30] }, size: 28, avatarD: 74, onDark: true, hasAvatar: false } } },
+      { let: 'height', value: { '+': [{ var: 'signTop' }, { max: [{ var: 'sign.h' }, { prim: 'footH', args: { qrSize: { var: 'qrSize' } } }] }, 48] } },
+
+      {
+        emit: {
+          k: 'grad', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, c1: { var: 's.c1' }, c2: { var: 's.c2' },
+          stops: [
+            { obj: { at: 0, color: { var: 's.c1' } } },
+            { obj: { at: 0.52, color: { prim: 'mix', args: { c1: { var: 's.c1' }, c2: { var: 's.c2' }, w: 0.5 } } } },
+            { obj: { at: 1, color: { var: 's.c2' } } },
+          ],
+        },
+      },
+      // 人像后面那团光：径向从半透明白走到全透，把大圆从渐变里"托"出来
+      { emit: { k: 'radial', x: { '-': [{ var: 'W' }, { var: 'pad' }, { '/': [{ var: 'avatarD' }, 2] }] }, y: { '+': [{ var: 'avatarTop' }, { '/': [{ var: 'avatarD' }, 2] }] }, r0: 0, r1: { '*': [{ var: 'avatarD' }, 1.05] }, c1: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.38 } }, c2: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0 } }, box: [0, 0, { var: 'W' }, { var: 'topH' }] } },
+      { emit: { k: 'fill', x: 0, y: { '-': [{ var: 'topH' }, 1] }, w: { var: 'W' }, h: { '+': [{ '-': [{ var: 'height' }, { var: 'topH' }] }, 1] }, color: { prim: 'withAlpha', args: { color: { prim: 'token', args: { name: 'hard' } }, alpha: 0.28 } } } },
+      {
+        if: {
+          cond: { var: 'hasAvatar' },
+          then: [{ emit: { k: 'avatar', x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: { var: 'avatarTop' }, d: { var: 'avatarD' }, ring: 6, ringColor: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.6 } }, fallback: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.2 } } } }],
+          else: [{ emitOne: { prim: 'glyphPlate', args: { x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: { var: 'avatarTop' }, w: { var: 'avatarD' }, h: { var: 'avatarD' }, color: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.28 } } } } }],
+        },
+      },
+      { emit: { k: 'text', x: { var: 'pad' }, y: { var: 'kickerY' }, lines: [{ var: 'kicker' }], size: 22, weight: 'bold', color: { var: 's.sub' }, track: 4 } },
+      { emit: { k: 'text', x: { var: 'pad' }, y: { '+': [{ var: 'titleTop' }, 72] }, lines: { var: 'titleLines' }, lh: 88, size: 72, weight: 'bold', color: { var: 's.ink' } } },
+      {
+        each: {
+          over: { var: 'points' }, as: 'p', index: 'pi',
+          do: [
+            { let: 'py', value: { '+': [{ var: 'pointsTop' }, { '*': [{ var: 'pi' }, { var: 'pillGap' }] }] } },
+            { emit: { k: 'rrect', x: { var: 'pad' }, y: { '+': [{ var: 'py' }, -34] }, w: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] }, h: 76, r: 38, fill: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.14 } } } },
+            { emit: { k: 'circle', x: { '+': [{ var: 'pad' }, 30] }, y: { var: 'py' }, r: 22, fill: { var: 's.accent' } } },
+            { emit: { k: 'text', x: { '+': [{ var: 'pad' }, 30] }, y: { '+': [{ var: 'py' }, 8] }, lines: [{ str: { '+': [{ var: 'pi' }, 1] } }], size: 22, weight: 'bold', color: { var: 's.accentInk' }, align: 'center' } },
+            { emit: { k: 'text', x: { '+': [{ var: 'pad' }, 66] }, y: { '+': [{ var: 'py' }, 9] }, lines: [{ var: 'p' }], size: 25, color: { var: 's.panelInk' } } },
+          ],
+        },
+      },
+      { emitMany: { var: 'sign.layers' } },
+      { let: 'qr', value: { prim: 'qrSticker', args: { x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'qrSize' }] }, y: { var: 'signTop' }, size: { var: 'qrSize' }, offset: { var: 's.accent' }, ink: 'rgba(255,255,255,0.72)', label: { prim: 'i18n', args: { key: 'scanToView' } } } } },
+      { emitMany: { var: 'qr.layers' } },
+    ],
+  },
+
+  // 杂志封面：整幅彩色人像铺满，一条上淡下浓的渐变把标题那一段压住，眉标坐在半透明药丸里。
+  cover: {
+    id: 'cover',
+    min_version: 1,
+    steps: [
+      { let: 's', value: { prim: 'scheme', args: { name: 'mono', categoryId: { var: 'note.category_id' } } } },
+      { let: 'pad', value: 48 },
+      { let: 'qrSize', value: 116 },
+
+      {
+        let: 'mast',
+        value: {
+          prim: 'clipTrack',
+          args: {
+            text: { prim: 'joinNonEmpty', args: { sep: ' · ', parts: [{ prim: 'blockName' }, { prim: 'noteDate' }] } },
+            maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, 40] },
+            track: 4,
+            size: 20,
+            bold: true,
+          },
+        },
+      },
+      { let: 'titleLines', value: { prim: 'fitLines', args: { text: { var: 'note.title' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] }, n: 2, size: 76, bold: true } } },
+      { do: { prim: 'setFont', args: { size: 26 } } },
+      { let: 'sumLines', value: [] },
+      { if: { cond: { truthy: { var: 'note.summary' } }, then: [{ let: 'sumLines', value: { prim: 'fitLines', args: { text: { var: 'note.summary' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }] }, n: 2 } } }] } },
+
+      { let: 'mastY', value: { '+': [{ var: 'pad' }, 20] } },
+      { let: 'titleTop', value: 796 },
+      { let: 'titleBottom', value: { '+': [{ var: 'titleTop' }, { '*': [{ '-': [{ len: { var: 'titleLines' } }, 1] }, 90] }, 76] } },
+      { let: 'sumTop', value: { if: [{ truthy: { var: 'sumLines' } }, { '+': [{ var: 'titleBottom' }, 30] }, 0] } },
+      { let: 'sumBottom', value: { if: [{ truthy: { var: 'sumLines' } }, { '+': [{ var: 'sumTop' }, { '*': [{ '-': [{ len: { var: 'sumLines' } }, 1] }, 40] }, 26] }, { var: 'titleBottom' }] } },
+      { let: 'signTop', value: { '+': [{ var: 'sumBottom' }, 52] } },
+      { let: 'sign', value: { prim: 'signRow', args: { x: { var: 'pad' }, y: { var: 'signTop' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, { var: 'qrSize' }, 30] }, size: 30, avatarD: 80, onDark: true } } },
+      { let: 'height', value: { '+': [{ var: 'signTop' }, { max: [{ var: 'sign.h' }, { prim: 'footH', args: { qrSize: { var: 'qrSize' } } }] }, 48] } },
+
+      { emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: { var: 's.bg' } } },
+      {
+        if: {
+          cond: { var: 'hasAvatar' },
+          then: [
+            // 彩色整幅人像铺满全张，眉标、标题、署名、码全部压在图上。压得住靠这条渐变：
+            // 脸那一段几乎不加暗，到标题那一段已经到 0.88，白字落在浅色衣服或白墙上也不会糊掉。
+            { emit: { k: 'image', key: 'avatar', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' } } },
+            {
+              emit: {
+                k: 'grad', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' },
+                c1: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0.2 } },
+                c2: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0.97 } },
+                stops: [
+                  { obj: { at: 0, color: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0.2 } } } },
+                  { obj: { at: 0.5, color: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0.42 } } } },
+                  { obj: { at: 0.66, color: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0.88 } } } },
+                  { obj: { at: 1, color: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0.97 } } } },
+                ],
+              },
+            },
+          ],
+          else: [
+            { emit: { k: 'radial', x: { '/': [{ var: 'W' }, 2] }, y: { '*': [{ var: 'height' }, 0.34] }, r0: 0, r1: { '*': [{ var: 'height' }, 0.62] }, c1: { prim: 'withAlpha', args: { color: { var: 's.accent' }, alpha: 0.34 } }, c2: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0 } }, box: [0, 0, { var: 'W' }, { var: 'height' }] } },
+            { emitOne: { prim: 'glyphPlate', args: { x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: { prim: 'withAlpha', args: { color: { var: 's.ink' }, alpha: 0.1 } } } } },
+          ],
+        },
+      },
+      // 药丸的宽度要量眉标实际占多宽：这一步沿用当前字体（上面最后一次切字体就是 26 那档），
+      // 所以不传 size——传了就会多切一次字体，绘制序列比基线多一步。
+      { let: 'mastW', value: { '+': [{ prim: 'trackWidth', args: { text: { var: 'mast' }, track: 4 } }, 40] } },
+      { emit: { k: 'rrect', x: { var: 'pad' }, y: { '-': [{ var: 'mastY' }, 30] }, w: { var: 'mastW' }, h: 44, r: 22, fill: { prim: 'withAlpha', args: { color: { prim: 'token', args: { name: 'hard' } }, alpha: 0.5 } } } },
+      { emit: { k: 'text', x: { '+': [{ var: 'pad' }, 20] }, y: { var: 'mastY' }, lines: [{ var: 'mast' }], size: 20, weight: 'bold', color: '#FFFFFF', track: 4 } },
+      { emit: { k: 'text', x: { var: 'pad' }, y: { '+': [{ var: 'titleTop' }, 76] }, lines: { var: 'titleLines' }, lh: 90, size: 76, weight: 'bold', color: { var: 's.ink' } } },
+      { emit: { k: 'fill', x: { var: 'pad' }, y: { '-': [{ var: 'titleTop' }, 26] }, w: 84, h: 8, color: { var: 's.accent' } } },
+      { if: { cond: { truthy: { var: 'sumLines' } }, then: [{ emit: { k: 'text', x: { var: 'pad' }, y: { '+': [{ var: 'sumTop' }, 26] }, lines: { var: 'sumLines' }, lh: 40, size: 26, color: { var: 's.sub' } } }] } },
+      { emitMany: { var: 'sign.layers' } },
+      { let: 'qr', value: { prim: 'qrSticker', args: { x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'qrSize' }] }, y: { var: 'signTop' }, size: { var: 'qrSize' }, offset: { var: 's.accent' }, ink: { var: 's.sub' }, label: { prim: 'i18n', args: { key: 'scanToView' } } } } },
+      { emitMany: { var: 'qr.layers' } },
+    ],
+  },
+
+  // 素宣信笺：竖排右起，标题占两列、摘要接着补列，最左一细列写款识，两枚朱印一枚空、一枚刻字。
+  letter: {
+    id: 'letter',
+    min_version: 1,
+    steps: [
+      { let: 's', value: { prim: 'scheme', args: { name: 'riso', categoryId: { var: 'note.category_id' } } } },
+      { let: 'pad', value: 56 },
+      { let: 'qrSize', value: 108 },
+      { let: 'slot', value: 60 },
+      { let: 'x0', value: { '-': [{ var: 'W' }, 100] } },
+      { let: 'slots', value: 7 },
+      { let: 'top', value: 176 },
+      { let: 'titleStep', value: 66 },
+      { let: 'bodyStep', value: 40 },
+      { let: 'kickStep', value: 32 },
+      // 那块朱地不进口令表：它跟着"印章"这一种画法走，不跟着分类也不跟着主题走，planner 里就是个局部常量。
+      { let: 'SEAL', value: '#9E3B2F' },
+      { let: 'colH', value: 772 },
+      { let: 'gap', value: 44 },
+
+      { let: 'T', value: { prim: 'vertCols', args: { text: { var: 'note.title' }, colH: { var: 'colH' }, step: { var: 'titleStep' }, maxCols: 2, size: 46, bold: true, fam: { prim: 'token', args: { name: 'serif' } } } } },
+      { let: 'tN', value: { len: { var: 'T.cols' } } },
+      // 摘要能占几列＝总槽数 − 标题那几列 −（有标题就空一个槽），下限 1 列
+      { let: 'B', value: { prim: 'vertCols', args: { text: { var: 'note.summary' }, colH: { var: 'colH' }, step: { var: 'bodyStep' }, maxCols: { max: [1, { '-': [{ var: 'slots' }, { var: 'tN' }, { if: [{ truthy: { var: 'tN' } }, 1, 0] }] }] }, size: 26, fam: { prim: 'token', args: { name: 'serif' } } } } },
+      // 切到 20 这一档在量款识之前、拼款识那句之外（planner 就是这个顺序），所以单列一步 do
+      { do: { prim: 'setFont', args: { size: 20, fam: { prim: 'token', args: { name: 'serif' } } } } },
+      { let: 'kicker', value: { slice: [{ prim: 'joinNonEmpty', args: { sep: ' · ', parts: [{ prim: 'blockName' }, { prim: 'noteDate' }] } }, 0, 14] } },
+      { let: 'kickAdv', value: { if: [{ truthy: { var: 'kicker' } }, { prim: 'vertAdv', args: { text: { var: 'kicker' }, step: { var: 'kickStep' } } }, 0] } },
+      { let: 'signH', value: { max: [84, { prim: 'qrStickerH', args: { size: { var: 'qrSize' } } }] } },
+      // 最长的列＝标题那几列的大 与 摘要那几列的大 里取大。数组摊不开进 max，所以套两次 maxOf。
+      { let: 'colLen', value: { prim: 'maxOf', args: { values: { var: 'B.advs' }, seed: { prim: 'maxOf', args: { values: { var: 'T.advs' }, seed: 0 } } } } },
+      { let: 'height', value: { min: [1360, { '+': [{ var: 'top' }, { max: [{ var: 'colLen' }, { if: [{ truthy: { var: 'kicker' } }, { '+': [{ var: 'kickAdv' }, 26, 44] }, 0] }] }, { var: 'gap' }, { var: 'signH' }, 56] }] } },
+      { let: 'signTop', value: { '-': [{ var: 'height' }, 56, { var: 'signH' }] } },
+
+      { emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: { var: 's.bg' } } },
+      // 引首章：只有朱地、不刻字，刻字留给落款那枚，两枚都响就闹了
+      { emit: { k: 'rrect', x: { '-': [{ var: 'x0' }, 26] }, y: 52, w: 52, h: 52, r: 6, fill: { var: 'SEAL' } } },
+      // 引首章里面那一圈从来没能画出来：planner 传的是 {line, lineWidth}，而 rrect 只读 fill/stroke。
+      // 这里按名单能写的写法落一枚"什么都不填什么都不描"的圆角矩形，绘制序列（beginPath+roundRect）
+      // 和从前一字不差，所以画面也没变；要不要真给它加一道白细框，是设计的事。
+      { emit: { k: 'rrect', x: { '-': [{ var: 'x0' }, 20] }, y: 58, w: 40, h: 40, r: 4 } },
+      { if: { cond: { truthy: { var: 'tN' } }, then: [{ emit: { k: 'text', x: { var: 'x0' }, y: { var: 'top' }, lines: { var: 'T.cols' }, vert: true, lh: { var: 'titleStep' }, colGap: { '-': [{ var: 'slot' }, { var: 'titleStep' }] }, size: 46, weight: 'bold', color: { var: 's.ink' }, fam: { prim: 'token', args: { name: 'serif' } }, vpunct: true } }] } },
+      { if: { cond: { truthy: { var: 'B.cols' } }, then: [{ emit: { k: 'text', x: { if: [{ truthy: { var: 'tN' } }, { '-': [{ var: 'x0' }, { '*': [{ '+': [{ var: 'tN' }, 1] }, { var: 'slot' }] }] }, { var: 'x0' }] }, y: { var: 'top' }, lines: { var: 'B.cols' }, vert: true, lh: { var: 'bodyStep' }, colGap: { '-': [{ var: 'slot' }, { var: 'bodyStep' }] }, size: 26, color: { prim: 'mix', args: { c1: { var: 's.ink' }, c2: { var: 's.bg' }, w: 0.8 } }, fam: { prim: 'token', args: { name: 'serif' } }, vpunct: true } }] } },
+      // 最左那一细列是款识：分类和日期，小字、淡色，读完正文回头才看得见
+      { let: 'kickX', value: 120 },
+      {
+        if: {
+          cond: { truthy: { var: 'kicker' } },
+          then: [
+            { emit: { k: 'text', x: { var: 'kickX' }, y: { var: 'top' }, lines: [{ var: 'kicker' }], vert: true, lh: { var: 'kickStep' }, size: 20, color: { prim: 'withAlpha', args: { color: { var: 's.ink' }, alpha: 0.5 } }, fam: { prim: 'token', args: { name: 'serif' } }, vpunct: true } },
+            { let: 'sealY', value: { '+': [{ var: 'top' }, { var: 'kickAdv' }, 26] } },
+            { emit: { k: 'rrect', x: { '-': [{ var: 'kickX' }, 22] }, y: { var: 'sealY' }, w: 44, h: 44, r: 5, fill: { var: 'SEAL' } } },
+            { do: { prim: 'setFont', args: { size: 24, bold: true, fam: { prim: 'token', args: { name: 'serif' } } } } },
+            { emit: { k: 'text', x: { var: 'kickX' }, y: { '+': [{ var: 'sealY' }, 33] }, lines: [{ prim: 'brandGlyph' }], size: 24, weight: 'bold', color: { prim: 'token', args: { name: 'paper' } }, align: 'center', fam: { prim: 'token', args: { name: 'serif' } } } },
+          ],
+        },
+      },
+      { let: 'sign', value: { prim: 'signRow', args: { x: { var: 'pad' }, y: { var: 'signTop' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, { var: 'qrSize' }, 40] }, size: 30, avatarD: 84 } } },
+      { emitMany: { var: 'sign.layers' } },
+      { let: 'qr', value: { prim: 'qrSticker', args: { x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'qrSize' }] }, y: { var: 'signTop' }, size: { var: 'qrSize' }, offset: { var: 's.accent' }, ink: { var: 's.sub' }, label: { prim: 'i18n', args: { key: 'scanToView' } } } } },
+      { emitMany: { var: 'qr.layers' } },
+    ],
+  },
 }

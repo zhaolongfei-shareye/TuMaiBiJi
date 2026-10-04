@@ -194,6 +194,44 @@ ok('each 里那个 index 前的乘算真按元素走（三枚圆 40/80/120）',
   !!synthPlan && [synthPlan.layers[2].y, synthPlan.layers[3].y, synthPlan.layers[4].y].join(',') === '40,80,120',
   synthPlan && [synthPlan.layers[2].y, synthPlan.layers[3].y, synthPlan.layers[4].y].join(','))
 
+// emitOne/emitMany 交回来的层不经过 buildRecipeLayer，所以字段名单要在这里再查一遍：
+// 否则一份坏配方可以拿 {lit:{k:'fill',…,随便一个键:1}} 绕开名单夹带字段，而那些键画的时候会被静默吃掉。
+const smuggle = {
+  id: 'smuggle', min_version: 1,
+  steps: [{ let: 'height', value: 300 }, { emitOne: { lit: { k: 'fill', x: 0, y: 0, w: 10, h: 10, color: '#000', bogus: 1 } } }],
+}
+ok('emitOne 用 lit 夹带一个名单外的字段：抛（不给"画的时候忽略掉"那条宽容路）',
+  !!throws(() => poster.planFromRecipe(ctx, d, smuggle)), '居然放行了')
+const smuggleOk = {
+  id: 'smuggle-ok', min_version: 1,
+  steps: [{ let: 'height', value: 300 }, { emitOne: { lit: { k: 'fill', x: 0, y: 0, w: 10, h: 10, color: '#000' } } }],
+}
+ok('同一份去掉那个野字段就放行（证明上面那条红是字段名单抓的，不是 emitOne 本身不通）',
+  !throws(() => poster.planFromRecipe(ctx, d, smuggleOk)), '好的也被拦了')
+// obj 是新加的项型（渐变色标那种 [{at,color}]）：形状写错要在静态检查就红，而不是跑起来才知道
+const gradStep = (stops) => ({
+  id: 'x', min_version: 1,
+  steps: [{ let: 'height', value: 300 }, { emit: { k: 'grad', x: 0, y: 0, w: 10, h: 10, c1: '#fff', c2: '#000', stops } }],
+})
+ok('obj 给的是数组而不是键值对象 → validate 红',
+  validateIt(gradStep([{ obj: [0, 1] }])).length > 0, '居然放行了')
+// 这条是关键：obj 的键值必须也当表达式走一遍名单，否则一个不认的算子藏在色标里就能混过静态检查
+ok('obj 的值里藏一个不认的算子 → validate 红（不是"跳过不查"）',
+  validateIt(gradStep([{ obj: { at: 0, color: { 不存在的算子: 1 } } }])).length > 0, '居然放行了')
+ok('obj 里的值可以现算（色标那一档混色真的落到图层里）',
+  (() => {
+    const p = poster.planFromRecipe(ctx, d, {
+      id: 'x', min_version: 1,
+      steps: [
+        { let: 'height', value: 300 },
+        { let: 's', value: { prim: 'scheme', args: { name: 'neon', categoryId: 1 } } },
+        { emit: { k: 'grad', x: 0, y: 0, w: 10, h: 10, c1: { var: 's.c1' }, c2: { var: 's.c2' }, stops: [{ obj: { at: 0.5, color: { prim: 'mix', args: { c1: { var: 's.c1' }, c2: { var: 's.c2' }, w: 0.5 } } } }] } },
+      ],
+    })
+    const st = p.layers[0].stops
+    return Array.isArray(st) && st.length === 1 && st[0].at === 0.5 && typeof st[0].color === 'string' && st[0].color !== '{'
+  })(), '')
+
 // 十套模板 × 六条笔记里凡是走配方的那几套，逐套都要能出图（不许有哪一篇跑不出来）
 const sampleNotes = [
   { title: '测试', summary: '人性就是这么现实啊。你', key_points: [], tags: [], category_id: null, source_type: 'manual', created_at: '2026-09-24T06:00:00Z' },

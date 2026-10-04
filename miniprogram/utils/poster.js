@@ -1226,7 +1226,11 @@ function planLetter(ctx, d) {
   layers.push(L.fill(0, 0, W, height, s.bg))
   // 引首章：右上那枚只有朱地、不刻字，刻字留给落款那枚，两枚都响就闹了
   layers.push(L.rrect(x0 - 26, 52, 52, 52, 6, { fill: SEAL }))
-  layers.push(L.rrect(x0 - 20, 58, 40, 40, 4, { line: withAlpha(PAPER, 0.7), lineWidth: 2 }))
+  // 这一枚内框从来没能画出来：原来这里写的是 `{ line, lineWidth }`，而 paintLayers 的 rrect 只读
+  // fill/stroke/strokeWidth，那两个键没人读，所以这一层落下去只有 beginPath+roundRect，一道线都没有。
+  // 10-04 转配方时白名单把它拦下来了；撤掉那两个死键画面不变（前后绘制序列 67 步一字不差，实测）。
+  // 要不要真给两枚印加一道白细框是设计的事，站长拍。
+  layers.push(L.rrect(x0 - 20, 58, 40, 40, 4))
   if (tN) {
     // 槽距统一 60，所以列层的 colGap = 60 - 本层步距（标题 46 字那层是 -6）
     layers.push(L.text({
@@ -1748,6 +1752,9 @@ const RECIPE_PRIMS = {
   paperOf: { keys: ['categoryId'], call: (env, a) => paperOf(a.categoryId) },
   // 活泼那六套不吃宣纸那两档，吃 palette 里的"配色方案"：一个名字 + 一个分类 → 一组色。
   scheme: { keys: ['name', 'categoryId'], call: (env, a) => schemeFor(a.name, a.categoryId) },
+  // 波普四格那四块版色：跨着相邻的几组各拿一块，四格才是四个色相（palette.js 里那段注释）。
+  // 数组长度是死的 4，但配方里还是按 each 走，条数不写死在配方里。
+  plateColors: { keys: ['categoryId'], call: (env, a) => plateColors(a.categoryId) },
   withAlpha: { keys: ['color', 'alpha'], call: (env, a) => withAlpha(a.color, a.alpha) },
   mix: { keys: ['c1', 'c2', 'w'], call: (env, a) => mix(a.c1, a.c2, a.w) },
   // 不 trim：planner 那两处都是 `[a, b].filter(Boolean).join(' · ')`，
@@ -1767,6 +1774,26 @@ const RECIPE_PRIMS = {
   // 配方要原样记下来才和基线的绘制序列对得上（配一条 `do` 用它）。
   setFont: { keys: ['size', 'bold', 'fam'], call: (env, a) => { font(env.ctx, a.size, a.bold, a.fam); return null } },
   vertCols: { keys: ['text', 'colH', 'step', 'maxCols', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => vcols(ctx, a.text, a.colH, a.step, a.maxCols)) },
+  // 竖排那一列走多长：信笺的落款章要盖在款识正下方，那个距离只能量出来。
+  // 不给 size 就沿用当前字体（planner 里那次 font(20,SERIF) 在量字外面，多切一次绘制序列就长一步）。
+  vertAdv: {
+    keys: ['text', 'step', 'size', 'bold', 'fam'],
+    call: (env, a) => measureWithFont(env, a, (ctx) => vertUnits(ctx, a.text, a.step).reduce((x, u) => x + u.adv, 0)),
+  },
+  // 把「一批列里最长的那一列」压成一个数。max 这个算子是定长参数表，摊不开数组，
+  // 所以数组求最大只能走原语。seed 必给（planner 那句是 Math.max(0, ...advs)：
+  // 标题和摘要都没有时数组是空的，不种子就会得 -Infinity，画布塌成一张负高的）。
+  maxOf: {
+    keys: ['values', 'seed'],
+    call: (env, a) => {
+      if (!Array.isArray(a.values)) throw new Error(`maxOf 要一个数组，拿到 ${a.values === null ? 'null' : typeof a.values}`)
+      if (typeof a.seed !== 'number' || !Number.isFinite(a.seed)) throw new Error('maxOf 少了 seed（那个种子数必须写出来）')
+      return Math.max(a.seed, ...a.values)
+    },
+  },
+  // 落款印里刻的那个字（也是没设形象时的占位字）。配方不许把它抄成字符串「麦」：
+  // 站长 09-24 定的这一枚，换字要连着占位图一起换，只许点名。
+  brandGlyph: { keys: [], call: () => BRAND_GLYPH },
   signRow: {
     keys: ['x', 'y', 'maxW', 'size', 'avatarD', 'onDark', 'hasAvatar'],
     // hasAvatar 可省：省了就跟随用户到底设没设形象（九套都是这样）。
@@ -1823,6 +1850,13 @@ function planFromRecipe(ctx, d, recipe) {
     buildLayer: buildRecipeLayer,
     checkLayer: (l, where) => {
       if (!l || !RECIPE_OP_KEYS[l.k]) throw new Error(`${where}: 原语交回来的不是一层能绘制的东西`)
+      // 字段也一起查：emitOne/emitMany 交回来的层没经过 buildRecipeLayer，
+      // 不查就等于允许配方用 {lit:{k:'fill',…,随便一个键:1}} 绕开名单夹带字段——
+      // 绘制时那些键会被静默忽略，正是"字段不认识就跳过"那条不许有的宽容路径。
+      const keys = RECIPE_OP_KEYS[l.k]
+      Object.keys(l).forEach((k) => {
+        if (k !== 'k' && keys.indexOf(k) < 0) throw new Error(`${where}: op「${l.k}」没有字段「${k}」，能用的是 ${keys.join('、')}`)
+      })
       return l
     },
   }
@@ -1839,7 +1873,7 @@ const PLANNERS = {
 
 // 已经转写成配方的那几套。包内自带的那份就是服务端下发失败时的兜底，
 // 名单在 poster.js、内容在 posterRecipes.js，两边对不上由 docs/工具/验-模板配方可执行.js 抓。
-const RECIPE_IDS = ['quote', 'card', 'block', 'lit', 'spec']
+const RECIPE_IDS = ['quote', 'card', 'block', 'lit', 'spec', 'popGrid', 'popDots', 'acid', 'cover', 'letter']
 
 function recipeOf(id) {
   return RECIPE_IDS.indexOf(id) < 0 ? null : RECIPES[id] || null

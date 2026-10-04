@@ -12,7 +12,9 @@
 // 抛错是故意的：名单外的名字一律当场抛。配方写错一个算子，要变成"这张卡画不出来、
 // 退回包内那一份"，而不是"少画一层、用户看见一张缺了东西的卡"。
 // 数组是"逐项求值后交回一个数组"（行的列表、坐标列表都靠它）；
-// 只有渐变色标、网点框那种"解释器不许碰内容、原样交给绘制层"的复合数据才包在 `{"lit": ...}` 里。
+// 只有网点框那种"解释器不许碰内容、原样交给绘制层"的复合数据才包在 `{"lit": ...}` 里。
+// `obj` 是给"数组里每项都是几个字段"的复合数据用的（渐变色标就是 [{at,color}…]）：
+// 键名原样留着，键值当表达式求值——色标里的颜色往往要现算（混一档、加一层透明）。
 const VERSION = 1
 
 // 算术：-1 是变长（'+ - * min max' 都按 JS 里的写法一路连着算，`a + b + c` 不用套三层）。
@@ -46,6 +48,12 @@ function shape(t) {
     const args = t.args === undefined ? {} : t.args
     if (args === null || typeof args !== 'object' || Array.isArray(args)) return { kind: 'err', e: `原语「${t.prim}」的 args 得是个对象` }
     return { kind: 'prim', name: t.prim, args }
+  }
+  if (t.obj !== undefined) {
+    const extra = Object.keys(t).filter((k) => k !== 'obj')
+    if (extra.length) return { kind: 'err', e: `obj 那一项里多了 ${extra.join('、')}` }
+    if (t.obj === null || typeof t.obj !== 'object' || Array.isArray(t.obj)) return { kind: 'err', e: 'obj 得是个键值对象' }
+    return { kind: 'obj', fields: t.obj }
   }
   const keys = Object.keys(t)
   if (keys.length !== 1) return { kind: 'err', e: `只能有一个键，这里有 ${keys.length} 个：${keys.join('、')}` }
@@ -154,6 +162,11 @@ function ev(term, env, scope, where) {
   if (s.kind === 'lit') return s.v
   if (s.kind === 'list') return s.v.map((x, i) => ev(x, env, scope, `${where}[${i}]`))
   if (s.kind === 'prim') return env.callPrim(s.name, s.args, scope)
+  if (s.kind === 'obj') {
+    const o = {}
+    Object.keys(s.fields).forEach((k) => { o[k] = ev(s.fields[k], env, scope, `${where} obj.${k}`) })
+    return o
+  }
   return callOp(s.name, s.a, env, scope, where)
 }
 
@@ -251,6 +264,10 @@ function scanTerm(t, allow, bad, where) {
       if (allow.primKeys[s.name].indexOf(k) < 0) bad.push(`${where}: 原语「${s.name}」没有参数「${k}」，能用的是 ${allow.primKeys[s.name].join('、')}`)
     })
     Object.keys(s.args).forEach((k) => scanTerm(s.args[k], allow, bad, `${where} ${s.name}.${k}`))
+    return
+  }
+  if (s.kind === 'obj') {
+    Object.keys(s.fields).forEach((k) => scanTerm(s.fields[k], allow, bad, `${where} obj.${k}`))
     return
   }
   const name = s.name
