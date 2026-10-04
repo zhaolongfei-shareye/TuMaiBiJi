@@ -192,18 +192,22 @@ ok('选完图返回仍然重算条身', /barTitle: this\.barTitleFor\(this\.data
 const apijs = fs.readFileSync(P('utils/api.js'), 'utf8')
 ok('api 层新增 ingestText，打的就是 /api/ingest/text',
   /ingestText: \(data\) => request\('\/api\/ingest\/text', 'POST'/.test(apijs))
+// 两道窗口（900／200）是 10-04 第八轮抬的：ingestText 的参数里多了「原文翻译」那一行
+// 和它上面两行注释，字符窗口就撞开了——这条断的是"提交→拿 task_id→轮询"这根接线，
+// 不是某段代码的物理长度。
 ok('写那态提交走 ingestText + 轮询任务（与链接／截图同一条等法）',
-  /async submitManual\(\)[\s\S]{0,900}api\.ingestText\([\s\S]{0,200}api\.pollTask\(/.test(js))
+  /async submitManual\(\)[\s\S]{0,1400}api\.ingestText\([\s\S]{0,520}api\.pollTask\(/.test(js))
 ok('这一档不再自己建笔记（手打那条路只留提炼一个入口）', !/api\.createNote\(/.test(js))
-ok('送进去的是标题 + 原文 + 归类三样',
-  /ingestText\(\{\s*title,\s*content,\s*category_id: picked \? picked\.id : null,\s*\}/.test(js))
+// 原来钉的是三样（标题／原文／归类），10-04 起是四样：多一枚开关就多一个字段。
+ok('送进去的是标题 + 原文 + 归类 + 原文翻译四样',
+  /ingestText\(\{\s*title,\s*content,\s*category_id: picked \? picked\.id : null,[\s\S]{0,260}translate: this\.data\.writeTranslate,\s*\}/.test(js))
 ok('原文空着要拦一道，且两门都有这句话', !!zh.needBody && !!en.needBody,
   `${zh.needBody} / ${en.needBody}`)
 ok('归类那一格只报名字（"归类"两个字和那一整行都撤了）',
   !/cat-key|categoryLabel/.test(wxml) && /class="wr-cat-val">\{\{categoryNames\[catIndex\]\}\}/.test(wxml))
 ok('按钮说的是提炼，不是保存', /catchtap="submitManual">\{\{busy === 'write' \? t\.busyExtract : t\.startExtract\}\}/.test(wxml))
-ok('腾出来的高度还给了原文（比原来那一格高一档）',
-  /\.wr-body\s*\{[^}]*height: (2[5-9]|[3-9][0-9])0rpx/.test(wxss))
+ok('腾出来的高度还给了原文（比加开关前的 180 高一档）',
+  /\.wr-body\s*\{[^}]*height: (2[0-4][0-9])rpx/.test(wxss))
 
 // ---------- 8. 第六轮那三条（站长 10-04 原话：标题在左，分类在右、分类字体颜色淡一点、"提要"改为"摘要"）----------
 const wrLine = wxml.slice(wxml.indexOf('class="wr-line"'), wxml.indexOf('class="face-area wr-body"'))
@@ -222,6 +226,48 @@ const i18nSrc = fs.readFileSync(P('utils/i18n.js'), 'utf8')
 ok('界面上那句说明改成「摘要」，与详情页那一格同一个词',
   !/提要/.test(zh.manualDesc) && /摘要/.test(zh.manualDesc), zh.manualDesc)
 ok('整本字典里再没有"提要"这个另造的词', !/提要/.test(i18nSrc))
+
+// ---------- 9. 「原文翻译」那一枚小开关（站长 10-04 原话：「在取消按钮上方，加个小开关，
+// 原文翻译，默认关，可以打开」）——根因在提示词整篇是中文，这里断的是接线与两态画法 ----------
+const swAt = wxml.indexOf('class="wr-sw ')
+const actsAfter = wxml.indexOf('<view class="acts">', swAt)
+const cancelAt = wxml.indexOf('catchtap="cancelWrite"')
+ok('这一行在原文框与那排按钮之间，中间不夹别的块',
+  swAt > wxml.indexOf('class="face-area wr-body"') && actsAfter > swAt && actsAfter - swAt < 600,
+  `swAt=${swAt} actsAfter=${actsAfter}`)
+ok('那排按钮里确实有「取消」，开关就在它上方',
+  cancelAt > swAt && /catchtap="cancelWrite">\{\{t\.cancel\}\}/.test(wxml),
+  `cancelAt=${cancelAt}`)
+ok('落点是整行，且用 catchtap（面板外壳挂着「点空白收回」，冒上去就顺手把面板收了）',
+  /class="wr-sw \{\{writeTranslate \? 'wr-sw-on' : ''\}\}" catchtap="onToggleTranslate">/.test(wxml))
+ok('药丸和那行字上没有第二个落点（一个功能只留一个入口）',
+  !/wr-sw-track[^>]*catchtap|wr-sw-lab[^>]*catchtap/.test(wxml))
+ok('两门都有这一句，中文就是他原话「原文翻译」',
+  zh.origTranslate === '原文翻译' && !!en.origTranslate,
+  `${zh.origTranslate} / ${en.origTranslate}`)
+ok('默认关：data 里那一位写的是 false', /writeTranslate: false,/.test(js))
+ok('点一下只翻这一个状态，不提交也不动别的字段',
+  /onToggleTranslate\(\)\s*\{\s*this\.setData\(\{ writeTranslate: !this\.data\.writeTranslate \}\)/.test(js))
+ok('存进去一篇之后跟着归零（下一篇回到默认关）',
+  /writeBody: '',\s*writeTranslate: false,/.test(js))
+ok('链接／截图那两条没带这个字段（它们没这枚开关，提示词一字不变）',
+  /api\.ingestUrl\(url\)/.test(js) && /api\.ingestScreenshots\(batch\)/.test(js)
+  && !/ingestUrl\([^)]*translate/.test(js) && !/ingestScreenshots\([^)]*translate/.test(js))
+// 两态各吃一对令牌：关是 --face 面配 --face-ink 点，开是 --solid-bg 面配 --solid-ink 点。
+// 配对是对的才不会"同底色压透明度等于没画"——开关画成看不见，比画丑更糟。
+ok('关态吃 --face 面 + --face-ink 点',
+  /\.wr-sw-track\s*\{[^}]*background: var\(--face\)/.test(wxss)
+  && /\.wr-sw-dot\s*\{[^}]*background: var\(--face-ink\)/.test(wxss))
+ok('开态吃 --solid-bg 面 + --solid-ink 点（与 .act.solid 同一对）',
+  /\.wr-sw-on \.wr-sw-track\s*\{[^}]*background: var\(--solid-bg\)/.test(wxss)
+  && /\.wr-sw-on \.wr-sw-dot\s*\{[^}]*background: var\(--solid-ink\)/.test(wxss))
+ok('这四条规则里没有一处写死色',
+  !/\.wr-sw[^{]*\{[^}]*(#[0-9A-Fa-f]{3,8}|rgba\()/.test(wxss))
+// 几何闭合：面 72 宽、点 32 宽、左右各留 4 → 位移只能是 72-32-4-4＝32，写别的数就留半格缝
+ok('点推到最右正好贴边（位移 32rpx 与 72／32／4 三个数对得上）',
+  /\.wr-sw-track\s*\{[^}]*width: 72rpx/.test(wxss)
+  && /\.wr-sw-dot\s*\{[^}]*width: 32rpx/.test(wxss)
+  && /\.wr-sw-on \.wr-sw-dot\s*\{[^}]*transform: translateX\(32rpx\)/.test(wxss))
 
 console.log(`统一录入条：${pass} 条通过`)
 if (fails.length) {

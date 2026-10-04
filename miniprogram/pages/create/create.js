@@ -36,6 +36,9 @@ Page({
     shotDesc: '',
     writeTitle: '',
     writeBody: '',
+    // 「原文翻译」那枚小开关（站长 10-04）：默认关＝摘要跟随原文的语言，打开才整理成中文。
+    // 只活在这一次提交里：落库成功后跟着标题／原文一起归零，不留到下一篇。
+    writeTranslate: false,
     // 「亲自撰写」的分类：0 是「未分类」，往后依次是用户自己的分类。
     // 只在第一次展开这张卡时取一次，这一页是启动页，冷启动就去拉没意义。
     categories: [],
@@ -468,6 +471,12 @@ Page({
     this.setData({ writeBody: e.detail.value })
   },
 
+  // 整行都是落点（wxml 把 catchtap 绑在这一行的外壳上），所以这里只管翻一下状态。
+  // 用 catchtap 而不是 bindtap：面板外壳挂着「点空白收回」，冒上去就顺手把面板收掉了。
+  onToggleTranslate() {
+    this.setData({ writeTranslate: !this.data.writeTranslate })
+  },
+
   cancelWrite() {
     this.collapse()
   },
@@ -493,12 +502,16 @@ Page({
         title,
         content,
         category_id: picked ? picked.id : null,
+        // 后端字段名就叫 translate，默认 false。这一位一路走到提示词里那行「输出语言」，
+        // 关掉它才是要的效果：英文原文出英文摘要，不再被自动写成中文。
+        translate: this.data.writeTranslate,
       })
       const result = await api.pollTask(task_id)
       this.setData({
         busy: '',
         writeTitle: '',
         writeBody: '',
+        writeTranslate: false,
         catIndex: 0,
         active: '',
         mode: 'write',

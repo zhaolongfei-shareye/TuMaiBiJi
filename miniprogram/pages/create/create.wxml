@@ -170,6 +170,17 @@
           maxlength="2000"
           bindinput="onWriteBody"
         />
+        <!-- 站长 10-04：「我贴一条纯英文的，界面也是英文，不明白为什么提炼的时候自动翻译成
+             中文」，要在这排按钮上面加一枚小开关，默认关。根因不在模型，在给它的提示词整篇
+             是中文（llm.py 的 SYSTEM_PROMPT），它就一直顺着提问的语言答。这一枚决定那行
+             「输出语言」带不带：关＝摘要跟随原文的语言（英文原文出英文摘要），开＝整理成中文。
+             只管「直接写」这一档——链接／截图那两条不带这个参数，提示词一字没变。
+             整行都是落点：面板只有 700 高，只让那枚药丸可点在这个距离上太难点中；
+             用 catchtap 是因为容器上挂着「点空白收回面板」，不能顺手把面板收掉。 -->
+        <view class="wr-sw {{writeTranslate ? 'wr-sw-on' : ''}}" catchtap="onToggleTranslate">
+          <text class="wr-sw-lab">{{t.origTranslate}}</text>
+          <view class="wr-sw-track"><view class="wr-sw-dot"></view></view>
+        </view>
         <view class="acts">
           <view class="act ghost" catchtap="cancelWrite">{{t.cancel}}</view>
           <view class="act {{busy === 'write' ? 'off' : 'solid'}}" catchtap="submitManual">{{busy === 'write' ? t.busyExtract : t.startExtract}}</view>

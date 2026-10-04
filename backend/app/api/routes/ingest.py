@@ -54,6 +54,10 @@ class IngestTextIn(BaseModel):
     title: Annotated[str, Field(min_length=1, max_length=MAX_TITLE)]
     content: Annotated[str, Field(min_length=1, max_length=MAX_BODY)]
     category_id: Optional[int] = None
+    # 站长 10-04：贴纯英文原文时摘要别自动变中文，界面上给一枚「原文翻译」开关，默认关。
+    # 默认值就写 False：老版本客户端（1.9.24 及以前）不带这个字段，落到"不翻译"正是他要的
+    # 新默认，不需要为旧客户端留第二条分支。
+    translate: bool = False
 
 
 @router.post("/text")
@@ -101,6 +105,9 @@ async def ingest_text(
         content,
         payload.category_id,
         user.generation,
+        # 这一位排在最后：队列里的 job 是按位置绑定的，正在跑的老 job 不带这个参数，
+        # 插到中间就会把 generation 挪一位（A6 那条串号闸门的成因就是这一类错位）。
+        payload.translate,
         job_id=task_id,
         job_timeout=600,
     )

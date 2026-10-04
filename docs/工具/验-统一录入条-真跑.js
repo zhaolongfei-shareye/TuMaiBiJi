@@ -239,6 +239,50 @@ const ck = (name, ok, got) => {
     !!barBg && !!panBg && barBg === panBg, `${barBg} vs ${panBg}`)
   await mp.screenshot({ path: `${OUT}/实测-3-展开写.png` })
 
+  // ---------- ③b 「原文翻译」那一枚开关（站长 10-04 原话：「在取消按钮上方，加个小开关，
+  // 原文翻译，默认关，可以打开」）----------
+  // 三样都要真点出来：位置（在那排按钮上方）、默认态（关）、点下去之后面板不许被收掉
+  // （落点用 catchtap 就是为了这个——冒到容器那条"点空白收回"上会变成一开开关一关面板）。
+  {
+    ck('写那态只有一行开关', (await page.$$('.wr-sw')).length === 1)
+    const swTxt = ((await (await page.$('.wr-sw')).text()) || '').replace(/\s+/g, '')
+    ck('那行字是他原话「原文翻译」', swTxt === '原文翻译', swTxt)
+    ck('默认是关', (await page.data('writeTranslate')) === false, String(await page.data('writeTranslate')))
+    const [gSw, gActs] = await rects(['.wr-sw', '.acts'])
+    ck('开关那一行就在那排按钮上方', !!gSw && !!gActs && gSw.bottom <= gActs.top + 1
+      && gActs.top - gSw.bottom < 30 * R,
+      gSw && gActs && `开关底 ${Math.round(gSw.bottom)}｜按钮顶 ${Math.round(gActs.top)}`)
+    const offTrack = await (await page.$('.wr-sw-track')).style('background-color')
+    const offDot = await (await page.$('.wr-sw-dot')).style('background-color')
+    await (await page.$('.wr-sw')).tap()
+    await sleep(600)
+    const d2 = await page.data()
+    ck('点整行一下，状态翻成开', d2.writeTranslate === true, String(d2.writeTranslate))
+    ck('点它不收面板、也不误触提交（面板还在、busy 没被碰）',
+      d2.active === 'write' && (await page.$$('.panel')).length === 1 && !d2.busy,
+      `${d2.active}/${d2.busy}`)
+    const onTrack = await (await page.$('.wr-sw-track')).style('background-color')
+    const onDot = await (await page.$('.wr-sw-dot')).style('background-color')
+    // "看得出来开着还是关着"要两条一起才算：① 同一枚面在开／关两态读数不同；
+    // ② 每一态里面与点是两支色。只比"面 vs 点"会掉进同底色压透明度那种永真判据，
+    // 只比"开 vs 关"又抓不到点融进面里的那种画法，所以两边都比。
+    ck('那一面在开／关两态换了色', !!offTrack && !!onTrack && offTrack !== onTrack,
+      `${offTrack} → ${onTrack}`)
+    ck('关态：点与面两支色', !!offTrack && !!offDot && offDot !== offTrack,
+      `点 ${offDot}｜面 ${offTrack}`)
+    ck('开态：点与面两支色', !!onTrack && !!onDot && onDot !== onTrack,
+      `点 ${onDot}｜面 ${onTrack}`)
+    await mp.screenshot({ path: `${OUT}/实测-3b-开关打开.png` })
+    await (await page.$('.wr-sw')).tap()
+    await sleep(600)
+    ck('再点一下回到关（来回都灵）', (await page.data('writeTranslate')) === false,
+      String(await page.data('writeTranslate')))
+    const backTrack = await (await page.$('.wr-sw-track')).style('background-color')
+    ck('关回去之后那一面的读数与最初一致', !!offTrack && backTrack === offTrack,
+      `${offTrack} vs ${backTrack}`)
+    await mp.screenshot({ path: `${OUT}/实测-3c-开关关闭.png` })
+  }
+
   // ---------- ④ 模式标签互切 ----------
   const modes = await page.$$('.mode')
   await modes[3].tap()   // 链接
@@ -248,6 +292,9 @@ const ck = (name, ok, got) => {
   ck('条身跟着换成「贴个链接」', d.barTitle === '贴个链接', d.barTitle)
   ck('链接那态有粘贴和保存', (await page.$$('.act')).length === 2)
   ck('链接那态没有归类那一格', (await page.$$('.wr-cat-face')).length === 0)
+  // 「原文翻译」只加在直接写这一档（站长指的就是这一屏），链接／截图／拍照三条不带它——
+  // 后端那两条也没这个字段，提示词一字没变。
+  ck('链接那态没有那枚开关（开关只归直接写这一档）', (await page.$$('.wr-sw')).length === 0)
   await mp.screenshot({ path: `${OUT}/实测-4-展开链接.png` })
 
   await (await page.$$('.mode'))[1].tap()  // 拍照（标签只切视图，不开相机）

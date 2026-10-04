@@ -152,7 +152,8 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
 
 
 def process_manual_text_task(task_id: str, user_id: str, title: str, content: str,
-                             category_id: int | None = None, generation: int | None = None):
+                             category_id: int | None = None, generation: int | None = None,
+                             translate: bool = False):
     """RQ worker 同步任务：手打的原文 → LLM 提炼 → 写入数据库。
 
     和 URL／截图两条只差两件事：① 标题用用户自己打的那个，不用模型另起的
@@ -161,11 +162,15 @@ def process_manual_text_task(task_id: str, user_id: str, title: str, content: st
     ② 归类是他当场挑的，所以要落 category_id。
     正文落 original_content、摘要是 summary —— 与另外两条同一份形状，详情页那三块
     （摘要 / 要点 / 原文）才不用为这一种来源特判。
+
+    `translate` 排在这个签名的最后一位：RQ 的 job 带的是位置参数列表，队列里还躺着
+    上一版入队的任务（不带这一位）。放中间会让老 job 的 generation 读到 translate 的
+    位置、这一位反而空着——A6 那次串号就是这么来的。放最后，老 job 只会拿到默认值 False。
     """
     try:
         set_task_status(task_id, "processing")
 
-        knowledge = asyncio.run(extract_knowledge(content, fallback_title=title))
+        knowledge = asyncio.run(extract_knowledge(content, fallback_title=title, translate=translate))
 
         db = SessionLocal()
         try:

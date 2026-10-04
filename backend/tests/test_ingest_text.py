@@ -183,7 +183,7 @@ class Test落库:
     def test_标题用用户打的那份_摘要要点标签用模型那份(self, worker, db):
         tasks, statuses, uid, mp = worker
 
-        async def fake_llm(text, fallback_title=""):
+        async def fake_llm(text, fallback_title="", translate=None):
             assert text == "原文第一段。", "送进模型的应该是用户打的原文"
             assert fallback_title == "我的标题", "降级时的标题也该拿用户那个，不是另起"
             return {"title": "模型另起的标题", "summary": "模型摘要",
@@ -207,7 +207,7 @@ class Test落库:
         db.add(cat)
         db.commit()
 
-        async def fake_llm(text, fallback_title=""):
+        async def fake_llm(text, fallback_title="", translate=None):
             return {"title": "t", "summary": "s", "key_points": [], "tags": []}
 
         mp.setattr(tasks, "extract_knowledge", fake_llm)
@@ -222,7 +222,7 @@ class Test落库:
         db.commit()
         cat_id = cat.id
 
-        async def fake_llm(text, fallback_title=""):
+        async def fake_llm(text, fallback_title="", translate=None):
             # 提炼这十几秒之间，另一个设备把那一格删了
             db.query(Category).filter(Category.id == cat_id).delete()
             db.commit()
@@ -242,10 +242,96 @@ class Test落库:
         db.add(cat)
         db.commit()
 
-        async def fake_llm(text, fallback_title=""):
+        async def fake_llm(text, fallback_title="", translate=None):
             return {"title": "t", "summary": "s", "key_points": [], "tags": []}
 
         mp.setattr(tasks, "extract_knowledge", fake_llm)
         tasks.process_manual_text_task("t4", uid, "标题", "正文", cat.id)
         _, result = statuses[-1]
         assert db.get(Note, result["note_id"]).category_id is None
+
+
+class Test原文翻译开关:
+    """站长 10-04：贴一段纯英文原文，摘要不该被自动翻成中文——给一枚开关，默认关。
+
+    三样各钉一处：① 这一位从 HTTP 一路带到队列，且落在**最后一个位置**（放中间会把
+    队列里正在跑的老 job 的 generation 挪一位，A6 那次串号就是这个形状）；
+    ② 到 worker 变成 extract_knowledge 的那个参数；
+    ③ 链接／截图两条不带这个参数，提示词必须与改动前一字不差。
+    """
+
+    def test_不带这个字段时入队的是关闭态(self, client, db, rec):
+        u = mk_user(db, "tr-default", generation=4)
+        resp = post_text(client, u, title="Title", content="An English paragraph.")
+        assert resp.status_code == 200, resp.text
+        args = rec.calls[0][0]
+        assert len(args) == 8, f"这一位没进队列：{args}"
+        assert args[7] is False, f"默认应该是关闭态：{args}"
+
+    def test_打开开关时入队最后一位是True(self, client, db, rec):
+        u = mk_user(db, "tr-on", generation=4)
+        resp = post_text(client, u, title="Title", content="An English paragraph.", translate=True)
+        assert resp.status_code == 200, resp.text
+        assert rec.calls[0][0][7] is True, rec.calls[0][0]
+
+    def test_这一位排在签名最后(self):
+        import inspect
+
+        from app.tasks.ingest_tasks import process_manual_text_task as fn
+
+        names = list(inspect.signature(fn).parameters)
+        assert names[-1] == "translate", names
+        assert names[names.index("generation") + 1] == "translate", names
+
+    def test_老job那六个位置参数照样落库(self, worker, db):
+        """队列里可能还躺着上一版入队的 job（不带第七位），它必须仍按老形状绑对。"""
+        tasks, statuses, uid, mp = worker
+        seen = {}
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            seen["translate"] = translate
+            return {"title": "t", "summary": "s", "key_points": [], "tags": []}
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        tasks.process_manual_text_task("t5", uid, "标题", "正文", None, 1)
+        status, result = statuses[-1]
+        assert status == "completed", result
+        assert seen["translate"] is False, seen
+        assert db.get(Note, result["note_id"]).title == "标题"
+
+    def test_worker把开关的值原样交给提炼(self, worker, db):
+        tasks, statuses, uid, mp = worker
+        seen = {}
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            seen["translate"] = translate
+            return {"title": "t", "summary": "s", "key_points": [], "tags": []}
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        tasks.process_manual_text_task("t6", uid, "标题", "正文", None, 1, True)
+        assert seen["translate"] is True, seen
+        tasks.process_manual_text_task("t7", uid, "标题", "正文", None, 1, False)
+        assert seen["translate"] is False, seen
+
+
+class Test提示词里的输出语言:
+    def test_关_写明跟随原文不翻译(self):
+        from app.services import llm
+
+        p = llm.system_prompt(False)
+        assert p.startswith(llm.SYSTEM_PROMPT)
+        assert "不要翻译成中文" in p
+
+    def test_开_要求用简体中文整理(self):
+        from app.services import llm
+
+        p = llm.system_prompt(True)
+        assert "简体中文" in p
+        assert "不要翻译成中文" not in p
+
+    def test_不表态时与改动前那份一字不差(self):
+        """链接／截图两条不带这个参数：它们的行为不能跟着这一枚开关一起动。"""
+        from app.services import llm
+
+        assert llm.system_prompt() == llm.SYSTEM_PROMPT
+        assert llm.system_prompt(None) == llm.SYSTEM_PROMPT

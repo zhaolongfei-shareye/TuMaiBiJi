@@ -76,15 +76,34 @@ SYSTEM_PROMPT = """你是一个内容提取与知识整理助手。用户会提�
   "tags": ["标签1", "标签2", ...]
 }"""
 
+# 站长 10-04：「我贴一条纯英文的，界面也是英文，不明白为什么提炼的时候自动翻译成中文」。
+# 根因不在模型勤快，在这份 prompt 整篇是中文——它就一直顺着提问的语言答。原来没有任何
+# 一行说明"用什么语言写"，所以这一段是从界面上那枚「原文翻译」开关补进来的：
+# 关＝跟随原文的语言（英文原文出英文摘要），开＝整理成中文。
+# None 是"不表态"＝回原来那份，链接／截图两条不带这个参数，行为一字不变。
+_LANG_KEEP = """
+输出语言：标题、摘要、要点、标签都跟随原文的语言。原文是英文就写英文，
+是日文就写日文，不要翻译成中文。"""
+_LANG_ZH = """
+输出语言：标题、摘要、要点、标签一律用简体中文写。原文是其他语言时先读懂，
+再整理成中文。"""
 
-async def extract_knowledge(text: str, fallback_title: str = "") -> dict:
+
+def system_prompt(translate=None):
+    """按那一枚开关决定给模型的提示词带不带"输出语言"那一段。"""
+    if translate is None:
+        return SYSTEM_PROMPT
+    return SYSTEM_PROMPT + (_LANG_ZH if translate else _LANG_KEEP)
+
+
+async def extract_knowledge(text: str, fallback_title: str = "", translate=None) -> dict:
     """提炼结构化知识；提炼能力不可用时自动降级，绝不让整条采集任务失败。
 
     返回 dict 含 title/summary/key_points/tags；降级时附带 degraded=True，
     便于任务结果里区分「采集失败」与「只是没提炼」。
     """
     try:
-        result = await _call_llm(text, fallback_title)
+        result = await _call_llm(text, fallback_title, translate)
         result.setdefault("degraded", False)
         return result
     except Exception as e:
@@ -101,7 +120,7 @@ def _build_user_content(text: str, fallback_title: str) -> str:
     return content
 
 
-async def _call_llm(text: str, fallback_title: str = "") -> dict:
+async def _call_llm(text: str, fallback_title: str = "", translate=None) -> dict:
     """按 EXTRACT_PROVIDER 分发到具体供应商实现。
 
     重试策略只作用于"可能自愈"的失败：429 限流、5xx、超时，最多 MAX_RETRIES 次指数退避。
@@ -116,10 +135,10 @@ async def _call_llm(text: str, fallback_title: str = "") -> dict:
     if provider not in KNOWN_PROVIDERS:
         raise RuntimeError(f"未知的 EXTRACT_PROVIDER={provider!r}，走降级")
 
-    return await _call_hunyuan_cloud_function(text, fallback_title)
+    return await _call_hunyuan_cloud_function(text, fallback_title, translate)
 
 
-async def _call_hunyuan_cloud_function(text: str, fallback_title: str) -> dict:
+async def _call_hunyuan_cloud_function(text: str, fallback_title: str, translate=None) -> dict:
     url = (settings.HUNYUAN_CF_URL or "").strip()
     key = (settings.HUNYUAN_CF_KEY or "").strip()
 
@@ -131,7 +150,7 @@ async def _call_hunyuan_cloud_function(text: str, fallback_title: str) -> dict:
     payload = {
         "text": _build_user_content(text, fallback_title),
         "fallback_title": fallback_title,
-        "system_prompt": SYSTEM_PROMPT,
+        "system_prompt": system_prompt(translate),
     }
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     timeout = settings.HUNYUAN_CF_TIMEOUT

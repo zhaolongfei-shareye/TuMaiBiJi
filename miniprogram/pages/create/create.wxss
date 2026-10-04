@@ -707,7 +707,57 @@
 /* 原文那一格：面板定高 700，富余那截被按钮行的 auto 外边距吃掉，所以只能写死高度。
    180→300 是把原来归类那一整行（88 + 16 间距 = 104）腾出来的地方还给正文，
    再多的从"报错行不显示时的那截余量"里拿——四态自然高用
-   `docs/工具/量-面板四态自然高.js` 现量，别照这个数手推。 */
+   `docs/工具/量-面板四态自然高.js` 现量，别照这个数手推。
+   300→228：10-04 在按钮行上面加了「原文翻译」那一行（56 + 16 间距 = 72），
+   这一格是让出它那 72 的地方，四态自然高跟着重量过。 */
 .wr-body {
-  height: 300rpx;
+  height: 228rpx;
+}
+
+/* 「原文翻译」那一行（站长 10-04：贴纯英文原文别自动出中文摘要）。
+   画法照首页二维码那枚药丸开关，尺寸收一档：面板只有 700 高，92×52 会把它顶成
+   一行主控件。两态都吃 toneStyle 发下来的成对变量——关是 --face 面配 --face-ink 点，
+   开是 --solid-bg 面配 --solid-ink 点（与 .act.solid 同一对），所以深色卡上不会出现
+   "同底色压透明度等于没画"那种开关。 */
+.wr-sw {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56rpx;
+  margin-top: var(--sp-2);
+}
+
+.wr-sw-lab {
+  font-size: var(--fs-meta);
+  color: var(--face-ink);
+}
+
+.wr-sw-track {
+  flex: none;
+  position: relative;
+  width: 72rpx;
+  height: 40rpx;
+  border-radius: var(--r-pill);
+  background: var(--face);
+  transition: background 160ms ease-out;
+}
+
+.wr-sw-dot {
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  background: var(--face-ink);
+  transition: transform 160ms ease-out;
+}
+
+.wr-sw-on .wr-sw-track {
+  background: var(--solid-bg);
+}
+
+.wr-sw-on .wr-sw-dot {
+  background: var(--solid-ink);
+  transform: translateX(32rpx);
 }
