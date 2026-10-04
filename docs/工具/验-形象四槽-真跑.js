@@ -13,6 +13,10 @@
 // 这支只动本机 storage 和本机 USER_DATA_PATH 里那几个 ruler-slot-*.jpg，不碰后端、不碰账号。
 const automator = require('miniprogram-automator')
 const lang = require('./尺子语言钉.js')
+const path = require('path')
+// 模板表只认这一份真相：分组名与每档几套都从 utils/poster.js 现读，
+// 尺子里再抄一遍"4 / 6"，以后加一套就是这里假红。
+const poster = require(path.resolve(__dirname, '../../miniprogram/utils/poster.js'))
 
 const PORT = process.env.MP_PORT || 9431
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -293,7 +297,15 @@ async function gotoProfile(mp) {
     await (await page.$$('.bin'))[1].tap()
     await sleep(1000)
     await tapConfirm(mp)
-    await sleep(1500)
+    /* 别拿固定 sleep 去读这一口：删完这一页会立刻重画十格小样（renderThumbs 一路 setData），
+       挤在中间读 page.data() 会拿到删之前的那一份。10-04 实测就是这么红的——storage 已经是
+       三张、界面上 ➕ 也补回来了，只有这一口读到四张。改成轮询到它自己变，最多等 12 秒；
+       判据本身一个字没松（等不到照样红）。 */
+    for (let i = 0; i < 24; i++) {
+      d = await page.data()
+      if (d.slots.filter(Boolean).length === 3) break
+      await sleep(500)
+    }
     d = await page.data()
     ck('点「删掉」之后那一格真的空了（剩三张）', d.slots.filter(Boolean).length === 3,
       `${d.slots.filter(Boolean).length} 张`)
@@ -309,6 +321,34 @@ async function gotoProfile(mp) {
       st.images[0] && st.images[0].card === true && st.images[0].bg === true
       && !!st.images[2] && !!st.images[3])
     await disarmModal(mp)
+
+    // ---------- ⑤b 两档分组名后面那个数（站长 10-04：经典款，个性款，后面要加（数字）） ----------
+    // 期望值全部从 utils/poster.js 那份表现算：括号里的数写死成 4 / 6，以后加一套模板
+    // 这把尺子会假红，而屏上其实是对的。
+    const groupsNow = await page.data('groups')
+    const langNow = await page.data('lang')
+    const headTx = []
+    for (const e of await page.$$('.grid-head')) headTx.push(((await e.text()) || '').trim())
+    const wantOf = (gid) => {
+      const n = poster.TEMPLATES.filter((x) => x.group === gid).length
+      return poster.groupName(gid, langNow) + (langNow === 'en' ? ` (${n})` : `（${n}）`)
+    }
+    ck('两档各一行，行末括号里的数就是这一档现在的套数',
+      headTx.length === poster.TEMPLATE_GROUPS.length
+        && poster.TEMPLATE_GROUPS.every((g, i) => headTx[i] === wantOf(g.id)),
+      `${headTx.join(' / ')}　应读 ${poster.TEMPLATE_GROUPS.map((g) => wantOf(g.id)).join(' / ')}`)
+    ck('data 里那份 label 与屏上这一行逐字相同（不是渲染完又被重画抹掉）',
+      Array.isArray(groupsNow) && groupsNow.length === headTx.length
+        && groupsNow.every((g, i) => g.label === headTx[i]),
+      `${groupsNow.map((g) => g.label).join(' / ')}`)
+    const cellsNow = await page.$$('.cell')
+    const numOf = (s) => Number((String(s).match(/(\d+)\s*[)）]/) || [0, 0])[1])
+    const sumNum = headTx.reduce((acc, x) => acc + numOf(x), 0)
+    ck('括号里的数加起＝屏上真画出来的格子数（同一个数两处对账）',
+      sumNum === cellsNow.length && sumNum > 0, `${headTx.join('')} → ${sumNum} vs 格子 ${cellsNow.length}`)
+    ck('叫法没被改（还是「经典款／个性款」那两个字，后面只跟括号）',
+      headTx.every((x, i) => x.indexOf(poster.groupName(poster.TEMPLATE_GROUPS[i].id, langNow)) === 0),
+      headTx.join(' / '))
 
     // ---------- ⑥ 首页背景跟着这张走（同一份真相） ----------
     await seedSlots(mp, [{ card: false, bg: true }, { card: true, bg: false }, {}, {}])

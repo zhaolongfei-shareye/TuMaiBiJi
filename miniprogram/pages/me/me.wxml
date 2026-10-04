@@ -9,8 +9,10 @@
            opacity:0＝一点不压（＝原图亮度）。三页同一个本机键，所以一起沉、一起亮。 -->
       <view wx:if="{{bgSrc}}" class="head-scrim" style="{{dimScrim}}"></view>
       <!-- 左上角这行大字与首页那一行是同一档量（--fs-h1 / 700 / -1rpx / left 32 top 22），
-           站长 10-01：三个 tab 的首页风格要一致，这一页原来只有右上角那枚药丸。 -->
-      <view class="h1">{{t.tabMe}}</view>
+           站长 10-01：三个 tab 的首页风格要一致，这一页原来只有右上角那枚药丸。
+           站长 10-04：这一行不再写死「我的」，改成跟着下面那枚药丸走——停在设置就写设置、
+           翻到关于就写关于，让这行大字报出当前这一屏是哪一档。-->
+      <view class="h1">{{tab === 'about' ? t.pillAbout : t.pillSettings}}</view>
       <!-- 数字没从 /api/user/quota 读回来之前整块不占位：宁可空着，也不先摆一个猜的数 -->
       <view wx:if="{{scoreText}}" class="score">
         <text class="score-n">{{scoreText}}</text>

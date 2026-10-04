@@ -183,7 +183,21 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     toRpx(m.text.height, W).toFixed(0))
 
   /* ---------- ②b 左上角那行大字（站长 10-01：三个 tab 的首页风格要一致） ---------- */
-  ck('头部左上角有这行大字，内容就是本页的 tab 名', !!m.h1 && m.h1.width > 0, JSON.stringify(m.h1))
+  ck('头部左上角有这行大字', !!m.h1 && m.h1.width > 0, JSON.stringify(m.h1))
+  /* 站长 10-04：这一行不再写死「我的」，改成跟着下面那枚药丸走——停在设置就写设置、
+     翻到关于就写关于。旧判据「内容就是本页的 tab 名」作废。
+     期望值一律从页面自己那份字典现读：写死中文串，账号一切英文就假红（10-03 那条）。 */
+  const h1Tx = ((await (await page.$('.h1')).text()) || '').trim()
+  const dict0 = await page.data('t')
+  const tab0 = await page.data('tab')
+  const segTx0 = []
+  for (const e of await page.$$('.seg')) segTx0.push(((await e.text()) || '').trim())
+  ck('这行大字就是当下这一档的名字（与药丸选中那一枚逐字相同）',
+    !!h1Tx && h1Tx === (tab0 === 'about' ? dict0.pillAbout : dict0.pillSettings)
+      && segTx0[tab0 === 'about' ? 1 : 0] === h1Tx,
+    `${h1Tx} / tab=${tab0} / 药丸 ${segTx0.join('|')}`)
+  ck('这行不再写死成本页的 tab 名「我的」', !!h1Tx && h1Tx !== dict0.tabMe,
+    `${h1Tx} ≠ ${dict0 && dict0.tabMe}`)
   const h1Style = await styleOf(page, '.h1', ['font-size', 'font-weight', 'letter-spacing', 'color'])
   ck('位子与首页那一行同档：左 32、上 22',
     Math.abs(toRpx(m.h1.left, W) - 32) <= 2 && Math.abs(toRpx(m.h1.top, W) - 22) <= 2,
@@ -417,6 +431,14 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   d = await page.data()
   m = await measure(mp)
   ck('切到关于', d.tab === 'about', d.tab)
+  /* 站长 10-04 那条联动要在这里收到第二条读数：切档之后左上角那行大字必须跟着换，
+     而且换的就是药丸那一枚的字（只钉第一帧的话，"跟着变"这一半没有任何证据）。 */
+  const h1Tx2 = ((await (await page.$('.h1')).text()) || '').trim()
+  const segTx2 = []
+  for (const e of await page.$$('.seg')) segTx2.push(((await e.text()) || '').trim())
+  ck('切到关于，这行大字跟着变成关于那一档（与药丸选中那枚仍然逐字相同）',
+    h1Tx2 === dict0.pillAbout && h1Tx2 !== h1Tx && segTx2[1] === h1Tx2,
+    `${h1Tx} → ${h1Tx2} / 药丸 ${segTx2.join('|')}`)
   ck('切走时展开着的面板收掉了', d.pwdOpen === false)
   const aboutLabels = []
   for (const r of await page.$$('.menu-item')) aboutLabels.push((await r.text()).replace(/\s+/g, ''))

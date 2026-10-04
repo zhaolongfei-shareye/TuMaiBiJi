@@ -20,15 +20,24 @@ const MEASURE_H = 750
 
 // 格子的骨架：先有 id 和占位高度，画布节点得先存在，小样才画得上去。
 function groupSkeleton(lang) {
-  return poster.TEMPLATE_GROUPS.map((g) => ({
-    id: g.id,
-    label: poster.groupName(g.id, lang),
-    items: poster.TEMPLATES.filter((x) => x.group === g.id).map((x) => ({
+  // 站长 10-04：分组名后面要带一个数（经典款（4）/ 个性款（6））。数一律从下面这份
+  // TEMPLATES 现算，一个都不写死——以后加一套或撤一套，改的是那张表，这一行自己跟着变。
+  // 括号跟着语言换：英文态写成 "Classic (4)"，全角括号夹在英文里像没排完。
+  // 合进 label 而不是另起一个字段：下面 renderThumbs 重画十格时只往回带 id/label/items，
+  // 单独那个数会被它抹掉（表现是画完小样之后括号当场消失）。
+  return poster.TEMPLATE_GROUPS.map((g) => {
+    const items = poster.TEMPLATES.filter((x) => x.group === g.id).map((x) => ({
       id: x.id,
       label: poster.templateLabel(x.id, lang),
       h: Math.round((THUMB_W * 4) / 3),
-    })),
-  }))
+    }))
+    const n = items.length
+    return {
+      id: g.id,
+      label: poster.groupName(g.id, lang) + (lang === 'en' ? ` (${n})` : `（${n}）`),
+      items,
+    }
+  })
 }
 
 Page({
