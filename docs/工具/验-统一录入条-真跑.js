@@ -43,6 +43,23 @@ const ck = (name, ok, got) => {
       ? { top: x.top === undefined ? x.y : x.top, bottom: x.bottom, h: x.height, w: x.width, left: x.left }
       : null))))
   }), sels)
+  // 「淡一档」这条要从渲染结果读，不从 wxss 读（wxss 那条静态尺子已经钉了令牌本身）。
+  // 通道只认这一条：`element.style('color')` 回的是**计算后**的值——10-04 探针实测
+  // `.wr-cat-val → rgba(35, 37, 44, 0.55)`、`.face-input → rgb(35, 37, 44)`。
+  // 试过 SelectorQuery.fields({computedStyle})：evaluate 那条路报 "An object could not
+  // be cloned"、不传对象则干脆不回调，把整把尺子拖到 timeout，后面二十几条当场没跑——
+  // 所以这里宁可一次拿不到就当红，也不留一个会挂的死通道。
+  const colorOf = async (sel) => {
+    const el = await page.$(sel)
+    return el ? await el.style('color') : null
+  }
+  const rgbOf = (s) => {
+    if (!s) return null
+    let m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+))?/.exec(s)
+    if (m) return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] }
+    m = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})/i.exec(s)
+    return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16), a: 1 } : null
+  }
 
   await mp.evaluate(() => { wx.removeStorageSync('home_bg_off'); wx.removeStorageSync('poster_profile') })
   let page = await enter('/pages/create/create')
@@ -153,9 +170,53 @@ const ck = (name, ok, got) => {
   ck('展开态这一行整个不渲染（站长拍的：不跟表单抢眼睛）', (await page.$$('.tips')).length === 0)
   ck('四个模式标签都在', (await page.$$('.mode')).length === 4)
   ck('当前标签是直接写', /直接写/.test((await (await page.$('.mode.on')).text()) || ''), await (await page.$('.mode.on')).text())
-  ck('写那态有标题框、正文框、归类、取消、保存',
-    (await page.$$('.face-input')).length === 1 && (await page.$$('.face-area')).length === 1
-    && (await page.$$('.cat-row')).length === 1 && (await page.$$('.act')).length === 2)
+  // 站长 10-04：这一档改成"标题 + 原文 → 模型出摘要"，归类那一整行并进标题这一行。
+  // 原来这条钉的是"标题框 + 摘要框 + 归类行"，三样都在，但摘要那格已经不存在了。
+  ck('写那态有标题框、原文框、分类那一格、两枚按钮',
+    (await page.$$('.face-input')).length === 1 && (await page.$$('.wr-body')).length === 1
+    && (await page.$$('.wr-cat-face')).length === 1 && (await page.$$('.act')).length === 2)
+  {
+    const [line, catCell, titleCell] = await rects(['.wr-line', '.wr-cat-face', '.wr-title'])
+    ck('分类与标题坐在同一行（上下沿对齐，不是两行）',
+      !!catCell && !!titleCell && Math.abs(catCell.top - titleCell.top) < 2
+      && Math.abs(catCell.bottom - titleCell.bottom) < 2,
+      catCell && titleCell && `分类 ${Math.round(catCell.top)}~${Math.round(catCell.bottom)}｜标题 ${Math.round(titleCell.top)}~${Math.round(titleCell.bottom)}`)
+    // 他原话是"分类占 1/3 宽度，其他留给标题"，所以钉的是**分类占整行的三分之一**。
+    // 第一版我写成"标题 = 分类 × 2"，那是把两件事混了：行里还夹一道 16 的缝，
+    // 1/3 之外剩下的并不等于 2/3（实量 分类 214｜标题 413｜整行 642），当场红的是尺子。
+    ck('那一格占整行 1/3、其余给标题（原话：分类占 1/3 宽度）',
+      !!catCell && !!titleCell && !!line
+      && Math.abs(catCell.w - line.w / 3) <= 2 * R
+      && Math.abs(line.w - (catCell.w + titleCell.w + 16 * R)) <= 3,
+      catCell && titleCell && line && `分类 ${(catCell.w / R).toFixed(0)}rpx（整行 ${(line.w / R).toFixed(0)} 的 ${(catCell.w * 100 / line.w).toFixed(1)}%）｜标题 ${(titleCell.w / R).toFixed(0)}rpx`)
+    const catText = ((await (await page.$('.wr-cat-face')).text()) || '').replace(/[›\s]/g, '')
+    const wantCat = ((d.categoryNames || [])[d.catIndex] || '').replace(/[›\s]/g, '')
+    ck('分类那一格只报名字（"归类"那两个字撤了，格子里就是当前那一格）',
+      !!wantCat && catText === wantCat, `${catText} vs ${wantCat}`)
+    // 站长 10-04 第六轮：「标题在左，分类在右」。上一版是分类在左——这条钉死左右，
+    // 不然下次谁（包括我自己）顺手把 wxml 里两格调回来，屏幕上看不出是回归。
+    ck('标题在左、分类在右（分类那格贴着整行右端）',
+      !!catCell && !!titleCell && !!line
+      && catCell.left > titleCell.left
+      && Math.abs((catCell.left + catCell.w) - (line.left + line.w)) <= 2,
+      catCell && titleCell && line
+      && `标题左 ${Math.round(titleCell.left)}｜分类左 ${Math.round(catCell.left)}｜整行右端 ${Math.round(line.left + line.w)}`)
+    {
+      const catColor = await colorOf('.wr-cat-val')
+      const titleColor = await colorOf('.face-input')
+      const ca = rgbOf(catColor), ta = rgbOf(titleColor)
+      ck('分类那格的字比标题淡（原话：分类字体颜色，淡一点）',
+        !!ca && !!ta && ca.a < ta.a && ca.a >= 0.5,
+        `分类 ${catColor}｜标题 ${titleColor}`)
+      // 只许淡，不许换色相：三通道必须还是那一支墨，否则"淡"会变成另一支灰。
+      ck('淡的这支还是面板那支墨（同一 RGB 只降 alpha）',
+        !!ca && !!ta && ca.r === ta.r && ca.g === ta.g && ca.b === ta.b,
+        `分类 (${ca && ca.r},${ca && ca.g},${ca && ca.b})｜标题 (${ta && ta.r},${ta && ta.g},${ta && ta.b})`)
+    }
+    ck('按钮说的是提炼，不是保存',
+      /提炼/.test(((await (await page.$$('.act'))[1].text()) || '')),
+      (await (await page.$$('.act'))[1].text()))
+  }
   g = await rects(['.entry-wrap', '.panel', '.bar'])
   // 09-28 深夜改判据：展开后整组不再"回到标题下面"，而是从流里拿出来贴到底栏上方
   // （真机反馈原来那一版把照片和标题整个盖住了）。152 = 底栏那 128 + 一条 24 的缝。
@@ -186,7 +247,7 @@ const ck = (name, ok, got) => {
   ck('切到链接那一态', d.active === 'url' && d.mode === 'url', `${d.active}/${d.mode}`)
   ck('条身跟着换成「贴个链接」', d.barTitle === '贴个链接', d.barTitle)
   ck('链接那态有粘贴和保存', (await page.$$('.act')).length === 2)
-  ck('链接那态没有归类那一行', (await page.$$('.cat-row')).length === 0)
+  ck('链接那态没有归类那一格', (await page.$$('.wr-cat-face')).length === 0)
   await mp.screenshot({ path: `${OUT}/实测-4-展开链接.png` })
 
   await (await page.$$('.mode'))[1].tap()  // 拍照（标签只切视图，不开相机）

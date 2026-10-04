@@ -131,40 +131,48 @@
 
       <view wx:else class="entry-body">
         <view class="entry-desc">{{t.manualDesc}}</view>
-        <view class="face-box">
-          <input
-            class="face-input"
-            value="{{writeTitle}}"
-            placeholder="{{t.writeTitlePh}}"
-            placeholder-class="face-ph"
-            bindinput="onWriteTitle"
-          />
+        <!-- 站长 10-04：归类这一格挪进标题那一行，只报分类名（"归类"那两个字撤掉），
+             整行 1/3 归它、剩下 2/3 给标题。原来它单独占一行，是把最贵的一屏高度
+             花在一个只有几个字的行上。
+             第六轮改的就是这一行里的左右：标题在左、分类在右，分类那格的名字再淡一档。 -->
+        <view class="wr-line">
+          <view class="wr-title">
+            <input
+              class="face-input"
+              value="{{writeTitle}}"
+              placeholder="{{t.writeTitlePh}}"
+              placeholder-class="face-ph"
+              bindinput="onWriteTitle"
+            />
+          </view>
+          <picker
+            wx:if="{{categoryNames.length}}"
+            class="wr-cat"
+            mode="selector"
+            range="{{categoryNames}}"
+            value="{{catIndex}}"
+            bindchange="onPickCategory"
+          >
+            <view class="wr-cat-face">
+              <text class="wr-cat-val">{{categoryNames[catIndex]}}</text>
+              <text class="wr-cat-caret">›</text>
+            </view>
+          </picker>
         </view>
+        <!-- 这一段现在是"原文"，不是摘要：摘要交给模型出，所以框子给足。
+             高度写死而不是 flex:1——面板定高 700，富余那截被按钮行的 auto 外边距吃掉，
+             textarea 拿 flex:1 一寸都长不了（见 create.wxss 上面那段注释）。 -->
         <textarea
-          class="face-area"
+          class="face-area wr-body"
           value="{{writeBody}}"
           placeholder="{{t.writeBodyPh}}"
           placeholder-class="face-ph"
           maxlength="2000"
           bindinput="onWriteBody"
         />
-        <picker
-          wx:if="{{categoryNames.length}}"
-          class="cat-pick"
-          mode="selector"
-          range="{{categoryNames}}"
-          value="{{catIndex}}"
-          bindchange="onPickCategory"
-        >
-          <view class="cat-row">
-            <text class="cat-key">{{t.categoryLabel}}</text>
-            <text class="cat-val">{{categoryNames[catIndex]}}</text>
-            <text class="cat-caret">›</text>
-          </view>
-        </picker>
         <view class="acts">
           <view class="act ghost" catchtap="cancelWrite">{{t.cancel}}</view>
-          <view class="act {{busy === 'write' ? 'off' : 'solid'}}" catchtap="saveManual">{{busy === 'write' ? t.busySave : t.save}}</view>
+          <view class="act {{busy === 'write' ? 'off' : 'solid'}}" catchtap="submitManual">{{busy === 'write' ? t.busyExtract : t.startExtract}}</view>
         </view>
         <view wx:if="{{errLine}}" class="entry-err">{{errLine}}</view>
       </view>

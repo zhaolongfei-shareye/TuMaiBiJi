@@ -2,14 +2,21 @@ import logging
 import time
 import uuid
 
+from typing import Annotated, Optional
+
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.models.category import Category
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.core.errors import UserError
 from app.core.rate_limit import limiter
+from app.api.routes.notes import MAX_BODY, MAX_TITLE
 from app.services.queue import get_queue, set_task_status
+from app.services.wechat import enforce_text_safety
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +41,65 @@ async def ingest_url(
         task_id,
         str(user.id),
         url,
+        user.generation,
+        job_id=task_id,
+        job_timeout=600,
+    )
+    return {"status": "queued", "task_id": task_id}
+
+
+class IngestTextIn(BaseModel):
+    # 两个上限从 notes 路由现读，不在这里重打一遍数：MAX_BODY 是和内容安全的
+    # 送检窗口（wechat.SEC_CHUNK × SEC_MAX_CHUNKS）对齐钉的，抄一份就会有两处真相。
+    title: Annotated[str, Field(min_length=1, max_length=MAX_TITLE)]
+    content: Annotated[str, Field(min_length=1, max_length=MAX_BODY)]
+    category_id: Optional[int] = None
+
+
+@router.post("/text")
+@limiter.limit("10/minute")
+async def ingest_text(
+    request: Request,
+    payload: IngestTextIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """手打这一档也走提炼：用户给标题 + 原文，摘要由模型出。
+
+    与 /url、/screenshots/process 唯一多出来的一步，是入队前先把这两段字过内容安全。
+    worker 落库那条路不经过 notes 的 `_guard_manual_text`（那道闸按 source_type=manual
+    才检，而它只在 HTTP 建笔记时跑），所以这一趟漏了就没有第二处会检——创建分享那道
+    只管"要公开"那一刻。抓取／截图两条不带这一步，是因为那两段是外部原文，不是用户写的。
+    """
+    title = payload.title.strip()
+    content = payload.content.strip()
+    if not title or not content:
+        raise HTTPException(status_code=400, detail="标题和原文都要填")
+
+    if payload.category_id is not None:
+        category = (
+            db.query(Category)
+            .filter(Category.id == payload.category_id, Category.user_id == str(user.id))
+            .first()
+        )
+        if not category:
+            raise HTTPException(status_code=400, detail="分类不存在或无权使用")
+
+    try:
+        enforce_text_safety(user.openid, title, content)
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    task_id = uuid.uuid4().hex
+    set_task_status(task_id, "queued", user_id=str(user.id))
+    q = get_queue()
+    q.enqueue(
+        "app.tasks.ingest_tasks.process_manual_text_task",
+        task_id,
+        str(user.id),
+        title,
+        content,
+        payload.category_id,
         user.generation,
         job_id=task_id,
         job_timeout=600,

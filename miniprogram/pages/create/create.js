@@ -457,7 +457,9 @@ Page({
     }
   },
 
-  // ---------- 手动撰写 ----------
+  // ---------- 直接写（站长 10-04 改口径：用户给标题 + 原文，摘要交给模型） ----------
+  // 这一档和拍照／截图／链接走同一条提炼链路，不再自己写摘要；差别只在标题用用户打的、
+  // 归类由他当场挑（另外三档没有这一格）。
   onWriteTitle(e) {
     this.setData({ writeTitle: e.detail.value, errLine: '' })
   },
@@ -470,33 +472,50 @@ Page({
     this.collapse()
   },
 
-  async saveManual() {
-    const title = this.data.writeTitle.trim()
+  async submitManual() {
     const { lang } = this.data
+    // 按钮变灰只是视觉，点还是会进来：不挡第二下就会提两个任务、落两条重复笔记
     if (this.data.busy) return
+    const title = this.data.writeTitle.trim()
+    const content = this.data.writeBody.trim()
     if (!title) {
       this.setData({ errLine: t('needTitle', lang) })
       return
     }
+    if (!content) {
+      this.setData({ errLine: t('needBody', lang) })
+      return
+    }
     this.setData({ busy: 'write', errLine: '' })
+    const picked = this.data.catIndex > 0 ? this.data.categories[this.data.catIndex - 1] : null
     try {
-      const picked = this.data.catIndex > 0 ? this.data.categories[this.data.catIndex - 1] : null
-      const note = await api.createNote({
+      const { task_id } = await api.ingestText({
         title,
-        summary: this.data.writeBody.trim() || null,
+        content,
         category_id: picked ? picked.id : null,
-        source_type: 'manual',
       })
-      this.setData({ busy: '', writeTitle: '', writeBody: '', catIndex: 0, active: '', mode: 'write', lead: 'pen', barTitle: '' })
-      wx.showToast({ title: t('saveSucceeded', lang), icon: 'success' })
-      setTimeout(() => {
-        wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}` })
-      }, 800)
-    } catch (err) {
-      console.error('保存失败', err)
+      const result = await api.pollTask(task_id)
       this.setData({
         busy: '',
-        errLine: (err.data && err.data.detail) || t('saveFailed', lang),
+        writeTitle: '',
+        writeBody: '',
+        catIndex: 0,
+        active: '',
+        mode: 'write',
+        lead: 'pen',
+        barTitle: '',
+      })
+      wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
+      setTimeout(() => {
+        wx.navigateTo({ url: `/pages/detail/detail?id=${result.note_id}` })
+      }, 800)
+    } catch (err) {
+      console.error('手打提炼失败', err)
+      this.setData({
+        busy: '',
+        errLine: err.timeout
+          ? t('taskTimeout', lang)
+          : ((err.data && err.data.detail) || err.error || t('taskFailed', lang)),
       })
     }
   },

@@ -149,3 +149,69 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
     except Exception as e:
         logger.exception("截图任务失败: %s: %s", type(e).__name__, e)
         set_task_status(task_id, "failed", {"error": failure_message(e)})
+
+
+def process_manual_text_task(task_id: str, user_id: str, title: str, content: str,
+                             category_id: int | None = None, generation: int | None = None):
+    """RQ worker 同步任务：手打的原文 → LLM 提炼 → 写入数据库。
+
+    和 URL／截图两条只差两件事：① 标题用用户自己打的那个，不用模型另起的
+    （他要的是"我给标题和原文，模型补提要"——屏幕上那一格叫「摘要」，字段是 summary，
+    模型那份只当 fallback）；
+    ② 归类是他当场挑的，所以要落 category_id。
+    正文落 original_content、摘要是 summary —— 与另外两条同一份形状，详情页那三块
+    （摘要 / 要点 / 原文）才不用为这一种来源特判。
+    """
+    try:
+        set_task_status(task_id, "processing")
+
+        knowledge = asyncio.run(extract_knowledge(content, fallback_title=title))
+
+        db = SessionLocal()
+        try:
+            user = _load_task_user(db, task_id, user_id, generation)
+            if user is None:
+                return
+            note = Note(
+                user_id=user_id,
+                title=title,
+                summary=knowledge["summary"],
+                key_points=knowledge["key_points"],
+                tags=knowledge["tags"],
+                original_content=content[:50000],
+                source_type="manual",
+                category_id=_still_yours_category(db, user_id, category_id),
+            )
+            db.add(note)
+            db.commit()
+            db.refresh(note)
+            credit_first_note(db, user_id, note)
+            set_task_status(
+                task_id,
+                "completed",
+                {"note_id": note.id, "title": note.title, "degraded": bool(knowledge.get("degraded"))},
+            )
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.exception("手打提炼任务失败: %s: %s", type(e).__name__, e)
+        set_task_status(task_id, "failed", {"error": failure_message(e)})
+
+
+def _still_yours_category(db, user_id: str, category_id: int | None) -> int | None:
+    """挑分类到落库中间隔着十几秒，那一格可能已被删掉。
+
+    归属在入队前已经查过一遍，这里只防"删了分类结果整篇笔记失败"——分类没了就当未分类，
+    不拿这个去报废一次提炼。
+    """
+    if category_id is None:
+        return None
+    from app.models.category import Category
+
+    found = (
+        db.query(Category.id)
+        .filter(Category.id == category_id, Category.user_id == str(user_id))
+        .first()
+    )
+    return category_id if found else None

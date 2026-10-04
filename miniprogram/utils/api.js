@@ -202,6 +202,9 @@ module.exports = {
   updateNote: (id, data) => request(`/api/notes/${id}`, 'PUT', data),
   deleteNote: (id) => request(`/api/notes/${id}`, 'DELETE'),
   ingestUrl: (url) => request('/api/ingest/url', 'POST', { url }, { contentType: 'application/x-www-form-urlencoded' }),
+  // 手打这一档也交给模型提炼：送的是用户自己写的标题 + 原文，回来的是摘要。
+  // 归类跟着这一篇走（服务端认人不认客户端说的 source_type）。
+  ingestText: (data) => request('/api/ingest/text', 'POST', data),
   ingestScreenshots,
   getTaskStatus,
   pollTask,

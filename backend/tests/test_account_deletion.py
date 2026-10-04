@@ -168,6 +168,7 @@ class Test注销之后:
             ("get", "/api/user/quota"),
             ("post", "/api/notes/"),
             ("post", "/api/ingest/url"),
+            ("post", "/api/ingest/text"),
             ("put", "/api/user/wallpaper"),
             ("delete", f"/api/notes/{mine['note']}"),
         ]

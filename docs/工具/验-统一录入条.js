@@ -179,7 +179,7 @@ ok('create.js 按四个入口取四档 toneStyle',
   /toneStyle\(1\)/.test(js) && /toneStyle\(2\)/.test(js) && /toneStyle\(3\)/.test(js) && /toneStyle\(0\)/.test(js))
 
 // ---------- 6. 老功能没被这一批碰坏 ----------
-;['submitUrl', 'submitScreenshots', 'saveManual', 'pasteUrl', 'clearUrl', 'removeShot',
+;['submitUrl', 'submitScreenshots', 'submitManual', 'pasteUrl', 'clearUrl', 'removeShot',
   'clearShots', 'openPermSetting', 'onPickCategory', 'onSwitchLang', 'onUrlInput',
   'onWriteTitle', 'onWriteBody'].forEach((h) => {
   ok(`${h} 仍挂在 wxml 上`, new RegExp('"' + h + '"').test(wxml))
@@ -187,6 +187,41 @@ ok('create.js 按四个入口取四档 toneStyle',
 ok('忙态仍然挡住收起', /collapse\(\)\s*\{\s*if \(this\.data\.busy/.test(js))
 ok('onShow 仍然不重置草稿', !/previewImages: \[\]/.test(js.split('async onShow')[1].split('hintFor(value)')[0]))
 ok('选完图返回仍然重算条身', /barTitle: this\.barTitleFor\(this\.data\.active, this\.data\.previewImages\.length\)/.test(js))
+
+// ---------- 7. 「直接写」这一档改成走提炼（站长 10-04：标题 + 原文 → 模型出摘要）----------
+const apijs = fs.readFileSync(P('utils/api.js'), 'utf8')
+ok('api 层新增 ingestText，打的就是 /api/ingest/text',
+  /ingestText: \(data\) => request\('\/api\/ingest\/text', 'POST'/.test(apijs))
+ok('写那态提交走 ingestText + 轮询任务（与链接／截图同一条等法）',
+  /async submitManual\(\)[\s\S]{0,900}api\.ingestText\([\s\S]{0,200}api\.pollTask\(/.test(js))
+ok('这一档不再自己建笔记（手打那条路只留提炼一个入口）', !/api\.createNote\(/.test(js))
+ok('送进去的是标题 + 原文 + 归类三样',
+  /ingestText\(\{\s*title,\s*content,\s*category_id: picked \? picked\.id : null,\s*\}/.test(js))
+ok('原文空着要拦一道，且两门都有这句话', !!zh.needBody && !!en.needBody,
+  `${zh.needBody} / ${en.needBody}`)
+ok('归类那一格只报名字（"归类"两个字和那一整行都撤了）',
+  !/cat-key|categoryLabel/.test(wxml) && /class="wr-cat-val">\{\{categoryNames\[catIndex\]\}\}/.test(wxml))
+ok('按钮说的是提炼，不是保存', /catchtap="submitManual">\{\{busy === 'write' \? t\.busyExtract : t\.startExtract\}\}/.test(wxml))
+ok('腾出来的高度还给了原文（比原来那一格高一档）',
+  /\.wr-body\s*\{[^}]*height: (2[5-9]|[3-9][0-9])0rpx/.test(wxss))
+
+// ---------- 8. 第六轮那三条（站长 10-04 原话：标题在左，分类在右、分类字体颜色淡一点、"提要"改为"摘要"）----------
+const wrLine = wxml.slice(wxml.indexOf('class="wr-line"'), wxml.indexOf('class="face-area wr-body"'))
+ok('这一行里标题排在分类前面（DOM 顺序＝左右顺序，flex 没给 order）',
+  wrLine.indexOf('class="wr-title"') > -1
+  && wrLine.indexOf('class="wr-cat"') > wrLine.indexOf('class="wr-title"'),
+  `title@${wrLine.indexOf('class="wr-title"')} cat@${wrLine.indexOf('class="wr-cat"')}`)
+ok('wxss 里没有 order:/direction:/row-reverse 把左右又翻回去',
+  !/\.wr-line\s*\{[^}]*(order:|direction:|row-reverse)/.test(wxss))
+ok('分类那一格的字淡一档：吃 --face-dim 这个令牌，不在规则里写死色',
+  /\.wr-cat-face\s*\{[^}]*color: var\(--face-dim\)/.test(wxss))
+ok('--face-dim 就定义在面板那套令牌里（不吃页面级 --text-tertiary：has-bg 会把它翻成纸白）',
+  /--face-dim: rgba\(35, 37, 44, 0\.55\)/.test(wxss)
+  && !/\.wr-cat-face\s*\{[^}]*--text-tertiary/.test(wxss))
+const i18nSrc = fs.readFileSync(P('utils/i18n.js'), 'utf8')
+ok('界面上那句说明改成「摘要」，与详情页那一格同一个词',
+  !/提要/.test(zh.manualDesc) && /摘要/.test(zh.manualDesc), zh.manualDesc)
+ok('整本字典里再没有"提要"这个另造的词', !/提要/.test(i18nSrc))
 
 console.log(`统一录入条：${pass} 条通过`)
 if (fails.length) {
