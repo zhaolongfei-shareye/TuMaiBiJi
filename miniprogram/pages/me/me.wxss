@@ -9,20 +9,23 @@
   padding-bottom: 140rpx;
 }
 
-/* ---------- 头部：底图 + 盖在它下沿的圆角留白卡 ----------
+/* ---------- 头部：底图一块 + 下面那一层往上凸出盖住它的下沿 ----------
    图用的是「卡片模板」最上面那四个位置里勾了「背景」的那一张（poster.homeBg()），
    和首页、新建页同一个来源、同一个取图口，这一页不开第二个上传入口。
-   可见高度 502 = 视口 1506 的三分之一；卡片往上盖住 40，所以这块盒子是 542。 */
+   盒子高 542 = 视口 1506 的三分之一，其中顶上 40 被 .sheet 盖住（那道弧的方向没动，
+   站长 10-04 指着第一版打过回：弧必须是"下面那层往上凸"，不是底图自己往下收）。 */
 .head {
   position: relative;
-  /* .container 自带 24rpx 左右内边距，而这一块的口径是"图贴屏边、只有下方两角收圆"，
+  /* .container 自带 24rpx 左右内边距，而这一块的口径是"图贴屏边"，
      所以自己把那份内边距顶回去。这里写死 24rpx 而不是 calc(-var(--sp-3))：
      真跑尺子量过，带 calc 的这条在这份编译里整条规则被丢掉，页面直接不渲染。
-     改了 --sp-3 要记得同步这里——`验-我的页改版-真跑.js` 有一条钉"留白卡左右贴屏边"。 */
+     改了 --sp-3 要记得同步这里——`验-我的页改版-真跑.js` 有一条钉"底图左右贴屏边"。 */
   margin-left: -24rpx;
   margin-right: -24rpx;
 }
 
+/* 下沿不给底图收圆（站长 10-04：弧的方向被我改反了，撤回来）。
+   接缝那道弧一直是由下面那一层 .sheet 的**上沿两角**凸出来盖住图形成的，方向不动。 */
 .head-band {
   position: relative;
   height: 542rpx;
@@ -124,20 +127,22 @@
   color: rgba(242, 239, 233, 0.62);
 }
 
-/* ---------- 留白区：圆 LOGO 与右边两行字等高（80 = 31×1.25 + 7 + 24×1.4） ---------- */
+/* ---------- LOGO 那一行：圆 LOGO 与右边两行字等高（80 = 31×1.25 + 7 + 24×1.4）
+   站长 10-04：它原来是一张卡，和下方那枚列表框实测只差 5 个像素、两框互相粘连，所以把"卡"撤掉——
+   撤的是那层不透明的卡色补丁和四角圆角里的下沿两角，底色换成**页面底同一个色**：
+   这一层还在（它负责把图的下沿盖住、留出那道往上凸的弧），但和它下面的页面同一个颜色，
+   读起来就是一整片，不再有第二个框。
+   左右内缩那 24 由 .container 给、这里再补 32，于是 LOGO 与下方卡里的行名落在同一条左线。 */
 .sheet {
   position: relative;
   margin-top: -40rpx;
   height: 144rpx;
-  padding: 0 32rpx;
+  padding: 0 56rpx;
   display: flex;
   align-items: center;
   gap: 24rpx;
-  /* 深色壁纸那几套的 --bg-card 是半透明的，直接铺在照片上会透出图来。
-     这里把同一张卡的颜色叠在自己的页面底色上画一遍，得到的是同一个色、但不透明。 */
-  background-color: var(--bg-page);
-  background-image: linear-gradient(var(--bg-card), var(--bg-card));
-  border-radius: var(--r-card);
+  background: var(--bg-page);
+  border-radius: var(--r-card) var(--r-card) 0 0;
 }
 
 .sheet-logo {
@@ -177,7 +182,7 @@
   text-overflow: ellipsis;
 }
 
-/* ---------- 条状列表：左名称，右一枚"圆点里住箭头"的一体 icon ---------- */
+/* ---------- 条状列表：左名称，右一枚裸箭头 ---------- */
 .menu-group {
   padding: 0 var(--sp-4);
   overflow: hidden;
@@ -258,23 +263,24 @@
   white-space: nowrap;
 }
 
+/* 站长 10-04：圆底撤了，只留箭头那一笔。盒子仍是 46 见方——行右端那条竖线要照它对齐。 */
 .ico {
   flex: none;
   width: 46rpx;
   height: 46rpx;
-  border-radius: 50%;
-  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* 箭头是圆点里的一根折角，不另起一枚：两者永远对齐、永远同一套色 */
+/* 箭头只是"这行还能进去"的指示，不是按钮面，所以吃三级字那一档：
+   压在卡底实测 3.4~3.7（图形门槛 3.0 过），比行名的墨浅两档，不抢读序。
+   原来这一笔是纸白、靠圆底把它撑出来，圆底一走就必须换个色。 */
 .ico .cv {
   width: 13rpx;
   height: 13rpx;
-  border-right: 4rpx solid var(--bg-page);
-  border-bottom: 4rpx solid var(--bg-page);
+  border-right: 4rpx solid var(--text-tertiary);
+  border-bottom: 4rpx solid var(--text-tertiary);
   transform: rotate(-45deg);
   margin-left: -4rpx;
 }

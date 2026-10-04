@@ -228,6 +228,14 @@
   --face-ph: rgba(35, 37, 44, 0.5);
   --face-off: rgba(35, 37, 44, 0.06);
   --face-off-ink: rgba(35, 37, 44, 0.42);
+  /* ⑨ 这一步本轮**没做成**，先撤回原值。
+     原本要写的是 `--solid-bg: var(--text-primary)`（让这枚吃"当前主题那一档墨"），实测出来是
+     纸白面 + 纯白字、按钮整个看不见（站长 10-04 真机截图：面 (241,239,234) 与 #F2EFE9 差 1，
+     字 (255,255,255)）。原因是本文件 :544 那条 `.container.has-bg` 把 `--text-primary` 连同
+     `--accent` 一起翻成纸白——那是给压在暗图上的字用的，可它的作用域罩得住这一块白纸面板。
+     所以在这条翻转的射程收窄之前，面板里没有任何一个现成令牌是"这页的墨"：
+     --text-primary/--accent 会被翻白，--btn-bg 是他明确不要的"并色"。
+     下面这两行就是原来那两行，一个字节没改；边界规则本身写在方案 §3.3。 */
   --solid-bg: #23252c;
   --solid-ink: #f2efe9;
   background: #fff;
@@ -422,7 +430,9 @@
   width: 40rpx;
   height: 40rpx;
   border-radius: 50%;
-  background: rgba(20, 20, 28, 0.66);
+  /* 遮罩只该有一个值：并到弹窗那枚同档的 0.55（categories.wxss 那层就是这个数）。
+     站长 10-04 拍的③。这一枚是缩略图右上角那 40rpx 的 X 小徽，不是整屏那层。 */
+  background: rgba(20, 20, 28, 0.55);
   color: #fff;
   font-size: var(--fs-micro);
   display: flex;

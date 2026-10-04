@@ -4,7 +4,7 @@
  *        NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-我的页改版-真跑.js
  *
  *  作废的旧判据（别再改代码去迁就它们）：
- *   ① 「私密密码那一行右边写着设没设」——这一版行右边只剩一枚一体 icon，状态不再用文字说；
+ *   ① 「私密密码那一行右边写着设没设」——这一版行右边只剩一枚箭头，状态不再用文字说；
  *   ② 密码面板的形状这一版又改了一次（站长 10-01 晚：「不在原菜单处理方式，改为前端下方弹出
  *      1/3 窗口」）：v10 那批钉的是"就地展开、内容长在列表里面"，整批作废，
  *      这里改成钉"独立一层铺满视口 + 那一份贴底约 1/3 高 + 菜单行自己不长高"。
@@ -52,6 +52,9 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
   q.select('.pwd-mask').boundingClientRect()
   q.selectAll('.rule').boundingClientRect()
   q.selectAll('.rdot').boundingClientRect()
+  // 10-04 加：撤掉那一行的框之后，"LOGO 与下方卡里的行名同一条左线"要拿真东西比，
+  // 不能拿两个内缩值手算（手算等于在尺子里再抄一份布局）。放在最后一位，前面的下标一个不动。
+  q.select('.menu-label').boundingClientRect()
   q.exec((res) => resolve({
     band: res[0], sheet: res[1], logo: res[2], text: res[3],
     score: res[4], num: res[5], lab: res[6], pill: res[7],
@@ -59,7 +62,7 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
     cells: res[11] || [], btns: res[12] || [], pwdCard: res[13],
     group: res[14], aboutLead: res[15], h1: res[16],
     scene: res[17], pwdName: res[18], mask: res[19], rules: res[20] || [],
-    rdots: res[21] || [],
+    rdots: res[21] || [], label: res[22],
     windowWidth: wx.getWindowInfo().windowWidth,
     windowHeight: wx.getWindowInfo().windowHeight,
   }))
@@ -130,17 +133,35 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   await sleep(1200)
   page = await gotoMe(mp)
 
-  /* ---------- ① 头部两块：底图 + 盖在它下沿的圆角留白卡 ---------- */
+  /* ---------- ① 头部：底图 + 那一层负责接缝弧的 LOGO 行 ----------
+     站长 10-04 两轮话要一起成立：① 那张"留白卡"不再是卡（拿他原图量过：上框贴屏边 x58..846、
+     下框左右各收 24rpx x82..823，两块边只差 5 个像素 → 互相粘连）；② 接缝那道弧的方向不许翻
+     （我第一版把弧挪到底图下沿，左右两角弯法反了，被他当场打回）。
+     所以钉的是：这一层仍往上盖住底图 40、仍只有上沿两角收圆，但它的底色必须**就是页面底本身**
+     ——同一个色就不存在第二个框，弧的方向也不用动。 */
   let m = await measure(mp)
   const W = m.windowWidth
-  ck('底图这块盒子高 542（可见 502 + 被卡盖住 40）', Math.abs(toRpx(m.band.height, W) - 542) <= 3, toRpx(m.band.height, W).toFixed(1))
+  ck('底图这块盒子高 542（可见 502 + 被那一层盖住 40）',
+    Math.abs(toRpx(m.band.height, W) - 542) <= 3, toRpx(m.band.height, W).toFixed(1))
+  ck('底图左右贴屏边（不内缩）', m.band.left <= 1 && Math.abs(m.band.right - W) <= 1, `${m.band.left}/${m.band.right}`)
+  const bandStyle = await styleOf(page, '.head-band', ['border-top-left-radius', 'border-bottom-left-radius', 'background-color'])
+  ck('弧不在底图上（下沿两角不收圆，方向仍是下面那层往上凸）',
+    parseFloat(bandStyle['border-bottom-left-radius'] || '99') === 0
+      && parseFloat(bandStyle['border-top-left-radius'] || '99') === 0,
+    `上 ${bandStyle['border-top-left-radius']} / 下 ${bandStyle['border-bottom-left-radius']}`)
   const overlap = m.band.bottom - m.sheet.top
-  ck('留白卡往上盖住底图 40 → 接缝左右两角是弧', Math.abs(toRpx(overlap, W) - 40) <= 3, toRpx(overlap, W).toFixed(1))
-  ck('留白卡左右贴屏边（不内缩）', m.sheet.left <= 1 && Math.abs(m.sheet.right - W) <= 1, `${m.sheet.left}/${m.sheet.right}`)
-  const sheetStyle = await styleOf(page, '.sheet', ['border-top-left-radius', 'background-color'])
-  ck('留白卡四角圆角 40', Math.abs(toRpx(parseFloat(sheetStyle['border-top-left-radius']), W) - 40) <= 2,
-    sheetStyle['border-top-left-radius'])
-  ck('留白卡底色不透明（深色壁纸下不会透出照片）', !/rgba/.test(sheetStyle['background-color'] || ''), sheetStyle['background-color'])
+  ck('那一层往上盖住底图 40 → 接缝左右两角是弧（方向与 10-01 那版一致）',
+    Math.abs(toRpx(overlap, W) - 40) <= 3, toRpx(overlap, W).toFixed(1))
+  const sheetStyle = await styleOf(page, '.sheet', ['border-top-left-radius', 'border-bottom-left-radius', 'background-color'])
+  ck('那一层只有上沿两角收圆 40、下沿直角（不是一枚四角卡）',
+    Math.abs(toRpx(parseFloat(sheetStyle['border-top-left-radius']), W) - 40) <= 2
+      && parseFloat(sheetStyle['border-bottom-left-radius'] || '99') === 0,
+    `上 ${sheetStyle['border-top-left-radius']} / 下 ${sheetStyle['border-bottom-left-radius']}`)
+  ck('那一层的底色就是页面底本身（与 .head-band 同值 → 不是第二层卡色，读起来是一整片）',
+    !!sheetStyle['background-color'] && sheetStyle['background-color'] === bandStyle['background-color'],
+    `sheet ${sheetStyle['background-color']} / band ${bandStyle['background-color']}`)
+  ck('LOGO 与下方卡里的行名同一条左线（撤框之后不能各走各的）',
+    !!m.label && Math.abs(m.logo.left - m.label.left) <= 2, `${m.logo && m.logo.left} vs ${m.label && m.label.left}`)
 
   /* 站长 10-04 真机：这一页导航条底下多出一条白线，别的页没有。
      拿他那张原图量过：白线 3px ÷ 1.488 = 正好 2rpx，就是 app.wxss 那条
@@ -157,7 +178,7 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   /* ---------- ② 圆 LOGO 80、整枚在留白区里、与右边两行字等高 ---------- */
   ck('圆 LOGO 是 80 见方', Math.abs(toRpx(m.logo.width, W) - 80) <= 2 && Math.abs(toRpx(m.logo.height, W) - 80) <= 2,
     `${toRpx(m.logo.width, W).toFixed(0)}×${toRpx(m.logo.height, W).toFixed(0)}`)
-  ck('LOGO 不再压着底图（整枚在留白卡里）', m.logo.top >= m.sheet.top - 1, `${m.logo.top} vs ${m.sheet.top}`)
+  ck('LOGO 整枚在图下方那一行里（不再压着底图）', m.logo.top >= m.sheet.top - 1, `${m.logo.top} vs ${m.sheet.top}`)
   ck('LOGO 高度 = 右边两行字的高度（±4）', Math.abs(toRpx(m.logo.height, W) - toRpx(m.text.height, W)) <= 4,
     toRpx(m.text.height, W).toFixed(0))
 
@@ -202,7 +223,7 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     !!m.score && Math.abs(toRpx(m.band.right - m.score.right, W) - 32) <= 2
     && Math.abs(toRpx(m.score.top - m.band.top, W) - 24) <= 2,
     m.score && `右 ${toRpx(m.band.right - m.score.right, W).toFixed(1)} 顶 ${toRpx(m.score.top - m.band.top, W).toFixed(1)}`)
-  ck('数字整块在图区以内，不落进留白卡', !!m.score && m.score.top >= m.band.top && m.score.bottom <= m.band.bottom,
+  ck('数字整块在图区以内，不落进下面那一行', !!m.score && m.score.top >= m.band.top && m.score.bottom <= m.band.bottom,
     m.score && `${m.score.top}~${m.score.bottom} in ${m.band.top}~${m.band.bottom}`)
 
   /* ---------- ④ 药丸：默认设置，切关于 ---------- */
@@ -210,10 +231,14 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck('药丸两枚：设置 / 关于', m.segs.length === 2, m.segs.length)
   // 原来钉"药丸钉在底图右上（在 band 里）"。10-01 晚站长要它搬到 LOGO 那一行的最右，
   // 因为它和左上角那行「我的」抢同一条视线——旧判据作废，跟着换成下面这四条。
-  ck('药丸在留白卡里（不再浮在照片上）', m.pill.top >= m.sheet.top - 1 && m.pill.bottom <= m.sheet.bottom + 1,
+  ck('药丸在 LOGO 那一行里（不再浮在照片上）', m.pill.top >= m.sheet.top - 1 && m.pill.bottom <= m.sheet.bottom + 1,
     `${m.pill.top}~${m.pill.bottom} in ${m.sheet.top}~${m.sheet.bottom}`)
-  ck('药丸钉在这一行最右：离屏边 32（和左右内缩同一档）',
-    Math.abs(toRpx(W - m.pill.right, W) - 32) <= 2, toRpx(W - m.pill.right, W).toFixed(1))
+  /* 原来钉"离屏边 32"——那是留白卡贴屏边、自己吃 32 内缩的那一档。10-04 这一行搬回
+     .container 的 24 内缩里，右沿就跟着变成 24+32；这里不再抄这两个数之和（那等于把
+     两个令牌值手算一遍），改成钉**左右对称**：药丸右沿离屏边 == LOGO 左沿离屏边。 */
+  ck('药丸钉在这一行最右（与 LOGO 左沿离屏边同一档，左右对称）',
+    Math.abs(toRpx(W - m.pill.right, W) - toRpx(m.logo.left, W)) <= 2,
+    `右离 ${toRpx(W - m.pill.right, W).toFixed(1)} / 左离 ${toRpx(m.logo.left, W).toFixed(1)}`)
   ck('药丸与 LOGO 垂直居中对齐（align-items:center 真生效）',
     Math.abs(toRpx((m.logo.top + m.logo.height / 2) - (m.pill.top + m.pill.height / 2), W)) <= 2,
     `圆心差 ${toRpx((m.logo.top + m.logo.height / 2) - (m.pill.top + m.pill.height / 2), W).toFixed(1)}rpx`)
@@ -264,15 +289,30 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   }))
   ck('这张图真在包里、尺寸 1280×1024（5:4）', img.ok && img.w === 1280 && img.h === 1024, JSON.stringify(img))
 
-  /* ---------- ⑤ 设置那五条：一体 icon + 从底部弹上来的那一层 ---------- */
+  /* ---------- ⑤ 设置那五条：右端一枚裸箭头 + 从底部弹上来的那一层 ---------- */
   const labels = []
   for (const r of await page.$$('.menu-item')) labels.push((await r.text()).replace(/\s+/g, ''))
   ck('设置态是五条：卡片模板/外观设置/分类管理/私密密码/注销账号',
     labels.join('|') === '卡片模板|外观设置|分类管理|私密密码|注销账号', labels.join('|'))
   ck('行高 106（不再是 118 那种大块头）', Math.abs(toRpx(m.items[0].height, W) - 106) <= 2, toRpx(m.items[0].height, W).toFixed(0))
-  ck('每行右边一枚 46 见方的圆点 icon', m.icos.length === 5 && Math.abs(toRpx(m.icos[0].width, W) - 46) <= 2,
+  ck('每行右边一枚 46 见方的箭头位（盒子没跟着圆底一起撤，行右端那条竖线要照它对齐）',
+    m.icos.length === 5 && Math.abs(toRpx(m.icos[0].width, W) - 46) <= 2
+      && Math.abs(m.icos[0].width - m.icos[0].height) <= 1,
     `${m.icos.length}/${toRpx(m.icos[0].width, W).toFixed(0)}`)
-  ck('icon 是圆的（宽高相等）', Math.abs(m.icos[0].width - m.icos[0].height) <= 1)
+  /* 站长 10-04：「右侧的圆点+箭头太突兀，只留箭头符号即可」。
+     钉两件事：圆底那块面没了；那一笔箭头不再是圆底上抠出来的纸白。
+     箭头色只钉 alpha 不钉色相——--text-tertiary 四套各一份（象牙 53,46,29 / 天青 29,53,34 /
+     樱落 53,29,41 / 雨雾 33,36,49），钉死 RGB 就等于把这把尺子钉在象牙那一套上。 */
+  /* 属性名要用四角那一条，不能用简写：`border-radius` 在这个 style 接口上回 null
+     （实测就是这一把第一次红的地方），null 参与 parseFloat 会变 NaN，判据永远红。 */
+  const icoStyle = await styleOf(page, '.ico', ['background-color', 'border-top-left-radius'])
+  ck('圆底撤了（无底色、无圆角）',
+    /rgba\(0, 0, 0, 0\)|transparent/.test(icoStyle['background-color'] || '')
+      && parseFloat(icoStyle['border-top-left-radius'] || '99') === 0,
+    `${icoStyle['background-color']} / ${icoStyle['border-top-left-radius']}`)
+  const cvColor = (await styleOf(page, '.ico .cv', ['border-right-color']))['border-right-color'] || ''
+  ck('那一笔箭头吃三级字那一档（alpha .55，不再是圆底上抠出来的纸白）',
+    /0\.55\)/.test(cvColor) && !/242, 239, 233/.test(cvColor), cvColor)
   ck('行里不再有"未设置"这类状态文字（旧判据作废）', !labels.some((x) => /未设置|密码已设置/.test(x)))
 
   const iPwd = labels.findIndex((x) => x.indexOf('私密密码') === 0)
@@ -430,7 +470,7 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     dotBg.replace(/\s/g, '') === tipRGB.replace(/\s/g, ''), `${dotBg} ← palette ${TIP_DOT}`)
   ck('三行之间不再画线（.rule 里那条 border-top 已随旧判据一起撤）',
     !/border-top/.test(cssOf('pages/me/me.wxss', 'rule')), cssOf('pages/me/me.wxss', 'rule').slice(0, 60))
-  ck('介绍卡在最上面（紧跟留白卡，不分二级）', !!m.aboutLead && !!m.sheet && m.aboutLead.top <= m.sheet.bottom + 2)
+  ck('介绍卡在最上面（紧跟 LOGO 那一行，不分二级）', !!m.aboutLead && !!m.sheet && m.aboutLead.top <= m.sheet.bottom + 2)
   ck('功能介绍和隐私条款不在这一页', !aboutLabels.some((x) => /功能|隐私/.test(x)))
   await mp.screenshot({ path: path.join(OUT, '02-关于-三行加规则块.png') })
 

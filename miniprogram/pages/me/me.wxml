@@ -1,7 +1,7 @@
 <view class="container {{themeClass}}">
-  <!-- 头部两块：底图贴屏边铺满，留白区是一张盖在图下沿的圆角卡。
-       盖住 40rpx 这一条是接缝那道弧的来源——图的左右下角被卡的圆角切掉，
-       于是"图与留白之间"和"留白与页面之间"都是弧，没有直线。 -->
+  <!-- 头部这块：底图贴屏边铺满；接缝那道弧的方向不动（站长 10-04 指出我改反了，已改回）——
+       仍是"下面那一层往上凸出来盖住图的下沿"，只是这一层的颜色换成了页面底，
+       所以它不再是一张卡，只是把那道弧留住。 -->
   <view class="head">
     <view class="head-band {{bgSrc ? 'has-bg' : ''}}">
       <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
@@ -17,6 +17,9 @@
         <text class="score-l">{{t.brainScore}}</text>
       </view>
     </view>
+    <!-- 站长 10-04：这一行不再是一张卡——那层"把卡色叠在页底上画成不透明"的补丁撤了，
+         换成页面底同一个色，下沿两角也不再收圆；留着的只有往上凸那道弧。
+         它在 .head 里面，为的是吃那块顶回去的 24 内缩、贴屏边把图的下沿盖住。 -->
     <view class="sheet">
       <image class="sheet-logo" src="{{logoSrc}}" mode="aspectFill" />
       <view class="sheet-text">
