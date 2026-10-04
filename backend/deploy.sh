@@ -163,6 +163,92 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
+# ---- 1.7 卡片模板配方：表长出来了还得把包内那十套灌进去 ----
+# 这一步不能省，也不能"等第一次用的时候再说"：客户端那条兜底是"下发失败就用包内那份"，
+# 而这条兜底是静默的——表里少一套、或者灌进去的配方服务端读不懂，接口照样回 200，
+# 站长以为新模板生效了，用户看到的还是老卡片。所以这里四道都查：
+# 表在不在、那条部分唯一索引在不在（没带 WHERE 就等于没有）、种子灌完 live 够不够条数、
+# 落库的每条配方再拿服务端那份校验器重跑一遍。种子唯一出处是 seed/poster_templates.json，
+# 它由 docs/工具/出-模板配方种子.js 从客户端现读的名单生成；迁移里不抄一份，启动时也不自动灌。
+echo ""
+echo ">>> 卡片模板配方表与种子..."
+python <<'PY'
+from sqlalchemy import create_engine, inspect, text
+
+from app.core.config import settings
+from app.db.database import SessionLocal
+from app.models.poster_template import GROUP_KEYS
+from app.services.poster_recipe import validate_recipe
+from app.services.poster_templates import live_templates, seed_poster_templates, seed_rows
+
+engine = create_engine(settings.DATABASE_URL)
+insp = inspect(engine)
+if "poster_templates" not in set(insp.get_table_names()):
+    print("  ✗ 没有 poster_templates 表（迁移没跑到 a7d2e5b8c310）")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    one_live_idx = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND name='ux_poster_templates_one_live_per_template'"
+    )).scalar()
+if not one_live_idx or "status" not in one_live_idx or "WHERE" not in one_live_idx.upper():
+    print(f"  ✗ 缺 ux_poster_templates_one_live_per_template 那条部分唯一索引（或它没带 status 的 WHERE）：{one_live_idx}")
+    print("    没有它，同一个模板可以有两行 live，客户端按 id 合并时哪条赢取决于查询顺序")
+    raise SystemExit(1)
+
+want = seed_rows()
+# 先纯检查、再动库：灌到一半才发现某条不合格的话，其余那几条已经 commit 进表了，
+# 于是"部署失败、线上保持原样"这句承诺是假的——表里会少一套，而少一套是静默的
+# （客户端拿不到那一套就照用包内那份，画面看着对、其实新配方没生效）。
+dirty = []
+for r in want:
+    errs = validate_recipe(r["recipe"])
+    if errs:
+        dirty.append(f"{r['template_id']}: {'；'.join(errs)}")
+    elif r["group_key"] not in GROUP_KEYS:
+        dirty.append(f"{r['template_id']}: group_key「{r['group_key']}」不在名单里（能用的是 {'、'.join(GROUP_KEYS)}）")
+if len({r["template_id"] for r in want}) != len(want):
+    dirty.append("种子里同一个 template_id 出现了两次（客户端按 id 合并，留哪条看查询顺序）")
+if dirty:
+    print(f"  ✗ 种子有 {len(dirty)} 条不合格，一行都没写，部署到此为止：")
+    for line in dirty:
+        print(f"    　{line}")
+    print("    → 改完配方跑 node docs/工具/出-模板配方种子.js 重新生成，别手改这份 JSON")
+    raise SystemExit(1)
+
+db = SessionLocal()
+try:
+    report = seed_poster_templates(db)
+    if report["rejected"]:
+        # 上面那道纯检查过了就不该走到这里；真走到，说明两边校验的口径不一致——那是更要紧的红。
+        print(f"  ✗ 灌的时候仍有 {len(report['rejected'])} 条被拒（那几条没落库，其余照常落）：")
+        for line in report["rejected"]:
+            print(f"    　{line}")
+        raise SystemExit(1)
+    print(f"  灌种子：新增 {report['inserted']} / 原样不动 {report['unchanged']} / 收旧版 {report['archived']}")
+    live = live_templates(db)
+    if len(live) != len(want):
+        print(f"  ✗ live 只有 {len(live)} 条，种子有 {len(want)} 条")
+        raise SystemExit(1)
+    missing = sorted({r["template_id"] for r in want} - {x.template_id for x in live})
+    if missing:
+        print(f"  ✗ 这几套在种子里但库里没有 live 行：{'、'.join(missing)}")
+        raise SystemExit(1)
+    bad = [f"{x.template_id}: {'；'.join(validate_recipe(x.recipe))}" for x in live if validate_recipe(x.recipe)]
+    if bad:
+        print("  ✗ 落库的配方过不了服务端这份名单（下发出去客户端会整条丢掉）：")
+        for line in bad:
+            print(f"    　{line}")
+        raise SystemExit(1)
+    print(f"  ✓ poster_templates：{len(live)} 套 live，每条都过名单校验，一条模板最多一行 live 由索引兜着")
+finally:
+    db.close()
+PY
+if [[ $? -ne 0 ]]; then
+    echo "✗ 卡片模板配方这一步没过，终止部署（服务未重启，线上仍是旧版本）"
+    exit 1
+fi
+
 # ---- 2. OCR 运行期预检：依赖装没装对，只有真跑一张才知道 ----
 # 放在 restart 之前：这份自检会在独立进程里加载模型（本机两次读数 789.8MB / 816~826MB，
 # 这块常驻开销本身有几十 MB 抖动），失败说明依赖有问题、新代码推上去只会让线上多一个

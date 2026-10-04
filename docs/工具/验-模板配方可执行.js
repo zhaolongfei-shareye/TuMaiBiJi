@@ -1,14 +1,17 @@
-// P0-2 的尺子：配方解释器本身对不对，以及三份名单会不会各说各话。
+// P0 的尺子：配方解释器本身对不对，以及三份名单会不会各说各话。
 //
 // 为什么需要第二把尺子：验-模板配方等价.js 只说"画面没变"，它说不出
 // "配方这条路到底有没有在跑""名单漏了一个字段会不会悄悄少画一层"。
-// 所以这把尺子干两件事：
+// 所以这把尺子干三件事：
 //   ① 从 poster.js 源码把 paintLayers 的 case 名和 ly.xxx 读回来，跟 RECIPE_OP_KEYS 对表——
 //      加了绘制字段忘了名单，那正是"配方里写了也不生效"的那种坑；
-//   ② 拿一份故意写坏的配方打解释器，逐条确认它红。每条都带"这条为什么必须红"。
+//   ② 拿一份故意写坏的配方打解释器，逐条确认它红。每条都带"这条为什么必须红"；
+//   ③ 后端那份种子（backend/seed/*.json）必须是现读这份客户端代码生成的——
+//      种子过期时 pytest 那条"Python == 种子"照样绿，缺的就是这一段。
 // 跑法：node docs/工具/验-模板配方可执行.js
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
 const poster = require('../../miniprogram/utils/poster.js')
 const engine = require('../../miniprogram/utils/posterRecipe.js')
 const RECIPES = require('../../miniprogram/utils/posterRecipes.js')
@@ -251,6 +254,98 @@ for (const id of poster.RECIPE_IDS) {
 }
 ok(`走配方的那几套 × 空笔记/长英文 × 中英 × 码开关全跑通（${poster.RECIPE_IDS.length * 12} 组）`,
   outOfRange.length === 0, outOfRange.slice(0, 2).join(' | '))
+
+// ---------------------------------------------------------------- 后端那份种子是不是现读的
+
+// 下发链路有两份名单抄本（客户端 poster.js、后端 poster_recipe.py），中间靠 backend/seed/*.json
+// 接上。接上的前提是那份 JSON 是**现读客户端代码生成的**——它要是过期了，
+// pytest 那条"Python == 种子"照样绿，而"客户端 == 种子"这段没人看，
+// 结果就是服务端放行一份客户端读不懂的配方，画面静默退回包内那一份。
+// 所以这里补上第三段：种子文件 == 现在这份 poster.js/posterRecipes.js 算出来的东西。
+const canonSeed = (v) => {
+  if (Array.isArray(v)) return v.map(canonSeed)
+  if (v && typeof v === 'object') {
+    const o = {}
+    Object.keys(v).sort().forEach((k) => { o[k] = canonSeed(v[k]) })
+    return o
+  }
+  return v
+}
+const SEED_DIR = path.resolve(__dirname, '../../backend/seed')
+const readSeed = (f) => JSON.parse(fs.readFileSync(path.join(SEED_DIR, f), 'utf8'))
+const wl = readSeed('poster_whitelist.json')
+const nowWl = canonSeed({
+  interpreter_version: engine.VERSION,
+  steps: engine.STEPS,
+  arith: engine.ARITH,
+  logic: engine.LOGIC,
+  conv: engine.CONV,
+  term_forms: engine.TERM_FORMS,
+  op_keys: poster.RECIPE_OP_KEYS,
+  prim_keys: Object.keys(poster.RECIPE_PRIMS).reduce((m, n2) => { m[n2] = poster.RECIPE_PRIMS[n2].keys; return m }, {}),
+  tokens: Object.keys(poster.RECIPE_TOKENS),
+  limits: engine.LIMITS,
+})
+ok('种子白名单与现在这份 poster.js 一致（过期就会红：后端拿旧名单放行＝静默退回包内）',
+  JSON.stringify(wl) === JSON.stringify(nowWl),
+  (() => {
+    const bad = Object.keys(nowWl).filter((k) => JSON.stringify(wl[k]) !== JSON.stringify(nowWl[k]))
+    return `这几个键对不上：${bad.join('、')}　→ 重跑 node docs/工具/出-模板配方种子.js`
+  })())
+// 三条上界现在也进上面那次比对（唯一出处是客户端那份 LIMITS，种子只是搬运）。
+// 但"两边数字相等"不等于"两边拦得住同一批"：字节怎么数、深度与节点怎么数也得是同一套。
+// 所以再钉三层：① 字节数与 Node 的 Buffer.byteLength 一致（Python 那边量的就是这个数）；
+// ② 包内这十套都在三条线内；③ 三条线各自单独咬得住（探针故意只超一条，另两条得留在界内）。
+const dumpSeed = (v) => JSON.stringify(canonSeed(v))
+const sizes = poster.TEMPLATES.map((t) => ({ id: t.id, sz: engine.sizeOf(RECIPES[t.id]) }))
+const mismatch = sizes.filter((r) => r.sz.bytes !== Buffer.byteLength(dumpSeed(RECIPES[r.id]), 'utf8'))
+ok('解释器数出来的字节与 Buffer.byteLength 一致（后端 UTF-8 量的就是同一个数）',
+  mismatch.length === 0,
+  mismatch.slice(0, 2).map((r) => `${r.id}：这里 ${r.sz.bytes} / Buffer ${Buffer.byteLength(dumpSeed(RECIPES[r.id]), 'utf8')}`).join(' | '))
+// 数法的锚定夹具：一份带中文、带代理对（emoji）、带空数组和空对象的小 JSON。
+// 三个数在下面这条断言里是写死的，同一份夹具在 backend/tests/test_poster_templates.py 里
+// 也写死一遍——两边数法一改（比如把代理对数成 6 字节、把空对象算成 0 层），就有一头红。
+const FIXTURE = { id: '锚', min_version: 1, steps: [
+  { let: 'height', value: { '+': [1, { '*': [2, { lit: [] }] }] } },
+  { emit: { k: 'text', text: { lit: '麦 🌾' }, box: { obj: {} } } },
+] }
+const fix = engine.sizeOf(FIXTURE)
+ok('数法锚定：那份夹具三个数是 159 字节 / 9 层 / 20 个节点（后端 pytest 钉的是同一份）',
+  fix.bytes === 159 && fix.depth === 9 && fix.nodes === 20, JSON.stringify(fix))
+const overBundled = sizes.filter((r) => r.sz.bytes > engine.LIMITS.max_bytes || r.sz.depth > engine.LIMITS.max_depth || r.sz.nodes > engine.LIMITS.max_nodes)
+const peak = (key) => sizes.reduce((m, r) => Math.max(m, r.sz[key]), 0)
+ok(`包内十套都在三条上界内（三条各自的峰值 ${peak('bytes')} 字节 / 深 ${peak('depth')} / ${peak('nodes')} 个节点，上限 ${JSON.stringify(engine.LIMITS)}）`,
+  overBundled.length === 0, overBundled.map((r) => r.id).join('、'))
+// 每份探针只越一条线：{线名, 该线的报错前缀, 配方}。三份都是"骨架合法、只是过大"，
+// 报出来的错若不止这一条，说明探针自己没做干净（那等于没在测这条线）。
+const nest = (n) => { let t = 1; for (let i = 0; i < n; i++) t = { '-': [1, t] }; return t }
+const capCases = [
+  ['字节', '整条配方', { id: 'cap-bytes', min_version: 1, steps: [{ let: 'height', value: 1 }, { do: { lit: new Array(17000).join('x') } }] }],
+  ['深度', '嵌套', { id: 'cap-depth', min_version: 1, steps: [{ let: 'height', value: nest(14) }] }],
+  ['节点', '个节点', { id: 'cap-nodes', min_version: 1, steps: [{ let: 'height', value: 1 }, { do: { lit: new Array(2100).fill(1) } }] }],
+]
+const capAllow = { opKeys: poster.RECIPE_OP_KEYS, primKeys: Object.keys(poster.RECIPE_PRIMS).reduce((m, n2) => { m[n2] = poster.RECIPE_PRIMS[n2].keys; return m }, {}) }
+const capFails = []
+capCases.forEach(([name, prefix, rec]) => {
+  const sz = engine.sizeOf(rec)
+  const errs = engine.validate(rec, capAllow).filter((e) => /上限/.test(e))
+  if (errs.length !== 1) capFails.push(`${name}：越界的报错有 ${errs.length} 条（${errs.join('；')}），探针要只越这一条`)
+  else if (errs[0].indexOf(prefix) < 0) capFails.push(`${name}：越的是这条线，报的却是「${errs[0]}」`)
+  if (sz.bytes > engine.LIMITS.max_bytes && name !== '字节') capFails.push(`${name}：字节也超了（${sz.bytes}）`)
+  if (sz.depth > engine.LIMITS.max_depth && name !== '深度') capFails.push(`${name}：深度也超了（${sz.depth}）`)
+  if (sz.nodes > engine.LIMITS.max_nodes && name !== '节点') capFails.push(`${name}：节点也超了（${sz.nodes}）`)
+})
+ok(`三条上界各自单独咬得住（${capCases.map((c) => c[0]).join(' / ')}）`, capFails.length === 0, capFails.join(' | '))
+const seedRows = readSeed('poster_templates.json')
+const sha16 = (s) => crypto.createHash('sha256').update(s).digest('hex')
+const stale = []
+if (seedRows.length !== poster.TEMPLATES.length) stale.push(`套数 ${seedRows.length} ≠ 模板 ${poster.TEMPLATES.length}`)
+seedRows.forEach((r) => {
+  const now = JSON.stringify(canonSeed(RECIPES[r.template_id]))
+  if (JSON.stringify(canonSeed(r.recipe)) !== now) stale.push(`${r.template_id} 的配方内容比种子新`)
+  if (sha16(now) !== r.content_hash) stale.push(`${r.template_id} 的 hash 与内容对不上`)
+})
+ok(`种子十套的配方与 hash 都是现读包内那份生成的（${seedRows.length} 套）`, stale.length === 0, stale.slice(0, 3).join(' | '))
 
 let n = 0
 for (const [name, pass, detail] of results) {

@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------- 配方解释器
 //
-// 一份配方就是一段纯 JSON：{ id, min_version, steps: [...] }。步型只有六种
-// （let / emit / emitOne / emitMany / if / each），表达式只有下面算子表里那些，
+// 一份配方就是一段纯 JSON：{ id, min_version, steps: [...] }。步型只有七种
+// （let / do / emit / emitOne / emitMany / if / each），表达式只有下面算子表里那些，
 // 要量文字的排版动作由外面注入的「原语」做——配方只能挑名字、填参数，不能带代码。
 //
 // 为什么是解释器而不是"下发 JS 代码"：微信《关于禁止小程序 JavaScript 解释器使用规范》
@@ -26,6 +26,60 @@ const LOGIC = { '<': 2, '<=': 2, '>': 2, '>=': 2, '==': 2, '!=': 2, and: -1, or:
 // `padStart` —— 规格卡那个「01 / 02」序号；`slice` —— 竖排那一列只取前十个字。
 const CONV = { str: 1, padStart: 2, slice: 3 }
 const STEPS = ['let', 'do', 'emit', 'emitOne', 'emitMany', 'if', 'each']
+// 项形：不是算子，是"一项能长成哪几种骨架"。导出给后端那份名单对表用（docs/工具/出-模板配方种子.js），
+// 加了一种形却忘了同步，服务端就会放行一份客户端读不懂的配方。
+const TERM_FORMS = ['var', 'lit', 'if', 'obj', 'prim', 'list']
+// 一条配方能有多大。解释器对"内容有多大"本来不设防，一条十万步的配方会让出图那一次
+// 主线程全卡在测量上——所以两头都要拦：下发前服务端拦一道，渲染前这里再拦一道。
+// 这三个数与 backend/app/services/poster_recipe.py 里那份必须相等，两边都由
+// backend/seed/poster_whitelist.json 对齐（尺子 验-模板配方可执行.js 与 pytest 各查一头）。
+// 参照：包内这十套实测峰值 6,383 字节 / 深 17 层 / 691 个节点，所以三条都留了两三倍。
+const LIMITS = { max_bytes: 16384, max_depth: 24, max_nodes: 2000 }
+
+// 按键名排序后的紧凑 JSON——与后端 `canonical_json` 同一个写法。三条上界量的是这个字节数，
+// 也正因为两边都算这一个字符串，服务端放行的尺寸和客户端认的尺寸才是同一个数。
+function canonJson(v) {
+  if (Array.isArray(v)) return `[${v.map(canonJson).join(',')}]`
+  if (v !== null && typeof v === 'object') {
+    return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonJson(v[k])}`).join(',')}}`
+  }
+  return JSON.stringify(v)
+}
+
+// 小程序里没有 Buffer，UTF-8 字节数自己数。代理对算 4 字节（与 Python 的 encode('utf-8') 一致），
+// 否则含 emoji 的配方两边会数出两个数来。
+function utf8Bytes(s) {
+  let n = 0
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    if (c < 0x80) n += 1
+    else if (c < 0x800) n += 2
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length && s.charCodeAt(i + 1) >= 0xdc00 && s.charCodeAt(i + 1) <= 0xdfff) { n += 4; i++ }
+    else n += 3
+  }
+  return n
+}
+
+// 深度/节点数的数法与后端 `_depth`/`_nodes` 逐字对齐：数组与对象各算一层，对象数键的个数、
+// 数组数个儿的个数，标量不算节点。两边数法不一样＝同一份配方一个放行一个拦。
+function sizeOf(recipe) {
+  const count = (v) => {
+    const isList = Array.isArray(v)
+    const isMap = !isList && v !== null && typeof v === 'object'
+    if (!isList && !isMap) return { d: 0, n: 0 }
+    const kids = isList ? v : Object.keys(v).map((k) => v[k])
+    let d = 0
+    let n = kids.length
+    kids.forEach((x) => {
+      const r = count(x)
+      if (r.d > d) d = r.d
+      n += r.n
+    })
+    return { d: d + 1, n }
+  }
+  const w = count(recipe)
+  return { bytes: utf8Bytes(canonJson(recipe)), depth: w.d, nodes: w.n }
+}
 
 function describe(v) {
   if (v === null) return 'null'
@@ -344,6 +398,12 @@ function validate(recipe, allow) {
     // 少这一步就是每张卡都塌成同一档，而那正是几何自检查得出的第一条。
     if (!recipe.steps.some((s) => s && typeof s === 'object' && s.let === 'height')) bad.push('steps 里必须有一步 let 出 height')
   }
+  // 三条上界放在最后：就算形状全错，尺寸也要量——否则一份"合法但十万步"的配方
+  // 会在渲染那一次把主线程吃干。这三条与后端 validate_recipe 那三条是同一道闸门的两头。
+  const sz = sizeOf(recipe)
+  if (sz.bytes > LIMITS.max_bytes) bad.push(`整条配方 ${sz.bytes} 字节，超过上限 ${LIMITS.max_bytes}`)
+  if (sz.depth > LIMITS.max_depth) bad.push(`嵌套 ${sz.depth} 层，超过上限 ${LIMITS.max_depth}`)
+  if (sz.nodes > LIMITS.max_nodes) bad.push(`${sz.nodes} 个节点，超过上限 ${LIMITS.max_nodes}`)
   return bad
 }
 
@@ -360,4 +420,4 @@ function planFromRecipe(recipe, env) {
   return { width: env.width, height: h, layers: env.layers, template: recipe.id }
 }
 
-module.exports = { VERSION, ARITH, LOGIC, STEPS, planFromRecipe, validate, truthy, evalTerm: ev }
+module.exports = { VERSION, ARITH, LOGIC, CONV, STEPS, TERM_FORMS, LIMITS, sizeOf, planFromRecipe, validate, truthy, evalTerm: ev }

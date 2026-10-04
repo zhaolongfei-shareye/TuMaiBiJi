@@ -7,7 +7,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 import logging
 
-from app.api.routes import notes, ingest, auth, categories, shares, user, tasks
+from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
 
@@ -108,6 +108,8 @@ app.include_router(shares.router, prefix="/api/shares", tags=["shares"])
 app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"])
 app.include_router(user.router, prefix="/api/user", tags=["user"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
+# 卡片模板配方下发。只有 GET——这张表能改画面，写路径留在部署脚本里（见 routes/poster_templates.py）
+app.include_router(poster_templates.router, prefix="/api/poster/templates", tags=["poster-templates"])
 
 @app.get("/")
 async def root():

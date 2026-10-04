@@ -1,0 +1,317 @@
+{
+ "arith": {
+  "%": 2,
+  "*": -1,
+  "+": -1,
+  "-": -1,
+  "/": 2,
+  "abs": 1,
+  "ceil": 1,
+  "floor": 1,
+  "max": -1,
+  "min": -1,
+  "neg": 1,
+  "round": 1
+ },
+ "conv": {
+  "padStart": 2,
+  "slice": 3,
+  "str": 1
+ },
+ "interpreter_version": 1,
+ "limits": {
+  "max_bytes": 16384,
+  "max_depth": 24,
+  "max_nodes": 2000
+ },
+ "logic": {
+  "!=": 2,
+  "<": 2,
+  "<=": 2,
+  "==": 2,
+  ">": 2,
+  ">=": 2,
+  "and": -1,
+  "len": 1,
+  "not": 1,
+  "or": -1,
+  "truthy": 1
+ },
+ "op_keys": {
+  "avatar": [
+   "x",
+   "y",
+   "d",
+   "ring",
+   "ringColor",
+   "fallback"
+  ],
+  "circle": [
+   "x",
+   "y",
+   "r",
+   "fill",
+   "stroke",
+   "strokeWidth"
+  ],
+  "dots": [
+   "x",
+   "y",
+   "w",
+   "h",
+   "gap",
+   "r",
+   "color",
+   "oddRowShift"
+  ],
+  "fill": [
+   "x",
+   "y",
+   "w",
+   "h",
+   "color"
+  ],
+  "grad": [
+   "x",
+   "y",
+   "w",
+   "h",
+   "c1",
+   "c2",
+   "dir",
+   "stops"
+  ],
+  "image": [
+   "key",
+   "x",
+   "y",
+   "w",
+   "h",
+   "placeholder",
+   "r",
+   "clipCircle",
+   "gray",
+   "tint",
+   "fadeFrom"
+  ],
+  "line": [
+   "x1",
+   "y1",
+   "x2",
+   "y2",
+   "w",
+   "color"
+  ],
+  "radial": [
+   "x",
+   "y",
+   "r0",
+   "r1",
+   "c1",
+   "c2",
+   "box"
+  ],
+  "rrect": [
+   "x",
+   "y",
+   "w",
+   "h",
+   "r",
+   "fill",
+   "shadow",
+   "shadowBlur",
+   "shadowY",
+   "stroke",
+   "strokeWidth"
+  ],
+  "text": [
+   "x",
+   "y",
+   "lines",
+   "lh",
+   "size",
+   "weight",
+   "color",
+   "align",
+   "fam",
+   "alpha",
+   "track",
+   "stroke",
+   "strokeWidth",
+   "vert",
+   "colGap",
+   "vpunct"
+  ]
+ },
+ "prim_keys": {
+  "blockName": [],
+  "brandGlyph": [],
+  "clipLine": [
+   "text",
+   "maxW",
+   "size",
+   "bold",
+   "fam"
+  ],
+  "clipTrack": [
+   "text",
+   "maxW",
+   "track",
+   "size",
+   "bold",
+   "fam"
+  ],
+  "fitLines": [
+   "text",
+   "maxW",
+   "n",
+   "size",
+   "bold",
+   "fam"
+  ],
+  "fitSize": [
+   "text",
+   "maxW",
+   "want",
+   "floor"
+  ],
+  "footH": [
+   "qrSize"
+  ],
+  "glyphPlate": [
+   "x",
+   "y",
+   "w",
+   "h",
+   "color"
+  ],
+  "i18n": [
+   "key"
+  ],
+  "joinNonEmpty": [
+   "sep",
+   "parts"
+  ],
+  "maxOf": [
+   "values",
+   "seed"
+  ],
+  "mix": [
+   "c1",
+   "c2",
+   "w"
+  ],
+  "noteDate": [],
+  "paperOf": [
+   "categoryId"
+  ],
+  "plateColors": [
+   "categoryId"
+  ],
+  "points": [
+   "limit",
+   "maxW",
+   "size",
+   "bold",
+   "fam"
+  ],
+  "qrSticker": [
+   "x",
+   "y",
+   "size",
+   "offset",
+   "ink",
+   "label"
+  ],
+  "qrStickerH": [
+   "size"
+  ],
+  "quoteText": [],
+  "scheme": [
+   "name",
+   "categoryId"
+  ],
+  "setFont": [
+   "size",
+   "bold",
+   "fam"
+  ],
+  "signRow": [
+   "x",
+   "y",
+   "maxW",
+   "size",
+   "avatarD",
+   "onDark",
+   "hasAvatar"
+  ],
+  "sourceLabel": [],
+  "tagsJoined": [
+   "sep"
+  ],
+  "token": [
+   "name"
+  ],
+  "trackWidth": [
+   "text",
+   "track",
+   "size",
+   "bold",
+   "fam"
+  ],
+  "vertAdv": [
+   "text",
+   "step",
+   "size",
+   "bold",
+   "fam"
+  ],
+  "vertCols": [
+   "text",
+   "colH",
+   "step",
+   "maxCols",
+   "size",
+   "bold",
+   "fam"
+  ],
+  "withAlpha": [
+   "color",
+   "alpha"
+  ],
+  "wrapLines": [
+   "text",
+   "maxW",
+   "size",
+   "bold",
+   "fam"
+  ]
+ },
+ "steps": [
+  "let",
+  "do",
+  "emit",
+  "emitOne",
+  "emitMany",
+  "if",
+  "each"
+ ],
+ "term_forms": [
+  "var",
+  "lit",
+  "if",
+  "obj",
+  "prim",
+  "list"
+ ],
+ "tokens": [
+  "paper",
+  "ink",
+  "body",
+  "muted",
+  "hard",
+  "warm",
+  "serif",
+  "mono"
+ ]
+}

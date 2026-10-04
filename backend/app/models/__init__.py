@@ -5,5 +5,6 @@ from app.models.asset import Asset
 from app.models.job import Job
 from app.models.share import Share
 from app.models.invitation import Invitation
+from app.models.poster_template import PosterTemplate
 
-__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation"]
+__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate"]
