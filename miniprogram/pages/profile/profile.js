@@ -1,4 +1,6 @@
 const poster = require('../../utils/poster.js')
+const posterTemplates = require('../../utils/posterTemplates.js')
+const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 
 // 画布自己的显示宽度，必须和 profile.wxss 里 .cell-canvas 的 width 是同一个数。
@@ -20,13 +22,16 @@ const MEASURE_H = 750
 
 // 格子的骨架：先有 id 和占位高度，画布节点得先存在，小样才画得上去。
 function groupSkeleton(lang) {
-  // 站长 10-04：分组名后面要带一个数（经典款（4）/ 个性款（6））。数一律从下面这份
-  // TEMPLATES 现算，一个都不写死——以后加一套或撤一套，改的是那张表，这一行自己跟着变。
+  // 站长 10-04：分组名后面要带一个数（经典款（4）/ 个性款（6））。数一律现算，一个都不写死
+  // ——以后加一套或撤一套，改的是那张表，这一行自己跟着变。
+  // P0-5 起这份"表"是**合并后的**那份（`poster.templateList()`＝包内 ∪ 下发）：
+  // 服务端多一套，这里就跟着多一格；把那一套收成 archived，数字自己掉下来。写死成 4/6
+  // 就等于把"不走发版"这条承诺在界面上先兑掉一半。
   // 括号跟着语言换：英文态写成 "Classic (4)"，全角括号夹在英文里像没排完。
   // 合进 label 而不是另起一个字段：下面 renderThumbs 重画十格时只往回带 id/label/items，
   // 单独那个数会被它抹掉（表现是画完小样之后括号当场消失）。
   return poster.TEMPLATE_GROUPS.map((g) => {
-    const items = poster.TEMPLATES.filter((x) => x.group === g.id).map((x) => ({
+    const items = poster.templateList().filter((x) => x.group === g.id).map((x) => ({
       id: x.id,
       label: poster.templateLabel(x.id, lang),
       h: Math.round((THUMB_W * 4) / 3),
@@ -80,6 +85,25 @@ Page({
       () => this.renderThumbs()
     )
     app.setNavTitle('navProfile', lang)
+    // 下发那一路（P0-5）：进这一页就后台拉一次配方。放在 onLoad 而不是 onShow——
+    // 这一页故意不吃 onShow 重绘（下面那条注释说的就是它），而每次从「我的」走进来
+    // 都是一次新的 onLoad，所以"改一条配方、不重启就看到新样子"这条够用。
+    // 拉不到、被 401 拦、接口报错，一律当"这次没拿到"：包内那十套照样画，
+    // 「生成笔记卡片」那枚按钮没有一条路径会因为这里而变灰。
+    this._pullTemplates()
+  },
+
+  // 返回那份报告（{accepted, rejected, error}）只给尺子看；界面不因为它弹任何东西——
+  // 用户不需要知道"这批配方是下发的还是包内的"，他只需要卡片一直画得出来。
+  _pullTemplates() {
+    const before = poster.remoteSignature()
+    return posterTemplates.refresh(() => api.getPosterTemplates()).then((rep) => {
+      if (!rep || rep.error || poster.remoteSignature() === before) return rep
+      // 号没变就不重画那十格：拉一次是几十 KB 的网，重画十格是十个原生画布，后者贵得多。
+      const groups = groupSkeleton(this.data.lang)
+      this.setData({ groups }, () => this.renderThumbs())
+      return rep
+    })
   },
 
   // 这里故意没有 onShow：从相册回来时真机会补发一次 onShow，那时候读一遍 storage

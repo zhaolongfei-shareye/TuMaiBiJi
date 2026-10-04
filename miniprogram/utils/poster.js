@@ -14,6 +14,9 @@ const { t } = require('./i18n.js')
 // 方向是单向的：poster.js 认识这两份，它们不认识 poster.js。
 const engine = require('./posterRecipe.js')
 const RECIPES = require('./posterRecipes.js')
+// 下发那一路的门槛比的是小程序版本号（`min_app_version`），这个号只有 appInfo 那一份出处。
+// 配方 JSON 里那个 `min_version` 是解释器版本，两回事，别拿这一个去判那一个。
+const { VERSION: APP_VERSION } = require('./appInfo.js')
 
 const W = 750
 const INK = '#23252C'
@@ -78,8 +81,10 @@ const TEMPLATE_GROUPS = [
 
 // 海报出中英文两版，模板名也就得跟着语言走。
 // 名字留在模板表里而不是 i18n 里：加一套模板只改一处，不会漏掉一半键值。
+// 这里读的是合并后的那份（templateList），不是包内数组：下发那一行要是改了叫法，
+// 界面得跟着改口——这正是"不走发版"那两个把手里的第二个（改文案不用发版，也不用清缓存）。
 function templateLabel(id, lang) {
-  const tpl = TEMPLATES.find((x) => x.id === id)
+  const tpl = templateList().find((x) => x.id === id)
   if (!tpl) return ''
   return lang === 'en' ? tpl.labelEn || tpl.label : tpl.label
 }
@@ -1875,8 +1880,119 @@ const PLANNERS = {
 // 名单在 poster.js、内容在 posterRecipes.js，两边对不上由 docs/工具/验-模板配方可执行.js 抓。
 const RECIPE_IDS = ['quote', 'card', 'block', 'lit', 'spec', 'popGrid', 'popDots', 'acid', 'cover', 'letter']
 
+// ---------------------------------------------------------------- 下发那一路（P0-5）
+//
+// 服务端那几行配方到了客户端，这里只回答一个问题：**这一套能不能整套用**。
+// 能用就整套盖掉包内那一份，不能用就整套丢掉、包内那份原样留着。
+// 绝不做"跳过不认识的那一层继续画"——半张图比不用更糟（方案 §四 第 4 条）。
+//
+// 这道闸门必须放在本文件：op 的字段表、原语的参数表都只在这里有一份，
+// posterTemplates.js 只管拉与存，它不认名单，所以也不许自己判"合格"。
+const RECIPE_PRIM_KEYS = {}
+Object.keys(RECIPE_PRIMS).forEach((n) => { RECIPE_PRIM_KEYS[n] = RECIPE_PRIMS[n].keys })
+
+// id → 那一行下发值。整个换掉（applyRemoteTemplates 里重赋值），不留旧行：
+// 服务端撤掉一套（status 改 archived）之后，本地这一份必须当场没有，
+// 否则"撤回秒级生效"就变成"等下一次全量下发覆盖"。
+let REMOTE = {}
+
+// '1.9.27' 这种三段号不许按字符串比：'1.10.0' 会被判成比 '1.9.9' 小。
+function appVersionOk(want) {
+  const a = String(APP_VERSION).split('.').map((x) => parseInt(x, 10) || 0)
+  const b = String(want).split('.').map((x) => parseInt(x, 10) || 0)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0
+    const y = b[i] || 0
+    if (x !== y) return x > y
+  }
+  return true
+}
+
+// 一行下发值的毛病清单（空数组＝这一行整套可用）。
+// 顺序是：先看信封（id/名字/分组/版本门槛），再看信纸（配方本身过不过名单）。
+function remoteRowProblems(row) {
+  if (row === null || typeof row !== 'object' || Array.isArray(row)) return ['这一行不是对象']
+  const bad = []
+  if (typeof row.template_id !== 'string' || !row.template_id) bad.push('少了 template_id')
+  if (typeof row.label !== 'string' || !row.label) bad.push('少了 label')
+  if (TEMPLATE_GROUPS.every((g) => g.id !== row.group_key)) bad.push(`分组「${row.group_key}」不在本包认的那两组（${TEMPLATE_GROUPS.map((g) => g.id).join('、')}）里`)
+  if (typeof row.min_app_version !== 'string' || !row.min_app_version) bad.push('少了 min_app_version')
+  else if (!appVersionOk(row.min_app_version)) bad.push(`这套要 ${row.min_app_version} 以上的包，这台是 ${APP_VERSION}`)
+  if (row.recipe === null || typeof row.recipe !== 'object' || Array.isArray(row.recipe)) {
+    bad.push('recipe 得是个对象')
+    return bad
+  }
+  // 名单校验（含字节/深度/节点三条上界）由解释器那份现成的 validate 做，不另写一套。
+  bad.push.apply(bad, engine.validate(row.recipe, { opKeys: RECIPE_OP_KEYS, primKeys: RECIPE_PRIM_KEYS }))
+  // 配方里那个 id 必须就是这一行的 template_id。少这一道，"加第 11 套"可以写成
+  // 把 quote 那份配方贴到新 id 上——列表里多一格、点进去画的却是另一张卡，
+  // 而每一层都合法，画面不会报错。这种"名字对、内容不对"的错只能在门口拦。
+  if (row.recipe && row.recipe.id !== row.template_id) bad.push(`配方自己的 id「${row.recipe && row.recipe.id}」与这行的 template_id 不一致`)
+  return bad
+}
+
+// 返回 { accepted, rejected: [人话] }。丢掉的那几条不改 REMOTE 里对应的那一项——
+// 包内那份照旧，画面上看不出来任何事，这也正是"回退"该有的样子。
+function applyRemoteTemplates(rows) {
+  const report = { accepted: 0, rejected: [] }
+  if (!Array.isArray(rows)) return { accepted: 0, rejected: ['下发不是一个数组'] }
+  const next = {}
+  rows.forEach((row) => {
+    const problems = remoteRowProblems(row)
+    if (problems.length) {
+      report.rejected.push(`${(row && row.template_id) || '?'}：${problems.join('；')}`)
+      return
+    }
+    next[row.template_id] = row
+    report.accepted++
+  })
+  REMOTE = next
+  return report
+}
+
+function remoteTemplates() {
+  return REMOTE
+}
+
+// 界面用它决定"要不要重画选择器"：一串 hash 拼起来的指纹，没变就什么都不做。
+function remoteSignature() {
+  return Object.keys(REMOTE).sort().map((id) => `${id}:${REMOTE[id].content_hash || ''}`).join('|')
+}
+
 function recipeOf(id) {
+  const r = REMOTE[id]
+  if (r && r.recipe) return r.recipe
   return RECIPE_IDS.indexOf(id) < 0 ? null : RECIPES[id] || null
+}
+
+// 这一套现在吃的是哪一份：下发的 / 包内的 / 还没转成配方（只有 JS planner）。
+// 出图那一路不问它（问了就要改图层清单，而那份清单是 480 组基线的比对对象），
+// 只有 P0-6 那三条反向对照读它——"这张卡到底是谁画的"必须有个不靠猜的说法。
+function recipeSource(id) {
+  if (REMOTE[id] && REMOTE[id].recipe) return 'remote'
+  if (RECIPE_IDS.indexOf(id) >= 0 && RECIPES[id]) return 'bundled'
+  return 'js'
+}
+
+// 模板列表＝包内 ∪ 下发（按 id 覆盖）。
+// 已有那十项**保持包内顺序**：下发改的是画法和叫法，不是排次；真要调序是另一件事，
+// 得让站长点头，不能让服务端一次改名字就把「玉版宣」挪到列表末尾。
+// 下发里新出现的 id 排在尾巴上，按 sort_order 定点。
+function templateList() {
+  const out = TEMPLATES.map((x) => {
+    const r = REMOTE[x.id]
+    if (!r) return x
+    return { id: x.id, label: r.label, labelEn: r.label_en || r.label, group: r.group_key }
+  })
+  const known = TEMPLATES.map((x) => x.id)
+  Object.keys(REMOTE)
+    .filter((id) => known.indexOf(id) < 0)
+    .sort((a, b) => ((REMOTE[a].sort_order || 0) - (REMOTE[b].sort_order || 0)) || (a < b ? -1 : 1))
+    .forEach((id) => {
+      const r = REMOTE[id]
+      out.push({ id, label: r.label, labelEn: r.label_en || r.label, group: r.group_key })
+    })
+  return out
 }
 
 // ---------------------------------------------------------------- 入口
@@ -1932,7 +2048,10 @@ function stripQr(plan, ctx, lang) {
 }
 
 function planPoster(ctx, note, templateId, profile, lang, opts) {
-  const tpl = PLANNERS[templateId] ? templateId : DEFAULT_TEMPLATE
+  // 认得这一套的两条路：有一份 JS planner，或者有一份配方（下发的或包内的）。
+  // 只查 PLANNERS 会把下发来的第 11 套判成"不认识的模板"、退回默认那一套——
+  // 站长在服务端加了模板而客户端毫无反应，就是这一行造成的。
+  const tpl = (PLANNERS[templateId] || recipeOf(templateId)) ? templateId : DEFAULT_TEMPLATE
   const p = profile || {}
   const o = opts || {}
   const d = { note, profile: p, hasAvatar: !!p.avatarPath, lang: lang || 'zh' }
@@ -1991,6 +2110,11 @@ module.exports = {
   RECIPE_PRIMS,
   RECIPE_TOKENS,
   recipeOf,
+  recipeSource,
+  templateList,
+  applyRemoteTemplates,
+  remoteTemplates,
+  remoteSignature,
   planFromRecipe,
   BRAND_GLYPH,
   SAMPLE_NOTE,

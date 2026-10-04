@@ -227,6 +227,11 @@ module.exports = {
   getShare: (token) => request(`/api/shares/${encodeURIComponent(token)}`),
   getShareQRCodeUrl: (token) => `${API_BASE}/api/shares/${token}/qrcode`,
   getWallpaperOptions: () => request('/api/user/wallpaper/options'),
+  // 卡片模板配方下发（P0-5）。路径尾巴那个斜杠是必须的：FastAPI 那里注册的是 ""，
+  // 少一个斜杠服务端回 307，而 wx.request 对重定向的处理在各端不一致——别拿它赌。
+  // 现网那张表还没建（这一批没部署），所以现在打过来只会 404，
+  // posterTemplates.refresh 那边把任何失败都当"这次没拿到"，包内那十套照样画。
+  getPosterTemplates: () => request('/api/poster/templates/'),
   getQuota: () => request('/api/user/quota'),
   // 确认标志必须在服务端看得见的地方，所以是 POST 带 body，不是 DELETE 带 body
   deactivateAccount: () =>

@@ -628,15 +628,15 @@ Page({
     // 台账里那一格现在指着哪一张，这一趟就照那一张开：模板和二维码开关两样都跟它对齐。
     // 站长 10-03 真机报的"无论点哪张小图，大图都是同一张"——原来这里读的是「我的→卡片模板」
     // 存的那套默认模板，跟台账里这一张没有任何关系，所以 ‹ i/n › 滑得再欢，开出来还是那一套。
-    // 台账里那套模板要是已经不在 TEMPLATES 里（改名／撤掉），退回默认那一套。
+    // 台账里那套模板要是已经不在合并后的模板列表里（改名／撤掉／下发收走了），退回默认那一套。
     const cur = (this._cardsOf(note.id) || [])[0]
-    const known = !!(cur && cur.tpl && poster.TEMPLATES.some((x) => x.id === cur.tpl))
+    const known = !!(cur && cur.tpl && poster.templateList().some((x) => x.id === cur.tpl))
     this.setData({
       detailOpen: false,
       templateOpen: true,
       posterNote: note,
       posterTpl: known ? cur.tpl : (profile.template || poster.DEFAULT_TEMPLATE),
-      tplIds: poster.TEMPLATES.map((x, i) => ({ id: x.id, color: toneColor(i) })),
+      tplIds: poster.templateList().map((x, i) => ({ id: x.id, color: toneColor(i) })),
       posterImagePath: '',
       posterBusy: true,
       noQr: known ? !!cur.noQr : false,
@@ -771,9 +771,9 @@ Page({
     this._advanceTemplate(dx < 0 ? 1 : -1)
   },
 
-  // v7 ⑤：按 poster.js 里那十套的顺序走，走到头就滑不动、不循环（效果图原话）。
+  // v7 ⑤：按合并后那份模板列表（包内 ∪ 下发）的顺序走，走到头就滑不动、不循环（效果图原话）。
   async _advanceTemplate(delta) {
-    const list = poster.TEMPLATES
+    const list = poster.templateList()
     const cur = list.findIndex((x) => x.id === this.data.posterTpl)
     const next = list[(cur < 0 ? 0 : cur) + delta]
     if (!next) return

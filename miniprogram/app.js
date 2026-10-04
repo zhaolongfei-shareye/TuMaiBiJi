@@ -1,4 +1,5 @@
 const { request } = require('./utils/api')
+const posterTemplates = require('./utils/posterTemplates')
 const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
@@ -42,6 +43,10 @@ App({
     // 字体那一排入口已撤（iOS 与安卓真机都不换字），但测试期可能在这台机器上留下过选择。
     // 留着它就等于一个看不见的开关在生效，所以启动先清掉；重新做字体时删掉这一行即可。
     wx.removeStorageSync(UI_FONT_KEY)
+    // 卡片模板配方：先把上一回拉到的那批端回来（只读本机存储、同步、不查网），
+    // 于是这一次会话从第一张卡起吃的就是上次那批下发值。拉新的一批在「卡片模板」页里。
+    // 坏了也只是"这批没有"——包内那十套是 poster.js 里的常量，跟这里通不通没关系。
+    posterTemplates.restore()
     this.login()
   },
 

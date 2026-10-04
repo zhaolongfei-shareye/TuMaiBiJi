@@ -39,6 +39,15 @@ def seed_poster_templates(db: Session, path: str = SEED_PATH) -> dict:
         if row["group_key"] not in GROUP_KEYS:
             report["rejected"].append(f"{row['template_id']}: group_key「{row['group_key']}」不在名单里")
             continue
+        # 配方里那个 id 必须就是这一行的 template_id——与客户端 poster.js 的 remoteRowProblems
+        # 同一条规则（两边各拦一遍，服务端这道先拦，写配方的人当场就能看到）。
+        # 少这一道，"加第 11 套"可以写成把 quote 那份配方贴到新 id 上：每一层都合法、
+        # 客户端也收，但列表里多那一格，点进去画的是另一张卡——名字对、内容不对。
+        if (row["recipe"] or {}).get("id") != row["template_id"]:
+            report["rejected"].append(
+                f"{row['template_id']}: 配方自己的 id「{(row['recipe'] or {}).get('id')}」与 template_id 不一致"
+            )
+            continue
         existing = (
             db.query(PosterTemplate)
             .filter(

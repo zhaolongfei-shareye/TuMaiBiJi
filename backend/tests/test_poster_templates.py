@@ -290,6 +290,24 @@ def test_同一个template_id不许有两行live(db):
     assert dup.status == "live"
 
 
+def test_配方自己的id与这行不符就整行不收(db):
+    # 每一层都合法、hash 也算得出来，唯独"名字对、内容不对"：把 card 那份配方贴到 quote 这行上。
+    # 服务端不拦的话客户端会收下（客户端那道同规则的对照组见 docs/工具/验-模板配方下发.js），
+    # 结果是列表里那一格写着「摘句」、画出来是「玉版宣」——画面不报错，没人会发现。
+    rows = seed_rows()
+    card = [r for r in rows if r["template_id"] == "card"][0]
+    quote = [r for r in rows if r["template_id"] == "quote"][0]
+    quote["recipe"] = card["recipe"]
+    quote["content_hash"] = content_hash_of(card["recipe"])
+    path = "/tmp/seed_id_mismatch.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(rows, f, ensure_ascii=False)
+    rep = seed_poster_templates(db, path)
+    assert len(rep["rejected"]) == 1 and rep["rejected"][0].startswith("quote:")
+    assert rep["inserted"] == 9
+    assert db.query(PosterTemplate).filter(PosterTemplate.template_id == "quote").count() == 0
+
+
 def test_脏种子一条都不落库(db):
     rows = seed_rows()
     # 加一步而不是改现有那一步：现成的第一步是 `let 'cardX' = 40`，改它的 value 会撞上类型；

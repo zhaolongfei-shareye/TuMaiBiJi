@@ -207,6 +207,9 @@ for r in want:
         dirty.append(f"{r['template_id']}: {'；'.join(errs)}")
     elif r["group_key"] not in GROUP_KEYS:
         dirty.append(f"{r['template_id']}: group_key「{r['group_key']}」不在名单里（能用的是 {'、'.join(GROUP_KEYS)}）")
+    elif r["recipe"].get("id") != r["template_id"]:
+        # 客户端 poster.js 那条规则一模一样：名字对、内容不对的配方，整套丢。
+        dirty.append(f"{r['template_id']}: 配方里的 id「{r['recipe'].get('id')}」与这行的 template_id 不一致")
 if len({r["template_id"] for r in want}) != len(want):
     dirty.append("种子里同一个 template_id 出现了两次（客户端按 id 合并，留哪条看查询顺序）")
 if dirty:

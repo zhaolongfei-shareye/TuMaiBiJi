@@ -184,7 +184,8 @@ Page({
     const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
     const picked = this.data.picked || profile.template || poster.DEFAULT_TEMPLATE
     const avatar = poster.cardPath()
-    const tpls = poster.TEMPLATES.map((x) => ({
+    // 合并后的那份（包内 ∪ 下发）：服务端多一套，这一排就多一格；收成 archived 就自己少一格。
+    const tpls = poster.templateList().map((x) => ({
       id: x.id,
       label: poster.templateLabel(x.id, lang),
       h: Math.round((PICK_W * 4) / 3),
