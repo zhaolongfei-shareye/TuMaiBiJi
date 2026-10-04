@@ -163,16 +163,22 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-# ---- 1.7 卡片模板配方：表长出来了还得把包内那十套灌进去 ----
-# 这一步不能省，也不能"等第一次用的时候再说"：客户端那条兜底是"下发失败就用包内那份"，
-# 而这条兜底是静默的——表里少一套、或者灌进去的配方服务端读不懂，接口照样回 200，
-# 站长以为新模板生效了，用户看到的还是老卡片。所以这里四道都查：
-# 表在不在、那条部分唯一索引在不在（没带 WHERE 就等于没有）、种子灌完 live 够不够条数、
-# 落库的每条配方再拿服务端那份校验器重跑一遍。种子唯一出处是 seed/poster_templates.json，
-# 它由 docs/工具/出-模板配方种子.js 从客户端现读的名单生成；迁移里不抄一份，启动时也不自动灌。
+# ---- 1.7 卡片模板配方：默认只读体检，写库要显式开闸 ----
+# 为什么要有这道闸：这段原本无条件挂在部署主流程里，一旦跑就写库——灌十套种子，
+# 还会把同模板的旧 live 行翻成 archived。而站长 10-05 的口径是这批先不部署。
+# "不部署"不能只靠人记得没跑脚本：以后任何一次常规部署（哪怕部署的是别的事）都会顺带
+# 把这十行带进现网。所以默认这一行都不写，只报现状；真要灌的那天带 POSTER_TEMPLATES=1 跑。
+# 闸门开着时四道都查：表在不在、那条部分唯一索引在不在（没带 WHERE 就等于没有）、
+# 种子灌完 live 够不够条数、落库的每条配方再拿服务端那份校验器重跑一遍。
+# 种子唯一出处是 seed/poster_templates.json，它由 docs/工具/出-模板配方种子.js 从客户端
+# 现读的名单生成；迁移里不抄一份，启动时也不自动灌。
+# 四道都查的原因：客户端那条兜底是"下发失败就用包内那份"，而它是静默的——表里少一套、
+# 或灌进去的配方服务端读不懂，接口照样回 200，站长以为新模板生效了，用户看到的还是老卡片。
 echo ""
-echo ">>> 卡片模板配方表与种子..."
+echo ">>> 卡片模板配方表与种子（默认只读，写库需 POSTER_TEMPLATES=1）..."
 python <<'PY'
+import os
+
 from sqlalchemy import create_engine, inspect, text
 
 from app.core.config import settings
@@ -180,6 +186,8 @@ from app.db.database import SessionLocal
 from app.models.poster_template import GROUP_KEYS
 from app.services.poster_recipe import validate_recipe
 from app.services.poster_templates import live_templates, seed_poster_templates, seed_rows
+
+GATE = os.environ.get("POSTER_TEMPLATES", "") == "1"
 
 engine = create_engine(settings.DATABASE_URL)
 insp = inspect(engine)
@@ -195,6 +203,18 @@ if not one_live_idx or "status" not in one_live_idx or "WHERE" not in one_live_i
     print(f"  ✗ 缺 ux_poster_templates_one_live_per_template 那条部分唯一索引（或它没带 status 的 WHERE）：{one_live_idx}")
     print("    没有它，同一个模板可以有两行 live，客户端按 id 合并时哪条赢取决于查询顺序")
     raise SystemExit(1)
+
+if not GATE:
+    db = SessionLocal()
+    try:
+        n_live = len(live_templates(db))
+    finally:
+        db.close()
+    print(f"  ⏸ 闸门关着（没带 POSTER_TEMPLATES=1）：一行都没写，现有 live {n_live} 条")
+    print("    表本身会随上面的 alembic 自动建出来，这一步管的只是往库里灌那十套配方")
+    print("    live 为 0 时那个 GET 回空数组，客户端照画包内那十套，画面不变")
+    print("    真要下发那天：POSTER_TEMPLATES=1 bash deploy.sh")
+    raise SystemExit(0)
 
 want = seed_rows()
 # 先纯检查、再动库：灌到一半才发现某条不合格的话，其余那几条已经 commit 进表了，
