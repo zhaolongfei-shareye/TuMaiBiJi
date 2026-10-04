@@ -7,11 +7,11 @@ const { t } = require('./utils/i18n')
 // 能一次接住。到底认不认、什么时候给额度，全在服务端判（见 backend/app/services/quota.py）。
 const INVITER_KEY = 'inviterId'
 
-// 淡雅那两枚壁纸（palette 里带 ramp 的）只存在这台设备上。
+// 象牙 / 天青 / 樱落这三枚只存在这台设备上（palette 里带 local 标记的）。
 // 原因不是偷懒：后端 PUT /api/user/wallpaper 有一张 WALLPAPER_PRESETS 白名单，
-// 那是现网代码，加两个 key 就要动后端并部署——这一轮明确不碰现网。
-// 所以规则是：本机存过就用本机的，没存过用服务端那份；切回那六枚时把这份删掉，
-// 让服务端重新当家（换设备、重装后还是原来那六枚的同步行为）。
+// 那是现网代码，加 key 就要动后端并部署——这一轮明确不碰现网。
+// 所以规则是：本机存过就用本机的，没存过用服务端那份；切到雨雾（沿用旧 key gradient-blue，
+// 在白名单里）时把这份删掉，让服务端重新当家（换设备、重装后还是跟着账号走）。
 const LOCAL_WALLPAPER_KEY = 'localWallpaper'
 
 // 界面字体同理是本机偏好：它只影响这一台设备上的字长什么样，不需要同步，
@@ -137,21 +137,26 @@ App({
    * 当前该用哪套壁纸：本机那份优先，没有才用服务端的。
    * @param fromServer 登录接口返回的原值，只在 _doLogin 那一步传进来
    *
-   * 深色那两枚（夜紫 / 深海）09-30 起整条链路屏蔽：这一屏永远铺背景图，而深色主题的
-   * 卡底是 rgba(255,255,255,.05) 那层薄膜——贴在纯色页底上读得出"一张卡"，贴在照片上就
-   * 等于没有，展开那行的概要字还硬写着 #5c6068，站长真机反馈"卡片是透明的、完全看不清"。
-   * 为了赶上线先做减法：选择条里不再出现（见 wallpaper.js），已经存过深色的人在这里
-   * 落回米白。判据只看 palette 里那个 `dark` 标记，别再各处抄一份 key 清单。
+   * 返回的是**解析后的 canonical key**（themeOf 里那张 WALLPAPER_ALIAS 表把六枚旧值压成四枚）。
+   * 这一句 10-04 改过两次：
+   * ① 原来这里判 `themeOf(wanted).dark ? 'default' : wanted`——深色那两枚（夜紫/深海）09-30 起
+   *    整条链路屏蔽，因为这一屏永远铺背景图，而深色主题的卡底是 rgba(255,255,255,.05) 那层薄膜，
+   *    贴在照片上等于没有，站长真机反馈"卡片是透明的、完全看不清"。现在四枚壁纸全浅色、
+   *    旧 key 一律由别名表落到浅色那枚，那个三元成了死路，所以撤干净，不留兼容壳。
+   * ② 原来直接把 wanted 原样返回，于是存过 'default' 的人拿到的就是 'default'，
+   *    而壁纸条里已经没有这一格 → 实际生效的是象牙，条上却一格都不亮（外观设置页那个高亮 bug）。
+   *    取 .key 就是把这件事收在一处：往下所有人拿到的都是四枚之一的 key。
    */
   getWallpaper(fromServer) {
     const local = wx.getStorageSync(LOCAL_WALLPAPER_KEY)
     const wanted = local || fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper) || 'default'
-    return themeOf(wanted).dark ? 'default' : wanted
+    return themeOf(wanted).key
   },
 
   /**
-   * 选完壁纸之后落一次账。带 local 标记的那两枚只写本机，其余那六枚删掉本机这份、
-   * 让服务端继续当家——这样"换设备还是原来那套"的老行为一点没变。
+   * 选完壁纸之后落一次账。带 local 标记的那三枚（象牙/天青/樱落）只写本机，
+   * 雨雾那一枚删掉本机这份、让服务端继续当家——这样"换设备还是原来那套"的老行为一点没变。
+   * 为什么三枚只能存本机：后端 WALLPAPER_PRESETS 那张白名单是现网代码，加 key 要部署。
    */
   setWallpaper(key) {
     if (themeOf(key).local) wx.setStorageSync(LOCAL_WALLPAPER_KEY, key)
@@ -204,16 +209,12 @@ App({
     return this.containerClass(wallpaper)
   },
 
-  isDarkTheme(wallpaper) {
-    return themeOf(wallpaper).dark
-  },
-
   applyTheme(wallpaper) {
     // 先把当前主题记进 palette：方块按分类取哪一档、新建页那三张卡用什么面，
     // 全看这一步有没有先落地（palette.js 里 ACTIVE_THEME 那段注释写了为什么做成模块状态）。
     const theme = setActiveTheme(wallpaper)
     // 导航条必须和页面底色同值，否则卡片滚到顶部会看出一条色差。
-    // 之前这里写死 '#f5f5f5'，和六套主题的底色一个都对不上。
+    // 之前这里写死 '#f5f5f5'，和四套主题的底色一个都对不上。
     // 页面刚 onLoad 时这个接口可能直接 fail，忽略即可，底色由容器自己画。
     wx.setNavigationBarColor({
       frontColor: theme.dark ? '#ffffff' : '#000000',

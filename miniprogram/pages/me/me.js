@@ -40,7 +40,7 @@ function probeBio() {
 Page({
   data: {
     lang: 'zh',
-    themeClass: 'theme-default',
+    themeClass: 'theme-tint-paper',  // 未登录/首帧的占位：类名必须真的存在，四枚里象牙是 THEMES[0]
     t: texts('zh'),
     // 药丸：默认停在「设置」，「关于」的内容直接长在头部下面，不分二级
     tab: 'set',

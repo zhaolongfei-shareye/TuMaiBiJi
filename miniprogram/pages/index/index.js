@@ -29,10 +29,9 @@ const SUM_LINES = 3
 const SUM_CHARS = 24
 
 /* 详情窗右上那枚淡底方形的底色（站长 10-03 原话："做一个淡淡方形，用背景风格的主色阶"）。
-   规则不是色号，三条：有色阶那两枚壁纸（象牙 / 天青）吃 steps[0]；浅色那四枚从**自己的页底**
-   掺 8% 墨（米白 → #E3E0DC、雾蓝 → 淡蓝、松绿 → 淡绿、暮橙 → 淡桃，效果图 s2 那格就是这个数）；
-   深色那两枚（夜紫 / 深海）不能照页底掺——页底是近黑，会把这块方染成近黑压在纸白窗上，
-   那就是他打回过的"太明显了"，所以参照物换成窗口自己的纸白（.float-sheet 那个 #FCFBF8）。 */
+   10-04 压成四枚之后规则只剩一条：都吃当前主题色阶的最浅那一档（steps[0]）。
+   下面那句 mix() 掺 8% 墨的算法现在没有壁纸会走到，留着是给"新加一枚壁纸忘了写 ramp"兜底
+   ——那条一触发就会拿页面底去掺，压在纸白窗上就是他打回过的"太明显了"。 */
 const SHEET_PAPER = '#FCFBF8'
 function paleStep(wallpaper) {
   const th = themeOf(wallpaper)
@@ -49,7 +48,7 @@ Page({
     searchOpen: false,
     selectedCategory: null,
     lang: 'zh',
-    themeClass: 'theme-default',
+    themeClass: 'theme-tint-paper',  // 未登录/首帧的占位：类名必须真的存在，四枚里象牙是 THEMES[0]
     t: texts('zh'),
     skip: 0,
     limit: 50,
@@ -149,7 +148,7 @@ Page({
       // 深浅每次进页重读：在首页那枚点上换过档，回到这一屏头部就该跟着沉或跟着亮。
       ...app.bgSkin(),
       // 搜索条那一块面由当前壁纸的页面底派生（palette.chromeOf），和底部导航那条胶囊同一个值；
-      // 每次进页重算，留着 data 字面量那份就等于永远停在米白那一档。
+      // 每次进页重算，留着 data 字面量那份就等于永远停在象牙那一档。
       // 但铺了图就整串不发：style 上的自定义属性优先级高于任何选择器，
       // 带着它，CSS 里那条"图上换成纸白面"的规则一行都翻不动。
       searchSkin: bgSrc ? '' : chromeOf(wallpaper).style,

@@ -1,0 +1,124 @@
+===== 甲档四套定稿（页面底 L86，色相种子见每行末）=====
+
+象牙 tint-paper / theme-tint-paper  local=True  ← 官网 --paper 那一支的 H
+  页面底 #E2DED4 (L85.9)  卡底 #F3F3F1 (L94.9)  墨 #352E1D
+  五档 #DCD8CC #C9C1AE #AFA488 #766B50 #645B43
+  按钮/圆底 #766948 (L37.3)  底栏条 #443B25
+  墨字/页底 10.02　卡/页底 1.21　纸白/按钮 4.71　纸白/底栏条 9.64　第1档/卡 1.28　第1档字 9.45　第2档/卡 1.61　第2档字 7.51　第3档/卡 2.23　第3档字 5.44　第4档/卡 4.74　第4档字 4.59　第5档/卡 6.06　第5档字 5.87
+
+天青 tint-celadon / theme-tint-celadon  local=True  ← 现网 tint-celadon 的 H
+  页面底 #D4E2D7 (L85.9)  卡底 #F1F3F2 (L94.9)  墨 #1D3522
+  五档 #CCDCCF #AEC9B4 #88AF91 #4F7557 #43634A
+  按钮/圆底 #467350 (L36.3)  底栏条 #25442B
+  墨字/页底 9.88　卡/页底 1.20　纸白/按钮 4.78　纸白/底栏条 9.43　第1档/卡 1.28　第1档字 9.28　第2档/卡 1.60　第2档字 7.46　第3档/卡 2.19　第3档字 5.42　第4档/卡 4.69　第4档字 4.56　第5档/卡 6.03　第5档字 5.86
+
+樱落 tint-blush / theme-tint-blush  local=True  ← 参考卡「樱落」R212 G172 B191
+  页面底 #E2D4DB (L85.9)  卡底 #F3F1F2 (L94.9)  墨 #351D29
+  五档 #DCCCD4 #C9AEBB #AF889C #8C5F76 #7A5266
+  按钮/圆底 #915975 (L45.9)  底栏条 #442534
+  墨字/页底 10.80　卡/页底 1.27　纸白/按钮 4.70　纸白/底栏条 11.73　第1档/卡 1.37　第1档字 10.03　第2档/卡 1.82　第2档字 7.55　第3档/卡 2.74　第3档字 5.02　第4档/卡 4.65　第4档字 4.56　第5档/卡 5.79　第5档字 5.67
+
+雨雾 gradient-blue / theme-blue  local=False  ← 参考卡「豪雨」R189 G192 B201（沿用旧 key，零部署）
+  页面底 #D7D9E0 (L86.1)  卡底 #F1F2F3 (L94.9)  墨 #212431
+  五档 #CED1D9 #B3B7C4 #8F95A8 #666C84 #595F73
+  按钮/圆底 #616986 (L45.3)  底栏条 #252C44
+  墨字/页底 10.94　卡/页底 1.26　纸白/按钮 4.72　纸白/底栏条 12.02　第1档/卡 1.36　第1档字 10.10　第2档/卡 1.79　第2档字 7.70　第3档/卡 2.66　第3档字 5.17　第4档/卡 4.63　第4档字 4.53　第5档/卡 5.66　第5档字 5.53
+
+===== 三条硬约束（红就是不能贴）=====
+  按钮/圆底与第4档是否同色：象牙 #766948vs#766B50异　天青 #467350vs#4F7557异　樱落 #915975vs#8C5F76异　雨雾 #616986vs#666C84异
+  全过
+
+===== 贴进 palette.js 的 THEMES =====
+  {
+    key: 'tint-paper', cls: 'theme-tint-paper', label: '象牙', labelEn: 'Ivory', local: true,
+    page: '#E2DED4', line: '#F3F3F1', lineEdge: 'rgba(53, 46, 29, 0.13)', dark: false,
+    ramp: { steps: ['#DCD8CC', '#C9C1AE', '#AFA488', '#766B50', '#645B43'], inks: ['#352E1D', '#352E1D', '#352E1D', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#352E1D', ink: '#F2EFE9' } },
+  },
+  {
+    key: 'tint-celadon', cls: 'theme-tint-celadon', label: '天青', labelEn: 'Celadon', local: true,
+    page: '#D4E2D7', line: '#F1F3F2', lineEdge: 'rgba(29, 53, 34, 0.13)', dark: false,
+    ramp: { steps: ['#CCDCCF', '#AEC9B4', '#88AF91', '#4F7557', '#43634A'], inks: ['#1D3522', '#1D3522', '#1D3522', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#1D3522', ink: '#F2EFE9' } },
+  },
+  {
+    key: 'tint-blush', cls: 'theme-tint-blush', label: '樱落', labelEn: 'Blush', local: true,
+    page: '#E2D4DB', line: '#F3F1F2', lineEdge: 'rgba(53, 29, 41, 0.13)', dark: false,
+    ramp: { steps: ['#DCCCD4', '#C9AEBB', '#AF889C', '#8C5F76', '#7A5266'], inks: ['#351D29', '#351D29', '#351D29', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#351D29', ink: '#F2EFE9' } },
+  },
+  {
+    key: 'gradient-blue', cls: 'theme-blue', label: '雨雾', labelEn: 'Mist',
+    page: '#D7D9E0', line: '#F1F2F3', lineEdge: 'rgba(33, 36, 49, 0.13)', dark: false,
+    ramp: { steps: ['#CED1D9', '#B3B7C4', '#8F95A8', '#666C84', '#595F73'], inks: ['#212431', '#212431', '#212431', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#212431', ink: '#F2EFE9' } },
+  },
+
+===== 贴进 app.wxss 的四个主题块 =====
+.theme-tint-paper {
+  --bg-page: #E2DED4;
+  --bg-card: #F3F3F1;
+  --bg-card-glass: rgba(243, 243, 241, 0.85);
+  --text-primary: #352E1D;
+  --text-secondary: rgba(53, 46, 29, 0.66);
+  --text-tertiary: rgba(53, 46, 29, 0.55);
+  --border: rgba(53, 46, 29, 0.09);
+  --card-edge: rgba(53, 46, 29, 0.12);
+  --accent: #352E1D;
+  --accent-soft: rgba(53, 46, 29, 0.07);
+  --btn-bg: #766948;
+  --chip-idle: rgba(53, 46, 29, 0.07);
+}
+.theme-tint-celadon {
+  --bg-page: #D4E2D7;
+  --bg-card: #F1F3F2;
+  --bg-card-glass: rgba(241, 243, 242, 0.85);
+  --text-primary: #1D3522;
+  --text-secondary: rgba(29, 53, 34, 0.66);
+  --text-tertiary: rgba(29, 53, 34, 0.55);
+  --border: rgba(29, 53, 34, 0.09);
+  --card-edge: rgba(29, 53, 34, 0.12);
+  --accent: #1D3522;
+  --accent-soft: rgba(29, 53, 34, 0.07);
+  --btn-bg: #467350;
+  --chip-idle: rgba(29, 53, 34, 0.07);
+}
+.theme-tint-blush {
+  --bg-page: #E2D4DB;
+  --bg-card: #F3F1F2;
+  --bg-card-glass: rgba(243, 241, 242, 0.85);
+  --text-primary: #351D29;
+  --text-secondary: rgba(53, 29, 41, 0.66);
+  --text-tertiary: rgba(53, 29, 41, 0.55);
+  --border: rgba(53, 29, 41, 0.09);
+  --card-edge: rgba(53, 29, 41, 0.12);
+  --accent: #351D29;
+  --accent-soft: rgba(53, 29, 41, 0.07);
+  --btn-bg: #915975;
+  --chip-idle: rgba(53, 29, 41, 0.07);
+}
+.theme-blue {
+  --bg-page: #D7D9E0;
+  --bg-card: #F1F2F3;
+  --bg-card-glass: rgba(241, 242, 243, 0.85);
+  --text-primary: #212431;
+  --text-secondary: rgba(33, 36, 49, 0.66);
+  --text-tertiary: rgba(33, 36, 49, 0.55);
+  --border: rgba(33, 36, 49, 0.09);
+  --card-edge: rgba(33, 36, 49, 0.12);
+  --accent: #212431;
+  --accent-soft: rgba(33, 36, 49, 0.07);
+  --btn-bg: #616986;
+  --chip-idle: rgba(33, 36, 49, 0.07);
+}
+
+===== 别名表（themeOf 一层解析，后端 WALLPAPER_PRESETS 不动）=====
+  default          → tint-paper    （象牙）
+  gradient-green   → tint-celadon  （天青）
+  gradient-sunset  → tint-paper    （象牙）
+  gradient-purple  → tint-paper    （象牙）
+  gradient-ocean   → tint-paper    （象牙）
+  gradient-blue    → gradient-blue （雨雾）
+  tint-paper       → tint-paper    （象牙）
+  tint-celadon     → tint-celadon  （天青）
+  tint-blush       → tint-blush    （樱落）

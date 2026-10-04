@@ -43,8 +43,8 @@ const FEATURES_ZH = [
   {
     mark: '外观',
     tone: 0,
-    title: '八张壁纸',
-    body: '含夜紫、深海两张深色，导航条、卡片和左侧色块会跟着一起换。另有「象牙」「天青」两枚是整套色阶：连左侧方块、按钮、标签一起收进同一支色相，只按深浅分层，这两枚只存在当前这台设备上。界面语言在新建页标题右边切（中 / EN），切完当场就变。',
+    title: '四张壁纸',
+    body: '四张都是浅色的整套色阶：象牙、天青、樱落、雨雾。换一张，页面底、卡片、按钮和左侧那块方块会一起收进同一支色相，只按深浅分层，导航条也跟着换。象牙、天青、樱落这三张只存在当前这台设备上，雨雾那张跟着账号走。界面语言在新建页标题右边切（中 / EN），切完当场就变。',
   },
 ]
 
@@ -76,8 +76,8 @@ const FEATURES_EN = [
   {
     mark: 'Skin',
     tone: 0,
-    title: 'Eight wallpapers',
-    body: 'Two are dark (Violet and Ocean); the nav bar, cards and left colour blocks switch with them. Ivory and Celadon are full tint ramps — the blocks, buttons and tags all collapse into one hue and only differ in lightness, and those two live on this phone only. The interface language switches to the right of the title on the new-note page, and applies immediately.',
+    title: 'Four wallpapers',
+    body: 'All four are light tint ramps: Ivory, Celadon, Blush and Mist. Switching one pulls the page, cards, buttons and the colour block on the left into a single hue that differs only in lightness, and the nav bar follows. The first three live on this phone only; Mist follows your account. The interface language switches to the right of the title on the new-note page, and applies immediately.',
   },
 ]
 

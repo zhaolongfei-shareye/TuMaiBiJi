@@ -58,10 +58,9 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
   }
   const before = await mp.evaluate(() => JSON.stringify(wx.getStorageSync('localWallpaper') || ''))
 
-  // 两枚代表：米白是"只换页面底"那一族，天青是"整套色阶"那一族（底栏那支派生色跟着整条走）。
-  // 原来第二枚是夜紫——09-30 深色那两枚整条链路屏蔽了（列表永远铺背景图，而深色卡底是 5% 白薄膜，
-  // 贴在照片上等于没有），拿一个渲染不出来的状态做判据没意义。
-  for (const w of ['default', 'tint-celadon']) {
+  // 10-04 起四枚壁纸全浅色、全带色阶，所以不再挑"两枚代表"，四枚全跑：
+  // 雨雾那枚页面底 S 只有 13，是四枚里最灰的一支，底栏派生色最容易在它身上跑偏。
+  for (const w of p.THEMES.map((x) => x.key)) {
     const label = p.themeOf(w).label
     const chrome = p.chromeOf(w)
     await mp.evaluate((key) => wx.setStorageSync('localWallpaper', key), w)
@@ -81,9 +80,10 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
     // ---------- 底栏（组件够不到，采像素）----------
     // 像素比对留 ±8：截图落盘带一次色彩管理，偏差不在 CSS 里——计算样式那一头读到的是
     // 精确值（v18 那一把钉的纸片色、色板零回归那把钉的取色函数走的是计算样式）。
-    // 这个容差是拿三枚壁纸实测出来的，不是猜的：
-    // 米白 #443C25 → (67,60,40)｜夜紫 #2D2D6C → (45,45,104)｜天青 #25442B → (44,67,45)，
-    // 单通道最大偏 7（天青那一支的红）。原来留 ±6 是只按夜紫那一档定的，换一枚就假红。
+    // 这个容差是拿四枚壁纸实测出来的，不是猜的（10-04 甲档那批，括号里是 chromeOf.bg 的期望）：
+    // 象牙 (67,59,40) vs (68,59,37)｜天青 (44,67,45) vs (37,68,43)｜樱落 (64,38,51) vs (68,37,52)｜
+    // 雨雾 (38,44,66) vs (37,44,68)——单通道最大偏 7（天青那一支的红）。
+    // 原来留 ±6 是只按旧夜紫那一档定的，换一枚就假红。
     const png = `${OUT}/实测-${label}.png`
     await mp.screenshot({ path: png })
     const s = sampleBar(png)
@@ -109,16 +109,27 @@ const sampleBar = (png) => JSON.parse(execFileSync('python3',
       onCol.reduce((m, v, i) => Math.max(m, Math.abs(v - s.fill[i])), 0) > 30,
       `亮差 ${onCol.map((v, i) => v - s.fill[i]).join('/')}`)
     ck(`${label}：选中的图标本身仍是纸白`, s.paper_pixels[1] > 60, `纸白像素 ${s.paper_pixels[1]}`)
+    // 未选中那一档只钉**右一格**（「我的」那枚），左一格（加号）不钉众数。
+    // 理由不是"量不准就算了"，是量出来的东西不同：`.tab-item` 上只有 31 行那一条
+    // `color: var(--chrome-idle)`，左右两格吃的是同一个声明，所以一格证明到位就够。
+    // 而加号那枚笔画只有 1.5 个设备像素宽，**没有平色内部**，众数是一堆并列 17~19 计的
+    // 抗锯齿档里任意取到的那一档（四套实测直方图头部：象牙 18/18/18/17、天青 19/18/18/18、
+    // 雨雾 18/18/18/18、樱落 34/19/18/18——樱落只是有两档量化撞成同一个 RGB，才以 34 计胜出，
+    // 它取到的 (151,136,140) 对期望 (176,162,164) 差 25 就是这么来的，不是颜色错）。
+    // 「我的」那枚头肩两道描边较宽，众数就是字色本身，四套下都贴着期望（象牙 175/176、
+    // 天青 167/164、樱落 174/176、雨雾 164/164）；alpha 要是被人改到 .4，这一条会差 35 直接红。
     const idleWant = blend(PAPER, chrome.bg, p.themeOf(w).dark ? 0.68 : 0.62)
-    ck(`${label}：未选中那两格采到淡一档（= 纸白 @${p.themeOf(w).dark ? .68 : .62} 混胶囊），且没有垫底`,
-      near(s.stroke[0], idleWant, 8) && near(s.stroke[2], idleWant, 8)
-      && s.paper_pixels[0] < 30 && s.paper_pixels[2] < 30,
-      `${s.stroke[0]} / ${s.stroke[2]} vs 期望 ${idleWant}，纸白 ${s.paper_pixels[0]} / ${s.paper_pixels[2]}`)
+    ck(`${label}：未选中那一格采到淡一档（= 纸白 @${p.themeOf(w).dark ? .68 : .62} 混胶囊）`,
+      near(s.stroke[2], idleWant, 8), `${s.stroke[2]} vs 期望 ${idleWant}`)
+    // 左右两格都不许出现满纸白：选中态那一条是 `.tab-item.active { color: --chrome-ink }`，
+    // 串了格就是"三格全亮"，这一条和下面那条"有笔画"合起来管住"没画"和"画错档"两头。
+    ck(`${label}：未选中那两格都没有满纸白（选中态没串到它们身上）`,
+      s.paper_pixels[0] < 30 && s.paper_pixels[2] < 30, `纸白 ${s.paper_pixels[0]} / ${s.paper_pixels[2]}`)
     // 阈值从 200 降到 120：撤了文字之后每格只剩一枚 40rpx 的描边图形，
     // 笔画像素本来就少了一半以上（实测三格 179 / 4233 / 299）。
     // ⚠️ 中间那格 4233 不是笔画，是那枚圆底整块——它比填充亮，全被算进"和填充不同的像素"里了。
     // 所以"选中的那一格 mask 真画出了图形"这件事不靠这条，靠上面那条 paper_pixels>60
-    //（实测米白 163、天青 139）；这一条守的是左右两格——它们没有垫底，179/299 就是描边本身。
+    //（10-04 四枚实测：象牙 163、天青 139、樱落 163、雨雾 163）；这一条守的是左右两格——它们没有垫底，179/299 就是描边本身。
     ck(`${label}：三格都真的有笔画（不是在三块空面上取样）`, s.ink_pixels.every((n) => n > 120),
       s.ink_pixels.join(' / '))
     ck(`${label}：胶囊和页面底不是同一块（不然这块面就消失了）`,

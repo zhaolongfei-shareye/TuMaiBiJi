@@ -24,9 +24,8 @@ function inkOf(theme) {
  * 手机模拟预览要画的那一屏。
  * 这些颜色一律是从"那一套主题"算出来的字面值，不吃当前主题的 CSS 变量——
  * 吃了就永远只能画出已经生效的那一套，预览也就没意义了。
- * 四行笔记左侧的方块是关键：带色阶的那两枚走自己那一支色相的深浅档，
- * 其余六枚走分类彩色，这正是"整套色阶"唯一一眼看得出的差别，所以必须画进预览，
- * 不再靠原来那个角标去解释。
+ * 四行笔记左侧的方块是关键：10-04 起四枚壁纸都带色阶，每一枚都走自己那一支色相的深浅档，
+ * 所以预览里必须真把方块画出来（原来那六枚走分类彩色，才需要靠角标解释"整套色阶"）。
  */
 function mockOf(key) {
   const theme = themeOf(key)
@@ -48,9 +47,9 @@ function mockOf(key) {
 Page({
   data: {
     wallpapers: [],
-    currentWallpaper: 'default',
+    currentWallpaper: 'tint-paper',
     currentLabel: '',
-    mock: mockOf('default'),
+    mock: mockOf('tint-paper'),
     applying: false,
     themeClass: '',
     lang: 'zh',
@@ -59,8 +58,8 @@ Page({
 
   async onShow() {
     const app = getApp()
-    // 先等登录落定再读壁纸：不带 local 的那六枚是从服务端 userInfo.wallpaper 来的，
-    // 冷启动抢先进这页会读到 'default'，于是这一页显示米白、别的页已经是深海。
+    // 先等登录落定再读壁纸：不带 local 的那一枚（雨雾）是从服务端 userInfo.wallpaper 来的，
+    // 冷启动抢先进这页会读到旧值，于是这一页显示一套、别的页显示另一套。
     // （和首页、新建页同一套做法。）
     await app.getLoginPromise().catch(() => {})
     const lang = (app.globalData.userInfo && app.globalData.userInfo.language) || 'zh'
@@ -73,24 +72,23 @@ Page({
       // 这一页自己也要走 applyTheme：只拿类名的话，导航条底色停在上一页那套主题，
       // 换完壁纸"导航条必须和页面底同值"这条约束在本页是破的（选完才补上，进页那一瞬不对）。
       themeClass: app.applyTheme(current),
-      // 上面那部手机永远画"已经生效的这一套"：点色块就直接生效，没有"先看一眼再说"的中间态。
+      // 上面那部手机永远画"已经生效这一套"：点色块就直接生效，没有"先看一眼再说"的中间态。
       mock: mockOf(current),
-      // 深色那两枚（夜紫 / 深海）不再出现在这一排，09-30 屏蔽，理由见 app.js 里
-      // getWallpaper 那段注释。先按原下标算色块、再滤，顺序不能反：象牙/天青本来排第 7、8 档，
-      // 先滤会让它们跳到第 5、6 档，那是另一件事，不该被这次屏蔽顺手改掉。
-      wallpapers: THEMES
-        .map((theme, i) => ({ theme, i }))
-        .filter(({ theme }) => !theme.dark)
-        .map(({ theme }) => ({
-          key: theme.key,
-          label: themeLabel(theme.key, lang),
-          active: theme.key === current,
-          // 这一格画的是"另一套主题"，拿不到当前主题的变量，
-          // 底、描边、勾的颜色都得由 JS 带进行内。--wp-opp 是勾里的字，要和勾本身反色。
-          itemStyle:
-            `background:${theme.page};--wp-label:${inkOf(theme)};` +
-            `--wp-opp:${theme.page};--wp-edge:${edgeOf(theme)}`,
-        })),
+      // 10-04 压成四枚之后，这一排就是 THEMES 的全部：原来这里挂着"按原下标算色块、再滤掉
+      // 深色那两枚"的一套机关（先算下标是为了不让象牙/天青从第 7、8 档跳到第 5、6 档）。
+      // 四枚全浅色、也没有要藏的了，那套 map/filter 一起撤掉——留着就是给一个不存在的分支让路。
+      // active 判的是 canonical key：getWallpaper 现在返回解析过的那一枚，
+      // 存过 'default' 的人不会再出现"实际生效象牙、条上一格都不亮"。
+      wallpapers: THEMES.map((theme) => ({
+        key: theme.key,
+        label: themeLabel(theme.key, lang),
+        active: theme.key === current,
+        // 这一格画的是"另一套主题"，拿不到当前主题的变量，
+        // 底、描边、勾的颜色都得由 JS 带进行内。--wp-opp 是勾里的字，要和勾本身反色。
+        itemStyle:
+          `background:${theme.page};--wp-label:${inkOf(theme)};` +
+          `--wp-opp:${theme.page};--wp-edge:${edgeOf(theme)}`,
+      })),
     })
     app.setNavTitle('wallpaper', lang)
   },

@@ -4,8 +4,8 @@
 // 所以名字留着；站长 10-04 改了口径，这一把现在钉的是这四件事：
 //   ① 点色块当场就生效（本机那两枚写本机偏好，不碰服务端）；
 //   ② 上面那部手机不再带点击口——点它什么都不该发生；
-//   ③ 六枚排成一行、横向不滚，盒宽实测（不是"看起来没滚"）；
-//   ④ 英文态那六个名字必须在一行里放得下（他真机截图就是英文，折行=红）。
+//   ③ 四枚排成一行、横向不滚，盒宽实测（不是"看起来没滚"）；
+//   ④ 英文态那四个名字必须在一行里放得下（他真机截图就是英文，折行=红）。
 // 跑在模拟器里，真点、读 data、读存储，最后把壁纸和语言都还原回去。
 //
 // 前置：微信开发者工具已开，跑过 cli auto --project .../miniprogram --auto-port 9431（改过 WXSS 必须先 close 再 auto）。
@@ -57,25 +57,29 @@ const enter = async (mp) => {
     return { w: rpx(s.width), h: rpx(s.height), left: rpx(o.left), top: rpx(o.top), right: rpx(o.left + s.width) }
   }
 
-  // ---------- ① 一行六枚，横向不滚（量盒子，不量类名） ----------
+  // ---------- ① 一行四枚，横向不滚（量盒子，不量类名） ----------
+  // 宽度不写死在断言里：10-04 六枚压成四枚，每格从 102 涨到 (702-3×18)/4=162。
+  // 钉的是"整行铺满内沿、缝 18、四格等宽"这三件事，枚数再变也不用改数。
+  const N = 4, GAP = 18, INNER = 702, CHIP_W = (INNER - GAP * (N - 1)) / N
   const chips = await page.$$('.wp-chip')
   const tiles = await page.$$('.wp-tile')
-  ck('这一排是六枚', chips.length === 6 && tiles.length === 6, `${chips.length} 枚`)
+  ck(`这一排是 ${N} 枚`, chips.length === N && tiles.length === N, `${chips.length} 枚`)
   ck('深色那两枚不在这一排（09-30 屏蔽，不是这一轮的事）',
     !(start.wallpapers || []).some((x) => /purple|ocean/.test(x.key)),
     (start.wallpapers || []).map((x) => x.key).join(','))
   const tb = []
   for (const el of tiles) tb.push(await box(el))
   const tops = tb.map((x) => x.top)
-  // 六枚若有一枚掉到第二行，这条就红——"看起来在一行"不算，量 top 才算。
-  ck('六枚顶边在同一条线上（真的一行）', Math.max(...tops) - Math.min(...tops) <= 1,
+  // 四枚若有一枚掉到第二行，这条就红——"看起来在一行"不算，量 top 才算。
+  ck(`${N} 枚顶边在同一条线上（真的一行）`, Math.max(...tops) - Math.min(...tops) <= 1,
     tops.map((v) => v.toFixed(1)).join(' '))
-  ck('缝是 18rpx、每枚 102rpx（6×102+5×18=702 的内沿净宽）',
-    tb.every((x) => near(x.w, 102, 2)), tb.map((x) => x.w.toFixed(1)).join(' '))
+  ck(`缝 18rpx、每枚 ${CHIP_W}rpx（${N}×${CHIP_W}+${N - 1}×18=${INNER} 的内沿净宽）`,
+    tb.every((x) => near(x.w, CHIP_W, 2)) && tb.every((x, i) => i === 0 || near(x.left - tb[i - 1].right, GAP, 2)),
+    tb.map((x) => x.w.toFixed(1)).join(' '))
   ck('整排正好铺满内沿、一枚都不越界（左 24 起、右 726 止）',
-    near(tb[0].left, 24, 2) && near(tb[5].right, 726, 2)
+    near(tb[0].left, 24, 2) && near(tb[N - 1].right, 726, 2)
     && tb.every((x) => x.left >= 23 && x.right <= 727),
-    `${tb[0].left.toFixed(1)} → ${tb[5].right.toFixed(1)}`)
+    `${tb[0].left.toFixed(1)} → ${tb[N - 1].right.toFixed(1)}`)
   ck('横向没有滚动容器（scroll-view 撤了）', (await page.$$('.wp-strip')).length === 0
     && (await page.$('scroll-view')) === null)
   await mp.screenshot({ path: `${OUT}/实测-进页.png` })
@@ -116,16 +120,17 @@ const enter = async (mp) => {
   const p3 = await page.data()
   ck('再点已在用的那一枚不重复走一遍', p3.currentWallpaper === targetKey && p3.applying === false)
 
-  // ---------- ③ 已经存过深色的人要能自愈 ----------
-  // 站长真机现在就是夜紫——只把两枚从这一排拿掉、不迁偏好，他扫新码进来还是那张透明的卡，所以这条必须真量：
-  // 本机硬写 gradient-purple，重进这一页，在用的那枚得是米白。
+  // ---------- ③ 存过旧值（含已被撤的深色两枚）的人要能自愈 ----------
+  // 10-04 之前这条判的是"深色那两枚打回 default"；现在四枚之外没有第五枚，
+  // 收口改在 WALLPAPER_ALIAS 那一层：gradient-purple → 象牙。症状一样（进页必须有一枚在用），
+  // 但落点变了，所以这里钉的是**解析后的 canonical key**，不是原样吐回存储里那个脏值。
   await mp.evaluate(() => wx.setStorageSync('localWallpaper', 'gradient-purple'))
   page = await enter(mp)
   await sleep(4000)
   const p4 = await page.data()
-  ck('本机存着夜紫，进页读到的在用壁纸落回米白', p4.currentWallpaper === 'default', p4.currentWallpaper)
+  ck('本机存着旧那枚夜紫，进页读到的在用壁纸解析成象牙', p4.currentWallpaper === 'tint-paper', p4.currentWallpaper)
   ck('本页主题类名也不再是 theme-purple', !/theme-purple/.test(p4.themeClass || ''), p4.themeClass)
-  ck('这一排仍是六枚（屏蔽不是把格子画空）', (await page.$$('.wp-chip')).length === 6)
+  ck(`这一排仍是 ${N} 枚（屏蔽不是把格子画空）`, (await page.$$('.wp-chip')).length === N)
   await mp.screenshot({ path: `${OUT}/实测-深色已屏蔽.png` })
   await mp.evaluate((raw) => {
     if (raw) wx.setStorageSync('localWallpaper', raw)
@@ -146,14 +151,14 @@ const enter = async (mp) => {
   const labels = (pEn.wallpapers || []).map((x) => x.label)
   // `.wp-name` 是 display:block，盒子永远和那一格一样宽，所以"有没有折行"只能看高：
   // 一行是 24rpx 字配 --lh-body 的行高（三十几），折成两行就翻倍。宽度那条量不出东西，不钉。
-  const oneLine = nb.every((x) => x.h < 50)
-  ck(`英文六个名字一行走完（${labels.join('/')}）`,
-    names.length === 6 && oneLine,
+  const oneLine = nb.length === N && nb.every((x) => x.h < 50)
+  ck(`英文${N} 枚名字一行走完（${labels.join('/')}）`,
+    oneLine,
     nb.map((x, i) => `${labels[i]} ${x.h.toFixed(0)}`).join(' '))
-  ck('英文态整排宽度没变（还是六枚 102，没被长名字撑开）',
-    cb.every((x) => near(x.w, 102, 2)) && near(cb[0].left, 24, 2) && near(cb[5].right, 726, 2),
+  ck('英文态整排宽度没变（还是四枚铺满内沿，没被长名字撑开）',
+    cb.every((x) => near(x.w, CHIP_W, 2)) && near(cb[0].left, 24, 2) && near(cb[N - 1].right, 726, 2),
     cb.map((x) => x.w.toFixed(1)).join(' '))
-  await mp.screenshot({ path: `${OUT}/实测-英文一行六枚.png` })
+  await mp.screenshot({ path: `${OUT}/实测-英文一行四枚.png` })
   await lang.pin(mp, langBefore)
 
   // ---------- 还原 ----------

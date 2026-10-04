@@ -1,0 +1,137 @@
+自检 chromeOf().sel（对不上就不往下走）：
+  页面底 #F2EFE9 → sel #796641，app.wxss 写的是 #796641　[ok]
+  页面底 #E9EEEA → sel #41794C，app.wxss 写的是 #41794C　[ok]
+
+四套（页面底 / 卡 / 墨 / 深色块 / 五档）：
+  象牙 Ivory    key=tint-paper     local=True  底 #F2EFE9 卡 #FCFBF8 墨 #241E16 深色块 #796641
+      H 40° 五档 #EAE0CE #D9C9AE #C2AA85 #85644A #6A5334
+  天青 Celadon  key=tint-celadon   local=True  底 #E9EEEA 卡 #F7FAF7 墨 #1B2A21 深色块 #41794C
+      H 132° 五档 #DDE7DF #C2D3C6 #9FB8A6 #54745D #40604A
+  雾蓝 Mist     key=gradient-blue  local=False 底 #E8E8F0 卡 #F9F9FB 墨 #1B1C32 深色块 #414179
+      H 240° 五档 #DDDDE7 #C2C3D3 #9FA0B8 #545574 #404160
+  藕荷 Lilac    key=tint-lilac     local=True  底 #F0EDF3 卡 #FBFBFC 墨 #2E223A 深色块 #5D4179
+      H 270° 五档 #E2DDE7 #CAC2D3 #AB9FB8 #645474 #504060
+
+对比度（WCAG：正文 4.5 起、大字 3.0 起）：
+  象牙：墨字/页面底 14.38　墨字/卡底 15.95　纸白字/深色块 4.83　字/第4档 4.67　字/第5档 6.31　次要字66%/卡底 5.27　三级字40%/卡底 2.43
+  天青：墨字/页面底 12.78　墨字/卡底 14.27　纸白字/深色块 4.50　字/第4档 4.54　字/第5档 6.12　次要字66%/卡底 4.83　三级字40%/卡底 2.35
+  雾蓝：墨字/页面底 13.69　墨字/卡底 15.87　纸白字/深色块 8.11　字/第4档 6.25　字/第5档 8.54　次要字66%/卡底 5.30　三级字40%/卡底 2.44
+  藕荷：墨字/页面底 12.88　墨字/卡底 14.44　纸白字/深色块 7.33　字/第4档 5.98　字/第5档 8.16　次要字66%/卡底 4.86　三级字40%/卡底 2.36
+
+三级字（日期/计数这类小字）那一档要拧到多少才过线——现网 0.4 是量不过的：
+  （下面每格是"墨色在这个透明度下压卡底的实际对比度"，3.0 是大字门槛，4.5 是正文门槛）
+  参照·现网米白那枚 #9A9EA6 压纯白卡 2.69、压米白页底 2.40
+  象牙：0.40→2.43　0.50→3.23　0.55→3.74　0.60→4.36
+  天青：0.40→2.35　0.50→3.05　0.55→3.49　0.60→4.05
+  雾蓝：0.40→2.44　0.50→3.24　0.55→3.76　0.60→4.38
+  藕荷：0.40→2.36　0.50→3.08　0.55→3.51　0.60→4.05
+
+可直接贴进 palette.js THEMES 的四条：
+  {
+    key: 'tint-paper', cls: 'theme-tint-paper', label: '象牙', labelEn: 'Ivory', local: true,
+    page: '#F2EFE9', line: '#FCFBF8', lineEdge: 'rgba(36, 30, 22,0.12)', dark: false,
+    ramp: {
+      steps: ['#EAE0CE', '#D9C9AE', '#C2AA85', '#85644A', '#6A5334'],
+      inks: ['#3B2F1F', '#33291B', '#2A2114', '#FBF6EC', '#FBF6EC'],
+      uncategorized: { bg: '#241E16', ink: '#F2EFE9' },
+    },
+  },
+  {
+    key: 'tint-celadon', cls: 'theme-tint-celadon', label: '天青', labelEn: 'Celadon', local: true,
+    page: '#E9EEEA', line: '#F7FAF7', lineEdge: 'rgba(27, 42, 33,0.13)', dark: false,
+    ramp: {
+      steps: ['#DDE7DF', '#C2D3C6', '#9FB8A6', '#54745D', '#40604A'],
+      inks: ['#1F2D25', '#1A271F', '#14211A', '#F3F7F2', '#F3F7F2'],
+      uncategorized: { bg: '#1B2A21', ink: '#F2EFE9' },
+    },
+  },
+  {
+    key: 'gradient-blue', cls: 'theme-blue', label: '雾蓝', labelEn: 'Mist', local: false,
+    page: '#E8E8F0', line: '#F9F9FB', lineEdge: 'rgba(27, 28, 50,0.12)', dark: false,
+    ramp: {
+      steps: ['#DDDDE7', '#C2C3D3', '#9FA0B8', '#545574', '#404160'],
+      inks: ['#1B1C32', '#1B1C32', '#1B1C32', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#1B1C32', ink: '#F2EFE9' },
+    },
+  },
+  {
+    key: 'tint-lilac', cls: 'theme-lilac', label: '藕荷', labelEn: 'Lilac', local: true,
+    page: '#F0EDF3', line: '#FBFBFC', lineEdge: 'rgba(46, 34, 58,0.12)', dark: false,
+    ramp: {
+      steps: ['#E2DDE7', '#CAC2D3', '#AB9FB8', '#645474', '#504060'],
+      inks: ['#2E223A', '#2E223A', '#2E223A', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#2E223A', ink: '#F2EFE9' },
+    },
+  },
+
+可直接贴进 app.wxss 的四块（变量顺序照现网那 12 条，不增不减）：
+.theme-tint-paper {
+  --bg-page: #F2EFE9;
+  --bg-card: #FCFBF8;
+  --bg-card-glass: rgba(252, 251, 248, 0.85);
+  --text-primary: #241E16;
+  --text-secondary: rgba(36, 30, 22, 0.66);
+  --text-tertiary: rgba(36, 30, 22, 0.55);
+  --border: rgba(36, 30, 22, 0.09);
+  --card-edge: rgba(36, 30, 22, 0.12);
+  --accent: #241E16;
+  --accent-soft: rgba(36, 30, 22, 0.07);
+  --btn-bg: #796641;
+  --chip-idle: rgba(36, 30, 22, 0.07);
+}
+
+.theme-tint-celadon {
+  --bg-page: #E9EEEA;
+  --bg-card: #F7FAF7;
+  --bg-card-glass: rgba(247, 250, 247, 0.85);
+  --text-primary: #1B2A21;
+  --text-secondary: rgba(27, 42, 33, 0.66);
+  --text-tertiary: rgba(27, 42, 33, 0.55);
+  --border: rgba(27, 42, 33, 0.09);
+  --card-edge: rgba(27, 42, 33, 0.12);
+  --accent: #1B2A21;
+  --accent-soft: rgba(27, 42, 33, 0.07);
+  --btn-bg: #41794C;
+  --chip-idle: rgba(27, 42, 33, 0.07);
+}
+
+.theme-blue {
+  --bg-page: #E8E8F0;
+  --bg-card: #F9F9FB;
+  --bg-card-glass: rgba(249, 249, 251, 0.85);
+  --text-primary: #1B1C32;
+  --text-secondary: rgba(27, 28, 50, 0.66);
+  --text-tertiary: rgba(27, 28, 50, 0.55);
+  --border: rgba(27, 28, 50, 0.09);
+  --card-edge: rgba(27, 28, 50, 0.12);
+  --accent: #1B1C32;
+  --accent-soft: rgba(27, 28, 50, 0.07);
+  --btn-bg: #414179;
+  --chip-idle: rgba(27, 28, 50, 0.07);
+}
+
+.theme-lilac {
+  --bg-page: #F0EDF3;
+  --bg-card: #FBFBFC;
+  --bg-card-glass: rgba(251, 251, 252, 0.85);
+  --text-primary: #2E223A;
+  --text-secondary: rgba(46, 34, 58, 0.66);
+  --text-tertiary: rgba(46, 34, 58, 0.55);
+  --border: rgba(46, 34, 58, 0.09);
+  --card-edge: rgba(46, 34, 58, 0.12);
+  --accent: #2E223A;
+  --accent-soft: rgba(46, 34, 58, 0.07);
+  --btn-bg: #5D4179;
+  --chip-idle: rgba(46, 34, 58, 0.07);
+}
+
+旧 key → 新归属（别名表，themeOf 一层解析，后端 WALLPAPER_PRESETS 一行不动）：
+  default          → tint-paper　（现网 14 人存的就是它）
+  gradient-green   → tint-celadon　（松绿收成淡雅那一档）
+  gradient-sunset  → tint-paper　（暮橙并到象牙）
+  gradient-purple  → tint-paper　（getWallpaper 现在就把深色打回 default）
+  gradient-ocean   → tint-paper　（现网 4 人存的是它，但屏幕上早就是米白了）
+
+出图：
+  /Users/zlfmac/Documents/TuMaiBiJi/docs/design/配色统一-四套莫兰迪/实测-四套色板.png
+  /Users/zlfmac/Documents/TuMaiBiJi/docs/design/配色统一-四套莫兰迪/实测-四套界面示意.png

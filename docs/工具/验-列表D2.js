@@ -38,25 +38,28 @@ const rule = (src, sel) => {
 const appWxss = fs.readFileSync(P('app.wxss'), 'utf8')
 const appWxssRule = (sel) => rule(appWxss, sel)
 
-const WALLS = ['default', 'gradient-blue', 'gradient-green', 'gradient-sunset',
-  'gradient-purple', 'gradient-ocean', 'tint-paper', 'tint-celadon']
+// 10-04 六枚压成四枚：WALLS 是"现在真实存在的四套"，LEGACY 是"服务端可能还存着的旧 key"。
+// 旧 key 不再有自己的派生色——themeOf 一层别名把它们送到这四枚之一，所以它们只配被验一件事。
+const WALLS = ['tint-paper', 'tint-celadon', 'tint-blush', 'gradient-blue']
+const LEGACY = ['default', 'gradient-blue', 'gradient-green', 'gradient-sunset',
+  'gradient-purple', 'gradient-ocean']
 
-// ---------- 1. 那块派生色：八枚对表 §1.2 ----------
+// ---------- 1. 那块派生色：四枚对表（10-04 甲档定稿，值出自 docs/design/配色统一-四套莫兰迪/生成结果5.txt）----------
 // 表是"对答案"用的，不是取色来源：值一律由 chromeOf 现算，比完还得证明代码里没有这张表。
 const DOC_12 = {
-  default: '#443C25', 'gradient-blue': '#1D284C', 'gradient-green': '#23462C',
-  'gradient-sunset': '#4C2D1D', 'gradient-purple': '#2D2D6C', 'gradient-ocean': '#2A4B6F',
-  'tint-paper': '#443A25', 'tint-celadon': '#25442B',
+  'tint-paper': '#443B25', 'tint-celadon': '#25442B',
+  'tint-blush': '#442534', 'gradient-blue': '#252C44',
 }
 WALLS.forEach((w) => {
   const got = p.chromeOf(w).bg.toUpperCase()
   ok(`${p.themeOf(w).label} 的派生色对表`, got === DOC_12[w], `${got} vs ${DOC_12[w]}`)
 })
-// 大写归一这条不是洁癖：hex 比对时 #443c25 和 #443C25 会判成"八枚全不符"，
-// 上一轮就红过一次，红得毫无意义。
+// 大写归一这条不是洁癖：hex 比对时 #443c25 和 #443C25 会判成"全不符"，上一轮就红过一次。
 ok('比对前两边都归一大写（不然同一个色会判成不符）',
-  p.chromeOf('default').bg !== p.chromeOf('default').bg.toUpperCase()
-  || p.chromeOf('default').bg.toUpperCase() === DOC_12.default)
+  WALLS.every((w) => p.chromeOf(w).bg.toUpperCase() === DOC_12[w]))
+// 旧 key 不许带出自己的底色：存过 'default' 的人和选象牙的人，底栏必须是同一块面。
+const aliasDrift = LEGACY.filter((w) => p.chromeOf(w).bg !== p.chromeOf(p.themeOf(w).key).bg)
+ok(`旧 key ${LEGACY.length} 个的派生色等于它解析到的那一枚`, aliasDrift.length === 0, aliasDrift.join(' '))
 
 const thin = []
 WALLS.forEach((w) => {
@@ -64,7 +67,7 @@ WALLS.forEach((w) => {
   const r = p.crOf(c.bg, '#F2EFE9')
   if (r < 7) thin.push(`${p.themeOf(w).label} ${r.toFixed(2)}`)
 })
-ok('纸白字压这八块面都 ≥ 7', thin.length === 0, thin.join(' | '))
+ok('纸白字压这四块面都 ≥ 7', thin.length === 0, thin.join(' | '))
 
 const idleBad = []
 WALLS.forEach((w) => {
@@ -77,6 +80,8 @@ ok('未选中那一档 alpha 不低于 .6（浅 .62 / 深 .68）', idleBad.lengt
 // ---------- 2. 颜色只能从函数来，两个文件里不许有那张表 ----------
 WALLS.forEach((w) => {
   const hex = DOC_12[w]
+  ok(`选中那一枚圆底 ${hex} 所在的 sel 也只在 chromeOf 里算一次`,
+    (fs.readFileSync(P('utils/palette.js'), 'utf8').match(/--chrome-sel/g) || []).length === 1)
   ok(`派生色 ${hex} 没被抄进列表页样式`, !new RegExp(hex, 'i').test(idxWxss))
   ok(`派生色 ${hex} 没被抄进底栏样式`, !new RegExp(hex, 'i').test(barWxss))
 })
@@ -377,18 +382,17 @@ WALLS.forEach((w) => {
   })
   ok(`${p.themeOf(w).label} 六档分类字压卡底 ≥ ${need}`, bad.length === 0, bad.join(' '))
 })
-ok('深色两枚的未分类是空心环',
-  p.catSkinFor(null, 'gradient-purple').ring === true && p.catSkinFor(null, 'gradient-ocean').ring === true)
-ok('浅色六枚的未分类是实心点',
-  p.catSkinFor(null, 'default').ring === false && p.catSkinFor(null, 'tint-paper').ring === false)
+// 空心环那一档本来是给深色那两枚的，10-04 四枚全浅色之后它没有主人了。
+// 字段还在（palette 仍按 theme.dark 给），这里钉两件仍然成立的事：四枚都是实心点。
+ok('四枚的未分类都是实心点（不再有深色壁纸走空心环）',
+  WALLS.every((w) => p.catSkinFor(null, w).ring === false))
 // 空心环那条（深色壁纸下未分类换成一圈描边）10-02 v18 起在列表里没有主人了——
 // 上面第 3 节钉的是"样式与绑定一起撤净"，这里只钉 palette 那个字段还在（别的页还读它）。
-// 效果图认下来的一条：浅卡上那枚点不单独达标（芥末黄压白卡 1.63），因为紧挨着的分类名过了门槛。
-// 这里钉住"点还是原色"，防止哪天有人把它改成派生值、六个分类挤成三种深浅。
-ok('浅壁纸下点色留原色（芥末黄那枚 1.63 是效果图认下的，见标注①）',
-  p.catSkinFor(0, 'default').dot.toUpperCase() === p.TONES[0].bg.toUpperCase())
-ok('深壁纸下点与字同值（原色在那块卡上会化掉）',
-  p.catSkinFor(1, 'gradient-purple').dot === p.catSkinFor(1, 'gradient-purple').text)
+// 10-04 起四枚都带色阶，而色阶第一档压卡底只有 1.27~1.37（原色会化掉），
+// 所以点一律跟着算出来的字色走。原来那条"浅壁纸点色留原色（芥末黄 1.63）"的前提没了——
+// 那五支彩色在界面上已经不出场，只有海报那条 toneFor 还留着。
+ok('四枚下点与字同值（色阶原色在卡上会化掉）',
+  WALLS.every((w) => p.catSkinFor(1, w).dot === p.catSkinFor(1, w).text))
 
 // ---------- 5. 一个没动：圆角、字阶、三个文字标签、方块在别的页还在 ----------
 ok('卡片圆角还是那三档', /--r-card: 40rpx/.test(fs.readFileSync(P('app.wxss'), 'utf8'))

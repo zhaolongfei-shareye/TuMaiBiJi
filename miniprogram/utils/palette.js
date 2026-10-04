@@ -204,8 +204,10 @@ function toneStyle(i) {
     `--solid-bg:${onDark ? '#FFFFFF' : ink}`,
     `--solid-ink:${onDark ? bg : '#FFFFFF'}`,
     // 校验/权限提示那行字直接坐在卡色上，所以亮底卡用深红、深底卡用浅红，两边都够对比度。
-    // 色阶主题下浅三档比原来那五支彩色暗，同一个 #8C2119 掉到 4.0~4.2（要 4.5），所以另给一档深红。
-    `--blk-err:${onDark ? '#FFD7D3' : ramp ? '#7A1A13' : '#8C2119'}`,
+    // 深红这一支原来也是手挑的（色阶那套 #7A1A13）：甲档第三档比原来暗了 3 档，同一个红掉到
+    // 3.44~3.54（要 4.5），所以改成现算——enforce 只往"更深"的方向挪 L，挪到刚好过线为止，
+    // 浅一档的卡色上它仍然是原来那个红，不会被无谓地压深。
+    `--blk-err:${onDark ? '#FFD7D3' : enforce(ramp ? '#7A1A13' : '#8C2119', bg, 4.5)}`,
   ].join(';')
 }
 
@@ -213,8 +215,8 @@ function toneStyle(i) {
  * 某一档的裸底色。
  * @param i 档号（和分类号同一套取模规则）
  * @param themeKey 画"别的主题"时必须传：壁纸选择器那一排缩略图每格画的都是另一套主题，
- *                 不传就会拿当前激活的主题去染色——停在米白时去看米白那一格，
- *                 六枚普通壁纸的缩略图也会跟着变成色阶色（真机截图里抓到过）。
+ *                 不传就会拿当前激活的主题去染色——停在象牙时去看天青那一格，
+ *                 不带 ramp 的那几枚壁纸的缩略图也会跟着变成色阶色（真机截图里抓到过）。
  */
 function toneColor(i, themeKey) {
   const theme = themeKey ? themeOf(themeKey) : ACTIVE_THEME
@@ -235,68 +237,88 @@ function toneVars(categoryId) {
 }
 
 /**
- * 八套壁纸（=主题）。page 必须和 app.wxss 里 .theme-* 的 --bg-page 一致，
- * 但 app.wxss 是 CSS、引不了 JS，所以改一边必须改另一边。
+ * 四套壁纸（=主题），10-04 定稿。page/line 必须和 app.wxss 里 .theme-* 的
+ * --bg-page/--bg-card 逐字等值，--btn-bg 同理必须等于 chromeOf(key).sel
+ * （app.wxss 是 CSS、引不了 JS，镜像值是既有做法，等值由色板那把尺子逐枚钉死）。
  * 之所以在 JS 里再存一份：导航条颜色只能由 wx.setNavigationBarColor 传值，
  * 壁纸选择器也要靠它画缩略图，两处都不能猜 CSS 变量。
+ *
+ * 四枚都是"整套色阶"主题（都带 ramp）：不只换页面底，连左侧方块、新建页那三张大卡、
+ * 按钮和标签都收进同一支色相，五档明度对应原来那五支彩色。
+ * 色相种子不是我挑的：象牙/天青沿用现网那两枚的 H，樱落＝站长给的莫兰迪参考卡
+ * 「樱落」那一格（R212 G172 B191），雨雾＝同一张卡的「豪雨」（R189 G192 B201）。
+ * 取数规则三条，全部写在 docs/design/配色统一-四套莫兰迪/生成色板5.py，那一份是唯一出处；
+ * 改任何一条都要回生成器重算，别在手底下改 hex：
+ * ① 页面底 L86（站长在甲 L86 / 乙 L78 里挑了甲），卡底比页面底亮 9 档。
+ * ② 浅三档**锚卡底**、离卡底 11.8 / 21.4 / 33.9 个 L——照的是现网那套他认过的象牙 ramp
+ *    的实测距离。锚页面底会出事：甲档下第一档离卡底只剩 2.7 档、对比 1.06，
+ *    那块 176rpx 的色块直接化在卡上（v3 就踩了这个，10-04 第二轮量出来才改）。
+ * ③ 深两档按 WCAG 反解（方块上那行分类名 16px/800 算小字，门槛 4.5），第 5 档再压 6 档。
+ *
+ * local: true 的那三枚只存本机（见 app.js 里 LOCAL_WALLPAPER_KEY）：后端 WALLPAPER_PRESETS
+ * 是现网代码，加 key 要动后端并部署。雨雾故意沿用 gradient-blue 这个旧 key——
+ * 旧值还在白名单里、PUT 不报 400，所以这一版零部署。差别只在换手机或重装那一次：
+ * 选雨雾的人保留，选另外三枚的人回到服务端记的那一枚（方案文档 §5.4 记着这条不一致）。
  *
  * line / lineEdge 只给缩略图里那两条中性描边行用：缩略图每一格画的都是"别的主题"，
  * 它拿不到当前主题的 CSS 变量，六个值必须由 JS 一个个带进去。
  */
 const THEMES = [
-  { key: 'default', cls: 'theme-default', label: '米白', labelEn: 'Paper', page: '#f4f2ec', line: '#ffffff', lineEdge: 'rgba(35,37,44,0.10)', dark: false },
-  { key: 'gradient-blue', cls: 'theme-blue', label: '雾蓝', labelEn: 'Mist', page: '#eaeefb', line: '#ffffff', lineEdge: 'transparent', dark: false },
-  { key: 'gradient-green', cls: 'theme-green', label: '松绿', labelEn: 'Pine', page: '#e7f3ea', line: '#ffffff', lineEdge: 'transparent', dark: false },
-  { key: 'gradient-sunset', cls: 'theme-sunset', label: '暮橙', labelEn: 'Dusk', page: '#fdeee6', line: '#ffffff', lineEdge: 'transparent', dark: false },
-  { key: 'gradient-purple', cls: 'theme-purple', label: '夜紫', labelEn: 'Violet', page: '#0c0c1d', line: 'rgba(255,255,255,0.14)', lineEdge: 'transparent', dark: true },
-  { key: 'gradient-ocean', cls: 'theme-ocean', label: '深海', labelEn: 'Ocean', page: '#0d1b2a', line: 'rgba(255,255,255,0.14)', lineEdge: 'transparent', dark: true },
-  // 下面两枚是"整套色阶"的淡雅主题：不只换页面底，连左侧方块、新建页那三张大卡、
-  // 按钮和标签都收进同一支色相，五档明度对应原来那五支彩色（索引公式一样，
-  // 所以同一个分类在这套里还是同一档，只是彩色换成了深浅）。
-  //
-  // 这两枚只存在本机（见 app.js 里 LOCAL_WALLPAPER_KEY）：后端的 WALLPAPER_PRESETS
-  // 白名单是现网代码，加两个 key 就要动后端并部署，所以这一轮不写库、不跨设备。
-  //
-  // steps/inks 一一对应，深两档的字翻成亮色；uncategorized 是"未分类"那一块。
-  // 母题色、面、按钮色一律由 mix() 和 inkIsLighter 从这两列派生，不另立色值。
-  // 名字收成两个字：壁纸条现在只有"色块 + 名字"那么大地方。象牙 / 天青是釉色本名，
-  // 和海报那三套（玉版宣 / 摘句 / 叠翠）一个路子；原名「米白一色」「雨过青」。
   {
-    key: 'tint-paper',
-    cls: 'theme-tint-paper',
-    label: '象牙',
-    labelEn: 'Ivory',
-    local: true,
-    page: '#F2EFE9',
-    line: '#FCFBF8',
-    lineEdge: 'rgba(36,30,22,0.12)',
-    dark: false,
+    key: 'tint-paper', cls: 'theme-tint-paper', label: '象牙', labelEn: 'Ivory', local: true,
+    page: '#E2DED4', line: '#F3F3F1', lineEdge: 'rgba(53, 46, 29, 0.13)', dark: false,
     ramp: {
-      // 第 4 档从 #9A7F5C 加深到 #85644A：原来那版配亮字只有 3.50，方块上那行分类名是 16px/800，
-      // 按 WCAG 要 4.5:1；加深后 4.97，且仍比第 5 档浅，色阶顺序没被打乱。
-      steps: ['#EAE0CE', '#D9C9AE', '#C2AA85', '#85644A', '#6A5334'],
-      inks: ['#3B2F1F', '#33291B', '#2A2114', '#FBF6EC', '#FBF6EC'],
-      uncategorized: { bg: '#241E16', ink: '#F2EFE9' },
+      steps: ['#DCD8CC', '#C9C1AE', '#AFA488', '#766B50', '#645B43'],
+      inks: ['#352E1D', '#352E1D', '#352E1D', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#352E1D', ink: '#F2EFE9' },
     },
   },
   {
-    key: 'tint-celadon',
-    cls: 'theme-tint-celadon',
-    label: '天青',
-    labelEn: 'Celadon',
-    local: true,
-    page: '#E9EEEA',
-    line: '#F7FAF7',
-    lineEdge: 'rgba(27,42,33,0.13)',
-    dark: false,
+    key: 'tint-celadon', cls: 'theme-tint-celadon', label: '天青', labelEn: 'Celadon', local: true,
+    page: '#D4E2D7', line: '#F1F3F2', lineEdge: 'rgba(29, 53, 34, 0.13)', dark: false,
     ramp: {
-      // 同上：第 4 档 #6E8F77 配亮字只有 3.31，加深到 #54745D 后 4.83。
-      steps: ['#DDE7DF', '#C2D3C6', '#9FB8A6', '#54745D', '#40604A'],
-      inks: ['#1F2D25', '#1A271F', '#14211A', '#F3F7F2', '#F3F7F2'],
-      uncategorized: { bg: '#1B2A21', ink: '#E9EEEA' },
+      steps: ['#CCDCCF', '#AEC9B4', '#88AF91', '#4F7557', '#43634A'],
+      inks: ['#1D3522', '#1D3522', '#1D3522', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#1D3522', ink: '#F2EFE9' },
+    },
+  },
+  {
+    key: 'tint-blush', cls: 'theme-tint-blush', label: '樱落', labelEn: 'Blush', local: true,
+    page: '#E2D4DB', line: '#F3F1F2', lineEdge: 'rgba(53, 29, 41, 0.13)', dark: false,
+    ramp: {
+      steps: ['#DCCCD4', '#C9AEBB', '#AF889C', '#8C5F76', '#7A5266'],
+      inks: ['#351D29', '#351D29', '#351D29', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#351D29', ink: '#F2EFE9' },
+    },
+  },
+  {
+    key: 'gradient-blue', cls: 'theme-blue', label: '雨雾', labelEn: 'Mist',
+    page: '#D7D9E0', line: '#F1F2F3', lineEdge: 'rgba(33, 36, 49, 0.13)', dark: false,
+    ramp: {
+      steps: ['#CED1D9', '#B3B7C4', '#8F95A8', '#666C84', '#595F73'],
+      inks: ['#212431', '#212431', '#212431', '#F2EFE9', '#F2EFE9'],
+      uncategorized: { bg: '#212431', ink: '#F2EFE9' },
     },
   },
 ]
+
+/**
+ * 旧壁纸 key → 现在生效的那一枚。六枚压成四枚（站长 10-04 拍：米白并入象牙），
+ * 但后端 WALLPAPER_PRESETS 那六个值**一个都不动**：存量值还得收得下，PUT 才不报 400，
+ * 而加 key 就要部署。所以并档只做在前端这一层解析。
+ *
+ * 现网实测（10-04 只读查询）：18 个用户里 14 存 default、4 存 gradient-ocean，
+ * 深色那两枚从 09-30 起本来就被打回米白，所以这 18 个人屏幕上现在都是米白——
+ * 并档不会让任何人"丢了他选的壁纸"，因为他选的本来就没在生效。
+ * 代价站长认过：那 14 人的整屏从 #f4f2ec 变深到 #E2DED4（ΔL 8.2，两色并排对比 1.20）。
+ */
+const WALLPAPER_ALIAS = {
+  default: 'tint-paper',
+  'gradient-green': 'tint-celadon',
+  'gradient-sunset': 'tint-paper',
+  'gradient-purple': 'tint-paper',
+  'gradient-ocean': 'tint-paper',
+}
 
 /**
  * 海报专用配色组。界面那六组色是"分类身份"，海报要的是"这一张好不好看、愿不愿意转发"，
@@ -372,7 +394,8 @@ function plateColors(categoryId) {
 }
 
 function themeOf(wallpaper) {
-  return THEMES.find((x) => x.key === wallpaper) || THEMES[0]
+  const key = WALLPAPER_ALIAS[wallpaper] || wallpaper
+  return THEMES.find((x) => x.key === key) || THEMES[0]
 }
 
 /**
@@ -388,10 +411,12 @@ function setActiveTheme(wallpaper) {
 }
 
 /**
- * 两套"整套色阶"主题（淡雅那两枚）的分类取档。
- * 索引公式和 toneFor 逐字一致，所以切到这套主题时同一个分类还是同一档，
+ * 某套主题的"整套色阶"取档（10-04 起四枚壁纸全部带 ramp）。
+ * 索引公式和 toneFor 逐字一致，所以同一个分类还是同一档，
  * 只是把五支彩色收成了一支色相、用深浅代替色相。
- * 现有六枚没有 ramp，一律返回 null，调用方原样回落到 TONES——这个 if 就是零回归的闸门。
+ * 下面那个 `if (!ramp) return null` 现在没有壁纸会走到，留着是给"新加一枚壁纸忘了写 ramp"
+ * 兜底的——那条一触发就等于把分类色悄悄带回彩色那套（规范 §3.8 明令禁止），
+ * 所以新增壁纸必须自带 ramp，别指望这个分支。
  * wallpaper 那一个参数是给底部导航组件用的：它拿不到 page 上的 CSS 变量，也不能依赖
  * ACTIVE_THEME（那是 app.applyTheme 给页面写的）。不传就是老行为，一处调用没改。
  */
@@ -481,17 +506,39 @@ function enforce(color, on, need) {
 }
 
 /**
+ * 解出"纸白压得住、又尽可能浅"的那一档明度：H、S 都不动，只挪 L。
+ * 二分只到实数，落进 8 位色还要四舍五入，会吃掉 0.01~0.05——所以解完再往下退到
+ * **这个 hex 真的过线**为止（不补这一刀，表里写的 4.7 实测只有 4.66）。
+ * 参数与 docs/design/配色统一-四套莫兰迪/生成色板5.py 里的 fit_dark 逐字一致。
+ */
+function lightFaceOnPaper(h, s, want) {
+  let lo = 5, hi = 60
+  for (let k = 0; k < 40; k += 1) {
+    const mid = (lo + hi) / 2
+    if (crOf(PAPER, hslToHex(h, s, mid)) < want) hi = mid; else lo = mid
+  }
+  let l = (lo + hi) / 2
+  for (let k = 0; k < 40; k += 1) {
+    if (crOf(PAPER, hslToHex(h, s, l)) >= want) break
+    l -= 0.4
+  }
+  return l
+}
+
+/**
  * 底栏和搜索条那一块面：由壁纸的页面底派生。
- * 色相 H 原样保留（不然就不是这套壁纸了），饱和度夹进 [30,45]（低于 30 灰成一块脏、
- * 高于 45 抢内容），明度按深浅定两档：浅壁纸 20.5%、深壁纸 30%。
- * 字一律纸白，未选中那一档靠 alpha 分深浅（浅 .62 / 深 .68）。
+ * bg（那一条底）一个字没动：H 原样、S 夹进 [30,45]（低于 30 灰成一块脏、高于 45 抢内容）、
+ * 浅壁纸 L 20.5。字一律纸白，未选中那一档靠 alpha 分深浅（浅 .62 / 深 .68）。
  * 返回的 style 串直接塞进 style 属性——组件拿不到 page 上的 CSS 变量。
  *
- * sel 是选中态那枚圆底：站长 10-01 把底栏的文字撤干净之后，"哪一格是当前页"只剩
- * 图标下面这一块面可以说。它不另起一支色——同一支 HSL 只把明度抬 16 档，
- * 于是"同色阶"这件事是算出来的、不是挑出来的。四套壁纸都量过（抬 16 之后：
- * 象牙 #796641、天青 #41794C、夜紫 #4545A6、深海 #4173AA），浅底深底都看得见，
- * 又不会亮过图标本身（图标是纸白 @98%，这一档仍在它下面）。
+ * sel 是选中态那枚圆底，同时**也是全局深色实心按钮那一面**（#304 甲那条决定：
+ * 深色按钮必须和底栏"选中那一格"下面那块圆底同色，app.wxss 的 --btn-bg 就是它的镜像值）。
+ * 10-04 改过一次：原来它的 L 是写死的（bg 抬 16 档＝36.5），只看色相不看对比，
+ * 于是"不想太深"和"两处同色"这两句只能实现一句。现在 L 由纸白 4.7 反解，两句同时成立。
+ * S 也不再夹到 30，改成页面底自己的 1.25 倍——雨雾那一枚页面底只有 S 12，
+ * 夹到 30 会把它顶成一支蓝（站长 10-04 明确撤过蓝）。四枚实测：
+ * 象牙 #766948(L37.3)、天青 #467350(L36.3)、樱落 #915975(L45.9)、雨雾 #616986(L45.3)，
+ * 纸白压上去 4.70~4.78，图形门槛 3.0 更是远过。
  */
 function chromeOf(wallpaper) {
   const theme = themeOf(wallpaper)
@@ -499,7 +546,8 @@ function chromeOf(wallpaper) {
   const sat = Math.min(45, Math.max(30, s))
   const light = theme.dark ? 30 : 20.5
   const bg = hslToHex(h, sat, light)
-  const sel = hslToHex(h, sat, Math.min(92, light + 16))
+  const selSat = s * 1.25
+  const sel = hslToHex(h, selSat, lightFaceOnPaper(h, selSat, 4.7))
   const idle = withAlpha(PAPER, theme.dark ? 0.68 : 0.62)
   const line = withAlpha(PAPER, theme.dark ? 0.22 : 0.14)
   const shadow = withAlpha('#000000', theme.dark ? 0.42 : 0.22)
@@ -516,8 +564,8 @@ function chromeOf(wallpaper) {
  * "只靠颜色才能理解"的那些信息。深色卡下原色会化掉，所以那档点和字同值。
  * 门槛两档：浅壁纸按 5、深壁纸按 7（效果图实测到的最低值就是 4.97 / 7.09，
  * 往 round 数靠）。这两个数都比 WCAG 的 4.5 严——这一行是分类身份，不是正文。
- * 卡底由这里算，不在页面里写死：深色那两枚的卡面是 rgba(255,255,255,.05) 叠页面底，
- * 浅色那六枚各吃自己主题的 line（象牙那块其实是 #FCFBF8，不是纯白）。
+ * 卡底由这里算，不在页面里写死：四枚浅色壁纸各吃自己主题的 line
+ * （象牙那块是 #F3F3F1，既不是纯白也不是页面底 #E2DED4）。
  */
 function catSkinFor(categoryId, wallpaper) {
   const theme = themeOf(wallpaper)
@@ -526,8 +574,8 @@ function catSkinFor(categoryId, wallpaper) {
   const card = theme.dark ? mix('#FFFFFF', theme.page, 0.05) : theme.line
   const text = enforce(raw, card, theme.dark ? 7 : 5)
   // 未分类在深色下连点都撤掉，换成空心环——"没归类"该长得不一样。
-  // 点什么时候用原色、什么时候跟着字走：淡雅那两枚和深色那两枚都是"原色在这块卡上会化掉"
-  // （#EAE0CE 压 #FCFBF8 只有 1.13），所以点换成算出来的字色；其余六枚的原色点是一块能看见的
+  // 点什么时候用原色、什么时候跟着字走：带 ramp 的这四枚第一档都是"原色在这块卡上会化掉"
+  // （#DCD8CC 压 #F3F3F1 只有 1.28），所以点换成算出来的字色；不带 ramp 的那几枚原色点是一块能看见的
   // 色，就照效果图留原色——包括芥末黄那枚压白卡只有 1.63 的点，理由见上面那段 1.4.1。
   return { dot: theme.dark || ramp ? text : raw, text, ring: categoryId == null && theme.dark, card }
 }
@@ -546,6 +594,7 @@ module.exports = {
   dimScrimStyle,
   MOTIFS,
   THEMES,
+  WALLPAPER_ALIAS,
   POSTER_SCHEMES,
   schemeFor,
   plateColors,

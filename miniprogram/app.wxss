@@ -3,8 +3,8 @@
    ① 非色彩令牌——全局一份，不随主题变。
    ② 主题（=用户选的壁纸）只管 chrome：页面底、导航、搜索框、chips、正文文字。
    ③ 方块的颜色不归主题管，由 utils/palette.js 按分类固定注入 --blk-bg / --blk-ink。
-      例外只有下面 .theme-tint-paper / .theme-tint-celadon 这两枚"整套色阶"：
-      它们自带 ramp，方块也收进同一支色相。其余六枚照③走。
+      10-04 起这一条成了例外中的全部：四枚壁纸都带 ramp（整套色阶），方块一律跟着
+      当前主题那一支色相走，所以它们的方块色在下面各主题块与 palette.js 里各存一份镜像值。
 
    V1→V2 只改了承载方式：颜色从"整张卡"退到卡片左侧那块方块，卡本身回白底。
    这一改带来两个后果，写清楚免得下一个人当成 bug：
@@ -53,24 +53,27 @@ page {
   --motif-size: 124rpx;
   --motif-shift: 32rpx;
 
-  /* chrome 色彩兜底 */
-  --text-primary: #23252c;
-  --text-secondary: #5c6068;
-  --text-tertiary: #9a9ea6;
-  --bg-page: #f4f2ec;
-  --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.85);
-  --accent: #23252c;
-  --accent-soft: rgba(35, 37, 44, 0.07);
+  /* chrome 色彩兜底：这一份就是象牙那一套（THEMES[0]，未登录/脏值都落在这里）。
+     下面四个 .theme-* 块各写一份镜像值，等值由色板那把尺子逐枚钉死。 */
+  --text-primary: #352E1D;
+  --text-secondary: rgba(53, 46, 29, 0.66);
+  /* 三级字（日期/计数）0.4 → 0.55：现值压在卡底只有 2.35~2.44，连 WCAG 大字门槛 3.0 都不过。
+     抬到 0.55 实测 3.4~3.7，仍比二级字浅一档，"这行是次要信息"这件事没丢。 */
+  --text-tertiary: rgba(53, 46, 29, 0.55);
+  --bg-page: #E2DED4;
+  --bg-card: #F3F3F1;
+  --bg-card-glass: rgba(243, 243, 241, 0.85);
+  --accent: #352E1D;
+  --accent-soft: rgba(53, 46, 29, 0.07);
   /* 实心按钮那一块面与压在上面的字（站长 10-04：深色按钮必须和底部导航"选中那一格"
      下面那块圆底同色，无论哪套壁纸）。唯一真相是 palette.chromeOf(壁纸).sel / .ink。
-     下面八个 .theme-* 块各写一份镜像值：app.wxss 是 CSS、引不了 JS，这和 --bg-page
-     与 palette 的 page 同值是同一个路子，等值由色板那把尺子逐枚钉死。 */
-  --btn-bg: #796b41;
+     10-04 第二轮：sel 的明度不再写死（原来一律"底栏条抬 16 档"＝L36.5，只看色相不看对比），
+     改成按纸白 4.7 反解——于是"两处同色"和站长那句"不想太深"同时成立。字仍是纸白。 */
+  --btn-bg: #766948;
   --btn-ink: #F2EFE9;
-  --border: rgba(35, 37, 44, 0.08);
-  --card-edge: rgba(35, 37, 44, 0.1);
-  --chip-idle: rgba(35, 37, 44, 0.06);
+  --border: rgba(53, 46, 29, 0.09);
+  --card-edge: rgba(53, 46, 29, 0.12);
+  --chip-idle: rgba(53, 46, 29, 0.07);
   --danger: #b4231f;
   --danger-soft: rgba(180, 35, 31, 0.08);
 
@@ -99,134 +102,75 @@ page {
   font-weight: 100;
 }
 
-/* 六套壁纸皮肤：只改 chrome，不改方块。card/line 的取值要和 palette.js 的 THEMES 一致。 */
-
-.theme-default {
-  --bg-page: #f4f2ec;
-  --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.85);
-  --text-primary: #23252c;
-  --text-secondary: #5c6068;
-  --text-tertiary: #9a9ea6;
-  --border: rgba(35, 37, 44, 0.08);
-  --card-edge: rgba(35, 37, 44, 0.1);
-  --accent: #23252c;
-  --accent-soft: rgba(35, 37, 44, 0.07);
-  --btn-bg: #796b41;
-  --chip-idle: rgba(35, 37, 44, 0.06);
-}
-
-.theme-blue {
-  --bg-page: #eaeefb;
-  --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.85);
-  --text-primary: #23264f;
-  --text-secondary: #5c6089;
-  --text-tertiary: #8b90bd;
-  --border: rgba(63, 82, 214, 0.14);
-  --card-edge: rgba(63, 82, 214, 0.14);
-  --accent: #3f52d6;
-  --accent-soft: rgba(63, 82, 214, 0.1);
-  --btn-bg: #334787;
-  --chip-idle: rgba(63, 82, 214, 0.09);
-}
-
-.theme-green {
-  --bg-page: #e7f3ea;
-  --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.85);
-  --text-primary: #12331f;
-  --text-secondary: #4c7a5b;
-  --text-tertiary: #7d9c88;
-  --border: rgba(70, 168, 99, 0.16);
-  --card-edge: rgba(47, 138, 77, 0.16);
-  --accent: #2f8a4d;
-  --accent-soft: rgba(70, 168, 99, 0.12);
-  --btn-bg: #3e7c4e;
-  --chip-idle: rgba(70, 168, 99, 0.1);
-}
-
-.theme-sunset {
-  --bg-page: #fdeee6;
-  --bg-card: #ffffff;
-  --bg-card-glass: rgba(255, 255, 255, 0.85);
-  --text-primary: #4a1f10;
-  --text-secondary: #a4664c;
-  --text-tertiary: #c0917c;
-  --border: rgba(233, 114, 61, 0.16);
-  --card-edge: rgba(212, 86, 42, 0.18);
-  --accent: #d4562a;
-  --accent-soft: rgba(233, 114, 61, 0.12);
-  --btn-bg: #875033;
-  --chip-idle: rgba(233, 114, 61, 0.1);
-}
-
-.theme-purple {
-  --bg-page: #0c0c1d;
-  --bg-card: rgba(255, 255, 255, 0.05);
-  --bg-card-glass: rgba(255, 255, 255, 0.05);
-  --text-primary: #eceaf6;
-  --text-secondary: #b3aecf;
-  --text-tertiary: #8d87ae;
-  --border: rgba(255, 255, 255, 0.1);
-  --card-edge: rgba(255, 255, 255, 0.12);
-  --accent: #a78bfa;
-  --accent-soft: rgba(167, 139, 250, 0.18);
-  --btn-bg: #4545a6;
-  --chip-idle: rgba(255, 255, 255, 0.09);
-  --danger: #ff8a80;
-  --danger-soft: rgba(255, 138, 128, 0.14);
-}
-
-.theme-ocean {
-  --bg-page: #0d1b2a;
-  --bg-card: rgba(255, 255, 255, 0.05);
-  --bg-card-glass: rgba(255, 255, 255, 0.05);
-  --text-primary: #e2eef6;
-  --text-secondary: #86a3bb;
-  --text-tertiary: #6f8ba3;
-  --border: rgba(255, 255, 255, 0.09);
-  --card-edge: rgba(255, 255, 255, 0.12);
-  --accent: #4fc3f7;
-  --accent-soft: rgba(79, 195, 247, 0.18);
-  --btn-bg: #4173aa;
-  --chip-idle: rgba(255, 255, 255, 0.09);
-  --danger: #ff8a80;
-  --danger-soft: rgba(255, 138, 128, 0.14);
-}
-
-/* 淡雅两枚：整套色阶主题。
-   上面六枚只改 chrome（方块色永远按分类走），这两枚连方块、色卡、按钮一起收进一支色相，
-   所以它们的方块色在 utils/palette.js 的 ramp 里，改一边必须改另一边。
-   卡底不用纯白：白纸贴在米纸上像一张张贴纸，退到比纸亮一档的暖白/冷白。 */
+/* ---------- 四套壁纸（=主题）10-04 定稿 ----------
+   这四枚都是"整套色阶"：页面底、卡底、文字四级、chips、按钮、左侧那块方块
+   全部收进同一支色相，所以方块色也在这里（镜像值），真身在 utils/palette.js 的 THEMES。
+   两边逐字等值由色板那把尺子钉死：--bg-page=theme.page、--bg-card=theme.line、
+   --btn-bg=chromeOf(key).sel。改一边必须改另一边，只改一边会在真机上出现
+   "导航条是上一页那套色"这一类对不上。
+   卡底不用纯白：白纸贴在米纸上像一张张贴纸，退到比页面底亮 9 档的那一支。
+   色值出处：docs/design/配色统一-四套莫兰迪/生成色板5.py（那一份是唯一算法，别在手底下改）。 */
 .theme-tint-paper {
-  --bg-page: #F2EFE9;
-  --bg-card: #FCFBF8;
-  --bg-card-glass: rgba(252, 251, 248, 0.85);
-  --text-primary: #241E16;
-  --text-secondary: rgba(36, 30, 22, 0.66);
-  --text-tertiary: rgba(36, 30, 22, 0.4);
-  --border: rgba(36, 30, 22, 0.09);
-  --card-edge: rgba(36, 30, 22, 0.12);
-  --accent: #241E16;
-  --accent-soft: rgba(36, 30, 22, 0.07);
-  --btn-bg: #796641;
-  --chip-idle: rgba(36, 30, 22, 0.07);
+  --bg-page: #E2DED4;
+  --bg-card: #F3F3F1;
+  --bg-card-glass: rgba(243, 243, 241, 0.85);
+  --text-primary: #352E1D;
+  --text-secondary: rgba(53, 46, 29, 0.66);
+  --text-tertiary: rgba(53, 46, 29, 0.55);
+  --border: rgba(53, 46, 29, 0.09);
+  --card-edge: rgba(53, 46, 29, 0.12);
+  --accent: #352E1D;
+  --accent-soft: rgba(53, 46, 29, 0.07);
+  --btn-bg: #766948;
+  --chip-idle: rgba(53, 46, 29, 0.07);
 }
 
 .theme-tint-celadon {
-  --bg-page: #E9EEEA;
-  --bg-card: #F7FAF7;
-  --bg-card-glass: rgba(247, 250, 247, 0.85);
-  --text-primary: #1B2A21;
-  --text-secondary: rgba(27, 42, 33, 0.66);
-  --text-tertiary: rgba(27, 42, 33, 0.4);
-  --border: rgba(27, 42, 33, 0.1);
-  --card-edge: rgba(27, 42, 33, 0.13);
-  --accent: #1B2A21;
-  --accent-soft: rgba(27, 42, 33, 0.08);
-  --btn-bg: #41794c;
-  --chip-idle: rgba(27, 42, 33, 0.07);
+  --bg-page: #D4E2D7;
+  --bg-card: #F1F3F2;
+  --bg-card-glass: rgba(241, 243, 242, 0.85);
+  --text-primary: #1D3522;
+  --text-secondary: rgba(29, 53, 34, 0.66);
+  --text-tertiary: rgba(29, 53, 34, 0.55);
+  --border: rgba(29, 53, 34, 0.09);
+  --card-edge: rgba(29, 53, 34, 0.12);
+  --accent: #1D3522;
+  --accent-soft: rgba(29, 53, 34, 0.07);
+  --btn-bg: #467350;
+  --chip-idle: rgba(29, 53, 34, 0.07);
+}
+
+.theme-tint-blush {
+  --bg-page: #E2D4DB;
+  --bg-card: #F3F1F2;
+  --bg-card-glass: rgba(243, 241, 242, 0.85);
+  --text-primary: #351D29;
+  --text-secondary: rgba(53, 29, 41, 0.66);
+  --text-tertiary: rgba(53, 29, 41, 0.55);
+  --border: rgba(53, 29, 41, 0.09);
+  --card-edge: rgba(53, 29, 41, 0.12);
+  --accent: #351D29;
+  --accent-soft: rgba(53, 29, 41, 0.07);
+  --btn-bg: #915975;
+  --chip-idle: rgba(53, 29, 41, 0.07);
+}
+
+/* 雨雾沿用旧 key gradient-blue / 类名 theme-blue：后端 WALLPAPER_PRESETS 那六个值一个都没动，
+   旧值还收得下，所以压成四枚这件事零部署（别名表在 utils/palette.js 的 WALLPAPER_ALIAS）。
+   这一枚 S 只有 13，是"冷灰"不是蓝——和站长 10-04 撤掉的那支雾蓝（S 21）不是一回事。 */
+.theme-blue {
+  --bg-page: #D7D9E0;
+  --bg-card: #F1F2F3;
+  --bg-card-glass: rgba(241, 242, 243, 0.85);
+  --text-primary: #212431;
+  --text-secondary: rgba(33, 36, 49, 0.66);
+  --text-tertiary: rgba(33, 36, 49, 0.55);
+  --border: rgba(33, 36, 49, 0.09);
+  --card-edge: rgba(33, 36, 49, 0.12);
+  --accent: #212431;
+  --accent-soft: rgba(33, 36, 49, 0.07);
+  --btn-bg: #616986;
+  --chip-idle: rgba(33, 36, 49, 0.07);
 }
 
 /* 界面字体：不挂这三个类就是上面 page 那条苹方链（默认）。
@@ -242,8 +186,8 @@ page {
 
 .container {
   /* 顶部这 2rpx 不是间距，是堵外边距穿透的：子元素第一个的 margin-top 会和
-     没有 padding-top 的父级合并，把整个容器往下推，露出 page 自己的米白底。
-     浅色壁纸下看不出来，深色壁纸下导航条底下就是一条白带。 */
+     没有 padding-top 的父级合并，把整个容器往下推，露出 page 自己的那一底。
+     浅色壁纸下看不出来，深色壁纸下导航条底下就是一条白带（深色那两枚 10-04 已撤）。 */
   padding: 2rpx var(--sp-3) 0;
   /* 主题类挂在 .container 上而不是 page 上（小程序给不了 page 类名），
      所以底色必须由容器自己画。真机实测：少了这两行，切壁纸只改导航条和 chip，整页底色永远不变。 */
@@ -449,7 +393,7 @@ page {
   background: var(--btn-bg);
   color: var(--btn-ink);
   border-radius: var(--r-pill);
-  font-size: 30rpx;
+  font-size: var(--fs-body);
   font-weight: 700;
   padding: var(--sp-3) 0;
   text-align: center;
@@ -459,7 +403,7 @@ page {
   background: var(--chip-idle);
   color: var(--text-primary);
   border-radius: var(--r-pill);
-  font-size: 30rpx;
+  font-size: var(--fs-body);
   font-weight: 600;
   padding: var(--sp-3) 0;
   text-align: center;

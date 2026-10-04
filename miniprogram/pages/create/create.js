@@ -19,7 +19,7 @@ Page({
   data: {
     lang: 'zh',
     t: texts('zh'),
-    themeClass: 'theme-default',
+    themeClass: 'theme-tint-paper',  // 未登录/首帧的占位：类名必须真的存在，四枚里象牙是 THEMES[0]
     // 展开的是哪一段：'' | 'url' | 'shot' | 'write'，同一时刻最多一个。
     // mode 是条身上那四个标签里当前哪一个（write | camera | album | url）：
     // camera 和 album 共用 shot 那一段表单，分开记只为了高亮和条身前面那枚图形。

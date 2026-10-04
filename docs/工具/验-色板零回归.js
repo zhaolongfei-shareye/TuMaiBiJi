@@ -42,42 +42,42 @@ const CATS = [null, 0, 1, 2, 3, 4, 5, 6, 7, 99, -3]
 const NOTES = [1, 7, 42, 12345, 999983]
 const OLD_KEYS = before.THEMES.map((t) => t.key)
 
-// ① 现有六枚主题下：方块串、卡面色串、裸色对、缩略图色，全部逐字节不变
-let diff = []
-for (const key of OLD_KEYS) {
-  before.setActiveTheme ? before.setActiveTheme(key) : null
-  after.setActiveTheme(key)
-  for (const c of CATS) {
-    for (const n of NOTES) {
-      const a = before.blockSkinFor(c, n)
-      const b = after.blockSkinFor(c, n)
-      if (a.style !== b.style || a.motif !== b.motif) diff.push(`${key} blk ${c}/${n}`)
-    }
-    const av = before.toneVars(c)
-    const bv = after.toneVars(c)
-    if (av !== bv) diff.push(`${key} toneVars ${c}`)
-  }
-  for (const i of [0, 1, 2, 3, 4, 5, 9]) {
-    if (before.toneStyle(i) !== after.toneStyle(i)) diff.push(`${key} toneStyle ${i}`)
-    if (before.toneColor(i) !== after.toneColor(i)) diff.push(`${key} toneColor ${i}`)
-  }
-}
-ck('现有六枚主题下取色逐字节不变', diff.length === 0, diff.slice(0, 4).join(' | ') || `${OLD_KEYS.length} 套 × ${CATS.length} 类 × ${NOTES.length} 条笔记全等`)
-
-// ② 没设过主题（冷启动、data 字面量在模块加载时算）也必须等于改前
+// ① 10-04 六枚压成四枚，"改前改后逐字节不变"这条的前提没了：方块从此一律吃当前主题的
+//    色阶，而四枚都有色阶——原来那五支分类彩色在界面上不再出现（只有海报那条 toneFor 还留着，
+//    由⑤钉住）。所以这里换成三条仍然成立的不变量：
+//    一、四枚都带 ramp（少一枚，那一枚的方块就会掉回彩色那套，规范 §3.8 明令禁止）；
+//    二、旧 key 一律解析到这四枚之一（后端白名单一个字没动，靠的就是这张表）；
+//    三、界面切到哪套主题都不许改海报取色（⑤那条继续跑）。
+const missingRamp = after.THEMES.filter((t) => !t.ramp)
+ck('四枚壁纸全部自带色阶（没有一枚会掉回分类彩色）', missingRamp.length === 0, missingRamp.map((t) => t.key).join(' '))
+const aliasMiss = before.THEMES.map((t) => t.key).filter((k) => {
+  const t = after.themeOf(k)
+  return !t || !t.ramp || after.THEMES.indexOf(t) < 0
+})
+ck(`旧 key ${before.THEMES.length} 个全部解析到四枚之一`, aliasMiss.length === 0, aliasMiss.join(' '))
+ck('themeOf 认得别名（default 就是象牙）',
+  after.themeOf('default').key === after.themeOf('tint-paper').key
+  && after.themeOf('gradient-ocean').key === after.themeOf('tint-paper').key
+  && after.themeOf('gradient-green').key === after.themeOf('tint-celadon').key)
+ck('脏值不会掉出主题表', after.themeOf(undefined).key === after.THEMES[0].key && after.themeOf('乱写的').key === after.THEMES[0].key)
+// 旧那条"未选主题时等于改前"随之作废：现在"未选主题"= THEMES[0] = 象牙，
+// 它本来就该和象牙一致，而不是和改前的米白一致。留一条自反的：冷启动取色 == 显式选象牙取色。
 after.setActiveTheme('default')
 const cold = after.blockSkinFor(2, 42).style
-before.setActiveTheme && before.setActiveTheme('default')
-ck('未选主题时等于改前', cold === before.blockSkinFor(2, 42).style)
+after.setActiveTheme('tint-paper')
+ck('冷启动那一帧等于显式选象牙（default 解析成同一枚）', cold === after.blockSkinFor(2, 42).style)
 
 // ③ 新增两枚：确实带色阶，且档数与彩色组数一一对应
 const ramped = after.THEMES.filter((t) => t.ramp)
-ck('新增两枚整套色阶主题', ramped.length === 2, ramped.map((t) => `${t.key}/${t.label}`).join(' '))
+ck('四枚全是整套色阶主题', ramped.length === 4, ramped.map((t) => `${t.key}/${t.label}`).join(' '))
 for (const t of ramped) {
   ck(`${t.key} 色阶档数＝彩色组数`, t.ramp.steps.length === before.TONES.length, `${t.ramp.steps.length}`)
   ck(`${t.key} 字色与底色等长`, t.ramp.inks.length === t.ramp.steps.length)
   ck(`${t.key} 五档底色互不重复`, new Set(t.ramp.steps).size === t.ramp.steps.length)
-  ck(`${t.key} key 不与现有主题撞`, OLD_KEYS.indexOf(t.key) < 0)
+  // 雨雾是**故意**沿用 gradient-blue 这个旧 key 的：后端 WALLPAPER_PRESETS 那张白名单
+  // 一个字没动，旧值还收得下，压成四枚这件事才能零部署。其余三枚必须是新 key。
+  ck(`${t.key} key 要么全新、要么就是故意沿用的 gradient-blue`,
+    OLD_KEYS.indexOf(t.key) < 0 || t.key === 'gradient-blue')
   ck(`${t.key} cls 是 theme- 前缀`, /^theme-[a-z-]+$/.test(t.cls), t.cls)
 }
 
@@ -346,7 +346,7 @@ const fnBody = (src, name) => {
 const wpJs = readSrc('pages/wallpaper/wallpaper.js')
 const wpCss = fs.readFileSync(path.join(pageDir, 'pages/wallpaper/wallpaper.wxss'), 'utf8')
 const i18nSrc = readSrc('utils/i18n.js')
-ck('八枚壁纸的名字全是两个字', after.THEMES.every((x) => [...x.label].length === 2),
+ck('四枚壁纸的名字全是两个字', after.THEMES.every((x) => [...x.label].length === 2),
   after.THEMES.map((x) => x.label).join(' '))
 const staleName = scanned.concat('utils/palette.js', 'utils/i18n.js').filter((rel) => /米白一色|雨过青/.test(liveOf(rel)))
 ck('两枚的旧名在界面上改净（注释里留着当线索）', staleName.length === 0, staleName.join(' '))
@@ -368,7 +368,7 @@ ck('旧的"试看"那一族撤净（handler／数据键／横滑容器／两条�
   oldTrail.length === 0, oldTrail.join(' '))
 // 六枚一行、横向不滚：结构上钉"不是滚动容器 + 宽度交给 flex 分"，
 // 真实盒宽由 `验-外观设置预览不越权.js` 在模拟器里量。
-ck('壁纸改成一行六枚、横向不滚（宽度交给 flex，不写死）',
+ck('壁纸排成一行（四枚）、横向不滚（宽度交给 flex，不写死）',
   /class="wp-row"/.test(wpWxml) && !/scroll-view/.test(wpWxml)
   && /\.wp-row\s*\{[^}]*display: flex/.test(wpCss) && /\.wp-chip\s*\{[^}]*flex: 1/.test(wpCss))
 ck('在用那一枚只画勾，勾和框不吃当前主题的变量',
@@ -446,19 +446,17 @@ for (const [nm, css, canvasSel, onSel] of [['分享页那一排', shareCss, 'pic
   ck('淡底那格的色从 style 递进来，wxss 里不写死 background',
     /class="ds-swatch" style="background:\{\{swatchBg\}\}/.test(idxWxml) && !/background:/.test(sw),
     sw.trim().replace(/\s+/g, ' ') || '没读到 .ds-swatch')
-  ck('paleStep 三条都在：有色阶吃 steps[0]／浅色掺自己的页底／深色那两枚改用窗口纸白',
-    /th\.ramp && th\.ramp\.steps && th\.ramp\.steps\.length\) return th\.ramp\.steps\[0\]/.test(idxJs)
-    && /th\.dark \? SHEET_PAPER : th\.page/.test(idxJs),
-    (idxJs.match(/function paleStep[\s\S]*?\n}/) || ['没抓到 paleStep'])[0].replace(/\s+/g, ' ').slice(0, 140))
-  // 米白那一格就是效果图 s2 画的那个数；哪天动公式而对不上，画过的图和屏上就对不上了
-  ck('米白下那块淡底 = 效果图 s2 那个数 #e3e2dd（墨 8% 掺页底 #f4f2ec）',
-    after.mix('#23252C', after.themeOf('default').page, 0.08).toLowerCase() === '#e3e2dd')
-  ck('深色那两枚不照页底掺（照掺就染出近黑压在纸白窗上）',
-    after.mix('#23252C', after.themeOf('gradient-purple').page, 0.08).toLowerCase() !== '#ebeae8'
-    && /th\.dark/.test(idxJs),
-    `页底掺=${after.mix('#23252C', after.themeOf('gradient-purple').page, 0.08)} 窗口纸白掺=${after.mix('#23252C', '#FCFBF8', 0.08)}`)
+  // 10-04 压成四枚之后 paleStep 只剩一条真规则：都吃当前主题色阶的最浅那一档。
+  // 后面那句 mix() 是给"新壁纸忘了写 ramp"兜底的死路，所以钉的是"它确实只在没 ramp 时才走"。
+  ck('paleStep 只有一条：有色阶就吃 steps[0]',
+    /th\.ramp && th\.ramp\.steps && th\.ramp\.steps\.length\) return th\.ramp\.steps\[0\]/.test(idxJs),
+    (idxJs.match(/function paleStep[\s\S]*?\n}/) || ['没抓到 paleStep'])[0].replace(/\s+/g, ' ').slice(0, 120))
+  // 这条不能拿 themeOf(t.key).steps[0] 和 t.steps[0] 比——那是同一个值自己跟自己比，永真。
+  // 要钉的是"四枚的第一档互不相同"，否则换壁纸那一块淡底根本不会变。
+  ck('四枚色阶第一档互不相同（换壁纸时这一块淡底一定跟着换）',
+    new Set(after.THEMES.map((t) => t.ramp.steps[0])).size === after.THEMES.length,
+    after.THEMES.map((t) => `${t.key}:${t.ramp.steps[0]}`).join(' '))
 }
-
 after.setActiveTheme('default')
 const bad = results.filter((r) => !r.ok)
 console.log(`\n${results.length - bad.length}/${results.length} 过`)
