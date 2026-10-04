@@ -285,6 +285,9 @@ const i18n = {
     pickFailed: '没能打开相机或相册，请再试一次',
     writeTitlePh: '标题',
     writeBodyPh: '把原文贴在这里…',
+    // 站长 10-04：贴进去的是纯英文原文，摘要却被自动写成中文。这一枚开关默认关，
+    // 关＝摘要跟着原文的语言走；打开才整理成中文。叫法用他原话「原文翻译」，不改口。
+    origTranslate: '原文翻译',
     needTitle: '先写个标题',
     needBody: '原文还空着',
     extractSucceeded: '已存入笔记',
@@ -310,6 +313,9 @@ const i18n = {
     // 已生成态那枚通栏：把台账里这一张再发一次。那三项是站长 10-04 的原话，一字不改照抄上来；
     // 面板里实际给到哪几条落点由微信系统层决定（样式与文案都不给改），这一行只说"点它会拉起分享"。
     cardShare: '分享卡片：微信好友 / 朋友圈 / 公众号',
+    // 大图底下左端那枚原来复用「取消」：站长 10-04 要它改成「查看笔记」，点了进这篇的详情页。
+    // 收窗那两条口都留着（顶上「点一下收起」+ 点窗外那层遮罩），所以这一枚不必再兼"退出"。
+    viewNote: '查看笔记',
     cardDrop: '删除',
     cardDropHint: '删除后可继续生成笔记卡片，已分享的依旧有效',
     sourceWechatArticle: '公众号文章',
@@ -586,6 +592,9 @@ const i18n = {
     pickFailed: 'Could not open the camera or album — please try again',
     writeTitlePh: 'Title',
     writeBodyPh: 'Paste the text here…',
+    // 与中文那枚同一个开关：关＝摘要用原文的语言写，开＝整理成中文。
+    // 这里不写 "Translate"（光秃秃会被读成"把界面翻译一下"），点明翻的是原文。
+    origTranslate: 'Translate original',
     needTitle: 'Add a title first',
     needBody: 'Add the text to work from',
     extractSucceeded: 'Saved to notes',
@@ -606,6 +615,8 @@ const i18n = {
     qrOff: 'QR code off',
     posterMake: 'Make a share image',
     cardShare: 'Share card: Chat / Moments / Official Account',
+    // 英文不直译"查看笔记"成 View note：这一枚去的是那篇笔记本身，Open note 更像按钮。
+    viewNote: 'Open note',
     cardDrop: 'Delete',
     cardDropHint: 'Delete it and you can make another; links you already shared stay valid',
     sourceWechatArticle: 'WeChat Article',

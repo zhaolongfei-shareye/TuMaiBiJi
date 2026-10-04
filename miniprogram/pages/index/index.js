@@ -607,15 +607,30 @@ Page({
   // 所以关掉弹窗后回来的是详情窗、里面内容还是这篇。
   // v22（站长 10-03）：入口从底排那枚按钮挪到右上那一格（有卡片就是那张缩略图，
   // 一张都没有就是那枚淡底方形），底排不再留第二个把手。
-  async onSheetToPoster() {
-    const note = this.data.detailNote
+  onSheetToPoster() { return this._openPosterFor(this.data.detailNote, 'sheet') },
+
+  // 站长 10-04：卡片那一格的小图点下去**直接拉大图**，不再先浮详情窗（原话「不需要再看原文」）。
+  // 私密那一篇照旧走详情窗：拉大图这一步会把这篇的活码建出来（`_ensurePosterAssets` 里
+  // 调 createShare），而服务端不允许私密笔记分享——给它开大图只会得到一枚失败吐司。
+  onCardTap(e) {
+    const idx = e.currentTarget.dataset.idx
+    const note = this.data.notes[idx]
+    if (!note) return
+    if (note.is_private) return this.onRowTap(e)
+    if (this.data.searchOpen) this.setData({ searchOpen: false })
+    return this._openPosterFor(note, 'grid')
+  },
+
+  // 两条入口共用同一段开窗逻辑：from 记的是"关掉之后回哪一层"（见 _closeTemplate）。
+  async _openPosterFor(note, from) {
     if (!note || note.is_private) return
+    this._posterFrom = from
     const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
-    // 右上那一格现在指着台账里哪一张，这一趟就照那一张开：模板和二维码开关两样都跟它对齐。
+    // 台账里那一格现在指着哪一张，这一趟就照那一张开：模板和二维码开关两样都跟它对齐。
     // 站长 10-03 真机报的"无论点哪张小图，大图都是同一张"——原来这里读的是「我的→卡片模板」
     // 存的那套默认模板，跟台账里这一张没有任何关系，所以 ‹ i/n › 滑得再欢，开出来还是那一套。
     // 台账里那套模板要是已经不在 TEMPLATES 里（改名／撤掉），退回默认那一套。
-    const cur = (this.data.detailCards || [])[0]
+    const cur = (this._cardsOf(note.id) || [])[0]
     const known = !!(cur && cur.tpl && poster.TEMPLATES.some((x) => x.id === cur.tpl))
     this.setData({
       detailOpen: false,
@@ -626,7 +641,7 @@ Page({
       posterImagePath: '',
       posterBusy: true,
       noQr: known ? !!cur.noQr : false,
-      // 台账里有这一篇那一张＝已生成态：底排只给「删除｜取消」，模板不能滑、名片不能改
+      // 台账里有这一篇那一张＝已生成态：底排给「查看笔记｜删除」，模板不能滑、名片不能改
       posterHasCard: known,
     })
     try {
@@ -789,14 +804,19 @@ Page({
 
   // v7 ⑥：取消、保存成功、点把手三个口都收掉弹窗，回来的还是详情窗那一屏（不是列表）。
   // 生成失败也走这里——人留在原地，只是多一枚吐司。
+  // 站长 10-04 加的第二条：从卡片那一格的小图直接开大图的（`_posterFrom === 'grid'`），
+  // 收掉就回到卡片那一屏，不该顺手把详情窗浮出来——他要的就是"不再先看原文"，
+  // 而且这一路从没设过 detailNote，浮出来的是上一篇留在那儿的内容。
   _closeTemplate() {
     const note = this.data.posterNote
+    const backToSheet = this._posterFrom !== 'grid'
+    this._posterFrom = null
     this.setData({
       templateOpen: false,
       posterImagePath: '',
       posterBusy: false,
       posterNote: null,
-      detailOpen: !!note,
+      detailOpen: backToSheet && !!note,
       // 刚刚真留下来的那张要立刻出现在右上那一格（台账是 _keepPoster 里写的），
       // 并把指针对到第一张——倒序之后第一张就是最新那张。
       detailCards: note ? this._cardsOf(note.id) : [],
@@ -809,6 +829,16 @@ Page({
 
   onCancelTemplate() { this._closeTemplate() },
   onHandleTap() { this._closeTemplate() },
+
+  // 大图底下左端那枚原来是「取消」，站长 10-04 要它改成「查看笔记」，点了进这篇的独立详情页。
+  // 收窗那两条口没动（顶上「点一下收起」+ 点窗外那层遮罩），所以撤掉这枚"退出"不让人困在里面。
+  // 先走 _closeTemplate 再跳：浮层状态留在页面上，从详情页返回会看见一张还盖着的大图。
+  onViewNote() {
+    const note = this.data.posterNote
+    if (!note) return
+    this._closeTemplate()
+    wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}` })
+  },
 
   // 站长 10-01：账号认证下来了，图片分享能力可以接。这枚按钮从"存进相册"换成弹微信那个
   // 五枚一排的图片面板（发送给朋友 / 分享到朋友圈 / 收藏 / 保存图片 / 转发为贴图），存和发一次给完。

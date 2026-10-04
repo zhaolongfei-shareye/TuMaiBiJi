@@ -259,7 +259,7 @@ const readCi = (mp) => mp.evaluate(() => {
     /* ---------- ④ 点右上那一格 → 只浮模板预览弹窗 ----------
        一篇一张之后这一层分两态（未生成／已生成）。这一把量的是未生成态那一套：底排、药丸、
        滑动不循环、名片小弹窗。所以开窗之前把这一篇那本账临时挪开（detailCards 也一起清空——
-       onSheetToPoster 读的就是它），跑完原样放回 storage；已生成态那两问（底排只剩取消｜删除、
+       onSheetToPoster 读的就是它），跑完原样放回 storage；已生成态那两问（底排只剩查看笔记｜删除、
        左右滑不动）钉在 验-列表v19-真跑.js 的 ⑧b，不在这把里重复造现场。 */
     const ledKeep = await mp.evaluate((id) => {
       const m = wx.getStorageSync('cardLog') || {}

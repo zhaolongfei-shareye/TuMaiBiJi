@@ -247,22 +247,40 @@ ok('画布落图那一步不再记账（_renderPoster 里不许出现 record，�
 ok('格子里第一张＝最近留下的那张（台账按 at 倒序；顺着放就会拿最早那张当封面）',
   /sort\(\(x, y\) => \(y\.at \|\| 0\) - \(x\.at \|\| 0\)\)/.test(CODE_JS))
 /* 小图 ↔ 大图必须一一对上（站长 10-03 真机报的严重 BUG：「点小图，和大图没有关联。
-   无论点什么小图，都是同一个大图」）。两处根因：onSheetToPoster 读的是「我的→卡片模板」
-   那套默认模板，跟台账里他刚点的这一张无关；而从卡片那一枚的格子点进去，指针一律归 0。 */
-const sheetFn = (CODE_JS.split('async onSheetToPoster()')[1] || '').split('\n  },')[0]
+   无论点什么小图，都是同一个大图」）。两处根因：开窗那段读的是「我的→卡片模板」
+   那套默认模板，跟台账里他刚点的这一张无关；而从卡片那一枚的格子点进去，指针一律归 0。
+   10-04 站长又要「点卡片小图直接拉大图」，两条入口合并成同一个 `_openPosterFor(note, from)`
+   ——所以这条判据的函数名跟着换，判据本身一个字没松。 */
+const sheetFn = (CODE_JS.split('async _openPosterFor(note, from)')[1] || '').split('\n  },')[0]
 ok('点开大图取的是「台账里那一张」的模板，不是卡片模板页那套默认（那套已不在 TEMPLATES 里才退回默认）',
-  /const cur = \(this\.data\.detailCards \|\| \[\]\)\[0\]/.test(sheetFn)
+  /const cur = \(this\._cardsOf\(note\.id\) \|\| \[\]\)\[0\]/.test(sheetFn)
   && /posterTpl: known \? cur\.tpl : \(profile\.template \|\| poster\.DEFAULT_TEMPLATE\)/.test(sheetFn)
   && /poster\.TEMPLATES\.some\(\(x\) => x\.id === cur\.tpl\)/.test(sheetFn))
+ok('两条入口共用同一段开窗逻辑（各写一份就会走样：一条照台账、一条照默认）',
+  /onSheetToPoster\(\) \{ return this\._openPosterFor\(this\.data\.detailNote, 'sheet'\) \}/.test(CODE_JS)
+  && /return this\._openPosterFor\(note, 'grid'\)/.test(CODE_JS))
+ok('卡片那一格：小图直接开大图、标题那行仍进详情窗（两个落点各一个口，私密那篇仍走详情窗）',
+  /class="pad" catchtap="onCardTap"/.test(CODE_WXML)
+  && /class="g-cap" catchtap="onRowTap"/.test(CODE_WXML)
+  && /if \(note\.is_private\) return this\.onRowTap\(e\)/.test(CODE_JS))
+ok('从小图开的那一趟，收窗回卡片那一屏、不再顺手浮详情窗（detailOpen 只在来源不是 grid 时才给 true）',
+  /const backToSheet = this\._posterFrom !== 'grid'/.test(CODE_JS)
+  && /detailOpen: backToSheet && !!note/.test(CODE_JS))
 ok('大图连二维码开关也照那一张摆（noQr 得先存进台账，两头才有一个共同来源）',
   /noQr: known \? !!cur\.noQr : false/.test(sheetFn)
   && /keep\.push\(\{ p: filePath, tpl: tplId, at, noQr: !!noQr \}\)/.test(cardLogJs))
-ok('两态底排：未生成态是「取消｜编辑个人名片」+ 通栏「生成分享图」；已生成态是通栏「分享卡片」+「取消｜删除」+ 一句说明',
+ok('两态底排：未生成态是「取消｜编辑个人名片」+ 通栏「生成分享图」；已生成态是通栏「分享卡片」+「查看笔记｜删除」+ 一句说明',
   /<block wx:if="\{\{posterHasCard\}\}">/.test(CODE_WXML)
   && /tpl-btn danger" bindtap="onDropCard"/.test(CODE_WXML)
   && /t\.cardDropHint/.test(CODE_WXML)
   && /<block wx:else>/.test(CODE_WXML)
-  && /tpl-btn" bindtap="onOpenCardInfo"/.test(CODE_WXML))
+  && /tpl-btn" bindtap="onOpenCardInfo"/.test(CODE_WXML)
+  /* 站长 10-04：已生成态左端那枚由「取消」改成「查看笔记」，点了进这篇的独立详情页。
+     未生成态那枚必须还是「取消」——那一态是"我正在生成"，改口就没人能退出去了。 */
+  && /tpl-btn ghost" bindtap="onViewNote">\{\{t\.viewNote\}\}/.test(CODE_WXML)
+  && (CODE_WXML.match(/tpl-btn ghost" bindtap="onCancelTemplate">\{\{t\.cancel\}\}/g) || []).length === 1)
+ok('「查看笔记」那枚跳的是这一篇的独立详情页，且先收窗再跳（浮层留着，返回会看见一张还盖着的大图）',
+  /onViewNote\(\)[\s\S]{0,260}this\._closeTemplate\(\)[\s\S]{0,120}wx\.navigateTo\(\{ url: `\/pages\/detail\/detail\?id=\$\{note\.id\}` \}\)/.test(CODE_JS))
 ok('药丸上面那行小字说的是状态、按钮中间那行只说干什么（旧那两句"带／无二维码分享"撤净，中英两份都撤）',
   /pill-lab">\{\{noQr \? t\.qrOff : t\.qrOn\}\}/.test(CODE_WXML)
   && /<text>\{\{t\.posterMake\}\}<\/text>/.test(CODE_WXML)

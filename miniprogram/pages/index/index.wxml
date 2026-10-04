@@ -133,10 +133,13 @@
     <!-- 笔记卡片那一枚：两列等宽、只画本机台账里有图的那几篇、顺序与上面那批完全一致。
          白垫固定一档，图按 aspectFit 落在正中——比白垫扁的那几套上下各留一道白，
          这样十套模板混排也排得齐（站长原话"排列整齐归一"）。
-         一篇同时只留一张（站长 10-03 23:40 做减法）：第二行那枚 ‹ i/n › 整块撤掉，不支持来回切换。 -->
+         一篇同时只留一张（站长 10-03 23:40 做减法）：第二行那枚 ‹ i/n › 整块撤掉，不支持来回切换。
+         站长 10-04：格子里那枚**小图**点下去直接拉大图（原来先浮详情窗，还得再点一次右上那一格，
+         他说"不需要再看原文"）；下面那行**标题**照旧进详情窗——两个落点各留一个口。
+         私密那一篇例外：小图也走详情窗（拉大图会把这篇的活码建出来，而私密不给分享）。 -->
     <view wx:elif="{{cells.length}}" class="grid2">
       <view class="gc" wx:for="{{cells}}" wx:key="id">
-        <view class="pad" catchtap="onRowTap" data-idx="{{item.i}}">
+        <view class="pad" catchtap="onCardTap" data-idx="{{item.i}}">
           <image class="pad-img" src="{{item.cards[0].p}}" mode="aspectFit" />
         </view>
         <text class="g-cap" catchtap="onRowTap" data-idx="{{item.i}}">{{item.title}}</text>
@@ -277,8 +280,10 @@
       </view>
     </view>
     <view class="tpl-dock">
-      <!-- 已生成态（站长 10-03 23:40）：底排只有「取消｜删除」两枚，模板不能滑、名片不能改，
-           要换就先删这一张。下面那行小字说的是删完之后会怎样——服务端那张活码一行都不碰。 -->
+      <!-- 已生成态（站长 10-03 23:40）：底排两枚，模板不能滑、名片不能改，要换就先删这一张。
+           下面那行小字说的是删完之后会怎样——服务端那张活码一行都不碰。
+           左端那枚原来复用「取消」：站长 10-04 改成「查看笔记」，点了进这篇的详情页；
+           收窗仍留着顶上那句「点一下收起」和点窗外那层遮罩，两条口一条都没撤。 -->
       <block wx:if="{{posterHasCard}}">
         <!-- 站长 10-04：已生成态上面先给一枚通栏「分享卡片」，把台账里这一张再发一次。
              吃的是 .tpl-main 同一套（--accent 深墨底 + --bg-page 纸白字），不另起色阶。
@@ -288,7 +293,7 @@
           <text>{{t.cardShare}}</text>
         </view>
         <view class="tpl-actions">
-          <view class="tpl-btn ghost" bindtap="onCancelTemplate">{{t.cancel}}</view>
+          <view class="tpl-btn ghost" bindtap="onViewNote">{{t.viewNote}}</view>
           <view class="tpl-btn danger" bindtap="onDropCard">{{t.cardDrop}}</view>
         </view>
         <text class="tpl-main-hint">{{t.cardDropHint}}</text>

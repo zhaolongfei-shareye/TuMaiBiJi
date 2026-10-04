@@ -438,7 +438,7 @@ const COUNT_ALL = () => {
     // 站长 10-03 23:40 做减法：一篇同一时间只有一张，要改存量必须先删掉这一张。
     // 所以这一节钉的东西整个换了一批：原来那三问（第二张记不记上、‹ 1/2 › 换得回来吗、
     // 两张各自是哪套模板）全都不存在了，换成——
-    // ① 已生成态底排只有「取消｜删除」，通栏那枚和「编辑个人名片」都不在这一态；
+    // ① 已生成态底排只有「查看笔记｜删除」（10-04 之前左端那枚是「取消」），通栏那枚和「编辑个人名片」都不在这一态；
     // ② 这一态左右滑不动模板（不会"顺手把那张换掉"）；
     // ③ 点删除：本机那一格与位图一起清掉，那一枚回到空态；
     // ④ 未生成态滑模板／开关码依旧一张都不记，真按通栏才记，且记完台账只有一张。
@@ -461,23 +461,27 @@ const COUNT_ALL = () => {
     }
 
     /* ---------- ⑧b 一篇一张：已生成态只能删、不能改 ---------- */
+    /* 站长 10-04：卡片那一格的小图现在**直接**开大图（原来先浮详情窗、再点窗里右上那一格，
+       他的原话是「不需要再看原文」）。所以这一节少一次跳转：旧判据「点卡片那一格进详情窗」作废，
+       换成钉"没浮详情窗、直接到大图"。 */
     await (await $('.pad')).tap()
     await sleep(2200)
     const opened = await page.data()
-    ck('点卡片那一格进详情窗：窗里带的就是台账里唯一那一条，"第几张"那个指针整个撤了',
-      opened.detailOpen === true && (opened.detailCards || []).length === 1
+    ck('点小图直接拉起大图，不再先浮详情窗',
+      opened.templateOpen === true && opened.detailOpen === false,
+      `templateOpen=${opened.templateOpen} / detailOpen=${opened.detailOpen}`)
+    ck('大图带的就是这一格那一篇（不是列表第一篇、也不是上一篇留在 posterNote 里的那个）',
+      !!opened.posterNote && String(opened.posterNote.id) === String((opened.cells[0] || {}).id)
       && opened.detailCardIdx === undefined,
-      `${(opened.detailCards || []).length} 条 / detailCardIdx=${opened.detailCardIdx}`)
+      `${opened.posterNote && opened.posterNote.id} vs 第一格 ${(opened.cells[0] || {}).id}`)
     ck('‹ i/n › 那一行两枚彻底没有（列表那一格与详情窗那一大格都没有页码行了）',
       (await $$('.g-pg')).length === 0 && (await $$('.ds-pg')).length === 0, '')
-    await (await $('.ds-entry')).tap()
-    await sleep(1500)
     const rGen = await waitRendered('已生成态开大图')
     ck('台账里已有这一张 → 弹窗一开就落在已生成态（这一态是从台账读出来的，不是点出来的）',
       rGen.endsWith('已出图') && (await data('posterHasCard')) === true, rGen)
     const dockGen = await dockBtns()
-    ck('已生成态那两枚是「取消｜删除」+ 一句说明；「编辑个人名片」与那排圆点都不在这一态',
-      dockGen === '取消|删除' && !(await $('.tpl-dots')) && !(await $('.pill-lab'))
+    ck('已生成态那两枚是「查看笔记｜删除」+ 一句说明；「编辑个人名片」与那排圆点都不在这一态',
+      dockGen === '查看笔记|删除' && !(await $('.tpl-dots')) && !(await $('.pill-lab'))
       && (await txt('.tpl-main-hint')) === '删除后可继续生成笔记卡片，已分享的依旧有效', dockGen)
     /* 站长 10-04 补的那枚通栏（没有它，一张卡发完就锁死了）。量三样：文案、它在两枚**上面**、
        以及它的底色是不是就等于底部导航"选中那一格"下面那块圆底。
@@ -488,7 +492,7 @@ const COUNT_ALL = () => {
       const s = await shareTx.size(), o = await shareTx.offset()
       return { w: s.width, h: s.height, top: o.top }
     })() : null
-    ck('已生成态上面那枚通栏是「分享卡片：微信好友 / 朋友圈 / 公众号」，且排在取消｜删除前面',
+    ck('已生成态上面那枚通栏是「分享卡片：微信好友 / 朋友圈 / 公众号」，且排在查看笔记｜删除前面',
       !!shareTx && (await shareTx.text()) === ZH.cardShare
       && !!shareBox && shareBox.top < (await rect('.tpl-actions')).top,
       `${shareTx ? await shareTx.text() : '（没有这枚）'}`)
@@ -609,19 +613,40 @@ const COUNT_ALL = () => {
       (cNew.cards || []).length === 1 && srcNew.indexOf(String((cNew.cards[0] || {}).p || '').split('/').pop()) >= 0,
       `${(cNew.cards || []).length} 张、屏上=${(srcNew.split('/').pop() || '空')}`)
     /* 第 ⑩ 问：点小图 → 大图必须跟着这一张走。站长 10-03 真机原话「无论点什么小图，
-       都是同一个大图」的根因是 onSheetToPoster 读的是「我的→卡片模板」那套默认，
-       跟台账无关；一篇一张之后这个根因还在，所以这条判据得留着，只是不再谈"第几张"。 */
+       都是同一个大图」的根因是开窗那段读的是「我的→卡片模板」那套默认，
+       跟台账无关；一篇一张之后这个根因还在，所以这条判据得留着，只是不再谈"第几张"。
+       10-04 起小图那一下**直接**开大图（原来中间还隔一层详情窗，要多点一次右上那一格）。 */
     await (await $('.pad')).tap()
     await sleep(2200)
-    await (await $('.ds-entry')).tap()
-    await sleep(1500)
     const rPair = await waitRendered('从小图点开大图')
     const dPair = await page.data()
     ck('点小图开出来的大图：模板与二维码开关都照台账那一张摆（旧写法在这里会开出默认那套）',
       rPair.endsWith('已出图') && dPair.posterTpl === wantTpl && dPair.noQr === true
-      && dPair.posterHasCard === true,
-      `大图模板=${dPair.posterTpl}（该 ${wantTpl}）、noQr=${dPair.noQr}（该 true）、${rPair}`)
+      && dPair.posterHasCard === true && dPair.detailOpen === false,
+      `大图模板=${dPair.posterTpl}（该 ${wantTpl}）、noQr=${dPair.noQr}（该 true）、详情窗=${dPair.detailOpen}、${rPair}`)
     await shot('v19-6-一篇一张已生成态.png')
+
+    /* ---------- ⑩b 那枚「查看笔记」（站长 10-04：原来这一枚是「取消」） ---------- */
+    // 真点一次，落点用 pageStack 读（Page 对象没有 path()，见这条尺子的历史注释）。
+    const wantId = (await page.data('posterNote') || {}).id
+    await (await $('.tpl-btn.ghost')).tap()
+    await sleep(2500)
+    const stack = (await mp.pageStack()) || []
+    const top = stack[stack.length - 1] || {}
+    const topPath = String(top.path || top.route || '')
+    ck('点「查看笔记」落到独立详情页那一层（页栈顶上多出一层 detail）',
+      topPath === 'pages/detail/detail', `${topPath} / 栈深 ${stack.length}`)
+    const dp = await mp.currentPage()
+    const did = dp ? await dp.data('noteId') : null
+    ck('详情页开的是大图里那一篇（noteId 与 posterNote.id 同一个）',
+      String(did) === String(wantId), `${did} vs ${wantId}`)
+    // 收窗那两条口一条都没撤：从详情页回来之后这层弹窗应该是收着的（不是还盖在列表上）。
+    await mp.navigateBack()
+    await sleep(2000)
+    const back = await page.data()
+    ck('从详情页回来：大图已经收掉，且没有顺手把详情窗浮出来（回的是卡片那一屏）',
+      back.templateOpen === false && back.detailOpen === false,
+      `templateOpen=${back.templateOpen} / detailOpen=${back.detailOpen}`)
     await closeFloats()
   }
 
