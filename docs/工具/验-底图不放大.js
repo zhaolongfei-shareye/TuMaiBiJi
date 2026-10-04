@@ -85,7 +85,7 @@ const PHYS_W_FLOOR = 1116
   const s1 = shrunk.out ? await info(shrunk.out) : {}
   const ratio0 = src0.w / src0.h
   const ratio1 = s1.w / s1.h
-  ck('compressedWidth 真起作用：865 宽的源件压到 400 上下（不是被忽略）',
+  ck(`compressedWidth 真起作用：${src0.w} 宽的源件压到 400 上下（不是被忽略）`,
     !!s1.w && Math.abs(s1.w - 400) <= 40, `${src0.w} → ${s1.w}`)
   ck('是等比缩，不是拉扁（宽高比变化 < 2%）',
     !!s1.w && Math.abs(ratio1 / ratio0 - 1) < 0.02, `${ratio0.toFixed(3)} → ${ratio1.toFixed(3)}`)
