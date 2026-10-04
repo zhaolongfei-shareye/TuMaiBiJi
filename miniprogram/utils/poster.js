@@ -10,6 +10,10 @@
 const { toneFor, mix, schemeFor, plateColors, withAlpha, lumOf } = require('./palette.js')
 const { formatShortDate } = require('./date.js')
 const { t } = require('./i18n.js')
+// 配方的求值与步型解释器（纯逻辑，不认识任何色和字号），以及包内自带那几套配方（纯数据）。
+// 方向是单向的：poster.js 认识这两份，它们不认识 poster.js。
+const engine = require('./posterRecipe.js')
+const RECIPES = require('./posterRecipes.js')
 
 const W = 750
 const INK = '#23252C'
@@ -1660,9 +1664,177 @@ function planSpec(ctx, d) {
   return { width: W, height, layers, template: 'spec' }
 }
 
+// ---------------------------------------------------------------- 配方（L3 数据 → 图层）
+//
+// 方案 docs/方案-卡片模板不走发版.md §三那三层的下面两层在这里落地：
+// L1 = paintLayers 认的十种绘制 op，L2 = 必须量了文字才算得出几何的排版原语。
+// 两份名单都以"名字 + 参数表"的形式待在本文件里，因为真正的能力就在这儿；
+// 配方（L3）只是引用名字的数据，所以它能下发。解释器在 posterRecipe.js。
+
+// 每个 op 允许的字段（k 之外）。唯一的出处是 paintLayers / drawLine / drawVertColumn
+// 里读到的 ly.xxx；docs/工具/验-模板配方可执行.js 会从本文件源码把两边读回来对表，
+// 加了绘制字段却忘了这里，那把尺子会红。
+const RECIPE_OP_KEYS = {
+  fill: ['x', 'y', 'w', 'h', 'color'],
+  grad: ['x', 'y', 'w', 'h', 'c1', 'c2', 'dir', 'stops'],
+  radial: ['x', 'y', 'r0', 'r1', 'c1', 'c2', 'box'],
+  rrect: ['x', 'y', 'w', 'h', 'r', 'fill', 'shadow', 'shadowBlur', 'shadowY', 'stroke', 'strokeWidth'],
+  circle: ['x', 'y', 'r', 'fill', 'stroke', 'strokeWidth'],
+  line: ['x1', 'y1', 'x2', 'y2', 'w', 'color'],
+  dots: ['x', 'y', 'w', 'h', 'gap', 'r', 'color', 'oddRowShift'],
+  text: ['x', 'y', 'lines', 'lh', 'size', 'weight', 'color', 'align', 'fam', 'alpha', 'track', 'stroke', 'strokeWidth', 'vert', 'colGap', 'vpunct'],
+  image: ['key', 'x', 'y', 'w', 'h', 'placeholder', 'r', 'clipCircle', 'gray', 'tint', 'fadeFrom'],
+  avatar: ['x', 'y', 'd', 'ring', 'ringColor', 'fallback'],
+}
+// 哪些字段属于 L.xxx 最后那个"可选项"参数（其余按位置传）。没列进去的按位置传，
+// 这样图层的默认值仍然只有 L 这一份出处。
+const RECIPE_OPT_KEYS = {
+  grad: ['dir', 'stops'],
+  rrect: ['fill', 'shadow', 'shadowBlur', 'shadowY', 'stroke', 'strokeWidth'],
+  circle: ['fill', 'stroke', 'strokeWidth'],
+  dots: ['gap', 'r', 'color', 'oddRowShift'],
+  image: ['placeholder', 'r', 'clipCircle', 'gray', 'tint', 'fadeFrom'],
+  avatar: ['ring', 'ringColor', 'fallback'],
+  text: ['x', 'y', 'lines', 'lh', 'size', 'weight', 'color', 'align', 'fam', 'alpha', 'track', 'stroke', 'strokeWidth', 'vert', 'colGap', 'vpunct'],
+}
+
+// 值没给就不塞这个键：L.rrect(..., {}) 与 L.rrect(..., {shadow: undefined}) 画上是同一张，
+// 但图层里多一个键就是多一处差异，逐层等价那条基线会把它判成"改了像素"。
+function pickFields(a, keys) {
+  const o = {}
+  keys.forEach((k) => { if (a[k] !== undefined) o[k] = a[k] })
+  return o
+}
+
+function buildRecipeLayer(fields) {
+  const keys = RECIPE_OP_KEYS[fields.k]
+  if (!keys) throw new Error(`不认的绘制 op「${fields.k}」`)
+  Object.keys(fields).forEach((k) => {
+    if (k !== 'k' && keys.indexOf(k) < 0) throw new Error(`op「${fields.k}」没有字段「${k}」，能用的是 ${keys.join('、')}`)
+  })
+  const o = pickFields(fields, RECIPE_OPT_KEYS[fields.k] || [])
+  switch (fields.k) {
+    case 'fill': return L.fill(fields.x, fields.y, fields.w, fields.h, fields.color)
+    case 'grad': return L.grad(fields.x, fields.y, fields.w, fields.h, fields.c1, fields.c2, o)
+    case 'radial': return L.radial(fields.x, fields.y, fields.r0, fields.r1, fields.c1, fields.c2, fields.box)
+    case 'rrect': return L.rrect(fields.x, fields.y, fields.w, fields.h, fields.r, o)
+    case 'circle': return L.circle(fields.x, fields.y, fields.r, o)
+    case 'line': return L.line(fields.x1, fields.y1, fields.x2, fields.y2, fields.w, fields.color)
+    case 'dots': return L.dots(fields.x, fields.y, fields.w, fields.h, o)
+    case 'text': return L.text(o)
+    case 'image': return L.image(fields.key, fields.x, fields.y, fields.w, fields.h, o)
+    default: return L.avatar(fields.x, fields.y, fields.d, o)
+  }
+}
+
+// L2 原语：配方能点名的排版动作，参数表写死在这里，名单外的名字与参数一律抛错。
+// size/bold/fam 刻意重复在每条量字的原语里：canvas 的 measureText 吃 ctx.font 这个隐状态，
+// 本文件那十套 planner 都是"先 font 再量"，原语自己带上字号才不会被上一段的字号顶掉。
+const RECIPE_TOKENS = { paper: PAPER, ink: INK, body: BODY, muted: MUTED, hard: HARD, warm: WARM, serif: SERIF, mono: MONO }
+// 给了 size 就"先切字体再量"（planner 每一处都是这个顺序）；不给 size 就沿用当前字体。
+// 后者不是冗余分支：planner 里有一处把切字体写在了三元表达式外面（金句那行的标题），
+// 配方要是再切一次，画面一样但绘制序列多一步，逐层等价那条基线就会红。
+const measureWithFont = (env, a, fn) => {
+  if (a.size !== undefined) font(env.ctx, a.size, a.bold, a.fam)
+  return fn(env.ctx)
+}
+const RECIPE_PRIMS = {
+  i18n: { keys: ['key'], call: (env, a) => t(a.key, env.lang) },
+  blockName: { keys: [], call: (env) => blockNameOf(env.note, env.lang) },
+  sourceLabel: { keys: [], call: (env) => sourceLabelOf(env.note, env.lang) },
+  quoteText: { keys: [], call: (env) => quoteOf(env.note) },
+  noteDate: { keys: [], call: (env) => formatShortDate(env.note.created_at) },
+  tagsJoined: { keys: ['sep'], call: (env, a) => (env.note.tags || []).join(a.sep) },
+  paperOf: { keys: ['categoryId'], call: (env, a) => paperOf(a.categoryId) },
+  mix: { keys: ['c1', 'c2', 'w'], call: (env, a) => mix(a.c1, a.c2, a.w) },
+  joinNonEmpty: { keys: ['sep', 'parts'], call: (env, a) => (a.parts || []).map((s) => String(s == null ? '' : s).trim()).filter(Boolean).join(a.sep) },
+  points: {
+    keys: ['limit', 'maxW', 'size', 'bold', 'fam'],
+    call: (env, a) => measureWithFont(env, a, (ctx) => (env.note.key_points || []).slice(0, a.limit).map((p) => clip(ctx, p, a.maxW))),
+  },
+  fitLines: { keys: ['text', 'maxW', 'n', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => fit(ctx, a.text, a.maxW, a.n)) },
+  wrapLines: { keys: ['text', 'maxW', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => wrap(ctx, a.text, a.maxW)) },
+  clipLine: { keys: ['text', 'maxW', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => clip(ctx, a.text, a.maxW)) },
+  clipTrack: { keys: ['text', 'maxW', 'track', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => clipTrack(ctx, a.text, a.maxW, a.track)) },
+  trackWidth: { keys: ['text', 'track', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => trackW(ctx, a.text, a.track)) },
+  fitSize: { keys: ['text', 'maxW', 'want', 'floor'], call: (env, a) => fitSize(env.ctx, a.text, a.maxW, a.want, a.floor) },
+  // planner 里有几处"先切字号，再按三元决定要不要量字"：那一次切字体在分支外面，
+  // 配方要原样记下来才和基线的绘制序列对得上（配一条 `do` 用它）。
+  setFont: { keys: ['size', 'bold', 'fam'], call: (env, a) => { font(env.ctx, a.size, a.bold, a.fam); return null } },
+  vertCols: { keys: ['text', 'colH', 'step', 'maxCols', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => vcols(ctx, a.text, a.colH, a.step, a.maxCols)) },
+  signRow: {
+    keys: ['x', 'y', 'maxW', 'size', 'avatarD', 'onDark'],
+    call: (env, a) => signRow({
+      ctx: env.ctx, x: a.x, y: a.y, maxW: a.maxW, size: a.size, avatarD: a.avatarD,
+      onDark: a.onDark, profile: env.profile, hasAvatar: env.hasAvatar,
+    }),
+  },
+  glyphPlate: { keys: ['x', 'y', 'w', 'h', 'color'], call: (env, a) => glyphPlate(env.ctx, a) },
+  // 码贴纸在 JS 里是往调用方的 layers 数组里塞四层；配方不许改数组，
+  // 所以这里收进一个局部数组，连同一块占多高一起交回去，由配方自己 emitMany。
+  qrSticker: {
+    keys: ['x', 'y', 'size', 'offset', 'ink', 'label'],
+    call: (env, a) => {
+      const layers = []
+      const h = qrSticker({ layers, x: a.x, y: a.y, size: a.size, offset: a.offset, ink: a.ink, label: a.label })
+      return { layers, h }
+    },
+  },
+  qrStickerH: { keys: ['size'], call: (env, a) => qrStickerH(a.size) },
+  footH: { keys: ['qrSize'], call: (env, a) => footH(a.qrSize) },
+  // 配方里不许出现写死的 hex：这四个色和两个字体族是本文件的常量，下发一份配方把 hex 抄进去，
+  // 下次统一墨色时那一份就会悄悄掉队。所以走名字，名字到值只有这一处映射。
+  token: { keys: ['name'], call: (env, a) => {
+    const v = RECIPE_TOKENS[a.name]
+    if (v === undefined) throw new Error(`色名/字体名「${a.name}」不在名单里，能用的是 ${Object.keys(RECIPE_TOKENS).join('、')}`)
+    return v
+  } },
+}
+
+function callRecipePrim(env, name, rawArgs, scope) {
+  const p = RECIPE_PRIMS[name]
+  if (!p) throw new Error(`原语「${name}」不在名单里`)
+  Object.keys(rawArgs).forEach((k) => {
+    if (p.keys.indexOf(k) < 0) throw new Error(`原语「${name}」没有参数「${k}」，能用的是 ${p.keys.join('、')}`)
+  })
+  const a = {}
+  p.keys.forEach((k) => {
+    a[k] = k in rawArgs ? engine.evalTerm(rawArgs[k], env, scope, `${name}.${k}`) : undefined
+  })
+  return p.call(env, a)
+}
+
+// 跑一份配方。d 是 planner 那一套入参（note / profile / lang / hasAvatar）。
+function planFromRecipe(ctx, d, recipe) {
+  const env = {
+    ctx, note: d.note, profile: d.profile, lang: d.lang, hasAvatar: d.hasAvatar,
+    layers: [], width: W,
+    scope: { W, note: d.note, profile: d.profile, lang: d.lang, hasAvatar: d.hasAvatar },
+    opKeys: RECIPE_OP_KEYS,
+    prims: RECIPE_PRIMS,
+    buildLayer: buildRecipeLayer,
+    checkLayer: (l, where) => {
+      if (!l || !RECIPE_OP_KEYS[l.k]) throw new Error(`${where}: 原语交回来的不是一层能绘制的东西`)
+      return l
+    },
+  }
+  env.callPrim = (name, args, scope) => callRecipePrim(env, name, args, scope)
+  return engine.planFromRecipe(recipe, env)
+}
+
+// JS 那十份 planner 全先留着：转成配方的那几套走 RECIPE_IDS，没转的照旧走 JS。
+// 十套全转完（P0-3）之后这份才会删净。
 const PLANNERS = {
   card: planCard, quote: planQuote, block: planBlock, letter: planLetter,
   popGrid: planPopGrid, popDots: planPopDots, acid: planAcid, cover: planCover, lit: planLit, spec: planSpec,
+}
+
+// 已经转写成配方的那几套。包内自带的那份就是服务端下发失败时的兜底，
+// 名单在 poster.js、内容在 posterRecipes.js，两边对不上由 docs/工具/验-模板配方可执行.js 抓。
+const RECIPE_IDS = ['quote']
+
+function recipeOf(id) {
+  return RECIPE_IDS.indexOf(id) < 0 ? null : RECIPES[id] || null
 }
 
 // ---------------------------------------------------------------- 入口
@@ -1721,7 +1893,18 @@ function planPoster(ctx, note, templateId, profile, lang, opts) {
   const tpl = PLANNERS[templateId] ? templateId : DEFAULT_TEMPLATE
   const p = profile || {}
   const o = opts || {}
-  const plan = PLANNERS[tpl](ctx, { note, profile: p, hasAvatar: !!p.avatarPath, lang: lang || 'zh' })
+  const d = { note, profile: p, hasAvatar: !!p.avatarPath, lang: lang || 'zh' }
+  const recipe = recipeOf(tpl)
+  let plan
+  if (!recipe) plan = PLANNERS[tpl](ctx, d)
+  else if (o.strict) plan = planFromRecipe(ctx, d, recipe)
+  else {
+    // 线上这一路是"绝不灰掉、绝不空白"：配方跑不出就拿 JS 那份兜底（P0-3 转完后
+    // JS 一份份删，兜底也就一份份少，最后一份兜到默认模板）。
+    // 尺子走 strict：坏了就抛。少了这道区分，一份从没跑起来的坏配方会一路用 JS 分支，
+    // 等价基线照样全绿，那把尺子就白立了。
+    try { plan = planFromRecipe(ctx, d, recipe) } catch (e) { plan = (PLANNERS[tpl] || PLANNERS[DEFAULT_TEMPLATE])(ctx, d) }
+  }
   return o.showQr === false ? stripQr(plan, ctx, lang || 'zh') : plan
 }
 
@@ -1760,6 +1943,13 @@ module.exports = {
   PAPER_B,
   TEMPLATE_GROUPS,
   DEFAULT_TEMPLATE,
+  RECIPE_IDS,
+  RECIPE_OP_KEYS,
+  RECIPE_OPT_KEYS,
+  RECIPE_PRIMS,
+  RECIPE_TOKENS,
+  recipeOf,
+  planFromRecipe,
   BRAND_GLYPH,
   SAMPLE_NOTE,
   SAMPLE_NOTE_EN,

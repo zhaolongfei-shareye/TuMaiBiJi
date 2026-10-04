@@ -93,7 +93,18 @@ const imgsOf = (withAvatar) => {
   return m
 }
 
-const norm = (v) => JSON.stringify(v, (k, val) => (typeof val === 'number' ? Math.round(val * 1000) / 1000 : val))
+// 清单指纹按**键名排序**规范化：图层是个"按名字读"的数据结构（paintLayers 全程读 ly.xxx），
+// JS 里 Object.assign 的先后顺序对画面没有任何影响。配方解释器按声明顺序拼图层，
+// 要是拿原始键序比，就会把"同样一张图"误判成"改了像素"。
+// 排序只吃掉键序这一种假差异：字段少了、数变了、行数组换了顺序，照样是红的。
+// 绘制序列那条不排序——它记的就是顺序。
+const canon = (v) => {
+  if (Array.isArray(v)) return `[${v.map(canon).join(',')}]`
+  if (v && typeof v === 'object') return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}`
+  if (typeof v === 'number') return String(Math.round(v * 1000) / 1000)
+  return JSON.stringify(v)
+}
+const norm = (v) => canon(v)
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 16)
 
 const cases = []
@@ -111,7 +122,9 @@ for (const tpl of poster.TEMPLATES) {
 
 function run(c) {
   const { ctx, trace } = newCtx()
-  const plan = poster.planPoster(ctx, notes[c.ni], c.tpl, profiles(c.tpl, c.withAvatar), c.lang, { showQr: c.showQr })
+  // strict：走配方的那几套要是跑不通就抛出来，不许悄悄退回 JS 那份 planner——
+  // 退回去这一组照样和基线一致，基线就白立了（poster.js 里 planPoster 那段写了为什么）。
+  const plan = poster.planPoster(ctx, notes[c.ni], c.tpl, profiles(c.tpl, c.withAvatar), c.lang, { showQr: c.showQr, strict: true })
   poster.paintLayers(ctx, plan.layers, imgsOf(c.withAvatar))
   return {
     plan: norm({ width: plan.width, height: plan.height, layers: plan.layers }),
