@@ -382,3 +382,55 @@ class TestCredentialErrorsDoNotLeak:
         resp = client.get(f"/api/shares/{token}/qrcode")
         assert resp.status_code == 502
         assert SECRET_SENTINEL not in resp.text and "url" not in resp.text
+
+
+class Test列表只按日期倒序:
+    """站长 10-04 真机：「排序没有按照日期倒序，要改」。
+
+    根因不是客户端排错了（客户端一列都不自己算，`index.js` 里没有任何 sort），
+    而是列表排序前两档「钉着的浮在最前、再按钉的时间」——置顶这个能力在客户端
+    10-03 已经整条撤净（列表、详情窗、独立详情页三处入口都没了），而他库里那两篇
+    还钉着（现网实测 notes.id=7、id=8 `is_pinned=1`），于是 09/23 那篇压在 10/04 上面。
+    只清数据不改这条，以后任何一篇被别的路径钉上就又会跳顶，所以钉的是规则本身。
+    """
+
+    @staticmethod
+    def _mk(db, uid, title, month, day):
+        from datetime import datetime
+
+        n = Note(user_id=str(uid), title=title, summary="", content="",
+                 original_content="", source_type="manual", tags=[], key_points=[],
+                 created_at=datetime(2026, month, day))
+        db.add(n)
+        db.commit()
+        return n.id
+
+    def test_钉着的那篇不许再压在最新那篇上面(self, client, db):
+        # 单开一个用户：这三篇只属于本用例，不会去动 module 级那批笔记的条数判据
+        u = User(openid="pytest-order-user")
+        db.add(u)
+        db.commit()
+        h = {"Authorization": f"Bearer {_create_token(u.id)}"}
+        old = self._mk(db, u.id, "最老那篇", 9, 23)
+        new = self._mk(db, u.id, "最新那篇", 10, 4)
+        mid = self._mk(db, u.id, "中间那篇", 9, 25)
+        # 走现网那个 pin 接口钉，不手写 SQL：这样"接口还在、列表不再理它"这件事本身也被钉住
+        assert client.post(f"/api/notes/{old}/pin", params={"pin": True}, headers=h).status_code == 200
+        got = [n["id"] for n in client.get("/api/notes/", headers=h).json()]
+        assert got == [new, mid, old], got
+
+    def test_撤掉置顶之后顺序一字不变(self, client, db):
+        # 反向钉：撤与不撤画出来的是同一个序——证明这一档排序真的不再参与，
+        # 而不是"恰好那篇本来就最新"
+        u = User(openid="pytest-order-user2")
+        db.add(u)
+        db.commit()
+        h = {"Authorization": f"Bearer {_create_token(u.id)}"}
+        old = self._mk(db, u.id, "最老那篇", 9, 23)
+        new = self._mk(db, u.id, "最新那篇", 10, 4)
+        before = [n["id"] for n in client.get("/api/notes/", headers=h).json()]
+        client.post(f"/api/notes/{old}/pin", params={"pin": True}, headers=h)
+        pinned = [n["id"] for n in client.get("/api/notes/", headers=h).json()]
+        client.post(f"/api/notes/{old}/pin", params={"pin": False}, headers=h)
+        unpinned = [n["id"] for n in client.get("/api/notes/", headers=h).json()]
+        assert before == pinned == unpinned == [new, old], (before, pinned, unpinned)

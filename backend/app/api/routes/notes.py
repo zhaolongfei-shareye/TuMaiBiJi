@@ -221,8 +221,14 @@ def list_notes(
             )
         else:
             q = q.filter(or_(title_like, body_like))
+    # 站长 10-04 真机报：「排序没有按照日期倒序，要改」。根因就是原来这里前两档
+    # （`is_pinned DESC, pinned_at DESC`）——置顶这个能力在客户端 10-03 已经整条撤净
+    # （列表、详情窗、独立详情页三处入口都没了），而他库里那两篇还是钉着的
+    # （实测 notes.id=7、id=8 `is_pinned=1`），于是 09/23 那篇压在 10/04 那篇上面。
+    # 只清数据不改这条，以后任何一篇被别的路径钉上就又会跳顶，所以撤的是规则本身。
+    # `pin_note` 那个接口与 is_pinned/pinned_at 两列暂时留着（动路由和删列要另一次部署，另拍）。
     notes = (
-        q.order_by(Note.is_pinned.desc(), Note.pinned_at.desc().nullslast(), Note.created_at.desc())
+        q.order_by(Note.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
