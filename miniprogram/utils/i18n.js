@@ -68,7 +68,7 @@ const i18n = {
       '分享时可选卡片模板，换套版式再发出去',
       '笔记卡片可以「分享」，直接发到微信',
       '设了密码的那一格是私密，锁着不发正文',
-      '外观里能换壁纸，也能换界面字体',
+      '外观里能换整套配色，点一下就生效',
     ],
     title: '标题',
     summary: '摘要',
@@ -98,10 +98,13 @@ const i18n = {
     noCategories: '暂无分类',
     // 「我的→设置」那几行右侧的小字说明（站长 10-05：「右侧要加小字说明，有哪些内容可以设置，
     // 也不要回行，提炼」）。放不放得下由 `docs/工具/探-小字不折行.js` 现量渲染盒子钉，改文案先跑它。
-    navProfileTip: '名片与十套版式',
-    wallpaperTip: '壁纸与界面字体',
-    categoriesTip: '增删与排序',
-    privatePasswordTip: '六位数，可重置',
+    // 站长 10-05 下午打回第一版：那四句写的是"里面装着什么零件"（名片与十套版式／六位数，可重置），
+    // 不是"这行拿来干嘛"。改成每句给用途，而且不许写页面上已经不存在的东西——「壁纸与界面字体」
+    // 就是这类错：界面字体那一排站长 09-26 就撤了（微信不认那些系统字体名，点了不换字），这句在承诺一个没有的功能。
+    navProfileTip: '分享给朋友那张卡片上印什么',
+    wallpaperTip: '整个界面的配色，挑顺眼的一套',
+    categoriesTip: '笔记分成哪几类、按什么顺序排',
+    privatePasswordTip: '锁住不想让别人看到的笔记',
     // 卡片模板页的形象图：四个槽，每槽自己带两枚开关——「卡片」= 画在卡片头像上，
     // 「背景」= 铺在首页与笔记页头部。两个角色各自单选，同一张可以两个都当。
     // 图只存在本机，不上传。
@@ -312,11 +315,13 @@ const i18n = {
     qrToggleHint: '发到微信以外的平台容易被屏蔽，可关掉只留文字',
     // 二维码药丸搬进主按钮之后，那行字要跟药丸一起说话（站长 10-03 第三稿）。
     // 两态刻意都六个字：切开关时居中那行不跳位，按钮里的字不会闪一下宽度。
-    // 站长 10-05：开着那一态后面补一句提醒——**想要纯图就得关掉**。第一版写成「纯分享图片，而非笔记
-    // 原文」，当场被打回："读起来像开着就是纯分享，歧义"（开着码扫出来恰恰是原文）。中英文都不许折行，
-    // 宽度由 `docs/工具/探-小字不折行.js` 现量渲染盒子钉住，改文案先跑它。
-    qrOn: '开启二维码｜想要纯分享图片请关闭',
-    qrOff: '关闭二维码',
+    // 站长 10-05 连着打回两次，口径记全：① 第一版「纯分享图片，而非笔记原文」有歧义（读着像
+    // "开着就是纯分享"，事实相反）；② 第二版只挂在"开着"这一态，他一开关注释就没了——**两态都得
+    // 自带说明，一句讲清这一态对朋友是什么**。所以现在是：开着＝能扫码转存，关掉＝只有这张图。
+    // 状态词本身保留（10-03 第三稿拍的是"那行字跟药丸一起说话"，说现在开着还是关着）。
+    // 中英文都不许折行，宽度由 `docs/工具/探-小字不折行.js` 两态各量一遍钉住，改文案先跑它。
+    qrOn: '开启二维码｜朋友扫码就能转存',
+    qrOff: '关闭二维码｜只发这张图，扫不出原文',
     posterMake: '生成分享图',
     // 已生成态那枚通栏：把台账里这一张再发一次。那三项是站长 10-04 的原话，一字不改照抄上来；
     // 面板里实际给到哪几条落点由微信系统层决定（样式与文案都不给改），这一行只说"点它会拉起分享"。
@@ -409,7 +414,7 @@ const i18n = {
       'Pick a card template before you share',
       'Share the card straight into WeChat',
       'A category with a password stays private',
-      'Change wallpaper and interface font',
+      'Pick a new look for the whole app',
     ],
     title: 'Title',
     summary: 'Summary',
@@ -434,10 +439,11 @@ const i18n = {
     deleteCategoryConfirm: 'Delete? Notes will become uncategorized',
     noCategories: 'No categories yet',
     // 与中文那四串同一组（英文一律不直译，且必须放得进那一行——同一把尺子量两种语言）
-    navProfileTip: 'Card name & 10 layouts',
-    wallpaperTip: 'Wallpaper & UI font',
-    categoriesTip: 'Add, rename, reorder',
-    privatePasswordTip: '6 digits, resettable',
+    // 同样按"这行拿来干嘛"写，不写零件清单；长度由同一把尺子现量。
+    navProfileTip: 'What prints on your shared card',
+    wallpaperTip: 'Pick the look of the whole app',
+    categoriesTip: 'How notes are grouped and ordered',
+    privatePasswordTip: 'Locks notes you keep private',
     navProfile: 'Card templates',
     slotCard: 'Card',
     slotBg: 'Home',
@@ -624,8 +630,8 @@ const i18n = {
     noQrMark: 'in WeChat',
     qrToggle: 'With QR code',
     qrToggleHint: 'Other apps often block QR codes — switch it off to keep text only',
-    qrOn: 'QR code on | turn it off for a picture only',
-    qrOff: 'QR code off',
+    qrOn: 'QR code on | friends can scan and save',
+    qrOff: 'QR code off | just this picture, nothing to scan',
     posterMake: 'Make a share image',
     cardShare: 'Share card: Chat / Moments / Official Account',
     // 英文不直译"查看笔记"成 View note：这一枚去的是那篇笔记本身，Open note 更像按钮。

@@ -1,6 +1,7 @@
 // 一次性探针（站长 10-05 两条文案改动）：新加的小字在中英文两种态下**不许折行、不许顶出那一行**。
-//   ① 「我的→设置」四行右侧说明：名片与十套版式／壁纸与界面字体／增删与排序／六位数，可重置
-//   ② 首页成品弹窗药丸上面那行：开启二维码｜纯分享图片，而非笔记原文
+//   ① 「我的→设置」四行右侧说明——每句说这一行**拿来干嘛**（不是里面装着什么零件），
+//     字面量一律现读字典，改文案不必来改这把尺子
+//   ② 首页成品弹窗药丸上面那行，**开着与关掉两态各量一次**（站长 10-05：注释不能一开关就没）
 // 为什么不能靠肉眼：`.menu-hint` 写了 `white-space: nowrap`，折行不会发生——**挤不下变成"顶出右边界"**，
 // 而顶出去的东西在截图里常常看不出来（箭头被挤走、字压到卡片边缘）。所以这里量渲染盒子，不量字符串长度：
 // 设置那四行是 flex 里的收缩件，盒子宽＝字的宽，逐行报「主字右沿／小字左右沿／箭头左沿／行右沿／高」，
@@ -58,10 +59,18 @@ const grabPill = (mp) => mp.evaluate(() => new Promise((resolve) => {
       await sleep(4500)
       await page.setData({ tab: 'set' })
       await sleep(1200)
+      const dict = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js')).texts(L)
       const g = await grab(mp)
       ck(`${L}｜设置那组正好四行带小字说明（注销账号那行没加，站长没点它）`,
         g.hints.length === 4, `量到 ${g.hints.length} 条`)
       if (g.hints.length !== 4) { console.log('  !! 条数不对，后面逐行判据跳过'); continue }
+
+      // 逐行文本现读字典（站长改过一轮口径：不许把字面量钉进尺子，否则每次改微文案假红一次）。
+      // 顺带钉住"这行说的是这行自己的功能"——四句按 DOM 序对四个键，串了位也算红。
+      const hintEls = await page.$$('.menu-hint')
+      const hintTexts = []
+      for (const e of hintEls) hintTexts.push(e ? await e.text() : '')
+      const hintKeys = ['navProfileTip', 'wallpaperTip', 'categoriesTip', 'privatePasswordTip']
 
       g.hints.forEach((h, i) => {
         // 逐行配对按"竖直方向落在哪一行的带里"，不按数组下标——这一页还有别的 .menu-item
@@ -81,27 +90,33 @@ const grabPill = (mp) => mp.evaluate(() => new Promise((resolve) => {
         ck(`${L}｜第 ${i + 1} 行小字没顶出那一行的右边界`, hRight <= toR(it.right), `差 ${toR(it.right) - hRight}rpx`)
         ck(`${L}｜第 ${i + 1} 行小字没压住主字`, !lb ? false : h.left >= lb.right,
           lb ? `间隙 ${toR(h.left - lb.right)}rpx` : '没配到主字')
+        ck(`${L}｜第 ${i + 1} 行屏上就是字典里那句（${hintKeys[i]}，没串位、没留旧串）`,
+          hintTexts[i] === dict[hintKeys[i]], `屏上「${hintTexts[i]}」／字典「${dict[hintKeys[i]]}」`)
       })
 
+      // 药丸那行**两态各量一次**：站长 10-05 打回的第二条就是"一开关注释就没了"，所以两态都必须
+      // 自带说明（句中含分隔符），且必须等于字典里那一句——不许有一态是光秃秃的状态词。
       const p = await mp.reLaunch('/pages/index/index')
       await sleep(4500)
-      await p.setData({ detailOpen: false, posterHasCard: false, templateOpen: true, noQr: false, posterImagePath: '' })
-      await sleep(1500)
-      const q = await grabPill(mp)
-      if (!q.lab) {
-        ck(`${L}｜药丸上面那行渲染出来了`, false, '没量到 .pill-lab（弹窗没开成？）')
-      } else {
-        const h = toR(q.lab.height), w = toR(q.lab.width)
-        console.log(`  药丸那行：盒子宽 ${w}rpx · 高 ${h}rpx`)
-        ck(`${L}｜「开启二维码」后面那句只有一行`, h <= 34, `高 ${h}rpx`)
+      for (const off of [false, true]) {
+        await p.setData({ detailOpen: false, posterHasCard: false, templateOpen: true, noQr: off, posterImagePath: '' })
+        await sleep(1200)
+        const q = await grabPill(mp)
+        const tag = `${L}｜${off ? '关掉' : '开着'}那一态`
+        const want = off ? dict.qrOff : dict.qrOn
+        if (!q.lab) { ck(`${tag}那行渲染出来了`, false, '没量到 .pill-lab（弹窗没开成？）'); continue }
+        const h = toR(q.lab.height)
+        console.log(`  ${off ? '关掉' : '开着'}那态：高 ${h}rpx · 盒子宽 ${toR(q.lab.width)}rpx`)
+        ck(`${tag}只有一行`, h <= 34, `高 ${h}rpx`)
         // 这里**不量右边界**：`.pill-lab` 是块级 `display:block`，盒子永远等于容器内沿，
         // 量出来是容器的宽、不是字的宽，拿它判"挤不挤"是永真式（10-05 第一趟就是被这条坑红的，
-        // 当时还把 24rpx 写成减 24px，两个错叠一起）。块级这一行的"不折行"只由上面那条**高度**判据担保。
+        // 当时还把 24rpx 写成减 24px，两个错叠一起）。块级这一行的"不折行"只由**高度**担保。
         const el = await p.$('.pill-lab')
         const txt = el ? await el.text() : ''
-        console.log(`  实际渲染出来的字：${txt}`)
-        ck(`${L}｜渲染的是改后那句（不是旧串）`,
-          txt.length > (L === 'zh' ? 12 : 24), `长度 ${txt.length}`)
+        console.log(`    渲染出来的字：${txt}`)
+        ck(`${tag}渲染的就是字典里那一句（不抄死）`, txt === want, `期望 ${want}`)
+        ck(`${tag}自带说明（含分隔符，不是光一个状态词）`,
+          /[｜|]/.test(txt) && txt.split(/[｜|]/)[1].trim().length >= 6, txt)
       }
 
       // 两种语言各存一张「我的→设置」实拍，给他对着看四行小字
