@@ -287,6 +287,22 @@
   opacity: 0.7;
 }
 
+/* 两枚 tab 那一行右端的折叠口（站长 10-05 要）。做法照「我的」页那四行右侧的小字：
+   margin-left:auto 推到行尾 + nowrap——挤不下不许折行。字色走 --text-tertiary 令牌，
+   不写死 rgba：四套壁纸各有各的墨，写死一个数会在别的套上掉队。
+   它跟着 .vtabs 那 padding: 0 56 走，所以右沿仍落在离边 56 那一条线上，与左边两枚同一条轴。 */
+.ix-fold {
+  margin-left: auto;
+  align-self: center;
+  font-size: var(--fs-meta);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.ix-fold:active {
+  opacity: 0.6;
+}
+
 /* 分类这一行紧跟在横线下面（v18 那条浅虚线换成上面那条通栏横线，负外缩进因此不要了；
    置顶那一档、右边那句「只看置顶」随置顶一起撤）。 */
 .cats {
@@ -322,6 +338,23 @@
   border-radius: var(--r-card) var(--r-card) 0 0;
   box-shadow: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
   overflow: hidden;
+}
+
+/* 展开那一态：把这张圆角纸卡的顶边抬到**详情浮窗那一条线**（同一个 130rpx，站长 10-05
+   原话"展开高度与笔记详情页高度一致"），下沿不动（本来就到屏底），于是同一批内容一次多露
+   约 372rpx（约三行列表 / 一排多一点的卡片）。
+   为什么走 fixed 而不是把 .head 那 542 压小：压小会把形象图从中间裁掉、还要连带改
+   bandGeom 与导航条反差那条规则（那是 10-01 拍过的两处几何）。这里 .head 一行没动，
+   图仍在原处画着，卡盖上去之后头部「我的笔记」和右上那列数字照样留在卡上面那一格里——
+   和 v22 详情窗给的是同一个状态感。
+   margin-top 归零是必须的：基础那条 -40 会把顶边顶到 90，就不是"与详情页一致"了。 */
+.sheet.ix-wide {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 130rpx;
+  bottom: 0;
+  margin-top: 0;
 }
 
 /* ---------- v22（站长 10-03 第四轮）：浮窗开着这一态，背后只留一层 ----------

@@ -88,6 +88,10 @@ const i18n = {
     // 公开状态只在详情窗下沿那句 sharedNow 里说）。
     tabList: '笔记列表',
     showMore: '显示更多',
+    // 列表区右上那枚折叠口（站长 10-05：「整个下部往上加高，下方内容同步增加，方便用户浏览
+    // 更多内容。展开高度与笔记详情页高度一致」）。两枚 tab 共用一句，因为加高的是整块纸卡。
+    expandTip: '点一下展开',
+    collapseTip: '点一下收起',
     noCards: '还没有生成过卡片',
     allCategories: '全部',
     addCategory: '添加分类',
@@ -430,6 +434,10 @@ const i18n = {
     // 与中文侧一一对应的三串（v19）。第二枚 tab 那两个字仍读 navShare。
     tabList: 'List',
     showMore: 'Show more',
+    // 与中文同义，但不直译"点一下"。用系统里最常见的那对词；不复用 'Show more'——
+    // 那一串已经给了摘要末尾那枚「显示更多」，同一个面板上两个口说同一句话会让人点错。
+    expandTip: 'Expand',
+    collapseTip: 'Collapse',
     noCards: 'No cards yet',
     allCategories: 'All',
     addCategory: 'Add category',

@@ -65,6 +65,10 @@ Page({
     // v19 这一屏的两枚 tab：'list' = 笔记列表（默认那一枚），'cards' = 笔记卡片。
     // 这是视图态，不落本机——他原话"默认第一个 tab"，每次进这一屏都从第一枚起。
     view: 'list',
+    // 整块纸卡加高那一态（站长 10-05：「整个下部往上加高，下方内容同步增加，方便用户浏览
+    // 更多内容。展开高度与笔记详情页高度一致」）。这是视图态、不落本机；它加高的是整块卡，
+    // **不是**把某一行就地摊开——v19 那条"点一行就直接浮详情窗、不就地展开"一个字没动。
+    listWide: false,
     // 两枚 tab 各自画的那两批，都由 arrange() 从同一份 notes 现算（同一份序、同一份筛选）
     rows: [],
     cells: [],
@@ -416,6 +420,24 @@ Page({
     const view = e.currentTarget.dataset.view
     if (view === this.data.view) return
     this.setData({ view })
+  },
+
+  // 整块纸卡的折叠口（站长 10-05：「整个下部往上加高，下方内容同步增加」）。
+  // 只挪这一块的顶边（CSS 一条 `.sheet.ix-wide`），两枚 tab 共用同一枚口——加高的是卡、
+  // 不是某一行，所以 rows / cells 一个字都不用重算，滚动位置也不丢（元素没被销毁）。
+  //
+  // 「展开就不提供搜索」（他 10-05 补的那句）落在两处：wxml 上那一行 `wx:if="{{!listWide}}"`
+  // 摘掉入口；这里把已经摊开的条子按**退出搜索**那一档收干净（缩回＋清词＋重拉）。
+  // 为什么不学"点某条笔记只缩条子、词留着"：那样列表还是筛过的结果，而筛子已经不见了，
+  // 正是他 10-03 打回过的"条子一收，下面还挂着上一次的结果，看着像没退出来"。
+  onToggleWide() {
+    const wide = !this.data.listWide
+    if (wide && this.data.searchOpen) {
+      this.setData({ listWide: true, searchOpen: false, searchKeyword: '' })
+      this.loadNotes(true)
+      return
+    }
+    this.setData({ listWide: wide })
   },
 
   // v19：两枚 tab 那两批屏都不就地展开——点一行 / 点一格 = 直接浮详情窗。

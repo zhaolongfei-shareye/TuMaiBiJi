@@ -25,8 +25,11 @@
          点这一行以外的**真空白**缩回并清词（等于退出搜索，站长 10-03 改口，原来那条"缩回不清词"作废）；
          点中某条笔记或某一枚分类只缩条子、词留着（那两枚是 catchtap，icon 亮着表示词还在），
          ✕ 仍是就地清词的口。
-         icon 一律 catchtap：它在行内，不该被当成"点了空白"而把搜索收掉。 -->
-    <view class="tools">
+         icon 一律 catchtap：它在行内，不该被当成"点了空白"而把搜索收掉。
+         ⚠ 展开那一态整行不画（站长 10-05：「展开就不提供搜索」）。必须是 `wx:if` 摘掉、
+         不能指望"被卡盖住"：这一行 z-index 5，比这张纸卡的 2 高，抬上来的卡盖不住它——
+         不摘的话它正好压在卡面中间，变成一枚看得见、点不动的孤点。 -->
+    <view wx:if="{{!listWide}}" class="tools">
       <view wx:if="{{searchOpen}}" class="srch" style="{{searchSkin}}" catchtap="noop">
         <view class="glyph-search"></view>
         <input
@@ -50,13 +53,19 @@
     </view>
   </view>
 
-  <view class="sheet">
+  <view class="sheet {{listWide ? 'ix-wide' : ''}}">
   <!-- v19（站长 10-03 拍）：区内顶上两枚 tab，小字、选中那枚深色并压一条墨色短杠在通栏横线上，
        未选那枚同一字号只浅色。默认落第一枚。第二枚那两个字仍读现网 navShare（笔记卡片）。
        排布切换那两枚 icon 的活交给这里，所以头部那一行只剩搜索一枚。 -->
   <view class="vtabs">
     <view class="vtab {{view === 'list' ? 'on' : ''}}" catchtap="onViewTap" data-view="list">{{t.tabList}}</view>
     <view class="vtab {{view === 'cards' ? 'on' : ''}}" catchtap="onViewTap" data-view="cards">{{t.navShare}}</view>
+    <!-- 这一行右端那枚是整块纸卡的折叠口（站长 10-05：「整个下部往上加高，下方内容同步增加，
+         方便用户浏览更多内容。展开高度与笔记详情页高度一致」）。两枚 tab 共用一枚口——
+         加高的是这张卡，不是某一行，所以 v19 那条"点一行就直接浮详情窗、不就地展开"没动。
+         仍要展开才看得到的东西一概不加：这一态只是让同一批内容一次多露几行。
+         catchtap：挂在 .container 的 bindtap 链上，冒泡上去会把搜索词一起清掉。 -->
+    <text class="ix-fold" catchtap="onToggleWide">{{listWide ? t.collapseTip : t.expandTip}}</text>
   </view>
   <!-- 分类这一行紧跟在横线下面，两枚 tab 都留着：卡片那一格是从同一份筛选结果里出来的，
        这里收掉分类，筛了「旅游」再切过去就会看到别的分类的卡片。
