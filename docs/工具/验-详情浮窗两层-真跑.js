@@ -8,7 +8,7 @@
 // visibility:hidden（不是没渲染，收窗回来滚动位置要在）、头部那一段必须铺满整屏、
 // 「我的笔记」和右上角那列数字必须还在且没被窗盖住、窗下沿必须离底栏 64rpx 而不是 24。
 // 同一段还钉死：出卡片的入口只剩右上那一格（底排那枚撤净）、要点前是 14 小黄点
-// （带圈序号一枚不许剩）、来源链接下面那行提示在、第一屏有「显示更多」那个出口。
+// （带圈序号一枚不许剩）、那行"链接打不开"的提示与来源链接那块同在有同在无、第一屏有「显示更多」那个出口。
 // 私密那两条用 setData 把 detailNote.is_private 钉成 true，验的是 dock 两块条件渲染；
 // 后端那个字段本身在现网验过（§8.65 那 12 条），这里不重复造数据。
 // ③（站长 10-03 报的落点错）真跳一趟编辑页再回来：没保存点取消，回来的必须还是这扇窗、
@@ -166,9 +166,17 @@ const readCi = (mp) => mp.evaluate(() => {
     const kpN = (((await page.data()).detailNote || {}).key_points || []).length
     ck('要点前是 14 小黄点，数量跟要点条数一样（不是少画一条）',
       (await page.$$('.ds-pt-dot')).length === kpN, `点 ${kpN ? (await page.$$('.ds-pt-dot')).length : 0} / 条 ${kpN}`)
-    ck('来源链接下面那行提示在（新串，一句都不许少）',
-      !!(await page.$('.ds-hint')) && (await tx(await page.$('.ds-hint'))) === '链接无法直接打开，可复制链接在浏览器打开',
-      await tx(await page.$('.ds-hint')))
+    /* 这一条原来钉的是"这一篇一定有那行提示"，可它挑的是第一篇非私密的笔记——
+       那篇有没有来源链接是**数据**，不是产品状态：测试账号新存进一篇没链接的，它就红
+       （10-06 那趟红在这里，改的其实是字色，一行窗口结构都没动）。
+       判据改成不变量：提示行与来源链接那一块**同在有、同在无**；文案与字典比，不硬写中文。 */
+    const hintEl = await page.$('.ds-hint')
+    const srcUrl = String(((await page.data()).detailNote || {}).source_url || '')
+    const wantHint = String(((await page.data()).t || {}).linkHint || '')
+    ck('那行提示与来源链接那块同在有、同在无（文案照字典）',
+      srcUrl ? (!!hintEl && (await tx(hintEl)) === wantHint) : !hintEl,
+      srcUrl ? `有链接（${srcUrl.slice(0, 28)}）→ ${hintEl ? await tx(hintEl) : '元素不存在'}`
+             : '这一篇没有来源链接，提示行不该在')
     ck('第一屏有「显示更多」那个出口（钉在正文与动作条之间）', !!(await page.$('.ds-more')),
       await tx(await page.$('.ds-more')))
     /* 站长 10-03：「第一屏最好有个"显示更多"，用户点击可以跳到下面看原文」。

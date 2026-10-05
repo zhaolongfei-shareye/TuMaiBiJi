@@ -141,14 +141,19 @@ Page({
     const wallpaper = app.getWallpaper()
     // 每次进页重取：在卡片模板页换完形象返回，这一屏的头部就该跟着换。
     const bgSrc = poster.homeBg()
+    // 这一趟是不是"从这一页 push 出去的页面返回"。是的话不许抹掉他自己选的那一枚 tab：
+    // 站长 10-06 真机「查看大图卡片 → 查看笔记 → 看完返回，没有回到笔记卡片」，人明明站在
+    // 第二枚上，被下面那句无条件复位甩回了第一枚。底栏切回来那一型仍照他 10-04 那句
+    // "默认第一个 tab"（不是本机偏好，不写存储）；标记只在 push 那两条口打：查看笔记、去编辑。
+    const keepView = !!this._keepView
+    this._keepView = false
     this.setData({
       lang,
       t: texts(lang),
       themeClass,
       bgSrc,
-      // 两枚 tab 每次进这一屏都回到第一枚（他原话"默认第一个 tab"），不是本机偏好；
       // 卡片那一格的台账在下面 loadNotes 里重读，从详情窗出完图回来就能看到新那一张。
-      view: 'list',
+      view: keepView ? this.data.view : 'list',
       // 深浅每次进页重读：在首页那枚点上换过档，回到这一屏头部就该跟着沉或跟着亮。
       ...app.bgSkin(),
       // 搜索条那一块面由当前壁纸的页面底派生（palette.chromeOf），和底部导航那条胶囊同一个值；
@@ -574,6 +579,7 @@ Page({
     // 出门前把窗收掉：改完回来 onShow 会重载列表，窗留着就是读旧内容。
     // 但记下这一篇，重排完在 onShow 里把窗重新开回来（取消没改也一样回窗，不是回列表）。
     this._backToDetail = note.id
+    this._keepView = true
     this.setData({ detailOpen: false })
     wx.navigateTo({ url: `/pages/write/write?id=${note.id}&mode=edit` })
   },
@@ -853,11 +859,15 @@ Page({
 
   // 大图底下左端那枚原来是「取消」，站长 10-04 要它改成「查看笔记」，点了进这篇的独立详情页。
   // 收窗那两条口没动（顶上「点一下收起」+ 点窗外那层遮罩），所以撤掉这枚"退出"不让人困在里面。
-  // 先走 _closeTemplate 再跳：浮层状态留在页面上，从详情页返回会看见一张还盖着的大图。
+  // 先走 _closeTemplate 再跳：浮层状态留在页面上，从详情页返回会看见一张还盖着的大图
+  // （而且 `_closeTemplate` 把 posterImagePath 清了，留下的是一张空窗）。
+  // 但这一趟不许顺手抹掉他站的那一枚 tab（10-06 真机报的就是这件事）——所以打 _keepView，
+  // 回来仍是「笔记卡片」那一屏，再点一下就是刚才那张大图。
   onViewNote() {
     const note = this.data.posterNote
     if (!note) return
     this._closeTemplate()
+    this._keepView = true
     wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}` })
   },
 
