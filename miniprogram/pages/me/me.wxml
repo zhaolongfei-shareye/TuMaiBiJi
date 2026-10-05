@@ -42,14 +42,17 @@
     <view class="menu-group card">
       <view class="menu-item" bindtap="onNavigate" data-page="profile">
         <text class="menu-label">{{t.navProfile}}</text>
+        <text class="menu-hint">{{t.navProfileTip}}</text>
         <view class="ico"><view class="cv"></view></view>
       </view>
       <view class="menu-item" bindtap="onNavigate" data-page="wallpaper">
         <text class="menu-label">{{t.wallpaper}}</text>
+        <text class="menu-hint">{{t.wallpaperTip}}</text>
         <view class="ico"><view class="cv"></view></view>
       </view>
       <view class="menu-item" bindtap="onNavigate" data-page="categories">
         <text class="menu-label">{{t.categories}}</text>
+        <text class="menu-hint">{{t.categoriesTip}}</text>
         <view class="ico"><view class="cv"></view></view>
       </view>
       <!-- 私密密码：这一行只是门，输入整块搬到屏幕下方那一层（站长 10-01 晚：
@@ -57,6 +60,7 @@
            门仍然只吃服务端那条读数，读没读回来决定右边按钮是「重置密码」还是「确定」。 -->
       <view class="menu-item {{pwdOpen ? 'open' : ''}}" bindtap="onTogglePwd">
         <text class="menu-label">{{t.privatePassword}}</text>
+        <text class="menu-hint">{{t.privatePasswordTip}}</text>
         <view class="ico"><view class="cv"></view></view>
       </view>
       <view class="menu-item menu-danger" bindtap="onDeleteAccount">

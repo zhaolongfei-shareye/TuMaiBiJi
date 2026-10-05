@@ -96,6 +96,12 @@ const i18n = {
     editCategory: '编辑分类',
     deleteCategoryConfirm: '确定删除？相关笔记将变为未分类',
     noCategories: '暂无分类',
+    // 「我的→设置」那几行右侧的小字说明（站长 10-05：「右侧要加小字说明，有哪些内容可以设置，
+    // 也不要回行，提炼」）。放不放得下由 `docs/工具/探-小字不折行.js` 现量渲染盒子钉，改文案先跑它。
+    navProfileTip: '名片与十套版式',
+    wallpaperTip: '壁纸与界面字体',
+    categoriesTip: '增删与排序',
+    privatePasswordTip: '六位数，可重置',
     // 卡片模板页的形象图：四个槽，每槽自己带两枚开关——「卡片」= 画在卡片头像上，
     // 「背景」= 铺在首页与笔记页头部。两个角色各自单选，同一张可以两个都当。
     // 图只存在本机，不上传。
@@ -306,7 +312,9 @@ const i18n = {
     qrToggleHint: '发到微信以外的平台容易被屏蔽，可关掉只留文字',
     // 二维码药丸搬进主按钮之后，那行字要跟药丸一起说话（站长 10-03 第三稿）。
     // 两态刻意都六个字：切开关时居中那行不跳位，按钮里的字不会闪一下宽度。
-    qrOn: '开启二维码',
+    // 站长 10-05：开着那一态后面补一句「卡片是图片、不含原文」，中英文都不许折行（字串长度由
+    // `docs/工具/探-小字不折行.js` 现量渲染盒子钉住，改文案先跑它）。
+    qrOn: '开启二维码｜纯分享图片，而非笔记原文',
     qrOff: '关闭二维码',
     posterMake: '生成分享图',
     // 已生成态那枚通栏：把台账里这一张再发一次。那三项是站长 10-04 的原话，一字不改照抄上来；
@@ -424,6 +432,11 @@ const i18n = {
     editCategory: 'Edit category',
     deleteCategoryConfirm: 'Delete? Notes will become uncategorized',
     noCategories: 'No categories yet',
+    // 与中文那四串同一组（英文一律不直译，且必须放得进那一行——同一把尺子量两种语言）
+    navProfileTip: 'Card name & 10 layouts',
+    wallpaperTip: 'Wallpaper & UI font',
+    categoriesTip: 'Add, rename, reorder',
+    privatePasswordTip: '6 digits, resettable',
     navProfile: 'Card templates',
     slotCard: 'Card',
     slotBg: 'Home',
@@ -610,7 +623,7 @@ const i18n = {
     noQrMark: 'in WeChat',
     qrToggle: 'With QR code',
     qrToggleHint: 'Other apps often block QR codes — switch it off to keep text only',
-    qrOn: 'QR code on',
+    qrOn: 'QR code on | a picture, not your note text',
     qrOff: 'QR code off',
     posterMake: 'Make a share image',
     cardShare: 'Share card: Chat / Moments / Official Account',

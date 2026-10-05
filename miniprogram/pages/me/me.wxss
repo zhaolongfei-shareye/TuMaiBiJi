@@ -207,6 +207,18 @@
   color: var(--text-primary);
 }
 
+/* 行右侧那行小字说明（站长 10-05：「右侧要加小字说明，有哪些内容可以设置，也不要回行，提炼」）。
+   `margin-left: auto` 把它推到箭头左边；`white-space: nowrap` 就是"不要回行"那句的实现——
+   挤不下的处理是改文案，不折行也不缩字，宽度由 `docs/工具/探-小字不折行.js` 现量钉住。
+   字色走令牌：四套壁纸各有各的墨色，写死一个数会在别的套上掉队。 */
+.menu-hint {
+  margin-left: auto;
+  margin-right: 12rpx;
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
 .menu-right {
   display: flex;
   align-items: center;

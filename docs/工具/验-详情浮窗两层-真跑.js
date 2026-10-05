@@ -33,6 +33,9 @@ const fs = require('fs')
 const path = require('path')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/笔记列表-堆叠卡/实测-详情浮窗')
+// 药丸上面那行的字从字典现读：站长 10-05 要它在「开启二维码」后面补一句说明，
+// 抄死旧串的那两条判据会当场变成假红（能不能放得下由 `探-小字不折行.js` 量渲染盒子钉）。
+const ZH = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js')).texts('zh')
 
 const bad = []
 const ck = (name, ok, got) => {
@@ -306,8 +309,8 @@ const readCi = (mp) => mp.evaluate(() => {
     /* 站长 10-03 23:40：按钮上的字不再跟药丸联动（那两句"带／无二维码分享"撤了），
        主按钮只说干什么＝「生成分享图」，状态改由药丸上面那行小字说。 */
     const mainTx = await (await page.$('.tpl-main')).text()
-    ck('通栏那枚只说「生成分享图」，状态交给药丸上面那行小字（默认「开启二维码」）',
-      mainTx === '生成分享图' && (await tx(await page.$('.pill-lab'))) === '开启二维码',
+    ck('通栏那枚只说「生成分享图」，状态交给药丸上面那行小字（默认吃字典里 `qrOn` 那一句）',
+      mainTx === '生成分享图' && (await tx(await page.$('.pill-lab'))) === ZH.qrOn,
       `${mainTx} / ${await tx(await page.$('.pill-lab'))}`)
     const menuApi = await mp.evaluate(() => typeof wx.showShareImageMenu)
     ck('这一档环境里有微信图片分享面板这个 API（真机上那五枚才是它给的）',
@@ -360,13 +363,13 @@ const readCi = (mp) => mp.evaluate(() => {
     ck('点药丸只切开关，没冒泡去分享（弹窗还开着、那层黑没铺）',
       d.templateOpen === true && d.shareDim === false, `open=${d.templateOpen} dim=${d.shareDim}`)
     ck('关着码时药丸上面那行小字跟着换成「关闭二维码」（药丸内部底色也退了）',
-      (await tx(await page.$('.pill-lab'))) === '关闭二维码'
+      (await tx(await page.$('.pill-lab'))) === ZH.qrOff
       && (await page.$$('.tpl-main .pill-on')).length === 0, await tx(await page.$('.pill-lab')))
     await mp.screenshot({ path: path.join(OUT, '05-关码重画.png') })
     await (await page.$('.tpl-main .pill')).tap()
     await sleep(7000)
     ck('再点一下开回来，那行小字也跟着回来',
-      (await tx(await page.$('.pill-lab'))) === '开启二维码', await tx(await page.$('.pill-lab')))
+      (await tx(await page.$('.pill-lab'))) === ZH.qrOn, await tx(await page.$('.pill-lab')))
     ck('主按钮上那行字从头到尾没跟着开关变（它只说这一枚干什么）',
       (await (await page.$('.tpl-main')).text()) === '生成分享图')
 

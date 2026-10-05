@@ -579,8 +579,10 @@ const COUNT_ALL = () => {
       rNew.endsWith('已出图') && (await data('posterHasCard')) === false
       && !!(await $('.tpl-main')) && !!(await $('.pill-lab')) && !!(await $('.tpl-dots'))
       && !(await $('.tpl-btn.danger')), `${await dockBtns()} / 小字=${await txt('.pill-lab')}`)
-    ck('未生成态那行小字默认说「开启二维码」（开关默认开着）',
-      (await data('noQr')) === false && (await txt('.pill-lab')) === '开启二维码', await txt('.pill-lab'))
+    // 串从字典现读，不在这抄一份：10-05 站长要「开启二维码」后面补一句"纯分享图片，而非笔记原文"，
+    // 抄死的旧串当场就成假红了（折行不放任由 `探-小字不折行.js` 量盒子钉）。
+    ck('未生成态那行小字默认是字典里 `qrOn` 那一句（开关默认开着）',
+      (await data('noQr')) === false && (await txt('.pill-lab')) === ZH.qrOn, await txt('.pill-lab'))
     const tplA = await data('posterTpl')
     await page.callMethod('onPosterTouchStart', { touches: [{ clientX: 300 }] })
     await page.callMethod('onPosterTouchEnd', { changedTouches: [{ clientX: 40 }] })
