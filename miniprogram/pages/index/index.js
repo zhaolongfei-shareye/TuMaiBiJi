@@ -969,9 +969,20 @@ Page({
   onDropCard() {
     const note = this.data.posterNote
     if (!note) return
-    cardLog.dropNote(note.id)
-    this._closeTemplate()
-    this.setData(this.arrange(this.data.notes))
+    const { lang } = this.data
+    // 这枚「删除」点下去当场就删（本机留档 + 那张位图），没有撤销，所以门口拦一道。
+    // 文案吃现成那句 `cardDropHint`（弹窗底排本来就写着），说的是卡片不是笔记。
+    // 按钮一律用系统默认那对（确定／取消）：自定义 confirmText 超 4 字会被静默截断。
+    wx.showModal({
+      title: t('confirmDelete', lang),
+      content: t('cardDropHint', lang),
+      success: (res) => {
+        if (!res.confirm) return
+        cardLog.dropNote(note.id)
+        this._closeTemplate()
+        this.setData(this.arrange(this.data.notes))
+      },
+    })
   },
 
   _ciCommit(next) {
