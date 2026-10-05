@@ -553,10 +553,41 @@ const COUNT_ALL = () => {
       `${led0.length}→${led1.length} 条、p ${led1[0].p === led0[0].p ? '没变' : '变了'}、at ${led1[0].at === led0[0].at ? '没变' : '被顶新了'}、open=${dShare.templateOpen} dim=${dShare.shareDim}`)
     await shot('v19-5b-已生成态分享卡片.png')
     const delBtn = (await $$('.tpl-btn'))[1]
+    /* 10-05 站长拍甲：这枚「删除」现在先弹一道确认框，所以这一段拆成两拍——
+         A 只录不调：证明"点下去没当场删"（台账、位图、弹窗三样都还在）；
+         B 把录下来的 success 喂一次 confirm:true：证明"确定才真删"。
+       为什么用替身：开发者工具里那层系统弹窗不是页面节点，automator 点不到它的「确定」。
+       代价要说清——被替掉的只有"弹窗真会在屏上出现"这一条，那一条由探-小字不折行那趟的
+       渲染读数（弹窗挡着时 .pill-lab 读成 null）与他真机扫屏担保。 */
+    await mp.evaluate(() => {
+      wx.__origShowModal = wx.showModal
+      wx.__modalSeen = []
+      wx.showModal = (o) => {
+        wx.__modalSeen.push({ title: o.title, content: o.content, confirmText: o.confirmText })
+        wx.__modalOpts = o
+      }
+    })
     await delBtn.tap()
+    await sleep(1200)
+    const m = await mp.evaluate(() => ({
+      seen: wx.__modalSeen || [],
+      stillOpen: !!(getCurrentPages()[0].data || {}).templateOpen,
+    }))
+    ck('点「删除」先弹确认框，而且此刻什么都没删（台账、位图、弹窗三样都还在）',
+      m.seen.length === 1 && m.stillOpen && (await countAll()) === 1 && (await filesLeft()) === 1,
+      `弹窗 ${m.seen.length} 次、张数=${await countAll()}、剩 ${await filesLeft()} 个文件、open=${m.stillOpen}`)
+    ck('确认框那两句吃的是字典里的 confirmDelete 与 cardDropHint（不抄死）',
+      !!m.seen[0] && m.seen[0].title === ZH.confirmDelete && m.seen[0].content === ZH.cardDropHint
+      && m.seen[0].confirmText === undefined,
+      m.seen[0] ? `${m.seen[0].title} / ${m.seen[0].content}` : '一次弹窗都没打')
+    await mp.evaluate(() => {
+      const o = wx.__modalOpts
+      wx.showModal = wx.__origShowModal
+      if (o && o.success) o.success({ confirm: true, cancel: false })
+    })
     await sleep(1500)
     const afterDel = await page.data()
-    ck('点「删除」：台账那一格与本机位图一起清掉，弹窗自己收（服务端那张活码一行都不碰）',
+    ck('确认框点「确定」：台账那一格与本机位图一起清掉，弹窗自己收（服务端那张活码一行都不碰）',
       afterDel.templateOpen === false && (await countAll()) === 0 && (await filesLeft()) === 0,
       `张数=${await countAll()}、目录里剩 ${await filesLeft()} 个文件`)
     await (await tabAt(1)).tap()
