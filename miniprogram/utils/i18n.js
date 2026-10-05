@@ -312,9 +312,10 @@ const i18n = {
     qrToggleHint: '发到微信以外的平台容易被屏蔽，可关掉只留文字',
     // 二维码药丸搬进主按钮之后，那行字要跟药丸一起说话（站长 10-03 第三稿）。
     // 两态刻意都六个字：切开关时居中那行不跳位，按钮里的字不会闪一下宽度。
-    // 站长 10-05：开着那一态后面补一句「卡片是图片、不含原文」，中英文都不许折行（字串长度由
-    // `docs/工具/探-小字不折行.js` 现量渲染盒子钉住，改文案先跑它）。
-    qrOn: '开启二维码｜纯分享图片，而非笔记原文',
+    // 站长 10-05：开着那一态后面补一句提醒——**想要纯图就得关掉**。第一版写成「纯分享图片，而非笔记
+    // 原文」，当场被打回："读起来像开着就是纯分享，歧义"（开着码扫出来恰恰是原文）。中英文都不许折行，
+    // 宽度由 `docs/工具/探-小字不折行.js` 现量渲染盒子钉住，改文案先跑它。
+    qrOn: '开启二维码｜想要纯分享图片请关闭',
     qrOff: '关闭二维码',
     posterMake: '生成分享图',
     // 已生成态那枚通栏：把台账里这一张再发一次。那三项是站长 10-04 的原话，一字不改照抄上来；
@@ -623,7 +624,7 @@ const i18n = {
     noQrMark: 'in WeChat',
     qrToggle: 'With QR code',
     qrToggleHint: 'Other apps often block QR codes — switch it off to keep text only',
-    qrOn: 'QR code on | a picture, not your note text',
+    qrOn: 'QR code on | turn it off for a picture only',
     qrOff: 'QR code off',
     posterMake: 'Make a share image',
     cardShare: 'Share card: Chat / Moments / Official Account',
