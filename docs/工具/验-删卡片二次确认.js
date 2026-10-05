@@ -13,7 +13,7 @@
 //   ② 弹窗那两句吃的是现成字典串（zh／en 各跑一遍，串从 i18n.js 现读，尺子里不抄第二份真相）；
 //   ③ 两支各自咬住：取消 → 台账与位图都不动、弹窗不收；确定 → 台账整条撤、位图 unlink、弹窗收；
 //   ④ 全程零网络写——确认文案那句「已分享的依旧有效」必须是真话。
-//   反向对照：把 HEAD 那版（还没有确认框的旧函数体）落成同目录探针再跑，它必须"一次弹窗都没打、
+//   反向对照：把线上那一版 `f58cdb8`（还没有确认框的旧函数体）落成同目录探针再跑，它必须"一次弹窗都没打、
 //   当场就删"。这一条要是也绿，说明上面三层是虚的。
 const path = require('path')
 const fs = require('fs')
@@ -138,11 +138,14 @@ const runCase = (label, file, lang, expectOld) => {
   runCase('en', INDEX, 'en', false)
 
   try {
-    const old = cp.execFileSync('git', ['show', 'HEAD:miniprogram/pages/index/index.js'], { cwd: ROOT }).toString()
+    // 反向对照的样本钉 **线上那一版 `f58cdb8`**，不钉 HEAD：HEAD 会随每次提交漂，
+    // 10-05 第一次提交完这条就自己失效了（报的是"样本不像旧版"，不是代码坏了）。
+    // 钉 f58cdb8 还多证一件事：用户手机上现在跑的那一版确实没有这道确认框。
+    const old = cp.execFileSync('git', ['show', 'f58cdb8:miniprogram/pages/index/index.js'], { cwd: ROOT }).toString()
     const seg = (old.split('onDropCard()')[1] || '').slice(0, 320)
     const looksOld = /cardLog\.dropNote\(note\.id\)/.test(seg) && !/showModal/.test(seg)
     if (!looksOld) {
-      ck('反向对照的样本确实是「没确认那一版」', false, '抽出来的 HEAD 版本不像旧版，这一段先别信')
+      ck('反向对照的样本确实是「没确认那一版」', false, '抽出来的 f58cdb8 版本不像旧版，这一段先别信')
     } else {
       fs.writeFileSync(PROBE, old)
       runCase('旧版', PROBE, 'zh', true)
