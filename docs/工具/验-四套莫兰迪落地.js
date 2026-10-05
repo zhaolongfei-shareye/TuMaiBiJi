@@ -88,11 +88,14 @@ const mixOn = (bgHex, inkHex, a) => {
       await mp.screenshot({ path: `${OUT}/${theme.key}-${tab}.png` })
     }
 
-    // ③ 三级字那一档抬到 .55：读一个**真吃它的元素**的计算色，不读变量。
+    // ③ 三级字那一档：读一个**真吃它的元素**的计算色，不读变量。
     //    （`el.style('--text-tertiary')` 实测回 null——automator 的 style() 只给常规计算属性，
-    //      自定义属性读不到；读消费者那一侧反而顺带证明"这条声明真的落到了这个元素上"。）
+    //      自定义属性读不到；读消费者那一侧反而顺带证明"这条声明真的落到了这个元素上"）
     //    .copyright 在「关于」那一档里（me.wxml 的 block wx:else），而 data.tab 默认是 'set'，
     //    进来直接查它是 null——所以先真点那枚 seg 切过去（不是 callMethod 绕入口）。
+    //    档位沿革：.4 → .55（10-04）→ .72（10-05 站长"部分数字颜色太浅了"）。
+    //    .55 那档实测压页底 3.03~3.24、压卡底 3.23~3.51，四套全不过正文门槛 4.5；
+    //    .72 是四套两面同时过线的最低值（再高到 .75 会反超二级字那档，顺序就倒了）。
     const me = await enter('/pages/me/me')
     await sleep(4000)
     const segs = await me.$$('.seg')
@@ -107,10 +110,18 @@ const mixOn = (bgHex, inkHex, a) => {
     const want3 = p.hexToRgb(theme.ramp.inks[0])
     const rgb3 = (String(tertiary).match(/\d+/g) || []).slice(0, 3).map(Number)
     ck(`${theme.label}：切到「关于」那一档（.copyright 在这档里才渲染）`, tabNow === 'about', tabNow)
-    ck(`${theme.label}：三级字 alpha = .55（原来 .4 压卡底只有 2.35~2.44，不过 3.0）`,
-      a3 !== null && Math.abs(a3 - 0.55) < 0.01, tertiary)
+    ck(`${theme.label}：三级字 alpha = .72（.55 压页底实测 3.03~3.25，站长真机说"很难看清"）`,
+      a3 !== null && Math.abs(a3 - 0.72) < 0.01, tertiary)
     ck(`${theme.label}：三级字用的就是本套那支墨 ${theme.ramp.inks[0]}（没串色）`,
       rgb3.length === 3 && rgb3.every((v, i) => Math.abs(v - want3[i]) <= 1), `${rgb3.join(',')} vs ${want3.join(',')}`)
+    // 两面都要过线：那些数字有的压在卡上（列表日期、要点计数），有的直接压在页底
+    //（「关于」那几行右侧的值、版权行）——只测卡底会漏掉页底那一面，而页底才是更暗的一面。
+    ck(`${theme.label}：三级字压本套卡底过正文门槛 4.5`,
+      p.crOf(mixOn(theme.line, theme.ramp.inks[0], 0.72), theme.line) >= 4.5,
+      p.crOf(mixOn(theme.line, theme.ramp.inks[0], 0.72), theme.line).toFixed(2))
+    ck(`${theme.label}：三级字压本套页底过正文门槛 4.5`,
+      p.crOf(mixOn(theme.page, theme.ramp.inks[0], 0.72), theme.page) >= 4.5,
+      p.crOf(mixOn(theme.page, theme.ramp.inks[0], 0.72), theme.page).toFixed(2))
 
     // ③b 二级字这一档 .66 → .72（站长 10-04 拍）：读「我的」页那行 slogan 的计算色，
     //     它是真吃 --text-secondary 且**不压在照片上**的元素（首页 .stat .l 在铺图态被翻成纸白，

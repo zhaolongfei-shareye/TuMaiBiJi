@@ -277,12 +277,16 @@
    真正高一档的只有这列数（原来 --fs-title 16px＝31rpx）。所以只降它，字不动——
    把 28 改成 21 会让三句规则比介绍还小，那是另一回事，他没点。
    字色给 secondary（与 `.rule-label` 同档），不再往下掉到 tertiary：这支数字是 Thin 字重，
-   再浅一档在浅色壁纸上就快看不见了。数字仍吃 'WtsjMind'（子集带 + - . / 那几个符号）。 */
+   再浅一档在浅色壁纸上就快看不见了。数字仍吃 'WtsjMind'（子集带 + - . / 那几个符号）。
+   ⚠ 降到 21rpx 之后他真机（天青那一套）还是回："部分数字颜色太浅，与背景太接近，很难看清，
+   请调高一档颜色"。卡底 #F1F3F2 上二级字实测 **5.17:1**——数字本身达标，但这支字体子集里
+   **只有 Thin 一个字重**（加不了粗），细笔画在同档墨色下就是比旁边的汉字淡一档。所以抬 primary：
+   **11.89:1**，与左边那三句标签拉开一档，读起来正好是"句子＋末尾那个数"。 */
 .rule-value {
   margin-left: auto;
   font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-size: var(--fs-tiny);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   white-space: nowrap;
 }
 
@@ -527,11 +531,14 @@
 }
 
 .about-ver {
-  /* 版本号是"v + 数字 + 点"，整串跟着全局那一档走，不然半粗半细更难看（字体里有 v 和 .） */
+  /* 版本号是"v + 数字 + 点"，整串跟着全局那一档走，不然半粗半细更难看（字体里有 v 和 .）。
+     站长 10-05 真机："版本号也很浅"——二级字 .72 压在卡底实测 5.17:1，数字本身达标，
+     但这支是 **Thin 一档字重**（子集里就一个字重，加不了粗），细笔画在同档墨色下就是比汉字淡。
+     所以这一枚直接吃 primary（11.89:1）：它是这格里唯一需要被读准的标识，不是次要说明。 */
   font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-size: var(--fs-label);
   font-weight: 100;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   background: var(--chip-idle);
   padding: 3rpx 14rpx;
   border-radius: var(--r-pill);

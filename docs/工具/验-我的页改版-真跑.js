@@ -304,10 +304,22 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck('这张图真在包里、尺寸 1280×1024（5:4）', img.ok && img.w === 1280 && img.h === 1024, JSON.stringify(img))
 
   /* ---------- ⑤ 设置那五条：右端一枚裸箭头 + 从底部弹上来的那一层 ---------- */
+  /* 名字要从 `.menu-label` 读，不能整行 `text()`：10-05 那批文案给前四行各加了一枚
+     `.menu-hint`，整行文本变成"卡片模板分享给朋友那张卡片上印什么"，这条判据就从
+     钉名字变成了钉"这一行永远只有名字"——而它红的那一晚改的是字色，一行没动。 */
   const labels = []
-  for (const r of await page.$$('.menu-item')) labels.push((await r.text()).replace(/\s+/g, ''))
+  for (const r of await page.$$('.menu-label')) labels.push((await r.text()).replace(/\s+/g, ''))
   ck('设置态是五条：卡片模板/外观设置/分类管理/私密密码/注销账号',
     labels.join('|') === '卡片模板|外观设置|分类管理|私密密码|注销账号', labels.join('|'))
+  /* 四行的小字说明常驻（他 10-05 打回过"切换开关就看不到注释"），钉数量也钉内容——
+     内容与字典比、不与硬写的中文比，换语言时这条不该红。注销账号那行没给说明，是他还没拍。 */
+  const hints = []
+  for (const r of await page.$$('.menu-hint')) hints.push((await r.text()).replace(/\s+/g, ''))
+  const dict = (await page.data()).t || {}
+  const wantHints = [dict.navProfileTip, dict.wallpaperTip, dict.categoriesTip, dict.privatePasswordTip]
+    .map((x) => String(x || '').replace(/\s+/g, ''))
+  ck('前四行各有一行右侧小字，且就是字典里那四句（不是硬写的中文）',
+    hints.length === 4 && hints.every((x, i) => x === wantHints[i]), hints.join('|'))
   ck('行高 106（不再是 118 那种大块头）', Math.abs(toRpx(m.items[0].height, W) - 106) <= 2, toRpx(m.items[0].height, W).toFixed(0))
   ck('每行右边一枚 46 见方的箭头位（盒子没跟着圆底一起撤，行右端那条竖线要照它对齐）',
     m.icos.length === 5 && Math.abs(toRpx(m.icos[0].width, W) - 46) <= 2
@@ -316,7 +328,9 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   /* 站长 10-04：「右侧的圆点+箭头太突兀，只留箭头符号即可」。
      钉两件事：圆底那块面没了；那一笔箭头不再是圆底上抠出来的纸白。
      箭头色只钉 alpha 不钉色相——--text-tertiary 四套各一份（象牙 53,46,29 / 天青 29,53,34 /
-     樱落 53,29,41 / 雨雾 33,36,49），钉死 RGB 就等于把这把尺子钉在象牙那一套上。 */
+     樱落 53,29,41 / 雨雾 33,36,49），钉死 RGB 就等于把这把尺子钉在象牙那一套上。
+     alpha 这一档 10-05 从 .55 抬到 .72（站长真机："部分数字颜色太浅，很难看清"）；
+     这里跟着改判据，不改代码去迁就旧尺子。 */
   /* 属性名要用四角那一条，不能用简写：`border-radius` 在这个 style 接口上回 null
      （实测就是这一把第一次红的地方），null 参与 parseFloat 会变 NaN，判据永远红。 */
   const icoStyle = await styleOf(page, '.ico', ['background-color', 'border-top-left-radius'])
@@ -325,9 +339,14 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
       && parseFloat(icoStyle['border-top-left-radius'] || '99') === 0,
     `${icoStyle['background-color']} / ${icoStyle['border-top-left-radius']}`)
   const cvColor = (await styleOf(page, '.ico .cv', ['border-right-color']))['border-right-color'] || ''
-  ck('那一笔箭头吃三级字那一档（alpha .55，不再是圆底上抠出来的纸白）',
-    /0\.55\)/.test(cvColor) && !/242, 239, 233/.test(cvColor), cvColor)
-  ck('行里不再有"未设置"这类状态文字（旧判据作废）', !labels.some((x) => /未设置|密码已设置/.test(x)))
+  ck('那一笔箭头吃三级字那一档（alpha .72，不再是圆底上抠出来的纸白）',
+    /0\.72\)/.test(cvColor) && !/242, 239, 233/.test(cvColor), cvColor)
+  /* 这一条必须拿**整行**文本判，不能退到 `.menu-label`：它钉的是"那一行里再没有别的状态字"
+     （旧口径右侧写"未设置/密码已设置"），只看名字那个节点就永远为真、等于没判。 */
+  const rowTexts = []
+  for (const r of await page.$$('.menu-item')) rowTexts.push((await r.text()).replace(/\s+/g, ''))
+  ck('行里不再有"未设置"这类状态文字（除名字与那行常驻小字，右端不挂第三种字）',
+    !rowTexts.some((x) => /未设置|密码已设置/.test(x)), rowTexts.join('|'))
 
   const iPwd = labels.findIndex((x) => x.indexOf('私密密码') === 0)
   await (await (await page.$$('.menu-item'))[iPwd]).tap()
