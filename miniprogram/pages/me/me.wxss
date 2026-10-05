@@ -226,9 +226,13 @@
   min-width: 0;
 }
 
+/* 「关于」那两行箭头左侧的值（网站、邮箱）。站长 10-05：这一处的字体风格没和上面
+   「设置」那四行右侧的小字统一——那就并到同一档：同一个字号令牌、同一支 tertiary 墨色、
+   同样 nowrap。两行都只有 latin 串（agentsbin.cn / 邮箱），没有汉字，所以不必走
+   `验-数字字体全局` 那条"含汉字就别吃数字字形"的分支，仍不写 font-family。 */
 .menu-value {
-  font-size: var(--fs-meta);
-  color: var(--text-secondary);
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
   white-space: nowrap;
 }
 
@@ -268,10 +272,17 @@
   color: var(--text-secondary);
 }
 
+/* 站长 10-05 两条一起落在这格上：「魅力值的数字也过大」＋"分小点的字要与产品介绍一样大"。
+   实测这一块的**字**本来就已经同档（`.rule-label` 与 `.about-p` 都 14px＝28rpx＝--fs-body），
+   真正高一档的只有这列数（原来 --fs-title 16px＝31rpx）。所以只降它，字不动——
+   把 28 改成 21 会让三句规则比介绍还小，那是另一回事，他没点。
+   字色给 secondary（与 `.rule-label` 同档），不再往下掉到 tertiary：这支数字是 Thin 字重，
+   再浅一档在浅色壁纸上就快看不见了。数字仍吃 'WtsjMind'（子集带 + - . / 那几个符号）。 */
 .rule-value {
   margin-left: auto;
   font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-size: var(--fs-title);
+  font-size: var(--fs-tiny);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 

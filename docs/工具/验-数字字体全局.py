@@ -71,7 +71,11 @@ FIELDS = [
     # 窗里不再有任何数字要吃这支字体，所以旧的那一条判据作废——不是删了判据，是它钉的东西没了。
     ('pages/detail/detail.wxss', '.point-num', 'var(--fs-tiny)', '', '详情页要点序号'),
     ('pages/share/view.wxss', '.point-num', '22rpx', '', '扫码落地页要点序号'),
-    ('pages/me/me.wxss', '.rule-value', 'var(--fs-title)', '+', '魅力值规则那三行的数（100 / +10 / +1）'),
+    # 站长 10-05 两条：「魅力值的数字也过大」＋"分小点的字要与产品介绍一样大"。实测那一块的
+    # **字**本来就同档（.rule-label 与 .about-p 都是 --fs-body），高的只有这列数（原 --fs-title），
+    # 所以只降数、不动字。字号从 31rpx 降到 21rpx 是**这一轮改的**，不是当年"只改字体不改尺寸"
+    # 那条被破——那条管的是"给它换数字字形时别顺手改字号"，这次是他主动要小一档。
+    ('pages/me/me.wxss', '.rule-value', 'var(--fs-tiny)', '+', '魅力值规则那三行的数（100 / +10 / +1）'),
     ('pages/write/write.wxss', '.char-count', 'var(--fs-tiny)', '/', '摘要字数 137/500'),
     ('pages/me/me.wxss', '.about-ver', 'var(--fs-label)', 'v.', '「我的」页那枚版本号（具体号由 appInfo.js 定，这里不钉）'),
     ('pages/about/about.wxss', '.brand-ver', 'var(--fs-micro)', 'v.', '关于页那枚版本号'),

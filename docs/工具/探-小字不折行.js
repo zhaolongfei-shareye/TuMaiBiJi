@@ -1,6 +1,9 @@
-// 一次性探针（站长 10-05 两条文案改动）：新加的小字在中英文两种态下**不许折行、不许顶出那一行**。
+// 一次性探针（站长 10-05 三条文案/字号改动）：这几处小字在中英文两种态下**不许折行、不许顶出那一行**，
+// 而且**字号档要对得上**（同一屏上实测 px 折回 rpx 与令牌比，不只比源码里的名字）。
 //   ① 「我的→设置」四行右侧说明——每句说这一行**拿来干嘛**（不是里面装着什么零件），
 //     字面量一律现读字典，改文案不必来改这把尺子
+//   ①b 「我的→关于」箭头左侧那串值（网站、邮箱）并到①同一档；魅力值那三行的数也从 --fs-title 降下来
+//     （他两条原话：「没有与设置的小字统一，请统一风格」＋「包括下面魅力值的数字，也过大」）
 //   ② 首页成品弹窗药丸上面那行，**开着与关掉两态各量一次**（站长 10-05：注释不能一开关就没）
 // 为什么不能靠肉眼：`.menu-hint` 写了 `white-space: nowrap`，折行不会发生——**挤不下变成"顶出右边界"**，
 // 而顶出去的东西在截图里常常看不出来（箭头被挤走、字压到卡片边缘）。所以这里量渲染盒子，不量字符串长度：
@@ -14,21 +17,45 @@ const path = require('path')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const lang = require('./尺子语言钉.js')
 
+// 字号档从令牌现读（app.wxss 是唯一出处），屏上算出来的 px 再折回 rpx 跟它比
+const APP_CSS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/app.wxss'), 'utf8')
+const TOK = (n) => {
+  const m = new RegExp('--' + n + ':\\s*([\\d.]+)rpx').exec(APP_CSS)
+  return m ? Number(m[1]) : NaN
+}
+const TINY = TOK('fs-tiny')
+const BODY = TOK('fs-body')
+
 const bad = []
 const ck = (name, ok, got) => {
   console.log(`${ok ? '✓' : '✗'} ${name}${got === undefined || got === '' ? '' : ' → ' + got}`)
   if (!ok) bad.push(name)
 }
 
-// 一次查询把三族盒子都拿回来（px），换算成 rpx 由调用方给比例
+// 一次查询把几族盒子都拿回来（px），换算成 rpx 由调用方给比例
 const grab = (mp) => mp.evaluate(() => new Promise((resolve) => {
   const q = wx.createSelectorQuery()
   q.selectAll('.menu-item').boundingClientRect()
   q.selectAll('.menu-label').boundingClientRect()
   q.selectAll('.menu-hint').boundingClientRect()
   q.selectAll('.ico').boundingClientRect()
-  q.exec((res) => resolve({ items: res[0] || [], labels: res[1] || [], hints: res[2] || [], icos: res[3] || [] }))
+  q.selectAll('.menu-value').boundingClientRect()
+  q.exec((res) => resolve({
+    items: res[0] || [], labels: res[1] || [], hints: res[2] || [], icos: res[3] || [], vals: res[4] || [],
+  }))
 }))
+
+// 屏上**算出来的**字号（automator 的 Element.style 只认 kebab-case）。
+// ⚠ 工具回的是**取整之后的 px**：21rpx 在这台视口是 10.92px，它回 "10px"；28rpx 回 "14px"。
+// 所以判"是不是同一档"两条一起用：① 两个节点之间直接比 px（同档就应当一字不差）；
+// ② 与令牌比时留一整 px 的取整余量（这台视口 1px ≈ 1.92rpx）。
+// 一上来按 ±1rpx 卡令牌会六条全假红（10-05 就是这么红过一轮，界面本身没错）。
+const fontPx = async (page, sel) => {
+  const el = await page.$(sel)
+  if (!el) return NaN
+  const n = parseFloat(await el.style('font-size'))
+  return Number.isFinite(n) ? n : NaN
+}
 
 const grabPill = (mp) => mp.evaluate(() => new Promise((resolve) => {
   const q = wx.createSelectorQuery()
@@ -57,6 +84,36 @@ const grabPill = (mp) => mp.evaluate(() => new Promise((resolve) => {
 
       const page = await mp.reLaunch('/pages/me/me')
       await sleep(4500)
+
+      // ————— 「关于」那一格先量（站长 10-05 两条都落在这上面：箭头左侧那串值的字号档、
+      //       以及魅力值那三行的数过大）—————
+      await page.setData({ tab: 'about' })
+      await sleep(1400)
+      const ga = await grab(mp)
+      ck(`${L}｜关于那两行箭头左侧都给了值（网站、邮箱两行都在）`,
+        ga.vals.length === 2, `量到 ${ga.vals.length} 条`)
+      ga.vals.forEach((v, i) => {
+        const it = ga.items.find((x) => v.top >= x.top - 2 && v.bottom <= x.bottom + 2)
+        const ico = ga.icos.find((x) => Math.abs((x.top + x.bottom) / 2 - (v.top + v.bottom) / 2) < 30)
+        console.log(`  关于第 ${i + 1} 行：值 ${toR(v.left)}→${toR(v.right)}rpx · 箭头左沿 ${ico ? toR(ico.left) : '?'}rpx · 行右沿 ${it ? toR(it.right) : '?'}rpx · 高 ${toR(v.height)}rpx`)
+        ck(`${L}｜关于第 ${i + 1} 行那串值只有一行`, toR(v.height) <= 34, `高 ${toR(v.height)}rpx`)
+        ck(`${L}｜关于第 ${i + 1} 行那串值没压到右边那枚箭头`,
+          !ico ? false : toR(v.right) <= toR(ico.left),
+          ico ? `间隙 ${toR(ico.left - v.right)}rpx` : '没配到箭头')
+      })
+      const sMV = await fontPx(page, '.menu-value')
+      const sRV = await fontPx(page, '.rule-value')
+      const sRL = await fontPx(page, '.rule-label')
+      const sAP = await fontPx(page, '.about-p')
+      const near = (px, tokRpx) => Number.isFinite(px) && Math.abs(px - tokRpx * R) < 1.05
+      console.log(`  字号实测（px，工具给的是取整值）：值 ${sMV} · 魅力值那列数 ${sRV} · 分点文字 ${sRL} · 产品介绍 ${sAP}｜令牌折 px：小字 ${(TINY * R).toFixed(2)} 正文 ${(BODY * R).toFixed(2)}`)
+      ck(`${L}｜箭头左侧那串值并到小字那一档（实测对上 --fs-tiny ${TINY}rpx）`,
+        near(sMV, TINY), `${sMV}px`)
+      ck(`${L}｜魅力值那三行的数降到同一档（原 --fs-title 31rpx 被他打回"过大"）`,
+        near(sRV, TINY), `${sRV}px`)
+      ck(`${L}｜分小点那三句的字与产品介绍同档（等 --fs-body，这两处他都没点，本来就该等）`,
+        sRL === sAP && near(sRL, BODY), `${sRL}px vs 介绍 ${sAP}px`)
+
       await page.setData({ tab: 'set' })
       await sleep(1200)
       const dict = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js')).texts(L)
@@ -93,6 +150,14 @@ const grabPill = (mp) => mp.evaluate(() => new Promise((resolve) => {
         ck(`${L}｜第 ${i + 1} 行屏上就是字典里那句（${hintKeys[i]}，没串位、没留旧串）`,
           hintTexts[i] === dict[hintKeys[i]], `屏上「${hintTexts[i]}」／字典「${dict[hintKeys[i]]}」`)
       })
+
+      // 这一档是本轮"统一字号"的基准，两边都要实测到，不能只比源码里的令牌名
+      const sHint = await fontPx(page, '.menu-hint')
+      const nearHint = Number.isFinite(sHint) && Math.abs(sHint - TINY * R) < 1.05
+      ck(`${L}｜设置那四行的小字仍在 --fs-tiny 这一档（基准，别被下一轮顺手改走）`,
+        nearHint, `${sHint}px vs 令牌 ${TINY}rpx＝${(TINY * R).toFixed(2)}px`)
+      ck(`${L}｜关于那两行的值与设置的小字**实测一字不差**（跨 tab 比 px，这才叫统一）`,
+        sMV === sHint && sRV === sHint, `值 ${sMV}px · 数 ${sRV}px · 小字 ${sHint}px`)
 
       // 药丸那行**两态各量一次**：站长 10-05 打回的第二条就是"一开关注释就没了"，所以两态都必须
       // 自带说明（句中含分隔符），且必须等于字典里那一句——不许有一态是光秃秃的状态词。
