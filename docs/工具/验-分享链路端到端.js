@@ -5,7 +5,7 @@
 //
 // 用法（先起自动化会话，跑完记得关掉，否则真机调试会被这个会话占住）：
 //   /Applications/wechatwebdevtools.app/Contents/MacOS/cli auto \
-//       --project /Users/zlfmac/Documents/TuMaiBiJi/miniprogram --auto-port 9420
+//       --project /Users/zlfmac/Documents/TuMaiBiJi/miniprogram --auto-port 9431
 //   node docs/工具/验-分享链路端到端.js
 //   /Applications/wechatwebdevtools.app/Contents/MacOS/cli close \
 //       --project /Users/zlfmac/Documents/TuMaiBiJi/miniprogram
@@ -17,6 +17,10 @@
 // 而确认之后的那段是产品代码本身（api.revokeShare → setData），所以这条缝只替掉了"用手指点一下"。
 // 状态行本身是真点的（page.$('.share-state').tap()），不是直接调 onUnshare。
 const automator = require('miniprogram-automator')
+
+// 端口跟着 `跑尺子.sh` 那条统一口径：本项目真跑那批一律 9431，这一把原来写死 9420，
+// 用 runner 跑就连不上——报的是连接红，不是判据红。要单独跑旧写法：APORT=9420 node ...
+const PORT = process.env.APORT || '9431'
 const fs = require('fs')
 
 // 截图落在 /tmp，而 /tmp 会被系统清掉；目录不在的时候 mp.screenshot 直接 ENOENT，
@@ -40,7 +44,7 @@ const pub = async (token) => {
 }
 
 ;(async () => {
-  const mp = await automator.connect({ wsEndpoint: 'ws://localhost:9420' })
+  const mp = await automator.connect({ wsEndpoint: `ws://localhost:${PORT}` })
   let noteId = null
   let jwt = ''
   try {

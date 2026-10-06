@@ -6,10 +6,14 @@
 //      同上环境变量再起 uvicorn --port 8010；限流要用 redis，本地起一个不带持久化的即可
 //   2) 把 miniprogram/utils/api.js 的 API_BASE 临时指到 http://127.0.0.1:8010，
 //      跑完立刻改回 https://api.agentsbin.cn/wtsj，并确认 git status 里这个文件是干净的
-//   3) cli auto --project .../miniprogram --auto-port 9420，然后
+//   3) cli auto --project .../miniprogram --auto-port 9431，然后
 //      NODE_PATH=/tmp/mp-verify/node_modules node docs/工具/验-转存与作者.js
 // 全程只在这份临时库里读写，不碰现网数据。
 const automator = require('miniprogram-automator')
+
+// 端口跟着 `跑尺子.sh` 那条统一口径：本项目真跑那批一律 9431，这一把原来写死 9420，
+// 用 runner 跑就连不上——报的是连接红，不是判据红。要单独跑旧写法：APORT=9420 node ...
+const PORT = process.env.APORT || '9431'
 const fs = require('fs')
 
 const BASE = 'http://127.0.0.1:8010'
@@ -40,7 +44,7 @@ const txt = async (els) => {
 
 ;(async () => {
   fs.mkdirSync(SHOT, { recursive: true })
-  const mp = await automator.connect({ wsEndpoint: 'ws://localhost:9420' })
+  const mp = await automator.connect({ wsEndpoint: `ws://localhost:${PORT}` })
   const ids = []
   let jwt = ''
   try {

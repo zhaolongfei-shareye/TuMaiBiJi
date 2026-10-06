@@ -1,7 +1,7 @@
 /**
  * 怎么跑（这三步顺序不能换，也不能省第一步）：
  *   1) "/Applications/wechatwebdevtools.app/Contents/MacOS/cli" auto \
- *        --project /Users/zlfmac/Documents/TuMaiBiJi/miniprogram --auto-port 9420
+ *        --project /Users/zlfmac/Documents/TuMaiBiJi/miniprogram --auto-port 9431
  *      —— IDE 要先开着并且登录着。上一轮如果用过 mp.close()，端口会被一起关掉，
  *      必须重新跑这一条；只想断开不断服务，用 mp.disconnect()。
  *   2) mkdir -p /tmp/mp-verify && cd /tmp/mp-verify && npm i miniprogram-automator
@@ -27,6 +27,10 @@
  * 那是一条怎么跑都绿的废断言（第一版就是这么假通过过一次）。
  */
 const automator = require('miniprogram-automator')
+
+// 端口跟着 `跑尺子.sh` 那条统一口径：本项目真跑那批一律 9431，这一把原来写死 9420，
+// 用 runner 跑就连不上——报的是连接红，不是判据红。要单独跑旧写法：APORT=9420 node ...
+const PORT = process.env.APORT || '9431'
 const fs = require('fs')
 
 const SHOT = '/tmp/mp-check'
@@ -43,7 +47,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 async function main() {
   fs.mkdirSync(SHOT, { recursive: true })
   console.log('=== 连接自动化会话 ===')
-  const mp = await automator.connect({ wsEndpoint: 'ws://localhost:9420' })
+  const mp = await automator.connect({ wsEndpoint: `ws://localhost:${PORT}` })
   console.log('  已连上')
 
   try {

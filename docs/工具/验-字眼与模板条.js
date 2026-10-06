@@ -1,7 +1,7 @@
 // 界面字眼 + 笔记卡片页那一排模板小图，逐条对着需求验收（跑在开发者工具里，打现网真接口）。
 // 用法：
 //   /Applications/wechatwebdevtools.app/Contents/MacOS/cli auto \
-//       --project /Users/zlfmac/Documents/TuMaiBiJi/miniprogram --auto-port 9420
+//       --project /Users/zlfmac/Documents/TuMaiBiJi/miniprogram --auto-port 9431
 //   NODE_PATH=/tmp/mp-verify/node_modules node docs/工具/验-字眼与模板条.js
 //   /Applications/wechatwebdevtools.app/Contents/MacOS/cli close \
 //       --project /Users/zlfmac/Documents/TuMaiBiJi/miniprogram
@@ -10,6 +10,10 @@
 // 小图那一排"固定样式、不动态刷新"也是量的：先等它长定（两轮取样尺寸一致），再连点三套，
 // 比 .pick-canvas 的尺寸和名字——只有选中态的外环可以变，格子本身不许动（曾经边框加粗抖 2px）。
 const automator = require('miniprogram-automator')
+
+// 端口跟着 `跑尺子.sh` 那条统一口径：本项目真跑那批一律 9431，这一把原来写死 9420，
+// 用 runner 跑就连不上——报的是连接红，不是判据红。要单独跑旧写法：APORT=9420 node ...
+const PORT = process.env.APORT || '9431'
 const lang = require('./尺子语言钉.js')
 const fs = require('fs')
 
@@ -43,7 +47,7 @@ const txt = async (els) => {
 
 ;(async () => {
   fs.mkdirSync(SHOT, { recursive: true })
-  const mp = await automator.connect({ wsEndpoint: 'ws://localhost:9420' })
+  const mp = await automator.connect({ wsEndpoint: `ws://localhost:${PORT}` })
   // 下面那一整套期望值是中文串，而语言是登录时从服务端带回的（测试号存的是 en）。
   // 原来这里只做一次检查、不是中文就退 4 让人手工切——现在自己钉成 zh，收尾还回去。
   // 钉的时机必须在登录之后：app.js:102 那一句是登录回包里盖掉整个 userInfo 的，
