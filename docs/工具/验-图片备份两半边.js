@@ -30,7 +30,14 @@ const MAIN = read('backend/app/main.py')
 // 语法先过一遍：这两个文件里有 async/await 与可选链，node 直接 require 会去跑 wx.
 // 所以只做语法检查，不执行。
 const { execFileSync } = require('child_process')
-for (const f of ['miniprogram/utils/imageCompress.js', 'miniprogram/utils/cloudUpload.js']) {
+for (const f of [
+  'miniprogram/utils/imageCompress.js',
+  'miniprogram/utils/cloudUpload.js',
+  'miniprogram/utils/assetQueue.js',
+  'miniprogram/pages/create/create.js',
+  'miniprogram/app.js',
+  'miniprogram/utils/api.js',
+]) {
   let ok = true
   let why = ''
   try {
@@ -93,6 +100,33 @@ ck('张数卡的是"这篇最终有多少张"，不是"这一次送几条"',
   /current \| \{it\.file_id for it in items\}/.test(BE))
 ck('fileID 光杆 cloud:// 被拒（前缀之外还得有东西）',
   /rest = fid\[len\("cloud:\/\/"\):\]/.test(BE) && /if not rest/.test(BE))
+
+/* ---------- 六、A/B 双链：B 链不许有任何一条路挡住"笔记存下来" ---------- */
+const CREATE = stripComments(read('miniprogram/pages/create/create.js'))
+const QUEUE = stripComments(read('miniprogram/utils/assetQueue.js'))
+ck('submitScreenshots 里 B 链是"起头不等收尾"（const backup = this._backupShots，没有 await）',
+  /const backup = this\._backupShots\(batch\)/.test(CREATE) && !/await this\._backupShots/.test(CREATE))
+ck('A 链失败那条口也收尾（_settleBackup(null, backup) → 把孤儿对象删掉）',
+  /catch \(err\) \{[\s\S]{0,200}?this\._settleBackup\(null, backup\)/.test(CREATE))
+ck('B 链逐张串行，不 Promise.all（九张 4000×3000 一起重绘会吃穿内存）',
+  /for \(const p of paths/.test(CREATE) && !/Promise\.all/.test(CREATE))
+ck('_settleBackup 整体裹在 try 里，任何炸法都不冒 unhandled rejection',
+  /async _settleBackup[\s\S]{0,700}?console\.warn\('图片备份收尾没走完/.test(CREATE))
+ck('压不动就传原图（"宁可大一点也不丢图"在调用侧也成立）',
+  /const src = small \|\| \{ path: p, bytes: null \}/.test(CREATE))
+
+/* ---------- 七、待补绑队列：云上占着账、库里没有，是最难查的那种漏 ---------- */
+ck('队列有上限 50 且超限丢最旧（无界会把 storage 撑爆）',
+  /MAX_QUEUE = 50/.test(QUEUE) && /list\.splice\(0, list\.length - MAX_QUEUE\)/.test(QUEUE))
+ck('flush 只把绑成功的那条摘掉（一次抖动不该丢掉整批）',
+  /_put\(list\.filter\(\(x\) => !done\.includes\(x\)\)\)/.test(QUEUE))
+ck('push 对同一 fileID 去重（bind 幂等，但队列并起来才少打请求）',
+  /new Set\(mine\.items\.map\(\(it\) => it\.file_id\)\)/.test(QUEUE))
+ck('回到前台补一次绑，且被登录态挡着',
+  /assetQueue\.flush\(apiModule\)/.test(APP) && /if \(this\.globalData\.isLoggedIn\) \{[\s\S]{0,120}?assetQueue\.flush/.test(APP))
+ck('B 链的 gate 只有一处判 cloudReady（判两次会出现"一半传了一半没传"）',
+  (CREATE.match(/cloudReady\(\)/g) || []).length === 1,
+  `${(CREATE.match(/cloudReady\(\)/g) || []).length} 处`)
 
 console.log(bad.length ? `\n✗ ${bad.length} 条不过：${bad.join(' / ')}` : '\n全过')
 process.exit(bad.length ? 1 : 0)

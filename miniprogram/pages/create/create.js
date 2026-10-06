@@ -3,6 +3,9 @@ const { t, texts } = require('../../utils/i18n.js')
 const { toneStyle, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const { allowPrivate } = require('../../utils/privateGate.js')
+const cloudUpload = require('../../utils/cloudUpload.js')
+const assetQueue = require('../../utils/assetQueue.js')
+const { compressForBackup } = require('../../utils/imageCompress.js')
 
 // 链接规范：必须有协议头、主机名里要有顶级域、整串不能出现空白。
 // 之前只判"以 http 开头且某处有个点"，`https://a.com 后面还有字` 和 `http:///a.b` 都能过，
@@ -441,22 +444,75 @@ Page({
     this.setData({ busy: 'shot', errLine: '' })
     // 提交的是点下去那一刻的那批图，后面列表再怎么变都不影响这一单
     const batch = this.data.previewImages.slice()
+    // B 链（把图留下来）与 A 链（提炼建笔记）同时起跑，谁也不等谁。这里**不 await**：
+    // 它慢、它失败，都不该让"笔记没存下来"这件事发生（方案 §3.1.4 那条关键原则）。
+    // CLOUD_ENV 没填时 cloudReady() 是 false，这一趟直接跳过，行为和今天一字不差。
+    const backup = this._backupShots(batch)
     try {
       const { task_id } = await api.ingestScreenshots(batch)
       const result = await api.pollTask(task_id)
       this.setData({ busy: '', previewImages: [], shotDesc: this.shotDescFor(0), barTitle: this.barTitleFor('shot', 0) })
       wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
+      this._settleBackup(result.note_id, backup)
       setTimeout(() => {
         wx.navigateTo({ url: `/pages/detail/detail?id=${result.note_id}` })
       }, 800)
     } catch (err) {
       console.error('截图导入失败', err)
+      // 这篇笔记没建出来，已经传上去的图就是孤儿对象——占全站那 5GB 却没人记得它，
+      // 所以顺手删掉。删不动（弱网）就留给云上，这条残留记在方案 §3 阶段 3 的出口条件里。
+      this._settleBackup(null, backup)
       this.setData({
         busy: '',
         errLine: err.timeout
           ? t('taskTimeout', lang)
           : ((err.data && err.data.detail) || err.error || t('taskFailed', lang)),
       })
+    }
+  },
+
+  /**
+   * B 链：逐张压、逐张传，攒出 bind 要的那批 items。
+   * **串行不并行**——九张 4000×3000 的截图一起重绘离屏 canvas 会把内存吃穿，
+   * 而真机在这件事上比模拟器诚实得多。
+   */
+  async _backupShots(paths) {
+    if (!cloudUpload.cloudReady()) return { skipped: true, items: [], fileIDs: [] }
+    const userId = getApp().globalData.userId
+    const items = []
+    for (const p of paths || []) {
+      const small = await compressForBackup(p)
+      // 压不动（读不到尺寸/画不出来）就传原图：宁可这一张大一点，也不要"图丢了"
+      const src = small || { path: p, bytes: null }
+      const up = await cloudUpload.uploadImage(src.path, userId)
+      if (!up) continue
+      items.push({
+        file_id: up.fileID,
+        size: small ? small.bytes : null,
+        width: small ? small.width : null,
+        height: small ? small.height : null,
+      })
+    }
+    return { skipped: false, items, fileIDs: items.map((i) => i.file_id) }
+  },
+
+  /** 收尾：A 链给了 note_id 就绑，绑不上就落本机队列下次补；A 链没成就把对象删掉。 */
+  async _settleBackup(noteId, backupPromise) {
+    try {
+      const r = await backupPromise
+      if (!r || r.skipped || !r.items.length) return
+      if (!noteId) {
+        await cloudUpload.deleteFiles(r.fileIDs)
+        return
+      }
+      try {
+        await api.bindNoteAssets(noteId, r.items)
+      } catch (e) {
+        assetQueue.push(noteId, r.items)
+      }
+    } catch (e) {
+      // 这条链任何一处炸了都不许冒出 unhandled rejection：它整个是附属品
+      console.warn('图片备份收尾没走完（不影响笔记）', e && (e.errMsg || e.message))
     }
   },
 

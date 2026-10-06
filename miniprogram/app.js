@@ -1,4 +1,6 @@
 const { request } = require('./utils/api')
+const apiModule = require('./utils/api')
+const assetQueue = require('./utils/assetQueue')
 const posterTemplates = require('./utils/posterTemplates')
 const cloudUpload = require('./utils/cloudUpload')
 const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle } = require('./utils/palette')
@@ -60,6 +62,14 @@ App({
     // 冷启由 _doLogin 带着 inviter 一起走；这里只管"已经登录着"的热启那条路。
     if (this.globalData.isLoggedIn && wx.getStorageSync(INVITER_KEY)) {
       this._reportInviter()
+    }
+    // 待补绑队列：图传上去了但"归到哪篇笔记"没做成（B 链比 A 链慢、或 bind 那一下弱网）。
+    // 这批对象在云上占着全站配额、库里却没有账，所以每次回到前台补一次。
+    // 不 await、不提示：它属于"看不见但迟早要对上"的那一类。
+    if (this.globalData.isLoggedIn) {
+      assetQueue.flush(apiModule).then((r) => {
+        if (r && r.sent) console.log(`补绑回 ${r.sent} 张图`)
+      })
     }
   },
 
