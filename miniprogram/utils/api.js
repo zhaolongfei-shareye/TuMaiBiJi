@@ -201,6 +201,13 @@ module.exports = {
   createNote: (data) => request('/api/notes/', 'POST', data),
   updateNote: (id, data) => request(`/api/notes/${id}`, 'PUT', data),
   deleteNote: (id) => request(`/api/notes/${id}`, 'DELETE'),
+  // 笔记配图那三接口（2.0 的 B 链）。图片字节不经过后端，这里传的每一项都是
+  // {file_id, size, width, height}——**方案文档 §3.1.5 原来写的是只传 file_ids 字符串数组**，
+  // 少了 size 就没法算配额（后端那 5GB 是按 SUM(file_size) 看的），所以按 items 传。
+  // size 拿不到时可以不给，那一行就不计入配额，比"因为取不到大小而整张图存不上"好。
+  bindNoteAssets: (id, items) => request(`/api/notes/${id}/assets`, 'POST', { items }),
+  getNoteAssets: (id) => request(`/api/notes/${id}/assets`),
+  getStorageQuota: () => request('/api/user/storage-quota'),
   ingestUrl: (url) => request('/api/ingest/url', 'POST', { url }, { contentType: 'application/x-www-form-urlencoded' }),
   // 手打这一档也交给模型提炼：送的是用户自己写的标题 + 原文，回来的是摘要。
   // 归类跟着这一篇走（服务端认人不认客户端说的 source_type）。
