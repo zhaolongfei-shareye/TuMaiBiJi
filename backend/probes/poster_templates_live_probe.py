@@ -8,6 +8,11 @@
 ③ 表建了、种子没灌（deploy.sh 那一步 1.7 被跳过）→ 接口回空数组，客户端合并列表退回包内十项，
    现象与②一模一样，但从界面上看不出来。
 
+**10-06 本机彩排（`probes/rehearse_poster_probe.sh`）翻出这支探针自己有两处不行，都改了**：
+③ 当时抓不到——"接口行数 == 库里行数"在两边都是 0 时照样成立，所以补了一条"live 不许是零行"的地板；
+① 当时不报红而是抛 SQLAlchemy 堆栈（一屏看不懂的栈，等于没给结论），所以先查一次表在不在。
+改探针必须重跑那一趟彩排，三档预期（全绿／红在零行／红在没表）钉在彩排脚本里。
+
 用法（服务器上跑，**必须先 cd 到项目目录**：家目录那份 .env 是另一个项目的）：
 
     cd /home/ubuntu/wtsj-backend && .venv/bin/python probes/poster_templates_live_probe.py
@@ -15,6 +20,7 @@
 只用 deploy-test（users.id=1）这一个账号，且**通篇只读**：不写库、不建笔记、不碰内容安全额度，
 所以收尾没什么可还原的。token 是本机签出来直接打现网用的，不落盘。
 """
+import os
 import re
 import sys
 from pathlib import Path
@@ -22,15 +28,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import httpx
+from sqlalchemy import inspect as sa_inspect
 
 from app.core.auth import _create_token
 from app.db.database import SessionLocal
 from app.models.poster_template import GROUP_KEYS, PosterTemplate
 from app.models.user import User
 from app.services.poster_recipe import validate_recipe
-from app.services.poster_templates import content_hash_of
+from app.services.poster_templates import content_hash_of, seed_rows
 
-BASE = "https://api.agentsbin.cn/wtsj"
+# 默认打现网；PROBE_BASE 只给"本机彩排"用（10-06 加：这支探针上线前一次都没跑过，
+# 而它自己就有过一条判据是虚的——见下面"live 一行都没有"那条，不彩排永远发现不了）。
+BASE = os.environ.get("PROBE_BASE", "https://api.agentsbin.cn/wtsj").rstrip("/")
 PATH = "/api/poster/templates/"
 FIELDS = {
     "template_id", "label", "label_en", "group_key",
@@ -49,6 +58,13 @@ with SessionLocal() as db:
     me = db.get(User, 1)
     assert me is not None, "users.id=1（deploy-test）不在库里，这支探针只准跑在它身上"
     token = _create_token(me.id)
+    # 开头说的第①种漏法（迁移没跑到，表压根不存在）今天彩排出来的是这个脸色：
+    # 下面那句 query 直接抛 sqlalchemy 的 OperationalError，一屏堆栈，看不出该干什么。
+    # 先查一次表在不在，红就红得能说人话。
+    if "poster_templates" not in set(sa_inspect(db.get_bind()).get_table_names()):
+        ck("库里那张表在（①迁移没跑到 a7d2e5b8c310 就是这一条红）", False, "库里没有 poster_templates 这张表")
+        print("\n红 1 条：表都还没建出来，先跑部署（alembic 会把它带上来），再回来跑这支。")
+        sys.exit(1)
     db_rows = db.query(PosterTemplate).filter(PosterTemplate.status == "live").all()
 
 hdr = {"Authorization": f"Bearer {token}"}
@@ -65,6 +81,10 @@ ck("回的是数组（客户端 applyRemoteTemplates 第一眼就问这条，不
    isinstance(body, list), type(body).__name__)
 
 rows = body if isinstance(body, list) else []
+# 本文件开头说的第③种漏法（表建了、种子没灌）在这里必须是红，但"接口行数 == 库里行数"抓不到它：
+# 两边都是 0，等式照样成立。所以先单独钉一条地板——live 零行就是没灌，不是"刚好都空着"。
+ck(f"库里 live 不是零行（deploy.sh 那一步 1.7 真跑过；种子那边有 {len(seed_rows())} 套）",
+   len(db_rows) > 0, f"库里 live {len(db_rows)} 行 / 接口 {len(rows)} 条")
 ck(f"现网 live 的行数与库里一致（接口 {len(rows)} / 库里 {len(db_rows)}）",
    len(rows) == len(db_rows), f"差 {len(rows) - len(db_rows)}")
 ids = [str(x.get("template_id")) for x in rows]
