@@ -232,9 +232,17 @@ ck('新写类名带页面前缀（dt- / sv- / me-storage），别的页面同名
    （踩过的坑记一笔：往 /tmp 写变异副本时，文件名别拿中文名的字节前缀算——"去掉 50 条上限"和
    "去掉同 fileID 去重"前四个字节一样，两份副本撞成同一个文件，第二次的改动根本没生效。） */
 const finish = () => {
+  clearTimeout(watchdog)
   console.log(bad.length ? `\n✗ ${bad.length} 条不过：${bad.join(' / ')}` : '\n全过')
   process.exit(bad.length ? 1 : 0)
 }
+/* 看门狗：这一段是异步的，任何一条路把某个 Promise 挂住（替身少发一个回调就会这样），
+   node 会在事件循环空掉时**静默 exit 0**——上面 66 条已经打完全绿，退出码 0，
+   而第九、十段一条都没跑。所以跑不完必须是红，不能是"没声音"。 */
+const watchdog = setTimeout(() => {
+  console.log('\n✗ 第九/十段没跑完（有替身没把回调发完，promise 永挂 → node 会静默 exit 0，这条就是防它）')
+  process.exit(1)
+}, 30000)
 ;(async () => {
   let store = {}
   let warns = []
@@ -327,6 +335,44 @@ const finish = () => {
   global.wx.setStorageSync = origSet
   ck('跑起来：storage 写不进去时 push 不抛穿（调用方是 B 链收尾，它一抛就会冒 unhandled rejection）',
     threw === null, threw && threw.message)
+  /* ---------- 十、今天这一支整条链是"关着的"——跑出来，不是读出来 ---------- */
+  /* 上面 §三 那四条查的是源码形状。这里给一个**功能齐全**的假 wx.cloud（env 没填才是关着的原因，
+     不是因为设备没有云能力），逐个数调用：真机上开发者工具会连 wx.cloud 都给你，
+     所以只有"init/upload/delete 一次都没打"才算证明今天的行为一字不变。 */
+  const cloudCalls = { init: 0, upload: 0, remove: 0 }
+  /* 假 wx.cloud 一律**把 success 回调发完**。云开发那几个 API 是回调式的外壳（里面才包 Promise），
+     替身只 return 不调 success，那条 `new Promise` 就永远不 settle——而 node 在事件循环空了的时候
+     会**静默 exit 0**，整把尺子一条没打却"通过"（10-06 反向对照时就是这么假绿的）。 */
+  global.wx = {
+    cloud: {
+      init: () => { cloudCalls.init++ },
+      uploadFile: (o) => { cloudCalls.upload++; if (o && o.success) o.success({ fileID: 'cloud://should-not-happen', statusCode: 204 }) },
+      deleteFile: (o) => { cloudCalls.remove++; if (o && o.success) o.success({ fileList: (o.fileList || []).map(() => ({ status: 0 })) }) },
+    },
+    getStorageSync: () => '', setStorageSync: () => {}, removeStorageSync: () => {},
+    getFileSystemManager: () => ({ accessSync: () => true }),
+    env: { USER_DATA_PATH: '/u' },
+    compressImage: (o) => { if (o && o.fail) o.fail({ errMsg: '不该被调用' }) },
+  }
+  const cu = require(path.join(ROOT, 'miniprogram/utils/cloudUpload.js'))
+  ck('跑起来：CLOUD_ENV 空着，即便设备有完整 wx.cloud，cloudReady 也回 false',
+    cu.CLOUD_ENV === '' && cu.cloudReady() === false, `CLOUD_ENV="${cu.CLOUD_ENV}"`)
+  ck('跑起来：initCloud 是空操作（一次 wx.cloud.init 都没打）',
+    cu.initCloud() === false && cloudCalls.init === 0, JSON.stringify(cloudCalls))
+  const up = await cu.uploadImage('/tmp/fake.jpg', 1)
+  ck('跑起来：uploadImage 回 null 且一次上传都没打（B 链今天一张都不传）',
+    up === null && cloudCalls.upload === 0, JSON.stringify(cloudCalls))
+  const delN = await cu.deleteFiles(['cloud://a.jpg', 'cloud://b.jpg'])
+  ck('跑起来：deleteFiles 回 0 且一次 wx.cloud.deleteFile 都没打（三个删除口今天都走它）',
+    delN === 0 && cloudCalls.remove === 0, JSON.stringify(cloudCalls))
+  const dropN = await cu.dropFromDeleteRes({ file_ids: ['cloud://a.jpg'] })
+  ck('跑起来：拿后端那份清单喂进去也一样静默（回体里真有 file_ids 也不许打）',
+    dropN === 0 && cloudCalls.remove === 0, JSON.stringify(cloudCalls))
+  const savedCloud = global.wx.cloud
+  delete global.wx.cloud
+  ck('跑起来：设备没有云能力这一路也挡得住（cloudReady 两个条件是"与"，少一个都不许往下走）',
+    cu.cloudReady() === false && cu.initCloud() === false)
+  global.wx.cloud = savedCloud
   console.warn = realWarn
 })().then(finish).catch((e) => {
   console.log(`✗ 第九段自己崩了（这不是判据红，是尺子坏了）：${e && e.stack ? e.stack.split('\n')[0] : e}`)
