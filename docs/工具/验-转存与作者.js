@@ -9,6 +9,11 @@
 //   3) cli auto --project .../miniprogram --auto-port 9431，然后
 //      NODE_PATH=/tmp/mp-verify/node_modules node docs/工具/验-转存与作者.js
 // 全程只在这份临时库里读写，不碰现网数据。
+//   4) 跑之前这台模拟器的「卡片模板」那一页得存过一个名称（本机 storage 键 poster_profile 的 name）。
+//      作者昵称不走 users.nickname，它是建分享那一次由客户端带上来的（见 shares.py 的 _author_name）。
+//      那一格空着时服务端存 null、落地页不画作者那行、详情页写「原创作者：—」——这是正确行为
+//      （notes.py 那句"两头都没有就留空，不拿假名去填"），但会让本把尺子从第一条起连着红 6 条。
+//      10-07 实测：填一个名字之后 25 条全过；跑完记得把那一格还原成原样并读回来。
 const automator = require('miniprogram-automator')
 
 // 端口跟着 `跑尺子.sh` 那条统一口径：本项目真跑那批一律 9431，这一把原来写死 9420，
