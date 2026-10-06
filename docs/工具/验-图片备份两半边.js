@@ -221,5 +221,114 @@ ck('新写类名带页面前缀（dt- / sv- / me-storage），别的页面同名
     && /\.sv-shots/.test(read('miniprogram/pages/share/view.wxss'))
     && /\.me-storage/.test(read('miniprogram/pages/me/me.wxss')))
 
-console.log(bad.length ? `\n✗ ${bad.length} 条不过：${bad.join(' / ')}` : '\n全过')
-process.exit(bad.length ? 1 : 0)
+/* ---------- 九、队列跑起来（不以正则为准：真把产品那份 require 进来打一遍） ---------- */
+/* 上面八段查的都是"代码长这样"。这一段查"它真那么做"：拿一个会数调用次数的假 api 与一个假
+   wx storage，把六条路径各走一遍——空队列、绑成、弱网、服务端拒绝、去重合并、超限丢弃。
+   为什么值得单独跑：这条链今天在线上一次都没真跑过（CLOUD_ENV 空着，整条是关的），
+   它坏了没人会看见，只会几个月后配额对不上账时才发现"原来弱网那一次根本没补绑上"。
+   这八条不是永真式：10-06 拿六份改坏的 assetQueue 各跑过一遍（去掉 4xx 摘除／让弱网也丢整批／
+   去掉 fileID 去重／去掉 50 条上限／让 storage 写失败抛穿／让空队列也打一次请求），
+   每一份都把自己那一条判据翻成红，其余不动。
+   （踩过的坑记一笔：往 /tmp 写变异副本时，文件名别拿中文名的字节前缀算——"去掉 50 条上限"和
+   "去掉同 fileID 去重"前四个字节一样，两份副本撞成同一个文件，第二次的改动根本没生效。） */
+const finish = () => {
+  console.log(bad.length ? `\n✗ ${bad.length} 条不过：${bad.join(' / ')}` : '\n全过')
+  process.exit(bad.length ? 1 : 0)
+}
+;(async () => {
+  let store = {}
+  let warns = []
+  const realWarn = console.warn
+  const origSet = (k, v) => { store[k] = v }
+  global.wx = {
+    getStorageSync: (k) => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : ''),
+    setStorageSync: origSet,
+    removeStorageSync: (k) => { delete store[k] },
+  }
+  console.warn = (...a) => { warns.push(a.join(' ')) }
+  const reset = () => { store = {}; warns = [] }
+  const mkApi = (mode) => {
+    const calls = []
+    return { calls, async bindNoteAssets(noteId, items) {
+      calls.push({ noteId, n: items.length })
+      if (mode === 'net') throw new Error('request:fail timeout')
+      if (mode === 'reject') { const e = new Error('not found'); e.statusCode = 404; throw e }
+      return { bound: items.length }
+    } }
+  }
+  const shot = (id) => ({ file_id: `cloud://x/${id}.jpg`, size: 1, width: 2, height: 3 })
+  const q = require(path.join(ROOT, 'miniprogram/utils/assetQueue.js'))
+
+  reset()
+  const a0 = mkApi('ok')
+  const r0 = await q.flush(a0)
+  ck('跑起来：空队列 flush 一次请求都不发（今天 CLOUD_ENV 没填，进前台就是这个形状）',
+    a0.calls.length === 0 && r0.sent === 0 && r0.left === 0, `打了 ${a0.calls.length} 次`)
+
+  reset()
+  q.push(11, [shot('a'), shot('b')])
+  q.push(22, [shot('c')])
+  const a1 = mkApi('ok')
+  const r1 = await q.flush(a1)
+  ck('跑起来：两篇各打一次、绑成之后队列真的空了',
+    a1.calls.length === 2 && q.take().length === 0 && r1.sent === 3 && r1.left === 0,
+    `打 ${a1.calls.length} 次 / sent ${r1.sent} / 剩 ${q.take().length}`)
+
+  reset()
+  q.push(11, [shot('a')])
+  const a2 = mkApi('net')
+  const r2 = await q.flush(a2)
+  // "还留着"只能在**那一刻**读：第二次 flush 一跑队列就空了。第一版把 `q.take()` 写进最后那条
+  // && 里，读到的是自己被清掉的现场，于是当场假红——观测要贴着产生它的那一步取。
+  const stillThere = q.take().length
+  const a2b = mkApi('ok')
+  const r2b = await q.flush(a2b)
+  ck('跑起来：弱网那一次不丢整批，下一次进前台真的又试了一次',
+    r2.left === 1 && stillThere === 1 && a2b.calls.length === 1 && r2b.sent === 1,
+    `第一次 left ${r2.left} / 当场还剩 ${stillThere} / 第二次打 ${a2b.calls.length} 次`)
+
+  reset()
+  q.push(11, [shot('a')])
+  const a3 = mkApi('reject')
+  const r3 = await q.flush(a3)
+  const a3b = mkApi('ok')
+  await q.flush(a3b)
+  ck('跑起来：服务端明确拒绝（4xx）当场摘掉，不再每次进前台白打一遍',
+    r3.left === 0 && q.take().length === 0 && a3b.calls.length === 0,
+    `left ${r3.left} / 剩 ${q.take().length} / 第二次打 ${a3b.calls.length} 次`)
+
+  reset()
+  q.push(11, [shot('a'), shot('b')])
+  q.push(11, [shot('b'), shot('c')])
+  const a4 = mkApi('ok')
+  await q.flush(a4)
+  ck('跑起来：同一篇的两次追加并成一条、同一个 fileID 不重复绑（少打请求也少占账）',
+    a4.calls.length === 1 && a4.calls[0].n === 3, JSON.stringify(a4.calls))
+
+  reset()
+  for (let i = 1; i <= 51; i++) q.push(i, [shot(`f${i}`)])
+  const left51 = q.take()
+  ck(`跑起来：超过 ${q.MAX_QUEUE} 条丢最旧，且丢的是最早那一条（不是随机丢）`,
+    left51.length === q.MAX_QUEUE && left51[0].noteId === 2 && !left51.some((x) => x.noteId === 1),
+    `剩 ${left51.length} 条，第一条 noteId=${left51[0] && left51[0].noteId}`)
+  ck('丢了要能看见：超限那一次留了告警（悄悄丢等于账面上从没存在过）',
+    warns.some((w) => /超过/.test(w) && /丢掉/.test(w)), warns.join(' | ') || '一条告警都没有')
+
+  reset()
+  q.push(11, [shot('a')])
+  q.clear()
+  ck('跑起来：clear() 之后队列是空的（注销那一步收口在这里，否则下一个身份替别人重试绑图）',
+    q.take().length === 0)
+
+  reset()
+  global.wx.setStorageSync = () => { throw new Error('storage full') }
+  let threw = null
+  try { q.push(11, [shot('a')]) } catch (e) { threw = e }
+  global.wx.setStorageSync = origSet
+  ck('跑起来：storage 写不进去时 push 不抛穿（调用方是 B 链收尾，它一抛就会冒 unhandled rejection）',
+    threw === null, threw && threw.message)
+  console.warn = realWarn
+})().then(finish).catch((e) => {
+  console.log(`✗ 第九段自己崩了（这不是判据红，是尺子坏了）：${e && e.stack ? e.stack.split('\n')[0] : e}`)
+  process.exit(2)
+})
