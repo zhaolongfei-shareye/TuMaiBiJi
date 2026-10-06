@@ -416,10 +416,22 @@ def delete_note(
     # Delete related shares and jobs first to avoid foreign key constraint errors
     db.query(Share).filter(Share.note_id == note_id).delete()
     db.query(Job).filter(Job.note_id == note_id).delete()
-    
+
+    # 配图：行在这里删，**对象删不掉**——云开发存储只有客户端（`wx.cloud.deleteFile`）
+    # 或云函数那两侧能删，这台自建后端没有那个凭据。所以把 fileID 一起回给调用方，
+    # 谁删的笔记谁去把对象清掉。残留是已知缺口（离线时删的笔记、注销账号那条路径都清不到），
+    # 记在 docs/方案-2.0大版本.md §3 阶段 3 的出口条件里，不当已解决。
+    from app.models.asset import Asset
+
+    file_ids = [
+        r.object_key
+        for r in db.query(Asset).filter(Asset.note_id == note_id).all()
+    ]
+    db.query(Asset).filter(Asset.note_id == note_id).delete()
+
     db.delete(note)
     db.commit()
-    return {"message": "Note deleted"}
+    return {"message": "Note deleted", "file_ids": file_ids}
 
 
 class NoteFromShare(BaseModel):
