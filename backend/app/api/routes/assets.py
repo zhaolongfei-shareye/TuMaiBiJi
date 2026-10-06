@@ -22,13 +22,13 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
-from app.models.asset import Asset
+from app.models.asset import Asset, MAX_ASSETS_PER_NOTE, not_failed
 from app.models.note import Note
 from app.models.user import User
 
@@ -38,8 +38,8 @@ logger = logging.getLogger(__name__)
 # 云开发单文件上限 20MB（docs/图片云备份-开发方案.md §二那张表）；压完正常在几百 KB，
 # 这条是拦住客户端把别的什么东西塞进来记账。
 MAX_FILE_BYTES = 20 * 1024 * 1024
-# 一篇笔记的配图张数。9 与前端选图上限同值，不是另起一档。
-MAX_ASSETS_PER_NOTE = 9
+# 一篇笔记的配图张数：常量在 models/asset.py 的 MAX_ASSETS_PER_NOTE（公开页也认它，
+# 别让两条路各拿一个 9）。
 # Asset.object_key 是 String(500)，但 SQLite 上那只是装饰（notes.py 顶上那条注释说的就是
 # 这个坑）：长度只能在入口卡。fileID 实测一百多字符，500 是给云开发自己留的余量。
 MAX_FILE_ID_LEN = 500
@@ -185,7 +185,9 @@ def list_note_assets(
         .filter(
             Asset.note_id == note_id,
             Asset.user_id == str(user.id),
-            Asset.backup_status != "failed",
+            # 与配额用的是同一个判断（not_failed）：两处写法一旦分叉，就会出现
+            # "这一张算进配额却列不出来"的幽灵行——看得见的是钱，看不见的是图。
+            not_failed(),
         )
         .order_by(Asset.id.asc())
         .all()
@@ -193,24 +195,15 @@ def list_note_assets(
     return _views(rows)
 
 
-def _not_failed():
-    """"这一行在云上真占着空间"。
-
-    `NULL != 'failed'` 在 SQL 里是 NULL（也就是不过），而 add_column 那种迁移给老行留下的
-    正是 NULL——所以这里必须把 NULL 也算进来，不然哪天有历史行就悄悄从配额里消失了。
-    """
-    return or_(Asset.backup_status.is_(None), Asset.backup_status != "failed")
-
-
 def _sum_bytes(db: Session, uid: Optional[str] = None) -> int:
-    q = db.query(func.coalesce(func.sum(Asset.file_size), 0)).filter(_not_failed())
+    q = db.query(func.coalesce(func.sum(Asset.file_size), 0)).filter(not_failed())
     if uid:
         q = q.filter(Asset.user_id == uid)
     return int(q.scalar() or 0)
 
 
 def _count(db: Session, uid: Optional[str] = None) -> int:
-    q = db.query(func.count(Asset.id)).filter(_not_failed())
+    q = db.query(func.count(Asset.id)).filter(not_failed())
     if uid:
         q = q.filter(Asset.user_id == uid)
     return int(q.scalar() or 0)

@@ -86,4 +86,18 @@ function deleteFiles(fileIDs) {
   })
 }
 
-module.exports = { CLOUD_ENV, cloudReady, initCloud, uploadImage, deleteFiles }
+/**
+ * 删笔记 / 注销账号的回体里那份清单直接交给它。
+ *
+ * 收在一处是因为 `file_ids` 这个键名是服务端定的（routes/notes.py 的 delete_note、
+ * routes/user.py 的 deactivate_account），三个调用方（详情页删一篇、列表详情窗删一篇、
+ * 我的页注销）各写一份 `(r && r.file_ids) || []` 的话，哪天真要改键名就会漏掉一处，
+ * 而漏掉的那一处的症状是"对象留在云上占全站配额，界面上谁都不记得它"。
+ */
+function dropFromDeleteRes(res) {
+  const ids = (res && res.file_ids) || []
+  if (!ids.length) return Promise.resolve(0)
+  return deleteFiles(ids)
+}
+
+module.exports = { CLOUD_ENV, cloudReady, initCloud, uploadImage, deleteFiles, dropFromDeleteRes }

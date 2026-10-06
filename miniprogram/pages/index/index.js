@@ -4,6 +4,7 @@ const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, themeOf, mix, TIP_
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const { isPrivate } = require('../../utils/privateGate.js')
+const cloudUpload = require('../../utils/cloudUpload.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 
 const SOURCE_TYPE_KEYS = {
@@ -594,7 +595,9 @@ Page({
       success: async (res) => {
         if (!res.confirm) return
         try {
-          await api.deleteNote(note.id)
+          const r = await api.deleteNote(note.id)
+          // 与详情页那一条同一个动作：服务端删行，这一侧删云上的对象（后端没那个凭据）。
+          cloudUpload.dropFromDeleteRes(r)
           cardLog.dropNote(note.id)
           wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
           this.setData({ detailOpen: false })

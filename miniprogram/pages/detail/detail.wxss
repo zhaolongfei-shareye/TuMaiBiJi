@@ -203,3 +203,24 @@
   font-size: var(--fs-tiny);
   color: #9a9ea6;
 }
+
+/* ---------------- 配图那一排（方案 §3.1.6） ---------------- */
+/* 横滑：scroll-view 吃整宽，里面的方格靠 inline-block 排。定宽**又**定高 + aspectFill
+   才不会被夹扁——只定宽用 widthFix 时，flex/高度约束会压高不压宽（站长踩过那条）。 */
+.dt-shots {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.dt-shot {
+  display: inline-block;
+  width: 180rpx;
+  height: 180rpx;
+  margin-right: var(--sp-2);
+  border-radius: var(--r-block);
+  background: var(--accent-soft);  /* 图还没落下来时那一格不是白的 */
+}
+
+.dt-shot:last-child {
+  margin-right: 0;
+}

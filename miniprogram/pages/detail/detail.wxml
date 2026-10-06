@@ -27,6 +27,21 @@
       <text class="state-act" bindtap="onUnshare">{{t.unshare}}</text>
     </view>
 
+    <!-- 配图（方案 §3.1.6）：横滑一排，点一下是 wx.previewImage 的全屏大图，左右划在这
+         一排里换。缩略图是定宽定高的方格 + aspectFill，所以不会被夹扁（站长那条"图片盒子
+         被夹扁"的坑：只定宽不定高时才需要 widthFix）。
+         这一排在 CLOUD_ENV 没填之前永远不渲染——loadImages 第一步就判 cloudReady，
+         连请求都不发（cloud:// 那个地址在没有 wx.cloud.init 过的环境里画不出来）。 -->
+    <view wx:if="{{noteImages.length}}" class="panel dt-shots-panel">
+      <text class="section-label">{{t.shotsLabel}}</text>
+      <scroll-view class="dt-shots" scroll-x>
+        <image wx:for="{{noteImages}}" wx:key="id"
+               class="dt-shot"
+               src="{{item.cloud_url}}" mode="aspectFill" lazy-load
+               bindtap="onPreviewImage" data-url="{{item.cloud_url}}" />
+      </scroll-view>
+    </view>
+
     <!-- 长文本一律回中性卡：方块只承担"这一条是什么"，不承担阅读 -->
     <view wx:if="{{note.summary}}" class="panel">
       <text class="section-label">{{t.summaryLabel}}</text>

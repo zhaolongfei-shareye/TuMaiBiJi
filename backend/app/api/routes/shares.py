@@ -13,6 +13,7 @@ from app.core.private_access import is_private_note, private_category_ids
 from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
+from app.models.asset import Asset, MAX_ASSETS_PER_NOTE, not_failed
 from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
@@ -47,6 +48,29 @@ def _author_name(req: "ShareCreateRequest") -> str | None:
     return (req.author_name or "").strip()[:AUTHOR_NAME_MAX] or None
 
 
+class ShareAsset(BaseModel):
+    """公开页只带这一样：一个能画出来的地址。
+
+    id / file_size / user_id 都不从公开口出去——这一页不过登录，回多一个字段就是多一个
+    外人可以拿来枚举的东西。
+    """
+    cloud_url: str
+
+
+# 公开响应里**不走快照**的那几个字段：它们是在读到 token 的那一刻现查出来的，
+# 既不在 SNAPSHOT_COLUMNS（sync_snapshot 不搬），也没进送检清单（图片侧的 imgSecCheck
+# 个人主体拿不到，见 docs/平台能力 那条）。
+#
+# 这个例外必须写成代码里的一个名字，而不是只写在测试里：tests/test_share_snapshot.py
+# 那条"快照列 == 对外字段"的不变量拿它做扣，以后谁再往 ShareResponse 上加一列显示字段，
+# 要么进 SNAPSHOT_COLUMNS（于是自动被同步和送检管住），要么就得在这里一起登记——
+# 逼着下一个人想清楚这一次。
+#
+# 为什么现查不会漏出收不回来的东西：图绑在 note_id 上，而① 撤回分享是 is_active=False，
+# 整页连图一起 404；② 删笔记会同时删掉 shares 和 assets 行。两条下线路径都覆盖图。
+LIVE_PUBLIC_FIELDS = {"assets"}
+
+
 class ShareResponse(BaseModel):
     token: str
     title: str | None
@@ -56,6 +80,9 @@ class ShareResponse(BaseModel):
     key_links: list | None
     source_url: str | None
     author_name: str | None
+    # 配图。默认空表：`shares` 那张表上并没有这一列，它是读公开页那一刻现查出来的
+    # （见 get_share 那两行），所以 create_share 的回体里它天然是空的。
+    assets: list[ShareAsset] = []
     created_at: UTCDatetime
 
     class Config:
@@ -201,7 +228,33 @@ def _get_active_share(token: str, db: Session) -> Share:
 
 @router.get("/{token}", response_model=ShareResponse)
 def get_share(token: str, db: Session = Depends(get_db)):
-    return _get_active_share(token, db)
+    share = _get_active_share(token, db)
+    resp = ShareResponse.model_validate(share)
+    # 「分享带图」（方案 §3.1.7）：落地页也是小程序页（扫码进 pages/share/view），
+    # 所以 cloud:// 这个地址在对面直接画得出来，不需要临时链接。
+    #
+    # 这里是**现查**而不是快照：图绑在笔记上，快照那几列是文字。两条口径要说明白——
+    # ① 撤掉分享（close_shares）之后整页 404，图跟着一起看不见，所以"收回来"这扇门
+    #    对图同样有效；② 建分享之后新绑上的图会出现在公开页上，而图片从来没有过
+    #    内容安全送检（文字走 msgSecCheck，图片侧的 imgSecCheck 个人主体拿不到）。
+    #    这一条记在 docs/产品需求.md，不当已解决。
+    resp.assets = _public_assets(db, share.note_id)
+    return resp
+
+
+def _public_assets(db: Session, note_id: int | None) -> list[ShareAsset]:
+    if not note_id:
+        return []
+    rows = (
+        db.query(Asset.object_key)
+        .filter(Asset.note_id == note_id, not_failed())
+        .order_by(Asset.id.asc())
+        # 张数上限只认 models/asset.py 那一个 9：绑定时卡它、这里露出的也是它，
+        # 两处各写一份迟早变成"库里 12 行、公开页 9 张"。
+        .limit(MAX_ASSETS_PER_NOTE)
+        .all()
+    )
+    return [ShareAsset(cloud_url=r[0]) for r in rows]
 
 
 @router.get("/{token}/qrcode")

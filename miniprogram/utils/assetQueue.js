@@ -57,21 +57,42 @@ function push(noteId, items) {
 async function flush(api) {
   const list = take()
   if (!list.length) return { sent: 0, left: 0 }
-  const done = []
+  const drop = []
   let sent = 0
   for (const entry of list) {
     try {
       await api.bindNoteAssets(entry.noteId, entry.items)
       sent += entry.items.length
-      done.push(entry)
+      drop.push(entry)
     } catch (e) {
-      // 留着下次再试。404（笔记已经删了）会一直留在这条队列里直到被 50 条上限挤掉——
-      // 那种残留只占 storage 里几十字节，不值得为它加一层"逐条判错误码"的复杂度。
+      // 服务端明确拒绝（4xx：笔记已删、地址不属于你、超张数）就摘掉——重试一万次也不会成，
+      // 留着只会让每次进前台都白打一个请求。api.js 对非 2xx 回的是整个 res，所以这里读 statusCode。
+      const code = e && e.statusCode
+      if (code >= 400 && code < 500) {
+        console.warn('补绑被服务端拒绝，这条不再重试', code)
+        drop.push(entry)
+        continue
+      }
+      // 剩下的（弱网、超时、5xx）留着下次再试：一次抖动不该丢掉整批。
       console.warn('补绑没成，留在队列里下次再试', e && (e.errMsg || e.message))
     }
   }
-  _put(list.filter((x) => !done.includes(x)))
-  return { sent, left: list.length - done.length }
+  _put(list.filter((x) => !drop.includes(x)))
+  return { sent, left: list.length - drop.length }
 }
 
-module.exports = { KEY, MAX_QUEUE, take, push, flush }
+/**
+ * 注销之后必须整叠清掉（app.clearSession 那一步调）。
+ * 留着会怎样：下一个身份（同一个人重新注册，或干脆是另一个人共用这台手机）第一次进前台
+ * 就把这批 fileID 往那些 note id 上绑——bind 接口按当前 token 认人，要么 404 要么 400，
+ * 于是这一条永远留在队列里，每次进前台重打一遍请求。
+ */
+function clear() {
+  try {
+    wx.removeStorageSync(KEY)
+  } catch (e) {
+    console.warn('待补绑队列清不掉', e)
+  }
+}
+
+module.exports = { KEY, MAX_QUEUE, take, push, flush, clear }

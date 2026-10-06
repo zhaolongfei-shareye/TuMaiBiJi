@@ -78,6 +78,15 @@ Page({
     }
   },
 
+  // 点缩略图看大图：urls 给整排，大图态里左右划能划完这一篇的图（与详情页同一个动作）。
+  onPreviewShot(e) {
+    const list = (this.data.share && this.data.share.assets) || []
+    const urls = list.map((x) => x && x.cloud_url).filter(Boolean)
+    if (!urls.length) return
+    const cur = e.currentTarget.dataset.url
+    wx.previewImage({ current: cur && urls.indexOf(cur) >= 0 ? cur : urls[0], urls })
+  },
+
   copySource() {
     const url = this.data.share && this.data.share.source_url
     if (!url) return

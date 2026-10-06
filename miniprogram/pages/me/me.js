@@ -5,6 +5,12 @@ const { t, texts } = require('../../utils/i18n.js')
 const { CONTACT_EMAIL } = require('../../utils/contact.js')
 const { VERSION, SITE, introLead } = require('../../utils/appInfo.js')
 const { TIP_DOT } = require('../../utils/palette.js')
+const cloudUpload = require('../../utils/cloudUpload.js')
+
+// 配额告警线。比值来自 GET /api/user/storage-quota 的 used_ratio，**它是全站口径**
+// （云开发那 5GB 是一个环境一个池子，不是每人 5GB），所以这一行说的是"这一池水快见底了"，
+// 不是"你的空间快满了"——文案里不许写成后者，那会让人以为删自己的笔记就能解决。
+const STORAGE_WARN_RATIO = 0.9
 
 // {n} 这类占位由服务端给的数字填，界面里不自己写死额度规则
 function fmt(tpl, map) {
@@ -62,6 +68,9 @@ Page({
     ruleDotStyle: 'background:' + TIP_DOT,
     // 私密密码：设没设只吃服务端读数；输入那一层是整屏遮罩 + 居中卡（见上面那组方法）
     privateSet: false,
+    // 图片云空间告警那一行：默认不出现，只有现读回来的比值过了线才亮。
+    storageWarn: false,
+    storageTip: '',
     pwdOpen: false,
     pwdEntering: false,
     pwdStep: 1,
@@ -110,6 +119,7 @@ Page({
       this.getTabBar().setData({ selected: 2 })
     }
     this.loadQuota()
+    this.loadStorage()
     this.loadPwdStatus()
   },
 
@@ -144,6 +154,31 @@ Page({
       })
     } catch (err) {
       console.error('额度读取失败', err)
+    }
+  },
+
+  // 图片云空间的比值现读一次（方案 §3.1.8）。
+  //
+  // 没填 CLOUD_ENV 就整段跳过：那时候全库不会有 assets 行，读回来永远是 0%，
+  // 而今天这一页一个请求都不该多打（B 链还没开，这一路也不该先响）。
+  async loadStorage() {
+    const lang = this.data.lang
+    if (!cloudUpload.cloudReady()) {
+      this.setData({ storageWarn: false, storageTip: '' })
+      return
+    }
+    try {
+      const q = await api.getStorageQuota()
+      const ratio = q && typeof q.used_ratio === 'number' ? q.used_ratio : 0
+      this.setData({
+        storageWarn: ratio > STORAGE_WARN_RATIO,
+        // 那一行整句由字典 + 现读的百分比拼出来，界面里不自己写死规则
+        storageTip: fmt(t('storageTip', lang), { pct: Math.round(ratio * 100) }),
+      })
+    } catch (err) {
+      // 读不到就不显示：这一行是提醒，不是状态。宁可漏报，也不摆一个猜的百分比。
+      console.warn('云空间配额读取失败', err && (err.errMsg || err.statusCode))
+      this.setData({ storageWarn: false, storageTip: '' })
     }
   },
 
@@ -400,9 +435,13 @@ Page({
     this.deleting = true
     wx.showLoading({ title: t('deletingAccount', lang), mask: true })
     try {
-      await api.deactivateAccount()
+      const r = await api.deactivateAccount()
       wx.hideLoading()
+      // 云上那批对象只有这一侧删得动，而**这是最后一次有机会**：注销之后 token 就废了，
+      // 再没有哪个接口能问出"这个人留了哪些图"。清单在服务端这次的回体里（file_ids）。
+      cloudUpload.dropFromDeleteRes(r)
       // 本地这套 token/userId 必须跟着清：留着下一个请求就带着一个已经不存在的身份去敲门。
+      // （clearSession 里面会连待补绑队列一起清掉。）
       app.clearSession()
       wx.showToast({ title: t('accountDeleted', lang), icon: 'success' })
       setTimeout(() => wx.reLaunch({ url: '/pages/index/index' }), 900)

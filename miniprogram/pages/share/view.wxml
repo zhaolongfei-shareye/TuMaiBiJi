@@ -20,6 +20,16 @@
 
       <text class="card-title">{{share.title}}</text>
 
+      <!-- 分享带图（方案 §3.1.7）：清单是服务端在读这一页时现查的（routes/shares.py 的
+           _public_assets），只有 cloud:// 这一个字段从公开口出去。扫码进来的人不用登录
+           也能看，因为这一页本来就是公开的；撤回分享之后整页 404，图跟着一起不见。 -->
+      <view wx:if="{{share.assets && share.assets.length}}" class="sv-shots">
+        <image wx:for="{{share.assets}}" wx:key="cloud_url"
+               class="sv-shot"
+               src="{{item.cloud_url}}" mode="aspectFill" lazy-load
+               bindtap="onPreviewShot" data-url="{{item.cloud_url}}" />
+      </view>
+
       <text wx:if="{{share.summary}}" class="card-summary">{{share.summary}}</text>
 
       <view wx:if="{{share.key_points && share.key_points.length}}" class="points">

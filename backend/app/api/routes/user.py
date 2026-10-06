@@ -9,7 +9,7 @@ from app.core.auth import get_current_user
 from app.core.private_access import PRIVATE_CATEGORY_NAME, create_unlock_token
 from app.core.rate_limit import limiter
 from app.db.database import get_db
-from app.models.asset import Asset
+from app.models.asset import Asset, not_failed
 from app.models.category import Category
 from app.models.invitation import Invitation
 from app.models.job import Job
@@ -218,11 +218,21 @@ def deactivate_account(
 
     返回删掉的条数，前端照着这个数告诉用户"删了 N 条笔记"，也方便事后拿同一份
     口径对账。别人名下的数据一条不动（每个查询都带着 user_id）。
+
+    回体里还带 `file_ids`：那批云存储对象这台服务器删不掉（没有云开发凭据），只能靠
+    客户端在**这一次响应里**拿到清单去删——注销之后 token 就废了，没有第二个口可以问。
     """
     if not req.confirm:
         raise HTTPException(status_code=400, detail="请先确认注销")
 
     uid = str(user.id)
+    # 配图的对象**要在这里一起删不掉**：这台自建后端没有云开发凭据，只有客户端
+    # `wx.cloud.deleteFile` 删得动。所以行删之前先把 fileID 抄出来，跟着回体一起发回去，
+    # 前端在 clearSession 之前拿它去清（注销之后再打任何接口都是 401，没有第二次机会）。
+    asset_ids = [
+        r[0]
+        for r in db.query(Asset.object_key).filter(Asset.user_id == uid, not_failed()).all()
+    ]
     deleted = {
         "notes": db.query(Note).filter(Note.user_id == uid).delete(),
         "categories": db.query(Category).filter(Category.user_id == uid).delete(),
@@ -267,4 +277,4 @@ def deactivate_account(
     db.delete(user)
     db.commit()
 
-    return {"message": "账号已注销", "deleted": deleted}
+    return {"message": "账号已注销", "deleted": deleted, "file_ids": asset_ids}

@@ -559,3 +559,24 @@
   font-size: var(--fs-tiny);
   color: var(--text-tertiary);
 }
+
+/* 图片云空间那一行脚注（方案 §3.1.8）：只在比值过线时出现，不是一张能点的门，
+   所以不给 border-bottom、不给高度，就贴着卡片下面一行小字。 */
+.me-storage {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  padding: 0 var(--sp-4);
+  margin-top: var(--sp-2);
+  font-size: var(--fs-tiny);
+  line-height: 1.5;
+}
+
+.me-storage-k {
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.me-storage-v {
+  color: var(--text-secondary);
+}

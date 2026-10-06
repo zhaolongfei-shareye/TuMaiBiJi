@@ -25,6 +25,12 @@ const UP = stripComments(UP_SRC)
 const API = read('miniprogram/utils/api.js')
 const APP = read('miniprogram/app.js')
 const BE = read('backend/app/api/routes/assets.py')
+// 这两个数从 routes/assets.py 搬到了 models/asset.py：公开页（routes/shares.py）也要认
+// 同一个 9 和同一个"这张图到底还在不在"的判断，留在某个路由里就得让另一个路由 import 它。
+const MODEL = read('backend/app/models/asset.py')
+const SHARES = read('backend/app/api/routes/shares.py')
+const USER_ROUTE = read('backend/app/api/routes/user.py')
+const NOTE_ROUTE = read('backend/app/api/routes/notes.py')
 const MAIN = read('backend/app/main.py')
 
 // 语法先过一遍：这两个文件里有 async/await 与可选链，node 直接 require 会去跑 wx.
@@ -35,8 +41,13 @@ for (const f of [
   'miniprogram/utils/cloudUpload.js',
   'miniprogram/utils/assetQueue.js',
   'miniprogram/pages/create/create.js',
+  'miniprogram/pages/detail/detail.js',
+  'miniprogram/pages/index/index.js',
+  'miniprogram/pages/me/me.js',
+  'miniprogram/pages/share/view.js',
   'miniprogram/app.js',
   'miniprogram/utils/api.js',
+  'miniprogram/utils/i18n.js',
 ]) {
   let ok = true
   let why = ''
@@ -89,13 +100,23 @@ FE_CALLS.forEach(([p]) => {
 ck('assets 路由在 main.py 注册了（没注册就是 404，且没有任何报错）',
   /app\.include_router\(assets\.router/.test(MAIN))
 ck('张数上限两边同值 9（前端选图 9 张，服务端卡的也是"一篇 9 张"）',
-  /MAX_ASSETS_PER_NOTE = 9/.test(BE) && /count: 9/.test(read('miniprogram/pages/create/create.js')))
+  /MAX_ASSETS_PER_NOTE = 9/.test(MODEL) && /count: 9/.test(read('miniprogram/pages/create/create.js')))
+ck('张数上限只有一处定义（公开页露出几张认的是同一个常量，不是抄的第二个 9）',
+  (MODEL.match(/MAX_ASSETS_PER_NOTE = /g) || []).length === 1
+    && !/MAX_ASSETS_PER_NOTE = |MAX_PUBLIC_ASSETS/.test(BE + SHARES),
+  `${(BE + SHARES).match(/_ASSETS_PER_NOTE = |MAX_PUBLIC_ASSETS/g) || []}`)
 
 /* ---------- 五、后端那三条口径不能被人改回"每人 5GB" ---------- */
 ck('配额比值按全站算（total_bytes 不带 user 过滤）',
   /total_bytes = _sum_bytes\(db\)/.test(BE) && /used_ratio=round\(total_bytes \/ cap/.test(BE))
 ck('NULL 的 backup_status 算进配额（SQL 三值逻辑那条坑）',
-  /backup_status\.is_\(None\)/.test(BE))
+  /backup_status\.is_\(None\)/.test(MODEL))
+ck('"这张图到底还在不在"只有一个定义，四处都调它',
+  (MODEL.match(/def not_failed/g) || []).length === 1
+    && (BE.match(/not_failed\(\)/g) || []).length === 3
+    && (SHARES.match(/not_failed\(\)/g) || []).length === 1
+    && (USER_ROUTE.match(/not_failed\(\)/g) || []).length === 1,
+  `定义 ${(MODEL.match(/def not_failed/g) || []).length} / assets ${(BE.match(/not_failed\(\)/g) || []).length}`)
 ck('张数卡的是"这篇最终有多少张"，不是"这一次送几条"',
   /current \| \{it\.file_id for it in items\}/.test(BE))
 ck('fileID 光杆 cloud:// 被拒（前缀之外还得有东西）',
@@ -118,8 +139,9 @@ ck('压不动就传原图（"宁可大一点也不丢图"在调用侧也成立�
 /* ---------- 七、待补绑队列：云上占着账、库里没有，是最难查的那种漏 ---------- */
 ck('队列有上限 50 且超限丢最旧（无界会把 storage 撑爆）',
   /MAX_QUEUE = 50/.test(QUEUE) && /list\.splice\(0, list\.length - MAX_QUEUE\)/.test(QUEUE))
-ck('flush 只把绑成功的那条摘掉（一次抖动不该丢掉整批）',
-  /_put\(list\.filter\(\(x\) => !done\.includes\(x\)\)\)/.test(QUEUE))
+ck('flush 把"绑成功"和"服务端明确拒绝（4xx）"两种摘掉，弱网留着下次再试',
+  /_put\(list\.filter\(\(x\) => !drop\.includes\(x\)\)\)/.test(QUEUE)
+    && /code >= 400 && code < 500/.test(QUEUE))
 ck('push 对同一 fileID 去重（bind 幂等，但队列并起来才少打请求）',
   /new Set\(mine\.items\.map\(\(it\) => it\.file_id\)\)/.test(QUEUE))
 ck('回到前台补一次绑，且被登录态挡着',
@@ -127,6 +149,80 @@ ck('回到前台补一次绑，且被登录态挡着',
 ck('B 链的 gate 只有一处判 cloudReady（判两次会出现"一半传了一半没传"）',
   (CREATE.match(/cloudReady\(\)/g) || []).length === 1,
   `${(CREATE.match(/cloudReady\(\)/g) || []).length} 处`)
+
+/* ---------- 八、交付那一半：读回来画得出去，删掉之后云上真没了 ---------- */
+const DETAIL = stripComments(read('miniprogram/pages/detail/detail.js'))
+const DETAIL_WXML = read('miniprogram/pages/detail/detail.wxml')
+const INDEX = stripComments(read('miniprogram/pages/index/index.js'))
+const ME = stripComments(read('miniprogram/pages/me/me.js'))
+const ME_WXML = read('miniprogram/pages/me/me.wxml')
+const VIEW = stripComments(read('miniprogram/pages/share/view.js'))
+const VIEW_WXML = read('miniprogram/pages/share/view.wxml')
+const I18N = read('miniprogram/utils/i18n.js')
+
+ck('file_ids 这个键名在两个回体里都存在（删笔记 / 注销）',
+  /"file_ids": file_ids/.test(NOTE_ROUTE) && /"file_ids": asset_ids/.test(USER_ROUTE))
+ck('清单只在删除那一刻交出去一次：注销那一路先读 fileID、再删行',
+  USER_ROUTE.indexOf('asset_ids = [') < USER_ROUTE.indexOf('"assets": db.query(Asset)'))
+ck('两个"删一篇"的口都去清对象（详情页 + 列表详情窗，漏一个就残留一排）',
+  /cloudUpload\.dropFromDeleteRes\(r\)/.test(DETAIL) && /cloudUpload\.dropFromDeleteRes\(r\)/.test(INDEX))
+ck('注销也清，而且排在 clearSession 之前（过了那一步再没有身份能问出这份清单）',
+  /dropFromDeleteRes\(r\)[\s\S]{0,220}?app\.clearSession\(\)/.test(ME))
+ck('clearSession 里连待补绑队列一起清（留着会让下一个身份替别人重试绑图）',
+  /assetQueue\.clear\(\)/.test(APP))
+ck('读配图第一步判 cloudReady（环境没填连请求都不发，也就不可能出现画不出来的破图）',
+  /async loadImages\(noteId\)[\s\S]{0,160}?if \(!cloudUpload\.cloudReady\(\)\) return/.test(DETAIL))
+ck('换一篇的时候 noteImages 先归零（读图慢了或失败，不许把上一篇的图挂在这一篇上）',
+  /note, loading: false, _loaded: true, noteImages: \[\]/.test(DETAIL))
+ck('读回来先对一下号：这一页可能已经切到别篇了',
+  /String\(this\.data\.noteId\) !== String\(noteId\)/.test(DETAIL))
+ck('看大图给的是整排 urls，不是只给被点那一张（详情页与分享落地页同一条动作）',
+  /const urls = this\.data\.noteImages\.map\(\(x\) => x\.cloud_url\)/.test(DETAIL)
+    && /const urls = list\.map\(\(x\) => x && x\.cloud_url\)/.test(VIEW))
+ck('缩略图定宽又定高 + aspectFill（只定宽用 widthFix 会被夹扁那条坑）',
+  /mode="aspectFill"/.test(DETAIL_WXML) && /width: 180rpx;[\s\S]{0,40}?height: 180rpx/.test(read('miniprogram/pages/detail/detail.wxss')))
+ck('落地页那一排也是定宽定高 + aspectFill',
+  /mode="aspectFill"/.test(VIEW_WXML)
+    && /width: 150rpx;[\s\S]{0,40}?height: 150rpx/.test(read('miniprogram/pages/share/view.wxss')))
+// 只看类体里那些"字段行"（四个空格 + 名字 + 冒号），docstring 里的中文行不算——
+// 直接对整段正则会被说明文字里那句"id / file_size / user_id"骗红（第一趟就是这么红的），
+// 而 `[\s\S]*?\n\n` 与 `(?:\n[ \t].*)*` 都会在 docstring 中间那个**空行**处截断
+// （第二、三趟各红在一个上面）。按行取到下一个顶格非空行为止才是类体本身。
+const SHARES_LINES = SHARES.split('\n')
+const SA_START = SHARES_LINES.findIndex((l) => /^class ShareAsset\(BaseModel\):/.test(l))
+const SA_FIELDS = []
+for (let i = SA_START + 1; i < SHARES_LINES.length; i++) {
+  const l = SHARES_LINES[i]
+  if (l.trim() && !/^[ \t]/.test(l)) break
+  if (/^ {4}\w+: /.test(l)) SA_FIELDS.push(l.trim())
+}
+ck('分享带图从公开口只出去一个字段（class ShareAsset 里只有 cloud_url）',
+  SA_START >= 0 && SA_FIELDS.length === 1 && SA_FIELDS[0] === 'cloud_url: str',
+  SA_FIELDS.join(' | '))
+ck('公开响应里"现查、没送检"那一列写在代码里（LIVE_PUBLIC_FIELDS），不是只写在测试里',
+  /LIVE_PUBLIC_FIELDS = \{"assets"\}/.test(SHARES) && /resp\.assets = _public_assets/.test(SHARES))
+ck('配额告警线 0.9 只有一处，且读失败就整行收起',
+  (ME.match(/STORAGE_WARN_RATIO = 0\.9/g) || []).length === 1
+    && /ratio > STORAGE_WARN_RATIO/.test(ME) && /storageWarn: false/.test(ME))
+ck('配额那一行先判 cloudReady（今天这一页一个新请求都不多打）',
+  /async loadStorage\(\)[\s\S]{0,200}?if \(!cloudUpload\.cloudReady\(\)\)/.test(ME))
+ck('配额行不是菜单里的一格（没有能点进去的页面就不画成门）',
+  !/wx:if="\{\{storageWarn\}\}" class="menu-item/.test(ME_WXML) && /class="me-storage"/.test(ME_WXML))
+;['shotsLabel', 'storageSpace', 'storageTip'].forEach((k) => {
+  const n = (I18N.match(new RegExp(`\\n\\s*${k}:`, 'g')) || []).length
+  ck(`字典里 ${k} 中英各一处（缺一个语言就是一屏生字）`, n === 2, `${n} 处`)
+})
+// 那句告警的**措辞**也是口径：比值是全站合计，写成"你的空间"会让人去删自己的笔记，
+// 而删了也不动那一个池子。字典是唯一出处，所以这条查字典本身。
+const DICT = require(path.join(ROOT, 'miniprogram/utils/i18n.js')).i18n
+ck('配额那句说的是"全站"那一池，不写成"你的空间"',
+  /全站/.test(DICT.zh.storageTip) && !/你的空间/.test(DICT.zh.storageTip), DICT.zh.storageTip)
+ck('栏名不叫"原始图片"（存下来的是压过的那一张）',
+  !/原始/.test(DICT.zh.shotsLabel), DICT.zh.shotsLabel)
+ck('新写类名带页面前缀（dt- / sv- / me-storage），别的页面同名 class 不会串',
+  /\.dt-shots/.test(read('miniprogram/pages/detail/detail.wxss'))
+    && /\.sv-shots/.test(read('miniprogram/pages/share/view.wxss'))
+    && /\.me-storage/.test(read('miniprogram/pages/me/me.wxss')))
 
 console.log(bad.length ? `\n✗ ${bad.length} 条不过：${bad.join(' / ')}` : '\n全过')
 process.exit(bad.length ? 1 : 0)

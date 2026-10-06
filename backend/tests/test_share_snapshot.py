@@ -422,15 +422,24 @@ def test_公开页显示的列全部在送检范围内():
 
 
 def test_快照列与对外响应字段是同一份():
-    """ShareResponse 加一列显示字段，就必须同时进 SNAPSHOT_COLUMNS 和送检清单。"""
-    from app.api.routes.shares import ShareResponse
+    """ShareResponse 加一列显示字段，就必须同时进 SNAPSHOT_COLUMNS 和送检清单。
+
+    唯一的豁免口子是 `LIVE_PUBLIC_FIELDS`（现在只有配图那一列），它登记在路由模块里、
+    不是写死在这条断言里——加字段的人要么把列进快照（自动被同步与送检管住），要么就
+    得在代码里明写"这一列是现查的、没送检"，逼着他想清楚这一次。
+    """
+    from app.api.routes.shares import LIVE_PUBLIC_FIELDS, ShareResponse
 
     exposed = set(ShareResponse.model_fields) - {"token", "created_at"}
     must_check = set(sharing.SNAPSHOT_COLUMNS) | set(sharing.NON_NOTE_PUBLIC_COLUMNS)
-    assert exposed == must_check, (
+    assert exposed - LIVE_PUBLIC_FIELDS == must_check, (
         f"公开响应给了 {sorted(exposed)}，快照同步的却是 {sorted(sharing.SNAPSHOT_COLUMNS)}，"
-        f"另有不是从笔记搬的 {sorted(sharing.NON_NOTE_PUBLIC_COLUMNS)}"
+        f"另有不是从笔记搬的 {sorted(sharing.NON_NOTE_PUBLIC_COLUMNS)}，"
+        f"登记的现查字段是 {sorted(LIVE_PUBLIC_FIELDS)}"
     )
+    # 豁免名单本身也要有人看着：写了却没在响应里出现的字段是残留，留着会让人以为
+    # "那一列也是现查的"，而下一次加列的人就会照抄这份错的名单。
+    assert LIVE_PUBLIC_FIELDS <= exposed, f"豁免名单里有响应中不存在的字段：{sorted(LIVE_PUBLIC_FIELDS - exposed)}"
     # 这些列还必须真的从 public_check_fields 出去，否则就是"公开页可见但没送检"。
     # 昵称单独走这条：它不在 SNAPSHOT_COLUMNS 里，sync_snapshot 不搬它，容易漏。
     probe = Note(user_id="0", title="T", source_type="manual")

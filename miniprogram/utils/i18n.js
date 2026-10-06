@@ -224,6 +224,10 @@ const i18n = {
     deletingAccount: '正在注销...',
     accountDeleted: '账号已注销',
     deleteAccountFailed: '注销失败，请稍后再试',
+    // 图片云空间（方案 §3.1.8）。那句说的是**全站**那一池 5GB，不是"你的空间"，
+    // 所以不写"你已用"——写成用户的，他会以为删几篇笔记就能腾出来。
+    storageSpace: '图片云空间',
+    storageTip: '全站已用 {pct}%，满了之后新上传的图会存不下',
     tagOrderHint: '点任意标签把它换到第一位，列表色块上显示的就是第一个标签',
     copied: '已复制',
     loading: '加载中...',
@@ -241,6 +245,9 @@ const i18n = {
     cannotRestore: '删除后无法恢复',
     linkCopied: '链接已复制',
     summaryLabel: '摘要',
+    // 详情页那一排缩略图的栏名。不叫"原始图片"：存下来的是压过的那一张（长边 1920），
+    // 叫"原始"会让人以为拿回来的是相机里那份原图。
+    shotsLabel: '配图',
     keyPoints: '核心要点',
     tagsLabel: '标签',
     sourceLink: '来源链接',
@@ -549,6 +556,9 @@ const i18n = {
     deletingAccount: 'Deleting...',
     accountDeleted: 'Account deleted',
     deleteAccountFailed: 'Delete failed, please try later',
+    // Same wording rule as the Chinese pair: the pool is shared across everyone, not "yours".
+    storageSpace: 'Image storage',
+    storageTip: '{pct}% of the shared pool used — new uploads may fail',
     tagOrderHint: 'Tap a tag to move it first — the colour block shows the first tag',
     copied: 'Copied',
     loading: 'Loading...',
@@ -566,6 +576,8 @@ const i18n = {
     cannotRestore: 'Cannot be restored after deletion',
     linkCopied: 'Link copied',
     summaryLabel: 'Summary',
+    // Not "Original images" — what we keep is the compressed copy (long edge 1920).
+    shotsLabel: 'Images',
     keyPoints: 'Key Points',
     tagsLabel: 'Tags',
     sourceLink: 'Source Link',

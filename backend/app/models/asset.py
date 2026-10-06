@@ -1,6 +1,10 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime, or_
 from sqlalchemy.sql import func
 from app.db.database import Base
+
+# 一篇笔记的配图张数。9 与小程序选图上限同值（`create.js` 的 `count: 9`），不是另起一档；
+# 这条上限今天第一次落在服务端，公开页露出的张数也认它（routes/shares.py）。
+MAX_ASSETS_PER_NOTE = 9
 
 
 class Asset(Base):
@@ -28,6 +32,20 @@ class Asset(Base):
     width = Column(Integer, nullable=True)
     height = Column(Integer, nullable=True)
     # 'uploaded' | 'failed'。failed 的行云上没东西，不计配额；历史遗留的 NULL 按 uploaded 算
-    # （见 routes/assets.py 的 `_not_failed()`——`NULL != 'failed'` 在 SQL 里是"不过"，不写清楚就漏账）。
+    # （判据就是本文件下面的 `not_failed()`——`NULL != 'failed'` 在 SQL 里是"不过"，不写清楚就漏账）。
     backup_status = Column(String(20), default="uploaded")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+def not_failed():
+    """筛出"云上真有这么个对象"的行。
+
+    `NULL != 'failed'` 在 SQL 里结果是 NULL（也就是不过），而 add_column 那种迁移给老行
+    留下的正是 NULL——所以 NULL 必须一起算进来，不然哪天有历史行就悄悄从配额里消失了。
+
+    放在模型这一层而不是某个路由里，是因为四处问的是同一个问题、答案必须一模一样：
+    配额求和与读一篇的配图（routes/assets.py）、公开页要露出哪几张（routes/shares.py）、
+    注销时报给客户端去删哪些（routes/user.py）。各写一份迟早走样，走样的症状是
+    "这张算进配额却列不出来"——看不见的那部分才最难查。
+    """
+    return or_(Asset.backup_status.is_(None), Asset.backup_status != "failed")

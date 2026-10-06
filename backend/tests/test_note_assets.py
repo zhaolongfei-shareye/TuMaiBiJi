@@ -213,3 +213,80 @@ def test_删笔记把fileID回给调用方并把行清掉(client, db, two_users)
     assert r.status_code == 200
     assert sorted(r.json()["file_ids"]) == sorted([fid("a", 0), fid("a", 1)])
     assert db.query(Asset).filter(Asset.note_id == a["note"]).count() == 0
+
+
+# ---------------------------------------------------------------- 六、公开页带图（分享带图）
+
+def _share(db, who, token="pubtok-a"):
+    """直接落一行分享，绕开建分享那道送检闸（这一组测的是图，不是文字）。"""
+    from app.models.share import Share
+    s = Share(user_id=str(who["user"].id), note_id=who["note"], token=token,
+              title="公开标题", is_active=True)
+    db.add(s)
+    db.commit()
+    return s
+
+
+def test_公开页带着这篇的配图(client, db, two_users):
+    a = two_users["a"]
+    bind(client, a, a["note"], three(2))
+    _share(db, a)
+    body = client.get("/api/shares/pubtok-a").json()
+    assert [x["cloud_url"] for x in body["assets"]] == [fid("a", 0), fid("a", 1)]
+
+
+def test_公开页只给地址不给内部字段(client, db, two_users):
+    """这一页不过登录：多回一个 id/size/user_id 就是多一个外人能枚举的东西。"""
+    a = two_users["a"]
+    bind(client, a, a["note"], three(1))
+    _share(db, a)
+    assert set(client.get("/api/shares/pubtok-a").json()["assets"][0]) == {"cloud_url"}
+
+
+def test_撤回分享之后公开页连图一起不见(client, db, two_users):
+    """"收回来"那扇门必须对图同样有效——海报上的码收不回，唯一下线途径就是撤回。"""
+    a = two_users["a"]
+    bind(client, a, a["note"], three(2))
+    _share(db, a)
+    assert client.post("/api/shares/revoke", json={"note_id": a["note"]}, headers=a["hdr"]).status_code == 200
+    assert client.get("/api/shares/pubtok-a").status_code == 404
+
+
+def test_标成失败的图不上公开页(client, db, two_users):
+    a = two_users["a"]
+    bind(client, a, a["note"], three(2))
+    row = db.query(Asset).filter(Asset.note_id == a["note"]).first()
+    row.backup_status = "failed"
+    db.commit()
+    _share(db, a)
+    body = client.get("/api/shares/pubtok-a").json()
+    assert [x["cloud_url"] for x in body["assets"]] == [fid("a", 1)], "云上没东西的行不该露出去"
+
+
+def test_别人的图不会出现在这篇的公开页上(client, db, two_users):
+    a, b = two_users["a"], two_users["b"]
+    bind(client, a, a["note"], three(2))
+    bind(client, b, b["note"], [{"file_id": fid("b", 0), "size": 1024}])
+    _share(db, b, token="pubtok-b")
+    assert [x["cloud_url"] for x in client.get("/api/shares/pubtok-b").json()["assets"]] == [fid("b", 0)]
+
+
+# ---------------------------------------------------------------- 七、注销连带清图
+
+def test_注销把要删的对象清单一起回出来(client, db, two_users):
+    """注销之后 token 就废了，这是客户端拿到 fileID 的**唯一**一次机会。"""
+    a = two_users["a"]
+    bind(client, a, a["note"], three(2))
+    r = client.post("/api/user/deactivate", json={"confirm": True}, headers=a["hdr"])
+    assert r.status_code == 200
+    assert sorted(r.json()["file_ids"]) == sorted([fid("a", 0), fid("a", 1)])
+    assert r.json()["deleted"]["assets"] == 2
+
+
+def test_注销只报自己名下的对象(client, db, two_users):
+    a, b = two_users["a"], two_users["b"]
+    bind(client, a, a["note"], three(2))
+    bind(client, b, b["note"], [{"file_id": fid("b", 0), "size": 1024}])
+    ids = client.post("/api/user/deactivate", json={"confirm": True}, headers=b["hdr"]).json()["file_ids"]
+    assert ids == [fid("b", 0)], f"把别人名下的 fileID 一起交出去，等于让注销顺带删了别人的图"
+

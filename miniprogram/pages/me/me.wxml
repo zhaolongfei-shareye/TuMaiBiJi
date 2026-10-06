@@ -68,6 +68,15 @@
         <view class="ico"><view class="cv"></view></view>
       </view>
     </view>
+
+    <!-- 图片云空间（方案 §3.1.8）：过了 0.9 才出现的脚注，不是菜单里的一格——
+         它没有能点进去的页面，画成 menu-item 就是给了一个按不动的门（站长那条
+         "一个功能只留一个入口"）。比值是**全站**口径，所以这句说的是这一池水，
+         不是"你的空间"。 -->
+    <view wx:if="{{storageWarn}}" class="me-storage">
+      <text class="me-storage-k">{{t.storageSpace}}</text>
+      <text class="me-storage-v">{{storageTip}}</text>
+    </view>
   </block>
 
   <!-- ---------------- 关于：只能看的那几样，直接在头部下面生成，不分二级 ---------------- -->

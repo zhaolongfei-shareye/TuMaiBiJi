@@ -228,3 +228,20 @@
 .save-row.done .save-text {
   color: #5c6068;
 }
+
+/* 分享带图那一排（方案 §3.1.7）：定宽**又**定高 + aspectFill，九张排成一行自动换行。
+   和详情页那一排同一个尺子，只是这一页的卡窄一些，方格也跟着小一档。 */
+.sv-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: var(--sp-3);
+}
+
+.sv-shot {
+  flex: none;
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: var(--r-chip);
+  background: var(--accent-soft);
+}

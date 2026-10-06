@@ -1,5 +1,5 @@
-const { request } = require('./utils/api')
 const apiModule = require('./utils/api')
+const { request } = apiModule
 const assetQueue = require('./utils/assetQueue')
 const posterTemplates = require('./utils/posterTemplates')
 const cloudUpload = require('./utils/cloudUpload')
@@ -135,13 +135,16 @@ App({
   },
 
   // 注销之后本地这一整套都要跟着清掉：留着旧 token 会让每一个请求都去撞 401，
-  // 留着 inviter 会让一个已经注销过的号再去成就别人一次。
+  // 留着 inviter 会让一个已经注销过的号再去成就别人一次，
+  // 留着待补绑队列会让下一个身份第一次进前台就替别人重试一遍绑图（收口在这里而不是
+  // 让注销那条路自己记得清，是因为 clearSession 是唯一一个"身份没了"的出口）。
   clearSession() {
     this.globalData.token = ''
     this.globalData.userId = ''
     this.globalData.userInfo = null
     this.globalData.isLoggedIn = false
     this.globalData.loginPromise = null
+    assetQueue.clear()
     wx.removeStorageSync(INVITER_KEY)
   },
 
