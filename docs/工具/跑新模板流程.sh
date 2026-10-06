@@ -2,7 +2,7 @@
 # 加一套卡片模板的流水线（规范在 docs/产品需求.md §11，路线图在 docs/流程-加一套卡片模板.md）。
 #
 # 用法：
-#   docs/工具/跑新模板流程.sh backend/seed/poster_extra/foo.json [更多文件…]     ← 两道关 + 出图
+#   docs/工具/跑新模板流程.sh backend/seed/poster_extra/<你的模板id>.json [更多文件…]   ← 两道关 + 出图
 #   docs/工具/跑新模板流程.sh --种子 同上                                          ← 看完图之后才跑这一段
 #
 # 它做什么：第 0 关（node 静态）→ 三道护栏（十套一张像素不许变 / 解释器与名单 / 下发合并回退）

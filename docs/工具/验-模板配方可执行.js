@@ -401,6 +401,55 @@ const revB = (() => {
 ok('反向对照：种子过期（内容变了 / hash 没重算）这条判据咬得住',
   revA && (revB === null || revB === false), `改内容报红=${revA}　改配方不换hash被抓=${revB === null ? '暂跳过（没有数据模板）' : !revB}`)
 
+// ---------------------------------------------------------------- 这条流水线本身别烂掉
+// 上面那些查的都是"配方对不对"。这一节查的是"照着做的那份操作单还成不成立"：
+// 脚本被改名、文档里那条命令指向一个不存在的文件、示例件哪天被改坏——
+// 这三种都不会让别的尺子红，只会在下一个人真去加模板的那天，让他第一步就撞墙。
+const ROOT = path.resolve(__dirname, '../..')
+const DOC = 'docs/流程-加一套卡片模板.md'
+const DRIVER = 'docs/工具/跑新模板流程.sh'
+const readRepo = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+const docOk = [DOC, DRIVER].every((p) => fs.existsSync(path.join(ROOT, p)))
+ok('操作单与那条流水线脚本都在仓库里', docOk, [DOC, DRIVER].filter((p) => !fs.existsSync(path.join(ROOT, p))).join('、'))
+ok('流水线脚本是可执行位（不能只靠 `zsh x.sh` 才跑得起来）',
+  (fs.statSync(path.join(ROOT, DRIVER)).mode & 0o111) !== 0)
+// 两份文件里凡是写到 `docs/工具/<名>` 或 `backend/seed/<路径>` 的，都得真存在。
+const refs = new Set()
+;[DOC, DRIVER].forEach((p) => {
+  const s = readRepo(p)
+  ;(s.match(/docs\/工具\/[\w.\-]+/g) || []).forEach((m) => refs.add(m))
+  ;(s.match(/backend\/seed\/[\w.\-*\/\u4e00-\u9fa5]+/g) || []).forEach((m) => refs.add(m))
+  ;(s.match(/miniprogram\/utils\/[\w.\-]+/g) || []).forEach((m) => refs.add(m))
+})
+const ghost = [...refs].filter((r) => !r.includes('*') && !fs.existsSync(path.join(ROOT, r)))
+ok(`操作单与脚本里点到的文件都还在（扫到 ${refs.size} 个引用）`, ghost.length === 0, ghost.join('、'))
+// 示例件是"下一个人的第一份配方"：它自己过不了闸门，照抄的人第一步就红。
+const eg = fs.existsSync(EXTRA_DIR)
+  ? (() => {
+      const f = fs.readdirSync(EXTRA_DIR).find((x) => x.endsWith('.example.json'))
+      return f ? JSON.parse(readRepo(path.join('backend/seed/poster_extra', f))) : null
+    })()
+  : null
+ok('poster_extra 里那份写法示例在（没它下一个人只能凭印象抄字段）', !!eg)
+if (eg) {
+  const stem = 'copy-me-probe'
+  const row = JSON.parse(JSON.stringify(eg))
+  Object.keys(row).forEach((k) => { if (k.startsWith('_')) delete row[k] })
+  row.template_id = stem
+  row.recipe.id = stem
+  const allow = { opKeys: poster.RECIPE_OP_KEYS, primKeys: capAllow.primKeys }
+  const errs = engine.validate(row.recipe, allow)
+  ok('示例件复制改名之后能过客户端那份名单（照抄的人第一步不该红）', errs.length === 0, errs.slice(0, 3).join('；'))
+  const need = ['label', 'label_en', 'group_key', 'sort_order', 'min_app_version']
+  ok('示例件带齐了生成器要的那五个字段（缺一个，复制品第一步就被生成器挡）',
+    need.every((k) => row[k] !== undefined && row[k] !== ''), need.filter((k) => !row[k]).join('、'))
+  const firstEmit = row.recipe.steps.find((s) => s.emit)
+  const bg = firstEmit && firstEmit.emit
+  ok('示例件第一处落笔就是一张满铺整张的底色（它示范的就是 §11.2 第 5 条那条最容易踩的规矩）',
+    !!bg && bg.k === 'fill' && bg.x === 0 && bg.y === 0 && bg.w && bg.w.var === 'W' && bg.h && bg.h.var === 'height',
+    bg ? `第 ${row.recipe.steps.indexOf(firstEmit) + 1} 步=${bg.k} w=${JSON.stringify(bg.w)} h=${JSON.stringify(bg.h)}` : '整份没有落笔')
+}
+
 let n = 0
 for (const [name, pass, detail] of results) {
   console.log(`${pass ? '✓' : '✗'} ${name}${pass || !detail ? '' : `　→ ${detail}`}`)
