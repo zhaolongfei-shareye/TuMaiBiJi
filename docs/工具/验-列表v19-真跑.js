@@ -624,8 +624,11 @@ const COUNT_ALL = () => {
     await page.callMethod('onToggleQr')
     await sleep(1200)
     await waitIdle()
-    ck('药丸那一下只切开关、不越级触发分享；小字跟着变成「关闭二维码」',
-      (await countAll()) === 0 && (await data('noQr')) === true && (await txt('.pill-lab')) === '关闭二维码',
+    // 上面那条注释说的"串从字典现读"这里也得守：`d8c5076`（10-05，站长要两态各带一句说明）
+    // 把 qrOff 从「关闭二维码」改成「关闭二维码｜只发这张图，扫不出原文」，
+    // 这里还钉着老那半截，于是红的不是药丸、是判据（master 上同样红着，10-06 全量真跑抓到）。
+    ck('药丸那一下只切开关、不越级触发分享；小字跟着换成字典里 `qrOff` 那一句',
+      (await countAll()) === 0 && (await data('noQr')) === true && (await txt('.pill-lab')) === ZH.qrOff,
       `台账 ${await countAll()} 张、小字=${await txt('.pill-lab')}`)
     const wantTpl = await data('posterTpl')
     await stubShare()
