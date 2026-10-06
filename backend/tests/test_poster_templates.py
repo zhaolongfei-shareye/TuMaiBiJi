@@ -27,9 +27,16 @@ from app.main import app
 from app.models.poster_template import PosterTemplate
 from app.models.user import User
 from app.services.poster_recipe import LIMITS, canonical_json, _depth, _nodes, validate_recipe, recipe_whitelist
-from app.services.poster_templates import content_hash_of, seed_poster_templates, seed_rows
+from app.services.poster_templates import content_hash_of, extra_files, seed_poster_templates, seed_rows
 
 SEED_JSON = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "seed", "poster_whitelist.json")
+
+
+def _live_rows():
+    """种子里真会下发的那几条。种子文件本身只许 live（生成器那条规矩），
+    但 live 这个数还是从数据里数出来，不在这里再抄一个 10。"""
+    return [r for r in seed_rows() if r.get("status", "live") == "live"]
+
 
 
 @pytest.fixture()
@@ -104,9 +111,19 @@ def test_种子白名单不是空壳():
 
 # ---------------------------------------------------------------- 二、包内十套配方服务端也认
 
-def test_种子十套全部通过校验():
+def test_种子全部通过校验_且数据模板那几条与盘上文件对得上():
     rows = seed_rows()
-    assert len(rows) == 10, f"种子应当是十套，读到 {len(rows)}"
+    ids = [r["template_id"] for r in rows]
+    assert len(ids) == len(set(ids)), f"种子里同一个 template_id 出现了两次：{ids}"
+    stems = {f[:-len(".json")] for f in extra_files()}
+    extras = [t for t in ids if t in stems]
+    # "十套"这个数在这里是故意写死的（与 test_种子白名单不是空壳 同一用法，防止两边都空掉还互相圆场）。
+    # 这一条查的是**种子 → 盘上**那个方向：种子里出现一条盘上没文件的数据模板 = 有人手改了生成物。
+    # 反方向（盘上有文件、种子里还没有）不在这里红——流水线看图之前本来就是这个样子，
+    # 那一头由 docs/工具/验-模板配方可执行.js 盯着（它才读 TPL_PENDING）。
+    assert len(rows) - len(extras) == 10, f"种子 {len(rows)} 条，其中对得上盘上文件的 {len(extras)} 条，剩下的应当正好是包内那十套"
+    assert all(r.get("status", "live") == "live" for r in rows if r["template_id"] in stems), \
+        "数据模板那几条带非 live 状态进了种子（生成器只放 live，这行是手搓出来的）"
     bad = [(r["template_id"], validate_recipe(r["recipe"])) for r in rows]
     bad = [x for x in bad if x[1]]
     assert not bad, f"这几套在服务器这份校验里过不去：{bad}"
@@ -202,7 +219,7 @@ def test_数法锚定_那份夹具三个数与客户端一致():
     assert _nodes(fixture) == 20
 
 
-def test_包内十套都没撞上那三条上界():
+def test_种子里每一套都没撞上那三条上界():
     # 上界是照这十套量出来的（方案 §五）。这条钉的是"现在还没把自己发的东西挡在门外"。
     for r in seed_rows():
         body = r["recipe"]
@@ -223,14 +240,14 @@ def test_未登录拿不到模板(db, client, me):
 
 def test_下发的只有live(db, client, me):
     _seed(db)
-    assert db.query(PosterTemplate).filter(PosterTemplate.status == "live").count() == 10
+    assert db.query(PosterTemplate).filter(PosterTemplate.status == "live").count() == len(_live_rows())
     # 改一条 status → 秒级收回来，不发版（这就是那两个把手里的第二个）
     row = db.query(PosterTemplate).filter(PosterTemplate.template_id == "quote").first()
     row.status = "archived"
     db.commit()
     body = client.get("/api/poster/templates/", headers={"Authorization": f"Bearer {_create_token(me.id, me.generation)}"}).json()
     ids = [x["template_id"] for x in body]
-    assert "quote" not in ids and len(ids) == 9
+    assert "quote" not in ids and len(ids) == len(_live_rows()) - 1
     # draft 根本不该出场
     db.add(PosterTemplate(template_id="newone", label="新", label_en="New", group_key="bold",
                           sort_order=5, recipe=good_recipe(), status="draft",
@@ -252,12 +269,30 @@ def test_响应里带配方与hash且按sort_order排(db, client, me):
 
 def test_灌两次不会多出行(db):
     a = _seed(db)
-    assert a["inserted"] == 10 and a["archived"] == 0
+    assert a["inserted"] == len(seed_rows()) and a["archived"] == 0
     b = _seed(db)
     # 第二次应当一条都不新增：幂等靠的就是 content_hash 相等，而不是"按 id 覆盖一遍"
     assert b["inserted"] == 0, f"第二次还在插新行：{b}"
-    assert b["unchanged"] == 10
-    assert db.query(PosterTemplate).count() == 10
+    assert b["unchanged"] == len(seed_rows())
+    assert db.query(PosterTemplate).count() == len(seed_rows())
+
+
+def test_种子行带draft也不许每次部署多插一行(db, tmp_path):
+    # 幂等判据原先硬写 status == 'live'：来一行 draft 就永远查不着自己，
+    # 跑一次多一行，库里能攒出五份同 hash 的 draft。生成器已经不放 draft 进种子，
+    # 这一条钉的是 seed_poster_templates(db, path) 还能吃手搓文件那半扇门。
+    rows = json.loads(json.dumps(seed_rows()))
+    rows[0]["status"] = "draft"
+    p = str(tmp_path / "seed_draft.json")
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(rows, f, ensure_ascii=False)
+    a = seed_poster_templates(db, p)
+    b = seed_poster_templates(db, p)
+    assert a["inserted"] == len(rows) and a["unchanged"] == 0
+    assert b["inserted"] == 0, f"第二次还在插：{b}"
+    assert b["unchanged"] == len(rows)
+    tid = rows[0]["template_id"]
+    assert db.query(PosterTemplate).filter(PosterTemplate.template_id == tid).count() == 1
 
 
 def test_内容变了就新增一版并把旧的收档(db):
@@ -304,7 +339,7 @@ def test_配方自己的id与这行不符就整行不收(db):
         json.dump(rows, f, ensure_ascii=False)
     rep = seed_poster_templates(db, path)
     assert len(rep["rejected"]) == 1 and rep["rejected"][0].startswith("quote:")
-    assert rep["inserted"] == 9
+    assert rep["inserted"] == len(seed_rows()) - 1
     assert db.query(PosterTemplate).filter(PosterTemplate.template_id == "quote").count() == 0
 
 
@@ -317,5 +352,5 @@ def test_脏种子一条都不落库(db):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(rows, f, ensure_ascii=False)
     rep = seed_poster_templates(db, path)
-    assert rep["inserted"] == 9 and len(rep["rejected"]) == 1
-    assert db.query(PosterTemplate).count() == 9
+    assert rep["inserted"] == len(seed_rows()) - 1 and len(rep["rejected"]) == 1
+    assert db.query(PosterTemplate).count() == len(seed_rows()) - 1

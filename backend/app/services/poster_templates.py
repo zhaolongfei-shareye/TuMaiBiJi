@@ -2,8 +2,9 @@
 
 **写路径只有这一个函数，没有 HTTP 写接口**。这不是偷懒，是这一批的边界（方案 §七 负面清单）：
 "不走发版"要的是站长改一条记录就能看到新卡片，不是给外部一个能改画面的口子。
-真要改的时候是：改 `miniprogram/utils/posterRecipes.js`（或直接在库里改一行）→ 跑那两把尺子 →
-重新生成种子 → 跑一次这个函数。方案 P1 那一步"服务端加第 11 套"也是走这一条，不新增接口。
+加一套**新**模板走的是纯数据那条路：往 `seed/poster_extra/` 放一份 JSON → 跑 `docs/工具/跑新模板流程.sh`
+（第 0 关 → 注入真跑出图 → 人看图）→ 重新生成种子 → 开闸部署。这条路一行客户端代码都不碰。
+只有改**包内那十套**才需要动 `miniprogram/utils/posterRecipes.js`，那是要发版的。详见 docs/流程-加一套卡片模板.md。
 """
 import hashlib
 import json
@@ -15,6 +16,16 @@ from app.models.poster_template import GROUP_KEYS, STATUS_LIVE, PosterTemplate
 from app.services.poster_recipe import canonical_json, validate_recipe
 
 SEED_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "seed", "poster_templates.json")
+# 数据模板那一档的落盘处：一份文件＝一套卡片，由 docs/工具/出-模板配方种子.js 并进上面那份种子。
+# 这里只拿来对账（种子的条数对不对得上盘上的文件），读文件拼种子那条路只走生成器，不留第二处。
+EXTRA_DIR = os.path.join(os.path.dirname(SEED_PATH), "poster_extra")
+
+
+def extra_files():
+    if not os.path.isdir(EXTRA_DIR):
+        return []
+    return sorted(f for f in os.listdir(EXTRA_DIR) if f.endswith(".json") and not f.endswith(".example.json"))
+
 
 
 def seed_rows(path: str = SEED_PATH):
@@ -48,11 +59,16 @@ def seed_poster_templates(db: Session, path: str = SEED_PATH) -> dict:
                 f"{row['template_id']}: 配方自己的 id「{(row['recipe'] or {}).get('id')}」与 template_id 不一致"
             )
             continue
+        # 幂等判据查的是**这一行自己那个 status**，不是硬写 live。
+        # 差一行写 draft 的种子：查 live 查不着 → 每次都当新行插一遍，部署几次就有几行同 hash 的 draft。
+        # 生成器那条路已经只放 live 进来（见 docs/工具/出-模板配方种子.js），这里再挡一道，
+        # 因为 seed_poster_templates(db, path) 还能吃手搓的种子文件。
+        want_status = row.get("status", STATUS_LIVE)
         existing = (
             db.query(PosterTemplate)
             .filter(
                 PosterTemplate.template_id == row["template_id"],
-                PosterTemplate.status == STATUS_LIVE,
+                PosterTemplate.status == want_status,
             )
             .first()
         )

@@ -338,14 +338,68 @@ capCases.forEach(([name, prefix, rec]) => {
 ok(`三条上界各自单独咬得住（${capCases.map((c) => c[0]).join(' / ')}）`, capFails.length === 0, capFails.join(' | '))
 const seedRows = readSeed('poster_templates.json')
 const sha16 = (s) => crypto.createHash('sha256').update(s).digest('hex')
+// 种子有两拨：包内十套（现读 poster.js/posterRecipes.js）+ poster_extra 里那几条纯数据模板。
+// 两拨的"对不对"查法不一样：前者比的是客户端代码，后者比的是盘上那个文件。
+// 少查后一半，就会出现"库里那行跟文件对不上"——而这条只有等部署完才看得见。
+const EXTRA_DIR = path.join(SEED_DIR, 'poster_extra')
+const extraFiles = (fs.existsSync(EXTRA_DIR) ? fs.readdirSync(EXTRA_DIR) : [])
+  .filter((f) => f.endsWith('.json') && !f.endsWith('.example.json')).sort()
+// 流水线第 2 步（看图之前）盘上已经放着配方文件、种子里头还没有——那一刻"对不上"才是对的。
+// 所以那一段跑这把尺子时把还没进种子的几份用 TPL_PENDING 报给它。
+// 注意这不是把判据调软：pending 的那几份反过来要求"种子里必须没有"，
+// 已经灌过了还带 TPL_PENDING 一样红（免得拿它当长期挡箭牌）。
+const extraStems = extraFiles.map((f) => f.slice(0, -'.json'.length))
+const PENDING = (process.env.TPL_PENDING || '').trim().split(/\s+/).filter(Boolean).map((f) => path.basename(f, '.json'))
+const pend = PENDING.filter((s) => extraStems.indexOf(s) >= 0)
+const bundledIds = poster.TEMPLATES.map((t) => t.id)
 const stale = []
-if (seedRows.length !== poster.TEMPLATES.length) stale.push(`套数 ${seedRows.length} ≠ 模板 ${poster.TEMPLATES.length}`)
-seedRows.forEach((r) => {
+PENDING.filter((s) => extraStems.indexOf(s) < 0).forEach((s) => stale.push(`TPL_PENDING 报了 ${s}，盘上 poster_extra 却没这份文件`))
+const bundled = seedRows.filter((r) => bundledIds.indexOf(r.template_id) >= 0)
+const extras = seedRows.filter((r) => bundledIds.indexOf(r.template_id) < 0)
+if (bundled.length !== bundledIds.length) stale.push(`包内该有的套数 ${bundledIds.length}，种子里只有 ${bundled.length}`)
+bundled.forEach((r) => {
   const now = JSON.stringify(canonSeed(RECIPES[r.template_id]))
   if (JSON.stringify(canonSeed(r.recipe)) !== now) stale.push(`${r.template_id} 的配方内容比种子新`)
   if (sha16(now) !== r.content_hash) stale.push(`${r.template_id} 的 hash 与内容对不上`)
 })
-ok(`种子十套的配方与 hash 都是现读包内那份生成的（${seedRows.length} 套）`, stale.length === 0, stale.slice(0, 3).join(' | '))
+if (extras.length !== extraFiles.length - pend.length) stale.push(`种子有 ${extras.length} 条数据模板，盘上该进种子的有 ${extraFiles.length - pend.length} 份（另 ${pend.length} 份还没到 --种子 那一步）`)
+extraFiles.forEach((f) => {
+  const stem = f.slice(0, -'.json'.length)
+  const r = extras.find((x) => x.template_id === stem)
+  if (pend.indexOf(stem) >= 0) {
+    if (r) stale.push(`${stem}：还挂着 TPL_PENDING，种子里却已经有这条了（别拿它当挡箭牌，去掉那个环境变量重跑）`)
+    return
+  }
+  if (!r) return stale.push(`${stem}：盘上有这份文件，种子里却没有（忘了重跑生成器）`)
+  let src
+  try {
+    src = JSON.parse(fs.readFileSync(path.join(EXTRA_DIR, f), 'utf8'))
+  } catch (e) {
+    return stale.push(`${stem}：文件读不住 ${e.message}`)
+  }
+  // 盘上那份改过了没重算 hash，客户端那条"号没变就不重解析"就是假的：
+  // 缓存里还躺着旧配方，界面照画旧的，谁都看不见。
+  if (sha16(JSON.stringify(canonSeed(src.recipe))) !== r.content_hash) stale.push(`${stem}：文件里的配方与种子 hash 对不上（改了没重跑生成器）`)
+  if (JSON.stringify(canonSeed(r.recipe)) !== JSON.stringify(canonSeed(src.recipe))) stale.push(`${stem}：种子里的 recipe 与文件不是同一份`)
+})
+ok(`种子里每一条都是现读的（包内 ${bundled.length} 套 + 数据模板 ${extras.length} 条${pend.length ? ` + 待灌 ${pend.length} 条` : ''}，与盘上文件逐字节对得上）`,
+  stale.length === 0, stale.slice(0, 3).join(' | '))
+// 反向对照：这条判据自己能不能报错。两份伪造都只在内存里，不落盘。
+// ① 包内某套的配方在客户端改了、种子没跟着重生成；② 数据模板改了文件、hash 没重算。
+const revA = (() => {
+  const c = JSON.parse(JSON.stringify(seedRows.find((r) => bundledIds.indexOf(r.template_id) >= 0)))
+  c.recipe.steps[0].value = 999999
+  const now = JSON.stringify(canonSeed(RECIPES[c.template_id]))
+  return JSON.stringify(canonSeed(c.recipe)) !== now
+})()
+const revB = (() => {
+  if (!extras.length) return null
+  const r = JSON.parse(JSON.stringify(extras[0]))
+  r.recipe.steps[0].value = 999999
+  return sha16(JSON.stringify(canonSeed(r.recipe))) === r.content_hash
+})()
+ok('反向对照：种子过期（内容变了 / hash 没重算）这条判据咬得住',
+  revA && (revB === null || revB === false), `改内容报红=${revA}　改配方不换hash被抓=${revB === null ? '暂跳过（没有数据模板）' : !revB}`)
 
 let n = 0
 for (const [name, pass, detail] of results) {

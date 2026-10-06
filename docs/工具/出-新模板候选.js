@@ -1,9 +1,16 @@
-// P1：只用包内已有的十种绘制 op + 那份原语名单，现场拼两套**全新**的卡片模板，各出一张成品图。
+// P1：只用包内已有的十种绘制 op + 那份原语名单，拼**全新**的卡片模板，各出一张成品图。
 //
 // 要证的是一句话：加一套新花样＝服务端多一条数据，产品代码一行不用改。
 // 所以这一趟不动 poster.js、不新增 JS planner、不出包、不部署；
-// 两份新配方以纯 JSON 落进 docs/design/新模板候选/，由 wx.request 替身冒充"服务端"下发，
+// 新配方以纯 JSON 落进 docs/design/新模板候选/，由 wx.request 替身冒充"服务端"下发，
 // 再走真运行时（分享页那一排真点）出 750 宽的成品 PNG。
+//
+// 两种吃法：
+//   ① 不带参数＝跑下面那两份演示件（band / halo）。§11.5 留的那份"这条路走得通"的证据，一条没改。
+//   ② 带 NEW_TPL_FILES＝跑你自己落盘的配方文件，一份文件一套卡：
+//        NEW_TPL_FILES="backend/seed/poster_extra/foo.json" bash docs/工具/跑尺子.sh 9431 出-新模板候选
+//      文件形状与 poster_extra 那一份是同一个（{template_id,label,label_en,group_key,sort_order,recipe}），
+//      所以第 0 关验过的东西和后面进种子的是**同一份字节**，中途不换件。
 //
 // 两道关，顺序不能倒：
 //   第 0 关在 node 里跑（几秒钟）：静态名单 + strict 规划 + 版面不溢出画布。
@@ -13,6 +20,7 @@
 const automator = require('miniprogram-automator')
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
 const poster = require(path.resolve(__dirname, '../../miniprogram/utils/poster.js'))
 const engine = require(path.resolve(__dirname, '../../miniprogram/utils/posterRecipe.js'))
 const pt = require(path.resolve(__dirname, '../../miniprogram/utils/posterTemplates.js'))
@@ -145,6 +153,67 @@ const HALO = {
 
 const CANDS = [BAND, HALO]
 
+// ---------------------------------------------------------------- 这一趟到底跑哪几套
+// 演示件那两套的元数据以前散在下面 rows 那一行里（label 用三元表达式现挑），
+// 现在两边都归成一个形状：{id, recipe, meta}，后面所有判据只认这个列表。
+function canonV(v) {
+  if (Array.isArray(v)) return v.map(canonV)
+  if (v && typeof v === 'object') {
+    const o = {}
+    Object.keys(v).sort().forEach((k) => { o[k] = canonV(v[k]) })
+    return o
+  }
+  return v
+}
+const demoMeta = {
+  band: { label: '色带横幅', label_en: 'Colour Band' },
+  halo: { label: '墨晕卡', label_en: 'Ink Halo' },
+}
+const FILES = (process.env.NEW_TPL_FILES || '').trim().split(/\s+/).filter(Boolean)
+let cases
+if (!FILES.length) {
+  cases = CANDS.map((r, i) => ({
+    id: r.id, recipe: r, src: '内置演示件',
+    meta: { ...demoMeta[r.id], group_key: 'bold', sort_order: 110 + i * 10, min_app_version: '1.0.0' },
+  }))
+} else {
+  const loadBad = []
+  cases = FILES.map((f) => {
+    const p = path.resolve(__dirname, '../..', f)
+    let row
+    try {
+      row = JSON.parse(fs.readFileSync(p, 'utf8'))
+    } catch (e) {
+      loadBad.push(`${f}：读不住 —— ${e.message}`)
+      return null
+    }
+    Object.keys(row).forEach((k) => { if (k.startsWith('_')) delete row[k] })
+    const id = row.template_id
+    const miss = ['label', 'label_en', 'group_key', 'sort_order', 'min_app_version'].filter((k) => row[k] === undefined || row[k] === '')
+    if (!id) loadBad.push(`${f}：没有 template_id`)
+    if (miss.length) loadBad.push(`${f}：缺字段 ${miss.join('、')}`)
+    if (!row.recipe || row.recipe.id !== id) loadBad.push(`${f}：recipe.id「${row.recipe && row.recipe.id}」与 template_id「${id}」不是一回事`)
+    if (id && path.basename(p, '.json') !== id) loadBad.push(`${f}：文件名「${id}」与 template_id 不一致（生成器那条也会拦）`)
+    return { id, recipe: row.recipe, src: f, meta: row }
+  }).filter(Boolean)
+  if (loadBad.length) {
+    console.error(`✗ 配方文件本身不合格，第 0 关没开跑：\n${loadBad.map((s) => `  ${s}`).join('\n')}`)
+    process.exit(1)
+  }
+  if (!cases.length) { console.error('✗ NEW_TPL_FILES 指向的文件一个都没读到'); process.exit(1) }
+}
+const recipeList = cases.map((c) => c.recipe)
+const ids = cases.map((c) => c.id)
+// 下发那一路要吃的行：hash 现算（与生成器、与库里那一列同一口径），
+// 这样"第 1 关验过的那一行"和"将来灌进库的那一行"是同一份字节，不是像以前那样塞个 p1-xx 占位串。
+const rows = cases.map((c) => ({
+  template_id: c.id, label: c.meta.label, label_en: c.meta.label_en,
+  group_key: c.meta.group_key, sort_order: c.meta.sort_order, min_app_version: c.meta.min_app_version,
+  content_hash: crypto.createHash('sha256').update(JSON.stringify(canonV(c.recipe))).digest('hex'),
+  recipe: c.recipe,
+}))
+console.log(`这一趟跑 ${cases.length} 套：${cases.map((c) => `${c.id}（${c.src}）`).join('、')}`)
+
 // ---------------------------------------------------------------- 第 0 关：node 侧规划
 // 假画布：只需要 measureText 和切字号，与 docs/工具/验-模板配方可执行.js 同一套量法。
 global.wx = {
@@ -182,65 +251,66 @@ const primKeys = Object.keys(poster.RECIPE_PRIMS).reduce((a, n) => { a[n] = post
 
 fs.mkdirSync(OUT, { recursive: true })
 console.log('—— 第 0 关：静态名单 + strict 规划（node，不启动模拟器）')
-CANDS.forEach((r) => {
+recipeList.forEach((r) => {
   const errs = engine.validate(r, { opKeys: poster.RECIPE_OP_KEYS, primKeys })
   ck(`${r.id}：静态名单过得去`, errs.length === 0, errs.slice(0, 4).join('；'))
 })
 if (bad.length) {
   console.log(`\n红 ${bad.length} 条，没往模拟器送`)
-  CANDS.forEach((r) => fs.writeFileSync(path.join(OUT, `配方-${r.id}.json`), JSON.stringify(r, null, 1), 'utf8'))
+  recipeList.forEach((r) => fs.writeFileSync(path.join(OUT, `配方-${r.id}.json`), JSON.stringify(r, null, 1), 'utf8'))
   process.exit(1)
 }
 
 // 下发那一路的闸门也真走一遍：不通过 applyRemoteTemplates 就进不了 recipeOf。
-const rows = CANDS.map((r, i) => ({
-  template_id: r.id, label: r.id === 'band' ? '色带横幅' : '墨晕卡', label_en: r.id === 'band' ? 'Colour Band' : 'Ink Halo',
-  group_key: 'bold', sort_order: 110 + i * 10, min_app_version: '1.0.0', content_hash: `p1-${r.id}`, recipe: r,
-}))
 const rep = poster.applyRemoteTemplates(rows)
-ck('下发闸门：两条新配方整套收下、零退回', rep.accepted === 2 && rep.rejected.length === 0,
+ck(`下发闸门：${rows.length} 条新配方整套收下、零退回`, rep.accepted === rows.length && rep.rejected.length === 0,
   `收 ${rep.accepted} 退 ${rep.rejected.length}${rep.rejected.length ? `（${rep.rejected.map((x) => `${x.id}：${x.problems.join('、')}`).join(' | ')}` : ''}`)
-ck('来源读数：这两套现在吃的是下发的配方，不是包内那一份',
-  poster.recipeSource('band') === 'remote' && poster.recipeSource('halo') === 'remote',
-  `${poster.recipeSource('band')} / ${poster.recipeSource('halo')}`)
-ck('合并列表：十套包内 + 两套新的 = 十二套，且新 id 排在末尾',
-    poster.templateList().length === 12 && poster.templateList().slice(-2).map((x) => x.id).join(',') === 'band,halo',
+ck('来源读数：这几套现在吃的是下发的配方，不是包内那一份',
+  ids.every((id) => poster.recipeSource(id) === 'remote'),
+  ids.map((id) => `${id}=${poster.recipeSource(id)}`).join(' '))
+const nBundled = poster.TEMPLATES.length
+ck(`合并列表：${nBundled} 套包内 + ${ids.length} 套新的 = ${nBundled + ids.length} 套，且新 id 排在末尾`,
+    poster.templateList().length === nBundled + ids.length && poster.templateList().slice(-ids.length).map((x) => x.id).join(',') === ids.join(','),
   poster.templateList().map((x) => x.id).join(','))
 
 const profile = { name: '阿飞', slogan: '每天读一点再走', avatarPath: '' }
 const notes = [['中文小样', poster.SAMPLE_NOTE], ['英文小样', poster.SAMPLE_NOTE_EN]]
 notes.forEach(([tag, note]) => {
-  CANDS.forEach((r) => {
+  cases.forEach((c) => {
     let plan = null
-    try { plan = poster.planPoster(fakeCtx, note, r.id, profile, tag === '中文小样' ? 'zh' : 'en', { strict: true }) } catch (e) {
-      ck(`${r.id}·${tag}：strict 规划跑得通`, false, e.message)
+    try { plan = poster.planPoster(fakeCtx, note, c.id, profile, tag === '中文小样' ? 'zh' : 'en', { strict: true }) } catch (e) {
+      ck(`${c.id}·${tag}：strict 规划跑得通`, false, e.message)
       return
     }
-    ck(`${r.id}·${tag}：成图落在这套上、高度按内容定（不塌不超限）`,
-      plan.template === r.id && plan.height > 700 && plan.height < 2600,
+    ck(`${c.id}·${tag}：成图落在这套上、高度按内容定（不塌不超限）`,
+      plan.template === c.id && plan.height > 700 && plan.height < 2600,
       `template=${plan.template} height=${plan.height} 层数=${plan.layers.length}`)
     const bottoms = plan.layers.map(bottomOf)
     const over = Math.max(...bottoms)
-    ck(`${r.id}·${tag}：没有一层画到画布外面`, over <= plan.height + 2, `最深 ${Math.round(over)} / 画布 ${plan.height}`)
+    ck(`${c.id}·${tag}：没有一层画到画布外面`, over <= plan.height + 2, `最深 ${Math.round(over)} / 画布 ${plan.height}`)
     // 图层是按数组顺序一张张贴上去的：铺满整张的底色要是排在内容后面，就把内容盖掉了。
     // 第一版 band 的真成品图就是这么空着半张（摘要和要点都画了，被纸白底压住），
     // 溢出那条查不出来，只有这条"底色必须打头"查得出来。
     const first = plan.layers[0]
     const covered = plan.layers.findIndex((l, i) => i > 0 && (l.h || 0) >= plan.height * 0.9 && l.k === 'fill')
-    ck(`${r.id}·${tag}：铺满整张的底色排在最前面，没有内容层被它盖住`,
+    ck(`${c.id}·${tag}：铺满整张的底色排在最前面，没有内容层被它盖住`,
       !!first && first.k === 'fill' && (first.h || 0) >= plan.height * 0.9 && covered < 0,
       `第 1 层=${first && first.k} 高=${first && first.h}／画布 ${plan.height}${covered >= 0 ? `　第 ${covered + 1} 层又有一张满铺底色` : ''}`)
     const ks = {}
     plan.layers.forEach((l) => { ks[l.k] = (ks[l.k] || 0) + 1 })
-    console.log(`    ${r.id}·${tag} 图层　${Object.keys(ks).map((k) => `${k}×${ks[k]}`).join(' ')}`)
+    console.log(`    ${c.id}·${tag} 图层　${Object.keys(ks).map((k) => `${k}×${ks[k]}`).join(' ')}`)
   })
 })
 if (bad.length) {
   console.log(`\n红 ${bad.length} 条，没往模拟器送`)
   process.exit(1)
 }
-CANDS.forEach((r) => fs.writeFileSync(path.join(OUT, `配方-${r.id}.json`), JSON.stringify(r, null, 1), 'utf8'))
-console.log(`　两份配方 JSON 落盘：${OUT}`)
+if (FILES.length) {
+  console.log(`　配方就是盘上那 ${FILES.length} 份文件，本趟不再抄第二份：${FILES.join('、')}`)
+} else {
+  recipeList.forEach((r) => fs.writeFileSync(path.join(OUT, `配方-${r.id}.json`), JSON.stringify(r, null, 1), 'utf8'))
+  console.log(`　两份配方 JSON 落盘：${OUT}`)
+}
 if (process.env.MP_STAGE === 'node') process.exit(0)
 
 // ---------------------------------------------------------------- 第 1 关：模拟器真下发真出图
@@ -300,8 +370,8 @@ const enter = async (mp, url) => {
   const profile1 = await enter(mp, '/pages/profile/profile')
   await sleep(6000)
   const cells = ((await profile1.data('groups')) || []).reduce((a, g) => a.concat(g.items || []), [])
-  ck('下发到客户端：卡片模板页十二格（十包内 + 2 新）',
-    cells.length === 12 && cells.some((c) => c.id === 'band') && cells.some((c) => c.id === 'halo'),
+  ck(`下发到客户端：卡片模板页 ${nBundled + ids.length} 格（${nBundled} 包内 + ${ids.length} 新）`,
+    cells.length === nBundled + ids.length && ids.every((id) => cells.some((x) => x.id === id)),
     `${cells.length} 格 / ${cells.map((c) => c.id).join(',')}`)
 
   await enter(mp, '/pages/index/index')
@@ -314,10 +384,10 @@ const enter = async (mp, url) => {
 
   const page = await enter(mp, `/pages/share/share?id=${noteId}`)
   const tpls = (await page.data('tpls')) || []
-  ck('分享页那一排跟着变十二格', tpls.length === 12, tpls.map((x) => x.id).join(','))
+  ck(`分享页那一排跟着变 ${nBundled + ids.length} 格`, tpls.length === nBundled + ids.length, tpls.map((x) => x.id).join(','))
 
   const stamp = Date.now()
-  for (const id of ['band', 'halo']) {
+  for (const id of ids) {
     const idx = tpls.findIndex((x) => x.id === id)
     const before = (await page.data('imagePath')) || ''
     const picks = await page.$$('.pick')
@@ -356,6 +426,16 @@ const enter = async (mp, url) => {
   }
 
   await mp.evaluate((key) => { wx.removeStorageSync(key); if (wx.__origRequest) { wx.request = wx.__origRequest; wx.__origRequest = null } }, pt.STORE_KEY)
+  // 收尾第一条读数：缓存**读回来**是空才算完。上面那句"已清"是自己说的，不算证据——
+  // 这批值要是留在本机缓存里，站长下次真机调试会凭空多出这几格（§11.3 收尾两条读数）。
+  const back = await mp.evaluate((key) => {
+    const v = wx.getStorageSync(key)
+    return { empty: v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0), raw: Array.isArray(v) ? `数组 ${v.length} 条` : JSON.stringify(v) }
+  }, pt.STORE_KEY)
+  ck('收尾读数：注入过的那批本机缓存读回来是空', !!(back && back.empty), back ? `storage=${back.raw}` : '读不到')
+  ck('收尾读数：wx.request 已经换回真的（替身留在页上会把后面的尺子全带歪）',
+    await mp.evaluate(() => !wx.__origRequest && !(wx.request && wx.request.__stub))
+      .catch(() => true))
   try { await mp.disconnect() } catch (e) { /* 收尾断不干净由跑尺子.sh 下一次整体重启兜 */ }
   console.log(bad.length ? `\n红 ${bad.length} 条：${bad.join('、')}` : `\n全过　成品目录：${OUT}`)
   process.exit(bad.length ? 1 : 0)
