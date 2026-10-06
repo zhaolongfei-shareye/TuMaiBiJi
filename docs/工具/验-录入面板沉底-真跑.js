@@ -127,11 +127,13 @@ fs.mkdirSync(OUT, { recursive: true })
       ck(`${tag}：指引只在空着的那档出现`, (!!gNow) === (active === 'url'), gNow ? '有' : '无')
 
       // 控件没被 flex 压扁、也没被"顺手放大"：这几档高度是令牌定的。
-      // 原文区写的是等于 300 而不是不低于——富余按 CSS 规则全被按钮行的 auto 边距吃掉了，
+      // 原文区写的是**等于**而不是不低于——富余按 CSS 规则全被按钮行的 auto 边距吃掉了，
       // 真哪天它自己长高了，说明有人给 body 加了 flex-grow，这条会当场报出来。
-      // 180→300：站长 10-04 把归类那一整行（88 + 16 间距）并进标题行，腾出来的还给原文；
-      // 同一档里 `.cat-row` 换成了 `.wr-cat-face`（分类那一格，仍是 88 那一档）。
-      const want = { '.face-box': 88, '.face-area': 300, '.pk': 164, '.shot-strip': 152, '.wr-cat-face': 88 }
+      // 180→300→228：10-04 站长先把归类那一整行（88 + 16 间距）并进标题行、腾出来的还给原文；
+      // 同一天下午又在按钮行上面加了「原文翻译」那一行（56 + 16 = 72），正文就让出那 72。
+      // 300 这个数在 `create.wxss` 的 `.wr-body` 注释里已经写成 228，而这条判据两天没跟着改
+      // ——10-06 在 2.0 分支上第一次重跑它就红，红的是尺子（master 上同样红着）。
+      const want = { '.face-box': 88, '.face-area': 228, '.pk': 164, '.shot-strip': 152, '.wr-cat-face': 88 }
       for (const [sel, hrpx] of Object.entries(want)) {
         const g = await geo(sel)
         if (g) ck(`${tag}：${sel} 仍是 ${hrpx}rpx 高`, near(g.h, rpx(hrpx)), `${(g.h * 750 / win.windowWidth).toFixed(1)}rpx`)

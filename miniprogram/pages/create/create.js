@@ -18,6 +18,12 @@ function isLink(value) {
   return LINK_RE.test(s)
 }
 
+/* 一篇笔记选几张图。这个数**跨语言有两份**（这里一份、服务端 `models/asset.py`
+   的 MAX_ASSETS_PER_NOTE 一份），合成不了，所以规矩是"每一侧只写一次 + 两边同值"，
+   由 docs/工具/验-张数只有一个出处.js 守着：原来这里是两个各自硬写的 9（选图 count 与
+   合并后 slice），把 9 改成 3 会只改到一处，症状是"能选 9 张、只留 3 张"。 */
+const MAX_SHOTS = 9
+
 Page({
   data: {
     lang: 'zh',
@@ -372,7 +378,7 @@ Page({
     // 提炼进行中不能再改图：新加的图不在这次提交数组里，成功后却一起被清空
     if (this.data.busy) return
     wx.chooseMedia({
-      count: 9,
+      count: MAX_SHOTS,
       mediaType: ['image'],
       sourceType: [source],
       success: (res) => {
@@ -384,7 +390,7 @@ Page({
         }
         const merged = this.data.previewImages
           .concat(files.map(f => f.tempFilePath))
-          .slice(0, 9)
+          .slice(0, MAX_SHOTS)
         this.setData({
           previewImages: merged,
           shotDesc: this.shotDescFor(merged.length),

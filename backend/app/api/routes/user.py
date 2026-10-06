@@ -2,6 +2,7 @@ import hashlib
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Dict, List
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -203,7 +204,15 @@ def reset_private_password(user: User = Depends(get_current_user), db: Session =
     return {"ok": True, "is_set": False}
 
 
-@router.post("/deactivate")
+class DeactivateOut(BaseModel):
+    """注销的回体。同 `NoteDeleteOut` 那条理由：`file_ids` 是客户端清云端对象的唯一一份清单，
+    而注销之后那个身份再问不出任何东西——这一列的名字必须进接口快照，被人改掉要有人报警。"""
+    message: str
+    deleted: Dict[str, int]
+    file_ids: List[str] = []
+
+
+@router.post("/deactivate", response_model=DeactivateOut)
 @limiter.limit("5/minute")
 def deactivate_account(
     request: Request,

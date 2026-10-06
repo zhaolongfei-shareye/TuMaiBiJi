@@ -38,8 +38,9 @@ logger = logging.getLogger(__name__)
 # 云开发单文件上限 20MB（docs/图片云备份-开发方案.md §二那张表）；压完正常在几百 KB，
 # 这条是拦住客户端把别的什么东西塞进来记账。
 MAX_FILE_BYTES = 20 * 1024 * 1024
-# 一篇笔记的配图张数：常量在 models/asset.py 的 MAX_ASSETS_PER_NOTE（公开页也认它，
-# 别让两条路各拿一个 9）。
+# 一篇笔记的配图张数：常量在 models/asset.py 的 MAX_ASSETS_PER_NOTE，全仓只有那一个定义。
+# **只有绑这一个口卡它**，两个读的口（列表、公开页）都不截——读的口再卡一遍就会造出
+# "库里占着配额、界面上不存在"的幽灵行。守这条的是 docs/工具/验-张数只有一个出处.js。
 # Asset.object_key 是 String(500)，但 SQLite 上那只是装饰（notes.py 顶上那条注释说的就是
 # 这个坑）：长度只能在入口卡。fileID 实测一百多字符，500 是给云开发自己留的余量。
 MAX_FILE_ID_LEN = 500

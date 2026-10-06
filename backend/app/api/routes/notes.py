@@ -396,7 +396,15 @@ def pin_note(
     return db_note
 
 
-@router.delete("/{note_id}")
+class NoteDeleteOut(BaseModel):
+    """删一篇的回体。写成模型而不是裸 dict，是为了让它进 `scripts/api_contract.py` 那份快照：
+    客户端要拿 `file_ids` 去清云上的对象，这一列要是哪天被人改名或删掉，光看代码看不出来，
+    症状却是云上堆一堆没人认领的对象占全站配额。裸 dict 的回体不进快照，等于没人守。"""
+    message: str
+    file_ids: List[str] = []
+
+
+@router.delete("/{note_id}", response_model=NoteDeleteOut)
 def delete_note(
     note_id: int,
     db: Session = Depends(get_db),

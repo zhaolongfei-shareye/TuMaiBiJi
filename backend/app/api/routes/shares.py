@@ -13,7 +13,7 @@ from app.core.private_access import is_private_note, private_category_ids
 from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
-from app.models.asset import Asset, MAX_ASSETS_PER_NOTE, not_failed
+from app.models.asset import Asset, not_failed
 from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
@@ -243,15 +243,18 @@ def get_share(token: str, db: Session = Depends(get_db)):
 
 
 def _public_assets(db: Session, note_id: int | None) -> list[ShareAsset]:
+    """这一篇公开页上要露出的图。
+
+    **故意不截一刀**：张数只在门口卡一次（`routes/assets.py` 绑定时卡 MAX_ASSETS_PER_NOTE），
+    读的这一侧再卡一遍就会造出"库里有 12 行、公开页只画 9 张"那种幽灵——多出来的那几行
+    照样占全站配额，却谁都不记得它们存在。卡一处、两处读得一样多，才是能对账的口径。
+    """
     if not note_id:
         return []
     rows = (
         db.query(Asset.object_key)
         .filter(Asset.note_id == note_id, not_failed())
         .order_by(Asset.id.asc())
-        # 张数上限只认 models/asset.py 那一个 9：绑定时卡它、这里露出的也是它，
-        # 两处各写一份迟早变成"库里 12 行、公开页 9 张"。
-        .limit(MAX_ASSETS_PER_NOTE)
         .all()
     )
     return [ShareAsset(cloud_url=r[0]) for r in rows]

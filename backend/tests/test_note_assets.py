@@ -283,6 +283,27 @@ def test_注销把要删的对象清单一起回出来(client, db, two_users):
     assert r.json()["deleted"]["assets"] == 2
 
 
+def test_两个读口张数一致_不许有看不见的行(client, db, two_users):
+    """张数只在绑那一个口卡一次，读的口都不许多截一刀。
+
+    正常走接口到不了 12 行（`test_第十张被拒` 就是钉那一条），所以这一例是**绕过接口直写库**
+    造出来的：它验的不是"能不能发生"，而是"万一发生了，两个读口会不会各说一套"。
+    如果哪天有人给公开页加一个 `.limit(9)`，多出来的那三行就变成"占全站配额但界面上不存在"
+    ——那种行谁也查不出来，只能靠这一例拦。
+    """
+    a = two_users["a"]
+    for i in range(12):
+        db.add(Asset(user_id=str(a["user"].id), note_id=a["note"], object_key=fid("a", i),
+                     file_size=1024, backup_status="uploaded"))
+    db.commit()
+    _share(db, a, token="pubtok-count")
+    private = client.get(f"/api/notes/{a['note']}/assets", headers=a["hdr"]).json()
+    public = client.get("/api/shares/pubtok-count").json()["assets"]
+    assert len(private) == 12, f"自己那侧读回来 {len(private)} 条"
+    assert len(public) == len(private), "两个读口张数不一致，多出来的那些行占配额却没人看得见"
+    assert [x["cloud_url"] for x in public] == [x["cloud_url"] for x in private]
+
+
 def test_注销只报自己名下的对象(client, db, two_users):
     a, b = two_users["a"], two_users["b"]
     bind(client, a, a["note"], three(2))

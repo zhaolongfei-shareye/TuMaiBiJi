@@ -252,10 +252,12 @@ ok('格子里第一张＝最近留下的那张（台账按 at 倒序；顺着放
    10-04 站长又要「点卡片小图直接拉大图」，两条入口合并成同一个 `_openPosterFor(note, from)`
    ——所以这条判据的函数名跟着换，判据本身一个字没松。 */
 const sheetFn = (CODE_JS.split('async _openPosterFor(note, from)')[1] || '').split('\n  },')[0]
-ok('点开大图取的是「台账里那一张」的模板，不是卡片模板页那套默认（那套已不在 TEMPLATES 里才退回默认）',
+ok('点开大图取的是「台账里那一张」的模板，不是卡片模板页那套默认（那套已不在合并表里才退回默认）',
   /const cur = \(this\._cardsOf\(note\.id\) \|\| \[\]\)\[0\]/.test(sheetFn)
   && /posterTpl: known \? cur\.tpl : \(profile\.template \|\| poster\.DEFAULT_TEMPLATE\)/.test(sheetFn)
-  && /poster\.TEMPLATES\.some\(\(x\) => x\.id === cur\.tpl\)/.test(sheetFn))
+  // 判的是**合并后那张表**，不是包内 `TEMPLATES`：台账里那一格完全可能指着一条远端下发的模板，
+  // 拿包内那张表去"认不认"会把真存在的模板判成不认识、开成默认那一套。
+  && /poster\.templateList\(\)\.some\(\(x\) => x\.id === cur\.tpl\)/.test(sheetFn))
 ok('两条入口共用同一段开窗逻辑（各写一份就会走样：一条照台账、一条照默认）',
   /onSheetToPoster\(\) \{ return this\._openPosterFor\(this\.data\.detailNote, 'sheet'\) \}/.test(CODE_JS)
   && /return this\._openPosterFor\(note, 'grid'\)/.test(CODE_JS))
@@ -312,9 +314,18 @@ ok('那行字三项照站长原话：微信好友 / 朋友圈 / 公众号，中�
   /cardShare: '分享卡片：微信好友 \/ 朋友圈 \/ 公众号'/.test(I18N)
   && /cardShare: 'Share card: Chat \/ Moments \/ Official Account'/.test(I18N)
   && /<text>\{\{t\.cardShare\}\}<\/text>/.test(CODE_WXML))
-ok('「删除」只动本机这本账：调 cardLog.dropNote 之后回详情窗，api 一行都不提它（服务端那张活码不碰）',
-  /onDropCard\(\) \{[\s\S]{0,240}cardLog\.dropNote\(note\.id\)[\s\S]{0,120}this\._closeTemplate\(\)/.test(CODE_JS)
-  && !/deleteCard|dropCard/ig.test(apiJs))
+// 这一条原来写成一条 240 字符窗口的长正则，10-04 那段"按钮一律用系统默认那对"的注释
+// 一进去就把距离撑过了窗口——红的是尺子，代码一字没错。改成**位置比较**：
+// 取 onDropCard 那个函数体，钉"dropNote 在 _closeTemplate 之前"，再钉"整段里没调过 api"。
+// （注释不参与判据，所以先把函数体里的注释剥掉再算。）
+const dropFn = ((CODE_JS.split('onDropCard() {')[1] || '').split('\n  },')[0])
+  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+const iDrop = dropFn.indexOf('cardLog.dropNote(note.id)')
+const iCloseTmp = dropFn.indexOf('this._closeTemplate()')
+ok('「删除」只动本机这本账：先删台账再收窗，整段一次 api 都不提（服务端那张活码不碰）',
+  iDrop >= 0 && iCloseTmp > iDrop && !/\bapi\./.test(dropFn)
+    && !/deleteCard|dropCard/i.test(apiJs),
+  `drop@${iDrop} close@${iCloseTmp} api ${(dropFn.match(/\bapi\./g) || []).length} 次`)
 /* 真机两轮（站长 10-03 20:42 与 21:20）：小弹窗浮起来时被成品弹窗整个盖住，只有输入框那行字
    漏出来（input 在 iOS 是原生层）。第一轮量出来是"102 画在 101 底下"，第二轮把那一层
    `visibility:hidden` 藏掉之后他原话「还没修好，依旧这样」——**所以这条只能钉静态，模拟器两轮都绿**。

@@ -81,7 +81,10 @@ ok('三个状态（加载/空/排布）都在这块滚动区里，一个都没�
   (wxml.match(/class="(loading|empty|bodyrow)"/g) || []).length === 3
   && wxml.indexOf('class="list"') < wxml.indexOf('class="loading"'))
 ok('图区 + 圆角卡 + 滚动区三块都在容器里，页面自己不滚',
-  /class="container[\s\S]*?<view class="head">[\s\S]*?<view class="sheet">/.test(wxml))
+  // `class="sheet"` 后来多了一个"加宽"档（`sheet {{listWide ? 'ix-wide' : ''}}`，10-04 那一批），
+  // 判据原来要求 `sheet">` 紧挨着，于是红的不是布局、是这一格多了个动态类。
+  // 这里要钉的是**先后与归属**（三块按顺序都在 container 里面），不是那个 class 一字不变。
+  /class="container[\s\S]*?<view class="head">[\s\S]*?<view class="sheet[ "]/.test(wxml))
 // 判"有没有删干净"要看代码，不能连注释一起算——那条解释为什么删掉的注释里
 // 就写着这个函数名，算进来就是自己钉死自己。
 const cjsCode = cjs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')

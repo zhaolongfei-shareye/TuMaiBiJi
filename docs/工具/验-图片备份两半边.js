@@ -99,12 +99,9 @@ FE_CALLS.forEach(([p]) => {
 })
 ck('assets 路由在 main.py 注册了（没注册就是 404，且没有任何报错）',
   /app\.include_router\(assets\.router/.test(MAIN))
-ck('张数上限两边同值 9（前端选图 9 张，服务端卡的也是"一篇 9 张"）',
-  /MAX_ASSETS_PER_NOTE = 9/.test(MODEL) && /count: 9/.test(read('miniprogram/pages/create/create.js')))
-ck('张数上限只有一处定义（公开页露出几张认的是同一个常量，不是抄的第二个 9）',
-  (MODEL.match(/MAX_ASSETS_PER_NOTE = /g) || []).length === 1
-    && !/MAX_ASSETS_PER_NOTE = |MAX_PUBLIC_ASSETS/.test(BE + SHARES),
-  `${(BE + SHARES).match(/_ASSETS_PER_NOTE = |MAX_PUBLIC_ASSETS/g) || []}`)
+// 张数那一条（前端 count / 服务端一篇上限 / 一批上限 / 两个读口都不许多截一刀）
+// 整批归 `验-张数只有一个出处.js` 管，这里不抄第二条：两条尺子各钉一份同一个数，
+// 改数量时就有一条会悄悄失效（这一轮就差点留下一条"公开页也认这个常量"的旧判据）。
 
 /* ---------- 五、后端那三条口径不能被人改回"每人 5GB" ---------- */
 ck('配额比值按全站算（total_bytes 不带 user 过滤）',

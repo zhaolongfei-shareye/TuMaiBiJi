@@ -10,7 +10,9 @@ const INFO = path.resolve(__dirname, '../../miniprogram/utils/appInfo.js')
 const HIT = /const VERSION = '([^']+)'/.exec(fs.readFileSync(INFO, 'utf8'))
 if (!HIT) { console.error('✗ 在 utils/appInfo.js 里找不到 VERSION，这条尺子先失效了'); process.exit(2) }
 const EXPECT = HIT[1]
-const PORT = process.env.APORT || '9420'
+// 默认端口跟着 `跑尺子.sh` 那条统一口径（本项目真跑那批一律 9431，这一把原来写死 9420，
+// 用 runner 跑就连不上——报的是连接红，不是判据红）。要单独跑旧写法：APORT=9420 node ...
+const PORT = process.env.APORT || '9431'
 ;(async () => {
   const mp = await automator.connect({ wsEndpoint: 'ws://localhost:' + PORT + '' })
   try {
