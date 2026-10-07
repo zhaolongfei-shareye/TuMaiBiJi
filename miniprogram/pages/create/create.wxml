@@ -26,10 +26,10 @@
     <text class="w">{{weekText}}</text>
   </view>
 
-  <!-- 统一录入条：收起时只有这一条，右边三枚小圆是拍照 / 相册 / 链接三个入口；
-       点条身或任意一枚小圆都向下展开成一张面板，面板里四个模式标签可以互切。
-       原来那三张饱和色大卡没有消失，只是被收进同一条肚子里——功能名、控件、
-       校验、报错行、忙态全部照旧，改的只有承载方式。 -->
+  <!-- 统一录入条（10-08 改版）。收起态还是那条纸白胶囊，右边三枚小圆是三个入口；
+       展开之后条身整条让位——上面换成框外那一行小字，下面升起一张暗面板。
+       面板里只剩两样东西：一个输入框（或一横排小图）＋ 一枚"右滑才开始提炼"的长条。
+       功能一个没少：校验、忙态、报错、权限引导全部照旧，改的是承载方式。 -->
   <view class="entry-wrap">
     <!-- 站长 10-01 晚：横条上面加一行轮播 Tips，教人用拍照提炼、分享选模板这些现成能力。
          展开态整行不渲染（和「换背景」同一规矩：面板已经贴底了，上面再滚一行提示会跟表单抢眼睛）。
@@ -41,11 +41,13 @@
       <view class="tips-dot" style="{{tipDotStyle}}"></view>
       <text class="tips-line">{{tipsPrefix}}{{tips[tipIdx]}}</text>
     </view>
-    <view class="bar {{active ? 'open' : ''}}" catchtap="openBar">
-      <view class="bar-lead glyph-{{lead}}"></view>
-      <view class="bar-label">{{barTitle}}</view>
-      <view wx:if="{{active}}" class="bar-hint">{{t.barCollapse}}</view>
-      <view wx:else class="bar-dots">
+
+    <!-- 收起态：条身不再挂 open 类。展开时它整个不渲染（面板自己贴底，
+         上面那行框外小字接手「点空白处收起」这一句），所以胶囊与面板"同一块白、接缝对齐"那套没了。 -->
+    <view wx:if="{{!active}}" class="bar" catchtap="openBar">
+      <view class="bar-lead glyph-pen"></view>
+      <view class="bar-label">{{t.barIdle}}</view>
+      <view class="bar-dots">
         <view class="dot" style="{{skinShot}}" catchtap="onDotShot" data-source="camera" aria-label="{{t.takePhoto}}">
           <view class="dot-glyph glyph-camera"></view>
         </view>
@@ -58,134 +60,102 @@
       </view>
     </view>
 
-    <view wx:if="{{active}}" class="panel" catchtap="noop">
-      <view class="modes">
-        <view class="mode {{mode === 'write' ? 'on' : ''}}" catchtap="onMode" data-mode="write">
-          <view class="mode-dot" style="{{skinWrite}}"></view>{{t.modeWrite}}
-        </view>
-        <view class="mode {{mode === 'camera' ? 'on' : ''}}" catchtap="onMode" data-mode="camera">
-          <view class="mode-dot" style="{{skinShot}}"></view>{{t.takePhoto}}
-        </view>
-        <view class="mode {{mode === 'album' ? 'on' : ''}}" catchtap="onMode" data-mode="album">
-          <view class="mode-dot" style="{{skinAlbum}}"></view>{{t.fromAlbum}}
-        </view>
-        <view class="mode {{mode === 'url' ? 'on' : ''}}" catchtap="onMode" data-mode="url">
-          <view class="mode-dot" style="{{skinUrl}}"></view>{{t.modeUrl}}
-        </view>
+    <!-- 展开态：面板外面那一行两枚小字（10-08 站长原话「这一行移出框外」）。
+         左边报名前在干什么、右边报怎么退出去，两枚都浮在形象图上，所以吃页面级
+         --text-tertiary：铺图时它是纸白 .56，没铺图时是这套壁纸的灰字，两头都不用另写规则。 -->
+    <view wx:if="{{active}}" class="out">
+      <text class="out-l">{{t.chooseMode}}</text>
+      <text class="out-r">{{t.barCollapse}}</text>
+    </view>
+    <!-- 报错行放在框外、面板上面（10-08）：它是临时消息不是控件，塞进面板里就得给每一态
+         都预留一行高度，而那一段高度正是站长连说两轮"继续压低"要省的地方。
+         权限那一类整行可点，直接进设置；其余只是读。 -->
+    <view wx:if="{{active && hintLine}}" class="out-err" catchtap="openPermSetting">{{hintLine}}</view>
+
+    <view wx:if="{{active}}" class="panel {{panelOpen ? 'panel-open' : ''}}" style="{{skinPanel}}" catchtap="noop">
+      <view class="modes" catchtap="noop">
+        <view class="md {{active === 'photo' ? 'on' : ''}}" catchtap="onTab" data-tab="photo">{{t.modePhoto}}</view>
+        <view class="md {{active === 'url' ? 'on' : ''}}" catchtap="onTab" data-tab="url">{{t.modeUrl}}</view>
+        <view class="md {{active === 'write' ? 'on' : ''}}" catchtap="onTab" data-tab="write">{{t.modeWrite}}</view>
       </view>
 
-      <!-- 下面三段就是原来那三张卡的 entry-body，一行没改逻辑 -->
-      <view wx:if="{{active === 'url'}}" class="entry-body">
-        <view class="entry-desc">{{t.linkDesc}}</view>
-        <view class="face-box">
+      <view class="card">
+        <!-- 照片 · 还没选图：三枚圈。中间那枚大的（白环＋实心）就是快门，是全篇唯一的大钮；
+             左边小圆走相册、右边小圆跳到链接那一档。三个图形都带字，没有裸图。 -->
+        <view wx:if="{{active === 'photo' && !previewImages.length}}" class="crow">
+          <view class="mini" catchtap="pickImage" data-source="album" aria-label="{{t.fromAlbum}}">
+            <view class="mini-c"><view class="mini-glyph glyph-images"></view></view>
+            <text class="mini-lb">{{t.fromAlbum}}</text>
+          </view>
+          <view class="shutcol" catchtap="pickImage" data-source="camera" aria-label="{{t.takePhoto}}">
+            <view class="shut"><view class="shut-core"><view class="shut-glyph glyph-camera"></view></view></view>
+            <text class="shut-lb">{{t.takePhoto}}</text>
+          </view>
+          <view class="mini" catchtap="onTab" data-tab="url" aria-label="{{t.modeUrl}}">
+            <view class="mini-c"><view class="mini-glyph glyph-link"></view></view>
+            <text class="mini-lb">{{t.modeUrl}}</text>
+          </view>
+        </view>
+
+        <!-- 照片 · 已选：一横排小图，➕ 那枚与小图同尺寸同圆角、钉在最右端。
+             「已选 N 张」那一行撤了，序号直接标在每张图的左下角（数一看就知道是第几张、删的是哪张）。
+             一行放 5 格：9 张 + ➕ = 10 格 = 正好两行，所以"展开只多一行"这条落得下去。 -->
+        <view wx:elif="{{active === 'photo'}}" class="strip">
+          <view class="th" wx:for="{{previewImages}}" wx:key="*this">
+            <image class="th-img" src="{{item}}" mode="aspectFill" />
+            <view class="th-x" data-index="{{index}}" catchtap="removeShot">✕</view>
+            <text class="th-no">{{index + 1}}</text>
+          </view>
+          <view class="th th-add {{shotsFull ? 'th-add-dis' : ''}}" catchtap="onAddShot" aria-label="{{t.importScreenshot}}">
+            <view class="th-plus glyph-plus"></view>
+          </view>
+        </view>
+
+        <!-- 链接：一个输入框，提示词吃现网那句 linkDesc，点进去就没了。
+             「粘贴」和「保存」那两枚按钮撤了——保存换成右滑那一枚，粘贴交给系统长按。 -->
+        <view wx:elif="{{active === 'url'}}" class="field">
           <input
-            class="face-input"
+            class="field-input"
             value="{{urlInput}}"
-            placeholder="https://mp.weixin.qq.com/…"
-            placeholder-class="face-ph"
+            placeholder="{{t.linkDesc}}"
+            placeholder-class="field-ph"
             confirm-type="done"
             bindinput="onUrlInput"
           />
-          <view wx:if="{{urlInput}}" class="face-x" catchtap="clearUrl">✕</view>
+          <view wx:if="{{urlInput}}" class="field-x" catchtap="clearUrl">✕</view>
         </view>
-        <template is="entryGuide" wx:if="{{!urlInput}}" data="{{t, tipDotStyle}}" />
-        <view class="acts">
-          <view class="act ghost" catchtap="pasteUrl">{{t.paste}}</view>
-          <view class="act {{urlHint === 'ok' && !busy ? 'solid' : 'off'}}" catchtap="submitUrl">{{busy === 'url' ? t.busyExtract : t.save}}</view>
-        </view>
-        <view wx:if="{{errLine}}" class="entry-err" catchtap="openPermSetting">{{errLine}}</view>
-        <view wx:elif="{{urlHint === 'bad'}}" class="entry-err">{{t.linkRule}}</view>
-        <view wx:elif="{{urlHint === 'ok'}}" class="entry-note">{{t.linkReady}}</view>
-        <view wx:else class="entry-note">{{t.urlHintIdle}}</view>
-      </view>
 
-      <view wx:elif="{{active === 'shot'}}" class="entry-body">
-        <view class="entry-desc">{{shotDesc}}</view>
-        <!-- 一横排可滑，不给它换行：换行的话 9 张会撑到三行，超出面板高度就被裁，
-             而裁掉的部分既看不见也点不到。 -->
-        <scroll-view wx:if="{{previewImages.length}}" class="shot-strip" scroll-x show-scrollbar="{{false}}">
-          <view class="shot-cell" wx:for="{{previewImages}}" wx:key="*this">
-            <image class="shot-img" src="{{item}}" mode="aspectFill" />
-            <view class="shot-x" data-index="{{index}}" catchtap="removeShot">✕</view>
-          </view>
-        </scroll-view>
-        <view class="pick2">
-          <view class="pk" style="{{skinShot}}" data-source="camera" catchtap="pickImage">
-            <view class="pk-glyph glyph-camera"></view>
-            <view class="pk-label">{{t.takePhoto}}</view>
-            <view class="pk-hint">{{t.takePhotoHint}}</view>
-          </view>
-          <view class="pk" style="{{skinAlbum}}" data-source="album" catchtap="pickImage">
-            <view class="pk-glyph glyph-images"></view>
-            <view class="pk-label">{{t.fromAlbum}}</view>
-            <view class="pk-hint">{{t.fromAlbumHint}}</view>
-          </view>
-        </view>
-        <template is="entryGuide" wx:if="{{!previewImages.length}}" data="{{t, tipDotStyle}}" />
-        <view class="acts">
-          <view wx:if="{{previewImages.length}}" class="act ghost" catchtap="clearShots">{{t.clear}}</view>
-          <view class="act {{previewImages.length && !busy ? 'solid' : 'off'}}" catchtap="submitScreenshots">{{busy === 'shot' ? t.busyExtract : t.startExtract}}</view>
-        </view>
-        <view wx:if="{{errLine}}" class="entry-err" catchtap="openPermSetting">{{errLine}}</view>
-      </view>
-
-      <view wx:else class="entry-body">
-        <view class="entry-desc">{{t.manualDesc}}</view>
-        <!-- 站长 10-04：归类这一格挪进标题那一行，只报分类名（"归类"那两个字撤掉），
-             整行 1/3 归它、剩下 2/3 给标题。原来它单独占一行，是把最贵的一屏高度
-             花在一个只有几个字的行上。
-             第六轮改的就是这一行里的左右：标题在左、分类在右，分类那格的名字再淡一档。 -->
-        <view class="wr-line">
-          <view class="wr-title">
-            <input
-              class="face-input"
-              value="{{writeTitle}}"
-              placeholder="{{t.writeTitlePh}}"
-              placeholder-class="face-ph"
-              bindinput="onWriteTitle"
-            />
-          </view>
-          <picker
-            wx:if="{{categoryNames.length}}"
-            class="wr-cat"
-            mode="selector"
-            range="{{categoryNames}}"
-            value="{{catIndex}}"
-            bindchange="onPickCategory"
-          >
-            <view class="wr-cat-face">
-              <text class="wr-cat-val">{{categoryNames[catIndex]}}</text>
-              <text class="wr-cat-caret">›</text>
-            </view>
-          </picker>
-        </view>
-        <!-- 这一段现在是"原文"，不是摘要：摘要交给模型出，所以框子给足。
-             高度写死而不是 flex:1——面板定高 700，富余那截被按钮行的 auto 外边距吃掉，
-             textarea 拿 flex:1 一寸都长不了（见 create.wxss 上面那段注释）。 -->
+        <!-- 文字：一个原文框（收起一行、展开两行）。标题和归类挪到详情页「编辑」里改，
+             所以这一屏只有一个框——站长 10-08 原话「砍一个输入框，只留一个输入框」。 -->
         <textarea
-          class="face-area wr-body"
+          wx:else
+          class="field field-area {{panelOpen ? 'field-area-2' : ''}}"
           value="{{writeBody}}"
-          placeholder="{{t.writeBodyPh}}"
-          placeholder-class="face-ph"
+          placeholder="{{t.manualDesc}}"
+          placeholder-class="field-ph"
           maxlength="2000"
+          show-confirm-bar="{{false}}"
           bindinput="onWriteBody"
+          bindfocus="onBodyFocus"
+          bindblur="onBodyBlur"
         />
-        <!-- 站长 10-04：「我贴一条纯英文的，界面也是英文，不明白为什么提炼的时候自动翻译成
-             中文」，要在这排按钮上面加一枚小开关，默认关。根因不在模型，在给它的提示词整篇
-             是中文（llm.py 的 SYSTEM_PROMPT），它就一直顺着提问的语言答。这一枚决定那行
-             「输出语言」带不带：关＝摘要跟随原文的语言（英文原文出英文摘要），开＝整理成中文。
-             只管「直接写」这一档——链接／截图那两条不带这个参数，提示词一字没变。
-             整行都是落点：面板只有 700 高，只让那枚药丸可点在这个距离上太难点中；
-             用 catchtap 是因为容器上挂着「点空白收回面板」，不能顺手把面板收掉。 -->
-        <view class="wr-sw {{writeTranslate ? 'wr-sw-on' : ''}}" catchtap="onToggleTranslate">
+
+        <!-- 「原文翻译」那一枚（站长 10-04 要的小开关，默认关）留在文字这一档，但只在展开态出现：
+             500rpx 的面板肚子里只剩"一个框 + 一枚条"，塞不下第三样，而硬塞就得把面板抬高、
+             正好顶回站长连说两轮不许挡的那张脸。展开态有这一段富余，够用。
+             ⚠️ 这一条放置是我定的，不是他拍过的——现网是收起态就能看到。 -->
+        <view wx:if="{{active === 'write' && panelOpen}}" class="wr-sw {{writeTranslate ? 'wr-sw-on' : ''}}" catchtap="onToggleTranslate">
           <text class="wr-sw-lab">{{t.origTranslate}}</text>
           <view class="wr-sw-track"><view class="wr-sw-dot"></view></view>
         </view>
-        <view class="acts">
-          <view class="act ghost" catchtap="cancelWrite">{{t.cancel}}</view>
-          <view class="act {{busy === 'write' ? 'off' : 'solid'}}" catchtap="submitManual">{{busy === 'write' ? t.busyExtract : t.startExtract}}</view>
-        </view>
-        <view wx:if="{{errLine}}" class="entry-err">{{errLine}}</view>
+
+        <!-- 右滑才开始提炼。三档共用同一枚画法，只差圆里那支图形（照片=叠图、链接=链环、文字=钢笔）。
+             圆跟着手指走、停在最右、颜色全程不变；是轨道随进度由纸白吃成实心，那一圈白环一直在。 -->
+        <template
+          wx:if="{{active !== 'photo' || previewImages.length}}"
+          is="sld"
+          data="{{t, busy, done, dragging, ready, knobRpx, fillPct, sldIcon}}"
+        />
       </view>
     </view>
 
@@ -206,19 +176,17 @@
   </view>
 </view>
 
-<!-- 四步指引：面板定高 700，空态中间那截富余原本被按钮行的 auto 边距吃掉，
-     现在拿来放这份操作说明。两个入口档各引一次，所以写成模板放一份。
-     ⚠️ <template is> 不继承页面 data，必须显式 data="{{t, tipDotStyle}}"——漏了 t 文字
-     整段是空的，漏了 tipDotStyle 那四枚点是透明的（模拟器实测就是这个现象）。 -->
-<template name="entryGuide">
-  <view class="guide">
-    <view class="gstep"><view class="gdot" style="{{tipDotStyle}}"></view>
-      <view class="gtxt"><text class="gt-t">{{t.guide1T}}</text><text class="gt-d">{{t.guide1D}}</text></view></view>
-    <view class="gstep"><view class="gdot" style="{{tipDotStyle}}"></view>
-      <view class="gtxt"><text class="gt-t">{{t.guide2T}}</text><text class="gt-d">{{t.guide2D}}</text></view></view>
-    <view class="gstep"><view class="gdot" style="{{tipDotStyle}}"></view>
-      <view class="gtxt"><text class="gt-t">{{t.guide3T}}</text><text class="gt-d">{{t.guide3D}}</text></view></view>
-    <view class="gstep"><view class="gdot" style="{{tipDotStyle}}"></view>
-      <view class="gtxt"><text class="gt-t">{{t.guide4T}}</text><text class="gt-d">{{t.guide4D}}</text></view></view>
+<!-- 滑动确认那一枚长条。三个模式共用一份，所以写成模板；
+     ⚠️ <template is> 不继承页面 data，用到的字段必须一个个显式递进去——
+     漏了 t 整句是空的，漏了 knobRpx 圆就永远停在 CSS 那个起点 10rpx（10-08 真跑量出来的：
+     data 里 knobRpx 一路走到 456，屏上那枚圆一动不动，四张截图里都是左边那颗）。
+     拖动中那条 transition 由 sld-drag 关掉，松手回弹与进位才交还给 CSS 过渡。 -->
+<template name="sld">
+  <view class="sld {{ready ? '' : 'sld-off'}} {{busy ? 'sld-busy' : ''}} {{done ? 'sld-done' : ''}} {{dragging ? 'sld-drag' : ''}}"
+        catchtap="onSldTap"
+        bindtouchstart="onSlideStart" catchtouchmove="onSlideMove" bindtouchend="onSlideEnd" bindtouchcancel="onSlideEnd">
+    <view class="sld-fill" style="width:{{fillPct}}%"></view>
+    <view class="sld-txt">{{busy || done ? t.busyExtract : t.slideExtract}}</view>
+    <view class="sld-knob" style="left:{{knobRpx}}rpx"><view class="sld-glyph glyph-{{sldIcon}}"></view></view>
   </view>
 </template>

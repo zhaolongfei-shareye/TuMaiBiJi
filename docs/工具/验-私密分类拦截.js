@@ -58,7 +58,13 @@ const ck = (name, ok, got) => {
   const write = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/create/create.js'), 'utf8')
   const wr = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/write/write.js'), 'utf8')
   ck('列表页判据已收到同一个函数里（不再各写一遍"私密"）', /isPrivate\(/.test(idx) && !/=== '私密'/.test(idx))
-  ck('新建页与编辑页都接了这道拦截', /allowPrivate\(/.test(write) && /allowPrivate\(/.test(wr))
+  // 10-08 创建入口改版：新建页那格分类选择器撤了（标题与归类挪到详情页「编辑」里改），
+  // 所以这道闸跟着退到唯一还在挑分类的那一页。闸比选择器多留着 = 有一条打得着的假防线，
+  // 少留着 = 挑私密那一格能绕过密码——两头都要看得见，故此处同时钉两边。
+  ck('挑分类那一页接了这道拦截（编辑页 write）', /allowPrivate\(/.test(wr))
+  ck('新建页不再挑分类，那道闸也跟着撤净（不留打不到的防线）',
+    !/allowPrivate|getCategories|categoryNames|catIndex/.test(write) && !/picker/.test(
+      fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/create/create.wxml'), 'utf8')))
 
   // ---------- 服务端那道闸在客户端的四条接线 ----------
   // 后端 09-30 起真的会裁字段（backend/app/core/private_access.py）：没解锁时私密笔记的

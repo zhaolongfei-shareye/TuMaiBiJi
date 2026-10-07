@@ -58,31 +58,39 @@ ok('展开时换背景那一行整个不渲染',
 ok('铺图抬层那条排除了展开态',
   /\.container\.has-bg:not\(\.entry-dock\) \.entry-wrap/.test(wxss))
 
-// ---------- 3. 四屏等高：面板定高，内容不许被压扁 ----------
+// ---------- 3. 两档等高：面板定高，内容不许被压扁 ----------
 const panel = seg('.panel')
 const PANEL_H = Number(/height:\s*(\d+)rpx/.exec(panel)[1])
 ok('面板定高', PANEL_H > 0 && PANEL_H < 1200, String(PANEL_H))
 ok('面板是 flex 列', /display:\s*flex/.test(panel) && /flex-direction:\s*column/.test(panel))
 ok('面板算 border-box（定高含内边距）', /box-sizing:\s*border-box/.test(panel))
-const body = seg('.entry-body')
-ok('body 吃掉面板剩下的那一段', /flex:\s*1/.test(body) && /min-height:\s*0/.test(body))
-ok('body 自己是 flex 列', /display:\s*flex/.test(body) && /flex-direction:\s*column/.test(body))
-ok('body 里每一段都不许 shrink（富余整段留给按钮行上面的 auto 边距）',
-  /\.entry-body > view,\s*\.entry-body > picker,\s*\.entry-body > textarea,\s*\.entry-body > scroll-view\s*\{[^}]*flex:\s*none/.test(wxss))
+// 10-08 起面板肚子里那块"卡"就是原来 .entry-body 的位置：吃掉标签行以下剩下的那一段。
+const card = seg('.card')
+ok('卡吃掉面板剩下的那一段', /flex:\s*1/.test(card) && /min-height:\s*0/.test(card))
+ok('卡自己是 flex 列', /display:\s*flex/.test(card) && /flex-direction:\s*column/.test(card))
+ok('卡里每一段都不许 shrink（富余整段留给框与条上面那两档 auto 边距）',
+  /\.card > view,\s*\.card > textarea\s*\{[^}]*flex:\s*none/.test(wxss))
 ok('模式标签行不许 shrink', /\.modes\s*\{[^}]*flex:\s*none/.test(wxss))
+ok('框外那两行（小字与报错）不许 shrink',
+  /\.out\s*\{[^}]*flex:\s*none/.test(wxss) && /\.out-err\s*\{[^}]*flex:\s*none/.test(wxss))
 ok('条身不许 shrink', /\.bar\s*\{[^}]*flex:\s*none/.test(wxss))
-ok('面板底边内边距就是 --sp-4（真跑那把拿它当"贴底"的判据）',
-  /padding:\s*8rpx var\(--sp-4\) var\(--sp-4\)/.test(panel))
-ok('按钮行沉到 body 底下', /\.panel \.acts\s*\{[^}]*margin-top:\s*auto/.test(wxss))
-// padding-top 是"填满时仍留一条缝"：只有 margin-top:auto 的话内容一满，auto 归零就贴脸了
-ok('按钮行留一条最小缝', /\.panel \.acts\s*\{[^}]*padding-top:\s*20rpx/.test(wxss))
+// 富余由 auto 边距分掉，不是硬写死的 margin——所以"框贴脸"这种错只能在真机上量出来，
+// 这里钉的是画法：框、条、三枚圈、小图排四处都写的是 margin-top:auto。
+ok('框与条之间那一段缝由 auto 边距给（四处都在）',
+  ['field', 'sld', 'crow', 'strip'].every((c) => /margin-top:\s*auto/.test(seg('.' + c))))
+ok('报错行画在框外，面板里不预留它那一行（这就是压到 500 的那一笔）',
+  !/\.entry-err|\.entry-note/.test(wxss) && /class="out-err"/.test(wxml))
 
-// ---------- 4. 那个高度是从源码单点读出来的，别处不许再抄一份 ----------
-ok('700 这个数在 WXSS 里只出现一次',
-  (wxss.match(/height:\s*700rpx/g) || []).length === 1)
-ok('量法脚本还在', fs.existsSync(path.join(ROOT, 'docs/工具/量-面板四态自然高.js')))
-ok('注释里写了三个模式的实测高度',
-  /608/.test(wxssRaw) && /660/.test(wxssRaw) && /413/.test(wxssRaw))
+// ---------- 4. 那两档高度是从源码单点读出来的，别处不许再抄一份 ----------
+const panelOpen = seg('.panel-open')
+ok('两档高度各只出现一次（500 与 580 不许在别处再写一遍）',
+  (wxss.match(/height:\s*500rpx/g) || []).length === 1 && (wxss.match(/height:\s*580rpx/g) || []).length === 1)
+ok('展开那一档挂在 .panel-open 上，由 JS 那一位说话',
+  /height:\s*580rpx/.test(panelOpen) && /panelOpen \? 'panel-open'/.test(wxml))
+ok('展开只多一行：580 − 500 = 80，而那一行的框正好是 160 − 105 + 开关那一段',
+  PANEL_H > 0 && Number((/height:\s*(\d+)rpx/.exec(panelOpen) || [0, 0])[1]) - PANEL_H === 80)
+ok('量法与算式写在这页注释里（改内容要重算这一笔账）',
+  /263\.5/.test(wxssRaw) && /566/.test(wxssRaw) && /254\.4/.test(wxssRaw))
 
 console.log(`${fails.length ? '✗' : '✓'} 录入面板沉底 静态：${pass}/${pass + fails.length} 条通过`
   + `　面板高 ${PANEL_H}rpx、底边距 ${bottom}rpx`)

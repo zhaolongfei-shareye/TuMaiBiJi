@@ -64,27 +64,18 @@ async function until(mp, route, pick, timeoutMs = 20000) {
   process.on('unhandledRejection', (e) => { console.error('尺子挂了（未处理拒绝）', e); process.exit(2) })
   const mp = await connect()
   try {
-    // ---------- ① 新建页：展开录入条、切到"写字"，分类选择器里必须选得到私密 ----------
-    // 分类是懒加载的：create.js 只在 open('write') 里调 loadCategories()，
-    // 收起态去读 categoryNames 永远是空数组——那不是 bug，是还没走到那一支。
-    await relaunch(mp, '/pages/create/create')
-    await sleep(2500)
-    const c0 = await mp.currentPage()
-    // Page 对象上没有 tap，只有元素有（这一版 automator 实测）
-    const bar = await c0.$('.bar')
-    ck('录入条在页面上找得到（收起态点它=直接进"写字"）', !!bar)
-    if (bar) await bar.tap()        // 收起态点条身 = 进"写字"，顺手把分类拉下来
-    const created = await poll(c0, (d) => (d.categoryNames || []).length)
-    ck('展开录入条后把分类拉下来了', (created.categoryNames || []).length > 0,
-      JSON.stringify(created.categoryNames))
-    ck(`新建页的分类里有「${PRIVATE}」`, (created.categoryNames || []).includes(PRIVATE),
-      JSON.stringify(created.categoryNames))
-    ck('确实落在"写字"这一段（分类选择器只在这一段里）',
-      created.active === 'write', `active=${created.active}`)
-    // 选择器吃的是这一个数组，所以数组里有 = 那一格里有；绑定关系钉住，别哪天改成另算一份
-    const cw = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/create/create.wxml'), 'utf8')
+    // ---------- ① 挑分类那一页：候选里必须选得到私密 ----------
+    // 10-08 创建入口改版：新建页那格分类选择器撤了（标题与归类挪到详情页「编辑」→ 这一页改），
+    // 所以"私密选得到"这条真跑判据跟着搬到**唯一还在挑分类的那一页**。
+    // 搬错了就等于没测：新建页现在根本没有 categoryNames 这一位。
+    const wr = await until(mp, '/pages/write/write', (d) => (d.categoryNames || []).length)
+    ck(`亲自撰写／编辑那一页的分类里有「${PRIVATE}」`, (wr.categoryNames || []).includes(PRIVATE),
+      JSON.stringify(wr.categoryNames))
+    const ww = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/write/write.wxml'), 'utf8')
     ck('那一排选择器的候选就是这个数组（不是另算一份）',
-      /<picker[^>]*range="\{\{categoryNames\}\}"/.test(cw))
+      /<picker[^>]*range="\{\{categoryNames\}\}"/.test(ww))
+    ck('新建页确实不再挑分类（撤了选择器也就撤了那道闸，见 验-私密分类拦截）',
+      !/categoryNames/.test(fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/create/create.js'), 'utf8')))
 
     // ---------- ② 列表页：私密要能当筛选条件 ----------
     const idx = await until(mp, '/pages/index/index', (d) => (d.categories || []).length)

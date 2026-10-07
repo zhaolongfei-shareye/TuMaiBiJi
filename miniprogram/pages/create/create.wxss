@@ -79,9 +79,10 @@
   margin-top: 62vh;
 }
 
-/* ---------- 统一录入条 ----------
-   收起态是一枚纸白胶囊：左边条身（唯一的动词），右边三枚小圆就是三个入口。
-   展开态胶囊换成"上圆角 40 + 下面接面板"，面板和它同一块白，中间不留缝。
+/* ---------- 收起态那条录入条 ----------
+   条子本身没改：纸白胶囊 + 右边三枚小圆。改的只有"展开之后它去哪儿"——
+   原来它留在原地当面板的盖子（.bar.open 换成方顶、与面板同一块白），
+   10-08 这版整条让位：展开时不渲染，上面换成框外那一行小字（.out）。
    这条为什么固定用纸白而不是壁纸的 --bg-card：四枚壁纸的 --bg-card 是各自那一支的浅纸
    （象牙 #F3F3F1、雨雾 #F1F2F3），同一条控件在四套壁纸里会变成四种面；而这条肚子里
    装的是输入框和按钮，面必须稳定。描边沿用 .card 那一条 3px。 */
@@ -91,13 +92,8 @@
    点是他要的那枚"小灯泡"象征：14rpx 圆，颜色由 palette.TIP_DOT 从 style 递进来，
    这里绝对不写色值（`验-统一录入条.js` 有一条专门扫 wxss 里的饱和色）。
    ⚠️ 那两个 68 是刻意的，不是遗留：.entry-wrap 整块靠 62vh 那条流内 margin 定位，
-   在它肚子里多一行就会把横条、换背景、底栏整组往下顶（正是"上面多一行就得改这里"那条老账，
-   日期那行当年就是这么把换背景顶进底栏的）。所以这一行要**整块从流里抵掉**：
-   盒子高 68 = 文字那 34 + 它下面留的一行 34，负 margin 也 68，两者互相抵干净，
-   横条顶边仍然等于整组顶边（这条由 `验-统一录入条-真跑.js` 量：条顶 == 组顶）。
-   文字落在这只盒子的上沿，于是它离横条是"一行"而不是零——上一版把 height 写成 34、
-   margin 写 -68，条子被往上顶了 34rpx，而文字底紧贴条顶，两头都不对。
-   改这一行的字号或行距，要连着改这个负 margin 和这只盒子的高。 */
+   在它肚子里多一行就会把横条、换背景、底栏整组往下顶。所以这一行要**整块从流里抵掉**：
+   盒子高 68 = 文字那 34 + 它下面留的一行 34，负 margin 也 68，两者互相抵干净。 */
 .tips {
   flex: none;
   display: flex;
@@ -149,12 +145,6 @@
   transform: scale(0.99);
 }
 
-.bar.open {
-  border-radius: var(--r-card) var(--r-card) 0 0;
-  background: #fff;
-  padding-bottom: 4rpx;
-}
-
 .bar-lead {
   flex: none;
   width: 52rpx;
@@ -163,9 +153,8 @@
 }
 
 .bar-label {
-  /* 站长 10-01 晚：这一档从 46rpx 收到笔记标题那一档（--fs-title 31）——
-     他说"标题字体过大，与笔记标题字体一样大就行"。原来那句"不能比页面标题小"作废：
-     页面标题 42 是整屏的门面，这一句只是横条里的动词，横条右边还有三枚入口要位置。 */
+  /* 站长 10-01 晚：这一档从 46rpx 收到笔记标题那一档（--fs-title 31）。
+     10-08 起它不再有"按模式换字"那一半：展开时条子整个退场，所以永远只说「动动手指」。 */
   flex: 1;
   min-width: 0;
   font-size: var(--fs-title);
@@ -175,15 +164,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* 展开后条身右边那一行小字：告诉你点哪儿能收回去。它是说明不是按钮，
-   所以不吃底色、不加圆角，只比条身淡一档。 */
-.bar-hint {
-  flex: none;
-  font-size: var(--fs-meta);
-  font-weight: 600;
-  color: rgba(35, 37, 44, 0.42);
 }
 
 .bar-dots {
@@ -213,229 +193,329 @@
   background: var(--blk-ink);
 }
 
-/* ---------- 展开面板 ----------
-   面板自己发一套"纸面上的控件面"：输入框是淡墨面、主按钮是墨底纸字、
-   不可用那档更薄。原来这套面由 toneStyle 按饱和卡色发下来，现在卡退成了白纸，
-   面就得按纸重算——键名一个没改，所以 app.wxss 里那批 .face-* / .act 照常工作。 */
+/* ---------- 面板外面那一行小字（站长 10-08 原话「这一行移出框外」） ----------
+   左边报名前在干什么、右边报怎么退出去。它浮在形象图上，所以吃页面级 --text-tertiary：
+   铺图时那一档本来就是纸白 .56（见下面 .container.has-bg），没铺图时是这套壁纸的灰字。
+   左右留空 20rpx 是从面板内边距 32 里退一档来的——贴着面板左右沿会显得两枚字被裁了。 */
+.out {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 0 20rpx 18rpx;
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  letter-spacing: 1rpx;
+  color: var(--text-tertiary);
+}
+
+/* 报错行也放框外：它是临时消息不是控件，塞进面板里就得给每一态都预留一行高度，
+   而那一段高度正是站长这一轮连说两轮"继续压低"要省的地方（效果图图例第 2 条）。
+   颜色不用壁纸令牌而写死一支浅红：这块底是形象图 + 压暗罩，不是任何一张纸，
+   --blk-err 那一档白纸面板上用的深红压在这张图上直接看不见。
+   #FFD7D3 与 palette.toneStyle 给深底卡算的那支红同值，两处都是"暗底上的红"这一个用途。 */
+.out-err {
+  flex: none;
+  padding: 0 20rpx 14rpx;
+  font-size: var(--fs-label);
+  line-height: 1.4;
+  font-weight: 700;
+  color: #ffd7d3;
+}
+
+/* ---------- 展开面板（10-08 改版）----------
+   一块稳住的暗面，肚子里只剩两样东西：一个输入框（或一横排小图）＋ 一枚"右滑才开始提炼"的长条。
+   面板、卡、输入框这三档暗面是这一页自己的纸，不随壁纸换（和那条纸白录入条同一个理由：
+   面必须稳定）；只有快门与滑动条那两档吃当前壁纸的色阶，色值一律从 palette.createSkin()
+   经 style 递进来，这里只写 var(--cp-*)——与 TIP_DOT、toneStyle 同一条规矩。
+
+   高度两个数都是按盒子模型算出来再拿真跑那把尺子量过的（docs/工具/验-录入面板沉底-真跑.js）：
+   收起 500 ＝ 上内边距 30 + 标签行 77.5 + 卡上边距 25 + 卡边框 6 + 卡内边距 60 + 内容 263.5 + 下内边距 32，
+   而最占地方那一态（照片那三枚圈：快门 210 + 间距 12 + 那行字 32.4）实测 254.4，装得下。
+   展开 580 ＝ 只多一行（原文框从 105 变 160、或者小图从一排变两排），站长原话「点击展开也只是多一行高度，不再增加高度」。
+   现网原来是 700 一档，这两档各矮 200 与 120——面板顶因此落在眼睛那条线下面，形象图不再被吃掉。 */
 .panel {
-  --blk-ink: #23252c;
-  --blk-err: #8c2119;
-  --face: rgba(35, 37, 44, 0.05);
-  --face-ink: #23252c;
-  /* 分类那一格的名字比标题淡一档（站长 10-04 第六轮原话）。为什么不用页面级的
-     --text-tertiary：这一页铺上背景图时 has-bg 会把那批令牌翻成纸白，而面板是一张白卡，
-     跟着翻就看不见（⑨ 那一步就是栽在这条上）。 */
-  --face-dim: rgba(35, 37, 44, 0.55);
-  /* 占位符那一档单独给一个带 alpha 的色，不用 opacity：<textarea> 的 placeholder 不吃
-     opacity，实测 摘要 那格压出来是 #23252c 全墨、标题 那格才是 50% 的 8c8c8f，
-     同一个 .face-ph 在两种控件上就成了两种字色。 */
-  --face-ph: rgba(35, 37, 44, 0.5);
-  --face-off: rgba(35, 37, 44, 0.06);
-  --face-off-ink: rgba(35, 37, 44, 0.42);
-  /* ⑨ 这一步本轮**没做成**，先撤回原值。
-     原本要写的是 `--solid-bg: var(--text-primary)`（让这枚吃"当前主题那一档墨"），实测出来是
-     纸白面 + 纯白字、按钮整个看不见（站长 10-04 真机截图：面 (241,239,234) 与 #F2EFE9 差 1，
-     字 (255,255,255)）。原因是本文件 :544 那条 `.container.has-bg` 把 `--text-primary` 连同
-     `--accent` 一起翻成纸白——那是给压在暗图上的字用的，可它的作用域罩得住这一块白纸面板。
-     所以在这条翻转的射程收窄之前，面板里没有任何一个现成令牌是"这页的墨"：
-     --text-primary/--accent 会被翻白，--btn-bg 是他明确不要的"并色"。
-     下面这两行就是原来那两行，一个字节没改；边界规则本身写在方案 §3.3。 */
-  --solid-bg: #23252c;
-  --solid-ink: #f2efe9;
-  background: #fff;
-  color: #23252c;
-  border-radius: 0 0 var(--r-card) var(--r-card);
-  padding: 8rpx var(--sp-4) var(--sp-4);
+  --face: rgba(242, 239, 233, 0.10);
+  --face-ink: #f2efe9;
+  --face-ph: rgba(242, 239, 233, 0.38);
+  --solid-bg: var(--cp-extract);
+  --solid-ink: var(--cp-ink);
+  background: var(--cp-panel);
+  border: var(--w-edge) solid var(--cp-edge-10);
   box-sizing: border-box;
-  /* 四屏等高。700 是量出来的不是拍的：三种内容在最坏情况下的自然高度（中文那排模式标签
-     比英文高 5rpx，取中文那一档）——直接写带报错 608、拍照带三张缩略图带报错 660、
-     链接带提示 413。最大 660 再留一行折行的余量（服务端 detail 是任意长度的一句话），
-     得 700。量法在 docs/工具/量-面板四态自然高.js，改任一模式的内容要重跑它。
-     短的那几屏空出来的位置由 margin-top:auto 的按钮行吸收：保存/粘贴永远落在同一处。 */
-  height: 700rpx;
+  padding: 30rpx 32rpx 32rpx;
+  height: 500rpx;
+  border-radius: 55rpx;
   display: flex;
   flex-direction: column;
 }
 
-/* 按钮行往下沉：auto 边距把富余的那一段留在它上面，而不是堆在面板底下。
-   padding-top 单独给 20rpx，保证内容刚好填满时按钮行和上面那格之间仍有一条缝。 */
-.panel .acts {
-  margin-top: auto;
-  padding-top: 20rpx;
+.panel-open {
+  height: 580rpx;
 }
 
 .container.has-bg .panel {
   box-shadow: 0 24rpx 52rpx rgba(8, 10, 14, 0.34);
 }
 
-/* 四个模式标签：色点用那四个入口各自的颜色（和收起态的三枚小圆同一套），
-   当前那枚只把字和 underline 转成墨色——不给色块加底，标签行才不会比表单更抢眼。 */
+/* 三个模式标签：居中、只由颜色和那一条短 underline 分清selected，不给色块加底。
+   31rpx 是条身那一档（--fs-title），三枚放得下——最长那对英文（Photo / Link / Text）
+   加两个 60 的间距实测 306rpx 宽，面板内宽 566。 */
 .modes {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex: none;
-  gap: 14rpx;
-  padding: 22rpx 0 4rpx;
-  border-bottom: 3rpx solid rgba(35, 37, 44, 0.07);
+  gap: 60rpx;
+  margin-top: 25rpx;
 }
 
-.mode {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
+.md {
+  position: relative;
   flex: none;
-  font-size: var(--fs-meta);
-  font-weight: 700;
-  color: rgba(35, 37, 44, 0.42);
-  padding: 0 4rpx 16rpx;
-  border-bottom: 5rpx solid transparent;
-  margin-bottom: -3rpx;
+  font-size: var(--fs-title);
+  line-height: 1.3;
+  letter-spacing: 1rpx;
+  color: var(--cp-ink-50);
+  padding-bottom: 15rpx;
   white-space: nowrap;
 }
 
-.mode.on {
-  color: #23252c;
-  border-bottom-color: #23252c;
+/* 那一横段是画在标签正下方的居中短线，不是整行 underline：
+   整行会被读成"这一排是一条 tab bar 的槽"，而这里要说的是"当前选中的是这一个"。 */
+.md::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: 65rpx;
+  height: 5rpx;
+  border-radius: 3rpx;
+  background: var(--cp-edge-10);
 }
 
-.mode-dot {
-  width: 26rpx;
-  height: 26rpx;
-  border-radius: 50%;
-  background: var(--blk-bg);
+.md.on {
+  color: var(--cp-ink);
+  font-weight: 600;
 }
 
-.entry-body {
-  position: relative;
-  z-index: 1;
-  animation: unfold 0.22s ease;
-  display: flex;
-  flex-direction: column;
+.md.on::after {
+  background: var(--cp-cam);
+}
+
+/* 卡：面板里的第二层。它存在的唯一理由是把"要填的那一格"和"那枚条"框在一起，
+   让暗面板上不出现三块各自浮着的控件。描边比面板那一条更淡一档，只是分界不做装饰。 */
+.card {
+  margin-top: 25rpx;
   flex: 1;
   min-height: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border-radius: 40rpx;
+  padding: 30rpx;
+  background: var(--cp-card);
+  border: var(--w-edge) solid var(--cp-edge-07);
 }
 
-/* 面板定高之后，肚子里每一段都不许被压扁：flex 子项默认 shrink，
-   88rpx 的输入框被挤成 70 属于看不出来但点着别扭的那类错。
-   富余的那一段整段留给按钮行上面的 auto 边距（见下面 .panel .acts），
-   连摘要区也不放大：CSS 弹性布局里 auto 外边距优先吃掉富余，
-   给 textarea 写 flex:1 它一寸都长不了，写了只是骗下一读这段的人。 */
-.entry-body > view,
-.entry-body > picker,
-.entry-body > textarea,
-.entry-body > scroll-view {
+/* 卡里每一段都不许被压扁（flex 子项默认 shrink，105 的框被挤成 90 属于看不出来但点着别扭的那类错）；
+   富余那一段由"第一个元素上面的 auto 边距"和"条上面的 auto 边距"分掉——
+   写两档 auto 而不是让框自己 margin:auto 0，是为了让框与条之间那条缝不少于框上面那条。 */
+.card > view,
+.card > textarea {
   flex: none;
 }
 
-@keyframes unfold {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* ---------- 照片 · 还没选图：三枚圈 ----------
+   中间那枚大的就是快门（白环 10 + 实心 155），是全篇唯一的大钮；左右两枚小圆 105。
+   三个图形都带字（相册 / 拍照 / 链接）——这一屏没有一个裸图。
+   整排居中（站长 10-08：「三个圆肯定是居中对齐」）。 */
+.crow {
+  margin-top: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 38rpx;
 }
 
-.entry-desc {
-  font-size: var(--fs-meta);
-  line-height: var(--lh-tight);
-  color: rgba(35, 37, 44, 0.62);
-  margin-top: 10rpx;
+.mini {
+  width: 130rpx;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
 }
 
-/* 四步指引：坐在空态那截富余里。前面四枚统一是 Tips 那支小黄点（颜色由 tipDotStyle 从
-   palette.TIP_DOT 带进来，这里不写十六进制），底板用面板已有的那档 .035 淡墨面，
-   不新增描边——"描边是骨架、投影已退役"那条照旧。 */
-.guide {
-  margin-top: 22rpx;
-  padding: 18rpx 22rpx;
-  border-radius: 24rpx;
-  background: rgba(35, 37, 44, 0.035);
+.mini:active {
+  opacity: 0.82;
 }
 
-.gstep {
+.mini-c {
+  width: 105rpx;
+  height: 105rpx;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 14rpx;
-  margin-bottom: 8rpx;
+  justify-content: center;
+  background: var(--face);
 }
 
-.gstep:last-child {
-  margin-bottom: 0;
+.mini-glyph {
+  width: 40rpx;
+  height: 40rpx;
+  background: var(--cp-ink-78);
 }
 
-/* 序号那一枚从"40×40 彩色方块"弱化成一枚小黄点（站长 10-01 深夜：方块喧宾夺主，
-   要"类似 Tips 那种"）。颜色不在这里写死：走 create.js 的 tipDotStyle，
-   和 Tips 行前那枚同一个来源 palette.TIP_DOT，改一处两枚一起改。
-   行距 12→8 是把第四步那一行挤回面板定高 700 的那一档（见上面 .panel 那段注释）。 */
-.gdot {
+.mini-lb {
+  font-size: var(--fs-tiny);
+  letter-spacing: 1rpx;
+  color: var(--cp-ink-50);
+}
+
+.shutcol {
   flex: none;
-  width: 14rpx;
-  height: 14rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 8 不是随手收的：卡里可用那一档实测 251.7rpx（10-08 真跑量出来的，见 量-面板四态自然高），
+     快门 210 + 这一档间距 + 那行字 28.8 正好压进去；原来写 12 会顶出 2.7rpx。 */
+  gap: 8rpx;
+}
+
+.shutcol:active {
+  opacity: 0.86;
+}
+
+/* 那道白环是这一稿的签名：轨道转成实心之后它仍然在（滑动条那一圈白线就是同一笔）。
+   环用 --cp-ink 而不是纯白：整页的"亮面"只有这一支纸白，掺不进第二支白。 */
+.shut {
+  width: 210rpx;
+  height: 210rpx;
+  box-sizing: border-box;
   border-radius: 50%;
+  border: 10rpx solid var(--cp-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* 站长 10-02 真机：这四行"太黑太重，喧宾夺主"。所以一律收到 --fs-meta 这一档、
-   粗体撤掉，主次只由两档色阶给（点那一枚已经是引导了）。
-   颜色留在这套 rgba 里、不换成 --text-secondary/tertiary：这一块的底是 .panel 写死的白纸，
-   而铺了背景图时那两个变量会翻成纸白（见下面 .container.has-bg 那段），翻完字就没了。 */
-.gtxt {
+.shut-core {
+  width: 155rpx;
+  height: 155rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cp-cam);
+}
+
+.shut-glyph {
+  width: 65rpx;
+  height: 65rpx;
+  background: var(--cp-cam-ink);
+}
+
+.shut-lb {
   font-size: var(--fs-meta);
-  line-height: 1.45;
-  color: rgba(35, 37, 44, 0.42);
-}
-
-.gtxt .gt-t {
-  font-weight: 400;
-  color: rgba(35, 37, 44, 0.72);
-  margin-right: 10rpx;
-}
-
-/* 提示行与报错行直接坐在纸上 */
-.entry-note {
-  margin-top: 14rpx;
-  font-size: var(--fs-label);
-  line-height: var(--lh-tight);
-  color: rgba(35, 37, 44, 0.56);
-}
-
-.entry-err {
-  margin-top: 14rpx;
-  font-size: var(--fs-label);
-  line-height: 1.4;
+  /* 行高 1.2：这一行字下面没有别的东西，但整排的高度就是它 + 快门 + 那 8rpx 撑起来的，
+     微信给 view 的默认行高约 1.6，一行字白吃 9rpx。 */
+  line-height: 1.2;
   font-weight: 700;
-  color: var(--blk-err);
+  letter-spacing: 1rpx;
+  color: var(--cp-ink-78);
 }
 
-/* ---------- 截图区 ---------- */
-.shot-strip {
+/* ---------- 输入格（链接一格、文字一格，同一套画法同一个位置） ----------
+   提示词全在框里（placeholder），未输入时看得见、点进去就没了——面板里不再有单独那行小标。
+   上下不贴边：那一段由 .card 的两档 auto 边距给（见上面那段注释）。 */
+.field {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 105rpx;
+  margin-top: auto;
+  padding: 0 28rpx;
+  border-radius: 18rpx;
+  background: var(--cp-field);
+  border: var(--w-edge) solid var(--cp-edge-14);
+  font-size: var(--fs-body);
+  color: var(--cp-ink);
+}
+
+.field-input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-body);
+  color: var(--cp-ink);
+}
+
+/* 占位符单独给一个带 alpha 的色，不用 opacity：<textarea> 的 placeholder 不吃 opacity，
+   实测两种控件上同一个类会出来两种字色（这条是现网踩过的那块白纸面板上量出来的）。 */
+.field-ph {
+  color: var(--face-ph);
+}
+
+.field-x {
+  flex: none;
+  padding: 0 8rpx;
+  font-size: var(--fs-meta);
+  color: var(--cp-ink-62);
+}
+
+/* 「文字」那一档的框：收起态与链接框等高一行，展开态才变两行。
+   textarea 是原生组件，padding 与行高都得自己给，align-items 在它身上没有意义。 */
+.field-area {
   width: 100%;
-  height: 152rpx;
-  margin-top: 22rpx;
-  white-space: nowrap;
+  line-height: 1.5;
+  padding: 0 28rpx;
 }
 
-.shot-cell {
+.field-area-2 {
+  height: 160rpx;
+  padding: 16rpx 28rpx;
+}
+
+/* ---------- 照片 · 已选：一横排小图 ----------
+   一行五格：小图 100、间距 16，五格正好铺满卡内宽（5×100 + 4×16 = 564 ≤ 566）。
+   取五列不是随手数的——上限 9 张 + ➕ 那一格 = 10 格 = 两行放得下的最小列数，
+   站长要的是"展开只多一行"，四列就得三行。
+   ➕ 与小图同尺寸同圆角（他的原话：「加图做成与小图一样尺寸的方图，风格统一」），
+   margin-left:auto 把它钉在这一行的最右端：一格不满时它在右端，两行时它落在最后一格的右位。 */
+.strip {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.th {
   position: relative;
-  display: inline-block;
-  width: 128rpx;
-  height: 128rpx;
-  margin-top: 14rpx;
-  margin-right: var(--sp-2);
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 18rpx;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.16);
 }
 
-.shot-img {
-  width: 128rpx;
-  height: 128rpx;
-  border-radius: var(--r-btn);
-  background: rgba(255, 255, 255, 0.5);
+.th-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.shot-x {
+/* 删这一张的那枚 ✕：右上角、离边 10，遮罩 0.55 是站长 10-04 拍的③那一档，与弹窗那枚同值。
+   放在图里面而不是压出界，是因为 .th 要 overflow:hidden 才切得出圆角。 */
+.th-x {
   position: absolute;
-  right: -8rpx;
-  top: -8rpx;
+  right: 10rpx;
+  top: 10rpx;
   width: 40rpx;
   height: 40rpx;
   border-radius: 50%;
-  /* 遮罩只该有一个值：并到弹窗那枚同档的 0.55（categories.wxss 那层就是这个数）。
-     站长 10-04 拍的③。这一枚是缩略图右上角那 40rpx 的 X 小徽，不是整屏那层。 */
   background: rgba(20, 20, 28, 0.55);
   color: #fff;
   font-size: var(--fs-micro);
@@ -444,43 +524,222 @@
   justify-content: center;
 }
 
-.pick2 {
+/* 序号直接标在图里（左下角那一枚小圆片）：「已选 N 张 · 可再加」那一整行撤了，
+   1…9 本身就报了数，还顺带把"第几张"和"删哪张"对上。 */
+.th-no {
+  position: absolute;
+  left: 10rpx;
+  bottom: 10rpx;
+  min-width: 38rpx;
+  height: 38rpx;
+  padding: 0 8rpx;
+  box-sizing: border-box;
+  border-radius: 19rpx;
+  background: rgba(20, 22, 26, 0.62);
+  color: var(--cp-ink);
+  font-size: var(--fs-micro);
   display: flex;
-  gap: var(--sp-2);
-  margin-top: 22rpx;
-}
-
-/* 拍照 / 相册这两块仍是饱和色（橙、绿），由 wxml 上的 toneStyle 发下来；
-   白面板上放两块真色，比四个灰框更容易认哪块是按下去会开相机的。 */
-.pk {
-  flex: 1;
-  height: 164rpx;
-  display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: var(--r-chip);
-  background: var(--blk-bg);
-  color: var(--blk-ink);
 }
 
-.pk:active { opacity: 0.82; }
+.th-add {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cp-field);
+  border: var(--w-edge) solid var(--cp-edge-14);
+  box-shadow: none;
+}
 
-.pk-label { font-size: var(--fs-title); font-weight: 800; letter-spacing: -0.5rpx; }
-.pk-hint { font-size: var(--fs-micro); opacity: 0.72; margin-top: 4rpx; }
+.th-add:active {
+  opacity: 0.82;
+}
 
-.pk-glyph {
-  width: 44rpx;
-  height: 44rpx;
-  margin-bottom: 8rpx;
-  background: var(--blk-ink);
+.th-plus {
+  width: 45rpx;
+  height: 45rpx;
+  background: var(--cp-ink-78);
+}
+
+/* 满了：➕ 转灰、边框撤掉，点它给一句吐司（原来是 slice(0, 9) 静默截掉，
+   用户以为加上了其实没有——这一条不是改样式，是补一个反馈）。 */
+.th-add-dis {
+  background: rgba(20, 22, 26, 0.28);
+  border-color: transparent;
+}
+
+.th-add-dis .th-plus {
+  background: var(--cp-ink-38);
+}
+
+/* ---------- 右滑才开始提炼那一枚长条 ----------
+   照他给的那张放大图取样：纸白长条 + 端上一枚实心圆、圆里白色图形、字两侧各一段虚线指方向。
+   那一圈 5rpx 的白边就是快门那枚白环的同一笔——轨道随进度转成实心之后它仍然在，
+   所以写在外壳的 border 上、而进度填充（.sld-fill）走在它内侧，永远盖不到它。
+   进度不做准（站长 10-08 原话「进度条不需要太精准」）：服务端任务里只有 status 没有百分比，
+   所以这一条按时间推，最多推到 90%，完成那一刻由接口回来钉到满。 */
+.sld {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  box-sizing: border-box;
+  margin-top: auto;
+  height: 110rpx;
+  border-radius: 55rpx;
+  background: var(--cp-ink);
+  border: 5rpx solid var(--cp-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sld-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 50rpx;
+  background: var(--cp-extract);
+  transition: width 240ms linear;
+}
+
+/* 字两侧那两段虚线是方向指示，比在圆里再塞一枚箭头省一笔（参考图就是这么画的）。
+   颜色用 currentColor + opacity：这一段的"淡"是同一支墨淡下来，不是第三种色。 */
+.sld-txt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+  font-size: var(--fs-title);
+  font-weight: 700;
+  letter-spacing: 1rpx;
+  color: var(--cp-panel);
+}
+
+.sld-txt::before,
+.sld-txt::after {
+  content: "";
+  width: 60rpx;
+  border-top: 3rpx dashed currentColor;
+  opacity: 0.34;
+}
+
+/* 圆停在最左那一格：left 由 JS 在第一次触摸时量出来（轨道与圆的实际宽度），
+   这里给的是"还没量过"那一帧的落点，与 5(边框) + 10(内缩) 对得上。 */
+.sld-knob {
+  position: absolute;
+  left: 10rpx;
+  top: 5rpx;
+  width: 90rpx;
+  height: 90rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cp-extract);
+  transition: left 160ms ease-out;
+}
+
+.sld-drag .sld-knob {
+  transition: none;
+}
+
+.sld-glyph {
+  width: 42rpx;
+  height: 42rpx;
+  background: var(--cp-extract-ink);
+}
+
+/* 这一格还没东西可提交：圆转灰、字淡下去，滑到最右也不会触发（松手回弹 + 一句报错在框外）。
+   灰面用暗 alpha 而不是浅一档的实心：它要说的是"这一枚现在按不动"。 */
+.sld-off .sld-knob {
+  background: rgba(20, 22, 26, 0.14);
+}
+
+.sld-off .sld-glyph {
+  background: rgba(20, 22, 26, 0.42);
+}
+
+.sld-off .sld-txt {
+  color: rgba(20, 22, 26, 0.38);
+}
+
+/* 提炼进行中：字淡到几乎不催（拖动中同一档），轨道仍是纸白——进度是从左边吃进来的那一段实心，
+   不是整条变色，这样"还剩多少"看得出来。 */
+.sld-busy .sld-txt {
+  color: var(--cp-panel);
+}
+
+/* 完成那一帧：整条转实心、白环还在、字转纸白，紧接着吐司一句「已存入笔记」再跳详情页。 */
+.sld-done {
+  background: var(--cp-extract);
+}
+
+.sld-done .sld-fill {
+  background: transparent;
+}
+
+.sld-done .sld-txt {
+  color: var(--cp-ink);
+}
+
+/* ---------- 「原文翻译」那一枚小开关（站长 10-04 要的，默认关） ----------
+   10-08 起它只在「文字」这一档的展开态出现（500 那一格放不下第三样控件，见上面 .panel 那段账）。
+   两态各吃一对令牌：关是 --face 面配 --face-ink 点，开是 --solid-bg 面配 --solid-ink 点，
+   而这一页这两个令牌由面板发暗面版本——配对错了就是"同底色压透明度等于没画"。
+   行高 56 + 上间距 14，与展开态那一格腾出来的富余对齐。 */
+.wr-sw {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* 48 + 8：展开那一档卡里可用实测 330.5rpx，两行框 160 + 条 110 之后只剩 60 给这一行；
+     原来 56 + 14 = 70 会顶出去（那枚药丸本身只有 40 高，行给它 48 已经够喘）。 */
+  height: 48rpx;
+  margin-top: 8rpx;
+}
+
+.wr-sw-lab {
+  font-size: var(--fs-meta);
+  color: var(--face-ink);
+}
+
+.wr-sw-track {
+  flex: none;
+  position: relative;
+  width: 72rpx;
+  height: 40rpx;
+  border-radius: var(--r-pill);
+  background: var(--face);
+  transition: background 160ms ease-out;
+}
+
+.wr-sw-dot {
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  background: var(--face-ink);
+  transition: transform 160ms ease-out;
+}
+
+.wr-sw-on .wr-sw-track {
+  background: var(--solid-bg);
+}
+
+.wr-sw-on .wr-sw-dot {
+  background: var(--solid-ink);
+  transform: translateX(32rpx);
 }
 
 /* ---------- 小图形公共面 ----------
-   .glyph 那一档是"压在卡底的水印"（264rpx、绝对定位），条身前面这三枚和
-   拍照/相册按钮里那两枚要的是"读得清的小图标"，所以另起一组：只借同一批
-   mask 形状，尺寸和颜色自己定。 */
-.bar-lead, .dot-glyph, .pk-glyph, .swap-glyph {
+   .glyph 那一档是"压在卡底的水印"（264rpx、绝对定位），条身前面那三枚、
+   三枚圈里那三枚、和滑动条圆里那一枚要的是"读得清的小图标"，所以另起一组：
+   只借同一批 mask 形状，尺寸和颜色自己定。 */
+.bar-lead, .dot-glyph, .mini-glyph, .shut-glyph, .sld-glyph, .swap-glyph, .th-plus {
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -490,7 +749,8 @@
 }
 
 /* ---------- 图形 ----------
-   几何取自 Lucide v1.49.0（ISC 授权）：pen-line / camera / images / link / chevron-right。
+   几何取自 Lucide v1.49.0（ISC 授权）：pen-line / camera / images / link / chevron-right，
+   10-08 这一轮多一支 plus（➕ 那一枚方格）。
    同一套 24 格、同一描边重量（1.6，原来这组里 1.5 和 1.6 混着，小尺寸上粗细不齐）、
    圆头线帽——自己手画的形状之所以显廉价，就是因为空心与实心混用、线宽不统一。
    底栏那三枚（plus / rows-3 / user-round）在 custom-tab-bar/index.wxss，同一支描边重量。 */
@@ -513,6 +773,11 @@
 .glyph-images {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16' /%3E %3Cpath d='M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2' /%3E %3Ccircle cx='13' cy='7' r='1' fill='%23000' /%3E %3Crect x='8' y='2' width='14' height='14' rx='2' /%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16' /%3E %3Cpath d='M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2' /%3E %3Ccircle cx='13' cy='7' r='1' fill='%23000' /%3E %3Crect x='8' y='2' width='14' height='14' rx='2' /%3E%3C/svg%3E");
+}
+
+.glyph-plus {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
 }
 
 .glyph-chev {
@@ -548,7 +813,7 @@
 
 /* 铺了图，这一页的三级字必须翻白，且 --accent 跟着翻（「中/EN」那条下划线吃它，
    象牙壁纸下它是深墨，压在暗图上等于没有）。只改本容器的变量：壁纸系统不动，
-   录入条和面板是自带的纸白面，不吃这套翻转。 */
+   录入条和面板是自带的面，不吃这套翻转。 */
 .container.has-bg {
   --text-primary: #f2efe9;
   --text-secondary: rgba(242, 239, 233, 0.78);
@@ -558,8 +823,7 @@
 
 /* 展开：整块从流里拿出来，沉到底栏上方，面板向上长。
    上一版是"把 66vh 那段留白让回 0、面板从顶上挂下来"，真机反馈两件事：
-   ① 它把上半屏的照片和标题整个盖住了；② 四个模式的面板自然高度不一样
-   （直接写带报错 608、拍照带三张缩略图带报错 660、链接带提示 413），切一次窗口跳一次。
+   ① 它把上半屏的照片和标题整个盖住了；② 四个模式的面板自然高度不一样，切一次窗口跳一次。
    现在贴底 + 定高：窗口不动，只换肚子里的内容，照片始终露着。
    bottom 152 = 底栏占的那 128（bottom 20 + height 108）+ 24 的缝，和底栏同一基准；
    底栏几何改了这里要跟着改。左右 24 是抄 .container 的 --sp-3 内缩，
@@ -585,6 +849,13 @@
 .container.has-bg:not(.entry-dock) .entry-wrap {
   position: relative;
   z-index: 2;
+}
+
+/* 换背景那一行坐在面板下面：面板贴底之后它正好被压在底栏那一段里，所以展开时整个不渲染。
+   10-08 重写这一版时这条规则被我删漏过一次（真跑尺子抓到：面板开着，`.home-swap` 还在树里），
+   所以把它写回来并在静态尺子里钉一条，别再靠眼睛发现。 */
+.container.entry-dock .home-swap {
+  display: none;
 }
 
 /* 这一行两截：左「调亮度」+ 一枚灰度点，右「换背景」+ 一枚箭头（站长 10-02 晚：
@@ -641,123 +912,4 @@
 
 .container {
   padding-bottom: 140rpx;
-}
-
-/* 「直接写」第一行（站长 10-04）：归类这一格并进来，与标题同一行。
-   两块各自一面（不是一个长条里切两半）：中间那道缝就是"这是两个控件"的信号，
-   合成一块面会被读成一个输入框，点左边那截弹选择器反而像误触。
-   1/3 给分类、2/3 给标题；分类只报名字，"归类"那两个字撤了。
-   第六轮：标题在左、分类在右（flex 就是这一列顺序），分类那格的字吃 --face-dim 淡一档。 */
-.wr-line {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  height: 88rpx;
-  margin-top: 26rpx;
-}
-
-.wr-cat {
-  flex: 0 0 33.333%;
-  min-width: 0;
-  display: block;
-}
-
-.wr-cat-face {
-  display: flex;
-  align-items: center;
-  height: 88rpx;
-  padding: 0 var(--sp-3);
-  box-sizing: border-box;
-  border-radius: var(--r-btn);
-  background: var(--face);
-  color: var(--face-dim);
-}
-
-.wr-cat-val {
-  flex: 1;
-  min-width: 0;
-  margin-right: 10rpx;
-  font-size: var(--fs-body);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.wr-cat-caret {
-  flex: none;
-  font-size: var(--fs-body);
-  /* 尖角维持原来那一档（全墨 + 50%），淡的只有分类名字这一处——他没点这个。 */
-  color: var(--face-ink);
-  opacity: 0.5;
-}
-
-.wr-title {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  height: 88rpx;
-  padding: 0 var(--sp-3);
-  box-sizing: border-box;
-  border-radius: var(--r-btn);
-  background: var(--face);
-  color: var(--face-ink);
-}
-
-/* 原文那一格：面板定高 700，富余那截被按钮行的 auto 外边距吃掉，所以只能写死高度。
-   180→300 是把原来归类那一整行（88 + 16 间距 = 104）腾出来的地方还给正文，
-   再多的从"报错行不显示时的那截余量"里拿——四态自然高用
-   `docs/工具/量-面板四态自然高.js` 现量，别照这个数手推。
-   300→228：10-04 在按钮行上面加了「原文翻译」那一行（56 + 16 间距 = 72），
-   这一格是让出它那 72 的地方，四态自然高跟着重量过。 */
-.wr-body {
-  height: 228rpx;
-}
-
-/* 「原文翻译」那一行（站长 10-04：贴纯英文原文别自动出中文摘要）。
-   画法照首页二维码那枚药丸开关，尺寸收一档：面板只有 700 高，92×52 会把它顶成
-   一行主控件。两态都吃 toneStyle 发下来的成对变量——关是 --face 面配 --face-ink 点，
-   开是 --solid-bg 面配 --solid-ink 点（与 .act.solid 同一对），所以深色卡上不会出现
-   "同底色压透明度等于没画"那种开关。 */
-.wr-sw {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 56rpx;
-  margin-top: var(--sp-2);
-}
-
-.wr-sw-lab {
-  font-size: var(--fs-meta);
-  color: var(--face-ink);
-}
-
-.wr-sw-track {
-  flex: none;
-  position: relative;
-  width: 72rpx;
-  height: 40rpx;
-  border-radius: var(--r-pill);
-  background: var(--face);
-  transition: background 160ms ease-out;
-}
-
-.wr-sw-dot {
-  position: absolute;
-  top: 4rpx;
-  left: 4rpx;
-  width: 32rpx;
-  height: 32rpx;
-  border-radius: 50%;
-  background: var(--face-ink);
-  transition: transform 160ms ease-out;
-}
-
-.wr-sw-on .wr-sw-track {
-  background: var(--solid-bg);
-}
-
-.wr-sw-on .wr-sw-dot {
-  background: var(--solid-ink);
-  transform: translateX(32rpx);
 }

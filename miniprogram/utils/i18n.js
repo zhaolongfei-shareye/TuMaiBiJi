@@ -42,15 +42,19 @@ const i18n = {
     about: '关于图麦笔记',
     noNotes: '暂无笔记',
     importUrl: 'URL链接',
+    // ➕ 那枚方格报的就是这一句：按下开的是"拍照或截图"两用的系统选择器。
     importScreenshot: '拍照或截图',
     writeNote: '亲自撰写',
-    // 首页那条统一录入的条身文案。三个入口合并成一条之后，条身就是这一屏唯一的动词，
-    // 所以它不属于任何一种模式，而是「点我就开始」；按模式换字那三条在下面各自跟着语言走。
+    // 10-08 创建入口改版：条身展开后不再盖在面板顶上，而是整条让位给面板，
+    // 所以"按模式换字"那三条（贴个链接 / 选了 N 张 / 拍照或截图）一起退了——收起态那条永远只说「动动手指」。
     barIdle: '动动手指',
-    barUrl: '贴个链接',
-    barShot: '选了 {n} 张',
     barCollapse: '点空白处收起',
-    modeWrite: '直接写',
+    // 面板上面那一行两枚小字（在框外，浮在形象图上）：左边报名前这一屏在干什么，右边报怎么退出去。
+    chooseMode: '选择记录模式',
+    // 三个模式标签。原来的四档（直接写/拍照/相册/链接）并成三档：相册不再是一个模式，
+    // 它是「照片」那一态左边那枚小圆；标签行只有三枚才放得下中间那枚大快门。
+    modePhoto: '照片',
+    modeWrite: '文字',
     modeUrl: '链接',
     homeBgSwap: '换背景',
     // 「换背景」左边那一枚：点一下换一档深浅（纯白 → 25% → 50% → 回纯白）。
@@ -271,43 +275,31 @@ const i18n = {
     paste: '粘贴',
     pasteEmpty: '剪贴板里还没有链接',
     clear: '清空',
-    startExtract: '开始提炼',
-    // 新建页录入面板中间那段空白的三步指引：只在"这一档还没东西"时出现（链接档等 urlInput、
-    // 相册档等 previewImages），一旦选了图/输了链接就让位给内容。直接写那一档不放——它本来就
-    // 顶满面板定高，再塞会把正文框挤扁。渠道那四个名字是站长 10-01 点名要突出的。
-    // 四步指引（站长 10-01 深夜：三步→四步，四句照他给的原话，前面那三枚彩色序号方块撤掉）
-    guide1T: '粘贴各类图文',
-    guide1D: '公众号 / 小红书 / 豆瓣 的链接或截图',
-    guide2T: 'AI自动提炼',
-    guide2D: '图里的字也读得懂，出摘要、要点',
-    guide3T: '存成笔记卡片',
-    guide3D: '能搜、能归类，能分享到朋友圈',
-    guide4T: '种草转存',
-    guide4D: '别人看到你分享卡片图，一键扫码转存',
+    // 10-08：那排「清空 / 开始提炼」的按钮整排撤了，改成"右滑才开始提炼"那一枚长条。
+    // 好处是他给的那张参考图说的——先滑过去，等于让用户把这一屏看清楚再动手。
+    slideExtract: '右滑开始提炼',
+    // 四步指引（guide1T…guide4D）10-08 整批撤掉：面板压到 500rpx 之后肚子里只剩
+    // 「一个输入框或一横排小图 ＋ 一枚滑动条」，那份四步说明放不下了。教学这件事
+    // 没有丢——横条上面那六句轮播 Tips 就是同一个用途（10-01 站长点名要的那一行）。
     busyExtract: '提炼中…',
     linkDesc: '公众号文章 / 网页链接',
-    albumDesc: '相册选择 / 拍照（JPG·PNG）',
-    manualDesc: '写下标题和原文，摘要自动生成',
-    pickedCount: '已选 {n} 张 · 可再加',
+    // 「直接写」那一档现在只留一个原文框（标题和归类挪到详情页「编辑」里改），
+    // 所以这句不再是一行说明，而是原文框里的占位字：没输入时看得见，点进去就没了。
+    manualDesc: '把原文贴在这里，摘要自动生成',
     noImagePicked: '没拿到图片，换一张或再试一次',
     pickFirst: '先选一张截图再开始',
-    addMore: '加图',
     takePhoto: '拍照',
     fromAlbum: '相册',
-    takePhotoHint: '直接开相机',
-    fromAlbumHint: '选已有截图',
-    urlHintIdle: '输入或粘贴链接后可保存',
+    // 满 9 张还点 ➕：原来是静默截掉（选了没看见，界面上什么都不说），现在给一句吐司。
+    // 张数从 create.js 的 MAX_SHOTS 拼进来，不在这个串里写死第二个 9。
+    maxShots: '最多 {n} 张，先删一张再加',
     linkRule: '链接要以 http:// 或 https:// 开头',
-    linkReady: '链接可用 · 保存后自动提炼',
     permCamera: '没拿到相机权限，点这里去设置',
     permAlbum: '没拿到相册权限，点这里去设置',
     pickFailed: '没能打开相机或相册，请再试一次',
-    writeTitlePh: '标题',
-    writeBodyPh: '把原文贴在这里…',
     // 站长 10-04：贴进去的是纯英文原文，摘要却被自动写成中文。这一枚开关默认关，
     // 关＝摘要跟着原文的语言走；打开才整理成中文。叫法用他原话「原文翻译」，不改口。
     origTranslate: '原文翻译',
-    needTitle: '先写个标题',
     needBody: '原文还空着',
     extractSucceeded: '已存入笔记',
     extractFailed: '提取失败，请重试',
@@ -412,12 +404,13 @@ const i18n = {
     importScreenshot: 'Photo or screenshot',
     writeNote: 'Write it myself',
     // 英文不翻"动动手指"——直译成 Tap and jot 没人这么说。这一屏旁边就是拍照/相册/链接
-    // 三枚图标，动词只留一个就够；同排的 Paste a link / Photo or screenshot 都是平实祈使句。
+    // 三枚图标，动词只留一个就够。10-08 起展开态整条让位给面板，所以按模式换字那三条也退了。
     barIdle: 'Jot it down',
-    barUrl: 'Paste a link',
-    barShot: '{n} picked',
     barCollapse: 'Tap outside to close',
-    modeWrite: 'Write',
+    chooseMode: 'Choose mode',
+    // 与中文那三枚同档：Photo / Link / Text，都是单个词，标签行才放得下。
+    modePhoto: 'Photo',
+    modeWrite: 'Text',
     modeUrl: 'Link',
     homeBgSwap: 'Change photo',
     bgDimLabel: 'Dim photo',
@@ -605,39 +598,25 @@ const i18n = {
     paste: 'Paste',
     pasteEmpty: 'Nothing to paste yet',
     clear: 'Clear',
-    startExtract: 'Extract',
-    guide1T: 'Paste anything',
-    guide1D: 'Link or screenshot',
-    guide2T: 'AI extracts',
-    guide2D: 'Summary and key points',
-    guide3T: 'Keep as card',
-    guide3D: 'Search, file, share',
-    guide4T: 'Card gets saved',
-    guide4D: 'A friend scans, saves',
+    // 「清空 / 开始提炼」那排按钮撤了，换成右滑才开始的那枚长条（中文那段注释写了为什么）。
+    slideExtract: 'Slide to extract',
     busyExtract: 'Extracting…',
     linkDesc: 'WeChat articles / Web pages',
-    albumDesc: 'Album / Camera (JPG·PNG)',
-    manualDesc: 'Title + text — we draft the summary',
-    pickedCount: '{n} selected · add more',
+    // 这一档只留一个原文框，这句从"框上面那行说明"变成"框里的占位字"。
+    // 不写 "Title + text"——标题已经不在这一屏填了。
+    manualDesc: 'Paste the text, get a summary',
     noImagePicked: 'No image came back — try another one',
     pickFirst: 'Pick a screenshot first',
-    addMore: 'Add',
     takePhoto: 'Camera',
     fromAlbum: 'Album',
-    takePhotoHint: 'Open the camera',
-    fromAlbumHint: 'Pick a screenshot',
-    urlHintIdle: 'Type or paste a link to save',
+    maxShots: 'Up to {n} images — delete one first',
     linkRule: 'Link must start with http:// or https://',
-    linkReady: 'Link looks good · extracts on save',
     permCamera: 'No camera access — tap to open settings',
     permAlbum: 'No album access — tap to open settings',
     pickFailed: 'Could not open the camera or album — please try again',
-    writeTitlePh: 'Title',
-    writeBodyPh: 'Paste the text here…',
     // 与中文那枚同一个开关：关＝摘要用原文的语言写，开＝整理成中文。
     // 这里不写 "Translate"（光秃秃会被读成"把界面翻译一下"），点明翻的是原文。
     origTranslate: 'Translate original',
-    needTitle: 'Add a title first',
     needBody: 'Add the text to work from',
     extractSucceeded: 'Saved to notes',
     extractFailed: 'Extract failed, please retry',

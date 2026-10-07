@@ -1,0 +1,334 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>创建入口 v7 · B 为基 · 两档面板</title>
+<style>
+  :root{
+    --panel:#23252C; --card:#2B2D35; --field:#1A1C21;
+    --cam:#E9723D; --cam-ink:#2C1204;      /* 拍照：大圆，橙色留给它 */
+    --paper:#F2EFE9;
+    --p92:rgba(242,239,233,.92); --p78:rgba(242,239,233,.78); --p62:rgba(242,239,233,.62);
+    --p56:rgba(242,239,233,.56); --p50:rgba(242,239,233,.50); --p42:rgba(242,239,233,.42);
+    --p38:rgba(242,239,233,.38); --p14:rgba(242,239,233,.14); --p10:rgba(242,239,233,.10); --p07:rgba(242,239,233,.07);
+    --chrome-bg:#443B25; --chrome-sel:#766948;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif}
+  body{background:#0B0C0F;padding:26px 20px 30px}
+  h1{color:var(--paper);font-size:21px;letter-spacing:.3px;font-weight:700;display:flex;align-items:center;gap:10px}
+  h1 i{width:3px;height:19px;border-radius:2px;background:var(--cam);flex:none}
+  .sub{color:#9AA1AC;font-size:12.5px;margin-top:9px;line-height:1.75;max-width:2100px}
+  .sub b{color:#D6DBE2;font-weight:600}
+  .plan{margin-top:26px}
+  .ptitle{display:flex;align-items:baseline;gap:10px}
+  .ptitle .k{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--cam)}
+  .ptitle .t{font-size:16px;font-weight:700;color:var(--paper)}
+  .ptitle .d{font-size:11.5px;color:#9AA1AC}
+  .row{display:flex;gap:16px;margin-top:12px;align-items:flex-start}
+  .side{width:228px;flex:none}
+  .side img{width:100%;border-radius:12px;display:block;border:1px solid rgba(255,255,255,.08)}
+  .side .who{font-size:11.5px;font-weight:800;color:#fff;margin-top:2px}
+  .side .what{font-size:10.5px;color:#9AA1AC;margin-top:4px;line-height:1.65}
+  .side .what + .who{margin-top:12px}
+  .col{display:flex;flex-direction:column;align-items:center}
+  .cap{color:#C7CDD6;font-size:11.5px;margin-top:10px;text-align:center;line-height:1.5;max-width:300px}
+  .cap b{color:var(--paper);font-weight:600}
+  .legend{margin-top:26px;font-size:12px;color:#C7CDD6;line-height:2.05;border-left:3px solid #333A45;padding-left:14px;max-width:2100px}
+  .legend b{color:var(--paper);font-weight:600}
+  .n{display:inline-block;width:17px;height:17px;border-radius:50%;background:#F6C445;color:#2A2005;font-size:11px;font-weight:800;text-align:center;line-height:17px;margin-right:6px}
+
+  /* ================= 屏（保真底子同 v6：真背景图 + 逐字抄的压暗罩 + 系统条 + 现网底栏色） ================= */
+  .phone{width:300px;height:650px;border-radius:44px;overflow:hidden;position:relative;flex:none;background:#000;
+    box-shadow:0 0 0 5px #17181C, 0 0 0 6px rgba(255,255,255,.09)}
+  .chrome{position:absolute;left:0;right:0;top:0;height:78px;background:#181A20;z-index:6}
+  .island{position:absolute;left:50%;transform:translateX(-50%);top:8px;width:96px;height:27px;border-radius:14px;background:#000}
+  .stime{position:absolute;left:20px;top:18px;font-size:12.5px;font-weight:600;color:#fff;letter-spacing:.2px}
+  .sright{position:absolute;right:15px;top:20px;display:flex;align-items:flex-end;gap:5px}
+  .sig{display:flex;align-items:flex-end;gap:1.6px;height:10px}
+  .sig i{width:3px;border-radius:1px;background:#fff}
+  .sig i:nth-child(1){height:4px}.sig i:nth-child(2){height:6px}
+  .sig i:nth-child(3){height:8px}.sig i:nth-child(4){height:10px}
+  .wifi{width:15px;height:11px;margin-bottom:-1px}
+  .bat{width:20px;height:10.5px;border-radius:3.2px;border:1px solid rgba(255,255,255,.42);position:relative;margin-bottom:-.5px}
+  .bat u{position:absolute;left:1.4px;top:1.4px;bottom:1.4px;width:13px;background:#fff;border-radius:1.6px}
+  .bat::after{content:"";position:absolute;right:-3.2px;top:3px;width:1.8px;height:4px;border-radius:0 1px 1px 0;background:rgba(255,255,255,.42)}
+  .navtitle{position:absolute;left:0;right:0;top:52px;text-align:center;font-size:13px;font-weight:600;color:rgba(255,255,255,.96);letter-spacing:.2px}
+  .capsule{position:absolute;right:6px;top:46px;width:70px;height:26px;border-radius:13px;display:flex;align-items:center;
+    background:rgba(0,0,0,.22);border:1px solid rgba(242,239,233,.28)}
+  .capsule .half{flex:1;display:flex;align-items:center;justify-content:center;gap:3.2px}
+  .capsule .dv{width:1px;height:14px;background:rgba(242,239,233,.24);flex:none}
+  .capsule .half i{width:3px;height:3px;border-radius:50%;background:var(--p92)}
+  .capsule .tgt{width:11px;height:11px;border-radius:50%;border:1.3px solid var(--p92);position:relative}
+  .capsule .tgt::after{content:"";position:absolute;left:2.6px;top:2.6px;width:3.4px;height:3.4px;border-radius:50%;background:var(--p92)}
+  .screen{position:absolute;left:0;right:0;top:78px;bottom:0;overflow:hidden}
+  .bgimg{position:absolute;inset:0;background:url("../../../miniprogram/assets/home-bg-portrait.jpg") 50% 22% / cover no-repeat}
+  .scrim{position:absolute;inset:0;
+    background:linear-gradient(180deg, rgba(18,20,26,.58) 0%, rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%, rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%, rgba(18,20,26,.62) 88%, rgba(18,20,26,.72) 100%)}
+  .head{position:absolute;left:13px;right:13px;top:20px}   /* 现网：容器 padding-top 2rpx + .title-row margin-top 48rpx ⇒ 大标题顶 50rpx */
+  .hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .htitle{font-size:16.8px;font-weight:700;letter-spacing:-.4px;color:var(--paper);line-height:1.3}
+  .lang{display:flex;align-items:baseline;gap:8px;flex:none}
+  .lang span{font-size:9.6px;line-height:1.4;color:var(--p56);padding:0 1px 2px;border-bottom:1.6px solid transparent}
+  .lang span.on{color:var(--paper);font-weight:700;border-bottom-color:var(--paper)}
+  .date{display:flex;align-items:baseline;gap:5.6px;margin-top:9px;font-size:9.6px;line-height:1.4}
+  .date .d{color:var(--p78);letter-spacing:.4px}
+  .date .w{color:var(--p56);letter-spacing:.8px}
+  .pill{position:absolute;left:9.6px;right:9.6px;bottom:8px;height:43.2px;border-radius:17.6px;display:flex;align-items:center;
+    background:var(--chrome-bg);border:1.2px solid var(--p14);z-index:4}
+  .pill .it{flex:1;display:flex;align-items:center;justify-content:center;color:var(--p62)}
+  .pill .it svg{width:16px;height:16px}
+  .pill .it.on{color:var(--paper)}
+  .pill .it.on .ic{width:30.4px;height:30.4px;border-radius:50%;background:var(--chrome-sel);display:flex;align-items:center;justify-content:center}
+  .pill .ic{display:flex;align-items:center;justify-content:center}
+
+  /* ---- 面板：双层、贴底；收起 700rpx=280px，展开 1175rpx=470px ---- */
+  /* 「选择记录模式 / 点空白处收起」这一行搬出面板，浮在面板上面那一条（现网 Tips 那一行就是浮在条上面的）；
+   面板里所有提示词都收进输入框的 placeholder，未输入时看得见、点进去就没了。 */
+  .dockwrap{position:absolute;left:9.6px;right:9.6px;bottom:60.8px;z-index:5;display:flex;flex-direction:column}
+  .out{display:flex;justify-content:space-between;padding:0 8px 7px}
+  /* 自然重量实测（撤掉定高跑一遍）：照片 162.0、链接 146.0、文字 146.0、多图 157.0 ⇒ 取最大那态 162
+   ＋ 一行报错的 18css ＝ 180css＝450rpx；展开＝180＋54（一行小图 48＋间距 6）＝234css＝585rpx，
+   实测多图展开自然高 211、文字展开 168，都装得下。比现网 700rpx 矮 250rpx。 */
+  .dock{height:180px;border-radius:22px;display:flex;flex-direction:column;
+    padding:12px 13px 13px;background:var(--panel);border:1px solid var(--p10)}
+  /* 展开＝只多一行（一行小图 48 ＋ 间距 6）：190 ＋ 54 ＝ 244css＝610rpx，不再往上加 */
+  .dock.open{height:234px}
+  /* 乙档：同一张面板只改 alpha（底下那层压暗罩本来就铺在形象图上，透多少由这一个数定） */
+  .dock.glassy{background:rgba(20,22,28,.66);border-color:var(--p14);
+    -webkit-backdrop-filter:blur(22px) saturate(120%);backdrop-filter:blur(22px) saturate(120%)}
+  .out{font-size:9.6px;color:var(--p42);letter-spacing:.2px}
+  .out span{line-height:1.4}
+  
+  .modes{display:flex;justify-content:center;gap:24px;margin-top:10px}
+  .md{font-size:12.5px;color:var(--p50);padding-bottom:6px;position:relative;letter-spacing:.5px}
+  .md::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:26px;height:2px;border-radius:1px;background:var(--p10)}
+  .md.on{color:var(--paper);font-weight:600}
+  .md.on::after{background:var(--cam)}
+  .card{margin-top:10px;flex:1;min-height:0;border-radius:16px;padding:12px;display:flex;flex-direction:column;
+    background:var(--card);border:1px solid var(--p07)}
+  .dock.glassy .card{background:rgba(242,239,233,.06);border-color:var(--p10)}
+
+  /* ---- 输入格：标题 2/3 + 分类 1/3 同一行（现网 wr-line 就是这个比例） ---- */
+  .wr{display:flex;gap:6px;flex:none}
+  .field{height:42px;border-radius:7px;color:var(--p38);font-size:11px;letter-spacing:.2px;
+    display:flex;align-items:center;padding:0 11px;gap:1px;background:var(--field);border:1px solid var(--p14)}
+  .dock.glassy .field,.dock.glassy .cat{background:rgba(10,12,16,.38)}
+  .wr .field{flex:1;min-width:0}
+  .cat{width:34%;flex:none;height:42px;border-radius:7px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 10px;background:var(--field);border:1px solid var(--p14);color:var(--p62);font-size:11px;letter-spacing:.2px}
+  .cat .car{color:var(--p42);font-size:13px;line-height:1}
+  .field.ta{height:auto;flex:1;min-height:42px;align-items:flex-start;padding:9px 11px;line-height:1.55}
+  .field.ta2{height:64px;flex:none;align-items:flex-start;padding:9px 11px;line-height:1.55;margin:auto 0}
+  .field.mid{margin:auto 0}   /* 上下居中：不贴着上面的边，也不顶着下面的条 */
+  .caret{width:1.4px;height:14px;background:var(--p78);flex:none;border-radius:1px}
+  .field.ta .caret{height:12px;margin-top:1px}
+  .flab{font-size:10px;color:var(--p42);letter-spacing:.4px;margin:9px 0 5px;flex:none}
+
+  /* ---- 通栏条＝滑动确认（照他给的那张参考图：白底长条 + 左端一枚带 icon 的圆，滑到最右才提炼） ---- */
+  .sld{margin-top:auto;flex:none;height:44px;border-radius:22px;position:relative;overflow:hidden;
+    background:#F2EFE9;border:2px solid #F2EFE9;   /* 这道白线就是拍照那枚白环的同一笔：轨道转橙之后它仍然在 */
+    display:flex;align-items:center;justify-content:center}
+  /* 参考图那一枚的字两侧各有一段虚线，用它指方向，比在圆里塞箭头更省一笔 */
+  .sld .txt{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;letter-spacing:.3px;color:#14161A}
+  .sld .txt::before,.sld .txt::after{content:"";width:24px;border-top:1.4px dashed rgba(20,22,26,.34)}
+  .sld .fill{position:absolute;left:2px;top:2px;bottom:2px;border-radius:20px;background:#C4541F}
+  .sld .knob{position:absolute;left:4px;top:3px;width:36px;height:36px;border-radius:50%;
+    background:#C4541F;color:#F2EFE9;display:flex;align-items:center;justify-content:center}
+  .sld .knob svg{width:17px;height:17px}
+  /* 空态：内容还没填，圆是灰的、滑到最右也回弹 */
+  .sld.off .knob{background:rgba(20,22,26,.14);color:rgba(20,22,26,.42)}
+  .sld.off .txt{color:var(--p38)}
+
+  /* ---- 快门（只有拍照用大圆） ---- */
+  .shutcol{display:flex;flex-direction:column;align-items:center;gap:5px;flex:none}
+  .shut{border-radius:50%;border:4px solid #fff;display:flex;align-items:center;justify-content:center}
+  .shut .core{border-radius:50%;background:var(--cam);color:var(--cam-ink);display:flex;align-items:center;justify-content:center}
+  .shut.lg{width:84px;height:84px}
+  .shut.lg .core{width:62px;height:62px}
+  .shut.lg .core svg{width:26px;height:26px}
+  .shutcol .lb{font-size:9.5px;color:var(--p78);font-weight:700;letter-spacing:.5px}
+  .mini{width:52px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .mini .c{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--p78);
+    background:rgba(242,239,233,.10)}
+  .mini .c svg{width:16px;height:16px}
+  .mini span{font-size:9px;color:var(--p50);letter-spacing:.4px}
+  .crow{display:flex;align-items:center;justify-content:center;gap:15px}
+  .desc{flex:1;min-width:0}
+  .d1{font-size:12.5px;color:var(--p92);font-weight:600;letter-spacing:.2px;line-height:1.35}
+  .d2{font-size:10.5px;color:var(--p50);margin-top:5px;line-height:1.5;letter-spacing:.2px}
+  .mid{margin:auto 0}
+  .note{font-size:10px;color:var(--p42);text-align:center;line-height:1.55;letter-spacing:.2px;margin-top:11px;flex:none}
+
+  /* ---- 缩略图：➕ 方图与小图同尺寸同圆角，排在网格最右那一格；收起两行、展开三行 ---- */
+  .th{width:48px;height:48px;border-radius:7px;flex:none;position:relative;overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+  .th.p1{background:linear-gradient(165deg,#E7B981 0%,#C4834C 46%,#7A4A2A 100%)}
+  .th.p2{background:linear-gradient(165deg,#9DB2D2 0%,#6C82A8 48%,#3E4C68 100%)}
+  .th.p3{background:linear-gradient(165deg,#A8C4A2 0%,#6F9068 50%,#41573C 100%)}
+  .th.p1::before,.th.p2::before,.th.p3::before{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;
+    background:linear-gradient(180deg,rgba(30,18,8,0),rgba(30,18,8,.5))}
+  .th.p1::after{content:"";position:absolute;right:9px;top:8px;width:9px;height:9px;border-radius:50%;background:rgba(255,238,205,.88)}
+  .th.p2::after{content:"";position:absolute;left:-6px;bottom:6px;width:30px;height:16px;border-radius:50% 50% 0 0;background:rgba(24,30,42,.55)}
+  .th.p3::after{content:"";position:absolute;right:-4px;bottom:4px;width:26px;height:18px;border-radius:50% 50% 0 0;background:rgba(24,34,22,.5)}
+  .th.s1,.th.s2{background:linear-gradient(180deg,#F1EEE6,#E2DED4)}
+  .th.s1::before,.th.s2::before{content:"";position:absolute;left:7px;right:7px;top:15px;height:24px;
+    background:repeating-linear-gradient(180deg, rgba(53,46,29,.34) 0 2px, transparent 2px 6.5px)}
+  .th.s1::after{content:"";position:absolute;left:7px;top:7px;width:20px;height:3.4px;border-radius:2px;background:#766B50}
+  .th.s2::after{content:"";position:absolute;left:7px;top:7px;width:14px;height:3.4px;border-radius:2px;background:#AFA488}
+  .th b{position:absolute;right:4px;top:4px;width:16px;height:16px;border-radius:50%;background:rgba(20,20,28,.55);
+    color:#fff;font-size:9px;font-weight:400;display:flex;align-items:center;justify-content:center;line-height:1}
+  .th u{position:absolute;left:4px;bottom:4px;min-width:15px;height:15px;border-radius:8px;padding:0 3px;
+    background:rgba(20,22,26,.62);color:#F2EFE9;font-size:9px;text-decoration:none;
+    display:flex;align-items:center;justify-content:center;letter-spacing:0}
+  .add{width:48px;height:48px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex:none;
+    background:var(--field);border:1px solid var(--p14);color:var(--p78)}
+  .dock.glassy .add{background:rgba(10,12,16,.38)}
+  .add svg{width:18px;height:18px}
+  .strip3{display:flex;gap:6px;padding-top:5px;margin:-5px 0 0;flex:none;margin:auto 0}
+  .strip3 .add{margin-left:auto}   /* 小图靠左排，➕ 钉在最右端 */
+  .grid{display:grid;grid-template-columns:repeat(4,48px);gap:6px;justify-content:space-between;padding-top:5px;margin:auto 0 0;flex:none}
+  .grid .add{position:static}
+  .cnt{font-size:10px;color:var(--p50);letter-spacing:.3px;margin-top:9px;flex:none}
+</style></head><body>
+
+<h1><i></i>创建入口 v7 · 以 v6 方案 B 为底 · 两档面板（不透明 / 淡透明）</h1>
+<div class="sub">真机现在跑<b>线上 1.9.29</b>（2026-10-07 19:32:01 发布），<b>2.0.0 已提审、正在审核中</b>（10-07 22:31:26 提交）；<b>10-08 这一版已经落进代码</b>（miniprogram/pages/create/ 三件全改，静态尺子 182 条 + 真跑尺子 A–H 节实测；<b>没出包、没上传、没部署</b>，所以真机上跑到的仍是线上那一版）。差在哪几处见下面第 10、11 条。
+<b>这一轮六条全落了：</b>① 「选择记录模式 / 点空白处收起」<b>整行搬出面板</b>，浮在面板上面那一条（现网 Tips 那行就是浮在条上面的，位置有先例）；② 灰框跟着往下落，面板再压一档：自然重量实测照片 162.0、链接 146.0、文字 146.0、多图 157.0css ⇒ 取最大那态 ＋ 一行报错的 18css ＝ <b>180css＝450rpx</b>（现网 700，矮了 250rpx）；③ <b>所有提示词收进输入框的 placeholder</b>——未输入时看得见，点进去就没了，面板里不再有单独那行小标；④ 输入框与图片行都<b>上下居中</b>（margin:auto 0），既不顶面板上沿也不贴下面的条；⑤ 「已选 N 张 · 可再加」那行删了，<b>序号直接标在每张图的左下角</b>；⑥ 满 9 张再点 ➕ 给吐司——<b>现网缺这一句</b>：create.js 第 393 行是 slice(0, MAX_SHOTS) 静默截掉，点了没反应，所以这一条不是改样式，是补一个反馈。
+<b>展开只多一行</b>：180 ＋ 54（一行小图 48 ＋ 间距 6）＝ 234css＝<b>585rpx</b>，实测多图展开的自然高 211、文字展开 168，都装得下；再点不再长。
+<b>两处要拍：</b>① 现网那句 manualDesc 是「写下标题和原文，摘要自动生成」，可标题已经不在这里填了——这句<b>口径不对了</b>，建议改「把原文贴在这里，摘要自动生成」/ Paste the text, we'll write the summary；② 进度那条疑问还没解（服务端任务里没有百分比，只有 status，图例第 5 条三条路）。
+<b>底子仍是现网实物</b>：背景＝包里 /assets/home-bg-portrait.jpg，压暗罩七档逐字抄 .page-scrim，状态栏/微信胶囊/导航条「图麦笔记」（#181A20＝applyNavForBand），底栏＝chromeOf('tint-paper') 实测色浮起胶囊；小图上限 9 张＝create.js 的 MAX_SHOTS（后端那条是 10，客户端这一档才是用户碰得到的）。几何 1rpx＝0.4px。
+</div>
+
+<div id="app"></div>
+
+
+<div class="plan"><div class="ptitle"><span class="k">补</span><span class="t">滑动确认这一枚的五个态</span><span class="d">按你这一轮的口径改过：圆跟着手指走、停在最右、颜色不变；是轨道随提炼进度由白转橙，白环线一直在</span></div>
+<div class="row" style="gap:18px;align-items:flex-start">
+  <div class="col" style="width:262px"><div class="stage" id="s1"></div><div class="cap"><b>① 待滑</b><br>圆停在最左<br>「右滑开始提炼」 / <i>Slide to extract</i></div></div>
+  <div class="col" style="width:262px"><div class="stage" id="s2"></div><div class="cap"><b>② 拖动中</b><br>圆跟手，轨道仍白，字淡下去不催</div></div>
+  <div class="col" style="width:262px"><div class="stage" id="s3"></div><div class="cap"><b>③ 就位·松手即触发</b><br>圆停在最右、<b>颜色不变</b>；字换成现网 busyExtract「提炼中…」<br>EN <i>Extracting…</i></div></div>
+  <div class="col" style="width:262px"><div class="stage" id="s4"></div><div class="cap"><b>④ 提炼中·进度</b><br>轨道从左边往右吃橙（画到 76%，字已被橙吃掉一半，所以字转纸白），<b>白环线一直在</b>＝拍照那枚白环的同一笔</div></div>
+  <div class="col" style="width:262px"><div class="stage" id="s5"></div><div class="cap"><b>⑤ 完成</b><br>整条转橙，吐司「已存入笔记」（现网 extractSucceeded），800ms 后跳详情页<br>EN <i>Saved to notes</i></div></div>
+  <div class="col" style="width:262px"><div class="stage2" id="s6"></div><div class="cap"><b>⑥ 满 9 张还点 ➕</b><br>➕ 那枚转灰，吐司「最多 9 张，先删一张再加」<br>EN <i>Up to 9 images — delete one first</i><br><b>现网缺这一句</b>：create.js 第 393 行是 slice(0, 9) 静默截掉，点了没反应</div></div>
+</div></div>
+<style>
+  .stage{width:262px;height:44px;position:relative}
+  .stage2{width:262px;height:110px;position:relative;display:flex;align-items:flex-end}
+  .row9{display:flex;gap:6px}
+  .th.dim{background:linear-gradient(180deg,#F1EEE6,#E2DED4);opacity:.5}
+  .add.dis{background:rgba(20,22,26,.28);color:rgba(242,239,233,.42);border-color:transparent}
+  .stage2 .tst{bottom:64px}
+  .stage .sld{margin-top:0;width:262px}
+  .cap i{color:#B98A6E;font-style:normal;font-size:11px}
+  .tst{position:absolute;left:50%;transform:translateX(-50%);bottom:52px;white-space:nowrap;
+    font-size:10.5px;color:#F2EFE9;background:rgba(20,22,26,.92);border-radius:14px;padding:5px 11px;display:flex;gap:5px;align-items:center}
+</style>
+<div class="legend">
+  <span class="n">1</span><b>这一轮六条的落点：</b>小字行出框（.dockwrap 里排在 .dock 上面，浮在形象图上）；灰框下落（面板顶从屏内 270css 降到实测值，见第 2 条）；提示词全进 placeholder（链接格＝现网 linkDesc，文字格＝现网 manualDesc 改口径版，照片态无框故无提示）；输入框与图片行 margin:auto 0 上下居中；「已选 N 张」删掉、序号进图（.th u，左下角那枚小圆片）；➕ 满额吐司（图例第 6 条）。<br>
+  <span class="n">2</span><b>高度这笔账（全是量出来的）：</b>把定高撤掉跑自然高——照片 162.0、链接 146.0、文字 146.0、多图 157.0、文字展开 168.0、多图展开 211.0css。收起态取最大那态 162 ＋ 一行报错 18 ＝ <b>180css＝450rpx</b>；展开＝180＋54＝<b>234css＝585rpx</b>。现网那条是 700rpx，这一稿<b>矮 250rpx</b>；面板顶落到屏内约 336css（展开约 282css），而<b>眼镜那一条线实测在 235css</b>——收起与展开都露着眼睛，形象图不再被吃掉。<br>
+  <span class="n">3</span><b>面板里现在只剩两样东西</b>：一个输入框（或一横排小图）＋一枚滑动条。链接与文字两态同构成"同一格、同一位置"，差别只在 placeholder 那句和条上那枚 icon。<br>
+  <span class="n">4</span><b>序号为什么标在图里、"已选 N 张"为什么可以删：</b>现网那句 pickedCount 是「已选 {n} 张 · 可再加」，删掉之后<b>这个 key 在创建页就没用了</b>（详情页/别处若还引用要一起清，动代码时查）。序号 1…9 本身就报了数，还顺带把"第几张"和"删哪张"对上。<br>
+  <span class="n">5</span><b>进度那条我还是有疑问（硬事实）：</b>服务端任务在 redis 里只有 status／result／user_id（app/services/queue.py 的 set_task_status），<b>没有百分比</b>；客户端 2 秒轮一次、最长 300 秒（utils/api.js 的 pollTask）。三条路：甲 假进度（按秒推，成本零，完成那一刻可能对不上）；乙 按 status 分三档（排队→识别→写摘要，成本零，只有三格）；丙 真进度（多图按"第 k 张／共 n 张"，后端加 done/total 两个字段、轮询回读，约半天）。<b>建议丙配多图、乙配链接与文字</b>。<br>
+  <span class="n">6</span><b>满 9 张点 ➕ 这一条是补反馈，不是改样式：</b>现网 create.js 第 381 行把 count 交给系统选择器、第 393 行再 slice(0, 9)，所以"满了还点"目前是<b>静默截断</b>，用户以为加上了其实没有。这一稿：➕ 转灰 + 吐司「最多 9 张，先删一张再加」/ Up to 9 images — delete one first（新 key）。上限取<b>客户端那档 9</b>（MAX_SHOTS）。⚠️ <b>这句在落码那天被推翻了</b>：服务端 `models/asset.py` 的 MAX_ASSETS_PER_NOTE <b>本来就是 9</b>，两侧同值；我先前看到的 10 是 `ingest.py` 的 MAX_IMAGES_PER_BATCH（一次 OCR 收几张），与"一篇挂几张"是两件事。这一条不用对齐，只有静默截断那一句是真的。<br>
+  <span class="n">7</span><b>文案（中英）：</b>待滑「右滑开始提炼」/ Slide to extract；拖动中同一句、字淡下去；松手即触发进「提炼中…」＝现网 busyExtract / Extracting…；完成吐司＝现网 extractSucceeded「已存入笔记」/ Saved to notes；满额吐司见第 6 条。<b>要新增三条</b>：选择记录模式 / Choose mode、右滑开始提炼 / Slide to extract、最多 9 张先删一张再加 / Up to 9 images — delete one first。<b>要改一句</b>：manualDesc（标题不在这里填了）。<br>
+  <span class="n">8</span><b>乙档"淡透明"仍是同一个面板只改 alpha</b>（.66 ＋ blur 22px），几何、颜色、文案一枚没换。<br>
+  <span class="n">9</span><b>结构证据（全国外、逐张目视）：</b>底部升起一张面板＋面板里带字选项 ← GoodNotes 6（国外首页取证/img/goodnotes-6_8.png）；一枚饱和实心大圆当唯一主动作 ← Structured（img/structured_1.png）＋ Things 3（img/things-3_1.png）；缩略图排＋右端加号格 ← Google Keep（img/google-keep_0.png）。滑动确认那一枚照你给的放大图取样：白底长条、深色圆、圆里白 icon、字两侧虚线。<br>
+  <span class="n">11</span><b>10-08 落码之后的四处偏差（这一稿仍是拍板的那一版，但下面四处按真机改了）：</b>① 面板两档从本稿的 <b>450／585rpx 改成 500／580rpx</b>——450 那一档装不下照片态那三枚圈（快门 210 + 那行字，实测卡里可用只有 251.7rpx），本稿的 180css 是按标签行 1.3 倍行高算的，微信给 view 的默认行高约 1.6，白吃 15rpx；580 这一档比本稿矮 5。② 快门与"右滑提炼"那两枚<b>不是写死的 #E9723D／#C4541F</b>，改成从当前壁纸色阶取深浅相邻的两档（象牙那套实测 #AFA488／#766B50，四套壁纸 × 两枚的字底对比全过 4.5）——理由与代价见 `docs/规格-创建入口这一条线.md` §6，<b>这一条是我定的、他没拍过</b>。③ 报错行从"面板里预留一行"改成<b>画在面板外面</b>，那一段高度才是 700→500 省下来的主要来源。④ <b>多图那一排的排布结构换了算法</b>：本稿画的是 <code>grid: repeat(4, 48px) + justify-content:space-between</code>（一行四枚、拉开铺满），落码是<b>一行五枚 100rpx + 16rpx 间隙靠左排、➕ 用 </b><code>margin-left:auto</code><b>钉在本行最右端</b>——不是随手改的，是"上限 9 张"与站长那句「点击展开也只是<b>多一行</b>高度」两条一起逼出来的：9+➕=10 格，一行 4 枚要三行、一行 5 枚才正好两行。展开那一档因此从本稿的"三行"变成"两行"，同一枚 ➕ 在两行里都贴右沿。<b>这一条是我按算式定的、他没逐字拍过</b>。落地后的实测读数与判据在 `docs/工具/验-统一录入条-真跑.js`（F 节：4 张 5 格一行、6 张两行、9 张点 ➕ 吐司）、`验-录入面板沉底-真跑.js`、`量-面板四态自然高.js` 三把里。<br>
+  <span class="n">10</span><b>落地口径（10-08 已执行完，这一条从"要办"改成"办了"）：</b>miniprogram/pages/create/ 三件全改，配套改了 utils/palette.js（发一枚 <code>createSkin()</code>）与 utils/i18n.js。<br>
+  <b>必须一起办的四条，逐条对完：</b>① 尺子几何重锚——<code>验-统一录入条.js</code> 整段重写（183 条，钉 500/580 两档、566×251rpx 卡内、一行 5 格、行程 456rpx），<code>量-面板四态自然高.js</code> 重跑（实测 500.0／578.8rpx），<code>验-录入面板沉底.js</code> 26 条重锚；② <code>pickedCount</code> 这个 key 连同 <code>barUrl</code>／<code>barShot</code>／<code>urlHintIdle</code>／<code>linkReady</code>／<code>needTitle</code>／<code>startExtract</code>／四步指引那八条 等<b>共 21 个键，从中英两份字典一起删干净</b>（289 → 272，两边同数，<code>验-中英文缺口</code> 61 条绿），另新增 4 位（<code>chooseMode</code>／<code>modePhoto</code>／<code>slideExtract</code>／<code>maxShots</code>），创建页不再引用那些旧键；③ 链接态不再出现 <code>t.save</code>／<code>t.paste</code>——保存换成"右滑那一枚"，粘贴交给系统长按；④ 上限那一刀：<b>两侧本来就同值（都是 9，我原稿写"9 与后端 10 对齐"是错的，已在本稿图例更正）</b>，改掉的不是数字而是<b>那一刀静默截断</b>——现在满了不开选择器（<code>count=剩余位</code>）、➕ 转灰、点它吐司一句。<br>
+</div>
+
+<script>
+var S='stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
+function svg(i){return '<svg viewBox="0 0 24 24" fill="none" '+S+'>'+i+'</svg>'}
+var IC={
+  cam:svg('<path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/>'),
+  img:svg('<path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"/><path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"/><circle cx="13" cy="7" r="1" fill="currentColor" stroke="none"/><rect x="8" y="2" width="14" height="14" rx="2"/>'),
+  lnk:svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'),
+  pen:svg('<path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>'),
+  x:svg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
+  plus:svg('<path d="M5 12h14"/><path d="M12 5v14"/>'),
+  rows:svg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M21 9H3"/><path d="M21 15H3"/>'),
+  user:svg('<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>')
+};
+var CHROME='<div class="chrome"><div class="island"></div><div class="stime">9:41</div>'+
+  '<div class="sright"><div class="sig"><i></i><i></i><i></i><i></i></div>'+
+  '<svg class="wifi" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M1 4.1a10.2 10.2 0 0 1 14 0"/><path d="M3.7 6.9a6.4 6.4 0 0 1 8.6 0"/><path d="M6.3 9.6a2.8 2.8 0 0 1 3.4 0"/></svg>'+
+  '<div class="bat"><u></u></div></div><div class="navtitle">图麦笔记</div>'+
+  '<div class="capsule"><div class="half"><i></i><i></i><i></i></div><div class="dv"></div><div class="half"><div class="tgt"></div></div></div></div>';
+var HEAD='<div class="head"><div class="hrow"><div class="htitle">看到好内容，随手记下来</div>'+
+  '<div class="lang"><span class="on">中</span><span>EN</span></div></div>'+
+  '<div class="date"><span class="d">10月7日</span><span class="w">周三</span></div></div>';
+var PILL='<div class="pill"><div class="it on"><div class="ic">'+IC.plus+'</div></div>'+
+  '<div class="it"><div class="ic">'+IC.rows+'</div></div><div class="it"><div class="ic">'+IC.user+'</div></div></div>';
+
+function modes(on){var t=['照片','链接','文字'];
+  return '<div class="modes">'+t.map(function(x){return '<div class="md'+(x===on?' on':'')+'">'+x+'</div>'}).join('')+'</div>';}
+function dhead(){return '<div class="out"><span>选择记录模式</span><span>点空白处收起</span></div>';}
+function sld(icon){return '<div class="sld"><div class="txt">右滑开始提炼</div><div class="knob">'+IC[icon]+'</div></div>';}
+function urlCard(){return '<div class="field mid">公众号文章 / 网页链接</div>';}
+function bodyCard(){return '<div class="field mid">写下标题和原文，摘要自动生成</div>';}
+function bodyCardOpen(){return '<div class="field ta2">写下标题和原文，摘要自动生成</div>';}
+function thumbs(n){var k=['p1','s1','p2','s2','p3','s2','p1','s3','s1','p2','p3','s2'];var o='';
+  for(var i=0;i<n;i++){o+='<div class="th '+k[i%k.length]+'"><b>✕</b><u>'+(i+1)+'</u></div>'}return o;}
+function addTile(){return '<div class="add">'+IC.plus+'</div>';}
+function grid(n){return '<div class="grid">'+thumbs(n)+addTile()+'</div>';}  /* 展开＝只多一行 */
+function strip3(){return '<div class="strip3">'+thumbs(3)+addTile()+'</div>';}function photo(){return '<div class="mid"><div class="crow">'+
+  '<div class="mini"><div class="c">'+IC.img+'</div><span>相册</span></div>'+
+  '<div class="shutcol"><div class="shut lg"><div class="core">'+IC.cam+'</div></div><div class="lb">拍照</div></div>'+
+  '<div class="mini"><div class="c">'+IC.lnk+'</div><span>链接</span></div></div></div>';}
+function link(){return urlCard()+sld('lnk');}
+function text(){return bodyCard()+sld('pen');}
+function multi(){return strip3()+sld('img');}
+function textOpen(){return bodyCardOpen()+sld('pen');}
+function multiOpen(){return grid(7)+sld('img');}
+
+function P(m,b){return {m:m,b:b}}
+function side(html){return '<div class="side">'+html+'</div>'}
+
+var SHOTS='<div class="who">真截图 · GoodNotes 6</div><img src="国外首页取证/img/goodnotes-6_8.png">'+
+  '<div class="what">抄：底部升起一张面板、面板里一行行带字选项。没抄：它的蓝、它的白底。</div>'+
+  '<div class="who">真截图 · Structured</div><img src="国外首页取证/img/structured_1.png">'+
+  '<div class="what">抄：全页只有一枚饱和实心大圆当主动作（我把它留给拍照）。没抄：粉色页、底栏那排图标。</div>';
+
+var ROWS=[
+ {k:'甲',t:'不透明实面板',d:'现网 700rpx 定高、贴底 152rpx，一个数没改；面板完全遮住背后的脸',cls:'',
+  phones:[
+   [P('照片',photo()),'<b>1 · 照片</b><br>只有三个圈：中间 84px 白环快门吃橙（全篇唯一的大钮），提示词按你说的撤了'],
+   [P('链接',link()),'<b>2 · 链接</b><br>就一个输入框：placeholder 用现网那句「公众号文章 / 网页链接」，点进去就没了；框上下居中，不顶着下面的条'],
+   [P('文字',text()),'<b>3 · 文字</b><br>与链接态同构：一个框、一句 placeholder（现网 manualDesc，口径要改，见图例第 7 条）、一枚条'],
+   [P('照片',multi()),'<b>4 · 选了多张</b><br>一横排：小图靠左、➕ 钉在最右端；「已选 N 张」那行删了，<b>序号标在图里左下角</b>；单张删还是右上角那枚 ✕'],
+   [P('文字',textOpen()),'<b>5 · 文字 · 展开</b><br>只多一行（585rpx）：原文格从一行变两行，条不挪位',1],
+   [P('照片',multiOpen()),'<b>6 · 多图 · 展开</b><br>只多一行：第二排小图，➕ 落在最后一格；再点展开不再长',1]
+  ]},
+ {k:'乙',t:'淡透明面板',d:'同一张面板只改 alpha（.66 ＋ blur 22px），让底下那层压暗罩反过来用；几何、颜色、文案一枚没换',cls:'glassy',
+  phones:[
+   [P('照片',photo()),'<b>1 · 照片</b><br>三圈居中、无提示词；脸透出来一点：形象图轮廓在面板下仍可辨'],
+   [P('链接',link()),'<b>2 · 链接</b><br>与甲档同一套三行，输入格在透明档里改吃 rgba(10,12,16,.38)'],
+   [P('文字',text()),'<b>3 · 文字</b><br>与甲档逐格同构，只差底色'],
+   [P('照片',multi()),'<b>4 · 选了多张</b><br>➕ 方图与小图同尺寸同圆角，序号在图里'],
+   [P('文字',textOpen()),'<b>5 · 文字 · 展开</b><br>展开态在透明档下最考验 blur 够不够压住背景',1],
+   [P('照片',multiOpen()),'<b>6 · 多图 · 展开</b><br>只多一行，➕ 仍在最后一格',1]
+  ]}
+];
+
+var out='';
+ROWS.forEach(function(r){
+  out+='<div class="plan"><div class="ptitle"><span class="k">'+r.k+'</span><span class="t">'+r.t+'</span><span class="d">'+r.d+'</span></div><div class="row">'+side(SHOTS);
+  r.phones.forEach(function(p){
+    var dock='<div class="dockwrap">'+dhead()+'<div class="dock'+(r.cls?' '+r.cls:'')+(p[2]?' open':'')+'">'+modes(p[0].m)+p[0].b+'</div></div>';
+    out+='<div class="col"><div class="phone">'+CHROME+'<div class="screen"><div class="bgimg"></div><div class="scrim"></div>'+HEAD+dock+PILL+'</div></div><div class="cap">'+p[1]+'</div></div>';
+  });
+  out+='</div></div>';
+});
+document.getElementById('app').innerHTML=out;
+function fl(w){return '<div class="fill" style="width:'+w+'"></div>'}
+var K='<div class="knob">',T='<div class="txt">';
+var W=262,KN='left:'+(W-4-36)+'px';
+document.getElementById('s1').innerHTML='<div class="sld">'+T+'右滑开始提炼</div>'+K+IC.lnk+'</div>';
+document.getElementById('s2').innerHTML='<div class="sld">'+T+'<span style="opacity:.2">右滑开始提炼</span><div class="knob" style="left:112px">'+IC.lnk+'</div></div>';
+document.getElementById('s3').innerHTML='<div class="sld">'+T+'提炼中…<div class="knob" style="'+KN+'">'+IC.lnk+'</div></div>';
+document.getElementById('s4').innerHTML='<div class="sld">'+fl('76%')+T+'<span style="color:#F2EFE9">提炼中…</span><div class="knob" style="'+KN+'">'+IC.lnk+'</div></div>';
+document.getElementById('s5').innerHTML='<div class="sld" style="background:#C4541F">'+T+'<span style="color:#F2EFE9">提炼中…</span><div class="knob" style="'+KN+'">'+IC.lnk+'</div></div><div class="tst">✓ 已存入笔记</div>';
+var t9='';for(var q=0;q<3;q++){t9+='<div class="th dim"><b>✕</b><u>'+(q+7)+'</u></div>'}
+document.getElementById('s6').innerHTML='<div class="row9">'+t9+'<div class="add dis">'+IC.plus+'</div></div><div class="tst">最多 9 张，先删一张再加</div>';
+</script></body></html>

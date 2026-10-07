@@ -1,15 +1,23 @@
-// 首页统一录入条的真跑自证：在模拟器里真点、真读 data、真截图。
-// 前置：微信开发者工具已开，跑过 cli close 再 cli auto --auto-port 9431（改过 WXSS 必须先 close）。
-// 跑法：NODE_PATH=/tmp/mpaauto/node_modules node docs/工具/验-统一录入条-真跑.js
+// 创建入口这一版的真跑自证：在模拟器里真点、真拖、真截图（不连生产后端，见下面那段桩）。
+// 前置：docs/工具/跑尺子.sh 9431 验-统一录入条-真跑   （它会先 quit + 重开 + cli auto）
+// 单独跑：NODE_PATH=$HOME/.mpauto/node_modules node docs/工具/验-统一录入条-真跑.js
 //
-// 只点不会调起系统面板的东西：拍照 / 相册那两枚小圆按下去会开 chooseMedia，
-// 那个面板一开就把自动化端口占住，所以这两态走面板里的模式标签进（标签只切视图）。
+// 这一把钉的是"屏上真的长这样、真的点得动"，静态那把（验-统一录入条.js）钉的是"源码里这么写"。
+// 两把都要跑：静态那把算不出 flex 的 auto 边距把框顶到哪儿，真跑这把读不出 wxml 里没画的东西。
+//
+// ⚠️ 拍照 / 相册那两枚按下去会开系统选择器，那个面板一占就把自动化端口吃住，
+//    所以 F 那一节先把 wx.chooseMedia 换成桩（桩只回一组临时路径，不开面板），
+//    点的是真入口、走的是 pickImage 那整趟——图必须由这条路喂进来，见 F 节开头那段注释。
+// ⚠️ 提交那一条会打现网，所以中途把 wx.request 换成桩（只接 /api/ingest 与 /api/tasks），
+//    别的 URL 一律走回原函数；跑完当场还原。为的是"整条滑动→忙态→进度→吐司→跳详情"
+//    真跑一遍而不往现网落一条垃圾笔记。跳转那一趟也挡下来（记下目标 url 就算证）。
 const automator = require('miniprogram-automator')
 const lang = require('./尺子语言钉.js')
 const fs = require('fs')
 const path = require('path')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-const OUT = path.resolve(__dirname, '../design/统一录入条/实测')
+const OUT = path.resolve(__dirname, '../design/10-08创建入口暗面板/实测')
+const I18N = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
 const bad = []
 const ck = (name, ok, got) => {
   console.log(`${ok ? '✓' : '✗'} ${name}${got === undefined || got === '' ? '' : `　→ ${got}`}`)
@@ -23,8 +31,6 @@ const ck = (name, ok, got) => {
     try { mp = await automator.connect({ wsEndpoint: 'ws://localhost:9431' }) } catch (e) { await sleep(12000) }
   }
   if (!mp) throw new Error('连不上自动化端口，先跑 cli auto')
-  // 这一把自己在第⑩节切到 en 再切回 zh，但**开头没钉**——账号停在 en 时前九节那些
-  // 中文判据会一次红四条（"当前标签是直接写""条身换成贴个链接"…）。补上开跑前的钉。
   const langBefore = await lang.read(mp)
   await lang.pin(mp, 'zh')
   fs.mkdirSync(OUT, { recursive: true })
@@ -35,354 +41,451 @@ const ck = (name, ok, got) => {
     }
     throw new Error(`进不去 ${url}`)
   }
+  // 一次拿一组节点的上下左右宽高（page 自己的 selectorQuery 够用：这一页没有自定义组件要摸）
   const rects = (sels) => mp.evaluate((list) => new Promise((resolve) => {
     const q = wx.createSelectorQuery()
     list.forEach((s) => { q.select(s).boundingClientRect() })
-    q.selectViewport().scrollOffset()
-    q.exec((r) => resolve(r.slice(0, list.length).map((x) => (x
-      ? { top: x.top === undefined ? x.y : x.top, bottom: x.bottom, h: x.height, w: x.width, left: x.left }
-      : null))))
+    q.exec((r) => resolve(list.map((s, i) => (r[i] ? {
+      top: r[i].top, bottom: r[i].bottom, h: r[i].height, w: r[i].width, left: r[i].left, right: r[i].right,
+    } : null))))
   }), sels)
-  // 「淡一档」这条要从渲染结果读，不从 wxss 读（wxss 那条静态尺子已经钉了令牌本身）。
-  // 通道只认这一条：`element.style('color')` 回的是**计算后**的值——10-04 探针实测
-  // `.wr-cat-val → rgba(35, 37, 44, 0.55)`、`.face-input → rgb(35, 37, 44)`。
-  // 试过 SelectorQuery.fields({computedStyle})：evaluate 那条路报 "An object could not
-  // be cloned"、不传对象则干脆不回调，把整把尺子拖到 timeout，后面二十几条当场没跑——
-  // 所以这里宁可一次拿不到就当红，也不留一个会挂的死通道。
-  const colorOf = async (sel) => {
-    const el = await page.$(sel)
-    return el ? await el.style('color') : null
-  }
-  const rgbOf = (s) => {
-    if (!s) return null
-    let m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+))?/.exec(s)
-    if (m) return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] }
-    m = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})/i.exec(s)
-    return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16), a: 1 } : null
-  }
+  const rectsAll = (sel) => mp.evaluate((s) => new Promise((resolve) => {
+    wx.createSelectorQuery().selectAll(s).boundingClientRect().exec((r) => resolve(
+      (r[0] || []).map((x) => ({ top: x.top, bottom: x.bottom, h: x.height, w: x.width, left: x.left, right: x.right }))))
+  }), sel)
+  const set = (patch) => mp.evaluate((p) => {
+    getCurrentPages().slice(-1)[0].setData(p)
+  }, patch)
+  const call = (fn, arg) => mp.evaluate((name, a) => {
+    const p = getCurrentPages().slice(-1)[0]
+    p[name](a)
+  }, fn, arg)
 
-  await mp.evaluate(() => { wx.removeStorageSync('home_bg_off'); wx.removeStorageSync('poster_profile') })
+  await mp.evaluate(() => { wx.removeStorageSync('home_bg_off') })
   let page = await enter('/pages/create/create')
   await sleep(4000)
-
-  // ---------- ① 收起态：只有一条 ----------
-  let d = await page.data()
-  ck('收起态条身是「动动手指」', d.barTitle === d.t.barIdle && d.barTitle === '动动手指', `${d.barTitle} / ${d.t.barIdle}`)
-  ck('收起态没有面板', (await page.$$('.panel')).length === 0)
-  ck('条身只有一条', (await page.$$('.bar')).length === 1)
-  ck('三枚小圆都在', (await page.$$('.bar-dots .dot')).length === 3)
-  ck('四个模式标签此时还没渲染', (await page.$$('.mode')).length === 0)
-  ck('铺了背景图，换背景那一行在', (await page.$$('.page-bg')).length === 1 && (await page.$$('.home-swap')).length === 1)
-  await mp.screenshot({ path: `${OUT}/实测-1-收起态.png` })
-
-  // ---------- ② 几何：条在下半屏，换背景那行坐在条与底栏中间 ----------
-  // 底栏是自定义组件，页面自己的 selectorQuery 摸不到它，所以按 CSS 算：
-  // 容器 bottom:20rpx + 高 108rpx，顶边 = 视口高 - 128rpx（rpx→px 按 windowWidth/750）
+  /* 每一节开头都重新取一次当前页：`reLaunch` 之后 app.js 那条登录链还会补发一次跳转，
+     拿着旧 handle 去 `page.data()` 就报 "page is not on top of page stack"，
+     整把尺子一条判据都没吐就崩（10-08 真跑就这么红过一次，重跑立刻好——那是时序红，不是回归）。 */
+  const top = async () => { page = await mp.currentPage(); return page }
   const metric = await mp.evaluate(() => {
     const i = wx.getSystemInfoSync()
     return { w: i.windowWidth, h: i.windowHeight }
   })
-  const R = metric.w / 750
-  const tabTop = metric.h - 128 * R
-  let g = await rects(['.bar', '.home-swap', '.entry-wrap'])
-  const [bar, swap, wrap] = g
-  ck('读到了条、换背景行、整组', !!bar && !!swap && !!wrap, JSON.stringify(g))
-  ck('条沉在下半屏（顶边过下巴线）', bar && bar.top > metric.h * 0.6, bar && `条顶 ${Math.round(bar.top)} / 视口 ${metric.h}`)
-  ck('条高 128rpx', bar && Math.abs(bar.h - 128 * R) < 1, bar && `${bar.h}px = ${(bar.h / R).toFixed(0)}rpx`)
-  ck('换背景那行高 110rpx', swap && Math.abs(swap.h - 110 * R) < 1, swap && `${(swap.h / R).toFixed(0)}rpx`)
-  ck('换背景那行在条下面、底栏上面', swap && swap.top >= bar.bottom - 1 && swap.bottom <= tabTop + 1,
-    swap && `行 ${Math.round(swap.top)}..${Math.round(swap.bottom)}｜底栏顶 ${Math.round(tabTop)}`)
-  ck('那一行整条宽（热区到边）', swap && swap.w > 700 * R, swap && `宽 ${(swap.w / R).toFixed(0)}rpx`)
-  ck('整组压在效果图那条线上（条底≈底栏顶减一行）', bar && Math.abs(bar.bottom - (tabTop - 110 * R - 22 * R)) < 14,
-    `条底 ${Math.round(bar.bottom)}｜应在 ${Math.round(tabTop - 110 * R - 22 * R)} 上下`)
+  const R = metric.w / 750                       // 1rpx 等于多少 px
+  const toRpx = (px) => px / R
+  const rpxEq = (px, want, tol = 2) => Math.abs(toRpx(px) - want) <= tol
+  const tabTop = metric.h - 128 * R              // 底栏顶边（bottom 20 + 高 108）
+  const styleOf = async (sel) => { const el = await page.$(sel); return el ? await el.style('background-color') : null }
+  const clsOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.attribute('class')) || '') : '' }
+  const txtOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.text()) || '').trim() : null }
 
-  // ---------- ②b 横条上面那一行轮播 Tips（站长 10-01 晚加）----------
-  // 这一行整块是靠一个 -68rpx 的负 margin 塞进横条上方那段空档的（见 create.wxss 那段注释）：
-  // 负 margin 写错一格，横条就带着「换背景」一起往下移、顶进底栏。
-  // 所以这里既量 Tips 自己，也回头量横条有没有原地不动（上面那两条已经钉过一次位置）。
-  const tipEl = await page.$('.tips')
-  const tipLine = await page.$('.tips-line')
-  const tipDot = await page.$('.tips-dot')
-  const [tipRect, dotRect] = await rects(['.tips', '.tips-dot'])
-  const tipFs = tipLine && await tipLine.style('font-size')
-  const tipPad = tipEl && await tipEl.style('padding-left')
-  const dotBg = tipDot && await tipDot.style('background-color')
-  // 简写那条 `border-radius` 这一档模拟器回 null（实测两次都是），分量那条才回话——
-  // 拿 `border-top-left-radius` 读到的值是 '50%'，那才是"渲染出来真的吃掉半边"的证据。
-  const dotRadius = tipDot && ((await tipDot.style('border-top-left-radius')) || (await tipDot.style('border-radius')))
-  const tipText = tipLine && await tipLine.text()
-  ck('收起态有这一行，且真的排出了高度', !!tipEl && !!tipRect && tipRect.w > 100 && tipRect.h > 0,
-    tipRect && `宽 ${(tipRect.w / R).toFixed(0)} 高 ${(tipRect.h / R).toFixed(0)}rpx`)
-  ck('Tips 字号 = --fs-meta（24rpx），和上面那行日期同一档',
-    Math.abs(parseFloat(tipFs || '0') / R - 24) <= 2, tipFs)
-  ck('这一行左边留 48rpx（原来是首行缩进，句前加了点就改内边距，留空量不变）',
-    Math.abs(parseFloat(tipPad || '0') / R - 48) <= 2, tipPad)
-  // 站长 10-01 晚：「Tips 前面最好加个小黄点，象征小灯泡」。色值不许写进 wxss
-  // （静态尺子扫的是那条），所以这里验的是 style 递下来之后**真的渲染成这个色**。
-  // 14rpx 落在这一档视口上渲染成 13.5（微信按整像素取整），容 2。
-  const dotSize = !!dotRect && Math.abs(dotRect.w / R - 14) <= 2 && Math.abs(dotRect.h / R - 14) <= 2
-  const dotColor = /246,\s*196,\s*69/.test(dotBg || '')
-  ck('句前那枚小黄点：14rpx 见方、正方（宽高相等）、颜色是 palette 的 #F6C445',
-    dotSize && dotColor && Math.abs(dotRect.w - dotRect.h) <= 1,
-    dotRect && `${(dotRect.w / R).toFixed(1)}×${(dotRect.h / R).toFixed(1)}rpx ${dotBg}`)
-  // 正圆这条判的是渲染结果，不是源码：模拟器把 border-radius 回成字面 '50%'，
-  // 那就是"按半边取"的意思；有的档回具体 px，那就得等于宽高的一半。
-  const radiusIsCircle = dotRadius === '50%' ||
-    (dotRadius && /^\d/.test(dotRadius) && Math.abs(parseFloat(dotRadius) - dotRect.w / 2) <= 1)
-  ck('那一枚渲染出来是正圆（radius 吃掉半边）', !!dotRect && radiusIsCircle, String(dotRadius))
-  ck('点落在那行字的正中（不顶高、不底坠）',
-    !!dotRect && !!tipRect && Math.abs((dotRect.top + dotRect.h / 2 - tipRect.top) / R - 16.8) <= 4,
-    dotRect && tipRect && `${((dotRect.top + dotRect.h / 2 - tipRect.top) / R).toFixed(1)}rpx`)
-  ck('这一行的盒子把自己从流里抵掉了（高 68 = 34 文字 + 34 间距）',
-    !!tipRect && Math.abs(tipRect.h / R - 68) <= 3, tipRect && `${(tipRect.h / R).toFixed(1)}rpx`)
-  ck('横条一动不动：条顶就是整组顶（负 margin 与盒子高等值）',
-    !!tipRect && Math.abs(bar.top - wrap.top) <= 1, bar && `条顶 ${bar.top}／组顶 ${wrap.top}`)
-  ck('Tips 那一行文字离横条留一行（盒子顶到条顶 68，文字占上沿 34）',
-    !!tipRect && Math.abs((bar.top - tipRect.top) / R - 68) <= 3,
-    tipRect && `${((bar.top - tipRect.top) / R).toFixed(1)}rpx`)
-  ck('Tips 前面带「Tips：」这一头', !!tipText && /^Tips：/.test(tipText), tipText)
-  // 节奏（站长：4 秒「还没看完就跳下一条」→ 慢一倍）。
-  // 不写成"等 4.6 秒看它没跳"：计时器是 onShow 起的，脚本插进来的相位不确定，
-  // 赶上周期尾巴就假红。两次跳变**之间**的间隔才是一个完整周期，那才是真凭据。
-  const marks = []
-  let lastTip = tipText
-  const tipStart = Date.now()
-  for (let i = 0; i < 42 && marks.length < 2; i++) {
-    await sleep(500)
-    const el = await page.$('.tips-line')
-    const cur = el && await el.text()
-    if (cur && cur !== lastTip) { marks.push(Date.now()); lastTip = cur }
-  }
-  const gap = marks.length === 2 ? (marks[1] - marks[0]) / 1000 : NaN
-  d = await page.data()
-  ck('池里是六句', (d.tips || []).length === 6, (d.tips || []).length)
-  ck('20 秒里换过两句（真的还在轮播，没被改死）', marks.length === 2,
-    `${marks.length} 次／等了 ${((Date.now() - tipStart) / 1000).toFixed(1)}s`)
-  ck('一句停 8 秒（不是 4 秒；500ms 采样，容 ±0.6s）',
-    Number.isFinite(gap) && gap >= 7.4 && gap <= 9.6, Number.isFinite(gap) ? `${gap.toFixed(1)}s` : '没量到')
+  // ---------- A 收起态：还是那一条纸白胶囊 ----------
+  await top()
+  let d = await page.data()
+  ck('A1 收起态没有面板', (await page.$$('.panel')).length === 0)
+  ck('A2 条身只有一条，且读的是「动动手指」', (await page.$$('.bar')).length === 1 && d.t.barIdle === '动动手指', d.t.barIdle)
+  ck('A3 三枚小圆都在', (await page.$$('.bar-dots .dot')).length === 3)
+  ck('A4 Tips 那一行在（展开才撤的那一位，此刻该留着）', (await page.$$('.tips')).length === 1)
+  const [bar0, wrap0, tip0] = await rects(['.bar', '.entry-wrap', '.tips'])
+  ck('A5 横条一动不动：条顶 == 整组顶（Tips 那盒子被负 margin 抵干净）',
+    !!bar0 && !!wrap0 && Math.abs(bar0.top - wrap0.top) <= 1,
+    bar0 && wrap0 && `条顶 ${Math.round(bar0.top)}／组顶 ${Math.round(wrap0.top)}`)
+  ck('A6 条高 128rpx', !!bar0 && rpxEq(bar0.h, 128), bar0 && `${toRpx(bar0.h).toFixed(1)}rpx`)
+  ck('A7 条底落在底栏上方一条缝上（110 那行换背景 + 22 的间距）',
+    !!bar0 && Math.abs(bar0.bottom - (tabTop - 110 * R - 22 * R)) < 14,
+    bar0 && `条底 ${Math.round(bar0.bottom)}｜应在 ${Math.round(tabTop - 132 * R)} 上下`)
+  ck('A8 换背景那一行在', (await page.$$('.home-swap')).length === 1)
+  await mp.screenshot({ path: `${OUT}/A-收起态.png` })
 
-  // ---------- ③ 点条身 = 直接写 ----------
+  // ---------- B 展开 · 照片档：三枚圈 ----------
+  await top()
   await (await page.$('.bar')).tap()
-  await sleep(1200)
+  await sleep(900)
   d = await page.data()
-  ck('点条身进「直接写」', d.active === 'write' && d.mode === 'write', `${d.active}/${d.mode}`)
-  ck('面板出来了', (await page.$$('.panel')).length === 1)
-  ck('展开态这一行整个不渲染（站长拍的：不跟表单抢眼睛）', (await page.$$('.tips')).length === 0)
-  ck('四个模式标签都在', (await page.$$('.mode')).length === 4)
-  ck('当前标签是直接写', /直接写/.test((await (await page.$('.mode.on')).text()) || ''), await (await page.$('.mode.on')).text())
-  // 站长 10-04：这一档改成"标题 + 原文 → 模型出摘要"，归类那一整行并进标题这一行。
-  // 原来这条钉的是"标题框 + 摘要框 + 归类行"，三样都在，但摘要那格已经不存在了。
-  ck('写那态有标题框、原文框、分类那一格、两枚按钮',
-    (await page.$$('.face-input')).length === 1 && (await page.$$('.wr-body')).length === 1
-    && (await page.$$('.wr-cat-face')).length === 1 && (await page.$$('.act')).length === 2)
-  {
-    const [line, catCell, titleCell] = await rects(['.wr-line', '.wr-cat-face', '.wr-title'])
-    ck('分类与标题坐在同一行（上下沿对齐，不是两行）',
-      !!catCell && !!titleCell && Math.abs(catCell.top - titleCell.top) < 2
-      && Math.abs(catCell.bottom - titleCell.bottom) < 2,
-      catCell && titleCell && `分类 ${Math.round(catCell.top)}~${Math.round(catCell.bottom)}｜标题 ${Math.round(titleCell.top)}~${Math.round(titleCell.bottom)}`)
-    // 他原话是"分类占 1/3 宽度，其他留给标题"，所以钉的是**分类占整行的三分之一**。
-    // 第一版我写成"标题 = 分类 × 2"，那是把两件事混了：行里还夹一道 16 的缝，
-    // 1/3 之外剩下的并不等于 2/3（实量 分类 214｜标题 413｜整行 642），当场红的是尺子。
-    ck('那一格占整行 1/3、其余给标题（原话：分类占 1/3 宽度）',
-      !!catCell && !!titleCell && !!line
-      && Math.abs(catCell.w - line.w / 3) <= 2 * R
-      && Math.abs(line.w - (catCell.w + titleCell.w + 16 * R)) <= 3,
-      catCell && titleCell && line && `分类 ${(catCell.w / R).toFixed(0)}rpx（整行 ${(line.w / R).toFixed(0)} 的 ${(catCell.w * 100 / line.w).toFixed(1)}%）｜标题 ${(titleCell.w / R).toFixed(0)}rpx`)
-    const catText = ((await (await page.$('.wr-cat-face')).text()) || '').replace(/[›\s]/g, '')
-    const wantCat = ((d.categoryNames || [])[d.catIndex] || '').replace(/[›\s]/g, '')
-    ck('分类那一格只报名字（"归类"那两个字撤了，格子里就是当前那一格）',
-      !!wantCat && catText === wantCat, `${catText} vs ${wantCat}`)
-    // 站长 10-04 第六轮：「标题在左，分类在右」。上一版是分类在左——这条钉死左右，
-    // 不然下次谁（包括我自己）顺手把 wxml 里两格调回来，屏幕上看不出是回归。
-    ck('标题在左、分类在右（分类那格贴着整行右端）',
-      !!catCell && !!titleCell && !!line
-      && catCell.left > titleCell.left
-      && Math.abs((catCell.left + catCell.w) - (line.left + line.w)) <= 2,
-      catCell && titleCell && line
-      && `标题左 ${Math.round(titleCell.left)}｜分类左 ${Math.round(catCell.left)}｜整行右端 ${Math.round(line.left + line.w)}`)
-    {
-      const catColor = await colorOf('.wr-cat-val')
-      const titleColor = await colorOf('.face-input')
-      const ca = rgbOf(catColor), ta = rgbOf(titleColor)
-      ck('分类那格的字比标题淡（原话：分类字体颜色，淡一点）',
-        !!ca && !!ta && ca.a < ta.a && ca.a >= 0.5,
-        `分类 ${catColor}｜标题 ${titleColor}`)
-      // 只许淡，不许换色相：三通道必须还是那一支墨，否则"淡"会变成另一支灰。
-      ck('淡的这支还是面板那支墨（同一 RGB 只降 alpha）',
-        !!ca && !!ta && ca.r === ta.r && ca.g === ta.g && ca.b === ta.b,
-        `分类 (${ca && ca.r},${ca && ca.g},${ca && ca.b})｜标题 (${ta && ta.r},${ta && ta.g},${ta && ta.b})`)
+  ck('B1 点条身进「照片」（10-08 起默认档不再是直接写）', d.active === 'photo', d.active)
+  const [panel1, out1] = await rects(['.panel', '.out'])
+  ck('B2 面板高 500rpx', !!panel1 && rpxEq(panel1.h, 500, 3), panel1 && `${toRpx(panel1.h).toFixed(1)}rpx`)
+  ck('B3 整组贴底：面板底 = 视口高 − 152rpx',
+    !!panel1 && Math.abs(panel1.bottom - (metric.h - 152 * R)) < 3,
+    panel1 && `底 ${Math.round(panel1.bottom)}｜应在 ${Math.round(metric.h - 152 * R)}`)
+  ck('B4 那行小字在面板**外面**（它底边不越过面板顶边）',
+    !!out1 && !!panel1 && out1.bottom <= panel1.top + 1,
+    out1 && panel1 && `字底 ${Math.round(out1.bottom)}｜面板顶 ${Math.round(panel1.top)}`)
+  /* 这一条守的是站长两轮"继续压低"要保的东西：面板顶不许盖住那张脸。
+     脸在屏上第几行是背景图的事，探针算不出来（它只能量节点），所以这里钉的是**换算**：
+     视口 753 时实测顶 414 = 0.55 屏，眼睛线在 0.47、下巴线在 0.56——面板顶落在两者之下。
+     门槛取 0.5：把面板改回现网那 700rpx，顶就掉到 0.47（红），改到 580 是 0.52（绿）。
+     "到底挡没挡脸"最后仍由这一把存的截图目视确认（B/C/D/F 各一张）。 */
+  ck('B5 面板顶在视口 50% 以下（改回 700rpx 会掉到 0.47 当场红；脸的位置看截图）',
+    !!panel1 && panel1.top / metric.h > 0.5, panel1 && `顶 ${Math.round(panel1.top)} / ${metric.h} = ${(panel1.top / metric.h).toFixed(2)}`)
+  ck('B6 左边那句是「选择记录模式」，右边那句是「点空白处收起」',
+    (await txtOf('.out-l')) === '选择记录模式' && (await txtOf('.out-r')) === '点空白处收起',
+    `${await txtOf('.out-l')} | ${await txtOf('.out-r')}`)
+  const mds = await page.$$('.md')
+  ck('B7 三个标签（相册并进照片了）', mds.length === 3, mds.length)
+  ck('B8 当前标签是照片', /(^|\s)md on(\s|$)/.test(await clsOf('.md')) && (await txtOf('.md.on')) === '照片', await txtOf('.md.on'))
+  ck('B9 这一态没有滑动条（没图就没得提炼）', (await page.$$('.sld')).length === 0)
+  const [crow, shut, miniA, miniB] = await rects(['.crow', '.shut', '.mini', '.card'])
+  ck('B10 三枚圈都在：快门 210rpx、两枚小圆 105rpx',
+    !!shut && rpxEq(shut.w, 210, 3) && Math.abs(toRpx((await rects(['.mini-c']))[0].w) - 105) <= 3,
+    shut && `快门 ${toRpx(shut.w).toFixed(1)}rpx`)
+  ck('B11 那一排居中（crow 中心 == 卡中心，左右偏差不超过 3rpx）',
+    !!crow && !!miniB && Math.abs((crow.left + crow.w / 2) - (miniB.left + miniB.w / 2)) <= 3,
+    crow && miniB && `排中心 ${Math.round(crow.left + crow.w / 2)}｜卡中心 ${Math.round(miniB.left + miniB.w / 2)}`)
+  ck('B12 快门那一圈是纸白的环（border 读得出、且就是 --cp-ink 那一支）',
+    (await (await page.$('.shut')).style('border-top-color')) === 'rgb(242, 239, 233)',
+    await (await page.$('.shut')).style('border-top-color'))
+  ck('B13 三枚圈各带一个字：相册 / 拍照 / 链接',
+    (await txtOf('.mini-lb')) === '相册' && (await txtOf('.shut-lb')) === '拍照'
+    && (await page.$$('.mini-lb'))[1] && (await (await page.$$('.mini-lb'))[1].text()) === '链接',
+    `${await txtOf('.mini-lb')} / ${await txtOf('.shut-lb')}`)
+  ck('B14 这一态没有多余的提示词行（拍照下面那句撤了）',
+    (await page.$$('.entry-desc')).length === 0 && (await page.$$('.note')).length === 0)
+  await mp.screenshot({ path: `${OUT}/B-照片三枚圈.png` })
+
+  // ---------- C 链接档：一个框 + 一枚条 ----------
+  await top()
+  await (await page.$$('.md'))[1].tap()
+  await sleep(900)
+  d = await page.data()
+  ck('C1 切到链接', d.active === 'url', d.active)
+  const [field1, sld1] = await rects(['.field', '.sld'])
+  ck('C2 只有一个输入框，高 105rpx', (await page.$$('.field')).length === 1 && !!field1 && rpxEq(field1.h, 105, 3),
+    field1 && `${toRpx(field1.h).toFixed(1)}rpx`)
+  const phAttr = await (await page.$('.field-input')).property('placeholder')
+  ck('C3 提示词在框里（placeholder 就是 linkDesc 那句，从节点属性读）',
+    phAttr === d.t.linkDesc, `${phAttr} vs ${d.t.linkDesc}`)
+  ck('C4 条高 110rpx、外圈那圈白边 5rpx',
+    !!sld1 && rpxEq(sld1.h, 110, 3), sld1 && `${toRpx(sld1.h).toFixed(1)}rpx`)
+  const knob1 = (await rects(['.sld-knob']))[0]
+  ck('C5 圆停在最左那一格（left ≈ 10rpx，与 SLD_REST 对得上）',
+    !!knob1 && Math.abs(toRpx(knob1.left - sld1.left) - 15) <= 2,
+    knob1 && sld1 && `圆离轨道左沿 ${toRpx(knob1.left - sld1.left).toFixed(1)}rpx（边框 5 + 内缩 10）`)
+  ck('C6 圆宽 90rpx', !!knob1 && rpxEq(knob1.w, 90, 3), knob1 && `${toRpx(knob1.w).toFixed(1)}rpx`)
+  ck('C7 这一格还空着 → 条是"按不动"那一档（sld-off 挂上了）',
+    /sld-off/.test(await clsOf('.sld')), await clsOf('.sld'))
+  ck('C8 框与条之间有缝、框不贴面板上沿（两档 auto 边距真的分到了地方）',
+    !!field1 && !!sld1 && sld1.top - field1.bottom >= 8 * R && field1.top - (await rects(['.card']))[0].top >= 8 * R,
+    field1 && sld1 && `框底到条顶 ${toRpx(sld1.top - field1.bottom).toFixed(1)}rpx`)
+  ck('C9 链接档没有归类那一格、没有粘贴按钮', (await page.$$('.wr-cat-face')).length === 0 && !/pasteUrl/.test(JSON.stringify(d)))
+
+  await (await page.$('.field-input')).input('not a link')
+  await sleep(700)
+  d = await page.data()
+  ck('C10 非法链接：urlHint 走 bad，且那句规则行当场就说出来（不必等滑到底）',
+    d.urlHint === 'bad' && d.hintLine === d.t.linkRule && (await page.$$('.out-err')).length === 1,
+    `hint=${d.hintLine}`)
+  const [err1] = await rects(['.out-err'])
+  ck('C11 那句报错把整组往上顶了一行，而面板高度没变（还是 500）',
+    !!err1 && err1.bottom <= panel1.top + 1 && rpxEq((await rects(['.panel']))[0].h, 500, 3),
+    err1 && `报错底 ${Math.round(err1.bottom)}／面板顶 ${Math.round(panel1.top)}`)
+  await mp.screenshot({ path: `${OUT}/C-链接-非法报错在框外.png` })
+
+  await (await page.$('.field-input')).input('https://mp.weixin.qq.com/s/abcdef')
+  await sleep(700)
+  d = await page.data()
+  ck('C12 合法链接：ready 翻成 true，sld-off 撤掉',
+    d.urlHint === 'ok' && d.ready === true && !/sld-off/.test(await clsOf('.sld')), `ready=${d.ready} ${await clsOf('.sld')}`)
+
+  // ---------- D 真拖：未就绪挡住、就绪触发 ----------
+  await top()
+  const drag = async (steps = 8) => {
+    const track = (await rects(['.sld']))[0]
+    const k = (await rects(['.sld-knob']))[0]
+    const x0 = k.left + k.w / 2
+    const y = k.top + k.h / 2
+    const el = await page.$('.sld')
+    await el.touchstart({ touches: [{ identifier: 0, clientX: x0, clientY: y }] })
+    const probe = { midRpx: null, midLeft: null }
+    for (let i = 1; i <= steps; i++) {
+      const x = x0 + ((track.right - 20 * R - x0) * i) / steps
+      await el.touchmove({ touches: [{ identifier: 0, clientX: x, clientY: y }] })
+      await sleep(70)
+      if (i === Math.floor(steps / 2)) {
+        // 拖到一半量一次"屏上那枚圆真挪了没"：只读 data 里的 knobRpx 抓不到 10-08 那次的漏绑定
+        //（数据一路走到 456、屏上原地不动），必须摸渲染结果。
+        await sleep(220)
+        probe.midRpx = (await page.data()).knobRpx
+        probe.midLeft = toRpx(((await rects(['.sld-knob']))[0] || {}).left || 0) - toRpx(track.left) - 5
+      }
     }
-    ck('按钮说的是提炼，不是保存',
-      /提炼/.test(((await (await page.$$('.act'))[1].text()) || '')),
-      (await (await page.$$('.act'))[1].text()))
+    await el.touchend({ touches: [] })
+    await sleep(400)
+    return probe
   }
-  g = await rects(['.entry-wrap', '.panel', '.bar'])
-  // 09-28 深夜改判据：展开后整组不再"回到标题下面"，而是从流里拿出来贴到底栏上方
-  // （真机反馈原来那一版把照片和标题整个盖住了）。152 = 底栏那 128 + 一条 24 的缝。
-  ck('展开后整组贴底（组底 = 视口高 − 152rpx，压在底栏上方那条缝上）',
-    g[0] && Math.abs(g[0].bottom - (metric.h - 152 * R)) < 2,
-    g[0] && `组底 ${Math.round(g[0].bottom)}｜应在 ${Math.round(metric.h - 152 * R)} 上下`)
-  ck('面板真的接在条下面（同一块白、无缝）', g[1] && g[2] && Math.abs(g[1].top - g[2].bottom) < 2,
-    g[1] && `条底 ${Math.round(g[2].bottom)}｜面板顶 ${Math.round(g[1].top)}`)
-  /* 09-28 他对着截图问"是不是和效果图不一致"——就是这两条没断过：几何相邻是真的，
-     但条身还挂着纸白胶囊（.bar.open 那条规则在 wxss 里躺着，wxml 从没挂上类）。 */
-  const barCls = (await (await page.$('.bar')).attribute('class')) || ''
-  ck('展开时条身挂上 open', /(^|\s)bar open(\s|$)/.test(barCls), barCls)
-  const barEl = await page.$('.bar'), panEl = await page.$('.panel')
-  /* 属性名必须写成 CSS 那种 kebab-case：style('backgroundColor') 一律回 null，
-     而 null === null 会被上一版当成"过"，是假绿。圆角这个 API 读不出来（试了
-     border-radius / borderBottomLeftRadius 都是 null），所以"下沿是直角"不在这里断，
-     由上面那条"条底 = 面板顶"的几何判据兜着。 */
-  const barBg = await barEl.style('background-color'), panBg = await panEl.style('background-color')
-  ck('展开时条身和面板同一块白（两边都读到值才算）',
-    !!barBg && !!panBg && barBg === panBg, `${barBg} vs ${panBg}`)
-  await mp.screenshot({ path: `${OUT}/实测-3-展开写.png` })
-
-  // ---------- ③b 「原文翻译」那一枚开关（站长 10-04 原话：「在取消按钮上方，加个小开关，
-  // 原文翻译，默认关，可以打开」）----------
-  // 三样都要真点出来：位置（在那排按钮上方）、默认态（关）、点下去之后面板不许被收掉
-  // （落点用 catchtap 就是为了这个——冒到容器那条"点空白收回"上会变成一开开关一关面板）。
-  {
-    ck('写那态只有一行开关', (await page.$$('.wr-sw')).length === 1)
-    const swTxt = ((await (await page.$('.wr-sw')).text()) || '').replace(/\s+/g, '')
-    ck('那行字是他原话「原文翻译」', swTxt === '原文翻译', swTxt)
-    ck('默认是关', (await page.data('writeTranslate')) === false, String(await page.data('writeTranslate')))
-    const [gSw, gActs] = await rects(['.wr-sw', '.acts'])
-    ck('开关那一行就在那排按钮上方', !!gSw && !!gActs && gSw.bottom <= gActs.top + 1
-      && gActs.top - gSw.bottom < 30 * R,
-      gSw && gActs && `开关底 ${Math.round(gSw.bottom)}｜按钮顶 ${Math.round(gActs.top)}`)
-    const offTrack = await (await page.$('.wr-sw-track')).style('background-color')
-    const offDot = await (await page.$('.wr-sw-dot')).style('background-color')
-    await (await page.$('.wr-sw')).tap()
-    await sleep(600)
-    const d2 = await page.data()
-    ck('点整行一下，状态翻成开', d2.writeTranslate === true, String(d2.writeTranslate))
-    ck('点它不收面板、也不误触提交（面板还在、busy 没被碰）',
-      d2.active === 'write' && (await page.$$('.panel')).length === 1 && !d2.busy,
-      `${d2.active}/${d2.busy}`)
-    const onTrack = await (await page.$('.wr-sw-track')).style('background-color')
-    const onDot = await (await page.$('.wr-sw-dot')).style('background-color')
-    // "看得出来开着还是关着"要两条一起才算：① 同一枚面在开／关两态读数不同；
-    // ② 每一态里面与点是两支色。只比"面 vs 点"会掉进同底色压透明度那种永真判据，
-    // 只比"开 vs 关"又抓不到点融进面里的那种画法，所以两边都比。
-    ck('那一面在开／关两态换了色', !!offTrack && !!onTrack && offTrack !== onTrack,
-      `${offTrack} → ${onTrack}`)
-    ck('关态：点与面两支色', !!offTrack && !!offDot && offDot !== offTrack,
-      `点 ${offDot}｜面 ${offTrack}`)
-    ck('开态：点与面两支色', !!onTrack && !!onDot && onDot !== onTrack,
-      `点 ${onDot}｜面 ${onTrack}`)
-    await mp.screenshot({ path: `${OUT}/实测-3b-开关打开.png` })
-    await (await page.$('.wr-sw')).tap()
-    await sleep(600)
-    ck('再点一下回到关（来回都灵）', (await page.data('writeTranslate')) === false,
-      String(await page.data('writeTranslate')))
-    const backTrack = await (await page.$('.wr-sw-track')).style('background-color')
-    ck('关回去之后那一面的读数与最初一致', !!offTrack && backTrack === offTrack,
-      `${offTrack} vs ${backTrack}`)
-    await mp.screenshot({ path: `${OUT}/实测-3c-开关关闭.png` })
-  }
-
-  // ---------- ④ 模式标签互切 ----------
-  const modes = await page.$$('.mode')
-  await modes[3].tap()   // 链接
-  await sleep(900)
-  d = await page.data()
-  ck('切到链接那一态', d.active === 'url' && d.mode === 'url', `${d.active}/${d.mode}`)
-  ck('条身跟着换成「贴个链接」', d.barTitle === '贴个链接', d.barTitle)
-  ck('链接那态有粘贴和保存', (await page.$$('.act')).length === 2)
-  ck('链接那态没有归类那一格', (await page.$$('.wr-cat-face')).length === 0)
-  // 「原文翻译」只加在直接写这一档（站长指的就是这一屏），链接／截图／拍照三条不带它——
-  // 后端那两条也没这个字段，提示词一字没变。
-  ck('链接那态没有那枚开关（开关只归直接写这一档）', (await page.$$('.wr-sw')).length === 0)
-  await mp.screenshot({ path: `${OUT}/实测-4-展开链接.png` })
-
-  await (await page.$$('.mode'))[1].tap()  // 拍照（标签只切视图，不开相机）
-  await sleep(900)
-  d = await page.data()
-  ck('拍照标签共用截图那一段', d.active === 'shot' && d.mode === 'camera', `${d.active}/${d.mode}`)
-  ck('条身退回功能名', d.barTitle === '拍照或截图', d.barTitle)
-  ck('两块选图按钮都在', (await page.$$('.pk')).length === 2)
-  ck('提炼按钮是灰的（还没选图）', (await page.$$('.act.off')).length === 1)
-  await mp.screenshot({ path: `${OUT}/实测-5-展开拍照.png` })
-
-  await (await page.$$('.mode'))[2].tap()  // 相册
-  await sleep(900)
-  d = await page.data()
-  ck('相册标签也共用那一段', d.active === 'shot' && d.mode === 'album', `${d.active}/${d.mode}`)
-  ck('前面那枚图形跟着换成叠图', d.lead === 'images', d.lead)
-
-  // ---------- ⑤ 点条身以外收起 ----------
-  await (await page.$('.title-row')).tap()
-  await sleep(900)
-  d = await page.data()
-  ck('点空白收回去了', d.active === '' && (await page.$$('.panel')).length === 0, d.active)
-  ck('收起后条身回到「动动手指」', d.barTitle === '动动手指', d.barTitle)
-  g = await rects(['.entry-wrap'])
-  ck('留白又回来了', g[0] && g[0].top > 300, g[0] && `组顶 ${Math.round(g[0].top)}`)
-
-  // ---------- ⑥ 链接那枚小圆 = 直接进链接态 ----------
-  // 展开之后三枚小圆就不在了（wx:else），所以样式要在点之前读
-  const dotStyles = []
-  for (const el of await page.$$('.bar-dots .dot')) { dotStyles.push((await el.attribute('style')) || '') }
-  await (await page.$$('.bar-dots .dot'))[2].tap()
-  await sleep(900)
-  d = await page.data()
-  ck('点蓝圆进链接态', d.active === 'url' && d.mode === 'url', `${d.active}/${d.mode}`)
-  ck('三枚小圆的底色各是一支色（由 palette 发下来）',
-    dotStyles.filter((x) => /--blk-bg:#/.test(x)).length === 3, dotStyles.map((x) => (x.match(/--blk-bg:[^;]+/) || [''])[0]).join(' '))
-  await mp.screenshot({ path: `${OUT}/实测-6-蓝圆进链接.png` })
-
-  // 校验行仍然跟着输入走（这条是现网老行为，别被这一批碰坏）
-  await (await page.$('.face-input')).input('not a link')
-  await sleep(700)
-  d = await page.data()
-  ck('非法链接仍然报规则行', d.urlHint === 'bad', d.urlHint)
-  ck('非法时保存按钮仍是灰的', (await page.$$('.act.off')).length === 1)
-
-  // ---------- ⑦ 忙态不许被收起打断 ----------
-  await mp.evaluate(() => {
-    const p = getCurrentPages().slice(-1)[0]
-    p.setData({ busy: 'url' })
-  })
-  await (await page.$('.title-row')).tap()
-  await sleep(700)
-  d = await page.data()
-  ck('忙的时候点空白不收面板', d.active === 'url', d.active)
-  await mp.evaluate(() => { getCurrentPages().slice(-1)[0].setData({ busy: '' }) })
-
-  // ---------- ⑧ 换背景那枚只导流，不弹相册 ----------
-  await (await page.$('.title-row')).tap()
+  await (await page.$('.field-x')).tap()      // 清空 → 这一格又空了
   await sleep(600)
-  // 这一行 10-02 晚拆成两半，父节点不再带 tap：正中落在两半那道缝里，点了等于没点。
-  // 取第二半（「换背景」），第一半现在是「调亮度」。
-  const halves = await page.$$('.swap-half')
-  ck('录入条下面两半各一个热区', halves.length === 2, `${halves.length} 半`)
-  await halves[1].tap()
-  await sleep(3500)
-  const now = await mp.evaluate(() => getCurrentPages().slice(-1)[0].route)
-  ck('点换背景走到卡片模板那一页', now === 'pages/profile/profile', now)
-  ck('换背景只是换了个页面，没有弹系统面板', await mp.evaluate(() => !!getCurrentPages().slice(-1)[0]) === true, now)
-
-  // ---------- ⑨ 那个旧开关已经作废：本机还留着它，也照样铺图 ----------
-  // 09-30 站长把外观设置里「用人像 / 不用」那一节整块撤了，`home_bg_off` 这个键
-  // 代码里再没人读。留这条断言是为了钉住"以前关过的人不会停在半截状态"：
-  // 键还在 storage 里，图、换背景那一行、条子落点三样都得和平时一模一样。
-  await mp.evaluate(() => wx.setStorageSync('home_bg_off', true))
-  page = await enter('/pages/create/create')
-  await sleep(4000)
   d = await page.data()
-  ck('旧开关还写着 true，图照样铺着', !!d.bgSrc, d.bgSrc || '(空)')
-  ck('换背景那一行照样在（它只跟"有没有图"走）', (await page.$$('.home-swap')).length === 1)
-  ck('条还在', (await page.$$('.bar')).length === 1)
-  // 落点只有一条线：这一屏不存在"没铺图"那一档，所以条顶不该随任何东西挪。
-  g = await rects(['.bar'])
-  ck('条子仍沉在下半屏（和铺图时同一档）',
-    g[0] && Math.abs(g[0].top - bar.top) < 2, g[0] && `条顶 ${Math.round(g[0].top)}｜先前 ${Math.round(bar.top)}`)
-  await mp.screenshot({ path: `${OUT}/实测-9-旧开关已作废.png` })
-  await mp.evaluate(() => wx.removeStorageSync('home_bg_off'))
+  ck('D0 清空之后 ready 退回 false', d.urlInput === '' && d.ready === false, `${d.urlInput}/${d.ready}`)
+  await drag()
+  d = await page.data()
+  ck('D1 空着拖到底：不提交，但把话说了（沿用"灰按钮被点也要给话"那条规矩）',
+    !d.busy && !!d.errLine && d.knobRpx === 10, `busy=${d.busy} err=${d.errLine} knob=${d.knobRpx}`)
 
-  // ---------- ⑩ 英文那一版 ----------
+  // 换桩：只接提炼那两条，别的 URL 走回原函数，免得往现网落一条垃圾笔记
+  const stubbed = await mp.evaluate(() => {
+    if (wx.__probeRaw) return false
+    wx.__probeRaw = wx.request
+    wx.request = (o) => {
+      const u = (o && o.url) || ''
+      if (u.indexOf('/api/ingest') > -1) {
+        setTimeout(() => o.success && o.success({ statusCode: 200, data: { status: 'queued', task_id: 'probe-task' } }), 60)
+        return { abort() {} }
+      }
+      // 详情页那一趟也别打现网：桩直接回一句"没有这条"，它走自己本地的错误态
+      if (u.indexOf('/api/notes') > -1) {
+        setTimeout(() => o.success && o.success({ statusCode: 404, data: { detail: 'probe' } }), 20)
+        return { abort() {} }
+      }
+      if (u.indexOf('/api/tasks/probe-task') > -1) {
+        // 第一次回 processing、第二次才回 completed：pollTask 是"一进来先问一次"，
+        // 不挡这一下的话整条 0.1 秒就走完了，"拖动中·进度"那张截图会拍到已完成那一帧。
+        wx.__probePolls = (wx.__probePolls || 0) + 1
+        const done = wx.__probePolls > 3
+        setTimeout(() => o.success && o.success({
+          statusCode: 200,
+          data: done ? { status: 'completed', result: { note_id: 'probe-note' } } : { status: 'processing' },
+        }), 60)
+        return { abort() {} }
+      }
+      return wx.__probeRaw(o)
+    }
+    // 跳转这一趟也挡住：完成那一帧只活 800ms，靠 sleep 去撞它必然掷硬币（10-08 D8 就这么红过一次——
+    // 红的是"读不到"而不是"画错了"）。桩把目标 url 记下来，D8 从容态里量，D9 改判"有没有约成这一跳"。
+    if (!wx.__probeRawNav) {
+      wx.__probeRawNav = wx.navigateTo
+      wx.__probeNav = []
+      wx.navigateTo = (o) => { wx.__probeNav.push((o && o.url) || '') }
+    }
+    return true
+  })
+  ck('D2 wx.request 换成桩了（这一节不会打现网）', stubbed === true, String(stubbed))
+
+  await (await page.$('.field-input')).input('https://mp.weixin.qq.com/s/abcdef')
+  await sleep(700)
+  await mp.evaluate(() => { wx.__probePolls = 0 })   // 计数归零，"第 4 次才回 completed"才是硬时刻
+  const pr = await drag()
+  let dD = await page.data()
+  ck('D3 拖到底 → 真的进忙态（busy=url）', dD.busy === 'url', dD.busy)
+  ck('D3b 拖到一半屏上那枚圆真跟着走（不是只写在 data 里）',
+    pr.midRpx > 120 && Math.abs(pr.midLeft - pr.midRpx) <= 8, `data ${pr.midRpx}rpx｜屏上 ${pr.midLeft.toFixed(0)}rpx`)
+  await sleep(1400)
+  dD = await page.data()
+  ck('D4 圆停在最右那一格 456rpx、且颜色没变（class 里没有一档改色）',
+    dD.knobRpx === 456 && !/sld-done|sld-off/.test(await clsOf('.sld')),
+    `knob=${dD.knobRpx} class=${await clsOf('.sld')}`)
+  ck('D5 进度那一格走起来了（假进度按秒推，>0 就算在动）', dD.fillPct > 0, `fillPct=${dD.fillPct}`)
+  const fillW = (await rects(['.sld-fill']))[0]
+  ck('D6 进度填充盖不住那圈白边（填充左边 == 轨道内沿，白边那一档还在）',
+    !!fillW && Math.abs(fillW.left - ((await rects(['.sld']))[0].left + 5 * R)) <= 2,
+    fillW && `填充左 ${Math.round(fillW.left)}`)
+  await mp.screenshot({ path: `${OUT}/D-拖动中-进度.png` })
+  // 完成那一帧不再靠 sleep 撞：跳转已被桩挡住，所以这一格会一直停在已完成，量得从容。
+  const waitDone = async () => {
+    for (let i = 0; i < 40; i++) {
+      const x = await mp.evaluate(() => {
+        const pg = getCurrentPages().filter((p) => p.route === 'pages/create/create').slice(-1)[0]
+        return pg ? { done: pg.data.done, fillPct: pg.data.fillPct, busy: pg.data.busy, urlInput: pg.data.urlInput } : null
+      })
+      if (x && x.done) return x
+      await sleep(200)
+    }
+    return null
+  }
+  const dDone = await waitDone()
+  ck('D7 接口回来 → 满格 + 完成那一帧（done=true、fillPct=100、草稿已清）',
+    !!dDone && dDone.done === true && dDone.fillPct === 100 && !dDone.busy && dDone.urlInput === '',
+    JSON.stringify(dDone))
+  ck('D8 完成那一帧整条转实心、白环仍然在', /sld-done/.test(await clsOf('.sld')) && !!dDone, await clsOf('.sld'))
+  const knobDone = (await rects(['.sld-knob']))[0]
+  ck('D8b 完成那一帧圆仍钉在最右那一格（没回弹）',
+    !!knobDone && Math.abs(knobDone.left - ((await rects(['.sld']))[0].left + (456 + 5) * R)) <= 3 * R,
+    knobDone && `圆左 ${toRpx(knobDone.left).toFixed(0)}rpx`)
+  await mp.screenshot({ path: `${OUT}/D-完成那一帧.png` })
+  await sleep(1200)
+  const nav = await mp.evaluate(() => wx.__probeNav || [])
+  ck('D9 吐司之后约成了跳笔记详情页这一跳（url 带 probe-note）',
+    nav.length === 1 && nav[0] === '/pages/detail/detail?id=probe-note', JSON.stringify(nav))
+  const route = await mp.evaluate(() => getCurrentPages().slice(-1)[0].route)
+  ck('D9b 探针自己没把页面跳走（还停在创建这一屏，桩挡住的那跳不会真发生）', route === 'pages/create/create', route)
+  await mp.evaluate(() => {
+    if (wx.__probeRaw) { wx.request = wx.__probeRaw; delete wx.__probeRaw }
+    if (wx.__probeRawNav) { wx.navigateTo = wx.__probeRawNav; delete wx.__probeRawNav; delete wx.__probeNav }
+  })
+  page = await enter('/pages/create/create')
+  await sleep(3500)
+
+  // ---------- E 文字档：一个框，展开才变两行 ----------
+  await top()
+  await (await page.$('.bar')).tap()
+  await sleep(700)
+  await (await page.$$('.md'))[2].tap()
+  await sleep(900)
+  d = await page.data()
+  ck('E1 切到文字', d.active === 'write' && d.panelOpen === false, `${d.active}/${d.panelOpen}`)
+  const ta = await page.$('.field-area')
+  ck('E2 只有一个原文框（标题格撤了、这一档连 input 都没有），提示词吃 manualDesc',
+    !!ta && (await ta.property('placeholder')) === d.t.manualDesc && (await page.$$('input')).length === 0,
+    `${await (await page.$('.field-area')).property('placeholder')} vs ${d.t.manualDesc}`)
+  ck('E3 收起那一档这个框是一行（105rpx）', rpxEq((await rects(['.field-area']))[0].h, 105, 3),
+    `${toRpx((await rects(['.field-area']))[0].h).toFixed(1)}rpx`)
+  // ⚠️ 这里用 trigger('focus') 而不是 tap()：模拟器里 tap 一枚原生 <textarea> **不会**把焦点落上去
+  //（实测 bodyFocus 一直是 false，E4/E5/E6 三条连着红，而面板高度那条量出来是 500 没错）。
+  // trigger 走的是 bind 事件那条通道，证的正是"焦点这一位接上了没"——真机上键盘起来必然发 focus，
+  // 那是平台行为，不在这一把的责任范围。
+  await ta.trigger('focus')
+  await sleep(900)
+  d = await page.data()
+  ck('E4 焦点进框里 → 面板抬到展开那一档（580rpx，只多一行）',
+    d.bodyFocus === true && d.panelOpen === true && rpxEq((await rects(['.panel']))[0].h, 580, 4),
+    `focus=${d.bodyFocus} open=${d.panelOpen} 高 ${toRpx((await rects(['.panel']))[0].h).toFixed(1)}rpx`)
+  ck('E5 框跟着变成两行（160rpx）', rpxEq((await rects(['.field-area']))[0].h, 160, 4),
+    `${toRpx((await rects(['.field-area']))[0].h).toFixed(1)}rpx`)
+  ck('E6 「原文翻译」那枚开关在展开态出现，默认关',
+    (await page.$$('.wr-sw')).length === 1 && d.writeTranslate === false)
+  await mp.screenshot({ path: `${OUT}/E-文字-展开两行.png` })
+  await (await page.$('.wr-sw')).tap()
+  await sleep(700)
+  d = await page.data()
+  ck('E7 点开关只翻这一位，面板不收、不提交',
+    d.writeTranslate === true && d.active === 'write' && !d.busy && (await page.$$('.panel')).length === 1,
+    `${d.writeTranslate}/${d.active}/${d.busy}`)
+  const offT = await styleOf('.wr-sw-track')
+  await (await page.$('.wr-sw')).tap()
+  await sleep(700)
+  const onT = await styleOf('.wr-sw-track')
+  ck('E8 开与关那一面换了色（两态看得出来）', !!offT && !!onT && offT !== onT, `${offT} → ${onT}`)
+  await (await page.$('.field-area')).trigger('blur')
+  await sleep(800)
+  d = await page.data()
+  ck('E9 离开焦点退回收起那一档，开关跟着撤',
+    d.panelOpen === false && (await page.$$('.wr-sw')).length === 0
+    && rpxEq((await rects(['.panel']))[0].h, 500, 4), `${d.panelOpen}`)
+
+  // ---------- F 照片档：小图一行、展开只多一行、满了给话 ----------
+  await top()
+  // 上一节停在文字档，这一节的"格数/行数"只有在照片档才画得出来，先切回照片那一档。
+  // ⚠️ 图只能走"桩住 wx.chooseMedia + 真点入口"这条路喂：拿 mp.evaluate 直接 setData 一个数组，
+  // 服务层 data 到位、渲染层却不跟（10-08 实测：evaluate 设 1 张，屏上仍是空态；同一位真点走 pickImage
+  // 立刻出 5 格）。这把尺子量的是屏上那一排，所以必须走真路径。
+  await (await page.$$('.md'))[0].tap()
+  await sleep(700)
+  await mp.evaluate(() => {
+    if (wx.__rawChoose) return
+    wx.__rawChoose = wx.chooseMedia
+    wx.__chooseCalls = 0
+    wx.__shots = []
+    wx.chooseMedia = (o) => {
+      wx.__chooseCalls += 1
+      const res = { type: 'image', tempFiles: (wx.__shots || []).map((p) => ({ tempFilePath: p })) }
+      if (o.success) o.success(res)
+      if (o.complete) o.complete(res)
+    }
+  })
+  const clearShots = async () => {
+    for (let i = 0; i < 12; i++) {
+      const x = await page.$('.th-x')
+      if (!x) break
+      await x.tap()
+      await sleep(220)
+    }
+    await sleep(500)
+  }
+  const setShots = async (n) => {
+    await clearShots()
+    await mp.evaluate((k) => {
+      // 路径必须互不相同：wx:key="*this" 拿路径当键，撞了键那一串整个不渲染
+      wx.__shots = Array.from({ length: k }, (_, i) => `http://usr/probe-${i}.png`)
+    }, n)
+    const add = await page.$('.th-add')
+    await (add || (await page.$$('.mini'))[0]).tap()
+    await sleep(1100)
+    return page.data()
+  }
+  let f = await setShots(4)
+  const n4 = (await page.$$('.strip .th')).length
+  ck('F1 四张 + ➕ 仍在同一行（5 格装得下），面板还是 500',
+    f.panelOpen === false && n4 === 5
+    && rpxEq((await rects(['.panel']))[0].h, 500, 4), `${n4} 格 / open=${f.panelOpen} / active=${f.active}`)
+  const th4 = await rectsAll('.strip .th')
+  const cardR = (await rects(['.card']))[0]
+  ck('F2 ➕ 钉在这一行最右端（它的右边 == 卡内右边）',
+    !!th4[4] && !!cardR && Math.abs(th4[4].right - cardR.right + 33 * R) <= 6 * R,
+    th4[4] && cardR ? `➕右 ${Math.round(th4[4].right)}｜卡右 ${Math.round(cardR.right)}` : `格数 ${th4.length}`)
+  ck('F3 序号标在图里（读到 1…4），没有"已选 N 张"那一行',
+    (await page.$$('.th-no')).length === 4 && (await txtOf('.th-no')) === '1'
+    && (await page.$$('.cnt')).length === 0, await txtOf('.th-no'))
+  ck('F4 四张图各自真画出来了（宽 100rpx 见方）',
+    th4.length === 5 && th4.slice(0, 4).every((x) => rpxEq(x.w, 100, 4) && Math.abs(x.h - x.w) <= 2),
+    th4.slice(0, 4).map((x) => `${toRpx(x.w).toFixed(0)}×${toRpx(x.h).toFixed(0)}`).join(' ') || '没有格')
+  await mp.screenshot({ path: `${OUT}/F-四张一行.png` })
+
+  f = await setShots(6)
+  ck('F5 第六格放不下 → 自己多一行，面板到 580 为止',
+    f.panelOpen === true && rpxEq((await rects(['.panel']))[0].h, 580, 4), `open=${f.panelOpen}`)
+  const th6 = await rectsAll('.strip .th')
+  const cardR6 = (await rects(['.card']))[0]
+  ck('F6 真排成两行（第六格与第一格不在同一行），➕ 被 margin-left:auto 钉在第二行最右端',
+    th6.length === 7 && th6[0].top !== th6[5].top
+    && !!cardR6 && Math.abs(th6[6].right - cardR6.right + 33 * R) <= 6 * R,
+    `格数 ${th6.length}｜➕右 ${th6[6] && Math.round(th6[6].right)}｜卡右 ${cardR6 && Math.round(cardR6.right)}`)
+  ck('F7 一行放五格（不是四格、也不是六格）：数一数第一行几枚',
+    th6.length === 7 && th6.filter((x) => Math.abs(x.top - th6[0].top) <= 2).length === 5,
+    `${th6.length ? th6.filter((x) => Math.abs(x.top - th6[0].top) <= 2).length : 0} 枚`)
+  await mp.screenshot({ path: `${OUT}/F-六张两行.png` })
+
+  f = await setShots(9)
+  ck('F8 满 9 张：➕ 转灰（th-add-dis 挂上）',
+    f.shotsFull === true && /th-add-dis/.test(await clsOf('.th-add')), await clsOf('.th-add'))
+  const before9 = (await page.data()).previewImages.length
+  const calls9 = await mp.evaluate(() => wx.__chooseCalls)
+  await (await page.$('.th-add')).tap()
+  await sleep(1200)
+  const after9 = (await page.data()).previewImages.length
+  const calls9b = await mp.evaluate(() => wx.__chooseCalls)
+  const route9 = await mp.evaluate(() => getCurrentPages().slice(-1)[0].route)
+  ck('F9 满了还点 ➕：不开系统选择器、张数不变（挡在门口 + 一句吐司）',
+    after9 === before9 && calls9b === calls9 && route9 === 'pages/create/create',
+    `${before9} → ${after9} 张｜chooseMedia 被叫 ${calls9b - calls9} 次 @ ${route9}`)
+  await mp.screenshot({ path: `${OUT}/F-满9张点加号.png` })
+  await (await page.$('.th-x')).tap()
+  await sleep(900)
+  f = await page.data()
+  ck('F10 删掉一张就退回 8 张，➕ 不再灰',
+    f.previewImages.length === 8 && f.shotsFull === false && !/th-add-dis/.test(await clsOf('.th-add')),
+    `${f.previewImages.length} 张`)
+  ck('F11 序号跟着重排（第一枚还是 1）', (await txtOf('.th-no')) === '1', await txtOf('.th-no'))
+  await mp.evaluate(() => {
+    if (wx.__rawChoose) { wx.chooseMedia = wx.__rawChoose; delete wx.__rawChoose; delete wx.__shots }
+  })
+
+  // ---------- G 收起与忙态 ----------
+  await top()
+  await set({ previewImages: [], writeBody: '', urlInput: '' })
+  await call('_sync')
+  await sleep(700)
+  await (await page.$('.title-row')).tap()
+  await sleep(900)
+  d = await page.data()
+  ck('G1 点空白收回去：面板没了、条回来了',
+    d.active === '' && (await page.$$('.panel')).length === 0 && (await page.$$('.bar')).length === 1, d.active)
+  ck('G2 收起之后那三位都归位（不留在上一档的样子）',
+    d.panelOpen === false && d.knobRpx === 10 && d.fillPct === 0 && d.done === false,
+    `open=${d.panelOpen} knob=${d.knobRpx} fill=${d.fillPct}`)
+  await (await page.$('.bar')).tap()
+  await sleep(700)
+  await set({ busy: 'url' })
+  await (await page.$('.title-row')).tap()
+  await sleep(700)
+  d = await page.data()
+  ck('G3 忙的时候点空白不收（别把进度藏起来）', d.active !== '', d.active)
+  await set({ busy: '' })
+  await call('collapse')
+  await sleep(600)
+
+  // ---------- H 英文那一版 ----------
+  await top()
   await mp.evaluate(() => {
     const app = getApp()
     if (app.globalData.userInfo) app.globalData.userInfo.language = 'en'
@@ -390,15 +493,25 @@ const ck = (name, ok, got) => {
   page = await enter('/pages/create/create')
   await sleep(4000)
   d = await page.data()
-  // 钉字典不钉字面量：这句微文案这一版改过两轮（Tap and jot → Jot it down），
-  // 硬编码在这里就会变成"改文案必红一条"的假故障。
-  ck('英文条身吃的就是字典里那条', d.barTitle === require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js')).texts('en').barIdle, d.barTitle)
+  ck('H1 英文条身吃的就是字典里那条', d.t.barIdle === I18N.texts('en').barIdle, d.t.barIdle)
   await (await page.$('.bar')).tap()
-  await sleep(1000)
+  await sleep(900)
   const labels = []
-  for (const m of await page.$$('.mode')) { labels.push(((await m.text()) || '').trim()) }
-  ck('四个英文标签齐全', labels.join('|') === 'Write|Camera|Album|Link', labels.join('|'))
-  await mp.screenshot({ path: `${OUT}/实测-10-英文展开.png` })
+  for (const m of await page.$$('.md')) { labels.push(((await m.text()) || '').trim()) }
+  ck('H2 三个英文标签：Photo / Link / Text', labels.join('|') === 'Photo|Link|Text', labels.join('|'))
+  await (await page.$$('.md'))[1].tap()
+  await sleep(900)
+  ck('H3 英文那句"右滑开始提炼"在条上', ((await txtOf('.sld-txt')) || '').indexOf('Slide to extract') > -1,
+    await txtOf('.sld-txt'))
+  const [outL, outR] = await rects(['.out-l', '.out-r'])
+  ck('H4 框外那两枚英文不打架（左右之间还有缝）',
+    !!outL && !!outR && outR.left - outL.right >= 0, outL && outR && `缝 ${Math.round(outR.left - outL.right)}px`)
+  const sldTxt = (await rects(['.sld-txt']))[0]
+  const sldBox = (await rects(['.sld']))[0]
+  ck('H5 英文那句放得进条里（不溢出轨道）',
+    !!sldTxt && !!sldBox && sldTxt.left >= sldBox.left && sldTxt.right <= sldBox.right,
+    sldTxt && sldBox && `字 ${Math.round(sldTxt.w)}px／轨道 ${Math.round(sldBox.w)}px`)
+  await mp.screenshot({ path: `${OUT}/H-英文链接档.png` })
   await mp.evaluate(() => {
     const app = getApp()
     if (app.globalData.userInfo) app.globalData.userInfo.language = 'zh'

@@ -121,11 +121,13 @@ const txt = async (els) => {
     ck('旧的三张入口卡没有复活', (await page.$$('.entry-label')).length === 0)
     await (await page.$('.bar')).tap()
     await sleep(1200)
-    const labels = await txt(await page.$$('.mode'))
-    // 站长 09-25 定过「就叫这三个、就按这个次序」，合并成一条之后语义变成四个模式标签；
-    // 写死成整串对比，换名字或换次序都会红（原来这条还写着"手写"，是 ce559fd 改名后一直没跟）。
-    ck('展开后四个模式＝直接写 / 拍照 / 相册 / 链接（次序也要对）',
-      labels.join(' / ') === '直接写 / 拍照 / 相册 / 链接', labels.join(' / '))
+    const labels = await txt(await page.$$('.md'))
+    // 10-08 创建入口改版：面板里那四个标签（直接写 / 拍照 / 相册 / 链接）并成三个（照片 / 链接 / 文字），
+    // 类名从 .mode 换成 .md。相册不再是一档，它是「照片」那一态左边那枚小圆。
+    // 仍写死成整串对比：换名字或换次序都会红（09-25 那条口径不变，只是个数从四变三）。
+    ck('展开后三个模式＝照片 / 链接 / 文字（次序也要对）',
+      labels.join(' / ') === '照片 / 链接 / 文字', labels.join(' / '))
+    ck('旧的四个标签与那排按钮不许复活', (await page.$$('.mode')).length === 0 && (await page.$$('.acts')).length === 0)
     // 1.9.7 站长把三个 tab 的导航条标题统一成应用名（哪一页由页面左上角那行大字说，
     // 见 create.js:146 / index.js:90 / me.js:94 三处都调 setNavTitle('appName')）。
     // 旧判据"＝新建笔记"是 ce559fd 之前的口径，作废；值现读 i18n，不抄第二份。

@@ -540,6 +540,48 @@ function lightFaceOnPaper(h, s, want) {
 }
 
 /**
+ * 创建入口那张**暗面板**的一套面（10-08 改版，效果图「创建入口-v7-B为基」落码）。
+ *
+ * 为什么这页要自带一套面、不吃壁纸那四枚的亮纸：面板整块压在形象图上，而站长这一轮
+ * 逐条拍过的是"暗面板 + 纸白字"那张图（面板里的输入框、缩略图、滑动条都在同一块暗面上）。
+ * 三档暗面（面板 #23252C / 卡 #2B2D35 / 框 #1A1C21）是这一页的纸，不随壁纸换，
+ * 与原来那张白纸面板一样属于"面必须稳定"那一类（见 create.wxss 里录入条那段注释）。
+ *
+ * 只有两档**跟着壁纸色阶走**：快门那枚圆（色阶第 3 档，配深字）与"右滑提炼"的圆和进度
+ * （第 4 档，配纸白字）。跟着色阶而不是写死一支橙，是因为 10-04 定过"四枚壁纸各吃自己
+ * 那一支色相的五档"，而同一轮的风格审计把"一支不属于色阶的饱和色"列成了缺陷（那枚孤蓝）。
+ * 两支的分工照他这一轮的原话：「开始提炼用其他颜色，不要与拍照混用」＋「与前面呼应」——
+ * 同一支色相里深浅相邻的两档，正是"呼应但不撞色"。象牙下实测 #AFA488 / #766B50。
+ *
+ * 规矩与 TIP_DOT、toneStyle 一模一样：这些色值只在这里出现，create.wxss 只写 var(--cp-*)。
+ */
+const CREATE_SURFACE = { panel: '#23252C', card: '#2B2D35', field: '#1A1C21' }
+const CREATE_X = (a) => withAlpha(PAPER, a)
+function createSkin() {
+  const cam = rampFor(2) || TONES[2]
+  const extract = rampFor(3) || TONES[3]
+  const vars = {
+    'cp-panel': CREATE_SURFACE.panel,
+    'cp-card': CREATE_SURFACE.card,
+    'cp-field': CREATE_SURFACE.field,
+    'cp-ink': PAPER,
+    'cp-ink-78': CREATE_X(0.78),
+    'cp-ink-62': CREATE_X(0.62),
+    'cp-ink-50': CREATE_X(0.5),
+    'cp-ink-42': CREATE_X(0.42),
+    'cp-ink-38': CREATE_X(0.38),
+    'cp-edge-14': CREATE_X(0.14),
+    'cp-edge-10': CREATE_X(0.1),
+    'cp-edge-07': CREATE_X(0.07),
+    'cp-cam': cam.bg,
+    'cp-cam-ink': cam.ink,
+    'cp-extract': extract.bg,
+    'cp-extract-ink': extract.ink,
+  }
+  return Object.keys(vars).map((k) => `--${k}:${vars[k]}`).join(';')
+}
+
+/**
  * 底栏和搜索条那一块面：由壁纸的页面底派生。
  * bg（那一条底）一个字没动：H 原样、S 夹进 [30,45]（低于 30 灰成一块脏、高于 45 抢内容）、
  * 浅壁纸 L 20.5。字一律纸白，未选中那一档靠 alpha 分深浅（浅 .62 / 深 .68）。
@@ -623,6 +665,7 @@ module.exports = {
   setActiveTheme,
   rampFor,
   chromeOf,
+  createSkin,
   catSkinFor,
   crOf,
   inkIsLighter,

@@ -38,8 +38,15 @@ ck('前端选图上限是一个具名常量（不再是散在各处的字面量�
 const SHOT_LITERAL = CREATE.match(/count:\s*9\b|slice\(\s*0\s*,\s*9\s*\)|previewImages[\s\S]{0,30}\b9\b|length\s*[><=]+\s*9\b/g) || []
 ck('这一侧只写一次（选图 count / 合并 slice / 张数比较里都不许再有裸 9）',
   feConst && SHOT_LITERAL.length === 0, SHOT_LITERAL.join(' | '))
-ck('选图 count 与合并后 slice 都用这个常量',
-  /count: MAX_SHOTS/.test(CREATE) && /\.slice\(0, MAX_SHOTS\)/.test(CREATE))
+// 10-08 起这一侧的写法换了：满了先挡在门口（不开选择器 + 一句吐司），
+// 没满时把"还能选几张"交给系统（count = 剩余位），合并那一处不再自己截一刀。
+// 原来那把尺子钉的是 `count: MAX_SHOTS` + `.slice(0, MAX_SHOTS)` 两处都用常量；
+// 现在钉的是"count 从常量推出来"且"截那一刀整个没了"——静默截断就是这一轮要修的病症。
+ck('满了挡在门口：不开选择器，先给一句吐司',
+  /const left = MAX_SHOTS - this\.data\.previewImages\.length/.test(CREATE)
+  && /if \(left <= 0\)/.test(CREATE) && /t\('maxShots', lang\)/.test(CREATE))
+ck('选图 count 给的是剩余位（不再是整个上限），且合并处不再截一刀',
+  /count: left,/.test(CREATE) && !/\.slice\(0, MAX_SHOTS\)/.test(CREATE))
 
 // ② 跨端同值
 const beConst = /MAX_ASSETS_PER_NOTE = (\d+)/.exec(MODEL)
@@ -72,7 +79,8 @@ ck('一批的上限只写一次，且不小于一篇张数（否则最后几张�
   batch ? `一批 ${batch[1]} / 一篇 ${beConst && beConst[1]}` : '没找到 MAX_IMAGES_PER_BATCH')
 
 // ⑤ 文案里不许出现第二个"9 张"（数字改了而话没改，是最容易漏的那一处）
-const I18N = read('miniprogram/utils/i18n.js')
+// 只看会上屏的那一串：注释里写"满 9 张还点➕"是给人读的说明，不是第二份数字。
+const I18N = strip(read('miniprogram/utils/i18n.js'))
 const said = (I18N.match(/\d+\s*张/g) || []).join('、')
 ck('字典里没有写死的"N 张"文案（要提数量就从常量拼）', said === '', said)
 

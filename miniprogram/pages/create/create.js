@@ -1,8 +1,7 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { toneStyle, TIP_DOT } = require('../../utils/palette.js')
+const { toneStyle, TIP_DOT, createSkin } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
-const { allowPrivate } = require('../../utils/privateGate.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const assetQueue = require('../../utils/assetQueue.js')
 const { compressForBackup } = require('../../utils/imageCompress.js')
@@ -18,46 +17,87 @@ function isLink(value) {
   return LINK_RE.test(s)
 }
 
+/**
+ * 「文字」那一档的标题：10-08 从面板上撤了（站长原话「标题和分类在详情页再修改」），
+ * 但服务端那道 schema 要一个非空标题（IngestTextIn.title 是 min_length=1），
+ * 所以这里从贴进来的原文里取第一行当标题——和 Bear / Notion 那个"首行即标题"的约定一致，
+ * 落库之后在详情页「编辑」那一格随时改。取完剥掉头部的 # > * - 这类记号，截到 50 字
+ * （列表那一行也放不下更长，而服务端 MAX_TITLE 是 500，不会顶）。
+ *
+ * ⚠️ 另一条路是"让模型起标题"（提炼那条链本来就出了一份 title，手打这一档现在不用它）。
+ * 那条更准，但要动后端两处 + 部署，本轮没做，记在产品需求里待拍。
+ */
+function titleFromText(content) {
+  const line = (content || '').split('\n').map((s) => s.trim()).find(Boolean) || ''
+  const cleaned = line.replace(/^[#>*\-\s]+/, '').trim()
+  const title = cleaned || line
+  return title.length > 50 ? title.slice(0, 50) : title
+}
+
 /* 一篇笔记选几张图。这个数**跨语言有两份**（这里一份、服务端 `models/asset.py`
    的 MAX_ASSETS_PER_NOTE 一份），合成不了，所以规矩是"每一侧只写一次 + 两边同值"，
-   由 docs/工具/验-张数只有一个出处.js 守着：原来这里是两个各自硬写的 9（选图 count 与
-   合并后 slice），把 9 改成 3 会只改到一处，症状是"能选 9 张、只留 3 张"。 */
+   由 docs/工具/验-张数只有一个出处.js 守着。
+   10-08 起这里**不再自己截一刀**：满了就不让再开选择器（给一句吐司），没满时把"还能选几张"
+   交给系统选择器（count = 剩余位），所以选得上来的必然装得下，slice 那一刀没有存在必要了。
+   原来那刀是静默的：选了 12 张只留 9 张，界面上一句都不说。 */
 const MAX_SHOTS = 9
+
+/* 一行放五格（小图 100 + 间距 16，五格 = 564 ≤ 卡内宽 566）。
+   这个数是 WXSS 的几何事实，不是拍的：上限 9 张 + ➕ 那一格 = 10 格，
+   五列是"展开只多一行"（两行放得下）的最小列数。改 .strip 的列数要连着改这里。 */
+const ROW_CELLS = 5
+
+/* 右滑那一枚的行程（rpx，与 create.wxss 里那三个数一一对上，改样式要连着改）：
+   轨道内宽 = 卡内宽 566 − 自己那圈白边 5×2 = 556；圆 90；左边内缩 10。
+   停在最右那一格 left = 556 − 90 − 10 = 456，所以行程 446。
+   这里按 rpx 走而不查节点：手指位移换算成 rpx 只需要 windowWidth（微信 rpx = 屏宽/750），
+   一次同步读取就够了，省下 touchstart 那一趟异步查询——快速一划就会掉在查询回来之前。 */
+const SLD_REST_RPX = 10
+const SLD_MAX_RPX = 456
+// 差 12rpx 就算到位（手指按在圆右缘上再往外划不出这 12，宁可让人划到底也不要"差一点没反应"）
+const SLD_SLOP_RPX = 12
 
 Page({
   data: {
     lang: 'zh',
     t: texts('zh'),
     themeClass: 'theme-tint-paper',  // 未登录/首帧的占位：类名必须真的存在，四枚里象牙是 THEMES[0]
-    // 展开的是哪一段：'' | 'url' | 'shot' | 'write'，同一时刻最多一个。
-    // mode 是条身上那四个标签里当前哪一个（write | camera | album | url）：
-    // camera 和 album 共用 shot 那一段表单，分开记只为了高亮和条身前面那枚图形。
+    // 展开的是哪一档：'' | 'photo' | 'url' | 'write'，同一时刻最多一个。
+    // 10-08 起相册不再是独立的一档（它是「照片」那一态左边那枚小圆），所以 mode 那一位也撤了：
+    // 面板上只有三个标签，一个真相。
     active: '',
-    mode: 'write',
-    lead: 'pen',
-    barTitle: '',
+    // 面板的两档高度：收起 500、展开 580（只多一行）。由 _syncPanelOpen 现算，
+    // 别在调用点手写 true/false——两个入口（原文框聚焦 / 图多了排不下）会各说一套。
+    panelOpen: false,
     busy: '',
     errLine: '',
+    // 框外那一行实际说的话：报错优先，其次"链接那一格正在输、但还不像链接"那句规则。
+    // 现网原来是用 urlHint==='bad' 单独驱动一行的，改成一位驱动就不是两份真相（见 _sync）。
+    hintLine: '',
     errPerm: false,
     urlInput: '',
     urlHint: 'idle',
     previewImages: [],
-    shotDesc: '',
-    writeTitle: '',
+    shotsFull: false,
     writeBody: '',
+    // 原文框有没有焦点：它是「文字」那一档展开/收起的唯一开关。
+    bodyFocus: false,
     // 「原文翻译」那枚小开关（站长 10-04）：默认关＝摘要跟随原文的语言，打开才整理成中文。
-    // 只活在这一次提交里：落库成功后跟着标题／原文一起归零，不留到下一篇。
+    // 只活在这一次提交里：落库成功后跟着原文一起归零，不留到下一篇。
     writeTranslate: false,
-    // 「亲自撰写」的分类：0 是「未分类」，往后依次是用户自己的分类。
-    // 只在第一次展开这张卡时取一次，这一页是启动页，冷启动就去拉没意义。
-    categories: [],
-    categoryNames: [],
-    catIndex: 0,
-    // 四个入口各自的饱和色，色值和字色配对仍归 palette 管
+    // 右滑那一枚的四个态（待滑 / 拖动中 / 就位 / 完成）都靠这几位说话。
+    ready: false,   // 这一格有没有东西可提交（决定圆是实心还是灰、滑到底触不触发）
+    dragging: false,
+    done: false,    // 完成那一帧：整条转实心 + 白环仍在，紧接着吐司再跳详情页
+    knobRpx: SLD_REST_RPX,
+    fillPct: 0,
+    sldIcon: 'pen',
+    // 四个入口各自的饱和色，色值和字色配对仍归 palette 管。
+    // 三枚小圆仍是 toneStyle 那三档（条身上），面板那一整套暗面改由 createSkin() 一次发下来。
     skinUrl: toneStyle(1),
     skinShot: toneStyle(2),
     skinAlbum: toneStyle(3),
-    skinWrite: toneStyle(0),
+    skinPanel: createSkin(),
     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
     bgSrc: '',
     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
@@ -100,7 +140,6 @@ Page({
   },
 
   // 一句停 8 秒（站长 10-01 晚：4 秒"还没看完就跳下一条了"，慢一倍）。
-  // 24rpx 一行最长 20 个汉字，8 秒够读完一遍还有余量；再长就成"卡住了"。
   // 小于两句就不起表（只有一句时它不该自己跳，也没有可跳的）。
   // 定时器挂在实例上、不进 data：它是节奏不是状态，进 data 只会多一堆无意义的 setData。
   startTips() {
@@ -123,15 +162,19 @@ Page({
 
   onHide() {
     this.stopTips()
+    // 那一格进度表也是同一个道理：这一屏不在前面了，别再空转 setData。
+    // ⚠️ 只停表不清 busy——提炼那条请求还在飞，回来还要接着说话（见下面 _extractDone 的注释）。
+    this.stopProgress()
   },
 
   onUnload() {
     this.stopTips()
+    this.stopProgress()
   },
 
   // onShow 只同步主题/语言/tab，**绝不重置草稿**。
   // 真机实测：从相机或相册返回时小程序会补发一次 onShow，一旦在这里清 previewImages
-  // 和 active，刚选好的图就凭空消失、卡片自己收起，界面上不留任何痕迹——
+  // 和 active，刚选好的图就凭空消失、面板自己收起，界面上不留任何痕迹——
   // 这就是"选完照片没反应、也没提示"的成因。草稿改在保存成功后各自清。
   async onShow() {
     const app = getApp()
@@ -143,13 +186,13 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
-      // 四个入口的颜色同样是在 data 字面量里定的（模块加载时主题还没落地），
+      // 三个入口的颜色同样是在 data 字面量里定的（模块加载时主题还没落地），
       // 每次进页按当前主题重算，淡雅那两枚才会真的把蓝/橙/绿/黄换成同色阶的四档。
       skinUrl: toneStyle(1),
       skinShot: toneStyle(2),
       skinAlbum: toneStyle(3),
-      skinWrite: toneStyle(0),
-      shotDesc: this.shotDescFor(this.data.previewImages.length),
+      // 面板那套暗面里的快门与滑动条吃当前壁纸的色阶，跟着上面三枚一起重算。
+      skinPanel: createSkin(),
       // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
       bgSrc: poster.homeBg(),
       // 背景深浅那一档也是每次进页重读：在「我的」页里改过、或别的 tab 点过那枚点，回到这一屏就该跟上。
@@ -161,7 +204,12 @@ Page({
       tipIdx: 0,
       tipsPrefix: t('tipsPrefix', lang),
     })
-    this.setData({ barTitle: this.barTitleFor(this.data.active, this.data.previewImages.length) })
+    // 从详情页返回、或从相机/相册回来：这一枚要退回"待滑"那一帧，再把那三位重算一遍。
+    // 忙态进行中什么都不动（提炼那条请求还在飞，那一帧正该停在原位）。
+    if (!this.data.busy) {
+      this.setData({ done: false, fillPct: 0, dragging: false, knobRpx: SLD_REST_RPX })
+    }
+    this._sync()
     app.setNavTitle('appName', lang)
     app.applyNavForBand(this.data.bgSrc)
     this.startTips()
@@ -178,58 +226,75 @@ Page({
     return isLink(s) ? 'ok' : 'bad'
   },
 
-  // 选图说明跟着语言重算：onLoad 时登录还没回来，写进去的是默认中文，
-  // 英文账号切回来会看到"卡里一行中文一行英文"。
-  shotDescFor(count) {
-    const { lang } = this.data
-    return count ? t('pickedCount', lang).replace('{n}', count) : t('albumDesc', lang)
+  // 面板上"这一格能不能提交"由三档各自的条件拼出来，而这一位同时决定
+  // 圆的颜色（实心/灰）与滑到底触不触发。判据与三个 submit 里的校验逐字一致，
+  // 所以不会出现"看着能滑、滑到底报一句不能提交"。
+  readyFor() {
+    const { active, urlHint, writeBody, previewImages } = this.data
+    if (active === 'url') return urlHint === 'ok'
+    if (active === 'write') return !!writeBody.trim()
+    return previewImages.length > 0
   },
 
-  // 条身前面那枚图形跟着模式走：写=钢笔、拍照=相机、相册=两张叠图、链接=链环。
-  // 图形只说明"现在这一条是干什么的"，不承担颜色识别——颜色在三枚小圆上。
-  // 这四支和底栏那三支是同一套 Lucide 几何（见 create.wxss 那一段注释）；
-  // 原来相册那枚是"四格"，那是"网格"的意思不是"照片"的意思，换成叠图才读得出"从相册里挑"。
-  leadFor(mode) {
-    return { write: 'pen', camera: 'camera', album: 'images', url: 'link' }[mode] || 'pen'
+  // 一处算、三处用（ready / shotsFull / panelOpen 都从当前状态推出来）。
+  // 每次动到 urlInput、writeBody、previewImages、active 都要过一遍，
+  // 漏一处就是"界面停在上一档的样子"。
+  _sync() {
+    const { active, previewImages, errLine, urlHint, lang } = this.data
+    const patch = {
+      ready: this.readyFor(),
+      // 报错优先；没有报错时，链接那一档"正在输但不像链接"仍然要说一句（现网就是这么演的：
+      // 那行规则字跟着 urlHint 走，不是等点下去才说）。
+      hintLine: errLine || (active === 'url' && urlHint === 'bad' ? t('linkRule', lang) : ''),
+      shotsFull: previewImages.length >= MAX_SHOTS,
+      // 「文字」那一档的展开由原文框的焦点说话；「照片」那一档由"这一行放不下了"说话
+      // （5 格是行宽，第 6 格起要第二排）。链接只有单行输入，永远不展开。
+      panelOpen: active === 'write' ? this.data.bodyFocus
+        : active === 'photo' && previewImages.length + 1 > ROW_CELLS,
+    }
+    this.setData(patch)
   },
 
-  // 条身那句话就是这一屏唯一的动词：收起态一律「动动手指」，
-  // 展开后按模式换成「贴个链接」「选了 2 张」，让收起之前也能从条身读出当前进度。
-  // 传参而不是读 this.data：setData 之前这一份还是旧值，切换那一瞬间条身会慢一拍。
-  barTitleFor(active, count) {
-    const { t } = this.data
-    if (active === 'url') return t.barUrl
-    if (active === 'shot') return count ? t.barShot.replace('{n}', count) : t.importScreenshot
-    return t.barIdle
+  // 条身前面那枚图形与滑动条圆里那枚图形，都是"现在这一档是干什么的"。
+  // 收起态那条固定用钢笔（它现在永远只说「动动手指」，不再跟着模式换字），
+  // 展开态那一枚跟着三档走：照片=叠图、链接=链环、文字=钢笔。
+  // 这三支和底栏那三支是同一套 Lucide 几何（见 create.wxss 那一段注释）。
+  sldIconFor(active) {
+    return { photo: 'images', url: 'link', write: 'pen' }[active] || 'pen'
   },
 
-  open(mode) {
-    const active = mode === 'camera' || mode === 'album' ? 'shot' : mode
+  open(active) {
     this.setData({
-      mode,
       active,
-      lead: this.leadFor(mode),
-      barTitle: this.barTitleFor(active, this.data.previewImages.length),
+      sldIcon: this.sldIconFor(active),
       errLine: '',
+      hintLine: '',
       errPerm: false,
       urlHint: this.hintFor(this.data.urlInput),
+      // 每一档进来都从"待滑"那一帧起：圆停在最左、轨道全白。
+      knobRpx: SLD_REST_RPX,
+      fillPct: 0,
+      done: false,
+      dragging: false,
     })
-    if (active === 'write') this.loadCategories()
+    this._sync()
   },
 
-  // 点条身 = 直接写（默认那一段）。已经展开时再点条身等于点空白，收回去。
+  // 点条身 = 「照片」那一档（这一屏第一眼就该是那枚快门）。
+  // 原来点条身进的是「直接写」，10-08 那轮把默认档换成照片：
+  // 站长的原话是"拍照是大按钮、其他的用小按钮"，那一大钮就是这一屏的门面。
   openBar() {
     if (this.data.busy) return
     if (this.data.active) { this.collapse(); return }
-    this.open('write')
+    this.open('photo')
   },
 
   // 三枚小圆是三个入口本身，不只是"展开到那一态"：橙=开相机、绿=开相册、蓝=进链接那一态。
-  // 选完图返回时面板已经停在对应那一态，刚选的图就在眼前。
+  // 选完图返回时面板已经停在对应那一档，刚选的图就在眼前。
   onDotShot(e) {
     if (this.data.busy) return
     const source = e.currentTarget.dataset.source
-    this.open(source)
+    this.open('photo')
     this.pickImage({ currentTarget: { dataset: { source } } })
   },
 
@@ -238,11 +303,11 @@ Page({
     this.open('url')
   },
 
-  // 面板里的四个标签只切视图，不顺手开相机：进来挑模式的人不该被系统选择器打断，
-  // 真要开相机有点按钮、也有条身那枚小圆。
-  onMode(e) {
+  // 面板里那三个标签只切视图，不顺手开相机：进来挑模式的人不该被系统选择器打断，
+  // 真要开相机有点那枚快门、也有条身那枚小圆。
+  onTab(e) {
     if (this.data.busy) return
-    this.open(e.currentTarget.dataset.mode)
+    this.open(e.currentTarget.dataset.tab)
   },
 
   // 点一下换一档深浅：纯白 → 25% → 50% → 回纯白。不给吐司也不给弹层——
@@ -259,34 +324,21 @@ Page({
   // 条外任意空白都收回到默认那条；忙的时候不收，别把进度藏起来
   collapse() {
     if (this.data.busy || !this.data.active) return
-    this.setData({ active: '', mode: 'write', lead: 'pen', barTitle: this.barTitleFor('', 0), errLine: '', errPerm: false })
+    this.setData({
+      active: '',
+      panelOpen: false,
+      bodyFocus: false,
+      errLine: '',
+      hintLine: '',
+      errPerm: false,
+      knobRpx: SLD_REST_RPX,
+      fillPct: 0,
+      done: false,
+      dragging: false,
+    })
   },
 
-  // 手写这条路上原本只有标题和正文，分类要等保存完再进「编辑」才挑得到；
-  // 所以在卡片里给一个选择器，当场归类。取失败不拦人——大不了回头在编辑里补。
-  async loadCategories() {
-    if (this.data.categories.length) return
-    const { lang } = this.data
-    try {
-      const categories = await api.getCategories()
-      this.setData({
-        categories,
-        categoryNames: [t('noCategory', lang)].concat(categories.map((c) => c.name)),
-      })
-    } catch (err) {
-      console.error('加载分类失败', err)
-    }
-  },
-
-  async onPickCategory(e) {
-    const i = Number(e.detail.value)
-    if (!(i >= 0)) return
-    // 私密分类要先设密码才让选；挡下时不改 catIndex，那一行显示的还是原来那格
-    if (!(await allowPrivate(this.data.categoryNames[i], this.data.lang))) return
-    this.setData({ catIndex: Math.min(i, Math.max(this.data.categoryNames.length - 1, 0)) })
-  },
-
-  // 整页是"收起"点击区，这颗开关自己吃掉点击，切语言不该顺手把展开的卡收掉。
+  // 整页是"收起"点击区，这几处自己吃掉点击，不该顺手把面板收掉。
   noop() {},
 
   // 语言只切界面：不动账号、不重新登录，服务端那一栏由 PUT /api/user/language 记着。
@@ -304,100 +356,185 @@ Page({
     }
     const app = getApp()
     if (app.globalData.userInfo) app.globalData.userInfo.language = key
-    this.setData({ lang: key, t: texts(key), categoryNames: this.categoryNamesFor(key) })
+    this.setData({ lang: key, t: texts(key) })
     this.onShow()
   },
 
-  // 分类那一列的首项是"未分类"这个概念，跟着语言走；后面是用户自己起的名字，不翻。
-  categoryNamesFor(lang) {
-    return [t('noCategory', lang)].concat(this.data.categories.map((c) => c.name))
+  // ---------- 右滑才开始提炼 ----------
+  // 圆跟着手指走、停在最右、颜色全程不变；轨道随进度由纸白吃成实心，那一圈白环一直在。
+  // 位移换算是同步的（windowWidth 一次读取用到底），所以快速一划也不会掉在异步查询前面。
+  rpxFactor() {
+    if (!this._rpx) this._rpx = 750 / (wx.getSystemInfoSync().windowWidth || 375)
+    return this._rpx
+  },
+
+  onSlideStart(e) {
+    if (this.data.busy || this.data.done || !e.touches || !e.touches.length) return
+    this._drag = { x0: e.touches[0].clientX, base: this.data.knobRpx }
+    this.setData({ dragging: true })
+  },
+
+  onSlideMove(e) {
+    const d = this._drag
+    if (!d || this.data.busy) return
+    const dx = ((e.touches[0] || e.changedTouches[0] || {}).clientX || d.x0) - d.x0
+    const next = Math.max(SLD_REST_RPX, Math.min(SLD_MAX_RPX, d.base + dx * this.rpxFactor()))
+    // 小于 3rpx 不写：一屏手指抖一下就是十几拍 setData，圆不会更跟手，只会更卡
+    if (Math.abs(next - this.data.knobRpx) < 3) return
+    this.setData({ knobRpx: next })
+  },
+
+  onSlideEnd() {
+    const d = this._drag
+    this._drag = null
+    if (!d || this.data.busy) return
+    const reached = this.data.knobRpx >= SLD_MAX_RPX - SLD_SLOP_RPX
+    // 只有"到位 + 这一格真有东西"才把圆钉在最右那一格进忙态；
+    // 空着滑到底要说一句、但圆必须回弹（效果图那枚 off 态写的就是这个：滑到最右也回弹）。
+    const go = reached && this.data.ready
+    this.setData({ dragging: false, knobRpx: go ? SLD_MAX_RPX : SLD_REST_RPX })
+    if (reached) this.runSubmit()
+  },
+
+  // 轨道点一下（不滑）：还没东西可提交时把那句校验说出来，别让人对着一枚按不动的条猜。
+  // 已经填好了什么也不做——那才是这枚条的意义：必须滑过去，等于让他先看一眼这一屏。
+  onSldTap() {
+    if (this.data.busy || this.data.done || this.data.ready) return
+    this.runSubmit()
+  },
+
+  runSubmit() {
+    const { active } = this.data
+    if (active === 'url') return this.submitUrl()
+    if (active === 'write') return this.submitManual()
+    return this.submitScreenshots()
+  },
+
+  // 三档共用的那一趟忙态。原来三处各写一遍"置忙 → 提交 → 轮询 → 清草稿 → 吐司 → 跳详情"，
+  // 改成滑动确认之后这六步的时序必须完全一致，所以收在一起。
+  _extractBegin(kind) {
+    this.setData({ busy: kind, errLine: '', hintLine: '', errPerm: false, done: false, fillPct: 0 })
+    this.startProgress()
+  },
+
+  _extractDone(noteId, patch) {
+    const { lang } = this.data
+    this.stopProgress()
+    // 满格 + 完成那一帧（整条转实心、白环仍在），紧接着吐司一句「已存入笔记」，800ms 后跳详情页。
+    // 草稿按 patch 清，面板这一趟先不收起：跳走之前那一帧要看得见"成了"。
+    this.setData({ busy: '', fillPct: 100, done: true, knobRpx: SLD_MAX_RPX, ...patch })
+    // 草稿清完跟着把"能不能提交"重算一遍——不然从详情页返回时那一枚还停在已完成的样子。
+    this._sync()
+    wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
+    setTimeout(() => {
+      wx.navigateTo({ url: `/pages/detail/detail?id=${noteId}` })
+    }, 800)
+  },
+
+  _extractFail(err) {
+    this.stopProgress()
+    const { lang } = this.data
+    // 没成就把这一枚退回待滑那一帧：圆回最左、轨道全白，留着那句错在框外说
+    this.setData({
+      busy: '',
+      fillPct: 0,
+      knobRpx: SLD_REST_RPX,
+      errLine: err.timeout
+        ? t('taskTimeout', lang)
+        : ((err.data && err.data.detail) || err.error || t('taskFailed', lang)),
+    })
+    this._sync()
+  },
+
+  /**
+   * 进度那一格是**按时间推的假进度**，不是真进度。
+   * 服务端那一趟任务在 redis 里只有 status/result/user_id（app/services/queue.py 的 set_task_status），
+   * 压根没有百分比；客户端两秒轮一次、最长 300 秒（utils/api.js 的 pollTask）。
+   * 站长 10-08 拍的是「进度条不需要太精准」，所以这里不动后端：一条 30 秒过半、封顶 90% 的曲线
+   * 慢慢走，接口回来的那一刻才钉到满。真要把第 k 张／共 n 张报出来，就得给任务加 done/total 两个字段。
+   */
+  startProgress() {
+    this.stopProgress()
+    this._t0 = Date.now()
+    this._progress = setInterval(() => {
+      const sec = (Date.now() - this._t0) / 1000
+      const pct = Math.min(90, Math.round(90 * (1 - Math.exp(-sec / 30))))
+      if (pct !== this.data.fillPct) this.setData({ fillPct: pct })
+    }, 600)
+  },
+
+  stopProgress() {
+    if (this._progress) {
+      clearInterval(this._progress)
+      this._progress = null
+    }
   },
 
   // ---------- URL 导入 ----------
   onUrlInput(e) {
-    const value = e.detail.value
-    this.setData({ urlInput: value, urlHint: this.hintFor(value), errLine: '' })
+    this.setData({ urlInput: e.detail.value, urlHint: this.hintFor(e.detail.value), errLine: '' })
+    this._sync()
   },
 
   clearUrl() {
     if (this.data.busy) return
     this.setData({ urlInput: '', urlHint: 'idle' })
-  },
-
-  pasteUrl() {
-    // 忙态下这两条不改 urlInput：清空会让"这一档还没东西"重新成立，
-    // 三步指引在提炼进行中冒出来，而下面那颗按钮已经是灰的。
-    if (this.data.busy) return
-    const { lang } = this.data
-    wx.getClipboardData({
-      success: (res) => {
-        const value = (res.data || '').trim()
-        if (!value) {
-          this.setData({ errLine: t('pasteEmpty', lang) })
-          return
-        }
-        this.setData({ urlInput: value, urlHint: this.hintFor(value), errLine: '' })
-      },
-      fail: () => this.setData({ errLine: t('pasteEmpty', lang) }),
-    })
+    this._sync()
   },
 
   async submitUrl() {
     const url = this.data.urlInput.trim()
-    const { lang } = this.data
-    // 按钮变灰只是视觉，点还是会进来：不挡第二下就会提两个任务、落两条重复笔记
     if (this.data.busy) return
     if (!isLink(url)) {
-      this.setData({ urlHint: 'bad' })
+      // 轨道被点到但这一格还空着/不像链接：把那句话说出来，不能静默
+      this.setData({ urlHint: 'bad', errLine: t('linkRule', this.data.lang) })
+      this._sync()
       return
     }
-    this.setData({ busy: 'url', errLine: '' })
+    this._extractBegin('url')
     try {
       const { task_id } = await api.ingestUrl(url)
       const result = await api.pollTask(task_id)
-      this.setData({ busy: '', urlInput: '', urlHint: 'idle' })
-      wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
-      setTimeout(() => {
-        wx.navigateTo({ url: `/pages/detail/detail?id=${result.note_id}` })
-      }, 800)
+      this._extractDone(result.note_id, { urlInput: '', urlHint: 'idle' })
     } catch (err) {
       console.error('URL 导入失败', err)
-      this.setData({
-        busy: '',
-        errLine: err.timeout
-          ? t('taskTimeout', lang)
-          : ((err.data && err.data.detail) || err.error || t('taskFailed', lang)),
-      })
+      this._extractFail(err)
     }
   },
 
-  // ---------- 截图导入 ----------
+  // ---------- 拍照 / 相册 ----------
+  // source 三种：camera 直接开快门、album 开相册、any 开系统那个"拍照或截图"两用的选择器
+  // （➕ 那一枚走 any：它只说"再加一张"，不再替用户分今天是拍还是选）。
   pickImage(e) {
     const source = e.currentTarget.dataset.source
     const { lang } = this.data
     // 提炼进行中不能再改图：新加的图不在这次提交数组里，成功后却一起被清空
     if (this.data.busy) return
+    const left = MAX_SHOTS - this.data.previewImages.length
+    if (left <= 0) {
+      // 满了。原来这里是静默的（选得上来、合并时 slice 掉、界面什么都不说），
+      // 现在➕转灰 + 一句吐司，告诉他是"满了"不是"没反应"。
+      wx.showToast({ title: t('maxShots', lang).replace('{n}', MAX_SHOTS), icon: 'none' })
+      return
+    }
+    const sourceType = source === 'any' ? ['album', 'camera'] : [source]
     wx.chooseMedia({
-      count: MAX_SHOTS,
+      // 只给"还能选几张"：系统选择器自己就把上限卡住了，这里不需要再截一刀
+      count: left,
       mediaType: ['image'],
-      sourceType: [source],
+      sourceType,
       success: (res) => {
         const files = (res && res.tempFiles) || []
         if (files.length === 0) {
           // 微信偶尔会回一个空列表（比如格式不被接受），不给提示就等于"点了没反应"
           this.setData({ errLine: t('noImagePicked', lang), errPerm: false })
+          this._sync()
           return
         }
-        const merged = this.data.previewImages
-          .concat(files.map(f => f.tempFilePath))
-          .slice(0, MAX_SHOTS)
-        this.setData({
-          previewImages: merged,
-          shotDesc: this.shotDescFor(merged.length),
-          barTitle: this.barTitleFor(this.data.active, merged.length),
-          errLine: '',
-          errPerm: false,
-        })
+        // 这里**不再截一刀**：还能选几张已经交给系统选择器（count = 剩余位），满了根本不开选择器。
+        // 原来那一刀是静默的（slice(0, MAX_SHOTS)），症状是"能选 9 张、只留 9 张里被砍掉的那几张"。
+        this.setData({ previewImages: this.data.previewImages.concat(files.map((f) => f.tempFilePath)) })
+        this._sync()
       },
       // 原来这里只有 success：权限被拒或系统选择器起不来时界面静默无反应，
       // 用户只能对着屏幕再点一次。fail 补上。
@@ -413,8 +550,18 @@ Page({
             : t('pickFailed', lang),
           errPerm: denied,
         })
+        this._sync()
       },
     })
+  },
+
+  // ➕ 那一枚：满了不走选择器，直接给话。
+  onAddShot(e) {
+    if (this.data.shotsFull) {
+      wx.showToast({ title: t('maxShots', this.data.lang).replace('{n}', MAX_SHOTS), icon: 'none' })
+      return
+    }
+    this.pickImage(e)
   },
 
   openPermSetting() {
@@ -427,27 +574,19 @@ Page({
     const index = e.currentTarget.dataset.index
     const left = this.data.previewImages.slice()
     left.splice(index, 1)
-    this.setData({
-      previewImages: left,
-      shotDesc: this.shotDescFor(left.length),
-      barTitle: this.barTitleFor(this.data.active, left.length),
-    })
-  },
-
-  clearShots() {
-    if (this.data.busy) return
-    this.setData({ previewImages: [], shotDesc: this.shotDescFor(0), barTitle: this.barTitleFor(this.data.active, 0) })
+    this.setData({ previewImages: left })
+    this._sync()
   },
 
   async submitScreenshots() {
-    const { lang } = this.data
     if (this.data.busy) return
     if (this.data.previewImages.length === 0) {
-      // 灰按钮被点到也要给话，不能静默
-      this.setData({ errLine: t('pickFirst', lang) })
+      // 灰圆被点到也要给话，不能静默
+      this.setData({ errLine: t('pickFirst', this.data.lang) })
+      this._sync()
       return
     }
-    this.setData({ busy: 'shot', errLine: '' })
+    this._extractBegin('shot')
     // 提交的是点下去那一刻的那批图，后面列表再怎么变都不影响这一单
     const batch = this.data.previewImages.slice()
     // B 链（把图留下来）与 A 链（提炼建笔记）同时起跑，谁也不等谁。这里**不 await**：
@@ -457,23 +596,14 @@ Page({
     try {
       const { task_id } = await api.ingestScreenshots(batch)
       const result = await api.pollTask(task_id)
-      this.setData({ busy: '', previewImages: [], shotDesc: this.shotDescFor(0), barTitle: this.barTitleFor('shot', 0) })
-      wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
+      this._extractDone(result.note_id, { previewImages: [] })
       this._settleBackup(result.note_id, backup)
-      setTimeout(() => {
-        wx.navigateTo({ url: `/pages/detail/detail?id=${result.note_id}` })
-      }, 800)
     } catch (err) {
       console.error('截图导入失败', err)
       // 这篇笔记没建出来，已经传上去的图就是孤儿对象——占全站那 5GB 却没人记得它，
       // 所以顺手删掉。删不动（弱网）就留给云上，这条残留记在方案 §3 阶段 3 的出口条件里。
       this._settleBackup(null, backup)
-      this.setData({
-        busy: '',
-        errLine: err.timeout
-          ? t('taskTimeout', lang)
-          : ((err.data && err.data.detail) || err.error || t('taskFailed', lang)),
-      })
+      this._extractFail(err)
     }
   },
 
@@ -522,15 +652,25 @@ Page({
     }
   },
 
-  // ---------- 直接写（站长 10-04 改口径：用户给标题 + 原文，摘要交给模型） ----------
-  // 这一档和拍照／截图／链接走同一条提炼链路，不再自己写摘要；差别只在标题用用户打的、
-  // 归类由他当场挑（另外三档没有这一格）。
-  onWriteTitle(e) {
-    this.setData({ writeTitle: e.detail.value, errLine: '' })
+  // ---------- 文字（站长 10-04 改口径：贴原文 → 模型出摘要；10-08 起标题与归类挪到详情页改） ----------
+  // 这一档和拍照／链接走同一条提炼链路，摘要、要点都由模型出。
+  // 标题为什么不在这里填：面板压到 500rpx 之后只放得下"一个框 + 一枚条"，
+  // 而详情页那格「编辑」本来就能改标题与归类（write 页两样都在），能力没少一个入口。
+  onWriteBody(e) {
+    this.setData({ writeBody: e.detail.value, errLine: '' })
+    this._sync()
   },
 
-  onWriteBody(e) {
-    this.setData({ writeBody: e.detail.value })
+  // 原文框一聚焦就把面板抬到展开那一档（两行的框 + 那枚「原文翻译」）， blur 回来。
+  // 焦点是这一档唯一的展开理由：没有第二个"展开"按钮，也不许它自己乱长。
+  onBodyFocus() {
+    this.setData({ bodyFocus: true })
+    this._sync()
+  },
+
+  onBodyBlur() {
+    this.setData({ bodyFocus: false })
+    this._sync()
   },
 
   // 整行都是落点（wxml 把 catchtap 绑在这一行的外壳上），所以这里只管翻一下状态。
@@ -539,59 +679,28 @@ Page({
     this.setData({ writeTranslate: !this.data.writeTranslate })
   },
 
-  cancelWrite() {
-    this.collapse()
-  },
-
   async submitManual() {
-    const { lang } = this.data
-    // 按钮变灰只是视觉，点还是会进来：不挡第二下就会提两个任务、落两条重复笔记
     if (this.data.busy) return
-    const title = this.data.writeTitle.trim()
     const content = this.data.writeBody.trim()
-    if (!title) {
-      this.setData({ errLine: t('needTitle', lang) })
-      return
-    }
     if (!content) {
-      this.setData({ errLine: t('needBody', lang) })
+      this.setData({ errLine: t('needBody', this.data.lang) })
+      this._sync()
       return
     }
-    this.setData({ busy: 'write', errLine: '' })
-    const picked = this.data.catIndex > 0 ? this.data.categories[this.data.catIndex - 1] : null
+    this._extractBegin('write')
     try {
       const { task_id } = await api.ingestText({
-        title,
+        title: titleFromText(content),
         content,
-        category_id: picked ? picked.id : null,
         // 后端字段名就叫 translate，默认 false。这一位一路走到提示词里那行「输出语言」，
         // 关掉它才是要的效果：英文原文出英文摘要，不再被自动写成中文。
         translate: this.data.writeTranslate,
       })
       const result = await api.pollTask(task_id)
-      this.setData({
-        busy: '',
-        writeTitle: '',
-        writeBody: '',
-        writeTranslate: false,
-        catIndex: 0,
-        active: '',
-        mode: 'write',
-        lead: 'pen',
-        barTitle: '',
-      })
-      wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
-      setTimeout(() => {
-        wx.navigateTo({ url: `/pages/detail/detail?id=${result.note_id}` })
-      }, 800)
+      this._extractDone(result.note_id, { writeBody: '', writeTranslate: false, bodyFocus: false })
     } catch (err) {
-      console.error('手打提炼失败', err)
-      this.setData({
-        busy: '',
-        errLine: err.timeout
-          ? t('taskTimeout', lang)
-          : ((err.data && err.data.detail) || err.error || t('taskFailed', lang)),
-      })
+      console.error('文字提炼失败', err)
+      this._extractFail(err)
     }
   },
 })
