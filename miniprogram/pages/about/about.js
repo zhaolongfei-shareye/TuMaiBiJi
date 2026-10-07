@@ -89,14 +89,14 @@ const PRIVACY_ZH = [
       '微信登录标识（OpenID）：只用来把笔记归到你名下，不下发给客户端，也不出现在任何页面里。',
       '你自己存进来的内容：标题、摘要、要点、标签、分类、来源链接，以及截图识别出的文字。',
       '你在「卡片模板」里填的昵称：只在你主动生成分享图的那一刻传给服务器，用来在扫码页上显示「原创作者：某某」。不生成分享图，它就一直只存在这台手机里。',
-      '你上传的截图：只用于识别里面的文字，处理方式见第 3 条。',
+      '你导入的截图：用来识别里面的文字，识别完这批图会按第 3 条那样存进我们的云存储一份，好让这篇笔记的图以后还看得到。',
       '不收集通讯录、位置、麦克风、设备标识和浏览记录。',
     ],
   },
   {
     title: '手机权限',
     lines: [
-      '相机与相册：截图导入（拍照或选图）、给分享海报挑一张头像图、把生成的海报图存进相册时用到。头像那张只存在这台手机里，不上传，服务器上没有任何用户图片。不给权限也能正常看笔记和搜索。',
+      '相机与相册：截图导入（拍照或选图）、给分享海报挑一张头像图、把生成的海报图存进相册时用到。海报头像和生成好的海报图都只存在这台手机里，不上传。不给权限也能正常看笔记和搜索。',
       '剪贴板：只有你点「粘贴」那颗按钮时才读一次，用来取你复制的链接；点「复制链接」时才会写入。',
       '权限随时能在手机设置里关掉，关掉后对应功能会明确提示，不会静默失败。',
     ],
@@ -104,8 +104,9 @@ const PRIVACY_ZH = [
   {
     title: '你的截图怎么处理',
     lines: [
-      '截图经 HTTPS 上传到我们自己的服务器，只在服务进程内存里暂存，识别完立刻丢弃。',
-      '服务器不把图片写入磁盘、不存入数据库，也没有图片对象存储；超过 30 分钟没提交的暂存批次自动作废。',
+      '截图经 HTTPS 上传到我们自己的服务器识别文字，只在服务进程内存里暂存，识别完立刻丢弃。',
+      '做识别的这台服务器不把图片写入磁盘、不存入数据库；超过 30 分钟没提交的暂存批次自动作废。',
+      '保存成功的这批图另压一份小图，存进我们的云开发对象存储（腾讯云），用来在详情页把图原样读回来；删掉这篇笔记或注销账号时，云端那一份跟着删。',
       '识别出的文字和整理出的摘要会作为笔记内容保存下来——这是你用它存笔记的目的，不是额外收集。',
     ],
   },
@@ -164,14 +165,14 @@ const PRIVACY_EN = [
       'WeChat login id (OpenID): used only to put your notes under your account. It is never sent to the client and appears on no page.',
       'What you save yourself: title, summary, key points, tags, category, source link, and the text recognised from your screenshots.',
       'The nickname you type in "Card templates": it reaches the server only at the moment you generate a share image, so the scan page can show "Original author: …". Until you generate one it stays on this phone.',
-      'Screenshots you upload: used only to read the text inside them; see item 3 for how they are handled.',
+      'Screenshots you import: we read the text inside them, and the batch is then kept as item 3 describes so the images stay visible in that note.',
       'We do not collect contacts, location, microphone, device identifiers or browsing history.',
     ],
   },
   {
     title: 'Device permissions',
     lines: [
-      'Camera and photo library: used for screenshot import (shoot or pick), for choosing an avatar image for the share poster, and for saving a generated poster into your album. The avatar stays on this phone and is never uploaded; our server holds no user images. Reading and searching notes works fine without these.',
+      'Camera and photo library: used for screenshot import (shoot or pick), for choosing an avatar image for the share poster, and for saving a generated poster into your album. The poster avatar and the finished poster stay on this phone and are never uploaded. Reading and searching notes works fine without these.',
       'Clipboard: read once only when you tap the "Paste" button, to take the link you copied; written to only when you tap "Copy link".',
       'You can revoke any permission in phone settings at any time. The matching feature then says so clearly instead of failing silently.',
     ],
@@ -179,8 +180,9 @@ const PRIVACY_EN = [
   {
     title: 'How your screenshots are handled',
     lines: [
-      'Screenshots are uploaded to our own server over HTTPS and held only in the running process memory, discarded immediately after recognition.',
-      'The server never writes images to disk, never stores them in the database, and has no image object storage; any staging batch left unsubmitted for more than 30 minutes is dropped.',
+      'Screenshots are uploaded to our own server over HTTPS to read their text, held only in the running process memory, and discarded immediately after recognition.',
+      'That recognition server never writes images to disk or stores them in the database; any staging batch left unsubmitted for more than 30 minutes is dropped.',
+      'Images from a note you saved are also compressed and stored in our CloudBase object storage (Tencent Cloud) so the note can show them again later; deleting that note, or your account, deletes the cloud copies.',
       'The recognised text and the summary built from it are saved as note content — that is the purpose of the product, not extra collection.',
     ],
   },

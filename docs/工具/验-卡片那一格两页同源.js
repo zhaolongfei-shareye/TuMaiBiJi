@@ -162,7 +162,23 @@ ck('这一格用到的三个键中英两侧都有',
   && ['shareAsImage', 'noCards', 'appName'].every((k) => new RegExp(`\\b${k}:`).test(enBlock)),
   ['shareAsImage', 'noCards', 'appName'].filter((k) => !new RegExp(`\\b${k}:`).test(enBlock)).join('、'))
 
-// ---------- 七、反向自证：这把尺子真的抓得到漂移 ----------
+// ---------- 七、成品弹窗那一层不许缓存正文（站长 10-07 真机报：「标题我已经改了，但生图时候还是旧标题」）----------
+// 首页的成品弹窗画的是 `this._posterAssets.note`，而 `_ensurePosterAssets` 原来一进来就按
+// noteId 整份短路——第一次开过这篇之后，改完标题回到首页再开，画布照画缓存里那份旧字。
+// 缓存该留的是**码**（POST 建码 + 下载那张图，重开一次弹窗烧不起），正文必须每次现读。
+const ENSURE = (INDEX_JS.match(/async _ensurePosterAssets\(noteId\) \{[\s\S]*?\n  \},/) || [''])[0]
+const readsFresh = (src) => {
+  const g = src.indexOf('await api.getNote(noteId)')
+  const s = src.search(/if \(this\._posterAssets && this\._posterAssets\.noteId === noteId\) return/)
+  return g >= 0 && (s < 0 || s > g)
+}
+ck('成品弹窗每次现读正文（`api.getNote` 排在那句短路前面）',
+  !!ENSURE && readsFresh(ENSURE), ENSURE ? '' : '_ensurePosterAssets 找不到了')
+ck('缓存只留给码：`createShare` 与下载码仍然只在没缓存那一趟跑',
+  /if \(cached\)[\s\S]{0,240}return[\s\S]{0,240}await api\.createShare/.test(ENSURE)
+  && /await this\._downloadQR\(share\.token\)/.test(ENSURE))
+
+// ---------- 八、反向自证：这把尺子真的抓得到漂移 ----------
 const driftWxss = DETAIL_WXSS + '\n.ds-pad { width: 200rpx; }\n'
 ck('反向①：谁在详情页 wxss 里再补一条 .ds-pad，"一条都不许有"这条必须红',
   cellRules(driftWxss).length > 0)
@@ -174,6 +190,10 @@ ck('反向③：详情页底排那枚的旧实现被谁加回来，"不再有 on
 const noAlive = DETAIL_JS.replace(/detailCards: cardLog\.aliveFor\(note\.id\)/, 'detailCards: cardLog.forNote(note.id)')
 ck('反向④：那一格改回吃裸 forNote（图被清掉也照样画一块白板），上面那条同源判据真的跟着红',
   onePredicate(DETAIL_JS) === true && onePredicate(noAlive) === false)
+const shortCircuitAgain = ENSURE.replace('const cached =',
+  'if (this._posterAssets && this._posterAssets.noteId === noteId) return\n    const cached =')
+ck('反向⑤：把那句整份短路加回去（就是这一轮真机报的那个毛病），"每次现读正文"这条必须红',
+  shortCircuitAgain !== ENSURE && readsFresh(shortCircuitAgain) === false)
 
 console.log(`\n${bad.length === 0 ? '全过' : `红 ${bad.length} 条`}`)
 bad.forEach((n) => console.log(`  ✗ ${n}`))

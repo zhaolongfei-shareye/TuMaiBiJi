@@ -668,10 +668,12 @@ Page({
   },
 
   async _ensurePosterAssets(noteId) {
-    if (this._posterAssets && this._posterAssets.noteId === noteId) return
+    // 缓存只留给码：那一趟要 POST 建码、要下一张图，重开一次成品弹窗烧不起。
+    // **正文每次现读**——站长 10-07 真机报"标题已经改了，卡片上还是旧标题"：原来这里
+    // 整份短路，`_renderPoster` 画的就是 `this._posterAssets.note`，于是首页这一层改完
+    // 标题回到首页再开弹窗，画布照画第一次缓存进去那份旧字（笔记卡片页没这个毛病，它每次 onLoad 现拉）。
+    const cached = this._posterAssets && this._posterAssets.noteId === noteId ? this._posterAssets : null
     const note = await api.getNote(noteId)
-    const share = await api.createShare(noteId, poster.readProfile().name)
-    const qrPath = await this._downloadQR(share.token)
     // 分类名不在笔记响应里，海报上那行小字要靠分类表查——与 share.js 同一条口径。
     if (note.category_id) {
       try {
@@ -680,6 +682,12 @@ Page({
         if (cat) note.category_name = cat.name
       } catch (err) { /* 查不到就只写来源 */ }
     }
+    if (cached) {
+      this._posterAssets = { noteId, note, token: cached.token, qrPath: cached.qrPath }
+      return
+    }
+    const share = await api.createShare(noteId, poster.readProfile().name)
+    const qrPath = await this._downloadQR(share.token)
     this._posterAssets = { noteId, note, token: share.token, qrPath }
   },
 
