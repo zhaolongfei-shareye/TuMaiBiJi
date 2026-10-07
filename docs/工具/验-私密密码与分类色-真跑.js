@@ -262,7 +262,36 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     for (const c of chips) { bg.push(await c.style('background-color')); fg.push(await c.style('color')) }
     ck('两枚分类章底色不一样（各自吃自己的分类色）', bg[1] !== bg[2], `${bg[1]} vs ${bg[2]}`)
     ck('分类章底色不再是那层暗玻璃', bg[1] !== 'rgba(18, 20, 26, 0.42)', bg[1])
-    ck('每枚字色跟着底色配对', fg[1] !== fg[2] || bg[1] === bg[2], `${fg[1]} vs ${fg[2]}`)
+    /* 「字色跟着底色配对」原来钉的是"相邻两枚字色得不同"——那是钉在这个账号的数据上的假尺子：
+       雨雾这一套里第 1、2 档底色是 #B3B7C4 与 #8F95A8，两档都是浅底，规则本来就给同一支深字
+       （`palette.toneVars` 现读对得上），所以屏上没错、是判据错。改成逐枚钉"这一枚的字色
+       就是它自己那一档配的那一支"，与有几枚、停在哪一档都无关。 */
+    const hexRgb = (h) => `rgb(${[1, 2, 3].map((i) => parseInt(String(h).slice(1 + (i - 1) * 2, 1 + i * 2), 16)).join(', ')})`
+    const chipD = (await list.data()) || {}
+    const cats = chipD.categories || []
+    const chipWp = await mp.evaluate(() => getApp().getWallpaper())
+    // 下面 ②③ 那一段才有 `const pal`，这一格在它前面，同名会撞 TDZ（node 直接跑不起来），
+    // 所以这里自己起一个名字 require（同一个模块，缓存的）。
+    const palChip = require('../../miniprogram/utils/palette.js')
+    // 选中那一枚翻面吃的是 CSS 的 `var(--bg-card)`，所以这个数从 app.wxss 那一段主题类里现读
+    // （palette 的 THEMES 里没有 card 这一项，写死在尺子里就是第三份真相）。
+    const appCss = fs.readFileSync(path.join(__dirname, '../../miniprogram/app.wxss'), 'utf8')
+    const cardHex = (new RegExp('\\.' + palChip.themeOf(chipWp).cls + '\\s*\\{[\\s\\S]{0,600}?--bg-card:\\s*(#[0-9A-Fa-f]{6})')
+      .exec(appCss) || [])[1] || ''
+    const pairBad = []
+    cats.forEach((c, i) => {
+      const k = i + 1
+      if (k >= bg.length) return
+      const m = /--tone-bg:(#\w{6});--tone-ink:(#\w{6})/.exec(c.toneStyle || '') || []
+      const want = chipD.selectedCategory === c.id
+        ? { bg: cardHex, ink: m[1] }   // 选中那一枚翻面：纸白底 + 它自己那支分类色当字
+        : { bg: m[1], ink: m[2] }
+      if (bg[k] !== hexRgb(want.bg) || fg[k] !== hexRgb(want.ink)) {
+        pairBad.push(`分类${c.id} 实=${bg[k]}／${fg[k]} 应为=${hexRgb(want.bg)}／${hexRgb(want.ink)}`)
+      }
+    })
+    ck('每一枚章的字色就是它自己那一档底色配的那一支（逐枚对 toneVars，不钉枚数也不钉第几档）',
+      pairBad.length === 0 && cats.length > 0, pairBad.join('　') || `${cats.length} 枚逐一对上（壁纸=${chipWp}）`)
     ck('「全部」那枚仍吃这一态自己的底（没被误上色）', !!bg[0], bg[0])
 
     /* ---------- 造一条归了类的笔记，验"归了哪一类"在屏上读得出来 ---------- */
