@@ -167,10 +167,11 @@ ck('这一格用到的三个键中英两侧都有',
 // noteId 整份短路——第一次开过这篇之后，改完标题回到首页再开，画布照画缓存里那份旧字。
 // 缓存该留的是**码**（POST 建码 + 下载那张图，重开一次弹窗烧不起），正文必须每次现读。
 const ENSURE = (INDEX_JS.match(/async _ensurePosterAssets\(noteId\) \{[\s\S]*?\n  \},/) || [''])[0]
+// 判"形状"而不是判那一句老代码的字面：只钉原文的话，谁换成可选链 `?.noteId` 就绕过去了，
+// 尺子绿着而毛病回来了。所以这条量的是**那次 GET 之前一个 return 都不许有**。
 const readsFresh = (src) => {
   const g = src.indexOf('await api.getNote(noteId)')
-  const s = src.search(/if \(this\._posterAssets && this\._posterAssets\.noteId === noteId\) return/)
-  return g >= 0 && (s < 0 || s > g)
+  return g >= 0 && !/\breturn\b/.test(src.slice(0, g))
 }
 ck('成品弹窗每次现读正文（`api.getNote` 排在那句短路前面）',
   !!ENSURE && readsFresh(ENSURE), ENSURE ? '' : '_ensurePosterAssets 找不到了')
@@ -194,6 +195,10 @@ const shortCircuitAgain = ENSURE.replace('const cached =',
   'if (this._posterAssets && this._posterAssets.noteId === noteId) return\n    const cached =')
 ck('反向⑤：把那句整份短路加回去（就是这一轮真机报的那个毛病），"每次现读正文"这条必须红',
   shortCircuitAgain !== ENSURE && readsFresh(shortCircuitAgain) === false)
+const optionalChainAgain = ENSURE.replace('const cached =',
+  'if (this._posterAssets?.noteId === noteId) return\n    const cached =')
+ck('反向⑥：换一种写法（可选链）绕上面那句字面，形状判据照样红——它量的是"GET 之前不许有 return"',
+  optionalChainAgain !== ENSURE && readsFresh(optionalChainAgain) === false)
 
 console.log(`\n${bad.length === 0 ? '全过' : `红 ${bad.length} 条`}`)
 bad.forEach((n) => console.log(`  ✗ ${n}`))
