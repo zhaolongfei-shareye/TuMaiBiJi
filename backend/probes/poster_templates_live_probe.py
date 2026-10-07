@@ -83,7 +83,13 @@ ck("回的是数组（客户端 applyRemoteTemplates 第一眼就问这条，不
 rows = body if isinstance(body, list) else []
 # 本文件开头说的第③种漏法（表建了、种子没灌）在这里必须是红，但"接口行数 == 库里行数"抓不到它：
 # 两边都是 0，等式照样成立。所以先单独钉一条地板——live 零行就是没灌，不是"刚好都空着"。
-ck(f"库里 live 不是零行（deploy.sh 那一步 1.7 真跑过；种子那边有 {len(seed_rows())} 套）",
+# 种子那份 JSON 是**部署件**（不在代码里），读不到时要报成一条红，不能抛栈——
+# 一屏看不懂的栈等于没给结论（10-06 彩排为同样的毛病改过这支探针一次，今天又犯在另一条上）。
+try:
+    种子那句 = f"种子那边有 {len(seed_rows())} 套"
+except Exception as e:
+    种子那句 = f"种子文件读不到：{type(e).__name__} {e}"
+ck(f"库里 live 不是零行（deploy.sh 那一步 1.7 真跑过；{种子那句}）",
    len(db_rows) > 0, f"库里 live {len(db_rows)} 行 / 接口 {len(rows)} 条")
 ck(f"现网 live 的行数与库里一致（接口 {len(rows)} / 库里 {len(db_rows)}）",
    len(rows) == len(db_rows), f"差 {len(rows) - len(db_rows)}")
