@@ -59,7 +59,20 @@ Page({
       wx.navigateBack()
       return
     }
-    this.setData({ noteId: parseInt(options.id) })
+    const noteId = parseInt(options.id)
+    this.setData({ noteId })
+    // 一篇只留一张卡片（站长 10-03 定的口径，10-07 他报这一页漏接了：从详情页进这一页，
+    // 生成过一张之后还能再生成一张）。挡在**这一页**而不是只挡详情页那个入口——规矩要落在
+    // 会出图的地方，这一页以后多几个入口（深链、列表里那枚）也照样拦得住。
+    // 拿的是上面那个局部变量而不是 `this.data.noteId`：setData 对视图层是异步的，
+    // 刚写完就读它，判的可能是上一个号的台账。
+    // 顺序要紧：这一句必须在 `generateShareImage()` 前面，那一趟会先 POST 建一张分享码，
+    // 挡晚了就等于"这篇不许有第二张卡片"和"这篇已经多了第二张活码"同时成立。
+    if (cardLog.forNote(noteId).length) {
+      wx.showToast({ title: t('cardOneOnly', lang), icon: 'none', duration: 1800 })
+      setTimeout(() => wx.navigateBack(), 1600)
+      return
+    }
     await this.generateShareImage()
   },
 

@@ -1,0 +1,177 @@
+// 一篇只留一张卡片：笔记卡片页这一页也守得住吗。跑法：docs/工具/跑尺子.sh 9431 验-一篇一张-真跑
+//
+// 站长 10-07 报的漏口：「生成一次后，还能继续生成卡片，这个不符合之前的约定。无论有没有附上
+// 图片，每个笔记只能生成一张卡片，除非删除了再生成。」首页那层成品弹窗一直有"已生成态"
+// （1.9.19），漏的是 `pages/share/share` 这一页——从详情页进它，台账里有没有这张它都照出。
+//
+// 这一把要拿到的证据有两层，缺一层都不算数：
+//   ① 挡下来了（页面被退回原页，人不会停在一个能继续点的屏上）；
+//   ② **是在 POST 建分享码之前挡下的**——`generateShareImage()` 第一趟就是建码，挡晚了等于
+//      "这篇不许有第二张卡片"和"这篇已经多了第二张活码"同时成立，而后者是写现网的。
+// 所以这里给 `wx.request` 套一层记录器，逐条记下 method + url，判的是"这一趟没有
+// POST /api/shares/"。**不是判"请求数为 0"**：挡下之后退回首页，首页 onShow 自己就要拉
+// 笔记/分类/额度三趟，数总数会把那三趟算成这一页的（第一版就是这么假红一条）。
+//
+// 全程不碰现网数据：用的笔记 id 是一个不存在的号（987654），台账那一格是本机塞进去的替身。
+// 反向那一趟（把替身撤掉再进同一页）会让它真发一次 createShare 打一个不存在的 id →
+// 服务端 `_owned_note` 判 404，一行都不写；这一趟存在的意义就是证明"挡住它的是那道闸，
+// 不是别的东西"。跑完把本机存储与 wx 上那两层补丁都还原。
+const automator = require('miniprogram-automator')
+const fs = require('fs')
+const path = require('path')
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const { i18n } = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
+
+const ROOT = path.resolve(__dirname, '../..')
+const FAKE_ID = 987654
+const MSG = i18n.zh.cardOneOnly
+const bad = []
+const ck = (name, ok, got) => {
+  console.log(`${ok ? '✓' : '✗'} ${name}${got === undefined || got === '' ? '' : `　→ ${got}`}`)
+  if (!ok) bad.push(name)
+}
+
+// ---------- 静态：顺序与"另一处入口没被带歪" ----------
+const SHARE_JS = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/share/share.js'), 'utf8')
+const SHARE_WXML = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/share/share.wxml'), 'utf8')
+const INDEX_WXML = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/index/index.wxml'), 'utf8')
+const atGuard = SHARE_JS.indexOf('cardLog.forNote(')
+const atCreate = SHARE_JS.indexOf('api.createShare(')
+const atRender = SHARE_JS.indexOf('this.generateShareImage()')
+ck('这一页确实问了台账', atGuard > 0)
+ck('问台账排在建分享码之前（顺序错了就是"卡片只许一张"和"活码多了一张"同时成立）',
+  atGuard > 0 && atGuard < atCreate, `forNote@${atGuard} createShare@${atCreate}`)
+ck('也排在整趟生成之前（generateShareImage 里第一件就是那次 POST）',
+  atGuard > 0 && atGuard < atRender, `forNote@${atGuard} generate@${atRender}`)
+ck('挡下时给的是字典里那句（不写死中文，这台工具可能停在英文态）',
+  /t\('cardOneOnly', lang\)/.test(SHARE_JS) && !!MSG, MSG)
+ck('这一页仍然留着退回（不是一句提示把人钉在屏上）',
+  /setTimeout\(\(\) => wx\.navigateBack\(\), 1600\)/.test(SHARE_JS))
+// 首页那一处：生成那一枚必须只在"未生成"那一态里。分支写法是 `<block wx:if="{{posterHasCard}}">`
+// …`<block wx:else>`…，所以判的是**位置**（在 else 之后），不是"这一串里有没有"——
+// 第一版拿 `wx:if="{{!posterHasCard}}"` 去切，那个串在文件里只挂在圆点那一行上，切出来的
+// 那段既没有生成按钮也没有分享按钮，判据当场假红。
+const hasAt = INDEX_WXML.indexOf('wx:if="{{posterHasCard}}"')
+const elseAt = INDEX_WXML.indexOf('<block wx:else>', hasAt)
+const genAt = INDEX_WXML.indexOf('onSavePoster')
+ck('首页那枚「生成分享图」在未生成那一态（排在 posterHasCard 的 else 之后）',
+  hasAt > 0 && elseAt > 0 && genAt > elseAt, `has@${hasAt} else@${elseAt} gen@${genAt}`)
+ck('已生成那一态里没有生成按钮，只有再分享／查看笔记／删除这三枚',
+  hasAt > 0 && elseAt > hasAt
+  && INDEX_WXML.slice(hasAt, elseAt).indexOf('onSavePoster') < 0
+  && /onShareCard/.test(INDEX_WXML.slice(hasAt, elseAt))
+  && /onDropCard/.test(INDEX_WXML.slice(hasAt, elseAt)))
+ck('中英两侧都有那一句', !!i18n.zh.cardOneOnly && !!i18n.en.cardOneOnly,
+  `${i18n.zh.cardOneOnly} / ${i18n.en.cardOneOnly}`)
+
+// ---------- 真跑：挡下来 + 一个请求都没发 ----------
+;(async () => {
+  let mp = null
+  for (let i = 0; i < 6 && !mp; i += 1) {
+    try { mp = await automator.connect({ wsEndpoint: 'ws://localhost:9431' }) } catch (e) { await sleep(12000) }
+  }
+  if (!mp) throw new Error('连不上 9431，先跑 cli auto')
+  /* automator 在"页面刚被 navigateBack 拆掉"那一瞬会抛内部错
+     （实测：`Cannot destructure property 'rawPath' of getPageMetaByWebviewId(...) is null`）。
+     这不是判据红，是工具在跟路由抢时机——所以每一跳都重试一次，别把它记成回归。
+     同一条道理写在 验-配图三处渲染-真跑 的进页循环里。 */
+  const hop = async (label, fn, tries) => {
+    let last = null
+    for (let i = 0; i < (tries || 6); i += 1) {
+      try { return await fn() } catch (e) { last = e; await sleep(6000) }
+    }
+    throw new Error(`${label} 连试六次都没成：${last && last.message}`)
+  }
+
+  await hop('进首页', () => mp.callWxMethod('reLaunch', { url: '/pages/index/index' }))
+  await sleep(2500)
+
+  // 给 wx.request / wx.showToast 各套一层记录器（跑完还原）。
+  // 记的是**每一条的 method + url**，不是总数：这一页挡下之后会退回首页，而首页 onShow 自己
+  // 要拉笔记/分类/额度那三趟——第一版判"请求数为 0"，被这三趟顶红了一条，那不是我改坏的，
+  // 是判据数错了对象。这一条真正要钉的是"没顺手 POST 建出第二张分享码"。
+  const ev = (label, fn, arg) => hop(label, () => mp.evaluate(fn, arg))
+  await ev('装记录器', () => {
+    if (!wx.__orig) {
+      wx.__orig = { request: wx.request, showToast: wx.showToast }
+      wx.__calls = { req: [], toast: [] }
+      wx.request = function (o) {
+        wx.__calls.req.push(((o && o.method) || 'GET') + ' ' + String((o && o.url) || '').split('?')[0])
+        return wx.__orig.request.apply(wx, arguments)
+      }
+      wx.showToast = function (o) {
+        wx.__calls.toast.push((o && o.title) || '')
+        return wx.__orig.showToast.apply(wx, arguments)
+      }
+    }
+    return true
+  })
+  const reset = () => ev('清记录', () => { wx.__calls = { req: [], toast: [] }; return true })
+  const readBack = () => ev('读记录', () => ({
+    req: wx.__calls.req.slice(), toast: wx.__calls.toast.slice(),
+  }))
+  const seed = (on) => ev('摆替身', (v) => {
+    const key = 'cardLog'
+    const map = wx.getStorageSync(key)
+    const base = map && typeof map === 'object' ? map : {}
+    if (v) base['987654'] = [{ tpl: 'classic', noQr: false, thumb: '' }]
+    else delete base['987654']
+    wx.setStorageSync(key, base)
+    return Object.keys(wx.getStorageSync(key) || {}).length
+  }, on)
+  // 路由走 callWxMethod 而不是 mp.navigateTo：后者内部是"改路由 → 睡 3 秒 → 再读当前页"，
+  // 这一页在它那三秒里自己 navigateBack 掉了，读那一趟就抛上面那个内部错，而重试会变成
+  // **再推一层这一页**——判据就测的不是那一次进入了。拆开：只发路由，读页单独重试。
+  const go = () => hop('进卡片页', () => mp.callWxMethod('navigateTo', { url: `/pages/share/share?id=${FAKE_ID}` }))
+  const where = () => hop('读当前页', () => mp.currentPage())
+
+  // ① 台账里有一张：应当被挡下，且一个请求都不发
+  const seededKeys = await seed(true)
+  ck('替身落进本机台账了（这一格只用来当"这篇已经有卡片"）', seededKeys >= 1, `${seededKeys} 篇有留档`)
+  await reset()
+  await go()
+  await sleep(3000)
+  const cur = await where()
+  const r1 = await readBack()
+  const isCreateShare = (l) => /^POST .*\/api\/shares\/$/.test(l)
+  ck('台账里已有这张：这一页没留住人，退回原页',
+    cur && cur.path !== 'pages/share/share', cur && cur.path)
+  ck('而且没顺手建出第二张分享码（这一趟一条 POST /api/shares/ 都没有）',
+    r1.req.filter(isCreateShare).length === 0, JSON.stringify(r1.req))
+  ck('给的那句就是字典里那句', r1.toast.indexOf(MSG) >= 0, JSON.stringify(r1.toast))
+
+  // ② 反向对照：撤掉替身，同一页同一 id 应当真去建码——证明挡住它的是那道闸，
+  //    而不是"这一页今天根本没跑起来"或者"网络没通"
+  await seed(false)
+  await reset()
+  await go()
+  await sleep(1500)
+  const r2 = await readBack()
+  ck('反向对照：台账空着时同一趟真会 POST 建码（所以①那条红不会是"页面没跑起来"）',
+    r2.req.filter(isCreateShare).length >= 1, JSON.stringify(r2.req))
+  await sleep(3000) // 那趟会因 404 自己退回，别把补丁留在飞着的页上
+  const cur2 = await where()
+  ck('不存在的笔记 id 打建码接口：服务端不认，页面自己退回（现网零写入）',
+    cur2 && cur2.path !== 'pages/share/share', cur2 && cur2.path)
+
+  // 还原
+  await ev('还原补丁', () => {
+    if (wx.__orig) { wx.request = wx.__orig.request; wx.showToast = wx.__orig.showToast; delete wx.__orig }
+    const m = wx.getStorageSync('cardLog')
+    if (m && m['987654']) { delete m['987654']; wx.setStorageSync('cardLog', m) }
+    return true
+  })
+  const left = await ev('复查还原', () => {
+    const m = wx.getStorageSync('cardLog')
+    return !!(m && m['987654']) || !!wx.__orig
+  })
+  ck('收尾：替身与那两层补丁都不留在这台工具上', left === false, String(left))
+  await mp.close()
+
+  console.log(`\n${bad.length === 0 ? '全过' : `红 ${bad.length} 条`}`)
+  bad.forEach((n) => console.log(`  ✗ ${n}`))
+  process.exit(bad.length ? 1 : 0)
+})().catch((e) => {
+  console.log(`✗ 这把尺子自己崩了（不是判据红）：${e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e}`)
+  process.exit(2)
+})
