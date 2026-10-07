@@ -156,11 +156,15 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   poster.writeSlots(after)
   ck('落盘之后「卡片」位还有人（海报不会一声不响没了头像）',
     poster.cardPath() === b, poster.cardPath())
-  // 页面接线：成品弹窗里那一层走的是 replaceSlot，不许图省事改回 placeSlot
-  const idxJs = fs.readFileSync(path.join(MP, 'pages/index/index.js'), 'utf8')
-  ck('首页「更换」那一条走 replaceSlot', /keep \? poster\.replaceSlot\(/.test(idxJs))
-  ck('首页那一层与卡片模板页读写同一份四槽（都出自 poster 的两个读口）',
-    /poster\.readSlots\(\)/.test(idxJs) && /poster\.writeSlots\(/.test(idxJs))
+  // 页面接线：成品弹窗里那一层走的是 replaceSlot，不许图省事改回 placeSlot。
+  // 10-07 改的是判据不是规矩：这一层的实现从 index.js 挪进了 utils/cardInfo.js（笔记卡片页
+  // 也要同一层，各写一份迟早走样），所以钉的对象换了住处；"两页不许各自复制一份"由
+  // docs/工具/验-名片弹窗两页同源.js 那把守，这里不重复钉。
+  const ciModule = fs.readFileSync(path.join(MP, 'utils/cardInfo.js'), 'utf8')
+  ck('名片那一层的「更换」走 replaceSlot（现在住在 utils/cardInfo.js，全项目一处）',
+    /keep \? poster\.replaceSlot\(/.test(ciModule))
+  ck('名片那一层与卡片模板页读写同一份四槽（都出自 poster 的两个读口）',
+    /poster\.readSlots\(\)/.test(ciModule) && /poster\.writeSlots\(/.test(ciModule))
 }
 {
   const a = putFile('p1.img'), b = putFile('p2.img')

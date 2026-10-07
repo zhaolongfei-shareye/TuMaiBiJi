@@ -23,6 +23,7 @@ const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
+const cardInfo = require('../../utils/cardInfo.js')
 
 Page({
   data: {
@@ -41,6 +42,8 @@ Page({
     // 码要不要印在图上。发微信以外的平台（微博、小红书那类）常常看见第三方码就屏蔽整张图，
     // 所以这一页允许只留文字。默认带码——在自己群里转发时码才是入口。
     noQr: false,
+    // 「卡片上的信息」那一层那四个键，与首页成品弹窗同一份初值（utils/cardInfo.js）
+    ...cardInfo.initial(),
   },
 
   async onLoad(options) {
@@ -282,7 +285,16 @@ Page({
     })
   },
 
-  onCancel() {
-    wx.navigateBack()
+  // ---------- 「卡片上的信息」（站长 10-07：这一页原来只有「取消」，没设形象就没法挑图） ----------
+  // 实现与首页成品弹窗共用 utils/cardInfo.js 那一份，这一页只给一个钩子：改完收窗就把
+  // 上面那张成品重画一遍。画布不清空、不摘层——这一页没有第二个 fixed 浮层要避让。
+  _ciAfterChange() {
+    if (this.data.generating) return
+    this.render().catch((err) => {
+      console.error('改完名片重画失败', err)
+      wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
+    })
   },
+
+  ...cardInfo.handlers,
 })

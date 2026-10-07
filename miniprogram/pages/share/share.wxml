@@ -39,8 +39,56 @@
 
   <view class="actions-bar">
     <view class="actions-row">
-      <view class="btn-secondary" bindtap="onCancel">{{t.cancel}}</view>
+      <!-- 站长 10-07：这一枚原来是「取消」，现在换成「编辑个人名片」。
+           退出这一页仍留着导航条左上那颗 ‹，没有少一条口。 -->
+      <view class="btn-secondary" bindtap="onOpenCardInfo">{{t.editCard}}</view>
       <view class="btn-primary" bindtap="saveToAlbum" disabled="{{!imagePath}}">{{t.saveToAlbum}}</view>
+    </view>
+  </view>
+
+  <!-- 「卡片上的信息」：与首页成品弹窗那一层同一份实现（utils/cardInfo.js）、同一套样式
+       （app.wxss 里那组 .ci-*），改的是同一份数据。这一页没有第二个 fixed 浮层要避让，
+       所以不像首页那样在弹窗开着时把底下那层摘掉——那一带是 10-03 真机两轮 BUG 换来的，
+       挪到这里会把画布清成空白。 -->
+  <view wx:if="{{cardInfoOpen}}" class="ci-mask" catchtap="">
+    <view class="ci-card" catchtap="">
+      <text class="ci-title">{{t.cardInfo}}</text>
+      <text class="ci-hint">{{t.cardInfoHint}}</text>
+      <view class="ci-slots">
+        <view wx:for="{{ciSlots}}" wx:key="index" class="ci-slot">
+          <view class="ci-disc {{item.path ? 'ci-filled' : 'ci-empty'}}" data-i="{{index}}" catchtap="onCiSlotTap">
+            <image wx:if="{{item.path}}" src="{{item.path}}" mode="aspectFill" class="ci-img" />
+            <text wx:else class="ci-plus">+</text>
+            <text wx:if="{{item.path}}" class="ci-repl" data-i="{{index}}" catchtap="onCiReplace">{{t.cardReplace}}</text>
+          </view>
+          <view wx:if="{{item.path}}" class="ci-bin" data-i="{{index}}" catchtap="onCiDrop">
+            <view class="ci-bin-lid"></view>
+            <view class="ci-bin-body"></view>
+          </view>
+          <view class="ci-cap {{item.card ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetCard"
+            aria-label="{{item.card ? t.slotCard : ''}}">
+            <view wx:if="{{item.card}}" class="ci-tick"></view>
+            <text wx:else>{{item.cap}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileName}}</text>
+        <!-- adjust-position 关掉是抄「我的」页私密密码那一层在他 iPhone 11 上验过的口径：
+             微信只保证焦点框不被压住，它不知道这张卡底下还有别的控件，一顶整页就把这种
+             fixed 浮层顶得跟原生输入层对不上（首页那层的原话，同一条结论）。 -->
+        <input class="ci-input" value="{{ciName}}" maxlength="16" placeholder="{{t.profileNamePh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiName" />
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileSlogan}}</text>
+        <input class="ci-input" value="{{ciSlogan}}" maxlength="24" placeholder="{{t.profileSloganPh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiSlogan" />
+      </view>
+      <view class="ci-acts">
+        <view class="ci-btn ghost" catchtap="onCloseCardInfo">{{t.cancel}}</view>
+        <view class="ci-btn pri" catchtap="onCiSave">{{t.save}}</view>
+      </view>
     </view>
   </view>
 </view>

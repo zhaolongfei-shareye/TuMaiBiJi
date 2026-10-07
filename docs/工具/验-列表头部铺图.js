@@ -102,10 +102,14 @@ ok('铺图时那串 chrome 变量整串不发（searchSkin 留空）',
    把 wx.chooseMedia 带进这一页却没跟进这条——所以它从那天起一直红着，10-04 才发现。
    它守的规矩仍然成立，只是范围要写准：**不许有的是"给笔记本身选图"的第二个入口**（那是
    录入条那一个入口的活）；名片上那四格换的是卡片用的图，是另一件事。收窄成"只许出现在
-   _ciPick 里、且全页只有一处"，比原来那句一刀切更严，也还守得住。 */
-const ciPickFn = (cjs.split('\n  _ciPick(')[1] || '').split('\n  },')[0]
-ok('这一页不给笔记选图；唯一的 chooseMedia 只许挂在名片那四格的 _ciPick 里（全页一处）',
-  !/chooseImage/.test(cjs) && (cjs.match(/wx\.chooseMedia\(/g) || []).length === 1
+   _ciPick 里、且全页只有一处"，比原来那句一刀切更严，也还守得住。
+   10-07 再跟进一次：名片那一层整批挪进 utils/cardInfo.js（首页与笔记卡片页共用一份实现），
+   所以这一页现在应当**一处 chooseMedia 都没有**，那唯一一处住在模块的 _ciPick 里。
+   钉的东西没变——这一页不许长出第二个选图口——只是它换了住处，判据跟着换读哪份文件。 */
+const ciPickFn = (read('utils/cardInfo.js')
+  .split('\n  _ciPick(')[1] || '').split('\n  },')[0]
+ok('这一页不给笔记选图：首页自己零处 chooseMedia，那唯一一处在名片模块的 _ciPick 里',
+  !/chooseImage/.test(cjs) && (cjs.match(/wx\.chooseMedia\(/g) || []).length === 0
   && /wx\.chooseMedia\(/.test(ciPickFn))
 ok('这一页不出现"写死的图片路径"', !/['"]\/assets\/home-bg/.test(cjs + wxml))
 ok('data 里 bgSrc 起手是空串（模块加载时存储还没读）', /bgSrc: ''/.test(cjs))
