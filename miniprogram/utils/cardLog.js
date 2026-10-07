@@ -74,6 +74,25 @@ function record(noteId, tplId, noQr, canvas, page) {
 
 function forNote(noteId) { return read()[noteId] || [] }
 
+/* 这一篇**还看得见**的卡片：台账里那一条的文件真的还在，且按留下来的先后倒序（最新那张排第一）。
+ *
+ * 为什么要在 forNote 之上再筛一层：账记在本机 storage 里，图存在应用私有目录，系统清缓存能
+ * 只清掉图而清不掉账（首页那张形象图同一处理：读不到就不铺）。指过去就是一块白板，看着像卡片
+ * 坏了，宁可退回"还没有生成过卡片"那一格。10-03 模拟器实测到这一态：src 递到了、232×330 有尺寸，
+ * 但 accessSync 说文件不在。
+ *
+ * 这一层必须只有一个出处：详情页右上那一格（画不画缩略图）、首页详情窗、以及笔记卡片页
+ * 那道"一篇只留一张"的闸（share.js）三处吃的都是它。筛掉的那条不算数——否则界面显示"还没生成过"、
+ * 点下去却被闸挡回"这篇已经有一张"，同一篇在一屏里同时成立两种状态。 */
+function aliveFor(noteId) {
+  const fm = wx.getFileSystemManager()
+  const alive = (p) => { try { fm.accessSync(p); return true } catch (e) { return false } }
+  return forNote(noteId)
+    .filter((x) => x && x.p && alive(x.p))
+    .slice()
+    .sort((x, y) => (y.at || 0) - (x.at || 0))
+}
+
 // 站长 10-03 23:40：「一个笔记同一时间只能生成一张笔记卡片，要改存量的必须删除旧的才能新增」。
 // 台账本来就是一篇一套模板一条，所以这里把"一篇一条"落成硬规则：copyIn 一次只留最新那张，
 // 另外给一次性的归一（下面 migrateOnePerNote）——他手机上那几篇留过两张以上的，进页就归成
@@ -116,4 +135,4 @@ function dropNote(noteId) {
   write(map)
 }
 
-module.exports = { record, forNote, dropNote, all: read, migrateKeepOnly, migrateOnePerNote, KEY, DIR, MODE_KEY, ONE_KEY }
+module.exports = { record, forNote, aliveFor, dropNote, all: read, migrateKeepOnly, migrateOnePerNote, KEY, DIR, MODE_KEY, ONE_KEY }

@@ -1,8 +1,10 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { blockSkinFor, toneVars } = require('../../utils/palette.js')
+const { blockSkinFor, toneVars, paleStep } = require('../../utils/palette.js')
 const { formatDateTime, formatShortDate } = require('../../utils/date.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
+const cardLog = require('../../utils/cardLog.js')
+const poster = require('../../utils/poster.js')
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
@@ -22,9 +24,14 @@ Page({
     t: texts('zh'),
     noteId: null,
     shared: false,
-    // 这篇的配图（云开发存储里的 fileID 列表）。空数组是常态：CLOUD_ENV 没填之前
-    // 全库不会有 assets 行，这一格也就永远不渲染。
+    // 这篇的配图（云开发存储里的 fileID 列表）。这条链 10-07 整条上线了（后端 + 桶可写），
+    // 没传过图的这篇才是空数组。
     noteImages: [],
+    // 右上那一格：这篇留过的那张卡片（图已经被系统清掉的那一条不算，见 cardLog.aliveFor）
+    // + 淡底方形的底色 + 品牌字。三个键的名字与详情窗那份逐字相同，两页画的是同一份标记。
+    detailCards: [],
+    swatchBg: paleStep('default'),
+    brandGlyph: poster.BRAND_GLYPH,
     _loaded: false,
   },
 
@@ -35,6 +42,9 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
+      // 那一格淡底的底色与这一页的主题吃同一份快照（都在进页这一下从当前壁纸算出来）：
+      // 分两处取就会出现"纸面换了、淡底没换"的半新半旧。
+      swatchBg: paleStep(app.getWallpaper()),
     })
     app.setNavTitle('navDetail', lang)
     if (options.id) {
@@ -103,7 +113,12 @@ Page({
       
       // noteImages 跟着这一篇重新起头：这一页会从"另一篇"navigateTo 进来，onShow 也会
       // 用新的 id 重取。读图那一步要是慢了或失败了，留着上一篇的图就等于张冠李戴。
-      this.setData({ note, loading: false, _loaded: true, noteImages: [] })
+      // detailCards 同理跟着重读一遍：从笔记卡片页生成完返回这一页走的就是 onShow → 这里，
+      // 右上那一格于是从「+」翻成那张缩略图——站长 10-07 报的就是这一页出完一张还能再点一次。
+      this.setData({
+        note, loading: false, _loaded: true, noteImages: [],
+        detailCards: cardLog.aliveFor(note.id),
+      })
       this.loadShareStatus(note.id)
       this.loadImages(note.id)
       // 搜一搜索引页面标题：用笔记真实标题替代静态"笔记详情"
@@ -253,9 +268,20 @@ Page({
     }
   },
 
-  onShare() {
+  /* 右上那一格 = 这一页出卡片的唯一入口（底排那枚「生成笔记卡片」10-07 撤了，
+     同一件事不留两个把手；这条是 v20 那一稿早就拍了的口径）。两态两件事：
+     · 这篇留过卡片 → 看那一张大图（跟详情窗那格点了拉成品弹窗同一句话："点小图直接看大图"，
+       站长 10-04）。这一页没有画布，所以走 `wx.previewImage` 看台账里那份成品图。
+     · 一张都没有 → 去笔记卡片页生成。生成完回来这一格自己会翻成缩略图（见 loadNote）。
+     私密笔记走不到这里：那一格整块不渲染（与详情窗同一条口径），服务端也不许私密篇分享。 */
+  onCardCell() {
+    const cards = this.data.detailCards
+    if (cards && cards.length) {
+      wx.previewImage({ urls: [cards[0].p], current: cards[0].p })
+      return
+    }
     const { note } = this.data
-    if (note.is_private) return
+    if (!note) return
     wx.navigateTo({ url: `/pages/share/share?id=${note.id}` })
   },
 })

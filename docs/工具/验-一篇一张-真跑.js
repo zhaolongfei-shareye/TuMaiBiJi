@@ -13,9 +13,10 @@
 // 笔记/分类/额度三趟，数总数会把那三趟算成这一页的（第一版就是这么假红一条）。
 //
 // 全程不碰现网数据：用的笔记 id 是一个不存在的号（987654），台账那一格是本机塞进去的替身。
-// 反向那一趟（把替身撤掉再进同一页）会让它真发一次 createShare 打一个不存在的 id →
-// 服务端 `_owned_note` 判 404，一行都不写；这一趟存在的意义就是证明"挡住它的是那道闸，
-// 不是别的东西"。跑完把本机存储与 wx 上那两层补丁都还原。
+// 替身摆三态：账在图在（该挡）、账在图没（**不该挡**——这一态详情页那一格画的是「+」）、
+// 整条撤掉（该放行）。后两态各发一次 createShare 打一个不存在的 id → 服务端 `_owned_note`
+// 判 404，一行都不写；这两趟存在的意义是证明"挡住①的是那道闸，不是别的东西"，以及
+// "闸和那一格吃的是同一条判据"。跑完把本机存储、那张替身图与 wx 上那两层补丁都还原。
 const automator = require('miniprogram-automator')
 const fs = require('fs')
 const path = require('path')
@@ -35,14 +36,25 @@ const ck = (name, ok, got) => {
 const SHARE_JS = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/share/share.js'), 'utf8')
 const SHARE_WXML = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/share/share.wxml'), 'utf8')
 const INDEX_WXML = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/index/index.wxml'), 'utf8')
-const atGuard = SHARE_JS.indexOf('cardLog.forNote(')
+const atGuard = SHARE_JS.indexOf('cardLog.aliveFor(')
 const atCreate = SHARE_JS.indexOf('api.createShare(')
 const atRender = SHARE_JS.indexOf('this.generateShareImage()')
 ck('这一页确实问了台账', atGuard > 0)
 ck('问台账排在建分享码之前（顺序错了就是"卡片只许一张"和"活码多了一张"同时成立）',
-  atGuard > 0 && atGuard < atCreate, `forNote@${atGuard} createShare@${atCreate}`)
+  atGuard > 0 && atGuard < atCreate, `aliveFor@${atGuard} createShare@${atCreate}`)
 ck('也排在整趟生成之前（generateShareImage 里第一件就是那次 POST）',
-  atGuard > 0 && atGuard < atRender, `forNote@${atGuard} generate@${atRender}`)
+  atGuard > 0 && atGuard < atRender, `aliveFor@${atGuard} generate@${atRender}`)
+/* 这道闸和"右上那一格画不画图"必须是同一条判据（`cardLog.aliveFor`：倒序 + 图不在就不列）。
+   各判各的会长出这样一屏：那一格显示"还没有生成过卡片"，点进来被挡回"这篇已经有一张"。
+   10-07 之前 share.js 吃的是裸 `forNote`（账在就算有），详情页与详情窗吃的是筛过图的那一份。 */
+const DETAIL_JS = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/detail/detail.js'), 'utf8')
+const INDEX_JS = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/index/index.js'), 'utf8')
+ck('闸与两页那一格吃同一个谓词（三处都走 cardLog.aliveFor，没有第二份筛选）',
+  /cardLog\.aliveFor\(noteId\)\.length/.test(SHARE_JS)
+  && /cardLog\.aliveFor\(note\.id\)/.test(DETAIL_JS)
+  && /cardLog\.aliveFor\(noteId\)/.test(INDEX_JS)
+  && !/cardLog\.forNote\(/.test(SHARE_JS + DETAIL_JS + INDEX_JS),
+  `闸=${/aliveFor/.test(SHARE_JS)} 详情页=${/aliveFor/.test(DETAIL_JS)} 首页=${/aliveFor/.test(INDEX_JS)} 还吃裸 forNote=${/cardLog\.forNote\(/.test(SHARE_JS + DETAIL_JS + INDEX_JS)}`)
 ck('挡下时给的是字典里那句（不写死中文，这台工具可能停在英文态）',
   /t\('cardOneOnly', lang\)/.test(SHARE_JS) && !!MSG, MSG)
 ck('这一页仍然留着退回（不是一句提示把人钉在屏上）',
@@ -110,45 +122,81 @@ ck('中英两侧都有那一句', !!i18n.zh.cardOneOnly && !!i18n.en.cardOneOnly
   const readBack = () => ev('读记录', () => ({
     req: wx.__calls.req.slice(), toast: wx.__calls.toast.slice(),
   }))
-  const seed = (on) => ev('摆替身', (v) => {
+  /* 替身怎么摆：闸现在吃的是 `cardLog.aliveFor`——"账里有一条 **而且那张图还在**"才算有。
+     所以替身必须真落一个文件（原来那版只塞 `{tpl, noQr, thumb}`、没有 `p`，在新谓词下会被
+     筛掉，测的就不是那道闸了；这是判据要跟着谓词走，不是把代码改回去迁就旧尺子）。
+     'live'＝账在且图在（该挡）；'dead'＝账在但图被清掉（**不该挡**，正是详情页那一格会画成
+     「+」的那一态）；'off'＝整条撤掉（该放行）。 */
+  const PROBE = 'ruler-live-card-987654.jpg'
+  const seed = (mode) => ev('摆替身', (v) => {
     const key = 'cardLog'
     const map = wx.getStorageSync(key)
     const base = map && typeof map === 'object' ? map : {}
-    if (v) base['987654'] = [{ tpl: 'classic', noQr: false, thumb: '' }]
-    else delete base['987654']
+    // 文件名写在函数体里，不从外面递：`mp.evaluate` 是把函数序列化进那台小程序跑的，
+    // 外面那个 PROBE 常量在那一侧不存在（只能拿它核对读数）。
+    const fp = `${wx.env.USER_DATA_PATH}/ruler-live-card-987654.jpg`
+    const fm = wx.getFileSystemManager()
+    if (v === 'off') {
+      delete base['987654']
+      try { fm.unlinkSync(fp) } catch (e) { /* 本就没落 */ }
+    } else {
+      if (v === 'live') { try { fm.writeFileSync(fp, 'ruler-substitute', 'utf8') } catch (e) { return `写替身图失败:${e && e.message}` } }
+      // 'dead' 必须**主动把上一态那张图撤掉**：live 那一趟已经落过盘了，只"不写"等于还留着，
+      // 那一态就摆不出来（第一版就是这么红的——它测的是"撤没撤干净"，不是"写没写"）。
+      if (v === 'dead') { try { fm.unlinkSync(fp) } catch (e) { /* 本就没落，也算撤了 */ } }
+      base['987654'] = [{ p: fp, tpl: 'classic', noQr: false, at: Date.now() }]
+    }
     wx.setStorageSync(key, base)
-    return Object.keys(wx.getStorageSync(key) || {}).length
-  }, on)
+    let hasFile = false
+    try { fm.accessSync(fp); hasFile = true } catch (e) { hasFile = false }
+    return { keys: Object.keys(wx.getStorageSync(key) || {}).length, hasFile, mode: v }
+  }, mode)
   // 路由走 callWxMethod 而不是 mp.navigateTo：后者内部是"改路由 → 睡 3 秒 → 再读当前页"，
   // 这一页在它那三秒里自己 navigateBack 掉了，读那一趟就抛上面那个内部错，而重试会变成
   // **再推一层这一页**——判据就测的不是那一次进入了。拆开：只发路由，读页单独重试。
   const go = () => hop('进卡片页', () => mp.callWxMethod('navigateTo', { url: `/pages/share/share?id=${FAKE_ID}` }))
   const where = () => hop('读当前页', () => mp.currentPage())
 
-  // ① 台账里有一张：应当被挡下，且一个请求都不发
-  const seededKeys = await seed(true)
-  ck('替身落进本机台账了（这一格只用来当"这篇已经有卡片"）', seededKeys >= 1, `${seededKeys} 篇有留档`)
+  const isCreateShare = (l) => /^POST .*\/api\/shares\/$/.test(l)
+
+  // ① 账在、图也在：应当被挡下，且一条建码请求都不发
+  const s1 = await seed('live')
+  ck('替身落进本机台账了，而且那张"图"真的在盘上（新谓词认的是账 + 图两样）',
+    s1 && s1.keys >= 1 && s1.hasFile === true, JSON.stringify(s1))
   await reset()
   await go()
   await sleep(3000)
   const cur = await where()
   const r1 = await readBack()
-  const isCreateShare = (l) => /^POST .*\/api\/shares\/$/.test(l)
   ck('台账里已有这张：这一页没留住人，退回原页',
     cur && cur.path !== 'pages/share/share', cur && cur.path)
   ck('而且没顺手建出第二张分享码（这一趟一条 POST /api/shares/ 都没有）',
     r1.req.filter(isCreateShare).length === 0, JSON.stringify(r1.req))
   ck('给的那句就是字典里那句', r1.toast.indexOf(MSG) >= 0, JSON.stringify(r1.toast))
 
-  // ② 反向对照：撤掉替身，同一页同一 id 应当真去建码——证明挡住它的是那道闸，
-  //    而不是"这一页今天根本没跑起来"或者"网络没通"
-  await seed(false)
+  // ② 账在、图被系统清了：这一态详情页与详情窗那一格画的是「+」（点得动），所以这道闸**不许**挡。
+  //    10-07 之前闸吃裸 forNote、那一格吃筛过图的那份，两边会在这一态打架：界面说"还没生成过"，
+  //    点进来回一句"这篇已经有一张"。
+  const s2 = await seed('dead')
+  ck('第二态摆好了：账里那条还在、图已经不在了',
+    s2 && s2.keys >= 1 && s2.hasFile === false, JSON.stringify(s2))
   await reset()
   await go()
   await sleep(1500)
   const r2 = await readBack()
+  ck('图不在了就不挡：同一趟照常去建码（闸跟那一格吃同一条判据）',
+    r2.req.filter(isCreateShare).length >= 1 && r2.toast.indexOf(MSG) < 0,
+    `${JSON.stringify(r2.req)} / 吐司=${JSON.stringify(r2.toast)}`)
+  await sleep(3000) // 那趟会因 404 自己退回，别把补丁留在飞着的页上
+
+  // ③ 反向对照：整条撤掉，同一页同一 id 也真去建码——证明①那条红不会是"这一页根本没跑起来"
+  await seed('off')
+  await reset()
+  await go()
+  await sleep(1500)
+  const r3 = await readBack()
   ck('反向对照：台账空着时同一趟真会 POST 建码（所以①那条红不会是"页面没跑起来"）',
-    r2.req.filter(isCreateShare).length >= 1, JSON.stringify(r2.req))
+    r3.req.filter(isCreateShare).length >= 1, JSON.stringify(r3.req))
   await sleep(3000) // 那趟会因 404 自己退回，别把补丁留在飞着的页上
   const cur2 = await where()
   ck('不存在的笔记 id 打建码接口：服务端不认，页面自己退回（现网零写入）',
@@ -159,13 +207,16 @@ ck('中英两侧都有那一句', !!i18n.zh.cardOneOnly && !!i18n.en.cardOneOnly
     if (wx.__orig) { wx.request = wx.__orig.request; wx.showToast = wx.__orig.showToast; delete wx.__orig }
     const m = wx.getStorageSync('cardLog')
     if (m && m['987654']) { delete m['987654']; wx.setStorageSync('cardLog', m) }
+    try { wx.getFileSystemManager().unlinkSync(`${wx.env.USER_DATA_PATH}/ruler-live-card-987654.jpg`) } catch (e) { /* 本就没落 */ }
     return true
   })
   const left = await ev('复查还原', () => {
     const m = wx.getStorageSync('cardLog')
-    return !!(m && m['987654']) || !!wx.__orig
+    let fileStillThere = true
+    try { wx.getFileSystemManager().accessSync(`${wx.env.USER_DATA_PATH}/ruler-live-card-987654.jpg`) } catch (e) { fileStillThere = false }
+    return !!(m && m['987654']) || !!wx.__orig || fileStillThere
   })
-  ck('收尾：替身与那两层补丁都不留在这台工具上', left === false, String(left))
+  ck('收尾：替身那条账、那张替身图、那两层补丁都不留在这台工具上', left === false, String(left))
   await mp.close()
 
   console.log(`\n${bad.length === 0 ? '全过' : `红 ${bad.length} 条`}`)

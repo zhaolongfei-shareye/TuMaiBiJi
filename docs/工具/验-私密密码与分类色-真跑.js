@@ -322,15 +322,17 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
       gotStyle === wantStyle, `壁纸=${wallpaper}\n实读=${gotStyle}\n期望=${wantStyle}`)
     await mp.screenshot({ path: path.join(OUT, '02-分类章与行前那枚点.png') })
 
-    /* ---------- 详情页：三个动作全在上方（10-03「置顶」那枚撤了） ---------- */
+    /* ---------- 详情页：动作全在上方，而出卡片的口只有右上那一格（10-07 撤了第三枚） ---------- */
     await mp.navigateTo(`/pages/detail/detail?id=${tempNoteId}`)
     await sleep(3500)
     const det = await mp.currentPage()
     const bar = await det.$$('.action-bar .icon-btn')
     const barTx = []
     for (const b of bar) barTx.push(await b.text())
-    ck('详情页上方一排三枚（编辑/删除/生成笔记卡片，置顶那枚已撤）', bar.length === 3, barTx.join('|'))
-    ck('末枚文案是「生成笔记卡片」', barTx[2] === '生成笔记卡片', barTx[2])
+    ck('详情页上方一排两枚（编辑/删除）——「生成笔记卡片」那枚撤净了，同一件事不留两个把手',
+      barTx.length === 2 && barTx[0] === '编辑' && barTx[1] === '删除', barTx.join('|'))
+    ck('这一屏唯一的出卡片入口在右上那一格', !!(await det.$('.ds-entry')),
+      `那一格=${!!(await det.$('.ds-entry'))}`)
     ck('文末不再有底部操作区', !(await det.$('.bottom-actions')))
     await mp.screenshot({ path: path.join(OUT, '03-详情页动作在上方.png') })
     await mp.navigateBack().catch(() => {})

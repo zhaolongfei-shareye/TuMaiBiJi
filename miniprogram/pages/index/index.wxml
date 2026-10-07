@@ -196,11 +196,11 @@
         <view class="ds-rt" wx:if="{{!detailNote.is_private}}">
           <block wx:if="{{detailCards.length}}">
             <!-- 一篇一张，所以这一格没有 ‹ i/n ›：点它就是拉起这一张的大图（站长 10-03 23:40） -->
-            <view class="ds-pad ds-entry" catchtap="onSheetToPoster">
+            <view class="ds-pad ds-entry" catchtap="onCardCell">
               <image class="ds-pad-img" src="{{detailCards[0].p}}" mode="aspectFit" />
             </view>
           </block>
-          <view wx:else class="ds-empty ds-entry" catchtap="onSheetToPoster">
+          <view wx:else class="ds-empty ds-entry" catchtap="onCardCell">
             <view class="ds-swatch" style="background:{{swatchBg}}">
               <view class="ds-logo"><view class="ds-logo-n">{{brandGlyph}}</view><text>{{t.appName}}</text></view>
               <view class="ds-plus">+</view>

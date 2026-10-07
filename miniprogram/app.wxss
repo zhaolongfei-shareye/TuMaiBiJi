@@ -752,3 +752,103 @@ page {
   background: #23252C;
   color: #F2EFE9;
 }
+
+/* ---------- 「笔记卡片」那一格（详情窗右上 + 详情页右上，两页共用这一份） ----------
+   10-07 从 index.wxss 搬上来：详情页要补同一格，尺寸/描边/品牌字必须逐寸一样，抄一遍就是
+   第二份真相。类名前缀 `ds-` 是当年"详情窗"留下的名字，现在两页都吃，别再当成某一页私有。
+   每一页只留自己那一行的分栏（详情窗内净宽 634、详情页卡内净宽 638，不是同一个数），所以 `.ds-hero`
+   与 `.dt-hero` 各自留在本页。底色不在这里——那格淡底由 `palette.paleStep` 现算走 style 递进来。
+   尺子：`docs/工具/验-卡片那一格两页同源.js`。 */
+.ds-rt {
+  flex: none;
+  width: 252rpx;
+}
+
+/* 白垫与里面那张小图：逐寸按卡片那一屏的 .pad / .pad-img 缩到 252 宽
+   （340→252 是 0.7412，474→352、312→232、446→330 都是乘这同一个数）。
+   点这一整格就是出卡片——底排那枚按钮撤了之后，这是唯一入口。 */
+.ds-pad {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 252rpx;
+  height: 352rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  box-shadow: 0 8rpx 22rpx rgba(8, 10, 14, 0.10);
+}
+
+.ds-pad-img {
+  width: 232rpx;
+  height: 330rpx;
+}
+
+/* 一张都没有：那枚淡底方形。尺寸吃列表那枚方块 --blk 的 176。 */
+.ds-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ds-swatch {
+  position: relative;
+  width: 176rpx;
+  height: 176rpx;
+  border-radius: 28rpx;
+  border: var(--w-edge) solid rgba(35, 37, 44, 0.10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-plus {
+  font-weight: 200;
+  font-size: 56rpx;
+  line-height: 1;
+  color: rgba(35, 37, 44, 0.42);
+}
+
+/* 左上角那枚品牌字：圆点 28 + 品牌名 18（--fs-micro 那一档，再小屏上就读不出了）。
+   圆点里那个字是 poster.BRAND_GLYPH，与海报无形象时的占位字同一个常量。 */
+.ds-logo {
+  position: absolute;
+  left: 14rpx;
+  top: 14rpx;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.ds-logo-n {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  background: #23252C;
+  color: #F2EFE9;
+  font-size: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-logo text {
+  font-size: var(--fs-micro);
+  letter-spacing: 1rpx;
+  color: rgba(35, 37, 44, 0.45);
+}
+
+.ds-e1 {
+  display: block;
+  margin-top: 18rpx;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: rgba(35, 37, 44, 0.9);
+}
+
+.ds-e2 {
+  display: block;
+  margin-top: 6rpx;
+  font-size: var(--fs-micro);
+  color: rgba(35, 37, 44, 0.5);
+}

@@ -226,17 +226,21 @@ const txt = async (els) => {
         ? `十张尺寸 ${b1.key}，整排 top ${Math.round(pos0.top)}→${Math.round(pos1.top)}`
         : [!sameSize && `尺寸 ${boxes0} → ${b1.key}`, !samePlace && `位子 top ${Math.round(pos0.top)}→${Math.round(pos1.top)} 高 ${pos0.h}→${pos1.h}`, !sameName && `名字 ${pickLabels.join('|')} → ${labels1}`].filter(Boolean).join('；'))
 
-    // 「生成笔记卡片」这枚在详情页**上方那一排**（09-30：改名 + 并排 + 全部功能搬上文，
-    // 原来它是一枚通栏 .btn-share 落在长文末尾，要滚到底才看得见）
+    // 「生成笔记卡片」原来就排在这一枚的位置上（09-30 把详情页所有功能搬到文档上方）。
+    // 10-07 撤净：出卡片的口只剩**右上那一格**，同一件事不留两个把手
+    // （站长原话"生成后，不应该出现生成卡片的入口，很多余，为什么不干掉"；这条是 v20 那一稿早拍过的）。
     page = await mp.reLaunch(`/pages/detail/detail?id=${noteId}`)
     await sleep(2000)
     const barBtns = (await txt(await page.$$('.action-bar .icon-btn'))).join('|')
     // 期望值从这一屏自己那份 t 里取：账号切了英文也不会把这条尺子判成假红
     const tt = await page.data('t')
     // 10-03「置顶」那一枚跟着列表一起撤了（列表已不显示置顶状态，按下去只进不出）
-    const want = [tt.edit, tt.delete, tt.shareAsImage].join('|')
-    ck('详情页上方一排三枚，末枚就是 shareAsImage 那颗', barBtns === want,
+    const want = [tt.edit, tt.delete].join('|')
+    ck('详情页上方一排只剩两枚（编辑／删除），第三枚那一句已经不在这排上',
+      barBtns === want && barBtns.indexOf(tt.shareAsImage) < 0,
       barBtns === want ? barBtns : `${barBtns} ≠ ${want}`)
+    ck('出卡片那一句只出现在右上那一格里（一屏两处同名就是两个把手）',
+      !!(await page.$('.ds-entry')), `那一格=${!!(await page.$('.ds-entry'))}`)
     ck('这一排里没有置顶', !/置顶|[Pp]in/.test(barBtns), barBtns)
     ck('文末不再有底部操作区', !(await page.$('.bottom-actions')))
     await mp.screenshot({ path: `${SHOT}/c6-详情页.png` })

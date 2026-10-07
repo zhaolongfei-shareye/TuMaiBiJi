@@ -2,24 +2,47 @@
   <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
   <view wx:elif="{{note}}" class="detail-wrapper">
-    <!-- 抬头：v4 那条口径——详情页不要色彩方块，纯文字抬头 -->
+    <!-- 抬头：v4 那条口径——详情页不要色彩方块，纯文字抬头。
+         10-07 补上右上那一格（v20 那一稿画了、一直没落地）：这篇留过卡片就是那张缩略图，
+         一张都没有就是那枚淡底方形 + 图麦 LOGO + `+`。它是出卡片的唯一入口。 -->
     <view class="card hero-flat">
-      <view class="hero-meta">{{note.source_type_label}} · {{note.created_at_label}}</view>
-      <view class="hero-title">{{note.title}}</view>
-      <view class="tags" wx:if="{{note.tags && note.tags.length}}">
-        <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
+      <view class="dt-hero {{note.is_private ? 'solo' : ''}}">
+        <view class="dt-lt">
+          <view class="hero-meta">{{note.source_type_label}} · {{note.created_at_label}}</view>
+          <view class="hero-title">{{note.title}}</view>
+          <view class="tags" wx:if="{{note.tags && note.tags.length}}">
+            <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
+          </view>
+        </view>
+        <view class="ds-rt" wx:if="{{!note.is_private}}">
+          <block wx:if="{{detailCards.length}}">
+            <!-- 一篇一张，所以这一格没有 ‹ i/n ›：点它就是拉起这一张的大图（站长 10-03 23:40） -->
+            <view class="ds-pad ds-entry" catchtap="onCardCell">
+              <image class="ds-pad-img" src="{{detailCards[0].p}}" mode="aspectFit" />
+            </view>
+          </block>
+          <view wx:else class="ds-empty ds-entry" catchtap="onCardCell">
+            <view class="ds-swatch" style="background:{{swatchBg}}">
+              <view class="ds-logo"><view class="ds-logo-n">{{brandGlyph}}</view><text>{{t.appName}}</text></view>
+              <view class="ds-plus">+</view>
+            </view>
+            <text class="ds-e1">{{t.shareAsImage}}</text>
+            <text class="ds-e2">{{t.noCards}}</text>
+          </view>
+        </view>
       </view>
     </view>
 
-    <!-- 操作条：三枚并排一行，全部钉在文档上方（站长 09-30："详情页所有功能都要在文档上方而不是下方"）。
+    <!-- 操作条：两枚并排一行，全部钉在文档上方（站长 09-30："详情页所有功能都要在文档上方而不是下方"）。
          原来「生成笔记卡片」和公开状态那两行落在长文末尾，得滚到底才看得见。
-         私密笔记那枚不给，公开状态那行也不给（与列表详情窗同一条口径）。
+         10-07：第三枚「生成笔记卡片」撤净——出卡片的入口只剩右上那一格，同一件事不留两个把手
+         （站长原话"生成后，不应该出现生成卡片的入口，很多余"；这条是 v20 那一稿早就拍了的口径）。
+         私密笔记那一格不出、公开状态那行也不给（与列表详情窗同一条口径）。
          「置顶」那一枚 10-03 跟着列表一起撤了——列表已经不再显示置顶状态，按了只有一句话回应、
          笔记却会一直顶在最前面且没法解开，那是个只进不出的门。 -->
     <view class="action-bar">
       <view class="icon-btn" bindtap="onEdit">{{t.edit}}</view>
       <view class="icon-btn danger" bindtap="onDelete">{{t.delete}}</view>
-      <view wx:if="{{!note.is_private}}" class="icon-btn primary" bindtap="onShare">{{t.shareAsImage}}</view>
     </view>
     <!-- 海报上的码不过期，所以这一行是用户唯一能把已公开内容收回来的入口；只在真的公开着时出现 -->
     <view wx:if="{{shared && !note.is_private}}" class="share-state">

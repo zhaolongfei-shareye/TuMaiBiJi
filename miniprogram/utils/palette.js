@@ -398,6 +398,20 @@ function themeOf(wallpaper) {
   return THEMES.find((x) => x.key === key) || THEMES[0]
 }
 
+/* 「笔记卡片」那一格空态的淡底（站长 10-03 原话："做一个淡淡方形，用背景风格的主色阶"）。
+   详情窗与详情页两页右上那一格吃这一个函数——10-07 之前它写在首页里，详情页要补同一格时
+   只能抄一遍色号，那就是第二份真相。
+   10-04 压成四枚壁纸之后规则只剩一条：吃当前主题色阶的最浅那一档（steps[0]）。
+   下面那句 mix() 掺 8% 墨的算法现在没有壁纸会走到，留着是给"新加一枚壁纸忘了写 ramp"兜底
+   ——那条一触发就会拿页面底去掺，深色那两枚的页底是近黑，掺出来压在纸白面上就是他打回过的
+   "太明显了"，所以兜底参照物换成窗口那张纸白。 */
+const SHEET_PAPER = '#FCFBF8'
+function paleStep(wallpaper) {
+  const th = themeOf(wallpaper)
+  if (th.ramp && th.ramp.steps && th.ramp.steps.length) return th.ramp.steps[0]
+  return mix('#23252C', th.dark ? SHEET_PAPER : th.page, 0.08)
+}
+
 /**
  * 当前生效的那套壁纸。由 app.applyTheme 在每次应用主题时写进来。
  * 之所以做成模块状态而不是参数：新建页那三张卡、首页搜索卡的颜色是在 Page 的
@@ -604,6 +618,7 @@ module.exports = {
   toneStyle,
   toneColor,
   themeOf,
+  paleStep,
   themeLabel,
   setActiveTheme,
   rampFor,

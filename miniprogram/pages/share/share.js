@@ -68,7 +68,10 @@ Page({
     // 刚写完就读它，判的可能是上一个号的台账。
     // 顺序要紧：这一句必须在 `generateShareImage()` 前面，那一趟会先 POST 建一张分享码，
     // 挡晚了就等于"这篇不许有第二张卡片"和"这篇已经多了第二张活码"同时成立。
-    if (cardLog.forNote(noteId).length) {
+    // 判据用 `aliveFor` 而不是 `forNote`：详情页与详情窗右上那一格画不画缩略图吃的就是它
+    // （账在本机 storage 里、图在应用私有目录，系统清缓存能只清图不清账）。两边要是各判各的，
+    // 那一格显示"还没有生成过卡片"、点进来却被这道闸挡回"这篇已经有一张"——一屏两句反话。
+    if (cardLog.aliveFor(noteId).length) {
       wx.showToast({ title: t('cardOneOnly', lang), icon: 'none', duration: 1800 })
       setTimeout(() => wx.navigateBack(), 1600)
       return

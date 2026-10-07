@@ -19,6 +19,25 @@
   padding: var(--sp-4);
 }
 
+/* 抬头分两列：左标题那一叠，右「笔记卡片」那一格（格子的样式在 app.wxss，两页共用一份）。
+   卡内净宽 638 = 750 − 容器左右 --sp-3(24)×2 − .hero-flat 内缩 --sp-4(32)×2，分给 362 + 24 + 252。
+   私密笔记不出那一格，左列摊满整宽（与详情窗 `.ds-hero.solo` 同一条口径）。 */
+.dt-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 24rpx;
+}
+
+.dt-hero .dt-lt {
+  flex: 1;
+  min-width: 0;
+}
+
+.dt-hero.solo .dt-lt {
+  flex: none;
+  width: 100%;
+}
+
 .hero-meta {
   font-size: var(--fs-tiny);
   font-weight: 800;
@@ -40,7 +59,7 @@
   margin-top: var(--sp-3);
 }
 
-/* 操作条：三个中性胶囊 */
+/* 操作条：两枚中性胶囊（10-07 起这排没有第三枚——出卡片的口在右上那一格） */
 .action-bar {
   display: flex;
   gap: var(--sp-2);
@@ -56,20 +75,13 @@
   color: var(--text-primary);
   font-size: 25rpx;
   font-weight: 700;
-  /* 与详情窗那一排同一条规矩：一行三枚不许折行，所以英文写 Make card 不写 Generate note card */
+  /* 与详情窗那一排同一条规矩：一行两枚不许折行（英文 Edit / Delete 本来就短） */
   white-space: nowrap;
 }
 
 .icon-btn.danger {
   color: var(--danger);
   background: var(--danger-soft);
-}
-
-/* 第四枚「生成笔记卡片」宽一点：六个字压在等宽的一枚里会顶到边 */
-.icon-btn.primary {
-  flex: 1.4;
-  background: var(--btn-bg);
-  color: var(--btn-ink);
 }
 
 /* 中性面板：长文本在这里读 */

@@ -151,7 +151,9 @@ ck('八套主题的 --btn-bg 全等于 chromeOf(该套).sel（实心按钮与底
 const BTN_RULES = [
   ['app.wxss', '.btn-primary'], ['pages/index/index.wxss', '.tpl-main'],
   ['pages/index/index.wxss', '.tpl-btn.primary'], ['pages/me/me.wxss', '.pwd-btn.primary'],
-  ['pages/detail/detail.wxss', '.icon-btn.primary'], ['pages/categories/categories.wxss', '.edit-confirm'],
+  // 详情页那枚 `.icon-btn.primary`（「生成笔记卡片」）10-07 整块撤了：入口挪进右上那一格，
+  // 同一件事不留两个把手。这条点名表跟着少一项——它钉的东西不在这页上了，不是判据松了。
+  ['pages/categories/categories.wxss', '.edit-confirm'],
   ['pages/categories/categories.wxss', '.dialog-btn.confirm'],
 ]
 const btnStale = BTN_RULES.filter(([f, sel]) => {
@@ -439,18 +441,28 @@ for (const [nm, css, canvasSel, onSel] of [['分享页那一排', shareCss, 'pic
    三条规则钉在一起（少一条就会变成"换壁纸那一块不动"或者"深色下染出一块近黑"）。 */
 {
   const idxWxml = fs.readFileSync(path.join(pageDir, 'pages/index/index.wxml'), 'utf8')
-  const bare = fs.readFileSync(path.join(pageDir, 'pages/index/index.wxss'), 'utf8')
+  // 10-07：那一格整套搬进 app.wxss（详情页要画同一格，尺寸必须逐寸一样）。所以"不写死 background"
+  // 这条要看的是 app.wxss，而两页自己的 wxss 里**不许再有一份** `.ds-swatch`——有第二份就是漂移的起点。
+  const bare = fs.readFileSync(path.join(pageDir, 'app.wxss'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
+  const idxCss = fs.readFileSync(path.join(pageDir, 'pages/index/index.wxss'), 'utf8')
+  const detCss = fs.readFileSync(path.join(pageDir, 'pages/detail/detail.wxss'), 'utf8')
   const idxJs = fs.readFileSync(path.join(pageDir, 'pages/index/index.js'), 'utf8')
   const sw = cssRule(bare, 'ds-swatch') || ''
   ck('淡底那格的色从 style 递进来，wxss 里不写死 background',
     /class="ds-swatch" style="background:\{\{swatchBg\}\}/.test(idxWxml) && !/background:/.test(sw),
     sw.trim().replace(/\s+/g, ' ') || '没读到 .ds-swatch')
+  ck('那一格的样式只有 app.wxss 那一份（两页各自再写一条就是第二份真相）',
+    /\.ds-swatch\s*\{/.test(bare) && !/\.ds-swatch\s*\{/.test(idxCss) && !/\.ds-swatch\s*\{/.test(detCss),
+    `app=${/\.ds-swatch\s*\{/.test(bare)} index=${/\.ds-swatch\s*\{/.test(idxCss)} detail=${/\.ds-swatch\s*\{/.test(detCss)}`)
   // 10-04 压成四枚之后 paleStep 只剩一条真规则：都吃当前主题色阶的最浅那一档。
   // 后面那句 mix() 是给"新壁纸忘了写 ramp"兜底的死路，所以钉的是"它确实只在没 ramp 时才走"。
+  // 10-07 这个函数从 pages/index/index.js 搬进 utils/palette.js（详情页也要用它，不能抄色号）。
+  const palJs = fs.readFileSync(path.join(pageDir, 'utils/palette.js'), 'utf8')
   ck('paleStep 只有一条：有色阶就吃 steps[0]',
-    /th\.ramp && th\.ramp\.steps && th\.ramp\.steps\.length\) return th\.ramp\.steps\[0\]/.test(idxJs),
-    (idxJs.match(/function paleStep[\s\S]*?\n}/) || ['没抓到 paleStep'])[0].replace(/\s+/g, ' ').slice(0, 120))
+    /th\.ramp && th\.ramp\.steps && th\.ramp\.steps\.length\) return th\.ramp\.steps\[0\]/.test(palJs)
+    && !/function paleStep/.test(idxJs),
+    (palJs.match(/function paleStep[\s\S]*?\n}/) || ['没抓到 paleStep'])[0].replace(/\s+/g, ' ').slice(0, 120))
   // 这条不能拿 themeOf(t.key).steps[0] 和 t.steps[0] 比——那是同一个值自己跟自己比，永真。
   // 要钉的是"四枚的第一档互不相同"，否则换壁纸那一块淡底根本不会变。
   ck('四枚色阶第一档互不相同（换壁纸时这一块淡底一定跟着换）',

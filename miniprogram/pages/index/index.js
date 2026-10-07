@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, themeOf, mix, TIP_DOT } = require('../../utils/palette.js')
+const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, paleStep, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardInfo = require('../../utils/cardInfo.js')
@@ -30,16 +30,8 @@ const SOURCE_TYPE_KEYS = {
 const SUM_LINES = 3
 const SUM_CHARS = 24
 
-/* 详情窗右上那枚淡底方形的底色（站长 10-03 原话："做一个淡淡方形，用背景风格的主色阶"）。
-   10-04 压成四枚之后规则只剩一条：都吃当前主题色阶的最浅那一档（steps[0]）。
-   下面那句 mix() 掺 8% 墨的算法现在没有壁纸会走到，留着是给"新加一枚壁纸忘了写 ramp"兜底
-   ——那条一触发就会拿页面底去掺，压在纸白窗上就是他打回过的"太明显了"。 */
-const SHEET_PAPER = '#FCFBF8'
-function paleStep(wallpaper) {
-  const th = themeOf(wallpaper)
-  if (th.ramp && th.ramp.steps && th.ramp.steps.length) return th.ramp.steps[0]
-  return mix('#23252C', th.dark ? SHEET_PAPER : th.page, 0.08)
-}
+/* 详情窗右上那枚淡底方形的底色已经搬进 `palette.paleStep`——10-07 详情页要补同一格时，
+   规则只该有一份，不该让第二页抄一遍色号。这一页吃的是下面 import 里那一个。 */
 
 Page({
   data: {
@@ -307,19 +299,11 @@ Page({
     return { rows, cells }
   },
 
-  // 台账里这一篇留过的卡片，一律按"留下来的先后"倒序——最新那张排第一。
-  // 卡片那一屏的 cells 与详情窗右上那一格都走这一个口，两处不再各排各的：
-  // 顺着放就会拿"最早那一张"当封面，站长 10-03 报的"小图跟大图完全不匹对"就是这个错位。
-  // 文件已经不在的那一条不列：账在本机 storage 里，图在应用私有目录，系统清缓存能只清掉图
-  // （首页那张形象图同一处理，见 bgSrc 那一条）。指过去就是一块白板，看着像卡片坏了，
-  // 宁可退回空态那一格让人重新出一张。10-03 模拟器实测到这一态：src 递到了、文件不在。
+  // 台账里这一篇**还看得见**的卡片，规则本体已经搬进 `cardLog.aliveFor`（倒序 + 图不在就不列），
+  // 因为 10-07 起三处要吃同一个谓词：这一页的 cells 与详情窗右上那一格、详情页右上那一格、
+  // 以及笔记卡片页那道「一篇只留一张」的闸。留这一个方法名是给上面两处调用点用的，不再装逻辑。
   _cardsOf(noteId) {
-    const fm = wx.getFileSystemManager()
-    const alive = (p) => { try { fm.accessSync(p); return true } catch (e) { return false } }
-    return (cardLog.forNote(noteId) || [])
-      .filter((x) => x && x.p && alive(x.p))
-      .slice()
-      .sort((x, y) => (y.at || 0) - (x.at || 0))
+    return cardLog.aliveFor(noteId)
   },
 
   async loadNotes(reset = false) {
@@ -634,7 +618,9 @@ Page({
   // 所以关掉弹窗后回来的是详情窗、里面内容还是这篇。
   // v22（站长 10-03）：入口从底排那枚按钮挪到右上那一格（有卡片就是那张缩略图，
   // 一张都没有就是那枚淡底方形），底排不再留第二个把手。
-  onSheetToPoster() { return this._openPosterFor(this.data.detailNote, 'sheet') },
+  // 名字 10-07 改成 `onCardCell`：详情页右上那一格是同一份标记、同一个口，两页绑同一个名字，
+  // 那份"两页那一格一模一样"的尺子才钉得住（各绑各的名字就没法逐字节比）。
+  onCardCell() { return this._openPosterFor(this.data.detailNote, 'sheet') },
 
   // 站长 10-04：卡片那一格的小图点下去**直接拉大图**，不再先浮详情窗（原话「不需要再看原文」）。
   // 私密那一篇照旧走详情窗：拉大图这一步会把这篇的活码建出来（`_ensurePosterAssets` 里

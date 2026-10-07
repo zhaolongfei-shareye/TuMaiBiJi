@@ -244,8 +244,14 @@ ok('海报页同一条：存相册成功才走 _keepCard，模板与带没带码
   && /this\._renderedNoQr = !!this\.data\.noQr/.test(strip(shareJs)))
 ok('画布落图那一步不再记账（_renderPoster 里不许出现 record，滑一次模板多一张就是它）',
   !/cardLog\.record/.test(renderPoster) && /this\._posterCanvas = canvas/.test(renderPoster))
+const SORT_RE = /sort\(\(x, y\) => \(y\.at \|\| 0\) - \(x\.at \|\| 0\)\)/
+const SORT_SHORT = /sort\(\(x, y\) => \(y\.at/
 ok('格子里第一张＝最近留下的那张（台账按 at 倒序；顺着放就会拿最早那张当封面）',
-  /sort\(\(x, y\) => \(y\.at \|\| 0\) - \(x\.at \|\| 0\)\)/.test(CODE_JS))
+  // 10-07：这条排序从首页那份 `_cardsOf` 搬进 `cardLog.aliveFor`——详情页右上那一格与笔记卡片页
+  // 那道闸都要吃同一个谓词，各自排各自的就会一屏出两种顺序。判据本身没松，只是钉到唯一的出处，
+  // 并顺手钉"首页不再自己排第二遍"。
+  SORT_RE.test(cardLogJs) && !SORT_SHORT.test(CODE_JS),
+  `台账里排了=${SORT_RE.test(cardLogJs)}　首页自己又排了一遍=${SORT_SHORT.test(CODE_JS)}`)
 /* 小图 ↔ 大图必须一一对上（站长 10-03 真机报的严重 BUG：「点小图，和大图没有关联。
    无论点什么小图，都是同一个大图」）。两处根因：开窗那段读的是「我的→卡片模板」
    那套默认模板，跟台账里他刚点的这一张无关；而从卡片那一枚的格子点进去，指针一律归 0。
@@ -259,7 +265,9 @@ ok('点开大图取的是「台账里那一张」的模板，不是卡片模板�
   // 拿包内那张表去"认不认"会把真存在的模板判成不认识、开成默认那一套。
   && /poster\.templateList\(\)\.some\(\(x\) => x\.id === cur\.tpl\)/.test(sheetFn))
 ok('两条入口共用同一段开窗逻辑（各写一份就会走样：一条照台账、一条照默认）',
-  /onSheetToPoster\(\) \{ return this\._openPosterFor\(this\.data\.detailNote, 'sheet'\) \}/.test(CODE_JS)
+  // 函数名 10-07 从 `onSheetToPoster` 改成 `onCardCell`：详情页右上那一格画的是同一份标记，
+  // 两页绑同一个名字，"那一格一模一样"那条尺子才能逐字节比。判据本身一个字没松。
+  /onCardCell\(\) \{ return this\._openPosterFor\(this\.data\.detailNote, 'sheet'\) \}/.test(CODE_JS)
   && /return this\._openPosterFor\(note, 'grid'\)/.test(CODE_JS))
 ok('卡片那一格：小图直接开大图、标题那行仍进详情窗（两个落点各一个口，私密那篇仍走详情窗）',
   /class="pad" catchtap="onCardTap"/.test(CODE_WXML)
