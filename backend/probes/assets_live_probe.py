@@ -35,6 +35,9 @@ MARK = uuid.uuid4().hex[:8]
 CAP = 9  # 与 app/models/asset.py 的 MAX_ASSETS_PER_NOTE 同值，这里现读靠那条超封顶判据兜住
 SIZES = [120000, 340000, 700]
 KEYS = [f"cloud://probe-{MARK}/img{i}-{s}.jpg" for i, s in enumerate(SIZES)]
+# 补到满 9 张那六条（§9.5 用）。放在这里是因为 §10 收尾要拿"三 + 六"这一整份去比对回体，
+# 中途红一次也不该留个没登记的键在库里没人记得。
+FULL = [f"cloud://probe-{MARK}/full{i}.jpg" for i in range(6)]
 
 results = []
 
@@ -194,12 +197,34 @@ def main():
               rc.status_code == 200 and pub2.status_code == 404,
               f"revoke={rc.status_code} 再读公开页={pub2.status_code}")
 
+    # ---- 9.5 满 9 这一档现网真收得下（§6 只证了"第 10 条被拦"，边界另一侧一直没钉）----
+    # 为什么单独跑这一趟：客户端一次 bind 最多送 9 条，而"一篇最多 9 张"这句在现网要是
+    # 判成 8，症状是用户传九张只留八张、接口回 400 被 B 链咽掉（失败不阻断存笔记），
+    # 谁都不会知道。上一轮只钉了上界那一侧（第 10 条拦下），这一条钉"第 9 条放过"。
+    six = [{"file_id": k, "size": 1000 + i, "width": 1080, "height": 1440} for i, k in enumerate(FULL)]
+    r = client.post(f"/api/notes/{note_id}/assets", headers=hdr, json={"items": six})
+    got9 = client.get(f"/api/notes/{note_id}/assets", headers=hdr).json()
+    check("补到满 9 张：接口收（200），库里就是 9 行",
+          r.status_code == 200 and len(got9) == CAP,
+          f"HTTP {r.status_code} 库里 {len(got9)} 行")
+    check("九张的顺序就是绑定的先后（详情页那排缩略图与看大图那页码都吃这个顺序）",
+          [x["cloud_url"] for x in got9] == KEYS + FULL, str([x["cloud_url"] for x in got9])[:120])
+    q9 = quota().json()
+    check("配额跟着算成 9 张、字节是三张之和加这六张",
+          q9["user_count"] == CAP and q9["user_bytes"] == sum(SIZES) + sum(x["size"] for x in six),
+          f"{q9['user_count']} 张 / {q9['user_bytes']} B")
+    r = client.post(f"/api/notes/{note_id}/assets", headers=hdr,
+                    json={"items": [{"file_id": f"cloud://probe-{MARK}/第十张.jpg", "size": 1}]})
+    still9 = len(client.get(f"/api/notes/{note_id}/assets", headers=hdr).json())
+    check("第十张仍被拦（400），库里还是 9 行（不是先写进去再报错）",
+          r.status_code == 400 and still9 == CAP, f"HTTP {r.status_code} 库里 {still9} 行")
+
     # ---- 10. 删笔记：行归零，那份 fileID 清单必须回给客户端 ------------------------
     r = client.delete(f"/api/notes/{note_id}", headers=hdr)
     body = r.json() if r.status_code == 200 else {}
     check("删掉这篇（200）", r.status_code == 200, f"HTTP {r.status_code} {r.text[:80]}")
-    check("回体里 file_ids 就是那三个对象（这台后端删不掉云上的东西，清单是客户端唯一的出处）",
-          set(body.get("file_ids") or []) == set(KEYS), str(body.get("file_ids"))[:140])
+    check("回体里 file_ids 是这九个对象（这台后端删不掉云上的东西，清单是客户端唯一的出处）",
+          set(body.get("file_ids") or []) == set(KEYS + FULL), str(body.get("file_ids"))[:140])
     q_end = quota().json()
     check("删完之后我的配额回到基线",
           (q_end["user_count"], q_end["user_bytes"]) == (j0["user_count"], j0["user_bytes"]),
