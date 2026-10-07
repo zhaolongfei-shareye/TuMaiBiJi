@@ -4,14 +4,17 @@
 // "笔记没存下来"发生**。所以这里没有一个 throw——全部 resolve(null)，调用方看到 null
 // 就当这张没备份，主流程照走。
 //
-// ⚠ CLOUD_ENV 现在是空串，整条链是**关着的**。
-// 空着的原因不是没写完，是环境 ID 只能从云开发控制台读，而我这侧的后台登录态是掉的
-// （读到的是"请使用微信扫码"）。填上这一格之前：
-//   · app.js 那一步 init 会直接跳过，不会拿空 env 去调用（那样每次上传都报一条看不懂的红）；
-//   · cloudReady() 回 false，录入页那条 B 链一张都不传，行为和今天一模一样。
-// 填法：小程序后台 → 云开发 → 环境管理 → 环境 ID（形如 xxx-1g2h3i4j），抄进下面这一格。
+// ✅ CLOUD_ENV 10-07 填上了，整条链从此是开的（前提是后端那三个接口也上了现网——
+// 现读：`/api/notes/{id}/assets`、`/api/user/storage-quota` 在 https://api.agentsbin.cn/wtsj 目前回 **404**，
+// 也就是图能传上云、但"归到哪篇笔记"这一步服务端还没接，详情页读不回来。上传这一半不依赖后端，可以先验）。
+// 这一串不是去控制台抄的：它就是提炼那条链在用的环境（docs/产品需求.md §6.1 那张表、§8.12 的实测读数），
+// 10-07 从这台机器 POST `cloudbase-d6gzh0i0tff02943a.api.tcloudbasegateway.com/v1/functions/extract`
+// 回 401、0.375s——环境活着、网关活着。存储桶有没有开仍然只在控制台能看到，代码侧证不了。
+// 填上之后：
+//   · app.js 那一步会真 `wx.cloud.init`；
+//   · cloudReady() 回 true，录入页那条 B 链开始真传（失败仍然只 resolve(null)，不阻断建笔记）。
 
-const CLOUD_ENV = ''
+const CLOUD_ENV = 'cloudbase-d6gzh0i0tff02943a'
 
 const _ext = (path) => {
   const m = /\.([a-zA-Z0-9]{2,4})$/.exec(String(path || ''))

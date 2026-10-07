@@ -6,6 +6,7 @@
 // 所以这里钉的全是"跨端各写一份、漂了就没人报警"的那几条。
 const fs = require('fs')
 const path = require('path')
+const os = require('os')   // §十 的反向对照要把模块副本写到临时目录再 require（os.tmpdir() 不给 /tmp 那个软链，缓存键才不会漂）
 
 const ROOT = path.resolve(__dirname, '../..')
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8')
@@ -76,9 +77,12 @@ ck('canvasToTempFilePath 显式给了 destWidth/destHeight（不给会再乘一�
 ck('三档都超就交最后一次（"宁可大一点也不丢图"这条取舍在代码里）',
   /overBudget/.test(CMP) && /return last/.test(CMP))
 
-/* ---------- 三、没填环境时整条链必须是关着的（今天的行为一字不变） ---------- */
-ck('CLOUD_ENV 默认空串（云开发环境 ID 还没读回来，不许假装它存在）',
-  /const CLOUD_ENV = ''/.test(UP))
+/* ---------- 三、环境那一格与四道闸门（形状层；"真打了几次"在 §十 用桩数） ---------- */
+/* 10-06 这一段钉的是"CLOUD_ENV 是空串、整条链关着"。10-07 那一格填上了，那条判据的前提没了——
+   按规矩改判据、不改代码去迁就旧尺子。空着那条分支的行为没有丢，它挪到 §十 用反向对照钉住。 */
+ck('CLOUD_ENV 是一串像样的环境 ID（非空、只含小写字母数字与连字符、不是一句占位话）',
+  /^const CLOUD_ENV = '[a-z0-9][a-z0-9-]{6,}'$/m.test(UP),
+  (UP.match(/^const CLOUD_ENV = .*$/m) || ['读不到那一行'])[0])
 ck('cloudReady 同时看 env 与 wx.cloud（基础库没有云能力时也不许往下走）',
   /return !!CLOUD_ENV && !!wx\.cloud/.test(UP))
 ck('uploadImage 第一行就挡：不 ready 直接 null',
@@ -224,7 +228,8 @@ ck('新写类名带页面前缀（dt- / sv- / me-storage），别的页面同名
 /* ---------- 九、队列跑起来（不以正则为准：真把产品那份 require 进来打一遍） ---------- */
 /* 上面八段查的都是"代码长这样"。这一段查"它真那么做"：拿一个会数调用次数的假 api 与一个假
    wx storage，把六条路径各走一遍——空队列、绑成、弱网、服务端拒绝、去重合并、超限丢弃。
-   为什么值得单独跑：这条链今天在线上一次都没真跑过（CLOUD_ENV 空着，整条是关的），
+   为什么值得单独跑：这条链到 10-07 为止在线上一次都没真跑过（先是 CLOUD_ENV 空着整条关着；
+   那一格填上之后，后端那两个读接口在现网仍回 404，绑定这一步还没人接），
    它坏了没人会看见，只会几个月后配额对不上账时才发现"原来弱网那一次根本没补绑上"。
    这八条不是永真式：10-06 拿六份改坏的 assetQueue 各跑过一遍（去掉 4xx 摘除／让弱网也丢整批／
    去掉 fileID 去重／去掉 50 条上限／让 storage 写失败抛穿／让空队列也打一次请求），
@@ -270,7 +275,7 @@ const watchdog = setTimeout(() => {
   reset()
   const a0 = mkApi('ok')
   const r0 = await q.flush(a0)
-  ck('跑起来：空队列 flush 一次请求都不发（今天 CLOUD_ENV 没填，进前台就是这个形状）',
+  ck('跑起来：空队列 flush 一次请求都不发（本机没攒下待补绑的，就不该有动静）',
     a0.calls.length === 0 && r0.sent === 0 && r0.left === 0, `打了 ${a0.calls.length} 次`)
 
   reset()
@@ -335,19 +340,19 @@ const watchdog = setTimeout(() => {
   global.wx.setStorageSync = origSet
   ck('跑起来：storage 写不进去时 push 不抛穿（调用方是 B 链收尾，它一抛就会冒 unhandled rejection）',
     threw === null, threw && threw.message)
-  /* ---------- 十、今天这一支整条链是"关着的"——跑出来，不是读出来 ---------- */
-  /* 上面 §三 那四条查的是源码形状。这里给一个**功能齐全**的假 wx.cloud（env 没填才是关着的原因，
-     不是因为设备没有云能力），逐个数调用：真机上开发者工具会连 wx.cloud 都给你，
-     所以只有"init/upload/delete 一次都没打"才算证明今天的行为一字不变。 */
-  const cloudCalls = { init: 0, upload: 0, remove: 0 }
+  /* ---------- 十、这一支现在是"开着的"——数调用，不读源码 ---------- */
+  /* 10-07 把 CLOUD_ENV 填上了，所以这一段反过来数：init 要真打一次、带的必须就是那一格、上传要真走一次、
+     删除要真发一次。再把 env 抠掉（复制一份模块、只改那一行）用同一套桩跑一遍，
+     证明"没配环境就是静默"那条分支还在——它不再是今天的事实，但仍是代码要守住的行为。 */
+  const cloudCalls = { init: 0, upload: 0, remove: 0, initEnv: null, cloudPath: null }
   /* 假 wx.cloud 一律**把 success 回调发完**。云开发那几个 API 是回调式的外壳（里面才包 Promise），
      替身只 return 不调 success，那条 `new Promise` 就永远不 settle——而 node 在事件循环空了的时候
      会**静默 exit 0**，整把尺子一条没打却"通过"（10-06 反向对照时就是这么假绿的）。 */
   global.wx = {
     cloud: {
-      init: () => { cloudCalls.init++ },
-      uploadFile: (o) => { cloudCalls.upload++; if (o && o.success) o.success({ fileID: 'cloud://should-not-happen', statusCode: 204 }) },
-      deleteFile: (o) => { cloudCalls.remove++; if (o && o.success) o.success({ fileList: (o.fileList || []).map(() => ({ status: 0 })) }) },
+      init: (o) => { cloudCalls.init++; cloudCalls.initEnv = o && o.env },
+      uploadFile: (o) => { cloudCalls.upload++; cloudCalls.cloudPath = (o && o.cloudPath) || null; if (o && o.success) o.success({ fileID: 'cloud://fake-ok.jpg', statusCode: 204 }) },
+      deleteFile: (o) => { cloudCalls.remove++; if (o && o.success) o.success({ fileList: ((o && o.fileList) || []).map(() => ({ status: 0 })) }) },
     },
     getStorageSync: () => '', setStorageSync: () => {}, removeStorageSync: () => {},
     getFileSystemManager: () => ({ accessSync: () => true }),
@@ -355,24 +360,46 @@ const watchdog = setTimeout(() => {
     compressImage: (o) => { if (o && o.fail) o.fail({ errMsg: '不该被调用' }) },
   }
   const cu = require(path.join(ROOT, 'miniprogram/utils/cloudUpload.js'))
-  ck('跑起来：CLOUD_ENV 空着，即便设备有完整 wx.cloud，cloudReady 也回 false',
-    cu.CLOUD_ENV === '' && cu.cloudReady() === false, `CLOUD_ENV="${cu.CLOUD_ENV}"`)
-  ck('跑起来：initCloud 是空操作（一次 wx.cloud.init 都没打）',
-    cu.initCloud() === false && cloudCalls.init === 0, JSON.stringify(cloudCalls))
-  const up = await cu.uploadImage('/tmp/fake.jpg', 1)
-  ck('跑起来：uploadImage 回 null 且一次上传都没打（B 链今天一张都不传）',
-    up === null && cloudCalls.upload === 0, JSON.stringify(cloudCalls))
+  ck('跑起来：这一格填的就是提炼那条链在用的同一个环境（串从代码现读，再拿它去文档里找）',
+    !!cu.CLOUD_ENV && read('docs/产品需求.md').includes(cu.CLOUD_ENV), `CLOUD_ENV="${cu.CLOUD_ENV}"`)
+  ck('跑起来：initCloud 真打了一次 wx.cloud.init，且带的就是这一格',
+    cu.initCloud() === true && cloudCalls.init === 1 && cloudCalls.initEnv === cu.CLOUD_ENV, JSON.stringify(cloudCalls))
+  const up = await cu.uploadImage('/tmp/fake.jpg', 7)
+  ck('跑起来：uploadImage 真传一次，路径按 images/{userId}/{YYYYMMDD}/{随机}.jpg 排（将来要按天清理就靠这一层）',
+    !!up && up.fileID === 'cloud://fake-ok.jpg' && cloudCalls.upload === 1
+      && /^images\/7\/\d{8}\/[a-z0-9]+\.jpg$/.test(cloudCalls.cloudPath || ''), `cloudPath=${cloudCalls.cloudPath}`)
   const delN = await cu.deleteFiles(['cloud://a.jpg', 'cloud://b.jpg'])
-  ck('跑起来：deleteFiles 回 0 且一次 wx.cloud.deleteFile 都没打（三个删除口今天都走它）',
-    delN === 0 && cloudCalls.remove === 0, JSON.stringify(cloudCalls))
-  const dropN = await cu.dropFromDeleteRes({ file_ids: ['cloud://a.jpg'] })
-  ck('跑起来：拿后端那份清单喂进去也一样静默（回体里真有 file_ids 也不许打）',
-    dropN === 0 && cloudCalls.remove === 0, JSON.stringify(cloudCalls))
+  ck('跑起来：deleteFiles 真发一次、按回体数成功个数（三个删除口共用这一个出口）',
+    delN === 2 && cloudCalls.remove === 1, `delN=${delN} ${JSON.stringify(cloudCalls)}`)
+  const dropN = await cu.dropFromDeleteRes({ file_ids: ['cloud://c.jpg'] })
+  ck('跑起来：后端回体里那份清单喂进去也真删（回体给一条就发一条）',
+    dropN === 1 && cloudCalls.remove === 2, `dropN=${dropN} remove=${cloudCalls.remove}`)
   const savedCloud = global.wx.cloud
   delete global.wx.cloud
-  ck('跑起来：设备没有云能力这一路也挡得住（cloudReady 两个条件是"与"，少一个都不许往下走）',
+  ck('跑起来：设备没有云能力这一路仍然挡得住（两个条件是"与"，env 填了也补不了缺 wx.cloud）',
     cu.cloudReady() === false && cu.initCloud() === false)
   global.wx.cloud = savedCloud
+
+  /* 反向对照：把那一格抠成空串（复制一份模块、只改那一行，另起一次 require），
+     同一套桩下必须一张都不打。少了这一条，上面那五条"真打了"证明不了是 env 在管着它们。 */
+  const offFile = path.join(os.tmpdir(), `cu-off-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.js`)
+  fs.writeFileSync(offFile, UP_SRC.replace(/^const CLOUD_ENV = '[^']*'/m, "const CLOUD_ENV = ''"))
+  const offCalls = { init: 0, upload: 0, remove: 0 }
+  global.wx = Object.assign({}, global.wx, { cloud: {
+    init: () => { offCalls.init++ },
+    uploadFile: (o) => { offCalls.upload++; if (o && o.success) o.success({ fileID: 'cloud://不该出现' }) },
+    deleteFile: (o) => { offCalls.remove++; if (o && o.success) o.success({ fileList: [] }) },
+  } })
+  const off = require(offFile)
+  ck('反向对照：env 抠成空串之后 cloudReady 回 false、initCloud 是空操作（一次 init 都没打）',
+    off.CLOUD_ENV === '' && off.cloudReady() === false && off.initCloud() === false && offCalls.init === 0,
+    JSON.stringify(offCalls))
+  const offUp = await off.uploadImage('/tmp/fake.jpg', 7)
+  const offDel = await off.deleteFiles(['cloud://a.jpg'])
+  ck('反向对照：空 env 那一份一张都不传、一张都不删（回 null / 回 0）——"B 链失败不阻断笔记"这条仍然成立',
+    offUp === null && offDel === 0 && offCalls.upload === 0 && offCalls.remove === 0, JSON.stringify(offCalls))
+  fs.unlinkSync(offFile)
+  global.wx = Object.assign({}, global.wx, { cloud: savedCloud })
   console.warn = realWarn
 })().then(finish).catch((e) => {
   console.log(`✗ 第九段自己崩了（这不是判据红，是尺子坏了）：${e && e.stack ? e.stack.split('\n')[0] : e}`)
