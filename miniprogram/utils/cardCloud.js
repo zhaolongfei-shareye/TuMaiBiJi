@@ -88,6 +88,27 @@ function flush() {
   return cardQueue.flush(api)
 }
 
+/**
+ * 补传：本机那张 jpg 还在、云上却没有那一行的那几张（10-08 那次撤 S3 把 `_archive` 那一趟
+ * 整个抛死，那一段时间生成的卡片全是这个形状）。origin 写 `backfilled`——服务端那一栏本来就
+ * 给这一档留着值，界面上那句话是"这张是从你手机上补传上去的"，不是"找回"。
+ *
+ * 云上已经有那一行的（`serverCard` 读得回来）不重复传：只把本机这一栏立上 `up`，
+ * 免得一次 onShow 就在桶里多落一个没人认的对象。
+ * 与另外两头同一纪律：不 await、不提示、失败不进界面（app.onShow 那一处调）。
+ */
+async function backfillLocal() {
+  if (!cloudUpload.cloudReady()) return { sent: 0, total: 0 }
+  const pending = cardLog.pendingBackfill()
+  let sent = 0
+  for (const it of pending) {
+    if (serverCard(it.noteId)) { cardLog.markUploaded(it.noteId, it.entry.p); continue }
+    const r = await archive(it.noteId, Object.assign({}, it.entry, { origin: 'backfilled' }))
+    if (r && (r.ok || r.queued)) { cardLog.markUploaded(it.noteId, it.entry.p); sent += 1 }
+  }
+  return { sent, total: pending.length }
+}
+
 // ---------- 读的那一半：这篇到底有没有卡片、画哪一张 ----------
 //
 // 这是"更新之后卡片不见了"那一态的根治点。今天三处判据（首页那一格、详情页右上那一格、
@@ -124,15 +145,22 @@ function isLoaded() {
 /**
  * 这一格画什么。**本机那张优先**：它是刚生成的那一张，可能还没来得及登记（登记是异步的，
  * 也可能正躺在待补队列里）。云上那份只在"本机这个文件已经不在了"时顶上——那正是这次要修的那一态。
- * @returns {Array<{p:string,tpl:string,noQr:boolean,at:number,fromServer:boolean,origin?:string}>}
+ *
+ * 每一格都额外带一个 `cloud`（云上那一份的 `cloud://`，没登记过就是空串）：
+ * 画缩略图吃 `p` 就够，**拉大图必须吃 `cloud`**——本机那一张在 `USER_DATA_PATH` 下
+ * （iOS 上是 `http://usr/…`），`<image>` 认它，`wx.previewImage` 在真机上不认（10-08 测试包报的
+ * "看到小图，但大图看不到"）。云上那一份与笔记配图同一用法，那一路真机是通的。
+ * @returns {Array<{p:string,cloud:string,tpl:string,noQr:boolean,at:number,fromServer:boolean,origin?:string}>}
  */
 function cellFor(noteId) {
-  const local = cardLog.aliveFor(noteId)
-  if (local.length) return local
   const s = serverCard(noteId)
-  if (!s || !s.cloud_url) return []
+  const cloud = (s && s.cloud_url) || ''
+  const local = cardLog.aliveFor(noteId).map((x) => Object.assign({}, x, { cloud }))
+  if (local.length) return local
+  if (!cloud) return []
   return [{
-    p: s.cloud_url,
+    p: cloud,
+    cloud,
     tpl: s.tpl,
     noQr: !!s.no_qr,
     at: 0,
@@ -219,7 +247,7 @@ function forget(noteId) {
 }
 
 module.exports = {
-  CARD_KIND, archive, flush,
+  CARD_KIND, archive, flush, backfillLocal,
   setServer, clearServer, serverCard,
   isLoaded, cellFor, hasCard, refresh, refreshOne, dropServer, signOut, forget,
 }

@@ -50,7 +50,7 @@ function 判(src) {
   ck('读不回来时不许说"没有卡片"：那一份数没读过就是没读过（isLoaded 挡着）',
     /let serverLoaded = false/.test(cloud) && /function isLoaded\(\)/.test(cloud))
   ck('云上那一份画得出来靠的是 cloud:// 直接进 image src（与配图那一路同一个用法）',
-    /p: s\.cloud_url/.test(cloud) && /cloud_url/.test(det))
+    /p: cloud,/.test(cloud) && /const cloud = \(s && s\.cloud_url\)/.test(cloud) && /cloud_url/.test(det))
 
   // —— ② 出图那一刻真的送 ——
   // 判的是 copyIn 那个 success 块**内部**的顺序：先落本机账、再送云上。
@@ -61,7 +61,7 @@ function 判(src) {
     succ.indexOf('write(map)') >= 0 && succ.indexOf('_archive(noteId, entry)') > succ.indexOf('write(map)'),
     `write@${succ.indexOf('write(map)')} archive@${succ.indexOf('_archive(noteId, entry)')}`)
   ck('那一趟不 await、包在 try 里（留档是附属品，不许把分享带回错误提示）',
-    /try \{\s*require\('\.\/cardCloud\.js'\)\.archive\(noteId, entry\)/.test(log)
+    /try \{\s*const r = require\('\.\/cardCloud\.js'\)\.archive\(noteId, entry\)/.test(log)
     && !/await .*cardCloud/.test(log))
   ck('上传拿不到 fileID 就返回 skipped，不抛', /if \(!up \|\| !up\.fileID\) return \{ skipped: true, reason: 'upload' \}/.test(cloud))
   ck('登记失败落待补队列（不是就地忘掉）', /catch \(e\) \{\s*cardQueue\.push\(noteId, item\)/.test(cloud))

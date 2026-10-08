@@ -47,9 +47,15 @@ const ensureDir = () => { try { fm().mkdirSync(DIR, true) } catch (e) { /* 已�
 // 同一个 record，留档这条链也必须只有一个出处（与 aliveFor 那一个出处同一条理由）。
 //
 // require 写在函数里：cardCloud 顶层要 cardLog，两边都写顶层就绕成循环加载了。
+//
+// 这一趟真成了（登记上、或进了待补队列）才在台账上立 `up` 那一栏——它是 pendingBackfill
+// 唯一的依据：没立过栏、图又还在本机的那一条，云上一定没有那一行，由 app.onShow 补传。
 function _archive(noteId, entry) {
   try {
-    require('./cardCloud.js').archive(noteId, entry)
+    const r = require('./cardCloud.js').archive(noteId, entry)
+    if (r && typeof r.then === 'function') {
+      r.then((res) => { if (res && (res.ok || res.queued)) markUploaded(noteId, entry.p) })
+    }
   } catch (e) {
     console.warn('卡片留档没起来（不影响这一张在本机的账）', e && (e.errMsg || e.message))
   }
@@ -74,9 +80,11 @@ function copyIn(noteId, tplId, noQr, srcPath) {
         keep.push(entry)
         map[noteId] = keep
         write(map)
-        // 补卡那一趟自己会带着 origin 去登记（`re-rendered`／`backfilled`），所以它调 copyIn 时
-        // 要把这一句关掉：默认这一趟的 origin 是 live，两句都落地就成了"这张是他刚生成的"——假话。
-        if (起留档) _archive(noteId, entry)
+        // 落完本机账，顺手把这一张送上去（2.0.1 S2）。这一句**不许再包在任何开关里**：
+        // 10-08 撤 S3 补卡那一趟时把这里的判断条件删掉了名字，留下一个没声明的标识符，
+        // 于是整个 success 回调抛 ReferenceError——云上永远没登记（现网 note_cards 实测 0 行），
+        // 而下面那句 resolve 也永远不落地，两处 `await cardLog.record()` 一起挂死。
+        _archive(noteId, entry)
         resolve(keep)
       },
       // 存不下就不记这一张。绝不能让"分享"那一步因为这一格失败。
@@ -115,6 +123,38 @@ function aliveFor(noteId) {
     .filter((x) => x && x.p && alive(x.p))
     .slice()
     .sort((x, y) => (y.at || 0) - (x.at || 0))
+}
+
+/* 补传的名单：**图还在本机、云上却没有那一行**的那几条。
+ *
+ * 这不是"找回卡片"——找回做不到的那一句早就定性了（2.0.1 只留下"防再丢"这一半）。这里处理的
+ * 是一台设备自己手里明明还有那张 jpg、只是那一趟上云没走成的形状：10-08 那次撤 S3 留下一个
+ * 没声明的标识符，`_archive` 整个抛在 success 回调里，那一段时间生成的卡片全是这个形状。
+ * 服务端 `note_cards.origin` 那一栏本来就给这一档留着值（`backfilled`，models/note_card.py）。
+ *
+ * `up` 那一栏由 `_archive` 成功的那一趟立，所以刚生成的那一张不会重复传。落定 60 秒以内的不补：
+ * 那一张的 live 那一趟可能还在飞，补一次就是云上多一个没人认的对象。 */
+function pendingBackfill() {
+  const fm = wx.getFileSystemManager()
+  const fresh = Date.now() - 60000
+  const out = []
+  const map = read()
+  Object.keys(map).forEach((noteId) => {
+    (map[noteId] || []).forEach((x) => {
+      if (!x || !x.p || x.up || (x.at || 0) > fresh) return
+      try { fm.accessSync(x.p) } catch (e) { return }
+      out.push({ noteId, entry: x })
+    })
+  })
+  return out
+}
+
+function markUploaded(noteId, p) {
+  const map = read()
+  const list = map[noteId] || []
+  let hit = false
+  list.forEach((x) => { if (x && x.p === p) { x.up = 1; hit = true } })
+  if (hit) write(map)
 }
 
 // 站长 10-03 23:40：「一个笔记同一时间只能生成一张笔记卡片，要改存量的必须删除旧的才能新增」。
@@ -159,4 +199,4 @@ function dropNote(noteId) {
   write(map)
 }
 
-module.exports = { record, forNote, aliveFor, dropNote, all: read, migrateKeepOnly, migrateOnePerNote, KEY, DIR, MODE_KEY, ONE_KEY }
+module.exports = { record, forNote, aliveFor, dropNote, pendingBackfill, markUploaded, all: read, migrateKeepOnly, migrateOnePerNote, KEY, DIR, MODE_KEY, ONE_KEY }

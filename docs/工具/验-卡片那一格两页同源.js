@@ -93,7 +93,7 @@ ck('两页那一格绑的是同一个处理函数名（各绑各的名字，上�
 ck('首页那一格点开的是成品弹窗（沿用 `_openPosterFor`，不在这里另开一条开窗路）',
   /onCardCell\(\) \{ return this\._openPosterFor\(this\.data\.detailNote, 'sheet'\) \}/.test(INDEX_JS))
 ck('详情页那一格：有那张就看大图，没有才去生成（生成过之后这一格自己会翻成缩略图）',
-  /onCardCell\(\)[\s\S]{0,400}wx\.previewImage\([\s\S]{0,120}cards\[0\]\.p[\s\S]{0,200}wx\.navigateTo\(\{ url: `\/pages\/share\/share\?id=\$\{note\.id\}` \}/.test(DETAIL_JS))
+  /onCardCell\(\)[\s\S]{0,400}cards\[0\]\.cloud \|\| cards\[0\]\.p[\s\S]{0,200}wx\.previewImage\(\{ urls: \[url\], current: url \}\)[\s\S]{0,200}wx\.navigateTo\(\{ url: `\/pages\/share\/share\?id=\$\{note\.id\}` \}/.test(DETAIL_JS))
 // 搬家的失败形态就是"屏上有那枚、js 里没那个函数"，所以两页每个接线的动作都点名查一遍。
 function unwired(wxmlPath, jsPath, extra) {
   const wxml = read(wxmlPath)

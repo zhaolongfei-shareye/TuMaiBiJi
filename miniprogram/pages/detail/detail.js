@@ -299,7 +299,11 @@ Page({
   onCardCell() {
     const cards = this.data.detailCards
     if (cards && cards.length) {
-      wx.previewImage({ urls: [cards[0].p], current: cards[0].p })
+      // 大图吃云上那一份：本机那张在 USER_DATA_PATH 下，`<image>` 画得出来、previewImage 不认它
+      // （10-08 测试包报的"看到小图，大图看不到"）。没登记过云时才退回本机路径。
+      const url = cards[0].cloud || cards[0].p
+      if (!url) return
+      wx.previewImage({ urls: [url], current: url })
       return
     }
     const { note } = this.data

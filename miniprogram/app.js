@@ -81,6 +81,10 @@ App({
       cardCloud.flush().then((r) => {
         if (r && r.sent) console.log(`补登记回 ${r.sent} 张卡片`)
       })
+      // 卡片补传：图还在本机、云上却没有那一行的那几张（10-08 那一趟留档静默死掉留下的存量）。
+      cardCloud.backfillLocal().then((r) => {
+        if (r && r.sent) console.log(`补传上云 ${r.sent} 张卡片`)
+      })
     }
   },
 
