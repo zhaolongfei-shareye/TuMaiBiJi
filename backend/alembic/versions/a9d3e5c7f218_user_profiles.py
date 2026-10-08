@@ -37,6 +37,7 @@ def upgrade() -> None:
         sa.Column('name', sa.String(length=64), nullable=True),
         sa.Column('slogan', sa.String(length=96), nullable=True),
         sa.Column('slots', sa.JSON(), nullable=True),
+        sa.Column('tpl', sa.String(length=50), nullable=True),
         sa.Column('bg_dim', sa.Integer(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True),

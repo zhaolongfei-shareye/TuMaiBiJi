@@ -318,7 +318,7 @@ Page({
       // 顺手登记名称与一句话（2.1）。不 await、不出声：这条链按设计与卡片留档同一条纪律——
       // 附属品失败不许把"本机已经存好"这件事报成失败。没登记上时本机那一份照旧是对的，
       // 代价是"换台手机这一格是空的"，而那由下一次进这一页再写一遍补回来。
-      profileCloud.pushText({ name: patch.name, slogan: patch.slogan })
+      profileCloud.pushText({ name: patch.name, slogan: patch.slogan, template: patch.template })
       wx.showToast({ title: t('profileSaved', lang), icon: 'success' })
       setTimeout(() => wx.navigateBack(), 900)
     } catch (err) {

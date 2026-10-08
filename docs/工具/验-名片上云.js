@@ -23,7 +23,8 @@ const P_B = `${DIR}/poster-avatar-2-2.img`
 let store, files, calls, server, apiFail
 
 function makeWx() {
-  store = { poster_profile: { name: '赵龙飞', slogan: '一句话', images: [{ path: P_A, card: true, bg: true }] } }
+  store = { poster_profile: { name: '赵龙飞', slogan: '一句话', template: 'cover',
+    images: [{ path: P_A, card: true, bg: true }] } }
   files = new Set([P_A])
   calls = { download: 0, upload: 0, unlink: 0, deleteFile: [], put: 0, get: 0, setBgDim: 0 }
   return {
@@ -140,6 +141,9 @@ async function main() {
         return p && p.slots && p.slots[0] && p.slots[0].file_id && p.slots[0].card === true && p.name === '赵龙飞'
       })(), JSON.stringify(require(path.join(MP, 'utils/api.js'))._lastPut))
       ck('③ 亮度档也一起登记（本机那一档 1）', require(path.join(MP, 'utils/api.js'))._lastPut.bg_dim === 1)
+      ck('③ 选的那一套模板也一起登记（poster_profile.template）',
+        require(path.join(MP, 'utils/api.js'))._lastPut.tpl === 'cover',
+        JSON.stringify(require(path.join(MP, 'utils/api.js'))._lastPut.tpl))
     }
 
     // —— ④ 读不到 ——
@@ -190,6 +194,22 @@ async function main() {
       cloud.signOut()
       ck('⑦ 注销之后本机文件一个都不删', calls.unlink === unlinkBefore)
       ck('⑦ 内存里那一份清了（下一个身份不该看见上一个人的名片）', cloud.serverState() === null && !cloud.isLoaded())
+
+    // —— ⑧ 模板那一栏：null 是"没登记过"，不是"回到默认" ——
+    server = { updated_at: '2026-10-01', slots: [{ file_id: FID_A, card: true, bg: true }], tpl: null }
+    apiFail = false
+    {
+      const { poster, cloud } = load()
+      await cloud.pull()
+      ck('⑧ 云上没登记过模板时，本机选的那一套不许被清成默认', poster.readProfile().template === 'cover',
+        poster.readProfile().template)
+    }
+    server = { updated_at: '2026-10-01', slots: [{ file_id: FID_A, card: true, bg: true }], tpl: 'acid' }
+    {
+      const { poster, cloud } = load()
+      await cloud.pull()
+      ck('⑧ 云上登记过就跟着它走', poster.readProfile().template === 'acid', poster.readProfile().template)
+    }
     }
 
     // —— 静态两条：那两条闸一旦被改坏，行为用例红在哪一条不够醒目，这里直接钉源码 ——

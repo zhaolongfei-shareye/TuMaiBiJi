@@ -149,7 +149,10 @@ async function pull() {
   }
 
   poster.writeSlots(next)
+  // 名称/一句话：服务器有这一行就以它为准（空就是空，本机那份是旧的那一档）。
+  // 模板那一栏反过来判：null 是「没登记过」，不是「回到默认」——清成默认会让人莫名其妙换了套皮。
   poster.writeProfile({ name: r.name || '', slogan: r.slogan || '' })
+  if (r.tpl) poster.writeProfile({ template: r.tpl })
   removed.forEach((p) => poster.removeAvatar(p))
   // 那两档外观：读回来有值才落本机（null 是"没登记过这一档"，不是"要清成默认"）
   const app = getApp()
@@ -179,6 +182,7 @@ async function bootstrap() {
       width: null, height: null, size: fileID ? _bytes(s.path) : null })
   }
   const body = { slots }
+  if (p.template) body.tpl = p.template
   if (p.name) body.name = p.name
   if (p.slogan) body.slogan = p.slogan
   const app = getApp()
@@ -241,9 +245,11 @@ async function pushSlots(slots) {
   return push({ slots: out }, { uploaded })
 }
 
-/** 名称／一句话（卡片模板那一页保存时调）。 */
+/** 名称／一句话／选的那一套模板（卡片模板那一页保存时调）。 */
 function pushText(patch) {
-  return push({ name: patch.name || '', slogan: patch.slogan || '' })
+  const body = { name: patch.name || '', slogan: patch.slogan || '' }
+  if (patch.template) body.tpl = patch.template
+  return push(body)
 }
 
 /** 亮度档：改一档就顺手登记一次（不弹窗、不出声，失败维持本机）。

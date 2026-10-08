@@ -245,6 +245,33 @@ class Test换下来的那些地址:
         assert put(client, u, name="阿飞").json()["file_ids"] == []
 
 
+class Test那一套模板:
+    def test_写进去读回一字不差(self, client, db):
+        u = mk_user(db, "tpl")
+        assert put(client, u, tpl="quote").status_code == 200
+        assert get(client, u).json()["tpl"] == "quote"
+
+    def test_服务端不抄模板白名单(self, client, db):
+        """库里、代码里都没有那份 id 名单——下发多一套，界面就多一格。
+        这条钉的是"以后有人图省事在这里加白名单"会先把用例弄红（那是「不走发版」那条承诺）。"""
+        u = mk_user(db, "tplnew")
+        assert put(client, u, tpl="某套服务端从没见过的模板id").status_code == 200
+        assert get(client, u).json()["tpl"] == "某套服务端从没见过的模板id"
+
+    def test_空串等于回到没选过(self, client, db):
+        u = mk_user(db, "tplclear")
+        put(client, u, tpl="popGrid")
+        put(client, u, tpl="   ")
+        assert get(client, u).json()["tpl"] is None
+
+    def test_改模板不许动名称那一栏(self, client, db):
+        u = mk_user(db, "tplpatch")
+        put(client, u, name="阿飞", tpl="card")
+        put(client, u, tpl="cover")
+        body = get(client, u).json()
+        assert body["tpl"] == "cover" and body["name"] == "阿飞"
+
+
 class Test隔离与连带:
     def test_两个人各读各的那一份(self, client, db):
         a = mk_user(db, "ia")

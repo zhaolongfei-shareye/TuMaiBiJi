@@ -8,7 +8,7 @@
 - 名片那四格形象图（`AVATAR_FILES_KEY` 记的是 `${USER_DATA_PATH}` 下的本机路径，
   而 `readSlots()` 里那句 `exists(s.path)` 会把"文件不在"的那格**直接静默丢掉**——
   和卡片那一格 2.0.1 之前的毛病一模一样，只是这次没人报）；
-- 背景亮度档（`BG_DIM_KEY`）。
+- 背景亮度档（`BG_DIM_KEY`）与卡片模板选的那一套（`poster_profile.template`）。
 
 **界面字体档（`UI_FONT_KEY`）故意不在这一张表里。** 它不是「没备份」，是**不该同步**：
 `app.js` 顶上那段写着，安卓上那三档字体基本命不中，跟着账号跑到别人设备上只会让人看到「没生效」。
@@ -33,6 +33,7 @@ from app.db.database import Base
 SLOT_COUNT = 4
 # 名称/一句话的长度：库里给的是**服务端上界**，比界面上的 maxlength（16 / 24）宽一档。
 # 故意不在这里复刻界面那两条——客户端以后放宽输入框不该把服务端挡死，但也不能没边。
+MAX_TPL_LEN = 50          # 与 NoteCard.tpl 同宽
 MAX_NAME_LEN = 64
 MAX_SLOGAN_LEN = 96
 # 亮度档只有三档（palette.BG_DIMS），但服务端不钉死取值：界面上加一档就得跟着发一次后端，
@@ -52,6 +53,11 @@ class UserProfile(Base):
     # 四格，顺序就是界面上那四个位置（空位是 null，不是"少一项"——少一项会把后面的格子挪位）。
     # 每格 {file_id, card, bg, width, height, size}。JSON 列，读口不重钉形状（见 routes/profiles.py）。
     slots = Column(JSON, nullable=True)
+    # 卡片模板他选的那一套。这一栏和 name/slogan 同一类：只在本机 poster_profile 里，
+    # 换手机就回到默认那一套，而界面上不会说这句话——同一个根，顺手一起收。
+    # ⚠ 服务端**不卡白名单**：模板走的是「不走发版」那条线（下发多一套 id 界面就多一格），
+    # 这里抄一份名单就得跟着每次新模板发一次后端，那条承诺当场作废。只校形状，见 routes/profiles.py。
+    tpl = Column(String(MAX_TPL_LEN), nullable=True)
     bg_dim = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

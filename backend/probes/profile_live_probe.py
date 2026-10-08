@@ -107,6 +107,13 @@ def main():
     check("亮度档换成 0 而名称还在（写口是补丁不是整份覆盖）",
           b.get("bg_dim") == 0 and b.get("name") == "探针名片" and b.get("slogan"), str(b)[:140])
 
+    # ---- 3b. 模板那一栏：服务端不抄名单（「不走发版」那条承诺） --------------------------
+    r = putp({"tpl": "某套服务端从没见过的模板id"})
+    check("一个服务端没见过的模板 id 也收（这里不抄白名单）", r.status_code == 200,
+          f"HTTP {r.status_code} {r.text[:80]}")
+    check("模板读回一字不差而名称那栏没被动", getp().json().get("tpl") == "某套服务端从没见过的模板id"
+          and getp().json().get("name") == "探针名片", str(getp().json())[:120])
+
     # ---- 4. 四格：补齐、顺序、角色单选 --------------------------------------------------
     r = putp({"slots": [None, slot(FID_A, card=True, bg=True)]})
     b = getp().json()

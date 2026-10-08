@@ -37,6 +37,7 @@ from app.models.note_card import NoteCard
 from app.models.user import User
 from app.models.user_profile import (
     BG_DIM_RANGE,
+    MAX_TPL_LEN,
     MAX_NAME_LEN,
     MAX_SLOGAN_LEN,
     SLOT_COUNT,
@@ -63,6 +64,9 @@ class SlotIn(BaseModel):
 
 
 class ProfileIn(BaseModel):
+    # 模板只校形状（长度），**不抄一份 id 白名单**：卡片模板走的是
+    # 「不走发版」那条线，服务端跟着名单就得每次新模板发一次后端，那条承诺当场作废（同 routes/cards.py 第 2 条）。
+    tpl: Optional[str] = Field(default=None, max_length=MAX_TPL_LEN)
     name: Optional[str] = Field(default=None, max_length=MAX_NAME_LEN)
     slogan: Optional[str] = Field(default=None, max_length=MAX_SLOGAN_LEN)
     # 允许传短于四格的数组（末尾按空位补），但**不许长**：第五格在界面上不存在。
@@ -76,6 +80,7 @@ class ProfileOut(BaseModel):
     现网那次把 `key_links` 钉成 `List[str]`，用例喂自己编的字符串数组照样全绿，线上第一条读取
     就 500（2026-10-08，探针抓到的）。同一份数据不许有两个说法。
     """
+    tpl: Optional[str] = None
     name: Optional[str] = None
     slogan: Optional[str] = None
     slots: Optional[list] = None
@@ -153,6 +158,7 @@ def _out(row: Optional[UserProfile]) -> ProfileOut:
     if row is None:
         return ProfileOut()
     return ProfileOut(
+        tpl=row.tpl,
         name=row.name,
         slogan=row.slogan,
         slots=row.slots,
@@ -197,6 +203,9 @@ def write_profile(
     dropped: List[str] = []
     data = body.model_dump(exclude_unset=True)
 
+    if "tpl" in data:
+        t = (data["tpl"] or "").strip()
+        row.tpl = t or None
     if "name" in data:
         row.name = _text(data["name"], MAX_NAME_LEN, "名称")
     if "slogan" in data:

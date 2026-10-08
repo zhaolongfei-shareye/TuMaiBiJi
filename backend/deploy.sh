@@ -191,7 +191,7 @@ if "user_profiles" not in tables:
     print("  ✗ 缺 user_profiles 表，名片与亮度档整条链没落点")
     raise SystemExit(1)
 prof_cols = {c["name"] for c in insp.get_columns("user_profiles")}
-missing = sorted({"user_id", "name", "slogan", "slots", "bg_dim"} - prof_cols)
+missing = sorted({"user_id", "name", "slogan", "slots", "tpl", "bg_dim"} - prof_cols)
 if missing:
     print(f"  ✗ user_profiles 迁移后仍缺：{'、'.join(missing)}")
     raise SystemExit(1)
