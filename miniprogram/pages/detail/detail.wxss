@@ -236,3 +236,13 @@
 .dt-shot:last-child {
   margin-right: 0;
 }
+
+/* 补回来的那一张下面那行小字（2.0.1 S3）。字号跟 .ds-meta 同一档、墨黑同族降透明度——
+   它是这一格的注脚，不是第二条消息，不能比图本身抢眼。两页同源：这一段在两个 wxss 里一字不差。 */
+.ds-card-note {
+  display: block;
+  margin-top: 10rpx;
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: rgba(35, 37, 44, 0.62);
+}

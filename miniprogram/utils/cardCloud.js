@@ -97,23 +97,46 @@ function flush() {
 // 不在就画云上那一份（`cloud://` 直接给 `<image src>`，与笔记配图那一路同一个用法）。
 let serverCards = {}
 let serverLoaded = false
+// 补卡那一趟（S3）的两份输入：服务端那份"该有一张"的名单，和这些篇**当年分享出去那一份**的文字快照。
+// 存在这一层而不是让 cardRepair 去打接口：读回来的一叠必须一起换掉，分开读就会出现
+// "名单是新的、快照是旧的"那种分档分错中间的态——而这一趟是要写库的。
+let serverNeedConfirm = []
+let serverSnapshots = {}
 
-function setServer(list) {
+function setServer(list, extra) {
   serverCards = {}
   ;(list || []).forEach((c) => {
     if (c && c.note_id != null) serverCards[String(c.note_id)] = c
   })
   serverLoaded = true
+  const e = extra || {}
+  serverNeedConfirm = (e.need_confirm || []).slice()
+  serverSnapshots = {}
+  ;(e.snapshots || []).forEach((s) => {
+    if (s && s.note_id != null) serverSnapshots[String(s.note_id)] = s
+  })
 }
 
 /** 换身份／注销之后必须清：留着就是上一个人的卡片画到这个人头上。 */
 function clearServer() {
   serverCards = {}
   serverLoaded = false
+  serverNeedConfirm = []
+  serverSnapshots = {}
 }
 
 function serverCard(noteId) {
   return serverCards[String(noteId)] || null
+}
+
+/** 服务端那份"这篇公开过、可我这儿没有它的卡片行"的名单（待确认档的候选）。 */
+function needConfirm() {
+  return serverNeedConfirm.slice()
+}
+
+/** 这一篇当年分享出去那一份快照。没有分享记录的返回 null——那种由调用方回退读笔记当前内容。 */
+function snapshotOf(noteId) {
+  return serverSnapshots[String(noteId)] || null
 }
 
 /** 这批数有没有真从服务端读回来过。没读回来时"没有卡片"这句话不成立，界面对此要保守。 */
@@ -146,12 +169,12 @@ function hasCard(noteId) {
   return cellFor(noteId).length > 0
 }
 
-/** 拉一次全量（列表页那一批 + 待确认名单）。失败不抛：读不到就维持上一次那份数。 */
+/** 拉一次全量（列表页那一批 + 待确认名单 + 那些篇的快照）。失败不抛：读不到就维持上一次那份数。 */
 async function refresh() {
   try {
     const r = await api.getMyCards()
-    setServer((r && r.cards) || [])
-    return r || { cards: [], need_confirm: [] }
+    setServer((r && r.cards) || [], r || {})
+    return r || { cards: [], need_confirm: [], snapshots: [] }
   } catch (e) {
     console.warn('卡片留档名单没读到（不影响界面）', e && (e.errMsg || e.statusCode))
     return null
@@ -220,5 +243,6 @@ function forget(noteId) {
 
 module.exports = {
   CARD_KIND, archive, flush,
-  setServer, clearServer, serverCard, isLoaded, cellFor, hasCard, refresh, refreshOne, dropServer, signOut, forget,
+  setServer, clearServer, serverCard, needConfirm, snapshotOf,
+  isLoaded, cellFor, hasCard, refresh, refreshOne, dropServer, signOut, forget,
 }

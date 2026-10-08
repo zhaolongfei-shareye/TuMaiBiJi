@@ -584,6 +584,41 @@
   height: 446rpx;
 }
 
+/* 待确认那一格（2.0.1 S3）：白垫照留——它和旁边那几格是同一层的东西，换个底色就像另一类内容。
+   里面从"一张图"换成"一句实话"，描边改虚线只表示这一格还欠一张；不新造一档颜色，
+   色板只有 utils/palette.js 那一份（这里写的都是墨黑那一族的透明度，与 .g-cap 同一个源头）。 */
+.pad-need {
+  border: 2rpx dashed rgba(35, 37, 44, 0.28);
+  box-shadow: none;
+  padding: 0 26rpx;
+}
+
+.pad-need-t {
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: rgba(35, 37, 44, 0.62);
+  text-align: center;
+}
+
+/* 补卡那一趟那一行：是一行可点的文字，不是一枚实心按钮——这一屏已经有底栏和那两枚 tab，
+   再抬一枚实心块就把"找回卡片"这件一次性的事说成了常驻功能。 */
+.repair-row {
+  margin-top: 8rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 16rpx;
+  background: rgba(35, 37, 44, 0.05);
+}
+
+.repair-row:active {
+  opacity: 0.9;
+}
+
+.repair-l {
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: rgba(35, 37, 44, 0.72);
+}
+
 .g-cap {
   display: block;
   margin-top: 12rpx;
@@ -1213,3 +1248,13 @@
 
 /* 分类行那三档在图上没有对应态：这一行整个在下面的圆角卡里，卡是页面底色，
    不吃照片——所以这里刻意不写任何 .has-bg 分支，写了就是给不存在的那一态兜底。 */
+
+/* 补回来的那一张下面那行小字（2.0.1 S3）。字号跟 .ds-meta 同一档、墨黑同族降透明度——
+   它是这一格的注脚，不是第二条消息，不能比图本身抢眼。两页同源：这一段在两个 wxss 里一字不差。 */
+.ds-card-note {
+  display: block;
+  margin-top: 10rpx;
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: rgba(35, 37, 44, 0.62);
+}

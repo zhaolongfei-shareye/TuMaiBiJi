@@ -94,6 +94,15 @@
     </scroll-view>
   </view>
 
+  <!-- 补卡那一趟的入口（2.0.1 P0 · S3，站长 10-08 点名要的那一节：已经丢的那批怎么找回来）。
+       **一次一个入口**，不复制到详情页那一格上（他定的减法）。放在「笔记卡片」那一枚 tab 的顶上：
+       空白格出现在这一屏，要找回东西的那一句就得出现在看得见问题的地方。
+       方案原来写的是「我的 → 笔记卡片」——现网没有这一条路径（「我的」里那一行叫「卡片模板」，
+       而「笔记卡片」是这一屏的第二枚 tab），10-08 落定时按现网名字改到这里，并把这句改法记进方案。 -->
+  <view wx:if="{{view === 'cards'}}" class="repair-row" catchtap="onRepairCards">
+    <text class="repair-l">{{t.repairEntry}}</text>
+  </view>
+
   <!-- v12：列表不再整页滚，改在这块区域里自己滚、滚到底再取下一批。
        内缩挂在 .sheet 的 padding 上，不挂在 scroll-view 自己身上——挂在它身上时
        右侧要给滚动条留位，左右就不等宽了（详情浮窗那一层实测右移 12rpx，同一条坑）。
@@ -148,8 +157,14 @@
          私密那一篇例外：小图也走详情窗（拉大图会把这篇的活码建出来，而私密不给分享）。 -->
     <view wx:elif="{{cells.length}}" class="grid2">
       <view class="gc" wx:for="{{cells}}" wx:key="id">
-        <view class="pad" catchtap="onCardTap" data-idx="{{item.i}}">
-          <image class="pad-img" src="{{item.cards[0].p}}" mode="aspectFit" />
+        <!-- 待确认档那一格（S3）：服务器知道这篇公开过、本机连台账都没了，**当年用的哪套模板没人记得**。
+             不画空白（空白＝"从没生成过"，正是这次要消灭的那个假象），也不自动猜一套——猜一张就是把他
+             没见过的那张塞进他的库。画一句实话，点下去走现有出图流程：模板名与带不带码他当场能看到、能改。
+             那句话由 JS 现算（`arrange` 里那两串之一）：缺形象图的那一篇要说的是另一句，
+             拿同一句糊上去＝叫他去做一件补不回来的事。 -->
+        <view class="pad {{item.needConfirm ? 'pad-need' : ''}}" catchtap="onCardTap" data-idx="{{item.i}}">
+          <image wx:if="{{!item.needConfirm}}" class="pad-img" src="{{item.cards[0].p}}" mode="aspectFit" />
+          <text wx:else class="pad-need-t">{{item.needText}}</text>
         </view>
         <text class="g-cap" catchtap="onRowTap" data-idx="{{item.i}}">{{item.title}}</text>
       </view>
@@ -199,6 +214,12 @@
             <view class="ds-pad ds-entry" catchtap="onCardCell">
               <image class="ds-pad-img" src="{{detailCards[0].p}}" mode="aspectFit" />
             </view>
+            <!-- 补回来的那一张要留痕（方案 §五 那句"不写这句就是悄悄换了他的东西"）。三档三句话，
+                 live 那一档**一句都不写**——那一张就是他刚生成的，说他"被换过"才是假话。
+                 两页这一格同源：这一段标记在首页详情窗与详情页一字不差（同源那把尺子逐字节比它）。 -->
+            <text wx:if="{{detailCards[0].origin === 're-rendered'}}" class="ds-card-note">{{t.cardOriginRerendered}}</text>
+            <text wx:elif="{{detailCards[0].origin === 'backfilled'}}" class="ds-card-note">{{t.cardOriginBackfilled}}</text>
+            <text wx:elif="{{detailCards[0].origin === 'from-share-snapshot'}}" class="ds-card-note">{{t.cardOriginSnapshot}}</text>
           </block>
           <view wx:else class="ds-empty ds-entry" catchtap="onCardCell">
             <view class="ds-swatch" style="background:{{swatchBg}}">

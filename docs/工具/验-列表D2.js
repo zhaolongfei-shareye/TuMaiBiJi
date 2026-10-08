@@ -234,7 +234,9 @@ const keepPoster = (CODE_JS.split('async _keepPoster()')[1] || '').split('\n  },
 const keepCard = (strip(shareJs).split('async _keepCard()')[1] || '').split('\n  },')[0]
 const renderPoster = (CODE_JS.split('async _renderPoster()')[1] || '').split('async _keepPoster()')[0]
 ok('首页记在两条"留下"的口上：图片面板 success 与存相册 success 都走 _keepPoster',
-  /cardLog\.record\(a\.noteId, this\.data\.posterTpl, this\.data\.noQr, this\._posterCanvas, this\)/.test(keepPoster)
+  // 那一句 10-08 多了第六个参数（待确认那一档要带 origin 落账），所以锚点不再要求它正好以
+  // `this)` 收尾。**判的还是同一件事**：五个入参一个没换顺序、记账只在这个口里发生。
+  /cardLog\.record\(a\.noteId, this\.data\.posterTpl, this\.data\.noQr, this\._posterCanvas, this/.test(keepPoster)
   && /success: async \(\) => \{ await this\._keepPoster\(\); this\._closeTemplate\(\) \}/.test(CODE_JS)
   && /success: async \(\) => \{\s*await this\._keepPoster\(\)/.test(CODE_JS))
 ok('海报页同一条：存相册成功才走 _keepCard，模板与带没带码都是画那一趟存下来的',
@@ -270,7 +272,9 @@ ok('两条入口共用同一段开窗逻辑（各写一份就会走样：一条�
   /onCardCell\(\) \{ return this\._openPosterFor\(this\.data\.detailNote, 'sheet'\) \}/.test(CODE_JS)
   && /return this\._openPosterFor\(note, 'grid'\)/.test(CODE_JS))
 ok('卡片那一格：小图直接开大图、标题那行仍进详情窗（两个落点各一个口，私密那篇仍走详情窗）',
-  /class="pad" catchtap="onCardTap"/.test(CODE_WXML)
+  // 那枚 `pad` 的 class 10-08 多了动态一段（待确认那一格要换描边），所以锚点从整串字面
+  // 改成"class 以 pad 开头 + 仍绑 onCardTap"。**判的还是同一件事**：小图那一个落点没被拆开。
+  /class="pad[^"]*" catchtap="onCardTap"/.test(CODE_WXML)
   && /class="g-cap" catchtap="onRowTap"/.test(CODE_WXML)
   && /if \(note\.is_private\) return this\.onRowTap\(e\)/.test(CODE_JS))
 ok('从小图开的那一趟，收窗回卡片那一屏、不再顺手浮详情窗（detailOpen 只在来源不是 grid 时才给 true）',

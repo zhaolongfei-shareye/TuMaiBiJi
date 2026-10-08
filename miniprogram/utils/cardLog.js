@@ -55,7 +55,8 @@ function _archive(noteId, entry) {
   }
 }
 
-function copyIn(noteId, tplId, noQr, srcPath) {
+function copyIn(noteId, tplId, noQr, srcPath, opt) {
+  const 起留档 = !(opt && opt.archive === false)
   return new Promise((resolve) => {
     ensureDir()
     const at = Date.now()
@@ -71,10 +72,16 @@ function copyIn(noteId, tplId, noQr, srcPath) {
         // 再放这张进去。所以"要改存量"只有一条路——先在大图里删掉这一张，再重新生成。
         const keep = (map[noteId] || []).filter((x) => { dropFile(x.p); return false })
         const entry = { p: filePath, tpl: tplId, at, noQr: !!noQr }
+        // 待确认那一档由他自己重出来的那一张要带 origin 存进本机这本账：详情窗里那句
+        // 「这张是按当年那份快照重出的」读的就是它。本机这本账是**缓存**，判据仍在服务器那一行，
+        // 但那一格画的是本机这张（快、不花钱），不带着这一栏那句话说不出来。
+        if (opt && opt.origin) entry.origin = opt.origin
         keep.push(entry)
         map[noteId] = keep
         write(map)
-        _archive(noteId, entry)
+        // 补卡那一趟自己会带着 origin 去登记（`re-rendered`／`backfilled`），所以它调 copyIn 时
+        // 要把这一句关掉：默认这一趟的 origin 是 live，两句都落地就成了"这张是他刚生成的"——假话。
+        if (起留档) _archive(noteId, entry)
         resolve(keep)
       },
       // 存不下就不记这一张。绝不能让"分享"那一步因为这一格失败。
@@ -83,12 +90,12 @@ function copyIn(noteId, tplId, noQr, srcPath) {
   })
 }
 
-function record(noteId, tplId, noQr, canvas, page) {
+function record(noteId, tplId, noQr, canvas, page, opt) {
   if (!noteId || !tplId || !canvas) return Promise.resolve(null)
   return new Promise((resolve) => {
     wx.canvasToTempFilePath({
       canvas, fileType: 'jpg', quality: 0.82,
-      success: (r) => copyIn(noteId, tplId, noQr, r.tempFilePath).then(resolve),
+      success: (r) => copyIn(noteId, tplId, noQr, r.tempFilePath, opt).then(resolve),
       fail: (e) => { console.error('卡片留档取图失败', e); resolve(null) },
     }, page)
   })
@@ -157,4 +164,26 @@ function dropNote(noteId) {
   write(map)
 }
 
-module.exports = { record, forNote, aliveFor, dropNote, all: read, migrateKeepOnly, migrateOnePerNote, KEY, DIR, MODE_KEY, ONE_KEY }
+/* 把台账里**不属于卡片**的那几条摘掉，返回摘掉的条数。
+ *
+ * 为什么会有这种东西：10-08 S0 在那台模拟器上现读到台账里混着一条 `http://usr/ruler-detail-cell.jpg`
+ * ——某把真跑尺子往这本账写过一条自证截图，`tpl` 还填着 classic。留着它，详情页那一格会照着它
+ * 去指一张调试图；更坏的是补卡那一趟把它当"这张你还没上云"给补传上去。
+ * ⚠ 只摘账、**不动那个文件**：那条路径指向的东西不是我们的（可能是别的尺子的临时截图），
+ * 我们没有任何资格去 unlink 一个自己没建的文件。判据由调用方递进来（`cardRepair.isCardPath`），
+ * 那一个出处与 `DIR` 同一个常量。 */
+function pruneNotCards(isCard) {
+  const map = read()
+  let n = 0
+  Object.keys(map).forEach((id) => {
+    const list = map[id] || []
+    const kept = list.filter((x) => x && x.p && isCard(x.p))
+    n += list.length - kept.length
+    if (kept.length) map[id] = kept
+    else delete map[id]
+  })
+  if (n) write(map)
+  return n
+}
+
+module.exports = { record, copyIn, forNote, aliveFor, dropNote, pruneNotCards, all: read, migrateKeepOnly, migrateOnePerNote, KEY, DIR, MODE_KEY, ONE_KEY }

@@ -85,9 +85,30 @@ class CardReadOut(BaseModel):
     had_share: bool = False
 
 
+class CardSnapshot(BaseModel):
+    """补卡那一趟的第二份输入：这篇**当年分享出去那一份**的文字快照。
+
+    为什么必须由服务端给、客户端自己去读笔记当前内容不行：`shares` 存的是建分享那刻的快照，
+    笔记后来被改过也不动它（§二 那条决定）。按快照重渲出来的才是"当年那张"，按当前内容渲出来的是
+    "现在这张"——后者发生在用户改过标题之后，界面上却说"补回你原来那张"，那是假话。
+    撤掉的分享同样要给：`GET /api/shares/{token}` 对关了的那张回 404，客户端拿不到，
+    而那篇当年确实出过一张卡。`active` 只是如实回那一行的状态，不影响给不给。
+    """
+    note_id: int
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    tags: Optional[List[str]] = None
+    key_points: Optional[List[str]] = None
+    key_links: Optional[List[str]] = None
+    source_url: Optional[str] = None
+    author_name: Optional[str] = None
+    active: bool = False
+
+
 class CardsListOut(BaseModel):
     cards: List[CardOut] = Field(default_factory=list)
     need_confirm: List[int] = Field(default_factory=list)
+    snapshots: List[CardSnapshot] = Field(default_factory=list)
 
 
 class CardDropOut(BaseModel):
@@ -267,4 +288,38 @@ def list_cards(
             for n in db.query(Note).filter(Note.user_id == uid, Note.id.in_(shared)).all()
         }
     need = sorted({nid for nid in alive if nid not in have})
-    return {"cards": _views(rows), "need_confirm": need}
+    return {"cards": _views(rows), "need_confirm": need, "snapshots": _snapshots(db, uid, need)}
+
+
+def _snapshots(db: Session, uid: str, note_ids: List[int]) -> List[dict]:
+    """给补卡那一趟按篇配一份当年分享的快照。没有分享记录的不在 `note_ids` 里，客户端自己回退读笔记当前内容。
+
+    一篇可能有好几行分享（撤过又开、换码重来）：取**最新那一行**（id 最大），因为最后一次建分享
+    才是"那张卡片当初印出去的内容"——取最早那行会渲出一张他早就改过的旧版本。
+    """
+    if not note_ids:
+        return []
+    rows = (
+        db.query(Share)
+        .filter(Share.user_id == uid, Share.note_id.in_(note_ids))
+        .order_by(Share.id.asc())
+        .all()
+    )
+    latest = {}
+    for s in rows:
+        latest[s.note_id] = s
+    return [
+        {
+            "note_id": s.note_id,
+            "title": s.title,
+            "summary": s.summary,
+            "tags": s.tags,
+            "key_points": s.key_points,
+            "key_links": s.key_links,
+            "source_url": s.source_url,
+            "author_name": s.author_name,
+            "active": bool(s.is_active),
+        }
+        for nid in note_ids
+        for s in ([latest[nid]] if nid in latest else [])
+    ]

@@ -246,6 +246,75 @@ class Test批量读那份待确认名单:
         assert client.get("/api/user/cards", headers=hdr(u)).json()["need_confirm"] == []
 
 
+class Test补卡那份快照:
+    """`snapshots` 是 S3 那一趟的第二份输入：按**当年分享出去那一份**渲，不是按笔记现在的内容渲。
+
+    少了这一栏，重渲出来的就是"现在这张"而界面说"补回你原来那张"——站长改过标题的那一天开始，
+    那句提示成了一句假话。撤掉的分享同样要给：公开口 `GET /api/shares/{token}` 对关了的那张回 404，
+    客户端除了这里没有第二个地方能拿到它。
+    """
+
+    def _share(self, db, u, n, tag="a", **kw):
+        fields = {"title": n.title, "summary": "当年那句摘要", "tags": ["当年"],
+                  "key_points": ["当年第一条"], "key_links": ["https://a.cn"],
+                  "source_url": "https://src.cn", "author_name": "当年的名字"}
+        fields.update(kw)
+        s = Share(user_id=str(u.id), note_id=n.id, token=f"tk-{n.id}-{tag}", **fields)
+        db.add(s)
+        db.commit()
+        return s
+
+    def test_名单里那篇带回逐项对得上的快照(self, client, db):
+        u = mk_user(db, "s1")
+        n = mk_note(db, u, "公开过、卡片丢了")
+        self._share(db, u, n)
+        got = client.get("/api/user/cards", headers=hdr(u)).json()
+        snap = {x["note_id"]: x for x in got["snapshots"]}
+        assert set(snap) == {n.id}, got
+        one = snap[n.id]
+        assert one["summary"] == "当年那句摘要"
+        assert one["key_points"] == ["当年第一条"]
+        assert one["key_links"] == ["https://a.cn"]
+        assert one["source_url"] == "https://src.cn"
+        assert one["author_name"] == "当年的名字"
+        assert one["active"] is True
+
+    def test_撤掉的分享照样给快照并如实带active(self, client, db):
+        u = mk_user(db, "s2")
+        n = mk_note(db, u, "撤过分享的那篇")
+        self._share(db, u, n, is_active=False)
+        one = client.get("/api/user/cards", headers=hdr(u)).json()["snapshots"][0]
+        assert one["active"] is False
+        assert one["summary"] == "当年那句摘要"
+
+    def test_一篇几行分享取最新那一行(self, client, db):
+        """最后一次建分享才是"那张卡片当初印出去的内容"，取最早那行会渲出一张他早就改过的旧版本。
+
+        两行都开着是撞索引的（`ux_shares_one_active_per_note`），真实形状就是旧的关、新的开。
+        """
+        u = mk_user(db, "s3")
+        n = mk_note(db, u, "分享过两次的这篇")
+        self._share(db, u, n, tag="old", title="第一次那版", summary="旧的摘要", is_active=False)
+        self._share(db, u, n, tag="new", title="第二次那版", summary="新的摘要")
+        one = client.get("/api/user/cards", headers=hdr(u)).json()["snapshots"][0]
+        assert one["summary"] == "新的摘要", one
+        assert one["active"] is True, one
+
+    def test_没公开过的篇不给快照(self, client, db):
+        """没有分享记录的由客户端回退读笔记当前内容——这里凭空给一份就是替它编。"""
+        u = mk_user(db, "s4")
+        mk_note(db, u, "从没公开过")
+        got = client.get("/api/user/cards", headers=hdr(u)).json()
+        assert got["snapshots"] == [] and got["need_confirm"] == [], got
+
+    def test_已经有卡片行的那篇不给快照(self, client, db):
+        u = mk_user(db, "s5")
+        n = mk_note(db, u, "卡片已经登记上了")
+        self._share(db, u, n)
+        put(client, u, n.id, file_id="cloud://x/ok.jpg")
+        assert client.get("/api/user/cards", headers=hdr(u)).json()["snapshots"] == []
+
+
 class Test删除连带:
     def test_删一篇把卡片地址一起回给客户端(self, client, db):
         u = mk_user(db, "q")
