@@ -1,0 +1,840 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>一支粉，六档色阶，每档两屏 · v27</title><style>
+@font-face{font-family:'WtsjMind';src:url(data:font/ttf;base64,AAEAAAANAIAAAwBQRFNJRwAAAAEAAAjAAAAACEdQT1NEdkx1AAAIcAAAACBHU1VCH0gnawAACJAAAAAwT1MvMljcW0EAAAFYAAAAYGNtYXABDwCJAAACBAAAAExnbHlmm+0G8wAAAngAAARaaGVhZCCu5CUAAADcAAAANmhoZWEGjAErAAABFAAAACRobXR4IoICeAAAAbgAAABMbG9jYQiYCdIAAAJQAAAAKG1heHAAhwBoAAABOAAAACBuYW1lHvI2PwAABtQAAAF6cG9zdP+4ADIAAAhQAAAAIAABAAAABAEGPGSDL18PPPUAAwPoAAAAANikqbIAAAAA5uP1fv/d/2QCLwOnAAAABwACAAAAAAAAAAEAAAQa/qIAZAJm/90ADwIvAAEAAAAAAAAAAAAAAAAAAAATAAEAAAATADAAAwAYAAIAAQACAB4ABgAAAGQAAAACAAEABAM7APoABQAAAooCWAAAAEsCigJYAAABXgAyAUQAAAAAAwAAAAAAAAAAAAABAAAAAAAAAAAAAAAASVRGTwDAACAAdgQa/qIAZARvAnMAAAABAAAAAAIcAr4AAAAgAAQB9AAAASIAAAJNACgBvP/dAHQAIAFnAB4CTABGAOIADwI3ADICPwA1Aj4AFAJQAEYCZgBGAfYACgJgADcCZgA8AHQAIAIDABQBvAAoAAAAAgAAAAMAAAAUAAMAAQAAABQABAA4AAAACgAIAAIAAgAgACsAOgB2//8AAAAgACsALQB2////4f/X/9b/mwABAAAAAAAAAAAAAAAAAAAAAAAVAB0AMwBDAHUAhACqAOMA/gEvAWwBgAHGAgICDgIgAi0AAQAoAH0CJQJ7AAsAAAEjFSM1IzUzNTMVMwIl9RT09BT1AXP29hL29gD////dAXMBSQGFAAIAErUAAAEAIP/+AFQANAALAAAWJjU0NjMyFhUUBiMvDw8LCw8PCwIPDAwPDwwMDwAAAQAe/2QBSQOnAAMAAAEBIwEBSf7pFAEVA6f7vQRDAAACAEb/+QIGAscADwAfAAASNjYzMhYWFRQGBiMiJiY1JCYmIyIGBhUUFhYzMjY2NUYkYlpZYyQkY1laYiQBrCBZU1NZICBZU1NZIAHTmlpam3BynFtbnHJsklVVkmxtlFZWlG0AAQAPAAAAjQLAAAUAABM1MxEjEQ9+FAKuEv1AAq4AAQAyAAACBQLHABcAADYSNTQmIyIGByM2NjMyFhUUBgYHIRUhNfXkVGBhZwcUCHdkVXN+ul0Brf4tiQEEdk5kdWBse15mWb6jNxILAAEANf/5AfwCxwAoAAASNjMyFhUUBgcVFhYVFAYjIiYnMxYWMzI2NTQmIyM1MzI1NCYjIgYHI0x4ZV5oUl1UaGpqY38RFA9zXV5iinwREvheVFJ2CxQCX2hiTEBfCAYJX1FRaWthUmZdSVdbE6FGVlZbAAIAFAAAAi8CwAAKAA0AADc1ATMRMxUjFSM1EQEhFAGNFHp6FP6MAXS+EAHy/hASvr4B4v4wAAEARv/5AhkCwAAfAAABIRE2NjMyFhUUBgYjIiYnMxYWMzI2NTQmIyIGByMRIQH3/m4dcEJ0cTBpUF5+DhQRclJqbG1kRW4eEgGmAq7+wCs0gWBCbkNqXVdce2Rgbzo0AXMAAgBG//kCKgLIABsAKQAAACYjIgYVFBc2NjMyFhUUBgYjIiY1NDYzMhYXIw4CFRQWFjMyNjU0JiMB7l1RcHcBDYFab3kuZk+VbHWFWmgLFO9nQzBoT15xcWMCXFqjtSMSTl2Ccj5oQbufs8JmWEguXEM8a0NyY250AAABAAoAAAHOAsAABgAAAQEjASE1IQHO/ugVARz+TQHEAq79UgKuEgAAAwA3/+cCKQLHABcAIwAvAAASJjU0NjMyFhUUBgcWFhUUBiMiJjU0NjckJiMiBhUUFjMyNjUEBhUUFjMyNjU0JiOVSnpra3pKT1Fcg3Z2g1xRAR1xYGBxcGFhcP7LgXxpaXyBZAF6Wz9RYmJRP1sQDmFKXmxsXkphDvhTU05MVVVMs1ZaWGBgWFpWAAACADz/+AIgAscAGwApAAA2FjMyNjU0JwYGIyImNTQ2NjMyFhUUBiMiJiczPgI1NCYmIyIGFRQWM3hdUXB3AQ2BWm95LmZPlWx1hVpoCxTvZ0MwaE9ecXFjZFqjtSMSTl2Ccj5oQbufs8JmWEguXEM8a0NyY250AP//ACD//gBUAfkAIgAEAAAABwAEAAABxQABABQAAAHvAhwABgAAJRMzAyMDMwEC2BXmD+YWHgH+/eQCHAABACgBcwGUAYUAAwAAARUhNQGU/pQBhRISAAAAAAAHAFoAAwABBAkAAACiAAAAAwABBAkAAQAYAKIAAwABBAkAAgAOALoAAwABBAkAAwA2AMgAAwABBAkABAAYAKIAAwABBAkABQAKAP4AAwABBAkABgAYAQgAQwBvAHAAeQByAGkAZwBoAHQAIAAyADAAMgAwACAAVABoAGUAIABQAG8AcABwAGkAbgBzACAAUAByAG8AagBlAGMAdAAgAEEAdQB0AGgAbwByAHMAIAAoAGgAdAB0AHAAcwA6AC8ALwBnAGkAdABoAHUAYgAuAGMAbwBtAC8AaQB0AGYAbwB1AG4AZAByAHkALwBQAG8AcABwAGkAbgBzACkAUABvAHAAcABpAG4AcwAgAFQAaABpAG4AUgBlAGcAdQBsAGEAcgBJAFQARgBPADsAIABQAG8AcABwAGkAbgBzACAAVABoAGkAbgA7ACAANAAuADAAMAA0AGIAOAA0AC4AMAAwADQAUABvAHAAcABpAG4AcwAtAFQAaABpAG4AAAADAAAAAAAA/7UAMgAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAKABwAHgABREZMVAAIAAQAAAAA//8AAAAAAAAAAQAAAAoALAAuAANERkxUABRkZXYyAB5kZXZhAB4ABAAAAAD//wAAAAAAAAAAAAAAAAABAAAAAA==) format('truetype');font-weight:100;font-style:normal}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{background:#DCDAD4;font-family:'PingFang SC','Helvetica Neue',sans-serif;color:#23252c;padding:48px 40px 64px}
+h1{font-size:34px;letter-spacing:-.6px;margin-bottom:10px}
+h1 i{display:inline-block;width:4px;height:22px;border-radius:2px;background:#E9723D;vertical-align:-2px;margin-right:12px}
+.lead{font-size:16px;line-height:1.75;color:#4a4f47;max-width:1700px;margin-bottom:12px}
+.lead code{background:#fff;padding:2px 7px;border-radius:5px;font-size:15px}
+.lead b{color:#23252c}
+.row{display:flex;gap:34px;align-items:flex-start;flex-wrap:nowrap;margin:0 0 46px}
+.plan{margin:0 0 26px;padding-top:26px;border-top:2px solid rgba(35,37,44,.14)}
+.plan .pt{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.plan .k{font-size:14px;font-weight:800;letter-spacing:3px;color:#E9723D}
+.plan .t{font-size:26px;font-weight:800;letter-spacing:-.4px}
+/* 类名不许用 .d：现网那枚危险态按钮就叫 b.d，撞上一次就把整排撑破（10-08 实测踩过） */
+.plan .desc{font-size:15px;color:#5c6068;line-height:1.6;flex:1;min-width:420px}
+.cell{width:750px;flex:none}
+.cap{font-size:15px;line-height:1.7;color:#4a4f47;margin-top:12px}
+.cap b{color:#23252c}
+.cap code{background:#fff;padding:1px 6px;border-radius:5px;font-size:14px}
+.tag{display:inline-block;font-size:13px;padding:2px 8px;border-radius:999px;background:#23252c;color:#F2EFE9;margin-right:6px;vertical-align:2px}
+.tag.orange{background:#E9723D;color:#2C1204}
+.tag.cut{background:#b4231f;color:#fff}
+
+/* 手机框：750×1670 = 1px:1rpx；令牌从 app.wxss 现读那份贴进来（上面已逐条核对） */
+.ph{width:750px;height:1670px;border-radius:60px;overflow:hidden;position:relative;outline:2px solid #B9B6AF;
+  background:var(--bg-page);color:#23252c;
+  --fs-h1:42px;--fs-h2:34px;--fs-title:31px;--fs-body:28px;--fs-meta:24px;--fs-tiny:21px;--fs-label:20px;--fs-micro:18px;--sp-2:16px;--sp-3:24px;--sp-4:32px;--r-card:40px;--r-block:32px;--r-chip:28px;--r-pill:999px;--w-edge:3px;--bg-page:#E2DED4;--bg-card:#F3F3F1;--text-primary:#352E1D;--text-secondary:rgba(53, 46, 29, 0.72);--text-tertiary:rgba(53, 46, 29, 0.72);--card-edge:rgba(53, 46, 29, 0.12);--accent:#352E1D;--dk:#331922;--si:242, 239, 233;--ia:0.5;--danger:#ee8277;--danger-edge:rgba(238, 130, 119,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948;--w:#FFFFFF;--cam:#E9723D;--ext:#C4541F}
+:root{--fs-h1:42px;--fs-h2:34px;--fs-title:31px;--fs-body:28px;--fs-meta:24px;--fs-tiny:21px;--fs-label:20px;--fs-micro:18px;--sp-2:16px;--sp-3:24px;--sp-4:32px;--r-card:40px;--r-block:32px;--r-chip:28px;--r-pill:999px;--w-edge:3px;--bg-page:#E2DED4;--bg-card:#F3F3F1;--text-primary:#352E1D;--text-secondary:rgba(53, 46, 29, 0.72);--text-tertiary:rgba(53, 46, 29, 0.72);--card-edge:rgba(53, 46, 29, 0.12);--accent:#352E1D}
+.status{height:94px;display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+  font-size:26px;font-weight:600;color:#fff;background:#181A20}
+.status .r{font-size:22px;font-weight:500;letter-spacing:1px}
+.nav{height:90px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:600;position:relative;
+  color:#F2EFE9;background:#181A20}
+.nav .capsule{position:absolute;right:24px;top:22px;width:174px;height:46px;border-radius:999px;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
+  display:flex;align-items:center;justify-content:space-around;font-size:22px;color:#fff}
+.body{padding:0 24px;position:relative}
+.band{height:542px;position:relative;overflow:hidden;margin:0 -24px}
+.band .ph2{position:absolute;inset:0;background:url(../../../miniprogram/assets/home-bg-portrait.jpg) center 15%/cover no-repeat}
+.band .sc{position:absolute;inset:0;background:linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 14%,rgba(18,20,26,.5) 58%,rgba(18,20,26,.44) 100%),rgba(8,9,12,.5)}
+.band .t1{position:absolute;left:32px;top:22px;font-size:var(--fs-h1);font-weight:700;letter-spacing:-1px;color:rgba(242,239,233,.96)}
+.stats{position:absolute;right:32px;top:24px;z-index:4}
+.st{width:96px;text-align:center}
+.st b{display:block;font-family:'WtsjMind',sans-serif;font-weight:100;font-size:56px;line-height:.9;color:rgba(242,239,233,.8)}
+.st i{font-style:normal;display:block;margin-top:8px;font-size:var(--fs-micro);letter-spacing:2px;color:rgba(242,239,233,.62)}
+.tools{position:absolute;left:24px;right:24px;top:400px;height:88px;display:flex;align-items:center;
+  justify-content:space-between;z-index:5}
+.tp{display:flex;align-items:center;gap:14px;flex:1;min-width:0;font-size:var(--fs-meta);line-height:1.35;color:rgba(242,239,233,.82)}
+.tp i{width:14px;height:14px;border-radius:50%;flex:none;background:#F6C445}
+.tp span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acts2{display:flex;align-items:center;gap:18px;flex:none;margin-left:26px}
+.acts2 svg{width:38px;height:38px;stroke:rgba(255,255,255,.86);fill:none;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+.srch{display:flex;align-items:center;gap:16px;height:60px}
+.srch.open{flex:1;min-width:0;border-radius:var(--r-pill);background:rgba(255,255,255,.18);
+  border:2px solid rgba(255,255,255,.36);padding:0 22px}
+.srch.open svg{width:30px;height:30px;stroke:rgba(255,255,255,.9);fill:none;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.srch .in{flex:1;min-width:0;font-size:var(--fs-body);color:rgba(242,239,233,.92);white-space:nowrap}
+.srch .in.iph{color:rgba(242,239,233,.55)}
+.srch .go{flex:none;font-size:var(--fs-meta);font-weight:600;color:#F2EFE9}
+
+/* 列表那一层：甲 = 页面底不变；乙 = 整层换深色面（与创建页那块面板同一档），顶部一条纸白@10% 的边
+   ——那条边就是"深色边框"在乙里的落点，它同时把这一层与底栏那块深色分开（两块深色挨在一起会连成一片） */
+.list{position:absolute;left:0;right:0;top:686px;bottom:150px;z-index:1;
+  border-radius:var(--r-card) var(--r-card) 0 0;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--bg-page)}
+.yi .list{background:var(--dk);border-top:var(--w-edge) solid rgba(var(--si),.10)}
+
+/* 区内顶那一行两枚 tab：现网 .vtabs 一个字没改（它就是"首页下划线文字"那把参照物） */
+.vtabs{display:flex;gap:44px;padding:0 32px;flex:none;position:relative;
+  border-bottom:2px solid rgba(35,37,44,.12)}
+.vtabs span{font-size:var(--fs-meta);font-weight:600;letter-spacing:1px;color:rgba(35,37,44,.42);padding:22px 0 14px;position:relative}
+.vtabs span.on{color:rgba(35,37,44,.9);font-weight:700}
+.vtabs span.on::after{content:'';position:absolute;left:0;right:0;bottom:-2px;height:4px;border-radius:2px;background:rgba(35,37,44,.9)}
+.vtabs .fold{margin-left:auto;align-self:center;font-size:var(--fs-meta);color:rgba(35,37,44,.42);padding:0}
+.yi .vtabs{border-bottom-color:rgba(var(--si),.10)}
+.yi .vtabs span{color:rgba(var(--si),var(--ia))}
+.yi .vtabs span.on{color:rgb(var(--si))}
+.yi .vtabs span.on::after{background:rgb(var(--si))}
+.yi .vtabs .fold{color:rgba(var(--si),var(--ia))}
+
+/* 分类那一行：撤胶囊，换成与上面同一种手法（文字 + 选中一条短杠）。
+   与上面那行的分工：横线只有一条（在 tab 底下），分类这行不再自带通栏线——
+   两行都压一条线就会被读成"两排 tab"，而分类是一排筛选、不是第二层导航。 */
+.cats{display:flex;gap:40px;padding:20px 32px 16px;flex:none;align-items:baseline;overflow:hidden}
+.cats span{position:relative;font-size:var(--fs-meta);font-weight:600;letter-spacing:1px;
+  color:rgba(35,37,44,.42);padding-bottom:14px;white-space:nowrap;flex:none}
+.cats span.on{color:rgba(35,37,44,.9);font-weight:700}
+.cats span.on::after{content:'';position:absolute;left:0;right:0;bottom:0;height:4px;border-radius:2px;background:rgba(35,37,44,.9)}
+.cats .fade{margin-left:auto;align-self:center;flex:none;font-size:var(--fs-micro);color:rgba(35,37,44,.35);padding:0}
+.yi .cats span{color:rgba(var(--si),var(--ia))}
+.yi .cats span.on{color:rgb(var(--si))}
+.yi .cats span.on::after{background:rgb(var(--si))}
+.yi .cats .fade{color:rgba(var(--si),.35)}
+
+/* 白内框：两套方案共用这一块，差别只在它外面有没有那一圈深色 */
+.wc{background:var(--w);border-radius:var(--r-block);color:#23252c}
+.jia .wc{border:4px solid var(--dk)}
+.yi .wc{box-shadow:0 6px 18px rgba(8,10,14,.28)}
+
+/* 笔记列表那一支 */
+.xlist{flex:1;min-height:0;overflow:hidden;padding:20px 24px 0}
+.xrow{display:flex;gap:20px;padding:24px 28px;margin-bottom:20px}
+.jia .xrow{padding:20px 24px}
+.xd{width:60px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px}
+.xd i{width:14px;height:14px;border-radius:50%;background:#F6C445}
+.xd b{font-family:'WtsjMind',sans-serif;font-weight:100;font-size:var(--fs-meta);line-height:1;color:rgba(35,37,44,.5)}
+.xm{flex:1;min-width:0}
+.xm .t{font-size:var(--fs-body);font-weight:600;line-height:1.35;color:rgba(35,37,44,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xm .s{margin-top:8px;font-size:var(--fs-meta);line-height:1.62;color:rgba(35,37,44,.7);display:-webkit-box;-webkit-box-orient:vertical;
+  -webkit-line-clamp:2;overflow:hidden}
+.xm .m{margin-top:10px;display:flex;align-items:baseline;gap:18px}
+.xm .more{font-size:var(--fs-meta);font-weight:700;color:#C4541F}
+.who{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:var(--fs-micro);color:rgba(35,37,44,.5);min-width:0}
+.who .g{position:relative;width:20px;height:20px;flex:none;overflow:hidden;opacity:.85}
+.who .g::before{content:'';position:absolute;left:5px;top:0;width:10px;height:10px;box-sizing:border-box;border:2px solid currentColor;border-radius:50%}
+.who .g::after{content:'';position:absolute;left:-2px;bottom:0;width:24px;height:13px;box-sizing:border-box;border:2px solid currentColor;border-bottom:none;border-radius:13px 13px 0 0}
+.who span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.yi .xd b{color:rgba(35,37,44,.5)}
+
+/* 卡片那一支：白垫就是白内框；甲给它一圈深色边，乙让它直接坐在深色上 */
+.grid2{flex:1;min-height:0;overflow:hidden;display:flex;flex-wrap:wrap;gap:22px;padding:22px 24px 0}
+.gc{width:340px}
+.pad{width:340px;height:474px;border-radius:20px;background:var(--w);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.jia .pad{border:4px solid var(--dk)}
+.yi .pad{box-shadow:0 8px 22px rgba(8,10,14,.34)}
+.gcap{margin-top:12px;font-size:var(--fs-meta);line-height:1.4;color:rgba(35,37,44,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.yi .gcap{color:rgba(var(--si),.82)}
+
+/* 详情那一层（浮窗与独立页共用一套块：白内框 + 里面一段段内容） */
+.sheet{position:absolute;left:24px;right:24px;top:314px;bottom:152px;border-radius:32px;z-index:9;
+  display:flex;flex-direction:column;overflow:hidden;background:var(--w)}
+.jia .sheet{border:6px solid var(--dk)}
+.yi .sheet{background:var(--dk);border:var(--w-edge) solid rgba(var(--si),.10)}
+.yi .dsb{padding:0 26px}
+.grip{flex:none;width:100%;height:56px;display:flex;align-items:center;justify-content:center;position:relative;
+  background:var(--w)}
+.yi .grip{background:transparent}
+.grip .bar{width:88px;height:8px;border-radius:999px;background:rgba(35,37,44,.16)}
+.yi .grip .bar{background:rgba(var(--si),.28)}
+.grip span{position:absolute;right:34px;top:0;height:56px;display:flex;align-items:center;
+  font-size:var(--fs-tiny);font-weight:700;letter-spacing:.4px;color:rgba(35,37,44,.42)}
+.yi .grip span{color:rgba(var(--si),var(--ia))}
+.dsb{flex:1;min-height:0;overflow:hidden;padding:0 34px}
+.dsb .meta{margin-top:14px;font-size:var(--fs-meta);color:rgba(35,37,44,.5)}
+.dsb h3{margin-top:8px;font-size:38px;font-weight:800;letter-spacing:-.9px;line-height:1.3;color:rgba(35,37,44,.9)}
+.yi .dsb h3{color:rgb(var(--si))}
+.yi .dsb .meta{color:rgba(var(--si),var(--ia))}
+/* 右上那一格＝出卡片的唯一入口（现网 app.wxss 的 .ds-rt / .ds-empty 那一整套：格 252×352、
+   方片 176、"+" 56、品牌行 14/14）。10-07 起动作条只剩两枚，「生成笔记卡片」不再是按钮，
+   画稿不许把它画回去（现网注释里就是站长那句"很多余"）。 */
+.hero{display:flex;align-items:flex-start;gap:24px}
+.hero .lt{flex:1;min-width:0}
+.hero .lt .mt{font-size:var(--fs-meta);color:rgba(35,37,44,.5)}
+.hero .lt .h1{margin-top:8px;font-size:38px;font-weight:800;letter-spacing:-.9px;line-height:1.3;color:rgba(35,37,44,.9)}
+.yi .hero .lt .mt{color:rgba(var(--si),var(--ia))}
+.yi .hero .lt .h1{color:rgb(var(--si))}
+.rt{flex:none;width:252px}
+.rt .cell{box-sizing:border-box;width:252px;height:352px;border-radius:20px;background:var(--w);
+  display:flex;flex-direction:column;align-items:center;justify-content:center}
+.jia .rt .cell{box-shadow:inset 0 0 0 2px rgba(35,37,44,.16)}
+.yi .rt .cell{background:color-mix(in srgb,#FFFFFF 7%,var(--dk))}
+.rt .sw{position:relative;width:176px;height:176px;border-radius:28px;flex:none;
+  border:var(--w-edge) solid rgba(35,37,44,.10);display:flex;align-items:center;justify-content:center}
+.yi .rt .sw{border-color:rgba(var(--si),.10)}
+/* 深面那一版：加号与品牌那颗圆点得跟着翻，否则 42% 的墨压在 #2B2D35 上等于没画（10-08 看图抓到） */
+.yi .rt .sw u{color:rgba(var(--si),.42)}
+.yi .rt .sw .lg i{background:rgb(var(--si));color:var(--dk)}
+.rt .sw u{text-decoration:none;font-weight:200;font-size:56px;line-height:1;color:rgba(35,37,44,.42)}
+.rt .sw .lg{position:absolute;left:14px;top:14px;display:flex;align-items:center;gap:6px}
+.rt .sw .lg i{width:28px;height:28px;border-radius:50%;background:#23252C;color:#F2EFE9;font-size:16px;
+  font-style:normal;display:flex;align-items:center;justify-content:center}
+.rt .sw .lg em{font-style:normal;font-size:var(--fs-micro);letter-spacing:1px;color:rgba(35,37,44,.45)}
+.yi .rt .sw .lg em{color:rgba(var(--si),var(--ia))}
+.rt .e1{display:block;margin-top:18px;text-align:center;font-size:var(--fs-meta);font-weight:700;color:rgba(35,37,44,.9)}
+.rt .e2{display:block;margin-top:4px;text-align:center;font-size:var(--fs-tiny);line-height:1.4;color:rgba(35,37,44,.45)}
+.yi .rt .e1{color:rgb(var(--si))}
+.yi .rt .e2{color:rgba(var(--si),var(--ia))}
+.blk{margin-top:22px;padding:22px 24px;border-radius:24px;background:var(--w)}
+.jia .blk{box-shadow:inset 0 0 0 2px rgba(35,37,44,.10)}
+.yi .blk{box-shadow:none}
+.blk .lab{font-size:var(--fs-label);font-weight:800;letter-spacing:1.6px;color:rgba(35,37,44,.42)}
+.blk p{margin-top:10px;font-size:var(--fs-body);line-height:1.7;color:rgba(35,37,44,.7)}
+.blk .pt{margin-top:14px;display:flex;gap:16px;align-items:flex-start}
+.blk .pt b{flex:none;width:38px;height:38px;border-radius:50%;background:#E9723D;color:#2C1204;
+  font-family:'WtsjMind',sans-serif;font-weight:100;font-size:22px;display:flex;align-items:center;justify-content:center}
+.blk .pt span{font-size:var(--fs-body);line-height:1.55;color:rgba(35,37,44,.9)}
+.blk .link{margin-top:10px;font-size:var(--fs-meta);line-height:1.5;color:#C4541F;word-break:break-all}
+.blk .shots{margin-top:14px;display:flex;gap:16px}
+.blk .shots u{width:150px;height:150px;border-radius:24px;background:#EDE9E1;flex:none;
+  box-shadow:inset 0 0 0 2px rgba(35,37,44,.10)}
+.dsd{flex:none;padding:22px 30px 30px;background:var(--w)}
+.yi .dsd{background:var(--dk);border-top:var(--w-edge) solid rgba(var(--si),.10)}
+.dsd .irow{display:flex;gap:14px}
+.dsd .irow b{flex:1;height:72px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;
+  white-space:nowrap;font-size:var(--fs-meta);font-weight:700;color:#23252C;background:var(--w);
+  box-shadow:inset 0 0 0 var(--w-edge) var(--dk)}
+.dsd .irow b.d{color:#b4231f;box-shadow:inset 0 0 0 var(--w-edge) rgba(180,35,31,.45)}
+.yi .dsd .irow b{background:transparent;color:rgb(var(--si));box-shadow:inset 0 0 0 var(--w-edge) rgba(var(--si),.10)}
+.dsd .pub{margin-top:18px;display:flex;align-items:center;justify-content:space-between;
+  font-size:var(--fs-micro);color:rgba(35,37,44,.5)}
+.yi .dsd .pub{color:rgba(var(--si),var(--ia))}
+.dsd .pub s{text-decoration:none;font-weight:700;color:#b4231f}
+
+/* 卡片页（share） */
+.sp{position:absolute;left:0;right:0;top:184px;bottom:0;padding:0 24px;display:flex;flex-direction:column}
+.jia .sp{background:var(--bg-page)}
+.yi .sp{background:var(--dk)}
+.stage{flex:none;height:760px;border-radius:28px;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  background:var(--w);margin-top:22px}
+.jia .stage{border:4px solid var(--dk)}
+.yi .stage{box-shadow:0 10px 26px rgba(8,10,14,.34)}
+.stage .big{width:470px;height:566px}
+.qrow{flex:none;display:flex;align-items:center;gap:16px;margin-top:22px}
+.qrow .tx b{display:block;font-size:var(--fs-body);font-weight:700;color:rgba(35,37,44,.9)}
+.yi .qrow .tx b{color:rgb(var(--si))}
+.qrow .tx i{font-style:normal;display:block;margin-top:4px;font-size:var(--fs-meta);line-height:1.4;color:rgba(35,37,44,.55)}
+.yi .qrow .tx i{color:rgba(var(--si),var(--ia))}
+.pill{width:92px;height:52px;border-radius:999px;background:rgba(35,37,44,.14);position:relative;flex:none}
+.pill u{position:absolute;left:6px;top:6px;width:40px;height:40px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.pill.on{background:#E9723D}
+.pill.on u{transform:translateX(40px)}
+.yi .pill{background:rgba(var(--si),.18)}
+/* 这一条本来缺：.yi .pill 与 .pill.on 同权重、写在后面，把开那档的橙盖成灰底（v23 就带着这个错，这次新加的断言才抓到） */
+.yi .pill.on{background:#E9723D}
+.strip{flex:1;min-height:0;overflow:hidden;margin-top:22px;white-space:nowrap}
+.strip .in{display:flex;gap:16px;align-items:flex-start}
+.pick{flex:none;width:190px;padding:8px;border-radius:24px;background:var(--w)}
+.jia .pick{box-shadow:inset 0 0 0 2px var(--dk)}
+.yi .pick{box-shadow:none}
+.pick.on{box-shadow:inset 0 0 0 4px #E9723D}
+.jia .pick.on{box-shadow:inset 0 0 0 4px #E9723D}
+.pick .mini{width:174px;height:244px;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.pick .mini .art{transform:scale(.51);transform-origin:center}
+.pick label{display:block;margin-top:8px;text-align:center;font-size:var(--fs-tiny);font-weight:600;color:rgba(35,37,44,.62);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 模板那一排在乙案里仍是白格子（白内框那条共用决定），所以字仍是墨色——
+   跟着深面翻成纸白就成了白纸白字，肉眼扫过去才发现，实测表量不出来。 */
+.pick.on label{color:rgba(35,37,44,.9);font-weight:700}
+.sact{flex:none;display:flex;gap:16px;padding:22px 0 30px}
+.sact b{flex:1;height:96px;border-radius:var(--r-pill);display:flex;align-items:center;justify-content:center;
+  white-space:nowrap;font-size:var(--fs-body);font-weight:700}
+.sact b.s2{color:rgba(35,37,44,.9);background:var(--w);box-shadow:inset 0 0 0 var(--w-edge) var(--dk)}
+.yi .sact b.s2{color:rgb(var(--si));background:transparent;box-shadow:inset 0 0 0 var(--w-edge) rgba(var(--si),.10)}
+/* 删除那一枚：浅面沿用现网 #b4231f（压白 6.56），深面换成 #e57368（压深 5.09）。
+   现网在深面上没画过这一枚，所以这一档是本稿新定的，实测表里有这两行。 */
+.sact b.s2.d,.yi .sact b.s2.d{color:#b4231f;box-shadow:inset 0 0 0 var(--w-edge) rgba(180,35,31,.45)}
+.yi .sact b.s2.d{color:var(--danger);box-shadow:inset 0 0 0 var(--w-edge) var(--danger-edge)}
+.yi .dsd .irow b.d{color:var(--danger);box-shadow:inset 0 0 0 var(--w-edge) var(--danger-edge)}
+.sact b.s1{background:#C4541F;color:#FFFFFF}
+
+/* 底栏：v24 起它是**每套壁纸自己那一档**（chromeOf(key).style 贴进手机壳的 style 上），
+   所以这里一律走 var，不再把象牙那支烤死在样式里——烤死的话四台机器的底栏会同色。 */
+.bar2{position:absolute;left:24px;right:24px;bottom:20px;height:108px;border-radius:44px;z-index:6;
+  background:var(--chrome-bg);border:3px solid var(--chrome-line);display:flex;align-items:center;justify-content:space-around;
+  box-shadow:0 16px 44px var(--chrome-shadow)}
+.bar2 u{text-decoration:none;width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--chrome-idle);color:var(--chrome-ink)}
+.bar2 u.on{background:var(--chrome-sel);color:var(--chrome-ink)}
+.bar2 svg{width:36px;height:36px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* 卡片小样 */
+.art{position:relative;overflow:hidden;padding:22px 20px}
+.art.jade{background:#FBF8F1;color:#17181C}
+.art.jade .hd{display:flex;align-items:center;gap:7px;font-size:12px;letter-spacing:2px;color:rgba(23,24,28,.5)}
+.art.jade .hd i{width:16px;height:16px;border-radius:50%;background:#23252c;color:#F2EFE9;font-size:10px;display:flex;align-items:center;justify-content:center;font-style:normal}
+.art.jade h6{margin-top:18px;font-size:20px;line-height:1.3;font-weight:800;letter-spacing:-.4px}
+.art.jade .ln{margin-top:12px;height:9px;border-radius:5px;background:rgba(23,24,28,.13)}
+.art.jade .ln.w86{width:86%}.art.jade .ln.w72{width:72%}.art.jade .ln.w58{width:58%}
+.art.jade .rule{margin-top:20px;height:2px;background:rgba(23,24,28,.16)}
+.art.jade .ft{position:absolute;left:20px;right:20px;bottom:18px;display:flex;align-items:flex-end;justify-content:space-between}
+.art.jade .ft u{width:34px;height:34px;border-radius:50%;background:#23252c;color:#F2EFE9;font-size:15px;display:flex;align-items:center;justify-content:center;text-decoration:none}
+.art.jade .qr{width:42px;height:42px;background:repeating-linear-gradient(0deg,#17181C 0 4px,transparent 4px 8px),repeating-linear-gradient(90deg,#17181C 0 4px,#FBF8F1 4px 8px);opacity:.75}
+.art.verse{background:#FFFDF6;color:#17181C;display:flex;flex-direction:column;justify-content:center}
+.art.verse em{font-style:normal;font-size:56px;line-height:.6;color:rgba(23,24,28,.22)}
+.art.verse p{margin-top:14px;font-size:19px;line-height:1.5;font-weight:700;letter-spacing:-.3px}
+.art.verse .sg{margin-top:20px;display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:2px;color:rgba(23,24,28,.5)}
+.art.verse .sg u{width:26px;height:26px;border-radius:50%;background:#23252c;color:#F2EFE9;font-size:12px;display:flex;align-items:center;justify-content:center;text-decoration:none}
+.art.verse.dk{background:#23252C;color:#F2EFE9}
+.art.verse.dk em{color:rgba(242,239,233,.28)}
+.art.verse.dk .sg{color:rgba(242,239,233,.6)}
+.art.verse.dk .sg u{background:#F2EFE9;color:#23252c}
+
+/* 局部放大那一格（分类行两态 + 尺寸标注） */
+.zoom{width:750px;flex:none;background:#fff;border-radius:28px;padding:26px 28px;box-shadow:0 8px 22px rgba(8,10,14,.10)}
+.zoom h4{font-size:17px;font-weight:800;letter-spacing:-.2px;margin-bottom:4px}
+.zoom .sub{font-size:14px;color:#5c6068;line-height:1.6;margin-bottom:16px}
+.zoom .strip2{border-radius:20px;overflow:hidden}
+.zoom .strip2.on-light{background:var(--bg-page)}
+.zoom .strip2.on-dark{background:#331922}
+.zoom .cats{padding:22px 26px 18px;gap:44px}
+/* 深色那一条得自己把墨翻成纸白：上一稿只有 .yi 那批规则，放大格里的深色条没吃到，
+   画出来是一块纯黑空带（10-08 看图才发现）。 */
+.zoom .strip2.on-dark .cats span{color:rgba(242,239,233,.55)}
+.zoom .strip2.on-dark .cats span.on{color:#F2EFE9}
+.zoom .strip2.on-dark .cats span.on::after{background:#F2EFE9}
+.dim{display:flex;gap:26px;margin-top:14px;font-size:13.5px;color:#4a4f47;line-height:1.65;flex-wrap:wrap}
+.dim b{color:#23252c}
+.dim code{background:#F2EFE9;padding:1px 6px;border-radius:5px}
+
+/* 实测表 */
+table.m{border-collapse:collapse;width:100%;background:#fff;font-size:14.5px;line-height:1.5}
+table.m th,table.m td{text-align:left;padding:9px 12px;border-bottom:1px solid rgba(35,37,44,.10);vertical-align:top}
+table.m th{font-size:13px;letter-spacing:1px;color:#5c6068;background:#F2EFE9}
+table.m td.k{font-family:ui-monospace,Menlo,monospace;white-space:nowrap}
+table.m td.ok,table.m td.bad{font-weight:800;white-space:nowrap}
+table.m td.ok{color:#1c6b3a}table.m td.bad{color:#b4231f}table.m td.soft{color:#8a6d1f}
+.legend{margin-top:34px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 30px}
+.legend>div{background:#fff;border-radius:18px;padding:16px 20px 16px 52px;font-size:14.5px;line-height:1.75;color:#3c4046;position:relative}
+.legend .n{position:absolute;left:16px;top:16px;width:26px;height:26px;border-radius:50%;background:#23252c;color:#F2EFE9;
+  font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.legend b{color:#23252c}.legend code{background:#F2EFE9;padding:1px 5px;border-radius:4px}
+.legend i{color:#5c6068}
+</style></head><body>
+<h1><i></i>挑了一支玫瑰粉（H340）：同色系六档从浅到深，每档两屏，横着比</h1>
+<div class="lead"><b>先说落地状态</b>：真机现在跑<b>线上 1.9.29</b>（后台实据 发布 10-07 19:32:01），<b>2.0.0 已提审、正在审核中</b>（10-07 22:31:26）。<b>这一稿只是效果图，代码一行没动</b>；v23 那三条已拍的决定（白内框、分类下划线文字、拍照与提炼固定橙）原样保留，也还没落进 <code>createSkin()</code>。</div>
+<div class="lead"><b>这一版在比什么</b>：色相我挑定 <code>H340</code> 那一族玫瑰粉，只动明度做六档（<code>L62 → L15</code>），每档画两屏（笔记列表、详情浮窗），最后一排把最深那档铺满其余四屏。<b>每一档配它自己那套字</b>——浅到纸白压不住底，字就得翻成墨，那是这一档真实的样子。尺子仍全部现读：字号／圆角／描边宽 = <code>app.wxss</code> 的 <code>page{}</code>；底栏 = <code>palette.chromeOf('tint-paper')</code>；界面话 = <code>utils/i18n.js</code> 的 zh 键；只有这条色阶是本稿提的新值，所以每档压的每处字、那两枚橙、那枚红都各算一遍对比。手机框 750×1670 = 1px:1rpx，与 v19／v22／v23／v24／v25／v26 同一套尺。</div>
+<div id="app"><div class="plan"><div class="pt"><span class="k">挑的这支</span>
+    <span class="t">H340 那一族玫瑰粉，同色系六档从浅到深，每档两屏</span>
+    <span class="desc">色相是我挑的：上一轮你要"偏粉"，就把粉定在 <code>H340</code>，六档只动明度（<code>L62 → L15</code>），饱和跟着略补。<b>每一档配它自己那套字</b>——浅到纸白压不住底，屏上的字就得翻成墨，那是这一档真实的样子，不是我偷偷换皮。下面两排：第一排笔记列表，第二排详情浮窗。</span></div>
+  <div class="row"><div class="cell" id="rp0"><div class="ph yi" style="--dk:#B58796;--si:35, 37, 44;--ia:1;--danger:#b4231f;--danger-edge:rgba(180, 35, 31,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948">
+  <div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div><div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div><div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">1 档</span><b>#B58796</b>　H340 S24 L62　白框分离 <code>3.06</code>　字翻成墨，但「未选」那一档淡不下去（只能上到 1），开关那枚橙压不住（1.01）</div></div><div class="cell" id="rp1"><div class="ph yi" style="--dk:#A86B80;--si:35, 37, 44;--ia:1;--danger:#b4231f;--danger-edge:rgba(180, 35, 31,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948">
+  <div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div><div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div><div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">2 档</span><b>#A86B80</b>　H340 S26 L54　白框分离 <code>4.13</code>　字翻成墨，但「未选」那一档淡不下去（只能上到 1），开关那枚橙压不住（1.37）</div></div><div class="cell" id="rp2"><div class="ph yi" style="--dk:#905166;--si:242, 239, 233;--ia:0.92;--danger:#b4231f;--danger-edge:rgba(180, 35, 31,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948">
+  <div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div><div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div><div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">3 档</span><b>#905166</b>　H340 S28 L44　白框分离 <code>5.91</code>　字走纸白，但「未选」那一档淡不下去（只能上到 0.92），开关那枚橙压不住（1.95）</div></div><div class="cell" id="rp3"><div class="ph yi" style="--dk:#713D4E;--si:242, 239, 233;--ia:0.72;--danger:#b4231f;--danger-edge:rgba(180, 35, 31,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948">
+  <div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div><div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div><div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">4 档</span><b>#713D4E</b>　H340 S30 L34　白框分离 <code>8.47</code>　字走纸白，开关那枚橙压不住（2.8）</div></div><div class="cell" id="rp4"><div class="ph yi" style="--dk:#512A37;--si:242, 239, 233;--ia:0.6;--danger:#ee8277;--danger-edge:rgba(238, 130, 119,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948">
+  <div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div><div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div><div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">5 档</span><b>#512A37</b>　H340 S32 L24　白框分离 <code>12.1</code>　字走纸白</div></div><div class="cell" id="yi1"><div class="ph yi" style="--dk:#331922;--si:242, 239, 233;--ia:0.5;--danger:#ee8277;--danger-edge:rgba(238, 130, 119,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948">
+  <div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div><div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div><div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">6 档</span><b>#331922</b>　H340 S34 L15　白框分离 <code>16.12</code>　字走纸白</div></div></div><div class="row"><div class="cell" id="rf0"><div class="ph yi" style="--dk:#B58796;--si:35, 37, 44;--ia:1;--danger:#b4231f;--danger-edge:rgba(180, 35, 31,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div>
+  <div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div>
+  <div class="sheet">
+  <div class="grip"><div class="bar"></div><span class="l">点一下收起</span></div>
+  <div class="dsb"><div class="hero">
+    <div class="lt"><div class="meta">10月02日 · 旅游</div><h3>Qwen3.8-Flash 限时免费，国际版先装上试一圈</h3></div>
+    <div class="rt"><div class="cell">
+  <div class="sw"><div class="lg"><i>麦</i><em>图麦笔记</em></div><u>+</u></div>
+  <b class="e1">生成笔记卡片</b><b class="e2">还没有生成过卡片</b></div></div></div>
+    <div class="blk"><div class="lab">摘要</div><p>这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走；拿十篇长文一次喂进去，没报错也没截断。</p></div><div class="blk"><div class="lab">核心要点</div><div class="pt"><b>1</b><span>上下文一次拉到 256K，十篇长文一起喂没截断</span></div><div class="pt"><b>2</b><span>换渠道只需重装一次，历史会话整体带走</span></div></div><div class="blk"><div class="lab">来源链接</div><div class="link">https://mp.weixin.qq.com/s/abcdef</div></div><div class="blk"><div class="lab">原文内容</div><p>上午把国际版装上，拿手头那十篇长文一次喂进去。第一遍没报错，也没截断；第二遍特意挑了最长那篇，进度条走完是完整的。翻设置里那一档上下文长度，已经写到 256K。历史会话能整体带走，这一点对日常影响最大——原来攒的那几十条不用重录。</p></div><div class="blk"><div class="lab">配图</div><div class="shots"><u></u><u></u><u></u></div></div></div>
+  <div class="dsd"><div class="irow"><b>编辑</b><b class="d">删除</b></div>
+    <div class="pub"><span>这篇已经公开，别人扫码能看</span><s>撤掉分享</s></div></div></div>
+  <div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">1 档</span><b>#B58796</b>　H340 S24 L62　白框分离 <code>3.06</code>　字翻成墨，但「未选」那一档淡不下去（只能上到 1），开关那枚橙压不住（1.01）</div></div><div class="cell" id="rf1"><div class="ph yi" style="--dk:#A86B80;--si:35, 37, 44;--ia:1;--danger:#b4231f;--danger-edge:rgba(180, 35, 31,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div>
+  <div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div>
+  <div class="sheet">
+  <div class="grip"><div class="bar"></div><span class="l">点一下收起</span></div>
+  <div class="dsb"><div class="hero">
+    <div class="lt"><div class="meta">10月02日 · 旅游</div><h3>Qwen3.8-Flash 限时免费，国际版先装上试一圈</h3></div>
+    <div class="rt"><div class="cell">
+  <div class="sw"><div class="lg"><i>麦</i><em>图麦笔记</em></div><u>+</u></div>
+  <b class="e1">生成笔记卡片</b><b class="e2">还没有生成过卡片</b></div></div></div>
+    <div class="blk"><div class="lab">摘要</div><p>这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走；拿十篇长文一次喂进去，没报错也没截断。</p></div><div class="blk"><div class="lab">核心要点</div><div class="pt"><b>1</b><span>上下文一次拉到 256K，十篇长文一起喂没截断</span></div><div class="pt"><b>2</b><span>换渠道只需重装一次，历史会话整体带走</span></div></div><div class="blk"><div class="lab">来源链接</div><div class="link">https://mp.weixin.qq.com/s/abcdef</div></div><div class="blk"><div class="lab">原文内容</div><p>上午把国际版装上，拿手头那十篇长文一次喂进去。第一遍没报错，也没截断；第二遍特意挑了最长那篇，进度条走完是完整的。翻设置里那一档上下文长度，已经写到 256K。历史会话能整体带走，这一点对日常影响最大——原来攒的那几十条不用重录。</p></div><div class="blk"><div class="lab">配图</div><div class="shots"><u></u><u></u><u></u></div></div></div>
+  <div class="dsd"><div class="irow"><b>编辑</b><b class="d">删除</b></div>
+    <div class="pub"><span>这篇已经公开，别人扫码能看</span><s>撤掉分享</s></div></div></div>
+  <div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">2 档</span><b>#A86B80</b>　H340 S26 L54　白框分离 <code>4.13</code>　字翻成墨，但「未选」那一档淡不下去（只能上到 1），开关那枚橙压不住（1.37）</div></div><div class="cell" id="rf2"><div class="ph yi" style="--dk:#905166;--si:242, 239, 233;--ia:0.92;--danger:#b4231f;--danger-edge:rgba(180, 35, 31,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div>
+  <div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div>
+  <div class="sheet">
+  <div class="grip"><div class="bar"></div><span class="l">点一下收起</span></div>
+  <div class="dsb"><div class="hero">
+    <div class="lt"><div class="meta">10月02日 · 旅游</div><h3>Qwen3.8-Flash 限时免费，国际版先装上试一圈</h3></div>
+    <div class="rt"><div class="cell">
+  <div class="sw"><div class="lg"><i>麦</i><em>图麦笔记</em></div><u>+</u></div>
+  <b class="e1">生成笔记卡片</b><b class="e2">还没有生成过卡片</b></div></div></div>
+    <div class="blk"><div class="lab">摘要</div><p>这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走；拿十篇长文一次喂进去，没报错也没截断。</p></div><div class="blk"><div class="lab">核心要点</div><div class="pt"><b>1</b><span>上下文一次拉到 256K，十篇长文一起喂没截断</span></div><div class="pt"><b>2</b><span>换渠道只需重装一次，历史会话整体带走</span></div></div><div class="blk"><div class="lab">来源链接</div><div class="link">https://mp.weixin.qq.com/s/abcdef</div></div><div class="blk"><div class="lab">原文内容</div><p>上午把国际版装上，拿手头那十篇长文一次喂进去。第一遍没报错，也没截断；第二遍特意挑了最长那篇，进度条走完是完整的。翻设置里那一档上下文长度，已经写到 256K。历史会话能整体带走，这一点对日常影响最大——原来攒的那几十条不用重录。</p></div><div class="blk"><div class="lab">配图</div><div class="shots"><u></u><u></u><u></u></div></div></div>
+  <div class="dsd"><div class="irow"><b>编辑</b><b class="d">删除</b></div>
+    <div class="pub"><span>这篇已经公开，别人扫码能看</span><s>撤掉分享</s></div></div></div>
+  <div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">3 档</span><b>#905166</b>　H340 S28 L44　白框分离 <code>5.91</code>　字走纸白，但「未选」那一档淡不下去（只能上到 0.92），开关那枚橙压不住（1.95）</div></div><div class="cell" id="rf3"><div class="ph yi" style="--dk:#713D4E;--si:242, 239, 233;--ia:0.72;--danger:#b4231f;--danger-edge:rgba(180, 35, 31,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div>
+  <div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div>
+  <div class="sheet">
+  <div class="grip"><div class="bar"></div><span class="l">点一下收起</span></div>
+  <div class="dsb"><div class="hero">
+    <div class="lt"><div class="meta">10月02日 · 旅游</div><h3>Qwen3.8-Flash 限时免费，国际版先装上试一圈</h3></div>
+    <div class="rt"><div class="cell">
+  <div class="sw"><div class="lg"><i>麦</i><em>图麦笔记</em></div><u>+</u></div>
+  <b class="e1">生成笔记卡片</b><b class="e2">还没有生成过卡片</b></div></div></div>
+    <div class="blk"><div class="lab">摘要</div><p>这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走；拿十篇长文一次喂进去，没报错也没截断。</p></div><div class="blk"><div class="lab">核心要点</div><div class="pt"><b>1</b><span>上下文一次拉到 256K，十篇长文一起喂没截断</span></div><div class="pt"><b>2</b><span>换渠道只需重装一次，历史会话整体带走</span></div></div><div class="blk"><div class="lab">来源链接</div><div class="link">https://mp.weixin.qq.com/s/abcdef</div></div><div class="blk"><div class="lab">原文内容</div><p>上午把国际版装上，拿手头那十篇长文一次喂进去。第一遍没报错，也没截断；第二遍特意挑了最长那篇，进度条走完是完整的。翻设置里那一档上下文长度，已经写到 256K。历史会话能整体带走，这一点对日常影响最大——原来攒的那几十条不用重录。</p></div><div class="blk"><div class="lab">配图</div><div class="shots"><u></u><u></u><u></u></div></div></div>
+  <div class="dsd"><div class="irow"><b>编辑</b><b class="d">删除</b></div>
+    <div class="pub"><span>这篇已经公开，别人扫码能看</span><s>撤掉分享</s></div></div></div>
+  <div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">4 档</span><b>#713D4E</b>　H340 S30 L34　白框分离 <code>8.47</code>　字走纸白，开关那枚橙压不住（2.8）</div></div><div class="cell" id="rf4"><div class="ph yi" style="--dk:#512A37;--si:242, 239, 233;--ia:0.6;--danger:#ee8277;--danger-edge:rgba(238, 130, 119,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div>
+  <div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div>
+  <div class="sheet">
+  <div class="grip"><div class="bar"></div><span class="l">点一下收起</span></div>
+  <div class="dsb"><div class="hero">
+    <div class="lt"><div class="meta">10月02日 · 旅游</div><h3>Qwen3.8-Flash 限时免费，国际版先装上试一圈</h3></div>
+    <div class="rt"><div class="cell">
+  <div class="sw"><div class="lg"><i>麦</i><em>图麦笔记</em></div><u>+</u></div>
+  <b class="e1">生成笔记卡片</b><b class="e2">还没有生成过卡片</b></div></div></div>
+    <div class="blk"><div class="lab">摘要</div><p>这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走；拿十篇长文一次喂进去，没报错也没截断。</p></div><div class="blk"><div class="lab">核心要点</div><div class="pt"><b>1</b><span>上下文一次拉到 256K，十篇长文一起喂没截断</span></div><div class="pt"><b>2</b><span>换渠道只需重装一次，历史会话整体带走</span></div></div><div class="blk"><div class="lab">来源链接</div><div class="link">https://mp.weixin.qq.com/s/abcdef</div></div><div class="blk"><div class="lab">原文内容</div><p>上午把国际版装上，拿手头那十篇长文一次喂进去。第一遍没报错，也没截断；第二遍特意挑了最长那篇，进度条走完是完整的。翻设置里那一档上下文长度，已经写到 256K。历史会话能整体带走，这一点对日常影响最大——原来攒的那几十条不用重录。</p></div><div class="blk"><div class="lab">配图</div><div class="shots"><u></u><u></u><u></u></div></div></div>
+  <div class="dsd"><div class="irow"><b>编辑</b><b class="d">删除</b></div>
+    <div class="pub"><span>这篇已经公开，别人扫码能看</span><s>撤掉分享</s></div></div></div>
+  <div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">5 档</span><b>#512A37</b>　H340 S32 L24　白框分离 <code>12.1</code>　字走纸白</div></div><div class="cell" id="yi3"><div class="ph yi" style="--dk:#331922;--si:242, 239, 233;--ia:0.5;--danger:#ee8277;--danger-edge:rgba(238, 130, 119,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div>
+  <div class="list"><div class="vtabs"><span class="on">笔记列表</span><span class="">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="xlist"><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div><div class="s">这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/02</b></div>
+  <div class="xm"><div class="t" data-m="xt">周末去顺义那家旧书店，门口贴着写</div><div class="s">三十平的小店按年代排架，九五品的文学类占了一半。老板建议工作日下午去，那时光线斜着进来。</div>
+    <div class="m"><span class="more">显示更多</span><span class="who"><span class="g"></span><span>阿麦的读书笔记</span></span></div>
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>10/01</b></div>
+  <div class="xm"><div class="t" data-m="xt">素宣信笺这一套试的那三种竖排行距</div><div class="s">行距 1.9 最舒服，1.6 会挤；列宽 26 字时标点落到行尾不刺眼。</div>
+    
+  </div></div><div class="xrow wc" data-m="row">
+  <div class="xd"><i></i><b>09/28</b></div>
+  <div class="xm"><div class="t" data-m="xt">把长文读成三条要点，设一个每天归档的提醒</div><div class="s">先摘句子，再问一句"这段在解决什么"，最后用自己的话写一遍。三条要点控制在两行以内。</div>
+    <div class="m"><span class="more">显示更多</span></div>
+  </div></div></div></div>
+  <div class="sheet">
+  <div class="grip"><div class="bar"></div><span class="l">点一下收起</span></div>
+  <div class="dsb"><div class="hero">
+    <div class="lt"><div class="meta">10月02日 · 旅游</div><h3>Qwen3.8-Flash 限时免费，国际版先装上试一圈</h3></div>
+    <div class="rt"><div class="cell">
+  <div class="sw"><div class="lg"><i>麦</i><em>图麦笔记</em></div><u>+</u></div>
+  <b class="e1">生成笔记卡片</b><b class="e2">还没有生成过卡片</b></div></div></div>
+    <div class="blk"><div class="lab">摘要</div><p>这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走；拿十篇长文一次喂进去，没报错也没截断。</p></div><div class="blk"><div class="lab">核心要点</div><div class="pt"><b>1</b><span>上下文一次拉到 256K，十篇长文一起喂没截断</span></div><div class="pt"><b>2</b><span>换渠道只需重装一次，历史会话整体带走</span></div></div><div class="blk"><div class="lab">来源链接</div><div class="link">https://mp.weixin.qq.com/s/abcdef</div></div><div class="blk"><div class="lab">原文内容</div><p>上午把国际版装上，拿手头那十篇长文一次喂进去。第一遍没报错，也没截断；第二遍特意挑了最长那篇，进度条走完是完整的。翻设置里那一档上下文长度，已经写到 256K。历史会话能整体带走，这一点对日常影响最大——原来攒的那几十条不用重录。</p></div><div class="blk"><div class="lab">配图</div><div class="shots"><u></u><u></u><u></u></div></div></div>
+  <div class="dsd"><div class="irow"><b>编辑</b><b class="d">删除</b></div>
+    <div class="pub"><span>这篇已经公开，别人扫码能看</span><s>撤掉分享</s></div></div></div>
+  <div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">6 档</span><b>#331922</b>　H340 S34 L15　白框分离 <code>16.12</code>　字走纸白</div></div></div>
+  <div class="row" style="margin-top:-14px"><div class="cap" style="width:100%">读法：<b>1~3 档是"浅色面"</b>（字翻墨、白内框与底的分离掉到 3~4、那枚橙压不住）；<b>4 档是交界</b>（纸白勉强够，橙还差一点）；<b>5~6 档是"深色面"</b>（纸白舒服、橙与红都过）。所以真正能选的是 4／5／6 这三档。</div></div>
+</div>
+<div class="plan"><div class="pt"><span class="k">最深那档铺满</span>
+    <span class="t">第 6 档 <code>#331922</code> 画其余四屏：卡片 / 详情页 / 卡片页 / 分类那一行</span>
+    <span class="desc">这一排与 v23 的乙案逐寸一样，只换了深底那一支；白内框里所有字的墨档一个字没动。</span></div>
+  <div class="row"><div class="cell" id="yi2"><div class="ph yi" style="--dk:#331922;--si:242, 239, 233;--ia:0.5;--danger:#ee8277;--danger-edge:rgba(238, 130, 119,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948">
+  <div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">图麦笔记<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="body"><div class="band"><div class="ph2"></div><div class="sc"></div>
+    <div class="t1">我的笔记</div>
+    <div class="stats"><div class="st"><b>20</b><i>笔记</i></div></div>
+    <div class="tools"><div class="tp"><i></i><span>拍照或截图存进来，会自动提炼成要点</span></div>
+      <div class="acts2"><a><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/></svg></a></div>
+    </div></div></div><div class="list"><div class="vtabs"><span class="">笔记列表</span><span class="on">笔记卡片</span><span class="fold">点一下收起</span></div><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div><div class="grid2"><div class="gc">
+  <div class="pad"><div class="art jade" style="width:312px;height:435px">
+    <div class="hd"><i>麦</i><span>图麦笔记</span></div><h6>Qwen3.8-Flash 限时免费</h6><div class="rule"></div>
+    <div class="ln"></div><div class="ln w86"></div><div class="ln w72"></div><div class="ln w58"></div>
+    <div class="ft"><u>麦</u><div class="qr"></div></div></div></div><div class="gcap" data-m="gcap">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div></div><div class="gc">
+  <div class="pad"><div class="art verse" style="width:312px;height:321px">
+    <em>“</em><p>行距 1.9 最舒服，1.6 会挤。</p><div class="sg"><u>麦</u><span>图麦笔记</span></div></div></div><div class="gcap" data-m="gcap">素宣信笺这一套试的那三种竖排行距</div></div><div class="gc">
+  <div class="pad"><div class="art jade" style="width:312px;height:435px">
+    <div class="hd"><i>麦</i><span>图麦笔记</span></div><h6>把长文读成三条要点</h6><div class="rule"></div>
+    <div class="ln"></div><div class="ln w86"></div><div class="ln w72"></div><div class="ln w58"></div>
+    <div class="ft"><u>麦</u><div class="qr"></div></div></div></div><div class="gcap" data-m="gcap">把长文读成三条要点，设一个每天归档的提醒</div></div><div class="gc">
+  <div class="pad"><div class="art verse dk" style="width:312px;height:321px">
+    <em>“</em><p>三句里塞了七个动词。</p><div class="sg"><u>麦</u><span>图麦笔记</span></div></div></div><div class="gcap" data-m="gcap">棋王里那一段吃的动词密度太高了</div></div></div></div><div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">6 档</span><b>笔记卡片</b>　两列白垫浮在同一条深底上</div></div><div class="cell" id="yi4"><div class="ph yi" style="--dk:#331922;--si:242, 239, 233;--ia:0.5;--danger:#ee8277;--danger-edge:rgba(238, 130, 119,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">笔记详情<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="sp">
+    <div class="hero" style="margin-top:22px">
+      <div class="lt"><div class="mt">10月02日 · 旅游</div>
+        <div class="h1">Qwen3.8-Flash 限时免费，国际版先装上试一圈</div></div>
+      <div class="rt"><div class="cell">
+  <div class="sw"><div class="lg"><i>麦</i><em>图麦笔记</em></div><u>+</u></div>
+  <b class="e1">生成笔记卡片</b><b class="e2">还没有生成过卡片</b></div></div></div>
+    <div class="sact" style="padding:18px 0 6px"><b class="s2">编辑</b><b class="s2 d">删除</b></div>
+    <div class="blk"><div class="lab">摘要</div><p>这一版把上下文一次拉到 256K，个人档限时免费到十一月底。换渠道只需重装一次，历史会话能整体带走；拿十篇长文一次喂进去，没报错也没截断。</p></div><div class="blk"><div class="lab">核心要点</div><div class="pt"><b>1</b><span>上下文一次拉到 256K，十篇长文一起喂没截断</span></div><div class="pt"><b>2</b><span>换渠道只需重装一次，历史会话整体带走</span></div><div class="pt"><b>3</b><span>个人档限时免费到十一月底，先装上试一圈</span></div></div><div class="blk"><div class="lab">来源链接</div><div class="link">https://mp.weixin.qq.com/s/abcdef</div></div><div class="blk"><div class="lab">原文内容</div><p>上午把国际版装上，拿手头那十篇长文一次喂进去。第一遍没报错，也没截断；第二遍特意挑了最长那篇，进度条走完是完整的。翻设置里那一档上下文长度，已经写到 256K。历史会话能整体带走，这一点对日常影响最大——原来攒的那几十条不用重录。</p></div><div class="blk"><div class="lab">配图</div><div class="shots"><u></u><u></u><u></u></div></div>
+  </div></div><div class="cap"><span class="tag">6 档</span><b>笔记详情页</b>（与浮窗同一套块、同一排动作）</div></div><div class="cell" id="yi5"><div class="ph yi" style="--dk:#331922;--si:242, 239, 233;--ia:0.5;--danger:#ee8277;--danger-edge:rgba(238, 130, 119,.45);--chrome-bg:#443b25;--chrome-ink:#F2EFE9;--chrome-idle:rgba(242,239,233,0.62);--chrome-line:rgba(242,239,233,0.14);--chrome-shadow:rgba(0,0,0,0.22);--chrome-sel:#766948"><div class="status"><span>10:43</span><span class="r">100 ▮</span></div><div class="nav">笔记卡片<div class="capsule"><span>•••</span><span>◎</span></div></div>
+  <div class="sp"><div class="stage"><div class="art jade big" style="width:312px;height:435px">
+    <div class="hd"><i>麦</i><span>图麦笔记</span></div><h6>把长文读成三条要点</h6><div class="rule"></div>
+    <div class="ln"></div><div class="ln w86"></div><div class="ln w72"></div><div class="ln w58"></div>
+    <div class="ft"><u>麦</u><div class="qr"></div></div></div></div>
+    <div class="qrow"><div class="pill on"><u></u></div><div class="tx"><b>带二维码</b><i>发到微信以外的平台容易被屏蔽，可关掉只留文字</i></div></div>
+    <div class="strip"><div class="in"><div class="pick on">
+      <div class="mini"><div class="art jade" style="width:312px;height:435px">
+    <div class="hd"><i>麦</i><span>图麦笔记</span></div><h6>把长文读成三条要点</h6><div class="rule"></div>
+    <div class="ln"></div><div class="ln w86"></div><div class="ln w72"></div><div class="ln w58"></div>
+    <div class="ft"><u>麦</u><div class="qr"></div></div></div></div><label data-m="pick">玉版宣</label></div><div class="pick ">
+      <div class="mini"><div class="art verse" style="width:312px;height:321px">
+    <em>“</em><p>行距 1.9 最舒服，1.6 会挤。</p><div class="sg"><u>麦</u><span>图麦笔记</span></div></div></div><label data-m="pick">摘句</label></div><div class="pick ">
+      <div class="mini"><div class="art jade" style="width:312px;height:435px">
+    <div class="hd"><i>麦</i><span>图麦笔记</span></div><h6>把长文读成三条要点</h6><div class="rule"></div>
+    <div class="ln"></div><div class="ln w86"></div><div class="ln w72"></div><div class="ln w58"></div>
+    <div class="ft"><u>麦</u><div class="qr"></div></div></div></div><label data-m="pick">叠翠</label></div><div class="pick ">
+      <div class="mini"><div class="art verse dk" style="width:312px;height:321px">
+    <em>“</em><p>行距 1.9 最舒服，1.6 会挤。</p><div class="sg"><u>麦</u><span>图麦笔记</span></div></div></div><label data-m="pick">纸间文艺</label></div></div></div>
+    <div class="sact"><b class="s2">编辑个人名片</b><b class="s1">保存到相册</b></div>
+  </div><div class="bar2"><u class=""><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></u><u class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg></u><u class=""><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19a6.5 6.5 0 0 1 13 0"/></svg></u></div></div><div class="cap"><span class="tag">6 档</span><b>卡片页</b>　海报预览 + 带二维码那一枚 + 模板那一排</div></div><div class="cell" id="yi6"><div class="zoom">
+  <h4>分类这一行：撤胶囊之后，两案共用同一种画法</h4>
+  <div class="sub">上面那两枚 tab 现网就是"文字 + 一条短杠"（<code>.vtabs</code>：字 24、杠 4 高、通栏于字宽、压在一条 2 的横线上）。分类照同一种手法，但<b>不再自带那条通栏横线</b>——两行都压线就会被读成"两排 tab"，而分类是一排筛选。</div>
+  <div class="strip2 on-light"><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div></div>
+  <div class="strip2 on-dark" style="margin-top:12px"><div class="cats"><span class="">全部</span><span class="on">旅游</span><span class="">生活</span><span class="">私密</span></div></div>
+  <div class="dim">
+    <span><b>字号</b> <code>--fs-meta 24rpx</code>（与上面那行同档，不新开一级）</span>
+    <span><b>选中</b> 字重 700 + 一条 <code>4×字宽</code> 的杠</span>
+    <span><b>未选</b> 42% 黑 / 深色面上 50% 纸白</span>
+    <span><b>间距</b> <code>gap 40rpx</code>（胶囊那版是 14，撤掉底色后要拉开才不粘连）</span>
+    <span><b>放不下</b> 照旧左右滚，右端留一档淡出</span>
+  </div></div><div class="cap"><span class="tag">6 档</span><b>分类这一行</b>（浅色面与这一档深底各一版）</div></div></div></div>
+<div class="plan"><div class="pt"><span class="k">实测</span><span class="t">字放得进吗 · 字压得住底吗</span>
+  <span class="d">宽度这一列由页面自己量（<code>Range</code> 只圈文字、<code>clientWidth − 内缩</code> 取可用宽）；对比这一列由 <code>palette.crOf</code> 现算，半透明字先按实际底色混成实心再算。</span></div>
+  <div class="row" style="flex-wrap:wrap"><div class="cell" style="width:1100px">
+  <table class="m"><thead><tr><th>量的是哪一句</th><th>屏上那一串</th><th>落在哪个容器</th><th>字宽／可用</th><th>判定</th></tr></thead><tbody id="mtb"></tbody></table>
+  </div></div></div></div>
+<div class="legend" id="lg"></div>
+<script>
+window.addEventListener('error',function(e){document.title='PAGE-ERROR: '+e.message+' @ line '+e.lineno})
+/*__GEN_BEGIN__*/
+var LEGEND=["<b>这一版按你这句话做的：</b>\"挑一种色，按同色系色阶从浅到深，分别设计多个界面来比\"。色相我挑 <b>H340 那一族玫瑰粉</b>（上一轮你要偏粉），六档只动明度：<code>L62／L54／L44／L34／L24／L15</code>，饱和从 <code>S24</code> 补到 <code>S34</code> 免得浅档糊成灰。前两排各六台，同一屏横着比。","<b>每一档配它自己那套字，不是同一套皮硬压：</b>纸白压不住底的那几档（1~3），屏上的字翻成墨；4 档起才回到纸白。这件事在屏上看得出来，也钉进了断言（1 档那台的分类字实际是 <code>rgba(35,37,44,1)</code>，6 档那台是 <code>rgba(242,239,233,0.5)</code>）。","<b>越界的那几条不是我把图画坏了，是这一档不能这么用：</b>1~3 档上，白内框与底的分离只剩 <code>3.06~5.91</code>（白卡开始化进底里），那枚开关的拍照橙压上去只有 <code>1.01~1.95</code>（门槛 3.0），\"未选／次要\"那一档也淡不下去、只能上到实心墨。<b>这三档实质是\"浅色面\"，走的是甲案那套皮</b>，所以表里标\"越界\"，不标\"不过\"。","<b>真正能选的是 4／5／6 这三档：</b><code>#713D4E</code>（H340 S30 L34）白框分离 <code>8.47</code>、正文 <code>7.38</code>、开关橙 <code>2.8</code>；<code>#512A37</code>（H340 S32 L24）白框分离 <code>12.1</code>、正文 <code>10.54</code>、开关橙 <code>4</code>；<code>#331922</code>（H340 S34 L15）白框分离 <code>16.12</code>、正文 <code>14.04</code>、开关橙 <code>5.33</code>。我推荐 <b>6 档 <code>#331922</code></b>：它是唯一一档连\"提炼橙 <code>#C4541F</code> 压深底\"都过 3.0 的（<code>3.56</code>），也就是说卡片页那枚开关、进度那一类将来无论吃哪支橙都不用再逐处换色。","<b>底栏仍跟壁纸走，六档都用象牙那一套（<code>#443b25</code>／选中 <code>#766948</code>）：</b>这一版比的是深底，底栏不动它，免得两张图之间有两个变量。","<b>白内框里所有字、那两枚固定橙、分类那一行的\"文字 + 短杠\"、动作条两枚、右上那一格是出卡片唯一入口</b>——全部照 v23 的乙案，一个字没动；<b>这一版唯一的新东西就是这条色阶本身</b>。","<b>落地状态与下一步：</b>仍是效果图，代码一行没动。你指一档（或者说\"4 和 5 之间再来一档\"），我把 v23 那三条 + 这一档一起落进代码：列表／详情那层的底色、<code>createSkin()</code> 那两行固定橙、删除那枚红按档走，然后把钉着壁纸色阶的那批尺子重锚。"];
+var CONTRAST=[["白内框上的标题","#393b41","#FFFFFF",4.5,11.19,"ok"],["白内框上的摘要","#65666b","#FFFFFF",4.5,5.73,"ok"],["白内框上的三级字","#919296","#FFFFFF",3,3.11,"ok"],["深底上的纸白字（标题、选中那枚）","#e3ded9","#331922",4.5,12.06,"ok"],["深底上未选那一档","#9c8f8f","#331922",4.5,5.17,"ok"],["深底上卡片名那一档","#d0c8c5","#331922",4.5,9.79,"ok"],["深底上入口格第二行","#9c8f8f","#331922",4.5,5.17,"ok"],["白内框压在这档深底上（分得开吗）","#FFFFFF","#331922",3,16.12,"ok"],["那条 3rpx 纸白边（分隔用，不算字）","#462e36","#331922",1.2,1.31,"ok"],["拍照橙配深字","#2C1204","#E9723D",4.5,5.8,"ok"],["提炼橙配纸白","#FFFFFF","#C4541F",4.5,4.53,"ok"],["主按钮（提炼橙）配纸白","#FFFFFF","#C4541F",4.5,4.53,"ok"],["拍照橙压在白内框上（图形档）","#E9723D","#FFFFFF",3,3.03,"ok"],["拍照橙压在深底上（开关、图形档）","#E9723D","#331922",3,5.33,"ok"],["提炼橙压在白内框上（图形档）","#C4541F","#FFFFFF",3,4.53,"ok"],["删除（白内框那档，现网原值）","#b4231f","#FFFFFF",4.5,6.56,"ok"],["删除（深底这档，本版新定）","#ee8277","#331922",4.5,6.21,"ok"],["1 档 #B58796：选中与正文那档字（墨）","#23252C","#B58796",4.5,5.01,"ok"],["1 档：未选那一档（#23252C 压 1）","#23252c","#B58796",4.5,5.01,"ok"],["1 档：白内框与它分得开吗","#FFFFFF","#B58796",3,3.06,"ok"],["1 档：开关那枚拍照橙压得住吗","#E9723D","#B58796",3,1.01,"note"],["1 档：删除那枚红（#b4231f）","#b4231f","#B58796",4.5,2.15,"note"],["2 档 #A86B80：选中与正文那档字（墨）","#23252C","#A86B80",4.5,3.7,"note"],["2 档：未选那一档（#23252C 压 1）","#23252c","#A86B80",4.5,3.7,"note"],["2 档：白内框与它分得开吗","#FFFFFF","#A86B80",3,4.13,"ok"],["2 档：开关那枚拍照橙压得住吗","#E9723D","#A86B80",3,1.37,"note"],["2 档：删除那枚红（#b4231f）","#b4231f","#A86B80",4.5,1.59,"note"],["3 档 #905166：选中与正文那档字（纸白）","#F2EFE9","#905166",4.5,5.15,"ok"],["3 档：未选那一档（#F2EFE9 压 0.92）","#eae2df","#905166",4.5,4.63,"ok"],["3 档：白内框与它分得开吗","#FFFFFF","#905166",3,5.91,"ok"],["3 档：开关那枚拍照橙压得住吗","#E9723D","#905166",3,1.95,"note"],["3 档：删除那枚红（#b4231f）","#b4231f","#905166",4.5,1.11,"note"],["4 档 #713D4E：选中与正文那档字（纸白）","#F2EFE9","#713D4E",4.5,7.38,"ok"],["4 档：未选那一档（#F2EFE9 压 0.72）","#cebdbe","#713D4E",4.5,4.7,"ok"],["4 档：白内框与它分得开吗","#FFFFFF","#713D4E",3,8.47,"ok"],["4 档：开关那枚拍照橙压得住吗","#E9723D","#713D4E",3,2.8,"note"],["4 档：删除那枚红（#b4231f）","#b4231f","#713D4E",4.5,1.29,"note"],["5 档 #512A37：选中与正文那档字（纸白）","#F2EFE9","#512A37",4.5,10.54,"ok"],["5 档：未选那一档（#F2EFE9 压 0.6）","#b2a0a2","#512A37",4.5,4.86,"ok"],["5 档：白内框与它分得开吗","#FFFFFF","#512A37",3,12.1,"ok"],["5 档：开关那枚拍照橙压得住吗","#E9723D","#512A37",3,4,"ok"],["5 档：删除那枚红（#ee8277）","#ee8277","#512A37",4.5,4.66,"ok"],["6 档 #331922：选中与正文那档字（纸白）","#F2EFE9","#331922",4.5,14.04,"ok"],["6 档：未选那一档（#F2EFE9 压 0.5）","#938486","#331922",4.5,4.52,"ok"],["6 档：白内框与它分得开吗","#FFFFFF","#331922",3,16.12,"ok"],["6 档：开关那枚拍照橙压得住吗","#E9723D","#331922",3,5.33,"ok"],["6 档：删除那枚红（#ee8277）","#ee8277","#331922",4.5,6.21,"ok"]];
+var TOK=[["--fs-h1","42rpx"],["--fs-h2","34rpx"],["--fs-title","31rpx"],["--fs-body","28rpx"],["--fs-meta","24rpx"],["--fs-tiny","21rpx"],["--fs-label","20rpx"],["--fs-micro","18rpx"],["--sp-2","16rpx"],["--sp-3","24rpx"],["--sp-4","32rpx"],["--r-card","40rpx"],["--r-block","32rpx"],["--r-chip","28rpx"],["--r-pill","999rpx"],["--w-edge","3rpx"],["--bg-page","#E2DED4"],["--bg-card","#F3F3F1"],["--text-primary","#352E1D"],["--text-secondary","rgba(53, 46, 29, 0.72)"],["--text-tertiary","rgba(53, 46, 29, 0.72)"],["--card-edge","rgba(53, 46, 29, 0.12)"],["--accent","#352E1D"]];
+/*__GEN_END__*/
+document.getElementById('lg').innerHTML=LEGEND.map(function(x,i){return '<div><span class="n">'+(i+1)+'</span>'+x+'</div>'}).join('');
+/* ---- 宽度实测：Range 只圈字（scrollWidth 会把容器自己的内缩算进来，那条坑记在记忆里） ---- */
+window.__metrics=function(){
+  var rows=[];
+  function inner(el){var cs=getComputedStyle(el);return el.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)}
+  function textW(el){var r=document.createRange();r.selectNodeContents(el);return r.getBoundingClientRect().width}
+  function one(key,sel,boxSel,label,soft){var el=document.querySelector(sel),box=document.querySelector(boxSel);
+    if(!el||!box){rows.push([key,'（探针找不到节点：'+(el?'box':'sel')+'）',label,'—','bad']);return}
+    var ew=textW(el),bw=inner(box),txt=(el.textContent||'').trim();
+    // 量到 0 宽＝那一串根本没落到屏幕上（选择器指错或父级没渲染），这必须算红，不能算"放得进"
+    // soft＝这一格本来就是设计成截断的（nowrap + 省略号），超出去是截字、不是折行，所以不算红但仍报数
+    rows.push([key,txt,label,'字 '+ew.toFixed(1)+' / 可用 '+bw.toFixed(1),
+      ew<=0.5?'bad':(ew<=bw+0.5?'ok':(soft?'soft':'bad'))])}
+  // 分类那一行四枚加起来（gap 40 已扣）：放不下就要滚，那是设计，但要知道差多少
+  (function(){var box=document.querySelector('.zoom .strip2.on-light .cats');
+    if(!box){rows.push(['分类四枚加起来','放大那一格（浅色面）','（找不到节点）','—','bad']);return}
+    var s=box.children,t=0;for(var i=0;i<s.length;i++)t+=textW(s[i]);
+    var bw=inner(box)-(s.length-1)*40;
+    rows.push(['分类四枚加起来',Array.prototype.map.call(s,function(e){return e.textContent}).join(' / '),
+      '区内净宽（gap 40 已扣）',t.toFixed(1)+' / '+bw.toFixed(1),(t>0.5&&t<=bw+0.5)?'ok':'bad'])})()
+  one('两枚 tab + 收起那一句','.vtabs','.list','区内那一行（含右边「点一下收起」）')
+  one('列表标题（最长那条）','#yi1 .xm .t','#yi1 .xm','白内框里那一列（现网 nowrap + 省略号）',true)
+  one('列表标题 · 1 档（最浅）','#rp0 .xm .t','#rp0 .xm','换浅底不改布局，逐档复量',true)
+  one('列表标题 · 3 档（交界）','#rp2 .xm .t','#rp2 .xm','同上',true)
+  one('列表标题 · 5 档（深）','#rp4 .xm .t','#rp4 .xm','同上',true)
+  one('卡片标题','#yi2 .gcap','#yi2 .gc','白垫下面那一行（现网就是 nowrap + 省略号）',true)
+  one('浮窗标题','#yi3 h3','#yi3 .hero .lt','左列（右边让给 252 那一格）')
+  one('详情页标题','#yi4 .hero .lt .h1','#yi4 .hero .lt','同一档 38，独立页那一屏')
+  one('浮窗按钮 1','#yi3 .dsd .irow b','#yi3 .dsd .irow b','两枚等宽 flex:1')
+  one('入口格第一行','#yi3 .rt .e1','#yi3 .rt','252 那一格：生成笔记卡片')
+  one('入口格第二行','#yi3 .rt .e2','#yi3 .rt','252 那一格：还没有生成过卡片')
+  one('卡片页主按钮','#yi5 .sact b.s1','#yi5 .sact b.s1','「保存到相册」')
+  one('卡片页次按钮','#yi5 .sact b.s2','#yi5 .sact b.s2','「编辑个人名片」六字那枚')
+  one('模板名 1','#yi5 .pick label','#yi5 .pick','190 宽的格子')
+  one('Tips 那一行','.tp span','.tp','头部那一行（含左端那枚点）')
+  // 这一组不问"字放得进吗"，问"这条规则真的落到屏幕上了吗"（v23 那批选择器少个点号就整层没变深，
+  // 只量字宽的表全绿，是肉眼看图才发现的）。
+  function sty(key,sel,prop,want,pseudo){var el=document.querySelector(sel);
+    if(!el){rows.push([key,'（找不到节点 '+sel+'）','计算样式','—','bad']);return}
+    var got=getComputedStyle(el,pseudo||null)[prop];
+    var norm=String(got).replace(/s+/g,' ').trim().toLowerCase(), okn=String(want).toLowerCase();
+    // 以 ~ 开头＝只要求包含（box-shadow 各浏览器把 inset 排前排后不一样，逐字比会假红）
+    var ok=okn[0]==='~'?norm.indexOf(okn.slice(1))>-1:norm===okn
+    rows.push([key,sel+' 的 '+prop,'落到屏幕上是什么（要等于右边）',norm+'　要　'+okn,ok?'ok':'bad'])}
+  // 六档每一档屏上实际吃到的底色，逐档钉死（浅档要被 CSS 覆盖成同一支，这里就会红）
+  sty('1 档落到屏上','#rp0 .list','backgroundColor','rgb(181, 135, 150)')
+  sty('2 档落到屏上','#rp1 .list','backgroundColor','rgb(168, 107, 128)')
+  sty('3 档落到屏上','#rp2 .list','backgroundColor','rgb(144, 81, 102)')
+  sty('4 档落到屏上','#rp3 .list','backgroundColor','rgb(113, 61, 78)')
+  sty('5 档落到屏上','#rp4 .list','backgroundColor','rgb(81, 42, 55)')
+  sty('6 档落到屏上（列表与浮窗两处）','#yi1 .list','backgroundColor','rgb(51, 25, 34)')
+  sty('6 档浮窗那一层','#yi3 .sheet','backgroundColor','rgb(51, 25, 34)')
+  // 浅档字必须翻成墨、深档字仍走纸白：这条是"每档配自己那套字"落没落到屏上
+  sty('1 档的字翻成墨','#rp0 .cats span','color','rgb(35, 37, 44)')
+  sty('6 档的字仍是纸白','#yi1 .cats span','color','rgba(242, 239, 233, 0.5)')
+  sty('删除那枚红跟着档走（1 档＝b4231f）','#rf0 .dsd .irow b.d','color','rgb(180, 35, 31)')
+  sty('删除那枚红（深档＝ee8277）','#yi3 .dsd .irow b.d','color','rgb(238, 130, 119)')
+  sty('白内框在这版里不另描边','#yi1 .xrow','borderTopWidth','0px')
+  sty('深底顶上有那条 3rpx 边','#yi1 .list','borderTopWidth','3px')
+  sty('分类选中那一枚的短杠高度','#yi1 .cats span.on','height','4px','::after')
+  sty('分类选中那一枚的短杠颜色','#yi1 .cats span.on','backgroundColor','rgb(242, 239, 233)','::after')
+  sty('放大格深色那条的字翻纸白','.zoom .strip2.on-dark .cats span.on','color','rgb(242, 239, 233)')
+  sty('放大格深色那条的短杠','.zoom .strip2.on-dark .cats span.on','backgroundColor','rgb(242, 239, 233)','::after');
+  sty('6 档入口格那枚加号走纸白','#yi3 .rt .sw u','color','rgba(242, 239, 233, 0.42)');
+  sty('模板那一排仍是白格子黑字','#yi5 .pick:not(.on) label','color','rgba(35, 37, 44, 0.62)');
+  // 提炼橙压在这档深底上过不了 3.0（实测 2.97），所以开关那枚改吃拍照橙——这条钉住它真的换了
+  sty('开关那枚改吃拍照橙','#yi5 .pill.on','backgroundColor','rgb(233, 114, 61)')
+  sty('卡片页主按钮吃固定橙','#yi5 .sact b.s1','backgroundColor','rgb(196, 84, 31)')
+  sty('模板选中那一枚吃拍照橙','#yi5 .pick.on','boxShadow','~rgb(233, 114, 61) 0px 0px 0px 4px')
+  sty('删除那枚红是抬过的那档','#yi3 .dsd .irow b.d','color','rgb(238, 130, 119)');
+  // 动作条必须等宽，且每一排都只有两枚（现网 10-07 起「生成笔记卡片」不再是按钮，画稿不许画回去）
+  // 上一版类名撞车把它撑成 48/420/144、多画一枚也没人管，这两条都是肉眼看图才发现的，所以钉成断言
+  (function(){var out=[],ok=true;
+    ['#yi3 .dsd .irow','#yi4 .sact'].forEach(function(sel){
+      var sets=document.querySelectorAll(sel);
+      if(sets.length!==1){out.push(sel+'✕'+sets.length);ok=false;return}
+      var els=sets[0].children,ws=[];
+      for(var i=0;i<els.length;i++)ws.push(Math.round(els[i].getBoundingClientRect().width));
+      out.push(sel.replace(/[#.]/g,'')+':'+ws.join('+'));
+      if(!(ws.length===2&&Math.max.apply(null,ws)-Math.min.apply(null,ws)<=1))ok=false})
+    rows.push(['动作条：两枚且等宽','编辑 / 删除','两排各自量出来的宽',out.join('　'),ok?'ok':'bad'])})()
+  return rows};
+(function(){
+  var rows=window.__metrics(),bad=0,tb=document.getElementById('mtb'),h='';
+  rows.forEach(function(r){if(r[4]==='bad')bad++;
+    h+='<tr><td class="k">'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td class="'+(r[4]==='bad'?'bad':'ok')+'">'+(r[4]==='ok'?'放得进':(r[4]==='soft'?'截断（设计如此）':'放不下／没落地'))+'</td></tr>'});
+  CONTRAST.forEach(function(c){var ok=c[5]==='ok',note=c[5]==='note';if(!ok&&!note)bad++;
+    h+='<tr><td class="k">'+c[0]+'</td><td>字 '+c[1]+'</td><td>压底 '+c[2]+'</td><td>对比 '+c[4]+' / 门槛 '+c[3]+'</td><td class="'+(ok?'ok':(note?'soft':'bad'))+'">'+(ok?'过':(note?'越界（这一档不能这么用）':'不过'))+'</td></tr>'});
+  TOK.forEach(function(t){h+='<tr><td class="k">令牌 '+t[0]+'</td><td>'+t[1]+'</td><td>app.wxss 的 page{}</td><td>—</td><td class="ok">本稿用的就是这个值</td></tr>'});
+  tb.innerHTML=h;
+  var f=document.createElement('div');f.id='metricflag';f.style.cssText='font-size:14px;color:#5c6068;margin-top:10px';
+  var notes=CONTRAST.filter(function(c){return c[5]==='note'}).length
+  f.textContent=(bad?'METRICS-BAD ':'METRICS-OK ')+'宽度 '+rows.length+' 串 + 对比 '+CONTRAST.length+' 组，画错 '+bad+' 条（浅档那 '+notes+' 条是越界结论，另计）';
+  tb.closest('table').parentNode.appendChild(f)})();
+(function(){var d=document.documentElement;
+  document.title='DIM '+Math.max(d.scrollWidth,document.body.scrollWidth)+'x'+Math.max(d.scrollHeight,document.body.scrollHeight)})();
+</script></body></html>
