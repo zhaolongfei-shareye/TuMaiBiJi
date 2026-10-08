@@ -55,12 +55,26 @@ const PHYS_W_FLOOR = 1116
     !!mQ && Q > 1 && Q <= 100 && /compressedWidth: BG_TARGET_W/.test(posterJs)
     && /fail:\s*\(\)\s*=>\s*resolve\(tempPath\)/.test(posterJs),
     mQ ? `quality=${Q}（须在 1～100）` : '没读到 quality')
-  const picks = ['pages/profile/profile.js', 'pages/index/index.js']
-    .map((f) => [f, read(f)])
-  ck('两处选图口都改成挑原图', picks.length === 2 && picks.every(([, s]) => /sizeType: \['original'\]/.test(s)),
-    picks.map(([f, s]) => `${f}:${/sizeType: \['original'\]/.test(s) ? 'original' : '没改'}`).join(' '))
+  // 选图口不写死文件名：10-08 那一次「首页那层弹窗」整搬进 utils/cardInfo.js，
+  // 这一把还硬钉 `pages/index/index.js`，红的是"某个文件里没有 sizeType"这种话，
+  // 真话（那层弹窗还在挑原图）反倒要我自己去读代码才确认。所以按调用点捞：
+  // 谁调 `poster.mintAvatar(` 谁就是这一路的选图口，将来多一处也跑不出这张名单。
+  const walk = (dir, out = []) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name)
+      if (e.isDirectory()) walk(p, out)
+      else if (e.name.endsWith('.js')) out.push(p)
+    }
+    return out
+  }
+  const picks = walk(MP)
+    .filter((p) => /poster\.mintAvatar\(/.test(fs.readFileSync(p, 'utf8')))
+    .map((p) => [path.relative(MP, p), fs.readFileSync(p, 'utf8')])
+  ck('形象图那一路的选图口全都挑原图（按调用点捞，不写死文件名）',
+    picks.length >= 2 && picks.every(([, s]) => /sizeType: \['original'\]/.test(s)),
+    `${picks.length} 处：` + picks.map(([f, s]) => `${f}:${/sizeType: \['original'\]/.test(s) ? 'original' : '没改'}`).join(' '))
   const stillCompressed = picks.filter(([, s]) => /sizeType: \['compressed'\]/.test(s)).map(([f]) => f)
-  ck('旧的 compressed 那一档两处都撤净（不留第二套口径）', stillCompressed.length === 0, stillCompressed.join(' '))
+  ck('旧的 compressed 那一档每一处都撤净（不留第二套口径）', stillCompressed.length === 0, stillCompressed.join(' '))
 
   // ---------- ② 运行时：compressedWidth 到底吃不吃 ----------
   const info = (src) => mp.evaluate((p) => new Promise((resolve) => {
