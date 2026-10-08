@@ -63,6 +63,16 @@
         <text class="menu-hint">{{t.privatePasswordTip}}</text>
         <view class="ico"><view class="cv"></view></view>
       </view>
+      <!-- 我的邮箱：这一行不给小字说明（右侧那一档要留给现读回来的地址，两处都要字就挤了），
+           说明整句搬进点开的这一层。地址没读回来之前右侧什么都不摆——连「未填写」也不摆，
+           那也是一个猜的数（这页另外几处读不到就整块不占位是同一条规矩）。 -->
+      <view class="menu-item {{emailOpen ? 'open' : ''}}" bindtap="onToggleEmail">
+        <text class="menu-label">{{t.myEmail}}</text>
+        <view class="menu-right">
+          <text wx:if="{{emailLoaded}}" class="menu-value me-email-val">{{emailText || t.myEmailUnset}}</text>
+          <view class="ico"><view class="cv"></view></view>
+        </view>
+      </view>
       <view class="menu-item menu-danger" bindtap="onDeleteAccount">
         <text class="menu-label">{{t.deleteAccount}}</text>
         <view class="ico"><view class="cv"></view></view>
@@ -156,6 +166,24 @@
         <view class="pwd-btn ghost" bindtap="onClosePwdPanel">{{t.cancel}}</view>
         <view wx:if="{{pwdEntering}}" class="pwd-btn primary" bindtap="onPwdOk">{{t.privatePasswordOk}}</view>
         <view wx:else class="pwd-btn danger" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 我的邮箱这一层：几何全部抄上面那一层（遮罩 rgba(20,20,28,.55)、卡宽 620rpx、
+       离顶 180rpx、一行两枚各占一半），只是把六个格子换成一只普通输入框。
+       输入框预填的是**现读回来的那一条**（不是本机存的），所以 me.js 在读没回来之前不让打开——
+       预填成空再把人引导去点保存，就等于替他把原来那条清了。 -->
+  <view wx:if="{{emailOpen}}" class="me-email-mask" bindtap="onCloseEmailPanel">
+    <view class="me-email-card card" catchtap="">
+      <text class="me-email-name">{{t.myEmail}}</text>
+      <text class="me-email-scene">{{t.myEmailScene}}</text>
+      <input class="me-email-field" type="text" confirm-type="done" adjust-position="{{false}}"
+        focus="{{emailFocus}}" placeholder="{{t.myEmailPlaceholder}}" placeholder-class="me-email-ph"
+        value="{{emailBuf}}" bindinput="onEmailBuf" bindconfirm="onEmailSave" />
+      <view class="me-email-two">
+        <view class="me-email-btn ghost" bindtap="onCloseEmailPanel">{{t.cancel}}</view>
+        <view class="me-email-btn primary" bindtap="onEmailSave">{{t.myEmailSave}}</view>
       </view>
     </view>
   </view>

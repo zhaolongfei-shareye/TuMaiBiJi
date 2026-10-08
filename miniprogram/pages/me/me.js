@@ -68,6 +68,13 @@ Page({
     ruleDotStyle: 'background:' + TIP_DOT,
     // 私密密码：设没设只吃服务端读数；输入那一层是整屏遮罩 + 居中卡（见上面那组方法）
     privateSet: false,
+    // 我的邮箱：值只从服务端现读，本机不存一份——存了就会在换设备后说谎（与 privateSet 同一条理由）。
+    // emailLoaded 是"这条读数到底回来了没"，没回来时右侧一个字都不摆。
+    emailLoaded: false,
+    emailText: '',
+    emailOpen: false,
+    emailFocus: false,
+    emailBuf: '',
     // 图片云空间告警那一行：默认不出现，只有现读回来的比值过了线才亮。
     storageWarn: false,
     storageTip: '',
@@ -121,6 +128,7 @@ Page({
     this.loadQuota()
     this.loadStorage()
     this.loadPwdStatus()
+    this.loadEmail()
   },
 
   // 图的尺寸要问出来才知道往上顶多少；读不到就退回 aspectFill 的默认居中
@@ -188,6 +196,7 @@ Page({
     // 切走之前把浮着的那一层收掉：两层内容叠在一起会读成"这一格里还有一格"
     this.setData({ tab: key })
     this.onClosePwdPanel()
+    this.onCloseEmailPanel()
     wx.pageScrollTo({ scrollTop: 0, duration: 120 })
   },
 
@@ -354,6 +363,62 @@ Page({
       wx.showToast({ title: t('privatePasswordResetDone', lang), icon: 'none' })
     } catch (err) {
       wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })
+    }
+  },
+
+  // ---------- 我的邮箱这一层（值只认服务端现读那一条，本机不存副本）----------
+  // 打开之前必须先拿到现读的那一条：服务端把"空串"定义成清除，所以预填成空白再让人点保存，
+  // 等于替他清掉了原来的地址——这一层不许在没读到的时候打开。
+  async loadEmail() {
+    try {
+      const r = await api.getContactEmail()
+      this.setData({ emailLoaded: true, emailText: (r && r.email) || '' })
+    } catch (err) {
+      // 读数没回来这一格就空着（连"未填写"都不写，那也是一个猜的数）。
+      this.setData({ emailLoaded: false, emailText: '' })
+    }
+  },
+
+  async onToggleEmail() {
+    if (this.data.emailOpen) {
+      this.onCloseEmailPanel()
+      return
+    }
+    const lang = this.data.lang
+    if (!this.data.emailLoaded) await this.loadEmail()
+    if (!this.data.emailLoaded) {
+      wx.showToast({ title: t('myEmailLoadFailed', lang), icon: 'none' })
+      return
+    }
+    this.setData({ emailOpen: true, emailBuf: this.data.emailText, emailFocus: true })
+  },
+
+  onEmailBuf(e) {
+    this.setData({ emailBuf: String(e.detail.value || '') })
+  },
+
+  onCloseEmailPanel() {
+    // buf 退回现读的那一条：半截没保存的字不该留在下一次打开的输入框里。
+    this.setData({ emailOpen: false, emailFocus: false, emailBuf: this.data.emailText })
+  },
+
+  async onEmailSave() {
+    const lang = this.data.lang
+    if (this.savingEmail) return
+    this.savingEmail = true
+    try {
+      const r = await api.setContactEmail((this.data.emailBuf || '').trim())
+      const email = (r && r.email) || ''
+      this.setData({
+        emailLoaded: true, emailText: email,
+        emailOpen: false, emailFocus: false, emailBuf: email,
+      })
+      wx.showToast({ title: email ? t('myEmailSaved', lang) : t('myEmailCleared', lang), icon: 'success' })
+    } catch (err) {
+      // 被拒的那一次服务端一个字都不写，所以这一格仍显示原来那条，不用回滚。
+      wx.showToast({ title: (err.data && err.data.detail) || t('operationFailed', lang), icon: 'none' })
+    } finally {
+      this.savingEmail = false
     }
   },
 

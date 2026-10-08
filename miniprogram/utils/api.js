@@ -245,6 +245,10 @@ module.exports = {
     request('/api/user/deactivate', 'POST', { confirm: true }, { noRelogin: true }),
   updateWallpaper: (wallpaper) => request('/api/user/wallpaper', 'PUT', { wallpaper }),
   updateLanguage: (language) => request('/api/user/language', 'PUT', { language }),
+  // 用户自己填的联系邮箱（账号能力）。空串在**服务端**就是清除这一格，不是"保持原值"，
+  // 所以界面上那一句"清空并保存＝不再留"吃的是这条契约（backend/app/api/routes/user.py）。
+  getContactEmail: () => request('/api/user/contact-email'),
+  setContactEmail: (email) => request('/api/user/contact-email', 'PUT', { email }),
   setPrivatePassword: async (password) => {
     // 换密码会让服务端手上那批解锁凭证当场作废（凭证绑在旧密码摘要上），
     // 本机这份也跟着清掉，别留一条"界面以为还解锁着、服务端已经不认"的凭证。

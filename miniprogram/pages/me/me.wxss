@@ -511,6 +511,97 @@
   box-shadow: inset 0 0 0 var(--w-edge) var(--danger-soft);
 }
 
+/* ---------- 我的邮箱：那一行的值 + 点开那一层 ----------
+   层的几何一字抄上面私密密码那一层（遮罩色 / 卡宽 620 / 离顶 180 / 一行两枚各占一半），
+   只有输入框替换了六格。类名带页面前缀：这一页与 about.wxss 各有一套 .menu-*，
+   再来一发裸名就是第三份。 */
+.me-email-val {
+  /* 地址最长收到 254，行里摆不下就得收：给个上限再用省略号，
+     否则 nowrap 会把右边那枚箭头顶出那一行（`探-小字不折行` 扫的正是这种"顶出去"）。 */
+  max-width: 340rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.me-email-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(20, 20, 28, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 180rpx;
+  z-index: 100;
+}
+
+.me-email-card {
+  width: 620rpx;
+  padding: var(--sp-5) var(--sp-4) var(--sp-4);
+  margin-bottom: 0;
+  box-shadow: var(--sh-float);
+}
+
+.me-email-name {
+  display: block;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  letter-spacing: -0.6rpx;
+  color: var(--text-primary);
+}
+
+.me-email-scene {
+  display: block;
+  margin-top: 12rpx;
+  font-size: var(--fs-tiny);
+  letter-spacing: -0.2rpx;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.me-email-field {
+  margin-top: var(--sp-4);
+  height: 96rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  border-radius: var(--r-chip);
+  background: var(--chip-idle);
+  box-shadow: inset 0 0 0 var(--w-edge) var(--card-edge);
+  font-size: var(--fs-body);
+  color: var(--text-primary);
+}
+
+.me-email-ph {
+  color: var(--text-tertiary);
+}
+
+.me-email-two {
+  margin-top: var(--sp-5);
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.me-email-btn {
+  flex: 1;
+  text-align: center;
+  padding: var(--sp-3) 0;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.me-email-btn.ghost {
+  color: var(--text-secondary);
+  background: var(--chip-idle);
+}
+
+.me-email-btn.primary {
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+}
+
 /* ---------- 关于：头部下面直接生成，不分二级 ---------- */
 .about-lead {
   padding: 24rpx 28rpx;

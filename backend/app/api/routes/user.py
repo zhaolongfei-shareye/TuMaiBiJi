@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Dict, List
@@ -78,6 +79,57 @@ async def update_language(
     user.language = req.language
     db.commit()
     return {"language": user.language}
+
+
+# —— 用户自己的联系邮箱（账号能力之一：换址与清除）——
+# 形状校验故意保守：这一格不验证所有权（不发确认邮件，服务端也没有发信能力），
+# 它只是"你留给我们、下次你来信时我们对得上你"的一个自报地址。所以只挡明显不合法的写法，
+# 不挡"能收信但形状怪"的写法。长度上限跟着 RFC 的 254 与 local-part 64 走，
+# 且必须与 models/user.py 那列的 String(254) 一字不差（有一条用例在比模型与迁移）。
+_CONTACT_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
+CONTACT_EMAIL_MAX = 254
+CONTACT_LOCAL_MAX = 64
+
+
+def _normalize_contact_email(raw: str) -> str:
+    """去首尾空白 + 转小写（同一个人在手机上习惯大写、在电脑上全小写，那是同一个地址）。"""
+    return (raw or "").strip().lower()
+
+
+class ContactEmailRequest(BaseModel):
+    email: str
+
+
+@router.get("/contact-email")
+async def get_contact_email(user: User = Depends(get_current_user)):
+    """只有本人（当前 token 那个 user）读得到；这一格不进任何公开响应。"""
+    return {"email": user.contact_email or ""}
+
+
+@router.put("/contact-email")
+@limiter.limit("20/hour")
+async def update_contact_email(
+    req: ContactEmailRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """换址；传空串就是清除（回到"未填写"）。"""
+    email = _normalize_contact_email(req.email)
+    if not email:
+        user.contact_email = None
+        db.commit()
+        return {"email": ""}
+    if len(email) > CONTACT_EMAIL_MAX:
+        raise HTTPException(status_code=400, detail="邮箱太长了，请换一个")
+    local = email.split("@", 1)[0]
+    if len(local) > CONTACT_LOCAL_MAX:
+        raise HTTPException(status_code=400, detail="邮箱格式不对，请检查后重试")
+    if not _CONTACT_RE.match(email):
+        raise HTTPException(status_code=400, detail="邮箱格式不对，请检查后重试")
+    user.contact_email = email
+    db.commit()
+    return {"email": user.contact_email}
 
 
 @router.get("/quota")

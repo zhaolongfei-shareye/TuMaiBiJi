@@ -21,5 +21,10 @@ class User(Base):
     generation = Column(Integer, nullable=False, default=1, server_default="1")
     # 私密笔记的 6 位数字密码哈希（sha256）；null 表示未设置
     private_password_hash = Column(String(64), nullable=True)
+    # 用户自己填的联系邮箱。**可空，且只有本人（当前 token 的 user_id）读得到**——它不进任何
+    # 公开响应、不进分享落地页、不进列表。收它的唯一用途写在 docs/产品需求.md：用户通过开发者
+    # 反馈邮箱来信行使查阅/更正/注销时，用来把来信对上库里哪个账号（openid 从不下发、也不给用户看，
+    # 没有这一格就没有别的对应办法）。服务端不发信、不做营销、不给第三方。
+    contact_email = Column(String(254), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

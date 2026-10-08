@@ -12,6 +12,8 @@ const fs = require('fs')
 const path = require('path')
 // 「使用场景」那句判据吃字典，不抄第二份（界面读同一份 i18n）
 const i18n = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
+// 反馈邮箱吃那唯一一份出处（10-08 起开发者邮箱改回 gmail，写死字面量的尺子会把它钉成假的）
+const CONTACT_EMAIL = require(path.resolve(__dirname, '../../miniprogram/utils/contact.js')).CONTACT_EMAIL
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/笔记列表-堆叠卡/实测-0930')
 const API = 'https://api.agentsbin.cn/wtsj'
@@ -37,7 +39,7 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await sleep(3500)
     const me = await mp.currentPage()
     let d = await me.data()
-    ck('反馈邮箱换成新址', d.contactEmail === '18509828@qq.com', d.contactEmail)
+    ck('反馈邮箱那一行与 contact.js 那份同源（不是两页各写一份）', d.contactEmail === CONTACT_EMAIL, d.contactEmail)
     const labels = []
     for (const r of await me.$$('.menu-item')) labels.push((await r.text()).replace(/\s+/g, ''))
     const iWall = labels.findIndex((x) => x.startsWith('外观设置'))

@@ -190,6 +190,17 @@ const i18n = {
     privatePasswordResetConfirm: '重置',
     privatePasswordResetDone: '已重置，请重新设置',
     privatePasswordSaved: '密码已设好',
+    /* ---------- 「我的→设置」第五行：用户自己填的联系邮箱 ----------
+       说明那行两句都不能省：「只有你本人看得到」是隐私口径，「清空并保存＝不再留」
+       说的是这个动作真会清掉旧值。 */
+    myEmail: '我的邮箱',
+    myEmailUnset: '未填写',
+    myEmailScene: '回信、更正、注销请求都靠它对上你的账号，只有你本人看得到。清空并保存＝不再留。',
+    myEmailPlaceholder: 'name@example.com',
+    myEmailSave: '保存',
+    myEmailSaved: '已保存',
+    myEmailCleared: '已清除',
+    myEmailLoadFailed: '没读到现在填的邮箱，先不改，稍后再试',
     /* ---------- 「我的」改版 v10：药丸、留白区那两行、脑力值、重置那道生物识别门 ----------
        脑力值只读服务端 /api/user/quota 的 mind 一个数（=100 起始 + 加分），界面不参与算。 */
     pillSettings: '设置',
@@ -524,6 +535,14 @@ const i18n = {
     privatePasswordResetConfirm: 'Yes',
     privatePasswordResetDone: 'Reset — please set a new one',
     privatePasswordSaved: 'Password saved',
+    myEmail: 'My Email',
+    myEmailUnset: 'Not set',
+    myEmailScene: 'Replies, corrections and deletion requests are matched to you through this address. Only you can see it. Clear it and save to remove it.',
+    myEmailPlaceholder: 'name@example.com',
+    myEmailSave: 'Save',
+    myEmailSaved: 'Saved',
+    myEmailCleared: 'Cleared',
+    myEmailLoadFailed: 'Could not load the saved address — try again later',
     pillSettings: 'Settings',
     pillAbout: 'About',
     meGreeting: 'Hello! I am Tumark',
