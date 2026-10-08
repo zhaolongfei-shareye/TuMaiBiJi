@@ -33,6 +33,7 @@ from app.models.category import Category
 from app.models.invitation import Invitation
 from app.models.job import Job
 from app.models.note import Note
+from app.models.note_card import NoteCard
 from app.models.share import Share
 from app.models.user import User
 from app.services import quota
@@ -65,7 +66,7 @@ def rows(db, model, uid):
 
 @pytest.fixture()
 def mine(db):
-    """一个有全套数据的人：笔记、分类、分享、任务、素材，外加两行邀请台账。
+    """一个有全套数据的人：笔记、分类、分享、任务、素材、卡片，外加两行邀请台账。
 
     他既被别人邀进来（inviter 那个人拿到过一笔奖励），也邀成功过别人（999 那个假 id
     只是台账里的一个号，不需要真有其人）。
@@ -85,6 +86,10 @@ def mine(db):
         share,
         Job(user_id=str(u.id), job_type="ingest_url", status="done", note_id=note.id),
         Asset(user_id=str(u.id), object_key="a/b.png"),
+        # 卡片那一行 10-08 起是第六类：注销是清云端对象的**唯一一次机会**，漏了它
+        # 云上那个 jpg 就永远没人删得动（后端没有云开发凭据）。
+        NoteCard(user_id=str(u.id), note_id=note.id, object_key="cloud://x/del-me.jpg",
+                 tpl="classic", no_qr=False, origin="live", is_current=True),
         Invitation(inviter_id=inviter.id, invitee_id=u.id, reward=quota.INVITE_REWARD),
         Invitation(inviter_id=u.id, invitee_id=999, reward=quota.INVITE_REWARD),
     ])
@@ -130,14 +135,17 @@ class Test注销入口:
 
 
 class Test删干净:
-    def test_一次删完五类数据并回报条数(self, client, db, mine):
+    def test_一次删完六类数据并回报条数(self, client, db, mine):
         resp = wipe(client, mine)
         assert resp.status_code == 200, resp.text
         assert resp.json()["deleted"] == {
-            "notes": 1, "categories": 1, "shares": 1, "jobs": 1, "assets": 1,
+            "notes": 1, "categories": 1, "shares": 1, "jobs": 1, "assets": 1, "cards": 1,
         }
-        for model in (Note, Category, Share, Job, Asset):
+        for model in (Note, Category, Share, Job, Asset, NoteCard):
             assert rows(db, model, mine["id"]) == 0, model.__tablename__
+        # 卡片那行的对象必须出现在同一份 file_ids 里——客户端只读那一个键，
+        # 没带出去的那个 jpg 在云上就永远没人删得动。
+        assert "cloud://x/del-me.jpg" in resp.json()["file_ids"], resp.json()
         assert db.query(User).filter(User.id == mine["id"]).count() == 0
         assert db.query(Invitation).count() == 0
 
@@ -154,7 +162,8 @@ class Test删干净:
         db.commit()
         resp = wipe(client, {"user": empty})
         assert resp.status_code == 200
-        assert resp.json()["deleted"] == {"notes": 0, "categories": 0, "shares": 0, "jobs": 0, "assets": 0}
+        assert resp.json()["deleted"] == {"notes": 0, "categories": 0, "shares": 0,
+                                          "jobs": 0, "assets": 0, "cards": 0}
         assert rows(db, Note, other["id"]) == 1
 
 

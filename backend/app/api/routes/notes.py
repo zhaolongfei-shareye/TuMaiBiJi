@@ -437,6 +437,17 @@ def delete_note(
     ]
     db.query(Asset).filter(Asset.note_id == note_id).delete()
 
+    # 卡片对象并进**同一个** `file_ids`，不另起一个 `card_file_ids` 键：客户端
+    # `cloudUpload.dropFromDeleteRes` 只读那一个键，加新键等于两端各改一遍、各漏一遍。
+    # 历史行（is_current=0）一起带出去——那些对象在云上还在，留着不删就是白占全站那 5GB。
+    from app.models.note_card import NoteCard
+
+    file_ids += [
+        r.object_key
+        for r in db.query(NoteCard).filter(NoteCard.note_id == note_id).all()
+    ]
+    db.query(NoteCard).filter(NoteCard.note_id == note_id).delete()
+
     db.delete(note)
     db.commit()
     return {"message": "Note deleted", "file_ids": file_ids}

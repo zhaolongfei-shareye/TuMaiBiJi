@@ -1,0 +1,301 @@
+"""卡片留档上服务端（2.0.1 P0 · S1）：写、读、批量、删除连带四条路。
+
+四条不变量：
+① **一篇只有一张"当前"**。写口是幂等 upsert（新的进来旧的转历史），库上还压了一道部分唯一
+   索引。这条要能在测试里被索引挡住——只靠代码判重等于没判，两个请求同时写就漏。
+② **同一个 fileID 重复登记不产生第二行**。补传那一趟会重跑，攒历史行的话读回来哪条赢取决于
+   顺序，界面就成了不确定的。
+③ **归属越权一律 404**，不回 403——区分"不存在"与"不是你的"就是给外人一篇一篇试 id 的探测器。
+④ **删除连带走的是同一个 `file_ids` 键**，不另起 `card_file_ids`：客户端
+   `cloudUpload.dropFromDeleteRes` 只读那一个键，两处各改一遍迟早漏一处。漏了的后果是云上
+   留一堆没人记得的对象，而对象只有客户端删得动。
+⑤ **配额按每张 ≤200KB 的上界入账，是估算不是实测**（站长 10-08 定）。这一栏不许当写口的
+   拒收线——挡人的那道线是云开发单文件上限 20MB，两个数混成一个的那天，症状就是"用户的
+   卡片存不上"。
+"""
+import os
+import sys
+import time
+
+os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest_cards.db"
+os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
+os.environ["EXTRACT_PROVIDER"] = "none"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
+
+from app.core.auth import _create_token
+from app.db.database import Base, SessionLocal, engine
+from app.main import app
+from app.api.routes.cards import MAX_CARD_UPLOAD_BYTES
+from app.models.note import Note
+from app.models.note_card import CARD_ACCOUNT_BYTES, NoteCard
+from app.models.share import Share
+from app.models.user import User
+
+FID = "cloud://tumaibiji.abc/cards/1-classic-1.jpg"
+
+
+@pytest.fixture()
+def client():
+    app.state.limiter.enabled = False
+    with TestClient(app) as c:
+        yield c
+    app.state.limiter.enabled = True
+
+
+@pytest.fixture()
+def db():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    session = SessionLocal()
+    yield session
+    session.close()
+
+
+def mk_user(db, tag):
+    u = User(openid=f"card-{tag}-{int(time.time() * 1000)}")
+    db.add(u)
+    db.commit()
+    return u
+
+
+def hdr(user):
+    return {"Authorization": f"Bearer {_create_token(user.id, user.generation)}"}
+
+
+def mk_note(db, user, title="有一张卡片的一篇"):
+    n = Note(user_id=str(user.id), title=title, source_type="manual")
+    db.add(n)
+    db.commit()
+    return n
+
+
+def row(user, note, key, **kw):
+    """直接造库里的行，**不走接口**——那两把索引用例要验的就是"绕过 upsert 也塞不进去"，
+    经接口的一趟会把违规先在代码层挡下来，索引等于没被量过。"""
+    return NoteCard(user_id=str(user.id), note_id=note.id, object_key=key,
+                    tpl="classic", no_qr=False, origin="live", **kw)
+
+
+def put(client, user, note_id, **kw):
+    body = {"file_id": FID, "tpl": "classic", "no_qr": False}
+    body.update(kw)
+    return client.post(f"/api/notes/{note_id}/card", json=body, headers=hdr(user))
+
+
+class Test写与读:
+    def test_登记完读回来就是那一张(self, client, db):
+        u = mk_user(db, "a")
+        n = mk_note(db, u)
+        r = put(client, u, n.id, size=204800, width=1080, height=1440)
+        assert r.status_code == 200, r.text
+        got = client.get(f"/api/notes/{n.id}/card", headers=hdr(u)).json()
+        assert got["card"]["cloud_url"] == FID
+        assert got["card"]["tpl"] == "classic"
+        assert got["card"]["size"] == 204800
+        assert got["card"]["origin"] == "live"
+        assert got["had_share"] is False
+
+    def test_没登记过的读回来是空而不是报错(self, client, db):
+        u = mk_user(db, "b")
+        n = mk_note(db, u)
+        got = client.get(f"/api/notes/{n.id}/card", headers=hdr(u)).json()
+        assert got == {"card": None, "had_share": False}
+
+    def test_公开过但没有卡片行时had_share为真(self, client, db):
+        """这一栏是"待确认档"的入口：服务端只能说"这篇该有一张"，说不出当年用的哪套模板。"""
+        u = mk_user(db, "c")
+        n = mk_note(db, u)
+        db.add(Share(user_id=str(u.id), note_id=n.id, token=f"tk-{n.id}", title=n.title))
+        db.commit()
+        got = client.get(f"/api/notes/{n.id}/card", headers=hdr(u)).json()
+        assert got["card"] is None and got["had_share"] is True
+
+
+class Test一篇只留一张:
+    def test_换一张时旧的转历史不删(self, client, db):
+        u = mk_user(db, "d")
+        n = mk_note(db, u)
+        put(client, u, n.id)
+        second = "cloud://tumaibiji.abc/cards/1-quote-2.jpg"
+        put(client, u, n.id, file_id=second, tpl="quote")
+        rows = db.query(NoteCard).filter(NoteCard.note_id == n.id).all()
+        assert len(rows) == 2, "历史行要留着，不能直接删"
+        assert sum(1 for r in rows if r.is_current) == 1
+        got = client.get(f"/api/notes/{n.id}/card", headers=hdr(u)).json()
+        assert got["card"]["cloud_url"] == second and got["card"]["tpl"] == "quote"
+
+    def test_同一个地址重复登记不产生第二行(self, client, db):
+        """补传那一趟会重跑。攒历史行的话，读回来哪条赢取决于查询顺序。"""
+        u = mk_user(db, "e")
+        n = mk_note(db, u)
+        put(client, u, n.id, size=100)
+        put(client, u, n.id, size=200)
+        rows = db.query(NoteCard).filter(NoteCard.note_id == n.id).all()
+        assert len(rows) == 1
+        assert rows[0].file_size == 200
+
+    def test_当前行撞唯一索引是真被挡住的(self, db):
+        """这条不看接口，看库：绕过 upsert 直接塞第二行 current 必须报错。
+        否则"一篇一张"就只是代码里的一句自觉。"""
+        u = mk_user(db, "f")
+        n = mk_note(db, u)
+        db.add(row(u, n, "cloud://x/a.jpg"))
+        db.commit()
+
+        db.add(row(u, n, "cloud://x/b.jpg"))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+    def test_同一篇的历史行不受这条索引管(self, db):
+        """索引是**部分**唯一（只圈 is_current=1）。要是连历史行也挡，"旧的转历史不删"
+        那条就写不进去——留档和唯一约束就会变成互相打架的两句话。"""
+        u = mk_user(db, "f2")
+        n = mk_note(db, u)
+        db.add(row(u, n, "cloud://x/a.jpg"))
+        db.commit()
+        db.add(row(u, n, "cloud://x/b.jpg", is_current=False))
+        db.add(row(u, n, "cloud://x/c.jpg", is_current=False))
+        db.commit()
+        rows = db.query(NoteCard).filter(NoteCard.note_id == n.id).all()
+        assert len(rows) == 3
+        assert sum(1 for r in rows if r.is_current) == 1
+
+
+class Test不收的形状:
+    def test_脏地址一律四百(self, client, db):
+        u = mk_user(db, "g")
+        n = mk_note(db, u)
+        for bad in ["cloud://", "cloud://有 空格", "http://不是云开发的地址"]:
+            r = put(client, u, n.id, file_id=bad)
+            assert r.status_code == 400, (bad, r.status_code, r.text)
+
+    def test_空地址在门口就被形状挡了(self, client, db):
+        """空串到不了语义那层：pydantic 的 min_length 先拦，回 422。
+        钉住它是为了别有人把 422 当"漏了一条 400"去"修"——那是两层门，不是一层坏了。"""
+        u = mk_user(db, "g2")
+        n = mk_note(db, u)
+        r = put(client, u, n.id, file_id="")
+        assert r.status_code == 422, r.text
+
+    def test_模板名不收空白但不卡白名单(self, client, db):
+        """白名单在这儿等于把"卡片模板不走发版"那条承诺作废：下发多一套 id，
+        服务端就得跟着发一次版。所以只校形状。"""
+        u = mk_user(db, "h")
+        n = mk_note(db, u)
+        assert put(client, u, n.id, tpl="").status_code == 422  # pydantic 的 min_length
+        assert put(client, u, n.id, tpl="clas sic").status_code == 400
+        assert put(client, u, n.id, tpl="brandNewIdFrom下发").status_code == 200
+
+    def test_来源不认得四百(self, client, db):
+        u = mk_user(db, "i")
+        n = mk_note(db, u)
+        assert put(client, u, n.id, origin="magic").status_code == 400
+
+
+class Test归属:
+    def test_别人的笔记回四百零四不是四百零三(self, client, db):
+        owner = mk_user(db, "j")
+        other = mk_user(db, "k")
+        n = mk_note(db, owner)
+        assert client.post(f"/api/notes/{n.id}/card",
+                           json={"file_id": FID, "tpl": "classic"}, headers=hdr(other)).status_code == 404
+        assert client.get(f"/api/notes/{n.id}/card", headers=hdr(other)).status_code == 404
+
+    def test_不带票问不了(self, client, db):
+        u = mk_user(db, "l")
+        n = mk_note(db, u)
+        assert client.get(f"/api/notes/{n.id}/card").status_code == 401
+        assert client.get("/api/user/cards").status_code == 401
+
+    def test_批量读只看得见自己的(self, client, db):
+        a = mk_user(db, "m")
+        b = mk_user(db, "n")
+        na, nb = mk_note(db, a, "甲的笔记"), mk_note(db, b, "乙的笔记")
+        put(client, a, na.id, file_id="cloud://x/a.jpg")
+        put(client, b, nb.id, file_id="cloud://x/b.jpg")
+        got = client.get("/api/user/cards", headers=hdr(a)).json()
+        assert [c["note_id"] for c in got["cards"]] == [na.id]
+        assert got["cards"][0]["cloud_url"] == "cloud://x/a.jpg"
+
+
+class Test批量读那份待确认名单:
+    def test_公开过又没卡片行的才进名单(self, client, db):
+        u = mk_user(db, "o")
+        n1 = mk_note(db, u, "公开过、没卡片")
+        n2 = mk_note(db, u, "公开过、卡片已登记")
+        n3 = mk_note(db, u, "没公开过")
+        for n in (n1, n2):
+            db.add(Share(user_id=str(u.id), note_id=n.id, token=f"tk-{n.id}", title=n.title))
+        db.commit()
+        put(client, u, n2.id, file_id="cloud://x/2.jpg")
+        got = client.get("/api/user/cards", headers=hdr(u)).json()
+        assert got["need_confirm"] == [n1.id], got
+
+    def test_笔记删掉了就不该再冒出来(self, client, db):
+        u = mk_user(db, "p")
+        n = mk_note(db, u, "删掉的这篇")
+        db.add(Share(user_id=str(u.id), note_id=n.id, token=f"tk-{n.id}", title=n.title))
+        db.commit()
+        assert n.id in client.get("/api/user/cards", headers=hdr(u)).json()["need_confirm"]
+        assert client.delete(f"/api/notes/{n.id}", headers=hdr(u)).status_code == 200
+        assert client.get("/api/user/cards", headers=hdr(u)).json()["need_confirm"] == []
+
+
+class Test删除连带:
+    def test_删一篇把卡片地址一起回给客户端(self, client, db):
+        u = mk_user(db, "q")
+        n = mk_note(db, u)
+        put(client, u, n.id, file_id="cloud://x/cur.jpg")
+        put(client, u, n.id, file_id="cloud://x/old.jpg", tpl="quote")  # 旧的转历史但对象还在云上
+        r = client.delete(f"/api/notes/{n.id}", headers=hdr(u))
+        assert r.status_code == 200
+        ids = r.json()["file_ids"]
+        # 断的是**同一个键**里带齐两行：另起 card_file_ids 就是客户端读不到的那一份
+        assert set(ids) == {"cloud://x/cur.jpg", "cloud://x/old.jpg"}, ids
+        assert "card_file_ids" not in r.json()
+        assert db.query(NoteCard).filter(NoteCard.note_id == n.id).count() == 0
+
+    def test_注销把卡片地址也带走(self, client, db):
+        u = mk_user(db, "r")
+        n = mk_note(db, u)
+        put(client, u, n.id, file_id="cloud://x/deact.jpg")
+        r = client.post("/api/user/deactivate", json={"confirm": True}, headers=hdr(u))
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert "cloud://x/deact.jpg" in body["file_ids"], body
+        assert body["deleted"]["cards"] == 1
+
+
+class Test配额记账口径:
+    """站长 10-08 定的那条，三处一起记（代码 / 这把尺子 / 方案 §四.4 + PRD §8.149）：
+    **一张卡片按 ≤200KB 的上界入账，是估算不是实测**。
+
+    为什么宁可往大里估：报少了的症状是"明明快满了，界面还说有余量"——那正是这个产品
+    最难查的那类假话。而估多了只是提前一格提示，用户点掉就完了。
+
+    ⚠ 这一栏**不许当写口的拒收线**，所以这里三条断言其实是同一件事的三个方向：入账的数
+    与挡人的数必须是两个数，混成一个的那天就是"用户的卡片存不上"的那天。
+    """
+
+    def test_入账口径就是200KB(self):
+        assert CARD_ACCOUNT_BYTES == 200 * 1024, (
+            "口径变了就得同批改方案 §四.4、PRD §8.149 与 验-卡片留档S1.js，别只改这一栏")
+
+    def test_比上界大的卡片照样登记得进(self, client, db):
+        u = mk_user(db, "s1")
+        n = mk_note(db, u)
+        big = 300 * 1024  # 超过入账上界 1.5 倍：估算线不是闸门
+        assert put(client, u, n.id, size=big).status_code == 200
+        assert db.query(NoteCard).filter(NoteCard.note_id == n.id).first().file_size == big
+
+    def test_挡人的那道线是云开发单文件上限(self, client, db):
+        u = mk_user(db, "s2")
+        n = mk_note(db, u)
+        assert MAX_CARD_UPLOAD_BYTES == 20 * 1024 * 1024
+        assert MAX_CARD_UPLOAD_BYTES != CARD_ACCOUNT_BYTES
+        assert put(client, u, n.id, size=MAX_CARD_UPLOAD_BYTES + 1).status_code == 422

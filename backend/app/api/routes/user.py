@@ -294,12 +294,22 @@ def deactivate_account(
         r[0]
         for r in db.query(Asset.object_key).filter(Asset.user_id == uid, not_failed()).all()
     ]
+    # 卡片对象与配图并进**同一份** `file_ids`（与 `routes/notes.py:delete_note` 同一条决定：
+    # 客户端只读那一个键）。历史行也一起带走——云上那些对象还占着全站配额，
+    # 而**这是最后一次有机会**：注销之后没有任何接口能再问出这个人留了哪些图。
+    from app.models.note_card import NoteCard
+
+    asset_ids += [
+        r[0]
+        for r in db.query(NoteCard.object_key).filter(NoteCard.user_id == uid).all()
+    ]
     deleted = {
         "notes": db.query(Note).filter(Note.user_id == uid).delete(),
         "categories": db.query(Category).filter(Category.user_id == uid).delete(),
         "shares": db.query(Share).filter(Share.user_id == uid).delete(),
         "jobs": db.query(Job).filter(Job.user_id == uid).delete(),
         "assets": db.query(Asset).filter(Asset.user_id == uid).delete(),
+        "cards": db.query(NoteCard).filter(NoteCard.user_id == uid).delete(),
     }
 
     # 防止邀请奖励上限绕过：注销前先把该用户贡献给邀请人的 bonus 扣掉

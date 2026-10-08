@@ -129,6 +129,65 @@ const stage = async (name, fn, mp) => {
       } catch (e) { return JSON.stringify({ err: String(e) }) }
     }, mp)
 
+    // —— 7. cards 目录空着量不到实物字节，就把卡片页那张画布现渲一份量（fileType/quality 与
+    //    cardLog.record 那一趟一字不差）。**只出临时件，不写台账、不记账、不分享。**
+    let rendered = null
+    if (!((cards && cards.文件数) > 0)) {
+      const noteId = await mp.evaluate(() => {
+        try {
+          const raw = wx.getStorageSync('cardLog')
+          const ids = raw && typeof raw === 'object' ? Object.keys(raw) : []
+          return ids.length ? parseInt(ids[0]) : 0
+        } catch (e) { return 0 }
+      })
+      console.log('\n（现渲量字节用的笔记 id 取自台账第一篇 = ' + noteId + '）')
+      if (noteId) {
+        await mp.reLaunch('/pages/share/share?id=' + noteId)
+        await sleep(9000)
+          // 两段式：这一趟**只把渲染起来、把临时件路径挂在页面实例上就立刻返回一个字符串**。
+        // 为什么不回 Promise：一回 Promise 就把 canvas 节点带进了 automator 的返回值通道，
+        // 报的是 "An object could not be cloned"（今天连着红了三趟都是这一类，不是产品红）。
+        await mp.evaluate(() => {
+          const page = getCurrentPages().slice(-1)[0]
+          if (!page) return '没有当前页'
+          page._probe = {}
+          const q = wx.createSelectorQuery()
+          q.select('#shareCanvas').fields({ node: true, size: true }).exec((res) => {
+            const box = res && res[0]
+            const node = box && box.node
+            if (!node) { page._probe.err = '取不到 #shareCanvas 节点'; return }
+            page._probe.画布 = box.width + '×' + box.height
+            wx.canvasToTempFilePath({
+              canvas: node, fileType: 'jpg', quality: 0.82,
+              success: (r) => {
+                page._probe.jpg = r.tempFilePath
+                wx.canvasToTempFilePath({ canvas: node, success: (r2) => { page._probe.png = r2.tempFilePath }, fail: (e) => { page._probe.pngErr = String(e) } }, page)
+              },
+              fail: (e) => { page._probe.err = 'jpg 那趟失败 ' + String(e) },
+            }, page)
+          })
+          return '已经派下去'
+        })
+        await sleep(3500)
+        rendered = await stage('现渲一张卡片的字节（第二段：只 stat）', () => {
+          try {
+            const page = getCurrentPages().slice(-1)[0]
+            const pr = (page && page._probe) || {}
+            const fm = wx.getFileSystemManager()
+            const sizeOf = (path) => {
+              try { const s = fm.statSync(path, false); const st = s && s.stats ? s.stats : s; return st && st.size } catch (e) { return 'stat失败' }
+            }
+            return JSON.stringify({
+              画布: pr.画布 || null,
+              jpg字节: pr.jpg ? sizeOf(pr.jpg) : null,
+              png字节: pr.png ? sizeOf(pr.png) : null,
+              err: pr.err || pr.pngErr || null,
+            })
+          } catch (e) { return JSON.stringify({ err: String(e) }) }
+        }, mp)
+      }
+    }
+
     console.log('\n———— 读数一：一张卡片多少字节 ————')
     const sizes = ((cards && cards.清单) || []).map((x) => x.字节).filter((n) => typeof n === 'number')
     if (sizes.length) {
@@ -136,8 +195,13 @@ const stage = async (name, fn, mp) => {
       console.log('这台设备上有 ' + sizes.length + ' 张真生成过的卡片：最小 ' + kb(Math.min.apply(null, sizes))
         + '，平均 ' + kb(avg) + '，最大 ' + kb(Math.max.apply(null, sizes)))
     } else {
-      console.log('cards 目录里一个文件都没有（从没生成过，或已被系统清掉）——第一个数今天量不到'
-        + '，得先在这台设备上真生成一张（那是写操作，等站长点头再做，这一把是纯只读）')
+      if (rendered && typeof rendered.jpg字节 === 'number') {
+        console.log('cards 目录里一个实物都没有，用的是**现渲那一份**：jpg ' + kb(rendered.jpg字节)
+          + '（png ' + kb(rendered.png字节) + '，画布 ' + rendered.画布 + '）——参数与 cardLog.record 那一趟一字不差')
+        console.log('→ 配额口径：卡片要上云就按 jpg 那一份算，' + kb(rendered.jpg字节) + '/张')
+      } else {
+        console.log('cards 目录空，现渲那趟也没出数：' + JSON.stringify(rendered))
+      }
     }
 
     console.log('\n———— 读数二：台账里"账在图没了"的是哪几篇 ————')

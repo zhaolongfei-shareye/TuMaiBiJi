@@ -7,7 +7,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 import logging
 
-from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets
+from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
 
@@ -113,6 +113,8 @@ app.include_router(poster_templates.router, prefix="/api/poster/templates", tags
 # 笔记配图：路径写在模块里（跨 /api/notes/{id}/assets 与 /api/user/storage-quota 两个前缀），
 # 所以这里不再给 prefix——一个模块两组路径，是为了让"归属校验"和"配额口径"只有一份实现。
 app.include_router(assets.router, tags=["assets"])
+# 卡片留档那三个口跨两个前缀（/api/notes/{id}/card 与 /api/user/cards），同 assets 那条写法
+app.include_router(cards.router, tags=["cards"])
 
 @app.get("/")
 async def root():
