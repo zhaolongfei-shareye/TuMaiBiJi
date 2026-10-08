@@ -97,9 +97,13 @@ class CardSnapshot(BaseModel):
     note_id: int
     title: Optional[str] = None
     summary: Optional[str] = None
-    tags: Optional[List[str]] = None
-    key_points: Optional[List[str]] = None
-    key_links: Optional[List[str]] = None
+    # 这三栏是 JSON 列，形状由上游那一份决定，**这里不重钉一遍**：现网的 `key_links` 一行是
+    # `[{"text": "…", "url": "…"}]`，钉成 List[str] 的用例照样全绿（喂的是自己编的字符串数组），
+    # 而线上第一条读取就炸成 500——2026-10-08 这次部署就是这么红的，探针抓的。
+    # 类型与 shares.py:ShareResponse 一字相同（`list | None`）：同一份数据不许有两个说法。
+    tags: Optional[list] = None
+    key_points: Optional[list] = None
+    key_links: Optional[list] = None
     source_url: Optional[str] = None
     author_name: Optional[str] = None
     active: bool = False

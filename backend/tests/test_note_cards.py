@@ -255,8 +255,12 @@ class Test补卡那份快照:
     """
 
     def _share(self, db, u, n, tag="a", **kw):
+        # ⚠ 这三栏的形状**照现网那一行抄**，不是照我以为的抄：2026-10-08 那次部署，
+        # key_links 这里喂的是字符串数组、用例全绿，而线上真数据是 [{"text","url"}]，
+        # 回体一序列化就 500。探针抓到的，不是用例抓的——所以用例从此钉对象。
         fields = {"title": n.title, "summary": "当年那句摘要", "tags": ["当年"],
-                  "key_points": ["当年第一条"], "key_links": ["https://a.cn"],
+                  "key_points": ["当年第一条"],
+                  "key_links": [{"text": "链接1", "url": "https://example.com"}],
                   "source_url": "https://src.cn", "author_name": "当年的名字"}
         fields.update(kw)
         s = Share(user_id=str(u.id), note_id=n.id, token=f"tk-{n.id}-{tag}", **fields)
@@ -274,7 +278,7 @@ class Test补卡那份快照:
         one = snap[n.id]
         assert one["summary"] == "当年那句摘要"
         assert one["key_points"] == ["当年第一条"]
-        assert one["key_links"] == ["https://a.cn"]
+        assert one["key_links"] == [{"text": "链接1", "url": "https://example.com"}], one
         assert one["source_url"] == "https://src.cn"
         assert one["author_name"] == "当年的名字"
         assert one["active"] is True

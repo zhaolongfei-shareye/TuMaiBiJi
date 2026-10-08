@@ -210,6 +210,28 @@ def main():
           == (q0["user_count"], q0["user_bytes"], q0["total_bytes"]),
           f"{q1['user_count']}/{q1['user_bytes']}/{q1['total_bytes']} vs {q0['user_count']}/{q0['user_bytes']}/{q0['total_bytes']}")
 
+    # ---- 9b. snapshots 这一栏（S3 重渲那一步的第二份输入）在现网真回得来 ----------------
+    # 为什么这一条必须打在现网而不只是用例：客户端重渲要按**当年那份分享快照**的正文渲，
+    # 这一栏不在，那一趟就静默退成"按笔记现在的内容渲"，而界面上说的是"按当年那份内容重出的"——
+    # 从 health 200 和小程序码都看不出来，只有真读一次回体才知道。
+    # 仍然不建分享（配额那条纪律没变）：拿这个账号现存的分享行做对照，
+    # 断的是服务端内部那条不变量——**每一份"待确认"都必须配着一份快照**，少一份就有一篇渲不出当年那张。
+    body = client.get("/api/user/cards", headers=hdr).json()
+    snaps = body.get("snapshots")
+    check("/api/user/cards 回体里有 snapshots 这一栏，且是个清单",
+          isinstance(snaps, list), f"实际拿到 {type(snaps).__name__}")
+    check("每一份 need_confirm 都配着一份快照（缺一篇就渲不出当年那张）",
+          sorted(x.get("note_id") for x in (snaps or [])) == sorted(body.get("need_confirm") or []),
+          f"snapshots={sorted(x.get('note_id') for x in (snaps or []))} "
+          f"need_confirm={sorted(body.get('need_confirm') or [])}")
+    缺键 = [x.get("note_id") for x in (snaps or [])
+            if not all(k in x for k in ("title", "summary", "key_points", "author_name"))]
+    check("快照那几栏形状齐（客户端拿的是这四个键）", not 缺键, f"缺键的篇：{缺键}")
+    check("这篇此刻有卡片行，所以它既不在待确认名单、也不在快照里（有下落的不许再报一次）",
+          note_id not in (body.get("need_confirm") or [])
+          and note_id not in [x.get("note_id") for x in (snaps or [])],
+          f"note_id={note_id}")
+
     # ---- 10. 删笔记连带：卡片地址并进同一份 file_ids ---------------------------
     r = client.delete(f"/api/notes/{note_id}", headers=hdr)
     body = r.json() if r.status_code == 200 else {}
