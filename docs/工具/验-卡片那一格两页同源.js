@@ -33,6 +33,7 @@ const DETAIL_WXML = read('miniprogram/pages/detail/detail.wxml')
 const INDEX_JS = stripJs(read('miniprogram/pages/index/index.js'))
 const DETAIL_JS = stripJs(read('miniprogram/pages/detail/detail.js'))
 const CARD_LOG = stripJs(read('miniprogram/utils/cardLog.js'))
+const CARD_CLOUD = stripJs(read('miniprogram/utils/cardCloud.js'))
 const CARD_INFO = stripJs(read('miniprogram/utils/cardInfo.js'))
 const PALETTE = stripJs(read('miniprogram/utils/palette.js'))
 const I18N = read('miniprogram/utils/i18n.js')
@@ -126,13 +127,20 @@ ck('那一页的分栏还是两列（左标题、右那一格），私密那篇�
   && /class="dt-lt"/.test(DETAIL_WXML) && /\.dt-hero \.dt-lt \{[\s\S]{0,60}flex: 1;/.test(DETAIL_WXSS))
 
 // ---------- 五、两条规则各只有一个出处 ----------
+// ⚠ 2.0.1 S2 把这条谓词往上挪了一层：三处判据现在吃的是 `cardCloud.cellFor`
+// （本机那张还在就画它，不在了就用云上登记的那一行顶上），本机那半仍然只有 `cardLog.aliveFor`
+// 一个出处。两条都要钉：页面里不许自己 `accessSync`，也不许有人绕过 cellFor 直接吃
+// `aliveFor`／`forNote` 当"这篇有没有卡片"——那正是"更新之后卡片不见了"的旧判据。
 const onePredicate = (detailSrc) => /function aliveFor\(noteId\)/.test(CARD_LOG)
+  && /function cellFor\(noteId\)/.test(CARD_CLOUD)
+  && /cardLog\.aliveFor\(noteId\)/.test(CARD_CLOUD)
   && !/accessSync/.test(INDEX_JS) && !/accessSync/.test(detailSrc)
   && !/cardLog\.forNote\(/.test(INDEX_JS + detailSrc)
-ck('那一格画不画图＝台账里那条**图还在**才算，这条判据只在 cardLog.aliveFor 里写一遍',
+  && !/cardLog\.aliveFor\(/.test(INDEX_JS + detailSrc)
+ck('那一格画不画图只有一个出处：cardCloud.cellFor（本机 ∪ 云上），本机那半只在 cardLog.aliveFor 里写一遍',
   onePredicate(DETAIL_JS))
 ck('详情页那一格的读数出在 loadNote 里（从卡片页生成完回来走的就是这一趟，格子当场翻成缩略图）',
-  /async loadNote\(id\)[\s\S]{0,3000}detailCards: cardLog\.aliveFor\(note\.id\)/.test(DETAIL_JS))
+  /async loadNote\(id\)[\s\S]{0,3000}detailCards: cardCloud\.cellFor\(note\.id\)/.test(DETAIL_JS))
 ck('淡底那格的色走 palette.paleStep，页面里没有第二份函数',
   /function paleStep\(wallpaper\)/.test(PALETTE) && !/function paleStep/.test(INDEX_JS)
   && !/function paleStep/.test(DETAIL_JS))
@@ -188,9 +196,12 @@ ck('反向②：把详情页那格的 mode 改一个属性，"逐字相同"这�
 const driftJs = DETAIL_JS + '\n  onShare() { wx.navigateTo({ url: "/pages/share/share" }) },\n'
 ck('反向③：详情页底排那枚的旧实现被谁加回来，"不再有 onShare"这条必须红',
   /onShare\s*\(/.test(driftJs))
-const noAlive = DETAIL_JS.replace(/detailCards: cardLog\.aliveFor\(note\.id\)/, 'detailCards: cardLog.forNote(note.id)')
+const noAlive = DETAIL_JS.replace(/detailCards: cardCloud\.cellFor\(note\.id\)/, 'detailCards: cardLog.forNote(note.id)')
 ck('反向④：那一格改回吃裸 forNote（图被清掉也照样画一块白板），上面那条同源判据真的跟着红',
   onePredicate(DETAIL_JS) === true && onePredicate(noAlive) === false)
+const backToLocal = DETAIL_JS.replace(/detailCards: cardCloud\.cellFor\(note\.id\)/, 'detailCards: cardLog.aliveFor(note.id)')
+ck('反向④b：改回只吃本机那半（就是 2.0.1 S2 之前那一态），同源判据也要红——这条钉的正是"卡片不见了"那个根',
+  onePredicate(backToLocal) === false)
 const shortCircuitAgain = ENSURE.replace('const cached =',
   'if (this._posterAssets && this._posterAssets.noteId === noteId) return\n    const cached =')
 ck('反向⑤：把那句整份短路加回去（就是这一轮真机报的那个毛病），"每次现读正文"这条必须红',

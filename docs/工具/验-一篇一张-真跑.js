@@ -36,25 +36,29 @@ const ck = (name, ok, got) => {
 const SHARE_JS = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/share/share.js'), 'utf8')
 const SHARE_WXML = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/share/share.wxml'), 'utf8')
 const INDEX_WXML = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/index/index.wxml'), 'utf8')
-const atGuard = SHARE_JS.indexOf('cardLog.aliveFor(')
+const atGuard = SHARE_JS.indexOf('cardCloud.hasCard(')
 const atCreate = SHARE_JS.indexOf('api.createShare(')
 const atRender = SHARE_JS.indexOf('this.generateShareImage()')
-ck('这一页确实问了台账', atGuard > 0)
-ck('问台账排在建分享码之前（顺序错了就是"卡片只许一张"和"活码多了一张"同时成立）',
-  atGuard > 0 && atGuard < atCreate, `aliveFor@${atGuard} createShare@${atCreate}`)
+ck('这一页确实问了留档（本机 ∪ 服务器）', atGuard > 0)
+ck('问留档排在建分享码之前（顺序错了就是"卡片只许一张"和"活码多了一张"同时成立）',
+  atGuard > 0 && atGuard < atCreate, `hasCard@${atGuard} createShare@${atCreate}`)
 ck('也排在整趟生成之前（generateShareImage 里第一件就是那次 POST）',
-  atGuard > 0 && atGuard < atRender, `aliveFor@${atGuard} generate@${atRender}`)
-/* 这道闸和"右上那一格画不画图"必须是同一条判据（`cardLog.aliveFor`：倒序 + 图不在就不列）。
+  atGuard > 0 && atGuard < atRender, `hasCard@${atGuard} generate@${atRender}`)
+/* 这道闸和"右上那一格画不画图"必须是同一条判据。
    各判各的会长出这样一屏：那一格显示"还没有生成过卡片"，点进来被挡回"这篇已经有一张"。
-   10-07 之前 share.js 吃的是裸 `forNote`（账在就算有），详情页与详情窗吃的是筛过图的那一份。 */
+   10-07 之前 share.js 吃的是裸 `forNote`（账在就算有），详情页与详情窗吃的是筛过图的那一份；
+   ⚠ 2.0.1 S2 起那一份谓词又往上挪了一层——三处现在都问 `cardCloud.cellFor` / `hasCard`
+   （本机那张在就画它，不在了用服务器上那一行顶上），页面里再直接吃 `cardLog.aliveFor`
+   就是退回"更新之后卡片不见了"那个根。 */
 const DETAIL_JS = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/detail/detail.js'), 'utf8')
 const INDEX_JS = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/index/index.js'), 'utf8')
-ck('闸与两页那一格吃同一个谓词（三处都走 cardLog.aliveFor，没有第二份筛选）',
-  /cardLog\.aliveFor\(noteId\)\.length/.test(SHARE_JS)
-  && /cardLog\.aliveFor\(note\.id\)/.test(DETAIL_JS)
-  && /cardLog\.aliveFor\(noteId\)/.test(INDEX_JS)
-  && !/cardLog\.forNote\(/.test(SHARE_JS + DETAIL_JS + INDEX_JS),
-  `闸=${/aliveFor/.test(SHARE_JS)} 详情页=${/aliveFor/.test(DETAIL_JS)} 首页=${/aliveFor/.test(INDEX_JS)} 还吃裸 forNote=${/cardLog\.forNote\(/.test(SHARE_JS + DETAIL_JS + INDEX_JS)}`)
+ck('闸与两页那一格吃同一个谓词（三处都走 cardCloud，没有第二份筛选，也没有谁还直接吃本机那半）',
+  /cardCloud\.hasCard\(noteId\)/.test(SHARE_JS)
+  && /cardCloud\.cellFor\(note\.id\)/.test(DETAIL_JS)
+  && /cardCloud\.cellFor\(noteId\)/.test(INDEX_JS)
+  && !/cardLog\.forNote\(/.test(SHARE_JS + DETAIL_JS + INDEX_JS)
+  && !/cardLog\.aliveFor\(/.test(SHARE_JS + DETAIL_JS + INDEX_JS),
+  `闸=${/cardCloud\.hasCard/.test(SHARE_JS)} 详情页=${/cardCloud\.cellFor/.test(DETAIL_JS)} 首页=${/cardCloud\.cellFor/.test(INDEX_JS)} 还吃裸 forNote=${/cardLog\.forNote\(/.test(SHARE_JS + DETAIL_JS + INDEX_JS)} 还直接吃 aliveFor=${/cardLog\.aliveFor\(/.test(SHARE_JS + DETAIL_JS + INDEX_JS)}`)
 ck('挡下时给的是字典里那句（不写死中文，这台工具可能停在英文态）',
   /t\('cardOneOnly', lang\)/.test(SHARE_JS) && !!MSG, MSG)
 ck('这一页仍然留着退回（不是一句提示把人钉在屏上）',

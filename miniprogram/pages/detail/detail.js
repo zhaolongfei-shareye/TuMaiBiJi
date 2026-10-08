@@ -3,7 +3,7 @@ const { t, texts } = require('../../utils/i18n.js')
 const { blockSkinFor, toneVars, paleStep } = require('../../utils/palette.js')
 const { formatDateTime, formatShortDate } = require('../../utils/date.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
-const cardLog = require('../../utils/cardLog.js')
+const cardCloud = require('../../utils/cardCloud.js')
 const poster = require('../../utils/poster.js')
 
 const SOURCE_TYPE_KEYS = {
@@ -115,12 +115,15 @@ Page({
       // 用新的 id 重取。读图那一步要是慢了或失败了，留着上一篇的图就等于张冠李戴。
       // detailCards 同理跟着重读一遍：从笔记卡片页生成完返回这一页走的就是 onShow → 这里，
       // 右上那一格于是从「+」翻成那张缩略图——站长 10-07 报的就是这一页出完一张还能再点一次。
+      // 这一趟先吃本机那一份（cellFor：文件在就画它），紧接着 loadCard 再从服务器补一次——
+      // 本机那个 jpg 已经被系统清掉的那些，就是靠后一趟找回来的。
       this.setData({
         note, loading: false, _loaded: true, noteImages: [],
-        detailCards: cardLog.aliveFor(note.id),
+        detailCards: cardCloud.cellFor(note.id),
       })
       this.loadShareStatus(note.id)
       this.loadImages(note.id)
+      this.loadCard(note.id)
       // 搜一搜索引页面标题：用笔记真实标题替代静态"笔记详情"
       if (note.title) {
         wx.setNavigationBarTitle({ title: note.title })
@@ -177,6 +180,21 @@ Page({
     } catch (err) {
       // 配图读不到不该影响这篇笔记本身，界面上也就是少一排缩略图
       console.warn('配图读取失败（不影响正文）', err && (err.errMsg || err.statusCode))
+    }
+  },
+
+  // 右上那一格画哪一张（2.0.1 S2）。**判据在服务器那一行 `note_cards` 上**，不在本机那个 jpg：
+  // 本机那张还在就照画（快、不花钱），不在了就用云上登记的这份顶上——后者就是站长 10-08
+  // 定性成严重问题的那一态（"版本更新之后卡片不见了"）。
+  // 先画本机那一份再等这一趟：这一格从来不是主流程，晚一拍补上比转圈合适。
+  async loadCard(noteId) {
+    if (!cloudUpload.cloudReady()) return
+    try {
+      const r = await cardCloud.refreshOne(noteId)
+      if (!r || String(this.data.noteId) !== String(noteId)) return
+      this.setData({ detailCards: cardCloud.cellFor(noteId) })
+    } catch (err) {
+      console.warn('卡片留档没读到（不影响正文）', err && (err.errMsg || err.statusCode))
     }
   },
 
@@ -240,6 +258,10 @@ Page({
             // 不等它：这一句自己不会抛（cloudUpload 任何失败都回 0），而"删除成功"那声
             // 吐司不该被一次清库存的慢请求拖住。
             cloudUpload.dropFromDeleteRes(r)
+            // 这篇的卡片留档也跟着忘：服务端那几行是 delete_note 一起删的（回体里就带着
+            // 它们的 fileID），本机这一半漏了的话，SQLite 把同一个号发给下一篇时，
+            // 那一篇头上会挂着这一篇那张图。
+            cardCloud.forget(this.data.note.id)
             wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
             setTimeout(() => {
               wx.navigateBack()

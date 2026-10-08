@@ -278,7 +278,8 @@ ok('从小图开的那一趟，收窗回卡片那一屏、不再顺手浮详情�
   && /detailOpen: backToSheet && !!note/.test(CODE_JS))
 ok('大图连二维码开关也照那一张摆（noQr 得先存进台账，两头才有一个共同来源）',
   /noQr: known \? !!cur\.noQr : false/.test(sheetFn)
-  && /keep\.push\(\{ p: filePath, tpl: tplId, at, noQr: !!noQr \}\)/.test(cardLogJs))
+  && /const entry = \{ p: filePath, tpl: tplId, at, noQr: !!noQr \}/.test(cardLogJs)
+  && /keep\.push\(entry\)/.test(cardLogJs))
 ok('两态底排：未生成态是「取消｜编辑个人名片」+ 通栏「生成分享图」；已生成态是通栏「分享卡片」+「查看笔记｜删除」+ 一句说明',
   /<block wx:if="\{\{posterHasCard\}\}">/.test(CODE_WXML)
   && /tpl-btn danger" bindtap="onDropCard"/.test(CODE_WXML)
@@ -324,16 +325,24 @@ ok('那行字三项照站长原话：微信好友 / 朋友圈 / 公众号，中�
   && /<text>\{\{t\.cardShare\}\}<\/text>/.test(CODE_WXML))
 // 这一条原来写成一条 240 字符窗口的长正则，10-04 那段"按钮一律用系统默认那对"的注释
 // 一进去就把距离撑过了窗口——红的是尺子，代码一字没错。改成**位置比较**：
-// 取 onDropCard 那个函数体，钉"dropNote 在 _closeTemplate 之前"，再钉"整段里没调过 api"。
+// 取 onDropCard 那个函数体，钉"撤服务器在清本机之前、清本机在收窗之前"。
 // （注释不参与判据，所以先把函数体里的注释剥掉再算。）
+// ⚠ 10-08（2.0.1 S2）这一条的前提换过：原来钉的是"整段一次 api 都不提"，因为那时卡片只存在
+// 这台手机上、撤这一格用不着服务端。判据挪到 `note_cards` 那一行之后，**不打服务器就删不掉**
+// （本机清了，下一次进详情页又从云上读回来画上去），所以那句"零网络"作废，改成钉这三步的顺序。
+// 但"不许碰 shares 那张活码"这半条一字不改地留着——「已分享的依旧有效」到今天还是真话。
 const dropFn = ((CODE_JS.split('onDropCard() {')[1] || '').split('\n  },')[0])
   .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-const iDrop = dropFn.indexOf('cardLog.dropNote(note.id)')
+const iDropSrv = dropFn.indexOf('cardCloud.dropServer(note.id)')
+const iForget = dropFn.indexOf('cardCloud.forget(note.id)')
 const iCloseTmp = dropFn.indexOf('this._closeTemplate()')
-ok('「删除」只动本机这本账：先删台账再收窗，整段一次 api 都不提（服务端那张活码不碰）',
-  iDrop >= 0 && iCloseTmp > iDrop && !/\bapi\./.test(dropFn)
-    && !/deleteCard|dropCard/i.test(apiJs),
-  `drop@${iDrop} close@${iCloseTmp} api ${(dropFn.match(/\bapi\./g) || []).length} 次`)
+ok('「删除」这一枚两半都撤，顺序是"先撤服务器 → 撤成了才清本机 → 再收窗"（反了就是删不掉，或云上留孤儿）',
+  iDropSrv >= 0 && iForget > iDropSrv && iCloseTmp > iForget,
+  `dropServer@${iDropSrv} forget@${iForget} close@${iCloseTmp}`)
+ok('这一枚一次都不碰 shares 那两条口（撤的是卡片留档，不是那张活码）',
+  !/createShare|revokeShare|deleteShare|\/api\/shares/.test(dropFn)
+    && !/api\.(create|revoke|delete)Share/.test(dropFn),
+  `这一段里的分享口调用 ${(dropFn.match(/\/api\/shares|Share\(/g) || []).length} 处`)
 /* 真机两轮（站长 10-03 20:42 与 21:20）：小弹窗浮起来时被成品弹窗整个盖住，只有输入框那行字
    漏出来（input 在 iOS 是原生层）。第一轮量出来是"102 画在 101 底下"，第二轮把那一层
    `visibility:hidden` 藏掉之后他原话「还没修好，依旧这样」——**所以这条只能钉静态，模拟器两轮都绿**。
@@ -382,8 +391,9 @@ ok('存量归一只跑一次：立 cardLogOnePerNote 标记，留下按时间最
   && /^migrateOnePerNote\(\)$/m.test(cardLog2)
   && /if \(wx\.getStorageSync\(ONE_KEY\) === 1\) return false/.test(cardLog2)
   && /map\[id\] = keep \? \[keep\] : \[\]/.test(cardLog2))
-ok('删笔记时那一格的台账与文件一起清（不留孤儿位图）',
-  /cardLog\.dropNote\(note\.id\)/.test(idxJs))
+ok('删笔记时那一格的台账与文件一起清（不留孤儿位图，也不给复用同一个号的新笔记留下旧卡片）',
+  /cardCloud\.forget\(note\.id\)/.test(idxJs)
+  && /cardLog\.dropNote\(noteId\)/.test(io2.readFileSync(P('utils/cardCloud.js'), 'utf8')))
 // v18 那一族色仍在 palette 活一份（这一屏不读了，但别的效果图与回滚点还指着它）
 // SHARED_TAG.ink 是 #FFFFFF，这一页本来就有别处在用白字，拿它扫样式表是一句假红；
 // 那枚色块撤没撤由下面那条「不再读纸片那一族」和反向钉 shared-tag 一起管。

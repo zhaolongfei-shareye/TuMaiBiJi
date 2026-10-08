@@ -208,6 +208,21 @@ module.exports = {
   bindNoteAssets: (id, items) => request(`/api/notes/${id}/assets`, 'POST', { items }),
   getNoteAssets: (id) => request(`/api/notes/${id}/assets`),
   getStorageQuota: () => request('/api/user/storage-quota'),
+  // 卡片留档那三个口（2.0.1 P0 · S1 的服务端，S2 接上客户端）。
+  // 形状与配图那一路同型：图片字节不经过后端，这里传的每一项都是登记信息。
+  // putNoteCard 是**幂等 upsert**：同一张再登记一次只更新那一行，所以补传重跑安全。
+  putNoteCard: (id, card) => request(`/api/notes/${id}/card`, 'POST', card),
+  // 读一篇回的是 {card, had_share}：had_share 是"这篇公开过但服务器没卡片行"，
+  // 那一格是补卡那一趟（S3）的入口，所以不能只回 card。
+  getNoteCard: (id) => request(`/api/notes/${id}/card`),
+  // 列表页一次拿全：{cards, need_confirm}。判据在服务器，不在这台手机的文件目录——
+  // 这正是"更新之后卡片不见了"那一态的根治。
+  getMyCards: () => request('/api/user/cards'),
+  // 撤掉这一格（界面上那枚「删除」）。回体带的还是 `file_ids` 那个键——对象只有客户端删得动，
+  // 拿到清单直接交给 cloudUpload.dropFromDeleteRes，与删笔记、注销同一条路。
+  // 这里用 DELETE 不违反注销那条"不用 DELETE"：那条挡的是**带请求体的 DELETE** 在 wx.request 里
+  // 怎么序列化没有保证，这一趟 note id 全在路径上，一个字节的身子都不发。
+  deleteNoteCard: (id) => request(`/api/notes/${id}/card`, 'DELETE'),
   ingestUrl: (url) => request('/api/ingest/url', 'POST', { url }, { contentType: 'application/x-www-form-urlencoded' }),
   // 手打这一档也交给模型提炼：送的是用户自己写的标题 + 原文，回来的是摘要。
   // 归类跟着这一篇走（服务端认人不认客户端说的 source_type）。

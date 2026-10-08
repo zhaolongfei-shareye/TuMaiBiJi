@@ -4,12 +4,12 @@
 // "笔记没存下来"发生**。所以这里没有一个 throw——全部 resolve(null)，调用方看到 null
 // 就当这张没备份，主流程照走。
 //
-// ✅ CLOUD_ENV 10-07 填上了，整条链从此是开的（前提是后端那三个接口也上了现网——
-// 现读：`/api/notes/{id}/assets`、`/api/user/storage-quota` 在 https://api.agentsbin.cn/wtsj 目前回 **404**，
-// 也就是图能传上云、但"归到哪篇笔记"这一步服务端还没接，详情页读不回来。上传这一半不依赖后端，可以先验）。
+// ✅ CLOUD_ENV 10-07 填上了；后端那两个口（`/api/notes/{id}/assets`、`/api/user/storage-quota`）
+// 同日 12:55 已上现网（第十四次代码部署，存图链那把探针 41/41）。
+// 这一段注释 10-07 当晚写的是"目前回 404"，那是部署之前的状态，别再照它判断这条链没通。
 // 这一串不是去控制台抄的：它就是提炼那条链在用的环境（docs/产品需求.md §6.1 那张表、§8.12 的实测读数），
 // 10-07 从这台机器 POST `cloudbase-d6gzh0i0tff02943a.api.tcloudbasegateway.com/v1/functions/extract`
-// 回 401、0.375s——环境活着、网关活着。存储桶有没有开仍然只在控制台能看到，代码侧证不了。
+// 回 401、0.375s——环境活着、网关活着。客户端在这一侧写得进、删得掉是 `docs/工具/探-云存储可写.js` 量的。
 // 填上之后：
 //   · app.js 那一步会真 `wx.cloud.init`；
 //   · cloudReady() 回 true，录入页那条 B 链开始真传（失败仍然只 resolve(null)，不阻断建笔记）。
@@ -46,16 +46,20 @@ function initCloud() {
  * 上传一张图。
  * @param {string} tempPath 压完那张的 tempFilePath
  * @param {number|string} userId app.globalData.userId（不是 openid，openid 从不下发到客户端）
+ * @param {string} [kind] 对象放哪一层前缀：`images`（默认，笔记配图）／`cards`（卡片成品）。
+ *   分层的理由不是好看：桶权限**完全可能是按前缀给的**，而这条链失败是故意不抛的（只 console.warn），
+ *   所以换前缀必须先单独量一次能不能写（`APREFIX=cards docs/工具/探-云存储可写.js`）。
  * @returns {Promise<{fileID:string, bytes:number|null}|null>}
  *
- * 路径 `images/{userId}/{YYYYMMDD}/{随机}.{ext}`：userId 那一层是隔离，日期那一层是
+ * 路径 `{kind}/{userId}/{YYYYMMDD}/{随机}.{ext}`：userId 那一层是隔离，日期那一层是
  * 以后真要清理时能按天前缀扫（fileID 一旦散成一堆随机名就没人敢批量删）。
  * 随机段用两个数拼，撞上的概率对"一人一天几百张"这个量级足够小；
  * 真撞了就是覆盖同一张，后端那一行的幂等也接得住（同 fileID 重复 bind 只更新不新增）。
  */
-async function uploadImage(tempPath, userId) {
+async function uploadImage(tempPath, userId, kind) {
   if (!cloudReady() || !tempPath || userId === undefined || userId === null) return null
-  const cloudPath = `images/${userId}/${_day()}/${Date.now().toString(36)}${_rand()}.${_ext(tempPath)}`
+  const prefix = kind === 'cards' ? 'cards' : 'images'
+  const cloudPath = `${prefix}/${userId}/${_day()}/${Date.now().toString(36)}${_rand()}.${_ext(tempPath)}`
   return await new Promise((resolve) => {
     wx.cloud.uploadFile({
       cloudPath,

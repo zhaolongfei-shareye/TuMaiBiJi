@@ -90,6 +90,12 @@ class CardsListOut(BaseModel):
     need_confirm: List[int] = Field(default_factory=list)
 
 
+class CardDropOut(BaseModel):
+    """撤掉那一格的回体。键名钉死是 `file_ids`——与 `delete_note`、`deactivate` 同一个键，
+    客户端 `cloudUpload.dropFromDeleteRes` 只读这一个（多一个键就是那一份永远没人删）。"""
+    file_ids: List[str] = Field(default_factory=list)
+
+
 def _check_file_id(fid: str) -> str:
     s = (fid or "").strip()
     # 光看前缀不够：`cloud://` 自己也算"以 cloud:// 开头"，那是一条指向空的地址。
@@ -195,6 +201,34 @@ def read_note_card(
         is not None
     )
     return {"card": _views([row])[0] if row else None, "had_share": had_share}
+
+
+@router.delete("/api/notes/{note_id}/card", response_model=CardDropOut)
+def drop_note_card(
+    note_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """撤掉这篇的卡片留档：行删掉，对象回给客户端删（后端没有云开发凭据）。
+
+    为什么必须有这一个口：界面上「删除」那一枚（首页成品弹窗底排）说的本来就是"这篇不该再有
+    卡片"。S2 把"有没有卡片"的权威从本机文件挪到服务器这一行之后，只删本机那个 jpg 不删这一行，
+    症状就是**那一格删不掉**——本机账清了，下次进详情页又从云上读回来画上去。
+
+    历史行（`is_current=0`）一起删：那些对象在这一趟一并从云上清掉，留一行指向已经不存在的
+    地址就是 `assets` 那条说过的"幽灵行"——算进配额却什么都读不出来。
+    """
+    _owned_note_or_404(db, user, note_id)
+    rows = (
+        db.query(NoteCard)
+        .filter(NoteCard.note_id == note_id, NoteCard.user_id == str(user.id))
+        .all()
+    )
+    ids = [r.object_key for r in rows]
+    for r in rows:
+        db.delete(r)
+    db.commit()
+    return {"file_ids": ids}
 
 
 @router.get("/api/user/cards", response_model=CardsListOut)

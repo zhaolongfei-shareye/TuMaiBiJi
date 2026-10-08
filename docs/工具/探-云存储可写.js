@@ -24,7 +24,12 @@ if (!m) {
 }
 const ENV = m[1]
 const rand = Math.random().toString(36).slice(2, 8)
-const CLOUD_PATH = `images/zzprobe/${new Date().toISOString().slice(0, 10).replace(/-/g, '')}/probe-${rand}.txt`
+// 前缀可以换：默认量的是笔记配图那一层（`images/`），卡片留档那条链（2.0.1 S2）要往
+// `cards/` 那一层写，而**桶权限完全可能是按前缀给的**——写不进去的症状是"上传一路静默失败、
+// 界面上没有任何一处报错"（B 链故意不抛），所以那一层必须先单独量一次，不能拿 images 的结论推。
+// 跑法：APREFIX=cards bash docs/工具/跑尺子.sh 9431 探-云存储可写
+const PREFIX = process.env.APREFIX || 'images'
+const CLOUD_PATH = `${PREFIX}/zzprobe/${new Date().toISOString().slice(0, 10).replace(/-/g, '')}/probe-${rand}.txt`
 console.log(`现读 CLOUD_ENV=${ENV}  cloudPath=${CLOUD_PATH}`)
 
 ;(async () => {
@@ -68,7 +73,7 @@ console.log(`现读 CLOUD_ENV=${ENV}  cloudPath=${CLOUD_PATH}`)
   console.log(JSON.stringify(out, null, 2))
   const s = (out && out.steps) || {}
   const ok = s.init === 'ok' && s.write === 'ok' && s.upload && s.upload.fileID && s.remove
-  console.log(ok ? '✓ 客户端在这一侧写得进去也删得掉' : `✗ 这一侧不通：${out && out.err}`)
+  console.log(ok ? `✓ 「${PREFIX}/」这一层客户端写得进去也删得掉` : `✗ 「${PREFIX}/」这一层不通：${out && out.err}`)
   await mp.close()
   process.exit(ok ? 0 : 1)
 })().catch((e) => {

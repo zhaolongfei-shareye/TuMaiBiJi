@@ -23,6 +23,7 @@ const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
+const cardCloud = require('../../utils/cardCloud.js')
 const cardInfo = require('../../utils/cardInfo.js')
 
 Page({
@@ -68,10 +69,13 @@ Page({
     // 刚写完就读它，判的可能是上一个号的台账。
     // 顺序要紧：这一句必须在 `generateShareImage()` 前面，那一趟会先 POST 建一张分享码，
     // 挡晚了就等于"这篇不许有第二张卡片"和"这篇已经多了第二张活码"同时成立。
-    // 判据用 `aliveFor` 而不是 `forNote`：详情页与详情窗右上那一格画不画缩略图吃的就是它
-    // （账在本机 storage 里、图在应用私有目录，系统清缓存能只清图不清账）。两边要是各判各的，
-    // 那一格显示"还没有生成过卡片"、点进来却被这道闸挡回"这篇已经有一张"——一屏两句反话。
-    if (cardLog.aliveFor(noteId).length) {
+    // 判据 2.0.1 S2 起是 `cardCloud.hasCard`（本机 ∪ 服务器那一行），不再只问本机那个 jpg：
+    // 图被系统清掉、服务器上那一行还在的那些篇，照旧不许再生成第二张。不然他白做一次工作，
+    // 而服务端那条 upsert 会把旧那张顶成历史——界面上看就是"我生成了两张，只剩一张"。
+    // 本机那份还在就不多打一次请求；不在了才去读这一篇那一行。读不到（离线）就当没有，
+    // 让他生成：服务端反正只留一张当前，不会写坏数据。
+    if (!cardCloud.hasCard(noteId)) await cardCloud.refreshOne(noteId)
+    if (cardCloud.hasCard(noteId)) {
       wx.showToast({ title: t('cardOneOnly', lang), icon: 'none', duration: 1800 })
       setTimeout(() => wx.navigateBack(), 1600)
       return

@@ -11,10 +11,16 @@
 // 三层判据 + 一段反向对照：
 //   ① 按下去先弹确认框，**此刻本机台账里那篇必须还在**（不许当场删）；
 //   ② 弹窗那两句吃的是现成字典串（zh／en 各跑一遍，串从 i18n.js 现读，尺子里不抄第二份真相）；
-//   ③ 两支各自咬住：取消 → 台账与位图都不动、弹窗不收；确定 → 台账整条撤、位图 unlink、弹窗收；
-//   ④ 全程零网络写——确认文案那句「已分享的依旧有效」必须是真话。
+//   ③ 两支各自咬住：取消 → 台账与位图都不动、弹窗不收、一个请求都不发；
+//      确定 → 台账整条撤、位图 unlink、弹窗收；
+//   ④ 这一路**只碰卡片留档那一个口**（`DELETE /api/notes/77/card`），一次都不碰 shares 那张活码
+//      ——「已分享的依旧有效」到 2.0.1 仍是真话。⚠ 这一条 10-08 改过：原来钉的是"全程零网络写"，
+//      那是"卡片只存在这台手机上"那期的口径；S2 把判据挪到服务器之后，删这一格**必须**打服务器，
+//      不然症状是那一格删不掉（本机清了、下一次进详情页又从云上读回来）。
+//   ⑤ 服务器回体里那个对象要落进待删队列——云上那份没删成不许就地忘掉。
+//   ⑥ 服务器撤不成（离线）时：台账、位图、弹窗三样都不许动，并给一句实话。
 //   反向对照：把线上那一版 `f58cdb8`（还没有确认框的旧函数体）落成同目录探针再跑，它必须"一次弹窗都没打、
-//   当场就删"。这一条要是也绿，说明上面三层是虚的。
+//   当场就删"。这一条要是也绿，说明上面几层是虚的。
 const path = require('path')
 const fs = require('fs')
 const cp = require('child_process')
@@ -26,17 +32,22 @@ const PROBE = path.join(MP, 'pages/index/.probe-before-index.js')
 
 const NOTE_ID = 77
 const CARD_FILE = 'wxfile://usr/cards/77-card-1.jpg'
+// 服务器上那一行指向的那个对象。回体里带回来的是它，进了待删队列的也必须是它。
+const CLOUD_FILE = 'cloud://cloudbase-d6gzh0i0tff02943a.636c-x/cards/77-card-1.jpg'
 
 const bad = []
 const ck = (name, ok, got) => {
   console.log(`${ok ? '✓' : '✗'} ${name}${got === undefined || got === '' ? '' : ' → ' + got}`)
   if (!ok) bad.push(name)
 }
+// 确定那一支现在是 async 的（要先撤服务器那一行）。一个宏任务足够把整条 await 链跑完：
+// 替身里没有一个真请求，每一跳都是立刻 resolve。
+const flush = () => new Promise((r) => setTimeout(r, 0))
 
 // —— 本机存储／文件系统／网络的替身 ——
 // 台账那一本账不是替身：读写走的都是产品自己那份 cardLog.js 的读法（getStorageSync('cardLog')）。
 const makeEnv = () => {
-  const env = { modals: [], unlinked: [], network: [], page: null, store: {} }
+  const env = { modals: [], unlinked: [], network: [], page: null, store: {}, failNext: false, dropRes: [], toast: '' }
   global.wx = {
     env: { USER_DATA_PATH: 'wxfile://usr' },
     getStorageSync: (k) => (k in env.store ? env.store[k] : ''),
@@ -49,11 +60,18 @@ const makeEnv = () => {
       copyFileSync: () => {},
     }),
     showModal: (o) => { env.modals.push(o) },
-    showToast: () => {},
+    showToast: (o) => { env.toast = (o && o.title) || '' },
     hideToast: () => {},
     showLoading: () => {},
     hideLoading: () => {},
-    request: (o) => { env.network.push('request'); o.fail && o.fail({ errMsg: 'stub' }) },
+    // 2.0.1 S2 起这一路**要打服务器**（撤的是 `note_cards` 那一行），所以替身要能成、
+    // 也要能故意不成：`env.failNext` 决定下一次 request 走 fail 还是走 success。
+    // 记的是"方法 + 路径"，④那条判据要看的就是这一路到底碰了哪些口。
+    request: (o) => {
+      env.network.push(`${(o.method || 'GET').toUpperCase()} ${String(o.url).replace(/^.*\/wtsj/, '')}`)
+      if (env.failNext) { o.fail && o.fail({ errMsg: 'stub offline' }); return }
+      o.success && o.success({ statusCode: 200, data: { file_ids: env.dropRes || [] } })
+    },
     uploadFile: () => { env.network.push('uploadFile') },
     downloadFile: () => { env.network.push('downloadFile') },
     createSelectorQuery: () => ({
@@ -79,9 +97,12 @@ const makeEnv = () => {
   return env
 }
 
-const runCase = (label, file, lang, expectOld) => {
+const runCase = async (label, file, lang, expectOld, opts) => {
   delete require.cache[require.resolve(file)]
   const env = makeEnv()
+  // 服务器那一行撤得成吗？回体里带回来的是哪个对象？两样都由这一把的用例定。
+  env.dropRes = [CLOUD_FILE]
+  env.failNext = !!(opts && opts.serverFails)
   const cardLog = require(path.join(MP, 'utils/cardLog.js'))
   const has = () => cardLog.forNote(NOTE_ID).length > 0
 
@@ -121,21 +142,42 @@ const runCase = (label, file, lang, expectOld) => {
     `confirmText=${JSON.stringify(o.confirmText)} cancelText=${JSON.stringify(o.cancelText)}`)
 
   o.success && o.success({ confirm: false, cancel: true })
-  ck(`${label}③｜取消这一支：台账不动、位图不删、弹窗不收`,
-    has() && env.unlinked.length === 0 && !ctx.__closed,
-    `unlink ${env.unlinked.length} 次 / closed=${!!ctx.__closed}`)
+  await flush()
+  ck(`${label}③｜取消这一支：台账不动、位图不删、弹窗不收、一个请求都不发`,
+    has() && env.unlinked.length === 0 && !ctx.__closed && env.network.length === 0,
+    `unlink ${env.unlinked.length} 次 / closed=${!!ctx.__closed} / 网络 ${JSON.stringify(env.network)}`)
 
   o.success && o.success({ confirm: true, cancel: false })
+  await flush()
+
+  if (opts && opts.serverFails) {
+    // S2 新加的那道顺序：服务器那一行没撤掉，本机这一半就**不许先清**。
+    // 反过来做（先清本机）的症状是"看着删掉了，下一次进详情页又从云上读回来画上去"，
+    // 而云上那个对象再没人记得要去删——对象只有客户端删得动。
+    ck(`${label}｜反向⑥：服务器撤不成时，台账、位图、弹窗三样都不许动`,
+      has() && env.unlinked.length === 0 && !ctx.__closed,
+      `台账还在=${has()} unlink=${JSON.stringify(env.unlinked)} closed=${!!ctx.__closed}`)
+    ck(`${label}｜反向⑥：这时候要给的是那句实话，不是静默`,
+      env.toast && env.toast.indexOf('还留着') >= 0, JSON.stringify(env.toast))
+    return
+  }
+
   ck(`${label}③｜确定这一支：台账整条撤、位图 unlink、弹窗收掉`,
     !has() && env.unlinked.length === 1 && env.unlinked[0] === CARD_FILE && !!ctx.__closed,
     `unlink=${JSON.stringify(env.unlinked)} closed=${!!ctx.__closed}`)
-  ck(`${label}④｜这一路零网络写（「已分享的依旧有效」是真话）`,
-    env.network.length === 0, `网络调用 ${env.network.length} 次`)
+  ck(`${label}④｜这一路只碰卡片留档那一个口，一次都不碰 shares 那张活码（「已分享的依旧有效」是真话）`,
+    env.network.length === 1 && /^DELETE \/api\/notes\/77\/card$/.test(env.network[0]),
+    JSON.stringify(env.network))
+  ck(`${label}④｜服务器回体里那个对象进了待删队列（云上那份没删成不许就地忘掉）`,
+    JSON.stringify(env.store).indexOf(CLOUD_FILE) >= 0,
+    `storage 键 ${Object.keys(env.store).join('、')}`)
 }
 
 ;(async () => {
-  runCase('zh', INDEX, 'zh', false)
-  runCase('en', INDEX, 'en', false)
+  await runCase('zh', INDEX, 'zh', false)
+  await runCase('en', INDEX, 'en', false)
+  // 服务器撤不成那一支（S2 新加的顺序判据）：本机这一半必须原地不动
+  await runCase('离线', INDEX, 'zh', false, { serverFails: true })
 
   try {
     // 反向对照的样本钉 **线上那一版 `f58cdb8`**，不钉 HEAD：HEAD 会随每次提交漂，
@@ -148,7 +190,7 @@ const runCase = (label, file, lang, expectOld) => {
       ck('反向对照的样本确实是「没确认那一版」', false, '抽出来的 f58cdb8 版本不像旧版，这一段先别信')
     } else {
       fs.writeFileSync(PROBE, old)
-      runCase('旧版', PROBE, 'zh', true)
+      await runCase('旧版', PROBE, 'zh', true)
     }
   } finally {
     if (fs.existsSync(PROBE)) fs.unlinkSync(PROBE)

@@ -345,6 +345,7 @@ const i18n = {
     viewNote: '查看笔记',
     cardDrop: '删除',
     cardDropHint: '删除后可继续生成笔记卡片，已分享的依旧有效',
+    cardDropOffline: '这会儿连不上服务器，那张卡片还留着',
     // 一篇只留一张：从详情页进笔记卡片页，这篇已经有卡片时给的那一句（10-07 他报的漏口）。
     // 说清"要干什么才有第二张"，不只说"不行"。
     cardOneOnly: '这篇已经有一张笔记卡片，删掉它才能再生成',
@@ -659,6 +660,7 @@ const i18n = {
     viewNote: 'Open note',
     cardDrop: 'Delete',
     cardDropHint: 'Delete it and you can make another; links you already shared stay valid',
+    cardDropOffline: 'Not connected right now — that card is still there',
     cardOneOnly: 'This note already has a card — delete it to make another',
     sourceWechatArticle: 'WeChat Article',
     sourceWebArticle: 'Web Article',

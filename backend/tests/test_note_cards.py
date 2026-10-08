@@ -1,4 +1,4 @@
-"""卡片留档上服务端（2.0.1 P0 · S1）：写、读、批量、删除连带四条路。
+"""卡片留档上服务端（2.0.1 P0 · S1/S2）：写、读一篇、批量读、撤掉那一格、删除连带五条路。
 
 四条不变量：
 ① **一篇只有一张"当前"**。写口是幂等 upsert（新的进来旧的转历史），库上还压了一道部分唯一
@@ -299,3 +299,54 @@ class Test配额记账口径:
         assert MAX_CARD_UPLOAD_BYTES == 20 * 1024 * 1024
         assert MAX_CARD_UPLOAD_BYTES != CARD_ACCOUNT_BYTES
         assert put(client, u, n.id, size=MAX_CARD_UPLOAD_BYTES + 1).status_code == 422
+
+
+class Test撤掉那一格:
+    """界面上那枚「删除」（首页成品弹窗底排）说的就是"这篇不该再有卡片"。
+
+    S2 把"有没有卡片"的权威从本机那个 jpg 挪到服务器这一行之后，这一个口是**必须有**的：
+    只删本机文件不删这一行，症状是那一格删不掉——本机账清了，下次进详情页又从云上读回来画上去。
+    """
+
+    def test_撤掉把当前与历史一起删并把对象回给客户端(self, client, db):
+        u = mk_user(db, "t1")
+        n = mk_note(db, u)
+        put(client, u, n.id, file_id="cloud://x/cur.jpg")
+        put(client, u, n.id, file_id="cloud://x/old.jpg", tpl="quote")  # 旧的转历史
+        r = client.delete(f"/api/notes/{n.id}/card", headers=hdr(u))
+        assert r.status_code == 200, r.text
+        assert set(r.json()["file_ids"]) == {"cloud://x/cur.jpg", "cloud://x/old.jpg"}
+        assert "card_file_ids" not in r.json()
+        assert db.query(NoteCard).filter(NoteCard.note_id == n.id).count() == 0
+        assert client.get(f"/api/notes/{n.id}/card", headers=hdr(u)).json()["card"] is None
+
+    def test_本来就没有也回二百并且清单为空(self, client, db):
+        """幂等：那一枚点第二下不该冒出一句"删失败"。"""
+        u = mk_user(db, "t2")
+        n = mk_note(db, u)
+        r = client.delete(f"/api/notes/{n.id}/card", headers=hdr(u))
+        assert r.status_code == 200, r.text
+        assert r.json()["file_ids"] == []
+
+    def test_撤别人的那一篇回四百零四且那一行还在(self, client, db):
+        owner = mk_user(db, "t3")
+        other = mk_user(db, "t4")
+        n = mk_note(db, owner)
+        put(client, owner, n.id)
+        assert client.delete(f"/api/notes/{n.id}/card", headers=hdr(other)).status_code == 404
+        assert db.query(NoteCard).filter(NoteCard.note_id == n.id).count() == 1
+
+    def test_撤这一篇不动那一篇(self, client, db):
+        u = mk_user(db, "t5")
+        a, b = mk_note(db, u, "甲"), mk_note(db, u, "乙")
+        put(client, u, a.id, file_id="cloud://x/a.jpg")
+        put(client, u, b.id, file_id="cloud://x/b.jpg")
+        client.delete(f"/api/notes/{a.id}/card", headers=hdr(u))
+        assert db.query(NoteCard).filter(NoteCard.note_id == b.id).count() == 1
+
+    def test_不带票撤不掉(self, client, db):
+        u = mk_user(db, "t6")
+        n = mk_note(db, u)
+        put(client, u, n.id)
+        assert client.delete(f"/api/notes/{n.id}/card").status_code == 401
+        assert db.query(NoteCard).filter(NoteCard.note_id == n.id).count() == 1

@@ -3,6 +3,7 @@ const { t, texts } = require('../../utils/i18n.js')
 const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, paleStep, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
+const cardCloud = require('../../utils/cardCloud.js')
 const cardInfo = require('../../utils/cardInfo.js')
 const { isPrivate } = require('../../utils/privateGate.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
@@ -299,11 +300,13 @@ Page({
     return { rows, cells }
   },
 
-  // 台账里这一篇**还看得见**的卡片，规则本体已经搬进 `cardLog.aliveFor`（倒序 + 图不在就不列），
-  // 因为 10-07 起三处要吃同一个谓词：这一页的 cells 与详情窗右上那一格、详情页右上那一格、
-  // 以及笔记卡片页那道「一篇只留一张」的闸。留这一个方法名是给上面两处调用点用的，不再装逻辑。
+  // 这一格画哪一张。**2.0.1 S2 起权威在服务器**：本机那张还在就画它（快、不花钱），
+  // 不在了就用云上登记的那一份顶上——后者就是"版本更新之后卡片不见了"那一态的修法。
+  // 谓词收在 `cardCloud.cellFor` 一个出处：首页这一格、详情页右上那一格、笔记卡片页那道
+  // 「一篇只留一张」的闸三处必须问同一个问题，各判各的就会一屏两句反话（10-07 定 aliveFor
+  // 一个出处时讲的是同一件事，今天只是把那一个出处往上挪了一层）。
   _cardsOf(noteId) {
-    return cardLog.aliveFor(noteId)
+    return cardCloud.cellFor(noteId)
   },
 
   async loadNotes(reset = false) {
@@ -342,6 +345,14 @@ Page({
         // 两批屏跟着数据走：追加一批、筛一个分类、搜一个词都重算一遍（一次 setData 交出去）
         ...this.arrange(allNotes),
       })
+      // 「哪几篇有卡片」这一叠从服务器读（2.0.1 S2）。**不等它**：笔记列表先画出来，
+      // 卡片那一格晚一拍补上——留档从来不是主流程。但也不能不读：只吃本机那个 jpg
+      // 就是"更新之后卡片不见了"的根。整表重载才读，翻页那几趟不重复打（这一个口回的是全量）。
+      if (reset || !cardCloud.isLoaded()) {
+        cardCloud.refresh().then((r) => {
+          if (r) this.setData(this.arrange(this.data.notes))
+        })
+      }
     } catch (err) {
       console.error('加载笔记失败', err)
       this.setData({ loading: false, loadingMore: false })
@@ -579,7 +590,7 @@ Page({
           const r = await api.deleteNote(note.id)
           // 与详情页那一条同一个动作：服务端删行，这一侧删云上的对象（后端没那个凭据）。
           cloudUpload.dropFromDeleteRes(r)
-          cardLog.dropNote(note.id)
+          cardCloud.forget(note.id)
           wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
           this.setData({ detailOpen: false })
           this.loadNotes(true)
@@ -965,10 +976,14 @@ Page({
 
   ...cardInfo.handlers,
 
-  // 「删除」这一枚：把这篇的本机留档整条撤掉（位图一起删），删完回详情窗，
-  // 右上那一格退回"没生成过卡片"那一态（淡底方形＋加号），想再要就重新生成一张。
-  // 只动本机这本账——shares 那张活码一行都不碰，所以"已分享的依旧有效"是白拿的，
-  // 也不用部署（站长 10-03 23:40 要的那句小字说的就是这件事）。
+  // 「删除」这一枚：把这篇的卡片整条撤掉——**服务器那一行 + 云上那个对象 + 本机这本账与位图**。
+  // 删完回详情窗，右上那一格退回"没生成过卡片"那一态（淡底方形＋加号），想再要就重新生成一张。
+  // shares 那张活码一行都不碰，所以"已分享的依旧有效"（站长 10-03 23:40 要的那句小字）。
+  //
+  // 2.0.1 S2 起这一枚多了一步：判据已经在服务器上，只清本机就是**那一格删不掉**——下一次进
+  // 详情页又从云上读回来画上去。顺序是"先撤服务器、撤成了才清本机"：反过来做，云上那个对象
+  // 就没人记得要去删了（对象只有客户端删得动），而它一直占着全站那 5GB。
+  // 撤不成（离线、后端在重启）就当这一格没删：屏上照原样留着 + 一句实话，不做半截。
   onDropCard() {
     const note = this.data.posterNote
     if (!note) return
@@ -979,9 +994,16 @@ Page({
     wx.showModal({
       title: t('confirmDelete', lang),
       content: t('cardDropHint', lang),
-      success: (res) => {
+      success: async (res) => {
         if (!res.confirm) return
-        cardLog.dropNote(note.id)
+        const dropped = await cardCloud.dropServer(note.id)
+        if (!dropped) {
+          wx.showToast({ title: t('cardDropOffline', lang), icon: 'none', duration: 2000 })
+          return
+        }
+        // 本机那本账与服务器读回来那一份一起忘掉（一个出处，见 cardCloud.forget）：
+        // 只清本机那一半，下一次进详情页又从云上读回来画上去——那一格就成了"删不掉"。
+        cardCloud.forget(note.id)
         this._closeTemplate()
         this.setData(this.arrange(this.data.notes))
       },

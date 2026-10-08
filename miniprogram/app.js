@@ -3,6 +3,7 @@ const { request } = apiModule
 const assetQueue = require('./utils/assetQueue')
 const posterTemplates = require('./utils/posterTemplates')
 const cloudUpload = require('./utils/cloudUpload')
+const cardCloud = require('./utils/cardCloud')
 const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
@@ -73,6 +74,11 @@ App({
       // 待删队列：笔记删了、云上对象没删成的那批（同一族，另一头）。不 await、不提示。
       cloudUpload.flushPurge().then((n) => {
         if (n) console.log(`补删掉 ${n} 个云上对象`)
+      })
+      // 卡片待补登记：成品图传上去了、但"这一张归哪篇"那一步没做成的那批（同一族，第三个头）。
+      // 这批最坏的情况是"云上有一张图、库里没有那一行"——界面上看不见，换台手机更看不见。
+      cardCloud.flush().then((r) => {
+        if (r && r.sent) console.log(`补登记回 ${r.sent} 张卡片`)
       })
     }
   },
@@ -149,6 +155,9 @@ App({
     this.globalData.isLoggedIn = false
     this.globalData.loginPromise = null
     assetQueue.clear()
+    // 卡片这一族两个头一起收（待补登记队列 + 从服务器读回来那份名单），收在 cardCloud 一个
+    // 出处里：留着名单就是下一个身份第一次进首页看见上一个人的卡片。
+    cardCloud.signOut()
     // 待删队列**故意不跟着清**：注销那一步自己就是往这里塞东西的一方（删云上对象没成的那批），
     // 清了等于把"云端那份一并删除"那句承诺刚欠下的账抹掉。下一个身份替上一个人重试删除没有害处
     // ——deleteFile 只会把对象删掉，不会改谁的归属。
