@@ -1,0 +1,84 @@
+diff --git a/miniprogram/utils/palette.js b/miniprogram/utils/palette.js
+index f83a7ca..c83700e 100644
+--- a/miniprogram/utils/palette.js
++++ b/miniprogram/utils/palette.js
+@@ -540,31 +540,44 @@ function lightFaceOnPaper(h, s, want) {
+ }
+ 
+ /**
+- * 创建入口那张**暗面板**的一套面（10-08 改版，效果图「创建入口-v7-B为基」落码）。
++ * 创建入口那张面板的一套面（10-08 深夜换皮：暗面板 → 浅麦框＋纸白卡，站长拍的
++ * 效果图正本 `docs/design/10-08第一屏浅色三方向/c5-第一屏压进红框410.png`）。
+  *
+- * 为什么这页要自带一套面、不吃壁纸那四枚的亮纸：面板整块压在形象图上，而站长这一轮
+- * 逐条拍过的是"暗面板 + 纸白字"那张图（面板里的输入框、缩略图、滑动条都在同一块暗面上）。
+- * 三档暗面（面板 #23252C / 卡 #2B2D35 / 框 #1A1C21）是这一页的纸，不随壁纸换，
+- * 与原来那张白纸面板一样属于"面必须稳定"那一类（见 create.wxss 里录入条那段注释）。
++ * 三档面：面板＝**层色**（由当前壁纸的底栏那一支派生：H 原样、S×0.35、L 78，与「我的」页
++ * 那批层色同一条式子，所以换壁纸这块面会跟着换色相，但一直是浅色一族）；卡＝纯白（他这一轮
++ * 要的就是"白多、麦少"，白卡吃面板 67%）；控件那一档（小圆／输入框／右滑条底）＝白上压 12% 墨。
+  *
+- * 只有两档**跟着壁纸色阶走**：快门那枚圆（色阶第 3 档，配深字）与"右滑提炼"的圆和进度
+- * （第 4 档，配纸白字）。跟着色阶而不是写死一支橙，是因为 10-04 定过"四枚壁纸各吃自己
+- * 那一支色相的五档"，而同一轮的风格审计把"一支不属于色阶的饱和色"列成了缺陷（那枚孤蓝）。
+- * 两支的分工照他这一轮的原话：「开始提炼用其他颜色，不要与拍照混用」＋「与前面呼应」——
+- * 同一支色相里深浅相邻的两档，正是"呼应但不撞色"。象牙下实测 #AFA488 / #766B50。
++ * 墨是这一页唯一的字色（`cp-ink`），透明度分档仍走 alpha 令牌——同值压不同面结果不同，
++ * 但两面（层色 9.27 / 白 15.30）都够，所以不必按面拆两套。
++ *
++ * 快门与"右滑提炼"那两枚**不再吃壁纸色阶**，改成两支固定橙（#E9723D / #C4541F，
++ * 规格-创建入口 §6.1 他 10-08 拍的）。理由：浅面上色阶那两档（象牙第 3 档 #AFA488）压白卡只有
++ * 1.5 上下，等于没有；而固定橙压白卡 3.03、深字压橙 5.80、白字压深橙 4.53 都过门槛。
++ * 快门那一圈也从"墨"改成 55% 墨（`cp-ring`）：白环在浅面上只有 1.44，撤。
+  *
+  * 规矩与 TIP_DOT、toneStyle 一模一样：这些色值只在这里出现，create.wxss 只写 var(--cp-*)。
+  */
+-const CREATE_SURFACE = { panel: '#23252C', card: '#2B2D35', field: '#1A1C21' }
+-const CREATE_X = (a) => withAlpha(PAPER, a)
++const CREATE_INK = '#23252C'
++const CREATE_CARD = '#FFFFFF'
++const CREATE_CAM = '#E9723D', CREATE_CAM_INK = '#2C1204'
++// 提炼那枚的字色不吃纸白：#F2EFE9 压 #C4541F 只有 3.95，不过 4.5；纯白才 4.53。
++const CREATE_EXTRACT = '#C4541F', CREATE_EXTRACT_INK = '#FFFFFF'
++const CREATE_X = (a) => withAlpha(CREATE_INK, a)
++/** 面板那一格的层色：从当前壁纸派生，与 chromeOf 同一批数学（H 原样、S×0.35、L 78）。 */
++function createFace() {
++  const theme = ACTIVE_THEME || themeOf('tint-paper')
++  const ch = chromeOf(theme.key)
++  const [h, s] = rgbToHsl(ch.bg)
++  return hslToHex(h, s * 0.35, 78)
++}
+ function createSkin() {
+-  const cam = rampFor(2) || TONES[2]
+-  const extract = rampFor(3) || TONES[3]
++  const face = createFace()
++  const well = mix(CREATE_INK, CREATE_CARD, 0.12)
+   const vars = {
+-    'cp-panel': CREATE_SURFACE.panel,
+-    'cp-card': CREATE_SURFACE.card,
+-    'cp-field': CREATE_SURFACE.field,
+-    'cp-ink': PAPER,
++    'cp-panel': face,
++    'cp-card': CREATE_CARD,
++    'cp-field': well,
++    'cp-ink': CREATE_INK,
+     'cp-ink-78': CREATE_X(0.78),
+     'cp-ink-62': CREATE_X(0.62),
+     'cp-ink-50': CREATE_X(0.5),
+@@ -573,10 +586,12 @@ function createSkin() {
+     'cp-edge-14': CREATE_X(0.14),
+     'cp-edge-10': CREATE_X(0.1),
+     'cp-edge-07': CREATE_X(0.07),
+-    'cp-cam': cam.bg,
+-    'cp-cam-ink': cam.ink,
+-    'cp-extract': extract.bg,
+-    'cp-extract-ink': extract.ink,
++    'cp-ring': CREATE_X(0.55),
++    'cp-fill': mix(CREATE_EXTRACT, well, 0.22),
++    'cp-cam': CREATE_CAM,
++    'cp-cam-ink': CREATE_CAM_INK,
++    'cp-extract': CREATE_EXTRACT,
++    'cp-extract-ink': CREATE_EXTRACT_INK,
+   }
+   return Object.keys(vars).map((k) => `--${k}:${vars[k]}`).join(';')
+ }
