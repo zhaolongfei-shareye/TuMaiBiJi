@@ -70,11 +70,23 @@ function 判(src) {
   // 注：`card_file_ids` 这个词在后端**是允许出现的**，只允许出现在注释里那句"不另起这个键"
   // 的理由里。所以判之前先把整行注释剥掉——不剥的话这条永远红，而红判据看多了，真漏键那天就没人看了。
   const 去注释 = (s) => s.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n')
+  // 这三条量的是"回体里那几个键"，不是"那一行字面长什么样"。10-08 给回体加了去重
+  // （`"file_ids": list(dict.fromkeys(file_ids))`），钉字面量的那版当场漂红。把行里的键名
+  // 读出来再数，值那一侧怎么写都不影响，而"多一个清单键"照样红——判据本身也跟着变强了。
+  const 清单键 = (s, 头) => {
+    const line = (s.match(new RegExp('return \\{' + 头 + '[^\\n]*')) || [''])[0]
+    return (line.match(/"([a-z_]+)"\s*:/g) || [])
+      .map((k) => k.match(/"([a-z_]+)"/)[1])
+      .filter((k) => /_ids$/.test(k))
+  }
   ck('删一篇把卡片地址并进同一个 file_ids', /file_ids\s*\+=\s*\[[\s\S]{0,140}?NoteCard/.test(notes))
   ck('删一篇的回体只有 file_ids 这一个清单键',
-    /return \{"message": "Note deleted", "file_ids": file_ids\}/.test(notes))
+    清单键(notes, '"message": "Note deleted"').join() === 'file_ids',
+    `读到 [${清单键(notes, '"message": "Note deleted"').join('、')}]`)
   ck('注销同样带走（也是同一个键）',
-    /asset_ids\s*\+=\s*\[[\s\S]{0,140}?NoteCard/.test(user) && /"file_ids": asset_ids/.test(user))
+    /asset_ids\s*\+=\s*\[[\s\S]{0,140}?NoteCard/.test(user)
+    && 清单键(user, '"message": "账号已注销"').join() === 'file_ids',
+    `读到 [${清单键(user, '"message": "账号已注销"').join('、')}]`)
   ck('剥掉注释后，后端代码里没有 card_file_ids 这个键',
     !/card_file_ids/.test(去注释(notes) + 去注释(user) + 去注释(r)))
 
@@ -103,9 +115,13 @@ const b1 = 判(m1)
 
 console.log('\n———— 反向钉②：删除连带另起一个 card_file_ids 键 ————')
 const m2 = Object.assign({}, src)
-m2[NOTES] = src[NOTES].replace(/return \{"message": "Note deleted", "file_ids": file_ids\}/,
-  'return {"message": "Note deleted", "file_ids": file_ids, "card_file_ids": card_ids}')
-if (m2[NOTES] === src[NOTES]) { console.log('✗ 变异没打上（锚点漂了）'); process.exit(2) }
+// 变异注入的是"多一个键"这个形状，不是某一行字面——所以它跟着判据一起换了写法：
+// 匹配到那行 return 之后，在收尾的 `}` 前追加一个清单键。
+m2[NOTES] = src[NOTES].replace(/return \{"message": "Note deleted", [^\n]*?\}/,
+  (s) => s.slice(0, -1) + ', "card_file_ids": card_ids}')
+m2[USER] = src[USER].replace(/return \{"message": "账号已注销", [^\n]*?\}/,
+  (s) => s.slice(0, -1) + ', "card_file_ids": card_ids}')
+if (m2[NOTES] === src[NOTES] || m2[USER] === src[USER]) { console.log('✗ 变异没打上（锚点漂了）'); process.exit(2) }
 const b2 = 判(m2)
 
 console.log('\n———— 反向钉③：只改代码，方案与 PRD 里那句 200KB 撤掉 ————')
@@ -114,7 +130,9 @@ m3[PLAN] = src[PLAN].replace(/200KB/g, '一个还没量的数')
 const b3 = 判(m3)
 
 const 红1 = b1.some((x) => x.includes('写口那道线是 20MB'))
-const 红2 = b2.some((x) => x.includes('回体只有 file_ids')) && b2.some((x) => x.includes('card_file_ids 这个键'))
+const 红2 = b2.some((x) => x.includes('回体只有 file_ids'))
+  && b2.some((x) => x.includes('注销同样带走'))
+  && b2.some((x) => x.includes('card_file_ids 这个键'))
 const 红3 = b3.some((x) => x.includes('方案 §四.4'))
 
 console.log(`\n正例 ${bad.length ? '红 ' + bad.length + ' 条：' + bad.join('、') : '全绿'}`)
