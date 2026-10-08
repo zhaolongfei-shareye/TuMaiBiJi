@@ -15,6 +15,7 @@
 //   · cloudReady() 回 true，录入页那条 B 链开始真传（失败仍然只 resolve(null)，不阻断建笔记）。
 
 const CLOUD_ENV = 'cloudbase-d6gzh0i0tff02943a'
+const purge = require('./assetPurge.js')
 
 const _ext = (path) => {
   const m = /\.([a-zA-Z0-9]{2,4})$/.exec(String(path || ''))
@@ -72,20 +73,60 @@ async function uploadImage(tempPath, userId) {
 /**
  * 删对象。只有客户端这一侧删得掉——那台自建后端没有云开发的凭据。
  * 所以后端 DELETE /api/notes/{id} 会把 file_ids 一起回出来，谁删的笔记谁负责清。
- * @returns {Promise<number>} 成功删除的个数（失败不抛）
+ *
+ * **删不成不许静默留在云上**：这一趟没做成的那几条落进 `utils/assetPurge` 那本机账，
+ * 下次回到前台由 `flushPurge()` 再删一次。关于页与提交给微信后台的《隐私保护指引》两句都写着
+ * "删除该条笔记或注销账号时云端那一份一并删除"——落账这一步是把那句从"尽力"变成"做得到"。
+ * 云能力没初始化（`cloudReady()` 假）也算这一趟没做成：原来那里直接 `resolve(0)`，
+ * 那才是最大的一个漏法——一次请求都没发出去，而调用方以为处理过了。
+ * @returns {Promise<number>} 成功删除的个数（不抛）
  */
 function deleteFiles(fileIDs) {
   const ids = (fileIDs || []).filter(Boolean)
-  if (!cloudReady() || !ids.length) return Promise.resolve(0)
+  if (!ids.length) return Promise.resolve(0)
+  if (!cloudReady()) {
+    purge.push(ids)
+    console.warn('云能力这会儿不可用，这批对象进了待删队列')
+    return Promise.resolve(0)
+  }
+  return _deleteOnce(ids).then((r) => {
+    if (r.failed.length) purge.push(r.failed)
+    return r.done
+  })
+}
+
+// 一次真正的 deleteFile，不碰队列。回 {done, failed}——failed 是"这一趟没删成的那些"。
+function _deleteOnce(ids) {
   return new Promise((resolve) => {
     wx.cloud.deleteFile({
       fileList: ids,
-      success: (r) => resolve(((r && r.fileList) || []).filter((x) => x.status === 0).length),
+      success: (r) => {
+        const list = (r && r.fileList) || []
+        // 回体缺 fileList（老基础库给的形状不一样）就当整批没成：宁可下次多删一遍，
+        // 也不能把"其实没删成"记成"删掉了"。
+        if (!list.length) return resolve({ done: 0, failed: ids.slice() })
+        const failed = list.filter((x) => !x || x.status !== 0).map((x) => x && x.fileID).filter(Boolean)
+        resolve({ done: ids.length - failed.length, failed })
+      },
       fail: (e) => {
-        console.warn('云存储删除失败（对象会残留，占全站配额）:', (e && e.errMsg) || e)
-        resolve(0)
+        console.warn('云存储删除失败（进了待删队列，下次进前台再删）:', (e && e.errMsg) || e)
+        resolve({ done: 0, failed: ids.slice() })
       },
     })
+  })
+}
+
+/**
+ * 把待删队列里那批再删一次。由 `app.js` 的 onShow 调（与待补绑队列同一个位置）。
+ * @returns {Promise<number>} 这一趟删掉的个数
+ */
+function flushPurge() {
+  const ids = purge.take()
+  if (!ids.length) return Promise.resolve(0)
+  if (!cloudReady()) return Promise.resolve(0)   // 云上不去就原样留着，下次进前台再试
+  return _deleteOnce(ids).then((r) => {
+    purge.drop(ids.filter((x) => r.failed.indexOf(x) < 0))
+    return r.done
   })
 }
 
@@ -103,4 +144,4 @@ function dropFromDeleteRes(res) {
   return deleteFiles(ids)
 }
 
-module.exports = { CLOUD_ENV, cloudReady, initCloud, uploadImage, deleteFiles, dropFromDeleteRes }
+module.exports = { CLOUD_ENV, cloudReady, initCloud, uploadImage, deleteFiles, dropFromDeleteRes, flushPurge }

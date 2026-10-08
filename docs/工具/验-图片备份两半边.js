@@ -383,7 +383,9 @@ const watchdog = setTimeout(() => {
   /* 反向对照：把那一格抠成空串（复制一份模块、只改那一行，另起一次 require），
      同一套桩下必须一张都不打。少了这一条，上面那五条"真打了"证明不了是 env 在管着它们。 */
   const offFile = path.join(os.tmpdir(), `cu-off-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.js`)
-  fs.writeFileSync(offFile, UP_SRC.replace(/^const CLOUD_ENV = '[^']*'/m, "const CLOUD_ENV = ''"))
+  // 副本落在临时目录，那句相对 require 得改成绝对路径才找得着 assetPurge（10-08 那条待删队列加进来之后才会这样）
+  const _abs = (s) => s.replace("require('./assetPurge.js')", `require('${path.join(ROOT, 'miniprogram/utils/assetPurge.js')}')`)
+  fs.writeFileSync(offFile, _abs(UP_SRC).replace(/^const CLOUD_ENV = '[^']*'/m, "const CLOUD_ENV = ''"))
   const offCalls = { init: 0, upload: 0, remove: 0 }
   global.wx = Object.assign({}, global.wx, { cloud: {
     init: () => { offCalls.init++ },

@@ -70,6 +70,10 @@ App({
       assetQueue.flush(apiModule).then((r) => {
         if (r && r.sent) console.log(`补绑回 ${r.sent} 张图`)
       })
+      // 待删队列：笔记删了、云上对象没删成的那批（同一族，另一头）。不 await、不提示。
+      cloudUpload.flushPurge().then((n) => {
+        if (n) console.log(`补删掉 ${n} 个云上对象`)
+      })
     }
   },
 
@@ -145,6 +149,9 @@ App({
     this.globalData.isLoggedIn = false
     this.globalData.loginPromise = null
     assetQueue.clear()
+    // 待删队列**故意不跟着清**：注销那一步自己就是往这里塞东西的一方（删云上对象没成的那批），
+    // 清了等于把"云端那份一并删除"那句承诺刚欠下的账抹掉。下一个身份替上一个人重试删除没有害处
+    // ——deleteFile 只会把对象删掉，不会改谁的归属。
     wx.removeStorageSync(INVITER_KEY)
   },
 
