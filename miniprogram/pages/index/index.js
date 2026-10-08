@@ -4,7 +4,6 @@ const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, paleStep, TIP_DOT 
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
-const cardRepair = require('../../utils/cardRepair.js')
 const cardInfo = require('../../utils/cardInfo.js')
 const { isPrivate } = require('../../utils/privateGate.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
@@ -35,31 +34,9 @@ const SUM_CHARS = 24
 /* 重渲那一张要用**当年那份分享快照**的正文，不是笔记现在的内容（方案 §二：按快照渲出来的才是当年那张）。
    但快照只覆盖它真有的那几栏：`shares` 那几列都可能为 null（老行、没提炼的篇），
    把 null 一起 Object.assign 进去就等于拿"没有"去盖掉"有"——渲出来是一张缺摘要缺要点的另一张。 */
-const _快照覆盖 = (snap) => {
-  if (!snap) return {}
-  const out = {}
-  ;['title', 'summary', 'tags', 'key_points', 'key_links', 'source_url', 'author_name'].forEach((k) => {
-    const v = snap[k]
-    if (v === null || v === undefined || v === '') return
-    if (Array.isArray(v) && !v.length) return
-    out[k] = v
-  })
-  return out
-}
 
 /* 详情窗右上那枚淡底方形的底色已经搬进 `palette.paleStep`——10-07 详情页要补同一格时，
    规则只该有一份，不该让第二页抄一遍色号。这一页吃的是下面 import 里那一个。 */
-
-/* 补卡那一趟报出来的"为什么跳过"→ 界面那句话。写成一张明表而不是 `'repairSkip' + reason`：
-   拼出来的键名扫不到（i18n 完整性那把尺子看不见它），打错一个字屏幕上就漏出英文键名。
-   表里少一行也只会退成那句通用话，不会说不出话。 */
-const REPAIR_SKIP = {
-  private: 'repairSkipPrivate',
-  noteGone: 'repairSkipNoteGone',
-  noToken: 'repairSkipNoToken',
-  noTpl: 'repairSkipNoTpl',
-  qrFail: 'repairSkipQrFail',
-}
 
 Page({
   data: {
@@ -317,10 +294,8 @@ Page({
       }
     })
     const cells = []
-    // 站长 10-08 打回：原来这里给"卡片找不回来"的那几篇画 11 个虚线空框 + 一句"待你确认"，
-    // 看上去像加载失败，实际是把"我们没把这条关联送上服务器"的后果推给他点 11 次。
-    // 现在这一档由补卡那一趟按当前默认版式自动出（`cardRepair.run`），**格子只画真存在的图**，
-    // 没有图就不占位——那一句实话改到补完之后写在格子下面（留痕那行），不写在空框里。
+    // 只画真存在的图。2.0.1 曾经给"卡片找不回来"的那几篇画虚线空框 + 一句"待你确认"，
+    // 站长 10-08 打回：那是把"我们没存这条关联"的后果推给他点，而且看上去像加载失败。
     notes.forEach((n, i) => {
       const list = this._cardsOf(n.id)
       if (list.length) cells.push({ i, id: n.id, title: n.title, cards: list })
@@ -686,13 +661,6 @@ Page({
     // 台账里那套模板要是已经不在合并后的模板列表里（改名／撤掉／下发收走了），退回默认那一套。
     const cur = (this._cardsOf(note.id) || [])[0]
     const known = !!(cur && cur.tpl && poster.templateList().some((x) => x.id === cur.tpl))
-    // 待确认那一格（S3）点下来走的就是这一段：那一档记得的不多——只记得"这篇公开过、该有一张"。
-    // 所以画的是**当年那份快照**的正文（有快照就盖上去，§二 那条），而留下的那一张登记的 origin
-    // 是 `from-share-snapshot` 不是 `live`：他当场挑的这套模板是我们替他猜不出来那一套，
-    // 界面上就得说清"这张是按当年那份内容重出的"。缺形象图那一档不盖快照（他重新挑的那张才是新的）。
-    const 待确认原因 = cardRepair.confirmMap()[note.id]
-    this._posterOrigin = known ? undefined : (待确认原因 === 'noLedger' ? 'from-share-snapshot' : undefined)
-    this._posterSnap = 待确认原因 === 'noLedger' ? (cardCloud.snapshotOf(note.id) || null) : null
     this.setData({
       detailOpen: false,
       templateOpen: true,
@@ -722,10 +690,6 @@ Page({
     // 标题回到首页再开弹窗，画布照画第一次缓存进去那份旧字（笔记卡片页没这个毛病，它每次 onLoad 现拉）。
     const cached = this._posterAssets && this._posterAssets.noteId === noteId ? this._posterAssets : null
     const note = await api.getNote(noteId)
-    // 待确认那一档按**当年那份分享快照**的正文渲（方案 §二：笔记后来被改过，按当前内容渲出来的
-    // 是"现在这张"，按快照渲出来的才是"当年那张"）。只盖快照真有的那几栏——null 盖掉"有"
-    // 就渲出一张缺摘要缺要点的另一张。
-    if (this._posterSnap) Object.assign(note, _快照覆盖(this._posterSnap))
     // 分类名不在笔记响应里，海报上那行小字要靠分类表查——与 share.js 同一条口径。
     if (note.category_id) {
       try {
@@ -828,122 +792,9 @@ Page({
   async _keepPoster() {
     const a = this._posterAssets
     if (!a || !this._posterCanvas) return
-    // 从待确认那一格开出来的这一趟要带着 origin 落账与登记：那张是"按当年那份内容重出的"，
-    // 记成 live 就等于在界面上说"这是你刚生成的那一张"——同一篇两句话，后一句是假话。
-    await cardLog.record(a.noteId, this.data.posterTpl, this.data.noQr, this._posterCanvas, this,
-      this._posterOrigin ? { origin: this._posterOrigin } : undefined)
+    await cardLog.record(a.noteId, this.data.posterTpl, this.data.noQr, this._posterCanvas, this)
     // 记完这一张就"有了"：底排立刻换成「删除｜取消」，不给第二张的入口（一篇一张）
     this.setData(Object.assign({ posterHasCard: true }, this.arrange(this.data.notes)))
-  },
-
-  // ---------- 补卡那一趟（2.0.1 P0 · S3）：把已经丢的那批找回来 ----------
-  // 分档与那份数都在 `utils/cardRepair.js`（那一半是纯的，静态尺子钉它）。这里只给三样它要的东西：
-  // 这篇能不能动（`_repairCheck`）、怎么把这张画出来（`_repairRender`）、跑完给谁看（`onRepairCards`）。
-
-  /**
-   * 这一篇这一趟动得动吗。**两条不能动的理由都不是"麻烦"，是会造成假话或替用户做决定**：
-   * · 锁着的（私密分类）——那张图上有他锁起来的正文，一张都不许送上云；
-   * · 当年那张要印码、而这篇现在没有开着的码——要印就得**新建一张分享码**，那是替他决定"这篇又公开了"。
-   *   这一条按 §五 的纪律不自动做，归进"请你确认"。
-   * 顺带把渲这一张要用的正文与那张码图准备好（页面有网络、有画布，cardRepair 那边两样都没有）。
-   */
-  async _repairCheck(x) {
-    let note = null
-    try {
-      note = await api.getNote(x.noteId)
-    } catch (err) {
-      return { skip: 'noteGone' }
-    }
-    if (!note) return { skip: 'noteGone' }
-    const cat = (this.data.categories || []).find((c) => c.id === note.category_id)
-    if (note.is_private || isPrivate(cat && cat.name)) return { skip: 'private' }
-    // 这张码只**复用已经开着的**：拿活码是为了在卡片上印它，不是为了开一篇新的公开。
-    // 读不到、或者根本没有活码，都只当"没有码"处理——不新建码这一步是硬规矩。
-    let qrPath = null
-    try {
-      const st = await api.getShareStatus(x.noteId)
-      if (st && st.active && st.token) qrPath = await this._downloadQR(st.token)
-    } catch (err) { /* 读不到就当没有码，走不带码那一张 */ }
-    if (x.entry) {
-      // 当年那张印过码、而现在没有开着的码：不替他重新公开，这一张跳过并说清为什么。
-      if (!x.entry.noQr && !qrPath) return { skip: 'noToken' }
-      return { note, qrPath }
-    }
-    // 待确认那一档：版式只能按他现在的默认那套（没人记得当年是哪套），
-    // 有没有码跟着"现在这篇还开着不开着"走——关着就出不带码那张，绝不为出图去开一篇新的。
-    const profile = poster.posterProfile()
-    return { note, qrPath, tpl: profile.template || poster.DEFAULT_TEMPLATE, noQr: !qrPath }
-  },
-
-  /** 渲一张"当年那张"：正文优先用**当年那份分享快照**，没有快照才回退笔记现在的内容。 */
-  async _repairRender(x, ready) {
-    const lang = this.data.lang
-    const profile = poster.posterProfile()
-    const canvas = await this._getCanvas()
-    const ctx = canvas.getContext('2d')
-    const note = Object.assign({}, (ready && ready.note) || {}, _快照覆盖(x.snapshot))
-    const images = {}
-    if (ready && ready.qrPath) images.qr = await poster.loadImage(canvas, ready.qrPath, 3000)
-    const avatar = poster.cardPath()
-    if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 5000)
-    canvas.width = poster.W
-    canvas.height = 750
-    const plan = poster.planPoster(ctx, note, x.entry.tpl, profile, lang, { showQr: !x.entry.noQr })
-    // 与成品弹窗那一趟同一套外圈与同一套两次改尺寸：重渲出来的必须和当年那张**同一张**，
-    // 少了这圈黑，那一张就是"边角被裁掉一圈"的另一张图。
-    const outW = plan.width + poster.MATTE * 2
-    const outH = plan.height + poster.MATTE * 2
-    canvas.width = outW
-    canvas.height = outH
-    ctx.fillStyle = '#000'
-    ctx.fillRect(0, 0, outW, outH)
-    ctx.save()
-    ctx.translate(poster.MATTE, poster.MATTE)
-    poster.paintLayers(ctx, plan.layers, images)
-    ctx.restore()
-    return new Promise((resolve, reject) => {
-      wx.canvasToTempFilePath({ canvas, fileType: 'png', success: (r) => resolve(r.tempFilePath), fail: reject }, this)
-    })
-  },
-
-  /** 顶部那一行点下去：一趟跑完，那份数逐条报出来（§五 那条"不许只报一句已修复"）。 */
-  async onRepairCards() {
-    if (this._repairing) return
-    this._repairing = true
-    wx.showLoading({ title: t('repairDoing', this.data.lang) })
-    let res = null
-    try {
-      res = await cardRepair.run({
-        check: (x) => this._repairCheck(x),
-        render: (x, ready) => this._repairRender(x, ready),
-      })
-    } catch (err) {
-      console.error('补卡那一趟没跑完', err)
-    }
-    wx.hideLoading()
-    this._repairing = false
-    if (!res || res.offline || !res.报告) {
-      wx.showToast({ title: t('repairOffline', this.data.lang), icon: 'none', duration: 2200 })
-      return
-    }
-    const 数 = res.报告
-    wx.showModal({
-      title: t('repairDone', this.data.lang),
-      content: t('repairReport', this.data.lang)
-        .replace('{a}', 数.补传).replace('{b}', 数.重渲)
-        .replace('{c}', 数.重出).replace('{d}', 数.跳过.length)
-        + (数.跳过.length ? '\n' + 数.跳过.map((s) => `${s.noteId}｜${t(REPAIR_SKIP[s.reason] || 'repairFailed', this.data.lang)}`).join('\n') : '')
-        + (数.失败.length ? '\n' + 数.失败.map((s) => `${s.noteId}｜${t('repairFailed', this.data.lang)}`).join('\n') : '')
-        + (数.摘掉 ? `\n${t('repairPrune', this.data.lang).replace('{n}', 数.摘掉)}` : '')
-        + (数.数对得上 ? '' : `\n${t('repairMismatch', this.data.lang)}`),
-      showCancel: false,
-      // 不写 confirmText：这一页 10-08 那条规矩就写着"按钮一律用系统默认那对"，
-      // 而我引的那串 `gotIt` 在 i18n 里根本不存在——写了屏幕上就漏出英文键名。
-    })
-    // 补完这一趟，"哪几篇有卡片"变了：重渲那几张已经进了台账，本机那份先重排一次，
-    // 再拉一次服务器名单（待确认那一档里被补掉的那些不能再留着提示）。
-    this.setData(this.arrange(this.data.notes))
-    cardCloud.refresh().then((r) => { if (r) this.setData(this.arrange(this.data.notes)) })
   },
 
   // v7 效果图里"左右滑换模板 / Swipe to change template"那条：横向滑过 60px 判定切换。

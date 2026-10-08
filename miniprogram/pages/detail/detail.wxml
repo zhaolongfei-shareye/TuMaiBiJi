@@ -20,12 +20,6 @@
             <view class="ds-pad ds-entry" catchtap="onCardCell">
               <image class="ds-pad-img" src="{{detailCards[0].p}}" mode="aspectFit" />
             </view>
-            <!-- 补回来的那一张要留痕（方案 §五 那句"不写这句就是悄悄换了他的东西"）。三档三句话，
-                 live 那一档**一句都不写**——那一张就是他刚生成的，说他"被换过"才是假话。
-                 两页这一格同源：这一段标记在首页详情窗与详情页一字不差（同源那把尺子逐字节比它）。 -->
-            <text wx:if="{{detailCards[0].origin === 're-rendered'}}" class="ds-card-note">{{t.cardOriginRerendered}}</text>
-            <text wx:elif="{{detailCards[0].origin === 'backfilled'}}" class="ds-card-note">{{t.cardOriginBackfilled}}</text>
-            <text wx:elif="{{detailCards[0].origin === 'from-share-snapshot'}}" class="ds-card-note">{{t.cardOriginSnapshot}}</text>
           </block>
           <view wx:else class="ds-empty ds-entry" catchtap="onCardCell">
             <view class="ds-swatch" style="background:{{swatchBg}}">
