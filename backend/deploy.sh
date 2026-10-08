@@ -156,7 +156,35 @@ inv_cols = {c["name"] for c in insp.get_columns("invitations")}
 if "source_note_id" not in inv_cols:
     print("  ✗ invitations 缺 source_note_id 列，转存那条激活记不到是哪篇带来的")
     raise SystemExit(1)
-print("  ✓ users.quota_bonus / users.invited_by / users.generation / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / 一篇笔记一张有效码的索引 到位")
+# ---- 2.0.1 卡片留档那条链（2026-10-08）----
+# users.contact_email：账号能力「我的邮箱」唯一的落点。缺它的话 GET/PUT 那两口会 500，
+# 但关于页与「我的」那一格是客户端画的，界面看着正常、一存就坏——所以在这里点一次名。
+if "contact_email" not in cols:
+    print("  ✗ users 缺 contact_email 列，邮箱换址那两口会当场炸")
+    raise SystemExit(1)
+# note_cards 是"卡片不见了"那一态的解药本体。表不在，POST /card 只是 500（还看得见）；
+# 真正静默的是**那条部分唯一索引丢了**：写口的代码照样"一篇一张"，但两个请求同时进来
+# 就能给同一篇留下两张当前，读回来哪张赢取决于 id 顺序——界面就成了不确定的。
+if "note_cards" not in tables:
+    print("  ✗ 缺 note_cards 表，卡片留档整条链没落点")
+    raise SystemExit(1)
+card_cols = {c["name"] for c in insp.get_columns("note_cards")}
+missing = sorted({"user_id", "note_id", "object_key", "tpl", "no_qr", "origin", "is_current"} - card_cols)
+if missing:
+    print(f"  ✗ note_cards 迁移后仍缺：{'、'.join(missing)}")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    card_idx = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND name='ux_note_cards_one_current_per_note'"
+    )).scalar()
+if not card_idx or "UNIQUE" not in card_idx.upper():
+    print("  ✗ note_cards 上缺那条部分唯一索引（一篇一张只剩代码里一句自觉）")
+    raise SystemExit(1)
+if "is_current" not in card_idx:
+    print(f"  ✗ ux_note_cards_one_current_per_note 建上了但没带 is_current 条件：{card_idx}")
+    raise SystemExit(1)
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / users.contact_email / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / note_cards（含「一篇一张」那条部分唯一索引）/ 一篇笔记一张有效码的索引 到位")
 PY
 if [[ $? -ne 0 ]]; then
     echo "✗ schema 校验未通过，终止部署"

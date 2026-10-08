@@ -328,6 +328,20 @@ class Test撤掉那一格:
         assert r.status_code == 200, r.text
         assert r.json()["file_ids"] == []
 
+    def test_撤掉时同一个地址在清单里只出现一次(self, client, db):
+        """登记 A → 换 B → 又换回 A：库里是 A 历史 / B 历史 / A 当前三行，地址只有两个。
+        清单里递两个 A 给 wx.cloud.deleteFile，第二次不算成功，客户端就把 A 记成
+        "没删成的那条"落进待删队列——从此每次回前台都替一个已经不存在的对象重打一遍删除。"""
+        u = mk_user(db, "t7")
+        n = mk_note(db, u)
+        a, b = "cloud://x/dup-a.jpg", "cloud://x/dup-b.jpg"
+        put(client, u, n.id, file_id=a)
+        put(client, u, n.id, file_id=b)
+        put(client, u, n.id, file_id=a)
+        assert db.query(NoteCard).filter(NoteCard.note_id == n.id).count() == 3
+        ids = client.delete(f"/api/notes/{n.id}/card", headers=hdr(u)).json()["file_ids"]
+        assert sorted(ids) == sorted({a, b}), ids
+
     def test_撤别人的那一篇回四百零四且那一行还在(self, client, db):
         owner = mk_user(db, "t3")
         other = mk_user(db, "t4")

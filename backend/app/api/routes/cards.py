@@ -224,7 +224,11 @@ def drop_note_card(
         .filter(NoteCard.note_id == note_id, NoteCard.user_id == str(user.id))
         .all()
     )
-    ids = [r.object_key for r in rows]
+    # 去重但保序：同一篇的历史行与当前行**可以指向同一个 fileID**（登记 A → 换 B → 又换回 A，
+    # 库里就是 A 历史 / B 历史 / A 当前三行）。递 `fileList: [A, A]` 给 wx.cloud.deleteFile，
+    # 第二次的 status 不是 0，`cloudUpload.deleteFiles` 就把 A 记成"没删成的那条"落进待删队列，
+    # 从此每次回前台都替一个已经不存在的对象重打一遍删除。
+    ids = list(dict.fromkeys(r.object_key for r in rows))
     for r in rows:
         db.delete(r)
     db.commit()

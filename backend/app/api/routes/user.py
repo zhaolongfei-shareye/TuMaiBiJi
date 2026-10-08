@@ -348,4 +348,6 @@ def deactivate_account(
     db.delete(user)
     db.commit()
 
-    return {"message": "账号已注销", "deleted": deleted, "file_ids": asset_ids}
+    # 去重保序，理由同 `routes/notes.py:delete_note`：注销这一份最容易撞重复——
+    # 同一张图既在 assets 里又在 note_cards 里（换过模板又换回来）时，两处各列一次。
+    return {"message": "账号已注销", "deleted": deleted, "file_ids": list(dict.fromkeys(asset_ids))}

@@ -450,7 +450,10 @@ def delete_note(
 
     db.delete(note)
     db.commit()
-    return {"message": "Note deleted", "file_ids": file_ids}
+    # 去重保序：配图与卡片两张表**可以指向同一个 fileID**（同一篇的历史行与当前行也会），
+    # 而重复的 id 递到 wx.cloud.deleteFile 里第二次不算成功，客户端就会把它当成"没删成的那条"
+    # 落进待删队列，从此每次回前台都替一个已经不存在的对象重打一遍删除。
+    return {"message": "Note deleted", "file_ids": list(dict.fromkeys(file_ids))}
 
 
 class NoteFromShare(BaseModel):
