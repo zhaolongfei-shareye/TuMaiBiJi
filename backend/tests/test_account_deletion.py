@@ -36,6 +36,7 @@ from app.models.note import Note
 from app.models.note_card import NoteCard
 from app.models.share import Share
 from app.models.user import User
+from app.models.user_profile import UserProfile
 from app.services import quota
 
 
@@ -92,6 +93,11 @@ def mine(db):
                  tpl="classic", no_qr=False, origin="live", is_current=True),
         Invitation(inviter_id=inviter.id, invitee_id=u.id, reward=quota.INVITE_REWARD),
         Invitation(inviter_id=u.id, invitee_id=999, reward=quota.INVITE_REWARD),
+        # 名片是第七类（2.1 起那四格图在云上）：同一条理由——注销之后没有任何口能再问出
+        # 这个人留了哪些地址，所以这些 fileID 必须在这一次响应里一起交回去。
+        UserProfile(user_id=str(u.id), name="要消失的名片",
+                    slots=[{"file_id": "cloud://x/del-me-avatar.jpg", "card": True, "bg": True,
+                            "width": None, "height": None, "size": None}, None, None, None]),
     ])
     db.commit()
     return {"user": u, "id": u.id, "note": note.id, "cat": cat.id, "share": share.id,
@@ -135,17 +141,20 @@ class Test注销入口:
 
 
 class Test删干净:
-    def test_一次删完六类数据并回报条数(self, client, db, mine):
+    def test_一次删完七类数据并回报条数(self, client, db, mine):
         resp = wipe(client, mine)
         assert resp.status_code == 200, resp.text
         assert resp.json()["deleted"] == {
             "notes": 1, "categories": 1, "shares": 1, "jobs": 1, "assets": 1, "cards": 1,
+            "profile": 1,
         }
-        for model in (Note, Category, Share, Job, Asset, NoteCard):
+        for model in (Note, Category, Share, Job, Asset, NoteCard, UserProfile):
             assert rows(db, model, mine["id"]) == 0, model.__tablename__
         # 卡片那行的对象必须出现在同一份 file_ids 里——客户端只读那一个键，
         # 没带出去的那个 jpg 在云上就永远没人删得动。
         assert "cloud://x/del-me.jpg" in resp.json()["file_ids"], resp.json()
+        # 名片那四格的对象同理（第七类，2.1）
+        assert "cloud://x/del-me-avatar.jpg" in resp.json()["file_ids"], resp.json()
         assert db.query(User).filter(User.id == mine["id"]).count() == 0
         assert db.query(Invitation).count() == 0
 
@@ -163,7 +172,7 @@ class Test删干净:
         resp = wipe(client, {"user": empty})
         assert resp.status_code == 200
         assert resp.json()["deleted"] == {"notes": 0, "categories": 0, "shares": 0,
-                                          "jobs": 0, "assets": 0, "cards": 0}
+                                          "jobs": 0, "assets": 0, "cards": 0, "profile": 0}
         assert rows(db, Note, other["id"]) == 1
 
 

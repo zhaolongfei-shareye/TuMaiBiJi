@@ -184,7 +184,26 @@ if not card_idx or "UNIQUE" not in card_idx.upper():
 if "is_current" not in card_idx:
     print(f"  ✗ ux_note_cards_one_current_per_note 建上了但没带 is_current 条件：{card_idx}")
     raise SystemExit(1)
-print("  ✓ users.quota_bonus / users.invited_by / users.generation / users.contact_email / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / note_cards（含「一篇一张」那条部分唯一索引）/ 一篇笔记一张有效码的索引 到位")
+# ---- 2.1 名片与外观档位那条链（2026-10-08）----
+# user_profiles 缺表的症状与 note_cards 同型：POST 会 500（看得见），而**静默的那一半**是
+# 客户端读不到就落回本机那份缓存——界面上"名片好好的"，换一台手机才发现四格全是空的。
+if "user_profiles" not in tables:
+    print("  ✗ 缺 user_profiles 表，名片与外观档位整条链没落点")
+    raise SystemExit(1)
+prof_cols = {c["name"] for c in insp.get_columns("user_profiles")}
+missing = sorted({"user_id", "name", "slogan", "slots", "bg_dim", "ui_font"} - prof_cols)
+if missing:
+    print(f"  ✗ user_profiles 迁移后仍缺：{'、'.join(missing)}")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    prof_idx = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND name='ix_user_profiles_user_id'"
+    )).scalar()
+if not prof_idx or "UNIQUE" not in (prof_idx or "").upper():
+    print("  ✗ user_profiles.user_id 上缺那条唯一索引（一人一份只剩代码里一句自觉）")
+    raise SystemExit(1)
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / users.contact_email / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / note_cards（含「一篇一张」那条部分唯一索引）/ user_profiles（含「一人一份」那条唯一索引）/ 一篇笔记一张有效码的索引 到位")
 PY
 if [[ $? -ne 0 ]]; then
     echo "✗ schema 校验未通过，终止部署"

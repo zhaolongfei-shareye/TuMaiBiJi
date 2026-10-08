@@ -303,6 +303,14 @@ def deactivate_account(
         r[0]
         for r in db.query(NoteCard.object_key).filter(NoteCard.user_id == uid).all()
     ]
+    # 名片那四格同理（2.1 起图在云上）：这是最后一次能把地址交回去的机会。
+    # 逐行读 JSON 列而不是在 SQL 里筛——`slots` 是一个数组，四格里哪格有图只有解出来才知道。
+    from app.models.user_profile import UserProfile
+
+    for (slots,) in db.query(UserProfile.slots).filter(UserProfile.user_id == uid).all():
+        for s in (slots or []):
+            if s and s.get("file_id"):
+                asset_ids.append(s["file_id"])
     deleted = {
         "notes": db.query(Note).filter(Note.user_id == uid).delete(),
         "categories": db.query(Category).filter(Category.user_id == uid).delete(),
@@ -310,6 +318,7 @@ def deactivate_account(
         "jobs": db.query(Job).filter(Job.user_id == uid).delete(),
         "assets": db.query(Asset).filter(Asset.user_id == uid).delete(),
         "cards": db.query(NoteCard).filter(NoteCard.user_id == uid).delete(),
+        "profile": db.query(UserProfile).filter(UserProfile.user_id == uid).delete(),
     }
 
     # 防止邀请奖励上限绕过：注销前先把该用户贡献给邀请人的 bonus 扣掉
