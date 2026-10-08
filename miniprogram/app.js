@@ -68,24 +68,39 @@ App({
     // 待补绑队列：图传上去了但"归到哪篇笔记"没做成（B 链比 A 链慢、或 bind 那一下弱网）。
     // 这批对象在云上占着全站配额、库里却没有账，所以每次回到前台补一次。
     // 不 await、不提示：它属于"看不见但迟早要对上"的那一类。
-    if (this.globalData.isLoggedIn) {
-      assetQueue.flush(apiModule).then((r) => {
-        if (r && r.sent) console.log(`补绑回 ${r.sent} 张图`)
-      })
-      // 待删队列：笔记删了、云上对象没删成的那批（同一族，另一头）。不 await、不提示。
-      cloudUpload.flushPurge().then((n) => {
-        if (n) console.log(`补删掉 ${n} 个云上对象`)
-      })
-      // 卡片待补登记：成品图传上去了、但"这一张归哪篇"那一步没做成的那批（同一族，第三个头）。
-      // 这批最坏的情况是"云上有一张图、库里没有那一行"——界面上看不见，换台手机更看不见。
-      cardCloud.flush().then((r) => {
-        if (r && r.sent) console.log(`补登记回 ${r.sent} 张卡片`)
-      })
-      // 卡片补传：图还在本机、云上却没有那一行的那几张（10-08 那一趟留档静默死掉留下的存量）。
-      cardCloud.backfillLocal().then((r) => {
-        if (r && r.sent) console.log(`补传上云 ${r.sent} 张卡片`)
-      })
-    }
+    this.flushQueues()
+  },
+
+  /**
+   * 五头欠账一起补：待补绑、待删对象、卡片待补登记、卡片补传、名片待补写。
+   *
+   * 为什么收成一个方法而不是留在 onShow 里：**冷启动那一次 onShow 早于 `_doLogin` 回来**，
+   * 这一趟的闸门 `isLoggedIn` 那时还是 false，于是一头都不补，要等用户把小程序切到后台再回来
+   * 才补第一次（10-09 审计那条）。所以登录成功那一刻也要自己叫一次，两处同一个出处。
+   */
+  flushQueues() {
+    if (!this.globalData.isLoggedIn) return
+    assetQueue.flush(apiModule).then((r) => {
+      if (r && r.sent) console.log(`补绑回 ${r.sent} 张图`)
+    })
+    // 待删队列：笔记删了、云上对象没删成的那批（同一族，另一头）。不 await、不提示。
+    cloudUpload.flushPurge().then((n) => {
+      if (n) console.log(`补删掉 ${n} 个云上对象`)
+    })
+    // 卡片待补登记：成品图传上去了、但"这一张归哪篇"那一步没做成的那批（同一族，第三个头）。
+    // 这批最坏的情况是"云上有一张图、库里没有那一行"——界面上看不见，换台手机更看不见。
+    cardCloud.flush().then((r) => {
+      if (r && r.sent) console.log(`补登记回 ${r.sent} 张卡片`)
+    })
+    // 卡片补传：图还在本机、云上却没有那一行的那几张（10-08 那一趟留档静默死掉留下的存量）。
+    cardCloud.backfillLocal().then((r) => {
+      if (r && r.sent) console.log(`补传上云 ${r.sent} 张卡片`)
+    })
+    // 名片待补写：换图／改名那一下 PUT 没成的那一笔。不补的话下一次 pull 会拿服务器那份
+    // 覆盖本机，把用户刚换的那张删掉（profileCloud 顶上那格注释写着这条）。
+    profileCloud.flushPending().then((cleared) => {
+      if (!cleared) console.warn('名片那一笔这次还没补成，留在本机')
+    })
   },
 
   async _reportInviter() {
@@ -139,6 +154,9 @@ App({
       }
       this.globalData.isLoggedIn = true
       this.applyTheme(this.globalData.userInfo.wallpaper)
+      // 五头欠账：冷启动那一次 onShow 比这里早，那时 isLoggedIn 还是 false，所以补账必须
+      // 在登录回来的这一刻自己叫一次，不能等用户切后台再回来（10-09 审计那条）。
+      this.flushQueues()
       // 2.1 第一条：名片那四格与两档外观的权威在服务器 `user_profiles`，本机那份降级成缓存。
       // 挂在"登录成功"这一刻，是因为站长把跨端定义成一句话——同一个微信号换手机／重置手机之后
       // **再登录**就该是自己的东西，不该还要他去点一枚「恢复」。

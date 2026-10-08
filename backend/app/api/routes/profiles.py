@@ -25,15 +25,15 @@
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.routes.assets import MAX_FILE_ID_LEN, _assert_ours, _clean_file_id
 from app.core.auth import get_current_user
+from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
-from app.models.asset import Asset
-from app.models.note_card import NoteCard
 from app.models.user import User
 from app.models.user_profile import (
     BG_DIM_RANGE,
@@ -47,7 +47,6 @@ from app.models.user_profile import (
 router = APIRouter()  # 路径写全（/api/user/profile），与 cards.py 同一做法
 logger = logging.getLogger(__name__)
 
-MAX_FILE_ID_LEN = 500  # 与 Asset.object_key / NoteCard.object_key 同宽
 # 名片图的上界拦的是"这不像一张形象图"，不是配额（配额那条见 models/user_profile.py 第 3 条）。
 # 与 assets/cards 同值：云开发单文件上限 20MB。
 MAX_PROFILE_UPLOAD_BYTES = 20 * 1024 * 1024
@@ -91,37 +90,6 @@ class ProfileOut(BaseModel):
 class ProfileSaveOut(BaseModel):
     profile: ProfileOut
     file_ids: List[str] = Field(default_factory=list)
-
-
-def _clean_file_id(fid: str) -> str:
-    """与 `routes/assets.py:_clean_items` 同一条格式校法（那边是内联的，这里抽出来复用）。"""
-    s = (fid or "").strip()
-    rest = s[len("cloud://"):] if s.startswith("cloud://") else ""
-    if not rest:
-        raise HTTPException(status_code=400, detail="图片地址格式不对")
-    if len(s) > MAX_FILE_ID_LEN:
-        raise HTTPException(status_code=400, detail="图片地址过长")
-    return s
-
-
-def _assert_ours(db: Session, uid: str, fid: str) -> None:
-    """这个地址如果已经在别人的账上，直接拒。
-
-    三张表都要问：`assets`（配图）、`note_cards`（卡片）、`user_profiles`（别人的名片）。
-    没登记过的新地址走不到这里被拒——它是这条链的常态（客户端先传后登记，服务器无从预知）。
-    """
-    for model in (Asset, NoteCard, UserProfile):
-        if model is UserProfile:
-            rows = db.query(model.slots).filter(model.user_id != uid).all()
-            for (slots,) in rows:
-                for s in (slots or []):
-                    if s and s.get("file_id") == fid:
-                        raise HTTPException(status_code=400, detail="图片地址不属于当前账号")
-            continue
-        col = Asset.object_key if model is Asset else NoteCard.object_key
-        hit = db.query(model).filter(col == fid).first()
-        if hit and hit.user_id != uid:
-            raise HTTPException(status_code=400, detail="图片地址不属于当前账号")
 
 
 def _clean_slots(db: Session, uid: str, slots: List[Optional[SlotIn]]) -> List[Optional[dict]]:
@@ -188,12 +156,18 @@ def read_profile(db: Session = Depends(get_db), user: User = Depends(get_current
 
 
 @router.put("/api/user/profile", response_model=ProfileSaveOut)
+@limiter.limit("30/minute")
 def write_profile(
+    request: Request,
     body: ProfileIn,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """补丁式写：只改请求体里出现的那几栏。回体带被换下／撤掉的旧地址清单。"""
+    """补丁式写：只改请求体里出现的那几栏。回体带被换下／撤掉的旧地址清单。
+
+    限流与卡片那个口同理由（10-09 审计）：这一口会把旧对象交回调用方去删，不该被白打。
+    30/分钟照的是"四格一次全换 + 名称一句话 + 亮度档"这种最宽的合法连写。
+    """
     uid = str(user.id)
     row = _row_or_none(db, uid)
     if row is None:

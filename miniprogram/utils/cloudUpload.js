@@ -95,6 +95,11 @@ function deleteFiles(fileIDs) {
   }
   return _deleteOnce(ids).then((r) => {
     if (r.failed.length) purge.push(r.failed)
+    // 这一趟真删成的那几条顺手从队列里摘掉。为什么在这儿也要摘一次（`flushPurge` 那边已经摘了）：
+    // 调用方现在会在**发删除请求之前**先把地址记进队列（"回体丢在网络上就永久没人认得"那一刀，
+    // 见 cardCloud.dropServer 与 detail.onDelete），不摘的话那几条会一直留着，
+    // 每次进前台多带几个 id 去删一个已经不存在的对象。
+    purge.drop(ids.filter((x) => r.failed.indexOf(x) < 0))
     return r.done
   })
 }
@@ -148,4 +153,13 @@ function dropFromDeleteRes(res) {
   return deleteFiles(ids)
 }
 
-module.exports = { CLOUD_ENV, cloudReady, initCloud, uploadImage, deleteFiles, dropFromDeleteRes, flushPurge }
+/**
+ * 只把地址记进待删那一格，不动手。用在"发那个不可逆请求**之前**"：
+ * 服务端删了行、把地址交回来的那一步要是丢在网络上，这批地址就再没人认得（对象只有客户端删得动）。
+ * 真删成的那几条由 `deleteFiles`／`flushPurge` 自己从队列里摘掉，所以预留不会留下尾巴。
+ */
+function reservePurge(ids) {
+  purge.push((ids || []).filter(Boolean))
+}
+
+module.exports = { CLOUD_ENV, cloudReady, initCloud, uploadImage, deleteFiles, dropFromDeleteRes, reservePurge, flushPurge }

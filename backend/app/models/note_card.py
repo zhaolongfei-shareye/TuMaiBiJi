@@ -27,13 +27,11 @@ ORIGIN_RE_RENDERED = "re-rendered"          # 账在图没了 → 按台账里�
 ORIGIN_FROM_SHARE_SNAPSHOT = "from-share-snapshot"  # 连账都没了 → 按 shares 那份快照重出的
 CARD_ORIGINS = (ORIGIN_LIVE, ORIGIN_BACKFILLED, ORIGIN_RE_RENDERED, ORIGIN_FROM_SHARE_SNAPSHOT)
 
-# 配额入账口径：**一张卡片按 200KB 的上界计**，不是实测（10-08 站长定："先按 ≤200KB 入账，
-# 量到实测再校，别用 5MB"）。今天没有实测数，所以宁可往上算——报少了的后果是"明明快满了
-# 界面还说有余量"，那正是这个产品最难查的那类假话。
-# ⚠ 这一栏**只用于配额估算**，不是写口的拒收线：拿没量的数去挡真人是另一种错法。
-# 实测从 S2 上线后每一条登记的 file_size 自己进来（ssh 只读查一次 MAX(file_size) 就是数），
-# 不需要再跑第四趟探针。
-CARD_ACCOUNT_BYTES = 200 * 1024
+# 这里原来有一栏 `CARD_ACCOUNT_BYTES = 200 * 1024`——站长 10-08 定的"没量到实测之前，
+# 一张卡片按 ≤200KB 上界**估算**入账"。S2 起每一条登记都带真实 `file_size`，估算的替身
+# 就该退场：配额现在 SUM 两张表的真字节（`routes/assets.py:_sum_bytes`，10-09 审计）。
+# 留着一个没有消费者的口径常量，等于给下一个人留第二份真相。
+# ⚠ 挡人的那道线在 routes/cards.py（云开发单文件 20MB），**从来不是**这个数，也别再拿它当闸门。
 
 
 class NoteCard(Base):

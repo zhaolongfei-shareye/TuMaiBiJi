@@ -252,6 +252,13 @@ Page({
       content: t('cannotRestore', lang),
       success: async (res) => {
         if (res.confirm) {
+          // 先把这篇的云端地址记进待删那一格，再按删除。顺序反过来的那一种失败是：
+          // 服务端行没了、回体丢在网络上，那批对象就永久没人认得（只有客户端删得动）。
+          // 本机知道这些地址的时机就是现在——配图那一排与卡片那一格都是刚读回来的。
+          const known = this.data.noteImages.map((x) => x && x.cloud_url).filter(Boolean)
+          const card = cardCloud.serverCard(this.data.note.id)
+          if (card && card.cloud_url) known.push(card.cloud_url)
+          cloudUpload.reservePurge(known)
           try {
             const r = await api.deleteNote(this.data.note.id)
             // 行是服务端删的，**对象只有这一侧删得动**（那台后端没有云开发凭据）。

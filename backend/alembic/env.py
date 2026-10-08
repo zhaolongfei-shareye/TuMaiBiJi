@@ -8,6 +8,11 @@ from alembic import context
 from app.core.config import settings
 from app.db.database import Base
 from app.models import Note, User, Category, Asset, Job, Share
+# ⚠ 这一行不是装饰：alembic 只看得见"这里 import 进来的表"。`app.models` 那个 __init__ 到
+# 10-09 还漏着 user_profile，于是 `--autogenerate` 会把库里那张真表当成"多出来的表"，
+# 顺手写一条 drop_table('user_profiles') 发出去——整表名片数据没了（10-09 审计严重③）。
+# 新加表的同一次提交里要在这里补一行，`tests/test_模型注册齐不齐` 钉着这一条。
+from app.models.user_profile import UserProfile  # noqa: F401  只要它把表挂进 Base.metadata
 
 config = context.config
 

@@ -125,10 +125,15 @@ function loadCloud(src) {
 
   // 10 接线：写了得有人调
   const appSrc = fs.readFileSync(APP, 'utf8')
-  const onShow = (appSrc.match(/onShow\(options\) \{[\s\S]*?\n  \},/) || [''])[0]
-  ck('⑩ app.onShow 真调了 flushPurge，且和补绑队列在同一个"已登录"分支里（写了没人调＝等于没写）',
-    /flushPurge\(\)/.test(onShow) && /assetQueue\.flush\(apiModule\)/.test(onShow) && /isLoggedIn/.test(onShow),
-    onShow ? '' : 'onShow 那段没匹配到')
+  const q = (appSrc.match(/flushQueues\(\) \{[\s\S]*?\n  \},/) || [''])[0]
+  ck('⑩ 待删这一头真有人调，且闸门只写一处（flushQueues 开头一句 isLoggedIn 判定）',
+    /cloudUpload\.flushPurge\(\)/.test(q) && /if \(!this\.globalData\.isLoggedIn\) return/.test(q),
+    q ? '' : 'flushQueues 那段没匹配到')
+  // 10b 两个时机都得叫它：冷启动那次 onShow 早于登录回来，只挂 onShow 等于第一趟一个都不补
+  const shown = (appSrc.match(/onShow\(options\) \{[\s\S]*?\n  \},/) || [''])[0]
+  const login = (appSrc.match(/async _doLogin\(\) \{[\s\S]*?\n  \},/) || [''])[0]
+  ck('⑩b 回前台与刚登录两处都调（原来只挂 onShow，冷启动那一趟一头都不补）',
+    /this\.flushQueues\(\)/.test(shown) && /this\.flushQueues\(\)/.test(login))
 
   // 11 接线：三个调用方仍走同一条路
   const dropRes = (fs.readFileSync(CLOUD, 'utf8').match(/function dropFromDeleteRes[\s\S]*?\n}/) || [''])[0]

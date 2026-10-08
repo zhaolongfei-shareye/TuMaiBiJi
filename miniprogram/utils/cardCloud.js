@@ -71,8 +71,13 @@ async function archive(noteId, entry) {
       origin: entry.origin || 'live',
     }
     try {
-      await api.putNoteCard(noteId, item)
-      return { ok: true, fileID: up.fileID }
+      const res = await api.putNoteCard(noteId, item)
+      // 这一趟顶成历史的那几张：对象只有客户端删得动，服务端把地址交回来、这一侧顺手删掉，
+      // 删不成由 `deleteFiles` 自己落进待删那一格。走这一条的两种现场：同一篇换模板重出，
+      // 和离线时"一篇一张"那道闸失效（share.js 明写读不到就当没有，让他生成）。
+      const replaced = (res && res.replaced_file_ids) || []
+      if (replaced.length) cloudUpload.deleteFiles(replaced)
+      return { ok: true, fileID: up.fileID, replaced: replaced.length }
     } catch (e) {
       cardQueue.push(noteId, item)
       return { ok: false, queued: true, fileID: up.fileID }
@@ -135,6 +140,18 @@ function clearServer() {
 
 function serverCard(noteId) {
   return serverCards[String(noteId)] || null
+}
+
+/**
+ * 本机此刻知道的云上地址（那一份名单读回来过就有）。
+ * 注销账号那一路只有这一个时机能预留：那个请求一回体丢了，服务器上什么都没了，
+ * 再没有第二个地方能告诉这台手机"曾经有这几张图归你"。配图那一批不在这里——
+ * 本机从没整份读过那个清单，那一条要真做严得服务端先交清单后删行（另开一次，见 PRD §8.161）。
+ */
+function knownFileIDs() {
+  return Object.keys(serverCards)
+    .map((k) => serverCards[k] && serverCards[k].cloud_url)
+    .filter(Boolean)
 }
 
 /** 这批数有没有真从服务端读回来过。没读回来时"没有卡片"这句话不成立，界面对此要保守。 */
@@ -211,6 +228,11 @@ async function refreshOne(noteId) {
  */
 async function dropServer(noteId) {
   try {
+    // 先把这一张的地址记进待删那一格，**再**发撤档请求。顺序是有讲究的：服务端那一步是
+    // "删行 + 把地址交回来"，而对象只有客户端删得动（那台后端没有云开发凭据）。回体要是丢在
+    // 网络上，行没了、地址也没人记得，那个对象就永久占着全站配额。本机知道这个地址的时机只有现在。
+    const known = serverCard(noteId)
+    if (known && known.cloud_url) cloudUpload.reservePurge([known.cloud_url])
     const res = await api.deleteNoteCard(noteId)
     serverCards = Object.assign({}, serverCards)
     delete serverCards[String(noteId)]
@@ -249,5 +271,5 @@ function forget(noteId) {
 module.exports = {
   CARD_KIND, archive, flush, backfillLocal,
   setServer, clearServer, serverCard,
-  isLoaded, cellFor, hasCard, refresh, refreshOne, dropServer, signOut, forget,
+  isLoaded, cellFor, hasCard, refresh, refreshOne, dropServer, signOut, forget, knownFileIDs,
 }

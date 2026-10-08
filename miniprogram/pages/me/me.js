@@ -6,6 +6,7 @@ const { CONTACT_EMAIL } = require('../../utils/contact.js')
 const { VERSION, SITE, introLead } = require('../../utils/appInfo.js')
 const { TIP_DOT } = require('../../utils/palette.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
+const cardCloud = require('../../utils/cardCloud.js')
 
 // 配额告警线。比值来自 GET /api/user/storage-quota 的 used_ratio，**它是全站口径**
 // （云开发那 5GB 是一个环境一个池子，不是每人 5GB），所以这一行说的是"这一池水快见底了"，
@@ -499,6 +500,10 @@ Page({
     const lang = this.data.lang
     this.deleting = true
     wx.showLoading({ title: t('deletingAccount', lang), mask: true })
+    // 先把本机知道的卡片地址记进待删那一格，再发注销：这一趟要是回体丢在网络上，token 当场作废，
+    // 那批对象就再也没有第二个地方能问出来了。清单仍以服务端这次回体为准，这一格只是把
+    // "没人记得"变成"下次进前台再删一次"。（配图那一批本机从没整份读过，见 cardCloud.knownFileIDs 注释。）
+    cloudUpload.reservePurge(cardCloud.knownFileIDs())
     try {
       const r = await api.deactivateAccount()
       wx.hideLoading()

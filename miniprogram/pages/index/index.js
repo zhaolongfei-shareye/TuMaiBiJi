@@ -591,6 +591,10 @@ Page({
       content: t('cannotRestore', lang),
       success: async (res) => {
         if (!res.confirm) return
+        // 与详情页那一条同一个动作、同一个顺序：先把这篇在云上的地址记进待删那一格，再发删除。
+        // 回体丢在网络上时，行没了而对象还在，就只有"本机曾经知道"这一条路能把它找回来。
+        const known = cardCloud.serverCard(note.id)
+        if (known && known.cloud_url) cloudUpload.reservePurge([known.cloud_url])
         try {
           const r = await api.deleteNote(note.id)
           // 与详情页那一条同一个动作：服务端删行，这一侧删云上的对象（后端没那个凭据）。

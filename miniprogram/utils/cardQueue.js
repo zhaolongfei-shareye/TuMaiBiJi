@@ -49,27 +49,45 @@ function push(noteId, item) {
 async function flush(api) {
   const list = take()
   if (!list.length) return { sent: 0, left: 0 }
-  const drop = []
+  const done = []
   let sent = 0
   for (const entry of list) {
     try {
       await api.putNoteCard(entry.noteId, entry.item)
       sent += 1
-      drop.push(entry)
+      done.push(entry)
     } catch (e) {
       // 服务端明确拒绝（4xx：笔记已删、地址不属于你、来源不认得）就摘掉——重试一万次也不会成，
       // 留着只会让每次进前台都白打一个请求。api.js 对非 2xx 回的是整个 res，所以这里读 statusCode。
       const code = e && e.statusCode
       if (code >= 400 && code < 500) {
         console.warn('卡片补登记被服务端拒绝，这条不再重试', code)
-        drop.push(entry)
+        done.push(entry)
         continue
       }
       console.warn('卡片补登记没成，留在队列里下次再试', e && (e.errMsg || e.message))
     }
   }
-  _put(list.filter((x) => !drop.includes(x)))
-  return { sent, left: list.length - drop.length }
+  _prune(done)
+  return { sent, left: take().length }
+}
+
+/**
+ * 收尾按**差量**写回：重读一次现表，只摘掉"这一趟真处理完、且内容没在这期间被动过"的那几条。
+ *
+ * 原来这里是 `_put(list.filter(...))`——拿循环开头那份快照整表覆盖。而每条 await 之间
+ * `push()` 完全可能落进来一条新的（回前台四头并发打接口，窗口是几秒），那一条就会被这份旧快照
+ * 盖掉。丢掉的后果不是"少补一次"，是**云上真有那个对象、库里没有那一行、而本机 `up` 已立**
+ * ——登记没人做、清理也没人做，界面上永远看不见它（10-09 审计第二条，`assetQueue` 同型）。
+ * 所以比对内容：同一个 noteId 但 item 变了，说明中间被重新 push 过，那条要留着。
+ */
+function _prune(done) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  _put(take().filter((x) => {
+    if (!x) return true
+    const was = done.find((d) => d && d.noteId === x.noteId)
+    return !was || !same(was, x)
+  }))
 }
 
 /**

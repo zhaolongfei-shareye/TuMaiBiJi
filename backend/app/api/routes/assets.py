@@ -30,7 +30,9 @@ from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
 from app.models.asset import Asset, MAX_ASSETS_PER_NOTE, not_failed
 from app.models.note import Note
+from app.models.note_card import NoteCard
 from app.models.user import User
+from app.models.user_profile import UserProfile
 
 router = APIRouter()  # 路径写全（跨 /api/notes 与 /api/user 两个前缀），见 main.py 那行注释
 logger = logging.getLogger(__name__)
@@ -96,18 +98,50 @@ def _owned_note_or_404(db: Session, user: User, note_id: int) -> Note:
     return note
 
 
+def _clean_file_id(fid: str) -> str:
+    """一条 fileID 的格式校法，**三张表共用**：`assets`（配图）、`note_cards`（卡片）、
+    `user_profiles`（名片）。原来三处各写一遍（这边内联在 `_clean_items` 里、cards.py 叫
+    `_check_file_id`、profiles.py 叫 `_clean_file_id`），结果 cards.py 那一份查空白、
+    profiles.py 那一份查长度——**同一条脏数据在三个口有三种命运**（10-09 审计）。
+    """
+    s = (fid or "").strip()
+    # 光看前缀不够：`cloud://` 自己也算"以 cloud:// 开头"，那是一条指向空的地址，
+    # 存进去之后前端拿它换临时链接只会拿到一个看不懂的错。
+    rest = s[len("cloud://"):] if s.startswith("cloud://") else ""
+    if not rest or any(c.isspace() for c in rest):
+        raise HTTPException(status_code=400, detail="图片地址格式不对")
+    if len(s) > MAX_FILE_ID_LEN:
+        raise HTTPException(status_code=400, detail="图片地址过长")
+    return s
+
+
+def _assert_ours(db: Session, uid: str, fid: str) -> None:
+    """这个地址如果已经在**别人**的账上，直接拒。
+
+    为什么必须有：fileID 是能被读到的地址，谁拿到都能往自己名下登记一行；而"删笔记／撤档／注销"
+    的回体会把这些地址交回**调用方**去删。不校这一条，就是"把你的对象登记成我的，再替我删掉"。
+    （10-09 审计第五条：卡片那个口当时只校形状，没校这一条。）
+
+    没登记过的新地址走不到这里被拒——它是这条链的常态（客户端先传后登记，服务器无从预知）。
+    """
+    for model, col in ((Asset, Asset.object_key), (NoteCard, NoteCard.object_key)):
+        hit = db.query(model).filter(col == fid).first()
+        if hit and hit.user_id != uid:
+            raise HTTPException(status_code=400, detail="图片地址不属于当前账号")
+    # 名片那一行的四格存在一个 JSON 列里，没有可查的列，只能整列捞出来在内存里比。
+    for (slots,) in db.query(UserProfile.slots).filter(UserProfile.user_id != uid).all():
+        for s in (slots or []):
+            if s and s.get("file_id") == fid:
+                raise HTTPException(status_code=400, detail="图片地址不属于当前账号")
+
+
 def _clean_items(items: List[AssetIn]) -> List[AssetIn]:
     """校格式 + 去重 + 卡张数。脏数据一律 400，不静默丢——静默丢会让"传上去 9 张、
     笔记里只剩 6 张"这种问题变成查不到的玄学。"""
     seen = set()
     out: List[AssetIn] = []
     for it in items:
-        fid = it.file_id.strip()
-        # 光看前缀不够：`cloud://` 自己也算"以 cloud:// 开头"，那是一条指向空的地址，
-        # 存进去之后前端拿它换临时链接只会拿到一个看不懂的错。
-        rest = fid[len("cloud://"):] if fid.startswith("cloud://") else ""
-        if not rest or any(c.isspace() for c in rest):
-            raise HTTPException(status_code=400, detail="图片地址格式不对")
+        fid = _clean_file_id(it.file_id)
         if fid in seen:
             continue
         seen.add(fid)
@@ -197,10 +231,23 @@ def list_note_assets(
 
 
 def _sum_bytes(db: Session, uid: Optional[str] = None) -> int:
-    q = db.query(func.coalesce(func.sum(Asset.file_size), 0)).filter(not_failed())
+    """**配图 + 卡片两张表**的真实字节。
+
+    原来这里只 SUM `Asset`，而卡片对象住在同一个桶里（`cards/` 那一层）却一个字节都没进账——
+    那枚"快满了"因此长期偏低，报的是一句"明明快满了界面还说有余量"的假话（10-09 审计）。
+    站长 10-08 定 ≤200KB 上界入账时说得很清楚：那是**没量到实测之前的估算口径**，
+    "量到实测再校"。S2 起每一条登记都带真实 `file_size`，实测数就在这一列里，所以口径换成真数，
+    那个估算常量随之退休（`models/note_card.py`、`验-卡片留档S1.js`、方案 §四.4、PRD §8.149 同批改）。
+
+    张数那一栏（`_count`）**不跟着加卡片**：界面上那一句说的是"你存了几张图"，
+    把成品卡片混进去会变成"我明明只传了 3 张图，怎么显示 7 张"。
+    """
+    q1 = db.query(func.coalesce(func.sum(Asset.file_size), 0)).filter(not_failed())
+    q2 = db.query(func.coalesce(func.sum(NoteCard.file_size), 0))
     if uid:
-        q = q.filter(Asset.user_id == uid)
-    return int(q.scalar() or 0)
+        q1 = q1.filter(Asset.user_id == uid)
+        q2 = q2.filter(NoteCard.user_id == uid)
+    return int(q1.scalar() or 0) + int(q2.scalar() or 0)
 
 
 def _count(db: Session, uid: Optional[str] = None) -> int:

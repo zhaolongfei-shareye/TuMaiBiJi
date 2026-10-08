@@ -20,12 +20,18 @@
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.routes.assets import _owned_note_or_404
+from app.api.routes.assets import (
+    MAX_FILE_ID_LEN,
+    _assert_ours,
+    _clean_file_id,
+    _owned_note_or_404,
+)
 from app.core.auth import get_current_user
+from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
 from app.models.note import Note
@@ -36,14 +42,13 @@ from app.models.user import User
 router = APIRouter()  # 路径写全（跨 /api/notes 与 /api/user 两个前缀），同 assets.py 那条
 logger = logging.getLogger(__name__)
 
-# NoteCard.object_key 是 String(500)，但 SQLite 上那只是装饰——长度只能在入口卡（assets.py 同条）。
-MAX_FILE_ID_LEN = 500
+# NoteCard.object_key 是 String(500)，但 SQLite 上那只是装饰——长度只能在入口卡。
+# 那个数与那条校法现在只有一个出处：`assets.py` 的 `MAX_FILE_ID_LEN` / `_clean_file_id`。
 MAX_TPL_LEN = 50
 # 写口的 size 拦的是"这不像一张卡片"，不是配额：上界取**云开发单文件上限 20MB**（与
-# assets 那条同值同理由）。⚠ 故意**不拿 200KB 当拒收线**——一张卡片到底多少字节今天还没量到
-# （站长 10-08 让探针停在三趟，"别为它停 S1"），拿一个没量过的数当闸门，症状会是真用户的
-# 卡片存不上。200KB 是**配额入账口径**（models/note_card.py 的 CARD_ACCOUNT_BYTES），
-# 量到实测再校，两件事不许混成一个数。
+# assets 那条同值同理由）。⚠ 故意**不拿"一张卡片大概多少字节"当拒收线**——拿一个估算数
+# 当闸门，症状会是真用户的卡片存不上。配额是另一件事：它 SUM 的是每一行登记自带的真实
+# `file_size`（`assets._sum_bytes`，10-09 审计换的口径）。两个数不许混成一个。
 MAX_CARD_UPLOAD_BYTES = 20 * 1024 * 1024
 
 
@@ -70,6 +75,11 @@ class CardOut(BaseModel):
     height: Optional[int] = None
     origin: str
     created_at: UTCDatetime = None
+    # 这一趟被顶成历史的那几条地址。交回给调用方去删，理由与 `file_ids` 那两个口同一条：
+    # **对象只有客户端删得动**（这台后端没有云开发凭据）。不交的话，"同一篇换了一套模板重出"
+    # 那一条路上旧的那张图就在云上永久留着，谁都不认得它——离线时那道"一篇一张"的闸失效
+    # （share.js:75 明写"读不到就当没有，让他生成"）走的正是这一条。
+    replaced_file_ids: List[str] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -121,15 +131,6 @@ class CardDropOut(BaseModel):
     file_ids: List[str] = Field(default_factory=list)
 
 
-def _check_file_id(fid: str) -> str:
-    s = (fid or "").strip()
-    # 光看前缀不够：`cloud://` 自己也算"以 cloud:// 开头"，那是一条指向空的地址。
-    rest = s[len("cloud://"):] if s.startswith("cloud://") else ""
-    if not rest or any(c.isspace() for c in rest):
-        raise HTTPException(status_code=400, detail="图片地址格式不对")
-    return s
-
-
 def _views(rows) -> List[dict]:
     out = []
     for r in rows:
@@ -150,20 +151,30 @@ def _views(rows) -> List[dict]:
 
 
 @router.post("/api/notes/{note_id}/card", response_model=CardOut)
+@limiter.limit("60/minute")
 def put_note_card(
+    request: Request,
     note_id: int,
     payload: CardIn,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """登记这篇笔记当前那张卡片。**幂等 upsert**：旧的转历史，新的成为当前。"""
+    """登记这篇笔记当前那张卡片。**幂等 upsert**：旧的转历史，新的成为当前。
+
+    限流这一道原来没有（10-09 审计）：这一口写的是库，个人主体的小程序没有第二个人会打到它，
+    但它同时是"把别人的地址挂到自己名下"那条路的入口，脚本化的尝试不该白打。
+    60/分钟是照着"回前台一次把存量卡片整批补登记"那个最宽的合法场景给的，不是照人手速给的。
+    """
     _owned_note_or_404(db, user, note_id)
     if payload.origin not in CARD_ORIGINS:
         raise HTTPException(status_code=400, detail="卡片来源不认得")
     if any(c.isspace() for c in payload.tpl.strip()) or not payload.tpl.strip():
         raise HTTPException(status_code=400, detail="模板名不对")
-    fid = _check_file_id(payload.file_id)
+    fid = _clean_file_id(payload.file_id)
     uid = str(user.id)
+    # 归属这一刀原来只有配图与名片两个口有，卡片这个口漏了（10-09 审计第五条）。漏的后果不是
+    # "看见别人的图"，是**别人的对象会被这台客户端删掉**：撤档与删笔记的回体把 file_ids 交回调用方。
+    _assert_ours(db, uid, fid)
 
     # 先查是不是"同一张卡片再登记一次"（重传、补传重跑都算）：那就不该留一条历史，
     # 否则补传跑两遍就攒出两行同址的记录，读回来靠顺序决胜——那是不确定行为。
@@ -184,6 +195,7 @@ def put_note_card(
         db.refresh(row)
         return _views([row])[0]
 
+    demoted = [o.object_key for o in same if o.object_key != fid]
     for old in same:
         old.is_current = False
     row = NoteCard(
@@ -201,7 +213,9 @@ def put_note_card(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return _views([row])[0]
+    out = _views([row])[0]
+    out["replaced_file_ids"] = demoted
+    return out
 
 
 @router.get("/api/notes/{note_id}/card", response_model=CardReadOut)

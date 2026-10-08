@@ -57,28 +57,42 @@ function push(noteId, items) {
 async function flush(api) {
   const list = take()
   if (!list.length) return { sent: 0, left: 0 }
-  const drop = []
+  const done = []
   let sent = 0
   for (const entry of list) {
     try {
       await api.bindNoteAssets(entry.noteId, entry.items)
       sent += entry.items.length
-      drop.push(entry)
+      done.push(entry)
     } catch (e) {
       // 服务端明确拒绝（4xx：笔记已删、地址不属于你、超张数）就摘掉——重试一万次也不会成，
       // 留着只会让每次进前台都白打一个请求。api.js 对非 2xx 回的是整个 res，所以这里读 statusCode。
       const code = e && e.statusCode
       if (code >= 400 && code < 500) {
         console.warn('补绑被服务端拒绝，这条不再重试', code)
-        drop.push(entry)
+        done.push(entry)
         continue
       }
       // 剩下的（弱网、超时、5xx）留着下次再试：一次抖动不该丢掉整批。
       console.warn('补绑没成，留在队列里下次再试', e && (e.errMsg || e.message))
     }
   }
-  _put(list.filter((x) => !drop.includes(x)))
-  return { sent, left: list.length - drop.length }
+  _prune(done)
+  return { sent, left: take().length }
+}
+
+/**
+ * 收尾按**差量**写回，与 `cardQueue._prune` 同一个道理（那边有注释）：原来拿循环开头那份快照
+ * 整表覆盖，几条 await 之间新 push 进来的那一批（同一篇并进来几条 items 也算）会被静默盖掉，
+ * 留下的就是文件头说的那笔"云上占着配额、库里没有账、永远对不上"的对不上账。
+ */
+function _prune(done) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  _put(take().filter((x) => {
+    if (!x) return true
+    const was = done.find((d) => d && d.noteId === x.noteId)
+    return !was || !same(was, x)
+  }))
 }
 
 /**

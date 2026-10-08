@@ -120,8 +120,11 @@ ck('"这张图到底还在不在"只有一个定义，四处都调它',
   `定义 ${(MODEL.match(/def not_failed/g) || []).length} / assets ${(BE.match(/not_failed\(\)/g) || []).length}`)
 ck('张数卡的是"这篇最终有多少张"，不是"这一次送几条"',
   /current \| \{it\.file_id for it in items\}/.test(BE))
-ck('fileID 光杆 cloud:// 被拒（前缀之外还得有东西）',
-  /rest = fid\[len\("cloud:\/\/"\):\]/.test(BE) && /if not rest/.test(BE))
+ck('fileID 光杆 cloud:// 被拒（前缀之外还得有东西）——三张表现在共用这一个函数',
+  /def _clean_file_id\(fid: str\)/.test(BE) && /rest = s\[len\("cloud:\/\/"\):\]/.test(BE)
+    && /if not rest or any\(c\.isspace\(\) for c in rest\)/.test(BE)
+    && /fid = _clean_file_id\(it\.file_id\)/.test(BE),
+  '内联那段被抽成 _clean_file_id 之后这条要跟着改锚点，别改回查字符串出现')
 
 /* ---------- 六、A/B 双链：B 链不许有任何一条路挡住"笔记存下来" ---------- */
 const CREATE = stripComments(read('miniprogram/pages/create/create.js'))
@@ -141,12 +144,14 @@ ck('压不动就传原图（"宁可大一点也不丢图"在调用侧也成立�
 ck('队列有上限 50 且超限丢最旧（无界会把 storage 撑爆）',
   /MAX_QUEUE = 50/.test(QUEUE) && /list\.splice\(0, list\.length - MAX_QUEUE\)/.test(QUEUE))
 ck('flush 把"绑成功"和"服务端明确拒绝（4xx）"两种摘掉，弱网留着下次再试',
-  /_put\(list\.filter\(\(x\) => !drop\.includes\(x\)\)\)/.test(QUEUE)
-    && /code >= 400 && code < 500/.test(QUEUE))
+  /_prune\(done\)/.test(QUEUE) && /code >= 400 && code < 500/.test(QUEUE))
+ck('收尾按差量写回，不许拿开头那份快照整表覆盖（10-09 审计：那样会丢掉 flush 期间新 push 的那条）',
+  /function _prune\(done\)/.test(QUEUE) && !/_put\(list\.filter\(/.test(QUEUE))
 ck('push 对同一 fileID 去重（bind 幂等，但队列并起来才少打请求）',
   /new Set\(mine\.items\.map\(\(it\) => it\.file_id\)\)/.test(QUEUE))
-ck('回到前台补一次绑，且被登录态挡着',
-  /assetQueue\.flush\(apiModule\)/.test(APP) && /if \(this\.globalData\.isLoggedIn\) \{[\s\S]{0,120}?assetQueue\.flush/.test(APP))
+ck('回到前台补一次绑，且被登录态挡着（闸门收在 flushQueues 开头那一句）',
+  /assetQueue\.flush\(apiModule\)/.test(APP)
+    && /flushQueues\(\) \{\s*if \(!this\.globalData\.isLoggedIn\) return/.test(APP))
 ck('B 链的 gate 只有一处判 cloudReady（判两次会出现"一半传了一半没传"）',
   (CREATE.match(/cloudReady\(\)/g) || []).length === 1,
   `${(CREATE.match(/cloudReady\(\)/g) || []).length} 处`)

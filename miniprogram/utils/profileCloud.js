@@ -96,6 +96,9 @@ function serverState() {
  *    地址变了就拉新的并收回旧那张占的地方，云上这一格是空的就把本机这一格也撤掉。
  */
 async function pull() {
+  // 第一件事：把欠着的那一笔补送一次。**还欠着的时候这一趟整段都不许往下走**——
+  // 下面的对齐拿"服务器权威"办事，会把云上还没有的那一格当已删除、把用户刚换的那张本机图删掉。
+  if (!(await flushPending())) return { ok: true, deferred: true, reason: 'pending-write' }
   let r
   try {
     r = await api.getProfile()
@@ -154,10 +157,12 @@ async function pull() {
   poster.writeProfile({ name: r.name || '', slogan: r.slogan || '' })
   if (r.tpl) poster.writeProfile({ template: r.tpl })
   removed.forEach((p) => poster.removeAvatar(p))
-  // 那两档外观：读回来有值才落本机（null 是"没登记过这一档"，不是"要清成默认"）
+  // 那两档外观：读回来有值才落本机（null 是"没登记过这一档"，不是"要清成默认"）。
+  // ⚠ 第二个参数 `fromServer` 必须传 true：`app.setBgDim` 不带它就会顺手 pushDim 回写一次，
+  // 于是"读服务器"变成"往服务器写"，每次登录白打一次 PUT 并把那一行的 updated_at 顶新
+  //（10-09 审计那条；原来这里连注释都写了两遍，第二遍就是漏口留下的疤）。
   const app = getApp()
-  // 读回来有值才落本机（null 是"没登记过这一档"，不是"要清成默认"）
-  if (app && r.bg_dim !== null && r.bg_dim !== undefined) app.setBgDim(r.bg_dim)
+  if (app && r.bg_dim !== null && r.bg_dim !== undefined) app.setBgDim(r.bg_dim, true)
   return { ok: true, server: true, downloaded, failed, removed: removed.length }
 }
 
@@ -194,6 +199,64 @@ async function bootstrap() {
 
 // ---------- 写的那一半 ----------
 
+/* 欠着的那一笔（单格，补丁语义）。
+ *
+ * 为什么必须有这一格：`_push` 失败原来只 `console.warn`，而 `pull()` 那一趟对齐是按
+ * "服务器权威"做的——云上这一格是空的就把本机那一格 `removeAvatar` 删掉（:123-126），
+ * 地址不一样就下新的、收旧的（:147）。于是"换图那一下 PUT 没成"＋"下次再登录"这两件事一撞，
+ * **用户刚换的那张图被静默删掉、退回旧的那张**，而刚传上去那个对象没人登记成孤儿（10-09 审计严重①）。
+ * 卡片那一族早就有 `cardQueue` 干这件事，名片这一族 `signOut()` 的注释里本来也写着"待补都清"，
+ * 只是那一格一直没做。
+ *
+ * 单格、后写的覆盖先写的：服务端 PUT 是补丁语义（只带要改的那几栏），所以同一栏以最后一次为准，
+ * 不同栏各留各的——这正是 `Object.assign` 的语义，不需要队列。 */
+const PENDING_KEY = 'profilePendingPatch'
+
+function _pending() {
+  const v = wx.getStorageSync(PENDING_KEY)
+  return v && typeof v === 'object' && Object.keys(v).length ? v : null
+}
+
+function _putPending(patch) {
+  try {
+    if (patch && Object.keys(patch).length) wx.setStorageSync(PENDING_KEY, patch)
+    else wx.removeStorageSync(PENDING_KEY)
+  } catch (e) {
+    // 写不进去只是补不成（下一次 pull 会因为"还欠着"而不去动本机），不许把调用方卡住
+    console.warn('名片待补那一格写不进去', e)
+  }
+}
+
+function hasPending() { return !!_pending() }
+
+function _mergePending(patch) {
+  if (!patch) return
+  _putPending(Object.assign(_pending() || {}, patch))
+}
+
+/** 送成了只摘这一笔涉及的那几栏：别的栏可能还欠着，整格清会把它们一起抹掉。 */
+function _subPending(patch) {
+  const cur = _pending()
+  if (!cur) return
+  const left = Object.assign({}, cur)
+  Object.keys(patch || {}).forEach((k) => { delete left[k] })
+  _putPending(left)
+}
+
+/** 把欠着的那一笔补送一次。全送掉了回 true；还欠着回 false——pull 就据此决定敢不敢动本机那一份。 */
+// 两个入口会同时叫它（app.flushQueues 与 pull 自己），而 `api` 这一层没有去重：
+// 同一笔 PUT 发两遍是白打一个请求，更要紧的是两遍回来都会去摘那一格，顺序不定。
+// 所以同一时刻只让一趟在飞，后到的拿前一趟的结果。
+let _flushing = null
+function flushPending() {
+  if (_flushing) return _flushing
+  const patch = _pending()
+  if (!patch) return Promise.resolve(true)
+  _flushing = _push(patch).then(() => !hasPending())
+    .finally(() => { _flushing = null })
+  return _flushing
+}
+
 /**
  * 把一份补丁送到服务器，并把回体里"被换下／撤掉"的旧对象删掉。
  * @param {object} patch 只带要改的那几栏（服务端是补丁语义）
@@ -209,10 +272,12 @@ async function _push(patch, meta) {
     setServer(Object.assign({}, serverProfile || {}, res && res.profile ? res.profile : patch,
       { updated_at: (res && res.profile && res.profile.updated_at) || new Date().toISOString() }))
     serverLoaded = true
+    _subPending(patch)
     const dropped = await cloudUpload.dropFromDeleteRes(res)
     return Object.assign({ ok: true, dropped }, meta || {})
   } catch (e) {
     console.warn('名片这一趟没登记上（界面上还是本机那份）', e && (e.errMsg || e.statusCode))
+    _mergePending(patch)
     return Object.assign({ ok: false, reason: 'write' }, meta || {})
   }
 }
@@ -260,10 +325,11 @@ function pushDim(v) { return push({ bg_dim: v }) }
 /** 换身份／注销之后由 app.clearSession 调：内存那份与待补都清，本机文件一份都不动。 */
 function signOut() {
   clearServer()
+  _putPending(null)
 }
 
 module.exports = {
-  PROFILE_KIND,
-  pull, bootstrap, push, pushSlots, pushText, pushDim,
+  PROFILE_KIND, PENDING_KEY,
+  pull, bootstrap, push, pushSlots, pushText, pushDim, flushPending, hasPending,
   setServer, clearServer, serverHasRow, serverState, isLoaded, signOut,
 }

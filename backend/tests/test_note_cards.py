@@ -9,9 +9,11 @@
 ④ **删除连带走的是同一个 `file_ids` 键**，不另起 `card_file_ids`：客户端
    `cloudUpload.dropFromDeleteRes` 只读那一个键，两处各改一遍迟早漏一处。漏了的后果是云上
    留一堆没人记得的对象，而对象只有客户端删得动。
-⑤ **配额按每张 ≤200KB 的上界入账，是估算不是实测**（站长 10-08 定）。这一栏不许当写口的
-   拒收线——挡人的那道线是云开发单文件上限 20MB，两个数混成一个的那天，症状就是"用户的
-   卡片存不上"。
+⑤ **配额 SUM 的是两张表的真实字节**（`assets` + `note_cards` 的 file_size，10-09 审计改的；
+   此前是"没量到实测前按 ≤200KB 估算"）。入账的数与挡人的数永远是两个数——挡人的那道线是
+   云开发单文件上限 20MB，混成一个的那天，症状就是"用户的卡片存不上"。
+⑥ **一条地址只能挂在它主人的账上**（`assets._assert_ours`）：不校这一条，谁拿到一条 fileID
+   就能把它登记成自己的，再借"撤档/删笔记"的回体让他的客户端去删别人那个对象。
 """
 import os
 import sys
@@ -31,7 +33,7 @@ from app.db.database import Base, SessionLocal, engine
 from app.main import app
 from app.api.routes.cards import MAX_CARD_UPLOAD_BYTES
 from app.models.note import Note
-from app.models.note_card import CARD_ACCOUNT_BYTES, NoteCard
+from app.models.note_card import NoteCard
 from app.models.share import Share
 from app.models.user import User
 
@@ -128,6 +130,18 @@ class Test一篇只留一张:
         got = client.get(f"/api/notes/{n.id}/card", headers=hdr(u)).json()
         assert got["card"]["cloud_url"] == second and got["card"]["tpl"] == "quote"
 
+    def test_顶掉旧的那张时地址交回调用方(self, client, db):
+        """10-09 审计：库里留历史行是对的，云上那个对象却从此没人认得——**只有客户端删得动**。
+        所以这一口的回体必须把被顶掉的那几条带出去，客户端顺手删（删不成进待删那一格）。"""
+        u = mk_user(db, "d2")
+        n = mk_note(db, u)
+        assert put(client, u, n.id).json()["replaced_file_ids"] == []   # 头一张，没顶掉谁
+        second = "cloud://tumaibiji.abc/cards/1-quote-2.jpg"
+        r = put(client, u, n.id, file_id=second, tpl="quote")
+        assert r.json()["replaced_file_ids"] == [FID], f"旧地址没交回来：{r.json()}"
+        # 同一个地址再登记一次（补传重跑）不算顶掉自己
+        assert put(client, u, n.id, file_id=second).json()["replaced_file_ids"] == []
+
     def test_同一个地址重复登记不产生第二行(self, client, db):
         """补传那一趟会重跑。攒历史行的话，读回来哪条赢取决于查询顺序。"""
         u = mk_user(db, "e")
@@ -221,6 +235,20 @@ class Test归属:
         got = client.get("/api/user/cards", headers=hdr(a)).json()
         assert [c["note_id"] for c in got["cards"]] == [na.id]
         assert got["cards"][0]["cloud_url"] == "cloud://x/a.jpg"
+
+    def test_别人名下的地址登记不到自己笔记上(self, client, db):
+        """10-09 审计第五条：这一口原来只校形状，不校这个地址是不是别人的。
+
+        后果不是"看见别人的图"，是**别人的对象会被这台客户端删掉**——撤档与删笔记的回体
+        把 `file_ids` 交回调用方去 `deleteFile`。谁拿到一条地址，就能把它挂到自己名下再删掉它。
+        """
+        a, b = mk_user(db, "o1"), mk_user(db, "o2")
+        na, nb = mk_note(db, a, "甲的"), mk_note(db, b, "乙的")
+        fid = "cloud://tumaibiji.abc/cards/steal.jpg"
+        assert put(client, a, na.id, file_id=fid).status_code == 200
+        r = put(client, b, nb.id, file_id=fid)
+        assert r.status_code == 400, f"这条地址在甲的账上，乙却登记得进：{r.status_code}"
+        assert db.query(NoteCard).filter(NoteCard.object_key == fid).count() == 1
 
 
 class Test批量读那份待确认名单:
@@ -345,24 +373,43 @@ class Test删除连带:
 
 
 class Test配额记账口径:
-    """站长 10-08 定的那条，三处一起记（代码 / 这把尺子 / 方案 §四.4 + PRD §8.149）：
-    **一张卡片按 ≤200KB 的上界入账，是估算不是实测**。
+    """10-09 审计把这一条换成**真实字节**：配额 SUM 的是 `assets` + `note_cards` 两张表各自的
+    `file_size`。此前是"没量到实测之前按 ≤200KB 上界估算入账"（站长 10-08 定），而 S2 起每一行
+    登记都带真实 `file_size`，那个估算替身就该退场——`CARD_ACCOUNT_BYTES` 已删。
 
-    为什么宁可往大里估：报少了的症状是"明明快满了，界面还说有余量"——那正是这个产品
-    最难查的那类假话。而估多了只是提前一格提示，用户点掉就完了。
+    原来这一格里只 SUM 配图，卡片一个字节都没进账，那枚"快满了"报的是"明明快满了界面还说有余
+    量"的假话；而旧用例把"配额口一个字没变"当判据钉死，绿灯正好盖住了这件事。
 
-    ⚠ 这一栏**不许当写口的拒收线**，所以这里三条断言其实是同一件事的三个方向：入账的数
-    与挡人的数必须是两个数，混成一个的那天就是"用户的卡片存不上"的那天。
+    ⚠ 入账的数与挡人的数永远是两个数：挡人的那道线是云开发单文件上限 20MB，混成一个的那天，
+    症状就是"用户的卡片存不上"。
     """
 
-    def test_入账口径就是200KB(self):
-        assert CARD_ACCOUNT_BYTES == 200 * 1024, (
-            "口径变了就得同批改方案 §四.4、PRD §8.149 与 验-卡片留档S1.js，别只改这一栏")
+    def test_卡片字节进配额(self, client, db):
+        u = mk_user(db, "q1")
+        n = mk_note(db, u)
+        q = lambda: client.get("/api/user/storage-quota", headers=hdr(u)).json()["user_bytes"]
+        before = q()
+        assert put(client, u, n.id, size=204800).status_code == 200
+        assert q() - before == 204800, "卡片那 204,800 字节没进账——「快满了」还在报假话"
 
-    def test_比上界大的卡片照样登记得进(self, client, db):
+    def test_别人的卡片不算到我账上(self, client, db):
+        a, b = mk_user(db, "q2"), mk_user(db, "q3")
+        na, nb = mk_note(db, a), mk_note(db, b)
+        assert put(client, a, na.id, size=300000).status_code == 200
+        assert client.get("/api/user/storage-quota", headers=hdr(b)).json()["user_bytes"] == 0
+
+    def test_张数那一栏不跟着卡片涨(self, client, db):
+        """界面上那句说的是"你存了几张图"。把成品卡片混进张数会变成"我明明只传了 3 张图，
+        怎么显示 7 张"——字节进账、张数不进账，是两条分开的口径，谁也别顺手统一掉。"""
+        u = mk_user(db, "q4")
+        n = mk_note(db, u)
+        assert put(client, u, n.id, size=1024).status_code == 200
+        assert client.get("/api/user/storage-quota", headers=hdr(u)).json()["user_count"] == 0
+
+    def test_比旧上界大的卡片照样登记得进(self, client, db):
         u = mk_user(db, "s1")
         n = mk_note(db, u)
-        big = 300 * 1024  # 超过入账上界 1.5 倍：估算线不是闸门
+        big = 300 * 1024  # 超过当年那个估算上界 1.5 倍：入账口径从来不是闸门
         assert put(client, u, n.id, size=big).status_code == 200
         assert db.query(NoteCard).filter(NoteCard.note_id == n.id).first().file_size == big
 
@@ -370,7 +417,6 @@ class Test配额记账口径:
         u = mk_user(db, "s2")
         n = mk_note(db, u)
         assert MAX_CARD_UPLOAD_BYTES == 20 * 1024 * 1024
-        assert MAX_CARD_UPLOAD_BYTES != CARD_ACCOUNT_BYTES
         assert put(client, u, n.id, size=MAX_CARD_UPLOAD_BYTES + 1).status_code == 422
 
 

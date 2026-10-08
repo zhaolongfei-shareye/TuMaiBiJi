@@ -3,10 +3,12 @@
 // S1 只有四件事：一张表、一条迁移、四个口、删除连带。能静态钉住的就是"这四件事在不在
 // 同一个口径上"，跑真库的那部分在 backend/tests/test_note_cards.py（21 条）。
 //
-// 最贵的一条是**配额口径**（站长 10-08 定：一张卡片按 ≤200KB 的上界**入账**，是估算不是
-// 实测）。它必须同时出现在四个地方——模型常量、测试、方案 §四.4、PRD §8.149——少一处就是
-// 下一个人会改错的地方；而它**绝不许**当写口的拒收线，所以这里还反向钉一条"把 200KB 当闸门"
-// 的变异，那条必须红。
+// 最贵的一条一直是**配额口径**。站长 10-08 定的是"没量到实测之前按 ≤200KB 上界估算入账"（PRD §8.149），
+// 10-09 审计把它换成**真实字节**：S2 起每一行登记都带 `file_size`，估算的替身该退场，而那一口
+// 当时只 SUM 配图，卡片一个字节都没进账（PRD §8.161）。
+// 现在这一把钉的是新口径的四处一致：`assets._sum_bytes` 两张表都算、那个估算常量**不许回来**、
+// 测试钉行为不钉常量、方案 §四.4 与 PRD 跟着改。挡人的那道线仍然是云开发 20MB——
+// 入账的数与挡人的数永远是两个数，混成一个的那天就是"用户的卡片存不上"的那天。
 // 跑法：node docs/工具/验-卡片留档S1.js
 const fs = require('fs')
 const path = require('path')
@@ -14,6 +16,7 @@ const path = require('path')
 const R = (p) => fs.readFileSync(path.resolve(__dirname, '../../', p), 'utf8')
 
 const MODEL = 'backend/app/models/note_card.py'
+const ASSETS = 'backend/app/api/routes/assets.py'
 const ROUTES = 'backend/app/api/routes/cards.py'
 const MAIN = 'backend/app/main.py'
 const NOTES = 'backend/app/api/routes/notes.py'
@@ -29,17 +32,30 @@ function 判(src) {
     console.log(`${ok ? '✓' : '✗'} ${name}${got === undefined || got === '' ? '' : ' → ' + got}`)
     if (!ok) bad.push(name)
   }
-  const m = src[MODEL], r = src[ROUTES], main = src[MAIN], notes = src[NOTES]
+  const m = src[MODEL], assets = src[ASSETS], r = src[ROUTES], main = src[MAIN], notes = src[NOTES]
   const user = src[USER], mig = src[MIG], t = src[TESTS], plan = src[PLAN], prd = src[PRD]
 
-  // —— ① 配额口径：200KB 是**入账**上界，四处置必须相等 ——
-  ck('模型里那一个源头 = 200 * 1024', /CARD_ACCOUNT_BYTES\s*=\s*200\s*\*\s*1024/.test(m))
-  ck('测试钉住了同一个数', /CARD_ACCOUNT_BYTES\s*==\s*200\s*\*\s*1024/.test(t))
-  ck('方案 §四.4 写了 ≤200KB 入账', /200KB/.test(plan) && /入账/.test(plan))
-  ck('PRD 记了这条口径（§8.149）', /8\.149/.test(prd) && /200KB/.test(prd))
-  ck('口径写明"估算、不是实测"', /估算/.test(m) && /不是实测/.test(m))
+  // —— ① 配额口径：SUM 两张表的**真实字节**（10-09 审计换的，四处一起改）——
+  ck('配额 SUM 的是配图 + 卡片两张表的 file_size',
+    /func\.sum\(Asset\.file_size\)/.test(assets) && /func\.sum\(NoteCard\.file_size\)/.test(assets)
+      && /return int\(q1\.scalar\(\) or 0\) \+ int\(q2\.scalar\(\) or 0\)/.test(assets))
+  // 注释里提一嘴"这个数退休了"是有用的，所以钉的是"它不再是一个定义／不再被 import"，
+  // 不是"这个字符串不许出现"——后者会把说明性注释也判红，那是尺子挡人。
+  // 整行注释先剔掉再找赋值：`# 这里原来有一栏 CARD_ACCOUNT_BYTES = 200 * 1024` 那句是说明，
+  // 拿它当"定义又回来了"会把人往回赶（反向④注入的那行不带 #，照样红得住）。
+  const m无注 = m.split('\n').filter((x) => !/^\s*#/.test(x)).join('\n')
+  ck('那个估算常量已经退休：不许再有定义、测试不许再 import 它',
+    !/^\s*CARD_ACCOUNT_BYTES\s*=/m.test(m无注) && !/import[^\n]*CARD_ACCOUNT_BYTES/.test(t))
+  ck('测试钉的是行为（登记一张 → 配额涨那么多字节），不是常量等于字面量',
+    /def test_卡片字节进配额/.test(t) && /q\(\) - before == 204800/.test(t)
+      && !/CARD_ACCOUNT_BYTES == 200/.test(t))
+  ck('字节进账、张数不进账，两条口径各有一条用例',
+    /def test_张数那一栏不跟着卡片涨/.test(t))
+  ck('方案 §四.4 跟着换成真实字节', /真实字节/.test(plan) || /真实 file_size/.test(plan))
+  ck('PRD 记了这次改口径（§8.161），估算那段史留在 §8.149 不抹',
+    /8\.161/.test(prd) && /8\.149/.test(prd))
   // 挡人的那道线是另一个数：云开发单文件上限 20MB。两个数一旦相等，症状就是"用户的卡片存不上"。
-  ck('写口那道线是 20MB，不是 200KB', /MAX_CARD_UPLOAD_BYTES\s*=\s*20\s*\*\s*1024\s*\*\s*1024/.test(r))
+  ck('写口那道线还是 20MB，与入账口径是两个数', /MAX_CARD_UPLOAD_BYTES\s*=\s*20\s*\*\s*1024\s*\*\s*1024/.test(r))
   ck('size 字段吃的是 20MB 那道线', /size:.*le=MAX_CARD_UPLOAD_BYTES/.test(r))
   ck('测试钉住"比 200KB 大的照样登记得进"', /big\s*=\s*300\s*\*\s*1024/.test(t))
 
@@ -101,7 +117,7 @@ function 判(src) {
 }
 
 const src = {}
-for (const f of [MODEL, ROUTES, MAIN, NOTES, USER, MIG, TESTS, PLAN, PRD]) src[f] = R(f)
+for (const f of [MODEL, ASSETS, ROUTES, MAIN, NOTES, USER, MIG, TESTS, PLAN, PRD]) src[f] = R(f)
 
 console.log('———— 正例：现在这份代码 ————')
 const bad = 判(src)
@@ -124,19 +140,29 @@ m2[USER] = src[USER].replace(/return \{"message": "账号已注销", [^\n]*?\}/,
 if (m2[NOTES] === src[NOTES] || m2[USER] === src[USER]) { console.log('✗ 变异没打上（锚点漂了）'); process.exit(2) }
 const b2 = 判(m2)
 
-console.log('\n———— 反向钉③：只改代码，方案与 PRD 里那句 200KB 撤掉 ————')
+console.log('\n———— 反向钉③：配额改回只 SUM 配图（10-09 之前那个样子） ————')
 const m3 = Object.assign({}, src)
-m3[PLAN] = src[PLAN].replace(/200KB/g, '一个还没量的数')
+m3[ASSETS] = src[ASSETS].replace('    return int(q1.scalar() or 0) + int(q2.scalar() or 0)',
+                                '    return int(q1.scalar() or 0)')
+if (m3[ASSETS] === src[ASSETS]) { console.log('✗ 变异没打上（锚点漂了）'); process.exit(2) }
 const b3 = 判(m3)
 
-const 红1 = b1.some((x) => x.includes('写口那道线是 20MB'))
+console.log('\n———— 反向钉④：把那个估算常量请回来（四处又变成两份真相） ————')
+const m4 = Object.assign({}, src)
+m4[MODEL] = src[MODEL] + '\nCARD_ACCOUNT_BYTES = 200 * 1024\n'
+m4[TESTS] = src[TESTS] + '\nassert CARD_ACCOUNT_BYTES == 200 * 1024\n'
+const b4 = 判(m4)
+
+const 红1 = b1.some((x) => x.includes('写口那道线还是 20MB'))
 const 红2 = b2.some((x) => x.includes('回体只有 file_ids'))
   && b2.some((x) => x.includes('注销同样带走'))
   && b2.some((x) => x.includes('card_file_ids 这个键'))
-const 红3 = b3.some((x) => x.includes('方案 §四.4'))
+const 红3 = b3.some((x) => x.includes('两张表的 file_size'))
+const 红4 = b4.some((x) => x.includes('那个估算常量已经退休'))
 
 console.log(`\n正例 ${bad.length ? '红 ' + bad.length + ' 条：' + bad.join('、') : '全绿'}`)
 console.log(`反向①拿估算线当闸门 ${红1 ? '红在对的地方' : '没红＝这条判据是假的'}`)
 console.log(`反向②另起一个键 ${红2 ? '红在对的地方' : '没红＝这条判据是假的'}`)
-console.log(`反向③只改代码不改文档 ${红3 ? '红在对的地方' : '没红＝这条判据是假的'}`)
-process.exit(bad.length || !红1 || !红2 || !红3 ? 1 : 0)
+console.log(`反向③配额改回只 SUM 配图 ${红3 ? '红在对的地方' : '没红＝这条判据是假的'}`)
+console.log(`反向④把估算常量请回来 ${红4 ? '红在对的地方' : '没红＝这条判据是假的'}`)
+process.exit(bad.length || !红1 || !红2 || !红3 || !红4 ? 1 : 0)
