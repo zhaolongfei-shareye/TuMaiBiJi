@@ -38,7 +38,8 @@ const ck = (name, ok, got) => {
   // 「把丢了的卡片找回来」那一行要点开才跑；这里直接调页面那一个方法，省掉两下点按的不稳定。
   await page.callMethod('onRepairCards')
   // 一趟里每一张都要：读正文 → 画布重画 → 落本机持久文件 → 传云 → 登记。模拟器上一张十几秒。
-  await sleep(150000)
+  // 11 篇一起重出：每篇要读正文、画一趟、传一张图，模拟器上一张十几秒
+  await sleep(420000)
 
   // 判的是**落盘那张图**，不是 `mp.screenshot()` 的回值：这一把第一次跑就是红在这里，
   // 而文件明明在（365KB）——回值形状是我以为的，不是它给的。看图的人只需要文件。
@@ -57,9 +58,8 @@ const ck = (name, ok, got) => {
   const 有图 = cells.filter((c) => c.cards && c.cards.length)
   ck('卡片那一屏的格子里有图了（不再是一片空白，也不是"从没生成过"）',
     有图.length > 0, `${有图.length}/${cells.length} 格有图`)
-  const 待确认 = cells.filter((c) => c.needConfirm)
-  console.log(`　还挂着"请你确认"的格子：${待确认.length} 篇` +
-    (待确认.length ? `（原因 ${待确认.map((c) => c.needConfirm).join(',')}）` : ''))
+  const 空格子 = cells.filter((c) => !c.cards || !c.cards.length)
+  ck('屏上没有那种只有框框的空格子了（站长 10-08 打回的那一条）', 空格子.length === 0, `${空格子.length} 格空的`)
   const 留痕 = 有图.filter((c) => c.cards[0] && c.cards[0].origin)
   ck('补回来的那一格下面确实有那句留痕（不是悄悄换了他的东西）',
     留痕.length > 0, `${留痕.length} 格带 origin=${留痕.map((c) => c.cards[0].origin).join(',')}`)

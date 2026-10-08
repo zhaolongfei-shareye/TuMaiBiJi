@@ -317,21 +317,13 @@ Page({
       }
     })
     const cells = []
-    // 待确认档（2.0.1 S3）：这一格该说什么由 `cardRepair.confirmMap` 一处判（本机台账 + 服务器
-    // 那两份名单一起看），页面不许自己拼一遍——两处各判一次，同一篇就能在一屏里出两句反话。
-    const 待确认 = cardRepair.confirmMap()
+    // 站长 10-08 打回：原来这里给"卡片找不回来"的那几篇画 11 个虚线空框 + 一句"待你确认"，
+    // 看上去像加载失败，实际是把"我们没把这条关联送上服务器"的后果推给他点 11 次。
+    // 现在这一档由补卡那一趟按当前默认版式自动出（`cardRepair.run`），**格子只画真存在的图**，
+    // 没有图就不占位——那一句实话改到补完之后写在格子下面（留痕那行），不写在空框里。
     notes.forEach((n, i) => {
       const list = this._cardsOf(n.id)
-      if (list.length) { cells.push({ i, id: n.id, title: n.title, cards: list }); return }
-      const reason = 待确认[n.id]
-      if (!reason) return
-      // 那两句话一个是"我们不知道当年哪套模板"、一个是"形象图不在这台手机上了"，
-      // 都是**要他自己动手**的一句；拿同一句糊上去就是第二种假话（他没动手，我们却说请他确认）。
-      const lang = this.data.lang
-      cells.push({
-        i, id: n.id, title: n.title, cards: [], needConfirm: reason,
-        needText: t(reason === 'avatar' ? 'cardNeedAvatar' : 'cardNeedConfirm', lang),
-      })
+      if (list.length) cells.push({ i, id: n.id, title: n.title, cards: list })
     })
     // 两批都现算：切到卡片那一枚时台账可能刚被详情窗里那次出图改过，
     // 而这一屏每次数据动过都会重算，不需要额外的脏标记。
@@ -865,19 +857,22 @@ Page({
     if (!note) return { skip: 'noteGone' }
     const cat = (this.data.categories || []).find((c) => c.id === note.category_id)
     if (note.is_private || isPrivate(cat && cat.name)) return { skip: 'private' }
-    if (x.entry && x.entry.noQr) return { note }
-    let st = null
+    // 这张码只**复用已经开着的**：拿活码是为了在卡片上印它，不是为了开一篇新的公开。
+    // 读不到、或者根本没有活码，都只当"没有码"处理——不新建码这一步是硬规矩。
+    let qrPath = null
     try {
-      st = await api.getShareStatus(x.noteId)
-    } catch (err) {
-      return { skip: 'noToken' }
+      const st = await api.getShareStatus(x.noteId)
+      if (st && st.active && st.token) qrPath = await this._downloadQR(st.token)
+    } catch (err) { /* 读不到就当没有码，走不带码那一张 */ }
+    if (x.entry) {
+      // 当年那张印过码、而现在没有开着的码：不替他重新公开，这一张跳过并说清为什么。
+      if (!x.entry.noQr && !qrPath) return { skip: 'noToken' }
+      return { note, qrPath }
     }
-    if (!st || !st.active || !st.token) return { skip: 'noToken' }
-    try {
-      return { note, qrPath: await this._downloadQR(st.token) }
-    } catch (err) {
-      return { skip: 'qrFail' }
-    }
+    // 待确认那一档：版式只能按他现在的默认那套（没人记得当年是哪套），
+    // 有没有码跟着"现在这篇还开着不开着"走——关着就出不带码那张，绝不为出图去开一篇新的。
+    const profile = poster.posterProfile()
+    return { note, qrPath, tpl: profile.template || poster.DEFAULT_TEMPLATE, noQr: !qrPath }
   },
 
   /** 渲一张"当年那张"：正文优先用**当年那份分享快照**，没有快照才回退笔记现在的内容。 */
@@ -936,7 +931,7 @@ Page({
       title: t('repairDone', this.data.lang),
       content: t('repairReport', this.data.lang)
         .replace('{a}', 数.补传).replace('{b}', 数.重渲)
-        .replace('{c}', 数.待确认).replace('{d}', 数.跳过.length)
+        .replace('{c}', 数.重出).replace('{d}', 数.跳过.length)
         + (数.跳过.length ? '\n' + 数.跳过.map((s) => `${s.noteId}｜${t(REPAIR_SKIP[s.reason] || 'repairFailed', this.data.lang)}`).join('\n') : '')
         + (数.失败.length ? '\n' + 数.失败.map((s) => `${s.noteId}｜${t('repairFailed', this.data.lang)}`).join('\n') : '')
         + (数.摘掉 ? `\n${t('repairPrune', this.data.lang).replace('{n}', 数.摘掉)}` : '')

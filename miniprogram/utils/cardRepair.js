@@ -140,7 +140,7 @@ async function run(opt) {
   const 摘掉 = cardLog.pruneNotCards(isCardPath)
 
   const 这趟跳过 = []
-  const 报 = { 补传: 0, 重渲: 0, 待确认: p.needConfirm.length, 摘掉, 跳过: p.skipped.slice(), 失败: [] }
+  const 报 = { 补传: 0, 重渲: 0, 重出: 0, 摘掉, 跳过: p.skipped.slice(), 失败: [] }
   const 每篇 = (kind) => { if (o.onEach) o.onEach(kind) }
   // 这一趟能不能动这篇：页面那一个 check 说了算（锁着的、笔记已删的、不能再替它开公开码的）。
   // 回 skip 的那些一律进"跳过"，带着理由——§五 那条"跳过的每一篇要能列出是为什么跳过"。
@@ -189,15 +189,41 @@ async function run(opt) {
     每篇('render')
   }
 
+  // 待确认那一档现在也**自动出**（站长 10-08 打回的原话："技术上必须解决，而不是要把锅给用户自己承担"）。
+  // 原来这里画 11 个虚线框 + 弹一句"待你确认"，等于把"我们从来没把这条关联送上服务器"的后果
+  // 变成他的工作量。当年哪套版式确实没人记得，那就按他现在的默认版式出一张，
+  // 并在格子下面那句留痕里写清"版式是重出的、内容是你当年分享那份"——不冒充原图。
+  for (const x of p.needConfirm) {
+    const c = await 查(x)
+    if (c.skip) { 这趟跳过.push({ noteId: x.noteId, reason: c.skip }); continue }
+    if (!c.tpl) { 这趟跳过.push({ noteId: x.noteId, reason: 'noTpl' }); continue }
+    const tpl = c.tpl
+    const noQr = !!c.noQr
+    let tmp = null
+    try {
+      tmp = typeof o.render === 'function'
+        ? await o.render({ noteId: x.noteId, snapshot: x.snapshot, entry: { tpl, noQr } }, c)
+        : null
+    } catch (e) { tmp = null }
+    if (!tmp) { 报.失败.push({ noteId: x.noteId, reason: 'render' }); 每篇('snapshot'); continue }
+    const kept = await cardLog.copyIn(x.noteId, tpl, noQr, tmp, { archive: false, origin: 'from-share-snapshot' })
+    const entry = kept && kept[kept.length - 1]
+    if (!entry) { 报.失败.push({ noteId: x.noteId, reason: 'copyIn' }); 每篇('snapshot'); continue }
+    const r = await cardCloud.archive(x.noteId, { p: entry.p, tpl, noQr, origin: 'from-share-snapshot' })
+    if (r && r.ok) 报.重出++
+    else 报.失败.push({ noteId: x.noteId, reason: (r && (r.reason || 'queued')) || 'throw' })
+    每篇('snapshot')
+  }
+
   // 那份数的等式：分档分了几篇，处理完就得有几篇有下落（补上了／跳过了／失败了，三选一，
   // 一条都不许静默）。对不上就是这一趟自己撒了谎——宁可在界面上打出"数对不上"这一句，
   // 也不许报一句"已修复"。§七 验收 1.3 断的就是这一个相等。
   报.跳过 = 报.跳过.concat(这趟跳过)
-  const 应补 = p.backfill.length + p.reRender.length
+  const 应补 = p.backfill.length + p.reRender.length + p.needConfirm.length
   报.应补 = 应补
-  报.实补 = 报.补传 + 报.重渲
+  报.实补 = 报.补传 + 报.重渲 + 报.重出
   报.数对得上 = 报.实补 + 这趟跳过.length + 报.失败.length === 应补
-  return { loaded: true, 报告: 报, 待确认: p.needConfirm, plan: p }
+  return { loaded: true, 报告: 报, plan: p }
 }
 
 /**

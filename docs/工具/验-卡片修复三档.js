@@ -180,7 +180,7 @@ async function runPass() {
 
   const res = await cardRepair.run({
     avatarMissing: false,
-    check: () => ({}),
+    check: () => ({ tpl: 'classic' }),
     render: async (x) => `tmp/${x.noteId}.png`,
   })
   const 报 = res.报告
@@ -188,12 +188,16 @@ async function runPass() {
     上传.some((u) => u.noteId === 5 && u.origin === 'backfilled'), JSON.stringify(上传))
   ck('重渲那一张带的 origin 是 re-rendered',
     上传.some((u) => u.noteId === 6 && u.origin === 're-rendered'), JSON.stringify(上传))
-  ck('重渲落本机台账那一趟把自动留档关了（否则 origin 又被改回 live）',
-    台账写.length === 1 && 台账写[0].archiveOff === true, JSON.stringify(台账写))
+  // 10-08 之后落本机台账的不只重渲那一张：待确认那两篇按默认版式重出也走同一条（copyIn + archive:false）。
+  ck('凡是补卡这一趟落的台账，自动留档全被关掉（否则 origin 又被改回 live）',
+    台账写.length === 3 && 台账写.every((x) => x.archiveOff === true), JSON.stringify(台账写))
   ck('那份数：补传 1／重渲 1', 报.补传 === 1 && 报.重渲 === 1, JSON.stringify(报))
-  ck('那份数：待确认 2（7 与 8 那两篇要他自己动手）', 报.待确认 === 2, 报.待确认)
+  ck('那份数：待确认那两篇按现在的版式自动重出了（不再推给他点）', 报.重出 === 2, 报.重出)
+  ck('重出那两篇登记的 origin 是 from-share-snapshot（不冒充当年那张）',
+    上传.filter((u) => u.origin === 'from-share-snapshot').map((u) => u.noteId).sort().join() === '7,8',
+    JSON.stringify(上传))
   ck('那份数：台账里那条不是卡片的被摘掉并报了数', 报.摘掉 === 1, 报.摘掉)
-  ck('报出来的数与实际处理条数相等（§七 验收 1.3）', 报.数对得上 === true && 报.应补 === 2,
+  ck('报出来的数与实际处理条数相等（§七 验收 1.3）', 报.数对得上 === true && 报.应补 === 4,
     `应补 ${报.应补}／实补 ${报.实补}／跳过 ${报.跳过.length}／失败 ${报.失败.length}`)
 
   // check 回 skip 的那些必须逐条带理由，一条都不许静默消失
@@ -206,7 +210,7 @@ async function runPass() {
     again.cardLog.pruneNotCards = () => 0
     return again.cardRepair.run({
       avatarMissing: false,
-      check: (x) => (x.noteId === 5 ? { skip: 'private' } : x.noteId === 6 ? { skip: 'noToken' } : {}),
+      check: (x) => (x.noteId === 5 ? { skip: 'private' } : x.noteId === 6 ? { skip: 'noToken' } : { tpl: 'classic' }),
       render: async () => 'tmp.png',
     })
   })()
@@ -214,7 +218,7 @@ async function runPass() {
   ck('跳过的每一篇都列得出为什么（私密／不能再替它开公开码）',
     报2.跳过.length === 2 && 报2.跳过.some((s) => s.reason === 'private') && 报2.跳过.some((s) => s.reason === 'noToken'),
     JSON.stringify(报2.跳过))
-  ck('一篇没补成也不许那份数对不上', 报2.数对得上 === true && 报2.实补 === 0, JSON.stringify({ 应补: 报2.应补, 实补: 报2.实补 }))
+  ck('一篇没补成也不许那份数对不上', 报2.数对得上 === true && 报2.实补 === 2, JSON.stringify({ 应补: 报2.应补, 实补: 报2.实补 }))
 
   return { cardLog, cardCloud, cardRepair }
 }
@@ -230,9 +234,9 @@ async function reverses() {
     m.cardCloud.archive = async () => ({ ok: true })
     m.cardLog.copyIn = async (n, tpl, noQr) => [{ p: `${DIR}/${n}-${tpl}-9.jpg`, tpl, noQr }]
     m.cardLog.pruneNotCards = () => 0
-    const r = await m.cardRepair.run({ avatarMissing: false, check: () => ({}), render: null })
+    const r = await m.cardRepair.run({ avatarMissing: false, check: () => ({ tpl: 'classic' }), render: null })
     ck('反向①：没有画布那一步就红（不许静默少补一张）',
-      r.报告.数对得上 === false || r.报告.重渲 === 0,
+      r.报告.数对得上 === false || (r.报告.重渲 + r.报告.重出) === 0,
       `数对得上=${r.报告.数对得上} 重渲=${r.报告.重渲} 失败=${r.报告.失败.length}`)
   }
   // ② 撤掉缺图那道 guard：那篇会被当"能自动补"，界面上就承诺了一张渲不出原样的图
@@ -257,23 +261,24 @@ async function reverses() {
   {
     const m = load()
     m.cardCloud.setServer(SERVER.cards, SERVER.extra)
-    let got = null
+    const 全部 = []
     m.cardCloud.refresh = async () => ({ cards: [], need_confirm: [], snapshots: [] })
-    m.cardCloud.archive = async (n, e) => { got = e.origin; return { ok: true } }
+    m.cardCloud.archive = async (n, e) => { 全部.push(e.origin); return { ok: true } }
     m.cardLog.copyIn = async (n, tpl, noQr) => [{ p: `${DIR}/${n}-${tpl}-9.jpg`, tpl, noQr }]
     m.cardLog.pruneNotCards = () => 0
-    await m.cardRepair.run({ avatarMissing: false, check: () => ({}), render: async () => 't.png' })
-    ck('反向④：补传与重渲那两趟里没有一张被记成 live',
-      got === 're-rendered', `最后一趟 origin=${got}`)
+    await m.cardRepair.run({ avatarMissing: false, check: () => ({ tpl: 'classic' }), render: async () => 't.png' })
+    ck('反向④：这一趟登记的四张里没有一张被记成 live（live 只留给他自己刚生成的那一张）',
+      全部.length === 4 && 全部.every((o) => o !== 'live'), JSON.stringify(全部))
   }
-  // ⑤ 界面那一格那句话必须有共同来源（不许页面自己再拼一遍名单）
+  // ⑤ 站长 10-08 打回那 11 个虚线空框之后，两条必须钉住：格子只画真存在的图；补卡不许新开公开码
   {
     const code = fs.readFileSync(path.join(MP, 'pages/index/index.js'), 'utf8')
-    ck('反向⑤：待确认那一格问的是 cardRepair.confirmMap（判据一个出处）',
-      /cardRepair\.confirmMap\(\)/.test(code) && !/cardCloud\.needConfirm\(\)\s*\n\s*notes\.forEach/.test(code))
     const wxml = fs.readFileSync(path.join(MP, 'pages/index/index.wxml'), 'utf8')
-    ck('反向⑤b：那一格说的那句话从 JS 现算，wxml 里不写死（两种理由两句话）',
-      /item\.needText/.test(wxml) && /cardNeedAvatar/.test(code))
+    ck('反向⑤：卡片那一屏只画真存在的图（不再有待确认那种空框）',
+      !/needConfirm/.test(wxml) && !/needText/.test(code))
+    const 那一段 = code.split('_repairCheck(x)')[1].split('_repairRender')[0]
+    ck('反向⑤b：补卡那一趟里没有 createShare（只复用开着的码，绝不为出图把一篇再公开）',
+      !/createShare/.test(那一段) && /getShareStatus/.test(那一段))
   }
 }
 

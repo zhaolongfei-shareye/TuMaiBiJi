@@ -157,14 +157,8 @@
          私密那一篇例外：小图也走详情窗（拉大图会把这篇的活码建出来，而私密不给分享）。 -->
     <view wx:elif="{{cells.length}}" class="grid2">
       <view class="gc" wx:for="{{cells}}" wx:key="id">
-        <!-- 待确认档那一格（S3）：服务器知道这篇公开过、本机连台账都没了，**当年用的哪套模板没人记得**。
-             不画空白（空白＝"从没生成过"，正是这次要消灭的那个假象），也不自动猜一套——猜一张就是把他
-             没见过的那张塞进他的库。画一句实话，点下去走现有出图流程：模板名与带不带码他当场能看到、能改。
-             那句话由 JS 现算（`arrange` 里那两串之一）：缺形象图的那一篇要说的是另一句，
-             拿同一句糊上去＝叫他去做一件补不回来的事。 -->
-        <view class="pad {{item.needConfirm ? 'pad-need' : ''}}" catchtap="onCardTap" data-idx="{{item.i}}">
-          <image wx:if="{{!item.needConfirm}}" class="pad-img" src="{{item.cards[0].p}}" mode="aspectFit" />
-          <text wx:else class="pad-need-t">{{item.needText}}</text>
+        <view class="pad" catchtap="onCardTap" data-idx="{{item.i}}">
+          <image class="pad-img" src="{{item.cards[0].p}}" mode="aspectFit" />
         </view>
         <text class="g-cap" catchtap="onRowTap" data-idx="{{item.i}}">{{item.title}}</text>
       </view>
