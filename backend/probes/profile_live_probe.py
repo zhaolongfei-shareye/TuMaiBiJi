@@ -70,7 +70,17 @@ def main():
 
     # ---- 0. 地基：迁移真的跑过了，表和那条唯一索引都在 --------------------------------
     head = db.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-    check("alembic 头是名片那条（现读，不是推定）", "a9d3e5c7f218" in head, str(head))
+    # 不钉"头 == 名片那条"：下一次迁移一长出来这条就红，而红的是尺子不是代码（card_live_probe 同条教训）。
+    anc = set()
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+        sd = ScriptDirectory.from_config(Config("alembic.ini"))
+        for h in head:
+            anc |= {r.revision for r in sd.iterate_revisions(h, "base")}
+    except Exception as e:
+        check("读不到 alembic 的迁移链（这条探针不猜）", False, str(e)[:90])
+    check("名片那条迁移在库里已跑到的那个头之前", "a9d3e5c7f218" in anc, f"库里的头={head}")
     tables = set(db.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).scalars().all())
     check("user_profiles 表在现网库里", "user_profiles" in tables)
     if "user_profiles" not in tables:

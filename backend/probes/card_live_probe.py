@@ -66,7 +66,19 @@ def main():
 
     # ---- 0. 地基：迁移真的跑过了 ------------------------------------------------
     head = db.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-    check("alembic 头是卡片那条（现读，不是推定）", "f2b7d4a8c915" in head, str(head))
+    # 这一条原来钉的是"头 == 卡片那条"，10-08 名片那条迁移（a9d3e5c7f218）一长出来它就红了——
+    # 红了不是谁弄坏了，是这把尺子问的是"今天第几天"。改成问**卡片那条在不在已跑到的链上**。
+    anc = set()
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+        sd = ScriptDirectory.from_config(Config("alembic.ini"))
+        for h in head:
+            anc |= {r.revision for r in sd.iterate_revisions(h, "base")}
+    except Exception as e:  # 读不到链就说读不到，不许默默判过
+        check("读不到 alembic 的迁移链（这条探针不猜）", False, str(e)[:90])
+    check("卡片那条迁移在库里已跑到的那个头之前（链上，不等于头）",
+          "f2b7d4a8c915" in anc, f"库里的头={head}")
     tables = set(db.execute(text(
         "SELECT name FROM sqlite_master WHERE type='table'")).scalars().all())
     check("note_cards 表在", "note_cards" in tables, str(sorted(tables))[:120])
