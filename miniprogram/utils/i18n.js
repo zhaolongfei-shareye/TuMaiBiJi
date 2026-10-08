@@ -285,6 +285,7 @@ const i18n = {
     saving: '保存中...',
     paste: '粘贴',
     pasteEmpty: '剪贴板里还没有链接',
+    pasteFailed: '读不到剪贴板，麻烦长按输入框再粘',
     clear: '清空',
     // 10-08：那排「清空 / 开始提炼」的按钮整排撤了，改成"右滑才开始提炼"那一枚长条。
     // 好处是他给的那张参考图说的——先滑过去，等于让用户把这一屏看清楚再动手。
@@ -618,6 +619,7 @@ const i18n = {
     saving: 'Saving...',
     paste: 'Paste',
     pasteEmpty: 'Nothing to paste yet',
+    pasteFailed: "Can't read the clipboard — long-press the field to paste",
     clear: 'Clear',
     // 「清空 / 开始提炼」那排按钮撤了，换成右滑才开始的那枚长条（中文那段注释写了为什么）。
     slideExtract: 'Slide to extract',

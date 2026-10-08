@@ -482,6 +482,28 @@ Page({
     this._sync()
   },
 
+  // 站长 10-08 真机反馈：链接那一档长按粘不上，所以把「粘贴」这枚加回输入框右侧
+  // （当初撤它的理由是"交给系统长按"，那条在真机上不成立）。
+  // 读剪贴板走 wx.getClipboardData：iOS 16+ 那一下由系统自己弹「粘贴」提示，不由我们请权限。
+  onPasteUrl() {
+    if (this.data.busy) return
+    wx.getClipboardData({
+      success: (res) => {
+        const s = String((res && res.data) || '').trim()
+        if (!s) {
+          wx.showToast({ title: t('pasteEmpty', this.data.lang), icon: 'none' })
+          return
+        }
+        this.setData({ urlInput: s, urlHint: this.hintFor(s), errLine: '' })
+        this._sync()
+      },
+      fail: () => {
+        // 读不到与"里面没东西"是两件事，不许合成一句糊过去
+        wx.showToast({ title: t('pasteFailed', this.data.lang), icon: 'none' })
+      },
+    })
+  },
+
   async submitUrl() {
     const url = this.data.urlInput.trim()
     if (this.data.busy) return

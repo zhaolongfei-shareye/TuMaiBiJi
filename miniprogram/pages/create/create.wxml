@@ -112,7 +112,8 @@
         </view>
 
         <!-- 链接：一个输入框，提示词吃现网那句 linkDesc，点进去就没了。
-             「粘贴」和「保存」那两枚按钮撤了——保存换成右滑那一枚，粘贴交给系统长按。 -->
+             「保存」那枚撤了，换成右滑那一枚。「粘贴」这枚 10-08 加回来：站长真机反馈
+             长按粘不上（撤它的理由是"交给系统长按"，那条在真机上不成立）。 -->
         <view wx:elif="{{active === 'url'}}" class="field">
           <input
             class="field-input"
@@ -123,6 +124,9 @@
             bindinput="onUrlInput"
           />
           <view wx:if="{{urlInput}}" class="field-x" catchtap="clearUrl">✕</view>
+          <view class="field-paste" catchtap="onPasteUrl" aria-label="{{t.paste}}">
+            <view class="paste-glyph glyph-clipboard"></view>
+          </view>
         </view>
 
         <!-- 文字：一个原文框（收起一行、展开两行）。标题和归类挪到详情页「编辑」里改，

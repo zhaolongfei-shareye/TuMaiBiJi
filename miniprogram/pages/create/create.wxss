@@ -465,6 +465,24 @@
   color: var(--cp-ink-62);
 }
 
+/* 「粘贴」这枚钉在输入框右侧、✕ 的右边（✕ 只在有字时出现，粘贴一直在）。
+   面 72×72 是给指头按的，图形只有 40——跟 ✕ 那枚同一档字色，不抢输入框的视觉重心。 */
+.field-paste {
+  flex: none;
+  width: 72rpx;
+  height: 72rpx;
+  margin-right: -12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.paste-glyph {
+  width: 40rpx;
+  height: 40rpx;
+  background: var(--cp-ink-62);
+}
+
 /* 「文字」那一档的框：收起态与链接框等高一行，展开态才变两行。
    textarea 是原生组件，padding 与行高都得自己给，align-items 在它身上没有意义。 */
 .field-area {
@@ -740,7 +758,7 @@
    .glyph 那一档是"压在卡底的水印"（264rpx、绝对定位），条身前面那三枚、
    三枚圈里那三枚、和滑动条圆里那一枚要的是"读得清的小图标"，所以另起一组：
    只借同一批 mask 形状，尺寸和颜色自己定。 */
-.bar-lead, .dot-glyph, .mini-glyph, .shut-glyph, .sld-glyph, .swap-glyph, .th-plus {
+.bar-lead, .dot-glyph, .mini-glyph, .shut-glyph, .sld-glyph, .swap-glyph, .th-plus, .paste-glyph {
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -751,7 +769,7 @@
 
 /* ---------- 图形 ----------
    几何取自 Lucide v1.49.0（ISC 授权）：pen-line / camera / images / link / chevron-right，
-   10-08 这一轮多一支 plus（➕ 那一枚方格）。
+   10-08 这一轮多一支 plus（➕ 那一枚方格）、一支 clipboard（链接框右侧那枚「粘贴」）。
    同一套 24 格、同一描边重量（1.6，原来这组里 1.5 和 1.6 混着，小尺寸上粗细不齐）、
    圆头线帽——自己手画的形状之所以显廉价，就是因为空心与实心混用、线宽不统一。
    底栏那三枚（plus / rows-3 / user-round）在 custom-tab-bar/index.wxss，同一支描边重量。 */
@@ -779,6 +797,12 @@
 .glyph-plus {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
+}
+
+/* 剪贴板（Lucide clipboard）：夹子在顶、板身一个圆角矩形，与上面那批同 24 格、同 1.6 描边。 */
+.glyph-clipboard {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1' /%3E %3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1' /%3E %3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' /%3E%3C/svg%3E");
 }
 
 .glyph-chev {
