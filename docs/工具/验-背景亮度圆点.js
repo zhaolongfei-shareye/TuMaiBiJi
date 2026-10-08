@@ -116,11 +116,19 @@ ck('那一行是两半：左「调亮度」点它换档、右「换背景」导�
 ck('点的颜色从 style 递进来，wxss 里不写死 background，也没有 mask / 投影残留',
   !/\.dim-dot\s*\{[^}]*(background|mask-image|filter)/.test(strip(read('pages/create/create.wxss')).replace(/\s+/g, ' ')))
 
-// ---------- ⑥ 这是本机偏好，不许变成第二条上传链路 ----------
+// ---------- ⑥ 2.1 换口径：亮度档升成账号级（换手机后还是自己那一档），字体档仍留本机 ----------
+// 这一节 10-08 之前钉的是"亮度档只走本机、不许变成第二条上传链路"。站长把跨端定成
+// "同一个微信号换手机／重置手机后再登录，依旧是自己那批东西"，那一档就跟着升成账号级了。
+// **改的是判据，不是拿代码去迁就旧尺子**；而"只有一条上传路"这半句仍然成立，所以钉得更死：
+// 上云只准走 profileCloud 那一个出处，页面里再出现第二处 PUT 就是红。
 const whole = ['app.js', 'utils/poster.js', 'utils/api.js'].map((f) => strip(read(f))).join('\n')
-ck('bgDim 这个键只走 wx.setStorageSync，没有混进任何请求体',
-  !/bgDim/.test(whole.replace(/const BG_DIM_KEY = 'bgDim'/g, '')
-    .replace(/wx\.setStorageSync\(BG_DIM_KEY, v\)/g, '')))
+const PC = strip(read('utils/profileCloud.js'))
+ck('亮度档上云只有 profileCloud.pushDim 那一个出处（app/poster/api 里不许出现第二处 bg_dim）',
+  !/bg_dim/.test(whole) && /function pushDim\(v\) \{ return push\(\{ bg_dim: v \}\) \}/.test(PC))
+ck('那一档仍然先落本机存储再登记（读的一路没换成网络，界面不许为它多等一趟）',
+  /wx\.setStorageSync\(BG_DIM_KEY, v\)/.test(strip(read('app.js'))) && /profileCloud\.pushDim\(v\)/.test(strip(read('app.js'))))
+ck('界面字体档**没有**跟着上云（安卓命不中那三档，跟着账号跑只会让人看到"没生效"）',
+  !/ui_font/.test(whole + PC) && !/pushFont/.test(whole + PC))
 
 console.log(`\n${bad.length ? '✗ ' + bad.length + ' 条不过：' + bad.join('、') : `背景亮度圆点 静态：${n} 条全过`}`)
 process.exit(bad.length ? 1 : 0)

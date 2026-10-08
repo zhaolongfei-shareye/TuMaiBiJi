@@ -223,6 +223,13 @@ module.exports = {
   // 这里用 DELETE 不违反注销那条"不用 DELETE"：那条挡的是**带请求体的 DELETE** 在 wx.request 里
   // 怎么序列化没有保证，这一趟 note id 全在路径上，一个字节的身子都不发。
   deleteNoteCard: (id) => request(`/api/notes/${id}/card`, 'DELETE'),
+  // 名片与那两档外观（2.1）。`updated_at` 为 null ＝ 这个人**从来没登记过**，
+  // 与"登记过、四格都是空的"是两件事——pull 那一路靠这一个数区分，区分错的后果是
+  // 把老用户本机那四张图当成"云上已经删了"跟着删掉。
+  getProfile: () => request('/api/user/profile'),
+  // PUT 是补丁语义：只改传进来的那几栏（只提交亮度档那一趟不许抹掉名称）。
+  // 回体里的 `file_ids` 是这次被换下／撤掉的旧地址，键名与删笔记、注销、撤卡片一致。
+  putProfile: (patch) => request('/api/user/profile', 'PUT', patch),
   ingestUrl: (url) => request('/api/ingest/url', 'POST', { url }, { contentType: 'application/x-www-form-urlencoded' }),
   // 手打这一档也交给模型提炼：送的是用户自己写的标题 + 原文，回来的是摘要。
   // 归类跟着这一篇走（服务端认人不认客户端说的 source_type）。

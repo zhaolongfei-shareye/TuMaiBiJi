@@ -144,7 +144,9 @@ function readSlots() {
   }
   const out = blankSlots()
   list.forEach((s, i) => {
-    if (s && s.path && exists(s.path)) out[i] = { path: s.path, card: !!s.card, bg: !!s.bg }
+    // fileID 这一栏 2.1 起要跟着带出来：`profileCloud.pull()` 靠它判断"云上这一格与本机这张
+    // 是同一张"，不带上就会每次开机重下一遍，而重下会覆盖掉本机那张正被画布用的文件。
+    if (s && s.path && exists(s.path)) out[i] = { path: s.path, card: !!s.card, bg: !!s.bg, fileID: s.fileID || null }
   })
   return out
 }
@@ -299,6 +301,22 @@ function copyTo(src, dest) {
 // 文件名唯一，所以"同一张图被系统按路径缓存"那一坑不会再踩（见 AVATAR_PREFIX 上方）。
 // 本地目录一共 10MB，所以这一页临时生成、最后没留下的那些张必须收掉——见 dropUncommitted。
 let minted = []
+
+// 从云上拉回来的那一张落成本机一份（2.1 那条 pull 用）。
+// 名字仍走 avatarFilePath()：一张一个名，避开"同路径换内容、界面与画布仍是第一张"那一坑。
+// 必须记进名单——`pruneAvatars` 只认这份名单，名单外的文件它一个都不碰，
+// 不记就等于这台手机上永远清不掉它（本地目录只有 10MB）。
+async function adoptLocal(srcPath) {
+  const dest = avatarFilePath()
+  try {
+    await copyTo(srcPath, dest)
+  } catch (e) {
+    unlinkFile(dest)
+    return null
+  }
+  trackAvatar(dest)
+  return dest
+}
 
 // 挑回来的图先自己缩一档再落盘，目标宽度＝铺满一屏还留余量。
 // 为什么不用 wx.chooseMedia 的 sizeType:['compressed'] 那一步替我们做：微信那档压缩是按
@@ -2135,6 +2153,8 @@ module.exports = {
   bandGeom,
   BAND_H,
   mintAvatar,
+  adoptLocal,
+  removeAvatar,
   dropUncommitted,
   pruneAvatars,
   planPoster,

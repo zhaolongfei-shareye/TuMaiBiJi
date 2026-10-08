@@ -184,14 +184,14 @@ if not card_idx or "UNIQUE" not in card_idx.upper():
 if "is_current" not in card_idx:
     print(f"  ✗ ux_note_cards_one_current_per_note 建上了但没带 is_current 条件：{card_idx}")
     raise SystemExit(1)
-# ---- 2.1 名片与外观档位那条链（2026-10-08）----
+# ---- 2.1 名片与背景亮度档那条链（2026-10-08）----
 # user_profiles 缺表的症状与 note_cards 同型：POST 会 500（看得见），而**静默的那一半**是
 # 客户端读不到就落回本机那份缓存——界面上"名片好好的"，换一台手机才发现四格全是空的。
 if "user_profiles" not in tables:
-    print("  ✗ 缺 user_profiles 表，名片与外观档位整条链没落点")
+    print("  ✗ 缺 user_profiles 表，名片与亮度档整条链没落点")
     raise SystemExit(1)
 prof_cols = {c["name"] for c in insp.get_columns("user_profiles")}
-missing = sorted({"user_id", "name", "slogan", "slots", "bg_dim", "ui_font"} - prof_cols)
+missing = sorted({"user_id", "name", "slogan", "slots", "bg_dim"} - prof_cols)
 if missing:
     print(f"  ✗ user_profiles 迁移后仍缺：{'、'.join(missing)}")
     raise SystemExit(1)

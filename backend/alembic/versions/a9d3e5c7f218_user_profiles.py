@@ -1,11 +1,11 @@
-"""user_profiles：名片（名称/一句话/四格形象图）与两档外观从本机搬到服务器
+"""user_profiles：名片（名称/一句话/四格形象图）与背景亮度档从本机搬到服务器
 
 Revision ID: a9d3e5c7f218
 Revises: f2b7d4a8c915
 Create Date: 2026-10-08 16:20
 
 2.1 第一条。站长把跨端定成"同一个微信号换手机／重置手机后再登录，依旧是自己的笔记"，
-实测下来笔记那一路本来就在服务器上，真正会丢的是名片那四格图与两档外观——它们到今天
+实测下来笔记那一路本来就在服务器上，真正会丢的是名片那四格图与背景亮度档——它们到今天
 只写 `wx.setStorageSync`，而 `poster.js` 的 `readSlots()` 拿"本机文件在不在"当判据，
 文件没了那一格就静默变空。这与 2.0.1 之前卡片那一格是同一个毛病（PRD §8.148），
 只是这次还没人报。所以这一张表建的是"人"这一层，不是又一套备份文件。
@@ -38,7 +38,6 @@ def upgrade() -> None:
         sa.Column('slogan', sa.String(length=96), nullable=True),
         sa.Column('slots', sa.JSON(), nullable=True),
         sa.Column('bg_dim', sa.Integer(), nullable=True),
-        sa.Column('ui_font', sa.String(length=16), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True),
         sa.PrimaryKeyConstraint('id'),

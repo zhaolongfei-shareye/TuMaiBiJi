@@ -87,7 +87,8 @@ class Test读回那一份:
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["name"] is None and body["slots"] is None
-        assert body["bg_dim"] is None and body["ui_font"] is None
+        assert body["bg_dim"] is None
+        assert "ui_font" not in body, "字体档不上云（models/user_profile.py 那条），读口也不该给这一栏"
 
     def test_写进去的名称与一句话读回一字不差(self, client, db):
         u = mk_user(db, "name")
@@ -122,10 +123,10 @@ class Test补丁语义:
 
     def test_没提交过的那几栏读回还是空(self, client, db):
         u = mk_user(db, "partial")
-        put(client, u, ui_font="serif")
+        put(client, u, bg_dim=1)
         body = get(client, u).json()
-        assert body["ui_font"] == "serif"
-        assert body["name"] is None and body["bg_dim"] is None
+        assert body["bg_dim"] == 1
+        assert body["name"] is None and body["slogan"] is None
 
     def test_亮度档越界被拒(self, client, db):
         u = mk_user(db, "dim")

@@ -1,4 +1,5 @@
 const poster = require('../../utils/poster.js')
+const profileCloud = require('../../utils/profileCloud.js')
 const posterTemplates = require('../../utils/posterTemplates.js')
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
@@ -188,10 +189,13 @@ Page({
 
   // 落盘 + 同步界面。这一块即时生效（点芯片、删图都当场写），不像名称/一句话那样等
   // 「保存」——因为删除那一步有二次确认，确认完还要等保存才真删，那句确认就是假话。
+  // 2.1：这一个是四格变动的**唯一出口**（放一张、换一张、勾角色、撤掉都走它），
+  // 所以登记也只挂在这里一处——挂到各按钮上就会漏掉某一条路，而漏掉的表现为"换台手机那格是空的"。
   _commitSlots(next) {
     poster.writeSlots(next)
     this.setData({ slots: next, allFull: !next.some((s) => !s) })
     this.renderThumbs()
+    profileCloud.pushSlots(next)
   },
 
   // 只有空槽响应整枚圆的点击。已经放了图的那一格，动作全在芯片和垃圾桶上，
@@ -311,6 +315,10 @@ Page({
       }
       // 形象那一块不在这里：四个槽当场就写了，这一句只管名称/一句话/模板
       poster.writeProfile(patch)
+      // 顺手登记名称与一句话（2.1）。不 await、不出声：这条链按设计与卡片留档同一条纪律——
+      // 附属品失败不许把"本机已经存好"这件事报成失败。没登记上时本机那一份照旧是对的，
+      // 代价是"换台手机这一格是空的"，而那由下一次进这一页再写一遍补回来。
+      profileCloud.pushText({ name: patch.name, slogan: patch.slogan })
       wx.showToast({ title: t('profileSaved', lang), icon: 'success' })
       setTimeout(() => wx.navigateBack(), 900)
     } catch (err) {

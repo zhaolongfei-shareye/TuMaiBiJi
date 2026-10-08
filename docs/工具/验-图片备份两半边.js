@@ -161,8 +161,15 @@ const VIEW = stripComments(read('miniprogram/pages/share/view.js'))
 const VIEW_WXML = read('miniprogram/pages/share/view.wxml')
 const I18N = read('miniprogram/utils/i18n.js')
 
+// 注销那一份清单 10-08 起过一次 `list(dict.fromkeys(...))` 去重（同一张图既在 assets 又在
+// note_cards 时两处各列一次），判据跟着读那一条真实写法，不读一个理想化的短形。
 ck('file_ids 这个键名在两个回体里都存在（删笔记 / 注销）',
-  /"file_ids": file_ids/.test(NOTE_ROUTE) && /"file_ids": asset_ids/.test(USER_ROUTE))
+  /"file_ids": list\(dict\.fromkeys\(file_ids\)\)/.test(NOTE_ROUTE)
+  && /"file_ids": list\(dict\.fromkeys\(asset_ids\)\)/.test(USER_ROUTE))
+ck('注销那份清单去重（同一张图既在配图又在卡片时会列两次，重复地址让 deleteFile 白跑）',
+  /asset_ids \+= \[[\s\S]*?"file_ids": list\(dict\.fromkeys\(asset_ids\)\)/.test(USER_ROUTE))
+ck('名片那四格的对象也并进注销这同一份清单（2.1 第七类，漏了就是云上留几个没人记得的对象）',
+  /db\.query\(UserProfile\.slots\)/.test(USER_ROUTE) && /"profile": db\.query\(UserProfile\)/.test(USER_ROUTE))
 ck('清单只在删除那一刻交出去一次：注销那一路先读 fileID、再删行',
   USER_ROUTE.indexOf('asset_ids = [') < USER_ROUTE.indexOf('"assets": db.query(Asset)'))
 ck('两个"删一篇"的口都去清对象（详情页 + 列表详情窗，漏一个就残留一排）',

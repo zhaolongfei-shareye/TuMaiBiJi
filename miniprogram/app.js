@@ -4,6 +4,7 @@ const assetQueue = require('./utils/assetQueue')
 const posterTemplates = require('./utils/posterTemplates')
 const cloudUpload = require('./utils/cloudUpload')
 const cardCloud = require('./utils/cardCloud')
+const profileCloud = require('./utils/profileCloud')
 const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
@@ -134,6 +135,13 @@ App({
       }
       this.globalData.isLoggedIn = true
       this.applyTheme(this.globalData.userInfo.wallpaper)
+      // 2.1 第一条：名片那四格与两档外观的权威在服务器 `user_profiles`，本机那份降级成缓存。
+      // 挂在"登录成功"这一刻，是因为站长把跨端定义成一句话——同一个微信号换手机／重置手机之后
+      // **再登录**就该是自己的东西，不该还要他去点一枚「恢复」。
+      // 故意不 await：读不到就维持本机这一份，首屏不许为它多等一趟；失败也不出声（那条链按设计静默）。
+      profileCloud.pull().then((r) => {
+        if (r && !r.ok) console.warn('名片那份这次没对齐:', r.reason)
+      })
     } catch (err) {
       console.error('登录失败:', err)
       throw err
@@ -158,6 +166,9 @@ App({
     // 卡片这一族两个头一起收（待补登记队列 + 从服务器读回来那份名单），收在 cardCloud 一个
     // 出处里：留着名单就是下一个身份第一次进首页看见上一个人的卡片。
     cardCloud.signOut()
+    // 名片那一份同理：内存里那份是"上一个人登记过的名片"，留着就是下一个身份一进卡片模板页
+    // 看见别人的头像与一句话。本机那四张文件**一个都不动**——它们是这个人自己的东西。
+    profileCloud.signOut()
     // 待删队列**故意不跟着清**：注销那一步自己就是往这里塞东西的一方（删云上对象没成的那批），
     // 清了等于把"云端那份一并删除"那句承诺刚欠下的账抹掉。下一个身份替上一个人重试删除没有害处
     // ——deleteFile 只会把对象删掉，不会改谁的归属。
@@ -197,6 +208,7 @@ App({
     return UI_FONT_CLASS[k] ? k : 'default'
   },
 
+  // 这一档**不上云**（2.1 定）：它不是"没备份"，是不该同步——理由见上面 UI_FONT_KEY 那段。
   setUIFont(key) {
     const k = UI_FONT_CLASS[key] ? key : 'default'
     if (k === 'default') wx.removeStorageSync(UI_FONT_KEY)
@@ -221,10 +233,27 @@ App({
   },
 
   // 点一下换一档：最亮 → 压一半 → 全铺 → 回最亮。存完把新那档原样返回，页面 setData 就行。
+  // 顺手登记一次（2.1）：这一档以前只在本机，换台手机就回到默认，而界面上那句"你选的亮度"
+  // 看不出来已经变了——静默的差别最难查，所以跟着名片那一条链一起收口。
   cycleBgDim() {
     const v = dimNext(dimAt(wx.getStorageSync(BG_DIM_KEY)).v)
     wx.setStorageSync(BG_DIM_KEY, v)
+    profileCloud.pushDim(v)
     return { dimV: v, dimDot: dimDotStyle(v), dimScrim: dimScrimStyle(v) }
+  },
+
+  // 2.1 起这一档要能"照服务器那一份原样落下来"，cycle 那一圈解决不了"云上存的是 0、本机是 2"。
+  // 脏值（别的版本写过的数、云上以后加了新档而本机还不认）由 dimAt 兜回默认那一档，
+  // 所以这里不收范围——收范围等于再写一份规则，两处迟早对不上。
+  bgDim() {
+    return dimAt(wx.getStorageSync(BG_DIM_KEY)).v
+  },
+
+  setBgDim(v, fromServer) {
+    const got = dimAt(v).v
+    wx.setStorageSync(BG_DIM_KEY, got)
+    if (!fromServer) profileCloud.pushDim(got)
+    return { dimV: got, dimDot: dimDotStyle(got), dimScrim: dimScrimStyle(got) }
   },
 
   // .container 上那一串类名 = 主题 + 界面字体。页面只管贴，不各自拼第二份规则。

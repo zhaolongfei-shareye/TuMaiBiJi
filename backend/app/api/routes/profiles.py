@@ -1,4 +1,4 @@
-"""名片与外观档位的读写口（2.1 第一条）。
+"""名片（四格形象图 + 名称 + 一句话）与背景亮度档的读写口（2.1 第一条）。
 
 一句话：**换手机／重置手机之后，名片那四格图和两档外观不该是空的。**
 成因在 `app/models/user_profile.py` 顶上那段，实测量与决定在 `docs/方案-2.1大版本.md` §三。
@@ -39,7 +39,6 @@ from app.models.user_profile import (
     BG_DIM_RANGE,
     MAX_NAME_LEN,
     MAX_SLOGAN_LEN,
-    MAX_UI_FONT_LEN,
     SLOT_COUNT,
     UserProfile,
 )
@@ -69,7 +68,6 @@ class ProfileIn(BaseModel):
     # 允许传短于四格的数组（末尾按空位补），但**不许长**：第五格在界面上不存在。
     slots: Optional[List[Optional[SlotIn]]] = Field(default=None, max_length=SLOT_COUNT)
     bg_dim: Optional[int] = Field(default=None, ge=BG_DIM_RANGE[0], le=BG_DIM_RANGE[1])
-    ui_font: Optional[str] = Field(default=None, max_length=MAX_UI_FONT_LEN)
 
 
 class ProfileOut(BaseModel):
@@ -82,7 +80,6 @@ class ProfileOut(BaseModel):
     slogan: Optional[str] = None
     slots: Optional[list] = None
     bg_dim: Optional[int] = None
-    ui_font: Optional[str] = None
     updated_at: UTCDatetime = None
 
 
@@ -160,7 +157,6 @@ def _out(row: Optional[UserProfile]) -> ProfileOut:
         slogan=row.slogan,
         slots=row.slots,
         bg_dim=row.bg_dim,
-        ui_font=row.ui_font,
         updated_at=row.updated_at,
     )
 
@@ -207,9 +203,6 @@ def write_profile(
         row.slogan = _text(data["slogan"], MAX_SLOGAN_LEN, "一句话")
     if "bg_dim" in data:
         row.bg_dim = data["bg_dim"]
-    if "ui_font" in data:
-        font = (data["ui_font"] or "").strip()
-        row.ui_font = font or None
     if "slots" in data:
         old = [s for s in (row.slots or []) if s]
         # 吃 `body.slots` 而不是 `data["slots"]`：后者被 model_dump 打成了 dict，
