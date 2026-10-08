@@ -1,0 +1,406 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>创建入口 v8 · 英文版（与已落地代码同口径）</title>
+<style>
+  :root{
+    --panel:#23252C; --card:#2B2D35; --field:#1A1C21;
+    --paper:#F2EFE9;
+    --p92:rgba(242,239,233,.92); --p78:rgba(242,239,233,.78); --p62:rgba(242,239,233,.62);
+    --p56:rgba(242,239,233,.56); --p50:rgba(242,239,233,.50); --p42:rgba(242,239,233,.42);
+    --p38:rgba(242,239,233,.38); --p14:rgba(242,239,233,.14); --p10:rgba(242,239,233,.10); --p07:rgba(242,239,233,.07);
+    --chrome-bg:#443B25; --chrome-sel:#766948;   /* ＝ palette.chromeOf('tint-paper') 的 bg／sel；第四排按四套壁纸各覆盖一次 */
+    /* 这两枚不再写死橙：与 miniprogram/utils/palette.js 的 createSkin() 同源，
+       象牙（tint-paper）这一套实测 = 色阶第 3 档 / 第 4 档。四套壁纸各一版见第四排。 */
+    --cam:#AFA488; --cam-ink:#352E1D; --extract:#766B50; --extract-ink:#F2EFE9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif}
+  body{background:#0B0C0F;padding:26px 20px 30px}
+  h1{color:var(--paper);font-size:21px;letter-spacing:.3px;font-weight:700;display:flex;align-items:center;gap:10px}
+  h1 i{width:3px;height:19px;border-radius:2px;background:var(--extract);flex:none}
+  .sub{color:#9AA1AC;font-size:12.5px;margin-top:9px;line-height:1.75;max-width:2100px}
+  .sub b{color:#D6DBE2;font-weight:600}
+  .plan{margin-top:26px}
+  .ptitle{display:flex;align-items:baseline;gap:10px}
+  .ptitle .k{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--extract)}
+  .ptitle .t{font-size:16px;font-weight:700;color:var(--paper)}
+  .ptitle .d{font-size:11.5px;color:#9AA1AC}
+  .row{display:flex;gap:16px;margin-top:12px;align-items:flex-start;flex-wrap:nowrap}
+  .col{display:flex;flex-direction:column;align-items:center}
+  .cap{color:#C7CDD6;font-size:11.5px;margin-top:10px;text-align:center;line-height:1.5;max-width:300px}
+  .cap b{color:var(--paper);font-weight:600}
+  .cap i{color:#8FA0B4;font-style:italic}
+  .legend{margin-top:26px;font-size:12px;color:#C7CDD6;line-height:2.05;border-left:3px solid #333A45;padding-left:14px;max-width:2100px}
+  .legend b{color:var(--paper);font-weight:600}
+  .legend code{color:#D6DBE2;background:#171A20;padding:1px 4px;border-radius:3px;font-size:11px}
+  .n{display:inline-block;width:17px;height:17px;border-radius:50%;background:#F6C445;color:#2A2005;font-size:11px;font-weight:800;text-align:center;line-height:17px;margin-right:6px}
+  table.m{margin-top:12px;border-collapse:collapse;font-size:11.5px;color:#C7CDD6}
+  table.m th,table.m td{border-bottom:1px solid #262B33;padding:5px 10px;text-align:left}
+  table.m th{color:#8FA0B4;font-weight:600}
+  table.m td.k{color:#F6C445;font-family:ui-monospace,monospace}
+  table.m td.s{max-width:420px}
+  table.m td.bad{color:#FF8B84;font-weight:700}
+  table.m td.ok{color:#7CC79A}
+
+  /* ================= 屏（底子同 v7：真背景图 + 逐字抄的压暗罩 + 系统条 + 现网底栏色） ================= */
+  .phone{width:300px;height:650px;border-radius:44px;overflow:hidden;position:relative;flex:none;background:#000;
+    box-shadow:0 0 0 5px #17181C, 0 0 0 6px rgba(255,255,255,.09)}
+  .chrome{position:absolute;left:0;right:0;top:0;height:78px;background:#181A20;z-index:6}
+  .island{position:absolute;left:50%;transform:translateX(-50%);top:8px;width:96px;height:27px;border-radius:14px;background:#000}
+  .stime{position:absolute;left:20px;top:18px;font-size:12.5px;font-weight:600;color:#fff;letter-spacing:.2px}
+  .sright{position:absolute;right:15px;top:20px;display:flex;align-items:flex-end;gap:5px}
+  .sig{display:flex;align-items:flex-end;gap:1.6px;height:10px}
+  .sig i{width:3px;border-radius:1px;background:#fff}
+  .sig i:nth-child(1){height:4px}.sig i:nth-child(2){height:6px}
+  .sig i:nth-child(3){height:8px}.sig i:nth-child(4){height:10px}
+  .wifi{width:15px;height:11px;margin-bottom:-1px}
+  .bat{width:20px;height:10.5px;border-radius:3.2px;border:1px solid rgba(255,255,255,.42);position:relative;margin-bottom:-.5px}
+  .bat u{position:absolute;left:1.4px;top:1.4px;bottom:1.4px;width:13px;background:#fff;border-radius:1.6px}
+  .bat::after{content:"";position:absolute;right:-3.2px;top:3px;width:1.8px;height:4px;border-radius:0 1px 1px 0;background:rgba(255,255,255,.42)}
+  .navtitle{position:absolute;left:0;right:0;top:52px;text-align:center;font-size:13px;font-weight:600;color:rgba(255,255,255,.96);letter-spacing:.2px}
+  .capsule{position:absolute;right:6px;top:46px;width:70px;height:26px;border-radius:13px;display:flex;align-items:center;
+    background:rgba(0,0,0,.22);border:1px solid rgba(242,239,233,.28)}
+  .capsule .half{flex:1;display:flex;align-items:center;justify-content:center;gap:3.2px}
+  .capsule .dv{width:1px;height:14px;background:rgba(242,239,233,.24);flex:none}
+  .capsule .half i{width:3px;height:3px;border-radius:50%;background:var(--p92)}
+  .capsule .tgt{width:11px;height:11px;border-radius:50%;border:1.3px solid var(--p92);position:relative}
+  .capsule .tgt::after{content:"";position:absolute;left:2.6px;top:2.6px;width:3.4px;height:3.4px;border-radius:50%;background:var(--p92)}
+  .screen{position:absolute;left:0;right:0;top:78px;bottom:0;overflow:hidden}
+  .bgimg{position:absolute;inset:0;background:url("../../../miniprogram/assets/home-bg-portrait.jpg") 50% 22% / cover no-repeat}
+  .scrim{position:absolute;inset:0;
+    background:linear-gradient(180deg, rgba(18,20,26,.58) 0%, rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%, rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%, rgba(18,20,26,.62) 88%, rgba(18,20,26,.72) 100%)}
+  .head{position:absolute;left:13px;right:13px;top:20px}
+  .hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .htitle{font-size:16.8px;font-weight:700;letter-spacing:-.4px;color:var(--paper);line-height:1.3}
+  .lang{display:flex;align-items:baseline;gap:8px;flex:none}
+  .lang span{font-size:9.6px;line-height:1.4;color:var(--p56);padding:0 1px 2px;border-bottom:1.6px solid transparent}
+  .lang span.on{color:var(--paper);font-weight:700;border-bottom-color:var(--paper)}
+  .date{display:flex;align-items:baseline;gap:5.6px;margin-top:9px;font-size:9.6px;line-height:1.4}
+  .date .d{color:var(--p78);letter-spacing:.4px}
+  .date .w{color:var(--p56);letter-spacing:.8px}
+  .pill{position:absolute;left:9.6px;right:9.6px;bottom:8px;height:43.2px;border-radius:17.6px;display:flex;align-items:center;
+    background:var(--chrome-bg);border:1.2px solid var(--p14);z-index:4}
+  .pill .it{flex:1;display:flex;align-items:center;justify-content:center;color:var(--p62)}
+  .pill .it svg{width:16px;height:16px}
+  .pill .it.on{color:var(--paper)}
+  .pill .it.on .ic{width:30.4px;height:30.4px;border-radius:50%;background:var(--chrome-sel);display:flex;align-items:center;justify-content:center}
+  .pill .ic{display:flex;align-items:center;justify-content:center}
+
+  /* ---- 面板：与代码同一口径（1rpx＝0.4px）
+     create.wxss：.panel height 500rpx / .panel-open 580rpx、padding 30 32 32、border 3、radius 55
+     .entry-wrap(dock) bottom 152rpx、left/right 24rpx（--sp-3）；.out font 24rpx、padding 0 20 18 ---- */
+  .dockwrap{position:absolute;left:9.6px;right:9.6px;bottom:60.8px;z-index:5;display:flex;flex-direction:column}
+  /* 收起态那一档条身不在 152rpx 上：它坐在"底栏顶 − 换背景那一行 − 一条间距"＝128+110+22＝260rpx＝104px
+     （现网真跑量过：条底 613／应在 618 上下） */
+  .dockwrap.rest{bottom:104px}
+  .tips{display:flex;align-items:center;gap:6px;padding:0 8px 7px;font-size:9.6px;color:var(--p42);letter-spacing:.2px}
+  .tips .dot{width:5.6px;height:5.6px;border-radius:50%;background:#F6C445;flex:none}
+  .out{display:flex;justify-content:space-between;padding:0 8px 7.2px;font-size:9.6px;color:var(--p42);letter-spacing:.2px}
+  .out span{line-height:1.4}
+  .err{display:flex;align-items:center;gap:5px;padding:0 8px 7.2px;font-size:9.6px;color:#FFD7D3;letter-spacing:.1px}
+  .dock{height:200px;border-radius:22px;display:flex;flex-direction:column;
+    padding:12px 12.8px 12.8px;background:var(--panel);border:1.2px solid var(--p10)}
+  .dock.open{height:232px}
+  .modes{display:flex;justify-content:center;gap:24px;margin-top:10px}
+  .md{font-size:12.4px;color:var(--p50);padding-bottom:6px;position:relative;letter-spacing:.4px;line-height:1.6}
+  .md::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:26px;height:2px;border-radius:1px;background:var(--p10)}
+  .md.on{color:var(--paper);font-weight:600}
+  .md.on::after{background:var(--cam)}
+  .card{margin-top:10px;flex:1;min-height:0;border-radius:16px;padding:12px;display:flex;flex-direction:column;
+    background:var(--card);border:1.2px solid var(--p07)}
+
+  /* ---- 输入格（.field 105rpx＝42px、radius 18＝7.2、padding 0 28＝11.2、字 28rpx＝11.2；展开 .field-area-2 160rpx＝64px） ---- */
+  .field{height:42px;border-radius:7.2px;color:var(--p38);font-size:11.2px;letter-spacing:.2px;
+    display:flex;align-items:center;padding:0 11.2px;background:var(--field);border:1.2px solid var(--p14)}
+  .field.mid{margin:auto 0}
+  .field.ta2{height:64px;flex:none;align-items:flex-start;padding:6.4px 11.2px;line-height:1.5;margin:auto 0}
+  .field .x{margin-left:auto;width:16px;height:16px;border-radius:50%;background:rgba(20,20,28,.55);color:#fff;
+    font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:400}
+  .wr-sw{display:flex;align-items:center;justify-content:space-between;height:19.2px;margin-top:3.2px;flex:none}
+  .wr-sw .lab{font-size:9.6px;color:var(--paper)}
+  .wr-sw .track{width:28.8px;height:16px;border-radius:8px;background:rgba(242,239,233,.10);position:relative}
+  .wr-sw .track u{position:absolute;left:1.6px;top:1.6px;width:12.8px;height:12.8px;border-radius:50%;background:var(--paper)}
+  .wr-sw.on .track{background:var(--extract)}
+  .wr-sw.on .track u{left:14.4px}
+
+  /* ---- 通栏条＝滑动确认（.sld 110rpx＝44px、border 5＝2、radius 55＝22；圆 90rpx＝36px、left 10＝4、top 5＝2；行程 456rpx＝182.4px） ---- */
+  .sld{margin-top:auto;flex:none;height:44px;border-radius:22px;position:relative;overflow:hidden;
+    background:var(--paper);border:2px solid var(--paper);
+    display:flex;align-items:center;justify-content:center}
+  .sld .txt{display:flex;align-items:center;gap:9px;font-size:12.4px;font-weight:700;letter-spacing:.3px;color:var(--panel)}
+  .sld .txt::before,.sld .txt::after{content:"";width:24px;border-top:1.4px dashed rgba(20,22,26,.34)}
+  .sld .fill{position:absolute;left:0;top:0;bottom:0;background:var(--extract)}
+  .sld .knob{position:absolute;left:4px;top:2px;width:36px;height:36px;border-radius:50%;
+    background:var(--extract);color:var(--paper);display:flex;align-items:center;justify-content:center}
+  .sld .knob svg{width:17px;height:17px}
+  .sld.off .knob{background:rgba(20,22,26,.14);color:rgba(20,22,26,.42)}
+  .sld.off .txt{color:var(--p38)}
+  .sld.done{background:var(--extract);border-color:var(--paper)}
+  .sld.done .txt{color:var(--paper)}
+  .sld.done .txt::before,.sld.done .txt::after{border-top-color:rgba(242,239,233,.34)}
+  .sld.done .fill{background:transparent}
+
+  /* ---- 快门与两枚小圆（.shut 210＝84、border 10＝4、core 155＝62；.mini 130＝52、c 105＝42、字 21rpx＝8.4；.crow gap 38＝15.2） ---- */
+  .crow{display:flex;align-items:center;justify-content:center;gap:15.2px;margin:auto 0}
+  .shutcol{display:flex;flex-direction:column;align-items:center;gap:3.2px;flex:none}
+  .shut{border-radius:50%;border:4px solid var(--paper);display:flex;align-items:center;justify-content:center}
+  .shut .core{width:62px;height:62px;border-radius:50%;background:var(--cam);color:var(--cam-ink);display:flex;align-items:center;justify-content:center}
+  .shut .core svg{width:26px;height:26px}
+  .shutcol .lb{font-size:9.6px;color:var(--p78);font-weight:700;letter-spacing:.4px;line-height:1.2}
+  .mini{width:52px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .mini .c{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--p78);
+    background:rgba(242,239,233,.10)}
+  .mini .c svg{width:16px;height:16px}
+  .mini span{font-size:8.4px;color:var(--p50);letter-spacing:.4px}
+
+  /* ---- 缩略图（.th 100rpx＝40px、gap 16＝6.4、radius 18＝7.2；一行 5 格＝564rpx≤卡内 566；➕ margin-left:auto 钉本行右端） ---- */
+  .strip{display:flex;flex-wrap:wrap;gap:6.4px;margin-top:auto;flex:none}
+  .th{width:40px;height:40px;border-radius:7.2px;flex:none;position:relative;overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+  .th.p1{background:linear-gradient(165deg,#E7B981 0%,#C4834C 46%,#7A4A2A 100%)}
+  .th.p2{background:linear-gradient(165deg,#9DB2D2 0%,#6C82A8 48%,#3E4C68 100%)}
+  .th.p3{background:linear-gradient(165deg,#A8C4A2 0%,#6F9068 50%,#41573C 100%)}
+  .th.p1::before,.th.p2::before,.th.p3::before{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;
+    background:linear-gradient(180deg,rgba(30,18,8,0),rgba(30,18,8,.5))}
+  .th.p1::after{content:"";position:absolute;left:7px;top:6px;width:8px;height:8px;border-radius:50%;background:rgba(255,238,205,.88)}
+  .th.p2::after{content:"";position:absolute;left:-5px;bottom:5px;width:25px;height:13px;border-radius:50% 50% 0 0;background:rgba(24,30,42,.55)}
+  .th.p3::after{content:"";position:absolute;right:-3px;bottom:3px;width:22px;height:15px;border-radius:50% 50% 0 0;background:rgba(24,34,22,.5)}
+  .th b{position:absolute;right:4px;top:4px;width:16px;height:16px;border-radius:50%;background:rgba(20,20,28,.55);
+    color:#fff;font-size:9px;font-weight:400;display:flex;align-items:center;justify-content:center;line-height:1}
+  .th u{position:absolute;left:4px;bottom:4px;min-width:15.2px;height:15.2px;border-radius:7.6px;padding:0 3.2px;
+    background:rgba(20,22,26,.62);color:var(--paper);font-size:9px;text-decoration:none;
+    display:flex;align-items:center;justify-content:center;letter-spacing:0}
+  .add{width:40px;height:40px;border-radius:7.2px;display:flex;align-items:center;justify-content:center;flex:none;
+    background:var(--field);border:1.2px solid var(--p14);color:var(--p78);margin-left:auto}
+  .add svg{width:16px;height:16px}
+  .add.dis{background:rgba(20,22,26,.28);border-color:transparent;color:var(--p38)}
+  .tst{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);background:rgba(16,18,22,.88);color:var(--paper);
+    font-size:10.5px;padding:8px 13px;border-radius:9px;white-space:nowrap;z-index:9;border:1px solid rgba(242,239,233,.10)}
+  .tst::before{content:"";position:absolute;left:50%;bottom:-4px;transform:translateX(-50%) rotate(45deg);
+    width:7px;height:7px;background:rgba(16,18,22,.88);border-right:1px solid rgba(242,239,233,.10);border-bottom:1px solid rgba(242,239,233,.10)}
+
+  /* ---- 收起态那条胶囊（.bar 128rpx＝51.2、radius 64＝25.6、字 --fs-title 31rpx＝12.4） ---- */
+  .bar{height:51.2px;border-radius:25.6px;background:var(--paper);display:flex;align-items:center;justify-content:center;
+    color:#14161A;font-size:12.4px;font-weight:700;letter-spacing:.3px;position:relative}
+  .bar .barin{display:flex;align-items:center;gap:9px}
+  .bar .g{width:16px;height:16px;border-radius:50%;border:1.6px solid rgba(20,22,26,.5);position:relative;flex:none}
+  .bar .g::after{content:"";position:absolute;left:3.4px;top:3.4px;width:7.6px;height:7.6px;border-radius:50%;background:rgba(20,22,26,.5)}
+</style></head><body>
+
+<h1><i></i>创建入口 v8 · 英文版 · 与已落地代码同一口径</h1>
+<div class="sub">
+<b>先说这一稿是什么</b>：不是新方案，是把<b>已经落进代码的那一屏</b>换成<b>英文那一门字典的原文</b>再画一遍；顺带把 v7 正本上两处与代码不一致的地方对齐了（面板 <b>450/585 → 500/580rpx</b>、快门与条的颜色<b>从写死的橙改成当前壁纸色阶</b>）。
+<b>真机现在跑线上 1.9.29</b>（2026-10-07 19:32:01 发布），<b>2.0.0 已提审、正在审核中</b>（10-07 22:31:26 提交）；这一批中英文都在<b>开发包 2.0.0 那一档</b>，<b>没出包、没上传、没部署</b>。
+<b>英文这一版不是"待办"</b>：代码里已经生效，模拟器真跑量过五条（<code>验-统一录入条-真跑</code> H 节：条身那句读的是 <i>Jot it down</i>、三枚标签 <i>Photo|Link|Text</i>、条上 <i>Slide to extract</i> 字 217px 放得进 300px 轨道、框外两枚之间还剩 123px 缝）。
+<b>每一句英文都不是我写的</b>：屏上出现的每串英文字都从 <code>miniprogram/utils/i18n.js</code> 的 en 字典现读注入（生成器 <code>docs/工具/出-创建入口v8英文稿.js</code>），图例里逐条标了键名。<b>几何 1rpx＝0.4px</b>，每个数都注了出处。
+</div>
+
+<div class="plan"><div class="ptitle"><span class="k">一排</span><span class="t">七屏 · English</span><span class="d">正本甲档那六格逐格同构，另加第 0 格「现网收起态」当对照；面板高度、卡内可用、一行格数、行程全部按已落地代码（500／580rpx）</span></div>
+<div class="row" id="r1"></div></div>
+
+<div class="plan"><div class="ptitle"><span class="k">二排</span><span class="t">滑动这一枚的六个态 · English</span><span class="d">圆跟手、停在最右、颜色不变；是轨道随进度由纸白吃进实心，白环线一直在</span></div>
+<div class="row" id="r2"></div></div>
+
+<div class="plan"><div class="ptitle"><span class="k">三排</span><span class="t">"说一句"的六个地方 · English</span><span class="d">报错与提示全在框外那一格，不占面板高度；权限那一句可点，直接去设置</span></div>
+<div class="row" id="r3"></div></div>
+
+<div class="plan"><div class="ptitle"><span class="k">四排</span><span class="t">同一屏 × 四套壁纸</span><span class="d">这是"颜色跟色阶走"那条决定的视觉后果——换壁纸时快门、条、底栏三处一起换（同一支色阶算出来的），深浅关系与对比不变；背景图与压暗罩这一排故意没跟着换</span></div>
+<div class="row" id="r4"></div></div>
+
+<div class="plan"><div class="ptitle"><span class="k">五排</span><span class="t">英文宽度实测（浏览器现量，不是我目测）</span><span class="d">折行或溢出＝红；这一表由页面自己量完写进 DOM，再由生成器读回来打印</span></div>
+<div class="row"><table class="m" id="mt"><thead><tr><th>键</th><th>串</th><th>落在哪个容器</th><th>字宽／可用</th><th>判定</th></tr></thead><tbody></tbody></table></div></div>
+
+<div class="legend" id="lg"></div>
+
+<script>
+// 出图/量宽度都是 headless 跑的，页面里报错看不见——所以把第一条错误顶到 <title> 上，
+// 生成器 dump-dom 之后 grep 一下就知道是没执行还是执行了但放不下。
+window.addEventListener('error',function(e){document.title='PAGE-ERROR: '+e.message+' @ line '+e.lineno})
+var S='stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
+function svg(i){return '<svg viewBox="0 0 24 24" fill="none" '+S+'>'+i+'</svg>'}
+var IC={
+  cam:svg('<path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/>'),
+  img:svg('<path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"/><path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"/><circle cx="13" cy="7" r="1" fill="currentColor" stroke="none"/><rect x="8" y="2" width="14" height="14" rx="2"/>'),
+  lnk:svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'),
+  pen:svg('<path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>'),
+  plus:svg('<path d="M5 12h14"/><path d="M12 5v14"/>'),
+  rows:svg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M21 9H3"/><path d="M21 15H3"/>'),
+  user:svg('<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>')
+};
+/* ==== 下面这一整块 EN/THEME 由 docs/工具/出-创建入口v8英文稿.js 从现网字典与 palette 现读生成，不要手改 ==== */
+/*__GEN_BEGIN__*/
+var EN={"appName":"TumarkNote","createHeading":"Save what matters","barIdle":"Jot it down","chooseMode":"Choose mode","barCollapse":"Tap outside to close","modePhoto":"Photo","modeUrl":"Link","modeWrite":"Text","fromAlbum":"Album","takePhoto":"Camera","linkDesc":"WeChat articles / Web pages","manualDesc":"Paste the text, get a summary","origTranslate":"Translate original","slideExtract":"Slide to extract","busyExtract":"Extracting…","extractSucceeded":"Saved to notes","maxShots":"Up to {n} images — delete one first","linkRule":"Link must start with http:// or https://","needBody":"Add the text to work from","permCamera":"No camera access — tap to open settings","pickFailed":"Could not open the camera or album — please try again","taskTimeout":"Processing timeout, check notes list later","_date":"Oct 8","_week":"Thursday","_tip":"Photos and screenshots turn into key points"};
+var THEMES=[{"key":"tint-paper","label":"象牙","cam":"#AFA488","camInk":"#352E1D","ext":"#766B50","crCam":"5.44","crExt":"4.59","chromeBg":"#443B25","chromeSel":"#766948"},{"key":"tint-celadon","label":"天青","cam":"#88AF91","camInk":"#1D3522","ext":"#4F7557","crCam":"5.42","crExt":"4.56","chromeBg":"#25442B","chromeSel":"#467350"},{"key":"tint-blush","label":"樱落","cam":"#AF889C","camInk":"#351D29","ext":"#8C5F76","crCam":"5.02","crExt":"4.56","chromeBg":"#442534","chromeSel":"#915975"},{"key":"gradient-blue","label":"雨雾","cam":"#8F95A8","camInk":"#212431","ext":"#666C84","crCam":"5.17","crExt":"4.53","chromeBg":"#252C44","chromeSel":"#616986"}];
+var LEGEN=["<b>这一稿与 v7 正本的关系（三处不同，先说清）：</b>① <b>只画甲档</b>——正本那张\"不透明／淡透明\"两档对照里，落地时你拍的是甲（不透明实面板），代码里也只有这一档，所以英文稿不再重复画乙；② 一排<b>多一格「0 · 收起态」</b>，那是现网现在跑着的样子，留着当对照；其余每一格的位置、层次、行高与正本逐格同构，<b>只换语言</b>——<b>一个例外</b>：多图那两格（本稿第 5、6 格）画的是<b>已落地的排布</b>（一行五枚 100rpx、➕ 钉在本行最右端），正本画的是\"一行四枚、拉开铺满\"那一版，这一处差异正本图例第 11 条 ④ 已经记过，不是本稿另起的结构。③ <b>另两处按已落地的代码对齐了</b>：面板两档从正本那一份的 450／585rpx 改成代码里的 <b>500／580rpx</b>（450 装不下照片那三枚圈：卡内可用 251.4rpx，那三枚要 250.4）；快门与「右滑提炼」那两枚<b>不再是写死的 #E9723D／#C4541F</b>，改成吃当前壁纸色阶第 3、第 4 档——这一稿画的是象牙那一套（#AFA488／#766B50）。<b>这一条放置是我定的、他没拍过</b>，要改回写死的橙只动 <code>createSkin()</code> 两行。","<b>每一句英文的出处（全是 <code>utils/i18n.js</code> 的 en 键，由生成器现读注入，手改无效）：</b>appName=<i>TumarkNote</i>、createHeading=<i>Save what matters</i>、barIdle=<i>Jot it down</i>、chooseMode=<i>Choose mode</i>、barCollapse=<i>Tap outside to close</i>、modePhoto=<i>Photo</i>、modeUrl=<i>Link</i>、modeWrite=<i>Text</i>、fromAlbum=<i>Album</i>、takePhoto=<i>Camera</i>、linkDesc=<i>WeChat articles / Web pages</i>、manualDesc=<i>Paste the text, get a summary</i>、origTranslate=<i>Translate original</i>、slideExtract=<i>Slide to extract</i>、busyExtract=<i>Extracting…</i>、extractSucceeded=<i>Saved to notes</i>、maxShots=<i>Up to {n} images — delete one first</i>、linkRule=<i>Link must start with http:// or https://</i>、needBody=<i>Add the text to work from</i>、permCamera=<i>No camera access — tap to open settings</i>、pickFailed=<i>Could not open the camera or album — please try again</i>、taskTimeout=<i>Processing timeout, check notes list later</i>。日期那一行不是字典键，是 <code>create.js</code> 的 <code>dateLineFor('en')</code> 同法现算（这一稿：<i>Oct 8 Thursday</i>）。","<b>为什么英文这一版不是\"待办\"：</b>代码里已经生效并且真跑量过——<code>验-统一录入条-真跑</code> H 节五条：条身读的是 <i>Jot it down</i>、三枚标签 <i>Photo|Link|Text</i>、条上那句 <i>Slide to extract</i> 字宽 217px／轨道 300px 放得进、框外两枚之间还剩 123px 缝。<b>本稿第五排那张宽度实测表由页面自己量</b>（<code>window.__metrics()</code>），不是我目测。","<b>英文微文案三条要注意的（这一稿已经按现网值画，改的时候别踩）：</b>① 说明行不许写零件清单，要写\"这行拿来干嘛\"——所以 <i>Paste the text, get a summary</i> 这种\"贴进来→出摘要\"的因果句是对的，\"标题／原文／摘要\"三个名词并列那种是清单；② 按钮与标签名不许承诺顺带做的事，<i>Slide to extract</i> 只说\"滑就开始提炼\"，没说\"提炼并保存\"；③ <b>折行＝红</b>：快门下面那枚字在中文是两个字「拍照」，英文 <i>Camera</i> 是六个字符，落点那一列 84px（去掉内缩可用 70），所以这一稿把它按现网字号（--fs-meta 24rpx）画出来量过——放不下会在第五排那张表里报\"放不下／折行\"。","<b>四套壁纸那一排说明的事：</b>换壁纸时快门与条<b>一起换深浅两档</b>（第 3、第 4 档），两枚的深浅关系、字底对比都不变：象牙 #AFA488／#766B50（5.44、4.59）；天青 #88AF91／#4F7557（5.42、4.56）；樱落 #AF889C／#8C5F76（5.02、4.56）；雨雾 #8F95A8／#666C84（5.17、4.53）。四套 × 两枚共八组对比全在 WCAG 小字 4.5 以上（数由 <code>palette.crOf</code> 现算）。<b>同一排里底栏那一胶囊也跟着换</b>——它跟这两枚是同一支色阶算出来的（<code>palette.chromeOf</code> 的 <code>bg</code>／<code>sel</code>：象牙 #443B25／#766948；天青 #25442B／#467350；樱落 #442534／#915975；雨雾 #252C44／#616986），只换按钮不换底栏就是稿子内部自相矛盾。<b>这一排没跟着换的是背景图与压暗罩</b>：真机换壁纸时那两样也换，但那是「外观」那一档的事，不在创建这一条线里，画进来只会让人以为这一稿在提案。","<b>进度那条仍然要说白：</b>这一枚走的是<b>假进度</b>——服务端任务在 redis 里只有 <code>status</code>（<code>backend/app/services/queue.py</code> 的 <code>set_task_status</code>），没有百分比，客户端 2 秒轮一次。曲线 <code>90×(1−e^(−秒/30))</code> 封顶 90%，接口回来才钉满。要真进度得给任务加 <code>done</code>/<code>total</code> 两个字段并部署（<code>docs/规格-创建入口这一条线.md</code> §11 第三条）。","<b>这一屏的英文与中文共用同一套皮：</b>面板三档暗面（#23252C／#2B2D35／#1A1C21）、纸白字与各档 alpha、描边宽度、圆角、行程 456rpx、小图 100rpx 见方一行五格——<b>没有为英文另开一套尺寸</b>；语言只换句子里的字。","<b>\"英文会不会撑破框\"这一条交给工具，不写在图例里当结论：</b>屏上最容易撑破的是输入框那两句 <i>WeChat articles / Web pages</i>／<i>Paste the text, get a summary</i>，落点是同一个框。下面第五排那张宽度实测表由页面自己量（<code>window.__metrics()</code>：字宽用 <code>Range</code> 只圈文字、可用宽用 <code>clientWidth − 左右内缩</code>），生成器把数读回来打印，<b>任何一串变成\"放不下\"脚本就非 0 退出</b>，所以这张表是活的尺子，不是这一稿的插图。<b>我早先在别一版量错过一次</b>（当时写成\"英文比框宽 22px、要么降字号要么换短句\"）：错在拿 <code>scrollWidth</code> 量字——它把框自己的左右内缩也算进去，每条虚高约 56px。改成 Range 之后这条不存在：placeholder 照旧吃现网 <code>--fs-body</code> 28rpx，不降号、不改字典、不加新句；中文那两句本来就在框里。"];
+/*__GEN_END__*/
+
+
+var CHROME='<div class="chrome"><div class="island"></div><div class="stime">9:41</div>'+
+  '<div class="sright"><div class="sig"><i></i><i></i><i></i><i></i></div>'+
+  '<svg class="wifi" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M1 4.1a10.2 10.2 0 0 1 14 0"/><path d="M3.7 6.9a6.4 6.4 0 0 1 8.6 0"/><path d="M6.3 9.6a2.8 2.8 0 0 1 3.4 0"/></svg>'+
+  '<div class="bat"><u></u></div></div><div class="navtitle">'+EN.appName+'</div>'+
+  '<div class="capsule"><div class="half"><i></i><i></i><i></i></div><div class="dv"></div><div class="half"><div class="tgt"></div></div></div></div>';
+function HEAD(){return '<div class="head"><div class="hrow"><div class="htitle" data-m="htitle">'+EN.createHeading+'</div>'+
+  '<div class="lang"><span>中</span><span class="on">EN</span></div></div>'+
+  '<div class="date"><span class="d">'+EN._date+'</span><span class="w">'+EN._week+'</span></div></div>'}
+var PILL='<div class="pill"><div class="it on"><div class="ic">'+IC.plus+'</div></div>'+
+  '<div class="it"><div class="ic">'+IC.rows+'</div></div><div class="it"><div class="ic">'+IC.user+'</div></div></div>';
+
+function modes(on){var t=[EN.modePhoto,EN.modeUrl,EN.modeWrite];
+  return '<div class="modes">'+t.map(function(x){return '<div class="md'+(x===on?' on':'')+'" data-m="md">'+x+'</div>'}).join('')+'</div>'}
+function dhead(){return '<div class="out"><span data-m="out-l">'+EN.chooseMode+'</span><span data-m="out-r">'+EN.barCollapse+'</span></div>'}
+function errline(s){return '<div class="err"><span data-m="err">'+s+'</span></div>'}
+function sld(icon,cls,txt,pct,knobLeft){
+  // 行程与代码同数：静止 left 10rpx＝4px、最右 456rpx＝182.4px（SLD_MAX_RPX）
+  var l=(knobLeft===undefined?4:knobLeft);
+  return '<div class="sld '+(cls||'')+'">'+
+    (pct?'<div class="fill" style="width:'+pct+'%"></div>':'')+
+    '<div class="txt" data-m="sld">'+(txt||EN.slideExtract)+'</div>'+
+    '<div class="knob" style="left:'+l+'px">'+IC[icon]+'</div></div>'}
+function photoCard(){return '<div class="crow">'+
+  '<div class="mini"><div class="c">'+IC.img+'</div><span data-m="mini">'+EN.fromAlbum+'</span></div>'+
+  '<div class="shutcol"><div class="shut"><div class="core">'+IC.cam+'</div></div><div class="lb" data-m="shutlb">'+EN.takePhoto+'</div></div>'+
+  '<div class="mini"><div class="c">'+IC.lnk+'</div><span data-m="mini">'+EN.modeUrl+'</span></div></div>'}
+function strip(n,dis){var k=['p1','s1','p2','s2','p3','p2','p1','s2','p3'],o='';
+  for(var i=0;i<n;i++){o+='<div class="th '+k[i%k.length]+'"><b>✕</b><u>'+(i+1)+'</u></div>'}
+  return '<div class="strip">'+o+'<div class="add'+(dis?' dis':'')+'">'+IC.plus+'</div></div>'}
+function urlCard(){return '<div class="field mid" data-m="field">'+EN.linkDesc+'</div>'}
+function urlFilled(){return '<div class="field mid" data-m="field">https://mp.weixin.qq.com/s/abcdef<div class="x">✕</div></div>'}
+function textCard(){return '<div class="field mid" data-m="field">'+EN.manualDesc+'</div>'}
+function textOpen(){return '<div class="field ta2" data-m="field2">'+EN.manualDesc+'</div>'+
+  '<div class="wr-sw"><span class="lab" data-m="sw">'+EN.origTranslate+'</span><span class="track"><u></u></span></div>'}
+
+function P(m,b){return {m:m,b:b}}
+function frame(body,open,extra){
+  // 框外那一行（Choose mode / Tap outside to close）在代码里是面板之上、报错之下的那一格，
+  // 每一档展开态都在，所以由 frame 统一带出来，不在每一格里手抄一遍
+  return '<div class="phone">'+CHROME+'<div class="screen"><div class="bgimg"></div><div class="scrim"></div>'+HEAD()+
+    '<div class="dockwrap">'+dhead()+(extra||'')+
+    '<div class="dock'+(open?' open':'')+'">'+modes(body.m)+'<div class="card">'+body.b+'</div></div></div>'+PILL+'</div></div>'}
+function plain(inner,cap){return '<div class="col">'+inner+'<div class="cap">'+cap+'</div></div>'}
+
+/* ---- 一排 ---- */
+var R1=[
+ ['<div class="phone">'+CHROME+'<div class="screen"><div class="bgimg"></div><div class="scrim"></div>'+HEAD()+
+  '<div class="dockwrap rest"><div class="tips"><span class="dot"></span><span data-m="tips">'+EN._tip+'</span></div>'+
+  '<div class="bar"><div class="barin" data-m="bar"><span class="g"></span>'+EN.barIdle+'</div></div></div>'+PILL+'</div></div>',
+  '<b>0 · 收起态</b><br>还是现网那条胶囊，一个字没改；句子吃 <i>en.barIdle</i>，上面那行轮播吃 <i>en.tips</i>'],
+ [frame(P(EN.modePhoto,photoCard()),0,null),'<b>1 · Photo</b><br>只有三枚圈：中间那枚大圆仍是全页唯一的实心大钮，提示词按你上一轮说的撤了'],
+ [frame(P(EN.modeUrl,urlCard()+sld('lnk','off')),0,null),'<b>2 · Link</b><br>一个框、一句 placeholder（<i>en.linkDesc</i>）；框上下居中，不顶着下面的条。这一格空着，所以圆是灰的'],
+ [frame(P(EN.modeWrite,textCard()+sld('pen','off')),0,null),'<b>3 · Text</b><br>与链接态同构，placeholder 换成 <i>en.manualDesc</i>（口径已按你拍的改掉，不再提"标题"）'],
+ [frame(P(EN.modeWrite,textOpen()+sld('pen')),1,null),'<b>4 · Text · 展开</b><br>焦点进框里才抬这一档：框从一行变两行、多出「原文翻译」那一枚开关，条不挪位；面板 580rpx 为止'],
+ [frame(P(EN.modePhoto,strip(4)+sld('img')),0,null),'<b>5 · 选了 4 张</b><br>一横排五格（4 张 + ➕），➕ 钉在这一行最右端；序号标在每张图左下角'],
+ [frame(P(EN.modePhoto,strip(9)+sld('img')),1,null),'<b>6 · 选了 9 张 · 展开</b><br>只多一行：9 + ➕ = 10 格 = 两行，➕ 落在第二行右端；再点不再长']
+];
+document.getElementById('r1').innerHTML=R1.map(function(x){return plain(x[0],x[1])}).join('');
+
+/* ---- 二排：滑动六态 ---- */
+var R2=[
+ [frame(P(EN.modeUrl,urlCard()+sld('lnk','off')),0,null),'<b>① 待滑·这一格还空着</b><br>圆转灰、字淡一档；<b>滑到最右也回弹</b>，但会说一句（见三排第 1 格）'],
+ [frame(P(EN.modeUrl,urlFilled()+sld('lnk')),0,null),'<b>② 待滑·有内容</b><br>圆吃实心色，字 <i>'+EN.slideExtract+'</i>；填好了点什么也不做——必须划过去，等于让他先看一眼这一屏'],
+ [frame(P(EN.modeUrl,urlFilled()+sld('lnk','',EN.slideExtract,0,96)),0,null),'<b>③ 拖动中</b><br>圆跟手（实测 data 259.6rpx／屏上 258rpx），轨道仍纸白，字不催'],
+ [frame(P(EN.modeUrl,urlFilled()+sld('lnk','',EN.busyExtract,0,182.4)),0,null),'<b>④ 就位·松手即触发</b><br>圆停在最右、<b>颜色不变</b>；字换成 <i>'+EN.busyExtract+'</i>'],
+ [frame(P(EN.modeUrl,urlFilled()+sld('lnk','',EN.busyExtract,76,182.4)),0,null),'<b>⑤ 提炼中·进度</b><br>轨道由左往右吃进实心色（画到 76%），<b>那圈白边一直在</b>＝快门白环的同一笔。进度是假的：服务端只有 status，按时间推、封顶 90%'],
+ [frame(P(EN.modeUrl,urlFilled()+sld('lnk','done',EN.busyExtract,100,182.4)),0,'<div class="tst">'+EN.extractSucceeded+'</div>'),'<b>⑥ 完成</b><br>整条转实心、白环仍在、字转纸白 → 吐司 <i>'+EN.extractSucceeded+'</i> → 800ms 后跳笔记详情页']
+];
+document.getElementById('r2').innerHTML=R2.map(function(x){return plain(x[0],x[1])}).join('');
+
+/* ---- 三排：说一句的六个地方 ---- */
+var R3=[
+ [frame(P(EN.modeUrl,'<div class="field mid" data-m="field">not a link</div>'+sld('lnk','off')),0,errline(EN.linkRule)),'<b>1 · 链接不像链接</b><br>边打字边说，不等点下去；那句在<b>框外</b>那一格，面板不因此变高'],
+ [frame(P(EN.modeWrite,textCard()+sld('pen','off')),0,errline(EN.needBody)),'<b>2 · 原文还空着</b><br>空着滑到底：说一句、圆回弹（不钉在最右）'],
+ [frame(P(EN.modePhoto,photoCard()),0,errline(EN.permCamera)),'<b>3 · 没拿到相机权限</b><br>这一句<b>可点</b>，直接去系统设置；只有真是权限问题才写成这句'],
+ [frame(P(EN.modePhoto,photoCard()),0,errline(EN.pickFailed)),'<b>4 · 相机/相册没起来</b><br>不是权限的失败另有一句，不拿"去开权限"糊弄'],
+ [frame(P(EN.modePhoto,strip(9,true)+sld('img')),1,'<div class="tst">'+EN.maxShots.replace('{n}','9')+'</div>'),'<b>5 · 满 9 张还点 ➕</b><br>➕ 转灰 + 一句吐司；<b>不开系统选择器</b>（真跑钉过：chooseMedia 被叫 0 次）'],
+ [frame(P(EN.modeUrl,urlFilled()+sld('lnk')),0,errline(EN.taskTimeout)),'<b>6 · 处理超时</b><br>失败/超时都退回"待滑"那一帧：圆回最左、轨道全白，那句错留在框外说。<b>框里那串链接还留着</b>，所以圆仍是实心色（<code>readyFor()</code> 只看这一格有没有东西可提交）']
+];
+document.getElementById('r3').innerHTML=R3.map(function(x){return plain(x[0],x[1])}).join('');
+
+/* ---- 四排：四套壁纸 ---- */
+document.getElementById('r4').innerHTML=THEMES.map(function(t){
+  // 底栏胶囊与那两枚是同一支色阶算出来的（palette.chromeOf），换壁纸时不许只换按钮
+  var css='--cam:'+t.cam+';--cam-ink:'+t.camInk+';--extract:'+t.ext+';--extract-ink:#F2EFE9;'
+    +'--chrome-bg:'+t.chromeBg+';--chrome-sel:'+t.chromeSel+';';
+  return '<div class="col"><div style="'+css+'">'+frame(P(EN.modePhoto,photoCard()),0,null)+'</div>'+
+    '<div class="cap"><b>'+t.label+' · '+t.key+'</b><br>快门 '+t.cam+'（深字压上去 '+t.crCam+'）<br>条 '+t.ext+'（纸白压上去 '+t.crExt+'）<br>底栏 '+t.chromeBg+'／选中 '+t.chromeSel+'</div></div>'}).join('');
+
+/* ---- 图例 ---- */
+document.getElementById('lg').innerHTML=LEGEN.map(function(x,i){
+  return '<div><span class="n">'+(i+1)+'</span>'+x+'</div>'}).join('');
+
+/* ---- 宽度实测：由页面自己量（window.__metrics），生成器用 headless Chrome --dump-dom 读回来打印 ---- */
+window.__metrics=function(){
+  var rows=[];
+  function inner(el){var cs=getComputedStyle(el);
+    return el.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)}
+  // 只量"字本身"多宽：scrollWidth 会把元素自己的左右内缩算进来（第一版就在这上面误判过三条"放不下"）
+  function textW(el){var r=document.createRange();r.selectNodeContents(el);return r.getBoundingClientRect().width}
+  function one(key,sel,boxSel,label){
+    var el=document.querySelector(sel), box=document.querySelector(boxSel);
+    if(!el||!box){rows.push([key,'（探针找不到节点：'+(el?'box':'sel')+'）',label,'—','bad']);return}
+    var ew=textW(el),bw=inner(box);
+    rows.push([key,el.textContent.trim(),label,ew.toFixed(1)+' / '+bw.toFixed(1),(ew<=bw+0.5)?'ok':'bad'])}
+  function sum3(key,sel,boxSel,gap,label){
+    var els=document.querySelectorAll(sel),box=document.querySelector(boxSel);
+    if(!els.length||!box){rows.push([key,'（探针找不到节点）',label,'—','bad']);return}
+    var t=0;for(var i=0;i<els.length;i++)t+=els[i].scrollWidth;
+    var bw=inner(box)-(els.length-1)*gap;
+    rows.push([key,Array.prototype.map.call(els,function(e){return e.textContent}).join(' | '),label,
+      t.toFixed(1)+' / '+bw.toFixed(1),(t<=bw+0.5)?'ok':'bad'])}
+  // 每一格量的是"这一串字放得进它落点那一格吗"——落点宽度由代码里的 rpx×0.4 定，不是我目测
+  one('createHeading','#r1 .htitle','#r1 .hrow','大标题（与右上「中 EN」抢同一行）');
+  one('barIdle','#r1 [data-m=bar]','#r1 .bar','胶囊条身');
+  one('tips','#r1 [data-m=tips]','#r1 .tips','Tips 那一行（浮在条上面）');
+  // 框外那一行两枚不许相撞：真正的约束是"两句加起来 ≤ 那一整宽"，不是各量各自（各自的盒子就是字宽，永远等号＝假绿）
+  (function(){
+    var l=document.querySelector('#r1 .col:nth-child(2) [data-m=out-l]'),
+        r=document.querySelector('#r1 .col:nth-child(2) [data-m=out-r]'),
+        row=document.querySelector('#r1 .col:nth-child(2) .out');
+    if(!l||!r||!row){rows.push(['框外那一行','（探针找不到节点）','两枚加起来',  '—','bad']);return}
+    var t=textW(l)+textW(r), bw=inner(row);
+    rows.push(['chooseMode + barCollapse',l.textContent+' ｜ '+r.textContent,'框外那一整行（两枚加起来，中间留的才是缝）',
+      t.toFixed(1)+' / '+bw.toFixed(1),(t<=bw+0.5)?'ok':'bad'])})()
+  sum3('三枚标签','#r1 .col:nth-child(2) [data-m=md]','#r1 .col:nth-child(2) .modes',24,'三枚标签加起来（gap 24 已扣）');
+  one('fromAlbum','#r1 .col:nth-child(2) [data-m=mini]','#r1 .col:nth-child(2) .mini','小圆下面那枚字（列宽 52）');
+  one('takePhoto','#r1 .col:nth-child(2) [data-m=shutlb]','#r1 .col:nth-child(2) .shutcol','快门下面那枚字（列宽 84）');
+  one('linkDesc','#r1 .col:nth-child(3) [data-m=field]','#r1 .col:nth-child(3) .field','链接框');
+  one('manualDesc 收起','#r1 .col:nth-child(4) [data-m=field]','#r1 .col:nth-child(4) .field','文字框（收起一行）');
+  one('manualDesc 展开','#r1 .col:nth-child(5) [data-m=field2]','#r1 .col:nth-child(5) .field','文字框（展开两行）');
+  one('origTranslate','#r1 .col:nth-child(5) [data-m=sw]','#r1 .col:nth-child(5) .wr-sw','「原文翻译」那一行（右边还有枚开关）');
+  one('slideExtract','#r2 .col:nth-child(2) [data-m=sld]','#r2 .col:nth-child(2) .sld','滑动条（含两侧虚线各 24）');
+  one('busyExtract','#r2 .col:nth-child(4) [data-m=sld]','#r2 .col:nth-child(4) .sld','忙态/完成那一格');
+  one('maxShots 吐司','#r3 .tst','#r3 .phone','吐司（不许宽过屏）');
+  var errs=document.querySelectorAll('#r3 .err span');
+  for(var i=0;i<errs.length;i++){var el=errs[i],p=el.parentElement;
+    rows.push(['框外报错 '+(i+1),el.textContent.trim(),'报错那一整宽',
+      el.scrollWidth.toFixed(1)+' / '+inner(p).toFixed(1),(el.scrollWidth<=inner(p)+0.5)?'ok':'bad'])}
+  return rows};
+(function(){
+  var rows=window.__metrics(), bad=0, tb=document.querySelector('#mt tbody'), h='';
+  rows.forEach(function(r){
+    if(r[4]==='bad')bad++;
+    h+='<tr><td class="k">'+r[0]+'</td><td class="s">'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td>'+
+       '<td class="'+r[4]+'">'+(r[4]==='ok'?'放得进':'放不下／折行')+'</td></tr>'});
+  tb.innerHTML=h;
+  var f=document.createElement('div');
+  f.id='metricflag';f.style.cssText='color:#8FA0B4;font-size:11px;margin-top:8px';
+  f.textContent=(bad?'METRICS-BAD ':'METRICS-OK ')+'共 '+rows.length+' 串，放不下 '+bad+' 串';
+  document.querySelector('#mt').parentNode.appendChild(f)})();
+// 把"这一稿到底要多大的画布"顶到 <title> 上：生成器照这个数开窗口。
+// 为什么不能靠写死的窗口高/宽：v7 那一稿的 PNG 就是被写死的 1095 宽**横向切掉过右边几台手机**，
+// 又被写死的窗口高纵向切掉过图例——两个方向都会静默截，截出来的图看着还是完整的一张。
+(function(){var d=document.documentElement;
+  document.title='DIM '+Math.max(d.scrollWidth,document.body.scrollWidth)+'x'+Math.max(d.scrollHeight,document.body.scrollHeight)})();
+/* ---- 各段在整张图上的纵向位置，也交给 DOM（目验时要按段裁，不靠我猜像素） ---- */
+(function(){
+  var g=[],sy=window.pageYOffset||0;
+  function push(name,sel){var el=(typeof sel==='string')?document.querySelector(sel):sel;if(!el)return;var r=el.getBoundingClientRect();
+    g.push({t:name,y:Math.round((r.top+sy)*2),h:Math.round(r.height*2),w:Math.round(r.width*2)})}
+  push('标题','h1');push('说明','.sub');
+  var ps=document.querySelectorAll('.plan');
+  for(var i=0;i<ps.length;i++)push('段'+(i+1),ps[i]);
+  push('图例','.legend');
+  var p=document.createElement('pre');p.id='geo';p.style.display='none';
+  p.textContent='GEO'+JSON.stringify(g);document.body.appendChild(p)})()
+</script>
+</body></html>
