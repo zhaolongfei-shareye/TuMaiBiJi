@@ -85,17 +85,25 @@ const ck = (name, ok, got) => {
   let d = await page.data()
   ck('A1 收起态没有面板', (await page.$$('.panel')).length === 0)
   ck('A2 条身只有一条，且读的是「动动手指」', (await page.$$('.bar')).length === 1 && d.t.barIdle === '动动手指', d.t.barIdle)
-  ck('A3 三枚小圆都在', (await page.$$('.bar-dots .dot')).length === 3)
+  ck('A3 条身右边那三枚小圆真撤了（屏上一枚都不该剩）', (await page.$$('.bar-dots .dot')).length === 0)
   ck('A4 Tips 那一行在（展开才撤的那一位，此刻该留着）', (await page.$$('.tips')).length === 1)
   const [bar0, wrap0, tip0] = await rects(['.bar', '.entry-wrap', '.tips'])
   ck('A5 横条一动不动：条顶 == 整组顶（Tips 那盒子被负 margin 抵干净）',
     !!bar0 && !!wrap0 && Math.abs(bar0.top - wrap0.top) <= 1,
     bar0 && wrap0 && `条顶 ${Math.round(bar0.top)}／组顶 ${Math.round(wrap0.top)}`)
   ck('A6 条高 128rpx', !!bar0 && rpxEq(bar0.h, 128), bar0 && `${toRpx(bar0.h).toFixed(1)}rpx`)
-  ck('A7 条底落在底栏上方一条缝上（110 那行换背景 + 22 的间距）',
+  // 条底那一段空档：110 + 22 这两个数 10-09 之前是「调亮度｜换背景」那一行自己占的，
+  // 那一行搬到日期下面之后这段是空的，但条底位是站长拍过的那一档（618），不跟搬家漂。
+  ck('A7 条底落在底栏上方一条缝上（缝 = 那一行搬走前占的 110 + 22，条底位不随搬家变）',
     !!bar0 && Math.abs(bar0.bottom - (tabTop - 110 * R - 22 * R)) < 14,
     bar0 && `条底 ${Math.round(bar0.bottom)}｜应在 ${Math.round(tabTop - 132 * R)} 上下`)
-  ck('A8 换背景那一行在', (await page.$$('.home-swap')).length === 1)
+  // A8 钉两件事：那一行只一枚（`wx:if="{{bgSrc}}"`，默认那张形象图在就该有一枚），
+  // 以及它此刻量在横条**上方**——站长 10-09 那句"换到日期下方"就是这个先后。
+  // 它自己那条负 margin 只是把占位扣掉，不许把横条顶到它身上（抵成 0 ≠ 重叠）。
+  const swapBox = (await rects(['.home-swap']))[0]
+  ck('A8 那一行只一枚，且量到它坐在横条上方（搬去的位置就是那儿）',
+    (await page.$$('.home-swap')).length === 1 && !!swapBox && !!bar0 && swapBox.bottom <= bar0.top + 1,
+    swapBox && bar0 && `行底 ${Math.round(swapBox.bottom)}／条顶 ${Math.round(bar0.top)}`)
   await mp.screenshot({ path: `${OUT}/A-收起态.png` })
 
   // ---------- B 展开 · 照片档：三枚圈 ----------

@@ -131,7 +131,12 @@ const STATES = [
     !!bar && !!wrap && !!tips && near(bar.top, wrap.top, 1),
     bar && wrap && `条顶 ${bar.top.toFixed(1)}／组顶 ${wrap.top.toFixed(1)}`)
   ck(`条高 ${BAR_H}rpx`, !!bar && near(bar.h, rpx(BAR_H), 1.5), bar && `${(bar.h * 750 / win.windowWidth).toFixed(1)}rpx`)
-  ck(`条底落在"底栏顶 − 换背景那一行 − 一条间距"上（${TAB_TOP}+${SWAP_H}+${SWAP_GAP}）`,
+  // 条底离底栏顶那一段：10-09 之前它是「调亮度｜换背景」那一行自己占的（110 + 22），
+  // 那一行搬到日期下面之后这段是空档，但**站长拍过的条底位就是这一档**，数不许跟着搬家漂。
+  // 这条判据抓的是同一类账三次：`.entry-wrap` 靠 `margin-top:62vh` 那条流内 margin 落点，
+  // 它上面多一行就把 Tips + 横条 + 面板整组顶下去（09-30 那行日期、10-01 那行 Tips、
+  // 10-09 这一行搬家，每次都靠这条真跑才看出来）。
+  ck(`条底离底栏顶留 ${SWAP_H}+${SWAP_GAP}rpx 那一段（拍过的 618 那一档，不随那一行搬家漂）`,
     !!bar && near(bar.bottom, win.windowHeight - rpx(TAB_TOP + SWAP_H + SWAP_GAP), 14),
     bar && `条底 ${bar.bottom.toFixed(0)}｜应在 ${(win.windowHeight - rpx(TAB_TOP + SWAP_H + SWAP_GAP)).toFixed(0)} 上下`)
 

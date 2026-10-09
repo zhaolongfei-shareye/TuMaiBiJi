@@ -54,6 +54,18 @@ const sp3 = Number(/--sp-3:\s*(\d+)rpx/.exec(appWxss)[1])
 ok('左右内缩等于 --sp-3', new RegExp(`left:\\s*${sp3}rpx`).test(dock) && new RegExp(`right:\\s*${sp3}rpx`).test(dock), `--sp-3=${sp3}`)
 ok('展开时换背景那一行整个不渲染',
   /\.container\.entry-dock \.home-swap\s*\{[^}]*display:\s*none/.test(wxss))
+// 10-09 那一行搬到录入条上面之后，它一占流内的位就把 Tips + 横条 + 面板整组顶下去
+//（`.entry-wrap` 靠上面那条 62vh 的**流内** margin 落点；同一类账 09-30 那行日期、
+// 10-01 那行 Tips 各欠过一次，每次都是真跑才看出来）。所以它必须把自己占的那一段
+// 从后面扣干净：高 + 上间距 + 负 margin == 0。钉等式不钉 132 这个数——那两个数改了，
+// 扣的量要跟着改，写死就成了第二条要人记得对齐的账。
+const swap = seg('.home-swap')
+const swapH = Number(/height:\s*([\d.]+)rpx/.exec(swap)[1])
+const swapTop = Number(/margin-top:\s*(-?[\d.]+)rpx/.exec(swap)[1])
+const swapBot = Number(/margin-bottom:\s*(-?[\d.]+)rpx/.exec(swap)[1])
+ok('搬到上面的那一行不占流内的位（自己的高 + 上间距被自己的负 margin 抵成 0）',
+  [swapH, swapTop, swapBot].every(Number.isFinite) && swapH + swapTop + swapBot === 0,
+  `${swapH} + ${swapTop} + ${swapBot}`)
 // 抬层那条规则不许再把 fixed 改回 relative：它必须排除展开态
 ok('铺图抬层那条排除了展开态',
   /\.container\.has-bg:not\(\.entry-dock\) \.entry-wrap/.test(wxss))
