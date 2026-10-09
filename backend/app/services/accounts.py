@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models.account import Account, AccountIdentity
 from app.models.user import User
+from app.services import generation
 
 
 def ensure_for_provider(db: Session, provider: str, provider_uid: str) -> Account:
@@ -118,9 +119,16 @@ def bump_generation(db: Session, account: Account) -> int:
     这里逐行走 ORM 而不是 `update({generation: generation + 1})`：一个人名下的 `users` 行
     只有 0 或 1 条，而批量 update 不会同步已在内存里的那个 User 对象——调用方紧接着还要拿
     这个对象发新 token，读到旧代次的话发出去就是一把当场过期的钥匙。
+
+    抬完必须把新号记进**持久水位线**（`services/generation.note`）。这一刀是本支函数原来没有的，
+    而没有它那条水位线就是假防线：一个人被合来合去可以把 `generation` 从 5 一路涨到 15，这中间
+    每一个值都真随 token 发出去过；只在注册那一处取号的话，`users` 被删空之后新人照样会撞上
+    其中某一个值。理由与那条洞的实测读数写在 `app/services/generation.py`。
     """
     rows = db.query(User).filter(User.account_id == account.id).all()
     for row in rows:
         row.generation = row.generation + 1
+    if rows:
+        generation.note(db, max(row.generation for row in rows))
     account.generation = account.generation + 1
     return len(rows)

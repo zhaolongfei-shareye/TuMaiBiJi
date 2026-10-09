@@ -5,14 +5,13 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import Depends, HTTPException, Header
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.database import get_db
 from app.models.account import Account
 from app.models.user import User
-from app.services import accounts, quota
+from app.services import accounts, generation, quota
 
 logger = logging.getLogger(__name__)
 
@@ -168,10 +167,14 @@ async def login_or_register(code: str, db: Session, inviter: int | None = None) 
     if user:
         pass
     else:
-        # 新账号的 generation 取全表最大值 +1。用全表而不是"这个 id 上一代是多少"，
-        # 是因为旧行已经被删掉了、查不到；全表严格递增同样能保证复用 id 时新旧不撞。
-        max_gen = db.query(func.coalesce(func.max(User.generation), 0)).scalar() or 0
-        user = User(openid=openid, generation=max_gen + 1)
+        # 新账号的代次由 `services/generation.allocate` 取号：它读的不是"这张表现在最高几"，
+        # 而是一格**持久的高水位线**。差别只在一种场合——`users` 被删空过（`DELETE /v1/account`
+        # 删的是整条 account 名下所有行，最后一个人走完就是空表），那时 `max(generation)` 回 NULL，
+        # 按全表 max+1 取号会退回 1，而 1 正是头一个人当年用过、且现网那批 token 还在 7 天有效期内的值；
+        # 配上 rowid 被还给下一个人（这台 SQLite 的 `users.id` 没有 AUTOINCREMENT，实测如此），
+        # 两格同时撞回去 = 旧钥匙开得到新人的东西。取号的完整理由与"为什么必须两处喂养"写在
+        # `app/services/generation.py`。
+        user = User(openid=openid, generation=generation.allocate(db))
         db.add(user)
         db.commit()
         db.refresh(user)

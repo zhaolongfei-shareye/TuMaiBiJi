@@ -36,6 +36,7 @@ from app.models.account import Account, AccountIdentity  # noqa: F401,E402
 from app.models.link_code import LinkCode  # noqa: F401,E402
 from app.models.note import Note  # noqa: F401,E402
 from app.models.user import User  # noqa: F401,E402
+from app.models.generation_seq import GenerationSeq  # noqa: F401,E402
 
 CLIENT_ID = "com.tumarknote.pytest.service-id"
 APPLE_ISS = "https://appleid.apple.com"
@@ -57,7 +58,7 @@ def _fresh_session():
     Base.metadata.drop_all(
         bind=engine,
         tables=[LinkCode.__table__, AccountIdentity.__table__, Note.__table__,
-                Account.__table__, User.__table__],
+                Account.__table__, User.__table__, GenerationSeq.__table__],
     )
     Base.metadata.create_all(bind=engine)
     return SessionLocal()

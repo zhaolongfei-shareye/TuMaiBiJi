@@ -43,6 +43,7 @@ import app.models  # noqa: E402,F401  —— 建表只看"这一刻已被 import
 from app.models.account import Account, AccountIdentity  # noqa: E402
 from app.models.asset import Asset  # noqa: E402
 from app.models.category import Category  # noqa: E402
+from app.models.generation_seq import GenerationSeq  # noqa: E402
 from app.models.invitation import Invitation  # noqa: E402
 from app.models.job import Job  # noqa: E402
 from app.models.link_code import LinkCode  # noqa: E402
@@ -65,7 +66,7 @@ def _fresh_session():
         ShareReport.__table__, Share.__table__, NoteCard.__table__, UserProfile.__table__,
         Invitation.__table__, LinkCode.__table__, Asset.__table__, Category.__table__,
         Note.__table__, Job.__table__, AccountIdentity.__table__, Account.__table__,
-        User.__table__,
+        User.__table__, GenerationSeq.__table__,
     ]
     Base.metadata.drop_all(bind=engine, tables=tables)
     Base.metadata.create_all(bind=engine)
@@ -609,12 +610,18 @@ class Test外键强制下这一路走得通:
 
 
 class Test删掉最后一行人之后:
-    """`/v1` 这一路能把 `users` **整张表清空**——这是代次机制的一个盲区，说清它靠哪一半。
+    """`/v1` 这一路能把 `users` **整张表清空**——代次机制原来有个盲区，10-10 站长拍"按你建议"之后补上了。
 
-    `login_or_register` 给新人取的代次是"全表 max + 1"，空表上就是 1；老钥匙比的是
-    `sub`(=`users.id`) + `gen` 两格。两格同时撞回去才出事，所以这一路的成立条件是：
-    **同一个 id 被还给下一个人**。这一句按引擎不一样（下面第一条把 DDL 编出来实测，
-    不是引用谁的说明书）。
+    出事要两格**同时**撞回去：老 `/api` 钥匙比的是 `sub`(=`users.id`) ＋ `gen`，而 SQLite 会把删掉的
+    行号**还给下一个人**（下面第一条把 DDL 编出来实测，不是引用谁的说明书）。原来给新人取号的
+    `max(users.generation) + 1` 在空表上回 1，而 1 正是头一个人当年用过、且现网那批 token 还在 7 天
+    有效期内的值——那一条当时以 xfail 钉着（`strict=False`，红是"已知风险"、转 XPASS 是"修好了"）。
+    现在取号改走 `services/generation.allocate`（库里那一格持久水位线），这一条**转成硬断言**。
+
+    ⚠ 这里有个夹具陷阱，值得写下来：`_wechat_person` 是直接 `User(generation=1)` 造人的，**不经取号**，
+    所以水位线还停在 0。用它造的那个人被删空之后，新人照样拿 1 —— 那不是修坏了，是这一条的前提
+    没成立。所以第二条改成从真注册路造第一个人（现网只有那一条路能造 `users` 行）。
+    逐代发钥匙的更狠那条在 `tests/test_persistent_generation.py`。
     """
 
     def test_自证两张引擎上id会不会被还回来(self):
@@ -630,35 +637,37 @@ class Test删掉最后一行人之后:
         assert "id SERIAL" in pg, pg[:120]
         assert "id INTEGER NOT NULL" in lt and "SERIAL" not in lt, lt[:120]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="已知风险，不是「这样对」：SQLite 上删空 users 之后 id 会还给下一个人、代次回到 1，"
-               "于是被删那人那把 7 天有效的旧 `/api` 钥匙开得到新人的行。"
-               "Postgres（现网 `.env` 读到的地址）上 id 不复用，这条走 skip 分支。"
-               "修法要一张持久代次计数器（或让注销不许清空整张表），属行为变更——"
-               "已记入 docs/产品需求.md 阶段2-2b 回执的待拍，站长拍之前这条保持 xfail。",
-    )
     def test_被删那人那把旧钥匙不许开新人的门(self, client, db, monkeypatch):
         from app.core import auth as auth_core
 
-        user, account = _wechat_person(db, openid="o_last")
+        async def fake(code):
+            return {"openid": "o_last_man", "session_key": "sk", "unionid": None}
+
+        # 第一个人也走真注册路：他的代次必须由 `allocate` 发，否则这一条量的就不是现网那件事
+        # （见类 docstring 末尾那条夹具陷阱）。
+        monkeypatch.setattr(auth_core, "_wechat_code2session", fake)
+        assert client.post("/api/auth/wechat", json={"code": "first"}).status_code == 200
+        user = _reload(db).query(User).filter(User.openid == "o_last_man").one()
         old_id, old_gen = user.id, user.generation
         old_token = _user_token(user)
+        account = _reload(db).query(Account).filter(Account.id == user.account_id).one()
         assert _delete(client, account).status_code == 200
         assert db.query(User).count() == 0, "上面那句没真把最后一行人带走，这条量的就不是空表"
 
-        async def fake(code):
+        async def next_person(code):
             return {"openid": "o_fresh_next", "session_key": "sk", "unionid": None}
 
-        monkeypatch.setattr(auth_core, "_wechat_code2session", fake)
-        # 走真那条注册路（不是把 `login_or_register` 的算法手抄一遍）：代次那一格由它自己算。
+        monkeypatch.setattr(auth_core, "_wechat_code2session", next_person)
+        # 第二个人也走真那条注册路（不是把 `login_or_register` 的算法手抄一遍）：号由它自己取。
         assert client.post("/api/auth/wechat", json={"code": "fresh"}).status_code == 200
         fresh = _reload(db).query(User).filter(User.openid == "o_fresh_next").one()
-        assert fresh.generation == old_gen == 1, \
-            f"代次没回到 1（{fresh.generation}），这一条的推论前提变了，重写它"
         if fresh.id != old_id:
             pytest.skip(f"这台引擎上 id 不会被还回来（新 id={fresh.id}，旧 id={old_id}），"
                         "代次撞回去也开不了门——SQLite 之外就是这一支")
+        assert fresh.generation > old_gen, (
+            f"行号还给了下一个人（都是 {old_id}）而代次没越过 {old_gen}（新的是 {fresh.generation}）："
+            "那把 7 天有效的旧钥匙就开得了新人的门"
+        )
         resp = client.get("/api/user/quota", headers=_bearer(old_token))
         assert resp.status_code == 401, \
             f"旧钥匙开得了新人的门：{resp.status_code} {resp.text}"

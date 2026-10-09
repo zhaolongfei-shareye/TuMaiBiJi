@@ -203,7 +203,28 @@ with engine.connect() as conn:
 if not prof_idx or "UNIQUE" not in (prof_idx or "").upper():
     print("  ✗ user_profiles.user_id 上缺那条唯一索引（一人一份只剩代码里一句自觉）")
     raise SystemExit(1)
-print("  ✓ users.quota_bonus / users.invited_by / users.generation / users.contact_email / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / note_cards（含「一篇一张」那条部分唯一索引）/ user_profiles（含「一人一份」那条唯一索引）/ 一篇笔记一张有效码的索引 到位")
+# ---- 2.2 代次水位线那一条防线（2026-10-10）----
+# 症状是**登录 500**（`services/generation._row` 第一句就查这张表），所以表不在一定看得见。
+# 真正静默的是**那一格的值低于库里在用的代次**：这一格是"这张代表发过哪些号"唯一的记忆，
+# 而它只在有人注册时才被读——现网这批人手里还有 7 天有效期的旧 token（实测最高代次 39）。
+# 一旦那一格落后（迁移没跑到、有人手工清库、初值写成了 0），今天什么都不红；等 `users` 被
+# `DELETE /v1/account` 删空一次，下一个人就接走一个旧号，被删那人的旧钥匙当场开得了新人的门。
+# 这条不变量只有在这里、在还有活人的时候量得出来。
+if "generation_seq" not in tables:
+    print("  ✗ 缺 generation_seq 表（迁移 b71f4e0c9d52 没跑到），登录那一路第一句就炸")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    seq_val = conn.execute(text("SELECT value FROM generation_seq WHERE key='users'")).scalar()
+    gen_max = conn.execute(text("SELECT COALESCE(MAX(generation), 0) FROM users")).scalar()
+if seq_val is None:
+    print("  ✗ generation_seq 里 key='users' 那一行不在：取号第一步就 500")
+    raise SystemExit(1)
+if int(seq_val) < int(gen_max):
+    print(f"  ✗ 水位线 {seq_val} 低于库里在用的代次 {gen_max}："
+          "users 被删空之后取出的号会撞上旧 token（旧钥匙开得了新人的门）")
+    raise SystemExit(1)
+print(f"  ✓ generation_seq 那一格 = {seq_val}（≥ 库里最高代次 {gen_max}）")
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / users.contact_email / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / note_cards（含「一篇一张」那条部分唯一索引）/ user_profiles（含「一人一份」那条唯一索引）/ 一篇笔记一张有效码的索引 / generation_seq（代次水位线，含「那一格不许落后库里代次」那条不变量） 到位")
 PY
 if [[ $? -ne 0 ]]; then
     echo "✗ schema 校验未通过，终止部署"

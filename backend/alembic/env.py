@@ -13,6 +13,7 @@ from app.models import Note, User, Category, Asset, Job, Share
 # 顺手写一条 drop_table('user_profiles') 发出去——整表名片数据没了（10-09 审计严重③）。
 # 新加表的同一次提交里要在这里补一行，`tests/test_模型注册齐不齐` 钉着这一条。
 from app.models.user_profile import UserProfile  # noqa: F401  只要它把表挂进 Base.metadata
+from app.models.generation_seq import GenerationSeq  # noqa: F401  同上（10-10 那张代次水位线表）
 
 config = context.config
 
