@@ -144,6 +144,50 @@ const mixOn = (bgHex, inkHex, a) => {
     //    壁纸切过来之后，chromeOf 现算的那一支确实 ≥ 4.7（纸白压得住）。
     ck(`${theme.label}：chromeOf.sel ${chrome.sel} 纸白压得住（≥4.7）`,
       p.crOf('#F2EFE9', chrome.sel) >= 4.7, p.crOf('#F2EFE9', chrome.sel).toFixed(2))
+
+    // ⑤ v30 那一层（#27 落码第 3 步）：层色、区内顶那一行的深面、分类行撤胶囊。
+    //    读的全是**真页面上真渲染出来的计算色**——不读变量（automator 的 style() 读不到自定义属性，
+    //    上面 ③ 那条同注释）、也不读源码。镜像值抄错、`createSkin()` 没递到这一行、
+    //    wxss 里手抄了一支黑，这三种坏法都只有这一节抓得到。
+    const ix = await enter('/pages/index/index')
+    await sleep(4000)
+    const layer = p.listLayerOf(theme.key)
+    const sheet = await ix.$('.sheet')
+    const gotSheet = sheet ? hex(await sheet.style('background-color')) : '(没读到 .sheet)'
+    ck(`${theme.label}：.sheet 真落在层色 ${layer} 上（不再吃页底 ${theme.page}）`,
+      gotSheet.toUpperCase() === layer.toUpperCase(), gotSheet)
+    const row = await ix.$('.vtabs')
+    const gotRow = row ? hex(await row.style('background-color')) : '(没读到 .vtabs)'
+    ck(`${theme.label}：区内顶那一行的面＝创建页那块深面 #23252C`,
+      gotRow.toUpperCase() === '#23252C', gotRow)
+    const tabs = await ix.$$('.vtab')
+    // 不用 `:not(.on)`：automator 的选择器引擎跑在 WXML 树上，`:not()` 它不认，
+    // 10-09 实测会退回匹配第一枚（正好是选中那枚），于是这条判据永远读到纸白、永远红。
+    // 改成按 class 属性自己捞——读的是真元素身上的 class，不是我自己推的。
+    const pick = async (want) => {
+      for (const e of tabs) {
+        const c = await e.attribute('class')
+        // attribute() 这一版直接回字符串，不是 {name,value}（同文件上面 ③ 那条读 style 也一样）。
+        // 先按字符串读、读不到再退 .value，两条路都不成立时判据红，不会闷声当"没这个 class"。
+        const v = typeof c === 'string' ? c : (c && c.value)
+        if (typeof v !== 'string') return null
+        if (v.split(/\s+/).includes('on') === want) return e
+      }
+      return null
+    }
+    const onTab = await pick(true)
+    const offTab = await pick(false)
+    const onCol = onTab ? String(await onTab.style('color')) : '(没读到选中那枚 .vtab)'
+    const offCol = offTab ? String(await offTab.style('color')) : '(没读到未选那枚 .vtab)'
+    ck(`${theme.label}：tab 一共两枚（捞少了下面的色就无从比）`, tabs.length === 2, `${tabs.length} 枚`)
+    ck(`${theme.label}：选中那枚是纸白`, hex(onCol).toUpperCase() === '#F2EFE9', onCol)
+    ck(`${theme.label}：未选那枚是 62% 纸白`, Math.abs((alphaOf(offCol) || 0) - 0.62) < 0.01, offCol)
+    const bw = row ? String(await row.style('border-bottom-width')) : '(读不到)'
+    ck(`${theme.label}：那一行底下那条通栏线撤了（border-bottom-width 归零）`, /^0/.test(bw.trim()), bw)
+    const capsules = await ix.$$('.chip')
+    ck(`${theme.label}：分类行不再有胶囊（首页上 .chip 一枚都不该剩）`, capsules.length === 0, `${capsules.length} 枚`)
+    const cats = await ix.$$('.ix-cat')
+    ck(`${theme.label}：分类那一行是文字档（.ix-cat 至少两枚，捞空不等于通过）`, cats.length >= 2, `${cats.length} 枚`)
   }
 
   // 收尾：把进来那一枚**点**回去（四枚都走服务端，这一趟会真发 PUT），

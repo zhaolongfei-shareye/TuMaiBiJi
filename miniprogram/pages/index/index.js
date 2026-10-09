@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { catSkinFor, chromeOf, toneVars, toneColor, withAlpha, paleStep, TIP_DOT } = require('../../utils/palette.js')
+const { catSkinFor, chromeOf, createSkin, toneColor, withAlpha, paleStep, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
@@ -56,8 +56,13 @@ Page({
     // 那枚小黄点的色仍由 palette.TIP_DOT 从 style 递进来（wxss 里不许抄饱和色）：
     // 头部那一行轮播 Tips 站长 10-04 撤了，但搜索词下面那枚点和详情窗要点那四行还在吃它。
     tipDotStyle: `background:${TIP_DOT}`,
-    // 「置顶」那枚下面一条短黄杠用的 --tip 自定义属性随置顶一起撤了：
-    // v19 两枚 tab 选中那枚下面的短杠吃墨色，走 var(--text-primary) 就够。
+    // 区内顶那一行（两枚 tab + 右端折叠口）v30 起整块换成新建页那块深面：面、纸白两档字
+    // 都从 `createSkin()` 那**同一个出口**递进来（抄一份 #23252C/#F2EFE9 就是第二份真相），
+    // 短杠那支黄也走 var 而不是把 `#F6C445` 写进 wxss。挂在行上而不是页上：这一行是深面，
+    // 它下面的分类行与列表是浅层，两套墨不能互相串色。
+    rowSkin: `${createSkin()};--tip-dot:${TIP_DOT}`,
+    // 「置顶」那枚下面一条短黄杠用的 --tip 自定义属性随置顶一起撤了；
+    // v19 那两枚 tab 的短杠吃墨，v30 起换成上面那支黄（就是 rowSkin 里这个 --tip-dot）。
     // 头部那一列数字：只有「笔记」。v18 做减法把「分享」「种草」两列撤了
     // （那两列是给分享/种草两屏回看用的，那两屏不做）。值仍来自 /api/user/quota，本页不自己相加。
     stats: [],
@@ -239,9 +244,9 @@ Page({
   async loadCategories() {
     try {
       const categories = await api.getCategories()
-      // chip 选中态的颜色必须和该分类的方块一致，所以取同一套派生规则，
-      // 不用后端那个 category.color——两者对不上时用户会以为分类乱了
-      categories.forEach((c) => { c.toneStyle = toneVars(c.id) })
+      // 分类行 v30 起是「文字 + 选中一条短杠」，不再穿各自分类的实色胶囊，所以这里不再给每一条
+      // 挂一份 toneStyle（`toneVars` 那对 --tone-bg/--tone-ink 在这一行没人消费了）。
+      // 分类身份还在的地方是行卡左边那枚方块与那枚点——它们照旧吃 catSkinFor，同一套派生规则。
       this.setData({ categories })
       // 分类比笔记晚到是常态：到了就得给已在屏上的行卡补上块内分类名，否则方块会一直空着。
       if (this.data.notes.length) {

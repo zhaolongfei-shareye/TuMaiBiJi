@@ -189,9 +189,10 @@
   box-sizing: border-box;
   flex: 1;
   min-width: 0;
-  /* 88 → 60（站长 10-03：搜索展开的输入框太大）。60 不是新数：分类那一枚 chip 实测算高
-     59（app.wxss 的 .chip：14 上下内缩 + 24 字），压到同一档，这一条就不会从分类行上
-     高出来一截。头部那一行仍是 88 高，条子竖向居中坐在里面。 */
+  /* 88 → 60（站长 10-03：搜索展开的输入框太大）。当时那个数不是新调的：分类那一枚 chip
+     实测算高 59（app.wxss 的 .chip：14 上下内缩 + 24 字），压到同一档就不会从分类行上高出来一截。
+     v30 起分类行换成「文字 + 短杠」（.ix-cat，不再吃 .chip 那个高度），这个 60 就只是**保留值**：
+     改它不属于这一版，头部那一行仍是 88 高，条子竖向坐在里面。 */
   height: 60rpx;
   display: flex;
   align-items: center;
@@ -241,20 +242,22 @@
    横向内缩挂在这一层的 padding 上，不挂到 scroll-view 自己身上（挂在它身上时
    右侧要给滚动条留位，实测左右差 12rpx）。
    下内缩 150 是给底栏胶囊让位；分类行自己带上下留白，所以这里 top 归零。 */
-/* ---------- 区内顶上那两枚 tab（站长 10-03 拍的图2 上面那一版） ----------
-   小字：字号吃 --fs-meta 24，与下面分类同一档（他一贯的"tab 用文字、不用按钮壳"）。
-   已选那枚 = 90% 黑 + 一条 4 的墨色短杠，短杠正压在通栏横线那一行上（bottom -2 把
-   横线自己那 2 吃掉，两条线不叠成 6 的粗杠）；未选那枚同一字号只降到 42% 黑。 */
+/* ---------- 区内顶上那两枚 tab（站长 10-08 拍的 v30：那一行整块换成创建页那块深面） ----------
+   面＝`--cp-panel`(#23252C)、字＝纸白两档（选中满纸白、未选 62%）、短杠＝`TIP_DOT` 那支黄——
+   三个数都不许在这一份 wxss 里出现：那两个 --cp-* 由 `index.js` 把 `createSkin()` 的整串贴在这一行上
+   （与新建页同一个出口，抄一遍字面值就是第二份真相），`--tip-dot` 同一条路子（wxss 里不许抄饱和色）。
+   原来那两条"短杠压在通栏横线上"的耦合（bottom:-2 吃掉那 2）随那条横线一起撤了：
+   换深面之后那面自己就把行与层切开，再留一条线会读成"两排 tab"（规格 §3 末行）。 */
 .vtabs {
   position: relative;
   flex: none;
   display: flex;
   gap: 44rpx;
-  /* 左右各外扩 24 把 .sheet 的内缩吃掉、再自己补回 32：那条通栏横线要像效果图一样
+  background: var(--cp-panel);
+  /* 左右各外扩 24 把 .sheet 的内缩吃掉、再自己补回 32：这一行的深面要像效果图一样
      一直走到整块圆角卡的边，而两枚字仍落在离边 32 那一条线上。 */
   margin: 0 -24rpx;
   padding: 0 56rpx;
-  border-bottom: 2rpx solid rgba(35, 37, 44, 0.12);
 }
 
 .vtab {
@@ -264,12 +267,12 @@
   font-size: var(--fs-meta);
   font-weight: 600;
   letter-spacing: 1rpx;
-  color: rgba(35, 37, 44, 0.42);
+  color: var(--cp-ink-62);
 }
 
 .vtab.on {
   font-weight: 700;
-  color: rgba(35, 37, 44, 0.9);
+  color: var(--cp-ink);
 }
 
 .vtab.on::after {
@@ -277,10 +280,10 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -2rpx;
+  bottom: 0;
   height: 4rpx;
   border-radius: 2rpx;
-  background: rgba(35, 37, 44, 0.9);
+  background: var(--tip-dot);
 }
 
 .vtab:active {
@@ -288,14 +291,14 @@
 }
 
 /* 两枚 tab 那一行右端的折叠口（站长 10-05 要）。做法照「我的」页那四行右侧的小字：
-   margin-left:auto 推到行尾 + nowrap——挤不下不许折行。字色走 --text-tertiary 令牌，
-   不写死 rgba：四套壁纸各有各的墨，写死一个数会在别的套上掉队。
-   它跟着 .vtabs 那 padding: 0 56 走，所以右沿仍落在离边 56 那一条线上，与左边两枚同一条轴。 */
+   margin-left:auto 推到行尾 + nowrap——挤不下不许折行。
+   换深面之后它和"未选那枚"并成一档（62% 纸白，规格 §3 第四行）——现网这两处本来就不同值。
+   仍跟着 .vtabs 那 padding: 0 56 走，右沿落在离边 56 那一条线上，与左边两枚同一条轴。 */
 .ix-fold {
   margin-left: auto;
   align-self: center;
   font-size: var(--fs-meta);
-  color: var(--text-tertiary);
+  color: var(--cp-ink-62);
   white-space: nowrap;
 }
 
@@ -303,8 +306,11 @@
   opacity: 0.6;
 }
 
-/* 分类这一行紧跟在横线下面（v18 那条浅虚线换成上面那条通栏横线，负外缩进因此不要了；
-   置顶那一档、右边那句「只看置顶」随置顶一起撤）。 */
+/* 分类这一行紧跟在那一行下面（置顶那一档、右边那句「只看置顶」随置顶一起撤）。
+   v30：撤胶囊改「文字 + 选中一条短杠」，与上面那两枚同一种手法；两档字与那条短杠都吃
+   **这一层自己的墨**——`--ink-on-layer` / `--ink-on-layer-soft` 挂在 `.theme-*` 上，
+   真身是 palette 的 layerSkinOf（`验-列表层底色.js` 逐套钉等值），不跟那支黄：
+   黄在这屏只许出现在"那一行"和首屏那两枚点上（规格 §4 那条他点了"不跟黄"）。 */
 .cats {
   position: relative;
   flex: none;
@@ -320,9 +326,37 @@
   white-space: nowrap;
 }
 
+/* 底色撤掉之后要拉开才不粘连：14 → 40（规格 §4）。 */
 .cat-chips {
   display: inline-flex;
-  gap: 14rpx;
+  gap: 40rpx;
+}
+
+.ix-cat {
+  position: relative;
+  display: inline-block;
+  padding: 10rpx 0 12rpx;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  white-space: nowrap;
+  color: var(--ink-on-layer-soft);
+}
+
+.ix-cat.on {
+  font-weight: 700;
+  color: var(--ink-on-layer);
+}
+
+.ix-cat.on::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: var(--ink-on-layer);
 }
 
 .sheet {
@@ -334,7 +368,10 @@
   flex-direction: column;
   margin-top: -40rpx;
   padding: 0 24rpx;
-  background: var(--bg-page);
+  /* v31 那一层（站长 10-08 拍「饱和压到 35%／明度 L78」）：不再吃页面底 `--bg-page`，
+     改吃 `--bg-layer`——它的真身是 `palette.listLayerOf()`（从底栏那一支派生，不许另挑色相），
+     四套的镜像值逐字等值由 `docs/工具/验-列表层底色.js` 钉住。 */
+  background: var(--bg-layer);
   border-radius: var(--r-card) var(--r-card) 0 0;
   box-shadow: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
   overflow: hidden;
@@ -1181,35 +1218,10 @@
   color: rgba(242, 239, 233, 0.62);
 }
 
-/* 分类筛选：v2 起每枚穿自己分类的实色（站长原话"分类底图也用不同颜色"）。
-   底与字成对吃 toneVars 的 --tone-bg/--tone-ink——这一对是 palette 里配好对比度的组合，
-   黄/橙/绿是深字、蓝/紫是纸白字，不写死白字。选中那枚反过来：纸白底、该色字、该色描边。 */
-.chip.tone {
-  background: var(--tone-bg);
-  color: var(--tone-ink);
-}
-
-.chip.tone.active {
-  background: var(--bg-card);
-  color: var(--tone-bg);
-  box-shadow: inset 0 0 0 var(--w-edge) var(--tone-bg);
-}
-
-/* 分类筛选：未选中那几枚在图上要有一层暗玻璃垫着才读得清，选中那枚换成纸白。
-   描边用 inset 而不是 border——border 会把那一档撑高，chips 整排会往下跳。
-   这一态只管「全部」那枚（它没有自己的色）；分类那几枚照旧吃实色，
-   再压一层暗玻璃等于把整排分类身份洗掉。 */
-.container.has-bg .chip.all {
-  background: rgba(18, 20, 26, 0.42);
-  color: #f2efe9;
-  box-shadow: inset 0 0 0 var(--w-edge) rgba(242, 239, 233, 0.30);
-}
-
-.container.has-bg .chip.all.active {
-  background: #f2efe9;
-  color: #23252c;
-  box-shadow: none;
-}
+/* 分类筛选 v30 起改「文字 + 短杠」（见上面 .ix-cat 那段）。这里原来那四条
+   `.chip.tone`／`.chip.tone.active`／`.container.has-bg .chip.all`／`.…all.active` 一起删掉：
+   胶囊的底与描边没有了，`toneVars` 那对 --tone-bg/--tone-ink 在这一行不再被消费。
+   `.chip` 本身留着——「我的」页形象那两枚勾选（pages/profile）还在吃它。 */
 
 /* 分类行那三档在图上没有对应态：这一行整个在下面的圆角卡里，卡是页面底色，
    不吃照片——所以这里刻意不写任何 .has-bg 分支，写了就是给不存在的那一态兜底。 */

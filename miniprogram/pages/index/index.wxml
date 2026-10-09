@@ -54,10 +54,11 @@
   </view>
 
   <view class="sheet {{listWide ? 'ix-wide' : ''}}">
-  <!-- v19（站长 10-03 拍）：区内顶上两枚 tab，小字、选中那枚深色并压一条墨色短杠在通栏横线上，
-       未选那枚同一字号只浅色。默认落第一枚。第二枚那两个字仍读现网 navShare（笔记卡片）。
-       排布切换那两枚 icon 的活交给这里，所以头部那一行只剩搜索一枚。 -->
-  <view class="vtabs">
+  <!-- v19（站长 10-03 拍）：区内顶上两枚 tab，小字，默认落第一枚。第二枚那两个字仍读现网 navShare（笔记卡片）。
+       排布切换那两枚 icon 的活交给这里，所以头部那一行只剩搜索一枚。
+       v30（站长 10-08 拍）：这一行整块换成新建页那块深面，选中那枚下面一条黄短杠——
+       面/字/杠三个数都由 style="{{rowSkin}}" 从 palette 递进来，wxss 里一个都不写死。 -->
+  <view class="vtabs" style="{{rowSkin}}">
     <view class="vtab {{view === 'list' ? 'on' : ''}}" catchtap="onViewTap" data-view="list">{{t.tabList}}</view>
     <view class="vtab {{view === 'cards' ? 'on' : ''}}" catchtap="onViewTap" data-view="cards">{{t.navShare}}</view>
     <!-- 这一行右端那枚是整块纸卡的折叠口（站长 10-05：「整个下部往上加高，下方内容同步增加，
@@ -67,26 +68,26 @@
          catchtap：挂在 .container 的 bindtap 链上，冒泡上去会把搜索词一起清掉。 -->
     <text class="ix-fold" catchtap="onToggleWide">{{listWide ? t.collapseTip : t.expandTip}}</text>
   </view>
-  <!-- 分类这一行紧跟在横线下面，两枚 tab 都留着：卡片那一格是从同一份筛选结果里出来的，
+  <!-- 分类这一行跟在两枚 tab 下面，两枚 tab 都留着：卡片那一格是从同一份筛选结果里出来的，
        这里收掉分类，筛了「旅游」再切过去就会看到别的分类的卡片。
-       多到一排放不下时照旧左右滚（v18 那条"只能从时间轴右侧起排"随时间轴一起撤了）。 -->
+       多到一排放不下时照旧左右滚（v18 那条"只能从时间轴右侧起排"随时间轴一起撤了）。
+       v30：撤胶囊，改「文字 + 选中一条短杠」，与上面那两枚同一种手法；色吃这一层自己的墨。 -->
   <view class="cats">
     <scroll-view class="cat-scroll" scroll-x show-scrollbar="{{false}}">
       <view class="cat-chips">
         <view
-          class="chip all {{selectedCategory === null ? 'active' : ''}}"
+          class="ix-cat {{selectedCategory === null ? 'on' : ''}}"
           catchtap="selectCategory"
           data-id="{{null}}"
         >
           {{t.allCategories}}
         </view>
         <view
-          class="chip tone {{selectedCategory === item.id ? 'active' : ''}}"
+          class="ix-cat {{selectedCategory === item.id ? 'on' : ''}}"
           wx:for="{{categories}}"
           wx:key="id"
           catchtap="selectCategory"
           data-id="{{item.id}}"
-          style="{{item.toneStyle}}"
         >
           {{item.name}}
         </view>
