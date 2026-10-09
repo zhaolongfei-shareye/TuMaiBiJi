@@ -195,6 +195,22 @@ def main():
         check("三趟都没在别人名下写出行",
               db.query(NoteCard).filter(NoteCard.note_id == foreign).count() == f0, f"{f0} 行")
 
+    # ---- 7b. 对象归属（10-09 审计补的那道闸）：别人名下的地址，登记到自己笔记上要拒 ----
+    # 为什么这一条必须打在现网：库里那些地址是真从客户端传上来的，而"撤档／删笔记／注销"的回体
+    # 会把登记过的地址交回**调用方**去删。不校这一条，就是"把你的对象登记成我的，再替我删掉"。
+    db.expire_all()
+    other = db.query(NoteCard).filter(NoteCard.user_id != uid).first()
+    if other is None:
+        check("别人名下的卡片地址拿来登记要拒（400）", False,
+              "现查不到第二个账号名下的行，这一条今天打不了——别当已过，去现网造一行再跑")
+    else:
+        before = mine()
+        r = client.post(f"/api/notes/{note_id}/card", headers=hdr,
+                        json={"file_id": other.object_key, "tpl": "classic"})
+        check("别人名下的地址登记不到自己笔记上（400，且一行都不写）",
+              r.status_code == 400 and mine() == before,
+              f"HTTP {r.status_code} {r.text[:60]}｜{before} → {mine()} 行")
+
     # ---- 8. 撤掉那一格：两行都走、回体带清单、幂等 ------------------------------
     r = client.delete(f"/api/notes/{note_id}/card", headers=hdr)
     body = r.json() if r.status_code == 200 else {}
@@ -214,13 +230,18 @@ def main():
     check("撤第二下不报错、清单为空（幂等：那一枚点两下不该冒出一句失败）",
           r.status_code == 200 and r.json().get("file_ids") == [], f"HTTP {r.status_code} {r.text[:80]}")
 
-    # ---- 9. 卡片行进的是另一个数：配图那口不许被它撑大 --------------------------
+    # ---- 9. 卡片进配额：涨的是**真实字节**，而张数那一栏不跟着涨（10-09 审计换的口径）----
+    # 原来这一条钉的是"配额口一个字都没变"——那时卡片对象根本不在 SUM 里，绿灯正好盖住
+    # "快满了"那行提示少算一整族对象。现在它进账了，判据跟着换成涨多少、涨的是哪个数。
     put(FID_A, size=204800)
     q1 = quota()
-    check("登记一张卡片之后，配图那个配额口一个字都没变（卡片不与配图混成同一个数）",
-          (q1["user_count"], q1["user_bytes"], q1["total_bytes"])
-          == (q0["user_count"], q0["user_bytes"], q0["total_bytes"]),
-          f"{q1['user_count']}/{q1['user_bytes']}/{q1['total_bytes']} vs {q0['user_count']}/{q0['user_bytes']}/{q0['total_bytes']}")
+    check("登记一张卡片：字节进账（正好那张的真实字节），张数那一栏一个字不动",
+          q1["user_bytes"] - q0["user_bytes"] == 204800
+          and q1["total_bytes"] - q0["total_bytes"] == 204800
+          and q1["user_count"] == q0["user_count"],
+          f"字节 {q0['user_bytes']}→{q1['user_bytes']}（应 +204800）"
+          f"｜全站 {q0['total_bytes']}→{q1['total_bytes']}（应 +204800）"
+          f"｜张数 {q0['user_count']}→{q1['user_count']}（应不变）")
 
     # ---- 9b. snapshots 这一栏（S3 重渲那一步的第二份输入）在现网真回得来 ----------------
     # 为什么这一条必须打在现网而不只是用例：客户端重渲要按**当年那份分享快照**的正文渲，
@@ -278,7 +299,7 @@ def finish(client, db, user, q0):
           left_asset == 0, f"还剩 {left_asset}")
     if q0:
         q = client.get("/api/user/storage-quota", headers=auth).json()
-        check("收尾：配图配额三个数回到开始前的值",
+        check("收尾：配额三个数回到开始前的值（卡片那一行已撤，涨的字节要退回去）",
               (q["user_count"], q["user_bytes"], q["total_bytes"])
               == (q0["user_count"], q0["user_bytes"], q0["total_bytes"]),
               f"现在 {q['user_count']}/{q['user_bytes']}/{q['total_bytes']}")
