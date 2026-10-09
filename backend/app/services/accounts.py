@@ -27,6 +27,12 @@ def ensure_for_user(db: Session, user: User) -> Account:
         # 悄悄新建一个会把这个人挂到第二个身份上，两份笔记各归各家；报错至少让人看见。
         raise RuntimeError(f"user {user.id} 的 account_id={user.account_id} 在 accounts 里查不到")
 
+    if user.openid is None:
+        # 这一支只写**微信**那一条身份。一个只有 Apple 身份的人（openid 为 NULL）走到这里，
+        # 拼出来的是 provider_uid=NULL，撞的是那一列的 NOT NULL——报错看不出是谁的错，
+        # 所以在这里响，并说清是哪一类人走错了门。
+        raise RuntimeError(f"user {user.id} 没有 openid：ensure_for_user 只给微信那一路写身份")
+
     account = Account(id=str(uuid.uuid4()))
     db.add(account)
     db.flush()

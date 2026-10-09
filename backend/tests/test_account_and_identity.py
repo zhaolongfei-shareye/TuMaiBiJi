@@ -395,3 +395,83 @@ class Test注销连带:
         assert db.query(Account).filter(Account.id == first_account).count() == 0, \
             "注销之后旧 account 还在"
         assert db.query(AccountIdentity).filter(AccountIdentity.provider_uid == "o_reuse").count() == 1
+
+
+class Test没有微信的那个人:
+    """`users.openid` 放开可空（迁移 d5a3f19bc728）这一刀的两面。
+
+    只有 Apple 身份的人给不出 openid，硬填等于替他编一串微信 id 冒名（契约 §十一 第 2 条），
+    所以那一列必须能空。但"放开可空"顺手动的是**同一列上的 unique**，而那道闸门管的是另一句
+    话：同一个微信号开不出两个账号。所以正反各钉一条，再钉一条"是这次迁移放开的、不是历来如此"。
+
+    三条都走真 alembic 建出来的库，不走 create_all：用例那条路上 nullable 由模型说了算，线上由
+    迁移说了算，两边各测各的才算两边都钉住（同一族缺口见上面唯一索引那条）。
+    """
+
+    def test_迁移之后同一个微信号仍然插不进第二条(self, tmp_path):
+        db_file = tmp_path / "mig.db"
+        _alembic(db_file, "head")
+
+        conn = sqlite3.connect(db_file)
+        conn.execute("insert into users (id, openid, generation) values (1, 'o_dup', 1)")
+        conn.commit()
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute("insert into users (id, openid, generation) values (2, 'o_dup', 2)")
+        conn.close()
+
+    def test_迁移之后两个只有Apple身份的人互不挡住(self, tmp_path):
+        db_file = tmp_path / "mig.db"
+        _alembic(db_file, "head")
+
+        conn = sqlite3.connect(db_file)
+        conn.execute("insert into users (id, openid, generation) values (1, NULL, 1)")
+        conn.execute("insert into users (id, openid, generation) values (2, NULL, 2)")
+        conn.commit()
+        assert conn.execute(
+            "select count(*) from users where openid is null"
+        ).fetchone()[0] == 2, "两个只有 Apple 身份的人不该互相挡住"
+        conn.close()
+
+    def test_迁移之前那版库插不进没有微信的人(self, tmp_path):
+        """反向钉：这一条红不红决定上面那条是不是在测一个本来就成立的事实。"""
+        db_file = tmp_path / "mig.db"
+        _alembic(db_file, "b7d2f4a1c903")      # 这次放开的**前**一版
+
+        conn = sqlite3.connect(db_file)
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute("insert into users (id, openid, generation) values (1, NULL, 1)")
+        conn.close()
+
+    @pytest.fixture
+    def fresh_db(self, tmp_path):
+        """另开一个一次性库、按**当前模型**建表。理由与 Test唯一索引 那个夹具同一个：
+        那枚共享测试库里的 users 可能是上一轮按旧的 nullable=False 建的，而 `create_all`
+        见表已存在就不动它——那样这条会红在环境上，不是红在代码上。
+        """
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from app.db.database import Base
+        import app.models  # noqa: F401  全部模型进 metadata，建出来的才是当前这一版表形
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'fresh.db'}")
+        Base.metadata.create_all(engine)
+        session = sessionmaker(bind=engine)()
+        try:
+            yield session
+        finally:
+            session.close()
+            engine.dispose()
+
+    def test_只有Apple身份的人走微信那一支要当场响(self, fresh_db):
+        """`ensure_for_user` 是新加的那道守卫的落点：它只写微信那一条身份。"""
+        from app.services.accounts import ensure_for_user
+
+        person = User(openid=None, generation=1)
+        fresh_db.add(person)
+        fresh_db.commit()
+
+        with pytest.raises(RuntimeError, match="没有 openid"):
+            ensure_for_user(fresh_db, person)
+        # 报错那一趟不许已经顺手建出一个 account（半个人的账比没账难查）。
+        assert fresh_db.query(Account).count() == 0

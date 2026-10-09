@@ -1,5 +1,5 @@
 #!/bin/bash
-# 反向验证（阶段2-1）：逐条把那一批实现改坏，确认对应的判据真的会红。
+# 反向验证（阶段2-1 与 2-2 的 openid 那一刀）：逐条把那一批实现改坏，确认对应的判据真的会红。
 # 每条都用 cp 备份 + cp 还原（全程不碰 git），还原后比 md5 证明没把文件改残。
 #
 # 这一批有两条建表路要分开钉：用例走 create_all（读模型），线上走 alembic（读迁移）。
@@ -10,6 +10,7 @@ AU=app/core/auth.py
 SV=app/services/accounts.py
 MD=app/models/account.py
 MG=alembic/versions/b7d2f4a1c903_accounts_and_account_identities.py
+MG2=alembic/versions/d5a3f19bc728_users_openid_nullable.py
 UR=app/api/routes/user.py
 mkdir -p /tmp/rv-bak2
 
@@ -64,6 +65,14 @@ run F "模型里那道唯一索引整条摘掉"                     "同一个�
 # G：注销不再连带删 account 与身份
 run G "注销那一段的连带删除挡死"                       "注销把account与身份一起删掉" \
   "perl -0pi -e 's/^    if user\.account_id:/    if False:  # 反向验证临时改坏/m' $UR" "$UR"
+
+# H：这一条迁移没把 openid 放开（迁移那一路）
+run H "迁移里 nullable=True 改回 False"                 "迁移之后两个只有Apple身份的人互不挡住" \
+  "perl -0pi -e 's/existing_type=sa\.String\\(100\\), nullable=True/existing_type=sa.String(100), nullable=False/' $MG2" "$MG2"
+
+# I：ensure_for_user 那道新守卫摘掉（只有 Apple 身份的人会拼出 provider_uid=NULL）
+run I "ensure_for_user 里 openid 为空那道守卫摘掉"      "只有Apple身份的人走微信那一支要当场响" \
+  "perl -0pi -e 's/^    if user\.openid is None:/    if False:  # 反向验证临时改坏/m' $SV" "$SV"
 
 echo "=== 全部还原后复跑本批，必须全绿 ==="
 $PY tests/test_account_and_identity.py tests/test_account_deletion.py 2>&1 | tail -1

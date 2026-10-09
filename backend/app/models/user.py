@@ -7,7 +7,12 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    openid = Column(String(100), unique=True, nullable=False, index=True)
+    # 只有微信号的人这一格是他的 openid；**只有 Apple 身份的人这一格是 NULL**（阶段2-2）。
+    # 原来这里写的是 nullable=False，那是一个填不进去的约束：一个只有 SIWA 的人给不出 openid，
+    # 硬填等于替他编一个微信 id 冒名（契约 §十一 第 2 条禁止的就是这个）。unique 保留——
+    # 它是"同一个微信号开不出两个账号"那句话的落点，而 NULL 与 NULL 在 SQL 里本来就不相等，
+    # 所以放开可空不会把这道闸门一起放开（正反两条都钉在 tests/test_account_and_identity.py）。
+    openid = Column(String(100), unique=True, nullable=True, index=True)
     session_key = Column(String(100), nullable=True)
     nickname = Column(String(100), nullable=True)
     avatar_url = Column(String(500), nullable=True)
