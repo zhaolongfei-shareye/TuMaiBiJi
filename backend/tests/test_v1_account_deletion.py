@@ -11,9 +11,10 @@
    的表**逐张数行；`invitations`／`share_reports` 这两张认不出 `user_id` 的由 `_person_left`
    按列名补上。将来新增一张挂 `user_id` 的表而 `purge` 没管它，这条会红。
 3. **别人名下一行不动**（每一步都带着归属条件）。
-4. **两个口的边界钉的是实际发生的那一半**：`/api` 传 `[user]`，但它连带把背后那条 account
-   整行、它名下全部 identity 与短码一起带走（今天一条 account 只有一行微信登录行，所以
-   两者同形；阶段3 出现第二行时这一档要重拍，见 `routes/user.py` 的 docstring）。
+4. **两个口的边界各有各的范围，而且不再同形**：`/v1` 删的是整条 account 名下所有登录行；
+   `/api` 从 2026-10-10 站长拍甲起收窄成"名下只剩自己这一行时才带走 account"，判据与它留下的那条
+   待拍写在 `routes/user.py:_account_to_take_along`。两档各钉一条（单行那一档**照样**连 account
+   一起走——那是现网 35 人全部所在的那一档，收窄不许把它做过头）。
 5. **`purge` 认的是 `account_id` 那个值，不是查出来的对象**——`users.account_id` 有值而
    `accounts` 里那一行没了时，注销必须照样把身份行摘掉并让那个人能重新注册（老 `/api` 那段
    代码的自愈，抽公共函数时差点被撤）。
@@ -456,22 +457,38 @@ class Test两个口的边界:
         resp = client.delete("/v1/account", headers=_bearer(_user_token(user)))
         assert resp.status_code == 401, resp.text
 
-    def test_小程序那一路删的实际范围是整条_account(self, client, db):
-        """⚠ 这一条钉的是**会发生的事**，不是我以为的范围（独立审 P1-2）。
+    def test_名下只剩这一行时带走整条_account(self, client, db):
+        """现网 35 个人就是这一档（实测"一条 account 名下几行 users"的分布是 `[(1, 35)]`）：
+        收窄那一刀对这一档一个字都不改——account 与它名下身份行照样一起走。
 
-        `/api` 传进 `purge` 的是 `[user]`，但它同时把 `user.account_id` 交给公共函数，于是
-        那条 **account 整行、它名下全部 identity、全部短码**一起走——同 account 上另一行
-        登录行的归属关系被留在空气里（那一行还在，`account_id` 指着一条已经不存在的 account）。
+        这一条存在的意义是**反面钉**：哪天有人把收窄做过头（连单行也不带 account 了），这条红。
+        """
+        user, account = _wechat_person(db, openid="o_only_row")
+        account_id = account.id
+        resp = client.post("/api/user/deactivate", json={"confirm": True},
+                           headers=_bearer(_user_token(user)))
+        assert resp.status_code == 200, resp.text
+        fresh = _reload(db)
+        assert fresh.query(User).filter(User.account_id == account_id).count() == 0
+        assert fresh.query(Account).filter(Account.id == account_id).count() == 0, \
+            "单行那一档被收窄做过头：account 该跟着走"
+        assert fresh.query(AccountIdentity).filter(
+            AccountIdentity.account_id == account_id).count() == 0, \
+            "身份行留着就等于那个 openid 永远占着，同一个人再也开不出新号"
 
-        今天这样不算越界：一条 account 名下最多只有一行带 openid 的 `users`，那是
-        `linking.redeem` 那一对一只闸管的后果，所以"这一行"与"这一条 account"同形。
-        真出现第二行是阶段3 之后（`/v1` 那侧也往 `users` 写行），**那时这一档要重拍**：
-        要么把 `/api` 的范围收窄成"只剩这一行时才带走 account"，要么认下"小程序点注销
-        会把 iPhone 那侧的账号一起删掉"。收窄是行为变更，归站长拍，不由我在抽公共函数这一批里
-        顺手做掉——所以这里钉现状，并把后果写在 `routes/user.py:deactivate_account` 的 docstring。
+    def test_名下还有第二行时_account_与那一行都不许动(self, client, db):
+        """2026-10-10 站长拍的甲：`/api` 注销收窄成"名下只剩这一行时才带走 account"。
+
+        第二行摆成 `openid=NULL` 那一种——那正是阶段3 之后 iPhone 那个人自己的行（`/v1` 开始往
+        `users` 写行之后才会出现，今天现网 0 条，所以这一刀对现网是纯预防）。
+        收窄之前这一档会把 account 连同它名下**全部**登录方式一起删掉，兄弟行的 `account_id`
+        悬空在空气里（旧那条判据 `test_小程序那一路删的实际范围是整条_account` 钉的就是那个现状，
+        它随收窄一起改写成现在这两条）。
+
+        收窄之后留下的那一格 `identities` 也是 0：回体的键集合不许随"这一路带不带 account"变形。
         """
         user_a, account = _wechat_person(db, openid="o_door_api")
-        user_b = User(openid="o_door_other", generation=1, account_id=account.id)
+        user_b = User(openid=None, generation=1, account_id=account.id)
         db.add(user_b)
         db.commit()
         _seed_every_table(db, user_b)
@@ -479,14 +496,20 @@ class Test两个口的边界:
         resp = client.post("/api/user/deactivate", json={"confirm": True},
                            headers=_bearer(_user_token(user_a)))
         assert resp.status_code == 200, resp.text
-        assert _reload(db).query(User).filter(User.id == uid_b).count() == 1, \
+        deleted = resp.json()["deleted"]
+        assert (deleted["account"], deleted["identities"], deleted["link_codes"]) == (0, 0, 0), \
+            f"收窄没生效：account 那一侧被带走了 {deleted}"
+
+        fresh = _reload(db)
+        assert fresh.query(User).filter(User.id == uid_b).count() == 1, \
             "小程序那一路删过了界：把同一条 account 上别人的登录行带走了"
         assert sum(_rows_left_for(db, uid_b).values()) >= 5, "别人名下的笔记被带走了"
-        # ↓ 这三句是"实际范围"那一半：account 与身份行确实被带走了，兄弟行因此悬空。
-        assert db.query(Account).filter(Account.id == account_id).count() == 0
-        assert db.query(AccountIdentity).filter(AccountIdentity.account_id == account_id).count() == 0
-        assert _reload(db).query(User).filter(User.id == uid_b).one().account_id == account_id, \
-            "悬空这一件事没人钉：范围哪天收窄了，这条会红，那时就该重拍上面那段"
+        # 兄弟行的归属必须**落得下来**：account 还在，`account_id` 不是悬空的那一格。
+        assert fresh.query(User).filter(User.id == uid_b).one().account_id == account_id
+        assert fresh.query(Account).filter(Account.id == account_id).first() is not None, \
+            "account 没了而那一行还指着它：那正是这一批要撤掉的那种悬空"
+        assert fresh.query(AccountIdentity).filter(
+            AccountIdentity.account_id == account_id).count() == 1
 
     def test_v1_那一路删的是整条_account_名下所有登录行(self, client, db):
         """⚠ 这一条故意把第三行摆成 `openid=NULL`：那正是阶段3 之后 iPhone 那个人自己的行。

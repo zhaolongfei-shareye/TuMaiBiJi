@@ -154,6 +154,10 @@ class Test删干净:
         assert resp.json()["deleted"] == {
             "notes": 1, "categories": 1, "shares": 1, "jobs": 1, "assets": 1, "cards": 1,
             "profile": 1, "reports": 1,
+            # 这三格 2026-10-10 起**一律在场**（`purge` 预先摆平），不再随"这一路带不带 account"
+            # 出现或消失。这个人是直接 `User(openid=…)` 造的、没有 account_id，所以三格都是 0；
+            # 走真登录路造的人那一格会是 1。键集合会变形的那一版，这两个字典比的是八格。
+            "identities": 0, "link_codes": 0, "account": 0,
         }
         for model in (Note, Category, Share, Job, Asset, NoteCard, UserProfile):
             assert rows(db, model, mine["id"]) == 0, model.__tablename__
@@ -183,7 +187,11 @@ class Test删干净:
         assert resp.status_code == 200
         assert resp.json()["deleted"] == {"notes": 0, "categories": 0, "shares": 0,
                                           "jobs": 0, "assets": 0, "cards": 0, "profile": 0,
-                                          "reports": 0}
+                                          "reports": 0,
+                                          # 这个人压根没有 account（`account_id` 为 NULL，那道闸
+                                          # 直接回 None），所以那三格是 0 而不是缺席——键集合不许
+                                          # 随"这一路带不带 account"变形。
+                                          "identities": 0, "link_codes": 0, "account": 0}
         assert rows(db, Note, other["id"]) == 1
 
 

@@ -69,6 +69,10 @@ def purge(db: Session, users: list[User], account_id: str | None) -> tuple[dict,
     # `pages/me/me.js` 注销那段只把回体交给 `cloudUpload.dropFromDeleteRes`，它只取 `file_ids`），
     # 留着它是对账用的，而一份"随人变形"的对账数字下一次换客户端还得先判键在不在。
     deleted: dict[str, int] = {key: 0 for key, _ in _BUSINESS_TABLES}
+    # 「人」那三格的键与上面七格同一句口径：**不许随"这一路带不带 account"变形**。2026-10-10
+    # 拍甲之后 `/api` 在"名下还有第二行"时传 None，那时它们是 0 而不是消失——回体是给人对账的，
+    # 键集合一变，下一个客户端就得先判"这个键今天该不该在"。
+    deleted.update({"identities": 0, "link_codes": 0, "account": 0})
 
     # 举报行只挂 token、不挂外键（`share_reports.token`——撤掉的码也要收得到举报，这是刻意
     # 不设约束的理由），所以删 shares 之后再也问不出这个人公开过哪些码。先抄下来。

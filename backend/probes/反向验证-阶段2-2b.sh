@@ -19,6 +19,10 @@
 # ⚠ 这一批的针全部跟着实现改过一遍名：`account` 那个对象参数换成了 `account_id`，
 # `/api` 那条从 `只删自己那一行登录行` 改名为 `实际范围是整条_account`。留着旧针的突变
 # 不会红，只会★突变没落盘★或★针没扎到用例★——那两种都不是"判据有效"。
+# ⚠ 10-10 那次改名同理再走一遍：站长拍甲把 `/api` 收窄之后，`实际范围是整条_account` 那条
+# 判据被拆成 `名下只剩这一行时带走整条_account` ＋ `名下还有第二行时_account_与那一行都不许动`
+# 两条（`routes/user.py:_account_to_take_along`），H 刀的针与突变式都跟着换了；旧的 `purge(db, [user],
+# user.account_id)` 那一行在盘上已经不存在，H 刀要是还照旧式写，报的会是★突变没落盘★而不是红。
 cd /Users/zlfmac/Documents/TuMaiBiJi/backend || exit 1
 PY=".venv/bin/python -m pytest -q"
 DE=app/services/deletion.py
@@ -77,8 +81,8 @@ run F "users 行整个不删（账号删了、登录行还挂着）" "每张挂_
 run G "邀请奖励不再回退（刷奖励那条循环重新敞开）" "注销之后邀请人那笔_bonus_退回" \
   "perl -pi -e 's/^        _release_invitations\\(db, user\\)/        pass  # rv/' $DE" "$DE"
 
-run H "小程序那一路把范围放大成整条 account（删过了界）" "小程序那一路删的实际范围是整条_account" \
-  "perl -pi -e 's/deletion\\.purge\\(db, \\[user\\], user\\.account_id\\)/deletion.purge(db, db.query(User).filter(User.account_id == (user.account_id or \"\")).all(), user.account_id)/' $UR" "$UR"
+run H "小程序那一路把范围放大成整条 account 名下所有行（删过了界）" "名下还有第二行时_account_与那一行都不许动" \
+  "perl -pi -e 's/deletion\\.purge\\(db, \\[user\\], _account_to_take_along\\(db, user\\)\\)/deletion.purge(db, db.query(User).filter(User.account_id == (user.account_id or \"\")).all(), user.account_id)  # rv/' $UR" "$UR"
 
 run I "iPhone 那一路只删带 openid 的行（苹果自己那行留在死账号上）" "v1_那一路删的是整条_account_名下所有登录行" \
   "perl -pi -e 's/^    rows = db\\.query\\(User\\)\\.filter\\(User\\.account_id == account\\.id\\)\\.all\\(\\)/    rows = linking.users_of(db, account.id)  # rv/' $VB" "$VB"

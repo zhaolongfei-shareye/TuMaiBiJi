@@ -1,6 +1,9 @@
 #!/bin/bash
-# 反向验证（阶段2-3：代次水位线 `services/generation` ＋ 迁移 b71f4e0c9d52 那一格的初值）：
+# 反向验证（阶段2-3：待拍②代次水位线 ＋ 待拍①`/api` 注销范围那道闸；站长 2026-10-10"按你建议"那三条里的两条）：
 # 逐条把这一批的实现改坏，确认对应的判据真的会红。全程 cp 备份 + cp 还原，不碰 git。
+#
+# A～F 是水位线那半（`services/generation` ＋ 迁移 `b71f4e0c9d52` 那一格的初值），
+# G～J 是那道闸那半（`routes/user.py:_account_to_take_along` ＋ 回体键集合）。
 #
 # 判据口径与前两批完全一致（`反向验证-阶段2-2.sh`、`反向验证-阶段2-2b.sh`）：
 # - 每条突变先 `--collect-only` 数这根针覆盖几条用例。`pytest -k` 空匹配的退出码是 5，
@@ -79,5 +82,25 @@ run F "迁移把那一格的初值写成 0（现网旧 token 的发号史就此�
   "初值是当时的最高代次" \
   "perl -pi -e 's/\\{\"v\": int\\(live_max or 0\\)\\}/{\"v\": 0}  # rv/' $MI" "$MI"
 
+# ── 待拍①：`/api` 注销范围那道闸（同一天站长拍甲，与上面那一批一起落）───────────
+UR=app/api/routes/user.py
+DE=app/services/deletion.py
+
+run G "把那道闸整个撤掉（回退成无条件带走整条 account——名下还有第二行时也带走）" \
+  "名下还有第二行时_account_与那一行都不许动" \
+  "perl -pi -e 's/^    return None if others is not None else user\\.account_id/    return user.account_id  # rv/' $UR" "$UR"
+
+run H "把那道闸做过头（连\"名下只剩这一行\"也不带走 account）" \
+  "名下只剩这一行时带走整条_account" \
+  "perl -pi -e 's/^    return None if others is not None else user\\.account_id/    return None  # rv/' $UR" "$UR"
+
+run I "撤掉\"account 那一行本来就不在\"那支例外（孤儿 openid 不再被摘掉，那个人下次登录撞 RuntimeError）" \
+  "注销要连带摘掉占着openid的身份行" \
+  "perl -0pi -e 's/    if alive is None:\\n        return user\\.account_id/    if alive is None:\\n        return None  # rv/' $UR" "$UR"
+
+run J "回体里那三格不再预先摆平（键集合重新随\"这一路带不带 account\"变形）" \
+  "一次删完七类数据并回报条数" \
+  "perl -0pi -e 's/    deleted\\.update\\(\\{\"identities\": 0, \"link_codes\": 0, \"account\": 0\\}\\)\\n//' $DE" "$DE"
+
 echo "=== 全部还原后复跑这一批的尺子，必须全绿 ==="
-$PY tests/test_persistent_generation.py tests/test_v1_account_deletion.py 2>&1 | tail -1
+$PY tests/test_persistent_generation.py tests/test_v1_account_deletion.py tests/test_account_deletion.py 2>&1 | tail -1

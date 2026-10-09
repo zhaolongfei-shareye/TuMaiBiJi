@@ -11,6 +11,7 @@ from app.core.auth import get_current_user
 from app.core.private_access import PRIVATE_CATEGORY_NAME, create_unlock_token
 from app.core.rate_limit import limiter
 from app.db.database import get_db
+from app.models.account import Account
 from app.models.category import Category
 from app.models.user import User
 from app.services import deletion, quota
@@ -259,6 +260,40 @@ class DeactivateOut(BaseModel):
     file_ids: List[str] = []
 
 
+def _account_to_take_along(db: Session, user: User) -> str | None:
+    """这条 account 名下**只剩他这一行**时才把 account 本身交给 `purge` 带走；否则回 None。
+
+    站长 2026-10-10 拍的甲。之前那一版是无条件传 `user.account_id`，于是小程序点注销会连背后
+    那条 account、它名下全部登录方式与短码一起删——同 account 上另一行登录行的归属留在空气里
+    （行还在，`account_id` 指着一条已经不存在的 account）。
+
+    今天这一刀**不改变任何现网行为**：现网只读查 `wtsj.db`，"一条 account 名下几行 `users`"的
+    分布是 `[(1, 35)]`——35 个人每人一行，多行的 0 条。所以收窄对得上"不动已上线行为"那句话，
+    它是赶在阶段3（`/v1` 那侧也往 `users` 写行）之前把边界立起来。
+
+    **例外那一支必须留着**：`account_id` 有值而 `accounts` 里那一行已经不在（半截事务留下的孤儿），
+    那时照样把值交出去。这种账里两行可能都指着同一条死 account，按"名下还有别人就不清"走的话，
+    占着 openid 的身份行会被留下，而下一次微信登录撞的是 `ensure_for_provider` 那句 RuntimeError
+    → 那个人直接登不进去。注销恰好是修这类坏账的那一次，这道闸不能把自愈撤掉——钉在
+    `tests/test_v1_account_deletion.py::Test那一格有值而account行没了`。
+
+    回 None 的时候，`purge` 连**他这一条 openid 的身份行**都不摘（那道清理挂在 account 上）。
+    于是这个人之后用微信登录，会由 `ensure_for_provider` 找回那条还活着的 account、把新的一行
+    挂回去——这正是"两个平台是一个人"的另一半：界面那句提示要说成"注销了小程序这一侧的数据"，
+    不能说成"这个微信号从此与这个账号无关"。要不要连带摘掉他这一侧的登录方式，是这一批新长
+    出来的一条，他没拍过，记在 docs 那一节的待拍里。
+    """
+    if user.account_id is None:
+        return None
+    alive = db.query(Account.id).filter(Account.id == user.account_id).first()
+    if alive is None:
+        return user.account_id
+    others = db.query(User.id).filter(
+        User.account_id == user.account_id, User.id != user.id
+    ).first()
+    return None if others is not None else user.account_id
+
+
 @router.post("/deactivate", response_model=DeactivateOut)
 @limiter.limit("5/minute")
 def deactivate_account(
@@ -280,22 +315,16 @@ def deactivate_account(
     回体里还带 `file_ids`：那批云存储对象这台服务器删不掉（没有云开发凭据），只能靠
     客户端在**这一次响应里**拿到清单去删——注销之后 token 就废了，没有第二个口可以问。
 
-    ⚠ 这一路的范围比"我自己那一行"要宽，说准一点：`purge` 拿到 `user.account_id` 之后，
-    连那条 **account 整行**、它名下**全部** identity、以及它名下还没被念的短码一起删。
-    今天这样没有越界，因为一条 account 名下最多只有一行带 openid 的 `users`（`linking.redeem`
-    那一对一闸门挡着第二条微信），"这一行"和"这一条 account"是同一个东西。
-    真出现多行是阶段3 之后（`/v1` 那边也往 `users` 写行），那时这一档必须重新拍一次——
-    拍之前不许有人把这里的注释简化成"只删自己那一行"。判据钉的是实际发生的那一半。
+    ⚠ 范围（2026-10-10 拍甲之后）：这一路删的是**他这一行 `users` 与他名下的数据**。背后那条
+    account 只在"名下只剩这一行"（或那条 account 本来就已经不在、属于要顺手修的那笔坏账）时才
+    一起走，判据与它留 None 之后"这个微信号还能落回同一条 account"那一半后果，全写在
+    `_account_to_take_along` 的 docstring 里。拍之前这一路是无条件带走整条 account 的。
     """
     if not req.confirm:
         raise HTTPException(status_code=400, detail="请先确认注销")
 
     # 「删哪七张表、按什么顺序、抄哪些云对象」只在 `services/deletion.py` 说一次；这一路只
-    # 决定"删谁"：这一行 `users` 登录行，加上它背后那条 account（乙之前它只可能是微信那条）。
-    # ⚠ 传的是 `user.account_id` 这个**值**而不是查出来的对象：值有、行没了（半截事务留下的
-    # 孤儿 account_id）时，老代码照样把身份行摘掉并自愈；换成对象就等于撤了那一次自愈——
-    # 那个 openid 一直被占着，同一个人下次微信登录撞 `accounts.ensure_for_provider` 那句
-    # RuntimeError，变成登不进去。钉在 `tests/test_v1_account_deletion.py`。
-    deleted, file_ids = deletion.purge(db, [user], user.account_id)
+    # 决定"删谁"：这一行 `users` 登录行，加上**由上面那道闸判断过**的那条 account（可能为 None）。
+    deleted, file_ids = deletion.purge(db, [user], _account_to_take_along(db, user))
     db.commit()
     return {"message": "账号已注销", "deleted": deleted, "file_ids": file_ids}
