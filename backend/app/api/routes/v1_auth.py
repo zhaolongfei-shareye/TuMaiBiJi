@@ -74,7 +74,14 @@ async def wechat_login(request: Request, req: WechatLoginRequest, db: Session = 
 
     `login_or_register` 顺手签的那把老钥匙（`sub=<users.id>`）在这里被丢掉：签出来不用它，
     是为了不再写一遍"换 openid、建 user、补 account"那一整段，而不是留着两把都能用。
+
+    第二行必须用 `ensure_for_user`、**不许**换成 `ensure_for_provider`：10-09 独立审抓出的
+    另一条 P0 就是这一行——`login_or_register` 内部按 `users.account_id` 认人（`ensure_for_user`），
+    而我这里又按 `(wechat, openid)` 那条身份行认人（`ensure_for_provider`）。**两把不同的钥匙
+    推导同一个问题**，正常时候答案一样，一旦库里出现"身份行与登录行分家"的状态（解绑那一趟
+    就能造出来，修之前），这一趟就会给客户端回一条全新的空 account，而那个人几百篇笔记在另一条
+    account 上。现在两条推导共用 `users.account_id` 这一个答案。
     """
     user, _legacy_user_token = await login_or_register(req.code, db, req.inviter)
-    account = accounts.ensure_for_provider(db, "wechat", user.openid)
+    account = accounts.ensure_for_user(db, user)
     return _login_response(db, account)

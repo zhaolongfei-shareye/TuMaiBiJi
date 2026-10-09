@@ -64,10 +64,17 @@ def create_link_code(
     db: Session = Depends(get_db),
     account: Account = Depends(get_current_account),
 ):
-    """生成一次性短码。**码只在响地里出现这一次**，库里只有 HMAC。
+    """生成一次性短码。**码只在响应里出现这一次**，库里只有 HMAC。
 
-    限流是这一条的命门：码只有 6 位、15 分钟有效，一百万种可能里随便猜中一枚的期望是
-    十万次量级——但那是"没有任何闸"时的算法。5/分钟按账号算，猜中一枚要连着几十万分钟。
+    限流这一档要说准它到底挡了什么：`app/core/rate_limit.py` 的 key 是
+    `get_user_key`——带得上有效 token 时按 `sub` 计（这一条门上是 `accounts.id`），
+    带不上就退回来源 IP。所以它挡的是**同一个人**刷码，不是"猜中一枚码要多少分钟"：
+    猜的人攻击的是 `/link/redeem`，那一头的 key 是**redeem 发起者自己**的 `users.id`，
+    他多有几个微信号就有几份 5/分钟。这一条上挂限流真正的用处是不让一个人的名下堆出
+    几千行没人念的 HMAC（每发都是一次写库）。
+    短码本身的安全不靠这个数：靠的是 6 位十进制 + 15 分钟 TTL + 一次消费（`used_at`
+    条件 UPDATE）+ 猜错与用过的码回同一句话（不给判分机）。真正还嫌薄的一环是
+    "对**某一枚**码的尝试次数"没有单独计数——记在 docs/产品需求.md「阶段2-2 落成」那一节（现编号 §8.174）的遗留里，审计回执是 §8.179。
     """
     code = link_codes.create(db, account)
     return LinkCodeResponse(code=code, expires_in_seconds=link_codes.TTL_MINUTES * 60)

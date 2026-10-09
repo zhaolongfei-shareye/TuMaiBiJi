@@ -208,6 +208,21 @@ def _bearer(token):
     return {"Authorization": f"Bearer {token}"}
 
 
+def _reload(db):
+    """丢掉测试会话的对象缓存，下一次查询真去库里读。
+
+    这是**这一份文件里最容易写出假绿的一处**。用例手里的 `db` 和请求用的是两个会话：
+    请求在服务侧会话里改了行，而测试会话这边只要那个对象还留在 identity map 里
+    （`_user_token(user)` 这种取值就在这一刻把它读出来了），`db.query(User).filter(...).one()`
+    会把**请求之前**的那一份快照原样还给你——SELECT 根本不发。10-09 实测：`merge_into`
+    确实把 `users.account_id` 搬过去了，不加这一句的用例仍然读到旧值、于是报红；
+    反过来"断言它没变"的那些用例加了这一句才第一次真的看得见。
+    凡是"打完请求之后要读那一行"的判据，都必须先走这一句。
+    """
+    db.expire_all()
+    return db
+
+
 @pytest.fixture
 def db():
     session = _fresh_session()
@@ -347,6 +362,47 @@ class Test两种钥匙各开各的门:
         token = create_unlock_token(user)
         assert client.get("/v1/account", headers=_bearer(token)).status_code == 401
         assert client.get("/api/user/quota", headers=_bearer(token)).status_code == 401
+
+    def test_账号钥匙少了_gen_那一格开不了门(self, client, db):
+        """`get_current_account` 里 `gen` 是**必填**的，不给默认值。
+
+        这一条要有正反两面，否则它只是在量"缺字段的 token 打不开门"这句空话：
+        `accounts.generation` 的默认值恰好也是 1，所以"没带 gen"和"刚签出来、代次还是 1"
+        在 `payload.get("gen", 1)` 那种写法下同形。正面那条（带 gen 打得开）就在上面
+        `test_账号钥匙开得动_v1`，这一条钉反面。
+        """
+        import jwt as pyjwt
+
+        from app.core.config import settings
+
+        _user, account = _wechat_person(db)
+        no_gen = pyjwt.encode(
+            {"sub": account.id, "kind": "account", "jti": "x", "exp": _utc_now() + timedelta(hours=1)},
+            settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+        assert client.get("/v1/account", headers=_bearer(no_gen)).status_code == 401, \
+            "没有 gen 的钥匙在新建的 account 上等于一把满血钥匙"
+
+    def test_解码器认不了缺_exp_或缺_jti_的钥匙(self, client, db):
+        """`_decode_token` 里那句 `options={"require": ["sub", "exp", "jti"]}` 以前没人钉。
+
+        少了 `exp` 的 token 会被 PyJWT 当成**永不过期**；少了 `jti` 的那把一旦哪天要做
+        吊销名单就根本没有行可查。两条都用 `/api` 那扇门量：同一支解码函数，两扇门共用。
+        """
+        import jwt as pyjwt
+
+        from app.core.config import settings
+
+        user, _account = _wechat_person(db)
+        base = {"sub": str(user.id), "gen": user.generation, "jti": "x",
+                "exp": _utc_now() + timedelta(hours=1)}
+        assert client.get("/api/user/quota", headers=_bearer(
+            pyjwt.encode(base, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM))).status_code == 200, \
+            "正面那条就不通：这一组判据量的就不是「缺字段」这一件事"
+        for gone in ("exp", "jti"):
+            payload = {k: v for k, v in base.items() if k != gone}
+            token = pyjwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+            resp = client.get("/api/user/quota", headers=_bearer(token))
+            assert resp.status_code == 401, f"少了 {gone} 的钥匙还开着门"
 
 
 class Test代次一次抬两格:
@@ -523,6 +579,34 @@ class Test_SIWA_验签:
         resp = _login(client, _mint(signing_key, aud="com.evil.other"))
         assert CLIENT_ID not in resp.text, f"响应里回显了 Service ID：{resp.text}"
         assert APPLE_ISS not in resp.text
+
+    def test_密钥端点里的非_rsa_密钥不许把登录打成_500(self, client, db, signing_key, monkeypatch):
+        """Apple 的端点今天只回 `kty=RSA`，但"今天只回"不是保证：它哪天挂上一枚 EC 或对称密钥，
+        按 `kid` 取到那一枚再去 `RSAAlgorithm.from_jwk` 冒的是 `InvalidKeyError`——
+        而**它不是 `InvalidTokenError` 的子类**（10-09 实测 MRO 是
+        `InvalidKeyError → PyJWTError → Exception`），只 except 后者的话端到端就是 HTTP 500。
+        500 会让客户端重试而不是重新登录，还把一次正常的密钥分布变成全站故障。
+
+        两面都钉：① `kty` 不对的在取密钥那一道就被筛掉（走"不认识这枚 kid"那条路 → 401）；
+        ② `kty=RSA` 但内容是残件的过得了筛选、必须在验签那一道被 except 接住 → 401。
+        """
+        from app.core import apple_identity
+        from app.core.config import settings
+
+        for label, junk in (
+            ("kty=EC", {"kty": "EC", "kid": KID, "crv": "P-256", "x": "AAAA", "y": "BBBB"}),
+            ("kty=oct", {"kty": "oct", "kid": KID, "k": "AAAA"}),
+            ("RSA 缺 n", {"kty": "RSA", "kid": KID, "alg": "RS256"}),
+            ("RSA 的 n 不是 base64url", {"kty": "RSA", "kid": KID, "n": "!!!!", "e": "AQAB"}),
+        ):
+            apple_identity.reset_jwks_cache()
+            monkeypatch.setattr(settings, "APPLE_CLIENT_ID", CLIENT_ID)
+            monkeypatch.setattr(apple_identity, "_http_jwks",
+                                _serve_jwks(_jwks_payload(junk)))
+            resp = _login(client, _mint(signing_key))
+            assert resp.status_code == 401, f"{label}：这一枚 JWK 我验不了，本该 401，实际 {resp.status_code} {resp.text}"
+            assert db.query(Account).count() == 0, f"{label}：验都没验成的凭证建出账号了"
+        apple_identity.reset_jwks_cache()
 
 
 class Test短码生成与消费:
@@ -704,8 +788,85 @@ class Test合并方向与吊销:
         assert body["account_id"] == wc_id, "微信那边有笔记却不是主：几百篇笔记的主人换了地方"
         assert body["merged"] is True
         assert db.query(Account).filter(Account.id == iphone_id).first() is None, "被并掉的那行还留着"
-        identity = db.query(AccountIdentity).filter(AccountIdentity.provider == "apple").one()
+        identity = _reload(db).query(AccountIdentity).filter(AccountIdentity.provider == "apple").one()
         assert identity.account_id == wc_id
+
+    def test_只有_iphone_那边有笔记_那边是主(self, client, db):
+        """`choose_main` 那两句"有一边有笔记"是**两个分支**，只钉一面等于没钉另一面。
+        10-09 反向验证里那条 `只有_iphone_那边有笔记_那边是主` 的针就是指这一条：文件重写时
+        把它整条丢了，needle 匹配不到任何用例、pytest 退出码 5、脚本把它读成"红（符合预期）"，
+        于是一次★假绿★被记成了一次成功。名字保留原样，别让下一轮又对不上。
+
+        这一条必须把**创建时间钉成微信那边更早**：否则"取较早创建的那个"那条规则会给同一个答案，
+        撤掉 `b_notes and not a_notes` 那一支也照样绿（上一轮的实测就是这样）。
+        """
+        iphone = _account_with_provider(db, "apple", "apple-only-notes",
+                                        created_at=_utc_now() + timedelta(days=2))
+        iphone_id = iphone.id
+        user, wc = _wechat_person(db)
+        wc.created_at = _utc_now() - timedelta(days=10)   # 微信那条**早**：时间比下来该它当主
+        wc_id = wc.id
+        db.commit()
+        iphone_user = User(openid=None, generation=1, account_id=iphone_id)
+        db.add(iphone_user)
+        db.commit()
+        _note(db, iphone_user, title="iPhone 那边的一篇")
+
+        resp = client.post("/v1/account/link/redeem", json={"code": _code(db, iphone)},
+                           headers=_bearer(_user_token(user)))
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["account_id"] == iphone_id, \
+            "只有 iPhone 那边有笔记却让微信那条当主：笔记的主人换了地方"
+        assert body["merged"] is True
+        assert db.query(Account).filter(Account.id == wc_id).first() is None, "该被并掉的那行还留着"
+        identity = _reload(db).query(AccountIdentity).filter(AccountIdentity.provider == "wechat").one()
+        assert identity.account_id == iphone_id, "微信身份没跟着搬到主账号上"
+
+    def test_主账号换成_iphone_时那条微信登录行跟着搬家(self, client, db):
+        """`merge_into` 里那句 `user.account_id = keep.id` 是**方向无关**的：主账号是 iPhone
+        那条时，挂在微信那条名下的 `users` 行要一起搬过去。少了这一句，那个人按
+        `users.account_id` 指的是一条**已经被删掉**的 account——下次登录 `ensure_for_user`
+        当场 RuntimeError，他连自己的笔记都读不到。
+
+        上面 `test_笔记一行都没搬` 钉的是"notes 不许动"，这一条钉的是"users 行必须动"，
+        两件事一个是数据、一个是归属，不能合成一条。
+        """
+        iphone = _account_with_provider(db, "apple", "apple-keep-face",
+                                        created_at=_utc_now() + timedelta(days=2))
+        iphone_id = iphone.id
+        user, wc = _wechat_person(db)
+        user_id = user.id
+        wc.created_at = _utc_now() - timedelta(days=10)
+        db.commit()
+        iphone_user = User(openid=None, generation=1, account_id=iphone_id)
+        db.add(iphone_user)
+        db.commit()
+        note = _note(db, iphone_user, title="iPhone 的那一篇")
+        note_id, note_owner = note.id, note.user_id
+
+        resp = client.post("/v1/account/link/redeem", json={"code": _code(db, iphone)},
+                           headers=_bearer(_user_token(user)))
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["account_id"] == iphone_id, "前提没了：这一趟的主账号不是 iPhone 那条"
+        moved = _reload(db).query(User).filter(User.id == user_id).one()
+        assert moved.account_id == iphone_id, "那条微信登录行留在原地，而原地的 account 已经被删了"
+        row = db.query(Note).filter(Note.id == note_id).one()
+        assert row.user_id == note_owner, "搬 users 行的时候顺手把笔记也搬了"
+
+    def test_创建时间缺失要响不许当成_1970(self, client, db):
+        """`_created_at` 里那道 NULL 守卫。`created_at` 有 server_default，正常不会是 NULL，
+        所以这一条量的是"账坏了"那一路：把它当成 1970 年会让时间戳坏掉的那个人**永远当主账号**，
+        而且一句错都不报。"""
+        user, wc = _wechat_person(db)
+        iphone = _account_with_provider(db, "apple", "apple-no-ts")
+        wc.created_at = None
+        db.commit()
+        resp = client.post("/v1/account/link/redeem", json={"code": _code(db, iphone)},
+                           headers=_bearer(_user_token(user)))
+        assert resp.status_code == 500, f"创建时间缺失被当成 1970 年 silently 比了：{resp.status_code} {resp.text}"
+        assert db.query(Account).count() == 2, "报错了却已经把账合了"
+        assert db.query(User).filter(User.id == user.id).one().account_id == wc.id, "名下的归属被动了"
 
     def test_两边都有笔记_取较早创建的那个(self, client, db):
         iphone = _account_with_provider(db, "apple", "apple-older",
@@ -804,7 +965,7 @@ class Test合并方向与吊销:
         resp = client.post("/v1/account/link/redeem", json={"code": _code(db, iphone)},
                            headers=_bearer(_user_token(user)))
         assert resp.status_code == 200, resp.text
-        row = db.query(Note).one()
+        row = _reload(db).query(Note).one()
         assert (row.id, row.user_id, row.title) == before, "笔记被搬家了"
         person = db.query(User).filter(User.id == user_id).one()
         assert person.account_id == wc_id, "主账号就是微信那条，users 行却改了归属"
@@ -855,6 +1016,9 @@ class Test合并方向与吊销:
         assert resp.status_code == 200, resp.text
         assert resp.json()["merged"] is False, "本来就是一条，却报「发生了合并」"
         assert resp.json()["account_id"] == wc_id
+        # 这一句量的是"库里那一格没被抬"，所以必须 `_reload`：不重读的话手里这两个对象
+        # 就是请求**之前**的快照，实现真的多抬了一格也照样绿。
+        _reload(db)
         assert (wc.generation, user.generation) == before, "再点一次关联把用户自己踢下线了"
         # 码照样作废：一次性这件事和"是不是同一条 account"无关
         assert db.query(LinkCode).filter(LinkCode.used_at.isnot(None)).count() == 1
@@ -908,6 +1072,84 @@ class Test解绑:
         assert resp.status_code == 404, resp.text
         assert db.query(AccountIdentity).count() == 1
 
+    def test_解绑微信那一条会把登录行一起摘掉(self, client, db):
+        """P0-1 的正面：解绑动的是**两样**东西，`account_identities` 那一行和挂在下面的
+        `users.account_id`。只删身份行的话这个人按登录行还归这条 account、按身份行已经不归了，
+        "这个人算哪条 account"从此有两个答案（见 `detach_users_of` 的 docstring）。"""
+        user, account = _wechat_person(db, openid="o_unbind_face")
+        account_id, user_id = account.id, user.id
+        db.add(AccountIdentity(account_id=account_id, provider="apple",
+                               provider_uid="apple-keep-me", verified_at=_utc_now()))
+        db.commit()
+        resp = client.delete("/v1/account/link/wechat", headers=_bearer(_account_token(account)))
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["providers"] == ["apple"]
+        left = _reload(db).query(User).filter(User.id == user_id).one()
+        assert left.account_id is None, "身份行摘了、登录行还挂着：这个人有两个归属答案"
+        assert left.generation == 2, \
+            "代次没抬：`unbind` 里那句 `bump_generation` 必须在 detach **之前**跑，先摘人再抬就抬不到他"
+
+    def test_解绑之后那个人下次登录另起一条(self, db):
+        """解绑断掉的是**数据关系**，不只是删一行表。修之前只删身份行、把 `users` 行留在原
+        account 上，那么 `ensure_for_user` 会照旧返回那条 iPhone account——他"解绑"了却还
+        跟那个 iPhone 是同一个人。摘干净之后，他下次登录应当拿到一条**新的**、只有微信的 account。"""
+        from app.services import accounts, linking
+
+        user, account = _wechat_person(db, openid="o_unbind_relogin")
+        old_id = account.id
+        db.add(AccountIdentity(account_id=old_id, provider="apple",
+                               provider_uid="apple-keep-2", verified_at=_utc_now()))
+        db.commit()
+        linking.unbind(db, account, "wechat")
+        fresh = accounts.ensure_for_user(db, db.query(User).filter(User.id == user.id).one())
+        assert fresh.id != old_id, "解绑之后再登录又回到那条 iPhone account 上：根本没断开"
+        assert linking.identity_providers(db, old_id) == ["apple"], "那条 account 上多了一条新微信身份"
+
+    def test_解绑苹果那一条不动登录行(self, client, db):
+        """`detach_users_of` 只在摘微信那一条形态下有意义（`users` 行是微信登录行）。
+        摘 Apple 那一条时把人家的 `account_id` 清空会是彻底的错：他还在用小程序，
+        账号归属却当场没了。这一条钉的是"只摘该摘的那一半"。"""
+        user, account = _wechat_person(db, openid="o_keep_face")
+        account_id, user_id = account.id, user.id
+        db.add(AccountIdentity(account_id=account_id, provider="apple",
+                               provider_uid="apple-drop-me", verified_at=_utc_now()))
+        db.commit()
+        resp = client.delete("/v1/account/link/apple", headers=_bearer(_account_token(account)))
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["providers"] == ["wechat"]
+        left = _reload(db).query(User).filter(User.id == user_id).one()
+        assert left.account_id == account_id, "摘 Apple 那一条把微信登录行的归属也清了"
+        assert left.generation == 2, "摘 Apple 那一条没吊销他的微信钥匙：契约 §二 要的是归属一变两侧都失效"
+
+
+    def test_身份行没了而登录行还挂着_闸门也要挡住(self, client, db):
+        """P0-1 的反面，也是 redeem 那道一对一闸门的**第二个判据**：
+        `"wechat" in identity_providers(...)` 只看身份行，被解绑掏空之后它就瞎了；
+        还挂着 `users` 行这件事只有 `users_of(...)` 看得见。少了后面那半句，第二个人
+        拿一枚新码就能把两个真人的笔记并成一份——10-09 独立审抓的就是这一处。
+
+        这里手工摆出"身份行已删、登录行还在"那个半成品状态（修之前的解绑就会留下它），
+        量的是闸门本身，不是解绑的实现。
+        """
+        iphone = _account_with_provider(db, "apple", "apple-half-unbound")
+        first_user, _wc = _wechat_person(db, openid="o_first_wc")
+        moved = db.query(AccountIdentity).filter(
+            AccountIdentity.provider == "wechat",
+            AccountIdentity.provider_uid == "o_first_wc").one()
+        moved.account_id = iphone.id          # 第一个人挂在这条 iPhone account 上
+        db.query(User).filter(User.id == first_user.id).update({"account_id": iphone.id})
+        db.delete(moved)                      # 但身份行没了：修之前的解绑就是这个形状
+        db.commit()
+        assert db.query(User).filter(User.id == first_user.id).one().account_id == iphone.id, \
+            "没摆出被审的那个状态，这条就不是在考闸门的第二半句"
+        second_user, _wc2 = _wechat_person(db, openid="o_second_wc")
+        resp = client.post("/v1/account/link/redeem", json={"code": _code(db, iphone)},
+                           headers=_bearer(_user_token(second_user)))
+        assert resp.status_code == 409, \
+            f"闸门只看身份行，放第二个真人并了进来：{resp.status_code} {resp.text}"
+        assert _reload(db).query(User).filter(User.id == first_user.id).one().account_id == iphone.id, \
+            "被拒的那一趟还是动了第一个人的归属"
+
 
 class Test_v1_微信登录转调:
     def test_同一个人两条门拿到同一条_account(self, client, db, monkeypatch):
@@ -941,6 +1183,72 @@ class Test_v1_微信登录转调:
         assert client.get("/v1/account", headers=_bearer(token)).status_code == 200
         assert client.get("/api/user/quota", headers=_bearer(token)).status_code == 401
         assert db.query(User).count() == 1, "/v1 那条自己又建了一行 users"
+
+    def test_分家状态下两条门给的是同一条_account(self, client, db, monkeypatch):
+        """P0-2：`/v1/auth/wechat` 原来按 `(wechat, openid)` 那条**身份行**认人
+        （`ensure_for_provider`），而它转调的 `login_or_register` 内部按 `users.account_id`
+        认人（`ensure_for_user`）。两把钥匙推同一个问题，正常时候答案一样；一旦库里出现
+        "登录行挂着、身份行没了"那种分家状态，这一趟就会给客户端回一条**全新的空 account**，
+        而那个人几百篇笔记挂在另一条上。现在两条推导共用 `users.account_id` 这一个答案。"""
+        from app.core import auth as auth_core
+
+        house = _account_with_provider(db, "apple", "apple-house")
+        house_id = house.id
+        db.add(User(openid="o_split", generation=1, account_id=house_id))
+        db.commit()
+        assert db.query(AccountIdentity).filter(
+            AccountIdentity.provider == "wechat").count() == 0, \
+            "没摆出分家状态：这条已经在考「两把钥匙」了"
+
+        async def fake_code2session(code):
+            return {"openid": "o_split", "session_key": "sk", "unionid": None}
+
+        monkeypatch.setattr(auth_core, "_wechat_code2session", fake_code2session)
+        v1 = client.post("/v1/auth/wechat", json={"code": "split"})
+        assert v1.status_code == 200, v1.text
+        assert v1.json()["account_id"] == house_id, \
+            "/v1 那条另起了一条 account，这个人从此两份笔记各归各家"
+        assert db.query(Account).count() == 1, f"多建了 account：{db.query(Account).count()} 条"
+        api = client.post("/api/auth/wechat", json={"code": "split"})
+        assert api.status_code == 200, api.text
+        assert db.query(Account).count() == 1, "老门又来了一遍，账上多出第二条 account：两条推导还是两个答案"
+
+
+class Test限流挂在该挂的那四道门上:
+    """限流这一档只能读 slowapi 的私有注册表：真跑出一发 429 得有 Redis 在，
+    而用例那侧 `app.state.limiter.enabled = False` 本来就是要关它。口径抄
+    `test_quota_and_invite.py` / `test_landing_page.py`。
+
+    为什么这四道要钉：**装饰器漏写了不会报错**，路由照样挂得上、用例照样全绿，
+    线上则是裸奔的一道写入口。`/link/code` 每发都往库里写一行 HMAC，
+    两道登录口每发都要出网打 Apple / 微信。
+    """
+
+    def test_四道门都在注册表里(self):
+        from app.core.rate_limit import limiter
+
+        import app.main  # noqa: F401  装饰器在 import 路由模块那一刻才注册
+
+        for key in ("app.api.routes.v1_auth.apple_login",
+                    "app.api.routes.v1_auth.wechat_login",
+                    "app.api.routes.v1_account.create_link_code",
+                    "app.api.routes.v1_account.redeem_link_code"):
+            limits = limiter._route_limits.get(key)
+            assert limits, f"{key} 上没有 @limiter.limit —— 这道门裸奔"
+            assert len(limits) == 1, f"{key} 挂了 {len(limits)} 层限流，按一层设计"
+            item = limits[0].limit
+            assert item.amount == 5 and item.GRANULARITY.name == "minute", \
+                f"{key} 的额度读出来是 {item}，不是 5/minute（改了口径要回契约 §七 对一遍）"
+
+    def test_注册表本身不是空的(self):
+        """上一条如果因为"路由模块没被 import"而一条都查不到，`for` 空转就是假绿。
+        这一条量的是扫描器自己没瞎。"""
+        from app.core.rate_limit import limiter
+
+        import app.main  # noqa: F401
+
+        v1_keys = [k for k in limiter._route_limits if k.startswith("app.api.routes.v1_")]
+        assert len(v1_keys) >= 4, f"只注册了 {len(v1_keys)} 道 /v1 限流：{v1_keys}"
 
 
 class Test迁移与模型对齐:

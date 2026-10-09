@@ -117,6 +117,9 @@ def get_current_user(
         user_id = int(payload["sub"])
     except ValueError:
         raise HTTPException(status_code=401, detail="无效的 Token")
+    # 这一格**留了默认值**，而 `get_current_account` 里那一格是必填的。差别不是我手松：
+    # 这一条门后站着现网那批已经发出去的 token，把"缺 gen"改成拒就是改现网行为；
+    # 而 `accounts.generation` 默认也是 1，新楼的 `/v1` 一把都还没发出去，没有兼容包袱。
     token_gen = payload.get("gen", 1)
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -141,10 +144,17 @@ def get_current_account(
     payload = _bearer_payload(authorization)
     if payload.get("kind") != "account":
         raise HTTPException(status_code=401, detail="这不是这一路要的凭证，请重新登录")
+    # `gen` 必须**在场**，不给它兜默认值。`payload.get("gen", 1)` 在新建的 account 上是致命的：
+    # `generation` 的默认值就是 1，于是"没带 gen 的钥匙"和"刚签发、还没人动过代次的钥匙"
+    # 在这一判上完全同形——哪天再有别的模块用同一把密钥签 token 而忘了写 gen，
+    # 它就能一路开 `/v1` 直到那个人第一次合并或解绑为止。`_sign` 一直会写 gen，
+    # 所以缺字段只可能是"不是 `_sign` 签的"，那就不该放过。
+    if "gen" not in payload:
+        raise HTTPException(status_code=401, detail="Token 已失效，请重新登录")
     account = db.query(Account).filter(Account.id == payload["sub"]).first()
     if not account:
         raise HTTPException(status_code=401, detail="账号不存在，请重新登录")
-    if account.generation != payload.get("gen", 1):
+    if account.generation != payload["gen"]:
         raise HTTPException(status_code=401, detail="Token 已失效，请重新登录")
     return account
 

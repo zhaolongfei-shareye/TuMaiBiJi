@@ -108,7 +108,7 @@ def bump_generation(db: Session, account: Account) -> int:
 
     为什么必须一次抬两格：站长 10-09 拍的乙让同一个人在最多两处有代次——微信那条老登录态
     比的是 `users.generation`（现网 7 天 token 认的是这一格，撤它等于把小程序用户全体踢下线），
-    `/v1` 那条比的是 `accounts.generation`。契约 §五"归属一变，两侧 token 全部失效"要的是
+    `/v1` 那条比的是 `accounts.generation`。契约 §二 第 4 步"归属一变，两侧 token 全部失效"要的是
     这个人**两边都登不回去**；只抬一格的话，另一格还活着的那条 token 在新归属下继续读得到
     合并前的数据，而那正是合并之后最不该发生的事。
 

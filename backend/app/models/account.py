@@ -29,8 +29,9 @@ class Account(Base):
     # `users.generation` **保留**、不搬走：现网那批 7 天有效期的微信 token 里写的是
     # `sub=<user.id>`、比对的是这一列，把它撤了等于把所有小程序用户当场踢下线。
     # 于是同一个人在最多有两格代次。唯一的写入点是
-    # `app/services/accounts.bump_generation`，它一次抬两格；契约 §五"归属一变两侧 token 全部失效"
-    # 那句话的全部重量都压在这一点上，钉它的尺子在 tests/test_account_and_identity.py。
+    # `app/services/accounts.bump_generation`，它一次抬两格；契约 §二 第 4 步"归属一变两侧 token
+    # 全部失效"那句话的全部重量都压在这一点上，钉它的尺子在
+    # `tests/test_v1_auth_and_link.py::Test代次一次抬两格`。
     generation = Column(Integer, nullable=False, default=1, server_default="1")
 
 

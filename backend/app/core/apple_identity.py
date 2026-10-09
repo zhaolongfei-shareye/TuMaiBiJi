@@ -61,7 +61,12 @@ async def _jwks_by_kid(force_refresh: bool = False) -> dict[str, dict]:
     if not isinstance(keys, list):
         logger.error("Apple JWKS 形状不对：%s", str(payload)[:200])
         raise HTTPException(status_code=502, detail="暂时无法向苹果核验身份，请稍后重试")
-    by_kid = {k["kid"]: k for k in keys if isinstance(k, dict) and "kid" in k}
+    # 只收 `kty=RSA`：下面 `RSAAlgorithm.from_jwk` 拿到别种（EC / oct / 缺 n 的残件）会冒
+    # `InvalidKeyError` 或 `ValueError`，而那两个都不是 `InvalidTokenError` 的子类——不在这儿筛掉，
+    # 端到端实测是 **HTTP 500**。10-09 独立审就是打在这一点上：那句 docstring 写"只抛 401/502"
+    # 当时是假话。筛掉之后，一枚不认识的 kid 走的是上面那条"强刷一次再判"的路，最终 401。
+    by_kid = {k["kid"]: k for k in keys
+              if isinstance(k, dict) and k.get("kid") and k.get("kty") == "RSA"}
     _cache, _cache_until = by_kid, now + JWKS_TTL_SECONDS
     return by_kid
 
@@ -73,7 +78,9 @@ def reset_jwks_cache() -> None:
 
 
 async def verify_identity_token(identity_token: str) -> str:
-    """验完返回 `sub`（Apple 那个 user identifier）。任何一环不对都抛，且只抛 401/502。
+    """验完返回 `sub`（Apple 那个 user identifier）。任何一环不对都抛，且只抛 401/502/503。
+
+    三样各对应客户端一种动作：401 去重新登录、502 原样重试、503 这一路没开（配置问题，重试无用）。
 
     返回值只有 `sub`：这张 token 里还有邮箱、姓名，调用方**不许**顺手把它们一起带出去——
     邮箱可能是 Apple 的隐私转发地址，姓名可能是用户没填的占位。真要存，走 Apple 那一路
@@ -108,7 +115,10 @@ async def verify_identity_token(identity_token: str) -> str:
             issuer=APPLE_ISSUER,
             options={"require": ["exp", "iss", "aud", "sub"]},
         )
-    except jwt.InvalidTokenError as exc:
+    except (jwt.InvalidTokenError, jwt.InvalidKeyError, ValueError) as exc:
+        # 三层分开看：`InvalidTokenError` 是签名/claim 不对（这张 token 不是 Apple 给我们签的）；
+        # `InvalidKeyError` 与 `ValueError` 是这一枚 JWK 我根本没法拿来验 RSA 签名（n/e 残缺、
+        # 形状不对）。上面已经按 `kty=RSA` 筛过一道，这里是第二道：少收一类就是端到端 HTTP 500。
         # 不把 exc 的文本回给客户端：PyJWT 的报错会带上 audience/issuer 的**期望值**，
         # 那是我们自己的 Service ID。日志里留类名足够排障。
         logger.warning("Apple identityToken 校验未通过：%s", type(exc).__name__)

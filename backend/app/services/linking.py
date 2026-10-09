@@ -65,7 +65,11 @@ def has_notes(db: Session, account_id: str) -> bool:
     - `notes.user_id` 那一列是 `String(100)`，所以比较值必须转成 `str`（routes/user.py 里
       查 `categories` 的每一处都写 `str(user.id)`）。SQLite 会替你把整型隐式转成文本，
       Postgres 不会——在那里 `text = integer` 直接是"operator does not exist"。
-    - 空 `IN` 在两种引擎上都不成立，所以先捞 id 再判空。
+    - 空 `IN` 先挡住再查。10-09 实测过这句的理由（原来这里写的是"空 IN 在两种引擎上都不成立"，
+      是假话）：SQLAlchemy 会把空集合展开成一个恒假条件，SQLite 上是
+      `user_id IN (SELECT 1 FROM (SELECT 1) WHERE 1!=1)`、Postgres 上是 `user_id IN (NULL) AND (1 != 1)`，
+      两种引擎都**正常返回零行**、不报错。所以这道 `if not user_ids` 不是 correctness 闸门，
+      它买的是"这个人的名下没有 users 行"这句话在代码里看得见，而不是埋在展开出来的 SQL 里。
     """
     user_ids = [str(row[0]) for row in db.query(User.id).filter(User.account_id == account_id).all()]
     if not user_ids:
@@ -136,7 +140,10 @@ def redeem(db: Session, user: User, code: str) -> tuple[Account, bool]:
 
     # 一对一的闸门：一个 iPhone 账号只能挂一个微信号。放过去的话，两个真人的笔记会并成一份，
     # 而"我的笔记"里凭空多出另一个人的东西——这是不可逆的数据混合，必须在这里响。
-    if "wechat" in identity_providers(db, target.id):
+    # 判据问的是**"这条 account 里还有没有第二个微信的人"**，所以两样都要看：身份行
+    # (`account_identities`) 和登录行 (`users.account_id`)。10-09 独立审只看到前者那一半被
+    # 解绑掏空、后者还挂着一个人和几百篇笔记，于是闸门形同虚设、第二个人顺利并进来（P0-1）。
+    if "wechat" in identity_providers(db, target.id) or users_of(db, target.id):
         raise LinkRefused("这个 iPhone 已经关联了一个微信号，一个 iPhone 只能关联一个", 409)
 
     keep, absorb = choose_main(db, mine, target)
@@ -152,12 +159,51 @@ def redeem(db: Session, user: User, code: str) -> tuple[Account, bool]:
     return keep, True
 
 
+def users_of(db: Session, account_id: str) -> list[User]:
+    """这条 account 名下那些**微信登录行**。`/v1` 这一路不看它，但闸门必须看：
+    `users.account_id` 是"这个人归哪条 account"的另一个答案，只看 identity 会漏。
+
+    筛 `openid is not None` 是必须的，不是顺手：`users` 那张表将来也会挂**只有 Apple 身份**
+    的人的行（阶段3 同步落地之后笔记仍然按 `users.id` 挂，那种行 `openid` 为 NULL，
+    `test_两边都有笔记_取较早创建的那个` 钉的就是这个形状）。把那种行也算成"这个 iPhone
+    已经关联过一个微信号"，闸门就会把每一次正常合并都挡死——我 10-09 补这一句时就是这样
+    一脚踩翻了那三条已有用例。闸门问的是"还有没有**别的真人微信**挂在这里"。
+    """
+    return db.query(User).filter(
+        User.account_id == account_id,
+        User.openid.isnot(None),
+    ).all()
+
+
+def detach_users_of(db: Session, account_id: str) -> int:
+    """把这条 account 名下的微信登录行**摘干净**（`account_id` 置空）。返回摘掉的行数。
+
+    摘了身份却不摘登录行会留下一个分家状态：那个人按 `users.account_id` 还归这条 account、
+    按 `account_identities` 已经不归了。10-09 独立审就是抓在这一句上（P0）——那条状态下
+    闸门（只看 identity）看不见还挂着的人，第二个人拿一枚新码就能把两个真人的笔记并成一份。
+    所以解绑必须是**两样一起摘**，而不是只删那一行身份。
+
+    范围跟着 `users_of` 走，只摘**带 openid 的那些行**：一条 `openid` 为 NULL 的 `users` 行
+    是 iPhone 那个人自己的行，不是"微信绑定"，摘 Apple 那一条登录方式时不该动它。
+    """
+    rows = users_of(db, account_id)
+    for row in rows:
+        row.account_id = None
+    return len(rows)
+
+
 def unbind(db: Session, account: Account, provider: str) -> Account:
     """摘掉某一条登录方式（契约 §二"可撤销"）。返回原 account。
 
     最后一条不许摘：那样会留下一行没有任何登录方式的 `accounts`，谁也登不进去、
     谁也删不掉（`DELETE /v1/account` 需要带 token，而带 token 需要能登录）。
     要真想走人，走删账号那条路。
+
+    摘掉微信那一条时，这个人的 `users` 行会跟着脱离这条 account——那才是"解绑"两个字
+    的真实意思：**他带着自己的笔记回到"只有微信"的那个人**，下次从小程序登录时
+    `ensure_for_user` 会给他立一条新 account（或对上已有的那条微信身份）。笔记不搬：
+    业务表挂的是 `users.id`，人走数据走。如果只删身份行、把 `users` 行留在原 account 上，
+    留在手里的那把微信钥匙还能读那些笔记，而"这个人算哪条 account"从此有两个答案。
     """
     rows = db.query(AccountIdentity).filter(
         AccountIdentity.account_id == account.id,
@@ -168,8 +214,17 @@ def unbind(db: Session, account: Account, provider: str) -> Account:
     total = db.query(AccountIdentity).filter(AccountIdentity.account_id == account.id).count()
     if total == len(rows):
         raise LinkRefused("这是最后一种登录方式，解绑就登不进来了；要删账号请走删除账号", 409)
+    # 代次先抬、再摘人。今天这一句顺序**不咬人**，而这是量出来的不是推的：`SessionLocal`
+    # 是 `autoflush=False`，`detach_users_of` 只改了内存里的对象，`bump_generation` 那句
+    # SELECT 打到库上时 `account_id` 还是旧值，所以那一行照样被抬——反向验证 S3 把两句调过来，
+    # 判据仍然绿（10-09 实测，见 probes/反向验证-阶段2-2.sh 头部那条清单）。
+    # 但把 bump 放在前面不靠这个巧合：哪天有人在这两句之间加一次 flush/commit、或者把
+    # detach 换成批量 update，顺序立刻就开始决定结果——那时"人已经被摘走、代次抬不到他"
+    # 就是字面上的"他手里那把旧钥匙还活着"。
+    accounts.bump_generation(db, account)
+    if provider == "wechat":
+        detach_users_of(db, account.id)
     for row in rows:
         db.delete(row)
-    accounts.bump_generation(db, account)
     db.commit()
     return account
