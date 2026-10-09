@@ -26,5 +26,12 @@ class User(Base):
     # 反馈邮箱来信行使查阅/更正/注销时，用来把来信对上库里哪个账号（openid 从不下发、也不给用户看，
     # 没有这一格就没有别的对应办法）。服务端不发信、不做营销、不给第三方。
     contact_email = Column(String(254), nullable=True)
+    # 这个微信号背后那个"人"。见 `app/models/account.py`：平台 id 不再当业务主键用之后，
+    # 加第二种登录方式才是往 auth_identities 插一行，而不是把所有历史数据搬家。
+    # 故意**不建外键**（和本仓 `share_reports.token` 同一先例）：给一张有 live 数据的
+    # users 表加带 FK 的列，SQLite 要重建整张表，而这道约束真正该由谁来保证只有一个答案——
+    # 写口在 `app/services/accounts.py` 一处。可空是因为迁移只回填它见过的那些行，
+    # 迁移之后新建的用户由登录那一路当场补上（同一支函数，两条路共用一个真相）。
+    account_id = Column(String(36), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

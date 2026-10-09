@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.database import get_db
 from app.models.user import User
-from app.services import quota
+from app.services import accounts, quota
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +112,10 @@ async def login_or_register(code: str, db: Session, inviter: int | None = None) 
         db.add(user)
         db.commit()
         db.refresh(user)
+
+    # 每个人先有一行 account 再谈别的。迁移只回填它当时看得见的那些行，而这一句让
+    # "每个用户都有 account"在迁移之后仍然成立（`ensure_for_user` 幂等，已有就原样返回）。
+    accounts.ensure_for_user(db, user)
 
     # 归因放在拿到 user 之后、发token之前：新老用户都会走到这一行，attribute_inviter
     # 内部自己判"要不要认"（已有归属、名下已有笔记、自己邀自己都不认）。

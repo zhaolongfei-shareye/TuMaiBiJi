@@ -11,6 +11,7 @@ from app.core.auth import get_current_user
 from app.core.private_access import PRIVATE_CATEGORY_NAME, create_unlock_token
 from app.core.rate_limit import limiter
 from app.db.database import get_db
+from app.models.account import Account, AuthIdentity
 from app.models.asset import Asset, not_failed
 from app.models.category import Category
 from app.models.invitation import Invitation
@@ -320,6 +321,17 @@ def deactivate_account(
         "cards": db.query(NoteCard).filter(NoteCard.user_id == uid).delete(),
         "profile": db.query(UserProfile).filter(UserProfile.user_id == uid).delete(),
     }
+
+    # 「人」那张表也要跟着走。不删的后果不是留垃圾行：那个 openid 会一直被唯一索引占着，
+    # 同一个人重新注册时插第二条身份直接撞库（这一轮把这一段撤掉试过，第二条身份当场
+    # IntegrityError，红在 `tests/test_account_and_identity.py::Test注销连带`）。
+    if user.account_id:
+        deleted["identities"] = (
+            db.query(AuthIdentity).filter(AuthIdentity.account_id == user.account_id).delete()
+        )
+        deleted["account"] = (
+            db.query(Account).filter(Account.id == user.account_id).delete()
+        )
 
     # 防止邀请奖励上限绕过：注销前先把该用户贡献给邀请人的 bonus 扣掉
     # 这样反复注册→写笔记→注销→再注册的循环就无法累积无限奖励
