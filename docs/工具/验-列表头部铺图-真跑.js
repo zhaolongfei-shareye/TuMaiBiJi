@@ -219,13 +219,27 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
     && (sd.stats || [])[0].key === 'notes', JSON.stringify(sd.stats))
   // v30 起分类那一行不再吃 `.chip`：胶囊、暗玻璃、`--tone-bg` 那三样一起删了。
   // 原来这一段四条判据量的前提都没了（不是红了要修界面，是尺子旧了）——换成量
-  // 「这一行两档字」，期望值从 `palette.layerSkinOf(当前壁纸)` 现算，不在尺子里抄第二份。
+  // 「这一行两档字」。期望值哪来的见下面那段 10-09 的注释（现在读的是这一页的墨，不是层上那支）。
   // 这里不能用文件下面那把 `sameCol`／`IDX_WXSS`：它们是第 249 行之后才声明的 const，
   // 在这一行取会撞临时死区（TDZ），跑出来是一条 ReferenceError 而不是任何判据红。
   const cats = await page.$$('.ix-cat')
   ck('这一趟至少有两枚分类（"全部" + 一枚真分类），字色那条才量得到', cats.length > 1, `${cats.length} 枚`)
   const wpNow = await mp.evaluate(() => getApp().getWallpaper() || '')
-  const skin = p.layerSkinOf(wpNow)
+  // 10-09 站长打回"太深"之后，这一行两档字不再吃 `layerSkinOf` 那支"压在层上的冷墨"，
+  // 退回这一页自己的 `--text-secondary` / `--text-primary`（与「我的」那四行同一对）。
+  // 期望值从 app.wxss 当前那一套 `.theme-*` 现读，尺子里不抄第二份数。
+  const APP_BLOCK = (new RegExp(`\\.theme-${wpNow}\\s*\\{([^}]*)\\}`)
+    .exec(fs.readFileSync(P('app.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')) || [])[1] || ''
+  const tok = (n) => (new RegExp(`--${n}:\\s*([^;]+)`).exec(APP_BLOCK) || [])[1] || '(读不出)'
+  const colParts = (s) => {
+    const t = String(s).trim()
+    if (t[0] === '#') {
+      const m = /#([\da-f]{2})([\da-f]{2})([\da-f]{2})/i.exec(t)
+      return m ? { rgb: [1, 2, 3].map((i) => parseInt(m[i], 16)), a: 1 } : null
+    }
+    const n = (t.match(/-?\d+(\.\d+)?/g) || []).map(Number)
+    return n.length >= 3 ? { rgb: n.slice(0, 3), a: n[3] === undefined ? 1 : n[3] } : null
+  }
   const alphaOf2 = (s) => { const m = /,\s*([\d.]+)\s*\)/.exec(String(s)); return m ? Number(m[1]) : 1 }
   const idxSrc = fs.readFileSync(P('pages/index/index.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
   const idleCols = [], onCols = []
@@ -234,12 +248,13 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
     const c = await el.style('color')
     if (/(^|\s)on(\s|$)/.test(cls)) onCols.push(c); else idleCols.push(c)
   }
-  ck('未选中那一档是这一层自己的淡墨（layerSkinOf().soft，压在层上过 4.5）',
-    idleCols.length > 0 && idleCols.every((c) => near(rgbOf(c), hexArr(skin.ink)) && Math.abs(alphaOf2(c) - alphaOf2(skin.soft)) < 0.02),
-    `${idleCols[0]}｜期望 ${skin.soft}（壁纸 ${wpNow}）`)
-  ck('选中那一档是整档墨、不是淡的（两支只差 alpha 时这条必须红，不许跟着上面那条一起绿）',
-    onCols.length === 1 && near(rgbOf(onCols[0]), hexArr(skin.ink)) && alphaOf2(onCols[0]) > 0.98,
-    `${onCols[0] || '(一枚没选中，那一行读不出选中态)'}｜期望 ${skin.ink}`)
+  const wantIdle = colParts(tok('text-secondary')), wantOn = colParts(tok('text-primary'))
+  ck('未选中那一档是这一页的 `--text-secondary`（10-09 起不再吃层上那支淡墨）',
+    !!wantIdle && idleCols.length > 0 && idleCols.every((c) => near(rgbOf(c), wantIdle.rgb) && Math.abs(alphaOf2(c) - wantIdle.a) < 0.02),
+    `${idleCols[0]}｜期望 ${tok('text-secondary')}（壁纸 ${wpNow}）`)
+  ck('选中那一档是这一页的整档墨 `--text-primary`、不是淡的（两支只差 alpha 时这条必须红，不许跟着上面那条一起绿）',
+    onCols.length === 1 && !!wantOn && near(rgbOf(onCols[0]), wantOn.rgb) && alphaOf2(onCols[0]) > 0.98,
+    `${onCols[0] || '(一枚没选中，那一行读不出选中态)'}｜期望 ${tok('text-primary')}`)
   ck('「全部」那一枚与其他未选中枚同一档（暗玻璃那一态整块没了）',
     idleCols.length > 1 && idleCols.every((c) => near(rgbOf(c), rgbOf(idleCols[0])) && Math.abs(alphaOf2(c) - alphaOf2(idleCols[0])) < 0.02),
     idleCols.join(' , '))
@@ -304,12 +319,13 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   const cls2 = ((await (await page.$('.container')).attribute('class')) || '')
   ck('容器照样带 has-bg', /has-bg/.test(cls2), cls2 || '(class 读成空)')
   // 这一段原来量的是"压在照片上的那块面"＝「全部」那一枚 chip 的暗玻璃。v30 起胶囊撤了，
-  // 这一行不再有任何面，照片与列表之间那块面就是圆角卡自己——判据跟着挪到 `.sheet`：
-  // 铺图这一态它仍必须是层色（既不退回页面底，也不被照片盖成别的支）。
+  // 这一行不再有任何面，照片与列表之间那块面就是圆角卡自己；10-09 站长打回"太深"之后
+  // 那一张卡吃的是 `--bg-card`（与「我的」那张卡同一支），不再是 v31 的 `listLayerOf` 那层灰。
   const sheetCol = await styleOf(page, '.sheet', 'background-color')
-  ck('铺图这一态那张圆角卡渲染出来就是层色（layer 由 palette.listLayerOf 现算，尺子里不抄第二份）',
-    near(rgbOf(sheetCol), hexArr(p.listLayerOf(wpNow))),
-    `${sheetCol}｜期望 ${p.listLayerOf(wpNow)}（壁纸 ${wpNow}）`)
+  const wantCard = colParts(tok('bg-card'))
+  ck('旧开关这一态那张圆角卡渲染出来是 --bg-card（期望值从当前那套 .theme-* 现读，不抄第二份）',
+    !!wantCard && near(rgbOf(sheetCol), wantCard.rgb),
+    `${sheetCol}｜期望 ${tok('bg-card')}（壁纸 ${wpNow}）`)
   ck('滚动区照旧不画面（底色是那张圆角卡给的）',
     /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list', 'background-color')),
     await styleOf(page, '.list', 'background-color'))

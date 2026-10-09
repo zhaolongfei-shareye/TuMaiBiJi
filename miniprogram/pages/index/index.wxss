@@ -242,20 +242,18 @@
    横向内缩挂在这一层的 padding 上，不挂到 scroll-view 自己身上（挂在它身上时
    右侧要给滚动条留位，实测左右差 12rpx）。
    下内缩 150 是给底栏胶囊让位；分类行自己带上下留白，所以这里 top 归零。 */
-/* ---------- 区内顶上那两枚 tab（站长 10-08 拍的 v30：那一行整块换成创建页那块深面） ----------
-   面＝`--cp-panel`(#23252C)、字＝纸白两档（选中满纸白、未选 62%）、短杠＝`TIP_DOT` 那支黄——
-   三个数都不许在这一份 wxss 里出现：那两个 --cp-* 由 `index.js` 把 `createSkin()` 的整串贴在这一行上
-   （与新建页同一个出口，抄一遍字面值就是第二份真相），`--tip-dot` 同一条路子（wxss 里不许抄饱和色）。
-   原来那两条"短杠压在通栏横线上"的耦合（bottom:-2 吃掉那 2）随那条横线一起撤了：
-   换深面之后那面自己就把行与层切开，再留一条线会读成"两排 tab"（规格 §3 末行）。 */
+/* ---------- 区内顶上那两枚 tab（站长 10-09 改口：撤掉 v30 那块深面，跟着下面同一张浅卡） ----------
+   v30 那一版把这一行整块换成创建页那块深面（`--cp-panel` #23252C + 纸白两档 + 黄短杠），
+   站长 10-09 对着「我的」页打回：**太深**，这两屏要用「我的」那两层浅背景（页面底 `--bg-page`
+   ＋卡 `--bg-card`，实测 #E2DED4／#F3F3F1）。所以这一行不再有自己那面，字退回这一页的墨两档，
+   短杠也退回同一支墨——与下面分类那一行同一种手法（那两档本来就是"文字 + 选中一条短杠"）。
+   `--cp-*` 那三个数不再出现在这一屏；`index.js` 仍把 `createSkin()` 贴在这一行上是别屏的事，
+   这里只撤"这一行吃它"。左右那两条负 margin 与 padding **一个字没动**：撤的是面，不是落点。 */
 .vtabs {
   position: relative;
   flex: none;
   display: flex;
   gap: 44rpx;
-  background: var(--cp-panel);
-  /* 左右各外扩 24 把 .sheet 的内缩吃掉、再自己补回 32：这一行的深面要像效果图一样
-     一直走到整块圆角卡的边，而两枚字仍落在离边 32 那一条线上。 */
   margin: 0 -24rpx;
   padding: 0 56rpx;
 }
@@ -267,12 +265,12 @@
   font-size: var(--fs-meta);
   font-weight: 600;
   letter-spacing: 1rpx;
-  color: var(--cp-ink-62);
+  color: var(--text-secondary);
 }
 
 .vtab.on {
   font-weight: 700;
-  color: var(--cp-ink);
+  color: var(--text-primary);
 }
 
 .vtab.on::after {
@@ -283,7 +281,7 @@
   bottom: 0;
   height: 4rpx;
   border-radius: 2rpx;
-  background: var(--tip-dot);
+  background: var(--text-primary);
 }
 
 .vtab:active {
@@ -292,13 +290,13 @@
 
 /* 两枚 tab 那一行右端的折叠口（站长 10-05 要）。做法照「我的」页那四行右侧的小字：
    margin-left:auto 推到行尾 + nowrap——挤不下不许折行。
-   换深面之后它和"未选那枚"并成一档（62% 纸白，规格 §3 第四行）——现网这两处本来就不同值。
+   撤深面之后它跟"未选那枚"并成一档（这一页的 `--text-secondary`）。
    仍跟着 .vtabs 那 padding: 0 56 走，右沿落在离边 56 那一条线上，与左边两枚同一条轴。 */
 .ix-fold {
   margin-left: auto;
   align-self: center;
   font-size: var(--fs-meta);
-  color: var(--cp-ink-62);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -307,10 +305,11 @@
 }
 
 /* 分类这一行紧跟在那一行下面（置顶那一档、右边那句「只看置顶」随置顶一起撤）。
-   v30：撤胶囊改「文字 + 选中一条短杠」，与上面那两枚同一种手法；两档字与那条短杠都吃
-   **这一层自己的墨**——`--ink-on-layer` / `--ink-on-layer-soft` 挂在 `.theme-*` 上，
-   真身是 palette 的 layerSkinOf（`验-列表层底色.js` 逐套钉等值），不跟那支黄：
-   黄在这屏只许出现在"那一行"和首屏那两枚点上（规格 §4 那条他点了"不跟黄"）。 */
+   v30：撤胶囊改「文字 + 选中一条短杠」，与上面那两枚同一种手法。
+   10-09 站长改口之后这两档字与那条短杠吃的是**这一页的墨**（`--text-primary` /
+   `--text-secondary`，与「我的」页那四行同一对），不再吃 `--ink-on-layer*`——那两个名字讲的是
+   "压在层色那一面上的字"，而这一层现在就是 `--bg-card` 那张浅卡，再留着就是拿冷墨写暖底。
+   也不跟那支黄：黄在这屏只许出现在首屏那两枚点上（规格 §4 那条他点了"不跟黄"）。 */
 .cats {
   position: relative;
   flex: none;
@@ -340,12 +339,12 @@
   font-weight: 600;
   letter-spacing: 1rpx;
   white-space: nowrap;
-  color: var(--ink-on-layer-soft);
+  color: var(--text-secondary);
 }
 
 .ix-cat.on {
   font-weight: 700;
-  color: var(--ink-on-layer);
+  color: var(--text-primary);
 }
 
 .ix-cat.on::after {
@@ -356,7 +355,7 @@
   bottom: 0;
   height: 4rpx;
   border-radius: 2rpx;
-  background: var(--ink-on-layer);
+  background: var(--text-primary);
 }
 
 .sheet {
@@ -368,10 +367,13 @@
   flex-direction: column;
   margin-top: -40rpx;
   padding: 0 24rpx;
-  /* v31 那一层（站长 10-08 拍「饱和压到 35%／明度 L78」）：不再吃页面底 `--bg-page`，
-     改吃 `--bg-layer`——它的真身是 `palette.listLayerOf()`（从底栏那一支派生，不许另挑色相），
-     四套的镜像值逐字等值由 `docs/工具/验-列表层底色.js` 钉住。 */
-  background: var(--bg-layer);
+  /* 站长 10-09 对着「我的」页打回：这两屏要那两层浅背景，不要 v31 那层灰。
+     于是这一张圆角纸卡回到 `--bg-card`（象牙档实测 #F3F3F1），外面那一层是页面底
+     `--bg-page`（实测 #E2DED4）——与「我的」页那两层逐字同一对，量法见 §8.180。
+     v31（10-08 拍「饱和 35%／明度 L78」）那版吃的是 `--bg-layer` #CDC9C1，比页面底还暗一档，
+     他今天判"太深"。`--bg-layer` 与它那两档字在这屏不再有人消费（详情浮窗那一层另说，
+     它此刻仍吃 `--bg-layer`，站长没点它）；派生函数与镜像值留着，撤它们要连 `验-列表层底色` 一起动。 */
+  background: var(--bg-card);
   border-radius: var(--r-card) var(--r-card) 0 0;
   box-shadow: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
   overflow: hidden;

@@ -148,9 +148,11 @@ ok('压暗那一串仍在图区里（画在段内，不再画满一屏）',
 const sheet = seg(wxss, '.sheet')
 ok('圆角卡回来了，但它不描边（框套框那条不变量还在）',
   /\.sheet\s*\{/.test(wxss) && !/border(?!-radius)/.test(sheet), sheet.match(/border[^;]*/g))
-ok('圆角卡往上盖住图 40、半径吃 --r-card、底色吃 --bg-layer（v31 起这一层不再与页面底同色）',
+// 站长 10-09 对着「我的」页打回 v31 那层灰（#CDC9C1，比页面底还暗一档）："太深"。
+// 这一张圆角纸卡回到 `--bg-card`，外面那一层是页面底 `--bg-page`——与「我的」那两层同一对。
+ok('圆角卡往上盖住图 40、半径吃 --r-card、底色吃 --bg-card（10-09 起这一层与「我的」那张卡同色）',
   /margin-top: -40rpx/.test(sheet) && /border-radius: var\(--r-card\)/.test(sheet)
-  && /background: var\(--bg-layer\)/.test(sheet))
+  && /background: var\(--bg-card\)/.test(sheet))
 ok('滚动区自己不画面（面是那张卡画的）',
   !/(?:^|\n)\.list\s*\{[^}]*(background|border)/.test(wxss))
 ok('容器竖排撑满一屏，列表区 flex:1 + min-height:0（少了 min-height:0 就会整页滚）',
@@ -242,10 +244,13 @@ ok('铺图那一态里胶囊相关的四条一个都不剩（撤净了才叫撤�
   !/\.container\.has-bg \.chip/.test(wxss) && !/\.chip\.tone/.test(wxss))
 ok('分类那一行不写任何 .has-bg 分支（它在卡里、不吃照片，写了就是给不存在的那一态兜底）',
   !/\.container\.has-bg[^{]*\.ix-cat/.test(wxss))
-ok('分类那两档吃这一层自己的墨（--ink-on-layer-soft / --ink-on-layer），短杠同色，不跟那支黄',
-  /color: var\(--ink-on-layer-soft\)/.test(seg(wxss, '.ix-cat'))
-  && /color: var\(--ink-on-layer\)/.test(seg(wxss, '.ix-cat\.on'))
-  && /\.ix-cat\.on::after[\s\S]*?background: var\(--ink-on-layer\)/.test(wxss)
+// 10-09 这一层从层色换成 `--bg-card` 之后，"压在层面上的那一支冷墨"（`--ink-on-layer*`）在分类
+// 这一行没有对象了：两档字与短杠改吃这一页的墨（`--text-primary`／`--text-secondary`），
+// 与「我的」页那四行同一对。留着旧那两个名字就是拿冷墨写暖底。
+ok('分类那两档吃这一页的墨（--text-secondary / --text-primary），短杠同色，不跟那支黄',
+  /color: var\(--text-secondary\)/.test(seg(wxss, '.ix-cat'))
+  && /color: var\(--text-primary\)/.test(seg(wxss, '.ix-cat\.on'))
+  && /\.ix-cat\.on::after[\s\S]*?background: var\(--text-primary\)/.test(wxss)
   && !/var\(--tip-dot\)/.test(seg(wxss, '.ix-cat\.on')))
 // 这一条比的是**代码**不是注释，所以吃文件顶上那把 `cjsCode`（第 90 行已经剥过注释）——
 // 拿原文正则扫会把自家注释判成残留（今天第二次踩同一坑，另一处是 #FCFBF8）。

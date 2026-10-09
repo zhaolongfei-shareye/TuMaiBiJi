@@ -839,10 +839,15 @@
   z-index: 6;
 }
 
-/* 铺图时把标题和条子抬到罩层之上。展开那一态排除在外：它的 position 由上面
-   那条 fixed 规则给，这里再写一遍 relative 会按源码顺序把它盖回去。 */
+/* 铺图时把标题、日期、这一行和条子抬到罩层之上。展开那一态的 entry-wrap 排除在外：
+   它的 position 由上面那条 fixed 规则给，这里再写一遍 relative 会按源码顺序把它盖回去。
+   10-09 站长拍甲把 `.home-swap` 加进来：它原来不在这份名单里，于是那两句字跟照片一起
+   被 `.page-scrim` 压暗、对比塌向 1:1（新旧两个位置都读不出来，见 §8.178）。
+   跟着名单走的代价照写在注释里：「调亮度」那一档不再把这一行一起压暗（图暗字亮），
+   这与标题、日期现在的行为一致。 */
 .container.has-bg .title-row,
 .container.has-bg .date-row,
+.container.has-bg .home-swap,
 .container.has-bg:not(.entry-dock) .entry-wrap {
   position: relative;
   z-index: 2;

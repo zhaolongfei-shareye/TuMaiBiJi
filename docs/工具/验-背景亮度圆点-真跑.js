@@ -104,10 +104,15 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
 
   // ---------- ② 点一下＝满月：罩子拧到 0，照片等于原图亮度 ----------
   const halves = await page.$$('.swap-half')
-  ck('这一行是两半：左「调亮度」、右「换背景」',
+  // 这两句串从**这一屏自己那份字典**现读，不写死中文：这一档账号的语言是登录带回的，
+  // 测试号存的是 en（同一件事 `验-列表头部铺图-真跑` 里已经记过一次），写死就是一句假红。
+  // 判据要守的东西没变：还是"两半、左调亮度右换背景"，只是拿本机的串去比。
+  const dT = (await page.data()).t || {}
+  ck('这一行是两半：左「调亮度」、右「换背景」（串读的是这一屏的字典，语言跟着账号走）',
     halves.length === 2
-    && (await (await halves[0].$('.swap-text')).text()) === '调亮度'
-    && (await (await halves[1].$('.swap-text')).text()) === '换背景', `${halves.length} 半`)
+    && (await (await halves[0].$('.swap-text')).text()) === dT.bgDimLabel
+    && (await (await halves[1].$('.swap-text')).text()) === dT.homeBgSwap,
+    `${halves.length} 半｜字典 ${dT.bgDimLabel} / ${dT.homeBgSwap}`)
   const half = halves[0]
   await half.tap()
   await sleep(1000)

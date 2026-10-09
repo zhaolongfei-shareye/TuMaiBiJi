@@ -63,9 +63,13 @@ ck('图和罩都 fixed，跟着视口不跟着滚',
   /\.page-bg\s*{[^}]*position:\s*fixed/.test(wxss) && /\.page-scrim\s*{[^}]*position:\s*fixed/.test(wxss))
 ck('铺图时三级字翻白', /\.container\.has-bg\s*{[^}]*--text-primary:\s*#f2efe9/.test(wxss))
 ck('语言切换那条下划线也跟着翻白', /\.container\.has-bg\s*{[^}]*--accent:\s*#f2efe9/.test(wxss))
-ck('内容压在罩之上（且这条不再管展开态的 position，两态各有一条）',
-  /\.container\.has-bg \.title-row,[\s\S]{0,120}?z-index:\s*2/.test(wxss)
-  && /\.container\.has-bg:not\(\.entry-dock\) \.entry-wrap/.test(wxss))
+// 抬层那条规则整段捞出来比名单：原来只拿"从 title-row 起 120 字符内出现 z-index:2"这种
+// 窗口写法，名单里加一行就会因为窗口不够长而红——那是尺子自己的毛病，不是回归。
+// 10-09 站长拍甲：名单要含 `.home-swap`（那两句字原来跟照片一起被罩层压住，读不出来）。
+const liftRule = /\.container\.has-bg \.title-row,[\s\S]{0,260}?\{[^}]*z-index:\s*2[^}]*\}/.exec(wxss)
+ck('内容压在罩之上（名单四样：标题、日期、那一行、录入条；展开态的 position 另有一条）',
+  !!liftRule && ['title-row', 'date-row', 'home-swap', 'entry-wrap'].every((s) => liftRule[0].includes(s)),
+  liftRule ? liftRule[0].split('{')[0].replace(/\s+/g, ' ') : '(没捞到那条抬层规则)')
 ck('整组按视口比例下移（不是写死 rpx；09-28 起 .entry-cards 改名叫 .entry-wrap，且这段不再挂在 has-bg 上）',
   /\.entry-wrap\s*{[^}]*margin-top:\s*\d+vh/.test(wxss)
   && !/\.container\.has-bg \.entry-wrap\s*{[^}]*margin-top/.test(wxss))

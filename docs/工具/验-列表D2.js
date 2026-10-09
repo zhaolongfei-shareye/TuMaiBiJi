@@ -125,18 +125,23 @@ ok('第一枚是新串 tabList、第二枚读现网 navShare（同一个词不�
   && ZH.tabList === '笔记列表' && ZH.navShare === '笔记卡片', `${ZH.tabList} / ${ZH.navShare}`)
 ok('两枚都小字：tab 字号 = 分类那一行那几枚字的字号（都是 --fs-meta）',
   /font-size: var\(--fs-meta\)/.test(vtabRule) && /font-size: var\(--fs-meta\)/.test(ixCatRule))
-// v30 那一版把这一行整块换成新建页那块深面：两档字不再是"90%/42% 黑"，
-// 而是满纸白 / 62% 纸白，短杠从墨色换成首屏那枚黄——三个数都不许写在 wxss 里。
-ok('已选那枚靠纸白+字重+一条黄短杠跳出来，未选同字号只 62% 纸白（不做按钮壳，wxss 里不抄那三个数）',
-  /color: var\(--cp-ink-62\)/.test(vtabRule)
-  && /color: var\(--cp-ink\)/.test(rule(idxWxss, 'vtab\.on'))
+// v30 那一版把这一行整块换成新建页那块深面（纸白两档 + 黄短杠），站长 10-09 对着「我的」页
+// 打回"太深"：那一面撤了，两枚字退回这一页的墨两档、短杠退回同一支墨（与分类那一行同一手法）。
+ok('已选那枚靠墨色+字重+一条同色短杠跳出来，未选同字号只 --text-secondary（不做按钮壳）',
+  /color: var\(--text-secondary\)/.test(vtabRule)
+  && /color: var\(--text-primary\)/.test(rule(idxWxss, 'vtab\.on'))
   && /font-weight: 700/.test(rule(idxWxss, 'vtab\.on'))
   && /\.vtab\.on::after[\s\S]*?height: 4rpx/.test(idxWxss)
-  && /\.vtab\.on::after[\s\S]*?background: var\(--tip-dot\)/.test(idxWxss)
+  && /\.vtab\.on::after[\s\S]*?background: var\(--text-primary\)/.test(idxWxss)
   && !/background/.test(vtabRule))
-ok('那一行的面＝新建页那块深面 var(--cp-panel)，底下那条通栏横线撤了（换深面再留一条线会读成两排 tab）',
-  /background: var\(--cp-panel\)/.test(vtRule) && !/border-bottom/.test(vtRule))
-ok('横线走到整块卡的边：.vtabs 负外扩把 .sheet 那 24 吃掉再补 32',
+// 撤一个状态要把那面"撤净"：只删 `background` 一行不够，那支黄留着就是两版并存。
+// 范围收在这一行自己的四段里（`.xrow` 那枚小黄点仍吃 `--tip-dot`，那是站长点过要留的）。
+const vtAll = [vtRule, vtabRule, rule(idxWxss, 'vtab\.on'), rule(idxWxss, 'vtab\.on::after')].join('\n')
+ok('那一行不再有任何"自己那面"：`--cp-panel` 与那支黄都不在这四段里，底下那条通栏横线也仍撤着',
+  !/--cp-panel/.test(vtAll) && !/--tip-dot/.test(vtAll) && !/border-bottom/.test(vtRule), vtAll.trim().slice(0, 60))
+// 10-09 撤面之后这一段不再有"看得见的横线"，但负外扩留着：它管的是两枚字的落点
+// （离屏边 32），撤了字会跟着 .sheet 那 24 往里缩。钉的是"字的位置不许漂"，不是有条线。
+ok('两枚那一行的盒子仍走到整块卡的边（负外扩管的是字的落点，10-09 撤面之后这条不再是"有条横线"）',
   /margin: 0 -24rpx/.test(vtRule) && /padding: 0 56rpx/.test(vtRule))
 // ④置顶整个撤：分类行左边那一档、右边那句提示、详情窗那枚按钮、JS 那三个 handler
 ok('置顶这一屏整个撤净（档、提示句、窗里那枚按钮、handler 都不在）',

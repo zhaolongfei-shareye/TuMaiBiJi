@@ -145,21 +145,24 @@ const mixOn = (bgHex, inkHex, a) => {
     ck(`${theme.label}：chromeOf.sel ${chrome.sel} 纸白压得住（≥4.7）`,
       p.crOf('#F2EFE9', chrome.sel) >= 4.7, p.crOf('#F2EFE9', chrome.sel).toFixed(2))
 
-    // ⑤ v30 那一层（#27 落码第 3 步）：层色、区内顶那一行的深面、分类行撤胶囊。
-    //    读的全是**真页面上真渲染出来的计算色**——不读变量（automator 的 style() 读不到自定义属性，
-    //    上面 ③ 那条同注释）、也不读源码。镜像值抄错、`createSkin()` 没递到这一行、
-    //    wxss 里手抄了一支黑，这三种坏法都只有这一节抓得到。
+    // ⑤ 这一节 10-09 换过一次口径：v30/v31 那版钉的是"层色 + 区内顶那一行吃创建页那块深面"，
+    //    站长拿「我的」页的截图打回"太深"，现在这两屏是**两层浅背景**：外层页底 `--bg-page`、
+    //    那张圆角卡 `--bg-card`（＝palette 的 `theme.line`），区内顶那一行不再有自己的面。
+    //    读的还是真页面上真渲染出来的计算色——不读变量、不读源码，理由同上一版注释。
     const ix = await enter('/pages/index/index')
     await sleep(4000)
-    const layer = p.listLayerOf(theme.key)
     const sheet = await ix.$('.sheet')
     const gotSheet = sheet ? hex(await sheet.style('background-color')) : '(没读到 .sheet)'
-    ck(`${theme.label}：.sheet 真落在层色 ${layer} 上（不再吃页底 ${theme.page}）`,
-      gotSheet.toUpperCase() === layer.toUpperCase(), gotSheet)
+    ck(`${theme.label}：那张圆角卡落在这一套的卡色 ${theme.line} 上（10-09 起不再吃 v31 那层派生灰）`,
+      gotSheet.toUpperCase() === theme.line.toUpperCase(), gotSheet)
+    const outer = await ix.$('.container')
+    const gotOuter = outer ? hex(await outer.style('background-color')) : '(没读到 .container)'
+    ck(`${theme.label}：卡外面那一层就是页面底 ${theme.page}（两层浅背景＝这两支，与「我的」同一对）`,
+      gotOuter.toUpperCase() === theme.page.toUpperCase(), gotOuter)
     const row = await ix.$('.vtabs')
-    const gotRow = row ? hex(await row.style('background-color')) : '(没读到 .vtabs)'
-    ck(`${theme.label}：区内顶那一行的面＝创建页那块深面 #23252C`,
-      gotRow.toUpperCase() === '#23252C', gotRow)
+    const gotRow = row ? String(await row.style('background-color')) : '(没读到 .vtabs)'
+    ck(`${theme.label}：区内顶那一行不再自己画面（撤深面要读到透明才算撤净）`,
+      /rgba\(0, 0, 0, 0\)|transparent/i.test(gotRow), gotRow)
     const tabs = await ix.$$('.vtab')
     // 不用 `:not(.on)`：automator 的选择器引擎跑在 WXML 树上，`:not()` 它不认，
     // 10-09 实测会退回匹配第一枚（正好是选中那枚），于是这条判据永远读到纸白、永远红。
@@ -180,8 +183,11 @@ const mixOn = (bgHex, inkHex, a) => {
     const onCol = onTab ? String(await onTab.style('color')) : '(没读到选中那枚 .vtab)'
     const offCol = offTab ? String(await offTab.style('color')) : '(没读到未选那枚 .vtab)'
     ck(`${theme.label}：tab 一共两枚（捞少了下面的色就无从比）`, tabs.length === 2, `${tabs.length} 枚`)
-    ck(`${theme.label}：选中那枚是纸白`, hex(onCol).toUpperCase() === '#F2EFE9', onCol)
-    ck(`${theme.label}：未选那枚是 62% 纸白`, Math.abs((alphaOf(offCol) || 0) - 0.62) < 0.01, offCol)
+    ck(`${theme.label}：选中那枚吃这一页的整档墨 ${theme.ramp.inks[0]}（10-09 撤深面之后不再吃纸白）`,
+      hex(onCol).toUpperCase() === theme.ramp.inks[0].toUpperCase(), onCol)
+    ck(`${theme.label}：未选那枚是同一支墨的 .72 档（--text-secondary），不是 62% 纸白`,
+      hex(offCol).toUpperCase() === theme.ramp.inks[0].toUpperCase()
+      && Math.abs((alphaOf(offCol) || 0) - 0.72) < 0.01, offCol)
     const bw = row ? String(await row.style('border-bottom-width')) : '(读不到)'
     ck(`${theme.label}：那一行底下那条通栏线撤了（border-bottom-width 归零）`, /^0/.test(bw.trim()), bw)
     const capsules = await ix.$$('.chip')

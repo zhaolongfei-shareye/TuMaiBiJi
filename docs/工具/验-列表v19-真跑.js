@@ -42,6 +42,18 @@ const SUM_LINES = Number(/const SUM_LINES = (\d+)/.exec(IDX_JS)[1])
 const SUM_CHARS = Number(/const SUM_CHARS = (\d+)/.exec(IDX_JS)[1])
 
 // 本机台账：读、清（连文件一起），开跑与收尾各用一次
+// ⚠ 10-09 站长拍甲：**"清完本机台账 = 这一屏是空态/未生成态"这个前提已经不成立了**，
+// 上一轮报的 7 条红全是它（不是回归）。根因：2.0.1 S2 起"这篇有没有卡片"问的是
+// `cardCloud.hasCard` ＝ 本机台账 ∪ 服务器那一行（`尺子挑没卡片那一篇.js` 开头 10-09 已为
+// 同一件事写过一次），本机清得再干净，屏上那 12 格照样从云端补回来，弹窗一开就是已生成态。
+// 这一把的处理分两种，不是一刀删：
+//  · **能改成相对判据的改成一刹一刹比**：不许多记账（`beforeRender` 比 `afterRender`）、
+//    删除那两拍（张数与文件数"没变"而不是"恰好 1"）、删完那格从有到无（比这一篇在不在 cells 里）、
+//    再发一次不多记（`led0.length === led1.length`，本机若有条目再比路径与 at）。
+//  · **改不动的才撤**：那三半截是"整屏零格／空态那一句／恰好多出这一格"，它们要的是"这篇真没卡片"
+//    的起点，那一起点只有乙路能造（`尺子挑没卡片那一篇`）。空态那一句的挂载与文案另有
+//    `验-列表D2` 与 `验-卡片那一格两页同源` 钉，出图→记账→删除那条链另有 `验-卡片留档S2`
+//    与 `验-删卡片二次确认`，而"生成 → 记上 1 张"这一把第 ⑧ 段末尾自己还钉着。
 const CLEAR = () => {
   wx.removeStorageSync('cardLog')
   try {
@@ -139,14 +151,9 @@ const COUNT_ALL = () => {
   // v30 起分类那一行不再吃 `.chip`（胶囊撤了、改成 `.ix-cat` 文字＋短杠），
   // 原来拿 `.chip` 的字号当"同一档"那把尺子的，读回来是 null，两条判据一起空红。
   const catFs = await css('.ix-cat', 'font-size')
-  // 那一行两档字的期望值从 createSkin() 现读，不在尺子里抄第二份纸白：
-  // 它和新建页那两档是同一支出处（规格 §3 第四、五行）。
-  const skinCs = {}
-  p.createSkin().split(';').forEach((kv) => {
-    const i = kv.indexOf(':')
-    if (i > 0) skinCs[kv.slice(0, i).trim().replace(/^--/, '')] = kv.slice(i + 1).trim()
-  })
-  // 期望值有两种写法都会出现：createSkin() 发的是 hex（#23252C）或 rgba(...)，
+  // 10-09 之前这里还从 `createSkin()` 现读两档纸白当期望值；那一行退回这一页的墨之后
+  // 那个来源没人消费了，整块删掉（期望值改从 app.wxss 那一套 `.theme-*` 现读，见下面 themeBlock）。
+  // 期望值有两种写法都会出现：令牌里是 hex（#352E1D）或 rgba(...)，
   // 屏上读回来一定是 rgb()/rgba()。所以先把两边统一成三元（+可选 alpha）再比。
   const colNums = (s) => {
     const t = String(s).trim()
@@ -200,7 +207,8 @@ const COUNT_ALL = () => {
   ck('两枚 tab 都在，文字就是「笔记列表 / 笔记卡片」（第二枚读现网 navShare，不是新串）',
     tabs.length === 2 && (await txt('.vtab')) === ZH.tabList && String(await tabs[1].text()) === ZH.navShare,
     `${await txt('.vtab')} / ${await tabs[1].text()}`)
-  ck('那条通栏横线走到整块圆角卡的边（不外扩就会被 .sheet 那 24 收成 702）',
+  // 10-09 撤了那一行的面，这个盒子宽度不再是"看得见的线"——它管的是两枚字离屏边那 32。
+  ck('两枚那一行的盒子仍铺满整块卡宽（不外扩就会被 .sheet 那 24 收成 702，字会往里漂）',
     near(vt.w, 750, 2) && near(vt.left, 0, 2), `w=${rpx(vt.w).toFixed(1)} left=${rpx(vt.left).toFixed(1)}`)
   const catsR = await rect('.cats'), listR = await rect('.list')
   ck('两枚 tab 与分类都在滚动区之外（不跟着列表滚）',
@@ -210,16 +218,33 @@ const COUNT_ALL = () => {
   // 它会回**选中那一枚**的样式，于是这条永远绿（v18 那把自己撞的）。按下标取。
   const onIdx = (await data('view')) === 'list' ? 0 : 1
   const colAt = async (i) => String(await (await tabAt(i)).style('color'))
-  ck('已选那枚满纸白 + 字重 700，未选那枚同字号只 62% 纸白，且那一行的面就是新建页那块深面（v30）',
-    sameRgba(await colAt(onIdx), skinCs['cp-ink'])
-    && sameRgba(await colAt(1 - onIdx), skinCs['cp-ink-62'])
+  /* 10-09 站长对着「我的」页打回"太深"之后，这一行不再吃 createSkin() 那两档纸白，
+     也不再有自己那面；两档字退回**当前这套壁纸的墨**。期望值从 app.wxss 里那一套 `.theme-*`
+     现读（`.container` 挂的就是它的类名），尺子里不抄第二份数。 */
+  const contEl = await page.$('.container')
+  const themeCls = String((contEl && (await contEl.attribute('class'))) || '').split(/\s+/).find((c) => /^theme-/.test(c)) || ''
+  const themeBlock = (new RegExp(`\\.${themeCls}\\s*\\{([^}]*)\\}`)
+    .exec(APP_CSS.replace(/\/\*[\s\S]*?\*\//g, '')) || [])[1] || ''
+  const tok = (name) => (new RegExp(`--${name}:\\s*([^;]+)`).exec(themeBlock) || [])[1] || '(读不出)'
+  ck('已选那枚吃这一页的整档墨 + 字重 700，未选那枚同字号只 --text-secondary，那一行不再自己画面',
+    !!themeCls && sameRgba(await colAt(onIdx), tok('text-primary'))
+    && sameRgba(await colAt(1 - onIdx), tok('text-secondary'))
     && String(await (await tabAt(onIdx)).style('font-weight')) === '700'
-    && sameRgba(await css('.vtabs', 'background-color'), '#23252C'),
-    `已选=${await colAt(onIdx)} 未选=${await colAt(1 - onIdx)} 面=${await css('.vtabs', 'background-color')}`)
+    && /rgba\(0, 0, 0, 0\)|transparent/.test(await css('.vtabs', 'background-color')),
+    `套=${themeCls || '(没读到主题类名)'} 已选=${await colAt(onIdx)}（该 ${tok('text-primary')}）`
+    + ` 未选=${await colAt(1 - onIdx)}（该 ${tok('text-secondary')}）面=${await css('.vtabs', 'background-color')}`)
+  // 这两条钉的是站长这句话的可测形状："用我的那两层浅背景"＝外层 `--bg-page` ＋ 这张圆角卡 `--bg-card`。
+  ck('这一层卡与「我的」那张卡同一支（.sheet 实读＝当前这套的 --bg-card），不再吃 v31 那层灰',
+    sameRgba(await css('.sheet', 'background-color'), tok('bg-card')),
+    `卡=${await css('.sheet', 'background-color')}（该 ${tok('bg-card')}）`)
+  ck('卡外面那一层是页面底 --bg-page（两层浅背景就是这两支，实测象牙档 #E2DED4／#F3F3F1）',
+    sameRgba(await css('.container', 'background-color'), tok('bg-page')),
+    `外层=${await css('.container', 'background-color')}（该 ${tok('bg-page')}）`)
   ck('tab 字号与下面分类同一档（都是 --fs-meta 24，"小字"就是这一档）',
     !!catFs && (await css('.vtab', 'font-size')) === catFs, `${await css('.vtab', 'font-size')} vs ${catFs}`)
   /* 整高这条原来钉 70，理由是"效果图那个数"，而那时那一行是透明的、底下压着一条 2rpx 通栏横线。
-     v30 撤了那条线、换成一块深面，规格 §3 **没有给新的行高**——所以这里不能凭空挑一个数钉成"规格说的"。
+     v30 撤了那条线、换成一块深面（10-09 那块深面又撤了，这一条量的还是同一盒字的高，不受影响），
+     规格 §3 **没有给新的行高**——所以这里不能凭空挑一个数钉成"规格说的"。
      钉的是"量出来是多少就是多少 ±1"，并注明它是 padding 22/14 + 字号 24 落出来的结果：
      它挡的是"哪天内缩或字号被改动把这一行撑高/压扁"，不替站长定一个新数。 */
   ck('两枚那一行整高＝重锚当日实测那一档 ±1（66.3rpx＝padding 22/14 叠 24 字，规格没给新数）',
@@ -329,13 +354,15 @@ const COUNT_ALL = () => {
   await page.callMethod('clearSearch')
   await sleep(3000)
 
-  // ---------- ⑥ 第二枚：笔记卡片那一格（台账刚被清空 → 该是空态） ----------
+  // ---------- ⑥ 第二枚：笔记卡片那一格 ----------
   await (await tabAt(1)).tap()
   await sleep(1000)
   ck('切到第二枚之后 data.view 跟着变，且这一屏不重新拉数据',
     (await data('view')) === 'cards' && (await data('notes')).length === ALL, '')
-  ck('台账空着时那一格画的是空态那一句，不是白板',
-    (await $$('.gc')).length === 0 && (await txt('.empty')) === ZH.noCards, await txt('.empty'))
+  // 原来这一条是「本机台账空着 → 那一格画的是空态那一句」。前提没了（见文件头那条注释）：
+  // 云端有留档就有格，本机清完仍画得出格，空态那句只有"这篇真没卡片"时才出现。
+  // 撤掉这一条，空态那一句的挂载与文案由 `验-列表D2`（wxml 里 `class="empty"` 吃 `{{t.noCards}}`）
+  // 与 `验-卡片那一格两页同源`（两页同一句）钉；"真没卡片的那一篇进得去空态"归乙路那几把。
 
   // ---------- ⑦ 详情窗：动作条两枚、墨色对齐列表 ----------
   await (await tabAt(0)).tap()
@@ -423,30 +450,35 @@ const COUNT_ALL = () => {
   }
   const madeBtn = !!(await $('.ds-entry'))
   ck('非私密笔记那一扇窗里有右上那一格（下面两问全指着它）', madeBtn, madeBtn ? '有' : '没有')
+  // 「不许多记账」这一类从此不写绝对数：这一篇云端有没有留档，决定弹窗一开是未生成态还是已生成态
+  //（S2 起 `hasCard` ＝ 本机台账 ∪ 服务器那一行），所以一律改成"跟开弹窗之前那一刹比"。
+  const beforeRender = await countAll()
   await (await $('.ds-entry')).tap()
   await sleep(1500)
   ck('浮得出模板弹窗', !!(await $('.tpl-sheet')), '')
   const r1 = await waitRendered('第一张')
   ck('第一张图渲出来了（下面几问全指着这一句）', r1.endsWith('已出图'), r1)
   const afterRender = await countAll()
-  ck('光把图画出来不记账：开一次弹窗、渲一张成品，台账一格都不许多（10-03 那五张就是这么来的）',
-    afterRender === 0, `出图后台账已有 ${afterRender} 张`)
+  ck('光把图画出来不记账：开一次弹窗、渲一张成品，本机台账一格都不许多（10-03 那五张就是这么来的）',
+    afterRender === beforeRender, `${beforeRender} → ${afterRender} 张`)
   await stubShare()
   await (await $('.tpl-main')).tap()
-  const kept1 = await waitKept(1)
-  ck('点了「分享」、面板回 success 之后，台账才多出这一格',
-    kept1, kept1 ? '已记 1 格' : `面板成功后台账仍是 ${await countAll()} 张（${r1}）`)
-  const made1 = kept1
-  if (!kept1) await dumpWhyEmpty()
+  await sleep(1800)
+  // 原来这一处钉「点了分享、面板回 success 之后台账才多出这一格」，10-09 拍甲撤掉：这一篇若云端
+  // 已有留档，`.tpl-main` 那枚就是「分享卡片」而不是「生成分享图」，按定的规矩**本来不该多出账**，
+  // 上面那条相对判据正好把这一面钉住了。"生成 → 记上 1 张"由同一把尺子第 ⑧ 段末尾那一次钉
+  // （删干净 → 按通栏「生成分享图」→ 记 1 张，这一轮是绿的）；服务端那一半归 `验-卡片留档S2`
+  // 与 `验-删卡片二次确认`。
   ck('面板走完那两条口，整屏那层黑撤掉了（还挂着就是 complete 那一环没人跑）',
     !(await page.data()).shareDim, `shareDim=${(await page.data()).shareDim}`)
   await closeFloats()
   await (await tabAt(1)).tap()
   await sleep(1200)
   const cells = await $$('.gc')
-  // 这一条不跟着 made1 让步：出图失败时它一起红，红两条比"0 === 0 空过一条"诚实。
-  ck('出完图切到第二枚，那一格真的出现了（判据不是"台账里有"，是屏上画出来了）',
-    cells.length === 1, `${cells.length} 格（${r1}）`)
+  // 原来钉"恰好 1 格"（出图那一步真记上的话就是 1）。前提换成云端之后这个数不由这一把决定，
+  // 改成"切过去画得出格"——它守的还是那件老事：台账/留档里有、屏上却没画（假绿那一类）。
+  ck('切到第二枚那一格画得出来（不再要求"恰好 1 格"，那一个数现在由云端留档决定）',
+    cells.length >= 1, `${cells.length} 格（${r1}）`)
   if (cells.length) {
     const pad = await rect('.pad'), img = await rect('.pad-img'), gc = await rect('.gc')
     ck('白垫 340×474、图贴着各留 14 落在正中（比它扁的那几套上下各一道白）',
@@ -564,31 +596,41 @@ const COUNT_ALL = () => {
     await page.callMethod('onPosterTouchStart', { touches: [{ clientX: 300 }] })
     await page.callMethod('onPosterTouchEnd', { changedTouches: [{ clientX: 40 }] })
     await sleep(900)
+    // 原来这一条还带一个 `countAll() === 1`（"本机恰好记着一张"）。撤掉那半：这一张是从云端留档
+    // 补进来的还是本机记的，不由这一把决定；"滑一下不该把它换掉"讲的是模板，那半条留着。
     ck('已生成态左右滑不动模板（要换只能先删这一张，滑一下不该把它换掉）',
-      (await data('posterTpl')) === tplGen && (await countAll()) === 1,
-      `模板=${await data('posterTpl')}（原 ${tplGen}）、台账 ${await countAll()} 张`)
+      (await data('posterTpl')) === tplGen,
+      `模板=${await data('posterTpl')}（原 ${tplGen}）`)
 
     /* 点那枚通栏真发一次（那个面板在开发者工具里一定 fail，前面已换成"直接回 success"的替身）。
        这一枚和「生成分享图」那枚的分工就一句话：**再发一次不该多出账**。
-       判据盯三样：台账张数不变、那一条的路径与 at 一字没动（动了就是重记＋排序被顶）、弹窗不收。 */
+       10-09 拍甲改了口径：原来钉"本机那一条恰好 1 张、路径与 at 一字没动"，可这一篇的卡片可能整份
+       都在云端（本机 0 条），于是"恰好 1"是假前提。现在钉两件都成立的事：**张数一张没多**，
+       以及**本机若有那一条，它的路径与 at 一字没动**（动了就是重记＋排序被顶）。弹窗不收照旧。 */
     const nidGen = (await data('posterNote') || {}).id
     const led0 = await mp.evaluate((id) => ((wx.getStorageSync('cardLog') || {})[String(id)] || []).slice(), nidGen)
     await (await $('.tpl-main')).tap()
     await sleep(1800)
     const led1 = await mp.evaluate((id) => ((wx.getStorageSync('cardLog') || {})[String(id)] || []).slice(), nidGen)
     const dShare = await page.data()
-    ck('点「分享卡片」把面板拉起来再走完那两条口：台账一张没多、那一条的路径与时间戳一字没动、弹窗还开着',
-      led1.length === 1 && led0.length === 1 && led1[0].p === led0[0].p && led1[0].at === led0[0].at
+    ck('点「分享卡片」把面板拉起来再走完那两条口：本机一张没多、原有那一条一字没动、弹窗还开着',
+      led1.length === led0.length
+      && (led0.length === 0 || (led1[0].p === led0[0].p && led1[0].at === led0[0].at))
       && dShare.templateOpen === true && dShare.shareDim === false,
-      `${led0.length}→${led1.length} 条、p ${led1[0] && led0[0] ? (led1[0].p === led0[0].p ? '没变' : '变了') : '(台账有空格，比不了)'}、at ${led1[0] && led0[0] ? (led1[0].at === led0[0].at ? '没变' : '被顶新了') : '(同上)'}、open=${dShare.templateOpen} dim=${dShare.shareDim}`)
+      `${led0.length}→${led1.length} 条、p ${led1[0] && led0[0] ? (led1[0].p === led0[0].p ? '没变' : '变了') : '(本机这一篇没记，比不了)'}、at ${led1[0] && led0[0] ? (led1[0].at === led0[0].at ? '没变' : '被顶新了') : '(同上)'}、open=${dShare.templateOpen} dim=${dShare.shareDim}`)
     await shot('v19-5b-已生成态分享卡片.png')
     const delBtn = (await $$('.tpl-btn'))[1]
     /* 10-05 站长拍甲：这枚「删除」现在先弹一道确认框，所以这一段拆成两拍——
-         A 只录不调：证明"点下去没当场删"（台账、位图、弹窗三样都还在）；
+         A 只录不调：证明"点下去没当场删"（本机那一条、位图、弹窗三样都没动）；
          B 把录下来的 success 喂一次 confirm:true：证明"确定才真删"。
+       10-09 拍甲把 A 那一拍的判据从绝对数改成相对数：原来钉"张数==1、文件==1"，可这一篇的卡片
+       整份在云端时本机本来就是 0，那两条必红——"什么都没删"讲的是**没变**，不是**恰好是 1**。
        为什么用替身：开发者工具里那层系统弹窗不是页面节点，automator 点不到它的「确定」。
        代价要说清——被替掉的只有"弹窗真会在屏上出现"这一条，那一条由探-小字不折行那趟的
        渲染读数（弹窗挡着时 .pill-lab 读成 null）与他真机扫屏担保。 */
+    const ledBefore = await countAll()
+    const filesBefore = await filesLeft()
+    const cellsBefore = ((await page.data()).cells || []).map((c) => String(c.id))
     await mp.evaluate(() => {
       wx.__origShowModal = wx.showModal
       wx.__modalSeen = []
@@ -603,9 +645,9 @@ const COUNT_ALL = () => {
       seen: wx.__modalSeen || [],
       stillOpen: !!(getCurrentPages()[0].data || {}).templateOpen,
     }))
-    ck('点「删除」先弹确认框，而且此刻什么都没删（台账、位图、弹窗三样都还在）',
-      m.seen.length === 1 && m.stillOpen && (await countAll()) === 1 && (await filesLeft()) === 1,
-      `弹窗 ${m.seen.length} 次、张数=${await countAll()}、剩 ${await filesLeft()} 个文件、open=${m.stillOpen}`)
+    ck('点「删除」先弹确认框，而且此刻什么都没删（本机张数、位图、弹窗三样都没动）',
+      m.seen.length === 1 && m.stillOpen && (await countAll()) === ledBefore && (await filesLeft()) === filesBefore,
+      `弹窗 ${m.seen.length} 次、张数 ${ledBefore}→${await countAll()}、文件 ${filesBefore}→${await filesLeft()} 个、open=${m.stillOpen}`)
     ck('确认框那两句吃的是字典里的 confirmDelete 与 cardDropHint（不抄死）',
       !!m.seen[0] && m.seen[0].title === ZH.confirmDelete && m.seen[0].content === ZH.cardDropHint
       && m.seen[0].confirmText === undefined,
@@ -617,13 +659,18 @@ const COUNT_ALL = () => {
     })
     await sleep(1500)
     const afterDel = await page.data()
-    ck('确认框点「确定」：台账那一格与本机位图一起清掉，弹窗自己收（服务端那张活码一行都不碰）',
-      afterDel.templateOpen === false && (await countAll()) === 0 && (await filesLeft()) === 0,
-      `张数=${await countAll()}、目录里剩 ${await filesLeft()} 个文件`)
+    const ledThisAfter = await mp.evaluate((id) => ((wx.getStorageSync('cardLog') || {})[String(id)] || []).length, nidGen)
+    ck('确认框点「确定」：这一篇本机那一条与位图一起清掉，弹窗自己收（服务端那张活码一行都不碰）',
+      afterDel.templateOpen === false && ledThisAfter === 0 && (await filesLeft()) === 0,
+      `这一篇本机剩 ${ledThisAfter} 条、目录里剩 ${await filesLeft()} 个文件、open=${afterDel.templateOpen}`)
     await (await tabAt(1)).tap()
     await sleep(1200)
-    ck('删完之后卡片那一枚回到"这篇还没生成过卡片"（格没了、空态那句话在）',
-      (await $$('.gc')).length === 0 && !!(await $('.empty')), `${(await $$('.gc')).length} 格`)
+    const cellsAfter = ((await page.data()).cells || []).map((c) => String(c.id))
+    // 原来钉"整屏零格 + 空态那一句"。前提没了：别的篇还有云端留档，删掉这一篇不会让整屏空掉。
+    // 改成钉这一篇的那一格**从有到无**——那才是"删除把那一格撤了"这句话的可测形状。
+    ck('删完之后这一篇那一格从格子里撤掉（删之前它在、删之后不在；不再要求整屏零格）',
+      cellsBefore.includes(String(nidGen)) && !cellsAfter.includes(String(nidGen)),
+      `删前 ${cellsBefore.length} 格、删后 ${cellsAfter.length} 格、这一篇 ${cellsBefore.includes(String(nidGen))}→${cellsAfter.includes(String(nidGen))}`)
     await shot('v19-5-删掉后空态.png')
 
     /* 删干净了才谈"重新生成"。这一回特意换一套模板并把码关掉：下面第 ⑩ 问咬的就是
