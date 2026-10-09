@@ -554,19 +554,24 @@ function lightFaceOnPaper(h, s, want) {
  * 三档暗面（面板 #23252C / 卡 #2B2D35 / 框 #1A1C21）是这一页的纸，不随壁纸换，
  * 与原来那张白纸面板一样属于"面必须稳定"那一类（见 create.wxss 里录入条那段注释）。
  *
- * 只有两档**跟着壁纸色阶走**：快门那枚圆（色阶第 3 档，配深字）与"右滑提炼"的圆和进度
- * （第 4 档，配纸白字）。跟着色阶而不是写死一支橙，是因为 10-04 定过"四枚壁纸各吃自己
- * 那一支色相的五档"，而同一轮的风格审计把"一支不属于色阶的饱和色"列成了缺陷（那枚孤蓝）。
- * 两支的分工照他这一轮的原话：「开始提炼用其他颜色，不要与拍照混用」＋「与前面呼应」——
- * 同一支色相里深浅相邻的两档，正是"呼应但不撞色"。象牙下实测 #AFA488 / #766B50。
+ * 那两枚橙**写死，不跟壁纸色阶**（站长 10-08 三条决定里的第三条，原话
+ * 「拍照与提炼那两枚固定橙色，不再跟壁纸色阶走」；口径唯一一份在
+ * `docs/规格-创建入口这一条线.md` §6.1，这里不复制表）。
+ * 这一条推翻了上面那个"跟着色阶走"的理由（10-04 那轮把"一支不属于色阶的饱和色"列成缺陷）——
+ * 10-08 他选了固定，就以固定为准：两个理由谁赢看他拍的那一次，不看注释写得早晚。
+ * 快门 `#E9723D` 配深字 `#2C1204`（实测 5.80）；提炼 `#C4541F` 配**纯白** `#FFFFFF`（4.53）。
+ * ⚠ 提炼那枚的字**不许退回纸白**：`#F2EFE9` 压 `#C4541F` 只有 3.95＝不过 4.5，这是 §6.1 那条
+ * 硬约束——改这一行必须连带把 `cp-extract-ink` 一起看一遍。
  *
  * 规矩与 TIP_DOT、toneStyle 一模一样：这些色值只在这里出现，create.wxss 只写 var(--cp-*)。
  */
 const CREATE_SURFACE = { panel: '#23252C', card: '#2B2D35', field: '#1A1C21' }
 const CREATE_X = (a) => withAlpha(PAPER, a)
+const CREATE_CAM = { bg: '#E9723D', ink: '#2C1204' }
+const CREATE_EXTRACT = { bg: '#C4541F', ink: '#FFFFFF' }
 function createSkin() {
-  const cam = rampFor(2) || TONES[2]
-  const extract = rampFor(3) || TONES[3]
+  const cam = CREATE_CAM
+  const extract = CREATE_EXTRACT
   const vars = {
     'cp-panel': CREATE_SURFACE.panel,
     'cp-card': CREATE_SURFACE.card,

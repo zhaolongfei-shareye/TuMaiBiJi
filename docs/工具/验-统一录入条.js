@@ -332,10 +332,28 @@ ok('wxss 用到的每一枚 --cp-* 都由 createSkin() 发得出来',
   usedVars.filter((v) => !skin.includes(`${v}:`)).join(','))
 ok('create.js 每次进页重发这套面（换壁纸回来要跟上）',
   /skinPanel: createSkin\(\)/.test(js) && /createSkin/.test(js.replace(/\n\s*\/\*[\s\S]*?\*\//g, '')))
-// 派生出来的两支色不许在 wxss 里露脸（否则改了壁纸这两支还是死的）
+// 那两支橙现在**是固定的**（站长 10-08 第三条决定，口径 docs/规格-创建入口这一条线.md §6.1），
+// 但一份都不许抄进 wxss——抄了就是把"固定"实现成了"每页各写一遍"，改出口时改不动。
 const derived = (skin.match(/--cp-(?:cam|extract)(?:-ink)?:([^;]+)/g) || []).map((x) => x.split(':')[1].toUpperCase())
-ok('快门与滑动条那两支派生色没有一份抄进 wxss',
+ok('快门与滑动条那两支橙没有一份抄进 wxss',
   !derived.some((h) => wxssHexes.includes(h)), derived.filter((h) => wxssHexes.includes(h)).join(','))
+// §6.1 那两行 + 那条硬约束，钉成三条：值、字色、以及"换壁纸这两枚不许动"。
+const cpOf = (k) => { const m = new RegExp('--' + k + ':([^;]+)').exec(skin); return m && m[1].toUpperCase() }
+ok('快门那枚固定 #E9723D、字固定 #2C1204（压字 ≥4.5）',
+  cpOf('cp-cam') === '#E9723D' && cpOf('cp-cam-ink') === '#2C1204'
+  && palette.crOf('#2C1204', '#E9723D') >= 4.5,
+  `${cpOf('cp-cam')}／${cpOf('cp-cam-ink')} 压 ${palette.crOf('#2C1204', '#E9723D').toFixed(2)}`)
+ok('提炼那枚固定 #C4541F、字是**纯白**不是纸白（纯白 4.53 过线，纸白只有 3.95）',
+  cpOf('cp-extract') === '#C4541F' && cpOf('cp-extract-ink') === '#FFFFFF'
+  && palette.crOf('#FFFFFF', '#C4541F') >= 4.5 && palette.crOf('#F2EFE9', '#C4541F') < 4.5,
+  `${cpOf('cp-extract')}／${cpOf('cp-extract-ink')} 纯白 ${palette.crOf('#FFFFFF', '#C4541F').toFixed(2)}`
+  + ` 纸白 ${palette.crOf('#F2EFE9', '#C4541F').toFixed(2)}`)
+const camFour = ['tint-paper', 'tint-celadon', 'tint-blush', 'gradient-blue']
+  .map((k) => { palette.setActiveTheme(k); const s = palette.createSkin(); return (/--cp-cam:([^;]+)/.exec(s)[1] + '/' + /--cp-extract:([^;]+)/.exec(s)[1]) })
+ok('换壁纸这两枚不变（四套各跑一遍 createSkin，四串读数必须同一）',
+  camFour.every((x) => x === camFour[0]), camFour.join(' | '))
+// 上面那趟改了 palette 的模块态（ACTIVE_THEME），后面还有判据要吃 palette，先归位。
+palette.setActiveTheme('')
 ok('三枚小圆仍吃 toneStyle 发下来的面', (wxml.match(/class="dot" style="\{\{skin/g) || []).length === 3)
 ok('小黄点的色值仍由 palette 经 style 递进来',
   /tipDotStyle: 'background:' \+ TIP_DOT/.test(js) && palette.TIP_DOT === '#F6C445')
