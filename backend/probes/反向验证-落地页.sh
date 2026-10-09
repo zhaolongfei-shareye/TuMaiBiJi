@@ -39,7 +39,7 @@ run D "key_links 不做网址白名单"                              "非网址�
 run E "公开页不带 no-store"                                   "no_store" m_e
 run F "一条举报就把页隐藏"                                    "举报落库一行" m_f
 run G "举报口摘掉限流装饰器"                                  "限流" m_g
-run H "给送检名单加一列而落地页没同步"                        "送检范围" m_h
+run H "给送检名单加一列而落地页没同步"                        "送检名单里的每一列" m_h
 
 echo "=== 全部还原后复跑，必须全绿 ==="
 $PY tests/test_landing_page.py 2>&1 | tail -1

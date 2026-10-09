@@ -74,5 +74,13 @@ run H "迁移里 nullable=True 改回 False"                 "迁移之后两个
 run I "ensure_for_user 里 openid 为空那道守卫摘掉"      "只有Apple身份的人走微信那一支要当场响" \
   "perl -0pi -e 's/^    if user\.openid is None:/    if False:  # 反向验证临时改坏/m' $SV" "$SV"
 
+# J：登录主路径上那道并发兜底摘掉（赢家通吃变成整趟 500）
+run J "ensure_for_user 撞索引不再认赢家，直接冒出来"      "后到那一趟不许响也不许多建一个account" \
+  "perl -pi -e 's/^        db\.rollback\(\)/        raise/' $SV" "$SV"
+
+# K：注销不再清举报行（留下指向已删 token 的孤儿）
+run K "注销那一段的举报连带清理挡死"                     "一次删完七类数据" \
+  "perl -0pi -e 's/^    if share_tokens:/    if False:  # 反向验证临时改坏/m' $UR" "$UR"
+
 echo "=== 全部还原后复跑本批，必须全绿 ==="
 $PY tests/test_account_and_identity.py tests/test_account_deletion.py 2>&1 | tail -1

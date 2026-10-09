@@ -11,6 +11,7 @@
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.account import Account, AccountIdentity
@@ -36,11 +37,38 @@ def ensure_for_user(db: Session, user: User) -> Account:
     account = Account(id=str(uuid.uuid4()))
     db.add(account)
     db.flush()
-    db.add(AccountIdentity(account_id=account.id, provider="wechat", provider_uid=user.openid,
-                        # 这串 openid 是 code2session 当场换回来的，属于"平台确认过"。
-                        # 留 null 会让每个老用户在界面上看起来像"绑了没验"。
-                        verified_at=datetime.now(timezone.utc)))
+    db.add(
+        AccountIdentity(
+            account_id=account.id,
+            provider="wechat",
+            provider_uid=user.openid,
+            # 这串 openid 是 code2session 当场换回来的，属于"平台确认过"。
+            # 留 null 会让每个老用户在界面上看起来像"绑了没验"。
+            verified_at=datetime.now(timezone.utc),
+        )
+    )
     user.account_id = account.id
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 同一个人同时登录两趟是真会发生的（小程序 onLaunch 重试、用户在启动页连点）：两趟都
+        # 读到 account_id 为空、各建一个 account，后提交那一趟撞 `ux_identity_provider_uid`。
+        # 那是并发赢家通吃，不是账坏了——所以退回去读赢的那一行、把这个人对到已经存在的那个
+        # account 上。这一句挂在**登录主路径**上（`core/auth.py:118`），让它响一次，那个人
+        # 这次就打不开自己的笔记；而上面那道 RuntimeError 不一样，那种是真账坏了，不许在这儿猜。
+        db.rollback()
+        winner = db.query(AccountIdentity).filter(
+            AccountIdentity.provider == "wechat",
+            AccountIdentity.provider_uid == user.openid,
+        ).first()
+        if winner is None:
+            raise
+        account = db.query(Account).filter(Account.id == winner.account_id).first()
+        if account is None:
+            raise RuntimeError(
+                f"身份行指着不存在的 account={winner.account_id}：账坏了，不在这里猜"
+            )
+        user.account_id = account.id
+        db.commit()
     db.refresh(account)
     return account

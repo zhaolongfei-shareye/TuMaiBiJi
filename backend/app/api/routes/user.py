@@ -312,15 +312,38 @@ def deactivate_account(
         for s in (slots or []):
             if s and s.get("file_id"):
                 asset_ids.append(s["file_id"])
+    # 举报行只挂 token、不挂外键（`share_reports.token`——撤掉的码也要收得到举报，这是刻意
+    # 不设约束的理由），所以删 shares 之后再也问不出这个人公开过哪些码。先抄下来。
+    from app.models.share_report import ShareReport
+
+    share_tokens = [r[0] for r in db.query(Share.token).filter(Share.user_id == uid).all()]
     deleted = {
-        "notes": db.query(Note).filter(Note.user_id == uid).delete(),
-        "categories": db.query(Category).filter(Category.user_id == uid).delete(),
+        # **先子后父**。`shares.note_id` 与 `jobs.note_id` 是声明了的外键（`share.py:23`、
+        # `job.py:17`），而 notes 是它们的父表——同仓 `routes/notes.py:delete_note` 早就是
+        # 这个顺序，注释写的理由一模一样。原来这里 notes 排第一：SQLite 测试跑不出问题
+        # （`db/database.py` 没开 `PRAGMA foreign_keys`，外键根本不生效），而 Postgres 上
+        # 每一张引用 notes 的表都会当场拒掉 → 分享过笔记的人点注销必 500，
+        # Apple 5.1.1(v) 要的"能在 App 内删账号"这条能力对他失效。
         "shares": db.query(Share).filter(Share.user_id == uid).delete(),
         "jobs": db.query(Job).filter(Job.user_id == uid).delete(),
+        "notes": db.query(Note).filter(Note.user_id == uid).delete(),
+        # notes 删完才轮到它引用的两张：`notes.category_id → categories.id`、
+        # `notes.cover_asset_id → assets.id`，方向都是 notes 指过去，所以这两张在后。
+        "categories": db.query(Category).filter(Category.user_id == uid).delete(),
         "assets": db.query(Asset).filter(Asset.user_id == uid).delete(),
         "cards": db.query(NoteCard).filter(NoteCard.user_id == uid).delete(),
         "profile": db.query(UserProfile).filter(UserProfile.user_id == uid).delete(),
     }
+
+    # 举报行只挂 token（不建外键是刻意的），所以它必须用删 shares **之前**抄的那份清单来清；
+    # 排在 shares 之后、account 之前，语义就是"这个人公开过的码，收到的举报一起带走"。
+    deleted["reports"] = 0
+    if share_tokens:
+        deleted["reports"] = (
+            db.query(ShareReport)
+            .filter(ShareReport.token.in_(share_tokens))
+            .delete(synchronize_session=False)
+        )
 
     # 「人」那张表也要跟着走。不删的后果不是留垃圾行：那个 openid 会一直被唯一索引占着，
     # 同一个人重新注册时插第二条身份直接撞库（这一轮把这一段撤掉试过，第二条身份当场

@@ -9,5 +9,11 @@ from app.models.poster_template import PosterTemplate
 from app.models.note_card import NoteCard
 from app.models.share_report import ShareReport
 from app.models.account import Account, AccountIdentity
+# `user_profile` 原来只挂在 `alembic/env.py` 上、没进这张名单。后果不是 alembic 认不出表
+# （那条有 §8.161 的尺子钉着），而是**任何按 Base.metadata 建表的调用都建不出这一张**：
+# `create_all` 与 `drop_all` 看的都是 metadata，而 10-09 那条注销用例就是这么红在
+# `no such table: user_profiles` 上的——routes/user.py 里那句 import 是函数内的懒加载，
+# 排在建表之后，救不了建表这一步。名单要只有一个地方能把它挂进来。
+from app.models.user_profile import UserProfile
 
-__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity"]
+__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "UserProfile"]

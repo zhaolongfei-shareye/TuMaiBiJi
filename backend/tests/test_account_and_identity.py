@@ -52,6 +52,26 @@ def _seed_users(db_file: Path, openids: list[str]) -> None:
     conn.close()
 
 
+def _fresh_shared_session():
+    """那枚共享测试库上的三张表**先删后建**，再开一个会话。
+
+    光 `create_all` 不够：它见表已存在就一个字都不动，于是这一档用例量到的是
+    **上一轮留在库里的那套约束**，不是这一轮的模型——10-09 反向验证把模型里那道唯一索引整条摘掉、
+    用例照样绿，就是栽在这儿。删了再建，"库里有没有这道约束"才只可能由现在这份模型决定。
+    """
+    from app.db.database import Base, SessionLocal, engine
+    from app.models.account import Account, AccountIdentity
+    from app.models.user import User
+
+    Base.metadata.drop_all(
+        bind=engine, tables=[AccountIdentity.__table__, Account.__table__, User.__table__]
+    )
+    # 建表建**全套**：注销那条路要读 assets / notes / shares 那些邻居，只建这三张会让路由
+    # 红在 `no such table: assets` 上——那是环境缺表，不是代码错。
+    Base.metadata.create_all(bind=engine)
+    return SessionLocal()
+
+
 class Test迁移回填:
     def test_每个老用户一个account并带一条微信身份(self, tmp_path):
         db_file = tmp_path / "mig.db"
@@ -148,10 +168,7 @@ class Test登录那一路:
 
     @pytest.fixture
     def db(self):
-        from app.db.database import Base, SessionLocal, engine
-
-        Base.metadata.create_all(bind=engine)
-        session = SessionLocal()
+        session = _fresh_shared_session()
         try:
             yield session
         finally:
@@ -249,14 +266,9 @@ class Test登录那一路:
 class Test唯一索引:
     @pytest.fixture
     def db(self):
-        from app.db.database import Base, SessionLocal, engine
-
-        # 这两张表先删后建。10-09 反向验证时把模型里那道唯一索引整条摘掉，用例却照样绿：
-        # `create_all` 见表已存在就不动它，于是那把尺子量的是**上一轮留在库里的那道索引**，
-        # 不是这一轮的模型定义。删了再建，库里有没有这道唯一约束才只可能由现在这份模型决定。
-        Base.metadata.drop_all(bind=engine, tables=[AccountIdentity.__table__, Account.__table__])
-        Base.metadata.create_all(bind=engine, tables=[Account.__table__, AccountIdentity.__table__])
-        session = SessionLocal()
+        # 走 `_fresh_shared_session`：先删后建，库里那道唯一约束才只可能来自现在这份模型定义
+        # （只 `create_all` 的话，表在上一轮就建好了，这一轮把模型里的索引整条摘掉也测不出来）。
+        session = _fresh_shared_session()
         try:
             yield session
         finally:
@@ -300,10 +312,7 @@ class Test注销连带:
 
     @pytest.fixture
     def db(self):
-        from app.db.database import Base, SessionLocal, engine
-
-        Base.metadata.create_all(bind=engine)
-        session = SessionLocal()
+        session = _fresh_shared_session()
         try:
             yield session
         finally:
@@ -475,3 +484,127 @@ class Test没有微信的那个人:
             ensure_for_user(fresh_db, person)
         # 报错那一趟不许已经顺手建出一个 account（半个人的账比没账难查）。
         assert fresh_db.query(Account).count() == 0
+
+
+class Test注销走得通外键那套语义:
+    """注销那条级联必须在**外键真被强制**的引擎上走得通。
+
+    SQLite 默认不执行外键，而 `app/db/database.py` 里没有开 `PRAGMA foreign_keys`——所以整批
+    用例跑的是"删 notes 时引用它的 shares/jobs 还挂着"这件事**没人追究**的那套语义，
+    Postgres 是要追究的。这一条把外键开起来、走真路由，把两种语义之间那道缝补上：
+    顺序错了它当场 500，而不是等某个分享过笔记的人在自己手机上点注销才发现。
+    """
+
+    @pytest.fixture
+    def fk_db(self, tmp_path):
+        from sqlalchemy import create_engine, event
+        from sqlalchemy.orm import Session
+
+        from app.db.database import Base
+        import app.models  # noqa: F401
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'fk.db'}")
+
+        @event.listens_for(engine, "connect")
+        def _enforce_fk(dbapi_conn, _conn_record):
+            dbapi_conn.execute("PRAGMA foreign_keys=ON")
+
+        Base.metadata.create_all(engine)
+        session = Session(engine)
+        try:
+            yield session
+        finally:
+            session.close()
+            engine.dispose()
+
+    @pytest.fixture
+    def client(self):
+        from fastapi.testclient import TestClient
+
+        from app.main import app
+
+        app.state.limiter.enabled = False
+        with TestClient(app) as c:
+            yield c
+        app.state.limiter.enabled = True
+
+    def test_分享过的笔记注销那一趟不能撞外键(self, fk_db, client):
+        from app.core.auth import _create_token, get_current_user
+        from app.db.database import get_db
+        from app.main import app
+        from app.models.note import Note
+        from app.models.share import Share
+        from app.models.share_report import ShareReport
+        from app.models.user import User
+        from app.services.accounts import ensure_for_user
+
+        fk_db.add(User(id=77, openid="o_fk", generation=1))
+        fk_db.add(Note(id=88, user_id="77", title="要分享的笔记", source_type="manual"))
+        fk_db.commit()
+        user = fk_db.get(User, 77)
+        account = ensure_for_user(fk_db, user)
+        # 先把 id 抄成一个字符串：注销把那行删掉之后，手里这个 ORM 对象再读 `.id` 会抛
+        # ObjectDeletedError——那时判据红在"对象没了"，而不是红在"库里还剩一行"。
+        account_id = account.id
+        fk_db.add(Share(user_id="77", note_id=88, token="tk_fk", title="t", is_active=True))
+        # 举报行只挂 token：注销之后它就是孤儿，而 docstring 承诺的是"删净"。
+        fk_db.add(ShareReport(token="tk_fk", reason="spam"))
+        fk_db.commit()
+
+        app.dependency_overrides[get_db] = lambda: fk_db
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            resp = client.post(
+                "/api/user/deactivate", json={"confirm": True},
+                headers={"Authorization": f"Bearer {_create_token(77, 1)}"},
+            )
+            assert resp.status_code == 200, f"注销这一趟没走通：{resp.status_code} {resp.text}"
+        finally:
+            app.dependency_overrides.clear()
+
+        fk_db.expire_all()
+        assert fk_db.query(Share).count() == 0
+        assert fk_db.query(Note).count() == 0, "notes 没删干净"
+        assert fk_db.query(ShareReport).filter(ShareReport.token == "tk_fk").count() == 0, \
+            "举报行留下了指向已删 token 的孤儿"
+        assert fk_db.query(Account).filter(Account.id == account_id).count() == 0
+
+
+class Test同一个人同时登录两趟:
+    def test_后到那一趟不许响也不许多建一个account(self, tmp_path):
+        """`ensure_for_user` 挂在**登录主路径**上（`core/auth.py:118`）。小程序 onLaunch 重试、
+        用户在启动页连点，都会让同一个人同时进来两趟：两趟都读到 account_id 为空、各建一个
+        account，后提交那一趟撞 `ux_identity_provider_uid`。那一撞不是账坏了，是赢家通吃——
+        所以必须认赢家；让它冒出来，那个人这次就打不开自己的笔记。
+        """
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from app.db.database import Base
+        import app.models  # noqa: F401
+        from app.models.account import Account, AccountIdentity
+        from app.models.user import User
+        from app.services.accounts import ensure_for_user
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'race.db'}")
+        Base.metadata.create_all(engine)
+        with Session(engine) as seed:
+            seed.add(User(id=1, openid="o_race", generation=1))
+            seed.commit()
+
+        s1 = Session(engine)
+        s2 = Session(engine)
+        try:
+            u1 = s1.get(User, 1)
+            u2 = s2.get(User, 1)              # 两个 identity map 里各一份，都还看见 account_id=None
+            a1 = ensure_for_user(s1, u1)      # 赢家
+            a2 = ensure_for_user(s2, u2)      # 撞索引那一趟
+            assert a2.id == a1.id, f"后到那一趟另建了一个 account：{a2.id} != {a1.id}"
+            assert s1.query(Account).count() == 1, "同一个人攒出两个 account"
+            assert s1.query(AccountIdentity).count() == 1, "同一个人攒出两条微信身份"
+            s2.expire_all()
+            assert s2.get(User, 1).account_id == a1.id, "认了赢家却没把自己挂上去"
+        finally:
+            s1.close()
+            s2.close()
+            engine.dispose()

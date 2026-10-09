@@ -35,6 +35,7 @@ from app.models.job import Job
 from app.models.note import Note
 from app.models.note_card import NoteCard
 from app.models.share import Share
+from app.models.share_report import ShareReport
 from app.models.user import User
 from app.models.user_profile import UserProfile
 from app.services import quota
@@ -142,14 +143,23 @@ class Test注销入口:
 
 class Test删干净:
     def test_一次删完七类数据并回报条数(self, client, db, mine):
+        # 第八类：举报行。它只挂 token、不建外键（撤掉的码也要收得到举报，这是刻意不设约束的
+        # 理由），所以库里挡不住"注销之后留着一堆指向已删码的孤儿"——只能由这一趟连带清掉，
+        # 并把条数一起回报（docstring 承诺的是"删净"，不是"删掉看得见的"）。
+        db.add(ShareReport(token=mine["token"], reason="spam"))
+        db.commit()
+
         resp = wipe(client, mine)
         assert resp.status_code == 200, resp.text
         assert resp.json()["deleted"] == {
             "notes": 1, "categories": 1, "shares": 1, "jobs": 1, "assets": 1, "cards": 1,
-            "profile": 1,
+            "profile": 1, "reports": 1,
         }
         for model in (Note, Category, Share, Job, Asset, NoteCard, UserProfile):
             assert rows(db, model, mine["id"]) == 0, model.__tablename__
+        assert db.query(ShareReport).filter(
+            ShareReport.token == mine["token"]
+        ).count() == 0, "举报行留下了指向已删 token 的孤儿"
         # 卡片那行的对象必须出现在同一份 file_ids 里——客户端只读那一个键，
         # 没带出去的那个 jpg 在云上就永远没人删得动。
         assert "cloud://x/del-me.jpg" in resp.json()["file_ids"], resp.json()
@@ -172,7 +182,8 @@ class Test删干净:
         resp = wipe(client, {"user": empty})
         assert resp.status_code == 200
         assert resp.json()["deleted"] == {"notes": 0, "categories": 0, "shares": 0,
-                                          "jobs": 0, "assets": 0, "cards": 0, "profile": 0}
+                                          "jobs": 0, "assets": 0, "cards": 0, "profile": 0,
+                                          "reports": 0}
         assert rows(db, Note, other["id"]) == 1
 
 

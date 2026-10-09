@@ -100,14 +100,29 @@ def test_公开页只画快照那六列与作者名(client, db_session):
         assert needle in html, f"公开页少了快照里的一列：{needle}"
 
 
-def test_公开页显示的列必须都在送检范围内():
-    """拿 `SNAPSHOT_COLUMNS` 当尺子：这条断言的意义是"两处不许各改各的"。
+def test_送检名单里的每一列都真在公开页上画出来(client, db_session):
+    """按名单自己喂哨兵，再逐列问页面上有没有。
 
-    落地页新画一列 → 那列必须先进送检名单，否则这里红；反过来给送检名单加一列而页面没画，
-    也只是多检了一列，不红——多检不漏检，方向是刻意这么定的。
+    原来这一条是拿一份**写死在本文件里的元组**去比 `SNAPSHOT_COLUMNS`——它只检得出"名单被改了"，
+    检不出"名单里某一列页面其实没画"，而后者才是公开页会漏内容的方向。改完之后：名单上有几列
+    就喂几个哨兵，少画一列当场红；多画一列不在这儿挡（那一侧由"正文与外部原文不许出现"两条挡），
+    方向仍是刻意这么定的：多检不漏检。
     """
-    assert set(("title", "summary", "tags", "key_points", "key_links", "source_url")) == set(SNAPSHOT_COLUMNS), \
-        "落地页画的列与 sharing.SNAPSHOT_COLUMNS 对不上了；改哪一侧都要同时改另一侧"
+    # 名单里有三个是 JSON **列表**列（给成字符串会被 `_list()` 当"不是列表"整列丢掉，
+    # 第一版哨兵就是这么红的——红的是哨兵自己，不是页面），而 key_links / source_url 还要过
+    # "只认 http(s)://"那道白名单（前者由 `test_非网址的链接列不会被渲染成可点的` 钉着），
+    # 所以这两位的哨兵必须长得像网址。
+    list_shaped = ("tags", "key_points", "key_links")
+    url_shaped = ("key_links", "source_url")
+    over = {}
+    for col in SNAPSHOT_COLUMNS:
+        sentinel = f"https://example.com/SNAP-{col}" if col in url_shaped else f"SNAP-{col}"
+        over[col] = [sentinel] if col in list_shaped else sentinel
+    _share(db_session, token="tok-snapshot-columns", **over)
+
+    html = client.get("/n/tok-snapshot-columns").text
+    for col in SNAPSHOT_COLUMNS:
+        assert f"SNAP-{col}" in html, f"送检名单里有 {col}，公开页却没把它画出来"
 
 
 def test_正文与外部原文不出现在公开页(client, db_session):
