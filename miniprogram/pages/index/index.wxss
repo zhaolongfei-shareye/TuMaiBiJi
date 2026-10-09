@@ -861,7 +861,8 @@
 
 .ds-dock {
   flex: none;
-  border-top: var(--w-edge) solid rgba(35, 37, 44, 0.10);
+  /* 这条 2rpx 的墨色 10% 顶边是 v23 给"深面"画的缝，面换成 L78 这一档浅灰之后它就变成
+     一条白边——规格 §5.1 第④条一起撤。浮窗自己有那圈 30/60 的投影，与背后那层分得开。 */
   padding: 22rpx 30rpx 30rpx;
 }
 
@@ -883,7 +884,10 @@
   font-size: var(--fs-meta);
   font-weight: 700;
   color: #23252C;
-  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.16);
+  /* 那一圈从 16% 墨抬到 `--layer-edge`（四套都反解到 60% 墨，压层 3.35~3.46）：
+     16% 是给深面画的，压在 L78 这一档浅灰上只有 1.32~1.33，按钮边界基本看不见（规格 §5.1 第一行）。
+     数只在 palette.layerEdgeOf 有一份，这里只写 var。 */
+  box-shadow: inset 0 0 0 var(--w-edge) var(--layer-edge);
 }
 
 .ds-ibtn.danger {
@@ -916,7 +920,8 @@
 /* ---------- v7 ③④ · v22：两个浮窗共用同一条几何 ----------
    详情窗（点一行 / 点一格浮它）和模板预览弹窗（点右上那一格出卡片浮它）是同一条窗口：
    左右 24、上沿 130（webview 内，也就是落在头部那一段 542 里面——「我的笔记」那行字
-   和右上角那列数字在它上面，露着）、下沿离底栏 64、同一张纸白、同一个圆角、同一枚把手。
+   和右上角那列数字在它上面，露着）、下沿离底栏 64、同一支层色面（v31 之前那一张是共用的纸白 #FCFBF8，
+   换层色之后两张窗仍共用一支面）、同一个圆角、同一枚把手。
    detailOpen 与 templateOpen 互斥，页面上永远只有一个浮层。
    v22（站长 10-03 第四轮）改了一条：这一态背后不再让列表原样透出来——中间那批
    （圆角纸卡本体 + 两枚 tab + 通栏横线 + 分类行 + 行卡）整块 visibility 藏掉，
@@ -948,7 +953,7 @@
   right: 24rpx;
   top: 130rpx;
   bottom: 192rpx;  /* 底栏顶到 128（离底 20 + 高 108）+ 64 空隙。站长 10-03：原来那 24 太贴 */
-  background: #FCFBF8;
+  background: var(--bg-layer);
   border-radius: 32rpx;
   box-shadow: 0 30rpx 60rpx rgba(8, 10, 14, 0.32);
   z-index: 101;

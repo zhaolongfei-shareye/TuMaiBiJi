@@ -1,3 +1,12 @@
+/* v31（#27 落码第 4 步，规格 §9 第 4 条）：这一屏的主面吃层色，不再吃页面底。
+   主题类挂在 `.container` 上而不是 page 上（小程序给不了 page 类名，app.wxss 那段同一条口径），
+   所以这一屏的覆盖也写在 `.container` 上；页面样式比 app.wxss 后到、权重相同，这一份赢。
+   里面一段段的块仍是 `--bg-card` 那张白卡——层退到 L78 之后白与层的分离只有 1.64~1.74，
+   靠颜色分不开了，这是这一档认下的代价（规格 §7 第一条），本轮没动那张卡本身。 */
+.container {
+  background: var(--bg-layer);
+}
+
 .loading {
   text-align: center;
   padding: var(--sp-6) 0;

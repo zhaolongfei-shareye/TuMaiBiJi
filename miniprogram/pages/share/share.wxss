@@ -1,6 +1,9 @@
-/* 固定条只有按钮那一行，预览让开它就行。 */
+/* 固定条只有按钮那一行，预览让开它就行。
+   v31（#27 落码第 4 步，规格 §9 第 4 条）：这一屏的主面改吃层色，与详情独立页同一条改法
+   （主题类挂在 .container 上、page 给不了类名，所以覆盖也写在这里；页面样式后到、同权重下赢）。 */
 .container {
   padding-bottom: 260rpx;
+  background: var(--bg-layer);
 }
 
 /* 预览框定高，图在框里等比缩放居中：换模板时框子不变高，下面那排小图就不跟着上下跳。
@@ -86,7 +89,9 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--bg-page);
+  /* 这一层是整屏 fixed 的加载垫，它盖住的就是这一屏的主面——主面换成层色之后它不许还留页面底，
+     否则加载那一段会先闪一支更暗的米色。 */
+  background: var(--bg-layer);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -102,7 +107,12 @@
   left: 0;
   right: 0;
   padding: 0 var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom));
-  background: var(--bg-page);
+  /* 站长 10-08 一句「白内框」：这条通栏底条原来吃 `--bg-page`，层退到 L78 之后它比层还亮，
+     就是"灰底与背景之间那条白边"在这屏换了个位置（规格 §5 第 4 条）。
+     面＝白（`--inner-face`，真身 palette.INNER_FACE），与层靠一条**上投影**分开——
+     那三个数是 `.sheet` 与照片分家用的同一条，不新调一支。 */
+  background: var(--inner-face);
+  box-shadow: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
 }
 
 /* 模板一排：左右滚着挑。它坐在按钮条里、按钮上方那一行，跟着按钮条一起固定，

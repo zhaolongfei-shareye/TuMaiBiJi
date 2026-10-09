@@ -88,6 +88,17 @@ page {
   --chip-idle: rgba(53, 46, 29, 0.07);
   --danger: #b4231f;
   --danger-soft: rgba(180, 35, 31, 0.08);
+  /* 层色那四条在 page 这一档也必须有一份兜底：`themeClass` 是各页 onLoad/onShow 里
+     `applyTheme` 之后才写进 data 的（detail.js:22／share.js:34 初值都是空串），
+     首帧那一刹容器上没有主题类——少了这四行，`background: var(--bg-layer)` 解不出值就是透明，
+     那一层会透空露出页面底，闪一下才回来。值＝象牙那一套（THEMES[0] 的兜底口径同上面那段）。 */
+  --bg-layer: #CDC9C1;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.72);
+  --layer-edge: rgba(35, 37, 44, 0.6);
+  /* 白内框那一档的面（规格 §5「底条走白内框」）。它与壁纸无关、四套同一个值，
+     所以只在这里出现一次；真身是 palette.INNER_FACE，等值由 验-列表层底色.js 钉。 */
+  --inner-face: #FFFFFF;
 
   background-color: var(--bg-page);
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
@@ -118,8 +129,8 @@ page {
    这四枚都是"整套色阶"：页面底、卡底、文字四级、chips、按钮、左侧那块方块
    全部收进同一支色相，所以方块色也在这里（镜像值），真身在 utils/palette.js 的 THEMES。
    两边逐字等值由色板那把尺子钉死：--bg-page=theme.page、--bg-card=theme.line、
-   --btn-bg=chromeOf(key).sel，10-09 起再加三条 --bg-layer / --ink-on-layer / --ink-on-layer-soft
-   ＝ palette 的 listLayerOf／layerSkinOf（`验-列表层底色.js` 逐套各钉一条）。改一边必须改另一边，只改一边会在真机上出现
+   --btn-bg=chromeOf(key).sel，10-09 起再加四条 --bg-layer / --ink-on-layer / --ink-on-layer-soft
+   / --layer-edge ＝ palette 的 listLayerOf／layerSkinOf（`验-列表层底色.js` 逐套各钉一条）。改一边必须改另一边，只改一边会在真机上出现
    "导航条是上一页那套色"这一类对不上。
    卡底不用纯白：白纸贴在米纸上像一张张贴纸，退到比页面底亮 9 档的那一支。
    色值出处：docs/design/配色统一-四套莫兰迪/生成色板5.py（那一份是唯一算法，别在手底下改）。 */
@@ -141,6 +152,7 @@ page {
   --bg-layer: #CDC9C1;
   --ink-on-layer: #23252C;
   --ink-on-layer-soft: rgba(35, 37, 44, 0.72);
+  --layer-edge: rgba(35, 37, 44, 0.6);
 }
 
 .theme-tint-celadon {
@@ -159,6 +171,7 @@ page {
   --bg-layer: #C1CDC3;
   --ink-on-layer: #23252C;
   --ink-on-layer-soft: rgba(35, 37, 44, 0.72);
+  --layer-edge: rgba(35, 37, 44, 0.6);
 }
 
 .theme-tint-blush {
@@ -177,6 +190,7 @@ page {
   --bg-layer: #CDC1C7;
   --ink-on-layer: #23252C;
   --ink-on-layer-soft: rgba(35, 37, 44, 0.78);
+  --layer-edge: rgba(35, 37, 44, 0.6);
 }
 
 /* 雨雾沿用旧 key gradient-blue / 类名 theme-blue：后端 WALLPAPER_PRESETS 那六个值一个都没动，
@@ -198,6 +212,7 @@ page {
   --bg-layer: #C1C4CD;
   --ink-on-layer: #23252C;
   --ink-on-layer-soft: rgba(35, 37, 44, 0.78);
+  --layer-edge: rgba(35, 37, 44, 0.6);
 }
 
 /* 界面字体：不挂这三个类就是上面 page 那条苹方链（默认）。

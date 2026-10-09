@@ -467,6 +467,13 @@ function inkIsLighter(bg, ink) {
    两条都是函数不是表：后端还会加壁纸、分类数也会变，写成常量表就是每加一枚改一次代码。 */
 
 const PAPER = '#F2EFE9'   // 官网那支纸白，压在派生出来的深色面上
+/**
+ * 「白内框」那一档的面（规格 §5 第 4 条：卡片页那条通栏底条走白内框，站长 10-08 一句"白内框"）。
+ * 它与壁纸无关、四套同一个值，所以不进 `THEMES`、也不按主题派生；`app.wxss` 的 `--inner-face`
+ * 是它唯一的镜像（等值由 `docs/工具/验-列表层底色.js` 钉一条）。
+ * 与 `PAPER` 不是一支东西：纸白是"压在深色面上的字与卡"，这支是"浅层上要凸出来的那块面"。
+ */
+const INNER_FACE = '#FFFFFF'
 
 function rgbToHsl(hexStr) {
   const [rr, gg, bb] = hexToRgb(hexStr)
@@ -637,7 +644,7 @@ function listLayerOf(wallpaper) {
 }
 
 /**
- * 那一层上的两档字（规格 §6）。**这条不是审美，是判定顺序**：
+ * 那一层上的两档字与那一圈描边（字见规格 §6，圈见 §5.1）。**这条不是审美，是判定顺序**：
  * 先试纸白压不压得住这层（`crOf(PAPER, 层色)`）——四套实测只有 1.43~1.52，全压不住，
  * 所以整层的字翻成墨 `#23252C`；淡档（未选、三级字那一档）**不写死 alpha**，在下面那架阶梯里
  * 取**第一个让对比 ≥ 4.5 的档**，而半透明字要谈对比必须先按实际底色混成实心再算
@@ -650,6 +657,24 @@ function listLayerOf(wallpaper) {
  */
 const LAYER_INK = '#23252C'
 const LAYER_INK_LADDER = [0.5, 0.55, 0.6, 0.66, 0.72, 0.78, 0.85, 0.92, 1]
+/**
+ * 描边那一圈的浓度阶梯与门槛（规格 §5.1）。这条阶梯与上面那架**不是一回事**：
+ * 那架管字（门槛 4.5，从 .5 起），这架管图形边界（门槛 3.0，从 .10 起）。
+ * 现网那一圈是 `.10`/`.16` 的墨，那是给**深面**画的；层退到 L78 之后压在这支浅灰上
+ * 只有 1.19 / 1.32~1.33（10-09 现跑 `crOf(mix(墨, 层, a), 层)`），按钮边界基本看不见。
+ * 按 3.0 反解 → 四套都落在 **.6**（压层 3.35~3.46，与规格 §5.1 第一行那 3.42~3.46 同一档）。
+ * ⚠ "描边必须过 3.0"这条是按 WCAG 1.4.11 提的、**站长没拍过**（规格 §11 第 1 条写明落码先按"认"走，
+ * 他一句"不认"就退回 10%）——所以这个数只在下面这一处出现，退回只改这一个出口。
+ */
+const LAYER_EDGE_LADDER = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+const LAYER_EDGE_MIN = 3.0
+function layerEdgeOf(bg) {
+  for (let i = 0; i < LAYER_EDGE_LADDER.length; i += 1) {
+    const a = LAYER_EDGE_LADDER[i]
+    if (crOf(mix(LAYER_INK, bg, a), bg) >= LAYER_EDGE_MIN) return withAlpha(LAYER_INK, a)
+  }
+  return withAlpha(LAYER_INK, 1)
+}
 function layerSkinOf(wallpaper) {
   const bg = listLayerOf(wallpaper)
   let alpha = LAYER_INK_LADDER[LAYER_INK_LADDER.length - 1]
@@ -657,7 +682,7 @@ function layerSkinOf(wallpaper) {
     const a = LAYER_INK_LADDER[i]
     if (crOf(mix(LAYER_INK, bg, a), bg) >= 4.5) { alpha = a; break }
   }
-  return { bg, ink: LAYER_INK, alpha, soft: withAlpha(LAYER_INK, alpha) }
+  return { bg, ink: LAYER_INK, alpha, soft: withAlpha(LAYER_INK, alpha), edge: layerEdgeOf(bg) }
 }
 
 /**
@@ -714,6 +739,8 @@ module.exports = {
   chromeOf,
   listLayerOf,
   layerSkinOf,
+  layerEdgeOf,
+  INNER_FACE,
   createSkin,
   catSkinFor,
   crOf,
