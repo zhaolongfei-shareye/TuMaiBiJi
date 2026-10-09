@@ -136,7 +136,32 @@ const COUNT_ALL = () => {
   }
   const tabAt = async (i) => (await $$('.vtab'))[i]
   const d0 = await page.data()
-  const chipFs = await css('.chip', 'font-size')
+  // v30 起分类那一行不再吃 `.chip`（胶囊撤了、改成 `.ix-cat` 文字＋短杠），
+  // 原来拿 `.chip` 的字号当"同一档"那把尺子的，读回来是 null，两条判据一起空红。
+  const catFs = await css('.ix-cat', 'font-size')
+  // 那一行两档字的期望值从 createSkin() 现读，不在尺子里抄第二份纸白：
+  // 它和新建页那两档是同一支出处（规格 §3 第四、五行）。
+  const skinCs = {}
+  p.createSkin().split(';').forEach((kv) => {
+    const i = kv.indexOf(':')
+    if (i > 0) skinCs[kv.slice(0, i).trim().replace(/^--/, '')] = kv.slice(i + 1).trim()
+  })
+  // 期望值有两种写法都会出现：createSkin() 发的是 hex（#23252C）或 rgba(...)，
+  // 屏上读回来一定是 rgb()/rgba()。所以先把两边统一成三元（+可选 alpha）再比。
+  const colNums = (s) => {
+    const t = String(s).trim()
+    if (t[0] === '#') {
+      const m = /#([\da-f]{2})([\da-f]{2})([\da-f]{2})/i.exec(t)
+      return m ? [1, 2, 3].map((i) => parseInt(m[i], 16)) : []
+    }
+    return (t.match(/-?\d+(\.\d+)?/g) || []).map(Number)
+  }
+  const rgbaNums = colNums
+  const sameRgba = (a, b) => {
+    const x = colNums(a), y = colNums(b)
+    return x.length >= 3 && y.length >= 3 && x.slice(0, 3).every((v, i) => Math.abs(v - y[i]) <= 1)
+      && Math.abs((x[3] === undefined ? 1 : x[3]) - (y[3] === undefined ? 1 : y[3])) < 0.02
+  }
 
   // ---------- ① 第一眼 ----------
   ck('这一把量的是中文那一面（下面钉的全是中文串，语言没钉住就会凭空红一片）',
@@ -185,15 +210,20 @@ const COUNT_ALL = () => {
   // 它会回**选中那一枚**的样式，于是这条永远绿（v18 那把自己撞的）。按下标取。
   const onIdx = (await data('view')) === 'list' ? 0 : 1
   const colAt = async (i) => String(await (await tabAt(i)).style('color'))
-  ck('已选那枚 90% 黑 + 字重 700，未选那枚同一字号只 42% 黑（选中只靠颜色与字重，不靠壳）',
-    (await colAt(onIdx)) === 'rgba(35, 37, 44, 0.9)'
-    && (await colAt(1 - onIdx)) === 'rgba(35, 37, 44, 0.42)'
-    && String(await (await tabAt(onIdx)).style('font-weight')) === '700',
-    `已选=${await colAt(onIdx)} 未选=${await colAt(1 - onIdx)}`)
+  ck('已选那枚满纸白 + 字重 700，未选那枚同字号只 62% 纸白，且那一行的面就是新建页那块深面（v30）',
+    sameRgba(await colAt(onIdx), skinCs['cp-ink'])
+    && sameRgba(await colAt(1 - onIdx), skinCs['cp-ink-62'])
+    && String(await (await tabAt(onIdx)).style('font-weight')) === '700'
+    && sameRgba(await css('.vtabs', 'background-color'), '#23252C'),
+    `已选=${await colAt(onIdx)} 未选=${await colAt(1 - onIdx)} 面=${await css('.vtabs', 'background-color')}`)
   ck('tab 字号与下面分类同一档（都是 --fs-meta 24，"小字"就是这一档）',
-    (await css('.vtab', 'font-size')) === chipFs, `${await css('.vtab', 'font-size')} vs ${chipFs}`)
-  ck('两枚那一行整高 70（效果图那个数），短杠压在通栏横线那一行上',
-    near((await rect('.vtabs')).h, 70, 3), `${rpx((await rect('.vtabs')).h).toFixed(1)}rpx`)
+    !!catFs && (await css('.vtab', 'font-size')) === catFs, `${await css('.vtab', 'font-size')} vs ${catFs}`)
+  /* 整高这条原来钉 70，理由是"效果图那个数"，而那时那一行是透明的、底下压着一条 2rpx 通栏横线。
+     v30 撤了那条线、换成一块深面，规格 §3 **没有给新的行高**——所以这里不能凭空挑一个数钉成"规格说的"。
+     钉的是"量出来是多少就是多少 ±1"，并注明它是 padding 22/14 + 字号 24 落出来的结果：
+     它挡的是"哪天内缩或字号被改动把这一行撑高/压扁"，不替站长定一个新数。 */
+  ck('两枚那一行整高＝重锚当日实测那一档 ±1（66.3rpx＝padding 22/14 叠 24 字，规格没给新数）',
+    near((await rect('.vtabs')).h, 66.3, 1), `${rpx((await rect('.vtabs')).h).toFixed(1)}rpx`)
 
   // ---------- ④ 列表那一行（X 那种排） ----------
   const rows = d0.rows
@@ -250,8 +280,8 @@ const COUNT_ALL = () => {
     && srch && near(srch.left, 24, 3) && near(srch.right, 702, 4),
     `左=${srch && rpx(srch.left).toFixed(1)} 右=${srch && rpx(srch.right).toFixed(1)} 宽=${srch && rpx(srch.w).toFixed(1)}rpx`)
   ck('右侧「搜索笔记」与分类同字号同字重（原来那档 31/800 比正文还大一级）',
-    (await css('.srch-go', 'font-size')) === chipFs && (await css('.srch-go', 'font-weight')) === '600',
-    `${await css('.srch-go', 'font-size')} vs chip ${chipFs}`)
+    (await css('.srch-go', 'font-size')) === catFs && (await css('.srch-go', 'font-weight')) === '600',
+    `${await css('.srch-go', 'font-size')} vs chip ${catFs}`)
   ck('输入里的字没动（仍 --fs-body 28：这轮只压条子和那两个字）',
     Math.abs((await fs2rpx('.srch-input')) - 28) <= 2, `${(await fs2rpx('.srch-input')).toFixed(1)}rpx`)
   await shot('v19-2-搜索摊开60.png')
@@ -429,10 +459,10 @@ const COUNT_ALL = () => {
     ck('格子里不再画第二行那枚页码（一篇一张，‹ i/n › 整块撤了）',
       (await $$('.g-pg')).length === 0, '')
     ck('那一格下面第一行是标题：与分类同字号、90% 黑、一行截断',
-      (await css('.g-cap', 'font-size')) === chipFs && (await css('.g-cap', 'color')) === 'rgba(35, 37, 44, 0.9)',
+      (await css('.g-cap', 'font-size')) === catFs && (await css('.g-cap', 'color')) === 'rgba(35, 37, 44, 0.9)',
       await css('.g-cap', 'font-size'))
     ck('卡片那一格也留着分类那一行（切过去不会看到别的分类）',
-      !!(await $('.cats')) && !!(await $('.chip')), '')
+      !!(await $('.cats')) && !!(await $('.ix-cat')), '')
     await shot('v19-4-卡片一格.png')
 
     // 站长 10-03 23:40 做减法：一篇同一时间只有一张，要改存量必须先删掉这一张。
@@ -548,9 +578,9 @@ const COUNT_ALL = () => {
     const led1 = await mp.evaluate((id) => ((wx.getStorageSync('cardLog') || {})[String(id)] || []).slice(), nidGen)
     const dShare = await page.data()
     ck('点「分享卡片」把面板拉起来再走完那两条口：台账一张没多、那一条的路径与时间戳一字没动、弹窗还开着',
-      led1.length === 1 && led1[0].p === led0[0].p && led1[0].at === led0[0].at
+      led1.length === 1 && led0.length === 1 && led1[0].p === led0[0].p && led1[0].at === led0[0].at
       && dShare.templateOpen === true && dShare.shareDim === false,
-      `${led0.length}→${led1.length} 条、p ${led1[0].p === led0[0].p ? '没变' : '变了'}、at ${led1[0].at === led0[0].at ? '没变' : '被顶新了'}、open=${dShare.templateOpen} dim=${dShare.shareDim}`)
+      `${led0.length}→${led1.length} 条、p ${led1[0] && led0[0] ? (led1[0].p === led0[0].p ? '没变' : '变了') : '(台账有空格，比不了)'}、at ${led1[0] && led0[0] ? (led1[0].at === led0[0].at ? '没变' : '被顶新了') : '(同上)'}、open=${dShare.templateOpen} dim=${dShare.shareDim}`)
     await shot('v19-5b-已生成态分享卡片.png')
     const delBtn = (await $$('.tpl-btn'))[1]
     /* 10-05 站长拍甲：这枚「删除」现在先弹一道确认框，所以这一段拆成两拍——

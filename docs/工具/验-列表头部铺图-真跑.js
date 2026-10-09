@@ -2,8 +2,8 @@
 // 跑法：NODE_PATH=$HOME/.mpauto/node_modules node docs/工具/验-列表头部铺图-真跑.js
 //      （或者走 docs/工具/跑尺子.sh 9431 验-列表头部铺图-真跑，它自己带 NODE_PATH）
 // 前置：微信开发者工具已开；改过 WXSS 要先 cli close 再 cli auto --auto-port 9431。
-// 一把量两个状态：铺图（图守头部那 542 + 圆角卡盖上来 + 裸 icon 那一行 + 分类实色 chip +
-// 列表里一条笔记只有一个框）和"本机还留着旧开关"（09-30 那一节整块撤了，
+// 一把量两个状态：铺图（图守头部那 542 + 圆角卡盖上来 + 裸 icon 那一行 + 分类那一行两档字（v30 起是
+// 文字＋短杠，不再吃实色 chip）+ 列表里一条笔记只有一个框）和"本机还留着旧开关"（09-30 那一节整块撤了，
 // 键还在 storage 里也必须照常铺图）。
 // 第二态不是可有可无——以前关过开关的人升级后不会去点任何设置，
 // 那一档要是静默退回"半铺半不铺"，没人会主动发现。
@@ -217,34 +217,35 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   ck('那一列的标签与键就是本页字典里那一条（notes 一个，不是 notes|shares|saved 三个）',
     (sd.stats || []).length === 1 && (sd.stats || [])[0].l === (sd.t || {}).statNotes
     && (sd.stats || [])[0].key === 'notes', JSON.stringify(sd.stats))
-  const chips = await page.$$('.chip')
-  ck('这一趟至少有两枚 chip（"全部" + 一枚分类），颜色那条才量得到', chips.length > 1, `${chips.length} 枚`)
-  // 09-30 这一批起，分类那几枚吃自己分类的实色（站长原话"分类按钮是有颜色的"），
-  // 暗玻璃只留给没有自己色的「全部」那一枚。拿"未选中那枚＝暗玻璃"去量，
-  // 量到的其实是第一枚分类 chip——上一把的红就是这么来的，不是渲染错。
-  let idle = null
-  let chipH = 0
-  for (const el of chips) {
+  // v30 起分类那一行不再吃 `.chip`：胶囊、暗玻璃、`--tone-bg` 那三样一起删了。
+  // 原来这一段四条判据量的前提都没了（不是红了要修界面，是尺子旧了）——换成量
+  // 「这一行两档字」，期望值从 `palette.layerSkinOf(当前壁纸)` 现算，不在尺子里抄第二份。
+  // 这里不能用文件下面那把 `sameCol`／`IDX_WXSS`：它们是第 249 行之后才声明的 const，
+  // 在这一行取会撞临时死区（TDZ），跑出来是一条 ReferenceError 而不是任何判据红。
+  const cats = await page.$$('.ix-cat')
+  ck('这一趟至少有两枚分类（"全部" + 一枚真分类），字色那条才量得到', cats.length > 1, `${cats.length} 枚`)
+  const wpNow = await mp.evaluate(() => getApp().getWallpaper() || '')
+  const skin = p.layerSkinOf(wpNow)
+  const alphaOf2 = (s) => { const m = /,\s*([\d.]+)\s*\)/.exec(String(s)); return m ? Number(m[1]) : 1 }
+  const idxSrc = fs.readFileSync(P('pages/index/index.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+  const idleCols = [], onCols = []
+  for (const el of cats) {
     const cls = (await el.attribute('class')) || ''
-    if (/tone/.test(cls) && !/active/.test(cls)) {
-      const style = (await el.attribute('style')) || ''
-      idle = {
-        bg: await el.style('background-color'),
-        want: (/--tone-bg:\s*(#[0-9A-Fa-f]{6})/.exec(style) || [])[1] || '',
-      }
-      chipH = ((await rects(['.chip']))[0] || {}).h || 0
-      break
-    }
+    const c = await el.style('color')
+    if (/(^|\s)on(\s|$)/.test(cls)) onCols.push(c); else idleCols.push(c)
   }
-  ck('未选中的分类 chip 吃它自己那一档分类色（inline 的 --tone-bg）',
-    !!idle && near(rgbOf(idle.bg), hexArr(idle.want)),
-    idle ? `${idle.bg}｜--tone-bg=${idle.want}` : '没找到未选中的分类 chip')
-  ck('「全部」那一枚才垫暗玻璃（它没有自己的色）',
-    /\.container\.has-bg \.chip\.all\s*\{[^}]*background:\s*rgba\(18, 20, 26/.test(
-      fs.readFileSync(P('pages/index/index.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')))
-  ck('选中那枚换成纸白',
-    near(rgbOf(await styleOf(page, '.chip.active', 'background-color')), hexArr(PAPER)),
-    await styleOf(page, '.chip.active', 'background-color'))
+  ck('未选中那一档是这一层自己的淡墨（layerSkinOf().soft，压在层上过 4.5）',
+    idleCols.length > 0 && idleCols.every((c) => near(rgbOf(c), hexArr(skin.ink)) && Math.abs(alphaOf2(c) - alphaOf2(skin.soft)) < 0.02),
+    `${idleCols[0]}｜期望 ${skin.soft}（壁纸 ${wpNow}）`)
+  ck('选中那一档是整档墨、不是淡的（两支只差 alpha 时这条必须红，不许跟着上面那条一起绿）',
+    onCols.length === 1 && near(rgbOf(onCols[0]), hexArr(skin.ink)) && alphaOf2(onCols[0]) > 0.98,
+    `${onCols[0] || '(一枚没选中，那一行读不出选中态)'}｜期望 ${skin.ink}`)
+  ck('「全部」那一枚与其他未选中枚同一档（暗玻璃那一态整块没了）',
+    idleCols.length > 1 && idleCols.every((c) => near(rgbOf(c), rgbOf(idleCols[0])) && Math.abs(alphaOf2(c) - alphaOf2(idleCols[0])) < 0.02),
+    idleCols.join(' , '))
+  ck('这一行源码里不再有胶囊那四条（.chip.tone／.container.has-bg .chip 任一回来都算两版并存）',
+    !/\.chip\.tone/.test(idxSrc) && !/\.container\.has-bg \.chip/.test(idxSrc))
+  const catH0 = ((await rects(['.ix-cat']))[0] || {}).h || 0
   // ---------- 1b. 图上那一行摊开后的那块面 ----------
   // v8 那枚"分类行最右的圆钮 + 展开的搜索条"整块没了；v18 是三枚裸 icon，
   // v19 又退成一枚（纸片墙／一行随两枚 tab 撤了）。摊开、两态互斥、
@@ -302,24 +303,23 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   // 于是 !/has-bg/ 永远成立——原来那条"关掉后容器不再带 has-bg"就是这么假绿的。
   const cls2 = ((await (await page.$('.container')).attribute('class')) || '')
   ck('容器照样带 has-bg', /has-bg/.test(cls2), cls2 || '(class 读成空)')
-  // 这一态原来量的是那枚圆钮（v8 起收起态没有 .sc-card 了）；v18 圆钮没了，
-  // 压在图上的那块面换成「全部」那一枚 chip——它没有自己的分类色，所以吃这一态的暗玻璃。
-  // 判据照旧是同一件事：铺图那一态下这块面是照片上垫出来的那一层，不是壁纸派生那支深色。
-  // 「全部」那一枚有两个态（选中=纸白、未选中=暗玻璃），源码是两条规则，
-  // 所以先读它此刻挂的是哪一条再去比——拿未选中那条的数去量选中那一格必红。
-  const chipAll = await page.$('.chip.all')
-  const chipAllCls = chipAll ? ((await chipAll.attribute('class')) || '') : ''
-  const chipAllSel = /active/.test(chipAllCls) ? '.chip.all.active' : '.chip.all'
-  ck(`「全部」那一枚照旧吃图上那一条规则（此刻是${chipAllSel}那一态，不再退回壁纸派生那支）`,
-    !!chipAll && sameCol(await chipAll.style('background-color'), decl(chipAllSel, 'background')),
-    `${chipAll && await chipAll.style('background-color')}｜源码 ${decl(chipAllSel, 'background')}`)
+  // 这一段原来量的是"压在照片上的那块面"＝「全部」那一枚 chip 的暗玻璃。v30 起胶囊撤了，
+  // 这一行不再有任何面，照片与列表之间那块面就是圆角卡自己——判据跟着挪到 `.sheet`：
+  // 铺图这一态它仍必须是层色（既不退回页面底，也不被照片盖成别的支）。
+  const sheetCol = await styleOf(page, '.sheet', 'background-color')
+  ck('铺图这一态那张圆角卡渲染出来就是层色（layer 由 palette.listLayerOf 现算，尺子里不抄第二份）',
+    near(rgbOf(sheetCol), hexArr(p.listLayerOf(wpNow))),
+    `${sheetCol}｜期望 ${p.listLayerOf(wpNow)}（壁纸 ${wpNow}）`)
   ck('滚动区照旧不画面（底色是那张圆角卡给的）',
     /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list', 'background-color')),
     await styleOf(page, '.list', 'background-color'))
-  // 那圈描边写成 inset 而不是 border：border 会把整排 chips 撑高，一撑高纸顶就往下挪
-  ck('这一档下 chip 同一档高度（inset 描边没把它撑高）',
-    Math.abs(((await rects(['.chip']))[0] || {}).h - chipH) < 1.5,
-    `铺图 ${(chipH / R).toFixed(1)}rpx / 现在 ${(((await rects(['.chip']))[0] || {}).h / R).toFixed(1)}rpx`)
+  // 原来这条比的是 chip 在两态同高（那圈 inset 不许把它撑高）。胶囊没了之后它仍值得留：
+  // 分类那一行不许在两态之间长个儿——一长，纸顶就往下挪。
+  const catH1 = ((await rects(['.ix-cat']))[0] || {}).h || 0
+  ck('分类那一行在两态同高，且它自己没有面（.ix-cat 不许带 background）',
+    catH0 > 0 && Math.abs(catH1 - catH0) < 1.5
+    && /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.ix-cat', 'background-color')),
+    `铺图 ${(catH0 / R).toFixed(1)}rpx / 现在 ${(catH1 / R).toFixed(1)}rpx`)
   await mp.screenshot({ path: path.join(OUT, '实测-列表旧开关已作废.png') })
 
   // ---------- 还原：借走的是他的真机偏好 ----------
