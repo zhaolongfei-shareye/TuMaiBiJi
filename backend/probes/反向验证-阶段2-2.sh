@@ -175,11 +175,14 @@ run U2 "验签那段的 except 退回只接 InvalidTokenError" "密钥端点里�
 run V "/v1 微信登录改回按身份行认人（P0-2 那一刀）" "分家状态下两条门给的是同一条_account" \
   "perl -pi -e 's/^    account = accounts\.ensure_for_user\(db, user\)/    account = accounts.ensure_for_provider(db, \"wechat\", user.openid)  # rv/' $VA" "$VA"
 
-run W "生成短码那道门不再限流" "四道门都在注册表里" \
+run W "生成短码那道门不再限流" "五道门都在注册表里" \
   "perl -0pi -e 's/\@limiter\.limit\(\"5\/minute\"\)\ndef create_link_code\(/def create_link_code(/' $VB" "$VB"
 
-run W2 "苹果登录那道门不再限流" "四道门都在注册表里" \
+run W2 "苹果登录那道门不再限流" "五道门都在注册表里" \
   "perl -0pi -e 's/\@limiter\.limit\(\"5\/minute\"\)\nasync def apple_login\(/async def apple_login(/' $VA" "$VA"
+
+run W3 "删账号那道门不再限流" "五道门都在注册表里" \
+  "perl -0pi -e 's/\@limiter\.limit\(\"5\/minute\"\)\ndef delete_account\(/def delete_account(/' $VB" "$VB"
 
 
 run T "创建时间撞平时的平局换人（把小于等于改成严格小于）" "创建时间一模一样_发起那一趟的一方是主" \

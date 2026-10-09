@@ -11,15 +11,9 @@ from app.core.auth import get_current_user
 from app.core.private_access import PRIVATE_CATEGORY_NAME, create_unlock_token
 from app.core.rate_limit import limiter
 from app.db.database import get_db
-from app.models.account import Account, AccountIdentity
-from app.models.asset import Asset, not_failed
 from app.models.category import Category
-from app.models.invitation import Invitation
-from app.models.job import Job
-from app.models.note import Note
-from app.models.share import Share
 from app.models.user import User
-from app.services import quota
+from app.services import deletion, quota
 
 logger = logging.getLogger(__name__)
 
@@ -278,120 +272,30 @@ def deactivate_account(
     用 POST 而不是 DELETE：DELETE 带请求体在 wx.request 里怎么序列化没有保证，
     而这一步的确认标志必须以服务端看得见的形式抵达。
 
-    返回删掉的条数，前端照着这个数告诉用户"删了 N 条笔记"，也方便事后拿同一份
-    口径对账。别人名下的数据一条不动（每个查询都带着 user_id）。
+    回体里的 `deleted` 是各表删掉的条数，**只用来事后对账**——现网没人读它（实测：
+    `grep -rn "\\.deleted" miniprogram` 是空的，`pages/me/me.js:doDeactivate` 只把整份回体交给
+    `cloudUpload.dropFromDeleteRes`，那里取的是 `file_ids`）。界面那句提示是固定文案，
+    不是"删了 N 条笔记"。
 
     回体里还带 `file_ids`：那批云存储对象这台服务器删不掉（没有云开发凭据），只能靠
     客户端在**这一次响应里**拿到清单去删——注销之后 token 就废了，没有第二个口可以问。
+
+    ⚠ 这一路的范围比"我自己那一行"要宽，说准一点：`purge` 拿到 `user.account_id` 之后，
+    连那条 **account 整行**、它名下**全部** identity、以及它名下还没被念的短码一起删。
+    今天这样没有越界，因为一条 account 名下最多只有一行带 openid 的 `users`（`linking.redeem`
+    那一对一闸门挡着第二条微信），"这一行"和"这一条 account"是同一个东西。
+    真出现多行是阶段3 之后（`/v1` 那边也往 `users` 写行），那时这一档必须重新拍一次——
+    拍之前不许有人把这里的注释简化成"只删自己那一行"。判据钉的是实际发生的那一半。
     """
     if not req.confirm:
         raise HTTPException(status_code=400, detail="请先确认注销")
 
-    uid = str(user.id)
-    # 配图的对象**要在这里一起删不掉**：这台自建后端没有云开发凭据，只有客户端
-    # `wx.cloud.deleteFile` 删得动。所以行删之前先把 fileID 抄出来，跟着回体一起发回去，
-    # 前端在 clearSession 之前拿它去清（注销之后再打任何接口都是 401，没有第二次机会）。
-    asset_ids = [
-        r[0]
-        for r in db.query(Asset.object_key).filter(Asset.user_id == uid, not_failed()).all()
-    ]
-    # 卡片对象与配图并进**同一份** `file_ids`（与 `routes/notes.py:delete_note` 同一条决定：
-    # 客户端只读那一个键）。历史行也一起带走——云上那些对象还占着全站配额，
-    # 而**这是最后一次有机会**：注销之后没有任何接口能再问出这个人留了哪些图。
-    from app.models.note_card import NoteCard
-
-    asset_ids += [
-        r[0]
-        for r in db.query(NoteCard.object_key).filter(NoteCard.user_id == uid).all()
-    ]
-    # 名片那四格同理（2.1 起图在云上）：这是最后一次能把地址交回去的机会。
-    # 逐行读 JSON 列而不是在 SQL 里筛——`slots` 是一个数组，四格里哪格有图只有解出来才知道。
-    from app.models.user_profile import UserProfile
-
-    for (slots,) in db.query(UserProfile.slots).filter(UserProfile.user_id == uid).all():
-        for s in (slots or []):
-            if s and s.get("file_id"):
-                asset_ids.append(s["file_id"])
-    # 举报行只挂 token、不挂外键（`share_reports.token`——撤掉的码也要收得到举报，这是刻意
-    # 不设约束的理由），所以删 shares 之后再也问不出这个人公开过哪些码。先抄下来。
-    from app.models.share_report import ShareReport
-
-    share_tokens = [r[0] for r in db.query(Share.token).filter(Share.user_id == uid).all()]
-    deleted = {
-        # **先子后父**。`shares.note_id` 与 `jobs.note_id` 是声明了的外键（`share.py:23`、
-        # `job.py:17`），而 notes 是它们的父表——同仓 `routes/notes.py:delete_note` 早就是
-        # 这个顺序，注释写的理由一模一样。原来这里 notes 排第一：SQLite 测试跑不出问题
-        # （`db/database.py` 没开 `PRAGMA foreign_keys`，外键根本不生效），而 Postgres 上
-        # 每一张引用 notes 的表都会当场拒掉 → 分享过笔记的人点注销必 500，
-        # Apple 5.1.1(v) 要的"能在 App 内删账号"这条能力对他失效。
-        "shares": db.query(Share).filter(Share.user_id == uid).delete(),
-        "jobs": db.query(Job).filter(Job.user_id == uid).delete(),
-        "notes": db.query(Note).filter(Note.user_id == uid).delete(),
-        # notes 删完才轮到它引用的两张：`notes.category_id → categories.id`、
-        # `notes.cover_asset_id → assets.id`，方向都是 notes 指过去，所以这两张在后。
-        "categories": db.query(Category).filter(Category.user_id == uid).delete(),
-        "assets": db.query(Asset).filter(Asset.user_id == uid).delete(),
-        "cards": db.query(NoteCard).filter(NoteCard.user_id == uid).delete(),
-        "profile": db.query(UserProfile).filter(UserProfile.user_id == uid).delete(),
-    }
-
-    # 举报行只挂 token（不建外键是刻意的），所以它必须用删 shares **之前**抄的那份清单来清；
-    # 排在 shares 之后、account 之前，语义就是"这个人公开过的码，收到的举报一起带走"。
-    deleted["reports"] = 0
-    if share_tokens:
-        deleted["reports"] = (
-            db.query(ShareReport)
-            .filter(ShareReport.token.in_(share_tokens))
-            .delete(synchronize_session=False)
-        )
-
-    # 「人」那张表也要跟着走。不删的后果不是留垃圾行：那个 openid 会一直被唯一索引占着，
-    # 同一个人重新注册时插第二条身份直接撞库（这一轮把这一段撤掉试过，第二条身份当场
-    # IntegrityError，红在 `tests/test_account_and_identity.py::Test注销连带`）。
-    if user.account_id:
-        deleted["identities"] = (
-            db.query(AccountIdentity).filter(AccountIdentity.account_id == user.account_id).delete()
-        )
-        deleted["account"] = (
-            db.query(Account).filter(Account.id == user.account_id).delete()
-        )
-
-    # 防止邀请奖励上限绕过：注销前先把该用户贡献给邀请人的 bonus 扣掉
-    # 这样反复注册→写笔记→注销→再注册的循环就无法累积无限奖励
-    invite_records = (
-        db.query(Invitation)
-        .filter(Invitation.invitee_id == user.id)
-        .all()
-    )
-    for record in invite_records:
-        inviter = db.get(User, record.inviter_id)
-        if inviter is None:
-            continue
-        if inviter.quota_bonus < record.reward:
-            # 正常情况下走不到：除了这里，没有别的地方会减 quota_bonus。真走到了说明
-            # 台账和余额已经对不上，宁可不追讨也不能把余额扣成负数（负数会把上限压到
-            # BASE_QUOTA 以下，那个人自己的笔记就存不下了）。留一条日志好事后对账。
-            logger.error(
-                "注销回退邀请奖励时发现余额不足，跳过：inviter=%s bonus=%s 应退=%s invitee=%s",
-                inviter.id, inviter.quota_bonus, record.reward, user.id,
-            )
-            continue
-        before = inviter.quota_bonus
-        inviter.quota_bonus = before - record.reward
-        logger.info(
-            "注销时回退邀请奖励：inviter=%s -%d（%d → %d）invitee=%s",
-            inviter.id, record.reward, before, inviter.quota_bonus, user.id,
-        )
-
-    # 邀请台账两个方向都删：留着被邀请人那条，等于把"谁邀的他"这件事留在一个已注销的
-    # 账号之外；留着邀请人那条，奖励来源就查得到。两边都不该在账号消失后还留着。
-    db.query(Invitation).filter(
-        (Invitation.invitee_id == user.id) | (Invitation.inviter_id == user.id)
-    ).delete()
-    db.query(User).filter(User.invited_by == user.id).update({User.invited_by: None})
-    db.delete(user)
+    # 「删哪七张表、按什么顺序、抄哪些云对象」只在 `services/deletion.py` 说一次；这一路只
+    # 决定"删谁"：这一行 `users` 登录行，加上它背后那条 account（乙之前它只可能是微信那条）。
+    # ⚠ 传的是 `user.account_id` 这个**值**而不是查出来的对象：值有、行没了（半截事务留下的
+    # 孤儿 account_id）时，老代码照样把身份行摘掉并自愈；换成对象就等于撤了那一次自愈——
+    # 那个 openid 一直被占着，同一个人下次微信登录撞 `accounts.ensure_for_provider` 那句
+    # RuntimeError，变成登不进去。钉在 `tests/test_v1_account_deletion.py`。
+    deleted, file_ids = deletion.purge(db, [user], user.account_id)
     db.commit()
-
-    # 去重保序，理由同 `routes/notes.py:delete_note`：注销这一份最容易撞重复——
-    # 同一张图既在 assets 里又在 note_cards 里（换过模板又换回来）时，两处各列一次。
-    return {"message": "账号已注销", "deleted": deleted, "file_ids": list(dict.fromkeys(asset_ids))}
+    return {"message": "账号已注销", "deleted": deleted, "file_ids": file_ids}

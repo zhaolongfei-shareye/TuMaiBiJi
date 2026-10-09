@@ -1214,17 +1214,17 @@ class Test_v1_微信登录转调:
         assert db.query(Account).count() == 1, "老门又来了一遍，账上多出第二条 account：两条推导还是两个答案"
 
 
-class Test限流挂在该挂的那四道门上:
+class Test限流挂在该挂的那五道门上:
     """限流这一档只能读 slowapi 的私有注册表：真跑出一发 429 得有 Redis 在，
     而用例那侧 `app.state.limiter.enabled = False` 本来就是要关它。口径抄
     `test_quota_and_invite.py` / `test_landing_page.py`。
 
-    为什么这四道要钉：**装饰器漏写了不会报错**，路由照样挂得上、用例照样全绿，
-    线上则是裸奔的一道写入口。`/link/code` 每发都往库里写一行 HMAC，
-    两道登录口每发都要出网打 Apple / 微信。
+    为什么这几道要钉：**装饰器漏写了不会报错**，路由照样挂得上、用例照样全绿，
+    线上则是裸奔的一道写入口。`/link/code` 每发都往库里写一行 HMAC，两道登录口每发
+    都要出网打 Apple / 微信，`DELETE /v1/account` 每发都不可逆地删数据。
     """
 
-    def test_四道门都在注册表里(self):
+    def test_五道门都在注册表里(self):
         from app.core.rate_limit import limiter
 
         import app.main  # noqa: F401  装饰器在 import 路由模块那一刻才注册
@@ -1232,7 +1232,8 @@ class Test限流挂在该挂的那四道门上:
         for key in ("app.api.routes.v1_auth.apple_login",
                     "app.api.routes.v1_auth.wechat_login",
                     "app.api.routes.v1_account.create_link_code",
-                    "app.api.routes.v1_account.redeem_link_code"):
+                    "app.api.routes.v1_account.redeem_link_code",
+                    "app.api.routes.v1_account.delete_account"):
             limits = limiter._route_limits.get(key)
             assert limits, f"{key} 上没有 @limiter.limit —— 这道门裸奔"
             assert len(limits) == 1, f"{key} 挂了 {len(limits)} 层限流，按一层设计"
@@ -1248,7 +1249,7 @@ class Test限流挂在该挂的那四道门上:
         import app.main  # noqa: F401
 
         v1_keys = [k for k in limiter._route_limits if k.startswith("app.api.routes.v1_")]
-        assert len(v1_keys) >= 4, f"只注册了 {len(v1_keys)} 道 /v1 限流：{v1_keys}"
+        assert len(v1_keys) >= 5, f"只注册了 {len(v1_keys)} 道 /v1 限流：{v1_keys}"
 
 
 class Test迁移与模型对齐:
