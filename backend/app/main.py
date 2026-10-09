@@ -31,8 +31,11 @@ app = FastAPI(title="图麦笔记 API", version="0.1.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
 # `/v1` 的错误体多带一个稳定 `code`（契约 §六）。这一支是**全局** handler，`/api/*` 也走它，
-# 所以"不动旧门"完全靠 `error_codes.attach` 里那一句路径判断——注册与判断分在两处，
-# 任何一处被改掉，`tests/test_v1_error_codes.py` 里那条"同状态码在 /api 上不许带 code"就红。
+# 所以"不动旧门"完全靠 `error_codes.is_v1_path` 那一句（它读 `route_path()` 而不是 `url.path`，
+# 理由记在 `error_codes.py` 顶部）——注册与判断分在两处，任何一处被改掉，
+# `tests/test_v1_error_codes.py` 里那一组"表里每一格在 /api 上都不得现身"就红。
+# 另注：这一行是**替换** FastAPI 默认那支 HTTPException handler，不是追加；默认那支里
+# "204/205/304 与 1xx 不给 body"那道闸门已经一起搬进 `http_exception_handler`，别在这儿删。
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_middleware(SlowAPIMiddleware)
 

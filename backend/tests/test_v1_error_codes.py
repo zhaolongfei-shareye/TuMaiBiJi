@@ -1,23 +1,32 @@
 """`/v1` 错误体里那个稳定 `code`（契约 §六、任务 #171、站长 2026-10-10 拍的"不编名字"）。
 
-这一把尺子量的是**两件事**，缺一半都不算数：
+这一把尺子量的是**三件事**，缺一半都不算数：
 1. `/v1` 上那四个"状态码唯一对应"的名字真的带出去了（401→`unauthorized`、404→`not_found`、
    409→`conflict`、429→`rate_limited`），而 `detail` 那句中文**一个字都没改**；
 2. **`/api` 一个字都没变**。这一支 handler 是全局注册的，`/api/*` 也走它，"不动旧门"这句话
-   兑现成代码就只剩 `attach()` 里那一句路径判断——所以兼容面必须按**整个回体**比，
-   只比 `status_code` 或只比 `detail` 都抓不到"多塞了一个键"。
-
-第三条是这次拍板那句话本身：400／422／502／503 **不带 code**。它们今天没有任何一端在读，
-名字不是我量出来的，所以这一版明确不承诺，客户端按状态码＋`detail` 处理（写在
-`app/core/error_codes.py` 顶部，也写进契约 §六）。
+   兑现成代码就只剩 `is_v1_path()` 那一句——所以兼容面必须按**整个回体**比，
+   只比 `status_code` 或只比 `detail` 都抓不到"多塞了一个键"；`CODE_BY_STATUS` 里每一个键
+   都要在 `/api` 上钉一遍（少一个键就是少一面：10-10 审查那轮 `/api` 只钉了 401 与 404，
+   而 409／429 在 `/api` 上今天真发得出，"只给 409 也加 code"这种改法能全绿）。
+3. 第三条是这次拍板那句话本身：400／405／422／502／503 **不带 code**。它们今天没有任何一端在读，
+   名字不是我量出来的，所以这一版明确不承诺，客户端按状态码＋`detail` 处理（写在
+   `app/core/error_codes.py` 顶部，也写进契约 §六）。
 
 ⚠ 429 这一格是**直调那支函数**验的，没走端到端：本地这套用例把限流整体关掉
 （`app.state.limiter.enabled = False`），而 slowapi 的存储指 `redis://localhost:6379`、
 测试机上没有那台 Redis。所以下面那条钉的是"注册的就是这一支"+"这一支翻得出名字"两件事，
 **不等于**现网 429 一定带 code——那一发挂在下一次部署的现网探针里（连打 6 次
 `/v1/auth/apple`，读第 6 次的回体）。这条没做的边界写在上面，不许被"有判据"三个字盖过去。
+
+下面 `Test那一句路径判断的地基` 那一组是 10-10 代码审计抓出来的三条，都不是"再挑一点毛病"，
+是**改坏了没有任何现网症状**的三类：`root_path`（前缀写法换成带前缀那种，`/v1` 静默不再带 code）、
+`/v1x` 这类"看着像 `/v1` 的路径"（过匹配会把一个旧门绝不该出现的键发出去）、
+以及 204/304 那种**按 HTTP 语义不许有 body** 的状态码（注册全局 handler 是替换默认那支，
+少了这道闸等于把 body 语义一起换掉，`/api` 也中）。
 """
+import asyncio
 import os
+import re
 import sys
 
 import pytest
@@ -31,14 +40,19 @@ from test_v1_auth_and_link import (  # noqa: E402
     _serve_jwks_raising, CLIENT_ID,
 )
 
+from app.core.error_codes import CODE_BY_STATUS  # noqa: E402  ← 兼容面按这张表**逐格**参数化
 from app.models.account import Account  # noqa: E402
 
 
 class _Request:
-    """只带 `url.path` 的假请求——`attach()` 读的就这一样东西，多给都是装饰。"""
+    """只带 `scope` 的假请求——`route_path()` 读的就 `path` 与 `root_path` 两样，多给都是装饰。
 
-    def __init__(self, path):
-        self.url = type("U", (), {"path": path})()
+    这里**故意**不给 `url`：那一路写法（`request.url.path`）正是 10-10 审查抓出来的那条，
+    留着 `url` 的话哪天有人改回去，这条判据会因为假对象恰好两种都支持而看不见。
+    """
+
+    def __init__(self, path, root_path=""):
+        self.scope = {"path": path, "root_path": root_path, "type": "http"}
 
 
 @pytest.fixture
@@ -138,6 +152,18 @@ class Test没起名的那些明确不带:
         assert resp.status_code == 422, resp.text
         assert "code" not in resp.json(), resp.json()
 
+    def test_405_不带_code_而_allow_头原样(self, client):
+        """路由表里有这条路径、但没有这个方法 → 405，这一格同样没名字。
+
+        405 是 10-10 审查从 `error_codes.py` 那份"发得出来的状态码"名单里**抓出来的漏项**
+        （同一份名单第一版还漏过 503）。它是 Starlette 路由自己发的，不经过我们任何一处 `raise`，
+        所以最容易漏——`allow` 头一起钉：那句"响应头原样"不许只写在注释里。
+        """
+        resp = client.post("/v1/account", json={})
+        assert resp.status_code == 405, resp.text
+        assert resp.json() == {"detail": "Method Not Allowed"}, resp.json()
+        assert resp.headers.get("allow") == "GET", dict(resp.headers)
+
     def test_502_不带_code(self, client, db, signing_key, monkeypatch):
         """苹果侧拿不到 JWKS → 502。这一格同样在"明确不承诺"里（客户端动作是原样重试）。
 
@@ -187,6 +213,94 @@ class Test旧门一个字没变:
         resp = client.get("/api/no-such-route")
         assert resp.status_code == 404, resp.text
         assert resp.json() == {"detail": "Not Found"}
+
+    @pytest.mark.parametrize("status_code", sorted(CODE_BY_STATUS))
+    def test_表里每一格在_api_上都不得现身(self, status_code):
+        """兼容面**逐格**钉，不是抽一格钉。
+
+        10-10 审查抓的就是这个缺面：旧版只钉了 `/api` 上的 401 与 404，而 `CODE_BY_STATUS` 里的
+        409 与 429 在 `/api` 上今天**真发得出**（`routes/shares.py` 那句"分享状态刚变过"、
+        `routes/ingest.py` 那发手写 `HTTPException(429)`）。那时候"只给 409 也加 code"这种改法
+        能让整把尺子全绿，而已上线的回体被改了。按表参数化＝表里长一格，兼容面自己多一面。
+        """
+        from app.core.error_codes import attach
+
+        assert attach(f"/api/anything/{status_code}", status_code, {"detail": "中文"}) == {"detail": "中文"}
+        assert attach("/api", status_code, {"detail": "中文"}) == {"detail": "中文"}
+
+    def test_看着像_v1_而不是_v1_的路径不许带_code(self, client):
+        """`startswith("/v1")` 那种过匹配：路由表外的 `/v1x/account` 会回一个旧门绝不该出现的键。
+
+        审查实跑的读数就是 `{"detail": "Not Found", "code": "not_found"}`。这一条把
+        `is_v1_path()` 钉成"正好 `/v1` 或 `/v1/…`"，反面（`/v1` 与 `/v1/account` 仍然算这一路）
+        由上面 `Test那四个名字真的带出去了` 那几条盖着。
+        """
+        resp = client.get("/v1x/account")
+        assert resp.status_code == 404, resp.text
+        assert resp.json() == {"detail": "Not Found"}
+        assert client.get("/v100").json() == {"detail": "Not Found"}
+
+
+class Test那一句路径判断的地基:
+    """三条共同点：**改坏了没有现网症状**——旧门照旧、新门只是少一个键或多加一个不该有的键。"""
+
+    def test_带_root_path_的前缀路径仍然算_v1(self):
+        """nginx 若是"不剥前缀 ＋ 告诉进程 root_path"那种写法（#161 的修法之一），
+        `request.url.path` 就成了 `/wtsj/v1/…`，那句判断**静默失效**：iPhone 拿不到 `code`，
+        而 `/api` 一个字没变。所以读的是 `get_route_path(scope)`，这条钉它。
+        """
+        from fastapi.exceptions import HTTPException as FastHTTPException
+
+        from app.core.error_codes import http_exception_handler
+
+        exc = FastHTTPException(status_code=401, detail="缺少认证凭证，请重新登录")
+        with_prefix = asyncio.run(http_exception_handler(_Request("/wtsj/v1/account", root_path="/wtsj"), exc))
+        assert with_prefix.status_code == 401
+        assert with_prefix.body.decode() == (
+            '{"detail":"缺少认证凭证，请重新登录","code":"unauthorized"}'
+        ), with_prefix.body
+
+        # 反面：旧门带着前缀也仍然是旧门，一个键都不许多。
+        old_door = asyncio.run(
+            http_exception_handler(_Request("/wtsj/api/user/quota", root_path="/wtsj"), exc))
+        assert old_door.body.decode() == '{"detail":"缺少认证凭证，请重新登录"}', old_door.body
+
+    @pytest.mark.parametrize("status_code", [204, 304])
+    @pytest.mark.parametrize("path", ["/v1/account", "/api/user/quota"])
+    def test_按_http_语义不许有_body_的那几格_body_必须是空的(self, status_code, path):
+        """注册全局 handler 是**替换**默认那支，默认那支里有一道 body 闸门。
+
+        少了它，`raise HTTPException(204)` 会带着 `{"detail": …}` 出去——204/205/304 与 1xx
+        按 HTTP 语义不许有 body，而这条与 `/v1` 无关，`/api` 一样中（10-10 审查实跑
+        `/api/probe-204` 看到的就是 JSON body）。今天全仓没有 204/304 的抛错处，所以是**潜伏**：
+        这一条不许被"现在没人这么写"注销，它钉的是那三行闸门还在。
+        """
+        from fastapi.exceptions import HTTPException as FastHTTPException
+
+        from app.core.error_codes import http_exception_handler
+
+        resp = asyncio.run(http_exception_handler(
+            _Request(path), FastHTTPException(status_code=status_code, detail="不该出现在 body 里")))
+        assert resp.status_code == status_code
+        assert resp.body == b"", resp.body
+        assert resp.media_type is None, resp.media_type
+
+    def test_v1_那一路今天发不出_403_这句是拿源码钉的(self):
+        """`error_codes.py` 顶部那句"今天 `/v1` 一条 403 都发不出来"是**实测**，不是修辞。
+
+        为什么值得上尺子：那一路把状态码交在服务层手里——`services/linking.py` 那支
+        `LinkRefused` 自带 status，`routes/v1_account.py:_refused` 原样翻成 HTTP。将来一句
+        `LinkRefused("…", 403)` 就让那句话变成假话，而且**零条判据会红**。
+        红的时候该改的是那段说明与"由抛错那一处报名字"的做法，**不是**把 403 塞进 `CODE_BY_STATUS`
+        （那三格 `forbidden`／`quota_reached`／`text_blocked` 正是要等那一天由抛错处挑一个）。
+        """
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        files = ("app/api/routes/v1_auth.py", "app/api/routes/v1_account.py",
+                 "app/services/linking.py", "app/core/auth.py", "app/core/apple_identity.py")
+        for name in files:
+            with open(os.path.join(root, name), encoding="utf-8") as fh:
+                text = fh.read()
+            assert not re.search(r"\b403\b|HTTP_403", text), f"{name} 里出现了 403：那段实测名单要一起改"
 
     def test_限流那一支注册的就是会翻名字的函数(self):
         """429 端到端跑不了（测试机上没有那台 Redis），这里钉两件事：

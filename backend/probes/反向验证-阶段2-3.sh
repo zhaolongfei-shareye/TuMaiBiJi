@@ -4,7 +4,14 @@
 #
 # A～F 是水位线那半（`services/generation` ＋ 迁移 `b71f4e0c9d52` 那一格的初值），
 # G～J 是那道闸那半（`routes/user.py:_account_to_take_along` ＋ 回体键集合），
-# K～N 是错误码那半（`core/error_codes.py` ＋ `main.py` 那行注册 ＋ 429 那一格）。
+# K～R 是错误码那半（`core/error_codes.py` ＋ `main.py` 那行注册 ＋ 429 那一格）。
+# K～N 是 10-10 凌晨那批自己写的；O～R 是同一晚**代码审计那轮**补的，四刀打的都是
+# "改坏之后现网没有任何症状"的那一类（`root_path`、`/v1x` 过匹配、204/304 的 body 闸门、
+# 那句"今天 /v1 发不出 403"），审计报告的原文与逐条核实记在 docs §8.189。
+#
+# ⚠ 这个脚本自己的**说明文字里不许出现反引号**：`run` 用 `eval` 跑，那会被当成命令替换。
+# 10-10 就栽过一次（K、M 两条的日志里冒出 `line 111: /api: No such file or directory`），
+# 改干净重跑才算数。
 #
 # 判据口径与前两批完全一致（`反向验证-阶段2-2.sh`、`反向验证-阶段2-2b.sh`）：
 # - 每条突变先 `--collect-only` 数这根针覆盖几条用例。`pytest -k` 空匹配的退出码是 5，
@@ -107,10 +114,11 @@ run J "回体里那三格不再预先摆平（键集合重新随\"这一路带�
 EC=app/core/error_codes.py
 MN=app/main.py
 RL=app/core/rate_limit.py
+LK=app/services/linking.py
 
 run K "撤掉那句路径判断（/api 那一侧也开始带 code——已上线回体被改动）" \
   "同一条_401_在_api_上不带_code" \
-  "perl -pi -e 's|^    if not path\\.startswith\\(\"/v1\"\\):|    if False:  # rv|' $EC" "$EC"
+  "perl -pi -e 's|^    if not is_v1_path\\(path\\):|    if False:  # rv|' $EC" "$EC"
 
 run L "给 400 现场编一个名字（站长那条\"没核实过的名字不许写进契约\"就是挡这一手）" \
   "400_不带_code" \
@@ -123,6 +131,24 @@ run M "全局 handler 那行注册撤掉（/v1 的 code 从此没人发，而 /a
 run N "把 429 那一格从名单里删掉（限流那一路不再报名字）" \
   "限流那一支注册的就是会翻名字的函数" \
   "perl -0pi -e 's/    429: \"rate_limited\",\\n//' $EC" "$EC"
+
+# O～R 是 10-10 代码审计那轮补的四刀。共同点：**改坏之后现网没有任何症状**（旧门照旧、
+# 新门只是少一个键或多一个不该有的键），所以只有刀能证明那四条判据不是装饰。
+run O "body 闸门那三行撤掉（204/304 开始带 JSON body，/api 一样中）" \
+  "body_必须是空的" \
+  "perl -pi -e 's|^    if not is_body_allowed_for_status_code\\(exc\\.status_code\\):|    if False:  # rv|' $EC" "$EC"
+
+run P "路径判断退回 request.url.path（nginx 换成带前缀那种写法之后 /v1 静默不再带 code）" \
+  "带_root_path_的前缀路径仍然算_v1" \
+  "perl -pi -e 's/^    return get_route_path\\(request\\.scope\\)/    return request.scope[\"path\"]  # rv/' $EC" "$EC"
+
+run Q "is_v1_path 退回成只 startswith（/v1x 这类路径也拿到 code）" \
+  "看着像_v1_而不是_v1_的路径不许带_code" \
+  "perl -pi -e 's|^    return path == \"/v1\" or path\\.startswith\\(\"/v1/\"\\)|    return path.startswith(\"/v1\")  # rv|' $EC" "$EC"
+
+run R "服务层默认状态码改成 403（error_codes 顶部那句\"v1 发不出 403\"当场变假话）" \
+  "v1_那一路今天发不出_403" \
+  "perl -pi -e 's/status_code: int = 400\\):/status_code: int = 403):/' $LK" "$LK"
 
 echo "=== 全部还原后复跑这三批的尺子，必须全绿 ==="
 $PY tests/test_persistent_generation.py tests/test_v1_account_deletion.py tests/test_account_deletion.py tests/test_v1_error_codes.py 2>&1 | tail -1
