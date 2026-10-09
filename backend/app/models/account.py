@@ -11,7 +11,7 @@ class Account(Base):
     而 `openid` 那一列是 `unique=True, nullable=False` —— 一个只有 Apple 身份的人填不出这串，
     硬填就是把微信的 id 编出来冒名。更重要的是反方向：一旦让某个平台的 id 当业务主键往外走，
     加第二种登录方式时所有历史数据都要搬家；`id` 是自家生成的 UUID 之后，加一种登录只是往
-    `auth_identities` 里插一行。
+    `account_identities` 里插一行。
 
     用 `String(36)` 存 UUID 而不是自增整数：自增 id 由服务器独占，而这条路线上迟早要有
     "客户端生成 id"的那一步（锚点 2 说的是跨端记录，走 UUIDv7）；这一张表今天的 id
@@ -25,7 +25,7 @@ class Account(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-class AuthIdentity(Base):
+class AccountIdentity(Base):
     """一个 account 对上某个平台的那个 id。一对多：同一个人可以有微信、有 Apple。
 
     `provider_uid` 存的是平台侧原样那串（微信 openid / Apple 的 user identifier）。
@@ -34,7 +34,7 @@ class AuthIdentity(Base):
     没有它，Apple 那边签名校验通过两次就会建出两个 account，而两个人各自看着一份不同的笔记。
     """
 
-    __tablename__ = "auth_identities"
+    __tablename__ = "account_identities"
 
     id = Column(Integer, primary_key=True, index=True)
     account_id = Column(String(36), ForeignKey("accounts.id"), nullable=False, index=True)

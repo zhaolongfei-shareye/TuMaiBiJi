@@ -1,4 +1,4 @@
-"""accounts / auth_identities：「人」这张表的四条不变量。
+"""accounts / account_identities：「人」这张表的四条不变量。
 
 ① 迁移把每一个**当时存在的**用户回填成一个 account ＋ 一条 (wechat, openid) 身份，
    `verified_at` 不给留 null（他们那串 openid 本来就是 code2session 换回来的）。
@@ -24,10 +24,10 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 # ⚠ 建表那一句（`Base.metadata.create_all`）只看得见"这一刻已经被 import 的模型"。本文件
-# 原先把模型 import 全放在夹具与用例体内，于是**单独跑这个文件**时 accounts / auth_identities
+# 原先把模型 import 全放在夹具与用例体内，于是**单独跑这个文件**时 accounts / account_identities
 # 两张表还没进 metadata，夹具里那句 DELETE 直接报 no such table（10-09 实测到的假红，
 # 整批跑时靠别的模块先 import 过才看不出来）。像本仓其他测试文件一样在文件头挂上。
-from app.models.account import Account, AuthIdentity  # noqa: F401,E402
+from app.models.account import Account, AccountIdentity  # noqa: F401,E402
 from app.models.user import User  # noqa: F401,E402
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -62,7 +62,7 @@ class Test迁移回填:
         conn = sqlite3.connect(db_file)
         accounts = conn.execute("select count(*) from accounts").fetchone()[0]
         identities = conn.execute(
-            "select account_id, provider, provider_uid, verified_at from auth_identities "
+            "select account_id, provider, provider_uid, verified_at from account_identities "
             "order by provider_uid"
         ).fetchall()
         # 三张表连着查一遍"这个人挂的那个 account 上，确实是他自己那条微信身份"。
@@ -70,7 +70,7 @@ class Test迁移回填:
         joined = conn.execute(
             "select u.openid, i.provider, i.provider_uid from users u "
             "join accounts a on a.id = u.account_id "
-            "join auth_identities i on i.account_id = a.id order by u.openid"
+            "join account_identities i on i.account_id = a.id order by u.openid"
         ).fetchall()
         conn.close()
 
@@ -96,7 +96,7 @@ class Test迁移回填:
             "left join accounts a on a.id = u.account_id where u.account_id is not null and a.id is null"
         ).fetchall()
         dangling = conn.execute(
-            "select i.account_id from auth_identities i "
+            "select i.account_id from account_identities i "
             "left join accounts a on a.id = i.account_id where a.id is null"
         ).fetchall()
         ids = conn.execute("select count(distinct account_id) from users").fetchone()[0]
@@ -118,14 +118,14 @@ class Test迁移回填:
         conn = sqlite3.connect(db_file)
         conn.execute("insert into accounts (id) values ('aaaaaaaa-1111-1111-1111-111111111111')")
         conn.execute(
-            "insert into auth_identities (account_id, provider, provider_uid) "
+            "insert into account_identities (account_id, provider, provider_uid) "
             "values ('aaaaaaaa-1111-1111-1111-111111111111', 'apple', '000827.1f')"
         )
         conn.execute("insert into accounts (id) values ('bbbbbbbb-1111-1111-1111-111111111111')")
         conn.commit()
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(
-                "insert into auth_identities (account_id, provider, provider_uid) "
+                "insert into account_identities (account_id, provider, provider_uid) "
                 "values ('bbbbbbbb-1111-1111-1111-111111111111', 'apple', '000827.1f')"
             )
         conn.close()
@@ -159,16 +159,16 @@ class Test登录那一路:
 
     @pytest.fixture
     def clean(self, db):
-        from app.models.account import Account, AuthIdentity
+        from app.models.account import Account, AccountIdentity
         from app.models.user import User
 
-        db.query(AuthIdentity).delete()
+        db.query(AccountIdentity).delete()
         db.query(Account).delete()
         db.query(User).delete()
         db.commit()
 
     def test_新用户第一次登录就有account(self, db, clean):
-        from app.models.account import Account, AuthIdentity
+        from app.models.account import Account, AccountIdentity
         from app.models.user import User
         from app.services.accounts import ensure_for_user
 
@@ -180,7 +180,7 @@ class Test登录那一路:
         account = ensure_for_user(db, user)
         assert user.account_id == account.id
         assert db.query(Account).count() == 1
-        identities = db.query(AuthIdentity).all()
+        identities = db.query(AccountIdentity).all()
         assert [(i.provider, i.provider_uid) for i in identities] == [("wechat", "o_new")]
         assert identities[0].verified_at is not None
 
@@ -224,7 +224,7 @@ class Test登录那一路:
         才发现微信这批人一个都不在表里。这一条就是钉那一句调用的。
         """
         from app.core import auth as auth_core
-        from app.models.account import Account, AuthIdentity
+        from app.models.account import Account, AccountIdentity
         from app.models.user import User
 
         async def fake(code):
@@ -238,10 +238,10 @@ class Test登录那一路:
         user = db.query(User).filter(User.openid == "o_route").first()
         assert user is not None, "登录路由没落出人"
         assert user.account_id, "走登录路由进来的用户没有 account（auth.py 里那一句没生效）"
-        assert db.query(AuthIdentity).filter(
-            AuthIdentity.account_id == user.account_id,
-            AuthIdentity.provider == "wechat",
-            AuthIdentity.provider_uid == "o_route",
+        assert db.query(AccountIdentity).filter(
+            AccountIdentity.account_id == user.account_id,
+            AccountIdentity.provider == "wechat",
+            AccountIdentity.provider_uid == "o_route",
         ).count() == 1
         assert db.query(Account).filter(Account.id == user.account_id).count() == 1
 
@@ -254,8 +254,8 @@ class Test唯一索引:
         # 这两张表先删后建。10-09 反向验证时把模型里那道唯一索引整条摘掉，用例却照样绿：
         # `create_all` 见表已存在就不动它，于是那把尺子量的是**上一轮留在库里的那道索引**，
         # 不是这一轮的模型定义。删了再建，库里有没有这道唯一约束才只可能由现在这份模型决定。
-        Base.metadata.drop_all(bind=engine, tables=[AuthIdentity.__table__, Account.__table__])
-        Base.metadata.create_all(bind=engine, tables=[Account.__table__, AuthIdentity.__table__])
+        Base.metadata.drop_all(bind=engine, tables=[AccountIdentity.__table__, Account.__table__])
+        Base.metadata.create_all(bind=engine, tables=[Account.__table__, AccountIdentity.__table__])
         session = SessionLocal()
         try:
             yield session
@@ -263,15 +263,15 @@ class Test唯一索引:
             session.close()
 
     def test_同一个平台的同一个人建不出第二条身份(self, db):
-        from app.models.account import Account, AuthIdentity
+        from app.models.account import Account, AccountIdentity
 
         a1 = Account(id="11111111-1111-1111-1111-111111111111")
         a2 = Account(id="22222222-2222-2222-2222-222222222222")
         db.add_all([a1, a2])
         db.flush()
-        db.add(AuthIdentity(account_id=a1.id, provider="apple", provider_uid="000827.1f"))
+        db.add(AccountIdentity(account_id=a1.id, provider="apple", provider_uid="000827.1f"))
         db.flush()
-        db.add(AuthIdentity(account_id=a2.id, provider="apple", provider_uid="000827.1f"))
+        db.add(AccountIdentity(account_id=a2.id, provider="apple", provider_uid="000827.1f"))
         with pytest.raises(IntegrityError):
             db.flush()
 
@@ -279,17 +279,17 @@ class Test唯一索引:
         """反面：唯一索引只管"同一个平台的同一个人"。把跨平台也一起挡住了，
         「iPhone 用 SIWA、小程序用微信、两边同一个人」那句验收就永远做不到。
         """
-        from app.models.account import Account, AuthIdentity
+        from app.models.account import Account, AccountIdentity
 
         account = Account(id="33333333-3333-3333-3333-333333333333")
         db.add(account)
         db.flush()
         db.add_all([
-            AuthIdentity(account_id=account.id, provider="wechat", provider_uid="o_multi"),
-            AuthIdentity(account_id=account.id, provider="apple", provider_uid="000827.2f"),
+            AccountIdentity(account_id=account.id, provider="wechat", provider_uid="o_multi"),
+            AccountIdentity(account_id=account.id, provider="apple", provider_uid="000827.2f"),
         ])
         db.commit()
-        assert db.query(AuthIdentity).filter(AuthIdentity.account_id == account.id).count() == 2
+        assert db.query(AccountIdentity).filter(AccountIdentity.account_id == account.id).count() == 2
 
 
 class Test注销连带:
@@ -325,11 +325,11 @@ class Test注销连带:
 
     @pytest.fixture
     def one(self, db):
-        from app.models.account import Account, AuthIdentity
+        from app.models.account import Account, AccountIdentity
         from app.models.user import User
         from app.services.accounts import ensure_for_user
 
-        db.query(AuthIdentity).delete()
+        db.query(AccountIdentity).delete()
         db.query(Account).delete()
         db.query(User).delete()
         db.commit()
@@ -341,7 +341,7 @@ class Test注销连带:
 
     def test_注销把account与身份一起删掉(self, client, db, one):
         from app.core.auth import _create_token
-        from app.models.account import Account, AuthIdentity
+        from app.models.account import Account, AccountIdentity
         from app.models.user import User
 
         user, account = one
@@ -355,19 +355,19 @@ class Test注销连带:
         # db.get 命中身份映射会把"内存里还有"当成"库里还有"（同 test_account_deletion 那条口径）。
         db.expunge_all()
         assert db.query(Account).filter(Account.id == account.id).count() == 0, "account 行留着"
-        assert db.query(AuthIdentity).filter(
-            AuthIdentity.provider_uid == "o_bye").count() == 0, "微信身份还占着那个 openid"
+        assert db.query(AccountIdentity).filter(
+            AccountIdentity.provider_uid == "o_bye").count() == 0, "微信身份还占着那个 openid"
         assert db.query(User).filter(User.openid == "o_bye").count() == 0
 
     def test_注销之后同一个openid能干净重开(self, client, db):
         """这才是那条不变量的正面：不撞唯一索引，而且新开的人拿到的是**他自己的**新 account。
         """
         from app.core.auth import _create_token
-        from app.models.account import Account, AuthIdentity
+        from app.models.account import Account, AccountIdentity
         from app.models.user import User
         from app.services.accounts import ensure_for_user
 
-        db.query(AuthIdentity).delete()
+        db.query(AccountIdentity).delete()
         db.query(Account).delete()
         db.query(User).delete()
         db.commit()
@@ -394,4 +394,4 @@ class Test注销连带:
         # 那句会把正确行为判成错。要钉的是：已注销那个人不再有 account，而活着的那个只有一个身份。
         assert db.query(Account).filter(Account.id == first_account).count() == 0, \
             "注销之后旧 account 还在"
-        assert db.query(AuthIdentity).filter(AuthIdentity.provider_uid == "o_reuse").count() == 1
+        assert db.query(AccountIdentity).filter(AccountIdentity.provider_uid == "o_reuse").count() == 1

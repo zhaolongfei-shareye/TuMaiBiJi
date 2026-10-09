@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models.account import Account, AuthIdentity
+from app.models.account import Account, AccountIdentity
 from app.models.user import User
 
 
@@ -30,7 +30,7 @@ def ensure_for_user(db: Session, user: User) -> Account:
     account = Account(id=str(uuid.uuid4()))
     db.add(account)
     db.flush()
-    db.add(AuthIdentity(account_id=account.id, provider="wechat", provider_uid=user.openid,
+    db.add(AccountIdentity(account_id=account.id, provider="wechat", provider_uid=user.openid,
                         # 这串 openid 是 code2session 当场换回来的，属于"平台确认过"。
                         # 留 null 会让每个老用户在界面上看起来像"绑了没验"。
                         verified_at=datetime.now(timezone.utc)))

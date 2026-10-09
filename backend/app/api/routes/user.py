@@ -11,7 +11,7 @@ from app.core.auth import get_current_user
 from app.core.private_access import PRIVATE_CATEGORY_NAME, create_unlock_token
 from app.core.rate_limit import limiter
 from app.db.database import get_db
-from app.models.account import Account, AuthIdentity
+from app.models.account import Account, AccountIdentity
 from app.models.asset import Asset, not_failed
 from app.models.category import Category
 from app.models.invitation import Invitation
@@ -327,7 +327,7 @@ def deactivate_account(
     # IntegrityError，红在 `tests/test_account_and_identity.py::Test注销连带`）。
     if user.account_id:
         deleted["identities"] = (
-            db.query(AuthIdentity).filter(AuthIdentity.account_id == user.account_id).delete()
+            db.query(AccountIdentity).filter(AccountIdentity.account_id == user.account_id).delete()
         )
         deleted["account"] = (
             db.query(Account).filter(Account.id == user.account_id).delete()

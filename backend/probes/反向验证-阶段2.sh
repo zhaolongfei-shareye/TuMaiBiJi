@@ -9,7 +9,7 @@ PY=".venv/bin/python -m pytest -q"
 AU=app/core/auth.py
 SV=app/services/accounts.py
 MD=app/models/account.py
-MG=alembic/versions/b7d2f4a1c903_accounts_and_auth_identities.py
+MG=alembic/versions/b7d2f4a1c903_accounts_and_account_identities.py
 UR=app/api/routes/user.py
 mkdir -p /tmp/rv-bak2
 
