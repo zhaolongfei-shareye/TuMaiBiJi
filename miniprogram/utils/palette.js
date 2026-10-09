@@ -614,6 +614,53 @@ function chromeOf(wallpaper) {
 }
 
 /**
+ * 笔记列表那一层的底色（`index.wxss` 的 `.sheet` 吃它）。规格 `docs/规格-列表层底色与区内顶那一行.md` §1：
+ *
+ *   层色 = HSL( 底栏 .bg 的 H, 底栏 .bg 的 S × 0.35, L 78 )
+ *
+ * **唯一上游是 `chromeOf`**：不许另挑色相（v27 那支 H340 的粉被打回，理由是同一屏两个不相干色相，
+ * 站长原话「你为啥要用粉红？你不能用底部的 BAR 的色系来处理吗？」）。0.35 与 78 是他点的
+ * （原话「饱和压到 35%／明度不动（还是你挑的 L78），只把白加进去」），所以这里做成两个具名常量，
+ * 裸数不出现在算式里。
+ *
+ * 四套算出来（10-09 现跑，与规格 §2 那张表逐字一致）：象牙 `#CDC9C1`、天青 `#C1CDC3`、
+ * 樱落 `#CDC1C7`、雨雾 `#C1C4CD`。色相一个字没改，只是往里加白。
+ *
+ * `app.wxss` 那四条 `.theme-*` 里的 `--bg-layer` 是这份输出的**镜像**，等值由
+ * `docs/工具/验-列表层底色.js` 逐字钉住（与 `--bg-page`／`--btn-bg` 那两条同一条规矩）。
+ */
+const LAYER_SAT = 0.35
+const LAYER_L = 78
+function listLayerOf(wallpaper) {
+  const [h, s] = rgbToHsl(chromeOf(wallpaper).bg)
+  return hslToHex(h, s * LAYER_SAT, LAYER_L)
+}
+
+/**
+ * 那一层上的两档字（规格 §6）。**这条不是审美，是判定顺序**：
+ * 先试纸白压不压得住这层（`crOf(PAPER, 层色)`）——四套实测只有 1.43~1.52，全压不住，
+ * 所以整层的字翻成墨 `#23252C`；淡档（未选、三级字那一档）**不写死 alpha**，在下面那架阶梯里
+ * 取**第一个让对比 ≥ 4.5 的档**，而半透明字要谈对比必须先按实际底色混成实心再算
+ * （alpha 不落地就是假数——第 6 条那句"混成实心"就是这个意思）。
+ * 10-09 现跑：象牙 `.72`→4.64、天青 `.72`→4.68、樱落 `.78`→5.27、雨雾 `.78`→5.24，
+ * 与规格 §2 那张表逐字一致。
+ *
+ * 同样镜像进 `app.wxss` 的 `--ink-on-layer` / `--ink-on-layer-soft`，等值由
+ * `docs/工具/验-列表层底色.js` 钉住（比较前把 `rgba(...)` 里的空格归一，那是排版不是色值）。
+ */
+const LAYER_INK = '#23252C'
+const LAYER_INK_LADDER = [0.5, 0.55, 0.6, 0.66, 0.72, 0.78, 0.85, 0.92, 1]
+function layerSkinOf(wallpaper) {
+  const bg = listLayerOf(wallpaper)
+  let alpha = LAYER_INK_LADDER[LAYER_INK_LADDER.length - 1]
+  for (let i = 0; i < LAYER_INK_LADDER.length; i += 1) {
+    const a = LAYER_INK_LADDER[i]
+    if (crOf(mix(LAYER_INK, bg, a), bg) >= 4.5) { alpha = a; break }
+  }
+  return { bg, ink: LAYER_INK, alpha, soft: withAlpha(LAYER_INK, alpha) }
+}
+
+/**
  * 分类身份在行卡 meta 行上的两档取色（D2：一块 14rpx 的点 + 二十几个 rpx 的三个字）。
  * 点色 = 这支色本身。浅色卡下它不单独达标是允许的（芥末黄压白卡 1.63）：紧挨着的
  * 分类名已经过了门槛，去掉颜色也不影响读出"这是哪一类"，WCAG 1.4.1 管的是
@@ -665,6 +712,8 @@ module.exports = {
   setActiveTheme,
   rampFor,
   chromeOf,
+  listLayerOf,
+  layerSkinOf,
   createSkin,
   catSkinFor,
   crOf,

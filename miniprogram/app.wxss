@@ -118,7 +118,8 @@ page {
    这四枚都是"整套色阶"：页面底、卡底、文字四级、chips、按钮、左侧那块方块
    全部收进同一支色相，所以方块色也在这里（镜像值），真身在 utils/palette.js 的 THEMES。
    两边逐字等值由色板那把尺子钉死：--bg-page=theme.page、--bg-card=theme.line、
-   --btn-bg=chromeOf(key).sel。改一边必须改另一边，只改一边会在真机上出现
+   --btn-bg=chromeOf(key).sel，10-09 起再加三条 --bg-layer / --ink-on-layer / --ink-on-layer-soft
+   ＝ palette 的 listLayerOf／layerSkinOf（`验-列表层底色.js` 逐套各钉一条）。改一边必须改另一边，只改一边会在真机上出现
    "导航条是上一页那套色"这一类对不上。
    卡底不用纯白：白纸贴在米纸上像一张张贴纸，退到比页面底亮 9 档的那一支。
    色值出处：docs/design/配色统一-四套莫兰迪/生成色板5.py（那一份是唯一算法，别在手底下改）。 */
@@ -135,6 +136,11 @@ page {
   --accent-soft: rgba(53, 46, 29, 0.07);
   --btn-bg: #766948;
   --chip-idle: rgba(53, 46, 29, 0.07);
+  /* 列表那一层（.sheet）的三档：层色与它那两档字。真身在 utils/palette.js 的 listLayerOf／layerSkinOf
+     （层色从底栏那一支派生，不许另挑色相），这三行是**镜像值**，逐字等值由 验-列表层底色.js 钉住。 */
+  --bg-layer: #CDC9C1;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.72);
 }
 
 .theme-tint-celadon {
@@ -150,6 +156,9 @@ page {
   --accent-soft: rgba(29, 53, 34, 0.07);
   --btn-bg: #467350;
   --chip-idle: rgba(29, 53, 34, 0.07);
+  --bg-layer: #C1CDC3;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.72);
 }
 
 .theme-tint-blush {
@@ -165,6 +174,9 @@ page {
   --accent-soft: rgba(53, 29, 41, 0.07);
   --btn-bg: #915975;
   --chip-idle: rgba(53, 29, 41, 0.07);
+  --bg-layer: #CDC1C7;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.78);
 }
 
 /* 雨雾沿用旧 key gradient-blue / 类名 theme-blue：后端 WALLPAPER_PRESETS 那六个值一个都没动，
@@ -183,6 +195,9 @@ page {
   --accent-soft: rgba(33, 36, 49, 0.07);
   --btn-bg: #616986;
   --chip-idle: rgba(33, 36, 49, 0.07);
+  --bg-layer: #C1C4CD;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.78);
 }
 
 /* 界面字体：不挂这三个类就是上面 page 那条苹方链（默认）。
