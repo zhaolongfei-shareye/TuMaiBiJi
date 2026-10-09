@@ -4,10 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import logging
 
 from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing, v1_auth, v1_account
+from app.core.error_codes import http_exception_handler
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
 
@@ -28,6 +30,10 @@ app = FastAPI(title="图麦笔记 API", version="0.1.0")
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
+# `/v1` 的错误体多带一个稳定 `code`（契约 §六）。这一支是**全局** handler，`/api/*` 也走它，
+# 所以"不动旧门"完全靠 `error_codes.attach` 里那一句路径判断——注册与判断分在两处，
+# 任何一处被改掉，`tests/test_v1_error_codes.py` 里那条"同状态码在 /api 上不许带 code"就红。
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 # 字段名 -> 用户看得懂的叫法。没列进来的走通用文案。

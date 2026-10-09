@@ -3,7 +3,8 @@
 # 逐条把这一批的实现改坏，确认对应的判据真的会红。全程 cp 备份 + cp 还原，不碰 git。
 #
 # A～F 是水位线那半（`services/generation` ＋ 迁移 `b71f4e0c9d52` 那一格的初值），
-# G～J 是那道闸那半（`routes/user.py:_account_to_take_along` ＋ 回体键集合）。
+# G～J 是那道闸那半（`routes/user.py:_account_to_take_along` ＋ 回体键集合），
+# K～N 是错误码那半（`core/error_codes.py` ＋ `main.py` 那行注册 ＋ 429 那一格）。
 #
 # 判据口径与前两批完全一致（`反向验证-阶段2-2.sh`、`反向验证-阶段2-2b.sh`）：
 # - 每条突变先 `--collect-only` 数这根针覆盖几条用例。`pytest -k` 空匹配的退出码是 5，
@@ -102,5 +103,26 @@ run J "回体里那三格不再预先摆平（键集合重新随\"这一路带�
   "一次删完七类数据并回报条数" \
   "perl -0pi -e 's/    deleted\\.update\\(\\{\"identities\": 0, \"link_codes\": 0, \"account\": 0\\}\\)\\n//' $DE" "$DE"
 
-echo "=== 全部还原后复跑这一批的尺子，必须全绿 ==="
-$PY tests/test_persistent_generation.py tests/test_v1_account_deletion.py tests/test_account_deletion.py 2>&1 | tail -1
+# ── 待拍③／#171：`/v1` 错误体那个 code（`core/error_codes.py` ＋ 两处注册）──────────
+EC=app/core/error_codes.py
+MN=app/main.py
+RL=app/core/rate_limit.py
+
+run K "撤掉那句路径判断（/api 那一侧也开始带 code——已上线回体被改动）" \
+  "同一条_401_在_api_上不带_code" \
+  "perl -pi -e 's|^    if not path\\.startswith\\(\"/v1\"\\):|    if False:  # rv|' $EC" "$EC"
+
+run L "给 400 现场编一个名字（站长那条\"没核实过的名字不许写进契约\"就是挡这一手）" \
+  "400_不带_code" \
+  "perl -pi -e 's/^CODE_BY_STATUS = \\{$/CODE_BY_STATUS = {  # rv\n    400: \"bad_request\",/' $EC" "$EC"
+
+run M "全局 handler 那行注册撤掉（/v1 的 code 从此没人发，而 /api 一个字没变、看不出坏了）" \
+  "401_带_unauthorized" \
+  "perl -pi -e 's/^app\\.add_exception_handler\\(StarletteHTTPException, http_exception_handler\\)/# rv app.add_exception_handler(StarletteHTTPException, http_exception_handler)/' $MN" "$MN"
+
+run N "把 429 那一格从名单里删掉（限流那一路不再报名字）" \
+  "限流那一支注册的就是会翻名字的函数" \
+  "perl -0pi -e 's/    429: \"rate_limited\",\\n//' $EC" "$EC"
+
+echo "=== 全部还原后复跑这三批的尺子，必须全绿 ==="
+$PY tests/test_persistent_generation.py tests/test_v1_account_deletion.py tests/test_account_deletion.py tests/test_v1_error_codes.py 2>&1 | tail -1

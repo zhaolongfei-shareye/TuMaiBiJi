@@ -33,7 +33,12 @@ limiter = Limiter(
 
 def rate_limit_exception_handler(request, exc):
     from fastapi.responses import JSONResponse
+
+    from app.core.error_codes import attach
+
+    # 这一发只有 `/v1` 那一路会多带一个 `code`（`app/core/error_codes.py` 里那句路径判断）。
+    # 现网小程序读的是 `/api/*`，回体一个字都不许变。
     return JSONResponse(
         status_code=429,
-        content={"detail": "请求过于频繁，请稍后再试"},
+        content=attach(request.url.path, 429, {"detail": "请求过于频繁，请稍后再试"}),
     )
