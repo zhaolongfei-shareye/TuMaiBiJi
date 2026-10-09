@@ -148,9 +148,9 @@ ok('压暗那一串仍在图区里（画在段内，不再画满一屏）',
 const sheet = seg(wxss, '.sheet')
 ok('圆角卡回来了，但它不描边（框套框那条不变量还在）',
   /\.sheet\s*\{/.test(wxss) && !/border(?!-radius)/.test(sheet), sheet.match(/border[^;]*/g))
-ok('圆角卡往上盖住图 40、半径吃 --r-card、底色吃 --bg-page（和「我的」那张 sheet 同一套量）',
+ok('圆角卡往上盖住图 40、半径吃 --r-card、底色吃 --bg-layer（v31 起这一层不再与页面底同色）',
   /margin-top: -40rpx/.test(sheet) && /border-radius: var\(--r-card\)/.test(sheet)
-  && /background: var\(--bg-page\)/.test(sheet))
+  && /background: var\(--bg-layer\)/.test(sheet))
 ok('滚动区自己不画面（面是那张卡画的）',
   !/(?:^|\n)\.list\s*\{[^}]*(background|border)/.test(wxss))
 ok('容器竖排撑满一屏，列表区 flex:1 + min-height:0（少了 min-height:0 就会整页滚）',
@@ -234,23 +234,23 @@ ok('条子压到 60（与分类那枚 chip 实测 59 同一档），那一行仍
   && /align-items: center/.test(seg(wxss, '.tools')))
 ok('有词又缩回时那枚 icon 翻一档（列表被筛过这件事得有地方说）',
   /class="ic \{\{searchKeyword \? 'on' : ''\}\}"/.test(wxml) && /\.ic\.on\s*\{/.test(wxss))
-// 09-30 起暗玻璃那一态只管「全部」那一枚（.chip.all）：分类那几枚穿自己的分类色，
-// 再压一层暗玻璃等于把整排分类身份洗掉（站长原话"分类按钮是有颜色的"）。
-const chipIdle = seg(wxss, '.container.has-bg .chip.all')
-ok('「全部」那枚在图上垫一层暗玻璃',
-  /background: rgba\(18, 20, 26, 0\.42\)/.test(chipIdle) && /color: #f2efe9/.test(chipIdle))
-ok('描边用 inset，不会把 56 那一档撑高', /box-shadow: inset 0 0 0 var\(--w-edge\)/.test(chipIdle))
-ok('选中的「全部」换成纸白、并撤掉那圈 inset',
-  /background: #f2efe9/.test(seg(wxss, '.container.has-bg .chip.all.active'))
-  && /box-shadow: none/.test(seg(wxss, '.container.has-bg .chip.all.active')))
-const chipTone = seg(wxss, '.chip.tone')
-ok('分类 chip 吃自己的分类色一对（底与字都来自 toneVars）',
-  /background: var\(--tone-bg\)/.test(chipTone) && /color: var\(--tone-ink\)/.test(chipTone))
-ok('铺图那一态不再有一条通吃所有 chip 的暗玻璃（那会把分类色洗掉）',
-  !/^\.container\.has-bg \.chip\s*\{/m.test(wxss))
-ok('分类 chip 选中那枚反过来：纸白底 + 该色字 + 该色描边',
-  /color: var\(--tone-bg\)/.test(seg(wxss, '.chip.tone.active'))
-  && /box-shadow: inset 0 0 0 var\(--w-edge\) var\(--tone-bg\)/.test(seg(wxss, '.chip.tone.active')))
+// 分类那一行 v30 起是「文字 + 选中一条短杠」（首页自己的 .ix-cat），胶囊那四条一起删了：
+// `.container.has-bg .chip.all`／`.…all.active`／`.chip.tone`／`.chip.tone.active`。
+// 它整段在下面的圆角卡里、不压在形象图上，所以这一屏**不该再有任何 chip 的铺图态**——
+// 原来那五条"暗玻璃/inset/纸白底/该色字"的判据不是红了要修，是它们量那一行的前提没了。
+ok('铺图那一态里胶囊相关的四条一个都不剩（撤净了才叫撤，留一条就是两版并存）',
+  !/\.container\.has-bg \.chip/.test(wxss) && !/\.chip\.tone/.test(wxss))
+ok('分类那一行不写任何 .has-bg 分支（它在卡里、不吃照片，写了就是给不存在的那一态兜底）',
+  !/\.container\.has-bg[^{]*\.ix-cat/.test(wxss))
+ok('分类那两档吃这一层自己的墨（--ink-on-layer-soft / --ink-on-layer），短杠同色，不跟那支黄',
+  /color: var\(--ink-on-layer-soft\)/.test(seg(wxss, '.ix-cat'))
+  && /color: var\(--ink-on-layer\)/.test(seg(wxss, '.ix-cat\.on'))
+  && /\.ix-cat\.on::after[\s\S]*?background: var\(--ink-on-layer\)/.test(wxss)
+  && !/var\(--tip-dot\)/.test(seg(wxss, '.ix-cat\.on')))
+// 这一条比的是**代码**不是注释，所以吃文件顶上那把 `cjsCode`（第 90 行已经剥过注释）——
+// 拿原文正则扫会把自家注释判成残留（今天第二次踩同一坑，另一处是 #FCFBF8）。
+ok('index.js 不再给每一条分类挂 toneStyle（那一行的 --tone-bg/--tone-ink 没人消费了）',
+  !/toneStyle/.test(cjsCode) && !/toneVars/.test(cjsCode), '分类行的色不再从 toneVars 出')
 ok('压在图上的那三行是纸白（标题 + 数字 + 小字各一档）',
   /color: rgba\(242, 239, 233, 0\.96\)/.test(seg(wxss, '.container.has-bg .h1'))
   && /color: rgba\(242, 239, 233, 0\.8\)/.test(seg(wxss, '.container.has-bg .stat .n'))

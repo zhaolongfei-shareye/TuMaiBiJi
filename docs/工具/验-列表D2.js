@@ -105,9 +105,10 @@ const vtRule = rule(idxWxss, 'vtabs'), vtabRule = rule(idxWxss, 'vtab')
 const xrowRule = rule(idxWxss, 'xrow'), xdRule = rule(idxWxss, 'xd')
 const xT = rule(idxWxss, 'x-t'), xS = rule(idxWxss, 'x-s'), xMore = rule(idxWxss, 'x-more')
 const padRule = rule(idxWxss, 'pad'), imgRule = rule(idxWxss, 'pad-img'), gcRule = rule(idxWxss, 'gc')
-const gridRule = rule(idxWxss, 'grid2'), catsRule = rule(idxWxss, 'cats')
+const gridRule = rule(idxWxss, 'grid2')
 const srchRule = rule(idxWxss, 'srch'), goRule = rule(idxWxss, 'srch-go')
-const chipRule = appWxssRule('chip')
+// 分类那一行 v30 起不再吃 .chip（胶囊撤了），所以这一把量的是首页自己的 .ix-cat。
+const ixCatRule = rule(idxWxss, 'ix-cat')
 const num = (src, name) => Number(new RegExp(`const ${name} = (\\d+)`).exec(src)[1])
 const SUM_LINES = num(idxJs, 'SUM_LINES'), SUM_CHARS = num(idxJs, 'SUM_CHARS')
 const strip = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -122,15 +123,19 @@ ok('两枚 tab 在滚动区之外，且默认那枚是「笔记列表」（view 
 ok('第一枚是新串 tabList、第二枚读现网 navShare（同一个词不在字典里抄第二份）',
   /\{\{t\.tabList\}\}/.test(idxWxml) && /\{\{t\.navShare\}\}/.test(idxWxml)
   && ZH.tabList === '笔记列表' && ZH.navShare === '笔记卡片', `${ZH.tabList} / ${ZH.navShare}`)
-ok('两枚都小字：tab 字号 = 分类那枚 chip 的字号（都是 --fs-meta）',
-  /font-size: var\(--fs-meta\)/.test(vtabRule) && /font-size: var\(--fs-meta\)/.test(chipRule))
-ok('已选那枚只靠颜色+字重+一条短杠跳出来，未选同字号浅色（不做按钮壳）',
-  /color: rgba\(35, 37, 44, 0\.42\)/.test(vtabRule)
-  && /color: rgba\(35, 37, 44, 0\.9\)/.test(rule(idxWxss, 'vtab\.on'))
+ok('两枚都小字：tab 字号 = 分类那一行那几枚字的字号（都是 --fs-meta）',
+  /font-size: var\(--fs-meta\)/.test(vtabRule) && /font-size: var\(--fs-meta\)/.test(ixCatRule))
+// v30 那一版把这一行整块换成新建页那块深面：两档字不再是"90%/42% 黑"，
+// 而是满纸白 / 62% 纸白，短杠从墨色换成首屏那枚黄——三个数都不许写在 wxss 里。
+ok('已选那枚靠纸白+字重+一条黄短杠跳出来，未选同字号只 62% 纸白（不做按钮壳，wxss 里不抄那三个数）',
+  /color: var\(--cp-ink-62\)/.test(vtabRule)
+  && /color: var\(--cp-ink\)/.test(rule(idxWxss, 'vtab\.on'))
   && /font-weight: 700/.test(rule(idxWxss, 'vtab\.on'))
-  && /\.vtab\.on::after[\s\S]*?height: 4rpx/.test(idxWxss) && !/background/.test(vtabRule))
-ok('通栏横线挂在 .vtabs 上（2rpx 实线，替掉 v18 那条挂在分类行下面的浅虚线）',
-  /border-bottom: 2rpx solid rgba\(35, 37, 44, 0\.12\)/.test(vtRule) && !/dashed/.test(catsRule))
+  && /\.vtab\.on::after[\s\S]*?height: 4rpx/.test(idxWxss)
+  && /\.vtab\.on::after[\s\S]*?background: var\(--tip-dot\)/.test(idxWxss)
+  && !/background/.test(vtabRule))
+ok('那一行的面＝新建页那块深面 var(--cp-panel)，底下那条通栏横线撤了（换深面再留一条线会读成两排 tab）',
+  /background: var\(--cp-panel\)/.test(vtRule) && !/border-bottom/.test(vtRule))
 ok('横线走到整块卡的边：.vtabs 负外扩把 .sheet 那 24 吃掉再补 32',
   /margin: 0 -24rpx/.test(vtRule) && /padding: 0 56rpx/.test(vtRule))
 // ④置顶整个撤：分类行左边那一档、右边那句提示、详情窗那枚按钮、JS 那三个 handler
