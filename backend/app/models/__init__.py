@@ -7,5 +7,6 @@ from app.models.share import Share
 from app.models.invitation import Invitation
 from app.models.poster_template import PosterTemplate
 from app.models.note_card import NoteCard
+from app.models.share_report import ShareReport
 
-__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard"]
+__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport"]

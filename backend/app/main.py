@@ -7,7 +7,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 import logging
 
-from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles
+from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
 
@@ -117,6 +117,10 @@ app.include_router(assets.router, tags=["assets"])
 app.include_router(cards.router, tags=["cards"])
 # 名片与外观档位（2.1）：路径也写在模块里（/api/user/profile），与上面两条同一做法
 app.include_router(profiles.router, tags=["profiles"])
+# 公开落地页：路径写在模块里（/n/{token}），而且**必须留在 /api 之外**——
+# Universal Link 要求"链接的域名与路径"和 App 那条 Associated Domains 一致，
+# 卡片上印的、微信里传的都是 https://agentsbin.cn/n/<token>，没有 /api 这一段。
+app.include_router(landing.router, tags=["landing"])
 
 @app.get("/")
 async def root():
