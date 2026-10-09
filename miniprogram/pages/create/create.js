@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { toneStyle, TIP_DOT, createSkin } = require('../../utils/palette.js')
+const { TIP_DOT, createSkin } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const assetQueue = require('../../utils/assetQueue.js')
@@ -93,10 +93,7 @@ Page({
     fillPct: 0,
     sldIcon: 'pen',
     // 四个入口各自的饱和色，色值和字色配对仍归 palette 管。
-    // 三枚小圆仍是 toneStyle 那三档（条身上），面板那一整套暗面改由 createSkin() 一次发下来。
-    skinUrl: toneStyle(1),
-    skinShot: toneStyle(2),
-    skinAlbum: toneStyle(3),
+    // 条身那三枚小圆的色随那三枚一起撤了（10-09）；面板那一整套暗面仍由 createSkin() 一次发下来。
     skinPanel: createSkin(),
     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
     bgSrc: '',
@@ -186,12 +183,7 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
-      // 三个入口的颜色同样是在 data 字面量里定的（模块加载时主题还没落地），
-      // 每次进页按当前主题重算，淡雅那两枚才会真的把蓝/橙/绿/黄换成同色阶的四档。
-      skinUrl: toneStyle(1),
-      skinShot: toneStyle(2),
-      skinAlbum: toneStyle(3),
-      // 面板那套暗面里的快门与滑动条吃当前壁纸的色阶，跟着上面三枚一起重算。
+      // 面板那套暗面里的快门与滑动条吃当前壁纸的色阶，每次进页重算。
       skinPanel: createSkin(),
       // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
       bgSrc: poster.homeBg(),
@@ -289,22 +281,11 @@ Page({
     this.open('photo')
   },
 
-  // 三枚小圆是三个入口本身，不只是"展开到那一态"：橙=开相机、绿=开相册、蓝=进链接那一态。
-  // 选完图返回时面板已经停在对应那一档，刚选的图就在眼前。
-  onDotShot(e) {
-    if (this.data.busy) return
-    const source = e.currentTarget.dataset.source
-    this.open('photo')
-    this.pickImage({ currentTarget: { dataset: { source } } })
-  },
-
-  onDotUrl() {
-    if (this.data.busy) return
-    this.open('url')
-  },
+  // 三枚小圆 10-09 撤了（站长："原来横条右边那三个按钮不清晰，默认就是直接拍照那一档"）。
+  // 相册没丢：面板里那枚 mini 就是选相册图；链接在面板顶上那排标签里切。
 
   // 面板里那三个标签只切视图，不顺手开相机：进来挑模式的人不该被系统选择器打断，
-  // 真要开相机有点那枚快门、也有条身那枚小圆。
+  // 真要开相机有点那枚快门。
   onTab(e) {
     if (this.data.busy) return
     this.open(e.currentTarget.dataset.tab)

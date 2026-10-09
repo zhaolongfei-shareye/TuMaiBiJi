@@ -26,7 +26,24 @@
     <text class="w">{{weekText}}</text>
   </view>
 
-  <!-- 统一录入条（10-08 改版）。收起态还是那条纸白胶囊，右边三枚小圆是三个入口；
+  <!-- 站长 10-09：这一行从横条下面搬到日期下面（离顶部那几行近，也在面板之外）。
+       两件事各一个入口照旧：左边「调亮度」换深浅一档，右边「换背景」导流到
+       「我的 → 卡片模板」那一页选图（这里不弹相册——一个功能只留一个入口）。
+       两截都是 catchtap：点左边不能顺手把右边那条导流也触发，点整行也不该冒到
+       容器的 collapse 上去。 -->
+  <view wx:if="{{bgSrc}}" class="home-swap">
+    <view class="swap-half" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
+      <text class="swap-text">{{t.bgDimLabel}}</text>
+      <view class="dim-dot" style="{{dimDot}}"></view>
+    </view>
+    <view class="swap-half" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}" role="button">
+      <text class="swap-text">{{t.homeBgSwap}}</text>
+      <view class="swap-glyph glyph-chev"></view>
+    </view>
+  </view>
+
+  <!-- 统一录入条（10-08 改版，10-09 又收一步）。收起态就是那条纸白胶囊：一枚图形 + 一句话，
+       整条点下去直接进「拍照提炼」那一档——右边那三枚小圆站长 10-09 撤了（"不清晰"）。
        展开之后条身整条让位——上面换成框外那一行小字，下面升起一张暗面板。
        面板里只剩两样东西：一个输入框（或一横排小图）＋ 一枚"右滑才开始提炼"的长条。
        功能一个没少：校验、忙态、报错、权限引导全部照旧，改的是承载方式。 -->
@@ -44,20 +61,12 @@
 
     <!-- 收起态：条身不再挂 open 类。展开时它整个不渲染（面板自己贴底，
          上面那行框外小字接手「点空白处收起」这一句），所以胶囊与面板"同一块白、接缝对齐"那套没了。 -->
+    <!-- 收起态条身：站长 10-09 拍「原来横条右边那三枚小圆不清晰，去掉；默认就是直接拍照那一档」——
+         条身只留一枚图形加一句话，整条的热区就是 openBar，而 openBar 落的正是 photo 那一档（本来就是这样，
+         10-08 那轮换过）。相册与链接两个口没撤：相册在面板里那枚小圆（选图两个落点），链接在面板顶上那排标签。 -->
     <view wx:if="{{!active}}" class="bar" catchtap="openBar">
       <view class="bar-lead glyph-pen"></view>
       <view class="bar-label">{{t.barIdle}}</view>
-      <view class="bar-dots">
-        <view class="dot" style="{{skinShot}}" catchtap="onDotShot" data-source="camera" aria-label="{{t.takePhoto}}">
-          <view class="dot-glyph glyph-camera"></view>
-        </view>
-        <view class="dot" style="{{skinAlbum}}" catchtap="onDotShot" data-source="album" aria-label="{{t.fromAlbum}}">
-          <view class="dot-glyph glyph-images"></view>
-        </view>
-        <view class="dot" style="{{skinUrl}}" catchtap="onDotUrl" aria-label="{{t.importUrl}}">
-          <view class="dot-glyph glyph-link"></view>
-        </view>
-      </view>
     </view>
 
     <!-- 展开态：面板外面那一行两枚小字（10-08 站长原话「这一行移出框外」）。
@@ -163,20 +172,7 @@
       </view>
     </view>
 
-    <!-- 这一行两件事，各一个入口：左边「调亮度」换深浅一档，右边「换背景」导流到
-         「我的 → 卡片模板」那一页选图（这里不弹相册——一个功能只留一个入口）。
-       两截都是 catchtap：点左边不能顺手把右边那条导流也触发，点整行也不该冒到
-       容器的 collapse 上去。 -->
-    <view wx:if="{{bgSrc}}" class="home-swap">
-      <view class="swap-half" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
-        <text class="swap-text">{{t.bgDimLabel}}</text>
-        <view class="dim-dot" style="{{dimDot}}"></view>
-      </view>
-      <view class="swap-half" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}" role="button">
-        <text class="swap-text">{{t.homeBgSwap}}</text>
-        <view class="swap-glyph glyph-chev"></view>
-      </view>
-    </view>
+    <!-- 这一行原来住在这里（横条下面），10-09 站长拍「换到日期下方」，已搬到 date-row 下面那一份。 -->
   </view>
 </view>
 

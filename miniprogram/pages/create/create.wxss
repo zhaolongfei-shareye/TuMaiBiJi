@@ -166,32 +166,9 @@
   text-overflow: ellipsis;
 }
 
-.bar-dots {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  flex: none;
-}
-
-.dot {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--blk-bg);
-}
-
-.dot:active {
-  opacity: 0.82;
-}
-
-.dot-glyph {
-  width: 38rpx;
-  height: 38rpx;
-  background: var(--blk-ink);
-}
+/* 条身右边那三枚小圆（`.bar-dots`／`.dot`／`.dot-glyph`）10-09 随入口一起删了——
+   站长原话"原来横条右边那三个按钮不清晰，默认就是直接拍照那一档"。
+   它们带来的 `--blk-bg`／`--blk-ink` 这两枚变量也没有别的消费者，一并没有留。 */
 
 /* ---------- 面板外面那一行小字（站长 10-08 原话「这一行移出框外」） ----------
    左边报名前在干什么、右边报怎么退出去。它浮在形象图上，所以吃页面级 --text-tertiary：
@@ -755,10 +732,10 @@
 }
 
 /* ---------- 小图形公共面 ----------
-   .glyph 那一档是"压在卡底的水印"（264rpx、绝对定位），条身前面那三枚、
+   .glyph 那一档是"压在卡底的水印"（264rpx、绝对定位），条身前面那一枚、
    三枚圈里那三枚、和滑动条圆里那一枚要的是"读得清的小图标"，所以另起一组：
    只借同一批 mask 形状，尺寸和颜色自己定。 */
-.bar-lead, .dot-glyph, .mini-glyph, .shut-glyph, .sld-glyph, .swap-glyph, .th-plus, .paste-glyph {
+.bar-lead, .mini-glyph, .shut-glyph, .sld-glyph, .swap-glyph, .th-plus, .paste-glyph {
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;

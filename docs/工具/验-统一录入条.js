@@ -107,9 +107,27 @@ ok('条身只在收起态渲染（展开时整条让位给面板）',
 ok('条身那句永远是 barIdle（不再按模式换字）',
   /class="bar-label">\{\{t\.barIdle\}\}/.test(wxml))
 ok('旧的 .bar.open 与条内 hint 整段撤净', !/\.bar\.open/.test(wxss) && !/bar-hint/.test(wxml + wxss))
-ok('收起态正好三枚小圆', (wxml.match(/class="dot"/g) || []).length === 3)
-ok('三枚小圆分别指向 camera / album / url',
-  /data-source="camera"/.test(wxml) && /data-source="album"/.test(wxml) && /onDotUrl/.test(wxml))
+// 收起态条身右边那三枚小圆：站长 10-09 撤了（原话"原来横条右边那三个按钮不清晰，
+// 默认就是直接拍照那一档"）。原来那两条"正好三枚／各自指向 camera|album|url"改成钉**撤净**，
+// 并补一条正面口径：点条身落的仍是 photo 那一档（那是 10-08 就换好的默认，不是这次新加的）。
+ok('条身那三枚小圆整块撤净（.bar-dots／.dot／两个 handler 任一回来都算两版并存）',
+  !/class="dot"/.test(wxml) && !/bar-dots/.test(wxml + wxss)
+  && !/onDotShot|onDotUrl/.test(js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
+ok('点条身进的就是拍照那一档（openBar 落 photo；相册与链接仍从面板里进）',
+  /openBar\(\)\s*\{[\s\S]{0,200}this\.open\('photo'\)/.test(js)
+  && /data-source="album"/.test(wxml) && /data-tab="url"/.test(wxml))
+// 站长 10-09 另一句：「调亮度和换背景换到日期下方」。
+// 这一条钉的是**顺序与归属**，不是样式：那一行必须排在 date-row 之后、录入条容器之前，
+// 且不再住在 `.entry-wrap` 里面（住在里面就会跟着面板一起被让位逻辑管着）。
+const iDate = wxml.indexOf('class="date-row"')
+const iSwap = wxml.indexOf('class="home-swap"')
+const iEntry = wxml.indexOf('class="entry-wrap"')
+ok('「调亮度｜换背景」那一行搬到了日期下面、录入条上面（三个节点的先后顺序）',
+  iDate > -1 && iSwap > iDate && iEntry > iSwap,
+  `date ${iDate} / swap ${iSwap} / entry ${iEntry}`)
+ok('那一行全页只有一份（搬走就别留第二份；上面那条比的是第一个位置，这条才咬得住重复）',
+  (wxml.match(/class="home-swap"/g) || []).length === 1,
+  `${(wxml.match(/class="home-swap"/g) || []).length} 份`)
 ok('展开态正好三个标签（相册并进照片，不再是独立一档）',
   (wxml.match(/class="md /g) || []).length === 3 && !/data-mode="album"/.test(wxml))
 ok('标签只有 photo / url / write 三个落点',
@@ -354,7 +372,11 @@ ok('换壁纸这两枚不变（四套各跑一遍 createSkin，四串读数必�
   camFour.every((x) => x === camFour[0]), camFour.join(' | '))
 // 上面那趟改了 palette 的模块态（ACTIVE_THEME），后面还有判据要吃 palette，先归位。
 palette.setActiveTheme('')
-ok('三枚小圆仍吃 toneStyle 发下来的面', (wxml.match(/class="dot" style="\{\{skin/g) || []).length === 3)
+// 快门与那排标签的色都只许从 palette 递进来；条身那三枚小圆撤了，它们那份 `toneStyle`
+// 在本页也就没有消费者了——这一条同时钉这两件，少一件都红。
+ok('快门与滑动条的色仍只从 createSkin() 递进来，且 create.js 不再引 toneStyle（那三枚小圆的色没人消费了）',
+  /--cp-cam:/.test(palette.createSkin()) && /skinPanel: createSkin\(\)/.test(js)
+  && !/toneStyle/.test(js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
 ok('小黄点的色值仍由 palette 经 style 递进来',
   /tipDotStyle: 'background:' \+ TIP_DOT/.test(js) && palette.TIP_DOT === '#F6C445')
 
