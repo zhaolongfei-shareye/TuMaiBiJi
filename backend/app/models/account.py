@@ -23,6 +23,15 @@ class Account(Base):
 
     id = Column(String(36), primary_key=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # `/v1` 那张登录态的代次（站长 10-09 拍的乙：`/v1` 的 token 以 account 为 sub，
+    # 所以吊销的开关必须挂在这一行上，而不是挂在 `users.generation` 上——只有 Apple 身份的人
+    # 根本没有 `users` 行，那格开关对他不存在）。
+    # `users.generation` **保留**、不搬走：现网那批 7 天有效期的微信 token 里写的是
+    # `sub=<user.id>`、比对的是这一列，把它撤了等于把所有小程序用户当场踢下线。
+    # 于是同一个人在最多有两格代次。唯一的写入点是
+    # `app/services/accounts.bump_generation`，它一次抬两格；契约 §五"归属一变两侧 token 全部失效"
+    # 那句话的全部重量都压在这一点上，钉它的尺子在 tests/test_account_and_identity.py。
+    generation = Column(Integer, nullable=False, default=1, server_default="1")
 
 
 class AccountIdentity(Base):

@@ -14,6 +14,15 @@ rq==2.12.0
 Pillow==10.4.0
 qrcode[pil]==7.4.2
 PyJWT==2.9.0
+# SIWA 那张 identityToken 是 RS256 签的——10-09 现读 Apple 的密钥端点 `appleid.apple.com/auth/keys`
+# 回的是 `kty=RSA / alg=RS256`（它文档正文那句"JWS E256"与自家密钥端点对不上，以端点为准）。
+# PyJWT 的 RS256 必须有 cryptography 才装得进来：本机实测没装时 `jwt.algorithms` 里取不到 RS256，
+# 而装了才拿到 RSAAlgorithm。站长 10-09 拍的甲＝用标准库验签，不自己写签名校验那段。
+# 版本是量过的不是抄的：50.0.2 发 `cp39-abi3` 的 manylinux2014_x86_64 wheel，本机用
+# `pip download --python-version 3.10 --only-binary=:all: --platform manylinux2014_x86_64`
+# 实拉成功（不需要在服务器上编译 Rust）。⚠ 现网要多装这一个包才打得开 /v1/auth/apple；
+# iPhone 上线之前这个口没人调，所以这一行不挡任何一次现有部署。
+cryptography==50.0.2
 slowapi==0.1.9
 # 自建 OCR：纯 CPU 推理，模型随包分发，无需任何密钥
 # rapidocr 硬依赖 GUI 版 opencv，无桌面 Ubuntu 上 import cv2 会缺 libGL.so.1（deploy.sh 自检会报）。

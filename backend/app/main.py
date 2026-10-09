@@ -7,7 +7,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 import logging
 
-from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing
+from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing, v1_auth, v1_account
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
 
@@ -121,6 +121,11 @@ app.include_router(profiles.router, tags=["profiles"])
 # Universal Link 要求"链接的域名与路径"和 App 那条 Associated Domains 一致，
 # 卡片上印的、微信里传的都是 https://agentsbin.cn/n/<token>，没有 /api 这一段。
 app.include_router(landing.router, tags=["landing"])
+# 阶段2 跨端身份。`/v1` 是**另一种钥匙**开的一组门：token 里 `sub` 是 `accounts.id`、
+# 带 `kind=account`，而 `/api/*` 那批按 `users.id` 发的老钥匙原样保留（现网 7 天有效期的
+# token 认的是后者）。两组门并存、互不开对方的房间，判据在 tests/test_v1_auth_and_link.py。
+app.include_router(v1_auth.router, prefix="/v1/auth", tags=["v1-auth"])
+app.include_router(v1_account.router, prefix="/v1/account", tags=["v1-account"])
 
 @app.get("/")
 async def root():

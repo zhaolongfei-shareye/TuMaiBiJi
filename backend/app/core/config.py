@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     HUNYUAN_CF_TIMEOUT: float = 90.0
     WECHAT_APP_ID: str = ""
     WECHAT_APP_SECRET: str = ""
+    # Sign in with Apple 那个 **Service ID 的 identifier**（反向域名写法，形如 `com.xxx.yyy`）。
+    # 它是 Apple 签进 `identityToken` 的 `aud`，也是服务端唯一能拿来判"这张 token 是不是给我们
+    # 家签的"的值——所以它**不是密钥**（Apple 的文档明确说 Service ID 是公开标识），但也不能猜：
+    # 猜错或留空时 `/v1/auth/apple` 一律 503，绝不退化成"不验 aud 放行"。
+    # 现网 .env 里必须有这一行，值只能从 Apple Developer 后台的 Service ID 页现读。
+    APPLE_CLIENT_ID: str = ""
     # 内容安全（msgSecCheck）总开关。生产必须为 true；测试环境关掉是为了**根本不出网**
     # （conftest 里那条不变量），而不是为了让用例好写——部署自检会拿一段已知违规的
     # 文本打一次，断言必须被拦下来，所以这里不存在"关了也没人发现"的静默失效。

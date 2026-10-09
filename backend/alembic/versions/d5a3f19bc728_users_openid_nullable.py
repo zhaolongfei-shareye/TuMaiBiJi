@@ -26,6 +26,13 @@ Create Date: 2026-10-09 09:30:00.000000
 downgrade 恢复 NOT NULL：库里只要已经有一条只有 Apple 身份的行就**必然失败**（NULL 填不回
 非空列）。这不是这份迁移的疏漏，是那条人已经存在这个事实本身——真要退回去只能先删掉那些人，
 所以这里选择让它在有 Apple 行时响，而不是悄悄把那些行删掉。
+
+⚠ **同一天晚些时候的更正（2026-10-09，§8.172）**：站长拍乙之后，"只有 Apple 身份的人"
+**不再有 `users` 行**（他只在 `accounts` + `account_identities(apple)` 上存在），所以这一刀
+当初的理由——"那种人填不出 openid"——按乙的路线已经走不到了。这一列**不回退**：回退要给一张
+有 live 数据的 `users` 表再发一次重建，而放宽这一约束不挡任何人；真正拦着"拿这行冒充微信用户"的
+是 `ensure_for_user` 里 openid 为空那道 RuntimeError，那条有尺子。当前口径写在
+`app/models/user.py` 那一列的注释上。**这一刀在本仓库里从未上过现网（零部署）。**
 """
 from typing import Sequence, Union
 

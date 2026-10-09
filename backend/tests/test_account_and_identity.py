@@ -354,6 +354,11 @@ class Test注销连带:
         from app.models.user import User
 
         user, account = one
+        # 在**发请求之前**把 id 抄成普通字符串：注销那一路 commit 过，`account` 这个对象上的
+        # 属性全被标脏，而下面 `expunge_all()` 一 detach 就再也没法回头读它
+        # （10-09 实测：`DetachedInstanceError`，报的是"读不到 id"，看着像注销没生效）。
+        # 判"那一行没了"要的是一串值，不是一个可能已经读不出值的对象。
+        account_id = account.id
         resp = client.post(
             "/api/user/deactivate", json={"confirm": True},
             headers={"Authorization": f"Bearer {_create_token(user.id, user.generation)}"},
@@ -363,7 +368,7 @@ class Test注销连带:
         # 存在性一律走 query 而不是 db.get：夹具这一会话里缓存着那些对象，
         # db.get 命中身份映射会把"内存里还有"当成"库里还有"（同 test_account_deletion 那条口径）。
         db.expunge_all()
-        assert db.query(Account).filter(Account.id == account.id).count() == 0, "account 行留着"
+        assert db.query(Account).filter(Account.id == account_id).count() == 0, "account 行留着"
         assert db.query(AccountIdentity).filter(
             AccountIdentity.provider_uid == "o_bye").count() == 0, "微信身份还占着那个 openid"
         assert db.query(User).filter(User.openid == "o_bye").count() == 0

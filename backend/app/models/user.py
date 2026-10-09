@@ -7,11 +7,17 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    # 只有微信号的人这一格是他的 openid；**只有 Apple 身份的人这一格是 NULL**（阶段2-2）。
-    # 原来这里写的是 nullable=False，那是一个填不进去的约束：一个只有 SIWA 的人给不出 openid，
-    # 硬填等于替他编一个微信 id 冒名（契约 §十一 第 2 条禁止的就是这个）。unique 保留——
-    # 它是"同一个微信号开不出两个账号"那句话的落点，而 NULL 与 NULL 在 SQL 里本来就不相等，
-    # 所以放开可空不会把这道闸门一起放开（正反两条都钉在 tests/test_account_and_identity.py）。
+    # 这一格是**微信**那一路的 openid，而 `users` 这张表今天只服务那一路。
+    # 站长 10-09 拍的乙：一个只有 Apple 身份的人**根本没有 `users` 行**——他只在 `accounts`
+    # ＋ `account_identities(apple)` 上存在（见 `app/api/routes/v1_auth.py` 顶部那段）。
+    # 所以"这一格填不出来"那个原始问题在乙这条路上不是被放开约束解决的，而是**这个人不再进这张表**。
+    # 那 `nullable=True` 还有没有必要？严格说没有：微信那一路每次都填得出 openid。留着的理由是
+    # 成本与风险的不对称——收紧成一非空列要给一张有 live 数据的 `users` 表再发一次重建（那是
+    # `d5a3f19bc728` 那一刀的倒车），而放宽不挡任何人：真正拦着"拿这行冒充微信用户"的是
+    # `services/accounts.ensure_for_user` 里那道 openid 为空的 RuntimeError，那一条有尺子。
+    # unique 保留不动——它是"同一个微信号开不出两个账号"那句话的落点，而 NULL 与 NULL 在 SQL 里
+    # 本来就不相等，所以可空不会把这道闸门一起放开（正反两条都钉在 tests/test_account_and_identity.py）。
+    # 契约 §十一 第 2 条禁的是把它当业务主键用，不是禁它可空。
     openid = Column(String(100), unique=True, nullable=True, index=True)
     session_key = Column(String(100), nullable=True)
     nickname = Column(String(100), nullable=True)
