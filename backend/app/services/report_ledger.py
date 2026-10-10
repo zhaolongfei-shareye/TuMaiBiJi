@@ -140,8 +140,11 @@ def ledger(db: Session) -> list[ReportGroup]:
         noted = [r[4].strip() for r in items if r[4] and r[4].strip()]
         # 状态取这一组里**第一行 join 到的那两格**（`token` 唯一 ⇒ 每组至多一条 share；
         # join 不上 = 码从来没存在过，或被删笔记那一路带走了）。
-        # 这里刻意只取标量：把 `Share` 实体整个 select 进来，SQLAlchemy 会对实体那一格去重，
-        # 同一篇上三行举报会被折成一行——本批第一次实跑就是这么撞上来的（`total` 读出 1）。
+        # 这里刻意只取标量：把 `Share` 实体混进 `Query` 的列里，SQLAlchemy 2.0.36 实测会在
+        # **整行相等**时把多行折成一行（同一篇三行举报的 token 与 join 到的那条 share 都相等
+        # ⇒ 折成一行、`total` 读出 1；本批第一次实跑就是这么撞上的）。多选一列逐行不等的标量
+        # 就不折，但这里没有这样的列可用（`detail`/`bucket`/`created_at` 三行可以全等），所以取标量。
+        # 注：`session.execute(select(...))` 那一套不折，这是 legacy `Query` 独有的行为。
         active, expires_at = items[0][5], items[0][6]
         if active is None:
             state = PAGE_NO_CODE

@@ -4,9 +4,10 @@
 # 全程 cp 备份 + cp 还原，**不碰 git**（`git checkout --` 在这套链里出过事，见记忆里那一条）。
 #
 # A～L 打在台账归组那一段（去重、NULL 那一档、台账边界、状态四档、排序两档、理由分布、
-# 原话封顶与取尾、归组键、数据侧不许清洗），M～W 打在探针的展示卫生那一个函数上，
+# 原话封顶与取尾、归组键、数据侧不许清洗），M、N、O、U、V 打在探针的展示卫生那一个函数上，
 # P～T 是 10-10 那轮双支审计补的牙（跨篇去重、瞬间而不是墙上时间、naive 与 aware 混排、
-# 字段集合、`hidden` 进了计算）。
+# 字段集合、hidden 进了计算），W 是同一晚自审第三轮补的（台账那发 select 里不许混 ORM 实体）。
+# 名单里第一版写过"M～W 全在探针那一支"——数错了，W 动的是台账。
 #
 # ⚠ 这个脚本自己的说明文字里不许出现反引号：`run` 用 `eval` 跑，那会被当成命令替换。
 #
@@ -173,6 +174,11 @@ run S "往台账的格子里再加一格（模块口径写着不读 hidden，却
 run T "把 hidden 真读进来并参与人数（那条死列一旦被接线，台账的所有数字都会跟着动）" \
   "置真了也不许改动台账的任何数字" \
   "perl -pi -e 's/Share\\.is_active, Share\\.expires_at,/Share.is_active, Share.expires_at, ShareReport.hidden,/' $LR && perl -pi -e 's/^            reporter_days=len\\(named\\) \\+ unknown,/            reporter_days=len(named) + unknown + sum(1 for r in items if r[7]),  # rv/' $LR" "$LR"
+
+# ── 本批自审补的一把（W）：注释说"只取标量"，纸面话要有牙 ──────────
+run W "把 Share 实体混进那一发 select 的列里（注释写着不许，实测整行相等就折行）" \
+  "同一个人一天里刷三次折成一档但条数照给" \
+  "perl -pi -e 's/Share\\.is_active, Share\\.expires_at,/Share.is_active, Share.expires_at, Share,/' $LR" "$LR"
 
 # ── 探针里那一个展示函数 ──────────────────────────────────────────
 run M "控制字符那一道闸门撤掉（NUL 与 ESC 原样吐进终端）" \
