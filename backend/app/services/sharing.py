@@ -113,6 +113,20 @@ def close_shares(db: Session, note_id: int) -> int:
     )
 
 
+def is_expired_at(expires_at: datetime | None) -> bool:
+    """按**那一格的值**判过期。这一份是唯一的实现，`is_expired` 只是它的 ORM 外衣。
+
+    为什么要多这一个标量入口：台账那一路是 `SELECT` 出标量列（不取整个 `Share` 对象——
+    把实体混进标量列里，SQLAlchemy 会对实体那一格做去重，一行举报会被折成一条）。
+    但"判过期时间的口径必须只有一份"这条不许因此破：那边调的是这一个函数，不是再抄一遍逻辑。
+    """
+    if not expires_at:
+        return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) >= expires_at
+
+
 def is_expired(share: Share) -> bool:
     """这张码按它自己那个过期时间算死了没有。
 
@@ -120,12 +134,7 @@ def is_expired(share: Share) -> bool:
     口径必须只有一份：库里存过 '…+00:00' 和不带时区两种写法，不带时区的按 UTC 读，
     和公开页那侧的行为一致。
     """
-    if not share.expires_at:
-        return False
-    expires = share.expires_at
-    if expires.tzinfo is None:
-        expires = expires.replace(tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) >= expires
+    return is_expired_at(share.expires_at)
 
 
 def active_share_by_token(db: Session, token: str) -> Share | None:
