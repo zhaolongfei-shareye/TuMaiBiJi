@@ -336,7 +336,8 @@ def submit_report(
     这里**不放 CSRF token**，是想清楚过的：这张表单唯一的副作用是往 `share_reports` 插一行
     给我们自己看的记录——它不动举报人的任何数据，也不把被举报页藏起来。跨站伪造能造成的
     最大伤害是灌我们的表，而那条已经被上面那 6/小时按来访者 IP 卡住了（伪造的表单同样
-    带着访客的 IP 进来）。真正要补的是这张表的读取侧（按 bucket 去重），不是这张表单。
+    带着访客的 IP 进来）。这张表的读取侧在 `services/report_ledger.py`（按 bucket 去重），
+    运维入口是 `probes/读-举报台账.py`——"有实际处理流程"要两边都在才算，只有这一支不算。
     """
     lang = _pick_lang(request)
     t = TEXT[lang]
