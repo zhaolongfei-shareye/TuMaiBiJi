@@ -85,5 +85,5 @@ rv_run O "400 那一趟先把 assets 那一张清掉并提交（独立审 P1-3 �
   "perl -0pi -e 's/    if not confirm:\\n        raise HTTPException\\(status_code=400/    from app.models.asset import Asset as _A  # rv\\n    db.query(_A).filter(_A.user_id.in_([str(r.id) for r in db.query(User).filter(User.account_id == account.id).all()])).delete()\\n    db.commit()  # rv：少了这一句不成——HTTPException 一路抛出去时 get_db 的 finally 把会话 close 掉，未提交的删除跟着回滚，那一刀根本落不到库上\\n    if not confirm:\\n        raise HTTPException(status_code=400/' $VB" "$VB"
 
 echo "=== 全部还原后复跑这一批的尺子，必须全绿 ==="
-$PY tests/test_v1_account_deletion.py tests/test_account_deletion.py 2>&1 | tail -1
+rv_recheck tests/test_v1_account_deletion.py tests/test_account_deletion.py
 rv_status

@@ -153,5 +153,5 @@ rv_run U "期望值撤成别的一格配置（日志里那半个值不可信）"
   "perl -pi -e 's/settings\\.APPLE_CLIENT_ID\\)$/settings.JWT_ALGORITHM)/' $AI" "$AI"
 
 echo "=== 全部还原后复跑这四批的尺子，必须全绿 ==="
-$PY tests/test_persistent_generation.py tests/test_v1_account_deletion.py tests/test_account_deletion.py tests/test_v1_error_codes.py tests/test_v1_auth_and_link.py 2>&1 | tail -1
+rv_recheck tests/test_persistent_generation.py tests/test_v1_account_deletion.py tests/test_account_deletion.py tests/test_v1_error_codes.py tests/test_v1_auth_and_link.py
 rv_status

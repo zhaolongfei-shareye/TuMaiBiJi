@@ -75,5 +75,5 @@ rv_run K "注销时的举报连带清理挡死"                     "一次删�
   "perl -0pi -e 's/^    if share_tokens:/    if False:  # 反向验证临时改坏/m' $DE" "$DE"
 
 echo "=== 全部还原后复跑本批，必须全绿 ==="
-$PY tests/test_account_and_identity.py tests/test_account_deletion.py 2>&1 | tail -1
+rv_recheck tests/test_account_and_identity.py tests/test_account_deletion.py
 rv_status

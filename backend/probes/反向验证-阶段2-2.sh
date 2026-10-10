@@ -173,5 +173,5 @@ rv_run T "创建时间撞平时的平局换人（把小于等于改成严格小�
   "perl -pi -e 's/_created_at\(a\) <= _created_at\(b\)/_created_at(a) < _created_at(b)/' $LK" "$LK"
 
 echo "=== 全部还原后复跑本批两把尺子，必须全绿 ==="
-$PY tests/test_v1_auth_and_link.py tests/test_account_and_identity.py 2>&1 | tail -1
+rv_recheck tests/test_v1_auth_and_link.py tests/test_account_and_identity.py
 rv_status

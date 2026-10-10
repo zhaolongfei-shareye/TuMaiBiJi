@@ -28,5 +28,5 @@ rv_run G "举报口摘掉限流装饰器"                                  "限�
 rv_run H "给送检名单加一列而落地页没同步"                        "送检名单里的每一列" m_h "$S"
 
 echo "=== 全部还原后复跑，必须全绿 ==="
-.venv/bin/python -m pytest -q tests/test_landing_page.py 2>&1 | tail -1
+rv_recheck tests/test_landing_page.py
 rv_status

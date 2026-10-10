@@ -53,13 +53,24 @@ rv_init() {  # rv_init <锁名>：抢锁、开临时备份目录、挂 trap
       RV_LIVE_FILE=""; RV_LIVE_BAK=""
     fi
   }
-  rv_on_exit() {
-    rv_restore_now
+  rv_cleanup() {
     [ -n "$RV_BAKDIR" ] && rm -rf "$RV_BAKDIR"
     [ -n "$RV_OUT" ] && rm -f "$RV_OUT"
     [ -n "$RV_LOCK" ] && rmdir "$RV_LOCK" 2>/dev/null
+    RV_BAKDIR=""; RV_OUT=""; RV_LOCK=""
   }
-  trap rv_on_exit EXIT INT TERM
+  rv_on_exit() { rv_restore_now; rv_cleanup; }
+  # 被打断必须**停在这儿**，光靠 EXIT 那份不够：bash 里 INT/TERM 的 handler 跑完会从被中断的那条语句
+  # **继续往下**跑，而 rv_cleanup 已经把备份目录与锁清掉了——于是后面每一条刀都在没有备份的真源文件上跑。
+  # 这是 10-10 深夜那支独立审计实测出来的（中途发一次 TERM：三份都留在盘上、锁也被删，第二支随即抢锁并发跑）。
+  rv_on_signal() {
+    rv_restore_now
+    rv_cleanup
+    echo "!! 被打断：已还原并释放锁，后面的刀不再跑（这一支到此为止）"
+    exit 130
+  }
+  trap rv_on_exit EXIT
+  trap rv_on_signal INT TERM
 }
 
 rv_run() {  # rv_run <标号> <说明> <应当红的用例关键字> <改动命令> <被改的文件>
@@ -76,16 +87,25 @@ rv_run() {  # rv_run <标号> <说明> <应当红的用例关键字> <改动命�
     return
   fi
   bak="$RV_BAKDIR/$tag"
-  cp "$file" "$bak"
+  if ! cp "$file" "$bak"; then
+    echo "$tag ★备份没建成★：$file → $bak —— 没有备份就不动真源文件，这一刀不跑"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  # 一建成备份就登记，**不能等到要跑判据那一刻**：从"文件被改坏"到"trap 认这个文件"之间不能有空窗，
+  # 空窗里来一发 TERM 就把坏文件留在工作树上（独立审计实测：三份都留盘、备份目录被 rm、锁还被删，
+  # 于是后面每一条刀都在没有备份的盘上跑）。登记之后每一条出口都必须还原并注销。
+  RV_LIVE_FILE="$file"; RV_LIVE_BAK="$bak"
   if ! eval "$mut"; then
     echo "$tag 改动命令失败，跳过（不算红也不算绿）"
     RV_BAD=$((RV_BAD + 1))
-    cp "$bak" "$file"
+    cp "$bak" "$file"; RV_LIVE_FILE=""; RV_LIVE_BAK=""
     return
   fi
   if [ "$(md5 -q "$file")" = "$(md5 -q "$bak")" ]; then
     echo "$tag ★突变没落盘★：$desc —— 命令跑完了但文件一字未改，这条不算数"
     RV_BAD=$((RV_BAD + 1))
+    RV_LIVE_FILE=""; RV_LIVE_BAK=""
     return
   fi
   case "$file" in
@@ -93,14 +113,13 @@ rv_run() {  # rv_run <标号> <说明> <应当红的用例关键字> <改动命�
       if ! .venv/bin/python -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read())" "$file" 2>/dev/null; then
         echo "$tag ★突变把文件改崩了★：$desc —— 语法都不通了，这种红不是牙，重写这一刀的模式"
         RV_BAD=$((RV_BAD + 1))
-        cp "$bak" "$file"
+        cp "$bak" "$file"; RV_LIVE_FILE=""; RV_LIVE_BAK=""
         return
       fi
       ;;
   esac
   hitline=$(diff "$bak" "$file" | grep -E '^[<>]' | head -2 | sed 's/^\([<>]\) /\1/' | tr '\n' '|')
   echo "     这一刀动的是：${hitline}"
-  RV_LIVE_FILE="$file"; RV_LIVE_BAK="$bak"
   if eval "$RV_PY -k '$needle'" >"$RV_OUT" 2>&1; then
     if [ "$soft" = "1" ]; then
       echo "$tag 绿（这一条**明写了撤了不红**，针覆盖 $hits 条）：$desc"
@@ -127,10 +146,25 @@ rv_run() {  # rv_run <标号> <说明> <应当红的用例关键字> <改动命�
     fi
   fi
   cp "$bak" "$file"
-  RV_LIVE_FILE=""; RV_LIVE_BAK=""
   if [ "$(md5 -q "$file")" != "$(md5 -q "$bak")" ]; then
+    # 还原没成：登记**不许注销**，留着让 trap 还有机会再试一次（注销了就再没人管这个文件了）
     echo "$tag 还原失败，检查 $file"
     RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  RV_LIVE_FILE=""; RV_LIVE_BAK=""
+}
+
+rv_recheck() {  # rv_recheck <测试文件…>：还原之后复跑这一支相关的尺子，非零必须记账
+  local out last code
+  out=$(eval "$RV_PY -q $*" 2>&1); code=$?
+  last=$(printf '%s\n' "$out" | tail -1)
+  if [ "$code" -ne 0 ]; then
+    echo "★还原复跑不绿★（退出码 $code）：$last —— 这一支把盘上的东西改坏了没还原干净，或者判据本来就红"
+    printf '%s\n' "$out" | grep -a '^FAILED' | head -3 | sed 's/^/      /'
+    RV_BAD=$((RV_BAD + 1))
+  else
+    echo "$last"
   fi
 }
 
