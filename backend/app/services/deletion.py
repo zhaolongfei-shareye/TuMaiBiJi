@@ -74,8 +74,10 @@ def purge(db: Session, users: list[User], account_id: str | None) -> tuple[dict,
     # 键集合一变，下一个客户端就得先判"这个键今天该不该在"。
     deleted.update({"identities": 0, "link_codes": 0, "account": 0})
 
-    # 举报行只挂 token、不挂外键（`share_reports.token`——撤掉的码也要收得到举报，这是刻意
-    # 不设约束的理由），所以删 shares 之后再也问不出这个人公开过哪些码。先抄下来。
+    # 举报行只挂 token、不挂外键。理由**别说反**（10-10 审计改口，`routes/landing.py` 第一句就是
+    # `active_share_by_token`，撤掉／过期／不存在的码一律 404，**撤掉之后收不到新举报**）：
+    # 不挂外键是为了留住**已经发生**的那一发——"先举报、后撤回"和"作者删笔记"都不该把已经收到的
+    # 举报记录一起抹掉。所以删 shares 之后再也问不出这个人公开过哪些码，先抄下来。
     # 配图与卡片对象同理，且都并进**同一份** `file_ids`（与 `routes/notes.py:delete_note`
     # 同一条决定：客户端只读那一个键）。历史行也一起带走——云上那些对象还占着全站配额。
     asset_ids: list[str] = []

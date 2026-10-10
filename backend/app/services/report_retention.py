@@ -19,11 +19,33 @@
 带 `--执行`，并且那一刻先打印出条数——这是"手滑一次就把证据清了"那道最后一道闸。
 
 时间戳的形状问题（naive／aware 混在一列里）与台账同源：比较一律走 `report_ledger._instant()`，
-不在这里另写一份归一化口径。
+不在这里另写一份归一化口径。三条 10-10 实测出来的形状事实，写在这里免得下一个人重新踩：
+
+④ **不是日期的字符串 = 这一发跑不起来，且一行都还没删**。那一列本质是 TEXT，塞什么都存得下，
+但 SQLAlchemy 读的时候当场 `ValueError: Invalid isoformat string`（实测 `/tmp/retention-shape.db`）。
+所以它不是"归到哪一档"的问题，是 fail-closed：脚本在删任何一行之前就崩，不静默跳过。
+
+⑤ **带非 UTC 偏移量的值，走 ORM 那一路与走裸 SQL 那一路不一样**。裸 INSERT 的 `'…+08:00'`
+读回来是 aware，`_instant` 会正确换算；而**同一个瞬间交给 ORM** 会被丢掉偏移量、按本地墙钟存成
+naive（`DateTime(timezone=True)` 在 SQLite 上不换算）。10-10 实测（`/tmp/retention-offset.db`，
+`now=2026-10-10T03:00Z`、180 天，截止 `2026-04-13T03:00Z`，故意取边界两侧各 1 小时）：
+偏东 +08／+14 那两行"该到期"的被判成**没到期**（多留 8／14 小时），偏西 −08／−12 那两行
+"不该到期"的被判成**已到期**（提前 8／12 小时删掉）。两边都错，但**错的方向不对称**：
+多留是可以再跑的，早删是不可逆的，而这条链路上唯一不可逆的就是 `delete_expired`。
+
+⑥ 所以⑤今天**不是现网的错**：会往这一列交值的只有两处——`landing.py` 建 `ShareReport` 时**不写**
+这一列（于是走 `server_default=func.now()`，SQLite 给的就是 UTC），以及测试里 `_at()` 那种显式 UTC。
+唯一故意交非 UTC 的地方是 `tests/test_report_ledger.py` 里
+`Test时间与默认值这两条前提::test_走ORM写入的这一列读回来是_naive_且丢偏移不换算`，
+它交 +08:00 正是为了把⑤这个现象钉成判据。除此之外，哪天有人给 `created_at` 直接赋一个带偏移量的
+aware 值（迁移回填、手工补行、将来的后台工具都算），⑤就会真的作用到删除上。要改这条的正确姿势
+不是在这里加换算，是**让写入侧一律交 UTC**——因为库里存的字符串已经没有偏移量信息，读的时候
+再聪明也补不回来。
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.share_report import ShareReport
@@ -36,14 +58,14 @@ RETENTION_DAYS = 180
 @dataclass(frozen=True)
 class RetentionPlan:
     cutoff: datetime
+    # `total` **不是**由下面两档推出来的，而是独立数一遍 `COUNT(*)`：
+    # 三档守恒那道检查只有在这个前提下才有牙——`total = expired + undated + kept` 如果
+    # 是定义式，任何一行分类时掉出三档之外都不可能被发现（10-10 第五轮审计实测：原来那版
+    # `kept` 就是差一个减法，改坏分类之后脚本照打"未到期保留 3 行"、照退 0）。
     total: int
     expired_ids: list[int] = field(default_factory=list)
     undated: int = 0
-
-    @property
-    def kept(self) -> int:
-        """还没到期的那些行——`total - len(expired_ids) - undated`，用它反着钉一条"行数守恒"。"""
-        return self.total - len(self.expired_ids) - self.undated
+    kept: int = 0
 
 
 def plan_expired(db: Session, now: datetime | None = None,
@@ -51,6 +73,7 @@ def plan_expired(db: Session, now: datetime | None = None,
     """数出哪些举报行过了保留期。**只读**，不改任何行。
 
     `days` 是给测试留的口：要证"边界那一秒到底算哪一边"，不能靠把系统时钟往前调 180 天。
+    `now` 默认取 UTC 此刻（现网那一路走的就是这条默认值，测试里一律显式传固定时刻）。
     """
     moment = now or datetime.now(timezone.utc)
     cutoff = moment - timedelta(days=days)
@@ -58,14 +81,20 @@ def plan_expired(db: Session, now: datetime | None = None,
     rows = db.query(ShareReport.id, ShareReport.created_at).all()
     ids: list[int] = []
     undated = 0
-    for row_id, created_at in rows:
+    kept = 0
+    for _row_id, created_at in rows:
         stamp = _instant(created_at)
         if stamp == "":
             undated += 1
             continue
         if stamp < key:
-            ids.append(row_id)
-    return RetentionPlan(cutoff=cutoff, total=len(rows), expired_ids=ids, undated=undated)
+            ids.append(_row_id)
+        else:
+            # 这一档必须**自己数**，不许写成"总数减另外两档"：分类里掉一行出去的时候，
+            # 减法版永远补得回来，看起来就是"守恒没问题"。
+            kept += 1
+    return RetentionPlan(cutoff=cutoff, total=db.query(func.count(ShareReport.id)).scalar() or 0,
+                         expired_ids=ids, undated=undated, kept=kept)
 
 
 def delete_expired(db: Session, ids: list[int], batch: int = 500) -> int:
