@@ -128,7 +128,7 @@ const STATES = [
     const q = wx.createSelectorQuery()
     list.forEach((s) => { q.selectAll(s).boundingClientRect() })
     q.exec((r) => resolve([].concat(...(r || []).map((x) => x || []))
-      .map((x) => ({ top: x.top, bottom: x.bottom }))))
+      .map((x) => ({ top: x.top, bottom: x.bottom, h: x.height }))))
   }), CARD_KIDS)
 
   // ---------- ① 收起态：那三块还在原位（10-10 晚换了载体，原来那条胶囊没了） ----------
@@ -206,7 +206,10 @@ const STATES = [
       const innerBottom = card.bottom - rpx(CARD_PAD + CARD_EDGE)
       ck(`${tag}：最后一块没被顶出卡外（离面板内下沿 ≤ 3rpx）`,
         kk.length > 0 && Number.isFinite(lastBottom) && lastBottom <= innerBottom + rpx(3),
-        `超 ${Number.isFinite(lastBottom) ? ((lastBottom - innerBottom) * 750 / win.windowWidth).toFixed(1) : '量不到'}rpx／卡里 ${kk.length} 块`)
+        `超 ${Number.isFinite(lastBottom) ? ((lastBottom - innerBottom) * 750 / win.windowWidth).toFixed(1) : '量不到'}rpx／卡里 ${kk.length} 块`
+        // 每一块的高一起打出来：静态那把算的是"式子对不对"，这一行给的是"屏上到底多高"，
+        // 两者差在哪一块，看这一串就知道（10-10 深夜展开那两档溢出 7~13rpx 就是这么定位的）。
+        + `／各块高 ${kk.map((x) => ((x.h || 0) * 750 / win.windowWidth).toFixed(1)).join(' ')}`)
       // 10-08 深夜他拍的是「照片那一排 `flex-start`→**center**」，所以照片·空这一档那一排
       // 不贴卡底、而是在卡内上下留白相等。原来这一条把"各态一条线"写成了"底边距卡内下沿
       // <3rpx"——那是 09-28 沉底那一版的**实现方式**，不是他要的不变量；换成 center 之后
@@ -251,25 +254,40 @@ const STATES = [
   }
   console.table(rows)
 
-  // ---------- ③ 最长那句报错：画在框外，且不许把面板顶高 ----------
+  /* ---------- ③ 最长那句报错：画在输入框上面那枚气泡里，且不许把面板顶高 ----------
+     10-10 深夜这一位搬了家：原来它挂在框外那一行（那一句会把整组顶高一格，站长原话
+     「报错消息不要在这里出现，换到输入框上面，用带阴影长条形气泡框弹出，几秒后消失」）。
+     所以判据跟着换两头：① 框外那一行不再有任何报错节点；② 面板还是同一档高（浮层不占流内高度）。 */
   for (const L of ['zh', 'en']) {
     const err = longestErr(L)
     await page.setData({
       lang: L, t: i18n.texts(L), active: 'write', previewImages: [], writeBody: '',
-      bodyFocus: false, errLine: err, errPerm: true,
+      bodyFocus: false, errLine: err, errPerm: true, hintLine: '',
     })
     await page.callMethod('_sync')
     await sleep(520)
-    const [panel, errRect, out] = await geo(['.panel', '.out-err', '.out'])
-    ck(`${L} 最长报错「${err.slice(0, 14)}…」画在框外`,
-      !!errRect && !!panel && errRect.bottom <= panel.top + 1,
-      errRect && panel && `报错底 ${errRect.bottom.toFixed(0)}｜面板顶 ${panel.top.toFixed(0)}`)
-    ck(`${L} 带报错时面板仍是 ${PANEL_H}rpx（没被顶高、也没把框外那行吞进来）`,
+    const [panel, bub, fld, out] = await geo(['.panel', '.hint-bubble', '.field', '.out'])
+    const bubEl = await page.$('.hint-bubble')
+    const bubTx = bubEl ? await bubEl.text() : ''
+    const bubCls = bubEl ? ((await bubEl.attribute('class')) || '') : ''
+    ck(`${L} 最长报错「${err.slice(0, 14)}…」画在面板里那一枚气泡上（屏上读得到同一句）`,
+      !!bub && !!panel && bub.top >= panel.top && String(bubTx).trim() === err,
+      bub && `气泡 ${Math.round(bub.top)}~${Math.round(bub.bottom)}／面板顶 ${Math.round(panel.top)}｜屏上「${bubTx}」`)
+    ck(`${L} 框外那一行不再有报错节点（旧的那一行整条撤了，留着就是两处报错两个位置）`,
+      (await page.$$('.out-err')).length === 0 && !!out, `${(await page.$$('.out-err')).length} 枚`)
+    ck(`${L} 气泡在输入框正上方，且底边不越过框的中线（字竖直居中，那一行露得出来）`,
+      !!bub && !!fld && bub.bottom <= fld.top + fld.h / 2,
+      bub && fld && `气泡底 ${Math.round(bub.bottom)}｜框 ${Math.round(fld.top)}~${Math.round(fld.bottom)}`)
+    ck(`${L} 带报错时面板仍是 ${PANEL_H}rpx（浮层不占流内高度，顶高＝搬家没搬成）`,
       !!panel && near(panel.h, rpx(PANEL_H), 3), panel && `${(panel.h * 750 / win.windowWidth).toFixed(1)}rpx`)
-    ck(`${L} 那一句是一行读完（折了就会顶到标题那一行）`,
-      !!errRect && near(errRect.h, rpx(20 * 1.4), 8), errRect && `行高 ${(errRect.h * 750 / win.windowWidth).toFixed(1)}rpx`)
-    ck(`${L} 报错行与框外小字行各占一行、不叠字`,
-      !!errRect && !!out && errRect.top >= out.bottom - 1, out && errRect && `${out.bottom.toFixed(0)} → ${errRect.top.toFixed(0)}`)
+    // 行数从高度倒推：单行那一档是 min-height 52，每多一行加一行字高（fs-meta 24×1.4≈33.6）。
+    const fsMeta = parseFloat((/--fs-meta:\s*([\d.]+)rpx/.exec(appWxss) || [, '24'])[1])
+    const lineH = rpx(fsMeta * 1.4)
+    const lines = !!bub ? Math.max(1, Math.round((bub.h - rpx(12)) / lineH)) : 0
+    ck(`${L} 那一句最多两行读完（三行就是气泡快顶到卡底了）`,
+      !!bub && lines <= 2, `${lines} 行／气泡高 ${(bub.h * 750 / win.windowWidth).toFixed(1)}rpx`)
+    ck(`${L} 权限那一类整枚可点：气泡挂着"可点"那一档（::after 那个 › 也算在文字里）`,
+      /hint-bubble-act/.test(bubCls), bubCls)
   }
   await mp.screenshot({ path: `${OUT}/沉底-最长报错.png` })
 

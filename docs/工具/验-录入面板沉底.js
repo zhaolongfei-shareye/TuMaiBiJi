@@ -95,8 +95,9 @@ ok('卡自己是 flex 列', /display:\s*flex/.test(card) && /flex-direction:\s*c
 ok('卡里每一段都不许 shrink（富余整段留给框与条上面那两档 auto 边距）',
   /\.card > view,\s*\.card > textarea\s*\{[^}]*flex:\s*none/.test(wxss))
 ok('模式标签行不许 shrink', /\.modes\s*\{[^}]*flex:\s*none/.test(wxss))
-ok('框外那两行（小字与报错）不许 shrink',
-  /\.out\s*\{[^}]*flex:\s*none/.test(wxss) && /\.out-err\s*\{[^}]*flex:\s*none/.test(wxss))
+// 框外那一行报错 10-10 深夜搬进气泡了（absolute 浮层，不是流内一行），
+// 所以这里只剩"小字那一行不许 shrink"这一条；报错那条改钉"它不占流内高度"。
+ok('框外那一行小字不许 shrink', /\.out\s*\{[^}]*flex:\s*none/.test(wxss))
 // 原来钉的是 `.bar { flex: none }`。10-10 晚胶囊换成三块，同一件事的新载体是左块与右两枚：
 // 左块 308 见方、右两枚各 148 高，都不许被 flex 压扁（右列 flex:1 会把左块挤瘦，
 // 效果图那一版就是这么翻车的——左块宽度算成 0，人物根本没地方画）。
@@ -106,10 +107,22 @@ ok('三块都不许 shrink（左块定宽定方、右列吃余量）',
   && /\.blk-col\s*\{[^}]*flex:\s*1/.test(wxss))
 // 富余由 auto 边距分掉，不是硬写死的 margin——所以"框贴脸"这种错只能在真机上量出来，
 // 这里钉的是画法：框、条、三枚圈、小图排四处都写的是 margin-top:auto。
-ok('框与条之间那一段缝由 auto 边距给（四处都在）',
-  ['field', 'sld', 'crow', 'strip'].every((c) => /margin-top:\s*auto/.test(seg('.' + c))))
-ok('报错行画在框外，面板里不预留它那一行（这一行的高度正是压进红框省出来的那一笔）',
-  !/\.entry-err|\.entry-note/.test(wxss) && /class="out-err"/.test(wxml))
+// 四处变两处（10-10 深夜）：框与图排身上那两档 auto 撤了——站长量的是
+// "面板内最上面的白边比最下面的高"，两档 auto 对半分富余，上白边就永远比下白边多半份。
+// 现在只留条上面那一档：框贴着卡顶，上下白边都等于卡的内边距。
+ok('只有条与那排圈身上还有 auto 上边距（框与图排身上那两档已撤给标签行）',
+  /margin-top:\s*auto/.test(seg('.sld')) && /margin-top:\s*auto/.test(seg('.crow'))
+  && !/margin-top:\s*auto/.test(seg('.field')) && !/margin-top:\s*auto/.test(seg('.strip')))
+ok('卡的内边距上下同一个数（"上白边＝下白边"这一句由它一个人说了算）',
+  (() => {
+    const p = (seg('.card').match(/padding:\s*([^;]+)/) || [, ''])[1].trim().split(/\s+/).map(parseFloat)
+    return p.length === 1 || p[0] === p[2]
+  })(), seg('.card').replace(/\s+/g, ' '))
+// 报错那一行反过来钉了：它现在是面板里的浮层，**不许在流内占高度**——
+// 这一行的高度正是 10-08 压进红框省出来的那一笔，谁把它请回流内，面板就会当场跳一帧。
+ok('报错是浮层，不占流内高度（.panel 得先成为定位父级）',
+  /position:\s*relative/.test(seg('.panel')) && /\.hint-bubble\s*\{[^}]*position:\s*absolute/.test(wxss)
+  && !/out-err/.test(wxml))
 
 // ---------- 4. 那两档高度是从源码单点读出来的，别处不许再抄一份 ----------
 // 两档的数**从 CSS 现读**，不写死在判据里：10-08 那轮 700→500/580、10-10 那轮 500/580→410/490，

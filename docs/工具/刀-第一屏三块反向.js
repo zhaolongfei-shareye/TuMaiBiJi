@@ -11,9 +11,10 @@ const RULER = path.join(ROOT, 'docs/工具/验-第一屏三块.js')
 const files = {
   wxss: path.join(ROOT, 'miniprogram/pages/create/create.wxss'),
   wxml: path.join(ROOT, 'miniprogram/pages/create/create.wxml'),
+  js: path.join(ROOT, 'miniprogram/pages/create/create.js'),
 }
 for (const f of Object.values(files)) fs.copyFileSync(f, f + '.knifebak')
-// restore 用 copy 不用 rename：一轮里要还原九次，备份得一直在。
+// restore 用 copy 不用 rename：一轮里要还原十几次，备份得一直在。
 const restore = () => { for (const f of Object.values(files)) if (fs.existsSync(f + '.knifebak')) fs.copyFileSync(f + '.knifebak', f) }
 const cleanup = () => { for (const f of Object.values(files)) fs.rmSync(f + '.knifebak', { force: true }) }
 process.on('exit', () => { restore(); cleanup() })
@@ -37,6 +38,13 @@ const KNIVES = [
   ['三元分支里塞一枚同名类（证明分支也扫了）', () => edit('wxml', "{{active ? 'entry-dock' : ''}}", "{{active ? 'blk' : ''}}"), '三元分支里那几枚'],
   ['撤掉 role 与 aria-label', () => edit('wxml', 'role="button" aria-label="{{noteCount}}{{t.statNotes}}" ', ''), 'role="button"'],
   ['整组类名改名（色扫必须自证真扫到了段）', () => { edit('wxss', '.home-blk', '.zz-grp', true); edit('wxss', '.blk-', '.zz-', true) }, '色扫真扫到了'],
+  /* 10-10 深夜换的"点剪影换位"那一组，刀也跟着换：上一轮钉的是双击那套机器，这一轮钉的是剪影本身。 */
+  ['剪影宽抬回 110（算出来 0.60 倍，不再"约一半"）', () => edit('wxss', 'width: 91rpx;\n  z-index: 1;', 'width: 110rpx;\n  z-index: 1;'), '剪影屏上高'],
+  ['热区缩到 100 高（男那张 132，头顶一段点了没反应）', () => edit('wxss', 'height: 152rpx;', 'height: 100rpx;'), '盖得住两张里更高'],
+  ['剪影抬到主人物前面（"在后面"那条反了）', () => edit('wxss', 'width: 91rpx;\n  z-index: 1;', 'width: 91rpx;\n  z-index: 4;'), '剪影在主人物'],
+  ['热区改用 bindtap（冒泡到左块＝换人的同时把面板打开）', () => edit('wxml', 'catchtap="swapPerson"', 'bindtap="swapPerson"'), '热区用 catchtap'],
+  ['开门那一下塞回定时器（就是他被延住的手感）', () => edit('js', "  openBar() {\n    if (this.data.busy) return", '  openBar() {\n    setTimeout(() => {}, 300)\n    if (this.data.busy) return'), '没有任何延迟'],
+  ['把人物路径抄进页面（三处画同一个人就会漂）', () => edit('js', 'const person = require', "const _probeSrc = '/assets/ic-person.png'\nconst person = require"), '只写在 utils/person.js'],
 ]
 
 const run = () => {
@@ -57,5 +65,5 @@ for (const [name, dig, needle] of KNIVES) {
   restore()
 }
 restore(); cleanup()
-console.log(bad === 0 ? '九把刀全部见血，改完已还原' : `${bad} 把刀没见血（改完已还原）`)
+console.log(bad === 0 ? `${KNIVES.length} 把刀全部见血，改完已还原` : `${bad}/${KNIVES.length} 把刀没见血（改完已还原）`)
 process.exit(bad ? 1 : 0)

@@ -162,9 +162,13 @@ const ck = (name, ok, got) => {
      "到底挡没挡脸"最后仍由这一把存的截图目视确认（B/C/D/F 各一张）。 */
   ck('B5 面板顶在视口 50% 以下（改回 700rpx 会掉到 0.47 当场红；脸的位置看截图）',
     !!panel1 && panel1.top / metric.h > 0.5, panel1 && `顶 ${Math.round(panel1.top)} / ${metric.h} = ${(panel1.top / metric.h).toFixed(2)}`)
-  ck('B6 左边那句是「选择记录模式」，右边那句是「点空白处收起」',
-    (await txtOf('.out-l')) === '选择记录模式' && (await txtOf('.out-r')) === '点空白处收起',
-    `${await txtOf('.out-l')} | ${await txtOf('.out-r')}`)
+  /* 框外那一行 10-10 深夜换了两头（他原话「"选择记录模式"改为 Tips，"点空白处收起"改为"返回"」）。
+     两边都拿这一页自己那份字典比，不抄第二份中文——上一版这里写的就是那句死字符串。 */
+  const outLTxt = await txtOf('.out-l')
+  const tipList = d.t.tips || []
+  ck('B6 左边那句是 Tips 那一串（前缀＋六句里的一句），右边那枚是字典里的「返回」',
+    tipList.some((x) => outLTxt === `${d.t.tipsPrefix}${x}`) && (await txtOf('.out-r')) === d.t.back,
+    `${outLTxt} | ${await txtOf('.out-r')}`)
   const mds = await page.$$('.md')
   ck('B7 三个标签（相册并进照片了）', mds.length === 3, mds.length)
   ck('B8 当前标签是照片', /(^|\s)md on(\s|$)/.test(await clsOf('.md')) && (await txtOf('.md.on')) === '照片', await txtOf('.md.on'))
@@ -186,6 +190,22 @@ const ck = (name, ok, got) => {
     `${await txtOf('.mini-lb')} / ${await txtOf('.shut-lb')}`)
   ck('B14 这一态没有多余的提示词行（拍照下面那句撤了）',
     (await page.$$('.entry-desc')).length === 0 && (await page.$$('.note')).length === 0)
+  /* ⑥ 他原话「照片，链接，文字，三个Tab很难点，把按键区域扩大」。量的是渲染出来的按键面：
+     高吃满那一行（≥56）、宽含左右内缩（≥88），两枚之间只剩那条 gap——
+     指头落在字旁边也点得中。只数 markup 抓不到"类名写了、align-items 没给 stretch"那一类。 */
+  const mdBoxes = await rectsAll('.md')
+  ck('B15 三枚标签的按键面：每枚高 ≥56rpx、宽 ≥88rpx（不再只有字那么大）',
+    mdBoxes.length === 3 && mdBoxes.every((x) => toRpx(x.h) >= 56 && toRpx(x.w) >= 88),
+    mdBoxes.map((x) => `${toRpx(x.w).toFixed(0)}×${toRpx(x.h).toFixed(0)}`).join(' '))
+  ck('B16 相邻两枚之间只剩那条缝（0~30rpx），热区既不重叠也不各奔东西',
+    mdBoxes.length === 3 && mdBoxes.slice(1).every((x, i) => {
+      const g = toRpx(x.left - mdBoxes[i].right)
+      return g >= 0 && g <= 30
+    }),
+    mdBoxes.slice(1).map((x, i) => toRpx(x.left - mdBoxes[i].right).toFixed(0)).join('/'))
+  ck('B17 热区扩了这一行没把面板顶高（还是那一档，卡里那两格的账没动）',
+    rpxEq((await rects(['.panel']))[0].h, PANEL_H, 3),
+    `${toRpx((await rects(['.panel']))[0].h).toFixed(1)}rpx`)
   await mp.screenshot({ path: `${OUT}/B-照片三枚圈.png` })
 
   // ---------- C 链接档：一个框 + 一枚条 ----------
@@ -194,7 +214,7 @@ const ck = (name, ok, got) => {
   await sleep(900)
   d = await page.data()
   ck('C1 切到链接', d.active === 'url', d.active)
-  const [field1, sld1] = await rects(['.field', '.sld'])
+  const [field1, sld1, panelC] = await rects(['.field', '.sld', '.panel'])
   ck('C2 只有一个输入框，高 105rpx', (await page.$$('.field')).length === 1 && !!field1 && rpxEq(field1.h, 105, 3),
     field1 && `${toRpx(field1.h).toFixed(1)}rpx`)
   const phAttr = await (await page.$('.field-input')).property('placeholder')
@@ -209,6 +229,13 @@ const ck = (name, ok, got) => {
   ck('C6 圆宽 90rpx', !!knob1 && rpxEq(knob1.w, 90, 3), knob1 && `${toRpx(knob1.w).toFixed(1)}rpx`)
   ck('C7 这一格还空着 → 条是"按不动"那一档（sld-off 挂上了）',
     /sld-off/.test(await clsOf('.sld')), await clsOf('.sld'))
+  // 他把锁从"皮"挪到了"行为"上：圆仍然是那一枚橙（10-10 深夜原话「拖动的圆ICON要换成橙色」），
+  // 但空着拖不动（下面 D1 量的是真拖）。所以这一条要在 sld-off 挂着的时候量颜色。
+  ck('C7b 空着那一档圆仍然是提炼那支橙（不跟壁纸走，也不许洗成灰）',
+    /rgb\(196,\s*84,\s*31\)/.test(await styleOf('.sld-knob')) && /sld-off/.test(await clsOf('.sld')),
+    await styleOf('.sld-knob'))
+  ck('C7c 圆里那枚图形吃的是橙底上的白字（--cp-extract-ink），不是墨',
+    /rgb\(255,\s*255,\s*255\)/.test(await styleOf('.sld-glyph')), await styleOf('.sld-glyph'))
   ck('C8 框与条之间有缝、框不贴面板上沿（两档 auto 边距真的分到了地方）',
     !!field1 && !!sld1 && sld1.top - field1.bottom >= 8 * R && field1.top - (await rects(['.card']))[0].top >= 8 * R,
     field1 && sld1 && `框底到条顶 ${toRpx(sld1.top - field1.bottom).toFixed(1)}rpx`)
@@ -217,14 +244,33 @@ const ck = (name, ok, got) => {
   await (await page.$('.field-input')).input('not a link')
   await sleep(700)
   d = await page.data()
-  ck('C10 非法链接：urlHint 走 bad，且那句规则行当场就说出来（不必等滑到底）',
-    d.urlHint === 'bad' && d.hintLine === d.t.linkRule && (await page.$$('.out-err')).length === 1,
-    `hint=${d.hintLine}`)
-  const [err1] = await rects(['.out-err'])
-  ck(`C11 那句报错把整组往上顶了一行，而面板高度没变（还是 ${PANEL_H}）`,
-    !!err1 && err1.bottom <= panel1.top + 1 && rpxEq((await rects(['.panel']))[0].h, PANEL_H, 3),
-    err1 && `报错底 ${Math.round(err1.bottom)}／面板顶 ${Math.round(panel1.top)}`)
-  await mp.screenshot({ path: `${OUT}/C-链接-非法报错在框外.png` })
+  const bubBefore = await rects(['.hint-bubble'])
+  ck('C10 非法链接：urlHint 走 bad，那句规则行当场就说出来（不必等滑到底）',
+    d.urlHint === 'bad' && d.hintLine === d.t.linkRule && bubBefore.length === 1,
+    `hint=${d.hintLine} 气泡 ${bubBefore.length} 枚`)
+  const [bub1, fld1, modes1, sld1b, panelNow] = await rects(['.hint-bubble', '.field', '.modes', '.sld', '.panel'])
+  ck('C11 报错换了地方之后，面板纹丝不动（原来那一行会把整组顶高一格，这是他要挪走的原因）',
+    !!bub1 && !!panelNow && Math.abs(panelNow.h - panelC.h) <= 1 && Math.abs(panelNow.top - panelC.top) <= 1,
+    panelNow && `面板顶 ${Math.round(panelNow.top)}（原 ${Math.round(panelC.top)}）／高 ${toRpx(panelNow.h).toFixed(1)}（原 ${toRpx(panelC.h).toFixed(1)}）`)
+  // 它**就是要压住框那一截上沿**（框里那行字竖直居中，压在它上面才读得出"这是说这一格的"），
+  // 所以这里钉的是"顶边在模式行下面、在框顶上面"，不钉"整枚在框上面"——后者量的是没发生的事。
+  ck('C11b 气泡画在面板里面、压在输入框上沿（顶边在模式那一行之下、在框顶之上，不骑在标签行上）',
+    !!bub1 && !!panelNow && !!modes1 && !!fld1
+    && bub1.top >= panelNow.top && bub1.top >= modes1.bottom && bub1.top < fld1.top,
+    bub1 && `气泡 ${Math.round(bub1.top)}~${Math.round(bub1.bottom)}／模式行底 ${Math.round(modes1.bottom)}／框顶 ${Math.round(fld1.top)}`)
+  // 「压在框上沿」可以，「挡住框里的字」不行：字竖直居中，盖过一半就会吃到那一行。
+  ck('C11c 气泡盖过输入框上沿但没盖过一半（字在中间，那一行露得出来）',
+    !!bub1 && !!fld1 && bub1.bottom <= fld1.top + fld1.h / 2,
+    bub1 && fld1 && `气泡底 ${Math.round(bub1.bottom)}／框 ${Math.round(fld1.top)}~${Math.round(fld1.bottom)}`)
+  ck('C11d 气泡是浮层：不占流内高度（它出现时框的位置与之前一致）',
+    !!fld1 && !!field1 && Math.abs(fld1.top - field1.top) <= 1,
+    fld1 && field1 && `现在 ${Math.round(fld1.top)}／无报错时 ${Math.round(field1.top)}`)
+  const bubEl = await page.$('.hint-bubble')
+  const bubShadow = bubEl ? await bubEl.style('box-shadow') : ''
+  ck('C11e 带阴影的长条（他那句"用带阴影长条形气泡框"）：box-shadow 真算出来了，且是一整条横宽的',
+    !!bub1 && !!bubShadow && bubShadow !== 'none' && bub1.w > 300 * R,
+    `${bubShadow || '读不到'}／宽 ${bub1 ? toRpx(bub1.w).toFixed(0) : '?'}rpx`)
+  await mp.screenshot({ path: `${OUT}/C-链接-报错气泡在框上方.png` })
 
   await (await page.$('.field-input')).input('https://mp.weixin.qq.com/s/abcdef')
   await sleep(700)
@@ -262,10 +308,22 @@ const ck = (name, ok, got) => {
   await sleep(600)
   d = await page.data()
   ck('D0 清空之后 ready 退回 false', d.urlInput === '' && d.ready === false, `${d.urlInput}/${d.ready}`)
-  await drag()
+  const pr0 = await drag()
   d = await page.data()
-  ck('D1 空着拖到底：不提交，但把话说了（沿用"灰按钮被点也要给话"那条规矩）',
-    !d.busy && !!d.errLine && d.knobRpx === 10, `busy=${d.busy} err=${d.errLine} knob=${d.knobRpx}`)
+  const bubDrag = await page.$$('.hint-bubble')
+  ck('D1 空着拖：不提交（没进忙态），但话说出来了（气泡在框上方，不再是一枚吐司）',
+    !d.busy && !!d.hintLine && bubDrag.length === 1, `busy=${d.busy} hint=${d.hintLine} 气泡 ${bubDrag.length} 枚`)
+  // 他把锁从"皮"挪到"行为"：以前空着照样跟手、松手回弹，圆洗成灰当提示；
+  // 现在空着起不了拖，圆保持橙色。中途那一次探针量的就是"真没跟着手指走"。
+  ck('D1b 空着那一档**拖不动**：data 与屏上两头都停在最左那一格',
+    d.knobRpx === 10 && Math.abs(pr0.midRpx - 10) <= 3 && Math.abs(pr0.midLeft - 10) <= 6,
+    `中途 data ${pr0.midRpx}／屏上 ${pr0.midLeft.toFixed(0)}／收尾 ${d.knobRpx}`)
+  await mp.screenshot({ path: `${OUT}/D-空着拖-圆不动且气泡在框上方.png` })
+  // 「几秒后消失」是一条有时间常量的判据：等满 HINT_MS 再加一段余量，仍然在屏上就是红。
+  await sleep(4600)
+  ck('D1c 那枚气泡几秒后自己走（不用等这一格有内容，也不用再点一下）',
+    (await page.$$('.hint-bubble')).length === 0 && !(await page.data()).hintLine,
+    `hint=${(await page.data()).hintLine}`)
 
   // 换桩：只接提炼那两条，别的 URL 走回原函数，免得往现网落一条垃圾笔记
   const stubbed = await mp.evaluate(() => {
@@ -372,8 +430,32 @@ const ck = (name, ok, got) => {
   ck('E2 只有一个原文框（标题格撤了、这一档连 input 都没有），提示词吃 manualDesc',
     !!ta && (await ta.property('placeholder')) === d.t.manualDesc && (await page.$$('input')).length === 0,
     `${await (await page.$('.field-area')).property('placeholder')} vs ${d.t.manualDesc}`)
-  ck('E3 收起那一档这个框是一行（105rpx）', rpxEq((await rects(['.field-area']))[0].h, 105, 3),
-    `${toRpx((await rects(['.field-area']))[0].h).toFixed(1)}rpx`)
+  /* 这一格 10-10 深夜多包了一层壳（textarea 装不下子节点，粘贴钮只能做兄弟），所以两头都要量：
+     壳是屏上那个带皮的盒子（105/160），框是壳里面写字的那一层（扣掉壳那 3rpx 边框）。
+     框只写 `height:100%` ＋ 上内边距而没写 box-sizing 的话，读数会是 129/184 —— 字掉到圆角外面，
+     静态读源码一条都看不出来，只有在这里量渲染才抓得住。 */
+  const [shell3, ta3] = await rects(['.field-write', '.field-area'])
+  ck('E3 收起那一档这一格是一行（壳 105rpx，写字那一层 99rpx）',
+    !!shell3 && rpxEq(shell3.h, 105, 3) && !!ta3 && rpxEq(ta3.h, 99, 3),
+    `壳 ${shell3 && toRpx(shell3.h).toFixed(1)}／框 ${ta3 && toRpx(ta3.h).toFixed(1)}rpx`)
+  /* ⑨ 文字档也要有粘贴钮，且与链接档一致——不只数节点：真往剪贴板塞一句话，点那枚钮，看进没进框。
+     （数节点的判据抓不到"钮在、但读的是别的键"，那正是链接档原来那个 bug 的形状。） */
+  await mp.evaluate(() => { wx.setClipboardData({ data: '验收用的那一句' }) })
+  await sleep(500)
+  const pasteBtn = await page.$('.field-write .field-paste')
+  ck('E3b 文字档那格有粘贴钮（在格子里，与链接档同一个类名）', !!pasteBtn)
+  if (pasteBtn) {
+    const bodyBefore = (await page.data()).writeBody || ''
+    await pasteBtn.tap()
+    await sleep(700)
+    const bodyAfter = (await page.data()).writeBody || ''
+    ck('E3c 点一下真把剪贴板那句话接进框里（框里原来有字也不许把旧的顶掉）',
+      /验收用的那一句/.test(bodyAfter) && bodyAfter.length > bodyBefore.length,
+      `前 ${JSON.stringify(bodyBefore)} → 后 ${JSON.stringify(bodyAfter)}`)
+    const bubAfter = await page.$$('.hint-bubble')
+    ck('E3d 接进去了就不许再报"还没有内容"（那枚气泡不能因为粘贴而亮着）',
+      bubAfter.length === 0 && !(await page.data()).hintLine, `${bubAfter.length} 枚`)
+  }
   // ⚠️ 这里用 trigger('focus') 而不是 tap()：模拟器里 tap 一枚原生 <textarea> **不会**把焦点落上去
   //（实测 bodyFocus 一直是 false，E4/E5/E6 三条连着红，而面板高度那条量出来是 500 没错）。
   // trigger 走的是 bind 事件那条通道，证的正是"焦点这一位接上了没"——真机上键盘起来必然发 focus，
@@ -384,8 +466,10 @@ const ck = (name, ok, got) => {
   ck(`E4 焦点进框里 → 面板抬到展开那一档（${PANEL_OPEN_H}rpx，只多一行）`,
     d.bodyFocus === true && d.panelOpen === true && rpxEq((await rects(['.panel']))[0].h, PANEL_OPEN_H, 4),
     `focus=${d.bodyFocus} open=${d.panelOpen} 高 ${toRpx((await rects(['.panel']))[0].h).toFixed(1)}rpx`)
-  ck('E5 框跟着变成两行（160rpx）', rpxEq((await rects(['.field-area']))[0].h, 160, 4),
-    `${toRpx((await rects(['.field-area']))[0].h).toFixed(1)}rpx`)
+  const [shell5, ta5] = await rects(['.field-write', '.field-area'])
+  ck('E5 壳跟着变成两行（160rpx，写在壳身上；写字那一层 154）',
+    !!shell5 && rpxEq(shell5.h, 160, 4) && !!ta5 && rpxEq(ta5.h, 154, 4),
+    `壳 ${shell5 && toRpx(shell5.h).toFixed(1)}／框 ${ta5 && toRpx(ta5.h).toFixed(1)}rpx`)
   ck('E6 「原文翻译」那枚开关在展开态出现，默认关',
     (await page.$$('.wr-sw')).length === 1 && d.writeTranslate === false)
   await mp.screenshot({ path: `${OUT}/E-文字-展开两行.png` })

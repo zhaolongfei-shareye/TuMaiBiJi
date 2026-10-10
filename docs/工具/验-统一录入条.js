@@ -67,16 +67,19 @@ const lens = (css, prop) => {
 const num = (css, prop) => (lens(css, prop)[0] !== undefined ? lens(css, prop)[0] : NaN)
 
 // ---------- 1. 文案：三条新串两门都有，五条退役串一处不剩 ----------
-;['chooseMode', 'slideExtract', 'maxShots', 'modePhoto'].forEach((k) => {
+;['back', 'slideExtract', 'maxShots', 'modePhoto'].forEach((k) => {
   ok(`i18n.${k} 中文有`, !!zh[k])
   ok(`i18n.${k} 英文有`, !!en[k])
 })
 ok('maxShots 两门都留了 {n} 位（张数从常量拼，不写进句子里）',
   /{n}/.test(zh.maxShots) && /{n}/.test(en.maxShots), `${zh.maxShots} / ${en.maxShots}`)
 // 那五支是上一代的承载方式说的话：条身按模式换字、已选 N 张、保存后可提炼、先写个标题、开始提炼按钮。
+// 后面四支是 10-10 深夜那一轮退的：面板外那行两枚改成「Tips ＋ 返回」，
+// 列表右上角那枚「点一下展开／收起」整个取消（折叠口没有第二个入口，`.sheet.ix-wide` 一并删）。
 ;['barUrl', 'barShot', 'pickedCount', 'urlHintIdle', 'linkReady', 'needTitle', 'writeTitlePh',
   'writeBodyPh', 'startExtract', 'albumDesc', 'takePhotoHint', 'fromAlbumHint', 'addMore',
-  'guide1T', 'guide1D', 'guide2T', 'guide2D', 'guide3T', 'guide3D', 'guide4T', 'guide4D']
+  'guide1T', 'guide1D', 'guide2T', 'guide2D', 'guide3T', 'guide3D', 'guide4T', 'guide4D',
+  'chooseMode', 'barCollapse', 'expandTip', 'collapseTip']
   .forEach((k) => {
     ok(`退役的键 ${k} 字典里没了`, zh[k] === undefined && en[k] === undefined)
     ok(`退役的键 ${k} 页面里也不再引用`, !new RegExp('\\bt\\.' + k + '\\b').test(wxml + js))
@@ -84,6 +87,23 @@ ok('maxShots 两门都留了 {n} 位（张数从常量拼，不写进句子里�
 // ➕ 那一枚方格的 aria-label 要说清"拍或选都行"，这一支留着就是给它用的
 ok('importScreenshot 还在（➕ 那格的可读名）', !!zh.importScreenshot && !!en.importScreenshot
   && /t\.importScreenshot/.test(wxml))
+// 那四支退役键的消费者有两支根本不在这一页（expandTip／collapseTip 在笔记列表），
+// 上面那个循环只扫得到这一页的 wxml+js，所以这里按整个 miniprogram 目录再扫一遍——
+// 键名留在字典里没人引用是"第二份真相"，注释里留着提它则是下一轮的坑。
+const sweep = (dir, out = []) => {
+  for (const name of fs.readdirSync(dir)) {
+    const f = path.join(dir, name)
+    if (fs.statSync(f).isDirectory()) { if (name !== 'node_modules') sweep(f, out); continue }
+    if (/\.(wxml|wxss|js|json)$/.test(name)) out.push(f)
+  }
+  return out
+}
+;['chooseMode', 'barCollapse', 'expandTip', 'collapseTip'].forEach((k) => {
+  const hits = sweep(path.join(ROOT, 'miniprogram'))
+    .filter((f) => new RegExp('\\b' + k + '\\b').test(fs.readFileSync(f, 'utf8')))
+    .map((f) => path.relative(ROOT, f))
+  ok(`退役的键 ${k} 全仓一处不留（含注释）`, hits.length === 0, hits.join(','))
+})
 ok('中英键数相等', Object.keys(zh).length === Object.keys(en).length,
   Object.keys(zh).length + ' vs ' + Object.keys(en).length)
 ok('拍照/相册两枚圈的标签复用现网串', zh.takePhoto === '拍照' && zh.fromAlbum === '相册')
@@ -158,8 +178,15 @@ ok('那一行小字存在且排在面板之前（在框外）',
   outAt > -1 && panelAt > outAt && wrapAt > -1 && outAt > wrapAt
   && /<view wx:if="\{\{active\}\}" class="entry-wrap">/.test(wxml),
   `wrap@${wrapAt} out@${outAt} panel@${panelAt}`)
-ok('那一行两枚：左边选模式、右边说怎么退',
-  /class="out-l">\{\{t\.chooseMode\}\}<\/text>\s*<text class="out-r">\{\{t\.barCollapse\}\}/.test(wxml))
+// 10-10 深夜这两枚换了内容：左边不再报"这一屏在干什么"，改成与收起态同一条轮播 Tips；
+// 右边从一句说明变成一枚真的按钮「返回」（与笔记列表右上角同一个词、同一个动作）。
+ok('那一行两枚：左边是轮播 Tips、右边是「返回」那一枚按钮',
+  /class="out-l">\{\{tipsPrefix\}\}\{\{tips\[tipIdx\]\}\}<\/text>/.test(wxml)
+  && /class="out-r"[^>]*role="button"[^>]*aria-label="\{\{t\.back\}\}"[^>]*catchtap="collapse"/.test(wxml))
+// Tips 那一枚必须只占一行：这一行在流内，一折行整块面板就被顶下去，而它每 8 秒换一句。
+ok('Tips 那一枚钉死单行（折行＝面板每 8 秒跳一次）',
+  /white-space:\s*nowrap/.test(seg('.out-l')) && /text-overflow:\s*ellipsis/.test(seg('.out-l'))
+  && /min-width:\s*0/.test(seg('.out-l')), seg('.out-l').replace(/\s+/g, ' '))
 // 面板肚子里只剩"一个框（或一横排小图）+ 一枚条"：那排按钮、四步指引、清空、粘贴都不该回来
 ok('面板里没有那排按钮（清空/粘贴/保存/取消全撤）', !/class="acts"/.test(wxml) && !/catchtap="pasteUrl|catchtap="clearShots|catchtap="cancelWrite/.test(wxml))
 ok('四步指引整批撤净（模板、引用、样式都没有）',
@@ -171,8 +198,22 @@ ok('文字档是一个 textarea（长原文要能换行）', /<textarea/.test(wx
 ok('链接框的提示词吃 linkDesc（不再有写死的 https 样例）',
   /placeholder="\{\{t\.linkDesc\}\}"/.test(wxml) && !/mp\.weixin\.qq\.com/.test(wxml))
 ok('文字框的提示词吃 manualDesc', /placeholder="\{\{t\.manualDesc\}\}"/.test(wxml))
-ok('那一行画在框外（面板之前），且权限那一类可点进设置',
-  /class="out-err" catchtap="openPermSetting">\{\{hintLine\}\}/.test(wxml) && outAt > -1 && wxml.indexOf('out-err') < panelAt)
+// 10-10 深夜报错换了地方与画法：不再画在框外那一行（那一段会把面板顶高），
+// 改成整枚浮在面板里、输入框正上方，几秒自己走；权限那一类仍然可点进设置。
+ok('报错那枚气泡在面板里面、输入框上方，且权限那一类可点进设置',
+  /class="hint-bubble[^"]*"[\s\S]{0,160}catchtap="onHintTap"/.test(wxml)
+  // 用元素本身比位置，不能比 `indexOf('hint-bubble')`：上面那条注释里也写着这个类名，
+  // 拿第一次出现的下标去和 panel 比，注释会冒充成"气泡挂在框外"。
+  && panelAt > -1 && wxml.search(/<view[^>]*class="hint-bubble/) > panelAt,
+  '气泡没画在 panel 之后＝它可能还挂在框外那一行')
+ok('旧的框外那一行报错整条撤净（样式与 markup 一处不留，留着就是两份真相）',
+  !/out-err/.test(wxml) && !/\.out-err\s*\{/.test(wxss))
+ok('气泡是浮层：absolute 定位，不许占流内高度（占了一行就会把面板顶来顶去）',
+  /position:\s*absolute/.test(seg('.hint-bubble')) && !/flex:\s*none/.test(seg('.hint-bubble')),
+  seg('.hint-bubble').replace(/\s+/g, ' ').slice(0, 60))
+ok('"几秒后消失"有人管：算出这一位之后统一上表，撤掉时统一撤表',
+  /if \(patch\.hintLine\) this\._armHint\(\)/.test(js) && /else this\._clearHint\(\)/.test(js)
+  && /onHide\(\)[\s\S]{0,300}_clearHint\(\)/.test(js) && /onUnload\(\)[\s\S]{0,200}_clearHint\(\)/.test(js))
 /* 那句"正在输但不像链接"的规则行是现网一直有的（原来由 urlHint==='bad' 单独驱动一行）。
    10-08 把它并进 hintLine 一位驱动——并的时候漏掉过一半：只剩 errLine，打字过程中界面一句都不说，
    要等滑到底才报。所以这里两头都钉：一位算出来要含那句规则，且每个会改 errLine 的出口都要过一遍 _sync。 */
@@ -259,19 +300,39 @@ const [panelPadY, panelPadX, panelPadBottom] = panelPad
 const cardBorder = num(cardCss, 'border')
 const cardPad = num(cardCss, 'padding')
 const cardMargin = num(cardCss, 'margin-top')
+/* 卡的 `margin-bottom` 有两个来源：这一页自己写的那一条，和 `app.wxss` 全局 `.card` 那一条
+   （它带 `margin-bottom: var(--sp-2)`）。全局那份会**静默补**到页面没写的属性上——
+   10-10 深夜真跑量到展开两档各溢出 7／12.8rpx，而这条算式一条都不红，差的就是这 16rpx。
+   所以两头都读：页面写了就按页面的，没写就把全局那一档算进 chrome。 */
+const appCardCss = (new RegExp('\\n\\.card\\s*\\{([^}]*)\\}').exec(appCss) || [, ''])[1]
+// `margin-bottom: 0` 没有单位，`num()` 那一档只认 rpx/var，所以这里自己解一次"0 也算一个数"。
+const lenOrZero = (css, prop) => {
+  const m = new RegExp(`${prop}:\\s*([^;]+)`).exec(css)
+  if (!m) return NaN
+  return /^\s*0\s*$/.test(m[1]) ? 0 : num(css, prop)
+}
+const cardMbGlobal = lenOrZero(appCardCss, 'margin-bottom')
+const cardMbOwn = lenOrZero(cardCss, 'margin-bottom')
+const cardMarginBottom = Number.isFinite(cardMbOwn) ? cardMbOwn : (Number.isFinite(cardMbGlobal) ? cardMbGlobal : 0)
+ok('这一页的 `.card` 自己把 margin-bottom 说死了（全局那一份带 16rpx，不写就被静默补进定高的面板里）',
+  Number.isFinite(cardMbOwn) && cardMbOwn === 0 && Number.isFinite(cardMbGlobal),
+  `页面写 ${cardMbOwn}／全局那一份 ${cardMbGlobal}`)
 // 10-10 压进红框把标签行上面那 25rpx 归 0 了（站长那句"小横杠与下方靠近"）。
 // 这里读不到就当 0，但下面那条钉"必须真的没有"，别让它悄悄长回来。
 const modesMargin = Number.isFinite(num(seg('.modes'), 'margin-top')) ? num(seg('.modes'), 'margin-top') : 0
 ok('标签行上面不再有 margin（那一档 10-10 归 0，算式里它就是 0）',
   !/margin-top/.test(seg('.modes')), seg('.modes').replace(/\s+/g, ' ').slice(0, 70))
-// 行高那一档用 1.6 而不是 CSS 里写的 1.3：10-08 真跑量到标签那一块比算式多 15rpx
-// （微信给 view 的默认行高约 1.6，`.md` 上那一条没吃进去），算式取**实测那一档**才不骗人。
-const mdLine = num(seg('.md'), 'font-size') * 1.6 + num(seg('.md'), 'padding-bottom')
+// 标签行 10-10 深夜起是**定高**的：那三枚要扩热区（站长「三个Tab很难点，把按键区域扩大」），
+// 高度不再由"字号 × 默认行高 ＋ 下内边距"派生，而是 `.modes` 自己写死一档，高出来的部分全是给指头的。
+// 这一档的来历：白卡里原来那两档 auto 边距（框上面、条上面）撤掉了上面那一档，省出来的整数搬到这里。
+const modesH = num(seg('.modes'), 'height')
+ok('标签行是定高的（扩热区那一档，读不到就是算式在空转）',
+  Number.isFinite(modesH) && modesH > 0, `${seg('.modes').replace(/\s+/g, ' ').slice(0, 80)}`)
 const innerWidth = 750 - 2 * dockInset - 2 * panelBorder - 2 * panelPadX
 const cardInnerW = innerWidth - 2 * cardBorder - 2 * cardPad
 // 面板自己那 3rpx 描边也在定高里面（border-box），漏掉它算出来的可用高度会多 6rpx——
 // 10-08 真跑量到卡里可用 251.7，而当时这条算的是 263.5，差的就是这 6 加行高那 6。
-const usedByChrome = 2 * panelBorder + panelPadY + modesMargin + mdLine + cardMargin + 2 * cardBorder + 2 * cardPad + panelPadBottom
+const usedByChrome = 2 * panelBorder + panelPadY + modesMargin + modesH + cardMargin + cardMarginBottom + 2 * cardBorder + 2 * cardPad + panelPadBottom
 const cardInnerH = PANEL_H - usedByChrome
 const openCardInnerH = PANEL_OPEN_H - usedByChrome
 ok('卡内宽算得出（三枚圈那一排不许超出）', innerWidth > 0 && cardInnerW > 400, `面板内宽 ${innerWidth} / 卡内宽 ${cardInnerW}`)
@@ -289,12 +350,87 @@ const fieldH = num(seg('.field'), 'height')
 const sldH = num(seg('.sld'), 'height')
 ok('一个框 + 一枚条放得进收起那一档（还留一条报错行的位置）',
   fieldH + sldH <= cardInnerH, `${fieldH}+${sldH}=${fieldH + sldH} ≤ ${cardInnerH.toFixed(1)}`)
+// 展开那一档的"两行框"高度 10-10 深夜起写在壳（.field-write-2）身上：那格多包了一层，
+// textarea 只负责字、壳负责那一格多高（原生组件装不下子节点，那枚粘贴钮只能做兄弟）。
+const write2H = num(seg('.field-write-2'), 'height')
 ok('展开那一档装得下两行框 + 开关 + 条',
-  num(seg('.field-area-2'), 'height') + num(seg('.wr-sw'), 'height') + num(seg('.wr-sw'), 'margin-top') + sldH <= openCardInnerH,
-  `需 ${num(seg('.field-area-2'), 'height') + num(seg('.wr-sw'), 'height') + num(seg('.wr-sw'), 'margin-top') + sldH} ≤ ${openCardInnerH.toFixed(1)}`)
-// 框不许贴着脸：条上面那档 auto 边距就是那条缝
-ok('框与条之间由两档 auto 边距给缝（不是硬写 margin）',
-  /margin-top:\s*auto/.test(seg('.field')) && /margin-top:\s*auto/.test(seg('.sld')))
+  write2H + num(seg('.wr-sw'), 'height') + num(seg('.wr-sw'), 'margin-top') + sldH <= openCardInnerH,
+  `需 ${write2H + num(seg('.wr-sw'), 'height') + num(seg('.wr-sw'), 'margin-top') + sldH} ≤ ${openCardInnerH.toFixed(1)}`)
+ok('两行框那一档仍然只比一行多一行（105 → 160，"展开只多一行"那句没被这轮改动顶掉）',
+  write2H === 160 && fieldH === 105, `一行 ${fieldH} / 两行 ${write2H}`)
+/* 文字那一档补一枚粘贴（站长 10-10 深夜「文字tab，里面输入框也要提供粘贴ICON，与链接tab一致」）。
+   "一致"钉的是三件事：同一份皮（.field-paste 那一档 72 见方）、同一个位置（框内右端）、
+   同一份图形（同一支 glyph-clipboard，不另画一份）。语义**不许**一致：链接是一行，
+   贴进去就是替换；原文框已经有人打好字了，贴进来只能接在后面。 */
+const writeBlock = (/class="field field-write[\s\S]*?<\/view>\s*<!--/.exec(wxml) || [''])[0]
+  || wxml.slice(wxml.indexOf('class="field field-write'), wxml.indexOf('class="field field-write') + 900)
+ok('文字那一格右边确实有一枚粘贴，且吃的是链接那一档同一个类名',
+  /class="field-paste" catchtap="onPasteWrite"/.test(writeBlock) && /paste-glyph glyph-clipboard/.test(writeBlock),
+  writeBlock.replace(/\s+/g, ' ').slice(0, 90))
+// 框自己的 padding 只许给上下（横向由壳给那一份 28）——两边各给一次，两档的字就错开 28rpx。
+ok('横向留白只在壳上给一份（框自己再给一次就会比链接格往里缩，两档的字对不齐）',
+  (() => {
+    const p = (seg('.field-area').match(/padding:\s*([^;]+)/) || [, ''])[1].trim().split(/\s+/).map(parseFloat)
+    const four = p.length === 4, l = four ? p[3] : (p.length > 1 ? p[1] : p[0])
+    const r = four ? p[1] : (p.length > 1 ? p[1] : p[0])
+    return p.length > 0 && l === 0 && r === 0 && /padding-right:\s*\d+rpx/.test(seg('.field-write'))
+  })(),
+  `框 ${seg('.field-area').replace(/\s+/g, ' ')}／壳 ${seg('.field-write').replace(/\s+/g, ' ')}`)
+ok('原文框已有内容时贴进来是接在后面，不是顶掉（两档语义各管各的）',
+  /const had = this\.data\.writeBody[\s\S]{0,200}\$\{had[\s\S]{0,40}\}\\n\$\{s\}/.test(js),
+  '没找到"接在后面"那一支＝可能把人打好的字整段换了')
+/* `height:100%` ＋ 上内边距同时写在框身上，就必须配 box-sizing:border-box：默认那一档
+   content-box 会把内边距加在 100% **外面**（105 的壳里塞一个 129 的框，字掉到圆角外面）。
+   这一条不用等渲染就能钉——它是两条声明凑在一起才成立的错，静态读得出来。 */
+ok('文字框配了 box-sizing:border-box（不配它 height:100% ＋ 上内边距＝溢出壳）',
+  /box-sizing:\s*border-box/.test(seg('.field-area')),
+  seg('.field-area').replace(/\s+/g, ' '))
+// 上内边距是**算出来对齐**的数，不是留白：链接格那行字由 align-items:center 竖直居中，
+// 字顶离壳的内容上沿 = (壳 105 − 边框 3×2 − 行高 28×1.5) / 2 = 28.5；textarea 的字从自己
+// 的内容顶顺着排，所以给同一个数才齐。改了字号/边框/壳高，这一条会红着提醒三头要一起动。
+ok('框的上内边距就是"与链接格那行字对齐"算出来的那一个（±1rpx）',
+  (() => {
+    const pt = parseFloat((seg('.field-area').match(/padding:\s*([\d.]+)rpx/) || [, ''])[1])
+    const lh = parseFloat((seg('.field-area').match(/line-height:\s*([\d.]+)/) || [, ''])[1])
+    const edge = parseFloat(TOK['w-edge'])
+    const line = parseFloat(TOK['fs-body']) * lh
+    return Number.isFinite(pt) && Number.isFinite(lh) && Math.abs(pt - (fieldH - 2 * edge - line) / 2) <= 1
+  })(),
+  `padding ${(seg('.field-area').match(/padding:\s*([^;]+)/) || [, ''])[1]}／算出 ${(fieldH - 2 * parseFloat(TOK['w-edge']) - parseFloat(TOK['fs-body']) * parseFloat((seg('.field-area').match(/line-height:\s*([\d.]+)/) || [, '1'])[1])) / 2}`)
+/* 10-10 深夜改的口：白卡里**上白边必须等于下白边**（站长原话「面板内最上面的白边高度，
+   与最下面的白边高度不一样，应该调整为与最下面的一样，把多出来的高度放在三个tab部分」）。
+   原来两档 auto（框上面＋条上面）把富余对半分，上白边就成了 padding＋半份、下白边只有 padding，
+   两头永远差半份。现在只留条上面那一档：框贴着卡顶，两头都等于 `.card` 的上下内边距。
+   下面这三条钉的是这件事的三头：框与图排身上不许有 auto、条身上必须有、两头相等由谁给。 */
+const cardPadTop = num(seg('.card'), 'padding-top') || num(seg('.card'), 'padding')
+ok('框（链接／文字）与图排身上不再有 auto 上边距——上白边只由卡的内边距给',
+  !/margin-top:\s*auto/.test(seg('.field')) && !/margin-top:\s*auto/.test(seg('.strip')),
+  `${seg('.field')} / ${seg('.strip')}`)
+ok('条上面那一档 auto 还留着（它才是"贴卡底"那一条）', /margin-top:\s*auto/.test(seg('.sld')))
+ok('卡的内边距上下同一个数（上白边＝下白边这条决定的落点）',
+  Number.isFinite(cardPadTop) && cardPadTop === (num(seg('.card'), 'padding-bottom') || cardPadTop), `${cardPadTop}`)
+// 标签行拿到的那一段必须真的比原来高（否则"扩热区"这句就是空话）
+// 标签行那一块必须比字本身高出一截，否则"扩热区"这句是空话：字那一档 31×1.2=37.2，
+// 判的是"至少再给指头 24rpx"（64 那一档留的是 26.8）。上限不在这里——上限由展开那一档
+// 装不装得下"两行框＋开关＋条"那条判据管着（两条夹住同一个数，谁改都会红）。
+ok('标签行那一块比字高出一截（多出来的高度确实落在这一行，不是又还给卡）',
+  modesH >= num(seg('.md'), 'font-size') * 1.2 + 24, `行 ${modesH} / 字 ${num(seg('.md'), 'font-size')}×1.2 ＋ 24`)
+ok('三枚标签各自吃满这一行的高度（热区是"整块"，不是字那么大）',
+  /align-items:\s*stretch/.test(seg('.modes')) && /display:\s*flex/.test(seg('.md')) && /padding:\s*0\s+22rpx/.test(seg('.md')),
+  seg('.md').replace(/\s+/g, ' '))
+/* 报错那枚气泡的高度位置也是算出来的，不是随手一个 top:78：
+   顶 = 面板上内边距 ＋ 标签行 ＋ 卡上边距（正好贴着卡顶，不骑在标签行上），
+   底 = 顶 ＋ min-height（不许盖过输入框的一半——字竖直居中，盖过一半就吃到那一行了）。
+   两头都从样式表现读，改了标签行高度或卡的内边距，这里会跟着红。 */
+const bubTop = num(seg('.hint-bubble'), 'top')
+const bubMinH = num(seg('.hint-bubble'), 'min-height')
+const panelPadTopN = num(seg('.panel'), 'padding-top') || num(seg('.panel'), 'padding')
+const cardTopY = panelPadTopN + modesH + num(seg('.card'), 'margin-top')
+const fieldTopY = cardTopY + num(seg('.card'), 'border') + cardPadTop
+ok('气泡贴在卡顶下面一点，不骑到标签行上（那三枚的热区不能被报错盖住）',
+  bubTop >= cardTopY && bubTop - cardTopY <= 12, `气泡顶 ${bubTop}／卡顶 ${cardTopY}`)
+ok('气泡最矮那一档也盖不过输入框的一半（字在中间，那一行露得出来）',
+  bubTop + bubMinH <= fieldTopY + fieldH / 2, `气泡底 ${bubTop + bubMinH}／框顶 ${fieldTopY}／中线 ${fieldTopY + fieldH / 2}`)
 
 // 缩略图那一排：列数、上限、以及"JS 里那个 ROW_CELLS 与 WXSS 是不是同一件事"
 const thW = num(seg('.th'), 'width')
@@ -326,6 +462,23 @@ ok('JS 里"停在最右"那一格 == 轨道内宽 − 圆宽 − 左边内缩',
   SLD_MAX === calcMax, `JS ${SLD_MAX} / 算出 ${calcMax}（轨道内宽 ${sldInner}）`)
 ok('圆停在最右那一格仍然在轨道里（留 0 到 20rpx 的余量）',
   calcMax + knobW + knobRest <= sldInner + 0.01, String(sldInner))
+/* 10-10 深夜这一枚改了两件事（站长原话「拖动的圆ICON要换成橙色，但如果上面的输入框里面没内容，
+   不允许滑动圆ICON。链接与文字处理一致」）：
+   ① 皮上不再洗灰——`.sld-off` 里不许再出现给圆或圆里那支图形上色的规则，橙色就是基础那一条；
+   ② 锁挪到行为上——`!ready` 根本不起拖（`onSlideStart` 里 return），所以也不会有"拖到一半回弹"。
+   两档共用同一份模板与同一个处理函数，所以"链接与文字一致"这一句是白送的，
+   但还是钉一条：三档的 ready 判定各自由谁说了算。 */
+ok('没内容那一档不再改圆的颜色（圆全程是那一支橙）',
+  !/\.sld-off \.sld-knob\s*\{[^}]*background/.test(wxss) && !/\.sld-off \.sld-glyph\s*\{/.test(wxss)
+  && /background:\s*var\(--cp-extract\)/.test(seg('.sld-knob')), seg('.sld-knob').replace(/\s+/g, ' '))
+ok('橙圆里那支图形吃的是配对那支字色（橙压白 4.53，反过来白压橙不够）',
+  /background:\s*var\(--cp-extract-ink\)/.test(seg('.sld-glyph')), seg('.sld-glyph').replace(/\s+/g, ' '))
+ok('空着不许起拖：onSlideStart 里 !ready 直接挡在门口，并且把那句校验说出来',
+  /onSlideStart\(e\)\s*\{[\s\S]{0,600}?if \(!this\.data\.ready\) \{ this\.runSubmit\(\); return \}/.test(js),
+  '没找到那一行＝又能空滑了')
+ok('三档共用同一枚 ready：readyFor() 只有一处定义、只有一处写进 data（"链接与文字一致"靠的就是这一条）',
+  (js.match(/readyFor\(\)\s*\{/g) || []).length === 1 && (js.match(/ready: this\.readyFor\(\)/g) || []).length === 1,
+  `定义 ${(js.match(/readyFor\(\)\s*\{/g) || []).length} 处 / 写入 ${(js.match(/ready: this\.readyFor\(\)/g) || []).length} 处`)
 // 那一圈与轨道同色（旧稿是纸白环、10-10 换浅面之后是井那一档），关键是它写在 .sld 的
 // border 上、而填充是绝对定位的兄弟节点——圆滑到最右也不会把它盖掉。
 ok('圆外面那一圈是轨道自己的 border，进度填充盖不到它',
@@ -486,7 +639,7 @@ ok('图片备份那条 B 链仍与建笔记那条并行、不 await',
 ok('失败时那批孤儿对象仍然删（_settleBackup(null, …)）', /this\._settleBackup\(null, backup\)/.test(js))
 
 // 这两叠高度是 §2 那两行算式的读数：改了字号/间距/控件之后它们会变，规格文档引的就是这两个数
-const writeOpenStack = num(seg('.field-area-2'), 'height') + num(seg('.wr-sw'), 'height')
+const writeOpenStack = num(seg('.field-write-2'), 'height') + num(seg('.wr-sw'), 'height')
   + num(seg('.wr-sw'), 'margin-top') + sldH
 console.log(`${fails.length ? '✗' : '✓'} 统一录入条：${pass}/${pass + fails.length} 条通过`
   + `　面板 ${PANEL_H}/${PANEL_OPEN_H}rpx、卡内 ${cardInnerW}×${cardInnerH.toFixed(1)}（展开 ${openCardInnerH.toFixed(1)}）rpx`

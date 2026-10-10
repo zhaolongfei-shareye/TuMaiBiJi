@@ -47,7 +47,11 @@ ok('它先挡 busy（与 clearUrl 同一条规矩：忙的时候不许改框里�
 ok('它真的读剪贴板：走 wx.getClipboardData', /wx\.getClipboardData\(/.test(body))
 ok('读到空与读失败各有话术，两条键不一样（不许合成一句糊过去）',
   /pasteEmpty/.test(body) && /pasteFailed/.test(body) && /fail:/.test(body))
-ok('两条话术都发吐司，不静默', (body.match(/wx\.showToast/g) || []).length >= 2)
+// 10-10 深夜这两条从"吐司"改道成"输入框上方那枚气泡"（站长：所有输入错误提示都用这种方式）。
+// 钉的还是同一件事：**两条都必须说出来**，不许静默；只是出口换成 sayErr。
+ok('两条话术都不静默（走气泡那一个出口，两档共用）',
+  (body.match(/this\.sayErr\(/g) || []).length >= 2 && !/wx\.showToast/.test(body),
+  `sayErr ${(body.match(/this\.sayErr\(/g) || []).length} 处`)
 ok('粘进去的字走与手打同一趟：hintFor ＋ _sync（右滑那一枚的 ready 才跟着变）',
   /this\.hintFor\(/.test(body) && /this\._sync\(\)/.test(body))
 ok('粘来的字符串先 trim（微信分享出去的那一坨前后常带空白与句子）', /\.trim\(\)/.test(body))

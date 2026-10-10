@@ -124,6 +124,10 @@ async function main() {
   ok('三块各自有读屏名字，且就是屏上那一句（左块＝「记下来」，两枚＝数字＋那一格的名字）',
     aPerson === t.barIdle && aNotes === `${dd.noteCount}${t.statNotes}` && aCards === `${dd.cardCount}${t.statCards}`,
     `${JSON.stringify(aPerson)}／${JSON.stringify(aNotes)}／${JSON.stringify(aCards)}`)
+  // 换人那一枚是一枚透明热区：屏上没有文字，读屏只能靠这一句（不挂就是"有个能点的地方，不知道是什么"）。
+  const aAlt = await ariaOf('.blk-alt-hit')
+  ok('剪影那一枚也有读屏名字（换人这一下不能只有眼睛看得见）',
+    aAlt === t.personSwap, JSON.stringify(aAlt))
   ok('小字那一行屏上真是「照片 · 链接 · 文字」三个现网标签（不是效果图上那句说明）',
     (await (await page.$('.blk-jot-s')).text()) === `${t.modePhoto} · ${t.modeUrl} · ${t.modeWrite}`,
     JSON.stringify(await (await page.$('.blk-jot-s')).text()))
@@ -157,34 +161,43 @@ async function main() {
   const shownN = await (await page.$('.blk-stat-notes .blk-n')).text()
   ok('那一格屏上写的就是这个数', String(shownN).trim() === String(d.noteCount), `${JSON.stringify(shownN)} vs ${d.noteCount}`)
 
-  /* ---------- 6. 双击换人 ---------- */
-  const before = d.personSrc
-  const p = await page.$('.blk-person')
-  const t0 = Date.now()
-  await p.tap()
-  await p.tap()
-  const gap = Date.now() - t0
-  await sleep(1200)
-  let after = (await page.data()).personSrc
-  if (after === before) {
-    // 两下之间隔着两次 WebSocket 往返，慢机器上可能已经过了那 300ms。
-    // 换走"直接打两次处理函数"这条路——它测的还是同一段判间隔的代码，只是不吃派发延迟。
-    await page.callMethod('onTapPerson')
-    await page.callMethod('onTapPerson')
-    await sleep(900)
-    after = (await page.data()).personSrc
-    console.log(`    （两下相隔 ${gap}ms，超过 300ms 那档；改走直调处理函数那一验）`)
-  }
-  ok('连点两下换到另一张人物', before !== after, `${before} → ${after}`)
+  /* ---------- 6. 点右后方那枚剪影换人（10-10 深夜替掉"连点两下"） ----------
+     那套自数两下的机器撤走之后，这一格量的是三件新东西：
+     ① 剪影在屏上真是"半高、右下、贴在主人物后面那一个角"；② 点它换的是另一个人，而且不顺手开门；
+     ③ 两张位是对调的（换完之后男在前、女当剪影），不是一枚 src 翻两面。
+     storage 会跨轮停在任意一张上，先把画面钉回默认那一态（女在前），否则下面量的就是掷硬币。 */
+  const tapHit = async () => { await (await page.$('.blk-alt-hit')).tap(); await sleep(700) }
+  for (let i = 0; i < 2 && (await page.data()).personKey !== 'girl'; i += 1) await tapHit()
+  const d6 = await page.data()
+  ok('默认那一态：女在前、男在剪影位（两个位各绑一枚，不是一枚 src 翻两面）',
+    d6.personKey === 'girl' && /ic-person\.png$/.test(d6.personSrc) && /ic-person-alt\.png$/.test(d6.personAltSrc),
+    `${d6.personSrc} / ${d6.personAltSrc}`)
+  const wrap6 = await rect('.blk-figwrap')
+  const fig6 = await rect('.blk-fig')
+  const alt6 = await rect('.blk-fig-alt')
+  const hit6 = await rect('.blk-alt-hit')
+  ok('剪影真渲染出来了，且高约主人物的一半（0.45~0.55，他原话"高度约为女的一半"）',
+    !!alt6 && alt6.h > 0 && alt6.h / fig6.h >= 0.45 && alt6.h / fig6.h <= 0.55,
+    alt6 ? `主人物 ${q(fig6.h).toFixed(1)}／剪影 ${q(alt6.h).toFixed(1)} = ${(alt6.h / fig6.h).toFixed(2)}` : '屏上没有 .blk-fig-alt')
+  ok('剪影落在右下（右缘、底缘都贴到取景窗那两条边）',
+    Math.abs(alt6.right - wrap6.right) <= 2 && Math.abs(alt6.bottom - wrap6.bottom) <= 2,
+    `右差 ${q(alt6.right - wrap6.right).toFixed(1)}／底差 ${q(alt6.bottom - wrap6.bottom).toFixed(1)}rpx`)
+  ok('热区盖得住剪影本身（宽或高小一档，剪影就有一段点了没反应）',
+    !!hit6 && hit6.w >= alt6.w - 1 && hit6.h >= alt6.h - 1,
+    `热区 ${hit6 && hit6.w}×${hit6 && hit6.h} vs 剪影 ${alt6.w}×${alt6.h}`)
+  const srcBefore = d6.personSrc
+  await tapHit()
+  const d7 = await page.data()
+  ok('点剪影真的换了人（两个位同时对调）',
+    d7.personKey === 'boy' && d7.personSrc !== srcBefore && d7.personAltSrc === srcBefore,
+    `${srcBefore} → ${d7.personSrc}（剪影位 ${d7.personAltSrc}）`)
+  ok('换人这一下没顺手把面板升起来（热区吃 catchtap，没冒到左块那一档）',
+    !!(await page.$('.home-blk')) && !(await page.$('.entry-wrap')) && !d7.active,
+    `active=${d7.active}`)
   ok('换完写进本机（下次进页还是这一张）',
-    ['boy', 'girl'].includes(unwrap(await mp.callWxMethod('getStorageSync', PERSON_KEY))),
+    (await mp.callWxMethod('getStorageSync', PERSON_KEY)) === 'boy',
     JSON.stringify(unwrap(await mp.callWxMethod('getStorageSync', PERSON_KEY))))
-  ok('换人这一下没顺手把面板升起来（第一下被那枚定时器延住了）',
-    !!(await page.$('.home-blk')) && !(await page.$('.entry-wrap')))
-  // 换人那一下是"翻一张"，而 storage 会跨轮停在任意一张上——先把画面钉在男那一张再量，
-  // 不然这一条测到的是女那张（女那张只高窗 5rpx，量出来就是在掷硬币）。
-  await page.setData({ personSrc: '/assets/ic-person-alt.png' })
-  await sleep(1500)
+  // 换到"男在前"之后再看那道窗——这才是他点出来的态，不是 setData 硬摆的。
   const figB = await rect('.blk-fig')
   const wrapB = await rect('.blk-figwrap')
   const jotB = await rect('.blk-jot')
@@ -192,9 +205,14 @@ async function main() {
     figB.bottom > wrapB.bottom + 20 * R, `图底 ${q(figB.bottom).toFixed(1)}／窗底 ${q(wrapB.bottom).toFixed(1)}`)
   ok('换完人，窗底仍然不低过白条上沿（这一条是"男性下半部不要遮挡白色横条"那一句）',
     wrapB.bottom <= jotB.top + 2 * R, `窗底 ${q(wrapB.bottom).toFixed(1)}／白条顶 ${q(jotB.top).toFixed(1)}`)
-  await page.setData({ personSrc: '/assets/ic-person.png' })
-  await sleep(900)
-  // 清残值：站在那一张上是他自己的选择，这一把尺子不该替他留下一个"双击过"的状态。
+  await tapHit()
+  const back6 = await page.data()
+  // 收尾必须复原（不留"点过的状态"给下一把尺子），顺带钉他那句"与男的处理一致"的另一半：
+  // 换得过去也换得回来，两张各自都能站到前面来。
+  ok('再点一次换得回原来那一个（女的那张重新站到前面）',
+    back6.personKey === 'girl' && back6.personSrc === srcBefore && /ic-person-alt/.test(back6.personAltSrc),
+    `${back6.personKey}／主 ${back6.personSrc}／剪影 ${back6.personAltSrc}`)
+  // 清残值：站在那一张上是他自己的选择，这一把尺子不该替他留下点过的状态。
   await mp.callWxMethod('removeStorageSync', PERSON_KEY)
 
   /* ---------- 7. 三块各自的落点 ----------
@@ -228,10 +246,19 @@ async function main() {
 
   await go('/pages/create/create')
   page = await mp.currentPage()
+  /* 单点左块那一下现在没有定时器挡着（那 300ms 就是他打回上一版的理由）。
+     这里量的是"tap 回来之后到看见 active"这一段：WS 往返本身要几十毫秒，
+     所以阈值给 250ms——旧的实现这一段实测要 300 ＋ 往返，两条判据分得开。 */
+  const tTap = Date.now()
   await (await page.$('.blk-person')).tap()
-  await sleep(1500)
-  ok('单点左块（等满那 300ms）进的是拍照那一档', (await page.data()).active === 'photo',
+  let tapGap = -1
+  for (let i = 0; i < 20; i += 1) {
+    if ((await page.data()).active) { tapGap = Date.now() - tTap; break }
+    await sleep(50)
+  }
+  ok('单点左块进的是拍照那一档', (await page.data()).active === 'photo',
     `active=${(await page.data()).active}`)
+  ok('而且零延迟（没有第二下要等）', tapGap > -1 && tapGap < 250, tapGap < 0 ? '没升起来' : `${tapGap}ms`)
   await page.callMethod('collapse')
   await sleep(1500)
 
