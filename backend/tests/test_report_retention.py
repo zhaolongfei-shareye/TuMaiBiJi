@@ -12,10 +12,16 @@
 ⑦ **打出来的档与实际走到的分支不许各说各话**：`Test真跑那条脚本` 真起子进程、真数行数，
    并且要求那一次屏幕上出现「dry-run」时不许同时出现「已删除」。
 ⑧ 数据库报的删除条数与名单条数对不上时，**那次提交不许发生**（判据另开一个会话数行数）。
+⑨ 删完之后复跑那一份必须过**同一道**自洽闸（`Test那两道对账闸`）——第六轮审计实测过"前一遍有闸、
+   后一遍没闸"：`after` 自己矛盾（总行数 3、三档只有 2）时脚本照退 0。这一组里那几发都用替身读数，
+   判据落在**退出码＋有没有 commit＋有没有动手删**三样上。
+⑩ 无时间戳那一档**方向要分清**：变少才是删错了，变多是别人新写的（这张表是公开表单在写的）。
+   报反了就是把并发诬陷成 bug——那和把 bug 说成并发是同一种假话。
 
 ⑥ 与 ⑦ 是同一个风险的两面，第五轮审计实测出来的：只钉常量（⑥）不够——把分支单独改坏之后
 屏幕照打「dry-run：一行都不删」、盘上照删两行、退出码 0，⑥那两条尺子全绿（`/tmp/aud7` 那一发）。
-⑦⑧ 两条各有一把刀（`反向验证-举报台账.sh` 的 AH／AI）。
+⑦⑧⑨⑩ 每一面都有自己的刀（`反向验证-举报台账.sh` 的 AH／AI／AJ～AN）——只钉常量不钉分支那种
+"有尺子但钉错了地方"的情形，第五、六两轮各抓到过一次。
 
 不出网：conftest 已把 `SEC_CHECK_ENABLED` 置 false，这一支本来就只读写那个一次性库。
 期限天数**不在这里钉死**（钉成"等于 180"是一条改天数就红、却什么都证不明的尺子）；钉的是
@@ -39,7 +45,8 @@ from sqlalchemy import text
 
 from app.db.database import Base, SessionLocal, engine
 from app.models.share_report import ShareReport
-from app.services.report_retention import RETENTION_DAYS, delete_expired, plan_expired
+from app.services.report_retention import (RETENTION_DAYS, RetentionPlan, delete_expired,
+                                           plan_expired, reconcile, selfcheck)
 
 BACKEND = Path(__file__).resolve().parents[1]
 
@@ -329,3 +336,111 @@ db.commit()
         code, out = self._run(url)
         assert code == 1, f"库都还不存在却退了 {code}：{out[-300:]}"
         assert "不是「现网很干净」" in out, out[-300:]
+
+
+class Test那两道对账闸:
+    """第六轮审计回执补的尺子（`selfcheck`／`reconcile` 与 `run()` 里那两处消费）。
+
+    这几发**喂假读数**（替身 `plan_expired`／`delete_expired`）：要造的正是"这张表正在被别人写"
+    那种并发与"复跑那份自己矛盾"两种状态，真库真表造不出来，也不该靠 `sleep` 去赌时序。
+    判据一律落在**退出码**、**有没有 commit**、**有没有动手删**这三样上，屏幕上的话只用来钉
+    "说的与做的是不是同一件"——`run()` 里那两个名字是从探针模块的命名空间取的，所以替身换得掉。
+    """
+
+    def _mod(self):
+        old = sys.argv
+        sys.argv = ["清-过期举报.py"]
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "clean_report_probe_recon", BACKEND / "probes" / "清-过期举报.py")
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+        finally:
+            sys.argv = old
+
+    @staticmethod
+    def _plan(*, total, scanned, expired, undated, kept) -> RetentionPlan:
+        """手搓一份读数。`expired` 给的是**条数**，id 用 0..n-1 占位（这三发只看长度）。"""
+        return RetentionPlan(cutoff=NOW, total=total, scanned=scanned,
+                             expired_ids=list(range(expired)), undated=undated, kept=kept)
+
+    class _Db:
+        def __init__(self):
+            self.commits = 0
+
+        def commit(self):
+            self.commits += 1
+
+    def test_内部两道检查各抓一种错(self):
+        good = self._plan(total=4, scanned=4, expired=1, undated=2, kept=1)
+        assert selfcheck(good) == [], f"自洽的一份被报成不自洽：{selfcheck(good)}"
+        # 第一道：独立那条 COUNT 与逐行数到的不等——并发写或读取被截断，**不是**分类掉了行
+        unstable = selfcheck(self._plan(total=5, scanned=4, expired=1, undated=2, kept=1))
+        assert len(unstable) == 1 and "不是全表" in unstable[0], unstable
+        assert "掉了出去" not in unstable[0], "把并发诬陷成实现有 bug，是另一种假话"
+        # 第二道：三档加起来对不上遍历到的行数——有一行既不删也不报
+        dropped = selfcheck(self._plan(total=4, scanned=4, expired=1, undated=2, kept=0))
+        assert len(dropped) == 1 and "掉了出去" in dropped[0], dropped
+
+    def test_删之前读数就不稳时一行都不许动(self):
+        mod = self._mod()
+        db = self._Db()
+        touched: list[int] = []
+        mod.plan_expired = lambda _db: self._plan(total=5, scanned=4, expired=1, undated=2, kept=1)
+
+        def fake_delete(_db, ids, **kw):
+            touched.append(len(ids))
+            return len(ids)
+
+        mod.delete_expired = fake_delete
+        assert mod.run(db, True) == 1
+        assert touched == [] and db.commits == 0, f"读数不稳却已经动手删了：{touched}"
+
+    def test_复跑那份自相矛盾时也必须报红(self, capsys):
+        """第六轮审计实测的就是这一发：删除**已经提交**之后 `after` 自己矛盾（三档只有 2 而
+        库里数到 3），原来那版把三个数打出来之后**退出码 0**。"""
+        mod = self._mod()
+        db = self._Db()
+        before = self._plan(total=3, scanned=3, expired=2, undated=1, kept=0)
+        after = self._plan(total=3, scanned=3, expired=0, undated=1, kept=1)
+        plans = iter([before, after])
+        mod.plan_expired = lambda _db: next(plans)
+        mod.delete_expired = lambda _db, ids, **kw: len(ids)
+        code = mod.run(db, True)
+        assert code == 1, "复跑那份自相矛盾却退了 0——前一遍有闸、后一遍没闸就是这一发"
+        assert db.commits == 1, "这一发的设定就是「已经提交了」，没提交说明改错了地方"
+        out = capsys.readouterr().out
+        assert "撤不回来" in out, out
+
+    def test_无时间戳那一档变多是别人写的不是删错了(self, capsys):
+        mod = self._mod()
+        db = self._Db()
+        before = self._plan(total=2, scanned=2, expired=1, undated=1, kept=0)
+        after = self._plan(total=2, scanned=2, expired=0, undated=2, kept=0)
+        plans = iter([before, after])
+        mod.plan_expired = lambda _db: next(plans)
+        mod.delete_expired = lambda _db, ids, **kw: len(ids)
+        assert mod.run(db, True) == 0
+        out = capsys.readouterr().out
+        assert "新写进来" in out, out
+        assert "说好一条都不删" not in out, f"把别人写的一行说成我们删错了：{out[-300:]}"
+
+    def test_无时间戳那一档变少才是真的删错了(self, capsys):
+        mod = self._mod()
+        db = self._Db()
+        before = self._plan(total=2, scanned=2, expired=1, undated=1, kept=0)
+        after = self._plan(total=1, scanned=1, expired=0, undated=0, kept=1)
+        plans = iter([before, after])
+        mod.plan_expired = lambda _db: next(plans)
+        mod.delete_expired = lambda _db, ids, **kw: len(ids)
+        assert mod.run(db, True) == 1
+        assert "说好一条都不删" in capsys.readouterr().out
+
+    def test_对账函数不许漏掉删完还剩到期行那一面(self):
+        before = self._plan(total=2, scanned=2, expired=2, undated=0, kept=0)
+        still_there = self._plan(total=1, scanned=1, expired=1, undated=0, kept=0)
+        clean = self._plan(total=0, scanned=0, expired=0, undated=0, kept=0)
+        bad = reconcile(before, still_there)
+        assert len(bad) == 1 and "还剩 1 行" in bad[0], bad
+        assert reconcile(before, clean) == [], "删干净了却还报问题，那道闸就没人信了"

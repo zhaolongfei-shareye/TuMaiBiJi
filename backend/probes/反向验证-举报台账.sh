@@ -7,9 +7,12 @@
 # 原话封顶与取尾、归组键、数据侧不许清洗），M、N、O、U、V 打在探针的展示卫生那一个函数上，
 # P～T 是 10-10 那轮双支审计补的牙（跨篇去重、瞬间而不是墙上时间、naive 与 aware 混排、
 # 字段集合、hidden 进了计算），W 是同一晚自审第三轮补的（台账那发 select 里不许混 ORM 实体）。
-# AB～AI 打在保留期那一批（RR＝services/report_retention.py，PC＝probes/清-过期举报.py）：
+# AB～AP 打在保留期那一批与状态／默认值那两条前提（RR＝services/report_retention.py，
+# PC＝probes/清-过期举报.py，SM＝app/models/share_report.py）：
 # AB～AF 是 #186 乙 落地那批的五把，AG～AI 是第五轮审计回执补的三把（守恒那一档自己数／
-# dry-run 那个分支单独改坏／删除计数对不上时不许提交）。
+# dry-run 那个分支单独改坏／删除计数对不上时不许提交），AJ～AN 是第六轮补的五把（复跑那份的
+# 自洽闸／删之前那道闸／独立 COUNT 那一面／无时间戳变少／到期归零），AO、AP 把原来写"钉不红"
+# 的两条立成真刀。
 # 名单里第一版写过"M～W 全在探针那一支"——数错了，W 动的是台账。
 #
 # ⚠ 这个脚本自己的说明文字里不许出现反引号：`run` 用 `eval` 跑，那会被当成命令替换。
@@ -31,17 +34,23 @@
 # 漏掉一类行（C 那一刀的形状），脚本必须 exit 1，而不是打出一本少了一页的台账。现网那张表
 # 最后一次读数是 0 行（§8.185，10-09 23:45），空库跑一万次也读不到这一发，所以用一次性库造。
 #
-# 两条**没做**的突变，写在这里而不是假装做过：
-# ① `test_走ORM写入的这一列读回来是_naive_且丢偏移不换算` 与
-#    `test_显式写_created_at_为_None_会被_server_default_填上` 钉的是 SQLAlchemy 的行为，
-#    本仓没有任何一个字符能把它俩弄红（除了把断言自己删掉）——它们是**前提**，不是尺子。
-# ② 状态四档里"已撤回"那一支（`elif not active`）没有单独一刀：撤掉与过期两档共用的
-#    是那一段 if 链，P～T 之外再切一刀的成本与 D 刀重复（D 已经把整条链的后两档废掉）。
+# **这一段 10-10 深夜被自己更正过一次**（第六轮审计）。它原来写的是"两条没做的突变，写在这里而不是
+# 假装做过"，其中两条现在都有刀了，所以那两句"没有任何一个字符能把它弄红"是**假的**：
+# ① test_显式写_created_at_为_None_会被_server_default_填上 → 刀 AP（把 app/models/share_report.py
+#    里那个 server_default=func.now() 摘掉，那一发当场红）。它钉的不是 SQLAlchemy 的天性，
+#    是**我们自己写了那一行**——所以本来就可钉。
+# ② 状态四档里"已撤回"那一支 → 刀 AO（elif not active: 改成 elif False:，test_四档各读对各 报
+#    「公开中 ≠ 已撤回」）。原来那句"成本与 D 刀重复"也没量过：D 撤的是整条链的后两档，
+#    AO 撤的是其中一档，两面不同。
+# 现在**真正钉不红**的只剩一条：test_走ORM写入的这一列读回来是_naive_且丢偏移不换算 钉的是
+# SQLAlchemy 的 SQLite 方言（aware → naive 丢偏移不换算），本仓没有一个字符能改它——那条是**前提**，
+# 不是尺子，留着当"为什么要 _instant()"的证据。
 cd /Users/zlfmac/Documents/TuMaiBiJi/backend || exit 1
 LR=app/services/report_ledger.py
 PB=probes/读-举报台账.py
 RR=app/services/report_retention.py
 PC=probes/清-过期举报.py
+SM=app/models/share_report.py
 GATE_DB=/tmp/ledger-gate.db
 # 锁、trap 还原、四道闸都在 probes/反向验证-lib.sh 里（10-10 深夜六支链共用一份，
 # 这一支原本是那份实现的出处；本地副本删掉，别再留第二份）。
@@ -178,6 +187,38 @@ rv_run AH "dry-run 那个分支单独改坏（照打「一行都没删」却删�
 rv_run AI "删除计数与名单对不上时照样提交（屏幕打过「已删除 N 条」而库里没删干净）" \
   "删除条数与名单对不上时不许提交" \
   "perl -pi -e 's/^    if deleted != len\\(p\\.expired_ids\\):/    if False:  # rv/' $PC" "$PC"
+
+# ── 第六轮审计回执补的七把（AJ～AP）──────────────────────────────
+# 前五把是"报告自我销毁"那一族的延续：复跑那份没闸／删之前那道闸没接上／独立 COUNT 那一面被废／
+# 无时间戳那一档变少不再报／到期归零那一面被撤。后两把（AO、AP）钉的是链头部原来写着"没有任何
+# 一个字符能把它弄红"的那两条——**那句是假的**，10-10 深夜实测都能弄红，所以直接立成刀。
+rv_run AJ "复跑那份只走外部对账、内部自洽那道闸没跟上（自相矛盾的读数照退 0）" \
+  "复跑那份自相矛盾时也必须报红" \
+  "perl -pi -e 's/^    bad = selfcheck\\(after\\) \\+ reconcile\\(p, after\\)$/    bad = reconcile(p, after)  # rv/' $PC" "$PC"
+
+rv_run AK "删之前那道自洽闸整个没接上（读数不稳却直接去删）" \
+  "删之前读数就不稳时一行都不许动" \
+  "perl -pi -e 's/^    bad = selfcheck\\(p\\)$/    bad = []  # rv/' $PC" "$PC"
+
+rv_run AL "独立那条 COUNT 与逐行数到的不等不再报（「读到的不是全表」这一面被悄悄废掉）" \
+  "内部两道检查各抓一种错" \
+  "perl -pi -e 's/^    if p\\.scanned != p\\.total:/    if False:  # rv/' $RR" "$RR"
+
+rv_run AM "无时间戳那一档变少不再报红（这一档说好一条都不删的）" \
+  "无时间戳那一档变少才是真的删错了" \
+  "perl -pi -e 's/^    if after\\.undated < before\\.undated:/    if False:  # rv/' $RR" "$RR"
+
+rv_run AN "到期归零那一面撤掉（那句「已删除」就成了半句假话）" \
+  "对账函数不许漏掉删完还剩到期行那一面" \
+  "perl -pi -e 's/^    if after\\.expired_ids:/    if False:  # rv/' $RR" "$RR"
+
+rv_run AO "状态那一档不再问 is_active（撤掉的页被台账读成公开中）" \
+  "四档各读对各" \
+  "perl -pi -e 's/^        elif not active:/        elif False:  # rv/' $LR" "$LR"
+
+rv_run AP "server_default 那一路撤掉（ORM 显式给 None 就真写出 NULL，口径②那个空值出处就不存在了）" \
+  "显式写_created_at_为_None_会被_server_default_填上" \
+  "perl -pi -e 's/, server_default=func\\.now\\(\\)//' $SM" "$SM"
 
 # ── 探针自己那道覆盖闸门的牙 ──────────────────────────────────────
 probe_gate() {
