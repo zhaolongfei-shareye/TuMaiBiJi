@@ -31,7 +31,6 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
-from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -306,17 +305,25 @@ p.hint {{ font-size: 13px; opacity: .66 }}</style></head>
 </body></html>""", headers=_NO_STORE)
 
 
-def _bucket(request: Request) -> str:
+def _bucket(request: Request) -> str | None:
     """举报人的"同一个人"指纹：按天轮换的加盐哈希，不存 IP 明文。
 
     为什么要有这一列：一张匿名表单没有它就无法回答"这五份举报是不是同一个人刷的"，
     而这条恰恰决定要不要把它当回事。为什么不留 IP：这是一张谁都能提交的公开表单，
     收访客地址换一点方便，是拿用户的隐私换我们的省事。
+
+    为什么这一格可以是 NULL（10-10 拍板 #184 甲）：读的是 ASGI 给的**客户端地址本身**，
+    而不是 `slowapi.util.get_remote_address`——后者拿不到地址时返回字面量 `"127.0.0.1"`，
+    于是"我们其实不知道来的是谁"这一种情况会被折进**同一个桶**，台账把它读成"一个人刷了 N 次"。
+    那是这一列最坏的一种错（少报，且看不出来）。宁可留空：台账对 NULL 的口径是"每一条各算一个人"
+    （`services/report_ledger.py` 口径②），不知道就按不知道处理。
     """
+    host = request.client.host if request.client else None
+    if not host:
+        return None
     day = datetime.now(timezone.utc).strftime("%Y%m%d")
     key = hmac.new(settings.JWT_SECRET_KEY.encode(), day.encode(), hashlib.sha256).hexdigest()
-    ip = get_remote_address(request) or ""
-    return hmac.new(key.encode(), ip.encode(), hashlib.sha256).hexdigest()[:32]
+    return hmac.new(key.encode(), host.encode(), hashlib.sha256).hexdigest()[:32]
 
 
 @router.post("/n/{token}/report", response_class=HTMLResponse)

@@ -37,6 +37,8 @@
 cd /Users/zlfmac/Documents/TuMaiBiJi/backend || exit 1
 LR=app/services/report_ledger.py
 PB=probes/读-举报台账.py
+RR=app/services/report_retention.py
+PC=probes/清-过期举报.py
 GATE_DB=/tmp/ledger-gate.db
 # 锁、trap 还原、四道闸都在 probes/反向验证-lib.sh 里（10-10 深夜六支链共用一份，
 # 这一支原本是那份实现的出处；本地副本删掉，别再留第二份）。
@@ -139,6 +141,28 @@ rv_run U "截断不留记号（500 字的话被静默砍成 120 字，尾巴读�
 rv_run V "可见码退回成尖括号写法（举报人自己打一串 <1b> 就能和一个真 ESC 撞成同一个读数）" \
   "可见码的写法不许举报人自己能打出来" \
   "perl -pi -e 's/^            out\\.append\\(f\"␀\\{ord\\(ch\\):02x\\}\"\\)$/            out.append(f\"<{ord(ch):02x}>\")  # rv/' $PB" "$PB"
+
+# ── 保留期那一批（#186 乙：`report_retention` ＋清理脚本）──────────────────
+# 这一组是全仓**唯一不可逆**那一步的牙：删错了没有下一版能补回来，所以五条各钉一面。
+rv_run AB "空时间戳落进过期名单（「不知道」被当成「最旧、该删」）" \
+  "时间为空的行保留且单独数得出来" \
+  "perl -pi -e 's/^        if stamp == \"\":/        if stamp is None:  # rv/' $RR" "$RR"
+
+rv_run AC "截止那一刻本身也算过期（边界两头都放行）" \
+  "截止那一刻本身不算过期再早一秒算" \
+  "perl -pi -e 's/^        if stamp < key:/        if stamp <= key:  # rv/' $RR" "$RR"
+
+rv_run AD "默认期限在函数签名里又写死一个数（180 那个旋钮不再是唯一出处）" \
+  "到期的被点名而没过期的不动" \
+  "perl -pi -e 's/days: int = RETENTION_DAYS/days: int = 90/' $RR" "$RR"
+
+rv_run AE "分批循环只跑第一批（半删状态比不删更难看出来）" \
+  "超过一批也要删全" \
+  "perl -pi -e 's/^    for start in range\\(0, len\\(ids\\), batch\\):/    for start in range(0, min(len(ids), batch), batch):  # rv/' $RR" "$RR"
+
+rv_run AF "清理脚本默认就执行（手滑一次就把证据清了）" \
+  "不带执行那条脚本就是只报告" \
+  "perl -pi -e 's/^EXECUTE = .*/EXECUTE = True  # rv/' $PC" "$PC"
 
 # ── 探针自己那道覆盖闸门的牙 ──────────────────────────────────────
 probe_gate() {
@@ -268,5 +292,5 @@ echo "=== 全部还原后复跑这一批与共享那一格的出处，必须全�
 # 台账调的是标量那一层——公开页与转存走的还是 `is_expired(share)`，两边都得跟着复跑一次。
 # （名单里不写 `test_import_from_share.py`：那份源文件早就不在了，只剩 `tests/__pycache__`
 # 里一个 stale 的 .pyc——照它写会一句都不跑，而这批已经在末尾那道"全绿"上撞过一回。）
-rv_recheck tests/test_report_ledger.py tests/test_landing_page.py tests/test_share_snapshot.py tests/test_note_flows.py
+rv_recheck tests/test_report_ledger.py tests/test_report_retention.py tests/test_landing_page.py tests/test_share_snapshot.py tests/test_note_flows.py
 rv_status

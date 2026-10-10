@@ -121,7 +121,8 @@ def report(db) -> int:
     nulls = db.query(ShareReport).filter(ShareReport.reporter_bucket.is_(None)).count()
     multi = [g for g in led if g.reporter_days >= ATTENTION_AT]
     print(f"页面状态：" + " · ".join(f"{k} {v}" for k, v in sorted(states.items())))
-    print(f"bucket 为 NULL 的行：{nulls}（这一档每行各算一人；现网那一路走不到，见 report_ledger 口径②）")
+    print(f"bucket 为 NULL 的行：{nulls}（这一档每行各算一人；10-10 起写入侧拿不到客户端地址"
+          "就落空，所以这一档是**收得到**的，见 report_ledger 口径②）")
     print(f"需要人看一眼的（人·天 ≥ {ATTENTION_AT}）：{len(multi)} 篇")
     print()
     print(f"从上往下读，最上面那篇是最多人在意的（原话每篇最多 {SAMPLE_LIMIT} 条）：")

@@ -22,8 +22,10 @@ import itertools
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 
+from app.api.routes.landing import _bucket
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
 from app.models.note import Note
@@ -258,6 +260,32 @@ def test_不存举报人明文地址只存哈希桶(client, db_session):
                 headers={"X-Forwarded-For": "203.0.113.9"})
     row = db_session.query(ShareReport).filter_by(token="tok-report-4").one()
     assert row.reporter_bucket and "203.0.113.9" not in row.reporter_bucket
+
+
+def test_拿不到客户端地址时那一格落空而不是撞成同一个人():
+    """#184 甲：这一列不许把"我们不知道来的是谁"折成一个桶。
+
+    `slowapi.util.get_remote_address` 在没有 client 时返回字面量 `"127.0.0.1"`，两发这样的举报
+    就撞成同一个指纹，台账把它读成"一个人刷了两次"——**少报，而且屏幕上看不出来**。
+    留空才是如实：台账对 NULL 的口径是"每一条各算一个人"（`report_ledger` 口径②）。
+    """
+    assert _bucket(Request({"type": "http", "headers": [], "query_string": b""})) is None
+
+
+def test_同一地址同一天必须撞成同一个桶而不同地址必须分开():
+    """去重那一档的全部意义在这两句上：撞得上（同一个人）＋分得开（不是同一个人）。
+
+    反过来钉一条：留空与"有地址"必须是**不同的读数**，不许都落到某个固定值上。
+    """
+    def mk(ip):
+        return Request({"type": "http", "headers": [], "query_string": b"",
+                        "client": (ip, 50000)})
+
+    a = _bucket(mk("203.0.113.9"))
+    assert a is not None and len(a) == 32 and "203.0.113.9" not in a
+    assert a == _bucket(mk("203.0.113.9")), "同一天同一地址落到两个桶，去重就是空的"
+    assert a != _bucket(mk("198.51.100.7")), "不同地址撞成一个桶，五个人会被读成一个人"
+    assert _bucket(Request({"type": "http", "headers": [], "query_string": b""})) != a
 
 
 def test_撤掉的码收不到新举报表单(client, db_session):

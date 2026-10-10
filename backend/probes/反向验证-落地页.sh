@@ -17,6 +17,7 @@ m_e() { perl -0pi -e 's/    return HTMLResponse\(_page\(share, lang\), headers=_
 m_f() { perl -0pi -e 's/        reporter_bucket=_bucket\(request\),/        reporter_bucket=_bucket(request),\n        hidden=True,/' "$L"; }
 m_g() { perl -0pi -e 's/\@limiter\.limit\("6\/hour"\)\n//' "$L"; }
 m_h() { perl -0pi -e 's/^SNAPSHOT_COLUMNS = \("title", "summary", "tags", "key_links", "key_points", "source_url"\)/SNAPSHOT_COLUMNS = ("title", "summary", "tags", "key_links", "key_points", "source_url", "content")/m' "$S"; }
+m_w() { perl -0pi -e 's/    if not host:\n        return None/    if not host:\n        host = "127.0.0.1"  # rv/' "$L"; }
 
 rv_run A "落地页自己只 filter(is_active)，不再问那唯一一把尺子" "过期那张码" m_a "$L"
 rv_run B "失效页带上 token，撤掉与不存在不再同一张纸"            "撤掉的码与不存在的码" m_b "$L"
@@ -26,6 +27,7 @@ rv_run E "公开页不带 no-store"                                   "no_store"
 rv_run F "一条举报就把页隐藏"                                    "举报落库一行" m_f "$L"
 rv_run G "举报口摘掉限流装饰器"                                  "限流" m_g "$L"
 rv_run H "给送检名单加一列而落地页没同步"                        "送检名单里的每一列" m_h "$S"
+rv_run W "拿不到客户端地址又折成 127.0.0.1（#184 甲退回旧语义：不相干的人撞成同一个桶）" "落空" m_w "$L"
 
 echo "=== 全部还原后复跑，必须全绿 ==="
 rv_recheck tests/test_landing_page.py
