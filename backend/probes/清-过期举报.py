@@ -10,8 +10,9 @@
 
 退出码：0 = 两次读数都自洽且对得上；1 = 表不在、读取抛异常、**删的条数与名单条数不一致**、
 或任一份读数内部对不上（逐行数到的与独立 `COUNT` 不等＝并发写或读取被截断；三档加起来与逐行数到的
-不等＝分类掉了一行），或删完之后到期那一档还有剩余、无时间戳那一档反而**变少**了。
-"变多"不算错：那张表是公开表单在写的，删除之后又有人举报是正常事，报成"删错了"才是假话。
+不等＝分类掉了一行），或删完之后**本次名单里那些行居然还在库里**、无时间戳那一档反而**变少**了。
+两种"变多"都不算错，也都不许报成"删错了"：复跑读到不在本次名单里的到期行＝这几秒里刚过线或新写来的，
+留给下一发；无时间戳那一档变多＝有人手工补了不带时间戳的行（写入那一路必有时间戳，见口径②）。
 这些是这条脚本自己的对账：删了却没删干净，比不删更坏，因为屏幕已经打了一句"已删除 N 条"。
 
 `created_at` 为空的行**一条都不删**，只报数量（口径②）。
@@ -23,8 +24,15 @@
 **复跑那一份必须过同一道闸**（10-10 第六轮审计抓的）：原来只有**删之前**那份读数做自洽检查，
 删完之后那份只看了"到期还剩几行"。实测把提交之后的 `after` 弄成自相矛盾（总行数 3、三档只有 2），
 脚本把那三个数打出来之后**退出码 0**——文件头那句"1 = 三档对不上总行数"当时只兑了前一遍。
-现在两次读都走 `selfcheck()`；`reconcile()` 只管删前／删后那两件事（到期必须归零、无时间戳那一档
-不许变**少**），方向钉死：那一档变多是别人新写的，不许报成"删错了"。
+现在两次读都走 `selfcheck()`；`reconcile()` 只管删前／删后那两件事（**本次名单**里的那些行必须不在、
+无时间戳那一档不许变**少**）。
+
+**第七轮（10-11 凌晨）把"到期还剩几行"改成"本次名单里还剩几行"**：两次读各取各的 `now`，
+中间没有快照，所以一行落在跑这一发的那几秒里跨过保留期线是**正常事**。实测
+（`/tmp/audit7-boundary-real.py`：一行写成比"此刻减 180 天"晚 1 秒，两次读之间只睡 2.2 秒，
+**那一发压根没删任何东西**）复跑就读到「到期 2 行」，而原实现当场报"那句「已删除」不能算完"
+并退 1——那是**诬陷**，与它自己刚更正的"无时间戳变多不许报红"是同一族错。
+现在那一条只查本次名单里的 id，落在名单外的由 `arrived_since()` 单独打一句给运维看。
 """
 import sys
 from pathlib import Path
@@ -34,8 +42,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import inspect
 
 from app.db.database import SessionLocal, engine
-from app.services.report_retention import (RETENTION_DAYS, delete_expired, plan_expired,
-                                           reconcile, selfcheck)
+from app.services.report_retention import (RETENTION_DAYS, arrived_since, delete_expired,
+                                           plan_expired, reconcile, selfcheck)
 
 EXECUTE = "--执行" in sys.argv[1:]
 
@@ -77,10 +85,18 @@ def run(db, execute: bool) -> int:
     if bad:
         print(f"⚠ 「已删除 {deleted} 行」那一句已经提交、撤不回来——这一发退出码是 1，要人工再对一遍")
         return 1
+    # 到这儿 `reconcile` 已经证明**本次名单里那些行都不在库里了**。下面这两件事只报"不是本轮造成的"
+    # 变化，免得运维下次读到同样的数字又去猜是不是没删干净。屏幕上的到期行数必须现读，
+    # 不许再写死"到期 0"——那一格现在可能是"刚跨线的 N 行"，写死就是把话说过。
+    arrived = arrived_since(p, after)
     grew = after.undated - p.undated
-    extra = f"（比删之前多 {grew} 行：那是删除之后新写进来的举报，不是这一档被删了）" if grew else ""
-    print(f"复跑对账：总行数 {after.total} · 到期 0 · 无时间戳 {after.undated}{extra} · "
-          f"未到期 {after.kept}")
+    print(f"复跑对账：总行数 {after.total} · 到期 {len(after.expired_ids)} · "
+          f"无时间戳 {after.undated} · 未到期 {after.kept}")
+    if arrived:
+        print(f"注：到期那 {arrived} 行是跑这一发的这几秒里刚过线的，不在本次名单，留给下一发")
+    if grew:
+        print(f"注：无时间戳那一档比删之前多 {grew} 行——这一档我们一条都没删，"
+              "那只能是手工补进来的行（写入那一路必有时间戳）")
     return 0
 
 

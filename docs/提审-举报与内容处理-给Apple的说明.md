@@ -94,11 +94,13 @@ Apple 原文（1.2，逐字抄自 developer.apple.com/app-store/review/guideline
   3. 库里若混进一条根本不是日期的 `created_at`（只有手工 SQL 或迁移能造出来），SQLite 存得进、
      SQLAlchemy 读的时候当场抛 `ValueError` ⇒ **整支脚本停在那一行之前，一行都不会删**
      （fail-closed，实测）。这一格没有自愈路径：要么手工把那一行的时间戳补上，要么这支清理一直跑不动。
-- 另外一条**平时看不见但真在跑**的行为：这支脚本做**两次**自洽核对（逐行数到的行数与独立那条
-  `COUNT(*)` 比；到期／无时间戳／未到期三档加起来与逐行数到的比）。**删之前**那一次对不上 ⇒
-  这一发**一行都不动**并退非零；**删之后**那一次对不上 ⇒ 已经提交的那部分撤不回来，脚本会把这一点
-  明写在屏幕上并退非零，要人工再对一遍。这张表是公开表单在写的，所以"对不上"多半只是有人在脚本跑的
-  中间又举报了一次——那种情况下宁可什么都不删。
+- 另外一条**不是纸面设计、代码里就那么写的**行为（注意：这批代码还没部署，所以下面说的都是"跑起来
+  会怎样"，不是"现网已经跑过"）：这支脚本做**两次**自洽核对（逐行数到的行数与独立那条 `COUNT(*)` 比；
+  到期／无时间戳／未到期三档加起来与逐行数到的比）。**删之前**那一次对不上 ⇒ 这一发**一行都不动**并退
+  非零；**删之后**那一次对不上 ⇒ 已经提交的那部分撤不回来，脚本会把这一点明写在屏幕上并退非零，要人工
+  再对一遍。删之后那一份过的**也是同一道内部核对**，在此之上它只与**本次答应删的那些行**比——那张表是
+  公开表单在写的，两次读之间有人新举报、或某一行正好在这几秒里跨过 180 天线，都是正常事，脚本把它
+  单独报给运维看而不算成"没删干净"（把外因诬陷成 bug 与把 bug 说成外因，是同一种假话）。
 
 ## 五、可以直接粘的英文段落
 
@@ -121,9 +123,12 @@ Apple 原文（1.2，逐字抄自 developer.apple.com/app-store/review/guideline
 > Reports are retained for 180 days under our own policy; expiry is enforced by a maintenance
 > script that we run by hand and that is dry-run by default (it reports what it would delete and
 > deletes nothing until a `--执行` flag is passed). The script checks its own arithmetic twice —
-> before and after the delete — and refuses to touch a single row if its counts don't add up; if a
-> mismatch appears only after the delete has been committed, it says so out loud and exits non-zero
-> rather than pretending the run was clean. Rows whose timestamp is missing are never
+> before and after the delete — and if the pre-delete counts don't add up it refuses to touch a
+> single row; if a mismatch shows up only after the delete has been committed, it says so out loud
+> and exits non-zero rather than pretending the run was clean. The post-delete check is against the
+> ids this run promised to remove, so a row that simply crossed the 180-day line while the script
+> was running is reported as "next run's business", not mistaken for an incomplete delete. Rows whose
+> timestamp is missing are never
 > deleted, only counted — "we don't know when this was written" is not treated as "this is old".
 > We do not store reporter IP addresses; we store a daily-rotated salted hash used only to tell
 > whether several reports came from the same person. If the client address is not available that

@@ -15,13 +15,22 @@
 ⑨ 删完之后复跑那一份必须过**同一道**自洽闸（`Test那两道对账闸`）——第六轮审计实测过"前一遍有闸、
    后一遍没闸"：`after` 自己矛盾（总行数 3、三档只有 2）时脚本照退 0。这一组里那几发都用替身读数，
    判据落在**退出码＋有没有 commit＋有没有动手删**三样上。
-⑩ 无时间戳那一档**方向要分清**：变少才是删错了，变多是别人新写的（这张表是公开表单在写的）。
-   报反了就是把并发诬陷成 bug——那和把 bug 说成并发是同一种假话。
+⑩ 无时间戳那一档**方向要分清**：这一档一条都不删，所以只有**变少**才是我们删错了；变多与本轮无关。
+   报反了就是把外因诬陷成 bug——那和把 bug 说成外因是同一种假话。⚠ 第六轮把"变多"的成因写成
+   "新写进来的举报"，那是**机制上的假话**（见⑪）：`landing.py` 建 `ShareReport` 不交 `created_at`，
+   走 `server_default=func.now()` 必有值，所以新举报进的是"未到期"那一档，永远进不了这一档；
+   能造出空时间戳的只有**手工 SQL 与迁移回填**。方向对、理由错，第七轮只改理由。
+⑪ **到期那一档也要跟本次名单取交集**：两次读各取各的 `now`（`plan_expired` 那两发 SELECT 之间没有
+   快照），跑这一发的几秒里有一行跨过保留期线是正常事。实测一行比"此刻减 180 天"晚 1 秒、
+   两次读之间只睡 2.2 秒（**那一发压根没删任何东西**），复跑就读到「到期 2 行」——按"还剩几行"
+   报"那句已删除不能算完"就是诬陷（`/tmp/audit7-boundary-real.py`）。这一面与⑩是同一族：
+   屏幕上的"到期"那一格从此**现读不写死**。
 
 ⑥ 与 ⑦ 是同一个风险的两面，第五轮审计实测出来的：只钉常量（⑥）不够——把分支单独改坏之后
 屏幕照打「dry-run：一行都不删」、盘上照删两行、退出码 0，⑥那两条尺子全绿（`/tmp/aud7` 那一发）。
-⑦⑧⑨⑩ 每一面都有自己的刀（`反向验证-举报台账.sh` 的 AH／AI／AJ～AN）——只钉常量不钉分支那种
-"有尺子但钉错了地方"的情形，第五、六两轮各抓到过一次。
+⑦⑧⑨⑩⑪ 每一面都有自己的刀（`反向验证-举报台账.sh` 的 AH／AI／AJ～AR）——只钉常量不钉分支那种
+"有尺子但钉错了地方"的情形，第五、六两轮各抓到过一次。第七轮另抓到⑩那一句**机制解释是假的**
+（变多不可能来自新举报，写入那一路必有时间戳），机制更正见⑪与 `reconcile` 的 docstring。
 
 不出网：conftest 已把 `SEC_CHECK_ENABLED` 置 false，这一支本来就只读写那个一次性库。
 期限天数**不在这里钉死**（钉成"等于 180"是一条改天数就红、却什么都证不明的尺子）；钉的是
@@ -45,8 +54,8 @@ from sqlalchemy import text
 
 from app.db.database import Base, SessionLocal, engine
 from app.models.share_report import ShareReport
-from app.services.report_retention import (RETENTION_DAYS, RetentionPlan, delete_expired,
-                                           plan_expired, reconcile, selfcheck)
+from app.services.report_retention import (RETENTION_DAYS, RetentionPlan, arrived_since,
+                                           delete_expired, plan_expired, reconcile, selfcheck)
 
 BACKEND = Path(__file__).resolve().parents[1]
 
@@ -413,7 +422,13 @@ class Test那两道对账闸:
         out = capsys.readouterr().out
         assert "撤不回来" in out, out
 
-    def test_无时间戳那一档变多是别人写的不是删错了(self, capsys):
+    def test_无时间戳那一档变多不是本轮删的(self, capsys):
+        """方向：这一档一条都不删，所以变多**不是**我们的错。
+
+        ⚠ 第六轮这一条的旧名叫"变多是别人新写的举报"，那句机制是假的（写入那一路必有时间戳，
+        见文件头⑩）；这一发改的是**理由**，判据钉的还是同一件事：不许报红、屏幕上不许出现
+        "这一档说好一条都不删的"那句指控。
+        """
         mod = self._mod()
         db = self._Db()
         before = self._plan(total=2, scanned=2, expired=1, undated=1, kept=0)
@@ -423,8 +438,30 @@ class Test那两道对账闸:
         mod.delete_expired = lambda _db, ids, **kw: len(ids)
         assert mod.run(db, True) == 0
         out = capsys.readouterr().out
-        assert "新写进来" in out, out
-        assert "说好一条都不删" not in out, f"把别人写的一行说成我们删错了：{out[-300:]}"
+        assert "手工补进来的行" in out, out
+        assert "说好一条都不删" not in out, f"把外因诬陷成我们删错了：{out[-300:]}"
+
+    def test_复跑读到刚跨线的那一行不许算成没删干净(self, capsys):
+        """第七轮抓的那一发：本次名单是 1 号那一行，删干净之后复跑读到的是**2 号**到期——
+        它是这几秒里刚跨过保留期线的那一行（第一次读时还在"未到期"那一档）。旧写法只看
+        "到期还剩几行"，当场报"那句已删除不能算完"并退 1，而那是半句假话：该删的那条真删了。
+
+        这一发**必须手工给 id**（`_plan` 那枚替身按 0..n-1 占位，表达不了"两次读的是不同的行"），
+        数字取自 `/tmp/audit7-boundary-real.py` 那一次真库真时钟的实测形状。
+        """
+        mod = self._mod()
+        db = self._Db()
+        before = RetentionPlan(cutoff=NOW, total=2, scanned=2, expired_ids=[1], undated=0, kept=1)
+        after = RetentionPlan(cutoff=NOW, total=1, scanned=1, expired_ids=[2], undated=0, kept=0)
+        plans = iter([before, after])
+        mod.plan_expired = lambda _db: next(plans)
+        mod.delete_expired = lambda _db, ids, **kw: len(ids)
+        assert mod.run(db, True) == 0, "刚跨线的那一行被算成本轮没删干净——这是诬陷"
+        assert db.commits == 1
+        out = capsys.readouterr().out
+        assert "刚过线" in out and "不能算完" not in out, out[-400:]
+        # 屏幕上"到期"那一格必须**现读**：这一发的真值是 1 行（刚跨线那条），写死"到期 0"就是当着一句话
+        assert "· 到期 1 ·" in out, f"复跑那一句把到期行数写死了：{out[-400:]}"
 
     def test_无时间戳那一档变少才是真的删错了(self, capsys):
         mod = self._mod()
@@ -442,5 +479,9 @@ class Test那两道对账闸:
         still_there = self._plan(total=1, scanned=1, expired=1, undated=0, kept=0)
         clean = self._plan(total=0, scanned=0, expired=0, undated=0, kept=0)
         bad = reconcile(before, still_there)
-        assert len(bad) == 1 and "还剩 1 行" in bad[0], bad
+        assert len(bad) == 1 and "还有 1 行在库里" in bad[0], bad
+        assert "本次名单" in bad[0], f"那句指控没钉在**本次承诺**上，将来会漂回「还剩几行」：{bad}"
         assert reconcile(before, clean) == [], "删干净了却还报问题，那道闸就没人信了"
+        # 同一发反面的另一面：复跑读到的是**别的行**（刚跨线），arrived_since 要能数出来给屏幕用
+        assert arrived_since(clean, self._plan(total=1, scanned=1, expired=1,
+                                               undated=0, kept=0)) == 1
