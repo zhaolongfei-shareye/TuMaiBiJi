@@ -8,6 +8,10 @@
 # K～N 是 10-10 凌晨那批自己写的；O～R 是同一晚**代码审计那轮**补的，四刀打的都是
 # "改坏之后现网没有任何症状"的那一类（`root_path`、`/v1x` 过匹配、204/304 的 body 闸门、
 # 那句"今天 /v1 发不出 403"），审计报告的原文与逐条核实记在 docs §8.189。
+# S～U 是 #178 拍甲（`aud` 期望值 = bundle id）那一半（`core/apple_identity.py` 新拆的那一支）。
+# 那一支不改任何对外行为——401 还是 401、话术还是那一句——它只往日志里多写两个值。所以
+# "撤掉它现网没有任何症状"这句话在这一刀上是**字面成立**的：症状要等到有人把那一格填错、
+# 对着每次登录 401 猜值的那一天才出现。这三刀钉的就是"排障信息也算实现"。
 #
 # ⚠ 这个脚本自己的**说明文字里不许出现反引号**：`run` 用 `eval` 跑，那会被当成命令替换。
 # 10-10 就栽过一次（K、M 两条的日志里冒出 `line 111: /api: No such file or directory`），
@@ -115,6 +119,7 @@ EC=app/core/error_codes.py
 MN=app/main.py
 RL=app/core/rate_limit.py
 LK=app/services/linking.py
+AI=app/core/apple_identity.py
 
 run K "撤掉那句路径判断（/api 那一侧也开始带 code——已上线回体被改动）" \
   "同一条_401_在_api_上不带_code" \
@@ -150,5 +155,21 @@ run R "服务层默认状态码改成 403（error_codes 顶部那句\"v1 发不�
   "v1_那一路今天发不出_403" \
   "perl -pi -e 's/status_code: int = 400\\):/status_code: int = 403):/' $LK" "$LK"
 
-echo "=== 全部还原后复跑这三批的尺子，必须全绿 ==="
-$PY tests/test_persistent_generation.py tests/test_v1_account_deletion.py tests/test_account_deletion.py tests/test_v1_error_codes.py 2>&1 | tail -1
+# S～U 打的是 #178 那一支排障（apple_identity.py 里 InvalidAudienceError 那一路）。
+# 三刀共同点：**对外一个字都不变**（401 还是 401、话术还是那一句），所以接口层的判据一条都不会红——
+# 只有钉日志的那条会。S 撤整支、T 撤观察值、U 撤期望值：观察值与期望值要**各自**有一条能红，
+# 只钉一边等于"日志里有个 aud 字样"就算过，那和没写一样。
+run S "整支撤掉（aud 对不上落回那个只报类名的通用分支，填错值那天日志里没有答案）" \
+  "aud_不对时日志里留下观察到的那一个" \
+  "perl -pi -e 's/except jwt\\.InvalidAudienceError:/except jwt.InvalidSignatureError:/' $AI" "$AI"
+
+run T "观察值那一次读取撤掉（日志里那半个值变成一个横杠）" \
+  "aud_不对时日志里留下观察到的那一个" \
+  "perl -pi -e 's/_verified_aud\\(identity_token, public_key\\)/\"-\"/' $AI" "$AI"
+
+run U "期望值撤成别的一格配置（日志里那半个值不可信）" \
+  "aud_不对时日志里留下观察到的那一个" \
+  "perl -pi -e 's/settings\\.APPLE_CLIENT_ID\\)$/settings.JWT_ALGORITHM)/' $AI" "$AI"
+
+echo "=== 全部还原后复跑这四批的尺子，必须全绿 ==="
+$PY tests/test_persistent_generation.py tests/test_v1_account_deletion.py tests/test_account_deletion.py tests/test_v1_error_codes.py tests/test_v1_auth_and_link.py 2>&1 | tail -1

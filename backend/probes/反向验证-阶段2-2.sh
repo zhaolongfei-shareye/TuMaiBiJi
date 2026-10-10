@@ -97,7 +97,7 @@ run D "验签不再比 aud（别的 App 的苹果凭证能登进来）" "aud_是
 # D 这一条**已知撤了不红**：PyJWT 在没给 audience 时自己就拒绝带 aud 的 token（同一发 401），
 # 所以"整句比较没了"和"库替你挡了"在这一条判据上长得一样。真正的凭据是 D2：
 # 把期望值换成别家的那个，正面登录那一发必须红——那才证明比的确实是我们配的那个值。
-run D2 "audience 换成别家的 Service ID（拿别人的期望值比）" "真签名登进来" \
+run D2 "期望的 aud 换成别家那个 bundle id（拿别人的期望值比）" "真签名登进来" \
   "perl -pi -e 's/audience=settings\.APPLE_CLIENT_ID,/audience=\"com.other.service.id\",/' $AI" "$AI"
 
 run E "验签不再比 iss" "iss_不是_appleid_401" \
@@ -106,7 +106,10 @@ run E "验签不再比 iss" "iss_不是_appleid_401" \
 run F "验签不再要求 exp/iss/aud/sub 都在" "没有_exp_这一格_401" \
   "perl -pi -e 's/options=\{\"require\": \[\"exp\", \"iss\", \"aud\", \"sub\"\]\}/options={}/' $AI" "$AI"
 
-run G "Service ID 没配时不再拒绝服务（退化成拿空 aud 去比）" "service_id_没配是_503_而不是放行" \
+# G 那根针 10-10 跟着 #178 拍甲改过名（原 test_service_id_没配是_503_而不是放行）：那一格填的
+# 是 bundle id 不是 Services ID，用例名里那个词是旧的假设。换针的同时核过一遍——针改错的话
+# 这一条会报★针没扎到用例★，不会悄悄变绿。
+run G "期望的 aud 没配时不再拒绝服务（退化成拿空 aud 去比）" "aud_期望值没配是_503_而不是放行" \
   "perl -pi -e 's/^    if not settings\.APPLE_CLIENT_ID:/    if False:  # rv/' $AI" "$AI"
 
 run H "kid 不认识时不再强刷一次 JWKS（撞密钥轮换就把人挡死）" "apple_换了密钥要先重取一次再判" \

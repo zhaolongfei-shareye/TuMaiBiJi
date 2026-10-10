@@ -22,11 +22,20 @@ class Settings(BaseSettings):
     HUNYUAN_CF_TIMEOUT: float = 90.0
     WECHAT_APP_ID: str = ""
     WECHAT_APP_SECRET: str = ""
-    # Sign in with Apple 那个 **Service ID 的 identifier**（反向域名写法，形如 `com.xxx.yyy`）。
+    # Sign in with Apple 那张 `identityToken` 里 `aud` 应当等于的值。10-10 拍**甲**：它是我们
+    # App 的 **bundle id**（`com.agentsbin.TumarkNote`），**不是** Services ID——Apple 的原话是
+    # "A Services ID identifies your **website**"、"You must use a unique identifier — a Services ID —
+    # to register each **web service** that supports Sign in with Apple"，而 App 那一侧是
+    # "Enable the Sign in with Apple capability for an app in Xcode, or by editing an **App ID**"。
+    # 本仓现读：`ios/TumarkNote.xcodeproj/project.pbxproj` 里主 target 的
+    # `PRODUCT_BUNDLE_IDENTIFIER = com.agentsbin.TumarkNote`；`ios/Signing/TumarkNote.entitlements`
+    # 里**还没有** `com.apple.developer.applesignin`，`ios/Sources` 里也一个 `ASAuthorization` 都没有
+    # ——所以真票要等 #162 那颗按钮做出来才打得到这一判。
     # 它是 Apple 签进 `identityToken` 的 `aud`，也是服务端唯一能拿来判"这张 token 是不是给我们
-    # 家签的"的值——所以它**不是密钥**（Apple 的文档明确说 Service ID 是公开标识），但也不能猜：
+    # 家签的"的值——所以它**不是密钥**（Apple 明确说这是公开标识），但也不能猜：
     # 猜错或留空时 `/v1/auth/apple` 一律 503，绝不退化成"不验 aud 放行"。
-    # 现网 .env 里必须有这一行，值只能从 Apple Developer 后台的 Service ID 页现读。
+    # 现网 .env 里必须有这一行。填错值不报 503 而是每次登录 401，所以 `apple_identity._verified_aud`
+    # 会把**观察到的**那一个写进日志：填完之后第一次真机登录要么通、要么日志里直接给出答案。
     APPLE_CLIENT_ID: str = ""
     # 内容安全（msgSecCheck）总开关。生产必须为 true；测试环境关掉是为了**根本不出网**
     # （conftest 里那条不变量），而不是为了让用例好写——部署自检会拿一段已知违规的

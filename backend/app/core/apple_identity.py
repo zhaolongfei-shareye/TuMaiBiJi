@@ -77,6 +77,33 @@ def reset_jwks_cache() -> None:
     _cache, _cache_until = None, 0.0
 
 
+def _verified_aud(identity_token: str, public_key) -> str:
+    """把这张票里的 `aud` 读出来**只为写进日志**——签名照验，只是不比 aud。
+
+    只在下面那一支 `InvalidAudienceError` 里调用，所以"读出来的东西"一定是 Apple 真签过的，
+    不存在"拿没验过签的字符串当结论"那一步。`iss` 在这里**手工**比那一句而不是传
+    `issuer=APPLE_ISSUER`：除了"这一格只有一个出处"这句口径，还有一条工具层的理由——
+    `probes/反向验证-阶段2-2.sh` 的 E 刀是按 `issuer=APPLE_ISSUER,` 那一行做突变的，
+    两处都写它，那一刀就会撤在排障这一支上、真防线一个字没动，判据照样绿（10-10 真踩过）。
+    截到 128 是日志卫生；这个值不从任何接口回读。
+    """
+    try:
+        claims = jwt.decode(
+            identity_token,
+            public_key,
+            algorithms=["RS256"],
+            options={"verify_aud": False},
+        )
+    except (jwt.InvalidTokenError, jwt.InvalidKeyError, ValueError):
+        return "<读不出>"
+    if claims.get("iss") != APPLE_ISSUER:
+        return "<非 appleid>"
+    aud = claims.get("aud")
+    if isinstance(aud, list):
+        aud = ",".join(str(x) for x in aud)
+    return str(aud)[:128]
+
+
 async def verify_identity_token(identity_token: str) -> str:
     """验完返回 `sub`（Apple 那个 user identifier）。任何一环不对都抛，且只抛 401/502/503。
 
@@ -115,12 +142,22 @@ async def verify_identity_token(identity_token: str) -> str:
             issuer=APPLE_ISSUER,
             options={"require": ["exp", "iss", "aud", "sub"]},
         )
+    except jwt.InvalidAudienceError:
+        # 单拆这一支只为排障：它的意思是"这张票 Apple 是真签的，但给**别家**签的"。
+        # 这一支恰好是 #178 那一格填错时唯一会出现的形状——不记下观察到的那一个，填错的人
+        # 下一轮还是在猜，而填错值的症状是每次登录 401，比没填时的 503 难查得多
+        # （503 至少把原因写在日志里）。期望值与观察值都只进日志、不进回体：那是 bundle id，
+        # 本来就打在客户端包里，不是密钥。
+        logger.warning("Apple identityToken 的 aud 对不上：观察到 %s，期望 %s",
+                       _verified_aud(identity_token, public_key), settings.APPLE_CLIENT_ID)
+        raise HTTPException(status_code=401, detail="苹果登录凭证无效，请重新登录")
     except (jwt.InvalidTokenError, jwt.InvalidKeyError, ValueError) as exc:
         # 三层分开看：`InvalidTokenError` 是签名/claim 不对（这张 token 不是 Apple 给我们签的）；
         # `InvalidKeyError` 与 `ValueError` 是这一枚 JWK 我根本没法拿来验 RSA 签名（n/e 残缺、
         # 形状不对）。上面已经按 `kty=RSA` 筛过一道，这里是第二道：少收一类就是端到端 HTTP 500。
         # 不把 exc 的文本回给客户端：PyJWT 的报错会带上 audience/issuer 的**期望值**，
-        # 那是我们自己的 Service ID。日志里留类名足够排障。
+        # 回体里一个字都不该有（`test_验签出错不许把期望值回显给用户` 钉的就是这一句）。
+        # 而日志里只留类名**不够**——aud 那一支单独走上面那条，别的失败形状不值得多解一次签。
         logger.warning("Apple identityToken 校验未通过：%s", type(exc).__name__)
         raise HTTPException(status_code=401, detail="苹果登录凭证无效，请重新登录")
     return claims["sub"]

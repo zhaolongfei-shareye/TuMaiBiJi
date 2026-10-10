@@ -9,7 +9,7 @@
 ② **只有 Apple 身份的人没有 `users` 行**。这是乙的全部重量压在库面上的那一句，
    所以必须有尺子：登一次 SIWA，`users` 表要**一行都不许多**。
 ③ **验签不许打折**。这一组自己生成 RSA 密钥对、签**真的** `identityToken`、造真的 JWKS
-   ——不 mock 一个"验签通过"的布尔值。换一枚别家的私钥、把 `aud` 改成别家的 Service ID、
+   ——不 mock 一个"验签通过"的布尔值。换一枚别家的私钥、把 `aud` 改成别家那个 App 的 bundle id、
    把 `alg` 换成 `none`、或者拿我们的公钥当 HMAC 的 secret 签 HS256（JWS 最经典那一招），
    都必须是 401。
 ④ **合并的方向与吊销**。契约 §二"谁已有笔记谁是主，两边都有则合并到较早创建的 account"，
@@ -32,13 +32,18 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from jwt.algorithms import RSAAlgorithm
 
 # ⚠ 建表只看"这一刻已经被 import 的模型"，所以模型一律在文件头挂上（同 test_account_and_identity）。
+from app.core import apple_identity
 from app.models.account import Account, AccountIdentity  # noqa: F401,E402
 from app.models.link_code import LinkCode  # noqa: F401,E402
 from app.models.note import Note  # noqa: F401,E402
 from app.models.user import User  # noqa: F401,E402
 from app.models.generation_seq import GenerationSeq  # noqa: F401,E402
 
-CLIENT_ID = "com.tumarknote.pytest.service-id"
+# 10-10 拍甲：`aud` 是 App 的 bundle id，不是 Services ID（Apple 的原话是 Services ID 标识
+# **website**、App 那一侧在 **App ID** 上开能力，见 `app/core/config.py` 那一格）。这一格以前叫
+# `...service-id`，那是把没拍的假设写进了夹具；换成 bundle id 的形状，下面所有用例跟着改口径。
+# 值本身对用例不重要（用例自己签、自己比），重要的是别再教读代码的人以为要建 Services ID。
+CLIENT_ID = "com.tumarknote.pytest.app"
 APPLE_ISS = "https://appleid.apple.com"
 KID = "pytest-apple-kid-1"
 
@@ -255,7 +260,7 @@ def signing_key():
 
 @pytest.fixture
 def jwks(signing_key, monkeypatch):
-    """把 Apple 那个密钥端点换成"只认我这枚公钥"，并把 Service ID 配上。
+    """把 Apple 那个密钥端点换成"只认我这枚公钥"，并把期望的 `aud`（甲：bundle id）配上。
 
     换的是 `_http_jwks` 这一层（出网的最外圈）。`verify_identity_token` 里取 kid → 找公钥 →
     验签 → 比 iss/aud/exp 那整段一个字都没被替掉，所以这一档用例量的仍然是真的校验路径。
@@ -514,7 +519,7 @@ class Test_SIWA_验签:
         assert resp.status_code == 401, f"alg 混淆没挡住：{resp.status_code} {resp.text}"
         assert db.query(Account).count() == 0, "混淆那张凭证已经建出账号了"
 
-    def test_service_id_没配是_503_而不是放行(self, client, db, signing_key, monkeypatch):
+    def test_aud_期望值没配是_503_而不是放行(self, client, db, signing_key, monkeypatch):
         from app.core import apple_identity
         from app.core.config import settings
 
@@ -575,11 +580,56 @@ class Test_SIWA_验签:
         assert client.post("/v1/auth/apple", json={"identity_token": "abc"}).status_code == 422
 
     def test_验签出错不许把期望值回显给用户(self, client, db, signing_key, jwks):
-        """PyJWT 的报错文本里带 audience / issuer 的**期望值**，那正是我们自己的 Service ID。
-        日志里留类名足够排障，响应体里一个字都不该有。"""
+        """PyJWT 的报错文本里带 audience / issuer 的**期望值**，那是我们自己的 bundle id。
+        它不是密钥，但它属于"服务端拿什么值去比"这一类信息，响应体里一个字都不该有；
+        要排障去服务器日志看（`_verified_aud` 那条）。"""
         resp = _login(client, _mint(signing_key, aud="com.evil.other"))
-        assert CLIENT_ID not in resp.text, f"响应里回显了 Service ID：{resp.text}"
+        assert CLIENT_ID not in resp.text, f"响应里回显了期望的 aud：{resp.text}"
         assert APPLE_ISS not in resp.text
+
+    def test_aud_不对时日志里留下观察到的那一个(self, client, db, signing_key, jwks, caplog):
+        """#178 那一格填错值时的红，只有日志能救——所以这条钉的是**排障信息本身**。
+
+        `aud` 对不上意思是"这张票 Apple 真签了、但是给别家签的"，它恰好是期望值填错时**唯一**
+        会出现的形状。它对外的话术与"签名不对""iss 不对"是同一句（那是故意的，见
+        `test_失败原因不分开报`），界面上只会显示"苹果登录失败"；如果日志里也只有类名
+        `InvalidAudienceError`，那下一次还是在猜值——而填错值比没填更难查：没填是 503，
+        填错是每次 401。两面都钉：① 错的那一发必须同时留下**观察到的**与**期望的**；
+        ② 对的那一发不许留这一条，否则日志里到处是"看着像填错了"的假红。
+        """
+        with caplog.at_level("WARNING", logger="app.core.apple_identity"):
+            resp = _login(client, _mint(signing_key, aud="com.agentsbin.otherapp"))
+        assert resp.status_code == 401
+        text = "\n".join(r.getMessage() for r in caplog.records)
+        assert "com.agentsbin.otherapp" in text, f"日志里没留下观察到的 aud：{text!r}"
+        assert CLIENT_ID in text, f"日志里没留下期望的 aud：{text!r}"
+        assert "com.agentsbin.otherapp" not in resp.text
+
+        caplog.clear()
+        with caplog.at_level("WARNING", logger="app.core.apple_identity"):
+            assert _login(client, _mint(signing_key)).status_code == 200
+        assert "aud 对不上" not in "\n".join(r.getMessage() for r in caplog.records)
+
+    def test_那三句关键参数在文件里各只有一个出处(self):
+        """反向验证的刀是**按行**做突变的，而 perl 的 s/// 不带 /g 只替换**第一处**。
+
+        10-10 真踩过：#178 新加的那次排障读取（`_verified_aud`）里也传了同一个参数，
+        于是 E 刀"验签不再比 iss"撤的是**排障那一支**、真防线一个字没动，判据照样绿——
+        一条假绿就这么造出来，而且它是被**新写的代码**挤出来的，写的时候谁都不会想到刀。
+        所以把"这几行代码各只出现一次"钉成尺子：以后谁再往第二个出处写同一句，这一条当场红，
+        逼他在"改这一处"和"给刀换一个更准的模式"之间显式选一个。
+
+        数的是**整行等值**而不是子串：这一版测试自己的说明里就引用了
+        `issuer=APPLE_ISSUER,` 那几个字，按子串数会被注释顶包（与 §8.174 那批
+        "剥注释根治顶包"同族，只是这次的"注释"是 docstring 里的一句引用）。
+        """
+        import inspect
+
+        lines = [ln.strip() for ln in inspect.getsource(apple_identity).splitlines()]
+        for needle in ('issuer=APPLE_ISSUER,', 'audience=settings.APPLE_CLIENT_ID,',
+                       'except jwt.InvalidAudienceError:'):
+            n = sum(1 for ln in lines if ln == needle)
+            assert n == 1, f"{needle!r} 作为一整行出现 {n} 次，反向验证那几刀会撤错地方"
 
     def test_密钥端点里的非_rsa_密钥不许把登录打成_500(self, client, db, signing_key, monkeypatch):
         """Apple 的端点今天只回 `kty=RSA`，但"今天只回"不是保证：它哪天挂上一枚 EC 或对称密钥，
