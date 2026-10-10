@@ -142,6 +142,25 @@ rv_run V "可见码退回成尖括号写法（举报人自己打一串 <1b> 就�
 
 # ── 探针自己那道覆盖闸门的牙 ──────────────────────────────────────
 probe_gate() {
+  # 这一档不走 rv_run（它验的不是 pytest，是探针自己那道覆盖闸门），所以 rv_run 的几道闸必须在这儿
+  # 再立一遍。第四轮审计抓出的四处：① 入口没闸，`RV_BAKDIR` 为空时备份写成 `/tmp//GATE`、而那句 `cp`
+  # 连返回值都没查；② 两份输出写死 `/tmp/rv-gate*`，盘上留着上一轮的读数就会被当成本轮的；
+  # ③ 只认"退出码非零＝有牙"，而探针压根没跑起来（导入炸）也是非零；④ 突变命令 perl 的返回值没查。
+  if [ -z "$RV_BAKDIR" ] || [ ! -d "$RV_BAKDIR" ]; then
+    echo "gate ★rv_init 没跑★：备份目录没备好（RV_BAKDIR='$RV_BAKDIR'），这一档不跑"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  local gout mout bak before after
+  gout=$(mktemp /tmp/rv-gate-out.XXXXXX)
+  mout=$(mktemp /tmp/rv-gate-out.XXXXXX)
+  if [ -z "$gout" ] || [ -z "$mout" ]; then
+    echo "gate ★临时输出建不出来★：没有地方收探针的读数，这一档不跑"
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  bak="$RV_BAKDIR/GATE"
   rm -f "$GATE_DB"
   if ! DATABASE_URL="sqlite:///$GATE_DB" JWT_SECRET_KEY=gate-only-not-a-real-one EXTRACT_PROVIDER=none \
     SEC_CHECK_ENABLED=false .venv/bin/python -c '
@@ -166,48 +185,80 @@ db.add_all([ShareReport(token="gate-live", reason="spam", reporter_bucket="甲",
             ShareReport(token="gate-revoked", reason="spam", reporter_bucket="乙", created_at=now)])
 db.commit()
 db.close()
-' >/dev/null 2>&1; then
+' >"$gout" 2>&1; then
     echo "gate ★一次性库造不出来★：这一档不算数"
+    tail -3 "$gout" | sed 's/^/      /'
+    rm -f "$gout" "$mout"
     RV_BAD=$((RV_BAD + 1))
     return
   fi
-  if [ ! -s "$GATE_DB" ]; then echo "gate ★一次性库是空的★：$GATE_DB，这一档不算数"; RV_BAD=$((RV_BAD + 1)); return; fi
+  if [ ! -s "$GATE_DB" ]; then echo "gate ★一次性库是空的★：$GATE_DB，这一档不算数"; rm -f "$gout" "$mout"; RV_BAD=$((RV_BAD + 1)); return; fi
 
-  DATABASE_URL="sqlite:///$GATE_DB" JWT_SECRET_KEY=gate-only-not-a-real-one .venv/bin/python "$PB" >/tmp/rv-gate 2>&1
-  local before=$?
-  cp "$LR" "$RV_BAKDIR/GATE"
-  RV_LIVE_FILE="$LR"; RV_LIVE_BAK="$RV_BAKDIR/GATE"
-  perl -pi -e 's/^    for token, items in grouped\.items\(\):/    for token, items in ((t, i) for t, i in grouped.items() if i[0][5]):  # rv/' "$LR"
-  if [ "$(md5 -q "$LR")" = "$(md5 -q "$RV_BAKDIR/GATE")" ]; then
+  DATABASE_URL="sqlite:///$GATE_DB" JWT_SECRET_KEY=gate-only-not-a-real-one .venv/bin/python "$PB" >"$gout" 2>&1
+  before=$?
+  # 「原始行数」那行是探针读完了库、走到归组之后才打的——它在，退出码才是**读数**；不在，非零只说明
+  # 这一发压根没跑起来（那种该记账成"不算数"，而不是替探针喊"有牙"或"没牙"）。
+  if ! grep -aq '原始行数' "$gout"; then
+    echo "gate ★改坏之前探针就没走到读数那一行★（exit=$before）：这一档不算数"
+    tail -3 "$gout" | sed 's/^/      /'
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  if [ "$before" -ne 0 ]; then
+    echo "gate ★改坏之前探针就不走绿★：退出码 $before，这一档的对比没有意义（一次性库里两篇都该归上）"
+    sed 's/^/      /' "$gout"
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  if ! cp "$LR" "$bak"; then
+    echo "gate ★备份没建成★：$LR → $bak，没有备份就不动真源文件，这一档不跑"
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  # 一建成备份就登记：从"文件被改坏"到"trap 认这个文件"之间不许有空窗（同 lib 里 rv_run 那条理由）。
+  RV_LIVE_FILE="$LR"; RV_LIVE_BAK="$bak"
+  if ! perl -pi -e 's/^    for token, items in grouped\.items\(\):/    for token, items in ((t, i) for t, i in grouped.items() if i[0][5]):  # rv/' "$LR"; then
+    echo "gate ★突变命令失败★：perl 非零退出，没跑到探针那一步"
+    cp "$bak" "$LR"
+    RV_LIVE_FILE=""; RV_LIVE_BAK=""
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  if [ "$(md5 -q "$LR")" = "$(md5 -q "$bak")" ]; then
     echo "gate ★突变没落盘★：C 那一刀没写进 $LR，这一档不算数"
     RV_LIVE_FILE=""; RV_LIVE_BAK=""
+    rm -f "$gout" "$mout"
     RV_BAD=$((RV_BAD + 1))
     return
   fi
-  DATABASE_URL="sqlite:///$GATE_DB" JWT_SECRET_KEY=gate-only-not-a-real-one .venv/bin/python "$PB" >/tmp/rv-gate-mut 2>&1
-  local after=$?
-  cp "$RV_BAKDIR/GATE" "$LR"
-  if [ "$(md5 -q "$LR")" != "$(md5 -q "$RV_BAKDIR/GATE")" ]; then
-    echo "gate 还原失败，检查 $LR"
+  DATABASE_URL="sqlite:///$GATE_DB" JWT_SECRET_KEY=gate-only-not-a-real-one .venv/bin/python "$PB" >"$mout" 2>&1
+  after=$?
+  cp "$bak" "$LR"
+  if [ "$(md5 -q "$LR")" != "$(md5 -q "$bak")" ]; then
+    # 还原没成：登记**不许注销**，留着让 trap 还有机会再试一次
+    echo "gate 还原失败，检查 $LR（备份在 $bak，那一趟输出留在 $mout）"
     RV_BAD=$((RV_BAD + 1))
     return
   fi
   RV_LIVE_FILE=""; RV_LIVE_BAK=""
 
-  if [ "$before" -ne 0 ]; then
-    echo "gate ★改坏之前探针就不走绿★：退出码 $before，这一档的对比没有意义（一次性库里两篇都该归上）"
-    sed 's/^/      /' /tmp/rv-gate
+  if ! grep -aq '原始行数' "$mout"; then
+    echo "gate ★改坏之后探针没走到读数那一行★（exit=$after）：非零退出但不是读数，这一档不算数"
+    tail -3 "$mout" | sed 's/^/      /'
     RV_BAD=$((RV_BAD + 1))
-    return
-  fi
-  if [ "$after" -eq 0 ]; then
+  elif [ "$after" -eq 0 ]; then
     echo "gate ★假绿★：C 那一刀让撤掉那一篇整批消失，探针仍然 exit 0 —— 覆盖那道闸门没牙"
-    sed 's/^/      /' /tmp/rv-gate-mut
+    sed 's/^/      /' "$mout"
     RV_FAKE_GREEN=$((RV_FAKE_GREEN + 1))
   else
-    echo "gate 红（符合预期）：漏掉撤掉那一篇时探针 exit=$after，读数：$(grep -o '原始行数 [0-9]* · 台账条数 [0-9]*' /tmp/rv-gate-mut | head -1)"
+    echo "gate 红（符合预期）：漏掉撤掉那一篇时探针 exit=$after，读数：$(grep -o '原始行数 [0-9]* · 台账条数 [0-9]*' "$mout" | head -1)"
     RV_RED=$((RV_RED + 1))
   fi
+  rm -f "$gout" "$mout"
 }
 
 probe_gate
