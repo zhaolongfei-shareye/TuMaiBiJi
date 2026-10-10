@@ -55,6 +55,9 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
   // 10-04 加：撤掉那一行的框之后，"LOGO 与下方卡里的行名同一条左线"要拿真东西比，
   // 不能拿两个内缩值手算（手算等于在尺子里再抄一份布局）。放在最后一位，前面的下标一个不动。
   q.select('.menu-label').boundingClientRect()
+  // 10-11 R12 加：图自己那块（不是 band 那一段）——"名片那一行底下必须有图"要看的是图铺到哪，
+  // 拿 imgStyle 那两个数自己换算等于在尺子里再抄一遍布局。同样放最后一位，前面的下标不动。
+  q.select('.head-img').boundingClientRect()
   q.exec((res) => resolve({
     band: res[0], sheet: res[1], logo: res[2], text: res[3],
     score: res[4], num: res[5], lab: res[6], pill: res[7],
@@ -62,7 +65,7 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
     cells: res[11] || [], btns: res[12] || [], pwdCard: res[13],
     group: res[14], aboutLead: res[15], h1: res[16],
     scene: res[17], pwdName: res[18], mask: res[19], rules: res[20] || [],
-    rdots: res[21] || [], label: res[22],
+    rdots: res[21] || [], label: res[22], img: res[23],
     windowWidth: wx.getWindowInfo().windowWidth,
     windowHeight: wx.getWindowInfo().windowHeight,
   }))
@@ -141,8 +144,11 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
      ——同一个色就不存在第二个框，弧的方向也不用动。 */
   let m = await measure(mp)
   const W = m.windowWidth
-  ck('底图这块盒子高 542（可见 502 + 被那一层盖住 40）',
-    Math.abs(toRpx(m.band.height, W) - 542) <= 3, toRpx(m.band.height, W).toFixed(1))
+  // ★10-11 R12（「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：名片那一行那 144 底下
+  // 必须有图，所以这一段盒子从 542 抬到 646，往上盖住的那一档从 40 变成 144（可见 502 没动，
+  // 行的落点逐像素不变——变的只是它底下从"只有 40 是图"变成"整条 144 都是图"）。
+  ck('底图这块盒子高 646（可见 502 + 被那一层盖住 144，R12 那一档）',
+    Math.abs(toRpx(m.band.height, W) - 646) <= 3, toRpx(m.band.height, W).toFixed(1))
   ck('底图左右贴屏边（不内缩）', m.band.left <= 1 && Math.abs(m.band.right - W) <= 1, `${m.band.left}/${m.band.right}`)
   const bandStyle = await styleOf(page, '.head-band', ['border-top-left-radius', 'border-bottom-left-radius', 'background-color'])
   ck('弧不在底图上（下沿两角不收圆，方向仍是下面那层往上凸）',
@@ -150,16 +156,29 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
       && parseFloat(bandStyle['border-top-left-radius'] || '99') === 0,
     `上 ${bandStyle['border-top-left-radius']} / 下 ${bandStyle['border-bottom-left-radius']}`)
   const overlap = m.band.bottom - m.sheet.top
-  ck('那一层往上盖住底图 40 → 接缝左右两角是弧（方向与 10-01 那版一致）',
-    Math.abs(toRpx(overlap, W) - 40) <= 3, toRpx(overlap, W).toFixed(1))
-  const sheetStyle = await styleOf(page, '.sheet', ['border-top-left-radius', 'border-bottom-left-radius', 'background-color'])
+  ck('那一层往上盖住底图 144 → 名片那一行整条底下都是图（"中间镂空"那一刀的反面）',
+    Math.abs(toRpx(overlap, W) - 144) <= 3, toRpx(overlap, W).toFixed(1))
+  const sheetStyle = await styleOf(page, '.sheet', ['border-top-left-radius', 'border-bottom-left-radius',
+    'background-color', 'background-image', 'backdrop-filter'])
   ck('那一层只有上沿两角收圆 40、下沿直角（不是一枚四角卡）',
     Math.abs(toRpx(parseFloat(sheetStyle['border-top-left-radius']), W) - 40) <= 2
       && parseFloat(sheetStyle['border-bottom-left-radius'] || '99') === 0,
     `上 ${sheetStyle['border-top-left-radius']} / 下 ${sheetStyle['border-bottom-left-radius']}`)
-  ck('那一层的底色就是页面底本身（与 .head-band 同值 → 不是第二层卡色，读起来是一整片）',
-    !!sheetStyle['background-color'] && sheetStyle['background-color'] === bandStyle['background-color'],
-    `sheet ${sheetStyle['background-color']} / band ${bandStyle['background-color']}`)
+  // 这条原来钉的是"sheet 的 background-color == band 的"。10-11 之后那一份面改成**同一张渐变**
+  // 的四个色标（白纱→渐退→页面底），`background` 简写会把 background-color 归零，照旧比就必然红。
+  // 它要守的东西没变：那一层不许是"第二层卡色"，读起来与页面底是一整片。所以改成拿渐变的
+  // **最后一个色标**去比 band 那一份 --bg-page——渐退退到底就是它。
+  const stops = (String(sheetStyle['background-image'] || '')
+    .match(/rgba?\([^)]*\)/g) || []).map((s) => (s.match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number))
+  const bandRgb = (String(bandStyle['background-color'] || '')
+    .match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number)
+  ck('玻璃渐退到底那一个色标就是页面底本身（与 .head-band 同值 → 接缝那儿没有第二层色）',
+    stops.length >= 2 && bandRgb.length === 3
+      && stops[stops.length - 1].every((v, i) => Math.abs(v - bandRgb[i]) <= 2),
+    `末色标 ${JSON.stringify(stops[stops.length - 1])} / band ${JSON.stringify(bandRgb)}`)
+  ck('卡顶那一段真挂了模糊（backdrop-filter 计算值不是 none）',
+    /blur\(\s*\d+(?:\.\d+)?px/.test(String(sheetStyle['backdrop-filter'] || '')),
+    String(sheetStyle['backdrop-filter'] || '(读不到这个属性)'))
   ck('LOGO 与下方卡里的行名同一条左线（撤框之后不能各走各的）',
     !!m.label && Math.abs(m.logo.left - m.label.left) <= 2, `${m.logo && m.logo.left} vs ${m.label && m.label.left}`)
 
@@ -277,9 +296,19 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   // 红得没道理。改成钉那条规则本身：按宽铺满、超出那截的 15% 顶到上面去。
   const gHeight = parseFloat((/height:(\d+(?:\.\d+)?)rpx/.exec(d.imgStyle || ''))[1] || 0)
   const gTop = parseFloat((/top:(-?\d+(?:\.\d+)?)rpx/.exec(d.imgStyle || ''))[1] || 0)
+  // ★10-11 R12：这一档递给 bandGeom 的盒子高是 GLASS_BAND_H(646)，不再是 BAND_H(542)。
+  // 数从 me.js 现读（写死 646 就成了第二份真相），比的是同一条式子。
+  const meBand = Number((fs.readFileSync(
+    path.resolve(__dirname, '../../miniprogram/pages/me/me.js'), 'utf8')
+    .match(/const GLASS_BAND_H\s*=\s*(\d+)/) || [, '0'])[1])
   ck('锚点算出来了：按宽铺满、超出那截的 15% 顶给上面（不写死某一张的数）',
-    /width:750rpx/.test(d.imgStyle || '') && gHeight > 542 && Math.abs(gTop + (gHeight - 542) * 0.15) <= 1,
-    d.imgStyle)
+    /width:750rpx/.test(d.imgStyle || '') && gHeight > meBand && Math.abs(gTop + (gHeight - meBand) * 0.15) <= 1,
+    `${d.imgStyle}／盒子高递给 ${meBand}`)
+  // R12 要的效果：名片那一行那 144 底下必须有图（他抓过"中间镂空"）。量的是图那块自己的底边，
+  // 不是拿 imgStyle 那两个数自己换算。
+  ck('图确实垫到了名片那一行底下（那 144 整条有图，不是镂空）',
+    !!m.img && !!m.sheet && m.img.bottom >= m.sheet.bottom - 2,
+    m.img && m.sheet && `图底 ${Math.round(m.img.bottom)} / 行底 ${Math.round(m.sheet.bottom)}px`)
   ck('数字来自服务端（base+bonus，不是界面写死）', /^\d+$/.test(String(d.scoreText || '')) && Number(d.scoreText) >= 100, d.scoreText)
   // 站长 10-02：那一行右边的「新写作者 +10」撤了（同一个数下面那块规则说一遍就够）。
   // 旧判据"右值吃 reward_each、单位不再写篇"整条作废；这里只断页面里连这一格字段都不留了，

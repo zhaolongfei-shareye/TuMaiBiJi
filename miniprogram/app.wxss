@@ -75,6 +75,23 @@ page {
   --bg-page: #E2DED4;
   --bg-card: #F3F3F1;
   --bg-card-glass: rgba(243, 243, 241, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F3F3F1 ／ #E2DED4 各取 .62（效果图 229／263 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(243, 243, 241, 0.62);
+  --glass-fade-page: rgba(226, 222, 212, 0.62);
+  /* ---------- 10-11 毛玻璃那一档：全站唯一出口 ----------
+     需求正本 `docs/需求清单-10-11毛玻璃.md` R1／R2／R3／R10。α＝.30 是站长在校准条上点的那一档，
+     四套壁纸下都是这一组——白纱本身与壁纸无关，只有"往下渐退"的终点才吃各主题的 --bg-card／--bg-page。
+     ⚠ 数值一律写死，不许改成 rgba(255,255,255,var(--glass-a))：var() 嵌进函数参数在老安卓 XWEB 上
+     会让整条声明掉下来（上面 min() 那条留退路是同一个原因）。
+     blur 用 px 不用 rpx：filter 里的 rpx 微信编译器不保证换算；23px ≈ 46rpx（375 屏那一档）。
+     上面那行 --bg-card-glass 是 §8.85「横条 95% 模仿毛玻璃」的残留（消费方 .note-row 已整块撤掉），
+     本轮另起一组、不去动它，免得把他拍过的那条痕迹一起抹了。 */
+  --glass-veil: rgba(255, 255, 255, 0.30);
+  --glass-bf: blur(23px) saturate(1.8);
+  --glass-hair: rgba(255, 255, 255, 0.55);
+  --glass-fill: rgba(255, 255, 255, 0.20);
+  --glass-jot: rgba(255, 255, 255, 0.38);
   --accent: #352E1D;
   --accent-soft: rgba(53, 46, 29, 0.07);
   /* 实心按钮那一块面与压在上面的字（站长 10-04：深色按钮必须和底部导航"选中那一格"
@@ -138,6 +155,10 @@ page {
   --bg-page: #E2DED4;
   --bg-card: #F3F3F1;
   --bg-card-glass: rgba(243, 243, 241, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F3F3F1 ／ #E2DED4 各取 .62（效果图 229／263 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(243, 243, 241, 0.62);
+  --glass-fade-page: rgba(226, 222, 212, 0.62);
   --text-primary: #352E1D;
   --text-secondary: rgba(53, 46, 29, 0.72);
   --text-tertiary: rgba(53, 46, 29, 0.72);
@@ -159,6 +180,10 @@ page {
   --bg-page: #D4E2D7;
   --bg-card: #F1F3F2;
   --bg-card-glass: rgba(241, 243, 242, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F1F3F2 ／ #D4E2D7 各取 .62（效果图 229／263 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(241, 243, 242, 0.62);
+  --glass-fade-page: rgba(212, 226, 215, 0.62);
   --text-primary: #1D3522;
   --text-secondary: rgba(29, 53, 34, 0.72);
   --text-tertiary: rgba(29, 53, 34, 0.72);
@@ -178,6 +203,10 @@ page {
   --bg-page: #E2D4DB;
   --bg-card: #F3F1F2;
   --bg-card-glass: rgba(243, 241, 242, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F3F1F2 ／ #E2D4DB 各取 .62（效果图 229／263 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(243, 241, 242, 0.62);
+  --glass-fade-page: rgba(226, 212, 219, 0.62);
   --text-primary: #351D29;
   --text-secondary: rgba(53, 29, 41, 0.72);
   --text-tertiary: rgba(53, 29, 41, 0.72);
@@ -200,6 +229,10 @@ page {
   --bg-page: #D7D9E0;
   --bg-card: #F1F2F3;
   --bg-card-glass: rgba(241, 242, 243, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F1F2F3 ／ #D7D9E0 各取 .62（效果图 229／263 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(241, 242, 243, 0.62);
+  --glass-fade-page: rgba(215, 217, 224, 0.62);
   --text-primary: #212431;
   --text-secondary: rgba(33, 36, 49, 0.72);
   --text-tertiary: rgba(33, 36, 49, 0.72);
@@ -570,6 +603,17 @@ page {
   border-radius: var(--r-card);
   box-shadow: var(--sh-float);
 }
+
+/* 10-11 毛玻璃 X4（站长逐条裁定时原话「4、做」）：那三枚居中弹窗挂同一枚 `glass-dialog`
+   ——index.wxml 的 .ci-card、me.wxml 的 .pwd-card 与 .me-email-card。
+   皮写在**各自那一页**（index.wxss / me.wxss），这条只留口径说明，原因有两条：
+   ① 闸名 `has-bg` 一旦出现在全局这张表里，`验-第一屏三块` 那条"页面类名不许和 app.wxss
+      同名"就永久报红（它按 `.has-bg` 全文匹配，分不清"给这枚上色"还是"只当祖先"）；
+   ② 这一屏要不要玻璃，问的是"这一页铺没铺形象图"，本来就是页内的事。
+   α 仍只有一个出口：上面那组 `--glass-veil`（全站 .30，R10），两页都只吃 var()。
+   ⚠ 这三枚底下垫的是 `rgba(20,20,28,.55)` 那层暗遮罩，白纱压在暗底上会落成中灰，
+      里面的墨字对比可能不到 4.5。落完拿像素量出来回报，**不过线我不自己抬 α**，
+      由他判要不要给这三枚单独一档。 */
 
 .ci-title {
   display: block;

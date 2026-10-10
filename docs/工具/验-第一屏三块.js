@@ -10,7 +10,8 @@
 //    照片是用户自己换的、运行时拿不到亮度，而 10-10 我立的那道 3.0 是站长没提过的东西，已撤。
 // ④ 两个计数必须来自接口，不许把效果图上那两个占位数（128／46）抄进页面；
 // ⑤ 卡片那一格的一次性落点标记：立一次、读一次、清一次，常驻就把「默认第一个 tab」那条废了；
-// ⑥ 双击换人是自己数的（小程序没有原生 dblclick），定时器在 onHide／onUnload 两头都要撤；
+// ⑥ 换人不靠"连点两下"（那一下会把每次开门延住 300ms，10-10 深夜他据此打回）：
+//    主人物在前、另一张画成右后方淡灰剪影，点剪影换位；键名与两张路径只住在 utils/person.js；
 // ⑦ 组顶那条 min() 里的 546，是从"整组高＋底栏高＋最少留白"推出来的，任何一头改了这里要跟着改。
 const fs = require('fs')
 const path = require('path')
@@ -226,7 +227,8 @@ ok('每次进页重读这两个数（出完图回来该跟着涨）',
 
 /* ---------- 6. 三块的落点 ---------- */
 ok('左块点下去仍是 openBar 那一档（拍照），没有另起一套开门逻辑',
-  /openBar\(\)\s*\{[\s\S]{0,200}this\.open\('photo'\)/.test(js) && /this\.openBar\(\)/.test(jsOnly))
+  /openBar\(\)\s*\{[\s\S]{0,200}this\.open\('photo'\)/.test(js)
+  && /class="blk-person"[^>]*catchtap="openBar"/.test(wxml))
 ok('笔记那一格切到列表 tab；卡片那一格切过去并落第二枚',
   /goNotes\(\)[\s\S]{0,160}switchTab\(\{ url: '\/pages\/index\/index' \}/.test(js)
   && /goCards\(\)[\s\S]{0,200}ixOpenCardsTab = true[\s\S]{0,120}switchTab/.test(js))
@@ -241,27 +243,102 @@ ok('标记只赢过"无条件复位"，赢不过"从这一页 push 出去再返�
 ok('清标记这一行排在取 view 之前（先算后清会读到上一趟的残值）',
   ixBody.indexOf('ixOpenCardsTab = false') < ixBody.indexOf("view: keepView"))
 
-/* ---------- 7. 双击换人 ---------- */
+/* ---------- 7. 人物与它的剪影（10-10 深夜换的切换方式） ----------
+   他这一轮的原话：「两个人切换体验不太好，改为左右有人点击右侧人像切换，例如女人在前，
+   男人就在右侧，用剪影淡灰缩小在右下，高度约为女的一半，在女的后面。如果点击男的，
+   男的就切换在左边，正常高度位置，女的就缩到右边，与男的处理一致。」
+   再加上「首页人物延续到笔记列表和卡片列表，放在框外面的左上角，首页是男的那里就是男的」。
+   ★10-11 这一句被他自己收回：「左上角的人，透明底侵入主图，列表左上角的人都去掉，维持只有首页有」
+   （R8）。所以这一组现在只钉一件事：① 首页那一位的切换画法与落点；② 列表页那一位不许回来。
+   "三处同一个他"那份唯一性随之作废——只剩一处，无从对撞。 */
+const intOf = (s, prop) => parseInt(new RegExp(`${prop}:\\s*(-?\\d+)`).exec(s)?.[1] ?? '', 10)
+const sFigAlt = seg('.blk-fig-alt')
+const sAltHit = seg('.blk-alt-hit')
+const personSeg = /class="blk-person"[\s\S]*?catchtap="openBar"/.test(wxml)
 ok('没把原生双击当能力用（小程序没有 dblclick，写了就是静默不响应）',
   !/binddblclick|catchdblclick|onDoubleTap/.test(wxml + js))
-ok('自己按间隔判两下，且第一下不当成开门（否则每次换人都看得见面板升起又落下）',
-  /const DBL_TAP_MS = \d+/.test(js) && /_tapTimer = setTimeout\(/.test(js)
-  && /clearTimeout\(this\._tapTimer\)/.test(jsOnly))
-ok('定时器在 onHide 与 onUnload 两头都撤（人走了还开面板＝幽灵一次点击）',
-  (js.match(/_cancelPersonTap\(\)/g) || []).length >= 3
-  && /onHide\(\)[\s\S]{0,400}_cancelPersonTap\(\)/.test(js)
-  && /onUnload\(\)[\s\S]{0,200}_cancelPersonTap\(\)/.test(js))
+// 反向钉他那句"体验不太好"打回的东西：整套自己数两下的机器一行都不许留。
+// 留着不报错、只是每一次开门先被定时器延住——正是他这次要撤掉的手感。
+const dblGone = ['DBL_TAP_MS', 'onTapPerson', 'togglePerson', '_tapTimer', '_cancelPersonTap']
+  .filter((k) => (wxml + wxssRaw + js).includes(k))
+ok('双击那套机器整条撤净（常量、两个方法、定时器、收尾那一趟都不许留残）',
+  dblGone.length === 0, dblGone.join(','))
+ok('左块那一点没有任何延迟（开门不等第二下）',
+  personSeg && !/setTimeout/.test((/openBar\(\)\s*\{([\s\S]*?)\n  \}/.exec(js)?.[1] || '')))
+ok('前后两张各绑自己的位：主人物吃 personSrc，剪影吃 personAltSrc（写反＝点剪影换到的是它自己）',
+  /class="blk-fig" src="\{\{personSrc\}\}"/.test(wxml)
+  && /class="blk-fig-alt" src="\{\{personAltSrc\}\}"/.test(wxml))
+ok('剪影在主人物**后面**（z-index 比它小），且落在右下（right/bottom 顶到窗边）',
+  intOf(sFigAlt, 'z-index') < intOf(sFig, 'z-index')
+  && /right:\s*0/.test(sFigAlt) && /bottom:\s*0/.test(sFigAlt),
+  `剪影 ${intOf(sFigAlt, 'z-index')} vs 主人物 ${intOf(sFig, 'z-index')}`)
+ok('剪影是"淡灰剪影"不是"另一张小图"：灰度＋半透明两条都在',
+  /grayscale\(\s*1/.test(sFigAlt) && /opacity:\s*\.[0-9]/.test(sFigAlt),
+  sFigAlt.replace(/\s+/g, ' ').trim())
+/* 「高度约为女的一半」这条按源件比例现算，不抄常量：主人物宽 220 时女那张屏上 264 高，
+   剪影宽 w 时男那张屏上 w/0.6897 高——比值要落在 0.45~0.55。
+   原来给的是 110 宽 → 160 高 = 0.60 倍，比他那句大一档，这一条当时量不到（判据写死 110/132）。 */
+const figAR = (() => {
+  const r = (f) => { const b = fs.readFileSync(P(f)); return b.readUInt32BE(16) / b.readUInt32BE(20) }
+  return { girl: r('assets/ic-person.png'), boy: r('assets/ic-person-alt.png') }
+})()
+const mainH = sizeOf('.blk-fig', 'width') / figAR.girl
+const altH = sizeOf('.blk-fig-alt', 'width') / figAR.boy
+ok('剪影屏上高 ≈ 主人物的一半（他原话"高度约为女的一半"，比值 0.45~0.55）',
+  altH / mainH >= 0.45 && altH / mainH <= 0.55,
+  `主人物 ${mainH.toFixed(1)}、剪影 ${altH.toFixed(1)} → ${(altH / mainH).toFixed(2)}`)
+// 点击为什么不在剪影那张图上：它压在主人物后面，重叠那一条被上面那张吞掉。
+// 所以热区必须盖在**最上层**，而且要比两张里高的那一张更大——少一挡就有一段点了没反应。
+const tallerAlt = Math.max(sizeOf('.blk-fig-alt', 'width') / figAR.girl, altH)
+ok('点的是透明热区，不是那张图：热区 z-index 盖过前后两张',
+  intOf(sAltHit, 'z-index') > intOf(sFig, 'z-index')
+  && intOf(sAltHit, 'z-index') > intOf(sFigAlt, 'z-index'),
+  `热区 ${intOf(sAltHit, 'z-index')}／主 ${intOf(sFig, 'z-index')}／剪影 ${intOf(sFigAlt, 'z-index')}`)
+ok('热区盖得住两张里更高的那一张（宽和高都不得小于剪影本身）',
+  sizeOf('.blk-alt-hit', 'width') >= sizeOf('.blk-fig-alt', 'width')
+  && sizeOf('.blk-alt-hit', 'height') >= tallerAlt,
+  `热区 ${sizeOf('.blk-alt-hit', 'width')}×${sizeOf('.blk-alt-hit', 'height')} vs 剪影最高 ${tallerAlt.toFixed(1)}`)
+ok('热区用 catchtap（不是 bindtap）——冒泡到左块就顺手把面板打开了，换人变成"换人＋开门"',
+  /class="blk-alt-hit"[^>]*catchtap="swapPerson"/.test(wxml)
+  && !/class="blk-alt-hit"[^>]*[^-]bindtap=/.test(wxml))
 ok('换人只换图，不动 active／草稿／忙态',
   (() => {
-    const m = /togglePerson\(\)\s*\{([\s\S]*?)\n  \}/.exec(jsOnly)
-    return !!m && !/previewImages|active:|busy|setData\(\{[^}]*active/.test(m[1])
-  })(), 'togglePerson 里出现了不该有的那几位')
-ok('两份图都在包里且各就各位（女＝默认，男＝切换那一版）',
+    const m = /swapPerson\(\)\s*\{([\s\S]*?)\n  \}/.exec(jsOnly)
+    return !!m && !/previewImages|active:|busy|linkBody|writeBody/.test(m[1])
+  })(), 'swapPerson 里出现了不该有的那几位')
+/* 一个人三处画（第一屏、笔记列表框外、卡片列表框外），所以键名与两张路径只许住在
+   utils/person.js 里。抄第二份的下场是"首页是男的、列表页还是女的"——他这条要的就是跟着走。 */
+const personJs = fs.readFileSync(P('utils/person.js'), 'utf8')
+const hardSrc = [P('pages/create/create.js'), P('pages/index/index.js')]
+  .filter((f) => /ic-person|homePerson/.test(fs.readFileSync(f, 'utf8')))
+  .map((f) => path.relative(ROOT, f))
+ok('两份图各在包里，且键名／路径／存储只写在 utils/person.js 一处',
   fs.existsSync(P('assets/ic-person.png')) && fs.existsSync(P('assets/ic-person-alt.png'))
   && fs.existsSync(P('assets/ic-stat-notes.png')) && fs.existsSync(P('assets/ic-stat-cards.png'))
-  && /PERSON_SRC = \{ girl: '\/assets\/ic-person\.png', boy: '\/assets\/ic-person-alt\.png' \}/.test(js))
-ok('选择写本机、下次进页沿用（读 data 初值那一趟就要按存过的来）',
-  /wx\.setStorageSync\(PERSON_KEY/.test(js) && /wx\.getStorageSync\(PERSON_KEY\)/.test(js))
+  && /girl: '\/assets\/ic-person\.png', boy: '\/assets\/ic-person-alt\.png'/.test(personJs)
+  && hardSrc.length === 0,
+  hardSrc.join(','))
+// ★10-11 改钉：上面那两条"两页都取／列表页也吃同一枚"的前提被他这句撤掉了——
+//   「左上角的人，透明底侵入主图，列表左上角的人都去掉，维持只有首页有」（需求清单 R8）。
+//   所以列表页现在**一个字都不该沾**这三位；首页（pages/create）那两位与"点小人换大人"照旧。
+//   反向钉留着：只要有人把那位再请回列表页，这两条立刻红。
+//   ⚠ 比的是**代码**，不是整份文件：index.js 顶上那段注释就写着"这一页的 require 一并撤"，
+//   拿含注释的原文去比 `utils/person.js` 会当场假红（上面那行留下的记录本身就是这句话）。
+const ixCode = ixJs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+ok('取数只剩首页一屏（列表页不再 require person.js，也不 spread figure()）',
+  /require\('\.\.\/\.\.\/utils\/person\.js'\)/.test(js) && /\.\.\.person\.figure\(\)/.test(js)
+  && !/utils\/person\.js/.test(ixCode) && !/person\.figure\(\)/.test(ixCode),
+  [/\.\.\.person\.figure\(\)/.test(ixCode) ? '列表页又 spread 了 figure()' : ''].join(','))
+const ixWxml = fs.readFileSync(P('pages/index/index.wxml'), 'utf8')
+const ixWxss = fs.readFileSync(P('pages/index/index.wxss'), 'utf8')
+ok('列表页框外那一位已经去掉：markup 与样式表里都不留 .ix-person',
+  !/ix-person/.test(ixWxml.replace(/<!--[\s\S]*?-->/g, ''))
+  && !/^\.ix-person\s*[,{]/m.test(ixWxss.replace(/\/\*[\s\S]*?\*\//g, '')),
+  '列表页还有人＝撞 R8')
+ok('列表页 data 里不带 personSrc（人撤了，键留着就是下一次把它接回去的接头）',
+  !/personSrc/.test(ixWxml) && !/personSrc/.test(ixCode))
+ok('选择写本机、下次进页沿用（读写都走 person.js 那一个键）',
+  /wx\.setStorageSync\(KEY/.test(personJs) && /wx\.getStorageSync\(KEY\)/.test(personJs))
 
 /* ---------- 8. 按下有反馈（他要的"轻微放大"） ----------
    这一组不是走形式：10-10 落码第一版写的是 hover-class="blk-press"，而样式表里那两条叫

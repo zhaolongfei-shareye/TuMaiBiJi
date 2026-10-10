@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>10-11 毛玻璃一轮 · 效果图</title>
+<style>
+/* ============================================================
+   这一份是效果图，不是实现。屏上每一个数都从现网读来：
+   · 色值 = utils/palette.js 现跑 createSkin(0) / entryBlocks(0) / chromeOf(0)（象牙＝默认那套）
+   · 字号/间距 = app.wxss 的 --fs-* / --sp-*
+   · 几何 = pages/create/create.wxss（面板 410／490、标签行 64、卡 30 内缩、框 105、条 110、圆 90）
+            pages/index/index.wxss（头 542、卡 -40 上盖、内缩 24）
+   · 文案 = utils/i18n.js 现读（照片／链接／文字／记下来／右滑开始提炼／返回／笔记列表／笔记卡片／我的笔记／全部…）
+   · 底图与人物 = miniprogram/assets/ 里那两张真件
+   画布 1px = 1rpx（750 宽），整屏 1624 高，外面再等比缩到 0.5。
+   ============================================================ */
+:root {
+  /* 现网那三层浅（面板→卡→井）：#cdc9c1 / #FFFFFF / #E5E5E6 */
+  --cp-panel: #cdc9c1;
+  --cp-card: #FFFFFF;
+  --cp-field: #E5E5E6;
+  --cp-ink: #23252C;
+  --cp-ink-50: rgba(35, 37, 44, .5);
+  --cp-ink-38: rgba(35, 37, 44, .38);
+  --cp-ink-62: rgba(35, 37, 44, .62);
+  --cp-edge-10: rgba(35, 37, 44, .1);
+  --cp-edge-12: rgba(35, 37, 44, .12);
+  --cp-edge-14: rgba(35, 37, 44, .14);
+  --cp-cam: #E9723D;
+  --cp-extract: #C4541F;
+  --eb-person: #F3F3F1;
+  --eb-notes: #C9C1AE;
+  --eb-cards: #DCD8CC;
+  --eb-ink: #352E1D;
+  --bg-page: #E2DED4;
+  --bg-card: #F3F3F1;
+  --text-primary: #352E1D;
+  --text-secondary: rgba(53, 46, 29, .72);
+  /* 铺图那一态的字色（.container.has-bg） */
+  --on-photo: #f2efe9;
+  --on-photo-78: rgba(242, 239, 233, .78);
+  --on-photo-56: rgba(242, 239, 233, .56);
+  --chrome-bg: #443b25;
+  --chrome-sel: #766948;
+  --chrome-ink: #F2EFE9;
+
+  /* ---------- 玻璃这一档 ----------
+     站长 10-11 对着参考图定的：外框与内框**先都刷成白**，再整块一起半透＝一张面。
+     第二轮（他圈了三处回来）：往下渐退那一条改成**同一个元素自己的背景从白纱渐变到实心**，
+     再挂 backdrop-filter。上一稿是另叠一层带 mask-image 的皮，那层皮是定位元素，
+     画到了静态文字的上面（等于给字蒙白），底下还压着实心卡＝后面没照片可糊。
+     顺带把 mask-image + backdrop-filter 那个安卓风险整条去掉了。 */
+  --ga: .30; /* ★站长 10-11 在 α 校准条上点的这一档（全站统一）。
+                我上一稿从他的 PNG 参考图沿线上反解出的是 .45，他选了更透的这一档；
+                代价是墨字压在暗照片上的对比会掉，落码后必须逐处实测（见页脚那条）。 */
+  --g-white: rgba(255, 255, 255, var(--ga));
+  --g-hair: rgba(255, 255, 255, .55);
+  --g-fill: rgba(255, 255, 255, .2);
+  --g-blur: blur(46px) saturate(1.8);
+  /* 上一版（三层各自透、井还是淡墨凹下去）＝他没要的那一种，留一格做对照 */
+  --g-panel: rgba(205, 201, 193, .55);
+  --g-card: rgba(255, 255, 255, .62);
+  --g-well: rgba(35, 37, 44, .06);
+  --g-strip: rgba(255, 255, 255, .72);
+  --g-edge: rgba(255, 255, 255, .55);
+  --g-blur-out: blur(26px) saturate(1.5);
+  --g-blur-in: blur(16px) saturate(1.4);
+  --fs-h1: 42px; --fs-h2: 34px; --fs-title: 31px; --fs-body: 28px;
+  --fs-meta: 24px; --fs-tiny: 21px; --fs-label: 20px; --fs-micro: 18px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+body {
+  background: #1b1c1f; color: #e8e6e1;
+  font: 400 15px/1.6 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  padding: 40px 40px 80px;
+}
+h1 { font-size: 26px; letter-spacing: .5px; margin-bottom: 6px; }
+.lead { font-size: 14px; color: #a9a5a0; margin-bottom: 26px; max-width: 1500px; }
+.lead b { color: #f0ede8; }
+.grid { display: grid; grid-template-columns: repeat(4, 375px); gap: 34px 26px; }
+.cell { width: 375px; }
+.tag { font-size: 13px; font-weight: 700; letter-spacing: .4px; margin: 0 0 4px; color: #fff; }
+.tag em { font-style: normal; color: #8b8781; font-weight: 400; }
+.note { font-size: 12.5px; line-height: 1.5; color: #a9a5a0; min-height: 3.5em; margin-top: 6px; }
+.note s { color: #6d6a66; }
+.badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-right: 6px; vertical-align: 1px; }
+.b-now { background: #3a3b40; color: #b6b3ae; }
+.b-new { background: #C4541F; color: #fff; }
+.viewport { width: 375px; height: 812px; overflow: hidden; border-radius: 26px; box-shadow: 0 18px 40px rgba(0, 0, 0, .5); position: relative; background: #000; }
+.shot { width: 750px; height: 1624px; transform: scale(.5); transform-origin: top left; position: relative; overflow: hidden; font-family: -apple-system, "PingFang SC", sans-serif; }
+
+/* 系统那两条（状态栏＋微信导航栏）：现网是黑的，图从导航栏下面开始 */
+.sys { height: 176px; background: #060607; position: relative; z-index: 40; }
+.sys .clock { position: absolute; left: 44px; top: 46px; font-size: 27px; font-weight: 600; color: #fff; }
+.sys .title { position: absolute; left: 0; right: 0; top: 112px; text-align: center; font-size: 31px; font-weight: 600; color: #fff; }
+.sys .capsule { position: absolute; right: 26px; top: 104px; width: 174px; height: 62px; border-radius: 31px; background: rgba(0, 0, 0, .5); border: 2px solid rgba(255, 255, 255, .16); display: flex; align-items: center; justify-content: space-evenly; }
+.sys .capsule i { width: 46px; height: 46px; background: radial-gradient(circle at 8px 23px, #fff 3.4px, transparent 4.4px), radial-gradient(circle at 23px 23px, #fff 3.4px, transparent 4.4px), radial-gradient(circle at 38px 23px, #fff 3.4px, transparent 4.4px); }
+.sys .capsule b { width: 44px; height: 44px; border-radius: 50%; border: 3px solid #fff; position: relative; display: block; }
+.sys .capsule b::after { content: ''; position: absolute; inset: 12px; border-radius: 50%; background: #fff; }
+
+.page { position: absolute; left: 0; right: 0; top: 176px; bottom: 0; }
+.photo { position: absolute; inset: 0; background: url('../../../miniprogram/assets/home-bg-portrait.jpg') center 15%/cover no-repeat; }
+.scrim { position: absolute; inset: 0; background: rgba(8, 10, 14, .30); }
+.pad { padding: 0 24px; }
+
+/* ---------- 首页：标题行 / 调亮度那一行 ---------- */
+.title-row { display: flex; align-items: center; justify-content: space-between; margin: 48px 0 32px; }
+.page-title { font-size: var(--fs-h1); font-weight: 700; letter-spacing: -1px; color: var(--on-photo); }
+.lang { display: flex; align-items: baseline; gap: 20px; font-size: var(--fs-meta); color: var(--on-photo-56); }
+.lang .on { color: var(--on-photo); font-weight: 700; border-bottom: 4px solid #C4A24E; padding-bottom: 4px; }
+.home-swap { display: flex; gap: 44px; font-size: var(--fs-meta); color: var(--on-photo-78); }
+.home-swap span { display: inline-flex; align-items: center; gap: 10px; border-bottom: 3px solid transparent; padding-bottom: 4px; }
+.home-swap .dot { width: 26px; height: 26px; border-radius: 50%; background: #fff; }
+
+/* ---------- 收起态那三块 ---------- */
+.home-blk { position: absolute; left: 24px; right: 24px; top: 902px; z-index: 6; }
+.tips { display: flex; align-items: flex-start; height: 74px; margin-bottom: 12px; padding: 10px 20px 0 24px; font-size: var(--fs-meta); line-height: 1.4; color: var(--on-photo-78); }
+.tips i { flex: none; width: 14px; height: 14px; margin-top: 10px; margin-right: 12px; border-radius: 50%; background: #C4A24E; }
+.blk-row { display: flex; gap: 12px; }
+.blk-person { position: relative; flex: none; width: 308px; height: 308px; border-radius: 34px; background: var(--eb-person); color: var(--eb-ink); }
+.figwrap { position: absolute; left: 0; right: 0; top: -52px; bottom: 105px; overflow: hidden; }
+.fig { position: absolute; left: 0; top: 0; width: 220px; z-index: 2; }
+.fig-alt { position: absolute; right: 0; bottom: 0; width: 91px; z-index: 1; filter: grayscale(1) brightness(1.45); opacity: .5; }
+.jot { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 18px 16px 36px; border-radius: 0 0 34px 34px; background: #fff; }
+.jot-l { display: flex; align-items: center; gap: 10px; font-size: 36px; font-weight: 700; letter-spacing: 1px; color: #3A3A3C; }
+.jot-l .cam { width: 32px; height: 32px; border-radius: 7px; border: 3px solid #3A3A3C; position: relative; }
+.jot-l .cam::after { content: ''; position: absolute; left: 50%; top: 52%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; border-radius: 50%; border: 3px solid #3A3A3C; }
+.jot-s { margin-top: 2px; font-size: var(--fs-micro); font-weight: 500; letter-spacing: .5px; color: #6E6E73; }
+.blk-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.blk-stat { position: relative; flex: none; height: 148px; border-radius: 34px; overflow: hidden; }
+.blk-stat.notes { background: var(--eb-notes); color: var(--eb-ink); }
+.blk-stat.cards { background: var(--eb-cards); color: var(--eb-ink); }
+.blk-ic { position: absolute; left: 12px; bottom: -25px; width: 160px; height: 160px; object-fit: contain; }
+.blk-n { position: absolute; right: 22px; top: 50%; transform: translateY(-55%); font-family: "Avenir Next", "Helvetica Neue", sans-serif; font-weight: 100; font-size: 88px; line-height: .84; letter-spacing: -2px; }
+.blk-strip { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; display: flex; align-items: center; padding: 0 22px; border-radius: 0 0 34px 34px; background: rgba(255, 255, 255, .85); }
+.blk-strip i { flex: none; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: currentColor; opacity: .45; }
+.blk-strip span { font-size: var(--fs-label); letter-spacing: 2px; }
+
+/* ---------- 底栏 ---------- */
+.dock { position: absolute; left: 24px; right: 24px; bottom: 20px; height: 108px; border-radius: 44px; background: var(--chrome-bg); display: flex; align-items: center; z-index: 30; }
+.dock div { flex: 1; display: flex; align-items: center; justify-content: center; }
+.dock .g { width: 76px; height: 76px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: rgba(242, 239, 233, .62); font-size: 40px; font-weight: 300; }
+.dock .on .g { background: var(--chrome-sel); color: var(--chrome-ink); }
+.dock .g i { display: block; width: 40px; height: 40px; border: 3px solid currentColor; border-radius: 6px; position: relative; }
+.dock .g i.ln::after { content: ''; position: absolute; left: 6px; right: 6px; top: 10px; border-top: 3px solid currentColor; box-shadow: 0 12px 0 currentColor; }
+.dock .g i.pn::after { content: ''; position: absolute; left: 50%; top: 6px; width: 13px; height: 13px; margin-left: -6.5px; border-radius: 50%; border: 3px solid currentColor; }
+.dock .g i.pn::before { content: ''; position: absolute; left: 4px; right: 4px; bottom: 3px; height: 12px; border-radius: 12px 12px 0 0; border: 3px solid currentColor; border-bottom: 0; }
+
+/* ---------- 展开态：框外那一行 + 面板 ---------- */
+.out { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; padding: 0 20px 18px; font-size: var(--fs-meta); line-height: 1.4; letter-spacing: 1px; color: var(--on-photo-56); }
+.entry { position: absolute; left: 24px; right: 24px; bottom: 152px; z-index: 20; }
+.panel { position: relative; height: 410px; border-radius: 55px; border: 2px solid var(--cp-edge-10); padding: 8px 24px 14px; background: var(--cp-panel); display: flex; flex-direction: column; box-shadow: 0 16px 34px rgba(8, 10, 14, .10); }
+.panel.open { height: 490px; }
+.modes { display: flex; align-items: stretch; justify-content: center; gap: 24px; height: 64px; flex: none; }
+.md { position: relative; display: flex; align-items: center; font-size: var(--fs-title); letter-spacing: 1px; color: var(--cp-ink-50); padding: 0 22px; }
+.md::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 10px; width: 65px; height: 5px; border-radius: 3px; background: var(--cp-edge-10); }
+.md.on { color: var(--cp-ink); font-weight: 600; }
+.md.on::after { background: var(--cp-ink); }
+.card { flex: 1; min-height: 0; margin-top: 6px; margin-bottom: 0; border-radius: 40px; padding: 30px; background: var(--cp-card); border: 2px solid var(--cp-edge-12); display: flex; flex-direction: column; }
+.crow { display: flex; align-items: center; justify-content: center; gap: 34px; }
+.mini { width: 105px; text-align: center; color: var(--cp-ink); font-size: var(--fs-label); letter-spacing: 1px; }
+.mini .c { width: 105px; height: 105px; border-radius: 50%; border: 3px solid var(--cp-edge-14); display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+.mini .c b { display: block; width: 54px; height: 54px; border: 4px solid var(--cp-ink); border-radius: 50%; position: relative; }
+.mini .c b.al::after { content: ''; position: absolute; left: 50%; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: var(--cp-ink); }
+.shut { width: 180px; text-align: center; font-size: var(--fs-label); letter-spacing: 1px; color: var(--cp-cam); }
+.shut .c { width: 180px; height: 180px; border-radius: 50%; border: 10px solid var(--cp-edge-14); background: var(--cp-cam); display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+.shut .c b { display: block; width: 96px; height: 96px; border-radius: 50%; border: 5px solid #2C1204; position: relative; }
+.shut .c b::after { content: ''; position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 5px solid #2C1204; }
+.field { display: flex; align-items: center; height: 105px; padding: 0 28px; border-radius: 18px; background: var(--cp-field); border: 3px solid var(--cp-edge-14); font-size: var(--fs-body); color: var(--cp-ink-38); flex: none; }
+.field .grow { flex: 1; min-width: 0; }
+.field .ink { color: var(--cp-ink); }
+.paste { flex: none; width: 72px; height: 72px; margin-right: -12px; display: flex; align-items: center; justify-content: center; }
+.paste b { display: block; width: 40px; height: 40px; border: 4px solid var(--cp-ink-62); border-radius: 7px; position: relative; }
+.paste b::after { content: ''; position: absolute; left: 50%; top: -10px; width: 18px; height: 9px; margin-left: -9px; border: 4px solid var(--cp-ink-62); border-bottom: 0; border-radius: 4px 4px 0 0; background: var(--cp-field); }
+.sld { position: relative; flex: none; margin-top: auto; height: 110px; border-radius: 55px; background: var(--cp-field); border: 5px solid var(--cp-field); display: flex; align-items: center; justify-content: center; }
+.sld .txt { display: flex; align-items: center; gap: 22px; font-size: var(--fs-title); font-weight: 700; letter-spacing: 1px; color: var(--cp-ink); }
+.sld .txt::before, .sld .txt::after { content: ''; width: 60px; border-top: 3px dashed currentColor; opacity: .34; }
+.knob { position: absolute; left: 10px; top: 5px; width: 90px; height: 90px; border-radius: 50%; background: var(--cp-extract); display: flex; align-items: center; justify-content: center; }
+.knob b { display: block; width: 42px; height: 42px; }
+.knob .lk { border: 5px solid #fff; border-radius: 12px 0 0 12px; border-right: 0; width: 20px; height: 32px; transform: rotate(-45deg); box-shadow: 22px -22px 0 -6px #fff, 22px -22px 0 -1px transparent; }
+.field-write { height: 160px; padding-right: 14px; align-items: flex-start; }
+.field-write .area { flex: 1; min-width: 0; padding-top: 28px; line-height: 1.5; }
+
+/* ---------- 报错气泡（顺手一屏：它现在压在玻璃卡上沿） ---------- */
+.bubble { position: absolute; left: 30px; right: 30px; top: 78px; z-index: 6; display: flex; align-items: center; min-height: 52px; padding: 6px 22px; border-radius: 26px; background: var(--cp-ink); color: #fff; font-size: var(--fs-meta); line-height: 1.3; font-weight: 700; box-shadow: 0 10px 24px rgba(8, 10, 14, .28); }
+
+
+
+/* ---------- 详情窗（读笔记那一层，图贯穿全屏垫在它后面） ---------- */
+.fmask { position: absolute; left: 0; right: 0; top: 176px; bottom: 0; background: rgba(20, 20, 28, .28); z-index: 50; }
+.fsheet { position: absolute; left: 24px; right: 24px; top: 306px; bottom: 192px; border-radius: 32px; background: var(--bg-card); z-index: 51; padding: 0 34px 26px; overflow: hidden; }
+/* 同一条规矩：这一层下方是大片实心内容，所以顶部玻璃必须往下渐退，不能一刀切。
+   0～96 全强度（那枚抓手＋第一行小字），96～240 退到实心 #F3F3F1，正文起就是实心。 */
+/* 站长 10-11 拍：笔记详情这一层**不做毛玻璃**——里面是大段正文，要清晰、不能被背景干扰。
+   所以 `.fsheet` 保持现网那层实心 #F3F3F1，下面那一条 glass 规则整条删掉，不留"能切回来"的后门。 */
+.grip { width: 88px; height: 8px; border-radius: 999px; background: rgba(35, 37, 44, .16); margin: 18px auto 0; }
+.fhead { display: flex; align-items: baseline; justify-content: space-between; margin-top: 14px; font-size: var(--fs-meta); color: var(--text-secondary); }
+.ftitle { font-size: 40px; font-weight: 700; line-height: 1.3; color: var(--text-primary); margin: 14px 0 18px; }
+.chips { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 22px; }
+.chips span { font-size: var(--fs-tiny); padding: 8px 16px; border-radius: 999px; background: rgba(35, 37, 44, .07); color: var(--text-primary); }
+.fsec { font-size: var(--fs-label); letter-spacing: 2px; color: rgba(53, 46, 29, .55); margin: 18px 0 8px; }
+.fpara { font-size: var(--fs-body); line-height: 1.66; color: var(--text-secondary); }
+.fbul { display: flex; gap: 12px; font-size: var(--fs-body); line-height: 1.6; color: var(--text-secondary); margin-top: 10px; }
+.fbul i { flex: none; width: 12px; height: 12px; border-radius: 50%; background: #C4A24E; margin-top: 16px; }
+.fbtns { display: flex; gap: 20px; margin-top: 26px; }
+.fbtns b { flex: 1; height: 84px; border-radius: 999px; border: 2px solid rgba(53, 46, 29, .18); display: flex; align-items: center; justify-content: center; font-size: var(--fs-body); font-weight: 700; color: var(--text-primary); }
+/* ---------- 「我的」页（设置／关于就是这里那两枚药丸，不是另两个页面） ---------- */
+/* ★上一稿这一页我抄错了几何：把形象图画成 790 高、名片行放到 646～790。
+   现网 pages/me/me.wxss 是 `.head-band` 542 + `.sheet` margin-top −40、高 144
+   → 名片行实际占 502～646，下面 `.body` 从 646 起。这一稿按现网这三个数重画。
+   图仍走 bandGeom 那一条公式：boxH 递 646（原来 542）→ top = −(1290−646)×15% = −96，
+   名片行那 144 底下就都有图可糊了（＝他说的"往下侵入在第一个内框上面"）。 */
+.me { position: absolute; left: 0; right: 0; top: 176px; bottom: 0; background: var(--bg-page); overflow: hidden; }
+/* ★站长 10-11 抓到的"中间镂空"：我上一稿把图盒子写成 1290 高，只把 `.me-scrim` 收到 646，
+   图本身没裁 → 一路铺到整页底下，而 `.me-body` 是透明的，卡片四周就把原图透出来了。
+   现网 `.head-band` 有 `overflow:hidden`，图永远只到那一条。这里把盒子收到 742
+   （顶边 −96，可见段正好 0～646），因为画法是 `no-repeat 0 0 / 750px 1290px`，
+   收短只是裁掉多画的那一段，**留下的像素一位没动**。 */
+.me-photo { position: absolute; left: 0; top: -96px; width: 750px; height: 742px; background: url('../../../miniprogram/assets/home-bg-portrait.jpg') no-repeat 0 0 / 750px 1290px; }
+.me-scrim { position: absolute; left: 0; right: 0; top: 0; height: 646px; background: rgba(8, 10, 14, .30); }
+.me-h1 { position: absolute; left: 32px; top: 22px; font-size: var(--fs-h1); font-weight: 700; letter-spacing: -1px; color: var(--on-photo); }
+.me-score { position: absolute; right: 32px; top: 24px; text-align: right; color: var(--on-photo); }
+.me-score .n { display: block; font-family: "Avenir Next", sans-serif; font-weight: 100; font-size: 88px; line-height: .84; letter-spacing: -2px; }
+.me-score .l { font-size: var(--fs-label); letter-spacing: 4px; opacity: .8; }
+.me-sheet { position: absolute; left: 0; right: 0; top: 502px; height: 144px; padding: 0 56px; display: flex; align-items: center; gap: 24px; border-radius: 32px 32px 0 0; background: var(--bg-page); }
+/* 他圈这一处写的就是"为什么没有渐变"：上一稿这一条是一档平的，144 到底硬切进实心页面底。
+   现在同一张背景从上往下：0～56 全强度白玻璃，56～144 交叉淡入到页面底 #E2DED4，
+   淡到底那一行正好与下面 `.me-body` 的实心底同色＝接缝消失。 */
+.me-sheet.glass { background: linear-gradient(180deg, rgba(255, 255, 255, var(--ga)) 0 56px, rgba(226, 222, 212, .62) 108px, #E2DED4 144px); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .5); }
+.me-logo { flex: none; width: 80px; height: 80px; border-radius: 50%; object-fit: cover; }
+.me-tx { flex: 1; min-width: 0; }
+.me-name { display: block; font-size: var(--fs-title); font-weight: 800; letter-spacing: -.4px; line-height: 1.25; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me-slogan { display: block; font-size: var(--fs-meta); line-height: 1.4; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill { flex: none; display: flex; gap: 4px; padding: 5px; border-radius: 999px; background: rgba(35, 37, 44, .055); }
+.pill span { font-size: var(--fs-meta); font-weight: 700; line-height: 58px; height: 58px; padding: 0 24px; border-radius: 999px; color: var(--text-secondary); }
+.pill .on { background: #3b3323; color: #F2EFE9; font-weight: 700; }
+.me-body { position: absolute; left: 0; right: 0; top: 646px; bottom: 0; padding: 8px 24px 0; overflow: hidden; }
+.mcard { border-radius: 32px; background: var(--bg-card); border: 2px solid rgba(53, 46, 29, .1); padding: 6px 28px; margin-bottom: 20px; }
+.mcard .lead2 { font-size: var(--fs-body); line-height: 1.66; color: var(--text-secondary); padding: 22px 0; }
+.mcard .vh { font-size: var(--fs-h2); font-weight: 700; color: var(--text-primary); display: inline-block; margin: 22px 0 0; }
+.mcard .vv { font-size: var(--fs-tiny); color: rgba(53, 46, 29, .5); background: rgba(53, 46, 29, .06); border-radius: 8px; padding: 2px 10px; margin-left: 10px; }
+.mi { display: flex; align-items: baseline; gap: 16px; padding: 28px 0; border-bottom: 2px solid rgba(53, 46, 29, .08); }
+.mi:last-child { border-bottom: 0; }
+.mi .lb { font-size: var(--fs-title); font-weight: 700; color: var(--text-primary); flex: none; }
+.mi .hn { margin-left: auto; font-size: var(--fs-meta); color: var(--text-secondary); }
+.mi .cv { flex: none; width: 18px; height: 18px; border-top: 3px solid rgba(53, 46, 29, .35); border-right: 3px solid rgba(53, 46, 29, .35); transform: rotate(45deg); margin-left: 12px; }
+.mi.warn .lb { color: #B3392B; }
+/* ---------- 列表·卡片那一格（同一条玻璃规则） ---------- */
+.cells { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding-top: 18px; }
+.cellcard { border-radius: 24px; overflow: hidden; background: #fff; border: 2px solid rgba(53, 46, 29, .08); }
+.cellcard .art { height: 300px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.cellcard .art b:nth-child(1) { background: #4b5fa8; }
+.cellcard .art b:nth-child(2) { background: #b99a3f; }
+.cellcard .art b:nth-child(3) { background: #2f8f74; }
+.cellcard .art b:nth-child(4) { background: #b5566b; }
+.cellcard .cap { background: #14171c; color: #f2efe9; padding: 14px 16px 18px; }
+.cellcard .cap .t { font-size: 26px; font-weight: 700; line-height: 1.3; }
+.cellcard .cap .s { font-size: 17px; opacity: .6; margin-top: 8px; }
+.cellcard .nm { font-size: var(--fs-meta); color: var(--text-primary); padding: 14px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 玻璃这一档怎么画 ---------- */
+/* ---------- 这一版（照参考图）：一张白玻璃 ---------- */
+.g-panel { background: var(--g-white); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); border-color: rgba(255, 255, 255, .62); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .55), 0 20px 50px rgba(8, 10, 14, .18); }
+/* 内框不再单独有一层：底色透明、边也不画，控件直接落在这张玻璃上 */
+.g-card { background: transparent; border-color: transparent; box-shadow: none; }
+/* 井＝细边＋一丝白（参考图里那两枚就是"描出来的"，不是"压下去的"） */
+.g-well { background: var(--g-fill); border-color: var(--g-hair); }
+/* 首页三块。★上一稿这里是个真 bug：`.blk-stat.notes`／`.blk-stat.cards` 是**两个类**(0,2,0)，
+   我那条 `.g-blk` 只有一个类(0,1,0)——压不住，所以 `13`／`12` 那两块从头到尾还是实心莫兰迪色，
+   他圈出来的"这里没做毛玻璃"就是它。必须写成 compound 选择器（落码时同一个坑）。 */
+.blk-person.g-blk, .blk-stat.g-blk { background: rgba(255, 255, 255, var(--ga)); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55), 0 14px 34px rgba(8, 10, 14, .16); }
+/* 块里那两条白条：同一张玻璃上再抬一档，抬的量跟着全站那一档走，不写死 */
+.g-jot { background: rgba(255, 255, 255, calc(var(--ga) + .08)); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6); }
+.g-knob { box-shadow: 0 6px 18px rgba(8, 10, 14, .22); }
+/* ---------- 上一版（他没要的那一种）：三层各自透、井是淡墨凹井 ---------- */
+.v1-panel { background: var(--g-panel); backdrop-filter: var(--g-blur-out); -webkit-backdrop-filter: var(--g-blur-out); border-color: var(--g-edge); }
+.v1-card { background: var(--g-card); backdrop-filter: var(--g-blur-in); -webkit-backdrop-filter: var(--g-blur-in); border-color: rgba(255, 255, 255, .7); }
+.v1-well { background: var(--g-well); border-color: rgba(35, 37, 44, .12); }
+
+/* ---------- 列表页 ---------- */
+.ix { position: absolute; left: 0; right: 0; top: 176px; bottom: 0; background: var(--bg-page); }
+.ix > .page { position: static; display: flex; flex-direction: column; height: 100%; }
+.head { position: relative; height: 542px; flex: none; overflow: hidden; background: var(--bg-page); }
+.head .photo { background-position: center 15%; background-size: cover; }
+/* 玻璃那一档必须有东西可糊：卡顶那 238 里，超出头部 542 的那一段底下原本没有图。
+   站长这句"没有背景图就把背景图下移"现网早就有口——utils/poster.js 的
+   `bandGeom(w, h, boxH)`：图按 750 宽铺好后高 1290，顶边 = −(1290−boxH)×15%，
+   盒子高由调用方递（详情窗那一态已经在传整屏高）。这里把 boxH 从 542 递到 740，
+   于是 top 由 −112 变 −83，同一张图、同一个锚点、同一条公式，只是往下垫了 29rpx。 */
+.ix.glass .head { overflow: visible; }
+.ix.glass .head .photo { left: 0; top: -83px; bottom: auto; width: 750px; height: 1290px; background: url('../../../miniprogram/assets/home-bg-portrait.jpg') no-repeat 0 0 / 750px 1290px; }
+.ix.glass .head .scrim { bottom: -198px; }
+/* 详情那一态：现网 index.wxml 传的是 `imgStyleThru`＝bandGeom(w,h,整屏高)。
+   1448 高的盒子时图按宽铺不满了，走的是公式另一支：宽 842、left −46、top 0。
+   这一格虽然不做玻璃（你拍了实心），但露在卡片四周那一条**必须是贯穿全屏的图**，
+   不然我拿这张图去对现网会对不上。 */
+.ix.thru .head { overflow: visible; }
+.ix.thru .head .photo { left: -46px; top: 0; bottom: auto; width: 842px; height: 1448px; background: url('../../../miniprogram/assets/home-bg-portrait.jpg') no-repeat 0 0 / 842px 1448px; }
+.ix.thru .head .scrim { bottom: -906px; }
+.h1 { position: absolute; left: 32px; top: 22px; font-size: var(--fs-h1); font-weight: 700; letter-spacing: -1px; color: var(--on-photo); }
+.stat { position: absolute; right: 32px; top: 24px; text-align: right; color: var(--on-photo); }
+.stat .n { font-family: "Avenir Next", sans-serif; font-weight: 100; font-size: 88px; line-height: .84; letter-spacing: -2px; display: block; }
+.stat .l { font-size: var(--fs-label); letter-spacing: 4px; opacity: .8; }
+.ix-person { position: absolute; left: 24px; bottom: 40px; width: 150px; z-index: 4; }
+.srch { position: absolute; right: 24px; bottom: 40px; width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; z-index: 5; }
+.srch b { display: block; width: 44px; height: 44px; border: 4px solid var(--on-photo); border-radius: 50%; position: relative; }
+.srch b::after { content: ''; position: absolute; right: -14px; bottom: -6px; width: 18px; height: 4px; background: var(--on-photo); transform: rotate(45deg); border-radius: 2px; }
+.sheet { position: relative; z-index: 2; flex: 1; min-height: 0; margin-top: -40px; padding: 0 24px; border-radius: 40px 40px 0 0; background: var(--bg-card); display: flex; flex-direction: column; }
+.vtabs { display: flex; align-items: center; height: 96px; flex: none; gap: 40px; font-size: var(--fs-body); color: var(--text-secondary); }
+.vtabs .on { color: var(--text-primary); font-weight: 700; position: relative; }
+.vtabs .on::after { content: ''; position: absolute; left: 0; right: 0; bottom: -8px; height: 5px; border-radius: 3px; background: var(--text-primary); }
+.vtabs .back { margin-left: auto; font-size: var(--fs-meta); color: var(--text-secondary); }
+.cats { position: relative; z-index: 1; display: flex; align-items: center; gap: 40px; height: 62px; flex: none; font-size: var(--fs-meta); font-weight: 600; letter-spacing: 1px; color: var(--text-secondary); }
+.cats .on { color: var(--text-primary); font-weight: 700; position: relative; }
+.cats .on::after { content: ''; position: absolute; left: 0; right: 0; bottom: -10px; height: 4px; border-radius: 2px; background: var(--text-primary); }
+.rows { flex: 1; min-height: 0; padding-top: 18px; }
+.row { display: flex; gap: 18px; padding: 20px 0; }
+.row .dt { flex: none; width: 74px; text-align: right; font-size: var(--fs-tiny); color: rgba(53, 46, 29, .5); padding-top: 6px; }
+.row .dt i { display: block; width: 12px; height: 12px; border-radius: 50%; background: #C4A24E; margin: 0 0 8px auto; }
+.row .bd { flex: 1; min-width: 0; }
+.row .tt { font-size: var(--fs-h2); font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+.row .ab { font-size: var(--fs-body); line-height: 1.62; color: var(--text-secondary); }
+/* ---------- 列表卡顶那一档玻璃 ----------
+   上一稿错在两处：① 白纱是**另叠的一层定位元素**，画到了两行字的上面＝给字蒙白；
+   ② 它底下还压着实心 #F3F3F1 的卡，后面没照片可糊＝看着就是实心米色。
+   这一版：玻璃与实心是**同一张背景的两个色标**，从上往下交叉淡入；文字是这张背景的
+   内容，天然压在玻璃之上。0～158 全强度（正好两行字），158～238 退到实心。
+   顺带把 mask-image + backdrop-filter 那个安卓风险去掉了。 */
+.sheet.glass-b {
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, var(--ga)) 0 158px,
+    rgba(243, 243, 241, .62) 198px,
+    #F3F3F1 238px);
+  backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur);
+}
+.sheet { position: relative; overflow: hidden; }
+
+/* ---------- 设置 / 关于 的上半 ---------- */
+.pgc { position: absolute; left: 0; right: 0; top: 176px; bottom: 0; background: var(--bg-page); padding: 32px 24px; overflow: hidden; }
+.crd { border-radius: 32px; background: var(--bg-card); border: 2px solid rgba(53, 46, 29, .12); padding: 28px; margin-bottom: 20px; }
+.crd.glass { background: rgba(255, 255, 255, .5); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); border-color: rgba(255, 255, 255, .62); }
+.crd .ct { font-size: var(--fs-h2); font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.crd .cs { font-size: var(--fs-meta); color: var(--text-secondary); }
+.discs { display: flex; gap: 22px; margin-bottom: 18px; }
+.disc { width: 108px; height: 108px; border-radius: 50%; border: 3px dashed rgba(53, 46, 29, .28); display: flex; align-items: center; justify-content: center; font-size: 48px; color: rgba(53, 46, 29, .38); }
+.disc.full { border-style: solid; background: url('../../../miniprogram/assets/home-bg-portrait.jpg') center/cover; }
+.tabs { display: flex; gap: 40px; font-size: var(--fs-body); color: var(--text-secondary); }
+.tabs .on { color: var(--text-primary); font-weight: 700; border-bottom: 5px solid var(--text-primary); padding-bottom: 8px; }
+.brand { display: flex; align-items: center; gap: 22px; }
+.brand img { width: 108px; height: 108px; border-radius: 26px; object-fit: cover; }
+.brand .bn { font-size: var(--fs-h2); font-weight: 700; color: var(--text-primary); }
+.brand .bv { font-size: var(--fs-tiny); color: rgba(53, 46, 29, .55); margin-left: 10px; }
+.brand .bs { font-size: var(--fs-meta); color: var(--text-secondary); margin-top: 4px; }
+.foot { margin-top: 34px; font-size: 13px; color: #8b8781; max-width: 1500px; line-height: 1.8; }
+.foot b { color: #d6d2cc; }
+</style>
+</head>
+<body>
+<h1>10-11 毛玻璃一轮 · 效果图（代码一行没动）</h1>
+<p class="lead">
+  <b>代码一行没动，这一份仍是效果图。</b>
+  玻璃这一档：<b>白 .30（你在校准条上点的）＋ blur 46 ＋ saturate 1.8</b>，外框与内框先都刷白再整块一起半透＝一张面，内框那圈边不画；里面那两枚（输入框／右滑条）只留一圈细白边＋一丝白；<b>按钮与图形一笔不动</b>。
+  你圈回来的两条我按规矩办了：<b>① 玻璃底下必须有东西可糊</b>——现网 <code>utils/poster.js</code> 的 <code>bandGeom(w,h,boxH)</code> 本来就是"盒子高由调用方递"，把 boxH 从 542 递到 740（名片行那一页递 646），图就往下垫到玻璃后面，不用发明新画法；<b>② 玻璃下方若是纯色就往下渐退，不一刀切</b>——白纱与实心是<b>同一张背景的两个色标</b>，交叉淡入（列表卡顶 158→238、名片行 56→144），文字压在背景之上所以不再被蒙白。上一稿那两条都不成立，是因为我另叠了一层带 <code>mask-image</code> 的皮：它是定位元素，画到了两行字上面，底下还压着实心卡。
+  落点四处：<b>首页三块</b>（人物、点小人换大人、两张插画全照旧，只换面色）、<b>录入面板</b>、<b>列表卡顶那两行</b>（两枚 tab ＋分类行，到具体内容恢复实心）、<b>「我的」名片行</b>。
+  <b>笔记详情那一层你拍了不做玻璃</b>（正文多、要清晰）——第 13 格按实心留着，就是为了记下这条例外。
+</p>
+
+
+<style>
+.cal { display: grid; grid-template-columns: repeat(6, 250px); gap: 18px; margin: 6px 0 10px; }
+.cal figure { margin: 0; }
+.cal .box { position: relative; height: 330px; border-radius: 22px; overflow: hidden; background: url('../../../miniprogram/assets/home-bg-portrait.jpg') center 30%/cover no-repeat; }
+.cal .box::after { content: ''; position: absolute; inset: 0; background: rgba(0, 0, 0, .30); }
+.cal .pan { position: absolute; left: 16px; right: 16px; top: 62px; bottom: 16px; border-radius: 26px; border: 1px solid rgba(255, 255, 255, .6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); }
+.cal .pan b { position: absolute; left: 12px; right: 12px; top: 44px; height: 40px; border-radius: 12px; background: rgba(255, 255, 255, .2); border: 1px solid rgba(255, 255, 255, .55); }
+.cal .pan i { position: absolute; left: 12px; top: 100px; width: 34px; height: 34px; border-radius: 50%; background: #C4541F; }
+.cal .pan u { position: absolute; left: 12px; right: 12px; top: 96px; height: 42px; border-radius: 21px; background: rgba(255, 255, 255, .2); border: 1px solid rgba(255, 255, 255, .55); z-index: -1; }
+.cal figcaption { font-size: 12.5px; color: #cfcac4; margin-top: 6px; }
+.cal figcaption em { font-style: normal; color: #8b8781; }
+</style>
+<h2 style="font-size:19px;margin:34px 0 4px">α 校准条 · <span style="color:#E9723D">已拍：.30（全站统一）</span></h2>
+<p style="font-size:13px;color:#a9a5a0;margin-bottom:12px;max-width:1500px">你 10-11 点的是 <b>.30</b>——比我从 PNG 参考图沿线上反解出的那一档（.45）更透。这一条留在图里当依据，六档同底同面板只换 α。<b>.30 的代价我先说明白</b>：白纱薄了，墨字压在<b>暗</b>照片上的对比会掉，落码后我逐处量对比（≥4.5），哪一处不过就单独给那一处补一档底，不回头改全站这一档。</p>
+<div class="cal">
+  <figure><div class="box"><div class="pan" style="background:rgba(255,255,255,0.30)"><u></u><i></i><b></b></div></div><figcaption>α = .30 <em>★你拍的这一档＝全站</em></figcaption></figure>
+  <figure><div class="box"><div class="pan" style="background:rgba(255,255,255,0.38)"><u></u><i></i><b></b></div></div><figcaption>α = .38 <em></em></figcaption></figure>
+  <figure><div class="box"><div class="pan" style="background:rgba(255,255,255,0.45)"><u></u><i></i><b></b></div></div><figcaption>α = .45 <em>我上一稿（从参考图反解）</em></figcaption></figure>
+  <figure><div class="box"><div class="pan" style="background:rgba(255,255,255,0.52)"><u></u><i></i><b></b></div></div><figcaption>α = .52 <em>我上一稿（偏白）</em></figcaption></figure>
+  <figure><div class="box"><div class="pan" style="background:rgba(255,255,255,0.60)"><u></u><i></i><b></b></div></div><figcaption>α = .60 <em></em></figcaption></figure>
+  <figure><div class="box"><div class="pan" style="background:rgba(255,255,255,0.70)"><u></u><i></i><b></b></div></div><figcaption>α = .70 <em></em></figcaption></figure>
+</div>
+<div class="grid">
+  <!-- 1 首页·现状 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-now">现状</span>首页·第一屏 <em>／人物、换人、三块位置一律不动</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:39</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="page"><div class="photo"></div><div class="scrim"></div>
+        <div class="pad">
+          <div class="title-row"><div class="page-title">看到好内容，随手记下来</div><div class="lang"><span class="on">中</span><span>EN</span></div></div>
+          <div class="home-swap"><span>调亮度 <b class="dot" style="width:26px;height:26px;border-radius:50%;background:#fff;display:inline-block"></b></span><span>换背景 ›</span></div>
+        </div>
+        <div class="home-blk">
+          <div class="tips"><i></i><span>Tips：拍照或截图存进来，会自动提炼成要点</span></div>
+          <div class="blk-row">
+            <div class="blk-person">
+              <div class="figwrap">
+                <img class="fig" src="../../../miniprogram/assets/ic-person-alt.png">
+                <img class="fig-alt" src="../../../miniprogram/assets/ic-person.png">
+              </div>
+              <div class="jot"><div class="jot-l"><span class="cam"></span>记下来</div><div class="jot-s">照片 · 链接 · 文字</div></div>
+            </div>
+            <div class="blk-col">
+              <div class="blk-stat notes"><img class="blk-ic" src="../../../miniprogram/assets/ic-stat-notes.png"><span class="blk-n">13</span><div class="blk-strip"><i></i><span>笔记</span></div></div>
+              <div class="blk-stat cards"><img class="blk-ic" src="../../../miniprogram/assets/ic-stat-cards.png"><span class="blk-n">12</span><div class="blk-strip"><i></i><span>卡片</span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="dock"><div><span class="g">＋</span></div><div class="on"><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">这一屏该改的只有面色：左块 #F3F3F1、右上 #C9C1AE、右下 #DCD8CC、白条 #FFFFFF／.85，四块实心。人物与"点小人换大人"照旧。</p>
+  </div>
+
+  <!-- 2 首页·玻璃 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-new">这一版</span>首页·第一屏 <em>／只换面色：三块→一张白玻璃</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:39</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="page"><div class="photo"></div><div class="scrim"></div>
+        <div class="pad">
+          <div class="title-row"><div class="page-title">看到好内容，随手记下来</div><div class="lang"><span class="on">中</span><span>EN</span></div></div>
+          <div class="home-swap"><span>调亮度 <b style="width:26px;height:26px;border-radius:50%;background:#fff;display:inline-block"></b></span><span>换背景 ›</span></div>
+        </div>
+        <div class="home-blk">
+          <div class="tips"><i></i><span>Tips：拍照或截图存进来，会自动提炼成要点</span></div>
+          <div class="blk-row">
+            <div class="blk-person g-blk">
+              <div class="figwrap"><img class="fig" src="../../../miniprogram/assets/ic-person-alt.png"><img class="fig-alt" src="../../../miniprogram/assets/ic-person.png"></div>
+              <div class="jot g-jot"><div class="jot-l"><span class="cam"></span>记下来</div><div class="jot-s">照片 · 链接 · 文字</div></div>
+            </div>
+            <div class="blk-col">
+              <div class="blk-stat notes g-blk"><img class="blk-ic" src="../../../miniprogram/assets/ic-stat-notes.png"><span class="blk-n">13</span><div class="blk-strip g-jot"><i></i><span>笔记</span></div></div>
+              <div class="blk-stat cards g-blk"><img class="blk-ic" src="../../../miniprogram/assets/ic-stat-cards.png"><span class="blk-n">12</span><div class="blk-strip g-jot"><i></i><span>卡片</span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="dock"><div><span class="g">＋</span></div><div class="on"><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">三块同一张白玻璃 <b>.30＋blur 46</b>（右上／右下原来那两档深浅不再分，都刷白），块里那圈 2px 白边是玻璃的边。<b>上一稿这里有个真 bug</b>：<code>13</code>／<code>12</code> 那两块我写的 <code>.g-blk</code> 只有一个类，压不住现网 <code>.blk-stat.notes</code> 那两个类，所以它俩当时<b>还是原来的实心莫兰迪色</b>——你圈的"这里没做毛玻璃"圈的正是它。现在改成 <code>.blk-stat.g-blk</code>，落码时同一个坑。<b>人物、点小人换大人、两张插画、相机图形，一件没动。</b></p>
+  </div>
+
+  <!-- 3 面板·照片·现状 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-now">现状</span>录入面板·照片档 <em>／三枚圈</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:36</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="page"><div class="photo"></div><div class="scrim"></div>
+        <div class="entry">
+          <div class="out"><span>Tips：分享时可选卡片模板，换套版式再发出去</span><span>返回</span></div>
+          <div class="panel">
+            <div class="modes"><span class="md on">照片</span><span class="md">链接</span><span class="md">文字</span></div>
+            <div class="card">
+              <div class="crow">
+                <div class="mini"><div class="c"><b></b></div>相册</div>
+                <div class="shut"><div class="c"><b></b></div>拍照</div>
+                <div class="mini"><div class="c"><b class="al"></b></div>链接</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dock"><div class="on"><span class="g">＋</span></div><div><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">面板 410 高、标签行 64、白卡 30 内缩、快门 180／两枚小圆 105。这三层现在都是实心色。</p>
+  </div>
+
+  <!-- 4 面板·照片·玻璃 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-new">新</span>录入面板·照片档 <em>／三层→玻璃</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:36</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="page"><div class="photo"></div><div class="scrim"></div>
+        <div class="entry">
+          <div class="out"><span>Tips：分享时可选卡片模板，换套版式再发出去</span><span>返回</span></div>
+          <div class="panel g-panel">
+            <div class="modes"><span class="md on">照片</span><span class="md">链接</span><span class="md">文字</span></div>
+            <div class="card g-card">
+              <div class="crow">
+                <div class="mini"><div class="c g-well"><b></b></div>相册</div>
+                <div class="shut"><div class="c"><b></b></div>拍照</div>
+                <div class="mini"><div class="c g-well"><b class="al"></b></div>链接</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dock"><div class="on"><span class="g">＋</span></div><div><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">快门那枚橙实心<b>不动</b>（它是唯一的大钮）；左右两枚小圆从实心 #E5E5E6 变成细白边的一圈。标签字与短杠照旧，整块只剩一张玻璃。</p>
+  </div>
+
+  <!-- 5 面板·链接·现状 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-now">现状</span>录入面板·链接档 <em>／图三那张</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:36</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="page"><div class="photo"></div><div class="scrim"></div>
+        <div class="entry">
+          <div class="out"><span>Tips：贴一个公众号链接，长文读成三句话</span><span>返回</span></div>
+          <div class="panel">
+            <div class="modes"><span class="md">照片</span><span class="md on">链接</span><span class="md">文字</span></div>
+            <div class="card">
+              <div class="field"><span class="grow">公众号文章 / 网页链接</span><span class="paste"><b></b></span></div>
+              <div class="sld"><span class="knob"><b class="lk"></b></span><span class="txt">右滑开始提炼</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="dock"><div class="on"><span class="g">＋</span></div><div><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">框 105、条 110 都是 #E5E5E6 实心；橙圆 #C4541F 配白图形（对比 4.53，那条硬约束在）。</p>
+  </div>
+
+  <!-- 5b 面板·链接·上一版（他没要的那种） -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-new">上一版</span>录入面板·链接档 <em>／三层各自透＝没按你说的做</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:36</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="page"><div class="photo"></div><div class="scrim"></div>
+        <div class="entry">
+          <div class="out"><span>Tips：贴一个公众号链接，长文读成三句话</span><span>返回</span></div>
+          <div class="panel v1-panel">
+            <div class="modes"><span class="md">照片</span><span class="md on">链接</span><span class="md">文字</span></div>
+            <div class="card v1-card">
+              <div class="field v1-well"><span class="grow">公众号文章 / 网页链接</span><span class="paste"><b></b></span></div>
+              <div class="sld v1-well"><span class="knob"><b class="lk"></b></span><span class="txt">右滑开始提炼</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="dock"><div class="on"><span class="g">＋</span></div><div><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">我上一稿画的这一种：外框还是那支壁纸灰、内框另有一层白、井往下压成淡墨。三层都还在，只是各自变透——<b>不是"一张白玻璃"</b>。</p>
+  </div>
+
+  <!-- 6 面板·链接·玻璃 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-new">这一版</span>录入面板·链接档 <em>／照参考图：一张白玻璃</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:36</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="page"><div class="photo"></div><div class="scrim"></div>
+        <div class="entry">
+          <div class="out"><span>Tips：贴一个公众号链接，长文读成三句话</span><span>返回</span></div>
+          <div class="panel g-panel">
+            <div class="modes"><span class="md">照片</span><span class="md on">链接</span><span class="md">文字</span></div>
+            <div class="card g-card">
+              <div class="field g-well"><span class="grow">公众号文章 / 网页链接</span><span class="paste"><b></b></span></div>
+              <div class="sld g-well"><span class="knob g-knob"><b class="lk"></b></span><span class="txt">右滑开始提炼</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="dock"><div class="on"><span class="g">＋</span></div><div><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">外框与内框<b>都刷白 .30 后一起半透</b>，内框那圈边不再画＝一张面；框与条只留一圈细白边＋一丝白。橙圆、粘贴图形、三枚标签一笔不动。</p>
+  </div>
+
+  <!-- 7 面板·文字·玻璃 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-new">新</span>录入面板·文字档 <em>／展开两行那一态</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:37</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="page"><div class="photo"></div><div class="scrim"></div>
+        <div class="entry">
+          <div class="out"><span>Tips：外观里能换整套配色，点一下就生效</span><span>返回</span></div>
+          <div class="panel open g-panel">
+            <div class="modes"><span class="md">照片</span><span class="md">链接</span><span class="md on">文字</span></div>
+            <div class="card g-card">
+              <div class="field field-write g-well"><span class="area ink">广州市涂鸦文化传播有限公司成立于2003年，是位于广州天河区的微型文化传播企业……</span><span class="paste"><b></b></span></div>
+              <div class="sld g-well"><span class="knob g-knob"><b class="lk"></b></span><span class="txt">右滑开始提炼</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="dock"><div class="on"><span class="g">＋</span></div><div><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">展开 490 那一档同样一张白玻璃；粘贴那枚图形与位置不动。三档（照片／链接／文字）共用同一套，不分叉。</p>
+  </div>
+
+  <!-- 8 列表·现状 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-now">现状</span>笔记列表 <em>／左上角那一位＝要去掉</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:32</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="ix"><div class="page">
+        <div class="head"><div class="photo"></div><div class="scrim"></div>
+          <div class="h1">我的笔记</div>
+          <div class="stat"><span class="n">13</span><span class="l">笔记</span></div>
+          <img class="ix-person" src="../../../miniprogram/assets/ic-person.png">
+          <div class="srch"><b></b></div>
+        </div>
+        <div class="sheet">
+          <div class="vtabs"><span class="on">笔记列表</span><span>笔记卡片</span><span class="back">返回</span></div>
+          <div class="cats"><span class="on">全部</span><span>旅游</span><span>生活</span><span>私密</span></div>
+          <div class="rows">
+            <div class="row"><div class="dt"><i></i>10/10</div><div class="bd"><div class="tt">广州市涂鸦文化传播有限公司简介</div><div class="ab">广州市涂鸦文化传播有限公司成立于2003年，是位于广州天河区的微型文化传播企业，法定代表人马斌。公司主营唱片制作、艺人培训及电影摄制……</div></div></div>
+            <div class="row"><div class="dt"><i></i>10/07</div><div class="bd"><div class="tt">祝汪晨蕊演出顺利</div><div class="ab">本文记录了汪晨蕊2026年《细听·讲你知》拉阔音乐会深圳站的演出顺利举办，并庆祝其出道十周年。</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="dock"><div><span class="g">＋</span></div><div class="on"><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">那一位是 <code>ic-person.png</code> 直接压在形象图上：PNG 自带一圈半透明底，边缘看得出来＝你说的"透明底侵入主图"。</p>
+  </div>
+
+  <!-- 9 列表·玻璃乙 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-new">新·乙（建议）</span>笔记列表 <em>／人去掉＋卡顶两条一起透</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:32</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="ix glass"><div class="page">
+        <div class="head"><div class="photo"></div><div class="scrim"></div>
+          <div class="h1">我的笔记</div>
+          <div class="stat"><span class="n">13</span><span class="l">笔记</span></div>
+          <div class="srch"><b></b></div>
+        </div>
+        <div class="sheet glass-b">
+          <div class="vtabs"><span class="on">笔记列表</span><span>笔记卡片</span><span class="back">返回</span></div>
+          <div class="cats"><span class="on">全部</span><span>旅游</span><span>生活</span><span>私密</span></div>
+          <div class="rows">
+            <div class="row"><div class="dt"><i></i>10/10</div><div class="bd"><div class="tt">广州市涂鸦文化传播有限公司简介</div><div class="ab">广州市涂鸦文化传播有限公司成立于2003年，是位于广州天河区的微型文化传播企业，法定代表人马斌。公司主营唱片制作、艺人培训及电影摄制……</div></div></div>
+            <div class="row"><div class="dt"><i></i>10/07</div><div class="bd"><div class="tt">祝汪晨蕊演出顺利</div><div class="ab">本文记录了汪晨蕊2026年《细听·讲你知》拉阔音乐会深圳站的演出顺利举办，并庆祝其出道十周年。</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="dock"><div><span class="g">＋</span></div><div class="on"><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">卡顶往下 <b>0～158 全强度</b>（正好两枚标签＋分类行那两行字），<b>158～238 交叉淡入到实心</b>，238 以下是实心 #F3F3F1。两处改法：① 白纱与实心现在是<b>同一张背景的两个色标</b>，文字是它的内容、天然压在玻璃上面（上一稿那层皮是定位元素，盖在字上＝给字蒙白）；② 形象图按 <code>bandGeom(w,h,740)</code> 往下垫到卡顶后面（上一稿图只到 542，玻璃下半截底下没图可糊＝看着就是实心）。</p>
+  </div>
+
+  <!-- 10 卡片那一格·同一条规则 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-new">这一版</span>笔记卡片那一格 <em>／同一条玻璃，两格共用</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:50</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="ix glass"><div class="page">
+        <div class="head"><div class="photo"></div><div class="scrim"></div>
+          <div class="h1">我的笔记</div>
+          <div class="stat"><span class="n">12</span><span class="l">卡片</span></div>
+          <div class="srch"><b></b></div>
+        </div>
+        <div class="sheet glass-b">
+          <div class="vtabs"><span>笔记列表</span><span class="on">笔记卡片</span><span class="back">返回</span></div>
+          <div class="cats"><span class="on">全部</span><span>旅游</span><span>生活</span><span>私密</span></div>
+          <div class="rows"><div class="cells">
+            <div class="cellcard"><div class="art"><b></b><b></b><b></b><b></b></div><div class="cap"><div class="t">广州市涂鸦文化传播有限公司简介</div><div class="s">阿麦 · 图麦笔记</div></div><div class="nm">广州市涂鸦文化…</div></div>
+            <div class="cellcard"><div class="art"><b></b><b></b><b></b><b></b></div><div class="cap"><div class="t">祝汪晨蕊演出顺利</div><div class="s">阿麦 · 图麦笔记</div></div><div class="nm">祝汪晨蕊演出顺利</div></div>
+          </div></div>
+        </div>
+      </div>
+      <div class="dock"><div><span class="g">＋</span></div><div class="on"><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+      </div>
+    </div></div>
+    <p class="note">卡里那些成品图是<b>示意</b>（真机上是你自己生成的那两张）。这一格要说的是：同一条渐退玻璃两枚 tab 共用，切格不改顶部落点。</p>
+  </div>
+
+  <!-- 13 详情窗·漏掉的那一大块 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-now">不做</span>读笔记那一层 <em>／你 10-11 拍的例外：正文多、要清晰</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:31</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="ix thru"><div class="page">
+        <div class="head"><div class="photo"></div><div class="scrim"></div></div>
+      </div></div>
+      <div class="fmask"></div>
+      <div class="fsheet">
+        <div class="grip"></div>
+        <div class="fhead"><span>截图识别 · 2026-10-10 23:17</span><span>收起</span></div>
+        <div class="ftitle">广州市涂鸦文化传播有限公司简介</div>
+        <div class="chips"><span>涂鸦文化</span><span>广州公司</span><span>文化传播</span><span>赵鹏</span><span>唱片</span></div>
+        <div class="fsec">摘要</div>
+        <div class="fpara">公司成立于2003年，是位于广州天河区的微型文化传播企业，法定代表人马斌。主营唱片制作、艺人培训及电影摄制。</div>
+        <div class="fsec">核心要点</div>
+        <div class="fbul"><i></i><span>公司成立于2003年8月26日，法定代表人为马斌，位于广州市天河区。</span></div>
+        <div class="fbul"><i></i><span>属广播、电视、电影和录音制作业，为微型企业，员工仅3人。</span></div>
+        <div class="fbtns"><b>编辑</b><b>删除</b></div>
+      </div>
+      <div class="dock"><div><span class="g">＋</span></div><div class="on"><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
+    </div></div>
+    <p class="note">这一层<b>保持实心</b>。上一稿我把它当"面积最大的一块玻璃"补了进来，你现在拍掉：正文多、要清晰、不让背景干扰。<b>这一格留着是为了记下这条例外</b>，免得落码时我又把它算进玻璃清单。它后面那张形象图仍是贯穿全屏的（现网 <code>imgStyleThru</code>），所以这一层必须是实心才压得住。</p>
+  </div>
+
+  <!-- 11 我的·设置档 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-new">这一版</span>「我的」·设置档 <em>／形象图往下侵到名片行底下</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:52</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="me">
+        <div class="me-photo"></div><div class="me-scrim"></div>
+        <div class="me-h1">设置</div>
+        <div class="me-score"><span class="n">113</span><span class="l">魅力</span></div>
+        <div class="me-sheet glass">
+          <img class="me-logo" src="../../../miniprogram/assets/logo.png">
+          <div class="me-tx"><span class="me-name">你好！我是图麦笔记</span><span class="me-slogan">把图文，提炼成有用的干货</span></div>
+          <div class="pill"><span class="on">设置</span><span>关于</span></div>
+        </div>
+        <div class="me-body">
+          <div class="mcard">
+            <div class="mi"><span class="lb">卡片模板</span><span class="hn">分享给朋友那张卡片上印什么</span><span class="cv"></span></div>
+            <div class="mi"><span class="lb">外观设置</span><span class="hn">整个界面的配色，挑顺眼的一套</span><span class="cv"></span></div>
+            <div class="mi"><span class="lb">分类管理</span><span class="hn">笔记分成哪几类、按什么顺序排</span><span class="cv"></span></div>
+            <div class="mi"><span class="lb">私密密码</span><span class="hn">锁住不想让别人看到的笔记</span><span class="cv"></span></div>
+            <div class="mi"><span class="lb">我的邮箱</span><span class="hn">未填写</span><span class="cv"></span></div>
+            <div class="mi warn"><span class="lb">注销账号</span><span class="cv"></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="dock"><div><span class="g">＋</span></div><div><span class="g"><i class="ln"></i></span></div><div class="on"><span class="g"><i class="pn"></i></span></div></div>
+    </div></div>
+    <p class="note">名片行那 144 由实心页面底改成白玻璃，<b>0～56 全强度、56～144 交叉淡入到页面底 #E2DED4</b>——你圈的"为什么没有渐变"就是它，上一稿这里是一档平的、144 到底硬切。<b>另外这一页我上一稿几何抄错了</b>：现网 <code>pages/me/me.wxss</code> 是 <code>.head-band</code> 542 ＋ <code>.sheet</code> margin-top −40、高 144（名片行占 502～646），我画成了图 790 高、名片行 646～790，整条低了 144。这一格按现网那三个数重画，图按 <code>bandGeom(w,h,646)</code> 往下垫到名片行底下。</p>
+  </div>
+
+  <!-- 12 我的·关于档 -->
+  <div class="cell">
+    <p class="tag"><span class="badge b-new">这一版</span>「我的」·关于档 <em>／同一处玻璃，两档共用</em></p>
+    <div class="viewport"><div class="shot">
+      <div class="sys"><div class="clock">23:53</div><div class="title">图麦笔记</div><div class="capsule"><i></i><b></b></div></div>
+      <div class="me">
+        <div class="me-photo"></div><div class="me-scrim"></div>
+        <div class="me-h1">关于</div>
+        <div class="me-score"><span class="n">113</span><span class="l">魅力</span></div>
+        <div class="me-sheet glass">
+          <img class="me-logo" src="../../../miniprogram/assets/logo.png">
+          <div class="me-tx"><span class="me-name">你好！我是图麦笔记</span><span class="me-slogan">把图文，提炼成有用的干货</span></div>
+          <div class="pill"><span>设置</span><span class="on">关于</span></div>
+        </div>
+        <div class="me-body">
+          <div class="mcard">
+            <div><span class="vh">图麦笔记</span><span class="vv">v2.1.1</span></div>
+            <div class="lead2">图麦笔记做的事很窄：把看到的好东西变成能用的笔记。公众号文章、网页链接、手机截图丢进来，出来就是一条带摘要、要点和标签的笔记，之后能搜、能归类、能存成一张卡片图随时调用。</div>
+          </div>
+          <div class="mcard">
+            <div class="mi"><span class="lb">产品官网</span><span class="hn">agentsbin.cn</span><span class="cv"></span></div>
+            <div class="mi"><span class="lb">反馈邮箱</span><span class="hn">jacky28471258@gmail.com</span><span class="cv"></span></div>
+            <div class="mi"><span class="lb">推荐图麦</span><span class="cv"></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="dock"><div><span class="g">＋</span></div><div><span class="g"><i class="ln"></i></span></div><div class="on"><span class="g"><i class="pn"></i></span></div></div>
+    </div></div>
+    <p class="note">同一处玻璃、同一个数：切到关于那一档，名片行不变，下面的卡照旧实心（这两档共用一张皮，不各写一套）。</p>
+  </div>
+
+</div>
+
+<p class="foot">
+  <b>你这几句已经把上一稿那三条待拍全定了，我不再重列</b>：① 首页那两位人<b>一个都不撤</b>，点小人换大人照旧——上一稿我把"左下角那个多余的人"读成了那枚剪影，是我读错，不是你说过两遍；② 列表页玻璃<b>从上往下糊两行字</b>（两枚标签＋分类行），到具体内容恢复实心；③ 设置／关于＝<b>「我的」页那两枚药丸就地展开的那两档</b>（上一稿我画成了 <code>pages/profile</code> 与 <code>pages/about</code> 两个独立页，那是错的页），形象图往下侵到名片行底下，那一行做玻璃。<br>
+  <b>这一轮又定了两条</b>：④ <b>α＝.30 全站统一</b>（校准条上你点的）；⑤ <b>笔记详情那一层不做玻璃</b>——正文多、要清晰、不让背景干扰，所以第 13 格保持实心 #F3F3F1。加上前一轮那条"毛玻璃下方若是纯色必须往下渐退"，全站玻璃的落点从六处收成<b>四处</b>：首页三块、录入面板、列表卡顶、「我的」名片行。<b>不进这一轮的</b>：底栏与报错气泡（本来就是深色实心，是设计不是漏）、模板层与那三枚居中弹窗（它们压在 55% 深色遮罩上、背后不是照片）、以及剩下八页不吃壁纸的页面。
+  <br>
+  <b>落码前我必做两把实测</b>：① <code>backdrop-filter</code> 在 iOS 与安卓 XWeb 上真糊不糊（模拟器＋你那两台各一张截图）。这一轮顺带把 <code>mask-image</code> 那层去掉了，安卓只剩 <code>backdrop-filter</code> 一个风险点；糊不出来我当场说，不静默降级。② <b>墨字压白玻璃的对比（WCAG AA ≥ 4.5）我已经先按这张形象图算过一遍</b>，结论是<b>两档数绑在一起、不能只留一档</b>：<br>
+  <b>· 糊得开（正常态）</b>：α=.30 ＋ blur 46，五处落点最差像素分别 首页笔记块 6.33／首页卡片块 5.31／列表卡顶 6.49／名片行 4.78／录入面板 6.87，<b>全部过线</b>，中位 7.5~10.2。<br>
+  <b>· 糊不开（安卓退路）</b>：同样 α=.30 但只有半透明没有 blur，<b>就有 1.2%~10.8% 的面积掉到 4.5 以下，最差 1.67</b>（发丝、暗木桌那些深块透上来了）。要在这种情况下还守住最差像素，白纱得抬到 <b>α ≥ .57</b>。<br>
+  所以那条退路的完整说法是"<b>α 抬到 .57 且不糊</b>"，不是"把 blur 去掉、α 照旧"。落码后我再拿四套壁纸×你换过的那两张形象图各量一次，哪一处不过我单独给那一处补底，不回头改全站这一档。<br>
+  <b>一处我不做主</b>：这一轮会把"三层浅"（面板→白卡→井）在录入面板里压成一张面，palette 里 <code>--cp-card</code>／<code>--cp-field</code> 那两档在面板内不再单独现面（首页三块同理，右上／右下那两档深浅也不再分）。这是玻璃的必然结果，不是我再改设计——落码时我会把这两档在面板里的引用一并清掉，别留一条画不出来的声明。
+</p>
+</body>
+</html>

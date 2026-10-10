@@ -127,9 +127,80 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   // 下一把连不上端口，看着像端口问题其实是这里）。先判空，让判据自己红。
   const gH = parseFloat((/height:(\d+(?:\.\d+)?)rpx/.exec(headStyle) || [0, 0])[1])
   const gT = parseFloat((/top:(-?\d+(?:\.\d+)?)rpx/.exec(headStyle) || [0, 0])[1])
+  // ★10-11 R12（「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：这一档的盒子高不再是
+  // BAND_H(542)，index.js 把 GLASS_BAND_H(740) 递给同一条 bandGeom。公式与 15% 锚点一个字没改，
+  // 所以这里比的还是那条式子，只是盒子里那个数**从源码现读**（写死 740 就成了第二份真相）。
+  const BAND = Number((fs.readFileSync(P('pages/index/index.js'), 'utf8')
+    .match(/const GLASS_BAND_H\s*=\s*(\d+)/) || [, '0'])[1])
   ck('这一页的取景走的是那一条规则（按宽铺满 + 超出的 15% 顶给上面）',
-    /width:750rpx/.test(headStyle || '') && gH > 542 && Math.abs(gT + (gH - 542) * 0.15) <= 1,
-    headStyle || '(没算出摆位)')
+    /width:750rpx/.test(headStyle || '') && gH > BAND && Math.abs(gT + (gH - BAND) * 0.15) <= 1,
+    `${headStyle || '(没算出摆位)'}／盒子高递给 ${BAND}`)
+  // R12 真正要的效果是"图往下垫到卡顶后面"：玻璃从卡顶一路糊到实心那一条线，这一段底下必须有图。
+  // ⚠ 基准是**卡顶实测**，不是头部底边——卡还往上盖了 40，拿段底算会多要 40rpx
+  // （10-11 第一版就是这么错的：图底 748 明明盖过 502+238=740，却按 540+238=778 判红）。
+  // 实心那一档（238）也从样式表现读，不在这儿再写一份。
+  const glassRule = String((fs.readFileSync(P('pages/index/index.wxss'), 'utf8')
+    .match(/\.container\.has-bg \.sheet\s*\{[^}]*\}/) || [''])[0])
+  // 渐变的色标要用**顶层逗号**切：`var(--glass-veil)` 里就带括号，按普通 split(',') 会把一条劈成三截。
+  const gradParts = (() => {
+    const s = glassRule.slice(glassRule.indexOf('linear-gradient'))
+    const out = []
+    let depth = 0, cur = ''
+    for (const ch of s) {
+      if (ch === '(') depth++
+      else if (ch === ')') { depth--; if (depth === 0) { out.push(cur); break } }
+      else if (ch === ',' && depth === 1) { out.push(cur); cur = ''; continue }
+      if (depth >= 1) cur += ch
+    }
+    return out
+  })()
+  // 每个色标取末尾那枚"数字＋可选单位"：第一档写的是不带单位的 `0`，
+  // 10-11 第一版那条正则 `\d+rpx` 因此一个都没匹配上，glassStop 读回 0（读回 0 就是尺子坏了，不是代码坏了）。
+  const stopAt = (s) => { const m = /(-?[\d.]+)(rpx|px)?\s*$/.exec(String(s).trim()); return m ? Number(m[1]) : null }
+  const veilStops = gradParts.filter((x) => /--glass-veil/.test(x)).map(stopAt)
+  const glassStop = veilStops.length ? Math.max(...veilStops) : 0
+  const solidStop = stopAt(gradParts[gradParts.length - 1]) || 0
+  // 读不到那一条样式，就把它写成一句人话放进两条判据的读数里——
+  // 让"正则没匹配上"和"代码真写了 0"这两种红一眼分得开（10-11 这一把先栽在后者上：读回 0 没人看出是尺子坏了）。
+  const readout = gradParts.length ? '' : '（样式里那条 `.container.has-bg .sheet` 没读到＝尺子的正则坏了，不是代码坏了）'
+  const sheetTopNow = (await rects(['.sheet']))[0] || {}
+  const tabRect = (await rects(['.vtabs']))[0]
+  // 分类那一行是一排元素，取它们底边的最大者＝那一行的下沿。
+  // ⚠ automator 的 Element 上**没有 boundingClientRect 这个方法**（10-11 第一版就是这么崩的：
+  // `e.boundingClientRect is not a function`），量必须走页面里的 createSelectorQuery。
+  const rowTops = await mp.evaluate(() => new Promise((resolve) => {
+    const q = wx.createSelectorQuery()
+    q.selectAll('.ix-cat').boundingClientRect()
+    q.selectAll('.x-t').boundingClientRect()
+    q.exec((r) => resolve({
+      cats: ((r && r[0]) || []).map((x) => x.bottom),
+      titles: ((r && r[1]) || []).map((x) => x.top),
+    }))
+  }))
+  const twoRowsBottom = Math.max(rowTops.cats.length ? Math.max(...rowTops.cats) : 0, (tabRect || {}).bottom || 0)
+  const firstTitleTop = rowTops.titles.length ? Math.min(...rowTops.titles) : 0
+  const relRpx = (px) => Math.round((px - (sheetTopNow.top || 0)) / R)
+  // R5 那一句是「毛玻璃是从上往下，暂居两行文字」——量的是**文字**：
+  // 白纱必须盖过那两行的下沿，又必须在第三行（正文第一条的标题）上沿之前收住。
+  // 等式两头的数都是实测，样式里那一档只有落在这两条线之间才算"就占两行"。
+  ck('R5：白纱那一段盖住两枚 tab ＋分类行，且在第三行字开始之前就收住',
+    glassStop > 0 && !!tabRect && rowTops.cats.length > 0 && rowTops.titles.length > 0 && !!sheetTopNow.top
+    && glassStop >= relRpx(twoRowsBottom) && glassStop <= relRpx(firstTitleTop),
+    `两行下沿 ${relRpx(twoRowsBottom)}rpx／白纱档 ${glassStop}rpx／第三行字顶 ${relRpx(firstTitleTop)}rpx（相对卡顶）${readout}`)
+  ck('R12：图确实垫到了实心那一条线以下（玻璃底下有东西可糊，不是透空）',
+    !!imgRect && !!sheetTopNow.top && solidStop > 0
+    && imgRect.top + imgRect.h >= sheetTopNow.top + solidStop * R - 2,
+    imgRect && `图底 ${Math.round((imgRect.top + imgRect.h) / R)}rpx／实心线 ${(sheetTopNow.top / R + solidStop) | 0}rpx${readout}`)
+
+  // R1/R4/R5：卡顶那一段现在是一张白玻璃，不是实心纸。backdrop-filter 有没有落到元素上、
+  // 渐变那四个色标在不在，这两条量的是"玻璃挂上了没有"；糊没糊由下面那一段按 std 判。
+  const sheetBgi = String(await styleOf(page, '.sheet', 'background-image') || '')
+  const sheetBf = String(await styleOf(page, '.sheet', 'backdrop-filter')
+    || await styleOf(page, '.sheet', '-webkit-backdrop-filter') || '')
+  ck('卡顶是渐变不是纯色（白纱段→渐退→实心，R4/R5/R6 那条渐退必须在 markup 计算样式里读得到）',
+    /linear-gradient/.test(sheetBgi) && (sheetBgi.match(/rgba?\(/g) || []).length >= 3, sheetBgi.slice(0, 90))
+  ck('这一条上真的挂了模糊（backdrop-filter 计算值不是 none）',
+    /blur\(\s*\d+(?:\.\d+)?px/.test(sheetBf), sheetBf || '(读不到 backdrop-filter 这个属性)')
   const vp = await mp.evaluate(() => new Promise((res) => {
     wx.createSelectorQuery().selectViewport().scrollOffset().exec((r) => res(r[0]))
   }))
@@ -321,11 +392,16 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   // 这一段原来量的是"压在照片上的那块面"＝「全部」那一枚 chip 的暗玻璃。v30 起胶囊撤了，
   // 这一行不再有任何面，照片与列表之间那块面就是圆角卡自己；10-09 站长打回"太深"之后
   // 那一张卡吃的是 `--bg-card`（与「我的」那张卡同一支），不再是 v31 的 `listLayerOf` 那层灰。
-  const sheetCol = await styleOf(page, '.sheet', 'background-color')
+  // ★10-11 R4/R5/R6：这张卡顶上那一段现在是**同一条渐变的四个色标**（白纱→渐退→实心），
+  // `background` 简写会把 background-color 归零，照旧读 background-color 只会读到 rgba(0, 0, 0, 0)。
+  // 这一格要守的东西一个字没变——旧开关那一态底下那张面也得是当前这套的 --bg-card、不许是 v31 那层灰
+  // ——变的只是读法：拿渐变的**最后一个色标**去比（渐退退到底就是它）。
+  const sheetBgiOld = String(await styleOf(page, '.sheet', 'background-image') || '')
+  const lastStopOld = (sheetBgiOld.match(/rgba?\([^)]*\)/g) || []).pop() || ''
   const wantCard = colParts(tok('bg-card'))
   ck('旧开关这一态那张圆角卡渲染出来是 --bg-card（期望值从当前那套 .theme-* 现读，不抄第二份）',
-    !!wantCard && near(rgbOf(sheetCol), wantCard.rgb),
-    `${sheetCol}｜期望 ${tok('bg-card')}（壁纸 ${wpNow}）`)
+    !!wantCard && near(rgbOf(lastStopOld), wantCard.rgb),
+    `末色标 ${lastStopOld || '(读不到渐变)'}｜期望 ${tok('bg-card')}（壁纸 ${wpNow}）`)
   ck('滚动区照旧不画面（底色是那张圆角卡给的）',
     /rgba\(0, 0, 0, 0\)|transparent/.test(await styleOf(page, '.list', 'background-color')),
     await styleOf(page, '.list', 'background-color'))

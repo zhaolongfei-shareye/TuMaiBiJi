@@ -234,9 +234,16 @@ const COUNT_ALL = () => {
     `套=${themeCls || '(没读到主题类名)'} 已选=${await colAt(onIdx)}（该 ${tok('text-primary')}）`
     + ` 未选=${await colAt(1 - onIdx)}（该 ${tok('text-secondary')}）面=${await css('.vtabs', 'background-color')}`)
   // 这两条钉的是站长这句话的可测形状："用我的那两层浅背景"＝外层 `--bg-page` ＋ 这张圆角卡 `--bg-card`。
-  ck('这一层卡与「我的」那张卡同一支（.sheet 实读＝当前这套的 --bg-card），不再吃 v31 那层灰',
-    sameRgba(await css('.sheet', 'background-color'), tok('bg-card')),
-    `卡=${await css('.sheet', 'background-color')}（该 ${tok('bg-card')}）`)
+  // ★10-11 改量法（R1/R4/R5/R6「界面纯色底色部分改为半透明毛玻璃效果」＋「毛玻璃如果下方纯色，
+  // 要进行渐变处理」）：卡顶那一段现在是**同一张渐变的四个色标**（白纱→渐退→实心），
+  // `background` 简写把 background-color 归零，照旧读 background-color 只会读到 transparent。
+  // 那句话要守的东西没变——这张卡是 --bg-card 那一支、不是 v31 那层灰——所以读渐变的
+  // **最后一个色标**去比：渐退退到底就是它。
+  const sheetBgi = String(await css('.sheet', 'background-image') || '')
+  const sheetStops = sheetBgi.match(/rgba?\([^)]*\)/g) || []
+  ck('这一层卡与「我的」那张卡同一支（渐变退到底＝当前这套的 --bg-card），不再吃 v31 那层灰',
+    sheetStops.length >= 2 && sameRgba(sheetStops[sheetStops.length - 1], tok('bg-card')),
+    `末色标=${sheetStops[sheetStops.length - 1] || '(读不出)'}（该 ${tok('bg-card')}）／整串 ${sheetBgi.slice(0, 70)}`)
   ck('卡外面那一层是页面底 --bg-page（两层浅背景就是这两支，实测象牙档 #E2DED4／#F3F3F1）',
     sameRgba(await css('.container', 'background-color'), tok('bg-page')),
     `外层=${await css('.container', 'background-color')}（该 ${tok('bg-page')}）`)
@@ -542,9 +549,11 @@ const COUNT_ALL = () => {
     ck('台账里已有这一张 → 弹窗一开就落在已生成态（这一态是从台账读出来的，不是点出来的）',
       rGen.endsWith('已出图') && (await data('posterHasCard')) === true, rGen)
     const dockGen = await dockBtns()
-    ck('已生成态那两枚是「查看笔记｜删除」+ 一句说明；「编辑个人名片」与那排圆点都不在这一态',
-      dockGen === '查看笔记|删除' && !(await $('.tpl-dots')) && !(await $('.pill-lab'))
-      && (await txt('.tpl-main-hint')) === '删除后可继续生成笔记卡片，已分享的依旧有效', dockGen)
+    // 那两枚的名字一律从字典现读（站长 10-10 深夜把右下角那枚从「删除」改成「删除分享图」，
+    // 判据当时抄的是死字符串，改完字典它就红——红的是抄的那一份，不是界面）。
+    ck(`已生成态那两枚是「查看笔记｜${ZH.cardDrop}」+ 一句说明；「编辑个人名片」与那排圆点都不在这一态`,
+      dockGen === `查看笔记|${ZH.cardDrop}` && !(await $('.tpl-dots')) && !(await $('.pill-lab'))
+      && (await txt('.tpl-main-hint')) === ZH.cardDropHint, dockGen)
     /* 站长 10-04 补的那枚通栏（没有它，一张卡发完就锁死了）。量三样：文案、它在两枚**上面**、
        以及它的底色是不是就等于底部导航"选中那一格"下面那块圆底。
        文字宽/高一起量：折行会让高度翻倍，那在这一屏是坏活。 */

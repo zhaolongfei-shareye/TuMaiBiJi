@@ -26,9 +26,15 @@
 
 /* 下沿不给底图收圆（站长 10-04：弧的方向被我改反了，撤回来）。
    接缝那道弧一直是由下面那一层 .sheet 的**上沿两角**凸出来盖住图形成的，方向不动。 */
+/* ★10-11 毛玻璃 R7／R12（站长原话「你只需要把背景图案往下侵入在第一个内框上面，
+   制作半透明毛玻璃效果即可」「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：
+   这一格从 542 抬到 646，正好把名片行那 144 整条垫在图下面（行占 502～646，
+   由下面 `.sheet` 的 margin-top:-144 保证，卡顶那条线一位都不动）。
+   ⚠ 这一格抬高的同时，`.head-band` 那道 `overflow:hidden` **必须留着**——它是"图只到 646、
+   646 以下是实心页面底"的唯一保险。效果图那一稿我把它画漏裁了，卡片四周透出原图＝他抓的"中间镂空"。 */
 .head-band {
   position: relative;
-  height: 542rpx;
+  height: 646rpx;
   overflow: hidden;
   background: var(--bg-page);
 }
@@ -62,10 +68,29 @@
   left: 0;
   right: 0;
   top: 0;
-  bottom: 0;
+  /* 底边收到 542 那一档（这一格抬到 646 之后不再 bottom:0）：那四个百分号停点是按 542 定的，
+     让盒子跟着长会把明暗分布整条拉伸，头部那一屏的观感就跟着变了。多出来那 104 由下面
+     `.head-band::after` 用渐变的末档平延过去，542 那条线上不会有亮度接缝。 */
+  bottom: 104rpx;
   /* 停点取首页那条罩子的前三分之一，同一张图两页的明暗要是一个连续体 */
   background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%, rgba(18, 20, 26, 0.58) 14%,
     rgba(18, 20, 26, 0.5) 58%, rgba(18, 20, 26, 0.44) 100%);
+}
+
+/* 542 以下那 104 的压暗延段——和首页那一条同一个改法（10-11 自查）：**挂在罩层自己身上**，
+   不挂 `.head-band`。理由是「调亮度」那一枚拧的是 `.head-scrim` 的 `opacity`
+   （`style="{{dimScrim}}"`，默认半月那一档 .5），伪元素跟着一起沉；画在 `.head-band` 上
+   那一段就永远吃满档 .44，默认档下 542 那条线一道硬边＝他打回的"一刀切"（R6）。
+   颜色取这条罩子渐变自己的末档（0.44）＝连续。`.head-scrim` 本身是 `wx:if="{{bgSrc}}"`，
+   没铺图那一态这两条都不存在，也就不会在纯色页面上多画一道暗带。 */
+.head-scrim::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 104rpx;
+  background: rgba(18, 20, 26, 0.44);
 }
 
 /* ---------- 药丸：关于的入口。默认「设置」 ----------
@@ -135,7 +160,9 @@
    左右内缩那 24 由 .container 给、这里再补 32，于是 LOGO 与下方卡里的行名落在同一条左线。 */
 .sheet {
   position: relative;
-  margin-top: -40rpx;
+  /* 10-11 随上面 `.head-band` 抬到 646 一起改：-40 → -144，卡顶那条线仍落在 502，
+     整行的落点与改之前逐像素相同；变的只是它底下从"只有 40 是图"变成"整条 144 都是图"。 */
+  margin-top: -144rpx;
   height: 144rpx;
   padding: 0 56rpx;
   display: flex;
@@ -143,6 +170,35 @@
   gap: 24rpx;
   background: var(--bg-page);
   border-radius: var(--r-card) var(--r-card) 0 0;
+}
+
+/* R6（「毛玻璃如果下方纯色，要进行渐变处理，不要一刀切」）：这一行下面就是实心页面底，
+   所以白纱必须往下渐退。0～56 全强度，56～144 交叉淡入到 `--bg-page`，淡到底那一行与
+   它下面的 `.body` 同色＝接缝消失。白纱与实心是**同一张背景的两个色标**，不另叠一层皮。
+   三个停点 56／108／144 与中间那一档"这套壁纸的页面底 @62%"都是从**已点头的那张效果图**
+   第 229 行抄的（`rgba(226,222,212,.62) 108px`，象牙那一套的 `--bg-page` 正是 #E2DED4），
+   不是我另起的一档——所以它必须跟着壁纸走，写成 `--glass-fade-page` 一枚令牌。
+   ⚠ 只在铺了形象图那一态读玻璃。退化方向与首页那一条同一段注释（var() 替换后非法＝IACVT
+   ＝`unset`＝底色归 transparent、整张透空），所以四套壁纸那五块必须各有一份镜像值。 */
+.container.has-bg .sheet {
+  background: linear-gradient(180deg,
+    var(--glass-veil) 0, var(--glass-veil) 56rpx,
+    var(--glass-fade-page) 108rpx, var(--bg-page) 144rpx);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+}
+
+/* X4：本页那两枚居中弹窗（密码那一层、我的邮箱那一层）。站长 10-11 逐条裁定时原话「4、做」。
+   皮写在页内，只有 `--glass-veil`/`--glass-bf` 两枚 var()（α 全站只那一个出口，R10）；
+   为什么不写在 app.wxss，理由记在那张表 X4 那段注释里。
+   compound（`.pwd-card.glass-dialog`）是为了压得过 markup 上同时挂着的 `.card` 那一档底色。
+   ⚠ 这两枚底下垫的是 `rgba(20,20,28,.55)` 那层暗遮罩：白纱压暗底会落成中灰，里面墨字的对比
+      可能不到 4.5。这一条我不自己抬 α，量出数来回报，过不过线由他判。 */
+.container.has-bg .pwd-card.glass-dialog,
+.container.has-bg .me-email-card.glass-dialog {
+  background: var(--glass-veil);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
 }
 
 .sheet-logo {

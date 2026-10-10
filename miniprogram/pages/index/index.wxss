@@ -32,20 +32,79 @@
     rgba(18, 20, 26, 0.44) 62%, rgba(18, 20, 26, 0.52) 100%);
 }
 
-/* 框外左上角那一个小人（与第一屏同一个来源、同一个本机键，见 utils/person.js）。
-   宽 150 是**从首页那一档等比缩下来的**：首页那张 220 宽、屏上 264 高，这里给 150 → 180 高，
-   约为首页那一档的 0.68，不至于把头部那行大字和右上那列数字挤着。
-   底边 bottom:40 = 纸卡上沿那一条（.head 高 542、卡 margin-top −40 → 卡顶 502），
-   所以他是"站在卡外面"，不是压在卡上。z-index 4：在罩层之上（罩层压暗的是照片，
-   不该把人也压暗），在 .tools 那枚搜索 icon（5）之下、盖得住纸卡那道投影（2）。 */
-.ix-person {
-  position: absolute;
-  left: 24rpx;
-  bottom: 40rpx;
-  width: 150rpx;
-  z-index: 4;
+/* 10-11 毛玻璃 R12（站长原话「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：
+   卡顶那 238 里超出头部 542 的一段底下原本没有图可糊，所以把头部这一格的**裁切放开**，
+   让形象图按 `bandGeom(w,h,740)` 往下垫到卡顶后面（boxH 由 index.js 的 GLASS_BAND_H 递，
+   同一个数不许在两处各写一遍）。
+   ⚠ 两道保险一条都不能撤：① 下面那条 `.head-scrim::after` 把罩层平延到 740，否则 542 那条线上
+   会出现一道亮度接缝；② `.sheet` 自己有 z-index 2、238 以下是实心卡，图溢出那一段全靠它盖住——
+   「我的」页那一格"中间镂空"就是这么来的（图铺到整页底下、容器又是透明的）。 */
+.container.has-bg .head {
+  overflow: visible;
 }
 
+/* 延下去那一段必须挂在**罩层自己身上**，不能挂在 `.head` 上：「调亮度」那一枚点拧的是
+   `.head-scrim` 的 `opacity`（wxml 里 `style="{{dimScrim}}"`，默认半月那一档就是 .5），
+   伪元素是它的子节点，跟着一起沉；若画在 `.head` 上，那一段就永远吃满档 .52，
+   默认档下 542 那条线上正好一道硬边＝他打回的"一刀切"（R6）。
+   颜色取这条罩子渐变自己的末档（0.52）＝连续，不是第三支写死的暗值。
+   详情／模板那一态 `.head-scrim` 铺满整屏，`top:100%` 落在屏外，不会从 `.float-sheet`
+   左右那 24rpx 缝里露出来。 */
+.container.has-bg .head-scrim::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 198rpx;
+  background: rgba(18, 20, 26, 0.52);
+}
+
+/* 首帧与取图失败那一态：`imgStyle` 还是空串，`.head-img` 只有类里那 542 高，
+   玻璃段下半截（542～740）底下就没图了——闪一下＋那道线又露出来。
+   这一条把铺图态下的默认高度先给到 740（`mode="aspectFill"` 自己居中裁），
+   `bandGeom` 那一份算回来之后由 inline style 覆盖，两态都是"整段有图"。 */
+.container.has-bg .head-img {
+  height: 740rpx;
+}
+
+/* R4／R5／R6：卡顶从上往下糊两行字（两枚 tab 那一行＋分类行那两行＝这一段 158，
+   这个数实测由 `验-列表头部铺图-真跑` 量 `.ix-cat` 底边对 `.sheet` 顶边核，不靠手算），
+   158～238 交叉淡入到实心，238 以下是实心 `--bg-card`，正文第一行起读数和改之前一致。
+   白纱与实心是**同一张背景的两个色标**，不是另叠一层皮——上一稿那层皮是定位元素，
+   画在这两行字上面＝给字蒙白。
+   ⚠ 退化方向要说准（10-11 自查改的口）：中间那个色标吃的是 `--glass-fade-card`，
+   它掉不下来；真掉下来的只有"某一枚 `--glass-*` 令牌在那套壁纸里没定义"那一种，
+   而 `var()` 替换后非法在 CSS 里是 IACVT＝这条声明当 `unset` 用，
+   `background` 简写会把底色归成 transparent ⇒ **整张卡透空露出原图**，不是"退回实心"。
+   所以这一页不许出现第二支 alpha，四套壁纸那五块必须各有一份镜像值——
+   由 `验-四套莫兰迪落地` 与 `验-玻璃令牌齐不齐` 两头钉。 */
+.container.has-bg .sheet {
+  background: linear-gradient(180deg,
+    var(--glass-veil) 0, var(--glass-veil) 158rpx,
+    var(--glass-fade-card) 198rpx, var(--bg-card) 238rpx);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+}
+
+/* X4「那三枚居中弹窗」这一枚（站长 10-11 逐条裁定原话「4、做」）。
+   皮写在页内、只有 `--glass-veil`/`--glass-bf` 两枚 var()，理由与"为什么不写在 app.wxss"
+   同一条，记在那张表 X4 那段注释里。写成 compound（`.ci-card.glass-dialog`）是为了压得过
+   app.wxss 里 `.ci-card` 自己的 `background: #FCFBF8`——效果图那一稿 13/12 两块就是栽在
+   类数不够、静默不生效。`pages/share` 那一屏没有 has-bg，那张同名卡照旧实心。 */
+.container.has-bg .ci-card.glass-dialog {
+  background: var(--glass-veil);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+}
+
+/* 这里原来画着框外左上角那一个小人（`.ix-person`，宽 150、底边压在纸卡上沿那一条 502、z-index 4，
+   与第一屏同一个来源同一个本机键）。
+   ★10-11 撤，依据只有一条——站长原话「左上角的人，透明底侵入主图，列表左上角的人都去掉，
+   维持只有首页有」（需求清单 R8）。撤的是**这一屏**那一位，首页（pages/create）那两位与
+   "点小人换大人"一个字没动（他另一句：「我哪个需求说要去掉首页两个人？」）。
+   markup 里那枚 `<image>`、这一段的样式、index.js 里的 require 与 `person.figure()` 三头一起撤净；
+   `utils/person.js` 本身留着，首页那一屏还在用。判据改写见 `验-第一屏三块`／`验-列表右上角返回`。 */
 .h1 {
   position: absolute;
   left: var(--sp-4);

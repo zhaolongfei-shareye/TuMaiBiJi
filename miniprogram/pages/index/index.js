@@ -8,7 +8,13 @@ const cardInfo = require('../../utils/cardInfo.js')
 const { isPrivate } = require('../../utils/privateGate.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
-const person = require('../../utils/person.js')
+// 10-11：这一屏不再画那一位小人（站长「列表左上角的人都去掉，维持只有首页有」），
+// 所以 `utils/person.js` 在这一页的 require 一并撤——首页那一屏仍在用它，别处不许跟着删。
+
+/* 卡顶玻璃那一段要糊到多高（rpx）。= 头部 542 + 玻璃段超出头部的那 198（238 那段里被头
+   部盖住的 40 已由 .sheet 的 margin-top:-40 抵掉）。与 index.wxss 里 `.head::after`
+   的 top:542／height:198、`.sheet` 那一条渐变的 158／198／238 是同一笔账。 */
+const GLASS_BAND_H = 740
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
@@ -70,9 +76,6 @@ Page({
     // v19 这一屏的两枚 tab：'list' = 笔记列表（默认那一枚），'cards' = 笔记卡片。
     // 这是视图态，不落本机——他原话"默认第一个 tab"，每次进这一屏都从第一枚起。
     view: 'list',
-    // 头部框外左上角那一个小人（与第一屏同一个来源，10-10 深夜他补的那句
-    // "首页是男的，框外面就是男的"）。每次进这一屏重读一遍，见 onShow 那一趟。
-    ...person.figure(),
     // 整块纸卡加高那一态（10-05 那条）10-10 深夜随右上角那枚「点一下展开」一起撤：
     // 那一枚改成了「返回」，折叠口没有第二个入口，留着 listWide 就是一块永远进不去的状态。
     // 两枚 tab 各自画的那两批，都由 arrange() 从同一份 notes 现算（同一份序、同一份筛选）
@@ -159,9 +162,6 @@ Page({
       t: texts(lang),
       themeClass,
       bgSrc,
-      // 框外左上角那一个小人：每次进这一屏重读，他在第一屏点了剪影换人之后切过来就是那一个。
-      // 只覆盖这一位，不动 view／搜索词这些他自己选的态（这条 setData 里每一样都写明"为什么每次进页要重取"）。
-      ...person.figure(),
       // 卡片那一格的落点优先于复位，但**不**优先于"从这一页 push 出去再返回"那一型
       // （keepView 那条已经把他自己站的 tab 保住了，这里不该越过去替他改）。
       // 卡片那一格自己的台账在下面 loadNotes 里重读，从详情窗出完图回来就能看到新那一张。
@@ -204,12 +204,16 @@ Page({
   // 按宽铺满、往上顶 15% 留头顶空间）。原来这里只是裸 aspectFill 塞进 750x542，
   // 同一个人在这页成了大特写、在「我的」页是半身——站长 10-01 真机对出来打回的。
   // 问不到尺寸就退回 aspectFill 的默认居中，不猜。
+  // ★10-11 毛玻璃 R12（「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：
+  //   盒子高从 `poster.BAND_H`(542) 递到 GLASS_BAND_H(740)。bandGeom 那条公式与 15% 锚点一个字没改，
+  //   只是盒子变高 → 顶边由 −112 变 −83，图就往下垫到卡顶那 238 后面，玻璃有东西可糊。
+  //   与 index.wxss 里 `.head::after` 的 top:542／height:198 是同一笔账，改一处要改两处。
   fitHead(src) {
     if (!src) { this.setData({ imgStyle: '', imgStyleThru: '' }); return }
     wx.getImageInfo({
       src,
       success: (info) => this.setData({
-        imgStyle: poster.bandGeom(info.width, info.height),
+        imgStyle: poster.bandGeom(info.width, info.height, GLASS_BAND_H),
         imgStyleThru: poster.bandGeom(info.width, info.height, this._webviewH()),
       }),
       fail: () => this.setData({ imgStyle: '', imgStyleThru: '' }),

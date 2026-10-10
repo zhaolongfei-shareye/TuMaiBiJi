@@ -1,0 +1,111 @@
+[
+ {
+  "who": "密码那一层",
+  "shot": "密码那一层-me.png",
+  "card": ".pwd-card",
+  "win": {
+   "w": 390,
+   "h": 753
+  },
+  "rect": {
+   "top": 93,
+   "left": 17,
+   "width": 356,
+   "height": 110
+  },
+  "veil": "rgba(255, 255, 255, 0.3)",
+  "backdropFilter": "blur(23px) saturate(1.8)",
+  "backgroundImage": "none",
+  "texts": [
+   {
+    "sel": ".pwd-name",
+    "color": "rgb(53, 46, 29)",
+    "fontSize": "17px",
+    "fontWeight": "700",
+    "text": ""
+   },
+   {
+    "sel": ".pwd-scene",
+    "color": "rgba(53, 46, 29, 0.72)",
+    "fontSize": "10px",
+    "fontWeight": "400",
+    "text": ""
+   }
+  ]
+ },
+ {
+  "who": "我的邮箱那一层",
+  "shot": "我的邮箱那一层-me.png",
+  "card": ".me-email-card",
+  "win": {
+   "w": 390,
+   "h": 753
+  },
+  "rect": {
+   "top": 93,
+   "left": 17,
+   "width": 356,
+   "height": 235
+  },
+  "veil": "rgba(255, 255, 255, 0.3)",
+  "backdropFilter": "blur(23px) saturate(1.8)",
+  "backgroundImage": "none",
+  "texts": [
+   {
+    "sel": ".me-email-name",
+    "color": "rgb(53, 46, 29)",
+    "fontSize": "17px",
+    "fontWeight": "700",
+    "text": "我的邮箱"
+   },
+   {
+    "sel": ".me-email-scene",
+    "color": "rgba(53, 46, 29, 0.72)",
+    "fontSize": "10px",
+    "fontWeight": "400",
+    "text": "回信、更正、注销请求都靠它对上你的账号，只有你本"
+   },
+   {
+    "sel": ".me-email-field",
+    "color": "rgb(53, 46, 29)",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "text": ""
+   }
+  ]
+ },
+ {
+  "who": "卡片上的信息那一层",
+  "shot": "卡片上的信息那一层-index.png",
+  "card": ".ci-card",
+  "win": {
+   "w": 390,
+   "h": 753
+  },
+  "rect": {
+   "top": 93,
+   "left": 34,
+   "width": 322,
+   "height": 320.296875
+  },
+  "veil": "rgba(255, 255, 255, 0.3)",
+  "backdropFilter": "blur(23px) saturate(1.8)",
+  "backgroundImage": "none",
+  "texts": [
+   {
+    "sel": ".ci-title",
+    "color": "rgb(35, 37, 44)",
+    "fontSize": "17px",
+    "fontWeight": "700",
+    "text": "卡片上的信息"
+   },
+   {
+    "sel": ".ci-hint",
+    "color": "rgba(35, 37, 44, 0.55)",
+    "fontSize": "10px",
+    "fontWeight": "400",
+    "text": "这四张就是卡片上的人和名字。换一张点「更换」，不"
+   }
+  ]
+ }
+]

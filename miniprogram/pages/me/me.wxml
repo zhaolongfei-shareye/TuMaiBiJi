@@ -1,4 +1,10 @@
-<view class="container {{themeClass}}">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}}">
+  <!-- has-bg 这一档 10-11 才补到 container 上（原来只有下面 .head-band 带）。需求原文：
+       站长 10-11「界面纯色底色部分改为半透明毛玻璃效果，按钮ICON不变」＋「毛玻璃白底下面
+       如果没有背景图，你可以下移背景图」＋ X4 那一格他回「做」。玻璃那几条规则全站统一以
+       `.container.has-bg` 为闸（首页/录入页本来就是这一档，本页只有 .head-band 带，导致
+       me.wxss 新写的 `.container.has-bg .sheet` 与 app.wxss 那两枚弹窗规则落不到实处）——
+       补上之后这两处才生效，没铺图时照旧是实心（§8.85 同一口径：背后是纯色页面，模糊没有对象）。 -->
   <!-- 头部这块：底图贴屏边铺满；接缝那道弧的方向不动（站长 10-04 指出我改反了，已改回）——
        仍是"下面那一层往上凸出来盖住图的下沿"，只是这一层的颜色换成了页面底，
        所以它不再是一张卡，只是把那道弧留住。 -->
@@ -151,7 +157,7 @@
        现在改成普通数字输入，字由样式染成透明，屏幕上只剩我们自己的六枚点；
        ②键盘盖住了下面两枚按钮 → adjust-position 关掉（不让微信去顶整页），卡自己坐到上面去。 -->
   <view wx:if="{{pwdOpen}}" class="pwd-mask" bindtap="onClosePwdPanel">
-    <view class="pwd-card card" catchtap="">
+    <view class="pwd-card card glass-dialog" catchtap="">
       <text class="pwd-name">{{pwdName}}</text>
       <text class="pwd-scene">{{pwdScene}}</text>
       <text wx:if="{{pwdEntering}}" class="pwd-tip">{{pwdTip}}</text>
@@ -175,7 +181,7 @@
        输入框预填的是**现读回来的那一条**（不是本机存的），所以 me.js 在读没回来之前不让打开——
        预填成空再把人引导去点保存，就等于替他把原来那条清了。 -->
   <view wx:if="{{emailOpen}}" class="me-email-mask" bindtap="onCloseEmailPanel">
-    <view class="me-email-card card" catchtap="">
+    <view class="me-email-card card glass-dialog" catchtap="">
       <text class="me-email-name">{{t.myEmail}}</text>
       <text class="me-email-scene">{{t.myEmailScene}}</text>
       <input class="me-email-field" type="text" confirm-type="done" adjust-position="{{false}}"

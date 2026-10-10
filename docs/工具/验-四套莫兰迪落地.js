@@ -152,9 +152,17 @@ const mixOn = (bgHex, inkHex, a) => {
     const ix = await enter('/pages/index/index')
     await sleep(4000)
     const sheet = await ix.$('.sheet')
-    const gotSheet = sheet ? hex(await sheet.style('background-color')) : '(没读到 .sheet)'
-    ck(`${theme.label}：那张圆角卡落在这一套的卡色 ${theme.line} 上（10-09 起不再吃 v31 那层派生灰）`,
-      gotSheet.toUpperCase() === theme.line.toUpperCase(), gotSheet)
+    // ★10-11 改判读法（不改预算）：铺图那一态这张卡的面换成了"白纱→渐退→实心"那一条渐变，
+    // 而 `background:` 简写会把 `background-color` 归零 ⇒ 再读 background-color 永远读到 transparent，
+    // 界面却是对的。这句"落在本套卡色上"真正说的是**渐退退到底那一档**，所以改读渐变的**最后一个色标**。
+    // 没铺图那一态（这张卡还是纯色）走原来那条路，两条都要有色，读不到就判红——不许"读不到＝算过"。
+    const sheetBgi = sheet ? String(await sheet.style('background-image') || '') : ''
+    const sheetBgSolid = sheet ? String(await sheet.style('background-color') || '') : ''
+    const lastStop = (sheetBgi.match(/rgba?\([^)]*\)/g) || []).pop() || ''
+    const gotSheet = hex(lastStop || sheetBgSolid)
+    ck(`${theme.label}：那张圆角卡落在这一套的卡色 ${theme.line} 上（10-09 起不再吃 v31 那层派生灰；10-11 起读渐变末色标＝"退到底就是它"）`,
+      (!!lastStop || !!sheetBgSolid) && gotSheet.toUpperCase() === theme.line.toUpperCase(),
+      gotSheet + (lastStop ? `（读的是渐变末色标 ${lastStop}）` : '（纯色那一态）') + '｜期望 ' + theme.line)
     const outer = await ix.$('.container')
     const gotOuter = outer ? hex(await outer.style('background-color')) : '(没读到 .container)'
     ck(`${theme.label}：卡外面那一层就是页面底 ${theme.page}（两层浅背景＝这两支，与「我的」同一对）`,

@@ -45,9 +45,26 @@ ok('图区里铺了 <image> 组件（wxss 的 background-image 不认包内本�
 // 只钉"有没有现算的摆位"会让整个贯穿态静默丢掉（回来的是 542 那一档，图上沿被切）。
 ok('头部那一枚摆位分两态：窗开着吃 imgStyleThru、收起吃 imgStyle',
   /style="\{\{detailOpen \|\| templateOpen \? imgStyleThru : imgStyle\}\}/.test(wxml))
+// ★10-11 改钉：常态那一档不再是"无参＝BAND_H(542)"。站长原话「毛玻璃白底下面如果没有背景图，
+// 你可以下移背景图」（需求清单 R12），落法是盒子高递给 bandGeom，542→740，公式与 15% 锚点没动。
+// 所以这条从"两态都调用 bandGeom"升级成"常态那一档钉死 740，且 740＝头部 542 ＋延段 198"——
+// 三个数分居两个文件（index.js 与 index.wxss），不钉等式就等着哪天只改一处。
+// 延段这一轮从 `.head::after` 改挂到 `.head-scrim::after`（「调亮度」那枚 opacity 才吃得到它，
+// 默认半月那一档下 542 才不出硬边，R6），所以 top 不再钉 542、钉的是 `100%`。
+const glassBand = Number((cjs.match(/const GLASS_BAND_H\s*=\s*(\d+)/) || [, '0'])[1])
+const headH = Number((seg(wxss, '.head').match(/height:\s*(\d+)rpx/) || [, '0'])[1])
+const bleed = seg(wxss, '.container.has-bg .head-scrim::after')
+const bleedH = Number((bleed.match(/height:\s*(\d+)rpx/) || [, '0'])[1])
 ok('两态都从 bandGeom 拿数（贯穿不换算法，只换盒子高）',
-  /poster\.bandGeom\(info\.width, info\.height\)/.test(cjs)
+  /poster\.bandGeom\(info\.width, info\.height, GLASS_BAND_H\)/.test(cjs)
   && /poster\.bandGeom\(info\.width, info\.height, this\._webviewH\(\)\)/.test(cjs))
+ok('常态盒子高 740 ＝头部 542 ＋罩平延那 198（R12 这笔账两头都对得上）',
+  glassBand === 740 && headH === 542 && glassBand === headH + bleedH,
+  `GLASS_BAND_H=${glassBand} .head高=${headH} 延段高=${bleedH}`)
+ok('延段挂在罩层自己身上、用 top:100%（挂 .head 就吃不到「调亮度」那枚 opacity＝默认档出硬边）',
+  /top:\s*100%/.test(bleed), bleed.trim().slice(0, 60))
+ok('罩平延那一段还是压暗的同一族色（只延长不换色，否则 542 那条线上出接缝）',
+  /rgba\(18, 20, 26/.test(bleed), bleed.trim().slice(0, 60))
 ok('贯穿那个盒子高是问过 webview 的（不写死机型）',
   /getWindowInfo\(\)/.test(cjs) && /_webviewH\(\)/.test(cjs))
 // 站长 10-01 真机对出来的：同一个人，这一页是大特写、「我的」页是半身。

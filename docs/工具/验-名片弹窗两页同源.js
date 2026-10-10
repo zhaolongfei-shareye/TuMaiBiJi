@@ -103,8 +103,18 @@ function popupOf(src) {
 const A = popupOf(INDEX_WXML)
 const B = popupOf(SHARE_WXML)
 ck('两页都找得到那一段弹窗', !!A && !!B)
+// 10-11 毛玻璃：首页那枚卡挂上了 `glass-dialog`（站长逐条裁定 X4 原话「4、做」），
+// 笔记卡片页这一枚没挂——依据不是"我懒得改两处"，是那一页**根本没有形象图可糊**：
+// share.wxml 全文没有 `has-bg`（该页不铺 bgSrc），玻璃的闸永远合不上，糊了没有对象。
+// 所以两页仍必须逐字相同，**只许差这一枚类名**；差任何别的东西照旧红。
+// 反向钉住依据本身：哪天 share 页也开始铺形象图，下面那条 "闸还不存在" 就红，逼人来重拍这一格。
+const Awo = A.replace(' glass-dialog', '')
 ck('那一段在两页里逐字相同（改字改结构必须一起改，不许一处好一处坏）',
-  A === B, A === B ? '' : '两处不一样')
+  Awo === B, Awo === B ? '' : '两处不一样')
+ck('唯一那处漂移就是玻璃那一枚类名，且只有首页吃它',
+  /class="ci-card glass-dialog"/.test(A) && !/glass-dialog/.test(B))
+ck('笔记卡片页那一格不做玻璃的依据还在：这一页没有 has-bg 那道闸',
+  !/has-bg/.test(SHARE_WXML) && !/bgSrc/.test(SHARE_WXML))
 ck('那四枚圆下面只写当前角色，勾「卡片」的口在两页都有',
   !!A && !!B && /onCiSetCard/.test(A) && /onCiSetCard/.test(B))
 // 两条真机换来的细节，逐页钉一遍——复制最容易丢的就是这种"看着没用"的属性

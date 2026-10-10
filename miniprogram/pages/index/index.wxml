@@ -11,12 +11,10 @@
     <!-- 这一层就是「调亮度」那一枚点拧的东西：dimScrim 空串＝全铺（最沉那一档＝现网样子），
          opacity:0＝一点不压（＝原图亮度）。与新建页 .page-scrim 同一个数、同一个本机键。 -->
     <view class="head-scrim" style="{{dimScrim}}"></view>
-    <!-- 框外左上角那一个小人（站长 10-10 深夜：「首页人物延续到笔记列表和卡片列表，
-         放在框外面的左上角，如果首页是男的，框外面就是男的」）。
-         画在罩层之后＝它是"图上的人"，不吃压暗那一档；底边正落在纸卡上沿那一条线上
-         （.head 高 542、纸卡 margin-top −40 → 卡顶 502，这里 bottom:40 就是那一条）。
-         两枚 tab 共用同一个头部，所以列表与卡片那一格看到的是同一个他。 -->
-    <image class="ix-person" src="{{personSrc}}" mode="widthFix" />
+    <!-- 框外左上角那一个小人 **10-11 撤掉**（站长原话：「左上角的人，透明底侵入主图，
+         列表左上角的人都去掉，维持只有首页有」）。这是对 10-10 深夜那一句的翻案
+         （当时他说「首页人物延续到笔记列表和卡片列表」），两版都留字在这里，免得以后
+         又当成漏画补回去。首页（pages/create）那两位与"点小人换大人"一个字没动。 -->
     <view class="h1">{{t.notesHeading}}</view>
     <!-- 一列：笔记。数仍来自服务端那一次 /api/user/quota，本页不自己相加。 -->
     <view class="stats">
@@ -349,7 +347,7 @@
        点输入框会被算成"点空白"。这一层只留 catchtap 挡穿透（不挡住会冒到 .container 的
        onBlankTap，连带清掉搜索词），点空白不再收它。 -->
   <view wx:if="{{cardInfoOpen}}" class="ci-mask" catchtap="">
-    <view class="ci-card" catchtap="">
+    <view class="ci-card glass-dialog" catchtap="">
       <text class="ci-title">{{t.cardInfo}}</text>
       <text class="ci-hint">{{t.cardInfoHint}}</text>
       <view class="ci-slots">

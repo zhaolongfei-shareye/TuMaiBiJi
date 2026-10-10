@@ -1183,3 +1183,86 @@
 .container {
   padding-bottom: 140rpx;
 }
+
+/* ============================================================
+   10-11 毛玻璃这一档 · 本页落点
+   需求正本 `docs/需求清单-10-11毛玻璃.md`：
+     R1「界面纯色底色部分改为半透明毛玻璃效果，按钮ICON不变」
+     R2「面板上仅纯色部分改为毛玻璃，其他有图案和设计的ICON不变」
+     R3「把外框底色和内框都变成白色后，集体变半透明毛玻璃。沉浸式」
+     R10「α = .30」
+   三条口径：
+   ① **只在铺了形象图那一态读玻璃**（`.container.has-bg`）。没铺图时背后是纯色页面，
+      模糊没有对象——沿用 §8.85 那条同一口径，也沿用上面 `.container.has-bg .panel` 投影的写法。
+   ② **快门那枚橙圆、两枚小圆里的图形、粘贴图形、三枚标签字，一行都不碰**（R1/R2 明写"按钮ICON不变"）。
+   ③ 覆盖选择器的类数必须 ≥ 被覆盖那条，否则静默不生效。效果图那一稿的 `13`／`12` 两块
+      就是 `.g-blk` 一个类压不住 `.blk-stat.notes` 两个类，从头到尾没变成玻璃——同一个坑不许踩第二遍。
+   ============================================================ */
+.container.has-bg .panel {
+  background: var(--glass-veil);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+  border-color: var(--glass-hair);
+}
+
+/* R3：内框不再单独有一层——底色透明、边也不画，控件直接落在这张玻璃上。
+   原文：「把外框底色和内框都变成白色后，集体变半透明毛玻璃。沉浸式」——"集体"就是这两层合成一层。
+   后果写清楚：`--cp-card` 那一档白面在铺图态不再现面（没铺图那一态照旧，这条只管 `.has-bg`）。 */
+.container.has-bg .card {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* 井（输入框／右滑条）＝一丝白＋一圈细白边，不再比卡深一档。
+   效果图第 267 行 `.g-well` 那份：`--g-fill: rgba(255,255,255,.2)` ＋ `--g-hair` 那一圈边。 */
+.container.has-bg .field,
+.container.has-bg .sld {
+  background: var(--glass-fill);
+  border-color: var(--glass-hair);
+}
+
+/* 两枚小圆（相册／链接）那一格。10-11 自查抓到的一条静默不生效：这里原来写的是
+   `.mini .c`，而 markup 是 `class="mini-c"`（create.wxml:129／137），`.c` 这一枚类全仓不存在
+   ⇒ 选择器命中零个节点、那两枚圆照旧是实心浅灰。类名照 markup 写，别照注释里那串清单写。
+   它自己那一格没有边（基条 `.mini-c` 只有一层 `--face` 面），所以这条只换面。 */
+.container.has-bg .mini-c {
+  background: var(--glass-fill);
+}
+
+/* 首页那三块（左块人物入口＋右两枚计数）。落点不是我自己圈的：这一版效果图第 271 行
+   `.blk-person.g-blk, .blk-stat.g-blk` 画的就是它们，站长 10-11 看过这张图回「新图没问题，直接落地甲」。
+   图上的口径一并抄过来：两枚计数原来那两档深浅不再分，都刷同一张白玻璃（于是 `--eb-notes`／
+   `--eb-cards` 两档面在铺图态不再现面），内环 2＝图上的 `inset 0 0 0 2px rgba(255,255,255,.55)`。 */
+.container.has-bg .blk-person,
+.container.has-bg .blk-stat-notes,
+.container.has-bg .blk-stat-cards {
+  background: var(--glass-veil);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+  box-shadow: inset 0 0 0 2rpx var(--glass-hair);
+}
+
+/* 块里那两条白条（"记下来"那一格与两条计数条）＝效果图第 273 行 `.g-jot`：
+   `rgba(255,255,255, calc(--ga + .08))` ＝ .38（在玻璃上再抬一档、仍留一点透），
+   模糊图上写的是 20——同一个换算与上面那一档一致（图上 1px＝1rpx≈0.52 真机 px，46→23、20→10）。 */
+.container.has-bg .blk-jot,
+.container.has-bg .blk-strip {
+  background: var(--glass-jot);
+  backdrop-filter: blur(10px) saturate(1.6);
+  -webkit-backdrop-filter: blur(10px) saturate(1.6);
+}
+
+/* 报错气泡（X1，站长 10-11 逐条裁定原话「4、做」之前一句「报错气泡，这是我下的需求，为什么不做？」；
+   正本需求原文：「报错消息不要在这里出现，换到输入框上面，用带阴影长条形气泡框弹出，几秒后消失。
+   所有输入错误提示都用这种方式」）。
+   ⚠ 这一处**不刷白纱**，是有意为之，理由挂在原文上：R3 那句"变成白色"点的名是**面板的外框与内框**，
+   没覆盖到气泡；而气泡现网是"墨面配纸白字"（`--cp-ink` 面 ＋ `--cp-card` 字）。给它套白纱会把字
+   压成白字压白底。所以按 R1 的字面做"半透明毛玻璃"，但**面仍跟着它自己的色相**：墨面半透＋真糊，
+   纸白字压在糊开的暗底上。
+   浓度不自起一架新梯子，拿现成的那一档 `--cp-ink-78`（同上面 `palette.js` 注释里"浓度不另起一架梯子"
+   那条口径；.72 那一档是我自己起的，10-11 自查时撤了）。alpha 与全站 .30 不同这一处**要单独报给他看**。 */
+.container.has-bg .hint-bubble {
+  background: var(--cp-ink-78);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+}

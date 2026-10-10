@@ -21,6 +21,13 @@ function fmt(tpl, map) {
 /* 头图的摆法（按宽铺满、往上顶 15% 留头顶空间）已收进 utils/poster.js 的 bandGeom：
    首页那一屏要的是同一个人、同一个取景，两页各留一份数迟早走样。 */
 
+/* 10-11 毛玻璃 R12（「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：这一页的玻璃段
+   是名片那一行那 144，所以盒子高从 poster.BAND_H(542) 抬到 646＝502 可见 + 144 盖住。
+   这一笔账一共住在四处，动一处要动齐四处：me.wxss 的 `.head-band` height:646、`.sheet`
+   margin-top:-144、`.head-scrim` bottom:104、`.head-band::after` 的 top:542/height:104。
+   （104 ＝ 646 − 542：罩层不再铺到段底，多出来的那一段改由 ::after 接着压暗。） */
+const GLASS_BAND_H = 646
+
 /* 这台手机能不能用指纹／面容，只能问它自己：文档写明的只有指纹，
    iOS 走面容没写在文档里，所以探不到就当没有——探不到时重置退回普通确认，
    绝不因为"没有生物识别"就把人堵在门外。 */
@@ -138,7 +145,10 @@ Page({
     if (!src) return
     wx.getImageInfo({
       src,
-      success: (info) => this.setData({ imgStyle: poster.bandGeom(info.width, info.height) }),
+      // 10-11 毛玻璃 R12：盒子高随 me.wxss 的 `.head-band` 一起从 542 抬到 646，
+      // 图才垫得到名片行那 144 底下（bandGeom 那条公式与 15% 锚点一个字没改）。
+      // 这两个数是一笔账，改一处必须改两处。
+      success: (info) => this.setData({ imgStyle: poster.bandGeom(info.width, info.height, GLASS_BAND_H) }),
       fail: () => this.setData({ imgStyle: '' }),
     })
   },
