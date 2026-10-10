@@ -11,6 +11,12 @@
     <!-- 这一层就是「调亮度」那一枚点拧的东西：dimScrim 空串＝全铺（最沉那一档＝现网样子），
          opacity:0＝一点不压（＝原图亮度）。与新建页 .page-scrim 同一个数、同一个本机键。 -->
     <view class="head-scrim" style="{{dimScrim}}"></view>
+    <!-- 框外左上角那一个小人（站长 10-10 深夜：「首页人物延续到笔记列表和卡片列表，
+         放在框外面的左上角，如果首页是男的，框外面就是男的」）。
+         画在罩层之后＝它是"图上的人"，不吃压暗那一档；底边正落在纸卡上沿那一条线上
+         （.head 高 542、纸卡 margin-top −40 → 卡顶 502，这里 bottom:40 就是那一条）。
+         两枚 tab 共用同一个头部，所以列表与卡片那一格看到的是同一个他。 -->
+    <image class="ix-person" src="{{personSrc}}" mode="widthFix" />
     <view class="h1">{{t.notesHeading}}</view>
     <!-- 一列：笔记。数仍来自服务端那一次 /api/user/quota，本页不自己相加。 -->
     <view class="stats">
@@ -29,7 +35,9 @@
          ⚠ 展开那一态整行不画（站长 10-05：「展开就不提供搜索」）。必须是 `wx:if` 摘掉、
          不能指望"被卡盖住"：这一行 z-index 5，比这张纸卡的 2 高，抬上来的卡盖不住它——
          不摘的话它正好压在卡面中间，变成一枚看得见、点不动的孤点。 -->
-    <view wx:if="{{!listWide}}" class="tools">
+    <!-- ⚠ 原来这一行是 `wx:if="{{!listWide}}"`（"展开就不提供搜索"那句落在这里）。
+         10-10 深夜右上角那枚折叠口改成「返回」，展开那一态进不去了，这一行也就没有不画的时候。 -->
+    <view class="tools">
       <view wx:if="{{searchOpen}}" class="srch" style="{{searchSkin}}" catchtap="noop">
         <view class="glyph-search"></view>
         <input
@@ -53,7 +61,7 @@
     </view>
   </view>
 
-  <view class="sheet {{listWide ? 'ix-wide' : ''}}">
+  <view class="sheet">
   <!-- v19（站长 10-03 拍）：区内顶上两枚 tab，小字，默认落第一枚。第二枚那两个字仍读现网 navShare（笔记卡片）。
        排布切换那两枚 icon 的活交给这里，所以头部那一行只剩搜索一枚。
        v30（站长 10-08 拍）：这一行整块换成新建页那块深面，选中那枚下面一条黄短杠——
@@ -61,12 +69,14 @@
   <view class="vtabs" style="{{rowSkin}}">
     <view class="vtab {{view === 'list' ? 'on' : ''}}" catchtap="onViewTap" data-view="list">{{t.tabList}}</view>
     <view class="vtab {{view === 'cards' ? 'on' : ''}}" catchtap="onViewTap" data-view="cards">{{t.navShare}}</view>
-    <!-- 这一行右端那枚是整块纸卡的折叠口（站长 10-05：「整个下部往上加高，下方内容同步增加，
-         方便用户浏览更多内容。展开高度与笔记详情页高度一致」）。两枚 tab 共用一枚口——
-         加高的是这张卡，不是某一行，所以 v19 那条"点一行就直接浮详情窗、不就地展开"没动。
-         仍要展开才看得到的东西一概不加：这一态只是让同一批内容一次多露几行。
-         catchtap：挂在 .container 的 bindtap 链上，冒泡上去会把搜索词一起清掉。 -->
-    <text class="ix-fold" catchtap="onToggleWide">{{listWide ? t.collapseTip : t.expandTip}}</text>
+    <!-- 这一行右端那一枚：10-05 那版是整块纸卡的折叠口（「点一下展开」／「收起」），
+         10-10 深夜站长把它整件换掉——「'点一下展开'功能取消，改为'返回'，点击返回默认首页。
+         卡片列表页同样处理。这样每页右上角体验一致性」。
+         两枚 tab 共用这一枚，位置与词都不随切 tab 变。
+         ⚠ 「我的」那一屏右上角仍是 MIND 那个数字——他这句只点到笔记列表与卡片两页，
+         第三页要不要也换成「返回」没提过，不许我替他推。
+         catchtap：它在 .container 的 bindtap 链上，冒泡上去会把搜索词一起清掉。 -->
+    <text class="ix-back" role="button" aria-label="{{t.back}}" catchtap="goFirstScreen">{{t.back}}</text>
   </view>
   <!-- 分类这一行跟在两枚 tab 下面，两枚 tab 都留着：卡片那一格是从同一份筛选结果里出来的，
        这里收掉分类，筛了「旅游」再切过去就会看到别的分类的卡片。

@@ -5,6 +5,7 @@ const poster = require('../../utils/poster.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const assetQueue = require('../../utils/assetQueue.js')
 const { compressForBackup } = require('../../utils/imageCompress.js')
+const person = require('../../utils/person.js')
 
 // 链接规范：必须有协议头、主机名里要有顶级域、整串不能出现空白。
 // 之前只判"以 http 开头且某处有个点"，`https://a.com 后面还有字` 和 `http:///a.b` 都能过，
@@ -59,15 +60,12 @@ const SLD_REST_RPX = 10
 const SLD_MAX_RPX = 476
 // 差 12rpx 就算到位（手指按在圆右缘上再往外划不出这 12，宁可让人划到底也不要"差一点没反应"）
 const SLD_SLOP_RPX = 12
+// 报错气泡在屏上停多久（站长 10-10 深夜只说了"几秒后消失"，没给数）。
+// 3600ms 是"读完最长那句（英文 43 个字母）再抬眼"的那一档；再短会让人怀疑自己看漏了。
+const HINT_MS = 3600
 
-/* 左块那一张人物（站长 10-10 晚给的两张 PNG）。双击换性别，换完写本机、下次进页沿用。
-   只落本机不落云端：他说的是"记住"，不是"换设备也要记住"，而多一个云端字段就要动后端
-   那一套 user_profiles 的白名单与迁移，这一轮不为此开那条链。 */
-const PERSON_KEY = 'homePerson'
-const PERSON_SRC = { girl: '/assets/ic-person.png', boy: '/assets/ic-person-alt.png' }
-/* 两下之间隔多久算"双击"。微信自己不给 dblclick，只能数点击间隔。
-   300ms 是系统各处双击的常见档；再长就会让"想打开面板"的普通一停被误读成换人。 */
-const DBL_TAP_MS = 300
+/* 左块那一张人物与它的剪影：键名、两张路径、谁在前都在 utils/person.js（列表页那两处要画同一个人）。
+   10-10 深夜改口：换性别不再靠"连点两下"，改成点右后方那枚淡灰剪影换位（见 swapPerson）。 */
 
 Page({
   data: {
@@ -98,7 +96,7 @@ Page({
     // 只活在这一次提交里：落库成功后跟着原文一起归零，不留到下一篇。
     writeTranslate: false,
     // 右滑那一枚的四个态（待滑 / 拖动中 / 就位 / 完成）都靠这几位说话。
-    ready: false,   // 这一格有没有东西可提交（决定圆是实心还是灰、滑到底触不触发）
+    ready: false,   // 这一格有没有东西可提交（决定那枚圆让不让你拖，10-10 深夜起不再决定它的颜色）
     dragging: false,
     done: false,    // 完成那一帧：整条转实心 + 白环仍在，紧接着吐司再跳详情页
     knobRpx: SLD_REST_RPX,
@@ -113,8 +111,8 @@ Page({
     // 收起态那三块的面色与字色，同样由当前壁纸派生（左块吃卡底、右两枚吃色阶第 2／1 档）。
     // 这里不带参数与上面同一个道理：空参回落象牙，每次进页由 onShow 拿真壁纸覆盖。
     blkSkin: entryBlocks().style,
-    // 左块那一张人物：初值按本机存的那一性读，没存过就是女。
-    personSrc: PERSON_SRC[wx.getStorageSync(PERSON_KEY) === 'boy' ? 'boy' : 'girl'],
+    // 左块那一张人物 + 右后方那枚剪影：初值按本机存的那一性读，没存过就是女。
+    ...person.figure(),
     // 右两枚的计数。两个数都是装饰性的读数，拉不到就画 0（沿用笔记页那一条口径：
     // 空着或画杠读起来像坏了），但拉取本身绝不许把这一屏拖挂。
     noteCount: 0,
@@ -169,19 +167,14 @@ Page({
     // 那一格进度表也是同一个道理：这一屏不在前面了，别再空转 setData。
     // ⚠️ 只停表不清 busy——提炼那条请求还在飞，回来还要接着说话（见下面 _extractDone 的注释）。
     this.stopProgress()
-    // 左块那一下的 300ms 判定也要撤：人已经切走了，定时器再回来会把面板悄悄升起来。
-    this._cancelPersonTap()
+    // 气泡那枚"几秒后消失"的表也要撤：人在别的 tab 上时不该有个定时器还想着这一屏。
+    this._clearHint()
   },
 
   onUnload() {
     this.stopTips()
     this.stopProgress()
-    this._cancelPersonTap()
-  },
-
-  _cancelPersonTap() {
-    if (this._tapTimer) { clearTimeout(this._tapTimer); this._tapTimer = null }
-    this._tapAt = 0
+    this._clearHint()
   },
 
   // onShow 只同步主题/语言/tab，**绝不重置草稿**。
@@ -234,6 +227,19 @@ Page({
     return isLink(s) ? 'ok' : 'bad'
   },
 
+  /**
+   * 说一句"这一格现在不对"。10-10 深夜起所有输入类报错只有这一条通道：
+   * errLine → _sync → hintLine → 输入框上方那枚气泡（几秒自己走）。
+   * 原来这些是散在六处的 `wx.showToast`，同一件事两种说法、两个位置——
+   * 他的原话是"所有输入错误提示都用这种方式"。
+   * ⚠ 两件事没并进来，是故意的：语言切换失败（收起态也会发生，那时没有面板、气泡无处浮）
+   *   与「已存入笔记」那声成功（不是报错）。
+   */
+  sayErr(msg, perm) {
+    this.setData({ errLine: msg, errPerm: !!perm })
+    this._sync()
+  },
+
   // 面板上"这一格能不能提交"由三档各自的条件拼出来，而这一位同时决定
   // 圆的颜色（实心/灰）与滑到底触不触发。判据与三个 submit 里的校验逐字一致，
   // 所以不会出现"看着能滑、滑到底报一句不能提交"。
@@ -261,6 +267,31 @@ Page({
         : active === 'photo' && previewImages.length + 1 > ROW_CELLS,
     }
     this.setData(patch)
+    // 气泡"几秒后消失"（站长 10-10 深夜那句）。计时挂在算出这一位之后，不在各个报错点各排一次——
+    // 那样会有人忘了排；同一趟里再报一句就把表重头走，读的人看到的是"这条是新的"。
+    if (patch.hintLine) this._armHint()
+    else this._clearHint()
+  },
+
+  _armHint() {
+    this._clearHint()
+    this._hintTimer = setTimeout(() => {
+      this._hintTimer = null
+      // 只收气泡，不清 errLine 本身：那一位是"这一格现在有没有错"的状态，
+      // 下一次 _sync 还会按它重算（真要在屏上再看一次，重新触发一次校验就有）。
+      this.setData({ hintLine: '' })
+    }, HINT_MS)
+  },
+
+  _clearHint() {
+    if (this._hintTimer) { clearTimeout(this._hintTimer); this._hintTimer = null }
+  },
+
+  // 气泡整枚可点：只有权限那一类有地方可去（直接进设置），其余只是读。
+  // 为什么不在 wxml 里写 `catchtap="{{errPerm ? 'a' : 'b'}}"`：事件名那一位要的是静态字符串。
+  onHintTap() {
+    if (!this.data.errPerm) return
+    this.openPermSetting()
   },
 
   // 滑动条圆里那枚图形跟着三档走：照片=叠图、链接=链环、文字=钢笔。
@@ -291,7 +322,7 @@ Page({
   // 点条身 = 「照片」那一档（这一屏第一眼就该是那枚快门）。
   // 原来点条身进的是「直接写」，10-08 那轮把默认档换成照片：
   // 站长的原话是"拍照是大按钮、其他的用小按钮"，那一大钮就是这一屏的门面。
-  // 10-10 晚条身换成左块人物，这一句原封不动搬进 onTapPerson 的那一下里。
+  // 10-10 晚条身换成左块人物，这一句就是左块那一点的行为（中间没有定时器延它）。
   openBar() {
     if (this.data.busy) return
     if (this.data.active) { this.collapse(); return }
@@ -299,40 +330,16 @@ Page({
   },
 
   /**
-   * 左块那一下。小程序没有原生双击，所以自己数间隔：
-   * 第一下先**不**打开面板，等满 300ms 没有第二下才当普通一用（openBar）；
-   * 300ms 内落到第二下就换人物、并把那扇还没开的面板收回原状。
-   * 为什么不"第一下立刻开、第二下再关掉"：那样每次换人都会看见面板升起又落下，闪一下。
-   * 代价是打开面板慢了 300ms——双击换人是低频动作，普通一用那 300ms 由下面这条定时器付。
+   * 点右后方那枚剪影 = 换到那一个人（站长 10-10 深夜改的口，原话「两个人切换体验不太好，
+   * 改为左右有人点击右侧人像切换」）。以前是"连点左块两下"，代价是每一次打开面板都要先
+   * 被一枚 300ms 定时器延住——那一下的手感就是他打回这一版的理由。
+   * 现在左块那一点直接开门（openBar，零延迟），换人只走剪影那一枚。
+   * 只换图，不动 active／草稿／忙态——这一屏别的什么都不该因为换张图而变。
    */
-  onTapPerson() {
-    if (this.data.busy) return
-    const now = Date.now()
-    if (this._tapAt && now - this._tapAt < DBL_TAP_MS) {
-      // 第二下：把这一下当成"换人"，第一下排的那个定时器要撤掉，不然面板还是会升起来。
-      if (this._tapTimer) { clearTimeout(this._tapTimer); this._tapTimer = null }
-      this._tapAt = 0
-      this.togglePerson()
-      return
-    }
-    this._tapAt = now
-    this._tapTimer = setTimeout(() => {
-      this._tapTimer = null
-      this._tapAt = 0
-      this.openBar()
-    }, DBL_TAP_MS)
-  },
-
-  // 换人物并写本机。只换图，不动 active／草稿／忙态——这一屏别的什么都不该因为换张图而变。
-  togglePerson() {
-    const next = this.data.personSrc === PERSON_SRC.girl ? 'boy' : 'girl'
-    try {
-      wx.setStorageSync(PERSON_KEY, next)
-    } catch (e) {
-      // 写不进去（配额满／被禁）不影响这一次切换，只是下次进页回到女那一张。
-      console.warn('人物那一档没存进本机', e && e.message)
-    }
-    this.setData({ personSrc: PERSON_SRC[next] })
+  swapPerson() {
+    const next = person.other(this.data.personKey)
+    person.remember(next)
+    this.setData(person.figure(next))
   },
 
   /**
@@ -442,6 +449,11 @@ Page({
 
   onSlideStart(e) {
     if (this.data.busy || this.data.done || !e.touches || !e.touches.length) return
+    // 这一格还没内容：**不给起拖**（站长 10-10 深夜「输入框里面没内容，不允许滑动圆ICON」）。
+    // 以前是"照样跟手、松手回弹"，圆的颜色洗成灰当锁——他现在把锁从皮挪到行为上，
+    // 圆保持橙色，但手指拖不动它。话还是要说（沿用"灰按钮被点也要给话"那条规矩），
+    // 所以这里直接走那一趟校验，让输入框上面那枚气泡当场说出来（10-10 深夜报错换了地方）。
+    if (!this.data.ready) { this.runSubmit(); return }
     this._drag = { x0: e.touches[0].clientX, base: this.data.knobRpx }
     this.setData({ dragging: true })
   },
@@ -461,8 +473,8 @@ Page({
     this._drag = null
     if (!d || this.data.busy) return
     const reached = this.data.knobRpx >= SLD_MAX_RPX - SLD_SLOP_RPX
-    // 只有"到位 + 这一格真有东西"才把圆钉在最右那一格进忙态；
-    // 空着滑到底要说一句、但圆必须回弹（效果图那枚 off 态写的就是这个：滑到最右也回弹）。
+    // 到位才进忙态；半路松手一律回弹。`ready` 这一半现在其实进不来（上面 `!ready` 根本不起拖），
+    // 留着是防"拖到一半内容被清空"那一类竞态，不当成空着能滑到底的那条老路径。
     const go = reached && this.data.ready
     this.setData({ dragging: false, knobRpx: go ? SLD_MAX_RPX : SLD_REST_RPX })
     if (reached) this.runSubmit()
@@ -563,7 +575,7 @@ Page({
       success: (res) => {
         const s = String((res && res.data) || '').trim()
         if (!s) {
-          wx.showToast({ title: t('pasteEmpty', this.data.lang), icon: 'none' })
+          this.sayErr(t('pasteEmpty', this.data.lang))
           return
         }
         this.setData({ urlInput: s, urlHint: this.hintFor(s), errLine: '' })
@@ -571,7 +583,30 @@ Page({
       },
       fail: () => {
         // 读不到与"里面没东西"是两件事，不许合成一句糊过去
-        wx.showToast({ title: t('pasteFailed', this.data.lang), icon: 'none' })
+        this.sayErr(t('pasteFailed', this.data.lang))
+      },
+    })
+  },
+
+  // 「文字」那一档的粘贴（站长 10-10 深夜：与链接那一档同一个 ICON、同一个位置）。
+  // 语义与链接那一档**故意不同**：链接是一行，贴进去就是替换；原文框是多行，
+  // 已经有内容时贴进来是接在后面（换行分隔），不许把人已经打好的字整段顶掉。
+  // 读不到与"剪贴板里没东西"仍是两句话，沿用链接那两条键。
+  onPasteWrite() {
+    if (this.data.busy) return
+    wx.getClipboardData({
+      success: (res) => {
+        const s = String((res && res.data) || '').trim()
+        if (!s) {
+          this.sayErr(t('pasteEmpty', this.data.lang))
+          return
+        }
+        const had = this.data.writeBody
+        this.setData({ writeBody: had ? `${had.replace(/\s+$/, '')}\n${s}` : s })
+        this._sync()
+      },
+      fail: () => {
+        this.sayErr(t('pasteFailed', this.data.lang))
       },
     })
   },
@@ -608,7 +643,7 @@ Page({
     if (left <= 0) {
       // 满了。原来这里是静默的（选得上来、合并时 slice 掉、界面什么都不说），
       // 现在➕转灰 + 一句吐司，告诉他是"满了"不是"没反应"。
-      wx.showToast({ title: t('maxShots', lang).replace('{n}', MAX_SHOTS), icon: 'none' })
+      this.sayErr(t('maxShots', lang).replace('{n}', MAX_SHOTS))
       return
     }
     const sourceType = source === 'any' ? ['album', 'camera'] : [source]
@@ -652,7 +687,7 @@ Page({
   // ➕ 那一枚：满了不走选择器，直接给话。
   onAddShot(e) {
     if (this.data.shotsFull) {
-      wx.showToast({ title: t('maxShots', this.data.lang).replace('{n}', MAX_SHOTS), icon: 'none' })
+      this.sayErr(t('maxShots', this.data.lang).replace('{n}', MAX_SHOTS))
       return
     }
     this.pickImage(e)

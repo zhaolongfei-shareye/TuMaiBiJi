@@ -8,6 +8,7 @@ const cardInfo = require('../../utils/cardInfo.js')
 const { isPrivate } = require('../../utils/privateGate.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
+const person = require('../../utils/person.js')
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
@@ -69,10 +70,11 @@ Page({
     // v19 这一屏的两枚 tab：'list' = 笔记列表（默认那一枚），'cards' = 笔记卡片。
     // 这是视图态，不落本机——他原话"默认第一个 tab"，每次进这一屏都从第一枚起。
     view: 'list',
-    // 整块纸卡加高那一态（站长 10-05：「整个下部往上加高，下方内容同步增加，方便用户浏览
-    // 更多内容。展开高度与笔记详情页高度一致」）。这是视图态、不落本机；它加高的是整块卡，
-    // **不是**把某一行就地摊开——v19 那条"点一行就直接浮详情窗、不就地展开"一个字没动。
-    listWide: false,
+    // 头部框外左上角那一个小人（与第一屏同一个来源，10-10 深夜他补的那句
+    // "首页是男的，框外面就是男的"）。每次进这一屏重读一遍，见 onShow 那一趟。
+    ...person.figure(),
+    // 整块纸卡加高那一态（10-05 那条）10-10 深夜随右上角那枚「点一下展开」一起撤：
+    // 那一枚改成了「返回」，折叠口没有第二个入口，留着 listWide 就是一块永远进不去的状态。
     // 两枚 tab 各自画的那两批，都由 arrange() 从同一份 notes 现算（同一份序、同一份筛选）
     rows: [],
     cells: [],
@@ -157,6 +159,9 @@ Page({
       t: texts(lang),
       themeClass,
       bgSrc,
+      // 框外左上角那一个小人：每次进这一屏重读，他在第一屏点了剪影换人之后切过来就是那一个。
+      // 只覆盖这一位，不动 view／搜索词这些他自己选的态（这条 setData 里每一样都写明"为什么每次进页要重取"）。
+      ...person.figure(),
       // 卡片那一格的落点优先于复位，但**不**优先于"从这一页 push 出去再返回"那一型
       // （keepView 那条已经把他自己站的 tab 保住了，这里不该越过去替他改）。
       // 卡片那一格自己的台账在下面 loadNotes 里重读，从详情窗出完图回来就能看到新那一张。
@@ -437,22 +442,13 @@ Page({
     this.setData({ view })
   },
 
-  // 整块纸卡的折叠口（站长 10-05：「整个下部往上加高，下方内容同步增加」）。
-  // 只挪这一块的顶边（CSS 一条 `.sheet.ix-wide`），两枚 tab 共用同一枚口——加高的是卡、
-  // 不是某一行，所以 rows / cells 一个字都不用重算，滚动位置也不丢（元素没被销毁）。
-  //
-  // 「展开就不提供搜索」（他 10-05 补的那句）落在两处：wxml 上那一行 `wx:if="{{!listWide}}"`
-  // 摘掉入口；这里把已经摊开的条子按**退出搜索**那一档收干净（缩回＋清词＋重拉）。
-  // 为什么不学"点某条笔记只缩条子、词留着"：那样列表还是筛过的结果，而筛子已经不见了，
-  // 正是他 10-03 打回过的"条子一收，下面还挂着上一次的结果，看着像没退出来"。
-  onToggleWide() {
-    const wide = !this.data.listWide
-    if (wide && this.data.searchOpen) {
-      this.setData({ listWide: true, searchOpen: false, searchKeyword: '' })
-      this.loadNotes(true)
-      return
-    }
-    this.setData({ listWide: wide })
+  // 右上角那一枚「返回」（站长 10-10 深夜：「'点一下展开'功能取消，改为'返回'，
+  // 点击返回默认首页。卡片列表页同样处理。这样每页右上角体验一致性」）。
+  // 两枚 tab 共用这一枚（它在这一行的右端，切到哪一枚都在同一个位置、同一个词）。
+  // "默认首页"= 底栏第一格那一屏（新建页），走 switchTab 不是 navigateBack——
+  // 这一屏是 tab 页，从底栏进来时没有返回栈可退。
+  goFirstScreen() {
+    wx.switchTab({ url: '/pages/create/create' })
   },
 
   // v19：两枚 tab 那两批屏都不就地展开——点一行 / 点一格 = 直接浮详情窗。

@@ -50,9 +50,12 @@ const i18n = {
     // 10-10 晚收起态从纸白胶囊换成左块人物（效果图 PNG图标.png），键名留着不动，
     // 中文改成块上那三个字；英文本来就是同一句「Jot it down」，一个字没动。
     barIdle: '记下来',
-    barCollapse: '点空白处收起',
-    // 面板上面那一行两枚小字（在框外，浮在形象图上）：左边报名前这一屏在干什么，右边报怎么退出去。
-    chooseMode: '选择记录模式',
+    // 「返回」这一枚 10-10 深夜同时上三个位置：创建页面板外那行右边、笔记列表与笔记卡片
+    // 右上角（那两处原来分别写着「点空白处收起」和「点一下展开」）。他原话
+    // 「这样每页右上角体验一致性」——所以是一个键，不是三句各写一遍。
+    back: '返回',
+    // 左块右后方那枚淡灰剪影的读屏名字（屏上没有这行字，只有点得中它的人才需要）。
+    personSwap: '换成另一个人',
     // 三个模式标签。原来的四档（直接写/拍照/相册/链接）并成三档：相册不再是一个模式，
     // 它是「照片」那一态左边那枚小圆；标签行只有三枚才放得下中间那枚大快门。
     modePhoto: '照片',
@@ -97,10 +100,9 @@ const i18n = {
     // 公开状态只在详情窗下沿那句 sharedNow 里说）。
     tabList: '笔记列表',
     showMore: '显示更多',
-    // 列表区右上那枚折叠口（站长 10-05：「整个下部往上加高，下方内容同步增加，方便用户浏览
-    // 更多内容。展开高度与笔记详情页高度一致」）。两枚 tab 共用一句，因为加高的是整块纸卡。
-    expandTip: '点一下展开',
-    collapseTip: '点一下收起',
+    // 列表区右上那枚折叠口的两句（"点一下展开"／"点一下收起"）10-10 深夜一起退了：
+    // 那一枚改成「返回」，展开那一态没有入口，`.sheet.ix-wide` 那条死样式也删了。
+    // ⚠ 键名本身不许再出现在这一份文件里——`验-统一录入条` 有一条全仓扫退役键名的判据，写在注释里也红。
     noCards: '还没有生成过卡片',
     allCategories: '全部',
     addCategory: '添加分类',
@@ -349,7 +351,10 @@ const i18n = {
     // 大图底下左端那枚原来复用「取消」：站长 10-04 要它改成「查看笔记」，点了进这篇的详情页。
     // 收窗那两条口都留着（顶上「点一下收起」+ 点窗外那层遮罩），所以这一枚不必再兼"退出"。
     viewNote: '查看笔记',
-    cardDrop: '删除',
+    // 10-10 深夜站长点名要这一枚改口：「查看卡片大图界面中，右下角的'删除'，文字改为'删除分享图'」。
+    // 同一排左边那枚是「查看笔记」，两个字与五个字并排不违和（两枚都是 flex:1，容器宽装得下）。
+    // 英文跟着同一件东西走：这一屏"卡片/分享卡片"本来就是同一张图，不另起一个新词。
+    cardDrop: '删除分享图',
     cardDropHint: '删除后可继续生成笔记卡片，已分享的依旧有效',
     cardDropOffline: '这会儿连不上服务器，那张卡片还留着',
     // 一篇只留一张：从详情页进笔记卡片页，这篇已经有卡片时给的那一句（10-07 他报的漏口）。
@@ -426,8 +431,8 @@ const i18n = {
     // Tap and jot 没人这么说，所以英文只留一个动词 Jot。这一屏旁边就是拍照/相册/链接
     // 三枚图标，动词本来也只该有一个。10-08 起展开态整条让位给面板，按模式换字那三条一起退了。
     barIdle: 'Jot it down',
-    barCollapse: 'Tap outside to close',
-    chooseMode: 'Choose mode',
+    back: 'Back',
+    personSwap: 'Switch to the other figure',
     // 与中文那三枚同档：Photo / Link / Text，都是单个词，标签行才放得下。
     modePhoto: 'Photo',
     modeWrite: 'Text',
@@ -459,10 +464,7 @@ const i18n = {
     // 与中文侧一一对应的三串（v19）。第二枚 tab 那两个字仍读 navShare。
     tabList: 'List',
     showMore: 'Show more',
-    // 与中文同义，但不直译"点一下"。用系统里最常见的那对词；不复用 'Show more'——
-    // 那一串已经给了摘要末尾那枚「显示更多」，同一个面板上两个口说同一句话会让人点错。
-    expandTip: 'Expand',
-    collapseTip: 'Collapse',
+    // 那两句折叠口的话（"点一下展开"／"点一下收起"的英文）随中文那一对一起退了。
     noCards: 'No cards yet',
     allCategories: 'All',
     addCategory: 'Add category',
@@ -669,7 +671,7 @@ const i18n = {
     cardShare: 'Share card: Chat / Moments / Official Account',
     // 英文不直译"查看笔记"成 View note：这一枚去的是那篇笔记本身，Open note 更像按钮。
     viewNote: 'Open note',
-    cardDrop: 'Delete',
+    cardDrop: 'Delete card',
     cardDropHint: 'Delete it and you can make another; links you already shared stay valid',
     cardDropOffline: 'Not connected right now — that card is still there',
     cardOneOnly: 'This note already has a card — delete it to make another',

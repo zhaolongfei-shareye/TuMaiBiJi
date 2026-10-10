@@ -159,6 +159,37 @@
   left: 0;
   top: 0;
   width: 220rpx;
+  z-index: 2;
+}
+
+/* 另一张：右后方那枚淡灰剪影（站长 10-10 深夜改的切换方式，替掉"连点左块两下"）。
+   宽按"高约主人物的一半"倒推出来的，不是随手数的：主人物那一张屏上 264 高
+   （源件 360×433，宽 220 → 高 220/0.8314 = 264.6），一半是 132；男那张源件 360×522，
+   要落 132 高就得给 91 宽（132 × 0.6897）。原来写 110 宽 → 160 高 = 0.6 倍，比他那句大一档。
+   灰度 + 提亮 + 半透明是"剪影"的画法，不是"另一张卡片"：它要说的是"还有这一个，点我就换"。
+   ⚠ 它压在主人物后面（z-index 1），重叠那一条的点击会被上面那张的方框吞掉，
+   所以点击不落在它身上——落在下面那块 .blk-alt-hit 上。 */
+.blk-fig-alt {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 91rpx;
+  z-index: 1;
+  filter: grayscale(1) brightness(1.45);
+  opacity: .5;
+}
+
+/* 剪影那一枚的透明热区：盖在最上层，比剪影本身往左、往上各扩 20rpx（指头不用瞄准）。
+   右和下都顶到取景窗的边——窗下面就是白条，再往下没有别的控件，扩出去也不会误按。
+   高按**两张里更高的那一张**给：男那张在 91 宽下算出 132 高，女那张 110 高，
+   所以 152 = 132 ＋ 20 两态都盖得住（换成 130 就会在默认那一态差出他头顶一条）。 */
+.blk-alt-hit {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 111rpx;
+  height: 152rpx;
+  z-index: 3;
 }
 
 .blk-jot {
@@ -295,8 +326,10 @@
    所以撤的是这一屏的写入，不是那两枚变量本身。 */
 
 /* ---------- 面板外面那一行小字（站长 10-08 原话「这一行移出框外」） ----------
-   左边报名前在干什么、右边报怎么退出去。它浮在形象图上，所以吃页面级 --text-tertiary：
-   铺图时那一档本来就是纸白 .56（见下面 .container.has-bg），没铺图时是这套壁纸的灰字。
+   10-10 深夜两枚都换内容：左边不再写"选择记录模式"，改成与收起态同一条轮播 Tips；
+   右边「点空白处收起」改成两个字「返回」（与笔记列表右上角那一枚同一个词、同一个动作）。
+   它浮在形象图上，所以吃页面级 --text-tertiary：铺图时那一档本来就是纸白 .56
+   （见下面 .container.has-bg），没铺图时是这套壁纸的灰字。
    左右留空 20rpx 比面板那 24 再往外 4——这一行要说的是"框外"，比框子的内边距略宽一点才对得上。 */
 .out {
   flex: none;
@@ -311,18 +344,59 @@
   color: var(--text-tertiary);
 }
 
-/* 报错行也放框外：它是临时消息不是控件，塞进面板里就得给每一态都预留一行高度，
-   而那一段高度正是站长这一轮连说两轮"继续压低"要省的地方（效果图图例第 2 条）。
-   颜色不用壁纸令牌而写死一支浅红：这块底是形象图 + 压暗罩，不是任何一张纸，
-   --blk-err 那一档白纸面板上用的深红压在这张图上直接看不见。
-   #FFD7D3 与 palette.toneStyle 给深底卡算的那支红同值，两处都是"暗底上的红"这一个用途。 */
-.out-err {
+/* Tips 那一枚必须**只占一行**：这一行在流内，它一折行就把整块面板往下顶 34rpx，
+   而轮播每 8 秒换一句（`create.js` startTips 那个 8000）——最长那句换成最短那句的时候面板会自己跳一下。
+   所以宁可省略号，也不许它换行（中文六句最长 23 字 ≈ 552rpx，加右边「返回」也放得下；
+   撑不住的是英文最长那句 49 个字母，会被切成"…",这是这一档的取舍）。 */
+.out-l {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.out-r {
   flex: none;
-  padding: 0 20rpx 14rpx;
-  font-size: var(--fs-label);
-  line-height: 1.4;
+}
+
+/* ---------- 报错那一枚气泡（站长 10-10 深夜：「报错消息不要在这里出现，换到输入框上面，
+   用带阴影长条形气泡框弹出，几秒后消失。所有输入错误提示都用这种方式」） ----------
+   以前是面板**外面**那一行红字：它浮在形象图上，一出现就把整组往上顶一行（真跑量过），
+   而且离输入框远，读起来像页面别处出的错。现在挪到输入框正上方、几秒自己走。
+
+   位置：`top: 78rpx` 就是白卡上沿那一条（面板上内边距 8 ＋ 标签行 64 ＋ 卡上边距 6），
+   气泡 52 高、下沿到 130，而输入框里的字从 140 起排（框顶 110 ＋ 上内边距 30），
+   所以它是"压在卡的上沿"，不是"盖住你打进去的字"。
+   ⚠ 它是**浮层**（absolute），不参与流内高度——这一条是这次改动的全部意义：
+   报错不许再把面板顶来顶去（`验-统一录入条-真跑` 有一条反向钉"面板纹丝不动"）。
+
+   配色：墨面配纸白字（`--cp-ink` 14.66 对比 `--cp-card`），不再用那支写在照片上的浅红
+   ——底换成实心气泡之后，"暗底上的红"这个理由就不成立了。 */
+.hint-bubble {
+  position: absolute;
+  left: 30rpx;
+  right: 30rpx;
+  top: 78rpx;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  min-height: 52rpx;
+  padding: 6rpx 22rpx;
+  box-sizing: border-box;
+  border-radius: 26rpx;
+  background: var(--cp-ink);
+  color: var(--cp-card);
+  font-size: var(--fs-meta);
+  line-height: 1.3;
   font-weight: 700;
-  color: #ffd7d3;
+  box-shadow: 0 10rpx 24rpx rgba(8, 10, 14, 0.28);
+}
+
+/* 权限那一类整枚可点（直接进设置），所以给一个"按得动"的样子：末尾那截箭头由 wxml 画。 */
+.hint-bubble-act::after {
+  content: " ›";
+  font-weight: 400;
 }
 
 /* ---------- 录入面板（10-08 改版；10-10 按效果图 c5 换浅面 + 压进红框）----------
@@ -347,6 +421,8 @@
   --face-ph: var(--cp-ink-38);
   --solid-bg: var(--cp-extract);
   --solid-ink: var(--cp-extract-ink);
+  /* 报错那枚气泡是 absolute 定位在它里面的（"压在输入框正上方"），所以面板得先成为定位父级。 */
+  position: relative;
   background: var(--cp-panel);
   border: 2rpx solid var(--cp-edge-10);
   box-sizing: border-box;
@@ -374,31 +450,42 @@
    （站长那句「下方的小横杠与下方靠近」说的是这条线与下面那张卡之间的缝）。 */
 .modes {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   flex: none;
-  gap: 60rpx;
+  height: 64rpx;
+  gap: 24rpx;
 }
 
+/* 热区从"字多大就多大"扩成一整块（站长 10-10 原话「三个Tab很难点，把按键区域扩大」）：
+   左右各 22、整块吃满这一行的 72 高（align-items:stretch），所以指头落在字旁边也点得中。
+   ⚠ 这一行的高度不是拍的：白卡里原来那两档 auto 边距（框上面一档、条上面一档）撤掉了上面那一档，
+   省出来的那一段搬到这里（43.2 → 64）。**没有全搬**：全搬就是 72，而展开那一档的
+   「两行框 160 ＋ 翻译开关 56 ＋ 上间距 14 ＋ 条 110」= 326 会装不进卡里（只剩 322）——
+   那一档是站长 10-08 拍的"展开只多一行"，不许为了热区把它挤出去。留 4.8rpx 余量。 */
 .md {
   position: relative;
   flex: none;
+  display: flex;
+  align-items: center;
   font-size: var(--fs-title);
   line-height: 1.2;
   letter-spacing: 1rpx;
   color: var(--cp-ink-50);
-  padding-bottom: 6rpx;
+  padding: 0 22rpx;
   white-space: nowrap;
 }
 
 /* 那一横段是画在标签正下方的居中短线，不是整行 underline：
-   整行会被读成"这一排是一条 tab bar 的槽"，而这里要说的是"当前选中的是这一个"。 */
+   整行会被读成"这一排是一条 tab bar 的槽"，而这里要说的是"当前选中的是这一个"。
+   bottom 从 0 抬到 10：热区扩高之后字是垂直居中的，线要贴着字（离字底 10rpx），
+   不能贴着那一块的底（那样线离字 27rpx，看着像另一排的东西）。 */
 .md::after {
   content: "";
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 0;
+  bottom: 10rpx;
   width: 65rpx;
   height: 5rpx;
   border-radius: 3rpx;
@@ -419,6 +506,11 @@
    稿上那台是白卡压层灰，边界只剩这一圈细边＋一道浅投影可分，再淡就当没有。 */
 .card {
   margin-top: 6rpx;
+  /* ⚠ 这一条是补全局那一份的漏：`app.wxss:242` 的 `.card` 带 `margin-bottom: var(--sp-2)`(16rpx)，
+     这一页的 `.card` 只写了 margin-top，剩下三头就由全局补上——面板是定高的，那 16rpx 就从卡的
+     可用高里扣走（10-10 深夜真跑量到展开两档各溢出 7／12.8rpx，静态那把算式却一条都不红）。
+     这一格要的是"吃满面板剩下的那一段"，列表页那套卡与卡之间的间距在这里没有意义。 */
+  margin-bottom: 0;
   flex: 1;
   min-height: 0;
   box-sizing: border-box;
@@ -545,13 +637,14 @@
 
 /* ---------- 输入格（链接一格、文字一格，同一套画法同一个位置） ----------
    提示词全在框里（placeholder），未输入时看得见、点进去就没了——面板里不再有单独那行小标。
-   上下不贴边：那一段由 .card 的两档 auto 边距给（见上面那段注释）。 */
+   10-10 深夜改：这一格**贴白卡上沿**（原来这里还有一档 `margin-top:auto`）。站长量的那句是
+   "面板内最上面的白边与最下面的白边不一样"——两档 auto 把富余对半分，上白边就成了 30+27=57、
+   下白边 30。撤掉上面那一档之后两头都是 30（那一档 28.8 整个搬去标签行，见 .modes）。 */
 .field {
   display: flex;
   align-items: center;
   box-sizing: border-box;
   height: 105rpx;
-  margin-top: auto;
   padding: 0 28rpx;
   border-radius: 18rpx;
   background: var(--cp-field);
@@ -599,16 +692,33 @@
 }
 
 /* 「文字」那一档的框：收起态与链接框等高一行，展开态才变两行。
-   textarea 是原生组件，padding 与行高都得自己给，align-items 在它身上没有意义。 */
-.field-area {
-  width: 100%;
-  line-height: 1.5;
-  padding: 0 28rpx;
+   10-10 深夜起这一格是"壳 ＋ 框 ＋ 粘贴钮"三件（壳吃上面 .field 那套皮，与链接格同一画法）：
+   textarea 是原生组件、装不下子节点，那枚钮只能做它的兄弟，横向留白也因此挪到壳上。
+   ⚠ 上内边距 28 是**算出来对齐用的**，不是留白：链接那一格是 `<input>`，字由 `align-items:center`
+   垂直居中，字顶离壳顶 = (105 − 边框 3×2 − 行高 42) / 2 + 边框 3 = 31.5；textarea 的字从框顶
+   顺着排，不给这一档就比链接格高一截（站长那句「文字tab里面的输入框里面的文字不是上下对齐，
+   要调整，与链接的输入框里面文字对齐样式」）。这一档写在内容坐标里，所以壳的边框 3 要先扣掉：
+   28 ＋ 边框 3 = 31。展开那一档给同一个数（壳高了、框跟着高，第一行的位置不变），
+   为的是聚焦展开那一下字不跳。
+   ⚠ `box-sizing:border-box` 不能省：这一格是 `height:100%` ＋ 上内边距，默认那个 content-box
+   会把 30 加在 100% 外面（框变成 129 高，溢出壳、字掉到圆角外面），静态读不出来、只有真量渲染才发现。 */
+.field-write {
+  padding-right: 14rpx;
 }
 
-.field-area-2 {
+/* 展开那一档：壳从 105 变 160（"多一行"），写在壳身上而不是框身上。
+   排在 .field 之后才盖得过它那条 height:105rpx。 */
+.field-write-2 {
   height: 160rpx;
-  padding: 16rpx 28rpx;
+}
+
+.field-area {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 100%;
+  line-height: 1.5;
+  padding: 28rpx 0 0;
 }
 
 /* ---------- 照片 · 已选：一横排小图 ----------
@@ -617,8 +727,8 @@
    站长要的是"展开只多一行"，四列就得三行。
    ➕ 与小图同尺寸同圆角（他的原话：「加图做成与小图一样尺寸的方图，风格统一」），
    margin-left:auto 把它钉在这一行的最右端：一格不满时它在右端，两行时它落在最后一格的右位。 */
+/* 已选那一排同样贴卡顶（上面 `.field` 那条同一个理由：富余只留给条上面那一档）。 */
 .strip {
-  margin-top: auto;
   display: flex;
   flex-wrap: wrap;
   gap: 16rpx;
@@ -788,16 +898,10 @@
   background: var(--cp-extract-ink);
 }
 
-/* 这一格还没东西可提交：圆转灰、字淡下去，滑到最右也不会触发（松手回弹 + 一句报错在框外）。
-   灰面用暗 alpha 而不是浅一档的实心：它要说的是"这一枚现在按不动"。 */
-.sld-off .sld-knob {
-  background: rgba(20, 22, 26, 0.14);
-}
-
-.sld-off .sld-glyph {
-  background: rgba(20, 22, 26, 0.42);
-}
-
+/* 这一格还没东西可提交：**圆钮照旧是橙色**（站长 10-10 深夜原话「拖动的圆ICON要换成橙色，
+   但如果上面的输入框里面没内容，不允许滑动圆ICON」）——"按不动"这件事以前是靠把圆洗成灰来表达，
+   现在改成靠行为表达（`create.js` 里 `!ready` 直接不给起拖），皮上不再另洗一档。
+   字那一档淡灰留着：它说的是"这一条现在还没内容"，不是"这枚钮坏了"。 */
 .sld-off .sld-txt {
   color: rgba(20, 22, 26, 0.38);
 }

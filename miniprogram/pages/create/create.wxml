@@ -59,13 +59,21 @@
 
     <view class="blk-row">
       <!-- 左块 = 原来那条胶囊的门面，点一下进的就是拍照那一档（openBar 落 photo，一字未改）。
-           双击换人物性别：小程序没有原生 dblclick，onTapPerson 自己按 300ms 内两下来判，
-           第一下不当成打开面板（见 create.js 那段）。选择写本机，下次进页沿用。
+           10-10 深夜把"连点两下换人"撤了：那一下会让每次开门都被一枚 300ms 定时器延住，
+           就是他打回这一版的理由。换人现在只走右后方那枚剪影，左块这一点没有任何延迟。
            人物那一张由 .blk-figwrap 裁：上边留 52rpx 出血让人超出块顶，下边裁到白条上沿，
            所以男的那张（更高）也不会把「记下来」压住——效果图里踩过的就是这个。 -->
-      <view class="blk-person" role="button" aria-label="{{t.barIdle}}" catchtap="onTapPerson" hover-class="blk-person-press" hover-stay-time="120">
+      <view class="blk-person" role="button" aria-label="{{t.barIdle}}" catchtap="openBar" hover-class="blk-person-press" hover-stay-time="120">
         <view class="blk-figwrap">
+          <!-- 主人物在前，另一张画成右后方那枚淡灰剪影（他 10-10 深夜那句：「女人在前，
+               男人就在右侧，用剪影淡灰缩小在右下，高度约为女的一半，在女的后面」）。
+               剪影自己不吃点击——它压在主人物后面，重叠那一条会被上面那张的方框吞掉，
+               所以另起一枚透明热区盖在最上层（下面那块 .blk-alt-hit）。
+               ⚠ 这一枚不挂 hover-class：它没有底色也没有子节点，按下态加在它身上画不出任何东西
+               （留着一行就是一条永不现形的声明）。换人那一下的反馈就是两张图当场对调。 -->
           <image class="blk-fig" src="{{personSrc}}" mode="widthFix" />
+          <image class="blk-fig-alt" src="{{personAltSrc}}" mode="widthFix" />
+          <view class="blk-alt-hit" role="button" aria-label="{{t.personSwap}}" catchtap="swapPerson"></view>
         </view>
         <view class="blk-jot">
           <view class="blk-jot-l">
@@ -93,18 +101,20 @@
 
   <view wx:if="{{active}}" class="entry-wrap">
     <!-- 展开态：面板外面那一行两枚小字（10-08 站长原话「这一行移出框外」）。
-         左边报名前在干什么、右边报怎么退出去，两枚都浮在形象图上，所以吃页面级
-         --text-tertiary：铺图时它是纸白 .56，没铺图时是这套壁纸的灰字，两头都不用另写规则。 -->
+         10-10 深夜他改了两枚的内容：左边不再写"选择记录模式"（那句话说的是框里本来就有的三个标签，
+         属于废话），换成与收起态同一条轮播 Tips；右边「点空白处收起」改成两个字「返回」，
+         与笔记列表、笔记卡片右上角那一枚同一个词、同一个动作（回第一屏）。
+         两枚都浮在形象图上，所以吃页面级 --text-tertiary：铺图时它是纸白 .56，
+         没铺图时是这套壁纸的灰字，两头都不用另写规则。 -->
     <view class="out">
-      <text class="out-l">{{t.chooseMode}}</text>
-      <text class="out-r">{{t.barCollapse}}</text>
+      <text class="out-l">{{tipsPrefix}}{{tips[tipIdx]}}</text>
+      <text class="out-r" role="button" aria-label="{{t.back}}" catchtap="collapse">{{t.back}}</text>
     </view>
-    <!-- 报错行放在框外、面板上面（10-08）：它是临时消息不是控件，塞进面板里就得给每一态
-         都预留一行高度，而那一段高度正是站长连说两轮"继续压低"要省的地方。
-         权限那一类整行可点，直接进设置；其余只是读。 -->
-    <view wx:if="{{hintLine}}" class="out-err" catchtap="openPermSetting">{{hintLine}}</view>
-
+    <!-- 报错不再占框外那一行（10-10 深夜改的，见下面 .hint-bubble 那条注释）：
+         整枚浮在输入框正上方，几秒自己走，权限那一类整枚可点进设置。 -->
     <view class="panel {{panelOpen ? 'panel-open' : ''}}" style="{{skinPanel}}" catchtap="noop">
+      <view wx:if="{{hintLine}}" class="hint-bubble {{errPerm ? 'hint-bubble-act' : ''}}"
+            role="alert" aria-label="{{hintLine}}" catchtap="onHintTap">{{hintLine}}</view>
       <view class="modes" catchtap="noop">
         <view class="md {{active === 'photo' ? 'on' : ''}}" catchtap="onTab" data-tab="photo">{{t.modePhoto}}</view>
         <view class="md {{active === 'url' ? 'on' : ''}}" catchtap="onTab" data-tab="url">{{t.modeUrl}}</view>
@@ -162,19 +172,27 @@
         </view>
 
         <!-- 文字：一个原文框（收起一行、展开两行）。标题和归类挪到详情页「编辑」里改，
-             所以这一屏只有一个框——站长 10-08 原话「砍一个输入框，只留一个输入框」。 -->
-        <textarea
-          wx:else
-          class="field field-area {{panelOpen ? 'field-area-2' : ''}}"
-          value="{{writeBody}}"
-          placeholder="{{t.manualDesc}}"
-          placeholder-class="field-ph"
-          maxlength="2000"
-          show-confirm-bar="{{false}}"
-          bindinput="onWriteBody"
-          bindfocus="onBodyFocus"
-          bindblur="onBodyBlur"
-        />
+             所以这一屏只有一个框——站长 10-08 原话「砍一个输入框，只留一个输入框」。
+             10-10 深夜补：右边那枚「粘贴」与链接那一档同一画法、同一个位置（他原话
+             「文字tab，里面输入框也要提供粘贴ICON，与链接tab一致」）。
+             ⚠ textarea 是原生组件，装不下子节点，所以这一格多包一层壳：壳吃 .field 那套皮，
+             钮是它的兄弟节点，框自己只负责字。 -->
+        <view wx:else class="field field-write {{panelOpen ? 'field-write-2' : ''}}">
+          <textarea
+            class="field-area"
+            value="{{writeBody}}"
+            placeholder="{{t.manualDesc}}"
+            placeholder-class="field-ph"
+            maxlength="2000"
+            show-confirm-bar="{{false}}"
+            bindinput="onWriteBody"
+            bindfocus="onBodyFocus"
+            bindblur="onBodyBlur"
+          />
+          <view class="field-paste" catchtap="onPasteWrite" aria-label="{{t.paste}}">
+            <view class="paste-glyph glyph-clipboard"></view>
+          </view>
+        </view>
 
         <!-- 「原文翻译」那一枚（站长 10-04 要的小开关，默认关）留在文字这一档，但只在展开态出现：
              500rpx 的面板肚子里只剩"一个框 + 一枚条"，塞不下第三样，而硬塞就得把面板抬高、
