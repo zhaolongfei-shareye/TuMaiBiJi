@@ -39,65 +39,39 @@ AU=app/core/auth.py
 AC=app/services/accounts.py
 GE=app/services/generation.py
 MI=alembic/versions/b71f4e0c9d52_generation_seq.py
-mkdir -p /tmp/rv-bak5
 
-run() {  # run <标号> <说明> <应当红的用例关键字> <改动命令> <被改的文件>
-  local tag="$1" desc="$2" needle="$3" mut="$4" file="$5"
-  local hits
-  hits=$(eval "$PY --collect-only -p no:warnings -k '$needle'" 2>/dev/null | grep -c '::')
-  if [ "$hits" -eq 0 ]; then
-    echo "$tag ★针没扎到用例★：\"$needle\" 在改坏之前就一条都没匹配到 —— 这条不算数"
-    return
-  fi
-  cp "$file" "/tmp/rv-bak5/$tag"
-  if ! eval "$mut"; then echo "$tag 改动命令失败，跳过（不算红也不算绿）"; cp "/tmp/rv-bak5/$tag" "$file"; return; fi
-  if [ "$(md5 -q "$file")" = "$(md5 -q /tmp/rv-bak5/$tag)" ]; then
-    echo "$tag ★突变没落盘★：$desc —— 命令跑完了但文件一字未改，这条不算数"
-    return
-  fi
-  # md5 只能证明"文件变了"，证明不了"变的是不是意图那一行"。10-10 真栽在这里（在 2-2 那支的
-  # E 刀上）：模式是整行文本，而新写的代码在**更靠前**的位置重复了同一句，perl 的 s/// 不带 /g、
-  # -0 整体读入时只换第一处，于是撤的是诊断分支、真防线一个字没动，判据照绿。
-  # 所以每一刀都把 diff 头两行贴进回执：读的人一眼能看出这一刀落在第几行、改成了什么。
-  local hitline
-  hitline=$(diff "/tmp/rv-bak5/$tag" "$file" | grep -E '^[<>]' | head -2 | sed 's/^\([<>]\) /\1/' | tr '\n' '|')
-  echo "     这一刀动的是：${hitline}"
-  if eval "$PY -k '$needle'" >/tmp/rv-out5 2>&1; then
-    echo "$tag ★假绿★（针覆盖 $hits 条）：$desc —— 实现改坏了，但判 \"$needle\" 仍然通过"
-    tail -3 /tmp/rv-out5 | sed 's/^/      /'
-  else
-    echo "$tag 红（符合预期，针覆盖 $hits 条）：$desc"
-  fi
-  cp "/tmp/rv-bak5/$tag" "$file"
-  if [ "$(md5 -q "$file")" != "$(md5 -q /tmp/rv-bak5/$tag)" ]; then
-    echo "$tag 还原失败，检查 $file"
-  fi
-}
+# 闸门那份公共实现见 probes/反向验证-lib.sh：collect-only 预数、突变落盘与 diff 回声、
+# ast.parse、FAILED 计数、锁与 trap 还原。本地那份 run() 删掉了，别再各留一份。
+source probes/反向验证-lib.sh
+rv_init 阶段2-3
 
 # ── 取号：`core/auth.login_or_register` 那一处 ─────────────────────
-run A "取号退回老那句『数全表 max + 1』（users 被删空就回到 1）" \
+# A：⚠ 这一刀原来在行尾带了个 `# rv` 标记——注释把那一行剩下的**闭括号**吞了，模块直接 import 不进来，
+#    pytest 报的是 collection error（非零退出），旧 `run()` 把它读成"红（符合预期）"。
+#    共用闸门那道 ast.parse 第一次抓到它。去掉标记之后这一刀是真红（两条判据，实测见 §8.196）。
+rv_run A "取号退回老那句『数全表 max + 1』（users 被删空就回到 1）" \
   "被删那人那把旧钥匙不许开新人的门 or 删空之后中间每一代发过的旧钥匙都开不了新人的门" \
-  "perl -pi -e 's/generation=generation\\.allocate\\(db\\)/generation=(max([u.generation for u in db.query(User).all()] or [0]) + 1)  # rv/' $AU" "$AU"
+  "perl -pi -e 's/generation=generation\\.allocate\\(db\\)/generation=(max([u.generation for u in db.query(User).all()] or [0]) + 1)/' $AU" "$AU"
 
-run B "allocate 里那层 live-max floor 撤掉（只信库里那一格）" \
+rv_run B "allocate 里那层 live-max floor 撤掉（只信库里那一格）" \
   "库里有人号比水位线高时" \
   "perl -pi -e 's/^    row\\.value = max\\(row\\.value, _live_max\\(db\\)\\) \\+ 1/    row.value = row.value + 1  # rv/' $GE" "$GE"
 
-run C "取号那一趟顺手把全表 generation 一起抬（活人全被踢下线）" \
+rv_run C "取号那一趟顺手把全表 generation 一起抬（活人全被踢下线）" \
   "新人注册不许把活人的钥匙抬废" \
   "perl -pi -e 's/generation=generation\\.allocate\\(db\\)\\)/generation=generation.allocate(db))  # rv 占位\n        db.query(User).update({\"generation\": User.generation + 1})/' $AU" "$AU"
 
 # ── 记账：`services/accounts.bump_generation` 那一处 ───────────────
-run D "bump 抬完不再把新号记回水位线（只在注册一处喂＝假防线）" \
+rv_run D "bump 抬完不再把新号记回水位线（只在注册一处喂＝假防线）" \
   "bump那一刀把水位线一起喂进去 or 删空之后中间每一代发过的旧钥匙都开不了新人的门" \
   "perl -0pi -e 's/    if rows:\\n        generation\\.note\\(db, max\\(row\\.generation for row in rows\\)\\)\\n//' $AC" "$AC"
 
-run E "note 里那句比较撤掉（无条件赋值＝水位线会被一次低代次的抬回）" \
+rv_run E "note 里那句比较撤掉（无条件赋值＝水位线会被一次低代次的抬回）" \
   "水位线只许往上走" \
   "perl -0pi -e 's/    if value > row\\.value:\\n        row\\.value = value/    row.value = value  # rv/' $GE" "$GE"
 
 # ── 迁移那一格 ────────────────────────────────────────────────────
-run F "迁移把那一格的初值写成 0（现网旧 token 的发号史就此失忆）" \
+rv_run F "迁移把那一格的初值写成 0（现网旧 token 的发号史就此失忆）" \
   "初值是当时的最高代次" \
   "perl -pi -e 's/\\{\"v\": int\\(live_max or 0\\)\\}/{\"v\": 0}  # rv/' $MI" "$MI"
 
@@ -105,19 +79,19 @@ run F "迁移把那一格的初值写成 0（现网旧 token 的发号史就此�
 UR=app/api/routes/user.py
 DE=app/services/deletion.py
 
-run G "把那道闸整个撤掉（回退成无条件带走整条 account——名下还有第二行时也带走）" \
+rv_run G "把那道闸整个撤掉（回退成无条件带走整条 account——名下还有第二行时也带走）" \
   "名下还有第二行时_account_与那一行都不许动" \
   "perl -pi -e 's/^    return None if others is not None else user\\.account_id/    return user.account_id  # rv/' $UR" "$UR"
 
-run H "把那道闸做过头（连\"名下只剩这一行\"也不带走 account）" \
+rv_run H "把那道闸做过头（连\"名下只剩这一行\"也不带走 account）" \
   "名下只剩这一行时带走整条_account" \
   "perl -pi -e 's/^    return None if others is not None else user\\.account_id/    return None  # rv/' $UR" "$UR"
 
-run I "撤掉\"account 那一行本来就不在\"那支例外（孤儿 openid 不再被摘掉，那个人下次登录撞 RuntimeError）" \
+rv_run I "撤掉\"account 那一行本来就不在\"那支例外（孤儿 openid 不再被摘掉，那个人下次登录撞 RuntimeError）" \
   "注销要连带摘掉占着openid的身份行" \
   "perl -0pi -e 's/    if alive is None:\\n        return user\\.account_id/    if alive is None:\\n        return None  # rv/' $UR" "$UR"
 
-run J "回体里那三格不再预先摆平（键集合重新随\"这一路带不带 account\"变形）" \
+rv_run J "回体里那三格不再预先摆平（键集合重新随\"这一路带不带 account\"变形）" \
   "一次删完七类数据并回报条数" \
   "perl -0pi -e 's/    deleted\\.update\\(\\{\"identities\": 0, \"link_codes\": 0, \"account\": 0\\}\\)\\n//' $DE" "$DE"
 
@@ -128,37 +102,37 @@ RL=app/core/rate_limit.py
 LK=app/services/linking.py
 AI=app/core/apple_identity.py
 
-run K "撤掉那句路径判断（/api 那一侧也开始带 code——已上线回体被改动）" \
+rv_run K "撤掉那句路径判断（/api 那一侧也开始带 code——已上线回体被改动）" \
   "同一条_401_在_api_上不带_code" \
   "perl -pi -e 's|^    if not is_v1_path\\(path\\):|    if False:  # rv|' $EC" "$EC"
 
-run L "给 400 现场编一个名字（站长那条\"没核实过的名字不许写进契约\"就是挡这一手）" \
+rv_run L "给 400 现场编一个名字（站长那条\"没核实过的名字不许写进契约\"就是挡这一手）" \
   "400_不带_code" \
   "perl -pi -e 's/^CODE_BY_STATUS = \\{$/CODE_BY_STATUS = {  # rv\n    400: \"bad_request\",/' $EC" "$EC"
 
-run M "全局 handler 那行注册撤掉（/v1 的 code 从此没人发，而 /api 一个字没变、看不出坏了）" \
+rv_run M "全局 handler 那行注册撤掉（/v1 的 code 从此没人发，而 /api 一个字没变、看不出坏了）" \
   "401_带_unauthorized" \
   "perl -pi -e 's/^app\\.add_exception_handler\\(StarletteHTTPException, http_exception_handler\\)/# rv app.add_exception_handler(StarletteHTTPException, http_exception_handler)/' $MN" "$MN"
 
-run N "把 429 那一格从名单里删掉（限流那一路不再报名字）" \
+rv_run N "把 429 那一格从名单里删掉（限流那一路不再报名字）" \
   "限流那一支注册的就是会翻名字的函数" \
   "perl -0pi -e 's/    429: \"rate_limited\",\\n//' $EC" "$EC"
 
 # O～R 是 10-10 代码审计那轮补的四刀。共同点：**改坏之后现网没有任何症状**（旧门照旧、
 # 新门只是少一个键或多一个不该有的键），所以只有刀能证明那四条判据不是装饰。
-run O "body 闸门那三行撤掉（204/304 开始带 JSON body，/api 一样中）" \
+rv_run O "body 闸门那三行撤掉（204/304 开始带 JSON body，/api 一样中）" \
   "body_必须是空的" \
   "perl -pi -e 's|^    if not is_body_allowed_for_status_code\\(exc\\.status_code\\):|    if False:  # rv|' $EC" "$EC"
 
-run P "路径判断退回 request.url.path（nginx 换成带前缀那种写法之后 /v1 静默不再带 code）" \
+rv_run P "路径判断退回 request.url.path（nginx 换成带前缀那种写法之后 /v1 静默不再带 code）" \
   "带_root_path_的前缀路径仍然算_v1" \
   "perl -pi -e 's/^    return get_route_path\\(request\\.scope\\)/    return request.scope[\"path\"]  # rv/' $EC" "$EC"
 
-run Q "is_v1_path 退回成只 startswith（/v1x 这类路径也拿到 code）" \
+rv_run Q "is_v1_path 退回成只 startswith（/v1x 这类路径也拿到 code）" \
   "看着像_v1_而不是_v1_的路径不许带_code" \
   "perl -pi -e 's|^    return path == \"/v1\" or path\\.startswith\\(\"/v1/\"\\)|    return path.startswith(\"/v1\")  # rv|' $EC" "$EC"
 
-run R "服务层默认状态码改成 403（error_codes 顶部那句\"v1 发不出 403\"当场变假话）" \
+rv_run R "服务层默认状态码改成 403（error_codes 顶部那句\"v1 发不出 403\"当场变假话）" \
   "v1_那一路今天发不出_403" \
   "perl -pi -e 's/status_code: int = 400\\):/status_code: int = 403):/' $LK" "$LK"
 
@@ -166,17 +140,18 @@ run R "服务层默认状态码改成 403（error_codes 顶部那句\"v1 发不�
 # 三刀共同点：**对外一个字都不变**（401 还是 401、话术还是那一句），所以接口层的判据一条都不会红——
 # 只有钉日志的那条会。S 撤整支、T 撤观察值、U 撤期望值：观察值与期望值要**各自**有一条能红，
 # 只钉一边等于"日志里有个 aud 字样"就算过，那和没写一样。
-run S "整支撤掉（aud 对不上落回那个只报类名的通用分支，填错值那天日志里没有答案）" \
+rv_run S "整支撤掉（aud 对不上落回那个只报类名的通用分支，填错值那天日志里没有答案）" \
   "aud_不对时日志里留下观察到的那一个" \
   "perl -pi -e 's/except jwt\\.InvalidAudienceError:/except jwt.InvalidSignatureError:/' $AI" "$AI"
 
-run T "观察值那一次读取撤掉（日志里那半个值变成一个横杠）" \
+rv_run T "观察值那一次读取撤掉（日志里那半个值变成一个横杠）" \
   "aud_不对时日志里留下观察到的那一个" \
   "perl -pi -e 's/_verified_aud\\(identity_token, public_key\\)/\"-\"/' $AI" "$AI"
 
-run U "期望值撤成别的一格配置（日志里那半个值不可信）" \
+rv_run U "期望值撤成别的一格配置（日志里那半个值不可信）" \
   "aud_不对时日志里留下观察到的那一个" \
   "perl -pi -e 's/settings\\.APPLE_CLIENT_ID\\)$/settings.JWT_ALGORITHM)/' $AI" "$AI"
 
 echo "=== 全部还原后复跑这四批的尺子，必须全绿 ==="
 $PY tests/test_persistent_generation.py tests/test_v1_account_deletion.py tests/test_account_deletion.py tests/test_v1_error_codes.py tests/test_v1_auth_and_link.py 2>&1 | tail -1
+rv_status

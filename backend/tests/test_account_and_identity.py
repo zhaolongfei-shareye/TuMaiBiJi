@@ -613,3 +613,74 @@ class Test同一个人同时登录两趟:
             s1.close()
             s2.close()
             engine.dispose()
+
+    def test_读不到赢家那一趟要认赢家不许多建一个(self, tmp_path):
+        """上面那一条**没有走到 except**：pysqlite 的 SELECT 不开事务，所以后到那一趟的
+        身份查询发生在赢家提交**之后**，它直接从头返回——测的是幂等，不是并发兜底。
+        这一条把那一发查询蒙住一次（只蒙开头那发 `AccountIdentity` 的读，恢复那发照实读），
+        于是这一趟真的插第二条身份、真的在 `commit()` 上撞 `ux_identity_provider_uid`，
+        走的正是被注释钉着的那一段：`rollback` → 读赢家 → 把这个人挂到赢家上。
+        """
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from app.db.database import Base
+        import app.models  # noqa: F401
+        from app.models.account import Account, AccountIdentity
+        from app.models.user import User
+        from app.services.accounts import ensure_for_user
+
+        engine = create_engine(f"sqlite:///{tmp_path / 'blind.db'}")
+        Base.metadata.create_all(engine)
+        with Session(engine) as seed:
+            seed.add(User(id=1, openid="o_blind", generation=1))
+            seed.commit()
+
+        class _只蒙一次身份读:
+            """把 `ensure_for_provider` 开头那发 `AccountIdentity` 查询蒙成"没查到"，
+            其余（含 except 里恢复那一发）一律交给真 Session。"""
+
+            def __init__(self, real):
+                self._real = real
+                self._left = 1
+
+            def query(self, entity, *rest):
+                q = self._real.query(entity, *rest)
+                if self._left and entity is AccountIdentity:
+                    self._left -= 1
+                    return _读不到(q)
+                return q
+
+            def __getattr__(self, name):
+                return getattr(self._real, name)
+
+        class _读不到:
+            def __init__(self, q):
+                self._q = q
+
+            def filter(self, *a, **k):
+                self._q = self._q.filter(*a, **k)
+                return self
+
+            def first(self):
+                return None
+
+            def __getattr__(self, name):
+                return getattr(self._q, name)
+
+        s1 = Session(engine)
+        s2 = Session(engine)
+        try:
+            u1 = s1.get(User, 1)
+            u2 = s2.get(User, 1)
+            a1 = ensure_for_user(s1, u1)          # 赢家，已经提交
+            a2 = ensure_for_user(_只蒙一次身份读(s2), u2)   # 这一趟撞唯一索引
+            assert a2.id == a1.id, f"撞了索引却没认赢家：{a2.id} != {a1.id}"
+            assert s1.query(Account).count() == 1, "撞索引那一趟多建了一个 account"
+            assert s1.query(AccountIdentity).count() == 1, "撞索引那一趟多建了一条微信身份"
+            s2.expire_all()
+            assert s2.get(User, 1).account_id == a1.id, "认了赢家却没把自己挂上去"
+        finally:
+            s1.close()
+            s2.close()
+            engine.dispose()
