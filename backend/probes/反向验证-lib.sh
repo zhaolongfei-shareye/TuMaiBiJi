@@ -36,7 +36,14 @@ RV_BAKDIR=""
 RV_LIVE_FILE=""
 RV_LIVE_BAK=""
 
-rv_init() {  # rv_init <锁名>：抢锁、开临时备份目录、挂 trap
+rv_init() {  # rv_init <锁名>：先认 cwd，再抢锁、开临时备份目录、挂 trap
+  # 这道闸必须在抢锁**之前**：那时 trap 还没挂，退了会留下一把没人清的锁。
+  # 为什么要认 cwd——`rv_run` 里 ast 闸写的是 `.venv/bin/python`，`RV_PY` 默认值也是相对路径，
+  # 从别的目录跑的话每一条刀都报★突变把文件改崩了★：那是 python 找不到，不是文件真崩了。
+  if [ ! -x .venv/bin/python ]; then
+    echo "rv_init：当前目录下没有可执行的 .venv/bin/python —— 这一套要在 backend/ 里跑（用法见文件头）。没抢锁、没动任何文件。pwd=$(pwd)"
+    exit 1
+  fi
   local lock="/tmp/反向验证-$1.lock"
   if ! mkdir "$lock" 2>/dev/null; then
     echo "另一支正在跑这一套（$lock 已经存在）——这些脚本改的是仓库里的真源文件，不并发跑。"
@@ -156,15 +163,18 @@ rv_run() {  # rv_run <标号> <说明> <应当红的用例关键字> <改动命�
 }
 
 rv_recheck() {  # rv_recheck <测试文件…>：还原之后复跑这一支相关的尺子，非零必须记账
+  # 这里**不许再加一个 `-q`**：`RV_PY` 自带 `-q`，两条 `-q -q` 就是 quiet level 2，
+  # 实测那种跑法**不打最后那行 "N passed"**（尾巴只剩 warnings 的 `-- Docs:` 那一句），
+  # 于是"复跑全绿"这句又没有数了——正是这一条函数要消灭的东西。读数行一律带上退出码。
   local out last code
-  out=$(eval "$RV_PY -q $*" 2>&1); code=$?
-  last=$(printf '%s\n' "$out" | tail -1)
+  out=$(eval "$RV_PY $*" 2>&1); code=$?
+  last=$(printf '%s\n' "$out" | sed '/^[[:space:]]*$/d' | tail -1)
   if [ "$code" -ne 0 ]; then
     echo "★还原复跑不绿★（退出码 $code）：$last —— 这一支把盘上的东西改坏了没还原干净，或者判据本来就红"
     printf '%s\n' "$out" | grep -a '^FAILED' | head -3 | sed 's/^/      /'
     RV_BAD=$((RV_BAD + 1))
   else
-    echo "$last"
+    echo "退出码 0 ｜ $last"
   fi
 }
 
