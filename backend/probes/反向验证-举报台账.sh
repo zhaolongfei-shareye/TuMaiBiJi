@@ -35,7 +35,6 @@
 # ② 状态四档里"已撤回"那一支（`elif not active`）没有单独一刀：撤掉与过期两档共用的
 #    是那一段 if 链，P～T 之外再切一刀的成本与 D 刀重复（D 已经把整条链的后两档废掉）。
 cd /Users/zlfmac/Documents/TuMaiBiJi/backend || exit 1
-PY=".venv/bin/python -m pytest -q"
 LR=app/services/report_ledger.py
 PB=probes/读-举报台账.py
 GATE_DB=/tmp/ledger-gate.db

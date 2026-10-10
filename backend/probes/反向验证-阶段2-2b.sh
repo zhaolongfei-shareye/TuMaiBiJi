@@ -24,7 +24,6 @@
 # 两条（`routes/user.py:_account_to_take_along`），H 刀的针与突变式都跟着换了；旧的 `purge(db, [user],
 # user.account_id)` 那一行在盘上已经不存在，H 刀要是还照旧式写，报的会是★突变没落盘★而不是红。
 cd /Users/zlfmac/Documents/TuMaiBiJi/backend || exit 1
-PY=".venv/bin/python -m pytest -q"
 DE=app/services/deletion.py
 VB=app/api/routes/v1_account.py
 UR=app/api/routes/user.py

@@ -5,7 +5,6 @@
 # 这一批有两条建表路要分开钉：用例走 create_all（读模型），线上走 alembic（读迁移）。
 # 所以 C 与 F 是同一条唯一索引的两面：C 改迁移、F 改模型，红的尺子不是同一把。
 cd /Users/zlfmac/Documents/TuMaiBiJi/backend || exit 1
-PY=".venv/bin/python -m pytest -q"
 AU=app/core/auth.py
 SV=app/services/accounts.py
 MD=app/models/account.py

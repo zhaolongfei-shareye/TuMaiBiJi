@@ -34,7 +34,6 @@
 # 判的是"__init__ 与 alembic/env.py **任一**挂着就行"，而这一批两处都挂了，所以只删一处它本来就该绿
 # ——那是设计如此，不是针没扎到。要验它得两处一起删，那种双文件突变这一套 run() 不做。
 cd /Users/zlfmac/Documents/TuMaiBiJi/backend || exit 1
-PY=".venv/bin/python -m pytest -q"
 AU=app/core/auth.py
 AC=app/services/accounts.py
 GE=app/services/generation.py

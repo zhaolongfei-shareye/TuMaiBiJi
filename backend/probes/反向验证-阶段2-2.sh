@@ -32,7 +32,6 @@
 # - A / B：`int()` 撞类型和"按 sub 查不到那一行"都会给出 401，只比状态码分不出守卫有没有跑。
 #   所以两条判据各加一句**报错文案**断言——文案正是这两道守卫唯一多做的那件事。
 cd /Users/zlfmac/Documents/TuMaiBiJi/backend || exit 1
-PY=".venv/bin/python -m pytest -q"
 AU=app/core/auth.py
 AI=app/core/apple_identity.py
 LC=app/services/link_codes.py

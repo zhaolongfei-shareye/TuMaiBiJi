@@ -36,23 +36,17 @@ RV_BAKDIR=""
 RV_LIVE_FILE=""
 RV_LIVE_BAK=""
 
-rv_init() {  # rv_init <锁名>：先认 cwd，再抢锁、开临时备份目录、挂 trap
-  # 这道闸必须在抢锁**之前**：那时 trap 还没挂，退了会留下一把没人清的锁。
-  # 为什么要认 cwd——`rv_run` 里 ast 闸写的是 `.venv/bin/python`，`RV_PY` 默认值也是相对路径，
-  # 从别的目录跑的话每一条刀都报★突变把文件改崩了★：那是 python 找不到，不是文件真崩了。
+rv_init() {  # rv_init <锁名>：先认 cwd，再抢锁、挂 trap，最后才开临时目录
+  # 这道闸必须在抢锁**之前**：那时 trap 还没挂，退了会留下一把没人清的锁（反证做在
+  # `/tmp/aud3m/lib-afterlock.sh`：把这段搬到 `mkdir` 之后，同样 exit 1，但锁真留在盘上）。
+  # 为什么要认 cwd——`rv_run` 里 ast 闸写的是相对路径 `.venv/bin/python`：cwd 不对时它找不到解释器。
+  # 报出来的**标签**取决于 `RV_PY`：默认（相对）值时是★突变把文件改崩了★，`RV_PY` 被覆盖成绝对路径时
+  # 第一条先报★针没扎到用例★（`--collect-only` 先撞在错的 rootdir 上）。两种都是全部"不算数"＋退出码非零。
   if [ ! -x .venv/bin/python ]; then
     echo "rv_init：当前目录下没有可执行的 .venv/bin/python —— 这一套要在 backend/ 里跑（用法见文件头）。没抢锁、没动任何文件。pwd=$(pwd)"
     exit 1
   fi
   local lock="/tmp/反向验证-$1.lock"
-  if ! mkdir "$lock" 2>/dev/null; then
-    echo "另一支正在跑这一套（$lock 已经存在）——这些脚本改的是仓库里的真源文件，不并发跑。"
-    echo "确认没有别的过程在跑之后：rmdir $lock 再来。"
-    exit 1
-  fi
-  RV_LOCK="$lock"
-  RV_BAKDIR=$(mktemp -d /tmp/rv-lib.XXXXXX)
-  RV_OUT=$(mktemp /tmp/rv-lib-out.XXXXXX)
   rv_restore_now() {
     if [ -n "$RV_LIVE_FILE" ] && [ -n "$RV_LIVE_BAK" ] && [ -f "$RV_LIVE_BAK" ] && [ -f "$RV_LIVE_FILE" ]; then
       cp "$RV_LIVE_BAK" "$RV_LIVE_FILE"
@@ -76,8 +70,18 @@ rv_init() {  # rv_init <锁名>：先认 cwd，再抢锁、开临时备份目录
     echo "!! 被打断：已还原并释放锁，后面的刀不再跑（这一支到此为止）"
     exit 130
   }
+  if ! mkdir "$lock" 2>/dev/null; then
+    echo "另一支正在跑这一套（$lock 已经存在）——这些脚本改的是仓库里的真源文件，不并发跑。"
+    echo "确认没有别的过程在跑之后：rmdir $lock 再来。"
+    exit 1
+  fi
+  RV_LOCK="$lock"
+  # trap 紧跟在"我开始拥有这把锁"之后挂，临时目录在 trap 之后才造：中间任何一步被打断，
+  # 都不会留下没人负责的锁或 `/tmp/rv-lib.*` 空目录（10-10 深夜盘上就有四个这样的遗留目录）。
   trap rv_on_exit EXIT
   trap rv_on_signal INT TERM
+  RV_BAKDIR=$(mktemp -d /tmp/rv-lib.XXXXXX)
+  RV_OUT=$(mktemp /tmp/rv-lib-out.XXXXXX)
 }
 
 rv_run() {  # rv_run <标号> <说明> <应当红的用例关键字> <改动命令> <被改的文件>
@@ -87,6 +91,14 @@ rv_run() {  # rv_run <标号> <说明> <应当红的用例关键字> <改动命�
   RV_SOFT=0
   local tag="$1" desc="$2" needle="$3" mut="$4" file="$5"
   local hits bak failed hitline
+  # `rv_init` 没跑就 `>` 到空的 `$RV_OUT`：bash 报一句"重定向失败"、pytest **一条都没执行**，
+  # 而这一支往下读的是"eval 非零 = 红"，于是打出 `红（符合预期，针覆盖 1 条、FAILED  条）`
+  # 并把 `rv_status` 留在 0（实测复现过）。所以先问备份目录与输出文件在不在，再谈跑不跑。
+  if [ -z "$RV_BAKDIR" ] || [ ! -d "$RV_BAKDIR" ] || [ -z "$RV_OUT" ]; then
+    echo "$tag ★rv_init 没跑★：备份目录或输出文件没备好（RV_BAKDIR='$RV_BAKDIR' RV_OUT='$RV_OUT'），这一刀不跑"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
   hits=$(eval "$RV_PY --collect-only -p no:warnings -k '$needle'" 2>/dev/null | grep -c '::')
   if [ "$hits" -eq 0 ]; then
     echo "$tag ★针没扎到用例★：\"$needle\" 在改坏之前就一条都没匹配到 —— 这条不算数"
@@ -137,7 +149,8 @@ rv_run() {  # rv_run <标号> <说明> <应当红的用例关键字> <改动命�
       RV_FAKE_GREEN=$((RV_FAKE_GREEN + 1))
     fi
   else
-    failed=$(grep -ac '^FAILED' "$RV_OUT")
+    failed=$(grep -ac '^FAILED' "$RV_OUT" 2>/dev/null)
+    [ -z "$failed" ] && failed=0   # 空串会让下面那句 `-eq` 报"integer expression expected"然后掉进"红"
     if [ "$failed" -eq 0 ]; then
       echo "$tag ★红得不明不白★（针覆盖 $hits 条）：$desc —— 非零退出但一条 FAILED 都没有，那是环境炸了不是牙"
       tail -3 "$RV_OUT" | sed 's/^/      /'
@@ -166,15 +179,26 @@ rv_recheck() {  # rv_recheck <测试文件…>：还原之后复跑这一支相�
   # 这里**不许再加一个 `-q`**：`RV_PY` 自带 `-q`，两条 `-q -q` 就是 quiet level 2，
   # 实测那种跑法**不打最后那行 "N passed"**（尾巴只剩 warnings 的 `-- Docs:` 那一句），
   # 于是"复跑全绿"这句又没有数了——正是这一条函数要消灭的东西。读数行一律带上退出码。
-  local out last code
+  local out summary last code
   out=$(eval "$RV_PY $*" 2>&1); code=$?
+  # 取的**不是"最后一行"，是"带计数那一行"**：任何在 pytest 之后才冒出来的噪声（夹具挂的 atexit、
+  # 外层命令的尾巴）会把汇总行顶掉，实测能取出 `LATE-NOISE …` 这种一句数都没有的行。
+  summary=$(printf '%s\n' "$out" | grep -aE '[0-9]+ (passed|failed|error)([^a-z]|$)' | tail -1)
   last=$(printf '%s\n' "$out" | sed '/^[[:space:]]*$/d' | tail -1)
   if [ "$code" -ne 0 ]; then
-    echo "★还原复跑不绿★（退出码 $code）：$last —— 这一支把盘上的东西改坏了没还原干净，或者判据本来就红"
+    echo "★还原复跑不绿★（退出码 $code）：${summary:-$last}"
+    case "$code" in
+      2|4|5|126|127)
+        echo "      退出码 $code 属「这一趟根本没跑起来」那一家（用法错／文件不存在／-k 那条针没匹配上／找不到解释器），「改坏了没还原」是另一回事"
+        ;;
+      *)
+        echo "      要么这一支把盘上的东西改坏了没还原干净，要么判据本来就红"
+        ;;
+    esac
     printf '%s\n' "$out" | grep -a '^FAILED' | head -3 | sed 's/^/      /'
     RV_BAD=$((RV_BAD + 1))
   else
-    echo "退出码 0 ｜ $last"
+    echo "退出码 0 ｜ ${summary:-$last}"
   fi
 }
 
