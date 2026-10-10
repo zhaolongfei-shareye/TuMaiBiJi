@@ -101,6 +101,8 @@ ck('--photo-shadow 这个令牌整个撤掉了（全仓一处都不许剩）',
     'pages/me/me.wxss'].map((f) => read(f)).join('')))
 
 // ---------- ④ 现网那层罩子的七个停点一个字没动（弯月档＝改版前的样子） ----------
+//（10-10 我一度照效果图 c5 把新建页这层翻成提亮罩，站长说没下过这条需求，已撤回；
+//  判据跟着撤回原样。要再动这一层，得他先下这句。）
 const scrim = /\.page-scrim\s*\{[\s\S]*?background:\s*linear-gradient\(([^;]*)\);/.exec(strip(read('pages/create/create.wxss')))
 ck('新建页罩子仍是那七个停点', !!scrim && (scrim[1].match(/rgba\(18, 20, 26/g) || []).length === 7,
   scrim ? `${(scrim[1].match(/rgba\(18, 20, 26/g) || []).length} 个停点` : '没找到那条规则')

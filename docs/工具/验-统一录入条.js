@@ -93,19 +93,27 @@ ok('三个标签都是单个词级：照片/链接/文字',
    （10-08 站长口径：砍一个输入框，标题和分类到详情页改）。 */
 ok('文字档那句占位字说的是原文与摘要，不再承诺标题',
   !/标题/.test(zh.manualDesc) && /摘要/.test(zh.manualDesc), zh.manualDesc)
-// 英文那侧必须放得进一行：框内宽 = 566(卡内) − 28×2(左右内缩) = 510rpx，28rpx 字号按 14rpx/字算放得下 36 个字符
+// 英文那侧必须放得进一行：框内宽 = 586(卡内) − 28×2(左右内缩) = 530rpx，28rpx 字号按 14rpx/字算放得下 37 个字符
 const phEn = en.manualDesc
 ok('英文占位字放得进单行框（≤36 字符，折行=红）', phEn.length <= 36, `${phEn.length}：${phEn}`)
 
 // ---------- 2. 结构：收起一条、展开三枚标签、面板里只剩两样控件 ----------
 ok('旧的三张入口卡已经拆掉', !/class="card entry/.test(wxml))
 ok('没有残留的手风琴开关', !/toggleCard/.test(wxml) && !/toggleCard/.test(js))
-ok('条身只有一条', (wxml.match(/class="bar[ "]/g) || []).length === 1)
-ok('条身只在收起态渲染（展开时整条让位给面板）',
-  /<view wx:if="{{!active}}" class="bar" catchtap="openBar">/.test(wxml)
-  && !/class="bar \{\{active/.test(wxml))
-ok('条身那句永远是 barIdle（不再按模式换字）',
-  /class="bar-label">\{\{t\.barIdle\}\}/.test(wxml))
+// 10-10 晚：收起态那条纸白胶囊换成左块人物（效果图 PNG图标.png）。
+// 原来钉 `.bar` 那三条的前提没了，改钉同一件事的新载体：入口只有一块、只在收起态在、
+// 那句话永远只读 barIdle 一个键。旧胶囊的类名与样式一并钉"不许留第二份"——
+// 两版并存是这类改版最容易漏的（屏上看着对，其实两套都在跑）。
+ok('收起态入口只有一块人物（胶囊那套类名与样式一处不留）',
+  // 数的是 `class="blk-person…`，且 class 前面必须是空白或引号：
+  // 按下态那枚 `hover-class="blk-person-press"` 尾巴上也带这一段，不加边界会数成两块。
+  (wxml.match(/(?:^|[\s"])class="blk-person/g) || []).length === 1
+  && !/(?:^|[\s"])class="bar[ "]/.test(wxml) && !/\.bar\s*[{:，,]|\.bar-lead|\.bar-label/.test(wxss),
+  `blk-person ${(wxml.match(/(?:^|[\s"])class="blk-person/g) || []).length} 块`)
+ok('那一组只在收起态渲染（展开时整组让位给面板）',
+  /<view wx:if="\{\{!active\}\}" class="home-blk"/.test(wxml))
+ok('左块那句永远是 barIdle（不再按模式换字）',
+  /class="blk-jot-l">[\s\S]{0,160}\{\{t\.barIdle\}\}/.test(wxml))
 ok('旧的 .bar.open 与条内 hint 整段撤净', !/\.bar\.open/.test(wxss) && !/bar-hint/.test(wxml + wxss))
 // 收起态条身右边那三枚小圆：站长 10-09 撤了（原话"原来横条右边那三个按钮不清晰，
 // 默认就是直接拍照那一档"）。原来那两条"正好三枚／各自指向 camera|album|url"改成钉**撤净**，
@@ -116,15 +124,20 @@ ok('条身那三枚小圆整块撤净（.bar-dots／.dot／两个 handler 任一
 ok('点条身进的就是拍照那一档（openBar 落 photo；相册与链接仍从面板里进）',
   /openBar\(\)\s*\{[\s\S]{0,200}this\.open\('photo'\)/.test(js)
   && /data-source="album"/.test(wxml) && /data-tab="url"/.test(wxml))
-// 站长 10-09 另一句：「调亮度和换背景换到日期下方」。
-// 这一条钉的是**顺序与归属**，不是样式：那一行必须排在 date-row 之后、录入条容器之前，
-// 且不再住在 `.entry-wrap` 里面（住在里面就会跟着面板一起被让位逻辑管着）。
-const iDate = wxml.indexOf('class="date-row"')
+// 站长 10-09 夜两句：「调亮度和换背景，之前不是说了换到日期位置吗？」＋指着效果图 c5 说
+// 「这个方案完全没做」。稿上标题下面那一格就是这一行，**日期那行在稿上没有**。
+// 所以这一条钉的是**顺序与归属**，不是样式：那一行必须排在标题行之后、录入条容器之前，
+// 且不再住在 `.entry-wrap` 里面（住在里面就会跟着面板一起被让位逻辑管着）；
+// 同时日期那一格整个不许留壳（留一半 = 屏上多一行没人要的东西）。
+const iTitle = wxml.indexOf('class="title-row"')
 const iSwap = wxml.indexOf('class="home-swap"')
 const iEntry = wxml.indexOf('class="entry-wrap"')
-ok('「调亮度｜换背景」那一行搬到了日期下面、录入条上面（三个节点的先后顺序）',
-  iDate > -1 && iSwap > iDate && iEntry > iSwap,
-  `date ${iDate} / swap ${iSwap} / entry ${iEntry}`)
+ok('「调亮度｜换背景」那一行顶在日期原来那一格（标题行之后、录入条之前）',
+  iTitle > -1 && iSwap > iTitle && iEntry > iSwap,
+  `title ${iTitle} / swap ${iSwap} / entry ${iEntry}`)
+ok('日期＋星期那一行撤净了（节点、样式、JS 里那三位都不许留）',
+  !/date-row|dateText|weekText|dateLineFor/.test(wxml + wxss + js),
+  (wxml + wxss + js).match(/date-row|dateText|weekText|dateLineFor/g)?.slice(0, 3).join(' ') || '零处')
 ok('那一行全页只有一份（搬走就别留第二份；上面那条比的是第一个位置，这条才咬得住重复）',
   (wxml.match(/class="home-swap"/g) || []).length === 1,
   `${(wxml.match(/class="home-swap"/g) || []).length} 份`)
@@ -136,11 +149,15 @@ ok('面板自己吃掉点击，不会一点输入框就收起', /class="panel[^"
 ok('整页仍是收起点击区', /bindtap="collapse"/.test(wxml))
 // 「选择记录模式 / 点空白处收起」这一行在面板**外面**（站长原话「移出框外」）。
 // 只查两段文字在不在等于没查——要看它在 DOM 里的位置：必须在 .panel 那个节点之前。
+// 10-10 晚 `wx:if="{{active}}"` 从这一行搬到了它的父级 `.entry-wrap` 上（收起态整组
+// 已经拆出去贴底，父级只在展开时存在），所以这一条改钉：位置关系不变、active 那道闸由父级把。
 const outAt = wxml.indexOf('class="out"')
 const panelAt = wxml.indexOf('class="panel ')
+const wrapAt = wxml.indexOf('class="entry-wrap"')
 ok('那一行小字存在且排在面板之前（在框外）',
-  outAt > -1 && panelAt > outAt && /<view wx:if="{{active}}" class="out">/.test(wxml),
-  `out@${outAt} panel@${panelAt}`)
+  outAt > -1 && panelAt > outAt && wrapAt > -1 && outAt > wrapAt
+  && /<view wx:if="\{\{active\}\}" class="entry-wrap">/.test(wxml),
+  `wrap@${wrapAt} out@${outAt} panel@${panelAt}`)
 ok('那一行两枚：左边选模式、右边说怎么退',
   /class="out-l">\{\{t\.chooseMode\}\}<\/text>\s*<text class="out-r">\{\{t\.barCollapse\}\}/.test(wxml))
 // 面板肚子里只剩"一个框（或一横排小图）+ 一枚条"：那排按钮、四步指引、清空、粘贴都不该回来
@@ -222,8 +239,10 @@ ok('页面上绑到的处理函数在 create.js 里都有', [...handlers].length
 const panelCss = seg('.panel')
 const PANEL_H = num(panelCss, 'height')
 const PANEL_OPEN_H = num(seg('.panel-open'), 'height')
-ok('面板收起态定高 500rpx（10-08 从 700 压下来，站长两轮"继续压低"）', PANEL_H === 500, String(PANEL_H))
-ok('展开态只多一行（580 = 500 + 80）', PANEL_OPEN_H === 580 && PANEL_OPEN_H - PANEL_H === 80, String(PANEL_OPEN_H))
+// 410／490 是站长 10-08 深夜圈的那个红框（顶 rpx 1107、底 1516）量出来的两档，
+// 正本效果图 c5；10-08 之前是 500／580，再之前 700。改这两个数要连着改下面那三条算式。
+ok('面板收起态定高 410rpx（10-10 压进站长那圈红框；10-08 从 700 压到 500 是上一笔）', PANEL_H === 410, String(PANEL_H))
+ok('展开态只多一行（490 = 410 + 80）', PANEL_OPEN_H === 490 && PANEL_OPEN_H - PANEL_H === 80, String(PANEL_OPEN_H))
 ok('面板算 border-box（定高含内边距与描边）', /box-sizing:\s*border-box/.test(panelCss))
 ok('面板是 flex 列', /display:\s*flex/.test(panelCss) && /flex-direction:\s*column/.test(panelCss))
 ok('展开那一档挂在面板自己身上，不是另一块 DOM',
@@ -240,7 +259,11 @@ const [panelPadY, panelPadX, panelPadBottom] = panelPad
 const cardBorder = num(cardCss, 'border')
 const cardPad = num(cardCss, 'padding')
 const cardMargin = num(cardCss, 'margin-top')
-const modesMargin = num(seg('.modes'), 'margin-top')
+// 10-10 压进红框把标签行上面那 25rpx 归 0 了（站长那句"小横杠与下方靠近"）。
+// 这里读不到就当 0，但下面那条钉"必须真的没有"，别让它悄悄长回来。
+const modesMargin = Number.isFinite(num(seg('.modes'), 'margin-top')) ? num(seg('.modes'), 'margin-top') : 0
+ok('标签行上面不再有 margin（那一档 10-10 归 0，算式里它就是 0）',
+  !/margin-top/.test(seg('.modes')), seg('.modes').replace(/\s+/g, ' ').slice(0, 70))
 // 行高那一档用 1.6 而不是 CSS 里写的 1.3：10-08 真跑量到标签那一块比算式多 15rpx
 // （微信给 view 的默认行高约 1.6，`.md` 上那一条没吃进去），算式取**实测那一档**才不骗人。
 const mdLine = num(seg('.md'), 'font-size') * 1.6 + num(seg('.md'), 'padding-bottom')
@@ -303,8 +326,11 @@ ok('JS 里"停在最右"那一格 == 轨道内宽 − 圆宽 − 左边内缩',
   SLD_MAX === calcMax, `JS ${SLD_MAX} / 算出 ${calcMax}（轨道内宽 ${sldInner}）`)
 ok('圆停在最右那一格仍然在轨道里（留 0 到 20rpx 的余量）',
   calcMax + knobW + knobRest <= sldInner + 0.01, String(sldInner))
-ok('圆那一圈白环是轨道自己的 border，进度填充盖不到它',
-  /border:\s*\d+rpx solid var\(--cp-ink\)/.test(seg('.sld'))
+// 那一圈与轨道同色（旧稿是纸白环、10-10 换浅面之后是井那一档），关键是它写在 .sld 的
+// border 上、而填充是绝对定位的兄弟节点——圆滑到最右也不会把它盖掉。
+ok('圆外面那一圈是轨道自己的 border，进度填充盖不到它',
+  /border:\s*\d+rpx solid var\(--cp-field\)/.test(seg('.sld'))
+  && /background:\s*var\(--cp-field\)/.test(seg('.sld'))
   && /position:\s*absolute/.test(seg('.sld-fill')) && !/z-index/.test(seg('.sld-fill')))
 ok('进度那一格是假进度：封顶 90%、按 exp 曲线推、完成才钉满',
   /Math\.min\(90, Math\.round\(90 \* \(1 - Math\.exp\(-sec \/ 30\)\)\)\)/.test(js)
@@ -352,7 +378,13 @@ ok('create.js 每次进页重发这套面（换壁纸回来要跟上）',
   /skinPanel: createSkin\(\)/.test(js) && /createSkin/.test(js.replace(/\n\s*\/\*[\s\S]*?\*\//g, '')))
 // 那两支橙现在**是固定的**（站长 10-08 第三条决定，口径 docs/规格-创建入口这一条线.md §6.1），
 // 但一份都不许抄进 wxss——抄了就是把"固定"实现成了"每页各写一遍"，改出口时改不动。
-const derived = (skin.match(/--cp-(?:cam|extract)(?:-ink)?:([^;]+)/g) || []).map((x) => x.split(':')[1].toUpperCase())
+// ⚠️ 纯中性白/黑要放过：这一条的名字说的是"那两支橙"，钉的是品牌色不许各页各写一遍。
+// 而 --cp-extract-ink 恰好就是 #FFFFFF，于是任何一页里合法的纯白（如 10-10 晚左块那条
+// 「记下来」的白底，站长原话「底色换成纯白」）都会被误报成抄了橙。那两枚橙的**值**
+// 由下面两条按名钉死，中性白抄不坏东西，不在本条射程内。
+const NEUTRAL = ['#FFFFFF', '#000000']
+const derived = (skin.match(/--cp-(?:cam|extract)(?:-ink)?:([^;]+)/g) || [])
+  .map((x) => x.split(':')[1].toUpperCase()).filter((h) => !NEUTRAL.includes(h))
 ok('快门与滑动条那两支橙没有一份抄进 wxss',
   !derived.some((h) => wxssHexes.includes(h)), derived.filter((h) => wxssHexes.includes(h)).join(','))
 // §6.1 那两行 + 那条硬约束，钉成三条：值、字色、以及"换壁纸这两枚不许动"。
@@ -437,7 +469,15 @@ ok('onShow 仍然不重置草稿', !/previewImages: \[\]/.test(showBody) && !/ac
 ok('选完图返回仍然重算那三位（ready / 满 / 展开）',
   /this\._sync\(\)/.test(js) && /_sync\(\)\s*\{[\s\S]{0,600}panelOpen:/.test(js))
 ok('链接校验那条正则没被顺手改松', js.includes('const LINK_RE = /^https?:\\/'))
-ok('Tips 那一行仍然只在收起态渲染', /wx:if="\{\{!active && tips\.length\}\}"/.test(wxml))
+// Tips 那一行仍然**只在收起态**渲染。原来它自己挂着 `!active && tips.length` 那道闸；
+// 10-10 晚它搬进了收起态那一组里，闸由组外壳 `<view wx:if="{{!active}}" class="home-blk">` 把，
+// 自己只留 `tips.length`。所以这一条钉的是"落在组里、且排在展开态之前"——
+// 光查那两个 wx:if 字面量会漏掉"搬出去了但闸没跟上"这一型（那样展开时提示会浮在面板上）。
+ok('Tips 那一行仍然只在收起态渲染（闸在组外壳上，本人在组内）',
+  /<view wx:if="\{\{tips\.length\}\}" class="tips">/.test(wxml)
+  && wxml.indexOf('class="home-blk"') < wxml.indexOf('class="tips"')
+  && wxml.indexOf('class="tips"') < wxml.indexOf('class="entry-wrap"'),
+  `blk@${wxml.indexOf('class="home-blk"')} tips@${wxml.indexOf('class="tips"')} wrap@${wxml.indexOf('class="entry-wrap"')}`)
 ok('Tips 六句中英各一份、句数相等', Array.isArray(zh.tips) && Array.isArray(en.tips)
   && zh.tips.length === 6 && en.tips.length === zh.tips.length)
 ok('一句停 8 秒', /\}, 8000\)/.test(js) && !/\}, 4000\)/.test(js))

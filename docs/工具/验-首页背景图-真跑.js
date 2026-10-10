@@ -36,6 +36,12 @@ const ck = (name, ok, got) => {
     const v = wx.getStorageSync(key)
     return v === '' || v === undefined ? '(空)' : JSON.stringify(v)
   }, k)
+  // 读**元素自己**身上的 class。原来这一条写成 `(d.themeClass + ' has-bg').includes('has-bg')`
+  // ——把常量拼进字符串再判包含，那是恒真，markup 里真丢了 has-bg 也照样绿（10-10 审计点的）。
+  const clsOf = async (sel) => {
+    const e = await page.$(sel)
+    return e ? await e.attribute('class') : ''
+  }
 
   // 先记下这一台模拟器原来的形象设置，探针结束时原样还回去
   const profileBefore = await readKey('poster_profile')
@@ -47,13 +53,25 @@ const ck = (name, ok, got) => {
   await sleep(4000)
   let d = await page.data()
   ck('没设形象时 bgSrc 是站长那张', d.bgSrc === DEFAULT_BG, d.bgSrc)
-  ck('容器带上了 has-bg', (d.themeClass + ' has-bg').includes('has-bg') && !!d.bgSrc)
+  const contCls = await clsOf('.container')
+  ck('容器元素自己身上真的有 has-bg（读 class，不拿 data 拼一句恒真话）',
+    /(^|\s)has-bg(\s|$)/.test(contCls) && !!d.bgSrc, contCls || '(读不到 .container)')
+  // 静态那把尺子扫不到"整枚类名来自数据"这一类（`{{themeClass}}`），这里补上：
+  // data 里那一枚必须真的出现在元素的 class 串上，否则壁纸换了就只是改了数据、界面没跟上。
+  ck('{{themeClass}} 那一枚也真落进了 class（静态扫不到的那类，只能在模拟器里读）',
+    !!d.themeClass && new RegExp(`(^|\\s)${d.themeClass}(\\s|$)`).test(contCls), `data=${d.themeClass}／元素=${contCls}`)
+  // 收起态不许带 entry-dock：`.container.has-bg:not(.entry-dock) .entry-wrap` 那一条夹高度
+  // 靠的就是这个名字，展开时才挂上（见下面 ② 那一段）。
+  ck('没展开时容器不带 entry-dock（展开那一下才挂上，见 ②）',
+    !/(^|\s)entry-dock(\s|$)/.test(contCls), contCls)
   ck('铺了 <image> 节点', (await page.$$('.page-bg')).length === 1)
   ck('铺了压暗罩', (await page.$$('.page-scrim')).length === 1)
-  // 几何：图铺满整个视口、三块压在图之上（automator 的 Element 没有 boundingBox，走 selectorQuery）
+  // 几何：图铺满整个视口、收起态那一组压在图之上（automator 的 Element 没有 boundingBox，走 selectorQuery）
+  // 10-10 晚收起态换了载体：原来那一条读 `.entry-wrap`（流内那条录入条的壳），现在那一组是
+  // `.home-blk` 自己 fixed，`.entry-wrap` 只在展开态存在——还读老名字就是 null，两条判据一起假红。
   const rects = await mp.evaluate(() => new Promise((resolve) => {
     wx.createSelectorQuery().select('.page-bg').boundingClientRect()
-      .select('.entry-wrap').boundingClientRect()
+      .select('.home-blk').boundingClientRect()
       .select('.page-scrim').boundingClientRect()
       .exec((r) => resolve(r.map((x) => x ? { y: (x.y === undefined ? x.top : x.y), h: x.height, w: x.width, raw: JSON.stringify(x) } : null)))
   }))
@@ -61,9 +79,9 @@ const ck = (name, ok, got) => {
   ck('图铺满视口宽', !!bg && bg.w >= 370, bg && `${bg.w}px`)
   ck('压暗罩和图同尺寸', !!bg && !!scrim && scrim.h === bg.h && scrim.w === bg.w,
     bg && scrim && `${scrim.w}x${scrim.h} vs ${bg.w}x${bg.h}`)
-  ck('三块压在罩之上、整组落在下巴以下', !!cards && !!bg && Number(cards.y) > bg.h * 0.48,
-    cards && `卡顶 ${cards.y} / 视口 ${bg.h}`)
-  ck('三块底边不压住底栏（底栏占视口最下 64px）', !!cards && !!bg && (cards.y + cards.h) <= bg.h - 64,
+  ck('那一组压在罩之上、整组落在下巴以下', !!cards && !!bg && Number(cards.y) > bg.h * 0.48,
+    cards && `组顶 ${cards.y} / 视口 ${bg.h}`)
+  ck('那一组底边不压住底栏（底栏占视口最下 64px）', !!cards && !!bg && (cards.y + cards.h) <= bg.h - 64,
     cards && `块底 ${Math.round(cards.y + cards.h)}，底栏顶 ${bg.h - 64}`)
   await mp.screenshot({ path: `${OUT}/实测-1-默认站长人像.png` })
 
@@ -84,7 +102,7 @@ const ck = (name, ok, got) => {
   // ---------- ②b 展开录入条：整块贴底，换背景那一行让位 ----------
   // 09-28 起展开态不再是"回到标题下面"，而是 fixed 贴底（bottom 152rpx）：窗口不动，
   // 只换肚子里的内容。所以这里量的是"块底还压不压底栏"，不再是"块顶有没有抬到 120 以上"。
-  await (await page.$('.bar')).tap()
+  await (await page.$('.blk-person')).tap()
   await sleep(1200)
   const openRect = await mp.evaluate(() => new Promise((resolve) => {
     wx.createSelectorQuery().select('.entry-wrap').boundingClientRect()

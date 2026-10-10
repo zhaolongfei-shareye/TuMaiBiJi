@@ -20,15 +20,10 @@
     </view>
   </view>
 
-  <!-- slogan 下面靠左那一行：日期 + 星期，只当提醒和气氛，字号跟右边「中」一致 -->
-  <view class="date-row">
-    <text class="d">{{dateText}}</text>
-    <text class="w">{{weekText}}</text>
-  </view>
-
-  <!-- 站长 10-09：这一行从横条下面搬到日期下面（离顶部那几行近，也在面板之外）。
-       两件事各一个入口照旧：左边「调亮度」换深浅一档，右边「换背景」导流到
-       「我的 → 卡片模板」那一页选图（这里不弹相册——一个功能只留一个入口）。
+  <!-- 站长 10-09 夜拿效果图 c5 打回：这一行不再"住在日期下面"，而是**顶掉日期那一格**
+       （稿上标题下面那一条就是它，日期那行在稿上没有）。两件事各一个入口照旧：
+       左边「调亮度」换深浅一档，右边「换背景」导流到「我的 → 卡片模板」那一页选图
+       （这里不弹相册——一个功能只留一个入口）。
        两截都是 catchtap：点左边不能顺手把右边那条导流也触发，点整行也不该冒到
        容器的 collapse 上去。 -->
   <view wx:if="{{bgSrc}}" class="home-swap">
@@ -47,41 +42,69 @@
        展开之后条身整条让位——上面换成框外那一行小字，下面升起一张暗面板。
        面板里只剩两样东西：一个输入框（或一横排小图）＋ 一枚"右滑才开始提炼"的长条。
        功能一个没少：校验、忙态、报错、权限引导全部照旧，改的是承载方式。 -->
-  <view class="entry-wrap">
-    <!-- 站长 10-01 晚：横条上面加一行轮播 Tips，教人用拍照提炼、分享选模板这些现成能力。
-         展开态整行不渲染（和「换背景」同一规矩：面板已经贴底了，上面再滚一行提示会跟表单抢眼睛）。
-         字号、左边留空、离横条那一行的距离全在 wxss 的 .tips 上，这里只递一枚点和一句文本。
-         点是他要的那枚"小灯泡"的象征，颜色由 palette.TIP_DOT 从 style 递进来——
-         写进 wxss 会被 `验-统一录入条.js` 那条"饱和色不许抄进样式表"打红。
-         中文是「Tips：」、英文是「Tips: 」——冒号那档跟着语言走，不硬贴一个全角冒号到英文上。 -->
-    <view wx:if="{{!active && tips.length}}" class="tips">
+  <!-- 收起态这一组（站长 10-10 晚拍板，效果图 docs/design/10-10两入口多方案/PNG图标.png）：
+       原来那条纸白胶囊换成三块——左块人物入口 308 见方（人物上半超出块顶），
+       右两枚计数各 382×148（图标下半被白条压住、数字在右、名字在白条里）。
+       整组贴底锚定，不再吃 .entry-wrap 那条流内 margin：这条链上"上面多一行就把整组顶下去"
+       已经栽过三回（62vh 那条评论自己写着），而 fixed + bottom 与展开态面板同一套基准。
+       三块的颜色由 palette.entryBlocks() 从当前壁纸派生，写在这里的只有 var()。 -->
+  <view wx:if="{{!active}}" class="home-blk" style="{{blkSkin}}">
+    <!-- 轮播 Tips：10-10 晚撤掉底色与边框，只留点与字；行高抬到 74 并把字顶对齐，
+         多出来的那一段落在字下面，正好是人物贝雷帽与这一行之间的呼吸空间（他原话「粘住头发了」）。
+         点仍是 palette.TIP_DOT 从 style 递进来——写进 wxss 会被「饱和色不许抄进样式表」那条打红。 -->
+    <view wx:if="{{tips.length}}" class="tips">
       <view class="tips-dot" style="{{tipDotStyle}}"></view>
       <text class="tips-line">{{tipsPrefix}}{{tips[tipIdx]}}</text>
     </view>
 
-    <!-- 收起态：条身不再挂 open 类。展开时它整个不渲染（面板自己贴底，
-         上面那行框外小字接手「点空白处收起」这一句），所以胶囊与面板"同一块白、接缝对齐"那套没了。 -->
-    <!-- 收起态条身：站长 10-09 拍「原来横条右边那三枚小圆不清晰，去掉；默认就是直接拍照那一档」——
-         条身只留一枚图形加一句话，整条的热区就是 openBar，而 openBar 落的正是 photo 那一档（本来就是这样，
-         10-08 那轮换过）。相册与链接两个口没撤：相册在面板里那枚小圆（选图两个落点），链接在面板顶上那排标签。 -->
-    <view wx:if="{{!active}}" class="bar" catchtap="openBar">
-      <view class="bar-lead glyph-pen"></view>
-      <view class="bar-label">{{t.barIdle}}</view>
-    </view>
+    <view class="blk-row">
+      <!-- 左块 = 原来那条胶囊的门面，点一下进的就是拍照那一档（openBar 落 photo，一字未改）。
+           双击换人物性别：小程序没有原生 dblclick，onTapPerson 自己按 300ms 内两下来判，
+           第一下不当成打开面板（见 create.js 那段）。选择写本机，下次进页沿用。
+           人物那一张由 .blk-figwrap 裁：上边留 52rpx 出血让人超出块顶，下边裁到白条上沿，
+           所以男的那张（更高）也不会把「记下来」压住——效果图里踩过的就是这个。 -->
+      <view class="blk-person" role="button" aria-label="{{t.barIdle}}" catchtap="onTapPerson" hover-class="blk-person-press" hover-stay-time="120">
+        <view class="blk-figwrap">
+          <image class="blk-fig" src="{{personSrc}}" mode="widthFix" />
+        </view>
+        <view class="blk-jot">
+          <view class="blk-jot-l">
+            <view class="blk-cam glyph-camera"></view>
+            <text>{{t.barIdle}}</text>
+          </view>
+          <text class="blk-jot-s">{{t.modePhoto}} · {{t.modeUrl}} · {{t.modeWrite}}</text>
+        </view>
+      </view>
 
+      <view class="blk-col">
+        <view class="blk-stat blk-stat-notes" role="button" aria-label="{{noteCount}}{{t.statNotes}}" catchtap="goNotes" hover-class="blk-stat-press" hover-stay-time="120">
+          <image class="blk-ic" src="/assets/ic-stat-notes.png" mode="aspectFit" />
+          <text class="blk-n">{{noteCount}}</text>
+          <view class="blk-strip"><view class="blk-dot"></view><text>{{t.statNotes}}</text></view>
+        </view>
+        <view class="blk-stat blk-stat-cards" role="button" aria-label="{{cardCount}}{{t.statCards}}" catchtap="goCards" hover-class="blk-stat-press" hover-stay-time="120">
+          <image class="blk-ic" src="/assets/ic-stat-cards.png" mode="aspectFit" />
+          <text class="blk-n">{{cardCount}}</text>
+          <view class="blk-strip"><view class="blk-dot"></view><text>{{t.statCards}}</text></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{active}}" class="entry-wrap">
     <!-- 展开态：面板外面那一行两枚小字（10-08 站长原话「这一行移出框外」）。
          左边报名前在干什么、右边报怎么退出去，两枚都浮在形象图上，所以吃页面级
          --text-tertiary：铺图时它是纸白 .56，没铺图时是这套壁纸的灰字，两头都不用另写规则。 -->
-    <view wx:if="{{active}}" class="out">
+    <view class="out">
       <text class="out-l">{{t.chooseMode}}</text>
       <text class="out-r">{{t.barCollapse}}</text>
     </view>
     <!-- 报错行放在框外、面板上面（10-08）：它是临时消息不是控件，塞进面板里就得给每一态
          都预留一行高度，而那一段高度正是站长连说两轮"继续压低"要省的地方。
          权限那一类整行可点，直接进设置；其余只是读。 -->
-    <view wx:if="{{active && hintLine}}" class="out-err" catchtap="openPermSetting">{{hintLine}}</view>
+    <view wx:if="{{hintLine}}" class="out-err" catchtap="openPermSetting">{{hintLine}}</view>
 
-    <view wx:if="{{active}}" class="panel {{panelOpen ? 'panel-open' : ''}}" style="{{skinPanel}}" catchtap="noop">
+    <view class="panel {{panelOpen ? 'panel-open' : ''}}" style="{{skinPanel}}" catchtap="noop">
       <view class="modes" catchtap="noop">
         <view class="md {{active === 'photo' ? 'on' : ''}}" catchtap="onTab" data-tab="photo">{{t.modePhoto}}</view>
         <view class="md {{active === 'url' ? 'on' : ''}}" catchtap="onTab" data-tab="url">{{t.modeUrl}}</view>
@@ -172,7 +195,6 @@
       </view>
     </view>
 
-    <!-- 这一行原来住在这里（横条下面），10-09 站长拍「换到日期下方」，已搬到 date-row 下面那一份。 -->
   </view>
 </view>
 

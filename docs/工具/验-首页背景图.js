@@ -67,12 +67,20 @@ ck('语言切换那条下划线也跟着翻白', /\.container\.has-bg\s*{[^}]*--
 // 窗口写法，名单里加一行就会因为窗口不够长而红——那是尺子自己的毛病，不是回归。
 // 10-09 站长拍甲：名单要含 `.home-swap`（那两句字原来跟照片一起被罩层压住，读不出来）。
 const liftRule = /\.container\.has-bg \.title-row,[\s\S]{0,260}?\{[^}]*z-index:\s*2[^}]*\}/.exec(wxss)
-ck('内容压在罩之上（名单四样：标题、日期、那一行、录入条；展开态的 position 另有一条）',
-  !!liftRule && ['title-row', 'date-row', 'home-swap', 'entry-wrap'].every((s) => liftRule[0].includes(s)),
+ck('内容压在罩之上（名单三样：标题、那一行、录入条；日期行 10-10 撤了，展开态的 position 另有一条）',
+  !!liftRule && ['title-row', 'home-swap', 'entry-wrap'].every((s) => liftRule[0].includes(s))
+  && !/date-row/.test(liftRule[0]),
   liftRule ? liftRule[0].split('{')[0].replace(/\s+/g, ' ') : '(没捞到那条抬层规则)')
-ck('整组按视口比例下移（不是写死 rpx；09-28 起 .entry-cards 改名叫 .entry-wrap，且这段不再挂在 has-bg 上）',
-  /\.entry-wrap\s*{[^}]*margin-top:\s*\d+vh/.test(wxss)
-  && !/\.container\.has-bg \.entry-wrap\s*{[^}]*margin-top/.test(wxss))
+// 10-10 晚收起态那三块从 `.entry-wrap` 里搬出去自己定顶了，所以这一条改钉 `.home-blk`（裸 `.blk` 与 app.wxss 里那枚分类色方块撞了）。
+// 钉的还是同一件事：**整组随视口高走，不许写成定值 rpx**——写死的话矮屏上组底会插进底栏，
+// 高屏上又浮得太高。现在这道数落成 min(66.3%, 100vh−546rpx)：比例那一头是站长拍的那条线，
+// 夹住那一头是"整组 394 ＋ 底栏 128 ＋ 最少留 24"，两头的机型都不撞。
+ck('整组按视口比例下移（10-10 晚搬进 .home-blk，仍不许写死 rpx；min() 那刀兜矮屏）',
+  /\.home-blk\s*\{[^}]*top:\s*66\.3%;/.test(wxss)
+  && /\.home-blk\s*\{[^}]*top:\s*min\(66\.3%,\s*calc\(100vh - \d+rpx\)\)/.test(wxss)
+  && !/\.home-blk\s*\{[^}]*bottom:\s*\d+rpx/.test(wxss)
+  && !/\.entry-wrap\s*\{[^}]*margin-top:\s*\d+(vh|rpx|px)/.test(wxss),
+  (/\.home-blk\s*\{[\s\S]{0,400}?\}/.exec(wxss) || ['(没读到 .blk)'])[0].replace(/\s+/g, ' ').slice(0, 120))
 ck('展开时整块贴底（不再从顶上挂下来盖住照片）',
   /\.container\.entry-dock \.entry-(cards|wrap)\s*{[^}]*position:\s*fixed/.test(wxss))
 ck('贴底挂在容器上（active 一翻就跟着翻）',
@@ -82,6 +90,7 @@ ck('没把本地图写成 wxss 的 background-image（那条微信不认）',
 ck('新建页每次进页重取图', cjs.includes('bgSrc: poster.homeBg()'))
 // 10-01 晚：三页共用 app.applyNavForBand 这一个出口（判据是"铺没铺图"，
 // 因为罩层顶部那档压完照片永远是深），没铺图时它整个不碰，主题色留给 applyTheme。
+// 10-10 我一度给这条加过第二个参数（新建页翻亮底墨字），站长说没下过这条需求，撤回原样。
 ck('铺图时导航条走共用出口', /app\.applyNavForBand\(this\.data\.bgSrc\)/.test(cjs))
 ck('这一页不自己写 setNavigationBarColor（值只有一份）', !/setNavigationBarColor/.test(cjs))
 

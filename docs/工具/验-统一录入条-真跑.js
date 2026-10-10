@@ -18,6 +18,31 @@ const path = require('path')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/10-08创建入口暗面板/实测')
 const I18N = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
+// 「停在最右」那一格从 create.js 现读，不抄进判据：10-10 面板内边距 32→24 一改，行程就从
+// 456 变 476；上一版把 456 抄在这里，改样式那一轮它只是**跟着红**，白费劲。
+const SLD_MAX = Number(/const SLD_MAX_RPX = (\d+)/.exec(
+  fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/create/create.js'), 'utf8'))[1])
+// 面板两档与快门那一枚的边长也从源码现读：10-08 那轮 700→500/580、10-10 那轮 →410/490 且快门
+// 210→180，两次都是判据里抄的数跟着红。环那一支同理——它 10-10 从纸白换成了 palette 算出来的
+// `--cp-ring`，判据要跟着换就得现读，不然下一轮换皮又是一次全红。
+const CWX = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/create/create.wxss'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+const PANEL_H = Number(/\.panel\s*\{[\s\S]*?height:\s*(\d+)rpx/.exec(CWX)[1])
+const PANEL_OPEN_H = Number(/\.panel-open\s*\{\s*height:\s*(\d+)rpx/.exec(CWX)[1])
+const SHUT_W = Number(/\.shut\s*\{[\s\S]*?width:\s*(\d+)rpx/.exec(CWX)[1])
+// 收起态那三块的四个数也从样式表现读（10-10 晚的载体：原来那条 128 高的胶囊没了）。
+// 抄成常量的话，下一轮改块高就只是"判据跟着红"，白费劲——和上面 PANEL_H 同一个理由。
+const segOf = (sel) => (new RegExp(`(?:^|\\n)${sel}\\s*\\{([^}]*)\\}`).exec(CWX) || [0, ''])[1]
+const lenOf = (sel, prop) => Number(new RegExp(`${prop}:\\s*(\\d+)rpx`).exec(segOf(sel))?.[1])
+const PERSON_CSS = lenOf('.blk-person', 'width')
+const TIPS_H_CSS = lenOf('.tips', 'height')
+const TIPS_MB_CSS = lenOf('.tips', 'margin-bottom')
+const STAT_H_CSS = lenOf('.blk-stat', 'height')
+const GROUP_H_CSS = TIPS_H_CSS + TIPS_MB_CSS + PERSON_CSS
+const RING_CSS = (/--cp-ring:([^;]+)/.exec(
+  require(path.resolve(__dirname, '../../miniprogram/utils/palette.js')).createSkin()) || [0, ''])[1].trim()
+// `rgba(35,37,44,0.5)` 这种写法在 palette 里不带空格，而 getComputedStyle 回来带——比对前归一
+const RING_RGB = RING_CSS.replace(/\(\s*/, '(').replace(/\s*,\s*/g, ', ')
 const bad = []
 const ck = (name, ok, got) => {
   console.log(`${ok ? '✓' : '✗'} ${name}${got === undefined || got === '' ? '' : `　→ ${got}`}`)
@@ -80,40 +105,50 @@ const ck = (name, ok, got) => {
   const clsOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.attribute('class')) || '') : '' }
   const txtOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.text()) || '').trim() : null }
 
-  // ---------- A 收起态：还是那一条纸白胶囊 ----------
+  // ---------- A 收起态：那三块（10-10 晚换的载体，原来那条纸白胶囊整个撤了） ----------
   await top()
   let d = await page.data()
   ck('A1 收起态没有面板', (await page.$$('.panel')).length === 0)
-  ck('A2 条身只有一条，且读的是「动动手指」', (await page.$$('.bar')).length === 1 && d.t.barIdle === '动动手指', d.t.barIdle)
+  ck('A2 收起态只有那一组，且左块那句读的是「记下来」',
+    (await page.$$('.home-blk')).length === 1 && d.t.barIdle === '记下来', d.t.barIdle)
   ck('A3 条身右边那三枚小圆真撤了（屏上一枚都不该剩）', (await page.$$('.bar-dots .dot')).length === 0)
   ck('A4 Tips 那一行在（展开才撤的那一位，此刻该留着）', (await page.$$('.tips')).length === 1)
-  const [bar0, wrap0, tip0] = await rects(['.bar', '.entry-wrap', '.tips'])
-  ck('A5 横条一动不动：条顶 == 整组顶（Tips 那盒子被负 margin 抵干净）',
-    !!bar0 && !!wrap0 && Math.abs(bar0.top - wrap0.top) <= 1,
-    bar0 && wrap0 && `条顶 ${Math.round(bar0.top)}／组顶 ${Math.round(wrap0.top)}`)
-  ck('A6 条高 128rpx', !!bar0 && rpxEq(bar0.h, 128), bar0 && `${toRpx(bar0.h).toFixed(1)}rpx`)
-  // 条底那一段空档：110 + 22 这两个数 10-09 之前是「调亮度｜换背景」那一行自己占的，
-  // 那一行搬到日期下面之后这段是空的，但条底位是站长拍过的那一档（618），不跟搬家漂。
-  ck('A7 条底落在底栏上方一条缝上（缝 = 那一行搬走前占的 110 + 22，条底位不随搬家变）',
-    !!bar0 && Math.abs(bar0.bottom - (tabTop - 110 * R - 22 * R)) < 14,
-    bar0 && `条底 ${Math.round(bar0.bottom)}｜应在 ${Math.round(tabTop - 132 * R)} 上下`)
+  const [blk0, tip0, person0, stat0, stat1] = await rects(
+    ['.home-blk', '.tips', '.blk-person', '.blk-stat-notes', '.blk-stat-cards'])
+  ck('A5 整组一动不动：组顶 == Tips 那一行的顶（组没有内边距，第一档就贴着顶）',
+    !!blk0 && !!tip0 && Math.abs(blk0.top - tip0.top) <= 1,
+    blk0 && tip0 && `组顶 ${Math.round(blk0.top)}／行顶 ${Math.round(tip0.top)}`)
+  ck(`A6 整组高 ${GROUP_H_CSS}rpx（Tips ${TIPS_H_CSS} ＋ 它下面 ${TIPS_MB_CSS} ＋ 左块 ${PERSON_CSS}）`,
+    !!blk0 && rpxEq(blk0.h, GROUP_H_CSS, 4), blk0 && `${toRpx(blk0.h).toFixed(1)}rpx`)
+  ck('A6b 左块渲染成 308 见方、右两枚各 148 高（全局同名那条把整组裁成 176 的那一刀就红在这里）',
+    !!person0 && rpxEq(person0.w, PERSON_CSS) && rpxEq(person0.h, PERSON_CSS)
+    && !!stat0 && rpxEq(stat0.h, STAT_H_CSS) && stat0.w > 300 * R,
+    person0 && stat0 && `左块 ${toRpx(person0.w).toFixed(0)}×${toRpx(person0.h).toFixed(0)}／右枚宽 ${toRpx(stat0.w).toFixed(0)}`)
+  ck('A6c 两枚同宽且右边缘与整组右边缘对齐（列没吃余量时这里先红）',
+    !!stat0 && !!stat1 && !!blk0 && Math.abs(stat0.w - stat1.w) <= 1
+    && Math.abs(stat1.right - blk0.right) <= 2,
+    stat0 && stat1 && blk0 && `枚右 ${Math.round(stat1.right)}／组右 ${Math.round(blk0.right)}`)
+  // 组底那一条缝：整组是 fixed，顶走 min(66.3%, 100vh−546rpx)，底就落在底栏上方 24rpx。
+  // 这一条守的是"不许插进底栏"，与原来那条"条底不随搬家漂"是同一件事的两种写法。
+  ck('A7 组底落在底栏上方一条 24rpx 的缝上（矮屏上 min() 夹的那一头也成立）',
+    !!blk0 && Math.abs(blk0.bottom - (tabTop - 24 * R)) < 14,
+    blk0 && `组底 ${Math.round(blk0.bottom)}｜应在 ${Math.round(tabTop - 24 * R)} 上下`)
   // A8 钉两件事：那一行只一枚（`wx:if="{{bgSrc}}"`，默认那张形象图在就该有一枚），
-  // 以及它此刻量在横条**上方**——站长 10-09 那句"换到日期下方"就是这个先后。
-  // 它自己那条负 margin 只是把占位扣掉，不许把横条顶到它身上（抵成 0 ≠ 重叠）。
+  // 以及它此刻量在整组**上方**——站长 10-09 那句"换到日期下方"就是这个先后。
   const swapBox = (await rects(['.home-swap']))[0]
-  ck('A8 那一行只一枚，且量到它坐在横条上方（搬去的位置就是那儿）',
-    (await page.$$('.home-swap')).length === 1 && !!swapBox && !!bar0 && swapBox.bottom <= bar0.top + 1,
-    swapBox && bar0 && `行底 ${Math.round(swapBox.bottom)}／条顶 ${Math.round(bar0.top)}`)
+  ck('A8 那一行只一枚，且量到它坐在整组上方（搬去的位置就是那儿）',
+    (await page.$$('.home-swap')).length === 1 && !!swapBox && !!blk0 && swapBox.bottom <= blk0.top + 1,
+    swapBox && blk0 && `行底 ${Math.round(swapBox.bottom)}／组顶 ${Math.round(blk0.top)}`)
   await mp.screenshot({ path: `${OUT}/A-收起态.png` })
 
   // ---------- B 展开 · 照片档：三枚圈 ----------
   await top()
-  await (await page.$('.bar')).tap()
-  await sleep(900)
+  await (await page.$('.blk-person')).tap()
+  await sleep(1200)
   d = await page.data()
   ck('B1 点条身进「照片」（10-08 起默认档不再是直接写）', d.active === 'photo', d.active)
   const [panel1, out1] = await rects(['.panel', '.out'])
-  ck('B2 面板高 500rpx', !!panel1 && rpxEq(panel1.h, 500, 3), panel1 && `${toRpx(panel1.h).toFixed(1)}rpx`)
+  ck(`B2 面板高 ${PANEL_H}rpx`, !!panel1 && rpxEq(panel1.h, PANEL_H, 3), panel1 && `${toRpx(panel1.h).toFixed(1)}rpx`)
   ck('B3 整组贴底：面板底 = 视口高 − 152rpx',
     !!panel1 && Math.abs(panel1.bottom - (metric.h - 152 * R)) < 3,
     panel1 && `底 ${Math.round(panel1.bottom)}｜应在 ${Math.round(metric.h - 152 * R)}`)
@@ -135,14 +170,15 @@ const ck = (name, ok, got) => {
   ck('B8 当前标签是照片', /(^|\s)md on(\s|$)/.test(await clsOf('.md')) && (await txtOf('.md.on')) === '照片', await txtOf('.md.on'))
   ck('B9 这一态没有滑动条（没图就没得提炼）', (await page.$$('.sld')).length === 0)
   const [crow, shut, miniA, miniB] = await rects(['.crow', '.shut', '.mini', '.card'])
-  ck('B10 三枚圈都在：快门 210rpx、两枚小圆 105rpx',
-    !!shut && rpxEq(shut.w, 210, 3) && Math.abs(toRpx((await rects(['.mini-c']))[0].w) - 105) <= 3,
+  ck(`B10 三枚圈都在：快门 ${SHUT_W}rpx、两枚小圆 105rpx`,
+    !!shut && rpxEq(shut.w, SHUT_W, 3) && Math.abs(toRpx((await rects(['.mini-c']))[0].w) - 105) <= 3,
     shut && `快门 ${toRpx(shut.w).toFixed(1)}rpx`)
   ck('B11 那一排居中（crow 中心 == 卡中心，左右偏差不超过 3rpx）',
     !!crow && !!miniB && Math.abs((crow.left + crow.w / 2) - (miniB.left + miniB.w / 2)) <= 3,
     crow && miniB && `排中心 ${Math.round(crow.left + crow.w / 2)}｜卡中心 ${Math.round(miniB.left + miniB.w / 2)}`)
-  ck('B12 快门那一圈是纸白的环（border 读得出、且就是 --cp-ink 那一支）',
-    (await (await page.$('.shut')).style('border-top-color')) === 'rgb(242, 239, 233)',
+  // 10-10 站长那句"白环换墨环"：白环压白卡对比 1.00＝等于没画。
+  ck(`B12 快门那一圈就是 palette 发下来那支环（现读 --cp-ring，不抄字面）`,
+    (await (await page.$('.shut')).style('border-top-color')) === RING_RGB,
     await (await page.$('.shut')).style('border-top-color'))
   ck('B13 三枚圈各带一个字：相册 / 拍照 / 链接',
     (await txtOf('.mini-lb')) === '相册' && (await txtOf('.shut-lb')) === '拍照'
@@ -185,8 +221,8 @@ const ck = (name, ok, got) => {
     d.urlHint === 'bad' && d.hintLine === d.t.linkRule && (await page.$$('.out-err')).length === 1,
     `hint=${d.hintLine}`)
   const [err1] = await rects(['.out-err'])
-  ck('C11 那句报错把整组往上顶了一行，而面板高度没变（还是 500）',
-    !!err1 && err1.bottom <= panel1.top + 1 && rpxEq((await rects(['.panel']))[0].h, 500, 3),
+  ck(`C11 那句报错把整组往上顶了一行，而面板高度没变（还是 ${PANEL_H}）`,
+    !!err1 && err1.bottom <= panel1.top + 1 && rpxEq((await rects(['.panel']))[0].h, PANEL_H, 3),
     err1 && `报错底 ${Math.round(err1.bottom)}／面板顶 ${Math.round(panel1.top)}`)
   await mp.screenshot({ path: `${OUT}/C-链接-非法报错在框外.png` })
 
@@ -280,8 +316,8 @@ const ck = (name, ok, got) => {
     pr.midRpx > 120 && Math.abs(pr.midLeft - pr.midRpx) <= 8, `data ${pr.midRpx}rpx｜屏上 ${pr.midLeft.toFixed(0)}rpx`)
   await sleep(1400)
   dD = await page.data()
-  ck('D4 圆停在最右那一格 456rpx、且颜色没变（class 里没有一档改色）',
-    dD.knobRpx === 456 && !/sld-done|sld-off/.test(await clsOf('.sld')),
+  ck(`D4 圆停在最右那一格 ${SLD_MAX}rpx、且颜色没变（class 里没有一档改色）`,
+    dD.knobRpx === SLD_MAX && !/sld-done|sld-off/.test(await clsOf('.sld')),
     `knob=${dD.knobRpx} class=${await clsOf('.sld')}`)
   ck('D5 进度那一格走起来了（假进度按秒推，>0 就算在动）', dD.fillPct > 0, `fillPct=${dD.fillPct}`)
   const fillW = (await rects(['.sld-fill']))[0]
@@ -308,7 +344,7 @@ const ck = (name, ok, got) => {
   ck('D8 完成那一帧整条转实心、白环仍然在', /sld-done/.test(await clsOf('.sld')) && !!dDone, await clsOf('.sld'))
   const knobDone = (await rects(['.sld-knob']))[0]
   ck('D8b 完成那一帧圆仍钉在最右那一格（没回弹）',
-    !!knobDone && Math.abs(knobDone.left - ((await rects(['.sld']))[0].left + (456 + 5) * R)) <= 3 * R,
+    !!knobDone && Math.abs(knobDone.left - ((await rects(['.sld']))[0].left + (SLD_MAX + 5) * R)) <= 3 * R,
     knobDone && `圆左 ${toRpx(knobDone.left).toFixed(0)}rpx`)
   await mp.screenshot({ path: `${OUT}/D-完成那一帧.png` })
   await sleep(1200)
@@ -326,8 +362,8 @@ const ck = (name, ok, got) => {
 
   // ---------- E 文字档：一个框，展开才变两行 ----------
   await top()
-  await (await page.$('.bar')).tap()
-  await sleep(700)
+  await (await page.$('.blk-person')).tap()
+  await sleep(1200)
   await (await page.$$('.md'))[2].tap()
   await sleep(900)
   d = await page.data()
@@ -345,8 +381,8 @@ const ck = (name, ok, got) => {
   await ta.trigger('focus')
   await sleep(900)
   d = await page.data()
-  ck('E4 焦点进框里 → 面板抬到展开那一档（580rpx，只多一行）',
-    d.bodyFocus === true && d.panelOpen === true && rpxEq((await rects(['.panel']))[0].h, 580, 4),
+  ck(`E4 焦点进框里 → 面板抬到展开那一档（${PANEL_OPEN_H}rpx，只多一行）`,
+    d.bodyFocus === true && d.panelOpen === true && rpxEq((await rects(['.panel']))[0].h, PANEL_OPEN_H, 4),
     `focus=${d.bodyFocus} open=${d.panelOpen} 高 ${toRpx((await rects(['.panel']))[0].h).toFixed(1)}rpx`)
   ck('E5 框跟着变成两行（160rpx）', rpxEq((await rects(['.field-area']))[0].h, 160, 4),
     `${toRpx((await rects(['.field-area']))[0].h).toFixed(1)}rpx`)
@@ -369,7 +405,7 @@ const ck = (name, ok, got) => {
   d = await page.data()
   ck('E9 离开焦点退回收起那一档，开关跟着撤',
     d.panelOpen === false && (await page.$$('.wr-sw')).length === 0
-    && rpxEq((await rects(['.panel']))[0].h, 500, 4), `${d.panelOpen}`)
+    && rpxEq((await rects(['.panel']))[0].h, PANEL_H, 4), `${d.panelOpen}`)
 
   // ---------- F 照片档：小图一行、展开只多一行、满了给话 ----------
   await top()
@@ -413,9 +449,9 @@ const ck = (name, ok, got) => {
   }
   let f = await setShots(4)
   const n4 = (await page.$$('.strip .th')).length
-  ck('F1 四张 + ➕ 仍在同一行（5 格装得下），面板还是 500',
+  ck(`F1 四张 + ➕ 仍在同一行（5 格装得下），面板还是 ${PANEL_H}`,
     f.panelOpen === false && n4 === 5
-    && rpxEq((await rects(['.panel']))[0].h, 500, 4), `${n4} 格 / open=${f.panelOpen} / active=${f.active}`)
+    && rpxEq((await rects(['.panel']))[0].h, PANEL_H, 4), `${n4} 格 / open=${f.panelOpen} / active=${f.active}`)
   const th4 = await rectsAll('.strip .th')
   const cardR = (await rects(['.card']))[0]
   ck('F2 ➕ 钉在这一行最右端（它的右边 == 卡内右边）',
@@ -430,8 +466,8 @@ const ck = (name, ok, got) => {
   await mp.screenshot({ path: `${OUT}/F-四张一行.png` })
 
   f = await setShots(6)
-  ck('F5 第六格放不下 → 自己多一行，面板到 580 为止',
-    f.panelOpen === true && rpxEq((await rects(['.panel']))[0].h, 580, 4), `open=${f.panelOpen}`)
+  ck(`F5 第六格放不下 → 自己多一行，面板到 ${PANEL_OPEN_H} 为止`,
+    f.panelOpen === true && rpxEq((await rects(['.panel']))[0].h, PANEL_OPEN_H, 4), `open=${f.panelOpen}`)
   const th6 = await rectsAll('.strip .th')
   const cardR6 = (await rects(['.card']))[0]
   ck('F6 真排成两行（第六格与第一格不在同一行），➕ 被 margin-left:auto 钉在第二行最右端',
@@ -477,12 +513,12 @@ const ck = (name, ok, got) => {
   await sleep(900)
   d = await page.data()
   ck('G1 点空白收回去：面板没了、条回来了',
-    d.active === '' && (await page.$$('.panel')).length === 0 && (await page.$$('.bar')).length === 1, d.active)
+    d.active === '' && (await page.$$('.panel')).length === 0 && (await page.$$('.home-blk')).length === 1, d.active)
   ck('G2 收起之后那三位都归位（不留在上一档的样子）',
     d.panelOpen === false && d.knobRpx === 10 && d.fillPct === 0 && d.done === false,
     `open=${d.panelOpen} knob=${d.knobRpx} fill=${d.fillPct}`)
-  await (await page.$('.bar')).tap()
-  await sleep(700)
+  await (await page.$('.blk-person')).tap()
+  await sleep(1200)
   await set({ busy: 'url' })
   await (await page.$('.title-row')).tap()
   await sleep(700)
@@ -501,9 +537,9 @@ const ck = (name, ok, got) => {
   page = await enter('/pages/create/create')
   await sleep(4000)
   d = await page.data()
-  ck('H1 英文条身吃的就是字典里那条', d.t.barIdle === I18N.texts('en').barIdle, d.t.barIdle)
-  await (await page.$('.bar')).tap()
-  await sleep(900)
+  ck('H1 英文左块那句吃的就是字典里那条', d.t.barIdle === I18N.texts('en').barIdle, d.t.barIdle)
+  await (await page.$('.blk-person')).tap()
+  await sleep(1200)
   const labels = []
   for (const m of await page.$$('.md')) { labels.push(((await m.text()) || '').trim()) }
   ck('H2 三个英文标签：Photo / Link / Text', labels.join('|') === 'Photo|Link|Text', labels.join('|'))

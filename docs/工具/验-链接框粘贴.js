@@ -67,8 +67,13 @@ ok('.field-paste 存在且不参与拉伸', /flex:\s*none/.test(paste), paste ||
 const w = parseInt(/width:\s*(\d+)rpx/.exec(paste)?.[1] || '0', 10)
 const h = parseInt(/height:\s*(\d+)rpx/.exec(paste)?.[1] || '0', 10)
 ok('可点面不小于 64×64rpx（指头按得动，图形只有 40）', w >= 64 && h >= 64, `${w}×${h}`)
-ok('.paste-glyph 挂在 mask 基础组那一行里（不然只有形状没有遮罩）',
-  /^\.bar-lead[^{]*\.paste-glyph\s*\{/m.test(wxss))
+// 原来这一条把名单第一个选择器（.bar-lead）写死在正则里，10-10 晚胶囊撤了、那个位置换成
+// .blk-cam，它就跟着红——可它要说的事和第一个选择器叫什么无关：**这一枚必须落在带
+// mask-repeat/mask-size 的那一组里**，不然只有形状没有遮罩。改成按那一组的实际特征认。
+// ⚠ 判据抽成一个函数：上一条用它、下面的反向对照也用它，这样"摘掉就该红"是真拿同一把尺子量的，
+// 不是另写一条否定式正则自说自话（10-10 审计点的就是那条：它算的是 `!false`，永远绿）。
+const inMaskGroup = (src) => /^[^\n{]*\.paste-glyph[^\n{]*\{[^}]*mask-repeat/m.test(src)
+ok('.paste-glyph 挂在 mask 基础组那一行里（不然只有形状没有遮罩）', inMaskGroup(wxss))
 ok('.glyph-clipboard 有图形，且与那批同 24 格、同 1.6 描边',
   /mask-image/.test(shape) && /viewBox='0 0 24 24'/.test(shape) && /stroke-width='1\.6'/.test(shape))
 // 那串 svg 是 URL 编码进 data-uri 的，尖括号在文件里长这样：%3Crect
@@ -83,9 +88,14 @@ ok('反向对照一：把那枚整枚撤掉，"找得到粘贴那枚"这条就�
   !/catchtap="onPasteUrl"/.test(urlBlock(cutPaste(wxml))) && /catchtap="onPasteUrl"/.test(blk))
 ok('反向对照二：把 _sync 那一趟摘掉，那条判据就该红',
   !/this\._sync\(\)/.test(body.replace('this._sync()', '')) && /this\._sync\(\)/.test(body))
-ok('反向对照三：只把基础组那一行里的 .paste-glyph 摘掉（自己那条规则留着），判据就该红',
-  !/^\.bar-lead[^{]*\.paste-glyph\s*\{/m.test(wxss.replace(/(\.bar-lead[^{]*?)\.paste-glyph(\s*\{)/, '$1$2')),
-  '注意：.paste-glyph 在文件里出现两次（自己的规则在前、基础组在后），摘错一处这条就是假绿')
+// 反向对照三：拿上面那条**同一个谓词**去跑一份被改坏的样式表——把基础组那一行的选择器名单里
+// `.paste-glyph` 那一枚抹掉（它自己那条规则留着）。谓词必须翻红，才证明钉的是那一行。
+ok('反向对照三：从基础组那一行抹掉 .paste-glyph，上一条立刻红（不是恒真）',
+  (() => {
+    const line = /^[^\n{]*\{[^}]*mask-repeat/m.exec(wxss)?.[0] || ''
+    const cut = line.replace(/\.paste-glyph\s*/, '')
+    return line.includes('.paste-glyph') && cut !== line && !inMaskGroup(wxss.replace(line, cut))
+  })(), '这一枚从名单里抹掉之后谓词仍然为真＝它上面那条没在管任何东西')
 
 console.log(`验-链接框粘贴：过 ${pass} 条`)
 if (fails.length) {

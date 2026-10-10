@@ -46,8 +46,10 @@ const i18n = {
     importScreenshot: '拍照或截图',
     writeNote: '亲自撰写',
     // 10-08 创建入口改版：条身展开后不再盖在面板顶上，而是整条让位给面板，
-    // 所以"按模式换字"那三条（贴个链接 / 选了 N 张 / 拍照或截图）一起退了——收起态那条永远只说「动动手指」。
-    barIdle: '动动手指',
+    // 所以"按模式换字"那三条（贴个链接 / 选了 N 张 / 拍照或截图）一起退了——收起态那一枚永远只说一句话。
+    // 10-10 晚收起态从纸白胶囊换成左块人物（效果图 PNG图标.png），键名留着不动，
+    // 中文改成块上那三个字；英文本来就是同一句「Jot it down」，一个字没动。
+    barIdle: '记下来',
     barCollapse: '点空白处收起',
     // 面板上面那一行两枚小字（在框外，浮在形象图上）：左边报名前这一屏在干什么，右边报怎么退出去。
     chooseMode: '选择记录模式',
@@ -83,7 +85,10 @@ const i18n = {
     notesHeading: '我的笔记',
     // 首页右上角那一列的小字。原来三列（笔记/分享/种草），10-04 站长拍板把后两列废掉：
     // 分享与种草那两屏本就没做，服务端那两个字段一起撤了，所以这里只留「笔记」一串。
+    // 10-10 晚第一屏换成三块，右两枚各要一个计数标签：statCards 与 statNotes 配成一对，
+    // 不借名片那一格的 slotCard——那一枚说的是"这个槽当卡片用"，和"生成了几张笔记卡片"是两件事。
     statNotes: '笔记',
+    statCards: '卡片',
     searchPh: '输入关键词',
     // v19 这一屏（站长 10-03 凌晨拍）：列表区顶上两枚 tab + X 式列表 + 卡片网格。
     // 第二枚那两个字不新造，仍读上面那串 navShare（现网原串「笔记卡片」）。
@@ -417,8 +422,9 @@ const i18n = {
     importUrl: 'URL link',
     importScreenshot: 'Photo or screenshot',
     writeNote: 'Write it myself',
-    // 英文不翻"动动手指"——直译成 Tap and jot 没人这么说。这一屏旁边就是拍照/相册/链接
-    // 三枚图标，动词只留一个就够。10-08 起展开态整条让位给面板，所以按模式换字那三条也退了。
+    // 这一句英文不是从中文逐字翻的：中文要的是"伸手记一笔"那个动作，直译成
+    // Tap and jot 没人这么说，所以英文只留一个动词 Jot。这一屏旁边就是拍照/相册/链接
+    // 三枚图标，动词本来也只该有一个。10-08 起展开态整条让位给面板，按模式换字那三条一起退了。
     barIdle: 'Jot it down',
     barCollapse: 'Tap outside to close',
     chooseMode: 'Choose mode',
@@ -447,6 +453,8 @@ const i18n = {
     search: 'Search notes',
     notesHeading: 'My notes',
     statNotes: 'Notes',
+    // 与中文那一对同一个道理：这是"生成了几张笔记卡片"的计数标签，不是名片槽位那个 slotCard。
+    statCards: 'Cards',
     searchPh: 'Enter keywords',
     // 与中文侧一一对应的三串（v19）。第二枚 tab 那两个字仍读 navShare。
     tabList: 'List',

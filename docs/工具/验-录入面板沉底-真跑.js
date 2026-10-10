@@ -46,12 +46,18 @@ const CARD_PAD = len(seg('.card'), 'padding')
 const CARD_EDGE = len(seg('.card'), 'border')
 const DOCK_BOTTOM = len(seg('.container.entry-dock .entry-wrap'), 'bottom')
 const INSET = Number(/--sp-3:\s*(\d+)rpx/.exec(appWxss)[1])
-const BAR_H = len(seg('.bar'), 'height')
+// 收起态 10-10 晚从"一条 128 高的纸白胶囊"换成"三块"（正本 PNG图标.png）：整组高
+// = Tips 那一行 + 它下面那道缝 + 左块那一段，三个数都从样式表现读，不抄在这里。
+const GROUP_H = len(seg('.tips'), 'height') + len(seg('.tips'), 'margin-bottom') + len(seg('.blk-person'), 'height')
 const SWAP_H = len(seg('.home-swap'), 'height')
-const SWAP_GAP = len(seg('.home-swap'), 'margin-top')
 const TAB_TOP = Number(/bottom:\s*(\d+)rpx/.exec(barWxss)[1]) + Number(/\.tab-bar\s*\{[\s\S]*?height:\s*(\d+)rpx/.exec(barWxss)[1])
+// 收起态那一组与底栏顶之间最少留多少——不抄数，从组顶那条 `min()` 的夹值反推：
+// 夹值 546 = 整组 GROUP_H ＋ 底栏 TAB_TOP ＋ 最少留白，所以留白就是夹值减掉那两个。
+// （原来这里写死 132，那是纸白胶囊时代"条底落在 618 那一档"的空档，载体换了那个数就没主了。）
+const BLK_CLAMP = Number(/calc\(100vh - (\d+)rpx\)/.exec(seg('.home-blk'))[1])
+const MIN_GAP = BLK_CLAMP - GROUP_H - TAB_TOP
 // 期望值读不出来就先大声红一条，别让它带着 NaN 往下跑二十几判据
-const READ = { PANEL_H, PANEL_OPEN_H, PANEL_PAD_BOTTOM, CARD_PAD, CARD_EDGE, DOCK_BOTTOM, INSET, BAR_H, SWAP_H, SWAP_GAP, TAB_TOP }
+const READ = { PANEL_H, PANEL_OPEN_H, PANEL_PAD_BOTTOM, CARD_PAD, CARD_EDGE, DOCK_BOTTOM, INSET, GROUP_H, SWAP_H, BLK_CLAMP, MIN_GAP, TAB_TOP }
 if (Object.keys(READ).some((k) => !Number.isFinite(READ[k]))) {
   console.log('✗ 从源码读不出期望值：', JSON.stringify(READ))
   process.exit(1)
@@ -94,7 +100,7 @@ const STATES = [
     try {
       page = await mp.reLaunch('/pages/create/create')
       await sleep(2500)
-      if (await page.$('.bar')) break
+      if (await page.$('.home-blk')) break
       page = null
     } catch (e) { page = null }
     await sleep(3000)
@@ -125,20 +131,23 @@ const STATES = [
       .map((x) => ({ top: x.top, bottom: x.bottom }))))
   }), CARD_KIDS)
 
-  // ---------- ① 收起态：那条纸白胶囊还在原位 ----------
-  let [bar, wrap, tips] = await geo(['.bar', '.entry-wrap', '.tips'])
-  ck('收起态只有一条，且它顶 == 整组顶（Tips 那盒子被负 margin 抵干净，没把条顶走）',
-    !!bar && !!wrap && !!tips && near(bar.top, wrap.top, 1),
-    bar && wrap && `条顶 ${bar.top.toFixed(1)}／组顶 ${wrap.top.toFixed(1)}`)
-  ck(`条高 ${BAR_H}rpx`, !!bar && near(bar.h, rpx(BAR_H), 1.5), bar && `${(bar.h * 750 / win.windowWidth).toFixed(1)}rpx`)
-  // 条底离底栏顶那一段：10-09 之前它是「调亮度｜换背景」那一行自己占的（110 + 22），
-  // 那一行搬到日期下面之后这段是空档，但**站长拍过的条底位就是这一档**，数不许跟着搬家漂。
-  // 这条判据抓的是同一类账三次：`.entry-wrap` 靠 `margin-top:62vh` 那条流内 margin 落点，
-  // 它上面多一行就把 Tips + 横条 + 面板整组顶下去（09-30 那行日期、10-01 那行 Tips、
-  // 10-09 这一行搬家，每次都靠这条真跑才看出来）。
-  ck(`条底离底栏顶留 ${SWAP_H}+${SWAP_GAP}rpx 那一段（拍过的 618 那一档，不随那一行搬家漂）`,
-    !!bar && near(bar.bottom, win.windowHeight - rpx(TAB_TOP + SWAP_H + SWAP_GAP), 14),
-    bar && `条底 ${bar.bottom.toFixed(0)}｜应在 ${(win.windowHeight - rpx(TAB_TOP + SWAP_H + SWAP_GAP)).toFixed(0)} 上下`)
+  // ---------- ① 收起态：那三块还在原位（10-10 晚换了载体，原来那条胶囊没了） ----------
+  let [blk, tips, person] = await geo(['.home-blk', '.tips', '.blk-person'])
+  ck('收起态那一组只一枚，且组顶 == Tips 那一行的顶（组没内边距，第一档贴着顶）',
+    !!blk && !!tips && near(blk.top, tips.top, 1),
+    blk && tips && `组顶 ${blk.top.toFixed(1)}／行顶 ${tips.top.toFixed(1)}`)
+  ck(`整组高 ${GROUP_H}rpx（Tips ＋ 那道缝 ＋ 左块，三个数都从样式表现读）`,
+    !!blk && near(blk.h, rpx(GROUP_H), 4), blk && `${(blk.h * 750 / win.windowWidth).toFixed(1)}rpx`)
+  // 这条抓的是全局同名那一刀：app.wxss 里 `.blk` 是笔记列表的分类色方块（176 见方 + overflow:hidden），
+  // 10-10 落码第一版组名就叫 `.blk`，整组被裁成 176、右两枚宽 0——**静态判据一条都没红**，只有这里量得出来。
+  ck('左块屏上真是 308 见方（被全局同名那条裁走的话这里先红）',
+    !!person && near(person.w, rpx(308), 3) && near(person.h, rpx(308), 3),
+    person && `${(person.w * 750 / win.windowWidth).toFixed(0)}×${(person.h * 750 / win.windowWidth).toFixed(0)}rpx`)
+  // 组底与底栏顶：`min(66.3%, 100vh−546rpx)` 里那个 546 = 整组 + 底栏 + 最少留白，
+  // 夹住的那一头正好留 MIN_GAP；没夹住（高屏按 66.3%）只会留得更多，所以判"不越过"而不是"等于"。
+  ck(`组底不越过底栏顶，且至少留 ${MIN_GAP}rpx（夹值那一头的下界就是它）`,
+    !!blk && blk.bottom <= win.windowHeight - rpx(TAB_TOP + MIN_GAP) + 3,
+    blk && `组底 ${blk.bottom.toFixed(0)}｜底栏顶 ${ (win.windowHeight - rpx(TAB_TOP)).toFixed(0)}`)
 
   // ---------- ② 六个态 × 两门语言：两档等高、内容不越界、条沉到同一处 ----------
   const rows = []
@@ -198,12 +207,28 @@ const STATES = [
       ck(`${tag}：最后一块没被顶出卡外（离面板内下沿 ≤ 3rpx）`,
         kk.length > 0 && Number.isFinite(lastBottom) && lastBottom <= innerBottom + rpx(3),
         `超 ${Number.isFinite(lastBottom) ? ((lastBottom - innerBottom) * 750 / win.windowWidth).toFixed(1) : '量不到'}rpx／卡里 ${kk.length} 块`)
-      ck(`${tag}：那一块沉到了同一处（底边距卡内下沿 < 3rpx，各态一条线）`,
-        kk.length > 0 && innerBottom - lastBottom <= rpx(3),
-        kk.length ? `${((innerBottom - lastBottom) * 750 / win.windowWidth).toFixed(1)}rpx` : '卡里一块都没摸到')
+      // 10-08 深夜他拍的是「照片那一排 `flex-start`→**center**」，所以照片·空这一档那一排
+      // 不贴卡底、而是在卡内上下留白相等。原来这一条把"各态一条线"写成了"底边距卡内下沿
+      // <3rpx"——那是 09-28 沉底那一版的**实现方式**，不是他要的不变量；换成 center 之后
+      // 红的是尺子自己（10-10 真跑：只有这一档红，其余五态仍贴底）。两档分开钉。
+      const centered = active === 'photo' && shots === 0
+      if (centered) {
+        const innerTop = card.top + rpx(CARD_PAD + CARD_EDGE)
+        const last = kk.length ? kk.reduce((a, b) => (b.bottom > a.bottom ? b : a)) : null
+        const up = last ? ((last.top - innerTop) * 750 / win.windowWidth) : NaN
+        const dn = last ? ((innerBottom - last.bottom) * 750 / win.windowWidth) : NaN
+        ck(`${tag}：那一排在卡内居中（10-08 拍的 center＝上下留白相等，不再要求贴底）`,
+          Number.isFinite(up) && Math.abs(up - dn) <= 3, `上 ${up.toFixed(1)}rpx 下 ${dn.toFixed(1)}rpx`)
+      } else {
+        ck(`${tag}：那一块沉到了同一处（底边距卡内下沿 < 3rpx，各态一条线）`,
+          kk.length > 0 && innerBottom - lastBottom <= rpx(3),
+          kk.length ? `${((innerBottom - lastBottom) * 750 / win.windowWidth).toFixed(1)}rpx` : '卡里一块都没摸到')
+      }
       // 「不挡人头」这一条分两档钉：
       // ① 收起那一档门槛 55% 屏，容 2px（实测 414.0px／线在 414.15px，差 0.15px 是四舍五入，不是布局坏了）；
-      // ② 展开那一档只多一行（500→580），顶到 49.5% 屏。两种展开分开看：
+      //    （10-10 压进红框那两档按 rpx 算是顶 66.3%／61.0%，比这两道门槛低一截。门槛不跟着
+      //     往上抬：它守的是"别再长回去挡脸"，不是"就该停在这么低"。实测值由这条自己打出来。）
+      // ② 展开那一档只多一行（410→490），顶到 61.0% 屏。两种展开分开看：
       //    文字档是**焦点**撑开的，真机上键盘一定已经顶起来、屏下半截本来就没了；
       //    照片 6 张以上是**格数**撑开的，没有键盘垫着，那一档确实盖到鼻尖以下——
       //    这是"上限 9 张"与"展开只多一行"两条一起逼出来的，不是可以偷偷改的数，报告里单列给他看。

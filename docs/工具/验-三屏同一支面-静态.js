@@ -6,8 +6,10 @@
 //   ② 层色那四条在 `page{}` 里没有兜底——`themeClass` 是各页 applyTheme 之后才写进 data 的，
 //      首帧容器上没有主题类，`var(--bg-layer)` 解不出值就是**透明**，那一层会闪一下页面底；
 //   ③ 描边那一圈的浓度不是"按 3.0 反解出来的那一档"（这里独立跑一遍阶梯，不比 palette）；
-//   ④ 四个落点没换成 var：`.float-sheet` 的面、`.ds-dock` 那条边、`.ds-ibtn` 的环、
-//      详情/卡片两屏的主面与那条通栏底条。
+//   ④ 落点：`.float-sheet` 那张窗的面（10-09 起＝列表那张卡那一支 `--bg-card`，见下面 ④ 那段）、
+//      `.ds-dock` 那条边、`.ds-ibtn` 的环、详情/卡片两屏的主面与那条通栏底条。
+//      ⚠ 文件名里那个"三屏同一支面"从 10-09 起是**半个**：窗跟卡走了，那两屏还吃层色。
+//      不是漏改——那两屏里面的块就是 `--bg-card`，主面一起换会让白卡与页面同色。等他拍。
 //
 // 跑法：node docs/工具/验-三屏同一支面-静态.js         正向，期望全过
 //       node docs/工具/验-三屏同一支面-静态.js --rev   反向：改坏象牙的 --layer-edge → 必红那一条
@@ -133,9 +135,15 @@ const INK = '#23252C'
       !!m && norm(m[1]) === norm(ivory[tok]), m ? `${m[1].trim()} vs ${ivory[tok]}` : '(这一条根本没有)')
   }
 
-  // ---------- ④ 四个落点 ----------
+  // ---------- ④ 落点 ----------
   const fs1 = ruleBody(ix, '.float-sheet')
-  ck('详情浮窗那张窗的面吃 var(--bg-layer)', !!fs1 && /background:\s*var\(--bg-layer\)/.test(fs1),
+  // 10-09 15:2x 站长对着 v19-3 与 v19-5b 两张图把这张窗改成**跟列表那张卡同支**。
+  // 于是这把尺子的名字所指的"三屏同一支面"从这一轮起不再成立：窗＝`--bg-card`，
+  // 而详情独立页与分享页仍吃 `--bg-layer`（那两屏里面一段段的块本身就是 `--bg-card`，
+  // 主面再换成它，白卡会和页面同色、分离只剩描边——规格 §7 第一条量过 1.64~1.74）。
+  // 两条已拍口径在这儿打架，判据先按现状钉，等他一句（§8.184 末）。
+  ck('详情浮窗那张窗的面＝列表那张卡那一支 var(--bg-card)（10-09 站长改的口）',
+    !!fs1 && /background:\s*var\(--bg-card\)/.test(fs1),
     grab(fs1, /background:[^;]+;/, '(没有 background 声明)'))
   ck('整份 index.wxss 的**声明**里那支写死的 #FCFBF8 一枚不剩（注释里提它是历史，不算）',
     !/FCFBF8/i.test(strip(ix)), (strip(ix).match(/FCFBF8/gi) || []).length + ' 处')
@@ -149,7 +157,8 @@ const INK = '#23252C'
 
   for (const [name, src] of [['详情独立页', dt], ['笔记卡片页', sh]]) {
     const c = ruleBody(src, '.container')
-    ck(`${name}：这一屏的主面吃 var(--bg-layer)`, !!c && /background:\s*var\(--bg-layer\)/.test(c),
+    ck(`${name}：这一屏的主面**仍**吃 var(--bg-layer)（窗那一刀没带到这儿；跟着换会和里面那张白卡同色，规格 §7 那条分离就没了——要改先解 §8.184 那句架）`,
+      !!c && /background:\s*var\(--bg-layer\)/.test(c),
       grab(c, /background:[^;]+;/, '(没有 background 声明)'))
   }
   const ab = ruleBody(sh, '.actions-bar')

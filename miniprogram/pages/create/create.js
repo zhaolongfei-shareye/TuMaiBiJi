@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { TIP_DOT, createSkin } = require('../../utils/palette.js')
+const { TIP_DOT, createSkin, entryBlocks } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const assetQueue = require('../../utils/assetQueue.js')
@@ -42,20 +42,32 @@ function titleFromText(content) {
    原来那刀是静默的：选了 12 张只留 9 张，界面上一句都不说。 */
 const MAX_SHOTS = 9
 
-/* 一行放五格（小图 100 + 间距 16，五格 = 564 ≤ 卡内宽 566）。
+/* 一行放五格（小图 100 + 间距 16，五格 = 564 ≤ 卡内宽 586）。
    这个数是 WXSS 的几何事实，不是拍的：上限 9 张 + ➕ 那一格 = 10 格，
-   五列是"展开只多一行"（两行放得下）的最小列数。改 .strip 的列数要连着改这里。 */
+   五列是"展开只多一行"（两行放得下）的最小列数。改 .strip 的列数要连着改这里。
+   卡内宽 10-10 从 566 变 586（面板内边距 32→24 让出来的），列数没跟着变。 */
 const ROW_CELLS = 5
 
 /* 右滑那一枚的行程（rpx，与 create.wxss 里那三个数一一对上，改样式要连着改）：
-   轨道内宽 = 卡内宽 566 − 自己那圈白边 5×2 = 556；圆 90；左边内缩 10。
-   停在最右那一格 left = 556 − 90 − 10 = 456，所以行程 446。
+   轨道内宽 = 卡内宽 586 − 自己那圈同色边 5×2 = 576；圆 90；左边内缩 10。
+   停在最右那一格 left = 576 − 90 − 10 = 476，所以行程 466。
+   10-10 面板压进红框之前这三个数算的是 456／446——`验-统一录入条.js` 有一条专门钉
+   "JS 里这个数 == 轨道内宽 − 圆宽 − 左内缩"，只改样式不改这里就会红。
    这里按 rpx 走而不查节点：手指位移换算成 rpx 只需要 windowWidth（微信 rpx = 屏宽/750），
    一次同步读取就够了，省下 touchstart 那一趟异步查询——快速一划就会掉在查询回来之前。 */
 const SLD_REST_RPX = 10
-const SLD_MAX_RPX = 456
+const SLD_MAX_RPX = 476
 // 差 12rpx 就算到位（手指按在圆右缘上再往外划不出这 12，宁可让人划到底也不要"差一点没反应"）
 const SLD_SLOP_RPX = 12
+
+/* 左块那一张人物（站长 10-10 晚给的两张 PNG）。双击换性别，换完写本机、下次进页沿用。
+   只落本机不落云端：他说的是"记住"，不是"换设备也要记住"，而多一个云端字段就要动后端
+   那一套 user_profiles 的白名单与迁移，这一轮不为此开那条链。 */
+const PERSON_KEY = 'homePerson'
+const PERSON_SRC = { girl: '/assets/ic-person.png', boy: '/assets/ic-person-alt.png' }
+/* 两下之间隔多久算"双击"。微信自己不给 dblclick，只能数点击间隔。
+   300ms 是系统各处双击的常见档；再长就会让"想打开面板"的普通一停被误读成换人。 */
+const DBL_TAP_MS = 300
 
 Page({
   data: {
@@ -93,8 +105,20 @@ Page({
     fillPct: 0,
     sldIcon: 'pen',
     // 四个入口各自的饱和色，色值和字色配对仍归 palette 管。
-    // 条身那三枚小圆的色随那三枚一起撤了（10-09）；面板那一整套暗面仍由 createSkin() 一次发下来。
+    // 条身那三枚小圆的色随那三枚一起撤了（10-09）；面板那一整套浅面仍由 createSkin() 一次发下来，
+    // 10-10 起它要吃当前壁纸那一档层色（站长拿效果图 c5 打回的浅面，见 palette.js 那段注释）。
+    // 这里不带参数是故意的：data 在模块加载时就求值，那时 `getApp()` 还没有，
+    // 空参回落到色板第一枚（象牙），每次进页由 onShow 拿真壁纸覆盖。
     skinPanel: createSkin(),
+    // 收起态那三块的面色与字色，同样由当前壁纸派生（左块吃卡底、右两枚吃色阶第 2／1 档）。
+    // 这里不带参数与上面同一个道理：空参回落象牙，每次进页由 onShow 拿真壁纸覆盖。
+    blkSkin: entryBlocks().style,
+    // 左块那一张人物：初值按本机存的那一性读，没存过就是女。
+    personSrc: PERSON_SRC[wx.getStorageSync(PERSON_KEY) === 'boy' ? 'boy' : 'girl'],
+    // 右两枚的计数。两个数都是装饰性的读数，拉不到就画 0（沿用笔记页那一条口径：
+    // 空着或画杠读起来像坏了），但拉取本身绝不许把这一屏拖挂。
+    noteCount: 0,
+    cardCount: 0,
     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
     bgSrc: '',
     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
@@ -102,9 +126,6 @@ Page({
     dimV: 1,
     dimDot: '',
     dimScrim: '',
-    // slogan 下面那行：onShow 里现算，这里先给空串免得第一帧闪一个空行
-    dateText: '',
-    weekText: '',
     // 横条上面那一行轮播 Tips（站长 10-01 晚）：句子整批从 i18n 取，界面按 tipIdx 指哪一句。
     // 空数组是"这一档还没有可提示的"，模板整行不渲染，不会留一条空行。
     tips: [],
@@ -113,20 +134,6 @@ Page({
     // Tips 前面那枚小黄点（站长 10-01 晚：象征小灯泡）。色值必须由 palette 发下来：
     // `验-统一录入条.js` 专门扫 create.wxss 里有没有 #F6C445，写进样式表就红。
     tipDotStyle: 'background:' + TIP_DOT,
-  },
-
-  // slogan 下面那行日期 + 星期（效果图「统一录入条」那一稿就有，之前落地时漏了）。
-  // 它是提醒、不是信息主体：字号跟右边「中」一致，颜色吃 --text-secondary/--text-tertiary
-  // ——铺了背景图时这两个变量本身就是半透明纸白，没铺时是灰字，两头都不用另写规则。
-  dateLineFor(lang) {
-    const n = new Date()
-    if (lang === 'en') {
-      const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-      const W = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      return { dateText: `${M[n.getMonth()]} ${n.getDate()}`, weekText: W[n.getDay()] }
-    }
-    const W = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-    return { dateText: `${n.getMonth() + 1}月${n.getDate()}日`, weekText: W[n.getDay()] }
   },
 
   // 横条上面那一行轮播 Tips：六句教人用现成的能力（拍照提炼、链接、分享选模板、
@@ -162,11 +169,19 @@ Page({
     // 那一格进度表也是同一个道理：这一屏不在前面了，别再空转 setData。
     // ⚠️ 只停表不清 busy——提炼那条请求还在飞，回来还要接着说话（见下面 _extractDone 的注释）。
     this.stopProgress()
+    // 左块那一下的 300ms 判定也要撤：人已经切走了，定时器再回来会把面板悄悄升起来。
+    this._cancelPersonTap()
   },
 
   onUnload() {
     this.stopTips()
     this.stopProgress()
+    this._cancelPersonTap()
+  },
+
+  _cancelPersonTap() {
+    if (this._tapTimer) { clearTimeout(this._tapTimer); this._tapTimer = null }
+    this._tapAt = 0
   },
 
   // onShow 只同步主题/语言/tab，**绝不重置草稿**。
@@ -183,14 +198,14 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
-      // 面板那套暗面里的快门与滑动条吃当前壁纸的色阶，每次进页重算。
-      skinPanel: createSkin(),
+      // 面板那套浅面里的层色吃当前壁纸，每次进页重算。
+      skinPanel: createSkin(app.getWallpaper()),
+      // 三块的面色也跟着壁纸走，同一趟重算：漏了这一位，换完壁纸回到首页三块还停在象牙那档。
+      blkSkin: entryBlocks(app.getWallpaper()).style,
       // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
       bgSrc: poster.homeBg(),
       // 背景深浅那一档也是每次进页重读：在「我的」页里改过、或别的 tab 点过那枚点，回到这一屏就该跟上。
       ...app.bgSkin(),
-      // 日期 + 星期：跨零点回来也要跟着翻，所以每次进页现算
-      ...this.dateLineFor(lang),
       // Tips 跟着语言整批换（英文态不能看到六句中文），并从第 1 句起重播
       tips: this.tipsFor(lang),
       tipIdx: 0,
@@ -205,6 +220,7 @@ Page({
     app.setNavTitle('appName', lang)
     app.applyNavForBand(this.data.bgSrc)
     this.startTips()
+    this.loadEntryStats()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().applyTheme(app.getWallpaper())
@@ -247,10 +263,10 @@ Page({
     this.setData(patch)
   },
 
-  // 条身前面那枚图形与滑动条圆里那枚图形，都是"现在这一档是干什么的"。
-  // 收起态那条固定用钢笔（它现在永远只说「动动手指」，不再跟着模式换字），
-  // 展开态那一枚跟着三档走：照片=叠图、链接=链环、文字=钢笔。
+  // 滑动条圆里那枚图形跟着三档走：照片=叠图、链接=链环、文字=钢笔。
   // 这三支和底栏那三支是同一套 Lucide 几何（见 create.wxss 那一段注释）。
+  // 收起态那枚不归这里管：10-10 晚条身换成左块人物之后，收起态唯一的图形是白条前那枚快门
+  // （.blk-cam，样式表里直接挂 glyph-camera，不吃这一位）。
   sldIconFor(active) {
     return { photo: 'images', url: 'link', write: 'pen' }[active] || 'pen'
   },
@@ -275,10 +291,85 @@ Page({
   // 点条身 = 「照片」那一档（这一屏第一眼就该是那枚快门）。
   // 原来点条身进的是「直接写」，10-08 那轮把默认档换成照片：
   // 站长的原话是"拍照是大按钮、其他的用小按钮"，那一大钮就是这一屏的门面。
+  // 10-10 晚条身换成左块人物，这一句原封不动搬进 onTapPerson 的那一下里。
   openBar() {
     if (this.data.busy) return
     if (this.data.active) { this.collapse(); return }
     this.open('photo')
+  },
+
+  /**
+   * 左块那一下。小程序没有原生双击，所以自己数间隔：
+   * 第一下先**不**打开面板，等满 300ms 没有第二下才当普通一用（openBar）；
+   * 300ms 内落到第二下就换人物、并把那扇还没开的面板收回原状。
+   * 为什么不"第一下立刻开、第二下再关掉"：那样每次换人都会看见面板升起又落下，闪一下。
+   * 代价是打开面板慢了 300ms——双击换人是低频动作，普通一用那 300ms 由下面这条定时器付。
+   */
+  onTapPerson() {
+    if (this.data.busy) return
+    const now = Date.now()
+    if (this._tapAt && now - this._tapAt < DBL_TAP_MS) {
+      // 第二下：把这一下当成"换人"，第一下排的那个定时器要撤掉，不然面板还是会升起来。
+      if (this._tapTimer) { clearTimeout(this._tapTimer); this._tapTimer = null }
+      this._tapAt = 0
+      this.togglePerson()
+      return
+    }
+    this._tapAt = now
+    this._tapTimer = setTimeout(() => {
+      this._tapTimer = null
+      this._tapAt = 0
+      this.openBar()
+    }, DBL_TAP_MS)
+  },
+
+  // 换人物并写本机。只换图，不动 active／草稿／忙态——这一屏别的什么都不该因为换张图而变。
+  togglePerson() {
+    const next = this.data.personSrc === PERSON_SRC.girl ? 'boy' : 'girl'
+    try {
+      wx.setStorageSync(PERSON_KEY, next)
+    } catch (e) {
+      // 写不进去（配额满／被禁）不影响这一次切换，只是下次进页回到女那一张。
+      console.warn('人物那一档没存进本机', e && e.message)
+    }
+    this.setData({ personSrc: PERSON_SRC[next] })
+  },
+
+  /**
+   * 右两枚的计数。两个口各自独立：笔记数拉不到不影响卡片数那一格，反之也一样。
+   * 口径与笔记页那一列一致（读不到当 0，不画杠也不留空），且整块包在 try 里——
+   * 这两个数是装饰，绝不能把这一屏的门面拖挂。
+   */
+  async loadEntryStats() {
+    try {
+      const q = await api.getQuota()
+      this.setData({ noteCount: typeof q.used === 'number' && isFinite(q.used) ? q.used : 0 })
+    } catch (err) {
+      console.warn('笔记那一格的数没读到（不影响界面）', err && (err.errMsg || err.statusCode))
+      this.setData({ noteCount: 0 })
+    }
+    try {
+      const r = await api.getMyCards()
+      const cards = (r && r.cards) || []
+      this.setData({ cardCount: Array.isArray(cards) ? cards.length : 0 })
+    } catch (err) {
+      console.warn('卡片那一格的数没读到（不影响界面）', err && (err.errMsg || err.statusCode))
+      this.setData({ cardCount: 0 })
+    }
+  },
+
+  // 右上那枚 = 笔记列表那一枚 tab（默认那一枚，切过去就是它，不用另递话）。
+  goNotes() {
+    wx.switchTab({ url: '/pages/index/index' })
+  },
+
+  // 右下那枚 = 笔记列表的第二枚 tab（笔记卡片）。
+  // 那一屏每次进页都无条件退回第一枚（站长 10-04 那句"默认第一个 tab"，不是本机偏好），
+  // 所以这里必须留一个一次性标记过去，由 index.onShow 读一次就清——
+  // 写成常驻状态的话，下一次他从底栏切过来也会被塞进卡片那一枚，那条规矩就废了。
+  goCards() {
+    getApp().globalData.ixOpenCardsTab = true
+    wx.switchTab({ url: '/pages/index/index' })
   },
 
   // 三枚小圆 10-09 撤了（站长："原来横条右边那三个按钮不清晰，默认就是直接拍照那一档"）。

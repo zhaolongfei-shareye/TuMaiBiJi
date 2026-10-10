@@ -147,13 +147,20 @@ Page({
     // "默认第一个 tab"（不是本机偏好，不写存储）；标记只在 push 那两条口打：查看笔记、去编辑。
     const keepView = !!this._keepView
     this._keepView = false
+    // 从首页右下那一枚「卡片」进来的：站在那一枚上就该落在第二枚 tab。
+    // 这是**一次性**标记，读一次就清——留着的话他下一次从底栏切回这一屏也会被塞进卡片那一枚，
+    // 上面那条"默认第一个 tab"的规矩就废了。清在取值这一行，不靠后面的分支顺手清。
+    const openCardsTab = !!app.globalData.ixOpenCardsTab
+    app.globalData.ixOpenCardsTab = false
     this.setData({
       lang,
       t: texts(lang),
       themeClass,
       bgSrc,
-      // 卡片那一格的台账在下面 loadNotes 里重读，从详情窗出完图回来就能看到新那一张。
-      view: keepView ? this.data.view : 'list',
+      // 卡片那一格的落点优先于复位，但**不**优先于"从这一页 push 出去再返回"那一型
+      // （keepView 那条已经把他自己站的 tab 保住了，这里不该越过去替他改）。
+      // 卡片那一格自己的台账在下面 loadNotes 里重读，从详情窗出完图回来就能看到新那一张。
+      view: keepView ? this.data.view : (openCardsTab ? 'cards' : 'list'),
       // 深浅每次进页重读：在首页那枚点上换过档，回到这一屏头部就该跟着沉或跟着亮。
       ...app.bgSkin(),
       // 搜索条那一块面由当前壁纸的页面底派生（palette.chromeOf），和底部导航那条胶囊同一个值；

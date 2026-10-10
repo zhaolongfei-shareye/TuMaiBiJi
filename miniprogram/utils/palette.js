@@ -547,12 +547,20 @@ function lightFaceOnPaper(h, s, want) {
 }
 
 /**
- * 创建入口那张**暗面板**的一套面（10-08 改版，效果图「创建入口-v7-B为基」落码）。
+ * 创建入口那张面板的一套面（10-08 定暗面，**10-10 站长拿效果图 c5 打回换成浅面**）。
  *
- * 为什么这页要自带一套面、不吃壁纸那四枚的亮纸：面板整块压在形象图上，而站长这一轮
- * 逐条拍过的是"暗面板 + 纸白字"那张图（面板里的输入框、缩略图、滑动条都在同一块暗面上）。
- * 三档暗面（面板 #23252C / 卡 #2B2D35 / 框 #1A1C21）是这一页的纸，不随壁纸换，
- * 与原来那张白纸面板一样属于"面必须稳定"那一类（见 create.wxss 里录入条那段注释）。
+ * 正本：`docs/design/10-08第一屏浅色三方向/c5-第一屏压进红框410.png`（提交 `69e9c04`）。
+ * 稿上那台是三层浅：层灰的框（面板）→ 纯白的卡 → 更浅一档的井（小圆／输入框／滑动条同一档）。
+ *
+ * 面板那一档**吃 `listLayerOf(当前壁纸)`，不再写死一支**：稿上那支 #CDC9C1 就是象牙那一枚的层色，
+ * 而层色这条派生链的唯一上游是 `chromeOf`（`listLayerOf` 就定义在本函数下面）。写死一支暖灰会让另外
+ * 三枚壁纸（天青／樱落／雨雾）在自家页底上挂一块不相干色相的框——那正是站长 10-04 打回过的账。
+ * 卡与井仍**不随壁纸**：稿上画的是纯白 #FFFFFF 与 #E5E5E6，而四枚壁纸的 --bg-card 各不相同，
+ * 这条与录入条那条纸白胶囊同一个理由（面必须稳定）。
+ *
+ * 井那一档不是随手挑的浅灰：它是"在白卡上取一个比卡暗、又离卡不远的面"，按稿上那条
+ * `wellOf` 的规则算出来（墨 12% 与纸白 90% 两取其一，挑与白卡对比大的那一支）＝ #E5E5E6，
+ * 压白卡 1.26。稿上那行说明自己写着"浅面上这一条本来就弱"，靠的是它上面那圈细边。
  *
  * 那两枚橙**写死，不跟壁纸色阶**（站长 10-08 三条决定里的第三条，原话
  * 「拍照与提炼那两枚固定橙色，不再跟壁纸色阶走」；口径唯一一份在
@@ -565,18 +573,25 @@ function lightFaceOnPaper(h, s, want) {
  *
  * 规矩与 TIP_DOT、toneStyle 一模一样：这些色值只在这里出现，create.wxss 只写 var(--cp-*)。
  */
-const CREATE_SURFACE = { panel: '#23252C', card: '#2B2D35', field: '#1A1C21' }
-const CREATE_X = (a) => withAlpha(PAPER, a)
+const CREATE_SURFACE = { card: '#FFFFFF', field: '#E5E5E6' }
+const CREATE_X = (a) => withAlpha(LAYER_INK, a)
 const CREATE_CAM = { bg: '#E9723D', ink: '#2C1204' }
 const CREATE_EXTRACT = { bg: '#C4541F', ink: '#FFFFFF' }
-function createSkin() {
+/**
+ * 快门那一圈环与滑动条外面那一圈（稿上是同一笔）。浅面上不能再画纸白环——白环压白卡
+ * 对比 1.0，等于没画（站长 10-08 那句"白环换墨环"就是这个意思）。浓度不另起一架梯子：
+ * 复用 `layerEdgeOf`（图形边界门槛 3.0，规格 §5.1 那条），底取白卡那一档。
+ * 象牙下算出来是 `rgba(35,37,44,.5)`，压白卡 3.20；稿上那台量到的是 3.59（它用的是另一架
+ * 从 .3 起跳的梯子），同一件事的两种取档，落码认现网这一架。
+ */
+function createSkin(wallpaper) {
   const cam = CREATE_CAM
   const extract = CREATE_EXTRACT
   const vars = {
-    'cp-panel': CREATE_SURFACE.panel,
+    'cp-panel': listLayerOf(wallpaper),
     'cp-card': CREATE_SURFACE.card,
     'cp-field': CREATE_SURFACE.field,
-    'cp-ink': PAPER,
+    'cp-ink': LAYER_INK,
     'cp-ink-78': CREATE_X(0.78),
     'cp-ink-62': CREATE_X(0.62),
     'cp-ink-50': CREATE_X(0.5),
@@ -584,13 +599,47 @@ function createSkin() {
     'cp-ink-38': CREATE_X(0.38),
     'cp-edge-14': CREATE_X(0.14),
     'cp-edge-10': CREATE_X(0.1),
-    'cp-edge-07': CREATE_X(0.07),
+    'cp-edge-12': CREATE_X(0.12),
+    'cp-ring': layerEdgeOf(CREATE_SURFACE.card),
     'cp-cam': cam.bg,
     'cp-cam-ink': cam.ink,
     'cp-extract': extract.bg,
     'cp-extract-ink': extract.ink,
   }
   return Object.keys(vars).map((k) => `--${k}:${vars[k]}`).join(';')
+}
+
+/**
+ * 第一屏那三块（左块人物入口 + 右两枚计数）的面色与配对字色。
+ * 取档规则照站长 10-10 晚拍板的那版效果图（docs/design/10-10两入口多方案/PNG图标.png）：
+ * 左块吃**卡底**（theme.line，它是这一套里最亮的那一面，人物和白色那条压上去才分得开），
+ * 右上吃色阶第 2 档、右下吃第 1 档——两枚比左块深一点，三块才有前后层次。
+ * 字色跟着各自那一档的 ink 走，不自己挑灰。
+ *
+ * ⚠️ "面压照片"这一道**不在这里算，也没有尺子算**：照片是用户自己换的，运行时拿不到它的亮度。
+ * 10-10 我曾给这三块立过一条"图形压底 ≥3.0"的门槛，那是**我自己加的**（站长没提过），
+ * 且拿的探点是**最暗那一档（弯月）**的罩后色——换到默认那档（半月）实测最低只有 1.98，
+ * 满月档 1.28。三档数字与量法记在 docs/规格-创建入口这一条线.md §6.2，这里不留门槛。
+ */
+function entryBlocks(wallpaper) {
+  const theme = themeOf(wallpaper)
+  const st = theme.ramp && theme.ramp.steps ? theme.ramp.steps : [theme.line, theme.line, theme.line]
+  const face = { person: theme.line, notes: st[1], cards: st[0] }
+  // 回落那条是"新加一枚壁纸忘了写 inks"的兜底（与上面 :405 那条同一个意图）。原来回落直接拿
+  // face 自己当字色，撞上来就是面 == 字、对比 1.000，整块字看不见。兜底至少从面上反解一支墨。
+  const ik = theme.ramp && theme.ramp.inks ? theme.ramp.inks : [
+    enforce(LAYER_INK, face.person, 4.5), enforce(LAYER_INK, face.notes, 4.5), enforce(LAYER_INK, face.cards, 4.5),
+  ]
+  const ink = { person: ik[0], notes: ik[1], cards: ik[0] }
+  const vars = {
+    'eb-person': face.person, 'eb-person-ink': ink.person,
+    'eb-notes': face.notes, 'eb-notes-ink': ink.notes,
+    'eb-cards': face.cards, 'eb-cards-ink': ink.cards,
+  }
+  return {
+    face, ink,
+    style: Object.keys(vars).map((k) => `--${k}:${vars[k]}`).join(';'),
+  }
 }
 
 /**
@@ -747,6 +796,7 @@ module.exports = {
   layerEdgeOf,
   INNER_FACE,
   createSkin,
+  entryBlocks,
   catSkinFor,
   crOf,
   inkIsLighter,
