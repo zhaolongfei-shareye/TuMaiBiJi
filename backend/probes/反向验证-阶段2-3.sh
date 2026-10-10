@@ -55,6 +55,13 @@ run() {  # run <标号> <说明> <应当红的用例关键字> <改动命令> <�
     echo "$tag ★突变没落盘★：$desc —— 命令跑完了但文件一字未改，这条不算数"
     return
   fi
+  # md5 只能证明"文件变了"，证明不了"变的是不是意图那一行"。10-10 真栽在这里（在 2-2 那支的
+  # E 刀上）：模式是整行文本，而新写的代码在**更靠前**的位置重复了同一句，perl 的 s/// 不带 /g、
+  # -0 整体读入时只换第一处，于是撤的是诊断分支、真防线一个字没动，判据照绿。
+  # 所以每一刀都把 diff 头两行贴进回执：读的人一眼能看出这一刀落在第几行、改成了什么。
+  local hitline
+  hitline=$(diff "/tmp/rv-bak5/$tag" "$file" | grep -E '^[<>]' | head -2 | sed 's/^\([<>]\) /\1/' | tr '\n' '|')
+  echo "     这一刀动的是：${hitline}"
   if eval "$PY -k '$needle'" >/tmp/rv-out5 2>&1; then
     echo "$tag ★假绿★（针覆盖 $hits 条）：$desc —— 实现改坏了，但判 \"$needle\" 仍然通过"
     tail -3 /tmp/rv-out5 | sed 's/^/      /'

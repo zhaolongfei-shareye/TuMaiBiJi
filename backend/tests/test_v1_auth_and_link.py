@@ -594,13 +594,18 @@ class Test_SIWA_验签:
         会出现的形状。它对外的话术与"签名不对""iss 不对"是同一句（那是故意的，见
         `test_失败原因不分开报`），界面上只会显示"苹果登录失败"；如果日志里也只有类名
         `InvalidAudienceError`，那下一次还是在猜值——而填错值比没填更难查：没填是 503，
-        填错是每次 401。两面都钉：① 错的那一发必须同时留下**观察到的**与**期望的**；
-        ② 对的那一发不许留这一条，否则日志里到处是"看着像填错了"的假红。
+        填错是每次 401。三面都钉：① 错的那一发必须同时留下**观察到的**与**期望的**；
+        ② 那条记录得是从**这个 logger** 出来的（运维是按 logger 名 grep 的，名字写错就等于没写）；
+        ③ 成功那一发这个 logger **一条都不许出**——这里钉的是"有没有记录"而不是"有没有那句中文"，
+        因为文案是随便改得动的东西：审计算过，只钉文案子串的话，把那句改成"aud 不匹配，拿到的是…"
+        再在成功路径上也打同一条，判据仍然绿。
         """
         with caplog.at_level("WARNING", logger="app.core.apple_identity"):
             resp = _login(client, _mint(signing_key, aud="com.agentsbin.otherapp"))
         assert resp.status_code == 401
-        text = "\n".join(r.getMessage() for r in caplog.records)
+        mine = [r for r in caplog.records if r.name == "app.core.apple_identity"]
+        text = "\n".join(r.getMessage() for r in mine)
+        assert mine, "aud 对不上那一发没从 app.core.apple_identity 这个 logger 发出来"
         assert "com.agentsbin.otherapp" in text, f"日志里没留下观察到的 aud：{text!r}"
         assert CLIENT_ID in text, f"日志里没留下期望的 aud：{text!r}"
         assert "com.agentsbin.otherapp" not in resp.text
@@ -608,7 +613,44 @@ class Test_SIWA_验签:
         caplog.clear()
         with caplog.at_level("WARNING", logger="app.core.apple_identity"):
             assert _login(client, _mint(signing_key)).status_code == 200
-        assert "aud 对不上" not in "\n".join(r.getMessage() for r in caplog.records)
+        assert not [r for r in caplog.records if r.name == "app.core.apple_identity"], \
+            "成功登录这一发也发了告警：日志里会到处是'看着像填错了'的假红"
+
+        # 第四面：这一支往日志里写的东西**不许带换行**。`repr` 之前实测能把
+        # `… INFO 校验通过 sub=fake-sub` 伪装成第二条日志混进 wtsj-api 的输出——
+        # 走到这一支的串是 Apple 签过的（今天带不进换行），所以这是纵深防御；
+        # 但"过一道 repr"这句话只有这一条能证明确实过了。
+        caplog.clear()
+        forged = "com.evil\n2026-10-10 09:00:00 INFO 校验通过 sub=fake-sub"
+        with caplog.at_level("WARNING", logger="app.core.apple_identity"):
+            assert _login(client, _mint(signing_key, aud=forged)).status_code == 401
+        mine = [r for r in caplog.records if r.name == "app.core.apple_identity"]
+        assert len(mine) == 1, f"那一发应该只留一条日志，实际 {len(mine)} 条"
+        assert "\n" not in mine[0].getMessage(), f"日志里混进了真换行（伪造出第二条记录）：{mine[0].getMessage()!r}"
+
+    def test_取密钥那一道只收_rsa_的_kid(self, signing_key, monkeypatch):
+        """`_jwks_by_kid` 的**键集合**本身是不变量，得直接量它，不能只靠端到端那一条。
+
+        端到端那条（`test_密钥端点里的非_rsa_密钥不许把登录打成_500`）钉的是"最后回 401"，而
+        `RSAAlgorithm.from_jwk` 拿到残件冒的 `InvalidKeyError` 会被下面那个大 except 接住、也是 401
+        ——两件事在同一发结果上**长得一模一样**，所以把筛选那道撤掉，端到端仍然全绿
+        （10-10 独立审计实测：撤掉筛选跑全量 719 条一条不红）。这一条钉的是筛选真的做了：
+        一枚 EC 与一枚 RSA 同时挂在端点上，回来的字典里**只许有 RSA 那枚的 kid**。
+        留着 EC 那枚的后果不是报错，是"按 kid 取到一枚没法验 RSA 签名的密钥"这条路径长期存在，
+        而它今天靠第二道 except 兜着——**兜住不等于挡住**。
+        """
+        import asyncio
+
+        from app.core import apple_identity
+
+        ec = {"kty": "EC", "kid": "pytest-ec-kid", "crv": "P-256", "x": "AAAA", "y": "BBBB"}
+        payload = _jwks_payload(ec, _public_jwk(signing_key))
+        apple_identity.reset_jwks_cache()
+        monkeypatch.setattr(apple_identity, "_http_jwks", _serve_jwks(payload))
+        by_kid = asyncio.run(apple_identity._jwks_by_kid(force_refresh=True))
+        assert set(by_kid) == {KID}, f"筛选没真做：回来的键是 {sorted(by_kid)}"
+        assert by_kid[KID]["kty"] == "RSA"
+        apple_identity.reset_jwks_cache()
 
     def test_那三句关键参数在文件里各只有一个出处(self):
         """反向验证的刀是**按行**做突变的，而 perl 的 s/// 不带 /g 只替换**第一处**。
@@ -620,8 +662,8 @@ class Test_SIWA_验签:
         逼他在"改这一处"和"给刀换一个更准的模式"之间显式选一个。
 
         数的是**整行等值**而不是子串：这一版测试自己的说明里就引用了
-        `issuer=APPLE_ISSUER,` 那几个字，按子串数会被注释顶包（与 §8.174 那批
-        "剥注释根治顶包"同族，只是这次的"注释"是 docstring 里的一句引用）。
+        `issuer=APPLE_ISSUER,` 那几个字，按子串数会被注释顶包（与 §8.175／§8.176 那批
+        JS 尺子的"剥注释根治顶包"同族，只是这次的"注释"是 docstring 里的一句引用）。
         """
         import inspect
 

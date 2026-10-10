@@ -85,7 +85,10 @@ def _verified_aud(identity_token: str, public_key) -> str:
     `issuer=APPLE_ISSUER`：除了"这一格只有一个出处"这句口径，还有一条工具层的理由——
     `probes/反向验证-阶段2-2.sh` 的 E 刀是按 `issuer=APPLE_ISSUER,` 那一行做突变的，
     两处都写它，那一刀就会撤在排障这一支上、真防线一个字没动，判据照样绿（10-10 真踩过）。
-    截到 128 是日志卫生；这个值不从任何接口回读。
+    返回值过一道 `repr`：日志里最坏的一种污染是一枚换行——`\n` 之后那半行会被当成一条全新的
+    日志（审计实测能往 wtsj-api 的输出里伪造出 `… INFO 校验通过 sub=fake-sub`），`repr` 顺手把
+    `\\x00`／`\\x1b` 也变成可见字符。走到这一支的串是 Apple 真签过的（bundle id 那种形状，今天
+    带不进换行），所以这条是**纵深防御**，不是在补一个可利用漏洞。上限 128 字符；值不从接口回读。
     """
     try:
         claims = jwt.decode(
@@ -96,12 +99,11 @@ def _verified_aud(identity_token: str, public_key) -> str:
         )
     except (jwt.InvalidTokenError, jwt.InvalidKeyError, ValueError):
         return "<读不出>"
-    if claims.get("iss") != APPLE_ISSUER:
+    if "iss" not in claims:
+        return "<缺 iss>"
+    if claims["iss"] != APPLE_ISSUER:
         return "<非 appleid>"
-    aud = claims.get("aud")
-    if isinstance(aud, list):
-        aud = ",".join(str(x) for x in aud)
-    return str(aud)[:128]
+    return repr(claims.get("aud"))[:128]
 
 
 async def verify_identity_token(identity_token: str) -> str:
