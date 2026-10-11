@@ -92,6 +92,17 @@ rows.append((bool(面板图上) and bool(面板码里), '录入面板那一条�
              '13:0x 那句「30变50，与首页一致」；井与小圆吃 --glass-fill(.20)，不在这一句里'))
 cmp('块宽', '308px（图上 .blk-person）', one(cre, r'\.blk-person \{[^}]*width:\s*(\d+)rpx', '落码')[1], '1px＝1rpx', '308')
 cmp('块圆角', '34px（图上 .blk-person）', one(cre, r'\.blk-person \{[^}]*border-radius:\s*(\d+)rpx', '落码')[1], '1px＝1rpx', '34')
+# ---- 10-11 13:2x R19「切换男孩后，右侧女孩高度太低，要与之前右侧男孩高度一致」----
+# 这一格两头都要钉：图上 `.fig-alt` 与码里 `.blk-fig-alt` 都得**按高定、且不再给宽**。
+# 按宽定就是被打回的原因：两张源件比例不同（女 0.8314／男 0.6897），同一个 91 宽算出 132 与 109.5 两档高，换人那一下小人矮一截。
+fig_html = one(html, r'(\.fig-alt\s*\{[^}]*\})', '效果图 .fig-alt')[1]
+fig_code = one(cre, r'(\.blk-fig-alt\s*\{[^}]*\})', 'create.wxss')[1]
+cmp('剪影那枚的高（两态同高那一档）', '132px（图上 .fig-alt）',
+    one(fig_html, r'height:\s*(\d+)px', '效果图 .fig-alt')[1], '1px＝1rpx', one(fig_code, r'height:\s*(\d+)rpx', '落码 .blk-fig-alt')[1])
+rows.append((not re.search(r'\bwidth:', fig_html) and not re.search(r'\bwidth:', fig_code),
+             '剪影那枚两头都不许再按宽定',
+             '图上 .fig-alt 无 width', '码里 .blk-fig-alt ' + ('有 width ✗' if re.search(r'\bwidth:', fig_code) else '无 width ✓'),
+             '按宽定＝换人矮一截，就是他打回的那一态；宽由 heightFix 各自按比例倒算'))
 
 # ---- 类数：效果图自己在 `.g-blk` 那条上面记过那个坑（.g-blk 一个类压不住 .blk-stat.notes 两个类） ----
 def cls(s):

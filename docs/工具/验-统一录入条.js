@@ -567,6 +567,23 @@ ok('快门与滑动条的色仍只从 createSkin() 递进来，且 create.js 不
   && !/toneStyle/.test(js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
 ok('小黄点的色值仍由 palette 经 style 递进来',
   /tipDotStyle: 'background:' \+ TIP_DOT/.test(js) && palette.TIP_DOT === '#F6C445')
+/* 站长 10-11 13:2x：「第二屏的 Tips 前面少了小圆点，要与第一屏一致」。"一致"分三层钉：
+   ① 那一枚真挂在 `.out` 的第一个子位置，色仍从 tipDotStyle 递进来（不是另调一支黄、也不是抄进样式表）；
+   ② 几何四条与第一屏 `.tips-dot` **逐字相同**——差一档就不是"一致"，是"差不多"；
+   ③ `.out` 原来那行有 `gap: 20rpx`，它分的是"字与返回"，留着它点与字就成 12＋20＝32，
+      跟第一屏的 12 对不上 ⇒ 那道缝必须挪到 `.out-r` 的 margin-left 上（真跑 H4"左右不打架"照旧成立）。 */
+const dotGeo = (sel) => ['width', 'height', 'margin-top', 'margin-right', 'border-radius']
+  .map((p) => { const m = new RegExp(`${p}:\\s*([^;]+);`).exec(seg(sel)); return m ? `${p}:${m[1].trim()}` : `${p}:(缺)` })
+const gTip = dotGeo('.tips-dot'), gOut = dotGeo('.out-dot')
+ok('第二屏框外那行有点，且吃的是同一枚 tipDotStyle（样式表里没有第二支黄）',
+  /<view class="out">\s*(?:<!--[\s\S]*?-->\s*)?<view class="out-dot" style="\{\{tipDotStyle\}\}"><\/view>/.test(wxml)
+  && !/#f6c445/i.test(wxss),
+  wxml.slice(Math.max(0, wxml.indexOf('<view class="out">')), wxml.indexOf('<view class="out">') + 200).replace(/\s+/g, ' '))
+ok('两枚点的几何与第一屏逐字相同（他这句"要与第一屏一致"，不是"差不多"）',
+  gTip.join('|') === gOut.join('|'), `第一屏 ${gTip.join(' ')} ／ 第二屏 ${gOut.join(' ')}`)
+ok('点与字只隔 12（`.out` 那道 gap 已挪到 .out-r 的 margin-left，否则这里量到 32）',
+  !/gap:/.test(seg('.out')) && /margin-left:\s*20rpx/.test(seg('.out-r')),
+  `.out＝${seg('.out').replace(/\s+/g, ' ').trim().slice(0, 70)}／.out-r＝${seg('.out-r').replace(/\s+/g, ' ').trim()}`)
 
 // ---------- 7. 提交链路：三档共用同一趟忙态时序 ----------
 ok('三档都从 runSubmit 进（滑动到位与轨道点一下共用一个口）',

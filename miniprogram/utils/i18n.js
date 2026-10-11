@@ -437,8 +437,11 @@ const i18n = {
     modePhoto: 'Photo',
     modeWrite: 'Text',
     modeUrl: 'Link',
-    homeBgSwap: 'Change photo',
-    bgDimLabel: 'Dim photo',
+    // 站长 10-11 13:2x：「调亮度，换背景的英文不准确」。原来这两枚是 'Dim photo'／'Change photo'——
+    // 这一屏上 "Photo" 已经是三枚标签里的「照片」那一档（上面 modePhoto），读起来像在说笔记的图，
+    // 而这两枚动的都是**背景那张形象图**：一枚换它、一枚调它的明暗。所以改成点名的那两样。
+    homeBgSwap: 'Background',
+    bgDimLabel: 'Brightness',
     tipsPrefix: 'Tips: ',
     tips: [
       'Photos and screenshots turn into key points',

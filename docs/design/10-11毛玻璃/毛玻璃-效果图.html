@@ -127,7 +127,10 @@ h1 { font-size: 26px; letter-spacing: .5px; margin-bottom: 6px; }
 .blk-person { position: relative; flex: none; width: 308px; height: 308px; border-radius: 34px; background: var(--eb-person); color: var(--eb-ink); }
 .figwrap { position: absolute; left: 0; right: 0; top: -52px; bottom: 105px; overflow: hidden; }
 .fig { position: absolute; left: 0; top: 0; width: 220px; z-index: 2; }
-.fig-alt { position: absolute; right: 0; bottom: 0; width: 91px; z-index: 1; filter: grayscale(1) brightness(1.45); opacity: .5; }
+/* 10-11 13:2x 站长：「切换男孩后，右侧女孩高度太低，要与之前右侧男孩高度一致……大人和小人的高度差不要太大，他们是男女情侣」。
+   ⇒ 这一枚从"按宽定 91px"改成"按高定 132px"：两张源件比例不同（女 0.8314／男 0.6897），同一个 91 宽算出 132 与 109.5 两档高，
+   换人那一下小人就矮一截（这张稿上画的正好是他打回的那一态：男在前、女当剪影）。按高定之后两态同高，宽各自按比例倒算（男 91／女 109.7）。 */
+.fig-alt { position: absolute; right: 0; bottom: 0; height: 132px; z-index: 1; filter: grayscale(1) brightness(1.45); opacity: .5; }
 .jot { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 18px 16px 36px; border-radius: 0 0 34px 34px; background: #fff; }
 .jot-l { display: flex; align-items: center; gap: 10px; font-size: 36px; font-weight: 700; letter-spacing: 1px; color: #3A3A3C; }
 .jot-l .cam { width: 32px; height: 32px; border-radius: 7px; border: 3px solid #3A3A3C; position: relative; }

@@ -275,29 +275,41 @@ ok('剪影在主人物**后面**（z-index 比它小），且落在右下（righ
 ok('剪影是"淡灰剪影"不是"另一张小图"：灰度＋半透明两条都在',
   /grayscale\(\s*1/.test(sFigAlt) && /opacity:\s*\.[0-9]/.test(sFigAlt),
   sFigAlt.replace(/\s+/g, ' ').trim())
-/* 「高度约为女的一半」这条按源件比例现算，不抄常量：主人物宽 220 时女那张屏上 264 高，
-   剪影宽 w 时男那张屏上 w/0.6897 高——比值要落在 0.45~0.55。
-   原来给的是 110 宽 → 160 高 = 0.60 倍，比他那句大一档，这一条当时量不到（判据写死 110/132）。 */
+/* 这条的量法在 10-11 13:2x 跟着他改口换过一次。原来剪影**按宽定**（widthFix＋91），两张源件比例
+   不同（女 0.8314／男 0.6897）→ 同一个 91 宽算出两档高（男 132／女 109.5），换到男孩那一态小人矮一截。
+   他那句「要与之前右侧男孩高度一致」要的是**两态同高**，所以实现改成按高定（heightFix＋132），
+   宽由各自比例倒算 ⇒ 判据不能再从 width 倒推高了。
+   高差那两档现在各自是 0.499（女当主人）／0.414（男当主人）：下界从 .45 松到 .40 是因为他把"同高"
+   钉成了绝对数，这一态的比值必然掉到"一半"以下——不是把它做矮了，是男那张本来就比女那张高 54。
+   要再收小只能抬这一枚的高，那是他那句之外的另一个数，没他的话我不自己抬。 */
 const figAR = (() => {
   const r = (f) => { const b = fs.readFileSync(P(f)); return b.readUInt32BE(16) / b.readUInt32BE(20) }
   return { girl: r('assets/ic-person.png'), boy: r('assets/ic-person-alt.png') }
 })()
-const mainH = sizeOf('.blk-fig', 'width') / figAR.girl
-const altH = sizeOf('.blk-fig-alt', 'width') / figAR.boy
-ok('剪影屏上高 ≈ 主人物的一半（他原话"高度约为女的一半"，比值 0.45~0.55）',
-  altH / mainH >= 0.45 && altH / mainH <= 0.55,
-  `主人物 ${mainH.toFixed(1)}、剪影 ${altH.toFixed(1)} → ${(altH / mainH).toFixed(2)}`)
+const altH = sizeOf('.blk-fig-alt', 'height')
+const altW = (ar) => altH * ar
+const mainW = sizeOf('.blk-fig', 'width')
+const mainH = (ar) => mainW / ar
+ok('剪影改成按高定：wxml 走 heightFix、wxss 只给高不给宽（还按宽给＝换人矮一截，就是他打回的那个）',
+  /class="blk-fig-alt"[^>]*mode="heightFix"/.test(wxml)
+  && Number.isFinite(altH) && !/\bwidth:/.test(sFigAlt),
+  `mode=${/class="blk-fig-alt"[^>]*mode="([a-zA-Z]+)"/.exec(wxml)?.[1]}，wxss 高 ${altH}，宽那行${/\bwidth:/.test(sFigAlt) ? '还在' : '已撤'}`)
+for (const [tag, ar] of [['默认那态（女当主人物）', figAR.girl], ['换人后（男当主人物）', figAR.boy]]) {
+  const ratio = altH / mainH(ar)
+  ok(`${tag}：剪影屏上高仍在主人物的 0.40~0.55 档（"约一半"那一档，两态同高后男主人那一态必然掉到 .41）`,
+    ratio >= 0.40 && ratio <= 0.55,
+    `主人物 ${mainH(ar).toFixed(1)}、剪影 ${altH} → ${ratio.toFixed(3)}`)
+}
 // 点击为什么不在剪影那张图上：它压在主人物后面，重叠那一条被上面那张吞掉。
-// 所以热区必须盖在**最上层**，而且要比两张里高的那一张更大——少一挡就有一段点了没反应。
-const tallerAlt = Math.max(sizeOf('.blk-fig-alt', 'width') / figAR.girl, altH)
+// 所以热区必须盖在**最上层**，而且要比两张里宽／高的那一张更大——少一挡就有一段点了没反应。
 ok('点的是透明热区，不是那张图：热区 z-index 盖过前后两张',
   intOf(sAltHit, 'z-index') > intOf(sFig, 'z-index')
   && intOf(sAltHit, 'z-index') > intOf(sFigAlt, 'z-index'),
   `热区 ${intOf(sAltHit, 'z-index')}／主 ${intOf(sFig, 'z-index')}／剪影 ${intOf(sFigAlt, 'z-index')}`)
-ok('热区盖得住两张里更高的那一张（宽和高都不得小于剪影本身）',
-  sizeOf('.blk-alt-hit', 'width') >= sizeOf('.blk-fig-alt', 'width')
-  && sizeOf('.blk-alt-hit', 'height') >= tallerAlt,
-  `热区 ${sizeOf('.blk-alt-hit', 'width')}×${sizeOf('.blk-alt-hit', 'height')} vs 剪影最高 ${tallerAlt.toFixed(1)}`)
+ok('热区盖得住两张里更宽的那一张，也盖得住高（按高定之后"更高"两态一样，"更宽"变成女那张）',
+  sizeOf('.blk-alt-hit', 'width') >= Math.max(altW(figAR.girl), altW(figAR.boy))
+  && sizeOf('.blk-alt-hit', 'height') >= altH,
+  `热区 ${sizeOf('.blk-alt-hit', 'width')}×${sizeOf('.blk-alt-hit', 'height')} vs 剪影 宽 ${Math.max(altW(figAR.girl), altW(figAR.boy)).toFixed(1)}（男 ${altW(figAR.boy).toFixed(1)}／女 ${altW(figAR.girl).toFixed(1)}）×高 ${altH}`)
 ok('热区用 catchtap（不是 bindtap）——冒泡到左块就顺手把面板打开了，换人变成"换人＋开门"',
   /class="blk-alt-hit"[^>]*catchtap="swapPerson"/.test(wxml)
   && !/class="blk-alt-hit"[^>]*[^-]bindtap=/.test(wxml))

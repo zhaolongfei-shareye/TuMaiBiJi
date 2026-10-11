@@ -72,7 +72,10 @@
                ⚠ 这一枚不挂 hover-class：它没有底色也没有子节点，按下态加在它身上画不出任何东西
                （留着一行就是一条永不现形的声明）。换人那一下的反馈就是两张图当场对调。 -->
           <image class="blk-fig" src="{{personSrc}}" mode="widthFix" />
-          <image class="blk-fig-alt" src="{{personAltSrc}}" mode="widthFix" />
+          <!-- 剪影这一枚 10-11 13:2x 改成**按高定**（原来是按宽）：站长原话「切换男孩后，右侧女孩高度太低，
+               要与之前右侧男孩高度一致」。两张源件比例不同（女 360×433／男 360×522），按宽给同一个数
+               ⇒ 女当剪影时只有 109.5 高、男当剪影是 132 高，换人那一下右边那位就矮一截。 -->
+          <image class="blk-fig-alt" src="{{personAltSrc}}" mode="heightFix" />
           <view class="blk-alt-hit" role="button" aria-label="{{t.personSwap}}" catchtap="swapPerson"></view>
         </view>
         <view class="blk-jot">
@@ -107,6 +110,9 @@
          两枚都浮在形象图上，所以吃页面级 --text-tertiary：铺图时它是纸白 .56，
          没铺图时是这套壁纸的灰字，两头都不用另写规则。 -->
     <view class="out">
+      <!-- 站长 10-11 13:2x：「第二屏的 Tips 前面少了小圆点，要与第一屏一致」。
+           同一枚点、同一个色（`palette.TIP_DOT` 从 style 递进来，写进样式表会被"饱和色不许抄进样式表"那条打红）。 -->
+      <view class="out-dot" style="{{tipDotStyle}}"></view>
       <text class="out-l">{{tipsPrefix}}{{tips[tipIdx]}}</text>
       <text class="out-r" role="button" aria-label="{{t.back}}" catchtap="collapse">{{t.back}}</text>
     </view>

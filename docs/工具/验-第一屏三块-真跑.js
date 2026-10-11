@@ -176,8 +176,8 @@ async function main() {
   const fig6 = await rect('.blk-fig')
   const alt6 = await rect('.blk-fig-alt')
   const hit6 = await rect('.blk-alt-hit')
-  ok('剪影真渲染出来了，且高约主人物的一半（0.45~0.55，他原话"高度约为女的一半"）',
-    !!alt6 && alt6.h > 0 && alt6.h / fig6.h >= 0.45 && alt6.h / fig6.h <= 0.55,
+  ok('剪影真渲染出来了，且高在主人物的 0.40~0.55 档（默认态女当主人 → 约 .50；换人后男当主人 → .41）',
+    !!alt6 && alt6.h > 0 && alt6.h / fig6.h >= 0.40 && alt6.h / fig6.h <= 0.55,
     alt6 ? `主人物 ${q(fig6.h).toFixed(1)}／剪影 ${q(alt6.h).toFixed(1)} = ${(alt6.h / fig6.h).toFixed(2)}` : '屏上没有 .blk-fig-alt')
   ok('剪影落在右下（右缘、底缘都贴到取景窗那两条边）',
     Math.abs(alt6.right - wrap6.right) <= 2 && Math.abs(alt6.bottom - wrap6.bottom) <= 2,
@@ -205,6 +205,19 @@ async function main() {
     figB.bottom > wrapB.bottom + 20 * R, `图底 ${q(figB.bottom).toFixed(1)}／窗底 ${q(wrapB.bottom).toFixed(1)}`)
   ok('换完人，窗底仍然不低过白条上沿（这一条是"男性下半部不要遮挡白色横条"那一句）',
     wrapB.bottom <= jotB.top + 2 * R, `窗底 ${q(wrapB.bottom).toFixed(1)}／白条顶 ${q(jotB.top).toFixed(1)}`)
+  /* R19 13:2x 他那句「切换男孩后，右侧女孩高度太低，要与之前右侧男孩高度一致」量的就是这两行：
+     改按高定之前，同一个 91 宽在两张源件上算出 132／109.5 两档高，换人那一下小人矮 22.5rpx。
+     ⇒ 现在换完态的屏上高必须与默认态对上（差 ≤2rpx 是渲染那一档抖动），且两态比值都还在"约一半"档里。 */
+  const altB = await rect('.blk-fig-alt')
+  ok('换到"男在前"后，剪影（这一态是女那位）的屏上高与默认态一致（"要与之前右侧男孩高度一致"）',
+    !!altB && Math.abs(altB.h - alt6.h) <= 2 * R,
+    `默认态 ${q(alt6.h).toFixed(1)} → 换人后 ${altB && q(altB.h).toFixed(1)}（差 ${altB && q(altB.h - alt6.h).toFixed(1)}rpx）`)
+  ok('换人后剪影对主人物的比值仍在 0.40~0.55（男那张本身比女高 54，这一态落在 .41 是他钉"同高"之后的必然）',
+    !!altB && altB.h / figB.h >= 0.40 && altB.h / figB.h <= 0.55,
+    `主人物 ${q(figB.h).toFixed(1)}／剪影 ${altB && q(altB.h).toFixed(1)} = ${altB && (altB.h / figB.h).toFixed(2)}`)
+  ok('两位之间不留空档：换人后剪影与主人物水平上仍然重叠（"大人和小人之间距离不要太多"）',
+    !!altB && altB.left < figB.right - 2 * R,
+    `剪影左缘 ${altB && q(altB.left).toFixed(1)}／主人物右缘 ${q(figB.right).toFixed(1)}（rpx）`)
   await tapHit()
   const back6 = await page.data()
   // 收尾必须复原（不留"点过的状态"给下一把尺子），顺带钉他那句"与男的处理一致"的另一半：
