@@ -5,7 +5,7 @@
 // ① 白纱 alpha 全站只有一个出口＝app.wxss 里那组 `--glass-*`。R10 是站长在校准条上点的「α = .30」，
 //    页面里再出现一支写死的白纱＝同一件事两份真相，下次调必漏改。
 // ② `--glass-fade-card`／`--glass-fade-page` **跟着壁纸走**（渐退的终点＝本套 --bg-card／--bg-page
-//    @62%，效果图第 229／263 行那两个档）。四套各一份镜像值，值算错＝那一套下卡顶渐退到一支错色。
+//    @62%，效果图第 229／332 行那两个档）。五块皮肤（`page`＋四套 `.theme-*`）各一份镜像值，值算错＝那一套下卡顶渐退到一支错色。
 // ③ `var()` 替换成非法值在 CSS 里是 IACVT＝整条 `background` 当 unset 用、底色归 transparent
 //    ⇒ 整张卡透空露出原图（＝"中间镂空"那一种，范围更大）。所以"缺一枚令牌"不是小事。
 // ④ 压暗延段那支暗值必须等于**各自罩层渐变自己的末档**，不同＝542 那条线一道硬边＝R6 打回的"一刀切"。
@@ -100,11 +100,17 @@ function evaluate(F) {
 
   ;[['index', IX], ['me', ME], ['create', CR]].forEach(([who, src]) => {
     const lines = src.split('\n')
-    const missing = lines.map((l, i) => ({ l: l.trim(), i }))
-      .filter((o) => /^backdrop-filter:/.test(o.l))
-      .filter((o) => !/^-webkit-backdrop-filter:/.test((lines[o.i + 1] || '').trim()))
-    ok(`${who}：每一行 backdrop-filter 后面都跟着 -webkit- 那一行`, missing.length === 0,
-      missing.map((o) => o.l).join('、'))
+    const at = (i) => String((lines[i] || '').trim())
+    // 两个方向都要查：只查"`backdrop-filter` 后面跟没跟 -webkit-"的话，
+    // **把标准那行删掉、只留 -webkit-** 就永远红不起来（10-11 审查抓到的没牙位）。
+    const noWebkit = lines.map((l, i) => ({ l: at(i), i })).filter((o) => /^backdrop-filter:/.test(o.l))
+      .filter((o) => !/^-webkit-backdrop-filter:/.test(at(o.i + 1)))
+    const noStd = lines.map((l, i) => ({ l: at(i), i })).filter((o) => /^-webkit-backdrop-filter:/.test(o.l))
+      .filter((o) => !/^backdrop-filter:/.test(at(o.i - 1)))
+    ok(`${who}：每一行 backdrop-filter 与 -webkit- 那行成对（缺任一行都算不生效）`,
+      noWebkit.length === 0 && noStd.length === 0,
+      [noWebkit.map((o) => `缺前缀 ${o.l}`).join('、'), noStd.map((o) => `缺标准行 ${o.l}`).join('、')]
+        .filter(Boolean).join('；') || `${(src.match(/^backdrop-filter:/gm) || []).length} 对`)
   })
 
   const ixBand = num(F.ixjs, /const GLASS_BAND_H\s*=\s*(\d+)/)
@@ -183,6 +189,9 @@ const MUT = [
   ['删掉 create 里一行的 -webkit- 前缀', 'cr', (s) => s.replace(
     '  backdrop-filter: var(--glass-bf);\n  -webkit-backdrop-filter: var(--glass-bf);\n  border-color',
     '  backdrop-filter: var(--glass-bf);\n  border-color')],
+  ['反过来：删掉标准那行、只留 -webkit-（这一刀以前逮不住）', 'cr', (s) => s.replace(
+    '  backdrop-filter: var(--glass-bf);\n  -webkit-backdrop-filter: var(--glass-bf);\n  border-color',
+    '  -webkit-backdrop-filter: var(--glass-bf);\n  border-color')],
   ['首页 GLASS_BAND_H 改回 542', 'ixjs', (s) => s.replace('const GLASS_BAND_H = 740', 'const GLASS_BAND_H = 542')],
   ['玻璃规则点一枚 markup 里没有的类（`.mini .c` 那一刀）', 'cr', (s) => s.replace(
     '.container.has-bg .mini-c {', '.container.has-bg .mini .c {')],

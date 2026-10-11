@@ -7,6 +7,14 @@
    "w": 390,
    "h": 753
   },
+  "want": [
+   ".pwd-name",
+   ".pwd-scene"
+  ],
+  "missing": [],
+  "skipped": [
+   ".pwd-tip"
+  ],
   "rect": {
    "top": 93,
    "left": 17,
@@ -26,7 +34,7 @@
    },
    {
     "sel": ".pwd-scene",
-    "color": "rgba(53, 46, 29, 0.72)",
+    "color": "rgb(53, 46, 29)",
     "fontSize": "10px",
     "fontWeight": "400",
     "text": ""
@@ -41,6 +49,13 @@
    "w": 390,
    "h": 753
   },
+  "want": [
+   ".me-email-name",
+   ".me-email-scene",
+   ".me-email-field"
+  ],
+  "missing": [],
+  "skipped": [],
   "rect": {
    "top": 93,
    "left": 17,
@@ -60,7 +75,7 @@
    },
    {
     "sel": ".me-email-scene",
-    "color": "rgba(53, 46, 29, 0.72)",
+    "color": "rgb(53, 46, 29)",
     "fontSize": "10px",
     "fontWeight": "400",
     "text": "回信、更正、注销请求都靠它对上你的账号，只有你本"
@@ -82,6 +97,14 @@
    "w": 390,
    "h": 753
   },
+  "want": [
+   ".ci-title",
+   ".ci-hint"
+  ],
+  "missing": [],
+  "skipped": [
+   ".ci-cap"
+  ],
   "rect": {
    "top": 93,
    "left": 34,
@@ -101,7 +124,7 @@
    },
    {
     "sel": ".ci-hint",
-    "color": "rgba(35, 37, 44, 0.55)",
+    "color": "rgb(35, 37, 44)",
     "fontSize": "10px",
     "fontWeight": "400",
     "text": "这四张就是卡片上的人和名字。换一张点「更换」，不"

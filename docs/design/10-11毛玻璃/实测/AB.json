@@ -4,6 +4,7 @@
    "w": 390,
    "h": 753
   },
+  "bg": "/assets/home-bg-portrait.jpg",
   "glass": [
    0,
    261,
@@ -22,6 +23,7 @@
    "w": 390,
    "h": 753
   },
+  "bg": "/assets/home-bg-portrait.jpg",
   "glass": [
    0,
    261,

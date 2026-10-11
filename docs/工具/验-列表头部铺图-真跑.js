@@ -192,8 +192,9 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
     && imgRect.top + imgRect.h >= sheetTopNow.top + solidStop * R - 2,
     imgRect && `图底 ${Math.round((imgRect.top + imgRect.h) / R)}rpx／实心线 ${(sheetTopNow.top / R + solidStop) | 0}rpx${readout}`)
 
-  // R1/R4/R5：卡顶那一段现在是一张白玻璃，不是实心纸。backdrop-filter 有没有落到元素上、
-  // 渐变那四个色标在不在，这两条量的是"玻璃挂上了没有"；糊没糊由下面那一段按 std 判。
+  // R1/R4/R5：卡顶那一段现在是一张白玻璃，不是实心纸。这两条量的是"玻璃挂上了没有"
+  // （计算样式里读得到渐变与 backdrop-filter）；**糊没糊不在这一把里判**，
+  // 那是同位 A/B 那两趟的事：`拍-玻璃AB.js` 取图 ＋ `量-玻璃糊没糊.py` 出比值。
   const sheetBgi = String(await styleOf(page, '.sheet', 'background-image') || '')
   const sheetBf = String(await styleOf(page, '.sheet', 'backdrop-filter')
     || await styleOf(page, '.sheet', '-webkit-backdrop-filter') || '')

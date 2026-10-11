@@ -32,7 +32,8 @@ def stats(im):
     if g.shape[0] < 5 or g.shape[1] < 5:
         raise SystemExit(f'!! 这块太小（{g.shape}），Laplacian 没法算')
     lap = (g[1:-1, :-2] + g[1:-1, 2:] + g[:-2, 1:-1] + g[2:, 1:-1] - 4 * g[1:-1, 1:-1])
-    return {'mean': g.mean(), 'std': g.std(), 'lapvar': float(lap.var())}
+    return {'mean': g.mean(), 'std': g.std(), 'min': float(g.min()), 'lapvar': float(lap.var()),
+            'p05': float(np.percentile(g, 5)), 'p95': float(np.percentile(g, 95))}
 
 
 def parse_rect(s):
@@ -90,25 +91,55 @@ def main():
     else:
         raise SystemExit('!! 要么给 --ab + --who（推荐），要么给 --rect；两样都没有就没法量')
 
+    # ★先验"这两张到底能不能用"，再出数（10-11 审查抓到的 P0 就是这一格没验）：
+    # 模拟器 `mp.screenshot` 有一帧里那张形象图**根本没画出来**的情形（头部整段 255 纯白）。
+    # 那种图上玻璃背后是平的，A／B 唯一的差别就只剩**文字的抗锯齿**，比值照样能算出 0.352 这种
+    # 看着像"糊住了"的数——所以对照组那块必须有画面，否则当场拒绝出数。
+    bad = []
+    if ref:
+        ra, rb = patch_px(ia, *ref), patch_px(ib, *ref)
+        qa, qb = stats(ra), stats(rb)
+        print(f'\n〔先验〕对照组 {rname} → 截图像素 {tuple(round(v) for v in ref)}（玻璃外面那一段，本来就该是那张图）')
+        print(f'  B（不带滤镜）那一块：mean {qb["mean"]:.1f}　min {qb["min"]:.0f}　p05 {qb["p05"]:.0f}　p95 {qb["p95"]:.0f}　std {qb["std"]:.2f}　Laplacian {qb["lapvar"]:.1f}')
+        # 判"平色"用 p05／均值，不用 std：std 会被几笔深色笔画（标题字、导航条那一道边）撑到 19，
+        # 而那一块其实 95% 的像素都是 255——10-11 那次假结论就是这么混过关的。
+        if qb['p05'] >= 245 or qb['mean'] >= 250:
+            raise SystemExit('!! 对照组那块**九成以上像素都是白**（p05 ' + f'{qb["p05"]:.0f}' + '、均值 '
+                             + f'{qb["mean"]:.1f}' + '）＝那张形象图没画进这一帧。'
+                             '这两张对判出来的任何比值都不作数（10-11 那次 0.352 就是这么来的假结论）。'
+                             '先按 `拍-玻璃AB.js` 头部那条注释把 bgSrc 钉成包内那张再重拍。')
+        if qb['std'] < 6:
+            raise SystemExit(f'!! 对照组 std 只有 {qb["std"]:.2f}＝那块是平的，这两张不能用')
+        if qb['lapvar'] < 1:
+            raise SystemExit('!! 对照组细节能量接近 0，比值会因除零乱跳，这一对不能用')
+    else:
+        print('\n⚠ 没给对照组（--ref auto）＝这一把没法证明"两张是同一屏"，下面的比值只能当参考')
+
     sa, sb = stats(patch_px(ia, *glass)), stats(patch_px(ib, *glass))
     print(f'\n玻璃那一块 {gname} → 截图像素 {tuple(round(v) for v in glass)}')
     for name, s in (('A 带 blur', sa), ('B 不带', sb)):
-        print(f'  {name}：均值 {s["mean"]:7.2f}  std {s["std"]:6.2f}  Laplacian方差 {s["lapvar"]:9.1f}')
+        print(f'  {name}：均值 {s["mean"]:7.2f}  min {s["min"]:5.1f}  std {s["std"]:6.2f}  Laplacian方差 {s["lapvar"]:9.1f}')
+    if sb['lapvar'] < 1:
+        raise SystemExit('!! 玻璃那一块在不带滤镜时也没有细节能量（背后是平的），比值不作数')
     rl = sa['lapvar'] / sb['lapvar']
     rs = sa['std'] / sb['std']
     print(f'  比值：Laplacian {rl:.3f}　std {rs:.3f}　⇒ A 的细节能量比 B 少 {(1 - rl) * 100:.0f}%')
     print(f'  判读：{"滤镜确实吃到了画面＝糊住了" if rl < 0.9 else "基本没差＝blur 没生效，这一屏的玻璃是块白纱"}'
           f'　（0.9 这条线是我定的分档，不是站长拍的；他拍的是"落前先跑 blur 实测"这件事本身）')
+    if rl >= 0.9:
+        bad.append('blur 没生效')
     print('  ⚠ 玻璃上的**字**本来就不吃 backdrop-filter（它只糊背后），字密的那一条带会把比值往 1 拉；'
           '要看纯底的效果得另取无字那一截，别拿被字占满的那一条判"没糊"。')
     if ref:
-        qa, qb = stats(patch_px(ia, *ref)), stats(patch_px(ib, *ref))
         qr = qa['lapvar'] / qb['lapvar']
-        print(f'\n对照组 {rname} → 截图像素 {tuple(round(v) for v in ref)}（玻璃外面那一段）')
-        print(f'  A Laplacian {qa["lapvar"]:9.1f}　B {qb["lapvar"]:9.1f}　比值 {qr:.3f}'
+        print(f'\n对照组比值：A Laplacian {qa["lapvar"]:9.1f}　B {qb["lapvar"]:9.1f}　{qr:.3f}'
               f'　→ {"≈1，这两张除玻璃外没差别，上面那条数可信" if 0.8 < qr < 1.25 else "离 1 太远：这两张不是同一屏，上面全部作废"}')
+        if not (0.8 < qr < 1.25):
+            bad.append('对照组离 1 太远')
     print('\n⚠ 这一把判的是"糊没糊"这一件事。字压在玻璃上读不读得清是**对比度**那条'
           '（`探-数字对比度` 与 §三.1～.3），两把尺子不许互相代替。')
+    if bad:
+        raise SystemExit('!! 这一把判红：' + '；'.join(bad))
 
 
 main()

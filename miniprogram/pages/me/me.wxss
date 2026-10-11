@@ -192,13 +192,22 @@
    皮写在页内，只有 `--glass-veil`/`--glass-bf` 两枚 var()（α 全站只那一个出口，R10）；
    为什么不写在 app.wxss，理由记在那张表 X4 那段注释里。
    compound（`.pwd-card.glass-dialog`）是为了压得过 markup 上同时挂着的 `.card` 那一档底色。
-   ⚠ 这两枚底下垫的是 `rgba(20,20,28,.55)` 那层暗遮罩：白纱压暗底会落成中灰，里面墨字的对比
-      可能不到 4.5。这一条我不自己抬 α，量出数来回报，过不过线由他判。 */
+   ⚠ 这两枚底下垫的是 `rgba(20,20,28,.55)` 那层暗遮罩：白纱压暗底落成中灰（实测面 rgb(157~165)），
+      里面墨字的对比量出来给站长判——他 10-11 拍**甲**，见下面那一条说明字。 */
 .container.has-bg .pwd-card.glass-dialog,
 .container.has-bg .me-email-card.glass-dialog {
   background: var(--glass-veil);
   backdrop-filter: var(--glass-bf);
   -webkit-backdrop-filter: var(--glass-bf);
+}
+
+/* 站长 10-11 拍**甲**（原话「甲，弹窗不用，甲，不用。」里第二个"甲"＝待拍第 3 条选甲）：
+   这两枚的说明字从 `--text-secondary`（墨 @.72）提到整档墨——量出来那两枚的说明字在玻璃面上是
+   3.30／3.10:1，不到小字门槛 4.5，而同样的面上整档墨是 4.98~6.17。
+   闸同样写在 `.container.has-bg` 上：没铺图那一态这张卡是实心 #FCFBF8，淡墨本来就够（≈7:1），那一态一个字不回改。 */
+.container.has-bg .pwd-card.glass-dialog .pwd-scene,
+.container.has-bg .me-email-card.glass-dialog .me-email-scene {
+  color: var(--text-primary);
 }
 
 .sheet-logo {

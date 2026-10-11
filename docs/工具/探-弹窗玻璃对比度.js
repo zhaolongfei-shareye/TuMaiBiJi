@@ -17,14 +17,15 @@ const path = require('path')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/10-11毛玻璃/实测')
 
-// 每一枚：弹窗选择器、里面要量的字选择器、以及"拿来取面色的那块无字区域"选哪一枚元素。
+// 每一枚：弹窗选择器、里面要量的字选择器。名字后面带 `?` 的是**条件节点**（wx:if／wx:for 里的），
+// 摸不到只记 skipped、不算漏量；不带 `?` 的摸不到就是 missing，量那一步会判红。
 const TARGETS = [
   { who: '密码那一层', page: '/pages/me/me', open: 'pwdOpen', card: '.pwd-card',
-    texts: ['.pwd-name', '.pwd-scene', '.pwd-tip'] },
+    texts: ['.pwd-name', '.pwd-scene', '.pwd-tip?'] },
   { who: '我的邮箱那一层', page: '/pages/me/me', open: 'emailOpen', card: '.me-email-card',
     texts: ['.me-email-name', '.me-email-scene', '.me-email-field'] },
   { who: '卡片上的信息那一层', page: '/pages/index/index', open: 'cardInfoOpen', card: '.ci-card',
-    texts: ['.ci-title', '.ci-hint', '.ci-cap'] },
+    texts: ['.ci-title', '.ci-hint', '.ci-cap?'] },
 ]
 
 ;(async () => {
@@ -63,9 +64,15 @@ const TARGETS = [
     const shot = `${t.who}-${t.page.split('/').pop()}.png`.replace(/\s/g, '')
     await mp.screenshot({ path: `${OUT}/${shot}` })
     const texts = []
-    for (const sel of t.texts) {
+    const missing = []
+    const skipped = []
+    for (const spec of t.texts) {
+      const opt = spec.endsWith('?')
+      const sel = opt ? spec.slice(0, -1) : spec
       const el = await page.$(sel)
-      if (!el) continue
+      // 摸不到节点要**记下来**，不许 `continue`：静默丢掉一枚＝那一枚压根没被量过，
+      // 而报告照样一路打"过"（10-11 审查抓到的：密码那枚与卡片那枚各少一枚就是这么没的）。
+      if (!el) { (opt ? skipped : missing).push(sel); continue }
       texts.push({
         sel, color: String(await el.style('color') || ''),
         fontSize: String(await el.style('font-size') || ''),
@@ -75,6 +82,7 @@ const TARGETS = [
     }
     rows.push({
       who: t.who, shot, card: t.card, win,
+      want: t.texts.filter((s) => !s.endsWith('?')), missing, skipped,
       rect: rect && { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
       veil: bg, backdropFilter: bf, backgroundImage: bgi,
       texts,
@@ -85,6 +93,11 @@ const TARGETS = [
   const file = `${OUT}/弹窗.json`
   fs.writeFileSync(file, JSON.stringify(rows, null, 1))
   console.log(`存 ${file}（${rows.length} 枚）`)
-  rows.forEach((r) => console.log(`  ${r.who}：面底色 ${r.veil || '(读不到)'}｜滤镜 ${r.backdropFilter || '(读不到)'}｜渐变 ${/linear-gradient/.test(r.backgroundImage || '') ? '有' : '无'}`))
+  rows.forEach((r) => console.log(`  ${r.who}：面底色 ${r.veil || '(读不到)'}｜滤镜 ${r.backdropFilter || '(读不到)'}`
+    + `｜渐变 ${/linear-gradient/.test(r.backgroundImage || '') ? '有' : '无'}`
+    + `${(r.missing || []).length ? `｜★漏量 ${r.missing.join('、')}` : ''}`
+    + `${(r.skipped || []).length ? `｜条件节点没出现 ${r.skipped.join('、')}` : ''}`))
+  const lost = rows.filter((r) => (r.missing || []).length)
   await mp.close()
+  if (lost.length) { console.error(`!! 有 ${lost.length} 枚弹窗的字没量全，这一趟不作数`); process.exit(1) }
 })().catch((e) => { console.error('!! 探针挂了', e && (e.stack || e.message)); process.exit(1) })

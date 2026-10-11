@@ -41,30 +41,47 @@ if a.win:
     chrome = (H / (W / ww) - wh) * (W / ww)     # 截图顶上那截，直接换成图像素
     print(f'  视口 {ww}×{wh}　截图顶上那截 {chrome:.0f} 图像素')
 else:
-    print('  ⚠ 没给 --win：--seam-y 按"从图左上角量"处理。要量的是样式表里那条线就必须给 --win。')
+    raise SystemExit('!! 必须给 --win <windowWidth,windowHeight>：不给就没法补上截图顶上那截'
+                     '（状态栏＋导航条），量到的不是那条线。10-11 第一版就栽在这里。')
 y = round(a.seam_y * R + chrome)
 x0, x1 = round(a.x0 * R), round(a.x1 * R)
 if x1 > W:
     x1 = W - 1
+if x1 - x0 < 8:
+    raise SystemExit(f'!! 横段只有 {x1 - x0} 像素宽，取不到统计量')
 gap = round(a.half * R)
-px = im.load()
+import numpy as np
+arr = np.asarray(im, dtype=float)
 
 
-def row_read(ry):
-    vals = sorted(px[x, ry] for x in range(x0, x1))
-    if not vals:
-        raise SystemExit(f'!! 横段 x {a.x0}~{a.x1}rpx 一个像素都没有，这把没法量')
-    return vals[len(vals) // 2]                 # 中位数：字占不到一半宽度时它就是底色
+def band_read(yc, n=3):
+    """取 yc 上下各 n 行、x0~x1 这一段，返回**中位数**。
+    两层中位数：先每行取中位（躲开深色笔画），再对几行取中位（躲开压着一根发丝线/一条分隔线的情形）。
+    10-11 审查抓到单行取样会被一根 1rpx 的细线判成"硬边"，就是这里补的。"""
+    lo, hi = max(yc - n, 0), min(yc + n + 1, arr.shape[0])
+    rows = [float(np.median(arr[ry, x0:x1])) for ry in range(lo, hi)]
+    if not rows:
+        raise SystemExit(f'!! y={yc} 这一行出界了')
+    return float(np.median(rows))
 
 
 if y - gap < 0 or y + gap >= H:
     raise SystemExit(f'!! 这条线（{a.seam_y}rpx → 像素 {y}）取样窗口出界，这张图不是这一屏')
-up = row_read(y - gap)
-down = row_read(y + gap)
-line = row_read(y)
+up = band_read(y - gap)
+down = band_read(y + gap)
+line = band_read(y)
 d = abs(up - down)
+if min(up, down, line) >= 253:
+    blk = arr[max(y - gap, 0):y + gap + 1, x0:x1]
+    if np.median(blk) >= 255 and np.percentile(blk, 95) >= 255:
+        # 真·平色：整块九成像素是**恰好 255**（不是 254 那种"白纱压浅底"，那说明图在、只是浅）。
+        # 在这种帧上量"上下连不连续"没有意义——底下压根没画那张形象图（10-11 审查抓到的 P0）。
+        raise SystemExit(f'!! 这条线上下整块 {(blk == 255).mean() * 100:.0f}% 是纯白 255＝那张形象图没画进这一帧，'
+                         '判不了硬边。用 `拍-玻璃AB.js`（它把 bgSrc 钉成包内那张）重拍再来。')
+    print(f'  ⚠ 这条线上下都接近纯白（{up:.0f}/{line:.0f}/{down:.0f}），"连续"这一条在这里几乎无从分辨——'
+          '读数照给，但别拿它当"图在那儿"的证据。')
 print(f'{a.png}')
-print(f'  交界 y＝{a.seam_y}rpx（像素 {y}）　横段 x {a.x0}~{a.x1}rpx　上下各取 {a.half}rpx')
+print(f'  交界 y＝{a.seam_y}rpx（像素 {y}）　横段 x {a.x0}~{a.x1}rpx　上下各取 {a.half}rpx、每块再取 ±3 行的中位')
 print(f'  线上一行 {up:6.1f}　线本身 {line:6.1f}　线下一行 {down:6.1f}　｜上下差 {d:5.2f}（8 位灰阶）')
 print(f'  判读：{"连续，没有硬边" if d <= 6 else "★这一条线上有硬边＝一刀切（撞 R6）"}'
       f'　（门槛 ≤6 灰阶＝我定的分档，约 2.4%）')
@@ -76,9 +93,11 @@ if a.scan:
     while yy <= s1:
         py = round(yy * R + chrome)
         if 0 <= py < H:
-            v = row_read(py)
+            v = band_read(py, 1)
             jump = '' if prev is None else f'　Δ {v - prev:+5.1f}'
             mark = ' ←线' if abs(yy - a.seam_y) < 1 else ''
             print(f'    {yy:6.0f}rpx（像素 {py:4d}）　{v:6.1f}{jump}{mark}')
             prev = v
         yy += 2
+if d > 6:
+    raise SystemExit(f'!! 这一条线上有硬边（上下差 {d:.2f} 灰阶）＝撞 R6"不要一刀切"')
