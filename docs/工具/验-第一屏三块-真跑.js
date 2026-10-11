@@ -262,6 +262,41 @@ async function main() {
   await page.callMethod('collapse')
   await sleep(1500)
 
+  /* ---------- 7.5 铺图态与不铺图态，这五枚必须**一模一样**（10-11 09:2x 站长真机打回那一格） ----------
+     他的原话：「漫画人物边缘外部是透明底，没说连衣服也透明了，ICON 也是」＋R1 后半句「按钮ICON不变」。
+     为什么单独立一条：那四张插画自己就是大半透明（`ic-person.png` 实心像素只占 0.7%），
+     底下只要半透，照片就从画里穿过来——静态读样式表看不见这件事（纱是加在容器上的），只有读渲染后的计算值才有牙。
+     ⚠ 这一条的写法换过一次：第一版钉"`background-color` 的 alpha 必须＝1"，当场把 `.blk-strip` 判红——
+       那一枚 10-10 那版本就是 `rgba(255,255,255,.85)`，**是我这条判据过约束，不是实现红**。
+       现在钉的是"本轮那两条 `.container.has-bg` 撤干净了没有"：同一枚在**铺图／不铺图两态**的渲染值必须逐字相同，
+       再加身上不许挂 `backdrop-filter`。这样既不动 10-10 已有的数，也钉得住"别再把纱加回来"。 */
+  const BLKS = ['.blk-person', '.blk-stat-notes', '.blk-stat-cards', '.blk-jot', '.blk-strip']
+  const readBlks = async () => {
+    const out = {}
+    for (const sel of BLKS) {
+      const node = await page.$(sel)
+      out[sel] = node ? String(await node.style('background-color')) : '(摸不到)'
+    }
+    return out
+  }
+  await page.setData({ bgSrc: '' })
+  await sleep(2200)
+  const off = await readBlks()
+  await page.setData({ bgSrc: '/assets/home-bg-portrait.jpg' })
+  await sleep(2600)
+  const on = await readBlks()
+  const onSrc = String(((await page.data()) || {}).bgSrc || '')
+  ok('两态对比是在"铺图"那一态收尾的（`bgSrc` 不在，下面那五条"相同"全是空转）',
+    /home-bg-portrait/.test(onSrc), onSrc || '(空)')
+  for (const sel of BLKS) {
+    ok(`${sel} 铺图态＝不铺图态（本轮那一条 .container.has-bg 已撤干净）`,
+      off[sel] === on[sel] && on[sel] !== '(摸不到)', `不铺图 ${off[sel]}｜铺图 ${on[sel]}`)
+    const node = await page.$(sel)
+    const bf = node ? String((await node.style('backdrop-filter')) || (await node.style('-webkit-backdrop-filter')) || 'none') : '(摸不到)'
+    ok(`${sel} 身上不许挂 backdrop-filter（要恢复这一格，得先把那四张插画压平——那是他那一格的决定）`,
+      !!node && /none|^\s*$/.test(bf), bf)
+  }
+
   /* ---------- 8. 整屏截图（对效果图用） ---------- */
   ok('这一路走下来页面没有报过错（报了不一定看得出现在这一屏）',
     pageErrs.length === 0, pageErrs.length ? safeJson(pageErrs[0]).slice(0, 200) : '')

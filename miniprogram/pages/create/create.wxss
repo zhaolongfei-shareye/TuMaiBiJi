@@ -1229,28 +1229,17 @@
   background: var(--glass-fill);
 }
 
-/* 首页那三块（左块人物入口＋右两枚计数）。落点不是我自己圈的：这一版效果图第 271 行
-   `.blk-person.g-blk, .blk-stat.g-blk` 画的就是它们，站长 10-11 看过这张图回「新图没问题，直接落地甲」。
-   图上的口径一并抄过来：两枚计数原来那两档深浅不再分，都刷同一张白玻璃（于是 `--eb-notes`／
-   `--eb-cards` 两档面在铺图态不再现面），内环 2＝图上的 `inset 0 0 0 2px rgba(255,255,255,.55)`。 */
-.container.has-bg .blk-person,
-.container.has-bg .blk-stat-notes,
-.container.has-bg .blk-stat-cards {
-  background: var(--glass-veil);
-  backdrop-filter: var(--glass-bf);
-  -webkit-backdrop-filter: var(--glass-bf);
-  box-shadow: inset 0 0 0 2rpx var(--glass-hair);
-}
-
-/* 块里那两条白条（"记下来"那一格与两条计数条）＝效果图第 273 行 `.g-jot`：
-   `rgba(255,255,255, calc(--ga + .08))` ＝ .38（在玻璃上再抬一档、仍留一点透），
-   模糊图上写的是 20——同一个换算与上面那一档一致（图上 1px＝1rpx≈0.52 真机 px，46→23、20→10）。 */
-.container.has-bg .blk-jot,
-.container.has-bg .blk-strip {
-  background: var(--glass-jot);
-  backdrop-filter: blur(10px) saturate(1.6);
-  -webkit-backdrop-filter: blur(10px) saturate(1.6);
-}
+/* 首页那三块（左块人物入口＋右两枚计数）与块里那两条白条：10-11 09:2x 站长打回，**这一格玻璃已撤**，
+   三块回到 10-10 那版实心面（`--eb-person`／`--eb-notes`／`--eb-cards`／白条 `#FFFFFF`）。
+   他的原话：「默认首页的漫画人物和右侧的icon图案，透明设置错误，侵入了主图，与效果图不一致。
+   我只是要求，漫画人物边缘外部是透明底，没说连衣服也透明了，ICON 也是。」
+   加上 R1 的后半句「按钮ICON不变」——这一格本来就不许动 ICON 与插画。
+   ⚠ 为什么"块面半透"一定会把插画一起弄透（这一条是量出来的，不是猜的）：那四张 PNG 自己就是大半透明的——
+   `ic-person.png` 实心像素只占 **0.7%**、半透 51.1%；`ic-person-alt` 1.6%／60.2%；
+   `ic-stat-notes` 1.0%／57.6%；`ic-stat-cards` 10.4%／44.1%。底下是实心的时候看不出来（那就是它们本来的画法），
+   底下换成 .30 白纱压在照片上，照片就直接从画里穿过来。效果图第 271／273 行那两枚 `.g-blk`／`.g-jot`
+   之所以看着没事，是那张图底下是一片浅色糊——**同一份半透插画压在深色照片上就现形**，这是我抄图时没核的一格。
+   要恢复这一格的玻璃，只有一条路：先把那四张插画压成实心（烘焙到白底、轮廓外仍透明），再刷纱——那要他点头才动他的资产。 */
 
 /* 报错气泡（X1，站长 10-11 逐条裁定原话「4、做」之前一句「报错气泡，这是我下的需求，为什么不做？」；
    正本需求原文：「报错消息不要在这里出现，换到输入框上面，用带阴影长条形气泡框弹出，几秒后消失。

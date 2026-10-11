@@ -91,6 +91,9 @@ page {
   --glass-bf: blur(23px) saturate(1.8);
   --glass-hair: rgba(255, 255, 255, 0.55);
   --glass-fill: rgba(255, 255, 255, 0.20);
+  /* 这一档 10-11 09:2x 起**没人吃**：首页那三块与两条白条的玻璃被站长打回（半透插画会透出底下的照片，
+     原话与实测 alpha 数见 `pages/create/create.wxss` 那一处注释）。留着是因为恢复这一格的玻璃只欠"把四张插画压平"
+     那一个决定，压平就直接用它；删了就得再抄一遍数。 */
   --glass-jot: rgba(255, 255, 255, 0.38);
   --accent: #352E1D;
   --accent-soft: rgba(53, 46, 29, 0.07);
