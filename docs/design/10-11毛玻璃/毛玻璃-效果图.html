@@ -57,6 +57,9 @@
   --g-hair: rgba(255, 255, 255, .55);
   --g-fill: rgba(255, 255, 255, .2);
   --g-blur: blur(46px) saturate(1.8);
+  /* 白底那一层（站长 10-11 11:0x：「首页三个块磨玻璃的背景图换成白底再毛玻璃，否则现在如果背景深色的话，
+     毛玻璃就会很暗，13，12 等数字完全看不清」）。只有首页那三块吃，别处不吃；α 不随尺寸换算。 */
+  --g-plate: rgba(255, 255, 255, .70);
   /* 上一版（三层各自透、井还是淡墨凹下去）＝他没要的那一种，留一格做对照 */
   --g-panel: rgba(205, 201, 193, .55);
   --g-card: rgba(255, 255, 255, .62);
@@ -268,7 +271,7 @@ h1 { font-size: 26px; letter-spacing: .5px; margin-bottom: 6px; }
 /* 首页三块。★上一稿这里是个真 bug：`.blk-stat.notes`／`.blk-stat.cards` 是**两个类**(0,2,0)，
    我那条 `.g-blk` 只有一个类(0,1,0)——压不住，所以 `13`／`12` 那两块从头到尾还是实心莫兰迪色，
    他圈出来的"这里没做毛玻璃"就是它。必须写成 compound 选择器（落码时同一个坑）。 */
-.blk-person.g-blk, .blk-stat.g-blk { background: rgba(255, 255, 255, var(--ga)); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55), 0 14px 34px rgba(8, 10, 14, .16); }
+.blk-person.g-blk, .blk-stat.g-blk { background: linear-gradient(var(--g-white), var(--g-white)), linear-gradient(var(--g-plate), var(--g-plate)); backdrop-filter: var(--g-blur); -webkit-backdrop-filter: var(--g-blur); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55), 0 14px 34px rgba(8, 10, 14, .16); }
 /* 块里那两条白条：同一张玻璃上再抬一档，抬的量跟着全站那一档走，不写死 */
 .g-jot { background: rgba(255, 255, 255, calc(var(--ga) + .08)); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6); }
 .g-knob { box-shadow: 0 6px 18px rgba(8, 10, 14, .22); }
@@ -447,7 +450,7 @@ h1 { font-size: 26px; letter-spacing: .5px; margin-bottom: 6px; }
         <div class="dock"><div><span class="g">＋</span></div><div class="on"><span class="g"><i class="ln"></i></span></div><div><span class="g"><i class="pn"></i></span></div></div>
       </div>
     </div></div>
-    <p class="note">三块同一张白玻璃 <b>.30＋blur 46</b>（右上／右下原来那两档深浅不再分，都刷白），块里那圈 2px 白边是玻璃的边。<b>上一稿这里有个真 bug</b>：<code>13</code>／<code>12</code> 那两块我写的 <code>.g-blk</code> 只有一个类，压不住现网 <code>.blk-stat.notes</code> 那两个类，所以它俩当时<b>还是原来的实心莫兰迪色</b>——你圈的"这里没做毛玻璃"圈的正是它。现在改成 <code>.blk-stat.g-blk</code>，落码时同一个坑。<b>人物、点小人换大人、两张插画、相机图形，一件没动。</b></p>
+    <p class="note">三块同一张白玻璃 <b>.30＋blur 46</b>（右上／右下原来那两档深浅不再分，都刷白），块里那圈 2px 白边是玻璃的边。<b>上一稿这里有个真 bug</b>：<code>13</code>／<code>12</code> 那两块我写的 <code>.g-blk</code> 只有一个类，压不住现网 <code>.blk-stat.notes</code> 那两个类，所以它俩当时<b>还是原来的实心莫兰迪色</b>——你圈的"这里没做毛玻璃"圈的正是它。现在改成 <code>.blk-stat.g-blk</code>，落码时同一个坑。<b>人物、点小人换大人、两张插画、相机图形，一件没动。</b><em>（10-11 09:5x 在这句上补一条更正，不改上面任何数值：为了真机对上这张图的外观，那四张插画的 <b>alpha 动了</b>——按"画在白底上"压平成实心，<b>轮廓外照旧透明、一个像素都没重画</b>。原来那句"一件没动"想说的是"不重画"，但不改 alpha 就压不住穿图：那四张自己实心像素只占 0.7%～10.4%，底下一半透照片就从画里穿过来。依据与数见 <code>docs/需求清单-10-11毛玻璃.md</code> §八.1。）<em>（10-11 11:0x 这一格再补一层：<b>白纱底下垫一层白 .70</b>（<code>--g-plate</code>），合成白＝.79。你原话「首页三个块磨玻璃的背景图换成白底再毛玻璃，否则现在如果背景深色的话，毛玻璃就会很暗，13，12 等数字完全看不清」——这一条正是本页页脚 55 行我自己预告过的那个代价（"墨字压在暗照片上的对比会掉，落码后必须逐处实测"），当时没量，你踩到了。）</em></p>
   </div>
 
   <!-- 3 面板·照片·现状 -->

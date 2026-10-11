@@ -262,23 +262,51 @@ async function main() {
   await page.callMethod('collapse')
   await sleep(1500)
 
-  /* ---------- 7.5 铺图态与不铺图态，这五枚必须**一模一样**（10-11 09:2x 站长真机打回那一格） ----------
-     他的原话：「漫画人物边缘外部是透明底，没说连衣服也透明了，ICON 也是」＋R1 后半句「按钮ICON不变」。
-     为什么单独立一条：那四张插画自己就是大半透明（`ic-person.png` 实心像素只占 0.7%），
-     底下只要半透，照片就从画里穿过来——静态读样式表看不见这件事（纱是加在容器上的），只有读渲染后的计算值才有牙。
-     ⚠ 这一条的写法换过一次：第一版钉"`background-color` 的 alpha 必须＝1"，当场把 `.blk-strip` 判红——
-       那一枚 10-10 那版本就是 `rgba(255,255,255,.85)`，**是我这条判据过约束，不是实现红**。
-       现在钉的是"本轮那两条 `.container.has-bg` 撤干净了没有"：同一枚在**铺图／不铺图两态**的渲染值必须逐字相同，
-       再加身上不许挂 `backdrop-filter`。这样既不动 10-10 已有的数，也钉得住"别再把纱加回来"。 */
-  const BLKS = ['.blk-person', '.blk-stat-notes', '.blk-stat-cards', '.blk-jot', '.blk-strip']
+  /* ---------- 7.5 铺图态这五枚是玻璃、不铺图态是实心（10-11 09:5x 站长定：效果图就是判据） ----------
+     他的原话链：① 打回「漫画人物边缘外部是透明底，没说连衣服也透明了，ICON 也是」＋R1 后半句「按钮ICON不变」；
+     ② 我把这一格撤了之后他两句「新的首页，不支持毛玻璃吗」「哪里有毛玻璃？」；③「尽快改！别浪费我时间！！！！需求+效果图都有」
+     ④「如果效果图你都不去参考，做效果图的意义是什么？」
+     ⇒ 正解不是撤玻璃：**效果图 `.g-blk`／`.g-jot` 那两条本来就是"块面是玻璃、人物与 icon 是实心"**，两头都要——
+       块面按图上落玻璃，插画用 `docs/工具/烘-插画压平.py` 压成实心。资产那一头由 `量-插画压没压.py` 钉（读 PNG alpha 直方图）。
+     ⑤ 10-11 11:0x 又补一句「首页三个块磨玻璃的背景图换成白底再毛玻璃，否则现在如果背景深色的话，毛玻璃就会很暗，13，12 等数字完全看不清」
+       ⇒ 那三块现在是**两层白**：白纱 .30 在上、白底 .70 在下，都挂在同一枚元素的 `background` 上（不另叠定位层）。
+     ⚠ 读法跟着变了：`background` 简写一旦给的是渐变，**`background-color` 就静默算成 transparent**，
+       再拿它判"是不是半透"＝一条永远绿的假判据（10-11 那批"简写吃掉底色"的坑是同一个）。所以这三块改读 `background-image`。 */
+  const GLASS_SEL = ['.blk-person', '.blk-stat-notes', '.blk-stat-cards', '.blk-jot', '.blk-strip']
+  const PLATED = ['.blk-person', '.blk-stat-notes', '.blk-stat-cards']
   const readBlks = async () => {
     const out = {}
-    for (const sel of BLKS) {
+    for (const sel of GLASS_SEL) {
       const node = await page.$(sel)
-      out[sel] = node ? String(await node.style('background-color')) : '(摸不到)'
+      if (!node) { out[sel] = { bg: '(摸不到)', bi: '(摸不到)', bf: '(摸不到)' }; continue }
+      out[sel] = {
+        bg: String(await node.style('background-color')),
+        bi: String(await node.style('background-image')),
+        bf: String((await node.style('backdrop-filter')) || (await node.style('-webkit-backdrop-filter')) || 'none'),
+      }
     }
     return out
   }
+  const alphaOf = (s) => {
+    const m = /rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([\d.]+)\s*\)/.exec(s)
+    return m ? Number(m[1]) : 1
+  }
+  /** 渲染后的两层白：第一层＝白纱、第二层＝白底。α 从各自那一层里现读，不写死在尺子里。
+      ⚠ 别拿"逗号"切层：`linear-gradient(rgba(..), rgba(..)), linear-gradient(..)` 里**渐变内部也有逗号**，
+      按逗号切会把一层的两个色标切成两层，读出来就是"上纱 .3／下底 .3"这种假红（第一版就栽在这）。
+      按 `linear-gradient(` 切才对。 */
+  const twoWhites = (s) => {
+    const layers = String(s).split(/linear-gradient\(/).slice(1)
+    if (layers.length < 2) return null
+    const a = layers.slice(0, 2).map((l) => {
+      const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/.exec(l)
+      return m ? { rgb: [+m[1], +m[2], +m[3]], a: m[4] === undefined ? 1 : Number(m[4]) } : null
+    })
+    return a[0] && a[1] ? a : null
+  }
+  const APP = fs.readFileSync(`${ROOT}/miniprogram/app.wxss`, 'utf8')
+  const PLATE_CODE = alphaOf(/--glass-plate:\s*(rgba\([^)]*\))/.exec(APP)[1])
+  const VEIL_CODE = alphaOf(/--glass-veil:\s*(rgba\([^)]*\))/.exec(APP)[1])
   await page.setData({ bgSrc: '' })
   await sleep(2200)
   const off = await readBlks()
@@ -286,15 +314,23 @@ async function main() {
   await sleep(2600)
   const on = await readBlks()
   const onSrc = String(((await page.data()) || {}).bgSrc || '')
-  ok('两态对比是在"铺图"那一态收尾的（`bgSrc` 不在，下面那五条"相同"全是空转）',
+  ok('两态对比是在"铺图"那一态收尾的（`bgSrc` 不在，下面那几条全是空转）',
     /home-bg-portrait/.test(onSrc), onSrc || '(空)')
-  for (const sel of BLKS) {
-    ok(`${sel} 铺图态＝不铺图态（本轮那一条 .container.has-bg 已撤干净）`,
-      off[sel] === on[sel] && on[sel] !== '(摸不到)', `不铺图 ${off[sel]}｜铺图 ${on[sel]}`)
-    const node = await page.$(sel)
-    const bf = node ? String((await node.style('backdrop-filter')) || (await node.style('-webkit-backdrop-filter')) || 'none') : '(摸不到)'
-    ok(`${sel} 身上不许挂 backdrop-filter（要恢复这一格，得先把那四张插画压平——那是他那一格的决定）`,
-      !!node && /none|^\s*$/.test(bf), bf)
+  for (const sel of GLASS_SEL) {
+    if (PLATED.includes(sel)) {
+      const t = twoWhites(on[sel].bi)
+      ok(`${sel} 铺图态是"白纱＋白底"两层（站长 11:0x 那句「换成白底再毛玻璃」）`,
+        !!t && Math.abs(t[0].a - VEIL_CODE) < 0.01 && Math.abs(t[1].a - PLATE_CODE) < 0.01
+        && t[0].rgb.join() === '255,255,255' && t[1].rgb.join() === '255,255,255',
+        t ? `上纱 α=${t[0].a}／下底 α=${t[1].a}（码里令牌 .${String(VEIL_CODE).slice(2)}＋.${String(PLATE_CODE).slice(2)}）` : `没读到两层：${on[sel].bi.slice(0, 90)}`)
+      ok(`${sel} 不铺图态没吃这两层白（底规则那档色相要还在）`,
+        !/rgba?\(255,\s*255,\s*255/.test(off[sel].bi), `不铺图 background-image＝${off[sel].bi.slice(0, 60)}`)
+    } else {
+      ok(`${sel} 铺图态是半透面（效果图「.g-jot」那一档）`, alphaOf(on[sel].bg) < 0.999, on[sel].bg)
+    }
+    ok(`${sel} 铺图态身上挂着 backdrop-filter（只半透不糊＝白纱，他打回过的那种）`, /blur/.test(on[sel].bf), on[sel].bf)
+    ok(`${sel} 不铺图态没吃本轮那两条玻璃（身上不许挂 backdrop-filter；面本身是 10-10 那版自己的色，不归这一格管）`,
+      off[sel].bf === '(摸不到)' || !/blur/.test(off[sel].bf), `不铺图 ${off[sel].bg}｜${off[sel].bf}`)
   }
 
   /* ---------- 8. 整屏截图（对效果图用） ---------- */

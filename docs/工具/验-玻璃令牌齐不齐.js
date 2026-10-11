@@ -29,12 +29,15 @@ const FILES = {
   cr: read('pages/create/create.wxss'),
   ixjs: read('pages/index/index.js'),
   mejs: read('pages/me/me.js'),
+  poster: read('utils/poster.js'),
 }
 
 const rgbOf = (hex) => [1, 2, 3].map((i) => parseInt(hex.slice(i * 2 - 1, i * 2 + 1), 16))
 const blockOf = (src, sel) => (new RegExp(
   `(?:^|\\n)${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(src) || [, ''])[1]
 const num = (s, re) => Number((re.exec(s) || [, '0'])[1])
+/** 读一枚写成算式的常量（`const GLASS_BAND_H = 542 + 198`）：只取第一个数的正则会把 542 当成 740。 */
+const sum = (s, re) => ((re.exec(s) || [, '0'])[1]).split('+').reduce((a, x) => a + Number(x.trim()), 0)
 const glassRules = (src) => [...src.matchAll(/\.container\.has-bg[^{]*\{([^}]*)\}/g)].map((m) => m[1]).join('\n')
 const lastStop = (src, sel) => {
   const b = blockOf(src, sel)
@@ -67,7 +70,7 @@ function evaluate(F) {
   })
 
   const base = blockOf(APP, 'page')
-  ;['--glass-veil', '--glass-bf', '--glass-hair', '--glass-fill', '--glass-jot'].forEach((v) =>
+  ;['--glass-veil', '--glass-bf', '--glass-hair', '--glass-fill', '--glass-jot', '--glass-plate'].forEach((v) =>
     ok(`app.wxss 的 page 那一块定义了 ${v}`, base.includes(`${v}:`)))
   ok('全站白纱只有 .30 这一档（R10 那一枚）',
     /--glass-veil:\s*rgba\(255, 255, 255, 0\.30\)/.test(APP),
@@ -113,7 +116,7 @@ function evaluate(F) {
         .filter(Boolean).join('；') || `${(src.match(/^backdrop-filter:/gm) || []).length} 对`)
   })
 
-  const ixBand = num(F.ixjs, /const GLASS_BAND_H\s*=\s*(\d+)/)
+  const ixBand = sum(F.ixjs, /const GLASS_BAND_H\s*=\s*(\d+(?:\s*\+\s*\d+)*)/)
   const ixHeadH = num(IX, /\.head\s*\{[^}]*?height:\s*(\d+)rpx/)
   const ixAfter = blockOf(IX, '.container.has-bg .head-scrim::after')
   const ixAftH = num(ixAfter, /height:\s*(\d+)rpx/)
@@ -124,15 +127,25 @@ function evaluate(F) {
   ok('首页铺图态那枚图自己先给到 740 高（首帧与 getImageInfo 失败那一态底下不至于没图）',
     /height:\s*740rpx/.test(blockOf(IX, '.container.has-bg .head-img')),
     blockOf(IX, '.container.has-bg .head-img').trim().slice(0, 60))
-  const meBand = num(F.mejs, /const GLASS_BAND_H\s*=\s*(\d+)/)
+  const HEAD = num(F.poster, /const HEAD_IMG_H\s*=\s*(\d+)/)
   const meBandH = num(ME, /\.head-band\s*\{[^}]*?height:\s*(\d+)rpx/)
   const meBottom = num(ME, /\.head-scrim\s*\{[^}]*?bottom:\s*(\d+)rpx/)
   const meAftH = num(ME, /\.head-scrim::after\s*\{[^}]*?height:\s*(\d+)rpx/)
   const meSheetM = num(ME, /\.sheet\s*\{[^}]*?margin-top:\s*-?(\d+)rpx/)
   ok('「我的」646 ＝ 罩层守的 542 ＋ 延段那 104，且名片行往上盖住那一档＝延段＋原来那 40',
-    meBand === 646 && meBandH === 646 && meBottom + 542 === meBandH
+    meBandH === 646 && meBottom + 542 === meBandH
     && meAftH === meBottom && meSheetM === meAftH + 40,
-    `band ${meBand}／盒 ${meBandH}／bottom ${meBottom}／延段 ${meAftH}／sheet margin ${meSheetM}`)
+    `盒 ${meBandH}／bottom ${meBottom}／延段 ${meAftH}／sheet margin ${meSheetM}`)
+  /* ★这一组是 10-11 11:2x 那一格的正主（「我第二，第三切换时候背景图为什么会上下跳到…你是否有其他代码影响」）。
+     实测跳幅 13.5rpx ≈ 7 视口 px（`探-头部图两页对位.js`），根因就是两页把**各自**的带高递给了 bandGeom。
+     锚点收成 poster.HEAD_IMG_H 一枚之后，这三条才钉得住"以后谁再各写一个数就红"。 */
+  ok('两页递给 bandGeom 的都是那一枚全站锚点（谁再写回自己的带高＝背景图两页顶边又岔开）',
+    /poster\.bandGeom\(info\.width, info\.height, poster\.HEAD_IMG_H\)/.test(F.ixjs)
+    && /poster\.bandGeom\(info\.width, info\.height, poster\.HEAD_IMG_H\)/.test(F.mejs))
+  ok('锚点取的是两页里大的那一档（＝列表那笔版式账 740），取小了「我的」名片行底下会没图＝"中间镂空"复发',
+    HEAD === ixBand && HEAD >= meBandH, `HEAD_IMG_H ${HEAD}／列表带 ${ixBand}／「我的」带 ${meBandH}`)
+  ok('两页都不再把本页那枚版式常量递给 bandGeom（一笔账拆成两件事：带高归 CSS，取景归锚点）',
+    !/bandGeom\([^)]*GLASS_BAND_H/.test(F.ixjs) && !/bandGeom\([^)]*GLASS_BAND_H/.test(F.mejs))
   // 选择器命中不到节点＝玻璃静默缺席（`.mini .c` 那一刀就是这么漏的）。
   // ⚠ 要比的是**从样式表里现读出来的类名**，不是我在尺子里手抄的一份清单——手抄那种，
   // 把 CSS 改错也量不到（反向自证第一轮就是这样没牙的）。
@@ -192,7 +205,12 @@ const MUT = [
   ['反过来：删掉标准那行、只留 -webkit-（这一刀以前逮不住）', 'cr', (s) => s.replace(
     '  backdrop-filter: var(--glass-bf);\n  -webkit-backdrop-filter: var(--glass-bf);\n  border-color',
     '  -webkit-backdrop-filter: var(--glass-bf);\n  border-color')],
-  ['首页 GLASS_BAND_H 改回 542', 'ixjs', (s) => s.replace('const GLASS_BAND_H = 740', 'const GLASS_BAND_H = 542')],
+  ['首页那笔版式账改回裸 542（玻璃带底下会没图）', 'ixjs', (s) => s.replace(
+    'const GLASS_BAND_H = 542 + 198', 'const GLASS_BAND_H = 542')],
+  ['★全站锚点改成「我的」那档 646（＝10-11 11:2x 那趟的错：两页顶边岔 13.5rpx，切 tab 背景图上下跳）', 'poster', (s) => s.replace(
+    'const HEAD_IMG_H = 740', 'const HEAD_IMG_H = 646')],
+  ['★「我的」把本页带高递回 bandGeom（锚点又变成两页各一个数）', 'mejs', (s) => s.replace(
+    'poster.bandGeom(info.width, info.height, poster.HEAD_IMG_H)', 'poster.bandGeom(info.width, info.height, 646)')],
   ['玻璃规则点一枚 markup 里没有的类（`.mini .c` 那一刀）', 'cr', (s) => s.replace(
     '.container.has-bg .mini-c {', '.container.has-bg .mini .c {')],
 ]

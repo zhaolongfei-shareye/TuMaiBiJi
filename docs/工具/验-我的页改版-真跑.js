@@ -296,13 +296,14 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   // 红得没道理。改成钉那条规则本身：按宽铺满、超出那截的 15% 顶到上面去。
   const gHeight = parseFloat((/height:(\d+(?:\.\d+)?)rpx/.exec(d.imgStyle || ''))[1] || 0)
   const gTop = parseFloat((/top:(-?\d+(?:\.\d+)?)rpx/.exec(d.imgStyle || ''))[1] || 0)
-  // ★10-11 R12：这一档递给 bandGeom 的盒子高是 GLASS_BAND_H(646)，不再是 BAND_H(542)。
-  // 数从 me.js 现读（写死 646 就成了第二份真相），比的是同一条式子。
+  // ★10-11 R12 抬的是**带子**（646），但 11:2x 起递给 bandGeom 的盒子高是全站那一枚
+  // `poster.HEAD_IMG_H`(740)——两页各写一个数＝同一张照片两页顶边岔开＝他抓的"切 tab 背景图上下跳"
+  // （实测 13.5rpx，见 `探-头部图两页对位.js`）。数从 poster.js 现读（写死就成了第二份真相），比的是同一条式子。
   const meBand = Number((fs.readFileSync(
-    path.resolve(__dirname, '../../miniprogram/pages/me/me.js'), 'utf8')
-    .match(/const GLASS_BAND_H\s*=\s*(\d+)/) || [, '0'])[1])
+    path.resolve(__dirname, '../../miniprogram/utils/poster.js'), 'utf8')
+    .match(/const HEAD_IMG_H\s*=\s*(\d+)/) || [, '0'])[1])
   ck('锚点算出来了：按宽铺满、超出那截的 15% 顶给上面（不写死某一张的数）',
-    /width:750rpx/.test(d.imgStyle || '') && gHeight > meBand && Math.abs(gTop + (gHeight - meBand) * 0.15) <= 1,
+    /width:750rpx/.test(d.imgStyle || '') && gHeight >= meBand && Math.abs(gTop + (gHeight - meBand) * 0.15) <= 1,
     `${d.imgStyle}／盒子高递给 ${meBand}`)
   // R12 要的效果：名片那一行那 144 底下必须有图（他抓过"中间镂空"）。量的是图那块自己的底边，
   // 不是拿 imgStyle 那两个数自己换算。

@@ -128,12 +128,13 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   const gH = parseFloat((/height:(\d+(?:\.\d+)?)rpx/.exec(headStyle) || [0, 0])[1])
   const gT = parseFloat((/top:(-?\d+(?:\.\d+)?)rpx/.exec(headStyle) || [0, 0])[1])
   // ★10-11 R12（「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：这一档的盒子高不再是
-  // BAND_H(542)，index.js 把 GLASS_BAND_H(740) 递给同一条 bandGeom。公式与 15% 锚点一个字没改，
-  // 所以这里比的还是那条式子，只是盒子里那个数**从源码现读**（写死 740 就成了第二份真相）。
-  const BAND = Number((fs.readFileSync(P('pages/index/index.js'), 'utf8')
-    .match(/const GLASS_BAND_H\s*=\s*(\d+)/) || [, '0'])[1])
+  // BAND_H(542)。10-11 11:2x 起那一枚是**全站共用的** `poster.HEAD_IMG_H`(740)——两页各写一个数就是
+  // "切 tab 背景图上下跳"（实测岔 13.5rpx，他抓的）。公式与 15% 锚点一个字没改，
+  // 所以这里比的还是那条式子，只是盒子里那个数**从 poster.js 现读**（写死 740 就成了第二份真相）。
+  const BAND = Number((fs.readFileSync(P('utils/poster.js'), 'utf8')
+    .match(/const HEAD_IMG_H\s*=\s*(\d+)/) || [, '0'])[1])
   ck('这一页的取景走的是那一条规则（按宽铺满 + 超出的 15% 顶给上面）',
-    /width:750rpx/.test(headStyle || '') && gH > BAND && Math.abs(gT + (gH - BAND) * 0.15) <= 1,
+    /width:750rpx/.test(headStyle || '') && gH >= BAND && Math.abs(gT + (gH - BAND) * 0.15) <= 1,
     `${headStyle || '(没算出摆位)'}／盒子高递给 ${BAND}`)
   // R12 真正要的效果是"图往下垫到卡顶后面"：玻璃从卡顶一路糊到实心那一条线，这一段底下必须有图。
   // ⚠ 基准是**卡顶实测**，不是头部底边——卡还往上盖了 40，拿段底算会多要 40rpx

@@ -12,9 +12,12 @@ const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 // 所以 `utils/person.js` 在这一页的 require 一并撤——首页那一屏仍在用它，别处不许跟着删。
 
 /* 卡顶玻璃那一段要糊到多高（rpx）。= 头部 542 + 玻璃段超出头部的那 198（238 那段里被头
-   部盖住的 40 已由 .sheet 的 margin-top:-40 抵掉）。与 index.wxss 里 `.head::after`
-   的 top:542／height:198、`.sheet` 那一条渐变的 158／198／238 是同一笔账。 */
-const GLASS_BAND_H = 740
+   部盖住的 40 已由 .sheet 的 margin-top:-40 抵掉）。与 index.wxss 里 `.head-scrim::after`
+   的 top:100%／height:198、`.sheet` 那一条渐变的 158／198／238 是同一笔账。
+   ⚠ 10-11 11:2x 起这一枚**不再递给 bandGeom**：照片的锚点盒高收成了全站唯一一枚
+   `poster.HEAD_IMG_H`（同一个人两页必须同一个落点，否则切 tab 背景图上下跳，他抓过两次）。
+   这一枚只留作本页那笔版式账，由 `验-玻璃令牌齐不齐` 钉它等于 542＋198。 */
+const GLASS_BAND_H = 542 + 198
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
@@ -213,7 +216,7 @@ Page({
     wx.getImageInfo({
       src,
       success: (info) => this.setData({
-        imgStyle: poster.bandGeom(info.width, info.height, GLASS_BAND_H),
+        imgStyle: poster.bandGeom(info.width, info.height, poster.HEAD_IMG_H),
         imgStyleThru: poster.bandGeom(info.width, info.height, this._webviewH()),
       }),
       fail: () => this.setData({ imgStyle: '', imgStyleThru: '' }),

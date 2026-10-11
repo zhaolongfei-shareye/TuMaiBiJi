@@ -22,11 +22,14 @@ function fmt(tpl, map) {
    首页那一屏要的是同一个人、同一个取景，两页各留一份数迟早走样。 */
 
 /* 10-11 毛玻璃 R12（「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：这一页的玻璃段
-   是名片那一行那 144，所以盒子高从 poster.BAND_H(542) 抬到 646＝502 可见 + 144 盖住。
+   是名片那一行那 144，所以带子从 542 抬到 646＝502 可见 + 144 盖住。
    这一笔账一共住在四处，动一处要动齐四处：me.wxss 的 `.head-band` height:646、`.sheet`
-   margin-top:-144、`.head-scrim` bottom:104、`.head-band::after` 的 top:542/height:104。
-   （104 ＝ 646 − 542：罩层不再铺到段底，多出来的那一段改由 ::after 接着压暗。） */
-const GLASS_BAND_H = 646
+   margin-top:-144、`.head-scrim` bottom:104、`.head-scrim::after` 的 top:100%/height:104。
+   （104 ＝ 646 − 542：罩层不再铺到段底，多出来的那一段改由 ::after 接着压暗。）
+   ⚠ 但**照片的锚点盒高不在这一笔账里**：那一枚是全站唯一的 `poster.HEAD_IMG_H`（＝740，取两页里大的那一档）。
+   10-11 R12 那趟我一度把这一页递给 bandGeom 的盒子高写成 646，于是同一张照片在两页顶边差 13.5rpx，
+   他 11:2x 抓到"切 tab 背景图上下跳"（量法与数见 `docs/工具/探-头部图两页对位.js`）。带子多高是版式，
+   照片落在哪是取景，这两件事不许再写回同一个数。 */
 
 /* 这台手机能不能用指纹／面容，只能问它自己：文档写明的只有指纹，
    iOS 走面容没写在文档里，所以探不到就当没有——探不到时重置退回普通确认，
@@ -145,10 +148,9 @@ Page({
     if (!src) return
     wx.getImageInfo({
       src,
-      // 10-11 毛玻璃 R12：盒子高随 me.wxss 的 `.head-band` 一起从 542 抬到 646，
-      // 图才垫得到名片行那 144 底下（bandGeom 那条公式与 15% 锚点一个字没改）。
-      // 这两个数是一笔账，改一处必须改两处。
-      success: (info) => this.setData({ imgStyle: poster.bandGeom(info.width, info.height, GLASS_BAND_H) }),
+      // 10-11 R12：图要垫得到名片行那 144 底下；11:2x 起锚点盒高走全站那一枚 `poster.HEAD_IMG_H`，
+      // 不再吃本页带高（吃了就和列表页顶边不一致＝切 tab 背景图上下跳，见上面那笔账）。
+      success: (info) => this.setData({ imgStyle: poster.bandGeom(info.width, info.height, poster.HEAD_IMG_H) }),
       fail: () => this.setData({ imgStyle: '' }),
     })
   },

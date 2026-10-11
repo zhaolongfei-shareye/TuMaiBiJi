@@ -51,14 +51,15 @@ ok('头部那一枚摆位分两态：窗开着吃 imgStyleThru、收起吃 imgSt
 // 三个数分居两个文件（index.js 与 index.wxss），不钉等式就等着哪天只改一处。
 // 延段这一轮从 `.head::after` 改挂到 `.head-scrim::after`（「调亮度」那枚 opacity 才吃得到它，
 // 默认半月那一档下 542 才不出硬边，R6），所以 top 不再钉 542、钉的是 `100%`。
-const glassBand = Number((cjs.match(/const GLASS_BAND_H\s*=\s*(\d+)/) || [, '0'])[1])
+const glassBand = ((cjs.match(/const GLASS_BAND_H\s*=\s*(\d+(?:\s*\+\s*\d+)*)/) || [, '0'])[1])
+  .split('+').reduce((a, x) => a + Number(x.trim()), 0)
 const headH = Number((seg(wxss, '.head').match(/height:\s*(\d+)rpx/) || [, '0'])[1])
 const bleed = seg(wxss, '.container.has-bg .head-scrim::after')
 const bleedH = Number((bleed.match(/height:\s*(\d+)rpx/) || [, '0'])[1])
 ok('两态都从 bandGeom 拿数（贯穿不换算法，只换盒子高）',
-  /poster\.bandGeom\(info\.width, info\.height, GLASS_BAND_H\)/.test(cjs)
+  /poster\.bandGeom\(info\.width, info\.height, poster\.HEAD_IMG_H\)/.test(cjs)
   && /poster\.bandGeom\(info\.width, info\.height, this\._webviewH\(\)\)/.test(cjs))
-ok('常态盒子高 740 ＝头部 542 ＋罩平延那 198（R12 这笔账两头都对得上）',
+ok('常态盒子高 740 ＝头部 542 ＋延段 198（R12 这笔账两头都对得上）；10-11 11:2x 起这一枚只管版式，取景走全站锚点',
   glassBand === 740 && headH === 542 && glassBand === headH + bleedH,
   `GLASS_BAND_H=${glassBand} .head高=${headH} 延段高=${bleedH}`)
 ok('延段挂在罩层自己身上、用 top:100%（挂 .head 就吃不到「调亮度」那枚 opacity＝默认档出硬边）',

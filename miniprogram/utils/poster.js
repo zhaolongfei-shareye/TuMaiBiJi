@@ -230,6 +230,16 @@ function homeBg() {
    算法和锚点仍是这一套，不分第二条公式。 */
 const BAND_H = 542
 const BG_ANCHOR = 0.15
+/* 头部那张形象图**全站共用的锚点盒高**（列表与「我的」两屏都递这一个值）。
+   为什么单独有这一枚：`bandGeom` 那句 `top = -(byWidth - boxH) × 0.15` 里带着 boxH，
+   所以**两页各写一个盒子高＝同一张照片在两页顶边不一样＝切换 tab 时背景图上下跳**。
+   站长 10-01 为这件事打回过一次（"同一个人在这页大特写、在那页半身"），当时靠两页同一条 bandGeom 修平；
+   10-11 R12 我把两页的盒子高分别抬到 740／646，那条等式就又散了——他 10-11 11:2x 抓到：
+   「我第二，第三切换时候背景图为什么会上下跳到，下面面板高度不变，为什么背景图会跳动，你是否有其他代码影响」。
+   实测跳幅 13.5rpx ≈ 7 视口 px（`docs/工具/探-头部图两页对位.js`）。
+   这一枚取两页里**大的那一档**（列表 740＝头部 542＋延段 198）：图必须垫得到玻璃带底下（R12 那条），
+   取小了「我的」那 646 底下会没图＝他抓过的"中间镂空"。带子各自多高是版式，写在两页的 wxss 里，与这一枚无关。 */
+const HEAD_IMG_H = 740
 function bandGeom(w, h, boxH = BAND_H) {
   if (!w || !h) return ''
   const byWidth = (750 * h) / w
@@ -2152,6 +2162,7 @@ module.exports = {
   homeBg,
   bandGeom,
   BAND_H,
+  HEAD_IMG_H,
   mintAvatar,
   adoptLocal,
   removeAvatar,
