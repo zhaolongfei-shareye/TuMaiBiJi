@@ -77,6 +77,19 @@ rows.append((bool(单层) and bool(单层图上) and not 又叠两层, '三块�
              '图上' + ('✓' if 单层图上 else '✗') + '／码里' + ('✓' if 单层 else '✗')
              + ('／⚠又叠回两层了' if 又叠两层 else '／没叠'),
              '糊由 backdrop-filter 给；再叠一层白纱就是 12:03 那版的错'))
+# 站长 13:0x 又一句「改第二屏面板毛玻璃（三个功能），30变50，与首页一致」⇒ 录入面板那一面也吃这一枚白 .50。
+# 两头都要钉：图上 `.g-panel` 与码里 `.container.has-bg .panel` 的 background 都得是各自那枚 plate 令牌，
+# 光"值差不多"不算——它要是还吃着 .30 白纱，就是他说的那句"与首页不一致"。
+panel_html = one(html, r'(\.g-panel\s*\{[^}]*\})', '效果图 .g-panel')[1]
+# create.wxss 里 `.container.has-bg .panel` 有**两条**（442 行那条只管投影、1203 行那条才管玻璃面），
+# 取第一条会量到投影那条 ⇒ 假报"还吃着 .30 白纱"。这里挑带 background 的那一条。
+panel_code = next((b for b in re.findall(r'\.container\.has-bg \.panel\s*\{([^}]*)\}', cre) if 'background' in b), '')
+面板图上 = re.search(r'background:\s*var\(--g-plate\)', panel_html)
+面板码里 = re.search(r'background:\s*var\(--glass-plate\)', panel_code)
+rows.append((bool(面板图上) and bool(面板码里), '录入面板那一条吃的是哪枚令牌',
+             '图上 `.g-panel` ＝ var(--g-plate)',
+             '图上' + ('✓' if 面板图上 else '✗') + '／码里' + ('✓ var(--glass-plate)' if 面板码里 else '✗ 还吃着 .30 白纱'),
+             '13:0x 那句「30变50，与首页一致」；井与小圆吃 --glass-fill(.20)，不在这一句里'))
 cmp('块宽', '308px（图上 .blk-person）', one(cre, r'\.blk-person \{[^}]*width:\s*(\d+)rpx', '落码')[1], '1px＝1rpx', '308')
 cmp('块圆角', '34px（图上 .blk-person）', one(cre, r'\.blk-person \{[^}]*border-radius:\s*(\d+)rpx', '落码')[1], '1px＝1rpx', '34')
 

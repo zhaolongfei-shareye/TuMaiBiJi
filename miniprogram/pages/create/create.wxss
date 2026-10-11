@@ -1201,7 +1201,11 @@
       就是 `.g-blk` 一个类压不住 `.blk-stat.notes` 两个类，从头到尾没变成玻璃——同一个坑不许踩第二遍。
    ============================================================ */
 .container.has-bg .panel {
-  background: var(--glass-veil);
+  /* 站长 10-11 13:0x：「改第二屏面板毛玻璃（三个功能），30变50，与首页一致」
+     ⇒ 这张面板（照片／链接／文字三个功能共用的那一整面）从全站那支 .30 白纱换成 **白 .50**，
+     与首页那三块同一个令牌、同一档；糊仍由 `--glass-bf` 给。
+     ⚠ 只换这一面：井（输入框／右滑条）与两枚小圆吃的是 `--glass-fill`(.20)，他没指，一字未动。 */
+  background: var(--glass-plate);
   backdrop-filter: var(--glass-bf);
   -webkit-backdrop-filter: var(--glass-bf);
   border-color: var(--glass-hair);

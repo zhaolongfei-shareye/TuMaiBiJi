@@ -191,8 +191,11 @@ const MUT = [
     '--glass-fade-card: rgba(241, 243, 242, 0.62)', '--glass-fade-card: rgba(255, 255, 255, 0.62)')],
   ['把白纱那一档从 .30 改成 .35', 'app', (s) => s.replace(
     '--glass-veil: rgba(255, 255, 255, 0.30)', '--glass-veil: rgba(255, 255, 255, 0.35)')],
+  // 这一刀原来锚在 `background: var(--glass-veil);` 那一行上——13:0x 面板与三块都改吃 `--glass-plate` 之后
+  // 那行在 create.wxss 里没有了，replace 打空、刀变成没牙（跑出来就是"反向那一刀没切进去"）。
+  // 锚点跟着换成现在真实挂在滤镜前面的那一枚令牌。
   ['玻璃面那一档里自己写一支白纱（不走 var()）', 'cr', (s) => s.replace(
-    '  background: var(--glass-veil);\n  backdrop-filter',
+    '  background: var(--glass-plate);\n  backdrop-filter',
     '  background: rgba(255, 255, 255, 0.44);\n  backdrop-filter')],
   ['延段挪回 .head-band（吃不到「调亮度」那枚 opacity）', 'me', (s) => s.replace(
     '.head-scrim::after {', '.head-band::after {')],
