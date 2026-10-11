@@ -5,7 +5,7 @@ const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const cardInfo = require('../../utils/cardInfo.js')
-const { isPrivate } = require('../../utils/privateGate.js')
+const { isPrivate, unlockOn } = require('../../utils/privateGate.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 // 10-11：这一屏不再画那一位小人（站长「列表左上角的人都去掉，维持只有首页有」），
@@ -84,8 +84,11 @@ Page({
     // 两枚 tab 各自画的那两批，都由 arrange() 从同一份 notes 现算（同一份序、同一份筛选）
     rows: [],
     cells: [],
-    // 私密笔记：本会话里已经验过密码就不再重问
-    _privateVerified: false,
+    // 私密解锁的状态**不记在这一格里**：它记在页面实例的 `_unlockedNoteId` 上，
+    // 判据是服务端认得的那把凭证（来龙去脉见 utils/privateGate.js 的 unlockOn）。
+    // 原来这是一个 data 里的 `_privateVerified`——首页是常驻 tab，它记一次就整个会话不再问；
+    // 重置／换密码把凭证清了却清不到它，症状是点开一篇私密笔记既不弹密码框、又只剩标题。
+    // 再说这一格视图层根本不读，跟着 setData 白跑一趟。
     // 点一枚纸片 / 一行 = 直接浮详情窗（v18 两档排布都不就地展开，理由见 onRowTap）
     detailOpen: false,
     detailNote: null,
@@ -200,7 +203,7 @@ Page({
     const reopen = this._backToDetail
     this._backToDetail = 0
     await this.loadNotes(true)
-    if (reopen) this._reopenDetail(reopen)
+    if (reopen) await this._reopenDetail(reopen)
   },
 
   // 头部那张图的取景：先问出图片真实尺寸，再按「我的」页那套数摆（poster.bandGeom，
@@ -461,7 +464,8 @@ Page({
   // v19：两枚 tab 那两批屏都不就地展开——点一行 / 点一格 = 直接浮详情窗。
   // 列表那一行只给三行摘要的位置，就地展开会把下面那条顶歪、也把「显示更多」那枚的出口废掉；
   // 摘要全文、要点、原文本来就在详情窗里。卡片那一格同理：白垫是固定一档，塞不下正文。
-  // 私密笔记进门前先验密码（会话里验过一次就不再问），密码不对既不开窗也不重载。
+  // 私密笔记进门前先验密码：**每一次点开一篇都要输**（站长 10-12「每次看详细都要输入一次」），
+  // 密码不对或他取消就既不开窗也不发请求。判据与那一趟输入都在 utils/privateGate.js 的 unlockOn。
   async onRowTap(e) {
     // 行是 catchtap：它不该被当成"点了空白"（那样会把关键字一起清掉）。
     // 但条子要收——收起来正好把结果让给这一屏。词留着，✕ 才是清词的口。
@@ -469,15 +473,11 @@ Page({
     const idx = e.currentTarget.dataset.idx
     const note = this.data.notes[idx]
     if (!note) return
-    if (!note.is_private || this.data._privateVerified) { this._openDetail(idx); return }
-    const ok = await this._promptPrivatePassword()
-    if (!ok) return
-    this.setData({ _privateVerified: true })
-    // 验完密码重取列表：服务端锁着的时候私密笔记那行的 summary 是裁掉的，
-    // 不重取的话窗里没有摘要，看着像"这篇没有概要"。
-    // 重取会整表重排，所以按 id 把行号找回来再开窗。
-    await this.loadNotes(true)
-    this._reopenDetail(note.id)
+    if (!(await unlockOn(this, note))) return
+    // 验完**不再整表重取**。列表那一趟今天永远不带凭证（api.js 的 getNotes 那条），
+    // 窗里的正文与摘要由 _openDetail 那一次 getNote 带着凭证取回来。
+    // 原来那句"验完重取列表拿摘要"正是泄密那一条：它把这一页所有私密行的 summary 一起留在内存里。
+    this._openDetail(idx)
   },
 
   // v7 ③：详情浮窗。列表项身上那些派生字段（分类色、来源、日期）这一屏早就算好了，
@@ -506,11 +506,15 @@ Page({
     if (!row.is_private) this._loadShareStatus(row.id)
   },
 
-  // 列表整表重排之后按 id 把那一行找回来再开窗。两条路共用：验完密码重取、从编辑页回来。
+  // 列表整表重排之后按 id 把那一行找回来再开窗。现在只剩一条路走这里：从编辑那一趟回来。
   // 找不到就是不开了——那篇已在别处被删掉，硬开只能凭空造一份内容。
-  _reopenDetail(noteId) {
+  // 回来这一趟也要过 unlockOn：同一篇、凭证还活着就不重复问；
+  // 凭证在他编辑那一阵里过期了就再问一次，不能拿一份只有标题的空壳当"这篇没内容"。
+  async _reopenDetail(noteId) {
     const at = this.data.notes.findIndex((n) => n.id === noteId)
-    if (at >= 0) this._openDetail(at)
+    if (at < 0) return
+    if (!(await unlockOn(this, this.data.notes[at]))) return
+    this._openDetail(at)
   },
 
   // 这篇对外不对外，只有服务端知道（码可能是在另一台手机上生成的）。
@@ -550,36 +554,6 @@ Page({
     wx.setClipboardData({
       data: url,
       success: () => wx.showToast({ title: t('linkCopied', this.data.lang), icon: 'success' }),
-    })
-  },
-
-  _promptPrivatePassword() {
-    const { lang } = this.data
-    return new Promise((resolve) => {
-      wx.showModal({
-        title: t('privatePasswordTitle', lang),
-        editable: true,
-        placeholderText: t('privatePasswordHint', lang),
-        confirmText: t('privatePasswordOk', lang),
-        cancelText: t('cancel', lang),
-        success: async (res) => {
-          if (!res.confirm) { resolve(false); return }
-          const pwd = (res.content || '').trim()
-          if (!/^\d{6}$/.test(pwd)) {
-            wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
-            resolve(false); return
-          }
-          try {
-            await api.verifyPrivatePassword(pwd)
-            resolve(true)
-          } catch (err) {
-            const msg = (err.data && err.data.detail) || t('privatePasswordWrong', lang)
-            wx.showToast({ title: msg, icon: 'none' })
-            resolve(false)
-          }
-        },
-        fail: () => resolve(false),
-      })
     })
   },
 

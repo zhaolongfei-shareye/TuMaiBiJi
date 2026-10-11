@@ -25,4 +25,81 @@ async function allowPrivate(categoryName, lang) {
   return false
 }
 
-module.exports = { PRIVATE_NAME, isPrivate, allowPrivate }
+// 服务端这一句是**给日志看的**，不是给人看的（backend/app/api/routes/user.py 那个 verify 口，
+// 密码列被清空时回 400「尚未设置私密密码」）。原来两页都把它原样当吐司发出去：
+// 那一列空着的时候输什么都不会对，人就卡在"既进不去、又不知道该去哪儿"（站长 10-12 报的死路）。
+// 所以这一种失败单独认，认出来就给一个能走的口；其余失败照旧回那句"密码不正确"。
+function _noPasswordSet(err) {
+  const d = (err && err.data && err.data.detail) || ''
+  return d.indexOf('尚未设置私密密码') > -1
+}
+
+function _promptPassword(lang) {
+  return new Promise((resolve) => {
+    wx.showModal({
+      title: t('privatePasswordTitle', lang),
+      editable: true,
+      placeholderText: t('privatePasswordHint', lang),
+      confirmText: t('privatePasswordOk', lang),
+      cancelText: t('cancel', lang),
+      success: async (res) => {
+        if (!res.confirm) { resolve(false); return }
+        const pwd = (res.content || '').trim()
+        if (!/^\d{6}$/.test(pwd)) {
+          wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
+          resolve(false); return
+        }
+        try {
+          await api.verifyPrivatePassword(pwd)
+          resolve(true)
+        } catch (err) {
+          if (_noPasswordSet(err)) {
+            wx.showModal({
+              title: t('privatePasswordTitle', lang),
+              content: t('privatePasswordRequired', lang),
+              confirmText: t('privatePasswordOk', lang),
+              cancelText: t('cancel', lang),
+              success: (r) => {
+                if (r.confirm) wx.switchTab({ url: '/pages/me/me' })
+                resolve(false)
+              },
+              fail: () => resolve(false),
+            })
+            return
+          }
+          const msg = (err.data && err.data.detail) || t('privatePasswordWrong', lang)
+          wx.showToast({ title: msg, icon: 'none' })
+          resolve(false)
+        }
+      },
+      fail: () => resolve(false),
+    })
+  })
+}
+
+/**
+ * 解锁这一趟全站只有一份实现（首页详情窗与独立详情页都调它，不许各存一份）。
+ * 判据**不是**"这一屏问过没有"，而是服务端认得的那把凭证 + 这一篇的号。
+ * 站长 10-12 两条回电都出在把"问过没有"记在页面上：首页是常驻 tab，记一次就整个会话不再问；
+ * 而重置／换密码会把凭证清掉（api.js 里那两位都跟着 clear），页面那个布尔没人清，
+ * 于是点开一篇私密笔记既不弹密码框、又只看到标题——服务端这时按
+ * app/core/private_access.py 判未解锁，把正文那五列一律裁成 null。
+ * 两条边界照站长拍的口径：同一篇从编辑那一趟回来不重复问（那是回到同一篇，不是新开一篇），
+ * 换一篇必问；凭证一过期就再问（宁可多问一次，不让他对着一篇只有标题的笔记发懵）。
+ */
+async function unlockOn(page, note) {
+  // 这一趟是**真验了一次**、还是手里那把还管用。详情页拿它决定要不要重取那一趟全文：
+  // 凭证还活着时第一次读回来的就已经是全文，再打一趟是白要的。
+  page._unlockRenewed = false
+  if (!note || !note.is_private) return true
+  if (page._unlockedNoteId === note.id && api.hasPrivateUnlock()) return true
+  // 先作废手上这把再问：留着的话"问了"只是形式，正文照旧拿旧凭证读出来。
+  api.clearPrivateUnlock()
+  page._unlockedNoteId = 0
+  if (!(await _promptPassword(page.data.lang))) return false
+  page._unlockedNoteId = note.id
+  page._unlockRenewed = true
+  return true
+}
+
+module.exports = { PRIVATE_NAME, isPrivate, allowPrivate, unlockOn }

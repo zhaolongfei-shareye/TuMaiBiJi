@@ -35,7 +35,7 @@ function hasPrivateUnlock() {
   return !!_unlockToken()
 }
 
-function _headers(contentType, extra) {
+function _headers(contentType, extra, withUnlock = true) {
   const h = {
     'content-type': contentType || 'application/json',
   }
@@ -43,7 +43,7 @@ function _headers(contentType, extra) {
   if (app.globalData.token) {
     h['Authorization'] = `Bearer ${app.globalData.token}`
   }
-  const unlock = _unlockToken()
+  const unlock = withUnlock ? _unlockToken() : ''
   if (unlock) h['X-Private-Token'] = unlock
   if (extra) Object.assign(h, extra)
   return h
@@ -55,7 +55,7 @@ const request = (url, method, data, options = {}, retryCount = 0) => {
       url: `${API_BASE}${url}`,
       method: method || 'GET',
       data: data || {},
-      header: _headers(options.contentType, options.header),
+      header: _headers(options.contentType, options.header, !options.noUnlock),
       timeout: 30000,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -195,7 +195,11 @@ module.exports = {
     let url = `/api/notes/?skip=${skip}&limit=${limit}`
     if (categoryId != null) url += `&category_id=${categoryId}`
     if (search) url += `&search=${encodeURIComponent(search)}`
-    return request(url)
+    // 这一趟**永远不带解锁凭证**（站长 10-12：「不输入密码就只能看标题」）。带着它，
+    // 服务端就会把这一页里**所有**私密笔记的 summary 一起发下来（锁着时只裁 summary 那一列），
+    // 而这些行会留在 this.data.notes 里——症状是"验过一次之后，别的私密篇不问就露摘要"。
+    // 正文与摘要只从 getNote(id) 那一条口取，那一口才许带凭证。
+    return request(url, 'GET', undefined, { noUnlock: true })
   },
   getNote: (id) => request(`/api/notes/${id}`),
   createNote: (data) => request('/api/notes/', 'POST', data),

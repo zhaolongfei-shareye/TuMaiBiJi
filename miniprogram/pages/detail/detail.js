@@ -4,6 +4,7 @@ const { blockSkinFor, toneVars, paleStep } = require('../../utils/palette.js')
 const { formatDateTime, formatShortDate } = require('../../utils/date.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const cardCloud = require('../../utils/cardCloud.js')
+const privateGate = require('../../utils/privateGate.js')
 const poster = require('../../utils/poster.js')
 
 const SOURCE_TYPE_KEYS = {
@@ -64,17 +65,16 @@ Page({
     this.setData({ loading: true })
     try {
       let note = await api.getNote(id)
-      if (note.is_private && !this._privateVerified) {
-        const ok = await this._promptPrivatePassword()
-        if (!ok) {
-          this.setData({ loading: false })
-          wx.navigateBack()
-          return
-        }
-        this._privateVerified = true
-        // 验完密码必须重取一次：第一份是服务端裁过的空壳（正文、要点、概要都是 null），
+      if (note.is_private && !(await privateGate.unlockOn(this, note))) {
+        // 没验过就一篇都不给看：收掉加载态、直接退回上一页，不留半截内容在屏上。
+        this.setData({ loading: false })
+        wx.navigateBack()
+        return
+      }
+      if (this._unlockRenewed) {
+        // 刚验完必须重取一次：上一份是服务端裁过的空壳（正文、要点、概要都是 null），
         // 直接渲染会渲染出一篇"什么都没有"的笔记。解锁凭证已经在 api.js 里存好了，
-        // 这一次带上请求头，服务端才发全文。
+        // 这一次带上请求头，服务端才发全文。手里那把还管用时不重取——白打一趟。
         note = await api.getNote(id)
       }
       const lang = this.data.lang
@@ -133,36 +133,6 @@ Page({
       this.setData({ loading: false })
       wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
     }
-  },
-
-  _promptPrivatePassword() {
-    const { lang } = this.data
-    return new Promise((resolve) => {
-      wx.showModal({
-        title: t('privatePasswordTitle', lang),
-        editable: true,
-        placeholderText: t('privatePasswordHint', lang),
-        confirmText: t('privatePasswordOk', lang),
-        cancelText: t('cancel', lang),
-        success: async (res) => {
-          if (!res.confirm) { resolve(false); return }
-          const pwd = (res.content || '').trim()
-          if (!/^\d{6}$/.test(pwd)) {
-            wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
-            resolve(false); return
-          }
-          try {
-            await api.verifyPrivatePassword(pwd)
-            resolve(true)
-          } catch (err) {
-            const msg = (err.data && err.data.detail) || t('privatePasswordWrong', lang)
-            wx.showToast({ title: msg, icon: 'none' })
-            resolve(false)
-          }
-        },
-        fail: () => resolve(false),
-      })
-    })
   },
 
   // 这篇有哪些配图。
