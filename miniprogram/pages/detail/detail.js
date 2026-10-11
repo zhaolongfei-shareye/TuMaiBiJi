@@ -65,6 +65,10 @@ Page({
 
   async loadNote(id) {
     this.setData({ loading: true })
+    // 这一面旗每趟进门先落下：它只由 unlockOn 抬起（真验过一次）。原来只在私密那一支里复位，
+    // 一篇验过的笔记后来被改成非私密（或这一趟没走那个分支）时就一直立着，
+    // 于是每次 onShow 都白打两趟详情。
+    this._unlockRenewed = false
     try {
       let note = await api.getNote(id)
       if (note.is_private && !(await privateGate.unlockOn(this, note))) {

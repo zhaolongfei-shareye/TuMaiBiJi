@@ -248,12 +248,36 @@ const ck = (name, ok, got) => {
   const objBody = (src, name) => (src.match(new RegExp(`${name}\\(([^\\n]*)\\) \\{[\\s\\S]*?\\n  \\},`)) || [''])[0]
   const rowTap = objBody(idx, 'onRowTap')
   const reOpen = objBody(idx, '_reopenDetail')
-  ck('首页点那一行：先过 unlockOn、再开窗', /unlockOn\(this, note\)/.test(rowTap)
-    && rowTap.indexOf('unlockOn') < rowTap.indexOf('_openDetail(idx)'))
+  const openDetail = objBody(idx, '_openDetail')
+  // 10-12 审查严重②：面板浮着的那一段时间人能从底栏切走再回来（底栏是自定义组件、z-index 999
+  // 压得过这一层的 100），onShow 那趟会重拉整表、序也变。所以验完必须按 id 找回那一行——
+  // 拿点下去那一刻的号开窗＝验的是 A、开的是 B，而 B 是私密也照样开（凭证是全局那一把）。
+  ck('首页点那一行：过完 unlockOn 之后按 id 找回行号才开窗',
+    /unlockOn\(this, note\)/.test(rowTap)
+    && rowTap.indexOf('unlockOn') < rowTap.indexOf('notes.findIndex')
+    && rowTap.indexOf('notes.findIndex') < rowTap.indexOf('this._openDetail(at)'))
+  ck('不许再用 await 之前那个号直接开窗', !/this\._openDetail\(idx\)/.test(rowTap))
+  // 审查严重①：列表那一行的 is_private 是本机按分类名现算的（后端列表响应里压根没这一栏），
+  // 分类那一张表没拉到/拉挂的当口一律算成"不私密"⇒ 闸整个跳过 ⇒ 症状还是"不弹密码、只剩标题"。
+  // 详情那一份的 is_private 才是服务端钉的，所以开窗那一步要以它为准再走一次同一道闸。
+  ck('开窗那一步以详情的 is_private 再走一次闸（列表那份是本机猜的）',
+    /full\.is_private[\s\S]{0,240}unlockOn\(this, \{ id: row\.id, is_private: true \}\)/.test(openDetail))
+  ck('闸没过就把窗收掉，不留一份裁过的空壳在屏上',
+    /detailOpen: false, detailNote: null/.test(openDetail))
   ck('验完密码这一趟不再整表重取（那一步把全表私密摘要留在内存里）',
     rowTap.length > 0 && !/loadNotes/.test(rowTap))
   ck('编辑那趟回来也过 unlockOn，并仍按 id 找回行号',
     /notes\.findIndex/.test(reOpen) && /unlockOn\(this/.test(reOpen))
+  // 审查次要①：那一面旗只该由 unlockOn 抬起。原来只在私密那一支里复位，
+  // 一篇验过的笔记后来被改成非私密就一直立着，于是每次 onShow 白打两趟详情。
+  ck('详情页进门先把那面旗落下（不靠私密那一支替它复位）',
+    /this\._unlockRenewed = false[\s\S]{0,40}try \{/.test(detailJs))
+  // 审查严重③的那一半能当场堵住的：注销把解锁凭证也带走。globalData 是进程里一份，
+  // 换新 token 不会换掉它——留着就是下一个身份不必重输读上一个人的私密正文。
+  ck('clearSession 里清解锁凭证（与卡片、名片那两个 signOut 同一口径）',
+    /clearSession\(\)[\s\S]{0,900}clearPrivateUnlock\(\)/.test(
+      fs.readFileSync(path.join(__dirname, '../../miniprogram/app.js'), 'utf8')))
+
   ck('解锁状态不记在 data 里（常驻 tab 记一次＝整个会话不再问）',
     !/_privateVerified:/.test(idx) && !/this\._privateVerified\s*=/.test(idx) && !/this\._privateVerified\s*=/.test(detailJs))
   // 一份解锁实现：输入框、判据、服务端那一句的分支，全站只许长一次。

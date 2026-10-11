@@ -425,7 +425,9 @@ ok('这一屏不再读纸片那一族（paperSkinFor 在列表页没有后代了
 ok('排布档不再是本机偏好（listMode 那个键整个撤了，两枚 tab 不落本机）',
   !/listMode|LIST_MODE_KEY/.test(idxJs) && !/setStorageSync\('view'\)/.test(idxJs))
 ok('列表里没有"就地展开"这一态（点一行 / 点一格 = 开详情窗）',
-  !/openIdx/.test(idxJs + idxWxml) && /this\._openDetail\(idx[,)]/.test(idxJs))
+  // 10-12：开窗那一步的入参从 `idx` 换成了按 id 找回来的 `at`（私密面板浮着时切 tab 回来会重拉整表，
+  // 旧行号会指到另一篇）。这条钉的是"没有就地展开那一态、点一行就是开窗"，不是那一个变量名。
+  !/openIdx/.test(idxJs + idxWxml) && /this\._openDetail\((idx|at)[,)]/.test(idxJs))
 ok('D2 那一排（点 + 分类名 + meta 行）从列表退了，分类两档仍从 palette 递进详情窗',
   !/class="cat[ "]/.test(idxWxml) && !/catLabel|tagLine|catRing/.test(idxJs + idxWxml)
   && /color: var\(--cat-ink\)/.test(rule(idxWxss, 'ds-tag')))

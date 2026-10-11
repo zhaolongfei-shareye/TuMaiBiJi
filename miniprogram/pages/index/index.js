@@ -476,10 +476,15 @@ Page({
     const note = this.data.notes[idx]
     if (!note) return
     if (!(await unlockOn(this, note))) return
-    // 验完**不再整表重取**。列表那一趟今天永远不带凭证（api.js 的 getNotes 那条），
+    // 验完**不再整表重取**：列表那一趟今天永远不带凭证（api.js 的 getNotes 那条），
     // 窗里的正文与摘要由 _openDetail 那一次 getNote 带着凭证取回来。
     // 原来那句"验完重取列表拿摘要"正是泄密那一条：它把这一页所有私密行的 summary 一起留在内存里。
-    this._openDetail(idx)
+    // 但行号还是要按 id 找回来：面板浮着的那一段时间里，人会切到底栏另一格再回来
+    // （底栏是自定义组件、z-index 999，压得过这一层的 100），onShow 那趟会重拉整表、序也变。
+    // 拿着点下去那一刻的号开窗＝验的是 A、开的是 B（B 是私密也照开，凭证是全局那一把）。
+    const at = this.data.notes.findIndex((n) => n.id === note.id)
+    if (at < 0) return
+    this._openDetail(at)
   },
 
   // v7 ③：详情浮窗。列表项身上那些派生字段（分类色、来源、日期）这一屏早就算好了，
@@ -493,9 +498,22 @@ Page({
       detailOpen: true, detailNote: row, origOpen: false, shared: false,
       detailCards: this._cardsOf(row.id), dsTo: '',
     })
+    // 这一篇算不算私密，先按列表那一行那一份猜（本机按分类名现算的），拿到详情再换成服务端钉的。
+    let priv = !!row.is_private
     try {
-      const full = await api.getNote(row.id)
+      let full = await api.getNote(row.id)
       if (!this.data.detailOpen) return
+      // 详情那一份的 is_private 才是服务端钉的（backend/app/core/private_access.py 的
+      // locked_response），列表那一行的不是——列表响应里根本没这一栏，本机是拿分类名现算的。
+      // 分类那一张表没拉到或拉挂的当口，现算的那份会一律判成"不私密"，上面那道闸就被跳过：
+      // 于是点开一篇私密笔记既不问密码、又只看见一个标题（站长 10-12 报的那一条的另一半）。
+      // 所以这里以详情为准再走一次同一道闸；没验成就把窗收掉，半截空壳都不画。
+      priv = !!full.is_private
+      if (priv && !(await unlockOn(this, { id: row.id, is_private: true }))) {
+        this.setData({ detailOpen: false, detailNote: null })
+        return
+      }
+      if (this._unlockRenewed) full = await api.getNote(row.id)
       const note = Object.assign({}, row, full)
       note.source_type_label = row.source_type_label
       note.date_label = row.date_label
@@ -505,7 +523,7 @@ Page({
       console.error('详情窗取全文失败', err)
     }
     // 私密笔记不给分享这条线，公开状态那行也就不查了。
-    if (!row.is_private) this._loadShareStatus(row.id)
+    if (!priv) this._loadShareStatus(row.id)
   },
 
   // 列表整表重排之后按 id 把那一行找回来再开窗。现在只剩一条路走这里：从编辑那一趟回来。

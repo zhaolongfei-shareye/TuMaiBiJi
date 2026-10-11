@@ -155,7 +155,10 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     // 站长 10-02 iPhone 11：这只原来挂 password="{{true}}"，iOS 的密文点是系统那一层画的、
     // 不吃 CSS opacity，于是六个格子左边漏出一串点和光标（他说的"锚点错位"）。
     // 现在改成普通数字输入 + 字和光标一律染透明；同时 adjust-position 关掉，键盘不再顶整页。
-    const meWx = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/me/me.wxml'), 'utf8')
+    // 10-12：这一层的标记与皮搬到 templates/pwd-sheet.wxml + styles/pwd-sheet.wxss（三页共用一份）。
+    // 这两处读法跟着换文件——量的还是那几件事（不挂 password、adjust-position 关掉、
+    // left 按已填几位推、字号 1rpx、宽 78rpx），一个字没松。
+    const meWx = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/templates/pwd-sheet.wxml'), 'utf8')
     const capTag = ((meWx.match(/<input class="pwd-capture"[\s\S]*?\/>/) || [])[0] || '')
     ck('那只 input 是数字键盘、最多 6 位，且整只标签里不再挂 password（漏点的就是它）',
       (await capture.attribute('maxlength')) + '' === '6' &&
@@ -188,7 +191,7 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     ck('input 的 left 按已填几位推过去（一格 78 + 一缝 14 = 92），第六位时钉在最后一格不往外跑',
       capTag.indexOf('left:{{(pwdBuf.length > 5 ? 5 : pwdBuf.length) * 92}}rpx') >= 0,
       capTag.slice(0, 96))
-    const meWxss = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/me/me.wxss'), 'utf8')
+    const meWxss = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/styles/pwd-sheet.wxss'), 'utf8')
     ck('input 字号收到 1rpx（光标自己塌掉），宽度写死成一格那么宽',
       /\.pwd-capture\s*\{[^}]*font-size: 1rpx/.test(meWxss) && /\.pwd-capture\s*\{[^}]*width: 78rpx/.test(meWxss))
     ck('设置态一行两枚：取消 + 确定', (await btnOf()).join('|') === '取消|确定', (await btnOf()).join('|'))
