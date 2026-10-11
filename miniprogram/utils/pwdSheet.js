@@ -86,16 +86,16 @@ function submit(page) {
   }
   if (st.busy) return
   st.busy = true
-  Promise.resolve(st.tryIt(page.data.pwdBuf)).then((ok) => {
+  const settle = (ok) => {
+    // 认对象，不认"有没有 _pin"：弱网下给 A 输完密码（verify 还在路上）再点 B，
+    // ask 会把 A 那层判掉、换成 B 的 _pin；A 的回包要是照旧往下走，
+    // 就会把 B 那一层结掉并按"验过了"放行——B 一个字没输就开了。
+    if (page._pin !== st) return
     st.busy = false
-    if (!page._pin) return // tryIt 自己收过场了（例如那层"先去设密码"的模态）
     if (ok) { finish(page, true); return }
     page.setData({ pwdBuf: '' })
-  }, () => {
-    // tryIt 抛了：面板不能卡在"忙"那一态，否则六格再也按不动。清空当没输过。
-    st.busy = false
-    page.setData({ pwdBuf: '' })
-  })
+  }
+  Promise.resolve(st.tryIt(page.data.pwdBuf)).then((ok) => settle(ok), () => settle(false))
 }
 
 function cancel(page) {

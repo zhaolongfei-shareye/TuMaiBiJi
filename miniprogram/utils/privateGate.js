@@ -80,12 +80,21 @@ function _promptPassword(page, lang) {
  * 两条边界照站长拍的口径：同一篇从编辑那一趟回来不重复问（那是回到同一篇，不是新开一篇），
  * 换一篇必问；凭证一过期就再问（宁可多问一次，不让他对着一篇只有标题的笔记发懵）。
  */
+/**
+ * 这一篇现在到底要不要问一遍。判据不是"这一屏问过没有"，而是服务端认得的那把凭证＋这一篇的号。
+ * unlockOn 用它，首页"要不要先把详情窗收掉"也用它——同一个判据写两处就会长出一份记法，
+ * 而首页那个窗的 z-index 是 101、密码面板是 100，收早了闪一下、收晚了面板看不见。
+ */
+function needsUnlock(page, note) {
+  if (!note || !note.is_private) return false
+  return !(page._unlockedNoteId === note.id && api.hasPrivateUnlock())
+}
+
 async function unlockOn(page, note) {
   // 这一趟是**真验了一次**、还是手里那把还管用。详情页拿它决定要不要重取那一趟全文：
   // 凭证还活着时第一次读回来的就已经是全文，再打一趟是白要的。
   page._unlockRenewed = false
-  if (!note || !note.is_private) return true
-  if (page._unlockedNoteId === note.id && api.hasPrivateUnlock()) return true
+  if (!needsUnlock(page, note)) return true
   // 先作废手上这把再问：留着的话"问了"只是形式，正文照旧拿旧凭证读出来。
   api.clearPrivateUnlock()
   page._unlockedNoteId = 0
@@ -95,4 +104,4 @@ async function unlockOn(page, note) {
   return true
 }
 
-module.exports = { PRIVATE_NAME, isPrivate, allowPrivate, unlockOn }
+module.exports = { PRIVATE_NAME, isPrivate, allowPrivate, needsUnlock, unlockOn }

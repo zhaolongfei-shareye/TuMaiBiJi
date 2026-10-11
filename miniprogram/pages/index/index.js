@@ -5,7 +5,7 @@ const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const cardInfo = require('../../utils/cardInfo.js')
-const { isPrivate, unlockOn } = require('../../utils/privateGate.js')
+const { isPrivate, needsUnlock, unlockOn } = require('../../utils/privateGate.js')
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
@@ -509,10 +509,16 @@ Page({
       // 于是点开一篇私密笔记既不问密码、又只看见一个标题（站长 10-12 报的那一条的另一半）。
       // 所以这里以详情为准再走一次同一道闸；没验成就把窗收掉，半截空壳都不画。
       priv = !!full.is_private
-      if (priv && !(await unlockOn(this, { id: row.id, is_private: true }))) {
-        this.setData({ detailOpen: false, detailNote: null })
-        return
-      }
+      const gate = { id: row.id, is_private: priv }
+      // 要问的时候先把窗收掉再问：`.float-sheet` 的 z-index 是 101，而那一层密码面板是 100
+      // （me.wxss 那份皮搬到 styles/pwd-sheet.wxss 时这一档一个字没改）。
+      // 先浮面板再收窗，面板就画在窗底下——人只看见一篇带标题的窗，屏上没有输入框、
+      // 也没有能关掉的地方（10-12 审计严重④，是上一批补闸时我自己引进来的）。
+      const askFirst = needsUnlock(this, gate)
+      if (askFirst) this.setData({ detailOpen: false, detailNote: row })
+      if (!(await unlockOn(this, gate))) return
+      if (askFirst) this.setData({ detailOpen: true })
+      if (this._unlockRenewed) full = await api.getNote(row.id)
       if (this._unlockRenewed) full = await api.getNote(row.id)
       const note = Object.assign({}, row, full)
       note.source_type_label = row.source_type_label

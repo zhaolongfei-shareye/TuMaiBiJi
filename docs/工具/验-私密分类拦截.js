@@ -261,9 +261,45 @@ const ck = (name, ok, got) => {
   // 分类那一张表没拉到/拉挂的当口一律算成"不私密"⇒ 闸整个跳过 ⇒ 症状还是"不弹密码、只剩标题"。
   // 详情那一份的 is_private 才是服务端钉的，所以开窗那一步要以它为准再走一次同一道闸。
   ck('开窗那一步以详情的 is_private 再走一次闸（列表那份是本机猜的）',
-    /full\.is_private[\s\S]{0,240}unlockOn\(this, \{ id: row\.id, is_private: true \}\)/.test(openDetail))
-  ck('闸没过就把窗收掉，不留一份裁过的空壳在屏上',
-    /detailOpen: false, detailNote: null/.test(openDetail))
+    openDetail.indexOf('full.is_private') >= 0
+    && openDetail.indexOf('full.is_private') < openDetail.indexOf('needsUnlock(this, gate)')
+    && openDetail.indexOf('needsUnlock(this, gate)') < openDetail.indexOf('unlockOn(this, gate)'))
+  // 审计严重④（我上一批自己引进来的）：那一层密码面板的 z-index 是 100，
+  // 而首页详情窗 .float-sheet 是 101——先浮面板再收窗，面板就压在窗底下，
+  // 人只看见一篇带标题的窗，屏上既没有输入框也没有能关的地方。所以收窗必须排在问之前。
+  ck('要问的时候先把详情窗收掉再浮面板（面板 100 压不过 .float-sheet 的 101）',
+    openDetail.indexOf('detailOpen: false') >= 0
+    && openDetail.indexOf('detailOpen: false') < openDetail.indexOf('unlockOn(this, gate)'))
+  ck('验过之后把窗放回来，再按新那一份取全文',
+    /if \(askFirst\) this\.setData\(\{ detailOpen: true \}\)/.test(openDetail)
+    && /if \(this\._unlockRenewed\) full = await api\.getNote\(row\.id\)/.test(openDetail))
+  ck('"要不要问"只有一处判据（首页与 unlockOn 共用 needsUnlock，页面里不许自己算一遍）',
+    /function needsUnlock\(page, note\)/.test(gateJs)
+    && !/page\._unlockedNoteId === [a-z]+\.id && [a-zA-Z.]*hasPrivateUnlock\(\)/.test(idx)
+    && /needsUnlock\(this, gate\)/.test(idx))
+
+  // 审计中等⑥：弱网下给 A 输完密码（verify 还在路上）再点 B，A 的迟到回包不许动 B 那一层。
+  before()
+  const pA = freshPage()
+  let releaseA = null
+  afterOpen = (p) => pwdSheet.input(p, { detail: { value: '123456' } })
+  const runA = pwdSheet.ask(pA, { lang: 'zh', tryIt: () => new Promise((r) => { releaseA = r }) })
+  await tick(20)
+  ck('A 那一层已经把六位交出去（tryIt 还挂着）',
+    pA.data.pwdBuf === '123456' && typeof releaseA === 'function')
+  afterOpen = null
+  const runB = pwdSheet.ask(pA, { lang: 'zh', tryIt: async () => true })
+  let bDone = false
+  runB.then(() => { bDone = true })
+  await tick(20)
+  ck('换 B 时 A 那一趟先被判掉（不许两个 pending 抢同一次输入）', (await runA) === false)
+  releaseA(true)
+  await tick(40)
+  ck('A 的迟到回包不许把 B 那一层收掉、也不许当"B 验过了"',
+    pA.data.pwdOpen === true && bDone === false, `open=${pA.data.pwdOpen} B 已结=${bDone}`)
+  pwdSheet.cancel(pA)
+  ck('B 自己那一趟仍要人输：取消之后才回 false', (await runB) === false)
+
   ck('验完密码这一趟不再整表重取（那一步把全表私密摘要留在内存里）',
     rowTap.length > 0 && !/loadNotes/.test(rowTap))
   ck('编辑那趟回来也过 unlockOn，并仍按 id 找回行号',
