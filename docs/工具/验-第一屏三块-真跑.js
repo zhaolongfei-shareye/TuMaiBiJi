@@ -269,9 +269,13 @@ async function main() {
      ⇒ 正解不是撤玻璃：**效果图 `.g-blk`／`.g-jot` 那两条本来就是"块面是玻璃、人物与 icon 是实心"**，两头都要——
        块面按图上落玻璃，插画用 `docs/工具/烘-插画压平.py` 压成实心。资产那一头由 `量-插画压没压.py` 钉（读 PNG alpha 直方图）。
      ⑤ 10-11 11:0x 又补一句「首页三个块磨玻璃的背景图换成白底再毛玻璃，否则现在如果背景深色的话，毛玻璃就会很暗，13，12 等数字完全看不清」
-       ⇒ 那三块现在是**两层白**：白纱 .30 在上、白底 .70 在下，都挂在同一枚元素的 `background` 上（不另叠定位层）。
-     ⚠ 读法跟着变了：`background` 简写一旦给的是渐变，**`background-color` 就静默算成 transparent**，
-       再拿它判"是不是半透"＝一条永远绿的假判据（10-11 那批"简写吃掉底色"的坑是同一个）。所以这三块改读 `background-image`。 */
+     ⑥ 10-11 12:5x 他把 ⑤ 的实现纠正回来：「不是加厚白色，是把原来根据背景风格自动切换的底色，换成白色，
+       然后按照半透明毛玻璃进行处理……假如 100% 白色，半透明 50%，也变成毛玻璃」，并点名 .50 这一档
+       ⇒ 那三块的面＝**一枚白色半透 `--glass-plate`(.50) 单层** ＋ `--glass-bf` 那档糊；
+         壁纸派生那档有色底在这三块上不再吃（不铺图那一态照旧吃它）。
+     ⚠ 我 ⑤ 那版是"白纱 .30 叠白 .70＝合成白 .79"，真机上没有玻璃味，所以这一格现在两头都钉：
+       铺图态必须是**白 .50 单层**，且**不许再出现两层白**（`background-image` 里两枚 white 渐变就红）。
+       读法也跟着换回 `background-color`：单层纯色时它才是真相；给渐变时它会被静默算成 transparent（那是另一坑）。 */
   const GLASS_SEL = ['.blk-person', '.blk-stat-notes', '.blk-stat-cards', '.blk-jot', '.blk-strip']
   const PLATED = ['.blk-person', '.blk-stat-notes', '.blk-stat-cards']
   const readBlks = async () => {
@@ -291,19 +295,11 @@ async function main() {
     const m = /rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([\d.]+)\s*\)/.exec(s)
     return m ? Number(m[1]) : 1
   }
-  /** 渲染后的两层白：第一层＝白纱、第二层＝白底。α 从各自那一层里现读，不写死在尺子里。
-      ⚠ 别拿"逗号"切层：`linear-gradient(rgba(..), rgba(..)), linear-gradient(..)` 里**渐变内部也有逗号**，
-      按逗号切会把一层的两个色标切成两层，读出来就是"上纱 .3／下底 .3"这种假红（第一版就栽在这）。
-      按 `linear-gradient(` 切才对。 */
-  const twoWhites = (s) => {
-    const layers = String(s).split(/linear-gradient\(/).slice(1)
-    if (layers.length < 2) return null
-    const a = layers.slice(0, 2).map((l) => {
-      const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/.exec(l)
-      return m ? { rgb: [+m[1], +m[2], +m[3]], a: m[4] === undefined ? 1 : Number(m[4]) } : null
-    })
-    return a[0] && a[1] ? a : null
-  }
+  /** 这一格现在只许一层白：`background-color` 是白半透，`background-image` 里不许再有第二枚白色渐变。
+      ⚠ 判"有没有叠回两层"要按 `linear-gradient(` 切，别按逗号切——渐变内部本来也有逗号，
+      按逗号切会把一层的两个色标当成两层（10-11 那条假红就是这么来的）。 */
+  const whiteLayers = (bi) => String(bi).split(/linear-gradient\(/).slice(1)
+    .filter((l) => /rgba?\(\s*255,\s*255,\s*255/.test(l)).length
   const APP = fs.readFileSync(`${ROOT}/miniprogram/app.wxss`, 'utf8')
   const PLATE_CODE = alphaOf(/--glass-plate:\s*(rgba\([^)]*\))/.exec(APP)[1])
   const VEIL_CODE = alphaOf(/--glass-veil:\s*(rgba\([^)]*\))/.exec(APP)[1])
@@ -318,13 +314,16 @@ async function main() {
     /home-bg-portrait/.test(onSrc), onSrc || '(空)')
   for (const sel of GLASS_SEL) {
     if (PLATED.includes(sel)) {
-      const t = twoWhites(on[sel].bi)
-      ok(`${sel} 铺图态是"白纱＋白底"两层（站长 11:0x 那句「换成白底再毛玻璃」）`,
-        !!t && Math.abs(t[0].a - VEIL_CODE) < 0.01 && Math.abs(t[1].a - PLATE_CODE) < 0.01
-        && t[0].rgb.join() === '255,255,255' && t[1].rgb.join() === '255,255,255',
-        t ? `上纱 α=${t[0].a}／下底 α=${t[1].a}（码里令牌 .${String(VEIL_CODE).slice(2)}＋.${String(PLATE_CODE).slice(2)}）` : `没读到两层：${on[sel].bi.slice(0, 90)}`)
-      ok(`${sel} 不铺图态没吃这两层白（底规则那档色相要还在）`,
-        !/rgba?\(255,\s*255,\s*255/.test(off[sel].bi), `不铺图 background-image＝${off[sel].bi.slice(0, 60)}`)
+      const w = /^rgba?\(\s*255,\s*255,\s*255\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(on[sel].bg)
+      ok(`${sel} 铺图态是"白 ${PLATE_CODE} 单层"（站长 12:5x 点名的那一档，糊由 backdrop-filter 给）`,
+        !!w && Math.abs((w[1] === undefined ? 1 : Number(w[1])) - PLATE_CODE) < 0.01
+        && whiteLayers(on[sel].bi) === 0,
+        w ? `background-color＝${on[sel].bg}／码里令牌 .${String(PLATE_CODE).slice(2)}（白纱 .${String(VEIL_CODE).slice(2)} 没叠进来）`
+          : `底色不是白半透：${on[sel].bg}`)
+      ok(`${sel} 没被叠回"白纱＋白底"两层（12:03 那一版就是这么把糊吃掉的）`,
+        whiteLayers(on[sel].bi) < 2, `background-image 里白色渐变层数＝${whiteLayers(on[sel].bi)}`)
+      ok(`${sel} 不铺图态仍吃壁纸派生那档有色底（这一层白只在铺图时生效）`,
+        !/^rgba?\(\s*255,\s*255,\s*255/.test(off[sel].bg), `不铺图 background-color＝${off[sel].bg}`)
     } else {
       ok(`${sel} 铺图态是半透面（效果图「.g-jot」那一档）`, alphaOf(on[sel].bg) < 0.999, on[sel].bg)
     }

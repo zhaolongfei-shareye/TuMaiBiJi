@@ -65,14 +65,18 @@ cmp('大面 saturate', gblur_s, bf_s, '不换算，照抄', gblur_s)
 cmp('白内环 α', one(gblk, r'inset 0 0 0 2px rgba\(255, 255, 255, (\.?[\d.]+)\)', '.g-blk')[1], hair, '不换算', one(gblk, r'inset 0 0 0 2px rgba\(255, 255, 255, (\.?[\d.]+)\)', '.g-blk')[1])
 cmp('白条 α', f'{float(ga) + .08:.2f}（图上 calc(--ga + .08)）', jot, '不换算', '.38')
 cmp('白条 blur', one(gjot, r'blur\((\d+)px\)', '.g-jot')[1], one(jot_rule, r'blur\((\d+)px\)', '落码')[1], '46→23 同一条换算 ⇒ 20→10', 10)
-cmp('白底 α（10-11 11:0x 那一句）', gplate, plate, '不换算（站长原话「换成白底再毛玻璃」）', gplate)
-# 白底不是"值对上了就算"——它必须真的挂在**同一枚元素的 background 两层**里，且白纱在上一层。
-# 另叠一层定位皮会画在静态内容之上＝给 13／12 那两枚数字蒙白（10-11 那条教训）。
-两层 = re.search(r'background:\s*linear-gradient\(var\(--glass-veil\)[^;]*?\),\s*linear-gradient\(var\(--glass-plate\)', blk_rule, re.S)
-两层图上 = re.search(r'background:\s*linear-gradient\(var\(--g-white\)[^;]*?\),\s*linear-gradient\(var\(--g-plate\)', gblk, re.S)
-rows.append((bool(两层) and bool(两层图上), '三块那一条的层法',
-             '白纱与白底是同一元素 background 的两个色层（纱在上）', '图上' + ('✓' if 两层图上 else '✗') + '／码里' + ('✓' if 两层 else '✗'),
-             '不许另叠定位层，也不许 <color> 写在非末层'))
+cmp('白底 α（10-11 12:5x 他点名的那一档）', gplate, plate, '不换算（他原话「100%白色，半透明50%，也变成毛玻璃」）', gplate)
+# 层法：这一格**只许一层白**。他 12:5x 纠正的正是"叠两层白"——白纱 .30 叠白 .70＝合成白 .79，
+# 真机上等于半块实心卡纸，糊被吃掉。所以这里两头都钉：① 图上与码里都是 `var(--g?-plate)` 单层；
+# ② 谁再把 `--glass-veil` 与 `--glass-plate` 叠进同一条 background，直接红。
+单层 = re.search(r'background:\s*var\(--glass-plate\)\s*;', blk_rule)
+单层图上 = re.search(r'background:\s*var\(--g-plate\)\s*;', gblk)
+又叠两层 = re.search(r'linear-gradient\(var\(--glass-veil\)[^;]*\)\s*,\s*linear-gradient\(var\(--glass-plate\)', blk_rule)
+rows.append((bool(单层) and bool(单层图上) and not 又叠两层, '三块那一条的层法（只一层白，不许再叠白纱）',
+             '图上＝`background: var(--g-plate)` 单层／码里＝`background: var(--glass-plate)` 单层',
+             '图上' + ('✓' if 单层图上 else '✗') + '／码里' + ('✓' if 单层 else '✗')
+             + ('／⚠又叠回两层了' if 又叠两层 else '／没叠'),
+             '糊由 backdrop-filter 给；再叠一层白纱就是 12:03 那版的错'))
 cmp('块宽', '308px（图上 .blk-person）', one(cre, r'\.blk-person \{[^}]*width:\s*(\d+)rpx', '落码')[1], '1px＝1rpx', '308')
 cmp('块圆角', '34px（图上 .blk-person）', one(cre, r'\.blk-person \{[^}]*border-radius:\s*(\d+)rpx', '落码')[1], '1px＝1rpx', '34')
 

@@ -1243,14 +1243,13 @@
 .container.has-bg .blk-person,
 .container.has-bg .blk-stat-notes,
 .container.has-bg .blk-stat-cards {
-  /* 站长 10-11 11:0x 又补一句：「首页三个块磨玻璃的背景图换成白底再毛玻璃，否则现在如果背景深色的话，
-     毛玻璃就会很暗，13，12 等数字完全看不清」⇒ 白纱底下**先垫一层白**（`--glass-plate`＝.70，只有这三块吃）。
-     两层都写成渐变、挂在同一枚元素自己身上：`background` 简写里 <color> 只许落在最后一层，
-     而**另叠一层定位皮会画在静态内容之上**＝给那两枚数字蒙白（10-11 那条教训，别再犯）。
-     他拍的 .30 一个字没抬：抬的是它下面那一层白。 */
-  background:
-    linear-gradient(var(--glass-veil), var(--glass-veil)),
-    linear-gradient(var(--glass-plate), var(--glass-plate));
+  /* 站长 10-11 11:0x 那句「首页三个块磨玻璃的背景图换成白底再毛玻璃，否则现在如果背景深色的话，毛玻璃就会很暗，
+     13，12 等数字完全看不清」，12:5x 他把我做错的版本纠正回来：「不是加厚白色，是把原来根据背景风格自动切换的
+     底色，换成白色，然后按照半透明毛玻璃进行处理」⇒ 这一格的面**只有白 .50 一层**（`--glass-plate`），
+     糊由 `--glass-bf` 给。我 12:03 那版是白纱 .30 叠白 .70＝合成白 .79，几乎实心，真机上就没有玻璃味了。
+     ⚠ 别再往回叠：`background` 简写里 <color> 只许落在最后一层，而另起一层定位皮会画在静态内容之上
+     （＝给那两枚数字蒙白，10-11 那条教训）。块里那两枚白条不吃这里，照旧走下面那条 `--glass-jot`。 */
+  background: var(--glass-plate);
   backdrop-filter: var(--glass-bf);
   -webkit-backdrop-filter: var(--glass-bf);
   box-shadow: inset 0 0 0 2rpx var(--glass-hair);
