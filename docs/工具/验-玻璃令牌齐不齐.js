@@ -27,6 +27,9 @@ const FILES = {
   ix: read('pages/index/index.wxss'),
   me: read('pages/me/me.wxss'),
   cr: read('pages/create/create.wxss'),
+  // 10-12：私密密码那一层的皮从 me.wxss 搬到这一份（三页共用）。它挂着 `.container.has-bg`
+  // 那一档玻璃，所以必须和三个页面的表一起受这一把管——不然搬过去的这一份就成了没人查的暗号。
+  sheet: read('styles/pwd-sheet.wxss'),
   ixjs: read('pages/index/index.js'),
   mejs: read('pages/me/me.js'),
   poster: read('utils/poster.js'),
@@ -51,6 +54,7 @@ const flat = (s) => String(s || '').replace(/\s+/g, ' ').trim()
 /** 全部判据都跑在这一个函数上：真文件调一次，八种改坏各调一次，红绿都由它说了算。 */
 function evaluate(F) {
   const APP = strip(F.app), IX = strip(F.ix), ME = strip(F.me), CR = strip(F.cr)
+  const SH = strip(F.sheet)
   const out = []
   const ok = (name, cond, extra) => { if (!cond) out.push(name + (extra ? ` —— ${extra}` : '')) }
 
@@ -78,7 +82,7 @@ function evaluate(F) {
   // 只管**真挂了滤镜的那几块面**：10-10 那批在照片上垫的 `.srch` 一层 .18 白＋.36 描边是他
   // 上一轮点头那一版里的，不属这一轮的玻璃档（这一轮的档＝带 backdrop-filter 的那几块）；
   // 把它一起圈进来＝尺子越界去重判他已经收过的那一格。
-  const glassBlocks = [IX, ME, CR]
+  const glassBlocks = [IX, ME, CR, SH]
     .flatMap((src) => [...src.matchAll(/\.container\.has-bg[^{]*\{([^}]*)\}/g)].map((m) => m[1]))
     .filter((b) => /backdrop-filter/.test(b))
     .join('\n')
@@ -101,7 +105,7 @@ function evaluate(F) {
     !/\.container\.has-bg \.head::after/.test(IX) && !/^\.head-band::after/m.test(ME)
     && /\.container\.has-bg \.head-scrim::after/.test(IX) && /^\.head-scrim::after/m.test(ME))
 
-  ;[['index', IX], ['me', ME], ['create', CR]].forEach(([who, src]) => {
+  ;[['index', IX], ['me', ME], ['create', CR], ['密码面板那一份', SH]].forEach(([who, src]) => {
     const lines = src.split('\n')
     const at = (i) => String((lines[i] || '').trim())
     // 两个方向都要查：只查"`backdrop-filter` 后面跟没跟 -webkit-"的话，

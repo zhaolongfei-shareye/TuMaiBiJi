@@ -1,3 +1,6 @@
+<!-- 私密密码那一层的标记搬到 templates/pwd-sheet.wxml（10-12 起三页共用一份），本页只挂数据与方法。
+     <import> 不渲染任何东西，放在根节点外面。 -->
+<import src="../../templates/pwd-sheet.wxml"/>
 <view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}}">
   <!-- has-bg 这一档 10-11 才补到 container 上（原来只有下面 .head-band 带）。需求原文：
        站长 10-11「界面纯色底色部分改为半透明毛玻璃效果，按钮ICON不变」＋「毛玻璃白底下面
@@ -147,34 +150,14 @@
     <text class="copyright">{{t.copyright}}</text>
   </block>
 
-  <!-- 私密密码这一层（站长 10-01 深夜第二次改口径：撤掉底部 1/3 那一份，照「分类管理」
-       改成整屏遮罩 + 居中卡）。从上到下：功能名 → 使用场景说明 → 校验提醒 + 六个方格 →
-       一行两枚（左退出、右动作）。六个格子是同一只隐藏 input 的显示面（六只 input 要点六次
-       才起键盘）。输完第一遍自动跳到第二遍，第二遍输满六位才真的发请求。
-       点遮罩空白处收回，和分类管理那一页一个手势（卡自己 catchtap 挡住，不冒泡）。
-       站长 10-02 iPhone 11 真机两条：①这只 input 原来挂 password="{{true}}"，iOS 的密文点是
-       系统那一层画的，不吃 CSS opacity——所以六个格子左边漏出一串点和光标（他说的"锚点错位"）。
-       现在改成普通数字输入，字由样式染成透明，屏幕上只剩我们自己的六枚点；
-       ②键盘盖住了下面两枚按钮 → adjust-position 关掉（不让微信去顶整页），卡自己坐到上面去。 -->
-  <view wx:if="{{pwdOpen}}" class="pwd-mask" bindtap="onClosePwdPanel">
-    <view class="pwd-card card glass-dialog" catchtap="">
-      <text class="pwd-name">{{pwdName}}</text>
-      <text class="pwd-scene">{{pwdScene}}</text>
-      <text wx:if="{{pwdEntering}}" class="pwd-tip">{{pwdTip}}</text>
-      <view wx:if="{{pwdEntering}}" class="pwd-boxes">
-        <view wx:for="{{[0, 1, 2, 3, 4, 5]}}" wx:key="index"
-          class="pwd-cell {{pwdBuf.length > index ? 'fill' : ''}}"></view>
-        <input class="pwd-capture" type="number" maxlength="6" adjust-position="{{false}}"
-          style="left:{{(pwdBuf.length > 5 ? 5 : pwdBuf.length) * 92}}rpx"
-          focus="{{pwdFocus}}" value="{{pwdBuf}}" bindinput="onPwdBuf" />
-      </view>
-      <view class="pwd-two">
-        <view class="pwd-btn ghost" bindtap="onClosePwdPanel">{{t.cancel}}</view>
-        <view wx:if="{{pwdEntering}}" class="pwd-btn primary" bindtap="onPwdOk">{{t.privatePasswordOk}}</view>
-        <view wx:else class="pwd-btn danger" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
-      </view>
-    </view>
-  </view>
+  <!-- 私密密码那一层：整屏遮罩 + 卡，从上到下是 功能名 → 使用场景说明 → 校验提醒 + 六个方格 →
+       一行两枚（左退出、右动作）。10-12 起这一层三页共用一份：标记在 templates/pwd-sheet.wxml、
+       皮在 styles/pwd-sheet.wxss，来历与 10-01/10-02 那两条真机结论（iOS 密文点会漏在六格左边、
+       键盘压住下面两枚按钮）都写在那两份的头里。
+       数据与方法仍是本页自己那七个同名键（pwdOpen/pwdEntering/pwdName/pwdScene/pwdTip/pwdBuf/pwdFocus）
+       与 onPwdBuf/onPwdOk/onPwdReset/onClosePwdPanel——换的是面，不是这一页的账。
+       两步确认与重置那一条链留在 me.js（那是这一页自己的事），共用的是这一层的皮。 -->
+  <template is="pwdSheet" data="{{pwdOpen, pwdEntering, pwdName, pwdScene, pwdTip, pwdBuf, pwdFocus, t}}"/>
 
   <!-- 我的邮箱这一层：几何全部抄上面那一层（遮罩 rgba(20,20,28,.55)、卡宽 620rpx、
        离顶 180rpx、一行两枚各占一半），只是把六个格子换成一只普通输入框。

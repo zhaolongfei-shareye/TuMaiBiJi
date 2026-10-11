@@ -6,6 +6,8 @@ const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const cardInfo = require('../../utils/cardInfo.js')
 const { isPrivate, unlockOn } = require('../../utils/privateGate.js')
+// 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
+const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 // 10-11：这一屏不再画那一位小人（站长「列表左上角的人都去掉，维持只有首页有」），
@@ -516,6 +518,13 @@ Page({
     if (!(await unlockOn(this, this.data.notes[at]))) return
     this._openDetail(at)
   },
+
+  // 私密解锁那一层（templates/pwd-sheet.wxml，与「我的」同一份）的三个把手。
+  // 方法名是模板里写死的那三枚——模板只能按名字找页面自己的方法，所以这三枚不许改名。
+  // 收键、推格、交出去全在 utils/pwdSheet.js，这一页只负责把事件递过去，不再各写一遍。
+  onPwdBuf(e) { pwdSheet.input(this, e) },
+  onPwdOk() { pwdSheet.submit(this) },
+  onClosePwdPanel() { pwdSheet.cancel(this) },
 
   // 这篇对外不对外，只有服务端知道（码可能是在另一台手机上生成的）。
   async _loadShareStatus(noteId) {

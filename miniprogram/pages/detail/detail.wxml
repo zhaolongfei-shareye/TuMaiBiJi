@@ -1,3 +1,7 @@
+<!-- 私密密码那一层的标记在 templates/pwd-sheet.wxml（10-12 起三页共用一份，站长
+     「看笔记提示输入密码的框，跟设置密码的框风格不一致。要统一」）。
+     <import> 不渲染任何东西；漏了这一句，下面那枚 template 是静默不画的。 -->
+<import src="../../templates/pwd-sheet.wxml"/>
 <view class="container {{themeClass}}">
   <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
 
@@ -106,4 +110,8 @@
     </view>
 
   </view>
+
+  <!-- 私密密码那一层（与「我的」那一条链同一份标记、同一张皮）。
+       这一屏根节点没有 has-bg（详情页不铺形象图），所以它是实心卡那一态。 -->
+  <template is="pwdSheet" data="{{pwdOpen, pwdEntering, pwdName, pwdScene, pwdTip, pwdBuf, pwdFocus, t}}"/>
 </view>

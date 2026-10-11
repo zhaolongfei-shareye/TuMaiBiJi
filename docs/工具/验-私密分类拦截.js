@@ -84,65 +84,122 @@ const ck = (name, ok, got) => {
   ck('状态读不到时也不放行（宁可让他重试）', (await gate.allowPrivate('私密', 'zh')) === false && toasts.length === 1)
 
   // ---------- unlockOn：点开一篇私密笔记的那一趟 ----------
-  // 每换一个用例都把三个全局计数归零，否则上一条留下的框数/吐司会伪装成这一条的证据。
+  // 10-12 第二刀起，那一层输入面不再是 wx.showModal（系统框没有掩码、六位密码明文上屏，
+  // 而且与「我的」设密码那一层两种长相），换成三页共用的六位面板：
+  // templates/pwd-sheet.wxml + styles/pwd-sheet.wxss + utils/pwdSheet.js。
+  // 所以这里不再编 showModal 的答复，改成**拿真模块按键**：假页面替他敲六格 / 点取消 / 按确定。
+  // pwdSheet 用的是真模块（它只碰 wx.showToast 与 page.setData，不碰网络）。
+  const pwdSheet = require('../../miniprogram/utils/pwdSheet.js')
+  const tick = (ms) => new Promise((r) => setTimeout(r, ms || 25))
   const PRIVATE = { id: 7, is_private: true }
   const OPEN = { id: 7, is_private: false }
   const OTHER = { id: 8, is_private: true }
-  const freshPage = () => ({ data: { lang: 'zh' }, _unlockedNoteId: 0 })
+  // 面板一浮起来就替按的那一下（每个用例自己排）；null = 让他自己点，这一趟由 cancel 收尾。
+  let afterOpen = null
+  const freshPage = () => {
+    const p = {
+      data: { lang: 'zh', pwdOpen: false, pwdEntering: false, pwdBuf: '', pwdFocus: false },
+      _unlockedNoteId: 0,
+      setData(o) {
+        Object.assign(p.data, o)
+        // 浮起那一刻留一张快照：收场时 hide() 会把 pwdEntering 撤成 false，
+        // 之后再读那个键量到的是"关着的样子"，不是"浮起来时画了什么"。
+        if (o.pwdOpen === true && !p._snap) {
+          p._snap = { name: p.data.pwdName, scene: p.data.pwdScene, tip: p.data.pwdTip,
+            entering: p.data.pwdEntering }
+        }
+        if (o.pwdOpen === true && afterOpen) {
+          const fn = afterOpen
+          afterOpen = null
+          setTimeout(() => fn(p), 0)
+        }
+      },
+    }
+    return p
+  }
+  const type = (v) => (p) => pwdSheet.input(p, { detail: { value: v } })
+  const tapOkWith = (v) => (p) => { pwdSheet.input(p, { detail: { value: v } }); pwdSheet.submit(p) }
+  const tapCancel = (p) => pwdSheet.cancel(p)
   const before = () => {
     toasts.length = 0; modals.length = 0; switches.length = 0
     unlock.has = false; unlock.clears = 0; unlock.verifies.length = 0
-    verifyFail = null; resetModalReplies([])
+    verifyFail = null; resetModalReplies([]); afterOpen = null
   }
 
-  before(); resetModalReplies([{ confirm: true, content: '123456' }])
+  before(); afterOpen = type('123456')
   let pg = freshPage()
-  ck('非私密笔记直接进，连密码框都不弹', (await gate.unlockOn(pg, OPEN)) === true && modals.length === 0 && pg._unlockRenewed === false)
+  ck('非私密笔记直接进，连那一层都不浮', (await gate.unlockOn(pg, OPEN)) === true && pg.data.pwdOpen === false && pg._unlockRenewed === false)
 
-  before(); resetModalReplies([{ confirm: true, content: '123456' }])
+  before(); afterOpen = type('123456')
   pg = freshPage()
-  ck('私密 + 手上没凭证 → 弹框，验对了放行', (await gate.unlockOn(pg, PRIVATE)) === true && modals.length === 1 && unlock.verifies.join() === '123456')
+  ck('私密 + 手上没凭证 → 浮那一层，六位验对了放行',
+    (await gate.unlockOn(pg, PRIVATE)) === true && unlock.verifies.join() === '123456' && pg.data.pwdOpen === false)
   ck('真验过这一次要标出来，让详情页知道第一份是空壳、得重取', pg._unlockRenewed === true && pg._unlockedNoteId === PRIVATE.id)
-  ck('弹框之前先把手上那把作废（留着就是"问了只是形式、正文照旧读出来"）', unlock.clears === 1)
+  ck('浮那一层之前先把手上那把作废（留着就是"问了只是形式、正文照旧读出来"）', unlock.clears === 1)
+  ck('浮起来那三行字全吃现网字典（功能名 / 用在哪 / 校验提醒），且是"要输"那一态',
+    !!pg._snap && pg._snap.name === i18n.zh.privatePassword && pg._snap.scene === i18n.zh.privatePasswordScene
+    && pg._snap.tip === i18n.zh.privatePasswordHint && pg._snap.entering === true,
+    `${pg._snap && pg._snap.name}｜${pg._snap && pg._snap.tip}`)
 
-  before(); resetModalReplies([])
+  before(); afterOpen = null
   pg = freshPage(); pg._unlockedNoteId = PRIVATE.id; unlock.has = true
-  ck('同一篇、凭证还活着 → 不重复问（从编辑那一趟回来那条路）', (await gate.unlockOn(pg, PRIVATE)) === true && modals.length === 0 && pg._unlockRenewed === false)
+  ck('同一篇、凭证还活着 → 那一层根本不浮（从编辑那一趟回来那条路）',
+    (await gate.unlockOn(pg, PRIVATE)) === true && pg.data.pwdOpen === false && pg._unlockRenewed === false)
 
-  before(); resetModalReplies([{ confirm: true, content: '123456' }])
+  before(); afterOpen = type('123456')
   pg = freshPage(); pg._unlockedNoteId = PRIVATE.id; unlock.has = true
-  ck('换一篇必重问，哪怕上一把还管用', (await gate.unlockOn(pg, OTHER)) === true && modals.length === 1 && unlock.has === true)
+  ck('换一篇必重问，哪怕上一把还管用', (await gate.unlockOn(pg, OTHER)) === true && unlock.verifies.length === 1)
 
-  before(); resetModalReplies([{ confirm: true, content: '123456' }])
+  before(); afterOpen = type('123456')
   pg = freshPage(); pg._unlockedNoteId = PRIVATE.id
-  ck('凭证一没（过期／重置密码）就对同一篇再弹一次——站长 10-12 那条"重置后既不弹框又只见标题"', (await gate.unlockOn(pg, PRIVATE)) === true && modals.length === 1)
+  ck('凭证一没（过期／重置密码）就对同一篇再浮一次——站长 10-12 那条"重置后既不弹框又只见标题"',
+    (await gate.unlockOn(pg, PRIVATE)) === true && unlock.verifies.length === 1)
 
-  before(); resetModalReplies([{ confirm: false }])
+  before(); afterOpen = tapCancel
   pg = freshPage()
-  ck('他取消 → 不放行，也不发验密码请求', (await gate.unlockOn(pg, PRIVATE)) === false && unlock.verifies.length === 0)
+  ck('他点取消 → 不放行、不发验密码、那一层收干净',
+    (await gate.unlockOn(pg, PRIVATE)) === false && unlock.verifies.length === 0 && pg.data.pwdOpen === false)
 
-  before(); resetModalReplies([{ confirm: true, content: '1234' }])
+  before(); afterOpen = tapOkWith('1234')
   pg = freshPage()
-  ck('不满六位不发服务端（省一次必败的验密）', (await gate.unlockOn(pg, PRIVATE)) === false && unlock.verifies.length === 0 && toasts.length === 1)
+  const shortRun = gate.unlockOn(pg, PRIVATE)
+  await tick()
+  ck('不满六位交不出去：只把规则讲一遍，不打服务端，那一层也不走',
+    unlock.verifies.length === 0 && toasts[0] === i18n.zh.privatePasswordHint && pg.data.pwdOpen === true,
+    `verifies=${unlock.verifies.length} toast=${toasts[0]} open=${pg.data.pwdOpen}`)
+  pwdSheet.cancel(pg)
+  ck('……他点取消才收场，这一趟回 false', (await shortRun) === false)
 
-  before(); resetModalReplies([{ confirm: true, content: '111111' }])
+  // 密码不对那一支：10-12 起照「我的」那一层的错法——吐司一句、六格清空、当场重输，
+  // 不是整层消失（他要的就是"和设置密码那个框一样"）。所以这一趟不会自己结掉，
+  // 断言完再替他点取消收尾。
+  before(); afterOpen = type('111111')
   verifyFail = { data: { detail: '私密密码不正确' } }
   pg = freshPage()
-  ck('密码不对 → 不放行，吐司就是服务端那句', (await gate.unlockOn(pg, PRIVATE)) === false && toasts.length === 1 && toasts[0] === '私密密码不正确' && switches.length === 0)
+  const wrongRun = gate.unlockOn(pg, PRIVATE)
+  await tick()
+  ck('密码不对 → 那一层留着、六格清空、吐司就是服务端那句',
+    pg.data.pwdOpen === true && pg.data.pwdBuf === '' && toasts[0] === '私密密码不正确' && switches.length === 0,
+    `open=${pg.data.pwdOpen} buf="${pg.data.pwdBuf}" toast=${toasts[0]}`)
+  ck('验失败也不许把凭证当活着（下一次点同一篇还得再问）', unlock.has === false)
+  pwdSheet.cancel(pg)
+  ck('他在这一步点取消 → 这一趟回 false，窗不开', (await wrongRun) === false)
 
   // 站长 10-12 报的死路：重置（清空密码列）后输什么都不对，界面上什么都不说、也不给口。
   // 服务端那一句是写给日志的，不是写给人的，所以这一支不许当吐司直发。
-  before(); resetModalReplies([{ confirm: true, content: '111111' }, { confirm: true }])
+  before(); afterOpen = type('111111'); resetModalReplies([{ confirm: true }])
   verifyFail = { data: { detail: '尚未设置私密密码' } }
   pg = freshPage()
-  ck('服务端说"还没设密码" → 不直接吐司那句话，改弹一层给去处', (await gate.unlockOn(pg, PRIVATE)) === false && modals.length === 2 && toasts.indexOf('尚未设置私密密码') === -1)
+  ck('服务端说"还没设密码" → 那一层收掉、改弹一层给去处，绝不把那句当吐司直发',
+    (await gate.unlockOn(pg, PRIVATE)) === false && modals.length === 1 && pg.data.pwdOpen === false
+    && toasts.indexOf('尚未设置私密密码') === -1, `模态 ${modals.length} 层／吐司 ${toasts.join('、')}`)
   ck('那一层的确定 = 跳「我的」设密码那一格', switches.join() === '/pages/me/me')
 
-  before(); resetModalReplies([{ confirm: true, content: '111111' }, { confirm: false }])
+  before(); afterOpen = type('111111'); resetModalReplies([{ confirm: false }])
   verifyFail = { data: { detail: '尚未设置私密密码' } }
   pg = freshPage()
   ck('他不点确定 → 就地收住，绝不偷偷跳页',
-    (await gate.unlockOn(pg, PRIVATE)) === false && modals.length === 2 && switches.length === 0)
+    (await gate.unlockOn(pg, PRIVATE)) === false && modals.length === 1 && switches.length === 0)
 
   const fs = require('fs')
   const idx = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/index/index.js'), 'utf8')
@@ -216,6 +273,43 @@ const ck = (name, ok, got) => {
     !pageJs.some((x) => /_promptPrivatePassword/.test(x.src)))
   ck('判据与输入都收在 unlockOn 这一个出口里（两页共用）',
     /unlockOn/.test(gateJs) && /unlockOn\(this/.test(idx) && /unlockOn\(this/.test(detailJs))
+
+  // ---------- 10-12 第二刀：那一层输入面三页共用一份 ----------
+  // 他的原话是「看笔记提示输入密码的框，跟设置密码的框风格不一致。要统一」。
+  // 统一的是三样：标记（templates/pwd-sheet.wxml）、皮（styles/pwd-sheet.wxss）、
+  // 收键那一条（utils/pwdSheet.js）。这里量的不是像不像，是**同一件东西在几份文件里**——
+  // 只要页面里还能抄出一份六格，下一次改一处就会漏改另一处，那正是他打的这一条。
+  const files = (d, ext) => dir(path.join(__dirname, d)).filter((f) => f.endsWith(ext))
+    .map((f) => ({ f, src: fs.readFileSync(f, 'utf8') }))
+  const pageWxml = files('../../miniprogram/pages', '.wxml')
+  const pageWxss = files('../../miniprogram/pages', '.wxss')
+  const tpl = fs.readFileSync(path.join(__dirname, '../../miniprogram/templates/pwd-sheet.wxml'), 'utf8')
+  const sheetWxss = fs.readFileSync(path.join(__dirname, '../../miniprogram/styles/pwd-sheet.wxss'), 'utf8')
+  const sheetJs = fs.readFileSync(path.join(__dirname, '../../miniprogram/utils/pwdSheet.js'), 'utf8')
+  const wxmlOf = (p) => fs.readFileSync(path.join(__dirname, '../../miniprogram/pages', p, p + '.wxml'), 'utf8')
+  const wxssOf = (p) => fs.readFileSync(path.join(__dirname, '../../miniprogram/pages', p, p + '.wxss'), 'utf8')
+
+  ck('系统那枚 editable 输入框全站归零（六位密码不许明文上屏，也不许留第二种长相）',
+    !/editable: true/.test(gateJs) && !pageJs.some((x) => /editable: true/.test(x.src)))
+  ck('解锁走的是这一层面板，不是 showModal', /pwdSheet\.ask\(/.test(gateJs))
+  ck('六格那一排的标记只有一处：模板里，页面 wxml 一份都没有',
+    /pwd-boxes/.test(tpl) && pageWxml.filter((x) => /pwd-boxes/.test(x.src)).length === 0,
+    pageWxml.filter((x) => /pwd-boxes/.test(x.src)).map((x) => path.basename(x.f)).join('、'))
+  ck('六格的皮只有一处：那张表里，页内 wxss 一条裸 .pwd 规则都不写',
+    /^\.pwd-cell\s*\{/m.test(sheetWxss) && pageWxss.filter((x) => /^\.pwd/m.test(x.src)).length === 0,
+    pageWxss.filter((x) => /^\.pwd/m.test(x.src)).map((x) => path.basename(x.f)).join('、'))
+  ck('三页都接上了这一层：@import 那张皮 + <import> 那张标记（少了任何一页就是那一屏没皮）',
+    ['me', 'index', 'detail'].every((p) => /@import '[^']*styles\/pwd-sheet\.wxss'/.test(wxssOf(p))
+      && /<import src="[^']*templates\/pwd-sheet\.wxml"/.test(wxmlOf(p))))
+  ck('首页与详情页都挂着那一枚 template（不 import 就不画，判据过了也是白过）',
+    /<template is="pwdSheet"/.test(wxmlOf('index')) && /<template is="pwdSheet"/.test(wxmlOf('detail'))
+    && /<template is="pwdSheet"/.test(wxmlOf('me')))
+  ck('模板要的那三枚把手，两页都备好了（名字是模板里写死的，换名＝点不动）',
+    ['onPwdBuf', 'onPwdOk', 'onClosePwdPanel'].every((n) => new RegExp(n + '\\s*\\(').test(idx)
+      && new RegExp(n + '\\s*\\(').test(detailJs)))
+  ck('面板上那三行字全从现网字典取（不给已有字段另造叫法）',
+    /t\('privatePassword', lang\)/.test(sheetJs) && /t\('privatePasswordScene', lang\)/.test(sheetJs)
+    && /t\('privatePasswordHint', lang\)/.test(sheetJs))
 
   ck('编辑页没解锁就不进编辑器（PUT 是整份回写，会清掉真概要）',
     /is_private[\s\S]{0,200}hasPrivateUnlock\(\)/.test(wr) && /privateUnlockFirst/.test(wr))

@@ -5,6 +5,8 @@ const { formatDateTime, formatShortDate } = require('../../utils/date.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const privateGate = require('../../utils/privateGate.js')
+// 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
+const pwdSheet = require('../../utils/pwdSheet.js')
 const poster = require('../../utils/poster.js')
 
 const SOURCE_TYPE_KEYS = {
@@ -134,6 +136,13 @@ Page({
       wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
     }
   },
+
+  // 私密解锁那一层（templates/pwd-sheet.wxml，与「我的」同一份）的三个把手。
+  // 方法名是模板里写死的那三枚——模板只能按名字找页面自己的方法，所以这三枚不许改名。
+  // 这一页的调用点在 loadNote：私密篇没验成就直接退回上一页，半截内容都不画。
+  onPwdBuf(e) { pwdSheet.input(this, e) },
+  onPwdOk() { pwdSheet.submit(this) },
+  onClosePwdPanel() { pwdSheet.cancel(this) },
 
   // 这篇有哪些配图。
   //

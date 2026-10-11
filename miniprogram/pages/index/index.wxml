@@ -1,3 +1,6 @@
+<!-- 私密密码那一层：解锁要看私密笔记时浮这一层（与「我的」设／改／重置那一层同一份标记、
+     同一张皮，来历写在 templates/pwd-sheet.wxml 头里）。放在根节点外面，只声明不渲染。 -->
+<import src="../../templates/pwd-sheet.wxml"/>
 <view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{detailOpen || templateOpen ? 'float-thru' : ''}}" bindtap="onBlankTap">
   <!-- v12（站长 10-01 拍）：图只守头部这一段 542，下面整块是一张圆角卡往上盖住它 40，
        于是接缝四个角都是弧——和「我的」页那张 sheet 同一画法、同一个量。
@@ -394,4 +397,12 @@
        连弹窗和底栏一起盖住（底栏是自定义组件、z-index 999，所以这里要压过它）。
        面板一收就由 onSavePoster 的 complete 撤掉，不常驻。 -->
   <view wx:if="{{shareDim}}" class="share-dim"></view>
+
+  <!-- 私密密码那一层：点一行私密笔记，先浮这一层问一串（与「我的」设／改／重置那一层
+       同一份标记、同一张皮，站长 10-12「要统一」）。收键与判定在 utils/pwdSheet.js，
+       三个方法（onPwdBuf／onPwdOk／onClosePwdPanel）在本页只是转给它。
+       遮罩那一条用的是 catchtap：本页根节点挂着 onBlankTap（点空白收搜索条），
+       冒泡上去就会在关这一层的同时把他打的词一起清掉。
+       这一层和详情窗不会同时浮着：点那一行是先问密码、后开窗（onRowTap），验不过连窗都不开。 -->
+  <template is="pwdSheet" data="{{pwdOpen, pwdEntering, pwdName, pwdScene, pwdTip, pwdBuf, pwdFocus, t}}"/>
 </view>

@@ -405,7 +405,9 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   }
   const SP4 = Number(/--sp-4:\s*(\d+)rpx/.exec(fs.readFileSync(
     path.resolve(__dirname, '../../miniprogram/app.wxss'), 'utf8'))[1])
-  const mine = cssOf('pages/me/me.wxss', 'pwd-card')
+  // 10-12：这一层的皮搬到 styles/pwd-sheet.wxss（三页共用一份，站长「两个框风格不一致，要统一」），
+  // 所以这一条读那一份，不再读 me.wxss——me.wxss 现在只剩一句 @import，读它等于读到一个空串。
+  const mine = cssOf('styles/pwd-sheet.wxss', 'pwd-card')
   const theirs = cssOf('pages/categories/categories.wxss', 'dialog-card')
   ck('这张卡的宽与内边距逐字抄分类管理那张对话框（不留第二份尺寸）',
     !!mine && !!theirs && mine.replace(/box-shadow:[^;]+;/, '') === theirs.replace(/box-shadow:[^;]+;/, ''),

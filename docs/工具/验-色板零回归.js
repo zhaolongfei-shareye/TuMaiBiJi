@@ -150,7 +150,10 @@ ck('八套主题的 --btn-bg 全等于 chromeOf(该套).sel（实心按钮与底
    和其余按钮一屏两种脾气。这里逐枚点名，不数总数（数总数会漏掉新加的那一枚）。 */
 const BTN_RULES = [
   ['app.wxss', '.btn-primary'], ['pages/index/index.wxss', '.tpl-main'],
-  ['pages/index/index.wxss', '.tpl-btn.primary'], ['pages/me/me.wxss', '.pwd-btn.primary'],
+  ['pages/index/index.wxss', '.tpl-btn.primary'],
+  // 10-12：私密密码那一层的皮搬到 styles/pwd-sheet.wxss（三页共用一份），点名表跟着换文件。
+  // 换的是读哪儿，不是松口：这一枚照样要吃 --btn-bg/--btn-ink，也不许留 --accent。
+  ['styles/pwd-sheet.wxss', '.pwd-btn.primary'],
   // 详情页那枚 `.icon-btn.primary`（「生成笔记卡片」）10-07 整块撤了：入口挪进右上那一格，
   // 同一件事不留两个把手。这条点名表跟着少一项——它钉的东西不在这页上了，不是判据松了。
   ['pages/categories/categories.wxss', '.edit-confirm'],

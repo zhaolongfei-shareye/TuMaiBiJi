@@ -1,5 +1,6 @@
 // 私密判据只有一个：分类名等于"私密"。后端 get_note、列表页 skin()、这里三处同一口径。
 const api = require('./api.js')
+const pwdSheet = require('./pwdSheet.js')
 const { t } = require('./i18n.js')
 
 const PRIVATE_NAME = '私密'
@@ -34,46 +35,38 @@ function _noPasswordSet(err) {
   return d.indexOf('尚未设置私密密码') > -1
 }
 
-function _promptPassword(lang) {
-  return new Promise((resolve) => {
-    wx.showModal({
-      title: t('privatePasswordTitle', lang),
-      editable: true,
-      placeholderText: t('privatePasswordHint', lang),
-      confirmText: t('privatePasswordOk', lang),
-      cancelText: t('cancel', lang),
-      success: async (res) => {
-        if (!res.confirm) { resolve(false); return }
-        const pwd = (res.content || '').trim()
-        if (!/^\d{6}$/.test(pwd)) {
-          wx.showToast({ title: t('privatePasswordHint', lang), icon: 'none' })
-          resolve(false); return
+// 那一串六位数的输入面：与「我的」设／改／重置那一层同一张模板、同一张皮、同一条收键逻辑。
+// 站长 10-12 原话「看笔记提示输入密码的框，跟设置密码的框风格不一致。要统一」——统一的就是这一层。
+// （原来这里用 wx.showModal({editable:true})：系统那枚框没有掩码参数，六位密码是明文摆在屏上的。）
+function _promptPassword(page, lang) {
+  return pwdSheet.ask(page, {
+    lang,
+    // 交过去的那一串对不对，只有服务端知道。true = 收层放行；
+    // false = 层留着、六格清空（照「我的」那一层的错法：吐司一句、当场重输，不是整层消失）。
+    tryIt: async (pwd) => {
+      try {
+        await api.verifyPrivatePassword(pwd)
+        return true
+      } catch (err) {
+        if (_noPasswordSet(err)) {
+          // 先把六格收掉再弹那一层"去「我的」设"——留着的话 ask 那一把 pending 永远没人结，
+          // 这一屏下一次点私密笔记会一声不响（cancel 走的是同一条收尾）。
+          pwdSheet.cancel(page)
+          wx.showModal({
+            title: t('privatePasswordTitle', lang),
+            content: t('privatePasswordRequired', lang),
+            confirmText: t('privatePasswordOk', lang),
+            cancelText: t('cancel', lang),
+            success: (r) => {
+              if (r.confirm) wx.switchTab({ url: '/pages/me/me' })
+            },
+          })
+          return false
         }
-        try {
-          await api.verifyPrivatePassword(pwd)
-          resolve(true)
-        } catch (err) {
-          if (_noPasswordSet(err)) {
-            wx.showModal({
-              title: t('privatePasswordTitle', lang),
-              content: t('privatePasswordRequired', lang),
-              confirmText: t('privatePasswordOk', lang),
-              cancelText: t('cancel', lang),
-              success: (r) => {
-                if (r.confirm) wx.switchTab({ url: '/pages/me/me' })
-                resolve(false)
-              },
-              fail: () => resolve(false),
-            })
-            return
-          }
-          const msg = (err.data && err.data.detail) || t('privatePasswordWrong', lang)
-          wx.showToast({ title: msg, icon: 'none' })
-          resolve(false)
-        }
-      },
-      fail: () => resolve(false),
-    })
+        wx.showToast({ title: (err.data && err.data.detail) || t('privatePasswordWrong', lang), icon: 'none' })
+        return false
+      }
+    },
   })
 }
 
@@ -96,7 +89,7 @@ async function unlockOn(page, note) {
   // 先作废手上这把再问：留着的话"问了"只是形式，正文照旧拿旧凭证读出来。
   api.clearPrivateUnlock()
   page._unlockedNoteId = 0
-  if (!(await _promptPassword(page.data.lang))) return false
+  if (!(await _promptPassword(page, page.data.lang))) return false
   page._unlockedNoteId = note.id
   page._unlockRenewed = true
   return true
