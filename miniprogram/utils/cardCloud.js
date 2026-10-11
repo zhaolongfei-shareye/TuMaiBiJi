@@ -79,6 +79,10 @@ async function archive(noteId, entry) {
       if (replaced.length) cloudUpload.deleteFiles(replaced)
       // 这一篇直发赢了：队列里那张旧账当场摘掉，不然下次进前台会被旧的顶回来（10-11 审计）。
       cardQueue.settle(noteId)
+      // 缓存里那一条也得换成刚登记这张：原来不回填，于是"刚重出一张 → 点详情页右上那一格看大图"
+      // 拿的是**上一张**的 `cloud://`，而上一张已经被上面那趟 `deleteFiles` 删掉了＝"图片不存在"
+      //（10-11 审计中⑤）。重读一篇比手拼一份可靠：那一条的形状与 `had_share` 只有服务端说得清。
+      refreshOne(noteId)
       return { ok: true, fileID: up.fileID, replaced: replaced.length }
     } catch (e) {
       cardQueue.push(noteId, item)
@@ -241,6 +245,9 @@ async function dropServer(noteId) {
     await cloudUpload.dropFromDeleteRes(res)
     return true
   } catch (e) {
+    // 行没撤掉，刚才预留的那条地址必须还回去：留着的话下一次进前台会把**这一格还在用的对象**删掉，
+    // 界面上小图还在（本机优先）、大图点开是"图片不存在"，换设备那一格直接空（10-11 审计严重①）。
+    if (known && known.cloud_url) cloudUpload.unreservePurge([known.cloud_url])
     console.warn('服务器那一行没撤掉，这一格先照原样留着', e && (e.errMsg || e.statusCode))
     return false
   }

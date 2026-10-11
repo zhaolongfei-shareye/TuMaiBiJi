@@ -620,6 +620,8 @@ Page({
           this.loadNotes(true)
           this.loadQuota()
         } catch (err) {
+          // 服务端那一行没撤掉，预留的那条地址就得还回去（同 `detail.js` 那一条，10-11 审计严重①）
+          if (known && known.cloud_url) cloudUpload.unreservePurge([known.cloud_url])
           wx.showToast({ title: t('deleteFailed', lang), icon: 'none' })
         }
       },

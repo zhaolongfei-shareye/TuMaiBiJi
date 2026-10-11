@@ -162,4 +162,17 @@ function reservePurge(ids) {
   purge.push((ids || []).filter(Boolean))
 }
 
-module.exports = { CLOUD_ENV, cloudReady, initCloud, uploadImage, deleteFiles, dropFromDeleteRes, reservePurge, flushPurge }
+/**
+ * 把刚记进去的那几条撤掉——**服务端那一步没成，就不该去删它管着的对象**。
+ * 10-11 代码审计严重①：`reservePurge` 排在删除请求**之前**是有理由的（回体丢在网络上时，
+ * 行没了、地址也没人记得），但原来四个 catch 一条都没撤。于是"飞行模式里点删除"这种
+ * **请求根本没发出去**的失败也留着那几条，下一次进前台 `flushPurge()` 无条件真删——
+ * 笔记还活着、账号也活着，配图与卡片对象却没了，详情页一排破图，没有任何话术交代。
+ * 两种失败不对称：撤早了最坏是留一个孤儿（占全站配额、界面上看不见），
+ * 撤晚了是删掉用户唯一的那一份。所以失败就撤。
+ */
+function unreservePurge(ids) {
+  purge.drop((ids || []).filter(Boolean))
+}
+
+module.exports = { CLOUD_ENV, cloudReady, initCloud, uploadImage, deleteFiles, dropFromDeleteRes, reservePurge, unreservePurge, flushPurge }

@@ -88,16 +88,16 @@ const PRIVACY_ZH = [
     lines: [
       '微信登录标识（OpenID）：只用来把笔记归到你名下，不下发给客户端，也不出现在任何页面里。',
       '你自己存进来的内容：标题、摘要、要点、标签、分类、来源链接，以及截图识别出的文字。',
-      '你在「卡片模板」里填的昵称：只在你主动生成分享图的那一刻传给服务器，用来在扫码页上显示「原创作者：某某」。不生成分享图，它就一直只存在这台手机里。',
+      '你在「卡片模板」里填的昵称：填了就会随名片一起存进我们的服务器（换手机之后名片还是你那套），并在你主动生成分享图那一刻用来在扫码页上显示「原创作者：某某」。这个昵称是你填给我们的，不是微信昵称——微信的昵称与头像我们读不到。',
       '你在「我的 → 我的邮箱」里自己留的邮箱（可不填）：只用来给你回信，以及把你的更正、注销请求对上你名下的账号。只有你本人读得到，不发营销、不给第三方，随时能改能清空。',
-      '你导入的截图：用来识别里面的文字，识别完这批图会按第 3 条那样存进我们的云存储一份，好让这篇笔记的图以后还看得到。',
+      '你导入的截图：用来识别里面的文字，识别完这批图会另压一份小图存进我们的云存储，好让这篇笔记的图以后还看得到。',
       '不收集通讯录、位置、麦克风、设备标识和浏览记录。',
     ],
   },
   {
     title: '手机权限',
     lines: [
-      '相机与相册：截图导入（拍照或选图）、给分享海报挑一张头像图、把生成的海报图存进相册时用到。海报头像和生成好的海报图都只存在这台手机里，不上传。不给权限也能正常看笔记和搜索。',
+      '相机与相册：截图导入（拍照或选图）、给名片挑一张形象图、把生成的卡片图存进相册时用到。你挑的那张名片形象图会另存一份到我们的云存储，换手机后名片上还是它；生成的卡片图也存一份在云上留档。存进你相册的那一份只在这台手机里。不给权限也能正常看笔记和搜索。',
       '剪贴板：只有你点「粘贴」那颗按钮时才读一次，用来取你复制的链接；点「复制链接」时才会写入。',
       '权限随时能在手机设置里关掉，关掉后对应功能会明确提示，不会静默失败。',
     ],
@@ -166,16 +166,16 @@ const PRIVACY_EN = [
     lines: [
       'WeChat login id (OpenID): used only to put your notes under your account. It is never sent to the client and appears on no page.',
       'What you save yourself: title, summary, key points, tags, category, source link, and the text recognised from your screenshots.',
-      'The nickname you type in "Card templates": it reaches the server only at the moment you generate a share image, so the scan page can show "Original author: …". Until you generate one it stays on this phone.',
+      'The nickname you type in "Card templates": once you type it, it is saved to our server with the rest of your card, so a new phone shows the same card. It is also printed on the scan page as "Original author: …" when you generate a share image. This name is one you type for us — we cannot read your WeChat nickname or avatar.',
       'The email you leave under "Me → My Email" (optional): we use it only to reply to you, and to match a correction or deletion request to the right account. Only you can read it, we send no marketing, we never share it, and you can change or clear it whenever you like.',
-      'Screenshots you import: we read the text inside them, and the batch is then kept as item 3 describes so the images stay visible in that note.',
+      'Screenshots you import: we read the text inside them, and a smaller copy of that batch is then kept in our cloud storage so the images stay visible in that note.',
       'We do not collect contacts, location, microphone, device identifiers or browsing history.',
     ],
   },
   {
     title: 'Device permissions',
     lines: [
-      'Camera and photo library: used for screenshot import (shoot or pick), for choosing an avatar image for the share poster, and for saving a generated poster into your album. The poster avatar and the finished poster stay on this phone and are never uploaded. Reading and searching notes works fine without these.',
+      'Camera and photo library: used for screenshot import (shoot or pick), for choosing an image for your card, and for saving a generated card into your album. The card image you choose is kept as a second copy in our cloud storage, so a new phone still shows it, and a finished card is also kept there as an archive. The copy saved into your album stays on this phone. Reading and searching notes works fine without these.',
       'Clipboard: read once only when you tap the "Paste" button, to take the link you copied; written to only when you tap "Copy link".',
       'You can revoke any permission in phone settings at any time. The matching feature then says so clearly instead of failing silently.',
     ],

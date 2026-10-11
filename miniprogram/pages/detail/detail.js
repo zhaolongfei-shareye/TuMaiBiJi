@@ -274,6 +274,8 @@ Page({
               wx.navigateBack()
             }, 1000)
           } catch (err) {
+            // 这一篇没删掉，刚才记进待删那一格的地址就得撤回来（不撤＝下次进前台把还活着的那份删没）
+            cloudUpload.unreservePurge(known)
             wx.showToast({ title: t('deleteFailed', lang), icon: 'none' })
           }
         }

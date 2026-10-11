@@ -195,7 +195,13 @@ Page({
     poster.writeSlots(next)
     this.setData({ slots: next, allFull: !next.some((s) => !s) })
     this.renderThumbs()
-    profileCloud.pushSlots(next)
+    profileCloud.pushSlots(next).then(() => {
+      // 刚传上去那几张的 `fileID` 只写回 storage、不在这一页的 data 里：不接回来，
+      // 下一次动任意一格都会把已有那几张**整批重传**一遍，而每一趟 PUT 都算一次"换下旧地址"
+      //（10-11 审计中④：两趟并发时后到的那份会把刚传的那个对象当旧的删掉）。
+      const fresh = poster.readSlots()
+      if (JSON.stringify(fresh) !== JSON.stringify(this.data.slots)) this.setData({ slots: fresh })
+    })
   },
 
   // 只有空槽响应整枚圆的点击。已经放了图的那一格，动作全在芯片和垃圾桶上，

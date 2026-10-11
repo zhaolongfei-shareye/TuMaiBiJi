@@ -515,7 +515,8 @@ Page({
     // 先把本机知道的卡片地址记进待删那一格，再发注销：这一趟要是回体丢在网络上，token 当场作废，
     // 那批对象就再也没有第二个地方能问出来了。清单仍以服务端这次回体为准，这一格只是把
     // "没人记得"变成"下次进前台再删一次"。（配图那一批本机从没整份读过，见 cardCloud.knownFileIDs 注释。）
-    cloudUpload.reservePurge(cardCloud.knownFileIDs())
+    const reservedCards = cardCloud.knownFileIDs()
+    cloudUpload.reservePurge(reservedCards)
     try {
       const r = await api.deactivateAccount()
       wx.hideLoading()
@@ -529,6 +530,8 @@ Page({
       setTimeout(() => wx.reLaunch({ url: '/pages/index/index' }), 900)
     } catch (err) {
       wx.hideLoading()
+      // 注销没成＝那一行还在，那批对象就还是"这个人的卡片"，一条都不许去删（10-11 审计严重①）
+      cloudUpload.unreservePurge(reservedCards)
       wx.showToast({
         title: (err && err.data && err.data.detail) || t('deleteAccountFailed', lang),
         icon: 'none',

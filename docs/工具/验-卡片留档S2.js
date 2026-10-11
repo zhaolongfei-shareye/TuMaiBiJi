@@ -18,6 +18,7 @@ const APP = 'miniprogram/app.js'
 const CARD_LOG = 'miniprogram/utils/cardLog.js'
 const CARD_CLOUD = 'miniprogram/utils/cardCloud.js'
 const CARD_QUEUE = 'miniprogram/utils/cardQueue.js'
+const ME = 'miniprogram/pages/me/me.js'
 const ASSET_Q = 'miniprogram/utils/assetQueue.js'
 const PURGE = 'miniprogram/utils/assetPurge.js'
 const CLOUD_UP = 'miniprogram/utils/cloudUpload.js'
@@ -35,7 +36,7 @@ function 判(src) {
   }
   const app = src[APP], log = src[CARD_LOG], cloud = src[CARD_CLOUD]
   const queue = src[CARD_QUEUE], up = src[CLOUD_UP], aq = src[ASSET_Q]
-  const api = src[API], idx = src[INDEX], det = src[DETAIL], sh = src[SHARE], back = src[BACK]
+  const api = src[API], idx = src[INDEX], det = src[DETAIL], sh = src[SHARE], back = src[BACK], me = src[ME]
   const three = idx + det + sh
 
   // —— ① 判据那一个出处 ——
@@ -97,6 +98,15 @@ function 判(src) {
   // 补登记这一趟也会顶下旧对象，直发那一条早就接了这个回体，队列这一条原来没接。
   ck('补登记顶下的旧对象也交给 deleteFile（不留孤儿占全站配额）',
     /onReplaced/.test(queue) && /cardQueue\.flush\(api, \(ids\) => cloudUpload\.deleteFiles\(ids\)\)/.test(cloud))
+
+  // 预留排在删除请求之前是有理由的（回体丢了就没人记得那批地址），但失败那一条原来没人撤——
+  // 10-11 审计严重①：飞行模式里点删除（请求根本没出去）也会留着那几条，
+  // 下一次进前台 `flushPurge()` 无条件真删：笔记还活着，配图与卡片对象没了。
+  ck('四处删除口失败都把预留的地址撤回去（不撤＝下次进前台删掉还活着的那一份）',
+    // 光有函数名不算：这一支的正文必须真的去 `purge.drop`，抽空的替身（反向⑦）要能抓出来
+    /function unreservePurge\([\s\S]{0,90}?purge\.drop\(/.test(up)
+      && /unreservePurge\(known\)/.test(det) && /unreservePurge\(\[known\.cloud_url\]\)/.test(idx)
+      && /unreservePurge\(reservedCards\)/.test(me) && /unreservePurge\(\[known\.cloud_url\]\)/.test(cloud))
   ck('换身份时卡片这一族两个头一起收（队列 + 那份名单），收在 cardCloud.signOut 一个出处',
     /cardCloud\.signOut\(\)/.test(app) && /function signOut\(\)/.test(cloud))
   ck('对象删不成就进待删队列（这一条吃的是已上线那条链，不另写一份）',
@@ -126,7 +136,7 @@ function 判(src) {
   return bad
 }
 
-const FILES = [APP, CARD_LOG, CARD_CLOUD, CARD_QUEUE, ASSET_Q, PURGE, CLOUD_UP, API, INDEX, DETAIL, SHARE, BACK,
+const FILES = [APP, CARD_LOG, CARD_CLOUD, CARD_QUEUE, ASSET_Q, PURGE, CLOUD_UP, API, INDEX, DETAIL, SHARE, BACK, ME,
   'miniprogram/utils/i18n.js']
 const src = {}
 for (const f of FILES) src[f] = R(f)
@@ -164,6 +174,12 @@ m5[ASSET_Q] = src[ASSET_Q].replace('code >= 400 && code < 500 && code !== 429', 
 if (m5[CARD_QUEUE] === src[CARD_QUEUE] || m5[ASSET_Q] === src[ASSET_Q]) { console.log('✗ 变异没打上（锚点漂了）'); process.exit(2) }
 const b5 = 判(m5)
 
+console.log('\n———— 反向⑦：失败不撤预留（10-11 之前那个样子） ————')
+const m7 = Object.assign({}, src)
+m7[CLOUD_UP] = src[CLOUD_UP].replace('  purge.drop((ids || []).filter(Boolean))', '  void ids')
+if (m7[CLOUD_UP] === src[CLOUD_UP]) { console.log('✗ 变异没打上（锚点漂了）'); process.exit(2) }
+const b7 = 判(m7)
+
 console.log('\n———— 反向⑥：直发赢了却不摘同篇旧待补／补登记不接被顶下的清单 ————')
 const m6 = Object.assign({}, src)
 m6[CARD_CLOUD] = src[CARD_CLOUD].replace('      cardQueue.settle(noteId)\n', '')
@@ -178,6 +194,7 @@ const 红4 = b4.some((x) => x.includes('三族一起补'))
 const 红5 = b5.some((x) => x.includes('429'))
 const 红6 = b6.some((x) => x.includes('直发登记成功会摘掉同篇那条旧待补'))
   && b6.some((x) => x.includes('补登记顶下的旧对象'))
+const 红7 = b7.some((x) => x.includes('四处删除口失败都把预留的地址撤回去'))
 
 
 console.log(`\n正例 ${bad.length ? '红 ' + bad.length + ' 条：' + bad.join('、') : '全绿'}`)
@@ -187,4 +204,5 @@ console.log(`反向③没量过的前缀 ${红3 ? '红在对的地方' : '没红
 console.log(`反向④漏补一族 ${红4 ? '红在对的地方' : '没红＝这条判据是假的'}`)
 console.log(`反向⑤429 当永久拒绝 ${红5 ? '红在对的地方' : '没红＝这条判据是假的'}`)
 console.log(`反向⑥不摘旧待补／不接顶下清单 ${红6 ? '红在对的地方' : '没红＝这条判据是假的'}`)
-process.exit(bad.length || !红1 || !红2 || !红3 || !红4 || !红5 || !红6 ? 1 : 0)
+console.log(`反向⑦失败不撤预留 ${红7 ? '红在对的地方' : '没红＝这条判据是假的'}`)
+process.exit(bad.length || !红1 || !红2 || !红3 || !红4 || !红5 || !红6 || !红7 ? 1 : 0)
