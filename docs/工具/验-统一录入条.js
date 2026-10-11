@@ -246,6 +246,20 @@ ok('换背景那一行只在铺了图时存在，且展开那一趟照旧渲染�
   && !/\.home-swap[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden)/.test(wxss)
   && !/\.entry-dock[^{]*\.home-swap/.test(wxss))
 ok('➕ 那一格是唯一"再加一张"的落点', (wxml.match(/catchtap="onAddShot"/g) || []).length === 1)
+// 站长 10-11 真机报的「拍照只支持一张，相册可以」根因就在这两条上：快门那一排的条件是
+// `!previewImages.length`，所以第一张之后**整排消失**，➕ 成了唯一入口；而 ➕ 原来没带 data-source，
+// pickImage 读到 undefined ⇒ `sourceType: [undefined]` 是一个枚举外的值，第二张就再也进不了相机。
+// 第一条钉前提（快门那排在有一张图之后确实不在了），第二条钉接替者必须自己把相机这条路保住。
+ok('照片圈那一排只在零张时渲染（所以 ➕ 是拍完之后的唯一入口）',
+  /class="crow"[^>]*wx:if="\{\{active === 'photo' && !previewImages\.length\}\}"/.test(wxml)
+  || /wx:if="\{\{active === 'photo' && !previewImages\.length\}\}"[^>]*class="crow"/.test(wxml))
+{
+  const gates = (wxml.match(/<view[^>]*catchtap="(pickImage|onAddShot)"[^>]*>/g) || [])
+  const bad = gates.filter((tag) => !/data-source="(album|camera|any)"/.test(tag))
+  ok('每一个通往 pickImage 的入口都带合法 data-source（漏一个就会发出 sourceType:[undefined]）',
+    gates.length === 3 && bad.length === 0,
+    `抓到 ${gates.length} 个入口，缺来源的：${bad.join(' ⎪ ') || '无'}`)
+}
 
 // ---------- 4. 状态机：一个 active 说清当前那一档 ----------
 ok('active 三档，且没有第四种值写在页面上',

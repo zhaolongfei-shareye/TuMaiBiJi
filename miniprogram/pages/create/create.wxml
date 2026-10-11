@@ -147,14 +147,18 @@
 
         <!-- 照片 · 已选：一横排小图，➕ 那枚与小图同尺寸同圆角、钉在最右端。
              「已选 N 张」那一行撤了，序号直接标在每张图的左下角（数一看就知道是第几张、删的是哪张）。
-             一行放 5 格：9 张 + ➕ = 10 格 = 正好两行，所以"展开只多一行"这条落得下去。 -->
+             一行放 5 格：9 张 + ➕ = 10 格 = 正好两行，所以"展开只多一行"这条落得下去。
+             ⚠ 这一态是快门那一排（上面 crow，条件 `!previewImages.length`）唯一的接替者，
+             所以 data-source 必须在：漏了它 pickImage 读到的是 undefined，发出去就是 sourceType:[undefined]，
+             第二张再也进不了相机。 -->
         <view wx:elif="{{active === 'photo'}}" class="strip">
           <view class="th" wx:for="{{previewImages}}" wx:key="*this">
             <image class="th-img" src="{{item}}" mode="aspectFill" />
             <view class="th-x" data-index="{{index}}" catchtap="removeShot">✕</view>
             <text class="th-no">{{index + 1}}</text>
           </view>
-          <view class="th th-add {{shotsFull ? 'th-add-dis' : ''}}" catchtap="onAddShot" aria-label="{{t.importScreenshot}}">
+          <view class="th th-add {{shotsFull ? 'th-add-dis' : ''}}" catchtap="onAddShot"
+                data-source="any" aria-label="{{t.importScreenshot}}">
             <view class="th-plus glyph-plus"></view>
           </view>
         </view>
