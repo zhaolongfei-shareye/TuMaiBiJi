@@ -20,7 +20,7 @@ const FID_B = 'cloud://env.abc/images/3/20261008/b.jpg'
 const P_A = `${DIR}/poster-avatar-1-1.img`
 const P_B = `${DIR}/poster-avatar-2-2.img`
 
-let store, files, calls, server, apiFail
+let store, files, calls, server, apiFail, uploadFail
 
 function makeWx() {
   store = { poster_profile: { name: '赵龙飞', slogan: '一句话', template: 'cover',
@@ -45,7 +45,11 @@ function makeWx() {
     }),
     cloud: {
       init: () => {},
-      uploadFile: ({ cloudPath, success }) => { calls.upload += 1; success && success({ fileID: `cloud://env.abc/${cloudPath}` }) },
+      uploadFile: ({ cloudPath, success, fail }) => {
+        calls.upload += 1
+        if (uploadFail) { fail && fail({ errMsg: 'cloud.uploadFile:fail 模拟传不上去' }); return }
+        success && success({ fileID: `cloud://env.abc/${cloudPath}` })
+      },
       downloadFile: ({ success }) => { calls.download += 1; success && success({ tempFilePath: `${DIR}/dl-${calls.download}.img` }) },
       deleteFile: ({ fileList, success }) => {
         calls.deleteFile = calls.deleteFile.concat(fileList)
@@ -212,21 +216,64 @@ async function main() {
     }
     }
 
+    // —— ⑨ 那一行存在、但四格从没登记过（只写过亮度档或名称 ⇒ 服务端 `slots` 是 NULL）——
+    // 10-11 代码审计严重①：`pull()` 原来只认 `updated_at` 当"服务器有这一行"，于是这种半行被当成权威，
+    // 逐格走"云上这一格是空的 → 本机跟着撤"，把本机那四张**从没上传成功过**的图 `removeAvatar` 删掉。
+    server = { updated_at: '2026-10-10T00:00:00Z', name: null, slogan: null, tpl: null, bg_dim: 2, slots: null }
+    apiFail = false
+    {
+      const { poster, cloud } = load()
+      poster.writeSlots([{ path: P_A, card: true, bg: true, fileID: null }, null, null, null])
+      const unlinkBefore = calls.unlink
+      const r = await cloud.pull()
+      ck('⑨ 四格从没登记过时，本机那一张一个都不许多删', calls.unlink === unlinkBefore,
+        `多删 ${calls.unlink - unlinkBefore} 张`)
+      ck('⑨ 那格图还在原位', !!(poster.readSlots()[0] && poster.readSlots()[0].path === P_A),
+        JSON.stringify(poster.readSlots()[0]))
+      ck('⑨ 名称与一句话不许被清成空（null 是"没登记过"，不是"他清空了"）',
+        poster.readProfile().name === '赵龙飞' && poster.readProfile().slogan === '一句话',
+        `${poster.readProfile().name}/${poster.readProfile().slogan}`)
+      ck('⑨ 这一趟走的是把本机这一份推上去', r.ok === true && calls.put === 1 && calls.upload === 1,
+        `ok=${r.ok} put=${calls.put} upload=${calls.upload} reason=${r.reason}`)
+    }
+
+    // —— ⑩ bootstrap 那一趟图传不上去：不许建一行"四格都是空的" ——
+    // 严重②的单机入口：四张全传失败仍然 PUT，服务端就落一行"登记过、四格全空"，
+    // 下一次登录再走 ⑨ 那条对齐——同一件事的两次，只是这次连"换手机"都不用。
+    uploadFail = true
+    server = { updated_at: null, slots: null, name: null, slogan: null, tpl: null }
+    {
+      const { poster, cloud } = load()
+      poster.writeSlots([{ path: P_A, card: true, bg: true, fileID: null }, null, null, null])
+      const r = await cloud.pull()
+      ck('⑩ 一张都没传上去就不 PUT（PUT 出去就是个毒行）', calls.put === 0, `put=${calls.put}`)
+      ck('⑩ 本机那一张还在', !!(poster.readSlots()[0] && poster.readSlots()[0].path === P_A))
+      ck('⑩ 回话如实是失败，不报成功', r.ok === false && r.reason === 'upload', `${r.ok}/${r.reason}`)
+    }
+    uploadFail = false
+
     // —— 静态两条：那两条闸一旦被改坏，行为用例红在哪一条不够醒目，这里直接钉源码 ——
     const fs = require('fs')
     const PC = fs.readFileSync(path.join(MP, 'utils/profileCloud.js'), 'utf8')
+    const GATE = 'if (!serverHasRow() || !Array.isArray(r.slots)) return await bootstrap()'
     const shape = (src) => ({
         keep: /if \(L && L\.fileID === s\.file_id\)/.test(src),
-        bootstrapFirst: /if \(!serverHasRow\(\)\) return await bootstrap\(\)/.test(src),
+        // 10-11 审计严重①之后这道闸宽了一格：光有那一行不算登记过四格，`slots` 得是数组。
+        bootstrapFirst: src.includes(GATE),
+        nameNull: /if \(r\.name !== null && r\.name !== undefined\)/.test(src),
         noThrow: /catch \(e\) \{\s*console\.warn\('名片这一趟没登记上/.test(src),
     })
     const now = shape(PC)
     ck('源码里"同一张就沿用"那一条在（撤掉它＝每次开机重下一遍，还会顶掉画布在用的路径）', now.keep)
-    ck('源码里"云上没这一行就先 bootstrap"挡在逐格对齐之前（撤掉它＝把老用户那四张当已删除）', now.bootstrapFirst)
+    ck('源码里"这一行存在但四格没登记过"也先走 bootstrap（严重①那道闸，撤掉＝把本机唯一那份删掉）', now.bootstrapFirst)
+    ck('源码里名称那一栏认 null 是"没登记过"（撤掉＝半行把本机填好的名字清成空）', now.nameNull)
     const m1 = PC.replace('if (L && L.fileID === s.file_id)', 'if (false)')
-    const m2 = PC.replace('if (!serverHasRow()) return await bootstrap()', '')
+    const m2 = PC.replace(GATE, '')
+    const m3 = PC.replace('if (r.name !== null && r.name !== undefined) textPatch.name = r.name',
+      'textPatch.name = r.name || \'\'')
     ck('反向①：把"沿用"改成永不沿用，这条判据会红', !shape(m1).keep)
-    ck('反向②：把 bootstrap 那道闸撤掉，这条判据会红', !shape(m2).bootstrapFirst)
+    ck('反向②：把 bootstrap 那道闸整条撤掉，这条判据会红', !shape(m2).bootstrapFirst)
+    ck('反向③：把名称那一栏改回无条件覆盖，这条判据会红', !shape(m3).nameNull)
 
     console.log('\n' + (bad.length ? `✗ 红 ${bad.length} 条：${bad.join('、')}` : '全绿'))
   process.exit(bad.length ? 1 : 0)

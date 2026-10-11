@@ -68,7 +68,10 @@ async function flush(api) {
       // 服务端明确拒绝（4xx：笔记已删、地址不属于你、超张数）就摘掉——重试一万次也不会成，
       // 留着只会让每次进前台都白打一个请求。api.js 对非 2xx 回的是整个 res，所以这里读 statusCode。
       const code = e && e.statusCode
-      if (code >= 400 && code < 500) {
+      // 429 不算「永久拒绝」：那两个口都挂了限流（`cards.py` 60/分钟、`profiles.py` 30/分钟），
+      // 一次进前台几队齐发或连点生成就会撞上。撞上就摘条 = 这笔配图账被永远丢掉，
+      // 留下的正是文件头说的那笔「云上有对象、库里没账」。它只是「现在别打」，下次进前台再试。
+      if (code >= 400 && code < 500 && code !== 429) {
         console.warn('补绑被服务端拒绝，这条不再重试', code)
         done.push(entry)
         continue

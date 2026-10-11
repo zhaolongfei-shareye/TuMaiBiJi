@@ -77,6 +77,8 @@ async function archive(noteId, entry) {
       // 和离线时"一篇一张"那道闸失效（share.js 明写读不到就当没有，让他生成）。
       const replaced = (res && res.replaced_file_ids) || []
       if (replaced.length) cloudUpload.deleteFiles(replaced)
+      // 这一篇直发赢了：队列里那张旧账当场摘掉，不然下次进前台会被旧的顶回来（10-11 审计）。
+      cardQueue.settle(noteId)
       return { ok: true, fileID: up.fileID, replaced: replaced.length }
     } catch (e) {
       cardQueue.push(noteId, item)
@@ -90,7 +92,7 @@ async function archive(noteId, entry) {
 
 /** 补登记：由 app.js 的 onShow 调（与待补绑、待删对象同一个位置）。 */
 function flush() {
-  return cardQueue.flush(api)
+  return cardQueue.flush(api, (ids) => cloudUpload.deleteFiles(ids))
 }
 
 /**

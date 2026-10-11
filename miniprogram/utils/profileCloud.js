@@ -108,13 +108,19 @@ async function pull() {
   }
   setServer(r || null)
   if (!r) return { ok: false, reason: 'empty' }
-  if (!serverHasRow()) return await bootstrap()
+  // 「这一行存在」有**两种**，只有后者才许拿服务器当权威：
+  // · `slots` 是数组（哪怕四个全 null）＝这个人真的登记过四格——清空是"四个 null"，
+  //   写口永远补齐四格（`backend/app/api/routes/profiles.py` 顶上第 2 条），所以数组就是登记过。
+  // · `slots` 是 null＝这一行只是被名称／一句话／亮度档顺手建出来的**半行**，四格从没登记过。
+  //   10-11 代码审计严重①：原来只认 `updated_at`，于是这种半行走进逐格对齐，
+  //   把本机那四张从没上传成功过的图按"云上这一格是空的"逐格 `removeAvatar` 删了——不可逆。
+  if (!serverHasRow() || !Array.isArray(r.slots)) return await bootstrap()
 
   const local = poster.readSlots()          // 已经按"本机文件在不在"滤过：不在的那格是 null
   const byId = {}
   local.forEach((s) => { if (s && s.fileID) byId[s.fileID] = s })
 
-  const remote = (Array.isArray(r.slots) ? r.slots : []).slice(0, poster.SLOT_COUNT)
+  const remote = r.slots.slice(0, poster.SLOT_COUNT)
   const next = poster.blankSlots()
   const removed = []
   let downloaded = 0
@@ -151,11 +157,25 @@ async function pull() {
     next[i] = { path, card: !!s.card, bg: !!s.bg, fileID: s.file_id }
   }
 
-  poster.writeSlots(next)
-  // 名称/一句话：服务器有这一行就以它为准（空就是空，本机那份是旧的那一档）。
-  // 模板那一栏反过来判：null 是「没登记过」，不是「回到默认」——清成默认会让人莫名其妙换了套皮。
-  poster.writeProfile({ name: r.name || '', slogan: r.slogan || '' })
-  if (r.tpl) poster.writeProfile({ template: r.tpl })
+  // 本机这一份**先落对，再删被换下来的那些**，而且这一整段包起来：`writeSlots`/`writeProfile`
+  // 里面是裸 `wx.setStorageSync`，storage 满就直接抛，而这一支按"全程不抛"设计（文件头第 9 行）。
+  // 原来这两句在 try 外面，一抛就变成一个没人接的 rejection（`app.js` 那个 `.then` 没有 `.catch`），
+  // 对齐停在半路。落不成的时候一个文件都不删——宁可多留几张占地方，不许删掉唯一的那一份。
+  try {
+    poster.writeSlots(next)
+    // 名称/一句话：与模板那一栏同一条判据——**null 是"这一栏从没登记过"，不是"他清空了"**。
+    // （清空走的是 `pushText`，那一份带的是空串，服务端存的就是空串，读回来是 `''` 不是 null。）
+    // 10-11 审计严重①的另一半：原来这两句无条件 `|| ''`，一行只有亮度档的半行会把本机填好的
+    // 名称与一句话清成空。
+    const textPatch = {}
+    if (r.name !== null && r.name !== undefined) textPatch.name = r.name
+    if (r.slogan !== null && r.slogan !== undefined) textPatch.slogan = r.slogan
+    if (Object.keys(textPatch).length) poster.writeProfile(textPatch)
+    if (r.tpl) poster.writeProfile({ template: r.tpl })
+  } catch (e) {
+    console.warn('名片对齐这一步没落到本机（先不删任何一张）', e && (e.message || e))
+    return { ok: false, reason: 'local-write' }
+  }
   removed.forEach((p) => poster.removeAvatar(p))
   // 那两档外观：读回来有值才落本机（null 是"没登记过这一档"，不是"要清成默认"）。
   // ⚠ 第二个参数 `fromServer` 必须传 true：`app.setBgDim` 不带它就会顺手 pushDim 回写一次，
@@ -175,16 +195,30 @@ async function bootstrap() {
   const p = poster.readProfile()
   const local = poster.readSlots()
   const slots = []
+  const fresh = []
   let uploaded = 0
+  let missing = 0
   for (const s of local) {
     if (!s) { slots.push(null); continue }
     let fileID = s.fileID
     if (!fileID) {
       fileID = await _upload(s.path)
-      if (fileID) uploaded += 1
+      if (fileID) { uploaded += 1; fresh.push(fileID) }
     }
+    if (!fileID) missing += 1
     slots.push({ file_id: fileID || null, card: !!s.card, bg: !!s.bg,
       width: null, height: null, size: fileID ? _bytes(s.path) : null })
+  }
+  const hasAnything = local.some(Boolean) || p.name || p.slogan
+  if (!hasAnything) return { ok: false, reason: 'nothing-local' }
+  // 本机有图却传不上去 ⇒ **这一趟干脆不登记**（10-11 审计严重②：原来照样 PUT，服务端就落一行
+  // "登记过、四格全空"，而 `pull()` 认数组＝登记过，下一次登录正是拿这一行走逐格对齐，
+  // 把本机那几张唯一存在的图当"云上已删"撤掉——严重①的单机版入口，不用换手机就踩得上）。
+  // 已经传上去的那几张当场收掉：留着就是"云上有、库里没账"的孤儿，占的是全站那 5GB，
+  // 而且只有客户端删得动。
+  if (missing) {
+    if (fresh.length) cloudUpload.deleteFiles(fresh)
+    return { ok: false, reason: 'upload' }
   }
   const body = { slots }
   if (p.template) body.tpl = p.template
@@ -192,8 +226,6 @@ async function bootstrap() {
   if (p.slogan) body.slogan = p.slogan
   const app = getApp()
   if (app && typeof app.bgDim === 'function') body.bg_dim = app.bgDim()
-  const hasAnything = local.some(Boolean) || p.name || p.slogan
-  if (!hasAnything) return { ok: false, reason: 'nothing-local' }
   return push(body, { bootstrap: true, uploaded })
 }
 

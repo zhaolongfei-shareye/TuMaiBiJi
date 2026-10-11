@@ -42,25 +42,47 @@ function push(noteId, item) {
 }
 
 /**
+ * 这一篇刚刚**直发登记成功**了（`cardCloud.archive` 那条正常路）：把队列里同篇那条旧账摘掉。
+ * 不摘的后果（10-11 审计）：离线时 A 那张 PUT 失败落进队列，回来之后用户重出一张 B 直发成功，
+ * 下次进前台 flush 会把**旧的 A** 再补一次——服务端那条"一篇只有一张当前"的唯一索引于是把 B 顶成
+ * 历史，界面上"我刚生成的那张"在别的设备上变成上一张。队列"新的顶掉旧的"只管得住 `push` 之间，
+ * 管不住"直发也赢了"这一头。
+ */
+function settle(noteId) {
+  if (!noteId) return
+  const list = take()
+  const left = list.filter((x) => !(x && String(x.noteId) === String(noteId)))
+  if (left.length !== list.length) _put(left)
+}
+
+/**
  * 把队列里能登记的都登记掉。**一条一条摘**：一次网络抖动不该丢掉整批。
  * @param api 传 utils/api 进来（这个模块自己不 require api，免得和 app 启动顺序绕在一起）
+ * @param onReplaced 可选：拿到回体里被顶下的 fileID 清单时调一次（`cardCloud` 递给 cloudUpload.deleteFiles）
  * @returns {Promise<{sent:number, left:number}>}
  */
-async function flush(api) {
+async function flush(api, onReplaced) {
   const list = take()
   if (!list.length) return { sent: 0, left: 0 }
   const done = []
   let sent = 0
   for (const entry of list) {
     try {
-      await api.putNoteCard(entry.noteId, entry.item)
+      const res = await api.putNoteCard(entry.noteId, entry.item)
+      // 这一趟顶成历史的那几张：对象只有客户端删得动。直发那一条（`cardCloud.archive`）早就处理了
+      // 这个回体，队列这一条原来没接——被顶掉的那张就永久占着全站配额（10-11 审计）。
+      const replaced = (res && res.replaced_file_ids) || []
+      if (replaced.length && typeof onReplaced === 'function') onReplaced(replaced)
       sent += 1
       done.push(entry)
     } catch (e) {
       // 服务端明确拒绝（4xx：笔记已删、地址不属于你、来源不认得）就摘掉——重试一万次也不会成，
       // 留着只会让每次进前台都白打一个请求。api.js 对非 2xx 回的是整个 res，所以这里读 statusCode。
       const code = e && e.statusCode
-      if (code >= 400 && code < 500) {
+      // 429 不算「永久拒绝」：那两个口都挂了限流（`cards.py` 60/分钟、`profiles.py` 30/分钟），
+      // 一次进前台几队齐发或连点生成就会撞上。撞上就摘条 = 这笔卡片账被永远丢掉，
+      // 留下的正是文件头说的那笔「云上有对象、库里没账」。它只是「现在别打」，下次进前台再试。
+      if (code >= 400 && code < 500 && code !== 429) {
         console.warn('卡片补登记被服务端拒绝，这条不再重试', code)
         done.push(entry)
         continue
@@ -106,4 +128,4 @@ function clear() {
   }
 }
 
-module.exports = { KEY, MAX_QUEUE, take, push, flush, clear }
+module.exports = { KEY, MAX_QUEUE, take, push, flush, settle, clear }

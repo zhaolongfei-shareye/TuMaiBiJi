@@ -21,6 +21,7 @@ const ROUTES = 'backend/app/api/routes/cards.py'
 const MAIN = 'backend/app/main.py'
 const NOTES = 'backend/app/api/routes/notes.py'
 const USER = 'backend/app/api/routes/user.py'
+const PURGE = 'backend/app/services/deletion.py'
 const MIG = 'backend/alembic/versions/f2b7d4a8c915_note_cards.py'
 const TESTS = 'backend/tests/test_note_cards.py'
 const PLAN = 'docs/方案-卡片留档上服务端.md'
@@ -33,7 +34,7 @@ function 判(src) {
     if (!ok) bad.push(name)
   }
   const m = src[MODEL], assets = src[ASSETS], r = src[ROUTES], main = src[MAIN], notes = src[NOTES]
-  const user = src[USER], mig = src[MIG], t = src[TESTS], plan = src[PLAN], prd = src[PRD]
+  const user = src[USER], mig = src[MIG], t = src[TESTS], plan = src[PLAN], prd = src[PRD], purge = src[PURGE]
 
   // —— ① 配额口径：SUM 两张表的**真实字节**（10-09 审计换的，四处一起改）——
   ck('配额 SUM 的是配图 + 卡片两张表的 file_size',
@@ -99,9 +100,15 @@ function 判(src) {
   ck('删一篇的回体只有 file_ids 这一个清单键',
     清单键(notes, '"message": "Note deleted"').join() === 'file_ids',
     `读到 [${清单键(notes, '"message": "Note deleted"').join('、')}]`)
-  ck('注销同样带走（也是同一个键）',
-    /asset_ids\s*\+=\s*\[[\s\S]{0,140}?NoteCard/.test(user)
-    && 清单键(user, '"message": "账号已注销"').join() === 'file_ids',
+  ck('注销把卡片对象并进同一份清单，且注销那一条路真调了这一支',
+    // 10-09 14:56 `cb116c3` 把"删一个人"从 `routes/user.py` 抽成 `services/deletion.py` 的 `purge`
+    // （两个删除口共用一支函数）。这条判据原先钉的是 user.py 里那句 `asset_ids += [...NoteCard...]`，
+    // 搬家之后那行字面在这一页不存在了，就一直红——**代码没错，是判据跟着旧落点漂了**。
+    // 现在钉的是那支函数本身：① `purge` 里卡片对象并进同一份清单；② 注销那个口确实调用 `deletion.purge`；
+    // ③ 回体仍然只有 `file_ids` 这一个清单键（反向②往回体里多塞一个键，照样红得住）。
+    /asset_ids\s*\+=\s*\[[\s\S]{0,160}?NoteCard/.test(purge)
+      && /deletion\.purge\(/.test(user)
+      && 清单键(user, '"message": "账号已注销"').join() === 'file_ids',
     `读到 [${清单键(user, '"message": "账号已注销"').join('、')}]`)
   ck('剥掉注释后，后端代码里没有 card_file_ids 这个键',
     !/card_file_ids/.test(去注释(notes) + 去注释(user) + 去注释(r)))
@@ -117,7 +124,7 @@ function 判(src) {
 }
 
 const src = {}
-for (const f of [MODEL, ASSETS, ROUTES, MAIN, NOTES, USER, MIG, TESTS, PLAN, PRD]) src[f] = R(f)
+for (const f of [MODEL, ASSETS, ROUTES, MAIN, NOTES, USER, PURGE, MIG, TESTS, PLAN, PRD]) src[f] = R(f)
 
 console.log('———— 正例：现在这份代码 ————')
 const bad = 判(src)
@@ -147,6 +154,19 @@ m3[ASSETS] = src[ASSETS].replace('    return int(q1.scalar() or 0) + int(q2.scal
 if (m3[ASSETS] === src[ASSETS]) { console.log('✗ 变异没打上（锚点漂了）'); process.exit(2) }
 const b3 = 判(m3)
 
+console.log('\n———— 反向钉⑤：这一支共用函数里的卡片那一刀被摘掉／注销不再调它 ————')
+const m5a = Object.assign({}, src)
+const 头 = '        asset_ids += [\n            r[0]\n            for r in db.query(NoteCard'
+const i5 = src[PURGE].indexOf(头)
+if (i5 < 0) { console.log('✗ 变异没打上（锚点漂了：purge 里那段卡片清单的写法变了）'); process.exit(2) }
+const j5 = src[PURGE].indexOf('        ]\n', i5)
+m5a[PURGE] = src[PURGE].slice(0, i5) + src[PURGE].slice(j5 + '        ]\n'.length)
+const b5a = 判(m5a)
+const m5b = Object.assign({}, src)
+m5b[USER] = src[USER].replace(/deletion\.purge\(/, 'legacy.purge(')
+if (m5b[USER] === src[USER]) { console.log('✗ 变异没打上（锚点漂了：注销那一口不再叫 deletion.purge）'); process.exit(2) }
+const b5b = 判(m5b)
+
 console.log('\n———— 反向钉④：把那个估算常量请回来（四处又变成两份真相） ————')
 const m4 = Object.assign({}, src)
 m4[MODEL] = src[MODEL] + '\nCARD_ACCOUNT_BYTES = 200 * 1024\n'
@@ -155,14 +175,18 @@ const b4 = 判(m4)
 
 const 红1 = b1.some((x) => x.includes('写口那道线还是 20MB'))
 const 红2 = b2.some((x) => x.includes('回体只有 file_ids'))
-  && b2.some((x) => x.includes('注销同样带走'))
+  && b2.some((x) => x.includes('注销把卡片对象并进同一份清单'))
   && b2.some((x) => x.includes('card_file_ids 这个键'))
 const 红3 = b3.some((x) => x.includes('两张表的 file_size'))
 const 红4 = b4.some((x) => x.includes('那个估算常量已经退休'))
+
+const 那条 = '注销把卡片对象并进同一份清单'
+const 红5 = b5a.some((x) => x.includes(那条)) && b5b.some((x) => x.includes(那条))
 
 console.log(`\n正例 ${bad.length ? '红 ' + bad.length + ' 条：' + bad.join('、') : '全绿'}`)
 console.log(`反向①拿估算线当闸门 ${红1 ? '红在对的地方' : '没红＝这条判据是假的'}`)
 console.log(`反向②另起一个键 ${红2 ? '红在对的地方' : '没红＝这条判据是假的'}`)
 console.log(`反向③配额改回只 SUM 配图 ${红3 ? '红在对的地方' : '没红＝这条判据是假的'}`)
 console.log(`反向④把估算常量请回来 ${红4 ? '红在对的地方' : '没红＝这条判据是假的'}`)
-process.exit(bad.length || !红1 || !红2 || !红3 || !红4 ? 1 : 0)
+console.log(`反向⑤摘掉卡片那一刀／注销不调这一支 ${红5 ? '红在对的地方' : '没红＝这条判据是假的'}`)
+process.exit(bad.length || !红1 || !红2 || !红3 || !红4 || !红5 ? 1 : 0)
