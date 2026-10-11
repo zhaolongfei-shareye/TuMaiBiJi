@@ -97,7 +97,11 @@ let mp
 
   try {
     // 2) 进卡片页，等模板条十格
-    await mp.callWxMethod('reLaunch', { url: `/pages/share/share?id=${ID}` })
+    // `mp.reLaunch(路径)` 自己就把页面对象返回来（这一版 automator **没有 `mp.page()`**，
+    // 10-11 这一把撞过：报 `mp.page is not a function`，而收尾那一段照样把建出来的那一篇删净了）。
+    const page = await mp.reLaunch(`/pages/share/share?id=${ID}`)
+    ck('拿到那一屏的页面对象', !!page, page ? 'ok' : 'reLaunch 没回页面对象')
+    if (!page) throw new Error('拿不到页面对象，点不到那十格')
     let tplN = 0
     for (let i = 0; i < 12; i++) {
       await sleep(3000)
@@ -110,9 +114,6 @@ let mp
     ck('模板条十格到位', tplN === 10, `等到 ${tplN} 格（每 3 秒问一次，最多 36 秒）`)
     if (tplN !== 10) throw new Error('进不去那一屏，后面九张没有意义')
 
-    const page = await mp.page('/pages/share/share')
-    ck('拿到那一屏的页面对象', !!page, page ? 'ok' : 'mp.page 返回空')
-    if (!page) throw new Error('拿不到页面对象，点不到那十格')
     const dump = (name) => mp.evaluate((d) => {
       const p = getCurrentPages().slice(-1)[0]
       const src = p.data.imagePath
@@ -164,11 +165,13 @@ let mp
       // 走界面那一下，不用 setData 直接改 picked：换模板那条链上有 `_pickerDone` 与节流，
       // 从数据侧改会绕过它们，出来的图就不算"真点过"。
       await picks[i].tap()
-      const picked = await page.data('picked')
-      ck(`第 ${i + 1} 格选中的是 ${list[i].id}`, picked === list[i].id, `picked=${picked}`)
+      // 画完之后再读 `picked`：`tap` 之后立刻读拿到的是**上一格**（10-11 第一把就是这么错红 8 处，
+      // 而真正权威的 `_renderedTpl` 十条全对——图确实是按各自那一套画的）。
       const done = await waitRendered(list[i].id)
       ck(`第 ${i + 1} 张画完了（${list[i].id}）`, done.img && done.tpl === list[i].id,
         `tpl=${done.tpl} 成品图=${done.img} 还在生成=${done.busy}`)
+      const picked = await page.data('picked')
+      ck(`第 ${i + 1} 格选中的是 ${list[i].id}`, picked === list[i].id, `picked=${picked}`)
       await pull(`虚拟-${list[i].id}.png`)
     }
     await mp.callWxMethod('reLaunch', { url: '/pages/index/index' })
