@@ -233,11 +233,15 @@ async function refreshOne(noteId) {
  * @returns {Promise<boolean>} 服务器上确实撤掉了没有
  */
 async function dropServer(noteId) {
+  // `known` 声明在 try **外面**：下面 catch 那一支要拿它把预留的地址还回去，声明在里面它就是个
+  // 未定义名 —— 10-11 静态尺子撞出来：撤服务器行一失败，catch 自己抛 ReferenceError，
+  // 那句"失败就撤"从来没执行过（`验-删卡片二次确认.js` 离线④那一条就是拿它炸的）。
+  let known = null
   try {
     // 先把这一张的地址记进待删那一格，**再**发撤档请求。顺序是有讲究的：服务端那一步是
     // "删行 + 把地址交回来"，而对象只有客户端删得动（那台后端没有云开发凭据）。回体要是丢在
     // 网络上，行没了、地址也没人记得，那个对象就永久占着全站配额。本机知道这个地址的时机只有现在。
-    const known = serverCard(noteId)
+    known = serverCard(noteId)
     if (known && known.cloud_url) cloudUpload.reservePurge([known.cloud_url])
     const res = await api.deleteNoteCard(noteId)
     serverCards = Object.assign({}, serverCards)
