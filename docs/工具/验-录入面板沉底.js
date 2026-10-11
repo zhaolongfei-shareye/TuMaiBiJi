@@ -59,8 +59,12 @@ ok('面板底边 = 底栏顶边 + 一条 24 的缝', gap === 24, `实得 ${gap}`
 // 左右内缩和 .container 的 --sp-3 是同一个数：fixed 不吃父级 padding，不写就宽一圈
 const sp3 = Number(/--sp-3:\s*(\d+)rpx/.exec(appWxss)[1])
 ok('左右内缩等于 --sp-3', new RegExp(`left:\\s*${sp3}rpx`).test(dock) && new RegExp(`right:\\s*${sp3}rpx`).test(dock), `--sp-3=${sp3}`)
-ok('展开时换背景那一行整个不渲染',
-  /\.container\.entry-dock \.home-swap\s*\{[^}]*display:\s*none/.test(wxss))
+// 站长 10-11 12:2x 原话「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」
+// ⇒ 这一行两屏都在。原来钉的是"展开时整个不渲染"，那条 display:none 已经撤了，判据跟着反过来钉：
+// 样式表里**不许再有**任何一条把这一行在展开态藏起来的规则（写回 `display:none`、写回 `visibility:hidden`、
+// 或者整条搬进 `.entry-dock` 的作用域里，都算违背他那一句）。
+ok('展开态不许再把换背景那一行藏起来（两屏都要有）',
+  !/\.container\.entry-dock[^{]*\.home-swap\s*\{[^}]*(display:\s*none|visibility:\s*hidden|height:\s*0)/.test(wxss))
 // 10-09 那一行搬到录入条上面时，它一占流内的位就把 Tips + 横条 + 面板整组顶下去
 //（`.entry-wrap` 靠上面那条 62vh 的**流内** margin 落点；同一类账 09-30 那行日期、
 // 10-01 那行 Tips 各欠过一次，每次都是真跑才看出来）。当时钉的是"高 + 上间距 + 负 margin == 0"。

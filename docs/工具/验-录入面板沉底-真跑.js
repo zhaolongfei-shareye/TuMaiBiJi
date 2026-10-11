@@ -149,9 +149,23 @@ const STATES = [
     !!blk && blk.bottom <= win.windowHeight - rpx(TAB_TOP + MIN_GAP) + 3,
     blk && `组底 ${blk.bottom.toFixed(0)}｜底栏顶 ${ (win.windowHeight - rpx(TAB_TOP)).toFixed(0)}`)
 
+  // 站长 10-11 12:2x 要「调亮度／换背景」这一行**两屏都有**，所以先在这里把收起态那一屏的顶边记下来，
+  // 下面六个展开态各自回来对一次账——只判"画没画"不够，两屏各画一处就是他 11:2x 抓过的那种跳。
+  const [swap0] = await geo(['.home-swap'])
+  ck(`收起态这一行画着，高 ${SWAP_H}rpx（盒子 88 是给指头的热区，不是字高）`,
+    !!swap0 && near(swap0.h, rpx(SWAP_H), 2), swap0 && `${(swap0.h * 750 / win.windowWidth).toFixed(1)}rpx`)
+
   // ---------- ② 六个态 × 两门语言：两档等高、内容不越界、条沉到同一处 ----------
   const rows = []
   for (const L of ['zh', 'en']) {
+    // 基准必须**同一门语言现取**：标题行那一句中英不一样高，拿 zh 的顶边去比 en 的六个态会整批假红
+    //（10-11 12:3x 第一趟就红在这儿：zh 63.5、en 59.0，差的 4.5rpx 是标题那一行，不是这一行跳了）。
+    await page.setData({ lang: L, t: i18n.texts(L), active: '', sldIcon: 'images',
+      previewImages: [], urlInput: '', urlHint: 'idle', writeBody: '', bodyFocus: false, errLine: '' })
+    await page.callMethod('_sync')
+    await sleep(320)
+    const [swapBase] = await geo(['.home-swap'])
+    const swapTop = swapBase && swapBase.top
     for (const [active, shots, open, label] of STATES) {
       // 走 automator 的 page.setData + callMethod，不用 mp.evaluate 里那句 setData：
       // 后者设数组时服务层 data 到位、渲染层却不跟（10-08 实测：evaluate 设 1 张，屏上仍是空态，
@@ -239,12 +253,13 @@ const STATES = [
       const gate = expanded ? 0.49 : 0.55
       ck(`${tag}：面板顶在视口 ${(panel.top / win.windowHeight * 100).toFixed(1)}%（门槛 ${Math.round(gate * 100)}%，${expanded ? '展开态·多一行' : '不挡那张脸'}）`,
         panel.top >= win.windowHeight * gate - 2, `${(panel.top / win.windowHeight).toFixed(3)} 屏`)
-      // 「整个不渲染」＝那一行不占位：`.home-swap` 靠 CSS `display:none` 撤，节点仍在树里
-      //（`page.$$('.home-swap')` 照样回 1、`boundingClientRect` 回的是**高 0 的那一份**，不是 null），
-      // 所以判"没画"要按高度判，别按摸没摸到判。
+      // 10-11 12:2x 他那句「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」把原来那条
+      // "展开时这一行整个不占位"作废了：现在钉的是**展开态照样画，而且顶边与收起态同一个数**。
+      // 判"画没画"按高度判（`display:none` 时节点仍在树里、`boundingClientRect` 回高 0 的那一份，不是 null）。
       const swap = (await geo(['.home-swap']))[0]
-      ck(`${tag}：展开时换背景那一行整个不占位（它一在就会跟面板抢那一段）`,
-        !swap || swap.h < 1, swap ? `高 ${swap.h.toFixed(0)}px` : '量不到')
+      ck(`${tag}：这一行展开态画着（高 ${SWAP_H}rpx 那一档），且顶边与收起态同一格（差 ≤1px）`,
+        !!swap && near(swap.h, rpx(SWAP_H), 2) && near(swap.top, swapTop, 1),
+        swap ? `高 ${(swap.h * 750 / win.windowWidth).toFixed(1)}rpx｜顶 ${swap.top.toFixed(1)} vs ${swapTop && swapTop.toFixed(1)}` : '量不到')
     }
     if (L === 'zh') {
       await mp.screenshot({ path: `${OUT}/沉底-zh-六态末.png` })

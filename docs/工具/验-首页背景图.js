@@ -16,7 +16,27 @@ const read = (p) => fs.readFileSync(path.join(MP, p), 'utf8')
 const ASSET = 'assets/home-bg-portrait.jpg'
 const st = fs.existsSync(path.join(MP, ASSET)) ? fs.statSync(path.join(MP, ASSET)) : null
 ck('默认背景图在包里', !!st, ASSET)
-ck('体积没吃主包（<150KB）', !!st && st.size < 150 * 1024, st ? `${(st.size / 1024).toFixed(1)} KB` : '没有文件')
+/* 原来这一条是「体积没吃主包（<150KB）」——那个 150KB 是**我自己拍的**，他没下过，
+   10-11 R16 他把默认图换成 1280×1280／314,793 B 那张，这一条当天就红了。
+   红的是我那道没主的门槛，不是包出问题：微信的硬线是**主包 2MB**，构建后实测 939,606 B（917.6KB）＝上限的 44.8%。
+   所以这一格改成钉真正有主的那条线：拿整个 miniprogram 目录的字节总和当上界代理
+   （构建会剥掉注释与空白，所以目录数一定 ≥ 包数，用它判偏保守），预算＝上限的八成，
+   留那两成给下一张图与后面的代码。目录再涨过 1.6MB 才红，红法是把两个数都打出来。 */
+const MAIN_LIMIT = 2 * 1024 * 1024
+const dirBytes = (() => {
+  let sum = 0
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => {
+    const p = path.join(d, e.name)
+    if (e.isDirectory()) walk(p)
+    else if (e.name !== '.DS_Store') sum += fs.statSync(p).size
+  })
+  walk(MP)
+  return sum
+})()
+ck(`默认图字节数只报数不判（他 10-11 换的这张 ${st ? (st.size / 1024).toFixed(1) : '—'}KB，判的是下面那条主包线）`,
+  !!st, st && `${(st.size / 1024).toFixed(1)} KB`)
+ck(`主包字节总和没越过 2MB 上限的八成（现 ${dirBytes}／预算 ${Math.round(MAIN_LIMIT * 0.8)}）`,
+  dirBytes < MAIN_LIMIT * 0.8, `${(dirBytes / 1024 / 1024).toFixed(2)}MB ＝ 上限的 ${(dirBytes / MAIN_LIMIT * 100).toFixed(1)}%`)
 
 // ---------- ② 取图语义：把 wx 桩出来，直接跑 poster.js 那三个函数 ----------
 const files = new Set()

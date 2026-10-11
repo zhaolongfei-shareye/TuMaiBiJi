@@ -99,9 +99,12 @@ const ck = (name, ok, got) => {
   d = await page.data()
   ck('设过形象后 bgSrc 换成用户那张', d.bgSrc === userImg, d.bgSrc)
   await mp.screenshot({ path: `${OUT}/实测-2-用用户的形象.png` })
-  // ---------- ②b 展开录入条：整块贴底，换背景那一行让位 ----------
+  // ---------- ②b 展开录入条：整块贴底，换背景那一行两屏都在 ----------
   // 09-28 起展开态不再是"回到标题下面"，而是 fixed 贴底（bottom 152rpx）：窗口不动，
   // 只换肚子里的内容。所以这里量的是"块底还压不压底栏"，不再是"块顶有没有抬到 120 以上"。
+  // 10-11 12:2x 站长原话「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」
+  // ⇒ 这一行不再"让位"，改成钉它**画着**且**底边不压到面板顶**（不重叠才是这句需求真正的安全边界：
+  //   它抬在罩层之上、面板 fixed 沉底，两样各占一头，谁也不许吃谁的位置）。
   await (await page.$('.blk-person')).tap()
   await sleep(1200)
   const openRect = await mp.evaluate(() => new Promise((resolve) => {
@@ -113,10 +116,12 @@ const ck = (name, ok, got) => {
   ck('展开后整块贴底，底边不压住底栏',
     !!openRect[0] && !!openRect[1] && (openRect[0].y + openRect[0].h) <= openRect[1].h - 64,
     openRect[0] && openRect[1] && `块底 ${Math.round(openRect[0].y + openRect[0].h)}，底栏顶 ${openRect[1].h - 64}`)
-  ck('展开时换背景那一行整个不渲染（不跟底栏抢位置）',
-    openRect[2] === null || openRect[2].h === 0,
-    openRect[2] && openRect[2].h ? `还在，块顶 ${Math.round(openRect[2].y)}、高 ${openRect[2].h}` : '')
-  await mp.screenshot({ path: `${OUT}/实测-2b-展开让位.png` })
+  ck('展开时换背景那一行画着（他 10-11 要两屏都有），且底边不压到面板顶',
+    !!openRect[2] && openRect[2].h > 40 && !!openRect[0] && (openRect[2].y + openRect[2].h) <= openRect[0].y + 1,
+    openRect[2] && openRect[0]
+      ? `行 ${Math.round(openRect[2].y)}..${Math.round(openRect[2].y + openRect[2].h)}（高 ${Math.round(openRect[2].h)}）｜面板顶 ${Math.round(openRect[0].y)}`
+      : '量不到')
+  await mp.screenshot({ path: `${OUT}/实测-2b-展开态两屏都在.png` })
   await (await page.$('.title-row')).tap()   // 点条以外的空白收起，回到常态
   await sleep(900)
 

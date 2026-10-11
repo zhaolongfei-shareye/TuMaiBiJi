@@ -239,9 +239,12 @@ ok('卡里那一层的块名就是真跑名单那五枚（改名要一起改名�
 ok('换背景只是导流，不弹相册', /goHomeBg\(\)\s*\{\s*wx\.navigateTo/.test(js) && !/goHomeBg[\s\S]{0,200}chooseMedia/.test(js))
 ok('导流目标还是那一页', /navigateTo\(\{ url: '\/pages\/profile\/profile' \}\)/.test(js))
 ok('选图入口全页只有 pickImage 一处', (js.match(/wx\.chooseMedia/g) || []).length === 1)
-ok('换背景那一行只在铺了图时存在，且面板展开那一趟整个不渲染（它一在就跟底栏抢那一段）',
+// 10-11 12:2x 他那句「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」把后半句作废了：
+// 这一行不再"面板展开那一趟整个不渲染"，两屏都在、同一个落点。闸只留 `bgSrc` 那一半（没铺图它没意义）。
+ok('换背景那一行只在铺了图时存在，且展开那一趟照旧渲染（他 10-11 要两屏都有）',
   /wx:if="\{\{bgSrc\}\}" class="home-swap"/.test(wxml)
-  && /\.container\.entry-dock \.home-swap\s*\{[^}]*display:\s*none/.test(wxss))
+  && !/\.home-swap[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden)/.test(wxss)
+  && !/\.entry-dock[^{]*\.home-swap/.test(wxss))
 ok('➕ 那一格是唯一"再加一张"的落点', (wxml.match(/catchtap="onAddShot"/g) || []).length === 1)
 
 // ---------- 4. 状态机：一个 active 说清当前那一档 ----------
