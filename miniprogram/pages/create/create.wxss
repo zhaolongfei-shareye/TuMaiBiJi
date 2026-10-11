@@ -969,6 +969,23 @@
   color: var(--face-ink);
 }
 
+/* 名字后面那句小字（站长 10-11 13:5x 点的丙案）。`flex: 1` 是它把这一行三头撑开的地方：
+   名字靠左、轨道靠右、这句跟在名字后面，`.wr-sw` 那条 `space-between` 剩下的富余全归它，
+   所以轨道不会被挤走。色吃 `--face-ph`（＝面板那支墨的 38%，与输入框占位字同一档）——
+   注释不该比名字显眼，而这一枚令牌本来就是"退一层"的那一档。
+   ⚠ `white-space: nowrap` ＋ 省略号是保险丝，不是设计意图：真按省略号截了就是装不下，
+   宽度由 `验-统一录入条` 中英各算一次钉住（折行会把 48rpx 那一行顶破）。 */
+.wr-sw-hint {
+  flex: 1;
+  min-width: 0;
+  margin: 0 16rpx 0 12rpx;
+  font-size: var(--fs-micro);
+  color: var(--face-ph);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .wr-sw-track {
   flex: none;
   position: relative;

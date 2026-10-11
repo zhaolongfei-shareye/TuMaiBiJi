@@ -206,6 +206,11 @@
              ⚠️ 这一条放置是我定的，不是他拍过的——现网是收起态就能看到。 -->
         <view wx:if="{{active === 'write' && panelOpen}}" class="wr-sw {{writeTranslate ? 'wr-sw-on' : ''}}" catchtap="onToggleTranslate">
           <text class="wr-sw-lab">{{t.origTranslate}}</text>
+          <!-- 站长 10-11 13:5x 点的那句小字（丙：「不管哪种语言，摘要都写成中文」）。三头钉死：
+               ① 与开关**同一行**——展开那一档卡里只剩这一格的高度，另起一行就得抬面板高（他两轮说过不许挡脸）；
+               ② 不跟着 `writeTranslate` 走——开着那句、关掉不能没有注释；
+               ③ 说的是**摘要**不是原文：这一枚只改提炼输出的语言，原文存进来什么样就是什么样。 -->
+          <text class="wr-sw-hint">{{t.origTranslateHint}}</text>
           <view class="wr-sw-track"><view class="wr-sw-dot"></view></view>
         </view>
 

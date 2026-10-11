@@ -316,9 +316,16 @@ const i18n = {
     permCamera: '没拿到相机权限，点这里去设置',
     permAlbum: '没拿到相册权限，点这里去设置',
     pickFailed: '没能打开相机或相册，请再试一次',
-    // 站长 10-04：贴进去的是纯英文原文，摘要却被自动写成中文。这一枚开关默认关，
+    // 站长 10-04：「我贴一条纯英文的，界面也是英文，不明白为什么提炼的时候自动翻译成中文」。这一枚开关默认关，
     // 关＝摘要跟着原文的语言走；打开才整理成中文。叫法用他原话「原文翻译」，不改口。
     origTranslate: '原文翻译',
+    /* 站长 10-11 13:5x 点的那句小字注释（丙）。他先给的草稿是「开启后可自动把英文译成中文」，两处对不上事实：
+       ① 这一枚改的是**提炼出来的标题／摘要／要点／标签用什么语言写**（`backend/app/services/llm.py` 里
+         `_LANG_ZH`／`_LANG_KEEP` 那两行），原文本身一个字不动，笔记里存的还是那段英文；
+       ② 不止英文——日文、法文都吃这一枚（提示词里明写"是日文就写日文"）。
+       ⇒ 注释照**它实际改的那个东西**写，不照名字、也不照草稿。英文那侧没跟"不管哪种语言"这半句，
+       因为容器是按中文排的：`Translate original` 那 18 个字母已经吃掉 216rpx，再长就折行（折行＝红，宽度由尺子算）。 */
+    origTranslateHint: '不管哪种语言，摘要都写成中文',
     needBody: '原文还空着',
     extractSucceeded: '已存入笔记',
     extractFailed: '提取失败，请重试',
@@ -653,6 +660,8 @@ const i18n = {
     // 与中文那枚同一个开关：关＝摘要用原文的语言写，开＝整理成中文。
     // 这里不写 "Translate"（光秃秃会被读成"把界面翻译一下"），点明翻的是原文。
     origTranslate: 'Translate original',
+    // 中文那半句"不管哪种语言"这一侧省掉：容器是按中文排的，加上就折行（宽度由 `验-统一录入条` 算）。
+    origTranslateHint: 'Summary in Chinese',
     needBody: 'Add the text to work from',
     extractSucceeded: 'Saved to notes',
     extractFailed: 'Extract failed, please retry',

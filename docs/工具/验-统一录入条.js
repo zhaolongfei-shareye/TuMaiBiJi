@@ -634,7 +634,46 @@ ok('两态各吃一对令牌，不在规则里写死色',
 ok('几何闭合：面 72、点 32、左右各留 4 ⇒ 位移只能是 32',
   num(seg('.wr-sw-track'), 'width') === 72 && num(seg('.wr-sw-dot'), 'width') === 32
   && /transform: translateX\(32rpx\)/.test(seg('.wr-sw-on .wr-sw-dot')))
-
+const HINT_W = {}
+/* ---------- 「原文翻译」那句小字注释（站长 10-11 13:5x 点的丙案） ----------
+   他先给的草稿是「开启后可自动把英文译成中文」，两处与事实不符：这一枚只改**提炼输出的语言**
+   （`llm.py` 里 `_LANG_ZH`／`_LANG_KEEP` 那两行），原文不动；而且吃的不是只有英文。
+   ⇒ 注释照它实际改的东西写。四条各钉一头：挂在同一行、两态都在、语义不许回退到"译原文"、宽度中英各算。 */
+const hintRow = (/class="wr-sw[\s\S]*?wr-sw-track/.exec(wxml) || [''])[0]
+ok('那句注释与开关同一行（另起一行要抬面板高，他两轮说过面板不许挡脸），且吃的是字典那一位',
+  /class="wr-sw-hint">\{\{t\.origTranslateHint\}\}<\/text>\s*<view class="wr-sw-track"/.test(wxml)
+  && !!zh.origTranslateHint && !!en.origTranslateHint, `zh「${zh.origTranslateHint}」／en「${en.origTranslateHint}」`)
+ok('注释不跟着开关走：节点上没有 `wx:if="{{writeTranslate`（开着那句、关掉不能没有注释）',
+  !/wx:if="\{\{writeTranslate/.test(hintRow) && /wr-sw-hint/.test(hintRow))
+ok('语义两头钉：说的是**摘要**，不是"把原文译成中文"（英文那侧也不许出现 translate）',
+  /摘要/.test(zh.origTranslateHint) && !/原文[^，。]*[译翻]/.test(zh.origTranslateHint)
+  && !/translat/i.test(en.origTranslateHint), `${zh.origTranslateHint} ｜ ${en.origTranslateHint}`)
+ok('注释比名字退一档：字号吃 --fs-micro、色吃 --face-ph，规则里没有写死的色',
+  num(seg('.wr-sw-hint'), 'font-size') === num(seg('.wr-sw-lab'), 'font-size') - 6
+  && /color:\s*var\(--face-ph\)/.test(seg('.wr-sw-hint'))
+  && !/(#[0-9A-Fa-f]{3,8}|rgba?\()/.test(seg('.wr-sw-hint')),
+  `注释 ${num(seg('.wr-sw-hint'), 'font-size')}rpx ／ 名字 ${num(seg('.wr-sw-lab'), 'font-size')}rpx`)
+// 宽度：汉字按 1em、拉丁按 0.5em 估（与上面英文占位字那条同一口径）。折行会把 48rpx 那一行顶破，
+// 而这一行的高度是"展开那一档剩下的富余"，一顶破就是面板装不下（那笔账在 §2 的算式里）。
+const hintFs = num(seg('.wr-sw-hint'), 'font-size')
+const labFs = num(seg('.wr-sw-lab'), 'font-size')
+const trackW = num(seg('.wr-sw-track'), 'width')
+// `margin: 0 16 0 12` 那一条简写由 lens 拆成四个数，左右两头就是第 2 与第 4 位
+const mHint = lens(seg('.wr-sw-hint'), 'margin')
+const hintGap = (mHint[1] !== undefined ? mHint[1] : 0) + (mHint[3] !== undefined ? mHint[3] : mHint[1] || 0)
+;[['zh', zh], ['en', en]].forEach(([tag, d]) => {
+  // 中日韩汉字＋全角标点算 1em，其余（拉丁字母、空格、半角标点）算 0.5em。
+  // ⚠ 名字与注释**两头都要过这道折算**：英文那侧名字 `Translate original` 也是 18 个字母，
+  //    只把注释按 0.5em 折、名字按 1em 算，会算出 690rpx 这种假红（第一版就栽在这）。
+  const wOf = (str, fs) => {
+    const cjk = (str.match(/[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]/g) || []).length
+    return cjk * fs + (str.length - cjk) * fs * 0.5
+  }
+  const w = wOf(d.origTranslate, labFs) + wOf(d.origTranslateHint, hintFs) + trackW + hintGap
+  HINT_W[tag] = `${Math.round(w)}/${cardInnerW}`
+  ok(`${tag} 那一行三头放得下（名字＋注释＋轨道 ≤ 卡内宽，折行=红）`,
+    w <= cardInnerW, `「${d.origTranslate}」＋「${d.origTranslateHint}」`)
+})
 // ---------- 8. 上一代那些能力没被这批碰坏 ----------
 ok('忙态仍然挡住收起', /collapse\(\)\s*\{\s*if \(this\.data\.busy/.test(js))
 const showBody = js.split('async onShow')[1].split('hintFor(value)')[0]
@@ -664,6 +703,7 @@ const writeOpenStack = num(seg('.field-write-2'), 'height') + num(seg('.wr-sw'),
 console.log(`${fails.length ? '✗' : '✓'} 统一录入条：${pass}/${pass + fails.length} 条通过`
   + `　面板 ${PANEL_H}/${PANEL_OPEN_H}rpx、卡内 ${cardInnerW}×${cardInnerH.toFixed(1)}（展开 ${openCardInnerH.toFixed(1)}）rpx`
   + `　最占的一叠：照片圈 ${crowH.toFixed(1)}/${cardInnerH.toFixed(1)}、文字展开 ${writeOpenStack}/${openCardInnerH.toFixed(1)}`
-  + `　一行 ${cols} 格、行程到 ${SLD_MAX}rpx`)
+  + `　一行 ${cols} 格、行程到 ${SLD_MAX}rpx`
+  + (HINT_W.zh ? `　开关那一行宽：zh ${HINT_W.zh}／en ${HINT_W.en}rpx` : ''))
 fails.forEach((f) => console.log('  ✗ ' + f))
 process.exit(fails.length ? 1 : 0)
