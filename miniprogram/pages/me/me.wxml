@@ -1,7 +1,9 @@
 <!-- 私密密码那一层的标记搬到 templates/pwd-sheet.wxml（10-12 起三页共用一份），本页只挂数据与方法。
      <import> 不渲染任何东西，放在根节点外面。 -->
 <import src="../../templates/pwd-sheet.wxml"/>
-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}}">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}}">
+  <!-- 背景图深浅那枚隐藏画布（与新建页、笔记页同一份实现 utils/imgBrightness.js）。 -->
+  <canvas id="bgBrite" type="2d" style="position:fixed;left:-9999px;width:32px;height:32px;"></canvas>
   <!-- has-bg 这一档 10-11 才补到 container 上（原来只有下面 .head-band 带）。需求原文：
        站长 10-11「界面纯色底色部分改为半透明毛玻璃效果，按钮ICON不变」＋「毛玻璃白底下面
        如果没有背景图，你可以下移背景图」＋ X4 那一格他回「做」。玻璃那几条规则全站统一以
@@ -12,7 +14,7 @@
        仍是"下面那一层往上凸出来盖住图的下沿"，只是这一层的颜色换成了页面底，
        所以它不再是一张卡，只是把那道弧留住。 -->
   <view class="head">
-    <view class="head-band {{bgSrc ? 'has-bg' : ''}}">
+    <view class="head-band {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}}">
       <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
       <!-- 「调亮度」那一枚点拧的就是这一层：dimScrim 空串＝全铺（最沉那一档＝现网样子），
            opacity:0＝一点不压（＝原图亮度）。三页同一个本机键，所以一起沉、一起亮。 -->

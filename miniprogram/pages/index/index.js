@@ -10,6 +10,7 @@ const { isPrivate, needsUnlock, unlockOn } = require('../../utils/privateGate.js
 const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
+const bgTone = require('../../utils/imgBrightness.js')
 // 10-11：这一屏不再画那一位小人（站长「列表左上角的人都去掉，维持只有首页有」），
 // 所以 `utils/person.js` 在这一页的 require 一并撤——首页那一屏仍在用它，别处不许跟着删。
 
@@ -130,6 +131,8 @@ Page({
     // 头部那一段铺不铺图：'' 表示不铺（用户在外观设置里关掉了，或形象文件被系统清了）。
     // 取图和新建页同一个口，不在这页另开一份判断。
     bgSrc: '',
+    // 背景图浅到白字兜不住那一档：与新建页、「我的」页同一个口（utils/imgBrightness.js）。
+    bgLight: false,
     // 淡底方形左上角那枚品牌字，与海报上无形象时的占位字是同一个常量（poster.BRAND_GLYPH）
     brandGlyph: poster.BRAND_GLYPH,
     // 右上那枚淡底方形的底：每次进页跟着壁纸重算（见 paleStep 那条规则）
@@ -189,7 +192,7 @@ Page({
     // 页面里本来就有左上角那行大字说"这是哪一页"，导航条不必再报一遍。
     app.setNavTitle('appName', lang)
     this.fitHead(bgSrc)
-    app.applyNavForBand(this.data.bgSrc)
+    bgTone.applyTone(this, this.data.bgSrc, 'bgBrite')
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().applyTheme(app.getWallpaper())

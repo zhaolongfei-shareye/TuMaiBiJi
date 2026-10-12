@@ -1305,6 +1305,50 @@
   color: rgba(242, 239, 233, 0.62);
 }
 
+/* ---------- 背景图是浅色那一档（站长 10-12 下的需求；深浅判定与阈值在 utils/imgBrightness.js）
+   上面那七条把字翻成纸白，前提是罩子压得住那张图；图本身很浅时这条前提不成立，
+   所以这里逐条翻回墨（同一个 #14161A 那一族），罩子从压暗换提亮。
+   ⚠ 延段那条（`.head-scrim::after`）的暗值必须等于浅色渐变自己的末档，
+   与深态同一个规矩（`验-玻璃令牌齐不齐` 两态都钉着）：不等＝542 那条线一道硬边＝R6 打回的"一刀切"。 */
+.container.has-bg.bg-light .h1 {
+  color: rgba(20, 22, 26, 0.92);
+}
+
+.container.has-bg.bg-light .stat .n {
+  color: rgba(20, 22, 26, 0.78);
+}
+
+.container.has-bg.bg-light .stat .l {
+  color: rgba(20, 22, 26, 0.56);
+}
+
+.container.has-bg.bg-light .ic {
+  color: rgba(20, 22, 26, 0.68);
+}
+
+.container.has-bg.bg-light .ic.on {
+  color: rgba(20, 22, 26, 0.92);
+}
+
+.container.has-bg.bg-light .srch {
+  background: rgba(20, 22, 26, 0.06);
+  border-color: rgba(20, 22, 26, 0.15);
+  color: rgba(20, 22, 26, 0.92);
+}
+
+.container.has-bg.bg-light .srch-ph {
+  color: rgba(20, 22, 26, 0.42);
+}
+
+.container.has-bg.bg-light .head-scrim {
+  background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.28) 30%,
+    rgba(242, 239, 233, 0.22) 62%, rgba(242, 239, 233, 0.3) 100%);
+}
+
+.container.has-bg.bg-light .head-scrim::after {
+  background: rgba(242, 239, 233, 0.3);
+}
+
 /* 分类筛选 v30 起改「文字 + 短杠」（见上面 .ix-cat 那段）。这里原来那四条
    `.chip.tone`／`.chip.tone.active`／`.container.has-bg .chip.all`／`.…all.active` 一起删掉：
    胶囊的底与描边没有了，`toneVars` 那对 --tone-bg/--tone-ink 在这一行不再被消费。

@@ -67,6 +67,23 @@
   color: rgba(242, 239, 233, 0.96);
 }
 
+/* ---------- 背景图是浅色那一档（站长 10-12 下的需求；判定与阈值在 utils/imgBrightness.js）
+   上面那条"铺了图才翻纸白"的前提在浅图上是反的，所以这一格的字与罩子一起翻回墨／提亮。
+   停点仍照本页那条渐变自己的形状（守 542 那一档、末档平延 104），只换颜色方向；
+   浅色延段那支必须等于浅色渐变自己的末档（0.22），否则 542 那条线出硬边＝R6 打回的那种。 */
+.head-band.has-bg.bg-light .h1 {
+  color: rgba(20, 22, 26, 0.92);
+}
+
+.head-band.has-bg.bg-light .head-scrim {
+  background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.35) 14%,
+    rgba(242, 239, 233, 0.28) 58%, rgba(242, 239, 233, 0.22) 100%);
+}
+
+.head-band.has-bg.bg-light .head-scrim::after {
+  background: rgba(242, 239, 233, 0.22);
+}
+
 .head-scrim {
   position: absolute;
   left: 0;

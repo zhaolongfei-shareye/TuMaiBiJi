@@ -6,6 +6,7 @@ const cloudUpload = require('../../utils/cloudUpload.js')
 const assetQueue = require('../../utils/assetQueue.js')
 const { compressForBackup } = require('../../utils/imageCompress.js')
 const person = require('../../utils/person.js')
+const bgTone = require('../../utils/imgBrightness.js')
 
 // 链接规范：必须有协议头、主机名里要有顶级域、整串不能出现空白。
 // 之前只判"以 http 开头且某处有个点"，`https://a.com 后面还有字` 和 `http:///a.b` 都能过，
@@ -119,6 +120,9 @@ Page({
     cardCount: 0,
     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
     bgSrc: '',
+    // 这张背景图是浅色（字翻墨、罩子翻提亮）：每次进页由 bgTone.applyTone 定，
+    // 本机算过就直接给对的第一帧，没算过先按深底出字、采样回来那一趟再翻。
+    bgLight: false,
     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
     // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
     dimV: 1,
@@ -211,7 +215,8 @@ Page({
     }
     this._sync()
     app.setNavTitle('appName', lang)
-    app.applyNavForBand(this.data.bgSrc)
+    // 深浅这一档与导航条同一趟给（applyTone 里读缓存→出字→设导航条；这张图没算过时异步补算）。
+    bgTone.applyTone(this, this.data.bgSrc, 'bgBrite')
     this.startTips()
     this.loadEntryStats()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {

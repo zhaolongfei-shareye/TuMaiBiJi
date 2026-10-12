@@ -110,8 +110,19 @@ ck('没把本地图写成 wxss 的 background-image（那条微信不认）',
 ck('新建页每次进页重取图', cjs.includes('bgSrc: poster.homeBg()'))
 // 10-01 晚：三页共用 app.applyNavForBand 这一个出口（判据是"铺没铺图"，
 // 因为罩层顶部那档压完照片永远是深），没铺图时它整个不碰，主题色留给 applyTheme。
-// 10-10 我一度给这条加过第二个参数（新建页翻亮底墨字），站长说没下过这条需求，撤回原样。
-ck('铺图时导航条走共用出口', /app\.applyNavForBand\(this\.data\.bgSrc\)/.test(cjs))
+// 10-10 我一度给这条加过第二个参数（新建页翻亮底墨字），站长说没下过这条需求，撤回原样（§8.191）。
+// 10-12 这条需求由他亲口下了：深浅判定搬进 utils/imgBrightness，页面只剩一个调用点，
+// 导航条由那一趟一起设——所以这一把改钉"页面只调 applyTone、不许自己碰 applyNavForBand"，
+// 并且三页必须同一个形状（谁再各抄一份 canvas 采样就红在这里）。
+ck('深浅与导航条走同一个出口（页面只调 bgTone.applyTone）',
+  /bgTone\.applyTone\(this, this\.data\.bgSrc, 'bgBrite'\)/.test(cjs) && !/applyNavForBand/.test(cjs))
+ck('三页都走那一个深浅出口（不各抄一份采样）',
+  ['create', 'index', 'me'].every((p) =>
+    /bgTone\.applyTone\(this, this\.data\.bgSrc, 'bgBrite'\)/.test(read(`pages/${p}/${p}.js`))))
+ck('浅色那一档在容器上有个名，data 里也有初值（第一帧不闪）',
+  /\{\{bgLight \? 'bg-light' : ''\}\}/.test(read('pages/create/create.wxml')) && /bgLight: false/.test(cjs))
+ck('浅色那一态的样式真在（只有类名没有规则＝静默不生效）',
+  /\.container\.has-bg\.bg-light \.page-scrim\s*\{/.test(wxss))
 ck('这一页不自己写 setNavigationBarColor（值只有一份）', !/setNavigationBarColor/.test(cjs))
 
 // ---------- ④ 入口唯一 ----------

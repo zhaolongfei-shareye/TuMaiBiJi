@@ -7,6 +7,7 @@ const { VERSION, SITE, introLead } = require('../../utils/appInfo.js')
 const { TIP_DOT } = require('../../utils/palette.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const cardCloud = require('../../utils/cardCloud.js')
+const bgTone = require('../../utils/imgBrightness.js')
 
 // 配额告警线。比值来自 GET /api/user/storage-quota 的 used_ratio，**它是全站口径**
 // （云开发那 5GB 是一个环境一个池子，不是每人 5GB），所以这一行说的是"这一池水快见底了"，
@@ -63,6 +64,8 @@ Page({
     tab: 'set',
     // 头部那一段铺不铺图：'' 表示不铺（形象文件被系统清了）。
     bgSrc: '',
+    // 背景图深浅那一档由 bgTone.applyTone 每次进页定（三页共用 utils/imgBrightness.js）。
+    bgLight: false,
     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
     // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
     dimV: 1,
@@ -128,7 +131,7 @@ Page({
     // 这一页原来只有导航条标题跟着语言走、底色永远吃壁纸：另外两页铺了图会翻成深底白字，
     // 于是三个 tab 顶上两深一浅。站长 10-01 晚要"按背景深浅自动反差"，这里补上同一条出口。
     app.setNavTitle('appName', lang)
-    app.applyNavForBand(this.data.bgSrc)
+    bgTone.applyTone(this, this.data.bgSrc, 'bgBrite')
     // 朋友圈这一路只在本页开：它要的是"单页可被转发"，别处不铺入口
     wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'], fail() {} })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {

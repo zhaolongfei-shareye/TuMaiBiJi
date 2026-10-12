@@ -105,6 +105,24 @@ function evaluate(F) {
     !/\.container\.has-bg \.head::after/.test(IX) && !/^\.head-band::after/m.test(ME)
     && /\.container\.has-bg \.head-scrim::after/.test(IX) && /^\.head-scrim::after/m.test(ME))
 
+  /* ---------- 10-12 背景图是浅色那一档（站长下的需求）：上面每一条规矩在浅态同样成立 ----------
+     浅态是把"压暗罩＋纸白字"整族翻成"提亮罩＋墨字"，所以同一条硬边规矩要再钉一遍；
+     延段仍必须挂在 `.head-scrim` 自己身上（「调亮度」那枚 opacity 照样管着它）。 */
+  const IXA = '.container.has-bg.bg-light .head-scrim'
+  const MEA = '.head-band.has-bg.bg-light .head-scrim'
+  ok('首页浅色那态：延段值＝浅色渐变自己的末档',
+    flat((/background:\s*(rgba\([^)]*\))/.exec(blockOf(IX, `${IXA}::after`)) || [])[1]) === lastStop(IX, IXA),
+    `延段 ${flat((/background:\s*(rgba\([^)]*\))/.exec(blockOf(IX, `${IXA}::after`)) || [])[1])}／末档 ${lastStop(IX, IXA)}`)
+  ok('「我的」浅色那态：延段值＝本页浅色渐变自己的末档',
+    flat((/background:\s*(rgba\([^)]*\))/.exec(blockOf(ME, `${MEA}::after`)) || [])[1]) === lastStop(ME, MEA),
+    `延段 ${flat((/background:\s*(rgba\([^)]*\))/.exec(blockOf(ME, `${MEA}::after`)) || [])[1])}／末档 ${lastStop(ME, MEA)}`)
+  ok('浅色那态两页的延段也挂在 `.head-scrim` 上（挪回 .head-band 就吃不到「调亮度」）',
+    new RegExp(`^\\${IXA}::after`, 'm').test(IX) && new RegExp(`^\\${MEA}::after`, 'm').test(ME)
+    && !/\.bg-light \.head-band::after/.test(ME) && !/\.bg-light \.head::after/.test(IX))
+  ok('浅色那态翻了三级字（只翻罩子不翻字＝白字压浅底，这一格就是需求本身）',
+    /\.container\.has-bg\.bg-light\s*\{[^}]*--text-primary:\s*rgba\(20, 22, 26/.test(CR),
+    blockOf(CR, '.container.has-bg.bg-light').trim().slice(0, 60))
+
   ;[['index', IX], ['me', ME], ['create', CR], ['密码面板那一份', SH]].forEach(([who, src]) => {
     const lines = src.split('\n')
     const at = (i) => String((lines[i] || '').trim())
@@ -201,8 +219,10 @@ const MUT = [
   ['玻璃面那一档里自己写一支白纱（不走 var()）', 'cr', (s) => s.replace(
     '  background: var(--glass-plate);\n  backdrop-filter',
     '  background: rgba(255, 255, 255, 0.44);\n  backdrop-filter')],
+  // 锚点必须带行首：10-12 起 me.wxss 里还有一支 `.head-band.has-bg.bg-light .head-scrim::after`，
+  // 它含 `.head-scrim::after {` 这个子串，不带 \n 的那一刀会先切中它、于是深态那把刀就没牙了（实测红过一次）。
   ['延段挪回 .head-band（吃不到「调亮度」那枚 opacity）', 'me', (s) => s.replace(
-    '.head-scrim::after {', '.head-band::after {')],
+    '\n.head-scrim::after {', '\n.head-band::after {')],
   ['延段那支比自家末档深一档（542 出硬边）', 'me', (s) => s.replace(
     '.head-scrim::after {\n  content: \'\';\n  position: absolute;\n  left: 0;\n  right: 0;\n  top: 100%;\n  height: 104rpx;\n  background: rgba(18, 20, 26, 0.44);',
     '.head-scrim::after {\n  content: \'\';\n  position: absolute;\n  left: 0;\n  right: 0;\n  top: 100%;\n  height: 104rpx;\n  background: rgba(18, 20, 26, 0.60);')],
@@ -220,6 +240,15 @@ const MUT = [
     'poster.bandGeom(info.width, info.height, poster.HEAD_IMG_H)', 'poster.bandGeom(info.width, info.height, 646)')],
   ['玻璃规则点一枚 markup 里没有的类（`.mini .c` 那一刀）', 'cr', (s) => s.replace(
     '.container.has-bg .mini-c {', '.container.has-bg .mini .c {')],
+  // 10-12 浅色那一档的四刀：每一刀都对应"浅态静默不对"的一种画法。
+  ['★浅色那态把延段挪回 .head-band（吃不到「调亮度」）', 'me', (s) => s.replace(
+    '.head-band.has-bg.bg-light .head-scrim::after {', '.head-band.has-bg.bg-light .head-band::after {')],
+  ['★浅色那态首页延段比自家末档深一档（542 出硬边）', 'ix', (s) => s.replace(
+    'rgba(242, 239, 233, 0.3) 100%)', 'rgba(242, 239, 233, 0.5) 100%)')],
+  ['★浅色那态「我的」延段比自家末档深一档', 'me', (s) => s.replace(
+    'rgba(242, 239, 233, 0.22) 100%)', 'rgba(242, 239, 233, 0.40) 100%)')],
+  ['★浅色那态只翻罩子不翻字（白字压浅底＝需求本身没落）', 'cr', (s) => s.replace(
+    '--text-primary: rgba(20, 22, 26, 0.92)', '--text-primary: #f2efe9')],
 ]
 let teeth = 0
 MUT.forEach(([name, key, mut]) => {

@@ -1,7 +1,9 @@
 <!-- 私密密码那一层：解锁要看私密笔记时浮这一层（与「我的」设／改／重置那一层同一份标记、
      同一张皮，来历写在 templates/pwd-sheet.wxml 头里）。放在根节点外面，只声明不渲染。 -->
 <import src="../../templates/pwd-sheet.wxml"/>
-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{detailOpen || templateOpen ? 'float-thru' : ''}}" bindtap="onBlankTap">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{detailOpen || templateOpen ? 'float-thru' : ''}}" bindtap="onBlankTap">
+  <!-- 背景图深浅那枚隐藏画布（与新建页、「我的」页同一份实现 utils/imgBrightness.js）。 -->
+  <canvas id="bgBrite" type="2d" style="position:fixed;left:-9999px;width:32px;height:32px;"></canvas>
   <!-- v12（站长 10-01 拍）：图只守头部这一段 542，下面整块是一张圆角卡往上盖住它 40，
        于是接缝四个角都是弧——和「我的」页那张 sheet 同一画法、同一个量。
        09-28 那版"图贯穿全屏"到此结束：当时打回的是"纸一圈描边 + 每条笔记又一圈描边"的框套框，
