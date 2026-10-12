@@ -2163,6 +2163,9 @@ module.exports = {
   bandGeom,
   BAND_H,
   HEAD_IMG_H,
+  /* 深浅采样要照同一条取景算"屏上那一条"落在原图哪几行，所以把这枚锚点也交出去：
+     留着它不外露就得在别处再写一遍 0.15，两遍迟早走样（同 HEAD_IMG_H 那笔账）。 */
+  BG_ANCHOR,
   mintAvatar,
   adoptLocal,
   removeAvatar,

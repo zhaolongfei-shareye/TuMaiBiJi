@@ -130,6 +130,18 @@ ck('三个 tab 页的画布只有笔记页出图那一枚（深浅采样走离�
     .map((p) => `${p}:${(read(`pages/${p}/${p}.wxml`).match(/<canvas/g) || []).length}`).join(' '))
 ck('采样确实只用离屏那一个口', /wx\.createOffscreenCanvas/.test(read('utils/imgBrightness.js'))
   && !/createSelectorQuery/.test(read('utils/imgBrightness.js')))
+// 10-12 他真机抓到：「怎么上面标题还是浅字体？你的逻辑是什么」——判据原来取的是**整张图平均**，
+// 那张黑白合影上半是浅墙（208~219）、下半两大块黑衣把全图平均压到 153 < 160，于是判成"深"、
+// 标题留在纸白，压在浅墙上只有 1.62:1。改判"字压着的那一条"之后钉这三条。
+const brightJs = read('utils/imgBrightness.js')
+ck('深浅采的是"字压着那一条"，不是整张图平均（求和只走那几行，不许再遍历整个 data）',
+  /function textRows/.test(brightJs) && /for \(let r = r0; r < r1/.test(brightJs)
+    && !/i < data\.length/.test(brightJs))
+ck('取景那两个数不在这儿重写一遍：盒高与锚点都从 poster 读（两处各写一个数迟早走样）',
+  /poster\.HEAD_IMG_H/.test(brightJs) && /poster\.BG_ANCHOR/.test(brightJs)
+    && !/=\s*740\b/.test(brightJs) && !/=\s*0\.15\b/.test(brightJs))
+ck('poster 真把那枚锚点交出来了（导出不加，这边读到的就是 undefined）',
+  /BG_ANCHOR,/.test(read('utils/poster.js')))
 ck('浅色那一档在容器上有个名，data 里也有初值（第一帧不闪）',
   /\{\{bgLight \? 'bg-light' : ''\}\}/.test(read('pages/create/create.wxml')) && /bgLight: false/.test(cjs))
 ck('浅色那一态的样式真在（只有类名没有规则＝静默不生效）',

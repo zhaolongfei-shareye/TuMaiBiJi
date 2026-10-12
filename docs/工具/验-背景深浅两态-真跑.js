@@ -2,7 +2,8 @@
 // 跑法：docs/工具/跑尺子.sh 9431 验-背景深浅两态-真跑
 //
 // 这一把要证的三件事，静态尺子一件都证不了：
-// ① 那张图**真的被 canvas 采过一次**并且判成浅色（storage 里落下 bgLum_<路径> 那一枚读数）；
+// ① 那张图**真的被 canvas 采过一次**并且判成浅色（storage 里落下 bgLumV2_<路径> 那一枚读数；
+//    前缀 V2 是因为口径换过一代：V1 采整张图平均，V2 只采字压着那一条——旧值不升前缀就不会重算）；
 // ② 采样回来之后 `bgLight` 与容器上的 `bg-light` 真的跟着翻了（有类名没规则、有规则没类名
 //    都是静默不生效，两边都得量渲染后的值）；
 // ③ 换一张深图翻得回去，而且旧那张的缓存键被扫掉（键只增不减那条债，就在这儿钉死）。
@@ -11,7 +12,7 @@
 // 加权亮度分别 ≈234／≈22／≈140），按 base64 参数递进小程序、用 FileSystemManager 落到 USER_DATA_PATH——
 // **不在 evaluate 里碰 `wx.createSelectorQuery()`**：实测那一趟返回时结构体克隆不了，
 // 报「An object could not be cloned」（画图交给宿主文件，采样仍由生产那套 canvas 自己跑）。
-// 收尾把 poster_profile 还原、探针文件与 bgLum_ 键删净，不留痕。
+// 收尾把 poster_profile 还原、探针文件与 bgLum 那批键（含旧前缀）删净，不留痕。
 const automator = require('miniprogram-automator')
 const fs = require('fs')
 const path = require('path')
@@ -21,10 +22,14 @@ const OUT = path.join(ROOT, 'docs/design/背景图深浅/实测')
 const LIGHT_FILE = 'probe-bg-light.jpg'
 const DARK_FILE = 'probe-bg-dark.jpg'
 const MID_FILE = 'probe-bg-mid.jpg'
+const MIX_FILE = 'probe-bg-mix.jpg'
 const b64Of = (rel) => fs.readFileSync(path.join(ROOT, rel)).toString('base64')
 const LIGHT_B64 = b64Of('docs/design/背景图深浅/探针-浅.jpg')
 const DARK_B64 = b64Of('docs/design/背景图深浅/探针-深.jpg')
 const MID_B64 = b64Of('docs/design/背景图深浅/探针-中灰.jpg')
+// 上三成 230、其余 30 那一枚：全图平均 90（旧那套"整张图取平均"判它是深、留白字），
+// 但字压着的那一条是 230。站长 10-12 真机那张黑白合影就是这个形状，这一枚是它的替身。
+const MIX_B64 = b64Of('docs/design/背景图深浅/探针-上浅下暗.jpg')
 
 let fails = 0
 let total = 0
@@ -44,7 +49,7 @@ async function main() {
 
   await mp.evaluate(() => {
     ;(wx.getStorageInfoSync().keys || []).forEach((k) => {
-      if (k.indexOf('bgLum_') === 0 || k === 'probe_draw') wx.removeStorageSync(k)
+      if (k.indexOf('bgLum') === 0 || k === 'probe_draw') wx.removeStorageSync(k)
     })
     wx.setStorageSync('probe_profile_backup', wx.getStorageSync('poster_profile') || null)
     return true
@@ -75,10 +80,12 @@ async function main() {
   const wLight = await write(LIGHT_FILE, LIGHT_B64)
   const wDark = await write(DARK_FILE, DARK_B64)
   const wMid = await write(MID_FILE, MID_B64)
+  const wMix = await write(MIX_FILE, MIX_B64)
   ok('② 浅色那张真落到本机用户目录', wLight === 'ok', wLight)
   ok('③ 深色那张真落到本机用户目录', wDark === 'ok', wDark)
   ok('③b 中灰那张真落到本机用户目录', wMid === 'ok', wMid)
-  if (wLight !== 'ok' || wDark !== 'ok' || wMid !== 'ok') { mp.close(); process.exit(1) }
+  ok('③c 上浅下暗那张真落到本机用户目录', wMix === 'ok', wMix)
+  if (wLight !== 'ok' || wDark !== 'ok' || wMid !== 'ok' || wMix !== 'ok') { mp.close(); process.exit(1) }
 
   const useSlot = (file) => mp.evaluate((f) => {
     const p = wx.getStorageSync('poster_profile') || {}
@@ -104,7 +111,7 @@ async function main() {
     /probe-bg-light\.jpg$/.test(String((light || {}).bgSrc || '')), String((light || {}).bgSrc))
 
   const lumKeys = await mp.evaluate(() => (wx.getStorageInfoSync().keys || [])
-    .filter((k) => k.indexOf('bgLum_') === 0)
+    .filter((k) => k.indexOf('bgLum') === 0)
     .map((k) => `${k.slice(-18)}=${wx.getStorageSync(k)}`))
   const lumNum = Number(/=(\d+)$/.exec((lumKeys || [])[0] || '=0')[1])
   ok('⑥ 读数按路径落进缓存，且落在浅色那一侧（>160）',
@@ -147,7 +154,7 @@ async function main() {
   }
   ok('⑧ 换深色那张之后翻回 false（不是停在上一张的判断上）', !!dark)
   const keysAfter = await mp.evaluate(() => (wx.getStorageInfoSync().keys || [])
-    .filter((k) => k.indexOf('bgLum_') === 0))
+    .filter((k) => k.indexOf('bgLum') === 0))
   ok('⑨ 旧那张的缓存键被扫掉（键只增不减那条债已还）',
     (keysAfter || []).length === 1, JSON.stringify(keysAfter))
   const clsDark = String((await (await page.$('.container')).attribute('class')) || '')
@@ -198,27 +205,50 @@ async function main() {
   await sleep(4000)
   await mp.screenshot({ path: path.join(OUT, '中灰-我的.png') })
 
+  /* ⑰ 判据取的是"字压着那一条"，不是整张图平均（10-12 他真机抓到：「怎么上面标题还是浅字体？
+     你的逻辑是什么」）。这张替身图上半 230／其余 30：整张平均 90，按旧逻辑判"深"、标题留纸白，
+     压在那面浅墙上实测只有 1.62:1。所以这两条是这一刀的正反两面——
+     ⑰ 判出来的必须是浅（标题翻墨）；⑱ 缓存里那枚读数必须是那一条的亮度（>200），
+     不是全图平均（90）——这条才是"取错了对象"直接能抓到的那一枚。图证：上浅下暗-首页.png。 */
+  await useSlot(MIX_FILE)
+  page = await mp.reLaunch('/pages/create/create')
+  for (let i = 0; i < 8 && !(await page.$('.container')); i += 1) await sleep(1500)
+  let mix = null
+  for (let i = 0; i < 12 && !mix; i += 1) {
+    const d = await page.data()
+    if (d && d.bgLight === true && /probe-bg-mix\.jpg$/.test(String(d.bgSrc || ''))) mix = d
+    else await sleep(1000)
+  }
+  ok('⑰ 上浅下暗那张判成浅（全图平均 90 会判深＝他抓到的那一态）', !!mix)
+  const mixLum = await mp.evaluate(() => (wx.getStorageInfoSync().keys || [])
+    .filter((k) => k.indexOf('bgLum') === 0)
+    .map((k) => `${k.slice(-16)}=${wx.getStorageSync(k)}`))
+  const mixNum = Number(/=(\d+)$/.exec((mixLum || [])[0] || '=0')[1])
+  ok('⑱ 缓存那枚读数＝字压着那一条的亮度（>200），不是全图平均（90）',
+    mixNum > 200, JSON.stringify(mixLum))
+  await mp.screenshot({ path: path.join(OUT, '上浅下暗-首页.png') })
+
   // ---------- 收尾：还原 profile、清掉探针文件与键 ----------
   await mp.evaluate((files) => {
     const b = wx.getStorageSync('probe_profile_backup')
     if (b && typeof b === 'object') wx.setStorageSync('poster_profile', b)
     else wx.removeStorageSync('poster_profile')
     ;(wx.getStorageInfoSync().keys || []).forEach((k) => {
-      if (k.indexOf('bgLum_') === 0 || k === 'probe_profile_backup' || k === 'probe_draw') wx.removeStorageSync(k)
+      if (k.indexOf('bgLum') === 0 || k === 'probe_profile_backup' || k === 'probe_draw') wx.removeStorageSync(k)
     })
     const fm = wx.getFileSystemManager()
     files.forEach((f) => { try { fm.unlinkSync(`${wx.env.USER_DATA_PATH}/${f}`) } catch (e) {} })
     return true
-  }, [LIGHT_FILE, DARK_FILE, MID_FILE])
+  }, [LIGHT_FILE, DARK_FILE, MID_FILE, MIX_FILE])
   const leftover = await mp.evaluate((files) => {
     const fm = wx.getFileSystemManager()
     const still = files.filter((f) => {
       try { fm.accessSync(`${wx.env.USER_DATA_PATH}/${f}`); return true } catch (e) { return false }
     })
     const keys = (wx.getStorageInfoSync().keys || []).filter((k) =>
-      k.indexOf('bgLum_') === 0 || k === 'probe_profile_backup' || k === 'probe_draw')
+      k.indexOf('bgLum') === 0 || k === 'probe_profile_backup' || k === 'probe_draw')
     return { files: still, keys }
-  }, [LIGHT_FILE, DARK_FILE, MID_FILE])
+  }, [LIGHT_FILE, DARK_FILE, MID_FILE, MIX_FILE])
   ok('⑪ 探针不留痕（文件、profile 备份与缓存键都清干净）',
     leftover && leftover.files.length === 0 && leftover.keys.length === 0, JSON.stringify(leftover))
 
