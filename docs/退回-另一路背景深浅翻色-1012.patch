@@ -1,0 +1,350 @@
+diff --git a/miniprogram/app.js b/miniprogram/app.js
+index 0ff2cf1..d6915b1 100644
+--- a/miniprogram/app.js
++++ b/miniprogram/app.js
+@@ -314,14 +314,22 @@ App({
+   // rgba(18,20,26,.58)，不管用户换哪张形象图，压完都是 #181A20 这一档的深，字就得是纸白。
+   // 没铺图的态不碰导航条——上面 applyTheme 已经按壁纸底色设过了，别在这里把主题色改丢。
+   // 原来这条判断在笔记页和新建页里各写一份，「我的」页漏了，于是三页的导航条两深一浅。
+-  //（10-10 我曾给这一条加过第二个参数、让新建页翻成亮底墨字，站长说没下过这条需求，已撤回。）
+-  applyNavForBand(hasBg) {
++  // 第二个参数 bgLight：浅色背景时翻成墨字浅底，避免白底白字看不见。
++  applyNavForBand(hasBg, bgLight) {
+     if (!hasBg) return
+-    wx.setNavigationBarColor({
+-      frontColor: '#ffffff',
+-      backgroundColor: '#181a20',
+-      fail() {},
+-    })
++    if (bgLight) {
++      wx.setNavigationBarColor({
++        frontColor: '#000000',
++        backgroundColor: '#f2efe9',
++        fail() {},
++      })
++    } else {
++      wx.setNavigationBarColor({
++        frontColor: '#ffffff',
++        backgroundColor: '#181a20',
++        fail() {},
++      })
++    }
+   },
+ 
+   // 导航条标题原来只写在 pages/*/*.json 里，全是硬编码中文：英文用户在语言页切完，
+diff --git a/miniprogram/pages/create/create.js b/miniprogram/pages/create/create.js
+index f9ea099..c3a8b4b 100644
+--- a/miniprogram/pages/create/create.js
++++ b/miniprogram/pages/create/create.js
+@@ -6,6 +6,7 @@ const cloudUpload = require('../../utils/cloudUpload.js')
+ const assetQueue = require('../../utils/assetQueue.js')
+ const { compressForBackup } = require('../../utils/imageCompress.js')
+ const person = require('../../utils/person.js')
++const { analyzeBgBrightness } = require('../../utils/imgBrightness.js')
+ 
+ // 链接规范：必须有协议头、主机名里要有顶级域、整串不能出现空白。
+ // 之前只判"以 http 开头且某处有个点"，`https://a.com 后面还有字` 和 `http:///a.b` 都能过，
+@@ -119,6 +120,7 @@ Page({
+     cardCount: 0,
+     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
+     bgSrc: '',
++    bgLight: false,
+     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
+     // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
+     dimV: 1,
+@@ -187,6 +189,7 @@ Page({
+     // 英文用户会在第一屏看到中文，切个 tab 才变——所以先等登录这条链。
+     await app.getLoginPromise().catch(() => {})
+     const lang = app.globalData.userInfo?.language || 'zh'
++    const bgSrc = poster.homeBg()
+     this.setData({
+       lang,
+       t: texts(lang),
+@@ -196,7 +199,7 @@ Page({
+       // 三块的面色也跟着壁纸走，同一趟重算：漏了这一位，换完壁纸回到首页三块还停在象牙那档。
+       blkSkin: entryBlocks(app.getWallpaper()).style,
+       // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
+-      bgSrc: poster.homeBg(),
++      bgSrc: bgSrc,
+       // 背景深浅那一档也是每次进页重读：在「我的」页里改过、或别的 tab 点过那枚点，回到这一屏就该跟上。
+       ...app.bgSkin(),
+       // Tips 跟着语言整批换（英文态不能看到六句中文），并从第 1 句起重播
+@@ -212,6 +215,16 @@ Page({
+     this._sync()
+     app.setNavTitle('appName', lang)
+     app.applyNavForBand(this.data.bgSrc)
++    if (bgSrc) {
++      analyzeBgBrightness(bgSrc, 'bgBrite', this).then((light) => {
++        if (light !== this.data.bgLight) {
++          this.setData({ bgLight: light })
++          app.applyNavForBand(bgSrc, light)
++        }
++      })
++    } else if (this.data.bgLight) {
++      this.setData({ bgLight: false })
++    }
+     this.startTips()
+     this.loadEntryStats()
+     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+diff --git a/miniprogram/pages/create/create.wxml b/miniprogram/pages/create/create.wxml
+index 9d7f38c..b21519e 100644
+--- a/miniprogram/pages/create/create.wxml
++++ b/miniprogram/pages/create/create.wxml
+@@ -1,4 +1,4 @@
+-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{active ? 'entry-dock' : ''}}" bindtap="collapse">
++<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{active ? 'entry-dock' : ''}}" bindtap="collapse">
+   <!-- 首页背景。图就是「我的 → 卡片模板」最上面那张形象图，没设过就用包里这张站长人像。
+        必须用 <image> 组件而不是 wxss 的 background-image：后者不认小程序包里的
+        本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
+@@ -229,6 +229,8 @@
+     </view>
+ 
+   </view>
++  <!-- 背景图深浅判断用的那枚隐藏画布，与笔记页、「我的」页各一枚同一画法。 -->
++  <canvas id="bgBrite" type="2d" style="position:fixed;left:-9999px;width:32px;height:32px;"></canvas>
+ </view>
+ 
+ <!-- 滑动确认那一枚长条。三个模式共用一份，所以写成模板；
+diff --git a/miniprogram/pages/create/create.wxss b/miniprogram/pages/create/create.wxss
+index 979aee2..30ae10e 100644
+--- a/miniprogram/pages/create/create.wxss
++++ b/miniprogram/pages/create/create.wxss
+@@ -1115,6 +1115,20 @@
+   --accent: #f2efe9;
+ }
+ 
++/* 浅色背景：变量翻回墨色，罩子换浅色提亮。 */
++.container.has-bg.bg-light {
++  --text-primary: rgba(20, 22, 26, 0.92);
++  --text-secondary: rgba(20, 22, 26, 0.68);
++  --text-tertiary: rgba(20, 22, 26, 0.46);
++  --accent: rgba(20, 22, 26, 0.92);
++}
++
++.container.has-bg.bg-light .page-scrim {
++  background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.35) 10%,
++    rgba(242, 239, 233, 0.28) 43%, rgba(242, 239, 233, 0.22) 62%,
++    rgba(242, 239, 233, 0.28) 83%, rgba(242, 239, 233, 0.32) 88%, rgba(242, 239, 233, 0.38) 100%);
++}
++
+ /* 展开：整块从流里拿出来，沉到底栏上方，面板向上长。
+    上一版是"把 66vh 那段留白让回 0、面板从顶上挂下来"，真机反馈两件事：
+    ① 它把上半屏的照片和标题整个盖住了；② 四个模式的面板自然高度不一样，切一次窗口跳一次。
+diff --git a/miniprogram/pages/index/index.js b/miniprogram/pages/index/index.js
+index 222476b..6803671 100644
+--- a/miniprogram/pages/index/index.js
++++ b/miniprogram/pages/index/index.js
+@@ -10,6 +10,7 @@ const { isPrivate, needsUnlock, unlockOn } = require('../../utils/privateGate.js
+ const pwdSheet = require('../../utils/pwdSheet.js')
+ const cloudUpload = require('../../utils/cloudUpload.js')
+ const { formatShortDate, formatDateTime } = require('../../utils/date.js')
++const { analyzeBgBrightness } = require('../../utils/imgBrightness.js')
+ // 10-11：这一屏不再画那一位小人（站长「列表左上角的人都去掉，维持只有首页有」），
+ // 所以 `utils/person.js` 在这一页的 require 一并撤——首页那一屏仍在用它，别处不许跟着删。
+ 
+@@ -130,6 +131,9 @@ Page({
+     // 头部那一段铺不铺图：'' 表示不铺（用户在外观设置里关掉了，或形象文件被系统清了）。
+     // 取图和新建页同一个口，不在这页另开一份判断。
+     bgSrc: '',
++    // 背景图是浅色（字要翻深）：由 onShow 里 analyzeBgBrightness 现算，
++    // 同一张图只算一次（结果存 localStorage），初值 false = 先按深色背景出字，算完再翻。
++    bgLight: false,
+     // 淡底方形左上角那枚品牌字，与海报上无形象时的占位字是同一个常量（poster.BRAND_GLYPH）
+     brandGlyph: poster.BRAND_GLYPH,
+     // 右上那枚淡底方形的底：每次进页跟着壁纸重算（见 paleStep 那条规则）
+@@ -190,6 +194,18 @@ Page({
+     app.setNavTitle('appName', lang)
+     this.fitHead(bgSrc)
+     app.applyNavForBand(this.data.bgSrc)
++    // 背景图深浅判断：canvas 采样一次，结果写回 bgLight。
++    // 异步的——第一帧先按深色出字（bgLight 初值 false），算完再翻，避免阻塞首屏。
++    if (bgSrc) {
++      analyzeBgBrightness(bgSrc, 'bgBrite', this).then((light) => {
++        if (light !== this.data.bgLight) {
++          this.setData({ bgLight: light })
++          app.applyNavForBand(bgSrc, light)
++        }
++      })
++    } else if (this.data.bgLight) {
++      this.setData({ bgLight: false })
++    }
+     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+       this.getTabBar().updateLabels()
+       this.getTabBar().applyTheme(app.getWallpaper())
+diff --git a/miniprogram/pages/index/index.wxml b/miniprogram/pages/index/index.wxml
+index 2eecb6e..5d729d8 100644
+--- a/miniprogram/pages/index/index.wxml
++++ b/miniprogram/pages/index/index.wxml
+@@ -1,7 +1,7 @@
+ <!-- 私密密码那一层：解锁要看私密笔记时浮这一层（与「我的」设／改／重置那一层同一份标记、
+      同一张皮，来历写在 templates/pwd-sheet.wxml 头里）。放在根节点外面，只声明不渲染。 -->
+ <import src="../../templates/pwd-sheet.wxml"/>
+-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{detailOpen || templateOpen ? 'float-thru' : ''}}" bindtap="onBlankTap">
++<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{detailOpen || templateOpen ? 'float-thru' : ''}}" bindtap="onBlankTap">
+   <!-- v12（站长 10-01 拍）：图只守头部这一段 542，下面整块是一张圆角卡往上盖住它 40，
+        于是接缝四个角都是弧——和「我的」页那张 sheet 同一画法、同一个量。
+        09-28 那版"图贯穿全屏"到此结束：当时打回的是"纸一圈描边 + 每条笔记又一圈描边"的框套框，
+@@ -405,4 +405,7 @@
+        冒泡上去就会在关这一层的同时把他打的词一起清掉。
+        这一层和详情窗不会同时浮着：点那一行是先问密码、后开窗（onRowTap），验不过连窗都不开。 -->
+   <template is="pwdSheet" data="{{pwdOpen, pwdEntering, pwdName, pwdScene, pwdTip, pwdBuf, pwdFocus, t}}"/>
++  <!-- 背景图深浅判断用的那枚隐藏画布：32×32 缩一份采样，结果存 localStorage，
++       同一张图只算一次。off-screen 不占屏位，但必须在页面树里才查得到节点。 -->
++  <canvas id="bgBrite" type="2d" style="position:fixed;left:-9999px;width:32px;height:32px;"></canvas>
+ </view>
+diff --git a/miniprogram/pages/index/index.wxss b/miniprogram/pages/index/index.wxss
+index 1ebe5ee..4df1266 100644
+--- a/miniprogram/pages/index/index.wxss
++++ b/miniprogram/pages/index/index.wxss
+@@ -1305,6 +1305,46 @@
+   color: rgba(242, 239, 233, 0.62);
+ }
+ 
++/* 浅色背景：字翻回墨色，罩子换成浅色提亮（不压暗），导航条也跟着翻。 */
++.container.has-bg.bg-light .h1 {
++  color: rgba(20, 22, 26, 0.92);
++}
++
++.container.has-bg.bg-light .stat .n {
++  color: rgba(20, 22, 26, 0.78);
++}
++
++.container.has-bg.bg-light .stat .l {
++  color: rgba(20, 22, 26, 0.56);
++}
++
++.container.has-bg.bg-light .ic {
++  color: rgba(20, 22, 26, 0.68);
++}
++
++.container.has-bg.bg-light .ic.on {
++  color: rgba(20, 22, 26, 0.92);
++}
++
++.container.has-bg.bg-light .srch {
++  background: rgba(20, 22, 26, 0.06);
++  border-color: rgba(20, 22, 26, 0.15);
++  color: rgba(20, 22, 26, 0.92);
++}
++
++.container.has-bg.bg-light .srch-ph {
++  color: rgba(20, 22, 26, 0.42);
++}
++
++.container.has-bg.bg-light .head-scrim {
++  background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.28) 30%,
++    rgba(242, 239, 233, 0.22) 62%, rgba(242, 239, 233, 0.30) 100%);
++}
++
++.container.has-bg.bg-light .head-scrim::after {
++  background: rgba(242, 239, 233, 0.30);
++}
++
+ /* 分类筛选 v30 起改「文字 + 短杠」（见上面 .ix-cat 那段）。这里原来那四条
+    `.chip.tone`／`.chip.tone.active`／`.container.has-bg .chip.all`／`.…all.active` 一起删掉：
+    胶囊的底与描边没有了，`toneVars` 那对 --tone-bg/--tone-ink 在这一行不再被消费。
+diff --git a/miniprogram/pages/me/me.js b/miniprogram/pages/me/me.js
+index cab416e..77d985f 100644
+--- a/miniprogram/pages/me/me.js
++++ b/miniprogram/pages/me/me.js
+@@ -7,6 +7,7 @@ const { VERSION, SITE, introLead } = require('../../utils/appInfo.js')
+ const { TIP_DOT } = require('../../utils/palette.js')
+ const cloudUpload = require('../../utils/cloudUpload.js')
+ const cardCloud = require('../../utils/cardCloud.js')
++const { analyzeBgBrightness } = require('../../utils/imgBrightness.js')
+ 
+ // 配额告警线。比值来自 GET /api/user/storage-quota 的 used_ratio，**它是全站口径**
+ // （云开发那 5GB 是一个环境一个池子，不是每人 5GB），所以这一行说的是"这一池水快见底了"，
+@@ -63,6 +64,7 @@ Page({
+     tab: 'set',
+     // 头部那一段铺不铺图：'' 表示不铺（形象文件被系统清了）。
+     bgSrc: '',
++    bgLight: false,
+     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
+     // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
+     dimV: 1,
+@@ -112,11 +114,12 @@ Page({
+     // 站长 10-01：这三样是**应用自己**的自我介绍，不是用户的签名——原来它吃本机填的
+     // 名称/一句话/形象图，英文态就把人自己写的"阿麦"顶到了这一屏最上面。
+     // 卡片模板页那两栏照旧留着，它们印在海报上；这一格不再跟着走。
++    const bgSrc = poster.homeBg()
+     this.setData({
+       lang,
+       t: texts(lang),
+       themeClass,
+-      bgSrc: poster.homeBg(),
++      bgSrc,
+       ...app.bgSkin(),
+       logoSrc: '/assets/logo.png',
+       nameText: t('meGreeting', lang),
+@@ -129,6 +132,16 @@ Page({
+     // 于是三个 tab 顶上两深一浅。站长 10-01 晚要"按背景深浅自动反差"，这里补上同一条出口。
+     app.setNavTitle('appName', lang)
+     app.applyNavForBand(this.data.bgSrc)
++    if (bgSrc) {
++      analyzeBgBrightness(bgSrc, 'bgBrite', this).then((light) => {
++        if (light !== this.data.bgLight) {
++          this.setData({ bgLight: light })
++          app.applyNavForBand(bgSrc, light)
++        }
++      })
++    } else if (this.data.bgLight) {
++      this.setData({ bgLight: false })
++    }
+     // 朋友圈这一路只在本页开：它要的是"单页可被转发"，别处不铺入口
+     wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'], fail() {} })
+     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+diff --git a/miniprogram/pages/me/me.wxml b/miniprogram/pages/me/me.wxml
+index 4a4781b..01897a3 100644
+--- a/miniprogram/pages/me/me.wxml
++++ b/miniprogram/pages/me/me.wxml
+@@ -1,7 +1,7 @@
+ <!-- 私密密码那一层的标记搬到 templates/pwd-sheet.wxml（10-12 起三页共用一份），本页只挂数据与方法。
+      <import> 不渲染任何东西，放在根节点外面。 -->
+ <import src="../../templates/pwd-sheet.wxml"/>
+-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}}">
++<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}}">
+   <!-- has-bg 这一档 10-11 才补到 container 上（原来只有下面 .head-band 带）。需求原文：
+        站长 10-11「界面纯色底色部分改为半透明毛玻璃效果，按钮ICON不变」＋「毛玻璃白底下面
+        如果没有背景图，你可以下移背景图」＋ X4 那一格他回「做」。玻璃那几条规则全站统一以
+@@ -12,7 +12,7 @@
+        仍是"下面那一层往上凸出来盖住图的下沿"，只是这一层的颜色换成了页面底，
+        所以它不再是一张卡，只是把那道弧留住。 -->
+   <view class="head">
+-    <view class="head-band {{bgSrc ? 'has-bg' : ''}}">
++    <view class="head-band {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}}">
+       <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
+       <!-- 「调亮度」那一枚点拧的就是这一层：dimScrim 空串＝全铺（最沉那一档＝现网样子），
+            opacity:0＝一点不压（＝原图亮度）。三页同一个本机键，所以一起沉、一起亮。 -->
+@@ -176,4 +176,6 @@
+       </view>
+     </view>
+   </view>
++  <!-- 背景图深浅判断用的那枚隐藏画布，与笔记页、首页各一枚同一画法。 -->
++  <canvas id="bgBrite" type="2d" style="position:fixed;left:-9999px;width:32px;height:32px;"></canvas>
+ </view>
+diff --git a/miniprogram/pages/me/me.wxss b/miniprogram/pages/me/me.wxss
+index 334308f..980e8d9 100644
+--- a/miniprogram/pages/me/me.wxss
++++ b/miniprogram/pages/me/me.wxss
+@@ -67,6 +67,20 @@
+   color: rgba(242, 239, 233, 0.96);
+ }
+ 
++/* 浅色背景：字翻回墨色，罩子换浅色提亮。 */
++.head-band.has-bg.bg-light .h1 {
++  color: rgba(20, 22, 26, 0.92);
++}
++
++.head-band.bg-light .head-scrim {
++  background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.35) 14%,
++    rgba(242, 239, 233, 0.28) 58%, rgba(242, 239, 233, 0.22) 100%);
++}
++
++.head-band.bg-light .head-scrim::after {
++  background: rgba(242, 239, 233, 0.22);
++}
++
+ .head-scrim {
+   position: absolute;
+   left: 0;
