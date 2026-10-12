@@ -58,9 +58,20 @@ GLASS_JOT = 'rgba(255,255,255,.38)'       # --glass-jot：白条
 #   合成后只剩中灰，块里的字就不够 4.5 了（两个数都在下面 head 里现算现印）。
 #   效果图这一版按 **白 .72** 画（甲案：只抬这一枚令牌，字色一个不动）——这一档他没拍过。
 PLATE = 'rgba(255,255,255,.72)'
-SCRIM = ('linear-gradient(180deg,rgba(18,20,26,.58) 0%,rgba(18,20,26,.58) 10%,'
-         'rgba(18,20,26,.44) 43%,rgba(18,20,26,.42) 62%,rgba(18,20,26,.52) 83%,'
-         'rgba(18,20,26,.62) 88%,rgba(18,20,26,.72) 100%)')
+# 现网 `.page-scrim` 那一条：七个停点、透明度 .58→.42→.72（先浅后深，中段最透）。
+# 他 10-13「黑底的半透明渐变效果不好，要与现网的渐变的过程一样」⇒ 黑底与内框都复用**同一串停点**，
+# 只换基色与透明度，不自己另发明一种缓动。
+SCRIM_STOPS = ((0, .58), (10, .58), (43, .44), (62, .42), (83, .52), (88, .62), (100, .72))
+SCRIM_ALPHAS = tuple(a for _, a in SCRIM_STOPS)
+
+
+def ramp(rgb, alphas):
+    parts = ['rgba({},{},{},{}) {}%'.format(rgb[0], rgb[1], rgb[2], alphas[i], pos)
+             for i, (pos, _) in enumerate(SCRIM_STOPS)]
+    return 'linear-gradient(180deg,' + ','.join(parts) + ')'
+
+
+SCRIM = ramp((18, 20, 26), SCRIM_ALPHAS)
 
 _fs = re.search(r'--fs-h1:\s*(\d+)rpx;.*?--fs-title:\s*(\d+)rpx;.*?--fs-body:\s*(\d+)rpx;'
                 r'.*?--fs-meta:\s*(\d+)rpx;.*?--fs-tiny:\s*(\d+)rpx;.*?--fs-micro:\s*(\d+)rpx;',
@@ -123,7 +134,17 @@ GRP_TOP = ENTRY_TOP
 CARD_X, CARD_W, CARD_H = ENTRY_X, 308, ENTRY_H
 COL_X = CARD_X + CARD_W + 12                        # .blk-row gap 12
 COL_W = STAGE_W - 24 - COL_X                        # 702 组宽 - 左块 - 缝
-NUM_H = 124                                         # 下方那一格黑色毛玻璃：数字／横线／小字 三排
+# 人物那一格的高度**不是拍的数**，是从两张 PNG 自己的比例算出来的（现网同一道算式）：
+# `.blk-fig` 宽 220、`.blk-figwrap` 上边出血 52 ⇒ 女那张 264.6 高、脚正好落在黑条上沿；
+# 男那张 319 高、比女高 54.4，靠这一窗裁齐（现网注释原话「男的那张比女那张高约 55rpx」）。
+FIG_W, BLEED = 220, 52
+def _ratio(f):
+    w, h = Image.open(os.path.join(HERE, f)).size
+    return h / w
+FIG_H_F = round(FIG_W * _ratio('ic-person.png'))
+FIG_H_M = round(FIG_W * _ratio('ic-person-alt.png'))
+FACE_H = FIG_H_F - BLEED                            # 白面那一格：212.6
+NUM_H = CARD_H - FACE_H                             # 黑条那一格：197.4
 
 PANEL_TOP = 1000                                    # 深色面板顶：把首屏那一组与第二屏框外那一行一起包住
 PANEL_H = STAGE_H - PANEL_TOP
@@ -131,6 +152,7 @@ PANEL_R = 40                                        # ← 这一枚他没给数�
 BAND = 240                                          # 上部那段渐变毛玻璃的高度
 
 PLUS = 140                                          # 圆形 ➕：右列底下那一格
+N_CELLS = 7                                         # ① 首屏两态 ＋ ②–⑥ 第二屏五态
 
 
 def sample(img_name, xr, yr, r=6):
@@ -205,8 +227,8 @@ def panel(inner):
 
 # ---------------- 首屏 ----------------
 def num_cell(x, w, n, label):
-    """数字在横线**上方**、分类名在横线**下方**（他 10-13 原话）；
-    数字用现网那支数字字形（`.blk-n`＝WtsjMind／Poppins Thin，同一族，只是从 88 收到 52），
+    """数字在横线**上方**、分类名在横线**下方**（他 10-13 原话）；整格可点。
+    数字用现网那支数字字形（`.blk-n`＝WtsjMind／Poppins Thin，同一族，只是从 88 收到 64），
     小字吃现成的 `--fs-micro` 那一档（＝「照片 · 链接 · 文字」那行同一个字号，他说的"正常小字"）。"""
     return ('<div style="{p}"><span class="num">{n}</span><span class="rule"></span>'
             '<span class="lab">{lab}</span></div>').format(
@@ -215,40 +237,51 @@ def num_cell(x, w, n, label):
         n=n, lab=label)
 
 
-def screen_home(lang):
-    # 左块＝人物。10-13 他一句「两个人背景用纯白渐变毛玻璃，下方数字区域用黑色毛玻璃，要模仿 ios 效果」
-    # ⇒ 这一块不再是单层玻璃，拆成上下两片皮：上＝白渐变（iOS 控制中心那种上亮下透），下＝黑玻璃。
-    face_h = CARD_H - NUM_H
+def screen_home(lang, big='f'):
+    """big='f'＝女在大位（现网默认），big='m'＝点过剪影换到大人那一张。
+    他 10-13「两个人切换到大人时候，人头要高于内框上沿，与目前现网一样」⇒ ⑦ 专门画这一态来自证。"""
+    main, alt = ('ic-person.png', 'ic-person-alt.png') if big == 'f' else \
+                ('ic-person-alt.png', 'ic-person.png')
+    # 内框（白面那一格）：他要"渐变＋一定半透明"⇒ 停点照 .page-scrim 那一串，只把基色换成白
     white = ('<div style="{p}"></div>').format(
-        p=box(0, 0, CARD_W, face_h,
-              'background:linear-gradient(to bottom,rgba(255,255,255,.94) 0px,'
-              'rgba(255,255,255,.86) {}px,rgba(255,255,255,.76) 100%);'
-              'backdrop-filter:{};-webkit-backdrop-filter:{}'.format(face_h * .45, GLASS_BF, GLASS_BF)))
-    # 取景窗照旧从块顶往上出血 52（他人物超出块顶那一下是他拍板的），下沿停在黑玻璃上沿
-    fig = ('<div style="{w}"><img class="fig" src="ic-person.png"/>'
-           '<img class="fig-alt" src="ic-person-alt.png"/>'
-           '<div class="alt-hit"></div></div>').format(
-        w=box(0, -52, CARD_W, face_h + 52, 'overflow:hidden;'))
+        p=box(0, 0, CARD_W, FACE_H,
+              'border-radius:34px 34px 0 0;overflow:hidden;background:{};'
+              'backdrop-filter:{};-webkit-backdrop-filter:{}'.format(
+                  ramp((255, 255, 255), (.92, .92, .84, .80, .74, .70, .64)), GLASS_BF, GLASS_BF)))
+    # 取景窗：上边出血 52（人头高于内框上沿＝现网那一下），下边正好停在黑条上沿。
+    # ⚠ 这一层自己吃 overflow:hidden，**卡那一层不能吃**——卡一吃就把出血那 52 裁掉、人头被切平，
+    #    他这一句打回的就是我上一版写在卡上的那一道 overflow。
+    fig = ('<div style="{w}"><img class="fig" src="{m}"/>'
+           '<img class="fig-alt" src="{a}"/><div class="alt-hit"></div></div>').format(
+        w=box(0, -BLEED, CARD_W, FACE_H + BLEED, 'overflow:hidden;'), m=main, a=alt)
+    # 黑条那一格：他要"与现网的渐变的过程一样"⇒ 直接复用 .page-scrim 那七个停点与那串透明度
     dark = ('<div style="{p}">{c}</div>').format(
-        p=box(0, face_h, CARD_W, NUM_H,
-              'background:rgba(20,22,26,.55);backdrop-filter:{};-webkit-backdrop-filter:{};'
-              'box-shadow:inset 0 1px 0 rgba(255,255,255,.18);'.format(GLASS_BF, GLASS_BF)),
-        c=num_cell(22, (CARD_W - 44 - 20) / 2, '16', T(lang, 'statNotes'))
-          + num_cell(22 + (CARD_W - 44 - 20) / 2 + 20, (CARD_W - 44 - 20) / 2, '13', T(lang, 'statCards')))
+        p=box(0, FACE_H, CARD_W, NUM_H,
+              'border-radius:0 0 34px 34px;overflow:hidden;'
+              'backdrop-filter:{};-webkit-backdrop-filter:{};'.format(GLASS_BF, GLASS_BF)
+              + 'box-shadow:inset 0 1px 0 rgba(255,255,255,.18);'),
+        # ⚠ 直接照抄 `.page-scrim` 那串 .42→.72 是**看不见的**：它下面垫的是已经近实心的墨黑面板
+        # （实测 (40,42,48)），透明度差 .3 合成下来只差 2 级。所以停点位置与"平—凹—深"的形状照抄，
+        # 幅度拉开到 (.35→.92)——合成差 13 级，肉眼才读得出这是一条渐变。
+        c=('<div style="{}"></div>'.format(
+               box(0, 0, CARD_W, NUM_H,
+                   'background:' + ramp((18, 20, 26), (.45, .45, .38, .35, .50, .68, .92)) + ';'))
+           + num_cell(22, (CARD_W - 44 - 20) / 2, '16', T(lang, 'statNotes'))
+           + num_cell(22 + (CARD_W - 44 - 20) / 2 + 20, (CARD_W - 44 - 20) / 2, '13', T(lang, 'statCards'))))
+    # 卡这一层：只做圆角与那一圈描边，**不裁子节点**（出血靠它）
     card = ('<div style="{p}">{a}{f}{b}</div>').format(
         p=pbox(CARD_X, GRP_TOP, CARD_W, CARD_H,
-               'border-radius:34px;overflow:hidden;box-shadow:inset 0 0 0 2px {}'.format(GLASS_HAIR)),
+               'border-radius:34px;box-shadow:inset 0 0 0 2px {}'.format(GLASS_HAIR)),
         a=white, f=fig, b=dark)
-    # 右列＝上 Tips、下圆形 ➕。10-13 他一句「Tips 处在区域，Tips 要上下居中对齐」
-    # ⇒ Tips 在它那一格里上下居中（不再是顶对齐），点仍跟着第一行字。
+    # 右列＝上 Tips（在格子里上下居中）、下圆形 ➕
     plus_top = GRP_TOP + CARD_H - PLUS
     tips = ('<div style="{p}"><div class="tipsin"><i class="dot" style="background:{d}"></i>'
             '<span>{pre}{txt}</span></div></div>').format(
-        p=pbox(COL_X, GRP_TOP, COL_W, plus_top - 24 - GRP_TOP, 'display:flex;align-items:center'),
+        p=pbox(COL_X, GRP_TOP, COL_W, plus_top - 40 - GRP_TOP, 'display:flex;align-items:center'),
         d=TIP_DOT, pre=T(lang, 'tipsPrefix'), txt=T(lang, 'tips')[0])
-    # 圆形 ➕：10-13 他一句「带+号的按钮颜色与第二屏拍照按钮颜色一致」⇒ 吃快门那支实心橙
+    # 圆形 ➕：他 10-13「右下的圆按钮要往中间靠，现在太边缘了」⇒ 从贴右沿挪进右列正中
     plus = ('<div style="{p}">{g}</div>').format(
-        p=pbox(COL_X + COL_W - PLUS, plus_top, PLUS, PLUS,
+        p=pbox(COL_X + (COL_W - PLUS) / 2, plus_top, PLUS, PLUS,
                'border-radius:50%;background: {};display:flex;align-items:center;'
                'justify-content:center;box-shadow:0 10px 26px rgba(0,0,0,.30);'.format(CP['--cp-cam'])),
         g=svg('plus', 56, CP['--cp-cam-ink'], 2.2))
@@ -438,7 +471,10 @@ def screen_entry(lang, kind, open_panel=False):
 def frame(lang, body, cap, tag=''):
     zh_on = 'lon' if lang == 'zh' else ''
     en_on = 'lon' if lang == 'en' else ''
+    # 枚红小方块＝行锚：表头那三张缩略图里也有深色导航带，按颜色扫行会撞上它们
+    # （10-13 就这么把 7 屏扫成 2 行、又把一行扫出 7 个假起点）。枚红不会出现在界面与照片里。
     return ('<div class="cell"><div class="stage">'
+            '<div class="mark"></div>'
             '<div class="nav"><span class="nt">{app}</span><span class="caps"><i></i><em></em><b></b></span></div>'
             '<div class="page"><div class="bg"></div><div class="scrim" style="opacity:{veil}"></div>'
             '<div class="trow"><span class="h1">{head}</span><span class="langs">'
@@ -468,6 +504,7 @@ body{background:#EAE7E2;padding:28px;font-family:-apple-system,"PingFang SC",san
 .head code{background:#F2EFE9;padding:1px 4px;border-radius:4px;font-size:13px}
 .grid{display:grid;grid-template-columns:repeat(3,__W__px);gap:34px 26px}
 .cell{width:__W__px}
+.mark{position:absolute;left:36px;top:0;width:8px;height:8px;background:#FF00FF;z-index:20}
 .stage{position:relative;width:__W__px;height:__H__px;background:#0E0D0B;overflow:hidden;
        border-radius:36px;box-shadow:0 10px 26px rgba(0,0,0,.28)}
 .nav{position:absolute;left:0;top:0;width:__W__px;height:__NAVH__px;background:#14161A;z-index:9}
@@ -544,10 +581,14 @@ def build(lang):
         (screen_home(lang), '① 首屏（B 方案）',
          '通栏深色面板压在形象图之上、框框之下：左上／右上圆角，顶上一段同色渐变（.55→.94，240rpx）'
          '＋ backdrop blur，墨黑 <code>' + INK + '</code>。'
-         '<b>左块与第二屏那块面板同一条顶、同一条底（1107–1517，410 高）</b>，两个人跟着块顶一起上移 99rpx；'
-         '下半 124 高那一格＝<b>黑色毛玻璃</b>，数字在横线<b>上方</b>、分类名在横线下方（整格可点）；'
-         '上半＝<b>纯白渐变毛玻璃</b>（.94→.86→.76）。'
-         '圆形 ➕ 吃<b>快门那支实心橙</b> <code>' + CP['--cp-cam'] + '</code>。'
+         '<b>左块与第二屏那块面板同一条顶、同一条底（1107–1517，410 高）</b>。'
+         '内框分两片皮：<b>上＝白渐变毛玻璃</b>（停点照现网 <code>.page-scrim</code> 那一串，'
+         '透明度 .92→.64，"要有一定半透明"）、<b>下＝黑条</b>（同一串停点、同一串透明度 .58→.72）。'
+         '黑条那一格高 <b>' + str(NUM_H) + '</b>——这个数不是我拍的，是<b>女那张脚底落在哪</b>算出来的：'
+         '取景窗上出血 ' + str(BLEED) + ' ＋ 220 宽 × 433/360 ＝ ' + str(FIG_H_F) + ' 高 ⇒ '
+         '人头高于内框上沿、脚与黑条靠住，中间不悬空。数字在横线上方、分类名在下方（整格可点）。'
+         '圆形 ➕ 吃<b>快门那支实心橙</b> <code>' + CP['--cp-cam'] + '</code>，'
+         '并从贴右沿<b>往中间靠</b>到右列正中（x ' + str(round(COL_X + (COL_W - PLUS) / 2)) + '）。'
          'Tips 在它那一格里<b>上下居中</b>。人物与"点右后方剪影换人"照旧。'),
         (screen_entry(lang, 'photo'), '② 点圆形 ➕ ＝ 第二屏',
          '现网那一屏一个字不动，只是外面多一层深色面板；框外那一行 Tips 在'
@@ -562,8 +603,15 @@ def build(lang):
          '缩略图 100 见方、圆角 18、✕ 右上、序号左下、➕ 钉最右（照现网）。'),
         (screen_entry(lang, 'busy'), '⑥ 第二屏·正在提炼',
          '文案换 <code>busyExtract</code>、轨道吃满、圆钮停在最右（照现网）。'),
+        (screen_home(lang, 'm'), '⑦ 首屏·换到大人那一态',
+         '<b>这一屏是我加来验他那句话的</b>：「两个人切换到大人时候，人头要高于内框上沿，与目前现网一样」。'
+         '男那张 360×522 ⇒ 220 宽时 <b>' + str(FIG_H_M) + '</b> 高，比女那张（' + str(FIG_H_F) + '）高 '
+         + str(FIG_H_M - FIG_H_F) + 'rpx，靠同一道取景窗（上出血 ' + str(BLEED) + '、下沿停在黑条上沿）裁齐'
+         '⇒ 人头高出内框上沿 ' + str(BLEED) + 'rpx、脚被黑条上沿切住，与现网那条注释同一口径。'),
     ]
     cells = ''.join(frame(lang, b, c, t) for b, c, t in items)
+    if len(items) != N_CELLS:
+        sys.exit('这一版排了 %d 屏，但 N_CELLS 写的是 %d ⇒ 切图会漏屏' % (len(items), N_CELLS))
     p50, p72 = mix(GLASS_PLATE, INK), mix(PLATE, INK)
     ink = (0x3A, 0x3A, 0x3C)
     cmp50, cmp72 = ratio(p50, ink), ratio(p72, ink)
@@ -583,12 +631,17 @@ def build(lang):
             '视口：你这两张真机截图 1116×2484 ⇒ <b>750×' + str(STAGE_H) + ' rpx</b>；'
             '导航带下沿 184、现网首屏那一组顶 1106、块顶 1192、底栏 1541–1649、'
             '第二屏白面板 1107–1516 —— 全部量自这两张图。<br>'
+            '<b>10-13 第三轮改的四处</b>：① 人头不再被内框裁平（上一版我把 <code>overflow:hidden</code> '
+            '写在了卡那一层，把现网那 52rpx 出血裁掉了 ⇒ 改由取景窗自己裁，卡那一层不裁）；'
+            '② 黑条上抬到与人物脚底靠住（124 → ' + str(NUM_H) + '），白面不悬空；'
+            '③ 圆 ➕ 从贴右沿挪进右列正中；④ 黑条与内框都改成现网 <code>.page-scrim</code> 那同一串七停点渐变。'
+            '另加 ⑦ 那一屏专门验"切换到大人时人头高于内框上沿"。<br>'
             '<b>10-13 第二轮改的四处</b>：① 左块改成与第二屏那块<b>同顶同底</b>（1107–1517）、'
             '两个人跟着上移、下半留给数字那一格；② 数字在横线上方、分类名在下方，'
             '数字 <b>64</b>（现网那支 WtsjMind Thin，从 <code>.blk-n</code> 的 88 收下来）、'
             '小字吃现成的 <code>--fs-micro</code> ' + str(FS['micro']) + '（＝「照片 · 链接 · 文字」那行同一档）；'
             '③ 圆形 ➕ 换成快门那支橙；④ 每一屏的 Tips 在各自那一格里上下居中。'
-            '<b>64／124／.94→.76 这三个数我定的，他没给。</b><br>'
+            '<b>64／白面 .92→.64 这两个数我定的，他没给（黑条高度改成算出来的，不再是我拍的）。</b><br>'
             '字：<code>i18n.js</code> 现读（缺键直接报错）；字号：<code>app.wxss --fs-*</code> 现读；'
             '色：<code>palette.js</code> 现读（面板取墨黑 <code>' + INK + '</code>、'
             '快门取固定橙 <code>' + CP['--cp-cam'] + '</code>、底栏取 <code>chromeOf</code>）；'
@@ -628,27 +681,35 @@ def render(name):
     out = os.path.join(HERE, name.replace('.html', '.png'))
     subprocess.run([CHROME, '--headless=new', '--disable-gpu', '--hide-scrollbars',
                     '--force-device-scale-factor=1', '--screenshot=' + out,
-                    '--window-size=2380,6400', 'file://' + os.path.join(HERE, name)],
+                    '--window-size=2380,9000', 'file://' + os.path.join(HERE, name)],
                    capture_output=True)
     im = Image.open(out).convert('RGB')
     px = im.load()
-    # 表头那一段的高度会随文案涨（这一轮就从 568 长到 871），写死窗口高就把第二屏切掉了。
-    # 做法：导航带那一整行 #14161A 是个现成的锚，扫出两行的起点，再按第二屏的底＋说明留白裁。
+    # 表头那一段的高度会随文案涨（10-13 那一轮就从 568 长到 871），写死窗口高就把后面的屏切掉了。
+    # 做法：导航带那一整行 #14161A 是个现成的锚，扫出每一行的起点，再按最后一屏的底＋说明留白裁。
     nav, inr = [], False
+    MARK = (0xFF, 0x00, 0xFF)
     for y in range(im.height):
-        ok = sum(1 for x in range(28, im.width, 9)
-                 if all(abs(px[x, y][i] - (0x14, 0x16, 0x1A)[i]) <= 8 for i in range(3))) > 150
+        ok = any(all(abs(px[x, y][i] - MARK[i]) <= 6 for i in range(3)) for x in range(0, im.width))
         if ok and not inr:
             nav.append(y)
             inr = True
         elif not ok:
             inr = False
-    if len(nav) < 2:
-        sys.exit('只扫到 %d 行 stage：版面没排成两行，别拿这张当成品' % len(nav))
-    bottom = min(im.height, nav[1] + STAGE_H + 200)
+    rows = -(-N_CELLS // 3)
+    if len(nav) < rows:
+        sys.exit('只扫到 %d 行 stage，但这一版 %d 屏要 %d 行 ⇒ 版面没排全，别拿这张当成品'
+                 % (len(nav), N_CELLS, rows))
+    bottom = nav[rows - 1] + STAGE_H + 220
+    if bottom > im.height:
+        sys.exit('窗口高度不够：第 %d 行下面的说明被切掉了（要 %d，只有 %d）' % (rows, bottom, im.height))
+    for y in range(im.height):
+        for x in range(im.width):
+            if all(abs(px[x, y][i] - MARK[i]) <= 6 for i in range(3)):
+                px[x, y] = (0x0E, 0x0D, 0x0B)     # 锚点用完擦掉，交付图里不许留着枚红方块
     im.crop((0, 0, im.width, bottom)).save(out)
     tag = '中' if '中文' in name else 'EN'
-    for i in range(6):
+    for i in range(N_CELLS):
         r, c = divmod(i, 3)
         x0 = (28, 804, 1580)[c]
         Image.open(out).convert('RGB').crop(
