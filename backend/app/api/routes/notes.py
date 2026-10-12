@@ -307,6 +307,7 @@ def create_note(
 
 @router.put("/{note_id}", response_model=NoteDetail)
 def update_note(
+    request: Request,
     note_id: int,
     note: NoteUpdate,
     db: Session = Depends(get_db),
@@ -371,11 +372,16 @@ def update_note(
 
     db.commit()
     db.refresh(db_note)
+    # 回体走与 GET 详情同一份裁剪：这篇是私密的、这一趟又没带解锁凭证，正文那五栏一个字都不给。
+    # 写入本身照做不改语义——线上那个包有一条不弹密码就进编辑页的路，改成拒绝会把它打坏。
+    if now_private and not unlocked(request, user):
+        return locked_view(db_note, NOTE_DETAIL_FIELDS, LOCKED_DROP_DETAIL)
     return db_note
 
 
 @router.post("/{note_id}/pin", response_model=NoteBrief)
 def pin_note(
+    request: Request,
     note_id: int,
     pin: bool = Query(True),
     db: Session = Depends(get_db),
@@ -393,6 +399,12 @@ def pin_note(
     db_note.pinned_at = datetime.now(timezone.utc) if pin else None
     db.commit()
     db.refresh(db_note)
+    # 置顶这一口回的是 NoteBrief，里面带着 summary：私密篇没验密码时按列表那一份裁。
+    if (
+        is_private_note(db_note, private_category_ids(db, user.id))
+        and not unlocked(request, user)
+    ):
+        return locked_view(db_note, NOTE_BRIEF_FIELDS, LOCKED_DROP_LIST)
     return db_note
 
 

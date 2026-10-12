@@ -10,6 +10,7 @@ from app.models.user import User
 from app.core.auth import get_current_user
 from app.core.private_access import PRIVATE_CATEGORY_NAME
 from app.core.timefmt import UTCDatetime
+from app.services.sharing import close_shares
 
 router = APIRouter()
 
@@ -120,9 +121,43 @@ def update_category(
         )
         if existing:
             raise HTTPException(status_code=400, detail="分类名称已存在")
-    
+
+    # 「私密」这一格是服务端判私密的唯一依据（库里没有 is_private 列，按分类名现算），
+    # 所以改名就等于改锁：把这一格改成别的名字，格里的笔记当场全体免密可读，而界面上
+    # 看不出任何痕迹。删除那一口早就有这道守门（下面 delete_category），改名这口一直漏着。
+    if (
+        "name" in update_data
+        and update_data["name"]
+        and db_cat.name == PRIVATE_CATEGORY_NAME
+        and update_data["name"] != PRIVATE_CATEGORY_NAME
+    ):
+        still = (
+            db.query(Note)
+            .filter(Note.category_id == category_id, Note.user_id == str(user.id))
+            .count()
+        )
+        if still:
+            raise HTTPException(
+                status_code=400,
+                detail=f"「私密」里还有 {still} 篇笔记，先把它们挪走再改这一格的名字",
+            )
+
+    was_private = db_cat.name == PRIVATE_CATEGORY_NAME
     for key, value in update_data.items():
         setattr(db_cat, key, value)
+
+    # 反向那半：把别的格改名成「私密」，那一格里在跑的分享码必须一起关掉，否则"归入私密"
+    # 就有了第二条路——而第二条路不关码。close_shares 不自己 commit，跟着下面那次一起。
+    if not was_private and db_cat.name == PRIVATE_CATEGORY_NAME:
+        ids = [
+            r[0]
+            for r in db.query(Note.id).filter(
+                Note.category_id == category_id, Note.user_id == str(user.id)
+            ).all()
+        ]
+        for nid in ids:
+            close_shares(db, nid)
+
     db.commit()
     db.refresh(db_cat)
     return db_cat

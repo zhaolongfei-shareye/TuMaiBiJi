@@ -31,7 +31,7 @@ from app.api.routes.assets import (
     _owned_note_or_404,
 )
 from app.core.auth import get_current_user
-from app.core.private_access import is_private_note, private_category_ids
+from app.core.private_access import is_private_note, private_category_ids, unlocked
 from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
@@ -228,11 +228,22 @@ def put_note_card(
 
 @router.get("/api/notes/{note_id}/card", response_model=CardReadOut)
 def read_note_card(
+    request: Request,
     note_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _owned_note_or_404(db, user, note_id)
+    note = _owned_note_or_404(db, user, note_id)
+    had_share = (
+        db.query(Share.id)
+        .filter(Share.note_id == note_id, Share.user_id == str(user.id))
+        .first()
+        is not None
+    )
+    # 卡片图就是一篇正文的副本，所以私密篇没验密码时回"这一篇没有卡片"（形状与真的没有
+    # 时一致，不新增失败态）。写口对私密篇本来就是 400，所以这里不会诱导出一次失败的生成。
+    if is_private_note(note, private_category_ids(db, user.id)) and not unlocked(request, user):
+        return {"card": None, "had_share": had_share}
     # 多条当前行在今天不可能存在（索引挡着），但读的时候按最新的取，别用 .one()：
     # 一处 .one() 崩掉的症状是整篇详情页 500，而那正好是用户最不该看到的东西。
     row = (
@@ -240,12 +251,6 @@ def read_note_card(
         .filter(NoteCard.note_id == note_id, NoteCard.user_id == str(user.id), current())
         .order_by(NoteCard.id.desc())
         .first()
-    )
-    had_share = (
-        db.query(Share.id)
-        .filter(Share.note_id == note_id, Share.user_id == str(user.id))
-        .first()
-        is not None
     )
     return {"card": _views([row])[0] if row else None, "had_share": had_share}
 
@@ -284,6 +289,7 @@ def drop_note_card(
 
 @router.get("/api/user/cards", response_model=CardsListOut)
 def list_cards(
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -314,7 +320,24 @@ def list_cards(
             for n in db.query(Note).filter(Note.user_id == uid, Note.id.in_(shared)).all()
         }
     need = sorted({nid for nid in alive if nid not in have})
-    return {"cards": _views(rows), "need_confirm": need, "snapshots": _snapshots(db, uid, need)}
+    # 这一趟没带解锁凭证时，私密篇的两样东西都不给：卡片行（图上印着标题＋摘要＋要点，
+    # 那就是一篇正文的副本）和当年那份分享快照（summary/key_points 是明文栏）。
+    # "该有几张卡"的账（have/need）仍按全量算，只有**回体**里把私密篇那几行裁掉；
+    # need_confirm 也跟着裁，是因为私密篇本来就登记不出卡片（写口那道闸），留着只会
+    # 让界面提示他去补一张补不出来的卡。
+    priv = private_category_ids(db, user.id)
+    hidden = set()
+    if priv and not unlocked(request, user):
+        locked_note_ids = {
+            n.id
+            for n in db.query(Note).filter(
+                Note.user_id == uid, Note.category_id.in_(priv)
+            ).all()
+        }
+        rows = [r for r in rows if r.note_id not in locked_note_ids]
+        hidden = locked_note_ids
+    shown_need = [nid for nid in need if nid not in hidden]
+    return {"cards": _views(rows), "need_confirm": shown_need, "snapshots": _snapshots(db, uid, shown_need)}
 
 
 def _snapshots(db: Session, uid: str, note_ids: List[int]) -> List[dict]:

@@ -20,12 +20,13 @@
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
+from app.core.private_access import is_private_note, private_category_ids, unlocked
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
 from app.models.asset import Asset, MAX_ASSETS_PER_NOTE, not_failed
@@ -210,11 +211,16 @@ def bind_note_assets(
 
 @router.get("/api/notes/{note_id}/assets", response_model=List[AssetOut])
 def list_note_assets(
+    request: Request,
     note_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _owned_note_or_404(db, user, note_id)
+    note = _owned_note_or_404(db, user, note_id)
+    # 截图类笔记的正文就在图里，所以私密篇没验密码时连配图列表都不给。回空数组而不是
+    # 403：界面上"锁着"那一态本来就不画缩略图，保持"这篇没有图"的形状不会多出一种失败态。
+    if is_private_note(note, private_category_ids(db, user.id)) and not unlocked(request, user):
+        return []
     rows = (
         db.query(Asset)
         .filter(

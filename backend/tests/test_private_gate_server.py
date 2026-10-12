@@ -20,7 +20,9 @@ from app.core.config import settings
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
 from app.models.category import Category
+from app.models.asset import Asset
 from app.models.note import Note
+from app.models.note_card import NoteCard
 from app.models.share import Share
 from app.models.user import User
 
@@ -286,3 +288,132 @@ class Test不受影响的面上:
         assert client.get(f"/api/notes/{n.id}", headers=hdr(u)).json()["content"] is None
         assert client.post("/api/user/private-password/verify",
                            json={"password": PRIVATE_PIN}, headers=hdr(u)).status_code == 400
+
+
+class Test回体与旁路那五道口:
+    """审计 B1／B2／B4／B5／B6：闸原先只装在 GET 详情与列表上，另有五条旁路读得到正文。
+
+    这一批**不改任何写入语义**——线上那个包有一条不弹密码就进编辑页的路，把写入改成拒绝
+    会当场打坏它。改的是回体：没带解锁凭证时那几条旁路一个字正文都不给。
+    """
+
+    def test_B1_PUT不带凭证时正文五栏不发但写入照做(self, client, db):
+        u = new_user(db, "b1")
+        cat = make_private_category(db, u)
+        n = make_note(db, u, "私密的一篇", category_id=cat.id)
+        unlock(client, u)
+        r = client.put(f"/api/notes/{n.id}", json={"title": "改过的标题"}, headers=hdr(u))
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["title"] == "改过的标题", "裁的是读，不是写"
+        for k in ("summary", "key_points", "key_links", "content", "original_content"):
+            assert body[k] is None, f"未解锁的回体里 {k} 不该有值"
+        assert body["is_private"] is True
+
+    def test_B1_PUT带凭证回体照旧给全(self, client, db):
+        u = new_user(db, "b1b")
+        cat = make_private_category(db, u)
+        n = make_note(db, u, "私密的一篇", category_id=cat.id)
+        tok = unlock(client, u)
+        r = client.put(f"/api/notes/{n.id}", json={"title": "改过的标题"},
+                       headers={**hdr(u), "X-Private-Token": tok})
+        assert r.json()["original_content"] == BODY_MARK
+
+    def test_B4_置顶回体不带凭证时不给概要(self, client, db):
+        u = new_user(db, "b4")
+        cat = make_private_category(db, u)
+        n = make_note(db, u, "私密的一篇", category_id=cat.id, summary="置顶旁路漏的概要")
+        unlock(client, u)
+        r = client.post(f"/api/notes/{n.id}/pin?pin=true", headers=hdr(u))
+        assert r.status_code == 200, r.text
+        assert r.json()["summary"] is None
+        assert r.json()["is_pinned"] is True, "置顶本身要生效"
+        tok = unlock(client, u)
+        r2 = client.post(f"/api/notes/{n.id}/pin?pin=false",
+                         headers={**hdr(u), "X-Private-Token": tok})
+        assert r2.json()["summary"] == "置顶旁路漏的概要"
+
+    def test_B5_配图列表不带凭证回空数组带凭证照旧(self, client, db):
+        u = new_user(db, "b5")
+        cat = make_private_category(db, u)
+        n = make_note(db, u, "私密的一篇", category_id=cat.id)
+        db.add(Asset(user_id=str(u.id), note_id=n.id,
+                     object_key=f"cloud://x/{u.id}/a.jpg", file_size=1234,
+                     backup_status="uploaded"))
+        db.commit()
+        assert client.get(f"/api/notes/{n.id}/assets", headers=hdr(u)).json() == []
+        tok = unlock(client, u)
+        got = client.get(f"/api/notes/{n.id}/assets",
+                         headers={**hdr(u), "X-Private-Token": tok}).json()
+        assert len(got) == 1, got
+
+    def test_B5_卡片读口不带凭证说没有这张卡(self, client, db):
+        u = new_user(db, "b5c")
+        cat = make_private_category(db, u)
+        n = make_note(db, u, "私密的一篇", category_id=cat.id)
+        db.add(NoteCard(user_id=str(u.id), note_id=n.id,
+                        object_key=f"cloud://x/{u.id}/card.jpg", tpl="cover"))
+        db.commit()
+        assert client.get(f"/api/notes/{n.id}/card", headers=hdr(u)).json()["card"] is None
+        tok = unlock(client, u)
+        got = client.get(f"/api/notes/{n.id}/card",
+                         headers={**hdr(u), "X-Private-Token": tok}).json()
+        assert got["card"] is not None and got["card"]["note_id"] == n.id
+
+    def test_B6_台账不带凭证时私密那行与它的快照都不给(self, client, db):
+        u = new_user(db, "b6")
+        cat = make_private_category(db, u)
+        pub = make_note(db, u, "公开的一篇")
+        priv = make_note(db, u, "私密的一篇", category_id=cat.id)
+        for nn in (pub, priv):
+            db.add(NoteCard(user_id=str(u.id), note_id=nn.id,
+                            object_key=f"cloud://x/{u.id}/c{nn.id}.jpg", tpl="cover"))
+        db.commit()
+        r = client.get("/api/user/cards", headers=hdr(u)).json()
+        assert [c["note_id"] for c in r["cards"]] == [pub.id], "私密那行整行都不该出现"
+        tok = unlock(client, u)
+        r2 = client.get("/api/user/cards", headers={**hdr(u), "X-Private-Token": tok}).json()
+        assert {c["note_id"] for c in r2["cards"]} == {pub.id, priv.id}
+
+    def test_B2_格里有笔记时不许把私密格改名(self, client, db):
+        u = new_user(db, "b2")
+        cat = make_private_category(db, u)
+        make_note(db, u, "锁着的一篇", category_id=cat.id)
+        r = client.put(f"/api/categories/{cat.id}", json={"name": "别的名字"}, headers=hdr(u))
+        assert r.status_code == 400 and "私密" in r.text, r.text
+        db.expire_all()
+        assert db.query(Category).filter(Category.id == cat.id).first().name == "私密", \
+            "拦下了就不许在库里留下痕迹"
+
+    def test_B2_空格子改名照旧(self, client, db):
+        u = new_user(db, "b2b")
+        cat = make_private_category(db, u)
+        assert client.put(f"/api/categories/{cat.id}", json={"name": "回收站"},
+                          headers=hdr(u)).status_code == 200
+
+    def test_B2_把别的格改名成私密会把那格的活码关掉(self, client, db):
+        u = new_user(db, "b2c")
+        cat = Category(user_id=str(u.id), name="随读", color="#D2683F")
+        db.add(cat)
+        db.commit()
+        n = make_note(db, u, "先分享的一篇", category_id=cat.id)
+        share = client.post("/api/shares/", json={"note_id": n.id}, headers=hdr(u)).json()
+        assert client.get(f"/api/shares/{share['token']}").status_code == 200
+        assert client.put(f"/api/categories/{cat.id}", json={"name": "私密"},
+                          headers=hdr(u)).status_code == 200
+        assert client.get(f"/api/shares/{share['token']}").status_code == 404, \
+            "改名归私密必须等于把笔记归私密，不许留第二条不关码的路"
+
+    def test_非私密笔记这五道口一个字没变(self, client, db):
+        u = new_user(db, "b99")
+        make_private_category(db, u)
+        n = make_note(db, u, "普通的一篇", summary="普通概要")
+        db.add(Asset(user_id=str(u.id), note_id=n.id,
+                     object_key=f"cloud://x/{u.id}/p.jpg", file_size=10,
+                     backup_status="uploaded"))
+        db.commit()
+        assert client.put(f"/api/notes/{n.id}", json={"title": "改过的"},
+                          headers=hdr(u)).json()["original_content"] == BODY_MARK
+        assert client.post(f"/api/notes/{n.id}/pin?pin=true",
+                           headers=hdr(u)).json()["summary"] == "普通概要"
+        assert len(client.get(f"/api/notes/{n.id}/assets", headers=hdr(u)).json()) == 1
