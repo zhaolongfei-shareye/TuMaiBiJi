@@ -123,6 +123,20 @@ ck('浅色那一档在容器上有个名，data 里也有初值（第一帧不�
   /\{\{bgLight \? 'bg-light' : ''\}\}/.test(read('pages/create/create.wxml')) && /bgLight: false/.test(cjs))
 ck('浅色那一态的样式真在（只有类名没有规则＝静默不生效）',
   /\.container\.has-bg\.bg-light \.page-scrim\s*\{/.test(wxss))
+// 压在图上那几行小字各有一支写死的纸白（`.swap-text`／`.swap-glyph`／`.home-swap`），
+// 浅态不一起翻就是"字跟浅底一个色"——10-12 实测那一行带里暗字 0.0%。逐条钉住有对应的浅色规则。
+// ⚠ 正则是拼出来的字符串：`\s` 写在模板串里会被吃掉反斜杠（变成字面 s），一律用 \\s。
+const lightRule = (src, host, sel) =>
+  new RegExp(`\\.${host}\\.has-bg\\.bg-light \\.${sel.slice(1)}\\s*\\{`).test(src)
+ck('图上那三行写死纸白的字，浅色那一态逐条有翻墨的对应规则',
+  ['.swap-glyph', '.swap-text', '.home-swap'].every((s) => lightRule(wxss, 'container', s)),
+  ['.swap-glyph', '.swap-text', '.home-swap']
+    .filter((s) => !lightRule(wxss, 'container', s)).join('、'))
+const meCss = read('pages/me/me.wxss')
+ck('「我的」头部那三行（大字与 MIND 数字）浅色态也有对应规则',
+  ['.h1', '.score-n', '.score-l'].every((s) => lightRule(meCss, 'head-band', s)),
+  ['.h1', '.score-n', '.score-l']
+    .filter((s) => !lightRule(meCss, 'head-band', s)).join('、'))
 ck('这一页不自己写 setNavigationBarColor（值只有一份）', !/setNavigationBarColor/.test(cjs))
 
 // ---------- ④ 入口唯一 ----------

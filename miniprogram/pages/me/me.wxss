@@ -75,6 +75,17 @@
   color: rgba(20, 22, 26, 0.92);
 }
 
+/* 头部那一格右上那两个 Thin 数字（MIND 那一族）也压在图上，纸白档同样要翻。
+   数字那一档给 .86 而不是与标题同档：细字重（100）的笔画本来就浅，墨色压到 .74 以下
+   在浅底上会发虚——这一条是 10-04 那轮"Thin 数字浅要单独加一档"的同一件事，方向反过来。 */
+.head-band.has-bg.bg-light .score-n {
+  color: rgba(20, 22, 26, 0.86);
+}
+
+.head-band.has-bg.bg-light .score-l {
+  color: rgba(20, 22, 26, 0.68);
+}
+
 .head-band.has-bg.bg-light .head-scrim {
   background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.35) 14%,
     rgba(242, 239, 233, 0.28) 58%, rgba(242, 239, 233, 0.22) 100%);
