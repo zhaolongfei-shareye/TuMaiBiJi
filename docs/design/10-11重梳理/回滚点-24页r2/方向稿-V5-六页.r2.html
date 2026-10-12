@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>图麦笔记 · 产品说明 · 方向稿 V5（六页样张）</title>
+<style>
+@page{size:A4;margin:0}
+*{box-sizing:border-box}
+body{margin:0;color:#252923;background:#F2EFE9;font:10pt/1.78 'PingFang SC','Helvetica Neue',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{position:relative;width:595.28pt;height:841.89pt;padding:39pt 46pt 62pt;background:#F2EFE9;break-after:page;overflow:hidden}
+.page:last-child{break-after:auto}
+.mast{display:flex;justify-content:space-between;align-items:center;border-bottom:.6pt solid #c9c5ba;padding-bottom:10pt;font-size:7.8pt;letter-spacing:.7pt;color:#62675c}
+.mast span:first-child{font:17pt Playfair,Georgia,serif;color:#14161a}
+.eyebrow{font-size:8pt;letter-spacing:1.1pt;color:#98613c;margin:18pt 0 8pt}
+h1,h2,h3{font-family:'Songti SC',STSong,serif;font-weight:600}
+h1{font-size:25pt;line-height:1.3;letter-spacing:.25pt;margin:0 0 8pt;color:#171c17}
+h2{font-size:12.5pt;line-height:1.45;margin:13pt 0 5pt}
+h3{font-size:11pt;margin:0 0 3pt}
+p{margin:0 0 9pt;overflow-wrap:anywhere}
+.subtitle{color:#67705f;font-size:10pt;line-height:1.65;margin-bottom:14pt}
+.content{display:flow-root}
+.note{font-size:7.6pt;line-height:1.6;color:#6b6c61;margin:10pt 0 0}
+.callout{font-family:'Songti SC',serif;font-size:15pt;color:#815338;border-left:2.3pt solid #D2683F;padding:8pt 0 8pt 14pt;margin:14pt 0}
+.footer{position:absolute;left:46pt;right:46pt;bottom:25pt;display:flex;justify-content:space-between;border-top:.5pt solid #c9c5ba;padding-top:8pt;font-size:7.5pt;color:#6b6c61}
+code{font:7.4pt/1.5 'SF Mono',Menlo,monospace;background:#e9e6dc;padding:0 3pt;border-radius:2pt}
+
+/* ---- 统一配图语言：纸面 + 线描 + 陶色一点（viewBox 用 pt 单位，1 单位＝纸上 1pt） ---- */
+.il{background:#FBFAF7;border:.6pt solid #cfccc2;padding:10pt 10pt 7pt;margin:6pt 0 10pt}
+.il svg{display:block;width:100%;height:auto}
+.il svg .s{stroke:#22251f;fill:none;stroke-width:.8;stroke-linecap:round;stroke-linejoin:round}
+.il svg .thin{stroke-width:.55}
+.il svg .hair{stroke-width:.35}
+.il svg .a{stroke:#D2683F}
+.il svg .af{fill:#D2683F;stroke:none}
+.il svg .cf{fill:#FBFAF7;stroke:#22251f;stroke-width:.8}
+.il svg .pf{fill:#ffffff;stroke:#22251f;stroke-width:.8}
+.il svg .gf{fill:#E7E3D8;stroke:none}
+.il svg .sh{fill:#22251f;stroke:none;opacity:.07}
+.il svg .ink{fill:#22251f;stroke:none}
+.il svg .mist{fill:#b9b6ab;stroke:none}
+.il svg .dash{stroke-dasharray:3 3}
+.il svg text{font-family:'Songti SC',STSong,serif;fill:#22251f}
+.il svg .tt{font-size:8.5px;font-weight:600}
+.il svg .num{font-size:7px;font-weight:600}
+.il svg .tn{font-size:7.2px;fill:#4a4d44}
+.il svg .tl{font-size:6.6px;letter-spacing:1px;fill:#98613c}
+.il svg .tm{font-size:6.6px;fill:#8a8b80}
+.ilcap{font-size:7.4pt;color:#8a8b80;margin:3pt 2pt 0;letter-spacing:.4pt}
+
+/* ---- P4 边界台账 ---- */
+.ledger{margin:6pt 0 4pt;border-top:.8pt solid #14161a}
+.ledger .lh,.ledger .lr{display:grid;grid-template-columns:96pt 1fr 1fr;gap:16pt;padding:8pt 0;border-bottom:.5pt solid #d2cfc5}
+.ledger .lh{font-size:7.8pt;letter-spacing:1.2pt;color:#98613c;border-bottom:.8pt solid #14161a;padding:5pt 0}
+.ledger .lr h3{margin:0;font-size:11pt}
+.ledger .lr p{margin:0;font-size:9pt;line-height:1.6}
+.ledger .no p{color:#8a5a3c}
+.ledger .yes p{color:#3f4a3c}
+
+/* ---- P7 概念手机 ---- */
+.split{display:grid;grid-template-columns:206pt 1fr;gap:22pt;align-items:start;margin:6pt 0 4pt}
+.ph{width:206pt;border:2.2pt solid #14161a;border-radius:20pt;padding:5pt;background:#fff;box-shadow:0 6pt 16pt rgba(20,22,26,.14)}
+.ph .scr{border-radius:14pt;overflow:hidden;background:#F2EFE9}
+.ph .notch{width:64pt;height:5pt;border-radius:3pt;background:#14161a;margin:2pt auto 4pt}
+.ph-hero{position:relative;height:214pt;background:#EDE7DA}
+.ph-hero svg{position:absolute;inset:0;width:100%;height:100%}
+.ph-dots{position:absolute;top:7pt;right:7pt;display:flex;gap:5pt}
+.ph-dots i{width:9pt;height:9pt;border-radius:50%;background:rgba(255,255,255,.85);border:.7pt solid #14161a}
+.ph-blocks{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:4pt;padding:5pt}
+.ph-b{border-radius:6pt;padding:6pt 6pt 7pt;background:#E3DCCB}
+.ph-b .w{background:#FBFAF7;border-radius:3pt;margin-top:5pt;padding:2pt 4pt;font-size:7pt;color:#4d4a41}
+.ph-b .n{font:15pt Playfair,Georgia,serif;color:#14161a;line-height:1}
+.ph-b .lab{font-size:6.6pt;color:#6b675c;margin-top:2pt}
+.ph-b.main{background:#D9CFB9}
+.minis{display:grid;grid-template-columns:1fr 1fr;gap:12pt;margin:8pt 0 2pt}
+.mini{border:.5pt solid #cfccc2;background:#FBFAF7;padding:7pt 8pt 5pt}
+.mini .mt{font-size:7.6pt;letter-spacing:1pt;color:#98613c;margin:0 0 5pt}
+.shades{display:flex;gap:6pt;align-items:center}
+.shades i{width:13pt;height:13pt;border-radius:3pt;border:.6pt solid #22251f}
+.shades b{font-size:6.6pt;color:#6b675c;font-weight:400}
+.panels{display:flex;gap:8pt;align-items:flex-end;height:44pt}
+.panels i{width:22pt;border:.6pt solid #22251f;border-bottom:none;border-radius:4pt 4pt 0 0;background:#fff}
+.panels b{font-size:6.6pt;color:#6b675c;font-weight:400}
+
+/* ---- P8 六格示意 ---- */
+.tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14pt;margin:6pt 0 4pt}
+.tile{border-top:.8pt solid #14161a;padding-top:7pt}
+.tile .il{margin:0 0 6pt;padding:6pt 6pt 3pt}
+.tile p{font-size:8.4pt;line-height:1.6;margin:0}
+
+/* ---- P2 / P5 ---- */
+.rows .row{display:grid;grid-template-columns:118pt 1fr;gap:16pt;border-top:.5pt solid #cfccc2;padding:9pt 0}
+.rows h2{margin:0;font-size:11.5pt}.rows p{margin:0;font-size:9.2pt}
+.contents{margin-top:12pt;border-top:.6pt solid #bbb8ae;padding-top:4pt}.contents p{color:#67705f;font-size:9pt}
+.flow{display:flex;align-items:center;justify-content:space-between;gap:4pt;padding:11pt 8pt;border-block:.5pt solid #b7b8ac;font-size:9pt;color:#4d624b;margin:10pt 0 4pt;background:#FBFAF7}
+.flow b{color:#a26442}
+</style>
+</head>
+<body>
+
+<!-- ============ 样张 1 ｜ 新 P2 作品概览 ============ -->
+<article class="page">
+<header class="mast"><span>Tumark</span><span>图麦笔记 · 微信小程序作品说明</span></header>
+<main class="content">
+<p class="eyebrow">作品概览 / PRODUCT VISION</p>
+<h1>收藏，是记录的开始。</h1>
+<p class="subtitle">让看过的内容，成为能找回、能表达、能再次使用的笔记。</p>
+
+<div class="il">
+<svg viewBox="0 0 503 154">
+  <defs><marker id="m2" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#D2683F"/></marker></defs>
+  <g transform="rotate(-8 62 46)"><rect class="sh" x="29" y="26" width="70" height="45" rx="2"/><rect class="pf" x="27" y="24" width="70" height="45" rx="2"/><line class="s hair" x1="34" y1="34" x2="77" y2="34"/><line class="s hair" x1="34" y1="42" x2="90" y2="42"/><line class="s hair" x1="34" y1="50" x2="83" y2="50"/><text class="tm" x="34" y="63">链接 · 在读的文章</text></g>
+  <g transform="rotate(6 78 103)"><rect class="sh" x="45" y="83" width="70" height="45" rx="2"/><rect class="pf" x="43" y="81" width="70" height="45" rx="2"/><rect class="gf" x="50" y="88" width="31" height="21"/><circle class="s hair" cx="57" cy="95" r="3"/><path class="s hair" d="M50 107 l9 -7 7 6 6 -5 8 7"/><text class="tm" x="50" y="120">截图 · 画面里的字</text></g>
+  <g transform="rotate(-4 131 62)"><rect class="sh" x="102" y="45" width="62" height="39" rx="2"/><rect class="pf" x="100" y="43" width="62" height="39" rx="2"/><path class="s thin" d="M109 68 l5 -13 3 9 4 -7 3 11"/><text class="tm" x="107" y="76">想法 · 冒出一句</text></g>
+  <path class="s a thin" d="M172 49 C 220 49 226 56 260 56"/>
+  <path class="s a thin" d="M174 62 C 220 62 226 77 260 77" marker-end="url(#m2)"/>
+  <path class="s a thin" d="M174 100 C 220 100 226 97 260 97"/>
+  <rect class="sh" x="269" y="22" width="118" height="113" rx="3"/><rect class="cf" x="267" y="20" width="118" height="113" rx="3"/>
+  <text class="tt" x="277" y="33">一条笔记</text><line class="s thin" x1="277" y1="38" x2="359" y2="38"/>
+  <rect class="gf" x="277" y="45" width="96" height="5"/><text class="tm" x="378" y="50">标题</text>
+  <rect class="gf" x="277" y="55" width="96" height="13"/><text class="tm" x="378" y="64">摘要</text>
+  <line class="s hair" x1="277" y1="76" x2="373" y2="76"/><text class="tm" x="378" y="78">要点</text>
+  <line class="s hair" x1="277" y1="84" x2="373" y2="84"/>
+  <line class="s hair" x1="277" y1="92" x2="373" y2="92"/><text class="tm" x="378" y="94">标签</text>
+  <rect class="af" x="277" y="105" width="13" height="13" rx="1.5"/><text class="tm" x="295" y="115">可出卡 · 可分享 · 可找回</text>
+  <text class="tl" x="405" y="36">FROM SCATTERED</text>
+  <text class="tl" x="405" y="45">TO KEPT</text>
+  <line class="s hair" x1="405" y1="52" x2="405" y2="124"/>
+  <text class="tn" x="412" y="67">散落在收藏夹、</text>
+  <text class="tn" x="412" y="77">相册与聊天记录里</text>
+  <text class="tn" x="412" y="90">的内容，接到一个</text>
+  <text class="tn" x="412" y="100">轻量小程序里，</text>
+  <text class="tn" x="412" y="113">成为能再次使用</text>
+  <text class="tn" x="412" y="123">的笔记。</text>
+</svg>
+<p class="ilcap">概念示意 · 从散落到成册</p>
+</div>
+
+<p>一篇值得重读的文章、一组课堂截图、一个突然冒出的想法，往往散落在收藏夹、相册与聊天记录里。等到真正需要使用时，人们还要重新寻找、摘录和整理。图麦笔记把这段重复劳动，接到一个轻量的微信小程序里。</p>
+<div class="callout">从“我好像看过”，走到“这次我能用上”。</div>
+<div class="rows">
+<div class="row"><h2>从已有内容开始</h2><p>粘贴公开文章链接、导入截图或拍照，或者直接写下自己的想法。不要求用户先搭一套知识体系，再决定如何记录。</p></div>
+<div class="row"><h2>把信息整理成结构</h2><p>链接正文与图片识别文字，共用标题、摘要、要点和标签。用户可以核对、修改、分类，再通过搜索找回。</p></div>
+<div class="row"><h2>让笔记走出列表</h2><p>十套不同排版的卡片，将内容变成可保存的图片：发朋友圈、做攻略、配公众号文章，也能打印贴进手账。</p></div>
+<div class="row"><h2>让分享成为下一次记录</h2><p>带小程序码的卡片可以连接公开摘要页；读者觉得有用，可转存为自己的独立笔记，而不只是再收藏一个入口。</p></div>
+</div>
+<p class="note">需求来自作者日常的信息整理与产品工作经历；以下人群与场景是设计定位，不作为用户规模、访谈结果或成效统计。</p>
+
+<div class="contents"><h2>阅读路径</h2><p>业务链路与设计边界 → 录入、摘要与新的第一屏 → 几处有趣的体验 → 十套模板图库 → 四类应用场景 → 联名设想 → 微信技术栈与开源 → 引用与联系</p></div>
+</main>
+<footer class="footer"><span>图麦笔记 · 产品作品集</span><span>方向稿 V5 · 02</span></footer>
+</article>
+
+<!-- ============ 样张 2 ｜ 新 P3 业务流程图 ============ -->
+<article class="page">
+<header class="mast"><span>Tumark</span><span>图麦笔记 · 微信小程序作品说明</span></header>
+<main class="content">
+<p class="eyebrow">业务链路 / END-TO-END FLOW</p>
+<h1>一条笔记，怎么从一个人手里走到另一个人手里。</h1>
+<p class="subtitle">创作 → 出卡 → 分享 → 有人看到 → 转存回库。五个环节都已在现网跑通；下面这张图是它完整的业务流程。</p>
+
+<div class="il">
+<svg viewBox="0 0 503 287">
+  <defs><marker id="ar" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#22251f"/></marker><marker id="arc" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#D2683F"/></marker></defs>
+  <rect class="s hair" x="24" y="22" width="32" height="10" rx="5"/><text class="tl" x="40" y="29" text-anchor="middle">作者侧</text>
+  <rect class="s hair" x="24" y="172" width="32" height="10" rx="5"/><text class="tl" x="40" y="179" text-anchor="middle">读者侧</text>
+  <line class="s hair dash" x1="24" y1="134" x2="479" y2="134"/>
+  <text class="tm" x="24" y="130">公开快照 · 不登录也能读</text>
+  <g><rect class="sh" x="26" y="35" width="141" height="53" rx="2.5"/><rect class="cf" x="24" y="33" width="141" height="53" rx="2.5"/>
+     <path class="s thin" d="M31 42 l5 -3 2 6 -5 3 z M36 39 l4 5"/><text class="tt" x="45" y="45">① 录入与提炼</text>
+     <text class="tn" x="31" y="57">链接 / 截图 / 手写三档，</text>
+     <text class="tn" x="31" y="66">服务端提炼，用户核对、</text>
+     <text class="tn" x="31" y="75">修改、归类。</text></g>
+  <g><rect class="sh" x="183" y="35" width="141" height="53" rx="2.5"/><rect class="cf" x="181" y="33" width="141" height="53" rx="2.5"/>
+     <rect class="s thin" x="188" y="38" width="8" height="10" rx="1"/><line class="s hair" x1="190" y1="42" x2="194" y2="42"/><line class="s hair" x1="190" y1="45" x2="194" y2="45"/><text class="tt" x="202" y="45">② 出卡</text>
+     <text class="tn" x="188" y="57">十套模板左右滑着换，</text>
+     <text class="tn" x="188" y="66">端侧先测量再绘制，</text>
+     <text class="tn" x="188" y="75">按内容定高画成一张图。</text></g>
+  <g><rect class="sh" x="340" y="35" width="141" height="53" rx="2.5"/><rect class="cf" x="338" y="33" width="141" height="53" rx="2.5"/>
+     <path class="s thin" d="M345 47 l9 -7 -3 9 4 -2"/><text class="tt" x="360" y="45">③ 分享</text>
+     <text class="tn" x="345" y="57">微信自己的转发三通道；</text>
+     <text class="tn" x="345" y="66">存到相册后由用户发，</text>
+     <text class="tn" x="345" y="75">产品不替用户发布。</text></g>
+  <line class="s thin" x1="167" y1="59" x2="176" y2="59" marker-end="url(#ar)"/>
+  <line class="s thin" x1="324" y1="59" x2="333" y2="59" marker-end="url(#ar)"/>
+  <g><rect class="sh" x="26" y="185" width="141" height="53" rx="2.5"/><rect class="cf" x="24" y="183" width="141" height="53" rx="2.5"/>
+     <rect class="s thin" x="31" y="190" width="9" height="9" rx="1"/><rect class="af" x="33" y="192" width="2" height="2"/><rect class="af" x="37" y="192" width="2" height="2"/><rect class="af" x="33" y="196" width="2" height="2"/><text class="tt" x="45" y="195">④ 扫码读快照</text>
+     <text class="tn" x="31" y="207">卡片上那枚码进公开页，</text>
+     <text class="tn" x="31" y="216">读的是建分享那一刻的</text>
+     <text class="tn" x="31" y="225">快照，不登录也能看。</text></g>
+  <g><rect class="sh" x="183" y="185" width="141" height="53" rx="2.5"/><rect class="cf" x="181" y="183" width="141" height="53" rx="2.5"/>
+     <path class="s thin" d="M188 193 h9 M194 190 l3 3 -3 3"/><path class="s hair" d="M188 198 h6"/><text class="tt" x="202" y="195">⑤ 转存</text>
+     <text class="tn" x="188" y="207">服务端从快照抄一条新</text>
+     <text class="tn" x="188" y="216">的：标题、摘要、要点、</text>
+     <text class="tn" x="188" y="225">标签、链接、来源。</text></g>
+  <g><rect class="sh" x="340" y="185" width="141" height="53" rx="2.5"/><rect class="cf" x="338" y="183" width="141" height="53" rx="2.5"/>
+     <rect class="s thin" x="345" y="191" width="8" height="6" rx="1"/><rect class="s hair" x="347" y="189" width="8" height="6" rx="1"/><text class="tt" x="360" y="195">⑥ 他自己的库里</text>
+     <text class="tn" x="345" y="207">来源只读钉住，编辑不</text>
+     <text class="tn" x="345" y="216">掉、只能整条删；可以再</text>
+     <text class="tn" x="345" y="225">编辑、再出卡、再分享。</text></g>
+  <line class="s thin" x1="167" y1="209" x2="176" y2="209" marker-end="url(#ar)"/>
+  <line class="s thin" x1="324" y1="209" x2="333" y2="209" marker-end="url(#ar)"/>
+  <path class="s thin" d="M408 86 C 408 131 94 131 94 178" marker-end="url(#ar)"/>
+  <g><rect class="sh" x="219" y="123" width="24" height="24" rx="2"/><rect class="pf" x="217" y="121" width="24" height="24" rx="2"/>
+     <rect class="af" x="220" y="124" width="4" height="4"/><rect class="af" x="227" y="124" width="4" height="4"/><rect class="af" x="234" y="124" width="4" height="4"/>
+     <rect class="af" x="220" y="131" width="4" height="4"/><rect class="s hair" x="227" y="131" width="4" height="4"/><rect class="af" x="234" y="131" width="4" height="4"/>
+     <rect class="af" x="220" y="138" width="4" height="4"/><rect class="af" x="227" y="138" width="4" height="4"/><rect class="s hair" x="234" y="138" width="4" height="4"/></g>
+  <text class="tm" x="229" y="153" text-anchor="middle">卡片上的小程序码</text>
+  <path class="s a hair dash" d="M479 209 C 495 209 495 13 251 13"/>
+  <path class="s a hair dash" d="M251 13 L 251 28" marker-end="url(#arc)"/>
+  <text class="tl" transform="rotate(-90 477 124)" x="477" y="124" text-anchor="middle">转存之后 · 回到 ② 再走一次</text>
+  <line class="s thin" x1="24" y1="267" x2="44" y2="267"/>
+  <text class="tm" x="48" y="269">实线 · 现网已跑通</text>
+  <line class="s a hair dash" x1="128" y1="267" x2="148" y2="267"/>
+  <text class="tm" x="152" y="269">陶色虚线 · 同一条笔记的第二次循环</text>
+  <g transform="translate(308,261)"><rect class="s hair" x="0" y="4" width="9" height="7" rx="1"/><path class="s hair" d="M2 4 v-2 a2.5 2.5 0 0 1 5 0 v2"/></g>
+  <text class="tm" x="321" y="269">撤回只关“公开”这扇门，不抹掉读者已转存的那条</text>
+</svg>
+<p class="ilcap">业务流程图 · 两条泳道之间只隔着一枚小程序码与一份公开快照</p>
+</div>
+
+<div class="callout">撤回只关“公开”这一扇门。</div>
+<p class="note">这一页只画现网跑通的环节，没画还没验证过的东西。10-11 当场实测：<code>GET /api/shares/{token}</code> 不带凭据回 200，回体那十个字段就是公开快照的全部；<code>POST /api/notes/from-share</code> 与 <code>POST /api/shares/revoke</code> 不带凭据回 401（路由在、要登录）。图片侧没有内容安全送检（个人主体拿不到 imgSecCheck），这一条记在文档里，不当已解决。</p>
+</main>
+<footer class="footer"><span>图麦笔记 · 产品作品集</span><span>方向稿 V5 · 03</span></footer>
+</article>
+
+<!-- ============ 样张 3 ｜ 新 P4 设计边界台账 ============ -->
+<article class="page">
+<header class="mast"><span>Tumark</span><span>图麦笔记 · 微信小程序作品说明</span></header>
+<main class="content">
+<p class="eyebrow">业务链路 / DESIGN BOUNDARY</p>
+<h1>每一步，都有一条故意不越过的线。</h1>
+<p class="subtitle">链路六环各自的设计取舍。左栏是它做什么，右栏是它故意不做什么——这一页回答评委最该问的那句：边界在哪。</p>
+
+<div class="ledger">
+<div class="lh"><span>环节</span><span>做</span><span>不做</span></div>
+<div class="lr"><h3>① 录入</h3><div class="yes"><p>三档入口通向同一套笔记结构；成稿由用户命名、归类、修正。</p></div><div class="no"><p>不要求先搭一套知识体系；不替用户分类，也不声称替他整理好人生。</p></div></div>
+<div class="lr"><h3>② 出卡</h3><div class="yes"><p>画布先测量再绘制，按内容决定高度；十套各有自己的构图逻辑。</p></div><div class="no"><p>不做同一版式换十种颜色的假模板；不为凑数加一套说不清用途的。</p></div></div>
+<div class="lr"><h3>③ 分享</h3><div class="yes"><p>通栏三出口用微信自己的转发能力；存到相册之后怎么发由用户完成。</p></div><div class="no"><p>不内建跨平台自动发布；不声称能替用户发到别处。</p></div></div>
+<div class="lr"><h3>④ 读</h3><div class="yes"><p>公开标题、摘要、要点、标签、关键链接、来源与署名；不登录可读。</p></div><div class="no"><p>私人库、正文、识别出的原文、分类都不出公开范围。</p></div></div>
+<div class="lr"><h3>⑤ 转存</h3><div class="yes"><p>抄一条独立副本，来源只读钉住；原作者撤回不影响这一条。</p></div><div class="no"><p>不存一个会跟着原文变的入口；不让转存者误以为拿到了原文。</p></div></div>
+<div class="lr"><h3>⑥ 商业化</h3><div class="yes"><p>品牌限定模板与专题活动由合作方付费（见「联名设想」三页）。</p></div><div class="no"><p>基础记录不设付费门槛；那三页是未获授权的概念设想，没有排期。</p></div></div>
+</div>
+
+<div class="il">
+<svg viewBox="0 0 503 60">
+  <text class="tl" x="24" y="12">同一条链路 · 六处落闸</text>
+  <line class="s hair" x1="24" y1="28" x2="479" y2="28"/>
+  <g><circle class="pf" cx="56" cy="28" r="7.5"/><text class="num" x="56" y="30.5" text-anchor="middle">①</text><line class="s a thin" x1="56" y1="36.5" x2="56" y2="43"/><text class="tn" x="56" y="52" text-anchor="middle">录入</text></g>
+  <g><circle class="pf" cx="134" cy="28" r="7.5"/><text class="num" x="134" y="30.5" text-anchor="middle">②</text><line class="s a thin" x1="134" y1="36.5" x2="134" y2="43"/><text class="tn" x="134" y="52" text-anchor="middle">出卡</text></g>
+  <g><circle class="pf" cx="212" cy="28" r="7.5"/><text class="num" x="212" y="30.5" text-anchor="middle">③</text><line class="s a thin" x1="212" y1="36.5" x2="212" y2="43"/><text class="tn" x="212" y="52" text-anchor="middle">分享</text></g>
+  <g><circle class="pf" cx="290" cy="28" r="7.5"/><text class="num" x="290" y="30.5" text-anchor="middle">④</text><line class="s a thin" x1="290" y1="36.5" x2="290" y2="43"/><text class="tn" x="290" y="52" text-anchor="middle">读</text></g>
+  <g><circle class="pf" cx="368" cy="28" r="7.5"/><text class="num" x="368" y="30.5" text-anchor="middle">⑤</text><line class="s a thin" x1="368" y1="36.5" x2="368" y2="43"/><text class="tn" x="368" y="52" text-anchor="middle">转存</text></g>
+  <g><circle class="pf" cx="446" cy="28" r="7.5"/><text class="num" x="446" y="30.5" text-anchor="middle">⑥</text><line class="s a thin" x1="446" y1="36.5" x2="446" y2="43"/><text class="tn" x="446" y="52" text-anchor="middle">商业化</text></g>
+</svg>
+<p class="ilcap">陶色短竖线＝每一环故意停下来的位置</p>
+</div>
+
+<div class="callout">把“不做什么”写清楚，取舍才算数。</div>
+<p class="note">前五条在 2.1.8 的前端与现网后端里（接口实测见上一页）；第六条是方向，不是已成交的合作。MIND 的起始值与两档奖励只写在 <code>backend/app/services/quota.py</code> 一处，客户端不硬编码规则。</p>
+</main>
+<footer class="footer"><span>图麦笔记 · 产品作品集</span><span>方向稿 V5 · 04</span></footer>
+</article>
+
+<!-- ============ 样张 4 ｜ 新 P5 录入漏斗 ============ -->
+<article class="page">
+<header class="mast"><span>Tumark</span><span>图麦笔记 · 微信小程序作品说明</span></header>
+<main class="content">
+<p class="eyebrow">交互创新 / CAPTURE</p>
+<h1>记录，不该从一张空白页开始。</h1>
+<p class="subtitle">把入口放到用户已经发生的动作旁边：四种开始的方式，通向同一条笔记。</p>
+
+<div class="il">
+<svg viewBox="0 0 503 185">
+  <defs><marker id="ar5" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#22251f"/></marker></defs>
+  <g><rect class="sh" x="22" y="14" width="92" height="30" rx="2.5"/><rect class="cf" x="20" y="12" width="92" height="30" rx="2.5"/><path class="s thin" d="M28 24 h10 a3 3 0 0 1 0 6 h-4"/><circle class="s hair" cx="28" cy="27" r="1.5"/><text class="tt" x="45" y="26">链接</text><text class="tm" x="45" y="35">接住正在阅读的内容</text></g>
+  <g><rect class="sh" x="22" y="54" width="92" height="30" rx="2.5"/><rect class="cf" x="20" y="52" width="92" height="30" rx="2.5"/><rect class="s thin" x="27" y="58" width="12" height="9" rx="1"/><circle class="s hair" cx="30.5" cy="61" r="1.5"/><path class="s hair" d="M27 65.5 l3.5 -3 3 2.5 2.5 -2 3 2.5"/><text class="tt" x="45" y="66">截图 / 拍照</text><text class="tm" x="45" y="75">让画面里的字可整理</text></g>
+  <g><rect class="sh" x="22" y="94" width="92" height="30" rx="2.5"/><rect class="cf" x="20" y="92" width="92" height="30" rx="2.5"/><path class="s thin" d="M28 106 l2 -7 5 5 -5 3 z M35 99 l2 2"/><text class="tt" x="45" y="106">自己写</text><text class="tm" x="45" y="115">把判断留给用户</text></g>
+  <g><rect class="sh" x="22" y="134" width="92" height="30" rx="2.5"/><rect class="cf" x="20" y="132" width="92" height="30" rx="2.5"/><path class="s thin" d="M28 146 h9 M34 143 l3 3 -3 3"/><text class="tt" x="45" y="146">转存</text><text class="tm" x="45" y="155">好笔记，从这里开始</text></g>
+  <path class="s a thin" d="M112 27 C 168 27 178 70 220 70"/>
+  <path class="s a thin" d="M112 67 C 168 67 178 82 220 82"/>
+  <path class="s a thin" d="M112 107 C 168 107 178 95 220 95"/>
+  <path class="s a thin" d="M112 147 C 168 147 178 107 220 107"/>
+  <text class="tl" x="226" y="38">FOUR DOORS · ONE ROOM</text>
+  <rect class="sh" x="228" y="46" width="113" height="84" rx="3"/><rect class="cf" x="226" y="44" width="113" height="84" rx="3"/>
+  <text class="tt" x="236" y="58">同一条笔记</text><line class="s thin" x1="236" y1="63" x2="308" y2="63"/>
+  <text class="tm" x="236" y="74">标题</text><rect class="gf" x="254" y="69" width="74" height="4.5"/>
+  <text class="tm" x="236" y="88">摘要</text><rect class="gf" x="254" y="81" width="74" height="12"/>
+  <text class="tm" x="236" y="101">要点</text><line class="s hair" x1="254" y1="97" x2="328" y2="97"/><line class="s hair" x1="254" y1="104" x2="328" y2="104"/>
+  <text class="tm" x="236" y="116">标签</text><line class="s hair" x1="254" y1="112" x2="328" y2="112"/>
+  <line class="s thin" x1="339" y1="86" x2="371" y2="86" marker-end="url(#ar5)"/>
+  <g><rect class="sh" x="379" y="58" width="92" height="60" rx="2.5"/><rect class="cf" x="377" y="56" width="92" height="60" rx="2.5"/>
+     <text class="tt" x="387" y="72">之后都一样</text>
+     <text class="tn" x="387" y="86">搜索找回 · 分类</text>
+     <text class="tn" x="387" y="96">十套模板出卡</text>
+     <text class="tn" x="387" y="106">分享与转存</text></g>
+</svg>
+<p class="ilcap">概念示意 · 四种入口，同一套结构</p>
+</div>
+
+<div class="flow"><span>提交内容</span><b>→</b><span>查看处理状态</span><b>→</b><span>核对与修改</span><b>→</b><span>分类 / 搜索 / 出卡</span></div>
+
+<div class="rows">
+<div class="row"><h2>链接</h2><p>粘贴公开网页地址，服务端获取正文并提炼为笔记，保留来源与取得的原文；链接栏右侧另有一枚「粘贴」按钮。记录从“这个值得留下”开始，而不是先复制长文、另开编辑器、再逐段摘录。</p></div>
+<div class="row"><h2>截图与拍照</h2><p>从相册或相机导入，一批最多九张。文字识别后进入同一条摘要流程，让课程重点、阅读截图、纸面资料获得统一的整理入口。清晰度与复杂版式仍会影响识别结果。</p></div>
+<div class="row"><h2>自己写</h2><p>标题与原文由用户自己填，摘要走同一条提炼链路；模型给的那份标题在这条入口不采用，用户写的原文一字不改地留着。旁边一枚「原文翻译」开关，默认关。</p></div>
+<div class="row"><h2>转存</h2><p>读者进入公开分享页可点“存到我的笔记”，保存的是独立副本，保留只读来源；原作者之后撤回分享，不会抹掉读者已经转存的记录。</p></div>
+</div>
+<p class="note">公开链接采集受登录、付费墙、站点限制与有效正文影响；没有正文或无法识别出文字时，需要如实提示，而非生成空成品。少的是重复搬运，不是用户的控制权。</p>
+</main>
+<footer class="footer"><span>图麦笔记 · 产品作品集</span><span>方向稿 V5 · 05</span></footer>
+</article>
+
+<!-- ============ 样张 5 ｜ 新 P7 概念第一屏 ============ -->
+<article class="page">
+<header class="mast"><span>Tumark</span><span>图麦笔记 · 微信小程序作品说明</span></header>
+<main class="content">
+<p class="eyebrow">交互创新 / INTERFACE</p>
+<h1>第一眼就是入口，不必先找按钮。</h1>
+<p class="subtitle">新的第一屏与录入面板。下面这台手机是概念示意，不是截图——为的是把结构讲清楚，而不是把像素摆出来。</p>
+
+<div class="split">
+  <div>
+    <div class="ph">
+      <div class="notch"></div>
+      <div class="scr">
+        <div class="ph-hero">
+          <svg viewBox="0 0 200 210">
+            <rect x="0" y="0" width="200" height="210" fill="#EDE7DA"/>
+            <circle cx="150" cy="50" r="15" fill="#D2683F" opacity=".75"/>
+            <path d="M0 128 C 34 112 62 134 96 120 S 160 128 200 114 L200 210 L0 210 Z" fill="#E2D9C4"/>
+            <path d="M0 156 C 40 140 74 164 112 148 S 178 156 200 144 L200 210 L0 210 Z" fill="#D9CFB9"/>
+            <path d="M0 184 C 46 172 84 190 124 178 S 180 184 200 176 L200 210 L0 210 Z" fill="#CFC4AA"/>
+            <g class="ink" opacity=".92">
+              <circle cx="74" cy="98" r="9.5"/>
+              <path d="M62 122 c0 -10 5 -16 12 -16 s12 6 12 16 c0 8 -3 14 -5 20 h-14 c-2 -6 -5 -12 -5 -20 z"/>
+            </g>
+            <path d="M60 138 c8 -5 14 -5 14 0 c0 -5 6 -5 14 0 v7 c-8 -4 -14 -4 -14 0 c0 -4 -6 -4 -14 0 z" fill="#FBFAF7" stroke="#22251f" stroke-width=".8"/>
+            <g class="mist" opacity=".85">
+              <circle cx="136" cy="112" r="6.5"/>
+              <path d="M128 128 c0 -7 3.5 -11 8 -11 s8 4 8 11 c0 6 -2 10 -3.5 14 h-9 c-1.5 -4 -3.5 -8 -3.5 -14 z"/>
+            </g>
+            <text x="16" y="28" font-family="Songti SC,serif" font-size="10.5" fill="#4d4a41">看到好的，随手记下来</text>
+          </svg>
+          <div class="ph-dots"><i></i><i></i></div>
+        </div>
+        <div class="ph-blocks">
+          <div class="ph-b main"><div class="w">记下来</div><div class="lab">照片 · 链接 · 文字</div></div>
+          <div class="ph-b"><div class="n">13</div><div class="lab">笔记</div></div>
+          <div class="ph-b"><div class="n">12</div><div class="lab">卡片</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="ilcap" style="text-align:center">概念示意 · 第一屏结构</p>
+  </div>
+  <div>
+    <h2>形象图就是这一屏</h2>
+    <p>「我的 → 卡片模板」最上面那格形象图铺满第一屏，没设过就用包里这一张；上面压一层可调的暗罩。导航条下面那一行两枚：<b>调亮度</b>换一档深浅，<b>换背景</b>跳到那一页选图——这里不弹相册，一个功能只留一个入口。</p>
+    <h2>三块入口</h2>
+    <p>左块是门面：点一下直接进「拍照」那一档，白条上写「记下来」；右边两枚是笔记数与卡片数，数字在块里、名字在白条里。三块颜色由当前壁纸派生，换一套壁纸一起换。</p>
+    <h2>面板两档高度</h2>
+    <p>展开后面板贴底，只多一行：一个输入框（或一横排小图）＋一枚右滑长条。框外那一行左边是同一条轮播 Tips，右边「返回」与列表页同一个词、同一个动作。</p>
+    <div class="minis">
+      <div class="mini"><p class="mt">亮度四档</p>
+        <div class="shades"><i style="background:#ffffff"></i><i style="background:#d8d4ca"></i><i style="background:#a9a49a"></i><i style="background:#ffffff"></i></div>
+        <p class="ilcap">纯白 → 25% → 50% → 回纯白，默认停中档</p></div>
+      <div class="mini"><p class="mt">面板两档</p>
+        <div class="panels"><i style="height:26pt"></i><b>410</b><i style="height:34pt"></i><b>490</b></div>
+        <p class="ilcap">rpx 两档，贴底，只多一行</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="il">
+<svg viewBox="0 0 503 70">
+  <text class="tl" x="20" y="6">录入面板 · 贴底那一层</text>
+  <rect class="sh" x="22" y="10" width="463" height="54" rx="5"/><rect class="cf" x="20" y="8" width="463" height="54" rx="5"/>
+  <rect class="pf" x="32" y="18" width="276" height="17" rx="3"/>
+  <text class="tm" x="40" y="29">输入框 · 或一横排小图</text>
+  <rect class="s thin" x="322" y="20" width="148" height="13" rx="6.5"/>
+  <circle class="af" cx="463" cy="26.5" r="5"/>
+  <text class="tm" x="332" y="29">右滑开始提炼</text>
+  <line class="s hair" x1="32" y1="44" x2="470" y2="44"/>
+  <text class="tm" x="32" y="54">框外左 · 与第一屏同一条轮播 Tips</text>
+  <text class="tm" x="470" y="54" text-anchor="end">框外右 · 返回</text>
+</svg>
+<p class="ilcap">概念示意 · 面板里只剩两样：一个输入框＋一枚右滑长条</p>
+</div>
+<p class="note">几何与色值现读 <code>create.wxss</code>／<code>palette.js</code>；屏上每一句字都来自现网字典 <code>utils/i18n.js</code>。真机与模拟器的实拍放在答辩现场演示，文档里只留结构。</p>
+</main>
+<footer class="footer"><span>图麦笔记 · 产品作品集</span><span>方向稿 V5 · 07</span></footer>
+</article>
+
+<!-- ============ 样张 6 ｜ 新 P8 六格示意 ============ -->
+<article class="page">
+<header class="mast"><span>Tumark</span><span>图麦笔记 · 微信小程序作品说明</span></header>
+<main class="content">
+<p class="eyebrow">交互创新 / SMALL MOMENTS</p>
+<h1>几处有趣的体验。</h1>
+<p class="subtitle">六件小事，让“记下来”这件事更贴人。每一格配一幅示意，评委不用读字也能看懂它在动什么。</p>
+
+<div class="tiles">
+  <div class="tile"><div class="il"><svg viewBox="0 0 156 72">
+    <defs><marker id="t1" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#D2683F"/></marker></defs>
+    <g class="ink" opacity=".92"><circle cx="52" cy="26" r="8"/><path d="M42 46 c0 -8 4 -13 10 -13 s10 5 10 13 c0 7 -2.5 12 -4 17 h-12 c-1.5 -5 -4 -10 -4 -17 z"/></g>
+    <g class="mist" opacity=".85"><circle cx="104" cy="32" r="5.5"/><path d="M97 46 c0 -6 3 -9 7 -9 s7 3 7 9 c0 5 -1.8 9 -3 12.5 h-8 c-1.2 -3.5 -3 -7 -3 -12.5 z"/></g>
+    <path class="s a thin" d="M66 22 C 82 12 90 12 100 20" marker-end="url(#t1)"/>
+    <path class="s a thin" d="M98 54 C 84 64 76 64 66 56" marker-end="url(#t1)"/>
+  </svg></div>
+  <h3>换一位主角</h3><p>点右后那枚淡灰剪影，两位当场对调并记在本机；这一位还延续到列表与卡片框外左上角。</p></div>
+
+  <div class="tile"><div class="il"><svg viewBox="0 0 156 72">
+    <defs><marker id="t2" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#D2683F"/></marker></defs>
+    <rect x="30" y="10" width="96" height="26" rx="2" fill="#EDE7DA"/>
+    <circle cx="104" cy="18" r="5" fill="#D2683F" opacity=".75"/>
+    <path d="M30 28 C 46 22 62 30 78 25 S 110 28 126 23 L126 36 L30 36 Z" fill="#D9CFB9"/>
+    <rect x="30" y="10" width="96" height="26" rx="2" fill="#22251f" opacity=".25"/>
+    <g><rect x="34" y="46" width="12" height="12" rx="2" fill="#ffffff" stroke="#22251f" stroke-width=".55"/>
+       <rect x="58" y="46" width="12" height="12" rx="2" fill="#d8d4ca" stroke="#22251f" stroke-width=".55"/>
+       <rect x="82" y="46" width="12" height="12" rx="2" fill="#a9a49a" stroke="#22251f" stroke-width=".55"/>
+       <rect x="106" y="46" width="12" height="12" rx="2" fill="#ffffff" stroke="#22251f" stroke-width=".55"/></g>
+    <path class="s a thin" d="M48 52 h8 M72 52 h8 M96 52 h8" marker-end="url(#t2)"/>
+    <text class="tm" x="34" y="68">纯白 → 25% → 50% → 回纯白</text>
+  </svg></div>
+  <h3>调亮度</h3><p>压的是罩子透明度，不是重画一张图；背景再深也不把数字压没。</p></div>
+
+  <div class="tile"><div class="il"><svg viewBox="0 0 156 72">
+    <rect class="s thin" x="20" y="30" width="116" height="11" rx="5.5"/>
+    <rect class="gf" x="23" y="33" width="98" height="5" rx="2.5"/>
+    <circle class="af" cx="127" cy="35.5" r="6"/>
+    <line class="s hair" x1="20" y1="20" x2="127" y2="20"/>
+    <line class="s hair" x1="20" y1="17" x2="20" y2="23"/>
+    <line class="s hair" x1="127" y1="17" x2="127" y2="23"/>
+    <path class="s a thin" d="M60 14 h40" marker-end="url(#t3)"/>
+    <defs><marker id="t3" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#D2683F"/></marker></defs>
+    <text class="tm" x="20" y="56">推到底才提交</text>
+  </svg></div>
+  <h3>右滑才开始提炼</h3><p>长条往右推到底才提交；先看清这一屏再动手，多这一下是有意的。</p></div>
+
+  <div class="tile"><div class="il"><svg viewBox="0 0 156 72">
+    <defs><marker id="t4" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#D2683F"/></marker></defs>
+    <rect class="s hair" x="30" y="22" width="24" height="34" rx="2"/>
+    <rect class="sh" x="68" y="17" width="32" height="44" rx="2"/><rect class="cf" x="66" y="15" width="32" height="44" rx="2"/>
+    <line class="s hair" x1="72" y1="25" x2="92" y2="25"/><line class="s hair" x1="72" y1="33" x2="92" y2="33"/><line class="s hair" x1="72" y1="41" x2="86" y2="41"/>
+    <rect class="s hair" x="114" y="22" width="24" height="34" rx="2"/>
+    <path class="s a thin" d="M20 39 l-6 -4.5 M20 39 l-6 4.5"/>
+    <path class="s a thin" d="M148 39 l6 -4.5 M148 39 l6 4.5"/>
+    <text class="tm" x="52" y="68">十套缩略排成一排</text>
+  </svg></div>
+  <h3>左右滑换模板</h3><p>十套缩略排成一排，滑着换；选之前先看得到结果，不用退回列表挑。</p></div>
+
+  <div class="tile"><div class="il"><svg viewBox="0 0 156 72">
+    <text class="tl" x="48" y="10">四格 · 存在账号里</text>
+    <rect class="s hair" x="48" y="16" width="30" height="20" rx="2"/>
+    <rect class="sh" x="86" y="17" width="30" height="20" rx="2"/><rect class="cf" x="84" y="16" width="30" height="20" rx="2"/>
+    <rect class="gf" x="88" y="20" width="22" height="12"/>
+    <circle class="af" cx="114" cy="16" r="2.5"/>
+    <rect class="s hair" x="48" y="42" width="30" height="20" rx="2"/>
+    <rect class="s hair" x="84" y="42" width="30" height="20" rx="2"/>
+    <text class="tm" x="48" y="70">同一套图铺第一屏、也署名在卡片角落</text>
+  </svg></div>
+  <h3>换笔记头像</h3><p>同一套图既铺第一屏、也署名在卡片角落；换手机或重装后还是那一套。</p></div>
+
+  <div class="tile"><div class="il"><svg viewBox="0 0 156 72">
+    <defs><marker id="t6" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#D2683F"/></marker></defs>
+    <rect class="s thin" x="30" y="24" width="30" height="14" rx="7"/>
+    <circle class="af" cx="37" cy="31" r="5"/>
+    <text class="tt" x="74" y="30">EN</text>
+    <path class="s a thin" d="M74 38 h22" marker-end="url(#t6)"/>
+    <text class="tt" x="102" y="34">中</text>
+    <text class="tm" x="30" y="56">默认关 · 关跟原文语言</text>
+  </svg></div>
+  <h3>控制提炼的语言</h3><p>「原文翻译」开关默认关：关＝摘要跟原文语言走，开＝先读懂再整理成中文。</p></div>
+</div>
+<div class="callout">小地方用心，大地方才可信。</div>
+<p class="note">六条都在 2.1 线的前端里；「原文翻译」那一条同时改服务端提示词（<code>backend/app/services/llm.py</code> 的 <code>system_prompt()</code>）。换主角那一条只落本机，<b>不含</b>跨设备同步——这一条他没要。</p>
+</main>
+<footer class="footer"><span>图麦笔记 · 产品作品集</span><span>方向稿 V5 · 08</span></footer>
+</article>
+
+</body>
+</html>
