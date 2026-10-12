@@ -1,3 +1,6 @@
+<!-- 私密解锁那一层的标记在 templates/pwd-sheet.wxml（10-12 起三页共用一份，站长拍「两个密码框要统一」；
+     这一页 10-12 起也自己问一次，判据出处见 utils/privateGate.js 的 unlockOn 与 loadNoteForEdit）。 -->
+<import src="../../templates/pwd-sheet.wxml"/>
 <view class="container {{themeClass}}">
   <view class="form-section card">
     <view class="form-group">
@@ -69,4 +72,6 @@
     <view class="btn-secondary" bindtap="onCancel">{{t.cancel}}</view>
     <view class="btn-primary" bindtap="onSave">{{t.save}}</view>
   </view>
+
+  <template is="pwdSheet" data="{{pwdOpen, pwdEntering, pwdName, pwdScene, pwdTip, pwdBuf, pwdFocus, t}}"/>
 </view>

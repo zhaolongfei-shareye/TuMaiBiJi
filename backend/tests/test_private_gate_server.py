@@ -239,6 +239,24 @@ class Test分享出口:
         st = client.get("/api/shares/status", params={"note_id": n.id}, headers=hdr(u)).json()
         assert st["active"] is False
 
+    def test_改成私密后那张卡片也转存不进来(self, client, db):
+        """站长 2026-10-12 那句的第二半：「之前生成的卡片，然后笔记设密码，那卡片就不能被转存。」
+
+        卡片上印的就是这张活码，所以挡转存取的是同一个判据——但**转存是另一条接口**
+        （`POST /api/notes/from-share`）。公开页 404 不等于转存也 404：上一版就出过"落地页
+        打不开、转存照样把内容抄走"那种两处各判一次的分歧（见 sharing.active_share_by_token 的注释）。
+        """
+        u = new_user(db, "t12b")
+        n = make_note(db, u, "先分享后私密")
+        share = client.post("/api/shares/", json={"note_id": n.id}, headers=hdr(u)).json()
+        cat = make_private_category(db, u)
+        assert client.put(f"/api/notes/{n.id}", json={"category_id": cat.id},
+                          headers=hdr(u)).status_code == 200
+        other = new_user(db, "t12c")
+        r = client.post("/api/notes/from-share", json={"token": share["token"]}, headers=hdr(other))
+        assert r.status_code == 404, "私密化之后转存必须同样读不到，不许出现「页打不开但内容抄得走」"
+        assert db.query(Note).filter(Note.user_id == str(other.id)).count() == 0
+
     def test_普通笔记分享完全照旧(self, client, db):
         u = new_user(db, "t13")
         make_private_category(db, u)

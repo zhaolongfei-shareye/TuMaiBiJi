@@ -63,7 +63,14 @@ function _promptPassword(page, lang) {
           })
           return false
         }
-        wx.showToast({ title: (err.data && err.data.detail) || t('privatePasswordWrong', lang), icon: 'none' })
+        wx.showToast({
+          // 这里**不再念服务端那句原文**（站长 10-12 拍 C5 甲）。原来那句是
+          // `wx.showToast({ title: err.data.detail })`：连错十次撞上 slowapi 的 10/分钟，
+          // 屏上就是一串英文 "Rate limit exceeded: 10 per 1 minute"，读着像乱码，
+          // 而且它本来是写给日志看的话。现在只按状态码分流，话一律由字典出（中英各一句）。
+          title: t(err && err.statusCode === 429 ? 'privateRateLimited' : 'privatePasswordWrong', lang),
+          icon: 'none',
+        })
         return false
       }
     },
@@ -104,4 +111,14 @@ async function unlockOn(page, note) {
   return true
 }
 
-module.exports = { PRIVATE_NAME, isPrivate, allowPrivate, needsUnlock, unlockOn }
+/**
+ * 验不成该去哪儿：能退就退，退无可退回首页。
+ * 深链／扫码直接落详情页时页面栈只有这一层，`wx.navigateBack()` 一声不响地失败，
+ * 人就停在一屏空白上（站长 10-12 拍 C4）。详情页与编辑页两处走同一句，别再各写一份。
+ */
+function exitOrHome() {
+  if (getCurrentPages().length > 1) wx.navigateBack()
+  else wx.switchTab({ url: '/pages/index/index' })
+}
+
+module.exports = { PRIVATE_NAME, isPrivate, allowPrivate, needsUnlock, unlockOn, exitOrHome }

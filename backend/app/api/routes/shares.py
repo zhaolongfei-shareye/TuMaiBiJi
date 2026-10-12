@@ -230,13 +230,19 @@ def _get_active_share(token: str, db: Session) -> Share:
 def get_share(token: str, db: Session = Depends(get_db)):
     share = _get_active_share(token, db)
     resp = ShareResponse.model_validate(share)
-    # 「分享带图」（方案 §3.1.7）：落地页也是小程序页（扫码进 pages/share/view），
-    # 所以 cloud:// 这个地址在对面直接画得出来，不需要临时链接。
+    # 「分享带图」（方案 §3.1.7）：清单是服务端在读这一页时现查的（`_public_assets` 在下面），
+    # 只有 `cloud_url` 这一个字段从公开口出去。
     #
-    # 这里是**现查**而不是快照：图绑在笔记上，快照那几列是文字。两条口径要说明白——
-    # ① 撤掉分享（close_shares）之后整页 404，图跟着一起看不见，所以"收回来"这扇门
-    #    对图同样有效；② 建分享之后新绑上的图会出现在公开页上，而图片从来没有过
-    #    内容安全送检（文字走 msgSecCheck，图片侧的 imgSecCheck 个人主体拿不到）。
+    # ⚠ 这一条**有前提**，10-12 之前这句注释写的是"落地页也是小程序页，所以 cloud:// 在对面
+    # 直接画得出来，不需要临时链接"——那是假话，站长报的 BUG 就是它：朋友打开落地页，
+    # 九格全空白。`cloud://` 不是公网地址，能不能读由**云开发环境的存储安全规则**决定，
+    # 默认那一档「仅创建者可读写」把非作者一律挡掉。修法不在代码里：控制台把「读」放开给
+    # 所有用户（写仍然只创建者）。**哪天那一档被改回去，这一排就又画不出来**，
+    # 症状与 10-12 那次一模一样，别先怀疑这条接口。
+    #
+    # 两条口径要说明白——① 撤掉分享（close_shares）之后整页 404，图跟着一起看不见，所以
+    # "收回来"这扇门对图同样有效；② 建分享之后新绑上的图会出现在公开页上，而图片从来没有过
+    # 内容安全送检（文字走 msgSecCheck，图片侧的 imgSecCheck 个人主体拿不到）。
     #    这一条记在 docs/产品需求.md，不当已解决。
     resp.assets = _public_assets(db, share.note_id)
     return resp

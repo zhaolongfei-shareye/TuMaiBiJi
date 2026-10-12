@@ -1,3 +1,6 @@
+/* 私密解锁那一层的皮，三页共用一份（templates/pwd-sheet.wxml 那一张模板吃它）。 */
+@import '../../styles/pwd-sheet.wxss';
+
 .form-section {
   margin-top: var(--sp-5);
   padding: var(--sp-4);

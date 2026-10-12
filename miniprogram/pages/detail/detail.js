@@ -72,9 +72,11 @@ Page({
     try {
       let note = await api.getNote(id)
       if (note.is_private && !(await privateGate.unlockOn(this, note))) {
-        // 没验过就一篇都不给看：收掉加载态、直接退回上一页，不留半截内容在屏上。
+        // 没验过就一篇都不给看：收掉加载态，不留半截内容在屏上。
+        // 退哪儿由 exitOrHome 判（C4）：从分享码或深链直接落这一页时页面栈只有一层，
+        // 那时 `navigateBack` 是静默失败，人会停在一屏空白。
         this.setData({ loading: false })
-        wx.navigateBack()
+        privateGate.exitOrHome()
         return
       }
       if (this._unlockRenewed) {

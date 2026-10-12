@@ -183,8 +183,10 @@ const i18n = {
     privatePasswordTitle: '输入密码',
     privatePasswordOk: '确定',
     privatePasswordWrong: '密码不正确',
+    // 连错撞上服务端 10/分钟那道限流时说的话。原来这一句屏上是 slowapi 那句英文原文
+    // （那是写给日志看的），站长 10-12 拍 C5 甲：换成一句人话。
+    privateRateLimited: '输得太快了，稍等一下再试',
     privatePasswordRequired: '请先在「我的」中设置私密密码',
-    privateUnlockFirst: '解锁已过期，请先在笔记里输一次密码',
     // 面板第二行只说这串密码干什么用——"6 位数字"输入框的占位符里已经有了，不重复。
     privatePasswordScene: '看私密笔记的内容时要输这串；归到私密的笔记不出笔记卡片。',
     privatePasswordSetHint: '已经设过了。要换一条就先重置，再输两遍设新的。',
@@ -543,8 +545,8 @@ const i18n = {
     privatePasswordTitle: 'Enter Password',
     privatePasswordOk: 'OK',
     privatePasswordWrong: 'Wrong password',
+    privateRateLimited: 'Too many tries, wait a minute',
     privatePasswordRequired: 'Please set a private password in Me first',
-    privateUnlockFirst: 'Unlock expired — re-enter the password in your notes',
     privatePasswordScene: 'Needed to open a private note. Notes filed as private get no share card.',
     privatePasswordSetHint: 'Already set. To change it, reset first, then type the new one twice.',
     privatePasswordBack: 'Back',

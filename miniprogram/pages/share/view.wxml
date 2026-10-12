@@ -21,8 +21,10 @@
       <text class="card-title">{{share.title}}</text>
 
       <!-- 分享带图（方案 §3.1.7）：清单是服务端在读这一页时现查的（routes/shares.py 的
-           _public_assets），只有 cloud:// 这一个字段从公开口出去。扫码进来的人不用登录
-           也能看，因为这一页本来就是公开的；撤回分享之后整页 404，图跟着一起不见。 -->
+           _public_assets），只有 cloud:// 这一个字段从公开口出去。撤回分享之后整页 404，图跟着一起不见。
+           ⚠ 这一排画不画得出来**不取决于这一页公不公开**，取决于云开发存储的「读」权限那一档：
+           默认「仅创建者可读写」时，别人打开就是九格空白（站长 10-12 报的那条 BUG，10-12 由他在
+           控制台把读放开给所有用户）。所以这一排要出问题的话，先去看那一档，别先怀疑这条接口。 -->
       <view wx:if="{{share.assets && share.assets.length}}" class="sv-shots">
         <image wx:for="{{share.assets}}" wx:key="cloud_url"
                class="sv-shot"

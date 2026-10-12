@@ -31,6 +31,7 @@ from app.api.routes.assets import (
     _owned_note_or_404,
 )
 from app.core.auth import get_current_user
+from app.core.private_access import is_private_note, private_category_ids
 from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
@@ -165,7 +166,14 @@ def put_note_card(
     但它同时是"把别人的地址挂到自己名下"那条路的入口，脚本化的尝试不该白打。
     60/分钟是照着"回前台一次把存量卡片整批补登记"那个最宽的合法场景给的，不是照人手速给的。
     """
-    _owned_note_or_404(db, user, note_id)
+    note = _owned_note_or_404(db, user, note_id)
+    # 私密笔记不登记卡片（站长 2026-10-12：「设了密码的笔记是不能生成卡片的」）。
+    # 界面上那一格对私密篇整个不渲染（pages/index/index.js 的 onCardTap／_openPosterFor），
+    # 可接口原本是照收的——与 shares.py 那条「私密笔记不能分享」同一个形状：承诺要卡在服务端。
+    # 不卡的后果不是"看见别人的东西"，是**这篇的标题＋概要＋要点被压成一张留档卡片**，
+    # 而这张卡片会跟着 `GET /api/user/cards` 回到任何一台登录设备上。
+    if is_private_note(note, private_category_ids(db, user.id)):
+        raise HTTPException(status_code=400, detail="私密笔记不能生成卡片")
     if payload.origin not in CARD_ORIGINS:
         raise HTTPException(status_code=400, detail="卡片来源不认得")
     if any(c.isspace() for c in payload.tpl.strip()) or not payload.tpl.strip():

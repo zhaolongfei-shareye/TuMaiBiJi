@@ -32,6 +32,7 @@ from app.core.auth import _create_token
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
 from app.api.routes.cards import MAX_CARD_UPLOAD_BYTES
+from app.models.category import Category
 from app.models.note import Note
 from app.models.note_card import NoteCard
 from app.models.share import Share
@@ -115,6 +116,55 @@ class Test写与读:
         db.commit()
         got = client.get(f"/api/notes/{n.id}/card", headers=hdr(u)).json()
         assert got["card"] is None and got["had_share"] is True
+
+
+class Test私密笔记不登记卡片:
+    """站长 2026-10-12：「设了密码的笔记是不能生成卡片的」。
+
+    界面对私密篇根本不开那张大图（`pages/index/index.js` 的 `onCardTap`／`_openPosterFor`），
+    所以这一组钉的是**接口那半边**：绕开界面直接 POST 也登记不进去、库里一行都不留。
+    判据与 `shares.py` 那条「私密笔记不能分享」是同一条（`app/core/private_access.py`：
+    分类名等于"私密"），两处各写一份迟早走样，所以这里也只认那一个出处。
+    """
+
+    def mk_private(self, db, u, title="私密的一篇"):
+        cat = Category(user_id=str(u.id), name="私密", color="#23252C")
+        db.add(cat)
+        db.commit()
+        n = mk_note(db, u, title)
+        n.category_id = cat.id
+        db.commit()
+        return n, cat
+
+    def test_私密篇登记卡片被拒且库里不留行(self, client, db):
+        u = mk_user(db, "pv1")
+        n, _ = self.mk_private(db, u)
+        r = put(client, u, n.id)
+        assert r.status_code == 400, r.text
+        assert "私密" in r.json()["detail"]
+        assert db.query(NoteCard).filter(NoteCard.note_id == n.id).count() == 0
+
+    def test_先出卡片后归私密的旧行不删但这一口关上(self, client, db):
+        """他这句的第二半：之前生成过卡片、后来设了密码。
+        旧行**故意不删**（撤档与删笔记那两条路各自有账，悄悄删掉一张他没删过的图是反向的错），
+        但从这一刻起这一口关上：再 PUT 一次等于替私密篇重出一张新的留档。"""
+        u = mk_user(db, "pv2")
+        cat = Category(user_id=str(u.id), name="私密", color="#23252C")
+        db.add(cat)
+        db.commit()
+        n = mk_note(db, u, "先出卡片后归私密")
+        assert put(client, u, n.id).status_code == 200, "还没归私密之前照旧登记得进（反向）"
+        n.category_id = cat.id
+        db.commit()
+        again = put(client, u, n.id, file_id="cloud://tumaibiji.abc/cards/2-classic-2.jpg")
+        assert again.status_code == 400, again.text
+        assert db.query(NoteCard).filter(NoteCard.note_id == n.id).count() == 1, "旧行留着，但不许再添"
+
+    def test_没建私密分类的账号照旧登记得进(self, client, db):
+        """反向：这道闸只加在"私密"那一类上，不给整站加摩擦（与 Test不受影响的面上 同口径）。"""
+        u = mk_user(db, "pv3")
+        n = mk_note(db, u, "普通的一篇")
+        assert put(client, u, n.id).status_code == 200
 
 
 class Test一篇只留一张:

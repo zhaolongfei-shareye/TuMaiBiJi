@@ -174,16 +174,29 @@ const ck = (name, ok, got) => {
   // 不是整层消失（他要的就是"和设置密码那个框一样"）。所以这一趟不会自己结掉，
   // 断言完再替他点取消收尾。
   before(); afterOpen = type('111111')
-  verifyFail = { data: { detail: '私密密码不正确' } }
+  verifyFail = { statusCode: 403, data: { detail: '私密密码不正确' } }
   pg = freshPage()
   const wrongRun = gate.unlockOn(pg, PRIVATE)
   await tick()
-  ck('密码不对 → 那一层留着、六格清空、吐司就是服务端那句',
-    pg.data.pwdOpen === true && pg.data.pwdBuf === '' && toasts[0] === '私密密码不正确' && switches.length === 0,
+  // C5 甲（站长 10-12）：屏上那句由字典出，**不吃服务端那句 detail**（那是写给日志看的话）。
+  // 旧版这条钉的正是"吐司就是服务端那句"，判据跟着这次改口一起换，不拿代码去迁就旧尺子。
+  ck('密码不对 → 那一层留着、六格清空、吐司是字典那句而不是服务端原文',
+    pg.data.pwdOpen === true && pg.data.pwdBuf === '' && toasts[0] === i18n.zh.privatePasswordWrong && switches.length === 0,
     `open=${pg.data.pwdOpen} buf="${pg.data.pwdBuf}" toast=${toasts[0]}`)
   ck('验失败也不许把凭证当活着（下一次点同一篇还得再问）', unlock.has === false)
   pwdSheet.cancel(pg)
   ck('他在这一步点取消 → 这一趟回 false，窗不开', (await wrongRun) === false)
+
+  before(); afterOpen = type('111111')
+  verifyFail = { statusCode: 429, data: { detail: 'Rate limit exceeded: 10 per 1 minute 1' } }
+  pg = freshPage()
+  const limited = gate.unlockOn(pg, PRIVATE)
+  await tick()
+  ck('撞上 10/分钟那道限流 → 屏上是「输得太快了」，不是 slowapi 那句英文（C5 甲的正面）',
+    pg.data.pwdOpen === true && toasts[0] === i18n.zh.privateRateLimited
+    && String(toasts[0]).indexOf('Rate limit') === -1, `toast=${toasts[0]}`)
+  pwdSheet.cancel(pg)
+  ck('……限流那一趟同样要他点取消才收场，回 false', (await limited) === false)
 
   // 站长 10-12 报的死路：重置（清空密码列）后输什么都不对，界面上什么都不说、也不给口。
   // 服务端那一句是写给日志的，不是写给人的，所以这一支不许当吐司直发。
@@ -358,21 +371,58 @@ const ck = (name, ok, got) => {
   ck('六格的皮只有一处：那张表里，页内 wxss 一条裸 .pwd 规则都不写',
     /^\.pwd-cell\s*\{/m.test(sheetWxss) && pageWxss.filter((x) => /^\.pwd/m.test(x.src)).length === 0,
     pageWxss.filter((x) => /^\.pwd/m.test(x.src)).map((x) => path.basename(x.f)).join('、'))
-  ck('三页都接上了这一层：@import 那张皮 + <import> 那张标记（少了任何一页就是那一屏没皮）',
-    ['me', 'index', 'detail'].every((p) => /@import '[^']*styles\/pwd-sheet\.wxss'/.test(wxssOf(p))
+  ck('四页都接上了这一层：@import 那张皮 + <import> 那张标记（少了任何一页就是那一屏没皮）',
+    ['me', 'index', 'detail', 'write'].every((p) => /@import '[^']*styles\/pwd-sheet\.wxss'/.test(wxssOf(p))
       && /<import src="[^']*templates\/pwd-sheet\.wxml"/.test(wxmlOf(p))))
-  ck('首页与详情页都挂着那一枚 template（不 import 就不画，判据过了也是白过）',
-    /<template is="pwdSheet"/.test(wxmlOf('index')) && /<template is="pwdSheet"/.test(wxmlOf('detail'))
-    && /<template is="pwdSheet"/.test(wxmlOf('me')))
-  ck('模板要的那三枚把手，两页都备好了（名字是模板里写死的，换名＝点不动）',
+  ck('首页、详情页、编辑页都挂着那一枚 template（不 import 就不画，判据过了也是白过）',
+    ['index', 'detail', 'me', 'write'].every((p) => /<template is="pwdSheet"/.test(wxmlOf(p))))
+  ck('模板要的那三枚把手，三页都备好了（名字是模板里写死的，换名＝点不动）',
     ['onPwdBuf', 'onPwdOk', 'onClosePwdPanel'].every((n) => new RegExp(n + '\\s*\\(').test(idx)
-      && new RegExp(n + '\\s*\\(').test(detailJs)))
+      && new RegExp(n + '\\s*\\(').test(detailJs) && new RegExp(n + '\\s*\\(').test(wr)))
   ck('面板上那三行字全从现网字典取（不给已有字段另造叫法）',
     /t\('privatePassword', lang\)/.test(sheetJs) && /t\('privatePasswordScene', lang\)/.test(sheetJs)
     && /t\('privatePasswordHint', lang\)/.test(sheetJs))
 
-  ck('编辑页没解锁就不进编辑器（PUT 是整份回写，会清掉真概要）',
-    /is_private[\s\S]{0,200}hasPrivateUnlock\(\)/.test(wr) && /privateUnlockFirst/.test(wr))
+  // 站长 10-12 拍 C3 甲：这一页**进门自己问一次**（不再靠"上一屏问过没有"），并且 PUT 只发真动过的栏。
+  // 旧的那条判据钉的是「读回来发现没凭证就吐司一句再退走」——那一版已被这次实现替掉，
+  // 按「改判据不改代码迁就旧尺子」改钉新的形状：验不成连表单都不铺，铺了就一定有基线。
+  ck('编辑页进门自己走一次 unlockOn（不是只看手里有没有凭证）',
+    /note\.is_private[\s\S]{0,120}unlockOn\(/.test(wr))
+  ck('验不成连表单都不铺：先 return，且退出走 exitOrHome（深链进来时 navigateBack 无处可退）',
+    /unlockOn\(this, note\)\)\)\s*\{[\s\S]{0,120}exitOrHome\(\)/.test(wr))
+  ck('PUT 只发真动过的那几栏，且一条都没动就不打那一趟（整份 PUT 会拿空壳清掉真概要）',
+    /const payload = \{\}/.test(wr) && /if \(now\.title !== base\.title\)/.test(wr)
+      && /Object\.keys\(payload\)\.length > 0/.test(wr) && !/payload\.source_type = undefined/.test(wr))
+  ck('基线在 setData 那一趟同一处建起来（事后从 data 回读会把他刚敲的字算成改动）',
+    /this\._baseline = \{/.test(wr) && /_baseline[\s\S]{0,400}normLines\(note\.key_points\)/.test(wr))
+  ck('归一化两头同一把尺：数组与文本框都折成"去掉项目符号的那些行"',
+    /const normLines = /.test(wr) && /const normTags = /.test(wr))
+  ck('没基线时一个字都不发（宁可存不下，不拿不知道哪来的东西去覆盖）',
+    /if \(!base\) \{[\s\S]{0,200}return/.test(wr))
+
+  // C1 甲（站长 10-12：「设了密码的笔记是不能生成卡片的」）。界面原本已经不给私密篇开大图，
+  // 这一组钉的是漏掉的两处：**历史遗留**那张（先出卡片、后来才归私密）还在台账里就会被画出来，
+  // 以及登记接口原本不判私密。
+  const cardsPy = fs.readFileSync(path.join(__dirname, '../../backend/app/api/routes/cards.py'), 'utf8')
+  const i18nJs = fs.readFileSync(path.join(__dirname, '../../miniprogram/utils/i18n.js'), 'utf8')
+  ck('首页卡片那一排：私密的不画，判不准（分类表还没拉回来）的也不画',
+    /if \(n\.is_private \|\| !n\.privKnown\) return/.test(idx))
+  ck('「判得准不准」单独留一栏——isPrivate(undefined) 回 false 是"不知道"，不是"不私密"',
+    /n\.privKnown = n\.category_id == null \|\| nameOf\[n\.category_id\] !== undefined/.test(idx))
+  ck('登记卡片那一口在服务端判私密（界面挡不住接口，与「私密笔记不能分享」同一形状）',
+    /私密笔记不能生成卡片/.test(cardsPy) && /is_private_note\(/.test(cardsPy))
+  // C4：验不成去哪儿。原来两处一律 `wx.navigateBack()`，深链／扫码直接落这一页时页面栈只有一层，
+  // 那句静默失败，人停在一屏空白。
+  ck('退路走 exitOrHome：能退就退，退无可退回首页（三处都问同一个判据）',
+    /function exitOrHome/.test(gateJs) && /getCurrentPages\(\)\.length > 1/.test(gateJs)
+      && /exitOrHome\(\)/.test(detailJs) && /exitOrHome\(\)/.test(wr))
+  // C5 甲：限流那句服务端原文（slowapi 那句英文 "Rate limit exceeded: 10 per 1 minute"）
+  // 本来是写给日志看的，原样当吐司发出去读着像乱码。话一律由字典出，中英各一句。
+  ck('解锁那一框不再念服务端原文，按状态码分流走字典',
+    !/title: \(err\.data && err\.data\.detail\)/.test(gateJs)
+      && /t\(err && err\.statusCode === 429 \? 'privateRateLimited' : 'privatePasswordWrong', lang\)/.test(gateJs))
+  ck('privateRateLimited 中英都在（缺一边就是那一语种下屏上没字）',
+    /privateRateLimited/.test(i18nJs) && (i18nJs.match(/privateRateLimited/g) || []).length >= 2)
   ck('凭证只存内存不落 storage（杀了重进要重新输）',
     !/setStorageSync\([^)]*[Uu]nlock/.test(apiJs))
   const appJs = fs.readFileSync(path.join(__dirname, '../../miniprogram/app.js'), 'utf8')

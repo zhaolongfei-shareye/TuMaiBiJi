@@ -300,6 +300,10 @@ Page({
       n.who = n.is_import ? (n.share_author_name || '') : ''
       // 私密判据：分类名等于"私密"。跟后端 get_note、录入侧那道拦截是同一条口径（utils/privateGate.js）。
       n.is_private = isPrivate(nameOf[n.category_id])
+      // 「这一格到底判得准不准」单独留一栏：分类那一张表还没拉回来（冷启第一屏、或那一趟挂了）
+      // 时 nameOf 是空的，`isPrivate(undefined)` 一律回 false——那是**不知道**，不是**不私密**。
+      // 卡片那一排不许拿"不知道"当"不私密"画（站长 10-12 拍 C1 甲：宁可偶尔少画几张）。
+      n.privKnown = n.category_id == null || nameOf[n.category_id] !== undefined
     })
     return notes
   },
@@ -326,6 +330,12 @@ Page({
     // 只画真存在的图。2.0.1 曾经给"卡片找不回来"的那几篇画虚线空框 + 一句"待你确认"，
     // 站长 10-08 打回：那是把"我们没存这条关联"的后果推给他点，而且看上去像加载失败。
     notes.forEach((n, i) => {
+      // 私密那一格不进卡片这一排（站长 10-12：「设了密码的笔记是不能生成卡片的」）。
+      // 新出的卡片本来就走不到这里——`onCardTap`／`_openPosterFor` 对私密篇整个不开，
+      // 服务端也不给登记（`cards.py` 同一句闸）。这里挡的是**历史遗留**：
+      // 先出了卡片、后来才把这篇归进私密，那一张台账还在，画出来就是标题＋概要＋要点上屏。
+      // 判不准的那一型（分类表还没拉回来）一并挡掉＝甲：宁可偶尔少画几张，不拿"不知道"当"不私密"。
+      if (n.is_private || !n.privKnown) return
       const list = this._cardsOf(n.id)
       if (list.length) cells.push({ i, id: n.id, title: n.title, cards: list })
     })

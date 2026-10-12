@@ -1,6 +1,18 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { allowPrivate } = require('../../utils/privateGate.js')
+const pwdSheet = require('../../utils/pwdSheet.js')
+const { allowPrivate, unlockOn, exitOrHome } = require('../../utils/privateGate.js')
+
+/* 这一页要发出去的那五栏，读回来时先存一份基线（站长 10-12 拍 C3 甲）。两个用途：
+   ① 保存只发**真动过**的那几栏——原来这一页是整份 PUT，拿一份服务端裁过的空壳去存，
+      等于把他真正的概要和要点清空（§七 严重③，那一趟只堵住了"猜是不是 null"那一半）；
+   ② 基线没建起来（读详情那一趟挂了、或凭证在这一页中途过期）就一个字都不发。
+   ⚠ 归一化必须两头同一把尺：库里是数组、屏上是文本框，两边都折成"去掉项目符号的那些行"，
+      否则"他一个字没改"也会被算成改过，这一刀就白补了。 */
+const normLines = (v) => (Array.isArray(v) ? v : (v == null ? [] : [v]))
+  .map((x) => String(x || '').replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean).join('\n')
+const normTags = (v) => (Array.isArray(v) ? v : (v == null ? '' : String(v)))
+  .split(/[，,]/).map((x) => x.trim()).filter(Boolean).join(',')
 
 Page({
   data: {
@@ -56,15 +68,20 @@ Page({
 
   async loadNoteForEdit() {
     try {
-      const note = await api.getNote(this.data.noteId)
+      let note = await api.getNote(this.data.noteId)
       // 没解锁时服务端把私密笔记的概要、要点、正文都裁成 null（后端 app/core/private_access.py）。
-      // 这一页保存是整份 PUT 回去的：拿一份裁过的空壳去存，等于把他真正的概要和要点清空。
-      // 正常路径走不到这里——要点到「编辑」得先在列表或详情里输过一次密码；
-      // 真走到了只有一种可能：那 15 分钟的解锁凭证刚好在这中间过期了。
-      if (note.is_private && !api.hasPrivateUnlock()) {
-        wx.showToast({ title: t('privateUnlockFirst', this.data.lang), icon: 'none' })
-        wx.navigateBack()
+      // 这一页保存是 PUT 回去的，拿一份裁过的空壳去存，等于把他真正的概要和要点清空。
+      // C3 甲（站长 10-12）：**这一页进门就自己问一次**，不再依赖"上一屏问过没有"——
+      // 上一版是读回来发现没凭证就吐司一句再退走，那一句「请先解锁」没给出口，
+      // 而且深链／编辑重进／凭证刚好在这一刻过期，三种都能撞上去。
+      // 判据与两处详情窗同一个出处（utils/privateGate.js 的 unlockOn）：真验过一次才算解锁。
+      if (note.is_private && !(await unlockOn(this, note))) {
+        exitOrHome()
         return
+      }
+      if (this._unlockRenewed) {
+        // 刚验完必须重取：上一份还是服务端裁过的空壳，直接铺进表单就是把空壳当"他的原文"。
+        note = await api.getNote(this.data.noteId)
       }
       const categoryIndex = note.category_id 
         ? this.data.categories.findIndex(c => c.id === note.category_id)
@@ -79,6 +96,15 @@ Page({
         selectedCategoryIndex: categoryIndex,
         originalCategoryId: note.category_id, // Preserve original even if categories fail to load
       })
+      // 基线就是"这一页刚铺开的那五栏"，与上面 setData 同一趟建，别事后从 data 里回读
+      // （回读会把他刚敲进去的字也算成改动）。
+      this._baseline = {
+        title: note.title || '',
+        summary: note.summary || '',
+        key_points: normLines(note.key_points),
+        tags: normTags(note.tags),
+        category_id: note.category_id == null ? null : note.category_id,
+      }
     } catch (err) {
       console.error('加载笔记失败', err)
       wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
@@ -130,6 +156,13 @@ Page({
     wx.navigateBack()
   },
 
+  // 私密解锁那一层（templates/pwd-sheet.wxml，与首页详情窗、独立详情页同一份）的三个把手。
+  // 这一页 10-12 起自己问一次（C3 甲），所以这三枚不能少：少了 ask 那一把 pending 永远没人结，
+  // 面板起来就再也下不去。
+  onPwdBuf(e) { pwdSheet.input(this, e) },
+  onPwdOk() { pwdSheet.submit(this) },
+  onClosePwdPanel() { pwdSheet.cancel(this) },
+
   async onSave() {
     const { title } = this.data.formData
     const { lang, isEdit, noteId, categories, selectedCategoryIndex, originalCategoryId } = this.data
@@ -162,7 +195,7 @@ Page({
         .map(s => s.trim())
         .filter(s => s)
 
-      const payload = {
+      const now = {
         title: title.trim(),
         summary: this.data.formData.summary.trim() || null,
         key_points: keyPoints.length > 0 ? keyPoints : null,
@@ -172,11 +205,28 @@ Page({
 
       let note
       if (isEdit) {
-        payload.source_type = undefined
-        note = await api.updateNote(noteId, payload)
+        // 编辑：只发**真动过**的那几栏（站长 10-12 拍 C3 甲）。原来整份 PUT，屏上铺的又是服务端
+        // 裁过的空壳时，一次保存就把他真正的概要和要点清空。上面那道 unlockOn 已经把"空壳铺进表单"
+        // 这一支堵住了，这里是第二层：基线没建起来（读详情那一趟挂了）就一个字都不发，
+        // 宁可存不下，也不拿一份不知道哪来的东西去覆盖。
+        const base = this._baseline
+        if (!base) {
+          wx.hideLoading()
+          wx.showToast({ title: t('loadFailed', lang), icon: 'none' })
+          exitOrHome()
+          return
+        }
+        const payload = {}
+        if (now.title !== base.title) payload.title = now.title
+        if ((now.summary || '') !== (base.summary || '')) payload.summary = now.summary
+        if (normLines(now.key_points) !== base.key_points) payload.key_points = now.key_points
+        if (normTags(now.tags) !== base.tags) payload.tags = now.tags
+        if (now.category_id !== base.category_id) payload.category_id = now.category_id
+        // 一个字没动就不打这一趟 PUT：PUT 会把 updated_at 顶上去、列表跟着换序，
+        // 而这一趟没有任何东西要写。
+        if (Object.keys(payload).length > 0) note = await api.updateNote(noteId, payload)
       } else {
-        payload.source_type = 'manual'
-        note = await api.createNote(payload)
+        note = await api.createNote(Object.assign({}, now, { source_type: 'manual' }))
       }
 
       wx.hideLoading()
