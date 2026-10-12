@@ -114,11 +114,11 @@ ck('新建页每次进页重取图', cjs.includes('bgSrc: poster.homeBg()'))
 // 10-12 这条需求由他亲口下了：深浅判定搬进 utils/imgBrightness，页面只剩一个调用点，
 // 导航条由那一趟一起设——所以这一把改钉"页面只调 applyTone、不许自己碰 applyNavForBand"，
 // 并且三页必须同一个形状（谁再各抄一份 canvas 采样就红在这里）。
-ck('深浅与导航条走同一个出口（页面只调 bgTone.applyTone）',
-  /bgTone\.applyTone\(this, this\.data\.bgSrc\)/.test(cjs) && !/applyNavForBand/.test(cjs))
+ck('深浅与导航条走同一个出口（页面只调 bgTone.applyTone，且把自己那两截递进去）',
+  /bgTone\.applyTone\(this, this\.data\.bgSrc, toneZones\(\)\)/.test(cjs) && !/applyNavForBand/.test(cjs))
 ck('三页都走那一个深浅出口（不各抄一份采样）',
   ['create', 'index', 'me'].every((p) =>
-    /bgTone\.applyTone\(this, this\.data\.bgSrc\)/.test(read(`pages/${p}/${p}.js`))))
+    /bgTone\.applyTone\(this, this\.data\.bgSrc, toneZones\(\)\)/.test(read(`pages/${p}/${p}.js`))))
 // 10-12 真机反馈「标题字能上下拖」：页面里那枚 `<canvas type="2d">` 是原生同层组件，
 // `position:fixed;left:-9999px` 在真机不保证把它移出流内——首屏被顶出一截，整页就变成可滚。
 // 采样改成离屏（`wx.createOffscreenCanvas`，与 utils/imageCompress.js 同一套）之后，
@@ -134,16 +134,31 @@ ck('采样确实只用离屏那一个口', /wx\.createOffscreenCanvas/.test(read
 // 那张黑白合影上半是浅墙（208~219）、下半两大块黑衣把全图平均压到 153 < 160，于是判成"深"、
 // 标题留在纸白，压在浅墙上只有 1.62:1。改判"字压着的那一条"之后钉这三条。
 const brightJs = read('utils/imgBrightness.js')
-ck('深浅采的是"字压着那一条"，不是整张图平均（求和只走那几行，不许再遍历整个 data）',
-  /function textRows/.test(brightJs) && /for \(let r = r0; r < r1/.test(brightJs)
-    && !/i < data\.length/.test(brightJs))
-ck('取景那两个数不在这儿重写一遍：盒高与锚点都从 poster 读（两处各写一个数迟早走样）',
-  /poster\.HEAD_IMG_H/.test(brightJs) && /poster\.BG_ANCHOR/.test(brightJs)
-    && !/=\s*740\b/.test(brightJs) && !/=\s*0\.15\b/.test(brightJs))
+ck('深浅存的是**逐行剖面**（32 行各一个数），不是一个平均数——上下两截要从同一份剖面各算一次',
+  /rows\.push\(Math\.round\(sum \/ SIDE\)\)/.test(brightJs)
+    && /function zoneLight/.test(brightJs) && !/i < data\.length/.test(brightJs))
+ck('两截各判一次：applyTone 一次交回 bgLight 与 bgLightLow（少一枚＝又变回一整页一个数）',
+  /bgLight: p === null/.test(brightJs) && /bgLightLow: p === null/.test(brightJs)
+    && /zones\.top/.test(brightJs) && /zones\.low/.test(brightJs))
+ck('取景那两个数不在 util 里写死：盒高与锚点由页面从 poster 递进来（两处各写一个数迟早走样）',
+  !/=\s*740\b/.test(brightJs) && !/=\s*0\.15\b/.test(brightJs)
+    && /poster\.HEAD_IMG_H/.test(read('pages/index/index.js'))
+    && /poster\.BG_ANCHOR/.test(read('pages/index/index.js'))
+    && /poster\.HEAD_IMG_H/.test(read('pages/me/me.js')))
 ck('poster 真把那枚锚点交出来了（导出不加，这边读到的就是 undefined）',
   /BG_ANCHOR,/.test(read('utils/poster.js')))
 ck('浅色那一档在容器上有个名，data 里也有初值（第一帧不闪）',
   /\{\{bgLight \? 'bg-light' : ''\}\}/.test(read('pages/create/create.wxml')) && /bgLight: false/.test(cjs))
+// 10-12 21:1x 第二刀：「请按照上下部分来分别判断，避免全图平均，造成差异」。
+// 下那一档要有名、有初值、三页都挂上，否则样式吃不到＝又一枚"有类名没规则"。
+ck('下那一档在三个 tab 页的容器上都有名，data 里都有初值',
+  ['create', 'index', 'me'].every((p) =>
+    /\{\{bgLightLow \? 'bg-light-low' : ''\}\}/.test(read(`pages/${p}/${p}.wxml`))
+    && /bgLightLow: false/.test(read(`pages/${p}/${p}.js`))))
+ck('首屏那行 Tips（收起态 .tips／展开态 .out）在"两档不一致"那两种情形各有对应规则',
+  /\.container\.has-bg\.bg-light:not\(\.bg-light-low\) \.tips,/.test(wxss)
+    && /\.container\.has-bg:not\(\.bg-light\)\.bg-light-low \.tips,/.test(wxss)
+    && /\.bg-light-low\) \.out \{/.test(wxss))
 ck('浅色那一态的样式真在（只有类名没有规则＝静默不生效）',
   /\.container\.has-bg\.bg-light \.page-scrim\s*\{/.test(wxss))
 // 压在图上那几行小字各有一支写死的纸白（`.swap-text`／`.swap-glyph`／`.home-swap`），
@@ -167,7 +182,7 @@ ck('这一页不自己写 setNavigationBarColor（值只有一份）', !/setNavi
 // 这四条（列表/卡片的 tab 行＋返回＋分类行，「我的」名片行的 slogan）压的是卡顶那层白纱，
 // 不是头部那层暗罩，白纱把暗图提成了中灰 —— 实测纸白压上去只有 1.9~2.2，所以这里跟着图翻的是
 // **墨的浓度**（深态整档墨、浅态留在 .72），不是极性。钉的就是带 `:not(.bg-light)` 那几条在不在。
-const deepSel = (src, sel) => src.includes(`.container.has-bg:not(.bg-light) ${sel}`)
+const deepSel = (src, sel) => src.includes(`.container.has-bg:not(.bg-light-low) ${sel}`)
 const ixCss = read('pages/index/index.wxss')
 ck('列表/卡片那两行固定字在深图那一态抬到整档墨（三条选择器一条不许少）',
   ['.vtab', '.ix-back', '.ix-cat'].every((s) => deepSel(ixCss, s)),
@@ -178,7 +193,7 @@ ck('浅图那一态这两行仍是两档（基础规则里那支 --text-secondar
   /\.vtab\s*\{[^}]*--text-secondary/.test(ixCss) && /\.ix-cat\s*\{[^}]*--text-secondary/.test(ixCss)
     && /\.sheet-slogan\s*\{[^}]*--text-secondary/.test(meCss))
 ck('这四条里没有一条写纸白（写了就是拿浅底那一档压中灰纱，实测 1.9~2.2）',
-  !/has-bg:not\(\.bg-light\)[\s\S]{0,200}?242,\s*239,\s*233/.test(ixCss + meCss))
+  !/has-bg:not\(\.bg-light-low\)[\s\S]{0,200}?242,\s*239,\s*233/.test(ixCss + meCss))
 
 // ---------- ④ 入口唯一 ----------
 ck('外观设置里不出现选图接口', !/chooseMedia|chooseImage/.test(read('pages/wallpaper/wallpaper.js')))

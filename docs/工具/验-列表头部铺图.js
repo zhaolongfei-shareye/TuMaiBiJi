@@ -137,7 +137,7 @@ ok('data 里 bgSrc 起手是空串（模块加载时存储还没读）', /bgSrc:
 ok('导航条那一档交给共用出口（本页不再自己写 setNavigationBarColor）',
   // 10-12 起这一页不再直接点导航条出口：深浅判定与导航条打包在 bgTone.applyTone 那一趟
   // （三页同一个调用形状，采样逻辑不许各抄一份）。导航条那支值仍然只在 app.js 里有一份。
-  /bgTone\.applyTone\(this, this\.data\.bgSrc\)/.test(cjs)
+  /bgTone\.applyTone\(this, this\.data\.bgSrc, toneZones\(\)\)/.test(cjs)
   && !/applyNavForBand/.test(cjs) && !/setNavigationBarColor/.test(cjs))
 ok('墨色那支值全工程只有一份（在 app.js 的出口里）',
   (read('app.js').match(/#181a20/g) || []).length === 1
@@ -268,10 +268,10 @@ ok('铺图那一态里胶囊相关的四条一个都不剩（撤净了才叫撤�
    分类行从那天起就压在白纱上，只是没人给它写过分支；站长 10-12 把深浅的范围扩到这两行，
    这一格才真有规则。所以这里改钉**新前提**：有一支、且只有一支，而且翻的是墨的浓度不是极性。 */
 ok('分类那一行在深图那一态有且只有一支抬色规则（10-12 范围扩到这两行；旧那条"不吃照片"已作废）',
-  (wxss.match(/\.container\.has-bg:not\(\.bg-light\)[^{]*\.ix-cat/g) || []).length === 1,
-  `命中 ${(wxss.match(/\.container\.has-bg:not\(\.bg-light\)[^{]*\.ix-cat/g) || []).length} 支`)
+  (wxss.match(/\.container\.has-bg:not\(\.bg-light-low\)[^{]*\.ix-cat/g) || []).length === 1,
+  `命中 ${(wxss.match(/\.container\.has-bg:not\(\.bg-light-low\)[^{]*\.ix-cat/g) || []).length} 支`)
 ok('那一支只改 color、不许带底色或纸白（底色归 R14 那枚 α .30 唯一出口，字色归深浅这一档）',
-  /\.container\.has-bg:not\(\.bg-light\)[\s\S]{0,400}?\.ix-cat\s*\{\s*color:\s*var\(--text-primary\);\s*\}/
+  /\.container\.has-bg:not\(\.bg-light-low\)[\s\S]{0,400}?\.ix-cat\s*\{\s*color:\s*var\(--text-primary\);\s*\}/
     .test(wxss))
 // 10-09 这一层从层色换成 `--bg-card` 之后，"压在层面上的那一支冷墨"（`--ink-on-layer*`）在分类
 // 这一行没有对象了：两档字与短杠改吃这一页的墨（`--text-primary`／`--text-secondary`），

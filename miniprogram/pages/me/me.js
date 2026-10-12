@@ -9,6 +9,15 @@ const cloudUpload = require('../../utils/cloudUpload.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const bgTone = require('../../utils/imgBrightness.js')
 
+/* 深浅分两截判（站长 10-12 21:1x：「请按照上下部分来分别判断，避免全图平均，造成差异」）。
+   取景盒同列表页那一枚（740／15%）。
+   上截 0~0.20＝那一大字与右上角 MIND 那两个数自己那一小段（都在盒子最上沿，同首页与列表页一条规矩）；
+   下截 0.68~0.90＝名片行那 144（502~646＝0.68~0.87）：LOGO 右边那两行字压的是 `.sheet` 那层白纱。 */
+const TONE_BOX = { boxH: poster.HEAD_IMG_H, anchor: poster.BG_ANCHOR }
+function toneZones() {
+  return Object.assign({}, TONE_BOX, { top: [0, 0.2], low: [0.68, 0.9] })
+}
+
 // 配额告警线。比值来自 GET /api/user/storage-quota 的 used_ratio，**它是全站口径**
 // （云开发那 5GB 是一个环境一个池子，不是每人 5GB），所以这一行说的是"这一池水快见底了"，
 // 不是"你的空间快满了"——文案里不许写成后者，那会让人以为删自己的笔记就能解决。
@@ -66,6 +75,7 @@ Page({
     bgSrc: '',
     // 背景图深浅那一档由 bgTone.applyTone 每次进页定（三页共用 utils/imgBrightness.js）。
     bgLight: false,
+    bgLightLow: false,
     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
     // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
     dimV: 1,
@@ -131,7 +141,7 @@ Page({
     // 这一页原来只有导航条标题跟着语言走、底色永远吃壁纸：另外两页铺了图会翻成深底白字，
     // 于是三个 tab 顶上两深一浅。站长 10-01 晚要"按背景深浅自动反差"，这里补上同一条出口。
     app.setNavTitle('appName', lang)
-    bgTone.applyTone(this, this.data.bgSrc)
+    bgTone.applyTone(this, this.data.bgSrc, toneZones())
     // 朋友圈这一路只在本页开：它要的是"单页可被转发"，别处不铺入口
     wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'], fail() {} })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {

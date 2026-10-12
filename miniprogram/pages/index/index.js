@@ -11,6 +11,18 @@ const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const { formatShortDate, formatDateTime } = require('../../utils/date.js')
 const bgTone = require('../../utils/imgBrightness.js')
+
+/* 深浅分两截判（站长 10-12 21:1x：「请按照上下部分来分别判断，避免全图平均，造成差异」）。
+   取景盒是全站那一枚 `poster.HEAD_IMG_H`(740)、锚点 `poster.BG_ANCHOR`(15%)——与 fitHead 递给
+   bandGeom 的是同一条，判的才是屏上真显示的那一截。
+   上截 0~0.20＝头部那两行字自己那一小段（大字与右边那两个数都落在盒子 3%~12%，
+   贴着字取才不会被中段空白把平均冲掉——同首页那一条规矩）；
+   下截 0.73~1＝卡顶那 158 的白纱（两枚 tab＋返回、分类那一排，10-12 那两行固定字就在这一截）。
+   ⚠ 搜索那一枚 icon 落在盒子 63% 那一处，吃的是上截这一档（它是描边不是字，没另开一档）。 */
+const TONE_BOX = { boxH: poster.HEAD_IMG_H, anchor: poster.BG_ANCHOR }
+function toneZones() {
+  return Object.assign({}, TONE_BOX, { top: [0, 0.2], low: [0.73, 1] })
+}
 // 10-11：这一屏不再画那一位小人（站长「列表左上角的人都去掉，维持只有首页有」），
 // 所以 `utils/person.js` 在这一页的 require 一并撤——首页那一屏仍在用它，别处不许跟着删。
 
@@ -133,6 +145,7 @@ Page({
     bgSrc: '',
     // 背景图浅到白字兜不住那一档：与新建页、「我的」页同一个口（utils/imgBrightness.js）。
     bgLight: false,
+    bgLightLow: false,
     // 淡底方形左上角那枚品牌字，与海报上无形象时的占位字是同一个常量（poster.BRAND_GLYPH）
     brandGlyph: poster.BRAND_GLYPH,
     // 右上那枚淡底方形的底：每次进页跟着壁纸重算（见 paleStep 那条规则）
@@ -192,7 +205,7 @@ Page({
     // 页面里本来就有左上角那行大字说"这是哪一页"，导航条不必再报一遍。
     app.setNavTitle('appName', lang)
     this.fitHead(bgSrc)
-    bgTone.applyTone(this, this.data.bgSrc)
+    bgTone.applyTone(this, this.data.bgSrc, toneZones())
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().applyTheme(app.getWallpaper())

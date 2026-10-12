@@ -8,6 +8,24 @@ const { compressForBackup } = require('../../utils/imageCompress.js')
 const person = require('../../utils/person.js')
 const bgTone = require('../../utils/imgBrightness.js')
 
+/* 深浅分两截判（站长 10-12 21:1x：「请按照上下部分来分别判断，避免全图平均，造成差异」）。
+   这一页上截＝左上角那行大字与「调亮度／换背景」（实测落在屏高 15% 与 20%），
+   下截＝那行轮播 Tips（收起态 68%、展开态在面板外那一行，同一个落点档）；
+   下面那三块面板自己有白底，不吃这一档，所以下截只取到 85%。
+   ⚠ 两截都**贴着字所在的那一小段**取，不是"屏对半切"：上截取到 28%（大字 15%、那一行 20%，
+   再多就把中段空白算进平均了），下截 55%~85%。
+   首页这张图是 `.page-bg`（750×100vh，`aspectFill` 居中裁）⇒ anchor 0.5，
+   与另外两页那枚全站 15% 不是同一个取景，别抄。 */
+function toneZones() {
+  const wi = wx.getWindowInfo()
+  return {
+    boxH: Math.round((wi.windowHeight * 750) / wi.windowWidth),
+    anchor: 0.5,
+    top: [0, 0.28],
+    low: [0.55, 0.85],
+  }
+}
+
 // 链接规范：必须有协议头、主机名里要有顶级域、整串不能出现空白。
 // 之前只判"以 http 开头且某处有个点"，`https://a.com 后面还有字` 和 `http:///a.b` 都能过，
 // 到了服务端才失败，用户在卡里看到的是一句和输入对不上的错。
@@ -123,6 +141,7 @@ Page({
     // 这张背景图是浅色（字翻墨、罩子翻提亮）：每次进页由 bgTone.applyTone 定，
     // 本机算过就直接给对的第一帧，没算过先按深底出字、采样回来那一趟再翻。
     bgLight: false,
+    bgLightLow: false,
     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
     // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
     dimV: 1,
@@ -216,7 +235,7 @@ Page({
     this._sync()
     app.setNavTitle('appName', lang)
     // 深浅这一档与导航条同一趟给（applyTone 里读缓存→出字→设导航条；这张图没算过时异步补算）。
-    bgTone.applyTone(this, this.data.bgSrc)
+    bgTone.applyTone(this, this.data.bgSrc, toneZones())
     this.startTips()
     this.loadEntryStats()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {

@@ -285,8 +285,10 @@
    名称那一行底中位灰阶 162 → 整档墨 5.25、纸白@.96 只有 2.17；slogan 那一行底 175 → 整档墨 6.11、
    `.72` 那一档 3.53、纸白 1.88。
    ⚠ 所以这里只抬 slogan：名称本来就是整档墨（`--text-primary`），已经过线，再动就是白动。
-   ⚠ `:not(.bg-light)` 不许省：浅那一态同一处量到 5.00，`.72` 本来就够（抬了等于把两档并成一档）。 */
-.container.has-bg:not(.bg-light) .sheet-slogan {
+   ⚠ `:not(.bg-light-low)` 不许省：浅那一态同一处量到 5.00，`.72` 本来就够（抬了等于把两档并成一档）。
+   ⚠ 吃的是**下那一档**（`bg-light-low`＝名片行那 144 的亮度），不是整页那一枚——10-12 21:1x 他那句
+   「请按照上下部分来分别判断」，这一页上截是头部大字与 MIND，下截就是这一行。 */
+.container.has-bg:not(.bg-light-low) .sheet-slogan {
   color: var(--text-primary);
 }
 

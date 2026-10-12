@@ -112,7 +112,9 @@ async function main() {
 
   const lumKeys = await mp.evaluate(() => (wx.getStorageInfoSync().keys || [])
     .filter((k) => k.indexOf('bgLum') === 0)
-    .map((k) => `${k.slice(-18)}=${wx.getStorageSync(k)}`))
+    // V3 存的是逐行剖面（32 个数），这里那枚读数取 32 行的平均——纯色探针上它就是那张图的亮度
+    .map((k) => { const pr = wx.getStorageSync(k)
+      return `${k.slice(-18)}=${Math.round(pr.rows.reduce((a, b) => a + b, 0) / pr.rows.length)}` }))
   const lumNum = Number(/=(\d+)$/.exec((lumKeys || [])[0] || '=0')[1])
   ok('⑥ 读数按路径落进缓存，且落在浅色那一侧（>160）',
     (lumKeys || []).length === 1 && lumNum > 160, JSON.stringify(lumKeys))
@@ -219,14 +221,28 @@ async function main() {
     if (d && d.bgLight === true && /probe-bg-mix\.jpg$/.test(String(d.bgSrc || ''))) mix = d
     else await sleep(1000)
   }
-  ok('⑰ 上浅下暗那张判成浅（全图平均 90 会判深＝他抓到的那一态）', !!mix)
+  // bgLightLow 与它相反才算分档做成；上面那个循环只等 bgLight，这里再等两秒让两枚都落定
+  if (mix) { await sleep(2000); mix = await page.data() }
+  ok('⑰ 上浅下暗那张：上截判浅（标题翻墨）、下截判深（那行 Tips 留纸白）——两枚必须不一致',
+    !!mix && mix.bgLight === true && mix.bgLightLow === false,
+    `bgLight=${mix && mix.bgLight} bgLightLow=${mix && mix.bgLightLow}`)
   const mixLum = await mp.evaluate(() => (wx.getStorageInfoSync().keys || [])
     .filter((k) => k.indexOf('bgLum') === 0)
-    .map((k) => `${k.slice(-16)}=${wx.getStorageSync(k)}`))
-  const mixNum = Number(/=(\d+)$/.exec((mixLum || [])[0] || '=0')[1])
-  ok('⑱ 缓存那枚读数＝字压着那一条的亮度（>200），不是全图平均（90）',
-    mixNum > 200, JSON.stringify(mixLum))
+    .map((k) => { const pr = wx.getStorageSync(k)
+      return `${k.slice(-16)}:行${pr.rows.length} 顶${pr.rows[0]} 底${pr.rows[pr.rows.length - 1]}` }))
+  ok('⑱ 缓存里是 32 行逐行剖面（顶行 >200、底行 <100），不是一个平均数',
+    /行32 顶2\d\d 底\d\d\b/.test((mixLum || [])[0] || ''), JSON.stringify(mixLum))
   await mp.screenshot({ path: path.join(OUT, '上浅下暗-首页.png') })
+  /* ⑲ 同一张图换一屏也要各自算一遍：列表页的上截取盒子 0~20%（大字那一小段＝这张图的浅带），
+     下截取 73%~100%（卡顶那 158 的白纱＝这张图的暗带）⇒ 这一屏该挂 bg-light、**不**挂 bg-light-low，
+     那两行固定字因此走"整档墨"那一支。两枚布尔一枚有一枚无，才是"上下分别判断"落到了样式上。 */
+  const ixMix = await mp.reLaunch('/pages/index/index')
+  for (let i = 0; i < 8 && !(await ixMix.$('.container')); i += 1) await sleep(1500)
+  await sleep(3500)
+  const clsMixIx = String((await (await ixMix.$('.container')).attribute('class')) || '')
+  ok('⑲ 列表页在这张图上挂 bg-light、不挂 bg-light-low（两枚各自判，不是一枚管全页）',
+    /(^| )bg-light( |$)/.test(clsMixIx) && !/bg-light-low/.test(clsMixIx), clsMixIx)
+  await mp.screenshot({ path: path.join(OUT, '上浅下暗-笔记列表.png') })
 
   // ---------- 收尾：还原 profile、清掉探针文件与键 ----------
   await mp.evaluate((files) => {

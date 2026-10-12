@@ -1358,11 +1358,13 @@
    所以这一处跟着图翻的是**墨的浓度**，不是极性：图深→整档墨；图浅→照旧 `.72`
    （浅那一态同一处量到 5.15、100% 的点过 4.5，本来就够，抬了是白抬）。
    ⚠ 只抬未选中那一档：`.vtab.on`／`.ix-cat.on` 与它们那条短杠本来就是整档墨，再抬等于把两档并成一档。
-   ⚠ `:not(.bg-light)` 这一档不许省：浅态的容器同样带 `has-bg`，不带这一档的话浅态会被这条一起吃掉
-   （写法同 pages/create/create.wxss 那枚 `.has-bg:not(.entry-dock)`）。 */
-.container.has-bg:not(.bg-light) .vtab,
-.container.has-bg:not(.bg-light) .ix-back,
-.container.has-bg:not(.bg-light) .ix-cat {
+   ⚠ `:not(.bg-light-low)` 这一档不许省：浅态的容器同样带 `has-bg`，不带这一档的话浅态会被这条一起吃掉
+   （写法同 pages/create/create.wxss 那枚 `.has-bg:not(.entry-dock)`）。
+   ⚠ 吃的是**下那一档**（`bg-light-low`），不是整页那一枚：站长 10-12 21:1x「请按照上下部分来分别判断」，
+   这两行本来就压在卡顶那 158 的白纱上，判的也是那一截的亮度，跟头部大字各判各的。 */
+.container.has-bg:not(.bg-light-low) .vtab,
+.container.has-bg:not(.bg-light-low) .ix-back,
+.container.has-bg:not(.bg-light-low) .ix-cat {
   color: var(--text-primary);
 }
 

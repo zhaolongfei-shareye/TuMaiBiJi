@@ -94,6 +94,23 @@
   text-overflow: ellipsis;
 }
 
+/* ---------- 这一行 Tips 吃**下那一档**（站长 10-12 21:1x：「请按照上下部分来分别判断，
+   避免全图平均，造成差异」）
+   它浮在形象图上、在屏高 ~68% 那一处，跟左上角那行大字（~15%）不是同一片底：他那张黑白合影
+   上面是一整面浅墙、这一行正压在那串黑字上——整页一枚布尔的话，标题与它必然有一个读不了
+   （第一刀之后量到的就是这一对：标题 1.62:1 ／ 翻完墨之后这一行 1.24:1）。
+   所以只钉"两档不一致"那两种情形，一致的时候这两个元素照旧吃 `--text-secondary`／`--text-tertiary`
+   那对令牌，一个字不回改。展开态那一行（`.out`）是同一句话的另一种摆法，跟着一起。 */
+.container.has-bg.bg-light:not(.bg-light-low) .tips,
+.container.has-bg.bg-light:not(.bg-light-low) .out {
+  color: rgba(242, 239, 233, 0.96);
+}
+
+.container.has-bg:not(.bg-light).bg-light-low .tips,
+.container.has-bg:not(.bg-light).bg-light-low .out {
+  color: rgba(20, 22, 26, 0.92);
+}
+
 /* ---------- 收起态那三块（站长 10-10 晚拍板，效果图 docs/design/10-10两入口多方案/PNG图标.png）
    三块的面色与字色全部走 palette.entryBlocks() 递下来的 var()，这一份样式表里不写死一个色相；
    只有白条那两层（#FFFFFF 与 .85 白）是中性皮，四套壁纸共用。
