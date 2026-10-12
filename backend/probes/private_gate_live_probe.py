@@ -23,6 +23,7 @@ from app.core.auth import _create_token
 from app.db.database import SessionLocal
 from app.models.category import Category
 from app.models.note import Note
+from app.models.note_card import NoteCard
 from app.models.share import Share
 from app.models.user import User
 
@@ -166,6 +167,18 @@ def main():
     check("⑥ 私密笔记 POST /api/shares 被服务端拦住",
           r.status_code == 400 and "私密" in r.text, f"HTTP {r.status_code} {r.text[:60]}")
 
+    # ---- ⑥b 私密笔记登记不了卡片（站长 2026-10-12：「设了密码的笔记是不能生成卡片的」）
+    # 界面对私密篇不渲染那一格，所以正常手点打不到这条接口——但它是写库的口，
+    # 承诺要卡在服务端。带着解锁凭证也打不过来：这条锁的是"这篇该不该有卡片"，不是"能不能读正文"。
+    r = client.post(f"/api/notes/{priv_id}/card", headers=uh, json={
+        "file_id": f"cloud://probe-{MARK}/cards/private-card.jpg",
+        "tpl": "cover", "origin": "live"})
+    check("⑥b 私密笔记 POST /api/notes/{id}/card 被服务端拦住，并且把原因说清楚",
+          r.status_code == 400 and "私密" in r.text, f"HTTP {r.status_code} {r.text[:80]}")
+    db.expire_all()
+    n_card = db.query(NoteCard).filter(NoteCard.note_id == priv_id).count()
+    check("⑥b 拦下了就不留行：这篇名下没有卡片", n_card == 0, f"{n_card} 行")
+
     # ---- ⑦ 一篇已经分享出去的笔记改判私密：旧码当场关掉 ----------------------
     r = client.post("/api/shares/", headers=hdr, json={"note_id": norm_id})
     share_token = r.json().get("token", "")
@@ -247,6 +260,9 @@ def finish(client, db, user, cat_id=None):
     check("收尾：deploy-test 的私密密码回到未设置", u.private_password_hash is None)
     check("收尾：探针名下没有孤儿分享行",
           db.query(Share).filter(Share.note_id.in_(ids or [0])).count() == 0)
+    left_cards = db.query(NoteCard).filter(NoteCard.note_id.in_(ids or [0])).count()
+    check("收尾：探针名下没有卡片行残留（幽灵行会一直算进配额）",
+          left_cards == 0, f"还剩 {left_cards} 行")
     client.close()
     passed = sum(1 for _, ok, _ in results if ok)
     print(f"\n{passed}/{len(results)} 条通过")
