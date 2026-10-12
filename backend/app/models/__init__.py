@@ -19,6 +19,9 @@ from app.models.user_profile import UserProfile
 # 同一件事在 `generation_seq` 上再防一遍：这张表没人 import 它就建不出来，而它建不出来的症状
 # 是"登录 500"（`services/generation._row` 第一句就查它），不是"少一列静默降级"。
 from app.models.generation_seq import GenerationSeq
+# 运营图那两张表同一个文件（账本 + 生效位），两处一起挂：漏一处的症状是
+# 「下一次 --autogenerate 把库里那张真表 drop 掉」，与上面两条同型（见 test_模型注册齐不齐.py）。
+from app.models.mp_asset import MpAsset, MpSetting
 
-__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "LinkCode", "UserProfile", "GenerationSeq"]
+__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting"]
 

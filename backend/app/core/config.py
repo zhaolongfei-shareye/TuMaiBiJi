@@ -57,6 +57,25 @@ class Settings(BaseSettings):
     # 而这一闸防的恰恰是手机在别人手里那一会儿。
     PRIVATE_UNLOCK_MINUTES: int = 15
 
+    # ---- 运营图（方案 docs/方案-cn后台资产管理.md P0-a）----
+    # 后台上传的那几张落在服务器磁盘上（站长 10-11 拍的 D 甲），不进微信云开发桶：
+    # 桶的公网域名不在小程序 downloadFile 白名单里，加白名单本身要跟一次发版，
+    # 而"不发版换图"就是这条链存在的唯一理由（锚点 A3）。默认按 backend/ 反推，
+    # 和 .env 一样用 __file__ 而不是当前工作目录——服务器上就是 /home/ubuntu/wtsj-backend/var/mp-assets。
+    MP_ASSETS_DIR: str = str(PROJECT_ROOT / "var" / "mp-assets")
+    # 提审期冻结闸（锚点 A6）：打开后 `/api/mp/config` 一律回"无下发"，客户端自然落回包里那张。
+    # 与模板那条的 `POSTER_TEMPLATES=1` 同型——审核时首页与上线后不一致是合规风险，只能用闸门堵。
+    # 默认关（= 正常下发）：这一版客户端还没有读那个口的代码，开不开都不改现网行为。
+    MP_ASSETS_FREEZE: bool = False
+    # 管理页那一把独立的钥匙（锚点 A7）：不进 users 表、不加 is_admin 列、不复用小程序 JWT。
+    # **留空时不拒启动**，只让 `/api/admin/*` 一律 503——这一条和 APPLE_CLIENT_ID 同一个理由：
+    # 现网 .env 里今天还没有这一行，把它做成 `JWT_SECRET_KEY` 那种硬失败等于让下一次部署起不来。
+    # 但绝不退化成"没配就当没设过密码"：`core/admin_access.py` 里空值开不了任何门。
+    ADMIN_TOKEN: str = ""
+    # 后台登录态活多久。故意短：这一把钥匙能换全站首页那张图，而它存在的地方是浏览器 sessionStorage。
+    # 过期只是要重新输一次，对一个人一天点不了几次的后台没有成本。
+    ADMIN_SESSION_MINUTES: int = 60
+
     @model_validator(mode="after")
     def _require_jwt_secret(self) -> "Settings":
         placeholder = "change-me-in-production-use-a-long-random-string"

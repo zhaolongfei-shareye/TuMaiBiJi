@@ -135,4 +135,36 @@ if not verify_only:
 PY
 RC=$?
 [[ $RC -eq 0 ]] || log "!! 备份流程退出码 $RC"
+
+# ---- 运营图那一个目录（方案 docs/方案-cn后台资产管理.md 配套第 1 条）----
+# 库里的 `mp_assets` 记的是"盘上有一个文件"，而这两个东西分开备份就会分开丢：
+# 库恢复了、文件没了，症状是后台显示"已发布"而小程序画不出来（发图口 404，客户端静默落回包里那张）。
+# 所以同一个 cron 里一起走，且保留份数与上面那条对齐（14 份）。
+# 这一段的判据同样是"验内容不是验存在"：tar 完立刻 `tar tzf` 数一遍条目，条数对不上就报红。
+ASSETS="$DIR/var/mp-assets"
+if [[ -d "$ASSETS" ]] && [[ -n "$(ls -A "$ASSETS" 2>/dev/null)" ]]; then
+    stamp=$(date '+%Y%m%d-%H%M%S')
+    out="$STORE/mp-assets-$stamp.tar.gz"
+    tmp="$STORE/.staging-mp-assets-$stamp.tar.gz"
+    if tar czf "$tmp" -C "$DIR/var" mp-assets && tar tzf "$tmp" >/dev/null 2>&1; then
+        n_src=$(find "$ASSETS" -type f | wc -l | tr -d ' ')
+        n_arc=$(tar tzf "$tmp" | grep -vc '/$')
+        mv "$tmp" "$out"
+        if [[ "$n_src" == "$n_arc" ]]; then
+            log "运营图备份完成 $(basename "$out")（$n_arc/$n_src 个文件，$(stat -c%s "$out" 2>/dev/null || echo ?) 字节）"
+        else
+            log "!! 运营图备份条目数对不上：盘上 $n_src，归档里 $n_arc"
+            RC=1
+        fi
+    else
+        rm -f "$tmp"
+        log "!! 运营图打包失败，本次没产出归档"
+        RC=1
+    fi
+    for path in $(ls -1dt "$STORE"/mp-assets-*.tar.gz 2>/dev/null | tail -n +15); do
+        rm -f "$path"
+        log "运营图保留 14 份：删除 $(basename "$path")"
+    done
+fi
+
 exit $RC

@@ -489,7 +489,9 @@ REQUIRED = {
     "WECHAT_APP_SECRET": "微信登录（小程序进不去）",
 }
 # 缺失即【该条链路不可用】，但不影响其它功能
-FEATURE = {}
+FEATURE = {
+    "ADMIN_TOKEN": "运营图后台 /ops（没配则那几个口一律 503，现网其它功能照常）",
+}
 # 缺失只是【降级】：采集照常入库，少掉自动提炼
 DEGRADABLE = {
     "HUNYUAN_CF_URL": "提炼云函数地址（缺失则只存原文，任务不再失败）",
@@ -527,6 +529,22 @@ elif deg_missing:
     print("  · 可降级项未配置（服务照常，功能降级）：")
     for d in deg_missing:
         print(f"     - {d}")
+
+# 运营图这一条链：口令有没有配、闸门开没开，两件事都只在这台服务器上看得见，
+# 而它们的症状都是"点了没反应"——不念出来的话，下一次查这个问题的人（可能是我）
+# 会先去翻 nginx 日志。值一个字都不打印，只报有无（同上面 REQUIRED 那一条纪律）。
+feat_missing = sorted(f"{v}  ← {k}" for k, v in FEATURE.items() if unusable(k))
+if feat_missing:
+    print("  · 该条链路不可用（其余功能照常）：")
+    for m in feat_missing:
+        print(f"     - {m}")
+else:
+    print("  ✓ 运营图后台可用（/ops，管理口令已配置；口令值不打印）")
+if s.MP_ASSETS_FREEZE:
+    print("  ⏸ MP_ASSETS_FREEZE=1：运营图下发已冻结，后台怎么点都不影响线上（提审期用）")
+else:
+    print("  · MP_ASSETS_FREEZE=0：下发未冻结。⚠ 现网包里还没有读它的代码（方案 P0-b 那一刀），"
+          "所以这一项今天不影响任何真实用户")
 
 # 分享码指向哪个版本。留在 trial 就发布，等于让真实用户扫到一张只有体验成员
 # 才打得开的码——这个错在服务器上看不出来，只有拿别人手机扫才发现，所以每次部署都念一遍。

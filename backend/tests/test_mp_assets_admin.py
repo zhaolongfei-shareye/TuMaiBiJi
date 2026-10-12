@@ -1,0 +1,486 @@
+"""运营图这条链（方案 docs/方案-cn后台资产管理.md P0-a）：鉴权、上传、发图、下发、冻结闸、生效位。
+
+这把尺子按"一条链走不通会有多静默"来分组，不是按代码文件分组：
+
+- 第一组（鉴权）钉的是 A7 那句"与用户体系完全隔离"。**正反两个方向都要判**：管理凭证开不了
+  用户那一排门，用户/解锁/`/v1` 那三把钥匙也开不了管理门。只判一个方向的用例等于没牙——
+  少一个方向的症状是"提权"或"打不开"，两者都不会有中间态可以察觉。
+- 第二组（上传与校验）钉的是"上限真的咬得住"。每条坏输入单独越一条线（字节、边长、格式、
+  假头），否则红了不知道是哪道门拦的。
+- 第三组（生效位）钉的是 A1：「没登记过」与「登记成停用」是两个值。这一组的最后一条
+  真跑一遍 alembic，因为**这一格是迁移写进去的**，只测 `create_all` 的那条路永远碰不到它。
+- 第四组（下发与发图）钉的是 A5/A6：三种"没图"的状态在客户端那一头必须塌成同一条分支。
+- 第五组（那一页 HTML）钉两条纪律：页面里不许出现口令值，也不许把任何动态串当 HTML 拼进去。
+
+跑法：cd backend && .venv/bin/python -m pytest tests/test_mp_assets_admin.py -q
+"""
+import os
+import sqlite3
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+from io import BytesIO
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+from PIL import Image
+from sqlalchemy.exc import IntegrityError
+
+os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest_mpassets.db"
+os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
+os.environ["EXTRACT_PROVIDER"] = "none"
+os.environ["SEC_CHECK_ENABLED"] = "false"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app.core.auth import _create_token, _create_account_token
+from app.core.config import settings
+from app.db.database import Base, SessionLocal, engine
+from app.main import app
+from app.models.account import Account
+from app.models.mp_asset import KIND_HOME_BG, MpAsset, MpSetting
+from app.models.user import User
+from app.services import mp_assets
+
+ADMIN_PW = "pytest-admin-token-not-a-real-one-32"
+CONFIG = "/api/mp/config"
+STATE = "/api/admin/mp/state"
+UPLOAD = "/api/admin/mp/assets"
+SETTING = f"/api/admin/mp/settings/{KIND_HOME_BG}"
+
+
+def png(w=40, h=60, color=(200, 180, 150)) -> bytes:
+    buf = BytesIO()
+    Image.new("RGB", (w, h), color).save(buf, "PNG")
+    return buf.getvalue()
+
+
+def jpg(w=40, h=60) -> bytes:
+    buf = BytesIO()
+    Image.new("RGB", (w, h), (120, 140, 160)).save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+
+def huge_png() -> bytes:
+    """随机噪声 PNG：压不动，字节数直接爆表，但边长仍在界内——只越"字节"那一条线。"""
+    side = 700
+    buf = BytesIO()
+    Image.frombytes("RGB", (side, side), os.urandom(side * side * 3)).save(buf, "PNG")
+    data = buf.getvalue()
+    assert len(data) > mp_assets.MAX_BYTES and side <= mp_assets.MAX_EDGE
+    return data
+
+
+@pytest.fixture()
+def store(tmp_path, monkeypatch):
+    d = tmp_path / "mp-assets"
+    monkeypatch.setattr(settings, "MP_ASSETS_DIR", str(d))
+    return d
+
+
+@pytest.fixture()
+def admin_pw(monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_TOKEN", ADMIN_PW)
+
+
+@pytest.fixture()
+def client():
+    app.state.limiter.enabled = False
+    with TestClient(app) as c:
+        yield c
+    app.state.limiter.enabled = True
+
+
+@pytest.fixture()
+def db():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    session = SessionLocal()
+    yield session
+    session.close()
+
+
+@pytest.fixture()
+def me(db):
+    u = User(openid=f"mpa-{int(time.time() * 1000)}")
+    db.add(u)
+    db.commit()
+    return u
+
+
+def user_headers(user) -> dict:
+    return {"Authorization": f"Bearer {_create_token(user.id, user.generation)}"}
+
+
+def login(client, pw=ADMIN_PW) -> str:
+    r = client.post("/api/admin/login", json={"token": pw})
+    assert r.status_code == 200, r.text
+    return r.json()["session"]
+
+
+def admin_h(client) -> dict:
+    return {"Authorization": f"Bearer {login(client)}"}
+
+
+def put_setting(client, headers, asset_id):
+    return client.put(SETTING, json={"asset_id": asset_id}, headers=headers)
+
+
+def upload(client, headers, data, kind=KIND_HOME_BG, name="随便起的名字.jpg", note=None):
+    form = {"kind": kind}
+    if note is not None:
+        form["note"] = note
+    return client.post(
+        UPLOAD, headers=headers, data=form,
+        files={"file": (name, data, "application/octet-stream")},
+    )
+
+
+def current_config(client, me) -> dict:
+    r = client.get(CONFIG, headers=user_headers(me))
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+# ---------------------------------------------------------------- 一、鉴权：两扇门互不开
+
+def test_没配管理口令时后台整条不可用而且不是放行(client, admin_pw, monkeypatch, store):
+    """ADMIN_TOKEN 为空必须是 503，绝不能退化成"没设口令 = 谁都能进"（同 APPLE_CLIENT_ID 那条纪律）。"""
+    monkeypatch.setattr(settings, "ADMIN_TOKEN", "")
+    assert client.get(STATE).status_code == 503
+    assert upload(client, {}, png()).status_code == 503
+    assert put_setting(client, {}, 1).status_code == 503
+    assert client.post("/api/admin/login", json={"token": "随便一把"}).status_code == 503
+
+
+def test_口令不对是401而且回体里没有任何线索(client, admin_pw, store):
+    r = client.post("/api/admin/login", json={"token": "差一点点的口令"})
+    assert r.status_code == 401
+    assert "session" not in r.json()
+    assert ADMIN_PW not in r.text
+
+
+def test_口令两头的空白不算数(client, admin_pw, monkeypatch, store):
+    """.env 里手抖多打一个空格是看不出来的，而不去空白的症状是"口令明明对却每次 401"。
+    两头都 strip：配置那一边、浏览器里敲的那一边（复制粘贴最常带一个尾空格）。"""
+    monkeypatch.setattr(settings, "ADMIN_TOKEN", "  " + ADMIN_PW + "\t")
+    assert client.post("/api/admin/login", json={"token": ADMIN_PW}).status_code == 200
+    assert client.post("/api/admin/login", json={"token": ADMIN_PW + " "}).status_code == 200
+    # 反向对照：中间的空格不放过，剥掉的只是两头
+    assert client.post("/api/admin/login", json={"token": ADMIN_PW + " 多一段"}).status_code == 401
+
+
+def test_非ASCII的口令打进来是401不是500(client, admin_pw, store):
+    """`hmac.compare_digest` 吃带非 ASCII 的 str 会直接 TypeError（实测），而"用中文输入法敲、
+    或粘过来一串全角引号"是站长自己会走的那条路。这一条钉的是 encode 那一句：
+    少了它，症状不是"口令不对"，是登录框转圈之后报服务器错误。"""
+    for pw in ("密码", "ｉｆｋ［", "✅-token"):
+        assert client.post("/api/admin/login", json={"token": pw}).status_code == 401
+
+
+def test_空口令不许当口令用(client, admin_pw, store):
+    # pydantic 的 min_length=1 拦下空串（422），而 compare_digest 那一路本来也不吃空值。
+    assert client.post("/api/admin/login", json={"token": ""}).status_code in (401, 422)
+
+
+def test_匿名打管理四个口一律401(client, admin_pw, store):
+    assert client.get(STATE).status_code == 401
+    assert upload(client, {}, png()).status_code == 401
+    assert put_setting(client, {}, 1).status_code == 401
+
+
+def test_用户token与解锁token与v1token都开不了管理门(client, admin_pw, db, me, store):
+    assert client.get(STATE, headers=user_headers(me)).status_code == 401
+    from app.core.private_access import create_unlock_token
+    assert client.get(STATE, headers={"Authorization": f"Bearer {create_unlock_token(me)}"}).status_code == 401
+    acct = Account(id=str(uuid.uuid4()), generation=1)
+    db.add(acct)
+    db.commit()
+    assert client.get(STATE, headers={"Authorization": f"Bearer {_create_account_token(acct)}"}).status_code == 401
+
+
+def test_管理凭证开不了用户那一排门(client, admin_pw, db, me, store):
+    """A7 的反向：这一把钥匙只能开后台。拿它去读自己的笔记必须是 401，不是"空列表"。"""
+    h = admin_h(client)
+    assert client.get("/api/notes/", headers=h).status_code == 401
+    assert client.get(CONFIG, headers=h).status_code == 401, "管理凭证能读下发 = 它同时是一把登录钥匙"
+
+
+def test_换口令之后旧登录当场失效(client, admin_pw, monkeypatch, store):
+    h = admin_h(client)
+    assert client.get(STATE, headers=h).status_code == 200
+    monkeypatch.setattr(settings, "ADMIN_TOKEN", ADMIN_PW + "-已经换过了")
+    assert client.get(STATE, headers=h).status_code == 401
+    assert client.post("/api/admin/login", json={"token": ADMIN_PW}).status_code == 401
+
+
+# ---------------------------------------------------------------- 二、上传：三道上限各自咬得住
+
+def test_传上来就落盘并记一行账(client, admin_pw, db, store):
+    r = upload(client, admin_h(client), png(), note="换春季那张")
+    assert r.status_code == 200, r.text
+    a = r.json()
+    assert (a["width"], a["height"]) == (40, 60)
+    assert a["media_type"] == "image/png" and a["file_size"] == len(png())
+    assert a["note"] == "换春季那张" and len(a["content_hash"]) == 64
+    row = db.get(MpAsset, a["id"])
+    assert (store / row.object_path).is_file(), "账上有一行而盘上没文件 = 发出去就是 404"
+
+
+def test_文件名一律由服务端按哈希起客户端那个名字不参与(store, client, admin_pw, db):
+    evil = "../../../../tmp/逃逸.jpg"
+    a = upload(client, admin_h(client), png(), name=evil).json()
+    # `object_path` 只在账本与盘上，不下发给任何人（包括这一页）：那是服务器上的文件名。
+    db.expire_all()
+    path = db.get(MpAsset, a["id"]).object_path
+    assert path == f"{a['content_hash']}.png"
+    assert evil not in path and "/" not in path
+    assert sorted(p.name for p in store.iterdir()) == [path], "盘上多出一个文件就是逃逸成功了一半"
+
+
+@pytest.mark.parametrize("名字,字节,关键词", [
+    ("空文件", b"", "空"),
+    ("HEIC", b"\x00\x00\x00\x24ftypheic" + b"\x00" * 40, "JPG 或 PNG"),
+    ("GIF", b"GIF89a" + b"\x00" * 40, "JPG 或 PNG"),
+    ("假PNG（头对身子坏）", b"\x89PNG\r\n\x1a\n" + b"\x11" * 60, "解不开"),
+    ("纯文本改名", "这是一段文字".encode() * 20, "JPG 或 PNG"),
+])
+def test_坏输入逐条拦住且回中文可读(名字, 字节, 关键词, client, admin_pw, store):
+    r = upload(client, admin_h(client), 字节)
+    assert r.status_code == 400, f"{名字} 这条居然放行了：{r.status_code} {r.text}"
+    assert 关键词 in r.json()["detail"], f"{名字} 拦住了但话不对：{r.json()['detail']}"
+
+
+def test_超字节上限拦住且话里带数(client, admin_pw, store):
+    d = upload(client, admin_h(client), huge_png()).json()["detail"]
+    assert "超过上限" in d and str(mp_assets.MAX_BYTES // 1024) in d
+    # 这一句在路由与服务两处都可能出现（读到上限就停 / 进来之后判），但话术与数字只有一个出处。
+    assert d == mp_assets.over_bytes_hint()
+
+
+def test_超边长拦住但不误伤字节那条线(client, admin_pw, store):
+    data = png(mp_assets.MAX_EDGE + 10, 8)   # 细长一张：字节很小，只越边长
+    assert len(data) < mp_assets.MAX_BYTES
+    d = upload(client, admin_h(client), data).json()["detail"]
+    assert "边长" in d and str(mp_assets.MAX_EDGE) in d
+
+
+def test_不认识的栏目不收(client, admin_pw, store):
+    r = upload(client, admin_h(client), png(), kind="不存在的一栏")
+    assert r.status_code == 400 and "这一栏" in r.json()["detail"]
+
+
+def test_同一栏传两次同样的字节只有一行也只有一个文件(client, admin_pw, db, store):
+    h = admin_h(client)
+    a1 = upload(client, h, png(50, 50, (10, 20, 30))).json()
+    a2 = upload(client, h, png(50, 50, (10, 20, 30))).json()
+    assert a1["id"] == a2["id"], "重复上传在攒历史，回滚那一栏会被同一张图挤满"
+    assert db.query(MpAsset).count() == 1
+    assert len(list(store.iterdir())) == 1, "内容寻址不该留下第二份同样的字节"
+
+
+def test_索引真拦得住并发那次重复(db, store):
+    """去重写在服务层，但"两个请求同时各查一遍"只有索引管得住（与 note_cards 同一条纪律）。"""
+    data = png(30, 30, (1, 2, 3))
+    h = mp_assets.content_hash_of(data)
+    for _ in range(2):
+        db.add(MpAsset(kind=KIND_HOME_BG, token=f"t{_}", content_hash=h, object_path="x.png",
+                       media_type="image/png", file_size=10, width=1, height=1))
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
+    assert db.query(MpAsset).count() == 0
+
+
+# ---------------------------------------------------------------- 三、生效位：A1 那两个值
+
+def test_发布与停用与回滚都是改那一栏(client, admin_pw, db, me, store):
+    h = admin_h(client)
+    a = upload(client, h, png(60, 60, (9, 9, 9))).json()
+    b = upload(client, h, png(61, 61, (8, 8, 8))).json()
+    assert current_config(client, me)[KIND_HOME_BG] is None, "没发布过就已经有下发 = 传上来就等于发布"
+
+    assert put_setting(client, h, a["id"]).status_code == 200
+    assert current_config(client, me)[KIND_HOME_BG]["content_hash"] == a["content_hash"]
+    # 回滚 = 把栏位指回旧那一张，不重传、不动文件
+    put_setting(client, h, b["id"])
+    assert current_config(client, me)[KIND_HOME_BG]["content_hash"] == b["content_hash"]
+    put_setting(client, h, a["id"])
+    assert current_config(client, me)[KIND_HOME_BG]["content_hash"] == a["content_hash"]
+    # 停用
+    put_setting(client, h, None)
+    assert current_config(client, me)[KIND_HOME_BG] is None
+    assert db.query(MpAsset).count() == 2, "停用不许删账"
+    assert len(list(store.iterdir())) == 2, "停用不许删文件——已经拿到过那张图的老设备要一直读得懂"
+
+
+def test_停用与从未登记在后台是两句话(client, admin_pw, db, store):
+    """A1 的落点：`registered` 与 `current` 分开给。合成一句"没图"就把"我停用了它"
+    和"我根本没传过"抹平了——这正是名片那条链上造成过不可逆删图的那个读法。"""
+    h = admin_h(client)
+    db.merge(MpSetting(kind=KIND_HOME_BG, asset_id=None))
+    db.commit()
+    k = client.get(STATE, headers=h).json()["kinds"][0]
+    assert k["registered"] is True and k["current"] is None, "有行、值为空应当读成「发布过、现在停用」"
+
+    db.query(MpSetting).filter(MpSetting.kind == KIND_HOME_BG).delete()
+    db.commit()
+    k = client.get(STATE, headers=h).json()["kinds"][0]
+    assert k["registered"] is False and k["current"] is None
+
+
+def test_发布不许指别的栏目的资产也不许指一个不存在的id(client, admin_pw, db, store):
+    h = admin_h(client)
+    other = upload(client, h, png(20, 20, (5, 5, 5))).json()
+    db.get(MpAsset, other["id"]).kind = "别的栏目"
+    db.commit()
+    r = put_setting(client, h, other["id"])
+    assert r.status_code == 400 and "栏目" in r.json()["detail"]
+    assert put_setting(client, h, 987654).status_code == 400
+    assert current_config_empty(db) is None
+
+
+def current_config_empty(db):
+    return mp_assets.current(db, KIND_HOME_BG)
+
+
+def test_迁移把空值那一行显式建出来(tmp_path):
+    """这一格只能靠真跑 alembic 来判：`create_all` 走的是模型，而"空要显式写"是迁移写的。
+    只看 create_all 的用例对这一条永远是假绿。"""
+    db_file = tmp_path / "mig.db"
+    env = dict(os.environ, DATABASE_URL=f"sqlite:///{db_file}")
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=str(Path(__file__).resolve().parents[1]), env=env, check=True, capture_output=True, text=True,
+    )
+    conn = sqlite3.connect(db_file)
+    rows = conn.execute("select kind, asset_id from mp_settings").fetchall()
+    assert rows == [(KIND_HOME_BG, None)], f"迁移没把「停用」这一格显式建出来：{rows}"
+    idx = conn.execute("select name from sqlite_master where type='index' and tbl_name='mp_assets'").fetchall()
+    assert {"ux_mp_assets_token", "ux_mp_assets_kind_hash"} <= {r[0] for r in idx}, idx
+
+
+# ---------------------------------------------------------------- 四、下发与发图（A2/A4/A5/A6）
+
+def test_下发里每一已知栏目都在且没图时是null(client, admin_pw, db, me, store):
+    body = current_config(client, me)
+    assert set(body) == set(mp_assets.KINDS)
+    assert body[KIND_HOME_BG] is None, "缺键和空值是两件事：客户端要能一条分支走完（锚点 A5）"
+
+
+def test_下发给的是相对地址而不是拼好的域名(client, admin_pw, db, me, store):
+    """域名与前缀的唯一出处是客户端 utils/api.js:3。后端这里拼一份，nginx 改名的那天就是两份真相分开错。"""
+    h = admin_h(client)
+    a = upload(client, h, png(70, 70, (4, 4, 4))).json()
+    put_setting(client, h, a["id"])
+    got = current_config(client, me)[KIND_HOME_BG]
+    assert got["url"].startswith("/api/mp/a/") and "://" not in got["url"] and "agentsbin" not in got["url"]
+    assert got["content_hash"] == a["content_hash"] and got["updated_at"].endswith("Z")
+    assert len(got["url"].split("/")[-1]) >= 24, "地址那一段是可枚举的短串 = A2 白钉"
+
+
+def test_图不要登录就能取且字节与上传的一字不差(client, admin_pw, db, me, store):
+    data = png(80, 80, (3, 3, 3))
+    h = admin_h(client)
+    a = upload(client, h, data).json()
+    put_setting(client, h, a["id"])
+    r = client.get(a["url"])          # 一个 Authorization 都不带
+    assert r.status_code == 200, r.text
+    assert r.content == data
+    assert r.headers["content-type"].startswith("image/png")
+    assert "immutable" in r.headers["cache-control"], "内容寻址的地址不带 immutable，客户端那一层缓存就永远吃不到"
+    assert client.get(CONFIG).status_code == 401, "config 反倒不该免登录（要登录才好按人分桶）"
+
+
+def test_jpeg按文件头声明不写死png(client, admin_pw, db, store):
+    h = admin_h(client)
+    a = upload(client, h, jpg()).json()
+    r = client.get(a["url"])
+    assert r.headers["content-type"].startswith("image/jpeg") and r.content[:2] == b"\xff\xd8"
+
+
+def test_查不着的token与盘上没文件的都是404(client, admin_pw, db, store):
+    h = admin_h(client)
+    assert client.get("/api/mp/a/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA").status_code == 404
+    a = upload(client, h, png(90, 90, (2, 2, 2))).json()
+    (store / mp_assets.by_token(db, a["token"]).object_path).unlink()
+    r = client.get(a["url"])
+    assert r.status_code == 404, "文件没了要出声（404），不许回 200 空字节——那会画出一张坏图并被缓存一年"
+
+
+def test_账本里路径形状不对就一个字都不读(client, admin_pw, db, store):
+    """`object_path` 只可能是服务端生成的那种形状；这一条钉的是有人手工 UPDATE 过库的情况。"""
+    h = admin_h(client)
+    a = upload(client, h, png(95, 95, (7, 7, 7))).json()
+    row = mp_assets.by_token(db, a["token"])
+    for evil in ("../../../etc/passwd", "/etc/passwd", "", "a/b.png", "x.gif"):
+        row.object_path = evil
+        db.commit()
+        assert client.get(a["url"]).status_code == 404, f"这一形状居然读得出去：{evil!r}"
+
+
+@pytest.mark.parametrize("冻结", [True, False])
+def test_冻结闸打开时下发一律回空(client, admin_pw, db, me, store, monkeypatch, 冻结):
+    """A6：提审期把闸拉上，客户端自然落回包里那张——这是合规闸门，不是功能开关。"""
+    monkeypatch.setattr(settings, "MP_ASSETS_FREEZE", 冻结)
+    h = admin_h(client)
+    a = upload(client, h, png(100, 100, (6, 6, 6))).json()
+    put_setting(client, h, a["id"])
+    got = current_config(client, me)[KIND_HOME_BG]
+    if 冻结:
+        assert got is None, "闸开着还在下发 = 审核时看到的首页与上线后不一致"
+        assert client.get(a["url"]).status_code == 200, "闸只管下发，不该把已经发出去的地址掐死"
+    else:
+        assert got and got["content_hash"] == a["content_hash"]
+    # 后台那一头始终看得见真实状态 + 一句"现在是冻住的"，否则操作者会以为自己的点击没生效
+    s = client.get(STATE, headers=h).json()
+    assert s["frozen"] is 冻结 and s["kinds"][0]["current"] is not None
+
+
+# ---------------------------------------------------------------- 五、那一页 HTML 的两条纪律
+
+def test_ops页面匿名可取但只是一个口令框(client, admin_pw, store):
+    r = client.get("/ops")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    assert "no-store" in r.headers["cache-control"] and 'content="noindex"' in r.text
+    assert ADMIN_PW not in r.text, "口令写进 HTML = 谁 F12 都读得到，A7 那把钥匙当场作废"
+    assert "sessionStorage" in r.text and "localStorage" not in r.text
+
+
+def test_ops页面那段JS在node里过得去语法(client, store):
+    """这一条查的不是 JS 写得对不对，查的是**Python 的转义有没有把 JS 吃掉**。
+
+    那份 HTML 是普通 Python 字符串，`\\/` 出来是一个反斜杠；JS 那边正则里又要写 `\/`。
+    两层各剥一次就差一个字，而 Python 与 pytest 都不看 JS 语法——症状是页面打开一片空白，
+    只有控制台里有错。所以把**求值之后**的那一段取出来交给 `node --check`（实测：直接拿
+    源文件文本去 check 会假红，因为那份文本还没经过 Python 的转义）。
+    """
+    import re
+    import shutil
+    from app.api.routes.ops_page import _PAGE
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("这台机器上没有 node")
+    js = re.search(r"<script>(.*?)</script>", _PAGE, re.S).group(1)
+    assert "\\\\/" not in js, "Python 少剥了一层，正则字面量里带着两个反斜杠"
+    fd, path = tempfile.mkstemp(suffix=".js", prefix="ops-page-check-")
+    os.close(fd)
+    try:
+        Path(path).write_text(js, encoding="utf-8")
+        r = subprocess.run([node, "--check", path], capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr[:600]
+    finally:
+        os.remove(path)
+
+
+def test_ops页面没有把任何动态串当HTML拼进去的地方(client, store):
+    """这一页显示 note（操作者手打）、hash、日期。判据用 textContent 而不是 innerHTML——
+    静态钉这一条：今天页面是常量所以打不进东西，但下一次有人加一栏就会顺手写 innerHTML。"""
+    src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
+    body = src.split("_PAGE", 1)[1]
+    assert "innerHTML" not in body and "insertAdjacentHTML" not in body and "document.write" not in body
+    assert body.count("textContent") >= 8
+    assert "encodeURIComponent(kind)" in body

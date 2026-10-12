@@ -14,6 +14,7 @@ from app.models import Note, User, Category, Asset, Job, Share
 # 新加表的同一次提交里要在这里补一行，`tests/test_模型注册齐不齐` 钉着这一条。
 from app.models.user_profile import UserProfile  # noqa: F401  只要它把表挂进 Base.metadata
 from app.models.generation_seq import GenerationSeq  # noqa: F401  同上（10-10 那张代次水位线表）
+from app.models.mp_asset import MpAsset, MpSetting  # noqa: F401  同上（运营图账本 + 生效位，方案-cn后台资产管理 A1）
 
 config = context.config
 

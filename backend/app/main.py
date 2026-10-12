@@ -8,7 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import logging
 
-from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing, v1_auth, v1_account
+from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing, v1_auth, v1_account, mp_config, admin_ops, ops_page
 from app.core.error_codes import http_exception_handler
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
@@ -130,6 +130,13 @@ app.include_router(profiles.router, tags=["profiles"])
 # Universal Link 要求"链接的域名与路径"和 App 那条 Associated Domains 一致，
 # 卡片上印的、微信里传的都是 https://agentsbin.cn/n/<token>，没有 /api 这一段。
 app.include_router(landing.router, tags=["landing"])
+# 运营图（方案 docs/方案-cn后台资产管理.md P0-a）：小程序读的两个口 + 后台那一页与它背后的四个口。
+# 三个模块、路径都写在模块里（`/api/mp/*`、`/api/admin/*`、`/ops`），所以这里都不给 prefix。
+# ⚠ 这一段现网是 **inert** 的：客户端还没有读 `/api/mp/config` 的代码，两张新表除了 `/ops`
+# 那一页以外没有任何写入者。上线它不等于"换图能力已经对用户生效"，P0-b 那一刀才生效。
+app.include_router(mp_config.router, tags=["mp-assets"])
+app.include_router(admin_ops.router, tags=["admin"])
+app.include_router(ops_page.router, tags=["admin"])
 # 阶段2 跨端身份。`/v1` 是**另一种钥匙**开的一组门：token 里 `sub` 是 `accounts.id`、
 # 带 `kind=account`，而 `/api/*` 那批按 `users.id` 发的老钥匙原样保留（现网 7 天有效期的
 # token 认的是后者）。两组门并存、互不开对方的房间，判据在 tests/test_v1_auth_and_link.py。
