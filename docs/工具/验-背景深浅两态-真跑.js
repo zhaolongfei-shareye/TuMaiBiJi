@@ -25,7 +25,9 @@ const LIGHT_B64 = b64Of('docs/design/背景图深浅/探针-浅.jpg')
 const DARK_B64 = b64Of('docs/design/背景图深浅/探针-深.jpg')
 
 let fails = 0
+let total = 0
 const ok = (name, cond, extra) => {
+  total += 1
   console.log(`  ${cond ? '✓' : '✗'} ${name}${extra ? '　→ ' + extra : ''}`)
   if (!cond) fails += 1
 }
@@ -111,6 +113,21 @@ async function main() {
   await mp.reLaunch('/pages/me/me')
   await sleep(4000)
   await mp.screenshot({ path: path.join(OUT, '浅色-我的.png') })
+
+  // ---------- 10-12 站长「范围扩展到笔记列表页和卡片列表页」：那两屏同一趟量一遍 ----------
+  const ix = await mp.reLaunch('/pages/index/index')
+  for (let i = 0; i < 8 && !(await ix.$('.container')); i += 1) await sleep(1500)
+  await sleep(3500)
+  const clsIx = String((await (await ix.$('.container')).attribute('class')) || '')
+  ok('⑫ 笔记列表页那一屏容器带 bg-light（头部那两行固定字吃的是同一份翻转）',
+    /bg-light/.test(clsIx), clsIx)
+  await mp.screenshot({ path: path.join(OUT, '浅色-笔记列表.png') })
+  const tabs = await ix.$$('.vtab')
+  if (tabs && tabs[1]) { await tabs[1].tap(); await sleep(3000) }
+  const clsCards = String((await (await ix.$('.container')).attribute('class')) || '')
+  ok('⑬ 切到卡片列表那一屏，容器仍带 bg-light（同一份 markup，切 view 不许掉）',
+    /bg-light/.test(clsCards), clsCards)
+  await mp.screenshot({ path: path.join(OUT, '浅色-卡片列表.png') })
   await mp.reLaunch('/pages/create/create')
   await sleep(2500)
 
@@ -161,7 +178,7 @@ async function main() {
     leftover && leftover.files.length === 0 && leftover.keys.length === 0, JSON.stringify(leftover))
 
   mp.close()
-  console.log(fails ? `\n✗ 背景深浅两态 真跑：红 ${fails} 条` : '\n✓ 背景深浅两态 真跑：11 条全过')
+  console.log(fails ? `\n✗ 背景深浅两态 真跑：红 ${fails} 条` : `\n✓ 背景深浅两态 真跑：${total} 条全过`)
   process.exit(fails ? 1 : 0)
 }
 
