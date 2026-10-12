@@ -2,8 +2,6 @@
      <import> 不渲染任何东西，放在根节点外面。 -->
 <import src="../../templates/pwd-sheet.wxml"/>
 <view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}}">
-  <!-- 背景图深浅那枚隐藏画布（与新建页、笔记页同一份实现 utils/imgBrightness.js）。 -->
-  <canvas id="bgBrite" type="2d" style="position:fixed;left:-9999px;width:32px;height:32px;"></canvas>
   <!-- has-bg 这一档 10-11 才补到 container 上（原来只有下面 .head-band 带）。需求原文：
        站长 10-11「界面纯色底色部分改为半透明毛玻璃效果，按钮ICON不变」＋「毛玻璃白底下面
        如果没有背景图，你可以下移背景图」＋ X4 那一格他回「做」。玻璃那几条规则全站统一以

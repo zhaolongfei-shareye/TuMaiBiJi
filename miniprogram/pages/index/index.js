@@ -192,7 +192,7 @@ Page({
     // 页面里本来就有左上角那行大字说"这是哪一页"，导航条不必再报一遍。
     app.setNavTitle('appName', lang)
     this.fitHead(bgSrc)
-    bgTone.applyTone(this, this.data.bgSrc, 'bgBrite')
+    bgTone.applyTone(this, this.data.bgSrc)
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().updateLabels()
       this.getTabBar().applyTheme(app.getWallpaper())

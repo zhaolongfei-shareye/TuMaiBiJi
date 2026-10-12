@@ -115,10 +115,21 @@ ck('新建页每次进页重取图', cjs.includes('bgSrc: poster.homeBg()'))
 // 导航条由那一趟一起设——所以这一把改钉"页面只调 applyTone、不许自己碰 applyNavForBand"，
 // 并且三页必须同一个形状（谁再各抄一份 canvas 采样就红在这里）。
 ck('深浅与导航条走同一个出口（页面只调 bgTone.applyTone）',
-  /bgTone\.applyTone\(this, this\.data\.bgSrc, 'bgBrite'\)/.test(cjs) && !/applyNavForBand/.test(cjs))
+  /bgTone\.applyTone\(this, this\.data\.bgSrc\)/.test(cjs) && !/applyNavForBand/.test(cjs))
 ck('三页都走那一个深浅出口（不各抄一份采样）',
   ['create', 'index', 'me'].every((p) =>
-    /bgTone\.applyTone\(this, this\.data\.bgSrc, 'bgBrite'\)/.test(read(`pages/${p}/${p}.js`))))
+    /bgTone\.applyTone\(this, this\.data\.bgSrc\)/.test(read(`pages/${p}/${p}.js`))))
+// 10-12 真机反馈「标题字能上下拖」：页面里那枚 `<canvas type="2d">` 是原生同层组件，
+// `position:fixed;left:-9999px` 在真机不保证把它移出流内——首屏被顶出一截，整页就变成可滚。
+// 采样改成离屏（`wx.createOffscreenCanvas`，与 utils/imageCompress.js 同一套）之后，
+// 这一条**反过来钉**：三个 tab 页的标记里再出现画布就是错（模拟器量不出来，只能靠钉）。
+ck('三个 tab 页的画布只有笔记页出图那一枚（深浅采样走离屏，不许再往页面里塞第二枚）',
+  ['create', 'index', 'me'].every((p) =>
+    (read(`pages/${p}/${p}.wxml`).match(/<canvas/g) || []).length === (p === 'index' ? 1 : 0)),
+  ['create', 'index', 'me']
+    .map((p) => `${p}:${(read(`pages/${p}/${p}.wxml`).match(/<canvas/g) || []).length}`).join(' '))
+ck('采样确实只用离屏那一个口', /wx\.createOffscreenCanvas/.test(read('utils/imgBrightness.js'))
+  && !/createSelectorQuery/.test(read('utils/imgBrightness.js')))
 ck('浅色那一档在容器上有个名，data 里也有初值（第一帧不闪）',
   /\{\{bgLight \? 'bg-light' : ''\}\}/.test(read('pages/create/create.wxml')) && /bgLight: false/.test(cjs))
 ck('浅色那一态的样式真在（只有类名没有规则＝静默不生效）',

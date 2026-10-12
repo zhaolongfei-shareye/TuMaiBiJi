@@ -216,7 +216,7 @@ Page({
     this._sync()
     app.setNavTitle('appName', lang)
     // 深浅这一档与导航条同一趟给（applyTone 里读缓存→出字→设导航条；这张图没算过时异步补算）。
-    bgTone.applyTone(this, this.data.bgSrc, 'bgBrite')
+    bgTone.applyTone(this, this.data.bgSrc)
     this.startTips()
     this.loadEntryStats()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {

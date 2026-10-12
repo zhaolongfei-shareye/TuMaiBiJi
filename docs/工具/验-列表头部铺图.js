@@ -137,7 +137,7 @@ ok('data 里 bgSrc 起手是空串（模块加载时存储还没读）', /bgSrc:
 ok('导航条那一档交给共用出口（本页不再自己写 setNavigationBarColor）',
   // 10-12 起这一页不再直接点导航条出口：深浅判定与导航条打包在 bgTone.applyTone 那一趟
   // （三页同一个调用形状，采样逻辑不许各抄一份）。导航条那支值仍然只在 app.js 里有一份。
-  /bgTone\.applyTone\(this, this\.data\.bgSrc, 'bgBrite'\)/.test(cjs)
+  /bgTone\.applyTone\(this, this\.data\.bgSrc\)/.test(cjs)
   && !/applyNavForBand/.test(cjs) && !/setNavigationBarColor/.test(cjs))
 ok('墨色那支值全工程只有一份（在 app.js 的出口里）',
   (read('app.js').match(/#181a20/g) || []).length === 1

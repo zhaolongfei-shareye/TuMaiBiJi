@@ -27,38 +27,40 @@ function sweepKeep(src) {
   })
 }
 
-/** 缩图采一次平均亮度。采不成（cloud:// 进不了 canvas、图坏了、取节点失败）回 null＝维持深底白字。 */
-function measure(src, canvasId, inst) {
+/** 缩图采一次平均亮度。采不成（图坏了、这台不支持离屏 2d、读像素被拒）回 null＝维持深底白字。
+ *  用 `wx.createOffscreenCanvas` 而不是页面里那枚 `<canvas>`：页面内的画布是原生同层组件，
+ *  真机上 `position:fixed;left:-9999px` 不保证把它移出流内（10-12 真机反馈「标题能上下拖」＝
+ *  首屏被它顶出一截、整页变成可滚）。离屏这一套 `utils/imageCompress.js` 已在真机跑通。 */
+function measure(src) {
   return new Promise((resolve) => {
     if (!src) return resolve(null)
-    const query = wx.createSelectorQuery().in(inst)
-    query.select('#' + canvasId).fields({ node: true, size: true }).exec((res) => {
-      if (!res || !res[0] || !res[0].node) return resolve(null)
-      const canvas = res[0].node
-      const ctx = canvas.getContext('2d')
-      const img = canvas.createImage()
-      img.onload = () => {
-        canvas.width = 32
-        canvas.height = 32
+    let canvas
+    try {
+      canvas = wx.createOffscreenCanvas({ type: '2d', width: 32, height: 32 })
+    } catch (e) {
+      return resolve(null)
+    }
+    const img = canvas.createImage()
+    img.onload = () => {
+      let data
+      try {
+        const ctx = canvas.getContext('2d')
         ctx.drawImage(img, 0, 0, 32, 32)
-        let data
-        try {
-          data = ctx.getImageData(0, 0, 32, 32).data
-        } catch (_) {
-          return resolve(null)
-        }
-        let sum = 0
-        for (let i = 0; i < data.length; i += 4) {
-          sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
-        }
-        const avg = Math.round(sum / (data.length / 4))
-        wx.setStorageSync(LUM_KEY + src, avg)
-        sweepKeep(src)
-        resolve(avg > LIGHT_THRESHOLD)
+        data = ctx.getImageData(0, 0, 32, 32).data
+      } catch (e) {
+        return resolve(null)
       }
-      img.onerror = () => resolve(null)
-      img.src = src
-    })
+      let sum = 0
+      for (let i = 0; i < data.length; i += 4) {
+        sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+      }
+      const avg = Math.round(sum / (data.length / 4))
+      wx.setStorageSync(LUM_KEY + src, avg)
+      sweepKeep(src)
+      resolve(avg > LIGHT_THRESHOLD)
+    }
+    img.onerror = () => resolve(null)
+    img.src = src
   })
 }
 
@@ -67,16 +69,15 @@ function measure(src, canvasId, inst) {
  * 这张图没算过时异步补算，算完发现翻了才重设一次。
  * @param {object} page 页面实例
  * @param {string} src  poster.homeBg() 那一张
- * @param {string} canvasId 本页那枚隐藏 canvas 的 id
  */
-function applyTone(page, src, canvasId) {
+function applyTone(page, src) {
   const app = getApp()
   const known = cachedLight(src)
   const light = known === null ? false : known
   page.setData({ bgLight: light })
   app.applyNavForBand(src, light)
   if (!src || known !== null) return
-  measure(src, canvasId, page).then((v) => {
+  measure(src).then((v) => {
     if (v === null || v === page.data.bgLight) return
     page.setData({ bgLight: v })
     app.applyNavForBand(src, v)

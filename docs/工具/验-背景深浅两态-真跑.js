@@ -47,8 +47,15 @@ async function main() {
   })
 
   let page = await mp.reLaunch('/pages/create/create')
-  for (let i = 0; i < 8 && !(await page.$('#bgBrite')); i += 1) await sleep(1500)
-  ok('① 新建页那枚隐藏画布真在页面树里（生产那套采样就挂在它上面）', !!(await page.$('#bgBrite')))
+  for (let i = 0; i < 8 && !(await page.$('.container')); i += 1) await sleep(1500)
+  /* ① 这一条是真机反馈带出来的：「标题字竟然可以上下拖动，这个不是需求啊」。
+     嫌疑是当时挂在页面里那枚 `<canvas type="2d">`——原生同层组件，真机上 `position:fixed`
+     不保证把它移出流内，首屏被顶出一截就变成整页可滚。采样已改离屏，这一条钉的是
+     **"首屏不许能滚"这个不变量本身**（不管以后是谁把什么东西顶出来的），模拟器量得到几何。 */
+  const winH = await mp.evaluate(() => wx.getSystemInfoSync().windowHeight)
+  const sz = await (await page.$('.container')).size()
+  ok('① 新建页首屏不许被顶成可滚（容器高 ≤ 视口高＋2px；他真机反馈"标题能上下拖"就是这一档）',
+    sz && sz.height <= winH + 2, `容器 ${sz && sz.height}／视口 ${winH}`)
 
   // ---------- 落两张纯色探针图 ----------
   const write = (name, data) => mp.evaluate((payload) => {
@@ -79,7 +86,7 @@ async function main() {
   // ---------- 浅那一态 ----------
   await useSlot(LIGHT_FILE)
   page = await mp.reLaunch('/pages/create/create')
-  for (let i = 0; i < 8 && !(await page.$('#bgBrite')); i += 1) await sleep(1500)
+  for (let i = 0; i < 8 && !(await page.$('.container')); i += 1) await sleep(1500)
   let light = null
   for (let i = 0; i < 12 && !light; i += 1) {
     const d = await page.data()
@@ -110,7 +117,7 @@ async function main() {
   // ---------- 换深那张 ----------
   await useSlot(DARK_FILE)
   page = await mp.reLaunch('/pages/create/create')
-  for (let i = 0; i < 8 && !(await page.$('#bgBrite')); i += 1) await sleep(1500)
+  for (let i = 0; i < 8 && !(await page.$('.container')); i += 1) await sleep(1500)
   let dark = null
   for (let i = 0; i < 12 && !dark; i += 1) {
     const d = await page.data()
