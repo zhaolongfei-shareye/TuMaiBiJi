@@ -143,6 +143,8 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   const glassRule = String((fs.readFileSync(P('pages/index/index.wxss'), 'utf8')
     .match(/\.container\.has-bg \.sheet\s*\{[^}]*\}/) || [''])[0])
   // 渐变的色标要用**顶层逗号**切：`var(--glass-veil)` 里就带括号，按普通 split(',') 会把一条劈成三截。
+  // ⚠ 10-12 21:4x 甲之后卡顶那一段吃的是 `--glass-veil-band`，这里两枚都要收：
+  // 只锚 `.30` 那一枚的话 glassStop 读回 0＝尺子坏了（"实心段够不够高"那两条会当场假红）。
   const gradParts = (() => {
     const s = glassRule.slice(glassRule.indexOf('linear-gradient'))
     const out = []

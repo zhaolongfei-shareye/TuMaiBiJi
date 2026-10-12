@@ -39,11 +39,13 @@ const ROOT = path.resolve(__dirname, '../..')
     return [b.left, b.top, b.width, Math.min(hRpx * win.w / 750, b.height)]
   }
   // 白纱那一段有多高，从样式表现读，不在这儿抄第二份（158／56 这两个数一改，这里跟着漂才怪）
+  // 10-12 21:4x 甲：卡顶那一段改吃单独一枚 `--glass-veil-band`（.60），所以这里两枚令牌都收——
+  // 只锚 `--glass-veil` 的话这一刀会把两页的段高读成 0（尺子坏了，不是代码坏了）。
   const veilStop = (rel) => {
     const src = fs.readFileSync(path.join(ROOT, 'miniprogram', rel), 'utf8')
     const rule = String((src.match(/\.container\.has-bg \.sheet\s*\{[^}]*\}/) || [''])[0])
-    const nums = [...rule.matchAll(/var\(--glass-veil\)\s+(-?[\d.]+)rpx/g)].map((m) => Number(m[1]))
-    if (!nums.length) throw new Error(`${rel} 里没读到 --glass-veil 那一档的 rpx 数＝样式或正则坏了`)
+    const nums = [...rule.matchAll(/var\(--glass-veil(?:-band)?\)\s+(-?[\d.]+)rpx/g)].map((m) => Number(m[1]))
+    if (!nums.length) throw new Error(`${rel} 里没读到 --glass-veil(-band) 那一档的 rpx 数＝样式或正则坏了`)
     return Math.max(...nums)
   }
   // ★10-11 审查抓到的 P0：本机存的那枚形象图是**上个会话的临时路径**，`mp.screenshot` 拍出来

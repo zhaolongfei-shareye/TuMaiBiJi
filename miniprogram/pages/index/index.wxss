@@ -82,10 +82,14 @@
    而 `var()` 替换后非法在 CSS 里是 IACVT＝这条声明当 `unset` 用，
    `background` 简写会把底色归成 transparent ⇒ **整张卡透空露出原图**，不是"退回实心"。
    所以这一页不许出现第二支 alpha，四套壁纸那五块必须各有一份镜像值——
-   由 `验-四套莫兰迪落地` 与 `验-玻璃令牌齐不齐` 两头钉。 */
+   由 `验-四套莫兰迪落地` 与 `验-玻璃令牌齐不齐` 两头钉。
+   ⚠ 10-12 21:4x 站长拍甲：这一段（还有「我的」那 144）单独走 `--glass-veil-band`＝**.60**，
+   不再是全站那枚 .30。理由与全部数在 `app.wxss` 那枚令牌自己的注释里（一句话：.30 把近黑的图
+   只提到灰阶 89~175，那两行落在"墨嫌暗、白嫌亮"的死区，换哪一极都挂一半）。**这一页仍然一支裸 alpha
+   都没有**——多出来的是 app.wxss 里第二枚令牌，不是页面里写死的数。 */
 .container.has-bg .sheet {
   background: linear-gradient(180deg,
-    var(--glass-veil) 0, var(--glass-veil) 158rpx,
+    var(--glass-veil-band) 0, var(--glass-veil-band) 158rpx,
     var(--glass-fade-card) 198rpx, var(--bg-card) 238rpx);
   backdrop-filter: var(--glass-bf);
   -webkit-backdrop-filter: var(--glass-bf);

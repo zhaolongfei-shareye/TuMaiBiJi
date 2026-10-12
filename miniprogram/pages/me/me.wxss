@@ -211,10 +211,13 @@
    第 229 行抄的（`rgba(226,222,212,.62) 108px`，象牙那一套的 `--bg-page` 正是 #E2DED4），
    不是我另起的一档——所以它必须跟着壁纸走，写成 `--glass-fade-page` 一枚令牌。
    ⚠ 只在铺了形象图那一态读玻璃。退化方向与首页那一条同一段注释（var() 替换后非法＝IACVT
-   ＝`unset`＝底色归 transparent、整张透空），所以四套壁纸那五块必须各有一份镜像值。 */
+   ＝`unset`＝底色归 transparent、整张透空），所以四套壁纸那五块必须各有一份镜像值。
+   ⚠ 白纱这一档 10-12 21:4x 起跟列表页同一枚 `--glass-veil-band`（.60，站长拍甲）：
+   名片行那两行压的是同一条纱，同一张图在两个 tab 上不该两档密度（他 10-01、10-11 为"两页不一致"
+   打回过两次）。本页那枚居中弹窗照旧吃全站 .30，没跟着抬。 */
 .container.has-bg .sheet {
   background: linear-gradient(180deg,
-    var(--glass-veil) 0, var(--glass-veil) 56rpx,
+    var(--glass-veil-band) 0, var(--glass-veil-band) 56rpx,
     var(--glass-fade-page) 108rpx, var(--bg-page) 144rpx);
   backdrop-filter: var(--glass-bf);
   -webkit-backdrop-filter: var(--glass-bf);

@@ -2,8 +2,10 @@
 // 跑法：node docs/工具/验-玻璃令牌齐不齐.js
 //
 // 为什么要有这一把（每一条都对应 10-11 真栽过、或这一轮审查抓到的那一种死法）：
-// ① 白纱 alpha 全站只有一个出口＝app.wxss 里那组 `--glass-*`。R10 是站长在校准条上点的「α = .30」，
-//    页面里再出现一支写死的白纱＝同一件事两份真相，下次调必漏改。
+// ① 白纱 alpha 只有两枚出口，都写在 app.wxss：全站那档 `--glass-veil`＝.30（R10，站长在校准条上点的），
+//    和卡顶那一段单独的 `--glass-veil-band`＝.60（10-12 21:4x 站长拍甲——.30 把近黑的图只提到
+//    灰阶 89~175，那两行落在"墨嫌暗、白嫌亮"的死区，换哪一极都挂一半）。页面里再出现一支写死的白纱
+//    ＝同一件事两份真相，下次调必漏改。
 // ② `--glass-fade-card`／`--glass-fade-page` **跟着壁纸走**（渐退的终点＝本套 --bg-card／--bg-page
 //    @62%，效果图第 229／332 行那两个档）。五块皮肤（`page`＋四套 `.theme-*`）各一份镜像值，值算错＝那一套下卡顶渐退到一支错色。
 // ③ `var()` 替换成非法值在 CSS 里是 IACVT＝整条 `background` 当 unset 用、底色归 transparent
@@ -51,7 +53,7 @@ const lastStop = (src, sel) => {
 }
 const flat = (s) => String(s || '').replace(/\s+/g, ' ').trim()
 
-/** 全部判据都跑在这一个函数上：真文件调一次，八种改坏各调一次，红绿都由它说了算。 */
+/** 全部判据都跑在这一个函数上：真文件调一次，每一种改坏各调一次，红绿都由它说了算。 */
 function evaluate(F) {
   const APP = strip(F.app), IX = strip(F.ix), ME = strip(F.me), CR = strip(F.cr)
   const SH = strip(F.sheet)
@@ -74,11 +76,28 @@ function evaluate(F) {
   })
 
   const base = blockOf(APP, 'page')
-  ;['--glass-veil', '--glass-bf', '--glass-hair', '--glass-fill', '--glass-jot', '--glass-plate'].forEach((v) =>
+  ;['--glass-veil', '--glass-veil-band', '--glass-bf', '--glass-hair', '--glass-fill', '--glass-jot', '--glass-plate'].forEach((v) =>
     ok(`app.wxss 的 page 那一块定义了 ${v}`, base.includes(`${v}:`)))
-  ok('全站白纱只有 .30 这一档（R10 那一枚）',
+  ok('全站那档白纱还是 .30（R10 那一枚，弹窗与密码面板吃它）',
     /--glass-veil:\s*rgba\(255, 255, 255, 0\.30\)/.test(APP),
     flat((/--glass-veil:[^;]*/.exec(APP) || [])[0]))
+  /* 站长 10-12 21:4x 拍甲：卡顶那一段玻璃单独一档 .60（.30 把近黑的图只提到灰阶 89~175，
+     那两行落在"墨嫌暗、白嫌亮"的死区——数见 `docs/design/背景图深浅/量-卡顶纱档位.py`）。
+     两头都要钉：这一档不许被改回 .30，也不许被顺手抬到全站那一枚头上（弹窗那三枚底下垫的是暗遮罩，
+     跟着抬等于把弹窗改成半张白纸，不在他这一刀里）。 */
+  ok('卡顶那一段单独一档＝.60（甲案那一枚，两页共用）',
+    /--glass-veil-band:\s*rgba\(255, 255, 255, 0\.60\)/.test(APP),
+    flat((/--glass-veil-band:[^;]*/.exec(APP) || [])[0]))
+  ok('列表与「我的」那两段 `.sheet` 真在吃这一枚（令牌定义了、样式没挂上＝静默不生效）',
+    [/var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+158rpx/.test(IX),
+     /var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+56rpx/.test(ME)].every(Boolean),
+    `列表158=${/var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+158rpx/.test(IX)} 我的56=${/var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+56rpx/.test(ME)}`)
+  ok('那三枚弹窗与密码面板没跟着抬（还吃全站 .30）',
+    [/\.container\.has-bg \.ci-card\.glass-dialog\s*\{[^}]*var\(--glass-veil\)\s*;/.test(IX)
+      && /\.container\.has-bg \.me-email-card\.glass-dialog\s*\{[^}]*var\(--glass-veil\)\s*;/.test(ME)
+      && /background:\s*var\(--glass-veil\)\s*;/.test(SH),
+     !/--glass-veil-band/.test(SH)].every(Boolean),
+    `弹窗index=${/\.ci-card\.glass-dialog\s*\{[^}]*var\(--glass-veil\)\s*;/.test(IX)} 弹窗me=${/\.me-email-card\.glass-dialog\s*\{[^}]*var\(--glass-veil\)\s*;/.test(ME)} 密码面板=${/background:\s*var\(--glass-veil\)\s*;/.test(SH)}`)
   // 只管**真挂了滤镜的那几块面**：10-10 那批在照片上垫的 `.srch` 一层 .18 白＋.36 描边是他
   // 上一轮点头那一版里的，不属这一轮的玻璃档（这一轮的档＝带 backdrop-filter 的那几块）；
   // 把它一起圈进来＝尺子越界去重判他已经收过的那一格。
@@ -205,7 +224,7 @@ const real = evaluate(FILES)
 console.log(real.length ? `\n✗ 玻璃令牌齐不齐：红 ${real.length} 条` : '\n✓ 玻璃令牌齐不齐：全过')
 real.forEach((f) => console.log('  · ' + f))
 
-// ---------- 反向自证：八种改坏，每一种都必须被逮住 ----------
+// ---------- 反向自证：下面每一种改坏，都必须被逮住 ----------
 const MUT = [
   ['删掉 celadon 那一套的 fade-card 令牌', 'app', (s) => s.replace(
     '  --glass-fade-card: rgba(241, 243, 242, 0.62);\n', '')],
@@ -249,6 +268,19 @@ const MUT = [
     'rgba(242, 239, 233, 0.22) 100%)', 'rgba(242, 239, 233, 0.40) 100%)')],
   ['★浅色那态只翻罩子不翻字（白字压浅底＝需求本身没落）', 'cr', (s) => s.replace(
     '--text-primary: rgba(20, 22, 26, 0.92)', '--text-primary: #f2efe9')],
+  // 10-12 21:4x 甲案（卡顶那一段单独 .60）的四刀：这一档两头都要有牙——
+  // 不许被改回 .30（甲等于没落），也不许被顺手抬到全站那一枚头上（弹窗那三枚会跟着变白纸）。
+  ['★列表卡顶那一段偷回全站 .30（甲没落，那两行还在死区里）', 'ix', (s) => s.replace(
+    'var(--glass-veil-band) 0, var(--glass-veil-band) 158rpx',
+    'var(--glass-veil) 0, var(--glass-veil) 158rpx')],
+  ['★「我的」名片行那一段偷回全站 .30（同一张图两个 tab 两档密度）', 'me', (s) => s.replace(
+    'var(--glass-veil-band) 0, var(--glass-veil-band) 56rpx',
+    'var(--glass-veil) 0, var(--glass-veil) 56rpx')],
+  ['★卡顶那一档从 .60 挪到 .50（乙案那一档，推算「返回」只有 3.85 不过线）', 'app', (s) => s.replace(
+    '--glass-veil-band: rgba(255, 255, 255, 0.60)', '--glass-veil-band: rgba(255, 255, 255, 0.50)')],
+  ['★弹窗跟着被抬到 .60（他 10-11 拍过的那版皮被这一刀顺走）', 'ix', (s) => s.replace(
+    '.container.has-bg .ci-card.glass-dialog {\n  background: var(--glass-veil);',
+    '.container.has-bg .ci-card.glass-dialog {\n  background: var(--glass-veil-band);')],
 ]
 let teeth = 0
 MUT.forEach(([name, key, mut]) => {
