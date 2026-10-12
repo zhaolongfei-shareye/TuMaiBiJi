@@ -54,7 +54,6 @@ GLASS_BF = 'blur(23px) saturate(1.8)'     # --glass-bf
 GLASS_HAIR = 'rgba(255,255,255,.55)'      # --glass-hair
 GLASS_FILL = 'rgba(255,255,255,.20)'      # --glass-fill：井与小圆
 GLASS_JOT = 'rgba(255,255,255,.38)'       # --glass-jot：白条
-JOT_INK = '#3A3A3C'                       # .blk-jot-l 那支字色（「记下来」原来吃的就是它）
 # ⚠ 现网那支白 .50 玻璃原来是压在**亮**的形象图上；B 方案把它压在**墨黑**面板上，
 #   合成后只剩中灰，块里的字就不够 4.5 了（两个数都在下面 head 里现算现印）。
 #   效果图这一版按 **白 .72** 画（甲案：只抬这一枚令牌，字色一个不动）——这一档他没拍过。
@@ -114,22 +113,24 @@ NAV_H = 184
 TAB_H, TAB_GAP = 108, 20
 TAB_TOP = STAGE_H - TAB_GAP - TAB_H                 # 1541
 
-GRP_TOP = 1192                                      # .home-blk 里 .blk-row 的顶
-CARD_X, CARD_W, CARD_H = 24, 308, 308
-COL_X = CARD_X + CARD_W + 12                        # .blk-row gap 12
-COL_W = STAGE_W - 24 - COL_X                        # 702 组宽 - 左块 - 缝
-JOT_H = 92                                          # 「记下来」白条那一档（现网 105，这里只留计数一行）
-
-PANEL_TOP = 1000                                    # 深色面板顶：把首屏 Tips 行与第二屏框外那一行一起包住
-PANEL_H = STAGE_H - PANEL_TOP
-PANEL_R = 40                                        # ← 这一枚他没给数，我定的（现网块 34／面板 55／底栏 44）
-BAND = 240                                          # 上部那段渐变毛玻璃的高度
-
 ENTRY_X, ENTRY_W = 24, 702
 ENTRY_TOP, ENTRY_H, ENTRY_OPEN = 1107, 410, 490
 ENTRY_R = 55
 
-PLUS = 140                                          # 圆形 ➕：吃掉右列原来「卡片」那一格的位置
+# 首屏那一组：10-13 他一句「左边内框要与第二个图高度对齐」⇒ 左块与第二屏那块面板
+# **同一条顶（1107）、同一条底（1517）**；两个人跟着块顶一起上移 99rpx，多出来的下半留给数字那一格。
+GRP_TOP = ENTRY_TOP
+CARD_X, CARD_W, CARD_H = ENTRY_X, 308, ENTRY_H
+COL_X = CARD_X + CARD_W + 12                        # .blk-row gap 12
+COL_W = STAGE_W - 24 - COL_X                        # 702 组宽 - 左块 - 缝
+NUM_H = 124                                         # 下方那一格黑色毛玻璃：数字／横线／小字 三排
+
+PANEL_TOP = 1000                                    # 深色面板顶：把首屏那一组与第二屏框外那一行一起包住
+PANEL_H = STAGE_H - PANEL_TOP
+PANEL_R = 40                                        # ← 这一枚他没给数，我定的（现网块 34／面板 55／底栏 44）
+BAND = 240                                          # 上部那段渐变毛玻璃的高度
+
+PLUS = 140                                          # 圆形 ➕：右列底下那一格
 
 
 def sample(img_name, xr, yr, r=6):
@@ -203,40 +204,54 @@ def panel(inner):
 
 
 # ---------------- 首屏 ----------------
+def num_cell(x, w, n, label):
+    """数字在横线**上方**、分类名在横线**下方**（他 10-13 原话）；
+    数字用现网那支数字字形（`.blk-n`＝WtsjMind／Poppins Thin，同一族，只是从 88 收到 52），
+    小字吃现成的 `--fs-micro` 那一档（＝「照片 · 链接 · 文字」那行同一个字号，他说的"正常小字"）。"""
+    return ('<div style="{p}"><span class="num">{n}</span><span class="rule"></span>'
+            '<span class="lab">{lab}</span></div>').format(
+        p=box(x, 0, w, NUM_H, 'display:flex;flex-direction:column;align-items:center;'
+                              'justify-content:center'),
+        n=n, lab=label)
+
+
 def screen_home(lang):
-    # 左块＝人物（现网 .blk-person：308 见方、圆角 34、取景窗上出血 52、下沿停在白条上）
-    figwrap_h = CARD_H - JOT_H + 52
+    # 左块＝人物。10-13 他一句「两个人背景用纯白渐变毛玻璃，下方数字区域用黑色毛玻璃，要模仿 ios 效果」
+    # ⇒ 这一块不再是单层玻璃，拆成上下两片皮：上＝白渐变（iOS 控制中心那种上亮下透），下＝黑玻璃。
+    face_h = CARD_H - NUM_H
+    white = ('<div style="{p}"></div>').format(
+        p=box(0, 0, CARD_W, face_h,
+              'background:linear-gradient(to bottom,rgba(255,255,255,.94) 0px,'
+              'rgba(255,255,255,.86) {}px,rgba(255,255,255,.76) 100%);'
+              'backdrop-filter:{};-webkit-backdrop-filter:{}'.format(face_h * .45, GLASS_BF, GLASS_BF)))
+    # 取景窗照旧从块顶往上出血 52（他人物超出块顶那一下是他拍板的），下沿停在黑玻璃上沿
     fig = ('<div style="{w}"><img class="fig" src="ic-person.png"/>'
            '<img class="fig-alt" src="ic-person-alt.png"/>'
            '<div class="alt-hit"></div></div>').format(
-        w=box(0, -52, CARD_W, figwrap_h, 'overflow:hidden;'))
-    # 「记下来 / 照片·链接·文字」那一块撤了 → 换成一行「笔记:16  卡片:13」，带下划线、可点
-    counts = ('<div style="{p}"><span class="u">{a}:16</span><span class="gap">　</span>'
-              '<span class="u">{b}:13</span></div>').format(
-        p=box(0, CARD_H - JOT_H, CARD_W, JOT_H,
-              'display:flex;align-items:center;justify-content:center;'
-              'font-size:{}px;font-weight:600;color:{};letter-spacing:1px;'.format(FS['body'], JOT_INK)),
-        a=T(lang, 'statNotes'), b=T(lang, 'statCards'))
-    card = ('<div style="{p}">{f}{c}</div>').format(
+        w=box(0, -52, CARD_W, face_h + 52, 'overflow:hidden;'))
+    dark = ('<div style="{p}">{c}</div>').format(
+        p=box(0, face_h, CARD_W, NUM_H,
+              'background:rgba(20,22,26,.55);backdrop-filter:{};-webkit-backdrop-filter:{};'
+              'box-shadow:inset 0 1px 0 rgba(255,255,255,.18);'.format(GLASS_BF, GLASS_BF)),
+        c=num_cell(22, (CARD_W - 44 - 20) / 2, '16', T(lang, 'statNotes'))
+          + num_cell(22 + (CARD_W - 44 - 20) / 2 + 20, (CARD_W - 44 - 20) / 2, '13', T(lang, 'statCards')))
+    card = ('<div style="{p}">{a}{f}{b}</div>').format(
         p=pbox(CARD_X, GRP_TOP, CARD_W, CARD_H,
-               'border-radius:34px;background: {};backdrop-filter:{};-webkit-backdrop-filter:{};'
-               'box-shadow:inset 0 0 0 2px {};overflow:hidden;'.format(
-                   PLATE, GLASS_BF, GLASS_BF, GLASS_HAIR)),
-        f=fig, c=counts)
-    # 右列上半＝Tips（原来那两块计数撤了）。现网 Tips 是单行带省略号，
-    # 落进 382 宽的右列必须折行 ⇒ 这一版按两行画，折行这条要他认。
-    tips = ('<div style="{p}"><i class="dot" style="background:{d}"></i>'
-            '<span>{pre}{txt}</span></div>').format(
-        p=pbox(COL_X, GRP_TOP, COL_W, 120,
-               'display:flex;align-items:flex-start;font-size:{}px;line-height:1.55;'
-               'letter-spacing:1px;color:{}'.format(FS['meta'], alpha(PAPER, .96))),
+               'border-radius:34px;overflow:hidden;box-shadow:inset 0 0 0 2px {}'.format(GLASS_HAIR)),
+        a=white, f=fig, b=dark)
+    # 右列＝上 Tips、下圆形 ➕。10-13 他一句「Tips 处在区域，Tips 要上下居中对齐」
+    # ⇒ Tips 在它那一格里上下居中（不再是顶对齐），点仍跟着第一行字。
+    plus_top = GRP_TOP + CARD_H - PLUS
+    tips = ('<div style="{p}"><div class="tipsin"><i class="dot" style="background:{d}"></i>'
+            '<span>{pre}{txt}</span></div></div>').format(
+        p=pbox(COL_X, GRP_TOP, COL_W, plus_top - 24 - GRP_TOP, 'display:flex;align-items:center'),
         d=TIP_DOT, pre=T(lang, 'tipsPrefix'), txt=T(lang, 'tips')[0])
-    # 右列底下＝圆形 ➕（＝添加，点它进第二屏）
+    # 圆形 ➕：10-13 他一句「带+号的按钮颜色与第二屏拍照按钮颜色一致」⇒ 吃快门那支实心橙
     plus = ('<div style="{p}">{g}</div>').format(
-        p=pbox(COL_X + COL_W - PLUS, GRP_TOP + CARD_H - PLUS, PLUS, PLUS,
+        p=pbox(COL_X + COL_W - PLUS, plus_top, PLUS, PLUS,
                'border-radius:50%;background: {};display:flex;align-items:center;'
-               'justify-content:center;box-shadow:0 10px 26px rgba(0,0,0,.30);'.format(PAPER)),
-        g=svg('plus', 56, INK, 2.2))
+               'justify-content:center;box-shadow:0 10px 26px rgba(0,0,0,.30);'.format(CP['--cp-cam'])),
+        g=svg('plus', 56, CP['--cp-cam-ink'], 2.2))
     return panel(card + tips + plus)
 
 
@@ -408,10 +423,10 @@ def sld_row(lang, x, y, w, busy, icon):
 
 
 def screen_entry(lang, kind, open_panel=False):
-    out = ('<div style="{p}"><i class="dot" style="background:{d}"></i>'
-           '<span class="outl">{pre}{txt}</span><span class="outr">{back}</span></div>').format(
-        p=pbox(0, ENTRY_TOP - 52, STAGE_W, 34,
-               'display:flex;align-items:baseline;padding:0 20px;box-sizing:border-box;'
+    out = ('<div style="{p}"><div class="tipsin"><i class="dot" style="background:{d}"></i>'
+           '<span class="outl">{pre}{txt}</span></div><span class="outr">{back}</span></div>').format(
+        p=pbox(0, PANEL_TOP, STAGE_W, ENTRY_TOP - PANEL_TOP,
+               'display:flex;align-items:center;padding:0 20px;box-sizing:border-box;'
                'font-size:{}px;line-height:1.4;letter-spacing:1px;color:{}'.format(
                    FS['meta'], alpha(PAPER, .9))),
         d=TIP_DOT, pre=T(lang, 'tipsPrefix'), txt=T(lang, 'tips')[0], back=T(lang, 'back'))
@@ -484,9 +499,13 @@ body{background:#EAE7E2;padding:28px;font-family:-apple-system,"PingFang SC",san
 .fig-alt{position:absolute;right:0;bottom:0;height:132px;width:auto;
          filter:grayscale(1) brightness(1.45);opacity:.5}
 .alt-hit{position:absolute;right:0;bottom:0;width:111px;height:152px}
-.u{border-bottom:2px solid rgba(53,46,29,.8);padding-bottom:3px}
-.gap{opacity:.45}
-.dot{flex:none;width:14px;height:14px;border-radius:50%;margin-top:9px;margin-right:12px}
+.tipsin{display:flex;align-items:flex-start;font-size:__FSMETA__px;line-height:1.4;
+        letter-spacing:1px;color:rgba(242,239,233,.96)}
+.num{font-family:'WtsjMind','Poppins',sans-serif;font-weight:100;font-size:64px;line-height:.84;
+     letter-spacing:-2px;color:#F2EFE9}
+.rule{width:88px;height:2px;background:rgba(242,239,233,.85);margin:12px 0 8px}
+.lab{font-size:__FSMICRO__px;letter-spacing:1px;color:rgba(242,239,233,.72)}
+.dot{flex:none;width:14px;height:14px;border-radius:50%;margin-top:10px;margin-right:12px}
 .outl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .outr{flex:none;margin-left:20px}
 .swt{position:relative;display:flex;align-items:center;height:100%;justify-content:center;
@@ -514,7 +533,8 @@ for k, v in [('__W__', STAGE_W), ('__H__', STAGE_H), ('__NAVH__', NAV_H),
              ('__TBBG__', CH['bg']), ('__TBSEL__', CH['sel']), ('__TBLINE__', CH['line']),
              ('__TBSHADOW__', CH['shadow']), ('__BG__', '站长给的-背景原图.jpg'),
              ('__SCRIM__', SCRIM), ('__FSH1__', FS['h1']), ('__FSTITLE__', FS['title']),
-             ('__CPINK__', CP['--cp-ink']), ('__SOLID__', CP['--cp-extract']),
+             ('__CPINK__', CP['--cp-ink']), ('__FSMETA__', FS['meta']), ('__FSMICRO__', FS['micro']),
+             ('__SOLID__', CP['--cp-extract']),
              ('__SOLIDINK__', CP['--cp-extract-ink'])]:
     CSS = CSS.replace(k, str(v))
 
@@ -523,12 +543,15 @@ def build(lang):
     items = [
         (screen_home(lang), '① 首屏（B 方案）',
          '通栏深色面板压在形象图之上、框框之下：左上／右上圆角，顶上一段同色渐变（.55→.94，240rpx）'
-         '＋ backdrop blur，手法同「我的」那层纱、只是换成墨黑 <code>' + INK + '</code>。'
-         '右侧那两块计数撤了→换 Tips；左下「记下来」那一块撤了→换一行带下划线可点的'
-         '「' + T(lang, 'statNotes') + ':16　' + T(lang, 'statCards') + ':13」；'
-         '右侧底下一枚圆形 ➕＝添加。人物与"点右后方剪影换人"照旧。'),
+         '＋ backdrop blur，墨黑 <code>' + INK + '</code>。'
+         '<b>左块与第二屏那块面板同一条顶、同一条底（1107–1517，410 高）</b>，两个人跟着块顶一起上移 99rpx；'
+         '下半 124 高那一格＝<b>黑色毛玻璃</b>，数字在横线<b>上方</b>、分类名在横线下方（整格可点）；'
+         '上半＝<b>纯白渐变毛玻璃</b>（.94→.86→.76）。'
+         '圆形 ➕ 吃<b>快门那支实心橙</b> <code>' + CP['--cp-cam'] + '</code>。'
+         'Tips 在它那一格里<b>上下居中</b>。人物与"点右后方剪影换人"照旧。'),
         (screen_entry(lang, 'photo'), '② 点圆形 ➕ ＝ 第二屏',
-         '现网那一屏一个字不动，只是外面多一层深色面板：白面板 410 高、圆角 55、'
+         '现网那一屏一个字不动，只是外面多一层深色面板；框外那一行 Tips 在'
+         '「面板顶→白面板顶」那 107rpx 里<b>上下居中</b>。白面板 410 高、圆角 55、'
          '三枚档（' + T(lang, 'modePhoto') + '／' + T(lang, 'modeUrl') + '／' + T(lang, 'modeWrite') + '）'
          '＋ 三枚圈（快门 180／两枚小圆 105，图形在圆里、名字在圆下）。'),
         (screen_entry(lang, 'url'), '③ 第二屏·链接档',
@@ -558,8 +581,14 @@ def build(lang):
             '＋现网那层压暗罩 <code>.page-scrim</code>（默认亮度档「' + DIM['name'] + '」）。</div></div>'
             '<div class="bx"><div class="t" style="max-width:360px;margin:0"><b>口径（全部现读／现量）</b><br>'
             '视口：你这两张真机截图 1116×2484 ⇒ <b>750×' + str(STAGE_H) + ' rpx</b>；'
-            '导航带下沿 184、首屏那一组顶 1106、块顶 1192、底栏 1541–1649、'
+            '导航带下沿 184、现网首屏那一组顶 1106、块顶 1192、底栏 1541–1649、'
             '第二屏白面板 1107–1516 —— 全部量自这两张图。<br>'
+            '<b>10-13 第二轮改的四处</b>：① 左块改成与第二屏那块<b>同顶同底</b>（1107–1517）、'
+            '两个人跟着上移、下半留给数字那一格；② 数字在横线上方、分类名在下方，'
+            '数字 <b>64</b>（现网那支 WtsjMind Thin，从 <code>.blk-n</code> 的 88 收下来）、'
+            '小字吃现成的 <code>--fs-micro</code> ' + str(FS['micro']) + '（＝「照片 · 链接 · 文字」那行同一档）；'
+            '③ 圆形 ➕ 换成快门那支橙；④ 每一屏的 Tips 在各自那一格里上下居中。'
+            '<b>64／124／.94→.76 这三个数我定的，他没给。</b><br>'
             '字：<code>i18n.js</code> 现读（缺键直接报错）；字号：<code>app.wxss --fs-*</code> 现读；'
             '色：<code>palette.js</code> 现读（面板取墨黑 <code>' + INK + '</code>、'
             '快门取固定橙 <code>' + CP['--cp-cam'] + '</code>、底栏取 <code>chromeOf</code>）；'
@@ -577,7 +606,8 @@ def build(lang):
             + str(cmp72) + ':1</b> ✓。但井那档（白 .20）在同一面上只剩 <code>' + hx(well) + '</code>、'
             '差 ' + str(well_step) + ' 级，比现网那道 ' + str(LIVE_WELL_STEP) + ' 级淡一半 ⇒ '
             '<b>井要一起从 .20 抬到 .42</b> 才回到现网那道分界。'
-            '这一档（面板上的玻璃浓度）他没拍过，我按数定的。'
+            '这一档（第二屏那块面板压在深色面板上的玻璃浓度）他没拍过，我按数定的。'
+            '（首屏左块不吃这一问了：他 10-13 改成了上白下黑两片皮。）'
             '</div></div></div>')
     html = ('<!doctype html><html><head><meta charset="utf-8"><title>B 方案 · 深色面板</title>'
             '<style>' + CSS + '</style></head><body>' + head +
@@ -585,7 +615,7 @@ def build(lang):
     name = 'B方案-深色面板-%s.html' % ('中文' if lang == 'zh' else '英文')
     # 内容没丢的最低一道闸：str.format 对多出来的位置参数不报错，整层内容会被静默吃掉，
     # 光看渲染出来的图"面板是黑的"根本分不出是没画还是画了被盖住。
-    for must in ('ic-person.png', 'ic-person-alt.png', 'class="u"', 'class="dot"', 'class="sw-track"',
+    for must in ('ic-person.png', 'ic-person-alt.png', 'class="num"', 'class="rule"', 'class="lab"', 'class="dot"', 'class="sw-track"',
                  'class="tabbar"', 'class="panel"', 'class="swt"', 'class="thumb p1"',
                  T(lang, 'statNotes'), T(lang, 'statCards'), T(lang, 'back')):
         if must not in html:
@@ -598,28 +628,31 @@ def render(name):
     out = os.path.join(HERE, name.replace('.html', '.png'))
     subprocess.run([CHROME, '--headless=new', '--disable-gpu', '--hide-scrollbars',
                     '--force-device-scale-factor=1', '--screenshot=' + out,
-                    '--window-size=2380,4260', 'file://' + os.path.join(HERE, name)],
+                    '--window-size=2380,6400', 'file://' + os.path.join(HERE, name)],
                    capture_output=True)
-    # 再切成单屏：整表 3×2，stage 起点从导航带那两行现读，不写死（表头一换行整张图就错位）
     im = Image.open(out).convert('RGB')
     px = im.load()
-    nav_rows, inr = [], False
+    # 表头那一段的高度会随文案涨（这一轮就从 568 长到 871），写死窗口高就把第二屏切掉了。
+    # 做法：导航带那一整行 #14161A 是个现成的锚，扫出两行的起点，再按第二屏的底＋说明留白裁。
+    nav, inr = [], False
     for y in range(im.height):
         ok = sum(1 for x in range(28, im.width, 9)
                  if all(abs(px[x, y][i] - (0x14, 0x16, 0x1A)[i]) <= 8 for i in range(3))) > 150
         if ok and not inr:
-            nav_rows.append(y)
+            nav.append(y)
             inr = True
         elif not ok:
             inr = False
+    if len(nav) < 2:
+        sys.exit('只扫到 %d 行 stage：版面没排成两行，别拿这张当成品' % len(nav))
+    bottom = min(im.height, nav[1] + STAGE_H + 200)
+    im.crop((0, 0, im.width, bottom)).save(out)
     tag = '中' if '中文' in name else 'EN'
     for i in range(6):
-        if len(nav_rows) < 2:
-            break
         r, c = divmod(i, 3)
         x0 = (28, 804, 1580)[c]
-        y0 = nav_rows[r]
-        im.crop((x0, y0, x0 + STAGE_W, y0 + STAGE_H)).save(
+        Image.open(out).convert('RGB').crop(
+            (x0, nav[r], x0 + STAGE_W, nav[r] + STAGE_H)).save(
             os.path.join(HERE, '单屏-B%s-%02d.png' % (tag, i + 1)))
     return out
 
