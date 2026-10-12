@@ -11,7 +11,13 @@
 # 装的位置也从 /tmp 挪到 ~/.mpauto——/tmp 会被系统半夜清一次，
 # 10-03 那次 miniprogram-automator 只剩两个 .d.ts，整个真跑链路当场全瞎。
 # 老的 /tmp/mpaauto 路径还在尺子文件头的注释里，给它留个软链，两条路都走得通。
-cd /Users/zlfmac/Documents/TuMaiBiJi || exit 1
+#
+# 项目根可以给：`MP_ROOT=/Users/zlfmac/Documents/TuMaiBiJi-2.2 docs/工具/跑尺子.sh …`。
+# 2.2 那条线是独立 worktree（方案 §2 甲），不传这个变量它就去不了。
+# 不给 MP_ROOT 时走的主目录，与以前写死的值一个字不差——2.1 那条线的跑法不受影响。
+# 尺子自己读的是 `path.resolve(__dirname,'../..')`，所以务必跑**目标工作树里那一份**脚本，
+# 别在主目录跑尺子去连 2.2 的包：那量到的是主目录的代码，绿是假绿。
+cd "${MP_ROOT:-/Users/zlfmac/Documents/TuMaiBiJi}" || exit 1
 export NODE_PATH="$HOME/.mpauto/node_modules"
 [ -d "$HOME/.mpauto/node_modules/miniprogram-automator" ] || {
   echo "!! 缺 miniprogram-automator，先装一次：mkdir -p ~/.mpauto && cd ~/.mpauto && npm i miniprogram-automator"
@@ -24,7 +30,7 @@ for f in "$@"; do
   "$CLI" quit >/dev/null 2>&1; sleep 8
   pkill -f wechatwebdevtools >/dev/null 2>&1; sleep 4
   open -a wechatwebdevtools; sleep 45
-  "$CLI" auto --project /Users/zlfmac/Documents/TuMaiBiJi/miniprogram --auto-port $PORT >/dev/null 2>&1
+  "$CLI" auto --project "$PWD/miniprogram" --auto-port $PORT >/dev/null 2>&1
   sleep 45
   LOG=/tmp/ruler-$f.log
   NODE_PATH=/tmp/mpaauto/node_modules node "docs/工具/$f.js" >"$LOG" 2>&1
