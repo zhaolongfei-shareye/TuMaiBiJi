@@ -1349,6 +1349,23 @@
   background: rgba(242, 239, 233, 0.3);
 }
 
+/* ---------- 卡顶那两行固定字跟着图翻（站长 10-12：「自动切换的范围，扩展到笔记列表页和卡片
+   列表页…固定的两行文字」）
+   这两行（两枚 tab＋右端「返回」、下面分类那一排）压的不是头部那层暗罩，是卡顶那 158rpx 的
+   **白纱**，所以上面那条"图深就翻纸白"在这儿方向是反的：白纱把暗图提成了中灰。
+   真机那张演唱会图实测（`docs/design/背景图深浅/量-分段候选.py`，每段只取亮的那 40% 当底）：
+   底中位灰阶 161~175 → 纸白@.96 只有 1.9~2.2，现网 `.72` 那一档 3.2~3.5，整档墨 5.2~6.1。
+   所以这一处跟着图翻的是**墨的浓度**，不是极性：图深→整档墨；图浅→照旧 `.72`
+   （浅那一态同一处量到 5.15、100% 的点过 4.5，本来就够，抬了是白抬）。
+   ⚠ 只抬未选中那一档：`.vtab.on`／`.ix-cat.on` 与它们那条短杠本来就是整档墨，再抬等于把两档并成一档。
+   ⚠ `:not(.bg-light)` 这一档不许省：浅态的容器同样带 `has-bg`，不带这一档的话浅态会被这条一起吃掉
+   （写法同 pages/create/create.wxss 那枚 `.has-bg:not(.entry-dock)`）。 */
+.container.has-bg:not(.bg-light) .vtab,
+.container.has-bg:not(.bg-light) .ix-back,
+.container.has-bg:not(.bg-light) .ix-cat {
+  color: var(--text-primary);
+}
+
 /* 分类筛选 v30 起改「文字 + 短杠」（见上面 .ix-cat 那段）。这里原来那四条
    `.chip.tone`／`.chip.tone.active`／`.container.has-bg .chip.all`／`.…all.active` 一起删掉：
    胶囊的底与描边没有了，`toneVars` 那对 --tone-bg/--tone-ink 在这一行不再被消费。
