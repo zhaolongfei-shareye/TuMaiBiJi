@@ -44,15 +44,22 @@ gx = lambda v: round((v - OX) * KX)
 gy = lambda v: round((v - OY) * KY)
 gw = lambda v: round(v * KX)
 gh = lambda v: round(v * KY)
-rel = lambda dx, dy: (gx(dx) - gx(360), gy(dy) - gy(1089))
+# 稿底下那一条是**整块通栏深色面板**（左右同色、左上右上各一个圆角），不是只有右半——
+# 站长 10-13 就是打回这一条：「为什么左下角没有背景，参考图是完整的深色面板」。
+#   连带第二刀：面板一通栏就把 Tips 与那批小图盖住了（它俩原先排在面板前面）⇒ 现在一律画在面板之后。
+# 所以面板 left:0、宽 750、一路铺到屏幕底；控件仍按稿上右半那一列（COL）排。
+# rel() 的 x 因此直接用屏坐标（不再减面板左边），y 仍相对面板顶。
+rel = lambda dx, dy: (gx(dx), gy(dy) - gy(1089))
 
 STAGE_W, STAGE_H, NAV_H = 750, 1623, 176
-PANEL = dict(left=gx(360), top=gy(1089), width=gw(391), height=gh(534))
+COL = dict(left=gx(360), width=gw(391))          # 稿上右半那一列：所有控件的宽与横向落点
+CX = COL['left']                              # ⚠ 面板通栏之后，凡"相对面板左边"的偏移一律要加这一位
+PANEL = dict(left=0, top=gy(1089), width=STAGE_W, height=STAGE_H - gy(1089))
 LIFT = 148                                            # D3 甲：整块上抬给底栏让位
 # ⚠ 稿上坐标是**整屏**的（含导航条那 176），而面板/底栏/Tips 都画在 .page 里（已从导航条下方起算）
 #   ⇒ 凡进 .page 的 y 一律减 NAV_H。这条 10-12 栽过一回：底栏被顶出舞台、量不到一个像素。
 DOCK_TOP = PANEL['top'] - LIFT
-DOCK_W, DOCK_H = PANEL['width'], PANEL['height']
+DOCK_W, DOCK_H = PANEL['width'], STAGE_H - DOCK_TOP      # 通栏、一路到底（底角交给机身圆角）
 
 PILL = dict(xy=rel(366, 1113), w=gw(364), h=gh(84), r=gh(42))
 CARD = dict(xy=rel(367, 1227), w=gw(363), h=gh(96), r=gh(28), y2=rel(367, 1353)[1])
@@ -61,14 +68,14 @@ RING = dict(xy=rel(449.5, 1155), w=gw(212), h=gh(212), bw=gw(10))
 CAM = dict(xy=rel(477.5, 1183), w=gw(156), h=gh(156))
 CAMLBL = dict(cx=rel(555.5, 1407)[0], y=rel(555.5, 1407)[1])
 SMALL = dict(y=rel(423.5, 1453)[1], w=gw(104), h=gh(104))
-SMALL['xs'] = [20, 20 + SMALL['w'] + 20, 20 + 2 * (SMALL['w'] + 20)]
+SMALL['xs'] = [CX + 20, CX + 20 + SMALL['w'] + 20, CX + 20 + 2 * (SMALL['w'] + 20)]
 TAGROW = dict(y=rel(360, 1112)[1], chip=gw(56), tw=88)
 STRIP = dict(y=rel(360, 1280)[1] + 34, th=gw(80), gap=gw(10), r=gw(18))
 SLIDE = dict(xy=rel(375.5, 1478), w=gw(361), h=gh(96), r=gh(48), knob=gw(76))
 FIELD = dict(xy=rel(367, 1227), w=gw(363), h=gh(96), h2=gh(168), r=gh(28))
 
 # 一行装得下几格：面板宽 406，去掉左右 22 的边，(406-44+10)/(83+10)
-PER_ROW = int((DOCK_W - 44 + STRIP['gap']) // (STRIP['th'] + STRIP['gap']))
+PER_ROW = int((COL['width'] - 44 + STRIP['gap']) // (STRIP['th'] + STRIP['gap']))
 NEED_ROWS = (9 + 1 + PER_ROW - 1) // PER_ROW
 STRIP_H = NEED_ROWS * STRIP['th'] + (NEED_ROWS - 1) * STRIP['gap']
 OVERLAP = STRIP['y'] + STRIP_H - SLIDE['xy'][1]        # 9 张那一排与右滑条重叠多少
@@ -171,7 +178,7 @@ def c_round(lang, k, on='photo'):
          '<div style="%s">%s</div>' % (box(CAM['xy'][0], CAM['xy'][1], CAM['w'], CAM['h'],
                                            'border-radius:50%%;background:%s;display:flex;align-items:center;'
                                            'justify-content:center;' % k['cam']), svg('camera', 62, k['cam_ink'], 1.7)),
-         '<div style="%s">%s</div>' % (box(0, CAMLBL['y'], DOCK_W, 32,
+         '<div style="%s">%s</div>' % (box(COL['left'], CAMLBL['y'], COL['width'], 32,
                                            'text-align:center;font-size:24px;font-weight:700;color:%s;' % k['out_ink']),
                                        T(lang, 'takePhoto'))]
     for (key, icon, tag), x in zip([('fromAlbum', 'images', 'album'), ('modeUrl', 'link', 'url'),
@@ -189,8 +196,8 @@ def c_round(lang, k, on='photo'):
 
 def c_tagrow(lang, k, on='photo'):
     """提炼态顶上那一行：橙圆片 + 三枚文字（现网 .modes 的手法，稿第三屏同一路）"""
-    o = ['<div style="%s"></div>' % box(0, TAGROW['y'] - 16, DOCK_W, 2, 'background:%s;' % k['dash'])]
-    x = 22
+    o = ['<div style="%s"></div>' % box(COL['left'], TAGROW['y'] - 16, COL['width'], 2, 'background:%s;' % k['dash'])]
+    x = CX + 22
     o.append('<div style="%s">%s</div>' % (
         box(x, TAGROW['y'], TAGROW['chip'], TAGROW['chip'],
             'border-radius:50%%;background:%s;display:flex;align-items:center;justify-content:center;' % k['cam']),
@@ -232,24 +239,24 @@ def c_strip(lang, k, n):
     o = []
     shown = min(n, PER_ROW)
     for i in range(shown):
-        x = 22 + i * (STRIP['th'] + STRIP['gap'])
+        x = CX + 22 + i * (STRIP['th'] + STRIP['gap'])
         o.append('<div style="%s"><span class="thumb p%d"></span><i class="x">✕</i>'
                  '<em class="no">%d</em></div>' % (
                      box(x, STRIP['y'], STRIP['th'], STRIP['th'],
                          'border-radius:%dpx;overflow:hidden;' % STRIP['r']), i % 4 + 1, i + 1))
     if n < 9:
-        x = 22 + shown * (STRIP['th'] + STRIP['gap'])
+        x = CX + 22 + shown * (STRIP['th'] + STRIP['gap'])
         o.append('<div style="%s">%s</div>' % (
             box(x, STRIP['y'], STRIP['th'], STRIP['th'],
                 'border-radius:%dpx;background:%s;display:flex;align-items:center;justify-content:center;'
                 % (STRIP['r'], k['dash'])), svg('plus', 26, k['ink'], 2.4)))
     if n > PER_ROW:
-        o.append('<div style="%s"></div>' % box(DOCK_W - 70, STRIP['y'], 70, STRIP['th'],
+        o.append('<div style="%s"></div>' % box(COL['left'] + COL['width'] - 70, STRIP['y'], 70, STRIP['th'],
                                                 'background:linear-gradient(90deg,rgba(0,0,0,0),%s);' % k['panel']))
         o.append('<div style="%s">%d / 9 ›</div>' % (
-            box(22, STRIP['y'] + STRIP['th'] + 10, 200, 28, 'font-size:20px;color:%s;' % k['ph']), n))
+            box(CX + 22, STRIP['y'] + STRIP['th'] + 10, 200, 28, 'font-size:20px;color:%s;' % k['ph']), n))
     elif n == 9:
-        o.append('<div style="%s">9 / 9</div>' % box(22, STRIP['y'] + STRIP['th'] + 10, 200, 28,
+        o.append('<div style="%s">9 / 9</div>' % box(CX + 22, STRIP['y'] + STRIP['th'] + 10, 200, 28,
                                                      'font-size:20px;color:%s;' % k['ph']))
     return ''.join(o)
 
@@ -327,17 +334,17 @@ def frame(lang, k, inner, cap, tag='', left=''):
             '<span class="%s">中</span><span class="%s">EN</span></span></div>'
             '<div class="swap"><span>%s</span><i class="sdot" style="background:%s"></i>'
             '<span class="s2">%s</span>%s</div>'
+            '<div class="dock" style="left:%dpx;top:%dpx;width:%dpx;height:%dpx;background:%s;'
+            'border-top-left-radius:41px;border-top-right-radius:41px">%s</div>'
             '%s'
             '<div class="tips" style="color:%s"><i style="background:%s"></i><span>%s</span></div>'
-            '<div class="dock" style="left:%dpx;top:%dpx;width:%dpx;height:%dpx;background:%s;'
-            'border-top-right-radius:41px;border-bottom-right-radius:41px">%s</div>'
             '<div class="tabbar"><span class="tb tb-on">%s</span><span class="tb">%s</span>'
             '<span class="tb">%s</span></div>'
             '</div></div><div class="cap"><b>%s</b>%s</div></div>' % (
                 T(lang, 'appName'), DIM['veil'], T(lang, 'createHeading'), zh_on, en_on,
                 T(lang, 'bgDimLabel'), DIM['dot'], T(lang, 'homeBgSwap'), svg('chev', 20, k['out_ink'], 2.2),
-                left, k['out_ink'], TIP_DOT, tips,
                 PANEL['left'], DOCK_TOP - NAV_H, DOCK_W, DOCK_H, k['panel'], inner,
+                left, k['out_ink'], TIP_DOT, tips,
                 svg('plus', 34, '#FCFAF3', 2.2), TAB_LIST, TAB_PERSON,
                 cap, ('　·　' + tag) if tag else ''))
 
