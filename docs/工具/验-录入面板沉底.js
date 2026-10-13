@@ -37,9 +37,13 @@ ok('旧的 bg-give-way 全项目清零', !/bg-give-way/.test(
 // 原来这一条钉 `.entry-wrap { margin-top: 62vh }`。10-10 晚收起态那三块搬出去自己按视口
 // 比例定顶（`.home-blk` 的 top: min(66.3%, 100vh−546rpx)），展开态那一档则由下面那条 fixed 管，
 // 流内 margin 没有生效者了——留着反而让人以为收起态还归它管。
-// 所以这一条改钉同一件事的两半：收起态仍按视口比例定顶 ＋ 展开态那条 fixed 仍在。
-ok('收起态仍按视口比例定顶、展开态仍走 fixed（62vh 那条随收起态搬走一起退场）',
-  /\.home-blk\s*\{[^}]*top:\s*min\(66\.3%,\s*calc\(100vh - \d+rpx\)\)/.test(wxss)
+// 10-14 再换一次：站长「两个屏的内框高度要一致」⇒ 收起态不再按视口比例，改成与展开态
+// **共用同一根底线**（组顶 = 100vh − 152 − 内框高）。所以这一条钉的是：
+// 收起态那条 top 是纯 `calc(100vh − N)`（N 由底栏那一口与内框高推出来，见 §5），
+// 66.3% 那一族比例值一处不剩（留着它，两屏在矮屏上就会分叉），展开态那条 fixed 仍在。
+ok('收起态与展开态共用同一根底线（66.3% 那一族退场，fixed 仍在）',
+  /\.home-blk\s*\{[^}]*top:\s*calc\(100vh - \d+rpx\)/.test(wxss)
+  && !/66\.3%/.test(wxss)
   && /\.container\.entry-dock \.entry-wrap\s*\{[^}]*position:\s*fixed/.test(wxss)
   && !/\.entry-wrap\s*\{[^}]*margin-top:\s*\d+(vh|rpx|px)/.test(wxss))
 ok('那条 margin-top 过渡已撤（贴底是 position 切换，过渡不动它）',
@@ -103,7 +107,7 @@ ok('模式标签行不许 shrink', /\.modes\s*\{[^}]*flex:\s*none/.test(wxss))
 // 所以这里只剩"小字那一行不许 shrink"这一条；报错那条改钉"它不占流内高度"。
 ok('框外那一行小字不许 shrink', /\.out\s*\{[^}]*flex:\s*none/.test(wxss))
 // 原来钉的是 `.bar { flex: none }`。10-10 晚胶囊换成三块，同一件事的新载体是左块与右两枚。
-// 2.2 B 方案之后载体又换了一次：右两枚没了，行里只剩"左块 308×410 ＋ 右列吃余量"，
+// 2.2 B 方案之后载体又换了一次：右两枚没了，行里只剩"左块 308×（面板同一个数）＋ 右列吃余量"，
 // 而这一行内部多出来的三样（Tips 那一格、圆形 ➕、两枚计数格）各有一条自己的伸缩规矩：
 // 左块与 ➕ 定死不压，列与 Tips 那一格吃余量但必须带 min-*（不带的话长句会把列撑破）。
 // 效果图那一版翻车过的还是同一件事——左块宽度算成 0，人物根本没地方画。
@@ -157,10 +161,53 @@ ok('展开那一档仍只出现一次（490 只有 .panel-open 一处，别处�
   `展开 ${OPEN_H}`)
 ok('展开那一档挂在 .panel-open 上，由 JS 那一位说话',
   OPEN_H > 0 && /panelOpen \? 'panel-open'/.test(wxml))
-ok(`展开只多一行：${OPEN_H} − ${PANEL_H} = 80，而那一行的框正好是 160 − 105 + 开关那一段`,
-  PANEL_H > 0 && OPEN_H - PANEL_H === 80)
+// 「展开只多一行」这一句钉的是**式子**，不是钉 80 那个数（10-14 收起压到 372 之后差变成 118）。
+// 多出来的那一段正好是一行小图的行距：`.th` 那一格的高 ＋ `.strip` 的行间距。
+// 差比行距小 ⇒ 第二排装不下（"多一行"落空）；差比行距大出 8 以上 ⇒ 那一档白给了，
+// 而白给的那一段会从深色面板的顶上穿出去（墨顶是按这一档推的，见 §5）。
+const TH_H = Number(/height:\s*(\d+)rpx/.exec(seg('.th'))[1])
+const STRIP_GAP = Number(/gap:\s*(\d+)rpx/.exec(seg('.strip'))[1])
+const ROW_PITCH = TH_H + STRIP_GAP
+ok(`展开只多一行：${OPEN_H} − ${PANEL_H} ＝ 一行小图的行距（格 ${TH_H} ＋ 行间距 ${STRIP_GAP} ＝ ${ROW_PITCH}）`,
+  PANEL_H > 0 && OPEN_H - PANEL_H >= ROW_PITCH && OPEN_H - PANEL_H < ROW_PITCH + 8,
+  `差 ${OPEN_H - PANEL_H}，行距 ${ROW_PITCH}`)
 ok('量法与算式写在这页注释里（改内容要重算这一笔账）',
-  /248\.6/.test(wxssRaw) && /586/.test(wxssRaw) && /216\.8/.test(wxssRaw))
+  /内容位 230/.test(wxssRaw) && /548/.test(wxssRaw) && /216\.8/.test(wxssRaw))
+
+// ---------- 5. 深色面板那一层的顶：两屏一根线，展开那一档跟着卡一起长 ----------
+// 站长 10-14 原话「第二屏，高度不准，要和第一屏一致」＋「back 抬到暗面板上面」。
+// 这一层原来的两根线（首屏 min(66.3% − 24, 100vh − 586)／第二屏 100vh − 749）差 163rpx，
+// 点一下 ➕ 背景就自己往上跑一趟。现在钉三件事：
+// ① 一根线：这一层的顶 ＝ 内框的顶往上 24，而内框两屏同高同底 ⇒ 一个式子内推出来；
+// ② 那根钉死第二屏的 `.entry-dock .stage-panel` 不许回来（它一回来就是两根线）；
+// ③ 展开那一档另给一条 `.dock-open`，数由展开档的高推出来 ⇒ 这一层永远比卡片高 24。
+const BREATH = 24
+const stage = seg('.stage-panel')
+const INK_H = Number((/top:\s*calc\(100vh - (\d+(?:\.\d+)?)rpx\)/.exec(stage) || [0, NaN])[1])
+ok('深色面板那一层的顶是纯 `calc(100vh − N)`（66.3%／min() 那一族一处不剩）',
+  Number.isFinite(INK_H) && !/66\.3%|min\(/.test(stage), stage.replace(/\s+/g, ' ').slice(0, 80))
+ok(`这一层的顶 ＝ 底栏那一口 ${bottom} ＋ 内框 ${PANEL_H} ＋ 呼吸 ${BREATH}（两屏同一根线）`,
+  INK_H === bottom + PANEL_H + BREATH, `读到的 N＝${INK_H}，应为 ${bottom + PANEL_H + BREATH}`)
+ok('第二屏那根另钉的顶已经撤净（`.entry-dock .stage-panel` 一条都不许留）',
+  !/\.entry-dock\s+\.stage-panel/.test(wxss))
+const openSeg = seg('.container.dock-open .stage-panel')
+const INK_OPEN_H = Number((/top:\s*calc\(100vh - (\d+(?:\.\d+)?)rpx\)/.exec(openSeg) || [0, NaN])[1])
+ok('展开那一档这一层跟着卡片一起长（顶＝底栏口 ＋ 展开档 ＋ 同一口呼吸）',
+  Number.isFinite(INK_OPEN_H) && INK_OPEN_H === bottom + OPEN_H + BREATH,
+  `读到 ${INK_OPEN_H}，应为 ${bottom + OPEN_H + BREATH}`)
+ok('这一条的闸挂在容器上、由 panelOpen 那一位说话',
+  /panelOpen \? 'dock-open'/.test(wxml))
+// 框外那一行：10-14 起只剩「返回」一枚，并且整枚要在墨面之上。
+// 它自己那一段的高 ＋ 下面那档 margin 是这一条的全部：margin 小于那口呼吸 ⇒ 骑到墨面上。
+const outSeg = seg('.out')
+const OUT_MB = Number((/margin-bottom:\s*(\d+(?:\.\d+)?)rpx/.exec(outSeg) || [0, NaN])[1])
+ok('框外那一行只剩「返回」一枚（Tips 与它前面那枚点都不许回来）',
+  !/class="out-l"/.test(wxml) && !/class="out-dot"/.test(wxml)
+  && (wxml.match(/class="out"[^>]*>[\s\S]*?<\/view>/) || [''])[0].includes('out-r'))
+ok(`那一行整枚坐在墨面之上（下面那档留白 ${OUT_MB} > 墨面那口呼吸 ${BREATH}）`,
+  Number.isFinite(OUT_MB) && OUT_MB > BREATH, `margin-bottom ${OUT_MB}`)
+ok('那一行不再吃写死的纸白（抬到照片上就得跟着深浅翻极性）',
+  /color:\s*var\(--text-(secondary|tertiary)\)/.test(outSeg), outSeg.replace(/\s+/g, ' '))
 
 console.log(`${fails.length ? '✗' : '✓'} 录入面板沉底 静态：${pass}/${pass + fails.length} 条通过`
   + `　面板高 ${PANEL_H}rpx、底边距 ${bottom}rpx`)

@@ -44,6 +44,10 @@ const GAP_CSS = Number(/(?:^|;)\s*gap:\s*(\d+)rpx/.exec(COUNT_SEG)[1])
 const PAD_CSS = Number(/(?:^|;)\s*padding:\s*0\s+(\d+)rpx/.exec(COUNT_SEG)[1])
 const CELL_W_WANT = (PERSON_W_CSS - 2 * PAD_CSS - GAP_CSS) / 2
 const GROUP_H_CSS = PERSON_H_CSS                          // 整组＝那一行左块，Tips 不再占组外一段
+// ➕ 那一格的右边缘离「卡」右边缘的那一口 ＝ 卡的内边距 ＋ 卡那圈描边。
+// 判据原来抄的是 33（＝内边距 30＋描边 2＋1），10-14 站长那句「排版紧凑一点」把内边距压到 24，
+// 它就以 25 的量红在 F2/F6 两条上——那是判据跟着红，不是屏上错了（同一个理由见文件头 PANEL_H 那段注释）。
+const CARD_INSET = lenOf('.card', 'padding') + lenOf('.card', 'border')
 const RING_CSS = (/--cp-ring:([^;]+)/.exec(
   require(path.resolve(__dirname, '../../miniprogram/utils/palette.js')).createSkin()) || [0, ''])[1].trim()
 // `rgba(35,37,44,0.5)` 这种写法在 palette 里不带空格，而 getComputedStyle 回来带——比对前归一
@@ -110,7 +114,7 @@ const ck = (name, ok, got) => {
   const clsOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.attribute('class')) || '') : '' }
   const txtOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.text()) || '').trim() : null }
 
-  // ---------- A 收起态：2.2 B 方案那一组（左块两片皮＋右列 Tips/圆 ➕，整组只有那一行 410） ----------
+  // ---------- A 收起态：2.2 B 方案那一组（左块两片皮＋右列 Tips/圆 ➕，整组只有那一行） ----------
   await top()
   let d = await page.data()
   ck('A1 收起态没有面板', (await page.$$('.panel')).length === 0)
@@ -172,13 +176,13 @@ const ck = (name, ok, got) => {
      "到底挡没挡脸"最后仍由这一把存的截图目视确认（B/C/D/F 各一张）。 */
   ck('B5 面板顶在视口 50% 以下（改回 700rpx 会掉到 0.47 当场红；脸的位置看截图）',
     !!panel1 && panel1.top / metric.h > 0.5, panel1 && `顶 ${Math.round(panel1.top)} / ${metric.h} = ${(panel1.top / metric.h).toFixed(2)}`)
-  /* 框外那一行 10-10 深夜换了两头（他原话「"选择记录模式"改为 Tips，"点空白处收起"改为"返回"」）。
-     两边都拿这一页自己那份字典比，不抄第二份中文——上一版这里写的就是那句死字符串。 */
-  const outLTxt = await txtOf('.out-l')
-  const tipList = d.t.tips || []
-  ck('B6 左边那句是 Tips 那一串（前缀＋六句里的一句），右边那枚是字典里的「返回」',
-    tipList.some((x) => outLTxt === `${d.t.tipsPrefix}${x}`) && (await txtOf('.out-r')) === d.t.back,
-    `${outLTxt} | ${await txtOf('.out-r')}`)
+  /* 10-14 站长「第二屏，Tips 去掉」⇒ 框外这一行只剩「返回」一枚，屏上查不到第二屏的 Tips。
+     原来这一条比的是"左边那句等于六句里的一句"（两边都拿这一页自己那份字典比，不抄死字符串），
+     载体撤了一处，"比字典"那半件事搬到了首屏那一格（§A 那批管 `.blk-tips-line`）。 */
+  ck('B6 框外那一行只剩字典里那句「返回」，屏上没有第二屏的 Tips 与它前面那枚点',
+    (await txtOf('.out-r')) === d.t.back && !(await page.$('.out-l')) && !(await page.$('.out-dot'))
+    && (await page.$$('.out > *')).length === 1,
+    `「${await txtOf('.out-r')}」／枚数 ${(await page.$$('.out > *')).length}`)
   const mds = await page.$$('.md')
   ck('B7 三个标签（相册并进照片了）', mds.length === 3, mds.length)
   ck('B8 当前标签是照片', /(^|\s)md on(\s|$)/.test(await clsOf('.md')) && (await txtOf('.md.on')) === '照片', await txtOf('.md.on'))
@@ -549,7 +553,7 @@ const ck = (name, ok, got) => {
   const th4 = await rectsAll('.strip .th')
   const cardR = (await rects(['.card']))[0]
   ck('F2 ➕ 钉在这一行最右端（它的右边 == 卡内右边）',
-    !!th4[4] && !!cardR && Math.abs(th4[4].right - cardR.right + 33 * R) <= 6 * R,
+    !!th4[4] && !!cardR && Math.abs(th4[4].right - cardR.right + CARD_INSET * R) <= 6 * R,
     th4[4] && cardR ? `➕右 ${Math.round(th4[4].right)}｜卡右 ${Math.round(cardR.right)}` : `格数 ${th4.length}`)
   ck('F3 序号标在图里（读到 1…4），没有"已选 N 张"那一行',
     (await page.$$('.th-no')).length === 4 && (await txtOf('.th-no')) === '1'
@@ -566,7 +570,7 @@ const ck = (name, ok, got) => {
   const cardR6 = (await rects(['.card']))[0]
   ck('F6 真排成两行（第六格与第一格不在同一行），➕ 被 margin-left:auto 钉在第二行最右端',
     th6.length === 7 && th6[0].top !== th6[5].top
-    && !!cardR6 && Math.abs(th6[6].right - cardR6.right + 33 * R) <= 6 * R,
+    && !!cardR6 && Math.abs(th6[6].right - cardR6.right + CARD_INSET * R) <= 6 * R,
     `格数 ${th6.length}｜➕右 ${th6[6] && Math.round(th6[6].right)}｜卡右 ${cardR6 && Math.round(cardR6.right)}`)
   ck('F7 一行放五格（不是四格、也不是六格）：数一数第一行几枚',
     th6.length === 7 && th6.filter((x) => Math.abs(x.top - th6[0].top) <= 2).length === 5,
@@ -643,9 +647,13 @@ const ck = (name, ok, got) => {
   await sleep(900)
   ck('H3 英文那句"右滑开始提炼"在条上', ((await txtOf('.sld-txt')) || '').indexOf('Slide to extract') > -1,
     await txtOf('.sld-txt'))
-  const [outL, outR] = await rects(['.out-l', '.out-r'])
-  ck('H4 框外那两枚英文不打架（左右之间还有缝）',
-    !!outL && !!outR && outR.left - outL.right >= 0, outL && outR && `缝 ${Math.round(outR.left - outL.right)}px`)
+  // 原来这一条量的是"Tips 与「返回」左右不打架"；行里只剩一枚，打架这件事没有了对象。
+  // 换成钉他 10-14 那一句在**英文档**也成立：「Back」整枚在深色面板之上（英文字比中文长，
+  // 万一它把那一行顶高、压过墨顶，只有这一档量得出来）。
+  const [outR, inkH] = await rects(['.out-r', '.stage-panel'])
+  ck('H4 英文那枚「Back」整枚在深色面板之上（抬到暗面板上面，英文档同样成立）',
+    !!outR && !!inkH && (outR.top + outR.h) < inkH.top,
+    outR && inkH ? `行底 ${Math.round(outR.bottom)}／墨顶 ${Math.round(inkH.top)}` : '量不到')
   const sldTxt = (await rects(['.sld-txt']))[0]
   const sldBox = (await rects(['.sld']))[0]
   ck('H5 英文那句放得进条里（不溢出轨道）',

@@ -92,13 +92,13 @@ ck('内容压在罩之上（名单三样：标题、那一行、录入条；日�
   && !/date-row/.test(liftRule[0]),
   liftRule ? liftRule[0].split('{')[0].replace(/\s+/g, ' ') : '(没捞到那条抬层规则)')
 // 10-10 晚收起态那三块从 `.entry-wrap` 里搬出去自己定顶了，所以这一条改钉 `.home-blk`（裸 `.blk` 与 app.wxss 里那枚分类色方块撞了）。
-// 钉的还是同一件事：**整组随视口高走，不许写成定值 rpx**——写死的话矮屏上组底会插进底栏，
-// 高屏上又浮得太高。现在这道数落成 min(66.3%, 100vh−546rpx)：比例那一头是站长拍的那条线，
-// 夹住那一头是"整组 394 ＋ 底栏 128 ＋ 最少留 24"，两头的机型都不撞。
-ck('整组按视口比例下移（10-10 晚搬进 .home-blk，仍不许写死 rpx；min() 那刀兜矮屏）',
-  /\.home-blk\s*\{[^}]*top:\s*66\.3%;/.test(wxss)
-  && /\.home-blk\s*\{[^}]*top:\s*min\(66\.3%,\s*calc\(100vh - \d+rpx\)\)/.test(wxss)
+// 钉的还是同一件事：**整组随视口高走，不许写成定值**——写死的话矮屏上组底会插进底栏。
+// 10-14 这道数从 `min(66.3%, 100vh−562rpx)` 换成 `calc(100vh − 524rpx)`：站长「两个屏的内框高度要一致」
+// ⇒ 首屏那一组与第二屏那块面板共用同一根底线（离底栏 152），比例那一头一留就会在两屏之间分叉。
+ck('整组随视口高走（10-14 起贴底那一根线；不许写死定值，也不许落回流内 margin）',
+  /\.home-blk\s*\{[^}]*top:\s*calc\(100vh - \d+rpx\)/.test(wxss)
   && !/\.home-blk\s*\{[^}]*bottom:\s*\d+rpx/.test(wxss)
+  && !/\.home-blk\s*\{[^}]*top:\s*\d+(px|rpx|vh)\s*[;}]/.test(wxss)
   && !/\.entry-wrap\s*\{[^}]*margin-top:\s*\d+(vh|rpx|px)/.test(wxss),
   (/\.home-blk\s*\{[\s\S]{0,400}?\}/.exec(wxss) || ['(没读到 .blk)'])[0].replace(/\s+/g, ' ').slice(0, 120))
 ck('展开时整块贴底（不再从顶上挂下来盖住照片）',
@@ -164,15 +164,32 @@ ck('下那一档在三个 tab 页的容器上都有名，data 里都有初值',
 const INK_ON_PANEL = /(rgba\(20,\s*22,\s*26|#14161A)/i
 // 选择器按类名**逐段**比（`.container.has-bg .blk-tips-in` 拆出 container/has-bg/blk-tips-in），
 // 否则 `.blk-tips-in` 会被 `.tips` 那种前缀匹配牵连，而 `--text-*` 变量那类只定义不命中。
-const PANEL_TEXT = ['tips', 'tips-line', 'out', 'out-l', 'out-r', 'blk-tips', 'blk-tips-in',
+// 10-14 名单里撤掉 `out`／`out-l`／`out-r`：第二屏框外那一行整枚抬到墨面之上了（站长
+// 「back 抬到暗面板上面」），它现在浮在形象图上，**必须**吃会翻极性那套令牌——方向反了。
+const PANEL_TEXT = ['tips', 'tips-line', 'blk-tips', 'blk-tips-in',
   'blk-tips-line', 'blk-num', 'blk-lab', 'blk-rule']
 const onPanelRow = (sel) => sel.split(',').some((s) =>
   s.split(/[^\w-]+/).some((t) => PANEL_TEXT.includes(t)))
 ck('压在面板上的那两行字是写死的纸白，不吃会翻极性的 --text-*',
   /\.blk-tips-in\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(wxss)
-    && /\.out\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(wxss)
-    && !/\.blk-tips-in\s*\{[^}]*var\(--text-/.test(wxss)
-    && !/\.out\s*\{[^}]*var\(--text-/.test(wxss))
+    && !/\.blk-tips-in\s*\{[^}]*var\(--text-/.test(wxss))
+ck('抬到墨面之上那一行反过来：吃页面级令牌，浅照片那一态才翻得成墨',
+  /(?:^|\n)\.out\s*\{[^}]*color:\s*var\(--text-(secondary|tertiary)\)/.test(wxss)
+  && !/(?:^|\n)\.out\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(wxss),
+  (/(?:^|\n)\.out\s*\{[^}]*\}/.exec(wxss) || ['(没读到 .out)'])[0].replace(/\s+/g, ' ').slice(0, 120))
+/* 10-14 追一刀（我自己上一版漏的那半）：只"吃令牌"还不够——`.container.has-bg` 与
+   `.container.has-bg.bg-light` 那两条翻的是**整页/头部那 0~0.28**，而这一枚的落点在视口
+   0.59~0.62（收起态实测行 848~890 / 框 1448），落在 `create.js` `toneZones().low`＝[0.55,0.85] 里。
+   拿错判据的后果是"头部浅、脚下深"那张图把这一枚翻成墨、压在深底上归零（反之亦然）。
+   站长 10-12 21:1x 原话「请按照上下部分来分别判断」⇒ 它必须跟着**下那一档**翻。
+   ⚠ 两条判据都跑在**剥掉注释**的那一份上：样式表里那些注释本身就写着 `.bg-light` 与 `.out`，
+   不剥的话反面那条会被自己的注释打红。 */
+const CSS_NC = wxss.replace(/\/\*[\s\S]*?\*\//g, '')
+ck('「返回」那一枚跟着"下那一档"翻：深低带给纸白、浅低带给墨，两条都得在',
+  /\.container\.has-bg:not\(\.bg-light-low\) \.out\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(CSS_NC)
+  && /\.container\.has-bg\.bg-light-low \.out\s*\{[^}]*color:\s*rgba\(20,\s*22,\s*26/.test(CSS_NC))
+ck('这一枚不许按头部那一档翻（`.bg-light .out` 一条都不许有——判的不是它压着的那一条带）',
+  !/\.bg-light\s+\.out\s*\{/.test(CSS_NC) && !/\.has-bg\.bg-light\s+\.out\s*\{/.test(CSS_NC))
 ck('没有任何一条规则把压在面板上的字翻成墨（浅壁纸那一态墨字压墨面＝归零）',
   [...wxss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .every((m) => !(onPanelRow(m[1]) && INK_ON_PANEL.test(m[2]))))

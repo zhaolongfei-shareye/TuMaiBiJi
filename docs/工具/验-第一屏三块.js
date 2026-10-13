@@ -12,7 +12,9 @@
 // ⑤ 卡片那一格的一次性落点标记：立一次、读一次、清一次，常驻就把「默认第一个 tab」那条废了；
 // ⑥ 换人不靠"连点两下"（那一下会把每次开门延住 300ms，10-10 深夜他据此打回）：
 //    主人物在前、另一张画成右后方淡灰剪影，点剪影换位；键名与两张路径只住在 utils/person.js；
-// ⑦ 组顶那条 min() 里的 546，是从"整组高＋底栏高＋最少留白"推出来的，任何一头改了这里要跟着改。
+// ⑦ 组顶那条 calc 里的数，是从"整组高＋底栏高＋最少留白 24"推出来的，任何一头改了这里要跟着改
+//    （10-14 之前它是 `min(66.3%, 100vh−562)`：比例那一条与贴底那一条在 410 那一档正好交于同一处，
+//     内框压矮之后两条分叉 ⇒ 只留贴底这一条，两屏共用同一根底线）。
 const fs = require('fs')
 const path = require('path')
 
@@ -336,42 +338,52 @@ ok('首屏那枚 ➕ 的 2.4 挂在 `.blk-plus .blk-plus-glyph`（两枚类，�
       && /-webkit-mask-image:/.test(m[1]) && /(?<!-webkit-)mask-image:/.test(m[1])
   })(),
   (/(?:^|\n)\.blk-plus \.blk-plus-glyph\s*\{/.test(wxssRaw) ? '两行不齐' : '没有那条两枚类的规则'))
-/* 面板顶这一档 10-13 改过口径：原来是"两态同一个顶 ＝ 组顶往上 107（框外那行的高）"，
-   站长「深色面板调下…内框与上面外框的距离，要与下方的 tab 面板距离一样」⇒
-   **收起态**改成"上下两口留空相等"，**展开态**仍要 107 那根线（`.out` 那 107 必须整个坐在面板上）。
-   数全部现读：组顶的夹值、面板的两条 top、`.out` 的高、底栏的高＋bottom。
-   ⚠ `decl()` 取的是**第一条**，而这几处都是"退路一条 ＋ min() 一条"成对写的（老安卓不认 min()），
-   所以同名声明要全收出来再挑带 min()/calc() 的那一条。 */
+/* 面板顶这一档 10-14 又换了一次口径。三版账：
+   ① 效果图那一版：两态同一个顶＝组顶往上 107（框外那一行的高）；
+   ② 10-13 站长「深色面板调下…内框与上面外框的距离，要与下方的 tab 面板距离一样」⇒
+      收起态改成"上下两口留空相等"（24），展开态另钉一根（152＋107＋490）；
+   ③ 10-14 站长「第二屏，高度不准，要和第一屏一致」＋「back 抬到暗面板上面」⇒
+      框外那一行只剩「返回」并且整枚抬到墨面之上，②里为那 107 预留的死墨没有对象了
+      ⇒ 两根并成一根：顶＝内框的顶往上那口呼吸，而内框两屏同高、同一条底线。
+   数全部现读：组顶那条 calc、面板那条 calc、录入条的 bottom、面板两档的高、底栏的高＋bottom。 */
 const declsOf = (src, prop) => (src.match(new RegExp(`${prop}:\\s*([^;]+)`, 'g')) || [])
 const topOf = (sel) => declsOf(seg(sel), 'top').join(' | ')
 const numIn = (src, re) => Number((re.exec(src) || [0, 0])[1])
 const BREATHE = numIn(seg2(tabWxss, '.tab-bar'), /height:\s*(\d+)rpx/)
   + numIn(seg2(tabWxss, '.tab-bar'), /bottom:\s*(\d+)rpx/)      // 底栏那一格占掉的高＋离底
-ok('收起态：面板顶到组顶的留空 ＝ 组顶夹值里那口"离底栏的呼吸"（上下两口同值 ⇒ 块正居中）', (() => {
-  const group = topOf('.home-blk'), panel = topOf('.stage-panel')
-  const gClamp = numIn(group, /calc\(100vh - (\d+)rpx\)/)
-  const pShift = numIn(panel, /calc\(66\.3% - (\d+)rpx\)/)
-  const pClamp = numIn(panel, /calc\(100vh - (\d+)rpx\)/)
-  const breathe = gClamp - PERSON_H - BREATHE                   // 562 − 410 − 128 = 24
-  return /min\(/.test(panel) && /min\(/.test(group) && breathe > 0 && pShift === breathe
-    && pClamp === gClamp + pShift && (panel.match(/calc\(66\.3% - /g) || []).length >= 2
-})(), `夹值 ${numIn(topOf('.home-blk'), /calc\(100vh - (\d+)rpx\)/)}／块高 ${PERSON_H}／底栏占 ${BREATHE}／面板上移 ${numIn(topOf('.stage-panel'), /calc\(66\.3% - (\d+)rpx\)/)}`)
-/* 第二屏那一态的顶：10-13 第二屏方案 D16 甲（站长「按你建议来」）把口径整个换掉了。
-   原来钉的是"展开态回到往上 107 那根线"，实测两态都还悬（收起 83／展开 80）——因为录入条自己是
-   **贴底**定的（bottom:152），而那一层走的是 66.3% 比例值，两条基准在面板 410↔490 换档时不重合。
-   现在这一层跟着录入条同一基准：顶 ＝ 100vh − (离底 152 ＋ 框外那一行 107 ＋ 面板展开 490)，
-   展开态那一行正好贴齐、收起态再往上让出两档面板的高差（80）⇒ 两态都不悬空。
-   `panelOpen` 那个动态类整条撤掉：这一层不再随快门那一排长出第二行而上下跳。 */
 const ENTRY_B = num(seg('.container.entry-dock .entry-wrap'), 'bottom')
-const OUT_H = num(seg('.out'), 'height')
 const OPEN_H = num(seg('.panel-open'), 'height')
-const bandOff = numIn(declsOf(seg('.container.entry-dock .stage-panel'), 'top').join(' | '), /calc\(100vh - (\d+)rpx\)/)
-ok('第二屏：那一层的顶＝录入条展开那一档的顶（框外那一行两态都坐在墨面上）',
-  ENTRY_B > 0 && OUT_H > 0 && OPEN_H >= PANEL_H && bandOff === ENTRY_B + OUT_H + OPEN_H,
-  `顶 calc(100vh − ${bandOff}) vs ${ENTRY_B}＋${OUT_H}＋${OPEN_H}=${ENTRY_B + OUT_H + OPEN_H}`)
-ok('这一层不再挂 `panelOpen`／`.stage-panel-open`（挂着＝收起↔展开还会上下跳 83）',
-  !/stage-panel-open/.test(wxss + wxml) && /class="stage-panel"/.test(wxml),
-  (/\{\{panelOpen[^}]*\}\}/.exec(wxml.match(/class="stage-panel[^"]*"/)?.[0] || '') || ['(已撤)'])[0])
+const GROUP_OFF = numIn(topOf('.home-blk'), /calc\(100vh - (\d+)rpx\)/)
+const INK_OFF = numIn(topOf('.stage-panel'), /calc\(100vh - (\d+)rpx\)/)
+ok('收起态：组顶与录入条同一条底线，而面板顶到组顶的留空＝组底到顶栏那一口（上下两口同值）', (() => {
+  const below = GROUP_OFF - PERSON_H - BREATHE          // 组底离底栏顶那一口：524 − 372 − 128 = 24
+  return GROUP_OFF > 0 && INK_OFF > 0 && GROUP_OFF - PERSON_H === ENTRY_B
+    && below > 0 && INK_OFF - GROUP_OFF === below
+})(), `组顶 calc(100vh − ${GROUP_OFF})／内框 ${PERSON_H}／墨顶 calc(100vh − ${INK_OFF})／底栏占 ${BREATHE}`)
+/* 第二屏不再另钉一根：`.container.entry-dock .stage-panel` 那条 749 一回来，两屏就又分叉
+   （1669 那台上量过：首屏 1083／第二屏 920，差 163rpx，点一下 ➕ 背景自己往上跑一趟）。
+   展开那一档另给一条 `.dock-open`，但它不是"第二屏那根"——它跟的是**这一档卡片自己的顶**，
+   收起↔展开之间这一层与那张卡一起长，两屏之间这一层一动不动。 */
+ok('第二屏不再另钉一根顶（`.entry-dock .stage-panel` 一条不剩＝两屏同一根线）',
+  !/\.entry-dock\s+\.stage-panel/.test(wxss), topOf('.stage-panel'))
+const OUT_H = num(seg('.out'), 'height')
+const bandOff = numIn(declsOf(seg('.container.dock-open .stage-panel'), 'top').join(' | '), /calc\(100vh - (\d+)rpx\)/)
+ok('展开那一档：这一层的顶＝展开卡片的顶往上同一口（卡片穿出墨面＝白给的那一段）',
+  ENTRY_B > 0 && OPEN_H >= PANEL_H && bandOff === ENTRY_B + OPEN_H + (INK_OFF - GROUP_OFF),
+  `顶 calc(100vh − ${bandOff}) vs ${ENTRY_B}＋${OPEN_H}＋${INK_OFF - GROUP_OFF}=${ENTRY_B + OPEN_H + (INK_OFF - GROUP_OFF)}`)
+// 那一行现在只剩「返回」一枚，它坐在墨面之上靠的是 `.out` 自己那档 margin-bottom：
+// 行底的"离底距离"＝ 录入条离底 ＋ 卡片高 ＋ 这一档；墨顶＝录入条离底 ＋ 卡片高 ＋ 那口呼吸。
+// 前者大于后者 ⇒ 整枚在墨面之上。两档都从 CSS 现读，改哪一头都红（收起、展开各算一次）。
+const OUT_MB = num(seg('.out'), 'margin-bottom')
+ok('框外那一行整枚在墨顶之上（收起、展开两档都算一次）', (() => {
+  const shut = ENTRY_B + PANEL_H + OUT_MB      // 行底离屏底：152＋372＋36 ＝ 560
+  const open = ENTRY_B + OPEN_H + OUT_MB       // 展开那一档：152＋490＋36 ＝ 678
+  return OUT_H > 0 && shut > INK_OFF && open > bandOff
+})(), `行底离屏底 收起 ${ENTRY_B + PANEL_H + OUT_MB} vs 墨顶 ${INK_OFF}／展开 ${ENTRY_B + OPEN_H + OUT_MB} vs ${bandOff}`)
+ok('这一层自己身上不挂动态类（它跟着卡片长，靠的是容器那一条 `.dock-open`）',
+  !/stage-panel-open/.test(wxss + wxml) && /class="stage-panel"/.test(wxml)
+  && /class="container[\s\S]*?\{\{panelOpen \? 'dock-open' : ''\}\}/.test(wxml),
+  (wxml.match(/class="stage-panel[^"]*"/) || ['(没找到)'])[0])
 
 /* 面板那三段皮的**分工**（他 10-13「新增面板为什么看不到渐变毛玻璃」追出来的）：
    本体必须透明。实心 .95 一旦写回本体，就与压在它上面的 `::before` 相乘
@@ -580,7 +592,7 @@ ok('按下态三种载体各归其位：整块放大只给卡，计数格与 ➕
   && !/blk-stat-press|\.blk-ic/.test(wxss + wxml),
   '旧那两枚计数块的按下态与图标缩放规则')
 
-/* ---------- 9. 组顶那道 min() 的常数与两头同源 ---------- */
+/* ---------- 9. 组顶那条 calc 的常数与两头同源 ---------- */
 const sBlk = seg('.home-blk')
 // 2.2 B 方案：整组只剩那一行（Tips 搬进右列里、不再单独占一行），所以整组高＝左块高。
 // 原来这一式子是 `Tips 74 ＋ margin 12 ＋ 左块 308 = 394`，那三样现在都不在组的"纵向累加"里了。
@@ -594,12 +606,12 @@ function seg2(src, sel) {
 }
 ok('整组高就是那一行（Tips 已搬进列里，不再单独占一行）', GROUP_H === PERSON_H, `${GROUP_H}`)
 ok('底栏占的那一段从底栏自己那一份现读（128 = 108 高 ＋ 20 离底）', TAB_H === 128, `${TAB_H}`)
-ok('min() 里那个夹值是推出来的、不是拍的：整组 ＋ 底栏 ＋ 最少留白 24',
-  /min\(66\.3%,\s*calc\(100vh - (\d+)rpx\)\)/.test(sBlk)
-  && parseInt(/min\(66\.3%,\s*calc\(100vh - (\d+)rpx\)\)/.exec(sBlk)[1], 10) === GROUP_H + TAB_H + 24,
+ok('组顶那条 calc 里的数是推出来的、不是拍的：整组 ＋ 底栏 ＋ 最少留白 24',
+  /top:\s*calc\(100vh - (\d+)rpx\)/.test(sBlk)
+  && parseInt(/top:\s*calc\(100vh - (\d+)rpx\)/.exec(sBlk)[1], 10) === GROUP_H + TAB_H + 24,
   `整组 ${GROUP_H} ＋ 底栏 ${TAB_H} ＋ 留白 24 = ${GROUP_H + TAB_H + 24}`)
-ok('min() 之前留了一行不带函数的退路（老安卓不认 min() 时不许塌成写死）',
-  (sBlk.match(/top:\s*66\.3%/) || []).length >= 1 && /top:\s*min\(/.test(sBlk))
+ok('66.3%／min() 那一族整族退场（贴底定的东西撞不到底栏，既不用夹刀、也不用老安卓退路）',
+  !/66\.3%|min\(/.test(sBlk), sBlk.replace(/\s+/g, ' ').slice(0, 80))
 /* 面板那一层是 `position:fixed; bottom:0` 的通栏一整片，它往上盖的那一段正好罩住底栏那枚胶囊。
    底栏是**自定义组件**，automator 的 `page.$` 够不到它的节点（10-01 那轮就记过：只能截图采像素），
    所以"点得到点不到"这一条真跑量不出来，只能在这里钉层号：面板那枚 z-index 必须**低于**底栏那一枚。

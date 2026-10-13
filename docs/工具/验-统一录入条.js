@@ -184,15 +184,17 @@ ok('那一行小字存在且排在面板之前（在框外）',
   outAt > -1 && panelAt > outAt && wrapAt > -1 && outAt > wrapAt
   && /<view wx:if="\{\{active\}\}" class="entry-wrap">/.test(wxml),
   `wrap@${wrapAt} out@${outAt} panel@${panelAt}`)
-// 10-10 深夜这两枚换了内容：左边不再报"这一屏在干什么"，改成与收起态同一条轮播 Tips；
-// 右边从一句说明变成一枚真的按钮「返回」（与笔记列表右上角同一个词、同一个动作）。
-ok('那一行两枚：左边是轮播 Tips、右边是「返回」那一枚按钮',
-  /class="out-l">\{\{tipsPrefix\}\}\{\{tips\[tipIdx\]\}\}<\/text>/.test(wxml)
-  && /class="out-r"[^>]*role="button"[^>]*aria-label="\{\{t\.back\}\}"[^>]*catchtap="collapse"/.test(wxml))
-// Tips 那一枚必须只占一行：这一行在流内，一折行整块面板就被顶下去，而它每 8 秒换一句。
-ok('Tips 那一枚钉死单行（折行＝面板每 8 秒跳一次）',
-  /white-space:\s*nowrap/.test(seg('.out-l')) && /text-overflow:\s*ellipsis/.test(seg('.out-l'))
-  && /min-width:\s*0/.test(seg('.out-l')), seg('.out-l').replace(/\s+/g, ' '))
+// 10-10 深夜这两枚换过内容；10-14 站长「第二屏，Tips 去掉」⇒ 这一行只剩「返回」一枚。
+ok('那一行只剩「返回」那一枚按钮（与笔记列表右上角同一个词、同一个动作）',
+  /class="out"[^>]*>\s*<text class="out-r"[^>]*role="button"[^>]*aria-label="\{\{t\.back\}\}"[^>]*catchtap="collapse"/.test(wxml),
+  (wxml.match(/<view class="out">[\s\S]{0,160}/) || [''])[0].replace(/\s+/g, ' '))
+// 原来这一条钉 `.out-l` 的 nowrap，理由是"这一行在流内，一折行就把整块面板顶下去，而它每 8 秒换一句"。
+// 载体撤了一处，这条风险就没有载体了；换成钉**还在的那一处**：首屏那一格允许折两三行
+// （它就是按两行排的），靠 `flex:1 + min-width:0 + max-width:9em` 那一套，不许有人为了单行改回写死。
+ok('首屏那一格 Tips 仍是"吃余量、可折行"（行宽上限 9em，不套 nowrap）',
+  /flex:\s*1/.test(seg('.blk-tips')) && /min-height:\s*0/.test(seg('.blk-tips'))
+  && /min-width:\s*0/.test(seg('.blk-tips-line')) && /max-width:\s*9em/.test(seg('.blk-tips-line'))
+  && !/white-space:\s*nowrap/.test(seg('.blk-tips-line')), seg('.blk-tips-line').replace(/\s+/g, ' '))
 // 面板肚子里只剩"一个框（或一横排小图）+ 一枚条"：那排按钮、四步指引、清空、粘贴都不该回来
 ok('面板里没有那排按钮（清空/粘贴/保存/取消全撤）', !/class="acts"/.test(wxml) && !/catchtap="pasteUrl|catchtap="clearShots|catchtap="cancelWrite/.test(wxml))
 ok('四步指引整批撤净（模板、引用、样式都没有）',
@@ -313,10 +315,18 @@ ok('页面上绑到的处理函数在 create.js 里都有', [...handlers].length
 const panelCss = seg('.panel')
 const PANEL_H = num(panelCss, 'height')
 const PANEL_OPEN_H = num(seg('.panel-open'), 'height')
-// 410／490 是站长 10-08 深夜圈的那个红框（顶 rpx 1107、底 1516）量出来的两档，
-// 正本效果图 c5；10-08 之前是 500／580，再之前 700。改这两个数要连着改下面那三条算式。
-ok('面板收起态定高 410rpx（10-10 压进站长那圈红框；10-08 从 700 压到 500 是上一笔）', PANEL_H === 410, String(PANEL_H))
-ok('展开态只多一行（490 = 410 + 80）', PANEL_OPEN_H === 490 && PANEL_OPEN_H - PANEL_H === 80, String(PANEL_OPEN_H))
+// 这两档的来历：10-08 之前 700，10-08 压成 500／580，10-10 压进站长那圈红框成 410／490，
+// 10-14 站长「第二屏的内面板，高度压缩一下，排版紧凑一点」＋「两个屏的内框高度要一致」
+// ⇒ 收起 372（与首屏那块左块同一个数），展开仍 490（那一档本来就没有富余）。
+// 这里**不钉字面量**：钉的是两条关系——收起＝首屏左块同高、展开−收起＝一行小图的行距。
+// 真要改数，改的是这两条关系与下面那三条加总（`验-录入面板沉底.js` 读的是同一份 CSS）。
+const BLOCK_H = num(seg('.blk-person'), 'height')
+const ROW_PITCH = num(seg('.th'), 'height') + num(seg('.strip'), 'gap')
+ok('收起那一档与首屏那块左块同高（两屏的内框是同一个数）',
+  PANEL_H > 0 && PANEL_H === BLOCK_H, `面板 ${PANEL_H}／左块 ${BLOCK_H}`)
+ok(`展开那一档正好多一行小图（差 ${PANEL_OPEN_H - PANEL_H}，一行是 ${ROW_PITCH}）`,
+  PANEL_OPEN_H - PANEL_H >= ROW_PITCH && PANEL_OPEN_H - PANEL_H < ROW_PITCH + 8,
+  `${PANEL_OPEN_H} − ${PANEL_H}`)
 ok('面板算 border-box（定高含内边距与描边）', /box-sizing:\s*border-box/.test(panelCss))
 ok('面板是 flex 列', /display:\s*flex/.test(panelCss) && /flex-direction:\s*column/.test(panelCss))
 ok('展开那一档挂在面板自己身上，不是另一块 DOM',
@@ -597,11 +607,12 @@ ok('快门与滑动条的色仍只从 createSkin() 递进来，且 create.js 不
   && !/toneStyle/.test(js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
 ok('小黄点的色值仍由 palette 经 style 递进来',
   /tipDotStyle: 'background:' \+ TIP_DOT/.test(js) && palette.TIP_DOT === '#F6C445')
-/* 站长 10-11 13:2x：「第二屏的 Tips 前面少了小圆点，要与第一屏一致」。"一致"分三层钉：
-   ① 那一枚真挂在 `.out` 的第一个子位置，色仍从 tipDotStyle 递进来（不是另调一支黄、也不是抄进样式表）；
-   ② 几何四条与第一屏 `.tips-dot` **逐字相同**——差一档就不是"一致"，是"差不多"；
-   ③ `.out` 原来那行有 `gap: 20rpx`，它分的是"字与返回"，留着它点与字就成 12＋20＝32，
-      跟第一屏的 12 对不上 ⇒ 那道缝必须挪到 `.out-r` 的 margin-left 上（真跑 H4"左右不打架"照旧成立）。 */
+/* 站长 10-14：「第二屏，Tips 去掉」⇒ 那枚小黄点在屏上只剩首屏一处。
+   原来这三条钉的是"两屏那两枚点逐字相同"（他 10-11 13:2x 那句「要与第一屏一致」）；
+   载体撤掉一处，"一致"就没有对手了，判据跟着换成"只剩一处、且那一处仍是同一个出口"：
+   ① 第二屏那一行里不许再有 `.out-dot`／`.out-l`（谁回来，谁就是第二个 Tips 入口）；
+   ② 首屏那一枚仍从 `tipDotStyle` 递色，样式表里没有第二支黄；
+   ③ 点与字那道缝仍是 12——这一档 10-14 没指，不许被这轮顺手带走。 */
 const dotGeo = (sel) => {
   const o = {}
   ;['width', 'height', 'margin-top', 'margin-right', 'border-radius'].forEach((p) => {
@@ -610,27 +621,20 @@ const dotGeo = (sel) => {
   })
   return o
 }
-const gTip = dotGeo('.tips-dot'), gOut = dotGeo('.out-dot')
-ok('第二屏框外那行有点，且吃的是同一枚 tipDotStyle（样式表里没有第二支黄）',
-  /<view class="out">\s*(?:<!--[\s\S]*?-->\s*)?<view class="out-dot" style="\{\{tipDotStyle\}\}"><\/view>/.test(wxml)
-  && !/#f6c445/i.test(wxss),
-  wxml.slice(Math.max(0, wxml.indexOf('<view class="out">')), wxml.indexOf('<view class="out">') + 200).replace(/\s+/g, ' '))
-/* 「要与第一屏一致」钉的是**落点**，不是钉两条规则逐字相同。
-   2.2 B 方案之后两行的对齐机制本来就换了：第一屏那一格是 `align-items:flex-start` ＋ 点自己
-   `margin-top:10rpx`；第二屏整行改成在那 107rpx 里居中（`align-items:center`），点跟着居中、
-   不再补 margin-top。两种写法算出来是同一个位置（居中的点 46.5 ＝ 居中的字 33.6 那一行 36.7 ＋ 9.8），
-   所以这里钉四条几何相同 ＋ 各自那一档偏移只能存在一份：
-   两边都留 `margin-top:10` ⇒ 第二屏的点比字低 10rpx；两边都撤 ⇒ 第一屏的点骑在字顶上方。 */
-ok('两枚点的四条几何与第一屏逐字相同（尺寸、离字那道缝、圆）',
-  ['width', 'height', 'margin-right', 'border-radius'].every((p) => gTip[p] === gOut[p]),
-  `第一屏 ${JSON.stringify(gTip)} ／ 第二屏 ${JSON.stringify(gOut)}`)
-ok('竖直偏移两屏各用一种机制、且只用一种（重复或都缺都会把点挪离字那一行）',
-  /^\d/.test(gTip['margin-top'] || '') && gOut['margin-top'] === null
-  && /align-items:\s*center/.test(seg('.out'))
-  && /align-items:\s*flex-start/.test(seg('.blk-tips-in')),
-  `.tips-dot margin-top＝${gTip['margin-top']}／.out-dot margin-top＝${gOut['margin-top']}`)
-ok('点与字只隔 12（`.out` 那道 gap 已挪到 .out-r 的 margin-left，否则这里量到 32）',
-  !/gap:/.test(seg('.out')) && /margin-left:\s*20rpx/.test(seg('.out-r')),
+const gTip = dotGeo('.tips-dot')
+ok('第二屏那一行里不再有 Tips、也不再有它前面那枚点（`.out-l`／`.out-dot` 全项目清零）',
+  !/out-l|out-dot/.test(wxml) && !/\.out-l|\.out-dot/.test(wxss),
+  seg('.out').replace(/\s+/g, ' ').slice(0, 70))
+ok('小黄点只剩首屏一处，色仍由 palette 经 style 递进来（样式表里没有第二支黄）',
+  (wxml.match(/tipDotStyle/g) || []).length === 1 && /class="tips-dot" style="\{\{tipDotStyle\}\}"/.test(wxml)
+  && !/#f6c445/i.test(wxss), `wxml 里出现 ${(wxml.match(/tipDotStyle/g) || []).length} 次`)
+ok('首屏那枚点的四条几何没被这轮带走（14 见方、离字 12、圆）',
+  gTip.width === '14rpx' && gTip.height === '14rpx' && gTip['margin-right'] === '12rpx'
+  && gTip['border-radius'] === '50%' && /^\d/.test(gTip['margin-top'] || ''),
+  JSON.stringify(gTip))
+ok('那一行不再需要 gap／margin 补缝（行里只剩「返回」一枚，靠 justify-content 落右）',
+  !/gap:/.test(seg('.out')) && !/margin-left:/.test(seg('.out-r'))
+  && /justify-content:\s*flex-end/.test(seg('.out')),
   `.out＝${seg('.out').replace(/\s+/g, ' ').trim().slice(0, 70)}／.out-r＝${seg('.out-r').replace(/\s+/g, ' ').trim()}`)
 
 // ---------- 7. 提交链路：三档共用同一趟忙态时序 ----------

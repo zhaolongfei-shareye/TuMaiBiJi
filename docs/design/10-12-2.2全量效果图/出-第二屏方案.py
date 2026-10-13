@@ -103,6 +103,15 @@ if len(FS) != 8 or any(v <= 0 for v in FS.values()):
     sys.exit('app.wxss 里那排 --fs-* 没读全')
 W_EDGE = nsv('var(--w-edge)')
 
+# ⚠ 这一份是 **10-13 D16 那一轮的记录稿**（八态全画＋当时量出的两处硬伤＋四条待拍）。
+# 10-14 站长把那一轮的结论打回了：「第二屏，高度不准，要和第一屏一致」＋「Tips 去掉，back 抬到
+# 暗面板上面」⇒ 两根顶线并成一根、框外那一行只剩「返回」并抬到墨面之上。下面那几条正则读的是
+# 那一版的锚点（`66.3% − 24` 与 `.container.entry-dock .stage-panel`），码里已经没有这两条了。
+# 要看**现行口径**的效果图：跑同目录那份 `出-B方案深色面板.py`（它的数全从 create.wxss 现读）。
+# 这里不跟着改：改了就把那一轮"为什么先钉 749、后来为什么又撤"的证据链抹平了。
+if not re.search(r'calc\(66\.3% - [\d.]+rpx\)', body('.stage-panel')):
+    sys.exit('这一份是 10-13 D16 那一轮的记录稿：码已换到 10-14 那一根线（`.stage-panel` 里不再有 66.3%）。'
+             '现行口径请跑 出-B方案深色面板.py；要把这一轮重画，得先决定那份记录稿要不要留。')
 ENTRY_L = nmb('.container.entry-dock .entry-wrap', 'left')
 ENTRY_B = nmb('.container.entry-dock .entry-wrap', 'bottom')
 OUT_H = nmb('.out', 'height')

@@ -18,13 +18,15 @@ const { execFileSync } = require('child_process')
 // 环境变量仍然优先，跨树抽跑照旧 `MP_ROOT=… node …`。
 const ROOT = process.env.MP_ROOT || path.resolve(__dirname, '../..')
 const RULER = path.join(ROOT, 'docs/工具/验-第一屏三块.js')
+// 10-14 起有两把刀下的是另一把尺子（见 KNIVES 末尾那两把的第 4 项）；这一份也必须在**这棵树**里。
+const R2 = path.join(ROOT, 'docs/工具/验-首页背景图.js')
 const files = {
   wxss: path.join(ROOT, 'miniprogram/pages/create/create.wxss'),
   wxml: path.join(ROOT, 'miniprogram/pages/create/create.wxml'),
   js: path.join(ROOT, 'miniprogram/pages/create/create.js'),
 }
 console.log(`下刀的树：${ROOT}`)
-if (!fs.existsSync(RULER)) throw new Error(`这棵树里没有那把尺子：${RULER}`)
+if (!fs.existsSync(RULER) || !fs.existsSync(R2)) throw new Error(`这棵树里没有那把尺子：${RULER}｜${R2}`)
 for (const f of Object.values(files)) fs.copyFileSync(f, f + '.knifebak')
 // restore 用 copy 不用 rename：一轮里要还原二十次上下，备份得一直在。
 const restore = () => { for (const f of Object.values(files)) if (fs.existsSync(f + '.knifebak')) fs.copyFileSync(f + '.knifebak', f) }
@@ -61,8 +63,8 @@ const KNIVES = [
       edit('wxss', 'rgba(18, 20, 26, 0.92) 100%', 'rgba(18, 20, 26, 0.72) 100%') }, '差 ≥6 级'],
   ['停点自己另写一档（「与现网的过程一样」就没了）',
     () => edit('wxss', 'rgba(255, 255, 255, 0.93) 43%', 'rgba(255, 255, 255, 0.93) 38%'), '停点位置与现网'],
-  ['窗底抬到 205（脚底与墨面之间开一条缝，就是他说的「悬空」）',
-    () => edit('wxss', 'bottom: 197rpx;', 'bottom: 205rpx;'), '窗底与墨面上沿是同一条线'],
+  ['窗底抬到 167（脚底与墨面之间开一条缝，就是他说的「悬空」）',
+    () => edit('wxss', 'bottom: 159rpx;', 'bottom: 167rpx;'), '窗底与墨面上沿是同一条线'],
   ['把 overflow 写回卡上（人头被切平——他这一句打回的就是这一刀）',
     () => edit('wxss', '.blk-person {\n  position: relative;', '.blk-person {\n  overflow: hidden;\n  position: relative;'), '卡自己不许出现 overflow'],
   /* 这一把原来锚在 `height: 213rpx;` 上——10-13 那一刀（白面上沿 0→24、高 213→189）之后那串字
@@ -83,16 +85,19 @@ const KNIVES = [
     () => edit('wxml', 'class="home-blk"', 'class="blk"', true), '没有一枚和 app.wxss 同名'],
   ['三元分支里塞一枚同名类（证明分支也扫了）',
     () => edit('wxml', "{{active ? 'entry-dock' : ''}}", "{{active ? 'blk' : ''}}"), '三元分支里那几枚'],
-  ['面板顶写成定值（不跟着那一组走，矮屏上两态的顶就岔开）',
-    () => edit('wxss', 'top: min(calc(66.3% - 24rpx), calc(100vh - 586rpx));', 'top: 1083rpx;'), '收起态：面板顶到组顶的留空'],
+  ['面板顶写成定值（不跟着那一组走，两屏的顶就岔开）',
+    () => edit('wxss', 'top: calc(100vh - 548rpx);', 'top: 1083rpx;'), '收起态：组顶与录入条同一条底线'],
   // 10-13 第二屏方案那四刀落码之后重排：原来这一把锚在 `.stage-panel-open { top: calc(66.3% - 107rpx);`，
   // 那条规则随 D16 甲整条撤了（闸改挂 `active`、顶钉成一根线），锚点找不到就报"刀没落下"。
-  ['★第二屏那根顶退回"跟着面板走"（＝乙案，聚焦一次往上跳 80）',
-    () => edit('wxss', '.container.entry-dock .stage-panel {\n  top: calc(100vh - 749rpx);',
-      '.container.entry-dock .stage-panel {\n  top: calc(100vh - 669rpx);'), '第二屏：那一层的顶'],
+  ['★第二屏那根另钉的顶回来（＝10-13 D16 甲那一版，两屏差 163rpx，站长今天打回的就是这一条）',
+    () => edit('wxss', '.container.dock-open .stage-panel {\n  top: calc(100vh - 666rpx);',
+      '.container.entry-dock .stage-panel {\n  top: calc(100vh - 749rpx);'), '第二屏不再另钉一根顶'],
+  ['★展开那一档不跟着卡片长（顶仍钉在收起那一根＝490 那张卡穿出墨面 118）',
+    () => edit('wxss', '.container.dock-open .stage-panel {\n  top: calc(100vh - 666rpx);',
+      '.container.dock-open .stage-panel {\n  top: calc(100vh - 548rpx);'), '展开那一档：这一层的顶'],
   ['★那一层重新挂回 `panelOpen`（收起↔展开又上下跳 83，框外那行再悬一次）',
     () => edit('wxml', '<view class="stage-panel"></view>',
-      "<view class=\"stage-panel{{panelOpen ? ' stage-panel-open' : ''}}\"></view>"), '不再挂 `panelOpen`'],
+      "<view class=\"stage-panel{{panelOpen ? ' stage-panel-open' : ''}}\"></view>"), '这一层自己身上不挂动态类'],
   ['★白面上沿抬回块顶（撤掉"头部一半在框外"那一刀）',
     () => edit('wxss', '.blk-face {\n  position: absolute;\n  left: 0;\n  right: 0;\n  top: 24rpx;',
       '.blk-face {\n  position: absolute;\n  left: 0;\n  right: 0;\n  top: 0rpx;'), '白面上沿落在女那张的头带中点'],
@@ -101,12 +106,14 @@ const KNIVES = [
   ['★剪影抬到 200 高（头顶越过白面上沿＝"男在框内"那句破了）',
     () => edit('wxss', 'height: 132rpx;\n  z-index: 1;', 'height: 200rpx;\n  z-index: 1;'), '男剪影整张仍在白框内'],
   ['★窗底让开墨面上沿 6rpx（"下方不能悬空"那句反了）',
-    () => edit('wxss', '  top: -52rpx;\n  bottom: 197rpx;', '  top: -52rpx;\n  bottom: 191rpx;'), '窗底与墨面上沿是同一条线'],
+    () => edit('wxss', '  top: -52rpx;\n  bottom: 159rpx;', '  top: -52rpx;\n  bottom: 153rpx;'), '窗底与墨面上沿是同一条线'],
   ['★那枚 2.4 退回裸类名（与 `.glyph-plus` 同权重、只靠源码顺序赢，挪一下就静默回 1.6）',
     () => edit('wxss', '.blk-plus .blk-plus-glyph {\n  -webkit-mask-image:', '.blk-plus-glyph {\n  -webkit-mask-image:'),
     '首屏那枚 ➕ 的 2.4'],
-  ['整组夹值少算一行（562 改回旧的 546＝还按整组 394 算）',
-    () => edit('wxss', 'top: min(66.3%, calc(100vh - 562rpx));', 'top: min(66.3%, calc(100vh - 546rpx));'), '夹值是推出来的'],
+  ['整组那条顶少算一行（524 改回旧的 562＝还按内框 410 算）',
+    () => edit('wxss', 'top: calc(100vh - 524rpx);', 'top: calc(100vh - 562rpx);'), '是推出来的'],
+  ['★框外那一行下面那档留白撤掉（「返回」骑到墨面上，他那句"抬到暗面板上面"就没了）',
+    () => edit('wxss', '  height: 44rpx;\n  margin-bottom: 36rpx;', '  height: 44rpx;\n  margin-bottom: 0rpx;'), '框外那一行整枚在墨顶之上'],
   ['热区缩到 100 高（剪影 132，头顶一段点了没反应）',
     () => edit('wxss', 'height: 152rpx;', 'height: 100rpx;'), '盖得住'],
   ['剪影抬到主人物前面（「在后面」那条反了）',
@@ -131,13 +138,25 @@ const KNIVES = [
     + '"上部渐变半透明毛玻璃"画了等于没画，而几何与字色判据全绿）',
     () => edit('wxss', 'background: transparent;\n  backdrop-filter',
       'background: rgba(35, 37, 44, 0.95);\n  backdrop-filter'), '深色面板本体透明'],
+  /* 下面两把下的是**另一把尺子**（`验-首页背景图.js`）：10-14 那一轮「返回」抬到墨面之上之后
+     新加的两条翻色判据（吃 `bg-light-low`、不吃 `bg-light`）。落点还在同一份 create.wxss 上，
+     所以共用这一套备份/还原，只把"红的那一条从哪把尺子里读出来"换成传进来的第 4 项。 */
+  ['把「返回」按头部那一档翻（`.bg-light .out` 一回来，"上浅下暗"那张图上它就是墨字压暗底）',
+    () => edit('wxss', '.container.has-bg:not(.bg-light-low) .out {',
+      '.container.has-bg.bg-light .out {\n  color: rgba(20, 22, 26, 0.68);\n}\n\n'
+      + '.container.has-bg:not(.bg-light-low) .out {'),
+    '这一枚不许按头部那一档翻', R2],
+  ['撤掉"下那一档"那两条覆写（只留 `.out` 吃令牌＝整页那一枚说了算，落点没人管）',
+    () => { edit('wxss', '.container.has-bg:not(.bg-light-low) .out {', '.container.has-bg:not(.bg-light-xx) .out {')
+      edit('wxss', '.container.has-bg.bg-light-low .out {', '.container.has-bg.bg-light-xx .out {') },
+    '那一枚跟着"下那一档"翻', R2],
 ]
 
 let bad = 0
-for (const [name, dig, needle] of KNIVES) {
+for (const [name, dig, needle, ruler] of KNIVES) {
   try { dig() } catch (e) { console.log(`✗ 刀没落下：${name} —— ${e.message}`); bad += 1; restore(); continue }
   let red = false, out = ''
-  try { execFileSync(process.execPath, [RULER], { encoding: 'utf8' }) }
+  try { execFileSync(process.execPath, [ruler || RULER], { encoding: 'utf8' }) }
   catch (e) { red = true; out = `${e.stdout || ''}${e.stderr || ''}` }
   if (!red) { console.log(`✗ 没红：${name} —— 这一条判据是空的`); bad += 1 }
   else if (!out.includes(needle)) {

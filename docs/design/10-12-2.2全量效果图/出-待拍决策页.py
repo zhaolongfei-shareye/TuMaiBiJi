@@ -149,6 +149,13 @@ GROUP_TOP = 1107
 # 这一档是**首屏**那一片墨的顶：组顶往上 24（与块离底栏那口呼吸相等），从 wxss 现读、不写进这份脚本。
 # ⚠ 第二屏另有**一根钉死的顶**（`.container.entry-dock .stage-panel`，10-13 D16 甲），这一页画的全是首屏，
 # 所以不吃那一根；原来那条 `.stage-panel-open` 已随 D16 甲整条撤掉。
+# ⚠ 10-14 之后这一页跑不动了，而且**不打算跟着改**：站长那一句「第二屏，高度不准，要和第一屏一致」
+# 把这一页画的口径换掉了（`.stage-panel` 里不再有 `calc(66.3% − 24rpx)`，整组也改成贴底那一根线，
+# 上面那个 GROUP_TOP=1107 也随之作废）。这一份是 D9–D15 那一轮待拍的**记录稿**，
+# 跟着改就把当时"为什么先钉 749、后来为什么撤"的证据链抹平了。
+# 现行口径的效果图：跑同目录那份 `出-B方案深色面板.py`（内框高、墨顶、那一行的位置全从 create.wxss 现读）。
+if not re.search(r'calc\(66\.3% - ([\d.]+)rpx\)', seg(CRE, '.stage-panel')):
+    sys.exit('这一份是 10-13 待拍那一轮的记录稿：码已换到 10-14 那一根线。现行效果图请跑 出-B方案深色面板.py')
 PANEL_LIFT = float(re.search(r'calc\(66\.3% - ([\d.]+)rpx\)', seg(CRE, '.stage-panel')).group(1))
 PANEL_TOP = GROUP_TOP - PANEL_LIFT
 

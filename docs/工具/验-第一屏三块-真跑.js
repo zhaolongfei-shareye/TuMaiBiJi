@@ -43,9 +43,7 @@ const GROUP_H = num(seg('.blk-person'), 'height')   // 整组＝那一行左块�
 const FACE_H = num(seg('.blk-face'), 'height')      // 上：纯白渐变毛玻璃那一片
 const FACE_TOP = num(seg('.blk-face'), 'top')       // 白面上沿离块顶那一口（10-13 追打那一刀之前恒为 0）
 const BAND_H = num(seg('.blk-count'), 'height')     // 下：墨黑渐变毛玻璃那一片
-const OUT_H = 107          // 展开态：面板顶比组顶高出去那一段＝第二屏框外那行的小字
 const BREATHE = 24         // 收起态：面板顶比组顶只高这一口＝那一组底离底栏顶的呼吸（静态那把钉的是"两口相等"这条等式，这里钉屏上量出来的数）
-const CLAMP = GROUP_H + 128 + 24  // 组顶夹值：整组 ＋ 底栏 ＋ 最少留白 = 562
 const BLEED = 52           // 人物高出内框上沿那一段
 const FIG_W = 220
 const ALT_H = 132          // 剪影按高定，两态同一个数
@@ -394,10 +392,10 @@ async function main() {
   await page.callMethod('collapse')
   await sleep(1500)
 
-  /* ---------- 8. 第二屏那三处：那一行整段坐在墨上、这层墨在两态之间不动 ----------
-     B 方案那句「点击圆形＋，就是第二个屏」＋「左边内框要与第二个图高度对齐」在屏上的意思是：
-     收起/展开换的是中间那块，面板顶与整组顶这条线一个字都不许动。
-     10-13 D16 甲又加了一条：这一层墨的顶在第二屏之内也不动（原来它跟着 `panelOpen` 上下跳）。 */
+  /* ---------- 8. 两屏同一根墨顶、那一行抬到墨面之上、展开那档跟着卡长 ----------
+     B 方案那句「点击圆形＋，就是第二个屏」＋ 10-14 那句「两个屏的内框高度要一致」在屏上的意思是：
+     收起/展开换的是中间那块的高度，而**深色面板那层的顶线在两屏之间是同一根**
+     （10-13 D16 甲那一版它差 163rpx，站长今天打回的就是这一条）。 */
   const tPlus = Date.now()
   await (await page.$('.blk-plus')).tap()
   let plusGap = -1
@@ -408,10 +406,15 @@ async function main() {
   ok('圆 ➕ 也是开门（他原话「如果点击圆形+，就是第二个屏」），且同样零延迟',
     (await page.data()).active === 'photo' && plusGap > -1 && plusGap < 250,
     plusGap < 0 ? '没升起来' : `active=${(await page.data()).active}／${plusGap}ms`)
-  /* 10-13 D16 甲换的就是这一段的口径。原来钉的两条——"那一行的顶＝墨顶"与"展开比收起高 107−24"——
-     量的都是"闸挂在 `panelOpen` 上"那一版，留着就是两条必红的旧尺子。
-     现在第二屏之内这一层是**一根不动的线**，而那行小字要**整段坐在墨上**（顶不在墨顶之下、底不压进面板）。
-     ⚠ 三条全钉屏上量出来的**关系**，不引 100vh 那个绝对值：`windowHeight` 与 CSS 的 `100vh`
+  /* 10-14 站长两句话把这一段的口径整个翻了过来：「第二屏，高度不准，要和第一屏一致」
+     ＋「back 抬到暗面板上面」。所以原来那三条——"那一行整段坐在墨上（收起）"、
+     "那一行整段坐在墨上（展开）"、"这层墨在两态之间不动"——量的都是 D16 甲那一版，
+     留着就是三条必红的旧尺子。现在钉的是：
+     ① 两屏的墨顶是**同一根线**（屏上量，不是算式）；
+     ② 框外那一行整枚在墨顶**之上**（他这一句反过来要求的就是这件事），两态都算一次；
+     ③ 展开那一档这层墨跟着那张卡一起长（墨顶到卡顶那一口在两态里是同一个数）——
+        它不再"自己单独跳"，因为动的对象就是卡片本身。
+     ⚠ 全钉屏上量出来的**关系**，不引 100vh 那个绝对值：`windowHeight` 与 CSS 的 `100vh`
      在带导航条的机型上不是一回事，拿它算绝对顶就是给自己造红（这一族坑在 §8 里记过）。 */
   const ink1 = await rect('.stage-panel')
   const row1 = await rect('.out')
@@ -423,24 +426,28 @@ async function main() {
   const pan2 = await rect('.panel')
   await page.setData({ panelOpen: false })
   await sleep(500)
-  const sits = (row, ink, pan) => !!row && !!ink && !!pan
-    && row.top >= ink.top - 3 * R && row.top + row.h <= pan.top + 3 * R
+  // 行底（含它下面那档 margin）不许碰到墨顶：量的是屏上两个矩形之间的缝，不是声明值。
+  const aboveInk = (row, ink) => !!row && !!ink && (row.top + row.h) < ink.top - 6 * R
   const fmt = (row, ink, pan) => row && ink && pan
     ? `行 ${q(row.top).toFixed(1)}~${q(row.top + row.h).toFixed(1)}／墨顶 ${q(ink.top).toFixed(1)}／面板顶 ${q(pan.top).toFixed(1)}` : '屏上没有 .out'
-  ok('收起那一态：框外那一行整段坐在墨上（顶不悬在墨外、底不压进面板），高仍是那 107',
-    sits(row1, ink1, pan1) && !!row1 && near(q(row1.h), OUT_H, 4),
-    row1 ? `行高 ${q(row1.h).toFixed(1)}（应 ${OUT_H}）／${fmt(row1, ink1, pan1)}` : '屏上没有 .out')
-  ok('展开那一态：那一行同样整段坐在墨上（顶钉在"展开那一档"就是为了这一态）',
-    sits(row2, ink2, pan2), fmt(row2, ink2, pan2))
-  ok('展开↔收起那一换，这层墨在屏上不动（旧挂法它往上跳 83rpx，那行悬空就是这一跳的因）',
-    !!ink1 && !!ink2 && near(ink1.top, ink2.top, 2 * R),
-    ink1 && ink2 ? `收起 ${q(ink1.top).toFixed(1)} → 展开 ${q(ink2.top).toFixed(1)}` : '量不到 .stage-panel')
-  ok('进第二屏这一层比首屏那一条更高（往上让出框外那一行那一段，两态同一条线）',
-    !!ink1 && ink1.top < panel.top - 20 * R,
-    `首屏 ${q(panel.top).toFixed(1)} → 第二屏 ${q(ink1.top).toFixed(1)}`)
-  // 这里**只钉顶线、不钉高度**：面板那张的高是 410 还是 490 还挂在他那条待拍上
-  // （画法向下长会压住底栏 56，代码向上长会把 `.out` 那 107 留在面板之上），
-  // 把还没拍的数钉成判据就是拿尺子替他做决定。
+  ok('两屏的墨顶是同一根线（点 ➕ 那一下这一层在屏上一动不动）',
+    !!ink1 && !!panel && near(ink1.top, panel.top, 3 * R),
+    panel && ink1 ? `首屏 ${q(panel.top).toFixed(1)} → 第二屏 ${q(ink1.top).toFixed(1)}` : '量不到')
+  ok('框外那一行整枚在墨顶之上（收起那一态）', aboveInk(row1, ink1), fmt(row1, ink1, pan1))
+  ok('框外那一行整枚在墨顶之上（展开那一态，它跟着卡片一起往上长）',
+    aboveInk(row2, ink2), fmt(row2, ink2, pan2))
+  ok('展开那一档：墨顶到卡顶那一口与收起是同一个数（这层跟着卡长，不自己单独跳）',
+    !!ink1 && !!ink2 && !!pan1 && !!pan2
+    && near(pan1.top - ink1.top, pan2.top - ink2.top, 3 * R) && pan2.top > ink2.top,
+    ink1 && ink2 && pan1 && pan2
+      ? `收起 ${q(pan1.top - ink1.top).toFixed(1)}／展开 ${q(pan2.top - ink2.top).toFixed(1)}` : '量不到')
+  ok('两屏的内框同高（屏上量的矩形，不是 CSS 声明）',
+    !!pan1 && !!blk && near(pan1.h, blk.h, 3 * R),
+    pan1 && blk ? `面板 ${q(pan1.h).toFixed(1)}／整组 ${q(blk.h).toFixed(1)}` : '量不到')
+  // 上一版这里写的是"只钉顶线、不钉高度"——因为那两档的高还挂在他那条待拍上。
+  // 10-14 他拍了：「两个屏的内框高度要一致」＋「第二屏的内面板，高度压缩一下」⇒ 高度本身
+  // 成了拍过的内容，上面那条"两屏内框同高"就是它的尺子；具体那个数（372）仍从 CSS 现读，
+  // 不钉成字面量。
   ok('录入面板的顶＝收起态那一组的顶（「左边内框要与第二个图高度对齐」在屏上的意思）',
     !!pan1 && near(pan1.top, blk.top, 3 * R),
     pan1 ? `面板顶 ${q(pan1.top).toFixed(1)}／组顶 ${q(blk.top).toFixed(1)}` : '屏上没有 .panel')
