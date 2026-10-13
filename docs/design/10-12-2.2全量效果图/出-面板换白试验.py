@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 「太黑了，换成纯白面板试试效果」（站长 10-13 12:3x）——把同一屏画两遍：
-# 左＝现在落码那版（深色面板），右＝纯白面板。两屏只差面板那一层的皮，几何／字／底栏全同一套数。
+# 左＝现在落码那版（深色面板），右＝纯白面板。三屏只差面板那一层的皮与那条半透明带的高，几何／字／底栏全同一套数。
 #
 # 为什么不另起一套画法：这一份直接 exec `出-待拍决策页.py` 的前半（到 `HTML = ` 那行为止），
 # 拿的是它同一批**落码现读**的常量（i18n 的字、palette 的橙与底栏色、create.wxss 的几何与两幅渐变）。
@@ -54,14 +54,19 @@ def panel_paint(base, a_lo, a_hi):
 
 WHITE_GRAD, WHITE_BG = panel_paint('255,255,255', .55, .94)
 
+# 站长 10-13 14:0x：「加上背景图才能看到效果」——原来两屏垫的是现网默认那张浅形象图，
+# 面板上下几乎同亮度，玻璃与渐变根本读不出来。换成他给的这张真人照（只进这张试验图，不进包）。
+WALLPAPER = '壁纸-站长给的-试面板.jpg'
 
-def screen(bg, grad, tips, dim=1):
-    """首屏那一屏，面板三样（实心 bg／band 渐变 grad／Tips 字色 tips）由外面给。"""
-    s = ['<div class="f" style="inset:0;background:url(home-bg-portrait.jpg) center top/cover"></div>',
+
+def screen(bg, grad, tips, dim=1, band_h=240):
+    """首屏那一屏，面板三样（实心 bg／band 渐变 grad／Tips 字色 tips）由外面给。
+    band_h＝面板顶上那一段半透明带的高（丙案把它抬到盖住左边那一块，见下面 PANELS 的注释）。"""
+    s = ['<div class="f" style="inset:0;background:url(%s) center 22%%/cover"></div>' % WALLPAPER,
          '<div class="f" style="inset:0;background:rgba(20,22,26,.58);opacity:%s"></div>' % DIMS[dim]['veil'],
          '<div class="f" style="left:0;right:0;top:%dpx;bottom:0;border-radius:%dpx %dpx 0 0;'
-         'overflow:hidden;background:%s"><div class="f" style="left:0;right:0;top:0;height:240px;'
-         'background:%s"></div></div>' % (PANEL_TOP, PANEL_R, PANEL_R, bg, grad),
+         'overflow:hidden;background:%s"><div class="f" style="left:0;right:0;top:0;height:%dpx;'
+         'background:%s"></div></div>' % (PANEL_TOP, PANEL_R, PANEL_R, bg, band_h, grad),
          '<div class="f" style="left:0;right:0;top:0;height:184px;'
          'background:linear-gradient(180deg,rgba(8,10,14,.55),rgba(8,10,14,0))"></div>',
          '<div class="f" style="left:30px;top:112px;font-size:34px;font-weight:600;color:%s">%s</div>'
@@ -106,8 +111,19 @@ def screen(bg, grad, tips, dim=1):
 
 
 INK_TIPS = 'rgba(20,22,26,.92)'                   # 现网 `.bg-light` 那一态的 --text-primary，同一支墨
-PANELS = [('甲｜现在落码这版：深色面板', '#23252C', DARK_BG, DARK_GRAD, 'rgba(242,239,233,.96)'),
-          ('乙｜换成纯白面板', '#FFFFFF', WHITE_BG, WHITE_GRAD, INK_TIPS)]
+# 丙＝白面板但把那条半透明带从 240rpx 抬到盖住左边那一块（410rpx）。
+# 为什么这样能"维持之前的效果"：那一块的白玻璃要糊，就得背后有东西可糊——
+# 带只有 240 时那块的下半截压在实心 .95 上（白压白＝级差 0，皮看不见），
+# 带抬到 410 之后整块都坐在"透图＋糊"的那一段上，白玻璃才还是白玻璃。
+# 这一种画法是我给的，不是站长点的，等他拍。
+PANELS = [('甲｜深面板（现在落码这版）', '#23252C', DARK_BG, DARK_GRAD, 'rgba(242,239,233,.96)', 240),
+          ('乙｜纯白面板', '#FFFFFF', WHITE_BG, WHITE_GRAD, INK_TIPS, 240),
+          ('丙｜纯白面板＋带抬到 410 盖住那一块', '#FFFFFF', WHITE_BG, WHITE_GRAD, INK_TIPS, int(PERSON_H))]
+
+rows = []
+for tag, plate, bg, grad, tips, band_h in PANELS:
+    rows.append('<div class="shot"><div class="cap">%s</div>%s</div>'
+                % (tag, scale(screen(bg, grad, tips, band_h=band_h))))
 
 # 三处连带后果，数在这里现算（不是抄结论）。底一律取各自那块面板自己的实心色。
 FACE_TOP_A = stop_alphas(FACE_GRAD)[0]            # 白面最浅那一档（.92 那一头）
@@ -122,26 +138,26 @@ NUMS = [('人物块上半那幅白面 与 它底下那层面板 的级差（＝�
         ('纸白数字 16 压在那条墨面上的对比（正文门槛 4.5）',
          '%.2f:1' % ratio(mix(PAPER, hx(d_band)), d_band),
          '%.2f:1' % ratio(mix(PAPER, hx(w_band)), w_band))]
-
-rows = []
-for tag, plate, bg, grad, tips in PANELS:
-    rows.append('<div class="shot"><div class="cap">%s</div>%s</div>' % (tag, scale(screen(bg, grad, tips))))
+丙注 = ('丙那一屏的级差<b>算不出来也不该算</b>：那一块背后是那张照片本身（面板在那一段是半透的），'
+        '逐像素变，只能眼看。甲乙两列能算，是因为它们底下是一整块纯色面板。')
 
 HTML = ('<!doctype html><html><head><meta charset="utf-8"><title>面板换白试验</title><style>%s'
         '.two{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}'
         '.num{margin-top:16px;font-size:14px;line-height:1.9}'
         '.num b{color:#D2683F}</style></head><body><div class="wrap">'
-        '<h1>面板换白试验 · 同一屏两遍（1px＝1rpx，屏是示意不是截图）</h1><div class="src">'
-        '站长 10-13：「太黑了，换成纯白面板试试效果」。两屏只差面板那一层的皮，'
-        '几何／两幅渐变／字／底栏全部从落码现读，同一套数。'
+        '<h1>面板换白试验 · 同一屏三遍（垫了真背景图，1px＝1rpx，屏是示意不是截图）</h1><div class="src">'
+        '站长 10-13：「太黑了，换成纯白面板试试效果」＋「加上背景图才能看到效果，然后左边的框框要维持之前的效果啊」。'
+        '三屏只差面板那一层的皮与那条半透明带的高，几何／两幅渐变／字／底栏全部从落码现读，同一套数；'
+        '背景换成他给的这张真人照（<b>只进这张试验图，不进包</b>）。'
         '<br><b>换白不是只换一层</b>：Tips 那行字本来写死纸白（不翻就看不见，右屏按翻墨画）；'
-        '人物块上半那幅白渐变与那圈白描边压在白面板上会整片消失；'
+        '左边的框那一圈白描边与上半那幅白渐变压在白面板上级差归 0，'
+        '只有落在面板顶上那 240rpx 半透明带里的一段还读得出来——这就是"左边的框框维持之前的效果"这一句卡住的地方；'
         '人物块下半那条墨面是半透墨，底下从恒深变成白，合成出来的墨会变浅，'
         '压着它的纸白数字对比要重算。下面三行数就是这三处。</div>'
         '<div class="row"><div class="shots">%s</div>'
         '<div class="num">%s</div></div></div></body></html>'
         % (CSS, ''.join(rows),
-           '<br>'.join('%s：甲 <b>%s</b> ／ 乙 <b>%s</b>' % (n, a, b) for n, a, b in NUMS)))
+           '<br>'.join('%s：甲 <b>%s</b> ／ 乙 <b>%s</b>' % (n, a, b) for n, a, b in NUMS) + '<br>' + 丙注))
 
 OUT_HTML = os.path.join(HERE, '面板换白试验.html')
 OUT_PNG = os.path.join(HERE, '面板换白试验.png')
