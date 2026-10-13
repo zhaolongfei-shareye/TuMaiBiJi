@@ -65,6 +65,11 @@ def grad(src, sel):
 PERSON_W = num(CRE, '.blk-person', 'width')
 PERSON_H = num(CRE, '.blk-person', 'height')
 FACE_H = num(CRE, '.blk-face', 'height')
+# 白面上沿离块顶：10-13 那一刀之前恒为 0（白面贴块顶），现在是女那张头带中点那一档（24）。
+# 不读它就把这张画在 0..189 —— 脚底会被白面自己裁掉 24，与落码差一截（`验-第一屏三块` 钉的是 24＋189＋197＝410）。
+FACE_TOP = num(CRE, '.blk-face', 'top')
+# 出血量：`.blk-figwrap` 的 top 是负数（人物超出块顶那一段，他 10-13「人头要高于内框上沿」）。
+FIG_OVER = -num(CRE, '.blk-figwrap', 'top')
 BAND_H = num(CRE, '.blk-count', 'height')
 # `padding: 0 22rpx` 是简写（竖 0 横 22），通用那条 num() 只认"数字紧跟 rpx"，这里单独取横那一档。
 BAND_PAD = float(re.search(r'padding:\s*[\d.]+\s+([\d.]+)rpx', seg(CRE, '.blk-count')).group(1))
@@ -254,9 +259,9 @@ def home(panel=True, bar=3, plus=True, dim=1):
              % (BLK_L, GROUP_TOP, 750 - 2 * BLK_L, GAP_ROW))
     s.append('<div class="f" style="position:relative;width:%dpx;height:%dpx;border-radius:34px;'
              'box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)">' % (PERSON_W, PERSON_H))
-    s.append('<div class="f" style="left:0;right:0;top:0;height:%dpx;border-radius:34px 34px 0 0;'
+    s.append('<div class="f" style="left:0;right:0;top:%dpx;height:%dpx;border-radius:34px 34px 0 0;'
              'overflow:hidden;background:%s;%s"><img src="ic-person.png" style="position:absolute;left:0;'
-             'top:-52px;width:220px"></div>' % (FACE_H, FACE_GRAD, BF(GLASS_BF)))
+             'top:%dpx;width:220px"></div>' % (FACE_TOP, FACE_H, FACE_GRAD, BF(GLASS_BF), -FIG_OVER - FACE_TOP))
     s.append('<div class="f" style="left:0;right:0;bottom:0;height:%dpx;border-radius:0 0 34px 34px;'
              'overflow:hidden;background:%s;%s;display:flex;align-items:center;gap:%dpx;padding:0 %dpx;'
              'box-sizing:border-box">' % (BAND_H, BAND_GRAD, BF(GLASS_BF), BAND_GAP, BAND_PAD))

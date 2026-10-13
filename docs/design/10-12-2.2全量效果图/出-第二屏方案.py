@@ -136,7 +136,28 @@ FIELD_BG = vof(val('.container.has-bg .field, .container.has-bg .sld', 'backgrou
 FIELD_EDGE = vof(val('.container.has-bg .field, .container.has-bg .sld', 'border-color'))
 
 TH, TH_GAP, TH_R, TH_PLUS = nmb('.th', 'width'), nmb('.strip', 'gap'), nmb('.th', 'border-radius'), nmb('.th-plus', 'width')
-TH_ADD_BG = vof(val('.th-add', 'background'))            # ← 这条**没**挂进 .has-bg 那一队（§六 那条发现）
+
+
+def val_opt(sel, prop):
+    """同 `val`，但**读不到不退出**：用来读"这一刀可能还没落进码里"的那几条（落没落，页上要说实话）。"""
+    b = BLK.get(' '.join(sel.split()))
+    if b is None:
+        return None
+    m = re.search(r'(?:;|^)\s*' + re.escape(prop) + r'\s*:\s*([^;]+)', b)
+    return ' '.join(m.group(1).split()) if m else None
+
+
+# 10-13 D17 甲落码：第二屏那两档白纱由 `.container.entry-dock` 就地改了令牌值（首屏不吃、闸在这一屏的身份上）。
+# 读不到就退回 app.wxss 那一档 ⇒ 这一刀没落进码里时，效果图照旧画旧值，不许凭印象抬。
+PLATE_OLD, FIELD_OLD = PLATE, FIELD_BG
+_e_plate, _e_fill = val_opt('.container.entry-dock', '--glass-plate'), val_opt('.container.entry-dock', '--glass-fill')
+PLATE = vof(_e_plate) if _e_plate else PLATE
+FIELD_BG = vof(_e_fill) if _e_fill else FIELD_BG
+ENTRY_LIFTED = bool(_e_plate or _e_fill)
+# 10-13 D18 落码：已选那排最右那枚 ➕ 格挂进玻璃那一队（`:not(.th-add-dis)` 把"满了转灰"那一条让开）。
+_add_glass = val_opt('.container.has-bg .th-add:not(.th-add-dis)', 'background')
+TH_ADD_GLASS = bool(_add_glass)
+TH_ADD_BG = vof(_add_glass) if _add_glass else vof(val('.th-add', 'background'))
 _m = re.search(r'const ROW_CELLS\s*=\s*(\d+)', open(os.path.join(MP, 'pages/create/create.js'), encoding='utf-8').read())
 if not _m:
     sys.exit('create.js 里读不到 ROW_CELLS ⇒"已选几张算展开"这一档不许我猜')
@@ -156,13 +177,27 @@ THPLUS_FG = vof(val('.th-plus', 'background'))                # 第二屏"再加
 TAB_TOP = VIEW_H - TAB_B - TAB_H
 
 LIFT_SHUT = float(re.search(r'calc\(66\.3% - ([\d.]+)rpx\)', body('.stage-panel')).group(1))
-LIFT_OPEN = float(re.search(r'calc\(66\.3% - ([\d.]+)rpx\)', body('.stage-panel-open')).group(1))
-INK_SHUT, INK_OPEN = GROUP_TOP - LIFT_SHUT, GROUP_TOP - LIFT_OPEN
+INK_SHUT = GROUP_TOP - LIFT_SHUT          # 首屏那一片墨的顶：这一刀没动它
+# 10-13 D16 甲落码：第二屏那一层的顶不再跟着 `panelOpen` 跳，改挂 `active`，
+# 顶写成 `calc(100vh − N rpx)`（N ＝ 录入条离底 ＋ 框外那一行 ＋ 面板展开那一档）。
+ENTRY_OFF = float(re.search(r'calc\(100vh - ([\d.]+)rpx\)', body('.container.entry-dock .stage-panel')).group(1))
+INK_OPEN = VIEW_H - ENTRY_OFF
+# 修之前那两档悬空是**算出来的历史值**（上一版那两条顶：收起 66.3%−24、展开 66.3%−107，
+# 107 就是 `.out` 的高），不是现在从码里读到的——落码里已经没有 `.stage-panel-open` 这一条了。
+# `entry_top()` 定义在下面，这里把它那句等式原样写开（VIEW_H − 离底 − 那一行 − 面板高）。
+OLD_INK_OPEN = GROUP_TOP - OUT_H
+OLD_S410 = INK_SHUT - (VIEW_H - ENTRY_B - OUT_H - PL_H)
+OLD_S490 = OLD_INK_OPEN - (VIEW_H - ENTRY_B - OUT_H - PL_H_OPEN)
 _g = body('.glyph-plus')
 GW = re.search(r"stroke-width='([\d.]+)'", _g)
 if not GW:
     sys.exit('落码那支 .glyph-plus 里读不到 stroke-width ⇒ ➕ 粗细那两格是假的')
 GLYPH_W = GW.group(1)
+# 10-13 D19 落码：首屏圆内那枚 ➕ 单开了一支 mask（`.blk-plus-glyph` 自己那一段里给 2.4）。
+# 文件里 `.blk-plus-glyph` 出现两次（一次给尺寸与面色、一次给这支 mask），所以 findall 取**最后**那一段。
+_thick = re.findall(r'\.blk-plus-glyph\s*\{[^}]*?stroke-width=.([\d.]+).', CRE, re.S)
+GLYPH_W_BLK = _thick[-1] if _thick else GLYPH_W
+BLK_LIFTED = GLYPH_W_BLK != GLYPH_W
 
 
 def entry_top(pl):
@@ -171,11 +206,11 @@ def entry_top(pl):
 
 
 def ink_top(pl, policy='code'):
-    """那一层墨的顶。code＝落码现在的挂法（闸在 panelOpen 上）；track＝顶跟着这一态的面板顶走；
-    cover＝整屏垫墨且顶固定（跟着最高那一态的顶）；none＝第二屏不垫。"""
+    """那一层墨的顶。code＝落码现在的挂法（闸在 `active` 上、两态同一根顶）；track＝顶跟着这一态的面板顶走；
+    cover＝与 code 同一个数（甲案落码之后这两条就是一件事）；none＝第二屏不垫。"""
     if policy == 'none':
         return None
-    if policy == 'cover':
+    if policy in ('cover', 'code'):
         return entry_top(PL_H_OPEN)
     if policy == 'track':
         return entry_top(pl)
@@ -227,6 +262,12 @@ def token_block(text, sel):
 TOKENS = (token_block(APP, 'page') + ';' + token_block(APP, '.theme-tint-paper') + ';' +
           ';'.join('%s:%s' % (k, v) for k, v in CP.items()))            # CP 的键本来就带 '--cp-' 前缀，别再拼一次
 
+# 这一屏的令牌串：app.wxss `page{}` 那两枚 .50／.20 已经**行内**挂在这一屏的壳上了（TOKENS 就是那排令牌），
+# 而行内声明赢过任何样式表规则 ⇒ 光把落码那条 `.container.entry-dock{--glass-plate:.72}` 搬进样式表是画不出来的
+# （第一版就是这么假绿的：A1 与 A2 那块面量出来逐字节相同）。所以这里把抬起来的那一档**接在同一串行内值后面**，
+# 与落码里"容器自己重定义这两枚令牌、后代继承"算出来的结果是同一个。
+TOKENS_E = TOKENS + (';--glass-plate:%s;--glass-fill:%s' % (PLATE, FIELD_BG) if ENTRY_LIFTED else '')
+
 CSS_SELS = ['.out', '.out-dot', '.out-l', '.out-r', '.panel', '.panel-open', '.container.has-bg .panel',
             '.modes', '.md', '.md::after', '.md.on', '.md.on::after', '.card', '.container.has-bg .card',
             '.crow', '.mini', '.mini-c', '.mini-glyph', '.mini-lb',
@@ -235,6 +276,9 @@ CSS_SELS = ['.out', '.out-dot', '.out-l', '.out-r', '.panel', '.panel-open', '.c
             '.field-write', '.field-write-2', '.field-area',
             '.strip', '.th', '.th-x', '.th-no', '.th-add', '.th-plus', '.th-add-dis',
             '.container.has-bg .field, .container.has-bg .sld', '.container.has-bg .mini-c',
+            # 10-13 D17 甲／D18 落码：第二屏那两档白纱由 `.container.entry-dock` 就地抬档，
+            # 已选那排最右那枚 ➕ 格挂进玻璃那一队。两条都得搬进来，不然页上画的还是修之前那一档。
+            '.container.entry-dock', '.container.has-bg .th-add:not(.th-add-dis)',
             '.sld', '.sld-fill', '.sld-txt', '.sld-txt::before, .sld-txt::after', '.sld-knob', '.sld-glyph',
             '.sld-off .sld-txt', '.sld-busy .sld-txt', '.sld-done',
             '.wr-sw', '.wr-sw-lab', '.wr-sw-hint', '.wr-sw-track', '.wr-sw-dot', '.wr-sw-on .wr-sw-track', '.wr-sw-on .wr-sw-dot',
@@ -401,7 +445,9 @@ def body_of(kind):
 def screen(kind, ink='code', plate=None, fill=None, bare_out=False, tip=0, marks=True):
     active, pl, _ = STATE[kind]
     itop = ink_top(pl, ink)
-    st = ['<div class="sc has-bg %s" style="%s">' % (variant(plate, fill) if (plate or fill) else '', TOKENS),
+    # `entry-dock` 这一枚是落码里"第二屏"的身份（wxml 那条 `{{active ? 'entry-dock' : ''}}`）：
+    # D17 甲那两档抬起来的白纱与 D16 甲那根顶都挂在它身上，不挂上就等于画的是首屏那一档。
+    st = ['<div class="sc has-bg entry-dock %s" style="%s">' % (variant(plate, fill) if (plate or fill) else '', TOKENS_E),
           '<div class="wb"></div>', '<div class="vs" style="opacity:%s"></div>' % DIM['veil']]
     if itop is not None:
         st.append(panel_layer(itop).replace('class="f"', 'class="scf"'))
@@ -437,9 +483,9 @@ def screen(kind, ink='code', plate=None, fill=None, bare_out=False, tip=0, marks
 
 
 # ============ 四、探针：三屏渲成 1∶1，从像素里读数 ============
-PROBE = [('A1', '照码：垫墨＋白 ' + PLATE, dict(kind='photo', ink='cover', marks=False)),
-         ('A2', '甲：垫墨＋白 .72／井 .42', dict(kind='photo', ink='cover', marks=False,
-                                                 plate='rgba(255,255,255,.72)', fill='rgba(255,255,255,.42)')),
+PROBE = [('A1', '照码（已落甲）：垫墨＋面 ' + PLATE + '／井 ' + FIELD_BG, dict(kind='photo', ink='cover', marks=False)),
+         ('A2', '修之前那一档：面 %s／井 %s' % (PLATE_OLD, FIELD_OLD), dict(kind='photo', ink='cover', marks=False,
+                                                 plate=PLATE_OLD, fill=FIELD_OLD)),
          ('B', '乙：第二屏不垫墨（＝现网那一屏）', dict(kind='photo', ink='none', marks=False, bare_out=True))]
 # 取样条的位置：必须落在墨层那条半透明带**以下**（带 240 自己就在变亮，会把标准差灌水），
 # 又要在面板里面（面板 1107~1517），且 x 让开白卡（卡从 50 起）。
@@ -478,6 +524,12 @@ def run_probe():
         bm, bs = stat(0, int(ENTRY_L) - 2, base + PY0)
         res.append(dict(tag=tag, name=name, mean=mean, face=hx(mean), std=std,
                         back=hx(bm), back_std=bs, kw=kw))
+    # 自证：A1（照码·抬过档）与 A2（修前那一档）那块面**必须量出两个值**。
+    # 相等就说明抬档那一条根本没画进试验页——第一版就是这么假绿的：落码那条 `.container.entry-dock`
+    # 被同一枚元素上的行内令牌压住，两屏都渲成 .50，页上却写着"已抬到 .72"。
+    _f = {r['tag']: r['face'] for r in res}
+    if _f.get('A1') == _f.get('A2'):
+        sys.exit('探针里 A1 与 A2 那块面逐字节相同（%s）⇒ 抬的那一档没画出来，这一页的数全是假的' % _f['A1'])
     os.remove(p)
     os.remove(q)
     return res
@@ -553,19 +605,19 @@ def clip(inner, y0, cap='', h=450):
 TOP0 = 880
 sec2 = [shot(screen(k), cap='%s　·　%s　%s' % (CAPS[k][0], STATE[k][2], CAPS[k][1])) for k in ORDER]
 sec3 = [clip(screen('photo', ink='code'), TOP0,
-             cap='现状（落码）｜墨的闸挂在 <code>panelOpen</code> 上：面板 %.0f 那一态墨顶 %.0f、'
-                 '那一行的顶 %.0f ⇒ 悬空 <b>%.0f</b> rpx' % (PL_H, INK_SHUT, entry_top(PL_H), S410)),
-        clip(screen('photo', ink='cover'), TOP0,
-             cap='甲（建议）｜闸改挂 <code>active</code>、顶固定 %.0f（＝面板 %.0f 那一态的顶）'
-                 '⇒ 整行坐墨上，这一屏内不再跳' % (entry_top(PL_H_OPEN), PL_H_OPEN)),
+             cap='已落码（甲）｜闸挂在 <code>active</code>、顶固定 %.0f：面板 %.0f 那一态墨顶 %.0f、'
+                 '那一行的顶 %.0f ⇒ 悬空 <b>%.0f</b>（修前是 %.0f）'
+                 % (entry_top(PL_H_OPEN), PL_H, INK_OPEN, entry_top(PL_H), S410, OLD_S410)),
         clip(screen('photo', ink='track'), TOP0,
-             cap='乙｜顶跟着面板实际顶走（%.0f→%.0f、%.0f→%.0f）'
+             cap='乙（没走）｜顶跟着面板实际顶走（%.0f→%.0f、%.0f→%.0f）'
                  '⇒ 聚焦输入框、加到第六张那两下，这一层墨自己往上 %.0f rpx'
                  % (PL_H, entry_top(PL_H), PL_H_OPEN, entry_top(PL_H_OPEN),
                     abs(entry_top(PL_H) - entry_top(PL_H_OPEN))))]
-sec4 = [shot(screen('photo', ink='cover', marks=False), cap='A1｜照码：垫墨 ＋ 白 <code>%s</code>' % PLATE),
-        shot(screen('photo', ink='cover', plate='rgba(255,255,255,.72)', fill='rgba(255,255,255,.42)', marks=False),
-             cap='A2｜甲：垫墨 ＋ 白 .72／井 .42'),
+sec4 = [shot(screen('photo', ink='cover', marks=False),
+             cap='A1｜照码（已落甲）：垫墨 ＋ 面 <code>%s</code>／井 <code>%s</code>' % (PLATE, FIELD_BG)),
+        shot(screen('photo', ink='cover', plate=PLATE_OLD, fill=FIELD_OLD, marks=False),
+             cap='A2｜修之前那一档：面 <code>%s</code>／井 <code>%s</code>（＝首屏现在还在吃的那一档）'
+                 % (PLATE_OLD, FIELD_OLD)),
         shot(screen('photo', ink='none', bare_out=True, marks=False), cap='B｜乙：第二屏不垫墨（＝现网那一屏）')]
 
 MEAS_LINES = []
@@ -601,40 +653,44 @@ NEG = ('<b>一、那一行不搬进框里</b>：你 10-08 原话「这一行移�
        '<b>四、不给这屏加第三样控件</b>：白卡肚子里的富余只有 <b>%.0f</b> rpx（现算：%.0f − 描边 %.0f − 上下内边距 %.0f＋%.0f − 标签行 %.0f − 卡上边距 %.0f − 卡内边距 %.0f×2），塞不进；而且你两轮说过不许挡脸。<br>'
        '<b>五、「加新模板不用发版」这一页一个字不提</b>。<br>'
        '<b>六、人物那两张图与这屏无关</b>：展开时 <code>home-blk</code> 整组不渲染（<code>wx:if="{{!active}}"</code>），'
-       '所以"白框下移、头部一半在框外"那一笔只作用在第一屏；这一屏上面露的是形象图本身。'
+       '所以"白框下移、头部一半在框外"那一笔只作用在第一屏（已落：白面上沿 0→24、高 213→189，'
+       '24 是从 <code>assets/ic-person.png</code> 发的顶 40／下巴 210 那两条线算出来的中点）；这一屏上面露的是形象图本身。'
        % (PL_H, PL_H_OPEN,
           PL_H - 2 * PL_BD - PL_PT - PL_PB - MODES_H - CARD_MT - 2 * CARD_PAD,
           PL_H, 2 * PL_BD, PL_PT, PL_PB, MODES_H, CARD_MT, CARD_PAD))
 
 
-def row(code, 标题, 出处, shots, 代价, 建议, 答案):
-    return ('<div class="row"><div class="ttl"><code>%s</code>%s</div><div class="sub">%s</div>'
+def row(code, 标题, 出处, shots, 代价, 建议, 答案, 状态='等你拍'):
+    return ('<div class="row"><div class="ttl"><code>%s</code>%s<span class="st">%s</span></div><div class="sub">%s</div>'
             '<div class="shots">%s</div><div class="cost">%s</div>'
             '<div class="ans">我的建议：%s　｜　你要回的就这几个字：%s</div></div>'
-            % (code, 标题, 出处, shots, 代价, 建议, 答案))
+            % (code, 标题, 状态, 出处, shots, 代价, 建议, 答案))
 
 
 rows = []
-rows.append(row('D16', '第二屏框外那一行有 %.0f／%.0f rpx 悬在墨层之外（这一条必须先修）' % (S410, S490),
-    '数不是量的，是从落码那六个数相加相减出来的：视口 %d、bottom %.0f、那一行 %.0f、面板 %.0f／%.0f、墨顶 %.0f／%.0f。'
-    '要拿屏幕钉它得等真跑那批（#109 还堵在 automator 连接报错）。' % (VIEW_H, ENTRY_B, OUT_H, PL_H, PL_H_OPEN, INK_SHUT, INK_OPEN),
+LANDED = '已按甲落码（2.2.0 预览包，真机可扫）'
+rows.append(row('D16', '第二屏框外那一行原来有 %.0f／%.0f rpx 悬在墨层之外（修前那两个数，见第三节）' % (OLD_S410, OLD_S490),
+    '数不是量的，是从落码那几个数相加相减出来的：视口 %d、bottom %.0f、那一行 %.0f、面板 %.0f／%.0f、'
+    '第二屏墨顶 %.0f（一根，两态同顶）。修后悬空 %.0f／%.0f。'
+    '要拿屏幕钉它得等真跑那批（#109 还堵在 automator 连接报错——已 A/B 过：主树连得上，2.2 这棵连不上）。'
+    % (VIEW_H, ENTRY_B, OUT_H, PL_H, PL_H_OPEN, INK_OPEN, S410, S490),
     '',
-    '<b>甲（建议）</b>：墨的闸从 <code>panelOpen</code> 改挂 <code>active</code>，顶固定 %.0f（跟着最高那一态的顶）。'
-    '代价：第一屏→第二屏那一下墨层往上挪 %.0frpx（现在也挪，只是挪错了地方），第二屏之内聚焦／加到第六张<b>不再跳</b>。<br>'
-    '<b>乙</b>：顶跟着面板实际顶走（%.0f→%.0f、%.0f→%.0f）。代价：这一屏之内每聚焦一次输入框、每加到第六张，'
+    '<b>甲（已落）</b>：墨的闸从 <code>panelOpen</code> 改挂 <code>active</code>，顶固定 %.0f（跟着最高那一态的顶）。'
+    '代价：第一屏→第二屏那一下墨层往上挪 %.0frpx，第二屏之内聚焦／加到第六张<b>不再跳</b>。<br>'
+    '<b>乙（没走）</b>：顶跟着面板实际顶走（%.0f→%.0f、%.0f→%.0f）。代价：这一屏之内每聚焦一次输入框、每加到第六张，'
     '背景那一层自己往上跳 %.0frpx——动的是背景，眼睛一定看得见。<br>'
     '两案都不动你 10-08 拍的「这一行移出框外」，也不动那一行 %.0f 的高。'
     % (entry_top(PL_H_OPEN), INK_SHUT - entry_top(PL_H_OPEN),
        PL_H, entry_top(PL_H), PL_H_OPEN, entry_top(PL_H_OPEN),
        abs(entry_top(PL_H) - entry_top(PL_H_OPEN)), OUT_H),
-    '甲', 'D16 甲'))
+    '甲', '真机看过再说要不要挪', LANDED))
 
 rows.append(row('D17', '那块录入面板压在恒深的墨上，糊不出东西（"第二屏没感觉"的那一半在这儿）',
     '同一态渲三遍，只差垫不垫那层墨、和那档白多少。下面是把这三屏渲成 1∶1 之后<b>从像素里读的</b>'
     '（读面板左内边距那一条 %d×%d，避开所有控件与文字）。' % (PX1 - PX0, PYH),
     '',
     '<div>%s</div><br>'
-    '<b>甲（抬白 .72／井 .42）</b>：面色回到现网那块实测的浅面（你那张真机截图上采的是 <code>%s</code>），'
+    '<b>甲（已落：抬白 .72／井 .42）</b>：面色回到现网那块实测的浅面（你那张真机截图上采的是 <code>%s</code>），'
     '那几行墨字过 4.5。代价：改你 10-11 亲手点的 .50，而且这一枚令牌 <code>--glass-plate</code> 是首屏那块与第二屏这块<b>一起吃</b>，'
     '抬一档两处同时变——这就是 D12 那一问，答一次两处都算。<br>'
     '<b>乙（第二屏不垫墨）</b>：回到 10-11 你要的"沉浸式"，玻璃有东西可糊（背后那条缝的标准差从 %.1f 回到 %.1f）。'
@@ -646,7 +702,7 @@ rows.append(row('D17', '那块录入面板压在恒深的墨上，糊不出东�
     '要修就单独开一票（把那一档从 .50 抬到 .62 上下，中英各量一次宽度）。'
     % ('<br>'.join(MEAS_LINES), LIVE_FACE or '（缺那张真机截图）', SUB['A1']['back_std'], SUB['B']['back_std'],
        SUB['B']['cr_dim'], SUB['A1']['cr_dim']),
-    '甲（与 D12 一起答）', 'D17 甲'))
+    '甲（与 D12 一起答）', '真机看过再说要不要挪', LANDED))
 
 rows.append(row('D18', '「已选那排」最右那枚 ➕ 格没挂进玻璃那一队（这条你没提过，是我这轮读码读出来的）',
     '落码里 <code>.container.has-bg</code> 那三条覆盖只点了 <code>.field</code>／<code>.sld</code>／<code>.mini-c</code>，'
@@ -659,24 +715,25 @@ rows.append(row('D18', '「已选那排」最右那枚 ➕ 格没挂进玻璃那
     '➕ 那一格只在"已选图之后"现面，所以你大概还没撞上。</div></div>'
     % (hx(tup(INK)), TH, TH, TH_R, TH_ADD_BG, TH, TH, TH_R, FIELD_BG,
        levels(tup(TH_ADD_BG), tup(INK)), levels(mix(FIELD_BG, _hex(tup(INK))), tup(INK))),
-    '<b>甲（建议）</b>：把 <code>.th-add</code> 一起挂进那条覆盖（一行的选择器），与井同档。代价：那枚➕淡一档，'
+    '<b>甲（已落）</b>：把 <code>.th-add</code> 一起挂进那条覆盖（一行的选择器），与井同档。代价：那枚➕淡一档，'
     '"名单齐不齐"那类静态尺子要跟着加一项。<br><b>乙</b>：不动。代价：你 10-08 那句「加图做成与小图一样尺寸的方图，风格统一」'
     '在这一格上是破的。',
-    '甲', 'D18 甲'))
+    '甲', '真机看过再说要不要挪', LANDED))
 
 rows.append(row('D19', '➕ 那支描边多粗（你说"稍微粗一点"的是首屏圆内那一枚，第二屏这枚要不要跟着）',
     '两枚吃<b>同一支</b> mask（<code>.glyph-plus</code>，落码描边 <b>%s</b>）：首屏圆内那枚 %drpx、'
     '第二屏"再加一张"那枚 %drpx。只加粗一枚就得给首屏那枚单开一支 mask。' % (GLYPH_W, PLUS_GLY, TH_PLUS),
-    plus_tile('现值：描边 %s｜首屏圆内那枚 %d' % (GLYPH_W, PLUS_GLY), 'gp-thin', PLUS_GLY, SUB['A1']['face'], PLUS_FG,
+    plus_tile('修之前：描边 %s｜首屏圆内那枚 %d' % (GLYPH_W, PLUS_GLY), 'gp-thin', PLUS_GLY, SUB['A1']['face'], PLUS_FG,
               '底是 A1 那块面实测的 %s；图形吃 <code>--cp-cam-ink</code>。就是左这一枚——你说"稍微粗一点"指的是它。' % SUB['A1']['face'])
-    + plus_tile('拟：描边 2.4（只首屏那一枚）', 'gp-thick', PLUS_GLY, SUB['A1']['face'], PLUS_FG,
-                '2.4 <b>是我挑的数，你没给过</b>；第二屏那枚照旧 %s。' % GLYPH_W)
+    + plus_tile('已落码：首屏那一枚描边 %s（落码里读回来的，不是我写的常量）' % GLYPH_W_BLK, 'gp-thick', PLUS_GLY,
+                SUB['A1']['face'], PLUS_FG,
+                '2.4 <b>是我挑的数，你没给过</b>；第二屏那枚照旧 %s。两行都写（标准＋<code>-webkit-</code>）。' % GLYPH_W)
     + plus_tile('乙：两枚一起粗（第二屏这枚 %d，压在井上）' % TH_PLUS, 'gp-thick', TH_PLUS, SUB['A1']['well'], THPLUS_FG,
                 '好处是两枚一致；代价是你指的是"圆内那枚"，我把没点的那枚也改了。'),
-    '<b>甲（建议）</b>：只加粗首屏圆内那枚（%s→2.4）。代价：同一支加号在两处粗细不齐。<br>'
-    '<b>乙</b>：两枚一起粗。代价：超出你那一句的指代范围。<br>'
-    '<b>这两笔（➕ 加粗、白框下移让头部一半在框外）都还没落码</b>——先看图上数，你答了我再动码。' % GLYPH_W,
-    '甲', 'D19 甲'))
+    '<b>甲（已落）</b>：只加粗首屏圆内那枚（%s→%s）。代价：同一支加号在两处粗细不齐。<br>'
+    '<b>乙（没走）</b>：两枚一起粗。代价：超出你那一句的指代范围。<br>'
+    '<b>这两笔都已落进 2.2.0 那个预览包</b>（➕ 首屏那枚 %s；白框上沿 0→24）——真机扫出来看的就是这一档。' % (GLYPH_W, GLYPH_W_BLK, GLYPH_W_BLK),
+    '甲', '真机看过再说要不要挪', LANDED))
 
 HEAD = """<!doctype html><html><head><meta charset="utf-8"><title>2.2 第二屏 · 完整方案</title>
 <style>%(CSS)s
@@ -686,6 +743,7 @@ h1{font-size:27px;margin:0 0 8px}
 h2{font-size:20px;margin:40px 0 8px;padding-left:12px;border-left:5px solid #D2683F}
 .src{font-size:13.5px;color:#5A5A5E;line-height:1.9;margin-bottom:10px}
 .src b{color:#D2683F}
+.st{float:right;font-size:12px;font-weight:700;color:#0A7A3D;background:#E4F4EA;border-radius:20px;padding:2px 12px}
 code{background:#F2EFE9;padding:1px 6px;border-radius:5px;font-size:12.5px;color:#3A3A3C}
 .row{background:#fff;border-radius:18px;padding:20px 22px 22px;margin:18px 0;box-shadow:0 8px 26px rgba(20,22,26,.07)}
 .ttl{font-size:17px;font-weight:700;margin:0 0 3px}
@@ -706,10 +764,14 @@ code{background:#F2EFE9;padding:1px 6px;border-radius:5px;font-size:12.5px;color
 .kv b{color:#D2683F}
 </style></head><body><div class="wrap">
 <h1>2.2 第二屏（点圆 ➕ 之后那一屏）· 完整方案</h1>
-<div class="src"><b>先说当前真机跑哪版</b>：你手机上是线上 <b>2.1.9</b>（审核中 2.1.10）那一版——
-第二屏那里<b>没有</b>这一层深色墨；录入面板是白玻璃 <code>%(PLATE)s</code> 直接糊在你的形象图上。
-这一页画的是 <b>2.2 隔离工作树</b>（<code>/Users/zlfmac/Documents/TuMaiBiJi-2.2</code>，分支 <code>release/2.2</code>，
-提交 <code>da43c75</code>）里的代码；现网一行没动、没提审、没出包。<br>
+<div class="src"><b>先说当前真机跑哪版</b>：你手机上装的还是线上 <b>2.1.9</b>（审核中 2.1.10）——那一版第二屏<b>没有</b>这层深色墨。
+<b>这一页画的四刀已经落进码里，并且出了一张 2.2.0 的预览码</b>：
+<code>/Users/zlfmac/Documents/TuMaiBiJi-2.2/docs/工具/出包-2.2.0-预览码.png</code>（包 909.8 KB／931,660 B，
+扫开跑的就是这一页这份代码）。码在 <b>2.2 隔离工作树</b>（<code>/Users/zlfmac/Documents/TuMaiBiJi-2.2</code>，
+分支 <code>release/2.2</code>，提交 <code>17ec10e</code>）；<b>现网一行没动、没提审、没打上传包</b>。<br>
+<b>这一轮落了哪四刀</b>：D16 甲（第二屏那层墨的顶改挂 <code>active</code>、钉在一根线上，框外那一行两态都坐墨上）／
+D17 甲（第二屏面 <code>%(PLATE)s</code>、井 <code>%(FIELD)s</code>，首屏照旧吃 .50）／D18（已选那排最右那枚 ➕ 格挂进玻璃那一队）／
+D19（首屏圆内那枚 ➕ 描边 %(GW)s→%(GWBLK)s）<b>＋你那句追打</b>（白框上沿 0→24、女那张头部一半在框外、男剪影在框内）。<br>
 <b>相对现网那条线（<code>release/2.0</code>），第二屏那 52 条选择器里 50 条一个字没动</b>（这条是脚本把两个分支那批块逐条比出来的，不是我印象）；
 动的只有两条：<code>.out</code>（框外那一行：定高 %(OUT_H).0f、上下居中、字色写死纸白 <code>%(OUT_C)s</code>）与 <code>.out-dot</code>
 （撤掉点自己那两行自定对齐）。这一屏肚子里那些（<code>.panel</code>／<code>.modes</code>／<code>.card</code>／三枚圈／输入格／小图排／右滑条／翻译开关）
@@ -731,17 +793,21 @@ code{background:#F2EFE9;padding:1px 6px;border-radius:5px;font-size:12.5px;color
 "没选中的那两枚标签"这一档字（<code>--cp-ink-50</code>）在 D17 那三屏上的对比数一并量了。</div>
 <div class="shots">%(SEC2)s</div></div>
 
-<h2>三、顶那一刀（D16）：框外那一行有 %(S410).0f／%(S490).0f rpx 悬在墨层之外</h2>
-<div class="row"><div class="sub">墨层那一顶的闸现在挂在 <code>panelOpen</code> 上，而 <code>panelOpen</code> 不是"第二屏"——它是
-<code>active==='write' &amp;&amp; bodyFocus</code> 或"照片已选到第 %(ROW_NEXT)d 张"。第二屏绝大多数时候它是 <b>false</b>，
-于是那一层墨停在 %(INK_SHUT).0f，而那一行的顶在 %(ET410).0f（面板 %(PL_H).0f）／%(ET490).0f（面板 %(PL_H_OPEN).0f）。三张裁的是同一态，差别只在墨层那一条顶线。</div>
+<h2>三、顶那一刀（D16 已按甲落码）：修前悬 %(OLD_S410).0f／%(OLD_S490).0f rpx，修后 %(S410).0f／%(S490).0f</h2>
+<div class="row"><div class="sub">修之前那一版把墨层的顶挂在 <code>panelOpen</code> 上，而 <code>panelOpen</code> 不是"第二屏"——它是
+<code>active==='write' &amp;&amp; bodyFocus</code> 或"照片已选到第 %(ROW_NEXT)d 张"，第二屏绝大多数时候它是 <b>false</b>，
+于是那一层停在 %(INK_SHUT).0f，而那一行的顶在 %(ET410).0f（面板 %(PL_H).0f）／%(ET490).0f（面板 %(PL_H_OPEN).0f）⇒ 悬 %(OLD_S410).0f／%(OLD_S490).0f。
+现在这一层改挂 <code>active</code>、顶钉在 %(INK_OPEN).0f 一根线上（＝录入条展开那一档的顶），两态都不悬。
+两张裁的是同一态，差别只在顶线挂谁。</div>
 <div class="shots">%(SEC3)s</div></div>
 
-<h2>四、面那一档（D17）：白玻璃压在恒深的墨上，糊不出东西</h2>
-<div class="row"><div class="sub">三屏是<b>同一态</b>（照片档·还没选图），只差垫不垫那层墨、和那档白多少。数在 D17 那一条里，是从像素里读的。</div>
+<h2>四、面那一档（D17 已按甲落码）：白玻璃压在恒深的墨上，糊不出东西</h2>
+<div class="row"><div class="sub">三屏是<b>同一态</b>（照片档·还没选图），只差垫不垫那层墨、和那档白多少。
+A1＝现在码里那一档（面 %(PLATE)s／井 %(FIELD)s），A2＝修之前那一档（.50／.20，也是首屏现在还在吃的），
+B＝第二屏干脆不垫墨。数在 D17 那一条里，是从像素里读的。</div>
 <div class="shots">%(SEC4)s</div></div>
 
-<h2>五、要你拍的四条</h2>
+<h2>五、这四条已按甲落码（旁边绿标那一枚），要你拍的是"真机看过之后挪不挪"</h2>
 %(ROWS)s
 <h2>六、负面清单（这几件我不做，理由写在旁边）</h2>
 <div class="row"><div class="cost">%(NEG)s</div></div>
@@ -753,7 +819,8 @@ code{background:#F2EFE9;padding:1px 6px;border-radius:5px;font-size:12.5px;color
 HTML = HEAD % dict(CSS=build_css(''.join(VARS) + PLUS_CSS), GEOM=GEOM_H, SEC2=''.join(sec2), SEC3=''.join(sec3),
                    SEC4=''.join(sec4), ROWS=''.join(rows), NEG=NEG, PLATE=PLATE, OUT_C=OUT_C,
                    GW=GLYPH_W, WALLP=WALLP, DIMNAME=DIM['name'], OUT_H=OUT_H,
-                   S410=S410, S490=S490, ROW_NEXT=ROW_CELLS + 1, INK_SHUT=INK_SHUT,
+                   S410=S410, S490=S490, ROW_NEXT=ROW_CELLS + 1, INK_SHUT=INK_SHUT, INK_OPEN=INK_OPEN,
+                   OLD_S410=OLD_S410, OLD_S490=OLD_S490, FIELD=FIELD_BG, GWBLK=GLYPH_W_BLK,
                    ET410=entry_top(PL_H), ET490=entry_top(PL_H_OPEN), PL_H=PL_H, PL_H_OPEN=PL_H_OPEN)
 
 OUT_HTML = os.path.join(HERE, '第二屏完整方案.html')
@@ -795,8 +862,10 @@ im.crop((0, 0, W, min(H, last + 40))).save(OUT_PNG)
 
 print('HTML ' + OUT_HTML)
 print('PNG  %s　（%d×%d，内容到底 %d）' % (OUT_PNG, W, min(H, last + 40), last))
-print('落码现读：面板 %.0f／%.0f｜那一行 %.0f｜bottom %.0f｜墨顶 %.0f／%.0f ⇒ 悬空 %.0f／%.0f'
-      % (PL_H, PL_H_OPEN, OUT_H, ENTRY_B, INK_SHUT, INK_OPEN, S410, S490))
+print('落码现读：面板 %.0f／%.0f｜那一行 %.0f｜bottom %.0f｜第二屏墨顶 %.0f ⇒ 悬空 %.0f／%.0f（修前 %.0f／%.0f）'
+      % (PL_H, PL_H_OPEN, OUT_H, ENTRY_B, INK_OPEN, S410, S490, OLD_S410, OLD_S490))
+print('抬档与加粗：面 %s／井 %s（首屏仍 %s／%s）｜➕ 描边 首屏 %s、其余 %s｜➕ 格玻璃 %s'
+      % (PLATE, FIELD_BG, PLATE_OLD, FIELD_OLD, GLYPH_W_BLK, GLYPH_W, '已挂' if TH_ADD_GLASS else '没挂'))
 for r in PR:
     print('　%s 面 %s（σ %.1f）｜背后 %s（σ %.1f）｜墨字 %.2f:1｜淡标签 %.2f:1｜井 %s 差 %.0f 级'
           % (r['tag'], r['face'], r['std'], r['back'], r['back_std'], r['cr_main'], r['cr_dim'], r['well'], r['well_lv']))
