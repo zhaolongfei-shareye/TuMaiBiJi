@@ -18,12 +18,31 @@ const ROOT = path.resolve(__dirname, '../..')
 const SHOT = path.join(ROOT, 'docs/design/10-12-2.2全量效果图/实测-首屏2.2.png')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const PERSON_KEY = 'homePerson'
+// §9 那一双"铺图／不铺图"里的探针用图：只是拿来当"背后有一张照片"，用完在收尾还回 before。
+// 为什么不能用进来时那一张：那一屏可能本来就没铺（before.bgSrc 是空），
+// 两态就量成同一个东西，"两态都挂"那几条会一起假绿。
+const PROBE_BG = '/assets/home-bg-portrait.jpg'
 
-// 下面这些"该落在哪"的数全从效果图正本换算来（图上 1px＝1rpx），推导写在静态那把
-// `验-第一屏三块.js`；这里只干一件事：在屏上量到它。
-const GROUP_H = 410        // 整组＝那一行左块的高（＝第二屏那张面板的高，同一根顶线）
-const FACE_H = 213         // 上：纯白渐变毛玻璃那一片（＝女那张脚底落在哪，算出来的）
-const BAND_H = 197         // 下：墨黑渐变毛玻璃那一片（410 − 213）
+// 下面这些"该落在哪"的数：整组／白面／墨面那三个从 create.wxss 现读，其余仍是效果图正本换算来
+// （图上 1px＝1rpx），推导写在静态那把 `验-第一屏三块.js`。
+//
+// ⚠ 为什么这三个改成现读（10-13 这轮实测出来的）：这里原来写死 `FACE_H = 213 / BAND_H = 197 /
+//   GROUP_H = 410`，而 D17 甲那一刀把白面改成「顶下留 24、高 189」，静态那把跟着改了口径、这把没跟上，
+//   于是屏上量到 188.5 反被判成红——**188.5 恰恰是应该的那一版**。
+//   这一把的任务是「渲染有没有照源码画出来」，"源码里那个数是不是效果图那一个"归静态那把钉；
+//   两处都写死同一个数就是同一句话讲两遍，改一处就得记得改两处，忘了就造一条假红。
+const wxss = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/create/create.wxss'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')           // 注释里那些"曾经是多少"不能被判据当真
+const seg = (sel) => {
+  const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const m = new RegExp(`(?:^|\\n)${esc}\\s*\\{([^}]*)\\}`).exec(wxss)
+  return m ? m[1] : ''
+}
+const num = (s, prop) => parseInt(new RegExp(prop + ':\\s*(-?\\d+)rpx').exec(s)?.[1] ?? '', 10)
+const GROUP_H = num(seg('.blk-person'), 'height')   // 整组＝那一行左块的高（＝第二屏那张面板的高，同一根顶线）
+const FACE_H = num(seg('.blk-face'), 'height')      // 上：纯白渐变毛玻璃那一片
+const FACE_TOP = num(seg('.blk-face'), 'top')       // 白面上沿离块顶那一口（10-13 追打那一刀之前恒为 0）
+const BAND_H = num(seg('.blk-count'), 'height')     // 下：墨黑渐变毛玻璃那一片
 const OUT_H = 107          // 展开态：面板顶比组顶高出去那一段＝第二屏框外那行的小字
 const BREATHE = 24         // 收起态：面板顶比组顶只高这一口＝那一组底离底栏顶的呼吸（静态那把钉的是"两口相等"这条等式，这里钉屏上量出来的数）
 const CLAMP = GROUP_H + 128 + 24  // 组顶夹值：整组 ＋ 底栏 ＋ 最少留白 = 562
@@ -47,10 +66,22 @@ const safeJson = (v) => { try { return JSON.stringify(v) } catch (e) { return St
 
 async function main() {
   let mp
+  // 10-13 这一轮就是栽在这儿：连接十二次全失败，尺子只打一句「连不上自动化端口」，
+  // 把 automator 的报错原样吞了——真原因是 `cmpVersion(undefined)`（IDE 的 Tool.getInfo
+  // 只回 version 不回 SDKVersion），靠这句才查得到。连接红必须自带最后一次的报错。
+  let lastErr = ''
   for (let i = 0; i < 12; i += 1) {
-    try { mp = await automator.connect({ wsEndpoint: 'ws://localhost:9431' }); break } catch (e) { await sleep(10000) }
+    try { mp = await automator.connect({ wsEndpoint: 'ws://localhost:9431' }); break } catch (e) {
+      lastErr = String((e && e.message) || e)
+      await sleep(10000)
+    }
   }
-  if (!mp) { console.log('!! 连不上自动化端口，先跑 cli auto'); process.exit(1) }
+  if (!mp) {
+    console.log('!! 连不上自动化端口，先跑 cli auto')
+    console.log('   最后一次的报错原文：' + lastErr)
+    console.log('   （ automator 的版本闸由 docs/工具/修-automator版本闸.js 管，先跑它一次再试）')
+    process.exit(1)
+  }
   // 自动化通道里"没有 id 的帧"走的是 `emit(method, params)`，而 MiniProgram 是 EventEmitter——
   // 万一哪天回的是这么一帧，Node 会因为 'error' 没人听而把参数直接抛出来。挂个监听把它变成一行日志。
   const pageErrs = []
@@ -133,9 +164,12 @@ async function main() {
   ok('收起态：内框离外框顶的那一口 ＝ 它离底栏顶的那一口（他 10-13「要与下方的 tab 面板距离一样」）',
     !!panel && !!blk && near(blk.top - panel.top, BREATHE * R, 3 * R),
     panel && blk ? `上留空 ${q((blk.top - panel.top) / R).toFixed(1)}rpx／应等于 ${BREATHE}rpx` : '没量到')
-  const cellNodes = await page.$$('.blk-cell')
-  const cells = []
-  for (const n of cellNodes) cells.push(await frame(n))
+  // ⚠ `cells` 存的是**元素句柄**（往节点里查 `.blk-num`、点它、读它的 aria-label 都靠这个），
+  //   量出来的帧另存 `cellBox`。原来两个名字是同一个，13 号那一跑就崩在
+  //   `cells[i].$ is not a function`——句柄数组被帧对象覆盖掉了，而这条红长得像"页面渲染坏了"。
+  const cells = await page.$$('.blk-cell')
+  const cellBox = []
+  for (const n of cells) cellBox.push(await frame(n))
   ok('首屏这一版的十一枚都在（深色面板／整组／左块／白面／墨面／取景窗／人物／右列／Tips 格／圆 ➕／两枚计数）',
     !!(panel && blk && person && face && count && wrap && fig && col && tips && plus) && cells.length === 2,
     [!panel && '深色面板', !blk && '.home-blk', !person && '左块', !face && '白面', !count && '墨面',
@@ -144,25 +178,26 @@ async function main() {
   if (!panel || !person || !face || !count || cells.length !== 2) { await mp.close(); report(); return }
 
   /* ---------- 1. 那一块里外：同顶、同底、两片无缝 ---------- */
-  ok('左块渲染成 308×410（与第二屏那张面板同高；±3rpx，被 flex 拉过就会扁）',
+  ok('左块渲染成 308 见方、高等源码那一档（与第二屏那张面板同高；±3rpx，被 flex 拉过就会扁）',
     near(q(person.w), 308, 3) && near(q(person.h), GROUP_H, 3),
-    `${q(person.w).toFixed(1)}×${q(person.h).toFixed(1)}`)
-  ok('白面 213 高、顶与左块同一条线、宽等于块宽（他 10-13「两个人背景用纯白渐变毛玻璃」那一片）',
-    near(q(face.h), FACE_H, 3) && near(face.top, person.top, 2 * R) && near(q(face.w), 308, 3),
-    `高 ${q(face.h).toFixed(1)}／顶差 ${q(face.top - person.top).toFixed(1)}／宽 ${q(face.w).toFixed(1)}`)
+    `量到 ${q(person.w).toFixed(1)}×${q(person.h).toFixed(1)}／应 308×${GROUP_H}`)
+  ok('白面：高等源码那一档、顶比块顶低"那一口"（10-13 追打那一刀：女那张头带一半要出框）、宽等于块宽',
+    near(q(face.h), FACE_H, 3) && near(q(face.top - person.top), FACE_TOP, 3) && near(q(face.w), 308, 3),
+    `高 ${q(face.h).toFixed(1)}／应 ${FACE_H}·顶留空 ${q(face.top - person.top).toFixed(1)}／应 ${FACE_TOP}／宽 ${q(face.w).toFixed(1)}`)
   ok('墨面 197 高、底与左块同一条线、与白面无缝相接（「下方数字区域用黑色毛玻璃」那一片）',
     near(q(count.h), BAND_H, 3) && near(count.bottom, person.bottom, 2 * R) && near(count.top, face.bottom, 2 * R),
-    `高 ${q(count.h).toFixed(1)}／底差 ${q(count.bottom - person.bottom).toFixed(1)}／缝 ${q(count.top - face.bottom).toFixed(1)}`)
-  ok('两片相加就是那一块（213＋197＝410；对不上＝有一片被哪条声明改过高度）',
-    near(q(face.h + count.h), GROUP_H, 4), `量到 ${q(face.h + count.h).toFixed(1)}`)
+    `高 ${q(count.h).toFixed(1)}／应 ${BAND_H}·底差 ${q(count.bottom - person.bottom).toFixed(1)}／缝 ${q(count.top - face.bottom).toFixed(1)}`)
+  ok('三段拼成整块：留空＋白面＋墨面＝块高（屏上量的；对不上＝有一片被哪条声明改过高度）',
+    near(q(face.top - person.top) + q(face.h) + q(count.h), GROUP_H, 4),
+    `屏上 ${(q(face.top - person.top) + q(face.h) + q(count.h)).toFixed(1)} vs 源码 ${FACE_TOP}＋${FACE_H}＋${BAND_H}＝${GROUP_H}`)
   ok('两枚计数各 122 宽、同顶同高、互不相交，缝是那一道 20',
-    near(q(cells[0].w), CELL_W, 3) && near(q(cells[1].w), CELL_W, 3)
-    && near(cells[0].top, cells[1].top, 2 * R) && near(cells[0].h, cells[1].h, 2 * R)
-    && cells[0].right <= cells[1].left + 1 && near(q(cells[1].left - cells[0].right), 20, 3),
-    `宽 ${q(cells[0].w).toFixed(1)}／${q(cells[1].w).toFixed(1)}，缝 ${q(cells[1].left - cells[0].right).toFixed(1)}`)
+    near(q(cellBox[0].w), CELL_W, 3) && near(q(cellBox[1].w), CELL_W, 3)
+    && near(cellBox[0].top, cellBox[1].top, 2 * R) && near(cellBox[0].h, cellBox[1].h, 2 * R)
+    && cellBox[0].right <= cellBox[1].left + 1 && near(q(cellBox[1].left - cellBox[0].right), 20, 3),
+    `宽 ${q(cellBox[0].w).toFixed(1)}／${q(cellBox[1].w).toFixed(1)}，缝 ${q(cellBox[1].left - cellBox[0].right).toFixed(1)}`)
   ok('两枚都待在墨面那一片里面（溢出到白面就是 absolute 那几条掉了一层）',
-    cells.every((c) => c.top >= count.top - 1 && c.bottom <= count.bottom + 1),
-    `墨面 ${q(count.top).toFixed(1)}~${q(count.bottom).toFixed(1)}／格 ${cells.map((c) => `${q(c.top).toFixed(1)}~${q(c.bottom).toFixed(1)}`).join('、')}`)
+    cellBox.every((c) => c.top >= count.top - 1 && c.bottom <= count.bottom + 1),
+    `墨面 ${q(count.top).toFixed(1)}~${q(count.bottom).toFixed(1)}／格 ${cellBox.map((c) => `${q(c.top).toFixed(1)}~${q(c.bottom).toFixed(1)}`).join('、')}`)
   ok('右列宽 382、与左块同顶同底、顶上那道缝 12（列没吃余量时宽会跟着塌）',
     near(q(col.w), COL_W, 4) && near(col.top, person.top, 2 * R) && near(col.bottom, person.bottom, 2 * R)
     && near(q(col.left - person.right), 12, 3),
@@ -179,8 +214,10 @@ async function main() {
     near(q(plus.left + plus.w / 2), q(col.left + col.w / 2), 3),
     `圆心 x ${q(plus.left + plus.w / 2).toFixed(1)}／列中线 x ${q(col.left + col.w / 2).toFixed(1)}`)
   ok('圆 ➕ 贴住这一列的底，顶上留出与 Tips 那一段的 40',
-    near(plus.top, col.bottom - PLUS * R, 2 * R) && near(q(tips.bottom - plus.top), PLUS_GAP + PLUS, 6),
-    `底差 ${q(plus.top - (col.bottom - PLUS * R)).toFixed(1)}／Tips 格底到 ➕ 顶 ${q(plus.top - tips.bottom).toFixed(1)}`)
+    near(plus.top, col.bottom - PLUS * R, 2 * R) && near(q(plus.top - tips.bottom), PLUS_GAP, 6),
+    // 原来第二条写的是 `tips.bottom - plus.top`（➕ 在格子下面，那是个负数）却拿去和
+    // PLUS_GAP＋PLUS＝180 比——两条腿一条永远真、一条永远假，红得看不出是量法错了。
+    `底差 ${q(plus.top - (col.bottom - PLUS * R)).toFixed(1)}／Tips 格底到 ➕ 顶 ${q(plus.top - tips.bottom).toFixed(1)}／应 ${PLUS_GAP}`)
   ok('Tips 格吃满 ➕ 以上那一段（顶贴列顶，不悬空也不重叠）',
     near(tips.top, col.top, 2 * R) && near(q(tips.h), GROUP_H - PLUS - PLUS_GAP, 6),
     `顶差 ${q(tips.top - col.top).toFixed(1)}／高 ${q(tips.h).toFixed(1)}`)
@@ -211,8 +248,14 @@ async function main() {
   ok('取景窗上沿就是那块出血的顶（−52）、下沿正好坐在黑条顶上（"下方不能悬空要与黑条靠着"）',
     near(q(wrap.top - person.top), -BLEED, 3) && near(wrap.bottom, count.top, 2 * R),
     `窗顶差 ${q(wrap.top - person.top).toFixed(1)}／窗底 ${q(wrap.bottom).toFixed(1)} vs 黑条顶 ${q(count.top).toFixed(1)}`)
-  ok('窗高 161（410 − 52 − 197 那条等式在屏上成立）',
-    near(q(wrap.h), GROUP_H - BLEED - BAND_H, 3), `${q(wrap.h).toFixed(1)}`)
+  // 窗高那一条原来写的是 `GROUP_H − BLEED − BAND_H`（＝410−52−197＝161），
+  // 而窗是"从出血的顶画到黑条顶上"，出血那一段在块顶**之上**、要加不是要减：
+  // 正确等式是 `块高 − 墨面 ＋ 出血`＝410−197＋52＝265，屏上量到 265.4。
+  // 这条红是量法错，不是渲染错——同一个数在相邻两条里一边判"贴住黑条顶"绿、一边判"窗高 161"红，
+  // 就说明错的是那个减号。
+  ok('窗高＝块高减墨面再加出血（窗从出血的顶画到黑条顶上，一段都不多一段都不少）',
+    near(q(wrap.h), GROUP_H - BAND_H + BLEED, 3),
+    `量到 ${q(wrap.h).toFixed(1)}／应 ${GROUP_H}−${BAND_H}＋${BLEED}＝${GROUP_H - BAND_H + BLEED}`)
   ok('主人物按宽定高：220 宽、女那张算出 264.6 高（写死方盒子会把其中一张拉扁）',
     near(q(fig.w), FIG_W, 3) && near(q(fig.h), 220 * 433 / 360, 6),
     `${q(fig.w).toFixed(1)}×${q(fig.h).toFixed(1)}`)
@@ -423,10 +466,13 @@ async function main() {
     labColor: await styleOf('.blk-lab', 'color'),
     tipsColor: await styleOf('.blk-tips-in', 'color'),
   })
+  // 铺图那一态要的是"背后真有一张照片"，所以这里给一张**探针用的图**，不给 before.bgSrc：
+  // 进来时若本来就不铺（before.bgSrc 为空），拿 before 去铺就变成"两态都没图"，
+  // 那两条"两态都挂"的判据会一起量到同一个东西 ⇒ 假绿。用完在收尾那儿把 before 还回去。
   await page.setData({ bgSrc: '' })
   await sleep(2200)
   const off = await readSkins('不铺图')
-  await page.setData({ bgSrc: '/assets/home-bg-portrait.jpg' })
+  await page.setData({ bgSrc: PROBE_BG })
   await sleep(2600)
   const on = await readSkins('铺图')
   for (const s of [off, on]) {
@@ -461,12 +507,13 @@ async function main() {
   ok('浅壁纸那一态字色不翻（面板恒深，那两条 `.bg-light` 翻转规则确实撤净了）',
     (rgbaOf(lit.numColor) || {}).rgb === '242, 239, 233' && (rgbaOf(lit.tipsColor) || {}).rgb === '242, 239, 233',
     `数字 ${lit.numColor}／Tips ${lit.tipsColor}`)
-  await page.setData({ bgLight: !!before.bgLight })
+  // 两态量完，把进来时那两个值原样还回去（bgSrc 用 before，不用上面那枚探针值）。
+  await page.setData({ bgSrc: before.bgSrc || '', bgLight: !!before.bgLight })
   await sleep(800)
   const nowData = await page.data()
   ok('这一路把页面数据回原样（bgSrc／bgLight 不给下一把尺子留残值）',
     String(nowData.bgSrc || '') === String(before.bgSrc || '') && !!nowData.bgLight === !!before.bgLight,
-    `回来 ${JSON.stringify(nowData.bgSrc)}／${nowData.bgLight}`)
+    `回来 ${JSON.stringify(nowData.bgSrc)}／${nowData.bgLight}　应回到 ${JSON.stringify(before.bgSrc || '')}／${before.bgLight}`)
 
   /* ---------- 10. 整屏截图（对效果图用） ＋ 报错监听 ---------- */
   ok('这一路走下来页面没有报过错（报了不一定看得出现在这一屏）',
