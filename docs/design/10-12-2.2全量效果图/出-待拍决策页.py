@@ -80,6 +80,23 @@ PANEL_BG = re.search(r'background:\s*(rgba\([^)]*\))', seg(CRE, '.stage-panel::a
 PANEL_GRAD = grad(CRE, '.stage-panel::before')
 FACE_GRAD = grad(CRE, '.blk-face')
 BAND_GRAD = grad(CRE, '.blk-count')
+# 两档糊也现读（站长 10-13「毛玻璃呢」——这一份前两版一层糊都没画，面板还把实心与渐变两乘叠在一起，
+# 于是"上部渐变半透明毛玻璃"在这张图上等于没画；正本 `出-B方案深色面板.py` 一直是画了糊的）。
+GLASS_BF = re.search(r'--glass-bf:\s*([^;]+)', APP).group(1).strip()
+PANEL_BF = re.search(r'backdrop-filter:\s*([^;]+)', seg(CRE, '.stage-panel')).group(1).strip()
+BF = lambda v: 'backdrop-filter:%s;-webkit-backdrop-filter:%s;' % (v, v)
+
+
+def panel_layer(ptop, band_h=240, bg=None, grad=None):
+    """面板那一层，按落码 10-13 那一刀之后的分工画：本体透明＋糊、band 归一层、实心归一层。
+    两乘（实心写在带糊的那层上、渐变再压上去）会把 band 顶压到只透出 5%，那正是要避开的画法。"""
+    return ('<div class="f" style="left:0;right:0;top:%dpx;bottom:0;border-radius:%dpx %dpx 0 0;'
+            'overflow:hidden;background:transparent;%s">'
+            '<div class="f" style="left:0;right:0;top:0;height:%dpx;background:%s"></div>'
+            '<div class="f" style="left:0;right:0;top:%dpx;bottom:0;background:%s"></div></div>'
+            % (ptop, PANEL_R, PANEL_R, BF(PANEL_BF), band_h, grad or PANEL_GRAD,
+               band_h, bg or PANEL_BG))
+
 PANEL_Z = num(CRE, '.stage-panel', 'z-index', '')
 TAB_Z = num(TAB, '.tab-bar', 'z-index', '')
 TAB_H = num(TAB, '.tab-bar', 'height')
@@ -191,9 +208,7 @@ def home(panel=True, bar=3, plus=True, dim=1):
     s = ['<div class="f" style="inset:0;background:url(home-bg-portrait.jpg) center top/cover"></div>',
          '<div class="f" style="inset:0;background:rgba(20,22,26,.58);opacity:%s"></div>' % DIMS[dim]['veil']]
     if panel:
-        s.append('<div class="f" style="left:0;right:0;top:%dpx;bottom:0;border-radius:%dpx %dpx 0 0;'
-                 'overflow:hidden;background:%s"><div class="f" style="left:0;right:0;top:0;height:240px;'
-                 'background:%s"></div></div>' % (PANEL_TOP, PANEL_R, PANEL_R, PANEL_BG, PANEL_GRAD))
+        s.append(panel_layer(PANEL_TOP))
     s.append('<div class="f" style="left:0;right:0;top:0;height:184px;'
              'background:linear-gradient(180deg,rgba(8,10,14,.55),rgba(8,10,14,0))"></div>')
     s.append('<div class="f" style="left:30px;top:112px;font-size:34px;font-weight:600;color:%s">%s</div>'
@@ -204,11 +219,11 @@ def home(panel=True, bar=3, plus=True, dim=1):
     s.append('<div class="f" style="position:relative;width:%dpx;height:%dpx;border-radius:34px;'
              'box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)">' % (PERSON_W, PERSON_H))
     s.append('<div class="f" style="left:0;right:0;top:0;height:%dpx;border-radius:34px 34px 0 0;'
-             'overflow:hidden;background:%s"><img src="ic-person.png" style="position:absolute;left:0;'
-             'top:-52px;width:220px"></div>' % (FACE_H, FACE_GRAD))
+             'overflow:hidden;background:%s;%s"><img src="ic-person.png" style="position:absolute;left:0;'
+             'top:-52px;width:220px"></div>' % (FACE_H, FACE_GRAD, BF(GLASS_BF)))
     s.append('<div class="f" style="left:0;right:0;bottom:0;height:%dpx;border-radius:0 0 34px 34px;'
-             'overflow:hidden;background:%s;display:flex;align-items:center;gap:%dpx;padding:0 %dpx;'
-             'box-sizing:border-box">' % (BAND_H, BAND_GRAD, BAND_GAP, BAND_PAD))
+             'overflow:hidden;background:%s;%s;display:flex;align-items:center;gap:%dpx;padding:0 %dpx;'
+             'box-sizing:border-box">' % (BAND_H, BAND_GRAD, BF(GLASS_BF), BAND_GAP, BAND_PAD))
     for k, v in ((ZH['statNotes'], '16'), (ZH['statCards'], '13')):
         s.append('<div class="f" style="position:static;width:%dpx;display:flex;flex-direction:column;'
                  'align-items:center"><div class="n" style="font-size:%dpx;color:%s">%s</div>'
@@ -253,9 +268,7 @@ def expanded(grow='up', panel=True):
     over = top + h - (VIEW_H - TAB_B - TAB_H)
     if panel:
         ptop = PANEL_TOP if grow == 'down' else top - LIFT
-        s.append('<div class="f" style="left:0;right:0;top:%dpx;bottom:0;border-radius:%dpx %dpx 0 0;'
-                 'background:%s"><div class="f" style="left:0;right:0;top:0;height:240px;background:%s"></div></div>'
-                 % (ptop, PANEL_R, PANEL_R, PANEL_BG, PANEL_GRAD))
+        s.append(panel_layer(ptop))
     ink = 'rgba(242,239,233,.9)'
     s.append('<div class="f" style="left:0;right:0;top:%dpx;height:%dpx;color:%s;font-size:24px;'
              'display:flex;align-items:center;justify-content:space-between;padding:0 20px;box-sizing:border-box">'
@@ -466,13 +479,18 @@ HTML = ('<!doctype html><html><head><meta charset="utf-8"><title>2.2 首屏 · �
         '几何与两档玻璃从 <code>create.wxss</code>／<code>app.wxss</code>／<code>custom-tab-bar/index.wxss</code> 现读；'
         '换算只有一条：图上 1px＝1rpx。<b>屏是示意（CSS 画的），不是截图</b>——真跑的屏还没跑（就是 D15）。'
         '出处：<code>docs/方案-2.2大版本.md §6.1</code>。<br>'
+        '<b>10-13 补一句：这一页前一版每一张屏都没画糊</b>（一层 <code>backdrop-filter</code> 都没有），'
+        '而且面板把实心 .95 与那条 .55→.94 渐变两乘叠在一起 ⇒ band 顶只透出 5%%，'
+        '"上部渐变半透明毛玻璃"在这张图上等于没画——你之前看到的"面板是死黑一块"有这一半原因。'
+        '现在两档糊（面板 <code>%s</code>／块 <code>%s</code>）与三层分工全部照落码现读重画，'
+        '有糊／没糊两版对差已按像素量过（band 那一条 36%% 的像素变了，面板以上那一条 0%%）。<br>'
         '<b>先说一样与下面七条无关的</b>：这一页每一张屏都画在「压暗罩＋纸白字」那一态（＝背景图判成深）。'
         '你手机上默认那张形象图判成<b>浅</b>——<code>utils/imgBrightness.js</code> 阈值 160，头部那一截 10-13 现算 184，'
         '所以现网那一态会把罩子翻成提亮罩、三级字翻回墨色。深浅翻色是 10-12 那一批已经落码的东西，'
         '甲乙两组屏在这上面完全一样，不在这里挑。<br>'
         '<b>另有一条你还没答的（D1）</b>：左侧那批随机卡片小图（含按压回色、「更多」、5 秒回弹、与 Tips 轮流）——'
         '本轮按"撤"在落码；要并入就是 P2 另开一票。回 <b>D1 撤</b> 或 <b>D1 并入</b>。</div>%s</div></body></html>'
-        % (CSS, CAM, ''.join(rows)))
+        % (CSS, CAM, PANEL_BF, GLASS_BF, ''.join(rows)))
 
 OUT_HTML = os.path.join(HERE, '待拍决策页-D9到D15.html')
 OUT_PNG = os.path.join(HERE, '待拍决策页-D9到D15.png')

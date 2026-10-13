@@ -6,6 +6,11 @@
 # 拿的是它同一批**落码现读**的常量（i18n 的字、palette 的橙与底栏色、create.wxss 的几何与两幅渐变）。
 # 锚行找不到就当场退出，不画凭印象的屏。
 #
+# 站长 10-13 14:2x：「毛玻璃呢」——这一份试验图前两个版本**根本没有糊**，
+# 而且面板那两层是"实心 .95 写在层上、渐变再压在它上面"＝我在落码里刚挨过的那一刀（两乘之后 band 顶只透出 5%）。
+# 正本 `出-B方案深色面板.py` 是画了糊的（三处 backdrop-filter），这份和 `出-待拍决策页.py` 都把它漏了
+# ⇒ 他看到的"太黑了"和"看不见渐变"有一半是我这张试验图画错，不是方案本身。
+# 现在两层按落码同一分工画（本体透明＋糊、band 归一层、实心归一层），糊的数从 wxss 现读，见下面 GLASS_BF／PANEL_BF。
 # 面板换白会连带牵动四样，这一屏**如实画**（不替站长修）：
 #   ① Tips 那行字写死纸白 ⇒ 白面板上读不出，右屏按"翻墨"画（不翻就是一张白底上刷白字）；
 #   ② 人物块上半那幅白渐变＋那圈白描边 ⇒ 压在白面板上级差归 0，皮会整片看不见；
@@ -45,6 +50,9 @@ _rgb = dp['_rgb']
 tup = lambda tok: _rgb(tok)[0]                     # 'rgba(…)'／'#…' → 三个分量的浮点元组
 stop_alphas = lambda g: [float(a) for a in re.findall(r'rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\s*\)', g)]
 
+# 两档糊与面板那三层的画法，直接吃 `出-待拍决策页.py` 里现读出来的同一支（不在这份里另写一遍分工）：
+GLASS_BF, PANEL_BF, panel_layer = dp['GLASS_BF'], dp['PANEL_BF'], dp['panel_layer']
+
 
 def panel_paint(base, a_lo, a_hi):
     """面板两层：band 走 a_lo→a_hi 的渐变，240rpx 以下收口成实心（与落码同一分工）。"""
@@ -61,12 +69,12 @@ WALLPAPER = '壁纸-站长给的-试面板.jpg'
 
 def screen(bg, grad, tips, dim=1, band_h=240):
     """首屏那一屏，面板三样（实心 bg／band 渐变 grad／Tips 字色 tips）由外面给。
+    面板本体**透明**、糊挂在它身上，band 与实心各一层——与 10-13 落码那一刀同一分工，
+    两乘（实心写在层上、渐变再压上去）会把 band 顶压到只透出 5%，那正是他问"毛玻璃呢"的来处。
     band_h＝面板顶上那一段半透明带的高（丙案把它抬到盖住左边那一块，见下面 PANELS 的注释）。"""
     s = ['<div class="f" style="inset:0;background:url(%s) center 22%%/cover"></div>' % WALLPAPER,
          '<div class="f" style="inset:0;background:rgba(20,22,26,.58);opacity:%s"></div>' % DIMS[dim]['veil'],
-         '<div class="f" style="left:0;right:0;top:%dpx;bottom:0;border-radius:%dpx %dpx 0 0;'
-         'overflow:hidden;background:%s"><div class="f" style="left:0;right:0;top:0;height:%dpx;'
-         'background:%s"></div></div>' % (PANEL_TOP, PANEL_R, PANEL_R, bg, band_h, grad),
+         panel_layer(PANEL_TOP, band_h, bg, grad),
          '<div class="f" style="left:0;right:0;top:0;height:184px;'
          'background:linear-gradient(180deg,rgba(8,10,14,.55),rgba(8,10,14,0))"></div>',
          '<div class="f" style="left:30px;top:112px;font-size:34px;font-weight:600;color:%s">%s</div>'
@@ -76,11 +84,13 @@ def screen(bg, grad, tips, dim=1, band_h=240):
          '<div class="f" style="position:relative;width:%dpx;height:%dpx;border-radius:34px;'
          'box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)">' % (PERSON_W, PERSON_H),
          '<div class="f" style="left:0;right:0;top:0;height:%dpx;border-radius:34px 34px 0 0;'
-         'overflow:hidden;background:%s"><img src="ic-person.png" style="position:absolute;left:0;'
-         'top:-52px;width:220px"></div>' % (FACE_H, FACE_GRAD),
+         'overflow:hidden;background:%s;backdrop-filter:%s;-webkit-backdrop-filter:%s">'
+         '<img src="ic-person.png" style="position:absolute;left:0;'
+         'top:-52px;width:220px"></div>' % (FACE_H, FACE_GRAD, GLASS_BF, GLASS_BF),
          '<div class="f" style="left:0;right:0;bottom:0;height:%dpx;border-radius:0 0 34px 34px;'
-         'overflow:hidden;background:%s;display:flex;align-items:center;gap:%dpx;padding:0 %dpx;'
-         'box-sizing:border-box">' % (BAND_H, BAND_GRAD, BAND_GAP, BAND_PAD)]
+         'overflow:hidden;background:%s;backdrop-filter:%s;-webkit-backdrop-filter:%s;'
+         'display:flex;align-items:center;gap:%dpx;padding:0 %dpx;'
+         'box-sizing:border-box">' % (BAND_H, BAND_GRAD, GLASS_BF, GLASS_BF, BAND_GAP, BAND_PAD)]
     for k, v in ((ZH['statNotes'], '16'), (ZH['statCards'], '13')):
         s.append('<div class="f" style="position:static;width:%dpx;display:flex;flex-direction:column;'
                  'align-items:center"><div class="n" style="font-size:%dpx;color:%s">%s</div>'
@@ -146,9 +156,14 @@ HTML = ('<!doctype html><html><head><meta charset="utf-8"><title>面板换白试
         '.num{margin-top:16px;font-size:14px;line-height:1.9}'
         '.num b{color:#D2683F}</style></head><body><div class="wrap">'
         '<h1>面板换白试验 · 同一屏三遍（垫了真背景图，1px＝1rpx，屏是示意不是截图）</h1><div class="src">'
-        '站长 10-13：「太黑了，换成纯白面板试试效果」＋「加上背景图才能看到效果，然后左边的框框要维持之前的效果啊」。'
-        '三屏只差面板那一层的皮与那条半透明带的高，几何／两幅渐变／字／底栏全部从落码现读，同一套数；'
+        '站长 10-13：「太黑了，换成纯白面板试试效果」＋「加上背景图才能看到效果，然后左边的框框要维持之前的效果啊」＋「毛玻璃呢」。'
+        '三屏只差面板那一层的皮与那条半透明带的高，几何／两幅渐变／<b>两档糊</b>／字／底栏全部从落码现读，同一套数；'
         '背景换成他给的这张真人照（<b>只进这张试验图，不进包</b>）。'
+        '<br><b>前两版这张试验图画错了，不是方案</b>：它一层糊都没画，而且把实心 .95 写在面板层上、'
+        '再让那条 .55→.94 的渐变压上去（两乘之后 band 顶只透出 5%%）＝我在落码里刚挨过的那同一刀。'
+        '正本 <code>出-B方案深色面板.py</code> 一直是画了糊的，这份和 <code>出-待拍决策页.py</code> 都漏了。'
+        '现在按落码同一分工重画：本体透明＋<code>blur(26px) saturate(1.15)</code>、band 与实心各一层，'
+        '左边那一块的上下两片皮各挂 <code>--glass-bf</code>。'
         '<br><b>换白不是只换一层</b>：Tips 那行字本来写死纸白（不翻就看不见，右屏按翻墨画）；'
         '左边的框那一圈白描边与上半那幅白渐变压在白面板上级差归 0，'
         '只有落在面板顶上那 240rpx 半透明带里的一段还读得出来——这就是"左边的框框维持之前的效果"这一句卡住的地方；'
