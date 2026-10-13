@@ -7,7 +7,8 @@
 //   那棵树"（10-13 就真忘传过一次，刀落在主目录三个 create.* 上，改写完才从 .knifebak 还原），
 //   首行仍把树打出来，跑错树一眼看得见；那棵树里没有对应的尺子时，一条都不落地就退出。
 // ⚠ `edit` 只替换第一条命中：下面每一把落刀前都核对过"那一串在本文件里出现几次、第一条是不是想要的那段"
-//   （`--cp-cam` 与 `height: 132rpx` 各有两处，前两处都在首屏那一段里，在 .shut-core 之前）。
+//   （10-13 那枚 ➕ 换成白玻璃之后不再吃 `--cp-cam`：那支只剩第二屏 `.shut-core` 一处，而色扫只吃首屏那几段，
+//    ⇒ 抄色那把刀改落在首屏这一段里还剩的 `--cp-cam-ink`（`.blk-plus-glyph`，全文第一处＝354 行）。）
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
@@ -46,8 +47,10 @@ const KNIVES = [
     () => edit('wxss', 'font-size: 64rpx;', 'font-size: 88rpx;'), '数字那一档是 64rpx'],
   ['小字自起一架（不走 --fs-micro，「与正常小字一样」这句就断了）',
     () => edit('wxss', '.blk-lab {\n  font-size: var(--fs-micro);', '.blk-lab {\n  font-size: 21rpx;'), '数字那一档是 64rpx'],
+  // 10-13 那枚 ➕ 换成白玻璃后不再吃 `--cp-cam` ⇒ 刀挪到首屏这一段里还剩的那一处 `--cp-cam-ink`
+  // （`.blk-plus-glyph` 的图形）。挪到 `.shut-core` 是空刀——色扫只吃首屏那几段，第二屏不在里面。
   ['把官网那支赭色抄进样式表（六位 hex）',
-    () => edit('wxss', 'background: var(--cp-cam);', 'background: #D2683F;'), '没有抄进来的色相'],
+    () => edit('wxss', 'background: var(--cp-cam-ink);', 'background: #D2683F;'), '没有抄进来的色相'],
   ['把品牌色抄成 rgba（原来这一支从指缝里过去）',
     () => edit('wxss', 'background: rgba(242, 239, 233, 0.85);', 'background: rgba(210, 104, 63, 0.5);'), '没有抄进来的色相'],
   ['暖白换成另一支暖白（只差三个通道值，照样不放行）',
@@ -70,7 +73,7 @@ const KNIVES = [
     () => { edit('wxml', '" style="{{skinPanel}}" bindtap="collapse"', '" bindtap="collapse"')
       edit('wxml', `<view class="panel ${'{{'}panelOpen ? 'panel-open' : ''}}" catchtap="noop">`,
         `<view class="panel ${'{{'}panelOpen ? 'panel-open' : ''}}" style="{{skinPanel}}" catchtap="noop">`) },
-    '那一套变量发在容器上'],
+    '容器仍发那套'],
   ['撤掉计数格那枚的 role 与 aria-label',
     () => edit('wxml', 'role="button" aria-label="{{noteCount}}{{t.statNotes}}" ', ''), '一枚不落'],
   ['整组类名退回裸 .blk（撞全局那枚分类方块）',
@@ -101,7 +104,7 @@ const KNIVES = [
     () => edit('wxml', 'hover-class="blk-cell-press"', 'hover-class="blk-cell-pressed"'), '真有一条规则接着'],
   ['面板那一层的层号抬到 9999（通栏贴屏底那一片压过底栏，两格导航点了没反应，而静态几何全对）',
     () => edit('wxss', '.stage-panel {\n  position: fixed;', '.stage-panel {\n  z-index: 9999;\n  position: fixed;'), '深色面板那层的层号低于底栏'],
-  ['把实心 .95 写回面板本体（10-13 那一刀：与压在它上面的 ::before 相乘，band 顶透出不到 2.3%，'
+  ['把实心 .95 写回面板本体（10-13 那一刀：与压在它上面的 ::before 相乘，band 顶透出不到 3.4%，'
     + '"上部渐变半透明毛玻璃"画了等于没画，而几何与字色判据全绿）',
     () => edit('wxss', 'background: transparent;\n  backdrop-filter',
       'background: rgba(35, 37, 44, 0.95);\n  backdrop-filter'), '深色面板本体透明'],
