@@ -530,6 +530,36 @@ elif deg_missing:
     for d in deg_missing:
         print(f"     - {d}")
 
+# .env 被整份重写时最容易"静默少几行"——10-12 23:59 就是这么把提炼那两行弄丢的：
+# 改坏当天什么都没发生（进程里还是旧值），14 小时后站长第一次录笔记才暴露，
+# 而 deploy.sh 只在部署那一刻跑，所以它抓不到"两次部署之间的手改"。
+# 这里补一刀：拿最新那份 .env.bak-* 的键名做对照，少了键就单独念出来（值一个字不打）。
+import glob as _glob
+import os as _os
+
+
+def _keys(path):
+    out = set()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                name = line.split("=", 1)[0].strip()
+                if line.count("=") and name.replace("_", "").isalnum() and name.isupper():
+                    out.add(name)
+    except OSError:
+        pass
+    return out
+
+
+_baks = sorted(_glob.glob(".env.bak*"), key=_os.path.getmtime)
+if _baks:
+    _lost = sorted(_keys(_baks[-1]) - _keys(".env"))
+    if _lost:
+        print(f"  !! 与最新备份 {_baks[-1]} 相比，.env 少了 {len(_lost)} 个键：{', '.join(_lost)}")
+        print("  !! 少键的症状通常是【静默降级】而不是报错——请逐个确认是故意删的还是重写时丢了。")
+    else:
+        print(f"  ✓ 键名与最新备份一致（{len(_keys('.env'))} 个，值不比对）")
+
 # 运营图这一条链：口令有没有配、闸门开没开，两件事都只在这台服务器上看得见，
 # 而它们的症状都是"点了没反应"——不念出来的话，下一次查这个问题的人（可能是我）
 # 会先去翻 nginx 日志。值一个字都不打印，只报有无（同上面 REQUIRED 那一条纪律）。
