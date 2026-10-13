@@ -1167,8 +1167,8 @@
      上一版这里写的是 rgba(35,37,44,.95)，与压在它上面的 .55→.94 相乘 ⇒ band 顶只透出 2.25%、
      band 底透出 0.30%，整块成了 98% 实心，"渐变半透明毛玻璃"等于没画（他 10-13：「新增面板为什么看不到渐变毛玻璃」）。 */
   background: transparent;
-  backdrop-filter: blur(26px) saturate(1.15);
-  -webkit-backdrop-filter: blur(26px) saturate(1.15);
+  backdrop-filter: blur(30px) saturate(1.15);
+  -webkit-backdrop-filter: blur(30px) saturate(1.15);
 }
 
 /* 面板顶上那 240rpx：同色渐变 .55 → .94（"我的"页那一路的走法：先透后收口）。

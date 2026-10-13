@@ -162,8 +162,8 @@ HTML = ('<!doctype html><html><head><meta charset="utf-8"><title>面板换白试
         '<br><b>前两版这张试验图画错了，不是方案</b>：它一层糊都没画，而且把实心 .95 写在面板层上、'
         '再让那条 .55→.94 的渐变压上去（两乘之后 band 顶只透出 5%%）＝我在落码里刚挨过的那同一刀。'
         '正本 <code>出-B方案深色面板.py</code> 一直是画了糊的，这份和 <code>出-待拍决策页.py</code> 都漏了。'
-        '现在按落码同一分工重画：本体透明＋<code>blur(26px) saturate(1.15)</code>、band 与实心各一层，'
-        '左边那一块的上下两片皮各挂 <code>--glass-bf</code>。'
+        '现在按落码同一分工重画：本体透明＋<code>%s</code>、band 与实心各一层，'
+        '左边那一块的上下两片皮各挂 <code>%s</code>。'
         '<br><b>换白不是只换一层</b>：Tips 那行字本来写死纸白（不翻就看不见，右屏按翻墨画）；'
         '左边的框那一圈白描边与上半那幅白渐变压在白面板上级差归 0，'
         '只有落在面板顶上那 240rpx 半透明带里的一段还读得出来——这就是"左边的框框维持之前的效果"这一句卡住的地方；'
@@ -171,7 +171,7 @@ HTML = ('<!doctype html><html><head><meta charset="utf-8"><title>面板换白试
         '压着它的纸白数字对比要重算。下面三行数就是这三处。</div>'
         '<div class="row"><div class="shots">%s</div>'
         '<div class="num">%s</div></div></div></body></html>'
-        % (CSS, ''.join(rows),
+        % (CSS, PANEL_BF, GLASS_BF, ''.join(rows),
            '<br>'.join('%s：甲 <b>%s</b> ／ 乙 <b>%s</b>' % (n, a, b) for n, a, b in NUMS) + '<br>' + 丙注))
 
 OUT_HTML = os.path.join(HERE, '面板换白试验.html')

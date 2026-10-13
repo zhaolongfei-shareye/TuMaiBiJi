@@ -103,8 +103,8 @@ const KNIVES = [
     () => edit('wxss', '.stage-panel {\n  position: fixed;', '.stage-panel {\n  z-index: 9999;\n  position: fixed;'), '深色面板那层的层号低于底栏'],
   ['把实心 .95 写回面板本体（10-13 那一刀：与压在它上面的 ::before 相乘，band 顶透出不到 2.3%，'
     + '"上部渐变半透明毛玻璃"画了等于没画，而几何与字色判据全绿）',
-    () => edit('wxss', 'background: transparent;\n  backdrop-filter: blur(26px',
-      'background: rgba(35, 37, 44, 0.95);\n  backdrop-filter: blur(26px'), '深色面板本体透明'],
+    () => edit('wxss', 'background: transparent;\n  backdrop-filter',
+      'background: rgba(35, 37, 44, 0.95);\n  backdrop-filter'), '深色面板本体透明'],
 ]
 
 let bad = 0
