@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { TIP_DOT, createSkin, entryBlocks } = require('../../utils/palette.js')
+const { TIP_DOT, createSkin } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const assetQueue = require('../../utils/assetQueue.js')
@@ -124,12 +124,14 @@ Page({
     // 四个入口各自的饱和色，色值和字色配对仍归 palette 管。
     // 条身那三枚小圆的色随那三枚一起撤了（10-09）；面板那一整套浅面仍由 createSkin() 一次发下来，
     // 10-10 起它要吃当前壁纸那一档层色（站长拿效果图 c5 打回的浅面，见 palette.js 那段注释）。
+    // 2.2 B 方案：这一整套变量改挂在**容器**上（原来挂在 .panel 那一枚元素上），
+    // 因为首屏那枚圆形 ➕ 要吃的 `--cp-cam` 在 .panel 外面（与第二屏快门同一支色）。
     // 这里不带参数是故意的：data 在模块加载时就求值，那时 `getApp()` 还没有，
     // 空参回落到色板第一枚（象牙），每次进页由 onShow 拿真壁纸覆盖。
     skinPanel: createSkin(),
-    // 收起态那三块的面色与字色，同样由当前壁纸派生（左块吃卡底、右两枚吃色阶第 2／1 档）。
-    // 这里不带参数与上面同一个道理：空参回落象牙，每次进页由 onShow 拿真壁纸覆盖。
-    blkSkin: entryBlocks().style,
+    // 收起态那三块原来吃的一整套 `--eb-*`（palette.entryBlocks() 从壁纸派生）随 2.2 B 方案一起退：
+    // 右两枚计数块被他撤了（「右侧两块去掉」），左块那两条白条也被两片新皮替了
+    // （白面渐变毛玻璃 ＋ 墨面渐变毛玻璃，都是中性色，不吃壁纸）。
     // 左块那一张人物 + 右后方那枚剪影：初值按本机存的那一性读，没存过就是女。
     ...person.figure(),
     // 右两枚的计数。两个数都是装饰性的读数，拉不到就画 0（沿用笔记页那一条口径：
@@ -214,10 +216,13 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
-      // 面板那套浅面里的层色吃当前壁纸，每次进页重算。
+      // 这一整套 `--cp-*` 现在发在容器上（首屏那枚圆形 ➕ 与第二屏那块面板共用同一支橙），
+      // 里面唯一随壁纸走的是层色 `--cp-panel`，每次进页重算；圆形 ➕ 吃的那两档是固定值，
+      // 换壁纸不会让它变，但仍是同一趟 setData 带下来，出口只有一个。
       skinPanel: createSkin(app.getWallpaper()),
-      // 三块的面色也跟着壁纸走，同一趟重算：漏了这一位，换完壁纸回到首页三块还停在象牙那档。
-      blkSkin: entryBlocks(app.getWallpaper()).style,
+      // 三块那套 `--eb-*` 随 2.2 B 方案撤干净（右两枚没了、左块换了两片中性的皮）：
+      // 漏在这里删掉而 wxml 还留着 `style="{{blkSkin}}"` 的话，三块会静默变透明——
+      // 所以那一位也从模板里一起删了，`验-第一屏三块.js` 钉的是"模板里没有 blkSkin"。
       // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
       bgSrc: poster.homeBg(),
       // 背景深浅那一档也是每次进页重读：在「我的」页里改过、或别的 tab 点过那枚点，回到这一屏就该跟上。
@@ -320,8 +325,8 @@ Page({
 
   // 滑动条圆里那枚图形跟着三档走：照片=叠图、链接=链环、文字=钢笔。
   // 这三支和底栏那三支是同一套 Lucide 几何（见 create.wxss 那一段注释）。
-  // 收起态那枚不归这里管：10-10 晚条身换成左块人物之后，收起态唯一的图形是白条前那枚快门
-  // （.blk-cam，样式表里直接挂 glyph-camera，不吃这一位）。
+  // 收起态那一枚不归这里管：白条那枚快门（.blk-cam）随 2.2 B 方案撤了，
+  // 首屏现在唯一的图形是右列那枚圆形 ➕（.blk-plus-glyph，样式表里直接挂 glyph-plus，也不吃这一位）。
   sldIconFor(active) {
     return { photo: 'images', url: 'link', write: 'pen' }[active] || 'pen'
   },

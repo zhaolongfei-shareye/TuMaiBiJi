@@ -29,7 +29,9 @@ from PIL import Image
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..'))
 SRC = os.path.join(ROOT, 'miniprogram/assets')
 OUT = os.path.join(ROOT, 'docs/design/10-11毛玻璃/压平')
-FILES = ['ic-person.png', 'ic-person-alt.png', 'ic-stat-notes.png', 'ic-stat-cards.png']
+# 2.2 B 方案撤掉右两枚计数块之后，那两枚 PNG（ic-stat-notes／ic-stat-cards）跟着撤出包，
+# 这里只剩人物那两张——它们现在压在首屏那层白面毛玻璃上，不压平照样穿图。
+FILES = ['ic-person.png', 'ic-person-alt.png']
 WRITE = '--写进包' in sys.argv
 FROM_GIT = sys.argv[sys.argv.index('--从git') + 1] if '--从git' in sys.argv else None
 # 这一档及以下不是"画"，是贴在轮廓外的那圈柔光（(254,254,254)@α4~6）与调色板残留杂色 ⇒ 整枚抠掉
@@ -116,6 +118,6 @@ for p in FILES:
     if WRITE:
         open(src, 'wb').write(buf.getvalue())
         print(f'  已写进 {src}')
-print(('★ 已覆盖包内那四枚；原件在 git 里，要还原：git checkout -- ' +
+print((f'★ 已覆盖包内那 {len(FILES)} 枚；原件在 git 里，要还原：git checkout -- ' +
        ' '.join(f'miniprogram/assets/{f}' for f in FILES)) if WRITE
       else '（没动 assets；上面这些产物在 docs/design/10-11毛玻璃/压平/。要落进包：加参数 --写进包）')

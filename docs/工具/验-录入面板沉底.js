@@ -102,13 +102,19 @@ ok('模式标签行不许 shrink', /\.modes\s*\{[^}]*flex:\s*none/.test(wxss))
 // 框外那一行报错 10-10 深夜搬进气泡了（absolute 浮层，不是流内一行），
 // 所以这里只剩"小字那一行不许 shrink"这一条；报错那条改钉"它不占流内高度"。
 ok('框外那一行小字不许 shrink', /\.out\s*\{[^}]*flex:\s*none/.test(wxss))
-// 原来钉的是 `.bar { flex: none }`。10-10 晚胶囊换成三块，同一件事的新载体是左块与右两枚：
-// 左块 308 见方、右两枚各 148 高，都不许被 flex 压扁（右列 flex:1 会把左块挤瘦，
-// 效果图那一版就是这么翻车的——左块宽度算成 0，人物根本没地方画）。
-ok('三块都不许 shrink（左块定宽定方、右列吃余量）',
-  /\.blk-person\s*\{[^}]*flex:\s*none/.test(wxss)
-  && /\.blk-stat\s*\{[^}]*flex:\s*none/.test(wxss)
-  && /\.blk-col\s*\{[^}]*flex:\s*1/.test(wxss))
+// 原来钉的是 `.bar { flex: none }`。10-10 晚胶囊换成三块，同一件事的新载体是左块与右两枚。
+// 2.2 B 方案之后载体又换了一次：右两枚没了，行里只剩"左块 308×410 ＋ 右列吃余量"，
+// 而这一行内部多出来的三样（Tips 那一格、圆形 ➕、两枚计数格）各有一条自己的伸缩规矩：
+// 左块与 ➕ 定死不压，列与 Tips 那一格吃余量但必须带 min-*（不带的话长句会把列撑破）。
+// 效果图那一版翻车过的还是同一件事——左块宽度算成 0，人物根本没地方画。
+ok('行里两样与列里三样各按该有的伸缩档位写（该定死的定死、该吃余量的带 min-*）',
+  ['blk-person', 'blk-plus'].every((c) => /flex:\s*none/.test(seg('.' + c)))
+  && [['blk-col', 'min-width'], ['blk-tips', 'min-height'], ['blk-cell', 'min-width']]
+    .every(([c, minKey]) => {
+      const t = seg('.' + c)
+      // 两条分开判、不比先后：写的顺序不该成为红的理由（这一把第一版按顺序写，纯属自找）。
+      return /flex:\s*1/.test(t) && new RegExp(`${minKey}:\\s*0`).test(t)
+    }))
 // 富余由 auto 边距分掉，不是硬写死的 margin——所以"框贴脸"这种错只能在真机上量出来，
 // 这里钉的是画法：框、条、三枚圈、小图排四处都写的是 margin-top:auto。
 // 四处变两处（10-10 深夜）：框与图排身上那两档 auto 撤了——站长量的是
@@ -134,10 +140,21 @@ ok('报错是浮层，不占流内高度（.panel 得先成为定位父级）',
 // .panel-open 上），不是钉那两个数。
 const panelOpen = seg('.panel-open')
 const OPEN_H = Number((/height:\s*(\d+)rpx/.exec(panelOpen) || [0, 0])[1])
-ok('两档高度各只出现一次（这一档的数不许在别处再写一遍）',
-  (wxss.match(new RegExp(`height:\\s*${PANEL_H}rpx`, 'g')) || []).length === 1
-  && (wxss.match(new RegExp(`height:\\s*${OPEN_H}rpx`, 'g')) || []).length === 1,
-  `收起 ${PANEL_H}、展开 ${OPEN_H}`)
+/* 原来钉的是"这一档的数全项目只出现一次"。2.2 B 方案把左块抬成与那块面板同高
+   （站长 10-13 原话「左边内框要与第二个图高度对齐」）⇒ 同一个数**故意**出现两次：
+   `.panel` 与 `.blk-person`。所以这一条改成钉"两处、且就是这两处"：
+   出现第三次才是漂移（那意味着有人又开始抄这个数），一处都没有则是那一块没了。
+   两处的数还必须是同一个数——分开各读各的，不许拿字面量比。 */
+const CARD_SEG = seg('.blk-person')
+const CARD_H = Number((/height:\s*(\d+)rpx/.exec(CARD_SEG) || [0, 0])[1])
+ok(`左块与面板同高（都读自 CSS：面板 ${PANEL_H}／左块 ${CARD_H}），而这个数全项目只出现在这两处`,
+  PANEL_H > 0 && CARD_H === PANEL_H
+  && (wxss.match(new RegExp(`height:\\s*${PANEL_H}rpx`, 'g')) || []).length === 2
+  && /\.blk-person\s*\{/.test(wxssRaw) && /\.panel\s*\{/.test(wxssRaw),
+  `height:${PANEL_H}rpx 的出现处数`)
+ok('展开那一档仍只出现一次（490 只有 .panel-open 一处，别处不许抄）',
+  OPEN_H > 0 && (wxss.match(new RegExp(`height:\\s*${OPEN_H}rpx`, 'g')) || []).length === 1,
+  `展开 ${OPEN_H}`)
 ok('展开那一档挂在 .panel-open 上，由 JS 那一位说话',
   OPEN_H > 0 && /panelOpen \? 'panel-open'/.test(wxml))
 ok(`展开只多一行：${OPEN_H} − ${PANEL_H} = 80，而那一行的框正好是 160 − 105 + 开关那一段`,

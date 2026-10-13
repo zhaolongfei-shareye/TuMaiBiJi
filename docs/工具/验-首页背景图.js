@@ -155,10 +155,27 @@ ck('下那一档在三个 tab 页的容器上都有名，data 里都有初值',
   ['create', 'index', 'me'].every((p) =>
     /\{\{bgLightLow \? 'bg-light-low' : ''\}\}/.test(read(`pages/${p}/${p}.wxml`))
     && /bgLightLow: false/.test(read(`pages/${p}/${p}.js`))))
-ck('首屏那行 Tips（收起态 .tips／展开态 .out）在"两档不一致"那两种情形各有对应规则',
-  /\.container\.has-bg\.bg-light:not\(\.bg-light-low\) \.tips,/.test(wxss)
-    && /\.container\.has-bg:not\(\.bg-light\)\.bg-light-low \.tips,/.test(wxss)
-    && /\.bg-light-low\) \.out \{/.test(wxss))
+/* 「这一行字被翻成墨」＝同一条规则里同时出现"命中这两个元素之一的选择器"与"一支墨色"。
+   要按**规则**逐条拆（选择器再按逗号拆），不能整份文件一把正则：
+   `.container.has-bg.bg-light{--text-primary:rgba(20,22,26,.92)}` 那种只改变量的规则里
+   同时含 `.bg-light` 与墨色，误判成"字被翻墨"会自红（这一把第一版就是这么写的）。
+   这两份样式表里没有 @media 嵌套，所以 `选择器{体}` 这一刀是平的、可以直接切。
+   墨色那两支（#14161A 与 rgba(20,22,26,…)）与上面 `.container.has-bg.bg-light` 那一段是同一族。 */
+const INK_ON_PANEL = /(rgba\(20,\s*22,\s*26|#14161A)/i
+// 选择器按类名**逐段**比（`.container.has-bg .blk-tips-in` 拆出 container/has-bg/blk-tips-in），
+// 否则 `.blk-tips-in` 会被 `.tips` 那种前缀匹配牵连，而 `--text-*` 变量那类只定义不命中。
+const PANEL_TEXT = ['tips', 'tips-line', 'out', 'out-l', 'out-r', 'blk-tips', 'blk-tips-in',
+  'blk-tips-line', 'blk-num', 'blk-lab', 'blk-rule']
+const onPanelRow = (sel) => sel.split(',').some((s) =>
+  s.split(/[^\w-]+/).some((t) => PANEL_TEXT.includes(t)))
+ck('压在面板上的那两行字是写死的纸白，不吃会翻极性的 --text-*',
+  /\.blk-tips-in\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(wxss)
+    && /\.out\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(wxss)
+    && !/\.blk-tips-in\s*\{[^}]*var\(--text-/.test(wxss)
+    && !/\.out\s*\{[^}]*var\(--text-/.test(wxss))
+ck('没有任何一条规则把压在面板上的字翻成墨（浅壁纸那一态墨字压墨面＝归零）',
+  [...wxss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .every((m) => !(onPanelRow(m[1]) && INK_ON_PANEL.test(m[2]))))
 ck('浅色那一态的样式真在（只有类名没有规则＝静默不生效）',
   /\.container\.has-bg\.bg-light \.page-scrim\s*\{/.test(wxss))
 // 压在图上那几行小字各有一支写死的纸白（`.swap-text`／`.swap-glyph`／`.home-swap`），

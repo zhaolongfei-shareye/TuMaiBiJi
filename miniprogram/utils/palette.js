@@ -610,39 +610,6 @@ function createSkin(wallpaper) {
 }
 
 /**
- * 第一屏那三块（左块人物入口 + 右两枚计数）的面色与配对字色。
- * 取档规则照站长 10-10 晚拍板的那版效果图（docs/design/10-10两入口多方案/PNG图标.png）：
- * 左块吃**卡底**（theme.line，它是这一套里最亮的那一面，人物和白色那条压上去才分得开），
- * 右上吃色阶第 2 档、右下吃第 1 档——两枚比左块深一点，三块才有前后层次。
- * 字色跟着各自那一档的 ink 走，不自己挑灰。
- *
- * ⚠️ "面压照片"这一道**不在这里算，也没有尺子算**：照片是用户自己换的，运行时拿不到它的亮度。
- * 10-10 我曾给这三块立过一条"图形压底 ≥3.0"的门槛，那是**我自己加的**（站长没提过），
- * 且拿的探点是**最暗那一档（弯月）**的罩后色——换到默认那档（半月）实测最低只有 1.98，
- * 满月档 1.28。三档数字与量法记在 docs/规格-创建入口这一条线.md §6.2，这里不留门槛。
- */
-function entryBlocks(wallpaper) {
-  const theme = themeOf(wallpaper)
-  const st = theme.ramp && theme.ramp.steps ? theme.ramp.steps : [theme.line, theme.line, theme.line]
-  const face = { person: theme.line, notes: st[1], cards: st[0] }
-  // 回落那条是"新加一枚壁纸忘了写 inks"的兜底（与上面 :405 那条同一个意图）。原来回落直接拿
-  // face 自己当字色，撞上来就是面 == 字、对比 1.000，整块字看不见。兜底至少从面上反解一支墨。
-  const ik = theme.ramp && theme.ramp.inks ? theme.ramp.inks : [
-    enforce(LAYER_INK, face.person, 4.5), enforce(LAYER_INK, face.notes, 4.5), enforce(LAYER_INK, face.cards, 4.5),
-  ]
-  const ink = { person: ik[0], notes: ik[1], cards: ik[0] }
-  const vars = {
-    'eb-person': face.person, 'eb-person-ink': ink.person,
-    'eb-notes': face.notes, 'eb-notes-ink': ink.notes,
-    'eb-cards': face.cards, 'eb-cards-ink': ink.cards,
-  }
-  return {
-    face, ink,
-    style: Object.keys(vars).map((k) => `--${k}:${vars[k]}`).join(';'),
-  }
-}
-
-/**
  * 底栏和搜索条那一块面：由壁纸的页面底派生。
  * bg（那一条底）一个字没动：H 原样、S 夹进 [30,45]（低于 30 灰成一块脏、高于 45 抢内容）、
  * 浅壁纸 L 20.5。字一律纸白，未选中那一档靠 alpha 分深浅（浅 .62 / 深 .68）。
@@ -796,7 +763,10 @@ module.exports = {
   layerEdgeOf,
   INNER_FACE,
   createSkin,
-  entryBlocks,
+  // entryBlocks（首屏三块那六枚 `--eb-*`）随 2.2 B 方案删掉：消费方 create.js 不再发这一位，
+  // 样式表里没有一处还吃 --eb-*，留着一份没人读的派生只会让"新加一枚壁纸忘了写 ramp.inks"
+  // 那条兜底变成一条永远不会被走到的分支。取档规则与"我自己加过的那道 ≥3.0 门槛"
+  // 记在 docs/规格-创建入口这一条线.md §6.2，不在这里留副本。
   catSkinFor,
   crOf,
   inkIsLighter,

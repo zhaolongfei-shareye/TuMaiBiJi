@@ -76,8 +76,17 @@ function evaluate(F) {
   })
 
   const base = blockOf(APP, 'page')
-  ;['--glass-veil', '--glass-veil-band', '--glass-bf', '--glass-hair', '--glass-fill', '--glass-jot', '--glass-plate'].forEach((v) =>
+  /* `--glass-jot`（首页白条那一档 .38）随 2.2 B 方案从名单里删：白条本身被他撤了
+     （「左下的记下来这部部分，去掉」），create.wxss 那两条消费方一起退。
+     这一份名单**就是"该定义哪几枚"的真相**：谁往 app.wxss 里加一枚新令牌，必须同时加进这里，
+     否则"定义了没人吃"与"吃了没定义"两类静默都不红。 */
+  ;['--glass-veil', '--glass-veil-band', '--glass-bf', '--glass-hair', '--glass-fill', '--glass-plate'].forEach((v) =>
     ok(`app.wxss 的 page 那一块定义了 ${v}`, base.includes(`${v}:`)))
+  /* 只钉"声明"与"消费方"两种形态，不钉名字——app.wxss/create.wxss 里那段退役说明会**提到**这枚令牌，
+     按名字搜会把注释也算成残留（10-13 这一把第一版就是这么自己诈自己一次的）。 */
+  ok('`--glass-jot` 的定义与消费都删净了（注释里提到它不算残留）',
+    !/--glass-jot\s*:/.test(APP) && !/var\(--glass-jot\)/.test(APP)
+    && !/--glass-jot\s*:/.test(read('pages/create/create.wxss')) && !/var\(--glass-jot\)/.test(read('pages/create/create.wxss')))
   ok('全站那档白纱还是 .30（R10 那一枚，弹窗与密码面板吃它）',
     /--glass-veil:\s*rgba\(255, 255, 255, 0\.30\)/.test(APP),
     flat((/--glass-veil:[^;]*/.exec(APP) || [])[0]))

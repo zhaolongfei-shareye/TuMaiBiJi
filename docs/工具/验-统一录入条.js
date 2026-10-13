@@ -132,8 +132,14 @@ ok('收起态入口只有一块人物（胶囊那套类名与样式一处不留�
   `blk-person ${(wxml.match(/(?:^|[\s"])class="blk-person/g) || []).length} 块`)
 ok('那一组只在收起态渲染（展开时整组让位给面板）',
   /<view wx:if="\{\{!active\}\}" class="home-blk"/.test(wxml))
-ok('左块那句永远是 barIdle（不再按模式换字）',
-  /class="blk-jot-l">[\s\S]{0,160}\{\{t\.barIdle\}\}/.test(wxml))
+/* 2.2 B 方案：左块下面那条「记下来」整条撤了（站长原话「左下的记下来这部部分，去掉」），
+   屏上不再有那句话，所以这一条改钉两件事：① 两处入口的**可及名**仍只读 `barIdle` 这一个键
+   （不为一枚圆形 ➕ 另起一句文案——文案正本还是那一句"记下来"）；② 旧白条那几个类一处不留。 */
+ok('左块与圆形 ➕ 的可及名都只读 barIdle（白条那三个类一处不留）',
+  /<view class="blk-person"[^>]*aria-label="\{\{t\.barIdle\}\}"/.test(wxml)
+  && /<view class="blk-plus"[^>]*aria-label="\{\{t\.barIdle\}\}"/.test(wxml)
+  && !/blk-jot/.test(wxml + wxss),
+  `blk-person/blk-plus 的 aria-label`)
 ok('旧的 .bar.open 与条内 hint 整段撤净', !/\.bar\.open/.test(wxss) && !/bar-hint/.test(wxml + wxss))
 // 收起态条身右边那三枚小圆：站长 10-09 撤了（原话"原来横条右边那三个按钮不清晰，
 // 默认就是直接拍照那一档"）。原来那两条"正好三枚／各自指向 camera|album|url"改成钉**撤净**，
@@ -586,15 +592,33 @@ ok('小黄点的色值仍由 palette 经 style 递进来',
    ② 几何四条与第一屏 `.tips-dot` **逐字相同**——差一档就不是"一致"，是"差不多"；
    ③ `.out` 原来那行有 `gap: 20rpx`，它分的是"字与返回"，留着它点与字就成 12＋20＝32，
       跟第一屏的 12 对不上 ⇒ 那道缝必须挪到 `.out-r` 的 margin-left 上（真跑 H4"左右不打架"照旧成立）。 */
-const dotGeo = (sel) => ['width', 'height', 'margin-top', 'margin-right', 'border-radius']
-  .map((p) => { const m = new RegExp(`${p}:\\s*([^;]+);`).exec(seg(sel)); return m ? `${p}:${m[1].trim()}` : `${p}:(缺)` })
+const dotGeo = (sel) => {
+  const o = {}
+  ;['width', 'height', 'margin-top', 'margin-right', 'border-radius'].forEach((p) => {
+    const m = new RegExp(`${p}:\\s*([^;]+);`).exec(seg(sel))
+    o[p] = m ? m[1].trim() : null
+  })
+  return o
+}
 const gTip = dotGeo('.tips-dot'), gOut = dotGeo('.out-dot')
 ok('第二屏框外那行有点，且吃的是同一枚 tipDotStyle（样式表里没有第二支黄）',
   /<view class="out">\s*(?:<!--[\s\S]*?-->\s*)?<view class="out-dot" style="\{\{tipDotStyle\}\}"><\/view>/.test(wxml)
   && !/#f6c445/i.test(wxss),
   wxml.slice(Math.max(0, wxml.indexOf('<view class="out">')), wxml.indexOf('<view class="out">') + 200).replace(/\s+/g, ' '))
-ok('两枚点的几何与第一屏逐字相同（他这句"要与第一屏一致"，不是"差不多"）',
-  gTip.join('|') === gOut.join('|'), `第一屏 ${gTip.join(' ')} ／ 第二屏 ${gOut.join(' ')}`)
+/* 「要与第一屏一致」钉的是**落点**，不是钉两条规则逐字相同。
+   2.2 B 方案之后两行的对齐机制本来就换了：第一屏那一格是 `align-items:flex-start` ＋ 点自己
+   `margin-top:10rpx`；第二屏整行改成在那 107rpx 里居中（`align-items:center`），点跟着居中、
+   不再补 margin-top。两种写法算出来是同一个位置（居中的点 46.5 ＝ 居中的字 33.6 那一行 36.7 ＋ 9.8），
+   所以这里钉四条几何相同 ＋ 各自那一档偏移只能存在一份：
+   两边都留 `margin-top:10` ⇒ 第二屏的点比字低 10rpx；两边都撤 ⇒ 第一屏的点骑在字顶上方。 */
+ok('两枚点的四条几何与第一屏逐字相同（尺寸、离字那道缝、圆）',
+  ['width', 'height', 'margin-right', 'border-radius'].every((p) => gTip[p] === gOut[p]),
+  `第一屏 ${JSON.stringify(gTip)} ／ 第二屏 ${JSON.stringify(gOut)}`)
+ok('竖直偏移两屏各用一种机制、且只用一种（重复或都缺都会把点挪离字那一行）',
+  /^\d/.test(gTip['margin-top'] || '') && gOut['margin-top'] === null
+  && /align-items:\s*center/.test(seg('.out'))
+  && /align-items:\s*flex-start/.test(seg('.blk-tips-in')),
+  `.tips-dot margin-top＝${gTip['margin-top']}／.out-dot margin-top＝${gOut['margin-top']}`)
 ok('点与字只隔 12（`.out` 那道 gap 已挪到 .out-r 的 margin-left，否则这里量到 32）',
   !/gap:/.test(seg('.out')) && /margin-left:\s*20rpx/.test(seg('.out-r')),
   `.out＝${seg('.out').replace(/\s+/g, ' ').trim().slice(0, 70)}／.out-r＝${seg('.out-r').replace(/\s+/g, ' ').trim()}`)
@@ -695,15 +719,18 @@ ok('onShow 仍然不重置草稿', !/previewImages: \[\]/.test(showBody) && !/ac
 ok('选完图返回仍然重算那三位（ready / 满 / 展开）',
   /this\._sync\(\)/.test(js) && /_sync\(\)\s*\{[\s\S]{0,600}panelOpen:/.test(js))
 ok('链接校验那条正则没被顺手改松', js.includes('const LINK_RE = /^https?:\\/'))
-// Tips 那一行仍然**只在收起态**渲染。原来它自己挂着 `!active && tips.length` 那道闸；
-// 10-10 晚它搬进了收起态那一组里，闸由组外壳 `<view wx:if="{{!active}}" class="home-blk">` 把，
+// Tips 那一行仍然**只在收起态**渲染。原来它住在整组最上面那一整行（`.tips`）；
+// 2.2 B 方案把它搬进右列那一格（`.blk-tips`），闸还是同一套：组外壳 `wx:if="{{!active}}"` 把，
 // 自己只留 `tips.length`。所以这一条钉的是"落在组里、且排在展开态之前"——
 // 光查那两个 wx:if 字面量会漏掉"搬出去了但闸没跟上"这一型（那样展开时提示会浮在面板上）。
-ok('Tips 那一行仍然只在收起态渲染（闸在组外壳上，本人在组内）',
-  /<view wx:if="\{\{tips\.length\}\}" class="tips">/.test(wxml)
-  && wxml.indexOf('class="home-blk"') < wxml.indexOf('class="tips"')
-  && wxml.indexOf('class="tips"') < wxml.indexOf('class="entry-wrap"'),
-  `blk@${wxml.indexOf('class="home-blk"')} tips@${wxml.indexOf('class="tips"')} wrap@${wxml.indexOf('class="entry-wrap"')}`)
+ok('Tips 那一格仍然只在收起态渲染（闸在组外壳上，本人在组内）',
+  /<view wx:if="\{\{tips\.length\}\}" class="blk-tips">/.test(wxml)
+  && wxml.indexOf('class="home-blk"') < wxml.indexOf('class="blk-tips"')
+  && wxml.indexOf('class="blk-tips"') < wxml.indexOf('class="entry-wrap"'),
+  `blk@${wxml.indexOf('class="home-blk"')} tips@${wxml.indexOf('class="blk-tips"')} wrap@${wxml.indexOf('class="entry-wrap"')}`)
+// 旧的那一整行载体（`.tips`／`.tips-line`）不许与新的那一格并存——两版并存是这类搬家最容易漏的。
+ok('旧 Tips 那一行的载体一处不留（`.tips ` 与 `.tips-line` 都不能再出现在模板或样式表里）',
+  !/class="tips"/.test(wxml) && !/class="tips-line"/.test(wxml) && !/\.tips\s*\{|\.tips-line\s*\{/.test(wxss))
 ok('Tips 六句中英各一份、句数相等', Array.isArray(zh.tips) && Array.isArray(en.tips)
   && zh.tips.length === 6 && en.tips.length === zh.tips.length)
 ok('一句停 8 秒', /\}, 8000\)/.test(js) && !/\}, 4000\)/.test(js))
