@@ -96,6 +96,8 @@ const KNIVES = [
     () => edit('wxml', '<view class="blk-count">', '<image class="blk-ic" src="/assets/ic-stat-notes.png" mode="aspectFit" /><view class="blk-count">'), '连文件带引用一起撤净'],
   ['按下态那枚类名写错（按下什么都不退色，界面照样能用、截图也看不出来）',
     () => edit('wxml', 'hover-class="blk-cell-press"', 'hover-class="blk-cell-pressed"'), '真有一条规则接着'],
+  ['面板那一层的层号抬到 9999（通栏贴屏底那一片压过底栏，两格导航点了没反应，而静态几何全对）',
+    () => edit('wxss', '.stage-panel {\n  position: fixed;', '.stage-panel {\n  z-index: 9999;\n  position: fixed;'), '深色面板那层的层号低于底栏'],
 ]
 
 let bad = 0
