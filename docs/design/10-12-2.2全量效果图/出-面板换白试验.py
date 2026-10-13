@@ -104,7 +104,7 @@ def screen(bg, grad, tips, dim=1, band_h=240):
                  % (CELL_W, NUM_FS, PAPER, v, RULE_W, k))
     s += ['</div></div>',
           '<div class="f" style="position:static;flex:1;display:flex;flex-direction:column;min-width:0">',
-          '<div class="f" style="position:static;flex:1;display:flex;align-items:center;box-sizing:border-box;padding:%s;font-size:%gpx;'
+          '<div class="f" style="position:static;flex:1;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:%s;font-size:%gpx;'
           'line-height:%g;letter-spacing:%s;color:%s"><div class="r2" style="flex:none;width:14px;'
           'height:14px;margin:%gpx 12px 0 0;background:%s"></div>'
           '<div style="flex:1;max-width:%s">%s</div></div>'

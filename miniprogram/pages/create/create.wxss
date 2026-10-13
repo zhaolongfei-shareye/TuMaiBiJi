@@ -73,6 +73,9 @@
      右端另外还有一道 `max-width: 9em` 管着（见 `.blk-tips-line`），这一条管的是"别贴着左块"。 */
   box-sizing: border-box;
   padding: 0 16rpx;
+  /* 10-13 站长「Tips 怎么还是靠左啊，不是说了不要靠边吗」⇒ 光留 16 不够，这一格改成**水平也居中**：
+     点＋句子整组在列里居中，左右各让出来的那一段由居中保证，不再靠"padding 猜一个数"。 */
+  justify-content: center;
 }
 
 .blk-tips-in {
@@ -172,9 +175,13 @@
   box-sizing: border-box;
   border-radius: 34rpx 34rpx 0 0;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.92) 10%,
-    rgba(255, 255, 255, 0.84) 43%, rgba(255, 255, 255, 0.80) 62%,
-    rgba(255, 255, 255, 0.74) 83%, rgba(255, 255, 255, 0.70) 88%, rgba(255, 255, 255, 0.64) 100%);
+  /* 10-13 站长「漫画女背景不够白」⇒ 整档平移抬白：幅度从 .92→.64 收到 .96→.86。
+        七个停点的位置与"平—凹—深"的形状一个字没动（那是他拍的「与现网的渐变的过程一样」），
+        动的是透明度区间——底下压的不再是恒深面板，是面板那条已经透到 84% 的带，白度还会再掉一截，
+        所以这一档必须整体抬高才读得出"白"。代价：渐变本身从 58 级收到约 13 级，更平。 */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.96) 10%,
+    rgba(255, 255, 255, 0.93) 43%, rgba(255, 255, 255, 0.92) 62%,
+    rgba(255, 255, 255, 0.90) 83%, rgba(255, 255, 255, 0.88) 88%, rgba(255, 255, 255, 0.86) 100%);
   backdrop-filter: var(--glass-bf);
   -webkit-backdrop-filter: var(--glass-bf);
 }
@@ -350,7 +357,10 @@
   background: var(--glass-plate);
   backdrop-filter: var(--glass-bf);
   -webkit-backdrop-filter: var(--glass-bf);
-  box-shadow: inset 0 0 0 2rpx var(--glass-hair), 0 10rpx 26rpx rgba(0, 0, 0, 0.30);
+  /* 「加号圆要发光」⇒ 外圈加一层白晕（36rpx 扩散、白 .45）；原来那条落影留着，两枚并存。
+     白是中性色，过"不许抄色相"那一档；晕的强度他没给数，这一档是我挑的，等他调。 */
+  box-shadow: inset 0 0 0 2rpx var(--glass-hair), 0 0 36rpx rgba(255, 255, 255, 0.45),
+    0 10rpx 26rpx rgba(0, 0, 0, 0.30);
 }
 
 .blk-plus-press {

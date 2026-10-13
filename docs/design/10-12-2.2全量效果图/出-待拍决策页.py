@@ -106,9 +106,11 @@ def decl(src, sel, prop):
 # 10-13「按钮变成白色风格。类似第二屏毛玻璃」⇒ 那枚 ➕ 的三样全从 `.blk-plus` 现读，不再吃 palette 那支橙
 PLUS_BG = var_of(decl(CRE, '.blk-plus', 'background')).replace('rpx', 'px')
 PLUS_BF = var_of(decl(CRE, '.blk-plus', 'backdrop-filter')).replace('rpx', 'px')
-_rm = re.search(r'inset[^,]*var\(--glass-hair\)', decl(CRE, '.blk-plus', 'box-shadow'))
-PLUS_RING = (_rm.group(0).replace('rpx', 'px').replace('var(--glass-hair)', var_of('var(--glass-hair)'))
-             if _rm else sys.exit('`.blk-plus` 的 box-shadow 里读不到那圈 --glass-hair 细边'))
+# 整条 box-shadow 原样搬（10-13「加号圆要发光」之后它有三段：细边＋白晕＋落影，只搬第一段会漏掉发光）
+_shd = decl(CRE, '.blk-plus', 'box-shadow')
+if 'var(--glass-hair)' not in _shd:
+    sys.exit('`.blk-plus` 的 box-shadow 里读不到那圈 --glass-hair 细边')
+PLUS_RING = re.sub(r'var\((--[a-z0-9-]+)\)', lambda m: var_of('var(%s)' % m.group(1)), _shd).replace('rpx', 'px')
 TIPS_FS = float(re.sub(r'[^0-9.]', '', var_of(decl(CRE, '.blk-tips-in', 'font-size'))))
 TIPS_LH = float(re.search(r'[\d.]+', decl(CRE, '.blk-tips-in', 'line-height')).group(0))
 TIPS_LS = var_of(decl(CRE, '.blk-tips-in', 'letter-spacing')).replace('rpx', 'px')
