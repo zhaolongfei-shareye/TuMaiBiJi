@@ -5,6 +5,7 @@ const posterTemplates = require('./utils/posterTemplates')
 const cloudUpload = require('./utils/cloudUpload')
 const cardCloud = require('./utils/cardCloud')
 const profileCloud = require('./utils/profileCloud')
+const mpAssets = require('./utils/mpAssets')
 const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
@@ -164,6 +165,9 @@ App({
       profileCloud.pull().then((r) => {
         if (r && !r.ok) console.warn('名片那份这次没对齐:', r.reason)
       })
+      // 运营图（首页背景图）：后台传了新图就静默拉下来缓存，下一屏 homeBg() 自然取到。
+      // 故意不 await：首屏不等它；失败也不出声（和 profileCloud.pull 同一纪律）。
+      mpAssets.pull()
     } catch (err) {
       console.error('登录失败:', err)
       throw err

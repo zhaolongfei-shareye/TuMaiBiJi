@@ -17,6 +17,7 @@ const RECIPES = require('./posterRecipes.js')
 // 下发那一路的门槛比的是小程序版本号（`min_app_version`），这个号只有 appInfo 那一份出处。
 // 配方 JSON 里那个 `min_version` 是解释器版本，两回事，别拿这一个去判那一个。
 const { VERSION: APP_VERSION } = require('./appInfo.js')
+const mpAssets = require('./mpAssets.js')
 
 const W = 750
 const INK = '#23252C'
@@ -217,7 +218,7 @@ function posterProfile() {
 const HOME_BG_DEFAULT = '/assets/home-bg-portrait.jpg'
 
 function homeBg() {
-  return rolePath(readSlots(), 'bg') || HOME_BG_DEFAULT
+  return rolePath(readSlots(), 'bg') || mpAssets.serverBgPath() || HOME_BG_DEFAULT
 }
 
 /* 头部那一段 542 的图怎么摆——首页与「我的」页必须同一套数，否则同一个人在两页
