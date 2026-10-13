@@ -298,38 +298,47 @@ ok('容器仍发那套 --cp-*（图形吃 --cp-cam-ink；发在 .panel 上首屏
   /background:\s*var\(--cp-cam-ink\)/.test(seg('.blk-plus-glyph'))
   && /class="container[^"]*"\s+style="\{\{skinPanel\}\}"/.test(wxml)
   && !/class="panel[^"]*"[^>]*style="\{\{skinPanel\}\}"/.test(wxml))
-/* 两态同一条顶线（深色面板那一层就是"两态共用"的那一层）：面板顶 ＝ 那一组顶 − 框外那一行的高。
-   数从三处现读、不写进判据：`.home-blk` 的夹值、`.stage-panel` 的那两个数、`.out` 的高。
-   ⚠ `decl()` 取的是**第一条**，而这两处都是"退路一条 ＋ min() 一条"成对写的（老安卓不认 min()），
-   所以这里要把该选择器所有同名声明都收出来，再挑带 min()/calc() 的那一条。 */
+/* 面板顶这一档 10-13 改过口径：原来是"两态同一个顶 ＝ 组顶往上 107（框外那行的高）"，
+   站长「深色面板调下…内框与上面外框的距离，要与下方的 tab 面板距离一样」⇒
+   **收起态**改成"上下两口留空相等"，**展开态**仍要 107 那根线（`.out` 那 107 必须整个坐在面板上）。
+   数全部现读：组顶的夹值、面板的两条 top、`.out` 的高、底栏的高＋bottom。
+   ⚠ `decl()` 取的是**第一条**，而这几处都是"退路一条 ＋ min() 一条"成对写的（老安卓不认 min()），
+   所以同名声明要全收出来再挑带 min()/calc() 的那一条。 */
 const declsOf = (src, prop) => (src.match(new RegExp(`${prop}:\\s*([^;]+)`, 'g')) || [])
-ok('两态的顶是同一条线（面板顶 ＝ 那一组顶那一档往上「框外那一行的高」）', (() => {
-  const all = (sel) => declsOf(seg(sel), 'top').join(' | ')
-  const group = all('.home-blk'), panel = all('.stage-panel')
-  const outH = num(seg('.out'), 'height')
-  const gClamp = Number((/calc\(100vh - (\d+)rpx\)/.exec(group) || [0, 0])[1])
-  const pShift = Number((/calc\(66\.3% - (\d+)rpx\)/.exec(panel) || [0, 0])[1])
-  const pClamp = Number((/calc\(100vh - (\d+)rpx\)/.exec(panel) || [0, 0])[1])
-  // 退路那条也得在（老安卓不认 min() 时整条掉下来＝面板顶塌成写死）
-  return /min\(/.test(panel) && /min\(/.test(group) && pShift > 0 && pShift === outH
-    && gClamp > 0 && pClamp === gClamp + outH
-    && (panel.match(/calc\(66\.3% - /g) || []).length >= 2
-})(), `组 top=${declsOf(seg('.home-blk'), 'top').join('｜')}／面板 top=${declsOf(seg('.stage-panel'), 'top').join('｜')}／那一行高 ${num(seg('.out'), 'height')}`)
+const topOf = (sel) => declsOf(seg(sel), 'top').join(' | ')
+const numIn = (src, re) => Number((re.exec(src) || [0, 0])[1])
+const BREATHE = numIn(seg2(tabWxss, '.tab-bar'), /height:\s*(\d+)rpx/)
+  + numIn(seg2(tabWxss, '.tab-bar'), /bottom:\s*(\d+)rpx/)      // 底栏那一格占掉的高＋离底
+ok('收起态：面板顶到组顶的留空 ＝ 组顶夹值里那口"离底栏的呼吸"（上下两口同值 ⇒ 块正居中）', (() => {
+  const group = topOf('.home-blk'), panel = topOf('.stage-panel')
+  const gClamp = numIn(group, /calc\(100vh - (\d+)rpx\)/)
+  const pShift = numIn(panel, /calc\(66\.3% - (\d+)rpx\)/)
+  const pClamp = numIn(panel, /calc\(100vh - (\d+)rpx\)/)
+  const breathe = gClamp - PERSON_H - BREATHE                   // 562 − 410 − 128 = 24
+  return /min\(/.test(panel) && /min\(/.test(group) && breathe > 0 && pShift === breathe
+    && pClamp === gClamp + pShift && (panel.match(/calc\(66\.3% - /g) || []).length >= 2
+})(), `夹值 ${numIn(topOf('.home-blk'), /calc\(100vh - (\d+)rpx\)/)}／块高 ${PERSON_H}／底栏占 ${BREATHE}／面板上移 ${numIn(topOf('.stage-panel'), /calc\(66\.3% - (\d+)rpx\)/)}`)
+ok('展开态：那一层回到往上「框外那行的高」那根线，且 wxml 真的挂了这个类', (() => {
+  const open = topOf('.stage-panel-open')
+  return /min\(/.test(open)
+    && numIn(open, /calc\(66\.3% - (\d+)rpx\)/) === num(seg('.out'), 'height')
+    && /class="stage-panel\{\{panelOpen \? ' stage-panel-open' : ''\}\}"/.test(wxml)
+})(), `展开态 top=${declsOf(seg('.stage-panel-open'), 'top').join('｜') || '(没写)'}`)
 
 /* 面板那三段皮的**分工**（他 10-13「新增面板为什么看不到渐变毛玻璃」追出来的）：
    本体必须透明。实心 .95 一旦写回本体，就与压在它上面的 `::before` 相乘
-   ⇒ band 顶透出 1−(1−.95)(1−.32)＝3.4%、band 底 0.30%，整块 97% 实心，
+   ⇒ band 顶透出 1−(1−.95)(1−.16)＝4.2%、band 底 0.30%，整块 96% 实心，
    "上部渐变半透明毛玻璃"画了等于没画，而且**静态几何全绿、截图也看不出差别**（它就是那一片墨）。
    所以这一条只能按结构钉，不能靠眼看。 */
 const sPanel = seg('.stage-panel')
 const sPanelBand = seg('.stage-panel::before')
 const sPanelBody = seg('.stage-panel::after')
-ok('深色面板本体透明（实心只能归 ::after；写回本体＝与 ::before 相乘，band 透出不到 3.4%）',
+ok('深色面板本体透明（实心只能归 ::after；写回本体＝与 ::before 相乘，band 透出不到 4.2%）',
   /^(transparent|none)$/i.test(decl(sPanel, 'background')),
   `本体 background=${decl(sPanel, 'background') || '(没写)'}`)
 const BAND_H_CSS = num(sPanelBand, 'height')
-ok('band 那一段是 ::before 的 .32→.94 两档（同色只走透明度；顶档 10-13 从 .55 收到 .32＝"上面渐变加强一点"）',
-  BAND_H_CSS > 0 && /rgba\(35,\s*37,\s*44,\s*0?\.32\)/.test(decl(sPanelBand, 'background'))
+ok('band 那一段是 ::before 的 .16→.94 两档（同色只走透明度；10-13 两刀把顶档从 .55 一路收到 .16＝"透明度多一点，现在太暗了"）',
+  BAND_H_CSS > 0 && /rgba\(35,\s*37,\s*44,\s*0?\.16\)/.test(decl(sPanelBand, 'background'))
   && /rgba\(35,\s*37,\s*44,\s*0?\.94\)/.test(decl(sPanelBand, 'background')),
   `高 ${BAND_H_CSS}／${decl(sPanelBand, 'background') || '(没写)'}`)
 ok('实心 .95 挂在 ::after 上，从 band 底下起、贴到屏底（top 与 ::before 的高是同一个数）',

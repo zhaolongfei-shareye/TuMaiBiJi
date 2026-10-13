@@ -81,7 +81,9 @@ const KNIVES = [
   ['三元分支里塞一枚同名类（证明分支也扫了）',
     () => edit('wxml', "{{active ? 'entry-dock' : ''}}", "{{active ? 'blk' : ''}}"), '三元分支里那几枚'],
   ['面板顶写成定值（不跟着那一组走，矮屏上两态的顶就岔开）',
-    () => edit('wxss', 'top: min(calc(66.3% - 107rpx), calc(100vh - 669rpx));', 'top: 1000rpx;'), '两态的顶是同一条线'],
+    () => edit('wxss', 'top: min(calc(66.3% - 24rpx), calc(100vh - 586rpx));', 'top: 1083rpx;'), '收起态：面板顶到组顶的留空'],
+  ['展开态那一档顶被抹平（两态又变成同一个顶＝第二屏框外那行 107 有 83 坐在面板外面）',
+    () => edit('wxss', '.stage-panel-open {\n  top: calc(66.3% - 107rpx);', '.stage-panel-open {\n  top: calc(66.3% - 24rpx);'), '展开态：那一层回到往上'],
   ['整组夹值少算一行（562 改回旧的 546＝还按整组 394 算）',
     () => edit('wxss', 'top: min(66.3%, calc(100vh - 562rpx));', 'top: min(66.3%, calc(100vh - 546rpx));'), '夹值是推出来的'],
   ['热区缩到 100 高（剪影 132，头顶一段点了没反应）',
@@ -104,7 +106,7 @@ const KNIVES = [
     () => edit('wxml', 'hover-class="blk-cell-press"', 'hover-class="blk-cell-pressed"'), '真有一条规则接着'],
   ['面板那一层的层号抬到 9999（通栏贴屏底那一片压过底栏，两格导航点了没反应，而静态几何全对）',
     () => edit('wxss', '.stage-panel {\n  position: fixed;', '.stage-panel {\n  z-index: 9999;\n  position: fixed;'), '深色面板那层的层号低于底栏'],
-  ['把实心 .95 写回面板本体（10-13 那一刀：与压在它上面的 ::before 相乘，band 顶透出不到 3.4%，'
+  ['把实心 .95 写回面板本体（10-13 那一刀：与压在它上面的 ::before 相乘，band 顶透出不到 4.2%，'
     + '"上部渐变半透明毛玻璃"画了等于没画，而几何与字色判据全绿）',
     () => edit('wxss', 'background: transparent;\n  backdrop-filter',
       'background: rgba(35, 37, 44, 0.95);\n  backdrop-filter'), '深色面板本体透明'],

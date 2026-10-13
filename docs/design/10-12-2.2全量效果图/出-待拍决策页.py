@@ -115,6 +115,7 @@ TIPS_LS = var_of(decl(CRE, '.blk-tips-in', 'letter-spacing')).replace('rpx', 'px
 DOT_MT = num(CRE, '.tips-dot', 'margin-top')
 # 行宽上限（10-13「Tips 要紧凑一点，现在有点宽」）：落码写的是 9em，这里原样搬，不换成算出来的 rpx
 TIPS_MAXW = decl(CRE, '.blk-tips-line', 'max-width') or sys.exit('`.blk-tips-line` 读不到 max-width ⇒ 图上又会画成满宽')
+TIPS_PAD = decl(CRE, '.blk-tips', 'padding').replace('rpx', 'px') or sys.exit('`.blk-tips` 读不到左右留空')
 
 
 def panel_layer(ptop, band_h=240, bg=None, grad=None):
@@ -138,7 +139,10 @@ CELL_W = (PERSON_W - 2 * BAND_PAD - BAND_GAP) / 2
 COL_W = 750 - 2 * BLK_L - PERSON_W - GAP_ROW
 VIEW_H = 1669
 GROUP_TOP = 1107
-PANEL_TOP = GROUP_TOP - LIFT
+# 10-13 那一刀之后这一档不再等于 `.out` 的高：收起态＝组顶往上 24（与块离底栏那口呼吸相等），
+# 展开态才往上 107（`.stage-panel-open`）。两档都从 wxss 现读，不写进这份脚本。
+PANEL_LIFT = float(re.search(r'calc\(66\.3% - ([\d.]+)rpx\)', seg(CRE, '.stage-panel')).group(1))
+PANEL_TOP = GROUP_TOP - PANEL_LIFT
 
 PLATE_CODE = re.search(r'--glass-plate:\s*rgba\(255, 255, 255,\s*([\d.]+)\)', APP).group(1)
 FILL_CODE = re.search(r'--glass-fill:\s*rgba\(255, 255, 255,\s*([\d.]+)\)', APP).group(1)
@@ -235,7 +239,7 @@ def scale(inner, h=VIEW_H):
 
 def home(panel=True, bar=3, plus=True, dim=1):
     """首屏那一屏。panel／bar／plus／dim 这四把开关就是 D9–D11 的差别本身。"""
-    s = ['<div class="f" style="inset:0;background:url(home-bg-portrait.jpg) center top/cover"></div>',
+    s = ['<div class="f" style="inset:0;background:url(壁纸-站长给的-试面板.jpg) center 22%/cover"></div>',
          '<div class="f" style="inset:0;background:rgba(20,22,26,.58);opacity:%s"></div>' % DIMS[dim]['veil']]
     if panel:
         s.append(panel_layer(PANEL_TOP))
@@ -263,10 +267,10 @@ def home(panel=True, bar=3, plus=True, dim=1):
                  % (CELL_W, NUM_FS, PAPER, v, RULE_W, k))
     s.append('</div></div>')                        # /band /card
     s.append('<div class="f" style="position:static;flex:1;display:flex;flex-direction:column;min-width:0">')
-    s.append('<div class="f" style="position:static;flex:1;display:flex;align-items:center;font-size:%gpx;'
+    s.append('<div class="f" style="position:static;flex:1;display:flex;align-items:center;box-sizing:border-box;padding:%s;font-size:%gpx;'
              'line-height:%g;letter-spacing:%s;color:%s"><div class="r2" style="flex:none;width:14px;'
              'height:14px;margin:%gpx 12px 0 0;background:%s"></div><div style="flex:1;max-width:%s">%s</div></div>'
-             % (TIPS_FS, TIPS_LH, TIPS_LS,
+             % (TIPS_PAD, TIPS_FS, TIPS_LH, TIPS_LS,
                 'rgba(242,239,233,.96)' if panel else CH['ink'], DOT_MT, TIP_DOT, TIPS_MAXW, ZH['tips'][0]))
     if plus:
         s.append('<div class="r2" style="flex:none;width:%dpx;height:%dpx;margin-top:%dpx;align-self:center;'
@@ -291,15 +295,15 @@ def home(panel=True, bar=3, plus=True, dim=1):
 
 def expanded(grow='up', panel=True):
     """整屏画展开态那一屏（D13 的三块）。grow＝面板那张往哪长。"""
-    s = ['<div class="f" style="inset:0;background:url(home-bg-portrait.jpg) center top/cover"></div>',
+    s = ['<div class="f" style="inset:0;background:url(壁纸-站长给的-试面板.jpg) center 22%/cover"></div>',
          '<div class="f" style="inset:0;background:rgba(20,22,26,.58);opacity:%s"></div>' % DIMS[1]['veil'],
          '<div class="f" style="left:0;right:0;top:0;height:184px;'
          'background:linear-gradient(180deg,rgba(8,10,14,.55),rgba(8,10,14,0))"></div>']
     h = OPEN_H if grow == 'down' else PERSON_H
-    top = (PANEL_TOP + LIFT) if panel else GROUP_TOP
+    top = GROUP_TOP                     # 展开态那一组仍落在他拍板的 66.3% 那根线上
     over = top + h - (VIEW_H - TAB_B - TAB_H)
     if panel:
-        ptop = PANEL_TOP if grow == 'down' else top - LIFT
+        ptop = (GROUP_TOP - LIFT) if grow != 'down' else PANEL_TOP   # 展开态回到往上 107 那根线
         s.append(panel_layer(ptop))
     ink = 'rgba(242,239,233,.9)'
     s.append('<div class="f" style="left:0;right:0;top:%dpx;height:%dpx;color:%s;font-size:24px;'
@@ -411,7 +415,7 @@ def annotated():
 def over_of(grow, panel):
     """那一屏的录入面板底比底栏顶低多少（正数＝压住）。与 expanded() 里同一套式子，别写两份。"""
     h = OPEN_H if grow == 'down' else PERSON_H
-    top = (PANEL_TOP + LIFT) if panel else GROUP_TOP
+    top = GROUP_TOP                     # 展开态那一组仍落在他拍板的 66.3% 那根线上
     return top + h - (VIEW_H - TAB_B - TAB_H)
 
 
@@ -554,5 +558,5 @@ for c in CASES:
     print('　%s 面合成 %s（计数 %.2f:1）／井合成 %s（与面差 %.0f 级）'
           % (c['tag'], c['face'], c['crLabel'], c['fill'], c['wellLv']))
 print('　展开态压底栏：top %d ＋ 高 %d ＝ %d ＞ 底栏顶 %d ⇒ 压住 %.0frpx'
-      % (PANEL_TOP + LIFT, OPEN_H, PANEL_TOP + LIFT + OPEN_H, VIEW_H - TAB_B - TAB_H,
-         PANEL_TOP + LIFT + OPEN_H - (VIEW_H - TAB_B - TAB_H)))
+      % (GROUP_TOP, OPEN_H, GROUP_TOP + OPEN_H, VIEW_H - TAB_B - TAB_H,
+         GROUP_TOP + OPEN_H - (VIEW_H - TAB_B - TAB_H)))

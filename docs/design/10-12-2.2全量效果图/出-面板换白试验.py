@@ -55,7 +55,7 @@ stop_alphas = lambda g: [float(a) for a in re.findall(r'rgba\([^,]+,[^,]+,[^,]+,
 GLASS_BF, PANEL_BF, panel_layer, BF = dp['GLASS_BF'], dp['PANEL_BF'], dp['panel_layer'], dp['BF']
 PLUS_BG, PLUS_BF, PLUS_RING = dp['PLUS_BG'], dp['PLUS_BF'], dp['PLUS_RING']
 TIPS_FS, TIPS_LH, TIPS_LS, DOT_MT = dp['TIPS_FS'], dp['TIPS_LH'], dp['TIPS_LS'], dp['DOT_MT']
-TIPS_MAXW = dp['TIPS_MAXW']
+TIPS_MAXW, TIPS_PAD = dp['TIPS_MAXW'], dp['TIPS_PAD']
 
 
 def panel_paint(base, a_lo, a_hi):
@@ -104,11 +104,11 @@ def screen(bg, grad, tips, dim=1, band_h=240):
                  % (CELL_W, NUM_FS, PAPER, v, RULE_W, k))
     s += ['</div></div>',
           '<div class="f" style="position:static;flex:1;display:flex;flex-direction:column;min-width:0">',
-          '<div class="f" style="position:static;flex:1;display:flex;align-items:center;font-size:%gpx;'
+          '<div class="f" style="position:static;flex:1;display:flex;align-items:center;box-sizing:border-box;padding:%s;font-size:%gpx;'
           'line-height:%g;letter-spacing:%s;color:%s"><div class="r2" style="flex:none;width:14px;'
           'height:14px;margin:%gpx 12px 0 0;background:%s"></div>'
           '<div style="flex:1;max-width:%s">%s</div></div>'
-          % (TIPS_FS, TIPS_LH, TIPS_LS, tips, DOT_MT, TIP_DOT, TIPS_MAXW, ZH['tips'][0]),
+          % (TIPS_PAD, TIPS_FS, TIPS_LH, TIPS_LS, tips, DOT_MT, TIP_DOT, TIPS_MAXW, ZH['tips'][0]),
           '<div class="r2" style="flex:none;width:%dpx;height:%dpx;margin-top:%dpx;align-self:center;'
           'background:%s;%sbox-shadow:%s;color:%s;display:flex;align-items:center;'
           'justify-content:center;font-size:64px;font-weight:300">+</div>'

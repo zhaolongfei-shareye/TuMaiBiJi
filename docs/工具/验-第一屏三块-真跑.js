@@ -24,7 +24,8 @@ const PERSON_KEY = 'homePerson'
 const GROUP_H = 410        // 整组＝那一行左块的高（＝第二屏那张面板的高，同一根顶线）
 const FACE_H = 213         // 上：纯白渐变毛玻璃那一片（＝女那张脚底落在哪，算出来的）
 const BAND_H = 197         // 下：墨黑渐变毛玻璃那一片（410 − 213）
-const OUT_H = 107          // 第二屏框外那一行占的那一段＝面板顶比组顶高出去的数
+const OUT_H = 107          // 展开态：面板顶比组顶高出去那一段＝第二屏框外那行的小字
+const BREATHE = 24         // 收起态：面板顶比组顶只高这一口＝那一组底离底栏顶的呼吸（静态那把钉的是"两口相等"这条等式，这里钉屏上量出来的数）
 const CLAMP = GROUP_H + 128 + 24  // 组顶夹值：整组 ＋ 底栏 ＋ 最少留白 = 562
 const BLEED = 52           // 人物高出内框上沿那一段
 const FIG_W = 220
@@ -129,6 +130,9 @@ async function main() {
   const col = await rect('.blk-col')
   const tips = await rect('.blk-tips')
   const plus = await rect('.blk-plus')
+  ok('收起态：内框离外框顶的那一口 ＝ 它离底栏顶的那一口（他 10-13「要与下方的 tab 面板距离一样」）',
+    !!panel && !!blk && near(blk.top - panel.top, BREATHE * R, 3 * R),
+    panel && blk ? `上留空 ${q((blk.top - panel.top) / R).toFixed(1)}rpx／应等于 ${BREATHE}rpx` : '没量到')
   const cellNodes = await page.$$('.blk-cell')
   const cells = []
   for (const n of cellNodes) cells.push(await frame(n))
@@ -366,8 +370,9 @@ async function main() {
   ok('展开态那 107 那一条真在面板顶上（框外那行小字占的就是这一段）',
     !!outRow && near(q(outRow.h), OUT_H, 4) && near(outRow.top, panelOn.top, 3 * R),
     outRow ? `行高 ${q(outRow.h).toFixed(1)}／行顶 ${q(outRow.top).toFixed(1)} vs 面板顶 ${q(panelOn.top).toFixed(1)}` : '屏上没有 .out')
-  ok('两态面板顶是同一条线（收起时量过的那个数，展开不许漂）',
-    near(panelOn.top, panel.top, 3 * R), `收起 ${q(panel.top).toFixed(1)} → 展开 ${q(panelOn.top).toFixed(1)}`)
+  ok('两态的顶**不再是同一条线**（10-13 那一刀）：展开比收起高出去的那一段＝107 − 24',
+    near(panel.top - panelOn.top, (OUT_H - BREATHE) * R, 3 * R),
+    `收起 ${q(panel.top).toFixed(1)} → 展开 ${q(panelOn.top).toFixed(1)}（差 ${q((panel.top - panelOn.top) / R).toFixed(1)}rpx）`)
   // 这里**只钉顶线、不钉高度**：面板那张的高是 410 还是 490 还挂在他那条待拍上
   // （画法向下长会压住底栏 56，代码向上长会把 `.out` 那 107 留在面板之上），
   // 把还没拍的数钉成判据就是拿尺子替他做决定。
