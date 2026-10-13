@@ -30,15 +30,20 @@ const CWX = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/cre
 const PANEL_H = Number(/\.panel\s*\{[\s\S]*?height:\s*(\d+)rpx/.exec(CWX)[1])
 const PANEL_OPEN_H = Number(/\.panel-open\s*\{\s*height:\s*(\d+)rpx/.exec(CWX)[1])
 const SHUT_W = Number(/\.shut\s*\{[\s\S]*?width:\s*(\d+)rpx/.exec(CWX)[1])
-// 收起态那三块的四个数也从样式表现读（10-10 晚的载体：原来那条 128 高的胶囊没了）。
+// 收起态那一组的数也从样式表现读（10-10 晚是"胶囊→三块"，10-13 B 方案又是"三块→左块两片皮＋右列"）。
 // 抄成常量的话，下一轮改块高就只是"判据跟着红"，白费劲——和上面 PANEL_H 同一个理由。
+// ⚠ 2.2：`.tips`（整组上方那一行）与 `.blk-stat`（两枚计数）都随 B 方案撤了——整组现在只有那一行 410，
+//   Tips 搬进右列（`.blk-tips`），计数变成墨面里两枚同类的 `.blk-cell`。原来那三行 lenOf 就是假红的源头。
 const segOf = (sel) => (new RegExp(`(?:^|\\n)${sel}\\s*\\{([^}]*)\\}`).exec(CWX) || [0, ''])[1]
 const lenOf = (sel, prop) => Number(new RegExp(`${prop}:\\s*(\\d+)rpx`).exec(segOf(sel))?.[1])
-const PERSON_CSS = lenOf('.blk-person', 'width')
-const TIPS_H_CSS = lenOf('.tips', 'height')
-const TIPS_MB_CSS = lenOf('.tips', 'margin-bottom')
-const STAT_H_CSS = lenOf('.blk-stat', 'height')
-const GROUP_H_CSS = TIPS_H_CSS + TIPS_MB_CSS + PERSON_CSS
+const PERSON_W_CSS = lenOf('.blk-person', 'width')
+const PERSON_H_CSS = lenOf('.blk-person', 'height')
+// 两枚计数**没写宽**（`flex:1`），所以期望宽要从那一条的左右内边距与缝倒算——写死 122 就是第二份真相。
+const COUNT_SEG = segOf('.blk-count')
+const GAP_CSS = Number(/(?:^|;)\s*gap:\s*(\d+)rpx/.exec(COUNT_SEG)[1])
+const PAD_CSS = Number(/(?:^|;)\s*padding:\s*0\s+(\d+)rpx/.exec(COUNT_SEG)[1])
+const CELL_W_WANT = (PERSON_W_CSS - 2 * PAD_CSS - GAP_CSS) / 2
+const GROUP_H_CSS = PERSON_H_CSS                          // 整组＝那一行左块，Tips 不再占组外一段
 const RING_CSS = (/--cp-ring:([^;]+)/.exec(
   require(path.resolve(__dirname, '../../miniprogram/utils/palette.js')).createSkin()) || [0, ''])[1].trim()
 // `rgba(35,37,44,0.5)` 这种写法在 palette 里不带空格，而 getComputedStyle 回来带——比对前归一
@@ -105,30 +110,35 @@ const ck = (name, ok, got) => {
   const clsOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.attribute('class')) || '') : '' }
   const txtOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.text()) || '').trim() : null }
 
-  // ---------- A 收起态：那三块（10-10 晚换的载体，原来那条纸白胶囊整个撤了） ----------
+  // ---------- A 收起态：2.2 B 方案那一组（左块两片皮＋右列 Tips/圆 ➕，整组只有那一行 410） ----------
   await top()
   let d = await page.data()
   ck('A1 收起态没有面板', (await page.$$('.panel')).length === 0)
   ck('A2 收起态只有那一组，且左块那句读的是「记下来」',
     (await page.$$('.home-blk')).length === 1 && d.t.barIdle === '记下来', d.t.barIdle)
   ck('A3 条身右边那三枚小圆真撤了（屏上一枚都不该剩）', (await page.$$('.bar-dots .dot')).length === 0)
-  ck('A4 Tips 那一行在（展开才撤的那一位，此刻该留着）', (await page.$$('.tips')).length === 1)
-  const [blk0, tip0, person0, stat0, stat1] = await rects(
-    ['.home-blk', '.tips', '.blk-person', '.blk-stat-notes', '.blk-stat-cards'])
-  ck('A5 整组一动不动：组顶 == Tips 那一行的顶（组没有内边距，第一档就贴着顶）',
-    !!blk0 && !!tip0 && Math.abs(blk0.top - tip0.top) <= 1,
-    blk0 && tip0 && `组顶 ${Math.round(blk0.top)}／行顶 ${Math.round(tip0.top)}`)
-  ck(`A6 整组高 ${GROUP_H_CSS}rpx（Tips ${TIPS_H_CSS} ＋ 它下面 ${TIPS_MB_CSS} ＋ 左块 ${PERSON_CSS}）`,
+  ck('A4 组外那一行 Tips 不再回来（它搬进右列 `.blk-tips`，整组上方不许再有一行 `.tips`）',
+    (await page.$$('.tips')).length === 0 && (await page.$$('.blk-tips')).length === 1,
+    `.tips ${(await page.$$('.tips')).length} 枚／.blk-tips ${(await page.$$('.blk-tips')).length} 枚`)
+  const [blk0, person0, col0] = await rects(['.home-blk', '.blk-person', '.blk-col'])
+  const cellBox = await page.$$('.blk-cell')
+  const cells0 = []
+  for (const n of cellBox) { const o = await n.offset(); const s = await n.size(); cells0.push({ top: o.top, left: o.left, w: s.width, h: s.height, bottom: o.top + s.height, right: o.left + s.width }) }
+  ck('A5 整组一动不动：组顶 == 左块顶（组没有内边距，第一档就贴着顶）',
+    !!blk0 && !!person0 && Math.abs(blk0.top - person0.top) <= 1,
+    blk0 && person0 && `组顶 ${Math.round(blk0.top)}／块顶 ${Math.round(person0.top)}`)
+  ck(`A6 整组高 ${GROUP_H_CSS}rpx（就是左块那一条，Tips 不再占组外一段；原来 394＝Tips74＋缝12＋块308 那串作废）`,
     !!blk0 && rpxEq(blk0.h, GROUP_H_CSS, 4), blk0 && `${toRpx(blk0.h).toFixed(1)}rpx`)
-  ck('A6b 左块渲染成 308 见方、右两枚各 148 高（全局同名那条把整组裁成 176 的那一刀就红在这里）',
-    !!person0 && rpxEq(person0.w, PERSON_CSS) && rpxEq(person0.h, PERSON_CSS)
-    && !!stat0 && rpxEq(stat0.h, STAT_H_CSS) && stat0.w > 300 * R,
-    person0 && stat0 && `左块 ${toRpx(person0.w).toFixed(0)}×${toRpx(person0.h).toFixed(0)}／右枚宽 ${toRpx(stat0.w).toFixed(0)}`)
-  ck('A6c 两枚同宽且右边缘与整组右边缘对齐（列没吃余量时这里先红）',
-    !!stat0 && !!stat1 && !!blk0 && Math.abs(stat0.w - stat1.w) <= 1
-    && Math.abs(stat1.right - blk0.right) <= 2,
-    stat0 && stat1 && blk0 && `枚右 ${Math.round(stat1.right)}／组右 ${Math.round(blk0.right)}`)
-  // 组底那一条缝：整组是 fixed，顶走 min(66.3%, 100vh−546rpx)，底就落在底栏上方 24rpx。
+  ck(`A6b 左块渲染成 ${PERSON_W_CSS}×${PERSON_H_CSS}（不再 308 见方；全局同名那条把整组裁成 176 的一刀就红在这里）`,
+    !!person0 && rpxEq(person0.w, PERSON_W_CSS) && rpxEq(person0.h, PERSON_H_CSS)
+    && cells0.length === 2 && rpxEq(cells0[0].w, CELL_W_WANT, 3),
+    person0 && cells0[0] && `左块 ${toRpx(person0.w).toFixed(0)}×${toRpx(person0.h).toFixed(0)}／计数枚 ${cells0.length}·宽 ${toRpx(cells0[0].w).toFixed(0)}（该 ${CELL_W_WANT}）`)
+  ck('A6c 两枚计数同宽，右列右边缘与整组右边缘对齐（列没吃余量时这里先红）',
+    cells0.length === 2 && !!col0 && !!blk0 && Math.abs(cells0[0].w - cells0[1].w) <= 1
+    && Math.abs(col0.right - blk0.right) <= 2,
+    cells0.length === 2 && `枚宽 ${toRpx(cells0[0].w).toFixed(0)}・${toRpx(cells0[1].w).toFixed(0)}／列右 ${Math.round(col0 && col0.right)}／组右 ${Math.round(blk0 && blk0.right)}`)
+  // 组底那一条缝：整组是 fixed，顶走 min(66.3%, 100vh−562rpx)（562＝整组 410＋底栏 128＋留白 24，
+  // B 方案之前那条是 546＝Tips74＋缝12＋块308＋底栏128＋24），底就落在底栏上方 24rpx。
   // 这一条守的是"不许插进底栏"，与原来那条"条底不随搬家漂"是同一件事的两种写法。
   ck('A7 组底落在底栏上方一条 24rpx 的缝上（矮屏上 min() 夹的那一头也成立）',
     !!blk0 && Math.abs(blk0.bottom - (tabTop - 24 * R)) < 14,

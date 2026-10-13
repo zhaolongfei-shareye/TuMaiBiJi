@@ -1,20 +1,39 @@
-// 第一屏三块的视觉自证（模拟器里真点、真量，不是读源码）。
-// 前置：docs/工具/跑尺子.sh 9431 验-第一屏三块-真跑
+// 第一屏那一大块（2.2 B 方案）的视觉自证：模拟器里真点、真量，不是读源码。
+// 前置：MP_ROOT=/Users/zlfmac/Documents/TuMaiBiJi-2.2 docs/工具/跑尺子.sh 9431 验-第一屏三块-真跑
 //
-// 这把只回答一件事：**屏上真是那三块吗**。静态那把量的是源码里的数，而"源码写对、渲染不对"
-// 是这一类改版最容易漏的——效果图那一轮左块宽度算成 0（定宽没给 + 兄弟 flex:1），
+// 这把只回答一件事：**屏上真是效果图那一版吗**。静态那把量的是源码里的数，而"源码写对、渲染不对"
+// 是这一类改版最容易漏的——10-10 那一轮左块宽度算成 0（定宽没给 ＋ 兄弟 flex:1），
 // 人物没地方画，屏上是什么都没有，源码里那三个数却一个都没错。
 // 所以这里全部用元素自己的帧（offset/size）来量，rpx 换算按微信那条 rpx = 屏宽/750。
 //
-// 截图落在 docs/design/10-10两入口多方案/模拟器-第一屏.png，直接打开就能对效果图。
+// ⚠ 为什么整把重写：10-11 那版的机器（白条 `.blk-jot`、两枚计数 `.blk-stat-*`、皮挂在
+//   `.container.has-bg` 上）在 B 方案里整层撤了。尺子继续指着那些类名就是**假红**——
+//   摸不到元素不等于渲染错了，是那一层根本不存在了。撤一个状态会作废一批判据，重算过才有新的。
+// 截图落在 docs/design/10-12-2.2全量效果图/实测-首屏2.2.png，打开就能与单屏-B中-01.png 对。
 const automator = require('miniprogram-automator')
 const path = require('path')
 const fs = require('fs')
 
 const ROOT = path.resolve(__dirname, '../..')
-const SHOT = path.join(ROOT, 'docs/design/10-10两入口多方案/模拟器-第一屏.png')
+const SHOT = path.join(ROOT, 'docs/design/10-12-2.2全量效果图/实测-首屏2.2.png')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const PERSON_KEY = 'homePerson'
+
+// 下面这些"该落在哪"的数全从效果图正本换算来（图上 1px＝1rpx），推导写在静态那把
+// `验-第一屏三块.js`；这里只干一件事：在屏上量到它。
+const GROUP_H = 410        // 整组＝那一行左块的高（＝第二屏那张面板的高，同一根顶线）
+const FACE_H = 213         // 上：纯白渐变毛玻璃那一片（＝女那张脚底落在哪，算出来的）
+const BAND_H = 197         // 下：墨黑渐变毛玻璃那一片（410 − 213）
+const OUT_H = 107          // 第二屏框外那一行占的那一段＝面板顶比组顶高出去的数
+const CLAMP = GROUP_H + 128 + 24  // 组顶夹值：整组 ＋ 底栏 ＋ 最少留白 = 562
+const BLEED = 52           // 人物高出内框上沿那一段
+const FIG_W = 220
+const ALT_H = 132          // 剪影按高定，两态同一个数
+const CELL_W = 122         // (308 − 22×2 − 20) / 2
+const COL_W = 382          // 702 − 308 − 12
+const PLUS = 140
+const PLUS_GAP = 40        // 圆 ➕ 顶上与 Tips 那一段之间留的数
+const PANEL_RGB = '35, 37, 44'  // 现网那支墨黑 #23252C，面板与墨面渐变各自的基色
 
 let pass = 0
 const fails = []
@@ -32,9 +51,8 @@ async function main() {
     try { mp = await automator.connect({ wsEndpoint: 'ws://localhost:9431' }); break } catch (e) { await sleep(10000) }
   }
   if (!mp) { console.log('!! 连不上自动化端口，先跑 cli auto'); process.exit(1) }
-  // 保险：自动化通道里"没有 id 的帧"走的是 `emit(method, params)`，而 MiniProgram 是 EventEmitter——
-  // 万一哪天回的是这么一帧，Node 会因为 'error' 没人听而把参数直接抛出来。挂个监听把它变成一行日志，
-  // 顺带把页面报错打出来。（这一把真正撞到的不是它，是下面 §7 那条参数形状；留着不删是因为它便宜。）
+  // 自动化通道里"没有 id 的帧"走的是 `emit(method, params)`，而 MiniProgram 是 EventEmitter——
+  // 万一哪天回的是这么一帧，Node 会因为 'error' 没人听而把参数直接抛出来。挂个监听把它变成一行日志。
   const pageErrs = []
   mp.on('error', (e) => {
     pageErrs.push(e)
@@ -48,7 +66,7 @@ async function main() {
     await sleep(6000)
     page = await mp.currentPage()
   }
-  // 这一屏第一眼就该是收起态；带着上一趟的面板进来会把三块整个换掉。
+  // 这一屏第一眼就该是收起态；带着上一趟的面板进来会把整组换掉（`wx:if="{{!active}}"`）。
   if ((await page.data()).active) { await mp.reLaunch('/pages/create/create'); await sleep(6000); page = await mp.currentPage() }
 
   const sys = await mp.systemInfo()
@@ -56,188 +74,237 @@ async function main() {
   const q = (px) => px / R                  // px → rpx（报数用）
   console.log(`视口 ${sys.windowWidth}×${sys.windowHeight} px（1rpx=${R.toFixed(3)}px）`)
 
-  const rect = async (sel) => {
-    const node = await page.$(sel)
+  const frame = async (node) => {
     if (!node) return null
     const o = await node.offset()
     const s = await node.size()
-    return { top: o.top, left: o.left, w: s.width, h: s.height, bottom: o.top + s.height, right: o.left + s.width }
+    // `size()` 的类型声明写的是 string，实际回的是 number（10-10 那几轮就靠这个数判的）。
+    // 这里统一 Number() 一下：万一哪天真回成 "308px"，`o.top + s.height` 会拼成字符串，
+    // 整把尺子会红得查不出原因。
+    const px = (v) => Number(typeof v === 'string' ? parseFloat(v) : v)
+    const top = px(o.top), left = px(o.left), w = px(s.width), h = px(s.height)
+    return { top, left, w, h, bottom: top + h, right: left + w }
   }
-  const disjoint = (a, b) => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top
+  const rect = async (sel) => frame(await page.$(sel))
+  // 两枚计数**没有各自的类名**（B 方案就是两枚同类的 .blk-cell，靠 catchtap 分 goNotes/goCards），
+  // 所以这里不用 `:first-child` 那种伪类——automator 的选择器引擎认不认它没验过，认错了就是"摸不到＝红"。
+  // 走 `$$` 拿到的那两个节点，再各自往节点里查（Element.$ 是带作用域的）。
+  const cellRect = async (i, sel) => frame(await cells[i].$(sel))
+  const cellText = async (i, sel) => {
+    const n = await cells[i].$(sel)
+    return n ? String(await n.text()).trim() : '(摸不到)'
+  }
+  const cellStyle = async (i, sel, prop) => {
+    const n = await cells[i].$(sel)
+    return n ? String(await n.style(prop)) : '(摸不到)'
+  }
+  const styleOf = async (sel, prop) => {
+    const node = await page.$(sel)
+    return node ? String(await node.style(prop)) : '(摸不到)'
+  }
+  const textOf = async (sel) => {
+    const node = await page.$(sel)
+    return node ? String(await node.text()).trim() : '(摸不到)'
+  }
+  const ariaOf = async (sel) => {
+    const node = await page.$(sel)
+    return node ? String(await node.attribute('aria-label')) : ''
+  }
+  const near = (a, b, tol) => Math.abs(a - b) <= tol
+  /** 渐变到底画没画出来：`background-image` 里数色标。
+      ⚠ 读"这面是不是白半透"不能只读 `background-color`——给的是渐变时它会被静默算成 transparent（10-11 那轮的坑）。 */
+  const gradStops = (s) => (String(s).match(/rgba?\(/g) || []).length
+  const rgbaOf = (s) => {
+    const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/.exec(String(s))
+    return m ? { rgb: `${m[1]}, ${m[2]}, ${m[3]}`, a: m[4] === undefined ? 1 : Number(m[4]) } : null
+  }
 
-  /* ---------- 0. 三块真渲染出来了 ---------- */
+  /* ---------- 0. 这一版的每一枚真渲染出来了 ---------- */
+  const panel = await rect('.stage-panel')
   const blk = await rect('.home-blk')
   const person = await rect('.blk-person')
-  const jot = await rect('.blk-jot')
+  const face = await rect('.blk-face')
+  const count = await rect('.blk-count')
   const wrap = await rect('.blk-figwrap')
   const fig = await rect('.blk-fig')
   const col = await rect('.blk-col')
-  const stN = await rect('.blk-stat-notes')
-  const stC = await rect('.blk-stat-cards')
-  ok('收起态那三块都在（.home-blk／左块／白条／两枚计数）',
-    !!(blk && person && jot && wrap && fig && col && stN && stC),
-    [!blk && '.home-blk', !person && '左块', !jot && '白条', !wrap && '取景窗', !fig && '人物', !stN && '笔记枚', !stC && '卡片枚'].filter(Boolean).join('、') || '都在')
-  if (!person || !stN || !stC) { await mp.close(); report(); return }
+  const tips = await rect('.blk-tips')
+  const plus = await rect('.blk-plus')
+  const cellNodes = await page.$$('.blk-cell')
+  const cells = []
+  for (const n of cellNodes) cells.push(await frame(n))
+  ok('首屏这一版的十一枚都在（深色面板／整组／左块／白面／墨面／取景窗／人物／右列／Tips 格／圆 ➕／两枚计数）',
+    !!(panel && blk && person && face && count && wrap && fig && col && tips && plus) && cells.length === 2,
+    [!panel && '深色面板', !blk && '.home-blk', !person && '左块', !face && '白面', !count && '墨面',
+      !wrap && '取景窗', !fig && '人物', !col && '右列', !tips && 'Tips 格', !plus && '圆 ➕',
+      cells.length !== 2 && `计数枚数=${cells.length}`].filter(Boolean).join('、') || '都在')
+  if (!panel || !person || !face || !count || cells.length !== 2) { await mp.close(); report(); return }
 
-  /* ---------- 1. 几何：屏上量的就是拍的那组数 ---------- */
-  ok('左块渲染成 308 见方（±3rpx：被 flex 拉过就会扁）',
-    Math.abs(q(person.w) - 308) <= 3 && Math.abs(q(person.h) - 308) <= 3,
+  /* ---------- 1. 那一块里外：同顶、同底、两片无缝 ---------- */
+  ok('左块渲染成 308×410（与第二屏那张面板同高；±3rpx，被 flex 拉过就会扁）',
+    near(q(person.w), 308, 3) && near(q(person.h), GROUP_H, 3),
     `${q(person.w).toFixed(1)}×${q(person.h).toFixed(1)}`)
-  ok('右两枚各 148 高且同宽（列没吃余量时宽会跟着塌）',
-    Math.abs(q(stN.h) - 148) <= 3 && Math.abs(q(stC.h) - 148) <= 3 && Math.abs(stN.w - stC.w) <= 1,
-    `笔记 ${q(stN.w).toFixed(1)}×${q(stN.h).toFixed(1)}／卡片 ${q(stC.w).toFixed(1)}×${q(stC.h).toFixed(1)}`)
-  ok('右两枚宽 382（效果图上量的那一个）', Math.abs(q(stN.w) - 382) <= 4, `${q(stN.w).toFixed(1)}`)
-  ok('左块顶与两枚顶齐平（不同顶＝行内被哪样东西顶开了）',
-    Math.abs(person.top - stN.top) <= 2, `差 ${q(person.top - stN.top).toFixed(1)}rpx`)
-  ok('左块与右列、两枚之间都是同一道 12（缝不一致会看着像没对齐）',
-    Math.abs(q(col.left - person.right) - 12) <= 3 && Math.abs(q(stC.top - stN.bottom) - 12) <= 3,
-    `行内 ${q(col.left - person.right).toFixed(1)}／列内 ${q(stC.top - stN.bottom).toFixed(1)}`)
-  ok('卡片那枚右边缘与整组右边缘对齐（三块是一个整体）',
-    Math.abs(col.right - blk.right) <= 2 && Math.abs(stC.right - col.right) <= 2,
-    `组右 ${q(blk.right).toFixed(1)}／列右 ${q(col.right).toFixed(1)}`)
+  ok('白面 213 高、顶与左块同一条线、宽等于块宽（他 10-13「两个人背景用纯白渐变毛玻璃」那一片）',
+    near(q(face.h), FACE_H, 3) && near(face.top, person.top, 2 * R) && near(q(face.w), 308, 3),
+    `高 ${q(face.h).toFixed(1)}／顶差 ${q(face.top - person.top).toFixed(1)}／宽 ${q(face.w).toFixed(1)}`)
+  ok('墨面 197 高、底与左块同一条线、与白面无缝相接（「下方数字区域用黑色毛玻璃」那一片）',
+    near(q(count.h), BAND_H, 3) && near(count.bottom, person.bottom, 2 * R) && near(count.top, face.bottom, 2 * R),
+    `高 ${q(count.h).toFixed(1)}／底差 ${q(count.bottom - person.bottom).toFixed(1)}／缝 ${q(count.top - face.bottom).toFixed(1)}`)
+  ok('两片相加就是那一块（213＋197＝410；对不上＝有一片被哪条声明改过高度）',
+    near(q(face.h + count.h), GROUP_H, 4), `量到 ${q(face.h + count.h).toFixed(1)}`)
+  ok('两枚计数各 122 宽、同顶同高、互不相交，缝是那一道 20',
+    near(q(cells[0].w), CELL_W, 3) && near(q(cells[1].w), CELL_W, 3)
+    && near(cells[0].top, cells[1].top, 2 * R) && near(cells[0].h, cells[1].h, 2 * R)
+    && cells[0].right <= cells[1].left + 1 && near(q(cells[1].left - cells[0].right), 20, 3),
+    `宽 ${q(cells[0].w).toFixed(1)}／${q(cells[1].w).toFixed(1)}，缝 ${q(cells[1].left - cells[0].right).toFixed(1)}`)
+  ok('两枚都待在墨面那一片里面（溢出到白面就是 absolute 那几条掉了一层）',
+    cells.every((c) => c.top >= count.top - 1 && c.bottom <= count.bottom + 1),
+    `墨面 ${q(count.top).toFixed(1)}~${q(count.bottom).toFixed(1)}／格 ${cells.map((c) => `${q(c.top).toFixed(1)}~${q(c.bottom).toFixed(1)}`).join('、')}`)
+  ok('右列宽 382、与左块同顶同底、顶上那道缝 12（列没吃余量时宽会跟着塌）',
+    near(q(col.w), COL_W, 4) && near(col.top, person.top, 2 * R) && near(col.bottom, person.bottom, 2 * R)
+    && near(q(col.left - person.right), 12, 3),
+    `宽 ${q(col.w).toFixed(1)}／顶底差 ${q(col.top - person.top).toFixed(1)}・${q(col.bottom - person.bottom).toFixed(1)}／缝 ${q(col.left - person.right).toFixed(1)}`)
+  ok('整组左右各留 24、通到同一根右边线（组宽 702）',
+    near(q(blk.w), 702, 3) && near(q(blk.left), 24, 2) && near(blk.right, col.right, 2 * R),
+    `宽 ${q(blk.w).toFixed(1)}／左 ${q(blk.left).toFixed(1)}`)
 
-  /* ---------- 2. 人物：上半真出血、下半真没压住白条 ---------- */
-  ok('人物上沿高过左块上沿（出血 52rpx，量到 40~64 都算成立）',
+  /* ---------- 2. 圆 ➕ 与 Tips 那一格（他这两句都点过名） ---------- */
+  ok('圆 ➕ 渲染成 140 见方（不是 110、也不是被 flex 压扁的椭圆）',
+    near(q(plus.w), PLUS, 3) && near(q(plus.h), PLUS, 3) && near(q(plus.right - plus.left), PLUS, 3),
+    `${q(plus.w).toFixed(1)}×${q(plus.h).toFixed(1)}`)
+  ok('圆 ➕ 落在右列正中（他 10-13「右下的圆按钮要往中间靠，现在太边缘了，不行」）',
+    near(q(plus.left + plus.w / 2), q(col.left + col.w / 2), 3),
+    `圆心 x ${q(plus.left + plus.w / 2).toFixed(1)}／列中线 x ${q(col.left + col.w / 2).toFixed(1)}`)
+  ok('圆 ➕ 贴住这一列的底，顶上留出与 Tips 那一段的 40',
+    near(plus.top, col.bottom - PLUS * R, 2 * R) && near(q(tips.bottom - plus.top), PLUS_GAP + PLUS, 6),
+    `底差 ${q(plus.top - (col.bottom - PLUS * R)).toFixed(1)}／Tips 格底到 ➕ 顶 ${q(plus.top - tips.bottom).toFixed(1)}`)
+  ok('Tips 格吃满 ➕ 以上那一段（顶贴列顶，不悬空也不重叠）',
+    near(tips.top, col.top, 2 * R) && near(q(tips.h), GROUP_H - PLUS - PLUS_GAP, 6),
+    `顶差 ${q(tips.top - col.top).toFixed(1)}／高 ${q(tips.h).toFixed(1)}`)
+  const line = await rect('.blk-tips-line')
+  const dot = await rect('.tips-dot')
+  ok('Tips 在那一格里上下居中（他 10-13「每个图片 Tips 处在区域，Tips 要上下居中对齐」）',
+    !!line && near(q((line.top + line.h / 2) - (tips.top + tips.h / 2)), 0, 6),
+    line ? `句子中心 ${q(line.top + line.h / 2).toFixed(1)}／格子中心 ${q(tips.top + tips.h / 2).toFixed(1)}` : '屏上没有 .blk-tips-line')
+  // 点跟着**第一行**走：折成两三行时 `line.h` 是两三行的总高，所以比的是"点中心落在第一行那 33.6 里"，
+  // 不是"落在整段中间"（那是原来 `.out-dot` 的 align-self:flex-start 想说的同一件事）。
+  const lineH = parseFloat(await styleOf('.blk-tips-line', 'line-height'), 10)
+  ok('小圆点落在句子第一行的正中（14 见方，比现档小字还低一档）',
+    !!dot && near(q(dot.w), 14, 2)
+    && Math.abs((dot.top + dot.h / 2) - (line.top + Math.min(lineH, line.h) / 2)) <= 4 * R,
+    dot ? `点 ${q(dot.w).toFixed(1)}见方·中心 ${q(dot.top + dot.h / 2).toFixed(1)}／第一行中心 ${q(line.top + Math.min(lineH, line.h) / 2).toFixed(1)}（行高 ${q(lineH).toFixed(1)}）` : '屏上没有 .tips-dot')
+  const tipText = await textOf('.blk-tips-line')
+  ok('屏上那句 Tips 真有内容（轮播起来之后不许是空串——空了那一格就塌）',
+    tipText.length > 3 && tipText !== '(摸不到)', JSON.stringify(tipText.slice(0, 24)))
+
+  /* ---------- 3. 取景窗与人物：出血、贴住黑条、剪影按高定 ---------- */
+  ok('人物上沿高过左块上沿（出血 52rpx，量到 40~64 都算成立；他 10-13「人头要高于内框上沿，与目前现网一样」）',
     person.top - fig.top >= 40 * R && person.top - fig.top <= 64 * R,
     `出血 ${q(person.top - fig.top).toFixed(1)}rpx`)
-  ok('取景窗下沿不低过白条上沿（低过头就是人物压住「记下来」）',
-    wrap.bottom <= jot.top + 2 * R, `窗底 ${q(wrap.bottom).toFixed(1)}／白条顶 ${q(jot.top).toFixed(1)}`)
-  ok('白条贴在左块最下面那一段（底对齐、宽等于块宽）',
-    Math.abs(jot.bottom - person.bottom) <= 2 && Math.abs(jot.w - person.w) <= 2,
-    `白条 ${q(jot.w).toFixed(1)}×${q(jot.h).toFixed(1)}`)
-  // 这一条挪到"换到男那张之后"再量（见 §6 末）：女那张 219×318 与窗高 260 只差一点点，
-  // 真正吃到这一刀的是男那张。在女那一张上量，这条几乎是在空转。
-  const jotText = await (await page.$('.blk-jot-l')).text()
-  ok('左块那句是「记下来」（现网字典那一条，不是效果图草稿）',
-    /记下来|Jot it down/.test(jotText), JSON.stringify(jotText))
-  // 三块的无障碍名字要在**屏上**成立才算数：静态只能证明 markup 写了，证明不了渲染层认这个属性
-  // （小程序里 aria-label 不是所有节点都吃得下去）。10-10 实测 `attribute('aria-label')` 读得到。
-  const ariaOf = async (sel) => {
-    const e = await page.$(sel)
-    return e ? await e.attribute('aria-label') : ''
-  }
-  const dd = await page.data()
-  const t = dd.t                                   // 拿这一页自己那份字典比，不另 require 一份（两份真相）
+  ok('取景窗上沿就是那块出血的顶（−52）、下沿正好坐在黑条顶上（"下方不能悬空要与黑条靠着"）',
+    near(q(wrap.top - person.top), -BLEED, 3) && near(wrap.bottom, count.top, 2 * R),
+    `窗顶差 ${q(wrap.top - person.top).toFixed(1)}／窗底 ${q(wrap.bottom).toFixed(1)} vs 黑条顶 ${q(count.top).toFixed(1)}`)
+  ok('窗高 161（410 − 52 − 197 那条等式在屏上成立）',
+    near(q(wrap.h), GROUP_H - BLEED - BAND_H, 3), `${q(wrap.h).toFixed(1)}`)
+  ok('主人物按宽定高：220 宽、女那张算出 264.6 高（写死方盒子会把其中一张拉扁）',
+    near(q(fig.w), FIG_W, 3) && near(q(fig.h), 220 * 433 / 360, 6),
+    `${q(fig.w).toFixed(1)}×${q(fig.h).toFixed(1)}`)
+  const figZ = parseFloat(await styleOf('.blk-fig', 'z-index'), 10)
+  const altZ = parseFloat(await styleOf('.blk-fig-alt', 'z-index'), 10)
+  ok('剪影真在主人物后面（z 序 2 对 1；反了就是"大的挡小的"那一眼）',
+    figZ > altZ, `主 ${figZ}／剪影 ${altZ}`)
+
+  /* ---------- 4. 数字那一格的次序与字阶（他点名的两句话） ---------- */
+  const d4 = await page.data()
+  const t4 = d4.t
+  const num0 = await cellRect(0, '.blk-num')
+  const rule0 = await cellRect(0, '.blk-rule')
+  const lab0 = await cellRect(0, '.blk-lab')
+  ok('数字在横线上方、分类名在横线下方（同一条线不许交叉）',
+    !!num0 && !!rule0 && !!lab0 && num0.bottom <= rule0.top + 2 * R && rule0.bottom <= lab0.top + 2 * R,
+    num0 ? `数字底 ${q(num0.bottom).toFixed(1)}／线 ${q(rule0.top).toFixed(1)}~${q(rule0.bottom).toFixed(1)}／名顶 ${q(lab0.top).toFixed(1)}` : '三件没量全')
+  ok('横线渲染成 88×2（那条"下划线可点击"的就是它，不是文字自带的 underline）',
+    !!rule0 && near(q(rule0.w), 88, 3) && near(q(rule0.h), 2, 1.5),
+    rule0 ? `${q(rule0.w).toFixed(1)}×${q(rule0.h).toFixed(1)}` : '')
+  ok('数字 64、分类名走现成那档小字（18=--fs-micro，不为一枚名字另起一架字号）',
+    near(q(parseFloat(await cellStyle(0, '.blk-num', 'font-size'), 10)), 64, 2)
+    && near(q(parseFloat(await cellStyle(0, '.blk-lab', 'font-size'), 10)), 18, 1),
+    `数字 ${q(parseFloat(await cellStyle(0, '.blk-num', 'font-size'), 10)).toFixed(1)}rpx／名 ${q(parseFloat(await cellStyle(0, '.blk-lab', 'font-size'), 10)).toFixed(1)}rpx`)
+  ok('屏上两枚数字就是这个真数（不是 setData 里的另一份，也不是效果图那两个占位）',
+    (await cellText(0, '.blk-num')) === String(d4.noteCount) && (await cellText(1, '.blk-num')) === String(d4.cardCount)
+    && !(d4.noteCount === 128 && d4.cardCount === 46),
+    `屏上 ${(await cellText(0, '.blk-num'))}・${(await cellText(1, '.blk-num'))} vs data ${d4.noteCount}・${d4.cardCount}`)
+  ok('两枚名字就是屏上那两格已有的词（笔记／卡片），不借屏外新叫法',
+    (await cellText(0, '.blk-lab')) === t4.statNotes && (await cellText(1, '.blk-lab')) === t4.statCards,
+    `${await cellText(0, '.blk-lab')}／${await cellText(1, '.blk-lab')}`)
+
+  /* ---------- 5. 读屏名字在渲染层也认（静态只能证明 markup 写了） ---------- */
   const aPerson = await ariaOf('.blk-person')
-  const aNotes = await ariaOf('.blk-stat-notes')
-  const aCards = await ariaOf('.blk-stat-cards')
-  ok('三块各自有读屏名字，且就是屏上那一句（左块＝「记下来」，两枚＝数字＋那一格的名字）',
-    aPerson === t.barIdle && aNotes === `${dd.noteCount}${t.statNotes}` && aCards === `${dd.cardCount}${t.statCards}`,
-    `${JSON.stringify(aPerson)}／${JSON.stringify(aNotes)}／${JSON.stringify(aCards)}`)
-  // 换人那一枚是一枚透明热区：屏上没有文字，读屏只能靠这一句（不挂就是"有个能点的地方，不知道是什么"）。
+  const aPlus = await ariaOf('.blk-plus')
+  const aNotes = String(await cells[0].attribute('aria-label'))
+  const aCards = String(await cells[1].attribute('aria-label'))
   const aAlt = await ariaOf('.blk-alt-hit')
-  ok('剪影那一枚也有读屏名字（换人这一下不能只有眼睛看得见）',
-    aAlt === t.personSwap, JSON.stringify(aAlt))
-  ok('小字那一行屏上真是「照片 · 链接 · 文字」三个现网标签（不是效果图上那句说明）',
-    (await (await page.$('.blk-jot-s')).text()) === `${t.modePhoto} · ${t.modeUrl} · ${t.modeWrite}`,
-    JSON.stringify(await (await page.$('.blk-jot-s')).text()))
+  ok('左块与圆 ➕ 念的是同一句「记下来」（屏上写的和读屏念的同一句，不许两份真相）',
+    aPerson === t4.barIdle && aPlus === t4.barIdle, `${JSON.stringify(aPerson)}／${JSON.stringify(aPlus)}`)
+  ok('两枚计数念的是「数字＋那一格的名字」（不只念一个数）',
+    aNotes === `${d4.noteCount}${t4.statNotes}` && aCards === `${d4.cardCount}${t4.statCards}`,
+    `${JSON.stringify(aNotes)}／${JSON.stringify(aCards)}`)
+  ok('剪影那枚透明热区也有读屏名字（换人这一下不能只有眼睛看得见）',
+    aAlt === t4.personSwap, JSON.stringify(aAlt))
 
-  /* ---------- 3. 右两枚：图标从白条后面露出来、数字与名字各就各位 ---------- */
-  const ic = await rect('.blk-stat-notes .blk-ic')
-  const strip = await rect('.blk-stat-notes .blk-strip')
-  const nm = await rect('.blk-stat-notes .blk-n')
-  ok('图标上半看得见、下半掉进白条里（"从里面露出来"那一下）',
-    ic.top < strip.top && ic.bottom > strip.bottom,
-    `图 ${q(ic.top).toFixed(0)}~${q(ic.bottom).toFixed(0)}／白条 ${q(strip.top).toFixed(0)}~${q(strip.bottom).toFixed(0)}`)
-  ok('数字与图标两个框不相交（数字被图标压住就是这一条）', disjoint(nm, ic),
-    `数字 ${q(nm.left).toFixed(0)}~${q(nm.right).toFixed(0)}／图标 ${q(ic.left).toFixed(0)}~${q(ic.right).toFixed(0)}`)
-  ok('名字那一行在数字下面（他原话「下移到数字下面」）',
-    strip.top >= nm.bottom - 6 * R, `白条顶 ${q(strip.top).toFixed(1)}／数字底 ${q(nm.bottom).toFixed(1)}`)
-
-  /* ---------- 4. 组顶那条线：比例值与夹值取小的那一个 ---------- */
-  const wantTop = Math.min(sys.windowHeight * 0.663, sys.windowHeight - (394 + 128 + 24) * R)
-  ok('整组顶落在 min(66.3%, 100vh−546rpx) 那一头',
-    Math.abs(blk.top - wantTop) <= 4 * R, `实测 ${blk.top.toFixed(1)} / 该落 ${wantTop.toFixed(1)}`)
-  ok('整组不撞底栏（卡片那枚底下还留得到留白）',
-    sys.windowHeight - stC.bottom >= 23 * R, `底下余 ${q(sys.windowHeight - stC.bottom).toFixed(1)}rpx`)
-
-  /* ---------- 5. 两个计数是真数 ---------- */
-  const d = await page.data()
-  ok('两枚各自有数、都是数字（读不到画 0，不画杠也不留空）',
-    typeof d.noteCount === 'number' && typeof d.cardCount === 'number',
-    `note=${d.noteCount} card=${d.cardCount}`)
-  ok('屏上不是效果图那两个占位（128／46 落进码里就是永远显示假数）',
-    !(d.noteCount === 128 && d.cardCount === 46), `note=${d.noteCount} card=${d.cardCount}`)
-  const shownN = await (await page.$('.blk-stat-notes .blk-n')).text()
-  ok('那一格屏上写的就是这个数', String(shownN).trim() === String(d.noteCount), `${JSON.stringify(shownN)} vs ${d.noteCount}`)
-
-  /* ---------- 6. 点右后方那枚剪影换人（10-10 深夜替掉"连点两下"） ----------
-     那套自数两下的机器撤走之后，这一格量的是三件新东西：
-     ① 剪影在屏上真是"半高、右下、贴在主人物后面那一个角"；② 点它换的是另一个人，而且不顺手开门；
-     ③ 两张位是对调的（换完之后男在前、女当剪影），不是一枚 src 翻两面。
-     storage 会跨轮停在任意一张上，先把画面钉回默认那一态（女在前），否则下面量的就是掷硬币。 */
+  /* ---------- 6. 点右后方那枚剪影换人 ---------- */
   const tapHit = async () => { await (await page.$('.blk-alt-hit')).tap(); await sleep(700) }
   for (let i = 0; i < 2 && (await page.data()).personKey !== 'girl'; i += 1) await tapHit()
   const d6 = await page.data()
   ok('默认那一态：女在前、男在剪影位（两个位各绑一枚，不是一枚 src 翻两面）',
     d6.personKey === 'girl' && /ic-person\.png$/.test(d6.personSrc) && /ic-person-alt\.png$/.test(d6.personAltSrc),
     `${d6.personSrc} / ${d6.personAltSrc}`)
-  const wrap6 = await rect('.blk-figwrap')
-  const fig6 = await rect('.blk-fig')
   const alt6 = await rect('.blk-fig-alt')
   const hit6 = await rect('.blk-alt-hit')
-  ok('剪影真渲染出来了，且高在主人物的 0.40~0.55 档（默认态女当主人 → 约 .50；换人后男当主人 → .41）',
-    !!alt6 && alt6.h > 0 && alt6.h / fig6.h >= 0.40 && alt6.h / fig6.h <= 0.55,
-    alt6 ? `主人物 ${q(fig6.h).toFixed(1)}／剪影 ${q(alt6.h).toFixed(1)} = ${(alt6.h / fig6.h).toFixed(2)}` : '屏上没有 .blk-fig-alt')
+  ok('剪影按高定：屏上 132（两态同一个数；按宽定就是被打回的"换人矮一截"）',
+    !!alt6 && near(q(alt6.h), ALT_H, 3), alt6 ? `高 ${q(alt6.h).toFixed(1)}／宽 ${q(alt6.w).toFixed(1)}` : '屏上没有 .blk-fig-alt')
   ok('剪影落在右下（右缘、底缘都贴到取景窗那两条边）',
-    Math.abs(alt6.right - wrap6.right) <= 2 && Math.abs(alt6.bottom - wrap6.bottom) <= 2,
-    `右差 ${q(alt6.right - wrap6.right).toFixed(1)}／底差 ${q(alt6.bottom - wrap6.bottom).toFixed(1)}rpx`)
+    !!alt6 && near(alt6.right, wrap.right, 2 * R) && near(alt6.bottom, wrap.bottom, 2 * R),
+    alt6 ? `右差 ${q(alt6.right - wrap.right).toFixed(1)}／底差 ${q(alt6.bottom - wrap.bottom).toFixed(1)}` : '')
   ok('热区盖得住剪影本身（宽或高小一档，剪影就有一段点了没反应）',
     !!hit6 && hit6.w >= alt6.w - 1 && hit6.h >= alt6.h - 1,
-    `热区 ${hit6 && hit6.w}×${hit6 && hit6.h} vs 剪影 ${alt6.w}×${alt6.h}`)
+    `热区 ${hit6 && q(hit6.w).toFixed(1)}×${hit6 && q(hit6.h).toFixed(1)} vs 剪影 ${q(alt6.w).toFixed(1)}×${q(alt6.h).toFixed(1)}`)
   const srcBefore = d6.personSrc
   await tapHit()
   const d7 = await page.data()
+  const fig7 = await rect('.blk-fig')
+  const alt7 = await rect('.blk-fig-alt')
   ok('点剪影真的换了人（两个位同时对调）',
     d7.personKey === 'boy' && d7.personSrc !== srcBefore && d7.personAltSrc === srcBefore,
     `${srcBefore} → ${d7.personSrc}（剪影位 ${d7.personAltSrc}）`)
+  ok('换到"男在前"之后剪影还是 132（"要与之前右侧男孩高度一致"量的就是这两行）',
+    !!alt7 && near(q(alt7.h), ALT_H, 3) && Math.abs(alt7.h - alt6.h) <= 2 * R,
+    `默认态 ${q(alt6.h).toFixed(1)} → 换人后 ${alt7 && q(alt7.h).toFixed(1)}`)
+  ok('男那张确实高出取景窗（窗把它裁住，人头仍高于内框上沿；这条在女那张上几乎空转）',
+    fig7.bottom > wrap.bottom + 20 * R && near(q(fig7.h), 220 * 522 / 360, 8),
+    `图底 ${q(fig7.bottom).toFixed(1)}／窗底 ${q(wrap.bottom).toFixed(1)}／自身高 ${q(fig7.h).toFixed(1)}`)
+  ok('换完人窗底仍然坐在黑条顶上（男性下半部不许越过数字那一格）',
+    near(wrap.bottom, (await rect('.blk-count')).top, 2 * R), '')
   ok('换人这一下没顺手把面板升起来（热区吃 catchtap，没冒到左块那一档）',
-    !!(await page.$('.home-blk')) && !(await page.$('.entry-wrap')) && !d7.active,
-    `active=${d7.active}`)
+    !!(await page.$('.home-blk')) && !(await page.$('.entry-wrap')) && !d7.active, `active=${d7.active}`)
   ok('换完写进本机（下次进页还是这一张）',
-    (await mp.callWxMethod('getStorageSync', PERSON_KEY)) === 'boy',
+    unwrap(await mp.callWxMethod('getStorageSync', PERSON_KEY)) === 'boy',
     JSON.stringify(unwrap(await mp.callWxMethod('getStorageSync', PERSON_KEY))))
-  // 换到"男在前"之后再看那道窗——这才是他点出来的态，不是 setData 硬摆的。
-  const figB = await rect('.blk-fig')
-  const wrapB = await rect('.blk-figwrap')
-  const jotB = await rect('.blk-jot')
-  ok('男那张确实高出取景窗（窗把它裁住，这条才不是在空转）',
-    figB.bottom > wrapB.bottom + 20 * R, `图底 ${q(figB.bottom).toFixed(1)}／窗底 ${q(wrapB.bottom).toFixed(1)}`)
-  ok('换完人，窗底仍然不低过白条上沿（这一条是"男性下半部不要遮挡白色横条"那一句）',
-    wrapB.bottom <= jotB.top + 2 * R, `窗底 ${q(wrapB.bottom).toFixed(1)}／白条顶 ${q(jotB.top).toFixed(1)}`)
-  /* R19 13:2x 他那句「切换男孩后，右侧女孩高度太低，要与之前右侧男孩高度一致」量的就是这两行：
-     改按高定之前，同一个 91 宽在两张源件上算出 132／109.5 两档高，换人那一下小人矮 22.5rpx。
-     ⇒ 现在换完态的屏上高必须与默认态对上（差 ≤2rpx 是渲染那一档抖动），且两态比值都还在"约一半"档里。 */
-  const altB = await rect('.blk-fig-alt')
-  ok('换到"男在前"后，剪影（这一态是女那位）的屏上高与默认态一致（"要与之前右侧男孩高度一致"）',
-    !!altB && Math.abs(altB.h - alt6.h) <= 2 * R,
-    `默认态 ${q(alt6.h).toFixed(1)} → 换人后 ${altB && q(altB.h).toFixed(1)}（差 ${altB && q(altB.h - alt6.h).toFixed(1)}rpx）`)
-  ok('换人后剪影对主人物的比值仍在 0.40~0.55（男那张本身比女高 54，这一态落在 .41 是他钉"同高"之后的必然）',
-    !!altB && altB.h / figB.h >= 0.40 && altB.h / figB.h <= 0.55,
-    `主人物 ${q(figB.h).toFixed(1)}／剪影 ${altB && q(altB.h).toFixed(1)} = ${altB && (altB.h / figB.h).toFixed(2)}`)
-  ok('两位之间不留空档：换人后剪影与主人物水平上仍然重叠（"大人和小人之间距离不要太多"）',
-    !!altB && altB.left < figB.right - 2 * R,
-    `剪影左缘 ${altB && q(altB.left).toFixed(1)}／主人物右缘 ${q(figB.right).toFixed(1)}（rpx）`)
   await tapHit()
   const back6 = await page.data()
-  // 收尾必须复原（不留"点过的状态"给下一把尺子），顺带钉他那句"与男的处理一致"的另一半：
-  // 换得过去也换得回来，两张各自都能站到前面来。
-  ok('再点一次换得回原来那一个（女的那张重新站到前面）',
-    back6.personKey === 'girl' && back6.personSrc === srcBefore && /ic-person-alt/.test(back6.personAltSrc),
-    `${back6.personKey}／主 ${back6.personSrc}／剪影 ${back6.personAltSrc}`)
-  // 清残值：站在那一张上是他自己的选择，这一把尺子不该替他留下点过的状态。
-  await mp.callWxMethod('removeStorageSync', PERSON_KEY)
+  ok('再点一次换得回原来那一个（两张各自都能站到前面来）',
+    back6.personKey === 'girl' && back6.personSrc === srcBefore, `${back6.personKey}／主 ${back6.personSrc}`)
+  await mp.callWxMethod('removeStorageSync', PERSON_KEY)   // 清残值：尺子不替他留下点过的状态
 
-  /* ---------- 7. 三块各自的落点 ----------
+  /* ---------- 7. 三个入口各自落点 ＋ 开门零延迟 ----------
      `mp.switchTab(url)` / `mp.reLaunch(url)` 吃的是**字符串**，不是 `{ url }`：传对象会被套成
      `{url:{url:"…"}}` 再交给 wx，报回来的是一句查不出东西的 "Uncaught [object Object]"
-     （10-10 在这把尺子自己身上踩的，不是产品问题）。退到 reLaunch 只是保险——两者走的都是同一条 onShow。 */
+     （10-10 在这把尺子自己身上踩的，不是产品问题）。 */
   const go = async (url) => {
     try { await mp.switchTab(url) } catch (e) { await mp.reLaunch(url) }
     await sleep(3500)
   }
-  // 卡片那枚 = 笔记列表第二枚 tab；标记是一次性的，所以点完还得验证"下一次普通进入回到第一枚"。
-  await (await page.$('.blk-stat-cards')).tap()
+  await cells[1].tap()
   await sleep(3500)
   let cur = await mp.currentPage()
   ok('点卡片那一枚落到笔记列表那一屏', /pages\/index\/index/.test(cur.path || ''), `落在 ${cur.path}`)
@@ -250,7 +317,12 @@ async function main() {
 
   await go('/pages/create/create')
   page = await mp.currentPage()
-  await (await page.$('.blk-stat-notes')).tap()
+  // 换过页面之后上一批元素句柄就作废了（automator 的 Element 绑的是当时那一帧的 id），
+  // 所以这里重新查一次两枚计数，不复用 §4 的 `cells`。
+  const cellsBack = await page.$$('.blk-cell')
+  ok('回到首屏还是两枚计数（换页回来整组重渲染，掉成一枚就是 wx:for/wx:if 那一段写坏）',
+    cellsBack.length === 2, `枚数=${cellsBack.length}`)
+  await cellsBack[0].tap()
   await sleep(3500)
   cur = await mp.currentPage()
   ok('点笔记那一枚也落在列表（默认那一枚）',
@@ -259,9 +331,6 @@ async function main() {
 
   await go('/pages/create/create')
   page = await mp.currentPage()
-  /* 单点左块那一下现在没有定时器挡着（那 300ms 就是他打回上一版的理由）。
-     这里量的是"tap 回来之后到看见 active"这一段：WS 往返本身要几十毫秒，
-     所以阈值给 250ms——旧的实现这一段实测要 300 ＋ 往返，两条判据分得开。 */
   const tTap = Date.now()
   await (await page.$('.blk-person')).tap()
   let tapGap = -1
@@ -269,83 +338,103 @@ async function main() {
     if ((await page.data()).active) { tapGap = Date.now() - tTap; break }
     await sleep(50)
   }
-  ok('单点左块进的是拍照那一档', (await page.data()).active === 'photo',
-    `active=${(await page.data()).active}`)
-  ok('而且零延迟（没有第二下要等）', tapGap > -1 && tapGap < 250, tapGap < 0 ? '没升起来' : `${tapGap}ms`)
+  ok('单点左块进的是拍照那一档', (await page.data()).active === 'photo', `active=${(await page.data()).active}`)
+  ok('而且零延迟（那 300ms 定时器就是他打回上一版的理由，不许回来）',
+    tapGap > -1 && tapGap < 250, tapGap < 0 ? '没升起来' : `${tapGap}ms`)
   await page.callMethod('collapse')
   await sleep(1500)
 
-  /* ---------- 7.5 铺图态这五枚是玻璃、不铺图态是实心（10-11 09:5x 站长定：效果图就是判据） ----------
-     他的原话链：① 打回「漫画人物边缘外部是透明底，没说连衣服也透明了，ICON 也是」＋R1 后半句「按钮ICON不变」；
-     ② 我把这一格撤了之后他两句「新的首页，不支持毛玻璃吗」「哪里有毛玻璃？」；③「尽快改！别浪费我时间！！！！需求+效果图都有」
-     ④「如果效果图你都不去参考，做效果图的意义是什么？」
-     ⇒ 正解不是撤玻璃：**效果图 `.g-blk`／`.g-jot` 那两条本来就是"块面是玻璃、人物与 icon 是实心"**，两头都要——
-       块面按图上落玻璃，插画用 `docs/工具/烘-插画压平.py` 压成实心。资产那一头由 `量-插画压没压.py` 钉（读 PNG alpha 直方图）。
-     ⑤ 10-11 11:0x 又补一句「首页三个块磨玻璃的背景图换成白底再毛玻璃，否则现在如果背景深色的话，毛玻璃就会很暗，13，12 等数字完全看不清」
-     ⑥ 10-11 12:5x 他把 ⑤ 的实现纠正回来：「不是加厚白色，是把原来根据背景风格自动切换的底色，换成白色，
-       然后按照半透明毛玻璃进行处理……假如 100% 白色，半透明 50%，也变成毛玻璃」，并点名 .50 这一档
-       ⇒ 那三块的面＝**一枚白色半透 `--glass-plate`(.50) 单层** ＋ `--glass-bf` 那档糊；
-         壁纸派生那档有色底在这三块上不再吃（不铺图那一态照旧吃它）。
-     ⚠ 我 ⑤ 那版是"白纱 .30 叠白 .70＝合成白 .79"，真机上没有玻璃味，所以这一格现在两头都钉：
-       铺图态必须是**白 .50 单层**，且**不许再出现两层白**（`background-image` 里两枚 white 渐变就红）。
-       读法也跟着换回 `background-color`：单层纯色时它才是真相；给渐变时它会被静默算成 transparent（那是另一坑）。 */
-  const GLASS_SEL = ['.blk-person', '.blk-stat-notes', '.blk-stat-cards', '.blk-jot', '.blk-strip']
-  const PLATED = ['.blk-person', '.blk-stat-notes', '.blk-stat-cards']
-  const readBlks = async () => {
-    const out = {}
-    for (const sel of GLASS_SEL) {
-      const node = await page.$(sel)
-      if (!node) { out[sel] = { bg: '(摸不到)', bi: '(摸不到)', bf: '(摸不到)' }; continue }
-      out[sel] = {
-        bg: String(await node.style('background-color')),
-        bi: String(await node.style('background-image')),
-        bf: String((await node.style('backdrop-filter')) || (await node.style('-webkit-backdrop-filter')) || 'none'),
-      }
-    }
-    return out
+  /* ---------- 8. 展开态那两处：顶线不动、那 107 还在原位 ----------
+     B 方案那句「点击圆形＋，就是第二个屏」＋「左边内框要与第二个图高度对齐」在屏上的意思是：
+     收起/展开换的是中间那块，面板顶与整组顶这条线一个字都不许动。 */
+  const tPlus = Date.now()
+  await (await page.$('.blk-plus')).tap()
+  let plusGap = -1
+  for (let i = 0; i < 20; i += 1) {
+    if ((await page.data()).active) { plusGap = Date.now() - tPlus; break }
+    await sleep(50)
   }
-  const alphaOf = (s) => {
-    const m = /rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([\d.]+)\s*\)/.exec(s)
-    return m ? Number(m[1]) : 1
-  }
-  /** 这一格现在只许一层白：`background-color` 是白半透，`background-image` 里不许再有第二枚白色渐变。
-      ⚠ 判"有没有叠回两层"要按 `linear-gradient(` 切，别按逗号切——渐变内部本来也有逗号，
-      按逗号切会把一层的两个色标当成两层（10-11 那条假红就是这么来的）。 */
-  const whiteLayers = (bi) => String(bi).split(/linear-gradient\(/).slice(1)
-    .filter((l) => /rgba?\(\s*255,\s*255,\s*255/.test(l)).length
-  const APP = fs.readFileSync(`${ROOT}/miniprogram/app.wxss`, 'utf8')
-  const PLATE_CODE = alphaOf(/--glass-plate:\s*(rgba\([^)]*\))/.exec(APP)[1])
-  const VEIL_CODE = alphaOf(/--glass-veil:\s*(rgba\([^)]*\))/.exec(APP)[1])
+  ok('圆 ➕ 也是开门（他原话「如果点击圆形+，就是第二个屏」），且同样零延迟',
+    (await page.data()).active === 'photo' && plusGap > -1 && plusGap < 250,
+    plusGap < 0 ? '没升起来' : `active=${(await page.data()).active}／${plusGap}ms`)
+  const panelOn = await rect('.stage-panel')
+  const outRow = await rect('.out')
+  const entry = await rect('.panel')
+  ok('展开态那 107 那一条真在面板顶上（框外那行小字占的就是这一段）',
+    !!outRow && near(q(outRow.h), OUT_H, 4) && near(outRow.top, panelOn.top, 3 * R),
+    outRow ? `行高 ${q(outRow.h).toFixed(1)}／行顶 ${q(outRow.top).toFixed(1)} vs 面板顶 ${q(panelOn.top).toFixed(1)}` : '屏上没有 .out')
+  ok('两态面板顶是同一条线（收起时量过的那个数，展开不许漂）',
+    near(panelOn.top, panel.top, 3 * R), `收起 ${q(panel.top).toFixed(1)} → 展开 ${q(panelOn.top).toFixed(1)}`)
+  // 这里**只钉顶线、不钉高度**：面板那张的高是 410 还是 490 还挂在他那条待拍上
+  // （画法向下长会压住底栏 56，代码向上长会把 `.out` 那 107 留在面板之上），
+  // 把还没拍的数钉成判据就是拿尺子替他做决定。
+  ok('展开态那张录入面板的顶＝收起态那一组的顶（「左边内框要与第二个图高度对齐」在屏上的意思）',
+    !!entry && near(entry.top, blk.top, 3 * R) && near(entry.top, panelOn.top + OUT_H * R, 3 * R),
+    entry ? `面板顶 ${q(entry.top).toFixed(1)}／组顶 ${q(blk.top).toFixed(1)}／面板顶+107 ${q(panelOn.top + OUT_H * R).toFixed(1)}` : '屏上没有 .panel')
+  await page.callMethod('collapse')
+  await sleep(1500)
+
+  /* ---------- 9. 两片皮与那层面板：糊在、两态都在、字不许翻极性 ----------
+     10-11 那一版的皮挂在 `.container.has-bg` 上（不铺图就没有玻璃），B 方案把皮写成**基础规则**：
+     深色面板是这一屏的底板，铺不铺形象图都在。所以这里量的不是"有没有覆盖"，而是**两态都挂**。
+     另一半是极性的坑：这一屏的字全压在恒深的面上，吃 `--text-*` 那一族的话，壁纸派生的
+     `.bg-light` 一翻就把墨字放到墨面上（直接归零）。恒纸白才是对的。 */
+  const before = await page.data()
+  const readSkins = async (tag) => ({
+    tag,
+    faceImg: await styleOf('.blk-face', 'background-image'),
+    faceBf: String((await styleOf('.blk-face', 'backdrop-filter')) || (await styleOf('.blk-face', '-webkit-backdrop-filter')) || 'none'),
+    bandImg: await styleOf('.blk-count', 'background-image'),
+    bandBf: String((await styleOf('.blk-count', 'backdrop-filter')) || (await styleOf('.blk-count', '-webkit-backdrop-filter')) || 'none'),
+    panelBg: await styleOf('.stage-panel', 'background-color'),
+    panelBf: String((await styleOf('.stage-panel', 'backdrop-filter')) || (await styleOf('.stage-panel', '-webkit-backdrop-filter')) || 'none'),
+    numColor: await styleOf('.blk-num', 'color'),
+    labColor: await styleOf('.blk-lab', 'color'),
+    tipsColor: await styleOf('.blk-tips-in', 'color'),
+  })
   await page.setData({ bgSrc: '' })
   await sleep(2200)
-  const off = await readBlks()
+  const off = await readSkins('不铺图')
   await page.setData({ bgSrc: '/assets/home-bg-portrait.jpg' })
   await sleep(2600)
-  const on = await readBlks()
-  const onSrc = String(((await page.data()) || {}).bgSrc || '')
-  ok('两态对比是在"铺图"那一态收尾的（`bgSrc` 不在，下面那几条全是空转）',
-    /home-bg-portrait/.test(onSrc), onSrc || '(空)')
-  for (const sel of GLASS_SEL) {
-    if (PLATED.includes(sel)) {
-      const w = /^rgba?\(\s*255,\s*255,\s*255\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(on[sel].bg)
-      ok(`${sel} 铺图态是"白 ${PLATE_CODE} 单层"（站长 12:5x 点名的那一档，糊由 backdrop-filter 给）`,
-        !!w && Math.abs((w[1] === undefined ? 1 : Number(w[1])) - PLATE_CODE) < 0.01
-        && whiteLayers(on[sel].bi) === 0,
-        w ? `background-color＝${on[sel].bg}／码里令牌 .${String(PLATE_CODE).slice(2)}（白纱 .${String(VEIL_CODE).slice(2)} 没叠进来）`
-          : `底色不是白半透：${on[sel].bg}`)
-      ok(`${sel} 没被叠回"白纱＋白底"两层（12:03 那一版就是这么把糊吃掉的）`,
-        whiteLayers(on[sel].bi) < 2, `background-image 里白色渐变层数＝${whiteLayers(on[sel].bi)}`)
-      ok(`${sel} 不铺图态仍吃壁纸派生那档有色底（这一层白只在铺图时生效）`,
-        !/^rgba?\(\s*255,\s*255,\s*255/.test(off[sel].bg), `不铺图 background-color＝${off[sel].bg}`)
-    } else {
-      ok(`${sel} 铺图态是半透面（效果图「.g-jot」那一档）`, alphaOf(on[sel].bg) < 0.999, on[sel].bg)
-    }
-    ok(`${sel} 铺图态身上挂着 backdrop-filter（只半透不糊＝白纱，他打回过的那种）`, /blur/.test(on[sel].bf), on[sel].bf)
-    ok(`${sel} 不铺图态没吃本轮那两条玻璃（身上不许挂 backdrop-filter；面本身是 10-10 那版自己的色，不归这一格管）`,
-      off[sel].bf === '(摸不到)' || !/blur/.test(off[sel].bf), `不铺图 ${off[sel].bg}｜${off[sel].bf}`)
+  const on = await readSkins('铺图')
+  for (const s of [off, on]) {
+    const w = rgbaOf(s.faceImg)
+    ok(`${s.tag}那一态：白面真的画出了一条渐变（≥7 个色标，照现网 .page-scrim 那七档）`,
+      gradStops(s.faceImg) >= 7 && !!w && w.rgb === '255, 255, 255',
+      `色标 ${gradStops(s.faceImg)}／首个色 ${s.faceImg.slice(0, 52)}`)
+    ok(`${s.tag}那一态：白面糊挂在身上（只半透不糊＝白纱，他打回过的那种）`, /blur/.test(s.faceBf), s.faceBf)
+    const ink = rgbaOf(s.bandImg)
+    ok(`${s.tag}那一态：墨面也是同串停点的渐变、基色是那支墨（18,20,26），不是照抄 .42→.72`,
+      gradStops(s.bandImg) >= 7 && !!ink && ink.rgb === '18, 20, 26',
+      `色标 ${gradStops(s.bandImg)}／首个色 ${s.bandImg.slice(0, 52)}`)
+    ok(`${s.tag}那一态：墨面糊挂在身上`, /blur/.test(s.bandBf), s.bandBf)
+    const p = rgbaOf(s.panelBg)
+    ok(`${s.tag}那一态：深色面板恒在、且不吃 bgSrc（这是这一屏的底板，不是铺图才有的覆盖层）`,
+      !!p && p.rgb === PANEL_RGB && p.a >= 0.9, `${s.panelBg}`)
+    ok(`${s.tag}那一态：面板身上挂着 backdrop-filter（「上部要做渐变半透明毛玻璃」那一句）`,
+      /blur/.test(s.panelBf), s.panelBf)
+    const n = rgbaOf(s.numColor), l = rgbaOf(s.labColor), tp = rgbaOf(s.tipsColor)
+    ok(`${s.tag}那一态：数字/名字/Tips 三样字全是纸白族（恒深面上不许随壁纸翻成墨）`,
+      !!n && n.rgb === '242, 239, 233' && !!l && l.rgb === '242, 239, 233' && !!tp && tp.rgb === '242, 239, 233',
+      `数字 ${s.numColor}／名 ${s.labColor}／Tips ${s.tipsColor}`)
   }
+  // 极性翻那一态真打一次：`.bg-light` 一挂上，那两条旧翻转规则（已随这一层撤掉）要是还在，
+  // 屏上那三行字会当街翻成墨。这一条在源码里读不出来，只有渲染层认不认得出。
+  await page.setData({ bgLight: true })
+  await sleep(1200)
+  const lit = await readSkins('bg-light')
+  ok('浅壁纸那一态字色不翻（面板恒深，那两条 `.bg-light` 翻转规则确实撤净了）',
+    (rgbaOf(lit.numColor) || {}).rgb === '242, 239, 233' && (rgbaOf(lit.tipsColor) || {}).rgb === '242, 239, 233',
+    `数字 ${lit.numColor}／Tips ${lit.tipsColor}`)
+  await page.setData({ bgLight: !!before.bgLight })
+  await sleep(800)
+  const nowData = await page.data()
+  ok('这一路把页面数据回原样（bgSrc／bgLight 不给下一把尺子留残值）',
+    String(nowData.bgSrc || '') === String(before.bgSrc || '') && !!nowData.bgLight === !!before.bgLight,
+    `回来 ${JSON.stringify(nowData.bgSrc)}／${nowData.bgLight}`)
 
-  /* ---------- 8. 整屏截图（对效果图用） ---------- */
+  /* ---------- 10. 整屏截图（对效果图用） ＋ 报错监听 ---------- */
   ok('这一路走下来页面没有报过错（报了不一定看得出现在这一屏）',
     pageErrs.length === 0, pageErrs.length ? safeJson(pageErrs[0]).slice(0, 200) : '')
   fs.mkdirSync(path.dirname(SHOT), { recursive: true })
@@ -359,8 +448,8 @@ async function main() {
 
 function report() {
   console.log(fails.length
-    ? `\n✗ 第一屏三块 真跑：${pass}/${pass + fails.length} 过　红：${fails.join(' / ')}`
-    : `\n✓ 第一屏三块 真跑：${pass} 条全过`)
+    ? `\n✗ 第一屏 2.2 真跑：${pass}/${pass + fails.length} 过　红：${fails.join(' / ')}`
+    : `\n✓ 第一屏 2.2 真跑：${pass} 条全过`)
   if (fails.length) process.exit(1)
 }
 

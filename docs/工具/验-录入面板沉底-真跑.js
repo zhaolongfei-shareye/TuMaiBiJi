@@ -46,14 +46,15 @@ const CARD_PAD = len(seg('.card'), 'padding')
 const CARD_EDGE = len(seg('.card'), 'border')
 const DOCK_BOTTOM = len(seg('.container.entry-dock .entry-wrap'), 'bottom')
 const INSET = Number(/--sp-3:\s*(\d+)rpx/.exec(appWxss)[1])
-// 收起态 10-10 晚从"一条 128 高的纸白胶囊"换成"三块"（正本 PNG图标.png）：整组高
-// = Tips 那一行 + 它下面那道缝 + 左块那一段，三个数都从样式表现读，不抄在这里。
-const GROUP_H = len(seg('.tips'), 'height') + len(seg('.tips'), 'margin-bottom') + len(seg('.blk-person'), 'height')
+// 2.2 B 方案：整组只有那一行（Tips 从组外那一行搬进右列 `.blk-tips`，组外那行 `.tips` 撤了），
+// 所以整组高＝左块那一段。三个数还是从样式表现读，不抄在这里。
+const GROUP_H = len(seg('.blk-person'), 'height')
 const SWAP_H = len(seg('.home-swap'), 'height')
 const TAB_TOP = Number(/bottom:\s*(\d+)rpx/.exec(barWxss)[1]) + Number(/\.tab-bar\s*\{[\s\S]*?height:\s*(\d+)rpx/.exec(barWxss)[1])
 // 收起态那一组与底栏顶之间最少留多少——不抄数，从组顶那条 `min()` 的夹值反推：
-// 夹值 546 = 整组 GROUP_H ＋ 底栏 TAB_TOP ＋ 最少留白，所以留白就是夹值减掉那两个。
-// （原来这里写死 132，那是纸白胶囊时代"条底落在 618 那一档"的空档，载体换了那个数就没主了。）
+// 夹值 = 整组 GROUP_H ＋ 底栏 TAB_TOP ＋ 最少留白，所以留白就是夹值减掉那两个。
+// （10-11 那版这个夹值是 546＝Tips74＋缝12＋块308＋底栏128＋24；B 方案整组抬成 410 一行 ⇒ 562。
+//   原来这里还写死过 132，那是纸白胶囊时代的空档，载体换了那个数就没主了。）
 const BLK_CLAMP = Number(/calc\(100vh - (\d+)rpx\)/.exec(seg('.home-blk'))[1])
 const MIN_GAP = BLK_CLAMP - GROUP_H - TAB_TOP
 // 期望值读不出来就先大声红一条，别让它带着 NaN 往下跑二十几判据
@@ -131,19 +132,21 @@ const STATES = [
       .map((x) => ({ top: x.top, bottom: x.bottom, h: x.height }))))
   }), CARD_KIDS)
 
-  // ---------- ① 收起态：那三块还在原位（10-10 晚换了载体，原来那条胶囊没了） ----------
-  let [blk, tips, person] = await geo(['.home-blk', '.tips', '.blk-person'])
-  ck('收起态那一组只一枚，且组顶 == Tips 那一行的顶（组没内边距，第一档贴着顶）',
-    !!blk && !!tips && near(blk.top, tips.top, 1),
-    blk && tips && `组顶 ${blk.top.toFixed(1)}／行顶 ${tips.top.toFixed(1)}`)
-  ck(`整组高 ${GROUP_H}rpx（Tips ＋ 那道缝 ＋ 左块，三个数都从样式表现读）`,
+  // ---------- ① 收起态：2.2 那一组还在原位（组外那行 Tips 搬进了右列） ----------
+  let [blk, person, tipsIn] = await geo(['.home-blk', '.blk-person', '.blk-tips'])
+  ck('收起态那一组只一枚，且组顶 == 左块顶（组没内边距，第一档贴着顶）',
+    !!blk && !!person && near(blk.top, person.top, 1),
+    blk && person && `组顶 ${blk.top.toFixed(1)}／块顶 ${person.top.toFixed(1)}`)
+  ck(`整组高 ${GROUP_H}rpx（就是左块那一条；Tips 已在右列里，不再占组外一段）`,
     !!blk && near(blk.h, rpx(GROUP_H), 4), blk && `${(blk.h * 750 / win.windowWidth).toFixed(1)}rpx`)
+  ck('Tips 真在组里（右列那一格），不在组外那一行', !!tipsIn && !!blk && tipsIn.top >= blk.top - 1
+    && tipsIn.bottom <= blk.bottom + 1, tipsIn && `Tips ${tipsIn.top.toFixed(0)}~${tipsIn.bottom.toFixed(0)}／组 ${blk.top.toFixed(0)}~${blk.bottom.toFixed(0)}`)
   // 这条抓的是全局同名那一刀：app.wxss 里 `.blk` 是笔记列表的分类色方块（176 见方 + overflow:hidden），
   // 10-10 落码第一版组名就叫 `.blk`，整组被裁成 176、右两枚宽 0——**静态判据一条都没红**，只有这里量得出来。
-  ck('左块屏上真是 308 见方（被全局同名那条裁走的话这里先红）',
-    !!person && near(person.w, rpx(308), 3) && near(person.h, rpx(308), 3),
+  ck(`左块屏上真是 308×${GROUP_H}（被全局同名那条裁走的话这里先红；308 见方是 B 方案之前那一版）`,
+    !!person && near(person.w, rpx(308), 3) && near(person.h, rpx(GROUP_H), 3),
     person && `${(person.w * 750 / win.windowWidth).toFixed(0)}×${(person.h * 750 / win.windowWidth).toFixed(0)}rpx`)
-  // 组底与底栏顶：`min(66.3%, 100vh−546rpx)` 里那个 546 = 整组 + 底栏 + 最少留白，
+  // 组底与底栏顶：`min(66.3%, 100vh−562rpx)` 里那个 562 = 整组 + 底栏 + 最少留白，
   // 夹住的那一头正好留 MIN_GAP；没夹住（高屏按 66.3%）只会留得更多，所以判"不越过"而不是"等于"。
   ck(`组底不越过底栏顶，且至少留 ${MIN_GAP}rpx（夹值那一头的下界就是它）`,
     !!blk && blk.bottom <= win.windowHeight - rpx(TAB_TOP + MIN_GAP) + 3,
