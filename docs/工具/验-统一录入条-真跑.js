@@ -624,10 +624,12 @@ const ck = (name, ok, got) => {
 
   // ---------- H 英文那一版 ----------
   await top()
-  await mp.evaluate(() => {
-    const app = getApp()
-    if (app.globalData.userInfo) app.globalData.userInfo.language = 'en'
-  })
+  // 走那份共用钉子，不走"直接改 globalData"：10-13 实测这一版会话里 `globalData.userInfo`
+  // 根本不存在（探针回 `hasUserInfo:false`），于是原来那句
+  // `if (app.globalData.userInfo) … = 'en'` 被自己的守卫挡成**空操作**——
+  // 语言一直没换，H1/H2/H3 三条量的是中文，红得像是英文坏了。
+  // `尺子语言钉.js` 的 pin 用的是 Object.assign，没有那一格也会造出来，所以真换得动。
+  await lang.pin(mp, 'en')
   page = await enter('/pages/create/create')
   await sleep(4000)
   d = await page.data()
@@ -650,10 +652,8 @@ const ck = (name, ok, got) => {
     !!sldTxt && !!sldBox && sldTxt.left >= sldBox.left && sldTxt.right <= sldBox.right,
     sldTxt && sldBox && `字 ${Math.round(sldTxt.w)}px／轨道 ${Math.round(sldBox.w)}px`)
   await mp.screenshot({ path: `${OUT}/H-英文链接档.png` })
-  await mp.evaluate(() => {
-    const app = getApp()
-    if (app.globalData.userInfo) app.globalData.userInfo.language = 'zh'
-  })
+  // 这里原来还有一句"改回 zh"的守卫式赋值（同上，空操作）。收尾本来就有
+  // `lang.pin(mp, langBefore)` 把进来时那一档还回去，不需要第二个人做同一件事。
 
   await lang.pin(mp, langBefore)
   await mp.close()
