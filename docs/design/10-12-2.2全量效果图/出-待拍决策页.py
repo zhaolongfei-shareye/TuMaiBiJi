@@ -75,7 +75,8 @@ PLUS = num(CRE, '.blk-plus', 'width')
 PLUS_GAP = num(CRE, '.blk-plus', 'margin-top')
 LIFT = num(CRE, '.out', 'height')                 # 面板顶比组顶高出去那一段＝107
 PANEL_R = num(CRE, '.stage-panel', 'border-radius')
-PANEL_BG = re.search(r'background:\s*(rgba\([^)]*\))', seg(CRE, '.stage-panel')).group(1)
+# 10-13 那一刀之后，实心那档不住在本体上了（本体透明，实心归 `::after`、band 归 `::before`）
+PANEL_BG = re.search(r'background:\s*(rgba\([^)]*\))', seg(CRE, '.stage-panel::after')).group(1)
 PANEL_GRAD = grad(CRE, '.stage-panel::before')
 FACE_GRAD = grad(CRE, '.blk-face')
 BAND_GRAD = grad(CRE, '.blk-count')

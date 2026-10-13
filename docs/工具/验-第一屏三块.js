@@ -308,6 +308,30 @@ ok('两态的顶是同一条线（面板顶 ＝ 那一组顶那一档往上「�
     && (panel.match(/calc\(66\.3% - /g) || []).length >= 2
 })(), `组 top=${declsOf(seg('.home-blk'), 'top').join('｜')}／面板 top=${declsOf(seg('.stage-panel'), 'top').join('｜')}／那一行高 ${num(seg('.out'), 'height')}`)
 
+/* 面板那三段皮的**分工**（他 10-13「新增面板为什么看不到渐变毛玻璃」追出来的）：
+   本体必须透明。实心 .95 一旦写回本体，就与压在它上面的 `::before` 相乘
+   ⇒ band 顶透出 1−(1−.95)(1−.55)＝2.25%、band 底 0.30%，整块 98% 实心，
+   "上部渐变半透明毛玻璃"画了等于没画，而且**静态几何全绿、截图也看不出差别**（它就是那一片墨）。
+   所以这一条只能按结构钉，不能靠眼看。 */
+const sPanel = seg('.stage-panel')
+const sPanelBand = seg('.stage-panel::before')
+const sPanelBody = seg('.stage-panel::after')
+ok('深色面板本体透明（实心只能归 ::after；写回本体＝与 ::before 相乘，band 透出不到 2.3%）',
+  /^(transparent|none)$/i.test(decl(sPanel, 'background')),
+  `本体 background=${decl(sPanel, 'background') || '(没写)'}`)
+const BAND_H_CSS = num(sPanelBand, 'height')
+ok('band 那一段是 ::before 的 .55→.94 两档（同色只走透明度，与正本那一条 gradient 等价）',
+  BAND_H_CSS > 0 && /rgba\(35,\s*37,\s*44,\s*0?\.55\)/.test(decl(sPanelBand, 'background'))
+  && /rgba\(35,\s*37,\s*44,\s*0?\.94\)/.test(decl(sPanelBand, 'background')),
+  `高 ${BAND_H_CSS}／${decl(sPanelBand, 'background') || '(没写)'}`)
+ok('实心 .95 挂在 ::after 上，从 band 底下起、贴到屏底（top 与 ::before 的高是同一个数）',
+  /rgba\(35,\s*37,\s*44,\s*0?\.95\)/.test(decl(sPanelBody, 'background'))
+  && num(sPanelBody, 'top') === BAND_H_CSS && /bottom:\s*0\b/.test(sPanelBody),
+  `::after top=${num(sPanelBody, 'top')}／bottom=${decl(sPanelBody, 'bottom')}／background=${decl(sPanelBody, 'background') || '(没写)'}`)
+ok('糊挂在面板本体上（本体透明又不挂 blur ⇒ 那一段就是一张洞，什么都不糊）',
+  /backdrop-filter:\s*blur/.test(sPanel) && /-webkit-backdrop-filter:\s*blur/.test(sPanel),
+  decl(sPanel, 'backdrop-filter') || '(没写)')
+
 /* ---------- 5. 两个计数来自接口 ---------- */
 /* 原来这一条只挡效果图上那两个旧占位数（128／46）。B 方案稿上写的是「笔记:16 卡片:13」，
    那两个数一样可能被抄进模板——所以改成挡"这一格里是个写死的数字"，不枚举哪两个数。

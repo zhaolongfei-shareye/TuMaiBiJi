@@ -33,7 +33,6 @@ const CELL_W = 122         // (308 − 22×2 − 20) / 2
 const COL_W = 382          // 702 − 308 − 12
 const PLUS = 140
 const PLUS_GAP = 40        // 圆 ➕ 顶上与 Tips 那一段之间留的数
-const PANEL_RGB = '35, 37, 44'  // 现网那支墨黑 #23252C，面板与墨面渐变各自的基色
 
 let pass = 0
 const fails = []
@@ -391,6 +390,7 @@ async function main() {
     bandImg: await styleOf('.blk-count', 'background-image'),
     bandBf: String((await styleOf('.blk-count', 'backdrop-filter')) || (await styleOf('.blk-count', '-webkit-backdrop-filter')) || 'none'),
     panelBg: await styleOf('.stage-panel', 'background-color'),
+    panelH: await styleOf('.stage-panel', 'height'),
     panelBf: String((await styleOf('.stage-panel', 'backdrop-filter')) || (await styleOf('.stage-panel', '-webkit-backdrop-filter')) || 'none'),
     numColor: await styleOf('.blk-num', 'color'),
     labColor: await styleOf('.blk-lab', 'color'),
@@ -414,8 +414,11 @@ async function main() {
       `色标 ${gradStops(s.bandImg)}／首个色 ${s.bandImg.slice(0, 52)}`)
     ok(`${s.tag}那一态：墨面糊挂在身上`, /blur/.test(s.bandBf), s.bandBf)
     const p = rgbaOf(s.panelBg)
-    ok(`${s.tag}那一态：深色面板恒在、且不吃 bgSrc（这是这一屏的底板，不是铺图才有的覆盖层）`,
-      !!p && p.rgb === PANEL_RGB && p.a >= 0.9, `${s.panelBg}`)
+    ok(`${s.tag}那一态：深色面板那一层真在屏上占着下半截（它不吃 bgSrc，两态都得有实测高）`,
+      parseFloat(s.panelH) > 200, `实测高 ${s.panelH}`)
+    ok(`${s.tag}那一态：面板本体是透明的（实心那档只能归 ::after；写回本体＝与 ::before 相乘，`
+      + `band 顶透出不到 2.3% —— 他 10-13「为什么看不到渐变毛玻璃」就是这一刀）`,
+      !!s.panelBg && (/transparent/i.test(s.panelBg) || (!!p && p.a === 0)), `${s.panelBg}`)
     ok(`${s.tag}那一态：面板身上挂着 backdrop-filter（「上部要做渐变半透明毛玻璃」那一句）`,
       /blur/.test(s.panelBf), s.panelBf)
     const n = rgbaOf(s.numColor), l = rgbaOf(s.labColor), tp = rgbaOf(s.tipsColor)

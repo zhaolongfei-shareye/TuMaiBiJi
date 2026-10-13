@@ -3,16 +3,19 @@
 // 每把刀改完就从 .knifebak 还原；进程以任何方式退出都先还原（不碰 git——工作树里有一整轮未提交改动）。
 // 跑法：MP_ROOT=/Users/zlfmac/Documents/TuMaiBiJi-2.2 node docs/工具/刀-第一屏三块反向.js
 // ⚠ ROOT 必须能传：这一支原来把主目录写死在这里。2.2 那条线是独立 worktree，不传就直接把刀
-//   下在**主目录**那三个文件上——那儿还有另一支 agent 未提交的改动。默认值仍是主目录
-//   （与 跑尺子.sh 同一口径：不传就维持历史行为），但首行把树打出来，跑错树一眼看得见；
-//   那棵树里没有对应的尺子时，一条都不落地就退出。
+//   下在**主目录**那三个文件上——那儿还有另一支 agent 未提交的改动。现在默认改成"这份脚本自己
+//   那棵树"（10-13 就真忘传过一次，刀落在主目录三个 create.* 上，改写完才从 .knifebak 还原），
+//   首行仍把树打出来，跑错树一眼看得见；那棵树里没有对应的尺子时，一条都不落地就退出。
 // ⚠ `edit` 只替换第一条命中：下面每一把落刀前都核对过"那一串在本文件里出现几次、第一条是不是想要的那段"
 //   （`--cp-cam` 与 `height: 132rpx` 各有两处，前两处都在首屏那一段里，在 .shut-core 之前）。
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 
-const ROOT = process.env.MP_ROOT || '/Users/zlfmac/Documents/TuMaiBiJi'
+// ROOT 默认取**这一份脚本自己那棵树**（与尺子同一个口径）：10-13 有一次忘了传 MP_ROOT，
+// 默认值把刀下在了主目录那三个 create.* 上（另一支 agent 的树），当场改写完才还原回来。
+// 环境变量仍然优先，跨树抽跑照旧 `MP_ROOT=… node …`。
+const ROOT = process.env.MP_ROOT || path.resolve(__dirname, '../..')
 const RULER = path.join(ROOT, 'docs/工具/验-第一屏三块.js')
 const files = {
   wxss: path.join(ROOT, 'miniprogram/pages/create/create.wxss'),
@@ -98,6 +101,10 @@ const KNIVES = [
     () => edit('wxml', 'hover-class="blk-cell-press"', 'hover-class="blk-cell-pressed"'), '真有一条规则接着'],
   ['面板那一层的层号抬到 9999（通栏贴屏底那一片压过底栏，两格导航点了没反应，而静态几何全对）',
     () => edit('wxss', '.stage-panel {\n  position: fixed;', '.stage-panel {\n  z-index: 9999;\n  position: fixed;'), '深色面板那层的层号低于底栏'],
+  ['把实心 .95 写回面板本体（10-13 那一刀：与压在它上面的 ::before 相乘，band 顶透出不到 2.3%，'
+    + '"上部渐变半透明毛玻璃"画了等于没画，而几何与字色判据全绿）',
+    () => edit('wxss', 'background: transparent;\n  backdrop-filter: blur(26px',
+      'background: rgba(35, 37, 44, 0.95);\n  backdrop-filter: blur(26px'), '深色面板本体透明'],
 ]
 
 let bad = 0
