@@ -162,16 +162,21 @@
 }
 
 /* 块里上面那一格：纯白渐变毛玻璃（他 10-13 原话「两个人背景用纯白渐变毛玻璃……要模仿 ios 效果」）。
-   213 ＝ 女那一张的自然高（220 宽 × 433/360 ＝ 264.6）− 块顶上面那 52 出血，也就是"人物脚底落在哪"。
+   10-13 追打那一刀（「漫画女背景的白框，上部分，往下一点，让头部一半在框外，然后漫画男在框内」）：
+   这一格的上沿不再贴块顶，改成往下 24、高 189，底仍停在 213 那条线（＝墨面上沿，「下方不能悬空」照旧）。
+   24 这个数是从源件量的，不是挑的：女那张 360×433 里发顶（贝蕾帽那截）在第 40 行、下巴在第 210 行，
+   中点 125；块内坐标 ＝ −52（出血）＋ 125 × (220/360) ＝ **24.4** ⇒ 取 24，头正好一半在框外。
+   男剪影那一枚顶在块内 81（窗底 213 − 高 132），81 > 24 ⇒ 整张仍在白框内，这一条同时成立。
+   证据图：`docs/design/10-12-2.2全量效果图/标-女那张头带.png`（每 20 行一条横线并标行号）。
    渐变不自己发明缓动：七个停点的位置照现网 `.page-scrim` 那一条逐档对齐（他 10-13
    「要与现网的渐变的过程一样，内框也要有渐变效果，要有一定半透明」），只把基色换成白；
-   幅度从 .92 收到 .64 是白的这一族，压在墨面板上合成后从上到下差 12 级，肉眼才读得出这是一条渐变。 */
+   停点是百分比，格子从 213 收到 189 之后"平—凹—深"的形状跟着等比走，不另调。 */
 .blk-face {
   position: absolute;
   left: 0;
   right: 0;
-  top: 0;
-  height: 213rpx;
+  top: 24rpx;
+  height: 189rpx;
   box-sizing: border-box;
   border-radius: 34rpx 34rpx 0 0;
   overflow: hidden;
@@ -1121,6 +1126,17 @@
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
 }
 
+/* 首屏那枚圆形 ➕ 的图形单独加粗到 2.4（站长 10-13 追打「还有原内的➕号，稍微粗一点」，
+   D19 甲＝只粗这一枚）。为什么另写一条而不改上面那支：那支是七个落点共用的同一份 mask
+   （快门／小圆／右滑条／粘贴／井格 ➕ 都吃它），改一支等于把整页图形一起加粗，
+   而"上面那批同 1.6、粗细齐"是他 10-08 拍过的口径。
+   ⚠ 两条都要写：iOS 的 WKWebView 只认 `-webkit-mask-image`，只写标准那行在 iPhone 上静默不生效。
+   ⚠ 顺序也说话：这一条与 `.glyph-plus` 同为单类权重，必须写在它**后面**才赢。 */
+.blk-plus-glyph {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
+}
+
 /* 剪贴板（Lucide clipboard）：夹子在顶、板身一个圆角矩形，与上面那批同 24 格、同 1.6 描边。 */
 .glyph-clipboard {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1' /%3E %3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' /%3E%3C/svg%3E");
@@ -1204,12 +1220,17 @@
   -webkit-backdrop-filter: blur(30px) saturate(1.15);
 }
 
-/* 展开态那一态另给一条顶：第二屏框外那行小字 `.out` 高 107，它必须整个坐在这一层上，
-   所以展开时这一层回到往上 107 的那根线（1107 − 107 = 1000）。
-   ⇒ 收起↔展开这一层会往上挪 83rpx；原来那条"两态同一个顶"让位给了"收起态上下留空相等"。 */
-.stage-panel-open {
-  top: calc(66.3% - 107rpx);
-  top: min(calc(66.3% - 107rpx), calc(100vh - 669rpx));
+/* 第二屏那一态另给一根顶：这一层不再跟着 `panelOpen` 上下跳，而是钉在**录入条展开那一档的顶**上。
+   749 ＝ 152（`.entry-wrap` 离底那条）＋ 107（框外那一行 `.out` 的高）＋ 490（面板展开那一档的高）。
+   为什么钉在展开那一档而不是收起那一档：框外那一行「笔记:16 卡片:13」两态都要整个坐在墨面上。
+   10-13 第二屏方案量出来的两处硬伤就是这一刀（正本 `docs/方案-2.2大版本.md` §9.12）：
+   原来收起态这一层顶在 1082、那一行顶在 1000 ⇒ 整行悬在墨面外 83rpx；展开态仍悬 80rpx。
+   钉到 749 之后：展开态那一行正好贴齐（悬空 0），收起态这一层比那一行再往上 80
+   （＝两档面板的高差 490 − 410）⇒ 那一行永远有承托，代价是第二屏的墨面比首屏那一片再高 80。
+   ⚠ 这一条是纯 `calc(100vh − …)`、不套 `min()`：录入条自己是贴底定的（`.entry-wrap` 那条 bottom:152），
+   这一层要跟着同一基准走才永远咬得住它；套 66.3% 那一族比例值会在矮屏上跑到录入条下面去。 */
+.container.entry-dock .stage-panel {
+  top: calc(100vh - 749rpx);
 }
 
 /* 面板顶上那 240rpx：同色渐变 .16 → .94（"我的"页那一路的走法：先透后收口）。
@@ -1441,6 +1462,29 @@
    它自己那一格没有边（基条 `.mini-c` 只有一层 `--face` 面），所以这条只换面。 */
 .container.has-bg .mini-c {
   background: var(--glass-fill);
+}
+
+/* 井格最右端那枚 ➕（已选图之后那一排）漏在这份玻璃名单外——10-13 第二屏方案 D18，站长「按你建议来」。
+   同一排里那几张小图吃 `.th` 那一档面，只有它是 `--cp-field` 实心浅灰，压在玻璃面板上是一块不透明的灰饼。
+   ⚠ `:not(.th-add-dis)` 那一刀是必须的：满了那一态 `.th-add-dis` 只有一枚类（选择器权重 1），
+   而这条是 3 枚，直接写会把"➕ 转灰、边撤掉"那一条静默吃掉（同一元素两个类，权重说话）。 */
+.container.has-bg .th-add:not(.th-add-dis) {
+  background: var(--glass-fill);
+  border-color: var(--glass-hair);
+}
+
+/* ---------- 10-13 第二屏方案 D17 甲：第二屏那两档白纱各抬一档 ----------
+   量出来的事（`docs/方案-2.2大版本.md` §9.12）：首屏那面 `.50` 白纱压在**恒深的墨面板**上，
+   那一片的标准差只有 0.7、而它背后那层墨自己也只有 1.6 ⇒ 糊不出任何东西，看着就是一张均匀的灰饼；
+   同一块纱压在照片上是 41.6。差就差在垫着的东西不是图，是墨。
+   甲案＝在这一屏把两枚令牌各抬一档（面 .72／井 .42），让白面真读得出是"白"，纹理交给墨面那一段渐变自己给。
+   ⚠ 只在这一屏抬：闸挂在 `.entry-dock`（＝`active` 非空）上，首屏那枚圆形 ➕ 照旧吃 `.50`，
+   与还挂着的 D12（首屏那档 .50 要不要一起抬到 .72）分开拍、互不牵连。
+   ⚠ 抬的是**令牌的值**、不是另起一枚令牌：消费方那几条仍写 `var(--glass-plate)`／`var(--glass-fill)`，
+   「页面里不许有第二支白纱」那一条判据圈的是挂了滤镜的块里的字面值，这一条不挂滤镜、走 var()，两不冲突。 */
+.container.entry-dock {
+  --glass-plate: rgba(255, 255, 255, 0.72);
+  --glass-fill: rgba(255, 255, 255, 0.42);
 }
 
 /* ---------- 10-11 那一档"首页三块刷白玻璃"的两条规则，2.2 B 方案一起退 ----------

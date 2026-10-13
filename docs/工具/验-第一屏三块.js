@@ -89,6 +89,8 @@ const sRow = seg('.blk-row')
 const PERSON = num(sPerson, 'width')
 const PERSON_H = num(sPerson, 'height')
 const FACE_H = num(sFace, 'height')
+// 白面上沿离块顶多少：10-13 追打那一刀之前恒为 0（白面贴块顶），现在是女那张头带中点那一档。
+const FACE_TOP = num(sFace, 'top')
 const COUNT_H = num(sCount, 'height')
 const GAP = num(sRow, 'gap')
 // 面板那一档的高度从 `.panel` 现读，不写进判据：他这句「与第二个图高度对齐」说的是**关系**，
@@ -97,9 +99,12 @@ const PANEL_H = num(seg('.panel'), 'height')
 ok('左块宽 308、高与第二屏那块面板同一个数（「左边内框要与第二个图高度对齐」）',
   PERSON === 308 && PERSON_H > 0 && PANEL_H > 0 && PERSON_H === PANEL_H,
   `块 ${PERSON}×${PERSON_H}／面板 ${PANEL_H}`)
-ok('两片皮正好拼成整块，不多不少（对不上就是中间开了缝、或者有一片溢出去）',
-  FACE_H > 0 && COUNT_H > 0 && FACE_H + COUNT_H === PERSON_H,
-  `白面 ${FACE_H} ＋ 墨面 ${COUNT_H} vs 块 ${PERSON_H}`)
+/* 三段的账：白面上沿那一档留空 ＋ 白面 ＋ 墨面 ＝ 整块高。
+   10-13 追打之前白面贴块顶（留空 0），等式退化成"两片皮拼成整块"；现在那 24 是**出血的一部分**，
+   不写进等式的话，中间开缝或有一片溢出去都不红（块顶到白面顶那一条是透明带，屏上就是深色面板）。 */
+ok('三段拼成整块：白面上沿留空 ＋ 白面 ＋ 墨面 ＝ 块高（对不上就是开了缝、或有一片溢出去）',
+  FACE_H > 0 && COUNT_H > 0 && FACE_TOP >= 0 && FACE_TOP + FACE_H + COUNT_H === PERSON_H,
+  `留空 ${FACE_TOP} ＋ 白面 ${FACE_H} ＋ 墨面 ${COUNT_H} vs 块 ${PERSON_H}`)
 /* ⚠ 这一条是他 10-13 那一刀的正面口径：「两个人切换到大人时候，人头要高于内框上沿，与目前现网一样」。
    上一版把 overflow 写在卡上，上面那 52rpx 的出血被裁平、人头齐根断。卡这一层从此只能不裁。 */
 ok('卡自己不许出现 overflow（裁在卡上＝把出血那 52 一起切掉，人头被切平）',
@@ -153,8 +158,23 @@ ok('人物上边出血 52rpx（这就是"超出内框上沿"那一下，归 0 �
    或者压进数字（窗底 > 墨面高）。 */
 ok('窗底与墨面上沿是同一条线（悬空 或 压进数字都算红）',
   WRAP_BOTTOM === COUNT_H, `窗底 ${WRAP_BOTTOM} vs 墨面 ${COUNT_H}`)
+const FIG_SRC_W = (() => { const b = fs.readFileSync(P('assets/ic-person.png')); return b.readUInt32BE(16) })()
+/* 女那张的头带两行（发顶＝贝蕾帽那一截、下巴）：从 `docs/design/10-12-2.2全量效果图/标-女那张头带.png`
+   逐行读出来的（那张图每 20 行一条横线并标行号），不是估的。源件 360×433，块内缩放比 ＝ 220/360。 */
+const CROWN_ROW = 40, CHIN_ROW = 210
+const HEAD_MID_BLOCK = -OVER + ((CROWN_ROW + CHIN_ROW) / 2) * (FIG_W / FIG_SRC_W)
+const ALT_TOP = PERSON_H - WRAP_BOTTOM - num(seg('.blk-fig-alt'), 'height')   // 男剪影在块内的顶（窗底 213 − 高 132）
 ok('窗高等于女那张按宽缩放的自然高（脚底刚好落在墨面上沿，一个像素不悬空）',
-  FIG_W + OVER > 0 && FACE_H + OVER === FIG_F, `窗高 ${FACE_H + OVER} vs 女那张 ${FIG_F}`)
+  FIG_W + OVER > 0 && (PERSON_H - WRAP_BOTTOM) + OVER === FIG_F,
+  `窗高 ${(PERSON_H - WRAP_BOTTOM) + OVER} vs 女那张 ${FIG_F}`)
+/* 站长 10-13 追打那一句的两半，各钉一条：「漫画女背景的白框，上部分，往下一点，让头部一半在框外，
+   然后漫画男在框内」。原来这两句是"白面贴块顶 ＋ 窗顶出血 52"，白面顶在 0、女那张头带跨 −28..76
+   ⇒ 只有出血那 28 在框外（约头的 28%），不是"一半"。 */
+ok('白面上沿落在女那张的头带中点（±2rpx 内）⇒ 头部一半在框外',
+  FACE_TOP > 0 && Math.abs(FACE_TOP - HEAD_MID_BLOCK) <= 2,
+  `白面顶 ${FACE_TOP} vs 头带中点 ${HEAD_MID_BLOCK.toFixed(1)}（发顶 ${CROWN_ROW}／下巴 ${CHIN_ROW}）`)
+ok('男剪影整张仍在白框内（它的顶必须低于白面上沿，否则这一刀把它也推出框了）',
+  ALT_TOP > FACE_TOP, `剪影顶 ${ALT_TOP} vs 白面顶 ${FACE_TOP}`)
 ok('人物只定宽、高由 widthFix 算（两张图比例不同：女 0.832／男 0.689，写死方盒会拉扁）',
   /width:\s*\d+rpx/.test(sFig) && !/height:/.test(sFig) && /mode="widthFix"/.test(wxml))
 ok('男那张（更高）也在同一道窗里被裁齐：源件比例确实不同、且确实高出窗顶',
@@ -318,12 +338,22 @@ ok('收起态：面板顶到组顶的留空 ＝ 组顶夹值里那口"离底栏�
   return /min\(/.test(panel) && /min\(/.test(group) && breathe > 0 && pShift === breathe
     && pClamp === gClamp + pShift && (panel.match(/calc\(66\.3% - /g) || []).length >= 2
 })(), `夹值 ${numIn(topOf('.home-blk'), /calc\(100vh - (\d+)rpx\)/)}／块高 ${PERSON_H}／底栏占 ${BREATHE}／面板上移 ${numIn(topOf('.stage-panel'), /calc\(66\.3% - (\d+)rpx\)/)}`)
-ok('展开态：那一层回到往上「框外那行的高」那根线，且 wxml 真的挂了这个类', (() => {
-  const open = topOf('.stage-panel-open')
-  return /min\(/.test(open)
-    && numIn(open, /calc\(66\.3% - (\d+)rpx\)/) === num(seg('.out'), 'height')
-    && /class="stage-panel\{\{panelOpen \? ' stage-panel-open' : ''\}\}"/.test(wxml)
-})(), `展开态 top=${declsOf(seg('.stage-panel-open'), 'top').join('｜') || '(没写)'}`)
+/* 第二屏那一态的顶：10-13 第二屏方案 D16 甲（站长「按你建议来」）把口径整个换掉了。
+   原来钉的是"展开态回到往上 107 那根线"，实测两态都还悬（收起 83／展开 80）——因为录入条自己是
+   **贴底**定的（bottom:152），而那一层走的是 66.3% 比例值，两条基准在面板 410↔490 换档时不重合。
+   现在这一层跟着录入条同一基准：顶 ＝ 100vh − (离底 152 ＋ 框外那一行 107 ＋ 面板展开 490)，
+   展开态那一行正好贴齐、收起态再往上让出两档面板的高差（80）⇒ 两态都不悬空。
+   `panelOpen` 那个动态类整条撤掉：这一层不再随快门那一排长出第二行而上下跳。 */
+const ENTRY_B = num(seg('.container.entry-dock .entry-wrap'), 'bottom')
+const OUT_H = num(seg('.out'), 'height')
+const OPEN_H = num(seg('.panel-open'), 'height')
+const bandOff = numIn(declsOf(seg('.container.entry-dock .stage-panel'), 'top').join(' | '), /calc\(100vh - (\d+)rpx\)/)
+ok('第二屏：那一层的顶＝录入条展开那一档的顶（框外那一行两态都坐在墨面上）',
+  ENTRY_B > 0 && OUT_H > 0 && OPEN_H >= PANEL_H && bandOff === ENTRY_B + OUT_H + OPEN_H,
+  `顶 calc(100vh − ${bandOff}) vs ${ENTRY_B}＋${OUT_H}＋${OPEN_H}=${ENTRY_B + OUT_H + OPEN_H}`)
+ok('这一层不再挂 `panelOpen`／`.stage-panel-open`（挂着＝收起↔展开还会上下跳 83）',
+  !/stage-panel-open/.test(wxss + wxml) && /class="stage-panel"/.test(wxml),
+  (/\{\{panelOpen[^}]*\}\}/.exec(wxml.match(/class="stage-panel[^"]*"/)?.[0] || '') || ['(已撤)'])[0])
 
 /* 面板那三段皮的**分工**（他 10-13「新增面板为什么看不到渐变毛玻璃」追出来的）：
    本体必须透明。实心 .95 一旦写回本体，就与压在它上面的 `::before` 相乘

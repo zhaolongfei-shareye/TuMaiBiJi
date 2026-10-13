@@ -244,9 +244,16 @@ const MUT = [
   // 这一刀原来锚在 `background: var(--glass-veil);` 那一行上——13:0x 面板与三块都改吃 `--glass-plate` 之后
   // 那行在 create.wxss 里没有了，replace 打空、刀变成没牙（跑出来就是"反向那一刀没切进去"）。
   // 锚点跟着换成现在真实挂在滤镜前面的那一枚令牌。
+  /* ⚠ 10-13 又没牙一次，这一回的因由不同：`String.replace` 只换**第一处**，而
+     `background: var(--glass-plate);\n  backdrop-filter` 这两行在 create.wxss 里第一处落在
+     **`.blk-plus`**（首屏那枚圆形 ➕，行 4223 字节处）而不是 `.container.has-bg .panel`（行 1.1 万之后）。
+     切进 `.blk-plus` 的那支字面白纱，被上面那条 `surfaces` 扫描（只圈 `.container.has-bg` 且带滤镜的块）
+     整个漏掉 ⇒ 刀切了、判据不红。锚点因此加长到"面板那一段独有的后三行"，确保切中的是面板。
+     （10-13 第二屏方案 D17 甲之后，`.container.entry-dock` 里也写了 `--glass-plate` 的字面值——
+     那是**令牌定义**、不是消费方，`surfaces` 那条圈的是 `.container.has-bg` 块里的 `background:`，两不冲突。） */
   ['玻璃面那一档里自己写一支白纱（不走 var()）', 'cr', (s) => s.replace(
-    '  background: var(--glass-plate);\n  backdrop-filter',
-    '  background: rgba(255, 255, 255, 0.44);\n  backdrop-filter')],
+    '  background: var(--glass-plate);\n  backdrop-filter: var(--glass-bf);\n  -webkit-backdrop-filter: var(--glass-bf);\n  border-color: var(--glass-hair);',
+    '  background: rgba(255, 255, 255, 0.44);\n  backdrop-filter: var(--glass-bf);\n  -webkit-backdrop-filter: var(--glass-bf);\n  border-color: var(--glass-hair);')],
   // 锚点必须带行首：10-12 起 me.wxss 里还有一支 `.head-band.has-bg.bg-light .head-scrim::after`，
   // 它含 `.head-scrim::after {` 这个子串，不带 \n 的那一刀会先切中它、于是深态那把刀就没牙了（实测红过一次）。
   ['延段挪回 .head-band（吃不到「调亮度」那枚 opacity）', 'me', (s) => s.replace(

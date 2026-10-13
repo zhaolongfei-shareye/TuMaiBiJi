@@ -277,9 +277,19 @@ ok('camera / album 两个来源仍归 pickImage 管（并进照片那一档的�
 ok('滑动条圆里的图形按三档给：照片=images、链接=link、文字=pen',
   /sldIconFor\(active\)/.test(js) && /photo: 'images', url: 'link', write: 'pen'/.test(js)
   && ['glyph-pen', 'glyph-camera', 'glyph-images', 'glyph-link', 'glyph-plus'].every((c) => wxss.includes('.' + c)))
-// 整套图形只留一个描边重量（原来 1.5 与 1.6 混用，小尺寸上粗细不齐）
+/* 整套图形只留一个描边重量（原来 1.5 与 1.6 混用，小尺寸上粗细不齐）。
+   10-13 第二屏方案 D19 甲开了一条例外：首屏那枚圆形 ➕ 单独粗到 2.4（站长「还有原内的➕号，稍微粗一点」）。
+   例外只给那一枚，所以钉三样：① 重量集合只能是 {1.6} ∪ {那一枚的那两行}；② 那两行必须成对
+   （`-webkit-mask-image` ＋ `mask-image`——只写一条在 iPhone 上静默不生效）；③ 它们必须真落在
+   `.blk-plus-glyph` 自己那一段里（跑到别处＝把整页图形一起加粗，1.6 那一档就没人守了）。 */
 const sw = [...new Set((wxss.match(/stroke-width='[\d.]+'/g) || []).map((x) => x.slice(14, -1)))]
-ok('这一页的图形描边只有一个重量，且是 1.6', sw.length === 1 && sw[0] === '1.6', sw.join(','))
+// 只认选择器**正好**是 `.blk-plus-glyph` 的那几段（文件里它出现两次：基础那条给尺寸与面色，
+// 后一条给 2.4 那支 mask）。用 indexOf 会从第一段起算、把 `}` 之前的内容当成整段，读出来恒为 0。
+const thickLines = [...wxssRaw.matchAll(/(?:^|\n)\.blk-plus-glyph\s*\{([^}]*)\}/g)]
+  .reduce((n, m) => n + ((m[1].match(/stroke-width='2\.4'/g) || []).length), 0)
+ok('这一页的图形描边只有 1.6 那一档（外加首屏圆形 ➕ 单独那一支 2.4）',
+  sw.every((x) => x === '1.6' || x === '2.4') && sw.includes('1.6') && thickLines === 2,
+  `重量 ${sw.join(',')}／➕ 那一段里 2.4 出现 ${thickLines} 次（要 2＝标准＋-webkit- 各一行）`)
 
 // 上屏文字全走字典：注释和属性里出现中文不算"写死"，只看真正会上屏的那几段
 const rendered = wxml.replace(/<!--[\s\S]*?-->/g, '')
