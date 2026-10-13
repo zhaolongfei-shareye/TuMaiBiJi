@@ -34,7 +34,10 @@ for f in ('ic-person.png', 'ic-person-alt.png'):
 NODE = (
     'const m=require("%s/utils/i18n.js");const p=require("%s/utils/palette.js");'
     'const ps=s=>Object.fromEntries(s.split(";").map(v=>{const i=v.indexOf(":");return[v.slice(0,i),v.slice(i+1)]}));'
-    'console.log(JSON.stringify({zh:m.texts("zh"),en:m.texts("en"),pal:{eb:p.entryBlocks("tint-paper"),'
+    # `eb`（`palette.entryBlocks()`）在 2.2 这一支撤了：B 方案把首页右下那两块计数换成了
+    # "数字＋横线＋分类名"那一格和一枚圆 ➕，三块配色那支口整个没 caller（这里也一处没用上）。
+    # 留着这一句只会让本树取字典那一趟直接 TypeError：`p.entryBlocks is not a function`。
+    'console.log(JSON.stringify({zh:m.texts("zh"),en:m.texts("en"),pal:{'
     'ch:p.chromeOf("tint-paper"),cp:ps(p.createSkin("tint-paper")),tipDot:p.TIP_DOT,dim:p.BG_DIMS,'
     'uncat:p.UNCATEGORIZED}}));' % (MP, MP)
 )
@@ -583,7 +586,7 @@ def build(lang):
          '＋ backdrop blur，墨黑 <code>' + INK + '</code>。'
          '<b>左块与第二屏那块面板同一条顶、同一条底（1107–1517，410 高）</b>。'
          '内框分两片皮：<b>上＝白渐变毛玻璃</b>（停点照现网 <code>.page-scrim</code> 那一串，'
-         '透明度 .92→.64，"要有一定半透明"）、<b>下＝黑条</b>（同一串停点、同一串透明度 .58→.72）。'
+         '透明度 .92→.64，"要有一定半透明"）、<b>下＝黑条</b>（同一串停点、透明度 .45→.92）。'
          '黑条那一格高 <b>' + str(NUM_H) + '</b>——这个数不是我拍的，是<b>女那张脚底落在哪</b>算出来的：'
          '取景窗上出血 ' + str(BLEED) + ' ＋ 220 宽 × 433/360 ＝ ' + str(FIG_H_F) + ' 高 ⇒ '
          '人头高于内框上沿、脚与黑条靠住，中间不悬空。数字在横线上方、分类名在下方（整格可点）。'
