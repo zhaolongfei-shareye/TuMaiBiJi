@@ -146,14 +146,22 @@ CELL_W = (PERSON_W - 2 * BAND_PAD - BAND_GAP) / 2
 COL_W = 750 - 2 * BLK_L - PERSON_W - GAP_ROW
 VIEW_H = 1669
 GROUP_TOP = 1107
-# 10-13 那一刀之后这一档不再等于 `.out` 的高：收起态＝组顶往上 24（与块离底栏那口呼吸相等），
-# 展开态才往上 107（`.stage-panel-open`）。两档都从 wxss 现读，不写进这份脚本。
+# 这一档是**首屏**那一片墨的顶：组顶往上 24（与块离底栏那口呼吸相等），从 wxss 现读、不写进这份脚本。
+# ⚠ 第二屏另有**一根钉死的顶**（`.container.entry-dock .stage-panel`，10-13 D16 甲），这一页画的全是首屏，
+# 所以不吃那一根；原来那条 `.stage-panel-open` 已随 D16 甲整条撤掉。
 PANEL_LIFT = float(re.search(r'calc\(66\.3% - ([\d.]+)rpx\)', seg(CRE, '.stage-panel')).group(1))
 PANEL_TOP = GROUP_TOP - PANEL_LIFT
 
 PLATE_CODE = re.search(r'--glass-plate:\s*rgba\(255, 255, 255,\s*([\d.]+)\)', APP).group(1)
 FILL_CODE = re.search(r'--glass-fill:\s*rgba\(255, 255, 255,\s*([\d.]+)\)', APP).group(1)
-PLATE_MOCK, FILL_MOCK = '0.72', '0.42'            # 效果图按这两档画的（§9.8 结论 1、2）
+# 10-13 D17 甲落码：.72／.42 这两档现在是**码里的数**（写在 create.wxss 的 `.container.entry-dock` 上，
+# 只有第二屏吃）。原来这里写死两个字符串当"效果图那一档"，码一改这两串就成了凭印象的数——改成现读，
+# 读不到就退出（落没落这一刀，页上要说实话，不许我替它说"已抬"）。
+_m = re.search(r'\.container\.entry-dock\s*\{[^}]*?--glass-plate:\s*rgba\(255, 255, 255,\s*([\d.]+)\)'
+               r'[^}]*?--glass-fill:\s*rgba\(255, 255, 255,\s*([\d.]+)\)', CRE, re.S)
+if not _m:
+    sys.exit('create.wxss 里读不到 `.container.entry-dock` 那两档 ⇒ D17 甲落没落进码里，不许这份页凭印象画')
+PLATE_MOCK, FILL_MOCK = _m.group(1), _m.group(2)
 PAPER = '#' + re.search(r'--btn-ink:\s*#([\dA-Fa-f]{6})', APP).group(1)
 
 
@@ -203,7 +211,8 @@ def white(a):
 
 INK_TEXT = (0x3A, 0x3A, 0x3C)                     # 面板上那几行字的现网墨（效果图也用它）
 CASES = []
-for tag, plate, fill in (('码里（.50 ＋ .20）', PLATE_CODE, FILL_CODE), ('图上（.72 ＋ .42）', PLATE_MOCK, FILL_MOCK)):
+for tag, plate, fill in ((('首屏码里（%s ＋ %s）' % (PLATE_CODE, FILL_CODE)), PLATE_CODE, FILL_CODE),
+                         (('第二屏已落（%s ＋ %s）' % (PLATE_MOCK, FILL_MOCK)), PLATE_MOCK, FILL_MOCK)):
     f = mix(white(plate), INK)                     # 那块面＝白 α ＋ 糊，压在面板的墨上
     w = mix(white(fill), hx(f))                    # 那口井是**压在那块面上**的，不能再压回墨底（第一版这里算错了一层）
     CASES.append({'tag': tag, 'face': hx(f), 'fill': hx(w),

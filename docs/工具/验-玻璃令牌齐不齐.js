@@ -121,6 +121,31 @@ function evaluate(F) {
   ok('app.wxss 里不许出现 `.container.has-bg`（闸名进全局表会让 验-第一屏三块 那把永久假红）',
     !/\.container\.has-bg/.test(APP))
 
+  /* ---------- 10-13 第二屏方案 D17 甲／D18 落码之后，这两条得有人看着 ----------
+     把 `.container.entry-dock` 那两枚令牌删掉、或把 `.th-add` 从玻璃名单里摘出去，屏上不会报错、
+     静态几何也全绿，而"第二屏那块面糊不出东西"这一整刀就白落了。
+     ⚠ 抬档写的是**令牌的值**（消费方仍走 var()），所以上面那条"页面里不许有第二支白纱"圈不到它——
+     那条只扫 `.container.has-bg` 且带滤镜的块里的 `background:` 字面值。这一条补的是另一个方向。 */
+  const ENTRY = blockOf(CR, '.container.entry-dock')
+  ok('第二屏就地抬的那两档白纱在（面 .72／井 .42），且只有这一屏吃',
+    /--glass-plate:\s*rgba\(255, 255, 255, 0\.72\)/.test(ENTRY)
+    && /--glass-fill:\s*rgba\(255, 255, 255, 0\.42\)/.test(ENTRY),
+    ENTRY.trim().slice(0, 90) || '(create.wxss 里没有 `.container.entry-dock` 那一段)')
+  ok('首屏那两档没被顺手抬走（app.wxss 仍是面 .50／井 .20——D12 那一问还没拍，不许替他答）',
+    /--glass-plate:\s*rgba\(255, 255, 255, 0\.50\)/.test(base)
+    && /--glass-fill:\s*rgba\(255, 255, 255, 0\.20\)/.test(base),
+    `${(/--glass-plate:[^;]*/.exec(base) || ['(缺)'])[0]}／${(/--glass-fill:[^;]*/.exec(base) || ['(缺)'])[0]}`)
+  /* 光钉 app.wxss 那一档不够：在 create.wxss 里再写一条 `.container{--glass-plate:.72}` 就把首屏一起抬了，
+     而上面那两条都还是绿的。所以钉"这一份表里重定义这两枚令牌的选择器只有一个、且就是它"。 */
+  const redef = [...CR.matchAll(/([^{}]*)\{[^}]*--glass-(?:plate|fill)\s*:/g)]
+    .map((m) => m[1].replace(/\s+/g, ' ').trim())
+  ok('create.wxss 里重定义这两枚令牌的只有 `.container.entry-dock` 一处（抬档只挂这一屏的身份）',
+    redef.length === 1 && redef[0] === '.container.entry-dock',
+    redef.join(' ｜ ') || '(一处都没有)')
+  ok('已选那排最右那枚 ➕ 格真在玻璃名单里，且带 `:not(.th-add-dis)` 那道闸',
+    /\.container\.has-bg \.th-add:not\(\.th-add-dis\)\s*\{[^}]*var\(--glass-fill\)/.test(CR),
+    blockOf(CR, '.container.has-bg .th-add:not(.th-add-dis)').trim().slice(0, 60) || '(没这一条)')
+
   ok('首页延段那支暗值＝首页罩层渐变的末档（撞 R6 的那种硬边就红在这里）',
     flat((/background:\s*(rgba\([^)]*\))/.exec(blockOf(IX, '.container.has-bg .head-scrim::after')) || [])[1])
     === lastStop(IX, '.head-scrim'),
@@ -275,6 +300,17 @@ const MUT = [
     'poster.bandGeom(info.width, info.height, poster.HEAD_IMG_H)', 'poster.bandGeom(info.width, info.height, 646)')],
   ['玻璃规则点一枚 markup 里没有的类（`.mini .c` 那一刀）', 'cr', (s) => s.replace(
     '.container.has-bg .mini-c {', '.container.has-bg .mini .c {')],
+  // 10-13 第二屏方案那两刀（D17 甲抬档／D18 ➕ 格挂玻璃）——每一刀对应"这一屏静默退回修前那一档"的一种画法。
+  ['★第二屏那两档抬纱整段删掉（D17 甲白落，那块面退回 .50）', 'cr', (s) => s.replace(
+    '.container.entry-dock {\n  --glass-plate: rgba(255, 255, 255, 0.72);\n  --glass-fill: rgba(255, 255, 255, 0.42);\n}', '')],
+  ['★只抬面不抬井（同一屏两档皮，"齐不齐"这件事又破一次）', 'cr', (s) => s.replace(
+    '  --glass-fill: rgba(255, 255, 255, 0.42);', '  --glass-fill: rgba(255, 255, 255, 0.20);')],
+  ['★把首屏那档也一起抬到 .72（D12 他没拍，这一刀等于替他答了）', 'cr', (s) => s.replace(
+    '.container.entry-dock {', '.container {\n  --glass-plate: rgba(255, 255, 255, 0.72);\n}\n.container.entry-dock {')],
+  ['★➕ 格那道 `:not(.th-add-dis)` 被抹平（满了那一态的"转灰"被三条类推掉）', 'cr', (s) => s.replace(
+    '.container.has-bg .th-add:not(.th-add-dis) {', '.container.has-bg .th-add {')],
+  ['★➕ 格从玻璃名单里整条摘掉（D18 白落）', 'cr', (s) => s.replace(
+    '.container.has-bg .th-add:not(.th-add-dis) {', '.container.has-bg .th-add-XX:not(.th-add-dis) {')],
   // 10-12 浅色那一档的四刀：每一刀都对应"浅态静默不对"的一种画法。
   ['★浅色那态把延段挪回 .head-band（吃不到「调亮度」）', 'me', (s) => s.replace(
     '.head-band.has-bg.bg-light .head-scrim::after {', '.head-band.has-bg.bg-light .head-band::after {')],

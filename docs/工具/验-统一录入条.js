@@ -285,7 +285,7 @@ ok('滑动条圆里的图形按三档给：照片=images、链接=link、文字=
 const sw = [...new Set((wxss.match(/stroke-width='[\d.]+'/g) || []).map((x) => x.slice(14, -1)))]
 // 只认选择器**正好**是 `.blk-plus-glyph` 的那几段（文件里它出现两次：基础那条给尺寸与面色，
 // 后一条给 2.4 那支 mask）。用 indexOf 会从第一段起算、把 `}` 之前的内容当成整段，读出来恒为 0。
-const thickLines = [...wxssRaw.matchAll(/(?:^|\n)\.blk-plus-glyph\s*\{([^}]*)\}/g)]
+const thickLines = [...wxssRaw.matchAll(/(?:^|\n)\.blk-plus \.blk-plus-glyph\s*\{([^}]*)\}/g)]
   .reduce((n, m) => n + ((m[1].match(/stroke-width='2\.4'/g) || []).length), 0)
 ok('这一页的图形描边只有 1.6 那一档（外加首屏圆形 ➕ 单独那一支 2.4）',
   sw.every((x) => x === '1.6' || x === '2.4') && sw.includes('1.6') && thickLines === 2,

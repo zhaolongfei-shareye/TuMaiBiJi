@@ -1131,8 +1131,10 @@
    （快门／小圆／右滑条／粘贴／井格 ➕ 都吃它），改一支等于把整页图形一起加粗，
    而"上面那批同 1.6、粗细齐"是他 10-08 拍过的口径。
    ⚠ 两条都要写：iOS 的 WKWebView 只认 `-webkit-mask-image`，只写标准那行在 iPhone 上静默不生效。
-   ⚠ 顺序也说话：这一条与 `.glyph-plus` 同为单类权重，必须写在它**后面**才赢。 */
-.blk-plus-glyph {
+   ⚠ 选择器必须写成 `.blk-plus .blk-plus-glyph`（两枚类）而**不是**裸 `.blk-plus-glyph`：
+   markup 是 `class="blk-plus-glyph glyph-plus"`，同一枚元素上两个类，裸写就是 1 类 vs 1 类、
+   谁在后面谁赢——今天靠源码顺序赢着，谁挪一下这两段就静默翻回 1.6（效果图与屏上都看不出来）。 */
+.blk-plus .blk-plus-glyph {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
 }
@@ -1184,7 +1186,8 @@
    站长 10-12 原话「在目前背景与框框直接加一层深色面板，面板左上和右上有圆角」
    ＋「深色面板上部要做渐变半透明毛玻璃。类似"我的"效果」；第一稿我画成右侧一块、左下角露着原图，
    整张被打回（「错误，为什么左下角没有背景，参考图是完整的深色面板」）⇒ **通栏**：左右 0、贴到屏底。
-   顶：收起态＝那一组顶往上 24（与块离底栏那口呼吸同值，10-13 那一刀）；展开态回到 107 那一根线（见 `.stage-panel-open`）。
+   顶：**首屏**＝那一组顶往上 24（与块离底栏那口呼吸同值，10-13 那一刀）；**第二屏**另有一根钉死的顶
+   （`.container.entry-dock .stage-panel`，10-13 D16 甲那一刀，理由与那 749 的账写在那一条上）。
    墨取现网那支 #23252C（palette 的 UNCATEGORIZED.bg／`--cp-ink` 同一支），不另起一档深灰；
    上半 240 那一段从 .16 走到 .94、再往下收口成 .95 的近实心——渐变不写在一条 background 上
    是**故意的**：`240rpx` 这种长度落在 linear-gradient() 的参数里，微信的 rpx→px 换算不保证跟得进去，

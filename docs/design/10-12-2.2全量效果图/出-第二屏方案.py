@@ -195,7 +195,7 @@ if not GW:
 GLYPH_W = GW.group(1)
 # 10-13 D19 落码：首屏圆内那枚 ➕ 单开了一支 mask（`.blk-plus-glyph` 自己那一段里给 2.4）。
 # 文件里 `.blk-plus-glyph` 出现两次（一次给尺寸与面色、一次给这支 mask），所以 findall 取**最后**那一段。
-_thick = re.findall(r'\.blk-plus-glyph\s*\{[^}]*?stroke-width=.([\d.]+).', CRE, re.S)
+_thick = re.findall(r'\.blk-plus \.blk-plus-glyph\s*\{[^}]*?stroke-width=.([\d.]+).', CRE, re.S)
 GLYPH_W_BLK = _thick[-1] if _thick else GLYPH_W
 BLK_LIFTED = GLYPH_W_BLK != GLYPH_W
 

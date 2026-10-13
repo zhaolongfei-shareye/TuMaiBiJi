@@ -351,9 +351,10 @@ async function main() {
   await page.callMethod('collapse')
   await sleep(1500)
 
-  /* ---------- 8. 展开态那两处：顶线不动、那 107 还在原位 ----------
+  /* ---------- 8. 第二屏那三处：那一行整段坐在墨上、这层墨在两态之间不动 ----------
      B 方案那句「点击圆形＋，就是第二个屏」＋「左边内框要与第二个图高度对齐」在屏上的意思是：
-     收起/展开换的是中间那块，面板顶与整组顶这条线一个字都不许动。 */
+     收起/展开换的是中间那块，面板顶与整组顶这条线一个字都不许动。
+     10-13 D16 甲又加了一条：这一层墨的顶在第二屏之内也不动（原来它跟着 `panelOpen` 上下跳）。 */
   const tPlus = Date.now()
   await (await page.$('.blk-plus')).tap()
   let plusGap = -1
@@ -364,21 +365,42 @@ async function main() {
   ok('圆 ➕ 也是开门（他原话「如果点击圆形+，就是第二个屏」），且同样零延迟',
     (await page.data()).active === 'photo' && plusGap > -1 && plusGap < 250,
     plusGap < 0 ? '没升起来' : `active=${(await page.data()).active}／${plusGap}ms`)
-  const panelOn = await rect('.stage-panel')
-  const outRow = await rect('.out')
-  const entry = await rect('.panel')
-  ok('展开态那 107 那一条真在面板顶上（框外那行小字占的就是这一段）',
-    !!outRow && near(q(outRow.h), OUT_H, 4) && near(outRow.top, panelOn.top, 3 * R),
-    outRow ? `行高 ${q(outRow.h).toFixed(1)}／行顶 ${q(outRow.top).toFixed(1)} vs 面板顶 ${q(panelOn.top).toFixed(1)}` : '屏上没有 .out')
-  ok('两态的顶**不再是同一条线**（10-13 那一刀）：展开比收起高出去的那一段＝107 − 24',
-    near(panel.top - panelOn.top, (OUT_H - BREATHE) * R, 3 * R),
-    `收起 ${q(panel.top).toFixed(1)} → 展开 ${q(panelOn.top).toFixed(1)}（差 ${q((panel.top - panelOn.top) / R).toFixed(1)}rpx）`)
+  /* 10-13 D16 甲换的就是这一段的口径。原来钉的两条——"那一行的顶＝墨顶"与"展开比收起高 107−24"——
+     量的都是"闸挂在 `panelOpen` 上"那一版，留着就是两条必红的旧尺子。
+     现在第二屏之内这一层是**一根不动的线**，而那行小字要**整段坐在墨上**（顶不在墨顶之下、底不压进面板）。
+     ⚠ 三条全钉屏上量出来的**关系**，不引 100vh 那个绝对值：`windowHeight` 与 CSS 的 `100vh`
+     在带导航条的机型上不是一回事，拿它算绝对顶就是给自己造红（这一族坑在 §8 里记过）。 */
+  const ink1 = await rect('.stage-panel')
+  const row1 = await rect('.out')
+  const pan1 = await rect('.panel')
+  await page.setData({ panelOpen: true })
+  await sleep(500)
+  const ink2 = await rect('.stage-panel')
+  const row2 = await rect('.out')
+  const pan2 = await rect('.panel')
+  await page.setData({ panelOpen: false })
+  await sleep(500)
+  const sits = (row, ink, pan) => !!row && !!ink && !!pan
+    && row.top >= ink.top - 3 * R && row.top + row.h <= pan.top + 3 * R
+  const fmt = (row, ink, pan) => row && ink && pan
+    ? `行 ${q(row.top).toFixed(1)}~${q(row.top + row.h).toFixed(1)}／墨顶 ${q(ink.top).toFixed(1)}／面板顶 ${q(pan.top).toFixed(1)}` : '屏上没有 .out'
+  ok('收起那一态：框外那一行整段坐在墨上（顶不悬在墨外、底不压进面板），高仍是那 107',
+    sits(row1, ink1, pan1) && !!row1 && near(q(row1.h), OUT_H, 4),
+    row1 ? `行高 ${q(row1.h).toFixed(1)}（应 ${OUT_H}）／${fmt(row1, ink1, pan1)}` : '屏上没有 .out')
+  ok('展开那一态：那一行同样整段坐在墨上（顶钉在"展开那一档"就是为了这一态）',
+    sits(row2, ink2, pan2), fmt(row2, ink2, pan2))
+  ok('展开↔收起那一换，这层墨在屏上不动（旧挂法它往上跳 83rpx，那行悬空就是这一跳的因）',
+    !!ink1 && !!ink2 && near(ink1.top, ink2.top, 2 * R),
+    ink1 && ink2 ? `收起 ${q(ink1.top).toFixed(1)} → 展开 ${q(ink2.top).toFixed(1)}` : '量不到 .stage-panel')
+  ok('进第二屏这一层比首屏那一条更高（往上让出框外那一行那一段，两态同一条线）',
+    !!ink1 && ink1.top < panel.top - 20 * R,
+    `首屏 ${q(panel.top).toFixed(1)} → 第二屏 ${q(ink1.top).toFixed(1)}`)
   // 这里**只钉顶线、不钉高度**：面板那张的高是 410 还是 490 还挂在他那条待拍上
   // （画法向下长会压住底栏 56，代码向上长会把 `.out` 那 107 留在面板之上），
   // 把还没拍的数钉成判据就是拿尺子替他做决定。
-  ok('展开态那张录入面板的顶＝收起态那一组的顶（「左边内框要与第二个图高度对齐」在屏上的意思）',
-    !!entry && near(entry.top, blk.top, 3 * R) && near(entry.top, panelOn.top + OUT_H * R, 3 * R),
-    entry ? `面板顶 ${q(entry.top).toFixed(1)}／组顶 ${q(blk.top).toFixed(1)}／面板顶+107 ${q(panelOn.top + OUT_H * R).toFixed(1)}` : '屏上没有 .panel')
+  ok('录入面板的顶＝收起态那一组的顶（「左边内框要与第二个图高度对齐」在屏上的意思）',
+    !!pan1 && near(pan1.top, blk.top, 3 * R),
+    pan1 ? `面板顶 ${q(pan1.top).toFixed(1)}／组顶 ${q(blk.top).toFixed(1)}` : '屏上没有 .panel')
   await page.callMethod('collapse')
   await sleep(1500)
 

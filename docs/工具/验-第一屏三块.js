@@ -318,6 +318,17 @@ ok('容器仍发那套 --cp-*（图形吃 --cp-cam-ink；发在 .panel 上首屏
   /background:\s*var\(--cp-cam-ink\)/.test(seg('.blk-plus-glyph'))
   && /class="container[^"]*"\s+style="\{\{skinPanel\}\}"/.test(wxml)
   && !/class="panel[^"]*"[^>]*style="\{\{skinPanel\}\}"/.test(wxml))
+/* 10-13 D19 甲：首屏圆内那枚 ➕ 单独加粗到 2.4。这里钉的是**选择器的形状**，不只是"有个 2.4"——
+   markup 是 `class="blk-plus-glyph glyph-plus"`，一枚元素两个类，写成裸 `.blk-plus-glyph` 就是
+   1 类 vs 1 类、纯靠源码顺序赢（今天赢着，谁挪一下那两段就静默退回 1.6，屏上看不出来）。
+   两行都必须在：iOS 的 WKWebView 只认 `-webkit-mask-image`。 */
+ok('首屏那枚 ➕ 的 2.4 挂在 `.blk-plus .blk-plus-glyph`（两枚类，不靠源码顺序）且标准＋-webkit- 成对',
+  (() => {
+    const m = /(?:^|\n)\.blk-plus \.blk-plus-glyph\s*\{([^}]*)\}/.exec(wxssRaw)
+    return !!m && (m[1].match(/stroke-width='2\.4'/g) || []).length === 2
+      && /-webkit-mask-image:/.test(m[1]) && /(?<!-webkit-)mask-image:/.test(m[1])
+  })(),
+  (/(?:^|\n)\.blk-plus \.blk-plus-glyph\s*\{/.test(wxssRaw) ? '两行不齐' : '没有那条两枚类的规则'))
 /* 面板顶这一档 10-13 改过口径：原来是"两态同一个顶 ＝ 组顶往上 107（框外那行的高）"，
    站长「深色面板调下…内框与上面外框的距离，要与下方的 tab 面板距离一样」⇒
    **收起态**改成"上下两口留空相等"，**展开态**仍要 107 那根线（`.out` 那 107 必须整个坐在面板上）。
