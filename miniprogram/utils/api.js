@@ -77,7 +77,11 @@ const request = (url, method, data, options = {}, retryCount = 0) => {
           const app = getApp()
           app.globalData.token = ''
           app.globalData.userId = ''
-          app.globalData.userInfo = null
+          // 语言这一格不许跟着身份一起清：屏上已经换成英文，下一次 onShow 从 `userInfo` 读回来
+          // 就是 undefined ⇒ 当场弹回中文（10-14 真跑实测到的，站长那句「切换中英文失效」的另一半
+          // 成因）。身份该清（重登之后可能是另一个号），语言留到那一份被服务器覆盖为止。
+          const keepLang = (app.globalData.userInfo || {}).language
+          app.globalData.userInfo = keepLang ? { language: keepLang } : null
           app.globalData.isLoggedIn = false
           app.globalData.loginPromise = null // Reset login promise to allow retry
           // 解锁凭证跟着登录态一起清：重登之后可能是另一个 generation 的账号，
@@ -125,7 +129,9 @@ const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
           const app = getApp()
           app.globalData.token = ''
           app.globalData.userId = ''
-          app.globalData.userInfo = null
+          // 与上面 `request()` 里同一句：语言这一格跟着身份清掉，界面会在下一次 onShow 弹回中文。
+          const keepLangUp = (app.globalData.userInfo || {}).language
+          app.globalData.userInfo = keepLangUp ? { language: keepLangUp } : null
           app.globalData.isLoggedIn = false
           app.globalData.loginPromise = null
           

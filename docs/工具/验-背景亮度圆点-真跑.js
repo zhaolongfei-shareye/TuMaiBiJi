@@ -7,8 +7,8 @@
 //    为的是三档之间真的分开——默认档本身由①那三条单独钉，不靠采样顺序；
 //  ② 满月那一档照片真的等于原图亮度——罩子的 opacity 实读必须是 0，照片均值必须**离开**弯月那一档
 //     （上一版栽在这条上：以为"不叠新层"＝"不压暗"，实测只有原图的 62%）。
-//     ⚠ "离开"的方向不是固定的"亮回去"：浅照片上那层罩子是**纸白提亮罩**（10-12 的自动翻色），
-//     铺满反而把画面抬亮；深照片上才是压暗罩。方向从屏上现读的 `bgLight` 拿，见 ①② 之间那段。
+//     ⚠ 方向恒为"压暗"：10-13 23:3x 站长第二次打回，浅照片上那支纸白提亮罩已从三页撤净，
+//     罩层只有一支（墨），所以这一把不再从屏上读 `bgLight` 定极性（见 ①② 之间那段）。
 //  ③ 罩子撤干净之后字上没有那道投影（站长 10-02 夜里否掉了它）——这一档的对比只打数不判红，
 //     判据依赖的前提已经不在代码里了，留着就是一条钉着旧方案的假尺子；
 //  ④ 三页吃同一个本机键，在首页点完，笔记页和「我的」页那层罩子跟着一起拧。
@@ -114,18 +114,13 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   await mp.screenshot({ path: shotWan })
   const W0 = photo(shotWan)
   await sleep(500)
-  // ⚠ 罩子的**极性**跟着那张照片走，这是 10-12 那批「背景图深浅自动翻色」落的东西（不是这轮改的）：
-  //   浅照片上 `create.wxss` 把 `.page-scrim` 换成一支**纸白提亮罩**
-  //   （`.container.has-bg.bg-light .page-scrim`，停点位置照压暗罩那条逐档对齐、只把墨换成纸白），
-  //   深照片上才是那支压暗罩。于是"罩子铺满"那一档在浅照片上反而把画面**抬亮**。
-  //   这把尺子原来钉死"满月必须比弯月亮 25%"，10-13 第一次真跑就把一条设计内的行为判成红
-  //   （实测：弯月 160.7 / 半月 143.1 / 满月 125.5，照片是浅的那张）。
-  //   判据改成钉两件事，方向由屏上现读的 `bgLight` 决定，**幅度一分不松**：
-  //   ① 三档真分得开（弯月与满月差 ≥ 25%）；② 罩子越铺满，画面越偏离原图（往哪边偏看极性）。
-  const POLAR = (await page.data()).bgLight ? 1 : -1   // ＋1＝提亮罩（浅照片）；−1＝压暗罩（深照片）
-  // 返回"罩子那一档相对原图那一档偏出去多少"——同号才叫偏，反号就是罩子画反了。
-  const veiled = (veilMean, bareMean) => (veilMean - bareMean) * POLAR
-  console.log(`  ℹ 这一张照片的罩子极性：${POLAR === 1 ? '提亮罩（纸白，照片偏浅）' : '压暗罩（墨，照片偏深）'}`)
+  // 罩子的极性**不再随照片走**：10-13 23:3x 站长第二次打回同一件事
+  // （「背景图，调亮度应该是压暗，现在变成提亮（要对照现网逻辑）」），10-12 那批给浅照片另开的
+  // 那支纸白提亮罩已从三页撤净（`验-玻璃令牌齐不齐` 现在钉的是"谁把它加回来谁红"）。
+  // 于是这一把恒按"罩子铺满＝把画面压暗"判，方向不用再从屏上读 `bgLight`；
+  // 幅度一分没松（≥25%）——上一轮那两条挂在待拍 D20 的"已知红"随提亮罩一起作废。
+  const veiled = (veilMean, bareMean) => bareMean - veilMean   // 正数＝罩子确实把画面压暗了
+  console.log('  ℹ 罩层只有一支（恒压暗）：弯月必须比满月暗，预算 25%')
 
   // ---------- ② 点一下＝满月：罩子拧到 0，照片等于原图亮度 ----------
   const halves = await page.$$('.swap-half')
@@ -152,10 +147,9 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   await mp.screenshot({ path: shotFull })
   await sleep(500)
   const F0 = photo(shotFull)
-  ck('满月那一档照片真的等于原图亮度（与弯月差出一档以上，且方向是"罩子把画面推离原图"）',
+  ck('满月那一档照片真的等于原图亮度（罩子铺满那一档必须比它暗一档以上）',
     veiled(W0.mean, F0.mean) > F0.mean * 0.25,
-    `弯月 ${W0.mean} → 满月 ${F0.mean}｜极性 ${POLAR === 1 ? '提亮罩' : '压暗罩'}·偏量 ${(veiled(W0.mean, F0.mean) / F0.mean * 100).toFixed(1)}%／预算 25%`
-    + '（⚠ 浅照片这一条现在是**已知红**：提亮罩那串 alpha 只有压暗罩的一半，见 方案 §9.16 与待拍 D20）')
+    `弯月 ${W0.mean} → 满月 ${F0.mean}｜压暗 ${(veiled(W0.mean, F0.mean) / F0.mean * 100).toFixed(1)}%／预算 25%`)
   // 站长 10-02 夜里否掉了那道淡投影，撤了。撤完这一档的白字就是直接压在原图上，
   // 这里只把实测对比打出来给他看代价，不钉成红——判据的前提已经不在代码里了。
   const TC = titleC(shotFull)
@@ -214,12 +208,11 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
     const x0 = rpx(head[0].left) + 250, x1 = rpx(head[0].left) + 330
     const y0 = rpx(head[0].top) + 140, y1 = rpx(head[0].top) + 320
     const A0 = lum(shotI0, x0, x1, y0, y1), A2 = lum(shotI2, x0, x1, y0, y1)
-    // 同一件事在笔记页那一层（`.head-scrim`）再钉一遍，极性也按**那一页自己**现读的 bgLight 判，
-    // 不拿首页那一屏的结论过来（两页吃同一张图，但翻色是各页在 onShow 里各算一次的）。
-    const POLAR2 = (await page.data()).bgLight ? 1 : -1
-    ck('笔记页的照片跟着一起离开原图亮度（方向照这一页的罩子极性）',
-      (A2.mean - A0.mean) * POLAR2 > A0.mean * 0.2,
-      `弯月 ${A2.mean} → 满月 ${A0.mean}｜这一页是 ${POLAR2 === 1 ? '提亮罩' : '压暗罩'}·偏量 ${(((A2.mean - A0.mean) * POLAR2) / A0.mean * 100).toFixed(1)}%／预算 20%（同 D20）`)
+    // 同一件事在笔记页那一层（`.head-scrim`）再钉一遍。方向与首页同一个：罩层只有一支、恒压暗
+    // （10-13 那一刀之后不再读 `bgLight` 定极性——两页吃同一张图，但翻色是各页在 onShow 里各算一次的）。
+    ck('笔记页的照片跟着一起被压暗（弯月必须比满月暗两成以上）',
+      A0.mean - A2.mean > A0.mean * 0.2,
+      `弯月 ${A2.mean} → 满月 ${A0.mean}｜压暗 ${(((A0.mean - A2.mean) / A0.mean) * 100).toFixed(1)}%／预算 20%`)
     const C0 = lum(shotI0, rpx(head[1].left), rpx(head[1].left) + 150,
       rpx(head[1].top) + 2, rpx(head[1].bottom) - 2, 'contrast')
     console.log(`!! 笔记页大标题（满月档、无投影）实测：字 ${C0.glyph} / 圈 ${C0.ring} → ${C0.ratio}:1（只报数不判红）`)

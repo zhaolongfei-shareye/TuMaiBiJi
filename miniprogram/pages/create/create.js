@@ -463,7 +463,13 @@ Page({
       return
     }
     const app = getApp()
-    if (app.globalData.userInfo) app.globalData.userInfo.language = key
+    // 这一格**不许带 `if`**。原来写的是 `if (app.globalData.userInfo) userInfo.language = key`，
+    // 而登录没回来的那一档 `userInfo` 就是 null（10-13 探针实测这一趟会话里它根本不存在），
+    // 于是这一句整个是空操作——可下面那句 `this.onShow()` 读语言走的正是同一个地方
+    // （`app.globalData.userInfo?.language || 'zh'`），当场把界面读回中文：
+    // 闪一下英文、又弹回原样，在他那边就是「切换中英文失效」。改成无条件并进去，
+    // 没有那一格也会造出来（同一类写法当天在尺子里也踩过一次，见方案 §9.16 ①）。
+    app.globalData.userInfo = Object.assign({}, app.globalData.userInfo, { language: key })
     this.setData({ lang: key, t: texts(key) })
     this.onShow()
   },

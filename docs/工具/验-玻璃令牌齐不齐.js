@@ -107,6 +107,15 @@ function evaluate(F) {
       && /background:\s*var\(--glass-veil\)\s*;/.test(SH),
      !/--glass-veil-band/.test(SH)].every(Boolean),
     `弹窗index=${/\.ci-card\.glass-dialog\s*\{[^}]*var\(--glass-veil\)\s*;/.test(IX)} 弹窗me=${/\.me-email-card\.glass-dialog\s*\{[^}]*var\(--glass-veil\)\s*;/.test(ME)} 密码面板=${/background:\s*var\(--glass-veil\)\s*;/.test(SH)}`)
+  /* 10-13 23:5x 站长（真机第三张图：「我的」页那层六位密码面板）原话
+     「密码弹窗突然变暗，这个不合理，要亮度不变」⇒ 这一层外面那圈遮罩改成完全透明：
+     六位那一格坐在原来那片墨面上，屏的亮度一个字不动。
+     ⚠ 只改了这一枚。全站另有四支同值的 `.dialog-mask`（app.wxss／me／create／categories），
+       他没指那几处，所以那几处照旧压暗——"去掉"只覆盖他点的那一处。 */
+  ok('六位密码那一层的遮罩不压暗（必须 transparent；那支 rgba(20,20,28,.55) 不许回来）',
+    /\.pwd-mask\s*\{[^}]*background:\s*transparent/.test(SH)
+    && !/\.pwd-mask\s*\{[^}]*background:\s*rgba\(/.test(SH),
+    (blockOf(SH, '.pwd-mask').match(/background:[^;]*/) || ['(没写 background)'])[0])
   // 只管**真挂了滤镜的那几块面**：10-10 那批在照片上垫的 `.srch` 一层 .18 白＋.36 描边是他
   // 上一轮点头那一版里的，不属这一轮的玻璃档（这一轮的档＝带 backdrop-filter 的那几块）；
   // 把它一起圈进来＝尺子越界去重判他已经收过的那一格。
@@ -158,20 +167,18 @@ function evaluate(F) {
     !/\.container\.has-bg \.head::after/.test(IX) && !/^\.head-band::after/m.test(ME)
     && /\.container\.has-bg \.head-scrim::after/.test(IX) && /^\.head-scrim::after/m.test(ME))
 
-  /* ---------- 10-12 背景图是浅色那一档（站长下的需求）：上面每一条规矩在浅态同样成立 ----------
-     浅态是把"压暗罩＋纸白字"整族翻成"提亮罩＋墨字"，所以同一条硬边规矩要再钉一遍；
-     延段仍必须挂在 `.head-scrim` 自己身上（「调亮度」那枚 opacity 照样管着它）。 */
-  const IXA = '.container.has-bg.bg-light .head-scrim'
-  const MEA = '.head-band.has-bg.bg-light .head-scrim'
-  ok('首页浅色那态：延段值＝浅色渐变自己的末档',
-    flat((/background:\s*(rgba\([^)]*\))/.exec(blockOf(IX, `${IXA}::after`)) || [])[1]) === lastStop(IX, IXA),
-    `延段 ${flat((/background:\s*(rgba\([^)]*\))/.exec(blockOf(IX, `${IXA}::after`)) || [])[1])}／末档 ${lastStop(IX, IXA)}`)
-  ok('「我的」浅色那态：延段值＝本页浅色渐变自己的末档',
-    flat((/background:\s*(rgba\([^)]*\))/.exec(blockOf(ME, `${MEA}::after`)) || [])[1]) === lastStop(ME, MEA),
-    `延段 ${flat((/background:\s*(rgba\([^)]*\))/.exec(blockOf(ME, `${MEA}::after`)) || [])[1])}／末档 ${lastStop(ME, MEA)}`)
-  ok('浅色那态两页的延段也挂在 `.head-scrim` 上（挪回 .head-band 就吃不到「调亮度」）',
-    new RegExp(`^\\${IXA}::after`, 'm').test(IX) && new RegExp(`^\\${MEA}::after`, 'm').test(ME)
-    && !/\.bg-light \.head-band::after/.test(ME) && !/\.bg-light \.head::after/.test(IX))
+  /* ---------- 10-13 23:3x 站长翻案：罩层只有一支，永远压暗 ----------
+     原话「背景图，调亮度应该是压暗，现在变成提亮（要对照现网逻辑）」。10-12 那批给浅照片
+     另开了一支纸白提亮罩（`.bg-light` 下的 `.page-scrim`／`.head-scrim` 与各自的延段），
+     今天整族撤掉——罩层那一层不再随图片深浅翻极性，翻的只有字（下面那条还钉着）。
+     原来这三条钉的是"浅色那态的延段值＝浅色渐变的末档"，被撤的状态撑不起判据，
+     所以换成钉反面的不变量（撤一个状态会作废一批判据：改判据，不把代码改回去迁就旧尺子）。 */
+  const SCRIM_LIGHT = /\.bg-light[^{]*\.(?:page|head)-scrim/
+  ok('首页这一份里没有"浅色态另开一支罩层"那条覆盖（罩层只有一支＝恒压暗）', !SCRIM_LIGHT.test(IX),
+    (SCRIM_LIGHT.exec(IX) || ['(没有)'])[0])
+  ok('「我的」这一份里同样没有', !SCRIM_LIGHT.test(ME), (SCRIM_LIGHT.exec(ME) || ['(没有)'])[0])
+  ok('录入页这一份里同样没有（三页共用同一个键，别处漏一条就是"这一屏提亮、那一屏压暗"）',
+    !SCRIM_LIGHT.test(CR), (SCRIM_LIGHT.exec(CR) || ['(没有)'])[0])
   ok('浅色那态翻了三级字（只翻罩子不翻字＝白字压浅底，这一格就是需求本身）',
     /\.container\.has-bg\.bg-light\s*\{[^}]*--text-primary:\s*rgba\(20, 22, 26/.test(CR),
     blockOf(CR, '.container.has-bg.bg-light').trim().slice(0, 60))
@@ -311,13 +318,20 @@ const MUT = [
     '.container.has-bg .th-add:not(.th-add-dis) {', '.container.has-bg .th-add {')],
   ['★➕ 格从玻璃名单里整条摘掉（D18 白落）', 'cr', (s) => s.replace(
     '.container.has-bg .th-add:not(.th-add-dis) {', '.container.has-bg .th-add-XX:not(.th-add-dis) {')],
-  // 10-12 浅色那一档的四刀：每一刀都对应"浅态静默不对"的一种画法。
-  ['★浅色那态把延段挪回 .head-band（吃不到「调亮度」）', 'me', (s) => s.replace(
-    '.head-band.has-bg.bg-light .head-scrim::after {', '.head-band.has-bg.bg-light .head-band::after {')],
-  ['★浅色那态首页延段比自家末档深一档（542 出硬边）', 'ix', (s) => s.replace(
-    'rgba(242, 239, 233, 0.3) 100%)', 'rgba(242, 239, 233, 0.5) 100%)')],
-  ['★浅色那态「我的」延段比自家末档深一档', 'me', (s) => s.replace(
-    'rgba(242, 239, 233, 0.22) 100%)', 'rgba(242, 239, 233, 0.40) 100%)')],
+  // 10-13 23:3x/23:5x 站长两刀之后的四把：原来那三把"浅色那态的延段…"锚在被撤掉的提亮罩上，
+  // 撤掉之后 `replace` 找不到锚点 ⇒ 报的是"这一刀没切进去"（不是绿）。换成反向四把：
+  // 谁把提亮罩／那圈压暗遮罩加回来，这一把必须当场咬住。
+  ['★把首页那支纸白提亮罩加回来（「调亮度」又变成提亮）', 'ix', (s) => s.replace(
+    '.container.has-bg .head-scrim::after {',
+    '.container.has-bg.bg-light .head-scrim {\n  background: rgba(242, 239, 233, 0.3);\n}\n.container.has-bg .head-scrim::after {')],
+  ['★把「我的」那支提亮罩加回来（同一把键，三页里漏一页＝那一屏提亮这一屏压暗）', 'me', (s) => s.replace(
+    '.head-scrim::after {',
+    '.head-band.has-bg.bg-light .head-scrim {\n  background: rgba(242, 239, 233, 0.22);\n}\n.head-scrim::after {')],
+  ['★把录入页那一层提亮罩加回来（D20 那半边假账的成因）', 'cr', (s) => s.replace(
+    '.page-scrim {',
+    '.container.has-bg.bg-light .page-scrim {\n  background: rgba(242, 239, 233, 0.35);\n}\n.page-scrim {')],
+  ['★六位密码那一层外面又压暗（他 10-13 那句「突然变暗，不合理」回来）', 'sheet', (s) => s.replace(
+    '  background: transparent;', '  background: rgba(20, 20, 28, 0.55);')],
   ['★浅色那态只翻罩子不翻字（白字压浅底＝需求本身没落）', 'cr', (s) => s.replace(
     '--text-primary: rgba(20, 22, 26, 0.92)', '--text-primary: #f2efe9')],
   // 10-12 21:4x 甲案（卡顶那一段单独 .60）的四刀：这一档两头都要有牙——

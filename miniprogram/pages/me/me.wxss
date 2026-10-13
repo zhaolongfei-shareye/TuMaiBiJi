@@ -86,14 +86,9 @@
   color: rgba(20, 22, 26, 0.68);
 }
 
-.head-band.has-bg.bg-light .head-scrim {
-  background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.35) 14%,
-    rgba(242, 239, 233, 0.28) 58%, rgba(242, 239, 233, 0.22) 100%);
-}
-
-.head-band.has-bg.bg-light .head-scrim::after {
-  background: rgba(242, 239, 233, 0.22);
-}
+/* 10-13 23:36 站长撤了浅照片那一档的提亮罩（「调亮度应该是压暗，现在变成提亮」）。
+   这一枚键三页共用，新建页／笔记列表页那两条同名的 `.bg-light` 罩层覆盖一起删了；
+   延段照旧等于罩层渐变末档（0.22 那一档），否则带子与延段之间出硬边。 */
 
 .head-scrim {
   position: absolute;
