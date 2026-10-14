@@ -10,8 +10,9 @@
 // 这一把管四件事，每件都对应一种"屏上看不出来的静默失效"：
 // ① **镜像**：`app.wxss` 那五块 `.mood-*` 必须逐字等于 `palette.moodVars()` 的输出。
 //    哪天改了色板忘了改 CSS（或反过来），屏上只有那一档下颜色不对，四档里挑出来极难。
-// ② **零回归**：墨那一档（默认）展开出来的九枚玻璃数必须与 `page{}` 那份兜底逐字相同，
-//    底栏在墨档下必须仍等于 `chromeOf` 原样——"新加四档"不许顺手把今天这一屏改掉一个字。
+// ② **零回归**：墨那一档（默认）展开出来的九枚玻璃数必须与 `page{}` 那份兜底逐字相同。
+//    ⚠ 底栏不在这一条里了——站长 10-14 19:3x 追了一句「换成彩色玻璃后，底部的 tab 要跟随上面的玻璃」，
+//    所以墨档底栏**也跟着换成玻璃**（rgba(35,37,44,.62)＋糊），默认那一屏这一处是他指的改动。
 // ③ **α 不许跟着色一起动**：透明度那几档（.30/.60/.50/.20/.72/.42/.16→.94→.95/七档渐变）
 //    是他 10-11～10-13 逐条拍的，这一轮换的只有色相。所以每档都按同一架 α 梯子核。
 // ④ **入口只有一处**：首页那枚「换心情」在、设置里「外观设置」那一格不在（隐藏不是删能力）。
@@ -105,22 +106,23 @@ function evaluate(S) {
   /* ---------- ② α 梯子：五档必须同一架 ---------- */
   const LADDER = {
     '--glass-veil': 0.30, '--glass-veil-band': 0.60, '--glass-plate': 0.50, '--glass-fill': 0.20,
-    '--glass-plate-dock': 0.72, '--glass-fill-dock': 0.42, '--stage-solid': 0.95,
+    '--glass-plate-dock': 0.72, '--glass-fill-dock': 0.42,
     '--stage-ink-strong': 0.96, '--stage-ink': 0.85, '--stage-ink-soft': 0.78, '--stage-ink-faint': 0.56,
   }
   P.MOODS.forEach((m) => {
     const v = V(m.key)
     const off = Object.keys(LADDER).filter((k) => alphaOf(v[k]) !== LADDER[k])
-    ck(`${m.key}：十一枚 α 与他拍过的那一架逐档相同`, off.length === 0, off.join(',') || '齐')
-    const band = (v['--stage-band'].match(/,\s*([\d.]+)\s*\)/g) || []).map((t) => Number(/([\d.]+)\s*\)/.exec(t)[1]))
-    ck(`${m.key}：面板 band 仍是 .16→.94（10-13 两刀收出来的那一档）`, JSON.stringify(band) === '[0.16,0.94]', band.join('→'))
+    ck(`${m.key}：十枚 α 与他拍过的那一架逐档相同`, off.length === 0, off.join(',') || '齐')
+    const face = (v['--stage-face'].match(/,\s*([\d.]+)\s*\)/g) || []).map((t) => Number(/([\d.]+)\s*\)/.exec(t)[1]))
+    ck(`${m.key}：面板那一整面仍是 .16→.94→.95（10-13 两刀收出来的那一档，10-14 并成一条渐变）`,
+      JSON.stringify(face) === JSON.stringify([0.16, 0.94, 0.95, 0.95]), face.join('→'))
     const cnt = (v['--blk-count-bg'].match(/,\s*([\d.]+)\s*\)/g) || []).map((t) => Number(/([\d.]+)\s*\)/.exec(t)[1]))
     ck(`${m.key}：左下那一格仍是那七个停点的 α（10-13「黑底的半透明渐变效果不好」那一版）`,
       JSON.stringify(cnt) === JSON.stringify([0.45, 0.45, 0.38, 0.35, 0.50, 0.68, 0.92]), cnt.join('/'))
   })
   /* 压在玻璃上的字读不读得出来：拿"面板实心那一档"当底（.95 的玻璃），五档各算一次。 */
   P.MOODS.forEach((m) => {
-    const face = '#' + rgbOf(V(m.key)['--stage-solid']).map((x) => x.toString(16).padStart(2, '0')).join('')
+    const face = '#' + rgbOf(V(m.key)['--stage-face']).map((x) => x.toString(16).padStart(2, '0')).join('')
     const cr = P.crOf(overHex(V(m.key)['--stage-ink-strong'], face) || '', face)
     const crSolid = P.crOf(V(m.key)['--stage-ink-solid'], face)
     ck(`${m.key}：面板上的字压得住这一档的玻璃（强档与实心档都 ≥4.5）`, cr >= 4.5 && crSolid >= 4.5,
@@ -135,15 +137,21 @@ function evaluate(S) {
       `page=${declOf(PAGE, k)}／ink=${INK[k]}`))
   ck('page{} 那五枚玻璃原值一个没动（兜底还在，缺类也不花）',
     /--glass-hair:\s*rgba\(255, 255, 255, 0\.55\)/.test(PAGE) && /--glass-bf:\s*blur\(23px\) saturate\(1\.8\)/.test(PAGE))
-  ck('墨档底栏 = chromeOf 原样，只多一枚 --chrome-blur:none', (() => {
-    const a = P.chromeOf('tint-paper').style.split(';').filter(Boolean).sort()
-    const b = P.moodChromeOf('ink').style.split(';').filter((s) => s && !/--chrome-blur/.test(s)).sort()
-    return JSON.stringify(a) === JSON.stringify(b)
-  })(), P.moodChromeOf('ink').style.slice(0, 60))
-  ck('彩色档底栏那块圆底仍是 chromeOf 算的那一支（只转发、不另算）',
-    P.MOODS.slice(1).every((m) => P.moodChromeOf(m.key).sel === P.chromeOf(m.theme).sel))
-  ck('每一档都发 --chrome-blur（墨发 none）：少一枚就是 IACVT，那条 backdrop-filter 整行掉下来',
-    P.MOODS.every((m) => /--chrome-blur:/.test(P.moodChromeOf(m.key).style)))
+  ck('五档底栏都是 `rgba(这一档的玻璃色, .62)`（**含墨档**——他这句「底部的 tab 要跟随上面的玻璃」指的是五档）',
+    P.MOODS.every((m) => {
+      const g = m.glass.replace('#', '')
+      const rgb = [0, 1, 2].map((i) => parseInt(g.substr(i * 2, 2), 16))
+      return P.moodChromeOf(m.key).bg === `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.62)`
+    }), P.MOODS.map((m) => `${m.key} ${P.moodChromeOf(m.key).bg}`).join(' / '))
+  // 10-14 19:3x 他追那一句之前，这一条钉的是反面（"墨档 = chromeOf 原样，只多一 --chrome-blur:none"）。
+  // 撤一个状态会作废一批判据：换的是这条判据，不是拿代码去迁就旧尺子。
+  ck('墨档底栏不再是壁纸派生那支实心（谁把 `chromeOf` 塞回墨档谁红）',
+    P.moodChromeOf('ink').bg !== P.chromeOf('tint-paper').bg,
+    `${P.moodChromeOf('ink').bg} vs ${P.chromeOf('tint-paper').bg}`)
+  ck('五档底栏那块圆底都仍是 chromeOf 算的那一支（只转发、不另算；站长 10-04 那条"深色按钮＝底栏选中那枚圆底"不在这一刀里）',
+    P.MOODS.every((m) => P.moodChromeOf(m.key).sel === P.chromeOf(m.theme).sel))
+  ck('每一档都发同一支 --chrome-blur：少一枚就是 IACVT，那条 backdrop-filter 整行掉下来',
+    P.MOODS.every((m) => /--chrome-blur:blur\(23px\) saturate\(1\.8\)/.test(P.moodChromeOf(m.key).style)))
 
   /* ---------- ④ CSS 镜像 ---------- */
   const pos = P.MOODS.map((m) => S.app.indexOf('.' + m.cls + ' {'))
@@ -159,9 +167,37 @@ function evaluate(S) {
       Object.keys(v).every((k) => declOf(blk, k) !== null) && diff.length === 0 && extra.length === 0,
       `缺/错 ${diff.join(',')}　多 ${extra.join(',')}`)
   })
-  ck('create.wxss 里那六处引用都在（面板两段、左下一格、四档字色）',
-    ['--stage-band', '--stage-solid', '--blk-count-bg', '--stage-ink-solid', '--stage-ink-strong', '--stage-ink-dim']
+  ck('create.wxss 里那六处引用都在（面板那一整面两态各一条、左下一格、四档字色）',
+    ['--stage-face', '--stage-face-open', '--blk-count-bg', '--stage-ink-solid', '--stage-ink-strong', '--stage-ink-dim']
       .every((k) => new RegExp(`var\\(${k}\\)`).test(S.createWxss)))
+  /* 站长 10-14 19:3x「还有黑色面板中间多了条线，其他色都没有，检查去掉」——根因那一层：
+     面板原来是**两枚并排的层**（`::before` 高 240rpx ＋ `::after` 从 240rpx 起），交界落在面板正中，
+     模拟器把两枚层各自贴到设备像素 ⇒ 那一行少铺一点 ⇒ 透出后面的糊面，读成一条亮线。
+     挪 `::after` 的 top 那条线跟着挪（实测 y1287→y1248），所以这一处钉的是**结构**：只许一层铺满。
+     停点那两枚百分比从 create.wxss 现读的两个数算（顶线 548、展开 666），不在这把尺子里抄第二份。
+     ⚠ 下面这几条一律读剥过注释的 `CSS`：拿原文读，我自己写的那段说明里有令牌名，会假绿。 */
+  const CSS = S.createWxss.replace(/\/\*[\s\S]*?\*\//g, '')
+  ck('create.wxss 里那六处引用都在（面板那一整面两态各一条、左下一格、四档字色）',
+    ['--stage-face', '--stage-face-open', '--blk-count-bg', '--stage-ink-solid', '--stage-ink-strong', '--stage-ink-dim']
+      .every((k) => new RegExp(`var\\(${k}\\)`).test(CSS)))
+  const before = blockOf(CSS, '.stage-panel::before')
+  ck('`.stage-panel::before` 一层铺满（top:0 且 bottom:0，不许再写 height:240rpx 只盖上面那截）',
+      /top:\s*0\s*;/.test(before) && /bottom:\s*0\s*;/.test(before) && !/height:/.test(before), before.replace(/\s+/g, ' ').slice(0, 90))
+  ck('`.stage-panel::after` 这一枚整个撤掉（两枚层并排＝中间那条线会长回来）',
+      !/\.stage-panel::after\s*\{/.test(CSS))
+  const TOP = Number(/\.stage-panel \{[^}]*?top: calc\(100vh - (\d+)rpx\)/.exec(CSS)[1])
+  const OPEN = Number(/\.container\.dock-open \.stage-panel \{[^}]*?top: calc\(100vh - (\d+)rpx\)/.exec(CSS)[1])
+  const pctOf = (tok) => Number(/0\.94\) ([\d.]+)%/.exec(V('ink')[tok])[1])
+  ck('带高仍是 240rpx：闭合那一档的停点＝240/顶线，展开那一档＝240/666（改了面板高就得跟着改）',
+      Math.abs(pctOf('--stage-face') - 240 / TOP * 100) < 0.1 && Math.abs(pctOf('--stage-face-open') - 240 / OPEN * 100) < 0.1,
+      `${pctOf('--stage-face')}% vs ${TOP}／${pctOf('--stage-face-open')}% vs ${OPEN}`)
+  ck('两态各发一条渐变（展开那一档不换停点，带就会跟着面板长到 292rpx）',
+      /background: var\(--stage-face\)/.test(before)
+      && /container\.dock-open \.stage-panel::before \{[^}]*background: var\(--stage-face-open\)/.test(CSS))
+  // 它 10-14 19:3x 那句里的"线"还有一处候选：`.blk-count` 上沿那枚白色 inset 高光（我从效果图抄进来的
+  // 装饰）。它压在墨档深底上落差 42.7、压在彩色四档浅底上只有 15～17 ⇒ 只有黑色那一档看得见。撤了。
+  ck('`.blk-count` 身上不许有白色 inset 高光（那道 1px 白线只有墨档读得出来）',
+    !/\.blk-count\s*\{[^}]*inset[^}]*rgba\(255,\s*255,\s*255/.test(CSS))
   ck('第二屏就地抬那两档发的是 var(--glass-*-dock)（写死白值＝五档同色，D17 甲白落）',
     /--glass-plate:\s*var\(--glass-plate-dock\)/.test(blockOf(S.createWxss, '.container.entry-dock'))
     && /--glass-fill:\s*var\(--glass-fill-dock\)/.test(blockOf(S.createWxss, '.container.entry-dock')))
@@ -224,17 +260,19 @@ function evaluate(S) {
 const KNIVES = [
   ['★删掉 `.mood-blush` 整块（那一档下所有玻璃静默退回 page 兜底＝五档里有一档是白的）', 'app',
     (s) => s.replace(/\.mood-blush \{[^}]*\}/, '')],
-  ['★把雨雾那一块的 stage-solid 改成 .90（α 梯子被他没拍的那一刀动了）', 'app',
-    (s) => s.replace(/(\.mood-mist \{[^}]*?--stage-solid: rgba\([^)]*, )0\.95/, '$10.90')],
+  ['★把雨雾那一块的 stage-face 顶档改成 .20（α 梯子被他没拍的那一刀动了）', 'app',
+    (s) => s.replace(/(\.mood-mist \{[^}]*?--stage-face: linear-gradient\(180deg, rgba\([^)]*, )0\.16/, '$10.20')],
+  ['★把闭合那一档的停点从 43.8% 写成 50%（带高不再是 240rpx，中间那道收口跟着往下漂）', 'palette',
+    (s) => s.replace('stageFace(43.8)', 'stageFace(50)')],
   ['★色板里把樱落那档的玻璃色换成一支"更好看"的（参考图那三个数被换掉）', 'palette',
     (s) => s.replace("glass: '#B5A8BF', band: '#9E95B0'", "glass: '#C0A8C8', band: '#9E95B0'")],
   ['★色板里把墨档的 band 写成面板那支 #23252C（左下那一格与今天差一档）', 'palette',
     (s) => s.replace("glass: '#23252C', band: '#12141A'", "glass: '#23252C', band: '#23252C'")],
   ['★moodChromeOf 里给彩色档另算一支圆底（"深色按钮与底栏选中那枚同色"那条 10-04 的规矩）', 'palette',
     (s) => s.replace('sel: base.sel,', 'sel: hslToHex(0, 40, 40),')],
-  ['★墨档底栏也换成玻璃（默认那一屏被他没指的地方改了）', 'palette',
-    (s) => s.replace("if (m.key === 'ink') return Object.assign({}, base, { style: base.style + ';--chrome-blur:none' })",
-      "if (m.key === 'ink') return Object.assign({}, base, { style: base.style })")],
+  ['★把墨档底栏退回壁纸派生那支实心（他 10-14 19:3x 那句「底部的 tab 要跟随上面的玻璃」白落）', 'palette',
+    (s) => s.replace('  const rgb = hexToRgb(m.glass)\n  const bg = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.62)`',
+      '  if (m.key === \'ink\') return base\n  const rgb = hexToRgb(m.glass)\n  const bg = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.62)`')],
   ['★containerClass 不再发心情类（五块 CSS 变成没人挂的孤儿）', 'appjs',
     (s) => s.replace('this.glassMood(wallpaper).cls, ', '')],
   ['★心情不与壁纸对账（服务端带回青底、本机还留着旧的樱落 ⇒ 青底配一支粉玻璃）', 'appjs',
@@ -249,7 +287,17 @@ const KNIVES = [
   ['★cycleGlassMood 不写本机存储（点一下当场变了，重进就回默认）', 'appjs',
     (s) => s.replace('wx.setStorageSync(MOOD_KEY, m.key)', '')],
   ['★create.wxss 那处引用换回写死的墨（这一档下面板还是黑的）', 'createWxss',
-    (s) => s.replace('background: var(--stage-solid);', 'background: rgba(35, 37, 44, 0.95);')],
+    (s) => s.replace('background: var(--stage-face);', 'background: rgba(35, 37, 44, 0.95);')],
+  ['★把面板那枚层退回"只盖上面 240rpx"（下面空出来，两枚层并排＝中间那条线长回来）', 'createWxss',
+    (s) => s.replace('  top: 0;\n  bottom: 0;\n  background: var(--stage-face);',
+      '  top: 0;\n  height: 240rpx;\n  background: var(--stage-face);')],
+  ['★把 `.stage-panel::after` 那枚第二层加回来（10-14 那条亮线的原样）', 'createWxss',
+    (s) => s.replace('.stage-panel::before {', '.stage-panel::after { content: ""; position: absolute; top: 240rpx; bottom: 0; }\n.stage-panel::before {')],
+  ['★展开那一档不换停点（面板长到 666，带跟着长到 292rpx）', 'createWxss',
+    (s) => s.replace('.container.dock-open .stage-panel::before {\n  background: var(--stage-face-open);\n}', '')],
+  ['★把 `.blk-count` 上沿那道白高光加回来（他 10-14 19:3x 那句"中间多了条线"又长回来一次）', 'createWxss',
+    (s) => s.replace('  background: var(--blk-count-bg);',
+      '  background: var(--blk-count-bg);\n  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.18);')],
   ['★「外观设置」那一格放回来（同一件事两个入口）', 'meWxml',
     (s) => s.replace('</block>', '<view class="menu-item" bindtap="onNavigate" data-page="wallpaper"><text class="menu-label">x</text></view></block>')],
   ['★首页那枚只换本机、不 PUT 服务端（换台手机就回到旧壁纸，而界面上明明是他选的）', 'createJs',

@@ -408,26 +408,31 @@ ok('这一层自己身上不挂动态类（它跟着卡片长，靠的是容器�
   && /class="container[\s\S]*?\{\{panelOpen \? 'dock-open' : ''\}\}/.test(wxml),
   (wxml.match(/class="stage-panel[^"]*"/) || ['(没找到)'])[0])
 
-/* 面板那三段皮的**分工**（他 10-13「新增面板为什么看不到渐变毛玻璃」追出来的）：
+/* 面板那几段皮的**分工**（他 10-13「新增面板为什么看不到渐变毛玻璃」追出来的）：
    本体必须透明。实心 .95 一旦写回本体，就与压在它上面的 `::before` 相乘
    ⇒ band 顶透出 1−(1−.95)(1−.16)＝4.2%、band 底 0.30%，整块 96% 实心，
    "上部渐变半透明毛玻璃"画了等于没画，而且**静态几何全绿、截图也看不出差别**（它就是那一片墨）。
-   所以这一条只能按结构钉，不能靠眼看。 */
+   ⚠ 10-14 那一刀改了分工的形状：原来是 `::before`（高 240rpx 的 .16→.94）＋ `::after`（240rpx 以下铺 .95）
+   两枚层并排，交界正落在面板正中 ⇒ 那一行少铺一点，透出后面的糊面，读成一条亮线（他：
+   「还有黑色面板中间多了条线，其他色都没有，检查去掉」；实测墨档整幅亮占比 0.47、彩色四档 ≤0.10，
+   把 `::after` 的 top 从 240rpx 挪到 200rpx，那条线跟着挪到 y1248）。现在**一层画完**：
+   一条渐变里 .16→.94→.95，收口位置是百分比停点（240/面板高），不再有两枚层的边。
+   所以底下这几条钉的是"只有一枚层、且它铺满"，不再是"两枚层的高与 top 相等"。 */
 const sPanel = seg('.stage-panel')
 const sPanelBand = seg('.stage-panel::before')
 const sPanelBody = seg('.stage-panel::after')
-ok('深色面板本体透明（实心只能归 ::after；写回本体＝与 ::before 相乘，band 透出不到 4.2%）',
+ok('深色面板本体透明（色只能归那一枚铺满的层；写回本体＝与它相乘，band 透出不到 4.2%）',
   /^(transparent|none)$/i.test(decl(sPanel, 'background')),
   `本体 background=${decl(sPanel, 'background') || '(没写)'}`)
-const BAND_H_CSS = num(sPanelBand, 'height')
-ok('band 那一段是 ::before 的 .16→.94 两档（同色只走透明度；10-13 两刀把顶档从 .55 一路收到 .16＝"透明度多一点，现在太暗了"）',
-  BAND_H_CSS > 0 && /rgba\(35,\s*37,\s*44,\s*0?\.16\)/.test(val(sPanelBand, 'background'))
-  && /rgba\(35,\s*37,\s*44,\s*0?\.94\)/.test(val(sPanelBand, 'background')),
-  `高 ${BAND_H_CSS}／${val(sPanelBand, 'background') || '(没写)'}`)
-ok('实心 .95 挂在 ::after 上，从 band 底下起、贴到屏底（top 与 ::before 的高是同一个数）',
-  /rgba\(35,\s*37,\s*44,\s*0?\.95\)/.test(val(sPanelBody, 'background'))
-  && num(sPanelBody, 'top') === BAND_H_CSS && /bottom:\s*0\b/.test(sPanelBody),
-  `::after top=${num(sPanelBody, 'top')}／bottom=${decl(sPanelBody, 'bottom')}／background=${val(sPanelBody, 'background') || '(没写)'}`)
+const FACE_CSS = val(sPanelBand, 'background')
+ok('面板那一整面是一条 .16→.94→.95 的渐变（同色只走透明度；10-13 两刀把顶档从 .55 一路收到 .16＝"透明度多一点，现在太暗了"）',
+  /rgba\(35,\s*37,\s*44,\s*0?\.16\)/.test(FACE_CSS) && /rgba\(35,\s*37,\s*44,\s*0?\.94\)/.test(FACE_CSS)
+  && /rgba\(35,\s*37,\s*44,\s*0?\.95\)/.test(FACE_CSS),
+  FACE_CSS || '(没写)')
+ok('只许一枚层铺满整面（top:0＋bottom:0、不写 height；再并第二枚层＝中间那条亮线长回来）',
+  /top:\s*0\s*;/.test(sPanelBand) && /bottom:\s*0\b/.test(sPanelBand) && !/height:/.test(sPanelBand)
+  && sPanelBody === '',
+  `::before top=${(decl(sPanelBand, 'top') || '(没写)')}／bottom=${decl(sPanelBand, 'bottom') || '(没写)'}／height=${decl(sPanelBand, 'height') || '没写'}；::after 段长 ${sPanelBody.length}`)
 ok('糊挂在面板本体上（本体透明又不挂 blur ⇒ 那一段就是一张洞，什么都不糊）',
   /backdrop-filter:\s*blur/.test(sPanel) && /-webkit-backdrop-filter:\s*blur/.test(sPanel),
   decl(sPanel, 'backdrop-filter') || '(没写)')

@@ -407,6 +407,7 @@ function moodVars(key) {
   const t = hexToRgb(m.text)
   const piece = m.key === 'ink' ? [255, 255, 255] : g.map((v) => Math.round(v + (255 - v) * 0.55))
   const COUNT_STOPS = [[0.45, '0%'], [0.45, '10%'], [0.38, '43%'], [0.35, '62%'], [0.50, '83%'], [0.68, '88%'], [0.92, '100%']]
+  const stageFace = (pct) => `linear-gradient(180deg, ${rgba(g, 0.16)} 0%, ${rgba(g, 0.94)} ${pct}%, ${rgba(g, 0.95)} ${pct}%, ${rgba(g, 0.95)} 100%)`
   return {
     '--glass-veil': rgba(piece, 0.30),
     '--glass-veil-band': rgba(piece, 0.60),
@@ -414,8 +415,11 @@ function moodVars(key) {
     '--glass-fill': rgba(piece, 0.20),
     '--glass-plate-dock': rgba(piece, 0.72),
     '--glass-fill-dock': rgba(piece, 0.42),
-    '--stage-band': `linear-gradient(180deg, ${rgba(g, 0.16)} 0%, ${rgba(g, 0.94)} 100%)`,
-    '--stage-solid': rgba(g, 0.95),
+    /* 面板那一整面：一层画完，不留两层交界（10-14 那条"中间多了条线"的根因，见 create.wxss）。
+       带高 240rpx 换算成"占面板这一截高的几成"：闭合 240/548＝43.8%，展开 240/666＝36%。
+       用百分比不用 rpx——停点落在 linear-gradient() 的参数里，rpx 换算不保证跟得进去（同文件上面那条）。 */
+    '--stage-face': stageFace(43.8),
+    '--stage-face-open': stageFace(36),
     '--blk-count-bg': `linear-gradient(180deg, ${COUNT_STOPS.map((s) => `${rgba(b, s[0])} ${s[1]}`).join(', ')})`,
     '--stage-ink-solid': m.text,
     '--stage-ink-strong': rgba(t, 0.96),
@@ -430,17 +434,19 @@ function moodVars(key) {
  * 底部导航那一层的皮。它是自定义组件，读不到 page 上的 CSS 变量，只能由 JS 把整串递进去
  * （`custom-tab-bar/index.js` 那句 `setData({ chromeStyle })`）。
  *
- * ⚠ 墨那一档**原样退回 `chromeOf`**：今天底栏那块面是壁纸色相派生的实心暗面（象牙下 #766948），
- * 不是玻璃。这一轮他说的是"下方的 tab 也与上面的同步"，彩色那四档同步成玻璃；
- * 墨这一档要是也换成 rgba(35,37,44,.62)＋糊，就等于顺手改了他没指过的默认态。
- * 所以默认那一屏底栏一个字节都不变，四档彩色才吃心情。
+ * **五档同一支构造**：`rgba(这一档的玻璃色, .62)` ＋ 同一条糊。墨那一档不再退回壁纸色相派生的
+ * 实心暗面（象牙下 #766948 那一支）——站长 10-14 19:3x 追了一句「换成彩色玻璃后，底部的 tab
+ * 要跟随上面的玻璃」，这一句把我上一版"墨档不动、免得动了默认那一屏"的理由顶掉了：现在默认那一屏
+ * 的底栏也换成 rgba(35,37,44,.62)＋糊，这是**他指的**改动，不是我顺手。
+ * 底栏压在深色面板之上，所以**没铺图那一态**它背后不是米白页面而是那块近实心墨面：10-14 真跑实测
+ * 混出来 (39,40,49)，纸白 #F2EFE9 压上去 12.76:1（AA 小字要 4.5）——我上一版估的"只剩 4.3:1、
+ * 要不要给墨档抬 α"是拿错底色算的（以为背后是页面，其实背后是面板），这一条不用他拍。
  * 选中那一枚圆底五档都仍吃 `chromeOf().sel`——站长 10-04 定过"深色按钮必须和底栏选中那一格
  * 下面那块圆底同色"，那一处不在这一刀里。
  */
 function moodChromeOf(key) {
   const m = moodOf(key)
   const base = chromeOf(m.theme)
-  if (m.key === 'ink') return Object.assign({}, base, { style: base.style + ';--chrome-blur:none' })
   const rgb = hexToRgb(m.glass)
   const bg = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.62)`
   const idle = withAlpha(m.text, 0.62)
@@ -448,8 +454,8 @@ function moodChromeOf(key) {
   const shadow = withAlpha('#000000', 0.22)
   return {
     bg, ink: m.text, idle, line, shadow, sel: base.sel,
-    // --chrome-blur 五档都要发一枚：只给彩色档发、墨档不发，那条 `backdrop-filter: var(--chrome-blur)`
-    // 在墨档就成了"引用一个不存在的变量"⇒ IACVT，整条声明掉下来（不是回落到 none 那么简单）。
+    // --chrome-blur 五档**都要**发一枚：少一枚就是"引用一个不存在的变量"⇒ IACVT，
+    // 那条 `backdrop-filter: var(--chrome-blur)` 整行掉下来（不是回落到 none 那么简单）。
     style: `--chrome-bg:${bg};--chrome-ink:${m.text};--chrome-idle:${idle};--chrome-line:${line};--chrome-shadow:${shadow};--chrome-sel:${base.sel};--chrome-blur:blur(23px) saturate(1.8)`,
   }
 }

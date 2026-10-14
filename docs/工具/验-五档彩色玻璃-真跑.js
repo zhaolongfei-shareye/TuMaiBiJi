@@ -15,6 +15,7 @@ const p = require('../../miniprogram/utils/palette.js')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/10-14五档彩色玻璃/实测')
 const PILL = path.resolve(__dirname, '采-底栏像素.py')
+const LINE = path.resolve(__dirname, '量-面板里有条线.py')
 // 玻璃的闸是 `.container.has-bg`：没铺图 ⇒ 这些面根本不吃 `--glass-*`。§8.231 删了包内默认底图之后
 // 这一屏可能"两级都空"，所以与 `验-背景亮度圆点-真跑` 同一处理：借一张包里还在的真位图按在屏上。
 const PROBE_BG = '/assets/share-card.jpg'
@@ -92,7 +93,8 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
     const tips = await styleOf(page, '.blk-tips-in', 'color')
     const count = await styleOf(page, '.blk-count', 'background-image')
     const fill = pill(shot).fill
-    seen.push({ key: want.key, wantCls: want.cls, gotKey: (/mood-[a-z]+/.exec(cl) || ['(没读到)'])[0], cl, tips, count, fill, storage: await mp.evaluate(() => wx.getStorageSync('glassMood')) })
+    const line = JSON.parse(execFileSync('python3', [LINE, shot], { encoding: 'utf8' }))
+    seen.push({ key: want.key, wantCls: want.cls, gotKey: (/mood-[a-z]+/.exec(cl) || ['(没读到)'])[0], cl, tips, count, fill, line, storage: await mp.evaluate(() => wx.getStorageSync('glassMood')) })
     ck(`第 ${i + 1} 档容器类是 ${want.cls}`, new RegExp(want.cls).test(cl), cl)
     ck(`${want.label}：压在面板上的那行字实读到 ${rgb(want.text).join(',')}（计算样式，不是源码）`,
       tripleIn(tips, rgb(want.text)), tips.slice(0, 60))
@@ -112,8 +114,20 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
   const spread = Math.max(...inks) - Math.min(...inks)
   ck('五档的底栏那块面在像素上互不相同（"tab 与上面同步"只能这么证：组件 automator 够不到）',
     spread > 40, `最亮-最暗＝${spread.toFixed(0)} 灰阶｜${seen.map((s, i) => `${s.key} ${s.fill.join(',')}(${inks[i].toFixed(0)})`).join(' / ')}`)
-  ck('墨那一档的底栏仍比彩色四档暗（默认那一屏没被换成玻璃）',
+  ck('墨那一档的底栏**不再**是壁纸派生那支实心（改之前 10-14 18:5x 实测 67,59,40；他 19:3x 那句要的就是这个差别）',
+    seen[0].fill.reduce((a, v, i) => a + Math.abs(v - [67, 59, 40][i]), 0) > 30, seen[0].fill.join(','))
+  ck('墨那一档在五档里仍是最暗那一枚（它跟随的是那块墨玻璃，不是变浅）',
     lumOf(seen[0].fill) === Math.min(...inks), `${seen[0].fill.join(',')}｜亮度 ${lumOf(seen[0].fill).toFixed(0)}`)
+
+  // 站长 10-14 19:3x 那句「黑色面板中间多了条线，其他色都没有，检查去掉」的量法：
+  // 逐张图在面板内找"整幅都比上下亮 ≥4 灰阶"的那一行，取占比最大的一枚。
+  // 为什么用"占比"而不是"跳档"：字和图标也会让某一行变亮，但它们只盖几列，一条线盖整幅——
+  // 10-14 改前实测墨 0.47（就在渐变带与近实心那道交界 y1287），彩色四档 ≤0.10。
+  // 阈值 0.15 卡在两堆数中间：改前墨档 0.47（那一行就是交界）超它三倍，改后五档 0.08～0.15 全落在
+  // 字那一行的水位上；交界那一行的凸起改前墨 +4.4，改后五档 ≤0.4（x=400 那一列 55→48 一路单调，没有亮行）。
+  ck('五档的面板里都不许有一条横贯整幅的线（占比 ≤0.15；底栏那道描边不在这段窗口里）',
+    seen.every((s) => s.line.line_frac <= 0.15),
+    seen.map((s) => `${s.key} ${s.line.line_frac}@y${s.line.line_y}｜交界 ${s.line.seam_delta}@y${s.line.seam_y}`).join(' / '))
 
   // ---------- ③ 别的页跟着同色（他现在钉在象牙档，两页各读一处玻璃面） ----------
   // ⚠ 期望值从 `moodVars()` 现读，不在这份尺子里另抄一遍：**玻璃那一族（纱／面／井）用的是
@@ -162,6 +176,21 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
   const rest = await mp.evaluate(() => ({ mood: wx.getStorageSync('glassMood'), wp: wx.getStorageSync('wallpaperCache') }))
   ck('两格本机偏好已还原成探针进来前的值', String(rest.mood) === String(before.mood) && String(rest.wp) === String(before.wp),
     `${rest.mood}/${rest.wp} vs ${before.mood}/${before.wp}`)
+
+  // ---------- ⑥ 无图那一态：这块玻璃底下是米白页面，糊没有对象，字能不能读要量 ----------
+  // 只报数不判红的那条下限设 3.0：低于它就是真读不动了。4.5（AA 小字）这一档我没自己钉成红——
+  // 墨档那支纸白压 .62 的墨玻璃混出来大概是 4.3:1，要不要给墨档单抬 α 归他一句（palette.js 那段注释里记着）。
+  page = await enter('/pages/create/create')
+  await sleep(4500)
+  await page.setData({ bgSrc: '' })
+  await sleep(1200)
+  const shotFlat = path.join(OUT, '档1-墨-无图那一态.png')
+  await mp.screenshot({ path: shotFlat })
+  const flat = pill(shotFlat)
+  const relLum = (a) => { const f = (v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4) }; return 0.2126 * f(a[0]) + 0.7152 * f(a[1]) + 0.0722 * f(a[2]) }
+  const flatCr = (relLum([242, 239, 233]) + 0.05) / (relLum(flat.fill) + 0.05)
+  console.log(`  ℹ 无图那一态：底栏那块面混出来 ${flat.fill.join(',')}，纸白 #F2EFE9 压上去 ${flatCr.toFixed(2)}:1（AA 小字要 4.5；这条只报数）`)
+  ck('无图那一态那块面与纸白至少还分得开（>3.0；掉到 3 以下就是真读不动）', flatCr > 3.0, `${flatCr.toFixed(2)}:1`)
 
   console.log(`\n${bad.length ? '✗ ' + bad.length + ' 条不过：' + bad.join('、') : `五档彩色玻璃 真跑：${n} 条全过`}`)
   console.log(`  图与数在 ${OUT}`)

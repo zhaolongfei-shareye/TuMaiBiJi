@@ -293,8 +293,8 @@ page {
   --glass-fill: rgba(255, 255, 255, 0.20);
   --glass-plate-dock: rgba(255, 255, 255, 0.72);
   --glass-fill-dock: rgba(255, 255, 255, 0.42);
-  --stage-band: linear-gradient(180deg, rgba(35, 37, 44, 0.16) 0%, rgba(35, 37, 44, 0.94) 100%);
-  --stage-solid: rgba(35, 37, 44, 0.95);
+  --stage-face: linear-gradient(180deg, rgba(35, 37, 44, 0.16) 0%, rgba(35, 37, 44, 0.94) 43.8%, rgba(35, 37, 44, 0.95) 43.8%, rgba(35, 37, 44, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(35, 37, 44, 0.16) 0%, rgba(35, 37, 44, 0.94) 36%, rgba(35, 37, 44, 0.95) 36%, rgba(35, 37, 44, 0.95) 100%);
   --blk-count-bg: linear-gradient(180deg, rgba(18, 20, 26, 0.45) 0%, rgba(18, 20, 26, 0.45) 10%, rgba(18, 20, 26, 0.38) 43%, rgba(18, 20, 26, 0.35) 62%, rgba(18, 20, 26, 0.50) 83%, rgba(18, 20, 26, 0.68) 88%, rgba(18, 20, 26, 0.92) 100%);
   --stage-ink-solid: #F2EFE9;
   --stage-ink-strong: rgba(242, 239, 233, 0.96);
@@ -311,8 +311,8 @@ page {
   --glass-fill: rgba(220, 213, 209, 0.20);
   --glass-plate-dock: rgba(220, 213, 209, 0.72);
   --glass-fill-dock: rgba(220, 213, 209, 0.42);
-  --stage-band: linear-gradient(180deg, rgba(177, 162, 153, 0.16) 0%, rgba(177, 162, 153, 0.94) 100%);
-  --stage-solid: rgba(177, 162, 153, 0.95);
+  --stage-face: linear-gradient(180deg, rgba(177, 162, 153, 0.16) 0%, rgba(177, 162, 153, 0.94) 43.8%, rgba(177, 162, 153, 0.95) 43.8%, rgba(177, 162, 153, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(177, 162, 153, 0.16) 0%, rgba(177, 162, 153, 0.94) 36%, rgba(177, 162, 153, 0.95) 36%, rgba(177, 162, 153, 0.95) 100%);
   --blk-count-bg: linear-gradient(180deg, rgba(141, 117, 100, 0.45) 0%, rgba(141, 117, 100, 0.45) 10%, rgba(141, 117, 100, 0.38) 43%, rgba(141, 117, 100, 0.35) 62%, rgba(141, 117, 100, 0.50) 83%, rgba(141, 117, 100, 0.68) 88%, rgba(141, 117, 100, 0.92) 100%);
   --stage-ink-solid: #352E1D;
   --stage-ink-strong: rgba(53, 46, 29, 0.96);
@@ -329,8 +329,8 @@ page {
   --glass-fill: rgba(210, 225, 214, 0.20);
   --glass-plate-dock: rgba(210, 225, 214, 0.72);
   --glass-fill-dock: rgba(210, 225, 214, 0.42);
-  --stage-band: linear-gradient(180deg, rgba(155, 188, 163, 0.16) 0%, rgba(155, 188, 163, 0.94) 100%);
-  --stage-solid: rgba(155, 188, 163, 0.95);
+  --stage-face: linear-gradient(180deg, rgba(155, 188, 163, 0.16) 0%, rgba(155, 188, 163, 0.94) 43.8%, rgba(155, 188, 163, 0.95) 43.8%, rgba(155, 188, 163, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(155, 188, 163, 0.16) 0%, rgba(155, 188, 163, 0.94) 36%, rgba(155, 188, 163, 0.95) 36%, rgba(155, 188, 163, 0.95) 100%);
   --blk-count-bg: linear-gradient(180deg, rgba(121, 156, 129, 0.45) 0%, rgba(121, 156, 129, 0.45) 10%, rgba(121, 156, 129, 0.38) 43%, rgba(121, 156, 129, 0.35) 62%, rgba(121, 156, 129, 0.50) 83%, rgba(121, 156, 129, 0.68) 88%, rgba(121, 156, 129, 0.92) 100%);
   --stage-ink-solid: #1D3522;
   --stage-ink-strong: rgba(29, 53, 34, 0.96);
@@ -347,8 +347,8 @@ page {
   --glass-fill: rgba(222, 216, 226, 0.20);
   --glass-plate-dock: rgba(222, 216, 226, 0.72);
   --glass-fill-dock: rgba(222, 216, 226, 0.42);
-  --stage-band: linear-gradient(180deg, rgba(181, 168, 191, 0.16) 0%, rgba(181, 168, 191, 0.94) 100%);
-  --stage-solid: rgba(181, 168, 191, 0.95);
+  --stage-face: linear-gradient(180deg, rgba(181, 168, 191, 0.16) 0%, rgba(181, 168, 191, 0.94) 43.8%, rgba(181, 168, 191, 0.95) 43.8%, rgba(181, 168, 191, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(181, 168, 191, 0.16) 0%, rgba(181, 168, 191, 0.94) 36%, rgba(181, 168, 191, 0.95) 36%, rgba(181, 168, 191, 0.95) 100%);
   --blk-count-bg: linear-gradient(180deg, rgba(158, 149, 176, 0.45) 0%, rgba(158, 149, 176, 0.45) 10%, rgba(158, 149, 176, 0.38) 43%, rgba(158, 149, 176, 0.35) 62%, rgba(158, 149, 176, 0.50) 83%, rgba(158, 149, 176, 0.68) 88%, rgba(158, 149, 176, 0.92) 100%);
   --stage-ink-solid: #351D29;
   --stage-ink-strong: rgba(53, 29, 41, 0.96);
@@ -365,8 +365,8 @@ page {
   --glass-fill: rgba(214, 219, 227, 0.20);
   --glass-plate-dock: rgba(214, 219, 227, 0.72);
   --glass-fill-dock: rgba(214, 219, 227, 0.42);
-  --stage-band: linear-gradient(180deg, rgba(164, 176, 192, 0.16) 0%, rgba(164, 176, 192, 0.94) 100%);
-  --stage-solid: rgba(164, 176, 192, 0.95);
+  --stage-face: linear-gradient(180deg, rgba(164, 176, 192, 0.16) 0%, rgba(164, 176, 192, 0.94) 43.8%, rgba(164, 176, 192, 0.95) 43.8%, rgba(164, 176, 192, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(164, 176, 192, 0.16) 0%, rgba(164, 176, 192, 0.94) 36%, rgba(164, 176, 192, 0.95) 36%, rgba(164, 176, 192, 0.95) 100%);
   --blk-count-bg: linear-gradient(180deg, rgba(109, 141, 170, 0.45) 0%, rgba(109, 141, 170, 0.45) 10%, rgba(109, 141, 170, 0.38) 43%, rgba(109, 141, 170, 0.35) 62%, rgba(109, 141, 170, 0.50) 83%, rgba(109, 141, 170, 0.68) 88%, rgba(109, 141, 170, 0.92) 100%);
   --stage-ink-solid: #212431;
   --stage-ink-strong: rgba(33, 36, 49, 0.96);
