@@ -230,7 +230,8 @@ async function refreshOne(noteId) {
  * 反过来做会留孤儿——本机清了、云上那个对象再没人记得要去删（对象只有客户端删得动），
  * 而它一直占着全站那 5GB。回体那份 `file_ids` 直接交给 `dropFromDeleteRes`，
  * 删不成的那几条自己落待删队列（与删笔记、注销同一条路）。
- * @returns {Promise<boolean>} 服务器上确实撤掉了没有
+ * @returns {Promise<boolean|string>} 撤掉了回 true；没撤掉回 false；**服务端回了一句原因的**
+ *   （10-14 那道「自带那一篇的卡片删不掉」）把那句原样交回去，调用方拿它当吐司。
  */
 async function dropServer(noteId) {
   // `known` 声明在 try **外面**：下面 catch 那一支要拿它把预留的地址还回去，声明在里面它就是个
@@ -252,6 +253,11 @@ async function dropServer(noteId) {
     // 行没撤掉，刚才预留的那条地址必须还回去：留着的话下一次进前台会把**这一格还在用的对象**删掉，
     // 界面上小图还在（本机优先）、大图点开是"图片不存在"，换设备那一格直接空（10-11 审计严重①）。
     if (known && known.cloud_url) cloudUpload.unreservePurge([known.cloud_url])
+    // 服务端回了一句原因的（10-14 那道「自带的卡片删不掉」就是）把那句原样交回去，
+    // 调用方拿它当吐司——只回 false 会被念成"没连上后端"，而真实原因是"这一张不许删"。
+    // 判据 4 那类"没原因"的失败（离线、超时、401）仍然回 false，走原来那句实话。
+    const detail = e && e.data && e.data.detail
+    if (typeof detail === 'string' && detail) return detail
     console.warn('服务器那一行没撤掉，这一格先照原样留着', e && (e.errMsg || e.statusCode))
     return false
   }

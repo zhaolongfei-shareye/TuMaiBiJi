@@ -665,7 +665,8 @@ Page({
         } catch (err) {
           // 服务端那一行没撤掉，预留的那条地址就得还回去（同 `detail.js` 那一条，10-11 审计严重①）
           if (known && known.cloud_url) cloudUpload.unreservePurge([known.cloud_url])
-          wx.showToast({ title: t('deleteFailed', lang), icon: 'none' })
+          // 与详情页同一句：服务端回了原因的念原因（10-14「自带那一篇是产品说明，删不掉」）
+          wx.showToast({ title: (err.data && err.data.detail) || t('deleteFailed', lang), icon: 'none' })
         }
       },
     })
@@ -1100,8 +1101,15 @@ Page({
       success: async (res) => {
         if (!res.confirm) return
         const dropped = await cardCloud.dropServer(note.id)
-        if (!dropped) {
-          wx.showToast({ title: t('cardDropOffline', lang), icon: 'none', duration: 2000 })
+        if (dropped !== true) {
+          // 服务端真回了一句原因的（10-14 那道「自带那一篇的卡片删不掉」）就照实念，
+          // 不许念成"没连上后端"——那会让人以为是网络问题，然后反复点。
+          // 没有原因的那种才是离线／后端没回，仍走原来那句实话。
+          wx.showToast({
+            title: typeof dropped === 'string' ? dropped : t('cardDropOffline', lang),
+            icon: 'none',
+            duration: 2000,
+          })
           return
         }
         // 本机那本账与服务器读回来那一份一起忘掉（一个出处，见 cardCloud.forget）：

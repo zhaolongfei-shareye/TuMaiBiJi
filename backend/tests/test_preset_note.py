@@ -103,14 +103,86 @@ def test_第二次登录不许再种第二篇(client, db, monkeypatch):
 
 
 def test_删掉预置那一篇之后_再冷启三次也不许回来(client, db, monkeypatch):
-    """§8.232 判据 2 的唯一证明：种子挂在建号那一个分支上，不是挂在登录回调上。"""
+    """§8.232 判据 2 的唯一证明：种子挂在建号那一个分支上，不是挂在登录回调上。
+
+    ⚠ 10-14 起这一篇**从接口删不掉了**（站长「默认的不能删除」，见下面两条），所以这里改成
+    直接从库里抹掉那一行。这不影响这一条证明的东西——它判的是"名下没有预置篇了，再登录会不会补一篇"，
+    抹掉的方式是 API 还是 ORM 与那个分支无关。用 API 删反而会被新那道闸挡成 400。
+    """
     first = _login(client, monkeypatch, "pm-kill-3")
-    headers = _bearer(first["token"])
-    assert client.delete(f"/api/notes/{first['seeded_note_id']}", headers=headers).status_code == 200
+    s = _reload(db)
+    row = s.query(Note).filter(Note.id == first["seeded_note_id"]).one()
+    s.delete(row)
+    s.commit()
     for _ in range(3):
         resp = _login(client, monkeypatch, "pm-kill-3")
         assert resp["seeded_note_id"] is None
     assert _notes_of(db, "pm-kill-3") == []
+
+
+def test_那一篇删不掉_接口回那一句而且行还在(client, db, monkeypatch):
+    """站长 10-14「默认的不能删除」：闸在服务端，回体带一句能念给人听的原因。
+
+    钉三样：状态码是 400（不是 403／500——403 会被客户端念成"票坏了"去重登）、
+    那句原因是 `preset_note.PRESET_NOTE_KEEP_MSG` 那一枚（客户端原样当吐司念，两处不许各写一遍）、
+    库里那一行还在（只回一句话、把行删了，是最坏的那一种组合）。
+    """
+    resp = _login(client, monkeypatch, "pm-keep-1")
+    headers = _bearer(resp["token"])
+    nid = resp["seeded_note_id"]
+    got = client.delete(f"/api/notes/{nid}", headers=headers)
+    assert got.status_code == 400, got.text
+    assert got.json()["detail"] == preset_note.PRESET_NOTE_KEEP_MSG, got.json()
+    assert [n.id for n in _notes_of(db, "pm-keep-1")] == [nid]
+    # 页头那一列也不许跟着掉：它判的是"名下有几篇"，不是"删得掉几篇"
+    assert client.get("/api/user/quota", headers=headers).json()["used"] == 1
+
+
+def test_他自己写的那一篇照旧删得掉(client, db, monkeypatch):
+    """反向对照：这道闸只认 `source_type == "preset"`，不许顺手把普通笔记一起锁上。
+
+    把判据写成"名下第一条／id 最小的那条"的话，这一条会红——那正是最容易写错的那一种形状：
+    他自己的第一篇恰好也占那个位置，从此他删不掉自己写的东西。
+    """
+    resp = _login(client, monkeypatch, "pm-keep-2")
+    headers = _bearer(resp["token"])
+    s = _reload(db)
+    mine = Note(user_id=str(s.query(User).filter(User.openid == "pm-keep-2").one().id),
+                title="他自己写的一篇", content="正文", source_type="manual")
+    s.add(mine)
+    s.commit()
+    got = client.delete(f"/api/notes/{mine.id}", headers=headers)
+    assert got.status_code == 200, got.text
+    assert [n.id for n in _notes_of(db, "pm-keep-2")] == [resp["seeded_note_id"]]
+
+
+def test_那一篇的卡片撤不掉_普通那篇的卡片照旧撤得掉(client, db, monkeypatch):
+    """同一把闸的第二半：「默认的不能删除」说的是那一篇，也说的是那一张。
+
+    代价记在台账 §8.236：一篇一张，而界面上"换一套模板"是先删再画 ⇒ 这一张会把预置那篇的模板钉死。
+    这一条同时钉住"只锁那一篇的卡片"——他自己那篇的卡片必须照旧撤得掉。
+    """
+    resp = _login(client, monkeypatch, "pm-keep-3")
+    headers = _bearer(resp["token"])
+    uid = resp["user_id"]
+    nid = resp["seeded_note_id"]
+    assert client.post(f"/api/notes/{nid}/card", headers=headers,
+                       json={"file_id": f"cloud://tumaibiji.abc/cards/preset-{nid}.jpg",
+                             "tpl": "classic", "no_qr": False}).status_code == 200
+
+    got = client.delete(f"/api/notes/{nid}/card", headers=headers)
+    assert got.status_code == 400, got.text
+    assert got.json()["detail"] == preset_note.PRESET_CARD_KEEP_MSG, got.json()
+    assert client.get(f"/api/notes/{nid}/card", headers=headers).json()["card"], "那一行不许被撤掉"
+
+    s = _reload(db)
+    mine = Note(user_id=str(uid), title="他自己写的一篇", content="正文", source_type="manual")
+    s.add(mine)
+    s.commit()
+    assert client.post(f"/api/notes/{mine.id}/card", headers=headers,
+                       json={"file_id": f"cloud://tumaibiji.abc/cards/mine-{mine.id}.jpg",
+                             "tpl": "classic", "no_qr": False}).status_code == 200
+    assert client.delete(f"/api/notes/{mine.id}/card", headers=headers).status_code == 200
 
 
 def test_老用户登录永远不会种(client, db, monkeypatch):
@@ -184,7 +256,11 @@ def test_预置篇存在时他自己写的第一篇_邀请人那十仍然结得�
 
 
 def test_那一篇走的是普通笔记那条链(client, db, monkeypatch):
-    """§8.232 判据 4：能改、能删、能分享，服务端不为它开任何特殊分支。"""
+    """§8.232 判据 4：能读、能改、能分享，服务端不为它开特殊分支。
+
+    ⚠ 这一条原来还写着"能删"——10-14 站长改口「默认的不能删除」，那半句作废，
+    删的那一半由上面 `test_那一篇删不掉_接口回那一句而且行还在` 钉。除"删"之外仍然没有分支。
+    """
     resp = _login(client, monkeypatch, "pm-plain-1")
     headers = _bearer(resp["token"])
     nid = resp["seeded_note_id"]

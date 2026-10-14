@@ -31,6 +31,7 @@ from app.services.sharing import (
     sync_snapshot,
 )
 from app.services import quota
+from app.services.preset_note import PRESET_NOTE_KEEP_MSG, PRESET_SOURCE_TYPE
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -432,6 +433,14 @@ def delete_note(
     )
     if not note:
         raise HTTPException(status_code=404, detail="笔记不存在或已删除")
+
+    # 站长 10-14「默认的不能删除」：§8.232 播种那一篇自带的产品说明删不掉。
+    # 闸必须在服务端——客户端那一层挡不住线上老版本，也挡不住直接打接口；判据是播种时那个
+    # `source_type == "preset"`，不是"名下第一篇"（那种写法会因为他改过标题、换过分类而误伤别人的笔记）。
+    # 注销账号那条路径**不受这一条影响**（`v1_account.delete_account` 按 user_id 整批清，不走这一个口），
+    # 否则就成了"人走了数据留着"，那是另一件事。
+    if note.source_type == PRESET_SOURCE_TYPE:
+        raise HTTPException(status_code=400, detail=PRESET_NOTE_KEEP_MSG)
     
     # Delete related shares and jobs first to avoid foreign key constraint errors
     db.query(Share).filter(Share.note_id == note_id).delete()
