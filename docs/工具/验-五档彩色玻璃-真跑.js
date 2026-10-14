@@ -16,6 +16,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/10-14五档彩色玻璃/实测')
 const PILL = path.resolve(__dirname, '采-底栏像素.py')
 const LINE = path.resolve(__dirname, '量-面板里有条线.py')
+const SHADOW = path.resolve(__dirname, '量-抬起来阴影.py')
 // 玻璃的闸是 `.container.has-bg`：没铺图 ⇒ 这些面根本不吃 `--glass-*`。§8.231 删了包内默认底图之后
 // 这一屏可能"两级都空"，所以与 `验-背景亮度圆点-真跑` 同一处理：借一张包里还在的真位图按在屏上。
 const PROBE_BG = '/assets/share-card.jpg'
@@ -177,9 +178,32 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
   ck('两格本机偏好已还原成探针进来前的值', String(rest.mood) === String(before.mood) && String(rest.wp) === String(before.wp),
     `${rest.mood}/${rest.wp} vs ${before.mood}/${before.wp}`)
 
-  // ---------- ⑥ 无图那一态：这块玻璃底下是米白页面，糊没有对象，字能不能读要量 ----------
+  // ---------- ⑥ 向上阴影那一枚：三处落点在屏上都解析得出来（站长 10-14 20:5x） ----------
+  // 静态那把（`验-向上阴影全局一枚`）读得出源码里写的是 `var(--sh-lift)`，读不出这一枚 var 在
+  // 那一屏的祖先链上到底存不存在——少一枚就是 IACVT，整条 `box-shadow` 按 unset 用＝没投影，
+  // 屏上又是最不容易看出来的一种。所以这里逐屏实读计算样式。
+  // ⚠ 期望值不写死像素数：模拟器把 rpx 按屏宽折半（12rpx→6px、28rpx→14px），第一版我拿
+  //   "1rpx＝1px"去比，三处全红——红的不是屏，是我把折算率当成了单位。这里只钉三件事：
+  //   色是那一支、偏移朝上、**三处逐字相同**（他这句要的就是"风格和高度全局一致"）。
+  const lifts = []
+  for (const [url, sel, label] of [['/pages/index/index', '.sheet', '列表那张纸卡（正本）'],
+  ['/pages/me/me', '.sheet', '「我的」那枚名片行（设置／关于两档共用）'],
+  ['/pages/create/create', '.stage-panel', '新建那块通栏深色面板（首屏／二屏共用）']]) {
+    const pg = await enter(url)
+    await sleep(4500)
+    const got = await styleOf(pg, sel, 'box-shadow')
+    lifts.push({ label, got })
+    const m = /^rgba\(18, 20, 26, 0?\.16\) 0px (-[\d.]+)px ([\d.]+)px 0px$/.exec(got.trim())
+    ck(`${label}：屏上读到的 box-shadow 是那一枚（色＝rgba(18,20,26,.16)、偏移朝上、后面跟一档糊），不是 none`,
+      !!m, got.slice(0, 84) || '(读不到)')
+  }
+  ck('三处读到的那一枚**逐字相同**（"风格和高度全局一致"只能这么证：一份令牌、三屏同一个解析结果）',
+    lifts.every((l) => l.got === lifts[0].got), lifts.map((l) => l.got).join(' ＝ '))
+
+  // ---------- ⑦ 无图那一态：这块玻璃底下是米白页面，糊没有对象，字能不能读要量 ----------
   // 只报数不判红的那条下限设 3.0：低于它就是真读不动了。4.5（AA 小字）这一档我没自己钉成红——
-  // 墨档那支纸白压 .62 的墨玻璃混出来大概是 4.3:1，要不要给墨档单抬 α 归他一句（palette.js 那段注释里记着）。
+  // ⚠ 这里原来写着"墨档纸白压 .62 墨玻璃大概只剩 4.3:1"，那是拿**米白页面**当底算的；
+  //   底栏其实压在深色面板上，下面那一行实测 (39,40,49) → 12.76:1，不存在要不要抬 α 的问题。
   page = await enter('/pages/create/create')
   await sleep(4500)
   await page.setData({ bgSrc: '' })
@@ -191,6 +215,13 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
   const flatCr = (relLum([242, 239, 233]) + 0.05) / (relLum(flat.fill) + 0.05)
   console.log(`  ℹ 无图那一态：底栏那块面混出来 ${flat.fill.join(',')}，纸白 #F2EFE9 压上去 ${flatCr.toFixed(2)}:1（AA 小字要 4.5；这条只报数）`)
   ck('无图那一态那块面与纸白至少还分得开（>3.0；掉到 3 以下就是真读不动）', flatCr > 3.0, `${flatCr.toFixed(2)}:1`)
+  // 计算样式读得到不等于屏上画得出来：`.stage-panel` 的 z-index 是 1，它头顶那一圈投影
+  // 要是被同屏 z-index 2／6 那几样（插画、白卡、录入面板）压住，屏上就是"没有"，而上面那一条照样绿。
+  // 所以这一处量**像素**：面板顶边上方那 6 行比再往上 25～45 行那一段暗多少。
+  // 改前同一张图同一扇窗口实测 近带 220.0／远带 220.0 ⇒ 差 0.0，所以"暗 ≥3 灰阶"这一条有牙。
+  const lift = JSON.parse(execFileSync('python3', [SHADOW, shotFlat, '548'], { encoding: 'utf8' }))
+  ck('新建那一屏（无图态）：深色面板顶边上方那一条带确实被投影压暗了（≥3 灰阶）',
+    lift.dip >= 3, `近带 ${lift.near}／远带 ${lift.far}／差 ${lift.dip}@y${lift.edge_y}｜${lift.profile.join(' ')}`)
 
   console.log(`\n${bad.length ? '✗ ' + bad.length + ' 条不过：' + bad.join('、') : `五档彩色玻璃 真跑：${n} 条全过`}`)
   console.log(`  图与数在 ${OUT}`)

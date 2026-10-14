@@ -211,6 +211,9 @@
   gap: 24rpx;
   background: var(--bg-page);
   border-radius: var(--r-card) var(--r-card) 0 0;
+  /* 站长 10-14 20:5x 那一句里"关于、设置"两档的落点就是这一枚——两档都住在它下面，一处管两档。
+     与列表页那张纸卡同一枚 `--sh-lift`（`app.wxss`），不在这页另抄一串数。 */
+  box-shadow: var(--sh-lift);
 }
 
 /* R6（「毛玻璃如果下方纯色，要进行渐变处理，不要一刀切」）：这一行下面就是实心页面底，
