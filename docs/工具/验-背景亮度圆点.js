@@ -113,8 +113,11 @@ const labels = [...read('utils/i18n.js').matchAll(/bgDimLabel:\s*'([^']+)'/g)].m
 ck('「调亮度」中英各一份', labels.length === 2, labels.join(' / '))
 ck('中文那版就是「调亮度」三个字', labels[0] === '调亮度', labels[0])
 const cw = read('pages/create/create.wxml')
-ck('那一行是两半：左「调亮度」点它换档、右「换背景」导流',
-  (cw.match(/class="swap-half"/g) || []).length === 2 && /catchtap="onCycleDim"/.test(cw))
+// 10-14 站长把「切换毛玻璃」也搬进这一行（原话「首页 增加一个入口『换心情』…每次点击切换一种」），
+// 所以"两半"这条前提已作废：现在是三半，前两枚的落点没动，第三枚往后加。
+ck('那一行是三半：「调亮度」换档、「换背景」导流、「换心情」循环（前两枚落点没动）',
+  (cw.match(/class="swap-half"/g) || []).length === 3
+  && /catchtap="onCycleDim"/.test(cw) && /catchtap="goHomeBg"/.test(cw) && /catchtap="onCycleMood"/.test(cw))
 ck('点的颜色从 style 递进来，wxss 里不写死 background，也没有 mask / 投影残留',
   !/\.dim-dot\s*\{[^}]*(background|mask-image|filter)/.test(strip(read('pages/create/create.wxss')).replace(/\s+/g, ' ')))
 

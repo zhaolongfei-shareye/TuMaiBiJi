@@ -184,10 +184,16 @@ ck('tab 栏组件里不再排字，也不再留那份字体栈抄件',
   && /aria-label="\{\{item\.text\}\}"/.test(tabWxml))
 // 去文字之后"当前在哪一页"只剩图标下面那枚圆底可说，所以那一档必须真的派生出来、
 // 并且仍然只由 chromeOf 一处给（组件里不许写死一支色）。
-ck('选中那枚圆底吃 --chrome-sel，且这支色只在 chromeOf 里算一次',
+const PAL = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/palette.js'), 'utf8')
+/* 10-14 之前"只出现一次"这个数就是判据（一处算、一处发）。现在有两个发出口：
+   `chromeOf` 与 `moodChromeOf`（底栏那层跟着心情走，见 palette 里 moodChromeOf 上面那段），
+   两枚发的是**同一个算出来的 `sel`**，所以判据从"数名字"改成"数算法"：
+   `sel` 那一次派生只能有一处，两个发出口都必须引用它、不许各自写一支色。 */
+ck('选中那枚圆底吃 --chrome-sel，且这支色只在 chromeOf 里算一次（moodChromeOf 只许转发）',
   /var\(--chrome-sel\)/.test(tabCss) && !/\.tab-item\.active \.tab-icon \{[^}]*#[0-9a-f]{6}/i.test(tabCss)
-  && (fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/palette.js'), 'utf8')
-    .match(/--chrome-sel/g) || []).length === 1)
+  && (PAL.match(/const sel = hslToHex\(/g) || []).length === 1
+  && /--chrome-sel:\$\{sel\}/.test(PAL) && /--chrome-sel:\$\{base\.sel\}/.test(PAL)
+  && !/--chrome-sel:\s*#[0-9a-fA-F]{6}/.test(PAL))
 ck('宋体类把 STSong 放在 Songti SC 前面', /font-song\s*\{[^}]*'STSong',\s*'Songti SC'/.test(css))
 // 两边不只是"都有"，声明必须逐字节相同：组件那份是抄的，抄漏一个名字就会出现
 // "主页面换了字、底部 tab 没换"这种半截效果，而它只在部分机型上看得见。
@@ -303,7 +309,11 @@ const barCss = fs.readFileSync(path.join(pageDir, 'custom-tab-bar/index.wxss'), 
 // 注释里会引用旧那七处 rgba(255,255,255,.42) 当线索，扫之前先把它剥掉：
 // 这条断言要管的是"声明里还有没有硬编码"，不是"文件里有没有这串字"。
 const barRule = barCss.replace(/\/\*[\s\S]*?\*\//g, '')
-ck('胶囊那一块面由 chromeOf 递进来', /chromeOf\(/.test(barJs) && /var\(--chrome-bg\)/.test(barRule))
+/* 10-14：底栏那一层改由 `moodChromeOf` 递（"下方的 tab 也与上面的同步"）。
+   原来这条 `chromeOf\(` 是**大小写敏感**的，正好能当"组件不许绕过心情直接问壁纸要色"的闸——
+   别把它放宽成 /ChromeOf\(/i，一放宽这两条链就又是两份真相。 */
+ck('胶囊那一块面由 moodChromeOf 递进来（组件不再直接问 chromeOf 要色）',
+  /moodChromeOf\(/.test(barJs) && !/[^d]chromeOf\(/.test(barJs) && /var\(--chrome-bg\)/.test(barRule))
 ck('胶囊里不再有任何写死的 rgba(255,255,255,…)（图标和文字吃 currentColor）',
   !/rgba\(255,\s*255,\s*255/.test(barRule), (barRule.match(/rgba\(255[^)]*\)/g) || []).join(' '))
 ck('深色那两枚不再有第二块胶囊底（#1a1c22 那种本地常量）', !/\.tab-bar-dark/.test(barRule))

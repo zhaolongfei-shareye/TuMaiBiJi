@@ -212,18 +212,33 @@ function segRaw(sel) {
   const m = new RegExp(`(?:^|\\n)${esc}\\s*\\{([^}]*)\\}`).exec(wxssRaw)
   return m ? m[1] : ''
 }
+/* ---------- 10-14 五档彩色毛玻璃：这几条读的值搬家了 ----------
+   面板那三段（band／实心／左下那一格）与压在面板上的三档字，源码里现在写的是 `var(--stage-*)`
+   与 `var(--blk-count-bg)`，**值在 `app.wxss` 的 `.mood-*` 那五块里**（真身在 utils/palette.js 的 moodVars）。
+   所以这一组判据先按"墨那一档"把 var() 展开成它实际落地的值，再照原来的算法算合成灰阶与对比度——
+   判的还是他 10-13 拍过的那几档数，只是量的位置从样式表挪到了令牌表。
+   ⚠ 展开取的是 `.mood-ink`（默认那一档）：彩色那四档由 `验-五档彩色玻璃.js` 逐档钉，两边不重复。 */
+const MOOD_INK = ((/\.mood-ink\s*\{([^}]*)\}/.exec(appWxss) || [0, ''])[1])
+const tok = (v) => {
+  const m = /var\((--[\w-]+)\)/.exec(v || '')
+  if (!m) return v || ''
+  const d = new RegExp('\\s*' + m[1] + ':([^;]+);').exec(MOOD_INK)
+  return d ? d[1].trim() : v
+}
+const val = (segTxt, prop) => tok(decl(segTxt, prop))
+
 ok('白面与墨面各是一条七档渐变（不是两档糊过去）',
-  (decl(sFace, 'background').match(/\d+%/g) || []).length === 7
-  && (decl(sCount, 'background').match(/\d+%/g) || []).length === 7,
-  `白面 ${(decl(sFace, 'background').match(/\d+%/g) || []).length} 档／墨面 ${(decl(sCount, 'background').match(/\d+%/g) || []).length} 档`)
+  (val(sFace, 'background').match(/\d+%/g) || []).length === 7
+  && (val(sCount, 'background').match(/\d+%/g) || []).length === 7,
+  `白面 ${(val(sFace, 'background').match(/\d+%/g) || []).length} 档／墨面 ${(val(sCount, 'background').match(/\d+%/g) || []).length} 档`)
 ok('两片皮的停点位置与现网 .page-scrim 逐档相同（"与现网的过程一样"）',
   scrimStops.length === 7
-  && JSON.stringify(stops(decl(sFace, 'background'))) === JSON.stringify(scrimStops)
-  && JSON.stringify(stops(decl(sCount, 'background'))) === JSON.stringify(scrimStops),
-  `现网 ${scrimStops}／白面 ${stops(decl(sFace, 'background'))}／墨面 ${stops(decl(sCount, 'background'))}`)
+  && JSON.stringify(stops(val(sFace, 'background'))) === JSON.stringify(scrimStops)
+  && JSON.stringify(stops(val(sCount, 'background'))) === JSON.stringify(scrimStops),
+  `现网 ${scrimStops}／白面 ${stops(val(sFace, 'background'))}／墨面 ${stops(val(sCount, 'background'))}`)
 ok('两片的基色一支是白、一支是 .page-scrim 那支 (18,20,26)',
-  /rgba\(255,\s*255,\s*255/.test(decl(sFace, 'background'))
-  && /rgba\(18,\s*20,\s*26/.test(decl(sCount, 'background')))
+  /rgba\(255,\s*255,\s*255/.test(val(sFace, 'background'))
+  && /rgba\(18,\s*20,\s*26/.test(val(sCount, 'background')))
 /* 幅度这一头按**合成后的灰阶差**判，不按透明度差判：透明度差 .3 压在近实心的墨底上，
    灰阶可能只动 2 级（那就是"画了等于没画"那一刀）。底取面板那支实心墨 #23252C（保守——
    真机上 .95 的面板还压着一张会透出来的图，底只会更浅，差只会更大不会更小）。
@@ -250,15 +265,15 @@ const gradSpan = (src) => {
   return a && b ? Math.abs(palette.lumOf(a) - palette.lumOf(b)) : NaN
 }
 ok('白面渐变合成到墨面板之后上下两端差 ≥6 级（照抄 .42→.72 那种只差 2 级的算没画）',
-  gradSpan(decl(sFace, 'background')) >= 6,
-  `实测 ${Math.round(gradSpan(decl(sFace, 'background')))} 级`)
+  gradSpan(val(sFace, 'background')) >= 6,
+  `实测 ${Math.round(gradSpan(val(sFace, 'background')))} 级`)
 ok('墨面渐变合成到墨面板之后同样差 ≥6 级',
-  gradSpan(decl(sCount, 'background')) >= 6,
-  `实测 ${Math.round(gradSpan(decl(sCount, 'background')))} 级`)
+  gradSpan(val(sCount, 'background')) >= 6,
+  `实测 ${Math.round(gradSpan(val(sCount, 'background')))} 级`)
 // 字压面：那一格的底取**渐变最浅那一端**（最难读的头），字与横线各自先合成成实心再算。
-const COUNT_FLOOR = over(gradTok(decl(sCount, 'background'), true), PANEL_FACE)
+const COUNT_FLOOR = over(gradTok(val(sCount, 'background'), true), PANEL_FACE)
 const solidOf = (sel, prop) => {
-  const raw = decl(seg(sel), prop)
+  const raw = val(seg(sel), prop)
   return /^#/.test(raw) ? raw : over(raw, COUNT_FLOOR)
 }
 const crNum = palette.crOf(solidOf('.blk-num', 'color'), COUNT_FLOOR)
@@ -307,9 +322,17 @@ const offenders = huesInBlk.filter((t) => !isPaperWhite(t))
 ok('这一组那几段样式表里没有抄进来的色相（中性色放行；唯一那支暖白必须是全站 `--btn-ink`）',
   !!PAPER && offenders.length === 0,
   offenders.join(',') || `纸白核对：${PAPER}`)
-ok('那一支纸白确实写在这一组里（一条都没有＝面板上的字全成了 var(--text-*)，浅壁纸那一态会翻墨）',
-  huesInBlk.filter(isPaperWhite).length >= 4,
-  `${huesInBlk.filter(isPaperWhite).length} 处`)
+/* 10-14 之前这一条数的是 create.wxss 里那几处写死的 #F2EFE9；现在那四处换成 var(--stage-ink-*)，
+   数源码里的字面量必然红。判据的前提跟着搬：**四处引用要在，且墨档展开出来必须还是那一枚纸白**
+   （少一处＝那一处会跟着彩色档翻墨；展开不是纸白＝默认那一屏的字色被他没指的这一刀改掉了）。 */
+const INK_REFS = ['.blk-num', '.blk-lab', '.blk-rule', '.blk-tips-in']
+const inkRefOk = (sel) => /var\(--stage-ink[-\w]*\)/.test(seg(sel))   // 四枚后缀各不相同（-solid/-dim/空/-strong），别挨个列
+const inkTokVals = ['.blk-num', '.blk-lab', '.blk-rule', '.blk-tips-in']
+  .map((sel) => val(seg(sel), /blk-rule/.test(sel) ? 'background' : 'color'))
+const inkTokPaper = inkTokVals.every((v) => isPaperWhite(v) || (v || '').toLowerCase() === PAPER.toLowerCase())
+ok('面板上那四处字色各引一枚 `--stage-ink-*`，且墨档展开回来仍是全站那一枚纸白',
+  INK_REFS.every(inkRefOk) && !!PAPER && inkTokPaper,
+  `${INK_REFS.filter(inkRefOk).length}/4 引用齐；展开值 ${inkTokVals.join(' ')}`)
 ok('这一组不再吃 `--eb-*`，也没有一处还写 `blkSkin`（那套随壁纸派生的面整条退役了）',
   !/--eb-|blkSkin|entryBlocks/.test(wxss + wxml + jsOnly),
   (/--eb-[a-z0-9-]+|blkSkin|entryBlocks/.exec(wxss + wxml + jsOnly) || ['(无)'])[0])
@@ -398,13 +421,13 @@ ok('深色面板本体透明（实心只能归 ::after；写回本体＝与 ::be
   `本体 background=${decl(sPanel, 'background') || '(没写)'}`)
 const BAND_H_CSS = num(sPanelBand, 'height')
 ok('band 那一段是 ::before 的 .16→.94 两档（同色只走透明度；10-13 两刀把顶档从 .55 一路收到 .16＝"透明度多一点，现在太暗了"）',
-  BAND_H_CSS > 0 && /rgba\(35,\s*37,\s*44,\s*0?\.16\)/.test(decl(sPanelBand, 'background'))
-  && /rgba\(35,\s*37,\s*44,\s*0?\.94\)/.test(decl(sPanelBand, 'background')),
-  `高 ${BAND_H_CSS}／${decl(sPanelBand, 'background') || '(没写)'}`)
+  BAND_H_CSS > 0 && /rgba\(35,\s*37,\s*44,\s*0?\.16\)/.test(val(sPanelBand, 'background'))
+  && /rgba\(35,\s*37,\s*44,\s*0?\.94\)/.test(val(sPanelBand, 'background')),
+  `高 ${BAND_H_CSS}／${val(sPanelBand, 'background') || '(没写)'}`)
 ok('实心 .95 挂在 ::after 上，从 band 底下起、贴到屏底（top 与 ::before 的高是同一个数）',
-  /rgba\(35,\s*37,\s*44,\s*0?\.95\)/.test(decl(sPanelBody, 'background'))
+  /rgba\(35,\s*37,\s*44,\s*0?\.95\)/.test(val(sPanelBody, 'background'))
   && num(sPanelBody, 'top') === BAND_H_CSS && /bottom:\s*0\b/.test(sPanelBody),
-  `::after top=${num(sPanelBody, 'top')}／bottom=${decl(sPanelBody, 'bottom')}／background=${decl(sPanelBody, 'background') || '(没写)'}`)
+  `::after top=${num(sPanelBody, 'top')}／bottom=${decl(sPanelBody, 'bottom')}／background=${val(sPanelBody, 'background') || '(没写)'}`)
 ok('糊挂在面板本体上（本体透明又不挂 blur ⇒ 那一段就是一张洞，什么都不糊）',
   /backdrop-filter:\s*blur/.test(sPanel) && /-webkit-backdrop-filter:\s*blur/.test(sPanel),
   decl(sPanel, 'backdrop-filter') || '(没写)')

@@ -140,13 +140,15 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   const halves = await page.$$('.swap-half')
   // 这两句串从**这一屏自己那份字典**现读，不写死中文：这一档账号的语言是登录带回的，
   // 测试号存的是 en（同一件事 `验-列表头部铺图-真跑` 里已经记过一次），写死就是一句假红。
-  // 判据要守的东西没变：还是"两半、左调亮度右换背景"，只是拿本机的串去比。
+  // 判据要守的东西没变：还是"每一半各管各的、不许互相吃掉"，只是拿本机的串去比。
+  // ⚠ 10-14 起这一行是三半（第三半「换心情」，§8.237）：前两枚的落点与文案一个字没动。
   const dT = (await page.data()).t || {}
-  ck('这一行是两半：左「调亮度」、右「换背景」（串读的是这一屏的字典，语言跟着账号走）',
-    halves.length === 2
+  ck('这一行是三半：「调亮度」换档、「换背景」导流、「换心情」循环（串读的是这一屏的字典）',
+    halves.length === 3
     && (await (await halves[0].$('.swap-text')).text()) === dT.bgDimLabel
-    && (await (await halves[1].$('.swap-text')).text()) === dT.homeBgSwap,
-    `${halves.length} 半｜字典 ${dT.bgDimLabel} / ${dT.homeBgSwap}`)
+    && (await (await halves[1].$('.swap-text')).text()) === dT.homeBgSwap
+    && (await (await halves[2].$('.swap-text')).text()) === dT.moodSwap,
+    `${halves.length} 半｜字典 ${dT.bgDimLabel} / ${dT.homeBgSwap} / ${dT.moodSwap}`)
   const half = halves[0]
   await half.tap()
   await sleep(1000)
@@ -258,26 +260,28 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   await sleep(4500)
   const i18n = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
   const halvesEn = await page.$$('.swap-half')
-  // 两半的矩形必须走 selectAll：`.select()` 只回第一个，写两遍拿到的是同一个元素的两份拷贝，
+  // 三半的矩形必须走 selectAll：`.select()` 只回第一个，写两遍拿到的是同一个元素的两份拷贝，
   // "不重叠"那条永远绿（自己钉自己）。
   const hrect = await mp.evaluate(() => new Promise((resolve) => {
     wx.createSelectorQuery().selectAll('.swap-half').boundingClientRect().exec((r) => resolve(r[0]))
   }))
-  ck('英文两半的文案就是字典那两条',
-    halvesEn.length === 2
+  ck('英文三半的文案就是字典那三条',
+    halvesEn.length === 3
     && (await (await halvesEn[0].$('.swap-text')).text()) === i18n.texts('en').bgDimLabel
-    && (await (await halvesEn[1].$('.swap-text')).text()) === i18n.texts('en').homeBgSwap,
+    && (await (await halvesEn[1].$('.swap-text')).text()) === i18n.texts('en').homeBgSwap
+    && (await (await halvesEn[2].$('.swap-text')).text()) === i18n.texts('en').moodSwap,
     hrect.map((x) => x && Math.round(x.width)).join(' / '))
   const row = (await rects(['.home-swap']))[0]
-  ck('英文态两半不重叠、不撞行边',
-    hrect[0] && hrect[1] && row
+  ck('英文态三半不重叠、不撞行边',
+    hrect.length === 3 && hrect.every((x) => !!x) && row
     && hrect[0].right <= hrect[1].left + 0.5
-    && hrect[0].left >= row.left - 0.5 && hrect[1].right <= row.right + 0.5,
-    hrect[0] && hrect[1] && row
-      ? `左 ${Math.round(rpx(hrect[0].left))}..${Math.round(rpx(hrect[0].right))} `
-        + `右 ${Math.round(rpx(hrect[1].left))}..${Math.round(rpx(hrect[1].right))} 行 ${Math.round(rpx(row.width))}`
+    && hrect[1].right <= hrect[2].left + 0.5
+    && hrect[0].left >= row.left - 0.5 && hrect[2].right <= row.right + 0.5,
+    hrect.length === 3 && row
+      ? hrect.map((x) => `${Math.round(rpx(x.left))}..${Math.round(rpx(x.right))}`).join(' ')
+        + ` 行 ${Math.round(rpx(row.left))}..${Math.round(rpx(row.right))}`
       : '量不到')
-  await mp.screenshot({ path: path.join(OUT, '圆点-7-英文两半.png') })
+  await mp.screenshot({ path: path.join(OUT, '圆点-7-英文三半.png') })
   await lang.pin(mp, 'zh')
 
   // ---------- 还原 ----------

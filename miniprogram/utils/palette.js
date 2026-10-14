@@ -321,6 +321,140 @@ const WALLPAPER_ALIAS = {
 }
 
 /**
+ * 「心情」＝五档彩色毛玻璃。站长 10-14 两句原话：
+ *   「四种界面配色（加上目前深色面板），改为不同颜色的毛玻璃，参考其他AI生成的效果图，
+ *    下方的tab也与上面的同步，其他页面有涉及毛玻璃的也用相同的颜色面板」
+ *   「切换毛玻璃改到首页，增加一个入口『换心情』icon是小云朵。每次点击切换一种」
+ * ⇒ 四套界面配色各自一支色，加上现网那一面墨，一共五档，点一次换一档。
+ *
+ * **三档色是从他给的参考图上量的，不是我挑的审美值**：
+ * `docs/design/毛玻璃参考图三张/` 三张是同一版首页布局、只差面板那一层的颜色，
+ * 量法＝面板中段（屏高 69~79% 那一行取均值）与底栏那一条（93~97%）各一个数：
+ *   暖陶土 玻璃 #B1A299／底带 #8D7564 → 象牙
+ *   雾蓝   玻璃 #A4B0C0／底带 #6D8DAA → 雨雾
+ *   藕荷紫 玻璃 #B5A8BF／底带 #9E95B0 → 樱落
+ * 天青那一档参考图里没有：玻璃色取它自己色阶中间档 #88AF91 往本套页面底 #D4E2D7 上并 1/4，
+ * 底带再从玻璃色往色阶最深那档 #43634A 并 .45。**这一档是我推的，他没拍过。**
+ * 墨那一档一个数都没动（玻璃＝现网那面 #23252C，字＝纸白 #F2EFE9），所以默认态与今天逐字同一屏。
+ *
+ * 只换**色相**，不换透明度：α 全部沿用他 10-11／10-12 逐条拍过的那几档
+ * （veil .30／band .60／plate .50／fill .20／hair .55；面板 .16→.94→.95；左下那一格 .45→.92）。
+ * 描边那一枚 `--glass-hair` 五档一律留白：它是玻璃自己那道反光，不是玻璃的本色。
+ *
+ * ⚠ 出口给的全是**写死的完整值**（rgba(...)／linear-gradient(...)），不许改成
+ * `rgba(var(--x), .3)` 那种嵌法：var() 进函数参数在老安卓 XWEB 上会让整条声明掉下来
+ * （app.wxss 里 `--glass-veil` 与 min() 那两条 ⚠ 记的是同一件事）。
+ * `app.wxss` 那五块 `.mood-*` 是这份表的**镜像**，逐字等值由 `docs/工具/验-五档彩色玻璃.js` 钉。
+ */
+const MOODS = [
+  {
+    key: 'ink', cls: 'mood-ink', label: '墨', labelEn: 'Ink', theme: 'tint-paper',
+    // band 不是 glass：现网左下那一格写的是 #12141A，面板那面才是 #23252C（见 moodVars ②）
+    glass: '#23252C', band: '#12141A', text: '#F2EFE9',
+  },
+  {
+    key: 'ivory', cls: 'mood-ivory', label: '象牙', labelEn: 'Ivory', theme: 'tint-paper',
+    glass: '#B1A299', band: '#8D7564', text: '#352E1D',
+  },
+  {
+    key: 'celadon', cls: 'mood-celadon', label: '天青', labelEn: 'Celadon', theme: 'tint-celadon',
+    glass: '#9BBCA3', band: '#799C81', text: '#1D3522',
+  },
+  {
+    key: 'blush', cls: 'mood-blush', label: '樱落', labelEn: 'Blush', theme: 'tint-blush',
+    glass: '#B5A8BF', band: '#9E95B0', text: '#351D29',
+  },
+  {
+    key: 'mist', cls: 'mood-mist', label: '雨雾', labelEn: 'Mist', theme: 'gradient-blue',
+    glass: '#A4B0C0', band: '#6D8DAA', text: '#212431',
+  },
+]
+
+/** 脏值（别的版本写过的 key、本机存储里残留的数）一律兜回第一档墨＝现网那一版。 */
+function moodOf(key) {
+  return MOODS.filter((m) => m.key === key)[0] || MOODS[0]
+}
+
+/** 点一次换一档：墨 → 象牙 → 天青 → 樱落 → 雨雾 → 回墨。 */
+function moodNext(key) {
+  const i = Math.max(0, MOODS.map((m) => m.key).indexOf(moodOf(key).key))
+  return MOODS[(i + 1) % MOODS.length]
+}
+
+/** 服务端只认 wallpaper 那六个值；心情这一档靠壁纸反查回来（墨与象牙同壁纸，反查落进象牙）。 */
+function moodOfWallpaper(wallpaper) {
+  const key = themeOf(wallpaper).key
+  return MOODS.filter((m) => m.theme === key)[0] || MOODS[0]
+}
+
+/**
+ * 这一档要往 CSS 里发的那一叠令牌值。`app.wxss` 里那五块 `.mood-*` 是这份输出的**镜像**，
+ * 逐字等值由 `docs/工具/验-五档彩色玻璃.js` 钉（与 `--bg-layer`／`--btn-bg` 同一条规矩）。
+ *
+ * 两件要说清的：
+ * ① **小件不能和面板同色**。纱／圆➕／录入面板那一叠（piece）在彩色档上取"玻璃色往白并 .55"，
+ *    因为同色的 .50 压在同色的 .95 上等于没画；墨那一档走另一支——它今天就是**白纱压暗面**，
+ *    piece 直接给纯白，五个数与 `page{}` 里他 10-11／10-12 拍过的原值逐字相同。
+ * ② **左下那一格的基色不是面板色**。现网 `.blk-count` 写的是 #12141A（18,20,26），
+ *    面板那面是 #23252C（35,37,44），两枚本来就不是一支，所以墨档的 band 给 #12141A，
+ *    照抄那七个停点的 α（.45/.45/.38/.35/.50/.68/.92）才谈得上"一个字节都没变"。
+ */
+function moodVars(key) {
+  const m = moodOf(key)
+  const rgba = (c, a) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a.toFixed(2)})`
+  const g = hexToRgb(m.glass)
+  const b = hexToRgb(m.band)
+  const t = hexToRgb(m.text)
+  const piece = m.key === 'ink' ? [255, 255, 255] : g.map((v) => Math.round(v + (255 - v) * 0.55))
+  const COUNT_STOPS = [[0.45, '0%'], [0.45, '10%'], [0.38, '43%'], [0.35, '62%'], [0.50, '83%'], [0.68, '88%'], [0.92, '100%']]
+  return {
+    '--glass-veil': rgba(piece, 0.30),
+    '--glass-veil-band': rgba(piece, 0.60),
+    '--glass-plate': rgba(piece, 0.50),
+    '--glass-fill': rgba(piece, 0.20),
+    '--glass-plate-dock': rgba(piece, 0.72),
+    '--glass-fill-dock': rgba(piece, 0.42),
+    '--stage-band': `linear-gradient(180deg, ${rgba(g, 0.16)} 0%, ${rgba(g, 0.94)} 100%)`,
+    '--stage-solid': rgba(g, 0.95),
+    '--blk-count-bg': `linear-gradient(180deg, ${COUNT_STOPS.map((s) => `${rgba(b, s[0])} ${s[1]}`).join(', ')})`,
+    '--stage-ink-solid': m.text,
+    '--stage-ink-strong': rgba(t, 0.96),
+    '--stage-ink': rgba(t, 0.85),
+    '--stage-ink-soft': rgba(t, 0.78),
+    '--stage-ink-dim': rgba(t, 0.72),
+    '--stage-ink-faint': rgba(t, 0.56),
+  }
+}
+
+/**
+ * 底部导航那一层的皮。它是自定义组件，读不到 page 上的 CSS 变量，只能由 JS 把整串递进去
+ * （`custom-tab-bar/index.js` 那句 `setData({ chromeStyle })`）。
+ *
+ * ⚠ 墨那一档**原样退回 `chromeOf`**：今天底栏那块面是壁纸色相派生的实心暗面（象牙下 #766948），
+ * 不是玻璃。这一轮他说的是"下方的 tab 也与上面的同步"，彩色那四档同步成玻璃；
+ * 墨这一档要是也换成 rgba(35,37,44,.62)＋糊，就等于顺手改了他没指过的默认态。
+ * 所以默认那一屏底栏一个字节都不变，四档彩色才吃心情。
+ * 选中那一枚圆底五档都仍吃 `chromeOf().sel`——站长 10-04 定过"深色按钮必须和底栏选中那一格
+ * 下面那块圆底同色"，那一处不在这一刀里。
+ */
+function moodChromeOf(key) {
+  const m = moodOf(key)
+  const base = chromeOf(m.theme)
+  if (m.key === 'ink') return Object.assign({}, base, { style: base.style + ';--chrome-blur:none' })
+  const rgb = hexToRgb(m.glass)
+  const bg = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.62)`
+  const idle = withAlpha(m.text, 0.62)
+  const line = withAlpha(m.text, 0.16)
+  const shadow = withAlpha('#000000', 0.22)
+  return {
+    bg, ink: m.text, idle, line, shadow, sel: base.sel,
+    // --chrome-blur 五档都要发一枚：只给彩色档发、墨档不发，那条 `backdrop-filter: var(--chrome-blur)`
+    // 在墨档就成了"引用一个不存在的变量"⇒ IACVT，整条声明掉下来（不是回落到 none 那么简单）。
+    style: `--chrome-bg:${bg};--chrome-ink:${m.text};--chrome-idle:${idle};--chrome-line:${line};--chrome-shadow:${shadow};--chrome-sel:${base.sel};--chrome-blur:blur(23px) saturate(1.8)`,
+  }
+}
+
+/**
  * 海报专用配色组。界面那六组色是"分类身份"，海报要的是"这一张好不好看、愿不愿意转发"，
  * 所以这里按风格成套给：同一套风格内部再按分类确定性取一个色向，
  * 于是同一条笔记在同一个模板上永远长一个样，但换分类会换色、换模板会换气质。
@@ -744,6 +878,12 @@ module.exports = {
   MOTIFS,
   THEMES,
   WALLPAPER_ALIAS,
+  MOODS,
+  moodOf,
+  moodNext,
+  moodOfWallpaper,
+  moodVars,
+  moodChromeOf,
   POSTER_SCHEMES,
   schemeFor,
   plateColors,

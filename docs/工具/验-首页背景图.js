@@ -208,8 +208,11 @@ const PANEL_TEXT = ['tips', 'tips-line', 'blk-tips', 'blk-tips-in',
   'blk-tips-line', 'blk-num', 'blk-lab', 'blk-rule']
 const onPanelRow = (sel) => sel.split(',').some((s) =>
   s.split(/[^\w-]+/).some((t) => PANEL_TEXT.includes(t)))
-ck('压在面板上的那两行字是写死的纸白，不吃会翻极性的 --text-*',
-  /\.blk-tips-in\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(wxss)
+// 10-14 五档彩色玻璃：压在面板上的那两行字不再写死纸白，改吃心情那一档的 `--stage-ink-*`
+// ——彩色那四档的面板不是墨色，纸白压上去极性就不对了。**"不许吃会翻极性的 `--text-*`"这条没变**，
+// 墨那一档的 `--stage-ink-strong` 逐字等于旧纸白由 `验-五档彩色玻璃.js` 钉（默认那一屏零变化）。
+ck('压在面板上的那两行字吃心情那一档的墨，不吃会翻极性的 --text-*',
+  /\.blk-tips-in\s*\{[^}]*color:\s*var\(--stage-ink-strong\)/.test(wxss)
     && !/\.blk-tips-in\s*\{[^}]*var\(--text-/.test(wxss))
 ck('抬到墨面之上那一行反过来：吃页面级令牌，浅照片那一态才翻得成墨',
   /(?:^|\n)\.out\s*\{[^}]*color:\s*var\(--text-(secondary|tertiary)\)/.test(wxss)

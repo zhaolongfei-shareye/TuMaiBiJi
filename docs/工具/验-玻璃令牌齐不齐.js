@@ -15,9 +15,12 @@
 //    挂 `.head`／`.head-band` 就跟不了这一沉，默认档下当场出硬边。
 // ⑥ iOS 的 WKWebView 只认 `-webkit-backdrop-filter`（效果图上每一行玻璃都是两条一起写的）。
 // ⑦ 下移背景图那笔账（R12）散在 js 常量与几处样式里，本把把它们相互咬住。
+// ⑧ 10-14 起玻璃的**色**跟着「心情」走（五档），值在 `app.wxss` 的 `.mood-*` 五块里；
+//    本把只管"齐不齐／α 对不对"这一面，五档各自的色值镜像由 `验-五档彩色玻璃.js` 钉。
 // 每条都有反向自证：把那一条改坏一次，判据必须红——不然它只是在读文件，不是在守东西。
 const fs = require('fs')
 const path = require('path')
+const palette = require(path.resolve(__dirname, '../../miniprogram/utils/palette.js'))
 
 const ROOT = path.resolve(__dirname, '../..')
 const P = (rel) => path.join(ROOT, 'miniprogram', rel)
@@ -87,16 +90,22 @@ function evaluate(F) {
   ok('`--glass-jot` 的定义与消费都删净了（注释里提到它不算残留）',
     !/--glass-jot\s*:/.test(APP) && !/var\(--glass-jot\)/.test(APP)
     && !/--glass-jot\s*:/.test(read('pages/create/create.wxss')) && !/var\(--glass-jot\)/.test(read('pages/create/create.wxss')))
-  ok('全站那档白纱还是 .30（R10 那一枚，弹窗与密码面板吃它）',
-    /--glass-veil:\s*rgba\(255, 255, 255, 0\.30\)/.test(APP),
-    flat((/--glass-veil:[^;]*/.exec(APP) || [])[0]))
+  /* 10-14 之后这一枚在 app.wxss 里有**六份**（page{} 那枚兜底 ＋ `.mood-*` 五块）。
+     原来这一条 `test(APP)` 只要六份里还剩一份对得上就绿——把 page{} 那档改成 .35 实测不红
+     （反向刀试出来的，"没牙"就是这两条）。改成**每一份的 α 都必须等于这一档**；
+     色相那半（每档各自一支色）归 `验-五档彩色玻璃.js` 钉，两把不重复也不互相放水。 */
+  const alphasOf = (name) => (APP.match(new RegExp(name + ':\\s*rgba\\([^)]*,\\s*([\\d.]+)\\s*\\)', 'g')) || [])
+    .map((t) => Number(/,\s*([\d.]+)\s*\)$/.exec(t)[1]))
+  ok('全站那档纱还是 .30（R10 那一枚，弹窗与密码面板吃它）——page 兜底与五块心情，每一份都算',
+    alphasOf('--glass-veil').length === 6 && alphasOf('--glass-veil').every((a) => a === 0.30),
+    `${alphasOf('--glass-veil').length} 份：${alphasOf('--glass-veil').join('/')}`)
   /* 站长 10-12 21:4x 拍甲：卡顶那一段玻璃单独一档 .60（.30 把近黑的图只提到灰阶 89~175，
      那两行落在"墨嫌暗、白嫌亮"的死区——数见 `docs/design/背景图深浅/量-卡顶纱档位.py`）。
      两头都要钉：这一档不许被改回 .30，也不许被顺手抬到全站那一枚头上（弹窗那三枚底下垫的是暗遮罩，
      跟着抬等于把弹窗改成半张白纸，不在他这一刀里）。 */
-  ok('卡顶那一段单独一档＝.60（甲案那一枚，两页共用）',
-    /--glass-veil-band:\s*rgba\(255, 255, 255, 0\.60\)/.test(APP),
-    flat((/--glass-veil-band:[^;]*/.exec(APP) || [])[0]))
+  ok('卡顶那一段单独一档＝.60（甲案那一枚，两页共用）——同样六份一份不许掉',
+    alphasOf('--glass-veil-band').length === 6 && alphasOf('--glass-veil-band').every((a) => a === 0.60),
+    `${alphasOf('--glass-veil-band').length} 份：${alphasOf('--glass-veil-band').join('/')}`)
   ok('列表与「我的」那两段 `.sheet` 真在吃这一枚（令牌定义了、样式没挂上＝静默不生效）',
     [/var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+158rpx/.test(IX),
      /var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+56rpx/.test(ME)].every(Boolean),
@@ -136,10 +145,21 @@ function evaluate(F) {
      ⚠ 抬档写的是**令牌的值**（消费方仍走 var()），所以上面那条"页面里不许有第二支白纱"圈不到它——
      那条只扫 `.container.has-bg` 且带滤镜的块里的 `background:` 字面值。这一条补的是另一个方向。 */
   const ENTRY = blockOf(CR, '.container.entry-dock')
-  ok('第二屏就地抬的那两档白纱在（面 .72／井 .42），且只有这一屏吃',
-    /--glass-plate:\s*rgba\(255, 255, 255, 0\.72\)/.test(ENTRY)
-    && /--glass-fill:\s*rgba\(255, 255, 255, 0\.42\)/.test(ENTRY),
-    ENTRY.trim().slice(0, 90) || '(create.wxss 里没有 `.container.entry-dock` 那一段)')
+  /* 10-14 五档彩色玻璃之后，这两枚的**值**搬进了 `.mood-*`（真身 palette.moodVars），
+     create.wxss 这里只剩两枚引用。判据跟着改口径、不迁就旧写法：
+     ① 这一屏仍必须"就地抬"这两档（引用在，且只写在 `.container.entry-dock` 这一段里）；
+     ② 抬到的透明度仍是 .72／.42 —— 从 palette 现算，五档一档不许掉（掉一档＝D17 甲白落）。 */
+  const dockAlpha = (key) => palette.MOODS.map((m) => {
+    const v = palette.moodVars(m.key)
+    return Number((/,\s*([\d.]+)\)\s*$/.exec(v[key]) || [0, 0])[1])
+  })
+  const plateDock = dockAlpha('--glass-plate-dock')
+  const fillDock = dockAlpha('--glass-fill-dock')
+  ok('第二屏就地抬的那两档在（面 .72／井 .42，五档都是），且只有这一屏吃',
+    /--glass-plate:\s*var\(--glass-plate-dock\)/.test(ENTRY)
+    && /--glass-fill:\s*var\(--glass-fill-dock\)/.test(ENTRY)
+    && plateDock.every((a) => a === 0.72) && fillDock.every((a) => a === 0.42),
+    `引用 ${/--glass-plate:\s*var\(--glass-plate-dock\)/.test(ENTRY) ? '在' : '没'}；面 ${plateDock.join('/')}／井 ${fillDock.join('/')}`)
   ok('首屏那两档没被顺手抬走（app.wxss 仍是面 .50／井 .20——D12 那一问还没拍，不许替他答）',
     /--glass-plate:\s*rgba\(255, 255, 255, 0\.50\)/.test(base)
     && /--glass-fill:\s*rgba\(255, 255, 255, 0\.20\)/.test(base),
@@ -271,8 +291,16 @@ const MUT = [
     '  --glass-fade-card: rgba(241, 243, 242, 0.62);\n', '')],
   ['celadon 那支 fade-card 偷写成白', 'app', (s) => s.replace(
     '--glass-fade-card: rgba(241, 243, 242, 0.62)', '--glass-fade-card: rgba(255, 255, 255, 0.62)')],
-  ['把白纱那一档从 .30 改成 .35', 'app', (s) => s.replace(
-    '--glass-veil: rgba(255, 255, 255, 0.30)', '--glass-veil: rgba(255, 255, 255, 0.35)')],
+  // 这一把原来只改 page{} 那一份（`String.replace` 只换第一个匹配），10-14 之后另外五份还留着 .30
+  // ⇒ 判据照样绿，等于这一刀从没切过。两半都补上：**整批挪档**一把、**只挪樱落那一档**一把。
+  ['把白纱那一档从 .30 改成 .35（六份一起挪）', 'app', (s) => s.replace(
+    /(--glass-veil:\s*rgba\([^)]*,\s*)0\.30(\s*\))/g, '$10.35$2')],
+  // ⚠ 这一把改的是**α**，不是色：本把只钉 α 齐不齐，"某一档的色被偷换"那一种由
+  //    `验-五档彩色玻璃.js` 的镜像判据管（上一版这把把樱落那档换成白 .30，α 没动 ⇒ 本把不红，
+  //    报的是"没牙"——那是把刀放错了尺子，不是尺子漏了）。
+  ['只挪樱落那一档的纱（五档里偷偷改掉一档，屏上只有那一档下看得出来）', 'app', (s) => s.replace(
+    '--glass-veil: ' + palette.moodVars('blush')['--glass-veil'],
+    '--glass-veil: ' + palette.moodVars('blush')['--glass-veil'].replace('0.30', '0.35'))],
   // 这一刀原来锚在 `background: var(--glass-veil);` 那一行上——13:0x 面板与三块都改吃 `--glass-plate` 之后
   // 那行在 create.wxss 里没有了，replace 打空、刀变成没牙（跑出来就是"反向那一刀没切进去"）。
   // 锚点跟着换成现在真实挂在滤镜前面的那一枚令牌。
@@ -308,10 +336,12 @@ const MUT = [
   ['玻璃规则点一枚 markup 里没有的类（`.mini .c` 那一刀）', 'cr', (s) => s.replace(
     '.container.has-bg .mini-c {', '.container.has-bg .mini .c {')],
   // 10-13 第二屏方案那两刀（D17 甲抬档／D18 ➕ 格挂玻璃）——每一刀对应"这一屏静默退回修前那一档"的一种画法。
+  // 10-14 这两把的锚点跟着搬家：值不在 create.wxss 里了，锚改成"那两枚引用"。
+  // 锚写错的话 replace 打不进去，跑尺子那侧会报"这一刀没切进去"而不是绿——两回事，别混着看。
   ['★第二屏那两档抬纱整段删掉（D17 甲白落，那块面退回 .50）', 'cr', (s) => s.replace(
-    '.container.entry-dock {\n  --glass-plate: rgba(255, 255, 255, 0.72);\n  --glass-fill: rgba(255, 255, 255, 0.42);\n}', '')],
+    '  --glass-plate: var(--glass-plate-dock);\n  --glass-fill: var(--glass-fill-dock);', '')],
   ['★只抬面不抬井（同一屏两档皮，"齐不齐"这件事又破一次）', 'cr', (s) => s.replace(
-    '  --glass-fill: rgba(255, 255, 255, 0.42);', '  --glass-fill: rgba(255, 255, 255, 0.20);')],
+    '  --glass-fill: var(--glass-fill-dock);', '  --glass-fill: var(--glass-fill);')],
   ['★把首屏那档也一起抬到 .72（D12 他没拍，这一刀等于替他答了）', 'cr', (s) => s.replace(
     '.container.entry-dock {', '.container {\n  --glass-plate: rgba(255, 255, 255, 0.72);\n}\n.container.entry-dock {')],
   ['★➕ 格那道 `:not(.th-add-dis)` 被抹平（满了那一态的"转灰"被三条类推掉）', 'cr', (s) => s.replace(
@@ -342,8 +372,10 @@ const MUT = [
   ['★「我的」名片行那一段偷回全站 .30（同一张图两个 tab 两档密度）', 'me', (s) => s.replace(
     'var(--glass-veil-band) 0, var(--glass-veil-band) 56rpx',
     'var(--glass-veil) 0, var(--glass-veil) 56rpx')],
-  ['★卡顶那一档从 .60 挪到 .50（乙案那一档，推算「返回」只有 3.85 不过线）', 'app', (s) => s.replace(
-    '--glass-veil-band: rgba(255, 255, 255, 0.60)', '--glass-veil-band: rgba(255, 255, 255, 0.50)')],
+  ['★卡顶那一档从 .60 挪到 .50（乙案那一档，推算「返回」只有 3.85 不过线）——六份一起挪', 'app', (s) => s.replace(
+    /(--glass-veil-band:\s*rgba\([^)]*,\s*)0\.60(\s*\))/g, '$10.50$2')],
+  ['★只把雨雾那一档的卡顶纱挪到 .50（同一件事在五档里只落四档）', 'app', (s) => s.replace(
+    '--glass-veil-band: ' + palette.moodVars('mist')['--glass-veil-band'], '--glass-veil-band: rgba(255, 255, 255, 0.50)')],
   ['★弹窗跟着被抬到 .60（他 10-11 拍过的那版皮被这一刀顺走）', 'ix', (s) => s.replace(
     '.container.has-bg .ci-card.glass-dialog {\n  background: var(--glass-veil);',
     '.container.has-bg .ci-card.glass-dialog {\n  background: var(--glass-veil-band);')],

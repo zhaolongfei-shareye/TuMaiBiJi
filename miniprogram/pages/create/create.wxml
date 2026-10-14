@@ -59,6 +59,13 @@
       <text class="swap-text">{{t.homeBgSwap}}</text>
       <view class="swap-glyph glyph-chev"></view>
     </view>
+    <!-- 「换心情」＝切那一档彩色毛玻璃（站长 10-14：「切换毛玻璃改到首页，增加一个入口『换心情』
+         icon是小云朵。每次点击切换一种」）。排在「换背景」之后：这两枚的位置是已拍内容，
+         新添的一枚只往后加，不挪前面的落点。图形沿用同一行的落点形状（字在前、小图形在后）。 -->
+    <view class="swap-half" catchtap="onCycleMood" aria-label="{{t.moodSwap}}" role="button">
+      <text class="swap-text">{{t.moodSwap}}</text>
+      <view class="swap-glyph glyph-cloud"></view>
+    </view>
   </view>
 
   <!-- 统一录入条（10-08 改版，10-09 又收一步）。收起态就是那条纸白胶囊：一枚图形 + 一句话，

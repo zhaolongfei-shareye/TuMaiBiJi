@@ -88,7 +88,7 @@
   font-size: var(--fs-meta);
   line-height: 1.4;
   letter-spacing: 0;
-  color: rgba(242, 239, 233, 0.96);
+  color: var(--stage-ink-strong);   /* 10-14 五档彩色玻璃：这行住在面板上，字色跟着面板那一档走 */
 }
 
 .blk-tips-line {
@@ -285,9 +285,9 @@
   align-items: center;
   gap: 20rpx;
   padding: 0 22rpx;
-  background: linear-gradient(180deg, rgba(18, 20, 26, 0.45) 0%, rgba(18, 20, 26, 0.45) 10%,
-    rgba(18, 20, 26, 0.38) 43%, rgba(18, 20, 26, 0.35) 62%,
-    rgba(18, 20, 26, 0.50) 83%, rgba(18, 20, 26, 0.68) 88%, rgba(18, 20, 26, 0.92) 100%);
+  /* 10-14：七个停点的 α 一个字没动（那是他 10-13 打的"黑底的半透明渐变效果不好"那一版），
+     换的是基色——墨档 `--blk-count-bg` 发出来的就是原来那串 rgba(18,20,26,…) 逐字同一份。 */
+  background: var(--blk-count-bg);
   backdrop-filter: var(--glass-bf);
   -webkit-backdrop-filter: var(--glass-bf);
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.18);
@@ -310,22 +310,24 @@
 
 /* 数字仍吃现网那支数字字形（WtsjMind＝内嵌的 Poppins Thin），只从 88 收到 64：
    88 那一档是"一格一枚数字"留下的，现在一格要装一枚数字加一条横线，两枚并排放不下。
-   字色恒纸白 #F2EFE9：这一格的底是恒深的墨面，不吃 --text-* 那一族（它们会随壁纸和
-   "背景图深浅"翻成墨，墨字压墨面直接归零）。 */
+   字色吃 `--stage-ink-solid`，**不吃 --text-* 那一族**（它们会随壁纸和"背景图深浅"翻色，
+   墨字压墨面直接归零）。10-14 之前这里是写死的 #F2EFE9——那一版面板恒深，写死是对的；
+   现在彩色那四档的面板是浅玻璃，纸白压上去读不了，所以这一枚跟着心情翻：墨档仍是 #F2EFE9，
+   一个数没变。 */
 .blk-num {
   font-family: 'WtsjMind', 'Poppins', sans-serif;
   font-weight: 100;
   font-size: 64rpx;
   line-height: .84;
   letter-spacing: -2rpx;
-  color: #F2EFE9;
+  color: var(--stage-ink-solid);
 }
 
 .blk-rule {
   width: 88rpx;
   height: 2rpx;
   margin: 12rpx 0 8rpx;
-  background: rgba(242, 239, 233, 0.85);
+  background: var(--stage-ink);
 }
 
 /* 「与正常小字一样」＝拿现成的 --fs-micro 18rpx 那一档（与「照片 · 链接 · 文字」、
@@ -333,7 +335,7 @@
 .blk-lab {
   font-size: var(--fs-micro);
   letter-spacing: 1rpx;
-  color: rgba(242, 239, 233, 0.72);
+  color: var(--stage-ink-dim);
 }
 
 /* ---------- 右列（2.2 B 方案：上面 Tips、底下圆形 ➕） ----------
@@ -1080,7 +1082,7 @@
    只借同一批 mask 形状，尺寸和颜色自己定。
    （名单里 `.blk-cam` 随左块那条「记下来」白条一起撤了，换进来的是 `.blk-plus-glyph`——
    这份名单由静态尺子逐条对 markup，多一个少一个都会红。） */
-.blk-plus-glyph, .mini-glyph, .shut-glyph, .sld-glyph, .swap-glyph, .th-plus, .paste-glyph {
+.blk-plus-glyph, .mini-glyph, .shut-glyph, .sld-glyph, .swap-glyph, .th-plus, .paste-glyph, .glyph-cloud {
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -1143,6 +1145,13 @@
 .glyph-chev {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6' /%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6' /%3E%3C/svg%3E");
+}
+
+/* 小云朵（Lucide cloud）：首页那一枚「换心情」的图形（站长 10-14 原话「icon是小云朵」）。
+   同 24 格、同 1.6 描边，与上面那一批一支重量。 */
+.glyph-cloud {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z' /%3E%3C/svg%3E");
 }
 
 /* ---------- 首页背景图 ----------
@@ -1242,7 +1251,7 @@
   right: 0;
   top: 0;
   height: 240rpx;
-  background: linear-gradient(180deg, rgba(35, 37, 44, 0.16), rgba(35, 37, 44, 0.94));
+  background: var(--stage-band);   /* 10-14 基色跟着心情换，.16→.94 那一档幅度是他 10-13 拍的，不动 */
 }
 
 /* 240rpx 以下那一段才是近实心的 .95。它挂在这一枚上、不挂在 `.stage-panel` 本体上，
@@ -1255,7 +1264,7 @@
   right: 0;
   top: 240rpx;
   bottom: 0;
-  background: rgba(35, 37, 44, 0.95);
+  background: var(--stage-solid);
 }
 
 /* 铺了图，这一页的三级字必须翻白，且 --accent 跟着翻（「中/EN」那条下划线吃它，
@@ -1509,8 +1518,11 @@
    ⚠ 抬的是**令牌的值**、不是另起一枚令牌：消费方那几条仍写 `var(--glass-plate)`／`var(--glass-fill)`，
    「页面里不许有第二支白纱」那一条判据圈的是挂了滤镜的块里的字面值，这一条不挂滤镜、走 var()，两不冲突。 */
 .container.entry-dock {
-  --glass-plate: rgba(255, 255, 255, 0.72);
-  --glass-fill: rgba(255, 255, 255, 0.42);
+  /* 抬的是**令牌的值**、不是另起一枚令牌：消费方那几条仍写 `var(--glass-plate)`／`var(--glass-fill)`。
+     10-14 起这两枚的值从心情取（`--glass-*-dock`），否则这一条 0-2-0 的 specificity 会把
+     `.mood-*`（0-1-0）发进来的彩色值盖掉——那就成了"展开录入条那一屏五档同色"。 */
+  --glass-plate: var(--glass-plate-dock);
+  --glass-fill: var(--glass-fill-dock);
 }
 
 /* ---------- 10-11 那一档"首页三块刷白玻璃"的两条规则，2.2 B 方案一起退 ----------

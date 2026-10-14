@@ -276,6 +276,106 @@ page {
   --layer-edge: rgba(35, 37, 44, 0.6);
 }
 
+/* ---------- 10-14 五档彩色毛玻璃：「心情」那一档 ----------
+   需求原话与量的过程记在 `utils/palette.js` 的 MOODS 上面那段；这里只是它的**镜像**。
+   五块挂在 `.container` 上（`app.containerClass()` 把 `mood-*` 与 `theme-*` 拼在一起发出去），
+   与 `.theme-*` 同一档 specificity（都是 0-1-0），所以**必须排在四块主题之后**：
+   心情要覆盖的正是主题里那几枚玻璃令牌，谁在后面谁赢。
+   ⚠ 值不许手改：改了要连着 `docs/工具/验-五档彩色玻璃.js` 一起改，那条尺子拿 palette 现算逐字对。
+   ⚠ `page{}` 里那几枚玻璃原值一个字不动——它是**没挂上心情类时的兜底**，
+      也是墨档那份的出处；`.mood-ink` 这一叠与它逐字相同，就是"默认态零变化"的证据。
+   ⚠ `--glass-hair` 不在这一叠里：描边那枚五档一律留白（玻璃自己的反光，不是玻璃的本色）。 */
+
+.mood-ink {
+  --glass-veil: rgba(255, 255, 255, 0.30);
+  --glass-veil-band: rgba(255, 255, 255, 0.60);
+  --glass-plate: rgba(255, 255, 255, 0.50);
+  --glass-fill: rgba(255, 255, 255, 0.20);
+  --glass-plate-dock: rgba(255, 255, 255, 0.72);
+  --glass-fill-dock: rgba(255, 255, 255, 0.42);
+  --stage-band: linear-gradient(180deg, rgba(35, 37, 44, 0.16) 0%, rgba(35, 37, 44, 0.94) 100%);
+  --stage-solid: rgba(35, 37, 44, 0.95);
+  --blk-count-bg: linear-gradient(180deg, rgba(18, 20, 26, 0.45) 0%, rgba(18, 20, 26, 0.45) 10%, rgba(18, 20, 26, 0.38) 43%, rgba(18, 20, 26, 0.35) 62%, rgba(18, 20, 26, 0.50) 83%, rgba(18, 20, 26, 0.68) 88%, rgba(18, 20, 26, 0.92) 100%);
+  --stage-ink-solid: #F2EFE9;
+  --stage-ink-strong: rgba(242, 239, 233, 0.96);
+  --stage-ink: rgba(242, 239, 233, 0.85);
+  --stage-ink-soft: rgba(242, 239, 233, 0.78);
+  --stage-ink-dim: rgba(242, 239, 233, 0.72);
+  --stage-ink-faint: rgba(242, 239, 233, 0.56);
+}
+
+.mood-ivory {
+  --glass-veil: rgba(220, 213, 209, 0.30);
+  --glass-veil-band: rgba(220, 213, 209, 0.60);
+  --glass-plate: rgba(220, 213, 209, 0.50);
+  --glass-fill: rgba(220, 213, 209, 0.20);
+  --glass-plate-dock: rgba(220, 213, 209, 0.72);
+  --glass-fill-dock: rgba(220, 213, 209, 0.42);
+  --stage-band: linear-gradient(180deg, rgba(177, 162, 153, 0.16) 0%, rgba(177, 162, 153, 0.94) 100%);
+  --stage-solid: rgba(177, 162, 153, 0.95);
+  --blk-count-bg: linear-gradient(180deg, rgba(141, 117, 100, 0.45) 0%, rgba(141, 117, 100, 0.45) 10%, rgba(141, 117, 100, 0.38) 43%, rgba(141, 117, 100, 0.35) 62%, rgba(141, 117, 100, 0.50) 83%, rgba(141, 117, 100, 0.68) 88%, rgba(141, 117, 100, 0.92) 100%);
+  --stage-ink-solid: #352E1D;
+  --stage-ink-strong: rgba(53, 46, 29, 0.96);
+  --stage-ink: rgba(53, 46, 29, 0.85);
+  --stage-ink-soft: rgba(53, 46, 29, 0.78);
+  --stage-ink-dim: rgba(53, 46, 29, 0.72);
+  --stage-ink-faint: rgba(53, 46, 29, 0.56);
+}
+
+.mood-celadon {
+  --glass-veil: rgba(210, 225, 214, 0.30);
+  --glass-veil-band: rgba(210, 225, 214, 0.60);
+  --glass-plate: rgba(210, 225, 214, 0.50);
+  --glass-fill: rgba(210, 225, 214, 0.20);
+  --glass-plate-dock: rgba(210, 225, 214, 0.72);
+  --glass-fill-dock: rgba(210, 225, 214, 0.42);
+  --stage-band: linear-gradient(180deg, rgba(155, 188, 163, 0.16) 0%, rgba(155, 188, 163, 0.94) 100%);
+  --stage-solid: rgba(155, 188, 163, 0.95);
+  --blk-count-bg: linear-gradient(180deg, rgba(121, 156, 129, 0.45) 0%, rgba(121, 156, 129, 0.45) 10%, rgba(121, 156, 129, 0.38) 43%, rgba(121, 156, 129, 0.35) 62%, rgba(121, 156, 129, 0.50) 83%, rgba(121, 156, 129, 0.68) 88%, rgba(121, 156, 129, 0.92) 100%);
+  --stage-ink-solid: #1D3522;
+  --stage-ink-strong: rgba(29, 53, 34, 0.96);
+  --stage-ink: rgba(29, 53, 34, 0.85);
+  --stage-ink-soft: rgba(29, 53, 34, 0.78);
+  --stage-ink-dim: rgba(29, 53, 34, 0.72);
+  --stage-ink-faint: rgba(29, 53, 34, 0.56);
+}
+
+.mood-blush {
+  --glass-veil: rgba(222, 216, 226, 0.30);
+  --glass-veil-band: rgba(222, 216, 226, 0.60);
+  --glass-plate: rgba(222, 216, 226, 0.50);
+  --glass-fill: rgba(222, 216, 226, 0.20);
+  --glass-plate-dock: rgba(222, 216, 226, 0.72);
+  --glass-fill-dock: rgba(222, 216, 226, 0.42);
+  --stage-band: linear-gradient(180deg, rgba(181, 168, 191, 0.16) 0%, rgba(181, 168, 191, 0.94) 100%);
+  --stage-solid: rgba(181, 168, 191, 0.95);
+  --blk-count-bg: linear-gradient(180deg, rgba(158, 149, 176, 0.45) 0%, rgba(158, 149, 176, 0.45) 10%, rgba(158, 149, 176, 0.38) 43%, rgba(158, 149, 176, 0.35) 62%, rgba(158, 149, 176, 0.50) 83%, rgba(158, 149, 176, 0.68) 88%, rgba(158, 149, 176, 0.92) 100%);
+  --stage-ink-solid: #351D29;
+  --stage-ink-strong: rgba(53, 29, 41, 0.96);
+  --stage-ink: rgba(53, 29, 41, 0.85);
+  --stage-ink-soft: rgba(53, 29, 41, 0.78);
+  --stage-ink-dim: rgba(53, 29, 41, 0.72);
+  --stage-ink-faint: rgba(53, 29, 41, 0.56);
+}
+
+.mood-mist {
+  --glass-veil: rgba(214, 219, 227, 0.30);
+  --glass-veil-band: rgba(214, 219, 227, 0.60);
+  --glass-plate: rgba(214, 219, 227, 0.50);
+  --glass-fill: rgba(214, 219, 227, 0.20);
+  --glass-plate-dock: rgba(214, 219, 227, 0.72);
+  --glass-fill-dock: rgba(214, 219, 227, 0.42);
+  --stage-band: linear-gradient(180deg, rgba(164, 176, 192, 0.16) 0%, rgba(164, 176, 192, 0.94) 100%);
+  --stage-solid: rgba(164, 176, 192, 0.95);
+  --blk-count-bg: linear-gradient(180deg, rgba(109, 141, 170, 0.45) 0%, rgba(109, 141, 170, 0.45) 10%, rgba(109, 141, 170, 0.38) 43%, rgba(109, 141, 170, 0.35) 62%, rgba(109, 141, 170, 0.50) 83%, rgba(109, 141, 170, 0.68) 88%, rgba(109, 141, 170, 0.92) 100%);
+  --stage-ink-solid: #212431;
+  --stage-ink-strong: rgba(33, 36, 49, 0.96);
+  --stage-ink: rgba(33, 36, 49, 0.85);
+  --stage-ink-soft: rgba(33, 36, 49, 0.78);
+  --stage-ink-dim: rgba(33, 36, 49, 0.72);
+  --stage-ink-faint: rgba(33, 36, 49, 0.56);
+}
+
 /* 界面字体：不挂这三个类就是上面 page 那条苹方链（默认）。
    宋体把 STSong 放在 Songti SC 前面：Mac 模拟器上实测命中的是 STSong，'Songti SC' 点不中；
    iOS 真机没验过（站长那台是安卓），所以两个名字都留在链里，谁命中用谁。

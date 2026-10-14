@@ -62,6 +62,8 @@ const i18n = {
     modeWrite: '文字',
     modeUrl: '链接',
     homeBgSwap: '换背景',
+    // 「换心情」＝切那一档彩色毛玻璃（站长 10-14 点的名）。三个字，与旁边两枚同档。
+    moodSwap: '换心情',
     // 「换背景」左边那一枚：点一下换一档深浅（纯白 → 25% → 50% → 回纯白）。
     // 英文侧跟着「Change photo」那档祈使语气写，别直译成 "Brightness" 那种名词堆。
     bgDimLabel: '调亮度',
@@ -454,6 +456,7 @@ const i18n = {
     // 这一屏上 "Photo" 已经是三枚标签里的「照片」那一档（上面 modePhoto），读起来像在说笔记的图，
     // 而这两枚动的都是**背景那张形象图**：一枚换它、一枚调它的明暗。所以改成点名的那两样。
     homeBgSwap: 'Background',
+    moodSwap: 'Mood',
     bgDimLabel: 'Brightness',
     tipsPrefix: 'Tips: ',
     tips: [

@@ -212,8 +212,9 @@ process.on('uncaughtException', (e) => { console.log('!! 量具挂了：' + (e &
   for (const wall of WALLS) {
     await mp.evaluate((k) => {
       const app = getApp()
-      // setWallpaper 只往 globalData.userInfo 里写，而模拟器这一档登录链吃 41002、userInfo 常为 null
-      // ⇒ 那一行是空操作。这里直接把那一份摆出来，走的还是 getWallpaper() 读的同一个字段。
+      // 模拟器这一档登录链吃 41002、userInfo 常为 null。10-14 起 `setWallpaper` 会另写一份
+      // `wallpaperCache` 本机缓存，但 `getWallpaper()` 读的顺序是"服务端值 → userInfo → 缓存"，
+      // 这一把要的是"我钉哪枚就是哪枚"，所以照旧直接摆 userInfo 那一份（优先级比缓存高，不会被顶掉）。
       app.globalData.userInfo = Object.assign({}, app.globalData.userInfo, { wallpaper: k })
     }, wall.key)
 

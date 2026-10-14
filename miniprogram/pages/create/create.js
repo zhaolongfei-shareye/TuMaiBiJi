@@ -91,7 +91,11 @@ Page({
   data: {
     lang: 'zh',
     t: texts('zh'),
-    themeClass: 'theme-tint-paper',  // 未登录/首帧的占位：类名必须真的存在，四枚里象牙是 THEMES[0]
+    // 未登录/首帧的占位：类名必须真的存在。四枚壁纸里象牙是 THEMES[0]，五档心情里墨是 MOODS[0]，
+    // 而墨那一档的九枚玻璃数与 page{} 那份兜底逐字相同 ⇒ 这一帧就算没等到 applyTheme 也不会花。
+    themeClass: 'theme-tint-paper mood-ink',
+    // 「换心情」那一枚的挡手位：同一帧连点两下会发两次 PUT（与 pages/wallpaper 那条 applying 同一个理由）。
+    moodBusy: false,
     // 展开的是哪一档：'' | 'photo' | 'url' | 'write'，同一时刻最多一个。
     // 10-08 起相册不再是独立的一档（它是「照片」那一态左边那枚小圆），所以 mode 那一位也撤了：
     // 面板上只有三个标签，一个真相。
@@ -423,6 +427,34 @@ Page({
   // 那枚点本身的灰度就是当前档，照片跟着一起沉，用户看得见，多说一句反而挡画面。
   onCycleDim() {
     this.setData(getApp().cycleBgDim())
+  },
+
+  /**
+   * 「换心情」：点一次切一档彩色毛玻璃（站长 10-14「每次点击切换一种」）。
+   * 本机立刻生效、底栏跟着立刻换；服务端那一趟**只在壁纸真的换了的那一档才发**——
+   * 墨与象牙共用 tint-paper 这一枚壁纸值，切这两档 PUT 的是同一个数，发一次等于白跑一趟、
+   * 还多开一个失败面。PUT 失败要说一句：界面已经变了而服务端没记下，下次登录会回到服务端那一份，
+   * 不报就是静默不一致（与 `pages/wallpaper` 原来那条 applyWallpaper 同一口径）。
+   * 同一帧连点两下会发两次 PUT，所以先挡手（那条链原来就写着这一句）。
+   */
+  onCycleMood() {
+    if (this.data.moodBusy) return
+    const app = getApp()
+    const before = app.getWallpaper()
+    this.setData({ moodBusy: true })
+    app.cycleGlassMood()
+    const after = app.getWallpaper()
+    this.setData({
+      moodBusy: false,
+      themeClass: app.containerClass(after),
+      // 层色那一套跟着壁纸走，换档不换它就是"面板换了色、录入条还是旧层色"
+      skinPanel: createSkin(after),
+    })
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().applyTheme(after)
+    if (after === before) return
+    api.updateWallpaper(after).catch(() => {
+      wx.showToast({ title: t('setFailed', this.data.lang), icon: 'none' })
+    })
   },
 
   // 换背景图只是导流：选图这件事仍然只在「我的 → 卡片模板」那一页做一次。
