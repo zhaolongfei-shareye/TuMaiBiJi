@@ -241,8 +241,9 @@ ok('导流目标还是那一页', /navigateTo\(\{ url: '\/pages\/profile\/profil
 ok('选图入口全页只有 pickImage 一处', (js.match(/wx\.chooseMedia/g) || []).length === 1)
 // 10-11 12:2x 他那句「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」把后半句作废了：
 // 这一行不再"面板展开那一趟整个不渲染"，两屏都在、同一个落点。闸只留 `bgSrc` 那一半（没铺图它没意义）。
-ok('换背景那一行只在铺了图时存在，且展开那一趟照旧渲染（他 10-11 要两屏都有）',
-  /wx:if="\{\{bgSrc\}\}" class="home-swap"/.test(wxml)
+ok('换背景那一行两态都画（站长 10-14「白底也要换背景，这是核心功能」，§8.235），「调亮度」那一截仍只在铺图时画，展开那一趟照旧渲染',
+  /<view class="home-swap">/.test(wxml)
+  && /wx:if="\{\{bgSrc\}\}" class="swap-half" catchtap="onCycleDim"/.test(wxml)
   && !/\.home-swap[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden)/.test(wxss)
   && !/\.entry-dock[^{]*\.home-swap/.test(wxss))
 ok('➕ 那一格是唯一"再加一张"的落点', (wxml.match(/catchtap="onAddShot"/g) || []).length === 1)

@@ -298,7 +298,10 @@ let lightRules = 0
   // 读不到就是红，不许静默跳过：10-14 这一把第一版把路径写成 `index/index.wxss`（少了 `pages/`），
   // 那三页被 existsSync 一句吞掉，判据当场绿成"0 条浅色规则违规"——其实是 0 条规则被看见。
   if (!fs.existsSync(path.join(MP, f))) { strayLight.push(`${f}：读不到这个文件`); return }
-  const src = read(f)
+  // ⚠ 先把注释整段剥掉再切选择器：`[^{}]*\{` 切出来的一块里含注释，注释里写一句 `.bg-light`
+  //   就会被算成"一条浅档规则"。2.1 那一支上它让条数虚高（23→24），2.2 那一支上它直接假红
+  //   （注释提到 .bg-light，紧跟的那条选择器不带 .has-bg ⇒ 判成"浅档规则漏了闸"）。
+  const src = read(f).replace(/\/\*[\s\S]*?\*\//g, '')
   ;(src.match(/[^{}]*\{/g) || []).forEach((sel) => {
     if (!/\.bg-light(-low)?(?![\w-])/.test(sel)) return
     lightRules += 1
