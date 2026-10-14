@@ -291,7 +291,7 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   // 槽里那张在模拟器里落地成 `http://usr/…`（就是 USER_DATA_PATH 那批文件），
   // 所以这一条不能只认包里那张的名字——它要钉的是"图从那个出口来、不是第二处"。
   ck('底图取的是首页那一个出口（包里那张或本机形象文件，两样都算）',
-    /home-bg-portrait|USER_DATA_PATH|http:\/\/usr\//.test(d.bgSrc || ''), d.bgSrc)
+    /share-card|USER_DATA_PATH|http:\/\/usr\//.test(d.bgSrc || ''), d.bgSrc)
   // 原来这条把 1448/-136 写死了，那是"默认那张竖构图"的数；本机形象一换就红，
   // 红得没道理。改成钉那条规则本身：按宽铺满、超出那截的 15% 顶到上面去。
   const gHeight = parseFloat((/height:(\d+(?:\.\d+)?)rpx/.exec(d.imgStyle || ''))[1] || 0)

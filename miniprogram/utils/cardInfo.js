@@ -134,7 +134,7 @@ const handlers = {
     const cur = this.data.ciSlots[at]
     if (!(at >= 0) || !cur.path) return
     const { lang } = this.data
-    // 删之前把后果说全（跟那一页同一句）：它要是正当着首页背景，删完首页会跳回默认那张。
+    // 删之前把后果说全（跟那一页同一句）：它要是正当着首页背景，删完首页就没有背景图了（§8.231 起露壁纸底色）。
     const parts = [t('slotDropBody', lang)]
     if (cur.card) parts.push(t('slotDropWasCard', lang))
     if (cur.bg) parts.push(t('slotDropWasBg', lang))

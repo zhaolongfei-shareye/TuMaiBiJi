@@ -258,7 +258,7 @@ Page({
     const cur = this.data.slots[at]
     if (!cur) return
     const { lang } = this.data
-    // 删之前把后果说全：它要是正当着首页背景，删完首页会跳回包里那张默认图——
+    // 删之前把后果说全：它要是正当着首页背景，删完首页就没有背景图了（§8.231 把包里那张硬编码的删了，露壁纸底色）——
     // 这个跳变是当场看得见的，不提前讲一句，看起来像界面自己坏了。
     // 中文每句自带句号，接着写就行；英文要留空格，不然 "uploaded.Your poster" 粘成一坨。
     const parts = [t('slotDropBody', lang)]

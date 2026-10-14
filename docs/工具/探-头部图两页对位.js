@@ -11,7 +11,7 @@ const automator = require('miniprogram-automator')
 const path = require('path')
 
 const ROOT = path.resolve(__dirname, '../..')
-const BG = '/assets/home-bg-portrait.jpg'
+const BG = '/assets/share-card.jpg'   // 同宽（1280）的量具替身，见 §8.231 删图那一刀
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0
 const fails = []

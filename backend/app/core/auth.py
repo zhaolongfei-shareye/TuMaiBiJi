@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.db.database import get_db
 from app.models.account import Account
 from app.models.user import User
-from app.services import accounts, generation, quota
+from app.services import accounts, generation, preset_note, quota
 
 logger = logging.getLogger(__name__)
 
@@ -159,14 +159,19 @@ def get_current_account(
 
 
 
-async def login_or_register(code: str, db: Session, inviter: int | None = None) -> tuple[User, str]:
+async def login_or_register(code: str, db: Session, inviter: int | None = None) -> tuple[User, str, int | None]:
+    """换票、建号、发钥匙，并且**只在建号那一次**给这个人名下播一篇预置笔记（§8.232）。
+
+    回第三个值＝这次种下去的那篇 id，没种（老用户、或这一趟出岔子）就是 None。
+    它唯一的作用是告诉客户端"这一台设备上这个账号是刚出生的"，好让首启那一张卡片知道该给哪一篇出图——
+    种没种成功都不许影响登录本身，所以它下面被 try 包住。
+    """
     data = await _wechat_code2session(code)
     openid = data["openid"]
 
     user = db.query(User).filter(User.openid == openid).first()
-    if user:
-        pass
-    else:
+    is_new_user = user is None
+    if is_new_user:
         # 新账号的代次由 `services/generation.allocate` 取号：它读的不是"这张表现在最高几"，
         # 而是一格**持久的高水位线**。差别只在一种场合——`users` 被删空过（`DELETE /v1/account`
         # 删的是整条 account 名下所有行，最后一个人走完就是空表），那时 `max(generation)` 回 NULL，
@@ -188,5 +193,20 @@ async def login_or_register(code: str, db: Session, inviter: int | None = None) 
     if inviter is not None:
         quota.attribute_inviter(user, db, inviter)
 
+    # ⚠ 播种必须排在归因**之后**：那条判据里"名下已经有笔记"就不认。
+    #   先种后认，每个新用户出生带着一篇，归因这条路对他永久关着，那笔 +10 MIND 凭空没了。
+    #   为什么挂在建号这一支而不是"名下没笔记"那种现算状态：那种写法每次 `_doLogin` 都会再种一遍，
+    #   用户删掉预置那篇、下次打开它就回来了（§8.232 判据 2 要钉的反向就是这条）。
+    seeded_note_id: int | None = None
+    if is_new_user:
+        try:
+            note = preset_note.seed_note_for_new_user(db, user)
+            seeded_note_id = note.id if note else None
+        except Exception:
+            # 种子出岔子（那一份 JSON 读坏了是最可能的一种）不许把登录回成 500：
+            # 用户连自己都进不来，比首屏空着严重。这里出声只出在日志里。
+            db.rollback()
+            logger.exception("预置笔记没种下去（不影响登录）：user=%s", user.id)
+
     token = _create_token(user.id, user.generation)
-    return user, token
+    return user, token, seeded_note_id

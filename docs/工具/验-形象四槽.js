@@ -63,8 +63,9 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   const s = poster.readSlots()
   ck('全新账号读出来就是四个空位（界面画四枚虚线 ➕）', s.length === 4 && s.every((x) => !x), JSON.stringify(s))
   ck('全新账号没有卡片头像 → 海报走无头像那一支', poster.cardPath() === '')
-  ck('全新账号没人勾背景 → 首页落回包里那张默认图',
-    poster.homeBg() === '/assets/home-bg-portrait.jpg', poster.homeBg())
+  // §8.231（10-14）：包里那张硬编码默认图已经删掉，兜底链从三级降到两级 ⇒ 全新账号就是白底那一档。
+  ck('全新账号没人勾背景 → 首页是白底那一档（homeBg 返回空串）',
+    poster.homeBg() === '', poster.homeBg() || '(空)')
 }
 
 // ---------------- ② 老版本升上来 ----------------
@@ -84,8 +85,8 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   const gone = '/tmp/fake-user/deleted.img'
   seed({ avatarPath: gone }, [])
   ck('storage 里记着但文件没了：那一格当空的，不画半截图', poster.readSlots().every((x) => !x))
-  ck('文件没了 → 首页落回默认、卡片没头像（不会引用一个不存在的文件）',
-    poster.homeBg() === '/assets/home-bg-portrait.jpg' && poster.cardPath() === '')
+  ck('文件没了 → 首页落白底、卡片没头像（不会引用一个不存在的文件）',
+    poster.homeBg() === '' && poster.cardPath() === '')
 }
 
 // ---------------- ④ 落盘形状与文件回收 ----------------
@@ -172,8 +173,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   const next = [null, { path: b, card: false, bg: false }]
   poster.writeSlots(next)
   ck('删掉唯一那张之后，「卡片」位空着 —— 不会自动挪给还留着的那张', poster.cardPath() === '')
-  ck('「背景」位同理：首页落回默认图，不自动接管',
-    poster.homeBg() === '/assets/home-bg-portrait.jpg')
+  ck('「背景」位同理：首页落白底，不自动接管', poster.homeBg() === '')
 }
 
 // ---------------- ⑧ 上限就是四个位置 ----------------

@@ -82,6 +82,6 @@ async def wechat_login(request: Request, req: WechatLoginRequest, db: Session = 
     就能造出来，修之前），这一趟就会给客户端回一条全新的空 account，而那个人几百篇笔记在另一条
     account 上。现在两条推导共用 `users.account_id` 这一个答案。
     """
-    user, _legacy_user_token = await login_or_register(req.code, db, req.inviter)
+    user, _legacy_user_token, _seeded_note_id = await login_or_register(req.code, db, req.inviter)
     account = accounts.ensure_for_user(db, user)
     return _login_response(db, account)

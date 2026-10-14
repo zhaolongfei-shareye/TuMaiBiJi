@@ -122,6 +122,18 @@ function measure(src) {
  */
 function applyTone(page, src, zones) {
   const app = getApp()
+  /* 无图这一档先分流，不跟着下面那套"按像素判极性"走。
+     §8.234 第 0 步要的是**显式的无图分支**，而不是让 `p === null ? false` 那一档巧合地落在墨字上：
+     三页那些翻色规则全都挂在 `.has-bg` 底下，没有图就没有这个名字 ⇒ 屏上吃的就是基样式那一套墨字，
+     导航条也不动（`applyNavForBand` 第一句就是 `if (!hasBg) return`），落回 app.json 那档 #f4f2ec ＋ 黑字。
+     实测过才敢这么写：三屏 × 四套壁纸 ＝ 12 个组合、48 枚字，无图态对比度全 ≥4.5
+     （`docs/工具/量-无图态字色-真跑.js` ＋ `量-无图态字色.py`，10-14）。
+     这两枚 data 在没有图时其实是"没有样式吃它"的死值，这里照样归置成 false，
+     免得哪一天有人加一条不带 `.has-bg` 的 `.bg-light` 规则，把白底上的墨字翻成白字。 */
+  if (!src) {
+    page.setData({ bgLight: false, bgLightLow: false })
+    return
+  }
   const prof = readProfile(src)
   const both = (p) => ({
     bgLight: p === null ? false : zoneLight(p, zones, zones.top) === true,

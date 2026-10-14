@@ -132,7 +132,9 @@ const i18n = {
     slotDropOk: '删掉',
     slotDropBody: '这张图会从这四个位置里去掉，只影响这台手机。',
     slotDropWasCard: '卡片头像会没有图。',
-    slotDropWasBg: '首页和笔记页头部会换回默认那张。',
+    // §8.231（10-14）：包内那张硬编码默认底图删掉了，删完不是「换回默认那张」，而是**没有背景图**、
+    // 露出这一套壁纸的底色。这句是删图弹窗里给站长按的那一行，说错就是让用户按着一句假话做决定。
+    slotDropWasBg: '首页和笔记页头部就没有背景图了，露出这一套壁纸的底色。',
     avatarSaveFailed: '这张图存不下来，再试一次',
     profileName: '名称',
     profileNamePh: '你的名字或昵称',
@@ -374,6 +376,8 @@ const i18n = {
     sourceWebArticle: '网页文章',
     sourceScreenshot: '截图识别',
     sourceManual: '亲自撰写',
+    // §8.232 新用户出生那一篇预置笔记的来源标签。`source_type` 是 'preset' 时读这一串。
+    sourcePreset: '官方预置',
     addCategoryPrompt: '请输入分类名',
     nameRequired: '名称不能为空',
     adding: '添加中...',
@@ -500,7 +504,7 @@ const i18n = {
     slotDropOk: 'Yes',
     slotDropBody: 'It is only stored on this phone — nothing is uploaded.',
     slotDropWasCard: 'Your poster will have no avatar.',
-    slotDropWasBg: 'Home and the notes header fall back to the default photo.',
+    slotDropWasBg: 'Home and the notes header get no background photo — just the wallpaper.',
     avatarSaveFailed: "Couldn't save that image — try again",
     profileName: 'Name',
     profileNamePh: 'Your name or nickname',
@@ -693,6 +697,7 @@ const i18n = {
     sourceWebArticle: 'Web Article',
     sourceScreenshot: 'Screenshot',
     sourceManual: 'Written by me',
+    sourcePreset: 'Preset sample',
     addCategoryPrompt: 'Enter category name',
     nameRequired: 'Name is required',
     adding: 'Adding...',

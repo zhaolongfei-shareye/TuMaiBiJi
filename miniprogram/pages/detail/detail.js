@@ -15,6 +15,7 @@ const SOURCE_TYPE_KEYS = {
   screenshot: 'sourceScreenshot',
   manual: 'sourceManual',
   share_import: 'sourceShareImport',
+  preset: 'sourcePreset',   // §8.232 那一篇预置笔记，同上一条口径
 }
 
 Page({

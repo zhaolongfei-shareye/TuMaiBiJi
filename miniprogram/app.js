@@ -39,6 +39,10 @@ App({
     userId: '',
     token: '',
     loginPromise: null,
+    // §8.232：这一次登录是服务端**建出来的新号**，他名下那篇预置笔记的 id 在这里等着被取走一次。
+    // 放 globalData 而不是 storage：它只对"这一台设备上这个账号刚出生"那一趟冷启有意义，
+    // 存进本机就变成"重装之后又认它是新人"，那颗种子就会再去出第二张卡片。
+    seededNoteId: 0,
     // 私密笔记的解锁凭证（{ token, expireAt }）。只存内存：杀了重进就要重新输密码，
     // 这一闸防的正是"手机在别人手里"那一段时间。读写都在 utils/api.js 里收口。
     privateUnlock: null,
@@ -133,6 +137,14 @@ App({
     return this.globalData.loginPromise
   },
 
+  consumeSeededNote() {
+    // 取走即清：首启那张卡片只许出一次。出图失败也不放回去——失败静默是 §8.232 口径 5，
+    // 每次冷启重试一次就是让"我们替他写的那篇"变成他删不掉的影子。
+    const id = this.globalData.seededNoteId
+    this.globalData.seededNoteId = 0
+    return id || 0
+  },
+
   async _doLogin() {
     try {
       const loginRes = await new Promise((resolve, reject) => {
@@ -147,6 +159,10 @@ App({
       const res = await request('/api/auth/wechat', 'POST', body)
       this.globalData.token = res.token
       this.globalData.userId = res.user_id
+      // §8.232：服务端只在这次登录**建出了新账号**那一次带回来一个笔记 id（老用户永远是 null）。
+      // 存这一格不是为了"他有预置笔记"这件事本身——库里那一行自己会说话——
+      // 而是给首启那一张卡片一个**一次性的**发令：谁取走谁清，取不到就是不该再出图。
+      this.globalData.seededNoteId = res.seeded_note_id || 0
       this.globalData.userInfo = {
         nickName: res.nickname || '',
         avatarUrl: res.avatar_url || '',

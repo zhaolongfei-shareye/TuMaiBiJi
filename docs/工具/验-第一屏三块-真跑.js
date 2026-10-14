@@ -319,12 +319,12 @@ async function main() {
   await page.setData({ bgSrc: '' })
   await sleep(2200)
   const off = await readBlks()
-  await page.setData({ bgSrc: '/assets/home-bg-portrait.jpg' })
+  await page.setData({ bgSrc: '/assets/share-card.jpg' })   // 量具替身：10-14 §8.231 把包内那张默认底图删了，这几把只需要有一张真位图，改指包里还在的 share-card.jpg（1280×1024 JPEG，同宽，不是产品资源）。
   await sleep(2600)
   const on = await readBlks()
   const onSrc = String(((await page.data()) || {}).bgSrc || '')
   ok('两态对比是在"铺图"那一态收尾的（`bgSrc` 不在，下面那几条全是空转）',
-    /home-bg-portrait/.test(onSrc), onSrc || '(空)')
+    /share-card/.test(onSrc), onSrc || '(空)')
   for (const sel of GLASS_SEL) {
     if (PLATED.includes(sel)) {
       const w = /^rgba?\(\s*255,\s*255,\s*255\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(on[sel].bg)

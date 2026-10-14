@@ -37,7 +37,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services import mp_assets  # noqa: E402
 
-REAL = Path("/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/home-bg-portrait.jpg")
+# 10-14 §8.231 把那枚默认底图从包里删了，彩排要的只是「一张 300KB 级的真 JPEG」，改读留档那一份（同一枚文件、同一个字节数）。
+REAL = Path("/Users/zlfmac/Documents/TuMaiBiJi/docs/design/留档-背景图-20261013/home-bg-portrait.jpg")
 data = REAL.read_bytes()
 print(f"② 现役那张：{len(data)} 字节 上限 {mp_assets.MAX_BYTES} → {'过' if len(data) <= mp_assets.MAX_BYTES else '拒'}")
 

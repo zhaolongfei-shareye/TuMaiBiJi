@@ -4,7 +4,8 @@
 其他的照常。积分规则，可以在官网公布，小程序不需要"）：
 - **笔记不限量**。原来那道"每人 100 篇、第 101 篇四条入口当场拦下"的闸门撤掉了，
   100 变成 MIND 的起始值，不再是一个上限；
-- 带来一个**新的写作者**给邀请人 **+10**：他动笔写下自己名下第一条才算，
+- 带来一个**新的写作者**给邀请人 **+10**：他自己动笔写下第一条才算（§8.232 那篇预置笔记
+  不算动笔，判据读 `preset_note.authored_count`），
   一个人一辈子只成就一次（`source_note_id IS NULL` 那半边唯一索引）；
 - **有人把某一篇转存进自己库里**给原作者 **+1**：不同用户各算一次，
   同一个人对同一篇只算一次（`source_note_id` 非空那半边按"这篇 × 这个人"唯一）。
@@ -24,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.models.invitation import Invitation
 from app.models.note import Note
 from app.models.user import User
+from app.services.preset_note import authored_count
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +83,7 @@ def quota_view(user: User, db: Session) -> dict:
 def attribute_inviter(user: User, db: Session, inviter_id) -> bool:
     """登录时把"谁邀我来的"记在账号上；只记账，不发奖励。
 
-    四条不认：没带参数、自己邀自己、已经有归属、名下已经有笔记。
+    四条不认：没带参数、自己邀自己、已经有归属、名下已经有他自己写的笔记。
     最后一条是给老用户的——他哪天从别人的分享链接进来一次，不能就此把归属改写到
     那个人名下，那笔奖励就凭空冒出来了。
     """
@@ -93,7 +95,10 @@ def attribute_inviter(user: User, db: Session, inviter_id) -> bool:
         return False
     if db.get(User, inviter_pk) is None:
         return False
-    if used_count(db, user) > 0:
+    # 「名下已经有笔记」这一条从 2.1.11 起读的是**他自己写的**那几篇：
+    # 每个新用户出生就带着 §8.232 那一篇预置笔记，拿全表条数的话归因这条路对他永久关着，
+    # 而这条不认的本意是"老用户不能事后被人改归属"，不是"我们替他写过东西"。
+    if authored_count(db, user.id) > 0:
         return False
     user.invited_by = inviter_pk
     db.commit()
@@ -102,8 +107,13 @@ def attribute_inviter(user: User, db: Session, inviter_id) -> bool:
 
 
 def _is_his_first_note(db: Session, user: User) -> bool:
-    """刚 commit 完这条，他名下正好一条 → 这就是他动笔写下的第一篇。"""
-    return used_count(db, user) == 1
+    """刚 commit 完这条，他**自己动笔**的名下正好一条 → 这就是他写下的第一篇。
+
+    ⚠ 2.1.11（§8.232）起这一条不能读 `used_count`：新用户出生就带着一篇预置笔记，
+    拿全表条数的话他真动笔那一篇是第 2 条 ⇒ 邀请人那 +10 永远不会结。
+    预置那一篇不算动笔——它是我们自己写进去的。
+    """
+    return authored_count(db, user.id) == 1
 
 
 def _settle(db: Session, inviter: User, invitee: User, source_note_id, reward: int, why: str) -> int:
