@@ -50,6 +50,7 @@ global.wx = {
   env: { USER_DATA_PATH: '/usrdata' },
   getStorageSync: (k) => (k in store ? store[k] : ''),
   setStorageSync: (k, v) => { store[k] = v },
+  removeStorageSync: (k) => { delete store[k] },
   getFileSystemManager: () => ({
     accessSync: (p) => { if (!files.has(p)) throw new Error('ENOENT') },
     unlinkSync: () => {},
@@ -83,6 +84,31 @@ ck('设过形象就用用户那张（第一级不动，站长 10-13 那句"后�
 // 形象文件被系统清掉：readSlots 已经把那一格当空的，这一趟落白底，不出现"半截铺图"。
 files.delete(mine)
 ck('形象文件没了就落白底（不再回落到包里那张）', poster.homeBg() === '', poster.homeBg() || '(空)')
+
+// ---------- ②b 第二级那半截账（10-14 审计抓出来的那一条） ----------
+/* 上面那一条对**第一级**成立，靠的是 `poster.readSlots()` 逐格 `exists(s.path)`；
+   而第二级 `mpAssets.serverBgPath()` 原来是把账上的路径**直接发出去**的——文件被系统清掉、
+   账还留着时，它回一个不存在的非空路径 ⇒ `bgSrc` 有值、`has-bg` 点亮、图上那一整套纸白字
+   压在浅壁纸上＝看不见，正是 §8.231 判据 6 点名的那一态（而且屏上不报错）。
+   这一把不读声明，拿桩件真跑这一个函数：账对不上文件时必须回 null，并且把那半截账一起撤掉
+   （`pull()` 判的是 content_hash 相等就 continue，留着账这台机就永远不再补下这一张＝永久白底）。 */
+const mpAssets = require(path.join(MP, 'utils/mpAssets.js'))
+const ASSET_KEY = 'MP_ASSET_KEY_home_bg'
+const assetLive = '/usrdata/mp-assets/home_bg-live'
+const assetGone = '/usrdata/mp-assets/home_bg-gone'
+files.add(assetLive)
+store[ASSET_KEY] = { filePath: assetGone, contentHash: 'h1' }
+ck('第二级：账在文件不在 ⇒ 回 null（不许点亮 has-bg）',
+  mpAssets.serverBgPath() === null, JSON.stringify(mpAssets.serverBgPath()))
+ck('并且那半截账一起撤掉（留着就永远不会再补下这一张）',
+  !(ASSET_KEY in store), JSON.stringify(store[ASSET_KEY] || '(已撤)'))
+store[ASSET_KEY] = { filePath: assetLive, contentHash: 'h2' }
+ck('文件真在时照旧给那一张（老用户零变化，§8.231 判据 3）',
+  mpAssets.serverBgPath() === assetLive, mpAssets.serverBgPath())
+ck('两级都空这一档仍然只由这一个口说：账撤掉之后 homeBg() 回空串', (() => {
+  delete store[ASSET_KEY]
+  return poster.homeBg() === ''
+})())
 
 // ---------- ③ 接线 ----------
 const wxml = read('pages/create/create.wxml')

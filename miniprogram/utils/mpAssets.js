@@ -78,10 +78,24 @@ async function pull() {
   }
 }
 
-// 返回当前缓存的那张背景图的本地路径，没有就 null。
+// 返回当前缓存的那张背景图的本地路径，没有（或那半截账对不上文件）就 null。
+/* ⚠ 必须验文件真在，且验不到就把那半截账一起撤掉，两条是一起的：
+   ① 账在文件不在时这里回一个**不存在的非空路径**，`homeBg()` 就当"有图"往外发 ⇒
+      `wx:if="{{bgSrc}}"` 成立、`has-bg` 被点亮，图上那一整套纸白字压在浅壁纸上＝看不见
+      （§8.231 判据 6 点名的正是这一态；`<image>` 解不出东西，屏上什么也不会报错）。
+      同一条纪律 `poster.readSlots()` 对四个槽早就在做（`exists(s.path)`），这一级一直是漏的。
+   ② 光回 null 不够：`pull()` 判的是 `contentHash` 相等就 `continue`，留着这条账这台机
+      **永远不会再下第二次**，运营图就永久白底。撤掉账，下一趟 `pull()` 才把它补回来。 */
 function serverBgPath() {
   const cached = wx.getStorageSync(_key('home_bg'))
-  return (cached && cached.filePath) || null
+  if (!cached || !cached.filePath) return null
+  try {
+    FS.accessSync(cached.filePath)
+  } catch (_) {
+    wx.removeStorageSync(_key('home_bg'))
+    return null
+  }
+  return cached.filePath
 }
 
 module.exports = { pull, serverBgPath }
