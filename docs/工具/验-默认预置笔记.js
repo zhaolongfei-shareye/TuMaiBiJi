@@ -136,6 +136,16 @@ ck('出图那一段不开弹窗（templateOpen 一个字都不许碰）',
   !!auto && !/templateOpen:\s*true/.test(auto) && /detailOpen/.test(auto), auto ? `${auto.split('\n').length} 行` : '没抓到方法体')
 ck('它走的就是用户那条出图链的三个口（不另画一份）',
   /_ensurePosterAssets\(noteId\)/.test(auto) && /_renderPoster\(\)/.test(auto) && /_keepPoster\(\)/.test(auto))
+/* ⚠ 这一趟是**共用画布的第二个调用者**：`_posterAssets`、`#posterCanvas`、`posterImagePath` 三样
+   成品弹窗也在写。站长 10-03 真机报过"无论点哪张小图，大图都是同一张"，根就是这块共享画布被两趟踩；
+   那一次修的是弹窗内部，这一次多了一个不开窗的调用者，所以钉"每 await 一步都回头看一眼归属"。
+   数段数不数行数：把两个 await 当分隔符切开，每一段开头都必须有那次复查。 */
+const autoSegs = auto.split(/await this\.(?:_ensurePosterAssets\(noteId\)|_renderPoster\(\))/).slice(1)
+ck('两个 await 之后各跟一次让位复查（这一趟不再是画布的唯一调用者）',
+  autoSegs.length === 2 && autoSegs.every((s) => /_posterAssets\.noteId !== noteId/.test(s.split('await')[0])),
+  `${autoSegs.length} 段`)
+ck('起手也挡弹窗正忙那一格（posterBusy 是那条链自己的旗）',
+  /this\.data\.posterBusy/.test(auto.split('const note =')[0] || ''))
 ck('私密那一格与台账已有那一格都先挡（同一条既有口径，不是为它新起的）',
   /if \(!note \|\| note\.is_private \|\| this\._cardsOf\(noteId\)\.length\) return/.test(auto))
 ck('`noCards` 那句空态文案还留着（口径 5：不许把"一定有一张"写成承诺）',

@@ -721,7 +721,8 @@ Page({
      所以弹窗关着也画得出来；`_tplBoxRpx()` 量不到展示框时返回 null，那一条自己就跳过了。
      模板与"带不带码"取的是这台设备存的那套默认（`posterProfile().template`），不是替用户猜一套。 */
   async _autoFirstCard(noteId) {
-    if (this.data.templateOpen || this.data.detailOpen) return
+    // `posterBusy` 那一格是弹窗那条链自己的忙碌旗：它开着就说明有人在这条链上，这一趟不挤进去。
+    if (this.data.templateOpen || this.data.detailOpen || this.data.posterBusy) return
     const note = (this.data.notes || []).find((n) => n.id === noteId)
     // 私密那一格本来就不许出卡片（10-12 那条闸，服务端 cards.py 同一句），这里跟着同一条判据；
     // 台账里已经有了也不重复出——一篇一张是这本账自己的规则，不是为这一条新起的。
@@ -732,8 +733,18 @@ Page({
       posterTpl: profile.template || poster.DEFAULT_TEMPLATE,
       noQr: false,
     })
+    /* ⚠ 每 await 一步都回头看一眼这一趟还占不占着画布：`_posterAssets`、`#posterCanvas`、
+       `posterImagePath` 三样都是和成品弹窗**共用**的，而这一趟是后台自己多出来的第二个调用者。
+       这中间他自己点开过任何一篇（`_openPosterFor` 会把 `_posterAssets` 换成他那一篇），
+       继续画就是两趟往同一块画布上上下下——站长 10-03 报过的"无论点哪张小图，大图都是同一张"
+       就是这个共享位被两趟踩出来的，只是那次是弹窗自己内部，这次多了一个不开窗的调用者。
+       让位就是让位：这一趟整个丢掉，不发第二次的令（`consumeSeededNote` 已经取走即清）。 */
     await this._ensurePosterAssets(noteId)
+    if (this.data.templateOpen || this.data.detailOpen) return
+    if (!this._posterAssets || this._posterAssets.noteId !== noteId) return
     await this._renderPoster()
+    if (this.data.templateOpen || this.data.detailOpen) return
+    if (!this._posterAssets || this._posterAssets.noteId !== noteId) return
     await this._keepPoster()
   },
 
