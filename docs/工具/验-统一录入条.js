@@ -633,6 +633,30 @@ ok('首屏那枚点的四条几何没被这轮带走（14 见方、离字 12、�
   gTip.width === '14rpx' && gTip.height === '14rpx' && gTip['margin-right'] === '12rpx'
   && gTip['border-radius'] === '50%' && /^\d/.test(gTip['margin-top'] || ''),
   JSON.stringify(gTip))
+/* ---------- 站长 10-14 三刀（都在这一屏那两行小字上） ----------
+   「Tips 字体调大一档」＋「调亮度换背景字体小一档，不要加粗」＋「旁边的亮度圆也同步缩小」。
+   判据一律钉**关系**不钉数值：字档写在 app.wxss 的令牌梯上，以后整架梯子挪档，这几条跟着走就还成立；
+   抄死 24／21 就是下一次改口的假红源头（这一类账 10-08、10-10 两轮都欠过）。 */
+const tipFs = num(seg('.blk-tips-in'), 'font-size')
+const swapFs = num(seg('.swap-text'), 'font-size')
+const swapW = (/font-weight:\s*([^;]+);/.exec(seg('.swap-text')) || [null, ''])[1].trim()
+ok('两行的主次对调了：Tips 吃 --fs-meta 那一档，且比「调亮度／换背景」大一档',
+  tipFs === Number(String(TOK['fs-meta']).replace('rpx', ''))
+  && swapFs === Number(String(TOK['fs-tiny']).replace('rpx', '')) && swapFs < tipFs,
+  `Tips ${tipFs}／那一行 ${swapFs}（令牌 ${TOK['fs-meta']}／${TOK['fs-tiny']}）`)
+ok('「调亮度」「换背景」那两字不加粗（他 10-14 点名撤的，700／bold 回来就红；不写也算过，继承下来就是常规）',
+  swapW === '' || /^(normal|400|500)$/.test(swapW), swapW)
+ok('亮度圆随那一行的字号同步（"同步缩小"钉的就是这一条：直径与字档脱钩即红）',
+  num(seg('.dim-dot'), 'width') === swapFs, `圆 ${num(seg('.dim-dot'), 'width')}／字 ${swapFs}`)
+ok('换背景那枚箭头与亮度圆同一档（两半并排不许一个 21 一个 24；⚠ 这一条是他那句"同步缩小"推的，不是他点的）',
+  num(seg('.swap-glyph'), 'width') === num(seg('.dim-dot'), 'width'),
+  `箭头 ${num(seg('.swap-glyph'), 'width')}／圆 ${num(seg('.dim-dot'), 'width')}`)
+ok('圆与箭头仍对回文字那一行（行高钉 34 不随字档走，margin-top 得按各自边长重算）',
+  ['.dim-dot', '.swap-glyph'].every((s) => Math.abs(num(seg(s), 'margin-top') - (34 - num(seg(s), 'width')) / 2) <= 1),
+  `.dim-dot ${num(seg('.dim-dot'), 'margin-top')}／.swap-glyph ${num(seg('.swap-glyph'), 'margin-top')}`)
+ok('Tips 抬档后那枚小黄点还在第一行正中间（margin-top 随字档重算，别只改字号）',
+  Math.abs(num(seg('.tips-dot'), 'margin-top') - (tipFs * 1.4 - 14) / 2) <= 1,
+  `margin-top ${num(seg('.tips-dot'), 'margin-top')}，该行高 ${tipFs}×1.4`)
 ok('那一行不再需要 gap／margin 补缝（行里只剩「返回」一枚，靠 justify-content 落右）',
   !/gap:/.test(seg('.out')) && !/margin-left:/.test(seg('.out-r'))
   && /justify-content:\s*flex-end/.test(seg('.out')),

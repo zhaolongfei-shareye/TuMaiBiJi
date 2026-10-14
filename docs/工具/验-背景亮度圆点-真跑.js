@@ -21,6 +21,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/背景亮度/实测')
 const PROBE = path.resolve(__dirname, '采-亮度图层.py')
 const p = require('../../miniprogram/utils/palette.js')
+// §8.231（10-14）把包内那张默认底图删了 ⇒ 这一屏从此可能"两级都空"，而这一把从头到尾量的
+// 就是"铺着图时那一层罩子"：`bgSrc` 空着连 `.page-bg` 都摸不到（当天实测退 2，红在第一条「首页铺着图 → (空)」）。
+// 与 `验-第一屏三块-真跑` 同一处理：借一张包里还在的真位图按在屏上（不是产品资源，只是"背后有一张照片"）。
+// 不写回本机偏好、也不还原——它只活在这一次页面实例里，下一次 reLaunch 就没了。
+const PROBE_BG = '/assets/share-card.jpg'
 
 const bad = []
 let n = 0
@@ -50,7 +55,9 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
 
   const enter = async (url) => {
     for (let i = 0; i < 5; i++) {
-      try { return await mp.reLaunch(url) } catch (e) { console.log(`第 ${i + 1} 次进 ${url} 没成：${e.message}`); await sleep(8000) }
+      // 每一次进页都补一次图（`withBg` 在下面）：新建页本来就是"每次进页重取图"，
+      // 探针按上去的那一张会被下一次 onShow 冲掉，所以按在"进页"这个动作上、不按在第一页上。
+      try { return await withBg(await mp.reLaunch(url)) } catch (e) { console.log(`第 ${i + 1} 次进 ${url} 没成：${e.message}`); await sleep(8000) }
     }
     throw new Error(`进不去 ${url}`)
   }
@@ -65,6 +72,13 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
     return el.style(prop)
   }
   const opacityOf = async (page, sel) => Number(await styleOf(page, sel, 'opacity'))
+  // 进页之后补一张图（`onShow` 已经跑完，setData 不会被它盖回去）
+  const withBg = async (page) => {
+    const d = await page.data()
+    if (d.bgSrc === undefined) return page        // 这一页没有这一格（不该发生，宁可原样返回也别乱写）
+    if (!d.bgSrc) { await page.setData({ bgSrc: PROBE_BG }); await sleep(1200) }
+    return page
+  }
 
   // 借走的是这台模拟器的本机偏好，量完原样还回去
   const dimBefore = await mp.evaluate(() => wx.getStorageSync('bgDim'))
@@ -74,7 +88,7 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   let page = await enter('/pages/create/create')
   await sleep(4500)
   let d = await page.data()
-  ck('首页铺着图（不然这一档无从谈起）', !!d.bgSrc, d.bgSrc || '(空)')
+  ck('这一屏从头到尾铺着图（探针按的那张还在，没被 onShow 重取图冲回空）', !!d.bgSrc, d.bgSrc || '(空)')
   const win = (await rects(['.page-bg']))[0]
   const R = win.width / 750                      // 截图就是视口：1rpx = R 个像素
   const rpx = (px) => px / R
