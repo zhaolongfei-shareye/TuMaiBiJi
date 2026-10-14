@@ -179,7 +179,17 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
   }
 
   // ---------- ④ 壁纸与心情对不上账：以壁纸为准 ----------
-  await mp.evaluate(() => { wx.setStorageSync('glassMood', 'ink'); wx.setStorageSync('wallpaperCache', 'tint-celadon') })
+  // ⚠ 这一发原来只写 `wx.setStorageSync('wallpaperCache', …)`，于是**它量到的是什么，取决于这一趟
+  //   登录有没有成**：`getWallpaper()` 先读 `globalData.userInfo.wallpaper`（服务端那一份是权威，
+  //   本文件 72 行自己写着），cache 只是没有会话时的退路。10-14 那几趟撞上 41002 冷启动没登录 ⇒
+  //   读到的是 cache、这两条绿；今晚登录成了、服务端回来的是 `tint-paper` ⇒ cache 被盖住，
+  //   红的不是对账逻辑，是这一发的写法（"判据依赖的那个观测量正好是被环境决定的那一个"）。
+  //   ⇒ 走页面自己那扇门 `setWallpaper()`：它一次写两头顶（globalData ＋ cache），
+  //     "以壁纸为准"这一条这才真的在被量。
+  await mp.evaluate(() => {
+    wx.setStorageSync('glassMood', 'ink')
+    getApp().setWallpaper('tint-celadon')
+  })
   page = await enter('/pages/create/create')
   await sleep(4500)
   cls = await clsOf(page)

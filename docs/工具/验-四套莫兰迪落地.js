@@ -124,10 +124,19 @@ const mixOn = (bgHex, inkHex, a) => {
       p.crOf(mixOn(theme.page, theme.ramp.inks[0], 0.72), theme.page).toFixed(2))
 
     // ③b 二级字这一档 .66 → .72（站长 10-04 拍）：读「我的」页那行 slogan 的计算色，
-    //     它是真吃 --text-secondary 且**不压在照片上**的元素（首页 .stat .l 在铺图态被翻成纸白，
-    //     拿它测这一档会量到另一条规则）。.66 时象牙/天青压卡底只有 4.35/4.38，本来就不线。
+    //     它是真吃 --text-secondary 的元素。
+    // ⚠ 但"它不压在照片上"这一句**今天已经不成立**：10-12 那批加了两条
+    //   `.container.has-bg:not(.bg-light-low)`（`me.wxss:351` 管 slogan、`index.wxss:1366` 管未选的 .vtab），
+    //   铺了图的那一态这两处被合法翻成整档墨。这个账号此刻就是铺着图的 ⇒ 量到 `rgb(53,46,29)`（无 alpha）
+    //   红的是"另一条规则盖住了这一档"，不是"这一档字浅了"。
+    //   ⇒ 读之前先把 `has-bg` 摘掉（容器那个类绑的就是 `bgSrc` 真值），读完原样还回去；预算 .72 一分没松。
+    const sloganBg = (await me.data()).bgSrc
+    await me.setData({ bgSrc: '' })
+    await sleep(900)
     const sl = await me.$('.sheet-slogan')
     const secondary = sl ? String(await sl.style('color')) : '(没读到 .sheet-slogan)'
+    await me.setData({ bgSrc: sloganBg || '' })
+    await sleep(600)
     const a2 = alphaOf(secondary)
     const want2 = p.hexToRgb(theme.ramp.inks[0])
     const rgb2 = (String(secondary).match(/\d+/g) || []).slice(0, 3).map(Number)
@@ -188,8 +197,14 @@ const mixOn = (bgHex, inkHex, a) => {
     }
     const onTab = await pick(true)
     const offTab = await pick(false)
+    // 同 ③b：未选那一枚在 `has-bg` 那一态被 `index.wxss:1366` 合法翻色 ⇒ 摘掉那一态再读，读完还回去。
+    const vtabBg = (await ix.data()).bgSrc
+    await ix.setData({ bgSrc: '' })
+    await sleep(900)
     const onCol = onTab ? String(await onTab.style('color')) : '(没读到选中那枚 .vtab)'
     const offCol = offTab ? String(await offTab.style('color')) : '(没读到未选那枚 .vtab)'
+    await ix.setData({ bgSrc: vtabBg || '' })
+    await sleep(600)
     ck(`${theme.label}：tab 一共两枚（捞少了下面的色就无从比）`, tabs.length === 2, `${tabs.length} 枚`)
     ck(`${theme.label}：选中那枚吃这一页的整档墨 ${theme.ramp.inks[0]}（10-09 撤深面之后不再吃纸白）`,
       hex(onCol).toUpperCase() === theme.ramp.inks[0].toUpperCase(), onCol)

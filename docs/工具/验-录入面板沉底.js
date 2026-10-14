@@ -63,12 +63,15 @@ ok('面板底边 = 底栏顶边 + 一条 24 的缝', gap === 24, `实得 ${gap}`
 // 左右内缩和 .container 的 --sp-3 是同一个数：fixed 不吃父级 padding，不写就宽一圈
 const sp3 = Number(/--sp-3:\s*(\d+)rpx/.exec(appWxss)[1])
 ok('左右内缩等于 --sp-3', new RegExp(`left:\\s*${sp3}rpx`).test(dock) && new RegExp(`right:\\s*${sp3}rpx`).test(dock), `--sp-3=${sp3}`)
-// 站长 10-11 12:2x 原话「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」
-// ⇒ 这一行两屏都在。原来钉的是"展开时整个不渲染"，那条 display:none 已经撤了，判据跟着反过来钉：
-// 样式表里**不许再有**任何一条把这一行在展开态藏起来的规则（写回 `display:none`、写回 `visibility:hidden`、
-// 或者整条搬进 `.entry-dock` 的作用域里，都算违背他那一句）。
-ok('展开态不许再把换背景那一行藏起来（两屏都要有）',
-  !/\.container\.entry-dock[^{]*\.home-swap\s*\{[^}]*(display:\s*none|visibility:\s*hidden|height:\s*0)/.test(wxss))
+// 这一条改过两次口，两次都跟着翻判据（不拿代码迁就旧尺子）：
+// · 10-11 12:2x「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」⇒ 两屏都在，
+//   于是钉的是"**不许再有**任何一条在展开态藏起这一行的规则"。
+// · 10-15 02:5x「第二屏不支持三个设置，要隐藏」⇒ 方向反过来，现在钉的是
+//   `.container.entry-dock .home-swap` 那一条**必须在**、且真的是 display:none。
+//   同一把尺子另一处（`验-统一录入条` 那两条一正一反）钉的是"收起态不许藏、展开态必须藏"，
+//   这一条只钉反面那半，两边凑齐才封得住"有人把 display:none 挪到收起态"那种改法。
+ok('展开态把换背景那一行整条藏起来（站长 10-15 02:5x 改的口，10-11 那句"两屏都要"作废）',
+  /\.container\.entry-dock\s*\.home-swap\s*\{[^}]*display:\s*none/.test(wxss.replace(/\/\*[\s\S]*?\*\//g, '')))
 // 10-09 那一行搬到录入条上面时，它一占流内的位就把 Tips + 横条 + 面板整组顶下去
 //（`.entry-wrap` 靠上面那条 62vh 的**流内** margin 落点；同一类账 09-30 那行日期、
 // 10-01 那行 Tips 各欠过一次，每次都是真跑才看出来）。当时钉的是"高 + 上间距 + 负 margin == 0"。
@@ -206,8 +209,13 @@ ok('框外那一行只剩「返回」一枚（Tips 与它前面那枚点都不�
   && (wxml.match(/class="out"[^>]*>[\s\S]*?<\/view>/) || [''])[0].includes('out-r'))
 ok(`那一行整枚坐在墨面之上（下面那档留白 ${OUT_MB} > 墨面那口呼吸 ${BREATH}）`,
   Number.isFinite(OUT_MB) && OUT_MB > BREATH, `margin-bottom ${OUT_MB}`)
-ok('那一行不再吃写死的纸白（抬到照片上就得跟着深浅翻极性）',
-  /color:\s*var\(--text-(secondary|tertiary)\)/.test(outSeg), outSeg.replace(/\s+/g, ' '))
+// 原来这一条钉的是"必须吃页面级令牌 `--text-secondary`"——10-15 02:5x 站长
+// 「字体颜色，与图片标题一样，70% 黑透明。包括第二屏的 back」把基准钉成了**一个数**：
+// 墨 @70。`--text-secondary` 是 .72 且随壁纸换色，不是那一个数 ⇒ 改成写死，判据跟着钉写死这一档。
+// 深浅两态的翻转仍在（`验-首页背景图` 那两条钉 `.bg-light-out` 那一正一反），这里只钉基准。
+ok('那一行的基准字色＝墨 @70（与那枚标题图同一档），且不许写死纸白',
+  /color:\s*rgba\(20,\s*22,\s*26,\s*0\.7\)/.test(outSeg)
+  && !/rgba\(242,\s*239,\s*233/.test(outSeg), outSeg.replace(/\s+/g, ' '))
 
 console.log(`${fails.length ? '✗' : '✓'} 录入面板沉底 静态：${pass}/${pass + fails.length} 条通过`
   + `　面板高 ${PANEL_H}rpx、底边距 ${bottom}rpx`)

@@ -2,7 +2,7 @@
      首屏那枚圆形 ➕ 要吃的 `--cp-cam`／`--cp-cam-ink` 与第二屏快门是同一支（站长 10-13 原话
      「带+号的按钮颜色与第二屏拍照按钮颜色一致」），而它在 `.panel` 外面，拿不到那一层的作用域。
      `createSkin()` 发的全是变量声明、没有一条直接生效的属性，挂到根上不会把别处的皮带下来。 -->
-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}}" style="{{skinPanel}}" bindtap="collapse">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{bgLightTitle ? 'bg-light-title' : ''}} {{bgLightSwap ? 'bg-light-swap' : ''}} {{bgLightOut ? 'bg-light-out' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}}" style="{{skinPanel}}" bindtap="collapse">
   <!-- 首页背景。图就是「我的 → 卡片模板」最上面那张形象图，没设过就用包里这张站长人像。
        必须用 <image> 组件而不是 wxss 的 background-image：后者不认小程序包里的
        本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
@@ -34,19 +34,29 @@
   <view class="ai-line">
     <view class="ai-dot" style="{{tipDotStyle}}"></view>
     <text class="ai-text">{{t.aiLine}}</text>
+    <!-- 语言切换（站长 10-15 01:4x 原话「中 EN 移到**左上角**，固定位置。变成 中和EN切换，
+         只显示其中一个。显示待切换」；但他 10-14 22:4x 那句是「中，EN**仍然在右侧**，不需要改在左边」
+         ⇒ 两句话隔三小时反了方向，屏上目前落的是**右上角**（那一行最左住着 Tips 那枚点与那行字，
+         挪过去就要把整条字往右顶 ~40rpx）。落点归他拍，见台账 §8.250 待拍 D30，这里不许当已定。）
+         原来那两枚住在 `.title-row` 右边、跟着大标题走，现在并进上面这一条玻璃带、钉在最右。
+         屏上只留**点下去会切到的那一门**——中文态写 EN、英文态写 中。
+         跟着这一行走还顺带解决一件事：`.ai-line` 自己带一层玻璃，字色吃 `--stage-ink-strong`
+         （浅面深字、深面白字），它不再需要为"压在照片上"另配一套翻色规则。
+         只切界面文案，不动账号也不重新登录；服务端那一栏由 PUT /api/user/language 记着，
+         换设备登录还是他选的那一门。整页是"收起"点击区，catchtap 不吃进 collapse。 -->
+    <view class="lang-corner" catchtap="onSwitchLang" data-key="{{lang === 'zh' ? 'en' : 'zh'}}"
+          role="button" aria-label="{{t.selectLanguage}}">{{lang === 'zh' ? 'EN' : '中'}}</view>
   </view>
 
   <view class="title-row">
-    <!-- 大标题拆两行、逗号去掉（他原话「"看到好内容"回行"随手记下来"」）；英文那一档第二行为空串，
-         于是只有一行——他 23:0x 追的「英文能否精简一点，不希望回行」。空串走 wx:if，不留一行空白。 -->
-    <view class="page-title"><view class="pt-l">{{t.createHeading}}</view><view class="pt-l" wx:if="{{t.createHeading2}}">{{t.createHeading2}}</view></view>
-    <!-- 语言切换放在第一眼这一行：需要它的人正是刚进来、还没摸到「我的」页的人。
-         只切界面文案，不动账号也不重新登录；服务端那一栏由 PUT /api/user/language 记着，
-         换设备登录还是他选的那一门。整页是"收起"点击区，所以这两段用 catchtap 不吃进 collapse。 -->
-    <view class="lang-switch" catchtap="noop" aria-label="{{t.selectLanguage}}">
-      <view class="lang-seg {{lang === 'zh' ? 'lang-on' : ''}}" catchtap="onSwitchLang" data-key="zh">中</view>
-      <view class="lang-seg {{lang === 'en' ? 'lang-on' : ''}}" catchtap="onSwitchLang" data-key="en">EN</view>
-    </view>
+    <!-- 大标题换成一张**透明底的图片字**（站长 10-15 01:4x「大标题变成透明底的图片文字，去白底…
+         中英文不影响，都只显示图片。70%透明度」；源件是他给的那张书法字，白底由
+         `docs/工具/出-标题字透明底.py` 抠掉、按内容包围盒裁好）。两门同一张图 ⇒ 这一枚不读 i18n。
+         70% 不透明度写在 wxss 的 `opacity` 里，改档不用重出图。
+         文字那两行（createHeading／createHeading2）从渲染里撤了、键留着：aria-label 与
+         `验-中英切换-真跑` 都还读它，撤干净就没人说清这张图上念的是哪句话。 -->
+    <image class="page-title" src="/assets/title-heading.png" mode="widthFix"
+           aria-label="{{t.createHeading}}{{t.createHeading2}}" />
   </view>
 
   <!-- 站长 10-09 夜拿效果图 c5 打回：这一行不再"住在日期下面"，而是**顶掉日期那一格**
@@ -65,7 +75,13 @@
   <view class="home-swap">
     <view wx:if="{{bgSrc}}" class="swap-half" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
       <text class="swap-text">{{t.bgDimLabel}}</text>
-      <view class="dim-dot" style="{{dimDot}}"></view>
+      <!-- 「调亮度」那一枚 10-15 01:4x 换成太阳（他原话「调亮度的icon 改为太阳icon，风格与其他一致」）：
+           与右边「换背景」那枚箭头、「换心情」那枚云朵同一个画法（`.swap-glyph` ＋ 一支 mask SVG），
+           同一档 21rpx、同一个色来源（浅面翻墨、深面翻纸白，跟着 `.swap-glyph` 那两条走）。
+           ⚠ 代价一条要说清：原来那枚圆点的**填充色**是当前亮度档（`dimDot` 从 style 递进来），
+           换成太阳之后这个读数在首屏没有了。`dimDot` 那一格三页还在算（create／index／me 的 data
+           里都留着），但全仓**只有这一处在画它**——撤了渲染它就是死数，要一并清干净是另一件事，等他点头。 -->
+      <view class="swap-glyph glyph-sun"></view>
     </view>
     <view class="swap-half" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}" role="button">
       <text class="swap-text">{{t.homeBgSwap}}</text>

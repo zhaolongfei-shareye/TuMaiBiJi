@@ -16,6 +16,7 @@ const automator = require('miniprogram-automator')
 const PORT = process.env.APORT || '9431'
 const lang = require('./尺子语言钉.js')
 const fs = require('fs')
+const path = require('path')
 
 const BASE = 'https://api.agentsbin.cn/wtsj'
 const MARK = Date.now().toString(36).slice(-6)
@@ -120,20 +121,37 @@ const txt = async (els) => {
     await sleep(1800)
     // 10-14 22:4x 站长把这句拆成两行、逗号去掉（「"看到好内容"回行"随手记下来"」），
     // 英文那一档他 23:0x 追「精简一点、不希望回行」⇒ 只有一行。
-    // ⇒ 判据不再抄整句字面量（抄一份＝屏上改了字典、尺子还钉着旧那句那种红），
-    //   改成**读字典给的那几行**再与屏上逐行比：字典与屏必须同一来源。
-    const headLines = (await txt(await page.$$('.pt-l')))
-    const wantLines = [require('../../miniprogram/utils/i18n.js').t('createHeading', 'zh'),
-      require('../../miniprogram/utils/i18n.js').t('createHeading2', 'zh')].filter((x) => !!x)
-    ck('新建页大标题＝字典给的那几行（中文两行、逗号已去），屏上不许自己拼一份',
-      headLines.join('|') === wantLines.join('|'), `屏上 ${headLines.join('|')}｜字典 ${wantLines.join('|')}`)
-    // 09-28 凌晨那一批把三张入口卡合成了一条录入条（PRD §8.50），`.entry-label` 这个类整个没了，
-    // 原来这条读的是那个类，于是一路读成空串、红了好几天。改成钉现在这一版：
-    // 收起态条身那句话、展开后四个模式标签的**文字和次序**、以及旧类名不许复活。
-    const idle = (await txt(await page.$$('.bar-label'))).join('|')
-    ck('收起态条身＝「动动手指」', idle === '动动手指', idle)
-    ck('旧的三张入口卡没有复活', (await page.$$('.entry-label')).length === 0)
-    await (await page.$('.bar')).tap()
+    // 10-15 01:4x 又改口：大标题**换成一张透明底的图片字**（原话「大标题变成透明底的图片文字，去白底…
+    // 中英文不影响，都只显示图片。70%透明度」）⇒ 屏上那两行 `.pt-l` 文字从渲染里撤了，字典里那两个
+    // 键留着、由那一枚的 `aria-label` 带着走（`create.wxml:58`）。判据跟着换**对象**、不松**来源**：
+    // 仍旧不许抄字面量，改成读字典那两键拼出来的串，与屏上 aria-label 逐字比。
+    const i18n = require('../../miniprogram/utils/i18n.js')
+    const wantLines = [i18n.t('createHeading', 'zh'), i18n.t('createHeading2', 'zh')].filter((x) => !!x)
+    const titleImg = await page.$('.page-title')
+    const titleSrc = titleImg ? String(await titleImg.attribute('src')) : ''
+    ck('新建页大标题＝字典给的那两行念的那句（换成图片字之后由 aria-label 带着走）',
+      titleImg && String(await titleImg.attribute('aria-label')) === wantLines.join(''),
+      `屏上 ${titleImg ? await titleImg.attribute('aria-label') : '(摸不到)'}｜字典 ${wantLines.join('')}`)
+    ck('那一枚真是包内那张透明底图（中英同一张，不吃语言）',
+      titleSrc === '/assets/title-heading.png'
+        && fs.existsSync(path.resolve(__dirname, '../../miniprogram/assets/title-heading.png')), titleSrc)
+    ck('撤掉的那两行文字不许复活（`.pt-l` 是旧渲染路径）', (await page.$$('.pt-l')).length === 0)
+    // 09-28 那批把三张入口卡合成一条录入条（§8.50），`.entry-label` 整个没了；10-12/13 的 B 方案
+    // 又把那条胶囊（`.bar`／`.bar-label`，里面那句「动动手指」）整条撤了——收起态现在是
+    // 「左块（人物）＋右列（Tips 与圆形 ➕）」，字典里也查不到「动动手指」那一串了。
+    // 原来那两条读的是已经不存在的类，于是一路读成空串、红了好几天（§8.54 同族：代码改了尺子没跟）。
+    // 换成钉现在这一版：收起态那两枚入口念的都是字典那句 barIdle，且只有一份话术。
+    const wantIdle = i18n.t('barIdle', 'zh')
+    const idleAria = []
+    for (const n of [await page.$('.blk-person'), await page.$('.blk-plus')]) {
+      idleAria.push(n ? String(await n.attribute('aria-label')) : '(摸不到)')
+    }
+    ck(`收起态两枚入口＝字典那句 barIdle（「${wantIdle}」），不各自另起一句`,
+      idleAria.every((x) => x === wantIdle), idleAria.join('｜'))
+    ck('旧的胶囊条与三张入口卡没有复活',
+      (await page.$$('.bar-label')).length === 0 && (await page.$$('.bar')).length === 0
+        && (await page.$$('.entry-label')).length === 0)
+    await (await page.$('.blk-plus')).tap()
     await sleep(1200)
     const labels = await txt(await page.$$('.md'))
     // 10-08 创建入口改版：面板里那四个标签（直接写 / 拍照 / 相册 / 链接）并成三个（照片 / 链接 / 文字），

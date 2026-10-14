@@ -147,12 +147,18 @@ const ck = (name, ok, got) => {
   ck('A7 组底落在底栏上方一条 24rpx 的缝上（矮屏上 min() 夹的那一头也成立）',
     !!blk0 && Math.abs(blk0.bottom - (tabTop - 24 * R)) < 14,
     blk0 && `组底 ${Math.round(blk0.bottom)}｜应在 ${Math.round(tabTop - 24 * R)} 上下`)
-  // A8 钉两件事：那一行只一枚（`wx:if="{{bgSrc}}"`，默认那张形象图在就该有一枚），
-  // 以及它此刻量在整组**上方**——站长 10-09 那句"换到日期下方"就是这个先后。
+  // A8 钉两件事：那一行只有一条（`.home-swap` 一枚），以及它坐在整组**上方**。
+  // ⚠ "上方"这一半今天换了量法，不是把预算放松：原来比的是**盒子**（行底 ≤ 组顶），
+  //   而 10-15 01:4x 他那句「调亮度等三块…离框框太高了，浪费空间」之后，`.home-swap` 带着
+  //   `margin: -14rpx 0 -22rpx`（`create.wxss:1525`）——那 −22rpx 就是"把下面那组抬上来"的手，
+  //   盒底因此天然比组顶低 ≈11px，拿盒底判红的正是这一刀本身。
+  //   ⇒ 改比**看得见的字**（两枚 `.swap-text` 的字节点底边不许越过组顶），盒子的数照量照报。
   const swapBox = (await rects(['.home-swap']))[0]
-  ck('A8 那一行只一枚，且量到它坐在整组上方（搬去的位置就是那儿）',
-    (await page.$$('.home-swap')).length === 1 && !!swapBox && !!blk0 && swapBox.bottom <= blk0.top + 1,
-    swapBox && blk0 && `行底 ${Math.round(swapBox.bottom)}／组顶 ${Math.round(blk0.top)}`)
+  const swapInk = await rectsAll('.swap-text')
+  const inkBottom = swapInk.length ? Math.max(...swapInk.map((x) => x.bottom)) : NaN
+  ck('A8 那一行只一条，且它的**字**坐在整组上方（搬去的位置就是那儿；盒底吃进那口空白是 −22rpx 的设计）',
+    (await page.$$('.home-swap')).length === 1 && !!swapBox && !!blk0 && swapInk.length >= 1 && inkBottom <= blk0.top + 1,
+    swapBox && blk0 && `字底 ${Math.round(inkBottom)}／组顶 ${Math.round(blk0.top)}／盒底 ${Math.round(swapBox.bottom)}`)
   await mp.screenshot({ path: `${OUT}/A-收起态.png` })
 
   // ---------- B 展开 · 照片档：三枚圈 ----------

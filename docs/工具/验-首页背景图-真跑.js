@@ -89,21 +89,43 @@ const ck = (name, ok, got) => {
   // 这里量的正是那一条翻案：行必须在，但只有「换背景」那一截（「调亮度」拧的是压暗罩的透明度，
   // 这一档罩子压根没渲染，留着它是一枚按了什么都不发生的钮）。
   const swapHalves = await page.$$('.swap-half')
-  ck('白底那一档「换背景」那一行画着（10-14 翻案，不再随 bgSrc 消失）',
-    (await page.$$('.home-swap')).length === 1 && swapHalves.length === 1,
+  // 原来这一条钉的是"只剩一枚"（那会儿这一行只有 调亮度／换背景 两截）。10-14 17:1x 他往首页
+  // 加了第三枚「换心情」（§8.237 原话「切换毛玻璃改到，首页 增加一个入口"换心情" icon是小云朵」），
+  // 而「换心情」不吃 `bgSrc`（拧的是本机那一档玻璃，没图也拧得动）⇒ 白底这一档现在是**两枚**：
+  // 换背景 ＋ 换心情。"不许有调亮度"那半条一个字没松，改成整行都不许出现"亮度"两个字。
+  ck('白底那一档「换背景」那一行画着（10-14 翻案，不再随 bgSrc 消失），且是换背景＋换心情两枚',
+    (await page.$$('.home-swap')).length === 1 && swapHalves.length === 2,
     `行 ${(await page.$$('.home-swap')).length} 条／截 ${swapHalves.length} 截`)
   const swapTxt = swapHalves.length ? String((await swapHalves[0].text()) || '').trim() : ''
-  ck('白底那一档剩的是「换背景」那一截，不是「调亮度」',
+  const allSwapTxt = []
+  for (const h of swapHalves) allSwapTxt.push(String((await h.text()) || '').trim())
+  ck('白底那一档剩的是「换背景」那一截，不是「调亮度」（整行都不许出现"亮度"）',
     swapTxt.indexOf('换背景') >= 0 || swapTxt.toLowerCase().indexOf('background') >= 0,
     `读到「${swapTxt || '(空)'}」`)
-  // 收起来那一组（`.home-blk`）与这一行的关系：行的盒子朝下伸进两者之间的空白，不许压到组顶。
+  ck('白底那一档整行没有「调亮度」（这一档压暗罩压根没渲染，留着是一枚按了什么都不发生的钮）',
+    !allSwapTxt.join('|').includes('亮度'), allSwapTxt.join('｜'))
+  // 收起来那一组（`.home-blk`）与这一行的关系。**量法今天改了一次，判的不是"松紧"**：
+  // 原来钉的是"行的**盒子**底边 ≤ 组顶"。10-15 01:4x 他那句「调亮度等三块…在框框上面，现在位置不准，
+  // 离框框太高了，浪费空间」之后，这一行的下沿是**故意**吃进两者之间那口空白的——`.home-swap` 带着
+  // `margin: -14rpx 0 -22rpx`（`create.wxss:1525`），那 −22rpx 就是把下面那组抬上来、把行底压过组顶的
+  // 那一只手；盒子的底因此天然比组顶低 ≈11px。拿盒子底判，红的就是这一刀本身，不是"压住东西"。
+  // ⇒ 改判**看得见的字**：两枚 `.swap-text` 的字节点底边不许越过组顶（这才是"压住"），
+  //   盒子的数照量照报，不藏。
   const g = await mp.evaluate(() => new Promise((resolve) => {
-    wx.createSelectorQuery().select('.home-swap').boundingClientRect()
-      .select('.home-blk').boundingClientRect()
-      .exec((r) => resolve(r.map((x) => x ? { y: (x.y === undefined ? x.top : x.y), h: x.height } : null)))
+    const q = wx.createSelectorQuery()
+    q.select('.home-swap').boundingClientRect()
+    q.select('.home-blk').boundingClientRect()
+    q.selectAll('.swap-text').boundingClientRect()
+    q.exec((r) => resolve({
+      row: r[0] ? { y: r[0].top, h: r[0].height } : null,
+      blk: r[1] ? { y: r[1].top, h: r[1].height } : null,
+      txt: (r[2] || []).map((x) => ({ y: x.top, h: x.height })),
+    }))
   }))
-  ck('白底那一档这一行底边不压住下面那一组', !!g[0] && !!g[1] && (g[0].y + g[0].h) <= g[1].y + 1,
-    g[0] && g[1] ? `行 ${Math.round(g[0].y)}..${Math.round(g[0].y + g[0].h)}｜组顶 ${Math.round(g[1].y)}` : '量不到')
+  const inkBottom = g.txt.length ? Math.max(...g.txt.map((x) => x.y + x.h)) : NaN
+  ck('白底那一档这一行的**字**不压住下面那一组（盒子底边照旧吃进那口空白，数在下面报）',
+    !!g.blk && g.txt.length === 2 && inkBottom <= g.blk.y + 1,
+    g.row && g.blk ? `字底 ${Math.round(inkBottom)}｜组顶 ${Math.round(g.blk.y)}｜盒底 ${Math.round(g.row.y + g.row.h)}` : '量不到')
   // 真点一下：白底档点它得真的落到卡片模板页（导流那条链本来就不依赖有没有背景图）。
   if (swapHalves.length) {
     await swapHalves[0].tap()
@@ -168,12 +190,13 @@ const ck = (name, ok, got) => {
   ck('展开后整块贴底，底边不压住底栏',
     !!openRect[0] && !!openRect[1] && (openRect[0].y + openRect[0].h) <= openRect[1].h - 64,
     openRect[0] && openRect[1] && `块底 ${Math.round(openRect[0].y + openRect[0].h)}，底栏顶 ${openRect[1].h - 64}`)
-  ck('展开时换背景那一行画着（他 10-11 要两屏都有），且底边不压到面板顶',
-    !!openRect[2] && openRect[2].h > 40 && !!openRect[0] && (openRect[2].y + openRect[2].h) <= openRect[0].y + 1,
-    openRect[2] && openRect[0]
-      ? `行 ${Math.round(openRect[2].y)}..${Math.round(openRect[2].y + openRect[2].h)}（高 ${Math.round(openRect[2].h)}）｜面板顶 ${Math.round(openRect[0].y)}`
-      : '量不到')
-  await mp.screenshot({ path: `${OUT}/实测-2b-展开态两屏都在.png` })
+  // 这一条原来是"展开态照样画这一行"，依据是他 10-11 那句「调亮度，换背景，再第二屏也需要」。
+  // **10-15 02:5x 他追了一句「第二屏不支持三个设置，要隐藏」** ⇒ 作废，钉成反面：展开态这一行不画、
+  // 也不占位。判"没画"按高判——`display:none` 时节点还在树里，`boundingClientRect` 回的是高 0 那一份。
+  ck('展开时这一行**不画**（他 10-15「第二屏不支持三个设置，要隐藏」，10-11 那句作废）',
+    !openRect[2] || openRect[2].h <= 0.5,
+    openRect[2] ? `行 ${Math.round(openRect[2].y)}..${Math.round(openRect[2].y + openRect[2].h)}（高 ${Math.round(openRect[2].h)}）｜面板顶 ${openRect[0] && Math.round(openRect[0].y)}` : '节点不在树里（也算没画）')
+  await mp.screenshot({ path: `${OUT}/实测-2b-展开态那一行隐藏.png` })
   await (await page.$('.title-row')).tap()   // 点条以外的空白收起，回到常态
   await sleep(900)
 
@@ -194,10 +217,16 @@ const ck = (name, ok, got) => {
   // 但**不许**再说成"首页一直铺着图"——两级都空时它就是白底（见 ①）。
   ck('首页没有"关掉背景"这条路（勾了图就铺着，两级都空才是白底）', d.bgSrc === userImg, d.bgSrc || '(空)')
   // 10-02 晚这一行拆成两半（左「调亮度」一枚点、右「换背景」一枚箭头），父节点身上
-  // 没有 tap 了：点 .home-swap 的正中会落在两半之间那道 34rpx 缝里，什么都不会发生。
-  // 所以这里按次序取第二半——顺序就是这一轮的约定，改顺序要连着改新建页。
+  // 没有 tap 了：点 .home-swap 的正中会落在两半之间那道缝里，什么都不会发生。
+  // **10-14 17:1x 他往首页加了第三枚「换心情」**（§8.237 原话「切换毛玻璃改到，首页 增加一个入口"换心情" icon是小云朵」）
+  // ⇒ 铺图那一档现在是三枚，次序 调亮度／换背景／换心情；次序也钉住（改顺序要连着改新建页）。
   const halves = await page.$$('.swap-half')
-  ck('换背景那一行是两半（调亮度 / 换背景）', halves.length === 2, `${halves.length} 半`)
+  const halfTxt = []
+  for (const h of halves) halfTxt.push(String((await h.text()) || '').replace(/\s+/g, ''))
+  ck('换背景那一行是三枚，次序＝调亮度／换背景／换心情（10-14 那枚在右）',
+    halves.length === 3 && /亮度|bright/i.test(halfTxt[0] || '')
+      && /换背景|background/i.test(halfTxt[1] || '') && /心情|mood/i.test(halfTxt[2] || ''),
+    `${halves.length} 枚：${halfTxt.join('｜')}`)
   await halves[1].tap()
   await sleep(2500)
   const now = await mp.currentPage()

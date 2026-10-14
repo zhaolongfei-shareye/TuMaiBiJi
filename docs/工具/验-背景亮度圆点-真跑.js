@@ -121,7 +121,16 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
     throw new Error('.title-row/.home-swap/.home-blk 里有摸不到的')
   }
   const [t0, t1] = [rpx(one[0].top), rpx(one[0].bottom)]
-  const [py0, py1] = [rpx(one[1].bottom) + 30, rpx(one[2].top) - 40]
+  // ⚠ 10-15 01:4x 那一刀把「调亮度／换背景／换心情」那一行**抬到面板顶上**（原来它离面板还有一截），
+  //   现在这一行底边与首屏那一组顶边之间只剩十几 rpx ⇒ 原来的 `home-swap.bottom+30 → home-blk.top−40`
+  //   会变成一条**倒挂**的带（起大于止），`lum()` 读到的是空区，三条亮度结论一起假绿。
+  //   带子因此改锚在**标题行之下、那一行之上**那一片真空照片区（同一个意思："从头部下面开始采、
+  //   采到面板之前为止"——只是面板的顶现在被那一行顶上去了，能采的真空只剩上面那一段）。
+  const [py0, py1] = [rpx(one[0].bottom) + 30, rpx(one[1].top) - 40]
+  if (!(py1 > py0)) {
+    console.log('!! 采样带倒挂（那一行与标题行之间没有真空区了），下面②③两条亮度结论不成立')
+    throw new Error(`采样带 py0=${py0.toFixed(1)} ≥ py1=${py1.toFixed(1)}`)
+  }
   const photo = (png) => lum(png, 36, 150, py0, py1)
   const titleC = (png) => lum(png, rpx(one[0].left) + 4, rpx(one[0].left) + 210, t0 + 4, t1 - 4, 'contrast')
   const shotWan = path.join(OUT, '圆点-1-弯月（现网那一档）.png')

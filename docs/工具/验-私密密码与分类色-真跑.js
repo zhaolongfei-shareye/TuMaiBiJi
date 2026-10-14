@@ -46,11 +46,15 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     const iPwd = labels.findIndex((x) => x.startsWith('私密密码'))
     const iCat = labels.findIndex((x) => x.startsWith('分类管理'))
     const iDel = labels.findIndex((x) => x.startsWith('注销账号'))
-    // 判据跟着 v10 定稿改：那一排的顺序是效果图拍的（外观→分类→私密→注销），
-    // 09-30 那条"紧跟外观设置"是被 11092b2 换外壳作废的旧尺子，不动代码迁就它。
-    ck('设置那一排按 v10 定稿排：外观 → 分类 → 私密 → 注销',
-      iWall > -1 && iCat === iWall + 1 && iPwd === iCat + 1 && iDel === iPwd + 1,
-      labels.slice(iWall, iDel + 1).join('|'))
+    // 判据跟着 v10 定稿改过一次（外观→分类→私密→注销），**10-14 17:1x 他又把「外观设置」那一格叫隐藏了**
+    // （§8.237 原话「设置里面的风格入口隐藏」「切换毛玻璃改到，首页 增加一个入口"换心情"」）
+    // ⇒ 这一排现在是 卡片模板 → 分类管理 → 私密密码 → 我的邮箱 → 注销账号，与 `验-我的页改版-真跑`
+    //   钉的那五行同一份事实。"私密紧跟分类"这半条一个字没松，只是锚从「外观」换成「分类」；
+    //   另外钉死「外观设置」这一格不许回来（它回来就是那个入口没藏住）。
+    const iCard = labels.findIndex((x) => x.startsWith('卡片模板'))
+    ck('设置那一排：卡片模板 → 分类管理 → 私密密码（私密紧跟分类那半条照旧），且「外观设置」那一格已隐藏',
+      iCard === 0 && iCat === iCard + 1 && iPwd === iCat + 1 && iDel > iPwd && iWall === -1,
+      labels.join('|'))
     // 1.9.0 起这一行右边只剩一枚一体 icon，设没设不再用文字说（旧判据作废，改判据不改代码）
     ck('那一行右边不再有状态文字', !/未设置|密码已设置/.test(labels[iPwd] || ''), labels[iPwd])
     ck('关于/反馈邮箱/注销那组里不再有私密密码', !labels.slice(iPwd + 1).some((x) => x.startsWith('私密密码')))
@@ -231,73 +235,66 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
       `buf=${d.pwdBuf} first=${d.pwdFirst} step=${d.pwdStep} focus=${d.pwdFocus}`)
     ck('收起后遮罩整层从屏上拿掉', !(await me.$('.pwd-mask')))
 
-    /* ---------- 首页 slogan 下面那行日期 + 星期 ---------- */
+    /* ---------- 首页 slogan 下面那行日期 ----------
+       这一段原来钉四件事：日期那一行在、是今天、星期跟着今天、字号与右边那枚「中」一致。
+       **它的对象已经不存在了**：10-09 夜他拿效果图 c5 打回（`create.wxml:62` 那段注释记着
+       「这一行不再住在日期下面，而是顶掉日期那一格」）⇒ `.date-row` 整个从渲染里撤走；
+       而"与右边「中」一致"里那枚 `.lang-seg` 也在 10-15 01:4x 并成一枚角标时没了。
+       留着的结果是每晚一条崩——10-15 04:3x 这把就崩在第 245 行 `hd.style(...)`（`hd` 是 null），
+       后面「分类那一排上颜色」那一大段整批没跑（假绿比红更坏）。
+       ⇒ 改成钉"撤掉的没复活 ＋ 顶上来的那一行在"。字色／字号那两条不在这里复述：
+       第一屏那两档小字由 `验-第一屏三块` 与静态那把管，这里再抄一份就是第二个真相。 */
     await mp.switchTab('/pages/create/create')
     await sleep(3500)
     const home = await mp.currentPage()
-    const hd = await home.$('.date-row .d')
-    const hw = await home.$('.date-row .w')
-    const now = new Date()
-    ck('slogan 下面有日期那一行', !!hd, hd ? await hd.text() : '没找到 .date-row .d')
-    ck('日期是今天', hd && (await hd.text()) === `${now.getMonth() + 1}月${now.getDate()}日`, hd ? await hd.text() : '')
-    ck('星期跟着今天', hw && (await hw.text()) === ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()], hw ? await hw.text() : '')
-    const seg = await home.$('.lang-seg')
-    ck('字号与右边「中」一致', await hd.style('font-size') === await seg.style('font-size'),
-      `${await hd.style('font-size')} vs ${await seg.style('font-size')}`)
-    const cd = await hd.style('color')
-    const dh = await home.data()
-    if (dh.bgSrc) ck('铺了图时是半透明的纸白', /rgba\(242, 239, 233/.test(cd), cd)
-    else console.log('— 这一屏没铺背景图，颜色走灰字那一档（半透明白那条只在铺图时成立）')
-    const posD = await hd.offset()
-    const posT = await (await home.$('.page-title')).offset()
-    ck('靠左坐在 slogan 下面', posD.left < 40 && posD.top > posT.top, `left=${posD.left} top=${posD.top} 标题 top=${posT.top}`)
-    await mp.screenshot({ path: path.join(OUT, '01c-首页日期行.png') })
+    ck('日期那一行按 10-09 那一刀撤干净了（`.date-row` 不许复活）', (await home.$$('.date-row')).length === 0)
+    ck('顶掉它的那一行真在屏上（调亮度／换背景／换心情那一条）', (await home.$$('.home-swap')).length === 1)
+    await mp.screenshot({ path: path.join(OUT, '01c-首页那一行顶掉日期.png') })
 
     /* ---------- 分类那一排上颜色 ---------- */
     await mp.switchTab('/pages/index/index')
     await sleep(3500)
     const list = await mp.currentPage()
-    const chips = await list.$$('.chip')
-    // 枚数从页面自己手上的分类表读，不钉死"两枚"：09-30 起「私密」那一格由服务端补出来，
-    // 这个账号现在有三枚分类，钉死数字的判据会把它当成 BUG。
+    /* ---------- 分类那一排：v30 那一刀之后是"文字档"，不再上色 ----------
+       这一节原来钉的是"筛选排那几枚胶囊各吃自己的分类色"（`--tone-bg`／`--tone-ink` 逐枚配对）。
+       他自己 10-01 定稿 D2 那一刀把这一行的分类色**整条撤了**：`index.wxml:85` 的注释写着
+       「v30：撤胶囊，改"文字 + 选中一条短杠"，色吃这一层自己的墨」，`index.wxss:1374` 更直白——
+       「胶囊的底与描边没有了，`toneVars` 那对 --tone-bg/--tone-ink 在这一行不再被消费」。
+       ⇒ 今天读到 `chips=0` 红的是"对象不在了"，不是回归。这里改成钉现在这一版（枚数、亮着的恰好一枚、
+       亮与暗两支不同），并补一发"胶囊不许复活"。分类色今天还在哪儿被消费：只有详情那一格
+       （`detail.wxml:78` 的 `note.toneStyle`），那一头归详情自己的尺子，不在这里复述第二份。 */
+    const catEls = await list.$$('.ix-cat')
+    // 枚数从页面自己手上的分类表读，不钉死"三枚"：09-30 起「私密」那一格由服务端补出来。
     const nCat = ((await list.data()).categories || []).length
-    ck('筛选排一枚「全部」+ 每枚分类各一枚', chips.length === nCat + 1, `chips=${chips.length} 分类=${nCat}`)
-    const bg = []
-    const fg = []
-    for (const c of chips) { bg.push(await c.style('background-color')); fg.push(await c.style('color')) }
-    ck('两枚分类章底色不一样（各自吃自己的分类色）', bg[1] !== bg[2], `${bg[1]} vs ${bg[2]}`)
-    ck('分类章底色不再是那层暗玻璃', bg[1] !== 'rgba(18, 20, 26, 0.42)', bg[1])
-    /* 「字色跟着底色配对」原来钉的是"相邻两枚字色得不同"——那是钉在这个账号的数据上的假尺子：
-       雨雾这一套里第 1、2 档底色是 #B3B7C4 与 #8F95A8，两档都是浅底，规则本来就给同一支深字
-       （`palette.toneVars` 现读对得上），所以屏上没错、是判据错。改成逐枚钉"这一枚的字色
-       就是它自己那一档配的那一支"，与有几枚、停在哪一档都无关。 */
-    const hexRgb = (h) => `rgb(${[1, 2, 3].map((i) => parseInt(String(h).slice(1 + (i - 1) * 2, 1 + i * 2), 16)).join(', ')})`
-    const chipD = (await list.data()) || {}
-    const cats = chipD.categories || []
-    const chipWp = await mp.evaluate(() => getApp().getWallpaper())
-    // 下面 ②③ 那一段才有 `const pal`，这一格在它前面，同名会撞 TDZ（node 直接跑不起来），
-    // 所以这里自己起一个名字 require（同一个模块，缓存的）。
-    const palChip = require('../../miniprogram/utils/palette.js')
-    // 选中那一枚翻面吃的是 CSS 的 `var(--bg-card)`，所以这个数从 app.wxss 那一段主题类里现读
-    // （palette 的 THEMES 里没有 card 这一项，写死在尺子里就是第三份真相）。
-    const appCss = fs.readFileSync(path.join(__dirname, '../../miniprogram/app.wxss'), 'utf8')
-    const cardHex = (new RegExp('\\.' + palChip.themeOf(chipWp).cls + '\\s*\\{[\\s\\S]{0,600}?--bg-card:\\s*(#[0-9A-Fa-f]{6})')
-      .exec(appCss) || [])[1] || ''
-    const pairBad = []
-    cats.forEach((c, i) => {
-      const k = i + 1
-      if (k >= bg.length) return
-      const m = /--tone-bg:(#\w{6});--tone-ink:(#\w{6})/.exec(c.toneStyle || '') || []
-      const want = chipD.selectedCategory === c.id
-        ? { bg: cardHex, ink: m[1] }   // 选中那一枚翻面：纸白底 + 它自己那支分类色当字
-        : { bg: m[1], ink: m[2] }
-      if (bg[k] !== hexRgb(want.bg) || fg[k] !== hexRgb(want.ink)) {
-        pairBad.push(`分类${c.id} 实=${bg[k]}／${fg[k]} 应为=${hexRgb(want.bg)}／${hexRgb(want.ink)}`)
-      }
-    })
-    ck('每一枚章的字色就是它自己那一档底色配的那一支（逐枚对 toneVars，不钉枚数也不钉第几档）',
-      pairBad.length === 0 && cats.length > 0, pairBad.join('　') || `${cats.length} 枚逐一对上（壁纸=${chipWp}）`)
-    ck('「全部」那枚仍吃这一态自己的底（没被误上色）', !!bg[0], bg[0])
+    ck('分类那一排是文字档：一枚「全部」＋每枚分类各一枚', catEls.length === nCat + 1, `枚 ${catEls.length}／分类 ${nCat}`)
+    ck('v30 那一刀撤掉的胶囊不许复活（这一行不再有 .chip）', (await list.$$('.chip')).length === 0)
+    const catCls = []
+    for (const c of catEls) catCls.push(String(await c.attribute('class') || ''))
+    const lit = catCls.filter((x) => x.split(/\s+/).includes('on'))
+    const onIdx = catCls.findIndex((x) => x.split(/\s+/).includes('on'))
+    ck('恰好一枚亮着（选中态由那一枚自己那枚 `.on` 说，两枚同时亮＝筛选态串了）',
+      lit.length === 1 && onIdx > -1, `亮 ${lit.length} 枚／第 ${onIdx} 枚`)
+    const rgbOf = (s) => (String(s).match(/\d+/g) || []).slice(0, 3).join(',')
+    const alphaOf = (s) => { const m = /rgba?\(\s*[\d.]+,\s*[\d.]+,\s*[\d.]+\s*,\s*([\d.]+)/.exec(String(s)); return m ? Number(m[1]) : null }
+    // 第一版这里直接判"亮 ≠ 暗"，当场红：这一台此刻**铺着图**，而 `index.wxss:1366`
+    // `.container.has-bg:not(.bg-light-low) .vtab, .ix-cat …` 那一条（10-12 那批"深浅自动翻色"）
+    // 把两枚一起抬成整档墨——抬的是设计，不是 bug。⇒ 两态各钉一次，谁也不许盖住谁。
+    const onColBg = onIdx > -1 ? String(await catEls[onIdx].style('color')) : '(摸不到)'
+    const offColBg = catEls.length > 1 ? String(await catEls[onIdx === 0 ? 1 : 0].style('color')) : '(只有一枚)'
+    const listBg = (await list.data()).bgSrc
+    await list.setData({ bgSrc: '' })
+    await sleep(900)
+    const onCol = onIdx > -1 ? String(await catEls[onIdx].style('color')) : '(摸不到)'
+    const offCol = catEls.length > 1 ? String(await catEls[onIdx === 0 ? 1 : 0].style('color')) : '(只有一枚)'
+    await list.setData({ bgSrc: listBg || '' })
+    await sleep(600)
+    ck('没铺图那一态：亮着那一枚吃整档墨、没亮那一枚吃同一支墨的 .72 档（两支不同，短杠那一档才看得出来）',
+      /rgb/.test(onCol) && /rgb/.test(offCol) && onCol !== offCol
+      && Math.abs((alphaOf(offCol) === null ? 1 : alphaOf(offCol)) - 0.72) < 0.01
+      && rgbOf(onCol) === rgbOf(offCol), `亮 ${onCol}／暗 ${offCol}`)
+    ck('铺图那一态：两枚一起抬成整档墨（10-12 那条 has-bg 抬档真的落到这一行，不是压在照片底下看不清）',
+      !listBg || (alphaOf(onColBg) === null && rgbOf(onColBg) === rgbOf(offColBg)),
+      `亮 ${onColBg}／暗 ${offColBg}｜bgSrc=${listBg ? '有' : '无'}`)
 
     /* ---------- 造一条归了类的笔记，验"归了哪一类"在屏上读得出来 ---------- */
     // v18 那一版这一格量的是**纸片底色跟着分类走**（paperSkinFor 按分类序号发色）。

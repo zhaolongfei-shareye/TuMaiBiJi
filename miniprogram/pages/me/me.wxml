@@ -43,9 +43,25 @@
         <view class="seg {{tab === 'set' ? 'on' : ''}}" bindtap="onTab" data-key="set">{{t.pillSettings}}</view>
         <view class="seg {{tab === 'about' ? 'on' : ''}}" bindtap="onTab" data-key="about">{{t.pillAbout}}</view>
       </view>
+      <!-- 10-15 01:4x「面板中间多了一条线」那一刀的**封层**：真实一枚（不是伪元素——前两版
+           `.sheet::after`／`.head-band::after` 复量截图证明压根没画上），把名片行最下那 30 格
+           涂成实心页面底。挂在 `.sheet` 最后一位才压得住照片；理由与那两版实测数抄在 me.wxss。 -->
+      <view class="sheet-seal"></view>
     </view>
   </view>
 
+  <!-- 站长 10-15 01:4x「设置和我的，上面固定不变，下方超过竖向位置，只是下方滚动，不要全屏滚动，
+       要与笔记列表体验一致。要改」⇒ 从这一行往下整个搬进一枚 `scroll-view`。
+       正本抄 `pages/index/index.wxml` 那枚 `.list`（同一套 `scroll-y` ＋ `enhanced` ＋
+       `show-scrollbar="{{false}}"`）；内缩挂在**这一层**的 padding 上，不挂在 scroll-view 自己身上，
+       理由抄在那一页的注释里（挂在它身上时右侧要给滚动条留位，左右不等宽）。
+       上面那一块 `.head`（底图＋名片行）不再跟着走：它由 `.container` 那条竖排给 `flex:none` 钉住。 -->
+  <scroll-view class="me-body" scroll-y enhanced show-scrollbar="{{false}}"
+               scroll-into-view="{{into}}">
+  <!-- 切档回顶用的两枚零高锚点（见 me.js `onTab` 那一段：这一屏不再整页滚，
+       原来那句 `wx.pageScrollTo` 管不到 scroll-view 里面，改用 `scroll-into-view`）。
+     两枚挨着放、内容都是零高，滚到哪一枚都是回到最顶；交替用是因为同一个 id 连设两次不触发。 -->
+  <view id="meTopA"></view><view id="meTopB"></view>
   <!-- ---------------- 设置：能操作的那几样 ---------------- -->
   <block wx:if="{{tab === 'set'}}">
     <view class="menu-group card">
@@ -151,6 +167,7 @@
 
     <text class="copyright">{{t.copyright}}</text>
   </block>
+  </scroll-view>
 
   <!-- 私密密码那一层：整屏遮罩 + 卡，从上到下是 功能名 → 使用场景说明 → 校验提醒 + 六个方格 →
        一行两枚（左退出、右动作）。10-12 起这一层三页共用一份：标记在 templates/pwd-sheet.wxml、

@@ -58,6 +58,10 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
   // 10-11 R12 加：图自己那块（不是 band 那一段）——"名片那一行底下必须有图"要看的是图铺到哪，
   // 拿 imgStyle 那两个数自己换算等于在尺子里再抄一遍布局。同样放最后一位，前面的下标不动。
   q.select('.head-img').boundingClientRect()
+  // 10-15 01:4x「上面固定不变，下方超过竖向位置只是下方滚动，不要全屏滚动」加：滚的那一层与
+  // 页面自己那一层各量一份（放最后两位，前面的下标一个字不动）。
+  q.select('.me-body').boundingClientRect()
+  q.select('.container').boundingClientRect()
   q.exec((res) => resolve({
     band: res[0], sheet: res[1], logo: res[2], text: res[3],
     score: res[4], num: res[5], lab: res[6], pill: res[7],
@@ -66,6 +70,7 @@ const measure = (mp) => mp.evaluate(() => new Promise((resolve) => {
     group: res[14], aboutLead: res[15], h1: res[16],
     scene: res[17], pwdName: res[18], mask: res[19], rules: res[20] || [],
     rdots: res[21] || [], label: res[22], img: res[23],
+    body: res[24], cont: res[25],
     windowWidth: wx.getWindowInfo().windowWidth,
     windowHeight: wx.getWindowInfo().windowHeight,
   }))
@@ -229,8 +234,13 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     Math.abs(toRpx(parseFloat(h1Style['font-size']), W) - 42) <= 2
     && parseFloat(h1Style['font-weight']) === 700 && lsRpx < 0 && lsRpx >= -2.5,
     `${h1Style['font-size']}/${h1Style['font-weight']}/${h1Style['letter-spacing']}`)
-  ck('铺了图这行翻成纸白（与首页 .has-bg .h1 同一档）',
-    /rgba\(242,\s*239,\s*233,\s*0?\.96/.test(h1Style.color || ''), h1Style.color)
+  /* 这一条原来**无条件**钉"铺了图就翻纸白"，10-12 那批给浅照片加了 `.bg-light` 那一档之后
+     它就成了假红（量回来 rgba(20,22,26,.92)＝墨，正是那一档该有的样子）。⇒ 判据跟着口径改：
+     极性由 `bgLight` 决定，两支各钉一支值，**不许只钉其中一支**。 */
+  const headLight = (await page.data()).bgLight === true
+  ck(`铺了图这一行按照片深浅翻极性（当前是${headLight ? '浅图⇒墨 .92' : '深图⇒纸白 .96'}，与首页同一族）`,
+    headLight ? /rgba\(20,\s*22,\s*26,\s*0?\.92/.test(h1Style.color || '')
+      : /rgba\(242,\s*239,\s*233,\s*0?\.96/.test(h1Style.color || ''), h1Style.color)
   // 右上角那一枚现在住的是 MIND 数字（药丸搬进 LOGO 那一行了）。先钉它在不在：
   // 数字整块是 wx:if="{{scoreText}}"，接口没通时节点根本没有，后面几条会 TypeError
   // 把整把尺子带崩——上一条踩过一次"正则回 null 把整把尺子打死"，这里先挡住。
@@ -244,7 +254,11 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   // 100 → 64：站长 10-01 晚要把这两个 tab 的右上角对齐成同一档量，笔记页那三列也是 64。
   ck('数字字号 64（与笔记页那三列同一个量）', Math.abs(toRpx(parseFloat(numStyle['font-size']), W) - 64) <= 2, numStyle['font-size'])
   ck('数字是 100 号字重（Thin）', parseFloat(numStyle['font-weight']) <= 100, numStyle['font-weight'])
-  ck('数字保持半透明', /rgba\(242,\s*239,\s*233,\s*0?\.7/.test(numStyle.color || ''), numStyle.color)
+  // 同一条口径：细字重（100）那一档浅照片下给 .86、深照片下给 .74（两个数都从 me.wxss 那两条读，
+  // 原来这条只钉纸白 .7 —— 那是 10-04 之前的数，10-05 晚并档之后就没再对上过）。
+  ck(`数字保持半透明（当前是${headLight ? '浅图⇒墨 .86' : '深图⇒纸白 .74'}）`,
+    headLight ? /rgba\(20,\s*22,\s*26,\s*0?\.86/.test(numStyle.color || '')
+      : /rgba\(242,\s*239,\s*233,\s*0?\.74/.test(numStyle.color || ''), numStyle.color)
   ck('英文字收到最小一档字阶 18', Math.abs(toRpx(parseFloat(labStyle['font-size']), W) - 18) <= 1, labStyle['font-size'])
   ck('英文字改成居中对齐', labStyle['text-align'] === 'center', labStyle['text-align'])
   const cNum = m.num.left + m.num.width / 2
@@ -339,17 +353,23 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
      钉名字变成了钉"这一行永远只有名字"——而它红的那一晚改的是字色，一行没动。 */
   const labels = []
   for (const r of await page.$$('.menu-label')) labels.push((await r.text()).replace(/\s+/g, ''))
-  ck('设置态是五条：卡片模板/外观设置/分类管理/私密密码/注销账号',
-    labels.join('|') === '卡片模板|外观设置|分类管理|私密密码|注销账号', labels.join('|'))
-  /* 四行的小字说明常驻（他 10-05 打回过"切换开关就看不到注释"），钉数量也钉内容——
+  /* 这两条从 10-08／10-14 起就一直红，红的是判据不是屏：
+     ① 「外观设置」那一格按站长 10-14 17:1x 原话**隐藏**了（「设置里面的风格入口隐藏」「切换毛玻璃
+        改到首页，增加一个入口"换心情"」，见 §8.237），顶上来的是 10-08 那格「我的邮箱」（§8.235 第 2 条）。
+     ② 小字那四句也跟着变：邮箱那一行**故意不给小字**（右侧那一档要留给现读回来的地址，
+        两处都要字就挤了——整句说明搬进点开的那一层，见 `验-我的邮箱这一格` 那条反向钉）。
+     ⇒ 期望值改成现在这一版，并注明出处；不是拿代码迁就旧尺子。 */
+  ck('设置态是五条：卡片模板/分类管理/私密密码/我的邮箱/注销账号（风格入口已按 §8.237 隐藏）',
+    labels.join('|') === '卡片模板|分类管理|私密密码|我的邮箱|注销账号', labels.join('|'))
+  /* 三行的小字说明常驻（他 10-05 打回过"切换开关就看不到注释"），钉数量也钉内容——
      内容与字典比、不与硬写的中文比，换语言时这条不该红。注销账号那行没给说明，是他还没拍。 */
   const hints = []
   for (const r of await page.$$('.menu-hint')) hints.push((await r.text()).replace(/\s+/g, ''))
   const dict = (await page.data()).t || {}
-  const wantHints = [dict.navProfileTip, dict.wallpaperTip, dict.categoriesTip, dict.privatePasswordTip]
+  const wantHints = [dict.navProfileTip, dict.categoriesTip, dict.privatePasswordTip]
     .map((x) => String(x || '').replace(/\s+/g, ''))
-  ck('前四行各有一行右侧小字，且就是字典里那四句（不是硬写的中文）',
-    hints.length === 4 && hints.every((x, i) => x === wantHints[i]), hints.join('|'))
+  ck('三行有右侧小字且就是字典里那三句（邮箱那行故意不给，注销那行他还没拍）',
+    hints.length === 3 && hints.every((x, i) => x === wantHints[i]), hints.join('|'))
   ck('行高 106（不再是 118 那种大块头）', Math.abs(toRpx(m.items[0].height, W) - 106) <= 2, toRpx(m.items[0].height, W).toFixed(0))
   ck('每行右边一枚 46 见方的箭头位（盒子没跟着圆底一起撤，行右端那条竖线要照它对齐）',
     m.icos.length === 5 && Math.abs(toRpx(m.icos[0].width, W) - 46) <= 2
@@ -565,6 +585,34 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   // 语言钉回进场时那个值。中途崩了这份钉不回，但崩了留下的也是 zh——后面几把尺子
   // 吃的正是中文，所以这条只是"不留下我的痕迹"，不是"不留就红"。
   await pinLang(mp, originalLang)
+
+  /* ---------- ⑧ 上半固定、只下方滚动（站长 10-15 01:4x） ----------
+     原话「设置和我的，上面固定不变，下方超过竖向位置，只是下方滚动，不要全屏滚动，要与笔记列表体验一致」。
+     钉三件：① 页面自己那一层不滚（容器高＝视口高，多一寸就是在滚整页）；
+     ② 滚的是下面那一层——判的是渲染层的 `overflow-y`（微信把 `scroll-view` 落成这一条），
+        markup 上那句 `scroll-y` 只报数不判红（automator 的 attribute() 读组件属性这一档今天没验过，
+        拿没验过的读法当判据＝给自己造红）；③ 上半那两块在滚层**外面**：滚层顶边就是那层皮的底边。 */
+  page = await gotoMe(mp)
+  const m8 = await measure(mp)
+  const svNode = await page.$('.me-body')
+  const svStyle = await styleOf(page, '.me-body', ['overflow-y'])
+  const svAttr = svNode ? String(await svNode.attribute('scroll-y')) : '(摸不到)'
+  ck('页面整屏不滚：容器高＝视口高（多一寸就是在滚整页）',
+    !!m8.cont && Math.abs(m8.cont.height - m8.windowHeight) <= 1,
+    m8.cont ? `容器 ${m8.cont.height.toFixed(1)}｜视口 ${m8.windowHeight}` : '读不到 .container')
+  // ⚠ 这一条第一版钉的是"渲染层 `overflow-y` 是 auto/scroll"——**那个前提是我自己猜的，当场被量翻**：
+  //   `.me-body` 自己读出来是 `visible`（微信把滚动挂在这枚组件的内层，外层不吃 overflow）。
+  //   而 markup 上那句 `scroll-y` automator 读得回来（实测 `true`）⇒ 判据改钉这一枚，
+  //   `overflow-y` 只报数不判红。判据钉的还是同一件事（"下面那一层自己会滚"），换的是量法。
+  ck('滚的是下面那一层：`.me-body` 这枚 `scroll-view` 的 `scroll-y` 真挂着',
+    svAttr === 'true', `scroll-y=${svAttr}｜overflow-y=${svStyle['overflow-y'] || '(读不到)'}（外层读 visible 是组件把滚动挂在内层，不是没滚）`)
+  ck('上半在滚层外面：滚层顶边就是那层皮的底边（差 ≤2px，头部与那层皮跟着页面钉死）',
+    !!m8.body && !!m8.sheet && Math.abs(m8.body.top - m8.sheet.bottom) <= 2,
+    m8.body && m8.sheet ? `滚层顶 ${m8.body.top.toFixed(1)}｜皮底 ${m8.sheet.bottom.toFixed(1)}` : '量不到')
+  ck('滚层吃满剩下的竖向空间（底边到视口底，中间不留第二条缝）',
+    !!m8.body && Math.abs(m8.body.bottom - m8.windowHeight) <= 2,
+    m8.body ? `滚层底 ${m8.body.bottom.toFixed(1)}｜视口底 ${m8.windowHeight}` : '量不到')
+  await mp.screenshot({ path: path.join(OUT, '04-上半固定只下方滚.png') })
 
   console.log(bad.length ? `\n✗ ${bad.length} 条不过：${bad.join('、')}` : '\n✓ 全过')
   await mp.close()

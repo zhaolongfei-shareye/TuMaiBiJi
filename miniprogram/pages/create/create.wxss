@@ -51,19 +51,28 @@
   white-space: nowrap;
 }
 
-/* 标题那一行：左边大标题，右边语言切换。标题自己的字号字重和上下留白一点没动，
-   只是从"独占一行"变成"和切换器同一行"，所以整页高度不变。
-   站长 10-14 23:0x 追「大标题的字，能否变成 70% 透明度」⇒ 用 `opacity` 而不是改 `color`：
-   这一屏的标题会随铺图深浅翻色（`.container.has-bg` 那一队规则给的是另一支字色），
-   写死 `rgba(20,22,26,.7)` 会把翻色那半条链顶掉。 */
+/* 标题那一行（站长 10-15 01:4x 之后只剩这一枚图）：大标题从两行字换成一张透明底图片字。
+   70% 不透明度沿用 10-14 23:0x 那一档（他当时要的就是「大标题的字，能否变成 70% 透明度」，
+   今天换成图，这一档照旧吃 `opacity` 而不是烘进图里 ⇒ 改档不用重出图）。
+   ⚠ 10-15 03:0x 补上自动翻色：「字体图片要支持遇到深色背景图自动反转色」⇒ 这一枚不再是一张
+   固定墨色的位图。做法是 `filter: invert(1)`（不是第二张白字图）：invert 的矩阵只动 RGB 三行、
+   alpha 那一行是 `[0,0,0,1,0]` ⇒ 透明底不会被涂白，墨 (22,22,22) 翻成 (233,233,233)，
+   与下面那三枚字翻过去的纸白 (242,239,233) 差 9 个灰阶，肉眼同一档。
+   ⚠ 判深浅吃的是**这一枚自己那块矩形**（`.bg-light-title`，由 `create.js` `toneRects()` 量出来），
+   10-15 03:2x 他那一句「计算深浅背景区域仅限文字图片覆盖的区域的平均值，不需要全屏计算」之前，
+   这一枚吃的是头部那一条整幅宽的带 [0,0.28]——右边那半幅是浅墙，把左边压着的深色头发平均掉了。 */
 .title-row .page-title {
   opacity: 0.7;
+}
+
+.container.has-bg:not(.bg-light-title) .page-title {
+  filter: invert(1);
 }
 
 .title-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 20rpx;
   margin: var(--sp-5) 0 var(--sp-4);
 }
@@ -76,35 +85,50 @@
    （站长 10-09 夜原话「调亮度和换背景，之前不是说了换到日期位置吗？」＋指着 c5 说「这个方案完全没做」）。
    它占的那一段流内高度由下面 `.home-swap` 原样接手，所以录入条的落点一个字不用改（见那一条的账）。 */
 
-/* 两段纯文字 + 一条下划线，不做成按钮：这一行的主角是标题，切换器要能看见但不抢位。
-   两段都带透明下边框，选中与否只差颜色和下划线，切换时字不会跳。 */
-.lang-switch {
-  display: flex;
-  align-items: baseline;
+/* 语言切换（站长 10-15 01:4x「中 EN 移到右上角，与顶部第一行处于同一行。固定位置。
+   变成 中和EN切换，只显示其中一个。显示待切换」；他先写"左上角"、隔一句改成"右上角同一行"）。
+   就住在上面那一条 `.ai-line` 里、`margin-left:auto` 顶到最右：
+   · "同一行"由同一个 flex 保证，不靠两边各写一个 top 去对；
+   · "固定位置"由那一行本身保证——它是这一屏最上面那一条，两态、五档心情都在同一个落点；
+   · 字色不再需要自己配：吃 `.ai-line` 的 `--stage-ink-strong`（浅面深字、深面白字），
+     与左边那句字同一个来源，压在那层玻璃上读，不压在照片上。
+   仍是"文字＋一条下划线"那套画法，不做成按钮（他 10-09 否过按钮式）。下划线常驻：
+   现在只剩一枚，没有"选中／未选中"可对比了，那条线的作用是说明它按得动。
+   ⚠ 这一枚与左边那句字**抢同一行宽度**（那一行是 nowrap）：两门各多占 60rpx，
+   够不够由 `验-第一屏三块-真跑` 现读那一句字的渲染宽与这一枚的右沿，不许照字面猜。 */
+.lang-corner {
   flex: none;
-  gap: 20rpx;
-}
-
-.lang-seg {
+  margin-left: auto;
+  padding-left: 12rpx;
   font-size: var(--fs-meta);
-  line-height: 1.4;
-  color: var(--text-tertiary);
-  border-bottom: 4rpx solid transparent;
-  padding: 0 2rpx 4rpx;
-}
-
-.lang-on {
-  color: var(--text-primary);
+  line-height: 1.35;
   font-weight: 700;
-  border-bottom-color: var(--accent);
+  letter-spacing: 1rpx;
+  border-bottom: 4rpx solid var(--accent);
+  padding-bottom: 2rpx;
 }
 
+.lang-corner:active {
+  opacity: 0.66;
+}
+
+/* 这一枚现在是图片字（源件 500×246，纵横比 0.492，由 `docs/工具/出-标题字透明底.py` 出）。
+   宽 208rpx ⇒ 高 102.3rpx。
+   ⚠ 208 这个数是**量着头发的左沿定的**，不是挑的（10-15 02:5x 他第三句「逗号还是压住脸了，再往左一点」）。
+   拿探针那张实测图（`docs/design/10-15首屏六件/探针-create-收起.png`，734 宽 ⇒ 1rpx=0.9787px，
+   页面顶在截图第 172 行）一根一根列扫出来的左沿：页内 168rpx 处 271、204rpx 处 248、266rpx 处 242、
+   278rpx 处 242——**头是往左斜着长上来的**，所以最紧的那一档在字的下沿。
+   上一版宽 300、左沿 24 ⇒ 右沿 324，而源件最右那一坨墨（α>200 的列到 99.2%，行 72%~79%）
+   正是句末那枚「。」，落在页内 305~324rpx／250rpx 上下＝**脸颊上**。
+   他要的是"往左"，但左沿 24 是这一页所有文字的同一条对齐线（上面那行、下面那块面板都在 24），
+   挪到 0 就变成第一笔贴屏边、且与整页不对齐 ⇒ 这一枚按"往左"的意思落成**右沿往回收**：
+   宽 208 ⇒ 右沿 232，比最紧那一档（242）还留 10rpx。代价一条：字比上一版小 31%。
+   源件 500 物理像素对 3x 机型需要的 312（208rpx × 1.5）绰绰有余。
+   `flex: none` 是必须的——它是 `.title-row` 这个 flex 子的唯一子项，一旦允许收缩，
+   `widthFix` 会被压成"高跟着宽不等比走"（这一类翻车记在 [[feedback-image-box-aspect-clamping]]）。 */
 .page-title {
-  font-size: var(--fs-h1);
-  font-weight: 700;
-  letter-spacing: -1rpx;
-  color: var(--text-primary);
-  margin: var(--sp-5) 0 var(--sp-4);
+  flex: none;
+  width: 208rpx;
 }
 
 /* 10-10 晚收起态那三块搬出去自己贴底之后，这一档只剩展开态在用（wxml 上挂了 wx:if="{{active}}"）。
@@ -488,7 +512,10 @@
   font-size: var(--fs-meta);
   line-height: 1.4;
   letter-spacing: 1rpx;
-  color: var(--text-secondary);
+  /* 10-15 02:5x「字体颜色，与图片标题一样，70% 黑透明。包括第二屏的 back」⇒ 从"跟页面级令牌
+     `--text-secondary`（.72，且随壁纸换色）"改成写死一档墨 @70，与首屏那三枚、那枚标题图同一个数。
+     深浅两态的翻转仍由下面那两条 `.bg-light-low` 接手（这一枚只认自己那条带）。 */
+  color: rgba(20, 22, 26, 0.7);
 }
 
 /* 「返回」这一枚：与笔记列表、笔记卡片右上角那一枚同一个词、同一个动作（回第一屏）。
@@ -847,9 +874,10 @@
    为的是聚焦展开那一下字不跳。
    ⚠ `box-sizing:border-box` 不能省：这一格是 `height:100%` ＋ 上内边距，默认那个 content-box
    会把 30 加在 100% 外面（框变成 129 高，溢出壳、字掉到圆角外面），静态读不出来、只有真量渲染才发现。 */
-.field-write {
-  padding-right: 14rpx;
-}
+/* 10-15 01:4x 这一档撤了（他原话「除了输入框内文字不同外，上下左右的占位要保持不变」）。
+   原来它把文字那一档的右内缩从 28 改成 14 ⇒ 同一个 `.field-paste`（自带 −12 外边距）
+   在两档分别落在离壳右沿 16 与 2 的位置，**切换 Link／Text 时那枚剪贴板图标横着跳 14rpx**。
+   撤掉之后两档同一份 28，剪贴板图标同一根线。 */
 
 /* 展开那一档：壳从 105 变 160（"多一行"），写在壳身上而不是框身上。
    排在 .field 之后才盖得过它那条 height:105rpx。 */
@@ -1217,6 +1245,14 @@
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z' /%3E%3C/svg%3E");
 }
 
+/* 太阳（Lucide sun）：「调亮度」那一枚（站长 10-15 01:4x「调亮度的icon 改为太阳icon，风格与其他一致」）。
+   与云朵、箭头同 24 格、同 1.6 描边、同一支色来源（`.swap-glyph` 给面，浅面翻墨、深面翻纸白）。
+   八道光芒各 2 格长、圆心 r=4 —— 21rpx 上头这些数再细就连成一片，所以取 Lucide 原比例不缩描边。 */
+.glyph-sun {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41'/%3E%3C/svg%3E");
+}
+
 /* ---------- 首页背景图 ----------
    上厚下薄再收口：标题那一段压到 0.58（纸白字对比实测 4.95，不压只有 1.23），
    往下到脸上只剩 0.42~0.44，脸还认得出来。档位按百分比给，换机型跟着视口走。
@@ -1362,31 +1398,27 @@
    ⚠ 留着的是**字**的翻色（`.bg-light` 那一队：三级字、`.swap-glyph`、导航条）——那是可读性那件事，
    与这枚点拧的是哪一层无关，没动。 */
 
-.container.has-bg.bg-light .swap-glyph {
-  background: rgba(20, 22, 26, 0.85);
+/* 原来这里有三条 `.container.has-bg.bg-light .swap-glyph / .swap-text / .home-swap`
+   （把那一行从纸白 .85 覆回墨 .85）。10-15 02:5x 基准翻成墨 @70 之后它们全废：
+   浅照片那一态现在就是基准本身，不需要覆写；深照片那一态由上面那两条
+   `.has-bg:not(.bg-light-swap)` 接手。留着会打架——`.bg-light` 判头部那 0~0.28，
+   而这一行住在低带 0.588~0.648，两张判据凑在一起能造出"头部浅＋低带深"那一格：
+   旧三条把它刷成墨，新两条把它刷成纸白，谁赢看源码顺序 ⇒ 一起删净。 */
+
+/* 10-14：「返回」那一枚抬到墨面之上之后压的是形象图**下那一截**（视口 0.59~0.62），
+   上面那两段按整页/头部翻的令牌判的不是这一条带 ⇒ 就地覆回来。两支都要：
+   浅图那一态是墨、深图那一态是纸白，而这一枚只认"它自己那一小块深不深"。
+   写法与 index 的 `.vtab/.ix-back/.ix-cat`、me 的 `.sheet-slogan` 同一个口径（那两处的
+   `:not(...)` 不许省，理由抄在这里），只是 10-15 03:2x 之后判据从"低带那一条整幅宽的带"
+   换成**它自己那块矩形**（`.bg-light-out`，由 `create.js` `toneRects()` 现量）。
+   ⚠ 10-15 02:5x 站长「字体颜色，与图片标题一样，70% 黑透明。**包括第二屏的 back**」⇒ 这两支的
+   α 从 .68／.78 并到 **同一档 .70**，与上面那三枚、那枚标题图一个数（原来那两档是各自定的）。 */
+.container.has-bg:not(.bg-light-out) .out {
+  color: rgba(242, 239, 233, 0.7);
 }
 
-.container.has-bg.bg-light .swap-text {
-  color: rgba(20, 22, 26, 0.85);
-}
-
-.container.has-bg.bg-light .home-swap {
-  /* 整行的字色兜底：那两枚「调亮度」「换背景」原来只吃 `.swap-text` 那支写死的纸白 .85，
-     实测浅态那一行带里暗字 0.0%、亮字 99.5%（＝字跟浅底一个色，完全没出来）。 */
-  color: rgba(20, 22, 26, 0.85);
-}
-
-/* 10-14：「返回」那一枚抬到墨面之上之后压的是形象图**下那一截**（视口 0.59~0.62，
-   落在 `toneZones().low`＝[0.55,0.85] 里），上面那两段按整页/头部翻的令牌判的不是这一条带
-   ⇒ 就地按低带覆回来。两支都要：浅图那一态 `--text-secondary` 是墨，深图那一态是纸白，
-   而这一枚只认"它自己那一条带深不深"。写法与 index 的 `.vtab/.ix-back/.ix-cat`、
-   me 的 `.sheet-slogan` 同一个口径（那两处的 `:not(.bg-light-low)` 不许省，理由抄在这里）。 */
-.container.has-bg:not(.bg-light-low) .out {
-  color: rgba(242, 239, 233, 0.78);
-}
-
-.container.has-bg.bg-light-low .out {
-  color: rgba(20, 22, 26, 0.68);
+.container.has-bg.bg-light-out .out {
+  color: rgba(20, 22, 26, 0.7);
 }
 
 /* 展开：整块从流里拿出来，沉到底栏上方，面板向上长。
@@ -1446,6 +1478,13 @@
      静态尺子钉的是"这三个数加起来等于 52"，不是钉 22 这个数。 */
 /* 站长 10-14 22:4x「换心情，调亮度，换背景，下移到下半部，面板上方」⇒ **收起态**这一行整条
    从流里抬出来，钉在面板顶之上（面板顶＝100vh−548，见 `.stage-panel` 那一条）。
+   10-15 01:4x 他追一刀「现在位置不准，离框框太高了，浪费空间」⇒ 那一口从 560 收到 **510**。
+   数是怎么来的（`验-第一屏三块-真跑` 现在按**关系**钉，不钉这个字面量）：
+   盒子 88 高、字那一档 34 顶对齐 ⇒ 字的下沿在盒子底之上 54；要字的下沿离面板顶 16，
+   盒子底就得落在 548 ＋ 16 − 54 ＝ **510**。
+   ⚠ 代价一条：盒子底下那 38rpx 是空的，它会**盖在面板顶之上**——那一段本来只是往上抬的呼吸，
+   现在按下去命中的是这三枚而不是"点空白收起"。留 88 高是 10-10 定过的口径（＝44px 指头按得住），
+   不想为了这 38rpx 把热区砍一半，所以宁可让它盖上去。
    ⚠ 只管 `:not(.entry-dock)`：展开态（第二屏）这一行仍住在标题下面那一格——10-11 他拍过"两屏都在"，
    而第二屏框外那一行今天只剩「返回」一枚，两枚同挤一条带会撞；他这句指的是首屏，没让动第二屏。
    （"第二屏保持原样"这一条是我按"他没说的不改"落的，他没拍过。）
@@ -1453,19 +1492,38 @@
    `.entry-wrap` 这一态不渲染），所以录入条那三块不漂；展开态走的是原来那条流内账，一个字没改。 */
 .container:not(.entry-dock) .home-swap {
   position: fixed;
-  left: 24rpx;
-  right: 24rpx;
-  bottom: 560rpx;
+  /* 左右 14 而不是 24：三枚自己各带 10rpx 的横向内边距（`.swap-half` 那枚热区），
+     14＋10＝24 ⇒ **字与图形的可见边**才落在这一页那条 24 的列上。写 24 会让整行往里缩 10。 */
+  left: 14rpx;
+  right: 14rpx;
+  bottom: 510rpx;
   margin: 0;
+}
+
+/* 站长 10-15 02:5x「第二屏不支持三个设置，要隐藏」⇒ 展开那一态整行撤掉。
+   ⚠ 这一条**改掉了 10-11 12:2x 那一条**（他当时原话「调亮度，换背景，再第二屏也需要，
+   第二屏就是带拍摄面板那个」，我据此把 `.container.entry-dock .home-swap { display:none }` 删了，
+   还在 `验-统一录入条` 里钉了一条"凡带 `.home-swap` 的规则块不许出现 display:none"）。
+   今天他改口，那条判据跟着作废——尺子改成钉"展开态这一条 display:none 必须在"，
+   不拿代码去迁就旧尺子（同一形状见 [[feedback-removing-a-state-invalidates-rulers]]）。
+   流内那 52rpx 的账也不用再算：展开态的面板是 `position: fixed`（`.container.entry-dock .entry-wrap`），
+   这一行在不在流里都不改它的落点。 */
+.container.entry-dock .home-swap {
+  display: none;
 }
 
 .home-swap {
   display: flex;
   align-items: flex-start;
-  justify-content: flex-start;
+  /* 站长 10-15 02:5x「第一屏三块设置，要在那一行自动均匀分布左中右，自然展开」⇒ 从"靠左堆着"
+     改成两头对齐、中间均分：三枚都在＝左／中／右，「调亮度」那一截没图不画＝两枚自动变成左／右。
+     不写死三档宽度，所以换语言、换文案长度都不必回来改数（`gap: 26rpx` 留着当下限：
+     英文那三句长，间距真被压到 26 以下时不再靠 space-between 硬挤，而是各留 26 顶开）。 */
+  justify-content: space-between;
   gap: 26rpx;
   height: 88rpx;
   margin: -14rpx 0 -22rpx;
+  color: rgba(20, 22, 26, 0.7);
 }
 
 .swap-half {
@@ -1476,18 +1534,11 @@
   padding: 0 10rpx;
 }
 
-/* 那一枚点的直径跟着这一行的字号走（站长 10-14「旁边的亮度圆也同步缩小」），
-   现在两边都是 --fs-tiny(21)。外面那圈 .swap-half 的 padding 把热区撑到 44 以上，
-   21 一枚手指点不准（热区靠盒子，不靠这枚点）。
-   这圈描边是给最亮那一档准备的：不描边，白点压在浅衬衫上就找不到北。 */
-.dim-dot {
-  width: 21rpx;
-  height: 21rpx;
-  margin-top: 7rpx;
-  border-radius: 50%;
-  flex: none;
-  border: 2rpx solid rgba(8, 9, 12, 0.28);
-}
+/* 「调亮度」那一枚圆点 10-15 01:4x 撤了，换成下面那支太阳（他那句「调亮度的icon 改为太阳icon，
+   风格与其他一致」）。原来这一枚的填充色是当前亮度档（`dimDot` 从 style 递进来），撤了渲染
+   就是"这一屏不再有亮度读数"——`dimDot` 那一格三页还在算，全仓只有这一处在画它，要一并清是另一件事。
+   它原来那 21rpx 直径与外面那圈描边（最亮那一档白点压在浅衬衫上找不到北）跟着一起没了，
+   直径这一档现在由下面 `.swap-glyph` 一处给三枚共用。 */
 
 /* 站长 10-01 晚：前面那枚照片图标撤掉，换一枚小箭头（ ">" 那一档）——
    这一行本来就是"点进去换"，箭头把这件事说得更直白，也少一块和横条抢眼的实心面。
@@ -1498,35 +1549,48 @@
   width: 21rpx;
   height: 21rpx;
   margin-top: 7rpx;
-  background: rgba(242, 239, 233, 0.85);
+  background: rgba(20, 22, 26, 0.7);
 }
 
 .swap-text {
   /* 站长 10-14「调亮度换背景字体小一档，不要加粗」⇒ 从 --fs-meta(24) 收到 --fs-tiny(21)、字重从 700 落回 400。
      这一行原本和 Tips 同档同体量，现在反过来比 Tips 小一档：它是页面级工具条，不该和引导语抢。
      行高仍钉 34rpx（不是 21×1.4）：那是日期行量到的那一条线，`.home-swap` 那 52rpx 的流内账靠它撑着
-     （见上面 .home-swap 那笔账），字档升降都不动它。 */
+     （见上面 .home-swap 那笔账），字档升降都不动它。
+     ⚠ 10-15 02:5x 字色换档：「字体颜色，与图片标题一样，70% 黑透明」⇒ 基准从"纸白 .85"翻成
+     **墨 @70**，与上面那枚标题图的 `opacity: .7` 同一档。原来那三条覆写（`:not(.has-bg)` 一条、
+     `.bg-light` 两条）都是为"基准是纸白"准备的，一起撤，换成下面那一条按深色照片翻纸白的。 */
   font-size: var(--fs-tiny);
   line-height: 34rpx;
   font-weight: 400;
   letter-spacing: 1rpx;
-  color: rgba(242, 239, 233, 0.85);
+  color: rgba(20, 22, 26, 0.7);
 }
 
-/* 白底那一档（两级都空，站长 10-14 要这一行照样画着 ⇒ 见 create.wxml 那一行的注释）。
-   上面那两支纸白是给**压暗罩**准备的，它们假设背后永远是一张被罩深的照片；这一档背后是壁纸
-   自己的浅底色（米白/天青那一族），纸白 .85 压上去实测就是"字跟底一个色"——同一种失效站长
-   10-11 在这行上已经打过一次回（见上面浅图那一档给这一行兜底的那两条规则：带里暗字 0.0%、亮字 99.5%）。
-   所以这里翻墨，且跟着 Tips 那一行吃同一枚令牌 `--text-secondary`：
-   同一屏上并列的两行小字不许一个跟主题走、一个跟照片走。
-   类数：`.container` + `:not(.has-bg)` + `.swap-text` = 3，压得住上面那支 1 类的，不是虚挂。 */
-.container:not(.has-bg) .swap-text {
-  color: var(--text-secondary);
+/* 深色照片那一档自动翻纸白（站长 10-15 03:0x「三个设置也要这样自动切换」，与标题图同一件事）。
+   判的是**这一行自己那块矩形**（`.bg-light-swap`）：10-14 把这一行搬到面板上方之后它压在
+   视口 0.588~0.648 那一条（探针量的帧：顶 443pt／底 488pt，框高 753pt），
+   而它左右两端压着的东西完全两样——左端是那块蓝布、右端是那截木头——
+   原来那两条"整幅宽的一截"（`bg-light`／`bg-light-low`）平均出来只能给一个答案，
+   站长 10-15 03:2x 要打掉的就是这个：「包括三块设置也是只计算下方三行区域的平均值颜色」。
+   写法 `.has-bg:not(.bg-light-swap)`：没铺图那一态不走这一条，吃上面那支基准墨 @70，
+   与壁纸的浅底同向（两级都空＝白底那一档 10-14 站长要保留这一行，字色必须读得出来）。
+   ⚠ 浅色照片那一态也吃基准：墨 @70 压在浅图上正是他要的样子，不再另写一条。 */
+.container.has-bg:not(.bg-light-swap) .home-swap,
+.container.has-bg:not(.bg-light-swap) .swap-text {
+  color: rgba(242, 239, 233, 0.7);
 }
 
-.container:not(.has-bg) .swap-glyph {
-  background: var(--text-secondary);
+.container.has-bg:not(.bg-light-swap) .swap-glyph {
+  background: rgba(242, 239, 233, 0.7);
 }
+
+/* 白底那一档（两级都空）10-15 02:5x 之后**不再需要覆写**：上面那支基准已经从"纸白 .85"翻成
+   墨 @70，浅壁纸上本来就读得出来。原来那两条 `.container:not(.has-bg) .swap-text/.swap-glyph`
+   （翻成 `--text-secondary`）是为"基准是纸白"准备的，撤净——留着它们反而多一档：
+   同一张浅底，`--text-secondary` 是 .72 而基准是 .70，两页两个数。
+   ⚠ 但**浅照片那一档也一起吃基准**，这是这一改的副产品：原来浅图靠 `.bg-light` 那两条覆回墨，
+   现在基准就是墨，那两条一起删（见上面 `:not(.bg-light-low)` 那一段）。 */
 
 .swap-half:active {
   opacity: 0.66;

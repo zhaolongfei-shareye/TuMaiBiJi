@@ -9,11 +9,13 @@ const person = require('../../utils/person.js')
 const bgTone = require('../../utils/imgBrightness.js')
 
 /* 深浅分两截判（站长 10-12 21:1x：「请按照上下部分来分别判断，避免全图平均，造成差异」）。
-   这一页上截＝左上角那行大字与「调亮度／换背景」（实测落在屏高 15% 与 20%），
-   下截＝那行轮播 Tips（收起态 68%、展开态在面板外那一行，同一个落点档）；
+   这一页上截＝左上角那行大字与那枚标题图（实测落在屏高 9%~16%），
+   下截＝「调亮度／换背景／换心情」那一行与「返回」那一枚（10-14 把这一行搬到面板上方之后
+   它从 20% 掉到 **58.8%~64.8%**，探针量的帧：顶 443pt／底 488pt，框高 753pt ⇒ 归低带管，
+   不再归上截；这句是 10-15 跟着改的，原来这里写的是"那一行实测在 20%"）；
    下面那三块面板自己有白底，不吃这一档，所以下截只取到 85%。
-   ⚠ 两截都**贴着字所在的那一小段**取，不是"屏对半切"：上截取到 28%（大字 15%、那一行 20%，
-   再多就把中段空白算进平均了），下截 55%~85%。
+   ⚠ 两截都**贴着字所在的那一小段**取，不是"屏对半切"：上截 0~28% 里只有那行大字与标题图，
+   再多就把中段空白算进平均了；下截 55%~85%（那一行工具条与「返回」都在这一段）。
    首页这张图是 `.page-bg`（750×100vh，`aspectFill` 居中裁）⇒ anchor 0.5，
    与另外两页那枚全站 15% 不是同一个取景，别抄。 */
 function toneZones() {
@@ -149,6 +151,11 @@ Page({
     // 本机算过就直接给对的第一帧，没算过先按深底出字、采样回来那一趟再翻。
     bgLight: false,
     bgLightLow: false,
+    // 10-15 03:2x 起再加三格：那三枚各按**自己那块矩形**判一次（`toneRects`），
+    // 不再共用上面那两截整幅宽的带。名字跟着元素走：标题图／三块那一行／第二屏的返回。
+    bgLightTitle: false,
+    bgLightSwap: false,
+    bgLightOut: false,
     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
     // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
     dimV: 1,
@@ -246,6 +253,8 @@ Page({
     app.setNavTitle('appName', lang)
     // 深浅这一档与导航条同一趟给（applyTone 里读缓存→出字→设导航条；这张图没算过时异步补算）。
     bgTone.applyTone(this, this.data.bgSrc, toneZones())
+    // 再按**元素自己那块矩形**各判一次（站长 10-15 03:2x 那一刀，见下面 `toneRects` 那段）。
+    this.toneRects()
     this.startTips()
     this.loadEntryStats()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
@@ -351,6 +360,52 @@ Page({
       dragging: false,
     })
     this._sync()
+    // 展开那一态才有 `.out`（第二屏框外那枚「返回」）⇒ 它的矩形此刻才量得到，这一趟补上它。
+    this.toneRects()
+  },
+
+  /** 站长 10-15 03:2x「计算深浅背景区域**仅限文字图片覆盖的区域**的平均值，不需要全屏计算。
+   *   包括三块设置也是只计算下方三行区域的平均值颜色」⇒ 这三枚各按自己那块矩形判一次深浅，
+   *   不再共用"上下两截"那两条整幅宽的带。
+   *  折算很直接：这一屏的形象图那只盒子（`.page-bg`）就是 750rpx × 100vh、铺满视口，
+   *  所以元素在屏上的像素矩形 ÷ 视口宽高＝盒子比例，不用另算偏移、也不用管图片怎么裁。
+   *  ⚠ `.out` 只有展开那一态在屏上，收起态根本不渲染 ⇒ 摸不到就不写那一格（宁可留上一帧的值，
+   *  也不按"整幅一条"猜一个），`open()` 里会再量一次。
+   *  ⚠ 那枚标题图是 `mode="widthFix"`：高度要等图本身回来才定，第一帧常常量到 0。
+   *  所以这一趟**跑两遍**（立刻一次、400ms 后补一次）——第二遍才是给标题用的。
+   *  判据 `验-第一屏三块-真跑` 里钉的是"这三格各自与它那块矩形的实测均值同向"，
+   *  少跑这一趟那一格就是红的。 */
+  toneRects() {
+    const once = () => {
+      const wi = wx.getWindowInfo()
+      // ⚠ 不带 `.in(this)`：那是给**自定义组件**划作用域用的，页面实例递进去这份查询直接回空，
+      //   于是三格 data 一个都没写、屏上就是"三枚全按深底出白字"，而一句错都不报。
+      //   正本抄 `pages/index/index.js` 那句 `.select('.tpl-body').boundingClientRect(...)`。
+      const q = wx.createSelectorQuery()
+      q.select('.page-title').boundingClientRect()
+      q.select('.home-swap').boundingClientRect()
+      q.select('.out').boundingClientRect()
+      q.exec((r) => {
+        const list = r || []
+        const rect = (n) => (n && n.width > 0 && n.height > 0
+          ? {
+            x: [n.left / wi.windowWidth, (n.left + n.width) / wi.windowWidth],
+            y: [n.top / wi.windowHeight, (n.top + n.height) / wi.windowHeight],
+          }
+          : null)
+        const rects = {}
+        const put = (key, n) => {
+          const v = rect(n)
+          if (v) rects[key] = v
+        }
+        put('title', list[0])
+        put('swap', list[1])
+        put('out', list[2])
+        bgTone.applyRects(this, this.data.bgSrc, toneZones(), rects)
+      })
+    }
+    once()
+    setTimeout(once, 400)
   },
 
   // 点条身 = 「照片」那一档（这一屏第一眼就该是那枚快门）。

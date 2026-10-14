@@ -189,8 +189,18 @@ ok('关于页三栏标题与隐私引导语走字典', ['aboutTabIntro', 'aboutT
 // 分享菜单标题兜底也跟着语言走，不是写死「图麦笔记」
 ok('分享落地页标题兜底走字典', /title: share\.title \|\| t\('appName', this\.data\.lang\)/.test(read('pages/share/view.js')))
 
-// 语言切换的入口还在（缺口补齐之前它一度被收起过，#44）
-ok('新建页仍有语言切换段', /class="lang-switch"/.test(read('pages/create/create.wxml')))
+// 语言切换的入口还在（#44 那阵子它一度被收起过）。10-15 01:4x 那一刀把整段 `.lang-switch`
+// 换成右上角那一枚角标 `.lang-corner`，同时给他定了新语义：「只显示其中一个。显示待切换」
+// ⇒ 类名换了不放宽：这里钉**这一枚真在 markup 里、点的是切语言、且它自己显示的就是待切换那一门**
+// （`data-key` 与文案吃同一个三元条件、互为反面）。
+{
+  const one = /<view class="lang-corner"([^>]*)>([^<]*)<\/view>/.exec(read('pages/create/create.wxml').replace(/\s+/g, ' '))
+  ok('新建页仍有语言切换那一枚（右上角标）', !!one, one ? '在' : '摸不到 .lang-corner')
+  ok('那一枚点的就是切语言', !!one && /catchtap="onSwitchLang"/.test(one[1]), one ? one[1].trim().slice(0, 70) : '(没有那一枚)')
+  ok('那一枚只显示待切换那一门（key 与文案同一个条件、互为反面）',
+    !!one && /data-key="{{lang === 'zh' \? 'en' : 'zh'}}"/.test(one[1])
+      && /\{\{lang === 'zh' \? 'EN' : '中'\}\}/.test(one[2]), one ? `文案位＝${one[2].trim()}` : '(没有那一枚)')
+}
 
 // ---------------- 汇总 ----------------
 console.log(`\n中英文缺口：通过 ${n - fails.length} / ${n}`)

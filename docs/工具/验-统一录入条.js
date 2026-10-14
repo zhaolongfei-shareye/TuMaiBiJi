@@ -247,25 +247,64 @@ ok('卡里那一层的块名就是真跑名单那五枚（改名要一起改名�
 ok('换背景只是导流，不弹相册', /goHomeBg\(\)\s*\{\s*wx\.navigateTo/.test(js) && !/goHomeBg[\s\S]{0,200}chooseMedia/.test(js))
 ok('导流目标还是那一页', /navigateTo\(\{ url: '\/pages\/profile\/profile' \}\)/.test(js))
 ok('选图入口全页只有 pickImage 一处', (js.match(/wx\.chooseMedia/g) || []).length === 1)
-// 10-11 12:2x 他那句「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」把后半句作废了：
-// 这一行不再"面板展开那一趟整个不渲染"，两屏都在、同一个落点。闸只留 `bgSrc` 那一半（没铺图它没意义）。
-// 第三、四条原来钉的是"没有任何一条带 `.home-swap` 的规则把它藏起来"＋"没有 `.entry-dock … .home-swap`
-// 这条选择器"。第二条是**写法**的锁，不是**行为**的锁：10-14 站长把这一行改成收起态 fixed 钉在面板上方
-// （`.container:not(.entry-dock) .home-swap`），那条正则撞上 `:not(.entry-dock)` 就假红。
-// ⇒ 换成按行为钉：凡选择器里带 `.home-swap` 的规则块，一律不许出现 display:none／visibility:hidden。
-// 这样"展开态把它藏回来"照样红，而"收起态换个落点"不再被误伤。
+// 这一条改过三次口，来历留在注释里，别再照第一版判：
+// · 10-11 12:2x「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」⇒ 撤掉"展开态不渲染"，
+//   两屏都在；10-14 站长又定"白底那一档也要画这一行"（§8.235），闸只留左边那一截看 `bgSrc`。
+// · 10-15 02:5x「第二屏不支持三个设置，要隐藏」⇒ **又改回展开态不画**。
+//   原来那一条判据钉的是"凡带 `.home-swap` 的规则块一律不许出现 display:none"——那是替他
+//   10-11 那句"两屏都在"守的门；今天门换了方向，尺子跟着翻，不拿代码去迁就旧尺子
+//   （同一形状见 [[feedback-removing-a-state-invalidates-rulers]]）。
+//   现在钉的是**反向**：`.container.entry-dock .home-swap` 那一条必须在、且真的是 display:none。
 const swapBlocks = (wxss.match(/[^{}]*\.home-swap[^{]*\{[^}]*\}/g) || [])
-ok('换背景那一行两态都画（站长 10-14「白底也要换背景，这是核心功能」，§8.235），「调亮度」那一截仍只在铺图时画，展开那一趟照旧渲染',
+const swapDock = /\.container\.entry-dock\s*\.home-swap\s*\{([^}]*)\}/.exec(wxss.replace(/\s+/g, ' '))
+ok('「调亮度／换背景／换心情」那一行只有首屏画（10-14 白底也画这一条没改；10-15 起第二屏整条隐藏）',
   /<view class="home-swap">/.test(wxml)
   && /wx:if="\{\{bgSrc\}\}" class="swap-half" catchtap="onCycleDim"/.test(wxml)
-  && swapBlocks.every((b) => !/display:\s*none|visibility:\s*hidden/.test(b)))
-// 站长 10-14 22:4x「换心情，调亮度，换背景，下移到下半部，面板上方」：收起态整条 fixed 钉在面板顶之上，
-// 展开态那条流内账一个字不动（第二屏框外那一行今天只剩「返回」，两枚同挤一条带会撞）。
+  && !!swapDock && /display:\s*none/.test(swapDock[1]),
+  swapDock ? swapDock[1].trim() : '没找到 `.container.entry-dock .home-swap` 那一条')
+ok('隐藏只准挂在展开态：收起态那一态不许有任何一条规则把这一行藏掉',
+  swapBlocks.filter((b) => !/entry-dock/.test(b)).every((b) => !/display:\s*none|visibility:\s*hidden/.test(b)))
+// 站长 10-14 22:4x「换心情，调亮度，换背景，下移到下半部，面板上方」＋10-15 01:4x
+// 「现在位置不准，离框框太高了，浪费空间」⇒ 这一档的"准"不是抄一个数，是**从面板顶算下来**：
+// 盒底 B、盒高 H、行高 L（字顶对齐 ⇒ 字下沿在盒底之上 H−L），要字下沿离面板顶留 16 的呼吸
+// ⇒ B ＝ 面板顶 ＋ 16 −（H − L）＝ 548 ＋ 16 −（88 − 34）＝ 510。
+// 三个数全部现读：面板顶 548 在 `.stage-panel` 那条里、盒高在 `.home-swap`、行高在 `.swap-text`。
+// 原来这里写死 `bottom:\s*560rpx`——他 10-14 抬了一档、10-15 又追一句"离框太高"，
+// 一个数改两次、尺子红两次，就是抄死的代价。
 const swapFixed = /container:not\(\.entry-dock\)\s*\.home-swap\s*\{([^}]*)\}/.exec(wxss.replace(/\s+/g, ' '))
-ok('收起态那一行改成钉在面板上方（fixed＋bottom 从面板顶算），展开态仍走原来那条流内账',
-  !!swapFixed && /position:\s*fixed/.test(swapFixed[1]) && /bottom:\s*560rpx/.test(swapFixed[1])
-  && /margin:\s*0/.test(swapFixed[1]),
-  swapFixed ? swapFixed[1].trim() : '没找到 `.container:not(.entry-dock) .home-swap` 那条')
+{
+  // `.stage-panel` 的顶写的是 `calc(100vh - 548rpx)`，`lens()` 那把通用解长度器的最后一档要
+  // `^数字rpx$`，撞上右括号就归 null ⇒ 这里单认这一支写法，别拿通用那把去掏 calc。
+  const panelCss = (/\.stage-panel\s*\{([^}]*)\}/.exec(wxss.replace(/\s+/g, ' ')) || [, ''])[1]
+  const panelTop = Number((/top:\s*calc\(100vh\s*-\s*(\d+)rpx\)/.exec(panelCss) || [])[1] || NaN)
+  const boxH = num(seg('.home-swap'), 'height')
+  const lineH = num(seg('.swap-text'), 'line-height')
+  const want = panelTop + 16 - (boxH - lineH)
+  const got = swapFixed ? num(swapFixed[1], 'bottom') : NaN
+  ok('收起态那一行钉在面板上方（fixed＋bottom 从面板顶现算，字下沿离面板顶 16 的呼吸）',
+    !!swapFixed && /position:\s*fixed/.test(swapFixed[1]) && /margin:\s*0/.test(swapFixed[1])
+    && Math.abs(got - want) <= 1 && want > 0,
+    `bottom ${got}，按 ${panelTop}＋16−(${boxH}−${lineH}) 该是 ${want}`)
+  // 左右 14 不是 24：三枚各带 10rpx 的横向内边距（`.swap-half` 那枚热区），
+  // 14＋10 才让**字与图形的可见边**落在这一页那条 24 的列上。
+  // `.swap-half` 那道内缩写的是简写 `padding: 0 10rpx`，`num(..., 'padding-left')` 认不到 ⇒ 现读简写
+  const halfPad = (() => {
+    const m = /padding:\s*([^;]+)/.exec(seg('.swap-half'))
+    if (!m) return NaN
+    const v = m[1].trim().split(/\s+/).map(parseFloat)
+    return v.length === 1 ? v[0] * 2 : v[1] * 2
+  })()
+  ok('那一行的左右落点：fixed 的 left/right 对称，加上一枚自己的内缩＝这一页那条 24 的列',
+    !!swapFixed && num(swapFixed[1], 'left') === num(swapFixed[1], 'right')
+    && 24 - num(swapFixed[1], 'left') === halfPad / 2,
+    `left ${swapFixed ? num(swapFixed[1], 'left') : NaN}／一枚的内缩 ${halfPad}`)
+  // 站长 10-15 02:5x「第一屏三块设置，要在那一行自动均匀分布左中右，自然展开」⇒ 从"靠左堆着"
+  // 改成两头对齐。钉的是**这一条等式**：三枚都不许定宽（定宽就均分不出来），且 justify 是 space-between。
+  ok('三枚靠左中右自动均分（space-between ＋ 三枚都不定宽；写死宽度＝换语言就挤）',
+    /justify-content:\s*space-between/.test(seg('.home-swap'))
+    && !/width:/.test(seg('.swap-half')),
+    `justify ${(/justify-content:\s*([^;]+)/.exec(seg('.home-swap')) || [])[1] || '没写'}／.swap-half 里出现 width 即红`)
+}
 ok('➕ 那一格是唯一"再加一张"的落点', (wxml.match(/catchtap="onAddShot"/g) || []).length === 1)
 // 站长 10-11 真机报的「拍照只支持一张，相册可以」根因就在这两条上：快门那一排的条件是
 // `!previewImages.length`，所以第一张之后**整排消失**，➕ 成了唯一入口；而 ➕ 原来没带 data-source，
@@ -424,14 +463,29 @@ ok('文字那一格右边确实有一枚粘贴，且吃的是链接那一档同�
   /class="field-paste" catchtap="onPasteWrite"/.test(writeBlock) && /paste-glyph glyph-clipboard/.test(writeBlock),
   writeBlock.replace(/\s+/g, ' ').slice(0, 90))
 // 框自己的 padding 只许给上下（横向由壳给那一份 28）——两边各给一次，两档的字就错开 28rpx。
-ok('横向留白只在壳上给一份（框自己再给一次就会比链接格往里缩，两档的字对不齐）',
+// ⚠ 后半句原来钉的是"壳**必须**再给一道 `padding-right`"，10-15 02:1x 撤了：那一道 14rpx 只写在
+//   `.field-write`（文字那一档的壳）上，链接档没有 ⇒ 同一枚剪贴板图标在两档之间横跳 14rpx，
+//   正是站长那句「切换时候跳到…除了输入框内文字不同外，上下左右的占位要保持不变」点着的火。
+//   撤完探针复量两档：`.field` 534/54、里面那枚 53/253、`.field-paste` 306/37、`.sld` 598/57
+//   ——四枚数在两档之间逐字相同（`docs/design/10-15首屏六件/`）。
+//   ⇒ 判据跟着翻成"两档都不许自己加横向内缩"，而不是拿代码去补回那 14 迁就旧尺子。
+ok('横向留白只在壳上给一份，两档不再各加一道（谁再写 padding-left/right 谁红）',
   (() => {
     const p = (seg('.field-area').match(/padding:\s*([^;]+)/) || [, ''])[1].trim().split(/\s+/).map(parseFloat)
     const four = p.length === 4, l = four ? p[3] : (p.length > 1 ? p[1] : p[0])
     const r = four ? p[1] : (p.length > 1 ? p[1] : p[0])
-    return p.length > 0 && l === 0 && r === 0 && /padding-right:\s*\d+rpx/.test(seg('.field-write'))
+    // "这一条规则里有没有横向内缩"：单写 padding-left/right 算，简写的第二档（横向）非 0 也算。
+    const side = (s) => {
+      if (/padding-(left|right)\s*:\s*(?!0\b|0rpx|0px)/.test(s)) return true
+      const m = /padding:\s*([^;]+)/.exec(s)
+      if (!m) return false
+      const v = m[1].trim().split(/\s+/).map(parseFloat)
+      if (v.some(Number.isNaN)) return false
+      return v.length === 4 ? (v[1] !== 0 || v[3] !== 0) : (v.length > 1 ? v[1] !== 0 : v[0] !== 0)
+    }
+    return p.length > 0 && l === 0 && r === 0 && !side(seg('.field-write')) && !side(seg('.field-input'))
   })(),
-  `框 ${seg('.field-area').replace(/\s+/g, ' ')}／壳 ${seg('.field-write').replace(/\s+/g, ' ')}`)
+  `框 ${seg('.field-area').replace(/\s+/g, ' ')}／文字壳 ${seg('.field-write').replace(/\s+/g, ' ') || '(没有这一条)'}`)
 ok('原文框已有内容时贴进来是接在后面，不是顶掉（两档语义各管各的）',
   /const had = this\.data\.writeBody[\s\S]{0,200}\$\{had[\s\S]{0,40}\}\\n\$\{s\}/.test(js),
   '没找到"接在后面"那一支＝可能把人打好的字整段换了')
@@ -665,14 +719,23 @@ ok('两行的主次对调了：Tips 吃 --fs-meta 那一档，且比「调亮度
   `Tips ${tipFs}／那一行 ${swapFs}（令牌 ${TOK['fs-meta']}／${TOK['fs-tiny']}）`)
 ok('「调亮度」「换背景」那两字不加粗（他 10-14 点名撤的，700／bold 回来就红；不写也算过，继承下来就是常规）',
   swapW === '' || /^(normal|400|500)$/.test(swapW), swapW)
-ok('亮度圆随那一行的字号同步（"同步缩小"钉的就是这一条：直径与字档脱钩即红）',
-  num(seg('.dim-dot'), 'width') === swapFs, `圆 ${num(seg('.dim-dot'), 'width')}／字 ${swapFs}`)
-ok('换背景那枚箭头与亮度圆同一档（两半并排不许一个 21 一个 24；⚠ 这一条是他那句"同步缩小"推的，不是他点的）',
-  num(seg('.swap-glyph'), 'width') === num(seg('.dim-dot'), 'width'),
-  `箭头 ${num(seg('.swap-glyph'), 'width')}／圆 ${num(seg('.dim-dot'), 'width')}`)
-ok('圆与箭头仍对回文字那一行（行高钉 34 不随字档走，margin-top 得按各自边长重算）',
-  ['.dim-dot', '.swap-glyph'].every((s) => Math.abs(num(seg(s), 'margin-top') - (34 - num(seg(s), 'width')) / 2) <= 1),
-  `.dim-dot ${num(seg('.dim-dot'), 'margin-top')}／.swap-glyph ${num(seg('.swap-glyph'), 'margin-top')}`)
+/* 10-15 01:4x 站长「调亮度的icon 改为太阳icon，风格与其他一致」⇒ 那枚 `.dim-dot` 整条撤了，
+   三枚图形（太阳／箭头／云朵）从此共用**同一支** `.swap-glyph`。
+   原来这三条钉的是"圆随字档、箭头随圆、两者各自对回行高"——前两条比的是**两枚元素之间**的相等，
+   现在三枚是同一支类，比"两枚相等"变成一句空话（自己等于自己）。
+   ⇒ 改成钉三件事：① 那一支类的边长仍随字档走；② 模板里确实是三枚 `.swap-glyph`、`.dim-dot` 没了；
+   ③ 对回行高那条等式仍按各自边长重算（只剩一支，等式照旧成立才有意义）。
+   ⚠ 改判据不改代码迁就旧尺子：`.dim-dot` 那条规则已经不存在，`num(seg(...))` 回 NaN，
+   留着那两条就是**假红**（摸不到规则不等于画错了，是那一层根本没了）。 */
+const glyphCount = (wxml.match(/class="swap-glyph/g) || []).length
+ok('三枚图形共用一处尺寸，且仍随那一行的字档同步（直径与字档脱钩即红）',
+  num(seg('.swap-glyph'), 'width') === swapFs, `.swap-glyph ${num(seg('.swap-glyph'), 'width')}／字 ${swapFs}`)
+ok('「调亮度」那枚圆点已经撤净、换成三枚同一支的图形（模板里 3 枚 swap-glyph、0 枚 dim-dot）',
+  glyphCount === 3 && !/dim-dot/.test(wxml) && !/\.dim-dot\s*\{/.test(wxss),
+  `swap-glyph ${glyphCount} 枚`)
+ok('图形仍对回文字那一行（行高钉 34 不随字档走，margin-top 得按边长重算）',
+  Math.abs(num(seg('.swap-glyph'), 'margin-top') - (34 - num(seg('.swap-glyph'), 'width')) / 2) <= 1,
+  `.swap-glyph margin-top ${num(seg('.swap-glyph'), 'margin-top')}，边长 ${num(seg('.swap-glyph'), 'width')}`)
 ok('Tips 抬档后那枚小黄点还在第一行正中间（margin-top 随字档重算，别只改字号）',
   Math.abs(num(seg('.tips-dot'), 'margin-top') - (tipFs * 1.4 - 14) / 2) <= 1,
   `margin-top ${num(seg('.tips-dot'), 'margin-top')}，该行高 ${tipFs}×1.4`)

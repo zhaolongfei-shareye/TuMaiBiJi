@@ -256,13 +256,15 @@ const STATES = [
       const gate = expanded ? 0.49 : 0.55
       ck(`${tag}：面板顶在视口 ${(panel.top / win.windowHeight * 100).toFixed(1)}%（门槛 ${Math.round(gate * 100)}%，${expanded ? '展开态·多一行' : '不挡那张脸'}）`,
         panel.top >= win.windowHeight * gate - 2, `${(panel.top / win.windowHeight).toFixed(3)} 屏`)
-      // 10-11 12:2x 他那句「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」把原来那条
-      // "展开时这一行整个不占位"作废了：现在钉的是**展开态照样画，而且顶边与收起态同一个数**。
-      // 判"画没画"按高度判（`display:none` 时节点仍在树里、`boundingClientRect` 回高 0 的那一份，不是 null）。
+      // 10-11 12:2x 他那句「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」曾经把这一行
+      // 钉成"两屏都画、顶边同一个数"。**10-15 02:5x 他追了一句「第二屏不支持三个设置，要隐藏」** ⇒
+      // 那条作废，现在钉的是反面：展开态这一行**不画、也不占位**。
+      // 判"没画"仍按高度判——`display:none` 时节点还在树里、`boundingClientRect` 回的是高 0 那一份，
+      // 不是 null（10-11 就为这个红过一次）；节点真不在树里也算"没画"，只是要把读到的说清楚。
       const swap = (await geo(['.home-swap']))[0]
-      ck(`${tag}：这一行展开态画着（高 ${SWAP_H}rpx 那一档），且顶边与收起态同一格（差 ≤1px）`,
-        !!swap && near(swap.h, rpx(SWAP_H), 2) && near(swap.top, swapTop, 1),
-        swap ? `高 ${(swap.h * 750 / win.windowWidth).toFixed(1)}rpx｜顶 ${swap.top.toFixed(1)} vs ${swapTop && swapTop.toFixed(1)}` : '量不到')
+      ck(`${tag}：这一行展开态**不画**（他 10-15「第二屏不支持三个设置，要隐藏」），也不占位`,
+        !swap || swap.h <= 0.5,
+        swap ? `高 ${(swap.h * 750 / win.windowWidth).toFixed(1)}rpx｜顶 ${swap.top.toFixed(1)}` : '节点不在树里（也算没画）')
     }
     if (L === 'zh') {
       await mp.screenshot({ path: `${OUT}/沉底-zh-六态末.png` })

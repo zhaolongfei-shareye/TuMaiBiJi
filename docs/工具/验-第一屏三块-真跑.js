@@ -118,6 +118,22 @@ async function main() {
     return { top, left, w, h, bottom: top + h, right: left + w }
   }
   const rect = async (sel) => frame(await page.$(sel))
+  /* 首屏那几枚（`.blk-person`／`.blk-plus`／`.blk-alt-hit`）全住在 `wx:if="{{!active}}"` 里面：
+     上一处判据刚把面板升起来，`collapse` 那一下还没落定就 `$()` 会回 null，`.tap()` 当场把整把
+     尺子打断（10-15 01:5x 主树那一趟就断在 §8 那枚 ➕ 上，报的是一句查不出东西的
+     `Cannot read properties of null (reading 'tap')`，前面几十条跟着白跑）。
+     这是**尺子的前提**、不是产品的断言 ⇒ 等到它真在屏上再点；等不到就把 data 快照打出来再抛，
+     别再留一句 null——快照里的 `active/busy/panelOpen` 才能分清"页面没收"和"这一版压根没渲染"。 */
+  const tapBlk = async (sel) => {
+    for (let i = 0; i < 30; i += 1) {
+      const n = await page.$(sel)
+      if (n) { await n.tap(); return }
+      if ((await page.data()).active) await page.callMethod('collapse')
+      await sleep(250)
+    }
+    const d = await page.data()
+    throw new Error(`${sel} 摸不到：等了 7.5 秒（active=${JSON.stringify(d.active)} busy=${d.busy} panelOpen=${d.panelOpen}）`)
+  }
   // 两枚计数**没有各自的类名**（B 方案就是两枚同类的 .blk-cell，靠 catchtap 分 goNotes/goCards），
   // 所以这里不用 `:first-child` 那种伪类——automator 的选择器引擎认不认它没验过，认错了就是"摸不到＝红"。
   // 走 `$$` 拿到的那两个节点，再各自往节点里查（Element.$ 是带作用域的）。
@@ -304,7 +320,7 @@ async function main() {
     aAlt === t4.personSwap, JSON.stringify(aAlt))
 
   /* ---------- 6. 点右后方那枚剪影换人 ---------- */
-  const tapHit = async () => { await (await page.$('.blk-alt-hit')).tap(); await sleep(700) }
+  const tapHit = async () => { await tapBlk('.blk-alt-hit'); await sleep(700) }
   for (let i = 0; i < 2 && (await page.data()).personKey !== 'girl'; i += 1) await tapHit()
   const d6 = await page.data()
   ok('默认那一态：女在前、男在剪影位（两个位各绑一枚，不是一枚 src 翻两面）',
@@ -408,7 +424,7 @@ async function main() {
     page = await mp.currentPage()
   }
   const tTap = Date.now()
-  await (await page.$('.blk-person')).tap()
+  await tapBlk('.blk-person')
   let tapGap = -1
   for (let i = 0; i < 20; i += 1) {
     if ((await page.data()).active) { tapGap = Date.now() - tTap; break }
@@ -425,7 +441,7 @@ async function main() {
      收起/展开换的是中间那块的高度，而**深色面板那层的顶线在两屏之间是同一根**
      （10-13 D16 甲那一版它差 163rpx，站长今天打回的就是这一条）。 */
   const tPlus = Date.now()
-  await (await page.$('.blk-plus')).tap()
+  await tapBlk('.blk-plus')
   let plusGap = -1
   for (let i = 0; i < 20; i += 1) {
     if ((await page.data()).active) { plusGap = Date.now() - tPlus; break }
@@ -657,9 +673,181 @@ async function main() {
   ok('浅壁纸那一态字色不翻（面板恒深，那两条 `.bg-light` 翻转规则确实撤净了）',
     (rgbaOf(lit.numColor) || {}).rgb === '242, 239, 233' && (rgbaOf(lit.tipsColor) || {}).rgb === '242, 239, 233',
     `数字 ${lit.numColor}／Tips ${lit.tipsColor}`)
+  /* ---------- 9b. 10-15 02:5x／03:2x 那两句：按**元素自己那块矩形**判深浅，深色图自动翻纸白 ----------
+     原话①「字体图片要支持遇到深色背景图自动反转色，然后三个设置也要这样自动切换」「然后字体颜色，
+     与图片标题一样，70%黑透明。包括第二屏的back」；原话②「计算深浅背景区域仅限文字图片覆盖的区域的
+     平均值。不需要全屏计算。包括三块设置也是只计算下方三行区域的平均值颜色」。
+     这把尺子钉的是**渲染层那条链断没断**：data 那两枚 flag → 容器上的类名 → 屏上那支颜色／那个滤镜。
+     三段里任何一段没接上（类名忘了挂、覆写规则类数不够、`:not()` 写反），源码读不出来、只有屏上认得出
+     ——与 10-09 抓 `.home-swap` 那一次同一个形状。
+     ⚠ 为什么不"换一张深照片"来测深色那一态：`/assets/` 里没有一张整幅都深的位图（`logo.png` 上深下浅、
+     `share-card.jpg` 整幅浅），拿某一张的去赌两个矩形各自的读数，判据就变成"我对那张图的印象"。
+     所以深色那一态走**强制 flag＝false**（`has-bg` 留着＝样式闸还在），浅那一态走**真测**（inject 包里
+     那张图，让页面自己按矩形算一次）。两态合起来把那条等式钉死：
+     **flag 浅 ⟺ 墨 @70 且不反色；flag 深 ⟺ 纸白 @70 且标题图挂 invert(1)。** */
+  const INK70 = 'rgba(20,22,26,0.7)'
+  const PAPER70 = 'rgba(242,239,233,0.7)'
+  const squash = (v) => String(v).replace(/\s+/g, '')
+  const clsAll = async () => String((await (await page.$('.container')).attribute('class')))
+  const toneState = async () => ({
+    cls: await clsAll(),
+    d: await page.data(),
+    titleFilter: await styleOf('.page-title', 'filter'),
+    titleOpacity: await styleOf('.page-title', 'opacity'),
+    swapColor: await styleOf('.swap-text', 'color'),
+    glyphBg: await styleOf('.swap-glyph', 'background-color'),
+    outColor: await styleOf('.out', 'color'),
+  })
+  /* 那条等式按**每一枚自己**判，一枚一条（分成"浅态一条／深态一条"两支会各报一次条数，
+     而今天这张照片只会落在其中一侧 ⇒ 另一侧永远量不到；上一版就是这么漏的）。
+     浅 ⇒ 墨 @70；深 ⇒ 纸白 @70，标题图那一枚深态挂 `filter: invert(1)`（invert 的矩阵只动 RGB 三行、
+     α 那一行是 [0,0,0,1,0] ⇒ 透明底不会被涂白，这正是它敢用位图当标题的原因）。 */
+  const KEYS = {
+    title: { cls: 'bg-light-title', flag: 'bgLightTitle', label: '标题图那枚' },
+    swap: { cls: 'bg-light-swap', flag: 'bgLightSwap', label: '那一行三枚（调亮度／换背景／换心情）' },
+    out: { cls: 'bg-light-out', flag: 'bgLightOut', label: '第二屏那枚「返回」' },
+  }
+  const eqOne = (tag, t, key) => {
+    const K = KEYS[key]
+    const has = new RegExp(K.cls).test(t.cls)
+    const light = t.d[K.flag] === true
+    if (has !== light) {
+      ok(`${tag}：${K.label}的类名跟着 data（类名没挂上＝样式闸没开，屏上还是老颜色）`, false,
+        `类 ${has}／flag ${light}`)
+      return
+    }
+    if (key === 'title') {
+      ok(`${tag}：${K.label}判成"${light ? '浅' : '深'}" ⇒ ${light ? '不反色（filter none），只留那 70% 透明度' : '自动反色（invert(1)）'}`,
+        light ? (squash(t.titleFilter) === 'none' && squash(t.titleOpacity) === '0.7')
+          : (/invert\(1\)/.test(t.titleFilter) && squash(t.titleOpacity) === '0.7'),
+        `filter ${t.titleFilter}／opacity ${t.titleOpacity}`)
+      return
+    }
+    const want = light ? INK70 : PAPER70
+    const val = key === 'swap' ? t.swapColor : t.outColor
+    const glyph = key === 'swap' ? squash(t.glyphBg) : ''
+    ok(`${tag}：${K.label}判成"${light ? '浅' : '深'}" ⇒ ${light ? '墨 @70（他给的"70% 黑透明"就是这一支）' : '翻纸白 @70'}`
+      + (key === 'swap' ? '，那枚太阳同一个数' : ''),
+      squash(val) === want && (!glyph || glyph === want),
+      `字 ${val}${key === 'swap' ? `／太阳 ${t.glyphBg}` : ''}`)
+  }
+  const eqAll = (tag, t, keys) => keys.forEach((k) => eqOne(tag, t, k))
+  // ① 真测那一发：inject 包里那张 1280×1024 的图，让页面自己按矩形量一次（`toneRects` 是页面上那个方法）。
+  await page.setData({ bgSrc: PROBE_BG })
+  await sleep(2000)
+  await page.callMethod('toneRects')
+  await sleep(3000)   // 第一次测那张图要等离屏 canvas 那趟回来（没网格时 applyRects 只挂 false）
+  const meas = await toneState()
+  /* 独立重算那一发。⚠ 不在 appservice 里 `require` 页面那份实现（试过：报
+     `module '../../miniprogram/utils/imgBrightness.js' is not defined`——evaluate 打进去的那个
+     模块上下文没有这条相对路径，整把尺子当场挂）。所以这里只从 storage 把**原料**取回来
+     （32×32 那张网格＋图自己的宽高），换算在 Node 这一侧另写一遍：
+     与 `验-列表头部-真跑` 那句"判据自己重算一遍＝与实现无关"同一个姿势，
+     两边算出同一个数才算实现走的是矩形。键前缀从实现文件现读，不在这再抄一份。 */
+  const lumSrc = fs.readFileSync(path.join(ROOT, 'miniprogram/utils/imgBrightness.js'), 'utf8')
+  const lumKey = ((lumSrc.match(/const LUM_KEY\s*=\s*'([^']+)'/) || [, 'bgLumV4_'])[1])
+  // 阈值与网格边长也从实现现读：这两枚是那一族的常量，在尺子里再写一遍数字＝两份真相，
+  // 改实现的人不会想起来改这里（§8.178 那一族"两处必须相等"的老坑）。
+  const THRESH = Number((lumSrc.match(/const LIGHT_THRESHOLD\s*=\s*(\d+)/) || [, '160'])[1])
+  const SIDE = Number((lumSrc.match(/const SIDE\s*=\s*(\d+)/) || [, '32'])[1])
+  const raw = await mp.evaluate((k) => {
+    const pg = getCurrentPages().slice(-1)[0]
+    const wi = wx.getWindowInfo()
+    const prof = wx.getStorageSync(k + pg.data.bgSrc) || null
+    const rect = (s) => new Promise((res) => {
+      const q = wx.createSelectorQuery(); q.select(s).boundingClientRect(); q.exec((r) => res(r && r[0]))
+    })
+    return Promise.all([rect('.page-title'), rect('.home-swap')]).then(([a, b]) => ({
+      src: pg.data.bgSrc,
+      win: { w: wi.windowWidth, h: wi.windowHeight },
+      prof: prof && { w: prof.w, h: prof.h, grid: prof.grid || null, rows: prof.rows || null },
+      title: a && { left: a.left, top: a.top, width: a.width, height: a.height },
+      swap: b && { left: b.left, top: b.top, width: b.width, height: b.height },
+      flag: { title: pg.data.bgLightTitle, swap: pg.data.bgLightSwap,
+        out: pg.data.bgLightOut, zone: pg.data.bgLight, low: pg.data.bgLightLow },
+    }))
+  }, lumKey)
+  const vis = (w, h, boxH, anchor) => {
+    const byW = (750 * h) / w
+    if (byW >= boxH) { const y0 = ((byW - boxH) * anchor) / byW; return { x0: 0, x1: 1, y0, y1: y0 + boxH / byW } }
+    const fitW = (boxH * w) / h
+    const x0 = (1 - 750 / fitW) * 0.5
+    return { x0, x1: x0 + 750 / fitW, y0: 0, y1: 1 }
+  }
+  const boxHrpx = Math.round((raw.win.h * 750) / raw.win.w)
+  const gridAvg = (r, v) => {
+    if (!raw.prof || !raw.prof.grid || !r) return null
+    const span = (a, b, f0, f1) => {
+      const c0 = Math.max(0, Math.min(SIDE - 1, Math.floor((a + (b - a) * f0) * SIDE)))
+      const c1 = Math.max(c0 + 1, Math.min(SIDE, Math.ceil((a + (b - a) * f1) * SIDE)))
+      return [c0, c1]
+    }
+    const [c0, c1] = span(v.x0, v.x1, r.x[0], r.x[1])
+    const [r0, r1] = span(v.y0, v.y1, r.y[0], r.y[1])
+    let s = 0, n = 0
+    for (let i = r0; i < r1; i += 1) for (let j = c0; j < c1; j += 1) { s += raw.prof.grid[i][j]; n += 1 }
+    return { avg: Math.round(s / n), n, light: s / n > THRESH }
+  }
+  const asRect = (r) => (r && r.width > 0 ? {
+    x: [r.left / raw.win.w, (r.left + r.width) / raw.win.w],
+    y: [r.top / raw.win.h, (r.top + r.height) / raw.win.h],
+  } : null)
+  const vv = raw.prof ? vis(raw.prof.w, raw.prof.h, boxHrpx, 0.5) : null
+  const calc = { title: gridAvg(asRect(raw.title), vv), swap: gridAvg(asRect(raw.swap), vv),
+    whole: gridAvg({ x: [0, 1], y: [0, 1] }, vv) }
+  console.log('    [独立重算]', JSON.stringify({ src: raw.src, boxHrpx, visible: vv,
+    标题: calc.title, 那一行: calc.swap, 整幅: calc.whole, 屏上flag: raw.flag }))
+  // 真测那一发的渲染层等式：三枚各按自己的 flag 走一支（深浅两态都能量到，不靠今天这张正好是哪一头）。
+  eqAll('真测那一张', meas, ['title', 'swap'])
+  ok('屏上那两枚 flag 就是**按元素矩形**重算出来的那两个数（实现没偷偷退回整幅／整条）',
+    !!calc.title && !!calc.swap && calc.title.light === !!raw.flag.title && calc.swap.light === !!raw.flag.swap,
+    `重算 标题 ${calc.title && calc.title.avg}／那一行 ${calc.swap && calc.swap.avg}`
+    + `（阈值 ${THRESH}）vs 屏上 ${raw.flag.title}／${raw.flag.swap}`)
+  ok('采到的格子确实只有字／图自己那一块（标题那一枚的格数明显小于整幅那一发）',
+    !!calc.title && !!calc.whole && calc.title.n > 0 && calc.title.n < calc.whole.n,
+    `标题 ${calc.title && calc.title.n} 格 vs 整幅 ${calc.whole && calc.whole.n} 格`
+    + `（网格 ${SIDE}×${SIDE}）`)
+  // 这一条是"不需要全屏计算"要的那个**结果**：同一张图上，框内与整幅落到了阈值两侧
+  // （落不到不算红，只在屏上打一行——那是图本身的性质，不是实现的错）。
+  if (calc.title && calc.whole && (calc.title.light !== calc.whole.light
+      || calc.swap.light !== calc.whole.light)) {
+    ok('这张图上"框内"与"整幅"果然分处阈值两侧 ⇒ 旧那口径（整幅平均）会判反，新口径按框内判对了',
+      calc.title.light === !!raw.flag.title,
+      `框内 ${calc.title.avg}／整幅 ${calc.whole.avg}／屏上按框内 = ${raw.flag.title}`)
+  } else {
+    console.log(`  ℹ 这张图上框内与整幅同侧（${calc.title && calc.title.avg} vs ${calc.whole && calc.whole.avg}），`
+      + '“判反”那一发今天量不到——不判红，只报数')
+  }
+  // ② 强制那一发：把两枚 flag 打成 false（深色照片在屏上的那一态），看渲染层跟不跟。
+  await page.setData({ bgLightTitle: false, bgLightSwap: false })
+  await sleep(1400)
+  eqAll('强制深色那一态', await toneState(), ['title', 'swap'])
+  // ③ 第二屏那枚「返回」（他点名的"包括第二屏的back"）：`.out` 挂在 `.entry-wrap` 的
+  //   `wx:if="{{active}}"` 上，而 `active` 是**档名**（'photo'/'url'/'write'），不是布尔——
+  //   第一版这里写 `setData({ panelOpen: true })`，那一枚根本没渲染，量回来的是「(摸不到)」两条假红。
+  //   所以走页面自己那个 `open()`（它顺带就会补调一次 `toneRects`），再补一发防第一帧矩形还没稳。
+  //   第一版这里写 `setData({ panelOpen: true })`，那一枚根本没渲染，量回来的是「(摸不到)」两条假红。
+  //   `.out` 住的整块是 `wx:if="{{active}}"`，而 `active` 是**档名**（'photo'/'url'/'write'）不是布尔
+  //   ⇒ 走页面自己那个 `open('url')`（它顺带就会补调一次 `toneRects`），再补一发防第一帧矩形还没稳。
+  await page.callMethod('open', 'url')
+  await sleep(1800)
+  await page.callMethod('toneRects')
+  await sleep(1800)
+  eqAll('展开态·第二屏「返回」', await toneState(), ['out'])
+  await page.setData({ bgLightOut: false })
+  await sleep(1200)
+  // 强制深色那一态：容器上别的 `bg-light`／`bg-light-low` 是头部与低带那两档自己的，
+  // 这里只盯 `bg-light-out` 这一枚掉没掉、字有没有跟着翻纸白（原来那条把别的档位一起算进来＝会假红）。
+  eqAll('强制深色那一态·「返回」', await toneState(), ['out'])
+  await page.callMethod('collapse')
+  await sleep(1000)
   // 两态量完，把进来时那两个值原样还回去（bgSrc 用 before，不用上面那枚探针值）。
-  await page.setData({ bgSrc: before.bgSrc || '', bgLight: !!before.bgLight })
-  await sleep(800)
+  // ⚠ 9b 那一发还多拧了三枚 flag（强制深色）与一个展开态：还完 bgSrc 之后**让页面自己重算一次**，
+  //   别把"强制"那两枚留到下一把尺子里（留着的后果是下一把量到墨字、报告说"翻色没生效"）。
+  await page.setData({ bgSrc: before.bgSrc || '', bgLight: !!before.bgLight, active: before.active })
+  await sleep(900)
+  await page.callMethod('toneRects')
+  await sleep(1200)
   const nowData = await page.data()
   ok('这一路把页面数据回原样（bgSrc／bgLight 不给下一把尺子留残值）',
     String(nowData.bgSrc || '') === String(before.bgSrc || '') && !!nowData.bgLight === !!before.bgLight,

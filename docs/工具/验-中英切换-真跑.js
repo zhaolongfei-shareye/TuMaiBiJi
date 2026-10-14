@@ -1,5 +1,8 @@
-// 「中／EN」那两枚切换器真点得动吗？——站长 10-13 23:3x 真机原话「切换中英文失效」。
-// 静态尺子能证明那句 catchtap 挂在两枚 view 上、证明 i18n 两档都有词，证不了
+// 「中／EN」那一枚角标真点得动吗？——站长 10-13 23:3x 真机原话「切换中英文失效」。
+// 10-15 01:4x 他把那**两枚**（`.lang-switch` 里两枚 `.lang-seg`，一边一个词）并成**一枚**：
+// 「变成 中和EN切换，只显示其中一个。显示待切换」⇒ 屏上现在是右上角那一枚 `.lang-corner`，
+// 里面写的就是"点下去会换成的那一门"（中文态显示 EN、英文态显示 中），`data-key` 同一个条件。
+// 静态尺子能证明那句 `catchtap` 挂在这枚 view 上、证明 i18n 两档都有词，证不了
 // 「指头落得上去」这一件事；而这一屏恰好有一整层 `position:fixed` 的罩子与深色面板，
 // 落点又只有字那么大（`--fs-meta` 那一档）。所以这一把全部真点，不 setData 假装。
 //
@@ -41,10 +44,11 @@ const num = (css, prop) => {
 // 字面期望值全从 i18n 现读，这把尺子里不抄第二份词表
 const ZH = i18n.t('createHeading', 'zh')
 const EN = i18n.t('createHeading', 'en')
-// ⚠ 10-14 22:4x 站长把大标题拆成两行（`.page-title` 里两枚 `.pt-l`，中文那门第二行是「随手记下来」，
-// 英文那门第二行是空串＝只有一行）。父节点的 `text()` 是把两行**连着**读回来的，
-// 所以"屏上那行大标题"的期望值是**字典里那两行连起来**，不是单支 `createHeading`——
-// 拿单支去比，中文那一趟会读成「看到好内容随手记下来」≠「看到好内容」而红（10-14 23:3x 就是这么红的）。
+// ⚠ 10-14 22:4x 站长把大标题拆成两行（`.page-title` 里两枚 `.pt-l`），10-15 01:4x 又把它整枚换成
+// **一张透明底的图片字**（「中英文不影响，都只显示图片」）⇒ 两门共用同一张图，屏上读不到文字了，
+// 而字典里那两个键仍在渲染里（那一枚的 `aria-label` ＝ 两行连起来，见 `create.wxml:58`）。
+// 所以"大标题跟着换语言"这一条今天只能量到**读屏那一份**：期望值仍是字典那两行连起来（不抄字面量），
+// 拿 `aria-label` 逐字比。图自己两门同一张 ⇒ 另一发判据是「切来切去 `src` 不许变」。
 /* 期望值走**页面同一扇门** `texts(lang)`：它是 `Object.assign({}, zh, dict)`，en 那一档留的空串会真盖成空；
    而 `t(key,lang)` 写的是 `dict[key] || zh[key] || key`——空串是 falsy，会被中文那一句顶回来。
    ⇒ 屏上只有一行（页面走 texts），判据按两行算（走 t）就是尺子自己红，不是屏红（10-14 23:5x 实测到这一条）。 */
@@ -54,19 +58,18 @@ const headLine = (l) => {
 }
 const ZH_SHOWN = headLine('zh')
 const EN_SHOWN = headLine('en')
-// 这一屏自己那两枚的字号／内边距／下划线，用来算"不扩热区时落点有多大"（只为把话说清楚，不判红）
+// 这一屏「调亮度／换背景」那一行给指头的盒子，用来把角标的落点说成一句有参照的话（只为把话说清楚，不判红）
 const FS_META = Number(/--fs-meta:\s*(\d+(?:\.\d+)?)rpx/.exec(appWxss)[1])
-const SEG = seg('.lang-seg')
-const SEG_PAD = num(SEG, 'padding')
-const SEG_BORDER = num(SEG, 'border-bottom') || num(SEG, 'border')
-const LINE_H = /line-height:\s*([\d.]+)(?!rpx)/.exec(SEG)
-const SEG_H_DECL = Math.round((FS_META * (LINE_H ? Number(LINE_H[1]) : 1.4) + (SEG_PAD || 0) + (SEG_BORDER || 0)) * 10) / 10
+const CORNER = seg('.lang-corner')
+const CORNER_FS = num(CORNER, 'font-size')
+const CORNER_LINE = /line-height:\s*([\d.]+)/.exec(CORNER)
+const CORNER_PB = num(CORNER, 'padding-bottom') || 0
+const CORNER_BD = num(CORNER, 'border-bottom') || 0
+const CORNER_H_DECL = Math.round((FS_META * (CORNER_LINE ? Number(CORNER_LINE[1]) : 1.4) + CORNER_PB + CORNER_BD) * 10) / 10
 // 落点下限不自己发明：这一屏「调亮度／换背景」那一行给指头的盒子就是 88（44pt），
 // 站长 10-10 那句「三个Tab很难点，把按键区域扩大」之后全站按这一档收。
 const SW = seg('.home-swap')
 const BOX_MIN = Number(/(?:^|[;\n])\s*height:\s*(\d+)rpx/.exec(SW)[1])
-// 两枚之间那道缝（他要的"两段纯文字＋一条下划线"那一版里就是 20）——落点为什么扩不到 88 要说得出数
-const GAP_TXT = num(seg('.lang-switch'), 'gap')
 if (!Number.isFinite(BOX_MIN) || !Number.isFinite(FS_META)) {
   console.log('✗ 从源码读不出落点下限（.home-swap 那一档盒子）：', BOX_MIN, FS_META)
   process.exit(1)
@@ -160,26 +163,28 @@ const ck = (name, cond, got) => {
 
   const geo = () => mp.evaluate(() => new Promise((resolve) => {
     const q = wx.createSelectorQuery()
-    q.selectAll('.lang-seg').boundingClientRect()
-    q.select('.title-row').boundingClientRect()
+    q.selectAll('.lang-corner').boundingClientRect()
+    q.select('.ai-line').boundingClientRect()
     q.exec((r) => resolve({ segs: r[0] || [], row: r[1] }))
   }))
   const win = await mp.systemInfo()
   const R = win.windowWidth / 750
   const toRpx = (v) => Math.round(v / R * 10) / 10
 
-  // ---------- ① 落点：两枚在不在屏上、多大 ----------
+  // ---------- ① 落点：那一枚在不在屏上、多大 ----------
   const g0 = await geo()
-  ck('首屏那两枚切换器在屏上（中／EN）', g0.segs.length === 2, JSON.stringify(g0.segs.map((s) => toRpx(s.width) + '×' + toRpx(s.height))))
+  ck('首屏那一枚语言角标在屏上，而且**只有一枚**（他要的是"只显示其中一个"，两枚＝旧的 `.lang-seg` 复活）',
+    g0.segs.length === 1, JSON.stringify(g0.segs.map((s) => toRpx(s.width) + '×' + toRpx(s.height))))
   const boxes = g0.segs.map((s) => ({ w: toRpx(s.width), h: toRpx(s.height), top: toRpx(s.top), right: toRpx(s.right) }))
-  const smallest = boxes.reduce((a, b) => (Math.min(b.w, b.h) < Math.min(a.w, a.h) ? b : a), boxes[0] || { w: 0, h: 0 })
-  ck(`两枚的落点都够指头按（每边 ≥${BOX_MIN}rpx，与「调亮度／换背景」那一行的盒子同档）`,
-    boxes.length === 2 && boxes.every((b) => b.h >= BOX_MIN && b.w >= BOX_MIN),
-    `实测最小那枚 ${smallest.w}×${smallest.h}　（CSS 算出来那一档 ≈${SEG_H_DECL}rpx 高）`
-    + `　已知红：横向要到 ${BOX_MIN} 就得把两枚之间那 ${GAP_TXT} 的缝让掉一半以上，那是他拍过的几何 ⇒ 挂成待拍 D21`)
-  ck('两枚都落在标题那一行里、没被别的层盖住（顶线在行内）',
-    !!g0.row && boxes.every((b) => b.top >= toRpx(g0.row.top) - 1 && b.right <= win.windowWidth / R + 1),
-    g0.row ? `行 ${toRpx(g0.row.top)}~${toRpx(g0.row.bottom)}，两枚顶 ${boxes.map((b) => b.top).join('/')}` : '读不到 .title-row')
+  const one = boxes[0] || { w: 0, h: 0 }
+  // 这一条原来是"两枚都 ≥88rpx"，那是 D21 那两条路（扩／不扩）的账。并成一枚之后落点更小，
+  // 但它挂在整行最右、行本身可点（`.ai-line` 那一行）——**不改成"看着绿"的判据，改成如实报数**，
+  // 要不要给这一枚单独垫到 88 仍归 D21 拍（#122），这里不自己拍。
+  console.log(`　落点实测 ${one.w}×${one.h}rpx（对照：「调亮度」那一行的盒子 ${BOX_MIN}rpx；`
+    + `CSS 里这一枚字号 ${CORNER_FS}、算出来那一档 ≈${CORNER_H_DECL}rpx 高）→ 落点要不要单独垫到 ${BOX_MIN}＝待拍 D21`)
+  ck('那一枚落在最上面那一行里、没被别的层盖住（顶线在行内、右缘不出视口）',
+    !!g0.row && one.top >= toRpx(g0.row.top) - 1 && one.right <= win.windowWidth / R + 1,
+    g0.row ? `行 ${toRpx(g0.row.top)}~${toRpx(g0.row.bottom)}，角标顶 ${one.top}、右 ${one.right}` : '读不到 .ai-line')
 
   // ---------- ② 先量"不需要登录"的那半条：本地那一份写入 + onShow 读回 ----------
   // 为什么要有这一节：模拟器这一趟 `wx.login` 直接报 41002（下面 ③ 那三条因此是环境红，
@@ -224,14 +229,22 @@ const ck = (name, cond, got) => {
   await lang.pin(mp, 'zh')
   page = await mp.reLaunch('/pages/create/create')
   await sleep(2500)
-  const segsS = await page.$$('.lang-seg')
-  await segsS[1].tap()
+  const cS = await page.$('.lang-corner')
+  ck('中文态那一枚写的就是待切换的那一门（屏上那两个字是「EN」）',
+    !!cS && String(await cS.text()) === 'EN', cS ? await cS.text() : '(摸不到)')
+  if (!cS) {
+    // 后面每一条都要点它，摸不到就别再往下量（往下量出来的一片红是尺子的，不是产品的）。
+    await stub(false); await lang.pin(mp, langBefore); await mp.close()
+    console.log('\n✗ 那一枚角标不在屏上 ⇒ 后面全是空跑，不装绿')
+    process.exit(1)
+  }
+  await cS.tap()
   await sleep(1200)
   const dS = await page.data()
   const tS = await page.$('.page-title')
-  ck('把那条 PUT 换成成功的桩，真点 EN 之后屏上换成英文',
-    dS.lang === 'en' && (!tS || (await tS.text()) === EN_SHOWN),
-    `lang=${dS.lang}　屏上「${tS ? await tS.text() : ''}」`)
+  ck('把那条 PUT 换成成功的桩，真点那一枚之后屏上换成英文（大标题的读屏话术跟着字典走）',
+    dS.lang === 'en' && String(await tS.attribute('aria-label')) === EN_SHOWN,
+    `lang=${dS.lang}　aria＝「${tS ? await tS.attribute('aria-label') : ''}」　期望「${EN_SHOWN}」`)
   await sleep(3000)
   const dS2 = await page.data()
   const sS = await sess()
@@ -245,8 +258,8 @@ const ck = (name, cond, got) => {
   await lang.pin(mp, 'zh')
   page = await mp.reLaunch('/pages/create/create')
   await sleep(2500)
-  const segs = await page.$$('.lang-seg')
-  ck('automator 拿得到这两枚的句柄', segs.length === 2, String(segs.length))
+  const segs = await page.$$('.lang-corner')
+  ck('automator 拿得到那一枚的句柄', segs.length === 1, String(segs.length))
   const d0 = await page.data()
   ck('起点是中文', d0.lang === 'zh' && d0.t.createHeading === ZH, `${d0.lang}｜${d0.t && d0.t.createHeading}`)
   const before = await probe()
@@ -257,16 +270,17 @@ const ck = (name, cond, got) => {
     const why = ((await probe()).login.slice(-1)[0] || {}).err || '没有登录态'
     console.log(`　!! 模拟器这一趟登录没成（${why}）⇒ 下面三条要真网络，记环境红、不记产品红`)
   }
-  await segs[1].tap()
+  await segs[0].tap()
   await sleep(2500)
   const d1 = await page.data()
   const p1 = await probe()
-  sk('真点右边那枚 EN，这一屏的 lang 真的换成 en（走真的那条 PUT）', d1.lang === 'en',
+  sk('真点那一枚角标，这一屏的 lang 真的换成 en（走真的那条 PUT）', d1.lang === 'en',
     `lang=${d1.lang}　吐司=${JSON.stringify(p1.toasts.slice(before.toasts.length))}　报错=${JSON.stringify(p1.errs.slice(before.errs.length))}　登录=${JSON.stringify(p1.login)}`,
     NO_SESSION ? '这一趟没有 token，那条 PUT 必然 401' : '')
   const t1 = await page.$('.page-title')
-  const shown = t1 ? await t1.text() : ''
-  sk('屏上那行大标题跟着换成英文（词从 i18n 现读）', shown === EN_SHOWN, `屏上「${shown}」，期望「${EN_SHOWN}」`,
+  const shown = t1 ? String(await t1.attribute('aria-label')) : ''
+  sk('大标题那一枚读屏话术跟着换成英文（词从 i18n 现读；图片两门同一张，文字撤了）',
+    shown === EN_SHOWN, `aria＝「${shown}」，期望「${EN_SHOWN}」`,
     NO_SESSION ? '同上' : '')
 
   // ---------- ④ 服务端那一栏真记住了 ----------
@@ -286,20 +300,34 @@ const ck = (name, cond, got) => {
 
   // ---------- ⑤ 往返：仍用那一把成功的桩（量的是"换得回来"，不是网络） ----------
   await stub(true)
-  // ③ 在没有登录态的那一趟里换不动（那是环境红），往返这一条不能从"已经是中文"起步——
-  // 那样点「中」会被 `key === this.data.lang` 直接挡回去，判据绿得没有意义。先真点回英文。
-  const sEn = await page.$$('.lang-seg')
-  await sEn[1].tap()
-  await sleep(2000)
+  // ⚠ 并成一枚之后，"点左边那枚／点右边那枚"这个说法没有了——这一枚是**开关**，点一下就翻到对面。
+  //   第一版照旧写"先点一次摆回英文"，结果 ③ 已经把这屏换成英文了，那一下反而翻回中文，
+  //   下面两条一起红（红的就是这一发的假设，不是屏）。⇒ 起点按 data 里那一枚真值决定，不猜。
+  const flipTo = async (want) => {
+    for (let i = 0; i < 4; i += 1) {
+      if ((await page.data()).lang === want) return true
+      const n = await page.$('.lang-corner')
+      if (!n) return false
+      await n.tap()
+      await sleep(2000)
+    }
+    return (await page.data()).lang === want
+  }
+  const atEn = await flipTo('en')
   const dMid = await page.data()
-  console.log(`　往返起点摆回英文：lang=${dMid.lang}`)
-  const segs2 = await page.$$('.lang-seg')
-  await segs2[0].tap()
-  await sleep(2500)
+  const gEn = await page.$('.lang-corner')
+  console.log(`　往返起点（按屏上真值定的）：lang=${dMid.lang}　那一枚此刻写的是「${gEn ? await gEn.text() : ''}」`)
+  ck('摆到英文这一档才往下量（翻不动就是这一枚点不动，红得有名字）', atEn && dMid.lang === 'en', `lang=${dMid.lang}`)
+  // 「显示待切换」的另一半：英文态那一枚自己就该写「中」（旧的两枚版没有这一发，
+  // 因为两枚都常驻；并成一枚之后这就是它唯一能被量到的语义，不补一条就没人守着）。
+  ck('英文态那一枚跟着翻成「中」（同一枚、两个方向都只写待切换那一门）',
+    !!gEn && String(await gEn.text()) === '中', gEn ? await gEn.text() : '(摸不到)')
+  const atZh = await flipTo('zh')
   const d3 = await page.data()
   const t3 = await page.$('.page-title')
-  ck('真点左边那枚「中」换得回来（往返不留半程）', d3.lang === 'zh' && (!t3 || (await t3.text()) === ZH_SHOWN),
-    `lang=${d3.lang}　屏上「${t3 ? await t3.text() : ''}」`)
+  ck('真点那一枚换得回中文（往返不留半程）',
+    atZh && d3.lang === 'zh' && String(await t3.attribute('aria-label')) === ZH_SHOWN,
+    `lang=${d3.lang}　aria＝「${t3 ? await t3.attribute('aria-label') : ''}」`)
   await stub(false)
   await lang.pin(mp, langBefore)
   await mp.close()

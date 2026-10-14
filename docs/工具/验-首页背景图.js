@@ -114,6 +114,9 @@ ck('两级都空这一档仍然只由这一个口说：账撤掉之后 homeBg() 
 const wxml = read('pages/create/create.wxml')
 const wxss = read('pages/create/create.wxss')
 const cjs = read('pages/create/create.js')
+// 剥掉注释那一份：样式表里那些说明本身就写着 `.bg-light`、`.out`、纸白那串数，
+// 不剥的话"不许出现某支"那几条反面判据会被自己的注释打红。
+const NO_COMMENT = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '')
 ck('新建页铺了 <image> 组件', /class="page-bg"[^>]*src="{{bgSrc}}"/.test(wxml) || /src="{{bgSrc}}"/.test(wxml))
 ck('新建页有压暗罩', wxml.includes('page-scrim'))
 ck('铺图时容器带 has-bg', wxml.includes("{{bgSrc ? 'has-bg' : ''}}"))
@@ -174,9 +177,20 @@ ck('采样确实只用离屏那一个口', /wx\.createOffscreenCanvas/.test(read
 // 那张黑白合影上半是浅墙（208~219）、下半两大块黑衣把全图平均压到 153 < 160，于是判成"深"、
 // 标题留在纸白，压在浅墙上只有 1.62:1。改判"字压着的那一条"之后钉这三条。
 const brightJs = read('utils/imgBrightness.js')
-ck('深浅存的是**逐行剖面**（32 行各一个数），不是一个平均数——上下两截要从同一份剖面各算一次',
-  /rows\.push\(Math\.round\(sum \/ SIDE\)\)/.test(brightJs)
-    && /function zoneLight/.test(brightJs) && !/i < data\.length/.test(brightJs))
+ck('深浅存的是**二维网格**（32×32 各一个数），逐行那一档也留着——上下两截与按元素的矩形都从同一份读',
+  /grid\.push\(line\)/.test(brightJs) && /rows\.push\(Math\.round\(line\.reduce/.test(brightJs)
+    && /function zoneLight/.test(brightJs) && /function rectLight/.test(brightJs)
+    && !/i < data\.length/.test(brightJs))
+// 10-15 03:2x 站长「计算深浅背景区域仅限文字图片覆盖的区域的平均值，不需要全屏计算」⇒ 除了
+// 上下两截，还要能按**元素自己的矩形**判。这两条一起钉：util 里要有那道口，且**页面真的去量**。
+ck('按矩形那一道口在 util 里有，且夹住越界（不夹会 NaN ⇒ 静默一律判成深底白字）',
+  /function applyRects/.test(brightJs) && /module\.exports\s*=\s*\{[^}]*applyRects/.test(brightJs)
+    && /Math\.max\(0,/.test(brightJs) && /Number\.isFinite\(avg\)/.test(brightJs))
+ck('create 页真的去量那三枚的矩形（`.in(this)` 会把页面作用域的查询打成空 ⇒ 三格永远 false）',
+  /toneRects\s*\(\s*\)\s*\{/.test(cjs) && !/createSelectorQuery\(\)\.in\(this\)/.test(cjs)
+    && /bgLightTitle: false/.test(cjs) && /bgLightSwap: false/.test(cjs) && /bgLightOut: false/.test(cjs)
+    && /applyRects\(/.test(cjs),
+  cjs.includes('.in(this)') ? 'create.js 里还有 createSelectorQuery().in(this)' : '三格或那道口没接上')
 ck('两截各判一次：applyTone 一次交回 bgLight 与 bgLightLow（少一枚＝又变回一整页一个数）',
   /bgLight: p === null/.test(brightJs) && /bgLightLow: p === null/.test(brightJs)
     && /zones\.top/.test(brightJs) && /zones\.low/.test(brightJs))
@@ -216,10 +230,14 @@ const onPanelRow = (sel) => sel.split(',').some((s) =>
 ck('压在面板上的那两行字吃心情那一档的墨，不吃会翻极性的 --text-*',
   /\.blk-tips-in\s*\{[^}]*color:\s*var\(--stage-ink-strong\)/.test(wxss)
     && !/\.blk-tips-in\s*\{[^}]*var\(--text-/.test(wxss))
-ck('抬到墨面之上那一行反过来：吃页面级令牌，浅照片那一态才翻得成墨',
-  /(?:^|\n)\.out\s*\{[^}]*color:\s*var\(--text-(secondary|tertiary)\)/.test(wxss)
-  && !/(?:^|\n)\.out\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(wxss),
-  (/(?:^|\n)\.out\s*\{[^}]*\}/.exec(wxss) || ['(没读到 .out)'])[0].replace(/\s+/g, ' ').slice(0, 120))
+// 10-15 02:5x 站长「字体颜色，与图片标题一样，70% 黑透明。包括第二屏的 back」⇒ 这一枚的**基准**
+// 从"跟页面级令牌 `--text-secondary`"改成写死一档墨 @70。原来那两条钉的是"必须吃令牌、不许写死纸白"，
+// 前一半随他这句作废（令牌是 .72 且随壁纸换色，不是他要的那个数），后一半**仍然成立且更重要**：
+// 基准这一档必须是墨，写死纸白就是回到"浅图上一团白字"。
+ck('第二屏那枚「返回」的基准是墨 @70（与标题图同一档），不许是纸白',
+  /(?:^|\n)\.out\s*\{[^}]*color:\s*rgba\(20,\s*22,\s*26,\s*0\.7\)/.test(NO_COMMENT(wxss))
+  && !/(?:^|\n)\.out\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(NO_COMMENT(wxss)),
+  (/(?:^|\n)\.out\s*\{[^}]*\}/.exec(NO_COMMENT(wxss)) || ['(没读到 .out)'])[0].replace(/\s+/g, ' ').slice(0, 160))
 /* 10-14 追一刀（我自己上一版漏的那半）：只"吃令牌"还不够——`.container.has-bg` 与
    `.container.has-bg.bg-light` 那两条翻的是**整页/头部那 0~0.28**，而这一枚的落点在视口
    0.59~0.62（收起态实测行 848~890 / 框 1448），落在 `create.js` `toneZones().low`＝[0.55,0.85] 里。
@@ -227,12 +245,13 @@ ck('抬到墨面之上那一行反过来：吃页面级令牌，浅照片那一�
    站长 10-12 21:1x 原话「请按照上下部分来分别判断」⇒ 它必须跟着**下那一档**翻。
    ⚠ 两条判据都跑在**剥掉注释**的那一份上：样式表里那些注释本身就写着 `.bg-light` 与 `.out`，
    不剥的话反面那条会被自己的注释打红。 */
-const CSS_NC = wxss.replace(/\/\*[\s\S]*?\*\//g, '')
-ck('「返回」那一枚跟着"下那一档"翻：深低带给纸白、浅低带给墨，两条都得在',
-  /\.container\.has-bg:not\(\.bg-light-low\) \.out\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233/.test(CSS_NC)
-  && /\.container\.has-bg\.bg-light-low \.out\s*\{[^}]*color:\s*rgba\(20,\s*22,\s*26/.test(CSS_NC))
-ck('这一枚不许按头部那一档翻（`.bg-light .out` 一条都不许有——判的不是它压着的那一条带）',
-  !/\.bg-light\s+\.out\s*\{/.test(CSS_NC) && !/\.has-bg\.bg-light\s+\.out\s*\{/.test(CSS_NC))
+const CSS_NC = NO_COMMENT(wxss)
+ck('「返回」那一枚跟着**自己那块矩形**翻：深给纸白、浅给墨，两条都得在',
+  /\.container\.has-bg:not\(\.bg-light-out\) \.out\s*\{[^}]*color:\s*rgba\(242,\s*239,\s*233,\s*0\.7\)/.test(CSS_NC)
+  && /\.container\.has-bg\.bg-light-out \.out\s*\{[^}]*color:\s*rgba\(20,\s*22,\s*26,\s*0\.7\)/.test(CSS_NC))
+ck('这一枚不许再按头部那一档、也不许再按"低带那一条整幅宽的带"翻（判的都不是它自己那一块）',
+  !/\.bg-light\s+\.out\s*\{/.test(CSS_NC) && !/\.has-bg\.bg-light\s+\.out\s*\{/.test(CSS_NC)
+    && !/bg-light-low\) \.out\s*\{/.test(CSS_NC) && !/\.bg-light-low \.out\s*\{/.test(CSS_NC))
 ck('没有任何一条规则把压在面板上的字翻成墨（浅壁纸那一态墨字压墨面＝归零）',
   [...wxss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .every((m) => !(onPanelRow(m[1]) && INK_ON_PANEL.test(m[2]))))
@@ -241,15 +260,33 @@ ck('没有任何一条规则把压在面板上的字翻成墨（浅壁纸那一�
 // 罩层只留压暗那一支。判据跟着换成钉反面（撤一个状态会作废一批判据，改判据不改代码迁就旧尺子）。
 ck('罩层只有一支：浅色那一态不再另开提亮覆盖（`.bg-light` 后面不许再挂 `.page-scrim`）',
   !/\.container\.has-bg\.bg-light \.page-scrim\s*\{/.test(wxss))
-// 压在图上那几行小字各有一支写死的纸白（`.swap-text`／`.swap-glyph`／`.home-swap`），
-// 浅态不一起翻就是"字跟浅底一个色"——10-12 实测那一行带里暗字 0.0%。逐条钉住有对应的浅色规则。
-// ⚠ 正则是拼出来的字符串：`\s` 写在模板串里会被吃掉反斜杠（变成字面 s），一律用 \\s。
-const lightRule = (src, host, sel) =>
-  new RegExp(`\\.${host}\\.has-bg\\.bg-light \\.${sel.slice(1)}\\s*\\{`).test(src)
-ck('图上那三行写死纸白的字，浅色那一态逐条有翻墨的对应规则',
-  ['.swap-glyph', '.swap-text', '.home-swap'].every((s) => lightRule(wxss, 'container', s)),
-  ['.swap-glyph', '.swap-text', '.home-swap']
-    .filter((s) => !lightRule(wxss, 'container', s)).join('、'))
+// 压在图上那几行小字**极性整个翻了**（站长 10-15 02:5x「字体颜色，与图片标题一样，70% 黑透明」
+// ＋03:0x「要支持遇到深色背景图自动反转色」）：
+// 原来这一族是"基准纸白 .85 ＋ 浅照片／白底两态各覆一条墨"，现在是"基准墨 @70 ＋ 深照片一态覆纸白"。
+// ⇒ 那两条"浅色那一态逐条有翻墨的对应规则"与"白底那一档有翻墨兜底"都随基准翻向而作废，
+// 换成钉反面：**基准必须是墨**，且**不许再有** `.bg-light .swap-*` / `:not(.has-bg) .swap-*` 那两支
+// （留着就是同一屏两个数：覆写那支 .85、基准这支 .70）。
+// 深色那一态的覆写按**各自那块矩形**判（`.bg-light-swap`），理由与上面 `.out` 那两条同。
+const darkSwapRule = (sel, prop) =>
+  new RegExp(`\\.container\\.has-bg:not\\(\\.bg-light-swap\\) \\.${sel.slice(1)}\\s*\\{[^}]*${prop}:\\s*rgba\\(242,\\s*239,\\s*233,\\s*0\\.7\\)`).test(CSS_NC)
+ck('图上那三枚的基准是墨 @70，深色那一态逐条有翻纸白的对应规则（少一枚＝白字压浅图或墨字压深图）',
+  /\.swap-text\s*\{[^}]*color:\s*rgba\(20,\s*22,\s*26,\s*0\.7\)/.test(CSS_NC)
+    && /\.swap-glyph\s*\{[^}]*background:\s*rgba\(20,\s*22,\s*26,\s*0\.7\)/.test(CSS_NC)
+    && darkSwapRule('.swap-text', 'color') && darkSwapRule('.swap-glyph', 'background')
+    && /\.container\.has-bg:not\(\.bg-light-swap\) \.home-swap,/.test(CSS_NC),
+  ['.swap-text', '.swap-glyph'].filter((s) => !darkSwapRule(s, 'color')).join('、'))
+ck('极性翻过来之后那两支旧覆写必须删净（`.bg-light .swap-*` 与 `:not(.has-bg) .swap-*`，留着就是同屏两个数）',
+  !/\.has-bg\.bg-light \.swap-(text|glyph)\s*\{/.test(CSS_NC)
+    && !/\.has-bg\.bg-light \.home-swap\s*\{/.test(CSS_NC)
+    && !/:not\(\.has-bg\) \.swap-(text|glyph)\s*\{/.test(CSS_NC))
+// 那枚标题图是位图，翻色靠 `filter: invert(1)`（invert 的矩阵只动 RGB 三行、alpha 那一行是
+// [0,0,0,1,0] ⇒ 透明底不会被涂白）。钉三件事：基准 .7 的透明度在、深色那一态挂 invert、
+// 且 invert **只**挂在 `.has-bg:not(.bg-light-title)` 上（没铺图那一态不许出现白字标题）。
+ck('标题图那枚也自动翻色：基准 opacity .7，深色那一态挂 invert(1)，浅态与无图态都不挂',
+  /\.title-row \.page-title\s*\{[^}]*opacity:\s*0\.7/.test(CSS_NC)
+    && /\.container\.has-bg:not\(\.bg-light-title\) \.page-title\s*\{[^}]*filter:\s*invert\(1\)/.test(CSS_NC)
+    && (CSS_NC.match(/filter:\s*invert\(1\)/g) || []).length === 1,
+  `invert 出现 ${(CSS_NC.match(/filter:\s*invert\(1\)/g) || []).length} 次（只许一处）`)
 // 10-14 站长翻案：「白底也要换背景，这是核心功能」。§8.231 之后两级都空＝bgSrc 是空串，
 // 而这一行原来整条挂在 `wx:if="{{bgSrc}}"` 上 ⇒ 新用户第一屏连「换背景」都看不见，
 // 等于把核心功能只留给已经设过图的人。两条一起钉，一条都不能松：
@@ -261,15 +298,15 @@ ck('白底那一档「换背景」那一行还画着（行上不许再挂任何 
 const dimHalfTag = (wxml.match(/<view[^>]*catchtap="onCycleDim"[^>]*>/) || [''])[0]
 ck('「调亮度」那一截仍只在有图时画（无图态那层罩子不渲染，不许留死钮）',
   /wx:if="\{\{bgSrc\}\}"/.test(dimHalfTag), dimHalfTag || '(读不到 onCycleDim 那一枚)')
-// 白底那一档背后是壁纸自己的浅底色，那两支写死的纸白不翻墨就是"字跟底一个色"（10-11 打过回）。
-// 兜底写在 `.container:not(.has-bg)` 上：类数 1+1+1=3，压得住上面那支 1 类的纸白，不是虚挂。
-const flatRule = (sel, prop) =>
-  new RegExp(`\\.container:not\\(\\.has-bg\\) \\.${sel.slice(1)}\\s*\\{[^}]*${prop}:`).test(wxss)
-ck('白底那一档那两样有翻墨兜底（字色与那枚箭头都算，只钉一支会漏箭头）',
-  flatRule('.swap-text', 'color') && flatRule('.swap-glyph', 'background'),
-  ['.swap-text', '.swap-glyph'].filter((s) => !flatRule(s, s === '.swap-text' ? 'color' : 'background')).join('、'))
+// 原来这里还有一条"白底那一档要有 `.container:not(.has-bg) .swap-*` 那两支翻墨兜底"——
+// 10-15 02:5x 基准翻成墨之后它自己就是兜底，那两支反而成了同屏第二个数，已由上面
+// 「旧覆写必须删净」那条钉住不许回来。这里不再重复钉。
 
 const meCss = read('pages/me/me.wxss')
+// 「我的」那一页没跟着这次翻极性（站长这三句点的是首屏那三枚与第二屏的返回），
+// 它仍是"基准纸白 ＋ 浅色那一态逐条覆墨"那一套 ⇒ `lightRule` 留着给这一页用。
+const lightRule = (src, host, sel) =>
+  new RegExp(`\\.${host}\\.has-bg\\.bg-light \\.${sel.slice(1)}\\s*\\{`).test(src)
 ck('「我的」头部那三行（大字与 MIND 数字）浅色态也有对应规则',
   ['.h1', '.score-n', '.score-l'].every((s) => lightRule(meCss, 'head-band', s)),
   ['.h1', '.score-n', '.score-l']

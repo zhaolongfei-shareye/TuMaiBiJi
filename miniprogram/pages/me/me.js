@@ -71,6 +71,9 @@ Page({
     t: texts('zh'),
     // 药丸：默认停在「设置」，「关于」的内容直接长在头部下面，不分二级
     tab: 'set',
+    // 下面那一区自己滚之后，"切档回顶"只能走 scroll-view 的 scroll-into-view（10-15 01:4x 那一刀），
+    // 这一格存的是当前指着哪一枚零高锚点；初值指 A，第一次切档把它换到 B。
+    into: 'meTopA',
     // 头部那一段铺不铺图：'' 表示不铺（形象文件被系统清了）。
     bgSrc: '',
     // 背景图深浅那一档由 bgTone.applyTone 每次进页定（三页共用 utils/imgBrightness.js）。
@@ -220,10 +223,15 @@ Page({
     const key = e.currentTarget.dataset.key
     if (key === this.data.tab) return
     // 切走之前把浮着的那一层收掉：两层内容叠在一起会读成"这一格里还有一格"
-    this.setData({ tab: key })
+    // 站长 10-15 01:4x 这一屏改成"上面固定、只有下面滚"之后，原来那句 `wx.pageScrollTo`
+    // 已经没有作用对象了（页面自己不滚，滚的是里面那枚 scroll-view）⇒ 换成 `scroll-into-view`，
+    // 两枚零高锚点交替指：同一个 id 连设两次不触发，换着指才每次都回顶。
+    this.setData({
+      tab: key,
+      into: this.data.into === 'meTopA' ? 'meTopB' : 'meTopA',
+    })
     this.onClosePwdPanel()
     this.onCloseEmailPanel()
-    wx.pageScrollTo({ scrollTop: 0, duration: 120 })
   },
 
   onNavigate(e) {
