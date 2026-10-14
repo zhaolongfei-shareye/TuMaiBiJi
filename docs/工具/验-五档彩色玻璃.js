@@ -116,6 +116,18 @@ function evaluate(S) {
     const face = (v['--stage-face'].match(/,\s*([\d.]+)\s*\)/g) || []).map((t) => Number(/([\d.]+)\s*\)/.exec(t)[1]))
     ck(`${m.key}：面板那一整面仍是 .16→.94→.95（10-13 两刀收出来的那一档，10-14 并成一条渐变）`,
       JSON.stringify(face) === JSON.stringify([0.16, 0.94, 0.95, 0.95]), face.join('→'))
+    /* 首屏那一行的底必须与面板**同一条坡、反着走**——站长 10-14 23:5x「与下方的面板渐变方向相反。浅在下，深在上」，
+       10-15 00:2x 附真机截图追「渐变的程度，要与下方面板一样，现在根本不是，太暗了…会浅一点，露出的透多一点」。
+       上面那条"五块逐字等于 moodVars()"只比 `app.wxss` 与色板是否一致，**色板里写成什么它都绿**；
+       所以这一条钉的是坡本身：① 端点＝面板那两个 α（.94 与 .16）反序；② 只有首尾两个停点＝一条连续的坡，
+       **不许有实心平台**（上一版把面板底部那 43.8% 的实心地板一起镜像到顶上，屏上就是一整块黑板，就是他打的回）。 */
+    const strip = (v['--stage-strip'].match(/,\s*([\d.]+)\s*\)/g) || []).map((t) => Number(/([\d.]+)\s*\)/.exec(t)[1]))
+    const stripStops = (v['--stage-strip'].match(/[\d.]+(?=%)/g) || []).map(Number)
+    const mono = strip.every((a, i) => i === 0 || a < strip[i - 1])
+    ck(`${m.key}：首屏那一行与面板同一条坡反着走（首档＝面板的 .94、末档＝面板的 .16、α 一路往下＝没有实心平台）`,
+      strip[0] === face[1] && strip[strip.length - 1] === face[0] && mono
+      && stripStops[0] === 0 && stripStops[stripStops.length - 1] === 100,
+      `α ${strip.join('→')}／停点 ${stripStops.join(' ')}（面板 ${face.join('→')}）`)
     const cnt = (v['--blk-count-bg'].match(/,\s*([\d.]+)\s*\)/g) || []).map((t) => Number(/([\d.]+)\s*\)/.exec(t)[1]))
     ck(`${m.key}：左下那一格仍是那七个停点的 α（10-13「黑底的半透明渐变效果不好」那一版）`,
       JSON.stringify(cnt) === JSON.stringify([0.45, 0.45, 0.38, 0.35, 0.50, 0.68, 0.92]), cnt.join('/'))
@@ -128,6 +140,35 @@ function evaluate(S) {
     ck(`${m.key}：面板上的字压得住这一档的玻璃（强档与实心档都 ≥4.5）`, cr >= 4.5 && crSolid >= 4.5,
       `${cr.toFixed(2)}／${crSolid.toFixed(2)} 底 ${face}`)
   })
+
+  /* ---------- ②′ 首屏那一行的皮：五条写在 create.wxss 里的硬约束（真跑那把读不动的这几枚） ----------
+     站长 10-14 22:4x→10-15 00:2x 四句都落在这枚 `.ai-line` 上。真跑那把（`验-第一屏三块-真跑`）
+     量的是"渲染层读不读得回来"，而 `white-space` 这一档 devtools 实测**永远回 null**（量法本身撑不住），
+     所以这一枚的几何与折行改由这把逐字钉。 */
+  const AILINE = blockOf(S.createWxss, '.ai-line')
+  ck('首屏那一行：不许折行（white-space:nowrap 在 `.ai-line .ai-text` 那一条里）',
+    /\.ai-text\s*\{[^}]*white-space:\s*nowrap/.test(S.createWxss))
+  ck('首屏那一行：顶上去（`margin` 的第一档＝上外边距是 0，也不许另写 `margin-top`）',
+    /margin:\s*0(\s|;)/.test(AILINE) && !/margin-top\s*:/.test(AILINE),
+    (/margin:[^;]*/.exec(AILINE) || ['(没写 margin)'])[0])
+  ck('首屏那一行：通栏靠负掉容器那一口内缩（`calc(0px - var(--sp-3))` 在，不是写死的 -24rpx）',
+    /margin:[^;]*calc\(0px\s*-\s*var\(--sp-3\)\)/.test(AILINE))
+  ck('首屏那一行：上沿方角、下沿圆角，半径与面板那枚同一个 40rpx',
+    /border-radius:\s*0 0 40rpx 40rpx/.test(AILINE))
+  ck('首屏那一行：阴影吃 `var(--sh-drop)`（不抄字面量，全站一份值那条规矩）',
+    /box-shadow:\s*var\(--sh-drop\)/.test(AILINE))
+  ck('首屏那一行：滤镜两条成对（iOS 的 WKWebView 只认 -webkit- 那一行）',
+    /backdrop-filter:\s*blur\(30px\)\s*saturate\(1\.15\)/.test(AILINE)
+    && /-webkit-backdrop-filter:\s*blur\(30px\)\s*saturate\(1\.15\)/.test(AILINE))
+  const pad = (/padding:\s*([\d.]+)rpx\s+var\(--sp-3\)\s+([\d.]+)rpx/.exec(AILINE) || []).slice(1).map(Number)
+  const bandH = (pad[0] || 0) + 24 * 1.35 + (pad[1] || 0)
+  ck('首屏那一行只有一行字那么高（整枚 ≤96rpx——00:3x「高度压缩，看到一行文字就行了，不要浪费空间」；⚠ 阈值 96 是我按"一行字＋一段淡出"定的，他没给数）',
+    pad.length === 2 && bandH <= 96, `上 ${pad[0]}＋字 32.4＋下 ${pad[1]} ＝ ${bandH.toFixed(1)}rpx`)
+  ck('`--sh-drop` 只在 `page` 那一族定义一处，且就是 `--sh-lift` 的镜像（只有纵向偏移取反）',
+    (S.app.match(/--sh-drop:/g) || []).length === 1
+    && /--sh-lift:\s*0 -12rpx 28rpx rgba\(18, 20, 26, 0\.16\)/.test(S.app)
+    && /--sh-drop:\s*0 12rpx 28rpx rgba\(18, 20, 26, 0\.16\)/.test(S.app),
+    `--sh-drop 出现 ${(S.app.match(/--sh-drop:/g) || []).length} 次`)
 
   /* ---------- ③ 零回归：墨档 == 今天 ---------- */
   const PAGE = blockOf(S.app, 'page')
@@ -264,6 +305,14 @@ const KNIVES = [
     (s) => s.replace(/(\.mood-mist \{[^}]*?--stage-face: linear-gradient\(180deg, rgba\([^)]*, )0\.16/, '$10.20')],
   ['★把闭合那一档的停点从 43.8% 写成 50%（带高不再是 240rpx，中间那道收口跟着往下漂）', 'palette',
     (s) => s.replace('stageFace(43.8)', 'stageFace(50)')],
+  ['★首屏那一行的底写成与面板同向（他那句「浅在下，深在上」整个反了：字压在最淡那一档上）', 'palette',
+    (s) => s.replace('${rgba(g, 0.94)} 0%, ${rgba(g, 0.80)} 55%, ${rgba(g, 0.16)} 100%',
+      '${rgba(g, 0.16)} 0%, ${rgba(g, 0.80)} 55%, ${rgba(g, 0.94)} 100%')],
+  ['★把实心平台加回来（.95 平铺到 56.2% 再掉到 .16＝面板底部那块地板镜像到顶上，就是他 00:2x 打回的那块黑板）', 'palette',
+    (s) => s.replace('${rgba(g, 0.94)} 0%, ${rgba(g, 0.80)} 55%, ${rgba(g, 0.16)} 100%',
+      '${rgba(g, 0.95)} 0%, ${rgba(g, 0.95)} 56.2%, ${rgba(g, 0.94)} 56.2%, ${rgba(g, 0.16)} 100%')],
+  ['★顶档从 .94 抬到 .99（"再深一点更清楚"——首档就不再是面板那个数了，五档一起比面板实）', 'palette',
+    (s) => s.replace('${rgba(g, 0.94)} 0%, ${rgba(g, 0.80)} 55%', '${rgba(g, 0.99)} 0%, ${rgba(g, 0.80)} 55%')],
   ['★色板里把樱落那档的玻璃色换成一支"更好看"的（参考图那三个数被换掉）', 'palette',
     (s) => s.replace("glass: '#B5A8BF', band: '#9E95B0'", "glass: '#C0A8C8', band: '#9E95B0'")],
   ['★色板里把墨档的 band 写成面板那支 #23252C（左下那一格与今天差一档）', 'palette',
@@ -304,6 +353,18 @@ const KNIVES = [
     (s) => s.replace('api.updateWallpaper(after)', 'Promise.resolve()')],
   ['★i18n 只补中文那一份（英文态那枚按钮是空白）', 'i18n',
     (s) => s.replace("    moodSwap: 'Mood',\n", '')],
+  ['★首屏那一行撤掉 `white-space:nowrap`（英文那一句被撑成两行，他 23:0x 那句"不希望回行"白落）', 'createWxss',
+    (s) => s.replace('  line-height: 1.35;\n  white-space: nowrap;', '  line-height: 1.35;')],
+  ['★首屏那一行的圆角长回上沿（他那句「左上右不需要留空间」当场反了）', 'createWxss',
+    (s) => s.replace('  border-radius: 0 0 40rpx 40rpx;', '  border-radius: 40rpx 40rpx 0 0;')],
+  ['★首屏那一行的阴影换回 `--sh-lift`（偏移朝上＝读成这块板浮在导航条上，不是"与背景之间带阴影"）', 'createWxss',
+    (s) => s.replace('  box-shadow: var(--sh-drop);', '  box-shadow: var(--sh-lift);')],
+  ['★那口 48rpx 的上外边距长回来（00:2x 那句「不要有空间，要顶上去」白说）', 'createWxss',
+    (s) => s.replace('  margin: 0 calc(0px - var(--sp-3)) 0;', '  margin: var(--sp-5) calc(0px - var(--sp-3)) 0;')],
+  ['★`--sh-drop` 的偏移没取反（与 `--sh-lift` 一模一样＝"镜像"那一枚是枚假令牌）', 'app',
+    (s) => s.replace('--sh-drop: 0 12rpx 28rpx', '--sh-drop: 0 -12rpx 28rpx')],
+  ['★那一枚的下内边距抬回 150rpx（00:2x 那一版：坡走得完，可屏上就是一条 200rpx 的大灰带＝他 00:3x 打的"浪费空间"）', 'createWxss',
+    (s) => s.replace('  padding: 14rpx var(--sp-3) 34rpx;', '  padding: 18rpx var(--sp-3) 150rpx;')],
   ['★底栏只写标准那行滤镜（iPhone 上胶囊不糊，安卓糊＝两机两样）', 'tabWxss',
     (s) => s.replace('  -webkit-backdrop-filter: var(--chrome-blur);\n', '')],
 ]

@@ -26,8 +26,20 @@
        这一条他没拍过，我按「只是多一层」的字面落的；要只在铺图时才有，说一声，闸挂在 `.has-bg` 上就行。 -->
   <view class="stage-panel"></view>
 
+  <!-- 首屏最上面那一行（站长 10-14 22:4x 原话「在看到…上方加一行。用 AI 帮你读懂一切：拍照 | 读图 |
+       翻译 | 提炼 | 分享」＋「底部加一层同色毛玻璃」）。底色吃 `--stage-strip`＝与面板同一支玻璃
+       （`moodVars()` 出、`app.wxss` 五块镜像，换心情一起跟）；字色吃 `--stage-ink-strong`＝与面板上
+       其余那几行同一个来源：浅面配深字、深面配白字。这两枚必须同档，否则就是 §8.240 量出来的那一档
+       （纸白压浅玻璃 2.35～2.79:1，读不动）。 -->
+  <view class="ai-line">
+    <view class="ai-dot" style="{{tipDotStyle}}"></view>
+    <text class="ai-text">{{t.aiLine}}</text>
+  </view>
+
   <view class="title-row">
-    <view class="page-title">{{t.createHeading}}</view>
+    <!-- 大标题拆两行、逗号去掉（他原话「"看到好内容"回行"随手记下来"」）；英文那一档第二行为空串，
+         于是只有一行——他 23:0x 追的「英文能否精简一点，不希望回行」。空串走 wx:if，不留一行空白。 -->
+    <view class="page-title"><view class="pt-l">{{t.createHeading}}</view><view class="pt-l" wx:if="{{t.createHeading2}}">{{t.createHeading2}}</view></view>
     <!-- 语言切换放在第一眼这一行：需要它的人正是刚进来、还没摸到「我的」页的人。
          只切界面文案，不动账号也不重新登录；服务端那一栏由 PUT /api/user/language 记着，
          换设备登录还是他选的那一门。整页是"收起"点击区，所以这两段用 catchtap 不吃进 collapse。 -->

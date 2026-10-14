@@ -1,8 +1,13 @@
 const i18n = {
   zh: {
     tabNotes: '笔记',
+    // 首屏最上面那一行（站长 10-14 22:4x 逐字给的）。分隔符与空格照他写的样子，不自己改成「·」
+    aiLine: '用 AI 帮你读懂一切：拍照 | 读图 | 翻译 | 提炼 | 分享',
+    // 大标题拆两行、逗号去掉（他原话「"看到好内容"回行"随手记下来"」）。第二行为空＝只有一行，
+    // 英文态就是这一档：他 10-14 23:0x 追「英文能否精简一点，不希望回行」，所以 en 只留一句。
+    createHeading: '看到好内容',
+    createHeading2: '随手记下来',
     tabCreate: '新建',
-    createHeading: '看到好内容，随手记下来',
     tabMe: '我的',
     appName: '图麦笔记',
     navDetail: '笔记详情',
@@ -405,7 +410,11 @@ const i18n = {
   en: {
     tabNotes: 'Notes',
     tabCreate: 'Create',
+    // 与中文那一档同键（缺一份＝英文态那行是空白，`验-五档彩色玻璃` 有一条专门钉中英两份都在）。
+    // 一句放得下，故 createHeading2 留空＝英文不回行（站长 10-14 23:0x「英文能否精简一点，不希望回行」）。
+    aiLine: 'AI reads it all: Shoot | Scan | Translate | Distill | Share',
     createHeading: 'Save what matters',
+    createHeading2: '',
     tabMe: 'Me',
     appName: 'TumarkNote',
     navDetail: 'Note detail',

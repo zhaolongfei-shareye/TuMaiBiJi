@@ -362,9 +362,16 @@ async function main() {
   ok('那一屏确实站在 cards 那一枚（标记递到了）', (await cur.data()).view === 'cards', `view=${(await cur.data()).view}`)
   await go('/pages/create/create')
   await go('/pages/index/index')
+  // 10-14 23:1x 这一条读过一次 `view=undefined`：`view` 是 index.js 的 data 字面量里就有的键，
+  // 首页不可能读不到，只有**读错了屏**才为空（切 tab 那 3.5 秒还没落定）。所以这里等到真的
+  // 站在 index 上再读，最多再等 8 秒；断言本身一个字没松，只是不再拿上一屏的空对象当结论。
   cur = await mp.currentPage()
+  for (let t = 0; t < 8 && !/pages\/index\/index/.test(cur.path || ''); t++) {
+    await sleep(1000)
+    cur = await mp.currentPage()
+  }
   ok('再普通进入一次回到默认那一枚（标记读一次就清了，没常驻）',
-    (await cur.data()).view === 'list', `view=${(await cur.data()).view}`)
+    (await cur.data()).view === 'list', `view=${(await cur.data()).view}｜屏是 ${cur.path}`)
 
   await go('/pages/create/create')
   page = await mp.currentPage()
@@ -461,7 +468,49 @@ async function main() {
      10-11 那一版的皮挂在 `.container.has-bg` 上（不铺图就没有玻璃），B 方案把皮写成**基础规则**：
      深色面板是这一屏的底板，铺不铺形象图都在。所以这里量的不是"有没有覆盖"，而是**两态都挂**。
      另一半是极性的坑：这一屏的字全压在恒深的面上，吃 `--text-*` 那一族的话，壁纸派生的
-     `.bg-light` 一翻就把墨字放到墨面上（直接归零）。恒纸白才是对的。 */
+     `.bg-light` 一翻就把墨字放到墨面上（直接归零）。恒纸白才是对的。
+     ⚠ 10-14「换心情」之后，心情存本机（`glassMood`）、壁纸那一格权威在服务端（本机 `wallpaperCache`
+     只是没有会话时的兜底缓存），而这一族判据钉的是**墨档**那一层（"基色 18,20,26""三样字全纸白"）。
+     10-14 23:1x 那一趟六条全红、读数全是 (121,156,129)／(29,53,34)——上一把尺子把这台机器留在天青档，
+     而"以壁纸为准"那条对账会连心情一起带过去。红的是前提不是屏，所以这里把前提钉死：
+     进来先钉回默认（墨＋米白，钉法见下面那段），量完原样还回去。另外四档由
+     `验-五档彩色玻璃-真跑` 钉，两把不重叠。 */
+  // ⚠ 钉前提要钉**两头顶**：`getWallpaper()` 先读 `globalData.userInfo.wallpaper`（登录回包里那份，
+  // 权威在服务端），本机缓存只是没有会话时的兜底。10-14 23:3x 第一版只摘了两个键，容器仍读回
+  // `theme-tint-celadon mood-celadon`（这台账号服务端存的就是天青）——所以这里走 app 自己那两个 setter。
+  // 只写本机，不发 PUT，服务端那一列一个字节不动。
+  const pref = await mp.evaluate(() => ({ mood: wx.getStorageSync('glassMood'), wp: getApp().getWallpaper() }))
+  const pinInk = () => mp.evaluate(() => {
+    wx.removeStorageSync('glassMood')
+    getApp().setWallpaper('tint-paper')
+    getApp().applyTheme('tint-paper')
+  })
+  // ⚠ 钉**一次**不算数：登录那一趟回来会把服务端那份壁纸再 apply 一遍，把先钉的那顶顶回去
+  //（10-14 23:5x 实测：同一趟 `验-五档彩色玻璃` 27 条红，全是这个竞态；10-15 00:4x 这一把也中了一次，
+  // 容器读回 `mood-celadon` ⇒ 后面六条红的全是"墨档"那几条前提）。所以钉→看屏→没钉住就再钉。
+  // **判据本身一个字没改**，改的是"钉前提"这个前置动作。
+  // ⚠ 钉完之后必须**重进这一屏**才算钉上：`themeClass` 是页面自己的 data，只有 `onShow` 那句
+  // `app.applyTheme()` 会把它重新算一遍；而 `go()` 走的是 `switchTab`，此刻正停在 create 这一枚 tab 上
+  // ⇒ 切到自己＝空操作，onShow 根本不发（10-15 00:4x 实测：连钉四次、storage 已摘干净，容器仍读回
+  // `mood-ivory`——那是上一把尺子留在屏上的那一层 data，不是本机偏好的真值）。这里改走 reLaunch。
+  let cl = '(还没钉)', st = '(没读)', live = '(没读)'
+  for (let i = 0; i < 4; i++) {
+    await pinInk()
+    await mp.reLaunch('/pages/create/create')
+    await sleep(4500)
+    page = await mp.currentPage()
+    const node = await page.$('.container')
+    cl = node ? String(await node.attribute('class')) : '(摸不到)'
+    if (/mood-ink/.test(cl) && /theme-tint-paper/.test(cl)) break
+    // 没钉住时把三个头一起报出来：本机那一格、app 现算的那一档、屏上那一串——
+    // 三者对得上是竞态，对不上才是产品的事。
+    st = String(await mp.evaluate(() => wx.getStorageSync('glassMood')))
+    live = String(await mp.evaluate(() => getApp().glassMood().key))
+    await sleep(4000)
+  }
+  ok('量墨档之前已把两头顶钉回默认（容器上是 mood-ink ＋ theme-tint-paper）',
+    /mood-ink/.test(cl) && /theme-tint-paper/.test(cl),
+    `${cl}／本机 glassMood=「${st}」／app 现算=「${live}」`)
   const before = await page.data()
   const readSkins = async (tag) => ({
     tag,
@@ -475,6 +524,31 @@ async function main() {
     numColor: await styleOf('.blk-num', 'color'),
     labColor: await styleOf('.blk-lab', 'color'),
     tipsColor: await styleOf('.blk-tips-in', 'color'),
+    // 10-14 22:4x 新加的首屏那一行：层序这件事读 `color` 读不出来，只能读渲染层给的那两枚
+    // （铺图那一态必须被抬层名单抬起来，否则整条压在罩层与照片底下＝看不见而判据全绿）。
+    aiPos: await styleOf('.ai-line', 'position'),
+    aiZ: await styleOf('.ai-line', 'z-index'),
+    // ⚠ 这一枚原来读的是 `.ai-line .ai-text` 的 `white-space`，实测**永远回 null**（节点摸得到、
+    //    这一档属性 devtools 不给），于是两态各红一条——红的是量法，不是屏。改成：读同一枚节点的
+    //    `font-size`（这条读得回来，能证明类名没点空）＋ 全页 `.ai-text` 只有一枚（证明读到的就是那一行）；
+    //    `white-space:nowrap` 本身挪到静态那把逐字钉（`验-五档彩色玻璃.js` 的"这一行的皮五条"）。
+    aiTextFs: await styleOf('.ai-text', 'font-size'),
+    aiTextN: (await page.$$('.ai-text')).length,
+    // 10-14 23:5x＋00:0x 站长追的两句：「与下方的面板渐变方向相反。浅在下，深在上」「左上右不需要留空间，
+    // 要通栏。左下和右下有圆弧，然后与背景之间带阴影。要与下方面板渐变毛玻璃风格一致」；
+    // 00:2x 第三句「不要有空间，要顶上去…渐变的程度要与下方面板一样…太暗了…露出的透多一点」。
+    // ⇒ 五条全部**对着面板那一枚现读现比**，判据里不写死 px／rpx（模拟器按屏宽折半换算，§9.22 那条自坑）。
+    aiMt: await styleOf('.ai-line', 'margin-top'),
+    aiH: await styleOf('.ai-line', 'height'),
+    aiMl: await styleOf('.ai-line', 'margin-left'),
+    boxPl: await styleOf('.container', 'padding-left'),
+    aiRt: await styleOf('.ai-line', 'border-top-left-radius'),
+    aiRb: await styleOf('.ai-line', 'border-bottom-left-radius'),
+    pnlRt: await styleOf('.stage-panel', 'border-top-left-radius'),
+    aiShadow: await styleOf('.ai-line', 'box-shadow'),
+    pnlShadow: await styleOf('.stage-panel', 'box-shadow'),
+    aiBf: String((await styleOf('.ai-line', 'backdrop-filter')) || (await styleOf('.ai-line', '-webkit-backdrop-filter')) || 'none'),
+    aiBg: await styleOf('.ai-line', 'background-image'),
   })
   // 铺图那一态要的是"背后真有一张照片"，所以这里给一张**探针用的图**，不给 before.bgSrc：
   // 进来时若本来就不铺（before.bgSrc 为空），拿 before 去铺就变成"两态都没图"，
@@ -508,6 +582,54 @@ async function main() {
     ok(`${s.tag}那一态：数字/名字/Tips 三样字全是纸白族（恒深面上不许随壁纸翻成墨）`,
       !!n && n.rgb === '242, 239, 233' && !!l && l.rgb === '242, 239, 233' && !!tp && tp.rgb === '242, 239, 233',
       `数字 ${s.numColor}／名 ${s.labColor}／Tips ${s.tipsColor}`)
+    // 10-14 22:4x 那一趟新加的首屏那一行（`.ai-line`）。**层序读 color 读不出来**：它第一次落码时
+    // 没进 `.container.has-bg` 那份抬层名单，铺图那一态整条压在罩层与照片底下，屏上看不见，
+    // 而计算样式那几条照样绿——与 10-09 站长抓 `.home-swap` 那一次同一个形状（§8.178）。
+    ok(`${s.tag}那一态：那一行的字节点真在渲染层里，且全页只有这一枚（font-size 读得回来＝类名没点空）`,
+      s.aiTextN === 1 && /px$/.test(String(s.aiTextFs)), `枚数 ${s.aiTextN}／font-size ${s.aiTextFs}`)
+    if (s.tag === '铺图') ok('铺图那一态：那一行被抬层名单抬起来了（position:relative ＋ z-index:2），不是压在照片底下',
+      /relative/.test(s.aiPos) && /^2/.test(String(s.aiZ).trim()), `position=${s.aiPos}／z-index=${s.aiZ}`)
+    // 顶上去（00:2x「不要有空间，要顶上去」）：这一枚自己的上外边距必须是 0。
+    // 容器那口 2rpx 是堵外边距穿透的（app.wxss `.container`），不是间距，不归这一条管。
+    const num = (v) => Number(String(v).replace(/[^0-9.\-]/g, '')) || 0
+    ok(`${s.tag}那一态：那一行顶到最上面（自己的 margin-top 是 0，没有那口 48 的呼吸）`,
+      num(s.aiMt) === 0, `margin-top=${s.aiMt}`)
+    // 通栏：容器自己 `padding: 2rpx var(--sp-3) 0`，只把这一枚的 margin 写成 0 仍是内缩 24rpx。
+    // 判据＝"负掉的量正好等于容器的内缩"，两头都现读，屏宽换算不进来。
+    const ml = num(s.aiMl)
+    const pl = num(s.boxPl)
+    ok(`${s.tag}那一态：那一行真通栏（左外边距负掉容器那一口内缩，两边都贴到屏沿）`,
+      pl > 0 && Math.abs(ml + pl) < 0.6, `margin-left=${s.aiMl}／容器 padding-left=${s.boxPl}`)
+    ok(`${s.tag}那一态：上沿方角、下沿圆角，且那一枚半径与面板顶角同一个数（上下颠倒，不是另挑一档）`,
+      num(s.aiRt) === 0 && num(s.aiRb) > 0 && Math.abs(num(s.aiRb) - num(s.pnlRt)) < 0.6,
+      `上 ${s.aiRt}／下 ${s.aiRb}／面板顶 ${s.pnlRt}`)
+    // 阴影：与面板那枚"同一支色、同一档模糊、偏移方向相反"（面板的边在上、这一行的边在下）。
+    // ⚠ 计算样式回的是一串**带单位**的数（`rgba(…) 0px 6px 14px 0px`，末档是 spread）——
+    //    直接 `Number("6px")` 得到 NaN，四条比较全是 false，看着像"阴影没画"其实是量法坏了。先剥 px。
+    const sh = (v) => (String(v).match(/-?[\d.]+px/g) || []).map((x) => Number(x.replace('px', '')))
+    const col = (v) => (String(v).match(/rgba?\([^)]*\)/) || [''])[0].replace(/\s+/g, '')
+    const sa = sh(s.aiShadow), sp = sh(s.pnlShadow)
+    ok(`${s.tag}那一态：与背景之间那枚阴影是面板那枚的镜像（色与模糊逐字相同、纵向偏移反号）`,
+      sa.length >= 3 && sp.length >= 3 && col(s.aiShadow) === col(s.pnlShadow)
+      && Math.abs(sa[0] - sp[0]) < 0.6 && Math.abs(sa[2] - sp[2]) < 0.6
+      && sa[1] > 0 && sp[1] < 0 && Math.abs(sa[1] + sp[1]) < 0.6,
+      `这一行 ${s.aiShadow}／面板 ${s.pnlShadow}`)
+    ok(`${s.tag}那一态：这一行与面板吃同一档滤镜（「渐变毛玻璃风格一致」——只染色不糊＝不是毛玻璃）`,
+      s.aiBf.replace(/\s+/g, '') === s.panelBf.replace(/\s+/g, ''), `这一行 ${s.aiBf}／面板 ${s.panelBf}`)
+    // 00:2x「渐变的程度要与下方面板一样…太暗了」＋00:3x「高度压缩，看到一行文字就行了，不要浪费空间」
+    // ⇒ 首档＝面板的 .94、末档＝面板的 .16、α 一路往下（不许有实心平台）；中间允许有过渡档（现是 .80@55%）。
+    const seq = (String(s.aiBg).match(/rgba\([^)]*,\s*([\d.]+)\)/g) || [])
+      .map((x) => Number(/,\s*([\d.]+)\)$/.exec(x)[1]))
+    const mono = seq.length > 1 && seq.every((a, i) => i === 0 || a < seq[i - 1])
+    ok(`${s.tag}那一态：那一行的底是面板那条坡反着走（首 .94、末 .16、一路往下没有实心平台）`,
+      /^linear-gradient/.test(String(s.aiBg)) && seq[0] === 0.94
+      && seq[seq.length - 1] === 0.16 && mono, `α ${seq.join('→')}（色标 ${seq.length} 枚）`)
+    // 高度那一条量的是**渲染出来的这一枚**，不是源码里的 rpx 字面量（模拟器按屏宽折半换算）。
+    // 与面板圆角半径比一个定档：40rpx 半径 ↔ 整枚 80.4rpx ⇒ 比值 2.01，钉 ≤4.8 是留余量的上界；
+    // 00:2x 那一版（200.4rpx）比值 5.01 ⇒ 这一条当场红。**阈值 4.8 是我定的，他没给数。**
+    ok(`${s.tag}那一态：那一枚整行只占一条窄带（实测高 ≤ 面板圆角半径的 4.8 倍，不是 00:2x 那条大灰带）`,
+      num(s.aiH) > 0 && num(s.pnlRt) > 0 && num(s.aiH) <= num(s.pnlRt) * 4.8,
+      `实测高 ${s.aiH}／面板圆角半径 ${s.pnlRt}`)
   }
   // 极性翻那一态真打一次：`.bg-light` 一挂上，那两条旧翻转规则（已随这一层撤掉）要是还在，
   // 屏上那三行字会当街翻成墨。这一条在源码里读不出来，只有渲染层认不认得出。
@@ -524,6 +646,16 @@ async function main() {
   ok('这一路把页面数据回原样（bgSrc／bgLight 不给下一把尺子留残值）',
     String(nowData.bgSrc || '') === String(before.bgSrc || '') && !!nowData.bgLight === !!before.bgLight,
     `回来 ${JSON.stringify(nowData.bgSrc)}／${nowData.bgLight}　应回到 ${JSON.stringify(before.bgSrc || '')}／${before.bgLight}`)
+  // 上面钉过的那两格偏好也要还回去——不还的话，下一把尺子读到的就是这一把留下的墨档。
+  await mp.evaluate((v) => {
+    if (v.mood === '' || v.mood === undefined || v.mood === null) wx.removeStorageSync('glassMood'); else wx.setStorageSync('glassMood', v.mood)
+    getApp().setWallpaper(v.wp)
+    getApp().applyTheme(v.wp)
+  }, pref)
+  const backPref = await mp.evaluate(() => ({ mood: wx.getStorageSync('glassMood'), wp: getApp().getWallpaper() }))
+  ok('两格偏好已还原成进来前的值（不给下一把尺子留档）',
+    String(backPref.mood) === String(pref.mood) && String(backPref.wp) === String(pref.wp),
+    `${backPref.mood}/${backPref.wp} vs ${pref.mood}/${pref.wp}`)
 
   /* ---------- 10. 整屏截图（对效果图用） ＋ 报错监听 ---------- */
   ok('这一路走下来页面没有报过错（报了不一定看得出现在这一屏）',

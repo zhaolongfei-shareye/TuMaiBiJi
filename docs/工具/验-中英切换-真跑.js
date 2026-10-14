@@ -41,6 +41,19 @@ const num = (css, prop) => {
 // 字面期望值全从 i18n 现读，这把尺子里不抄第二份词表
 const ZH = i18n.t('createHeading', 'zh')
 const EN = i18n.t('createHeading', 'en')
+// ⚠ 10-14 22:4x 站长把大标题拆成两行（`.page-title` 里两枚 `.pt-l`，中文那门第二行是「随手记下来」，
+// 英文那门第二行是空串＝只有一行）。父节点的 `text()` 是把两行**连着**读回来的，
+// 所以"屏上那行大标题"的期望值是**字典里那两行连起来**，不是单支 `createHeading`——
+// 拿单支去比，中文那一趟会读成「看到好内容随手记下来」≠「看到好内容」而红（10-14 23:3x 就是这么红的）。
+/* 期望值走**页面同一扇门** `texts(lang)`：它是 `Object.assign({}, zh, dict)`，en 那一档留的空串会真盖成空；
+   而 `t(key,lang)` 写的是 `dict[key] || zh[key] || key`——空串是 falsy，会被中文那一句顶回来。
+   ⇒ 屏上只有一行（页面走 texts），判据按两行算（走 t）就是尺子自己红，不是屏红（10-14 23:5x 实测到这一条）。 */
+const headLine = (l) => {
+  const d = i18n.texts(l)
+  return (String(d.createHeading || '') + String(d.createHeading2 || '')).trim()
+}
+const ZH_SHOWN = headLine('zh')
+const EN_SHOWN = headLine('en')
 // 这一屏自己那两枚的字号／内边距／下划线，用来算"不扩热区时落点有多大"（只为把话说清楚，不判红）
 const FS_META = Number(/--fs-meta:\s*(\d+(?:\.\d+)?)rpx/.exec(appWxss)[1])
 const SEG = seg('.lang-seg')
@@ -217,7 +230,7 @@ const ck = (name, cond, got) => {
   const dS = await page.data()
   const tS = await page.$('.page-title')
   ck('把那条 PUT 换成成功的桩，真点 EN 之后屏上换成英文',
-    dS.lang === 'en' && (!tS || (await tS.text()) === EN),
+    dS.lang === 'en' && (!tS || (await tS.text()) === EN_SHOWN),
     `lang=${dS.lang}　屏上「${tS ? await tS.text() : ''}」`)
   await sleep(3000)
   const dS2 = await page.data()
@@ -253,7 +266,7 @@ const ck = (name, cond, got) => {
     NO_SESSION ? '这一趟没有 token，那条 PUT 必然 401' : '')
   const t1 = await page.$('.page-title')
   const shown = t1 ? await t1.text() : ''
-  sk('屏上那行大标题跟着换成英文（词从 i18n 现读）', shown === EN, `屏上「${shown}」，期望「${EN}」`,
+  sk('屏上那行大标题跟着换成英文（词从 i18n 现读）', shown === EN_SHOWN, `屏上「${shown}」，期望「${EN_SHOWN}」`,
     NO_SESSION ? '同上' : '')
 
   // ---------- ④ 服务端那一栏真记住了 ----------
@@ -285,7 +298,7 @@ const ck = (name, cond, got) => {
   await sleep(2500)
   const d3 = await page.data()
   const t3 = await page.$('.page-title')
-  ck('真点左边那枚「中」换得回来（往返不留半程）', d3.lang === 'zh' && (!t3 || (await t3.text()) === ZH),
+  ck('真点左边那枚「中」换得回来（往返不留半程）', d3.lang === 'zh' && (!t3 || (await t3.text()) === ZH_SHOWN),
     `lang=${d3.lang}　屏上「${t3 ? await t3.text() : ''}」`)
   await stub(false)
   await lang.pin(mp, langBefore)

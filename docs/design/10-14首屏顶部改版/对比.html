@@ -1,0 +1,108 @@
+<!doctype html><meta charset="utf-8"><style>
+body{margin:0;background:#F2EFE9;font-family:-apple-system,"PingFang SC",sans-serif;padding:20px}
+h1{font-size:17px;margin:0 0 4px}p{font-size:12px;margin:0 0 16px;color:#555}
+.grid{display:grid;grid-template-columns:repeat(2,300px);gap:26px 22px}
+.cap{font-size:12px;margin:0 0 6px}.cap b{font-size:13px}.draft{color:#B14A2F;margin-left:6px}
+.ph{width:300px;height:650px;border-radius:34px;overflow:hidden;position:relative;box-shadow:0 3px 14px rgba(0,0,0,.16)}
+.nav{height:35.2px;display:flex;align-items:center;justify-content:center;font-size:12px;position:relative;background:rgba(255,255,255,.35)}
+.nav i{position:absolute;right:9.6px;top:9.6px;width:68px;height:24.8px;border-radius:12.4px;border:1px solid rgba(0,0,0,.3)}
+.row1{display:flex;align-items:center;justify-content:space-between;padding:19.2px 9.6px 12.8px}
+.row1.tight{padding:8px 9.6px 9.6px;align-items:center}
+.h1{font-size:16.8px;font-weight:700;letter-spacing:-.4px;line-height:1.15;color:#14161A}
+.h1.soft{color:rgba(20,22,26,.70)}
+.lang{flex:none;text-align:right}.lang b{font-size:9.6px;color:#8A8578;margin-left:8px;font-weight:400}.lang b:first-child{color:rgba(20,22,26,.70);border-bottom:2px solid rgba(20,22,26,.70)}
+/* 00:0x 站长追的两句：「左上右不需要留空间，要通栏。左下和右下有圆弧，然后与背景之间带阴影。
+   要与下方面板渐变毛玻璃风格一致」⇒ 圆角／阴影／滤镜三样全部照 panel 那一枚上下颠倒抄：
+   面板是 radius 40 40 0 0 ＋ shadow 0 -12 28 ＋ blur(30) saturate(1.15)
+   这一行是 radius 0 0 40 40 ＋ shadow 0 12 28 ＋ 同一档滤镜。
+   ⚠ 稿上的 .ph 本来就没有水平内缩，所以稿上"看着通栏"；真页的 .container 有 2rpx 24rpx 0 那一口内缩，
+   代码里必须把它负回去才是真通栏——这一处是**稿对、代码错**，不是反过来。
+   （这一版注释里不许出现反引号：整段 CSS 在一个模板字符串里，反引号会当场把串吞掉。） */
+.ai{margin:0 0 0px;padding:5.6px 9.6px 13.6px;
+    border-radius:0 0 16px 16px;box-shadow:0 4.8px 11.2px rgba(18,20,26,.16);
+    color:#F2EFE9;font-size:9.6px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    backdrop-filter:blur(30px) saturate(1.15);-webkit-backdrop-filter:blur(30px) saturate(1.15)}
+.ai i{display:inline-block;width:4.8px;height:4.8px;border-radius:50%;margin-right:4px}
+.swap{position:absolute;left:9.6px;right:9.6px;font-size:8.4px;color:#8A8578;display:flex;justify-content:space-between}
+.swap span{margin-left:11.2px}
+.swap.low{bottom:224px;color:#4A4740}
+.art{position:absolute;left:9.6px;right:9.6px;border:1px solid rgba(0,0,0,.16);border-radius:8px 8px 0 0;
+     background:url('底-现网形象图.png') top center / cover no-repeat}
+.art.now{top:120px;bottom:224px}
+.art.after{top:158.4px;bottom:244.8px}
+.panel{position:absolute;left:0;right:0;bottom:0;height:219.2px;border-radius:16px 16px 0 0;box-shadow:0 -4.8px 11.2px rgba(18,20,26,.16)}
+.face{position:absolute;left:11.2px;top:9.6px;width:109.6px;height:89.6px;background:#fff;border-radius:5.6px}
+.count{position:absolute;left:11.2px;top:104.8px;width:109.6px;height:50.4px;border-radius:5.6px;display:flex;align-items:center;justify-content:space-around;color:#F2EFE9}
+.count em{font-style:normal;font-size:25.6px;font-weight:200}
+.count hr{border:0;border-top:1px solid rgba(242,239,233,.5);margin:2.4px 7.2px}
+.count div{text-align:center;width:50%}.count span{font-size:7.2px;opacity:.72}
+.tips{position:absolute;left:137.6px;top:24px;width:120px;color:#F2EFE9;font-size:9.6px;line-height:1.4}
+.tips i{display:inline-block;width:4.8px;height:4.8px;border-radius:50%;margin-right:3.2px}
+.plus{position:absolute;left:160px;top:84px;width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:38.4px;font-weight:300}
+.tab{position:absolute;left:8px;right:8px;bottom:6.4px;height:38.4px;border-radius:19.2px;background:rgba(36,37,43,.62);display:flex;align-items:center;justify-content:space-around}
+.tab b{width:30.4px;height:30.4px;border-radius:50%;color:#F2EFE9;font-size:17.6px;display:flex;align-items:center;justify-content:center;font-weight:300}
+.tab u{width:18.4px;height:18.4px;border-radius:4.8px;background:rgba(242,239,233,.5)}
+</style>
+<h1>首屏顶部改版：加一行「用 AI 帮你读懂一切」＋大标题拆两行并降到 70% 透明＋三枚挪到面板上方（中／EN 仍在右侧）</h1>
+<p>左列中文、右列英文；上排现状、下排改后。帧宽 300px＝750rpx，字号间距全按现网 --fs-*／--sp-* 换算；新那行底下垫的是同档心情那块玻璃色的一层；中间那块贴的是今天从现网屏上采下来的形象图。英文一律一行放得下、不回行。</p>
+<div class="grid">
+<div class="cell"><div class="cap"><b>中文</b> 现状</div>
+ <div class="ph" style="background:#E2DED4">
+  <div class="nav">图麦笔记<i></i></div>
+  <div class="row1"><div class="h1">看到好内容</div><div class="lang"><b>中</b><b>EN</b></div></div>
+       <div class="swap" style="top:82.4px">调亮度 ｜ 换背景 ›<span>换心情 ☁</span></div>
+  <div class="art now"></div>
+  
+  <div class="panel" style="background:rgb(36,37,43)">
+    <div class="face"></div>
+    <div class="count" style="background:rgba(#12141A,.94)"><div><em>0</em><hr><span>笔记</span></div><div><em>0</em><hr><span>卡片</span></div></div>
+    <div class="tips"><i style="background:#F6C445"></i>Tips：贴一个公众号链接，长文读成三句话</div>
+    <div class="plus" style="background:#E9723D;color:#2C1204">+</div>
+    <div class="tab"><b style="background:#E9723D">+</b><u></u><u></u></div>
+  </div>
+ </div></div>
+<div class="cell"><div class="cap"><b>English</b> 现状<span class="draft">英文我拟，待你改</span></div>
+ <div class="ph" style="background:#E2DED4">
+  <div class="nav">TumarkNote<i></i></div>
+  <div class="row1"><div class="h1">Save what matters</div><div class="lang"><b>中</b><b>EN</b></div></div>
+       <div class="swap" style="top:82.4px">Brightness ｜ Background ›<span>Mood ☁</span></div>
+  <div class="art now"></div>
+  
+  <div class="panel" style="background:rgb(36,37,43)">
+    <div class="face"></div>
+    <div class="count" style="background:rgba(#12141A,.94)"><div><em>0</em><hr><span>Notes</span></div><div><em>0</em><hr><span>Cards</span></div></div>
+    <div class="tips"><i style="background:#F6C445"></i>Tips: Paste a link — get it down to three lines</div>
+    <div class="plus" style="background:#E9723D;color:#2C1204">+</div>
+    <div class="tab"><b style="background:#E9723D">+</b><u></u><u></u></div>
+  </div>
+ </div></div>
+<div class="cell"><div class="cap"><b>中文</b> 改后</div>
+ <div class="ph" style="background:#E2DED4">
+  <div class="nav">图麦笔记<i></i></div>
+  <div class="ai" style="background:linear-gradient(180deg, rgba(35, 37, 44, 0.94) 0%, rgba(35, 37, 44, 0.80) 55%, rgba(35, 37, 44, 0.16) 100%)"><i style="background:#F6C445"></i>用 AI 帮你读懂一切：拍照 | 读图 | 翻译 | 提炼 | 分享</div>
+       <div class="row1 tight"><div class="h1 soft">看到好内容<br>随手记下来</div><div class="lang"><b>中</b><b>EN</b></div></div>
+  <div class="art after"></div>
+  <div class="swap low">调亮度<span>换背景 ›</span><span>换心情 ☁</span></div>
+  <div class="panel" style="background:rgb(36,37,43)">
+    <div class="face"></div>
+    <div class="count" style="background:rgba(#12141A,.94)"><div><em>0</em><hr><span>笔记</span></div><div><em>0</em><hr><span>卡片</span></div></div>
+    <div class="tips"><i style="background:#F6C445"></i>Tips：贴一个公众号链接，长文读成三句话</div>
+    <div class="plus" style="background:#E9723D;color:#2C1204">+</div>
+    <div class="tab"><b style="background:#E9723D">+</b><u></u><u></u></div>
+  </div>
+ </div></div>
+<div class="cell"><div class="cap"><b>English</b> 改后<span class="draft">英文我拟，待你改</span></div>
+ <div class="ph" style="background:#E2DED4">
+  <div class="nav">TumarkNote<i></i></div>
+  <div class="ai" style="background:linear-gradient(180deg, rgba(35, 37, 44, 0.94) 0%, rgba(35, 37, 44, 0.80) 55%, rgba(35, 37, 44, 0.16) 100%)"><i style="background:#F6C445"></i>AI reads it all: Shoot | Scan | Translate | Distill | Share</div>
+       <div class="row1 tight"><div class="h1 soft">Save what matters</div><div class="lang"><b>中</b><b>EN</b></div></div>
+  <div class="art after"></div>
+  <div class="swap low">Brightness<span>Background ›</span><span>Mood ☁</span></div>
+  <div class="panel" style="background:rgb(36,37,43)">
+    <div class="face"></div>
+    <div class="count" style="background:rgba(#12141A,.94)"><div><em>0</em><hr><span>Notes</span></div><div><em>0</em><hr><span>Cards</span></div></div>
+    <div class="tips"><i style="background:#F6C445"></i>Tips: Paste a link — get it down to three lines</div>
+    <div class="plus" style="background:#E9723D;color:#2C1204">+</div>
+    <div class="tab"><b style="background:#E9723D">+</b><u></u><u></u></div>
+  </div>
+ </div></div></div>

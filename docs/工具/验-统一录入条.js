@@ -249,11 +249,23 @@ ok('导流目标还是那一页', /navigateTo\(\{ url: '\/pages\/profile\/profil
 ok('选图入口全页只有 pickImage 一处', (js.match(/wx\.chooseMedia/g) || []).length === 1)
 // 10-11 12:2x 他那句「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」把后半句作废了：
 // 这一行不再"面板展开那一趟整个不渲染"，两屏都在、同一个落点。闸只留 `bgSrc` 那一半（没铺图它没意义）。
+// 第三、四条原来钉的是"没有任何一条带 `.home-swap` 的规则把它藏起来"＋"没有 `.entry-dock … .home-swap`
+// 这条选择器"。第二条是**写法**的锁，不是**行为**的锁：10-14 站长把这一行改成收起态 fixed 钉在面板上方
+// （`.container:not(.entry-dock) .home-swap`），那条正则撞上 `:not(.entry-dock)` 就假红。
+// ⇒ 换成按行为钉：凡选择器里带 `.home-swap` 的规则块，一律不许出现 display:none／visibility:hidden。
+// 这样"展开态把它藏回来"照样红，而"收起态换个落点"不再被误伤。
+const swapBlocks = (wxss.match(/[^{}]*\.home-swap[^{]*\{[^}]*\}/g) || [])
 ok('换背景那一行两态都画（站长 10-14「白底也要换背景，这是核心功能」，§8.235），「调亮度」那一截仍只在铺图时画，展开那一趟照旧渲染',
   /<view class="home-swap">/.test(wxml)
   && /wx:if="\{\{bgSrc\}\}" class="swap-half" catchtap="onCycleDim"/.test(wxml)
-  && !/\.home-swap[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden)/.test(wxss)
-  && !/\.entry-dock[^{]*\.home-swap/.test(wxss))
+  && swapBlocks.every((b) => !/display:\s*none|visibility:\s*hidden/.test(b)))
+// 站长 10-14 22:4x「换心情，调亮度，换背景，下移到下半部，面板上方」：收起态整条 fixed 钉在面板顶之上，
+// 展开态那条流内账一个字不动（第二屏框外那一行今天只剩「返回」，两枚同挤一条带会撞）。
+const swapFixed = /container:not\(\.entry-dock\)\s*\.home-swap\s*\{([^}]*)\}/.exec(wxss.replace(/\s+/g, ' '))
+ok('收起态那一行改成钉在面板上方（fixed＋bottom 从面板顶算），展开态仍走原来那条流内账',
+  !!swapFixed && /position:\s*fixed/.test(swapFixed[1]) && /bottom:\s*560rpx/.test(swapFixed[1])
+  && /margin:\s*0/.test(swapFixed[1]),
+  swapFixed ? swapFixed[1].trim() : '没找到 `.container:not(.entry-dock) .home-swap` 那条')
 ok('➕ 那一格是唯一"再加一张"的落点', (wxml.match(/catchtap="onAddShot"/g) || []).length === 1)
 // 站长 10-11 真机报的「拍照只支持一张，相册可以」根因就在这两条上：快门那一排的条件是
 // `!previewImages.length`，所以第一张之后**整排消失**，➕ 成了唯一入口；而 ➕ 原来没带 data-source，
@@ -626,9 +638,16 @@ const gTip = dotGeo('.tips-dot')
 ok('第二屏那一行里不再有 Tips、也不再有它前面那枚点（`.out-l`／`.out-dot` 全项目清零）',
   !/out-l|out-dot/.test(wxml) && !/\.out-l|\.out-dot/.test(wxss),
   seg('.out').replace(/\s+/g, ' ').slice(0, 70))
-ok('小黄点只剩首屏一处，色仍由 palette 经 style 递进来（样式表里没有第二支黄）',
-  (wxml.match(/tipDotStyle/g) || []).length === 1 && /class="tips-dot" style="\{\{tipDotStyle\}\}"/.test(wxml)
-  && !/#f6c445/i.test(wxss), `wxml 里出现 ${(wxml.match(/tipDotStyle/g) || []).length} 次`)
+/* 判据跟着 10-14 那一轮改口径（改的是尺子不是代码）：原来钉"小黄点只剩首屏一处"，
+   因为那一阵全站只有 Tips 前面那一枚。站长今天拍的那张首屏稿上，新加的那一行
+   「用 AI 帮你读懂一切…」前面也有一枚（效果图正本 `docs/design/10-14首屏顶部改版/对比.png`）
+   ⇒ 现在是两枚。这条真正要防的从来不是"枚数"，而是**第二支写死的黄**：
+   色只从 palette.TIP_DOT 经 style 递进来，样式表里出现 #f6c445 就是红。 */
+const tipUses = (wxml.match(/style="\{\{tipDotStyle\}\}"/g) || []).length
+ok('小黄点两枚（Tips 那一枚＋新行那一枚），色仍由 palette 经 style 递进来（样式表里没有第二支黄）',
+  tipUses === 2 && /class="tips-dot" style="\{\{tipDotStyle\}\}"/.test(wxml)
+  && /class="ai-dot" style="\{\{tipDotStyle\}\}"/.test(wxml)
+  && !/#f6c445/i.test(wxss), `wxml 里 style="{{tipDotStyle}}" 出现 ${tipUses} 次`)
 ok('首屏那枚点的四条几何没被这轮带走（14 见方、离字 12、圆）',
   gTip.width === '14rpx' && gTip.height === '14rpx' && gTip['margin-right'] === '12rpx'
   && gTip['border-radius'] === '50%' && /^\d/.test(gTip['margin-top'] || ''),

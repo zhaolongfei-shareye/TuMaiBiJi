@@ -57,6 +57,15 @@ const txt = async (els) => {
   let jwt = ''
   try {
     jwt = (await wait(() => mp.evaluate(() => getApp().globalData.token || ''), 30000)) || ''
+    if (!jwt) {
+      // 冷启动那一趟 `wx.login` 会报 **41002 appid missing**（10-14 23:1x／23:4x 两趟都撞上；`跑尺子.sh`
+      // 每把之前重启一次开发者工具，于是每把都要赌这一次）。这一把后面每一条判据都吃真会话，
+      // 所以先自己再叫一次登录（没登录成时 `getLoginPromise()` 就是重跑 `_doLogin`），再等 30 秒；
+      // 仍拿不到才记环境红。**判据一个字没松**，只是把"补齐前提"这个动作做够一次。
+      console.log('  … 第一趟没拿到 token，再叫一次登录（41002 冷启动那一档）')
+      await mp.evaluate(() => { const g = getApp(); g.globalData.loginPromise = null; g.getLoginPromise(); return true })
+      jwt = (await wait(() => mp.evaluate(() => getApp().globalData.token || ''), 30000)) || ''
+    }
     ck('模拟器已登录', jwt.length > 30, `JWT 长度 ${jwt.length}`)
     langBefore = await lang.read(mp)
     await lang.pin(mp, 'zh')
@@ -109,10 +118,15 @@ const txt = async (els) => {
     // ---------- 新建页：大标题 + 三个入口 + 导航条标题 ----------
     let page = await mp.reLaunch('/pages/create/create')
     await sleep(1800)
-    const heading = (await txt(await page.$$('.page-title'))).join('|')
-    // 09-25 站长定：这句要和 iPhone 版一致（TumarkNote `AppCopy.swift` 的 Create.headline），
-    // 中文「看到好内容，随手记下来」/ 英文 "Save what's worth saving"，两边不许各写一份。
-    ck('新建页大标题＝「看到好内容，随手记下来」', heading === '看到好内容，随手记下来', heading)
+    // 10-14 22:4x 站长把这句拆成两行、逗号去掉（「"看到好内容"回行"随手记下来"」），
+    // 英文那一档他 23:0x 追「精简一点、不希望回行」⇒ 只有一行。
+    // ⇒ 判据不再抄整句字面量（抄一份＝屏上改了字典、尺子还钉着旧那句那种红），
+    //   改成**读字典给的那几行**再与屏上逐行比：字典与屏必须同一来源。
+    const headLines = (await txt(await page.$$('.pt-l')))
+    const wantLines = [require('../../miniprogram/utils/i18n.js').t('createHeading', 'zh'),
+      require('../../miniprogram/utils/i18n.js').t('createHeading2', 'zh')].filter((x) => !!x)
+    ck('新建页大标题＝字典给的那几行（中文两行、逗号已去），屏上不许自己拼一份',
+      headLines.join('|') === wantLines.join('|'), `屏上 ${headLines.join('|')}｜字典 ${wantLines.join('|')}`)
     // 09-28 凌晨那一批把三张入口卡合成了一条录入条（PRD §8.50），`.entry-label` 这个类整个没了，
     // 原来这条读的是那个类，于是一路读成空串、红了好几天。改成钉现在这一版：
     // 收起态条身那句话、展开后四个模式标签的**文字和次序**、以及旧类名不许复活。

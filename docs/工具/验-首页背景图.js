@@ -124,9 +124,11 @@ ck('语言切换那条下划线也跟着翻白', /\.container\.has-bg\s*{[^}]*--
 // 抬层那条规则整段捞出来比名单：原来只拿"从 title-row 起 120 字符内出现 z-index:2"这种
 // 窗口写法，名单里加一行就会因为窗口不够长而红——那是尺子自己的毛病，不是回归。
 // 10-09 站长拍甲：名单要含 `.home-swap`（那两句字原来跟照片一起被罩层压住，读不出来）。
+// 10-14 22:4x 新加的 `.ai-line`（首屏最上面那一行）也进名单——它第一次落码时没进，铺图那一态
+// 整条压在罩层与照片底下，屏上看不见，而计算样式那几条判据照样绿：**又是同一个 10-09 的形状**。
 const liftRule = /\.container\.has-bg \.title-row,[\s\S]{0,260}?\{[^}]*z-index:\s*2[^}]*\}/.exec(wxss)
-ck('内容压在罩之上（名单三样：标题、那一行、录入条；日期行 10-10 撤了，展开态的 position 另有一条）',
-  !!liftRule && ['title-row', 'home-swap', 'entry-wrap'].every((s) => liftRule[0].includes(s))
+ck('内容压在罩之上（名单四样：标题、首屏那一行、换背景那一行、录入条；日期行 10-10 撤了，展开态的 position 另有一条）',
+  !!liftRule && ['title-row', 'ai-line', 'home-swap', 'entry-wrap'].every((s) => liftRule[0].includes(s))
   && !/date-row/.test(liftRule[0]),
   liftRule ? liftRule[0].split('{')[0].replace(/\s+/g, ' ') : '(没捞到那条抬层规则)')
 // 10-10 晚收起态那三块从 `.entry-wrap` 里搬出去自己定顶了，所以这一条改钉 `.home-blk`（裸 `.blk` 与 app.wxss 里那枚分类色方块撞了）。

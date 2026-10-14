@@ -68,16 +68,47 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
   }
   const pill = (png) => JSON.parse(execFileSync('python3', [PILL, png], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }))
 
-  // 借走这台模拟器的两格本机偏好，量完原样还回去
-  const before = await mp.evaluate(() => ({ mood: wx.getStorageSync('glassMood'), wp: wx.getStorageSync('wallpaperCache') }))
-  await mp.evaluate(() => { wx.removeStorageSync('glassMood'); wx.removeStorageSync('wallpaperCache') })
+  // 借走这台机器的心情与壁纸，量完原样还回去。
+  // ⚠ 「钉回默认＝墨」要钉**两头顶**：`app.getWallpaper()` 先读 `globalData.userInfo.wallpaper`
+  //   （登录回包里那一份，权威在服务端 `users.wallpaper_theme`），本机 `wallpaperCache` 只是没有
+  //   会话时的兜底缓存。10-14 23:3x 只摘两个键试过一次——模拟器这次真登录上了，容器照样读回
+  //   `theme-tint-celadon mood-celadon`（这台测试号服务端存的就是天青）。所以走 app 自己那两个 setter。
+  //   只写本机，不发 PUT，服务端那一列一个字节不动。
+  const snapPref = () => ({ mood: wx.getStorageSync('glassMood'), wp: getApp().getWallpaper() })
+  const pinInk = () => mp.evaluate(() => {
+    wx.removeStorageSync('glassMood')
+    getApp().setWallpaper('tint-paper')
+    getApp().applyTheme('tint-paper')
+  })
+  const unpin = (v) => mp.evaluate((x) => {
+    if (x.mood === '' || x.mood === undefined || x.mood === null) wx.removeStorageSync('glassMood'); else wx.setStorageSync('glassMood', x.mood)
+    getApp().setWallpaper(x.wp)
+    getApp().applyTheme(x.wp)
+  }, v)
+  const before = await mp.evaluate(snapPref)
+  // ⚠ 钉完还要跟登录那一趟抢一次：登录回包里会 `applyTheme(服务端那份壁纸)`，把刚钉的默认**盖回去**。
+  //   10-14 23:47 那一趟 27 条全红就是这么来的——冷启动后登录回调晚于第一次钉，容器被服务端那天青盖回去，
+  //   之后每点一档都往后错一档（屏上是 celadon→blush→mist，判据要的是 ink→ivory→celadon）。
+  //   所以钉完要**看着屏**确认落住了，没落住就再钉一次（最多四次），最后一次仍不中就让它红、把实读打出来。
+  const pinUntilInk = async () => {
+    let pg
+    for (let i = 0; i < 4; i++) {
+      await pinInk()
+      pg = await enter('/pages/create/create')
+      await sleep(4500)
+      if (/mood-ink/.test(await clsOf(pg))) return pg
+      await sleep(4000)
+    }
+    return pg
+  }
+  await pinInk()
 
   // ---------- ① 起点＝墨（今天那一屏），且这一屏真的铺着图 ----------
-  let page = await enter('/pages/create/create')
+  let page = await pinUntilInk()
   await sleep(4500)
   ck('这一屏铺着图（没铺图那些面不吃 `--glass-*`，下面全部结论不成立）', !!(await page.data()).bgSrc, (await page.data()).bgSrc || '(空)')
   let cls = await clsOf(page)
-  ck('没有本机键时容器上是 `theme-tint-paper mood-ink`（默认态零变化的屏上证一遍）',
+  ck('钉回默认那一档时容器上是 `theme-tint-paper mood-ink`（默认态零变化的屏上证一遍）',
     /theme-tint-paper/.test(cls) && /mood-ink/.test(cls), cls)
 
   // ---------- ② 真点五下走满一圈：每档四项各量各的 ----------
@@ -157,9 +188,7 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
   ck('而且主题类跟着壁纸：theme-tint-celadon', /theme-tint-celadon/.test(cls), cls)
 
   // ---------- ⑤ 点它不许把录入面板带出来（catchtap 不吃整页的收起） ----------
-  await mp.evaluate(() => { wx.removeStorageSync('glassMood'); wx.removeStorageSync('wallpaperCache') })
-  page = await enter('/pages/create/create')
-  await sleep(4500)
+  page = await pinUntilInk()
   const h3 = (await page.$$('.swap-half'))[2]
   await h3.tap()
   await sleep(1200)
@@ -170,12 +199,9 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
     /mood-ivory/.test(await clsOf(page)) && /theme-tint-paper/.test(await clsOf(page)), await clsOf(page))
 
   // ---------- 还原 ----------
-  await mp.evaluate((v) => {
-    if (v.mood === '' || v.mood === undefined || v.mood === null) wx.removeStorageSync('glassMood'); else wx.setStorageSync('glassMood', v.mood)
-    if (v.wp === '' || v.wp === undefined || v.wp === null) wx.removeStorageSync('wallpaperCache'); else wx.setStorageSync('wallpaperCache', v.wp)
-  }, before)
-  const rest = await mp.evaluate(() => ({ mood: wx.getStorageSync('glassMood'), wp: wx.getStorageSync('wallpaperCache') }))
-  ck('两格本机偏好已还原成探针进来前的值', String(rest.mood) === String(before.mood) && String(rest.wp) === String(before.wp),
+  await unpin(before)
+  const rest = await mp.evaluate(snapPref)
+  ck('两格偏好已还原成探针进来前的值', String(rest.mood) === String(before.mood) && String(rest.wp) === String(before.wp),
     `${rest.mood}/${rest.wp} vs ${before.mood}/${before.wp}`)
 
   // ---------- ⑥ 向上阴影那一枚：三处落点在屏上都解析得出来（站长 10-14 20:5x） ----------
@@ -201,11 +227,16 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
     lifts.every((l) => l.got === lifts[0].got), lifts.map((l) => l.got).join(' ＝ '))
 
   // ---------- ⑦ 无图那一态：这块玻璃底下是米白页面，糊没有对象，字能不能读要量 ----------
+  // ⚠ ⑤ 末尾那趟还原把这台机器**进来之前**那一档放了回来（10-14 23:1x 实测 celadon），
+  //   而下面这一条量的是**墨档**那一层（截图名就叫 `档1-墨-无图那一态`）。前提得自己钉：
+  //   这里再钉一次默认（两头顶＝墨＋米白，且盯着屏确认落住），量完在原样还回去。
+  //   浅档在无图态分不分得开是另一件事，站长 10-14 拍过"本期不改"，正本 PRD §8.240。
+  page = await pinUntilInk()
   // 只报数不判红的那条下限设 3.0：低于它就是真读不动了。4.5（AA 小字）这一档我没自己钉成红——
   // ⚠ 这里原来写着"墨档纸白压 .62 墨玻璃大概只剩 4.3:1"，那是拿**米白页面**当底算的；
   //   底栏其实压在深色面板上，下面那一行实测 (39,40,49) → 12.76:1，不存在要不要抬 α 的问题。
-  page = await enter('/pages/create/create')
-  await sleep(4500)
+  ck('⑦ 量之前容器确实是墨档（两头顶钉住＝默认，不是上一把尺子留下的那一档）',
+    /mood-ink/.test(await clsOf(page)) && /theme-tint-paper/.test(await clsOf(page)), await clsOf(page))
   await page.setData({ bgSrc: '' })
   await sleep(1200)
   const shotFlat = path.join(OUT, '档1-墨-无图那一态.png')
@@ -222,6 +253,9 @@ const lumOf = (a) => 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2]
   const lift = JSON.parse(execFileSync('python3', [SHADOW, shotFlat, '548'], { encoding: 'utf8' }))
   ck('新建那一屏（无图态）：深色面板顶边上方那一条带确实被投影压暗了（≥3 灰阶）',
     lift.dip >= 3, `近带 ${lift.near}／远带 ${lift.far}／差 ${lift.dip}@y${lift.edge_y}｜${lift.profile.join(' ')}`)
+
+  // ⑦ 前钉过的那两头顶，最后再还一次（这台机器的档不该由一把尺子留下）
+  await unpin(before)
 
   console.log(`\n${bad.length ? '✗ ' + bad.length + ' 条不过：' + bad.join('、') : `五档彩色玻璃 真跑：${n} 条全过`}`)
   console.log(`  图与数在 ${OUT}`)
