@@ -17,6 +17,7 @@ const RECIPES = require('./posterRecipes.js')
 // 下发那一路的门槛比的是小程序版本号（`min_app_version`），这个号只有 appInfo 那一份出处。
 // 配方 JSON 里那个 `min_version` 是解释器版本，两回事，别拿这一个去判那一个。
 const { VERSION: APP_VERSION } = require('./appInfo.js')
+const mpAssets = require('./mpAssets.js')
 
 const W = 750
 const INK = '#23252C'
@@ -208,16 +209,22 @@ function posterProfile() {
 }
 
 /**
- * 首页与笔记页头部铺的那张：取勾了「背景」的那张，没人勾就用包里这张默认。
- * 站长那张默认图是包内资源。放这儿而不是写进 wxss：WXSS 的 background-image
- * 不认小程序包里的本地文件（只认 base64 和网络地址），只能由 <image> 组件铺。
- * 槽里的文件被系统清掉时 readSlots 已经把那一格当空的，所以这里自然落回默认那张，
- * 不会出现"背景没了、字色还留着翻白"的半截状态。
+ * 首页与笔记页头部铺的那张，只有两级：用户自己勾了「背景」那一格的文件 → 运营后台下发、
+ * 已落到本机的那张。两级都空就是**没有背景图**（白底那一档），不再回落到包里那一张。
+ * 站长 10-13 拍的是甲案的加强版，原话「如果是之前的背景图写到代码，硬编码就要删除。只提供白色背景」（§8.231）：
+ * 末尾那一档原先是包内 `/assets/home-bg-portrait.jpg`（314,793 B），新用户冷启首帧必先解它，
+ * 而运营图落地后没有任何一处重绘当前这一屏 ⇒ 他报的"连续 load 两张背景图"就是这么来的。
+ * 文件本体已随这一刀从包里删掉，留档在 `docs/design/留档-背景图-20261013/`（历史效果图还引它）。
+ * 取图口仍留在 JS 而不是写进样式：这一张是本地文件，WXSS 的 background-image 不认包内与用户目录的
+ * 本地路径（只认 base64 和网络地址），只能由 <image> 组件铺。
+ * ⚠ 白底这一档从"今天走不到的分支"变成默认路径之一，所以它不是推定而是量过的：
+ *   三屏（首页／新建／「我的」）× 四套壁纸 ＝ 12 个组合，头部大字与那几行小字共 48 枚，
+ *   无图态对比度全 ≥4.5、字走墨（`量-无图态字色-真跑.js` ＋ `量-无图态字色.py`，10-14 跑的）。
+ *   深浅那两档在没有图时留 `false`＝浅壁纸本来的那一套墨字，导航条由 `applyNavForBand` 原样不动，
+ *   落回 app.json 那档（#f4f2ec ＋ 黑字），与四套浅壁纸同档。
  */
-const HOME_BG_DEFAULT = '/assets/home-bg-portrait.jpg'
-
 function homeBg() {
-  return rolePath(readSlots(), 'bg') || HOME_BG_DEFAULT
+  return rolePath(readSlots(), 'bg') || mpAssets.serverBgPath() || ''
 }
 
 /* 头部那一段 542 的图怎么摆——首页与「我的」页必须同一套数，否则同一个人在两页
@@ -906,11 +913,15 @@ function blockNameOf(note, lang) {
 }
 
 function sourceLabelOf(note, lang) {
+  // 这一张表和 pages/index、pages/detail 那两条 `SOURCE_TYPE_KEYS` 必须是同一套值：
+  // 漏一支就把英文原文（`share_import`／`preset`）直接画上卡片（站长 10-02 对 v18 时撞过一次同一型）。
   const keys = {
     wechat_article: 'sourceWechatArticle',
     web_article: 'sourceWebArticle',
     screenshot: 'sourceScreenshot',
     manual: 'sourceManual',
+    share_import: 'sourceShareImport',
+    preset: 'sourcePreset',
   }
   const key = keys[note.source_type]
   return key ? t(key, lang) : note.source_type || ''

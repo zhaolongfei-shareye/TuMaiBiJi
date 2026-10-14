@@ -82,11 +82,11 @@ const PHYS_W_FLOOR = 1116
   }), src)
   const probe = await mp.evaluate(() => ({
     has: typeof wx.compressImage === 'function',
-    pkg: '/assets/home-bg-portrait.jpg',
+    pkg: '/assets/share-card.jpg',   // 量具替身：10-14 §8.231 把包内那张默认底图删了，这几把只需要有一张真位图，改指包里还在的 share-card.jpg（1280×1024 JPEG，同宽，不是产品资源）。
   }))
   ck('这个基础库有 wx.compressImage', probe.has)
   const src0 = await info(probe.pkg)
-  ck('代码包里那张默认底图能读出尺寸', !src0.err && src0.w > 0, JSON.stringify(src0))
+  ck('量具那张 JPEG（share-card.jpg）能读出尺寸', !src0.err && src0.w > 0, JSON.stringify(src0))
   // 目标故意给一个比源件小的数：只有 compressedWidth 真被 honoring，输出宽才会掉到 400 上下。
   const shrunk = await mp.evaluate((p) => new Promise((resolve) => {
     wx.compressImage({

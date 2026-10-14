@@ -4,7 +4,8 @@
 ① 只删自己名下的：每个删除查询都带着 user_id，别人的笔记/分类/分享一条不动。
 ② 注销后旧 token 立刻失效（用户行没了，get_current_user 自然回 401），公开分享页
    也必须扫不开——那张卡片图已经发出去了，留着就是泄漏。
-③ 同一个 openid 重新登录是一个全新空账号，看不到旧数据。
+③ 同一个 openid 重新登录是一个全新账号，看不到旧数据。2.1.11 起"全新"不等于"名下 0 条"：
+   新号出生带着一篇 §8.232 的预置笔记，判据钉的是**那一条只能是预置那一型**，旧笔记一条不许跟过来。
 ④ id 被新号复用之后，旧 token 依然失效。②靠的是"行没了"，可 SQLite 会把那个 id 发
    给下一个注册的人，行又有了——这时候挡住的必须是账号代数，不是行的存在性。
    见 Test账号代数。
@@ -38,7 +39,7 @@ from app.models.share import Share
 from app.models.share_report import ShareReport
 from app.models.user import User
 from app.models.user_profile import UserProfile
-from app.services import quota
+from app.services import preset_note, quota
 
 
 @pytest.fixture(scope="module")
@@ -236,14 +237,31 @@ class Test注销之后:
         body = client.get(
             "/api/user/quota", headers={"Authorization": f"Bearer {token}"}
         ).json()
-        assert body["used"] == 0
+        # ⚠ 这一条从 2.1.11（§8.232 新用户预置那一篇）起从 0 变成 1，**改的是判据不是代码**：
+        #   这一格原本钉的是"旧笔记没跟过来"，而它顺手用了"名下一条都不剩"当代理读数。
+        #   现在新号出生就带一篇我们自己写进去的预置笔记，代理读数不再是 0。
+        #   真正要钉的那句话换成两条：他旧的那篇仍然读不到（下面那行 404 原样留着），
+        #   而他名下这一条必须是预置那一型（source_type='preset'），不是旧笔记借尸回来。
+        assert body["used"] == 1, body
+        # 列表口回的就是一个数组（`response_model=List[NoteListItem]`），不包 items。
+        items = client.get("/api/notes/", headers={"Authorization": f"Bearer {token}"}).json()
+        assert [n["source_type"] for n in items] == [preset_note.PRESET_SOURCE_TYPE], items
         assert body["bonus"] == 0
         assert body["limit"] == quota.BASE_QUOTA
         assert body["invites_rewarded"] == 0
         # SQLite 在非 AUTOINCREMENT 主键上会复用刚空出来的 rowid，所以"新账号一定拿到
         # 新 id"是不能断的；能断的是这个号底下什么都没有了——旧笔记、旧归因都不跟过来。
-        assert client.get(f"/api/notes/{old_note}", headers={"Authorization": f"Bearer {token}"}).status_code == 404
-        assert client.get("/api/notes/", headers={"Authorization": f"Bearer {token}"}).json() == []
+        # 名下那唯一一条上面已经钉死是预置那一型，所以这一格不必再断"列表是空的"。
+        # ⚠ 旧笔记那个号 2.1.11 起**可能就是新号的预置那一篇**（rowid 复用是这一格自己的前提，
+        #   这次跑出来就是 200）：所以"404"不再是"旧数据没跟过来"的证明。换成钉读到的那一行
+        #   绝不是旧内容——要么根本没有那一行，要么那一行是预置那一型、标题不是他那篇旧的。
+        back = client.get(f"/api/notes/{old_note}", headers={"Authorization": f"Bearer {token}"})
+        if back.status_code == 200:
+            row = back.json()
+            assert row["source_type"] == preset_note.PRESET_SOURCE_TYPE, row
+            assert row["title"] != "要消失的笔记", row
+        else:
+            assert back.status_code == 404
         new = db.query(User).filter(User.openid == "del-me").first()
         assert new.invited_by is None
         assert db.query(Invitation).count() == 0
@@ -351,9 +369,15 @@ class Test账号代数:
         db.add(fresh)
         db.commit()
 
+        # 冒充那一趟之前的底数：`register` 现在会替他种下 §8.232 那一篇预置笔记，
+        # 而这一格是直接 `db.delete(old)`（不走 /v1/account 那条级联），那一行留在库里挂在同一个
+        # 数字 id 上。所以"名下 0 条"从 2.1.11 起不再是这件事的证明——它证明的是残留行。
+        # 判据换成**差分**：那一趟 POST 前后条数一模一样，而且没有一条叫这个名字。
+        before = db.query(Note).filter(Note.user_id == str(uid)).count()
         assert client.post("/api/notes/", headers=old_hdr, json={"title": "冒充写入"}).status_code == 401
         db.expire_all()
-        assert db.query(Note).filter(Note.user_id == str(uid)).count() == 0
+        assert db.query(Note).filter(Note.user_id == str(uid)).count() == before
+        assert db.query(Note).filter(Note.user_id == str(uid), Note.title == "冒充写入").count() == 0
 
     def test_新号自己的token照常可用(self, client, db, monkeypatch):
         old = register(client, db, monkeypatch, "gen-old2")

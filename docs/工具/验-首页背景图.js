@@ -1,5 +1,5 @@
 // 首页背景图这一批的静态自证：不连模拟器也能跑的那部分。
-// 管三件事：① 那张默认图真的在包里、没胖到吃主包；② 三档取图的语义（默认/用户形象/关掉）；
+// 管三件事：① 包里**不再有**那张硬编码默认图、主包没吃线；② 两级取图的语义（用户勾的那格/运营下发/都没有）；
 // ③ 入口唯一——换图只有「我的 → 卡片模板」那一个门，外观设置里只许有开关。
 // 跑法：node docs/工具/验-首页背景图.js
 const fs = require('fs')
@@ -13,9 +13,16 @@ const ck = (name, ok, got) => {
 const read = (p) => fs.readFileSync(path.join(MP, p), 'utf8')
 
 // ---------- ① 资源 ----------
+/* §8.231（站长 10-13 拍甲的加强版：「如果是之前的背景图写到代码，硬编码就要删除。只提供白色背景」）：
+   原先这一格钉的是"默认图在包里"，10-14 这一刀把 `assets/home-bg-portrait.jpg`（314,793 B）整个删掉，
+   于是判据反过来钉"包里不许再有它"。留档那份是给 `docs/design/` 下那 9 份历史效果图用的（不追改它们的引用），
+   不是产品资源——所以留档存在与包内没有，两样都要钉住。 */
 const ASSET = 'assets/home-bg-portrait.jpg'
 const st = fs.existsSync(path.join(MP, ASSET)) ? fs.statSync(path.join(MP, ASSET)) : null
-ck('默认背景图在包里', !!st, ASSET)
+ck('包里不再有那张硬编码默认背景图（−307KB，§8.231 判据 4）', !st, st ? `还在：${st.size}B` : '已删')
+const ARCHIVE = path.resolve(__dirname, '../../docs/design/留档-背景图-20261013/home-bg-portrait.jpg')
+ck('留档那一份还在（历史效果图与"当初是哪张"的凭据）', fs.existsSync(ARCHIVE),
+  fs.existsSync(ARCHIVE) ? `${fs.statSync(ARCHIVE).size}B` : '(没找到)')
 /* 原来这一条是「体积没吃主包（<150KB）」——那个 150KB 是**我自己拍的**，他没下过，
    10-11 R16 他把默认图换成 1280×1280／314,793 B 那张，这一条当天就红了。
    红的是我那道没主的门槛，不是包出问题：微信的硬线是**主包 2MB**，构建后实测 939,606 B（917.6KB）＝上限的 44.8%。
@@ -33,8 +40,6 @@ const dirBytes = (() => {
   walk(MP)
   return sum
 })()
-ck(`默认图字节数只报数不判（他 10-11 换的这张 ${st ? (st.size / 1024).toFixed(1) : '—'}KB，判的是下面那条主包线）`,
-  !!st, st && `${(st.size / 1024).toFixed(1)} KB`)
 ck(`主包字节总和没越过 2MB 上限的八成（现 ${dirBytes}／预算 ${Math.round(MAIN_LIMIT * 0.8)}）`,
   dirBytes < MAIN_LIMIT * 0.8, `${(dirBytes / 1024 / 1024).toFixed(2)}MB ＝ 上限的 ${(dirBytes / MAIN_LIMIT * 100).toFixed(1)}%`)
 
@@ -45,6 +50,7 @@ global.wx = {
   env: { USER_DATA_PATH: '/usrdata' },
   getStorageSync: (k) => (k in store ? store[k] : ''),
   setStorageSync: (k, v) => { store[k] = v },
+  removeStorageSync: (k) => { delete store[k] },
   getFileSystemManager: () => ({
     accessSync: (p) => { if (!files.has(p)) throw new Error('ENOENT') },
     unlinkSync: () => {},
@@ -52,25 +58,57 @@ global.wx = {
   }),
 }
 const poster = require(path.join(MP, 'utils/poster.js'))
-const DEFAULT_BG = '/assets/home-bg-portrait.jpg'
 
-ck('没设形象时落回站长那张', poster.homeBg() === DEFAULT_BG, poster.homeBg() || '(空)')
+/* §8.231 之后取图只有两级：用户勾了「背景」那一格 → 运营下发且已落本机。两级都空就是**白底那一档**，
+   所以"落回包里那张"这三条全部反过来钉：空串才是对的产物，非空＝那档硬编码又长回来了。 */
+ck('两级都空＝白底那一档（homeBg 返回空串，§8.231 判据 4）', poster.homeBg() === '', poster.homeBg() || '(空)')
 ck('取图函数导出了', typeof poster.homeBg === 'function')
 // 09-30 站长把外观设置里那一节整块撤了：这一屏不再有"用/不用"这个状态，
 // 缩略图那个别名函数也一并删了——首页和外观设置只剩同一个出口，不会再有第二份口径。
 ck('开关那两个函数已经从导出里拿掉',
   poster.homeBgOn === undefined && poster.setHomeBgOff === undefined)
 ck('缩略图别名也已经删掉，只剩 homeBg 这一个出口', poster.homeBgImage === undefined)
+// 兜底链从三级降到两级：`HOME_BG_DEFAULT` 这一格常量不许以另一种名字再长回来（包里也没那枚文件了）。
+const posterSrc = fs.readFileSync(path.join(MP, 'utils/poster.js'), 'utf8')
+ck('poster.js 里没有第三档兜底（既无 `HOME_BG_DEFAULT`，也不引那枚文件）',
+  !/HOME_BG_DEFAULT/.test(posterSrc)
+  && (posterSrc.match(/return rolePath\(readSlots\(\), 'bg'\)[^\n]*/) || [''])[0].split('||').length === 3,
+  (posterSrc.match(/return rolePath\(readSlots\(\), 'bg'\)[^\n]*/) || ['(没读到 homeBg 那一行)'])[0].trim())
 
 const mine = '/usrdata/poster-avatar-1-1.img'
 files.add(mine)
 poster.writeProfile({ avatarPath: mine })
-ck('设过形象就用用户那张', poster.homeBg() === mine, poster.homeBg())
-ck('没有任何一条路径能取到空背景', poster.homeBg() !== '')
+ck('设过形象就用用户那张（第一级不动，站长 10-13 那句"后台优先"打的是第二、三级之间）',
+  poster.homeBg() === mine, poster.homeBg())
 
-// 形象文件被系统清掉：不能出现"图没了、字色还翻着白"的半截状态
+// 形象文件被系统清掉：readSlots 已经把那一格当空的，这一趟落白底，不出现"半截铺图"。
 files.delete(mine)
-ck('形象文件没了就落回默认，不空铺', poster.homeBg() === DEFAULT_BG, poster.homeBg() || '(空)')
+ck('形象文件没了就落白底（不再回落到包里那张）', poster.homeBg() === '', poster.homeBg() || '(空)')
+
+// ---------- ②b 第二级那半截账（10-14 审计抓出来的那一条） ----------
+/* 上面那一条对**第一级**成立，靠的是 `poster.readSlots()` 逐格 `exists(s.path)`；
+   而第二级 `mpAssets.serverBgPath()` 原来是把账上的路径**直接发出去**的——文件被系统清掉、
+   账还留着时，它回一个不存在的非空路径 ⇒ `bgSrc` 有值、`has-bg` 点亮、图上那一整套纸白字
+   压在浅壁纸上＝看不见，正是 §8.231 判据 6 点名的那一态（而且屏上不报错）。
+   这一把不读声明，拿桩件真跑这一个函数：账对不上文件时必须回 null，并且把那半截账一起撤掉
+   （`pull()` 判的是 content_hash 相等就 continue，留着账这台机就永远不再补下这一张＝永久白底）。 */
+const mpAssets = require(path.join(MP, 'utils/mpAssets.js'))
+const ASSET_KEY = 'MP_ASSET_KEY_home_bg'
+const assetLive = '/usrdata/mp-assets/home_bg-live'
+const assetGone = '/usrdata/mp-assets/home_bg-gone'
+files.add(assetLive)
+store[ASSET_KEY] = { filePath: assetGone, contentHash: 'h1' }
+ck('第二级：账在文件不在 ⇒ 回 null（不许点亮 has-bg）',
+  mpAssets.serverBgPath() === null, JSON.stringify(mpAssets.serverBgPath()))
+ck('并且那半截账一起撤掉（留着就永远不会再补下这一张）',
+  !(ASSET_KEY in store), JSON.stringify(store[ASSET_KEY] || '(已撤)'))
+store[ASSET_KEY] = { filePath: assetLive, contentHash: 'h2' }
+ck('文件真在时照旧给那一张（老用户零变化，§8.231 判据 3）',
+  mpAssets.serverBgPath() === assetLive, mpAssets.serverBgPath())
+ck('两级都空这一档仍然只由这一个口说：账撤掉之后 homeBg() 回空串', (() => {
+  delete store[ASSET_KEY]
+  return poster.homeBg() === ''
+})())
 
 // ---------- ③ 接线 ----------
 const wxml = read('pages/create/create.wxml')
@@ -207,6 +245,25 @@ ck('图上那三行写死纸白的字，浅色那一态逐条有翻墨的对应�
   ['.swap-glyph', '.swap-text', '.home-swap'].every((s) => lightRule(wxss, 'container', s)),
   ['.swap-glyph', '.swap-text', '.home-swap']
     .filter((s) => !lightRule(wxss, 'container', s)).join('、'))
+// 10-14 站长翻案：「白底也要换背景，这是核心功能」。§8.231 之后两级都空＝bgSrc 是空串，
+// 而这一行原来整条挂在 `wx:if="{{bgSrc}}"` 上 ⇒ 新用户第一屏连「换背景」都看不见，
+// 等于把核心功能只留给已经设过图的人。两条一起钉，一条都不能松：
+// ① 那一行本身不许再看图的脸色；
+// ② 但「调亮度」那一截必须还看着——没图时它拧的那层压暗罩压根没渲染，留着一枚按下去什么都不发生的钮。
+const swapRowTag = (wxml.match(/<view[^>]*class="home-swap"[^>]*>/) || [''])[0]
+ck('白底那一档「换背景」那一行还画着（行上不许再挂任何 wx:if，10-14 原话）',
+  !!swapRowTag && !/wx:if=/.test(swapRowTag), swapRowTag || '(读不到 .home-swap 那一枚)')
+const dimHalfTag = (wxml.match(/<view[^>]*catchtap="onCycleDim"[^>]*>/) || [''])[0]
+ck('「调亮度」那一截仍只在有图时画（无图态那层罩子不渲染，不许留死钮）',
+  /wx:if="\{\{bgSrc\}\}"/.test(dimHalfTag), dimHalfTag || '(读不到 onCycleDim 那一枚)')
+// 白底那一档背后是壁纸自己的浅底色，那两支写死的纸白不翻墨就是"字跟底一个色"（10-11 打过回）。
+// 兜底写在 `.container:not(.has-bg)` 上：类数 1+1+1=3，压得住上面那支 1 类的纸白，不是虚挂。
+const flatRule = (sel, prop) =>
+  new RegExp(`\\.container:not\\(\\.has-bg\\) \\.${sel.slice(1)}\\s*\\{[^}]*${prop}:`).test(wxss)
+ck('白底那一档那两样有翻墨兜底（字色与那枚箭头都算，只钉一支会漏箭头）',
+  flatRule('.swap-text', 'color') && flatRule('.swap-glyph', 'background'),
+  ['.swap-text', '.swap-glyph'].filter((s) => !flatRule(s, s === '.swap-text' ? 'color' : 'background')).join('、'))
+
 const meCss = read('pages/me/me.wxss')
 ck('「我的」头部那三行（大字与 MIND 数字）浅色态也有对应规则',
   ['.h1', '.score-n', '.score-l'].every((s) => lightRule(meCss, 'head-band', s)),
@@ -231,6 +288,65 @@ ck('浅图那一态这两行仍是两档（基础规则里那支 --text-secondar
     && /\.sheet-slogan\s*\{[^}]*--text-secondary/.test(meCss))
 ck('这四条里没有一条写纸白（写了就是拿浅底那一档压中灰纱，实测 1.9~2.2）',
   !/has-bg:not\(\.bg-light-low\)[\s\S]{0,200}?242,\s*239,\s*233/.test(ixCss + meCss))
+
+// ---------- ③c 2.1.11 第 0 步（§8.233 那条 P0 前置闸）：无图态那一档的字色 ----------
+// 「铺了图」是这个产品今天的默认态，所以有一批字色是**直接写在基样式里**的纸白——
+// 它在"后台没配图 / 图被撤掉 / 形象文件被系统清掉"那一态就是浅页面底上的白字。
+// §8.234 那句「无图态字色先钉死，再谈删图」量的就是这一档，实测工具是
+// `量-无图态字色-真跑.js` ＋ `量-无图态字色.py`（三屏 × 四套壁纸＝12 个组合的像素对比度）。
+// 10-14 第一次跑就是这一条红：「我的」右上那对数字四套壁纸全红（实测 1.10~1.17）。
+// 这里钉的是"下一次别再有人把纸白写回基样式"，像素那把判的是"这一档真读得清"。
+// ⚠ 取基样式必须锚在行首：`.head-band.has-bg .score-n {` 里也含 `.score-n {`，
+//   不锚行首会把挂在 has-bg 下那一条当成基样式，红成假红或绿成假绿（10-14 自己踩过）。
+const baseRule = (css, sel) => {
+  const m = new RegExp(`(?:^|\\n)\\${sel}\\s*\\{([^}]*)\\}`).exec(css)
+  return m ? m[1] : null
+}
+const PAPER = /242,\s*239,\s*233/
+const noPaperBase = (file, css, sels) => sels.filter((s) => {
+  const b = baseRule(css, s)
+  return b && PAPER.test(b)
+})
+;[
+  ['pages/me/me.wxss', ['.score-n', '.score-l', '.h1']],
+  ['pages/create/create.wxss', ['.page-title', '.tips-line']],
+  ['pages/index/index.wxss', ['.h1']],
+].forEach(([f, sels]) => {
+  const css = read(f)
+  const hit = noPaperBase(f, css, sels)
+  ck(`${f.replace('pages/', '')} 头部那几行的**基样式**里没有一条写纸白（无图态就读得清）`,
+    hit.length === 0, hit.join('、') || `${sels.length} 条逐条看过`)
+})
+// 纸白不是不许有，是只许挂在"真铺了图"那一档下面——上面那条撤掉这一档就没人守得住。
+ck('「我的」那对数字的纸白档挂在 .head-band.has-bg 下面（图上那一态没被一起撤掉）',
+  /\.head-band\.has-bg \.score-n\s*\{[^}]*242,\s*239,\s*233/.test(meCss)
+  && /\.head-band\.has-bg \.score-l\s*\{[^}]*242,\s*239,\s*233/.test(meCss))
+ck('无图态那一档有量具在（删图那一刀之前必须先跑它）',
+  fs.existsSync(path.join(__dirname, '量-无图态字色-真跑.js')) && fs.existsSync(path.join(__dirname, '量-无图态字色.py')))
+// §8.234 第 0 步那半句：「`p === null ? false` 的回落要被显式的"无图"分支取代（无图 ≠ 深色态）」。
+// 今天墨字这个结果是**结构**给的（翻色规则全挂在 `.has-bg` 底下，没图就没这个名字），不是那条 null 回落判出来的。
+// 所以两样一起钉：① applyTone 里那一支显式分流在；② 每一支 `.bg-light(-low)` 的字色规则都还带着 `.has-bg`——
+// 有人哪天加一条不带 `.has-bg` 的浅色规则，白底上的墨字就会被翻成白字，而第一条拦不住、只有这条拦得住。
+ck('applyTone 里有显式的无图分支（不许靠探针那条 null 回落巧合）',
+  /if \(!src\) \{[\s\S]{0,120}setData\(\{ bgLight: false, bgLightLow: false \}/.test(brightJs))
+const strayLight = []
+let lightRules = 0
+;['pages/index/index.wxss', 'pages/create/create.wxss', 'pages/me/me.wxss', 'app.wxss'].forEach((f) => {
+  // 读不到就是红，不许静默跳过：10-14 这一把第一版把路径写成 `index/index.wxss`（少了 `pages/`），
+  // 那三页被 existsSync 一句吞掉，判据当场绿成"0 条浅色规则违规"——其实是 0 条规则被看见。
+  if (!fs.existsSync(path.join(MP, f))) { strayLight.push(`${f}：读不到这个文件`); return }
+  const src = read(f)
+  ;(src.match(/[^{}]*\{/g) || []).forEach((sel) => {
+    if (!/\.bg-light(-low)?(?![\w-])/.test(sel)) return
+    lightRules += 1
+    if (!/has-bg/.test(sel)) strayLight.push(`${f}：${sel.trim().slice(0, 70)}`)
+  })
+})
+// 这条兜"上面那条会不会是空转"：名字总共有几块在吃它，必须报得出数来。
+ck('浅色那一档的规则确实捞到了条数（0 条＝量具对不上界面，不是屏上干净）',
+  lightRules > 0, `${lightRules} 条`)
+ck('没有一条浅色那一档的规则不带 .has-bg（带了才只在"真铺了图"时生效）',
+  strayLight.length === 0, strayLight.join('　'))
 
 // ---------- ④ 入口唯一 ----------
 ck('外观设置里不出现选图接口', !/chooseMedia|chooseImage/.test(read('pages/wallpaper/wallpaper.js')))

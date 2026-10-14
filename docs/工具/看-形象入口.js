@@ -49,7 +49,7 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     await mp.screenshot({ path: path.join(OUT, '02-四格都空.png') })
 
     const one = (d.slots || []).slice()
-    one[0] = { path: '/assets/home-bg-portrait.jpg', card: true, bg: true }
+    one[0] = { path: '/assets/share-card.jpg', card: true, bg: true }   // 桩件，包里得真有这一枚文件
     await page.setData({ slots: one, allFull: false })
     await sleep(1500)
     const chips2 = await page.$$('.chip-dot')

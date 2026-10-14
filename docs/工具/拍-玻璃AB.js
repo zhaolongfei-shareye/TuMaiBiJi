@@ -51,9 +51,9 @@ const ROOT = path.resolve(__dirname, '../..')
   // ★10-11 审查抓到的 P0：本机存的那枚形象图是**上个会话的临时路径**，`mp.screenshot` 拍出来
   // 头部整段是 255 纯白（图根本没画进这一帧）。拿那两张去比 blur 的细节能量，比的是**文字抗锯齿**，
   // 0.352 那种数看着像"糊住了"、其实玻璃背后一片空白。所以取图这一趟把 bgSrc 钉成**包内那一张**
-  // （`/assets/home-bg-portrait.jpg`，poster.HOME_BG_DEFAULT 也是它），并且由 `量-玻璃糊没糊.py`
+  // （原来指包内那张默认底图，§8.231 在 10-14 已把它从包里删掉，这里改指包里还在的 share-card.jpg）
   // 在算比值之前先验"对照组那块确实有画面"——平色就拒绝出数，不许它再报一次假结论。
-  const BG_PROBE = '/assets/home-bg-portrait.jpg'
+  const BG_PROBE = '/assets/share-card.jpg'   // 量具替身：10-14 §8.231 把包内那张默认底图删了，这几把只需要有一张真位图，改指包里还在的 share-card.jpg（1280×1024 JPEG，同宽，不是产品资源）。
   const forceBg = async () => {
     const page = await mp.currentPage()
     await page.setData({ bgSrc: BG_PROBE })

@@ -42,6 +42,8 @@ const SOURCE_TYPE_KEYS = {
   // 转存别人分享的那一篇。这一支以前漏在表外：source_type 是 'share_import' 的行
   // 查不到键就直接把英文原文写到屏上了（站长 10-02 对 v18 时撞见）。字典里那串早就有。
   share_import: 'sourceShareImport',
+  // §8.232 新用户出生那一篇（服务端 source_type='preset'）。漏在表外的值会把英文原文写上屏（站长 10-02 撞过一次）。
+  preset: 'sourcePreset',
 }
 
 /* v19（站长 10-03 凌晨拍）：这一屏不再有两种排布，而是列表区顶上两枚 tab——
@@ -413,6 +415,14 @@ Page({
           if (r) this.setData(this.arrange(this.data.notes))
         })
       }
+      // §8.232 首启那一张卡片：服务端这次登录**建出了新账号**并替他存了那一篇，才会带一个 id 过来。
+      // 三处纪律照需求原文：① 排在这次 setData **之后**、不 await（列表首帧不许为它多等，判据 3）；
+      // ② 失败不出声（口径 5，与 app.js 里 `mpAssets.pull()` 同一条）；
+      // ③ `consumeSeededNote()` 取走即清 ⇒ 这一趟只发一次令，用户删掉那一篇之后不会再长出卡片。
+      if (reset) {
+        const seededId = getApp().consumeSeededNote()
+        if (seededId) this._autoFirstCard(seededId).catch((err) => console.warn('首启那张卡片没出成：', err && err.message))
+      }
     } catch (err) {
       console.error('加载笔记失败', err)
       this.setData({ loading: false, loadingMore: false })
@@ -702,6 +712,40 @@ Page({
     if (note.is_private) return this.onRowTap(e)
     if (this.data.searchOpen) this.setData({ searchOpen: false })
     return this._openPosterFor(note, 'grid')
+  },
+
+  /* §8.232 首启那一张卡片：给服务端刚种下去的那一篇，静默走一遍**和用户自己出图完全同一条链**
+     （`_ensurePosterAssets` → `_renderPoster` → `_keepPoster`，一篇一张、生成即上传都在里面）。
+     和 `_openPosterFor` 的差别只有一处：不开那层弹窗——`templateOpen` 这一栏一个字都不碰。
+     画布本来就在屏外（`poster-canvas-offscreen`，wxml 里是常驻节点，不跟着弹窗的 wx:if 走），
+     所以弹窗关着也画得出来；`_tplBoxRpx()` 量不到展示框时返回 null，那一条自己就跳过了。
+     模板与"带不带码"取的是这台设备存的那套默认（`posterProfile().template`），不是替用户猜一套。 */
+  async _autoFirstCard(noteId) {
+    // `posterBusy` 那一格是弹窗那条链自己的忙碌旗：它开着就说明有人在这条链上，这一趟不挤进去。
+    if (this.data.templateOpen || this.data.detailOpen || this.data.posterBusy) return
+    const note = (this.data.notes || []).find((n) => n.id === noteId)
+    // 私密那一格本来就不许出卡片（10-12 那条闸，服务端 cards.py 同一句），这里跟着同一条判据；
+    // 台账里已经有了也不重复出——一篇一张是这本账自己的规则，不是为这一条新起的。
+    if (!note || note.is_private || this._cardsOf(noteId).length) return
+    const profile = poster.posterProfile()
+    this.setData({
+      posterNote: note,
+      posterTpl: profile.template || poster.DEFAULT_TEMPLATE,
+      noQr: false,
+    })
+    /* ⚠ 每 await 一步都回头看一眼这一趟还占不占着画布：`_posterAssets`、`#posterCanvas`、
+       `posterImagePath` 三样都是和成品弹窗**共用**的，而这一趟是后台自己多出来的第二个调用者。
+       这中间他自己点开过任何一篇（`_openPosterFor` 会把 `_posterAssets` 换成他那一篇），
+       继续画就是两趟往同一块画布上上下下——站长 10-03 报过的"无论点哪张小图，大图都是同一张"
+       就是这个共享位被两趟踩出来的，只是那次是弹窗自己内部，这次多了一个不开窗的调用者。
+       让位就是让位：这一趟整个丢掉，不发第二次的令（`consumeSeededNote` 已经取走即清）。 */
+    await this._ensurePosterAssets(noteId)
+    if (this.data.templateOpen || this.data.detailOpen) return
+    if (!this._posterAssets || this._posterAssets.noteId !== noteId) return
+    await this._renderPoster()
+    if (this.data.templateOpen || this.data.detailOpen) return
+    if (!this._posterAssets || this._posterAssets.noteId !== noteId) return
+    await this._keepPoster()
   },
 
   // 两条入口共用同一段开窗逻辑：from 记的是"关掉之后回哪一层"（见 _closeTemplate）。

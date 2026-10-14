@@ -144,7 +144,7 @@ const pick = async (poster, slots, i, src) => {
   fs.add(`${UD}/temp2.img`)
 
   ck(poster.cardPath() === '', '没放过图时卡片位是空的，不抛异常')
-  ck(poster.homeBg() === '/assets/home-bg-portrait.jpg', '没放过图时首页用包里那张默认图')
+  ck(poster.homeBg() === '', '没放过图时首页是白底那一档（§8.231 已删包内那张默认图）')
 
   // —— 站长报过的那条 BUG，正面断言：两张的文件名必须不一样 ——
   let s = poster.blankSlots()
@@ -195,7 +195,7 @@ const pick = async (poster, slots, i, src) => {
   ck(full.filter(Boolean).length === 4, '四个位置放满', JSON.stringify(full.map((x) => !!x)))
   poster.writeSlots(poster.blankSlots())
   ck(avatarsOf(fs.files).length === 0, '全清之后目录里没有头像残留', `[${avatarsOf(fs.files).join(',')}]`)
-  ck(poster.cardPath() === '' && poster.homeBg() === '/assets/home-bg-portrait.jpg', '清完之后卡片没图、首页回默认')
+  ck(poster.cardPath() === '' && poster.homeBg() === '', '清完之后卡片没图、首页落白底')
 
   // 挑完没落盘就退出（onUnload）：这张不该留在本机
   const orphan = await poster.mintAvatar(`${UD}/temp1.img`)
@@ -228,7 +228,7 @@ const pick = async (poster, slots, i, src) => {
   fresh.writeSlots([{ path: pending, card: true, bg: true }, null, null, null])
   fs.files.delete(pending)
   ck(fresh.cardPath() === '', '文件没了 → 卡片位退回空（海报退回「麦」占位字）')
-  ck(fresh.homeBg() === '/assets/home-bg-portrait.jpg', '文件没了 → 首页落回默认图，不引用不存在的文件')
+  ck(fresh.homeBg() === '', '文件没了 → 首页落白底，不引用不存在的文件')
   ck(fresh.posterProfile().avatarPath === '', 'posterProfile 也跟着回空（画海报那条读的是它）')
 
   // 空着再清一轮：不该抛异常

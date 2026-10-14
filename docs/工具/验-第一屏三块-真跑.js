@@ -21,7 +21,10 @@ const PERSON_KEY = 'homePerson'
 // §9 那一双"铺图／不铺图"里的探针用图：只是拿来当"背后有一张照片"，用完在收尾还回 before。
 // 为什么不能用进来时那一张：那一屏可能本来就没铺（before.bgSrc 是空），
 // 两态就量成同一个东西，"两态都挂"那几条会一起假绿。
-const PROBE_BG = '/assets/home-bg-portrait.jpg'
+// ⚠ 10-14 §8.231 把包内那张默认底图（`/assets/home-bg-portrait.jpg`）从包里删了，这一格跟着改指
+//   包里还在的一张真位图：`share-card.jpg`（1280×1024 JPEG，宽度与原来那张同为 1280，不是产品资源）。
+//   留着老路径的后果是"铺图那一态其实没铺上图"，而这一批判据全在"铺了图"那一态上——假绿。
+const PROBE_BG = '/assets/share-card.jpg'
 
 // 下面这些"该落在哪"的数：整组／白面／墨面那三个从 create.wxss 现读，其余仍是效果图正本换算来
 // （图上 1px＝1rpx），推导写在静态那把 `验-第一屏三块.js`。

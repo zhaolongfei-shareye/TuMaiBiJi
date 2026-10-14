@@ -8,7 +8,7 @@ const path = require('path')
 const fs = require('fs')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/10-11毛玻璃/实测')
-const BG = '/assets/home-bg-portrait.jpg'
+const BG = '/assets/share-card.jpg'   // 量具替身：10-14 §8.231 把包内那张默认底图删了，这几把只需要有一张真位图，改指包里还在的 share-card.jpg（1280×1024 JPEG，同宽，不是产品资源）。
 
 ;(async () => {
   let mp
