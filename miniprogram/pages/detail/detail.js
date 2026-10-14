@@ -262,7 +262,9 @@ Page({
           } catch (err) {
             // 这一篇没删掉，刚才记进待删那一格的地址就得撤回来（不撤＝下次进前台把还活着的那份删没）
             cloudUpload.unreservePurge(known)
-            wx.showToast({ title: t('deleteFailed', lang), icon: 'none' })
+            // 服务端回了原因的照实念（10-14 那道「自带那一篇是产品说明，删不掉」；与分类页
+            // `deleteCategory` 那一条同一个手法）。只回"删除失败"会让人以为按钮坏了，反复点。
+            wx.showToast({ title: (err.data && err.data.detail) || t('deleteFailed', lang), icon: 'none' })
           }
         }
       },

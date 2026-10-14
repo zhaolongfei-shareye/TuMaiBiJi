@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { TIP_DOT, createSkin, entryBlocks } = require('../../utils/palette.js')
+const { TIP_DOT, createSkin } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const assetQueue = require('../../utils/assetQueue.js')
@@ -65,18 +65,19 @@ const MAX_SHOTS = 9
 /* 一行放五格（小图 100 + 间距 16，五格 = 564 ≤ 卡内宽 586）。
    这个数是 WXSS 的几何事实，不是拍的：上限 9 张 + ➕ 那一格 = 10 格，
    五列是"展开只多一行"（两行放得下）的最小列数。改 .strip 的列数要连着改这里。
-   卡内宽 10-10 从 566 变 586（面板内边距 32→24 让出来的），列数没跟着变。 */
+   卡内宽 10-10 从 566 变 586（面板内边距 32→24 让出来的），10-14 再变 598（卡内边距 30→24
+   让出来的，站长那一句「排版紧凑一点」），列数两回都没跟着变。 */
 const ROW_CELLS = 5
 
 /* 右滑那一枚的行程（rpx，与 create.wxss 里那三个数一一对上，改样式要连着改）：
-   轨道内宽 = 卡内宽 586 − 自己那圈同色边 5×2 = 576；圆 90；左边内缩 10。
-   停在最右那一格 left = 576 − 90 − 10 = 476，所以行程 466。
+   轨道内宽 = 卡内宽 598 − 自己那圈同色边 5×2 = 588；圆 90；左边内缩 10。
+   停在最右那一格 left = 588 − 90 − 10 = 488，所以行程 478。
    10-10 面板压进红框之前这三个数算的是 456／446——`验-统一录入条.js` 有一条专门钉
    "JS 里这个数 == 轨道内宽 − 圆宽 − 左内缩"，只改样式不改这里就会红。
    这里按 rpx 走而不查节点：手指位移换算成 rpx 只需要 windowWidth（微信 rpx = 屏宽/750），
    一次同步读取就够了，省下 touchstart 那一趟异步查询——快速一划就会掉在查询回来之前。 */
 const SLD_REST_RPX = 10
-const SLD_MAX_RPX = 476
+const SLD_MAX_RPX = 488
 // 差 12rpx 就算到位（手指按在圆右缘上再往外划不出这 12，宁可让人划到底也不要"差一点没反应"）
 const SLD_SLOP_RPX = 12
 // 报错气泡在屏上停多久（站长 10-10 深夜只说了"几秒后消失"，没给数）。
@@ -90,7 +91,11 @@ Page({
   data: {
     lang: 'zh',
     t: texts('zh'),
-    themeClass: 'theme-tint-paper',  // 未登录/首帧的占位：类名必须真的存在，四枚里象牙是 THEMES[0]
+    // 未登录/首帧的占位：类名必须真的存在。四枚壁纸里象牙是 THEMES[0]，五档心情里墨是 MOODS[0]，
+    // 而墨那一档的九枚玻璃数与 page{} 那份兜底逐字相同 ⇒ 这一帧就算没等到 applyTheme 也不会花。
+    themeClass: 'theme-tint-paper mood-ink',
+    // 「换心情」那一枚的挡手位：同一帧连点两下会发两次 PUT（与 pages/wallpaper 那条 applying 同一个理由）。
+    moodBusy: false,
     // 展开的是哪一档：'' | 'photo' | 'url' | 'write'，同一时刻最多一个。
     // 10-08 起相册不再是独立的一档（它是「照片」那一态左边那枚小圆），所以 mode 那一位也撤了：
     // 面板上只有三个标签，一个真相。
@@ -124,12 +129,14 @@ Page({
     // 四个入口各自的饱和色，色值和字色配对仍归 palette 管。
     // 条身那三枚小圆的色随那三枚一起撤了（10-09）；面板那一整套浅面仍由 createSkin() 一次发下来，
     // 10-10 起它要吃当前壁纸那一档层色（站长拿效果图 c5 打回的浅面，见 palette.js 那段注释）。
+    // 2.2 B 方案：这一整套变量改挂在**容器**上（原来挂在 .panel 那一枚元素上），
+    // 因为首屏那枚圆形 ➕ 要吃的 `--cp-cam` 在 .panel 外面（与第二屏快门同一支色）。
     // 这里不带参数是故意的：data 在模块加载时就求值，那时 `getApp()` 还没有，
     // 空参回落到色板第一枚（象牙），每次进页由 onShow 拿真壁纸覆盖。
     skinPanel: createSkin(),
-    // 收起态那三块的面色与字色，同样由当前壁纸派生（左块吃卡底、右两枚吃色阶第 2／1 档）。
-    // 这里不带参数与上面同一个道理：空参回落象牙，每次进页由 onShow 拿真壁纸覆盖。
-    blkSkin: entryBlocks().style,
+    // 收起态那三块原来吃的一整套 `--eb-*`（palette.entryBlocks() 从壁纸派生）随 2.2 B 方案一起退：
+    // 右两枚计数块被他撤了（「右侧两块去掉」），左块那两条白条也被两片新皮替了
+    // （白面渐变毛玻璃 ＋ 墨面渐变毛玻璃，都是中性色，不吃壁纸）。
     // 左块那一张人物 + 右后方那枚剪影：初值按本机存的那一性读，没存过就是女。
     ...person.figure(),
     // 右两枚的计数。两个数都是装饰性的读数，拉不到就画 0（沿用笔记页那一条口径：
@@ -214,10 +221,13 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
-      // 面板那套浅面里的层色吃当前壁纸，每次进页重算。
+      // 这一整套 `--cp-*` 现在发在容器上（首屏那枚圆形 ➕ 与第二屏那块面板共用同一支橙），
+      // 里面唯一随壁纸走的是层色 `--cp-panel`，每次进页重算；圆形 ➕ 吃的那两档是固定值，
+      // 换壁纸不会让它变，但仍是同一趟 setData 带下来，出口只有一个。
       skinPanel: createSkin(app.getWallpaper()),
-      // 三块的面色也跟着壁纸走，同一趟重算：漏了这一位，换完壁纸回到首页三块还停在象牙那档。
-      blkSkin: entryBlocks(app.getWallpaper()).style,
+      // 三块那套 `--eb-*` 随 2.2 B 方案撤干净（右两枚没了、左块换了两片中性的皮）：
+      // 漏在这里删掉而 wxml 还留着 `style="{{blkSkin}}"` 的话，三块会静默变透明——
+      // 所以那一位也从模板里一起删了，`验-第一屏三块.js` 钉的是"模板里没有 blkSkin"。
       // 每次进页重取：在分享形象页换完图返回，这一屏就该跟着换（onShow 不碰草稿，见上面那段注释）。
       bgSrc: poster.homeBg(),
       // 背景深浅那一档也是每次进页重读：在「我的」页里改过、或别的 tab 点过那枚点，回到这一屏就该跟上。
@@ -320,8 +330,8 @@ Page({
 
   // 滑动条圆里那枚图形跟着三档走：照片=叠图、链接=链环、文字=钢笔。
   // 这三支和底栏那三支是同一套 Lucide 几何（见 create.wxss 那一段注释）。
-  // 收起态那枚不归这里管：10-10 晚条身换成左块人物之后，收起态唯一的图形是白条前那枚快门
-  // （.blk-cam，样式表里直接挂 glyph-camera，不吃这一位）。
+  // 收起态那一枚不归这里管：白条那枚快门（.blk-cam）随 2.2 B 方案撤了，
+  // 首屏现在唯一的图形是右列那枚圆形 ➕（.blk-plus-glyph，样式表里直接挂 glyph-plus，也不吃这一位）。
   sldIconFor(active) {
     return { photo: 'images', url: 'link', write: 'pen' }[active] || 'pen'
   },
@@ -419,6 +429,34 @@ Page({
     this.setData(getApp().cycleBgDim())
   },
 
+  /**
+   * 「换心情」：点一次切一档彩色毛玻璃（站长 10-14「每次点击切换一种」）。
+   * 本机立刻生效、底栏跟着立刻换；服务端那一趟**只在壁纸真的换了的那一档才发**——
+   * 墨与象牙共用 tint-paper 这一枚壁纸值，切这两档 PUT 的是同一个数，发一次等于白跑一趟、
+   * 还多开一个失败面。PUT 失败要说一句：界面已经变了而服务端没记下，下次登录会回到服务端那一份，
+   * 不报就是静默不一致（与 `pages/wallpaper` 原来那条 applyWallpaper 同一口径）。
+   * 同一帧连点两下会发两次 PUT，所以先挡手（那条链原来就写着这一句）。
+   */
+  onCycleMood() {
+    if (this.data.moodBusy) return
+    const app = getApp()
+    const before = app.getWallpaper()
+    this.setData({ moodBusy: true })
+    app.cycleGlassMood()
+    const after = app.getWallpaper()
+    this.setData({
+      moodBusy: false,
+      themeClass: app.containerClass(after),
+      // 层色那一套跟着壁纸走，换档不换它就是"面板换了色、录入条还是旧层色"
+      skinPanel: createSkin(after),
+    })
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().applyTheme(after)
+    if (after === before) return
+    api.updateWallpaper(after).catch(() => {
+      wx.showToast({ title: t('setFailed', this.data.lang), icon: 'none' })
+    })
+  },
+
   // 换背景图只是导流：选图这件事仍然只在「我的 → 卡片模板」那一页做一次。
   goHomeBg() {
     wx.navigateTo({ url: '/pages/profile/profile' })
@@ -458,7 +496,13 @@ Page({
       return
     }
     const app = getApp()
-    if (app.globalData.userInfo) app.globalData.userInfo.language = key
+    // 这一格**不许带 `if`**。原来写的是 `if (app.globalData.userInfo) userInfo.language = key`，
+    // 而登录没回来的那一档 `userInfo` 就是 null（10-13 探针实测这一趟会话里它根本不存在），
+    // 于是这一句整个是空操作——可下面那句 `this.onShow()` 读语言走的正是同一个地方
+    // （`app.globalData.userInfo?.language || 'zh'`），当场把界面读回中文：
+    // 闪一下英文、又弹回原样，在他那边就是「切换中英文失效」。改成无条件并进去，
+    // 没有那一格也会造出来（同一类写法当天在尺子里也踩过一次，见方案 §9.16 ①）。
+    app.globalData.userInfo = Object.assign({}, app.globalData.userInfo, { language: key })
     this.setData({ lang: key, t: texts(key) })
     this.onShow()
   },

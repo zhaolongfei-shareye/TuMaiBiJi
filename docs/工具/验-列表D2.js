@@ -78,16 +78,21 @@ WALLS.forEach((w) => {
 ok('未选中那一档 alpha 不低于 .6（浅 .62 / 深 .68）', idleBad.length === 0, idleBad.join(' | '))
 
 // ---------- 2. 颜色只能从函数来，两个文件里不许有那张表 ----------
+const palSrc = fs.readFileSync(P('utils/palette.js'), 'utf8')
 WALLS.forEach((w) => {
   const hex = DOC_12[w]
-  ok(`选中那一枚圆底 ${hex} 所在的 sel 也只在 chromeOf 里算一次`,
-    (fs.readFileSync(P('utils/palette.js'), 'utf8').match(/--chrome-sel/g) || []).length === 1)
+  // 10-14 起 moodChromeOf 也发 --chrome-sel，所以"只出现一次"这条已作废；换成"算的地方仍只有一处、彩色那档只转发"。
+  ok(`选中那一枚圆底 ${hex} 所在的 sel 只算一次（彩色那档转发 base.sel，不另算一支）`,
+    (palSrc.match(/const sel = hslToHex\(/g) || []).length === 1
+    && /sel: base\.sel,/.test(palSrc) && /--chrome-sel:\$\{base\.sel\}/.test(palSrc))
   ok(`派生色 ${hex} 没被抄进列表页样式`, !new RegExp(hex, 'i').test(idxWxss))
   ok(`派生色 ${hex} 没被抄进底栏样式`, !new RegExp(hex, 'i').test(barWxss))
 })
 ok('底栏和搜索条吃的是同一串 --chrome-*',
   /var\(--chrome-bg\)/.test(barWxss) && /var\(--chrome-bg\)/.test(idxWxss))
-ok('底栏那一块面由 chromeOf 递进来', /chromeOf\(/.test(barJs) && /style="\{\{chromeStyle\}\}"/.test(barWxml))
+// 10-14 换心情：底栏那块面不再直接取壁纸那支，改由心情那一档的 moodChromeOf 递（上面换了下面必须跟着换）。
+ok('底栏那一块面由 moodChromeOf 递进来（且不再直接吃 chromeOf）',
+  /moodChromeOf\(/.test(barJs) && !/[^d]chromeOf\(/.test(barJs) && /style="\{\{chromeStyle\}\}"/.test(barWxml))
 ok('搜索条每次进页重算，不吃模块加载那一次的兜底',
   /const wallpaper = app\.getWallpaper\(\)/.test(idxJs)
   // 09-28 深夜起多一个条件：头部铺了图就整串不发，让 CSS 那条"图上换纸白"生效

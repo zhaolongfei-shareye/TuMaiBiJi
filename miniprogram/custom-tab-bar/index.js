@@ -1,4 +1,4 @@
-const { chromeOf } = require('../utils/palette.js')
+const { moodChromeOf } = require('../utils/palette.js')
 
 Component({
   data: {
@@ -26,7 +26,11 @@ Component({
     applyTheme(wallpaper) {
       // 组件读不到 page 上的 CSS 变量，颜色只能由 JS 算好递进来；
       // 判定结果一律取 palette 里那份，不在这里另记一遍壁纸名单。
-      this.setData({ chromeStyle: chromeOf(wallpaper).style })
+      // 10-14 起这一层跟着「心情」走（站长：「下方的 tab 也与上面的同步」）。
+      // ⚠ 传进来的那个参数是**壁纸**，不是心情：拿它去查心情会查不到、静默落回墨那一档，
+      //    所以心情从 `app.glassMood()` 现读。壁纸这参数留着不改签名——三个 tab 页各自在
+      //    onShow 里递它，动签名要连着改三处，不值。
+      this.setData({ chromeStyle: moodChromeOf(getApp().glassMood().key).style })
     },
 
     updateLabels() {

@@ -1,4 +1,8 @@
-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{active ? 'entry-dock' : ''}}" bindtap="collapse">
+<!-- `--cp-*` 这一整套变量改挂在容器上（原来挂在 `.panel` 那一枚元素上）：
+     首屏那枚圆形 ➕ 要吃的 `--cp-cam`／`--cp-cam-ink` 与第二屏快门是同一支（站长 10-13 原话
+     「带+号的按钮颜色与第二屏拍照按钮颜色一致」），而它在 `.panel` 外面，拿不到那一层的作用域。
+     `createSkin()` 发的全是变量声明、没有一条直接生效的属性，挂到根上不会把别处的皮带下来。 -->
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}}" style="{{skinPanel}}" bindtap="collapse">
   <!-- 首页背景。图就是「我的 → 卡片模板」最上面那张形象图，没设过就用包里这张站长人像。
        必须用 <image> 组件而不是 wxss 的 background-image：后者不认小程序包里的
        本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
@@ -8,9 +12,34 @@
        也就是这半年一直在跑的样子），opacity:0＝一点不压（＝原图亮度，站长拿原图对过才认的）。
        不再另叠第二层黑——上一版那么做，"纯白"档实测只有原图亮度的 62%，压暗的其实一直是这层罩子。 -->
   <view wx:if="{{bgSrc}}" class="page-scrim" style="{{dimScrim}}"></view>
+  <!-- 2.2 B 方案那一层深色面板（站长 10-12 原话「在目前背景与框框直接加一层深色面板，面板左上和右上
+       有圆角」＋「只是多了外面一层深色面板，深色面板上部要做渐变半透明毛玻璃，类似"我的"效果」）。
+       通栏（左右 0、贴到屏底）不是半屏：第一版我把它画成右侧一块，左下角露着原图，被他整张打回
+       （「错误，为什么左下角没有背景，参考图是完整的深色面板」）。
+       顶：**两屏同一根线**（10-14 站长「第二屏，高度不准，要和第一屏一致」）。这一层的顶＝内框的顶
+       往上 24，而两屏的内框同高（372）同底线（离底栏 152）⇒ 点 ➕ 那一下这一层一动不动。
+       展开那一档（内框 490）它跟着那张卡一起往上长（`.container.dock-open .stage-panel`）。
+       这里换过三版，账写在 `docs/方案-2.2大版本.md` §9.12／§9.17：107（效果图那一版）→
+       首屏 24、第二屏钉 749（D16 甲，为了让框外那一行整行坐在墨面上）→ 今天那一行只剩「返回」
+       并且抬到墨面之上，749 那 107 的预留成了死墨 ⇒ 并成一根。
+       ⚠ 这一层**不吃 `bgSrc`**：面板是这一屏的底板，不铺形象图那一态照旧在（否则同一屏要养两套布局）。
+       这一条他没拍过，我按「只是多一层」的字面落的；要只在铺图时才有，说一声，闸挂在 `.has-bg` 上就行。 -->
+  <view class="stage-panel"></view>
+
+  <!-- 首屏最上面那一行（站长 10-14 22:4x 原话「在看到…上方加一行。用 AI 帮你读懂一切：拍照 | 读图 |
+       翻译 | 提炼 | 分享」＋「底部加一层同色毛玻璃」）。底色吃 `--stage-strip`＝与面板同一支玻璃
+       （`moodVars()` 出、`app.wxss` 五块镜像，换心情一起跟）；字色吃 `--stage-ink-strong`＝与面板上
+       其余那几行同一个来源：浅面配深字、深面配白字。这两枚必须同档，否则就是 §8.240 量出来的那一档
+       （纸白压浅玻璃 2.35～2.79:1，读不动）。 -->
+  <view class="ai-line">
+    <view class="ai-dot" style="{{tipDotStyle}}"></view>
+    <text class="ai-text">{{t.aiLine}}</text>
+  </view>
 
   <view class="title-row">
-    <view class="page-title">{{t.createHeading}}</view>
+    <!-- 大标题拆两行、逗号去掉（他原话「"看到好内容"回行"随手记下来"」）；英文那一档第二行为空串，
+         于是只有一行——他 23:0x 追的「英文能否精简一点，不希望回行」。空串走 wx:if，不留一行空白。 -->
+    <view class="page-title"><view class="pt-l">{{t.createHeading}}</view><view class="pt-l" wx:if="{{t.createHeading2}}">{{t.createHeading2}}</view></view>
     <!-- 语言切换放在第一眼这一行：需要它的人正是刚进来、还没摸到「我的」页的人。
          只切界面文案，不动账号也不重新登录；服务端那一栏由 PUT /api/user/language 记着，
          换设备登录还是他选的那一门。整页是"收起"点击区，所以这两段用 catchtap 不吃进 collapse。 -->
@@ -42,6 +71,13 @@
       <text class="swap-text">{{t.homeBgSwap}}</text>
       <view class="swap-glyph glyph-chev"></view>
     </view>
+    <!-- 「换心情」＝切那一档彩色毛玻璃（站长 10-14：「切换毛玻璃改到首页，增加一个入口『换心情』
+         icon是小云朵。每次点击切换一种」）。排在「换背景」之后：这两枚的位置是已拍内容，
+         新添的一枚只往后加，不挪前面的落点。图形沿用同一行的落点形状（字在前、小图形在后）。 -->
+    <view class="swap-half" catchtap="onCycleMood" aria-label="{{t.moodSwap}}" role="button">
+      <text class="swap-text">{{t.moodSwap}}</text>
+      <view class="swap-glyph glyph-cloud"></view>
+    </view>
   </view>
 
   <!-- 统一录入条（10-08 改版，10-09 又收一步）。收起态就是那条纸白胶囊：一枚图形 + 一句话，
@@ -49,28 +85,27 @@
        展开之后条身整条让位——上面换成框外那一行小字，下面升起一张暗面板。
        面板里只剩两样东西：一个输入框（或一横排小图）＋ 一枚"右滑才开始提炼"的长条。
        功能一个没少：校验、忙态、报错、权限引导全部照旧，改的是承载方式。 -->
-  <!-- 收起态这一组（站长 10-10 晚拍板，效果图 docs/design/10-10两入口多方案/PNG图标.png）：
-       原来那条纸白胶囊换成三块——左块人物入口 308 见方（人物上半超出块顶），
-       右两枚计数各 382×148（图标下半被白条压住、数字在右、名字在白条里）。
-       整组贴底锚定，不再吃 .entry-wrap 那条流内 margin：这条链上"上面多一行就把整组顶下去"
-       已经栽过三回（62vh 那条评论自己写着），而 fixed + bottom 与展开态面板同一套基准。
-       三块的颜色由 palette.entryBlocks() 从当前壁纸派生，写在这里的只有 var()。 -->
-  <view wx:if="{{!active}}" class="home-blk" style="{{blkSkin}}">
-    <!-- 轮播 Tips：10-10 晚撤掉底色与边框，只留点与字；行高抬到 74 并把字顶对齐，
-         多出来的那一段落在字下面，正好是人物贝雷帽与这一行之间的呼吸空间（他原话「粘住头发了」）。
-         点仍是 palette.TIP_DOT 从 style 递进来——写进 wxss 会被「饱和色不许抄进样式表」那条打红。 -->
-    <view wx:if="{{tips.length}}" class="tips">
-      <view class="tips-dot" style="{{tipDotStyle}}"></view>
-      <text class="tips-line">{{tipsPrefix}}{{tips[tipIdx]}}</text>
-    </view>
-
+  <!-- 收起态那一组（2.2 B 方案，效果图正本 docs/design/10-12-2.2全量效果图/单屏-B中-01.png）。
+       站长 10-12 那一轮的原话逐条对上：
+       · 「右侧两块去掉，换成 Tips，然后右侧底下圆形+，就是添加的意思」
+       · 「左下的记下来这部部分，去掉，改为"笔记:16 卡片:13"，下划线可点击」
+       · 「如果点击圆形+，就是第二个屏」
+       · 「左边内框要与第二个图高度对齐」⇒ 左块从 308 见方抬成与第二屏那张面板同高（10-13 是 410；
+         10-14 站长追一句「两个屏的内框高度要一致」＋「第二屏的内面板，高度压缩一下」⇒ 两屏一起压到 372）
+       · 「两个人背景用纯白渐变毛玻璃，下方数字区域用黑色毛玻璃」⇒ 块里两片皮
+       整组仍是 fixed 按视口比例定顶、不吃流内 margin：这条链上"上面多一行就把整组顶下去"栽过三回。
+       ⚠ 组名必须叫 `.home-blk`，不能简写成 `.blk`：app.wxss 里那一条 `.blk` 是笔记列表的
+       "分类色方块"（176 见方 + 18 内边距 + overflow:hidden + flex 纵排），全局生效、同名就撞上，
+       整组会被裁成一块 176 的小方盒——10-10 落码第一版就是这么翻车的。 -->
+  <view wx:if="{{!active}}" class="home-blk">
     <view class="blk-row">
-      <!-- 左块 = 原来那条胶囊的门面，点一下进的就是拍照那一档（openBar 落 photo，一字未改）。
-           10-10 深夜把"连点两下换人"撤了：那一下会让每次开门都被一枚 300ms 定时器延住，
-           就是他打回这一版的理由。换人现在只走右后方那枚剪影，左块这一点没有任何延迟。
-           人物那一张由 .blk-figwrap 裁：上边留 52rpx 出血让人超出块顶，下边裁到白条上沿，
-           所以男的那张（更高）也不会把「记下来」压住——效果图里踩过的就是这个。 -->
+      <!-- 左块这一点仍是"开门进拍照那一档"（openBar 落 photo，一字未改；10-10 深夜撤掉的
+           "连点两下换人"不许回来——那一下会让每次开门被一枚 300ms 定时器延住）。
+           ⚠ 这一层**自己不吃 overflow:hidden**：人头要高出块顶那 52rpx 的出血（他 10-13
+           「两个人切换到大人时候，人头要高于内框上沿，与目前现网一样」），裁在卡上就把头切平了；
+           只由下面那块 .blk-figwrap 自己裁。 -->
       <view class="blk-person" role="button" aria-label="{{t.barIdle}}" catchtap="openBar" hover-class="blk-person-press" hover-stay-time="120">
+        <view class="blk-face"></view>
         <view class="blk-figwrap">
           <!-- 主人物在前，另一张画成右后方那枚淡灰剪影（他 10-10 深夜那句：「女人在前，
                男人就在右侧，用剪影淡灰缩小在右下，高度约为女的一半，在女的后面」）。
@@ -85,47 +120,61 @@
           <image class="blk-fig-alt" src="{{personAltSrc}}" mode="heightFix" />
           <view class="blk-alt-hit" role="button" aria-label="{{t.personSwap}}" catchtap="swapPerson"></view>
         </view>
-        <view class="blk-jot">
-          <view class="blk-jot-l">
-            <view class="blk-cam glyph-camera"></view>
-            <text>{{t.barIdle}}</text>
+        <!-- 下面那一格墨黑毛玻璃里的两枚计数：数字在横线上方、名字在横线下方（他 10-13 原话
+             「数字在横线上方，笔记和卡片文字在横线下方。数字稍微大一点，文字稍微小一点，与正常小字一样」）。
+             两枚都是整格可点（catchtap 不吃进左块那一点 openBar）。 -->
+        <view class="blk-count">
+          <view class="blk-cell" role="button" aria-label="{{noteCount}}{{t.statNotes}}" catchtap="goNotes" hover-class="blk-cell-press" hover-stay-time="120">
+            <text class="blk-num">{{noteCount}}</text>
+            <view class="blk-rule"></view>
+            <text class="blk-lab">{{t.statNotes}}</text>
           </view>
-          <text class="blk-jot-s">{{t.modePhoto}} · {{t.modeUrl}} · {{t.modeWrite}}</text>
+          <view class="blk-cell" role="button" aria-label="{{cardCount}}{{t.statCards}}" catchtap="goCards" hover-class="blk-cell-press" hover-stay-time="120">
+            <text class="blk-num">{{cardCount}}</text>
+            <view class="blk-rule"></view>
+            <text class="blk-lab">{{t.statCards}}</text>
+          </view>
         </view>
       </view>
 
       <view class="blk-col">
-        <view class="blk-stat blk-stat-notes" role="button" aria-label="{{noteCount}}{{t.statNotes}}" catchtap="goNotes" hover-class="blk-stat-press" hover-stay-time="120">
-          <image class="blk-ic" src="/assets/ic-stat-notes.png" mode="aspectFit" />
-          <text class="blk-n">{{noteCount}}</text>
-          <view class="blk-strip"><view class="blk-dot"></view><text>{{t.statNotes}}</text></view>
+        <!-- 轮播 Tips 搬进右列（原来它住在三块上面那一整行）。他 10-13：「每个图片Tips处在区域，
+             Tips 要上下居中对齐」⇒ 这一格吃满 ➕ 以上剩下的那一段，字在里面垂直居中。
+             与第二屏框外那一行不一样：那一行只给一条线宽、超长打省略号；这一格窄（382rpx），
+             句子必然折成两三行，所以这里**不套 nowrap**——原来那条 nowrap 防的是"折行把面板顶下去"，
+             现在整组是 fixed 定顶、Tips 又在定高的一格里折，顶不动任何东西。
+             点仍是 palette.TIP_DOT 从 style 递进来——写进 wxss 会被「饱和色不许抄进样式表」那条打红。 -->
+        <view wx:if="{{tips.length}}" class="blk-tips">
+          <view class="blk-tips-in">
+            <view class="tips-dot" style="{{tipDotStyle}}"></view>
+            <text class="blk-tips-line">{{tipsPrefix}}{{tips[tipIdx]}}</text>
+          </view>
         </view>
-        <view class="blk-stat blk-stat-cards" role="button" aria-label="{{cardCount}}{{t.statCards}}" catchtap="goCards" hover-class="blk-stat-press" hover-stay-time="120">
-          <image class="blk-ic" src="/assets/ic-stat-cards.png" mode="aspectFit" />
-          <text class="blk-n">{{cardCount}}</text>
-          <view class="blk-strip"><view class="blk-dot"></view><text>{{t.statCards}}</text></view>
+        <!-- 圆形 ➕ ＝ "添加"，点的就是进第二屏（与左块同一个 openBar，落拍照那一档）。
+             颜色吃第二屏快门那同一支 --cp-cam（他原话「带+号的按钮颜色与第二屏拍照按钮颜色一致」），
+             饱和色一律由 palette.createSkin() 从 style 递进来，这份样式表里不写死。
+             aria-label 复用字典里那句 barIdle（「记下来」），不为这一枚另起一句文案。
+             ⚠ 这一枚与底栏第一格那枚 ➕ 现在是同一个动作的两个入口——他那句「其他元素去掉」
+             我没往底栏上引（只覆盖他指到的那两处），要不要撤底栏那一枚归 #100 待拍。 -->
+        <view class="blk-plus" role="button" aria-label="{{t.barIdle}}" catchtap="openBar" hover-class="blk-plus-press" hover-stay-time="120">
+          <view class="blk-plus-glyph glyph-plus"></view>
         </view>
       </view>
     </view>
   </view>
 
   <view wx:if="{{active}}" class="entry-wrap">
-    <!-- 展开态：面板外面那一行两枚小字（10-08 站长原话「这一行移出框外」）。
-         10-10 深夜他改了两枚的内容：左边不再写"选择记录模式"（那句话说的是框里本来就有的三个标签，
-         属于废话），换成与收起态同一条轮播 Tips；右边「点空白处收起」改成两个字「返回」，
-         与笔记列表、笔记卡片右上角那一枚同一个词、同一个动作（回第一屏）。
-         两枚都浮在形象图上，所以吃页面级 --text-tertiary：铺图时它是纸白 .56，
-         没铺图时是这套壁纸的灰字，两头都不用另写规则。 -->
+    <!-- 展开态：面板外面那一行只剩「返回」一枚（10-08 站长原话「这一行移出框外」，
+         10-14 站长「第二屏，Tips 去掉，back 抬到暗面板上面」）。
+         左边那条轮播 Tips 与它前面的小圆点一起撤了——Tips 仍在首屏右列那一格（`.blk-tips`），
+         一个功能只留一个入口；这一行现在整枚坐在深色面板**之上**（见 .out 那条的账）。
+         「返回」与笔记列表、笔记卡片右上角那一枚同一个词、同一个动作（回第一屏）。 -->
     <view class="out">
-      <!-- 站长 10-11 13:2x：「第二屏的 Tips 前面少了小圆点，要与第一屏一致」。
-           同一枚点、同一个色（`palette.TIP_DOT` 从 style 递进来，写进样式表会被"饱和色不许抄进样式表"那条打红）。 -->
-      <view class="out-dot" style="{{tipDotStyle}}"></view>
-      <text class="out-l">{{tipsPrefix}}{{tips[tipIdx]}}</text>
       <text class="out-r" role="button" aria-label="{{t.back}}" catchtap="collapse">{{t.back}}</text>
     </view>
     <!-- 报错不再占框外那一行（10-10 深夜改的，见下面 .hint-bubble 那条注释）：
          整枚浮在输入框正上方，几秒自己走，权限那一类整枚可点进设置。 -->
-    <view class="panel {{panelOpen ? 'panel-open' : ''}}" style="{{skinPanel}}" catchtap="noop">
+    <view class="panel {{panelOpen ? 'panel-open' : ''}}" catchtap="noop">
       <view wx:if="{{hintLine}}" class="hint-bubble {{errPerm ? 'hint-bubble-act' : ''}}"
             role="alert" aria-label="{{hintLine}}" catchtap="onHintTap">{{hintLine}}</view>
       <view class="modes" catchtap="noop">

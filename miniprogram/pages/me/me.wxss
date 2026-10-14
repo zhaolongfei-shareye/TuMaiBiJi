@@ -86,14 +86,9 @@
   color: rgba(20, 22, 26, 0.68);
 }
 
-.head-band.has-bg.bg-light .head-scrim {
-  background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.35) 14%,
-    rgba(242, 239, 233, 0.28) 58%, rgba(242, 239, 233, 0.22) 100%);
-}
-
-.head-band.has-bg.bg-light .head-scrim::after {
-  background: rgba(242, 239, 233, 0.22);
-}
+/* 10-13 23:36 站长撤了浅照片那一档的提亮罩（「调亮度应该是压暗，现在变成提亮」）。
+   这一枚键三页共用，新建页／笔记列表页那两条同名的 `.bg-light` 罩层覆盖一起删了；
+   延段照旧等于罩层渐变末档（0.22 那一档），否则带子与延段之间出硬边。 */
 
 .head-scrim {
   position: absolute;
@@ -216,6 +211,9 @@
   gap: 24rpx;
   background: var(--bg-page);
   border-radius: var(--r-card) var(--r-card) 0 0;
+  /* 站长 10-14 20:5x 那一句里"关于、设置"两档的落点就是这一枚——两档都住在它下面，一处管两档。
+     与列表页那张纸卡同一枚 `--sh-lift`（`app.wxss`），不在这页另抄一串数。 */
+  box-shadow: var(--sh-lift);
 }
 
 /* R6（「毛玻璃如果下方纯色，要进行渐变处理，不要一刀切」）：这一行下面就是实心页面底，

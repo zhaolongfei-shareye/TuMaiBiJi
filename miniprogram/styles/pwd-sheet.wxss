@@ -1,6 +1,6 @@
 /* 六位密码那一层的皮。站长 10-12 原话：「看笔记提示输入密码的框，跟设置密码的框风格不一致。要统一。」
    这一份是从 pages/me/me.wxss 里**整段搬过来的**，一个数值都没改（六格 78×96、缝 14、卡宽 620、
-   离顶 180、遮罩 rgba(20,20,28,.55) 那套都是他 10-02/10-03 真机调出来的数）。
+   离顶 180 那套是他 10-02/10-03 真机调出来的数）。遮罩底色是 10-13 唯一改过的一项，见下面那条注释。
    为什么单独成一个文件：小程序的页内样式只服务自己那一页，首页详情窗与详情页要用同一层面板，
    留在 me.wxss 里就得再抄一份到 index.wxss／detail.wxss——两份皮迟早长歪，那正是他打的这一条。
    三页各 @import 这一份（me.wxss／index.wxss／detail.wxss），配套标记在 templates/pwd-sheet.wxml。
@@ -12,15 +12,18 @@
    站长 10-02 iPhone 11：居中那一版键盘还是把两枚按钮盖住了——微信只保证"焦点框不被压住"，
    它不知道这张卡底下还有按钮。所以这一层不再居中：卡自己坐到上面去（离顶 180rpx），
    input 那边同时关掉 adjust-position（不让微信去顶整页），两枚按钮永远在键盘上面。
-   其余几何一项都不自己发明：遮罩 rgba(20,20,28,.55) / 卡宽 620rpx / 内边距 48·32·32 /
-   一行两枚各占一半 —— 与 categories.wxss 的 .dialog-mask / .dialog-card / .dialog-actions 同值。 */
+   其余几何一项都不自己发明：卡宽 620rpx / 内边距 48·32·32 / 一行两枚各占一半
+   —— 与 categories.wxss 的 .dialog-mask / .dialog-card / .dialog-actions 同值。
+   ⚠ 底色这一项**不再与那几处同值**：10-13 23:37 真机图打回「密码弹窗突然变暗，这个不合理，
+   要亮度不变」⇒ 这一层只留"点外面收口"的热区，不许压暗整屏。其余四处同值的 `.dialog-mask`
+   （app.wxss／me.wxss／create.wxss／categories.wxss）他没指，照旧压暗。 */
 .pwd-mask {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(20, 20, 28, 0.55);
+  background: transparent;
   display: flex;
   align-items: flex-start;
   justify-content: center;

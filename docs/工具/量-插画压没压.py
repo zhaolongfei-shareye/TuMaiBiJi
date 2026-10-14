@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# 首页那四张插画**压平了没有**（10-11 09:5x 站长：「需求+效果图都有」「如果效果图你都不去参考，做效果图的意义是什么？」），
+# 首页包里的插画**压平了没有**（10-11 09:5x 站长：「需求+效果图都有」「如果效果图你都不去参考，做效果图的意义是什么？」）
+# ——10-11 那趟是四张，2.2 B 方案撤掉右两枚计数块之后名单收到两张（在下面 FILES，别在这里写死数量）。
 # 以及**压平有没有压出白边**（10-11 13:2x 站长：「笔记和卡片上面的图片透明底消除不干净，有明显的白边，不美观」）。
 # 为什么要有这一把：效果图第 271／273 行画的是"块面玻璃＋人物与 icon 实心"，可原始 PNG 自己就是大半透明
 # （`ic-person.png` 实心像素只占 0.7%）——纱挂在容器上，**静态读样式表与读令牌都看不见这件事**，
@@ -17,7 +18,9 @@ from PIL import Image
 from PIL.ImageFilter import MaxFilter
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..'))
-FILES = ['ic-person.png', 'ic-person-alt.png', 'ic-stat-notes.png', 'ic-stat-cards.png']
+# 名单跟着 2.2 B 方案收：ic-stat-notes／ic-stat-cards 那两枚随右两枚计数块一起撤出包，
+# 现在只有人物那两张还压在首屏那层白面毛玻璃上（压没压平直接决定穿不穿图）。
+FILES = ['ic-person.png', 'ic-person-alt.png']
 # 上一版（把柔光圈拉成实心白）实测 67%~82%，抠掉那圈之后 8%~20% ⇒ 门槛放 30%，两头都留得下余量
 RING_WHITE_MAX = 30.0
 
@@ -48,6 +51,6 @@ for p in FILES:
         bad.append(f'{p} 最外环 {ring_pct:.0f}% 是实心近白＝那圈白边又回来了（压平时"凡 α>0 就拉满"会把它造出来，'
                    f'α≤64 那一档必须整枚抠掉）')
 
-print('\n' + ('✓ 四张插画全是实心、轮廓外透明、最外环也没有成片实心白——压平与白边两头都对得上' if not bad
+print('\n' + (f'✓ {len(FILES)} 张插画全是实心、轮廓外透明、最外环也没有成片实心白——压平与白边两头都对得上' if not bad
       else f'!! 红 {len(bad)} 条：' + '；'.join(bad) + '\n   重烘一次：python3 docs/工具/烘-插画压平.py --从git <原件 commit> --写进包'))
 sys.exit(0 if not bad else 1)

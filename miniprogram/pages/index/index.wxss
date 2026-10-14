@@ -468,7 +468,9 @@
      （15:2x，§8.184）跟着换成 `--bg-card`；派生函数与镜像值留着，撤它们要连 `验-列表层底色` 一起动。 */
   background: var(--bg-card);
   border-radius: var(--r-card) var(--r-card) 0 0;
-  box-shadow: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
+  /* 这一枚是**正本**：站长 10-14 说的"这个是对的"指的就是它。值搬进 `app.wxss` 的 `--sh-lift`，
+     像素一个数没改，只是让首屏／二屏／关于／设置跟着同一枚。 */
+  box-shadow: var(--sh-lift);
   overflow: hidden;
 }
 
@@ -1344,14 +1346,9 @@
   color: rgba(20, 22, 26, 0.42);
 }
 
-.container.has-bg.bg-light .head-scrim {
-  background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.28) 30%,
-    rgba(242, 239, 233, 0.22) 62%, rgba(242, 239, 233, 0.3) 100%);
-}
-
-.container.has-bg.bg-light .head-scrim::after {
-  background: rgba(242, 239, 233, 0.3);
-}
+/* 10-13 23:36 站长撤了浅照片那一档的提亮罩（「调亮度应该是压暗，现在变成提亮」）。
+   这一页与新建页、「我的」页吃**同一枚本机键**，所以三页一起改：罩层恒为压暗那一支。
+   延段（`.head-scrim::after`）跟着留回压暗那档——它必须等于罩层渐变自己的末档，否则 542 那条线上出硬边。 */
 
 /* ---------- 卡顶那两行固定字跟着图翻（站长 10-12：「自动切换的范围，扩展到笔记列表页和卡片
    列表页…固定的两行文字」）

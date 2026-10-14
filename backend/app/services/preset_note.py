@@ -16,9 +16,13 @@
    从现网 appInfo.js / about.js 抄的），所以这一条既不吃提炼那次静默降级，
    也不在注册链路上多烧一次混元调用。
 
-它**不是**一种新笔记类型：库里就是一行普通的 `notes`，能改、能删、能设私密、能分享，
-服务端与客户端都不为它开分支。唯一的痕迹是 `source_type == "preset"`——
-那只是为了让"他动笔的第一篇"和"他名下已经有几篇"这两句判据还能分得开。
+它**不是**一种新笔记类型：库里就是一行普通的 `notes`，能改、能设私密、能分享，
+读写那几条链都不为它开分支。唯一的痕迹是 `source_type == "preset"`——
+那本来只是为了让"他动笔的第一篇"和"他名下已经有几篇"这两句判据还能分得开。
+
+**10-14 起多一个例外：那一篇删不掉，它名下那张卡片也撤不掉**（站长「默认的不能删除」）。
+闸挂在下面那两个常量上，由 `delete_note` 与 `drop_note_card` 两个口各引一次；
+除这两处之外它和用户自建笔记一模一样（§8.232 判据 4 里"能删"那半句从他改口那天起作废）。
 """
 import json
 import os
@@ -29,6 +33,13 @@ from app.models.note import Note
 
 SEED_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "seed", "preset_note.json")
 PRESET_SOURCE_TYPE = "preset"
+
+# 站长 10-14：「默认笔记，和默认卡片有没有做……然后默认的不能删除」。
+# 那两句要说给用户听的话只活在这一处：删笔记与撤卡片两个口共用，两处各写一遍迟早一边改了另一边没改。
+# 判据就是播种时那个 `source_type == "preset"`——不另起一列，也不靠"名下第一篇"猜（那种写法会
+# 因为他改过标题、换过分类而误伤别人的笔记）。
+PRESET_NOTE_KEEP_MSG = "自带那一篇是产品说明，删不掉；要改内容可以直接编辑"
+PRESET_CARD_KEEP_MSG = "自带那一篇的卡片删不掉"
 
 
 def seed_row(path: str = SEED_PATH) -> dict:

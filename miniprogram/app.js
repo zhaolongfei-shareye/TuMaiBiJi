@@ -6,7 +6,7 @@ const cloudUpload = require('./utils/cloudUpload')
 const cardCloud = require('./utils/cardCloud')
 const profileCloud = require('./utils/profileCloud')
 const mpAssets = require('./utils/mpAssets')
-const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle } = require('./utils/palette')
+const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle, moodOf, moodNext, moodOfWallpaper } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
 // 分享卡片的路径上带着邀请人的 user id（?inviter=123）。落到本地存储是因为它必须活到
@@ -23,6 +23,23 @@ const UI_FONT_CLASS = { song: 'font-song', fang: 'font-fang', kai: 'font-kai' }
 // 跟着账号跑到另一台设备上，只会让人看到"我的图怎么自己变黑了"。
 // 三档的值与那两枚灰度都在 utils/palette.js 的 BG_DIMS 里，这里只管存哪一个档被选中。
 const BG_DIM_KEY = 'bgDim'
+
+/**
+ * 「心情」那一档彩色玻璃（站长 10-14：「切换毛玻璃改到首页，增加一个入口『换心情』…每次点击切换一种」）。
+ *
+ * 为什么只存本机：服务端那一列叫 `wallpaper`，只有四套壁纸的值，**表达不了"同一套壁纸配墨面板
+ * 还是配彩色玻璃"**——墨与象牙共用 tint-paper 这一枚。要让它跨设备，得给 `user_profiles` 加一列并部署。
+ * 代价说清楚：换手机或重装之后这一档回到默认（墨＝今天那一屏），壁纸本身照旧从服务端带回来。
+ * 加不加那一列归他拍（本轮先按"入口搬到首页"这条做完，不替他扩需求）。
+ *
+ * ⚠ 但本机这一档不能压着服务端带回来的壁纸乱配：壁纸是青的、心情还是旧的樱落，屏上就成
+ * "青底配一支粉玻璃"。所以读的时候先对一次账，两档同壁纸（墨与象牙都是 tint-paper）才认本机那一位。
+ */
+const MOOD_KEY = 'glassMood'
+
+// 壁纸那四枚的**本机缓存**（权威仍在服务端，见 `setWallpaper` 那段）。单独起一个键名，
+// 不复用历史上可能的 'wallpaper'：那一枚在 10-04 之后已经没人写，读它会把老版本残留当成新选择。
+const WALLPAPER_CACHE_KEY = 'wallpaperCache'
 
 function rememberInviter(options) {
   const raw = options && options.query ? options.query.inviter : ''
@@ -236,16 +253,22 @@ App({
    *    取 .key 就是把这件事收在一处：往下所有人拿到的都是四枚之一的 key。
    */
   getWallpaper(fromServer) {
-    const wanted = fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper) || 'default'
+    const wanted = fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper)
+      || wx.getStorageSync(WALLPAPER_CACHE_KEY) || 'default'
     return themeOf(wanted).key
   },
 
   /**
-   * 选完壁纸之后落一次账。四枚现在都由服务端当家（站长 10-04 拍「统一」，
-   * 后端白名单已加这三个新 key），所以这里只更新内存里那一份，不再写本机存储。
+   * 选完壁纸之后落一次账。四枚的**权威在服务端**（站长 10-04 拍「统一」，后端白名单已加这三个新 key）：
+   * 登录回来时 `getWallpaper(fromServer)` 吃服务端那一枚，本机这一份只是没有会话时的兜底缓存——
+   * 与 2.1 名片那四格「服务端为权威、本机降级成缓存」同一手法。
+   * 为什么现在要留这一份缓存：模拟器与登录失败那一趟 `globalData.userInfo` 是空的（§D22 同一症状），
+   * 而「换心情」那一档要与壁纸对账；没有缓存，天青／樱落／雨雾三档会被对账判成"对不上"而退回墨，
+   * 首页那枚就只剩两档可点。
    */
   setWallpaper(key) {
     if (this.globalData.userInfo) this.globalData.userInfo.wallpaper = key
+    wx.setStorageSync(WALLPAPER_CACHE_KEY, key)
     return key
   },
 
@@ -304,7 +327,33 @@ App({
 
   // .container 上那一串类名 = 主题 + 界面字体。页面只管贴，不各自拼第二份规则。
   containerClass(wallpaper) {
-    return [themeOf(wallpaper).cls, this.uiFontClass()].filter(Boolean).join(' ')
+    return [themeOf(wallpaper).cls, this.glassMood(wallpaper).cls, this.uiFontClass()].filter(Boolean).join(' ')
+  },
+
+  /**
+   * 当前那一档心情。脏值与"从来没点过"落回第一档墨＝今天那一屏；
+   * 本机这一档与服务端带回来的壁纸对不上账时以壁纸为准，不然换台手机就是"青底配一支粉玻璃"。
+   * （墨与象牙共用 tint-paper，所以同壁纸的那两档仍由本机这一位说了算。）
+   */
+  glassMood(wallpaper) {
+    const w = wallpaper || this.getWallpaper()
+    const m = moodOf(wx.getStorageSync(MOOD_KEY))
+    return m.theme === themeOf(w).key ? m : moodOfWallpaper(w)
+  },
+
+  /**
+   * 点一次换一档。**这里只做本机的三件事**：记档、把壁纸跟着换成本档钉的那套、让主题重算。
+   * 往服务端那一趟由调用方发（首页那枚按钮），理由与 `pages/wallpaper` 原来那条
+   * `applyWallpaper` 一样：PUT 是异步的，界面不能等它。
+   * 彩色那四档各自钉着一套壁纸，所以这一枚按下去，整屏（页面底色、卡片、底栏、玻璃）一起换——
+   * 「四种界面配色…改为不同颜色的毛玻璃」要的就是这个一起换，不是只换面板那一层。
+   */
+  cycleGlassMood() {
+    const m = moodNext(this.glassMood().key)
+    wx.setStorageSync(MOOD_KEY, m.key)
+    this.setWallpaper(m.theme)
+    this.applyTheme(m.theme)
+    return m
   },
 
   getThemeClass(wallpaper) {

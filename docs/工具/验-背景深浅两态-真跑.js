@@ -233,6 +233,26 @@ async function main() {
   ok('⑱ 缓存里是 32 行逐行剖面（顶行 >200、底行 <100），不是一个平均数',
     /行32 顶2\d\d 底\d\d\b/.test((mixLum || [])[0] || ''), JSON.stringify(mixLum))
   await mp.screenshot({ path: path.join(OUT, '上浅下暗-首页.png') })
+  /* ⑰b 10-14 那一刀的判据（我自己上一版漏掉的半句）：「返回」那一枚抬到墨面之上之后，
+     压的是形象图**下那一截**，不是头部那一条带 ⇒ 在这张"上浅下暗"的图上它必须留纸白。
+     上一版我只让它吃 `--text-secondary`，而那支令牌是按**头部**那一档翻的（`bg-light` 翻墨），
+     于是这张图会把它翻成墨、压在暗底上归零——正是站长 10-12 21:1x 那句
+     「请按照上下部分来分别判断」要防的事。两条一起钉：先钉它落点真在 low 那一档里（前提），
+     再钉它屏上算出来的字色是纸白（结果）。 */
+  await mp.evaluate(() => { getCurrentPages().slice(-1)[0].setData({ active: 'photo' }) })
+  await sleep(1600)
+  const mixWinH = await mp.evaluate(() => wx.getWindowInfo().windowHeight)
+  const outMix = await mp.evaluate(() => new Promise((res) => {
+    wx.createSelectorQuery().select('.out').boundingClientRect((r) => res(r || null)).exec()
+  }))
+  const outMixEl = await page.$('.out')
+  const outMixColor = outMixEl ? await outMixEl.style('color') : null
+  ok('⑰b 落点前提：那一枚在屏上确实落在 low 那一档（视口 0.55~0.85）里',
+    !!outMix && outMix.top / mixWinH >= 0.55 && outMix.bottom / mixWinH <= 0.85,
+    outMix && `行 ${Math.round(outMix.top)}~${Math.round(outMix.bottom)}／视口高 ${mixWinH}`
+      + `＝${outMix && ((outMix.top / mixWinH).toFixed(2))}~${outMix && ((outMix.bottom / mixWinH).toFixed(2))}`)
+  ok('⑰c 上浅下暗那张：「返回」留纸白（翻色吃的是下那一档，不是头部那一档）',
+    /rgba?\(\s*242,\s*239,\s*233/.test(String(outMixColor)), outMixColor)
   /* ⑲ 同一张图换一屏也要各自算一遍：列表页的上截取盒子 0~20%（大字那一小段＝这张图的浅带），
      下截取 73%~100%（卡顶那 158 的白纱＝这张图的暗带）⇒ 这一屏该挂 bg-light、**不**挂 bg-light-low，
      那两行固定字因此走"整档墨"那一支。两枚布尔一枚有一枚无，才是"上下分别判断"落到了样式上。 */

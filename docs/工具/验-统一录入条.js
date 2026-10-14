@@ -132,8 +132,14 @@ ok('收起态入口只有一块人物（胶囊那套类名与样式一处不留�
   `blk-person ${(wxml.match(/(?:^|[\s"])class="blk-person/g) || []).length} 块`)
 ok('那一组只在收起态渲染（展开时整组让位给面板）',
   /<view wx:if="\{\{!active\}\}" class="home-blk"/.test(wxml))
-ok('左块那句永远是 barIdle（不再按模式换字）',
-  /class="blk-jot-l">[\s\S]{0,160}\{\{t\.barIdle\}\}/.test(wxml))
+/* 2.2 B 方案：左块下面那条「记下来」整条撤了（站长原话「左下的记下来这部部分，去掉」），
+   屏上不再有那句话，所以这一条改钉两件事：① 两处入口的**可及名**仍只读 `barIdle` 这一个键
+   （不为一枚圆形 ➕ 另起一句文案——文案正本还是那一句"记下来"）；② 旧白条那几个类一处不留。 */
+ok('左块与圆形 ➕ 的可及名都只读 barIdle（白条那三个类一处不留）',
+  /<view class="blk-person"[^>]*aria-label="\{\{t\.barIdle\}\}"/.test(wxml)
+  && /<view class="blk-plus"[^>]*aria-label="\{\{t\.barIdle\}\}"/.test(wxml)
+  && !/blk-jot/.test(wxml + wxss),
+  `blk-person/blk-plus 的 aria-label`)
 ok('旧的 .bar.open 与条内 hint 整段撤净', !/\.bar\.open/.test(wxss) && !/bar-hint/.test(wxml + wxss))
 // 收起态条身右边那三枚小圆：站长 10-09 撤了（原话"原来横条右边那三个按钮不清晰，
 // 默认就是直接拍照那一档"）。原来那两条"正好三枚／各自指向 camera|album|url"改成钉**撤净**，
@@ -178,15 +184,17 @@ ok('那一行小字存在且排在面板之前（在框外）',
   outAt > -1 && panelAt > outAt && wrapAt > -1 && outAt > wrapAt
   && /<view wx:if="\{\{active\}\}" class="entry-wrap">/.test(wxml),
   `wrap@${wrapAt} out@${outAt} panel@${panelAt}`)
-// 10-10 深夜这两枚换了内容：左边不再报"这一屏在干什么"，改成与收起态同一条轮播 Tips；
-// 右边从一句说明变成一枚真的按钮「返回」（与笔记列表右上角同一个词、同一个动作）。
-ok('那一行两枚：左边是轮播 Tips、右边是「返回」那一枚按钮',
-  /class="out-l">\{\{tipsPrefix\}\}\{\{tips\[tipIdx\]\}\}<\/text>/.test(wxml)
-  && /class="out-r"[^>]*role="button"[^>]*aria-label="\{\{t\.back\}\}"[^>]*catchtap="collapse"/.test(wxml))
-// Tips 那一枚必须只占一行：这一行在流内，一折行整块面板就被顶下去，而它每 8 秒换一句。
-ok('Tips 那一枚钉死单行（折行＝面板每 8 秒跳一次）',
-  /white-space:\s*nowrap/.test(seg('.out-l')) && /text-overflow:\s*ellipsis/.test(seg('.out-l'))
-  && /min-width:\s*0/.test(seg('.out-l')), seg('.out-l').replace(/\s+/g, ' '))
+// 10-10 深夜这两枚换过内容；10-14 站长「第二屏，Tips 去掉」⇒ 这一行只剩「返回」一枚。
+ok('那一行只剩「返回」那一枚按钮（与笔记列表右上角同一个词、同一个动作）',
+  /class="out"[^>]*>\s*<text class="out-r"[^>]*role="button"[^>]*aria-label="\{\{t\.back\}\}"[^>]*catchtap="collapse"/.test(wxml),
+  (wxml.match(/<view class="out">[\s\S]{0,160}/) || [''])[0].replace(/\s+/g, ' '))
+// 原来这一条钉 `.out-l` 的 nowrap，理由是"这一行在流内，一折行就把整块面板顶下去，而它每 8 秒换一句"。
+// 载体撤了一处，这条风险就没有载体了；换成钉**还在的那一处**：首屏那一格允许折两三行
+// （它就是按两行排的），靠 `flex:1 + min-width:0 + max-width:9em` 那一套，不许有人为了单行改回写死。
+ok('首屏那一格 Tips 仍是"吃余量、可折行"（行宽上限 9em，不套 nowrap）',
+  /flex:\s*1/.test(seg('.blk-tips')) && /min-height:\s*0/.test(seg('.blk-tips'))
+  && /min-width:\s*0/.test(seg('.blk-tips-line')) && /max-width:\s*9em/.test(seg('.blk-tips-line'))
+  && !/white-space:\s*nowrap/.test(seg('.blk-tips-line')), seg('.blk-tips-line').replace(/\s+/g, ' '))
 // 面板肚子里只剩"一个框（或一横排小图）+ 一枚条"：那排按钮、四步指引、清空、粘贴都不该回来
 ok('面板里没有那排按钮（清空/粘贴/保存/取消全撤）', !/class="acts"/.test(wxml) && !/catchtap="pasteUrl|catchtap="clearShots|catchtap="cancelWrite/.test(wxml))
 ok('四步指引整批撤净（模板、引用、样式都没有）',
@@ -241,11 +249,23 @@ ok('导流目标还是那一页', /navigateTo\(\{ url: '\/pages\/profile\/profil
 ok('选图入口全页只有 pickImage 一处', (js.match(/wx\.chooseMedia/g) || []).length === 1)
 // 10-11 12:2x 他那句「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」把后半句作废了：
 // 这一行不再"面板展开那一趟整个不渲染"，两屏都在、同一个落点。闸只留 `bgSrc` 那一半（没铺图它没意义）。
+// 第三、四条原来钉的是"没有任何一条带 `.home-swap` 的规则把它藏起来"＋"没有 `.entry-dock … .home-swap`
+// 这条选择器"。第二条是**写法**的锁，不是**行为**的锁：10-14 站长把这一行改成收起态 fixed 钉在面板上方
+// （`.container:not(.entry-dock) .home-swap`），那条正则撞上 `:not(.entry-dock)` 就假红。
+// ⇒ 换成按行为钉：凡选择器里带 `.home-swap` 的规则块，一律不许出现 display:none／visibility:hidden。
+// 这样"展开态把它藏回来"照样红，而"收起态换个落点"不再被误伤。
+const swapBlocks = (wxss.match(/[^{}]*\.home-swap[^{]*\{[^}]*\}/g) || [])
 ok('换背景那一行两态都画（站长 10-14「白底也要换背景，这是核心功能」，§8.235），「调亮度」那一截仍只在铺图时画，展开那一趟照旧渲染',
   /<view class="home-swap">/.test(wxml)
   && /wx:if="\{\{bgSrc\}\}" class="swap-half" catchtap="onCycleDim"/.test(wxml)
-  && !/\.home-swap[^{]*\{[^}]*(display:\s*none|visibility:\s*hidden)/.test(wxss)
-  && !/\.entry-dock[^{]*\.home-swap/.test(wxss))
+  && swapBlocks.every((b) => !/display:\s*none|visibility:\s*hidden/.test(b)))
+// 站长 10-14 22:4x「换心情，调亮度，换背景，下移到下半部，面板上方」：收起态整条 fixed 钉在面板顶之上，
+// 展开态那条流内账一个字不动（第二屏框外那一行今天只剩「返回」，两枚同挤一条带会撞）。
+const swapFixed = /container:not\(\.entry-dock\)\s*\.home-swap\s*\{([^}]*)\}/.exec(wxss.replace(/\s+/g, ' '))
+ok('收起态那一行改成钉在面板上方（fixed＋bottom 从面板顶算），展开态仍走原来那条流内账',
+  !!swapFixed && /position:\s*fixed/.test(swapFixed[1]) && /bottom:\s*560rpx/.test(swapFixed[1])
+  && /margin:\s*0/.test(swapFixed[1]),
+  swapFixed ? swapFixed[1].trim() : '没找到 `.container:not(.entry-dock) .home-swap` 那条')
 ok('➕ 那一格是唯一"再加一张"的落点', (wxml.match(/catchtap="onAddShot"/g) || []).length === 1)
 // 站长 10-11 真机报的「拍照只支持一张，相册可以」根因就在这两条上：快门那一排的条件是
 // `!previewImages.length`，所以第一张之后**整排消失**，➕ 成了唯一入口；而 ➕ 原来没带 data-source，
@@ -272,9 +292,19 @@ ok('camera / album 两个来源仍归 pickImage 管（并进照片那一档的�
 ok('滑动条圆里的图形按三档给：照片=images、链接=link、文字=pen',
   /sldIconFor\(active\)/.test(js) && /photo: 'images', url: 'link', write: 'pen'/.test(js)
   && ['glyph-pen', 'glyph-camera', 'glyph-images', 'glyph-link', 'glyph-plus'].every((c) => wxss.includes('.' + c)))
-// 整套图形只留一个描边重量（原来 1.5 与 1.6 混用，小尺寸上粗细不齐）
+/* 整套图形只留一个描边重量（原来 1.5 与 1.6 混用，小尺寸上粗细不齐）。
+   10-13 第二屏方案 D19 甲开了一条例外：首屏那枚圆形 ➕ 单独粗到 2.4（站长「还有原内的➕号，稍微粗一点」）。
+   例外只给那一枚，所以钉三样：① 重量集合只能是 {1.6} ∪ {那一枚的那两行}；② 那两行必须成对
+   （`-webkit-mask-image` ＋ `mask-image`——只写一条在 iPhone 上静默不生效）；③ 它们必须真落在
+   `.blk-plus-glyph` 自己那一段里（跑到别处＝把整页图形一起加粗，1.6 那一档就没人守了）。 */
 const sw = [...new Set((wxss.match(/stroke-width='[\d.]+'/g) || []).map((x) => x.slice(14, -1)))]
-ok('这一页的图形描边只有一个重量，且是 1.6', sw.length === 1 && sw[0] === '1.6', sw.join(','))
+// 只认选择器**正好**是 `.blk-plus-glyph` 的那几段（文件里它出现两次：基础那条给尺寸与面色，
+// 后一条给 2.4 那支 mask）。用 indexOf 会从第一段起算、把 `}` 之前的内容当成整段，读出来恒为 0。
+const thickLines = [...wxssRaw.matchAll(/(?:^|\n)\.blk-plus \.blk-plus-glyph\s*\{([^}]*)\}/g)]
+  .reduce((n, m) => n + ((m[1].match(/stroke-width='2\.4'/g) || []).length), 0)
+ok('这一页的图形描边只有 1.6 那一档（外加首屏圆形 ➕ 单独那一支 2.4）',
+  sw.every((x) => x === '1.6' || x === '2.4') && sw.includes('1.6') && thickLines === 2,
+  `重量 ${sw.join(',')}／➕ 那一段里 2.4 出现 ${thickLines} 次（要 2＝标准＋-webkit- 各一行）`)
 
 // 上屏文字全走字典：注释和属性里出现中文不算"写死"，只看真正会上屏的那几段
 const rendered = wxml.replace(/<!--[\s\S]*?-->/g, '')
@@ -298,10 +328,18 @@ ok('页面上绑到的处理函数在 create.js 里都有', [...handlers].length
 const panelCss = seg('.panel')
 const PANEL_H = num(panelCss, 'height')
 const PANEL_OPEN_H = num(seg('.panel-open'), 'height')
-// 410／490 是站长 10-08 深夜圈的那个红框（顶 rpx 1107、底 1516）量出来的两档，
-// 正本效果图 c5；10-08 之前是 500／580，再之前 700。改这两个数要连着改下面那三条算式。
-ok('面板收起态定高 410rpx（10-10 压进站长那圈红框；10-08 从 700 压到 500 是上一笔）', PANEL_H === 410, String(PANEL_H))
-ok('展开态只多一行（490 = 410 + 80）', PANEL_OPEN_H === 490 && PANEL_OPEN_H - PANEL_H === 80, String(PANEL_OPEN_H))
+// 这两档的来历：10-08 之前 700，10-08 压成 500／580，10-10 压进站长那圈红框成 410／490，
+// 10-14 站长「第二屏的内面板，高度压缩一下，排版紧凑一点」＋「两个屏的内框高度要一致」
+// ⇒ 收起 372（与首屏那块左块同一个数），展开仍 490（那一档本来就没有富余）。
+// 这里**不钉字面量**：钉的是两条关系——收起＝首屏左块同高、展开−收起＝一行小图的行距。
+// 真要改数，改的是这两条关系与下面那三条加总（`验-录入面板沉底.js` 读的是同一份 CSS）。
+const BLOCK_H = num(seg('.blk-person'), 'height')
+const ROW_PITCH = num(seg('.th'), 'height') + num(seg('.strip'), 'gap')
+ok('收起那一档与首屏那块左块同高（两屏的内框是同一个数）',
+  PANEL_H > 0 && PANEL_H === BLOCK_H, `面板 ${PANEL_H}／左块 ${BLOCK_H}`)
+ok(`展开那一档正好多一行小图（差 ${PANEL_OPEN_H - PANEL_H}，一行是 ${ROW_PITCH}）`,
+  PANEL_OPEN_H - PANEL_H >= ROW_PITCH && PANEL_OPEN_H - PANEL_H < ROW_PITCH + 8,
+  `${PANEL_OPEN_H} − ${PANEL_H}`)
 ok('面板算 border-box（定高含内边距与描边）', /box-sizing:\s*border-box/.test(panelCss))
 ok('面板是 flex 列', /display:\s*flex/.test(panelCss) && /flex-direction:\s*column/.test(panelCss))
 ok('展开那一档挂在面板自己身上，不是另一块 DOM',
@@ -582,22 +620,65 @@ ok('快门与滑动条的色仍只从 createSkin() 递进来，且 create.js 不
   && !/toneStyle/.test(js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
 ok('小黄点的色值仍由 palette 经 style 递进来',
   /tipDotStyle: 'background:' \+ TIP_DOT/.test(js) && palette.TIP_DOT === '#F6C445')
-/* 站长 10-11 13:2x：「第二屏的 Tips 前面少了小圆点，要与第一屏一致」。"一致"分三层钉：
-   ① 那一枚真挂在 `.out` 的第一个子位置，色仍从 tipDotStyle 递进来（不是另调一支黄、也不是抄进样式表）；
-   ② 几何四条与第一屏 `.tips-dot` **逐字相同**——差一档就不是"一致"，是"差不多"；
-   ③ `.out` 原来那行有 `gap: 20rpx`，它分的是"字与返回"，留着它点与字就成 12＋20＝32，
-      跟第一屏的 12 对不上 ⇒ 那道缝必须挪到 `.out-r` 的 margin-left 上（真跑 H4"左右不打架"照旧成立）。 */
-const dotGeo = (sel) => ['width', 'height', 'margin-top', 'margin-right', 'border-radius']
-  .map((p) => { const m = new RegExp(`${p}:\\s*([^;]+);`).exec(seg(sel)); return m ? `${p}:${m[1].trim()}` : `${p}:(缺)` })
-const gTip = dotGeo('.tips-dot'), gOut = dotGeo('.out-dot')
-ok('第二屏框外那行有点，且吃的是同一枚 tipDotStyle（样式表里没有第二支黄）',
-  /<view class="out">\s*(?:<!--[\s\S]*?-->\s*)?<view class="out-dot" style="\{\{tipDotStyle\}\}"><\/view>/.test(wxml)
-  && !/#f6c445/i.test(wxss),
-  wxml.slice(Math.max(0, wxml.indexOf('<view class="out">')), wxml.indexOf('<view class="out">') + 200).replace(/\s+/g, ' '))
-ok('两枚点的几何与第一屏逐字相同（他这句"要与第一屏一致"，不是"差不多"）',
-  gTip.join('|') === gOut.join('|'), `第一屏 ${gTip.join(' ')} ／ 第二屏 ${gOut.join(' ')}`)
-ok('点与字只隔 12（`.out` 那道 gap 已挪到 .out-r 的 margin-left，否则这里量到 32）',
-  !/gap:/.test(seg('.out')) && /margin-left:\s*20rpx/.test(seg('.out-r')),
+/* 站长 10-14：「第二屏，Tips 去掉」⇒ 那枚小黄点在屏上只剩首屏一处。
+   原来这三条钉的是"两屏那两枚点逐字相同"（他 10-11 13:2x 那句「要与第一屏一致」）；
+   载体撤掉一处，"一致"就没有对手了，判据跟着换成"只剩一处、且那一处仍是同一个出口"：
+   ① 第二屏那一行里不许再有 `.out-dot`／`.out-l`（谁回来，谁就是第二个 Tips 入口）；
+   ② 首屏那一枚仍从 `tipDotStyle` 递色，样式表里没有第二支黄；
+   ③ 点与字那道缝仍是 12——这一档 10-14 没指，不许被这轮顺手带走。 */
+const dotGeo = (sel) => {
+  const o = {}
+  ;['width', 'height', 'margin-top', 'margin-right', 'border-radius'].forEach((p) => {
+    const m = new RegExp(`${p}:\\s*([^;]+);`).exec(seg(sel))
+    o[p] = m ? m[1].trim() : null
+  })
+  return o
+}
+const gTip = dotGeo('.tips-dot')
+ok('第二屏那一行里不再有 Tips、也不再有它前面那枚点（`.out-l`／`.out-dot` 全项目清零）',
+  !/out-l|out-dot/.test(wxml) && !/\.out-l|\.out-dot/.test(wxss),
+  seg('.out').replace(/\s+/g, ' ').slice(0, 70))
+/* 判据跟着 10-14 那一轮改口径（改的是尺子不是代码）：原来钉"小黄点只剩首屏一处"，
+   因为那一阵全站只有 Tips 前面那一枚。站长今天拍的那张首屏稿上，新加的那一行
+   「用 AI 帮你读懂一切…」前面也有一枚（效果图正本 `docs/design/10-14首屏顶部改版/对比.png`）
+   ⇒ 现在是两枚。这条真正要防的从来不是"枚数"，而是**第二支写死的黄**：
+   色只从 palette.TIP_DOT 经 style 递进来，样式表里出现 #f6c445 就是红。 */
+const tipUses = (wxml.match(/style="\{\{tipDotStyle\}\}"/g) || []).length
+ok('小黄点两枚（Tips 那一枚＋新行那一枚），色仍由 palette 经 style 递进来（样式表里没有第二支黄）',
+  tipUses === 2 && /class="tips-dot" style="\{\{tipDotStyle\}\}"/.test(wxml)
+  && /class="ai-dot" style="\{\{tipDotStyle\}\}"/.test(wxml)
+  && !/#f6c445/i.test(wxss), `wxml 里 style="{{tipDotStyle}}" 出现 ${tipUses} 次`)
+ok('首屏那枚点的四条几何没被这轮带走（14 见方、离字 12、圆）',
+  gTip.width === '14rpx' && gTip.height === '14rpx' && gTip['margin-right'] === '12rpx'
+  && gTip['border-radius'] === '50%' && /^\d/.test(gTip['margin-top'] || ''),
+  JSON.stringify(gTip))
+/* ---------- 站长 10-14 三刀（都在这一屏那两行小字上） ----------
+   「Tips 字体调大一档」＋「调亮度换背景字体小一档，不要加粗」＋「旁边的亮度圆也同步缩小」。
+   判据一律钉**关系**不钉数值：字档写在 app.wxss 的令牌梯上，以后整架梯子挪档，这几条跟着走就还成立；
+   抄死 24／21 就是下一次改口的假红源头（这一类账 10-08、10-10 两轮都欠过）。 */
+const tipFs = num(seg('.blk-tips-in'), 'font-size')
+const swapFs = num(seg('.swap-text'), 'font-size')
+const swapW = (/font-weight:\s*([^;]+);/.exec(seg('.swap-text')) || [null, ''])[1].trim()
+ok('两行的主次对调了：Tips 吃 --fs-meta 那一档，且比「调亮度／换背景」大一档',
+  tipFs === Number(String(TOK['fs-meta']).replace('rpx', ''))
+  && swapFs === Number(String(TOK['fs-tiny']).replace('rpx', '')) && swapFs < tipFs,
+  `Tips ${tipFs}／那一行 ${swapFs}（令牌 ${TOK['fs-meta']}／${TOK['fs-tiny']}）`)
+ok('「调亮度」「换背景」那两字不加粗（他 10-14 点名撤的，700／bold 回来就红；不写也算过，继承下来就是常规）',
+  swapW === '' || /^(normal|400|500)$/.test(swapW), swapW)
+ok('亮度圆随那一行的字号同步（"同步缩小"钉的就是这一条：直径与字档脱钩即红）',
+  num(seg('.dim-dot'), 'width') === swapFs, `圆 ${num(seg('.dim-dot'), 'width')}／字 ${swapFs}`)
+ok('换背景那枚箭头与亮度圆同一档（两半并排不许一个 21 一个 24；⚠ 这一条是他那句"同步缩小"推的，不是他点的）',
+  num(seg('.swap-glyph'), 'width') === num(seg('.dim-dot'), 'width'),
+  `箭头 ${num(seg('.swap-glyph'), 'width')}／圆 ${num(seg('.dim-dot'), 'width')}`)
+ok('圆与箭头仍对回文字那一行（行高钉 34 不随字档走，margin-top 得按各自边长重算）',
+  ['.dim-dot', '.swap-glyph'].every((s) => Math.abs(num(seg(s), 'margin-top') - (34 - num(seg(s), 'width')) / 2) <= 1),
+  `.dim-dot ${num(seg('.dim-dot'), 'margin-top')}／.swap-glyph ${num(seg('.swap-glyph'), 'margin-top')}`)
+ok('Tips 抬档后那枚小黄点还在第一行正中间（margin-top 随字档重算，别只改字号）',
+  Math.abs(num(seg('.tips-dot'), 'margin-top') - (tipFs * 1.4 - 14) / 2) <= 1,
+  `margin-top ${num(seg('.tips-dot'), 'margin-top')}，该行高 ${tipFs}×1.4`)
+ok('那一行不再需要 gap／margin 补缝（行里只剩「返回」一枚，靠 justify-content 落右）',
+  !/gap:/.test(seg('.out')) && !/margin-left:/.test(seg('.out-r'))
+  && /justify-content:\s*flex-end/.test(seg('.out')),
   `.out＝${seg('.out').replace(/\s+/g, ' ').trim().slice(0, 70)}／.out-r＝${seg('.out-r').replace(/\s+/g, ' ').trim()}`)
 
 // ---------- 7. 提交链路：三档共用同一趟忙态时序 ----------
@@ -696,15 +777,18 @@ ok('onShow 仍然不重置草稿', !/previewImages: \[\]/.test(showBody) && !/ac
 ok('选完图返回仍然重算那三位（ready / 满 / 展开）',
   /this\._sync\(\)/.test(js) && /_sync\(\)\s*\{[\s\S]{0,600}panelOpen:/.test(js))
 ok('链接校验那条正则没被顺手改松', js.includes('const LINK_RE = /^https?:\\/'))
-// Tips 那一行仍然**只在收起态**渲染。原来它自己挂着 `!active && tips.length` 那道闸；
-// 10-10 晚它搬进了收起态那一组里，闸由组外壳 `<view wx:if="{{!active}}" class="home-blk">` 把，
+// Tips 那一行仍然**只在收起态**渲染。原来它住在整组最上面那一整行（`.tips`）；
+// 2.2 B 方案把它搬进右列那一格（`.blk-tips`），闸还是同一套：组外壳 `wx:if="{{!active}}"` 把，
 // 自己只留 `tips.length`。所以这一条钉的是"落在组里、且排在展开态之前"——
 // 光查那两个 wx:if 字面量会漏掉"搬出去了但闸没跟上"这一型（那样展开时提示会浮在面板上）。
-ok('Tips 那一行仍然只在收起态渲染（闸在组外壳上，本人在组内）',
-  /<view wx:if="\{\{tips\.length\}\}" class="tips">/.test(wxml)
-  && wxml.indexOf('class="home-blk"') < wxml.indexOf('class="tips"')
-  && wxml.indexOf('class="tips"') < wxml.indexOf('class="entry-wrap"'),
-  `blk@${wxml.indexOf('class="home-blk"')} tips@${wxml.indexOf('class="tips"')} wrap@${wxml.indexOf('class="entry-wrap"')}`)
+ok('Tips 那一格仍然只在收起态渲染（闸在组外壳上，本人在组内）',
+  /<view wx:if="\{\{tips\.length\}\}" class="blk-tips">/.test(wxml)
+  && wxml.indexOf('class="home-blk"') < wxml.indexOf('class="blk-tips"')
+  && wxml.indexOf('class="blk-tips"') < wxml.indexOf('class="entry-wrap"'),
+  `blk@${wxml.indexOf('class="home-blk"')} tips@${wxml.indexOf('class="blk-tips"')} wrap@${wxml.indexOf('class="entry-wrap"')}`)
+// 旧的那一整行载体（`.tips`／`.tips-line`）不许与新的那一格并存——两版并存是这类搬家最容易漏的。
+ok('旧 Tips 那一行的载体一处不留（`.tips ` 与 `.tips-line` 都不能再出现在模板或样式表里）',
+  !/class="tips"/.test(wxml) && !/class="tips-line"/.test(wxml) && !/\.tips\s*\{|\.tips-line\s*\{/.test(wxss))
 ok('Tips 六句中英各一份、句数相等', Array.isArray(zh.tips) && Array.isArray(en.tips)
   && zh.tips.length === 6 && en.tips.length === zh.tips.length)
 ok('一句停 8 秒', /\}, 8000\)/.test(js) && !/\}, 4000\)/.test(js))

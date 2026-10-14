@@ -5,8 +5,10 @@
 //  ① 默认停在半月（站长 10-02 夜里改的口：三档里默认中档，把选择权给用户），
 //    点一下走 满月→半月→弯月→满月；照片亮度采样那段把键钉回弯月起步，
 //    为的是三档之间真的分开——默认档本身由①那三条单独钉，不靠采样顺序；
-//  ② 满月那一档照片真的等于原图亮度——罩子的 opacity 实读必须是 0，照片均值必须亮回去
-//     （上一版栽在这条上：以为"不叠新层"＝"不压暗"，实测只有原图的 62%）；
+//  ② 满月那一档照片真的等于原图亮度——罩子的 opacity 实读必须是 0，照片均值必须**离开**弯月那一档
+//     （上一版栽在这条上：以为"不叠新层"＝"不压暗"，实测只有原图的 62%）。
+//     ⚠ 方向恒为"压暗"：10-13 23:3x 站长第二次打回，浅照片上那支纸白提亮罩已从三页撤净，
+//     罩层只有一支（墨），所以这一把不再从屏上读 `bgLight` 定极性（见 ①② 之间那段）。
 //  ③ 罩子撤干净之后字上没有那道投影（站长 10-02 夜里否掉了它）——这一档的对比只打数不判红，
 //     判据依赖的前提已经不在代码里了，留着就是一条钉着旧方案的假尺子；
 //  ④ 三页吃同一个本机键，在首页点完，笔记页和「我的」页那层罩子跟着一起拧。
@@ -14,10 +16,16 @@ const automator = require('miniprogram-automator')
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
+const lang = require('./尺子语言钉.js')   // 换界面语言只走这一份实现（理由见 ⑤ 那一段）
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const OUT = path.resolve(__dirname, '../design/背景亮度/实测')
 const PROBE = path.resolve(__dirname, '采-亮度图层.py')
 const p = require('../../miniprogram/utils/palette.js')
+// §8.231（10-14）把包内那张默认底图删了 ⇒ 这一屏从此可能"两级都空"，而这一把从头到尾量的
+// 就是"铺着图时那一层罩子"：`bgSrc` 空着连 `.page-bg` 都摸不到（当天实测退 2，红在第一条「首页铺着图 → (空)」）。
+// 与 `验-第一屏三块-真跑` 同一处理：借一张包里还在的真位图按在屏上（不是产品资源，只是"背后有一张照片"）。
+// 不写回本机偏好、也不还原——它只活在这一次页面实例里，下一次 reLaunch 就没了。
+const PROBE_BG = '/assets/share-card.jpg'
 
 const bad = []
 let n = 0
@@ -47,7 +55,9 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
 
   const enter = async (url) => {
     for (let i = 0; i < 5; i++) {
-      try { return await mp.reLaunch(url) } catch (e) { console.log(`第 ${i + 1} 次进 ${url} 没成：${e.message}`); await sleep(8000) }
+      // 每一次进页都补一次图（`withBg` 在下面）：新建页本来就是"每次进页重取图"，
+      // 探针按上去的那一张会被下一次 onShow 冲掉，所以按在"进页"这个动作上、不按在第一页上。
+      try { return await withBg(await mp.reLaunch(url)) } catch (e) { console.log(`第 ${i + 1} 次进 ${url} 没成：${e.message}`); await sleep(8000) }
     }
     throw new Error(`进不去 ${url}`)
   }
@@ -62,6 +72,13 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
     return el.style(prop)
   }
   const opacityOf = async (page, sel) => Number(await styleOf(page, sel, 'opacity'))
+  // 进页之后补一张图（`onShow` 已经跑完，setData 不会被它盖回去）
+  const withBg = async (page) => {
+    const d = await page.data()
+    if (d.bgSrc === undefined) return page        // 这一页没有这一格（不该发生，宁可原样返回也别乱写）
+    if (!d.bgSrc) { await page.setData({ bgSrc: PROBE_BG }); await sleep(1200) }
+    return page
+  }
 
   // 借走的是这台模拟器的本机偏好，量完原样还回去
   const dimBefore = await mp.evaluate(() => wx.getStorageSync('bgDim'))
@@ -71,7 +88,7 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   let page = await enter('/pages/create/create')
   await sleep(4500)
   let d = await page.data()
-  ck('首页铺着图（不然这一档无从谈起）', !!d.bgSrc, d.bgSrc || '(空)')
+  ck('这一屏从头到尾铺着图（探针按的那张还在，没被 onShow 重取图冲回空）', !!d.bgSrc, d.bgSrc || '(空)')
   const win = (await rects(['.page-bg']))[0]
   const R = win.width / 750                      // 截图就是视口：1rpx = R 个像素
   const rpx = (px) => px / R
@@ -92,7 +109,17 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
     JSON.stringify([d.dimV, d.dimScrim]))
   ck('那一枚点是最深那档的灰（实心，没有 mask 也没有投影）',
     d.dimDot === 'background:#5C6169', d.dimDot)
-  const one = await rects(['.title-row', '.date-row', '.entry-wrap', '.dim-dot'])
+  // 采样带两头重新锚（10-13 查出来的两条旧前提，与 2.2 无关）：
+  // ① `.date-row` 那行 10-10 就被「调亮度／换背景」那一行顶掉了（主树 2.1 那份 wxml 里也搜不到），
+  //    所以带上沿改锚 `.home-swap`——它现在是头部最低的那一条，"从头部下面开始采照片"这个意思没变；
+  // ② `.entry-wrap` 在 2.2 挂了 `wx:if="{{active}}"`，收起态根本不在屏上，
+  //    下沿改锚 `.home-blk`（首屏那一组的顶）——同样是"采到那块深色面板之前为止"。
+  //    这条不能省：带子要是压进面板，三档亮度会被面板那层墨盖成同一个数，②③两条就白量。
+  const one = await rects(['.title-row', '.home-swap', '.home-blk', '.dim-dot'])
+  if (!one[0] || !one[1] || !one[2]) {
+    console.log('!! 采样带两头锚不到（头部那一条或首屏那一组没在屏上），下面的亮度结论不成立')
+    throw new Error('.title-row/.home-swap/.home-blk 里有摸不到的')
+  }
   const [t0, t1] = [rpx(one[0].top), rpx(one[0].bottom)]
   const [py0, py1] = [rpx(one[1].bottom) + 30, rpx(one[2].top) - 40]
   const photo = (png) => lum(png, 36, 150, py0, py1)
@@ -101,18 +128,27 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   await mp.screenshot({ path: shotWan })
   const W0 = photo(shotWan)
   await sleep(500)
+  // 罩子的极性**不再随照片走**：10-13 23:3x 站长第二次打回同一件事
+  // （「背景图，调亮度应该是压暗，现在变成提亮（要对照现网逻辑）」），10-12 那批给浅照片另开的
+  // 那支纸白提亮罩已从三页撤净（`验-玻璃令牌齐不齐` 现在钉的是"谁把它加回来谁红"）。
+  // 于是这一把恒按"罩子铺满＝把画面压暗"判，方向不用再从屏上读 `bgLight`；
+  // 幅度一分没松（≥25%）——上一轮那两条挂在待拍 D20 的"已知红"随提亮罩一起作废。
+  const veiled = (veilMean, bareMean) => bareMean - veilMean   // 正数＝罩子确实把画面压暗了
+  console.log('  ℹ 罩层只有一支（恒压暗）：弯月必须比满月暗，预算 25%')
 
   // ---------- ② 点一下＝满月：罩子拧到 0，照片等于原图亮度 ----------
   const halves = await page.$$('.swap-half')
   // 这两句串从**这一屏自己那份字典**现读，不写死中文：这一档账号的语言是登录带回的，
   // 测试号存的是 en（同一件事 `验-列表头部铺图-真跑` 里已经记过一次），写死就是一句假红。
-  // 判据要守的东西没变：还是"两半、左调亮度右换背景"，只是拿本机的串去比。
+  // 判据要守的东西没变：还是"每一半各管各的、不许互相吃掉"，只是拿本机的串去比。
+  // ⚠ 10-14 起这一行是三半（第三半「换心情」，§8.237）：前两枚的落点与文案一个字没动。
   const dT = (await page.data()).t || {}
-  ck('这一行是两半：左「调亮度」、右「换背景」（串读的是这一屏的字典，语言跟着账号走）',
-    halves.length === 2
+  ck('这一行是三半：「调亮度」换档、「换背景」导流、「换心情」循环（串读的是这一屏的字典）',
+    halves.length === 3
     && (await (await halves[0].$('.swap-text')).text()) === dT.bgDimLabel
-    && (await (await halves[1].$('.swap-text')).text()) === dT.homeBgSwap,
-    `${halves.length} 半｜字典 ${dT.bgDimLabel} / ${dT.homeBgSwap}`)
+    && (await (await halves[1].$('.swap-text')).text()) === dT.homeBgSwap
+    && (await (await halves[2].$('.swap-text')).text()) === dT.moodSwap,
+    `${halves.length} 半｜字典 ${dT.bgDimLabel} / ${dT.homeBgSwap} / ${dT.moodSwap}`)
   const half = halves[0]
   await half.tap()
   await sleep(1000)
@@ -127,8 +163,9 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   await mp.screenshot({ path: shotFull })
   await sleep(500)
   const F0 = photo(shotFull)
-  ck('满月那一档照片亮回去了（均值比弯月高出一档以上）', F0.mean > W0.mean * 1.25,
-    `弯月 ${W0.mean} → 满月 ${F0.mean}`)
+  ck('满月那一档照片真的等于原图亮度（罩子铺满那一档必须比它暗一档以上）',
+    veiled(W0.mean, F0.mean) > F0.mean * 0.25,
+    `弯月 ${W0.mean} → 满月 ${F0.mean}｜压暗 ${(veiled(W0.mean, F0.mean) / F0.mean * 100).toFixed(1)}%／预算 25%`)
   // 站长 10-02 夜里否掉了那道淡投影，撤了。撤完这一档的白字就是直接压在原图上，
   // 这里只把实测对比打出来给他看代价，不钉成红——判据的前提已经不在代码里了。
   const TC = titleC(shotFull)
@@ -149,7 +186,8 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   const shotHalf = path.join(OUT, '圆点-3-半月.png')
   await mp.screenshot({ path: shotHalf })
   const H0 = photo(shotHalf)
-  ck('半月确实夹在中间（比满月暗、比弯月亮）', H0.mean < F0.mean && H0.mean > W0.mean,
+  ck('半月确实夹在中间（离原图的距离：弯月 > 半月 > 满月，方向同一个）',
+    veiled(W0.mean, F0.mean) > veiled(H0.mean, F0.mean) && veiled(H0.mean, F0.mean) > 0,
     `满月 ${F0.mean} / 半月 ${H0.mean} / 弯月 ${W0.mean}`)
   await half.tap()
   await sleep(1000)
@@ -186,7 +224,11 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
     const x0 = rpx(head[0].left) + 250, x1 = rpx(head[0].left) + 330
     const y0 = rpx(head[0].top) + 140, y1 = rpx(head[0].top) + 320
     const A0 = lum(shotI0, x0, x1, y0, y1), A2 = lum(shotI2, x0, x1, y0, y1)
-    ck('笔记页的照片跟着一起亮回去', A0.mean > A2.mean * 1.2, `弯月 ${A2.mean} → 满月 ${A0.mean}`)
+    // 同一件事在笔记页那一层（`.head-scrim`）再钉一遍。方向与首页同一个：罩层只有一支、恒压暗
+    // （10-13 那一刀之后不再读 `bgLight` 定极性——两页吃同一张图，但翻色是各页在 onShow 里各算一次的）。
+    ck('笔记页的照片跟着一起被压暗（弯月必须比满月暗两成以上）',
+      A0.mean - A2.mean > A0.mean * 0.2,
+      `弯月 ${A2.mean} → 满月 ${A0.mean}｜压暗 ${(((A0.mean - A2.mean) / A0.mean) * 100).toFixed(1)}%／预算 20%`)
     const C0 = lum(shotI0, rpx(head[1].left), rpx(head[1].left) + 150,
       rpx(head[1].top) + 2, rpx(head[1].bottom) - 2, 'contrast')
     console.log(`!! 笔记页大标题（满月档、无投影）实测：字 ${C0.glyph} / 圈 ${C0.ring} → ${C0.ratio}:1（只报数不判红）`)
@@ -211,38 +253,36 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   ck('右半截照旧导流去卡片模板页', now === 'pages/profile/profile', now)
 
   // ---------- ⑤ 英文那一版：两半挤不挤得下 ----------
-  await mp.evaluate(() => {
-    const app = getApp()
-    if (app.globalData.userInfo) app.globalData.userInfo.language = 'en'
-  })
+  // 原来这里也是 `if (app.globalData.userInfo) … = 'en'`——10-13 探针实测这一版会话里
+  // `globalData.userInfo` 不存在，守卫把赋值挡成空操作，英文那一版从没真量过（同 验-统一录入条-真跑）。
+  await lang.pin(mp, 'en')
   page = await enter('/pages/create/create')
   await sleep(4500)
   const i18n = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
   const halvesEn = await page.$$('.swap-half')
-  // 两半的矩形必须走 selectAll：`.select()` 只回第一个，写两遍拿到的是同一个元素的两份拷贝，
+  // 三半的矩形必须走 selectAll：`.select()` 只回第一个，写两遍拿到的是同一个元素的两份拷贝，
   // "不重叠"那条永远绿（自己钉自己）。
   const hrect = await mp.evaluate(() => new Promise((resolve) => {
     wx.createSelectorQuery().selectAll('.swap-half').boundingClientRect().exec((r) => resolve(r[0]))
   }))
-  ck('英文两半的文案就是字典那两条',
-    halvesEn.length === 2
+  ck('英文三半的文案就是字典那三条',
+    halvesEn.length === 3
     && (await (await halvesEn[0].$('.swap-text')).text()) === i18n.texts('en').bgDimLabel
-    && (await (await halvesEn[1].$('.swap-text')).text()) === i18n.texts('en').homeBgSwap,
+    && (await (await halvesEn[1].$('.swap-text')).text()) === i18n.texts('en').homeBgSwap
+    && (await (await halvesEn[2].$('.swap-text')).text()) === i18n.texts('en').moodSwap,
     hrect.map((x) => x && Math.round(x.width)).join(' / '))
   const row = (await rects(['.home-swap']))[0]
-  ck('英文态两半不重叠、不撞行边',
-    hrect[0] && hrect[1] && row
+  ck('英文态三半不重叠、不撞行边',
+    hrect.length === 3 && hrect.every((x) => !!x) && row
     && hrect[0].right <= hrect[1].left + 0.5
-    && hrect[0].left >= row.left - 0.5 && hrect[1].right <= row.right + 0.5,
-    hrect[0] && hrect[1] && row
-      ? `左 ${Math.round(rpx(hrect[0].left))}..${Math.round(rpx(hrect[0].right))} `
-        + `右 ${Math.round(rpx(hrect[1].left))}..${Math.round(rpx(hrect[1].right))} 行 ${Math.round(rpx(row.width))}`
+    && hrect[1].right <= hrect[2].left + 0.5
+    && hrect[0].left >= row.left - 0.5 && hrect[2].right <= row.right + 0.5,
+    hrect.length === 3 && row
+      ? hrect.map((x) => `${Math.round(rpx(x.left))}..${Math.round(rpx(x.right))}`).join(' ')
+        + ` 行 ${Math.round(rpx(row.left))}..${Math.round(rpx(row.right))}`
       : '量不到')
-  await mp.screenshot({ path: path.join(OUT, '圆点-7-英文两半.png') })
-  await mp.evaluate(() => {
-    const app = getApp()
-    if (app.globalData.userInfo) app.globalData.userInfo.language = 'zh'
-  })
+  await mp.screenshot({ path: path.join(OUT, '圆点-7-英文三半.png') })
+  await lang.pin(mp, 'zh')
 
   // ---------- 还原 ----------
   await mp.evaluate((v) => {

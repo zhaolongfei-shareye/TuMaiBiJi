@@ -24,6 +24,10 @@ export NODE_PATH="$HOME/.mpauto/node_modules"
   exit 1
 }
 [ -e /tmp/mpaauto ] || ln -s "$HOME/.mpauto" /tmp/mpaauto
+# 每把之前确认一次 automator 那道版本闸还修着（详见 修-automator版本闸.js 头部那段实测）。
+# 为什么写在这儿而不是"修一次就完事"：补丁打在 ~/.mpauto 那个 node_modules 里，
+# 重装 npm i 会把它冲掉，冲掉之后所有真跑尺子打的还是那句没原因的「连不上自动化端口」。
+node "docs/工具/修-automator版本闸.js" || exit 1
 PORT=$1; shift
 CLI=/Applications/wechatwebdevtools.app/Contents/MacOS/cli
 for f in "$@"; do

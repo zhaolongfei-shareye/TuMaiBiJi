@@ -31,6 +31,7 @@ from app.api.routes.assets import (
     _owned_note_or_404,
 )
 from app.core.auth import get_current_user
+from app.services.preset_note import PRESET_CARD_KEEP_MSG, PRESET_SOURCE_TYPE
 from app.core.private_access import is_private_note, private_category_ids, unlocked
 from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
@@ -270,7 +271,12 @@ def drop_note_card(
     历史行（`is_current=0`）一起删：那些对象在这一趟一并从云上清掉，留一行指向已经不存在的
     地址就是 `assets` 那条说过的"幽灵行"——算进配额却什么都读不出来。
     """
-    _owned_note_or_404(db, user, note_id)
+    note = _owned_note_or_404(db, user, note_id)
+    # 站长 10-14「默认的不能删除」：那一篇自带的卡片也撤不掉，与 `delete_note` 同一把闸、同一个判据。
+    # 代价要说给他听：一篇一张，而"换一套模板"在界面上是先删再画 ⇒ **这一张会把预置那篇的模板永久钉住**。
+    # （要松开只有两条路：允许在它身上覆盖重画，或只锁笔记不锁卡片。两条都不在他这句话里，我没动。）
+    if note.source_type == PRESET_SOURCE_TYPE:
+        raise HTTPException(status_code=400, detail=PRESET_CARD_KEEP_MSG)
     rows = (
         db.query(NoteCard)
         .filter(NoteCard.note_id == note_id, NoteCard.user_id == str(user.id))

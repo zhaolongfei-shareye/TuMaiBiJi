@@ -321,6 +321,160 @@ const WALLPAPER_ALIAS = {
 }
 
 /**
+ * 「心情」＝五档彩色毛玻璃。站长 10-14 两句原话：
+ *   「四种界面配色（加上目前深色面板），改为不同颜色的毛玻璃，参考其他AI生成的效果图，
+ *    下方的tab也与上面的同步，其他页面有涉及毛玻璃的也用相同的颜色面板」
+ *   「切换毛玻璃改到首页，增加一个入口『换心情』icon是小云朵。每次点击切换一种」
+ * ⇒ 四套界面配色各自一支色，加上现网那一面墨，一共五档，点一次换一档。
+ *
+ * **三档色是从他给的参考图上量的，不是我挑的审美值**：
+ * `docs/design/毛玻璃参考图三张/` 三张是同一版首页布局、只差面板那一层的颜色，
+ * 量法＝面板中段（屏高 69~79% 那一行取均值）与底栏那一条（93~97%）各一个数：
+ *   暖陶土 玻璃 #B1A299／底带 #8D7564 → 象牙
+ *   雾蓝   玻璃 #A4B0C0／底带 #6D8DAA → 雨雾
+ *   藕荷紫 玻璃 #B5A8BF／底带 #9E95B0 → 樱落
+ * 天青那一档参考图里没有：玻璃色取它自己色阶中间档 #88AF91 往本套页面底 #D4E2D7 上并 1/4，
+ * 底带再从玻璃色往色阶最深那档 #43634A 并 .45。**这一档是我推的，他没拍过。**
+ * 墨那一档一个数都没动（玻璃＝现网那面 #23252C，字＝纸白 #F2EFE9），所以默认态与今天逐字同一屏。
+ *
+ * 只换**色相**，不换透明度：α 全部沿用他 10-11／10-12 逐条拍过的那几档
+ * （veil .30／band .60／plate .50／fill .20／hair .55；面板 .16→.94→.95；左下那一格 .45→.92）。
+ * 描边那一枚 `--glass-hair` 五档一律留白：它是玻璃自己那道反光，不是玻璃的本色。
+ *
+ * ⚠ 出口给的全是**写死的完整值**（rgba(...)／linear-gradient(...)），不许改成
+ * `rgba(var(--x), .3)` 那种嵌法：var() 进函数参数在老安卓 XWEB 上会让整条声明掉下来
+ * （app.wxss 里 `--glass-veil` 与 min() 那两条 ⚠ 记的是同一件事）。
+ * `app.wxss` 那五块 `.mood-*` 是这份表的**镜像**，逐字等值由 `docs/工具/验-五档彩色玻璃.js` 钉。
+ */
+const MOODS = [
+  {
+    key: 'ink', cls: 'mood-ink', label: '墨', labelEn: 'Ink', theme: 'tint-paper',
+    // band 不是 glass：现网左下那一格写的是 #12141A，面板那面才是 #23252C（见 moodVars ②）
+    glass: '#23252C', band: '#12141A', text: '#F2EFE9',
+  },
+  {
+    key: 'ivory', cls: 'mood-ivory', label: '象牙', labelEn: 'Ivory', theme: 'tint-paper',
+    glass: '#B1A299', band: '#8D7564', text: '#352E1D',
+  },
+  {
+    key: 'celadon', cls: 'mood-celadon', label: '天青', labelEn: 'Celadon', theme: 'tint-celadon',
+    glass: '#9BBCA3', band: '#799C81', text: '#1D3522',
+  },
+  {
+    key: 'blush', cls: 'mood-blush', label: '樱落', labelEn: 'Blush', theme: 'tint-blush',
+    glass: '#B5A8BF', band: '#9E95B0', text: '#351D29',
+  },
+  {
+    key: 'mist', cls: 'mood-mist', label: '雨雾', labelEn: 'Mist', theme: 'gradient-blue',
+    glass: '#A4B0C0', band: '#6D8DAA', text: '#212431',
+  },
+]
+
+/** 脏值（别的版本写过的 key、本机存储里残留的数）一律兜回第一档墨＝现网那一版。 */
+function moodOf(key) {
+  return MOODS.filter((m) => m.key === key)[0] || MOODS[0]
+}
+
+/** 点一次换一档：墨 → 象牙 → 天青 → 樱落 → 雨雾 → 回墨。 */
+function moodNext(key) {
+  const i = Math.max(0, MOODS.map((m) => m.key).indexOf(moodOf(key).key))
+  return MOODS[(i + 1) % MOODS.length]
+}
+
+/** 服务端只认 wallpaper 那六个值；心情这一档靠壁纸反查回来（墨与象牙同壁纸，反查落进象牙）。 */
+function moodOfWallpaper(wallpaper) {
+  const key = themeOf(wallpaper).key
+  return MOODS.filter((m) => m.theme === key)[0] || MOODS[0]
+}
+
+/**
+ * 这一档要往 CSS 里发的那一叠令牌值。`app.wxss` 里那五块 `.mood-*` 是这份输出的**镜像**，
+ * 逐字等值由 `docs/工具/验-五档彩色玻璃.js` 钉（与 `--bg-layer`／`--btn-bg` 同一条规矩）。
+ *
+ * 两件要说清的：
+ * ① **小件不能和面板同色**。纱／圆➕／录入面板那一叠（piece）在彩色档上取"玻璃色往白并 .55"，
+ *    因为同色的 .50 压在同色的 .95 上等于没画；墨那一档走另一支——它今天就是**白纱压暗面**，
+ *    piece 直接给纯白，五个数与 `page{}` 里他 10-11／10-12 拍过的原值逐字相同。
+ * ② **左下那一格的基色不是面板色**。现网 `.blk-count` 写的是 #12141A（18,20,26），
+ *    面板那面是 #23252C（35,37,44），两枚本来就不是一支，所以墨档的 band 给 #12141A，
+ *    照抄那七个停点的 α（.45/.45/.38/.35/.50/.68/.92）才谈得上"一个字节都没变"。
+ */
+function moodVars(key) {
+  const m = moodOf(key)
+  const rgba = (c, a) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a.toFixed(2)})`
+  const g = hexToRgb(m.glass)
+  const b = hexToRgb(m.band)
+  const t = hexToRgb(m.text)
+  const piece = m.key === 'ink' ? [255, 255, 255] : g.map((v) => Math.round(v + (255 - v) * 0.55))
+  const COUNT_STOPS = [[0.45, '0%'], [0.45, '10%'], [0.38, '43%'], [0.35, '62%'], [0.50, '83%'], [0.68, '88%'], [0.92, '100%']]
+  const stageFace = (pct) => `linear-gradient(180deg, ${rgba(g, 0.16)} 0%, ${rgba(g, 0.94)} ${pct}%, ${rgba(g, 0.95)} ${pct}%, ${rgba(g, 0.95)} 100%)`
+  return {
+    '--glass-veil': rgba(piece, 0.30),
+    '--glass-veil-band': rgba(piece, 0.60),
+    '--glass-plate': rgba(piece, 0.50),
+    '--glass-fill': rgba(piece, 0.20),
+    '--glass-plate-dock': rgba(piece, 0.72),
+    '--glass-fill-dock': rgba(piece, 0.42),
+    /* 面板那一整面：一层画完，不留两层交界（10-14 那条"中间多了条线"的根因，见 create.wxss）。
+       带高 240rpx 换算成"占面板这一截高的几成"：闭合 240/548＝43.8%，展开 240/666＝36%。
+       用百分比不用 rpx——停点落在 linear-gradient() 的参数里，rpx 换算不保证跟得进去（同文件上面那条）。 */
+    '--stage-face': stageFace(43.8),
+    '--stage-face-open': stageFace(36),
+    /* 首屏最上面那一行「用 AI 帮你读懂一切…」垫的那一条：**通栏渐变毛玻璃，与下面那块面板反向**。
+       站长 10-14 23:5x 原话「最上面的，要做成通栏的渐变毛玻璃，与下方的面板渐变方向相反。浅在下，深在上」；
+       10-15 00:0x 补「左上右不需要留空间，要通栏。左下和右下有圆弧，然后与背景之间带阴影。要与下方面板渐变毛玻璃风格一致」；
+       00:2x 拿真机截图打回「不要有空间，要顶上去，然后渐变的程度，要与下方面板一样，现在根本不是，太暗了，
+       下面的面板相同高度下，会浅一点，露出的透多一点」。
+       ⇒ 三句合起来的口径：**端点与面板那两条一样（.94 与 .16）、一条单调下降的坡、不许有实心平台**，
+       而且**整枚只有一行字那么高**（站长 10-15 00:3x 附第二张真机截图：「最上面的面板高度压缩，
+       看到一行文字就行了，不要浪费空间」——00:2x 那一版为了把坡走完给到 200rpx，屏上是一条大灰带，他把这一版也打了）。
+       中间那一档 `.80 55%` 是**为了把字留在够深的那一截**：坡要在 80rpx 里从 .94 走完到 .16，
+       字（占 17%～58%）的下半截就掉到 α .5 以下，墨那一档当场读不动；提前一档让坡前半段走得慢、后半段走得急，
+       字压在 α .90～.76，屏下那 34rpx 才是快速化进页面的一段。**端点仍是面板那两个数，没有另挑一档。**
+       上一版（`.95 0% → .95 56.2% → .94 56.2% → .16 100%`）错在把面板**整条**镜像，连面板底部那
+       43.8% 的实心地板一起搬到顶上 ⇒ 一整块黑板，就是 00:2x 打回的那一张。 */
+    '--stage-strip': `linear-gradient(180deg, ${rgba(g, 0.94)} 0%, ${rgba(g, 0.80)} 55%, ${rgba(g, 0.16)} 100%)`,
+    '--blk-count-bg': `linear-gradient(180deg, ${COUNT_STOPS.map((s) => `${rgba(b, s[0])} ${s[1]}`).join(', ')})`,
+    '--stage-ink-solid': m.text,
+    '--stage-ink-strong': rgba(t, 0.96),
+    '--stage-ink': rgba(t, 0.85),
+    '--stage-ink-soft': rgba(t, 0.78),
+    '--stage-ink-dim': rgba(t, 0.72),
+    '--stage-ink-faint': rgba(t, 0.56),
+  }
+}
+
+/**
+ * 底部导航那一层的皮。它是自定义组件，读不到 page 上的 CSS 变量，只能由 JS 把整串递进去
+ * （`custom-tab-bar/index.js` 那句 `setData({ chromeStyle })`）。
+ *
+ * **五档同一支构造**：`rgba(这一档的玻璃色, .62)` ＋ 同一条糊。墨那一档不再退回壁纸色相派生的
+ * 实心暗面（象牙下 #766948 那一支）——站长 10-14 19:3x 追了一句「换成彩色玻璃后，底部的 tab
+ * 要跟随上面的玻璃」，这一句把我上一版"墨档不动、免得动了默认那一屏"的理由顶掉了：现在默认那一屏
+ * 的底栏也换成 rgba(35,37,44,.62)＋糊，这是**他指的**改动，不是我顺手。
+ * 底栏压在深色面板之上，所以**没铺图那一态**它背后不是米白页面而是那块近实心墨面：10-14 真跑实测
+ * 混出来 (39,40,49)，纸白 #F2EFE9 压上去 12.76:1（AA 小字要 4.5）——我上一版估的"只剩 4.3:1、
+ * 要不要给墨档抬 α"是拿错底色算的（以为背后是页面，其实背后是面板），这一条不用他拍。
+ * 选中那一枚圆底五档都仍吃 `chromeOf().sel`——站长 10-04 定过"深色按钮必须和底栏选中那一格
+ * 下面那块圆底同色"，那一处不在这一刀里。
+ */
+function moodChromeOf(key) {
+  const m = moodOf(key)
+  const base = chromeOf(m.theme)
+  const rgb = hexToRgb(m.glass)
+  const bg = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.62)`
+  const idle = withAlpha(m.text, 0.62)
+  const line = withAlpha(m.text, 0.16)
+  const shadow = withAlpha('#000000', 0.22)
+  return {
+    bg, ink: m.text, idle, line, shadow, sel: base.sel,
+    // --chrome-blur 五档**都要**发一枚：少一枚就是"引用一个不存在的变量"⇒ IACVT，
+    // 那条 `backdrop-filter: var(--chrome-blur)` 整行掉下来（不是回落到 none 那么简单）。
+    style: `--chrome-bg:${bg};--chrome-ink:${m.text};--chrome-idle:${idle};--chrome-line:${line};--chrome-shadow:${shadow};--chrome-sel:${base.sel};--chrome-blur:blur(23px) saturate(1.8)`,
+  }
+}
+
+/**
  * 海报专用配色组。界面那六组色是"分类身份"，海报要的是"这一张好不好看、愿不愿意转发"，
  * 所以这里按风格成套给：同一套风格内部再按分类确定性取一个色向，
  * 于是同一条笔记在同一个模板上永远长一个样，但换分类会换色、换模板会换气质。
@@ -610,39 +764,6 @@ function createSkin(wallpaper) {
 }
 
 /**
- * 第一屏那三块（左块人物入口 + 右两枚计数）的面色与配对字色。
- * 取档规则照站长 10-10 晚拍板的那版效果图（docs/design/10-10两入口多方案/PNG图标.png）：
- * 左块吃**卡底**（theme.line，它是这一套里最亮的那一面，人物和白色那条压上去才分得开），
- * 右上吃色阶第 2 档、右下吃第 1 档——两枚比左块深一点，三块才有前后层次。
- * 字色跟着各自那一档的 ink 走，不自己挑灰。
- *
- * ⚠️ "面压照片"这一道**不在这里算，也没有尺子算**：照片是用户自己换的，运行时拿不到它的亮度。
- * 10-10 我曾给这三块立过一条"图形压底 ≥3.0"的门槛，那是**我自己加的**（站长没提过），
- * 且拿的探点是**最暗那一档（弯月）**的罩后色——换到默认那档（半月）实测最低只有 1.98，
- * 满月档 1.28。三档数字与量法记在 docs/规格-创建入口这一条线.md §6.2，这里不留门槛。
- */
-function entryBlocks(wallpaper) {
-  const theme = themeOf(wallpaper)
-  const st = theme.ramp && theme.ramp.steps ? theme.ramp.steps : [theme.line, theme.line, theme.line]
-  const face = { person: theme.line, notes: st[1], cards: st[0] }
-  // 回落那条是"新加一枚壁纸忘了写 inks"的兜底（与上面 :405 那条同一个意图）。原来回落直接拿
-  // face 自己当字色，撞上来就是面 == 字、对比 1.000，整块字看不见。兜底至少从面上反解一支墨。
-  const ik = theme.ramp && theme.ramp.inks ? theme.ramp.inks : [
-    enforce(LAYER_INK, face.person, 4.5), enforce(LAYER_INK, face.notes, 4.5), enforce(LAYER_INK, face.cards, 4.5),
-  ]
-  const ink = { person: ik[0], notes: ik[1], cards: ik[0] }
-  const vars = {
-    'eb-person': face.person, 'eb-person-ink': ink.person,
-    'eb-notes': face.notes, 'eb-notes-ink': ink.notes,
-    'eb-cards': face.cards, 'eb-cards-ink': ink.cards,
-  }
-  return {
-    face, ink,
-    style: Object.keys(vars).map((k) => `--${k}:${vars[k]}`).join(';'),
-  }
-}
-
-/**
  * 底栏和搜索条那一块面：由壁纸的页面底派生。
  * bg（那一条底）一个字没动：H 原样、S 夹进 [30,45]（低于 30 灰成一块脏、高于 45 抢内容）、
  * 浅壁纸 L 20.5。字一律纸白，未选中那一档靠 alpha 分深浅（浅 .62 / 深 .68）。
@@ -777,6 +898,12 @@ module.exports = {
   MOTIFS,
   THEMES,
   WALLPAPER_ALIAS,
+  MOODS,
+  moodOf,
+  moodNext,
+  moodOfWallpaper,
+  moodVars,
+  moodChromeOf,
   POSTER_SCHEMES,
   schemeFor,
   plateColors,
@@ -796,7 +923,10 @@ module.exports = {
   layerEdgeOf,
   INNER_FACE,
   createSkin,
-  entryBlocks,
+  // entryBlocks（首屏三块那六枚 `--eb-*`）随 2.2 B 方案删掉：消费方 create.js 不再发这一位，
+  // 样式表里没有一处还吃 --eb-*，留着一份没人读的派生只会让"新加一枚壁纸忘了写 ramp.inks"
+  // 那条兜底变成一条永远不会被走到的分支。取档规则与"我自己加过的那道 ≥3.0 门槛"
+  // 记在 docs/规格-创建入口这一条线.md §6.2，不在这里留副本。
   catSkinFor,
   crOf,
   inkIsLighter,

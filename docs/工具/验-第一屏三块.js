@@ -12,7 +12,9 @@
 // ⑤ 卡片那一格的一次性落点标记：立一次、读一次、清一次，常驻就把「默认第一个 tab」那条废了；
 // ⑥ 换人不靠"连点两下"（那一下会把每次开门延住 300ms，10-10 深夜他据此打回）：
 //    主人物在前、另一张画成右后方淡灰剪影，点剪影换位；键名与两张路径只住在 utils/person.js；
-// ⑦ 组顶那条 min() 里的 546，是从"整组高＋底栏高＋最少留白"推出来的，任何一头改了这里要跟着改。
+// ⑦ 组顶那条 calc 里的数，是从"整组高＋底栏高＋最少留白 24"推出来的，任何一头改了这里要跟着改
+//    （10-14 之前它是 `min(66.3%, 100vh−562)`：比例那一条与贴底那一条在 410 那一档正好交于同一处，
+//     内框压矮之后两条分叉 ⇒ 只留贴底这一条，两屏共用同一根底线）。
 const fs = require('fs')
 const path = require('path')
 
@@ -80,142 +82,372 @@ const seg = (sel) => {
   return m ? m[1] : ''
 }
 
-/* ---------- 1. 几何：三块是一个整体 ---------- */
+/* ---------- 1. 几何：一块卡（两片皮）＋ 一列（2.2 B 方案） ---------- */
 const sPerson = seg('.blk-person')
-const sStat = seg('.blk-stat')
+const sFace = seg('.blk-face')
+const sCount = seg('.blk-count')
 const sCol = seg('.blk-col')
 const sRow = seg('.blk-row')
 const PERSON = num(sPerson, 'width')
 const PERSON_H = num(sPerson, 'height')
-const STAT_H = num(sStat, 'height')
+const FACE_H = num(sFace, 'height')
+// 白面上沿离块顶多少：10-13 追打那一刀之前恒为 0（白面贴块顶），现在是女那张头带中点那一档。
+const FACE_TOP = num(sFace, 'top')
+const COUNT_H = num(sCount, 'height')
 const GAP = num(sRow, 'gap')
-const COL_GAP = num(sCol, 'gap')
-ok('左块是见方的（宽高不等就是被 flex 拉过）', PERSON === PERSON_H, `${PERSON}×${PERSON_H}`)
-ok('左块 308 见方 = 右两枚各 148 ＋ 中间那道缝（148×2＋12）',
-  PERSON === 308 && STAT_H === 148 && COL_GAP === 12 && PERSON === STAT_H * 2 + COL_GAP,
-  `块 ${PERSON}／枚 ${STAT_H}／缝 ${COL_GAP}`)
-ok('三块之间那两道缝同一个数（行内与列内不一致会看着像没对齐）', GAP === COL_GAP, `${GAP} vs ${COL_GAP}`)
+// 面板那一档的高度从 `.panel` 现读，不写进判据：他这句「与第二个图高度对齐」说的是**关系**，
+// 面板以后改成别的数，左块要跟着走，判据不该反过来把 410 钉成真理。
+const PANEL_H = num(seg('.panel'), 'height')
+ok('左块宽 308、高与第二屏那块面板同一个数（「左边内框要与第二个图高度对齐」）',
+  PERSON === 308 && PERSON_H > 0 && PANEL_H > 0 && PERSON_H === PANEL_H,
+  `块 ${PERSON}×${PERSON_H}／面板 ${PANEL_H}`)
+/* 三段的账：白面上沿那一档留空 ＋ 白面 ＋ 墨面 ＝ 整块高。
+   10-13 追打之前白面贴块顶（留空 0），等式退化成"两片皮拼成整块"；现在那 24 是**出血的一部分**，
+   不写进等式的话，中间开缝或有一片溢出去都不红（块顶到白面顶那一条是透明带，屏上就是深色面板）。 */
+ok('三段拼成整块：白面上沿留空 ＋ 白面 ＋ 墨面 ＝ 块高（对不上就是开了缝、或有一片溢出去）',
+  FACE_H > 0 && COUNT_H > 0 && FACE_TOP >= 0 && FACE_TOP + FACE_H + COUNT_H === PERSON_H,
+  `留空 ${FACE_TOP} ＋ 白面 ${FACE_H} ＋ 墨面 ${COUNT_H} vs 块 ${PERSON_H}`)
+/* ⚠ 10-13 23:36 站长真机图：「漫画女背景多了一层」。成因就是原先描在整块外沿那一圈 2rpx 细边——
+   白面从块顶往下留了 24（D17 甲），于是"描边 ＋ 描边与白板之间那条透出深色面板的带"读成第二层板。
+   撤掉之后屏上只剩白面与墨面两片。这一条钉的是反面的不变量：这一层从此不许再有任何描边。
+   （圆 ➕ 那一圈在 `.blk-plus` 上，是另一枚东西，另一条判据管着，别把这两件事混成一件。） */
+ok('左块这一层不许再描边（一圈细边会被读成白板外面的第二层板）',
+  !/box-shadow/.test(sPerson) && !/(?:^|[;\n])\s*border(?:-width|-style)?\s*:/.test(sPerson),
+  (sPerson.match(/(?:box-shadow|border)[^;\n]*/g) || []).join(' ｜ ') || '没有描边')
+/* ⚠ 这一条是他 10-13 那一刀的正面口径：「两个人切换到大人时候，人头要高于内框上沿，与目前现网一样」。
+   上一版把 overflow 写在卡上，上面那 52rpx 的出血被裁平、人头齐根断。卡这一层从此只能不裁。 */
+ok('卡自己不许出现 overflow（裁在卡上＝把出血那 52 一起切掉，人头被切平）',
+  !/overflow/.test(sPerson), sPerson.replace(/\s+/g, ' ').trim().slice(0, 80))
+ok('两片皮各自带圆角、各自裁（裁的是自己的角，不是整块）',
+  /border-radius:\s*34rpx 34rpx 0 0/.test(sFace) && /overflow:\s*hidden/.test(sFace)
+  && /border-radius:\s*0 0 34rpx 34rpx/.test(sCount) && /overflow:\s*hidden/.test(sCount),
+  `白面 radius=${decl(sFace, 'border-radius')}／墨面 radius=${decl(sCount, 'border-radius')}`)
 ok('左块定宽不伸、右列吃余量（效果图那一版左块宽度算成 0，人物没地方画，就是这两条反了）',
   /flex:\s*none/.test(sPerson) && /flex:\s*1/.test(sCol) && /min-width:\s*0/.test(sCol))
 // 页面内缩 24，所以右列宽 = 750 − 24×2 − 左块 − 缝。这个数不写在任何地方，是推出来的。
 const RIGHT_W = 750 - 24 * 2 - PERSON - GAP
-ok('右两枚推出来的宽度落在 382（效果图上量的那一个）', RIGHT_W === 382, `${RIGHT_W}`)
+ok('右列推出来的宽度落在 382（效果图上量的那一个）', RIGHT_W === 382, `${RIGHT_W}`)
+// 列里那两样的账：➕ 定死 140 贴列底、与 Tips 那一格之间留 40，剩下的归 Tips 那一格。
+const PLUS_W = num(seg('.blk-plus'), 'width')
+const PLUS_H = num(seg('.blk-plus'), 'height')
+const PLUS_GAP = num(seg('.blk-plus'), 'margin-top')
+ok('圆形 ➕ 见方、贴列底，列高这本账（块高 − 缝 − ➕）正好是 Tips 那一格吃余量的那一段',
+  PLUS_W > 0 && PLUS_W === PLUS_H && PLUS_GAP > 0
+  && /flex:\s*1/.test(seg('.blk-tips')) && /align-self:\s*center/.test(seg('.blk-plus')),
+  `➕ ${PLUS_W}×${PLUS_H}／缝 ${PLUS_GAP}／列 ${PERSON_H} ⇒ Tips 那一格 ${PERSON_H - PLUS_W - PLUS_GAP}`)
+ok('➕ 在列的正中（他 10-13「右下的圆按钮要往中间靠，现在太边缘了」）',
+  /align-self:\s*center/.test(seg('.blk-plus')) && !/right:\s*0/.test(seg('.blk-plus')))
+// 两枚计数：块内左右各缩 22、中间缝 20，两枚等宽——这个数是从 `.blk-count` 那一段现读的，
+// 只有等式成立才说明 markup 里真是两枚（写第三枚的话 flex 会把它们各自挤瘦，屏上不报错）。
+const CNT_PAD = (decl(sCount, 'padding').match(/\d+/g) || []).map(Number)
+const CNT_GAP = num(sCount, 'gap')
+const CELL_W = (PERSON - (CNT_PAD[1] || CNT_PAD[0] || 0) * 2 - CNT_GAP) / 2
+ok('两枚计数等宽（块内缩 22、中间缝 20 推出来那一档），且都带 min-width:0',
+  (wxml.match(/class="blk-cell"/g) || []).length === 2
+  && /flex:\s*1/.test(seg('.blk-cell')) && /min-width:\s*0/.test(seg('.blk-cell'))
+  && CELL_W > 0 && CELL_W === Math.floor(CELL_W),
+  `每枚 ${CELL_W}`)
 
-/* ---------- 2. 人物不许压住那条白底 ---------- */
+/* ---------- 2. 人物那一张与那扇窗 ---------- */
 const sWrap = seg('.blk-figwrap')
-const sJot = seg('.blk-jot')
 const sFig = seg('.blk-fig')
 const OVER = -num(sWrap, 'top')            // 出血量：人物超出块顶那一段
 const WRAP_BOTTOM = num(sWrap, 'bottom')   // 取景窗下沿离块底多少
-const JOT_PAD = sJot.match(/padding:\s*([\d.]+)rpx\s*([\d.]+)rpx\s*([\d.]+)rpx\s*([\d.]+)rpx/)
-// 白条自己的高度：上内边距＋「记下来」那一行＋小字上边距＋小字一行＋下内边距。
-// 字号从现网令牌与样式里现读，不抄常量——改了字号这里要跟着变，写死就量不出来。
-// 小字那一档现在走的是 `var(--fs-micro)`，所以两头都要能解令牌（sizeOf）。
-const jotH = (() => {
-  if (!JOT_PAD) return NaN
-  const [, t, , b] = JOT_PAD      // 四段内边距的顺序是 上/右/下/左
-  const big = sizeOf('.blk-jot-l', 'font-size')
-  const bigLh = parseFloat(decl(seg('.blk-jot-l'), 'line-height') || '1.3')
-  const cam = num(seg('.blk-cam'), 'height')   // 那一行是 flex：高度取字与快门里高的那个
-  const small = sizeOf('.blk-jot-s', 'font-size')
-  const smallMt = num(seg('.blk-jot-s'), 'margin-top')
-  const rowH = Math.max(big * bigLh, cam)
-  return parseInt(t, 10) + Math.round(rowH) + smallMt + Math.round(small * 1.4) + parseInt(b, 10)
-})()
-ok('取景窗有 overflow:hidden（没有它就裁不住，人物会盖到白条上）', /overflow:\s*hidden/.test(sWrap))
-ok('人物上边出血 52rpx（这就是"超出边框一部分"那一下，归 0 等于撤了这条决定）',
+const ratioOf = (f) => { const b = fs.readFileSync(P(f)); return b.readUInt32BE(20) / b.readUInt32BE(16) }
+const FIG_W = num(sFig, 'width')
+// 窗的"应然高度"从两张源件自己的像素尺寸算（10-13 他这一刀的数就是这么来的）：
+// 女那张按宽 220 缩放的自然高，正好等于 出血 52 ＋ 白面 213 ⇒ 脚底压在墨面上沿、不悬空。
+const FIG_F = Math.round(FIG_W * ratioOf('assets/ic-person.png'))
+ok('取景窗有 overflow:hidden（没有它就裁不住，人物会盖到数字那一格上）', /overflow:\s*hidden/.test(sWrap))
+ok('人物上边出血 52rpx（这就是"超出内框上沿"那一下，归 0 等于撤了这条决定）',
   OVER === 52, `出血 ${OVER}`)
-// 窗底必须停在白条上沿**或之上**（低过头就压字），又不许离得太远（留一条缝就不是"贴住"）。
-// 104 是上面现读出来的白条高（14＋47＋2＋25＋16），105 是样式里那个数：中间这 1rpx 是留的呼吸，
-// 超过 6 就是另一回事了。10-10 小字从 14 抬到 --fs-micro(18) 之后，白条高了 5，窗底跟着抬 5。
-ok('取景窗下沿停在白条上沿（低过头压字，高太多就留缝）',
-  WRAP_BOTTOM >= jotH && WRAP_BOTTOM - jotH <= 6, `窗底 ${WRAP_BOTTOM} vs 白条实测高 ${jotH}`)
+/* 窗底必须正好停在墨面那一格的上沿——他 10-13 的原话是「女人上抬，下方不能悬空要与黑条靠着」。
+   原来钉的是"窗底 ≥ 白条实测高，且不超 6rpx 呼吸"，因为那时脚底落在哪由白条多高说了算；
+   现在那一格是墨面，窗底与它同一条线是**等式**而不是区间：不等就是悬空（窗底 < 墨面高）
+   或者压进数字（窗底 > 墨面高）。 */
+ok('窗底与墨面上沿是同一条线（悬空 或 压进数字都算红）',
+  WRAP_BOTTOM === COUNT_H, `窗底 ${WRAP_BOTTOM} vs 墨面 ${COUNT_H}`)
+const FIG_SRC_W = (() => { const b = fs.readFileSync(P('assets/ic-person.png')); return b.readUInt32BE(16) })()
+/* 女那张的头带两行（发顶＝贝蕾帽那一截、下巴）：从 `docs/design/10-12-2.2全量效果图/标-女那张头带.png`
+   逐行读出来的（那张图每 20 行一条横线并标行号），不是估的。源件 360×433，块内缩放比 ＝ 220/360。 */
+const CROWN_ROW = 40, CHIN_ROW = 210
+const HEAD_MID_BLOCK = -OVER + ((CROWN_ROW + CHIN_ROW) / 2) * (FIG_W / FIG_SRC_W)
+const ALT_TOP = PERSON_H - WRAP_BOTTOM - num(seg('.blk-fig-alt'), 'height')   // 男剪影在块内的顶（窗底 213 − 高 132）
+ok('窗高等于女那张按宽缩放的自然高（脚底刚好落在墨面上沿，一个像素不悬空）',
+  FIG_W + OVER > 0 && (PERSON_H - WRAP_BOTTOM) + OVER === FIG_F,
+  `窗高 ${(PERSON_H - WRAP_BOTTOM) + OVER} vs 女那张 ${FIG_F}`)
+/* 站长 10-13 追打那一句的两半，各钉一条：「漫画女背景的白框，上部分，往下一点，让头部一半在框外，
+   然后漫画男在框内」。原来这两句是"白面贴块顶 ＋ 窗顶出血 52"，白面顶在 0、女那张头带跨 −28..76
+   ⇒ 只有出血那 28 在框外（约头的 28%），不是"一半"。 */
+ok('白面上沿落在女那张的头带中点（±2rpx 内）⇒ 头部一半在框外',
+  FACE_TOP > 0 && Math.abs(FACE_TOP - HEAD_MID_BLOCK) <= 2,
+  `白面顶 ${FACE_TOP} vs 头带中点 ${HEAD_MID_BLOCK.toFixed(1)}（发顶 ${CROWN_ROW}／下巴 ${CHIN_ROW}）`)
+ok('男剪影整张仍在白框内（它的顶必须低于白面上沿，否则这一刀把它也推出框了）',
+  ALT_TOP > FACE_TOP, `剪影顶 ${ALT_TOP} vs 白面顶 ${FACE_TOP}`)
 ok('人物只定宽、高由 widthFix 算（两张图比例不同：女 0.832／男 0.689，写死方盒会拉扁）',
   /width:\s*\d+rpx/.test(sFig) && !/height:/.test(sFig) && /mode="widthFix"/.test(wxml))
-ok('男那张（更高）也在同一道窗里被裁齐：源件宽高比确实不同，判据才不是空转',
+ok('男那张（更高）也在同一道窗里被裁齐：源件比例确实不同、且确实高出窗顶',
   (() => {
-    const r = (f) => { const b = fs.readFileSync(P(f)); return b.readUInt32BE(16) / b.readUInt32BE(20) }
-    const a = r('assets/ic-person.png'), b = r('assets/ic-person-alt.png')
-    return Math.abs(a - b) > 0.1
+    const a = ratioOf('assets/ic-person.png'), b = ratioOf('assets/ic-person-alt.png')
+    return Math.abs(a - b) > 0.1 && Math.round(FIG_W * b) > FACE_H + OVER
   })(),
-  '两张比例相同的话这一组判据没在管任何东西')
-ok('白条是纯白（他原话「底色换成纯白」），且不是纸白 #F2EFE9 那一枚',
-  /background:\s*#FFFFFF/i.test(sJot) && !/#f2efe9/i.test(sJot))
-// 两档灰的**色号**钉死（他 10-10 晚改的口：小字原来 14rpx／#8E8E93 在白底上只有 3.26，读不动），
-// 但**对比度另算一条、且从样式表现读**——色号这条只管"是不是这一支"，管不了"换一支会不会掉线"。
-const jotInk = (/#(?:[0-9a-fA-F]{6})\b/.exec(seg('.blk-jot-l'))?.[0] || '').toUpperCase()
-const jotSInk = (/#(?:[0-9a-fA-F]{6})\b/.exec(seg('.blk-jot-s'))?.[0] || '').toUpperCase()
-ok('「记下来」深灰 #3A3A3C、小字 #6E6E73（他 10-10 晚改的口，不是橙也不是白）',
-  jotInk === '#3A3A3C' && jotSInk === '#6E6E73', `${jotInk}／${jotSInk}`)
-ok('小字这一档从 14rpx 抬到了 --fs-micro（抬字是拍板的一半，另一半不能悄悄掉回 14）',
-  sizeOf('.blk-jot-s', 'font-size') === 18, `${decl(seg('.blk-jot-s'), 'font-size')}`)
-ok('两档写死的灰都压得住白条那张纯白（≥4.5）——读不到色号直接红，不许空过',
-  !!jotInk && !!jotSInk && palette.crOf(jotInk, '#FFFFFF') >= 4.5 && palette.crOf(jotSInk, '#FFFFFF') >= 4.5,
-  `${jotInk} ${palette.crOf(jotInk || '#000000', '#FFFFFF').toFixed(2)}／${jotSInk} ${palette.crOf(jotSInk || '#000000', '#FFFFFF').toFixed(2)}`)
-ok('白条底下那一层 85% 半透明白（.blk-strip）没有把字冲淡：四套 × 两枚 ≥4.5',
-  palette.THEMES.every((th) => {
-    const b = palette.entryBlocks(th.key)
-    return ['notes', 'cards'].every((k) => {
-      const strip = palette.mix('#FFFFFF', b.face[k], 0.85)
-      return palette.crOf(b.ink[k], strip) >= 4.5
-    })
-  }),
-  palette.THEMES.map((th) => {
-    const b = palette.entryBlocks(th.key)
-    return `${th.label} ${['notes', 'cards'].map((k) => palette.crOf(b.ink[k], palette.mix('#FFFFFF', b.face[k], 0.85)).toFixed(2)).join('/')}`
-  }).join(' '))
-ok('快门那枚复用第二屏那支 Lucide camera（同一份 mask，不另画一份）',
-  /class="blk-cam glyph-camera"/.test(wxml)
-  && /\.blk-cam[^{]*\{[^}]*\}/.test(wxss)
-  && new RegExp('\\.blk-cam[^{]*\\.paste-glyph[^{]*\\{[^}]*mask-repeat').test(wxss))
+  `窗高 ${FACE_H + OVER}／男那张按宽缩放 ${Math.round(FIG_W * ratioOf('assets/ic-person-alt.png'))}`
+  + '（两个数相等或男不比窗高，这一组判据就没在管任何东西）')
 
-/* ---------- 3. 颜色只能由 palette 派生 ---------- */
-const usedEb = [...new Set((wxss.match(/var\((--eb-[a-z0-9-]+)\)/g) || []).map((x) => /--eb[a-z0-9-]*/.exec(x)[0]))]
-const ebSkin = palette.entryBlocks().style
-ok('三块用到的每一枚 --eb-* 都由 entryBlocks() 发得出来（拼错不会红、只会静默透明）',
-  usedEb.length === 6 && usedEb.every((v) => ebSkin.includes(`${v}:`)),
-  usedEb.filter((v) => !ebSkin.includes(`${v}:`)).join(',') || `只读到 ${usedEb.length} 枚`)
-ok('create.js 每次进页重发这套面（换壁纸回来三块要跟上，初值那一枚不算）',
-  /blkSkin: entryBlocks\(app\.getWallpaper\(\)\)\.style/.test(js))
-// 只扫这三块自己那些选择器那几段（同一份样式表下面还有面板、卡、滑条那些色，
+/* ---------- 3. 两片皮：同一串停点、看得出的幅度、压得住的字 ----------
+   他 10-13 两句一起管：「要与现网的渐变的过程一样」（＝停点位置照 .page-scrim，不自造缓动）
+   与「内框也要有渐变效果，要有一定半透明」（＝幅度得看得见）。
+   上一版在这两处各翻过一次车：① 照抄 .page-scrim 那串 .42→.72 到已经近实心的墨面上，
+   合成只差 2 级＝画了跟没画一样（他那句"黑底的半透明渐变效果不好"就是这个）；
+   ② 停点自己另写一套，与现网那条曲线不是"同一个过程"。所以这里两头都钉。 */
+/* ⚠ `Number('43%')` 是 NaN、`JSON.stringify` 又把 NaN 写成 null——
+   原来这里 `map(Number)` 之后比的是两串 null，**永远相等**，停点改成 38% 也不红（刀试出来的）。
+   取百分比一律 parseFloat，并且先自证读到了七档，读不到就红，不许空过。 */
+const stops = (src) => (src.match(/[\d.]+%/g) || []).map(parseFloat)
+const scrimStops = stops(seg('.page-scrim') || segRaw('.page-scrim'))
+const alphas = (src) => (src.match(/rgba\([^)]*,\s*([\d.]+)\s*\)/g) || [])
+  .map((s) => Number((/([\d.]+)\s*\)/.exec(s) || [0, 0])[1]))
+function segRaw(sel) {
+  const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const m = new RegExp(`(?:^|\\n)${esc}\\s*\\{([^}]*)\\}`).exec(wxssRaw)
+  return m ? m[1] : ''
+}
+/* ---------- 10-14 五档彩色毛玻璃：这几条读的值搬家了 ----------
+   面板那三段（band／实心／左下那一格）与压在面板上的三档字，源码里现在写的是 `var(--stage-*)`
+   与 `var(--blk-count-bg)`，**值在 `app.wxss` 的 `.mood-*` 那五块里**（真身在 utils/palette.js 的 moodVars）。
+   所以这一组判据先按"墨那一档"把 var() 展开成它实际落地的值，再照原来的算法算合成灰阶与对比度——
+   判的还是他 10-13 拍过的那几档数，只是量的位置从样式表挪到了令牌表。
+   ⚠ 展开取的是 `.mood-ink`（默认那一档）：彩色那四档由 `验-五档彩色玻璃.js` 逐档钉，两边不重复。 */
+const MOOD_INK = ((/\.mood-ink\s*\{([^}]*)\}/.exec(appWxss) || [0, ''])[1])
+const tok = (v) => {
+  const m = /var\((--[\w-]+)\)/.exec(v || '')
+  if (!m) return v || ''
+  const d = new RegExp('\\s*' + m[1] + ':([^;]+);').exec(MOOD_INK)
+  return d ? d[1].trim() : v
+}
+const val = (segTxt, prop) => tok(decl(segTxt, prop))
+
+ok('白面与墨面各是一条七档渐变（不是两档糊过去）',
+  (val(sFace, 'background').match(/\d+%/g) || []).length === 7
+  && (val(sCount, 'background').match(/\d+%/g) || []).length === 7,
+  `白面 ${(val(sFace, 'background').match(/\d+%/g) || []).length} 档／墨面 ${(val(sCount, 'background').match(/\d+%/g) || []).length} 档`)
+ok('两片皮的停点位置与现网 .page-scrim 逐档相同（"与现网的过程一样"）',
+  scrimStops.length === 7
+  && JSON.stringify(stops(val(sFace, 'background'))) === JSON.stringify(scrimStops)
+  && JSON.stringify(stops(val(sCount, 'background'))) === JSON.stringify(scrimStops),
+  `现网 ${scrimStops}／白面 ${stops(val(sFace, 'background'))}／墨面 ${stops(val(sCount, 'background'))}`)
+ok('两片的基色一支是白、一支是 .page-scrim 那支 (18,20,26)',
+  /rgba\(255,\s*255,\s*255/.test(val(sFace, 'background'))
+  && /rgba\(18,\s*20,\s*26/.test(val(sCount, 'background')))
+/* 幅度这一头按**合成后的灰阶差**判，不按透明度差判：透明度差 .3 压在近实心的墨底上，
+   灰阶可能只动 2 级（那就是"画了等于没画"那一刀）。底取面板那支实心墨 #23252C（保守——
+   真机上 .95 的面板还压着一张会透出来的图，底只会更浅，差只会更大不会更小）。
+   门槛 6 级：现量白面 ≈60 级、墨面 ≈8 级，而他打回那一版（照抄 .page-scrim 的 .42→.72）实测 2 级，
+   6 这条线正好卡在"看得出一个渐变"与"看不出来"中间。 */
+const PANEL_FACE = '#23252C'
+const toHexLocal = (rgb) => '#' + rgb.map((v) =>
+  Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('')
+// 一支 rgba(...) 压在实心底上合成出来的实心色——半透明层"画没画"只能这样算，盯着 alpha 会受骗
+// （10-11 那条"白纱 .30 叠白 .70 合成 .79"的教训是同一件事的另一头）。
+const over = (tok, bg) => {
+  const n = ((tok || '').match(/[\d.]+/g) || []).map(Number)
+  if (n.length < 4) return null
+  const b = palette.hexToRgb(bg)
+  return toHexLocal([0, 1, 2].map((i) => n[i] * n[3] + b[i] * (1 - n[3])))
+}
+const gradTok = (src, first) => {
+  const t = (src.match(/rgba\([^)]*\)/g) || [])
+  return first ? t[0] : t[t.length - 1]
+}
+const gradSpan = (src) => {
+  const a = over(gradTok(src, true), PANEL_FACE)
+  const b = over(gradTok(src, false), PANEL_FACE)
+  return a && b ? Math.abs(palette.lumOf(a) - palette.lumOf(b)) : NaN
+}
+ok('白面渐变合成到墨面板之后上下两端差 ≥6 级（照抄 .42→.72 那种只差 2 级的算没画）',
+  gradSpan(val(sFace, 'background')) >= 6,
+  `实测 ${Math.round(gradSpan(val(sFace, 'background')))} 级`)
+ok('墨面渐变合成到墨面板之后同样差 ≥6 级',
+  gradSpan(val(sCount, 'background')) >= 6,
+  `实测 ${Math.round(gradSpan(val(sCount, 'background')))} 级`)
+// 字压面：那一格的底取**渐变最浅那一端**（最难读的头），字与横线各自先合成成实心再算。
+const COUNT_FLOOR = over(gradTok(val(sCount, 'background'), true), PANEL_FACE)
+const solidOf = (sel, prop) => {
+  const raw = val(seg(sel), prop)
+  return /^#/.test(raw) ? raw : over(raw, COUNT_FLOOR)
+}
+const crNum = palette.crOf(solidOf('.blk-num', 'color'), COUNT_FLOOR)
+const crLab = palette.crOf(solidOf('.blk-lab', 'color'), COUNT_FLOOR)
+const crRule = palette.crOf(solidOf('.blk-rule', 'background'), COUNT_FLOOR)
+/* 读不到色号必须红，不许空过：solidOf 拿不到东西时返回 ''，crOf('') 会算出一个"看起来过了"的数。
+   原来这一条就是靠 `!!jotInk &&` 挡的，换了三样东西之后那道挡箭牌也跟着换成三样都得是 hex。 */
+const isHex = (v) => /^#[0-9a-fA-F]{6}$/.test(v || '')
+ok('数字与小字压得住墨面最难读那一端（≥4.5），横线作为图形 ≥3.0',
+  isHex(COUNT_FLOOR) && isHex(solidOf('.blk-num', 'color')) && isHex(solidOf('.blk-lab', 'color'))
+  && isHex(solidOf('.blk-rule', 'background'))
+  && crNum >= 4.5 && crLab >= 4.5 && crRule >= 3.0,
+  `底 ${COUNT_FLOOR}：数字 ${crNum.toFixed(2)}／小字 ${crLab.toFixed(2)}／横线 ${crRule.toFixed(2)}`)
+ok('数字那一档是 64rpx 那支 Thin、小字吃现成的 --fs-micro（"与正常小字一样"＝同一档，不自起一架）',
+  num(seg('.blk-num'), 'font-size') === 64 && /WtsjMind/.test(seg('.blk-num'))
+  && /var\(--fs-micro\)/.test(seg('.blk-lab'))
+  && sizeOf('.blk-lab', 'font-size') === 18,
+  `数字 ${num(seg('.blk-num'), 'font-size')}／小字 ${sizeOf('.blk-lab', 'font-size')}`)
+
+/* ---------- 4. 色相仍然只许从 palette 来 ---------- */
+// 只扫这一组自己那些选择器那几段（同一份样式表下面还有面板、卡、滑条那些色，
 // 拿整份来判"不许抄色相"会一把红到底，量不到任何东西）。
 const blkSels = wxss.match(/^\.home-blk[-\w.,\s]*\{[^}]*\}|^\.blk[-\w.,\s]*\{[^}]*\}/gm) || []
 const blkSegs = blkSels.join('\n')
 // 这一段必须先自证"真的扫到了东西"：原来这条判据在 `blkSegs` 为空时是 `[] .length === 0` → 绿。
 // 10-10 那次翻车（组名从 `.blk` 改成 `.home-blk`）只要正则少写一个分支，整组色判据就会集体假绿。
-ok('色扫真扫到了三块那几段（匹配到 0 段时，下面几条"没有抄色相"全是假绿）',
+ok('色扫真扫到了这一组那几段（匹配到 0 段时，下面几条"没有抄色相"全是假绿）',
   blkSels.length >= 15 && blkSegs.length > 800,
   `${blkSels.length} 段／${blkSegs.length} 字符`)
 const huesInBlk = (blkSegs.match(COLOR_RE) || []).filter(isHue)
-ok('三块那几段样式表里没有抄进来的色相（白名单换成按饱和度认：中性色放行，有彩度就红）',
-  huesInBlk.length === 0, huesInBlk.join(','))
-// 写死的背景同样按饱和度认。原来这里额外放行 `rgba(255,255,255,*)`／`rgba(0,0,0,*)`，
-// 那是给半透明白与黑开的洞——但 rgba 里换成 `rgba(210,104,63,.5)` 一样从洞里过去了。
-const hardBg = (blkSegs.match(/(?:background|background-color):\s*([^;}]+)/g) || [])
-  .flatMap((s) => (s.match(COLOR_RE) || []))
-  .filter(isHue)
-ok('三块的面色确实一段都不写死（背景全是 var(--eb-*)，只有纯白与快门的灰是拍过的中性色）',
-  /\.blk-person\s*\{[^}]*background:\s*var\(--eb-person\)/.test(wxss) && hardBg.length === 0,
-  hardBg.join(','))
-
-/* ---------- 4. 门槛：字压面 ≥4.5（四套 × 三块 = 12 个值） ----------
-   这里**只钉得住"换壁纸这一头不许塌"**。"面压照片"那一头当初也立过一条 3.0，10-10 撤了：
-   一是站长从没提过这条门槛（我自己加的），二是我当时报的那三个探点色 #7A7D84/#625A56/#5D5959
-   取的是**最暗那一档（弯月）**罩后的读数——默认那档（半月）实测最低 1.98、满月档 1.28，
-   那句"十二个值全过 3.0"当时就是假的。三档数字与量法记在 docs/规格-创建入口这一条线.md §6.2。 */
-for (const th of palette.THEMES) {
-  const b = palette.entryBlocks(th.key)
-  const ink = Object.keys(b.face).map((k) => ({ k, c: palette.crOf(b.ink[k], b.face[k]) }))
-  ok(`${th.label}：字压面三块全 ≥4.5`, ink.every((x) => x.c >= 4.5),
-    ink.map((x) => `${x.k} ${x.c.toFixed(2)}`).join(' '))
+/* 唯一允许出现在这一组里的彩度，是**全站那一枚纸白**（`--btn-ink` #F2EFE9，暖白，实测彩度 9，
+   正好越过上面那条 8 级的线）——压在恒深的深色面板上，字只能写死这一支，
+   吃 `--text-*` 那一族会随壁纸/深浅翻成墨（见 create.wxss 那一段注释）。
+   放行条件是**逐通道与那一枚完全同值**，不是"看着像白就放行"：
+   阈值那档（8）不能放宽，四套壁纸发出来的 eb 值实测 11~27，放宽就会放进一支真的品牌色；
+   而别的暖白（比如随手抄的 #F5F0E6）通道不同，照样红。
+   ⚠ 这一枚的值从 app.wxss 现读，抄进判据就成了两份真相。 */
+const PAPER = ((/--btn-ink:\s*(#[0-9a-fA-F]{6})/.exec(appWxss) || [0, ''])[1] || '').toLowerCase()
+const rgbOfPaper = palette.hexToRgb(PAPER || '#000000')
+const isPaperWhite = (tok) => {
+  if (!PAPER) return false
+  const n = rgbOf(tok)
+  return n.length >= 3 && n.slice(0, 3).every((v, i) => Math.round(v) === rgbOfPaper[i])
 }
+const offenders = huesInBlk.filter((t) => !isPaperWhite(t))
+ok('这一组那几段样式表里没有抄进来的色相（中性色放行；唯一那支暖白必须是全站 `--btn-ink`）',
+  !!PAPER && offenders.length === 0,
+  offenders.join(',') || `纸白核对：${PAPER}`)
+/* 10-14 之前这一条数的是 create.wxss 里那几处写死的 #F2EFE9；现在那四处换成 var(--stage-ink-*)，
+   数源码里的字面量必然红。判据的前提跟着搬：**四处引用要在，且墨档展开出来必须还是那一枚纸白**
+   （少一处＝那一处会跟着彩色档翻墨；展开不是纸白＝默认那一屏的字色被他没指的这一刀改掉了）。 */
+const INK_REFS = ['.blk-num', '.blk-lab', '.blk-rule', '.blk-tips-in']
+const inkRefOk = (sel) => /var\(--stage-ink[-\w]*\)/.test(seg(sel))   // 四枚后缀各不相同（-solid/-dim/空/-strong），别挨个列
+const inkTokVals = ['.blk-num', '.blk-lab', '.blk-rule', '.blk-tips-in']
+  .map((sel) => val(seg(sel), /blk-rule/.test(sel) ? 'background' : 'color'))
+const inkTokPaper = inkTokVals.every((v) => isPaperWhite(v) || (v || '').toLowerCase() === PAPER.toLowerCase())
+ok('面板上那四处字色各引一枚 `--stage-ink-*`，且墨档展开回来仍是全站那一枚纸白',
+  INK_REFS.every(inkRefOk) && !!PAPER && inkTokPaper,
+  `${INK_REFS.filter(inkRefOk).length}/4 引用齐；展开值 ${inkTokVals.join(' ')}`)
+ok('这一组不再吃 `--eb-*`，也没有一处还写 `blkSkin`（那套随壁纸派生的面整条退役了）',
+  !/--eb-|blkSkin|entryBlocks/.test(wxss + wxml + jsOnly),
+  (/--eb-[a-z0-9-]+|blkSkin|entryBlocks/.exec(wxss + wxml + jsOnly) || ['(无)'])[0])
+/* 10-13 站长「按钮变成白色风格。类似第二屏毛玻璃」⇒ 这一枚不再是快门橙，而是第二屏那面玻璃的同一配方。
+   钉三样：① 吃 `--glass-plate` 且挂了糊（只写白不写糊＝一张白饼，不是毛玻璃）；② 不许写死色值；
+   ③ 容器上那一套 `--cp-*` 仍要发——图形那枚吃 `--cp-cam-ink`，搬到 `.panel` 上首屏就拿不到。 */
+ok('➕ 是第二屏那一配方（白 .50  plate ＋ 糊 ＋ 细边），且没有抄进来的色值',
+  /background:\s*var\(--glass-plate\)/.test(seg('.blk-plus'))
+  && /backdrop-filter:\s*var\(--glass-bf\)/.test(seg('.blk-plus'))
+  && /-webkit-backdrop-filter:\s*var\(--glass-bf\)/.test(seg('.blk-plus'))
+  && /var\(--glass-hair\)/.test(seg('.blk-plus'))
+  && !/#[0-9A-Fa-f]{6}/.test(seg('.blk-plus')),
+  decl(seg('.blk-plus'), 'background') || '(没写)')
+ok('容器仍发那套 --cp-*（图形吃 --cp-cam-ink；发在 .panel 上首屏拿不到＝透明）',
+  /background:\s*var\(--cp-cam-ink\)/.test(seg('.blk-plus-glyph'))
+  && /class="container[^"]*"\s+style="\{\{skinPanel\}\}"/.test(wxml)
+  && !/class="panel[^"]*"[^>]*style="\{\{skinPanel\}\}"/.test(wxml))
+/* 10-13 D19 甲：首屏圆内那枚 ➕ 单独加粗到 2.4。这里钉的是**选择器的形状**，不只是"有个 2.4"——
+   markup 是 `class="blk-plus-glyph glyph-plus"`，一枚元素两个类，写成裸 `.blk-plus-glyph` 就是
+   1 类 vs 1 类、纯靠源码顺序赢（今天赢着，谁挪一下那两段就静默退回 1.6，屏上看不出来）。
+   两行都必须在：iOS 的 WKWebView 只认 `-webkit-mask-image`。 */
+ok('首屏那枚 ➕ 的 2.4 挂在 `.blk-plus .blk-plus-glyph`（两枚类，不靠源码顺序）且标准＋-webkit- 成对',
+  (() => {
+    const m = /(?:^|\n)\.blk-plus \.blk-plus-glyph\s*\{([^}]*)\}/.exec(wxssRaw)
+    return !!m && (m[1].match(/stroke-width='2\.4'/g) || []).length === 2
+      && /-webkit-mask-image:/.test(m[1]) && /(?<!-webkit-)mask-image:/.test(m[1])
+  })(),
+  (/(?:^|\n)\.blk-plus \.blk-plus-glyph\s*\{/.test(wxssRaw) ? '两行不齐' : '没有那条两枚类的规则'))
+/* 面板顶这一档 10-14 又换了一次口径。三版账：
+   ① 效果图那一版：两态同一个顶＝组顶往上 107（框外那一行的高）；
+   ② 10-13 站长「深色面板调下…内框与上面外框的距离，要与下方的 tab 面板距离一样」⇒
+      收起态改成"上下两口留空相等"（24），展开态另钉一根（152＋107＋490）；
+   ③ 10-14 站长「第二屏，高度不准，要和第一屏一致」＋「back 抬到暗面板上面」⇒
+      框外那一行只剩「返回」并且整枚抬到墨面之上，②里为那 107 预留的死墨没有对象了
+      ⇒ 两根并成一根：顶＝内框的顶往上那口呼吸，而内框两屏同高、同一条底线。
+   数全部现读：组顶那条 calc、面板那条 calc、录入条的 bottom、面板两档的高、底栏的高＋bottom。 */
+const declsOf = (src, prop) => (src.match(new RegExp(`${prop}:\\s*([^;]+)`, 'g')) || [])
+const topOf = (sel) => declsOf(seg(sel), 'top').join(' | ')
+const numIn = (src, re) => Number((re.exec(src) || [0, 0])[1])
+const BREATHE = numIn(seg2(tabWxss, '.tab-bar'), /height:\s*(\d+)rpx/)
+  + numIn(seg2(tabWxss, '.tab-bar'), /bottom:\s*(\d+)rpx/)      // 底栏那一格占掉的高＋离底
+const ENTRY_B = num(seg('.container.entry-dock .entry-wrap'), 'bottom')
+const OPEN_H = num(seg('.panel-open'), 'height')
+const GROUP_OFF = numIn(topOf('.home-blk'), /calc\(100vh - (\d+)rpx\)/)
+const INK_OFF = numIn(topOf('.stage-panel'), /calc\(100vh - (\d+)rpx\)/)
+ok('收起态：组顶与录入条同一条底线，而面板顶到组顶的留空＝组底到顶栏那一口（上下两口同值）', (() => {
+  const below = GROUP_OFF - PERSON_H - BREATHE          // 组底离底栏顶那一口：524 − 372 − 128 = 24
+  return GROUP_OFF > 0 && INK_OFF > 0 && GROUP_OFF - PERSON_H === ENTRY_B
+    && below > 0 && INK_OFF - GROUP_OFF === below
+})(), `组顶 calc(100vh − ${GROUP_OFF})／内框 ${PERSON_H}／墨顶 calc(100vh − ${INK_OFF})／底栏占 ${BREATHE}`)
+/* 第二屏不再另钉一根：`.container.entry-dock .stage-panel` 那条 749 一回来，两屏就又分叉
+   （1669 那台上量过：首屏 1083／第二屏 920，差 163rpx，点一下 ➕ 背景自己往上跑一趟）。
+   展开那一档另给一条 `.dock-open`，但它不是"第二屏那根"——它跟的是**这一档卡片自己的顶**，
+   收起↔展开之间这一层与那张卡一起长，两屏之间这一层一动不动。 */
+ok('第二屏不再另钉一根顶（`.entry-dock .stage-panel` 一条不剩＝两屏同一根线）',
+  !/\.entry-dock\s+\.stage-panel/.test(wxss), topOf('.stage-panel'))
+const OUT_H = num(seg('.out'), 'height')
+const bandOff = numIn(declsOf(seg('.container.dock-open .stage-panel'), 'top').join(' | '), /calc\(100vh - (\d+)rpx\)/)
+ok('展开那一档：这一层的顶＝展开卡片的顶往上同一口（卡片穿出墨面＝白给的那一段）',
+  ENTRY_B > 0 && OPEN_H >= PANEL_H && bandOff === ENTRY_B + OPEN_H + (INK_OFF - GROUP_OFF),
+  `顶 calc(100vh − ${bandOff}) vs ${ENTRY_B}＋${OPEN_H}＋${INK_OFF - GROUP_OFF}=${ENTRY_B + OPEN_H + (INK_OFF - GROUP_OFF)}`)
+// 那一行现在只剩「返回」一枚，它坐在墨面之上靠的是 `.out` 自己那档 margin-bottom：
+// 行底的"离底距离"＝ 录入条离底 ＋ 卡片高 ＋ 这一档；墨顶＝录入条离底 ＋ 卡片高 ＋ 那口呼吸。
+// 前者大于后者 ⇒ 整枚在墨面之上。两档都从 CSS 现读，改哪一头都红（收起、展开各算一次）。
+const OUT_MB = num(seg('.out'), 'margin-bottom')
+ok('框外那一行整枚在墨顶之上（收起、展开两档都算一次）', (() => {
+  const shut = ENTRY_B + PANEL_H + OUT_MB      // 行底离屏底：152＋372＋36 ＝ 560
+  const open = ENTRY_B + OPEN_H + OUT_MB       // 展开那一档：152＋490＋36 ＝ 678
+  return OUT_H > 0 && shut > INK_OFF && open > bandOff
+})(), `行底离屏底 收起 ${ENTRY_B + PANEL_H + OUT_MB} vs 墨顶 ${INK_OFF}／展开 ${ENTRY_B + OPEN_H + OUT_MB} vs ${bandOff}`)
+ok('这一层自己身上不挂动态类（它跟着卡片长，靠的是容器那一条 `.dock-open`）',
+  !/stage-panel-open/.test(wxss + wxml) && /class="stage-panel"/.test(wxml)
+  && /class="container[\s\S]*?\{\{panelOpen \? 'dock-open' : ''\}\}/.test(wxml),
+  (wxml.match(/class="stage-panel[^"]*"/) || ['(没找到)'])[0])
+
+/* 面板那几段皮的**分工**（他 10-13「新增面板为什么看不到渐变毛玻璃」追出来的）：
+   本体必须透明。实心 .95 一旦写回本体，就与压在它上面的 `::before` 相乘
+   ⇒ band 顶透出 1−(1−.95)(1−.16)＝4.2%、band 底 0.30%，整块 96% 实心，
+   "上部渐变半透明毛玻璃"画了等于没画，而且**静态几何全绿、截图也看不出差别**（它就是那一片墨）。
+   ⚠ 10-14 那一刀改了分工的形状：原来是 `::before`（高 240rpx 的 .16→.94）＋ `::after`（240rpx 以下铺 .95）
+   两枚层并排，交界正落在面板正中 ⇒ 那一行少铺一点，透出后面的糊面，读成一条亮线（他：
+   「还有黑色面板中间多了条线，其他色都没有，检查去掉」；实测墨档整幅亮占比 0.47、彩色四档 ≤0.10，
+   把 `::after` 的 top 从 240rpx 挪到 200rpx，那条线跟着挪到 y1248）。现在**一层画完**：
+   一条渐变里 .16→.94→.95，收口位置是百分比停点（240/面板高），不再有两枚层的边。
+   所以底下这几条钉的是"只有一枚层、且它铺满"，不再是"两枚层的高与 top 相等"。 */
+const sPanel = seg('.stage-panel')
+const sPanelBand = seg('.stage-panel::before')
+const sPanelBody = seg('.stage-panel::after')
+ok('深色面板本体透明（色只能归那一枚铺满的层；写回本体＝与它相乘，band 透出不到 4.2%）',
+  /^(transparent|none)$/i.test(decl(sPanel, 'background')),
+  `本体 background=${decl(sPanel, 'background') || '(没写)'}`)
+const FACE_CSS = val(sPanelBand, 'background')
+ok('面板那一整面是一条 .16→.94→.95 的渐变（同色只走透明度；10-13 两刀把顶档从 .55 一路收到 .16＝"透明度多一点，现在太暗了"）',
+  /rgba\(35,\s*37,\s*44,\s*0?\.16\)/.test(FACE_CSS) && /rgba\(35,\s*37,\s*44,\s*0?\.94\)/.test(FACE_CSS)
+  && /rgba\(35,\s*37,\s*44,\s*0?\.95\)/.test(FACE_CSS),
+  FACE_CSS || '(没写)')
+ok('只许一枚层铺满整面（top:0＋bottom:0、不写 height；再并第二枚层＝中间那条亮线长回来）',
+  /top:\s*0\s*;/.test(sPanelBand) && /bottom:\s*0\b/.test(sPanelBand) && !/height:/.test(sPanelBand)
+  && sPanelBody === '',
+  `::before top=${(decl(sPanelBand, 'top') || '(没写)')}／bottom=${decl(sPanelBand, 'bottom') || '(没写)'}／height=${decl(sPanelBand, 'height') || '没写'}；::after 段长 ${sPanelBody.length}`)
+ok('糊挂在面板本体上（本体透明又不挂 blur ⇒ 那一段就是一张洞，什么都不糊）',
+  /backdrop-filter:\s*blur/.test(sPanel) && /-webkit-backdrop-filter:\s*blur/.test(sPanel),
+  decl(sPanel, 'backdrop-filter') || '(没写)')
 
 /* ---------- 5. 两个计数来自接口 ---------- */
-ok('效果图上那两个占位数没被抄进页面（128／46 一旦落进 wxml 就是永远显示假数）',
-  !/>\{\{?(128|46)\}?\}/.test(wxml) && !/class="blk-n">128</.test(wxml))
+/* 原来这一条只挡效果图上那两个旧占位数（128／46）。B 方案稿上写的是「笔记:16 卡片:13」，
+   那两个数一样可能被抄进模板——所以改成挡"这一格里是个写死的数字"，不枚举哪两个数。
+   数从 markup 现数：两枚 .blk-num，一枚不是 mustache 就是假数常驻。 */
+ok('两枚数字那一格只能是 mustache，不许是写死的数字（稿上那两枚一旦落进 wxml 就是永远显示假数）',
+  (wxml.match(/class="blk-num">[^<{]*\d/g) || []).length === 0
+  && (wxml.match(/class="blk-num">\{\{/g) || []).length === 2
+  && !/>\{\{?(128|46|16|13)\}?\}/.test(wxml))
 ok('两枚各自绑自己的位（noteCount／cardCount），且都从接口来',
-  /class="blk-n">\{\{noteCount\}\}<\/text>/.test(wxml)
-  && /class="blk-n">\{\{cardCount\}\}<\/text>/.test(wxml)
+  /class="blk-num">\{\{noteCount\}\}<\/text>/.test(wxml)
+  && /class="blk-num">\{\{cardCount\}\}<\/text>/.test(wxml)
   && /api\.getQuota\(\)/.test(jsOnly) && /api\.getMyCards\(\)/.test(jsOnly))
 ok('两个口各自独立：任一拉不到不许把另一格和这一屏一起拖挂（各包各的 try）',
   (jsOnly.match(/try \{[\s\S]*?getQuota[\s\S]*?\} catch/g) || []).length === 1
@@ -324,9 +556,13 @@ const personJs = fs.readFileSync(P('utils/person.js'), 'utf8')
 const hardSrc = [P('pages/create/create.js'), P('pages/index/index.js')]
   .filter((f) => /ic-person|homePerson/.test(fs.readFileSync(f, 'utf8')))
   .map((f) => path.relative(ROOT, f))
-ok('两份图各在包里，且键名／路径／存储只写在 utils/person.js 一处',
+/* 那两枚计数图标（ic-stat-notes／ic-stat-cards）随右两枚计数块一起出了包：
+   留着就是包里 18KB 没人读的字节。它们**曾经**是"压平到实心"的四张里的两张，
+   所以这一条同时钉两头——该在的两张在、该走的两张连引用都不许剩。 */
+ok('人物那两张还在包里，两张计数图标连文件带引用一起撤净',
   fs.existsSync(P('assets/ic-person.png')) && fs.existsSync(P('assets/ic-person-alt.png'))
-  && fs.existsSync(P('assets/ic-stat-notes.png')) && fs.existsSync(P('assets/ic-stat-cards.png'))
+  && !fs.existsSync(P('assets/ic-stat-notes.png')) && !fs.existsSync(P('assets/ic-stat-cards.png'))
+  && sweep(P('')).filter((f) => /ic-stat-/.test(fs.readFileSync(f, 'utf8'))).length === 0
   && /girl: '\/assets\/ic-person\.png', boy: '\/assets\/ic-person-alt\.png'/.test(personJs)
   && hardSrc.length === 0,
   hardSrc.join(','))
@@ -361,8 +597,8 @@ ok('选择写本机、下次进页沿用（读写都走 person.js 那一个键�
 const hoverNames = [...new Set((wxml.match(/hover-class="([^"]+)"/g) || [])
   .map((x) => /hover-class="([^"]+)"/.exec(x)[1])
   .filter((x) => /^blk-/.test(x)))]
-ok('三块各自挂了按下态（hover-class，不是 :active——小程序里 :active 不稳）',
-  hoverNames.length === 2 && (wxml.match(/hover-class="blk-[a-z-]+"/g) || []).length === 3,
+ok('三样共用一套按下态，且名字与 markup 两头对得上（枚数从 markup 现数）',
+  hoverNames.length === 3 && (wxml.match(/hover-class="blk-[a-z-]+"/g) || []).length === 4,
   hoverNames.join(','))
 ok('每一枚 hover-class 在样式表里真有一条规则接着（名字对不上＝静默不放大）',
   hoverNames.every((n) => new RegExp(`(?:^|\\n)\\.${n}[\\s,{][^}]*\\{[^}]*\\}`).test(wxss)),
@@ -371,13 +607,24 @@ ok('样式表里没有"挂了但没人指"的 .blk-*-press（孤儿规则）',
   (wxss.match(/^\.blk-[a-z-]*press(?=[\s,{])/gm) || [])
     .every((s) => hoverNames.includes(s.slice(1).replace(/\s+$/, ''))),
   (wxss.match(/^\.blk-[a-z-]*press/gm) || []).join(','))
-ok('放大只给图标自己、不给整块（整块会长高，把两枚之间那道 12 的缝吃掉）',
-  /\.blk-stat-press \.blk-ic\s*\{[^}]*transform:\s*scale/.test(wxss)
-  && !/\.blk-stat-press\s*\{[^}]*transform/.test(wxss))
+/* 按下态那一帧本身尺子量不到（automator 的 tap 不派发 touchstart／touchend，见规格 §8 那条），
+   这里只能钉"规则在、且改的是可控的那一档"。原来钉的是"放大只给图标、不给整块"——
+   图标跟着右两枚一起没了，剩下三枚都没有子图标可放大：
+   卡仍是整块 scale(1.02)（那一条他没动过），两枚计数格与 ➕ 用透明度退一档。
+   ⚠ 计数格不许学卡那样整块放大：它在那 197 的墨面里、外面还套着 `overflow:hidden` 的窗，
+   放大就会被裁出一截，那正是"按下反而像坏了"。 */
+ok('按下态三种载体各归其位：整块放大只给卡，计数格与 ➕ 走透明度',
+  /\.blk-person-press\s*\{[^}]*transform:\s*scale/.test(wxss)
+  && /\.blk-cell-press\s*\{[^}]*opacity/.test(wxss) && !/\.blk-cell-press\s*\{[^}]*transform/.test(wxss)
+  && /\.blk-plus-press\s*\{[^}]*opacity/.test(wxss)
+  && !/blk-stat-press|\.blk-ic/.test(wxss + wxml),
+  '旧那两枚计数块的按下态与图标缩放规则')
 
-/* ---------- 9. 组顶那道 min() 的常数与两头同源 ---------- */
+/* ---------- 9. 组顶那条 calc 的常数与两头同源 ---------- */
 const sBlk = seg('.home-blk')
-const GROUP_H = num(seg('.tips'), 'height') + num(seg('.tips'), 'margin-bottom') + PERSON_H
+// 2.2 B 方案：整组只剩那一行（Tips 搬进右列里、不再单独占一行），所以整组高＝左块高。
+// 原来这一式子是 `Tips 74 ＋ margin 12 ＋ 左块 308 = 394`，那三样现在都不在组的"纵向累加"里了。
+const GROUP_H = PERSON_H
 // 底栏占的那一段 = 它自己那条 height ＋ 它离底那条 bottom，两个都从底栏那一份样式表现读。
 const sTab = seg2(tabWxss, '.tab-bar')
 const TAB_H = num(sTab, 'height') + num(sTab, 'bottom')
@@ -385,40 +632,57 @@ function seg2(src, sel) {
   const m = new RegExp(`(?:^|\\n)${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(src)
   return m ? m[1] : ''
 }
-ok('整组高 394（Tips 74 ＋ 它下面 12 ＋ 左块 308）', GROUP_H === 394, `${GROUP_H}`)
+ok('整组高就是那一行（Tips 已搬进列里，不再单独占一行）', GROUP_H === PERSON_H, `${GROUP_H}`)
 ok('底栏占的那一段从底栏自己那一份现读（128 = 108 高 ＋ 20 离底）', TAB_H === 128, `${TAB_H}`)
-ok('min() 里那个夹值是推出来的、不是拍的：整组 ＋ 底栏 ＋ 最少留白 24',
-  /min\(66\.3%,\s*calc\(100vh - (\d+)rpx\)\)/.test(sBlk)
-  && parseInt(/min\(66\.3%,\s*calc\(100vh - (\d+)rpx\)\)/.exec(sBlk)[1], 10) === GROUP_H + TAB_H + 24,
+ok('组顶那条 calc 里的数是推出来的、不是拍的：整组 ＋ 底栏 ＋ 最少留白 24',
+  /top:\s*calc\(100vh - (\d+)rpx\)/.test(sBlk)
+  && parseInt(/top:\s*calc\(100vh - (\d+)rpx\)/.exec(sBlk)[1], 10) === GROUP_H + TAB_H + 24,
   `整组 ${GROUP_H} ＋ 底栏 ${TAB_H} ＋ 留白 24 = ${GROUP_H + TAB_H + 24}`)
-ok('min() 之前留了一行不带函数的退路（老安卓不认 min() 时不许塌成写死）',
-  (sBlk.match(/top:\s*66\.3%/) || []).length >= 1 && /top:\s*min\(/.test(sBlk))
+ok('66.3%／min() 那一族整族退场（贴底定的东西撞不到底栏，既不用夹刀、也不用老安卓退路）',
+  !/66\.3%|min\(/.test(sBlk), sBlk.replace(/\s+/g, ' ').slice(0, 80))
+/* 面板那一层是 `position:fixed; bottom:0` 的通栏一整片，它往上盖的那一段正好罩住底栏那枚胶囊。
+   底栏是**自定义组件**，automator 的 `page.$` 够不到它的节点（10-01 那轮就记过：只能截图采像素），
+   所以"点得到点不到"这一条真跑量不出来，只能在这里钉层号：面板那枚 z-index 必须**低于**底栏那一枚。
+   两个数都从各自那一份样式表现读，不抄——底栏将来改层号，这一条跟着走。 */
+const Z_PANEL = (/z-index:\s*(-?\d+)/.exec(seg('.stage-panel')) || [])[1]
+const Z_TAB = (/z-index:\s*(-?\d+)/.exec(sTab) || [])[1]
+ok('深色面板那层的层号低于底栏（面板通栏贴到屏底，压过 999 就是把"回列表／去我的"那两格点了没反应）',
+  Z_PANEL !== undefined && Z_TAB !== undefined && Number(Z_PANEL) < Number(Z_TAB),
+  `面板 ${Z_PANEL}／底栏 ${Z_TAB}`)
 
 /* ---------- 10. 字典 ---------- */
-ok('左块那句中英各一份（zh 换成「记下来」，en 本来就是同一句，不许有一边空着）',
+/* 「记下来」这一句从屏上撤了（他 10-12「左下的记下来这部部分，去掉」），但**键不许删**：
+   左块与圆形 ➕ 的 aria-label 还吃它（读屏念的那句就是屏上以前写的那句）。
+   所以这一条改钉两头：键还在、且两枚入口都还指它。 */
+ok('barIdle 那一键中英都在（屏上不写了，读屏还念它）',
   zh.barIdle === '记下来' && en.barIdle === 'Jot it down')
+ok('屏面上不再出现那一整条白皮（`.blk-jot` 的 markup 与样式都没有，含它那句「照片 · 链接 · 文字」）',
+  !/blk-jot/.test(wxml + wxss)
+  && !/\{\{t\.modePhoto\}\} · \{\{t\.modeUrl\}\} · \{\{t\.modeWrite\}\}/.test(wxml))
 ok('两枚计数的标签成对（statNotes／statCards），且不借名片那一格的 slotCard',
   !!zh.statNotes && !!zh.statCards && !!en.statNotes && !!en.statCards
   && /t\.statNotes/.test(wxml) && /t\.statCards/.test(wxml) && !/t\.slotCard/.test(wxml))
-ok('模式那一行吃现网三个标签，不新造叫法',
-  /t\.modePhoto.*t\.modeUrl.*t\.modeWrite/.test(wxml.replace(/\s+/g, '')))
-// 三块都是"整块可点"的入口，markup 上没有文字之外的可读名字（数字在 blk-n 里，读屏只念数字）。
-// 10-10 拍板补 role="button" + aria-label，词**全部复用屏上已有的字典键**，不另编一句（同 :30/:34
-// 那两枚 lang-seg 的先例）。这里钉的是"三块都挂了、且挂的是那两个键"，不是钉某句中文。
-const ariaBlocks = (wxml.match(/class="(?:blk-person|blk-stat blk-stat-\w+)"[^>]*>/g) || [])
-ok('三块每枚都挂了 role="button" + aria-label（读屏念的是「12 笔记」这一句，不只念一个数）',
-  ariaBlocks.length === 3 && ariaBlocks.every((t) => /role="button"/.test(t) && /aria-label="\{\{/.test(t)),
-  `${ariaBlocks.length} 枚`)
+// 这一组里每一枚"整块可点"的东西都得有 role＋aria-label，词**全部复用屏上已有的字典键**，
+// 不另编一句。枚数从 markup 现数：卡、两枚计数格、剪影热区、圆形 ➕ ＝ 5 枚，一枚都不能漏
+// （漏的那一枚读屏只念数字或不念，屏上看着没毛病）。
+const ariaTags = (wxml.match(/<view\s+class="(?:blk-person|blk-cell|blk-plus|blk-alt-hit)"/g) || [])
+const ariaHeads = (wxml.match(/<view\s+class="(?:blk-person|blk-cell|blk-plus|blk-alt-hit)"[^>]*>/g) || [])
+ok('这一组每一枚可点的都挂了 role="button" + aria-label（5 枚，一枚不落）',
+  ariaTags.length === 5 && ariaHeads.length === 5
+  && ariaHeads.every((t) => /role="button"/.test(t) && /aria-label="\{\{/.test(t))
+  && /class="blk-person" role="button" aria-label="\{\{t\.barIdle\}\}"/.test(wxml)
+  && /class="blk-plus" role="button" aria-label="\{\{t\.barIdle\}\}"/.test(wxml),
+  `${ariaHeads.length} 枚／缺 role 或 aria 的：` + ariaHeads.filter((t) => !/role="button"/.test(t)).length)
 ok('两枚计数的 aria-label 是「数字＋那一格的名字」拼出来的，不借屏外新词',
   /aria-label="\{\{noteCount\}\}\{\{t\.statNotes\}\}"/.test(wxml)
   && /aria-label="\{\{cardCount\}\}\{\{t\.statCards\}\}"/.test(wxml))
-ok('左块那句吃 t.barIdle（屏上写的和读屏念的同一句，不许两份真相）',
-  /class="blk-person" role="button" aria-label="\{\{t\.barIdle\}\}"/.test(wxml))
 ok('中英键数相等', Object.keys(zh).length === Object.keys(en).length,
   `${Object.keys(zh).length} vs ${Object.keys(en).length}`)
 // 旧胶囊那句撤干净没有，要扫整个 miniprogram 目录（不止这一页：别处也可能还写着那句）。
 // 早先这里写成 fs.readFileSync(<目录>)，那是 EISDIR——抛出去之前整把尺子一条都不落地。
-const sweep = (dir, out = []) => {
+// 这一把是 `function` 声明（不是 const 箭头）：§8 那一条"两张计数图标连引用都不许剩"要先用它，
+// 改成 const 就成了"用到它时还没定义"——那种红看着像代码错，其实是判据自己的顺序错。
+function sweep(dir, out = []) {
   for (const name of fs.readdirSync(dir)) {
     const f = path.join(dir, name)
     if (fs.statSync(f).isDirectory()) { if (name !== 'node_modules') sweep(f, out); continue }

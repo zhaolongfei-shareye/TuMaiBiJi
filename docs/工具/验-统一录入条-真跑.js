@@ -30,15 +30,24 @@ const CWX = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/cre
 const PANEL_H = Number(/\.panel\s*\{[\s\S]*?height:\s*(\d+)rpx/.exec(CWX)[1])
 const PANEL_OPEN_H = Number(/\.panel-open\s*\{\s*height:\s*(\d+)rpx/.exec(CWX)[1])
 const SHUT_W = Number(/\.shut\s*\{[\s\S]*?width:\s*(\d+)rpx/.exec(CWX)[1])
-// 收起态那三块的四个数也从样式表现读（10-10 晚的载体：原来那条 128 高的胶囊没了）。
+// 收起态那一组的数也从样式表现读（10-10 晚是"胶囊→三块"，10-13 B 方案又是"三块→左块两片皮＋右列"）。
 // 抄成常量的话，下一轮改块高就只是"判据跟着红"，白费劲——和上面 PANEL_H 同一个理由。
+// ⚠ 2.2：`.tips`（整组上方那一行）与 `.blk-stat`（两枚计数）都随 B 方案撤了——整组现在只有那一行 410，
+//   Tips 搬进右列（`.blk-tips`），计数变成墨面里两枚同类的 `.blk-cell`。原来那三行 lenOf 就是假红的源头。
 const segOf = (sel) => (new RegExp(`(?:^|\\n)${sel}\\s*\\{([^}]*)\\}`).exec(CWX) || [0, ''])[1]
 const lenOf = (sel, prop) => Number(new RegExp(`${prop}:\\s*(\\d+)rpx`).exec(segOf(sel))?.[1])
-const PERSON_CSS = lenOf('.blk-person', 'width')
-const TIPS_H_CSS = lenOf('.tips', 'height')
-const TIPS_MB_CSS = lenOf('.tips', 'margin-bottom')
-const STAT_H_CSS = lenOf('.blk-stat', 'height')
-const GROUP_H_CSS = TIPS_H_CSS + TIPS_MB_CSS + PERSON_CSS
+const PERSON_W_CSS = lenOf('.blk-person', 'width')
+const PERSON_H_CSS = lenOf('.blk-person', 'height')
+// 两枚计数**没写宽**（`flex:1`），所以期望宽要从那一条的左右内边距与缝倒算——写死 122 就是第二份真相。
+const COUNT_SEG = segOf('.blk-count')
+const GAP_CSS = Number(/(?:^|;)\s*gap:\s*(\d+)rpx/.exec(COUNT_SEG)[1])
+const PAD_CSS = Number(/(?:^|;)\s*padding:\s*0\s+(\d+)rpx/.exec(COUNT_SEG)[1])
+const CELL_W_WANT = (PERSON_W_CSS - 2 * PAD_CSS - GAP_CSS) / 2
+const GROUP_H_CSS = PERSON_H_CSS                          // 整组＝那一行左块，Tips 不再占组外一段
+// ➕ 那一格的右边缘离「卡」右边缘的那一口 ＝ 卡的内边距 ＋ 卡那圈描边。
+// 判据原来抄的是 33（＝内边距 30＋描边 2＋1），10-14 站长那句「排版紧凑一点」把内边距压到 24，
+// 它就以 25 的量红在 F2/F6 两条上——那是判据跟着红，不是屏上错了（同一个理由见文件头 PANEL_H 那段注释）。
+const CARD_INSET = lenOf('.card', 'padding') + lenOf('.card', 'border')
 const RING_CSS = (/--cp-ring:([^;]+)/.exec(
   require(path.resolve(__dirname, '../../miniprogram/utils/palette.js')).createSkin()) || [0, ''])[1].trim()
 // `rgba(35,37,44,0.5)` 这种写法在 palette 里不带空格，而 getComputedStyle 回来带——比对前归一
@@ -105,30 +114,35 @@ const ck = (name, ok, got) => {
   const clsOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.attribute('class')) || '') : '' }
   const txtOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.text()) || '').trim() : null }
 
-  // ---------- A 收起态：那三块（10-10 晚换的载体，原来那条纸白胶囊整个撤了） ----------
+  // ---------- A 收起态：2.2 B 方案那一组（左块两片皮＋右列 Tips/圆 ➕，整组只有那一行） ----------
   await top()
   let d = await page.data()
   ck('A1 收起态没有面板', (await page.$$('.panel')).length === 0)
   ck('A2 收起态只有那一组，且左块那句读的是「记下来」',
     (await page.$$('.home-blk')).length === 1 && d.t.barIdle === '记下来', d.t.barIdle)
   ck('A3 条身右边那三枚小圆真撤了（屏上一枚都不该剩）', (await page.$$('.bar-dots .dot')).length === 0)
-  ck('A4 Tips 那一行在（展开才撤的那一位，此刻该留着）', (await page.$$('.tips')).length === 1)
-  const [blk0, tip0, person0, stat0, stat1] = await rects(
-    ['.home-blk', '.tips', '.blk-person', '.blk-stat-notes', '.blk-stat-cards'])
-  ck('A5 整组一动不动：组顶 == Tips 那一行的顶（组没有内边距，第一档就贴着顶）',
-    !!blk0 && !!tip0 && Math.abs(blk0.top - tip0.top) <= 1,
-    blk0 && tip0 && `组顶 ${Math.round(blk0.top)}／行顶 ${Math.round(tip0.top)}`)
-  ck(`A6 整组高 ${GROUP_H_CSS}rpx（Tips ${TIPS_H_CSS} ＋ 它下面 ${TIPS_MB_CSS} ＋ 左块 ${PERSON_CSS}）`,
+  ck('A4 组外那一行 Tips 不再回来（它搬进右列 `.blk-tips`，整组上方不许再有一行 `.tips`）',
+    (await page.$$('.tips')).length === 0 && (await page.$$('.blk-tips')).length === 1,
+    `.tips ${(await page.$$('.tips')).length} 枚／.blk-tips ${(await page.$$('.blk-tips')).length} 枚`)
+  const [blk0, person0, col0] = await rects(['.home-blk', '.blk-person', '.blk-col'])
+  const cellBox = await page.$$('.blk-cell')
+  const cells0 = []
+  for (const n of cellBox) { const o = await n.offset(); const s = await n.size(); cells0.push({ top: o.top, left: o.left, w: s.width, h: s.height, bottom: o.top + s.height, right: o.left + s.width }) }
+  ck('A5 整组一动不动：组顶 == 左块顶（组没有内边距，第一档就贴着顶）',
+    !!blk0 && !!person0 && Math.abs(blk0.top - person0.top) <= 1,
+    blk0 && person0 && `组顶 ${Math.round(blk0.top)}／块顶 ${Math.round(person0.top)}`)
+  ck(`A6 整组高 ${GROUP_H_CSS}rpx（就是左块那一条，Tips 不再占组外一段；原来 394＝Tips74＋缝12＋块308 那串作废）`,
     !!blk0 && rpxEq(blk0.h, GROUP_H_CSS, 4), blk0 && `${toRpx(blk0.h).toFixed(1)}rpx`)
-  ck('A6b 左块渲染成 308 见方、右两枚各 148 高（全局同名那条把整组裁成 176 的那一刀就红在这里）',
-    !!person0 && rpxEq(person0.w, PERSON_CSS) && rpxEq(person0.h, PERSON_CSS)
-    && !!stat0 && rpxEq(stat0.h, STAT_H_CSS) && stat0.w > 300 * R,
-    person0 && stat0 && `左块 ${toRpx(person0.w).toFixed(0)}×${toRpx(person0.h).toFixed(0)}／右枚宽 ${toRpx(stat0.w).toFixed(0)}`)
-  ck('A6c 两枚同宽且右边缘与整组右边缘对齐（列没吃余量时这里先红）',
-    !!stat0 && !!stat1 && !!blk0 && Math.abs(stat0.w - stat1.w) <= 1
-    && Math.abs(stat1.right - blk0.right) <= 2,
-    stat0 && stat1 && blk0 && `枚右 ${Math.round(stat1.right)}／组右 ${Math.round(blk0.right)}`)
-  // 组底那一条缝：整组是 fixed，顶走 min(66.3%, 100vh−546rpx)，底就落在底栏上方 24rpx。
+  ck(`A6b 左块渲染成 ${PERSON_W_CSS}×${PERSON_H_CSS}（不再 308 见方；全局同名那条把整组裁成 176 的一刀就红在这里）`,
+    !!person0 && rpxEq(person0.w, PERSON_W_CSS) && rpxEq(person0.h, PERSON_H_CSS)
+    && cells0.length === 2 && rpxEq(cells0[0].w, CELL_W_WANT, 3),
+    person0 && cells0[0] && `左块 ${toRpx(person0.w).toFixed(0)}×${toRpx(person0.h).toFixed(0)}／计数枚 ${cells0.length}·宽 ${toRpx(cells0[0].w).toFixed(0)}（该 ${CELL_W_WANT}）`)
+  ck('A6c 两枚计数同宽，右列右边缘与整组右边缘对齐（列没吃余量时这里先红）',
+    cells0.length === 2 && !!col0 && !!blk0 && Math.abs(cells0[0].w - cells0[1].w) <= 1
+    && Math.abs(col0.right - blk0.right) <= 2,
+    cells0.length === 2 && `枚宽 ${toRpx(cells0[0].w).toFixed(0)}・${toRpx(cells0[1].w).toFixed(0)}／列右 ${Math.round(col0 && col0.right)}／组右 ${Math.round(blk0 && blk0.right)}`)
+  // 组底那一条缝：整组是 fixed，顶走 min(66.3%, 100vh−562rpx)（562＝整组 410＋底栏 128＋留白 24，
+  // B 方案之前那条是 546＝Tips74＋缝12＋块308＋底栏128＋24），底就落在底栏上方 24rpx。
   // 这一条守的是"不许插进底栏"，与原来那条"条底不随搬家漂"是同一件事的两种写法。
   ck('A7 组底落在底栏上方一条 24rpx 的缝上（矮屏上 min() 夹的那一头也成立）',
     !!blk0 && Math.abs(blk0.bottom - (tabTop - 24 * R)) < 14,
@@ -162,13 +176,13 @@ const ck = (name, ok, got) => {
      "到底挡没挡脸"最后仍由这一把存的截图目视确认（B/C/D/F 各一张）。 */
   ck('B5 面板顶在视口 50% 以下（改回 700rpx 会掉到 0.47 当场红；脸的位置看截图）',
     !!panel1 && panel1.top / metric.h > 0.5, panel1 && `顶 ${Math.round(panel1.top)} / ${metric.h} = ${(panel1.top / metric.h).toFixed(2)}`)
-  /* 框外那一行 10-10 深夜换了两头（他原话「"选择记录模式"改为 Tips，"点空白处收起"改为"返回"」）。
-     两边都拿这一页自己那份字典比，不抄第二份中文——上一版这里写的就是那句死字符串。 */
-  const outLTxt = await txtOf('.out-l')
-  const tipList = d.t.tips || []
-  ck('B6 左边那句是 Tips 那一串（前缀＋六句里的一句），右边那枚是字典里的「返回」',
-    tipList.some((x) => outLTxt === `${d.t.tipsPrefix}${x}`) && (await txtOf('.out-r')) === d.t.back,
-    `${outLTxt} | ${await txtOf('.out-r')}`)
+  /* 10-14 站长「第二屏，Tips 去掉」⇒ 框外这一行只剩「返回」一枚，屏上查不到第二屏的 Tips。
+     原来这一条比的是"左边那句等于六句里的一句"（两边都拿这一页自己那份字典比，不抄死字符串），
+     载体撤了一处，"比字典"那半件事搬到了首屏那一格（§A 那批管 `.blk-tips-line`）。 */
+  ck('B6 框外那一行只剩字典里那句「返回」，屏上没有第二屏的 Tips 与它前面那枚点',
+    (await txtOf('.out-r')) === d.t.back && !(await page.$('.out-l')) && !(await page.$('.out-dot'))
+    && (await page.$$('.out > *')).length === 1,
+    `「${await txtOf('.out-r')}」／枚数 ${(await page.$$('.out > *')).length}`)
   const mds = await page.$$('.md')
   ck('B7 三个标签（相册并进照片了）', mds.length === 3, mds.length)
   ck('B8 当前标签是照片', /(^|\s)md on(\s|$)/.test(await clsOf('.md')) && (await txtOf('.md.on')) === '照片', await txtOf('.md.on'))
@@ -539,7 +553,7 @@ const ck = (name, ok, got) => {
   const th4 = await rectsAll('.strip .th')
   const cardR = (await rects(['.card']))[0]
   ck('F2 ➕ 钉在这一行最右端（它的右边 == 卡内右边）',
-    !!th4[4] && !!cardR && Math.abs(th4[4].right - cardR.right + 33 * R) <= 6 * R,
+    !!th4[4] && !!cardR && Math.abs(th4[4].right - cardR.right + CARD_INSET * R) <= 6 * R,
     th4[4] && cardR ? `➕右 ${Math.round(th4[4].right)}｜卡右 ${Math.round(cardR.right)}` : `格数 ${th4.length}`)
   ck('F3 序号标在图里（读到 1…4），没有"已选 N 张"那一行',
     (await page.$$('.th-no')).length === 4 && (await txtOf('.th-no')) === '1'
@@ -556,7 +570,7 @@ const ck = (name, ok, got) => {
   const cardR6 = (await rects(['.card']))[0]
   ck('F6 真排成两行（第六格与第一格不在同一行），➕ 被 margin-left:auto 钉在第二行最右端',
     th6.length === 7 && th6[0].top !== th6[5].top
-    && !!cardR6 && Math.abs(th6[6].right - cardR6.right + 33 * R) <= 6 * R,
+    && !!cardR6 && Math.abs(th6[6].right - cardR6.right + CARD_INSET * R) <= 6 * R,
     `格数 ${th6.length}｜➕右 ${th6[6] && Math.round(th6[6].right)}｜卡右 ${cardR6 && Math.round(cardR6.right)}`)
   ck('F7 一行放五格（不是四格、也不是六格）：数一数第一行几枚',
     th6.length === 7 && th6.filter((x) => Math.abs(x.top - th6[0].top) <= 2).length === 5,
@@ -614,10 +628,12 @@ const ck = (name, ok, got) => {
 
   // ---------- H 英文那一版 ----------
   await top()
-  await mp.evaluate(() => {
-    const app = getApp()
-    if (app.globalData.userInfo) app.globalData.userInfo.language = 'en'
-  })
+  // 走那份共用钉子，不走"直接改 globalData"：10-13 实测这一版会话里 `globalData.userInfo`
+  // 根本不存在（探针回 `hasUserInfo:false`），于是原来那句
+  // `if (app.globalData.userInfo) … = 'en'` 被自己的守卫挡成**空操作**——
+  // 语言一直没换，H1/H2/H3 三条量的是中文，红得像是英文坏了。
+  // `尺子语言钉.js` 的 pin 用的是 Object.assign，没有那一格也会造出来，所以真换得动。
+  await lang.pin(mp, 'en')
   page = await enter('/pages/create/create')
   await sleep(4000)
   d = await page.data()
@@ -631,19 +647,21 @@ const ck = (name, ok, got) => {
   await sleep(900)
   ck('H3 英文那句"右滑开始提炼"在条上', ((await txtOf('.sld-txt')) || '').indexOf('Slide to extract') > -1,
     await txtOf('.sld-txt'))
-  const [outL, outR] = await rects(['.out-l', '.out-r'])
-  ck('H4 框外那两枚英文不打架（左右之间还有缝）',
-    !!outL && !!outR && outR.left - outL.right >= 0, outL && outR && `缝 ${Math.round(outR.left - outL.right)}px`)
+  // 原来这一条量的是"Tips 与「返回」左右不打架"；行里只剩一枚，打架这件事没有了对象。
+  // 换成钉他 10-14 那一句在**英文档**也成立：「Back」整枚在深色面板之上（英文字比中文长，
+  // 万一它把那一行顶高、压过墨顶，只有这一档量得出来）。
+  const [outR, inkH] = await rects(['.out-r', '.stage-panel'])
+  ck('H4 英文那枚「Back」整枚在深色面板之上（抬到暗面板上面，英文档同样成立）',
+    !!outR && !!inkH && (outR.top + outR.h) < inkH.top,
+    outR && inkH ? `行底 ${Math.round(outR.bottom)}／墨顶 ${Math.round(inkH.top)}` : '量不到')
   const sldTxt = (await rects(['.sld-txt']))[0]
   const sldBox = (await rects(['.sld']))[0]
   ck('H5 英文那句放得进条里（不溢出轨道）',
     !!sldTxt && !!sldBox && sldTxt.left >= sldBox.left && sldTxt.right <= sldBox.right,
     sldTxt && sldBox && `字 ${Math.round(sldTxt.w)}px／轨道 ${Math.round(sldBox.w)}px`)
   await mp.screenshot({ path: `${OUT}/H-英文链接档.png` })
-  await mp.evaluate(() => {
-    const app = getApp()
-    if (app.globalData.userInfo) app.globalData.userInfo.language = 'zh'
-  })
+  // 这里原来还有一句"改回 zh"的守卫式赋值（同上，空操作）。收尾本来就有
+  // `lang.pin(mp, langBefore)` 把进来时那一档还回去，不需要第二个人做同一件事。
 
   await lang.pin(mp, langBefore)
   await mp.close()

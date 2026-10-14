@@ -31,6 +31,11 @@ const BE = read('backend/app/api/routes/assets.py')
 const MODEL = read('backend/app/models/asset.py')
 const SHARES = read('backend/app/api/routes/shares.py')
 const USER_ROUTE = read('backend/app/api/routes/user.py')
+/* 10-10 那次"删什么只说一次"的抽取：小程序注销（`routes/user.py`）与 iPhone 的
+   `DELETE /v1/account` 共用一支 `services/deletion.py`，**清单怎么抄、去不去重、先读还是先删**
+   全搬进去了，路由里只剩"删谁"与回体那三个键。这把尺子当时没跟着搬，于是五条红在两条线上
+   （release/2.0 与 release/2.2 一样红）——红的不是代码缺，是判据还在旧文件里找。 */
+const DELETION = read('backend/app/services/deletion.py')
 const NOTE_ROUTE = read('backend/app/api/routes/notes.py')
 const MAIN = read('backend/app/main.py')
 
@@ -112,12 +117,16 @@ ck('配额比值按全站算（total_bytes 不带 user 过滤）',
   /total_bytes = _sum_bytes\(db\)/.test(BE) && /used_ratio=round\(total_bytes \/ cap/.test(BE))
 ck('NULL 的 backup_status 算进配额（SQL 三值逻辑那条坑）',
   /backup_status\.is_\(None\)/.test(MODEL))
-ck('"这张图到底还在不在"只有一个定义，四处都调它',
+ck('"这张图到底还在不在"只有一个定义，读图那三处与注销那一路都调它',
   (MODEL.match(/def not_failed/g) || []).length === 1
     && (BE.match(/not_failed\(\)/g) || []).length === 3
     && (SHARES.match(/not_failed\(\)/g) || []).length === 1
-    && (USER_ROUTE.match(/not_failed\(\)/g) || []).length === 1,
-  `定义 ${(MODEL.match(/def not_failed/g) || []).length} / assets ${(BE.match(/not_failed\(\)/g) || []).length}`)
+    && (DELETION.match(/not_failed\(\)/g) || []).length >= 1
+    // 注销那一路**不许**再自己写一份判据：抽公共函数就是为了这个。旧判据钉的是"路由里调一次"，
+    // 抽完之后那一格变成 0 处，红得毫无道理——现在钉成"路由里没有"。
+    && !/not_failed\(\)/.test(USER_ROUTE),
+  `定义 ${(MODEL.match(/def not_failed/g) || []).length}／assets ${(BE.match(/not_failed\(\)/g) || []).length}`
+  + `／shares ${(SHARES.match(/not_failed\(\)/g) || []).length}／deletion ${(DELETION.match(/not_failed\(\)/g) || []).length}`)
 ck('张数卡的是"这篇最终有多少张"，不是"这一次送几条"',
   /current \| \{it\.file_id for it in items\}/.test(BE))
 ck('fileID 光杆 cloud:// 被拒（前缀之外还得有东西）——三张表现在共用这一个函数',
@@ -168,15 +177,22 @@ const I18N = read('miniprogram/utils/i18n.js')
 
 // 注销那一份清单 10-08 起过一次 `list(dict.fromkeys(...))` 去重（同一张图既在 assets 又在
 // note_cards 时两处各列一次），判据跟着读那一条真实写法，不读一个理想化的短形。
+// 10-13 对上新位置：抄清单／去重／名片四格／先读后删这四件事现在都在 `services/deletion.py`，
+// 路由里只留回体那个键名。
 ck('file_ids 这个键名在两个回体里都存在（删笔记 / 注销）',
   /"file_ids": list\(dict\.fromkeys\(file_ids\)\)/.test(NOTE_ROUTE)
-  && /"file_ids": list\(dict\.fromkeys\(asset_ids\)\)/.test(USER_ROUTE))
+  && /"file_ids": file_ids/.test(USER_ROUTE)
+  && /return deleted, list\(dict\.fromkeys\(asset_ids\)\)/.test(DELETION))
 ck('注销那份清单去重（同一张图既在配图又在卡片时会列两次，重复地址让 deleteFile 白跑）',
-  /asset_ids \+= \[[\s\S]*?"file_ids": list\(dict\.fromkeys\(asset_ids\)\)/.test(USER_ROUTE))
+  /asset_ids: list\[str\] = \[\][\s\S]*?return deleted, list\(dict\.fromkeys\(asset_ids\)\)/.test(DELETION))
 ck('名片那四格的对象也并进注销这同一份清单（2.1 第七类，漏了就是云上留几个没人记得的对象）',
-  /db\.query\(UserProfile\.slots\)/.test(USER_ROUTE) && /"profile": db\.query\(UserProfile\)/.test(USER_ROUTE))
+  /db\.query\(UserProfile\.slots\)/.test(DELETION)
+  && /\("profile", UserProfile\)/.test(DELETION))
 ck('清单只在删除那一刻交出去一次：注销那一路先读 fileID、再删行',
-  USER_ROUTE.indexOf('asset_ids = [') < USER_ROUTE.indexOf('"assets": db.query(Asset)'))
+  DELETION.indexOf('asset_ids: list[str] = []') >= 0
+  && DELETION.indexOf('for key, model in _BUSINESS_TABLES') >= 0
+  && DELETION.indexOf('asset_ids: list[str] = []') < DELETION.indexOf('for key, model in _BUSINESS_TABLES'),
+  `抄清单 @${DELETION.indexOf('asset_ids: list[str] = []')}／删行 @${DELETION.indexOf('for key, model in _BUSINESS_TABLES')}`)
 ck('两个"删一篇"的口都去清对象（详情页 + 列表详情窗，漏一个就残留一排）',
   /cloudUpload\.dropFromDeleteRes\(r\)/.test(DETAIL) && /cloudUpload\.dropFromDeleteRes\(r\)/.test(INDEX))
 ck('注销也清，而且排在 clearSession 之前（过了那一步再没有身份能问出这份清单）',

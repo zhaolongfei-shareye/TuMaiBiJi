@@ -34,7 +34,10 @@ for f in ('ic-person.png', 'ic-person-alt.png'):
 NODE = (
     'const m=require("%s/utils/i18n.js");const p=require("%s/utils/palette.js");'
     'const ps=s=>Object.fromEntries(s.split(";").map(v=>{const i=v.indexOf(":");return[v.slice(0,i),v.slice(i+1)]}));'
-    'console.log(JSON.stringify({zh:m.texts("zh"),en:m.texts("en"),pal:{eb:p.entryBlocks("tint-paper"),'
+    # `eb`（`palette.entryBlocks()`）在 2.2 这一支撤了：B 方案把首页右下那两块计数换成了
+    # "数字＋横线＋分类名"那一格和一枚圆 ➕，三块配色那支口整个没 caller（这里也一处没用上）。
+    # 留着这一句只会让本树取字典那一趟直接 TypeError：`p.entryBlocks is not a function`。
+    'console.log(JSON.stringify({zh:m.texts("zh"),en:m.texts("en"),pal:{'
     'ch:p.chromeOf("tint-paper"),cp:ps(p.createSkin("tint-paper")),tipDot:p.TIP_DOT,dim:p.BG_DIMS,'
     'uncat:p.UNCATEGORIZED}}));' % (MP, MP)
 )
@@ -125,11 +128,53 @@ TAB_H, TAB_GAP = 108, 20
 TAB_TOP = STAGE_H - TAB_GAP - TAB_H                 # 1541
 
 ENTRY_X, ENTRY_W = 24, 702
-ENTRY_TOP, ENTRY_H, ENTRY_OPEN = 1107, 410, 490
 ENTRY_R = 55
 
-# 首屏那一组：10-13 他一句「左边内框要与第二个图高度对齐」⇒ 左块与第二屏那块面板
-# **同一条顶（1107）、同一条底（1517）**；两个人跟着块顶一起上移 99rpx，多出来的下半留给数字那一格。
+# ---------------- 内框与那层墨的顶：从 create.wxss 现读，不抄第二份 ----------------
+# 10-14 站长三句：「两个屏的内框高度要一致」「第二屏的内面板，高度压缩一下，排版紧凑一点」
+# 「第二屏，Tips 去掉，back 抬到暗面板上面」。原来这一节写死的是 1107／410／490／1000 那四个数
+# （量自他那两张截图），内框一压、墨顶一改，这四条全是第二份真相 ⇒ 换成从码里读：
+# 读不到那条规则就直接退出，不许凭印象画一张旧的给他对。
+_CX = re.sub(r'/\*[\s\S]*?\*/', '', open(os.path.join(MP, 'pages/create/create.wxss'), encoding='utf-8').read())
+
+
+def _blk(sel):
+    m = re.search('(?:^|\\n)' + re.escape(sel) + r'\s*\{([^}]*)\}', _CX)
+    if not m:
+        sys.exit('效果图读不到码里那条规则：' + sel + '（这一页与码同一口径，读不到就停）')
+    return m.group(1)
+
+
+def _rpx(sel, prop):
+    m = re.search('(?:;|^)\\s*' + re.escape(prop) + r':\s*(-?[\d.]+)rpx', _blk(sel))
+    if not m:
+        sys.exit('效果图读不到 %s 的 %s' % (sel, prop))
+    return float(m.group(1))
+
+
+def _ink_top(sel):
+    m = re.search(r'top:\s*calc\(100vh - ([\d.]+)rpx\)', _blk(sel))
+    if not m:
+        sys.exit('效果图读不到 ' + sel + ' 那条 `top: calc(100vh − N rpx)`')
+    return STAGE_H - float(m.group(1))
+
+
+ENTRY_H = _rpx('.panel', 'height')                            # 内框那一档（＝首屏左块同一个数）
+ENTRY_OPEN = _rpx('.panel-open', 'height')
+ENTRY_B = _rpx('.container.entry-dock .entry-wrap', 'bottom')  # 离底栏那口（152）
+OUT_H, OUT_MB = _rpx('.out', 'height'), _rpx('.out', 'margin-bottom')
+PL_BD, PL_PAD_T, PL_PAD_X, PL_PAD_B = (_rpx('.panel', 'border'),) + tuple(
+    float(x) for x in _blk('.panel').split('padding:')[1].split(';')[0].strip().replace('rpx', '').split())
+MODES_H, CARD_MT, CARD_PD = _rpx('.modes', 'height'), _rpx('.card', 'margin-top'), _rpx('.card', 'padding')
+INK_TOP = _ink_top('.stage-panel')                            # 两屏同一根线
+INK_TOP_OPEN = _ink_top('.container.dock-open .stage-panel')   # 展开那一档跟着卡片往上长
+INK_BREATH = INK_TOP - (STAGE_H - ENTRY_B - ENTRY_H)          # 墨顶到内框顶那一口（24）
+# 内框的顶＝屏底往上「离底那一口 ＋ 内框高」；展开那一档同一式子换成 490（卡片向上长）。
+ENTRY_TOP = STAGE_H - ENTRY_B - ENTRY_H
+ENTRY_TOP_OPEN = STAGE_H - ENTRY_B - ENTRY_OPEN
+
+# 首屏那一组：10-13 他一句「左边内框要与第二个图高度对齐」＋ 10-14「两个屏的内框高度要一致」
+# ⇒ 左块与第二屏那块面板**同一条顶、同一条底、同一个高**（三个数全从码里推，见上面那一节）。
 GRP_TOP = ENTRY_TOP
 CARD_X, CARD_W, CARD_H = ENTRY_X, 308, ENTRY_H
 COL_X = CARD_X + CARD_W + 12                        # .blk-row gap 12
@@ -144,9 +189,9 @@ def _ratio(f):
 FIG_H_F = round(FIG_W * _ratio('ic-person.png'))
 FIG_H_M = round(FIG_W * _ratio('ic-person-alt.png'))
 FACE_H = FIG_H_F - BLEED                            # 白面那一格：212.6
-NUM_H = CARD_H - FACE_H                             # 黑条那一格：197.4
+NUM_H = CARD_H - FACE_H                             # 黑条那一格：372 − 213 ＝ 159（跟着内框压）
 
-PANEL_TOP = 1000                                    # 深色面板顶：把首屏那一组与第二屏框外那一行一起包住
+PANEL_TOP = INK_TOP        # 深色面板顶：两屏同一根线（＝内框顶往上那口呼吸），10-14 之前这里是写死的 1000
 PANEL_H = STAGE_H - PANEL_TOP
 PANEL_R = 40                                        # ← 这一枚他没给数，我定的（现网块 34／面板 55／底栏 44）
 BAND = 240                                          # 上部那段渐变毛玻璃的高度
@@ -212,7 +257,7 @@ def box(x, y, w=None, h=None, css=''):
     return s + css
 
 
-def panel(inner):
+def panel(inner, ink_top=None):
     """通栏深色面板：左上／右上圆角，顶上一段同色渐变 .55→.94 ＋ backdrop blur 打在形象图上。
     ⚠ 这里一律用**具名**占位：上一版有一处把 inner 写成第 13 个位置参数、模板只有 12 个 `{}`，
     Python 的 str.format 对多出来的位置参数**不报错**，结果整层内容被静默丢掉、面板里空无一物。"""
@@ -220,7 +265,8 @@ def panel(inner):
             'border-radius:{r}px {r}px 0 0;'
             'background:linear-gradient(to bottom,{a} 0px,{b} {band}px,{c} {c0}px,{d} 100%)">'
             '{inner}</div>').format(
-                top=PANEL_TOP - NAV_H, w=STAGE_W, h=PANEL_H, r=PANEL_R,
+                top=(PANEL_TOP if ink_top is None else ink_top) - NAV_H, w=STAGE_W,
+                h=STAGE_H - (PANEL_TOP if ink_top is None else ink_top), r=PANEL_R,
                 a=alpha(INK, .55), b=alpha(INK, .94), band=BAND,
                 c=alpha(INK, .95), c0=BAND + 1, d=alpha(INK, .95), inner=inner)
 
@@ -292,15 +338,15 @@ def screen_home(lang, big='f'):
 # 面板内部尺寸逐条照 create.wxss：.panel 描边 2 ＋ 内边距 8/24/14、.modes 高 64、
 # .card 上边距 6 ＋ 内边距 30（铺图态底色透明、边不画）、快门 180/环 10/实心 132/图形 65、
 # 小圆 105/图形 40、右滑条 110/圆钮 90/图形 42、输入框 105（文字展开 160）、小图 100 见方 gap 16。
-PL_BD, PL_PAD_T, PL_PAD_X, PL_PAD_B = 2, 8, 24, 14
-MODES_H, CARD_MT, CARD_PD = 64, 6, 30
+# （PL_*／MODES_H／CARD_* 这六个数 10-14 起从 create.wxss 现读，见上面"内框与那层墨的顶"那一节。）
 
 
-def pbox(x, y, w=None, h=None, css=''):
+def pbox(x, y, w=None, h=None, css='', top=None):
     """深色面板内的落点：传视口坐标，这里换成面板坐标。
     上一轮就是漏了这一刀（面板本身在 .page 里已经让开 NAV_H，里面的元素又按视口高写），
-    结果底栏被推到屏外、Tips 被面板盖住，全是静默翻车。"""
-    return box(x, y - PANEL_TOP, w, h, css)
+    结果底栏被推到屏外、Tips 被面板盖住，全是静默翻车。
+    `top` 10-14 加的一档：展开那一态这层墨与那张卡一起往上长，坐标系跟着换一根。"""
+    return box(x, y - (PANEL_TOP if top is None else top), w, h, css)
 
 
 def card_metrics(ph):
@@ -345,12 +391,15 @@ def modes_row(lang, on):
 
 def entry_panel(lang, kind, open_panel=False):
     ph = ENTRY_OPEN if open_panel else ENTRY_H
+    ink = INK_TOP_OPEN if open_panel else INK_TOP
+    ctop = ENTRY_TOP_OPEN if open_panel else ENTRY_TOP
     cx, cy, cw, ch = card_metrics(ph)
     return ('<div style="{p}">{m}<div style="{c}">{b}</div></div>').format(
-        p=pbox(ENTRY_X, ENTRY_TOP, ENTRY_W, ph,
+        p=pbox(ENTRY_X, ctop, ENTRY_W, ph,
                'border-radius:{}px;background:{};backdrop-filter:{};-webkit-backdrop-filter:{};'
                'border:{}px solid rgba(255,255,255,.10);box-sizing:border-box;'
-               'box-shadow:0 16px 34px rgba(8,10,14,.10);'.format(ENTRY_R, PLATE, GLASS_BF, GLASS_BF, PL_BD)),
+               'box-shadow:0 16px 34px rgba(8,10,14,.10);'.format(ENTRY_R, PLATE, GLASS_BF, GLASS_BF, PL_BD),
+               top=ink),
         m=modes_row(lang, 'photo' if kind in ('photo', 'shots', 'busy') else kind),
         # .card 在铺图态＝透明、无边（R3：外框与内框合成一层玻璃），只留那一档内边距
         c=box(*card_rect(ph)[:2], *card_rect(ph)[2:],
@@ -456,14 +505,20 @@ def sld_row(lang, x, y, w, busy, icon):
 
 
 def screen_entry(lang, kind, open_panel=False):
-    out = ('<div style="{p}"><div class="tipsin"><i class="dot" style="background:{d}"></i>'
-           '<span class="outl">{pre}{txt}</span></div><span class="outr">{back}</span></div>').format(
-        p=pbox(0, PANEL_TOP, STAGE_W, ENTRY_TOP - PANEL_TOP,
-               'display:flex;align-items:center;padding:0 20px;box-sizing:border-box;'
-               'font-size:{}px;line-height:1.4;letter-spacing:1px;color:{}'.format(
-                   FS['meta'], alpha(PAPER, .9))),
-        d=TIP_DOT, pre=T(lang, 'tipsPrefix'), txt=T(lang, 'tips')[0], back=T(lang, 'back'))
-    return panel(out + entry_panel(lang, kind, open_panel))
+    # 10-14「第二屏，Tips 去掉，back 抬到暗面板上面」：这一行只剩「返回」一枚，
+    # 行底在**墨顶之上**再留一档（码里是 `.out` 的 margin-bottom 36 ＝ 那口呼吸 24 ＋ 12）。
+    ink = INK_TOP_OPEN if open_panel else INK_TOP
+    ctop = ENTRY_TOP_OPEN if open_panel else ENTRY_TOP
+    row_y = ctop - OUT_MB - OUT_H
+    # ⚠ 这一行是 `.page` 的**兄弟节点**、不是面板的孩子：码里它挂在 `.entry-wrap`（z-index 6），
+    # 而那一层墨 `overflow:hidden`——画进墨里就被裁掉（上一版漏这一刀，屏上根本看不见「返回」）。
+    out = ('<div style="{p}"><span class="outr">{back}</span></div>').format(
+        p=box(0, row_y - NAV_H, STAGE_W, OUT_H,
+              'display:flex;align-items:center;justify-content:flex-end;padding:0 20px;'
+              'box-sizing:border-box;font-size:{}px;line-height:1.4;letter-spacing:1px;'
+              'color:{};z-index:5;'.format(FS['meta'], alpha(PAPER, .78))),
+        back=T(lang, 'back'))
+    return out + panel(entry_panel(lang, kind, open_panel), ink)
 
 
 
@@ -583,7 +638,7 @@ def build(lang):
          '＋ backdrop blur，墨黑 <code>' + INK + '</code>。'
          '<b>左块与第二屏那块面板同一条顶、同一条底（1107–1517，410 高）</b>。'
          '内框分两片皮：<b>上＝白渐变毛玻璃</b>（停点照现网 <code>.page-scrim</code> 那一串，'
-         '透明度 .92→.64，"要有一定半透明"）、<b>下＝黑条</b>（同一串停点、同一串透明度 .58→.72）。'
+         '透明度 .92→.64，"要有一定半透明"）、<b>下＝黑条</b>（同一串停点、透明度 .45→.92）。'
          '黑条那一格高 <b>' + str(NUM_H) + '</b>——这个数不是我拍的，是<b>女那张脚底落在哪</b>算出来的：'
          '取景窗上出血 ' + str(BLEED) + ' ＋ 220 宽 × 433/360 ＝ ' + str(FIG_H_F) + ' 高 ⇒ '
          '人头高于内框上沿、脚与黑条靠住，中间不悬空。数字在横线上方、分类名在下方（整格可点）。'
@@ -646,7 +701,9 @@ def build(lang):
             '色：<code>palette.js</code> 现读（面板取墨黑 <code>' + INK + '</code>、'
             '快门取固定橙 <code>' + CP['--cp-cam'] + '</code>、底栏取 <code>chromeOf</code>）；'
             '玻璃：<code>--glass-plate</code> 白 .50 ＋ <code>--glass-bf</code> blur(23px)。<br>'
-            '<b>面板</b>：顶 ' + str(PANEL_TOP) + '、通栏 0–750、贴到屏底；上部 240rpx 一段同色渐变 '
+            '<b>面板</b>：顶 ' + str(round(PANEL_TOP)) + '（＝内框顶 ' + str(round(ENTRY_TOP))
+            + ' 往上 ' + str(round(INK_BREATH)) + '，**两屏同一根线**；展开那一档 '
+            + str(round(INK_TOP_OPEN)) + '，跟着卡片一起长）、通栏 0–750、贴到屏底；上部 240rpx 一段同色渐变 '
             '.55→.94 ＋ backdrop blur 26px。<br>'
             '<b>一处必须拍（数是从他这两张截图上采的，不是我估的）</b>：现网那块面的面实测 '
             '<code>' + LIVE_FACE + '</code>、井（小圆／输入框）实测 <code>' + LIVE_WELL + '</code>，'

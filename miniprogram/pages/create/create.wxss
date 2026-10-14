@@ -1,5 +1,65 @@
+/* 首屏最上面那一行（站长 10-14 22:4x 点名要的那句＋那一层玻璃；23:5x 与 00:0x 追的两句改成通栏反向渐变）。
+   原话一：「最上面的，要做成通栏的渐变毛玻璃，与下方的面板渐变方向相反。浅在下，深在上」
+   原话二：「都说跟下面面板相反，左上右不需要留空间，要通栏。左下和右下有圆弧，然后与背景之间带阴影。
+            要与下方面板渐变毛玻璃风格一致。」
+   ⇒ 四件事逐条对着面板那枚（`.stage-panel`）反过来抄：
+     ① 通栏＝左右负掉容器自己的 `padding: 2rpx var(--sp-3) 0`（只写 `margin:… 0` 仍内缩 24rpx，那不是通栏）；
+     ② 面板是 `border-radius: 40rpx 40rpx 0 0`（上圆下方），这一枚是 `0 0 40rpx 40rpx`（上下方、下圆）；
+     ③ 面板吃 `--sh-lift`（向上那枚），这一枚吃它的镜像 `--sh-drop`（向下）＝"与背景之间带阴影"；
+     ④ "渐变毛玻璃风格一致"＝面板那两行滤镜照抄（blur(30px) saturate(1.15)），不然这一枚只是一层染色纱、不糊。
+   00:2x 他附真机截图打回第三句：「不要有空间，要顶上去，然后渐变的程度，要与下方面板一样，现在根本不是，
+        太暗了，下面的面板相同高度下，会浅一点，露出的透多一点。」
+   ⇒ 那两句落的是"形状"（通栏／下沿两枚圆角／阴影／同一档滤镜），这一句落的是"皮有多深"：
+     上一版 `--stage-strip` 是把面板**整条**镜像（.95 平铺到 56.2% 再掉到 .16），连面板底部那
+     43.8% 的实心地板一起搬到了顶上 ⇒ 屏上读成一整块黑板。现在改成**同一条坡反着走**：
+     `.94 → .16` 连续、没有实心平台，端点与面板那两档（.94／.16）逐字相同。
+   ⇒ 另外两样跟着这句改：`margin-top` 撤成 0（顶上去；容器那口 2rpx 是堵外边距穿透的，不是间距，不动）、
+     下内边距从 60 抬到 150（让那条坡走得完）。
+   00:3x 他附第二张真机截图打回第四句：「最上面的面板高度压缩，看到一行文字就行了，不要浪费空间。」
+   ⇒ 00:2x 那一版为了"坡走完"给到 200rpx，屏上就是一条大灰带——那一版也打了。现在整枚压回 **80.4rpx**
+     （上 14 ＋ 字 32.4 ＋ 下 34），坡改成三档 `.94 → .80（55%）→ .16`：**端点仍是面板那两个数**，
+     只是把"前半段慢、后半段急"——坡若在 80rpx 里线性走完，字（占 17%～58%）的下半截会掉到 α .5 以下，
+     墨那一档当场读不动。现量字压在 **α .90～.76**，五档最坏那一档 5.7～7.1（AA 小字线 4.5）。
+   字色仍吃 `--stage-ink-strong`＝与底同一档心情（浅面配深字、深面配白字），点仍是 palette.TIP_DOT
+   从 style 递进来（写进样式表会被「饱和色不许抄进 WXSS」那条打红）。 */
+.ai-line {
+  display: flex;
+  align-items: flex-start;
+  margin: 0 calc(0px - var(--sp-3)) 0;
+  padding: 14rpx var(--sp-3) 34rpx;
+  border-radius: 0 0 40rpx 40rpx;
+  box-shadow: var(--sh-drop);
+  background: var(--stage-strip);
+  backdrop-filter: blur(30px) saturate(1.15);
+  -webkit-backdrop-filter: blur(30px) saturate(1.15);
+  color: var(--stage-ink-strong);
+}
+
+.ai-dot {
+  flex: none;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  /* 这一枚改成顶端对齐之后，点要自己往下挪半行：`(字高 32.4 − 点 12) / 2 ≈ 10`。
+     不挪的话点会骑在字的上沿，读成"引号"而不是"圆点"。 */
+  margin: 10rpx 10rpx 0 0;
+}
+
+.ai-text {
+  font-size: var(--fs-meta);
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
 /* 标题那一行：左边大标题，右边语言切换。标题自己的字号字重和上下留白一点没动，
-   只是从"独占一行"变成"和切换器同一行"，所以整页高度不变。 */
+   只是从"独占一行"变成"和切换器同一行"，所以整页高度不变。
+   站长 10-14 23:0x 追「大标题的字，能否变成 70% 透明度」⇒ 用 `opacity` 而不是改 `color`：
+   这一屏的标题会随铺图深浅翻色（`.container.has-bg` 那一队规则给的是另一支字色），
+   写死 `rgba(20,22,26,.7)` 会把翻色那半条链顶掉。 */
+.title-row .page-title {
+  opacity: 0.7;
+}
+
 .title-row {
   display: flex;
   align-items: center;
@@ -56,28 +116,53 @@
   flex-direction: column;
 }
 
-/* 横条上面那一行轮播 Tips（站长 10-01 晚加的行，10-10 晚改皮）：撤底色、撤边框，只留点与字；
-   行高从 68 抬到 74 并把字顶对齐——多出来的那一段落在字下面，正好是人物帽子与这一行之间的
-   呼吸空间（他原话「粘住头发了」）。左边留空 48rpx 沿用（这一行是"点 + 字"两个节点，
-   缩进只作用在第一个节点上、点会被顶到边，所以留空写在容器内边距上）。
-   点是他要的那枚"小灯泡"象征：14rpx 圆，颜色由 palette.TIP_DOT 从 style 递进来，
-   这里绝对不写色值（`验-统一录入条.js` 有一条专门扫 wxss 里的饱和色）。
-   10-10 起不再需要那一对"高 68 + 负 margin 68"的自我抵销：整组改成 fixed 按视口比例定顶，
-   这一行是组里正常的一档，它自己高多少都不会把别的东西顶走。 */
-.tips {
-  flex: none;
+/* ---------- 轮播 Tips 的落点（2.2 B 方案，10-14 收成一处）----------
+   第一屏那一枚住在右列（`.blk-tips`）。第二屏框外那一枚 10-14 撤了
+   （站长原话「第二屏，Tips 去掉」）——一个功能只留一个入口，Tips 还在首屏那一格轮播，
+   8 秒一句那套（`create.js` startTips）一个字没动，只是不再在两处同时铺。
+   留下的这一格仍压在深色面板上，所以字色是面板自己的一档、不再吃 `--text-secondary`：
+   那枚令牌会随壁纸和"背景图深浅"翻成墨（`.bg-light` 那一态），墨字压墨面直接归零。
+   原来挂在 `.bg-light` 上的那两条翻转规则（`.tips`／`.out` 各一条）随这件事一起删——
+   删的是"底会换极性"这个前提，不是删他拍过的数：面板是恒深的一层，字就恒纸白。
+   点仍是 palette.TIP_DOT 从 style 递进来（写进 wxss 会被"饱和色不许抄进样式表"那条打红）。 */
+.blk-tips {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: flex-start;
-  height: 74rpx;
-  margin-bottom: 12rpx;
-  padding: 10rpx 20rpx 0 48rpx;
+  align-items: center;   /* 他 10-13：「Tips 要上下居中对齐」——在这一格里居中，不是贴顶 */
+  /* 10-13 站长「左右两端都碰到其他边缘了，要留空间」⇒ 左右各让 16（`box-sizing` 得一起给，
+     否则 padding 加在 flex 项外面，这一格会凭空宽 32、把右列那 382 挤掉）。
+     右端另外还有一道 `max-width: 9em` 管着（见 `.blk-tips-line`），这一条管的是"别贴着左块"。 */
   box-sizing: border-box;
+  padding: 0 16rpx;
+  /* 10-13 站长「Tips 怎么还是靠左啊，不是说了不要靠边吗」⇒ 光留 16 不够，这一格改成**水平也居中**：
+     点＋句子整组在列里居中，左右各让出来的那一段由居中保证，不再靠"padding 猜一个数"。 */
+  justify-content: center;
+}
+
+.blk-tips-in {
+  display: flex;
+  align-items: flex-start;   /* 点跟着**第一行**走：折成两三行时点不许掉到整段中间 */
+  /* 站长 10-13「Tips 那段文字，要紧凑一点，现在有点宽」⇒ 从 --fs-meta 收到 --fs-tiny 并撤掉 1rpx 字距；
+     站长 10-14「Tips 字体调大一档」⇒ 又抬回 --fs-meta（24）。行高没动，横向那两条（9em 上限、16 内缩）也没动。 */
   font-size: var(--fs-meta);
   line-height: 1.4;
-  color: var(--text-secondary);
+  letter-spacing: 0;
+  color: var(--stage-ink-strong);   /* 10-14 五档彩色玻璃：这行住在面板上，字色跟着面板那一档走 */
 }
-/* 点落在文字那一行的正中间：行高 24×1.4=33.6，(33.6−14)/2≈10。
-   14rpx 是刻意比 --fs-tiny 那一档还小一档：它是提示，不该比句子显眼。 */
+
+.blk-tips-line {
+  flex: 1;
+  min-width: 0;   /* 这一格只有 382rpx 宽，句子必折两三行；不套 nowrap（见 wxml 那段） */
+  /* 这里给一个**行宽上限**：9em＝九个字（em 跟着上面 `.blk-tips-in` 的字档走，字档在 10-13 收到
+     --fs-tiny、10-14 又抬回 --fs-meta，这一式子两次都没失效，折行行数只看字数不看字号）。
+     六句中文 16~18 字折成 9＋7／9＋8／9＋9 两行；英文最长 43 字母折三行，
+     格高 192rpx（列 372 − ➕ 140 − 缝 40）装得下：三行 × 1.4 × 24 ＝ 100.8rpx。 */
+  max-width: 9em;
+}
+
+/* 点落在文字第一行的正中间：行高 24×1.4=33.6，(33.6−14)/2≈10（10-14 Tips 抬回 --fs-meta 那一档之后重算）。
+   14rpx 是刻意比正文小一档：它是提示，不该比句子显眼。 */
 .tips-dot {
   flex: none;
   width: 14rpx;
@@ -86,34 +171,10 @@
   margin-right: 12rpx;
   border-radius: 50%;
 }
-.tips-line {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-/* ---------- 这一行 Tips 吃**下那一档**（站长 10-12 21:1x：「请按照上下部分来分别判断，
-   避免全图平均，造成差异」）
-   它浮在形象图上、在屏高 ~68% 那一处，跟左上角那行大字（~15%）不是同一片底：他那张黑白合影
-   上面是一整面浅墙、这一行正压在那串黑字上——整页一枚布尔的话，标题与它必然有一个读不了
-   （第一刀之后量到的就是这一对：标题 1.62:1 ／ 翻完墨之后这一行 1.24:1）。
-   所以只钉"两档不一致"那两种情形，一致的时候这两个元素照旧吃 `--text-secondary`／`--text-tertiary`
-   那对令牌，一个字不回改。展开态那一行（`.out`）是同一句话的另一种摆法，跟着一起。 */
-.container.has-bg.bg-light:not(.bg-light-low) .tips,
-.container.has-bg.bg-light:not(.bg-light-low) .out {
-  color: rgba(242, 239, 233, 0.96);
-}
-
-.container.has-bg:not(.bg-light).bg-light-low .tips,
-.container.has-bg:not(.bg-light).bg-light-low .out {
-  color: rgba(20, 22, 26, 0.92);
-}
-
-/* ---------- 收起态那三块（站长 10-10 晚拍板，效果图 docs/design/10-10两入口多方案/PNG图标.png）
-   三块的面色与字色全部走 palette.entryBlocks() 递下来的 var()，这一份样式表里不写死一个色相；
-   只有白条那两层（#FFFFFF 与 .85 白）是中性皮，四套壁纸共用。
+/* ---------- 收起态那一组（2.2 B 方案，效果图 docs/design/10-12-2.2全量效果图/单屏-B中-01.png）
+   两片皮（白面＋墨面）都是中性色，色相一个不写；唯一那支饱和色是右列底下圆形 ➕ 的底，
+   它由 `--cp-cam` 从容器上的 style 递下来。
    ⚠ 组名必须叫 `.home-blk`，不能简写成 `.blk`：app.wxss 里那一条 `.blk` 是笔记列表的
    "分类色方块"（176 见方 + 18 内边距 + overflow:hidden + flex 纵排），全局生效、同名就撞上，
    整组会被裁成一块 176 的小方盒——10-10 落码第一版就是这么翻车的。 */
@@ -121,14 +182,15 @@
   position: fixed;
   left: 24rpx;
   right: 24rpx;
-  /* 组顶落在视口 66.3% —— 这是他拍板的那条线，也是原来 .entry-wrap 那条 62vh 流内 margin
-     想说的同一件事。必须随视口高走、不许写成定值 rpx：矮屏上照 66.3% 算下来组底会插进底栏，
-     所以再夹一刀——100vh 减掉「整组 394 ＋ 底栏 128 ＋ 最少留 24」= 546，两个值取小的那个。
-     参考机型（1670rpx 高）落在 66.3% 那一头，组底离底栏顶正好是效果图上量的那 41rpx；
-     矮到 iPhone SE（1334rpx）自动退成 788rpx 起头，留 24rpx，不撞底栏。
-     上面那行不带 min() 的是老安卓 XWEB 不认 min() 时的退路——退回来仍是比例值，不塌成写死。 */
-  top: 66.3%;
-  top: min(66.3%, calc(100vh - 546rpx));
+  /* 组顶**与第二屏那块面板共用同一根底线**：100vh 减掉「离底栏那口 152 ＋ 内框 372」＝ 524。
+     站长 10-14 原话「两个屏的内框高度要一致」——同高（372）还要同位置，只能同一条底。
+     ⚠ 这里原来落的是视口 66.3%（那条在 410 那一档与贴底那条交于同一处：1669 那台上都是 1107，
+     所以两屏看不出分叉）。内框一矮这两条就分家：比例那条把首屏留在 1107、第二屏贴底在 1145，
+     而深色面板的顶只有一根，跟谁都不对 ⇒ 撤比例那条，两屏同一式子。
+     也不再需要 `min()` 那一族：贴底定的东西撞不到底栏（老安卓不认 min() 的退路一并没了对象）。
+     ⚠ 三处必须一起改（`验-第一屏三块.js` 按"组顶＝100vh−524＝第二屏面板顶"这条等式钉）：
+     这里的 524、下面 `.blk-person` 的高、以及 `.stage-panel` 的顶（524 ＋ 24 ＝ 548）。 */
+  top: calc(100vh - 524rpx);
   z-index: 2;
 }
 
@@ -137,15 +199,23 @@
   gap: 12rpx;
 }
 
+/* 左块：308 宽不变，高与第二屏那张面板 `.panel` **同一个数**（他 10-13 原话
+   「左边内框要与第二个图高度对齐」，10-14 又追一句「两个屏的内框高度要一致」⇒ 410 压到 372，
+   两屏同时改；顶线也从"各算各的"并成同一根，见上面 `.home-blk` 那条）。
+   ⚠ 这一层**没有 background、也没有 overflow:hidden**：块里那两片皮各自带底色与各自的圆角，
+   卡这一层只负责那一圈细边；而人头要高出块顶（出血 52rpx），裁在卡上就把头切平了
+   ——他 10-13 打回的就是我写在卡上的那一道 overflow。 */
 .blk-person {
   position: relative;
   flex: none;
   width: 308rpx;
-  height: 308rpx;
+  height: 372rpx;
   box-sizing: border-box;
   border-radius: 34rpx;
-  background: var(--eb-person);
-  color: var(--eb-person-ink);
+  /* 10-13 23:36 站长真机图打回「漫画女背景多了一层」：这一圈 2rpx 细边原先描在整块外沿，
+     而白面从块顶往下留了 24（D17 甲那一刀），于是描边与白板之间那一条透出深色面板的带＋描边自己，
+     读起来就是"白板外面又套了一块板"。撤掉描边，只剩白面与墨面那两片，头照样出框。
+     ⚠ 别再把它加回来：圆 ➕ 那一圈（`.blk-plus`）是另一枚东西，尺子钉的是那一条。 */
   transition: transform .25s;
 }
 
@@ -153,18 +223,52 @@
   transform: scale(1.02);
 }
 
+/* 块里上面那一格：纯白渐变毛玻璃（他 10-13 原话「两个人背景用纯白渐变毛玻璃……要模仿 ios 效果」）。
+   10-13 追打那一刀（「漫画女背景的白框，上部分，往下一点，让头部一半在框外，然后漫画男在框内」）：
+   这一格的上沿不再贴块顶，改成往下 24、高 189，底仍停在 213 那条线（＝墨面上沿，「下方不能悬空」照旧）。
+   24 这个数是从源件量的，不是挑的：女那张 360×433 里发顶（贝蕾帽那截）在第 40 行、下巴在第 210 行，
+   中点 125；块内坐标 ＝ −52（出血）＋ 125 × (220/360) ＝ **24.4** ⇒ 取 24，头正好一半在框外。
+   男剪影那一枚顶在块内 81（窗底 213 − 高 132），81 > 24 ⇒ 整张仍在白框内，这一条同时成立。
+   证据图：`docs/design/10-12-2.2全量效果图/标-女那张头带.png`（每 20 行一条横线并标行号）。
+   渐变不自己发明缓动：七个停点的位置照现网 `.page-scrim` 那一条逐档对齐（他 10-13
+   「要与现网的渐变的过程一样，内框也要有渐变效果，要有一定半透明」），只把基色换成白；
+   停点是百分比，格子从 213 收到 189 之后"平—凹—深"的形状跟着等比走，不另调。 */
+.blk-face {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 24rpx;
+  height: 189rpx;
+  box-sizing: border-box;
+  border-radius: 34rpx 34rpx 0 0;
+  overflow: hidden;
+  /* 10-13 站长「漫画女背景不够白」⇒ 整档平移抬白：幅度从 .92→.64 收到 .96→.86。
+        七个停点的位置与"平—凹—深"的形状一个字没动（那是他拍的「与现网的渐变的过程一样」），
+        动的是透明度区间——底下压的不再是恒深面板，是面板那条已经透到 84% 的带，白度还会再掉一截，
+        所以这一档必须整体抬高才读得出"白"。代价：渐变本身从 58 级收到约 13 级，更平。 */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.96) 10%,
+    rgba(255, 255, 255, 0.93) 43%, rgba(255, 255, 255, 0.92) 62%,
+    rgba(255, 255, 255, 0.90) 83%, rgba(255, 255, 255, 0.88) 88%, rgba(255, 255, 255, 0.86) 100%);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+}
+
 /* 人物那一张的取景窗：上边让出 52rpx 出血（人超出块顶，这是他拍板的那一下），
-   下边正好停在白条上沿。男那张比女那张高约 55rpx，靠这一窗裁齐，
-   所以不会把「记下来」压住——效果图里踩中的就是这个，落码直接按同一道数收。
-   105 = 白条实测高 104（上内边距 14 ＋「记下来」47 ＋ 小字上边距 2 ＋ 小字 25 ＋ 下内边距 16）
-   ＋ 1rpx 呼吸；小字那档从 14rpx 抬到 --fs-micro 18rpx 时这里跟着涨了 6，两头必须一起改
-   （`验-第一屏三块.js` 现读现算比对，只改一头会红）。 */
+   下边正好停在墨黑那一格上沿——他 10-13 原话「女人上抬，下方不能悬空要与黑条靠着，
+   所以男人也要同步上抬」。
+   159 ＝ 整块 372 − 213，而 213 就是女那张脚底那条线（＝上面那一格 24 ＋ 189 的底）；
+   两态脚底都压在黑条上沿、都不悬空。10-14 内框从 410 压到 372 之后，这一档跟着从 197 收到 159
+   ——**213 那条线不许动**（它是从源件第 210 行算出来的脚底，不是留白），要收只能收黑条那一格。
+   男那张（220 × 522/360 ＝ 319）比女那张高 54.4，靠这一窗裁掉超出的那一段，
+   所以不会把数字那一格顶穿——效果图里踩中的就是这个，落码按同一道数收。
+   ⚠ 只有这一层吃 overflow:hidden：裁在卡那一层会把上面 52 的出血一起切掉（人头被切平，
+   他这一句打回的就是我写在卡上的那一道 overflow）。 */
 .blk-figwrap {
   position: absolute;
   left: 0;
   right: 0;
   top: -52rpx;
-  bottom: 105rpx;
+  bottom: 159rpx;
   overflow: hidden;
 }
 
@@ -200,7 +304,8 @@
   opacity: .5;
 }
 
-/* 剪影那一枚的透明热区：盖在最上层，右和下都顶到取景窗的边——窗下面就是白条，再往下没有别的控件，
+/* 剪影那一枚的透明热区：盖在最上层，右和下都顶到取景窗的边——窗下面就是数字那一格
+   （两枚 .blk-cell 各在自己的 catchtap 上，与这一枚不重叠），再往下没有别的控件，
    扩出去也不会误按。往上仍留 20rpx 呼吸（高 152 ＝ 剪影 132 ＋ 20）。
    10-11 13:2x 剪影改成按高定之后，宽变成两态不同（男 91／女 109.7），"比剪影往左扩 20"这句已经不成立：
    111 宽对女那一态只剩 1.3rpx 余量，但**仍然整张盖得住**（111 > 109.7 ⇒ 没有点了没反应的一条）。
@@ -215,131 +320,135 @@
   z-index: 3;
 }
 
-.blk-jot {
+/* ---------- 块里下面那一格：两枚计数 ----------
+   站长 10-12「左下的记下来这部部分，去掉，改为"笔记:16 卡片:13"，下划线可点击」
+   ＋ 10-13「数字在横线上方，笔记和卡片文字在横线下方。数字稍微大一点，文字稍微小一点，
+   与正常小字一样」⇒ 皮换成墨黑渐变毛玻璃，里面两枚整格可点的计数。
+   159 ＝ 整块 372 − 213（213 是女那一张脚底落下来的那条线），不是拍的：
+   10-14 内框压掉的那 38 全从这一格里出，白面那 189 与脚底那条线一个字没动。
+   里面那一竖（数字 53.8 ＋ 横线 2 加上下 12/8 ＋ 分类名 25）＝ 101，还剩 58 上下分 ⇒ 不挤。
+   ⚠ 幅度不许照抄现网 .page-scrim 那串 .42→.72：这一格下面垫的是已经近实心的墨面板
+   （效果图上实测 (40,42,48)），.42 与 .72 合成下来只差 2 级＝画了跟没画一样（10-13 那一版
+   就是这么被他打回的："黑底的半透明渐变效果不好"）。停点位置与"平—凹—深"的形状照抄，
+   幅度拉开到 .35→.92（合成差 13 级）。
+   顶上那一条 inset 1rpx 白 .18 是白面与墨面之间那道分界。 */
+.blk-count {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 14rpx 18rpx 16rpx 36rpx;
+  height: 159rpx;
   box-sizing: border-box;
   border-radius: 0 0 34rpx 34rpx;
-  background: #FFFFFF;
-}
-
-.blk-jot-l {
+  overflow: hidden;
   display: flex;
   align-items: center;
-  gap: 10rpx;
-  font-size: 36rpx;
-  font-weight: 700;
-  letter-spacing: 1rpx;
-  line-height: 1.3;
-  color: #3A3A3C;
+  gap: 20rpx;
+  padding: 0 22rpx;
+  /* 10-14：七个停点的 α 一个字没动（那是他 10-13 打的"黑底的半透明渐变效果不好"那一版），
+     换的是基色——墨档 `--blk-count-bg` 发出来的就是原来那串 rgba(18,20,26,…) 逐字同一份。 */
+  background: var(--blk-count-bg);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+  /* 10-14 19:3x 站长「黑色面板中间多了条线，其他色都没有，检查去掉」⇒ 撤掉原来那道
+     `inset 0 1rpx 0 rgba(255,255,255,.18)`。根因是我把它从效果图抄进了码：同一支白线压在
+     墨档那支深底上量出 42.7 级落差，压在彩色四档那支浅底上只有 15～17 级——**只有黑色那一档看得见**，
+     正是他那句"其他色都没有"。这道装饰本来就是我定的，他没点过。 */
 }
 
-/* 快门那支图形就是第二屏那枚 Lucide camera（复用 .glyph-camera 的 mask），
-   只换尺寸与着色，不再另画一份。 */
-.blk-cam {
-  flex: none;
-  width: 32rpx;
-  height: 32rpx;
-  background: #3A3A3C;
+/* 两枚各 (308 − 44 − 20)/2 ＝ 122 宽，与效果图上那两个格子同一个等式。
+   整格可点：catchtap 各走 goNotes／goCards，不吃进左块那一点 openBar。 */
+.blk-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-/* 这一档 10-10 晚从 14rpx/#8E8E93 抬到现成的 --fs-micro/#6E6E73：
-   效果图那两值是按 750 画布 1px=1rpx 等比抄过来的，落到 390pt 的手机上只有 7.3pt，
-   而 #8E8E93 压它真正的底（纯白那条）只有 3.26，不过全站那条正文 4.5。 */
-.blk-jot-s {
-  display: block;
-  margin-top: 2rpx;
+.blk-cell-press {
+  opacity: .62;
+}
+
+/* 数字仍吃现网那支数字字形（WtsjMind＝内嵌的 Poppins Thin），只从 88 收到 64：
+   88 那一档是"一格一枚数字"留下的，现在一格要装一枚数字加一条横线，两枚并排放不下。
+   字色吃 `--stage-ink-solid`，**不吃 --text-* 那一族**（它们会随壁纸和"背景图深浅"翻色，
+   墨字压墨面直接归零）。10-14 之前这里是写死的 #F2EFE9——那一版面板恒深，写死是对的；
+   现在彩色那四档的面板是浅玻璃，纸白压上去读不了，所以这一枚跟着心情翻：墨档仍是 #F2EFE9，
+   一个数没变。 */
+.blk-num {
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-weight: 100;
+  font-size: 64rpx;
+  line-height: .84;
+  letter-spacing: -2rpx;
+  color: var(--stage-ink-solid);
+}
+
+.blk-rule {
+  width: 88rpx;
+  height: 2rpx;
+  margin: 12rpx 0 8rpx;
+  background: var(--stage-ink);
+}
+
+/* 「与正常小字一样」＝拿现成的 --fs-micro 18rpx 那一档（与「照片 · 链接 · 文字」、
+   日期那一行同一档），不为一枚分类名另起一架字号。 */
+.blk-lab {
   font-size: var(--fs-micro);
-  font-weight: 500;
-  letter-spacing: .5rpx;
-  color: #6E6E73;
+  letter-spacing: 1rpx;
+  color: var(--stage-ink-dim);
 }
 
+/* ---------- 右列（2.2 B 方案：上面 Tips、底下圆形 ➕） ----------
+   他 10-12 原话「右侧两块去掉，换成 Tips，然后右侧底下圆形+，就是添加的意思」
+   ＋ 10-13「右下的圆按钮要往中间靠，现在太边缘了」⇒ 圆钮在这一列正中，不贴右沿。
+   列高不用写：`.blk-row` 默认 stretch，这一列自己就是左块那 372，两态同一条顶线同一条底线。 */
 .blk-col {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
 }
 
-.blk-stat {
-  position: relative;
+/* 圆形 ➕ 140 见方，顶上留 40 与 Tips 那一段分开（效果图上那一段）。
+   10-13 站长「按钮变成白色风格。类似第二屏毛玻璃」⇒ 这一枚从快门橙换成**第二屏那面玻璃同一配方**：
+   `--glass-plate` 白 .50 ＋ `--glass-bf` 糊 ＋ `--glass-hair` 一圈细边（`.container.has-bg .panel` 就是这三样）。
+   ⚠ 这一句把同一天早些时候那条「带+号的按钮颜色与第二屏拍照按钮颜色一致」顶掉了，以这一条为准。
+   ⚠ 它落在面板的**实心 .95 那一段**（列底 1517，band 只到 1240），所以白 .50 合成出来是灰白一档，
+      不会像第二屏那样透出壁纸——要它真透图，得让整列也坐进半透明带里（＝效果图那份的丙案，他没拍）。
+   底色不再吃 `--cp-cam`，但图形仍吃 `--cp-cam-ink`（那支近墨），容器上那一套变量照样要发。 */
+.blk-plus {
   flex: none;
-  height: 148rpx;
+  width: 140rpx;
+  height: 140rpx;
+  margin-top: 40rpx;
+  align-self: center;
   box-sizing: border-box;
-  border-radius: 34rpx;
-  overflow: hidden;
-}
-
-.blk-stat-notes {
-  background: var(--eb-notes);
-  color: var(--eb-notes-ink);
-}
-
-.blk-stat-cards {
-  background: var(--eb-cards);
-  color: var(--eb-cards-ink);
-}
-
-/* 图标沉到 -25：上半看得见、下半被白条压掉一截，这是他要的那种"从里面露出来"。
-   放大只给图标自己（1.08），不给整块——整块会跟着长高，把两枚之间那条 12 的缝吃掉。 */
-.blk-ic {
-  position: absolute;
-  left: 12rpx;
-  bottom: -25rpx;
-  width: 160rpx;
-  height: 160rpx;
-  transition: transform .25s;
-}
-
-.blk-stat-press .blk-ic {
-  transform: scale(1.08);
-}
-
-.blk-n {
-  position: absolute;
-  right: 22rpx;
-  top: 50%;
-  transform: translateY(-55%);
-  font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-weight: 100;
-  font-size: 88rpx;
-  line-height: .84;
-  letter-spacing: -2rpx;
-}
-
-.blk-strip {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 40rpx;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  padding: 0 22rpx;
-  box-sizing: border-box;
-  border-radius: 0 0 34rpx 34rpx;
-  background: rgba(255, 255, 255, 0.85);
+  justify-content: center;
+  background: var(--glass-plate);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+  /* 「加号圆要发光」⇒ 外圈加一层白晕（36rpx 扩散、白 .45）；原来那条落影留着，两枚并存。
+     白是中性色，过"不许抄色相"那一档；晕的强度他没给数，这一档是我挑的，等他调。 */
+  box-shadow: inset 0 0 0 2rpx var(--glass-hair), 0 0 36rpx rgba(255, 255, 255, 0.45),
+    0 10rpx 26rpx rgba(0, 0, 0, 0.30);
 }
 
-.blk-dot {
-  flex: none;
-  width: 8rpx;
-  height: 8rpx;
-  margin-right: 8rpx;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: .45;
+.blk-plus-press {
+  opacity: .86;
 }
 
-.blk-strip text {
-  font-size: var(--fs-label);
-  font-weight: 400;
-  letter-spacing: 2rpx;
+/* 图形不另画一份：复用第二屏那批 Lucide mask 里的 `.glyph-plus`，只换尺寸与着色。
+   56 是效果图上那一枚（这枚外面没有快门那圈 10rpx 的墨环，所以比 65/132 那一档略收一点）。 */
+.blk-plus-glyph {
+  width: 56rpx;
+  height: 56rpx;
+  background: var(--cp-cam-ink);
 }
 
 /* 条身右边那三枚小圆（`.bar-dots`／`.dot`／`.dot-glyph`）10-09 随入口一起删了——
@@ -349,54 +458,43 @@
    所以撤的是这一屏的写入，不是那两枚变量本身。 */
 
 /* ---------- 面板外面那一行小字（站长 10-08 原话「这一行移出框外」） ----------
-   10-10 深夜两枚都换内容：左边不再写"选择记录模式"，改成与收起态同一条轮播 Tips；
-   右边「点空白处收起」改成两个字「返回」（与笔记列表右上角那一枚同一个词、同一个动作）。
-   它浮在形象图上，所以吃页面级 --text-tertiary：铺图时那一档本来就是纸白 .56
-   （见下面 .container.has-bg），没铺图时是这套壁纸的灰字。
+   10-14 站长两刀：「第二屏，Tips 去掉，back 抬到暗面板上面」⇒ 这一行只剩「返回」一枚，
+   并且整枚坐在深色面板**之上**（不在墨面里）。
+   这一格的高与下面那一档留白是算出来的，不是挑的：
+   · 行本身 44（字 21×1.4≈29 ＋ 上下各 7 呼吸），
+   · `margin-bottom: 36` ＝ 墨面那口呼吸 24 ＋ 行底离墨顶的 12 ⇒ 行底在面板顶上方 36，
+     而墨面的顶在面板顶上方 24 ⇒ 这一行整枚在墨面之上，离墨顶 12。
+   展开那一档（面板 490）这一行跟着往上走——它在流里、贴在面板顶上，不需要另写规则。
+   字色回到页面级令牌：它现在浮在形象图／壁纸上，与标题、「调亮度／换背景」那一行同一层，
+   要吃页面级翻转（原来那支写死的纸白 .90 是给"永远压在恒深墨面上"那一版的，搬出墨面之后
+   留着它，浅照片上就是一团白字压浅底）。
+   ⚠ 但**翻它的必须是"下那一档"（`bg-light-low`），不是整页/头部那一枚（`bg-light`）**：
+   这一枚此刻在屏上的位置是视口 0.59~0.62（收起态实测行 848~890 / 框 1448），
+   正落在 `create.js` `toneZones().low`＝[0.55, 0.85] 那一截里；而 `.container.has-bg` 那一条
+   把 `--text-secondary` 整个翻白、`.container.has-bg.bg-light` 又按**头部那 0~0.28** 翻回墨，
+   两头判的都不是这一枚压着的那一条带 ⇒ 在下面那两段翻转之后就地按低带覆回来
+   （写法与 index 那两行、me 那行 slogan 同一个口径，站长 10-12 21:1x 原话
+   「请按照上下部分来分别判断」）。
    左右留空 20rpx 比面板那 24 再往外 4——这一行要说的是"框外"，比框子的内边距略宽一点才对得上。 */
 .out {
   flex: none;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 0 20rpx 18rpx;
+  align-items: center;
+  justify-content: flex-end;
+  height: 44rpx;
+  margin-bottom: 36rpx;
+  box-sizing: border-box;
+  padding: 0 20rpx;
   font-size: var(--fs-meta);
   line-height: 1.4;
   letter-spacing: 1rpx;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
-/* Tips 那一枚必须**只占一行**：这一行在流内，它一折行就把整块面板往下顶 34rpx，
-   而轮播每 8 秒换一句（`create.js` startTips 那个 8000）——最长那句换成最短那句的时候面板会自己跳一下。
-   所以宁可省略号，也不许它换行（中文六句最长 23 字 ≈ 552rpx，加右边「返回」也放得下；
-   撑不住的是英文最长那句 49 个字母，会被切成"…",这是这一档的取舍）。 */
-/* Tips 那一枚小圆点（站长 10-11 13:2x：「第二屏的 Tips 前面少了小圆点，要与第一屏一致」）。
-   尺寸与偏移逐条抄 `.tips-dot`：14×14、离文字 12、往下 10（这一行行高同样是 24×1.4=33.6，同一个偏移才落在字的正中间）。
-   ⚠ 点自己 `align-self: flex-start`——`.out` 是 baseline 对齐，一枚空 view 没有基线，不指定就跟着那档乱跳。
-   `.out` 原来是 `gap: 20rpx` ——那是"字与返回之间"的缝，不是点与字的缝。留着它，点与字就成 12＋20=32，
-   与第一屏的 12 对不上；所以缝挪到 `.out-r` 的 margin-left 上（真跑 H4 那条"左右不打架"照旧成立）。
-   颜色不吃样式表：`palette.TIP_DOT` 从 `tipDotStyle` 递进来，写进 wxss 会被"饱和色不许抄进样式表"那条打红。 */
-.out-dot {
-  flex: none;
-  align-self: flex-start;
-  width: 14rpx;
-  height: 14rpx;
-  margin-top: 10rpx;
-  margin-right: 12rpx;
-  border-radius: 50%;
-}
-
-.out-l {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
+/* 「返回」这一枚：与笔记列表、笔记卡片右上角那一枚同一个词、同一个动作（回第一屏）。
+   原来那两档（`margin-left:20` 是"字与返回之间"的缝）随 Tips 一起撤了——行里只剩它一枚。 */
 .out-r {
   flex: none;
-  margin-left: 20rpx;
 }
 
 /* ---------- 报错那一枚气泡（站长 10-10 深夜：「报错消息不要在这里出现，换到输入框上面，
@@ -444,14 +542,17 @@
    色值一律从 palette.createSkin() 经 style 递进来，这里只写 var(--cp-*)
    ——与 TIP_DOT、toneStyle 同一条规矩。旧稿那三档暗面（#23252C／#2B2D35／#1A1C21）作废。
 
-   高度两个数走的是站长 10-08 深夜圈的那个红框（顶 rpx 1107、底 1516，底与现网面板底同一条）：
-   收起 410 ＝ 描边 4 + 上内边距 8 + 标签行 65.4 + 卡上边距 6 + 卡边框 4 + 卡内边距 60
-              + 内容位 248.6 + 下内边距 14，
-   而最占地方那一态（照片那三枚圈：快门 180 + 间距 8 + 那行字 28.8）216.8，装得下；
-   链接那一态（输入框 105 + 右滑条 110）235，也装得下，余量 13.6。
-   展开 490 ＝ 仍只多 80（原文框从 105 变 160、或者小图从一排变两排），站长原话
-   「点击展开也只是多一行高度，不再增加高度」。
-   比搬家前那两档各矮 90 与 90：面板顶因此从 61.0% 掉到 66.3%，往上让出 90rpx 给底图。
+   高度两个数（10-14 这一档）：站长原话「第二屏的内面板，高度压缩一下，排版紧凑一点」
+   ＋「两个屏的内框高度要一致」⇒ 收起从 410 压到 **372**，与首屏那块左块同一个数；
+   展开那一档 **490 不动**（它本来就没有富余：见下面那串加总），于是两档差从 80 变成 118
+   ＝ 多一行小图那一格（100 ＋ 行间距 16）＝ 116，另 2 落在缝里——站长那句
+   「点击展开也只是多一行高度」按字面成立，多出来的正好是一行。
+   收起 372 ＝ 描边 4 ＋ 上内边距 6 ＋ 标签行 64 ＋ 卡上边距 6 ＋ 卡边框 4 ＋ 卡内边距 48
+                ＋ 内容位 230 ＋ 下内边距 10，
+   内容位 230 里最占地方那两态：照片那三枚圈 180 ＋ 缝 8 ＋ 那行字 28.8 ＝ 216.8（余 13.2）；
+   链接／文字收起 ＝ 框 105 ＋ 条 110 ＝ 215（缝 15，由 `.sld` 那条 `margin-top:auto` 给）。
+   展开 490 ＝ 同一串加总换成内容位 348：小图两排 216 ＋ 条 110 ＝ 326、文字两行框 160 ＋ 开关 56 ＋ 条 110 ＝ 326，
+   各余 22 ⇒ 这一档压无可压，压它就是把「展开只多一行」那条撤了。
    ⚠ 这一段等式**不含** `.modes` 的上边距——那一档 10-10 跟着压进红框一起归 0 了，
    留着它等式就对不上（旧注释欠了这一笔，`验-录入面板沉底.js` 现在按上面这串加总钉）。 */
 .panel {
@@ -465,13 +566,15 @@
   background: var(--cp-panel);
   border: 2rpx solid var(--cp-edge-10);
   box-sizing: border-box;
-  padding: 8rpx 24rpx 14rpx;
-  height: 410rpx;
+  padding: 6rpx 24rpx 10rpx;
+  height: 372rpx;
   border-radius: 55rpx;
   display: flex;
   flex-direction: column;
 }
 
+/* 展开那一档：只多一行小图（10-14 收起压到 372 之后，这一档不动 ⇒ 差从 80 变 118）。
+   深色面板的顶跟着这一档再往上抬 118，见 `.container.dock-open .stage-panel`。 */
 .panel-open {
   height: 490rpx;
 }
@@ -556,7 +659,10 @@
   display: flex;
   flex-direction: column;
   border-radius: 40rpx;
-  padding: 30rpx;
+  /* 30 → 24：10-14 那一句「排版紧凑一点」里，白卡里那两圈白边是最大的一块死空间
+     （收起态上下各 30.8 ＋ 框与条之间还富 40.4）。压到 24 之后上下各留 24，
+     中间那一档由 `.sld` 的 `margin-top:auto` 自己收，不用再写数。 */
+  padding: 24rpx;
   background: var(--cp-card);
   border: 2rpx solid var(--cp-edge-12);
 }
@@ -1034,11 +1140,12 @@
 }
 
 /* ---------- 小图形公共面 ----------
-   .glyph 那一档是"压在卡底的水印"（264rpx、绝对定位），左块白条前面那枚快门、
-   三枚圈里那三枚、和滑动条圆里那一枚要的是"读得清的小图标"，所以另起一组：
+   .glyph 那一档是"压在卡底的水印"（264rpx、绝对定位），三枚圈里那三枚、滑动条圆里那一枚、
+   「调亮度／换背景」那一行那枚箭头、和首屏那枚圆形 ➕ 要的是"读得清的小图标"，所以另起一组：
    只借同一批 mask 形状，尺寸和颜色自己定。
-   （名单里原来那枚 .bar-lead 随纸白胶囊一起撤了，换进来的是 .blk-cam。） */
-.blk-cam, .mini-glyph, .shut-glyph, .sld-glyph, .swap-glyph, .th-plus, .paste-glyph {
+   （名单里 `.blk-cam` 随左块那条「记下来」白条一起撤了，换进来的是 `.blk-plus-glyph`——
+   这份名单由静态尺子逐条对 markup，多一个少一个都会红。） */
+.blk-plus-glyph, .mini-glyph, .shut-glyph, .sld-glyph, .swap-glyph, .th-plus, .paste-glyph, .glyph-cloud {
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -1079,6 +1186,19 @@
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
 }
 
+/* 首屏那枚圆形 ➕ 的图形单独加粗到 2.4（站长 10-13 追打「还有原内的➕号，稍微粗一点」，
+   D19 甲＝只粗这一枚）。为什么另写一条而不改上面那支：那支是七个落点共用的同一份 mask
+   （快门／小圆／右滑条／粘贴／井格 ➕ 都吃它），改一支等于把整页图形一起加粗，
+   而"上面那批同 1.6、粗细齐"是他 10-08 拍过的口径。
+   ⚠ 两条都要写：iOS 的 WKWebView 只认 `-webkit-mask-image`，只写标准那行在 iPhone 上静默不生效。
+   ⚠ 选择器必须写成 `.blk-plus .blk-plus-glyph`（两枚类）而**不是**裸 `.blk-plus-glyph`：
+   markup 是 `class="blk-plus-glyph glyph-plus"`，同一枚元素上两个类，裸写就是 1 类 vs 1 类、
+   谁在后面谁赢——今天靠源码顺序赢着，谁挪一下这两段就静默翻回 1.6（效果图与屏上都看不出来）。 */
+.blk-plus .blk-plus-glyph {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
+}
+
 /* 剪贴板（Lucide clipboard）：夹子在顶、板身一个圆角矩形，与上面那批同 24 格、同 1.6 描边。 */
 .glyph-clipboard {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1' /%3E %3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' /%3E%3C/svg%3E");
@@ -1088,6 +1208,13 @@
 .glyph-chev {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6' /%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6' /%3E%3C/svg%3E");
+}
+
+/* 小云朵（Lucide cloud）：首页那一枚「换心情」的图形（站长 10-14 原话「icon是小云朵」）。
+   同 24 格、同 1.6 描边，与上面那一批一支重量。 */
+.glyph-cloud {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z' /%3E%3C/svg%3E");
 }
 
 /* ---------- 首页背景图 ----------
@@ -1122,6 +1249,91 @@
    veil=0 那一档是 opacity:0（＝一点不压，等于原图）。三档的值与那枚点的灰度都在
    `palette.BG_DIMS`，这一屏与笔记页、「我的」页共用，一处都没动。 */
 
+/* ---------- 2.2 B 方案那一层深色面板（`.stage-panel`，wxml 里挂在 .page-scrim 之后） ----------
+   站长 10-12 原话「在目前背景与框框直接加一层深色面板，面板左上和右上有圆角」
+   ＋「深色面板上部要做渐变半透明毛玻璃。类似"我的"效果」；第一稿我画成右侧一块、左下角露着原图，
+   整张被打回（「错误，为什么左下角没有背景，参考图是完整的深色面板」）⇒ **通栏**：左右 0、贴到屏底。
+   顶：**两屏同一根线**（10-14 那一刀，站长原话「第二屏，高度不准，要和第一屏一致」）。
+   这一层的顶＝内框的顶往上 24，而两屏的内框同高同底线（372／离底栏 152），所以一根顶线两屏共用，
+   点 ➕ 那一下这一层一动不动；展开那一档（内框 490）它跟着那张卡一起往上长，见下面 `.dock-open` 那条。
+   墨取现网那支 #23252C（palette 的 UNCATEGORIZED.bg／`--cp-ink` 同一支），不另起一档深灰；
+   上半 240 那一段从 .16 走到 .94、再往下收口成 .95 的近实心。
+   ⚠ 10-13 那一刀：上一版把 .95 写在本体上，与压在它上面的 `::before` 相乘 ⇒ band 顶只透出 4.2%，
+   整块 98% 实心，"上部渐变半透明毛玻璃"画了等于没画（他原话「新增面板为什么看不到渐变毛玻璃」）。
+   两层深色**只能有一层**管同一片区域。
+   ⚠ 10-14 那一刀（站长「黑色面板中间多了条线，其他色都没有，检查去掉」）：原来那"一层"是两枚
+   并排的层（`::before` 高 240rpx 走 .16→.94 ＋ `::after` 从 240rpx 起铺 .95），交界正好落在面板中间，
+   模拟器把两枚层各自对齐到设备像素 ⇒ 那一行少铺了一点点，透出后面的糊面，读成一条亮线。
+   实测：墨档那一行整幅亮占比 0.47，彩色四档 ≤0.10（同一处，只是它们面板本来就浅、看不出来）；
+   把 `::after` 的 top 从 240rpx 挪到 200rpx，那条线跟着挪到 y1248、y1287 归零 ⇒ 根因就是这道交界。
+   现在**一层画完**：停点写在 `--stage-face` 里，用的是百分比（43.8%＝240/548、展开 36%＝240/666），
+   不是 rpx——rpx 落在 linear-gradient() 的参数里换算不保证跟得进去，换算不下来整条 background 掉下来；
+   百分比不吃单位，所以能安全地把"带"和"近实心"并成一条渐变，交界处不再有第二枚层的边。
+   层号 1：压在 .page-scrim（同为 1，靠 DOM 顺序在后）之上、那一组与录入面板（2／6）之下。
+   ⚠ 「调亮度」那三档拧的是 .page-scrim 的 opacity；这一层是恒深的一整面，不吃那一档
+   ——面板以下从此基本不受亮度旋钮影响（面板上半 .16 那一段能读出大半）。这一条要报给他拍。 */
+.stage-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* 一根顶线两屏共用：100vh 减掉「离底栏那口 152 ＋ 内框 372 ＋ 顶上那口呼吸 24」＝ 548。
+     ⚠ 三个数是一根链：`.entry-wrap`/`.home-blk` 那条 152、`.panel` 与 `.blk-person` 那个 372、
+     这里的 24。`验-第一屏三块.js` 与 `验-录入面板沉底.js` 都按这条等式现读，改一头不改另一头会红。
+     原来这里落的是 `min(66.3% − 24, 100vh − 586)`（首屏）＋ 第二屏另钉 749 两根线——
+     10-13 D16 甲那一刀为了让"框外那一行"整行坐在墨面上，把第二屏钉到展开那一档的顶上（749），
+     代价就是站长今天打回的这一条：两屏的墨面顶差 163rpx。现在那一行里只剩「返回」一枚、
+     并且抬到墨面之上（见 `.out`），这一层不再需要为它多垫 107 ⇒ 两根线并成一根。 */
+  top: calc(100vh - 548rpx);
+  z-index: 1;
+  border-radius: 40rpx 40rpx 0 0;
+  /* 站长 10-14 20:5x 那一句里"首屏、二屏"的落点就是这一枚（两屏同一枚元素、两个高度，一处管两屏）。
+     与列表页那张纸卡同一枚 `--sh-lift`；投影画在边框外，不被本体的 `overflow: hidden` 裁掉。 */
+  box-shadow: var(--sh-lift);
+  overflow: hidden;   /* 圆角要裁住 ::before／::after 那两段的方顶 */
+  /* 本体**透明**：整面的色归 `::before` 那一条渐变（band 那一段 .16→.94、往下 .95 近实心，一层画完）。
+     上一版这里写的是 rgba(35,37,44,.95)，与压在它上面的 .16→.94 相乘 ⇒ band 顶只透出 4.2%、
+     band 底透出 0.30%，整块成了 98% 实心，"渐变半透明毛玻璃"等于没画（他 10-13：「新增面板为什么看不到渐变毛玻璃」）。 */
+  background: transparent;
+  backdrop-filter: blur(30px) saturate(1.15);
+  -webkit-backdrop-filter: blur(30px) saturate(1.15);
+}
+
+/* 展开那一档（`.panel-open`，面板 490）这一层跟着那张卡一起长：548 ＋ (490 − 372) ＝ 666。
+   闸挂在容器上（`create.wxml` 根节点那串 class 里多出来的 `dock-open` ＝ `panelOpen`），
+   不挂在录入条自己身上——这一层与那张卡是"一起长"的一个东西，两态之间它从不单独动。
+   ⚠ 这一条与 `.panel-open` 那个 490 是同一根链：490 改了这里的 666 必须跟着改，
+   否则展开态那张卡的顶会穿出墨面（`验-录入面板沉底-真跑.js` 按"墨顶＝卡顶−24"逐态钉）。
+   原来这一条叫 `.container.entry-dock .stage-panel`、钉的是 749（＝152＋107＋490，
+   107 是框外那一行的高），10-14 那一行抬到墨面之上、只剩「返回」，那 107 就不归这一层管了。 */
+.container.dock-open .stage-panel {
+  top: calc(100vh - 666rpx);
+}
+
+/* 面板那一整面：一条渐变铺完（.16 → .94 到 240rpx 那道，再往下 .95 近实心）。
+   10-13 站长两刀：先「上面渐变加强一点」(.55→.32)，再看图说「透明度多一点，现在太暗了」⇒ 顶档再收到 **.16**
+   （幅度 .39 → .78；同一支墨只改透明度，带的高他没指，仍是 240）。
+   40 这个圆角他没给数（现网块 34／面板 55／底栏 44 三档里我挑了最大那一档，因为这一层是通栏底板）——
+   这一条他没拍过，效果图上标的也是同一个数。
+   ⚠ 高必须是 `top:0;bottom:0` 铺满，不能只铺上面那 240rpx：那 240 现在写在令牌的百分比停点里，
+   拆成两枚层就又是 10-14 那条亮线（见上面 `.stage-panel` 那段）。 */
+.stage-panel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--stage-face);   /* 10-14 基色跟着心情换，.16→.94→.95 那一档幅度是他 10-13 拍的，不动 */
+}
+
+/* 展开那一档（面板 666 高）带高仍是 240rpx ⇒ 停点换成 240/666＝36%。
+   ⚠ 这一条与上面 `.container.dock-open .stage-panel` 那个 666 是同一根链，改一头不改另一头，
+   带就跟着面板长（`验-五档彩色玻璃.js` 按 240/顶线 现算这两个百分比，对不上就红）。 */
+.container.dock-open .stage-panel::before {
+  background: var(--stage-face-open);
+}
+
 /* 铺了图，这一页的三级字必须翻白，且 --accent 跟着翻（「中/EN」那条下划线吃它，
    象牙壁纸下它是深墨，压在暗图上等于没有）。只改本容器的变量：壁纸系统不动，
    录入条和面板是自带的面，不吃这套翻转。 */
@@ -1143,14 +1355,12 @@
   --accent: rgba(20, 22, 26, 0.92);
 }
 
-/* 提亮罩：停点的位置与档数照上面那条压暗罩逐条对齐，只把压暗换成提亮、暗值换成纸白系，
-   换深浅的观感才是同一件事的两个方向，而不是两条不同的曲线。
-   「调亮度」那枚点拧的是这一层的 opacity（`style="{{dimScrim}}"`），两态共用一套档位。 */
-.container.has-bg.bg-light .page-scrim {
-  background: linear-gradient(180deg, rgba(242, 239, 233, 0.35) 0%, rgba(242, 239, 233, 0.35) 10%,
-    rgba(242, 239, 233, 0.28) 43%, rgba(242, 239, 233, 0.22) 62%,
-    rgba(242, 239, 233, 0.28) 83%, rgba(242, 239, 233, 0.32) 88%, rgba(242, 239, 233, 0.38) 100%);
-}
+/* 10-13 23:36 站长把这一档撤了：「背景图，调亮度应该是压暗，现在变成提亮（要对照现网逻辑）」。
+   原来浅照片上这条 `.bg-light .page-scrim` 会把压暗罩换成一支纸白提亮罩（10-12 18:29 `4c65938` 落的），
+   于是那枚点拧起来是"越拧越白"。撤掉之后罩层恒为上面那条压暗渐变，三页同一枚本机键一起改
+   （见 index／me 两页各自那条同名的 `.bg-light` 罩层覆盖，一起删了；只改一页会出新的不一致）。
+   ⚠ 留着的是**字**的翻色（`.bg-light` 那一队：三级字、`.swap-glyph`、导航条）——那是可读性那件事，
+   与这枚点拧的是哪一层无关，没动。 */
 
 .container.has-bg.bg-light .swap-glyph {
   background: rgba(20, 22, 26, 0.85);
@@ -1164,6 +1374,19 @@
   /* 整行的字色兜底：那两枚「调亮度」「换背景」原来只吃 `.swap-text` 那支写死的纸白 .85，
      实测浅态那一行带里暗字 0.0%、亮字 99.5%（＝字跟浅底一个色，完全没出来）。 */
   color: rgba(20, 22, 26, 0.85);
+}
+
+/* 10-14：「返回」那一枚抬到墨面之上之后压的是形象图**下那一截**（视口 0.59~0.62，
+   落在 `toneZones().low`＝[0.55,0.85] 里），上面那两段按整页/头部翻的令牌判的不是这一条带
+   ⇒ 就地按低带覆回来。两支都要：浅图那一态 `--text-secondary` 是墨，深图那一态是纸白，
+   而这一枚只认"它自己那一条带深不深"。写法与 index 的 `.vtab/.ix-back/.ix-cat`、
+   me 的 `.sheet-slogan` 同一个口径（那两处的 `:not(.bg-light-low)` 不许省，理由抄在这里）。 */
+.container.has-bg:not(.bg-light-low) .out {
+  color: rgba(242, 239, 233, 0.78);
+}
+
+.container.has-bg.bg-light-low .out {
+  color: rgba(20, 22, 26, 0.68);
 }
 
 /* 展开：整块从流里拿出来，沉到底栏上方，面板向上长。
@@ -1187,8 +1410,12 @@
    10-09 站长拍甲把 `.home-swap` 加进来：它原来不在这份名单里，于是那两句字跟照片一起
    被罩层压暗、对比塌向 1:1（新旧两个位置都读不出来，见 §8.178）。
    跟着名单走的代价照写在注释里：「调亮度」那一档不再把这一行一起罩住（图亮字不跟着淡），
-   这与标题现在的行为一致。日期行 10-10 随那一行一起撤了，名单里那一笔也删。 */
+   这与标题现在的行为一致。日期行 10-10 随那一行一起撤了，名单里那一笔也删。
+   ⚠ 10-14 22:4x 新加的 `.ai-line`（首屏最上面那一行）**必须跟着进这份名单**：它第一次落码时没进，
+   于是铺图那一态它整条压在罩层与照片底下——屏上直接看不见这一行，而计算样式那几条判据照样绿
+   （层序这件事读 `color` 读不出来）。与 10-09 站长抓 `.home-swap` 那一次是同一个形状（§8.178）。 */
 .container.has-bg .title-row,
+.container.has-bg .ai-line,
 .container.has-bg .home-swap,
 .container.has-bg:not(.entry-dock) .entry-wrap {
   position: relative;
@@ -1217,6 +1444,21 @@
      `.entry-wrap` 靠 `margin-top:62vh` 这条**流内** margin 定位，它上面每多一行都会把
      Tips + 横条 + 面板一起往下推——同一类账 09-30 那行日期、10-01 那行 Tips 各欠过一次。
      静态尺子钉的是"这三个数加起来等于 52"，不是钉 22 这个数。 */
+/* 站长 10-14 22:4x「换心情，调亮度，换背景，下移到下半部，面板上方」⇒ **收起态**这一行整条
+   从流里抬出来，钉在面板顶之上（面板顶＝100vh−548，见 `.stage-panel` 那一条）。
+   ⚠ 只管 `:not(.entry-dock)`：展开态（第二屏）这一行仍住在标题下面那一格——10-11 他拍过"两屏都在"，
+   而第二屏框外那一行今天只剩「返回」一枚，两枚同挤一条带会撞；他这句指的是首屏，没让动第二屏。
+   （"第二屏保持原样"这一条是我按"他没说的不改"落的，他没拍过。）
+   ⚠ 搬走之后它在流内那 52rpx 一并没了——收起态它下面没有任何流内兄弟（`.home-blk` 是 fixed、
+   `.entry-wrap` 这一态不渲染），所以录入条那三块不漂；展开态走的是原来那条流内账，一个字没改。 */
+.container:not(.entry-dock) .home-swap {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 560rpx;
+  margin: 0;
+}
+
 .home-swap {
   display: flex;
   align-items: flex-start;
@@ -1234,13 +1476,14 @@
   padding: 0 10rpx;
 }
 
-/* 那一枚点的直径与 Tips 那一行字号同档（--fs-meta 24），当前是哪一档就看这一枚有多灰。
-   外面那圈 .swap-half 的 padding 把热区撑到 44 以上，24 一枚手指点不准。
+/* 那一枚点的直径跟着这一行的字号走（站长 10-14「旁边的亮度圆也同步缩小」），
+   现在两边都是 --fs-tiny(21)。外面那圈 .swap-half 的 padding 把热区撑到 44 以上，
+   21 一枚手指点不准（热区靠盒子，不靠这枚点）。
    这圈描边是给最亮那一档准备的：不描边，白点压在浅衬衫上就找不到北。 */
 .dim-dot {
-  width: 24rpx;
-  height: 24rpx;
-  margin-top: 5rpx;
+  width: 21rpx;
+  height: 21rpx;
+  margin-top: 7rpx;
   border-radius: 50%;
   flex: none;
   border: 2rpx solid rgba(8, 9, 12, 0.28);
@@ -1248,22 +1491,24 @@
 
 /* 站长 10-01 晚：前面那枚照片图标撤掉，换一枚小箭头（ ">" 那一档）——
    这一行本来就是"点进去换"，箭头把这件事说得更直白，也少一块和横条抢眼的实心面。
-   箭头本身只有 24。margin-top 那 5 是把它对回文字那一行：(34 − 24) / 2。
-   margin-top 那 5 是把它对回文字那一行：(34 − 24) / 2（10-10 这一行改靠左顶对齐带的）。
+   margin-top 那 7 是把它对回文字那一行：(34 − 21) / 2 ＝ 6.5 取整（10-10 这一行改靠左顶对齐带的；
+   10-14 箭头随「调亮度」那枚圆同步从 24 收到 21 —— 这句是从他那一条「同步缩小」推的，他只点了圆）。
    这两样仍是给压暗罩准备的纸白 .85——罩子方向 10-10 站长明确不改。 */
 .swap-glyph {
-  width: 24rpx;
-  height: 24rpx;
-  margin-top: 5rpx;
+  width: 21rpx;
+  height: 21rpx;
+  margin-top: 7rpx;
   background: rgba(242, 239, 233, 0.85);
 }
 
 .swap-text {
-  /* 字号并到 Tips 那一档（--fs-meta 24），两行小字在照片上是一个体量。
-     行高钉 34rpx 不是随手写的：它＝24×1.4，正是日期行量到的那一条线（见上面 .home-swap 那笔账）。 */
-  font-size: var(--fs-meta);
+  /* 站长 10-14「调亮度换背景字体小一档，不要加粗」⇒ 从 --fs-meta(24) 收到 --fs-tiny(21)、字重从 700 落回 400。
+     这一行原本和 Tips 同档同体量，现在反过来比 Tips 小一档：它是页面级工具条，不该和引导语抢。
+     行高仍钉 34rpx（不是 21×1.4）：那是日期行量到的那一条线，`.home-swap` 那 52rpx 的流内账靠它撑着
+     （见上面 .home-swap 那笔账），字档升降都不动它。 */
+  font-size: var(--fs-tiny);
   line-height: 34rpx;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 1rpx;
   color: rgba(242, 239, 233, 0.85);
 }
@@ -1340,37 +1585,44 @@
   background: var(--glass-fill);
 }
 
-/* 首页那三块（左块人物入口＋右两枚计数）与块里那两条白条＝效果图第 271／273 行（`.blk-person.g-blk,
-   .blk-stat.g-blk`／`.g-jot`），站长 10-11 看过这张图回「新图没问题，直接落地甲」，10-11 09:5x 又一句
-   「尽快改！别浪费我时间！！！！需求+效果图都有，你怎么不去做」⇒ 这一格按效果图落回玻璃。
-   ⚠ 上一趟他打回的是"插画被弄透"（原话「漫画人物边缘外部是透明底，没说连衣服也透明了，ICON也是」＋R1 后半句
-   「按钮ICON不变」）。根因不在这两条规则，在那四张 PNG 自己大半透明（`ic-person.png` 实心像素只占 0.7%），
-   底下半透就穿图。解法是**把插画压平到实心**（`docs/工具/烘-插画压平.py`：按"画在白底上"合成、有画的地方 alpha 拉满、
-   轮廓外照旧透明，一个像素没重画），不是撤玻璃。两件事现在都做了，所以这一格与效果图一致、人物与 icon 又是实的。
-   图上的口径一并抄：两枚计数原来那两档深浅不再分，都刷同一张白纱（`--eb-notes`／`--eb-cards` 在铺图态不再现面），
-   内环 2＝图上的 `inset 0 0 0 2px rgba(255,255,255,.55)`；白条那档＝图上 `.g-jot` 的 .38＋`blur(20px)`（换算 20→10）。 */
-.container.has-bg .blk-person,
-.container.has-bg .blk-stat-notes,
-.container.has-bg .blk-stat-cards {
-  /* 站长 10-11 11:0x 那句「首页三个块磨玻璃的背景图换成白底再毛玻璃，否则现在如果背景深色的话，毛玻璃就会很暗，
-     13，12 等数字完全看不清」，12:5x 他把我做错的版本纠正回来：「不是加厚白色，是把原来根据背景风格自动切换的
-     底色，换成白色，然后按照半透明毛玻璃进行处理」⇒ 这一格的面**只有白 .50 一层**（`--glass-plate`），
-     糊由 `--glass-bf` 给。我 12:03 那版是白纱 .30 叠白 .70＝合成白 .79，几乎实心，真机上就没有玻璃味了。
-     ⚠ 别再往回叠：`background` 简写里 <color> 只许落在最后一层，而另起一层定位皮会画在静态内容之上
-     （＝给那两枚数字蒙白，10-11 那条教训）。块里那两枚白条不吃这里，照旧走下面那条 `--glass-jot`。 */
-  background: var(--glass-plate);
-  backdrop-filter: var(--glass-bf);
-  -webkit-backdrop-filter: var(--glass-bf);
-  box-shadow: inset 0 0 0 2rpx var(--glass-hair);
+/* 井格最右端那枚 ➕（已选图之后那一排）漏在这份玻璃名单外——10-13 第二屏方案 D18，站长「按你建议来」。
+   同一排里那几张小图吃 `.th` 那一档面，只有它是 `--cp-field` 实心浅灰，压在玻璃面板上是一块不透明的灰饼。
+   ⚠ `:not(.th-add-dis)` 那一刀是必须的：满了那一态 `.th-add-dis` 只有一枚类（选择器权重 1），
+   而这条是 3 枚，直接写会把"➕ 转灰、边撤掉"那一条静默吃掉（同一元素两个类，权重说话）。 */
+.container.has-bg .th-add:not(.th-add-dis) {
+  background: var(--glass-fill);
+  border-color: var(--glass-hair);
 }
 
-.container.has-bg .blk-jot,
-.container.has-bg .blk-strip {
-  background: var(--glass-jot);
-  backdrop-filter: blur(10px) saturate(1.6);
-  -webkit-backdrop-filter: blur(10px) saturate(1.6);
+/* ---------- 10-13 第二屏方案 D17 甲：第二屏那两档白纱各抬一档 ----------
+   量出来的事（`docs/方案-2.2大版本.md` §9.12）：首屏那面 `.50` 白纱压在**恒深的墨面板**上，
+   那一片的标准差只有 0.7、而它背后那层墨自己也只有 1.6 ⇒ 糊不出任何东西，看着就是一张均匀的灰饼；
+   同一块纱压在照片上是 41.6。差就差在垫着的东西不是图，是墨。
+   甲案＝在这一屏把两枚令牌各抬一档（面 .72／井 .42），让白面真读得出是"白"，纹理交给墨面那一段渐变自己给。
+   ⚠ 只在这一屏抬：闸挂在 `.entry-dock`（＝`active` 非空）上，首屏那枚圆形 ➕ 照旧吃 `.50`，
+   与还挂着的 D12（首屏那档 .50 要不要一起抬到 .72）分开拍、互不牵连。
+   ⚠ 抬的是**令牌的值**、不是另起一枚令牌：消费方那几条仍写 `var(--glass-plate)`／`var(--glass-fill)`，
+   「页面里不许有第二支白纱」那一条判据圈的是挂了滤镜的块里的字面值，这一条不挂滤镜、走 var()，两不冲突。 */
+.container.entry-dock {
+  /* 抬的是**令牌的值**、不是另起一枚令牌：消费方那几条仍写 `var(--glass-plate)`／`var(--glass-fill)`。
+     10-14 起这两枚的值从心情取（`--glass-*-dock`），否则这一条 0-2-0 的 specificity 会把
+     `.mood-*`（0-1-0）发进来的彩色值盖掉——那就成了"展开录入条那一屏五档同色"。 */
+  --glass-plate: var(--glass-plate-dock);
+  --glass-fill: var(--glass-fill-dock);
 }
 
+/* ---------- 10-11 那一档"首页三块刷白玻璃"的两条规则，2.2 B 方案一起退 ----------
+   撤的理由挂在结构上，不是撤效果：他 10-12 那句「右侧两块去掉」把两枚计数块整块删掉，
+   「左下的记下来这部部分，去掉」把白条整条删掉，于是这两条规则的选择器已经没有节点可命中；
+   首屏现在那两片皮（白面渐变毛玻璃 `.blk-face` ＋ 墨面渐变毛玻璃 `.blk-count`）是**基础规则**、
+   不再分"铺图/不铺图"两态——因为这一屏底下永远垫着那层深色面板，玻璃的对象一直在。
+   ⚠ 一条 10-11 的真教训跟着这一屏走，别丢：人物那两张 PNG 曾经大半透明
+   （`ic-person.png` 实心像素只占 0.7%），压在半透面上就穿图。他当时打回的原话是
+   「漫画人物边缘外部是透明底，没说连衣服也透明了，ICON也是」＋R1 后半句「按钮ICON不变」，
+   根因不在这两条玻璃规则，解法是**把插画压平到实心**（`docs/工具/烘-插画压平.py`：
+   按"画在白底上"合成、有画的地方 alpha 拉满、轮廓外照旧透明，一个像素没重画）。
+   现在两张人物照样吃 `.blk-face` 那层半透白，所以那四张里在用的两张仍是压平过的那一份。
+   `--glass-jot`（白条那一档 .38）跟着这两条一起从 app.wxss 删掉——全仓最后一处消费方就是这里。 */
 /* 报错气泡（X1，站长 10-11 逐条裁定原话「4、做」之前一句「报错气泡，这是我下的需求，为什么不做？」；
    正本需求原文：「报错消息不要在这里出现，换到输入框上面，用带阴影长条形气泡框弹出，几秒后消失。
    所有输入错误提示都用这种方式」）。

@@ -8,7 +8,9 @@
 // ③ 种子的落点与先后（挂在建号那一个分支、且排在邀请归因之后）——
 //    顺序反了或改成"名下没笔记就种"，表现是**所有邀请奖励从此结不出来**，接口一声不响；
 // ④ 不为这一篇开特殊分支：`preset` 只许出现在取数与结钱那几处判据里，
-//    编辑/删除/私密/分享四条链路上出现它就是有人加了一格 if。
+//    编辑/私密/分享三条链路上出现它就是有人加了一格 if。
+//    ⚠ 10-14 起"删除"从这一条里出去了（站长「默认的不能删除」）：删除那一路**必须**有那一格 if，
+//    而且只许有那两格（一篇一张）。白名单按行给，不按文件给，见下面 GATE_OK 那段。
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
@@ -100,9 +102,24 @@ ck('归因那条不认的判据也改读 authored_count（同一条钱，第二�
 ck('页头那一列仍读 used_count（口径 6：新用户看到 1，不许被降成 0）',
   /def used_count/.test(QUOTA) && /"used": used/.test(QUOTA))
 
-// ---------- ④ 不许为它开特殊分支 ----------
-// `preset` 只许出现在：种子读取、auth 的挂载点、结钱/归因的计数、以及卡片那一条"这一篇走同一条链"的注释里。
+// ---------- ④ 不许为它开特殊分支（删除那一路 10-14 起是**唯一**的例外） ----------
+// `preset` 只许出现在：种子读取、auth 的挂载点、结钱/归因的计数、卡片那一条"这一篇走同一条链"的注释里，
+// 以及下面 GATE_OK 白名单里那**几行**（一道闸两格：删那一篇、撤那一张）。
+// 白名单按行给、不按文件给：把整个 `notes.py` 放进 ALLOW，等于允许任何人以后在同一个文件里
+// 再加一格 `if preset: 跳过审核／跳过分享`，这把尺子一声不响。
 const ALLOW = ['app/core/auth.py', 'app/services/preset_note.py', 'app/services/quota.py', 'seed/preset_note.json']
+const GATE_OK = {
+  'app/api/routes/notes.py': [
+    /^from app\.services\.preset_note import/,
+    /^\s*if note\.source_type == PRESET_SOURCE_TYPE:$/,
+    /^\s*raise HTTPException\(status_code=400, detail=PRESET_NOTE_KEEP_MSG\)$/,
+  ],
+  'app/api/routes/cards.py': [
+    /^from app\.services\.preset_note import/,
+    /^\s*if note\.source_type == PRESET_SOURCE_TYPE:$/,
+    /^\s*raise HTTPException\(status_code=400, detail=PRESET_CARD_KEEP_MSG\)$/,
+  ],
+}
 const hits = []
 const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => {
   const p = path.join(d, e.name)
@@ -114,12 +131,40 @@ const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => {
   src.split('\n').forEach((line, i) => {
     // 只认这个枚举值本身：`WALLPAPER_PRESETS`（壁纸预设，09-24 就在了）里也含 "preset" 三个字母，
     // 拿 /preset/i 扫会把无关的常量报成"为这一篇开了分支"。
-    if (/(PRESET_SOURCE_TYPE|['"]preset['"])/.test(line) && !/^\s*[#"]/.test(line.trim())) hits.push(`${rel}:${i + 1} ${line.trim().slice(0, 60)}`)
+    if (!/(PRESET_SOURCE_TYPE|['"]preset['"])/.test(line) || /^\s*[#"]/.test(line.trim())) return
+    if ((GATE_OK[rel] || []).some((rx) => rx.test(line))) return
+    hits.push(`${rel}:${i + 1} ${line.trim().slice(0, 60)}`)
   })
 })
 walk(path.join(ROOT, 'backend/app'))
-ck('编辑/删除/私密/分享那几条链路上没有一格 `if preset`（判据 4：同一条链）',
+ck('编辑/私密/分享那几条链路上没有一格 `if preset`；删除那一路只有白名单里那两格（判据 4 改口之后）',
   hits.length === 0, hits.join('　| ').slice(0, 300))
+
+// ---------- ④b 10-14「默认的不能删除」：那两格闸与念出原因的那三张嘴 ----------
+const NOTES_PY = be('app/api/routes/notes.py')
+const CARDS_PY = be('app/api/routes/cards.py')
+const PN_PY = be('app/services/preset_note.py')
+ck('删那一篇有闸：判据是播种时那个 source_type，不是"名下第一篇"（后者会误伤他自己写的第一篇）',
+  /if note\.source_type == PRESET_SOURCE_TYPE:\s*\n\s*raise HTTPException\(status_code=400, detail=PRESET_NOTE_KEEP_MSG\)/.test(NOTES_PY))
+ck('撤那一张有同一把闸（一篇一张，锁了卡片才算真锁住）',
+  /if note\.source_type == PRESET_SOURCE_TYPE:\s*\n\s*raise HTTPException\(status_code=400, detail=PRESET_CARD_KEEP_MSG\)/.test(CARDS_PY))
+ck('那两句原因只活一份（定义在 preset_note.py；两个 route 里出现中文字面量就是第二份真相）',
+  /PRESET_NOTE_KEEP_MSG = "/.test(PN_PY) && /PRESET_CARD_KEEP_MSG = "/.test(PN_PY)
+    && !/detail="[^"]*删不掉/.test(NOTES_PY + CARDS_PY))
+ck('闸挂在 400 上，不挂 403／500（403 会被客户端念成"票坏了"去重登，500 会把它记进错误日志）',
+  !/status_code=403, detail=PRESET|status_code=500, detail=PRESET/.test(NOTES_PY + CARDS_PY))
+// 注销那条路径不许被这道闸带累：人走了数据必须跟着走，那一趟按 user_id 整批清、不走 delete_note 这个口。
+ck('注销那一条不读这道闸（`deletion`／`v1_account` 里出现 PRESET 判据＝人走了他那一篇还留着）',
+  !/PRESET/.test(be('app/api/routes/v1_account.py') + be('app/services/deletion.py')))
+const DETAIL_JS = read('pages/detail/detail.js')
+const IX_JS = read('pages/index/index.js')
+const CC_JS = read('utils/cardCloud.js')
+ck('删那一篇被拦下时，详情页与首页两处都把服务端那句原样念出来（只回"删除失败"＝按钮看起来坏了）',
+  (DETAIL_JS.match(/\(err\.data && err\.data\.detail\) \|\| t\('deleteFailed', lang\)/g) || []).length === 1
+    && (IX_JS.match(/\(err\.data && err\.data\.detail\) \|\| t\('deleteFailed', lang\)/g) || []).length === 1)
+ck('撤那一张被拦下时走同一张嘴：`dropServer` 把 detail 交回调用方，没原因的那种才念"没连上后端"',
+  /if \(typeof detail === 'string' && detail\) return detail/.test(CC_JS)
+    && /typeof dropped === 'string' \? dropped : t\('cardDropOffline', lang\)/.test(IX_JS))
 
 // ---------- ⑤ 首启那张卡片的触发是一次性的、静默的、排在列表之后 ----------
 const APP = read('app.js'), IX = read('pages/index/index.js')

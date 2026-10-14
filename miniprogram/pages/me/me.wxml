@@ -54,11 +54,13 @@
         <text class="menu-hint">{{t.navProfileTip}}</text>
         <view class="ico"><view class="cv"></view></view>
       </view>
-      <view class="menu-item" bindtap="onNavigate" data-page="wallpaper">
-        <text class="menu-label">{{t.wallpaper}}</text>
-        <text class="menu-hint">{{t.wallpaperTip}}</text>
-        <view class="ico"><view class="cv"></view></view>
-      </view>
+      <!-- 「外观设置」这一格按站长的话**隐藏**（10-14 原话「设置里面的风格入口隐藏」＋
+           「切换毛玻璃改到首页，增加一个入口『换心情』」）。
+           ⚠ 去的是入口，不是能力：换壁纸这件事整条搬到了首页那枚「换心情」（五档彩色毛玻璃，
+              见 utils/palette.js 的 MOODS 与 pages/create 的 onCycleMood），
+              所以这一格留着＝同一件事两个入口（他定过"一个功能只留一个入口"）。
+           路由表里那一位（me.js 的 wallpaper）与那一页都留着没删：删页要连着改 app.json、
+           判据与那页的图标资源，是另一件事，等他拍要不要一起撤。 -->
       <view class="menu-item" bindtap="onNavigate" data-page="categories">
         <text class="menu-label">{{t.categories}}</text>
         <text class="menu-hint">{{t.categoriesTip}}</text>
