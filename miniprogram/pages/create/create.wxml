@@ -25,9 +25,16 @@
        左边「调亮度」换深浅一档，右边「换背景」导流到「我的 → 卡片模板」那一页选图
        （这里不弹相册——一个功能只留一个入口）。
        两截都是 catchtap：点左边不能顺手把右边那条导流也触发，点整行也不该冒到
-       容器的 collapse 上去。 -->
-  <view wx:if="{{bgSrc}}" class="home-swap">
-    <view class="swap-half" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
+       容器的 collapse 上去。
+       ⚠ 站长 10-14 定：这一行**白底那一档也要画**（原话「白底也要换背景，这是核心功能」）。
+       §8.231 把包内那张默认图删掉之后，两级都空＝bgSrc 是空串，而这一行原来整条挂在
+       `wx:if="{{bgSrc}}"` 上——于是新用户第一屏连「换背景」这个入口都看不见，等于把核心
+       功能只留给已经设过图的人。所以行不再看图，只有**左边那一截**看图：「调亮度」拧的是
+       `.page-scrim` 那一层的透明度，没图时那一层压根没渲染，留着它是一枚按了什么都不发生的钮。
+       盒子还是原来那一条（88rpx 高、−14/−22 那两道 margin 一个字没改），所以少一截不改流内
+       高度，下面录入条那三块的落点不漂。 -->
+  <view class="home-swap">
+    <view wx:if="{{bgSrc}}" class="swap-half" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
       <text class="swap-text">{{t.bgDimLabel}}</text>
       <view class="dim-dot" style="{{dimDot}}"></view>
     </view>

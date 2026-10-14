@@ -1268,6 +1268,21 @@
   color: rgba(242, 239, 233, 0.85);
 }
 
+/* 白底那一档（两级都空，站长 10-14 要这一行照样画着 ⇒ 见 create.wxml 那一行的注释）。
+   上面那两支纸白是给**压暗罩**准备的，它们假设背后永远是一张被罩深的照片；这一档背后是壁纸
+   自己的浅底色（米白/天青那一族），纸白 .85 压上去实测就是"字跟底一个色"——同一种失效站长
+   10-11 在这行上已经打过一次回（见上面浅图那一档给这一行兜底的那两条规则：带里暗字 0.0%、亮字 99.5%）。
+   所以这里翻墨，且跟着 Tips 那一行吃同一枚令牌 `--text-secondary`：
+   同一屏上并列的两行小字不许一个跟主题走、一个跟照片走。
+   类数：`.container` + `:not(.has-bg)` + `.swap-text` = 3，压得住上面那支 1 类的，不是虚挂。 */
+.container:not(.has-bg) .swap-text {
+  color: var(--text-secondary);
+}
+
+.container:not(.has-bg) .swap-glyph {
+  background: var(--text-secondary);
+}
+
 .swap-half:active {
   opacity: 0.66;
 }

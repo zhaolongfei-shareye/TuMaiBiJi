@@ -208,6 +208,25 @@ ck('图上那三行写死纸白的字，浅色那一态逐条有翻墨的对应�
   ['.swap-glyph', '.swap-text', '.home-swap'].every((s) => lightRule(wxss, 'container', s)),
   ['.swap-glyph', '.swap-text', '.home-swap']
     .filter((s) => !lightRule(wxss, 'container', s)).join('、'))
+// 10-14 站长翻案：「白底也要换背景，这是核心功能」。§8.231 之后两级都空＝bgSrc 是空串，
+// 而这一行原来整条挂在 `wx:if="{{bgSrc}}"` 上 ⇒ 新用户第一屏连「换背景」都看不见，
+// 等于把核心功能只留给已经设过图的人。两条一起钉，一条都不能松：
+// ① 那一行本身不许再看图的脸色；
+// ② 但「调亮度」那一截必须还看着——没图时它拧的那层压暗罩压根没渲染，留着一枚按下去什么都不发生的钮。
+const swapRowTag = (wxml.match(/<view[^>]*class="home-swap"[^>]*>/) || [''])[0]
+ck('白底那一档「换背景」那一行还画着（行上不许再挂任何 wx:if，10-14 原话）',
+  !!swapRowTag && !/wx:if=/.test(swapRowTag), swapRowTag || '(读不到 .home-swap 那一枚)')
+const dimHalfTag = (wxml.match(/<view[^>]*catchtap="onCycleDim"[^>]*>/) || [''])[0]
+ck('「调亮度」那一截仍只在有图时画（无图态那层罩子不渲染，不许留死钮）',
+  /wx:if="\{\{bgSrc\}\}"/.test(dimHalfTag), dimHalfTag || '(读不到 onCycleDim 那一枚)')
+// 白底那一档背后是壁纸自己的浅底色，那两支写死的纸白不翻墨就是"字跟底一个色"（10-11 打过回）。
+// 兜底写在 `.container:not(.has-bg)` 上：类数 1+1+1=3，压得住上面那支 1 类的纸白，不是虚挂。
+const flatRule = (sel, prop) =>
+  new RegExp(`\\.container:not\\(\\.has-bg\\) \\.${sel.slice(1)}\\s*\\{[^}]*${prop}:`).test(wxss)
+ck('白底那一档那两样有翻墨兜底（字色与那枚箭头都算，只钉一支会漏箭头）',
+  flatRule('.swap-text', 'color') && flatRule('.swap-glyph', 'background'),
+  ['.swap-text', '.swap-glyph'].filter((s) => !flatRule(s, s === '.swap-text' ? 'color' : 'background')).join('、'))
+
 const meCss = read('pages/me/me.wxss')
 ck('「我的」头部那三行（大字与 MIND 数字）浅色态也有对应规则',
   ['.h1', '.score-n', '.score-l'].every((s) => lightRule(meCss, 'head-band', s)),

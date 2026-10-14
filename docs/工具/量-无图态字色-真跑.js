@@ -53,7 +53,11 @@ const SCREENS = [
   { page: '/pages/create/create', tag: '新建', nodes: [
     ['头部大字', '.page-title', ''], ['框外那行 Tips', '.tips-line', 'opt'],
     ['铺满那层底图', '.page-bg', 'gone'], ['压暗那一层', '.page-scrim', 'gone'],
-    ['「调亮度／换背景」那一行', '.home-swap', 'gone'],
+    // 10-14 站长翻案「白底也要换背景，这是核心功能」⇒ 这一行不再随 bgSrc 消失，从 'gone' 挪进
+    // 必量名单。量 `.swap-text` 那一枚而不是 `.home-swap` 那个壳：壳自己不带字色，`el.style('color')`
+    // 读到的是继承色，那样 CSS 里那两支写死的纸白（`.swap-text`／`.swap-glyph`）漏在外面，
+    // 白底档「米白底 + 纸白字」这一对正好是它 10-11 打过一次回的那个失效，会假绿。
+    ['「换背景」那两字', '.swap-text', ''],
   ] },
   { page: '/pages/me/me', tag: '我的', nodes: [
     ['头部大字', '.h1', ''], ['脑力值数字', '.score-n', 'opt'], ['脑力值小字', '.score-l', 'opt'],
@@ -87,7 +91,7 @@ const restore = () => {
   const bak = POSTER + '.probebak'
   if (fs.existsSync(bak)) { fs.copyFileSync(bak, POSTER); fs.rmSync(bak, { force: true }) }
   patched = false
-  console.log('已还原 utils/poster.js（默认图那一档回到包里那一张）')
+  console.log('已还原 utils/poster.js（`homeBg()` 那两级链回到盘上那一版）')
 }
 process.on('exit', restore)
 process.on('uncaughtException', (e) => { console.log('!! 量具挂了：' + (e && e.message)); restore(); process.exit(2) })

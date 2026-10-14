@@ -84,6 +84,35 @@ const ck = (name, ok, got) => {
   // 靠的就是这个名字，展开时才挂上（见下面 ② 那一段）。
   ck('没展开时容器不带 entry-dock（展开那一下才挂上，见 ②）',
     !/(^|\s)entry-dock(\s|$)/.test(contCls), contCls)
+  // 站长 10-14 定这一条：「白底也要换背景，这是核心功能」——这一行不再跟着 bgSrc 消失。
+  // 原来 §8.231 一落地，两级都空那一档整条 `wx:if="{{bgSrc}}"` 就没了，新用户第一屏连入口都看不见。
+  // 这里量的正是那一条翻案：行必须在，但只有「换背景」那一截（「调亮度」拧的是压暗罩的透明度，
+  // 这一档罩子压根没渲染，留着它是一枚按了什么都不发生的钮）。
+  const swapHalves = await page.$$('.swap-half')
+  ck('白底那一档「换背景」那一行画着（10-14 翻案，不再随 bgSrc 消失）',
+    (await page.$$('.home-swap')).length === 1 && swapHalves.length === 1,
+    `行 ${(await page.$$('.home-swap')).length} 条／截 ${swapHalves.length} 截`)
+  const swapTxt = swapHalves.length ? String((await swapHalves[0].text()) || '').trim() : ''
+  ck('白底那一档剩的是「换背景」那一截，不是「调亮度」',
+    swapTxt.indexOf('换背景') >= 0 || swapTxt.toLowerCase().indexOf('background') >= 0,
+    `读到「${swapTxt || '(空)'}」`)
+  // 收起来那一组（`.home-blk`）与这一行的关系：行的盒子朝下伸进两者之间的空白，不许压到组顶。
+  const g = await mp.evaluate(() => new Promise((resolve) => {
+    wx.createSelectorQuery().select('.home-swap').boundingClientRect()
+      .select('.home-blk').boundingClientRect()
+      .exec((r) => resolve(r.map((x) => x ? { y: (x.y === undefined ? x.top : x.y), h: x.height } : null)))
+  }))
+  ck('白底那一档这一行底边不压住下面那一组', !!g[0] && !!g[1] && (g[0].y + g[0].h) <= g[1].y + 1,
+    g[0] && g[1] ? `行 ${Math.round(g[0].y)}..${Math.round(g[0].y + g[0].h)}｜组顶 ${Math.round(g[1].y)}` : '量不到')
+  // 真点一下：白底档点它得真的落到卡片模板页（导流那条链本来就不依赖有没有背景图）。
+  if (swapHalves.length) {
+    await swapHalves[0].tap()
+    await sleep(2500)
+    const after = await mp.currentPage()
+    ck('白底那一档点「换背景」照样落到卡片模板页', after.path === 'pages/profile/profile', after.path)
+    await mp.navigateBack().catch(() => {})
+    await sleep(800)
+  }
   await mp.screenshot({ path: `${OUT}/实测-1-两级都空白底.png` })
 
   // ---------- ② 设了形象：铺用户那张（和卡片模板同一张图） ----------
