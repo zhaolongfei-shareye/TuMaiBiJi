@@ -125,10 +125,14 @@
      "missing": false
     },
     {
-     "name": "「调亮度／换背景」那一行",
-     "sel": ".home-swap",
-     "kind": "gone",
-     "missing": false
+     "name": "「换背景」那两字",
+     "sel": ".swap-text",
+     "color": "rgba(53, 46, 29, 0.72)",
+     "text": "换背景",
+     "x": 17,
+     "y": 63.5,
+     "w": 39,
+     "h": 17
     }
    ]
   },
@@ -323,10 +327,14 @@
      "missing": false
     },
     {
-     "name": "「调亮度／换背景」那一行",
-     "sel": ".home-swap",
-     "kind": "gone",
-     "missing": false
+     "name": "「换背景」那两字",
+     "sel": ".swap-text",
+     "color": "rgba(29, 53, 34, 0.72)",
+     "text": "换背景",
+     "x": 17,
+     "y": 63.5,
+     "w": 39,
+     "h": 17
     }
    ]
   },
@@ -521,10 +529,14 @@
      "missing": false
     },
     {
-     "name": "「调亮度／换背景」那一行",
-     "sel": ".home-swap",
-     "kind": "gone",
-     "missing": false
+     "name": "「换背景」那两字",
+     "sel": ".swap-text",
+     "color": "rgba(53, 29, 41, 0.72)",
+     "text": "换背景",
+     "x": 17,
+     "y": 63.5,
+     "w": 39,
+     "h": 17
     }
    ]
   },
@@ -719,10 +731,14 @@
      "missing": false
     },
     {
-     "name": "「调亮度／换背景」那一行",
-     "sel": ".home-swap",
-     "kind": "gone",
-     "missing": false
+     "name": "「换背景」那两字",
+     "sel": ".swap-text",
+     "color": "rgba(33, 36, 49, 0.72)",
+     "text": "换背景",
+     "x": 17,
+     "y": 63.5,
+     "w": 39,
+     "h": 17
     }
    ]
   },
