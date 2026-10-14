@@ -375,6 +375,17 @@ async function main() {
 
   await go('/pages/create/create')
   page = await mp.currentPage()
+  // ⚠ 这一处原来直接量"回到首屏还是两枚计数"，在**主树那一趟**（10-15 01:2x）当场 `枚数=0` 而下一行
+  // `cellsBack[0].tap()` 直接把尺子打断。差的不可能是包：合并后两支的 `miniprogram/` 是同一个树对象
+  // （`0d6b99c…`），2.2 工作树那一趟 94/94。差在**进出路**——`go()` 是 `switchTab`，回到的是还活着的
+  // 那一枚 tab 页实例，上一趟留在 `data.active` 里的展开态跟着回来了（`.home-blk` 是 `wx:if="{{!active}}"`，
+  // 展开就没有这两枚）。⇒ 与文件开头那一处同款：这是**尺子的前提**，不是产品的断言（第一眼该是收起态，
+  // 由这里自己把它钉回收起态；入口分型＝从别的页 switchTab 回来）。判据一个字没改，量的还是"重渲染后两枚计数"。
+  if ((await page.data()).active) {
+    await mp.reLaunch('/pages/create/create')
+    await sleep(4000)
+    page = await mp.currentPage()
+  }
   // 换过页面之后上一批元素句柄就作废了（automator 的 Element 绑的是当时那一帧的 id），
   // 所以这里重新查一次两枚计数，不复用 §4 的 `cells`。
   const cellsBack = await page.$$('.blk-cell')
@@ -389,6 +400,13 @@ async function main() {
 
   await go('/pages/create/create')
   page = await mp.currentPage()
+  // 同一处分型，理由见上面那段：switchTab 回的是还活着的实例，展开态会跟着回来，
+  // 而这一处要点 `.blk-person`（它在收起态才在屏上）并量"零延迟"。
+  if ((await page.data()).active) {
+    await mp.reLaunch('/pages/create/create')
+    await sleep(4000)
+    page = await mp.currentPage()
+  }
   const tTap = Date.now()
   await (await page.$('.blk-person')).tap()
   let tapGap = -1
