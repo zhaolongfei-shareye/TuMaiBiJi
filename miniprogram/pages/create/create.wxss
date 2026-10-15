@@ -98,20 +98,31 @@
    · "固定位置"由那一行本身保证——它是这一屏最上面那一条，两态、五档心情都在同一个落点；
    · 字色不再需要自己配：吃 `.ai-line` 的 `--stage-ink-strong`（浅面深字、深面白字），
      与左边那句字同一个来源，压在那层玻璃上读，不压在照片上。
-   仍是"文字＋一条下划线"那套画法，不做成按钮（他 10-09 否过按钮式）。下划线常驻：
-   现在只剩一枚，没有"选中／未选中"可对比了，那条线的作用是说明它按得动。
+   仍是"文字＋一枚小圆点"，不做成按钮（他 10-09 否过按钮式）。
+   ⚠ 10-15 14:0x「中 EN 的下划线去掉，不要加粗，前面加小黄点就行」：撤掉的是原来那条常驻下划线
+   （它原本的作用是"说明这枚按得动"，现在由那枚点担这件事），加粗也一并撤了。
    ⚠ 这一枚与左边那句字**抢同一行宽度**（那一行是 nowrap）：两门各多占 60rpx，
    够不够由 `验-第一屏三块-真跑` 现读那一句字的渲染宽与这一枚的右沿，不许照字面猜。 */
 .lang-corner {
   flex: none;
   margin-left: auto;
   padding-left: 12rpx;
+  display: flex;
+  align-items: center;
   font-size: var(--fs-meta);
   line-height: 1.35;
-  font-weight: 700;
   letter-spacing: 1rpx;
-  border-bottom: 4rpx solid var(--accent);
-  padding-bottom: 2rpx;
+}
+
+/* 那一枚小黄点：色值**不许写在这一份样式表里**（`验-统一录入条.js` 会扫这里有没有 #F6C445，
+   写进来就红），由 `create.js` 的 `langDotStyle` 从 palette 的 `TIP_DOT` 发下来，与 `.tips-dot` 同一支。
+   10rpx 比 Tips 那枚（14rpx）还小一档：这一格是两个字母的角标，点不能比字显眼。 */
+.lang-corner .lang-dot {
+  flex: none;
+  width: 10rpx;
+  height: 10rpx;
+  margin-right: 8rpx;
+  border-radius: 50%;
 }
 
 .lang-corner:active {

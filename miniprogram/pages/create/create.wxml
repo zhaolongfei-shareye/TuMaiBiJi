@@ -45,7 +45,7 @@
          只切界面文案，不动账号也不重新登录；服务端那一栏由 PUT /api/user/language 记着，
          换设备登录还是他选的那一门。整页是"收起"点击区，catchtap 不吃进 collapse。 -->
     <view class="lang-corner" catchtap="onSwitchLang" data-key="{{lang === 'zh' ? 'en' : 'zh'}}"
-          role="button" aria-label="{{t.selectLanguage}}">{{lang === 'zh' ? 'EN' : '中'}}</view>
+          role="button" aria-label="{{t.selectLanguage}}"><view class="lang-dot" style="{{langDotStyle}}"></view><text>{{lang === 'zh' ? 'EN' : '中'}}</text></view>
   </view>
 
   <view class="title-row">

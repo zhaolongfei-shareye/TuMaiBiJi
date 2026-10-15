@@ -194,12 +194,27 @@ ok('分享落地页标题兜底走字典', /title: share\.title \|\| t\('appName
 // ⇒ 类名换了不放宽：这里钉**这一枚真在 markup 里、点的是切语言、且它自己显示的就是待切换那一门**
 // （`data-key` 与文案吃同一个三元条件、互为反面）。
 {
-  const one = /<view class="lang-corner"([^>]*)>([^<]*)<\/view>/.exec(read('pages/create/create.wxml').replace(/\s+/g, ' '))
+  // ⚠ 10-15 14:0x 他给这一枚前面加了一枚小黄点（「中 EN 的下划线去掉，不要加粗，前面加小黄点就行」）
+  //   ⇒ 它不再是"一个 view 直接装文本"，原来那条 `>([^<]*)</view>` 摸不到整枚了（内层先闭合）。
+  //   改成从开标签一路吃到 `</text></view>`：点是自闭的一枚，文字在 `<text>` 里。
+  const SRC = read('pages/create/create.wxml').replace(/\s+/g, ' ')
+  const one = /<view class="lang-corner"([^>]*?)>([\s\S]*?)<\/text><\/view>/.exec(SRC)
   ok('新建页仍有语言切换那一枚（右上角标）', !!one, one ? '在' : '摸不到 .lang-corner')
   ok('那一枚点的就是切语言', !!one && /catchtap="onSwitchLang"/.test(one[1]), one ? one[1].trim().slice(0, 70) : '(没有那一枚)')
   ok('那一枚只显示待切换那一门（key 与文案同一个条件、互为反面）',
     !!one && /data-key="{{lang === 'zh' \? 'en' : 'zh'}}"/.test(one[1])
-      && /\{\{lang === 'zh' \? 'EN' : '中'\}\}/.test(one[2]), one ? `文案位＝${one[2].trim()}` : '(没有那一枚)')
+      && /\{\{lang === 'zh' \? 'EN' : '中'\}\}/.test(one[2]), one ? `文案位 ${one[2].trim().slice(0, 60)}` : '(没有那一枚)')
+  ok('前面那枚小黄点真挂在 markup 里，且色走 style 出口（不写进 WXSS）',
+    !!one && /<view class="lang-dot" style="\{\{langDotStyle\}\}"><\/view>/.test(one[2]),
+    one ? one[2].trim().slice(0, 60) : '(没有那一枚)')
+  // 他这次撤的两样也得钉住——不然下次有人把下划线当"提示按得动"又加回来，屏上静默变回去
+  const CS = read('pages/create/create.wxss').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ')
+  const corner = /\.lang-corner\s*\{([^}]*)\}/.exec(CS)
+  ok('那一枚的下划线已撤净（这条规则里一次都不许出现 border-bottom）',
+    !!corner && !/border-bottom/.test(corner[1]), corner ? corner[1].trim() : '(摸不到那条规则)')
+  ok('那一枚不再加粗（也不许留 padding-bottom 那种给下划线让位的残留）',
+    !!corner && !/font-weight/.test(corner[1]) && !/padding-bottom/.test(corner[1]),
+    corner ? corner[1].trim() : '(摸不到那条规则)')
 }
 
 // ---------------- 汇总 ----------------

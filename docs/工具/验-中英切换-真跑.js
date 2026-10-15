@@ -20,6 +20,7 @@ const fs = require('fs')
 const path = require('path')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const i18n = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
+const PAL = require(path.resolve(__dirname, '../../miniprogram/utils/palette.js'))
 const lang = require('./尺子语言钉.js')
 const ROOT = path.resolve(__dirname, '../..')
 const P = (rel) => path.join(ROOT, 'miniprogram', rel)
@@ -238,6 +239,28 @@ const ck = (name, cond, got) => {
     console.log('\n✗ 那一枚角标不在屏上 ⇒ 后面全是空跑，不装绿')
     process.exit(1)
   }
+  // 他 10-15 14:0x 那三样（撤下划线／撤加粗／前面加小黄点）在**屏上**真的生效了吗？
+  // 静态那把只证 markup 挂着、源码里那两行删了；"类名点空、补的那层没挂上带 inline 的那层"
+  // 这一类静默失效只有计算样式读得出来（`改一层皮的十三种静默失效` 那条清单里的第 2、4 项）。
+  const rgbOf = (s) => (String(s).match(/\d+/g) || []).map(Number).slice(0, 3)
+  const WANT_DOT = [1, 3, 5].map((i) => parseInt(PAL.TIP_DOT.slice(i, i + 2), 16))
+  const dotS = await page.$('.lang-dot')
+  // `Element.size()` 是**不带参数**的，返回 `{width, height}`（automator/out/Element.js 里
+  // `size(){const[e,t]=await this.domProperty(["offsetWidth","offsetHeight"]);…}`）。
+  // 写成 `size('width')` 不报错、只把那个对象丢进 `Number(...)` ⇒ 永远 NaN，红得像"点没画出来"。
+  const ds = dotS ? await dotS.size() : null
+  ck('前面那枚小黄点在屏上真有一块面（宽高都不为 0，不是个空标签）',
+    !!ds && Number(ds.width) > 0 && Number(ds.height) > 0 && Number(ds.width) === Number(ds.height),
+    ds ? `${ds.width}×${ds.height}` : '(摸不到 .lang-dot)')
+  ck('它的底色就是 palette 那支 TIP_DOT——色走 style 出口发下来，屏上实读同一个 rgb',
+    !!dotS && rgbOf(await dotS.style('background-color')).join(',') === WANT_DOT.join(','),
+    dotS ? `${await dotS.style('background-color')}／期望 rgb(${WANT_DOT.join(', ')})` : '(摸不到)')
+  const cw = Number(rgbOf(await cS.style('border-bottom-width'))[0])
+  const cfw = await cS.style('font-weight')
+  ck('那一条下划线在屏上真的没宽度了（撤的是现读的那一层，不是源码少一行）',
+    cw === 0, `border-bottom-width=${cw}`)
+  ck('那一枚也不再加粗（屏上实读的字重不是 700／bold）',
+    !/700|800|900|bold/i.test(String(cfw)), `font-weight=${cfw}`)
   await cS.tap()
   await sleep(1200)
   const dS = await page.data()
