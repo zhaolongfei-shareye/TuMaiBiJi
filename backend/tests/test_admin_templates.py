@@ -252,7 +252,7 @@ def test_页面真有第三屏且切得过去():
     body = src.split("_PAGE", 1)[1]
     assert 'id="view-tpl" class="view hidden"' in body, "第三屏的容器没加"
     assert "{ label: '卡片模板', view: 'tpl', key: 'tpl:list' }" in body, "左栏「配置」那组里没有这一条"
-    assert "['stats', 'config', 'tpl']" in body, "showView 还在只管两屏——点「卡片模板」会切不出屏"
+    assert "['stats', 'config', 'tpl', 'tumaike']" in body, "showView 还在只管三屏——点「卡片模板」或「图麦克」会切不出屏"
     assert "loadTemplates" in body and "renderTemplates" in body and "$('tpls')" in body
     assert "api/admin/poster/templates'" in body and "api/admin/poster/templates/' + r.id" in body, \
         "读口或写口没接上：这一栏会是空的"

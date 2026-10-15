@@ -84,8 +84,12 @@ textarea.ta { width:100%; box-sizing:border-box; border:1px solid var(--line); b
   background:#fff; flex:none }
 .sw b { font-weight:500; font-size:13px; padding:7px 13px; color:var(--muted); white-space:nowrap }
 .sw b.on { background:var(--ink); color:#fff; font-weight:600 }
-.sw b.off { color:#b9b6ae; cursor:default }
-.sw b#swOther { cursor:pointer }   /* 10-16 起这一枚点得动：亮着就得看着像点得动的样子 */
+.sw b { cursor:pointer }
+/* 图麦克那一屏嵌的是它自己那一页（站长 10-16 拍「用 frame 模式实现图麦克的原页面」）。
+   它那套皮按 1200 排，我们这一栏只有 704，所以那一屏要把整页放宽一档。 */
+main.wide { max-width:1180px }
+.frame { display:block; width:100%; height:calc(100vh - 150px); min-height:560px;
+  border:1px solid var(--line); border-radius:12px; background:#fff }
 .swnote { font-size:12px; color:var(--muted); margin:6px 0 0; text-align:right; max-width:280px }
 .shell { display:flex; gap:24px; align-items:flex-start }
 nav#nav { width:132px; flex:none; font-size:13px; color:var(--muted); position:sticky; top:20px }
@@ -145,7 +149,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
       <p class="sub">左边切「数据」与「配置」两栏。这里只能看到运营内容本身，看不到任何用户的笔记与图片。</p>
     </div>
     <div>
-      <div class="sw"><b class="on">图麦笔记</b><b class="off" id="swOther">图麦克</b></div>
+      <div class="sw"><b class="on" id="swSelf">图麦笔记</b><b id="swOther">图麦克</b></div>
       <p class="swnote" id="swNote"></p>
     </div>
   </header>
@@ -168,6 +172,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
       <div id="view-stats" class="view"><div id="stats"></div></div>
       <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div></div>
       <div id="view-tpl" class="view hidden"><div id="tpls"></div></div>
+      <div id="view-tumaike" class="view hidden"><iframe id="frameOther" class="frame" title="图麦克后台" src="about:blank"></iframe></div>
       <footer>
         <div>换完之后：线上小程序要<strong>退出重进（冷启）</strong>才看到新图，正在用的用户不会当场被换。</div>
         <div>提醒：换一张明暗和原图差很多的，会把首页那几行字的对比度带偏——第一屏的字色是按壁纸档派生的，
@@ -230,7 +235,7 @@ var NAV = [
 ];
 
 function showView(v) {
-  ['stats', 'config', 'tpl'].forEach(function (name) {
+  ['stats', 'config', 'tpl', 'tumaike'].forEach(function (name) {
     $('view-' + name).classList.toggle('hidden', v !== name);
   });
 }
@@ -249,6 +254,7 @@ function buildNav() {
       var s = el('s', null, it.label);
       s.dataset.key = it.key;
       s.addEventListener('click', function () {
+        setProduct('self');
         showView(it.view);
         var target = document.querySelector('[data-key="' + it.key + '"]');
         if (target) target.scrollIntoView({ block: 'start' });
@@ -729,20 +735,29 @@ function refresh() {
   });
 }
 
-// 顶栏那枚产品切换。**10-16 对面接上了换票口，这一枚从此点得动**：跳过去之后它自己拿这一侧的票
-// 去换一把它自己的，不必再输一次口令。灰的时候要有原因，亮的时候也要——原因就是那一口通了。
-// 注：这一枚是"跳过去"，不是"把它的屏并进这一页"。并屏那件事是我自己方案里写过的，站长没提过，
-// 今天也没做；融合拍的是**一个登录账号**，不是**一个界面**。
-$('swOther').classList.remove('off');
-$('swOther').title = '用这一侧的登录进图麦克的后台，不用再输一次口令';
-$('swNote').textContent = '上面那枚「图麦克」点得动：同一把口令，两个后台各开各的屏。它那边的钱、用户与图片不在这一页。';
+// 顶栏那枚产品切换。**站长 10-16 拍「用 frame 模式实现图麦克的原页面」**：点它不跳走，
+// 而是在主区嵌一个 iframe 指它那一页。两边同源（都在 api.agentsbin.cn），它那一页开局读的就是
+// 同源的存储，所以这一侧登过之后框里直接是它的 dashboard，不会再要第二次口令。
+// src 只在第一次点的时候挂：不点就不去它那口上花一次请求。这一页仍不替它存任何凭证
+// （本页硬纪律：只吃 sessionStorage，见 `test_mp_assets_admin` 里那条"不许出现另一种存储"的判据）。
+function setProduct(which) {
+  var other = which === 'other';
+  $('swSelf').classList.toggle('on', !other);
+  $('swOther').classList.toggle('on', other);
+  document.querySelector('main').classList.toggle('wide', other);
+  $('swNote').textContent = other
+    ? '这一屏是图麦克自己的后台（嵌它那一页）。它那边的钱、用户与图片不流到我们这一侧来。'
+    : '点上面那枚「图麦克」看它的后台——同一把口令，不用再输一次。';
+}
+$('swSelf').addEventListener('click', function () { setProduct('self'); showView('stats'); });
 $('swOther').addEventListener('click', function () {
-  if (!session()) { $('swNote').textContent = '先在这一侧登录（下面那个口令框），那一枚才有票可换。'; showLogin(); return; }
-  // 这一页不替它存任何东西——本页的硬纪律是"凭证只进 sessionStorage，关掉标签页就没了"
-  // （`test_mp_assets_admin` 里那条"页面里不许出现另一种存储"的判据就是钉这个的）。同一标签页里
-  // sessionStorage 本来就同源可读，所以只需要跳过去，它自己去拿那把 opsSession 换它自己的票。
-  location.href = '/admin.html';
+  if (!session()) { $('swNote').textContent = '先在这一侧登录（下面那个口令框），那一枚才换得到票。'; showLogin(); return; }
+  var f = $('frameOther');
+  if (!f.dataset.on) { f.src = '/admin.html'; f.dataset.on = '1'; }   // 绝对路径：走 u() 会被加上 /wtsj/ 前缀
+  setProduct('other');
+  showView('tumaike');
 });
+setProduct('self');
 buildNav();
 
 if (session()) refresh();

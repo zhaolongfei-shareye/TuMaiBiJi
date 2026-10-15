@@ -281,22 +281,29 @@ def test_数据与配置是两屏不是一列():
     # 卡要能被左栏点到：两边都挂 data-key
     assert "card.dataset.key = 'kind:'" in body and "card.dataset.key = 'text:'" in body
     assert "keys = ['overview', 'perday', 'sources', 'templates', 'invites', 'shares']" in body
-    # 图麦克那枚：10-16 对面接上换票口之后它是亮的，页面上要写着它为什么亮、点下去会发生什么
-    assert "classList.remove('off')" in body and "$('swNote').textContent" in body
+    # 图麦克那枚：不再是"灰着并写着为什么灰"，两枚都是点得动的切换
+    assert 'class="off"' not in body and 'id="swSelf"' in body and "$('swNote').textContent" in body
     assert "还没接上换票口" not in body, "对面已经上线了，那句旧话在屏上是假话"
 
 
-def test_图麦克那一枚点下去是跳过去而不是又输一次口令():
-    """站长拍的是「一个登录账号，就可以同时管理两个小程序」，而主入口是这一页。
+def test_图麦克那一枚点下去是嵌它原页面不是跳走():
+    """站长拍的是「一个登录账号，就可以同时管理两个小程序」，主入口是这一页；
+    10-16 又拍「你可以用 frame 模式来实现图麦克的原页面」⇒ 这一枚是**嵌进来**，不是跳走。
 
-    只在 admin.html 那一侧做改道不算成立：从这一页出去仍要输第二次口令。10-16 对面接上换票口之后
-    这一枚就许点亮。**这一页只负责跳过去**——换票那一步在它那一页做，因为这一页有一条比融合更大的
-    纪律：凭证只进 sessionStorage（见 `test_mp_assets_admin` 里那条 `localStorage not in`）。
+    两边同源（都在 api.agentsbin.cn），它那一页开局读的就是同源的存储，所以这一侧登过之后
+    框里直接是它的 dashboard。这一页仍不替它存任何凭证（`test_mp_assets_admin` 里那条判据）。
     """
     src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
     body = src.split("_PAGE", 1)[1]
-    seg = body.split("$('swOther').addEventListener", 1)[1].split("buildNav()", 1)[0]
-    assert "location.href = '/admin.html'" in seg, "那一枚点了不跳页，等于没融合"
-    assert "if (!session())" in seg, "没登录也照着跳，过去那边仍要输口令——这一枚就成了假亮"
+    seg = body.split("$('swOther').addEventListener", 1)[1].split("setProduct('self');", 1)[0]
+    assert "f.src = '/admin.html'" in seg, "那一枚没把它的原页面挂进 frame"
+    assert "u('admin.html')" not in seg and "api('admin" not in seg, \
+        "那一趟是根路径，走 u() 会被加上 /wtsj/ 前缀（挂上去就是 404）"
+    assert "showView('tumaike')" in seg and 'id="view-tumaike"' in body, "第四屏的容器或切换没接上"
+    assert "if (!f.dataset.on)" in seg, "src 要懒挂：不点就不去它那口上花一次请求"
+    assert "if (!session())" in seg, "没登录也照着挂，框里仍是它的口令——这一枚就成了假亮"
     assert "localStorage" not in seg, "这一页不许替它留凭证：本页只吃 sessionStorage 那一条纪律"
+    assert "location.href = '/admin.html'" not in body, "已经改成嵌了，不许留着'点一下整页跳走'那条路"
     assert "innerHTML" not in body and "removeItem('opsSession')" not in seg
+    # 它那套皮按 1200 排，我们这一栏只有 704：那一屏必须放宽一档，否则嵌进来是挤的
+    assert "main.wide" in body and "classList.toggle('wide'" in body

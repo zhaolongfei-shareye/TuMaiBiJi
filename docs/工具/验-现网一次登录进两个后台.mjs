@@ -57,7 +57,7 @@ async function main() {
   await cdp.send('Runtime.enable');
   await cdp.send('Page.navigate', { url: ADMIN_URL });
   await sleep(2500);
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 800, deviceScaleFactor: 2, mobile: false });
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 2, mobile: false });
 
   const ev = async (expression) => {
     const r = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
@@ -66,7 +66,7 @@ async function main() {
   };
   // 屏照只截上半截：它那一页往下就是用户列表，openid 是真人标识，不该进仓库。
   const shot = async (name, height = 0) => {
-    const params = height ? { format: 'png', clip: { x: 0, y: 0, width: 1100, height, scale: 1 } } : { format: 'png' };
+    const params = height ? { format: 'png', clip: { x: 0, y: 0, width: 1280, height, scale: 1 } } : { format: 'png' };
     const s = await cdp.send('Page.captureScreenshot', params);
     writeFileSync(`${OUT}/${name}`, Buffer.from(s.data, 'base64'));
     console.log(`  · 屏照 ${OUT}/${name}`);
@@ -119,19 +119,40 @@ async function main() {
   check('在壳页这一侧输一次口令就进了壳页', await ev(
     `document.getElementById('app').classList.contains('hidden') === false`));
   await ev(`document.getElementById('swOther').click()`);
-  await sleep(3500);
-  const jumped = JSON.parse(await ev(`JSON.stringify({href: location.href,
-      mine: !!localStorage.getItem('adminToken'),
-      dash: !!document.getElementById('dashboardView') && !document.getElementById('dashboardView').classList.contains('hidden'),
-      err: (document.getElementById('fusionError') || {}).textContent || ''})`));
-  check('点那枚「图麦克」真跳到了它那一页', /\/admin\.html$/.test(jumped.href), jumped.href);
-  check('落地就是它的 dashboard，全程没再输一次口令', jumped.dash && jumped.mine, jumped.err);
-  await shot('现网-从壳页点图麦克-免口令落地.png', 420);
+  await sleep(4000);
+  const framed = JSON.parse(await ev(`(() => {
+      const f = document.getElementById('frameOther'); const d = f.contentDocument;
+      return JSON.stringify({
+        href: location.href, viewShown: !document.getElementById('view-tumaike').classList.contains('hidden'),
+        wide: document.querySelector('main').classList.contains('wide'),
+        mine: !!localStorage.getItem('adminToken'),
+        innerPath: d ? d.location.pathname : '(读不到)',
+        innerLogin: d ? !d.getElementById('loginView').classList.contains('hidden') : null,
+        innerDash: d ? !d.getElementById('dashboardView').classList.contains('hidden') : null,
+        users: d && d.getElementById('totalUsers') ? d.getElementById('totalUsers').textContent : '' });
+    })()`));
+  check('点那枚「图麦克」整页没跳走（还在壳页里）', framed.href.includes('/wtsj/ops'), framed.href);
+  check('第四屏切出来了、整页放宽一档', framed.viewShown && framed.wide, JSON.stringify([framed.viewShown, framed.wide]));
+  check('frame 挂的就是它那一页（根路径，没被加上 /wtsj 前缀）', framed.innerPath === '/admin.html', framed.innerPath);
+  check('框里直接就是它的 dashboard，全程没再输一次口令',
+        framed.innerDash === true && framed.innerLogin === false, JSON.stringify([framed.innerDash, framed.innerLogin]));
+  check('框里读到的是它自己的数（总用户数是个数字）', /^[0-9]+$/.test(framed.users), framed.users);
+  check('它那一页开局自己拿壳页那张票换到了自己的票', framed.mine);
+  await shot('现网-壳页里嵌图麦克原页面.png', 560);
 
-  // 登出：它自己那把要清掉；壳页那把不是它写的，所以不许被顺手抹掉
-  await ev(`[...document.querySelectorAll('.logout-btn')].find(b => b.textContent.trim() === '退出登录').click()`);
+  await ev(`document.getElementById('swSelf').click()`);
   await sleep(600);
-  check('点退出，它自己那把清了', await ev(`localStorage.getItem('adminToken') === null`));
+  check('点「图麦笔记」切回我们那一屏（frame 只是藏起来，不重新加载）', await ev(
+    `document.getElementById('view-tumaike').classList.contains('hidden')
+      && !document.getElementById('view-stats').classList.contains('hidden')`));
+
+  // 再进去，在它自己那一屏里点退出：它那把要清掉，壳页那把不是它写的，不许被顺手抹掉
+  await ev(`document.getElementById('swOther').click()`);
+  await sleep(2000);
+  await ev(`(() => { const d = document.getElementById('frameOther').contentDocument;
+      [...d.querySelectorAll('.logout-btn')].find(b => b.textContent.trim() === '退出登录').click(); return 1; })()`);
+  await sleep(600);
+  check('在框里点退出，它自己那把清了', await ev(`localStorage.getItem('adminToken') === null`));
   check('但没顺手抹掉壳页那把票（那一把不是这一页写的）', await ev(
     `sessionStorage.getItem('opsSession') !== null`));
   check('全程（真点登录、真点那枚切换、真点退出）没有未捕获异常', cdp.exceptions.length === 0, cdp.exceptions.join(' | '));
