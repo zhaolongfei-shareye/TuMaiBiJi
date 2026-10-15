@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 分享封面 · 文艺留白版（1280×1024）。
+   上一版被否在"堆砌"：kicker＋两行大字＋四行 80px 展示字＋底线＋页脚，八块文字挤在一列。
+   这一版只留五件，全走一条左栏，字号拉开层级、留白抬到底：
+   ① 一枚小 kicker（唯一彩色）② 一条 64px 细线 ③ 两行宋体大字 ④ 副标题一行，单独占一格
+   ⑤ 页脚一枚极小的拉丁域名。右边那组（倾斜手机壳＋压角竖排纸卡）是他官方图的裁片，原样搬。
+   色只两档：墨 #14161A 与一点黏土 #C0552F；底是他那张图自己的纸色。 */
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-400-normal.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-500-normal.woff2') format('woff2'); font-weight: 500; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; height: 1024px; overflow: hidden; }
+.card { position: relative; width: 1280px; height: 1024px; background: #E9E7DC; color: #14161A;
+  font-family: 'Songti SC', 'STSong', serif; overflow: hidden; }
+
+.kick { position: absolute; left: 96px; top: 88px; font-family: 'Playfair'; font-weight: 500; font-size: 15px;
+  letter-spacing: .42em; color: #C0552F; }
+.hair { position: absolute; left: 96px; top: 128px; width: 64px; height: 2px; background: #14161A; }
+
+.h1 { position: absolute; left: 96px; top: 172px; width: 660px; font-size: 88px; line-height: 1.22;
+  font-weight: 700; letter-spacing: -.015em; }
+
+/* 副标题：单独一格，一行排满，靠字距与留白立住，不靠字号堆。
+   宽度要停在右边那张竖排纸卡转出去的顶边之前（纸卡是斜的，顶边越往右越高），实测止于 x 573。 */
+.sub { position: absolute; left: 98px; top: 434px; font-size: 25px; letter-spacing: .16em;
+  color: rgba(20,22,26,.56); white-space: nowrap; }
+.sub i { font-style: normal; color: rgba(20,22,26,.26); padding: 0 12px; }
+
+.dom { position: absolute; left: 98px; bottom: 74px; font-family: 'Playfair'; font-size: 14px;
+  letter-spacing: .34em; color: rgba(20,22,26,.38); }
+
+.grp { position: absolute; right: 48px; top: 56px; width: 720px; height: 953px; }
+.grp img { width: 720px; height: 953px; display: block; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="kick">TUMARK · 图麦笔记</div>
+  <div class="hair"></div>
+  <div class="h1">看到好内容，<br>随手记下来。</div>
+  <div class="sub">16 语整理成中文<i>—</i>10 套卡片<i>—</i>5 种心情</div>
+  <div class="dom">agentsbin.cn</div>
+
+  <div class="grp"><img src="组-手机与纸卡-透明.png" alt=""></div>
+</div>
+</body>
+</html>
