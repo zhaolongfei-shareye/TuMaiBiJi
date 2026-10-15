@@ -186,11 +186,14 @@ ck('深浅存的是**二维网格**（32×32 各一个数），逐行那一档�
 ck('按矩形那一道口在 util 里有，且夹住越界（不夹会 NaN ⇒ 静默一律判成深底白字）',
   /function applyRects/.test(brightJs) && /module\.exports\s*=\s*\{[^}]*applyRects/.test(brightJs)
     && /Math\.max\(0,/.test(brightJs) && /Number\.isFinite\(avg\)/.test(brightJs))
-ck('create 页真的去量那三枚的矩形（`.in(this)` 会把页面作用域的查询打成空 ⇒ 三格永远 false）',
+ck('create 页真的去量那几枚的矩形（`.in(this)` 会把页面作用域的查询打成空 ⇒ 几格永远 false）',
   /toneRects\s*\(\s*\)\s*\{/.test(cjs) && !/createSelectorQuery\(\)\.in\(this\)/.test(cjs)
-    && /bgLightTitle: false/.test(cjs) && /bgLightSwap: false/.test(cjs) && /bgLightOut: false/.test(cjs)
+    && ['bgLightTitle', 'bgLightDim', 'bgLightWallpaper', 'bgLightMood', 'bgLightOut']
+      .every((k) => new RegExp(`${k}: false`).test(cjs))
     && /applyRects\(/.test(cjs),
-  cjs.includes('.in(this)') ? 'create.js 里还有 createSelectorQuery().in(this)' : '三格或那道口没接上')
+  cjs.includes('.in(this)') ? 'create.js 里还有 createSelectorQuery().in(this)'
+    : `缺格：${['bgLightTitle', 'bgLightDim', 'bgLightWallpaper', 'bgLightMood', 'bgLightOut']
+      .filter((k) => !new RegExp(`${k}: false`).test(cjs)).join('、') || '那道口没接上'}`)
 ck('两截各判一次：applyTone 一次交回 bgLight 与 bgLightLow（少一枚＝又变回一整页一个数）',
   /bgLight: p === null/.test(brightJs) && /bgLightLow: p === null/.test(brightJs)
     && /zones\.top/.test(brightJs) && /zones\.low/.test(brightJs))
@@ -266,15 +269,36 @@ ck('罩层只有一支：浅色那一态不再另开提亮覆盖（`.bg-light` �
 // ⇒ 那两条"浅色那一态逐条有翻墨的对应规则"与"白底那一档有翻墨兜底"都随基准翻向而作废，
 // 换成钉反面：**基准必须是墨**，且**不许再有** `.bg-light .swap-*` / `:not(.has-bg) .swap-*` 那两支
 // （留着就是同一屏两个数：覆写那支 .85、基准这支 .70）。
-// 深色那一态的覆写按**各自那块矩形**判（`.bg-light-swap`），理由与上面 `.out` 那两条同。
-const darkSwapRule = (sel, prop) =>
-  new RegExp(`\\.container\\.has-bg:not\\(\\.bg-light-swap\\) \\.${sel.slice(1)}\\s*\\{[^}]*${prop}:\\s*rgba\\(242,\\s*239,\\s*233,\\s*0\\.7\\)`).test(CSS_NC)
-ck('图上那三枚的基准是墨 @70，深色那一态逐条有翻纸白的对应规则（少一枚＝白字压浅图或墨字压深图）',
+// 深色那一态的覆写按**各自那块矩形**判，理由与上面 `.out` 那两条同。
+// ⚠ 10-15 清晨从"整行一个 `.bg-light-swap`"拆成三枚各一个（`.bg-light-dim`／`-wallpaper`／`-mood`）：
+//   他那张红框截图量的就是整行一个数的错——同一条横带上左中右三段实测中位亮度 175／129／105，
+//   整行平均 126 压在 160 那道闸的口上，一个数管三枚必然有一头读不出来（台账 §8.251）。
+//   旧的 `.bg-light-swap` 与 `.home-swap` 那一档覆写一起作废，这里钉反面：它们不许留下任何一处。
+// ⚠ 三条选择器写成一个逗号组（只有最后一条后面跟 `{`），所以**不能**拿"选择器紧跟 `{`"那种正则去认，
+//   那样只有第三条命中、前两条假红（今天第一次跑就是这么红的）。改成先把样式表拆成一块一块、
+//   每块把选择器按逗号切开，再问"这一块里有没有这一条、这一块自己有没有那支声明"。
+const RULES = [...CSS_NC.matchAll(/([^{}]+)\{([^}]*)\}/g)].map((mm) => ({
+  sels: mm[1].split(',').map((s) => s.replace(/\s+/g, ' ').trim()),
+  body: mm[2].replace(/\s+/g, ' ').trim(),
+}))
+const darkSwapRule = (item, sel, prop) => RULES.some((r) => r.sels.includes(
+  `.container.has-bg:not(.bg-light-${item}) .swap-${item} .${sel.slice(1)}`)
+  && new RegExp(`${prop}: rgba\\(242, 239, 233, 0\\.7`).test(r.body))
+ck('图上那三枚的基准是墨 @70，深色那一态**一枚一条**翻纸白（少一枚＝白字压浅图或墨字压深图）',
   /\.swap-text\s*\{[^}]*color:\s*rgba\(20,\s*22,\s*26,\s*0\.7\)/.test(CSS_NC)
     && /\.swap-glyph\s*\{[^}]*background:\s*rgba\(20,\s*22,\s*26,\s*0\.7\)/.test(CSS_NC)
-    && darkSwapRule('.swap-text', 'color') && darkSwapRule('.swap-glyph', 'background')
-    && /\.container\.has-bg:not\(\.bg-light-swap\) \.home-swap,/.test(CSS_NC),
-  ['.swap-text', '.swap-glyph'].filter((s) => !darkSwapRule(s, 'color')).join('、'))
+    && ['dim', 'wallpaper', 'mood'].every((it) => darkSwapRule(it, '.swap-text', 'color')
+      && darkSwapRule(it, '.swap-glyph', 'background')),
+  ['dim', 'wallpaper', 'mood']
+    .filter((it) => !darkSwapRule(it, '.swap-text', 'color') || !darkSwapRule(it, '.swap-glyph', 'background'))
+    .join('、') || '(三条都在)')
+// 比的是**代码**不是注释：这一族"拿原文正则扫，把自家注释判成残留"的坑本文件上面刚踩过一次。
+// 那几处作废说明（js 两行、wxml 一行、wxss 一行）全写在注释里，剥完注释再扫才算数。
+const CODE_ONLY = (s) => NO_COMMENT(s).replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
+ck('整行那一个数作废净了（`.bg-light-swap` 与 `bgLightSwap` 在代码里一处不许留，留着就是同屏两个判据）',
+  !/bg-light-swap/.test(CODE_ONLY(CSS_NC)) && !/bg-light-swap/.test(CODE_ONLY(wxml))
+    && !/bgLightSwap/.test(CODE_ONLY(cjs)),
+  `样式 ${(CODE_ONLY(CSS_NC).match(/bg-light-swap/g) || []).length}／标记 ${(CODE_ONLY(wxml).match(/bg-light-swap/g) || []).length}／逻辑 ${(CODE_ONLY(cjs).match(/bgLightSwap/g) || []).length}`)
 ck('极性翻过来之后那两支旧覆写必须删净（`.bg-light .swap-*` 与 `:not(.has-bg) .swap-*`，留着就是同屏两个数）',
   !/\.has-bg\.bg-light \.swap-(text|glyph)\s*\{/.test(CSS_NC)
     && !/\.has-bg\.bg-light \.home-swap\s*\{/.test(CSS_NC)

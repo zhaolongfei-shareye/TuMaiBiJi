@@ -1,0 +1,24 @@
+/* 卡顶那一段玻璃（形象图 → 卡面／页面底）——两页共用这一份。
+   站长 10-15 03:5x 原话「两个渐变框架为什么不一样，要统一到笔记列表那种，比较自然，
+   "设置"和"我的"看到明显的断层，不符合我的需求。都要参考笔记列表那种框架设计，
+   自然过度，没有断层，也支持上面固定」。
+   ⇒ 停点 0／158／198／238 是**列表页那一版他点头的数**（158 由 `验-列表头部铺图-真跑`
+     按 `.ix-cat` 底边对 `.sheet` 顶边核过，不靠手算），「我的」原来那一条是
+     0／56／108／144：短一截，且在 144 之内又被一枚实心封层提前刷满 ⇒ 多出一道台阶。
+     现在两页吃同一条规则、同一组停点，只差"最后淡到哪一层"——
+     列表淡到卡面 `--bg-card`，「我的」淡到页面底 `--bg-page`，由各自在 `.sheet` 上递两枚令牌：
+       --glass-surface       淡到的那一层实心色
+       --glass-fade-surface  中间那一档＝同一层色 @.62
+   ⚠ 这一条**不搬进 app.wxss**：闸名 `has-bg` 一进全局表，`验-第一屏三块` 那条
+     "页面类名不许和 app.wxss 同名"就永久报红（它按 `.has-bg` 全文匹配，分不清
+     "给这枚上色"还是"只当祖先"）。同一条理由抄在 app.wxss 末尾 X4 那段注释里。
+   ⚠ 退化方向要说准：`var()` 替换后非法在 CSS 里是 IACVT＝这条声明当 `unset` 用，
+     `background` 简写会把底色归成 transparent ⇒ **整张卡透空露出原图**，不是"退回实心"。
+     所以两枚令牌必须在每一套壁纸里都解得出值，由 `验-玻璃令牌齐不齐` 钉住。 */
+.container.has-bg .sheet {
+  background: linear-gradient(180deg,
+    var(--glass-veil-band) 0, var(--glass-veil-band) 158rpx,
+    var(--glass-fade-surface) 198rpx, var(--glass-surface) 238rpx);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+}

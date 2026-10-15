@@ -116,8 +116,18 @@ const cw = read('pages/create/create.wxml')
 // 10-14 站长把「切换毛玻璃」也搬进这一行（原话「首页 增加一个入口『换心情』…每次点击切换一种」），
 // 所以"两半"这条前提已作废：现在是三半，前两枚的落点没动，第三枚往后加。
 ck('那一行是三半：「调亮度」换档、「换背景」导流、「换心情」循环（前两枚落点没动）',
-  (cw.match(/class="swap-half"/g) || []).length === 3
-  && /catchtap="onCycleDim"/.test(cw) && /catchtap="goHomeBg"/.test(cw) && /catchtap="onCycleMood"/.test(cw))
+  (cw.match(/class="swap-half[ "]/g) || []).length === 3
+  && /catchtap="onCycleDim"/.test(cw) && /catchtap="goHomeBg"/.test(cw) && /catchtap="onCycleMood"/.test(cw),
+  `数到 ${(cw.match(/class="swap-half[ "]/g) || []).length} 枚（10-15 起每枚后面还带自己的深浅类）`)
+/* 10-15 清晨：深浅判定从"整行一个矩形"拆成"一枚一个矩形"（站长红框那张图同一条横带上
+   左中右三段实测中位 175／129／105，整行平均正好压在阈值口上 ⇒ 一个数管三枚必有一头读不出来）。
+   三枚各自的类是那一刀的**唯一索引**——`create.js` 按这三个类量矩形，`create.wxss` 按
+   `.bg-light-dim/-wallpaper/-mood` 三条覆写。少一枚＝那一枚又回到整行那个数。 */
+ck('三枚各带一枚自己的深浅类（`.swap-dim`／`.swap-wallpaper`／`.swap-mood`，一枚一个矩形）',
+  ['swap-dim', 'swap-wallpaper', 'swap-mood']
+    .every((c) => (cw.match(new RegExp(`class="swap-half ${c}"`, 'g')) || []).length === 1),
+  ['swap-dim', 'swap-wallpaper', 'swap-mood']
+    .filter((c) => (cw.match(new RegExp(`class="swap-half ${c}"`, 'g')) || []).length !== 1).join('、'))
 ck('点的颜色从 style 递进来，wxss 里不写死 background，也没有 mask / 投影残留',
   !/\.dim-dot\s*\{[^}]*(background|mask-image|filter)/.test(strip(read('pages/create/create.wxss')).replace(/\s+/g, ' ')))
 

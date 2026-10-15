@@ -149,11 +149,15 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
      ——同一个色就不存在第二个框，弧的方向也不用动。 */
   let m = await measure(mp)
   const W = m.windowWidth
-  // ★10-11 R12（「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：名片那一行那 144 底下
-  // 必须有图，所以这一段盒子从 542 抬到 646，往上盖住的那一档从 40 变成 144（可见 502 没动，
-  // 行的落点逐像素不变——变的只是它底下从"只有 40 是图"变成"整条 144 都是图"）。
-  ck('底图这块盒子高 646（可见 502 + 被那一层盖住 144，R12 那一档）',
-    Math.abs(toRpx(m.band.height, W) - 646) <= 3, toRpx(m.band.height, W).toFixed(1))
+  /* ★10-11 R12（「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：名片那一行那 144 底下
+     必须有图，所以这一段盒子从 542 抬到 646，往上盖住的那一档从 40 变成 144。
+     ★10-15 03:5x 再抬到 740／238（站长「两个渐变框架为什么不一样，要统一到笔记列表那种…
+     看到明显的断层」）：**照片被裁那条线**与**玻璃淡满那条线**原来同一条（都在 646），
+     差一像素就露一行照片，只能拿一枚实心封层去盖，而封层自己就是那道台阶。
+     抬到 740 之后裁切线整条落在实心段底下，封层撤掉，两页共用同一条渐变。
+     ⚠ 可见那一段（502）与名片行的落点逐像素没动——动的只有底下借出去的那 94。 */
+  ck('底图这块盒子高 740（可见 502 + 被那一层盖住 238；与全站那枚锚点 HEAD_IMG_H 同一个数）',
+    Math.abs(toRpx(m.band.height, W) - 740) <= 3, toRpx(m.band.height, W).toFixed(1))
   ck('底图左右贴屏边（不内缩）', m.band.left <= 1 && Math.abs(m.band.right - W) <= 1, `${m.band.left}/${m.band.right}`)
   const bandStyle = await styleOf(page, '.head-band', ['border-top-left-radius', 'border-bottom-left-radius', 'background-color'])
   ck('弧不在底图上（下沿两角不收圆，方向仍是下面那层往上凸）',
@@ -161,8 +165,15 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
       && parseFloat(bandStyle['border-top-left-radius'] || '99') === 0,
     `上 ${bandStyle['border-top-left-radius']} / 下 ${bandStyle['border-bottom-left-radius']}`)
   const overlap = m.band.bottom - m.sheet.top
-  ck('那一层往上盖住底图 144 → 名片那一行整条底下都是图（"中间镂空"那一刀的反面）',
-    Math.abs(toRpx(overlap, W) - 144) <= 3, toRpx(overlap, W).toFixed(1))
+  ck('那一层往上盖住底图 238 → 名片那一行整条底下都是图，且图一直铺到玻璃淡满那一条线',
+    Math.abs(toRpx(overlap, W) - 238) <= 3, toRpx(overlap, W).toFixed(1))
+  ck('玻璃段自己就是 238 高（与列表页那一段同一条；短一档就又要靠实心去盖裁切线）',
+    Math.abs(toRpx(m.sheet.height, W) - 238) <= 3, toRpx(m.sheet.height, W).toFixed(1))
+  /* 10-15 03:5x 撤掉的那枚实心封层：它当年压住了照片被裁的那条硬边，自己却成了一道台阶
+     （屏上三行 Δ 灰阶 +6.7／+16.5／+10.1，量法 `docs/工具/量-面板顶断层.py`）。
+     根因已由"裁切线抬到 740"解决 ⇒ 这一枚不许回来，回来了那道台阶就跟着回来。 */
+  ck('实心封层不许复活（`.sheet-seal` 这一枚在标记里必须不存在）',
+    !(await page.$('.sheet-seal')), String(await page.$('.sheet-seal')))
   const sheetStyle = await styleOf(page, '.sheet', ['border-top-left-radius', 'border-bottom-left-radius',
     'background-color', 'background-image', 'backdrop-filter'])
   ck('那一层只有上沿两角收圆 40、下沿直角（不是一枚四角卡）',
@@ -184,6 +195,19 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck('卡顶那一段真挂了模糊（backdrop-filter 计算值不是 none）',
     /blur\(\s*\d+(?:\.\d+)?px/.test(String(sheetStyle['backdrop-filter'] || '')),
     String(sheetStyle['backdrop-filter'] || '(读不到这个属性)'))
+  /* ⚠ 这一条是"共用那一份真落到这一页"的唯一实测证据。静态那两把钉的是文件里写了什么，
+     可 @import 没生效／选择器层数不够／被页内同名规则顶掉，屏上都是"实心一片、没有渐变"，
+     而上面那几条（模糊、末色标）照样绿——10-11 那一族"改一层皮静默不生效"的第八种死法。
+     所以这里把渲染出来的**四个停点位置**换算回 rpx 钉成 0／158／198／238（列表页那一条）。 */
+  const gradStr = String(sheetStyle['background-image'] || '')
+  // 停点位置写在每一支颜色的**右括号之后**（`rgba(255,255,255,.6) 82.16px`），单位这一台读回来是 px；
+  // 万一哪一版读成 `%`，按盒子自己那一档高换算回去，不拿猜的数当判据。
+  const posOf = [...gradStr.matchAll(/rgba?\([^)]*\)\s*(-?[\d.]+)(px|%)/g)].map((mm) => (
+    mm[2] === '%' ? parseFloat(mm[1]) / 100 * m.sheet.height : parseFloat(mm[1])
+  )).map((px) => toRpx(px, W))
+  ck('渲染出来的那四个停点就是列表页那一条（0／158／198／238）——共用那一份真落到这一屏',
+    posOf.length === 4 && [0, 158, 198, 238].every((v, i) => Math.abs(posOf[i] - v) <= 4),
+    posOf.map((v) => v.toFixed(0)).join('／') || '(读不到停点＝这一屏压根没有渐变)')
   ck('LOGO 与下方卡里的行名同一条左线（撤框之后不能各走各的）',
     !!m.label && Math.abs(m.logo.left - m.label.left) <= 2, `${m.logo && m.logo.left} vs ${m.label && m.label.left}`)
 
@@ -319,9 +343,10 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   ck('锚点算出来了：按宽铺满、超出那截的 15% 顶给上面（不写死某一张的数）',
     /width:750rpx/.test(d.imgStyle || '') && gHeight >= meBand && Math.abs(gTop + (gHeight - meBand) * 0.15) <= 1,
     `${d.imgStyle}／盒子高递给 ${meBand}`)
-  // R12 要的效果：名片那一行那 144 底下必须有图（他抓过"中间镂空"）。量的是图那块自己的底边，
-  // 不是拿 imgStyle 那两个数自己换算。
-  ck('图确实垫到了名片那一行底下（那 144 整条有图，不是镂空）',
+  // R12 要的效果：玻璃那一段底下必须有图（他抓过"中间镂空"）。量的是图那块自己的底边，
+  // 不是拿 imgStyle 那两个数自己换算。10-15 03:5x 那一段从 144 长到 238 ⇒ 这一条跟着改口径，
+  // 比的仍是"图的底边 ≥ 皮的底边"这一件事（被 overflow 裁掉的那一截 boundingClientRect 照报原盒）。
+  ck('图确实垫到了玻璃那一段底下（那 238 整条有图，不是镂空）',
     !!m.img && !!m.sheet && m.img.bottom >= m.sheet.bottom - 2,
     m.img && m.sheet && `图底 ${Math.round(m.img.bottom)} / 行底 ${Math.round(m.sheet.bottom)}px`)
   ck('数字来自服务端（base+bonus，不是界面写死）', /^\d+$/.test(String(d.scoreText || '')) && Number(d.scoreText) >= 100, d.scoreText)
@@ -606,9 +631,18 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   //   `overflow-y` 只报数不判红。判据钉的还是同一件事（"下面那一层自己会滚"），换的是量法。
   ck('滚的是下面那一层：`.me-body` 这枚 `scroll-view` 的 `scroll-y` 真挂着',
     svAttr === 'true', `scroll-y=${svAttr}｜overflow-y=${svStyle['overflow-y'] || '(读不到)'}（外层读 visible 是组件把滚动挂在内层，不是没滚）`)
-  ck('上半在滚层外面：滚层顶边就是那层皮的底边（差 ≤2px，头部与那层皮跟着页面钉死）',
-    !!m8.body && !!m8.sheet && Math.abs(m8.body.top - m8.sheet.bottom) <= 2,
-    m8.body && m8.sheet ? `滚层顶 ${m8.body.top.toFixed(1)}｜皮底 ${m8.sheet.bottom.toFixed(1)}` : '量不到')
+  ck('上半在滚层外面：滚层顶边落在名片行那一格的底（646），头部与名片行跟着页面钉死',
+    !!m8.body && !!m8.sheet && Math.abs(toRpx(m8.body.top - m8.sheet.top, m8.windowWidth) - 144) <= 3,
+    m8.body && m8.sheet
+      ? `滚层顶 ${m8.body.top.toFixed(1)}｜皮顶 ${m8.sheet.top.toFixed(1)}（差 ${toRpx(m8.body.top - m8.sheet.top, m8.windowWidth).toFixed(1)}rpx，应是 144）`
+      : '量不到')
+  /* ⚠ 这一条原来钉的是"滚层顶边＝那层皮的底边"（那时两者同在 646）。10-15 03:5x 玻璃段抬到
+     238 之后**故意不再相等**：皮的底边在 740，比滚层顶低 94 —— 那 94 是借来给渐变收尾的，
+     靠 `.head` 那道 `margin-bottom:-94rpx` 不占地，所以名片行与第一张卡的落点一个像素没挪。
+     于是这一格改钉上面那条（滚层顶＝名片行内容底），下面这一条钉那 94 确实重叠、且只重叠 94。 */
+  ck('玻璃末段与滚层重叠那 94（只借屏幕不占地：名片行与下面那区的落点因此没动）',
+    !!m8.body && !!m8.sheet && Math.abs(toRpx(m8.sheet.bottom - m8.body.top, m8.windowWidth) - 94) <= 3,
+    m8.body && m8.sheet ? toRpx(m8.sheet.bottom - m8.body.top, m8.windowWidth).toFixed(1) : '量不到')
   ck('滚层吃满剩下的竖向空间（底边到视口底，中间不留第二条缝）',
     !!m8.body && Math.abs(m8.body.bottom - m8.windowHeight) <= 2,
     m8.body ? `滚层底 ${m8.body.bottom.toFixed(1)}｜视口底 ${m8.windowHeight}` : '量不到')

@@ -1568,20 +1568,22 @@
 }
 
 /* 深色照片那一档自动翻纸白（站长 10-15 03:0x「三个设置也要这样自动切换」，与标题图同一件事）。
-   判的是**这一行自己那块矩形**（`.bg-light-swap`）：10-14 把这一行搬到面板上方之后它压在
-   视口 0.588~0.648 那一条（探针量的帧：顶 443pt／底 488pt，框高 753pt），
-   而它左右两端压着的东西完全两样——左端是那块蓝布、右端是那截木头——
-   原来那两条"整幅宽的一截"（`bg-light`／`bg-light-low`）平均出来只能给一个答案，
-   站长 10-15 03:2x 要打掉的就是这个：「包括三块设置也是只计算下方三行区域的平均值颜色」。
-   写法 `.has-bg:not(.bg-light-swap)`：没铺图那一态不走这一条，吃上面那支基准墨 @70，
+   ⚠ 10-15 清晨这一组从"整行一个判据"拆成**三枚各一个**（`.bg-light-dim`／`.bg-light-wallpaper`／
+   `.bg-light-mood`）。拆的依据是他这张真机图：同一条横带上左中右三段实测中位亮度 175／129／105，
+   整行平均 126 正好压在 160 那道闸的口上——一个数同时管三枚，必然有一头是"浅底浅字"或"深底深字"。
+   他这句要的就是「计算深浅背景区域**仅限文字图片覆盖的区域**的平均值」⇒ 一枚一个矩形。
+   写法仍是 `.has-bg:not(.bg-light-×)`：没铺图那一态不走这一条，吃上面那支基准墨 @70，
    与壁纸的浅底同向（两级都空＝白底那一档 10-14 站长要保留这一行，字色必须读得出来）。
    ⚠ 浅色照片那一态也吃基准：墨 @70 压在浅图上正是他要的样子，不再另写一条。 */
-.container.has-bg:not(.bg-light-swap) .home-swap,
-.container.has-bg:not(.bg-light-swap) .swap-text {
+.container.has-bg:not(.bg-light-dim) .swap-dim .swap-text,
+.container.has-bg:not(.bg-light-wallpaper) .swap-wallpaper .swap-text,
+.container.has-bg:not(.bg-light-mood) .swap-mood .swap-text {
   color: rgba(242, 239, 233, 0.7);
 }
 
-.container.has-bg:not(.bg-light-swap) .swap-glyph {
+.container.has-bg:not(.bg-light-dim) .swap-dim .swap-glyph,
+.container.has-bg:not(.bg-light-wallpaper) .swap-wallpaper .swap-glyph,
+.container.has-bg:not(.bg-light-mood) .swap-mood .swap-glyph {
   background: rgba(242, 239, 233, 0.7);
 }
 

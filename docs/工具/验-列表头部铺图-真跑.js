@@ -107,6 +107,64 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
     `${(await page.$$('.xrow')).length} 条 / view=${d0.view}`)
   const cls = (await (await page.$('.container')).attribute('class')) || ''
   ck('铺图时容器带 has-bg', /has-bg/.test(cls), cls)
+  // ---------- 浅照片那一档：期望值读"当下该生效的那一条规则"，深浅两态各量一次 ----------
+  // 10-12 那批给这一页开了两支反向覆写：整页浅＝`.container.has-bg.bg-light X`；
+  // 而卡顶那 158rpx 白纱上的两行固定字吃的是**下那一档**（`:not(.bg-light-low)` 让路，
+  // 站长 10-12 21:1x「请按照上下部分来分别判断」）。这一把原来那四条（压在图上的大字／
+  // 分类行未选中／搜索条那两条）无条件钉"深照片"那一头 ⇒ 屏上这张正好是浅的就红，
+  // 红的是尺子旧了、不是代码坏了（同一族见 §8.250 那四条"代码改了尺子没跟"）。
+  // 改法两条：① 值一律从 CSS 现读（不抄第二份 rgba）② 两态各强制一次，
+  // 不靠今天这一张正好落在哪一头（同姿势见 验-第一屏三块-真跑 那条 §9b）。
+  const clsHas = (c, name) => String(c).split(/\s+/).indexOf(name) >= 0
+  const toneFlags = async (pg) => {
+    const c = (await (await pg.$('.container')).attribute('class')) || ''
+    return {
+      light: clsHas(c, 'bg-light'), low: clsHas(c, 'bg-light-low'),
+      hasBg: clsHas(c, 'has-bg'), raw: c,
+    }
+  }
+  // setData 之后必须读回类名确认它真翻过去了再量：这一页每次进页都由 bgTone 重算两档，
+  // 中途被重算回去就成了"量的是另一个态、期望值按这个态算"——那种绿没有意义，所以要抛。
+  const forceTone = async (pg, key, val) => {
+    await pg.setData({ [key]: val })
+    await sleep(900)
+    const t = await toneFlags(pg)
+    if ((key === 'bgLight' ? t.light : t.low) !== val) {
+      throw new Error(`强制 ${key}=${val} 没落到类名上（当前 ${t.raw}）：再往下量就是拿另一个态比这一态的期望值`)
+    }
+    return t
+  }
+  const IDX_NC = fs.readFileSync(P('pages/index/index.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+  // ⚠ 匹配串里那一个空格是判据的一部分：少了它，深那一支的前缀会把
+  //   `.container.has-bg.bg-light .srch` 一起吃掉，读回来的正好是反的那一支值。
+  const declOf = (sel, prop, light) => {
+    const s = sel.slice(1)
+    const head = light
+      ? `\\.container\\.has-bg\\.bg-light \\.${s}\\s*\\{([^}]*)\\}`
+      : `\\.container\\.has-bg \\.${s}\\s*\\{([^}]*)\\}`
+    const b = (new RegExp(head).exec(IDX_NC) || [, ''])[1]
+    // 属性名前面必须真是行首或分号：光写 `color:` 会先撞上同一条规则里的 `border-color:`
+    return ((new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(b) || [0, ''])[1] || '').trim()
+  }
+  // 渲染值一律是 rgb()/rgba()，源码里可能写 #hex 也可能写 rgba() ⇒ 两边都拆成数再比。
+  // alpha 那一档单收到 0.02：比色那个 ±1 的容差对等于没看（两支只差 alpha 的那些条就糊过去了）。
+  const nums = (v) => (String(v).match(/-?\d+(\.\d+)?/g) || []).map(Number)
+  const toNums = (v) => (/^#/.test(String(v).trim()) ? [...hexArr(v), 1] : nums(v).slice(0, 4))
+  const sameCol = (a, b) => {
+    const x = nums(a).slice(0, 4), y = toNums(b)
+    return x.length >= 3 && y.length >= 3
+      && x.every((v, i) => Math.abs(v - (y[i] === undefined ? 1 : y[i])) <= (i === 3 ? 0.02 : 1))
+  }
+  const alphaOf2 = (s) => { const m = /,\s*([\d.]+)\s*\)/.exec(String(s)); return m ? Number(m[1]) : 1 }
+  const colParts = (s) => {
+    const t = String(s).trim()
+    if (t[0] === '#') {
+      const m = /#([\da-f]{2})([\da-f]{2})([\da-f]{2})/i.exec(t)
+      return m ? { rgb: [1, 2, 3].map((i) => parseInt(m[i], 16)), a: 1 } : null
+    }
+    const n = (t.match(/-?\d+(\.\d+)?/g) || []).map(Number)
+    return n.length >= 3 ? { rgb: n.slice(0, 3), a: n[3] === undefined ? 1 : n[3] } : null
+  }
   const [headRect, imgRect, scrimRect] = await rects(['.head', '.head-img', '.head-scrim'])
   // v12（站长 10-01 拍）：图不再贯穿全屏，只守头部这一段 542，和「我的」那条 band 同一个量。
   ck('图区从视口顶起、高 542rpx（不再铺到屏底）',
@@ -140,7 +198,10 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   // ⚠ 基准是**卡顶实测**，不是头部底边——卡还往上盖了 40，拿段底算会多要 40rpx
   // （10-11 第一版就是这么错的：图底 748 明明盖过 502+238=740，却按 540+238=778 判红）。
   // 实心那一档（238）也从样式表现读，不在这儿再写一份。
-  const glassRule = String((fs.readFileSync(P('pages/index/index.wxss'), 'utf8')
+  // ⚠ 10-15 03:5x 起这一条不在本页的表里了：两页那一段玻璃合成一份实现（站长「两个渐变框架为什么
+  // 不一样，要统一到笔记列表那种」），正本搬到 `styles/glass-sheet.wxss`。读错文件＝gradParts 空
+  // ＝glassStop/solidStop 归 0＝下面那两条"实心段够不够高"当场假红（这一族"尺子坏了"第 N 次）。
+  const glassRule = String((fs.readFileSync(P('styles/glass-sheet.wxss'), 'utf8')
     .match(/\.container\.has-bg \.sheet\s*\{[^}]*\}/) || [''])[0])
   // 渐变的色标要用**顶层逗号**切：`var(--glass-veil)` 里就带括号，按普通 split(',') 会把一条劈成三截。
   // ⚠ 10-12 21:4x 甲之后卡顶那一段吃的是 `--glass-veil-band`，这里两枚都要收：
@@ -256,9 +317,21 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   if (rowRect) ck('第一条行在这块滚动区里（图区下面，没压在图上）',
     !!sheetRect && rowRect.top >= sheetRect.top,
     `行顶 ${(rowRect.top / R).toFixed(0)}rpx / 卡片区顶 ${(sheetRect.top / R).toFixed(0)}rpx`)
-  ck('压在图上的大字是纸白',
-    near(rgbOf(await styleOf(page, '.h1', 'color')), hexArr(PAPER), 6),
-    await styleOf(page, '.h1', 'color'))
+  // 大字压在头部那一截**照片**上，吃的是整页那一档（`bgLight`）：浅 ⇒ `.container.has-bg.bg-light .h1`
+  // 那一支（墨），深 ⇒ 基条 `.container.has-bg .h1`（纸白）。两支都从 CSS 现读，尺子里不写数
+  // （原来这一条无条件钉纸白，浅照片那一态一上来就红）。
+  const h1Want = (t) => declOf('.h1', 'color', t.light)
+  const t0 = await toneFlags(page)
+  const h1a = await styleOf(page, '.h1', 'color')
+  ck('压在图上的大字按当下那一态读（浅照片翻墨／深照片纸白，两支都从 CSS 现读）',
+    !!t0.hasBg && !!h1Want(t0) && sameCol(h1a, h1Want(t0)),
+    `${h1a}｜态「${t0.light ? '浅' : '深'}」｜生效的那一条 ${h1Want(t0) || '(样式里没读到＝尺子的正则坏了)'}`)
+  const t1 = await forceTone(page, 'bgLight', !t0.light)
+  const h1b = await styleOf(page, '.h1', 'color')
+  ck('强制换到另一态，大字跟着翻（两支不许通吃，另一态没对应规则就红）',
+    !!h1Want(t1) && sameCol(h1b, h1Want(t1)) && !sameCol(h1a, h1b),
+    `翻过去 ${h1b}｜翻回来前 ${h1a}`)
+  await forceTone(page, 'bgLight', t0.light)   // 还原：下面那些条量的还是真那一态
   // ---------- 右上角那一列（v18：分享／种草两列随那两个屏一起撤了） ----------
   // 这把尺子自带的 rects() 用的是 select（一个选择器只回第一个），列数要 selectAll 才数得全，
   // 所以这里单独走一趟——不然量到的是"第一列存在"，不是"只剩一列"。
@@ -295,8 +368,8 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   // v30 起分类那一行不再吃 `.chip`：胶囊、暗玻璃、`--tone-bg` 那三样一起删了。
   // 原来这一段四条判据量的前提都没了（不是红了要修界面，是尺子旧了）——换成量
   // 「这一行两档字」。期望值哪来的见下面那段 10-09 的注释（现在读的是这一页的墨，不是层上那支）。
-  // 这里不能用文件下面那把 `sameCol`／`IDX_WXSS`：它们是第 249 行之后才声明的 const，
-  // 在这一行取会撞临时死区（TDZ），跑出来是一条 ReferenceError 而不是任何判据红。
+  // `sameCol`／`colParts`／`alphaOf2` 已在文件上面声明（紧跟着 has-bg 那一条），
+  // 原来它们写在这一行之后、够不着，撞过一次临时死区（TDZ）：报的是 ReferenceError 而不是判据红。
   const cats = await page.$$('.ix-cat')
   ck('这一趟至少有两枚分类（"全部" + 一枚真分类），字色那条才量得到', cats.length > 1, `${cats.length} 枚`)
   const wpNow = await mp.evaluate(() => getApp().getWallpaper() || '')
@@ -306,27 +379,43 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   const APP_BLOCK = (new RegExp(`\\.theme-${wpNow}\\s*\\{([^}]*)\\}`)
     .exec(fs.readFileSync(P('app.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')) || [])[1] || ''
   const tok = (n) => (new RegExp(`--${n}:\\s*([^;]+)`).exec(APP_BLOCK) || [])[1] || '(读不出)'
-  const colParts = (s) => {
-    const t = String(s).trim()
-    if (t[0] === '#') {
-      const m = /#([\da-f]{2})([\da-f]{2})([\da-f]{2})/i.exec(t)
-      return m ? { rgb: [1, 2, 3].map((i) => parseInt(m[i], 16)), a: 1 } : null
-    }
-    const n = (t.match(/-?\d+(\.\d+)?/g) || []).map(Number)
-    return n.length >= 3 ? { rgb: n.slice(0, 3), a: n[3] === undefined ? 1 : n[3] } : null
-  }
-  const alphaOf2 = (s) => { const m = /,\s*([\d.]+)\s*\)/.exec(String(s)); return m ? Number(m[1]) : 1 }
   const idxSrc = fs.readFileSync(P('pages/index/index.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-  const idleCols = [], onCols = []
-  for (const el of cats) {
-    const cls = (await el.attribute('class')) || ''
-    const c = await el.style('color')
-    if (/(^|\s)on(\s|$)/.test(cls)) onCols.push(c); else idleCols.push(c)
+  const readCats = async () => {
+    const idle = [], on = []
+    for (const el of cats) {
+      const c2 = (await el.attribute('class')) || ''
+      const col = await el.style('color')
+      if (/(^|\s)on(\s|$)/.test(c2)) on.push(col); else idle.push(col)
+    }
+    return { idle, on }
   }
-  const wantIdle = colParts(tok('text-secondary')), wantOn = colParts(tok('text-primary'))
-  ck('未选中那一档是这一页的 `--text-secondary`（10-09 起不再吃层上那支淡墨）',
-    !!wantIdle && idleCols.length > 0 && idleCols.every((c) => near(rgbOf(c), wantIdle.rgb) && Math.abs(alphaOf2(c) - wantIdle.a) < 0.02),
-    `${idleCols[0]}｜期望 ${tok('text-secondary')}（壁纸 ${wpNow}）`)
+  const { idle: idleCols, on: onCols } = await readCats()
+  const matchCol = (c, want) => {
+    // 两边都走 colParts，不许拿 `alphaOf2` 去读渲染值：那条正则取"最后一个逗号后的数"，
+    // 遇到不透明的 `rgb(53, 46, 29)`（bg-light 那一档让路之后就是这种写法）会把 **29 当 alpha**，
+    // 于是一条量对了的判据红（这一把第一版就是这么红的——期望 `#352E1D`、屏上 `rgb(53,46,29)`，
+    // 三个数一字不差，红在尺子上）。colParts 对 rgb/rgba/#hex 都回 {rgb,a}，a 缺省 1。
+    const g = colParts(c), w = colParts(want)
+    return !!g && !!w && near(g.rgb, w.rgb) && Math.abs(g.a - w.a) < 0.02
+  }
+  // 这一行压的**不是照片**，是卡顶那 158rpx 白纱（纱把暗图提成中灰），所以它吃的是
+  // **下那一档** `bgLightLow`：那一截深 ⇒ `.container.has-bg:not(.bg-light-low) .ix-cat`
+  // 抬成整档墨；那一截浅 ⇒ 让路给基条 `--text-secondary`（.72 在那一态本来就够 4.5:1）。
+  // 原来这一条无条件钉 `.72`（写于 10-09，10-12 那支抬墨的规则还没生），浅/深两态一翻就红。
+  const idleWant = (t) => (t.hasBg && !t.low ? tok('text-primary') : tok('text-secondary'))
+  const tCat = await toneFlags(page)
+  const wantOn = colParts(tok('text-primary'))
+  ck('未选中那一档按"下那一档"读：图上且那一截深→整档墨；那一截浅→照旧 `--text-secondary`',
+    idleCols.length > 0 && idleCols.every((c) => matchCol(c, idleWant(tCat))),
+    `${idleCols[0]}｜态「${tCat.hasBg ? (tCat.low ? '图上·下浅' : '图上·下深') : '没铺图'}」`
+    + `｜期望 ${idleWant(tCat)}（壁纸 ${wpNow}）`)
+  const tCatB = await forceTone(page, 'bgLightLow', !tCat.low)
+  const idleB = (await readCats()).idle
+  ck('强制翻"下那一档"，这一行的未选中字跟着翻（两支不许通吃）',
+    idleB.length > 0 && idleWant(tCatB) !== idleWant(tCat)
+    && idleB.every((c) => matchCol(c, idleWant(tCatB))),
+    `翻过去 ${idleB[0]}｜期望 ${idleWant(tCatB)}`)
+  await forceTone(page, 'bgLightLow', tCat.low)
   ck('选中那一档是这一页的整档墨 `--text-primary`、不是淡的（两支只差 alpha 时这条必须红，不许跟着上面那条一起绿）',
     onCols.length === 1 && !!wantOn && near(rgbOf(onCols[0]), wantOn.rgb) && alphaOf2(onCols[0]) > 0.98,
     `${onCols[0] || '(一枚没选中，那一行读不出选中态)'}｜期望 ${tok('text-primary')}`)
@@ -342,33 +431,32 @@ const PAPER = /const PAPER = '(#[0-9A-Fa-f]{6})'/.exec(fs.readFileSync(P('utils/
   // 缩回不清词那些都由 验-列表v19-真跑.js 真点真量；这一把只补它不量的一半——
   // 这块面压在照片上，渲染出来的到底是不是 CSS 里那一条发的值。
   // 期望值从 index.wxss 现读，探针里不抄第二份 rgba。
-  const IDX_WXSS = fs.readFileSync(P('pages/index/index.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-  const decl = (sel, prop) => {
-    const b = (new RegExp(`\\.container\\.has-bg \\${sel}\\s*\\{([^}]*)\\}`).exec(IDX_WXSS) || [, ''])[1]
-    // 属性名前面必须真是行首或分号：`color:` 光这样写会先撞上同一条规则里的
-    // `border-color:`（上一把就是这么读的——量出来是描边那支白，判成"字没翻色"）。
-    return ((new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(b)) || [0, ''])[1].trim()
-  }
-  const norm = (s) => String(s).replace(/\s+/g, '')
-  // 渲染值一律是 rgb()/rgba()，源码里可能写 #hex 也可能写 rgba()——两边都拆成三个数再比。
-  // （第一把直接用字符串对，'rgb(242, 239, 233)' 对 '#f2efe9' 当然不相等，红得毫无道理。）
-  const toRgb = (v) => (/^#/.test(String(v).trim()) ? hexArr(v) : rgbOf(v))
-  // 第四个通道是 alpha：比色那个 ±1 的容差对它等于没看，单独收到 0.02。
-  const nums = (v) => (String(v).match(/-?\d+(\.\d+)?/g) || []).map(Number)
-  const toNums = (v) => (/^#/.test(String(v).trim()) ? [...hexArr(v), 1] : nums(v).slice(0, 4))
-  const sameCol = (a, b) => {
-    const x = nums(a).slice(0, 4), y = toNums(b)
-    return x.length >= 3 && y.length >= 3
-      && x.every((v, i) => Math.abs(v - (y[i] === undefined ? 1 : y[i])) <= (i === 3 ? 0.02 : 1))
-  }
+  // 期望值从 index.wxss **当下该生效的那一条**现读（浅照片那一态生效的是 `.bg-light` 那一条），
+  // 探针里不抄第二份 rgba。原来这两条只读基条 `.container.has-bg .srch` ⇒
+  // 浅照片态屏上量到 `rgba(20,22,26,.06)`／`.92`（正是 bg-light 那一条写的数）却判红。
+  const srchWant = (t, prop) => declOf('.srch', prop, t.light)
   await (await page.$('.acts .ic')).tap()
   await sleep(1400)
-  ck('摊开那块面压在图上就是 CSS 里那一条发的半透明白（不退成壁纸派生那支深色）',
-    sameCol(await styleOf(page, '.srch', 'background-color'), decl('.srch', 'background')),
-    `${await styleOf(page, '.srch', 'background-color')}｜源码 ${decl('.srch', 'background')}`)
-  ck('面上的字跟着翻成纸白那一档（读的是同一条规则里的 color）',
-    sameCol(await styleOf(page, '.srch', 'color'), decl('.srch', 'color')),
-    await styleOf(page, '.srch', 'color'))
+  const tS = await toneFlags(page)
+  const srBgA = await styleOf(page, '.srch', 'background-color')
+  const srInkA = await styleOf(page, '.srch', 'color')
+  ck('摊开那块面压在图上就是该生效那一条发的值（浅照片读 .bg-light 那一条，不退成壁纸派生那支深色）',
+    !!srchWant(tS, 'background') && sameCol(srBgA, srchWant(tS, 'background')),
+    `${srBgA}｜态「${tS.light ? '浅' : '深'}」｜源码 ${srchWant(tS, 'background') || '(样式里没读到＝尺子坏了)'}`)
+  ck('面上的字跟着同一条规则翻（读的就是那一条里的 color）',
+    !!srchWant(tS, 'color') && sameCol(srInkA, srchWant(tS, 'color')),
+    `${srInkA}｜源码 ${srchWant(tS, 'color') || '(样式里没读到＝尺子坏了)'}`)
+  // 另一态也强制一次：面与字两支都必须有自己的规则，少一支就是"浅底浅字"那一族
+  // （站长 10-15 03:5x 指着首屏那两枚打的"为什么还是浅底浅字，不合理，必须改"）。
+  const tS2 = await forceTone(page, 'bgLight', !tS.light)
+  const srBgB = await styleOf(page, '.srch', 'background-color')
+  const srInkB = await styleOf(page, '.srch', 'color')
+  ck('强制换到另一态，那块面与字一起翻（两支不许通吃）',
+    !!srchWant(tS2, 'background') && !!srchWant(tS2, 'color')
+    && sameCol(srBgB, srchWant(tS2, 'background')) && sameCol(srInkB, srchWant(tS2, 'color'))
+    && !sameCol(srBgA, srBgB) && !sameCol(srInkA, srInkB),
+    `另一态 面 ${srBgB}／字 ${srInkB}`)
+  await forceTone(page, 'bgLight', tS.light)
   await mp.screenshot({ path: path.join(OUT, '实测-列表搜索展开态.png') })
   // 点条以外的空白（这里点页头那行大字，它自己没有任何 tap 处理）→ 缩回
   await (await page.$('.h1')).tap()

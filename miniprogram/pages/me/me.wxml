@@ -43,10 +43,12 @@
         <view class="seg {{tab === 'set' ? 'on' : ''}}" bindtap="onTab" data-key="set">{{t.pillSettings}}</view>
         <view class="seg {{tab === 'about' ? 'on' : ''}}" bindtap="onTab" data-key="about">{{t.pillAbout}}</view>
       </view>
-      <!-- 10-15 01:4x「面板中间多了一条线」那一刀的**封层**：真实一枚（不是伪元素——前两版
-           `.sheet::after`／`.head-band::after` 复量截图证明压根没画上），把名片行最下那 30 格
-           涂成实心页面底。挂在 `.sheet` 最后一位才压得住照片；理由与那两版实测数抄在 me.wxss。 -->
-      <view class="sheet-seal"></view>
+      <!-- 10-15 01:4x「面板中间多了一条线」那一刀的实心封层（`.sheet-seal`）**同一天 03:5x 撤了**：
+           站长「设置和我的看到明显的断层…要统一到笔记列表那种」。那条线是照片被 `overflow:hidden`
+           裁掉的那条硬边，封层盖住它、自己却成了一道新台阶（实测 Δ 灰阶 +6.7／+16.5／+10.1 三行）。
+           根因是"玻璃淡满那一条线＝照片裁切那一条线"同一档 ⇒ 现在这一格抬到 740、玻璃段抬到
+           与列表页同一条 238，裁切线整条压在实心段底下，封层与它那道台阶一起作废。
+           来历、两版伪元素为什么没画上、全部实测数抄在 me.wxss 那段注释里。 -->
     </view>
   </view>
 

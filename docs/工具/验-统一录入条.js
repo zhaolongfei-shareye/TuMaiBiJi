@@ -259,7 +259,7 @@ const swapBlocks = (wxss.match(/[^{}]*\.home-swap[^{]*\{[^}]*\}/g) || [])
 const swapDock = /\.container\.entry-dock\s*\.home-swap\s*\{([^}]*)\}/.exec(wxss.replace(/\s+/g, ' '))
 ok('「调亮度／换背景／换心情」那一行只有首屏画（10-14 白底也画这一条没改；10-15 起第二屏整条隐藏）',
   /<view class="home-swap">/.test(wxml)
-  && /wx:if="\{\{bgSrc\}\}" class="swap-half" catchtap="onCycleDim"/.test(wxml)
+  && /wx:if="\{\{bgSrc\}\}" class="swap-half swap-dim" catchtap="onCycleDim"/.test(wxml)
   && !!swapDock && /display:\s*none/.test(swapDock[1]),
   swapDock ? swapDock[1].trim() : '没找到 `.container.entry-dock .home-swap` 那一条')
 ok('隐藏只准挂在展开态：收起态那一态不许有任何一条规则把这一行藏掉',

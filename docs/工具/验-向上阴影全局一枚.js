@@ -21,6 +21,10 @@ const FILES = {
   ix: 'pages/index/index.wxss',
   me: 'pages/me/me.wxss',
   cr: 'pages/create/create.wxss',
+  // 10-15 03:5x：卡顶那一段玻璃搬成两页共用的一份（站长「两个渐变框架为什么不一样，要统一到
+  // 笔记列表那种」）。`.container.has-bg .sheet` 从此不在这两页的表里，而在下面这一份——
+  // 上面第③条要圈的那一段跟着搬，不搬就是一句"这一块不在"的**假绿**（读不到不等于没写）。
+  glass: 'styles/glass-sheet.wxss',
   meWxml: 'pages/me/me.wxml',
 }
 const read = (rel) => fs.readFileSync(path.join(ROOT, 'miniprogram', rel), 'utf8')
@@ -53,7 +57,7 @@ function evaluate(S) {
   /* ① 令牌本身 */
   const lift = declOf(blockOf(APP, 'page'), '--sh-lift')
   ck('`page{}` 里那一枚 `--sh-lift` 就是列表页正本那一串（逐字）', lift === REF, lift || '(没定义)')
-  const copied = ['ix', 'me', 'cr'].filter((k) => strip(S[k]).includes(REF))
+  const copied = ['ix', 'me', 'cr', 'glass'].filter((k) => strip(S[k]).includes(REF))
   ck('那串字面量全站只在 `app.wxss` 出现一次（页面里再抄一份＝两份真相，"全局一致"当场作废）',
     copied.length === 0, `又抄了一份的页面：${copied.join(',') || '无'}`)
 
@@ -65,9 +69,10 @@ function evaluate(S) {
   const open = blockOf(strip(S.cr), '.container.dock-open .stage-panel')
   ck('展开那一档（二屏）不许把阴影关掉：那一块里不许出现 box-shadow',
     !/box-shadow/.test(open), open.replace(/\s+/g, ' ').slice(0, 70) || '(这一块不在)')
-  const band = blockOf(strip(S.me), '.container.has-bg .sheet')
-  ck('铺图那一档（名片行换玻璃）也不许把阴影关掉', !/box-shadow/.test(band),
-    band.replace(/\s+/g, ' ').slice(0, 70) || '(这一块不在)')
+  const band = blockOf(strip(S.glass), '.container.has-bg .sheet')
+  ck('铺图那一档（名片行换玻璃，10-15 起两页共用那一份）也不许把阴影关掉',
+    band.length > 0 && !/box-shadow/.test(band),
+    band.replace(/\s+/g, ' ').slice(0, 70) || '(那一条不在共用文件里＝这一把读错了地方，不是代码坏了)')
 
   /* ④ 落点管得到他点的那两档 */
   const w = S.meWxml
@@ -96,7 +101,7 @@ const KNIVES = [
   ['★展开那一档补一句 `box-shadow: none`（同一屏两态有／没有，翻两屏才看得出来）', 'cr',
     (s) => s.replace('.container.dock-open .stage-panel {\n  top: calc(100vh - 666rpx);',
       '.container.dock-open .stage-panel {\n  box-shadow: none;\n  top: calc(100vh - 666rpx);')],
-  ['★铺图那一档补一句 `box-shadow: none`（只在铺了形象图那一态掉阴影）', 'me',
+  ['★铺图那一档补一句 `box-shadow: none`（只在铺了形象图那一态掉阴影）', 'glass',
     (s) => s.replace('.container.has-bg .sheet {\n  background: linear-gradient(180deg,',
       '.container.has-bg .sheet {\n  box-shadow: none;\n  background: linear-gradient(180deg,')],
 ]

@@ -35,6 +35,10 @@ const FILES = {
   // 10-12：私密密码那一层的皮从 me.wxss 搬到这一份（三页共用）。它挂着 `.container.has-bg`
   // 那一档玻璃，所以必须和三个页面的表一起受这一把管——不然搬过去的这一份就成了没人查的暗号。
   sheet: read('styles/pwd-sheet.wxss'),
+  // 10-15 03:5x：卡顶那一段玻璃从两页各自一份搬成一份（站长「两个渐变框架为什么不一样，
+  // 要统一到笔记列表那种」）。搬出去的那一份同样挂着 `.container.has-bg .sheet`，
+  // 必须和页面的表一起受这一把管——同上面 pwd-sheet 那条理由，搬走不等于没人查。
+  glass: read('styles/glass-sheet.wxss'),
   ixjs: read('pages/index/index.js'),
   mejs: read('pages/me/me.js'),
   poster: read('utils/poster.js'),
@@ -59,7 +63,7 @@ const flat = (s) => String(s || '').replace(/\s+/g, ' ').trim()
 /** 全部判据都跑在这一个函数上：真文件调一次，每一种改坏各调一次，红绿都由它说了算。 */
 function evaluate(F) {
   const APP = strip(F.app), IX = strip(F.ix), ME = strip(F.me), CR = strip(F.cr)
-  const SH = strip(F.sheet)
+  const SH = strip(F.sheet), GS = strip(F.glass || '')
   const out = []
   const ok = (name, cond, extra) => { if (!cond) out.push(name + (extra ? ` —— ${extra}` : '')) }
 
@@ -106,10 +110,29 @@ function evaluate(F) {
   ok('卡顶那一段单独一档＝.60（甲案那一枚，两页共用）——同样六份一份不许掉',
     alphasOf('--glass-veil-band').length === 6 && alphasOf('--glass-veil-band').every((a) => a === 0.60),
     `${alphasOf('--glass-veil-band').length} 份：${alphasOf('--glass-veil-band').join('/')}`)
-  ok('列表与「我的」那两段 `.sheet` 真在吃这一枚（令牌定义了、样式没挂上＝静默不生效）',
-    [/var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+158rpx/.test(IX),
-     /var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+56rpx/.test(ME)].every(Boolean),
-    `列表158=${/var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+158rpx/.test(IX)} 我的56=${/var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+56rpx/.test(ME)}`)
+  /* 10-15 03:5x 站长「两个渐变框架为什么不一样，要统一到笔记列表那种…没有断层」⇒ 这一段
+     从"两页各写一条"（列表 0/158/198/238、「我的」0/56/108/144）搬成一份实现。
+     ⚠ 原来这一格钉的是"两页各自的停点"（列表158／我的56），那两个数**正是这次要合并掉的东西**，
+     照旧留着就是把新前提钉成红。现在钉四件事：① 共用那一条在、且吃 .60 那一档、停点是列表那四个；
+     ② 两页都 @import 了它（没 import＝那条规则压根不在这页的表里，静默不生效）；
+     ③ 两页里都不许再出现第二条 `.container.has-bg .sheet`（两份真相＝下次调必漏改一页，
+        他这两次为"两页不一致"打回过）；④ 两页各自递那两枚面令牌，缺一条就是 IACVT→整张透空。 */
+  ok('卡顶那一段两页共用一份实现：那一条在 `styles/glass-sheet.wxss` 里、吃 .60、停点是列表那四个',
+    /\.container\.has-bg \.sheet\s*\{[^}]*var\(--glass-veil-band\)\s+0,\s*var\(--glass-veil-band\)\s+158rpx[^}]*var\(--glass-fade-surface\)\s+198rpx[^}]*var\(--glass-surface\)\s+238rpx/.test(GS)
+    && /backdrop-filter:\s*var\(--glass-bf\)/.test(GS) && /-webkit-backdrop-filter:\s*var\(--glass-bf\)/.test(GS),
+    `读到 ${(GS.match(/\.container\.has-bg \.sheet/g) || []).length} 段`)
+  ok('两页都 @import 了那一份（import 必须在最前面，与 pwd-sheet 同一条规矩）',
+    /@import '\.\.\/\.\.\/styles\/glass-sheet\.wxss'/.test(IX) && /@import '\.\.\/\.\.\/styles\/glass-sheet\.wxss'/.test(ME),
+    `列表=${/@import '[^']*glass-sheet/.test(IX)} 我的=${/@import '[^']*glass-sheet/.test(ME)}`)
+  ok('两页里都不许再写第二条 `.container.has-bg .sheet`（合并完又长回来＝两份真相，下次必漏改一页）',
+    !/\.container\.has-bg \.sheet/.test(IX) && !/\.container\.has-bg \.sheet/.test(ME),
+    `列表 ${(IX.match(/\.container\.has-bg \.sheet/g) || []).length} 段／我的 ${(ME.match(/\.container\.has-bg \.sheet/g) || []).length} 段`)
+  ok('两页各自把"淡到哪一层"递齐两枚令牌（缺一枚＝var() 替换后非法＝IACVT＝整张卡透空露原图）',
+    [/--glass-surface:\s*var\(--bg-card\)/.test(blockOf(IX, '.sheet'))
+      && /--glass-fade-surface:\s*var\(--glass-fade-card\)/.test(blockOf(IX, '.sheet')),
+     /--glass-surface:\s*var\(--bg-page\)/.test(blockOf(ME, '.sheet'))
+      && /--glass-fade-surface:\s*var\(--glass-fade-page\)/.test(blockOf(ME, '.sheet'))].every(Boolean),
+    `列表卡面=${/--glass-surface:\s*var\(--bg-card\)/.test(blockOf(IX, '.sheet'))} 我的页面底=${/--glass-surface:\s*var\(--bg-page\)/.test(blockOf(ME, '.sheet'))}`)
   ok('那三枚弹窗与密码面板没跟着抬（还吃全站 .30）',
     [/\.container\.has-bg \.ci-card\.glass-dialog\s*\{[^}]*var\(--glass-veil\)\s*;/.test(IX)
       && /\.container\.has-bg \.me-email-card\.glass-dialog\s*\{[^}]*var\(--glass-veil\)\s*;/.test(ME)
@@ -234,10 +257,22 @@ function evaluate(F) {
   const meBottom = num(ME, /\.head-scrim\s*\{[^}]*?bottom:\s*(\d+)rpx/)
   const meAftH = num(ME, /\.head-scrim::after\s*\{[^}]*?height:\s*(\d+)rpx/)
   const meSheetM = num(ME, /\.sheet\s*\{[^}]*?margin-top:\s*-?(\d+)rpx/)
-  ok('「我的」646 ＝ 罩层守的 542 ＋ 延段那 104，且名片行往上盖住那一档＝延段＋原来那 40',
-    meBandH === 646 && meBottom + 542 === meBandH
+  ok('「我的」740 ＝ 罩层守的 542 ＋ 延段那 198，且名片行往上盖住那一档＝延段＋原来那 40',
+    meBandH === 740 && meBottom + 542 === meBandH
     && meAftH === meBottom && meSheetM === meAftH + 40,
     `盒 ${meBandH}／bottom ${meBottom}／延段 ${meAftH}／sheet margin ${meSheetM}`)
+  /* 10-15 03:5x 那三枚数一起从 646／104／144 抬到 740／198／238（站长「统一到笔记列表那种」）。
+     ⚠ 抬的不是"名片行的高度"，是**照片被裁的那条线**：它原来与玻璃淡满那条线同一条（都在 646），
+     所以差一像素就露一行照片，只能靠一枚实心封层去盖，而封层自己就是一道台阶。
+     现在 740 与全站那枚锚点 `poster.HEAD_IMG_H` 同一个数 ⇒ 两页照片被裁的位置也合一了。
+     这一格长出来的那 94 不占流内（`.head` 上那道 `margin-bottom:-94rpx`），下面那区仍从 646 起。 */
+  const meHeadM = num(ME, /\.head\s*\{[^}]*?margin-bottom:\s*-?(\d+)rpx/)
+  const meSheetH = num(ME, /\.sheet\s*\{[^}]*?height:\s*(\d+)rpx/)
+  const meSheetP = num(ME, /\.sheet\s*\{[^}]*?padding:\s*0 56rpx (\d+)rpx/)
+  ok('长出来那 94 只借屏幕不占地：盒 740 − 那道负 margin 94 ＝ 下面那区仍从 646 起',
+    meSheetH === meSheetM && meSheetP === meSheetH - 144 && meHeadM === meSheetP
+    && meBandH - meHeadM === 646,
+    `sheet ${meSheetH}／下内缩 ${meSheetP}／负 margin ${meHeadM} → 落区 ${(meBandH - meHeadM)}rpx`)
   /* ★这一组是 10-11 11:2x 那一格的正主（「我第二，第三切换时候背景图为什么会上下跳到…你是否有其他代码影响」）。
      实测跳幅 13.5rpx ≈ 7 视口 px（`探-头部图两页对位.js`），根因就是两页把**各自**的带高递给了 bandGeom。
      锚点收成 poster.HEAD_IMG_H 一枚之后，这三条才钉得住"以后谁再各写一个数就红"。 */
@@ -319,8 +354,8 @@ const MUT = [
   ['延段挪回 .head-band（吃不到「调亮度」那枚 opacity）', 'me', (s) => s.replace(
     '\n.head-scrim::after {', '\n.head-band::after {')],
   ['延段那支比自家末档深一档（542 出硬边）', 'me', (s) => s.replace(
-    '.head-scrim::after {\n  content: \'\';\n  position: absolute;\n  left: 0;\n  right: 0;\n  top: 100%;\n  height: 104rpx;\n  background: rgba(18, 20, 26, 0.44);',
-    '.head-scrim::after {\n  content: \'\';\n  position: absolute;\n  left: 0;\n  right: 0;\n  top: 100%;\n  height: 104rpx;\n  background: rgba(18, 20, 26, 0.60);')],
+    '.head-scrim::after {\n  content: \'\';\n  position: absolute;\n  left: 0;\n  right: 0;\n  top: 100%;\n  height: 198rpx;\n  background: rgba(18, 20, 26, 0.44);',
+    '.head-scrim::after {\n  content: \'\';\n  position: absolute;\n  left: 0;\n  right: 0;\n  top: 100%;\n  height: 198rpx;\n  background: rgba(18, 20, 26, 0.60);')],
   ['删掉 create 里一行的 -webkit- 前缀', 'cr', (s) => s.replace(
     '  backdrop-filter: var(--glass-bf);\n  -webkit-backdrop-filter: var(--glass-bf);\n  border-color',
     '  backdrop-filter: var(--glass-bf);\n  border-color')],
@@ -364,14 +399,23 @@ const MUT = [
     '  background: transparent;', '  background: rgba(20, 20, 28, 0.55);')],
   ['★浅色那态只翻罩子不翻字（白字压浅底＝需求本身没落）', 'cr', (s) => s.replace(
     '--text-primary: rgba(20, 22, 26, 0.92)', '--text-primary: #f2efe9')],
-  // 10-12 21:4x 甲案（卡顶那一段单独 .60）的四刀：这一档两头都要有牙——
+  // 10-12 21:4x 甲案（卡顶那一段单独 .60）：这一档两头都要有牙——
   // 不许被改回 .30（甲等于没落），也不许被顺手抬到全站那一枚头上（弹窗那三枚会跟着变白纸）。
-  ['★列表卡顶那一段偷回全站 .30（甲没落，那两行还在死区里）', 'ix', (s) => s.replace(
+  // ⚠ 10-15 03:5x 起那一条搬进了共用文件，所以这两刀改的键从 'ix'／'me' 换成 'glass'；
+  //   原来那两刀换的是两页各自的停点串，那两个数已经作废（见上面那四条新判据的注释）。
+  ['★卡顶那一段偷回全站 .30（甲没落，那两行还在死区里）', 'glass', (s) => s.replace(
     'var(--glass-veil-band) 0, var(--glass-veil-band) 158rpx',
     'var(--glass-veil) 0, var(--glass-veil) 158rpx')],
-  ['★「我的」名片行那一段偷回全站 .30（同一张图两个 tab 两档密度）', 'me', (s) => s.replace(
-    'var(--glass-veil-band) 0, var(--glass-veil-band) 56rpx',
-    'var(--glass-veil) 0, var(--glass-veil) 56rpx')],
+  ['★只把共用那一条的实心档换掉（令牌定义了、末段淡错一层）', 'glass', (s) => s.replace(
+    'var(--glass-fade-surface) 198rpx, var(--glass-surface) 238rpx',
+    'var(--glass-fade-surface) 198rpx, var(--bg-card) 238rpx')],
+  // 10-15 03:5x 合并这一档带来的三种新死法，各一刀：
+  ['★「我的」自己又长回一条 `.container.has-bg .sheet`（两份真相，下次调必漏改一页）', 'me', (s) => s.replace(
+    '.head-band {', '.container.has-bg .sheet {\n  background: var(--glass-veil);\n}\n.head-band {')],
+  ['★某一页没 @import 那一份（规则不在这页的表里＝静默不生效，屏上还是实心）', 'ix', (s) => s.replace(
+    "@import '../../styles/glass-sheet.wxss';", '')],
+  ['★「我的」那枚面令牌递错／漏递（var() 替换后非法＝IACVT＝整张卡透空露原图）', 'me', (s) => s.replace(
+    '--glass-fade-surface: var(--glass-fade-page);', '')],
   ['★卡顶那一档从 .60 挪到 .50（乙案那一档，推算「返回」只有 3.85 不过线）——六份一起挪', 'app', (s) => s.replace(
     /(--glass-veil-band:\s*rgba\([^)]*,\s*)0\.60(\s*\))/g, '$10.50$2')],
   ['★只把雨雾那一档的卡顶纱挪到 .50（同一件事在五档里只落四档）', 'app', (s) => s.replace(

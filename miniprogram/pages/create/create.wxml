@@ -2,7 +2,7 @@
      首屏那枚圆形 ➕ 要吃的 `--cp-cam`／`--cp-cam-ink` 与第二屏快门是同一支（站长 10-13 原话
      「带+号的按钮颜色与第二屏拍照按钮颜色一致」），而它在 `.panel` 外面，拿不到那一层的作用域。
      `createSkin()` 发的全是变量声明、没有一条直接生效的属性，挂到根上不会把别处的皮带下来。 -->
-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{bgLightTitle ? 'bg-light-title' : ''}} {{bgLightSwap ? 'bg-light-swap' : ''}} {{bgLightOut ? 'bg-light-out' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}}" style="{{skinPanel}}" bindtap="collapse">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{bgLightTitle ? 'bg-light-title' : ''}} {{bgLightDim ? 'bg-light-dim' : ''}} {{bgLightWallpaper ? 'bg-light-wallpaper' : ''}} {{bgLightMood ? 'bg-light-mood' : ''}} {{bgLightOut ? 'bg-light-out' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}}" style="{{skinPanel}}" bindtap="collapse">
   <!-- 首页背景。图就是「我的 → 卡片模板」最上面那张形象图，没设过就用包里这张站长人像。
        必须用 <image> 组件而不是 wxss 的 background-image：后者不认小程序包里的
        本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
@@ -71,9 +71,16 @@
        功能只留给已经设过图的人。所以行不再看图，只有**左边那一截**看图：「调亮度」拧的是
        `.page-scrim` 那一层的透明度，没图时那一层压根没渲染，留着它是一枚按了什么都不发生的钮。
        盒子还是原来那一条（88rpx 高、−14/−22 那两道 margin 一个字没改），所以少一截不改流内
-       高度，下面录入条那三块的落点不漂。 -->
+       高度，下面录入条那三块的落点不漂。
+       ⚠ 10-15 清晨三枚各加一枚自己的类（`.swap-dim`／`.swap-wallpaper`／`.swap-mood`）：
+       深浅判定原来吃**整行那一个矩形**，可他这张真机图在这一条横带上从左到右是
+       亮墙 → 浅衣服 → 深色背包，实测三段的亮度中位数 175／129／105（截图直接量的，含罩子那一压），
+       整行平均 126 —— 正好压在 160 那道闸的口上（换算回原图约 161，翻哪边都可能）。
+       整行一个数 ⇒ 左端那枚"浅底浅字"（他红框圈的正是这一处）与右端那枚"深底深字"只能二选一。
+       他这句要的是「计算深浅背景区域**仅限文字图片覆盖的区域**的平均值」⇒ 一枚一个矩形才是字面意思，
+       三枚各判各的。`.home-swap` 那一个矩形不再参与判定（`bgLightSwap` 这一格随之作废）。 -->
   <view class="home-swap">
-    <view wx:if="{{bgSrc}}" class="swap-half" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
+    <view wx:if="{{bgSrc}}" class="swap-half swap-dim" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
       <text class="swap-text">{{t.bgDimLabel}}</text>
       <!-- 「调亮度」那一枚 10-15 01:4x 换成太阳（他原话「调亮度的icon 改为太阳icon，风格与其他一致」）：
            与右边「换背景」那枚箭头、「换心情」那枚云朵同一个画法（`.swap-glyph` ＋ 一支 mask SVG），
@@ -83,14 +90,14 @@
            里都留着），但全仓**只有这一处在画它**——撤了渲染它就是死数，要一并清干净是另一件事，等他点头。 -->
       <view class="swap-glyph glyph-sun"></view>
     </view>
-    <view class="swap-half" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}" role="button">
+    <view class="swap-half swap-wallpaper" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}" role="button">
       <text class="swap-text">{{t.homeBgSwap}}</text>
       <view class="swap-glyph glyph-chev"></view>
     </view>
     <!-- 「换心情」＝切那一档彩色毛玻璃（站长 10-14：「切换毛玻璃改到首页，增加一个入口『换心情』
          icon是小云朵。每次点击切换一种」）。排在「换背景」之后：这两枚的位置是已拍内容，
          新添的一枚只往后加，不挪前面的落点。图形沿用同一行的落点形状（字在前、小图形在后）。 -->
-    <view class="swap-half" catchtap="onCycleMood" aria-label="{{t.moodSwap}}" role="button">
+    <view class="swap-half swap-mood" catchtap="onCycleMood" aria-label="{{t.moodSwap}}" role="button">
       <text class="swap-text">{{t.moodSwap}}</text>
       <view class="swap-glyph glyph-cloud"></view>
     </view>
