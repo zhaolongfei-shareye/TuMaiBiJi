@@ -307,3 +307,5 @@ def test_图麦克那一枚点下去是嵌它原页面不是跳走():
     assert "innerHTML" not in body and "removeItem('opsSession')" not in seg
     # 它那套皮按 1200 排，我们这一栏只有 704：那一屏必须放宽一档，否则嵌进来是挤的
     assert "main.wide" in body and "classList.toggle('wide'" in body
+    # 顶上那句"看不到任何用户…"原来是无条件的——嵌进它那一页之后就成了半句假话（框里就看得到它的用户）
+    assert '这里只能看到运营内容本身' not in body and '这两栏只看运营内容本身' in body

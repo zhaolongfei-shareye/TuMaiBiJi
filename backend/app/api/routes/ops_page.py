@@ -146,7 +146,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
   <header class="top">
     <div>
       <h1>运营后台</h1>
-      <p class="sub">左边切「数据」与「配置」两栏。这里只能看到运营内容本身，看不到任何用户的笔记与图片。</p>
+      <p class="sub">左边切「数据」与「配置」两栏，这两栏只看运营内容本身，看不到任何用户的笔记与图片；图麦克那一屏是它自己的后台，看得到它自己的用户。</p>
     </div>
     <div>
       <div class="sw"><b class="on" id="swSelf">图麦笔记</b><b id="swOther">图麦克</b></div>
