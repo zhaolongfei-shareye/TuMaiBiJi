@@ -1,12 +1,14 @@
-"""后台那一页背后的五个口：登录、看状态、上传、改图片生效位、改文案生效位。
+"""后台那一页背后的七个口：登录、看状态、上传、改图片生效位、改文案生效位、验票、看数。
 
 路径都写在这一份文件里（`/api/admin/*`），所以 `app/main.py` 挂载时不给 prefix——
 与 `assets`/`cards`/`profiles`/`landing` 同一族做法。理由在这条链上更硬一层：
 `/ops` 那一页在另一个模块里，两个模块合起来才是"后台"这一个东西，
 路径写在一起（而不是靠 prefix 拼）才看得出全貌。
 
-鉴权一律走 `app/core/admin_access.py` 那把独立的钥匙，**除了 `/api/admin/login` 本身**。
-口令没配的时候五个口全回 503（不是 401）：401 会让人以为"口令打错了"，
+鉴权一律走 `app/core/admin_access.py` 那把独立的钥匙，**除了 `/api/admin/login` 本身，
+还有 `/api/admin/verify-token`——它不吃管理 session，吃另一把只给同机兄弟服务用的换票暗号
+（`X-Exchange`，见站长 10-15 拍的那句「以我们登录为主」：门在这边，票也从这边签）。**
+口令没配的时候其余各口全回 503（不是 401）：401 会让人以为"口令打错了"，
 而真实情况是"这台服务器还没开这一页"，两句话得靠不同状态码分开。
 
 这一段上现网之后**线上那个包的行为一行都不变**：它读到多出来的 `tips` 键会跳过（那条闸门是
@@ -21,16 +23,24 @@ nginx 日志里有 32 条真微信客户端在打，别拿前者当后者的证�
 """
 import logging
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.admin_access import check_login, create_session_token, enabled, get_admin
+from app.core.admin_access import (
+    check_exchange,
+    check_login,
+    create_session_token,
+    enabled,
+    exchange_enabled,
+    get_admin,
+    verify_ticket,
+)
 from app.core.config import settings
 from app.core.errors import UserError
 from app.core.rate_limit import limiter
 from app.db.database import get_db
-from app.services import mp_assets
+from app.services import admin_stats, mp_assets
 
 logger = logging.getLogger(__name__)
 
@@ -160,3 +170,51 @@ def admin_mp_text(
         return {"kind": kind, "current": value}
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class VerifyIn(BaseModel):
+    token: str = Field(min_length=1, max_length=4096)
+
+
+@router.post("/api/admin/verify-token")
+@limiter.limit("30/minute")
+def admin_verify_token(
+    request: Request,
+    body: VerifyIn,
+    x_exchange: str | None = Header(default=None, alias="X-Exchange"),
+):
+    """给同机的兄弟服务验一枚管理票真伪（融合后台那条换票链的锚）。
+
+    **它不吃管理 session，吃另一把暗号**：调它的必须是知道 `ADMIN_EXCHANGE_SECRET` 的服务，
+    不是浏览器。为什么不在这里挂 `get_admin`——挂了就变成"要开这先得有这"，
+    换票口自己把自己锁在外面；为什么不共享 `JWT_SECRET_KEY` 给对方——两把签名钥匙合并之后，
+    任何一边泄了就是两边同时开门，而这一口只回答"这枚票真不真"，对方拿不到签名权。
+
+    暗号没配 → 503（同 `ADMIN_TOKEN` 那条纪律：没配是"这个功能不可用"，不是"门槛消失"）。
+    暗号不对 → 401，**不回"差在哪"**，也不记票值：这一行的对端是本机另一个进程，
+    它出错时该看到的是"我这把暗号没配对"，而不是别人那枚票的片段。
+    """
+    if not exchange_enabled():
+        raise HTTPException(status_code=503, detail="换票未开放：服务器还没配置换票暗号")
+    if not check_exchange(x_exchange or ""):
+        logger.warning("换票暗号不对 remote=%s", request.client.host if request.client else "?")
+        raise HTTPException(status_code=401, detail="换票暗号不对")
+    return verify_ticket(body.token)
+
+
+@router.get("/api/admin/stats/overview")
+@limiter.limit("60/minute")
+def admin_stats_overview(
+    request: Request,
+    days: int = 14,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """「数据」那一栏的全部数，只读、零新列、零迁移（算法与口径都在 `services/admin_stats.py`）。
+
+    回体里那三个字段是给页面上那句话用的：`tz`（日期按 UTC 分桶）、`window_days`（统计窗口）、
+    `totals.preset_notes_excluded`（有多少篇是预置那篇、已从"新增"里扣掉）。
+    **少了这三个，屏上每个数都会变成"不知道在说哪一段时间、哪个时区、扣没扣预置"**——
+    那正是这一栏最容易被当成读数卖的地方。
+    """
+    return admin_stats.overview(db, days=days)

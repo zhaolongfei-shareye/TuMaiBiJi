@@ -75,6 +75,11 @@ class Settings(BaseSettings):
     # 后台登录态活多久。故意短：这一把钥匙能换全站首页那张图，而它存在的地方是浏览器 sessionStorage。
     # 过期只是要重新输一次，对一个人一天点不了几次的后台没有成本。
     ADMIN_SESSION_MINUTES: int = 60
+    # 融合后台的换票暗号（10-15 站长拍「以我们登录为主」）：图麦克那个服务拿管理员票来我们这边
+    # 验真时，要在 `X-Exchange` 头里带上这一行。**留空 = 那个验真口一律 503**，理由与 ADMIN_TOKEN
+    # 同型（没配就得是"这个功能不可用"，不能是"门槛消失"）；两边不共享 JWT_SECRET_KEY，
+    # 票的可信由这一台当场判——所以轮换这一行只影响"能不能换票"，不影响任何已发出去的登录态。
+    ADMIN_EXCHANGE_SECRET: str = ""
 
     @model_validator(mode="after")
     def _require_jwt_secret(self) -> "Settings":

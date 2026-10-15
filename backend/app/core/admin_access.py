@@ -89,14 +89,13 @@ def check_login(candidate: str) -> bool:
     )
 
 
-def get_admin(authorization: str | None = Header(None)) -> str:
-    """FastAPI 依赖：不是管理凭证就 401，没配口令就 503。返回值目前没人用，留着是为了
-    调用方能拿到"这是谁"的那一天不用再改签名（多管理员在负面清单第 4 条，今天不建）。"""
-    if not enabled():
-        raise HTTPException(status_code=503, detail="后台未开放：服务器还没配置管理口令")
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="请先登录后台")
-    token = authorization.split(" ", 1)[1]
+def _decode_admin_ticket(token: str) -> dict:
+    """把一枚管理票拆开判三道：签名与有效期、`scope`、`atk` 指纹。任何一道不过就 401。
+
+    这里是 `get_admin` 与 `verify_ticket` **唯一的一份实现**。分成两份的后果很具体：
+    融合后台那天给图麦克验票的是第二份，改了判据忘了改第二份，就会出现"自己人打得开的票，
+    换票口说它无效"或者反过来——后者是那种两边都能登录、却没人说得清谁在守门的事故形状。
+    """
     try:
         payload = jwt.decode(
             token,
@@ -115,4 +114,43 @@ def get_admin(authorization: str | None = Header(None)) -> str:
         raise HTTPException(status_code=401, detail="这把钥匙开不了后台")
     if payload.get("atk") != _token_fingerprint(_configured()):
         raise HTTPException(status_code=401, detail="管理口令已更换，请重新登录")
+    return payload
+
+
+def verify_ticket(token: str) -> dict:
+    """给同机的兄弟服务验票用（融合后台那条换票链）。**不签新的、不改有效期、不落日志里的票值。**
+
+    回的那三个字段只有"这枚票是谁、能干什么、什么时候过期"，够对端签它自己的短命票了，
+    也够它把过期时间对齐到我们这一枚上——不回填 `sub` 之外的任何用户数据。
+    """
+    payload = _decode_admin_ticket(token)
+    return {"sub": payload.get("sub"), "scope": payload.get("scope"), "exp": payload.get("exp")}
+
+
+def exchange_enabled() -> bool:
+    return bool(exchange_secret())
+
+
+def exchange_secret() -> str:
+    """换票暗号。留空时验真口一律 503（同 `enabled()` 那条理由：不许当"没设密码"放行）。"""
+    return (settings.ADMIN_EXCHANGE_SECRET or "").strip()
+
+
+def check_exchange(candidate: str) -> bool:
+    if not exchange_enabled():
+        return False
+    return hmac.compare_digest(
+        (candidate or "").strip().encode("utf-8"),
+        exchange_secret().encode("utf-8"),
+    )
+
+
+def get_admin(authorization: str | None = Header(None)) -> str:
+    """FastAPI 依赖：不是管理凭证就 401，没配口令就 503。返回值目前没人用，留着是为了
+    调用方能拿到"这是谁"的那一天不用再改签名（多管理员在负面清单第 4 条，今天不建）。"""
+    if not enabled():
+        raise HTTPException(status_code=503, detail="后台未开放：服务器还没配置管理口令")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="请先登录后台")
+    _decode_admin_ticket(authorization.split(" ", 1)[1])
     return "admin"

@@ -73,6 +73,23 @@ textarea.ta { width:100%; box-sizing:border-box; border:1px solid var(--line); b
   resize:vertical; margin-top:8px }
 .langlabel { font-size:12.5px; color:var(--muted); margin-top:12px }
 .hidden { display:none }
+.grp { font-size:12.5px; color:var(--muted); letter-spacing:.08em; margin:26px 0 10px;
+  border-bottom:1px solid var(--line); padding-bottom:6px }
+/* 「数据」那一栏：数在左、口径在右，一行一条。数字统一右对齐 + 等宽数字，
+   不然竖着看三行"12 / 1,204 / 7"会以为最后一行最大。 */
+.krow { display:flex; gap:12px; align-items:baseline; padding:9px 0; border-bottom:1px solid #f1efe9 }
+.krow:last-child { border-bottom:0 }
+.knum { font-size:20px; font-weight:600; min-width:76px; text-align:right;
+  font-variant-numeric:tabular-nums }
+.kmeta { flex:1; min-width:0 }
+table.dt { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px }
+table.dt th, table.dt td { text-align:right; padding:6px 4px; border-bottom:1px solid #f1efe9;
+  font-variant-numeric:tabular-nums }
+table.dt th { color:var(--muted); font-weight:500; font-size:12px }
+table.dt th:first-child, table.dt td:first-child { text-align:left }
+button.mini { padding:5px 11px; font-size:13px; background:#fff; color:var(--ink);
+  border:1px solid var(--line) }
+button.mini.cur { background:var(--ink); color:#fff; border-color:var(--ink) }
 footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 }
 </style>
 </head>
@@ -94,6 +111,9 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
   </section>
 
   <div id="app" class="hidden">
+    <p class="grp">数据</p>
+    <div id="stats"></div>
+    <p class="grp">配置</p>
     <div id="kinds"></div>
     <div id="texts"></div>
     <footer>
@@ -341,10 +361,127 @@ function putText(kind, value, msg, done) {
   }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
 }
 
+// ---- 「数据」那一栏（方案 docs/方案-cn后台融合.md §3；口径正本在 docs/规格-后台数据分析这一栏.md）。
+// 只读：这一排按钮一个写口都不碰。每个数后面那句"这是什么数"不是装饰——
+// 少了它，"累计 1,204" 会被读成"新增 1,204"，而这一栏最容易卖出去的就是那种假数。
+var statsDays = 14;
+var SOURCE_LABELS = {
+  wechat_article: '公众号文章', web_article: '网页文章', screenshot: '截图识别',
+  manual: '亲自撰写', share_import: '转存自分享', preset: '官方预置'
+};
+var TPL_HINT = '卡片记录时写下的模板代号，原样显示（这里不另起一套名字，免得和下发那套长歪）';
+
+function numOf(v) { return (v === null || v === undefined) ? '—' : String(v); }
+
+function statCard(title, sub) {
+  var c = el('section', 'card');
+  c.appendChild(el('h2', null, title));
+  if (sub) c.appendChild(el('p', 'note', sub));
+  return c;
+}
+
+// 一行：左边那个数，右边"叫什么 + 从哪来"。
+function knum(parent, value, label, hint) {
+  var row = el('div', 'krow');
+  row.appendChild(el('b', 'knum', value));
+  var meta = el('div', 'kmeta');
+  meta.appendChild(el('div', null, label));
+  if (hint) meta.appendChild(el('div', 'note', hint));
+  row.appendChild(meta);
+  parent.appendChild(row);
+}
+
+function tableOf(parent, head, rows) {
+  var t = el('table', 'dt');
+  var htr = el('tr');
+  head.forEach(function (h) { htr.appendChild(el('th', null, h)); });
+  var thead = el('thead');
+  thead.appendChild(htr);
+  t.appendChild(thead);
+  var tb = el('tbody');
+  rows.forEach(function (r) {
+    var tr = el('tr');
+    r.forEach(function (cell) { tr.appendChild(el('td', null, cell)); });
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+  parent.appendChild(t);
+}
+
+function renderStats(d) {
+  var box = $('stats');
+  while (box.firstChild) box.removeChild(box.firstChild);
+
+  var src = '现点现算，读的是业务库那五张表（笔记／账号／卡片／邀请／分享），不是行为埋点。';
+  var t = d.totals || {};
+  var per = d.per_day || [];
+  var winNotes = 0, winAccounts = 0;
+  per.forEach(function (r) { winNotes += r.notes || 0; winAccounts += r.accounts || 0; });
+
+  var c1 = statCard('总量与这一段时间', '日期按 ' + (d.tz || 'UTC') + ' 分桶——与小程序里那串日期同一套日子，这一页不擅自换算成北京时间。' + src);
+  var days = el('div', 'row');
+  [7, 14, 30].forEach(function (v) {
+    var b = el('button', 'mini' + (v === statsDays ? ' cur' : ''), v + ' 天');
+    b.addEventListener('click', function () { if (v !== statsDays) { statsDays = v; loadStats(); } });
+    days.appendChild(b);
+  });
+  c1.appendChild(days);
+  knum(c1, numOf(winNotes), '这 ' + d.window_days + ' 天的新增笔记', '已剔除官方预置那一篇，所以它是"真的有人记了东西"');
+  knum(c1, numOf(winAccounts), '这 ' + d.window_days + ' 天的新账号', '注册落在 users 表的行，不含注销');
+  knum(c1, numOf(t.notes), '累计笔记', '同样剔除预置；库里现存 ' + numOf(t.preset_notes_excluded) + ' 篇预置没算进来');
+  knum(c1, numOf(t.accounts), '累计账号', '一个账号一行，不认设备');
+  box.appendChild(c1);
+
+  var c2 = statCard('逐日', '缺的那一天补 0，所以"三天没数"和"那三天没人来"在这张表上是两回事。');
+  tableOf(c2, ['日期', '新增笔记', '转存', '新账号'], per.map(function (r) {
+    return [r.date, numOf(r.notes), numOf(r.imports), numOf(r.accounts)];
+  }));
+  box.appendChild(c2);
+
+  var c3 = statCard('来源分布', '分得开"公众号文章"与"网页文章"是这一栏有用与否的关键；转存那一支是别人把某一篇存进他自己的库。');
+  tableOf(c3, ['来源', '篇数'], (d.sources || []).map(function (s) {
+    return [SOURCE_LABELS[s.source_type] || s.source_type, numOf(s.count)];
+  }));
+  box.appendChild(c3);
+
+  var c4 = statCard('模板热度榜', '"当前在用"只数每张笔记现在挂着的那一版；全量那一列含历史版本，所以它是"被试过"而不是"在被用"。' + TPL_HINT + '。');
+  tableOf(c4, ['模板', '出图总数', '当前在用', '不带码'], (d.templates || []).map(function (x) {
+    return [x.tpl, numOf(x.total), numOf(x.current), numOf(x.without_qr)];
+  }));
+  box.appendChild(c4);
+
+  var iv = d.invitations || {};
+  var c5 = statCard('邀请对账', '两个数一起给，这一页不替你判等：台账发的奖励与账号里持有的加成今天应当相等，不等说明有一笔走到了别的路上——但"差多少算异常"没有公开标准。');
+  knum(c5, numOf(iv.invitations), '邀请记录条数', 'invitations 表');
+  knum(c5, numOf(iv.rewards_granted), '台账发出的奖励合计', '按 invitations 里那条 reward 累加');
+  knum(c5, numOf(iv.quota_bonus_held), '账号侧持有合计', 'users.quota_bonus 之和');
+  box.appendChild(c5);
+
+  var sh = d.shares || {};
+  var c6 = statCard('分享', '活着的张数由那个"公开／不公开"开关说话（撤回置 0），不按有效期现算——过期还没清掉的一批在库里仍然是活着的行，两种数会打架。');
+  knum(c6, numOf(sh.created), '建过的分享', '包含已撤回的');
+  knum(c6, numOf(sh.active), '当前活着的', '只有这一部分能被扫码看到');
+  box.appendChild(c6);
+}
+
+function loadStats() {
+  return api('api/admin/stats/overview?days=' + statsDays).then(function (d) {
+    renderStats(d);
+  }, function (e) {
+    // 401 那条由 api() 统一处理（把这一页收回口令框），这里只接其余的：
+    // 红了不许整页空白——配置那一栏读到了就照常能用，方案里那句"少一组卡比整页打不开好"同理。
+    if (e.status === 401) return;
+    var box = $('stats');
+    while (box.firstChild) box.removeChild(box.firstChild);
+    box.appendChild(el('p', 'note', '这一栏没读到数：' + e.message));
+  });
+}
+
 function refresh() {
   return api('api/admin/mp/state').then(function (state) {
     showApp();
     render(state);
+    return loadStats();
   }, function (e) {
     if (e.status === 503) { $('login').classList.remove('hidden'); $('loginErr').textContent = e.message; }
   });
