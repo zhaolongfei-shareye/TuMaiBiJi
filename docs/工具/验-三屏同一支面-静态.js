@@ -165,8 +165,22 @@ const INK = '#23252C'
   ck('卡片页那条通栏底条走白内框那一档（面＝var(--inner-face)）',
     !!ab && /background:\s*var\(--inner-face\)/.test(ab),
     grab(ab, /background:[^;]+;/, '(没有 background 声明)'))
-  ck('它与层靠一条上投影分开（box-shadow 有 y 分量是负的那一条）',
-    !!ab && /box-shadow:\s*0\s*-/.test(ab), grab(ab, /box-shadow:[^;]+;/, '(没有 box-shadow)'))
+  /* 10-15 封版那一趟把这一枚的字面量换成了 `var(--sh-lift)`（值逐字相同，见 `docs/对照-风格统一全盘查.md` S1），
+     所以判据不能再盯着声明文本里的 `0 -`：**先展开令牌再判 y 分量的符号**。
+     展开只从 `app.wxss` 现读第一处定义（那是 `page{}` 那一族兜底，五块 `.mood-*` 与它逐字同值、
+     由 `验-五档彩色玻璃` 钉着），抄进判据就又变成两份真相。 */
+  const shadowOf = (body) => {
+    const raw = grab(body, /box-shadow:[^;]+;/, '')
+    if (!raw) return { raw: '', val: '' }
+    const m = /var\((--[\w-]+)\)/.exec(raw)
+    if (!m) return { raw, val: raw.replace(/^box-shadow:/, '').trim() }
+    const d = new RegExp('\\s*' + m[1] + ':\\s*([^;]+);').exec(appSrc())
+    return { raw, val: d ? d[1].trim() : '', tok: m[1] }
+  }
+  const abSh = shadowOf(ab)
+  ck('它与层靠一条上投影分开（字面量或令牌都行，展开后 y 分量必须是负的）',
+    !!ab && /^0\s*-/.test(abSh.val),
+    `${abSh.raw.replace(/\s+/g, ' ').slice(0, 58)}｜展开 ${abSh.tok ? abSh.tok + ' → ' : '(没展开)'}${abSh.val || '读不到'}`)
   const lo = ruleBody(sh, '.loading-overlay')
   ck('卡片页那块加载垫跟着主面走层色（不闪回页面底）',
     !!lo && /background:\s*var\(--bg-layer\)/.test(lo),

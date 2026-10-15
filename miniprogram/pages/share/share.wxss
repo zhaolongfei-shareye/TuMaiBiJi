@@ -112,7 +112,7 @@
      面＝白（`--inner-face`，真身 palette.INNER_FACE），与层靠一条**上投影**分开——
      那三个数是 `.sheet` 与照片分家用的同一条，不新调一支。 */
   background: var(--inner-face);
-  box-shadow: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
+  box-shadow: var(--sh-lift);
 }
 
 /* 模板一排：左右滚着挑。它坐在按钮条里、按钮上方那一行，跟着按钮条一起固定，

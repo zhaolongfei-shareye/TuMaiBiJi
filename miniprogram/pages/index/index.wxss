@@ -757,7 +757,7 @@
 .grip-bar {
   width: 88rpx;
   height: 8rpx;
-  border-radius: 999rpx;
+  border-radius: var(--r-pill);
   background: rgba(35, 37, 44, 0.16);
 }
 
@@ -1041,7 +1041,7 @@
      `--bg-card`，主面再换成同一支，白卡会和页面同色、分离只剩描边（规格 §7 第一条量过 1.64~1.74）。
      所以 v31 那条"三屏同一支面"到这一轮只剩半个，两条已拍口径打架，等他一句（§8.184 末）。 */
   background: var(--bg-card);
-  border-radius: 32rpx;
+  border-radius: var(--r-block);
   box-shadow: 0 30rpx 60rpx rgba(8, 10, 14, 0.32);
   z-index: 101;
   display: flex;
@@ -1197,7 +1197,7 @@
   position: relative;
   width: 92rpx;
   height: 52rpx;
-  border-radius: 999rpx;
+  border-radius: var(--r-pill);
   background: rgba(35, 37, 44, 0.16);
   transition: background 160ms ease-out;
 }

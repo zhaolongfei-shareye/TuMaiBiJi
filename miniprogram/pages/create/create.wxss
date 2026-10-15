@@ -4,7 +4,8 @@
             要与下方面板渐变毛玻璃风格一致。」
    ⇒ 四件事逐条对着面板那枚（`.stage-panel`）反过来抄：
      ① 通栏＝左右负掉容器自己的 `padding: 2rpx var(--sp-3) 0`（只写 `margin:… 0` 仍内缩 24rpx，那不是通栏）；
-     ② 面板是 `border-radius: 40rpx 40rpx 0 0`（上圆下方），这一枚是 `0 0 40rpx 40rpx`（上下方、下圆）；
+     ② 面板是 `border-radius: var(--r-card) var(--r-card) 0 0`（上圆下方），这一枚是它的反向
+        `0 0 var(--r-card) var(--r-card)`（上下方、下圆）——两枚半径都吃全站那一份 `--r-card`（app.wxss 只定义一处）；
      ③ 面板吃 `--sh-lift`（向上那枚），这一枚吃它的镜像 `--sh-drop`（向下）＝"与背景之间带阴影"；
      ④ "渐变毛玻璃风格一致"＝面板那两行滤镜照抄（blur(30px) saturate(1.15)），不然这一枚只是一层染色纱、不糊。
    00:2x 他附真机截图打回第三句：「不要有空间，要顶上去，然后渐变的程度，要与下方面板一样，现在根本不是，
@@ -27,7 +28,7 @@
   align-items: flex-start;
   margin: 0 calc(0px - var(--sp-3)) 0;
   padding: 14rpx var(--sp-3) 34rpx;
-  border-radius: 0 0 40rpx 40rpx;
+  border-radius: 0 0 var(--r-card) var(--r-card);
   box-shadow: var(--sh-drop);
   background: var(--stage-strip);
   backdrop-filter: blur(30px) saturate(1.15);
@@ -709,7 +710,7 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  border-radius: 40rpx;
+  border-radius: var(--r-card);
   /* 30 → 24：10-14 那一句「排版紧凑一点」里，白卡里那两圈白边是最大的一块死空间
      （收起态上下各 30.8 ＋ 框与条之间还富 40.4）。压到 24 之后上下各留 24，
      中间那一档由 `.sld` 的 `margin-top:auto` 自己收，不用再写数。 */
@@ -1346,7 +1347,7 @@
      并且抬到墨面之上（见 `.out`），这一层不再需要为它多垫 107 ⇒ 两根线并成一根。 */
   top: calc(100vh - 548rpx);
   z-index: 1;
-  border-radius: 40rpx 40rpx 0 0;
+  border-radius: var(--r-card) var(--r-card) 0 0;
   /* 站长 10-14 20:5x 那一句里"首屏、二屏"的落点就是这一枚（两屏同一枚元素、两个高度，一处管两屏）。
      与列表页那张纸卡同一枚 `--sh-lift`；投影画在边框外，不被本体的 `overflow: hidden` 裁掉。 */
   box-shadow: var(--sh-lift);

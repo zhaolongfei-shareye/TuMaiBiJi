@@ -185,7 +185,7 @@
   height: 102rpx;
   box-sizing: border-box;
   border: 2rpx solid var(--wp-edge);
-  border-radius: 16rpx;
+  border-radius: var(--r-btn);
   transition: border-color 0.2s;
 }
 

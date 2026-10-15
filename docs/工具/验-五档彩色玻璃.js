@@ -157,8 +157,26 @@ function evaluate(S) {
     (/margin:[^;]*/.exec(AILINE) || ['(没写 margin)'])[0])
   ck('首屏那一行：通栏靠负掉容器那一口内缩（`calc(0px - var(--sp-3))` 在，不是写死的 -24rpx）',
     /margin:[^;]*calc\(0px\s*-\s*var\(--sp-3\)\)/.test(AILINE))
-  ck('首屏那一行：上沿方角、下沿圆角，半径与面板那枚同一个 40rpx',
-    /border-radius:\s*0 0 40rpx 40rpx/.test(AILINE))
+  // 半径这一档 10-16 起钉的是**写法**（吃令牌）而不是字面量 `40rpx`：那一枚全站只在 `page{}` 定义一次，
+  // 值仍是同一个 40rpx ⇒ 换成令牌零像素变化，但反过来若有人把数抄回样式表，这一条会红（与上面那枚
+  // `box-shadow: var(--sh-drop)` 同一条规矩）。展开后仍比一次实际值，防"令牌名对了、值被人改过"。
+  const R_CARD = (declOf(blockOf(S.app, 'page'), '--r-card') || '').trim()
+  const cornersOf = (blk) => ((/border-radius:\s*([^;]*)/.exec(blk) || [, ''])[1]).trim().split(/\s+/)
+  const expands = (c) => {
+    const m = /^var\((--[\w-]+)\)$/.exec(c)
+    return m ? (declOf(blockOf(S.app, 'page'), m[1]) || '〈令牌不存在〉').trim() : c
+  }
+  const AI_RAW = cornersOf(AILINE)
+  const AI_C = AI_RAW.map(expands)
+  const PANEL_C = cornersOf(blockOf(S.createWxss, '.stage-panel')).map(expands)
+  ck('首屏那一行：上沿两角方、下沿两角吃全站那一份 `--r-card`（半径不许另抄一个数）',
+    AI_RAW.join(' ') === '0 0 var(--r-card) var(--r-card)',
+    AI_RAW.join(' ') || '(没写 border-radius)')
+  ck('首屏那一行与面板那枚是同一个半径的镜像（上圆下方 ↔ 下方上圆，两个数都从令牌展开后比）',
+    AI_C.length === 4 && PANEL_C.length === 4
+    && AI_C.every((c, i) => c === PANEL_C[3 - i])
+    && AI_C[2] === R_CARD && AI_C[0] === '0' && R_CARD === '40rpx',
+    `.ai-line[${AI_C.join(' ')}] ↔ 面板[${PANEL_C.join(' ')}]，令牌＝${R_CARD || '(读不到)'}`)
   ck('首屏那一行：阴影吃 `var(--sh-drop)`（不抄字面量，全站一份值那条规矩）',
     /box-shadow:\s*var\(--sh-drop\)/.test(AILINE))
   ck('首屏那一行：滤镜两条成对（iOS 的 WKWebView 只认 -webkit- 那一行）',
@@ -450,7 +468,8 @@ const KNIVES = [
   ['★首屏那一行撤掉 `white-space:nowrap`（英文那一句被撑成两行，他 23:0x 那句"不希望回行"白落）', 'createWxss',
     (s) => s.replace('  line-height: 1.35;\n  white-space: nowrap;', '  line-height: 1.35;')],
   ['★首屏那一行的圆角长回上沿（他那句「左上右不需要留空间」当场反了）', 'createWxss',
-    (s) => s.replace('  border-radius: 0 0 40rpx 40rpx;', '  border-radius: 40rpx 40rpx 0 0;')],
+    (s) => s.replace('  border-radius: 0 0 var(--r-card) var(--r-card);',
+                    '  border-radius: var(--r-card) var(--r-card) 0 0;')],
   ['★首屏那一行的阴影换回 `--sh-lift`（偏移朝上＝读成这块板浮在导航条上，不是"与背景之间带阴影"）', 'createWxss',
     (s) => s.replace('  box-shadow: var(--sh-drop);', '  box-shadow: var(--sh-lift);')],
   ['★那口 48rpx 的上外边距长回来（00:2x 那句「不要有空间，要顶上去」白说）', 'createWxss',
