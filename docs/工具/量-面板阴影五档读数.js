@@ -1,17 +1,20 @@
 // 量"深色面板上沿那条阴影在五档里到底读不读得出来"（站长 10-15：「默认黑色的两个面板好像没做阴影，其他颜色面板是有阴影的」）。
 //
 // 为什么必须量数不靠眼看：这句话是**五张图之间比出来的**，而静态代码已经能证一件事——
-// `--sh-lift` 只在 `app.wxss` 的 `page{}` 里定义过一枚，五块 `.mood-*` 各自那 16 枚令牌里
+// 改之前 `--sh-lift` 只在 `app.wxss` 的 `page{}` 里定义过一枚，五块 `.mood-*` 各自那 16 枚令牌里
 // 没有任何一枚是阴影，`.stage-panel` 上那条 `box-shadow` 也不带档位分支。
 // ⇒ **"墨档漏写阴影"这个假设已经被代码否掉了**，剩下的唯一解释是同一枚深色投影压在不同深浅的皮上
-//    读出的落差不同。落差这件事只有像素能证。
+//    读出的落差不同。落差这件事只有像素能证。（10-15 他拍甲之后这一族进了五档，这一把留着复测。）
 //
-// 三枚数（都以"面板上沿那一行"为原点，全部现算，不写死 y）：
-//   ① L_photo —— 上沿以上 140rpx～60rpx 那一段的平均亮度＝没被投影碰到的照片本色；
-//   ② L_shad  —— 上沿以上 24rpx～6rpx 那一段＝投影该落在的那一条；
-//   ③ L_panel —— 上沿以下 30rpx～70rpx 那一段＝面板皮自己（渐变已经走完，近实心）。
-// 判读方向是**反的**：浮起感要 L_shad < L_panel（面板上方比面板暗）。
-// 要是 L_shad > L_panel，那一条读出来就是"面板上面亮着一圈"，人眼记成"没做阴影"。
+// 四枚数（都以"面板上沿那一行"为原点，全部现算，不写死 y；字段名与 `…读数.py` 那份输出对齐）：
+//   ① L_far    —— 上沿以上 140rpx～60rpx＝没被投影碰到的背景本色；
+//   ② L_above  —— 上沿以上 24rpx～6rpx＝投影该落在的那一条；
+//   ③ L_face   —— 上沿以下 2rpx～20rpx＝面板皮那一段渐变里最浅的一档；
+//   ④ L_solid  —— 上沿以下 320rpx～380rpx＝面板实心那一段的本色。
+// 两个方向都要报，别混成一句话：
+//   **投影压暗**＝`L_far - L_above`（这一枚阴影自己使了多少劲；`验-五档彩色玻璃-真跑` 那条 ≥3 灰阶钉的就是它）；
+//   **近带减面板**＝`L_above - L_solid`（面板与它上面那一条分不分得开——彩色四档的皮本来就比压暗后的背景深，
+//   这一列是负的并不等于"没阴影"，所以结论只看前一列）。
 //
 // 跑法：MP_ROOT=/Users/zlfmac/Documents/TuMaiBiJi docs/工具/跑尺子.sh 9431 量-面板阴影五档读数
 const automator = require('miniprogram-automator')
@@ -63,12 +66,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
       await sleep(1500)
     }
     console.log(JSON.stringify(rows, null, 1))
-    console.log('\n档     L_photo  L_shad  L_panel   上方减照片  上方减面板  读法')
+    /* ⚠ 这一张表曾经整列打成 `undefined`／`NaN`：它读的是 `L_photo`／`L_shad`／`L_panel` 三枚名字，
+       而上游（`量-面板阴影五档读数.py`）发回来的是 `L_far`／`L_above`／`L_face`／`L_solid`——
+       字段改名只改了一半，于是最下面那行"读成没阴影"的结论是拿 `NaN < 0`（永远 false）印出来的，
+       **不是测量结果**。名字跟着上游对齐，判据用"投影把背景压暗了几格"（与 `验-五档彩色玻璃-真跑`
+       那条 ≥3 灰阶同一架尺子），面板与背景的分界另报一列，不混进结论。 */
+    console.log('\n档     远带   近带  面板实心  投影压暗  近带减面板  读法')
     for (const r of rows) {
-      const dPhoto = (r.L_shad - r.L_photo).toFixed(1)
-      const dPanel = (r.L_shad - r.L_panel).toFixed(1)
-      const how = Number(dPanel) < 0 ? '面板上方更暗＝浮得起' : '面板上方反而更亮＝读成"没阴影"'
-      console.log(`${r.label.padEnd(5)} ${String(r.L_photo).padStart(7)} ${String(r.L_shad).padStart(7)} ${String(r.L_panel).padStart(8)} ${String(dPhoto).padStart(10)} ${String(dPanel).padStart(11)}  ${how}`)
+      const dark = (r.L_far - r.L_above).toFixed(1)
+      const split = (r.L_above - r.L_solid).toFixed(1)
+      const how = Number(dark) >= 3 ? `投影压得动（${dark} 格）` : `投影只压 ${dark} 格＝读不出`
+      console.log(`${r.label.padEnd(5)} ${String(r.L_far).padStart(6)} ${String(r.L_above).padStart(6)} ${String(r.L_solid).padStart(8)} ${String(dark).padStart(9)} ${String(split).padStart(11)}  ${how}`)
     }
   } catch (e) {
     console.error('跑挂了：', e && e.message ? e.message : e)

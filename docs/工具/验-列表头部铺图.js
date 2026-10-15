@@ -131,18 +131,19 @@ ok('这一页不给笔记选图：首页自己零处 chooseMedia，那唯一一�
   && /wx\.chooseMedia\(/.test(ciPickFn))
 ok('这一页不出现"写死的图片路径"', !/['"]\/assets\/home-bg/.test(cjs + wxml))
 ok('data 里 bgSrc 起手是空串（模块加载时存储还没读）', /bgSrc: ''/.test(cjs))
-// 10-01 晚：这条判断从"每页各写一份"收进 app.applyNavForBand 一个出口
-// （三页原来两深一浅，就是因为「我的」页漏抄了那两行）。
-// 所以判据跟着换：这一页调那个出口，且全工程只有 app.js 里出现那支墨色一次。
+// 10-01 晚：这条判断从"每页各写一份"收进一个出口（三页原来两深一浅，就是因为「我的」页漏抄了那两行）。
+// 10-12 起这一页不再直接点导航条出口：深浅判定打包在 bgTone.applyTone 那一趟里。
+// 10-15 站长拍甲之后**"深浅"那一档整个从导航条退场**：值只剩 `palette.navFor(当前心情)` 一个来源，
+// app.js 里那两枚写死的 `#f2efe9`／`#181a20` 一起删掉 ⇒ 这一条从"值只有一份"改成"代码里一份都不许有"。
+// ⚠ 读之前先把整行注释剥掉：说明文字里**会提到**这两个数（就是记它们被删掉的那段），按原文算会假红。
 ok('导航条那一档交给共用出口（本页不再自己写 setNavigationBarColor）',
-  // 10-12 起这一页不再直接点导航条出口：深浅判定与导航条打包在 bgTone.applyTone 那一趟
-  // （三页同一个调用形状，采样逻辑不许各抄一份）。导航条那支值仍然只在 app.js 里有一份。
   /bgTone\.applyTone\(this, this\.data\.bgSrc, toneZones\(\)\)/.test(cjs)
   && !/applyNavForBand/.test(cjs) && !/setNavigationBarColor/.test(cjs))
-ok('墨色那支值全工程只有一份（在 app.js 的出口里）',
-  (read('app.js').match(/#181a20/g) || []).length === 1
+ok('顶上那一条的两支写死色从代码里退净（值只从 `palette.navFor` 来；注释里提到那两个数不算残留）',
+  !/#181a20|#f2efe9/.test(read('app.js').replace(/^\s*\/\/.*$/gm, ''))
   && !/#181a20/.test(read('pages/create/create.js'))
-  && !/#181a20/.test(read('pages/me/me.js')))
+  && !/#181a20/.test(read('pages/me/me.js')),
+  (read('app.js').replace(/^\s*\/\/.*$/gm, '').match(/#[0-9a-fA-F]{6}/g) || []).slice(0, 6).join(' '))
 ok('三个 tab 的导航条标题都吃 appName（顶部不再一页一个名字）',
   /setNavTitle\('appName', lang\)/.test(cjs)
   && /setNavTitle\('appName', lang\)/.test(read('pages/create/create.js'))

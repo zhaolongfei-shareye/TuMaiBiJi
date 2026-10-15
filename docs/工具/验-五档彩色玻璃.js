@@ -13,6 +13,8 @@
 // ② **零回归**：墨那一档（默认）展开出来的九枚玻璃数必须与 `page{}` 那份兜底逐字相同。
 //    ⚠ 底栏不在这一条里了——站长 10-14 19:3x 追了一句「换成彩色玻璃后，底部的 tab 要跟随上面的玻璃」，
 //    所以墨档底栏**也跟着换成玻璃**（rgba(35,37,44,.62)＋糊），默认那一屏这一处是他指的改动。
+//    ⚠ 10-15 拍甲之后**投影那两枚也不在这条里**（墨档 α 抬到 .42，兜底留 .16），
+//      顶上那一条（原生导航条）也一样：默认态的面值从壁纸底色换成 #23252C，这两处都是他指着的改动。
 // ③ **α 不许跟着色一起动**：透明度那几档（.30/.60/.50/.20/.72/.42/.16→.94→.95/七档渐变）
 //    是他 10-11～10-13 逐条拍的，这一轮换的只有色相。所以每档都按同一架 α 梯子核。
 // ④ **入口只有一处**：首页那枚「换心情」在、设置里「外观设置」那一格不在（隐藏不是删能力）。
@@ -164,11 +166,84 @@ function evaluate(S) {
   const bandH = (pad[0] || 0) + 24 * 1.35 + (pad[1] || 0)
   ck('首屏那一行只有一行字那么高（整枚 ≤96rpx——00:3x「高度压缩，看到一行文字就行了，不要浪费空间」；⚠ 阈值 96 是我按"一行字＋一段淡出"定的，他没给数）',
     pad.length === 2 && bandH <= 96, `上 ${pad[0]}＋字 32.4＋下 ${pad[1]} ＝ ${bandH.toFixed(1)}rpx`)
-  ck('`--sh-drop` 只在 `page` 那一族定义一处，且就是 `--sh-lift` 的镜像（只有纵向偏移取反）',
-    (S.app.match(/--sh-drop:/g) || []).length === 1
-    && /--sh-lift:\s*0 -12rpx 28rpx rgba\(18, 20, 26, 0\.16\)/.test(S.app)
-    && /--sh-drop:\s*0 12rpx 28rpx rgba\(18, 20, 26, 0\.16\)/.test(S.app),
-    `--sh-drop 出现 ${(S.app.match(/--sh-drop:/g) || []).length} 次`)
+  /* ---------- ②″ 面板与背景之间那一条投影（站长 10-15 拍甲：这一族也进五档） ----------
+     他那句「默认黑色的两个面板，好像没做阴影，但其他颜色面板是有阴影的，你对照下，哪里漏了」量出来是：
+     五档共用 `page{}` 那一枚 .16，投影落在上沿只把背景压暗 13 灰阶，而面板本体墨 46.5／象牙 164…，
+     墨档那 183 点的落差把 13 点整个吃掉 ⇒ "没做阴影"。所以他拍的是**抬墨档那一枚 α**，不是补一条声明。
+     ⚠ 原来这一格钉的是"`--sh-drop` 全站只在 `page` 那一族定义一处"，那个前提这次被他撤掉了
+        ⇒ 改的是判据，不是拿代码去迁就旧尺子。新口径四件事：
+     ① 字面量只住在 `app.wxss`：`page{}` 兜底 ＋ 五块 `.mood-*`，两枚令牌各六份，少一份就是那一档悄悄掉回兜底；
+     ② 每一块里 `--sh-drop` 就是同块 `--sh-lift` 的镜像（只有纵向偏移取反，其余逐字相同）；
+     ③ 墨档 .42、其余四档 .16、`page{}` 兜底仍 .16（没挂心情类的屏——分享页——不许跟着变深）；
+     ④ 几何那半（`0 ±12rpx 28rpx`）与色底（18,20,26）十二处一个数不许动：10-14 那句「高度全局一致」钉的就是它。 */
+  const SH = { '--sh-lift': '0 -12rpx 28rpx', '--sh-drop': '0 12rpx 28rpx' }
+  const SH_SEL = ['page'].concat(P.MOODS.map((m) => '.' + m.cls))
+  const SH_A = { page: 0.16, ink: 0.42, ivory: 0.16, celadon: 0.16, blush: 0.16, mist: 0.16 }
+  /* 形状拆成"几何"与"色底"两段，α 由 `alphaOf` 另取：这样"改了 α"与"改了偏移／换了色底"各红各的，
+     不会合成一条读不出来的读数。写不进这个形状的值（比如 `0 -20rpx`）算几何红，不当"没定义"。 */
+  const shParts = (v) => {
+    const m = /^(0 -?\d+rpx \d+rpx) rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/
+      .exec(String(v == null ? '' : v).replace(/\s+/g, ' ').trim())
+    return m ? { geo: m[1], rgb: `${m[2]},${m[3]},${m[4]}`, a: Number(m[5]) } : null
+  }
+  const shDecl = (sel, tok) => declOf(blockOf(S.app, sel), tok)
+  const shRead = (sel, tok) => shParts(shDecl(sel, tok))
+  Object.keys(SH).forEach((tok) => {
+    const miss = SH_SEL.filter((sel) => shDecl(sel, tok) === null)
+    ck(`${tok} 六份都在（page 兜底＋五块心情），少一份就是那一档悄悄掉回兜底而屏上看不出来`,
+      miss.length === 0 && (S.app.match(new RegExp(`${tok}:`, 'g')) || []).length === 6,
+      `缺 ${miss.join(',') || '无'}／共 ${(S.app.match(new RegExp(`${tok}:`, 'g')) || []).length} 份`)
+    const bad = SH_SEL.filter((sel) => {
+      const p = shRead(sel, tok)
+      return !p || p.geo !== SH[tok] || p.rgb !== '18,20,26'
+    })
+    ck(`${tok} 的几何与色底六处一个数不许动（只许动 α——10-14「高度全局一致」钉的就是它）`, bad.length === 0,
+      bad.map((sel) => `${sel}=${shDecl(sel, tok)}`).join(' ') || `${SH[tok]} rgba(18,20,26,·)`)
+  })
+  ck('每一块里 `--sh-drop` 都是同块 `--sh-lift` 的镜像（只有纵向偏移取反；偏移没取反＝一枚假令牌，首屏那条读成"浮在导航条上"）',
+    SH_SEL.every((sel) => {
+      const l = shDecl(sel, '--sh-lift'), d = shDecl(sel, '--sh-drop')
+      return !!l && !!d && norm(d) === norm(l.replace('0 -12rpx', '0 12rpx'))
+    }), SH_SEL.map((sel) => `${sel}:${shDecl(sel, '--sh-drop') || '(无)'}`).join(' ').slice(0, 90))
+  ck('墨档那两枚 .42、其余四档与 page 兜底 .16（甲案那一枚；兜底不许变深，分享页没挂心情类）',
+    (shRead('page', '--sh-lift') || {}).a === SH_A.page
+    && P.MOODS.every((m) => ['--sh-lift', '--sh-drop']
+      .every((t) => (shRead('.' + m.cls, t) || {}).a === SH_A[m.key])),
+    SH_SEL.map((sel) => `${sel}:${(shRead(sel, '--sh-lift') || {}).a}`).join(' '))
+  ck('色板那两枚与 CSS 同档同 α（正本只有 `moodVars` 一份，CSS 是镜像）',
+    P.MOODS.every((m) => ['--sh-lift', '--sh-drop']
+      .every((t) => norm(V(m.key)[t]) === norm(declOf(blockOf(S.app, '.' + m.cls), t)))))
+
+  /* ---------- ②‴ 顶上那一条（原生导航条）跟着心情走（站长 10-15 拍甲：有图没图都跟） ----------
+     原来两套真相：`applyTheme` 吃 `theme.page`（四套壁纸全是浅色 ⇒ 没铺图的页顶上永远一条浅），
+     铺图那三页另由 `applyNavForBand` 发两枚写死的 `#f2efe9`／`#181a20` ⇒ 同一条栏两深一浅，
+     就是他今天那句「最顶上的色块…依据什么，我看有些是黑底，有些是白底」。这一刀合成一个出口，
+     值只剩"当前那一档心情"一处。 */
+  ck('导航条全站只有一个出口：`app.js` 里 `setNavigationBarColor` 只出现一次，面与字都取自 `navFor(当前心情)`',
+    (S.appjs.match(/setNavigationBarColor/g) || []).length === 1
+    && /const nav = navFor\(this\.glassMood\(\)\.key\)/.test(S.appjs)
+    && /backgroundColor:\s*nav\.face/.test(S.appjs) && /frontColor:\s*nav\.front/.test(S.appjs),
+    `出现 ${(S.appjs.match(/setNavigationBarColor/g) || []).length} 次`)
+  // 10-15 这一轮我自己踩中的一条：`navFor` 用了却没进解构名单 ⇒ applyNav 一调就 ReferenceError，
+  // 顶上那条一动不动，而静态色板与 CSS 全绿。这类"用了没引"只能单独钉。
+  ck('`navFor` 已在 app.js 的 require 名单里（漏一行＝ReferenceError，导航条停在默认色）',
+    /const \{[^}]*\bnavFor\b[^}]*\} = require\('\.\/utils\/palette'\)/.test(S.appjs),
+    (/const \{[^}]*\} = require\('\.\/utils\/palette'\)/.exec(S.appjs) || ['(没读到名单)'])[0].slice(0, 60))
+  ck('`applyNavForBand` 那一支删净了（声明与调用都不许在；注释里提到它不算残留）',
+    !/applyNavForBand\s*\(/.test(S.appjs) && !/applyNavForBand\s*\(/.test(S.createJs),
+    (S.appjs.match(/.{0,12}applyNavForBand\s*\(.{0,12}/g) || []).join(' | '))
+  ck('五档的导航条面值＝五档面板那支玻璃本色，且互不相同（整屏从上到下同族）',
+    P.MOODS.every((m) => P.navFor(m.key).face === m.glass)
+    && new Set(P.MOODS.map((m) => P.navFor(m.key).face)).size === 5,
+    P.MOODS.map((m) => P.navFor(m.key).face).join(' '))
+  ck('墨档白字、其余四档黑字，且 frontColor 只用微信认的那两枚（写别的会被静默丢掉）',
+    P.navFor('ink').front === '#ffffff' && P.MOODS.slice(1).every((m) => P.navFor(m.key).front === '#000000'),
+    P.MOODS.map((m) => `${m.key}:${P.navFor(m.key).front}`).join(' '))
+  /* ⚠ 墨档（＝没点过心情的默认态）导航条**不在下面③"零回归"那一组里**：面值从壁纸底色换成
+     #23252C、字换成白，这是"顶上的色块跟毛玻璃色阶同步"这句的直接结果，不是漏改。
+     谁要把导航条扩进③，先红在这里。 */
+  ck('墨档导航条那一面就是墨档玻璃本色 #23252C（默认态跟着换＝他这一刀要的，不许当成回归改回去）',
+    P.navFor('ink').face === '#23252C', P.navFor('ink').face)
 
   /* ---------- ③ 零回归：墨档 == 今天 ---------- */
   const PAGE = blockOf(S.app, 'page')
@@ -363,6 +438,35 @@ const KNIVES = [
     (s) => s.replace('  margin: 0 calc(0px - var(--sp-3)) 0;', '  margin: var(--sp-5) calc(0px - var(--sp-3)) 0;')],
   ['★`--sh-drop` 的偏移没取反（与 `--sh-lift` 一模一样＝"镜像"那一枚是枚假令牌）', 'app',
     (s) => s.replace('--sh-drop: 0 12rpx 28rpx', '--sh-drop: 0 -12rpx 28rpx')],
+  ['★把 `page{}` 那枚兜底投影抬到 .42（分享页那一屏没挂心情类，跟着变深＝超出他那一刀）', 'app',
+    (s) => s.replace('--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);', '--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.42);')],
+  ['★把墨档那两枚投影压回 .16（他 10-15 那句「默认黑色的两个面板好像没做阴影」当场长回来）', 'app',
+    (s) => s.replace(/--sh-(lift|drop): (0 -?12)rpx 28rpx rgba\(18, 20, 26, 0\.42\)/g, '--sh-$1: $2rpx 28rpx rgba(18, 20, 26, 0.16)')],
+  ['★彩色四档的投影跟着抬到 .42（象牙那一档自己变深，他没点过这一档）', 'app',
+    (s) => s.replace('--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);\n  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);',
+      '--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.42);\n  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.42);')],
+  ['★`.mood-mist` 那两枚投影删掉（雨雾那一档悄悄掉回 `page{}` 兜底，六份少一份）', 'app',
+    (s) => {
+      const i = s.lastIndexOf('--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);')
+      return s.slice(0, i) + s.slice(i)
+        .replace('--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);\n', '')
+        .replace('  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);\n', '')
+    }],
+  ['★把雨雾那一枚 `--sh-drop` 的偏移从 12rpx 改成 20rpx（说好了只改 α，几何却跟着漂＝几屏高度不一致）', 'app',
+    (s) => {
+      const i = s.lastIndexOf('--sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);')
+      return s.slice(0, i) + s.slice(i).replace('0 12rpx 28rpx', '0 20rpx 28rpx')
+    }],
+  ['★`navFor` 从 app.js 的解构名单里漏掉（用了没引＝ReferenceError，导航条停在默认色而全批静态绿）', 'appjs',
+    (s) => s.replace(', moodOfWallpaper, navFor }', ', moodOfWallpaper }')],
+  ['★导航条那两枚写死的色塞回 app.js（一条栏两套真相长回来：铺图的页与没图的页又能各翻各的）', 'appjs',
+    (s) => s.replace('wx.setNavigationBarColor({ frontColor: nav.front, backgroundColor: nav.face, fail() {} })',
+      'wx.setNavigationBarColor({ frontColor: nav.face === "#23252C" ? "#ffffff" : "#000000", backgroundColor: "#181a20", fail() {} })')],
+  ['★`applyNavForBand` 那一支加回来（两个出口，「我的」页当年漏抄那两行＝两深一浅的老病根）', 'appjs',
+    (s) => s.replace('  applyNav() {',
+      '  applyNavForBand(hasBg) { if (hasBg) wx.setNavigationBarColor({ frontColor: \'#000000\', backgroundColor: \'#f2efe9\', fail() {} }) },\n  applyNav() {')],
+  ['★色板里把墨档的投影那两枚撤掉（CSS 与色板对不上，且这一族从五档里掉出去）', 'palette',
+    (s) => s.replace(/    '--sh-lift'[^\n]*\n    '--sh-drop'[^\n]*\n/, '')],
   ['★那一枚的下内边距抬回 150rpx（00:2x 那一版：坡走得完，可屏上就是一条 200rpx 的大灰带＝他 00:3x 打的"浪费空间"）', 'createWxss',
     (s) => s.replace('  padding: 14rpx var(--sp-3) 34rpx;', '  padding: 18rpx var(--sp-3) 150rpx;')],
   ['★底栏只写标准那行滤镜（iPhone 上胶囊不糊，安卓糊＝两机两样）', 'tabWxss',

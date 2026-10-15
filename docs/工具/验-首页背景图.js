@@ -151,13 +151,13 @@ ck('贴底挂在容器上（active 一翻就跟着翻）',
 ck('没把本地图写成 wxss 的 background-image（那条微信不认）',
   !/background-image:\s*url\(['"]?\/(assets|images)\//.test(wxss))
 ck('新建页每次进页重取图', cjs.includes('bgSrc: poster.homeBg()'))
-// 10-01 晚：三页共用 app.applyNavForBand 这一个出口（判据是"铺没铺图"，
-// 因为罩层顶部那档压完照片永远是深），没铺图时它整个不碰，主题色留给 applyTheme。
+// 10-01 晚：三页共用一个出口（那时判据是"铺没铺图"，因为罩层顶部那档压完照片永远是深）。
 // 10-10 我一度给这条加过第二个参数（新建页翻亮底墨字），站长说没下过这条需求，撤回原样（§8.191）。
-// 10-12 这条需求由他亲口下了：深浅判定搬进 utils/imgBrightness，页面只剩一个调用点，
-// 导航条由那一趟一起设——所以这一把改钉"页面只调 applyTone、不许自己碰 applyNavForBand"，
-// 并且三页必须同一个形状（谁再各抄一份 canvas 采样就红在这里）。
-ck('深浅与导航条走同一个出口（页面只调 bgTone.applyTone，且把自己那两截递进去）',
+// 10-12 这条需求由他亲口下了：深浅判定搬进 utils/imgBrightness，页面只剩一个调用点。
+// 10-15 站长拍甲：**顶上那一条不再看深浅**，改看"当前这一档心情"（`app.applyNav` ＋ `palette.navFor`），
+// `applyNavForBand` 那一支连同两枚写死的色一起删。⇒ 这一把仍钉"页面不许自己碰导航条、
+// 三页同一个调用形状"，只是它背后那个出口换了一个。
+ck('深浅与导航条各走各的出口（页面只调 bgTone.applyTone，且把自己那两截递进去；导航条不在这一趟里）',
   /bgTone\.applyTone\(this, this\.data\.bgSrc, toneZones\(\)\)/.test(cjs) && !/applyNavForBand/.test(cjs))
 ck('三页都走那一个深浅出口（不各抄一份采样）',
   ['create', 'index', 'me'].every((p) =>

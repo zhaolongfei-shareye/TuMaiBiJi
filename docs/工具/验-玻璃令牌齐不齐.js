@@ -86,8 +86,10 @@ function evaluate(F) {
   /* `--glass-jot`（首页白条那一档 .38）随 2.2 B 方案从名单里删：白条本身被他撤了
      （「左下的记下来这部部分，去掉」），create.wxss 那两条消费方一起退。
      这一份名单**就是"该定义哪几枚"的真相**：谁往 app.wxss 里加一枚新令牌，必须同时加进这里，
-     否则"定义了没人吃"与"吃了没定义"两类静默都不红。 */
-  ;['--glass-veil', '--glass-veil-band', '--glass-bf', '--glass-hair', '--glass-fill', '--glass-plate'].forEach((v) =>
+     否则"定义了没人吃"与"吃了没定义"两类静默都不红。
+     10-15 加进投影那两枚：站长拍甲之后这一族也进五档，与白纱一样是"兜底＋五块"六个落点。 */
+  ;['--glass-veil', '--glass-veil-band', '--glass-bf', '--glass-hair', '--glass-fill', '--glass-plate',
+    '--sh-lift', '--sh-drop'].forEach((v) =>
     ok(`app.wxss 的 page 那一块定义了 ${v}`, base.includes(`${v}:`)))
   /* 只钉"声明"与"消费方"两种形态，不钉名字——app.wxss/create.wxss 里那段退役说明会**提到**这枚令牌，
      按名字搜会把注释也算成残留（10-13 这一把第一版就是这么自己诈自己一次的）。 */
@@ -110,6 +112,22 @@ function evaluate(F) {
   ok('卡顶那一段单独一档＝.60（甲案那一枚，两页共用）——同样六份一份不许掉',
     alphasOf('--glass-veil-band').length === 6 && alphasOf('--glass-veil-band').every((a) => a === 0.60),
     `${alphasOf('--glass-veil-band').length} 份：${alphasOf('--glass-veil-band').join('/')}`)
+  /* 投影这一族（`--sh-lift`／`--sh-drop`）10-15 拍甲之后同样是"page 兜底＋五块心情"六个落点，
+     但 α **不是一档**：墨 .42、其余四档与兜底 .16。`alphasOf` 那支只认 `令牌: rgba(...)` 开头的值，
+     投影前面还有 `0 -12rpx 28rpx`，所以这里另用按块读的那支（`declOf`）。
+     ⚠ 兜底那一档不许跟着抬：分享页那一屏没挂心情类，抬了＝超出他这一刀。
+     几何那半（偏移与模糊半径）与镜像那半由 `验-五档彩色玻璃.js` 钉，这把只管齐不齐／α。 */
+  const SH_A = { ink: 0.42, ivory: 0.16, celadon: 0.16, blush: 0.16, mist: 0.16 }
+  ;['--sh-lift', '--sh-drop'].forEach((tok) => {
+    const read = (sel) => {
+      const m = new RegExp(`${tok}:\\s*[^;]*?rgba\\([^)]*,\\s*([\\d.]+)\\s*\\)`).exec(blockOf(APP, sel))
+      return m ? Number(m[1]) : null
+    }
+    const six = ['page'].concat(palette.MOODS.map((m) => '.' + m.cls))
+    const bad = six.filter((sel) => read(sel) !== (sel === 'page' ? 0.16 : SH_A[sel.replace('.mood-', '')]))
+    ok(`${tok} 六份都在且 α 就是"墨 .42／其余四档与兜底 .16"（少一份或错一档都算）`,
+      bad.length === 0, six.map((sel) => `${sel}:${read(sel)}`).join(' '))
+  })
   /* 10-15 03:5x 站长「两个渐变框架为什么不一样，要统一到笔记列表那种…没有断层」⇒ 这一段
      从"两页各写一条"（列表 0/158/198/238、「我的」0/56/108/144）搬成一份实现。
      ⚠ 原来这一格钉的是"两页各自的停点"（列表158／我的56），那两个数**正是这次要合并掉的东西**，
@@ -423,6 +441,14 @@ const MUT = [
   ['★弹窗跟着被抬到 .60（他 10-11 拍过的那版皮被这一刀顺走）', 'ix', (s) => s.replace(
     '.container.has-bg .ci-card.glass-dialog {\n  background: var(--glass-veil);',
     '.container.has-bg .ci-card.glass-dialog {\n  background: var(--glass-veil-band);')],
+  // 10-15 拍甲：投影这一族进五档（墨 .42／其余四档与兜底 .16）。新增那两条 ok 各配一刀，
+  // 不然它们只是"读文件"，不是"守东西"。
+  ['★把墨档那两枚投影压回 .16（他 10-15 那句「黑色那两块没做阴影」当场长回来）', 'app', (s) => s.replace(
+    /--sh-(lift|drop): 0 (-?)12rpx 28rpx rgba\(18, 20, 26, 0\.42\)/g, '--sh-$1: 0 $212rpx 28rpx rgba(18, 20, 26, 0.16)')],
+  ['★只把 `page{}` 那枚兜底抬到 .42（分享页没挂心情类，跟着变深＝超出他那一刀）', 'app', (s) => s.replace(
+    '--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16)', '--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.42)')],
+  ['★`page{}` 里那枚 `--sh-drop` 整行删掉（名单上"该定义哪几枚"少一枚＝兜底没了）', 'app', (s) => s.replace(
+    /^.*--sh-drop:.*\n/m, '')],
 ]
 let teeth = 0
 MUT.forEach(([name, key, mut]) => {

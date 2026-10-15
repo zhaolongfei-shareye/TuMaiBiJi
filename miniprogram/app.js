@@ -6,7 +6,7 @@ const cloudUpload = require('./utils/cloudUpload')
 const cardCloud = require('./utils/cardCloud')
 const profileCloud = require('./utils/profileCloud')
 const mpAssets = require('./utils/mpAssets')
-const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle, DIM_PLAIN, moodOf, moodNext, moodOfWallpaper } = require('./utils/palette')
+const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle, DIM_PLAIN, moodOf, moodNext, moodOfWallpaper, navFor } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
 // 分享卡片的路径上带着邀请人的 user id（?inviter=123）。落到本地存储是因为它必须活到
@@ -379,35 +379,27 @@ App({
   applyTheme(wallpaper) {
     // 先把当前主题记进 palette：方块按分类取哪一档、新建页那三张卡用什么面，
     // 全看这一步有没有先落地（palette.js 里 ACTIVE_THEME 那段注释写了为什么做成模块状态）。
-    const theme = setActiveTheme(wallpaper)
-    // 导航条必须和页面底色同值，否则卡片滚到顶部会看出一条色差。
-    // 之前这里写死 '#f5f5f5'，和四套主题的底色一个都对不上。
-    // 页面刚 onLoad 时这个接口可能直接 fail，忽略即可，底色由容器自己画。
-    wx.setNavigationBarColor({
-      frontColor: theme.dark ? '#ffffff' : '#000000',
-      backgroundColor: theme.page,
-      fail() {},
-    })
+    setActiveTheme(wallpaper)
+    // 顶上那一条跟着**这一档心情**走（站长 10-15 拍甲：有图没图都跟，整屏从上到下同族）。
+    // 这里原来吃 `theme.page`——四套壁纸全是浅色 ⇒ 没铺图那一态顶上永远一条浅；而铺图那三页
+    // 另由 `applyNavForBand` 发两枚写死的 `#f2efe9`／`#181a20`。同一条栏两套真相，
+    // 就是他今天那句"有些是黑底、有些是白底"。两枚一起作废，值只剩 `navFor(心情)` 一处。
+    this.applyNav()
     // tab 栏不在这里推：getTabBar 是 Page 的 API，App 实例上根本没有这个方法，
     // 原来那句 this.getTabBar?.() 恒为 undefined，等于没人管过 tab 栏的颜色和字体。
     // 三个 tab 页各自在 onShow 里已经有 this.getTabBar() 那一串，由它们推。
     return this.containerClass(wallpaper)
   },
 
-  // 铺了形象图的那三页（新建／笔记／我的），导航条跟着翻。
-  // 10-10 之前这里只有一个判断（铺没铺图），理由写在下一行：罩子顶部压 `rgba(18,20,26,.58)`，
-  // 不管换哪张图压完都是 #181A20 那一档的深，字就得是纸白。**那句前提在浅色那一态不再成立**——
-  // 壁纸本身很浅时罩子跟着翻成提亮罩，压完是浅面，白字压上去读不了，所以第二个参数把深浅递进来。
-  // 这条需求是站长 10-12 下的（10-10 我先从效果图反推过一次，被以"没下过这条需求"打回，见 §8.191）。
-  // 没铺图的态不碰导航条——上面 applyTheme 已经按壁纸底色设过了，别在这里把主题色改丢。
-  // 原来这条判断在笔记页和新建页里各写一份，「我的」页漏了，于是三页的导航条两深一浅。
-  applyNavForBand(hasBg, bgLight) {
-    if (!hasBg) return
-    // 浅底那档的底色吃全站纸白 #F2EFE9（宣纸那族），深底那档照旧 #181A20。
-    // frontColor 微信只认 #ffffff／#000000 两枚，不许写别的。
-    wx.setNavigationBarColor(bgLight
-      ? { frontColor: '#000000', backgroundColor: '#f2efe9', fail() {} }
-      : { frontColor: '#ffffff', backgroundColor: '#181a20', fail() {} })
+  /**
+   * 顶上那一条唯一的出口。面＝该档面板皮那支本色，字＝按皮的亮度在微信只认的两枚里挑
+   * （`frontColor` 只吃 `#ffffff`／`#000000`，写别的会被静默丢掉）。
+   * 页面不许自己碰——原来"铺没铺图"那一档判断在笔记页和新建页各写一份、「我的」页漏了，
+   * 于是三页的导航条两深一浅（10-01 收进一个出口，10-15 这一刀把"深浅"那一档整个撤掉）。
+   */
+  applyNav() {
+    const nav = navFor(this.glassMood().key)
+    wx.setNavigationBarColor({ frontColor: nav.front, backgroundColor: nav.face, fail() {} })
   },
 
   // 导航条标题原来只写在 pages/*/*.json 里，全是硬编码中文：英文用户在语言页切完，

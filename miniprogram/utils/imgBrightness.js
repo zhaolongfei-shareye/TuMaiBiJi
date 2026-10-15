@@ -172,7 +172,8 @@ function applyTone(page, src, zones) {
   /* 无图这一档先分流，不跟着下面那套"按像素判极性"走。
      §8.234 第 0 步要的是**显式的无图分支**，而不是让 `p === null ? false` 那一档巧合地落在墨字上：
      三页那些翻色规则全都挂在 `.has-bg` 底下，没有图就没有这个名字 ⇒ 屏上吃的就是基样式那一套墨字，
-     导航条也不动（`applyNavForBand` 第一句就是 `if (!hasBg) return`），落回 app.json 那档 #f4f2ec ＋ 黑字。
+     导航条也不在这里设（10-15 那一刀之后它只跟心情走，见下面那段注释），
+     落回 `applyTheme` 进门那一趟。
      实测过才敢这么写：三屏 × 四套壁纸 ＝ 12 个组合、48 枚字，无图态对比度全 ≥4.5
      （`docs/工具/量-无图态字色-真跑.js` ＋ `量-无图态字色.py`，10-14）。
      这两枚 data 在没有图时其实是"没有样式吃它"的死值，这里照样归置成 false，
@@ -188,14 +189,15 @@ function applyTone(page, src, zones) {
   })
   const t = both(prof)
   page.setData(t)
-  app.applyNavForBand(src, t.bgLight)
+  /* 这一趟不碰顶上那一条（站长 10-15 拍甲之后）：它的值只剩"当前那一档心情"一个来源，
+     由 `app.applyNav()` 在 `applyTheme` 里发——每一页进门都会走那一趟，深浅这一档不再参与。
+     原来这里按 `bgLight` 发两枚写死的 hex，于是同一条栏在铺图页与没铺图页两套真相。 */
   if (!src || prof) return
   measure(src).then((p) => {
     if (!p) return
     const n = both(p)
     if (n.bgLight === page.data.bgLight && n.bgLightLow === page.data.bgLightLow) return
     page.setData(n)
-    app.applyNavForBand(src, n.bgLight)
   })
 }
 
