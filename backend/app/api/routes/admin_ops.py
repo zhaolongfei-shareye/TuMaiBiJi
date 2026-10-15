@@ -1,4 +1,5 @@
-"""后台那一页背后的七个口：登录、看状态、上传、改图片生效位、改文案生效位、验票、看数。
+"""后台那一页背后的九个口：登录、看状态、上传、改图片生效位、改文案生效位、验票、看数、
+列卡片模板、改卡片模板（元数据与上下架，**改不了配方**）。
 
 路径都写在这一份文件里（`/api/admin/*`），所以 `app/main.py` 挂载时不给 prefix——
 与 `assets`/`cards`/`profiles`/`landing` 同一族做法。理由在这条链上更硬一层：
@@ -40,7 +41,7 @@ from app.core.config import settings
 from app.core.errors import UserError
 from app.core.rate_limit import limiter
 from app.db.database import get_db
-from app.services import admin_stats, mp_assets
+from app.services import admin_stats, admin_templates, mp_assets
 
 logger = logging.getLogger(__name__)
 
@@ -218,3 +219,44 @@ def admin_stats_overview(
     那正是这一栏最容易被当成读数卖的地方。
     """
     return admin_stats.overview(db, days=days)
+
+
+class TemplateIn(BaseModel):
+    """卡片模板那一栏的写体。**没有 `recipe`、没有 `group_key`**——
+    字段不在这里声明，Pydantic 就在门口把它丢了，所以"改配方"这件事在这一栏里没有落点。
+    """
+    label: str | None = None
+    label_en: str | None = None
+    sort_order: int | None = None
+    min_app_version: str | None = None
+    status: str | None = None
+
+
+@router.get("/api/admin/poster/templates")
+@limiter.limit("60/minute")
+def admin_template_list(request: Request, db: Session = Depends(get_db), _admin: str = Depends(get_admin)):
+    """十套（以及往后的 draft／archived）一次列全，含"这套在被用还是只被试过"那两个数。"""
+    rows = admin_templates.list_rows(db)
+    return {"rows": rows, "counts": admin_templates.status_counts(rows)}
+
+
+@router.put("/api/admin/poster/templates/{row_id}")
+@limiter.limit("30/minute")
+def admin_template_update(
+    row_id: int,
+    body: TemplateIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """改元数据或上下架。给 `null` 的字段＝这次不改它；**任何一项不合格，一条都不写**。
+
+    上架撞车（同一个 `template_id` 已经有一版在线上）回 400 并说明先把哪一版下架，
+    **不自动归档那一版**：归档等于替他决定"旧的那版不再下发了"。
+    """
+    try:
+        row = admin_templates.update(db, row_id, **body.model_dump())
+        return admin_templates.describe(db, row)
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+

@@ -1,4 +1,4 @@
-"""现网探针：后台融合这一期（换票口＋统计口＋`/ops`「数据」栏）在服务器上到底通不通。
+"""现网探针：后台融合这一期（换票口＋统计口＋`/ops`「数据」栏＋「卡片模板」栏）在服务器上到底通不通。
 
 本地 pytest 全绿只证明这份代码；现网那台 nginx 前缀转不转、`.env` 里那两把钥匙是不是各就各位、
 `/ops` 那一页真把「数据」渲染出来了没有——只有从公网打一次才知道
@@ -14,6 +14,11 @@
 
 这一支**只读**：一个写口都不碰，不改文案、不传图、不发任何东西。所以它不需要 `--keep`／`--revert`
 那一套收尾，跑完现网状态与跑之前逐字节相同。
+
+「卡片模板」那一栏有写口，所以这一支对它只做三种打：匿名打（应当 401）、登录后读列表、
+以及**两次注定改不到任何数据的写**——空 body（在任何一行被查出来之前就被挡）与一个不存在的 id
+（在字段校验之前就被挡）。往真行上打非法值同样会被挡，但万一"挡"这件事本身没部署对，
+代价是现网少一套卡片给用户用；真行字段的校验只在本地 pytest 判（`tests/test_admin_templates.py` 十六条）。
 """
 import os
 import sys
@@ -120,13 +125,50 @@ unknown = sorted(srcs - KNOWN)
 check("来源取值都在代码那六档闭集里（冒出第七种就是脏值上屏）", not unknown,
       str(unknown) if unknown else f"{len(srcs)} 档：{', '.join(sorted(srcs))}")
 if "web_article" not in srcs:
-    note("现网还没有一条 `web_article`，所以那一档在表里缺席＝数据事实，不是分不开")
+    note("这一台库里没有一条 `web_article`，所以那一档在表里缺席＝数据事实，不是分不开")
 
-# ---------------- ⑤ 那一页：部署的必须是带「数据」栏的这一版 ----------------
+# ---------------- ⑤ 卡片模板那一栏：门、形状、以及两次注定改不到数据的写 ----------------
+TPL = f"{BASE}/api/admin/poster/templates"
+check("匿名打模板列表口是 401", httpx.get(TPL, timeout=20).status_code == 401)
+r = httpx.get(f"{BASE}/api/poster/templates/", headers=H, timeout=20)
+check("管理票打用户那个下发口是 401（方向只有一个，反了就是提权）", r.status_code == 401, f"HTTP {r.status_code}")
+r = httpx.get(TPL, headers=H, timeout=30)
+check("登录后模板列表口 200", r.status_code == 200, f"HTTP {r.status_code}{'' if r.status_code == 200 else ' ' + r.text[:80]}")
+tb = r.json() if r.status_code == 200 else {}
+if tb:
+    check("回体两块齐全（rows 与 counts）", {"rows", "counts"} <= set(tb), str(sorted(tb)))
+    check("counts 三态各一个数（少一态就是页面那个'线上几套'会说谎）",
+          {"live", "draft", "archived"} <= set(tb.get("counts") or {}), str(tb.get("counts")))
+    need_row = {"id", "template_id", "label", "label_en", "group_key", "sort_order", "status",
+                "min_app_version", "content_hash", "recipe", "used", "used_current"}
+    missing = sorted(need_row - set(tb["rows"][0])) if tb.get("rows") else ["一行都没有"]
+    check("每行十二个字段齐全（配方只读也要看得见）", not missing, f"缺 {missing}")
+    if tb.get("rows"):
+        check("列表按排序从小到大回", [x["sort_order"] for x in tb["rows"]] == sorted(x["sort_order"] for x in tb["rows"]),
+              str([x["sort_order"] for x in tb["rows"]][:6]) + "…")
+    live_ids = [x["template_id"] for x in tb.get("rows", []) if x["status"] == "live"]
+    check("同一套 template_id 只有一版在线上（那条部分唯一索引在现网是真的）",
+          len(live_ids) == len(set(live_ids)), f"线上 {len(live_ids)} 套")
+    note(f"这一台今天：线上 {tb['counts'].get('live')} 套／草稿 {tb['counts'].get('draft')}／已下架 {tb['counts'].get('archived')}")
+    # 用户那道口读到的套数应当＝这里数的 live（两处不是一个口，但必须是同一个事实）
+    r2 = httpx.get(f"{BASE}/api/poster/templates/", timeout=20)
+    note(f"用户口不带票是 {r2.status_code}（要带用户票才读得到，这一支不签用户票）")
+r = httpx.put(f"{TPL}/0", json={}, headers=H, timeout=20)
+check("空 body 被挡且说的是'什么都没要改'（这一句在查任何一行之前）",
+      r.status_code == 400 and "什么都没要改" in r.json().get("detail", ""), f"HTTP {r.status_code} {r.text[:60]}")
+r = httpx.put(f"{TPL}/999999", json={"status": "on"}, headers=H, timeout=20)
+check("不存在的 id 被挡并写明 id（这一句在字段校验之前，所以非法状态也到不了任何一行）",
+      r.status_code == 400 and "999999" in r.json().get("detail", ""), f"HTTP {r.status_code} {r.text[:60]}")
+
+# ---------------- ⑥ 那一页：部署的必须是带「数据」栏与「卡片模板」栏的这一版 ----------------
 r = httpx.get(OPS, timeout=20)
 page = r.text
 check("/ops 匿名可取（它只是个口令框）", r.status_code == 200, f"HTTP {r.status_code}")
 check("/ops 那页真带「数据」那一栏", "renderStats" in page and "api/admin/stats/overview" in page)
+check("/ops 那页真带「卡片模板」那一屏",
+      "loadTemplates" in page and "view-tpl" in page and "api/admin/poster/templates" in page)
+check("/ops 那页三屏各一个容器（不是一列到底）",
+      all(f'id="view-{v}"' in page for v in ("stats", "config", "tpl")))
 check("/ops 那页仍零 innerHTML（动态串一律 textContent）", "innerHTML" not in page)
 check("/ops 不缓存（no-store）", "no-store" in r.headers.get("cache-control", ""),
       r.headers.get("cache-control", ""))

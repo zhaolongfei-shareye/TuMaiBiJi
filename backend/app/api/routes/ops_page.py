@@ -5,7 +5,7 @@
 一处部署、跟着 `backend/deploy.sh` 走、不用配 CORS、**口令不落在 nginx 静态目录里**。
 
 这一页零构建：原生 HTML + 原生 JS，没有打包步骤、没有依赖、不引前端框架。它的全部数据都从
-`/api/admin/*` 那四个口现取，页面本身不含任何服务端拼出来的用户内容——所以这里没有一处
+`/api/admin/*` 那几个口现取，页面本身不含任何服务端拼出来的用户内容——所以这里没有一处
 需要 HTML 转义，也就没有"漏了一个 `_e()`"这种坑。JS 里同理：**动态字符串一律走
 `textContent`，全页零 `innerHTML`**，因为历史那些 `note` 是操作者手打的，谁也不知道他会粘什么进来。
 
@@ -54,6 +54,7 @@ button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line) }
 button.danger { background:#fff; color:var(--clay); border:1px solid var(--clay) }
 button:disabled { opacity:.45; cursor:default }
 .err { color:var(--clay); font-size:13px; margin-top:10px; min-height:18px }
+.err.ok { color:#1d6b3f }
 .thumb { width:96px; height:96px; object-fit:cover; border-radius:8px; border:1px solid var(--line); display:block }
 .big { width:100%; max-height:320px; object-fit:contain; border-radius:8px; border:1px solid var(--line);
   background:#faf9f6; margin-top:10px }
@@ -115,6 +116,23 @@ table.dt th:first-child, table.dt td:first-child { text-align:left }
 button.mini { padding:5px 11px; font-size:13px; background:#fff; color:var(--ink);
   border:1px solid var(--line) }
 button.mini.cur { background:var(--ink); color:#fff; border-color:var(--ink) }
+/* 「卡片模板」那一栏：一行一套，代号与状态在上，四个可改字段排成一排，配方只读折叠。
+   输入框比配置那一栏矮一档，是因为一屏要放十套，不是把它当次要内容。 */
+.tplhead { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap }
+.tplhead code { font:13px/1.5 ui-monospace,Menlo,monospace; color:var(--ink) }
+.tag { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted) }
+.tag.live { color:#1d6b3f; border-color:#bcd8c4 }
+.tag.draft { color:var(--clay); border-color:#f0c48a }
+.fields { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px }
+.fields label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); flex:1; min-width:120px }
+.fields label.w2 { flex:2; min-width:180px }
+.fields input { border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:14px;
+  color:var(--ink); background:#fff; min-width:0; width:100% }
+details.rec { margin-top:12px; border-top:1px solid var(--line); padding-top:10px }
+details.rec summary { font-size:12.5px; color:var(--muted); cursor:pointer }
+details.rec pre { margin:8px 0 0; padding:10px; background:#faf9f6; border:1px solid var(--line);
+  border-radius:8px; font:12px/1.6 ui-monospace,Menlo,monospace; white-space:pre-wrap; word-break:break-all;
+  max-height:260px; overflow:auto }
 footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 }
 </style>
 </head>
@@ -148,11 +166,13 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
     <div id="main">
       <div id="view-stats" class="view"><div id="stats"></div></div>
       <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div></div>
+      <div id="view-tpl" class="view hidden"><div id="tpls"></div></div>
       <footer>
         <div>换完之后：线上小程序要<strong>退出重进（冷启）</strong>才看到新图，正在用的用户不会当场被换。</div>
         <div>提醒：换一张明暗和原图差很多的，会把首页那几行字的对比度带偏——第一屏的字色是按壁纸档派生的，
         运营图不在这条派生链里。发布后请在真机上看一眼那一屏。</div>
         <div>文案那一栏同理：改了要等用户下一次冷启（拉到新那份之后）才轮得到，正在看的那一句不会当场跳。</div>
+        <div>「卡片模板」那一栏改的是名单与叫法（哪几套在发、叫什么、排第几、要哪个包才给），画面本身在这里改不了。</div>
         <div>「数据」这一栏读的是业务库里的行数，现点现算；没有新增任何用户行为埋点。</div>
       </footer>
     </div>
@@ -203,13 +223,15 @@ var NAV = [
   ] },
   { grp: '配置', items: [
     { label: '运营图', view: 'config', key: 'kind:home_bg' },
-    { label: '首屏 Tips', view: 'config', key: 'text:tips' }
+    { label: '首屏 Tips', view: 'config', key: 'text:tips' },
+    { label: '卡片模板', view: 'tpl', key: 'tpl:list' }
   ] }
 ];
 
 function showView(v) {
-  $('view-stats').classList.toggle('hidden', v !== 'stats');
-  $('view-config').classList.toggle('hidden', v !== 'config');
+  ['stats', 'config', 'tpl'].forEach(function (name) {
+    $('view-' + name).classList.toggle('hidden', v !== name);
+  });
 }
 
 function markNav(key) {
@@ -445,6 +467,135 @@ function putText(kind, value, msg, done) {
   }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
 }
 
+// ---- 「卡片模板」那一栏（方案 docs/方案-cn后台资产管理.md 的 P1，站长 10-15「先补笔记模板管理界面」）。
+// 这一栏只改四样元数据＋上下架。配方（就是"画面长什么样"那份 JSON）**只给看，不给改**——
+// 在线编辑配方是 P2，是唯一一个"不发版就能改用户看到的画"的口子，它没被拍开，所以界面上
+// 连一个能输入配方的地方都不许出现：有落点就有人会去点它。
+var TPL_STATUS_LABEL = { live: '线上', draft: '草稿（不下发）', archived: '已下架' };
+
+function fieldInt(labelText, cls, value) {
+  var lab = el('label', cls);
+  lab.appendChild(el('span', null, labelText));
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = String(value === null || value === undefined ? '' : value);
+  lab.appendChild(inp);
+  return { lab: lab, inp: inp };
+}
+
+function tplCard(r) {
+  var card = el('section', 'card');
+  card.dataset.id = r.id;  // 重读之后还要找得到这一行（回执要落在它身上，见 loadTemplates 的 flash）
+  var head = el('div', 'tplhead');
+  head.appendChild(el('code', null, r.template_id));
+  head.appendChild(el('span', 'tag ' + r.status, TPL_STATUS_LABEL[r.status] || r.status));
+  head.appendChild(el('span', 'note', '分组 ' + r.group_key + '　hash ' + shortHash(r.content_hash)));
+  card.appendChild(head);
+
+  card.appendChild(el('p', 'state ' + (r.status === 'live' ? 'on' : 'off'),
+    r.status === 'live' ? '在线上：用户那道口能拿到这一套。'
+      : (r.status === 'draft' ? '草稿：不下发，只有本地拿真机验的人看得见。' : '已下架：不再下发，但记录还在（历史行不许删）。')));
+  card.appendChild(el('p', 'note', '出图 ' + r.used + ' 张　其中当前挂着 ' + r.used_current + ' 张　' +
+    '改完要等客户端下一次冷启才换；' + (r.updated_at ? '上次改动 ' + dayOf(r.updated_at) + '。' : '今天还没改过。')));
+
+  var fZh = fieldInt('中文名', 'w2', r.label);
+  var fEn = fieldInt('英文名', 'w2', r.label_en);
+  var fSort = fieldInt('排序（小的在前）', null, r.sort_order);
+  var fVer = fieldInt('最低包版本', null, r.min_app_version);
+  var fields = el('div', 'fields');
+  fields.appendChild(fZh.lab); fields.appendChild(fEn.lab);
+  fields.appendChild(fSort.lab); fields.appendChild(fVer.lab);
+  card.appendChild(fields);
+
+  var msg = el('div', 'err');
+  card.appendChild(msg);
+  var row = el('div', 'row');
+  var btnSave = el('button', null, '保存这几项');
+  var btnSt = el('button', r.status === 'live' ? 'danger' : 'ghost', r.status === 'live' ? '下架这一版' : '上架这一版');
+  row.appendChild(btnSave); row.appendChild(btnSt);
+  card.appendChild(row);
+
+  // 只送"跟刚读出来的不一样"的那几项：全量回写会把没碰过的字段也重新判一遍，
+  // 报回来的错就不是"我改错了"而是"我没改的那格错了"。
+  btnSave.addEventListener('click', function () {
+    msg.textContent = ''; msg.className = 'err';
+    var body = {};
+    if (fZh.inp.value !== String(r.label)) body.label = fZh.inp.value;
+    if (fEn.inp.value !== String(r.label_en)) body.label_en = fEn.inp.value;
+    if (fSort.inp.value !== String(r.sort_order)) body.sort_order = fSort.inp.value;
+    if (fVer.inp.value !== String(r.min_app_version)) body.min_app_version = fVer.inp.value;
+    if (!Object.keys(body).length) { msg.textContent = '这一行一个字都没改。'; return; }
+    btnSave.disabled = true; btnSt.disabled = true;
+    api('api/admin/poster/templates/' + r.id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    }).then(function () {
+      return loadTemplates({ id: r.id, text: '已写入。用户那道口下一次冷启读到的是这一版。' });
+    }, function (e) { msg.textContent = e.message; })
+      .then(function () { btnSave.disabled = false; btnSt.disabled = false; });
+  });
+  btnSt.addEventListener('click', function () {
+    msg.textContent = '';
+    var to = r.status === 'live' ? 'archived' : 'live';
+    btnSt.disabled = true;
+    api('api/admin/poster/templates/' + r.id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: to })
+    }).then(function () {
+      return loadTemplates({ id: r.id, text: to === 'live'
+        ? '已上架：用户那道口下一次冷启能选到它。'
+        : '已下架：不再下发，记录还在。' });
+    },
+      // 被挡下（同一套已经有一版在线上）时**只报错、不重读**：400 意味着库里一个字没动，
+      // 屏上那份还是真的；而重读会把卡片连同这句"为什么没成"一起重建掉——
+      // 症状是"点下架没反应，也没说为什么"。（本机 10-15 真点撞出来过。）
+      function (e) { msg.textContent = e.message; btnSt.disabled = false; });
+  });
+
+  var rec = el('details', 'rec');
+  rec.appendChild(el('summary', null, '配方（只读，' + ((r.recipe && r.recipe.steps) || []).length + ' 步）'));
+  rec.appendChild(el('pre', null, JSON.stringify(r.recipe, null, 1)));
+  card.appendChild(rec);
+  return card;
+}
+
+function renderTemplates(d, flash) {
+  var box = $('tpls');
+  while (box.firstChild) box.removeChild(box.firstChild);
+
+  var c = d.counts || {};
+  var sum = statCard('线上几套', '这一栏改的是"哪几套卡片在被下发、叫什么、排第几、要哪个包才给"。' +
+    '改完落库即生效于下发口那个回体，但正在用的用户要等下一次冷启。');
+  sum.dataset.key = 'tpl:list';
+  knum(sum, numOf(c.live), '线上', '客户端「卡片模板」那一页能选到的套数');
+  knum(sum, numOf(c.draft), '草稿', '不进下发口，改的人本地验');
+  knum(sum, numOf(c.archived), '已下架', '不再下发，记录留着（老包拿过的那份要一直收得住）');
+  box.appendChild(sum);
+
+  (d.rows || []).forEach(function (r) { box.appendChild(tplCard(r)); });
+  if (!(d.rows || []).length) box.appendChild(el('p', 'note', '库里一行模板都没有（闸没开或种子没灌）。'));
+
+  // 回执落在**重读之后那一行**上：卡片是刚重建的，写进旧节点等于没写
+  // （本机 10-15 真点出来过——保存成功了屏上却一个字没变，只剩顺序自己动了）。
+  if (flash) {
+    var hit = box.querySelector('.card[data-id="' + flash.id + '"]');
+    if (hit) {
+      var m = hit.querySelector('.err');
+      m.classList.add('ok');  // 类名只加不换：这一格的标识要是被换掉，页面上"上一句成了还是砸了"就没处找了
+      m.textContent = flash.text;
+    }
+  }
+}
+
+function loadTemplates(flash) {
+  return api('api/admin/poster/templates').then(function (d) {
+    renderTemplates(d, flash);
+  }, function (e) {
+    if (e.status === 401) return;
+    var box = $('tpls');
+    while (box.firstChild) box.removeChild(box.firstChild);
+    box.appendChild(el('p', 'note', '这一栏没读到：' + e.message));
+  });
+}
+
 // ---- 「数据」那一栏（方案 docs/方案-cn后台融合.md §3；口径正本在 docs/规格-后台数据分析这一栏.md）。
 // 只读：这一排按钮一个写口都不碰。每个数后面那句"这是什么数"不是装饰——
 // 少了它，"累计 1,204" 会被读成"新增 1,204"，而这一栏最容易卖出去的就是那种假数。
@@ -570,7 +721,8 @@ function refresh() {
   return api('api/admin/mp/state').then(function (state) {
     showApp();
     render(state);
-    return loadStats();
+    // 三屏各读各的口，互不牵连：统计或模板那一头红了，不许把配置那栏一起带走（两个函数自己吞错）。
+    return Promise.all([loadStats(), loadTemplates()]);
   }, function (e) {
     if (e.status === 503) { $('login').classList.remove('hidden'); $('loginErr').textContent = e.message; }
   });

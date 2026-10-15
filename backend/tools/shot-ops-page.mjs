@@ -74,6 +74,8 @@ async function main() {
       statCards: document.querySelectorAll('#stats .card').length,
       kindCards: document.querySelectorAll('#kinds .card').length,
       textCards: document.querySelectorAll('#texts .card').length,
+      tplCards: document.querySelectorAll('#tpls .card').length,
+      tplSummary: (document.getElementById('tpls').textContent||'').replace(/\\s+/g,' ').slice(0,160),
       statsText: (document.getElementById('stats').textContent||'').slice(0,400),
       height: document.body.scrollHeight,
       tableRows: document.querySelectorAll('#stats table.dt tbody tr').length,
@@ -91,11 +93,12 @@ async function main() {
   if (!measured.height) throw new Error('页面没量到高度：' + JSON.stringify(measured).slice(0, 300));
   const { writeFileSync } = await import('node:fs');
 
-  // 两屏各存一张：数据一屏、配置一屏（10-15 站长打回"数据分析和配置要分开"，判据要看得到分屏结果）。
-  const shots = process.env.OPS_CLICK ? [
-    { file: OUT.replace(/\.png$/, '-数据.png'), label: null },
-    { file: OUT.replace(/\.png$/, '-配置.png'), label: process.env.OPS_CLICK },
-  ] : [{ file: OUT, label: null }];
+  // 一屏一张：数据 / 配置 / 卡片模板（OPS_CLICK 给逗号分隔的左栏条目名，各存一张）。
+  const labels = (process.env.OPS_CLICK || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const shots = labels.length
+    ? [{ file: OUT.replace(/\.png$/, '-数据.png'), label: null },
+       ...labels.map((lb) => ({ file: OUT.replace(/\.png$/, `-${lb}.png`), label: lb }))]
+    : [{ file: OUT, label: null }];
 
   for (const s of shots) {
     if (s.label) {

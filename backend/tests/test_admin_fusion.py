@@ -256,7 +256,8 @@ def test_后台那一页有数据那一组格子():
     body = src.split("_PAGE", 1)[1]
     assert "renderStats" in body and "loadStats" in body
     assert "api/admin/stats/overview" in body, "取数那句没写，或写成了别的口"
-    assert "refresh()" in body and "return loadStats()" in body, "登录进来那一趟没顺手拉数据"
+    assert "refresh()" in body and "Promise.all([loadStats(), loadTemplates()])" in body, \
+        "登录进来那一趟没顺手拉数据（10-15 起三屏一起拉，这句就是那条调用）"
     assert "id=\"stats\"" in body and "$('stats')" in body
     # 这一栏的硬纪律与整页一致：动态串一律 textContent，全页零 innerHTML
     assert "innerHTML" not in body
