@@ -7,6 +7,7 @@ const assetQueue = require('../../utils/assetQueue.js')
 const { compressForBackup } = require('../../utils/imageCompress.js')
 const person = require('../../utils/person.js')
 const bgTone = require('../../utils/imgBrightness.js')
+const mpAssets = require('../../utils/mpAssets.js')
 
 /* 深浅分两截判（站长 10-12 21:1x：「请按照上下部分来分别判断，避免全图平均，造成差异」）。
    这一页上截＝左上角那行大字与那枚标题图（实测落在屏高 9%~16%），
@@ -174,12 +175,20 @@ Page({
     // Tips 前面那枚小黄点（站长 10-01 晚：象征小灯泡）。色值必须由 palette 发下来：
     // `验-统一录入条.js` 专门扫 create.wxss 里有没有 #F6C445，写进样式表就红。
     tipDotStyle: 'background:' + TIP_DOT,
+    // 语言角标前面那枚小黄点（站长 10-15 14:0x「中 EN 的下划线去掉，不要加粗，前面加小黄点就行」）。
+    // 与上面那句 Tips 的点**同一支色、同一个出口**：色值只从 palette 来，一次都不许写进 WXSS。
+    langDotStyle: 'background:' + TIP_DOT,
   },
 
   // 横条上面那一行轮播 Tips：六句教人用现成的能力（拍照提炼、链接、分享选模板、
-  // 卡片那枚「分享」、私密那一格、外观）。句子全在 i18n，这里只管取和切。
+  // 卡片那枚「分享」、私密那一格、外观）。
+  // 站长 10-15「Tips 改为后台配置」⇒ 现在**两份来源**：后台下发那份优先，拿不到才落回 i18n。
+  // 顺序不许倒过来判：包里那六句是兜底真相，下发那一头坏了（没拉到、停用了、数组是空）
+  // 屏上必须还有字，而不是那一行整条消失（`wx:if="{{tips.length}}"` 会把空数组渲染成没有这一行）。
+  // 下发也不走"合并"：一次下发＝整份替换，与卡片模板那条同纪律，撤回才能秒级生效。
   tipsFor(lang) {
-    const arr = t('tips', lang)
+    const remote = mpAssets.serverTips(lang)
+    const arr = remote || t('tips', lang)
     return Array.isArray(arr) ? arr : []
   },
 

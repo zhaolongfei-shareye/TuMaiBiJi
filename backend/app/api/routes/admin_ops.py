@@ -1,4 +1,4 @@
-"""后台那一页背后的四个口：登录、看状态、上传、改生效位。
+"""后台那一页背后的五个口：登录、看状态、上传、改图片生效位、改文案生效位。
 
 路径都写在这一份文件里（`/api/admin/*`），所以 `app/main.py` 挂载时不给 prefix——
 与 `assets`/`cards`/`profiles`/`landing` 同一族做法。理由在这条链上更硬一层：
@@ -6,11 +6,15 @@
 路径写在一起（而不是靠 prefix 拼）才看得出全貌。
 
 鉴权一律走 `app/core/admin_access.py` 那把独立的钥匙，**除了 `/api/admin/login` 本身**。
-口令没配的时候四个口全回 503（不是 401）：401 会让人以为"口令打错了"，
+口令没配的时候五个口全回 503（不是 401）：401 会让人以为"口令打错了"，
 而真实情况是"这台服务器还没开这一页"，两句话得靠不同状态码分开。
 
-这一段上现网之后现网小程序的行为一行都不变：客户端还没有读 `/api/mp/config` 的代码，
+这一段上现网之后**线上那个包（2.1.10）的行为一行都不变**：它里面还没有读 `/api/mp/config` 的代码，
 `mp_assets` / `mp_settings` 两张表除了这一页以外没有任何写入者（方案 §四 P0-a 的副作用声明）。
+⚠ 这句 10-15 之后要盯紧一点：文案那半截（`tips`）的读法这一轮加进了 `utils/mpAssets.js`，
+所以从下一个出包（2.2.0 那批）起，这一条链**开始真的影响屏上那行字**了。
+判它到底生没生效，看的是 `验-Tips后台下发-真跑` 在模拟器里读到的是下发那份还是包里那六句，
+不是看后台点没点过"发布"。
 """
 import logging
 
@@ -46,6 +50,15 @@ class PublishIn(BaseModel):
     这两句在数据层本来就是同一栏的两种取值，分成两个口就会有两个"怎么写这一栏"的实现。
     """
     asset_id: int | None = None
+
+
+class TextIn(BaseModel):
+    """`value` 给 `{"zh": […], "en": […]}` 是"发这一份"，给 null 是"停用，回到包里那六句"。
+
+    这里**不声明句子形状**（不收 `list[str]`、不定 min_length）：形状与上限的唯一出处是
+    `services/mp_assets.clean_text`，路由再写一道就成了第二份真相，改上限那天必然有一处忘。
+    """
+    value: dict | None = None
 
 
 @router.post("/api/admin/login")
@@ -117,5 +130,30 @@ def admin_mp_setting(
             return {"kind": kind, "current": None}
         asset = mp_assets.publish(db, kind, body.asset_id)
         return {"kind": kind, "current": mp_assets.describe(asset)}
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/api/admin/mp/texts/{kind}")
+@limiter.limit("30/minute")
+def admin_mp_text(
+    kind: str,
+    body: TextIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """文案那一栏的生效位，与上面那个图片口**同一路子**：一个口两种写法。
+
+    `value` 给对象是"发这一份"，给 null 是"停用，回到包里那六句"。
+    校验全在 `services/mp_assets.clean_text`（句子形状、两份语言、上限），这里只做整份退回：
+    不合格就 400，**不收半份**——文案是一轮播报的序列，收半份界面上读出的是"少一句且不知道少哪句"。
+    """
+    try:
+        if body.value is None:
+            mp_assets.clear_text(db, kind)
+            return {"kind": kind, "current": None}
+        value = mp_assets.set_text(db, kind, body.value)
+        return {"kind": kind, "current": value}
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))

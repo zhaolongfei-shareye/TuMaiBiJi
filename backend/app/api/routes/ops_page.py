@@ -29,7 +29,7 @@ _PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>运营图后台 · 图麦笔记</title>
+<title>运营后台 · 图麦笔记</title>
 <style>
 :root { --ink:#14161A; --muted:#6b6f78; --line:#e3e0d8; --paper:#F2EFE9; --clay:#D2683F; }
 * { box-sizing:border-box }
@@ -66,14 +66,20 @@ button:disabled { opacity:.45; cursor:default }
   text-align:center; font-size:12px; color:var(--muted) }
 .swatch.cur { border-color:var(--ink); box-shadow:0 0 0 2px rgba(20,22,26,.08) }
 .swatch img { width:72px; height:72px; object-fit:cover; border-radius:6px; display:block }
+/* 文案那一栏：一行一句，所以给的是 textarea 而不是输入框。字号与正文同档，
+   行高留宽一点是为了数得清句子。 */
+textarea.ta { width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:8px;
+  padding:9px 11px; font-size:14px; line-height:1.7; font-family:inherit; min-height:120px;
+  resize:vertical; margin-top:8px }
+.langlabel { font-size:12.5px; color:var(--muted); margin-top:12px }
 .hidden { display:none }
 footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 }
 </style>
 </head>
 <body>
 <main>
-  <h1>运营图后台</h1>
-  <p class="sub">换小程序的默认背景图，不用发版。这里只能看到运营图本身，看不到任何用户的笔记与图片。</p>
+  <h1>运营后台</h1>
+  <p class="sub">换小程序的默认背景图、改首屏那行 Tips，都不用发版。这里只能看到运营内容本身，看不到任何用户的笔记与图片。</p>
 
   <div id="frozen" class="banner hidden"></div>
 
@@ -89,10 +95,12 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
 
   <div id="app" class="hidden">
     <div id="kinds"></div>
+    <div id="texts"></div>
     <footer>
       <div>换完之后：线上小程序要<strong>退出重进（冷启）</strong>才看到新图，正在用的用户不会当场被换。</div>
       <div>提醒：换一张明暗和原图差很多的，会把首页那几行字的对比度带偏——第一屏的字色是按壁纸档派生的，
       运营图不在这条派生链里。发布后请在真机上看一眼那一屏。</div>
+      <div>文案那一栏同理：改了要等用户下一次冷启（拉到新那份之后）才轮得到，正在看的那一句不会当场跳。</div>
     </footer>
   </div>
 </main>
@@ -163,6 +171,65 @@ function render(state) {
   var box = $('kinds');
   while (box.firstChild) box.removeChild(box.firstChild);
   state.kinds.forEach(function (k) { box.appendChild(cardFor(k)); });
+  // 文案栏与图片栏分开两组渲染（后端也是两套 kind 闭集）。`|| []` 不是防呆，是防"新页配旧后端"
+  // 那一刻的空回体：这一页是静态 HTML、后端可能还在滚更新，红了整页打不开比少一组卡更糟。
+  var tbox = $('texts');
+  while (tbox.firstChild) tbox.removeChild(tbox.firstChild);
+  (state.texts || []).forEach(function (t) { tbox.appendChild(textCardFor(t)); });
+}
+
+// 一行一句 ⇒ 一句一串。空行丢掉：手打的时候都会留个尾换行，那不该变成一句空文案
+// （服务端也会再 strip 一道，两处口径一致：空句不是"一句话"，是"没写"）。
+function linesOf(v) {
+  return String(v || '').split('\\n').map(function (s) { return s.trim(); })
+    .filter(function (s) { return s.length > 0; });
+}
+
+function textCardFor(t) {
+  var card = el('section', 'card');
+  card.appendChild(el('h2', null, t.label));
+
+  var cur = t.current;
+  if (!t.registered) {
+    card.appendChild(el('p', 'state off', '这台后台还没登记过这一栏（小程序用包里那一份）。'));
+  } else if (!cur) {
+    card.appendChild(el('p', 'state off', '当前停用：小程序用包里那六句。'));
+  } else {
+    card.appendChild(el('p', 'state on', '当前生效：中文 ' + (cur.zh || []).length + ' 句／英文 ' +
+      (cur.en || []).length + ' 句。'));
+  }
+  card.appendChild(el('p', 'note',
+    '一行一句，最多 ' + t.max_items + ' 句、每句 ' + t.max_chars + ' 字（超了整份退回，不收半份——' +
+    '这一行是按顺序轮播的，丢一句就变成"少一句且没人知道少了哪句"）。两份语言都要填，' +
+    '少一份切过去那一门会读到空、那一行整条消失。'));
+
+  var areas = {};
+  (t.langs || ['zh', 'en']).forEach(function (lang) {
+    card.appendChild(el('div', 'langlabel', lang === 'zh' ? '中文' : 'English'));
+    var ta = document.createElement('textarea');
+    ta.className = 'ta';
+    // 现值走 .value 赋值，绝不用拼字符串造节点：这一页的硬纪律是"任何动态串都不当 HTML 拼"
+    // （tests/test_mp_assets_admin.py 里那条静态扫描就是在钉这件事，它扫的就是那几个属性名）。
+    ta.value = ((cur || {})[lang] || []).join('\\n');
+    areas[lang] = ta;
+    card.appendChild(ta);
+  });
+
+  var msg = el('div', 'err');
+  card.appendChild(msg);
+  var row = el('div', 'row');
+  var btnPub = el('button', null, '发布这一份');
+  var btnOff = el('button', 'danger', '停用，回到包里那份');
+  row.appendChild(btnPub); row.appendChild(btnOff);
+  card.appendChild(row);
+
+  btnPub.addEventListener('click', function () {
+    var value = {};
+    Object.keys(areas).forEach(function (lang) { value[lang] = linesOf(areas[lang].value); });
+    putText(t.kind, value, msg, function () { return refresh(); });
+  });
+  btnOff.addEventListener('click', function () { putText(t.kind, null, msg, function () { return refresh(); }); });
+  return card;
 }
 
 function cardFor(k) {
@@ -261,6 +328,16 @@ function put(kind, assetId, msg, done) {
   api('api/admin/mp/settings/' + encodeURIComponent(kind), {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ asset_id: assetId })
+  }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
+}
+
+// 与上面那个 put 同形状、不同口（图片改 asset_id，文案改 value）。
+// 分开写而不是给 put 加一个参数：那参数会变成"这一栏到底是图还是话"的第三处猜测。
+function putText(kind, value, msg, done) {
+  msg.textContent = '';
+  api('api/admin/mp/texts/' + encodeURIComponent(kind), {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: value })
   }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
 }
 

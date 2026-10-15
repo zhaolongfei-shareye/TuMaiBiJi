@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.errors import UserError
 from app.core.timefmt import _as_utc_iso
-from app.models.mp_asset import KINDS, KIND_LABELS, MpAsset, MpSetting
+from app.models.mp_asset import KINDS, KIND_LABELS, TEXT_KINDS, MpAsset, MpSetting
 
 logger = logging.getLogger(__name__)
 
@@ -266,15 +266,100 @@ def unpublish(db: Session, kind: str) -> None:
     logger.info("运营图已停用 kind=%s（回到包内那张）", kind)
 
 
+# ────────────── 文案栏（站长 10-15「Tips 改为后台配置」） ──────────────
+# 这两个上限是**我定的，站长没拍过**，改它们只需要改这两行、全链路跟着走：
+#   · 单句 40 字——屏上那个盒子是 `.blk-tips-line { max-width: 9em }`（`验-统一录入条` 钉着这条），
+#     一句 40 字在里面折成五排，会把展开态那一格往上顶；
+#   · 最多 12 句——客户端每 8 秒轮一句，12 句一轮 96 秒，已经超过这一屏的平均停留，再多就是看不见。
+MAX_TIPS_ITEMS = 12
+MAX_TIP_CHARS = 40
+# 两份语言都得齐。只给一份就是后台漏填，客户端切过去会读到空数组 ⇒ 那一行整条消失（`wx:if="{{tips.length}}"`）。
+TIP_LANGS = ("zh", "en")
+
+
+def check_text_kind(kind: str) -> str:
+    """与 `check_kind` 分开关门：这一道只认文案栏。
+
+    两条不能合成一条：`upload`/`publish` 那一路假设进来的 kind 能收字节、能记账宽高，
+    文案混进去就会出现"给一句话上传一张 JPEG"那种点得动、存进库、屏上永远读不到的格子。
+    """
+    if kind not in TEXT_KINDS:
+        raise UserError("这一栏不是文案栏，请刷新后台页面")
+    return kind
+
+
+def clean_text(value) -> dict:
+    """把送来的那份文案洗成唯一形状 `{"zh": […], "en": […]}`；任何不合格整份退回，不部分收。
+
+    整份退回而不是"收合格那几行"（卡片模板那条是收合格的）：文案是一轮播报的序列，
+    丢一句就把顺序改了，界面上读出来的是"少一句且我不知道少了哪句"。宁可让后台红着。
+    """
+    if not isinstance(value, dict):
+        raise UserError("文案要按语言给两份")
+    out = {}
+    for lang in TIP_LANGS:
+        lines = value.get(lang)
+        if not isinstance(lines, list):
+            raise UserError(f"{lang} 那份要是句子列表")
+        if not 1 <= len(lines) <= MAX_TIPS_ITEMS:
+            raise UserError(f"{lang} 那份要 1~{MAX_TIPS_ITEMS} 句")
+        cleaned = []
+        for s in lines:
+            if not isinstance(s, str):
+                raise UserError(f"{lang} 那份里有不是句子的")
+            t = s.strip()
+            if not t:
+                raise UserError(f"{lang} 那份里有空句")
+            if len(t) > MAX_TIP_CHARS:
+                raise UserError(f"{lang} 有一句超过 {MAX_TIP_CHARS} 字：{t[:12]}…")
+            cleaned.append(t)
+        out[lang] = cleaned
+    return out
+
+
+def set_text(db: Session, kind: str, value) -> dict:
+    check_text_kind(kind)
+    payload = clean_text(value)
+    row = setting_row(db, kind, create=True)
+    row.text_value = payload
+    # 文案栏永远不指图片行。写死这一格，是为了让"两栏都填了一半"这种状态在库里无法存在——
+    # 那种状态一旦允许，`config_payload` 就要替它编一个优先级，而优先级没人拍过。
+    row.asset_id = None
+    db.commit()
+    db.refresh(row)
+    logger.info("运营文案已生效 kind=%s（zh %d 句／en %d 句）", kind, len(payload["zh"]), len(payload["en"]))
+    return payload
+
+
+def clear_text(db: Session, kind: str) -> None:
+    """停用＝写回 NULL，客户端落回包内那六句。与 `unpublish` 同一条 A1 口径：留行不留值。"""
+    check_text_kind(kind)
+    row = setting_row(db, kind, create=True)
+    row.text_value = None
+    db.commit()
+    logger.info("运营文案已停用 kind=%s（回到包里那份）", kind)
+
+
+def current_text(db: Session, kind: str) -> dict | None:
+    row = setting_row(db, kind)
+    if row is None or not row.text_value:
+        return None
+    return row.text_value
+
+
 def config_payload(db: Session) -> dict:
-    """给小程序的那一份。每一已知 kind 都在，值要么是那张图要么是 null。
+    """给小程序的那一份。每一已知 kind（图片栏与文案栏都算）都在，值要么是当前那份要么是 null。
 
     三种情况在这里塌成同一个 null 是**故意的**：冻结（审核期）、停用、从未登记过——
-    对客户端都是"用包里那张"，让它们共用一条分支才有 A5 那句"全程不抛、不出声"。
+    对客户端都是"用包里那份"，让它们共用一条分支才有 A5 那句"全程不抛、不出声"。
     区分那三种是后台的事，读 `admin_state`。
+
+    ⚠ 回体里多一个 `tips` 键对**现网老包是安全的**：`utils/mpAssets.js:62-65` 遍历回体的键，
+      但第一条就是 `if (!entry || !entry.content_hash) continue`，文案那份没有 content_hash ⇒ 跳过。
+      这条兼容不靠猜，由 `验-Tips后台下发.js` 拿真回体形状钉着。
     """
     if settings.MP_ASSETS_FREEZE:
-        return {kind: None for kind in KINDS}
+        return {kind: None for kind in (*KINDS, *TEXT_KINDS)}
     out = {}
     for kind in KINDS:
         asset = current(db, kind)
@@ -285,6 +370,19 @@ def config_payload(db: Session) -> dict:
                 "updated_at": _as_utc_iso(asset.updated_at or asset.created_at),
             }
             if asset is not None
+            else None
+        )
+    for kind in TEXT_KINDS:
+        row = setting_row(db, kind)
+        value = current_text(db, kind)
+        out[kind] = (
+            {
+                **value,
+                # 客户端拿它当"本机那份要不要换"的判据，与图片那条用 content_hash 同一作用；
+                # 文案没有字节可哈希，时间戳就是唯一那份"改过没有"的证据。
+                "updated_at": _as_utc_iso(row.updated_at) if row is not None else None,
+            }
+            if value is not None
             else None
         )
     return out
@@ -315,4 +413,20 @@ def admin_state(db: Session) -> dict:
             "current": describe(asset) if asset is not None else None,
             "history": [describe(a) for a in history],
         })
-    return {"kinds": kinds, "frozen": settings.MP_ASSETS_FREEZE}
+    # 文案栏单列一组，不混进上面那个 `kinds`：后台那一页的 `cardFor()` 整段假设一栏是一张图
+    # （有文件框、有预览、有历史色块），文案要的是两栏 textarea。混在一起只会画出一个没用的图框。
+    # 上限跟着回体走，是为了让网页上那句"最多几句、每句几字"与服务层那两枚常量是同一个出处。
+    texts = []
+    for kind in TEXT_KINDS:
+        row = setting_row(db, kind)
+        texts.append({
+            "kind": kind,
+            "label": KIND_LABELS.get(kind, kind),
+            "registered": row is not None,
+            "frozen": settings.MP_ASSETS_FREEZE,
+            "current": row.text_value if row is not None else None,
+            "max_items": MAX_TIPS_ITEMS,
+            "max_chars": MAX_TIP_CHARS,
+            "langs": list(TIP_LANGS),
+        })
+    return {"kinds": kinds, "texts": texts, "frozen": settings.MP_ASSETS_FREEZE}

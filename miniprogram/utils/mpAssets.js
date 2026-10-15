@@ -1,11 +1,14 @@
-// 运营图下发：后台传一张背景图，小程序冷启 / 登录成功后拉一次，落到本机缓存。
+// 运营内容下发：后台传一张背景图、改一行 Tips，小程序冷启 / 登录成功后拉一次，落到本机缓存。
+// （图是 P0-a 那一刀，文案是站长 10-15「Tips 改为后台配置」加的第二栏；两条共用同一次请求。）
 //
 // 为什么不直接让 homeBg() 每次现查服务器：首页 onShow 就要用那张图，等一趟 RTT 会让
 // 首屏白一块。所以策略和 posterTemplates 一样——先读本机缓存画上去，后台静默拉新的，
 // 下一次进首页自然就是新图。content_hash 判重：哈希没变就不下载，省流量也省一次写盘。
+// 文案没有字节可哈希，判重那一格改用 updated_at。
 //
 // 存储结构（wx.setStorageSync）：
 //   MP_ASSET_KEY_home_bg → { filePath, contentHash }
+//   MP_TEXT_KEY_tips     → { zh: [...], en: [...], updatedAt }
 // filePath 是 FileSystemManager.saveFile 落到的永久路径；contentHash 用来和服务器那次比对。
 const { request } = require('./api.js')
 
@@ -16,6 +19,8 @@ const FS = wx.getFileSystemManager()
 const DIR = `${wx.env.USER_DATA_PATH}/mp-assets`
 
 function _key(kind) { return `MP_ASSET_KEY_${kind}` }
+// 文案只有一栏，不需要按 kind 拼键名；单独一个键也方便上面那条"撤账"一步到位。
+const TEXT_KEY = 'MP_TEXT_KEY_tips'
 
 function _ensureDir() {
   try { FS.accessSync(DIR) } catch (_) { FS.mkdirSync(DIR, true) }
@@ -59,6 +64,10 @@ async function pull() {
   }
   if (!config) return
 
+  // 文案先落账，再走图片那条循环：两条各自独立，一条坏了不许连累另一条
+  // （与下面"一种 kind 失败不影响另一种"同一条纪律）。
+  try { _saveTexts(config) } catch (e) { console.warn('mpAssets pull: 文案落账失败', e) }
+
   const kinds = Object.keys(config)
   for (const kind of kinds) {
     const entry = config[kind]
@@ -98,4 +107,31 @@ function serverBgPath() {
   return cached.filePath
 }
 
-module.exports = { pull, serverBgPath }
+// 运营文案（站长 10-15「Tips 改为后台配置」）。形状与图片那份完全不同：没有 url、没有字节、
+// 也没有 content_hash 可哈希，所以**不挤进上面那个 kind 循环**——挤进去就要在循环里判
+// "这一条是图还是话"，那等于把后端的两个 kind 闭集在客户端抄第三份。
+// 判重那一格用 updated_at（服务端那条链里"改过没有"的唯一证据）。
+function _saveTexts(config) {
+  const entry = Object.prototype.hasOwnProperty.call(config, 'tips') ? config.tips : null
+  if (!entry || !Array.isArray(entry.zh) || !Array.isArray(entry.en)) {
+    // 服务端明说"停用"（回 null）时要把账一起撤掉，和 `serverBgPath()` 那句"账对不上文件就撤账"
+    // 是同一条纪律。只回 null 不撤账，这台机就会永远显示旧那一份，而后台写着"已停用"。
+    // 老后端根本没这个键时走的是同一条路径：撤一个从没写过的键，无害。
+    try { wx.removeStorageSync(TEXT_KEY) } catch (_) {}
+    return
+  }
+  const cached = wx.getStorageSync(TEXT_KEY)
+  if (cached && cached.updatedAt === entry.updated_at) return
+  wx.setStorageSync(TEXT_KEY, { zh: entry.zh, en: entry.en, updatedAt: entry.updated_at })
+}
+
+// 当前缓存的那一份文案；没有（从没下发过、或已停用、或那一门是空数组）就 null。
+// 返回 null 是**正常状态不是错误**：调用方（create.js 的 tipsFor）落回包里那六句。
+function serverTips(lang) {
+  const cached = wx.getStorageSync(TEXT_KEY)
+  if (!cached) return null
+  const arr = cached[lang]
+  return Array.isArray(arr) && arr.length ? arr : null
+}
+
+module.exports = { pull, serverBgPath, serverTips }

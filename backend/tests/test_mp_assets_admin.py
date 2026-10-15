@@ -40,7 +40,7 @@ from app.core.config import settings
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
 from app.models.account import Account
-from app.models.mp_asset import KIND_HOME_BG, MpAsset, MpSetting
+from app.models.mp_asset import KIND_HOME_BG, KIND_TIPS, MpAsset, MpSetting
 from app.models.user import User
 from app.services import mp_assets
 
@@ -49,6 +49,7 @@ CONFIG = "/api/mp/config"
 STATE = "/api/admin/mp/state"
 UPLOAD = "/api/admin/mp/assets"
 SETTING = f"/api/admin/mp/settings/{KIND_HOME_BG}"
+TEXT = f"/api/admin/mp/texts/{KIND_TIPS}"
 
 
 def png(w=40, h=60, color=(200, 180, 150)) -> bytes:
@@ -348,7 +349,13 @@ def current_config_empty(db):
 
 def test_迁移把空值那一行显式建出来(tmp_path):
     """这一格只能靠真跑 alembic 来判：`create_all` 走的是模型，而"空要显式写"是迁移写的。
-    只看 create_all 的用例对这一条永远是假绿。"""
+    只看 create_all 的用例对这一条永远是假绿。
+
+    10-15 文案那半截进来之后，这一条从"只数图片栏"改成**数两个闭集的并**：
+    将来谁加了一栏（图片或文案）而忘了在迁移里补那一行空值，这里就红——
+    那正是要防的那件事（"这一栏不存在"与"这一栏空着"在界面上是两句话）。
+    顺带 `select text_value` 本身就是那条加栏的判据：栏没加上，这条 SQL 直接报错。
+    """
     db_file = tmp_path / "mig.db"
     env = dict(os.environ, DATABASE_URL=f"sqlite:///{db_file}")
     subprocess.run(
@@ -356,8 +363,9 @@ def test_迁移把空值那一行显式建出来(tmp_path):
         cwd=str(Path(__file__).resolve().parents[1]), env=env, check=True, capture_output=True, text=True,
     )
     conn = sqlite3.connect(db_file)
-    rows = conn.execute("select kind, asset_id from mp_settings").fetchall()
-    assert rows == [(KIND_HOME_BG, None)], f"迁移没把「停用」这一格显式建出来：{rows}"
+    rows = conn.execute("select kind, asset_id, text_value from mp_settings order by kind").fetchall()
+    want = sorted([(k, None, None) for k in (*mp_assets.KINDS, *mp_assets.TEXT_KINDS)])
+    assert rows == want, f"迁移没把每一已知栏目的「空」那一格显式建出来：{rows}"
     idx = conn.execute("select name from sqlite_master where type='index' and tbl_name='mp_assets'").fetchall()
     assert {"ux_mp_assets_token", "ux_mp_assets_kind_hash"} <= {r[0] for r in idx}, idx
 
@@ -366,8 +374,11 @@ def test_迁移把空值那一行显式建出来(tmp_path):
 
 def test_下发里每一已知栏目都在且没图时是null(client, admin_pw, db, me, store):
     body = current_config(client, me)
-    assert set(body) == set(mp_assets.KINDS)
+    # 图片栏与文案栏都要在，且缺任何一栏都不行：客户端那两条读法各自只认"这一键存在但为 null"，
+    # 键整个不在时它会以为后端还没上（老包行为），新栏就永远拉不到。
+    assert set(body) == set(mp_assets.KINDS) | set(mp_assets.TEXT_KINDS)
     assert body[KIND_HOME_BG] is None, "缺键和空值是两件事：客户端要能一条分支走完（锚点 A5）"
+    assert body[KIND_TIPS] is None, "文案那一栏没发布时也要显式回 null，客户端才落回包里那六句"
 
 
 def test_下发给的是相对地址而不是拼好的域名(client, admin_pw, db, me, store):
@@ -484,3 +495,141 @@ def test_ops页面没有把任何动态串当HTML拼进去的地方(client, stor
     assert "innerHTML" not in body and "insertAdjacentHTML" not in body and "document.write" not in body
     assert body.count("textContent") >= 8
     assert "encodeURIComponent(kind)" in body
+
+
+# ---------------------------------------------------------------- 六、文案栏（站长 10-15「Tips 改为后台配置」）
+
+GOOD = {"zh": ["拍张照，随手记下来", "链接贴进来也能提炼"], "en": ["Snap a photo", "Paste a link"]}
+
+
+def put_text(client, headers, value):
+    return client.put(TEXT, json={"value": value}, headers=headers)
+
+
+def test_文案发一份之后下发读到的就是那一份(client, admin_pw, db, me, store):
+    h = admin_h(client)
+    r = put_text(client, h, GOOD)
+    assert r.status_code == 200, r.text
+    body = current_config(client, me)
+    got = body[KIND_TIPS]
+    assert got is not None and got["zh"] == GOOD["zh"] and got["en"] == GOOD["en"], got
+    # updated_at 是客户端判"本机那份要不要换"的唯一依据（图片那条用的是 content_hash，
+    # 文案没有字节可哈希）。这一格一旦不在，客户端要么每次都重写缓存、要么永远不换。
+    assert got["updated_at"] and got["updated_at"].endswith("Z"), got
+    assert "content_hash" not in got, "文案条目里不许混进图片那套字段，老包靠这个键决定跳不跳过它"
+
+
+def test_文案停用之后下发回空而不是缺键(client, admin_pw, db, me, store):
+    """A1 那一格在文案侧的同一句：停用要读成"这一栏存在、值是空"，客户端才落回包里那六句。"""
+    h = admin_h(client)
+    assert put_text(client, h, GOOD).status_code == 200
+    assert current_config(client, me)[KIND_TIPS] is not None
+    assert put_text(client, h, None).status_code == 200
+    assert KIND_TIPS in current_config(client, me)
+    assert current_config(client, me)[KIND_TIPS] is None
+
+
+def test_文案任何一处不合格整份退回不收半份(client, admin_pw, db, me, store):
+    """整份退回而不是"收合格那几行"（卡片模板那条是收合格的）：这一行是按顺序轮播的序列，
+    丢一句屏上读出的是"少一句且没人知道少了哪句"，比退回一份重填糟得多。"""
+    h = admin_h(client)
+    bad = [
+        ({}, "空对象"),
+        ({"zh": GOOD["zh"]}, "缺英文那份"),
+        ({"zh": [], "en": GOOD["en"]}, "中文那份零句"),
+        ({"zh": ["  "], "en": GOOD["en"]}, "只有一句空白"),
+        ({"zh": "一整串不是列表", "en": GOOD["en"]}, "形状不对"),
+        ({"zh": ["a"] * (mp_assets.MAX_TIPS_ITEMS + 1), "en": GOOD["en"]}, "句数越线"),
+        ({"zh": ["字" * (mp_assets.MAX_TIP_CHARS + 1)], "en": GOOD["en"]}, "单句越线"),
+        ({"zh": [None], "en": GOOD["en"]}, "句子里有非字符串"),
+    ]
+    for value, why in bad:
+        r = put_text(client, h, value)
+        assert r.status_code == 400, f"{why} 竟然收了：{r.status_code} {r.text}"
+    # 上面每一条都得"没写进去"，而不是"写进去半条"
+    assert current_config(client, me)[KIND_TIPS] is None
+
+
+def test_文案的句数与字数上限就是那两枚常量(client, admin_pw, db, me, store):
+    """越线一条差一个都不行：上限写在服务层两枚常量上，改常量时这条用例自动跟着走，
+    所以它判的是"边界"而不是"这两个数"。"""
+    h = admin_h(client)
+    at_items = {"zh": ["句"] * mp_assets.MAX_TIPS_ITEMS, "en": GOOD["en"]}
+    assert put_text(client, h, at_items).status_code == 200
+    at_chars = {"zh": ["字" * mp_assets.MAX_TIP_CHARS], "en": GOOD["en"]}
+    assert put_text(client, h, at_chars).status_code == 200
+    assert put_text(client, h, {"zh": ["字" * (mp_assets.MAX_TIP_CHARS + 1)], "en": GOOD["en"]}).status_code == 400
+
+
+def test_图片口与文案口互不开门(client, admin_pw, db, me, store):
+    """两个 kind 闭集分开是这一刀的骨架：混用一个口就会出现"给一句话上传一张 JPEG"
+    那种点得动、存进库、屏上永远读不到的格子。正反两个方向都要判。"""
+    h = admin_h(client)
+    # 文案栏走图片口 ⇒ 拒
+    assert upload(client, h, png(50, 50), kind=KIND_TIPS).status_code == 400
+    assert client.put(f"/api/admin/mp/settings/{KIND_TIPS}", json={"asset_id": 1}, headers=h).status_code == 400
+    # 图片栏走文案口 ⇒ 拒（不是静默接受成一份"文案"）
+    assert client.put("/api/admin/mp/texts/home_bg", json={"value": GOOD}, headers=h).status_code == 400
+    # 而且两边都没写脏东西
+    body = current_config(client, me)
+    assert body[KIND_TIPS] is None and body[KIND_HOME_BG] is None
+
+
+def test_文案发出去不许把同一栏的图片生效位带歪(client, admin_pw, db, me, store):
+    """`set_text` 里那一句 `row.asset_id = None` 不是顺手写的：它让"两栏都填了一半"在库里无法存在。
+    一旦允许，`config_payload` 就得替那种状态编一个优先级，而优先级谁也没拍过。"""
+    h = admin_h(client)
+    a = upload(client, h, png(70, 70, (9, 9, 9))).json()
+    assert put_setting(client, h, a["id"]).status_code == 200
+    assert current_config(client, me)[KIND_HOME_BG] is not None
+    # 文案写的是 tips 那一行，不该动 home_bg 的生效位
+    assert put_text(client, h, GOOD).status_code == 200
+    assert current_config(client, me)[KIND_HOME_BG] is not None, "发文案把背景图的生效位洗掉了"
+
+
+def test_冻结闸打开时文案也一起不下发(client, admin_pw, db, me, store, monkeypatch):
+    """提审期那道闸挡的是"运营改动"整条链，不只挡图。漏掉文案的那一半，症状是
+    审核包里那行字还在被后台改——那是提审期最怕的一件事，而且界面上没有任何报错。"""
+    h = admin_h(client)
+    assert put_text(client, h, GOOD).status_code == 200
+    monkeypatch.setattr(settings, "MP_ASSETS_FREEZE", True)
+    body = current_config(client, me)
+    assert set(body) == set(mp_assets.KINDS) | set(mp_assets.TEXT_KINDS)
+    assert body[KIND_TIPS] is None and body[KIND_HOME_BG] is None
+    monkeypatch.setattr(settings, "MP_ASSETS_FREEZE", False)
+    assert current_config(client, me)[KIND_TIPS] is not None, "解冻之后要自己回得来"
+
+
+def test_没配管理口令时文案口同样是503而不是放行(client, db, me, store, monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_TOKEN", "")
+    r = client.put(TEXT, json={"value": GOOD}, headers={"Authorization": "Bearer whatever"})
+    assert r.status_code == 503, r.text
+    assert current_config(client, me)[KIND_TIPS] is None
+
+
+def test_后台状态里文案与图片分两组给(client, admin_pw, db, me, store):
+    """`admin_state` 里 `texts` 单独一组，是因为页面那个 `cardFor()` 整段假设"一栏=一张图"
+    （有文件框、有预览、有历史色块）。混进 `kinds` 就会画出一个没用的图框。"""
+    h = admin_h(client)
+    assert put_text(client, h, GOOD).status_code == 200
+    state = client.get(STATE, headers=h).json()
+    assert [k["kind"] for k in state["kinds"]] == list(mp_assets.KINDS)
+    one = [t for t in state["texts"] if t["kind"] == KIND_TIPS]
+    assert len(one) == 1, state["texts"]
+    t = one[0]
+    assert t["registered"] is True and t["current"]["zh"] == GOOD["zh"]
+    # 上限跟着回体走：网页上那句"最多几句、每句几字"与服务层那两枚常量必须是同一个出处
+    assert t["max_items"] == mp_assets.MAX_TIPS_ITEMS and t["max_chars"] == mp_assets.MAX_TIP_CHARS
+    assert t["langs"] == list(mp_assets.TIP_LANGS)
+
+
+def test_后台那一页有文案那一组可编辑的格子(client, store):
+    """静态钉页面：文案栏要真有 textarea、真走那个新口、且现值走 .value 而不是拼 HTML。
+    这条不是装饰——`render()` 里少一行 `texts.forEach`，后端全对、屏上仍是包里那六句，
+    而没有任何一处会报错。"""
+    src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
+    body = src.split("_PAGE", 1)[1]
+    assert "textCardFor" in body and "createElement('textarea')" in body
+    assert "api/admin/mp/texts/" in body
+    assert "state.texts" in body, "render() 没把文案那一组渲染出来"
+    assert "ta.value =" in body

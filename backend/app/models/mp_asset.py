@@ -23,7 +23,7 @@
 代价是删一行不能顺手删文件（另一行可能正指着它），所以这一版根本不删文件——
 只涨不删，配合后台 400KB 的上限，长不了多少（服务器磁盘 10-11 实测余 12G）。
 """
-from sqlalchemy import Column, DateTime, Index, Integer, String
+from sqlalchemy import Column, DateTime, Index, Integer, JSON, String
 from sqlalchemy.sql import func
 
 from app.db.database import Base
@@ -32,8 +32,14 @@ from app.db.database import Base
 # 不接受任意字符串（`services/mp_assets.py` 的校验以它为准）。
 KIND_HOME_BG = "home_bg"
 KINDS = (KIND_HOME_BG,)
+# 站长 10-15「Tips 改为后台配置」⇒ 后台从此也能管**一句话**，不只管一张图。
+# 但**不把 tips 塞进上面那个 `KINDS`**：那一条是"图片栏"的闭集，`upload`/`publish`/`check_kind`
+# 全都假设里面的 kind 能收字节、能记账宽高。把 tips 混进去的代价不是报错，是
+# 后台会出现一个"给文案上传一张 JPEG"的格子——界面能点、点下去存进库，而屏上永远读不到它。
+KIND_TIPS = "tips"
+TEXT_KINDS = (KIND_TIPS,)
 # 界面上的叫法。管理页那一栏的标题从这里读，免得网页和后端各写一份中文名。
-KIND_LABELS = {KIND_HOME_BG: "首页默认背景图"}
+KIND_LABELS = {KIND_HOME_BG: "首页默认背景图", KIND_TIPS: "首屏那行 Tips"}
 
 
 class MpAsset(Base):
@@ -75,7 +81,13 @@ class MpAsset(Base):
 
 
 class MpSetting(Base):
-    """某一栏当前生效的是哪一行；空值就是"用包里那张"，且这一格要显式存在。"""
+    """某一栏当前生效的是什么：图片栏指着一行 `mp_assets`，文案栏直接存一份 JSON。
+
+    两类共用这一张表是**故意的**：`/api/mp/config`（小程序读）、`/api/admin/*`（后台写）、
+    `/ops`（那一页）三处都要同一句"这一栏现在生效的是什么"，一个 kind 一个生效位只能有一份表。
+    共用带来的唯一约束：`asset_id` 与 `text_value` 至多填一个，谁填由 kind 属于哪个闭集决定
+    （`services/mp_assets.py` 的 `check_kind` 只认图片栏、`check_text_kind` 只认文案栏）。
+    """
 
     __tablename__ = "mp_settings"
 
@@ -85,4 +97,9 @@ class MpSetting(Base):
     # SQLite 上后加列加不了外键，声明了就会和那条"alembic 升级后的库和模型一字不差"永远对不上。
     # 归属的一致性靠服务层（`publish` 只收这一张表里真存在的 id）。
     asset_id = Column(Integer, nullable=True)
+    # 文案栏的生效值，形如 `{"zh": ["…", …], "en": ["…", …]}`。图片栏这一格永远是 NULL。
+    # 用 JSON 一栏而不是拆成"一句一行"（与 `note.py:14`/`share.py:28` 的 key_points 同型）：
+    # 这一栏的读写单位从来是**整批**——客户端一次替换一整份、撤回秒级生效（`posterTemplates` 那条
+    # 同型纪律）。拆成行就要为"第几句改过"额外维护一套序号一致性，而没有任何读法需要单句。
+    text_value = Column(JSON, nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
