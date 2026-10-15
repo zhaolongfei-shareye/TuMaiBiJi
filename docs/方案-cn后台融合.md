@@ -1,7 +1,11 @@
 # 方案：两个小程序的后台融合成一个（`admin.html` ＋ `/wtsj/ops`）
 
 > 站长 10-15 15:1x 原话（本地钟点，先前误记成 04:1x 已改）：**「`https://api.agentsbin.cn/admin.html` 原是另外一个小程序的后台，要和 `https://api.agentsbin.cn/wtsj/ops` 进行整合，一个登录账号，就可以同时管理两个小程序，数据和配置，你看下要怎么融合，网站风格要一致，交互要流畅。」**
-> 本文件是融合方案。**拍板之后的实现进度（10-15 晚）**：我们这一侧的三件已落码——换票暗号 `ADMIN_EXCHANGE_SECRET`、验票口 `POST /api/admin/verify-token`、只读统计口 `GET /api/admin/stats/overview`（A 档五枚）；尺子 `backend/tests/test_admin_fusion.py` 11 条，全仓 859 条绿。**未部署**。图麦克那一侧一行没动（第 8 节第 4 条等他点头）。
+> 本文件是融合方案。**拍板之后的实现进度**：我们这一侧三件已落码**并已上现网**——换票暗号 `ADMIN_EXCHANGE_SECRET`
+> （**10-15 20:58 已配**，值只在那台机器的 `.env` 里）、验票口 `POST /api/admin/verify-token`、只读统计口
+> `GET /api/admin/stats/overview`（第 27 次部署 17:42）；10-15 20:35 第 28 次又补上「卡片模板」那一栏。
+> 尺子 `backend/tests/test_admin_fusion.py`＋`test_admin_templates.py`，全仓 878 条绿；现网探针 `docs/工具/探-现网后台融合.py` **34 条全过**。
+> **图麦克那一侧一行没动**（第 8 节第 4 条等他点头）⇒ 登录仍是两次。
 > 方向图在 `docs/design/后台融合-方向图-20261015.html`（两套皮各一版，已挑定 A 版）。
 > 前置盘点见 `docs/方案-cn后台整合.md`（§8.249）与 `docs/规格-后台数据分析这一栏.md`（§8.248）。
 
@@ -38,14 +42,24 @@
 
 ```
 POST https://api.agentsbin.cn/wtsj/api/admin/verify-token
-     （本机直连是 POST /api/admin/verify-token；nginx 那层前缀只在浏览器看得见的位置上）
-Header  X-Exchange: <ADMIN_EXCHANGE_SECRET>      # 两边 .env 填同一个值，openssl rand -hex 32
+Header  X-Exchange: <ADMIN_EXCHANGE_SECRET>      # 两边 .env 填同一个值
 Header  Content-Type: application/json
 Body    { "token": "<我们 /api/admin/login 发的那枚 session 票原样>" }
 200     { "sub": "admin", "scope": "admin", "exp": 1765800000 }
-401     暗号不对 / 票不是管理票（scope 不符、过期、换过口令的旧票）
-503     我们这侧 `ADMIN_EXCHANGE_SECRET` 留空 —— 语义是"这条链不可用"，两边各自登录照常
+401     暗号不对 / 不带暗号 / 票不是管理票（scope 不符、过期、换过口令的旧票）
+503     我们这侧 `ADMIN_EXCHANGE_SECRET` 留空 —— 语义是"这条链不可用"（**10-15 20:58 起已配，这一支不再触发**）
 ```
+
+**地址三条实测（10-15 21:0x，从图麦克那个容器 `watermark-image-api` 里面打出来的，不是从宿主机 shell）**：
+
+| 打哪个 | 结果 | 说明 |
+| --- | --- | --- |
+| `http://172.17.0.1:8000/api/admin/verify-token` | **401**（通） | docker 网桥上的宿主机地址；`uvicorn` 现读绑 `0.0.0.0:8000`，所以容器能到。**推荐走这条**，不出机器、不过 nginx |
+| `https://api.agentsbin.cn/wtsj/api/admin/verify-token` | **401**（通） | 走公网绕一圈，也行；**必须带 `/wtsj/` 前缀**（不带前缀实测 404），域名只能 `api.agentsbin.cn` |
+| `http://127.0.0.1:8000/api/admin/verify-token` | **Connection refused** | 容器里的 `127.0.0.1` 是容器自己。**别照"本机直连"四个字写成这条**——宿主机 shell 上它是对的，容器里是错的 |
+
+对面那台的落点也记一下（10-15 只读实测）：`.env` 在 `/home/ubuntu/cloud/image-service/.env`（20 个键，**还没有 `ADMIN_EXCHANGE_SECRET`**），
+服务是 **docker 跑的**（容器 `watermark-image-api`，`127.0.0.1:8080->8080`）⇒ **加完那一行要重建容器才读得到**，光改文件不生效。
 
 对端拿到 200 之后要做的事，以及**不许**做的事：
 
