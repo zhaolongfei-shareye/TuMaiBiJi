@@ -73,8 +73,33 @@ textarea.ta { width:100%; box-sizing:border-box; border:1px solid var(--line); b
   resize:vertical; margin-top:8px }
 .langlabel { font-size:12.5px; color:var(--muted); margin-top:12px }
 .hidden { display:none }
-.grp { font-size:12.5px; color:var(--muted); letter-spacing:.08em; margin:26px 0 10px;
-  border-bottom:1px solid var(--line); padding-bottom:6px }
+.grp { font-size:11px; color:#a2a49c; letter-spacing:.08em; margin:14px 0 4px }
+/* 壳页那一层（方向图 docs/design/后台融合-方向图-20261015.html 的 A 版信息架构）：
+   顶栏一枚产品切换 → 左栏「数据／配置」两组 → 主区一屏只放一组。
+   选中态是"文字加粗＋左边走一条墨线"，不是按钮：整页只有主按钮一种实心块，别处不再长第二套皮。 */
+.top { display:flex; gap:16px; align-items:flex-start; justify-content:space-between;
+  border-bottom:1px solid var(--line); padding-bottom:14px; margin-bottom:20px }
+.sw { display:flex; gap:0; border:1px solid var(--line); border-radius:9px; overflow:hidden;
+  background:#fff; flex:none }
+.sw b { font-weight:500; font-size:13px; padding:7px 13px; color:var(--muted); white-space:nowrap }
+.sw b.on { background:var(--ink); color:#fff; font-weight:600 }
+.sw b.off { color:#b9b6ae; cursor:default }
+.swnote { font-size:12px; color:var(--muted); margin:6px 0 0; text-align:right; max-width:280px }
+.shell { display:flex; gap:24px; align-items:flex-start }
+nav#nav { width:132px; flex:none; font-size:13px; color:var(--muted); position:sticky; top:20px }
+nav#nav s { display:block; text-decoration:none; padding:6px 0 6px 11px; margin:1px 0;
+  border-left:2px solid transparent; cursor:pointer; color:var(--ink) }
+nav#nav s:hover { color:var(--clay) }
+nav#nav s.on { border-left-color:var(--ink); font-weight:600 }
+#main { flex:1; min-width:0 }
+@media (max-width:720px) {
+  body { padding:20px 14px 48px }
+  .top { display:block } .swnote { text-align:left; max-width:none }
+  .shell { display:block }
+  nav#nav { width:auto; position:static; display:flex; flex-wrap:wrap; gap:2px 14px; margin-bottom:16px }
+  nav#nav i { width:100% } nav#nav s { border-left:0; padding:4px 0; border-bottom:2px solid transparent }
+  nav#nav s.on { border-left:0; border-bottom-color:var(--ink) }
+}
 /* 「数据」那一栏：数在左、口径在右，一行一条。数字统一右对齐 + 等宽数字，
    不然竖着看三行"12 / 1,204 / 7"会以为最后一行最大。 */
 .krow { display:flex; gap:12px; align-items:baseline; padding:9px 0; border-bottom:1px solid #f1efe9 }
@@ -95,8 +120,16 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
 </head>
 <body>
 <main>
-  <h1>运营后台</h1>
-  <p class="sub">换小程序的默认背景图、改首屏那行 Tips，都不用发版。这里只能看到运营内容本身，看不到任何用户的笔记与图片。</p>
+  <header class="top">
+    <div>
+      <h1>运营后台</h1>
+      <p class="sub">左边切「数据」与「配置」两栏。这里只能看到运营内容本身，看不到任何用户的笔记与图片。</p>
+    </div>
+    <div>
+      <div class="sw"><b class="on">图麦笔记</b><b class="off" id="swOther">图麦克</b></div>
+      <p class="swnote" id="swNote"></p>
+    </div>
+  </header>
 
   <div id="frozen" class="banner hidden"></div>
 
@@ -110,18 +143,19 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
     <p class="note">口令只存在这个标签页里（sessionStorage），关掉页面就没了；服务器换过口令后旧登录会立刻失效。</p>
   </section>
 
-  <div id="app" class="hidden">
-    <p class="grp">数据</p>
-    <div id="stats"></div>
-    <p class="grp">配置</p>
-    <div id="kinds"></div>
-    <div id="texts"></div>
-    <footer>
-      <div>换完之后：线上小程序要<strong>退出重进（冷启）</strong>才看到新图，正在用的用户不会当场被换。</div>
-      <div>提醒：换一张明暗和原图差很多的，会把首页那几行字的对比度带偏——第一屏的字色是按壁纸档派生的，
-      运营图不在这条派生链里。发布后请在真机上看一眼那一屏。</div>
-      <div>文案那一栏同理：改了要等用户下一次冷启（拉到新那份之后）才轮得到，正在看的那一句不会当场跳。</div>
-    </footer>
+  <div id="app" class="hidden shell">
+    <nav id="nav"></nav>
+    <div id="main">
+      <div id="view-stats" class="view"><div id="stats"></div></div>
+      <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div></div>
+      <footer>
+        <div>换完之后：线上小程序要<strong>退出重进（冷启）</strong>才看到新图，正在用的用户不会当场被换。</div>
+        <div>提醒：换一张明暗和原图差很多的，会把首页那几行字的对比度带偏——第一屏的字色是按壁纸档派生的，
+        运营图不在这条派生链里。发布后请在真机上看一眼那一屏。</div>
+        <div>文案那一栏同理：改了要等用户下一次冷启（拉到新那份之后）才轮得到，正在看的那一句不会当场跳。</div>
+        <div>「数据」这一栏读的是业务库里的行数，现点现算；没有新增任何用户行为埋点。</div>
+      </footer>
+    </div>
   </div>
 </main>
 <script>
@@ -155,6 +189,54 @@ function api(path, opts) {
 function showLogin() { $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
 function showApp() { $('login').classList.add('hidden'); $('app').classList.remove('hidden'); }
 function $(id) { return document.getElementById(id); }
+
+// 左栏那两组：**一屏只放一组**（站长 10-15 17:5x「数据分析和配置要分开」，结构照方向图 A 版）。
+// key 指向主区里那张卡的 data-key；点一条＝切到那一屏再滚到那张卡。
+var NAV = [
+  { grp: '数据', items: [
+    { label: '总览', view: 'stats', key: 'overview' },
+    { label: '逐日', view: 'stats', key: 'perday' },
+    { label: '来源分布', view: 'stats', key: 'sources' },
+    { label: '模板热度', view: 'stats', key: 'templates' },
+    { label: '邀请对账', view: 'stats', key: 'invites' },
+    { label: '分享', view: 'stats', key: 'shares' }
+  ] },
+  { grp: '配置', items: [
+    { label: '运营图', view: 'config', key: 'kind:home_bg' },
+    { label: '首屏 Tips', view: 'config', key: 'text:tips' }
+  ] }
+];
+
+function showView(v) {
+  $('view-stats').classList.toggle('hidden', v !== 'stats');
+  $('view-config').classList.toggle('hidden', v !== 'config');
+}
+
+function markNav(key) {
+  var all = $('nav').querySelectorAll('s');
+  for (var i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i].dataset.key === key);
+}
+
+function buildNav() {
+  var nav = $('nav');
+  while (nav.firstChild) nav.removeChild(nav.firstChild);
+  NAV.forEach(function (g) {
+    nav.appendChild(el('i', 'grp', g.grp));
+    g.items.forEach(function (it) {
+      var s = el('s', null, it.label);
+      s.dataset.key = it.key;
+      s.addEventListener('click', function () {
+        showView(it.view);
+        var target = document.querySelector('[data-key="' + it.key + '"]');
+        if (target) target.scrollIntoView({ block: 'start' });
+        markNav(it.key);
+      });
+      nav.appendChild(s);
+    });
+  });
+  markNav(NAV[0].items[0].key);
+  showView('stats');
+}
 
 $('btnLogin').addEventListener('click', function () {
   $('loginErr').textContent = '';
@@ -207,6 +289,7 @@ function linesOf(v) {
 
 function textCardFor(t) {
   var card = el('section', 'card');
+  card.dataset.key = 'text:' + t.kind;
   card.appendChild(el('h2', null, t.label));
 
   var cur = t.current;
@@ -254,6 +337,7 @@ function textCardFor(t) {
 
 function cardFor(k) {
   var card = el('section', 'card');
+  card.dataset.key = 'kind:' + k.kind;
   card.appendChild(el('h2', null, k.label));
 
   var st;
@@ -462,6 +546,11 @@ function renderStats(d) {
   knum(c6, numOf(sh.created), '建过的分享', '包含已撤回的');
   knum(c6, numOf(sh.active), '当前活着的', '只有这一部分能被扫码看到');
   box.appendChild(c6);
+
+  // 左栏那六条要能各指到一张卡：按出场顺序挂 key，与 NAV 里那份名单一一对应。
+  var keys = ['overview', 'perday', 'sources', 'templates', 'invites', 'shares'];
+  var cards = box.querySelectorAll('.card');
+  for (var i = 0; i < cards.length && i < keys.length; i++) cards[i].dataset.key = keys[i];
 }
 
 function loadStats() {
@@ -486,6 +575,12 @@ function refresh() {
     if (e.status === 503) { $('login').classList.remove('hidden'); $('loginErr').textContent = e.message; }
   });
 }
+
+// 顶栏那枚产品切换：图麦克今天是灰的。**灰要有原因**——它那一侧还没来验过票（交接件已写、没人动手），
+// 而不是"做好了藏着"。等对面接上换票口，这一枚才许变亮，同时左边那两组要按产品各长一份。
+$('swOther').title = '图麦克那一侧还没接上换票口，暂时进不来';
+$('swNote').textContent = '图麦克那一栏要等它接上我们的换票口才会出现；今天两边仍各输一次口令。';
+buildNav();
 
 if (session()) refresh();
 </script>

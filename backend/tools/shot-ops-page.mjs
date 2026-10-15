@@ -89,13 +89,37 @@ async function main() {
 
   const measured = JSON.parse(state.result.value);
   if (!measured.height) throw new Error('页面没量到高度：' + JSON.stringify(measured).slice(0, 300));
-  const h = measured.height;
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 900, height: Math.min(h, 8000), deviceScaleFactor: 2, mobile: false });
-  await sleep(400);
-  const shot = await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 900, height: Math.min(h, 8000), scale: 1 } });
   const { writeFileSync } = await import('node:fs');
-  writeFileSync(OUT, Buffer.from(shot.data, 'base64'));
-  console.log('saved ' + OUT);
+
+  // 两屏各存一张：数据一屏、配置一屏（10-15 站长打回"数据分析和配置要分开"，判据要看得到分屏结果）。
+  const shots = process.env.OPS_CLICK ? [
+    { file: OUT.replace(/\.png$/, '-数据.png'), label: null },
+    { file: OUT.replace(/\.png$/, '-配置.png'), label: process.env.OPS_CLICK },
+  ] : [{ file: OUT, label: null }];
+
+  for (const s of shots) {
+    if (s.label) {
+      await cdp.send('Runtime.evaluate', {
+        expression: `(() => { const all = document.querySelectorAll('#nav s');
+          for (const n of all) if (n.textContent === ${JSON.stringify(s.label)}) { n.click(); return 'clicked'; }
+          return 'nav 里没这条：' + Array.from(all).map(x => x.textContent).join('/'); })()`,
+        returnByValue: true,
+      });
+      await sleep(500);
+    }
+    const m = await cdp.send('Runtime.evaluate', {
+      expression: `JSON.stringify({shown:[...document.querySelectorAll('#app .view')].filter(v=>!v.classList.contains('hidden')).map(v=>v.id), navOn:(document.querySelector('#nav s.on')||{}).textContent, height:document.body.scrollHeight})`,
+      returnByValue: true,
+    });
+    console.log(s.file.split('/').pop() + ' → ' + m.result.value);
+    const info = JSON.parse(m.result.value);
+    const h = Math.min(info.height, 8000);
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 900, height: h, deviceScaleFactor: 2, mobile: false });
+    await sleep(300);
+    const shot = await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 900, height: h, scale: 1 } });
+    writeFileSync(s.file, Buffer.from(shot.data, 'base64'));
+    console.log('saved ' + s.file);
+  }
   cdp.ws.close();
   process.exit(0);
 }

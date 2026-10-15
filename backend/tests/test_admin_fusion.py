@@ -261,3 +261,24 @@ def test_后台那一页有数据那一组格子():
     # 这一栏的硬纪律与整页一致：动态串一律 textContent，全页零 innerHTML
     assert "innerHTML" not in body
     assert "SOURCE_LABELS[s.source_type] || s.source_type" in body, "来源漏在表外会把英文写上屏（站长 10-02 撞过）"
+
+
+def test_数据与配置是两屏不是一列():
+    """站长 10-15 17:5x 打回：「数据分析和配置要分开。你怎么没按你的设计稿来做」。
+
+    钉的是**结构**而不是样式：两屏各有一个容器、默认只露「数据」那一屏、左栏那两组由 NAV 生成、
+    切换走 showView。第一版我只在原来那一列上插了两行小标题（`<p class="grp">数据</p>` 那种），
+    读起来还是"一屏到底"——所以这条判据顺手把那个写法钉死：不许再出现"两组标题夹一堆卡"。
+    """
+    src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
+    body = src.split("_PAGE", 1)[1]
+    assert 'id="view-stats"' in body and 'id="view-config"' in body, "两屏容器没分开"
+    assert 'id="view-config" class="view hidden"' in body, "默认那屏应当是数据，配置要藏起来"
+    assert "function showView" in body and "showView('stats')" in body
+    assert "grp: '数据'" in body and "grp: '配置'" in body, "左栏那两组没按稿子生成"
+    assert 'grp">数据</p>' not in body and 'grp">配置</p>' not in body, "又退回去做'一列加两行标题'了"
+    # 卡要能被左栏点到：两边都挂 data-key
+    assert "card.dataset.key = 'kind:'" in body and "card.dataset.key = 'text:'" in body
+    assert "keys = ['overview', 'perday', 'sources', 'templates', 'invites', 'shares']" in body
+    # 图麦克那枚不许被做成"看着能点"：默认灰、且页面里写着为什么灰
+    assert 'class="off" id="swOther"' in body and "$('swNote').textContent" in body
