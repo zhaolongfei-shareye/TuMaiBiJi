@@ -3,15 +3,16 @@
 // 查五件事：图层不许出画布、高度不许塌、开码时恰好一张码、关码时码和"扫码"那行都得没、
 // 换成的是那两行纯文字；最后一段另量小样圆角画进位图后有没有咬到字和码。
 // 跑法：node docs/工具/验-海报模板几何.js
-const poster = require('../../miniprogram/utils/poster.js')
-const { i18n } = require('../../miniprogram/utils/i18n.js')
-
 global.wx = {
   getStorageSync: () => ({ name: '阿飞', slogan: '每天读一点再走', template: 'cover', avatarPath: '' }),
   setStorageSync: () => {},
   getFileSystemManager: () => ({ accessSync: () => true }),
   env: { USER_DATA_PATH: '/u' },
 }
+
+const poster = require('../../miniprogram/utils/poster.js')
+const { i18n } = require('../../miniprogram/utils/i18n.js')
+
 
 const grad = () => ({ addColorStop() {} })
 // 替身的 measureText 要跟着 ctx.font 里的字号变，否则"按框宽试字号"那条逻辑量不出来。

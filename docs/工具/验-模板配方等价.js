@@ -16,17 +16,18 @@
 // 基线文件在仓库里：docs/design/模板配方-等价基线.json。它记的是**当前这份产品代码的真实输出**，
 // 不是我以为它应该输出什么；所以第一次生成之后，任何一条红都必须解释成"我改了什么导致它变"，
 // 而不是"基线过期了"顺手重生成一次。
-const fs = require('fs')
-const path = require('path')
-const crypto = require('crypto')
-const poster = require('../../miniprogram/utils/poster.js')
-
 global.wx = {
   getStorageSync: () => ({ name: '阿飞', slogan: '每天读一点再走', template: 'cover', avatarPath: '' }),
   setStorageSync: () => {},
   getFileSystemManager: () => ({ accessSync: () => true }),
   env: { USER_DATA_PATH: '/u' },
 }
+
+const fs = require('fs')
+const path = require('path')
+const crypto = require('crypto')
+const poster = require('../../miniprogram/utils/poster.js')
+
 
 const BASE = path.resolve(__dirname, '../design/模板配方-等价基线.json')
 const WRITE = process.argv.includes('--写基线')

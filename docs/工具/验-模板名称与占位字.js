@@ -2,14 +2,15 @@
 // 名字是数据、占位字是画出来的，肉眼看图既慢又容易漏（波普那一格一次就画四个"把"）。
 // 所以拿产品那份 poster.js 在 node 里跑十套 × 两种语言 × 有无形象，直接量图层。
 // 跑法：node docs/工具/验-模板名称与占位字.js
-const poster = require('../../miniprogram/utils/poster.js')
-
 global.wx = {
   getStorageSync: () => null,
   setStorageSync: () => {},
   getFileSystemManager: () => ({ accessSync: () => { throw new Error('no file') } }),
   env: { USER_DATA_PATH: '/u' },
 }
+
+const poster = require('../../miniprogram/utils/poster.js')
+
 
 let fontPx = 28
 const charW = (c) => (c.codePointAt(0) > 0x2e80 ? fontPx : fontPx * 0.55)

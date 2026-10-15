@@ -9,6 +9,13 @@
 //   ③ 后端那份种子（backend/seed/*.json）必须是现读这份客户端代码生成的——
 //      种子过期时 pytest 那条"Python == 种子"照样绿，缺的就是这一段。
 // 跑法：node docs/工具/验-模板配方可执行.js
+global.wx = {
+  getStorageSync: () => ({ name: '阿飞', slogan: '每天读一点再走', template: 'quote', avatarPath: '' }),
+  setStorageSync: () => {},
+  getFileSystemManager: () => ({ accessSync: () => true }),
+  env: { USER_DATA_PATH: '/u' },
+}
+
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
@@ -16,12 +23,6 @@ const poster = require('../../miniprogram/utils/poster.js')
 const engine = require('../../miniprogram/utils/posterRecipe.js')
 const RECIPES = require('../../miniprogram/utils/posterRecipes.js')
 
-global.wx = {
-  getStorageSync: () => ({ name: '阿飞', slogan: '每天读一点再走', template: 'quote', avatarPath: '' }),
-  setStorageSync: () => {},
-  getFileSystemManager: () => ({ accessSync: () => true }),
-  env: { USER_DATA_PATH: '/u' },
-}
 
 let fontPx = 28
 const charW = (c) => (c.codePointAt(0) > 0x2e80 ? fontPx : fontPx * 0.55)

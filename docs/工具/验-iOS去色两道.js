@@ -3,14 +3,15 @@
 // 但这一道本身有个更难看的失败模式：机型不认 saturation 时赋值被忽略，那层灰就变成实心灰块。
 // 所以这里量两件事：认的机型两道都走；不认的那道一步都不许做。
 // 跑法：node docs/工具/验-iOS去色两道.js
-const poster = require('../../miniprogram/utils/poster.js')
-
 global.wx = {
   getStorageSync: () => null,
   setStorageSync: () => {},
   getFileSystemManager: () => ({ accessSync: () => { throw new Error('no file') } }),
   env: { USER_DATA_PATH: '/u' },
 }
+
+const poster = require('../../miniprogram/utils/poster.js')
+
 
 let fontPx = 28
 const charW = (c) => (c.codePointAt(0) > 0x2e80 ? fontPx : fontPx * 0.55)

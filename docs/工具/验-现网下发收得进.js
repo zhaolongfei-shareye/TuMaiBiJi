@@ -20,6 +20,13 @@
 // 拿不到回体就退 3 报错，**不许拿仓库里那份种子顶替**——顶替就等于这把尺子从没量过现网。
 //
 // 跑法：node docs/工具/验-现网下发收得进.js [回体路径]      （默认 /tmp/live-payload.json）
+global.wx = {
+  getStorageSync: () => ({ name: '阿飞', slogan: '每天读一点再走', template: 'cover', avatarPath: '' }),
+  setStorageSync: () => {},
+  getFileSystemManager: () => ({ accessSync: () => true }),
+  env: { USER_DATA_PATH: '/u' },
+}
+
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
@@ -28,12 +35,6 @@ const poster = require('../../miniprogram/utils/poster.js')
 const FILE = process.argv[2] || '/tmp/live-payload.json'
 const BASE = path.resolve(__dirname, '../design/模板配方-等价基线.json')
 
-global.wx = {
-  getStorageSync: () => ({ name: '阿飞', slogan: '每天读一点再走', template: 'cover', avatarPath: '' }),
-  setStorageSync: () => {},
-  getFileSystemManager: () => ({ accessSync: () => true }),
-  env: { USER_DATA_PATH: '/u' },
-}
 
 if (!fs.existsSync(FILE)) {
   console.error(`✗ 读不到现网回体：${FILE}`)
