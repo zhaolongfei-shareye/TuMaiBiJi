@@ -60,7 +60,8 @@ else:
 
 # ---------------- ② 登录 → 拿票 ----------------
 r = httpx.post(f"{BASE}/api/admin/login", json={"token": TOKEN}, timeout=20)
-check("管理口令能登录", r.status_code == 200, f"HTTP {r.status_code} {r.text[:80]}")
+# 只报状态码：成功回体里那枚 session 票不许进日志、更不许进对话（打印 `r.text` 就是把它抄一份）
+check("管理口令能登录", r.status_code == 200, f"HTTP {r.status_code}{'' if r.status_code == 200 else ' ' + r.text[:80]}")
 if r.status_code != 200:
     print("\n!!! 登录都没过，后面的判据无从谈起")
     sys.exit(1)
@@ -112,7 +113,14 @@ else:
 check("邀请那两个数一起回（只回一个就是替操作者判等）",
       {"rewards_granted", "quota_bonus_held"} <= set(d.get("invitations", {})), str(d.get("invitations")))
 srcs = {x.get("source_type") for x in d.get("sources", [])}
-check("来源里公众号与网页是分开的两档", {"wechat_article", "web_article"} <= srcs or not srcs, str(sorted(srcs)))
+# 判据钉的是"代码那个闭集没漏出第七种值"，不是"库里两种文章都出现过"——
+# 现网今天没有一条 `web_article`（实测六档只出五档），那是数据事实，拿它判红等于把尺子当产品。
+KNOWN = {"manual", "screenshot", "web_article", "wechat_article", "share_import", "preset"}
+unknown = sorted(srcs - KNOWN)
+check("来源取值都在代码那六档闭集里（冒出第七种就是脏值上屏）", not unknown,
+      str(unknown) if unknown else f"{len(srcs)} 档：{', '.join(sorted(srcs))}")
+if "web_article" not in srcs:
+    note("现网还没有一条 `web_article`，所以那一档在表里缺席＝数据事实，不是分不开")
 
 # ---------------- ⑤ 那一页：部署的必须是带「数据」栏的这一版 ----------------
 r = httpx.get(OPS, timeout=20)
