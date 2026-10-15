@@ -119,6 +119,14 @@ const GATE_OK = {
     /^\s*if note\.source_type == PRESET_SOURCE_TYPE:$/,
     /^\s*raise HTTPException\(status_code=400, detail=PRESET_CARD_KEEP_MSG\)$/,
   ],
+  'app/services/admin_stats.py': [
+    // 后台「数据」那一栏（10-15 融合这一期）：三行都是**只读聚合里的 where**，
+    // 语义正是上面 A2 那条口径"新增笔记不许把预置那篇算进去"，
+    // 不是给这一篇开一格行为分支（不跳审核、不跳分享、不特殊返回）。
+    /^from app\.services\.preset_note import/,
+    /^\s*\.where\(Note\.source_type != PRESET_SOURCE_TYPE\)$/,
+    /^\s*select\(func\.count\(\)\)\.select_from\(Note\)\.where\(Note\.source_type (!=|==) PRESET_SOURCE_TYPE\)$/,
+  ],
 }
 const hits = []
 const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => {
