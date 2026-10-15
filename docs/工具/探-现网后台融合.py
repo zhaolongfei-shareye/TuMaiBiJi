@@ -173,6 +173,46 @@ check("/ops 那页仍零 innerHTML（动态串一律 textContent）", "innerHTML
 check("/ops 不缓存（no-store）", "no-store" in r.headers.get("cache-control", ""),
       r.headers.get("cache-control", ""))
 
+# ---------------- ⑦ 对面那一侧：换票这条链在现网真走通（10-16 它部署之后才有这一段） ----------------
+# 它自己的口不带 /wtsj 前缀；这一段只在打真现网时跑（本机自测探针本身时没有对面可打）。
+THEIR = os.environ.get("THEIR_BASE", "https://api.agentsbin.cn").rstrip("/")
+if "api.agentsbin.cn" not in BASE:
+    note("⑦ 对面那一段跳过：这一台不是现网，换票链的另一头不在")
+else:
+    EX = f"{THEIR}/admin/session/exchange"
+    r = httpx.post(EX, json={}, timeout=20)
+    check("对面换票口不再是 404（它那一版真上线了）", r.status_code != 404, f"HTTP {r.status_code}")
+    check("空 ticket → 400（钉的是新契约：浏览器只交票，不再带暗号）",
+          r.status_code == 400, f"HTTP {r.status_code} {r.text[:60]}")
+    r = httpx.post(EX, json={"ticket": "not-a-real-ticket"}, timeout=20)
+    check("假票 → 401 而不是 502（它真打到我们验票口、我们回了『票不对』）",
+          r.status_code == 401, f"HTTP {r.status_code} {r.text[:60]}")
+    r = httpx.post(EX, json={"ticket": session}, timeout=20)
+    b = r.json() if r.status_code == 200 else {}
+    check("拿我们这侧的真管理票换到它自己的票 → 200", r.status_code == 200,
+          f"HTTP {r.status_code}{'' if r.status_code == 200 else ' ' + r.text[:80]}")
+    check("换到的回体只有 token/expiresAt 两键", set(b) == {"token", "expiresAt"}, str(sorted(b)))
+    if SECRET and b.get("token"):
+        their_exp = int(httpx.post(VERIFY, json={"token": session},
+                                   headers={"X-Exchange": SECRET}, timeout=20).json().get("exp") or 0)
+        check("换到的票有效期不超过我们这侧那枚票的 exp（两边一起到点，不许这边还登着）",
+              0 < int(b.get("expiresAt") or 0) <= their_exp, f"{b.get('expiresAt')} vs {their_exp}")
+    else:
+        note("有效期那条跳过：这一台没给暗号，拿不到对面回体里那个 exp")
+    if b.get("token"):
+        r = httpx.get(f"{THEIR}/admin/dashboard", headers={"Authorization": "Bearer " + b["token"]}, timeout=30)
+        check("换出来的票开得了它自己的门（/admin/dashboard 200）", r.status_code == 200, f"HTTP {r.status_code}")
+    r = httpx.get(f"{THEIR}/admin/dashboard", headers=H, timeout=20)
+    check("我们那枚票直接开不了它的门（不共用签名密钥这件事在现网是真的）", r.status_code == 401, f"HTTP {r.status_code}")
+    r = httpx.post(f"{THEIR}/admin/login", json={"username": "nobody@example.com", "password": "wrong-on-purpose"}, timeout=20)
+    check("它自己那套邮箱＋密码那口照旧在（应急通道没被融合堵死）", r.status_code == 401, f"HTTP {r.status_code}")
+    r = httpx.get(f"{THEIR}/admin.html", timeout=20)
+    check("对面那一页已是登录改道那一版（一个口令框＋应急通道那条链接）",
+          r.status_code == 200 and "loginWithSharedToken" in r.text and "showLocalLogin" in r.text,
+          f"HTTP {r.status_code}")
+    check("那一页里不出现暗号（红线 1 也要在现网那份上钉住）",
+          "X-Exchange" not in r.text and "ADMIN_EXCHANGE_SECRET" not in r.text)
+
 print(f"\n{'!!! 失败 ' + str(len(fails)) + ' 条：' + '、'.join(fails) if fails else '✓ 全过'}")
 for n in notes:
     print("  · " + n)

@@ -281,5 +281,22 @@ def test_数据与配置是两屏不是一列():
     # 卡要能被左栏点到：两边都挂 data-key
     assert "card.dataset.key = 'kind:'" in body and "card.dataset.key = 'text:'" in body
     assert "keys = ['overview', 'perday', 'sources', 'templates', 'invites', 'shares']" in body
-    # 图麦克那枚不许被做成"看着能点"：默认灰、且页面里写着为什么灰
-    assert 'class="off" id="swOther"' in body and "$('swNote').textContent" in body
+    # 图麦克那枚：10-16 对面接上换票口之后它是亮的，页面上要写着它为什么亮、点下去会发生什么
+    assert "classList.remove('off')" in body and "$('swNote').textContent" in body
+    assert "还没接上换票口" not in body, "对面已经上线了，那句旧话在屏上是假话"
+
+
+def test_图麦克那一枚点下去是跳过去而不是又输一次口令():
+    """站长拍的是「一个登录账号，就可以同时管理两个小程序」，而主入口是这一页。
+
+    只在 admin.html 那一侧做改道不算成立：从这一页出去仍要输第二次口令。10-16 对面接上换票口之后
+    这一枚就许点亮。**这一页只负责跳过去**——换票那一步在它那一页做，因为这一页有一条比融合更大的
+    纪律：凭证只进 sessionStorage（见 `test_mp_assets_admin` 里那条 `localStorage not in`）。
+    """
+    src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
+    body = src.split("_PAGE", 1)[1]
+    seg = body.split("$('swOther').addEventListener", 1)[1].split("buildNav()", 1)[0]
+    assert "location.href = '/admin.html'" in seg, "那一枚点了不跳页，等于没融合"
+    assert "if (!session())" in seg, "没登录也照着跳，过去那边仍要输口令——这一枚就成了假亮"
+    assert "localStorage" not in seg, "这一页不许替它留凭证：本页只吃 sessionStorage 那一条纪律"
+    assert "innerHTML" not in body and "removeItem('opsSession')" not in seg

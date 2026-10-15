@@ -85,6 +85,7 @@ textarea.ta { width:100%; box-sizing:border-box; border:1px solid var(--line); b
 .sw b { font-weight:500; font-size:13px; padding:7px 13px; color:var(--muted); white-space:nowrap }
 .sw b.on { background:var(--ink); color:#fff; font-weight:600 }
 .sw b.off { color:#b9b6ae; cursor:default }
+.sw b#swOther { cursor:pointer }   /* 10-16 起这一枚点得动：亮着就得看着像点得动的样子 */
 .swnote { font-size:12px; color:var(--muted); margin:6px 0 0; text-align:right; max-width:280px }
 .shell { display:flex; gap:24px; align-items:flex-start }
 nav#nav { width:132px; flex:none; font-size:13px; color:var(--muted); position:sticky; top:20px }
@@ -728,10 +729,20 @@ function refresh() {
   });
 }
 
-// 顶栏那枚产品切换：图麦克今天是灰的。**灰要有原因**——它那一侧还没来验过票（交接件已写、没人动手），
-// 而不是"做好了藏着"。等对面接上换票口，这一枚才许变亮，同时左边那两组要按产品各长一份。
-$('swOther').title = '图麦克那一侧还没接上换票口，暂时进不来';
-$('swNote').textContent = '图麦克那一栏要等它接上我们的换票口才会出现；今天两边仍各输一次口令。';
+// 顶栏那枚产品切换。**10-16 对面接上了换票口，这一枚从此点得动**：跳过去之后它自己拿这一侧的票
+// 去换一把它自己的，不必再输一次口令。灰的时候要有原因，亮的时候也要——原因就是那一口通了。
+// 注：这一枚是"跳过去"，不是"把它的屏并进这一页"。并屏那件事是我自己方案里写过的，站长没提过，
+// 今天也没做；融合拍的是**一个登录账号**，不是**一个界面**。
+$('swOther').classList.remove('off');
+$('swOther').title = '用这一侧的登录进图麦克的后台，不用再输一次口令';
+$('swNote').textContent = '上面那枚「图麦克」点得动：同一把口令，两个后台各开各的屏。它那边的钱、用户与图片不在这一页。';
+$('swOther').addEventListener('click', function () {
+  if (!session()) { $('swNote').textContent = '先在这一侧登录（下面那个口令框），那一枚才有票可换。'; showLogin(); return; }
+  // 这一页不替它存任何东西——本页的硬纪律是"凭证只进 sessionStorage，关掉标签页就没了"
+  // （`test_mp_assets_admin` 里那条"页面里不许出现另一种存储"的判据就是钉这个的）。同一标签页里
+  // sessionStorage 本来就同源可读，所以只需要跳过去，它自己去拿那把 opsSession 换它自己的票。
+  location.href = '/admin.html';
+});
 buildNav();
 
 if (session()) refresh();
