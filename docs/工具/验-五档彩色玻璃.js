@@ -28,6 +28,8 @@ const FILES = {
   palette: 'miniprogram/utils/palette.js',
   appjs: 'miniprogram/app.js',
   createWxss: 'miniprogram/pages/create/create.wxss',
+  ixWxss: 'miniprogram/pages/index/index.wxss',
+  meWxss: 'miniprogram/pages/me/me.wxss',
   createWxml: 'miniprogram/pages/create/create.wxml',
   createJs: 'miniprogram/pages/create/create.js',
   meWxml: 'miniprogram/pages/me/me.wxml',
@@ -166,19 +168,20 @@ function evaluate(S) {
   const bandH = (pad[0] || 0) + 24 * 1.35 + (pad[1] || 0)
   ck('首屏那一行只有一行字那么高（整枚 ≤96rpx——00:3x「高度压缩，看到一行文字就行了，不要浪费空间」；⚠ 阈值 96 是我按"一行字＋一段淡出"定的，他没给数）',
     pad.length === 2 && bandH <= 96, `上 ${pad[0]}＋字 32.4＋下 ${pad[1]} ＝ ${bandH.toFixed(1)}rpx`)
-  /* ---------- ②″ 面板与背景之间那一条投影（站长 10-15 拍甲：这一族也进五档） ----------
-     他那句「默认黑色的两个面板，好像没做阴影，但其他颜色面板是有阴影的，你对照下，哪里漏了」量出来是：
-     五档共用 `page{}` 那一枚 .16，投影落在上沿只把背景压暗 13 灰阶，而面板本体墨 46.5／象牙 164…，
-     墨档那 183 点的落差把 13 点整个吃掉 ⇒ "没做阴影"。所以他拍的是**抬墨档那一枚 α**，不是补一条声明。
-     ⚠ 原来这一格钉的是"`--sh-drop` 全站只在 `page` 那一族定义一处"，那个前提这次被他撤掉了
-        ⇒ 改的是判据，不是拿代码去迁就旧尺子。新口径四件事：
-     ① 字面量只住在 `app.wxss`：`page{}` 兜底 ＋ 五块 `.mood-*`，两枚令牌各六份，少一份就是那一档悄悄掉回兜底；
-     ② 每一块里 `--sh-drop` 就是同块 `--sh-lift` 的镜像（只有纵向偏移取反，其余逐字相同）；
-     ③ 墨档 .42、其余四档 .16、`page{}` 兜底仍 .16（没挂心情类的屏——分享页——不许跟着变深）；
-     ④ 几何那半（`0 ±12rpx 28rpx`）与色底（18,20,26）十二处一个数不许动：10-14 那句「高度全局一致」钉的就是它。 */
+  /* ---------- ②″ 面板与背景之间那一条投影（10-15 拍甲进五档 → 17:3x 又打回"不许开特例"） ----------
+     他先说「默认黑色的两个面板，好像没做阴影」，我给的解法是**只抬墨档那一枚 α**（.16→.42）；
+     真机两张图一来，他那句是「墨档的阴影过黑，与其他色的阴影不一致。你的算法不一样吗？」
+     ——是，那一版给的就是两个数。现在回到**全站一枚 .16，五档谁都不特殊**：同一枚 α 压在同一支背景上，
+     五档压暗的格数本来就相同，这才是"一致"。
+     ⚠ 代价钉在这儿，别偷偷改回上一版：墨档那条只有 9.8 格，正是他 14:5x 说"没做阴影"的那个读数。
+        真要抬，这一把只允许一种抬法——**六份（`page{}` 兜底＋五块心情）一起抬成同一个数**。
+     四件事：① 字面量只住在 `app.wxss`（两枚令牌各六份，少一份＝那一档悄悄掉回兜底）；
+     ② 每块里 `--sh-drop` 是同块 `--sh-lift` 的镜像（只有纵向偏移取反）；
+     ③ **六份的 α 全等于 .16**，哪一档单独抬／单独降都红；
+     ④ 几何那半（`0 ±12rpx 28rpx`）与色底（18,20,26）十二处一个数不许动：10-14「高度全局一致」。 */
   const SH = { '--sh-lift': '0 -12rpx 28rpx', '--sh-drop': '0 12rpx 28rpx' }
   const SH_SEL = ['page'].concat(P.MOODS.map((m) => '.' + m.cls))
-  const SH_A = { page: 0.16, ink: 0.42, ivory: 0.16, celadon: 0.16, blush: 0.16, mist: 0.16 }
+  const SH_A = 0.16
   /* 形状拆成"几何"与"色底"两段，α 由 `alphaOf` 另取：这样"改了 α"与"改了偏移／换了色底"各红各的，
      不会合成一条读不出来的读数。写不进这个形状的值（比如 `0 -20rpx`）算几何红，不当"没定义"。 */
   const shParts = (v) => {
@@ -205,11 +208,10 @@ function evaluate(S) {
       const l = shDecl(sel, '--sh-lift'), d = shDecl(sel, '--sh-drop')
       return !!l && !!d && norm(d) === norm(l.replace('0 -12rpx', '0 12rpx'))
     }), SH_SEL.map((sel) => `${sel}:${shDecl(sel, '--sh-drop') || '(无)'}`).join(' ').slice(0, 90))
-  ck('墨档那两枚 .42、其余四档与 page 兜底 .16（甲案那一枚；兜底不许变深，分享页没挂心情类）',
-    (shRead('page', '--sh-lift') || {}).a === SH_A.page
-    && P.MOODS.every((m) => ['--sh-lift', '--sh-drop']
-      .every((t) => (shRead('.' + m.cls, t) || {}).a === SH_A[m.key])),
-    SH_SEL.map((sel) => `${sel}:${(shRead(sel, '--sh-lift') || {}).a}`).join(' '))
+  ck('六份的 α 全等于 .16——**任何一档单独抬或单独降都红**（10-15 17:3x 他打回的就是我给墨档开的那个 .42 特例）',
+    SH_SEL.every((sel) => ['--sh-lift', '--sh-drop']
+      .every((t) => (shRead(sel, t) || {}).a === SH_A)),
+    SH_SEL.map((sel) => `${sel.replace('.', '')}:${(shRead(sel, '--sh-lift') || {}).a}`).join(' '))
   ck('色板那两枚与 CSS 同档同 α（正本只有 `moodVars` 一份，CSS 是镜像）',
     P.MOODS.every((m) => ['--sh-lift', '--sh-drop']
       .every((t) => norm(V(m.key)[t]) === norm(declOf(blockOf(S.app, '.' + m.cls), t)))))
@@ -244,6 +246,23 @@ function evaluate(S) {
      谁要把导航条扩进③，先红在这里。 */
   ck('墨档导航条那一面就是墨档玻璃本色 #23252C（默认态跟着换＝他这一刀要的，不许当成回归改回去）',
     P.navFor('ink').face === '#23252C', P.navFor('ink').face)
+  /* 导航条翻深之后带出来的第二条（站长 10-15 真机两张图：「为什么顶部有条线，要去掉」）：
+     app.wxss 的 `.container { padding: 2rpx var(--sp-3) 0 }` 顶部那一档不是间距，是堵外边距穿透的，
+     它露出来的是**容器自己那支底色**——浅色导航条底下看不出来，深色底下就是一条亮带。
+     拿他那张原图量过：亮带正好 3 设备像素 ÷ 1.488 ＝ 2rpx，落点 y274（导航条 37／亮带 230／条面 48）。
+     笔记页与「我的」页 10-04 为同一条线各自把容器 `padding: 0` 收过（`验-我的页改版-真跑` 钉着），
+     这一屏当时没轮到 ⇒ 三个 tab 现在必须都收到 0，写法两样（简写 0 或 `padding-top: 0`）都算。 */
+  const TOP_INSET = [
+    ['新建', S.createWxss], ['笔记', S.ixWxss], ['「我的」', S.meWxss],
+  ].map(([label, src]) => {
+    const b = blockOf(src.replace(/\/\*[\s\S]*?\*\//g, ''), '.container')
+    const short = (/padding:\s*([^;]*);/.exec(b) || [])[1]
+    const top = (/padding-top:\s*([^;]*);/.exec(b) || [])[1]
+    const zero = (v) => v !== undefined && v.trim().split(/\s+/).every((n) => /^0/.test(n))
+    return { label, got: `padding:${short === undefined ? '—' : short}／padding-top:${top === undefined ? '—' : top}`, ok: zero(top) || zero(short) }
+  })
+  TOP_INSET.forEach((t) => ck(`${t.label}那一屏：容器顶内缩收到 0（深色导航条底下那条 2rpx 亮带就是这么来的）`,
+    t.ok, t.got))
 
   /* ---------- ③ 零回归：墨档 == 今天 ---------- */
   const PAGE = blockOf(S.app, 'page')
@@ -440,11 +459,16 @@ const KNIVES = [
     (s) => s.replace('--sh-drop: 0 12rpx 28rpx', '--sh-drop: 0 -12rpx 28rpx')],
   ['★把 `page{}` 那枚兜底投影抬到 .42（分享页那一屏没挂心情类，跟着变深＝超出他那一刀）', 'app',
     (s) => s.replace('--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);', '--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.42);')],
-  ['★把墨档那两枚投影压回 .16（他 10-15 那句「默认黑色的两个面板好像没做阴影」当场长回来）', 'app',
-    (s) => s.replace(/--sh-(lift|drop): (0 -?12)rpx 28rpx rgba\(18, 20, 26, 0\.42\)/g, '--sh-$1: $2rpx 28rpx rgba(18, 20, 26, 0.16)')],
-  ['★彩色四档的投影跟着抬到 .42（象牙那一档自己变深，他没点过这一档）', 'app',
-    (s) => s.replace('--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);\n  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);',
-      '--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.42);\n  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.42);')],
+  ['★把墨档那一枚投影抬到 .42（＝10-15 17:3x 他打回的那一版：只有墨档特殊，读起来"过黑、不一致"）', 'app',
+    (s) => s.replace(/--sh-(lift|drop): (0 -?12)rpx 28rpx rgba\(18, 20, 26, 0\.16\);(\n  --sh-(?:lift|drop): [^\n]+\n\})/, '--sh-$1: $2rpx 28rpx rgba(18, 20, 26, 0.42);$3')],
+  ['★把彩色那一档（象牙）的投影单独抬到 .42——五档里只有一档特殊，与墨档那一刀是同一个坏法的另一半', 'app',
+    (s) => {
+      const PAT = '--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);\n  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);'
+      // 第一处相邻成对的 .16 现在是墨档（10-15 撤特例之后六份同值），所以这一刀要跳过去打第二处＝象牙。
+      const first = s.indexOf(PAT)
+      const i = s.indexOf(PAT, first + 1)
+      return i < 0 ? s : s.slice(0, i) + PAT.replace(/0\.16/g, '0.42') + s.slice(i + PAT.length)
+    }],
   ['★`.mood-mist` 那两枚投影删掉（雨雾那一档悄悄掉回 `page{}` 兜底，六份少一份）', 'app',
     (s) => {
       const i = s.lastIndexOf('--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);')
@@ -467,6 +491,10 @@ const KNIVES = [
       '  applyNavForBand(hasBg) { if (hasBg) wx.setNavigationBarColor({ frontColor: \'#000000\', backgroundColor: \'#f2efe9\', fail() {} }) },\n  applyNav() {')],
   ['★色板里把墨档的投影那两枚撤掉（CSS 与色板对不上，且这一族从五档里掉出去）', 'palette',
     (s) => s.replace(/    '--sh-lift'[^\n]*\n    '--sh-drop'[^\n]*\n/, '')],
+  ['★新建那一屏的 `padding-top: 0` 撤掉（深色导航条底下那条 2rpx 亮带长回来＝他 17:3x 打回的那条线）', 'createWxss',
+    (s) => s.replace('  padding-top: 0;\n  padding-bottom: 140rpx;', '  padding-bottom: 140rpx;')],
+  ['★笔记那一屏的容器 `padding: 0` 改回带顶内缩那一档（同一条线在第二屏长回来）', 'ixWxss',
+    (s) => s.replace('  padding: 0;\n}', '  padding: 2rpx 0 0;\n}')],
   ['★那一枚的下内边距抬回 150rpx（00:2x 那一版：坡走得完，可屏上就是一条 200rpx 的大灰带＝他 00:3x 打的"浪费空间"）', 'createWxss',
     (s) => s.replace('  padding: 14rpx var(--sp-3) 34rpx;', '  padding: 18rpx var(--sp-3) 150rpx;')],
   ['★底栏只写标准那行滤镜（iPhone 上胶囊不糊，安卓糊＝两机两样）', 'tabWxss',

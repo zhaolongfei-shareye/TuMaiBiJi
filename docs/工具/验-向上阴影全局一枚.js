@@ -131,7 +131,10 @@ const KNIVES = [
   ['★首屏那一行抄一份 .42 的字面量（不走令牌：五档里只有墨档该是 .42，彩色四档跟着变深＝两份真相）', 'cr',
     (s) => s.replace('  box-shadow: var(--sh-drop);', '  box-shadow: 0 12rpx 28rpx rgba(18, 20, 26, 0.42);')],
   ['★某一档心情把偏移从 12rpx 改成 20rpx（α 之外动了手，几屏的"抬起来"就不等高）', 'app',
-    (s) => s.replace('--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.42)', '--sh-lift: 0 -20rpx 28rpx rgba(18, 20, 26, 0.42)')],
+    (s) => {
+      const i = s.lastIndexOf('--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);')
+      return s.slice(0, i) + s.slice(i).replace('0 -12rpx 28rpx', '0 -20rpx 28rpx')
+    }],
 ]
 
 const base = {}

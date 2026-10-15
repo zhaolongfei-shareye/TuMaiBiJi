@@ -112,20 +112,19 @@ function evaluate(F) {
   ok('卡顶那一段单独一档＝.60（甲案那一枚，两页共用）——同样六份一份不许掉',
     alphasOf('--glass-veil-band').length === 6 && alphasOf('--glass-veil-band').every((a) => a === 0.60),
     `${alphasOf('--glass-veil-band').length} 份：${alphasOf('--glass-veil-band').join('/')}`)
-  /* 投影这一族（`--sh-lift`／`--sh-drop`）10-15 拍甲之后同样是"page 兜底＋五块心情"六个落点，
-     但 α **不是一档**：墨 .42、其余四档与兜底 .16。`alphasOf` 那支只认 `令牌: rgba(...)` 开头的值，
-     投影前面还有 `0 -12rpx 28rpx`，所以这里另用按块读的那支（`declOf`）。
-     ⚠ 兜底那一档不许跟着抬：分享页那一屏没挂心情类，抬了＝超出他这一刀。
-     几何那半（偏移与模糊半径）与镜像那半由 `验-五档彩色玻璃.js` 钉，这把只管齐不齐／α。 */
-  const SH_A = { ink: 0.42, ivory: 0.16, celadon: 0.16, blush: 0.16, mist: 0.16 }
+  /* 投影这一族（`--sh-lift`／`--sh-drop`）同样是"page 兜底＋五块心情"六个落点，
+     α **六份全等于 .16**：10-15 我先给墨档单独开过一档 .42，他 17:3x 拿真机两张图打回
+     「墨档的阴影过黑，与其他色的阴影不一致。你的算法不一样吗？」⇒ 特例撤了，这一条现在钉的就是
+     **"谁再单独抬某一档，谁红"**。几何与镜像那两半归 `验-五档彩色玻璃.js` 钉，这把只管齐不齐／α。 */
+  const SH_A = 0.16
   ;['--sh-lift', '--sh-drop'].forEach((tok) => {
     const read = (sel) => {
-      const m = new RegExp(`${tok}:\\s*[^;]*?rgba\\([^)]*,\\s*([\\d.]+)\\s*\\)`).exec(blockOf(APP, sel))
-      return m ? Number(m[1]) : null
+      const m = new RegExp(`${tok}:\\s*[^;]*?rgba\\(([^)]*),\\s*([\\d.]+)\\s*\\)`).exec(blockOf(APP, sel))
+      return m ? Number(m[2]) : null
     }
     const six = ['page'].concat(palette.MOODS.map((m) => '.' + m.cls))
-    const bad = six.filter((sel) => read(sel) !== (sel === 'page' ? 0.16 : SH_A[sel.replace('.mood-', '')]))
-    ok(`${tok} 六份都在且 α 就是"墨 .42／其余四档与兜底 .16"（少一份或错一档都算）`,
+    const bad = six.filter((sel) => read(sel) !== SH_A)
+    ok(`${tok} 六份都在且 α 全是 .16（哪一档单独抬都红——墨档那个 .42 特例已被他打回）`,
       bad.length === 0, six.map((sel) => `${sel}:${read(sel)}`).join(' '))
   })
   /* 10-15 03:5x 站长「两个渐变框架为什么不一样，要统一到笔记列表那种…没有断层」⇒ 这一段
@@ -441,11 +440,10 @@ const MUT = [
   ['★弹窗跟着被抬到 .60（他 10-11 拍过的那版皮被这一刀顺走）', 'ix', (s) => s.replace(
     '.container.has-bg .ci-card.glass-dialog {\n  background: var(--glass-veil);',
     '.container.has-bg .ci-card.glass-dialog {\n  background: var(--glass-veil-band);')],
-  // 10-15 拍甲：投影这一族进五档（墨 .42／其余四档与兜底 .16）。新增那两条 ok 各配一刀，
-  // 不然它们只是"读文件"，不是"守东西"。
-  ['★把墨档那两枚投影压回 .16（他 10-15 那句「黑色那两块没做阴影」当场长回来）', 'app', (s) => s.replace(
-    /--sh-(lift|drop): 0 (-?)12rpx 28rpx rgba\(18, 20, 26, 0\.42\)/g, '--sh-$1: 0 $212rpx 28rpx rgba(18, 20, 26, 0.16)')],
-  ['★只把 `page{}` 那枚兜底抬到 .42（分享页没挂心情类，跟着变深＝超出他那一刀）', 'app', (s) => s.replace(
+  // 10-15 拍甲：投影这一族进五档；同一轮 17:3x 又把"只抬墨档"那个特例打回 ⇒ α 六份必须全等于 .16。
+  ['★把墨档那两枚投影抬到 .42（就是他打回的那一版：五档里只有一档特殊）', 'app', (s) => s.replace(
+    /--sh-(lift|drop): 0 (-?)12rpx 28rpx rgba\(18, 20, 26, 0\.16\);(\n  --sh-(?:lift|drop): [^\n]+\n\})/, '--sh-$1: 0 $212rpx 28rpx rgba(18, 20, 26, 0.42);$3')],
+  ['★只把 `page{}` 那枚兜底抬到 .42（六份里的一份自己变了）', 'app', (s) => s.replace(
     '--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16)', '--sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.42)')],
   ['★`page{}` 里那枚 `--sh-drop` 整行删掉（名单上"该定义哪几枚"少一枚＝兜底没了）', 'app', (s) => s.replace(
     /^.*--sh-drop:.*\n/m, '')],
