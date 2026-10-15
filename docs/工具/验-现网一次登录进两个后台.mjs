@@ -89,7 +89,7 @@ async function main() {
       dash: !document.getElementById('dashboardView').classList.contains('hidden'),
       err: document.getElementById('fusionError').textContent })`));
   check('点一下登录，它自己那把进 localStorage', after.mine);
-  check('我们那把进 sessionStorage 且盖上这一页的戳', after.ops && after.by === 'admin', after.by);
+  check('我们那把进 sessionStorage 且盖上"跟这把票走"的戳', after.ops && /^\d+:/.test(after.by || ''), after.by);
   check('进了它自己的 dashboard（屏上没有报错话）', after.dash && !after.err, after.err);
   await shot('现网-图麦克那一页-登录后.png', 420);
 
