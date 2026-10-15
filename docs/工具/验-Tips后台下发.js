@@ -64,6 +64,19 @@ ck('校验句数与单句字数上限，且两处都读那两枚常量（不在�
   /MAX_TIPS_ITEMS\s*=\s*(\d+)/.test(SVC) && /MAX_TIP_CHARS\s*=\s*(\d+)/.test(SVC)
     && (NC(SVC).match(/MAX_TIPS_ITEMS/g) || []).length >= 2
     && (NC(SVC).match(/MAX_TIP_CHARS/g) || []).length >= 2)
+// 这条是 10-15 浏览器实测撞出来的真缺陷钉成的判据：上限当时定 40，而**自家包里的英文文案有 43 字**，
+// 等于他打开后台想原样填回自己现在那六句，会被自家闸门挡在门外（还是整份退回、零提示的那种）。
+// 上限与包内文案分属两个仓库文件，谁改了另一边不知道就是这条要红的时候。
+const CAP = Number(/MAX_TIP_CHARS\s*=\s*(\d+)/.exec(SVC)[1])
+const ITEMS = Number(/MAX_TIPS_ITEMS\s*=\s*(\d+)/.exec(SVC)[1])
+const I18N_T = require('../../miniprogram/utils/i18n.js')
+const PACK = { zh: I18N_T.t('tips', 'zh'), en: I18N_T.t('tips', 'en') }
+ck(`包里那六句（中英两份）逐句都放得进上限 ${CAP} 字（改短文案或抬上限都要看这条，别让它再倒挂）`,
+  CAP >= Math.max(...PACK.zh.concat(PACK.en).map((s) => s.length)),
+  `中文最长 ${Math.max(...PACK.zh.map((s) => s.length))}／英文最长 ${Math.max(...PACK.en.map((s) => s.length))}｜上限 ${CAP}`)
+ck('包里那六句的句数也放得进句数上限（后台一次发一份，条数不能超）',
+  PACK.zh.length <= ITEMS && PACK.en.length <= ITEMS,
+  `zh ${PACK.zh.length} 句／en ${PACK.en.length} 句｜上限 ${ITEMS}`)
 ck('两份语言都要给，缺一整份退回（切过去读到空数组＝那一行整条消失）',
   /TIP_LANGS\s*=\s*\(\s*"zh",\s*"en"\s*\)/.test(SVC)
     && /for lang in TIP_LANGS/.test(SVC))
