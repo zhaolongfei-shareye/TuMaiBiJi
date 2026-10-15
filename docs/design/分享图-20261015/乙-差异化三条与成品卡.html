@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 分享封面 · 方向乙：把"竞品没有的三条"摆成主视觉——左半 01/02/03 三条差异化，
+   右半壳里放**一张成品卡片**（＝「玉版宣」模板：标题 + 摘要 + 要点 + 标签 + 带码署名），
+   让"自动出摘要要点标签""卡片自带扫得开的码"这两条直接被看见。
+   界面与卡片全部 CSS 画，不放真截图、不放真人照片。 */
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-400-normal.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-500-normal.woff2') format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-500-italic.woff2') format('woff2'); font-weight: 500; font-style: italic; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; height: 1024px; overflow: hidden; }
+.card { position: relative; width: 1280px; height: 1024px; background: #F2EFE9; color: #14161A;
+  font-family: 'Songti SC', 'STSong', serif; overflow: hidden; }
+
+.kick { position: absolute; left: 84px; top: 60px; font-size: 21px; letter-spacing: .3em; color: #D2683F; font-weight: 700; }
+.h1 { position: absolute; left: 84px; top: 106px; width: 660px; font-size: 78px; line-height: 1.24; font-weight: 700; }
+.h1 i { font-style: normal; color: #D2683F; }
+.sub { position: absolute; left: 86px; top: 322px; font-size: 26px; letter-spacing: .04em; color: rgba(20,22,26,.55); }
+.sub b { font-weight: 400; color: rgba(20,22,26,.3); padding: 0 11px; }
+
+.list { position: absolute; left: 84px; top: 396px; width: 596px; }
+.it { display: flex; gap: 22px; padding: 21px 0; border-top: 1px solid rgba(20,22,26,.16); }
+.it:last-child { border-bottom: 1px solid rgba(20,22,26,.16); }
+.no { flex: none; font-family: 'Playfair'; font-weight: 500; font-size: 34px; line-height: 1.05; width: 50px; color: #6E9070; }
+.it:nth-child(2) .no { color: #D2683F; } .it:nth-child(3) .no { color: #4B50C9; }
+.tt { font-size: 30px; font-weight: 700; letter-spacing: .03em; }
+.dd { margin-top: 6px; font-size: 22px; line-height: 1.45; color: rgba(20,22,26,.62); }
+.foot { position: absolute; left: 86px; bottom: 48px; font-size: 22px; letter-spacing: .1em; color: rgba(20,22,26,.5); }
+
+/* 手机壳 */
+.phone { position: absolute; right: 88px; top: 96px; width: 452px; height: 828px; border-radius: 66px;
+  background: #1B1D22; padding: 16px; transform: rotate(3deg);
+  box-shadow: 0 40px 80px rgba(20,22,26,.26), inset 0 0 0 0 rgba(255,255,255,0), inset 0 0 0 2px rgba(255,255,255,.08); }
+.scr { position: relative; width: 420px; height: 796px; border-radius: 52px; overflow: hidden; background: #23252C; }
+.isl { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); width: 116px; height: 32px;
+  border-radius: 999px; background: #0D0E11; z-index: 9; }
+.sb { position: absolute; left: 0; top: 0; width: 420px; height: 52px; color: #F2EFE9; font-size: 15px;
+  font-weight: 700; display: flex; align-items: center; justify-content: space-between; padding: 0 26px; }
+.sb .r { font-size: 12px; font-weight: 400; opacity: .85; }
+.nb { position: absolute; left: 0; top: 52px; width: 420px; height: 46px; display: flex; align-items: center;
+  justify-content: center; color: #F2EFE9; font-size: 16px; letter-spacing: .06em; }
+.nb .cap { position: absolute; right: 14px; top: 8px; width: 86px; height: 30px; border-radius: 999px;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); display: flex; align-items: center;
+  justify-content: space-evenly; color: #F2EFE9; font-size: 14px; }
+.nb .bk { position: absolute; left: 18px; top: 6px; font-size: 20px; color: rgba(242,239,233,.85); }
+
+/* 壳里那张＝「玉版宣」成品卡（poster.js id='card'），下面接模板小图那一排与「存到相册」 */
+.note { position: absolute; left: 18px; top: 112px; width: 384px; background: #FBF8F1;
+  border-radius: 6px; padding: 28px 26px 22px; box-shadow: 0 18px 34px rgba(0,0,0,.3); }
+.note .kick2 { font-size: 12px; letter-spacing: .28em; color: rgba(20,22,26,.45); }
+.note .rule { height: 2px; background: #14161A; margin: 11px 0 16px; }
+.note .ct { font-size: 34px; line-height: 1.3; font-weight: 700; }
+.note .sm { margin-top: 12px; font-size: 15px; line-height: 1.7; color: rgba(20,22,26,.7); }
+.note .hd { margin: 16px 0 2px; font-size: 12px; letter-spacing: .22em; color: rgba(20,22,26,.42); }
+.note .pt { font-size: 15px; line-height: 1.5; color: rgba(20,22,26,.82); display: flex; gap: 9px; padding: 7px 0;
+  border-top: 1px solid rgba(20,22,26,.12); }
+.note .pt i { width: 6px; height: 6px; border-radius: 50%; background: #D2683F; margin-top: 8px; flex: none; }
+.note .tags { margin-top: 12px; display: flex; gap: 8px; }
+.note .tags span { font-size: 13px; padding: 5px 11px; border-radius: 999px; background: rgba(110,144,112,.16);
+  color: #4E6B52; }
+.note .sign { margin-top: 20px; display: flex; align-items: center; gap: 9px;
+  border-top: 1px solid rgba(20,22,26,.14); padding-top: 13px; }
+.note .sign i { width: 30px; height: 30px; border-radius: 50%; background: #6E9070; flex: none; }
+.note .sign .nm { font-size: 14px; font-weight: 700; }
+.note .sign .ln { font-size: 11.5px; color: rgba(20,22,26,.5); }
+.note .sign img { width: 56px; height: 56px; border-radius: 8px; margin-left: auto; display: block; }
+
+.thumbs { position: absolute; left: 18px; top: 674px; width: 384px; display: flex; gap: 9px; }
+.thumbs b { width: 42px; height: 56px; border-radius: 6px; display: block; opacity: .82; }
+.thumbs b:nth-child(1) { background: #FBF8F1; opacity: 1; box-shadow: 0 0 0 2px #F6C445; }
+.thumbs b:nth-child(2) { background: #14161A; }
+.thumbs b:nth-child(3) { background: #D2683F; }
+.thumbs b:nth-child(4) { background: #4B50C9; }
+.thumbs b:nth-child(5) { background: #6E9070; }
+.thumbs b:nth-child(6) { background: #A4B0C0; }
+.thumbs b:nth-child(7) { background: #F6C445; }
+.save { position: absolute; left: 18px; top: 742px; width: 384px; height: 40px; border-radius: 20px;
+  background: #F2EFE9; color: #14161A; font-size: 15px; text-align: center; line-height: 40px; letter-spacing: .1em; }
+
+/* 压角小纸卡：第二套模板，说明"十套"不是一句空话 */
+.stack { position: absolute; left: 500px; top: 796px; width: 196px; height: 196px; }
+.stack .c2 { position: absolute; left: 0; top: 0; width: 224px; height: 196px; background: #14161A; color: #F2EFE9;
+  border-radius: 10px; transform: rotate(-9deg); box-shadow: 0 20px 36px rgba(20,22,26,.26); padding: 20px 18px; }
+.stack .c2 .q { font-size: 19px; line-height: 1.55; font-weight: 700; }
+.stack .c2 .q em { font-style: normal; color: #F6C445; }
+.stack .c2 .by { position: absolute; left: 18px; bottom: 16px; font-size: 11px; letter-spacing: .16em;
+  color: rgba(242,239,233,.6); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="kick">TUMARK · 图麦笔记 / 2026</div>
+  <div class="h1"><i>截图和链接</i>，<br>变成能扫的笔记。</div>
+  <div class="sub">10 套卡片<b>·</b>5 种心情<b>·</b>免费不限量</div>
+
+  <div class="list">
+    <div class="it"><div class="no">01</div><div><div class="tt">存的是内容本身</div>
+      <div class="dd">原文被删了，你这条笔记还在</div></div></div>
+    <div class="it"><div class="no">02</div><div><div class="tt">自动出摘要、要点、标签</div>
+      <div class="dd">丢进来就行，不用回头自己再读一遍</div></div></div>
+    <div class="it"><div class="no">03</div><div><div class="tt">卡片自带一个码</div>
+      <div class="dd">扫开就是这一条笔记，不是首页</div></div></div>
+  </div>
+
+  <div class="foot">微信搜「图麦笔记」 · agentsbin.cn</div>
+
+  <div class="phone"><div class="scr"><div class="isl"></div>
+    <div class="sb"><span>17:57</span><span class="r">●●●●○ ▮▮</span></div>
+    <div class="nb"><span class="bk">‹</span>转为笔记卡片<span class="cap">⋯&nbsp;&nbsp;◎</span></div>
+    <div class="note">
+      <div class="kick2">旅行 · 10/15</div>
+      <div class="rule"></div>
+      <div class="ct">厦门三日路线</div>
+      <div class="hd">摘要</div>
+      <div class="sm">不赶景点，沿着海边走。轮渡要提前一天订，岛上骑车比走路省一半时间。</div>
+      <div class="hd">要点</div>
+      <div class="pt"><i></i>轮渡提前一天订，别现场排队</div>
+      <div class="pt"><i></i>岛上骑车比走路省一半时间</div>
+      <div class="pt"><i></i>傍晚五点后沙坡尾光线最好</div>
+      <div class="hd">标签</div>
+      <div class="tags"><span># 厦门</span><span># 路线</span><span># 周末</span></div>
+      <div class="sign"><i></i><div><div class="nm">阿麦</div><div class="ln">读过的都会忘，记下来的才归我</div></div>
+        <img src="qr_sharecard.jpg" alt=""></div>
+    </div>
+    <div class="thumbs"><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+    <div class="save">存到相册</div>
+  </div></div>
+
+  <div class="stack"><div class="c2"><div class="q">「读过的都会忘，<br>记下来的<em>才归我</em>。」</div>
+    <div class="by">摘句 · 另一套模板</div></div></div>
+</div>
+</body>
+</html>

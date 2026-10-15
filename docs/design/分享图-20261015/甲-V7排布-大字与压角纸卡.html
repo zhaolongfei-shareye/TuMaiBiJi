@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 分享封面 · 方向甲：照站长给的 V7 作品集封面排布逐层搬——
+   左上 kicker + 两行宋体大字 + 一行三项副题；左下三行展示字（对应 Keep./Make./Share.）；
+   右侧一只顺时针微倾的 iPhone 壳，壳里是**现在的首屏**（2.2.0 那套深色毛玻璃面板）；
+   壳的左下角压一张逆时针微倾的竖排纸卡（＝「素宣信笺」模板）。
+   界面全部 CSS 画：不放真截图、不放真人照片（肖像权未确认）。 */
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-400-normal.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-500-normal.woff2') format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-500-italic.woff2') format('woff2'); font-weight: 500; font-style: italic; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; height: 1024px; overflow: hidden; }
+.card { position: relative; width: 1280px; height: 1024px; background: #F2EFE9; color: #14161A;
+  font-family: 'Songti SC', 'STSong', serif; overflow: hidden; }
+
+.kick { position: absolute; left: 84px; top: 60px; font-size: 21px; letter-spacing: .3em; color: #D2683F; font-weight: 700; }
+.h1 { position: absolute; left: 84px; top: 108px; width: 620px; font-size: 92px; line-height: 1.22; font-weight: 700; }
+.sub { position: absolute; left: 86px; top: 354px; font-size: 27px; letter-spacing: .04em; color: rgba(20,22,26,.55); }
+.sub b { font-weight: 400; color: rgba(20,22,26,.3); padding: 0 12px; }
+.disp { position: absolute; left: 84px; top: 452px; }
+.dl { font-size: 92px; line-height: 1.16; font-weight: 700; }
+.dl .g { color: #6E9070; } .dl .c { color: #D2683F; }
+.foot { position: absolute; left: 86px; bottom: 48px; font-size: 22px; letter-spacing: .1em; color: rgba(20,22,26,.5); }
+
+/* 手机壳 */
+.phone { position: absolute; right: 156px; top: 70px; width: 452px; height: 828px; border-radius: 66px;
+  background: #1B1D22; padding: 16px; transform: rotate(4deg);
+  box-shadow: 0 40px 80px rgba(20,22,26,.26), inset 0 0 0 2px rgba(255,255,255,.08); }
+.scr { position: relative; width: 420px; height: 796px; border-radius: 52px; overflow: hidden; background: #23252C; }
+.isl { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); width: 116px; height: 32px;
+  border-radius: 999px; background: #0D0E11; z-index: 9; }
+
+/* 首屏：顶部深色 chrome（状态条 + 导航 + 那一行 Tips） */
+.sb { position: absolute; left: 0; top: 0; width: 420px; height: 52px; color: #F2EFE9; font-size: 15px;
+  font-weight: 700; display: flex; align-items: center; justify-content: space-between; padding: 0 26px; }
+.sb .r { display: flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 400; opacity: .85; }
+.nb { position: absolute; left: 0; top: 52px; width: 420px; height: 46px; display: flex; align-items: center;
+  justify-content: center; color: #F2EFE9; font-size: 16px; letter-spacing: .06em; }
+.nb .cap { position: absolute; right: 14px; top: 8px; width: 86px; height: 30px; border-radius: 999px;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); display: flex; align-items: center;
+  justify-content: space-evenly; color: #F2EFE9; font-size: 14px; }
+.tips { position: absolute; left: 0; top: 98px; width: 420px; height: 40px; display: flex; align-items: center;
+  gap: 7px; padding: 0 16px; color: rgba(242,239,233,.9); font-size: 12.5px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #F6C445; flex: none; }
+.lang { position: absolute; right: 16px; top: 138px; font-size: 11px; color: rgba(242,239,233,.75); }
+.lang i { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #F6C445; margin-right: 5px; }
+
+/* 背景图那一档：CSS 画的浅面（不放真人照片） */
+.hero { position: absolute; left: 0; top: 138px; width: 420px; height: 330px; overflow: hidden;
+  background: linear-gradient(180deg, #EDF0E7 0%, #DCE4D6 44%, #BCCDB6 100%); }
+.hero .sun { position: absolute; right: 62px; top: 74px; width: 96px; height: 96px; border-radius: 50%;
+  background: rgba(210,168,120,.55); }
+.hero .sea { position: absolute; left: -20px; right: -20px; bottom: -6px; height: 128px;
+  background: linear-gradient(180deg, rgba(110,144,112,.34), rgba(78,107,82,.55));
+  border-radius: 50% 50% 0 0 / 26% 26% 0 0; }
+.hero .ht { position: absolute; left: 22px; top: 26px; font-size: 31px; line-height: 1.24; font-weight: 700;
+  color: rgba(20,22,26,.7); }
+.hero .he { position: absolute; left: 24px; top: 118px; font-family: 'Playfair'; font-style: italic; font-size: 14px;
+  color: rgba(20,22,26,.45); }
+.swap { position: absolute; left: 0; top: 442px; width: 420px; display: flex; justify-content: space-between;
+  padding: 0 20px; font-size: 12.5px; color: rgba(20,22,26,.6); }
+
+/* 通栏深色玻璃面板 */
+.panel { position: absolute; left: 0; top: 468px; width: 420px; height: 262px; border-radius: 26px 26px 0 0;
+  background: linear-gradient(180deg, rgba(35,37,44,.86) 0%, #23252C 42%); color: #F2EFE9;
+  box-shadow: 0 -14px 30px rgba(20,22,26,.16); padding: 20px 18px; }
+.panel .prow { display: flex; gap: 14px; align-items: flex-start; }
+.mini { width: 96px; height: 128px; border-radius: 14px; background: #FBF8F1; color: #14161A; padding: 10px;
+  position: relative; flex: none; }
+.mini .ln { height: 6px; border-radius: 3px; background: rgba(20,22,26,.16); margin-bottom: 7px; }
+.mini .ln.s { width: 62%; }
+.mini .fig { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 46px; border-radius: 6px;
+  background: linear-gradient(180deg, #DCE4D6, #9CB39A); }
+.panel .tip2 { flex: 1; font-size: 13.5px; line-height: 1.6; color: rgba(242,239,233,.88); }
+.panel .tip2 .h { display: flex; align-items: center; gap: 7px; font-weight: 700; margin-bottom: 6px; }
+.plus { width: 74px; height: 74px; border-radius: 50%; background: rgba(242,239,233,.14);
+  border: 1px solid rgba(242,239,233,.3); color: #F2EFE9; font-size: 40px; line-height: 70px; text-align: center;
+  flex: none; margin-top: 22px; }
+.cnt { position: absolute; left: 18px; bottom: 62px; font-size: 12px; color: rgba(242,239,233,.6); }
+.cnt b { font-family: 'Playfair'; font-size: 26px; font-weight: 500; color: #F2EFE9; display: block; line-height: 1; }
+.tab { position: absolute; left: 12px; right: 12px; bottom: 14px; height: 56px; border-radius: 28px;
+  background: rgba(242,239,233,.08); display: flex; align-items: center; justify-content: space-around;
+  color: rgba(242,239,233,.62); font-size: 20px; }
+.tab .on { color: #F2EFE9; }
+
+/* 压角竖排纸卡＝「素宣信笺」 */
+.paper { position: absolute; left: 552px; top: 636px; width: 262px; height: 344px; background: #FBF8F1;
+  transform: rotate(-7deg); box-shadow: 0 26px 46px rgba(20,22,26,.24); padding: 24px 22px;
+  display: flex; flex-direction: row-reverse; gap: 12px; }
+.paper .v { writing-mode: vertical-rl; text-orientation: upright; }
+.paper .t { font-size: 21px; font-weight: 700; letter-spacing: .08em; }
+.paper .b { font-size: 13px; line-height: 1.95; color: rgba(20,22,26,.62); }
+.paper .seal { writing-mode: vertical-rl; width: 24px; height: 24px; background: #B4392B; color: #FBF8F1;
+  font-size: 15px; text-align: center; line-height: 24px; align-self: flex-start; }
+.paper .meta { position: absolute; left: 20px; right: 20px; bottom: 18px; display: flex; align-items: center; gap: 8px;
+  border-top: 1px solid rgba(20,22,26,.14); padding-top: 11px; }
+.paper .meta i { width: 22px; height: 22px; border-radius: 50%; background: #6E9070; flex: none; }
+.paper .meta .nm { font-size: 12px; font-weight: 700; }
+.paper .meta .ln { font-size: 10.5px; color: rgba(20,22,26,.5); }
+.paper .meta .br { margin-left: auto; text-align: right; font-size: 9.5px; letter-spacing: .1em; color: rgba(20,22,26,.42); }
+
+/* 真码：现网 getwxacodeunlimit 回的 280×280（scene=sharecard, page=pages/create/create, env=release） */
+.qr { position: absolute; right: 40px; bottom: 44px; width: 96px; text-align: center; }
+.qr img { width: 96px; height: 96px; border-radius: 14px; display: block; box-shadow: 0 12px 26px rgba(20,22,26,.2); }
+.qr span { display: block; margin-top: 8px; font-size: 13px; letter-spacing: .08em; color: rgba(20,22,26,.55); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="kick">TUMARK · 图麦笔记 / 2026</div>
+  <div class="h1">看到好内容，<br>随手记下来。</div>
+  <div class="sub">10 套卡片<b>·</b>5 种心情<b>·</b>免费不限量</div>
+
+  <div class="disp">
+    <div class="dl"><span class="g">存下来。</span></div>
+    <div class="dl"><span class="c">提炼好。</span></div>
+    <div class="dl"><span class="g">扫得开。</span></div>
+  </div>
+
+  <div class="foot">微信搜「图麦笔记」 · agentsbin.cn</div>
+
+  <div class="phone"><div class="scr"><div class="isl"></div>
+    <div class="sb"><span>17:57</span><span class="r">●●●●○ ▮▮</span></div>
+    <div class="nb">图麦笔记<span class="cap">⋯&nbsp;&nbsp;◎</span></div>
+    <div class="tips"><span class="dot"></span>用 AI 帮你读懂一切：拍照 | 读图 | 翻译 | 提炼 | 分享</div>
+    <div class="lang"><i></i>EN</div>
+    <div class="hero">
+      <div class="ht">看到好内容，<br>随手记下来。</div>
+      <div class="he">Save what matters</div>
+      <div class="sun"></div><div class="sea"></div>
+    </div>
+    <div class="swap"><span>换背景 ›</span><span>换心情 ☁</span></div>
+    <div class="panel">
+      <div class="prow">
+        <div class="mini"><div class="ln"></div><div class="ln"></div><div class="ln s"></div><div class="fig"></div></div>
+        <div class="tip2"><div class="h"><span class="dot"></span>Tips</div>贴一个公众号链接，<br>长文读成三句话</div>
+        <div class="plus">+</div>
+      </div>
+      <div class="cnt"><b>20</b>卡片</div>
+    </div>
+    <div class="tab"><span>⌕</span><span class="on">▤</span><span>◔</span></div>
+  </div></div>
+
+  <div class="paper">
+    <div class="v t">周末去厦门，两天怎么排</div>
+    <div class="v b">不赶景点，沿着海边走。路线与提醒整理成一张卡，出发前照着走一遍就行。</div>
+    <div class="v seal">麦</div>
+    <div class="meta"><i></i><div><div class="nm">阿麦</div><div class="ln">读过的都会忘，记下来的才归我</div></div>
+      <div class="br">图麦笔记<br>KEEP WHAT YOU READ</div></div>
+  </div>
+
+  <div class="qr"><img src="qr_sharecard.jpg" alt=""><span>扫码直达</span></div>
+</div>
+</body>
+</html>

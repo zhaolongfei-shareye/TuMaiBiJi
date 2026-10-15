@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+/* 分享封面 · 按 V7 作品集封面的图文重新排版（1280×1024，微信 128KB 上限）。
+   文字与图形一律取自那张封面：kicker、两行宋体大字、三项副题（16 语整理成中文 · 10 套卡片 · 5 种心情）、
+   Keep./Make./Share. 三行展示字、右侧倾斜手机壳＋压角竖排纸卡（这一整组按裁片原样搬，不重画）。
+   底色直接取参照图自己的纸色 #E9E7DC，裁片边缘才接得看不出来。 */
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-400-normal.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-500-normal.woff2') format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Playfair'; src: url('playfair-display-latin-500-italic.woff2') format('woff2'); font-weight: 500; font-style: italic; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1280px; height: 1024px; overflow: hidden; }
+.card { position: relative; width: 1280px; height: 1024px; background: #E9E7DC; color: #14161A;
+  font-family: 'Songti SC', 'STSong', serif; overflow: hidden; }
+
+.kick { position: absolute; left: 72px; top: 54px; font-family: 'Playfair'; font-weight: 500; font-size: 18px;
+  letter-spacing: .3em; color: #C0552F; }
+.h1 { position: absolute; left: 72px; top: 96px; width: 520px; font-size: 76px; line-height: 1.2; font-weight: 700; }
+.sub { position: absolute; left: 74px; top: 292px; width: 520px; font-size: 23px; line-height: 1.5;
+  letter-spacing: .02em; color: rgba(20,22,26,.62); }
+.sub b { font-weight: 400; color: rgba(20,22,26,.32); padding: 0 8px; }
+
+.disp { position: absolute; left: 70px; top: 372px; font-family: 'Playfair'; font-weight: 500; font-size: 104px;
+  line-height: 1.06; letter-spacing: -.01em; }
+.disp div { color: #6E9070; }
+.disp .c { color: #C0552F; font-style: italic; }
+
+.foot { position: absolute; left: 74px; bottom: 46px; font-size: 19px; letter-spacing: .12em; color: rgba(20,22,26,.5); }
+.rule { position: absolute; left: 74px; right: 40px; bottom: 92px; height: 1px; background: rgba(20,22,26,.18); }
+
+/* 参照图里那一整组（倾斜手机壳 + 压角竖排纸卡）按裁片原样搬进来 */
+.grp { position: absolute; right: 34px; top: 54px; width: 720px; height: 946px; }
+.grp img { width: 720px; height: 946px; display: block; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="kick">PRODUCT DESIGN / 2026</div>
+  <div class="h1">看到好内容，<br>随手记下来。</div>
+  <div class="sub">16 语整理成中文<b>·</b>10 套卡片<b>·</b>5 种心情</div>
+
+  <div class="disp"><div>Keep.</div><div class="c">Make.</div><div>Share.</div></div>
+
+  <div class="rule"></div>
+  <div class="foot">图麦笔记 · agentsbin.cn</div>
+
+  <div class="grp"><img src="组-手机与纸卡.png" alt=""></div>
+</div>
+</body>
+</html>
