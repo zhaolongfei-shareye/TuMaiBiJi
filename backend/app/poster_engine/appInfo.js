@@ -1,0 +1,40 @@
+/** 「我的」和「关于」两处都要说同一套话：版本号、官网、介绍语。
+ *  以前版本号只写在 pages/about/about.js 里，「我的」这一版要把关于收进本页，
+ *  两处各写一份迟早走样（这个号已经踩过三次"上传完才想起来改"），所以挪到这里，
+ *  两边都读这一份，`验-关于页版本号.js` 也直接读这里当期望值。 */
+/* 这一条只在 release/2.0 这一支上：2.0 与 1.x 的隔离走"同 AppID 分支隔离"（方案 §2 甲），
+   界面上一眼能分清跑的是哪一条线，靠的就是这一格。
+   1.x 那一支要出补丁就在 master 上改回 1.9.x，别把这一格 merge 过去。
+   ⚠ 别在这里写"现网线上是几点几"——那是后台的事实，只有登录后台才读得到，写在代码里
+   第二天就变成假话（这一格曾经把 1.9.26 当成线上版留了三天）。
+   2.2 这一支另起号段（方案 §2 甲）：不复用 2.1.x 的任何号，两条线的预览包在屏幕上分得开。
+   ⚠ 这一格必须与出包那一趟 `cli upload -v`／`cli preview -v` 的数**相等**（这一条踩过三次）。
+   ⚠ **同一个号不许叠第二层**（站长 10-15 14:2x 拍「我要新版 2.2.1」）：10-15 01:12 送审那份构建叫 2.2.0，
+   当天 14:16 又拿 `-v 2.2.0` 覆盖传了一份 ⇒ 后台「审核版本」与「开发版本」两格里都是 2.2.0，
+   扫开的是哪一份只能靠上传时间猜。以后每出一份往上走一号。
+   ⚠ 10-15 00:3x 站长拍「要合并分支，微信开发者工具默认打开应该是最新版，不看旧版」⇒ `release/2.2` 已并进
+   这一支，上面那句"这一条只在 release/2.0 这一支上"从此作废：这一格就是当前工程的号。
+   至于后台现在挂着几点几、线上是哪一份——那是登录后台才读得到的事实，不写在这里（这一格曾经
+   把 1.9.26 当成线上版留了三天）。
+   ⚠ 号是**一份包一个**，不是"一次改动一个"：2.2.0／2.2.1／2.2.2 各已被一份包用掉（2.2.2 那张预览码里
+   是"墨档投影单独 .42 ＋ 导航条底下那条 2rpx 亮带"，他 17:3x 两张真机图把这两处都打回了），
+   所以撤特例＋去亮带这一版走 **2.2.3**。 */
+const VERSION = '2.2.3'
+
+// 官网地址以站点自己的 canonical 为准（curl 读到的 <link rel=canonical> 是不带 www 的那个）。
+// 只能复制、点不开：web-view 组件个人主体用不了，小程序里打不开外部网页。
+const SITE = 'agentsbin.cn'
+const OFFICIAL_ACCOUNT = '杰克AI日记'
+
+// 介绍语：关于页和「我的」的介绍卡说的是同一套话。
+// 站长 10-01 晚排查中英文缺口时补的英文一份——原来只有中文，英文态这两张卡还是整段汉字。
+const INTRO_LEADS = {
+  zh: '图麦笔记做的事很窄：把看到的好东西变成能用的笔记。公众号文章、网页链接、手机截图丢进来，出来就是一条带摘要、要点和标签的笔记，之后能搜、能归类、能存成一张卡片图随时调用。',
+  en: 'TumarkNote does one narrow thing: turn what you read into notes you can actually use. Drop in an article, a link, or a screenshot, and you get back a note with a summary, key points and tags — searchable, sortable, and savable as a share card whenever you need it.',
+}
+
+function introLead(lang) {
+  return INTRO_LEADS[lang === 'en' ? 'en' : 'zh']
+}
+
+module.exports = { VERSION, SITE, OFFICIAL_ACCOUNT, introLead }

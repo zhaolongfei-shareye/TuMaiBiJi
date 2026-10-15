@@ -1,0 +1,50 @@
+{
+ "entry": "poster.js",
+ "files": [
+  {
+   "name": "api.js",
+   "bytes": 15986,
+   "md5": "eb96bcf4a84d53667d601da692f0b6b2"
+  },
+  {
+   "name": "appInfo.js",
+   "bytes": 3535,
+   "md5": "5d106d2966ceda6865bce2c8372342ce"
+  },
+  {
+   "name": "date.js",
+   "bytes": 1434,
+   "md5": "2fc4aac972e95cf0873f9cda8fac5f2a"
+  },
+  {
+   "name": "i18n.js",
+   "bytes": 42705,
+   "md5": "cd970a93aed619483df8c365914f05c8"
+  },
+  {
+   "name": "mpAssets.js",
+   "bytes": 6645,
+   "md5": "b4ba4835adfb119939927d7a4bfa5ceb"
+  },
+  {
+   "name": "palette.js",
+   "bytes": 56583,
+   "md5": "5fc1ec0dbbb19561f3aef01b169acf8c"
+  },
+  {
+   "name": "poster.js",
+   "bytes": 105775,
+   "md5": "fabdd7e08e25cd84dd73ce3359bfa6d8"
+  },
+  {
+   "name": "posterRecipe.js",
+   "bytes": 22487,
+   "md5": "31cf26a14991dbaba1104edc7aee12c7"
+  },
+  {
+   "name": "posterRecipes.js",
+   "bytes": 65358,
+   "md5": "d2226f86826035ebeefac22f1cea4994"
+  }
+ ]
+}

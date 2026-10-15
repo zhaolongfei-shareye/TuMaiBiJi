@@ -213,6 +213,35 @@ else:
     check("那一页里不出现暗号（红线 1 也要在现网那份上钉住）",
           "X-Exchange" not in r.text and "ADMIN_EXCHANGE_SECRET" not in r.text)
 
+# ──  卡片模板那一栏的预览引擎（10-16 加的那一口）───────────────────────────
+# 这一口吐的是自家源码，所以门的检查要先做；更要紧的是第二条：**现网那一份与本机
+# miniprogram 那一份逐字相同**。副本与源文件一旦分叉，屏上那张预览就成了看着像的假图，
+# 而这件事在本机测不出来——只有打现网才量得到那台机上到底部署了哪一份。
+import hashlib
+from pathlib import Path as _P
+
+ENGINE = f"{BASE}/api/admin/poster/engine"
+UTILS = _P(__file__).resolve().parents[2] / "miniprogram" / "utils"
+check("匿名打预览引擎口是 401（它吐的是源码）", httpx.get(ENGINE, timeout=20).status_code == 401)
+r = httpx.get(ENGINE, headers=H, timeout=30)
+eng = r.json() if r.status_code == 200 else {}
+check("管理票打预览引擎口 200，回体是 JSON 两键", r.status_code == 200 and set(eng) == {"entry", "files"},
+      f"HTTP {r.status_code}{'' if r.status_code == 200 else ' ' + r.text[:80]}")
+if eng.get("files"):
+    drift = [n for n, src in eng["files"].items()
+             if hashlib.md5((UTILS / n).read_bytes()).hexdigest() != hashlib.md5(src.encode("utf-8")).hexdigest()]
+    check(f"现网那 {len(eng['files'])} 只引擎文件与本机 miniprogram/utils 逐字相同", not drift, f"分叉的：{drift}")
+    check("入口是 poster.js 且导出着预览要用的那四个名字",
+          eng.get("entry") == "poster.js" and all(
+              k in eng["files"]["poster.js"] for k in ("planPoster", "paintLayers", "applyRemoteTemplates", "recipeSource")))
+    r2 = httpx.get(ENGINE, headers=dict(H, **{"If-None-Match": r.headers.get("etag", "")}), timeout=20)
+    check("内容没变回 304（一次进那一栏只占一个读口额度）", r2.status_code == 304, f"HTTP {r2.status_code}")
+page = httpx.get(f"{BASE}/ops", timeout=20).text
+check("现网那一页已带上预览那一格（第三十二次部署真落了）",
+      "paintPreviews" in page and "预览引擎没加载成" in page and "function makeRequire" in page)
+check("那一页里仍然没有第二份画法",
+      not any(k in page for k in ("fillRect", "measureText", "createLinearGradient")))
+
 print(f"\n{'!!! 失败 ' + str(len(fails)) + ' 条：' + '、'.join(fails) if fails else '✓ 全过'}")
 for n in notes:
     print("  · " + n)

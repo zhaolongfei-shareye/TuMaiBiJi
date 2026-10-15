@@ -24,7 +24,7 @@ nginx 日志里有 32 条真微信客户端在打，别拿前者当后者的证�
 """
 import logging
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -41,7 +41,7 @@ from app.core.config import settings
 from app.core.errors import UserError
 from app.core.rate_limit import limiter
 from app.db.database import get_db
-from app.services import admin_stats, admin_templates, mp_assets
+from app.services import admin_stats, admin_templates, mp_assets, poster_engine
 
 logger = logging.getLogger(__name__)
 
@@ -259,4 +259,38 @@ def admin_template_update(
         return admin_templates.describe(db, row)
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/api/admin/poster/engine")
+@limiter.limit("60/minute")
+def admin_poster_engine(
+    request: Request,
+    if_none_match: str | None = Header(default=None),
+    _admin: str = Depends(get_admin),
+):
+    """「卡片模板」那一栏的预览引擎：小程序那份绘制代码的只读副本，一口吐一整包。
+
+    画不在这里画。这一口只把 `miniprogram/utils/poster.js` 那一族的**源码当数据**交给后台
+    那一页的浏览器（回体是 JSON，不是可执行脚本——省掉页面里一次 `eval`），
+    由它自己的 canvas 现画。所以"服务端没有 canvas"那条前提一个字没改。
+
+    · 预览与配方同源，**不会过期**——不像"上传一张缩略图"那样，改了配方图还是旧的；
+    · 名单与 md5 由 `services/poster_engine.py` 现校验，对不上就 503。宁可屏上说
+      "预览引擎没加载成"，也不许出现一张看着像的假图；
+    · 要管理票才给：这几只文件本来就在小程序包里，不算秘密，但也没有理由对全网吐源码；
+    · ETag 用整包 md5：内容没变回 304，一次进这一栏只占一个读口额度（九只文件合成一口）。
+    """
+    if not poster_engine.ready():
+        raise HTTPException(status_code=503, detail="预览引擎没随包部署，这一栏的预览画不出来")
+    try:
+        body, etag = poster_engine.bundle()
+    except (OSError, ValueError) as e:
+        raise HTTPException(status_code=503, detail=f"预览引擎读不出来：{e}")
+    if if_none_match and if_none_match.strip('"') == etag:
+        return Response(status_code=304, headers={"ETag": f'"{etag}"'})
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={"ETag": f'"{etag}"', "Cache-Control": "private, must-revalidate"},
+    )
 

@@ -138,6 +138,15 @@ details.rec summary { font-size:12.5px; color:var(--muted); cursor:pointer }
 details.rec pre { margin:8px 0 0; padding:10px; background:#faf9f6; border:1px solid var(--line);
   border-radius:8px; font:12px/1.6 ui-monospace,Menlo,monospace; white-space:pre-wrap; word-break:break-all;
   max-height:260px; overflow:auto }
+/* 预览：这一格里的图是浏览器现画的（画代码就是小程序那一份），不是存起来的缩略图，
+   所以它跟着配方走、不会过期。点一下放大，是为了看得清断行——不是 decoration。 */
+.prev { display:flex; gap:16px; align-items:flex-start; margin-top:12px;
+  border-top:1px solid var(--line); padding-top:12px }
+.prev canvas { flex:none; width:190px; height:auto; background:#fff; cursor:zoom-in;
+  border:1px solid var(--line); border-radius:8px }
+.prev.big canvas { width:420px; cursor:zoom-out }
+.prev .cap { flex:1; min-width:0; font-size:12px; color:var(--muted); margin:0; line-height:1.75 }
+.prev .no { flex:1; min-width:0; font-size:13px; color:var(--clay); margin:0; line-height:1.7 }
 footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 }
 </style>
 </head>
@@ -178,7 +187,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
         <div>提醒：换一张明暗和原图差很多的，会把首页那几行字的对比度带偏——第一屏的字色是按壁纸档派生的，
         运营图不在这条派生链里。发布后请在真机上看一眼那一屏。</div>
         <div>文案那一栏同理：改了要等用户下一次冷启（拉到新那份之后）才轮得到，正在看的那一句不会当场跳。</div>
-        <div>「卡片模板」那一栏改的是名单与叫法（哪几套在发、叫什么、排第几、要哪个包才给），画面本身在这里改不了。</div>
+        <div>「卡片模板」那一栏改的是名单与叫法（哪几套在发、叫什么、排第几、要哪个包才给），画面本身在这里改不了；那一格预览画的就是库里这一行的配方，只是看一眼，改不动它。</div>
         <div>「数据」这一栏读的是业务库里的行数，现点现算；没有新增任何用户行为埋点。</div>
       </footer>
     </div>
@@ -199,17 +208,78 @@ function el(tag, cls, text) {
   return n;
 }
 
-function api(path, opts) {
+function authed(opts) {
   opts = opts || {};
   opts.headers = Object.assign({}, opts.headers || {});
   if (session()) opts.headers['Authorization'] = 'Bearer ' + session();
-  return fetch(u(path), opts).then(function (r) {
+  return opts;
+}
+
+function api(path, opts) {
+  return fetch(u(path), authed(opts)).then(function (r) {
     return r.json().catch(function () { return {}; }).then(function (body) {
       if (r.status === 401) { sessionStorage.removeItem('opsSession'); showLogin(); }
       if (!r.ok) { var e = new Error(body.detail || ('HTTP ' + r.status)); e.status = r.status; throw e; }
       return body;
     });
   });
+}
+
+// ---- 预览引擎：把小程序那份绘制代码在这一页里跑起来。
+//
+// 为什么走这一条而不是"后台存一张缩略图"：缩略图与配方没有绑定关系，改了配方图还是旧的，
+// 屏上那张就成了假话；而画这件事本来就没有服务端版本（`方案-cn后台资产管理.md` §六 第 7 条
+// 的理由"服务端没有 canvas"到今天还成立）。这一页是浏览器，它有 canvas，
+// 于是画的是**客户端那一份代码现算的当前这一行配方**——同一次求值，不存在过期。
+//
+// 引擎字节由 `api/admin/poster/engine` 一口吐完（名单＋md5 在那一侧现校验），
+// 这一侧只有一个同步的 CommonJS 装载器：`require` 必须是同步的，因为 CommonJS 就是同步的。
+// 装载器要是 async，require 返回一个 Promise，而解构一个 Promise 不报错、只是每个名字都成
+// undefined——那时 poster.js 会跑到第 800 行才报 "toneFor is not a function"，看着像源文件的毛病。
+var POSTER = null;
+var ENGINE_AT = null;
+
+var FAKE_WX = {
+  env: { USER_DATA_PATH: '/preview-has-no-sandbox' },
+  getStorageSync: function () { return ''; },
+  setStorageSync: function () {},
+  getFileSystemManager: function () { return {
+    accessSync: function () { throw new Error('预览不该读本机文件'); },
+    copyFile: function () { throw new Error('预览不该读本机文件'); },
+    unlinkSync: function () {},
+  }; },
+};
+
+function makeRequire(files) {
+  var cache = {};
+  function req(p) {
+    var key = String(p).replace(/^\\.\\//, '').split('/').pop();
+    if (cache[key]) return cache[key].exports;
+    if (!(key in files)) throw new Error('预览引擎的名单里没有 ' + key);
+    var m = { exports: {} };
+    cache[key] = m;
+    // files[key] 只可能是服务端按 md5 校验过的本仓库那几只 js（同一口要管理票才给），
+    // 这里没有任何外部值拼进这段源码；跑的就是客户端包里那一份代码，不是重写的一份。
+    new Function('module', 'exports', 'require', 'wx', files[key])(m, m.exports, req, FAKE_WX);
+    return m.exports;
+  }
+  return req;
+}
+
+function loadEngine() {
+  if (ENGINE_AT) return ENGINE_AT;
+  ENGINE_AT = fetch(u('api/admin/poster/engine'), authed()).then(function (r) {
+    if (r.status === 401) { sessionStorage.removeItem('opsSession'); showLogin(); throw new Error('登录已过期'); }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function (d) {
+    POSTER = makeRequire(d.files)(d.entry);
+    return POSTER;
+  }, function (e) {
+    ENGINE_AT = null;                      // 失败不缓存：下一次进这一栏还得再试一次
+    throw e;
+  });
+  return ENGINE_AT;
 }
 
 function showLogin() { $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
@@ -490,6 +560,66 @@ function fieldInt(labelText, cls, value) {
   return { lab: lab, inp: inp };
 }
 
+// ---- 每一行一格预览。
+//
+// 画之前先问客户端那道闸收不收这一行（`applyRemoteTemplates` 回的就是客户端自己的判据，
+// 这里不另写一份），收了还要再认一句"这一套现在吃的是 remote"：不是 remote 就说明画的是
+// **包里那一版**，那不等于这一行的样子，宁可不画只说原因。
+// 画不出来这件事本身就是这一栏要的信息（草稿行尤其）——所以它是屏上一句话，不是一个空白格子。
+var PREV = [];
+var PREVIEW_PROFILE = { name: '阿飞', slogan: '每天读一点', avatarPath: '' };
+
+function previewBox(r) {
+  var box = el('div', 'prev');
+  box.appendChild(el('p', 'no', '预览：正在装载绘制引擎…'));
+  PREV.push({ box: box, row: r });
+  return box;
+}
+
+function drawInto(box, r) {
+  while (box.firstChild) box.removeChild(box.firstChild);
+  var cv = document.createElement('canvas');
+  var ctx = cv.getContext('2d');
+  var rep = POSTER.applyRemoteTemplates([r]);
+  if (rep.rejected.length || POSTER.recipeSource(r.template_id) !== 'remote') {
+    box.appendChild(el('p', 'no', '这一行客户端不会收下，所以不画它：'
+      + (rep.rejected[0] || '这一行没进那份名单') + '。'));
+    return;
+  }
+  var plan;
+  try {
+    // strict：配方跑不动就抛。不 strict 会静默退回包里那份 JS 画法，
+    // 那画出来的就不是这一行的样子了——这一栏最不该骗人的就是这张图。
+    plan = POSTER.planPoster(ctx, POSTER.SAMPLE_NOTE, r.template_id, PREVIEW_PROFILE, 'zh', { showQr: true, strict: true });
+  } catch (e) {
+    box.appendChild(el('p', 'no', '这一行配方跑不出图：' + ((e && e.message) || e)
+      + '。线上遇到它，用户看到的是退回默认那一套的卡。'));
+    return;
+  }
+  cv.width = plan.width;
+  cv.height = plan.height;
+  POSTER.paintLayers(ctx, plan.layers, {});
+  box.appendChild(cv);
+  box.appendChild(el('p', 'cap', '现画：这一行的配方，' + plan.width + '×' + plan.height + '、'
+    + plan.layers.length + ' 层。内容是内置小样那一篇，不是任何人的笔记；署名那两行是占位；'
+    + '那格码是占位方块，不印真码。字宽按浏览器本机字体量，真机上断行可能略有差。点图放大。'));
+  box.addEventListener('click', function () { box.classList.toggle('big'); });
+}
+
+function paintPreviews() {
+  var queue = PREV;
+  PREV = [];
+  if (!queue.length) return;
+  loadEngine().then(function () {
+    queue.forEach(function (it) { drawInto(it.box, it.row); });
+  }, function (e) {
+    queue.forEach(function (it) {
+      while (it.box.firstChild) it.box.removeChild(it.box.firstChild);
+      it.box.appendChild(el('p', 'no', '预览引擎没加载成：' + e.message + '。这一栏其余各项照旧能用。'));
+    });
+  });
+}
+
 function tplCard(r) {
   var card = el('section', 'card');
   card.dataset.id = r.id;  // 重读之后还要找得到这一行（回执要落在它身上，见 loadTemplates 的 flash）
@@ -498,6 +628,7 @@ function tplCard(r) {
   head.appendChild(el('span', 'tag ' + r.status, TPL_STATUS_LABEL[r.status] || r.status));
   head.appendChild(el('span', 'note', '分组 ' + r.group_key + '　hash ' + shortHash(r.content_hash)));
   card.appendChild(head);
+  card.appendChild(previewBox(r));
 
   card.appendChild(el('p', 'state ' + (r.status === 'live' ? 'on' : 'off'),
     r.status === 'live' ? '在线上：用户那道口能拿到这一套。'
@@ -579,6 +710,7 @@ function renderTemplates(d, flash) {
 
   (d.rows || []).forEach(function (r) { box.appendChild(tplCard(r)); });
   if (!(d.rows || []).length) box.appendChild(el('p', 'note', '库里一行模板都没有（闸没开或种子没灌）。'));
+  paintPreviews();  // 卡片是刚重建的，图也得跟着重画：预览认的是库里这一行，不缓存上一次那张
 
   // 回执落在**重读之后那一行**上：卡片是刚重建的，写进旧节点等于没写
   // （本机 10-15 真点出来过——保存成功了屏上却一个字没变，只剩顺序自己动了）。
