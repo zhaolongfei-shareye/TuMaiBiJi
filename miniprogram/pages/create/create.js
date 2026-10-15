@@ -152,14 +152,14 @@ Page({
     bgLight: false,
     bgLightLow: false,
     // 10-15 03:2x 起再加几格：那几枚各按**自己那块矩形**判一次（`toneRects`），
-    // 不再共用上面那两截整幅宽的带。名字跟着元素走：标题图／那一行三枚各一枚／第二屏的返回。
-    // ⚠ 原来这一组只有 `bgLightSwap` 一枚管整行——他 10-15 清晨那张红框截图量的就是它的错：
-    //   同一条横带上左中右三段实测中位亮度 175／129／105，整行平均 126 正好压在 160 那道闸的口上，
-    //   一个数管三枚 ⇒ 左端"浅底浅字"与右端"深底深字"只能二选一。拆成三枚，`bgLightSwap` 作废。
+    // 不再共用上面那两截整幅宽的带。名字跟着元素走：标题图／那一行整条／第二屏的返回。
+    // ⚠ 10-15 09:2x 那一行**并回一个矩形**（站长原话「首屏下面三个设置，深浅字要一致，
+    //   现在是左边两个黑，右边一个白，不合理。要一致」）：三枚各判是上一刀做的，
+    //   它把"浅底浅字"修好了却把这一行拆成两种极性 —— 他要的是同一行同一个色。
+    //   判的还是**那一行自己那块矩形**（`.home-swap` 的框），不是整条横带、更不是全屏，
+    //   所以 03:2x 那句"不需要全屏计算"仍然成立。代价一条见 create.wxss 那一条注释。
     bgLightTitle: false,
-    bgLightDim: false,
-    bgLightWallpaper: false,
-    bgLightMood: false,
+    bgLightSwap: false,
     bgLightOut: false,
     // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
     // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
@@ -388,9 +388,10 @@ Page({
       //   正本抄 `pages/index/index.js` 那句 `.select('.tpl-body').boundingClientRect(...)`。
       const q = wx.createSelectorQuery()
       q.select('.page-title').boundingClientRect()
-      q.select('.swap-dim').boundingClientRect()
-      q.select('.swap-wallpaper').boundingClientRect()
-      q.select('.swap-mood').boundingClientRect()
+      // 那一行只量**整条一次**（`.home-swap` 自己的框：space-between 把三枚顶到两端，
+      // 这一枚的框就等于三枚并起来那一块）。10-15 09:2x 之前这里是三枚各 select 一次，
+      // 判出三种极性，站长打回"要一致"——见 data 里 `bgLightSwap` 那一段。
+      q.select('.home-swap').boundingClientRect()
       q.select('.out').boundingClientRect()
       q.exec((r) => {
         const list = r || []
@@ -406,10 +407,8 @@ Page({
           if (v) rects[key] = v
         }
         put('title', list[0])
-        put('dim', list[1])
-        put('wallpaper', list[2])
-        put('mood', list[3])
-        put('out', list[4])
+        put('swap', list[1])
+        put('out', list[2])
         bgTone.applyRects(this, this.data.bgSrc, toneZones(), rects)
       })
     }

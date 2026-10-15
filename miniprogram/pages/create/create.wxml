@@ -2,7 +2,7 @@
      首屏那枚圆形 ➕ 要吃的 `--cp-cam`／`--cp-cam-ink` 与第二屏快门是同一支（站长 10-13 原话
      「带+号的按钮颜色与第二屏拍照按钮颜色一致」），而它在 `.panel` 外面，拿不到那一层的作用域。
      `createSkin()` 发的全是变量声明、没有一条直接生效的属性，挂到根上不会把别处的皮带下来。 -->
-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{bgLightTitle ? 'bg-light-title' : ''}} {{bgLightDim ? 'bg-light-dim' : ''}} {{bgLightWallpaper ? 'bg-light-wallpaper' : ''}} {{bgLightMood ? 'bg-light-mood' : ''}} {{bgLightOut ? 'bg-light-out' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}}" style="{{skinPanel}}" bindtap="collapse">
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{bgLightTitle ? 'bg-light-title' : ''}} {{bgLightSwap ? 'bg-light-swap' : ''}} {{bgLightOut ? 'bg-light-out' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}}" style="{{skinPanel}}" bindtap="collapse">
   <!-- 首页背景。图就是「我的 → 卡片模板」最上面那张形象图，没设过就用包里这张站长人像。
        必须用 <image> 组件而不是 wxss 的 background-image：后者不认小程序包里的
        本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
@@ -72,13 +72,18 @@
        `.page-scrim` 那一层的透明度，没图时那一层压根没渲染，留着它是一枚按了什么都不发生的钮。
        盒子还是原来那一条（88rpx 高、−14/−22 那两道 margin 一个字没改），所以少一截不改流内
        高度，下面录入条那三块的落点不漂。
-       ⚠ 10-15 清晨三枚各加一枚自己的类（`.swap-dim`／`.swap-wallpaper`／`.swap-mood`）：
-       深浅判定原来吃**整行那一个矩形**，可他这张真机图在这一条横带上从左到右是
-       亮墙 → 浅衣服 → 深色背包，实测三段的亮度中位数 175／129／105（截图直接量的，含罩子那一压），
-       整行平均 126 —— 正好压在 160 那道闸的口上（换算回原图约 161，翻哪边都可能）。
-       整行一个数 ⇒ 左端那枚"浅底浅字"（他红框圈的正是这一处）与右端那枚"深底深字"只能二选一。
-       他这句要的是「计算深浅背景区域**仅限文字图片覆盖的区域**的平均值」⇒ 一枚一个矩形才是字面意思，
-       三枚各判各的。`.home-swap` 那一个矩形不再参与判定（`bgLightSwap` 这一格随之作废）。 -->
+       ⚠ 这一行的深浅判法两趟改过口，记全：10-15 清晨按他「计算深浅背景区域**仅限文字图片覆盖的区域**
+       的平均值」拆成**三枚各一个矩形**（那一趟他那张真机图在这一条横带上从左到右是亮墙 → 浅衣服 →
+       深色背包，三段中位 175／129／105、整行平均 126，正好压在 160 那道闸的口上，一个数管三枚
+       必有一头读不出来）；拆完之后三枚各按各的底色翻了极性，他 09:2x 打回
+       「首屏下面三个设置，深浅字要一致，现在是左边两个黑，右边一个白，不合理。要一致」
+       ⇒ 现在**并回一个矩形**：量的还是这一行自己那一块（`.home-swap` 的框——`space-between`
+       把三枚顶到两端，这一枚的框就等于三枚并起来那一块），不是上面那两截整幅宽的带、更不是全屏，
+       所以 03:2x 那句"不需要全屏计算"仍然成立。三枚各自的类名留着，但它们现在只用来指名哪一枚，
+       不再各带一枚深浅 flag（`bgLightDim`／`-Wallpaper`／`-Mood` 随这一刀作废，回到 `bgLightSwap`）。
+       ⚠ 并回一个数的代价一条要说死：这一行底下从左到右明暗差很大（本轮屏上实测三段 232／207／51），
+       一个数只能取一个极性 ⇒ 最右那枚的字会压在它自己那块暗区上。这一条不靠注释自证，
+       由 `验-第一屏三块-真跑` §9b 现量现报（三枚同一极性 ＋ 各枚自己那块底上的对比度）。 -->
   <view class="home-swap">
     <view wx:if="{{bgSrc}}" class="swap-half swap-dim" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
       <text class="swap-text">{{t.bgDimLabel}}</text>

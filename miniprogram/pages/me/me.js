@@ -79,9 +79,11 @@ Page({
     // 背景图深浅那一档由 bgTone.applyTone 每次进页定（三页共用 utils/imgBrightness.js）。
     bgLight: false,
     bgLightLow: false,
-    // 背景深浅那一档：初值给中档（站长 10-02 夜里定的默认档，也是 app.bgSkin() 在本机读不到
-    // 键时回落的那一档），免得第一帧先闪一下别的深浅。三样每次进页由 app.bgSkin() 重读。
-    dimV: 1,
+    // 背景深浅那一档：这一页（含「设置」那一 tab）**不跟首页那枚「调亮度」走**，
+    // 恒给最亮那一档（罩层 opacity 0＝原图）。站长 10-15 09:2x「不需要跟随首页调亮度」
+    // ＋11:0x 追死「是要正常亮度，不是压暗！」，数从 `app.bgSkinLocked()` 那一道口出，
+    // 这里那个 0 只是第一帧的初值，与那道口同一个数。
+    dimV: 0,
     dimDot: '',
     dimScrim: '',
     imgStyle: '',
@@ -133,7 +135,10 @@ Page({
       t: texts(lang),
       themeClass,
       bgSrc: poster.homeBg(),
-      ...app.bgSkin(),
+      // 与笔记列表同一句：这一屏（含「设置」「关于」那一档，它是同一页）不再跟随首页那枚「调亮度」
+      // （站长 10-15 09:2x），锁在默认那一档；理由与"要改成完全不压暗该动哪一行"都在
+      // app.bgSkinLocked() 那一段，这里不另写一份规则。
+      ...app.bgSkinLocked(),
       logoSrc: '/assets/logo.png',
       nameText: t('meGreeting', lang),
       sloganText: t('slogan', lang),

@@ -82,6 +82,13 @@ const BG_DIMS = [
   { v: 2, name: '弯月', veil: 1, dot: '#5C6169' },
 ]
 const DIM_DEFAULT = BG_DIMS[1]
+/**
+ * 「正常亮度／原图」那一档的别名＝BG_DIMS[0]（满月，veil 0）。
+ * 单独起名而不写 `BG_DIMS[0]`：那个 0 读起来是"数组第一个"，而它的含义是"不压暗"，
+ * 换一天有人往这组数前面插一档，写 0 的地方就静默变了。
+ * 站长 10-15 11:0x「是要正常亮度，不是压暗！」——笔记列表／卡片列表／我的／设置那四屏锁在这一档。
+ */
+const DIM_PLAIN = BG_DIMS[0]
 
 const dimAt = (v) => BG_DIMS.find((d) => d.v === v) || DIM_DEFAULT
 // 点一下换到下一档：满月 → 半月 → 弯月 → 满月。
@@ -891,6 +898,8 @@ module.exports = {
   UNCATEGORIZED,
   TIP_DOT,
   BG_DIMS,
+  DIM_DEFAULT,
+  DIM_PLAIN,
   dimAt,
   dimNext,
   dimDotStyle,

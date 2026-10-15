@@ -6,7 +6,7 @@ const cloudUpload = require('./utils/cloudUpload')
 const cardCloud = require('./utils/cardCloud')
 const profileCloud = require('./utils/profileCloud')
 const mpAssets = require('./utils/mpAssets')
-const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle, moodOf, moodNext, moodOfWallpaper } = require('./utils/palette')
+const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle, DIM_PLAIN, moodOf, moodNext, moodOfWallpaper } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
 // 分享卡片的路径上带着邀请人的 user id（?inviter=123）。落到本地存储是因为它必须活到
@@ -290,7 +290,8 @@ App({
   },
 
   /**
-   * 背景形象图那一档深浅，三页（新建／笔记／我的）每次进页读一次。
+   * 背景形象图那一档深浅，**只有新建页（首屏＋第二屏）**每次进页读一次。
+   * 10-15 09:2x 站长把笔记／我的那两页搬去下面那道 `bgSkinLocked()`，所以这里"三页"的说法作废。
    * dimV 是当前档（0 最亮 / 1 压一半 / 2 现网那一档），dimDot 是那一枚点的灰度，
    * dimScrim 是**现网那层压暗罩自己**的透明度样式串——不是再叠一层黑。
    * 最沉那一档 dimScrim 是空串（罩子照 CSS 全铺）；最亮那一档是 opacity:0，
@@ -298,6 +299,21 @@ App({
    */
   bgSkin() {
     const v = dimAt(wx.getStorageSync(BG_DIM_KEY)).v
+    return { dimV: v, dimDot: dimDotStyle(v), dimScrim: dimScrimStyle(v) }
+  },
+
+  /**
+   * 站长 10-15 09:2x「笔记列表，卡片列表，我的，设置，上面的背景图，不需要跟随首页调亮度。
+   * 首页调亮度只影响首屏和第二屏」，11:0x 又追了一句把它说死：**「是要正常亮度，不是压暗！」**
+   * ⇒ 那四屏不再读本机那一档，恒给**最亮那一档**（`DIM_PLAIN`＝满月，veil 0 ⇒ 罩层 `opacity:0`
+   * ＝照片等于原图，站长拿原图对过才认的这一档）。
+   * ⚠ 我第一版落成了"锁在默认那一档（半月 .5）"，把"不跟随"错当成"锁默认"——他要的是不压暗，
+   *   这一句已经改口，别照着旧注释再改回去。
+   * ⚠ 只改这一处，**不许在页面里各写一份**（那正是这一刀要撤掉的"四处各算一遍"）；
+   *   `DIM_DEFAULT`（半月）那枚常量仍然归首页那枚「调亮度」的兜底用，两件事不是一个数，别合。
+   */
+  bgSkinLocked() {
+    const v = DIM_PLAIN.v
     return { dimV: v, dimDot: dimDotStyle(v), dimScrim: dimScrimStyle(v) }
   },
 
