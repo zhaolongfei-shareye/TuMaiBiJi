@@ -688,28 +688,50 @@ async function main() {
   const INK70 = 'rgba(20,22,26,0.7)'
   const PAPER70 = 'rgba(242,239,233,0.7)'
   const squash = (v) => String(v).replace(/\s+/g, '')
-  const clsAll = async () => String((await (await page.$('.container')).attribute('class')))
+  // ⚠ 摸不到 `.container` 要**报一条看得懂的**，不许直接把 null 递进 .attribute()：
+  //   10-15 上午那趟就是这么整把崩掉的（批跑中途有人改了 miniprogram/ 里一个注释 ⇒ IDE 热重载
+  //   ⇒ 页面句柄变 null ⇒ TypeError 冒到顶，后面 90 多条一条没跑，红字只有一句"读不到 attribute"，
+  //   看不出是回归还是环境）。这一条改成红一条＋一句原因，剩下的判据照跑。
+  const clsAll = async () => {
+    const el = await page.$('.container')
+    if (!el) throw new Error('摸不到 .container：这一屏被重载过（多半是跑中途动了 miniprogram/），不是判据红，重跑这一把')
+    return String(await el.attribute('class'))
+  }
+  const itemState = async (it) => ({
+    color: await styleOf(`.swap-${it} .swap-text`, 'color'),
+    glyph: await styleOf(`.swap-${it} .swap-glyph`, 'background-color'),
+  })
   const toneState = async () => ({
     cls: await clsAll(),
     d: await page.data(),
     titleFilter: await styleOf('.page-title', 'filter'),
     titleOpacity: await styleOf('.page-title', 'opacity'),
-    swapColor: await styleOf('.swap-text', 'color'),
-    glyphBg: await styleOf('.swap-glyph', 'background-color'),
+    dim: await itemState('dim'),
+    wallpaper: await itemState('wallpaper'),
+    mood: await itemState('mood'),
     outColor: await styleOf('.out', 'color'),
   })
-  /* 那条等式按**每一枚自己**判，一枚一条（分成"浅态一条／深态一条"两支会各报一次条数，
-     而今天这张照片只会落在其中一侧 ⇒ 另一侧永远量不到；上一版就是这么漏的）。
+  /* 那条等式按**屏上那一枚**判，但"判深浅"那一档 10-15 一天里改口两次，两趟都记下来免得下次照旧注释改回去：
+     ① 清晨把那一行拆成三枚各一个 flag（他那张红框真机图同一条横带左中右三段实测中位 232／207／51，
+        整行平均 174 压在阈值那一档（`LIGHT_THRESHOLD`，从实现现读）附近 ⇒ 一个数管三枚必有一头读不出来）；
+     ② 09:2x 站长打回：「首屏下面三个设置，深浅字要一致，现在是左边两个黑，右边一个白，不合理。要一致。」
+        ⇒ **并回一行一个 flag**（`.home-swap` 自己那块矩形），三枚共用同一个极性。
      浅 ⇒ 墨 @70；深 ⇒ 纸白 @70，标题图那一枚深态挂 `filter: invert(1)`（invert 的矩阵只动 RGB 三行、
-     α 那一行是 [0,0,0,1,0] ⇒ 透明底不会被涂白，这正是它敢用位图当标题的原因）。 */
+     α 那一行是 [0,0,0,1,0] ⇒ 透明底不会被涂白，这正是它敢用位图当标题的原因）。
+     ⚠ 并回之后这一族要钉的**不再是"三枚各判"，而是"三枚同极性"**——那才是他这句话的字面意思。
+     代价一条由下面「逐枚对比度」那一发如实报数、不藏：那一行三枚各自底上的明暗能差到 180 灰阶，
+     共用一个极性时必然有一枚对比度不足（那是他这句指令的物理后果，不是实现的 bug）。 */
   const KEYS = {
     title: { cls: 'bg-light-title', flag: 'bgLightTitle', label: '标题图那枚' },
-    swap: { cls: 'bg-light-swap', flag: 'bgLightSwap', label: '那一行三枚（调亮度／换背景／换心情）' },
+    swap: { cls: 'bg-light-swap', flag: 'bgLightSwap', label: '那一行三枚' },
     out: { cls: 'bg-light-out', flag: 'bgLightOut', label: '第二屏那枚「返回」' },
   }
+  // 三枚的身份类还在（wxml 上 `.swap-dim`／`-wallpaper`／`-mood`），只是不再各带一个深浅 flag；
+  // 这一族留着读"三枚屏上到底同一个数没"，以及逐枚量自己那块底。
+  const HALF = ['dim', 'wallpaper', 'mood']
   const eqOne = (tag, t, key) => {
     const K = KEYS[key]
-    const has = new RegExp(K.cls).test(t.cls)
+    const has = new RegExp(` ${K.cls}[ "]`).test(`${t.cls} `)
     const light = t.d[K.flag] === true
     if (has !== light) {
       ok(`${tag}：${K.label}的类名跟着 data（类名没挂上＝样式闸没开，屏上还是老颜色）`, false,
@@ -717,19 +739,27 @@ async function main() {
       return
     }
     if (key === 'title') {
-      ok(`${tag}：${K.label}判成"${light ? '浅' : '深'}" ⇒ ${light ? '不反色（filter none），只留那 70% 透明度' : '自动反色（invert(1)）'}`,
-        light ? (squash(t.titleFilter) === 'none' && squash(t.titleOpacity) === '0.7')
-          : (/invert\(1\)/.test(t.titleFilter) && squash(t.titleOpacity) === '0.7'),
+      ok(`${tag}：${K.label}判成"${light ? '浅' : '深'}" ⇒ ${light ? '不反色（filter none），只留那 80% 透明度' : '自动反色（invert(1)）'}`,
+        light ? (squash(t.titleFilter) === 'none' && squash(t.titleOpacity) === '0.8')
+          : (/invert\(1\)/.test(t.titleFilter) && squash(t.titleOpacity) === '0.8'),
         `filter ${t.titleFilter}／opacity ${t.titleOpacity}`)
       return
     }
+    if (key === 'out') {
+      const want = light ? INK70 : PAPER70
+      ok(`${tag}：${K.label}判成"${light ? '浅' : '深'}" ⇒ ${light ? '墨 @70（他给的"70% 黑透明"就是这一支）' : '翻纸白 @70'}`,
+        squash(t.outColor) === want, `字 ${t.outColor}`)
+      return
+    }
     const want = light ? INK70 : PAPER70
-    const val = key === 'swap' ? t.swapColor : t.outColor
-    const glyph = key === 'swap' ? squash(t.glyphBg) : ''
-    ok(`${tag}：${K.label}判成"${light ? '浅' : '深'}" ⇒ ${light ? '墨 @70（他给的"70% 黑透明"就是这一支）' : '翻纸白 @70'}`
-      + (key === 'swap' ? '，那枚太阳同一个数' : ''),
-      squash(val) === want && (!glyph || glyph === want),
-      `字 ${val}${key === 'swap' ? `／太阳 ${t.glyphBg}` : ''}`)
+    // ★"一致"这一条要钉的是**三枚屏上只剩一个数**。只钉"每枚都与同一个 flag 同号"不够——
+    //   退回"一枚一条覆写"时那三句照样各自成立，而他打的回票正是这个。
+    const uniq = (f) => new Set(HALF.map((it) => squash(f(t[it])))).size
+    ok(`${tag}：${K.label}判成"${light ? '浅' : '深'}" ⇒ 那一行三枚**同一个数**（09:2x 原话"深浅字要一致"）`
+      + '，后面那枚小图形也是同一个数',
+      uniq((x) => x.color) === 1 && uniq((x) => x.glyph) === 1
+        && HALF.every((it) => squash(t[it].color) === want && squash(t[it].glyph) === want),
+      HALF.map((it) => `${it} 字 ${t[it].color}／图形 ${t[it].glyph}`).join('　'))
   }
   const eqAll = (tag, t, keys) => keys.forEach((k) => eqOne(tag, t, k))
   // ① 真测那一发：inject 包里那张 1280×1024 的图，让页面自己按矩形量一次（`toneRects` 是页面上那个方法）。
@@ -757,12 +787,20 @@ async function main() {
     const rect = (s) => new Promise((res) => {
       const q = wx.createSelectorQuery(); q.select(s).boundingClientRect(); q.exec((r) => res(r && r[0]))
     })
-    return Promise.all([rect('.page-title'), rect('.home-swap')]).then(([a, b]) => ({
+    return Promise.all([
+      rect('.page-title'), rect('.home-swap'), rect('.out'),
+      rect('.swap-dim'), rect('.swap-wallpaper'), rect('.swap-mood'),
+    ]).then(([a, b, c, d1, d2, d3]) => ({
       src: pg.data.bgSrc,
       win: { w: wi.windowWidth, h: wi.windowHeight },
       prof: prof && { w: prof.w, h: prof.h, grid: prof.grid || null, rows: prof.rows || null },
       title: a && { left: a.left, top: a.top, width: a.width, height: a.height },
       swap: b && { left: b.left, top: b.top, width: b.width, height: b.height },
+      out: c && { left: c.left, top: c.top, width: c.width, height: c.height },
+      // 三枚各自的框从这一版起**不参与判定**（并回一行一个判据），只留着报逐枚对比度那一发。
+      dim: d1 && { left: d1.left, top: d1.top, width: d1.width, height: d1.height },
+      wallpaper: d2 && { left: d2.left, top: d2.top, width: d2.width, height: d2.height },
+      mood: d3 && { left: d3.left, top: d3.top, width: d3.width, height: d3.height },
       flag: { title: pg.data.bgLightTitle, swap: pg.data.bgLightSwap,
         out: pg.data.bgLightOut, zone: pg.data.bgLight, low: pg.data.bgLightLow },
     }))
@@ -795,30 +833,58 @@ async function main() {
   const vv = raw.prof ? vis(raw.prof.w, raw.prof.h, boxHrpx, 0.5) : null
   const calc = { title: gridAvg(asRect(raw.title), vv), swap: gridAvg(asRect(raw.swap), vv),
     whole: gridAvg({ x: [0, 1], y: [0, 1] }, vv) }
+  HALF.forEach((it) => { calc[it] = gridAvg(asRect(raw[it]), vv) })
   console.log('    [独立重算]', JSON.stringify({ src: raw.src, boxHrpx, visible: vv,
-    标题: calc.title, 那一行: calc.swap, 整幅: calc.whole, 屏上flag: raw.flag }))
-  // 真测那一发的渲染层等式：三枚各按自己的 flag 走一支（深浅两态都能量到，不靠今天这张正好是哪一头）。
+    标题: calc.title, 整行: calc.swap, 整幅: calc.whole,
+    三枚各自: { 调亮度: calc.dim, 换背景: calc.wallpaper, 换心情: calc.mood },
+    屏上flag: raw.flag }))
+  // 真测那一发的渲染层等式：两枚各按自己的 flag 走一支（深浅两态都能量到，不靠今天这张正好是哪一头）。
   eqAll('真测那一张', meas, ['title', 'swap'])
-  ok('屏上那两枚 flag 就是**按元素矩形**重算出来的那两个数（实现没偷偷退回整幅／整条）',
-    !!calc.title && !!calc.swap && calc.title.light === !!raw.flag.title && calc.swap.light === !!raw.flag.swap,
-    `重算 标题 ${calc.title && calc.title.avg}／那一行 ${calc.swap && calc.swap.avg}`
-    + `（阈值 ${THRESH}）vs 屏上 ${raw.flag.title}／${raw.flag.swap}`)
+  ok('屏上那两枚 flag 就是**按各自那块矩形**重算出来的那两个数（实现没偷偷退回整幅／整条）',
+    ['title', 'swap'].every((k) => calc[k] && calc[k].light === !!raw.flag[k]),
+    `重算 ${['title', 'swap'].map((k) => `${KEYS[k].label} ${calc[k] ? calc[k].avg : 'null'}`).join('／')}`
+    + `（阈值 ${THRESH}）vs 屏上 ${['title', 'swap'].map((k) => raw.flag[k]).join('／')}`)
+  /* ★逐枚对比度这一发**只报数、不判红**。它量的是"并回一行一个判据"这条指令的物理代价：
+     三枚共用一个极性，而三枚各自那块底可以差很远（清晨那张真机图三段中位 232/207/51）。
+     算法：那支 rgba 先与底按 α 混成实心，再走 WCAG 那条 (L1+0.05)/(L2+0.05)；底取**原图**均值、
+     不含压暗罩（罩子会把三档都拉低，读了反而看不出"这一行本身垫不垫得住字"）。
+     不判红的理由一条：要消掉这一发只有"给那一行垫一段纱／挪落点／换构图"三条路，
+     三条都是他拍的事，尺子不许替他把"当前这张图上的余量"钉成回归闸。 */
+  const lin = (c) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
+  const lumOf = (g) => 0.2126 * lin(g) + 0.7152 * lin(g) + 0.0722 * lin(g)
+  const ratio = (a, b) => {
+    const hi = Math.max(lumOf(a), lumOf(b)); const lo = Math.min(lumOf(a), lumOf(b))
+    return ((hi + 0.05) / (lo + 0.05)).toFixed(2)
+  }
+  const sharedGray = squash(meas.dim.color) === INK70 ? (20 + 22 + 26) / 3 : (242 + 239 + 233) / 3
+  const perItem = HALF.reduce((o, it) => {
+    const c = calc[it]
+    if (!c) { o[it] = '量不到'; return o }
+    const mix = Math.round(0.7 * sharedGray + 0.3 * c.avg)
+    o[it] = { 底: c.avg, 混后字: mix, 对比度: ratio(mix, c.avg) }
+    return o
+  }, {})
+  console.log('    [逐枚对比度·只报数]', JSON.stringify(perItem))
+  ok('那一行吃的是自己那块矩形（格数明显小于整幅那一发；还共用一个矩形＝并回没并成）',
+    !!calc.swap && !!calc.whole && calc.swap.n > 0 && calc.swap.n < calc.whole.n,
+    `整行 ${calc.swap && calc.swap.n} 格 vs 整幅 ${calc.whole && calc.whole.n} 格（网格 ${SIDE}x${SIDE}）`)
   ok('采到的格子确实只有字／图自己那一块（标题那一枚的格数明显小于整幅那一发）',
     !!calc.title && !!calc.whole && calc.title.n > 0 && calc.title.n < calc.whole.n,
     `标题 ${calc.title && calc.title.n} 格 vs 整幅 ${calc.whole && calc.whole.n} 格`
     + `（网格 ${SIDE}×${SIDE}）`)
   // 这一条是"不需要全屏计算"要的那个**结果**：同一张图上，框内与整幅落到了阈值两侧
   // （落不到不算红，只在屏上打一行——那是图本身的性质，不是实现的错）。
-  if (calc.title && calc.whole && (calc.title.light !== calc.whole.light
-      || calc.swap.light !== calc.whole.light)) {
+  const straddle = ['title', 'swap'].filter((k) => calc[k] && calc.whole
+    && calc[k].light !== calc.whole.light)
+  if (straddle.length) {
     ok('这张图上"框内"与"整幅"果然分处阈值两侧 ⇒ 旧那口径（整幅平均）会判反，新口径按框内判对了',
-      calc.title.light === !!raw.flag.title,
-      `框内 ${calc.title.avg}／整幅 ${calc.whole.avg}／屏上按框内 = ${raw.flag.title}`)
+      straddle.every((k) => calc[k].light === !!raw.flag[k]),
+      `${straddle.map((k) => `${KEYS[k].label} 框内 ${calc[k].avg}`).join('／')}／整幅 ${calc.whole.avg}／屏上按框内`)
   } else {
-    console.log(`  ℹ 这张图上框内与整幅同侧（${calc.title && calc.title.avg} vs ${calc.whole && calc.whole.avg}），`
+    console.log(`  ℹ 这张图上两枚框内与整幅同侧（${['title', 'swap'].map((k) => calc[k] && calc[k].avg).join('/')} vs ${calc.whole && calc.whole.avg}），`
       + '“判反”那一发今天量不到——不判红，只报数')
   }
-  // ② 强制那一发：把两枚 flag 打成 false（深色照片在屏上的那一态），看渲染层跟不跟。
+  // ② 强制那一发：把那**两枚** flag 打成 false（深色照片在屏上的那一态），看渲染层跟不跟。
   await page.setData({ bgLightTitle: false, bgLightSwap: false })
   await sleep(1400)
   eqAll('强制深色那一态', await toneState(), ['title', 'swap'])

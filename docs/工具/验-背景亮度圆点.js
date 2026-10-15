@@ -41,6 +41,12 @@ ck('弯月不发样式串（CSS 里那层本来就全铺，再写个 opacity:1 �
 ck('满月发的是 opacity:0——拧的是现网那层罩子自己，不是再叠一层黑',
   p.dimScrimStyle(0) === 'opacity:0', p.dimScrimStyle(0))
 ck('半月是半档', p.dimScrimStyle(1) === 'opacity:0.5', p.dimScrimStyle(1))
+/* 站长 10-15 11:0x 把"不跟随首页调亮度"说死成**「是要正常亮度，不是压暗！」** ⇒ 笔记／我的那两页
+   锁的是"最亮那一档"，不是"默认那一档"。这两枚常量差一档、差一层 .5 的黑，混用就是他现在看到的
+   这个错，所以各钉一条：DIM_PLAIN 必须等于 opacity:0 那一档，且不许等于 DIM_DEFAULT。 */
+ck('DIM_PLAIN 是"原图"那一档（罩层 opacity 0），且与 DIM_DEFAULT 不是同一档',
+  p.dimScrimStyle(p.DIM_PLAIN.v) === 'opacity:0' && p.DIM_PLAIN.v !== p.DIM_DEFAULT.v,
+  `DIM_PLAIN.v=${p.DIM_PLAIN.v}／DIM_DEFAULT.v=${p.DIM_DEFAULT.v}`)
 ck('三枚点是三个不同的灰度', new Set(D.map((d) => p.dimDotStyle(d.v))).size === 3)
 ck('越沉的那档点越黑（点本身就是当前档，界面上不画形状）',
   D.every((d, i) => i === 0 || p.lumOf(d.dot) < p.lumOf(D[i - 1].dot)),
@@ -67,6 +73,13 @@ for (const rel of IMPORTERS) {
 const app = read('app.js')
 ck('app 上有 bgSkin()（进页读当前档）和 cycleBgDim()（点一下换档）',
   /bgSkin\(\)\s*\{/.test(app) && /cycleBgDim\(\)\s*\{/.test(app))
+/* 那道"锁档"的口必须**一次都不读那个键**——它要是还去 `getStorageSync(BG_DIM_KEY)`，
+   这一刀就只是换了个函数名，首页点完那四屏照样跟着变。 */
+ck('bgSkinLocked() 只吃 DIM_PLAIN，一次都不读本机那个键（读了就还是"跟随"）',
+  (() => {
+    const b = /bgSkinLocked\(\)\s*\{[\s\S]*?\n  \}/.exec(app)
+    return !!b && /DIM_PLAIN\.v/.test(b[0]) && !/getStorageSync/.test(b[0])
+  })())
 ck('只存本机，键名是 bgDim', /const BG_DIM_KEY = 'bgDim'/.test(app))
 ck('cycleBgDim 先算下一档、再落盘、最后才发样式（顺序反了会把旧档写回去）',
   (() => {
@@ -86,8 +99,24 @@ for (const [rel, cls] of Object.entries(pages)) {
   const js = strip(read(`${rel}.js`))
   const wxml = read(`${rel}.wxml`)
   const wxss = strip(read(`${rel}.wxss`))
-  ck(`${name} 进页从 app.bgSkin() 取档（不各拼一份）`, /app\.bgSkin\(\)/.test(js))
-  ck(`${name} 初值停在中间那一档（data 字面量与 app.bgSkin() 的兜底是同一个数，第一帧不闪）`, /dimV: 1,/.test(js))
+  /* 站长 10-15 09:2x「笔记列表，卡片列表，我的，设置，上面的背景图，不需要跟随首页调亮度。
+     首页调亮度只影响首屏和第二屏」⇒ 取档那一道口分成两个：
+     · create（首屏＋第二屏同页）仍吃 `app.bgSkin()`——它才是那一枚钮的主人；
+     · index／me 改吃 `app.bgSkinLocked()`——恒取默认那一档，本机存了哪一档都不读。
+     ⚠ 这条原来是 `/app\.bgSkin\(\)/`，而 `bgSkinLocked()` 里含 `bgSkin` 却不含 `bgSkin()`，
+       所以照旧写法不会红＝**假绿**（改了代码尺子还绿，等于这条白写）。
+       改成"该吃哪个就点名哪个，另一个必须不出现"，正反各钉一句。
+     ⚠ 反面那半句必须比在**剥掉行注释**的那一份上：`strip` 只削块注释、不削行注释，
+       而这三页 data 上面那段历史说明里就带着 `app.bgSkin()` 这串字 ⇒ 第一版拿原文扫，
+       被自家注释打红两条（同一族坑本文件上面记过一次："拿原文正则扫，把自家注释判成残留"）。 */
+  const codeOf = (s) => s.replace(/^\s*\/\/.*$/gm, '')
+  const CREATE_REL = 'pages/create/create'
+  ck(`${name} 进页只从 app.${rel === CREATE_REL ? 'bgSkin()' : 'bgSkinLocked()'} 取档（不各拼一份）`,
+    rel === CREATE_REL
+      ? /app\.bgSkin\(\)/.test(codeOf(js))
+      : /app\.bgSkinLocked\(\)/.test(codeOf(js)) && !/app\.bgSkin\(\)/.test(codeOf(js)))
+  ck(`${name} 初值与那一道口同一个数（create 中档 .5／另两页最亮那一档＝原图，第一帧不闪）`,
+    new RegExp(`dimV: ${rel === CREATE_REL ? 1 : 0},`).test(js))
   ck(`${name} 那层罩子吃 dimScrim（拧它自己的透明度）`,
     new RegExp(`class="${cls}" style="\\{\\{dimScrim\\}\\}"`).test(wxml))
   ck(`${name} 不再另叠第二层黑（上一版那种 .page-dim / .head-dim 撤干净了）`,
@@ -119,11 +148,13 @@ ck('那一行是三半：「调亮度」换档、「换背景」导流、「换�
   (cw.match(/class="swap-half[ "]/g) || []).length === 3
   && /catchtap="onCycleDim"/.test(cw) && /catchtap="goHomeBg"/.test(cw) && /catchtap="onCycleMood"/.test(cw),
   `数到 ${(cw.match(/class="swap-half[ "]/g) || []).length} 枚（10-15 起每枚后面还带自己的深浅类）`)
-/* 10-15 清晨：深浅判定从"整行一个矩形"拆成"一枚一个矩形"（站长红框那张图同一条横带上
-   左中右三段实测中位 175／129／105，整行平均正好压在阈值口上 ⇒ 一个数管三枚必有一头读不出来）。
-   三枚各自的类是那一刀的**唯一索引**——`create.js` 按这三个类量矩形，`create.wxss` 按
-   `.bg-light-dim/-wallpaper/-mood` 三条覆写。少一枚＝那一枚又回到整行那个数。 */
-ck('三枚各带一枚自己的深浅类（`.swap-dim`／`.swap-wallpaper`／`.swap-mood`，一枚一个矩形）',
+/* 10-15 清晨那一行从"整行一个矩形"拆成"一枚一个矩形"（红框那张真机图同一条横带左中右三段
+   实测中位 232／207／51，整行平均 174 压在阈值口上 ⇒ 一个数管三枚必有一头读不出来）；
+   09:2x 站长又打回：「首屏下面三个设置，深浅字要一致…要一致」⇒ **并回一行一个判据**。
+   ⚠ 这三个类随那一刀**不再是深浅覆写的索引**（覆写现在挂在 `.home-swap` 上、吃 `bg-light-swap`），
+     留着只当一个身份：`验-第一屏三块-真跑` 的"三枚屏上是不是同一个数"与逐枚对比度靠它认哪一枚。
+     所以这一条钉的是"三枚各有一枚、类名不重复"，不钉深浅——深浅那条在 验-首页背景图 与那把真跑里。 */
+ck('那一行三枚各带一枚身份类（`.swap-dim`／`.swap-wallpaper`／`.swap-mood`，一枚一枚不多不少）',
   ['swap-dim', 'swap-wallpaper', 'swap-mood']
     .every((c) => (cw.match(new RegExp(`class="swap-half ${c}"`, 'g')) || []).length === 1),
   ['swap-dim', 'swap-wallpaper', 'swap-mood']

@@ -11,7 +11,10 @@
 //     罩层只有一支（墨），所以这一把不再从屏上读 `bgLight` 定极性（见 ①② 之间那段）。
 //  ③ 罩子撤干净之后字上没有那道投影（站长 10-02 夜里否掉了它）——这一档的对比只打数不判红，
 //     判据依赖的前提已经不在代码里了，留着就是一条钉着旧方案的假尺子；
-//  ④ 三页吃同一个本机键，在首页点完，笔记页和「我的」页那层罩子跟着一起拧。
+//  ④ 10-15 09:2x 站长「笔记列表，卡片列表，我的，设置，上面的背景图，不需要跟随首页调亮度。
+//     首页调亮度只影响首屏和第二屏」＋11:0x 追死「是要正常亮度，不是压暗！」⇒ 这一节钉**两页不跟随**：
+//     本机键拧到两端各进一次笔记页，罩子实读**恒 0**（原图那一档）、照片像素均值差 < 4 灰阶；
+//     首页那一半照旧跟随（存弯月⇒铺满、存满月⇒实读 0），正反各一条。
 const automator = require('miniprogram-automator')
 const fs = require('fs')
 const path = require('path')
@@ -57,7 +60,16 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
     for (let i = 0; i < 5; i++) {
       // 每一次进页都补一次图（`withBg` 在下面）：新建页本来就是"每次进页重取图"，
       // 探针按上去的那一张会被下一次 onShow 冲掉，所以按在"进页"这个动作上、不按在第一页上。
-      try { return await withBg(await mp.reLaunch(url)) } catch (e) { console.log(`第 ${i + 1} 次进 ${url} 没成：${e.message}`); await sleep(8000) }
+      // ⚠ 10-15 批 J 这一把崩在"进页之后、外部第一次 `page.data()`"（`page is not on top of page stack`，
+      //   一条断言都没打出来就退 2）：IDE 刚 `cli auto` 起来那一下，首启导航会把 `reLaunch` 拿到的句柄顶掉，
+      //   而重试口只保到 `withBg` 里那一次读。⇒ 把"等首启跑完＋真的读回一次 data"也挪进这个口，
+      //   顶掉了就整页重进一次，别让一把尺子空跑。外部那些 `sleep(4500)` 留着无害，只是多等一拍。
+      try {
+        const pg = await mp.reLaunch(url)
+        await sleep(4500)
+        await pg.data()
+        return await withBg(pg)
+      } catch (e) { console.log(`第 ${i + 1} 次进 ${url} 没成：${e.message}`); await sleep(8000) }
     }
     throw new Error(`进不去 ${url}`)
   }
@@ -213,47 +225,72 @@ const lum = (png, x0, x1, y0, y1, mode) => JSON.parse(execFileSync('python3',
   ck('三档三枚灰度互不相同（白／中灰／深灰），且只有 background 这一段',
     dots.size === 3 && [...dots].every((s) => /^background:#[0-9A-F]{6}$/.test(s)), [...dots].join(' | '))
 
-  // ---------- ④ 三页吃同一个键 ----------
-  await mp.evaluate(() => wx.setStorageSync('bgDim', 0))
+  /* ---------- ④ 亮度档只管首屏与第二屏，另外两页恒铺在原图上 ----------
+     站长 10-15 09:2x 原话「笔记列表，卡片列表，我的，设置，上面的背景图，不需要跟随首页调亮度。
+     首页调亮度只影响首屏和第二屏」，11:0x 又把"锁到哪一档"说死：**「是要正常亮度，不是压暗！」**
+     ⇒ 这一节原来钉的是**反的**（"三页吃同一个键"），随 09:2x 那句作废；
+     而我第一版把它落成"锁默认那一档（半月 .5）"，随 11:0x 这一句再改一次。
+     ⚠ 判据不写成"读 data.dimV === 0"就完事：那只是本机存的那个数没被读到，
+       真正要钉的是两件事——① 罩子那层**实读 opacity 0**（不是"跟着键变"，也不是停在 .5），
+       ② 把本机键拧到两端各进一次笔记页，头部那块照片的实测均值几乎不动（不跟随）。
+       只断 data 会漏掉"读了默认档但罩子写死"与"锁错一档"这两类，三条一起才算闭上。 */
+  const V0 = await mp.evaluate(() => { wx.setStorageSync('bgDim', 0); return wx.getStorageSync('bgDim') })
+  ck('本机键确实拧到了满月（这一趟的前置：写进去读得回来，否则下面两组图是同一张）', V0 === 0, V0)
   page = await enter('/pages/index/index')
   await sleep(4500)
   d = await page.data()
-  ck('笔记页进页读到的也是满月', d.dimV === 0 && d.dimScrim === 'opacity:0', JSON.stringify([d.dimV]))
-  ck('笔记页头部那层罩子的 opacity 一起拧到 0', (await opacityOf(page, '.head-scrim')) === 0)
+  ck('笔记页不再吃那个键：进页停在最亮那一档（罩层 0＝原图，站长 11:0x「是要正常亮度，不是压暗」）',
+    d.dimV === 0 && d.dimScrim === 'opacity:0', JSON.stringify([d.dimV, d.dimScrim]))
+  ck('笔记页头部那层罩子**实读 opacity 0**（照片就是原图，不是 .5 那一档）',
+    (await opacityOf(page, '.head-scrim')) === 0, await opacityOf(page, '.head-scrim'))
   const head = await rects(['.head', '.h1'])
-  const shotI0 = path.join(OUT, '圆点-4-笔记页满月.png')
+  const shotI0 = path.join(OUT, '圆点-4-笔记页-本机存满月.png')
   await mp.screenshot({ path: shotI0 })
+
   await mp.evaluate(() => wx.setStorageSync('bgDim', 2))
   page = await enter('/pages/index/index')
   await sleep(4500)
-  ck('笔记页切回弯月，罩子又铺满', (await opacityOf(page, '.head-scrim')) === 1)
-  const shotI2 = path.join(OUT, '圆点-5-笔记页弯月.png')
+  ck('本机键换到弯月，笔记页那层罩子仍是 0（一前一后两个读数都得是 0 才叫不跟随、也不压暗）',
+    (await page.data()).dimV === 0 && (await opacityOf(page, '.head-scrim')) === 0,
+    JSON.stringify([(await page.data()).dimV]))
+  const shotI2 = path.join(OUT, '圆点-5-笔记页-本机存弯月.png')
   await mp.screenshot({ path: shotI2 })
-  if (head[0] && head[1]) {
+  if (head[0]) {
     const x0 = rpx(head[0].left) + 250, x1 = rpx(head[0].left) + 330
     const y0 = rpx(head[0].top) + 140, y1 = rpx(head[0].top) + 320
     const A0 = lum(shotI0, x0, x1, y0, y1), A2 = lum(shotI2, x0, x1, y0, y1)
-    // 同一件事在笔记页那一层（`.head-scrim`）再钉一遍。方向与首页同一个：罩层只有一支、恒压暗
-    // （10-13 那一刀之后不再读 `bgLight` 定极性——两页吃同一张图，但翻色是各页在 onShow 里各算一次的）。
-    ck('笔记页的照片跟着一起被压暗（弯月必须比满月暗两成以上）',
-      A0.mean - A2.mean > A0.mean * 0.2,
-      `弯月 ${A2.mean} → 满月 ${A0.mean}｜压暗 ${(((A0.mean - A2.mean) / A0.mean) * 100).toFixed(1)}%／预算 20%`)
-    const C0 = lum(shotI0, rpx(head[1].left), rpx(head[1].left) + 150,
-      rpx(head[1].top) + 2, rpx(head[1].bottom) - 2, 'contrast')
-    console.log(`!! 笔记页大标题（满月档、无投影）实测：字 ${C0.glyph} / 圈 ${C0.ring} → ${C0.ratio}:1（只报数不判红）`)
-  } else ck('笔记页的照片跟着一起亮回去', false, '头部或标题量不到矩形')
+    // 预算 4 灰阶：同一张图、同一档罩子（0），两趟之间只剩抗锯齿与编码噪声。
+    // 首页同样两趟的实测差是 30+ 灰阶（见②③那两条的打印），4 与 30 之间没有含糊地带。
+    ck('笔记页头部那块照片**实测不跟随**：本机键两端之间均值差 < 4 灰阶',
+      Math.abs(A0.mean - A2.mean) < 4, `存满月 ${A0.mean}／存弯月 ${A2.mean}｜差 ${Math.abs(A0.mean - A2.mean).toFixed(1)}／预算 4`)
+    if (head[1]) {
+      const C0 = lum(shotI0, rpx(head[1].left), rpx(head[1].left) + 150,
+        rpx(head[1].top) + 2, rpx(head[1].bottom) - 2, 'contrast')
+      console.log(`!! 笔记页大标题（原图那一档、无投影）实测：字 ${C0.glyph} / 圈 ${C0.ring} → ${C0.ratio}:1（只报数不判红）`)
+    }
+  } else ck('笔记页头部那块照片实测不跟随', false, '头部量不到矩形')
 
-  await mp.evaluate(() => wx.setStorageSync('bgDim', 0))
+  await mp.evaluate(() => wx.setStorageSync('bgDim', 2))
   page = await enter('/pages/me/me')
   await sleep(4500)
-  ck('「我的」页同档、罩子一起拧到 0',
+  ck('「我的」页（含「设置」那一 tab）同样不吃那个键：存的是弯月，进页罩子仍实读 0',
     (await page.data()).dimV === 0 && (await opacityOf(page, '.head-scrim')) === 0,
     JSON.stringify([(await page.data()).dimV]))
-  await mp.screenshot({ path: path.join(OUT, '圆点-6-我的页满月.png') })
+  await mp.screenshot({ path: path.join(OUT, '圆点-6-我的页-本机存弯月.png') })
 
   page = await enter('/pages/create/create')
   await sleep(4500)
-  ck('回到首页还是那一档（没有各页一份）', (await page.data()).dimV === 0, (await page.data()).dimV)
+  ck('首页仍然照旧跟本机键走（"只影响首屏和第二屏"的正面那一半：存弯月 ⇒ 首页弯月、罩子铺满）',
+    (await page.data()).dimV === 2 && (await opacityOf(page, '.page-scrim')) === 1,
+    (await page.data()).dimV)
+  // 后面 ⑤ 那一节量的是英文态那三枚挤不挤得下，与亮度无关，但**别给它留一个跟早上不一样的档**：
+  // 这一把收尾把键还回满月（＝这一节开始时的值），下一把尺子读到的屏与这一把开头一致。
+  await mp.evaluate(() => wx.setStorageSync('bgDim', 0))
+  page = await enter('/pages/create/create')
+  await sleep(3500)
+  ck('首页跟着键回到满月（罩子实读 0）——这一把还回去的也是这一档',
+    (await page.data()).dimV === 0 && (await opacityOf(page, '.page-scrim')) === 0,
+    JSON.stringify([(await page.data()).dimV, await opacityOf(page, '.page-scrim')]))
   // 这一档下再点「换背景」那半截，仍要走到卡片模板页：两半各管各的，别互相吃掉
   const hv = await page.$$('.swap-half')
   await hv[1].tap()

@@ -175,8 +175,12 @@ const COUNT_ALL = () => {
     (await txt('.h1')) === '我的笔记', await txt('.h1'))
   ck('默认落在第一枚 tab「笔记列表」（他原话"默认第一个tab"，这一档不落本机）',
     d0.view === 'list', `view=${d0.view}`)
-  ck('头部深浅仍停在中间那一档（罩子实读 0.5）',
-    d0.dimV === 1 && (await css('.head-scrim', 'opacity')) === '0.5', await css('.head-scrim', 'opacity'))
+  /* 站长 10-15 09:2x「笔记列表…上面的背景图，不需要跟随首页调亮度」＋11:0x 追死
+     「是要正常亮度，不是压暗！」⇒ 这一屏恒给最亮那一档，罩子实读 **0**（原来这条钉的是 0.5）。
+     与 `验-背景亮度圆点-真跑` 第④节同一件事，那一把钉"本机键拧到两端它都不动"，这一把钉"落点就是 0"。 */
+  ck('头部那层罩子恒铺在原图上（最亮那一档，实读 opacity 0，不跟首页那枚钮走）',
+    d0.dimV === 0 && (await css('.head-scrim', 'opacity')) === '0',
+    `dimV=${d0.dimV}／实读 ${await css('.head-scrim', 'opacity')}`)
   ck('右上角只剩「笔记」一列', d0.stats.length === 1 && d0.stats[0].l === ZH.statNotes, JSON.stringify(d0.stats))
   const ALL = d0.notes.length
   ck('这一屏有得可看，且列表那一屏一条不落（rows 条数 = 笔记条数）',
@@ -222,17 +226,54 @@ const COUNT_ALL = () => {
      也不再有自己那面；两档字退回**当前这套壁纸的墨**。期望值从 app.wxss 里那一套 `.theme-*`
      现读（`.container` 挂的就是它的类名），尺子里不抄第二份数。 */
   const contEl = await page.$('.container')
-  const themeCls = String((contEl && (await contEl.attribute('class'))) || '').split(/\s+/).find((c) => /^theme-/.test(c)) || ''
+  const contCls = String((contEl && (await contEl.attribute('class'))) || '')
+  const themeCls = contCls.split(/\s+/).find((c) => /^theme-/.test(c)) || ''
   const themeBlock = (new RegExp(`\\.${themeCls}\\s*\\{([^}]*)\\}`)
     .exec(APP_CSS.replace(/\/\*[\s\S]*?\*\//g, '')) || [])[1] || ''
   const tok = (name) => (new RegExp(`--${name}:\\s*([^;]+)`).exec(themeBlock) || [])[1] || '(读不出)'
-  ck('已选那枚吃这一页的整档墨 + 字重 700，未选那枚同字号只 --text-secondary，那一行不再自己画面',
-    !!themeCls && sameRgba(await colAt(onIdx), tok('text-primary'))
-    && sameRgba(await colAt(1 - onIdx), tok('text-secondary'))
+  /* ⚠ 未选那一枚的期望值**不是一个常数**，10-15 上午这条红就是被这个前提埋的：
+     `index.wxss:1365` 那一条（10-12「深浅自动切换扩到那两行固定字」那一刀落进来的）写的是
+     `.container.has-bg:not(.bg-light-low) .vtab { color: var(--text-primary) }`
+     ⇒ 照片下那一档判成"深"时，**两枚都抬到整档墨**，未选那一枚就不是 `--text-secondary`。
+     这一把量到的正是那一态（`has-bg` 有、`bg-light-low` 没有），屏上行为与样式表逐字对得上，
+     红的是这条判据把"浅照片那一态"当成了唯一真相。
+     改法与 `验-列表头部铺图-真跑` 同一姿势：**按当下那一态读期望值**，再把两态各强制一次。
+     （改的是判据，不是拿代码去迁就旧尺子——两态各自都钉得住，比原来只钉一态更严。） */
+  const clsHas = (name) => new RegExp(`(^|\\s)${name}(\\s|$)`).test(contCls)
+  const lowBefore = await data('bgLightLow')
+  const idleWant = (deep) => (deep ? tok('text-primary') : tok('text-secondary'))
+  const readTabs = async () => ({ on: await colAt(onIdx), off: await colAt(1 - onIdx) })
+  const deepNow = clsHas('has-bg') && !clsHas('bg-light-low')
+  const t0 = await readTabs()
+  ck('已选那枚吃这一页的整档墨 + 字重 700，未选那枚只吃"当下这一档该吃的那一支"，那一行不再自己画面',
+    !!themeCls && sameRgba(t0.on, tok('text-primary'))
+    && sameRgba(t0.off, idleWant(deepNow))
     && String(await (await tabAt(onIdx)).style('font-weight')) === '700'
     && /rgba\(0, 0, 0, 0\)|transparent/.test(await css('.vtabs', 'background-color')),
-    `套=${themeCls || '(没读到主题类名)'} 已选=${await colAt(onIdx)}（该 ${tok('text-primary')}）`
-    + ` 未选=${await colAt(1 - onIdx)}（该 ${tok('text-secondary')}）面=${await css('.vtabs', 'background-color')}`)
+    `套=${themeCls || '(没读到主题类名)'} 下那一档=${deepNow ? '深（两枚都抬整档墨）' : '浅（未选退到 .72）'}`
+    + ` 已选=${t0.on} 未选=${t0.off}（该 ${idleWant(deepNow)}）面=${await css('.vtabs', 'background-color')}`)
+  // 两态各强制一次：只钉"当下碰到的这一态"等于没钉另一态——样式表里那两条是成对存在的，
+  // 少一条（或 `:not()` 写反）屏上有一天的照片才会露出来，而尺子不许等那一天。
+  const flip = async (val) => {
+    await page.setData({ bgLightLow: val })
+    await sleep(900)
+    const r = await readTabs()
+    return { r, want: idleWant(clsHas('has-bg') && !val) }
+  }
+  const f1 = await flip(false)
+  ck('强制"下那一档＝深"：两枚都抬到整档墨（`:not(.bg-light-low)` 那一条真的在生效）',
+    sameRgba(f1.r.on, tok('text-primary')) && sameRgba(f1.r.off, f1.want),
+    `已选=${f1.r.on} 未选=${f1.r.off}（该 ${f1.want}）`)
+  const f2 = await flip(true)
+  ck('强制"下那一档＝浅"：未选那枚回到 --text-secondary（基样式那条没被抬墨的盖掉）',
+    sameRgba(f2.r.off, tok('text-secondary')) && !sameRgba(f2.r.off, tok('text-primary')),
+    `未选=${f2.r.off}（该 ${tok('text-secondary')}）`)
+  // 还回进来那一格（不是"还回 false"——`has-bg` 那一档不在时 `deepNow` 也是 false，
+  // 照它写会把人家原本的 `bgLightLow=true` 抹掉，下一把尺子读到的就是这一把留的档）。
+  await page.setData({ bgLightLow: !!lowBefore })
+  await sleep(700)
+  ck('两态量完把那一格还回原值（不给下一把尺子留档）',
+    (await data('bgLightLow')) === !!lowBefore, `回来 ${await data('bgLightLow')}／进来 ${lowBefore}`)
   // 这两条钉的是站长这句话的可测形状："用我的那两层浅背景"＝外层 `--bg-page` ＋ 这张圆角卡 `--bg-card`。
   // ★10-11 改量法（R1/R4/R5/R6「界面纯色底色部分改为半透明毛玻璃效果」＋「毛玻璃如果下方纯色，
   // 要进行渐变处理」）：卡顶那一段现在是**同一张渐变的四个色标**（白纱→渐退→实心），

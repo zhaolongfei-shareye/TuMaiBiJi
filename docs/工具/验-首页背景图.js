@@ -188,11 +188,11 @@ ck('按矩形那一道口在 util 里有，且夹住越界（不夹会 NaN ⇒ �
     && /Math\.max\(0,/.test(brightJs) && /Number\.isFinite\(avg\)/.test(brightJs))
 ck('create 页真的去量那几枚的矩形（`.in(this)` 会把页面作用域的查询打成空 ⇒ 几格永远 false）',
   /toneRects\s*\(\s*\)\s*\{/.test(cjs) && !/createSelectorQuery\(\)\.in\(this\)/.test(cjs)
-    && ['bgLightTitle', 'bgLightDim', 'bgLightWallpaper', 'bgLightMood', 'bgLightOut']
+    && ['bgLightTitle', 'bgLightSwap', 'bgLightOut']
       .every((k) => new RegExp(`${k}: false`).test(cjs))
     && /applyRects\(/.test(cjs),
   cjs.includes('.in(this)') ? 'create.js 里还有 createSelectorQuery().in(this)'
-    : `缺格：${['bgLightTitle', 'bgLightDim', 'bgLightWallpaper', 'bgLightMood', 'bgLightOut']
+    : `缺格：${['bgLightTitle', 'bgLightSwap', 'bgLightOut']
       .filter((k) => !new RegExp(`${k}: false`).test(cjs)).join('、') || '那道口没接上'}`)
 ck('两截各判一次：applyTone 一次交回 bgLight 与 bgLightLow（少一枚＝又变回一整页一个数）',
   /bgLight: p === null/.test(brightJs) && /bgLightLow: p === null/.test(brightJs)
@@ -270,10 +270,15 @@ ck('罩层只有一支：浅色那一态不再另开提亮覆盖（`.bg-light` �
 // 换成钉反面：**基准必须是墨**，且**不许再有** `.bg-light .swap-*` / `:not(.has-bg) .swap-*` 那两支
 // （留着就是同一屏两个数：覆写那支 .85、基准这支 .70）。
 // 深色那一态的覆写按**各自那块矩形**判，理由与上面 `.out` 那两条同。
-// ⚠ 10-15 清晨从"整行一个 `.bg-light-swap`"拆成三枚各一个（`.bg-light-dim`／`-wallpaper`／`-mood`）：
-//   他那张红框截图量的就是整行一个数的错——同一条横带上左中右三段实测中位亮度 175／129／105，
-//   整行平均 126 压在 160 那道闸的口上，一个数管三枚必然有一头读不出来（台账 §8.251）。
-//   旧的 `.bg-light-swap` 与 `.home-swap` 那一档覆写一起作废，这里钉反面：它们不许留下任何一处。
+// ⚠ 这一族 10-15 一天里改口两次，判据跟着翻了两次，把两趟都记下免得下次照旧注释改回去：
+//   ① 03:2x 他从"整行一个 `.bg-light-swap`"拆成三枚各一个（`.bg-light-dim`／`-wallpaper`／`-mood`），
+//     依据是他那张红框真机图——同一条横带左中右三段实测中位亮度 232／207／51，整行平均 174
+//     压在 160 那道闸上，一个数管三枚必然有一头读不出来（台账 §8.251）。
+//   ② 09:2x 他打回：「首屏下面三个设置，深浅字要一致，现在是左边两个黑，右边一个白，不合理。要一致。」
+//     ⇒ 并回**一行一个判据**（量 `.home-swap` 那一枚自己的矩形，不是整条横带也不是全屏）。
+//     代价一条已经如实报给他：并回之后那一行只能有一个极性，而三段明暗差到 232↔51，
+//     取"浅"则右那枚墨字压在自己那块 51 的底上对比度≈1.4（读不出来），取"深"则左两枚浅底浅字。
+//     **判据不再钉"三枚各判"，改钉"三枚同一极性"**——那才是他这句话的字面意思。
 // ⚠ 三条选择器写成一个逗号组（只有最后一条后面跟 `{`），所以**不能**拿"选择器紧跟 `{`"那种正则去认，
 //   那样只有第三条命中、前两条假红（今天第一次跑就是这么红的）。改成先把样式表拆成一块一块、
 //   每块把选择器按逗号切开，再问"这一块里有没有这一条、这一块自己有没有那支声明"。
@@ -281,36 +286,51 @@ const RULES = [...CSS_NC.matchAll(/([^{}]+)\{([^}]*)\}/g)].map((mm) => ({
   sels: mm[1].split(',').map((s) => s.replace(/\s+/g, ' ').trim()),
   body: mm[2].replace(/\s+/g, ' ').trim(),
 }))
-const darkSwapRule = (item, sel, prop) => RULES.some((r) => r.sels.includes(
-  `.container.has-bg:not(.bg-light-${item}) .swap-${item} .${sel.slice(1)}`)
+const hasDarkRule = (sel, prop) => RULES.some((r) =>
+  r.sels.includes(`.container.has-bg:not(.bg-light-swap) .home-swap ${sel}`)
   && new RegExp(`${prop}: rgba\\(242, 239, 233, 0\\.7`).test(r.body))
-ck('图上那三枚的基准是墨 @70，深色那一态**一枚一条**翻纸白（少一枚＝白字压浅图或墨字压深图）',
+ck('图上那一行的基准是墨 @70，深色那一态**整行一条**翻纸白（一行一个极性＝他要的"一致"）',
   /\.swap-text\s*\{[^}]*color:\s*rgba\(20,\s*22,\s*26,\s*0\.7\)/.test(CSS_NC)
     && /\.swap-glyph\s*\{[^}]*background:\s*rgba\(20,\s*22,\s*26,\s*0\.7\)/.test(CSS_NC)
-    && ['dim', 'wallpaper', 'mood'].every((it) => darkSwapRule(it, '.swap-text', 'color')
-      && darkSwapRule(it, '.swap-glyph', 'background')),
-  ['dim', 'wallpaper', 'mood']
-    .filter((it) => !darkSwapRule(it, '.swap-text', 'color') || !darkSwapRule(it, '.swap-glyph', 'background'))
-    .join('、') || '(三条都在)')
+    && hasDarkRule('.swap-text', 'color') && hasDarkRule('.swap-glyph', 'background'),
+  [['.swap-text', 'color'], ['.swap-glyph', 'background']]
+    .filter(([s, p]) => !hasDarkRule(s, p)).map(([s]) => s).join('、') || '(两条都在)')
 // 比的是**代码**不是注释：这一族"拿原文正则扫，把自家注释判成残留"的坑本文件上面刚踩过一次。
 // 那几处作废说明（js 两行、wxml 一行、wxss 一行）全写在注释里，剥完注释再扫才算数。
 const CODE_ONLY = (s) => NO_COMMENT(s).replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
-ck('整行那一个数作废净了（`.bg-light-swap` 与 `bgLightSwap` 在代码里一处不许留，留着就是同屏两个判据）',
-  !/bg-light-swap/.test(CODE_ONLY(CSS_NC)) && !/bg-light-swap/.test(CODE_ONLY(wxml))
-    && !/bgLightSwap/.test(CODE_ONLY(cjs)),
-  `样式 ${(CODE_ONLY(CSS_NC).match(/bg-light-swap/g) || []).length}／标记 ${(CODE_ONLY(wxml).match(/bg-light-swap/g) || []).length}／逻辑 ${(CODE_ONLY(cjs).match(/bgLightSwap/g) || []).length}`)
+ck('三枚各判那一套作废净了（`.bg-light-dim`／`-wallpaper`／`-mood` 与对应三格 data 一处不许留，'
+  + '留着＝同一行两个判据、字色又分家）',
+  ['bg-light-dim', 'bg-light-wallpaper', 'bg-light-mood', 'bgLightDim', 'bgLightWallpaper', 'bgLightMood']
+    .every((k) => !new RegExp(k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(
+      CODE_ONLY(CSS_NC) + CODE_ONLY(wxml) + CODE_ONLY(cjs))),
+  ['bg-light-dim', 'bg-light-wallpaper', 'bg-light-mood', 'bgLightDim', 'bgLightWallpaper', 'bgLightMood']
+    .filter((k) => (CODE_ONLY(CSS_NC) + CODE_ONLY(wxml) + CODE_ONLY(cjs)).includes(k)).join('、'))
+ck('一行那个判据在代码里是活的（wxml 容器挂 `bgLightSwap`、js 有那一格、样式吃它）',
+  /\{\{bgLightSwap \? 'bg-light-swap' : ''\}\}/.test(CODE_ONLY(wxml))
+    && /bgLightSwap: false/.test(CODE_ONLY(cjs)) && /\.home-swap/.test(CODE_ONLY(cjs)))
 ck('极性翻过来之后那两支旧覆写必须删净（`.bg-light .swap-*` 与 `:not(.has-bg) .swap-*`，留着就是同屏两个数）',
   !/\.has-bg\.bg-light \.swap-(text|glyph)\s*\{/.test(CSS_NC)
     && !/\.has-bg\.bg-light \.home-swap\s*\{/.test(CSS_NC)
     && !/:not\(\.has-bg\) \.swap-(text|glyph)\s*\{/.test(CSS_NC))
 // 那枚标题图是位图，翻色靠 `filter: invert(1)`（invert 的矩阵只动 RGB 三行、alpha 那一行是
-// [0,0,0,1,0] ⇒ 透明底不会被涂白）。钉三件事：基准 .7 的透明度在、深色那一态挂 invert、
+// [0,0,0,1,0] ⇒ 透明底不会被涂白）。钉三件事：基准透明度在、深色那一态挂 invert、
 // 且 invert **只**挂在 `.has-bg:not(.bg-light-title)` 上（没铺图那一态不许出现白字标题）。
-ck('标题图那枚也自动翻色：基准 opacity .7，深色那一态挂 invert(1)，浅态与无图态都不挂',
-  /\.title-row \.page-title\s*\{[^}]*opacity:\s*0\.7/.test(CSS_NC)
+// 10-15 09:2x「并且透明度调到80%」⇒ 基准从 .7 抬到 .8（.7 是他 02:5x 定的那档，这一句把它替掉）。
+ck('标题图那枚也自动翻色：基准 opacity .8，深色那一态挂 invert(1)，浅态与无图态都不挂',
+  /\.title-row \.page-title\s*\{[^}]*opacity:\s*0\.8/.test(CSS_NC)
     && /\.container\.has-bg:not\(\.bg-light-title\) \.page-title\s*\{[^}]*filter:\s*invert\(1\)/.test(CSS_NC)
     && (CSS_NC.match(/filter:\s*invert\(1\)/g) || []).length === 1,
   `invert 出现 ${(CSS_NC.match(/filter:\s*invert\(1\)/g) || []).length} 次（只许一处）`)
+/* 10-15 09:2x「首屏左上角的图片文字，可以放大一点。现在有点小」⇒ 宽 208 → 228、左沿 23 → 6。
+   这一条要同时钉两件事，缺一条就是假绿：
+   ① 宽度确实抬了（208 是上一版量着头发左沿定的，写死在这里＝改了没落地会红）；
+   ② **那道负 margin 必须落在 `.title-row .page-title` 上**，落在光 `.page-title` 上会被
+     那条 `margin: 0` 整个吃掉（两枚类 0,2,0 压过一枚类 0,1,0）——屏上一点不动、源码看着却像改了。
+     这一类"类名点空"的静默失效本仓记在 [[feedback-surface-css-silent-noop]]。 */
+ck('标题那一枚放大落地：宽 228rpx，且负 margin 写在赢的那条规则里（`.title-row .page-title`）',
+  /\.page-title\s*\{[^}]*width:\s*228rpx/.test(CSS_NC)
+    && /\.title-row \.page-title\s*\{[^}]*margin:\s*0 0 0 -17rpx/.test(CSS_NC),
+  `宽 ${( /\.page-title\s*\{[^}]*width:\s*(\d+)rpx/.exec(CSS_NC) || [, '(没读到)'])[1]}rpx／负 margin 该在 .title-row .page-title 那条上`)
 // 10-14 站长翻案：「白底也要换背景，这是核心功能」。§8.231 之后两级都空＝bgSrc 是空串，
 // 而这一行原来整条挂在 `wx:if="{{bgSrc}}"` 上 ⇒ 新用户第一屏连「换背景」都看不见，
 // 等于把核心功能只留给已经设过图的人。两条一起钉，一条都不能松：
