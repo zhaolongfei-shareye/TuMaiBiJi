@@ -8,8 +8,11 @@
  * 反向对照排在一个坏行后面：库里塞一行"客户端那道闸收不住的配方"，
  * 那一格必须写原因、且不许有 canvas——否则"画不出来"会被读成"这套卡片是白屏"。
  *
- * 跑法：node docs/工具/验-后台模板预览真点.mjs
- * 屏照落在 docs/design/后台预览-自证-20261016/。口令是本机现编的一次性值，只活在这台机上。
+ * 跑法（本机，默认）：node docs/工具/验-后台模板预览真点.mjs
+ * 跑法（现网，只读）：ssh agentsbin "cd /home/ubuntu/wtsj-backend && grep '^ADMIN_TOKEN=' .env | cut -d= -f2-" \
+ *   | PREV_BASE=https://api.agentsbin.cn/wtsj node docs/工具/验-后台模板预览真点.mjs
+ * 本机这一把现编一次性口令；现网那一把走 stdin，都不进 argv、不上屏。
+ * 反向对照那两行坏配方只塞在本机库里，所以打现网时那两条自动跳过（屏上没有坏行）。
  */
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
@@ -22,7 +25,10 @@ const DB = '/tmp/prev-view.db';
 const PORT = 8310;
 const CDP_PORT = 9362;
 const OUT = 'docs/design/后台预览-自证-20261016';
-const PW = 'local-preview-' + randomBytes(16).toString('hex');
+const LIVE = (process.env.PREV_BASE || '').replace(/\/+$/, '');
+const PW = LIVE ? (readFileSync(0, 'utf8').split('\n')[0] || '').trim() : 'local-preview-' + randomBytes(16).toString('hex');
+const OPS_URL = LIVE ? `${LIVE}/ops` : `http://127.0.0.1:${PORT}/ops`;
+const TAG = LIVE ? '现网' : '本机';
 const JWT = 'local-preview-jwt-' + randomBytes(18).toString('hex');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ok = [], bad = [];
@@ -70,7 +76,8 @@ const ENV = { DATABASE_URL: `sqlite:///${DB}`, JWT_SECRET_KEY: JWT, ADMIN_TOKEN:
 try {
   if (existsSync(DB)) rmSync(DB);
   mkdirSync(OUT, { recursive: true });
-  await sh(`${BACKEND}/.venv/bin/python`, ['tools/dev_seed_fusion_view.py'], ENV, { cwd: BACKEND });
+  if (LIVE) console.log(`>>> 打现网 ${LIVE}（只读：这一支不写任何东西）　口令 ${PW ? '读到' : '没读到'}`);
+  if (!LIVE) await sh(`${BACKEND}/.venv/bin/python`, ['tools/dev_seed_fusion_view.py'], ENV, { cwd: BACKEND });
   // 塞两行坏的：一行"那道闸收不住"（分组不在本包认的那两组里），一行"收得进但跑不出图"（步型未知）。
   // 这两条走的是不同分支：前者根本不该画，后者画的时候抛。
   writeFileSync('/tmp/prev-bad.py', [
@@ -88,16 +95,16 @@ try {
     'db.commit(); db.close()',
     '',
   ].join('\n'))
-  await sh(`${BACKEND}/.venv/bin/python`, ['/tmp/prev-bad.py'], ENV, { cwd: BACKEND });
+  if (!LIVE) await sh(`${BACKEND}/.venv/bin/python`, ['/tmp/prev-bad.py'], ENV, { cwd: BACKEND });
 
-  server = spawn(`${BACKEND}/.venv/bin/python`, ['-m', 'uvicorn', 'app.main:app', '--port', String(PORT), '--log-level', 'warning'],
+  if (!LIVE) server = spawn(`${BACKEND}/.venv/bin/python`, ['-m', 'uvicorn', 'app.main:app', '--port', String(PORT), '--log-level', 'warning'],
     { cwd: BACKEND, env: { ...process.env, ...ENV }, stdio: 'ignore' });
-  let up = false;
-  for (let i = 0; i < 60; i++) {
+  let up = !!LIVE;
+  for (let i = 0; !LIVE && i < 60; i++) {
     try { if ((await fetch(`http://127.0.0.1:${PORT}/ops`)).ok) { up = true; break; } } catch { }
     await sleep(250);
   }
-  ck(`本机后端起来了（:${PORT}/ops）`, up);
+  ck(LIVE ? '现网那一页打得开' : `本机后端起来了（:${PORT}/ops）`, up);
   if (!up) throw new Error('后端没起来，后面没法测');
 
   const profileDir = '/tmp/prev-chrome-';
@@ -121,7 +128,7 @@ try {
     console.log(`  · 屏照 ${OUT}/${name}`);
   };
 
-  await cdp.send('Page.navigate', { url: `http://127.0.0.1:${PORT}/ops` });
+  await cdp.send('Page.navigate', { url: OPS_URL });
   await sleep(1200);
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await ev(`document.getElementById('pw').value = ${JSON.stringify(PW)}`);
@@ -151,7 +158,9 @@ try {
         nos: boxes.filter(b => !b.querySelector('canvas')).map(b =>
           ({ id: b.closest('.card').querySelector('code').textContent, t: b.textContent.replace(/\\s+/g, ' ').slice(0, 70) })),
         caps: [...document.querySelectorAll('.prev .cap')].length,
-        eng: performance.getEntriesByName(location.origin + '/api/admin/poster/engine').map(e => e.responseStatus)
+        // 名字要按**这个页真打出去的那条 URL** 量：nginx 那层带 /wtsj/ 前缀，
+        // 写死 '/api/…' 在现网这一把里永远是空数组（本机没前缀，所以本机测不出来）。
+        eng: performance.getEntries().filter((e) => e.name.endsWith('/api/admin/poster/engine')).map((e) => e.responseStatus)
       });
     })()`));
 
@@ -165,11 +174,17 @@ try {
 
   const badGroup = st.nos.find((n) => n.id === 'badGroup');
   const badStep = st.nos.find((n) => n.id === 'badStep');
-  ck('反向对照①：分组收不住那一行写的是原因，不是空白格', !!badGroup && /客户端不会收下/.test(badGroup.t), badGroup && badGroup.t);
-  // 这一行本来是想撞"收得进但跑不出图"那第二个分支，实际被第一道闸先拦了（validate 认得"不认的步型"）。
-  // 第二个分支只在源码上钉（见 tests 里那条"画不出来必须说原因"），这里改判"它得说清为什么"。
-  ck('反向对照②：步型不认识的那一行也写原因，不是空白格', !!badStep && /不认的步型/.test(badStep.t), badStep && badStep.t);
+  if (LIVE) {
+    console.log('  · 那两行坏配方只塞在本机库里 ⇒ 这两条反向对照打现网时是"没这一步"，不算过');
+  } else {
+    ck('反向对照①：分组收不住那一行写的是原因，不是空白格', !!badGroup && /客户端不会收下/.test(badGroup.t), badGroup && badGroup.t);
+    // 这一行本来是想撞"收得进但跑不出图"那第二个分支，实际被第一道闸先拦了（validate 认得"不认的步型"）。
+    // 第二个分支只在源码上钉（见 tests 里那条"画不出来必须说原因"），这里改判"它得说清为什么"。
+    ck('反向对照②：步型不认识的那一行也写原因，不是空白格', !!badStep && /不认的步型/.test(badStep.t), badStep && badStep.t);
+  }
   ck('两行坏的都各占一格，没混进"画出来了"那堆', st.drawn.every((d) => d.id !== 'badGroup' && d.id !== 'badStep'));
+  ck(LIVE ? '现网十套线上模板每一套都画得出（一格不落）' : '十套线上那几行都画出了图',
+    !LIVE || st.drawn.length >= 10, LIVE ? `画了 ${st.drawn.length} 格` : '');
   ck('全程不抛异常', cdp.exceptions.length === 0, cdp.exceptions.join(' | ').slice(0, 300));
 
   // 屏照按整屏截，不按元素裁：那一格在文档里第几张卡上，裁片的坐标要跟滚动位置对齐，
@@ -177,10 +192,10 @@ try {
   // 整屏这一张要能同时看到"图 + 那四句限定 + 下面那几格输入框"，那才是这一栏真实的样子。
   await ev(`document.querySelectorAll('#nav s')[document.querySelectorAll('#nav s').length - 1].scrollIntoView()`);
   await sleep(1200);
-  await shot('本机-卡片模板那一栏.png');
+  await shot(`${TAG}-卡片模板那一栏.png`);
   await ev(`document.querySelector('.prev').classList.add('big')`);
   await sleep(600);
-  await shot('本机-预览放大那一格.png');
+  await shot(`${TAG}-预览放大那一格.png`);
   console.log(`  · 画出来的十格：${st.drawn.map((d) => d.id).join('、')}`);
 } finally {
   if (chrome) chrome.kill();

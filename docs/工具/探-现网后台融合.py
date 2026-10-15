@@ -213,7 +213,7 @@ else:
     check("那一页里不出现暗号（红线 1 也要在现网那份上钉住）",
           "X-Exchange" not in r.text and "ADMIN_EXCHANGE_SECRET" not in r.text)
 
-# ──  卡片模板那一栏的预览引擎（10-16 加的那一口）───────────────────────────
+# ── ⑧ 卡片模板那一栏的预览引擎（10-16 加的那一口）─────────────────────────
 # 这一口吐的是自家源码，所以门的检查要先做；更要紧的是第二条：**现网那一份与本机
 # miniprogram 那一份逐字相同**。副本与源文件一旦分叉，屏上那张预览就成了看着像的假图，
 # 而这件事在本机测不出来——只有打现网才量得到那台机上到底部署了哪一份。
@@ -236,7 +236,7 @@ if eng.get("files"):
               k in eng["files"]["poster.js"] for k in ("planPoster", "paintLayers", "applyRemoteTemplates", "recipeSource")))
     r2 = httpx.get(ENGINE, headers=dict(H, **{"If-None-Match": r.headers.get("etag", "")}), timeout=20)
     check("内容没变回 304（一次进那一栏只占一个读口额度）", r2.status_code == 304, f"HTTP {r2.status_code}")
-page = httpx.get(f"{BASE}/ops", timeout=20).text
+page = httpx.get(OPS, timeout=20).text
 check("现网那一页已带上预览那一格（第三十二次部署真落了）",
       "paintPreviews" in page and "预览引擎没加载成" in page and "function makeRequire" in page)
 check("那一页里仍然没有第二份画法",
