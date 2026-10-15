@@ -24,6 +24,9 @@ const files = {
   wxss: path.join(ROOT, 'miniprogram/pages/create/create.wxss'),
   wxml: path.join(ROOT, 'miniprogram/pages/create/create.wxml'),
   js: path.join(ROOT, 'miniprogram/pages/create/create.js'),
+  // 10-15 封版后这一趟新加的：墨面那七档停点从 create.wxss 搬进了 app.wxss 的 `.mood-ink` 块
+  // （`--blk-count-bg`，app.wxss:319），尺子读的就是那一块 ⇒ 这一族的刀必须落在那一份上。
+  app: path.join(ROOT, 'miniprogram/app.wxss'),
 }
 console.log(`下刀的树：${ROOT}`)
 if (!fs.existsSync(RULER) || !fs.existsSync(R2)) throw new Error(`这棵树里没有那把尺子：${RULER}｜${R2}`)
@@ -53,14 +56,22 @@ const KNIVES = [
   // （`.blk-plus-glyph` 的图形）。挪到 `.shut-core` 是空刀——色扫只吃首屏那几段，第二屏不在里面。
   ['把官网那支赭色抄进样式表（六位 hex）',
     () => edit('wxss', 'background: var(--cp-cam-ink);', 'background: #D2683F;'), '没有抄进来的色相'],
+  /* 这两把原来锚的是 create.wxss 里写死的 `rgba(242, 239, 233, 0.85)` 与 `color: #F2EFE9`——
+     10-14 五档彩色玻璃那一轮把那几处换成了 `var(--stage-ink-*)`（判据跟着搬了，见 `验-第一屏三块.js`
+     第 325 行那段注释），锚点却留在旧串上 ⇒ 10-15 封版后第一趟全量跑，这两把报的是"刀没落下"，
+     那条色相判据从此没人证过。现在落进同一族里两枚**全文唯一**的引用点（`.blk-lab` 449 行、
+     `.blk-num` 434 行），改坏的都是字色本身，判据吃的仍是那几段。 */
   ['把品牌色抄成 rgba（原来这一支从指缝里过去）',
-    () => edit('wxss', 'background: rgba(242, 239, 233, 0.85);', 'background: rgba(210, 104, 63, 0.5);'), '没有抄进来的色相'],
+    () => edit('wxss', '  color: var(--stage-ink-dim);', '  color: rgba(210, 104, 63, 0.5);'), '没有抄进来的色相'],
   ['暖白换成另一支暖白（只差三个通道值，照样不放行）',
-    () => edit('wxss', 'color: #F2EFE9;', 'color: #F5F0E6;'), '唯一那支暖白必须是全站'],
+    () => edit('wxss', '  color: var(--stage-ink-solid);', '  color: #F5F0E6;'), '唯一那支暖白必须是全站'],
+  /* 这一把的三串停点 10-15 跑的时候在 create.wxss 里已经一处都不剩——墨面那七档整条搬进了
+     `app.wxss:319` 的 `--blk-count-bg`（就在 `.mood-ink` 块里，尺子的 MOOD_INK 正是从那一块读的）。
+     落点跟着搬过去，改的还是同一件事：把"照抄 .page-scrim 的 .42→.72"那一版塞回去，合成差必须被读出来。 */
   ['墨面照抄 .page-scrim 那串幅度（合成只差 2 级＝画了跟没画一样，他原话「渐变效果不好」）',
-    () => { edit('wxss', 'rgba(18, 20, 26, 0.35) 62%', 'rgba(18, 20, 26, 0.42) 62%')
-      edit('wxss', 'rgba(18, 20, 26, 0.68) 88%', 'rgba(18, 20, 26, 0.62) 88%')
-      edit('wxss', 'rgba(18, 20, 26, 0.92) 100%', 'rgba(18, 20, 26, 0.72) 100%') }, '差 ≥6 级'],
+    () => { edit('app', 'rgba(18, 20, 26, 0.35) 62%', 'rgba(18, 20, 26, 0.42) 62%')
+      edit('app', 'rgba(18, 20, 26, 0.68) 88%', 'rgba(18, 20, 26, 0.62) 88%')
+      edit('app', 'rgba(18, 20, 26, 0.92) 100%', 'rgba(18, 20, 26, 0.72) 100%') }, '差 ≥6 级'],
   ['停点自己另写一档（「与现网的过程一样」就没了）',
     () => edit('wxss', 'rgba(255, 255, 255, 0.93) 43%', 'rgba(255, 255, 255, 0.93) 38%'), '停点位置与现网'],
   ['窗底抬到 167（脚底与墨面之间开一条缝，就是他说的「悬空」）',
@@ -139,17 +150,19 @@ const KNIVES = [
     () => edit('wxss', 'background: transparent;\n  backdrop-filter',
       'background: rgba(35, 37, 44, 0.95);\n  backdrop-filter'), '深色面板本体透明'],
   /* 下面两把下的是**另一把尺子**（`验-首页背景图.js`）：10-14 那一轮「返回」抬到墨面之上之后
-     新加的两条翻色判据（吃 `bg-light-low`、不吃 `bg-light`）。落点还在同一份 create.wxss 上，
-     所以共用这一套备份/还原，只把"红的那一条从哪把尺子里读出来"换成传进来的第 4 项。 */
+     新加的两条翻色判据。10-15 封版后这一趟它们报"刀没落下"——原因在**类名换了**：create 页那一档
+     不再借用"下那一档"（`bg-light-low`，index／me 两页还在用），改成量它自己那块矩形发的那枚
+     `bg-light-out`（`create.wxss:1437` 那条注释记着这一搬）。锚点与期望红的判据名一起对上现行那两份。
+     落点还在同一份 create.wxss 上，所以共用这一套备份/还原，只把"红的那一条从哪把尺子里读出来"换成传进来的第 4 项。 */
   ['把「返回」按头部那一档翻（`.bg-light .out` 一回来，"上浅下暗"那张图上它就是墨字压暗底）',
-    () => edit('wxss', '.container.has-bg:not(.bg-light-low) .out {',
+    () => edit('wxss', '.container.has-bg:not(.bg-light-out) .out {',
       '.container.has-bg.bg-light .out {\n  color: rgba(20, 22, 26, 0.68);\n}\n\n'
-      + '.container.has-bg:not(.bg-light-low) .out {'),
-    '这一枚不许按头部那一档翻', R2],
-  ['撤掉"下那一档"那两条覆写（只留 `.out` 吃令牌＝整页那一枚说了算，落点没人管）',
-    () => { edit('wxss', '.container.has-bg:not(.bg-light-low) .out {', '.container.has-bg:not(.bg-light-xx) .out {')
-      edit('wxss', '.container.has-bg.bg-light-low .out {', '.container.has-bg.bg-light-xx .out {') },
-    '那一枚跟着"下那一档"翻', R2],
+      + '.container.has-bg:not(.bg-light-out) .out {'),
+    '这一枚不许再按头部那一档', R2],
+  ['撤掉"自己那块矩形"那两条覆写（只留 `.out` 吃令牌＝整页那一枚说了算，落点没人管）',
+    () => { edit('wxss', '.container.has-bg:not(.bg-light-out) .out {', '.container.has-bg:not(.bg-light-xx) .out {')
+      edit('wxss', '.container.has-bg.bg-light-out .out {', '.container.has-bg.bg-light-xx .out {') },
+    '那一枚跟着**自己那块矩形**翻', R2],
 ]
 
 let bad = 0
