@@ -94,10 +94,16 @@ def test_url里没有主机名就拒():
 
 
 def test_直接写内网IP的链接过不了闸门():
-    """域名都不用，攻击者可以直接填字面 IP。"""
+    """域名都不用，攻击者可以直接填字面 IP。
+
+    ⚠ 这两条原来钉的是 `"内网" in str(e.value)`——那正是 #11 要抹掉的那半句：
+    回体里带"内网"两个字，提交者就拿到了一台判分机。判据改成"拦住了、且回体不含定位信息"，
+    不回去改实现迁就旧尺子。
+    """
     with pytest.raises(UserError) as e:
         scraper._validate_url("http://169.254.0.23/latest/meta-data/")
-    assert "内网" in str(e.value)
+    assert e.value.args[0] == scraper.BLOCKED_URL_HINT
+    assert "169.254" not in str(e.value) and "内网" not in str(e.value)
 
 
 def test_IPv6未指定地址的链接过不了闸门():
@@ -113,7 +119,8 @@ def test_域名解析到内网也拦(monkeypatch):
     )
     with pytest.raises(UserError) as e:
         scraper._validate_url("https://innocent-looking.example.com/a")
-    assert "内网" in str(e.value)
+    assert e.value.args[0] == scraper.BLOCKED_URL_HINT
+    assert "内网" not in str(e.value) and "10.0.0.5" not in str(e.value)
 
 
 def test_解析出多个地址时只要有一个是内网就整条拦(monkeypatch):
@@ -145,8 +152,32 @@ def test_域名解析失败给中文而不是gaierror原文(monkeypatch):
     )
     with pytest.raises(UserError) as e:
         scraper._validate_url("https://no-such-host.invalid/a")
-    assert "无法解析域名" in str(e.value)
+    assert e.value.args[0] == scraper.BLOCKED_URL_HINT
     assert "gaierror" not in str(e.value)
+
+
+def test_解析失败与内网拦截回同一句话_闸门不是判分机(monkeypatch):
+    """审计 #11：这两条以前各回一句（"无法解析域名: x"／"域名解析到内网地址，已拦截: x"），
+    于是提交者拿回体就能分辨"这个域名在内网解析得动"——一次真请求都不用发。
+    反向对照很直接：把任意一句改回可区分的写法，这一条立刻红。"""
+    monkeypatch.setattr(
+        scraper.socket, "getaddrinfo",
+        lambda *a, **kw: (_ for _ in ()).throw(scraper.socket.gaierror(-2, "nope")),
+    )
+    with pytest.raises(UserError) as dns_fail:
+        scraper._validate_url("https://no-such-host.invalid/a")
+
+    monkeypatch.setattr(
+        scraper.socket, "getaddrinfo",
+        lambda *a, **kw: [(2, 1, 6, "", ("10.0.0.7", 0))],
+    )
+    with pytest.raises(UserError) as internal_hit:
+        scraper._validate_url("https://internal-metadata.example/a")
+
+    both = {dns_fail.value.args[0], internal_hit.value.args[0]}
+    assert both == {scraper.BLOCKED_URL_HINT}, f"两种失败回体不同＝一台内网判分机：{both}"
+    for msg in both:
+        assert "10.0.0.7" not in msg and "internal-metadata" not in msg and "no-such-host" not in msg, msg
 
 
 def test_公网域名放行(monkeypatch):

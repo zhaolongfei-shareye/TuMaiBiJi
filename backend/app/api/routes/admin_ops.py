@@ -40,7 +40,7 @@ from app.core.admin_access import (
 )
 from app.core.config import settings
 from app.core.errors import UserError
-from app.core.rate_limit import limiter
+from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
 from app.services import admin_stats, admin_templates, mp_assets, poster_engine
 
@@ -49,8 +49,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # 上传口挂在管理凭证后面，所以这里的限流防的是"登录态被拿着之后手滑"，不是防爆破。
-# 真正要限的是 login：那是这一条链上唯一一个匿名可反复试的判据，5/分钟按 IP 分桶
-# （uvicorn 带 --proxy-headers、nginx 传 X-Forwarded-For 已实测，见 shares.py:264-274 那段）。
+# 真正要限的是 login：那是这一条链上唯一一个匿名可反复试的判据。
+# ⚠ 这句原来写的是"5/分钟按 IP 分桶"——那是半句假话：全局那把 `key_func` 是 `get_user_key`，
+# 请求只要带着一把签名有效的票（`verify_exp=False`，过期的也算）就换成按 `user:<sub>` 计。
+# 现在这一枚口上显式挂 `get_ip_key`，"按 IP"才真成立（uvicorn 带 --proxy-headers、
+# nginx 传 X-Forwarded-For 已实测，见 shares.py 里那段）。
 
 
 class LoginIn(BaseModel):
@@ -77,7 +80,7 @@ class TextIn(BaseModel):
 
 
 @router.post("/api/admin/login")
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=get_ip_key)
 def admin_login(request: Request, body: LoginIn):
     """换成一把短命管理 session。成功只回 token，失败回一句不含任何线索的话。
 
@@ -285,8 +288,14 @@ def admin_poster_engine(
         raise HTTPException(status_code=503, detail="预览引擎没随包部署，这一栏的预览画不出来")
     try:
         body, etag = poster_engine.bundle()
-    except (OSError, ValueError) as e:
-        raise HTTPException(status_code=503, detail=f"预览引擎读不出来：{e}")
+    except ValueError as e:
+        # 这一支是我们自己写的那句话（哪一只文件与名单对不上），给操作者看正合适，不含路径。
+        raise HTTPException(status_code=503, detail=f"预览引擎校验没过：{e}")
+    except OSError as e:
+        # `open()` 打不开时异常原文带**绝对路径**（`[Errno 13] … '/home/ubuntu/wtsj-backend/…'`），
+        # 而这一口的回体会被那一页原样显示出来。路径留在日志里给人查，屏上只说读不出来。
+        logger.warning("预览引擎读不出来 err=%s", e)
+        raise HTTPException(status_code=503, detail="预览引擎读不出来，这一栏的预览画不出来")
     if if_none_match and if_none_match.strip('"') == etag:
         return Response(status_code=304, headers={"ETag": f'"{etag}"'})
     return Response(

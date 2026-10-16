@@ -32,8 +32,16 @@ function _put(list) {
 /** 追加一条待补登记：同一篇再补一次就是覆盖那一条（见顶上那段"新的顶掉旧的"）。 */
 function push(noteId, item) {
   if (!noteId || !item || !item.file_id) return
-  const list = take().filter((x) => !(x && x.noteId === noteId))
-  list.push({ noteId, item })
+  // ⚠ 落库前先归成一枚**数**（审计 #17）。这一篇的 id 从两条路来：出图那一头给的是数，
+  // 台账（`cardLog`）那本对象交回来的键是**字符串**——JS 的对象键只有字符串这一种。
+  // 原来这里用 `===` 比，两种类型永远不相等 ⇒ 同一篇在队列里留下两条，而 flush 按顺序挨个 PUT，
+  // 服务端那条"一篇只有一张当前"的唯一索引让**最后一条赢**＝上一张顶掉刚出的那张。
+  // 归成数与本文件顶上那句 `{noteId:number}` 是同一份口径；比对仍统一走 String 那一层，
+  // 因为调用方塞进来的类型不归这条路管。
+  const id = Number(noteId)
+  if (!Number.isFinite(id) || id <= 0) return
+  const list = take().filter((x) => !(x && String(x.noteId) === String(id)))
+  list.push({ noteId: id, item })
   if (list.length > MAX_QUEUE) {
     console.warn(`卡片待补队列超过 ${MAX_QUEUE} 条，丢掉最旧的 ${list.length - MAX_QUEUE} 条`)
     list.splice(0, list.length - MAX_QUEUE)
@@ -107,7 +115,7 @@ function _prune(done) {
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
   _put(take().filter((x) => {
     if (!x) return true
-    const was = done.find((d) => d && d.noteId === x.noteId)
+    const was = done.find((d) => d && String(d.noteId) === String(x.noteId))
     return !was || !same(was, x)
   }))
 }

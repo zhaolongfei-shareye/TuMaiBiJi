@@ -1789,12 +1789,38 @@ function pickFields(a, keys) {
   return o
 }
 
+// 图层里**值**的三道检查（审计 #16）。上面那些判据查的都是名字（不认的 op、不认的字段），
+// 名字对了不等于画得出来：canvas 那两个绘制函数按规范"参数不是有限数就直接 return"，
+// 于是 NaN／Infinity／null 的症状是**那一层静默不画**——整张卡照样出、少一块底或少一行字，
+// 全程零报错，那是最难查的一类坏图。缺字段也一起管：`L.fill(undefined, …)` 今天同样静默不画。
+// 两处都调它：`buildRecipeLayer`（配方字面量那一头）与 `checkLayer`（原语交回来的那一头），
+// 只挂一处就留了一条绕过的路。
+// ⚠ 这一道挡不住"坐标写成字符串"（`'abc'` 要到 canvas 才变 NaN）——配方是 JSON、写不出 NaN，
+// 真出现字符串坐标说明上游已经算错了，那一条不在这里补第二道闸。
+function checkRecipeValues(kind, fields, where) {
+  const keys = RECIPE_OP_KEYS[kind]
+  if (!keys) return
+  const optional = RECIPE_OPT_KEYS[kind] || []
+  keys.forEach((k) => {
+    const v = fields[k]
+    if (v === undefined) {
+      if (optional.indexOf(k) < 0) throw new Error(`${where}: op「${kind}」缺字段「${k}」`)
+      return
+    }
+    if (v === null) throw new Error(`${where}: op「${kind}」的字段「${k}」是 null，画的时候会被当成 0 或静默跳过`)
+    if (typeof v === 'number' && !Number.isFinite(v)) {
+      throw new Error(`${where}: op「${kind}」的字段「${k}」不是有限数（${String(v)}）`)
+    }
+  })
+}
+
 function buildRecipeLayer(fields) {
   const keys = RECIPE_OP_KEYS[fields.k]
   if (!keys) throw new Error(`不认的绘制 op「${fields.k}」`)
   Object.keys(fields).forEach((k) => {
     if (k !== 'k' && keys.indexOf(k) < 0) throw new Error(`op「${fields.k}」没有字段「${k}」，能用的是 ${keys.join('、')}`)
   })
+  checkRecipeValues(fields.k, fields, '配方')
   const o = pickFields(fields, RECIPE_OPT_KEYS[fields.k] || [])
   switch (fields.k) {
     case 'fill': return L.fill(fields.x, fields.y, fields.w, fields.h, fields.color)
@@ -1936,6 +1962,9 @@ function planFromRecipe(ctx, d, recipe) {
       Object.keys(l).forEach((k) => {
         if (k !== 'k' && keys.indexOf(k) < 0) throw new Error(`${where}: op「${l.k}」没有字段「${k}」，能用的是 ${keys.join('、')}`)
       })
+      // 值也一起查（审计 #16 的另一半）：原语算出来的层没经过 `buildRecipeLayer`，
+      // 只在字面量那一头查就等于留了一条绕过的路——`{lit:{k:'fill',…,h:0/0}}` 那种。
+      checkRecipeValues(l.k, l, where)
       return l
     },
   }
@@ -2077,13 +2106,29 @@ function templateList() {
 // 原地换成两行纯文字。摘的条件是中心离码中心近、面积不超过码的四倍，
 // 所以整张卡的大底不会被误摘。
 // 文字不许截成"图麦笔…"：那种位置宁可字号小一档，所以按框宽往下试字号而不是裁字。
+// `fitSize` 三个入参不是有限数时的兜底字级（px）。挑 24 的理由很朴素：它是这文件里正文一档的量级，
+// 画出来读得懂，而这一支本来就不该被走到——走到就意味着配方给的不是数。
+const FIT_FALLBACK_SIZE = 24
+
 function fitSize(ctx, text, maxW, want, floor) {
+  // 三个数里任何一枚不是有限数就**不进那个循环**，直接给一个能读的字级：
+  // NaN 会让 `measureText(...) <= maxW` 与 `s <= floor` 两个条件永远为假，
+  // 而 `Math.max(NaN*0.9, NaN)` 还是 NaN ⇒ 一条死循环，症状是出图那一步把主线程打死
+  // （审计 #16，比"字大了/小了"重一档，因为它不报错、只是再也不返回）。
+  // 这里按站长 10-0x 那条"极端排版不限制、只保证不报错"的口径**不抛**：宁可这一行字大小不对，
+  // 不许整张卡出不来。兜底那一枚是唯一一处写死的数，所以给它一个名字。
+  if (!Number.isFinite(maxW) || !Number.isFinite(want) || !Number.isFinite(floor)) {
+    return FIT_FALLBACK_SIZE
+  }
   let s = Math.max(want, floor)
-  for (;;) {
+  // 循环自己也要有上界：0.9 这一档从任何合理起点收敛到 floor 只要十几次，写死 64 是给
+  // "floor 与 want 差得离谱"那种配方留的保险，不是第二条判据。
+  for (let guard = 0; guard < 64; guard++) {
     font(ctx, s, false)
     if (ctx.measureText(text).width <= maxW || s <= floor) return s
     s = Math.max(Math.round(s * 0.9), floor)
   }
+  return s
 }
 
 function stripQr(plan, ctx, lang) {
@@ -2171,6 +2216,9 @@ const SAMPLE_NOTE_EN = {
 
 module.exports = {
   W,
+  // 只为尺子留的一个口子（`验-审计第一批客户端三条.js` 要直接喂 NaN 看它死不死循环）。
+  // 界面没有一处用它：那一头要的是整张 plan，不是这一枚字号。
+  fitSize,
   MATTE,
   TEMPLATES,
   paperOf,

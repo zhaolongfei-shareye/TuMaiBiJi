@@ -34,6 +34,11 @@ EXTRA_BLOCKED_NETWORKS = [
 # 兜底文案：httpx 的异常文本是英文且带完整 URL，直接 str(e) 会进用户 toast（只两行，约 30 汉字）
 GENERIC_FETCH_ERROR = "读取网页失败，请稍后重试或改用截图"
 
+# 闸门拒一个链接时**只有这一句**话。为什么"解析不出来"与"解析到内网"不许分开说（审计 #11）：
+# 分开就等于把这道闸门做成一台内网判分机——提交者拿"哪个域名回哪一句"就能扫出内网有哪些
+# 主机名解析得动、落在哪个网段，一次请求都不用真发出去。真原因进日志，那一行的读者是操作者。
+BLOCKED_URL_HINT = "这个链接我们打不开，换一个试试"
+
 
 def _is_private_ip(ip_str: str) -> bool:
     """判定一个 IP 是否属于"不该让抓取器去连"的范围。解析不了一律当危险处理。
@@ -72,11 +77,13 @@ def _validate_url(url: str) -> str:
     try:
         resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
     except socket.gaierror:
-        raise UserError(f"无法解析域名: {hostname}")
+        logger.warning("链接闸门：域名解析失败 host=%s", hostname)
+        raise UserError(BLOCKED_URL_HINT)
     for family, _, _, _, sockaddr in resolved:
         ip = sockaddr[0]
         if _is_private_ip(ip):
-            raise UserError(f"域名解析到内网地址，已拦截: {hostname}")
+            logger.warning("链接闸门：解析到内网地址已拦截 host=%s ip=%s", hostname, ip)
+            raise UserError(BLOCKED_URL_HINT)
     return url
 
 

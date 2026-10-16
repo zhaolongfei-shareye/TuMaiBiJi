@@ -24,6 +24,16 @@ def get_user_key(request):
     return f"ip:{get_remote_address(request)}"
 
 
+def get_ip_key(request):
+    """**只看来源，不看 Authorization**。登录／换票这一类口防的是"同一台机器反复试"，
+    而 `get_user_key` 那把在票签名有效时会换成 `user:<sub>` 分桶（还带 `verify_exp=False`，
+    过期票也算有效）。挂在那类口上就等于：谁手里有一把有效票，谁就能给同一台机器换一条额度。
+    所以这一枚显式不吃票，`get_remote_address` 读的是 uvicorn `--proxy-headers` 之后的对端
+    （nginx 传 `X-Forwarded-For` 那两枚实测过，见 `routes/shares.py` 里那段）。
+    """
+    return get_remote_address(request)
+
+
 limiter = Limiter(
     key_func=get_user_key,
     storage_uri=settings.REDIS_URL,

@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.auth import login_or_register
-from app.core.rate_limit import limiter
+from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
 
 router = APIRouter()
@@ -30,7 +30,7 @@ class LoginResponse(BaseModel):
 
 
 @router.post("/wechat", response_model=LoginResponse)
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=get_ip_key)
 async def wechat_login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
     user, token, seeded_note_id = await login_or_register(req.code, db, req.inviter)
     return LoginResponse(

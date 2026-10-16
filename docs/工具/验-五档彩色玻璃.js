@@ -53,6 +53,16 @@ const blockOf = (src, sel) => {
   const m = new RegExp(`(?:^|\\n)\\s*${esc}\\s*\\{([^}]*)\\}`).exec(src)
   return m ? m[1] : ''
 }
+// 同一个选择器在一份 wxss 里可以有**好几块**（CSS 是叠加生效的）。10-16 那一趟把五枚别名
+// 抬到 `.container`，于是新建那一屏多出一块只管令牌的 `.container {}`，排在带 `padding-top: 0`
+// 那块之前——只取第一块的读法当场把"顶内缩收到 0"读成"没有这一行"（红的是尺子，不是屏）。
+const blocksOf = (src, sel) => {
+  const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`(?:^|\\n)\\s*${esc}\\s*\\{([^}]*)\\}`, 'g')
+  let m, all = ''
+  while ((m = re.exec(src))) all += m[1] + '\n'
+  return all
+}
 /* 先把注释剥掉再按行取声明：这些块里大量声明的上一行是注释（以 `星号斜杠` 结尾），
    拿 `(?:^|;)` 当锚就会漏掉"紧跟在注释后面的那一枚"——第一版正是这样把四枚玻璃令牌
    读成 null，看着像"page{} 里没有"，其实是解析器没剥注释。 */
@@ -273,7 +283,7 @@ function evaluate(S) {
   const TOP_INSET = [
     ['新建', S.createWxss], ['笔记', S.ixWxss], ['「我的」', S.meWxss],
   ].map(([label, src]) => {
-    const b = blockOf(src.replace(/\/\*[\s\S]*?\*\//g, ''), '.container')
+    const b = blocksOf(src.replace(/\/\*[\s\S]*?\*\//g, ''), '.container')
     const short = (/padding:\s*([^;]*);/.exec(b) || [])[1]
     const top = (/padding-top:\s*([^;]*);/.exec(b) || [])[1]
     const zero = (v) => v !== undefined && v.trim().split(/\s+/).every((n) => /^0/.test(n))

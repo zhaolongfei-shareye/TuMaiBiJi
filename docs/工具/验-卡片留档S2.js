@@ -77,7 +77,10 @@ function 判(src) {
     && /const KEY = 'pendingNoteAssets'/.test(src[ASSET_Q])
     && /const KEY = 'pendingCloudPurge'/.test(src[PURGE]))
   ck('一篇在队列里只留最新那一条（新的顶掉旧的，服务端那条唯一索引才不会被队列顺序决胜）',
-    /take\(\)\.filter\(\(x\) => !\(x && x\.noteId === noteId\)\)/.test(queue))
+    // 原来这里钉的是 `x.noteId === noteId` 那一串字面量——审计 #17 把比对改成先归一化，
+    // 那条钉子就从"钉行为"变成"钉我上一版怎么写的字"。改成认这一族写法：
+    // 比对两侧都得过 String()，且落库前把 id 归成一枚数（行为判据在 `验-审计第一批客户端三条.js`）。
+    /String\(x\.noteId\)\s*===\s*String\(/.test(queue) && /const id = Number\(noteId\)/.test(queue))
   ck('上限 50、超了丢最旧的并留一句日志', /MAX_QUEUE = 50/.test(queue) && /丢掉最旧的/.test(queue))
   ck('4xx 不再重试、其余留着下次（与待补绑同一条纪律）',
     /code >= 400 && code < 500/.test(queue))

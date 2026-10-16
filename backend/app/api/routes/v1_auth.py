@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.apple_identity import verify_identity_token
 from app.core.auth import _create_account_token, login_or_register
-from app.core.rate_limit import limiter
+from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
 from app.models.account import Account
 from app.services import accounts, linking
@@ -53,7 +53,7 @@ def _login_response(db: Session, account: Account) -> LoginResponse:
 
 
 @router.post("/apple", response_model=LoginResponse)
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=get_ip_key)
 async def apple_login(request: Request, req: AppleLoginRequest, db: Session = Depends(get_db)):
     """验 Apple 签的那张 token，然后**只**按 `sub` 找人。
 
@@ -67,7 +67,7 @@ async def apple_login(request: Request, req: AppleLoginRequest, db: Session = De
 
 
 @router.post("/wechat", response_model=LoginResponse)
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=get_ip_key)
 async def wechat_login(request: Request, req: WechatLoginRequest, db: Session = Depends(get_db)):
     """契约 §二"另开 `/v1/auth/wechat` 转调同一实现"。同一实现 = 同一支 `login_or_register`，
     建号、邀请归因、account 补齐全部走它，这里不复制任何一条；区别只在**发哪一种钥匙**。

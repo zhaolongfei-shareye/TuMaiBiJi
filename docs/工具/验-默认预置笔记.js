@@ -134,6 +134,10 @@ const GATE_OK = {
     /^from app\.services\.preset_note import/,
     /^\s*\.where\(Note\.source_type != PRESET_SOURCE_TYPE\)$/,
     /^\s*select\(func\.count\(\)\)\.select_from\(Note\)\.where\(Note\.source_type (!=|==) PRESET_SOURCE_TYPE\)$/,
+    // 10-16 A4 那三枚计数把 where 折成了多行（`_count(db, select(...).where(` 之后换行续条件），
+    // 条件那一行自己就是 `Note.source_type != PRESET_SOURCE_TYPE` 打头。仍然按行给、不放开整个文件：
+    // 这一条只认"以这个条件开头、后面跟的是取数条件或收尾括号"，行为分支那种写法（`if … == PRESET…:`）过不了。
+    /^\s*Note\.source_type != PRESET_SOURCE_TYPE\b[,)]/,
   ],
 }
 const hits = []
