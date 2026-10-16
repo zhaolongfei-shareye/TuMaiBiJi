@@ -93,8 +93,12 @@ function 判(src) {
     `queue=${/code !== 429/.test(queue)} aq=${/code !== 429/.test(aq)}`)
   // 队列"一篇只留一条、新的顶掉旧的"只管得住 `push` 之间；直发赢了那一头原来没人摘旧账，
   // 于是离线那张 A 会在下次进前台把刚生成的 B 顶成历史。
+  // ⚠ 这一条必须只量 `archive` 那一段正文，不许拿整份文件测：10-16 那条「改私密就清卡片」
+  // 里也有一句 `cardQueue.settle(noteId)`，拿整份文件测的话反向⑥把那一句删干净也照样绿——判据自己变成假的。
+  const arch = (cloud.split('async function archive(')[1] || '').split('\n}\n')[0]
   ck('直发登记成功会摘掉同篇那条旧待补（不摘就是旧的顶回来）',
-    /cardQueue\.settle\(noteId\)/.test(cloud) && /function settle\(/.test(queue))
+    /cardQueue\.settle\(noteId\)/.test(arch) && /function settle\(/.test(queue),
+    `archive 段长 ${arch.length}`)
   // 补登记这一趟也会顶下旧对象，直发那一条早就接了这个回体，队列这一条原来没接。
   ck('补登记顶下的旧对象也交给 deleteFile（不留孤儿占全站配额）',
     /onReplaced/.test(queue) && /cardQueue\.flush\(api, \(ids\) => cloudUpload\.deleteFiles\(ids\)\)/.test(cloud))

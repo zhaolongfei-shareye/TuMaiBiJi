@@ -375,6 +375,8 @@ const i18n = {
     cardDrop: '删除分享图',
     cardDropHint: '删除后可继续生成笔记卡片，已分享的依旧有效',
     cardDropOffline: '这会儿连不上服务器，那张卡片还留着',
+    cardPrivateDropFail: '已存为私密，但那张卡片没删掉：',
+    cardPrivateDropOffline: '已存为私密，但那张卡片这会儿没删掉',
     // 一篇只留一张：从详情页进笔记卡片页，这篇已经有卡片时给的那一句（10-07 他报的漏口）。
     // 说清"要干什么才有第二张"，不只说"不行"。
     cardOneOnly: '这篇已经有一张笔记卡片，删掉它才能再生成',
@@ -704,6 +706,8 @@ const i18n = {
     cardDrop: 'Delete card',
     cardDropHint: 'Delete it and you can make another; links you already shared stay valid',
     cardDropOffline: 'Not connected right now — that card is still there',
+    cardPrivateDropFail: 'Saved as private, but that card is still there: ',
+    cardPrivateDropOffline: 'Saved as private, but that card could not be removed just now',
     cardOneOnly: 'This note already has a card — delete it to make another',
     sourceWechatArticle: 'WeChat Article',
     sourceWebArticle: 'Web Article',

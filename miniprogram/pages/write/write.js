@@ -1,7 +1,8 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const pwdSheet = require('../../utils/pwdSheet.js')
-const { allowPrivate, unlockOn, exitOrHome } = require('../../utils/privateGate.js')
+const { allowPrivate, isPrivate, unlockOn, exitOrHome } = require('../../utils/privateGate.js')
+const cardCloud = require('../../utils/cardCloud.js')
 
 /* 这一页要发出去的那五栏，读回来时先存一份基线（站长 10-12 拍 C3 甲）。两个用途：
    ① 保存只发**真动过**的那几栏——原来这一页是整份 PUT，拿一份服务端裁过的空壳去存，
@@ -204,6 +205,7 @@ Page({
       }
 
       let note
+      let dropNote = ''
       if (isEdit) {
         // 编辑：只发**真动过**的那几栏（站长 10-12 拍 C3 甲）。原来整份 PUT，屏上铺的又是服务端
         // 裁过的空壳时，一次保存就把他真正的概要和要点清空。上面那道 unlockOn 已经把"空壳铺进表单"
@@ -224,13 +226,37 @@ Page({
         if (now.category_id !== base.category_id) payload.category_id = now.category_id
         // 一个字没动就不打这一趟 PUT：PUT 会把 updated_at 顶上去、列表跟着换序，
         // 而这一趟没有任何东西要写。
-        if (Object.keys(payload).length > 0) note = await api.updateNote(noteId, payload)
+        if (Object.keys(payload).length > 0) {
+          note = await api.updateNote(noteId, payload)
+          // 这一趟把这篇挪进了私密分类 ⇒ 它那张卡片要跟着没（站长 10-16 拍乙）。
+          // 判据与卡片那一排、详情窗那两处同一个出处（privateGate.isPrivate 吃分类名）。
+          // 只在**真的从别的分类挪进来**那一格动手：本来就私密的篇目每存一次都清一遍，
+          // 会把"私密篇重新出一张卡"那条路也堵死（那条路服务端本来就拒，界面上不该有动作）。
+          const movedIn = payload.category_id !== undefined
+            && isPrivate(((categories.find((c) => c.id === categoryId) || {}).name) || '')
+          if (movedIn) {
+            const dropped = await cardCloud.dropForPrivate(noteId)
+            if (dropped !== 'dropped' && dropped !== 'none') {
+              // 服务端真回了一句原因的照着实心念（与详情页那一格同一个口径），
+              // 没原因的那种（离线／超时）走字典里那句不猜原因的实话——不许把内部状态码拼上屏。
+              dropNote = typeof dropped === 'string'
+                ? t('cardPrivateDropFail', lang) + dropped
+                : t('cardPrivateDropOffline', lang)
+              // 只换那句话，**不拦后面的返回**：笔记这一步是真存成了，
+              // 停在编辑页再点一次保存反而修不好——那时分类已经没变，这一趟根本不会再打 PUT，
+              // 清卡片那段就成了永远走不到的分支。
+            }
+          }
+        }
       } else {
         note = await api.createNote(Object.assign({}, now, { source_type: 'manual' }))
       }
 
       wx.hideLoading()
-      wx.showToast({ title: isEdit ? t('updateSucceeded', lang) : t('saveSucceeded', lang), icon: 'success' })
+      // 卡片没清掉的时候不许念"已更新"了事——那等于屏上一句半假话（那句从字典里出，不在这儿拼词）。
+      wx.showToast(dropNote
+        ? { title: dropNote, icon: 'none', duration: 2600 }
+        : { title: isEdit ? t('updateSucceeded', lang) : t('saveSucceeded', lang), icon: 'success' })
       setTimeout(() => {
         if (isEdit) {
           // Navigate back to detail page instead of creating duplicate

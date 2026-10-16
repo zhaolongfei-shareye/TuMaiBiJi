@@ -287,8 +287,53 @@ function forget(noteId) {
   delete serverCards[String(noteId)]
 }
 
+/**
+ * 这篇被归进私密了 ⇒ 它那张卡片该跟着没。三处一起清，少一处就是假清：
+ *   ① 云上那个对象（私密正文就印在上面）② 服务器那一行登记 ③ 本机 jpg 与台账。
+ *
+ * 为什么必须在"改分类那一刻"动手，不能等补传那条链去挡：私密那道闸（服务端登记口拒私密篇）
+ * 拦的是**新的登记**，而这张图是在它还公开的时候出的。本机留着图、云上没那一行的时候，
+ * `backfillLocal` 只问"本机有没有、云上有没有"——它整条链上没有一处读"这篇现在是不是私密"。
+ * 于是每次进前台都把这张带正文的图重传一遍。站长 10-16 拍的就是这一条（乙）。
+ *
+ * 顺序照 `dropServer` 那条既有纪律：先把地址记进待删那一格，再撤行；撤行没成就停手，
+ * **不许先把本机账清了**——那样地址就没人记得，对象永久占着全站配额（10-11 审计严重①同型）。
+ *
+ * @returns {Promise<string|boolean>} 'dropped' 清完了；'none' 本来就没有卡片；服务端回了一句原因的
+ *   原样交回去；连原因都没有的那种失败回 `false`。**这一支不抛**（留档链同一条纪律）：
+ *   笔记那一步是真存成了，这里炸不许把它念成保存失败。
+ */
+async function dropForPrivate(noteId) {
+  try {
+    if (!noteId) return 'none'
+    const known = serverCard(noteId)
+    const queued = cardQueue.take().filter((x) => x && String(x.noteId) === String(noteId))
+    const local = cardLog.forNote(noteId)
+    if (!known && !queued.length && !local.length) return 'none'
+    if (known) {
+      const r = await dropServer(noteId)
+      // 撤不下来不许往下清本机账（地址一没人记得就是永久孤儿）。这里也**不许造一个 'failed'
+      // 之类的码交出去**——调用方会把它原样拼进吐司，屏上就长出一句字典里没有的英文。
+      if (r !== true) return typeof r === 'string' ? r : false
+    }
+    // 队列里那几条是"对象已经传上去了、只差登记"。行一没就再没人去登记它，
+    // 所以地址同样要先记进待删那一格；删不成由 `deleteFiles` 自己落回队列，下次进前台再试。
+    const ids = queued.map((q) => q.item && q.item.file_id).filter(Boolean)
+    if (ids.length) {
+      cloudUpload.reservePurge(ids)
+      cardQueue.settle(noteId)
+      await cloudUpload.deleteFiles(ids)
+    }
+    forget(noteId)
+    return 'dropped'
+  } catch (e) {
+    console.warn('改私密清卡片这一趟没走完（笔记那一步已经存好了）', e && (e.errMsg || e.message))
+    return false
+  }
+}
+
 module.exports = {
   CARD_KIND, archive, flush, backfillLocal,
   setServer, clearServer, serverCard,
-  isLoaded, cellFor, hasCard, refresh, refreshOne, dropServer, signOut, forget, knownFileIDs,
+  isLoaded, cellFor, hasCard, refresh, refreshOne, dropServer, signOut, forget, dropForPrivate, knownFileIDs,
 }
