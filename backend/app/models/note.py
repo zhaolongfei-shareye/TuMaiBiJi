@@ -2,6 +2,12 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Boolean, F
 from sqlalchemy.sql import func
 from app.db.database import Base
 
+# 从别人分享页转存进来的那一篇的 `source_type`。写在这里而不是散在各处当字面量：
+# 结 MIND 那一条要把它从"他自己动笔"里排出去（`quota._is_his_first_note`），
+# 而写入那一头（`routes/notes.py` 的转存口）钉的就是这一个值——两处必须同一个出处，
+# 否则其中一处改了个字符串，另一处的判据就成了永远不成立的假话。
+SOURCE_SHARE_IMPORT = "share_import"
+
 
 class Note(Base):
     __tablename__ = "notes"

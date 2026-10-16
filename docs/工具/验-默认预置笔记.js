@@ -94,9 +94,17 @@ ck('播种排在邀请归因**之后**（反了＝所有新用户永久无法被
 ck('建号那一支自己带 try（种子读不到不许把登录回成 500）',
   /except Exception:[\s\S]{0,200}预置笔记没种下去/.test(AUTH))
 const QUOTA = be('app/services/quota.py')
-ck('动笔首篇那条改读 authored_count（读 used_count 就被预置那一篇占了第一名）',
-  /_is_his_first_note[\s\S]{0,600}?authored_count\(db, user\.id\) == 1/.test(QUOTA)
-  && !/_is_his_first_note[\s\S]{0,600}?used_count\(db, user\) == 1/.test(QUOTA))
+/* 10-16 审计把这一条的**判法**换了：原来钉的是"读 `authored_count(...) == 1`"，
+   而拿条数当"这是不是第一篇"的顺序证据有两处结不出来（两篇真并发、名下第一条是转存）。
+   现在钉的是同一条意思的新写法：预置那一篇必须被排出去，且判的是"本次这一篇是不是 id 最小的那篇"。
+   ⚠ 旧的那句 literal 判据不改就会永久红——它钉的是实现，不是"预置篇不许占第一名"这件事本身。
+   两半都留着：读 `used_count`（预置篇算在内）仍然要红。 */
+ck('动笔首篇那条不许读 used_count，也不读条数——改成"本次这一篇是不是动笔那几篇里最早的"',
+  !/_is_his_first_note[\s\S]{0,900}?used_count\(db, user\)/.test(QUOTA)
+  && !/_is_his_first_note[\s\S]{0,900}?authored_count\(db, user\.id\) == 1/.test(QUOTA)
+  && /_is_his_first_note[\s\S]{0,900}?func\.min\(Note\.id\)/.test(QUOTA)
+  && /_is_his_first_note[\s\S]{0,900}?PRESET_SOURCE_TYPE/.test(QUOTA)
+  && /_is_his_first_note[\s\S]{0,900}?SOURCE_SHARE_IMPORT/.test(QUOTA))
 ck('归因那条不认的判据也改读 authored_count（同一条钱，第二处闸门）',
   /attribute_inviter[\s\S]{0,900}?authored_count\(db, user\.id\) > 0/.test(QUOTA))
 ck('页头那一列仍读 used_count（口径 6：新用户看到 1，不许被降成 0）',

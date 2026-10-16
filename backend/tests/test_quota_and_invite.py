@@ -32,7 +32,7 @@ from app.core.auth import _create_token
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
 from app.models.invitation import Invitation
-from app.models.note import Note
+from app.models.note import Note, SOURCE_SHARE_IMPORT
 from app.models.user import User
 from app.services import quota
 
@@ -437,6 +437,63 @@ class Test邀请到账:
         assert quota.credit_first_note(last, db, invitee) == 0
         db.refresh(inviter)
         assert inviter.quota_bonus == 0
+        assert db.query(Invitation).count() == 0
+
+    def test_两篇真并发时号小的那一篇必须结得上(self, db):
+        """10-16 审计第一条。原来判的是"名下正好一条"，两笔真并发就两边都数到 2、谁都不结。
+
+        这一把不去起两个线程（交错本身不是判据要钉的东西，撞车由唯一索引兜），
+        摆的是交错之后**必然留下的那个库状态**：名下已经有两条动笔行。
+        老代码在这里两条都回 0（那条 +10 从此永久结不出来，且永不自愈），
+        现在判的是"本次这一篇是不是他动笔那几篇里 id 最小的"——先落库那条必须结上。
+        """
+        inviter = mk_user(db, "race-inviter")
+        invitee = mk_user(db, "race-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        first = Note(user_id=str(invitee.id), title="先落库的那一篇", source_type="manual")
+        second = Note(user_id=str(invitee.id), title="后落库的那一篇", source_type="manual")
+        db.add_all([first, second])
+        db.commit()
+
+        assert quota.credit_first_note(second, db, invitee) == 0
+        assert quota.credit_first_note(first, db, invitee) == quota.INVITE_REWARD
+        db.refresh(inviter)
+        assert inviter.quota_bonus == quota.INVITE_REWARD
+        assert db.query(Invitation).count() == 1
+
+    def test_名下第一条是转存时_真动笔那一篇照样结(self, db):
+        """10-16 审计第二条。`authored_count` 只把预置那一篇排出去，转存那一篇它照数，
+        所以他要是先抄了别人一篇、之后才自己写，判据读到的条数已经是 2 ⇒ 那 +10 永久漏。
+        转存不是"他动笔"，必须从这一档里排出去（排出去的是判定，不是那一条笔记）。
+        """
+        inviter = mk_user(db, "imp-inviter")
+        invitee = mk_user(db, "imp-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        db.add(Note(user_id=str(invitee.id), title="抄来的那一篇", source_type=SOURCE_SHARE_IMPORT))
+        db.commit()
+        mine = Note(user_id=str(invitee.id), title="他自己写的第一篇", source_type="manual")
+        db.add(mine)
+        db.commit()
+
+        assert quota.credit_first_note(mine, db, invitee) == quota.INVITE_REWARD
+        db.refresh(inviter)
+        assert inviter.quota_bonus == quota.INVITE_REWARD
+
+    def test_转存那一篇自己不会触发到账(self, db):
+        """排出去是"别让它占掉首篇那一格"，不是"转存也算动笔"。
+        名下只有转存行的时候，谁都不该结那 +10（否则抄一次别人就替邀请人挣满分）。
+        """
+        inviter = mk_user(db, "imp-only-inviter")
+        invitee = mk_user(db, "imp-only-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        copied = Note(user_id=str(invitee.id), title="只有这一篇，是抄的", source_type=SOURCE_SHARE_IMPORT)
+        db.add(copied)
+        db.commit()
+
+        assert quota.credit_first_note(copied, db, invitee) == 0
         assert db.query(Invitation).count() == 0
 
     def test_自己指向自己的台账也不结(self, db):

@@ -31,7 +31,7 @@ from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
 from app.models.asset import Asset, MAX_ASSETS_PER_NOTE, not_failed
 from app.models.note import Note
-from app.models.note_card import NoteCard
+from app.models.note_card import NoteCard, current
 from app.models.user import User
 from app.models.user_profile import UserProfile
 
@@ -247,9 +247,18 @@ def _sum_bytes(db: Session, uid: Optional[str] = None) -> int:
 
     张数那一栏（`_count`）**不跟着加卡片**：界面上那一句说的是"你存了几张图"，
     把成品卡片混进去会变成"我明明只传了 3 张图，怎么显示 7 张"。
+
+    卡片那一半只算 `current()` 那几行（10-16 审计）。历史行（`is_current=0`）的对象是**已经不在桶里**
+    的那几张：同一篇换模板重出时回体把地址交回客户端删（`cards.py` 的 `put_note_card` 那句 `replaced_file_ids`），
+    撤那一张（`cards.py` 的 `drop_note_card`）与删那一篇（`notes.py` 的 `delete_note`）更是把历史行一起带出去删。
+    原来这一栏整表 SUM，于是"删掉的图还在算体积"——`used_ratio` 只涨不降，那枚"快满了"迟早是句假话。
+    **这一刀往哪边错要说清楚**：少数情况下那个对象客户端没删成（手机重装、待删队列丢掉），
+    它还躺在桶里却不再进账 ⇒ 比值**偏低**。选择偏低而不是偏高，是因为偏高会让人以为满了而不敢传图，
+    而偏低那一半由桶本身兜（真满了上传当场失败，那句错是准的）。与配图那一半同一纪律——
+    **失败的、已经不在了的字节都不许进账**，否则就是本仓反复警告的幽灵行。
     """
     q1 = db.query(func.coalesce(func.sum(Asset.file_size), 0)).filter(not_failed())
-    q2 = db.query(func.coalesce(func.sum(NoteCard.file_size), 0))
+    q2 = db.query(func.coalesce(func.sum(NoteCard.file_size), 0)).filter(current())
     if uid:
         q1 = q1.filter(Asset.user_id == uid)
         q2 = q2.filter(NoteCard.user_id == uid)

@@ -20,7 +20,15 @@ from fastapi.responses import HTMLResponse
 
 router = APIRouter()
 
-_NO_STORE = {"Cache-Control": "no-store", "Pragma": "no-cache"}
+# 这一页是管理壳页：它自己不开给别人嵌（`frame-ancestors 'self'`），但它**去嵌别人**——
+# 图麦克那一屏是同源 iframe（`/admin.html`），同源在 'self' 里是允许的，这一条不挡那一屏。
+# 不挡的理由要说清：挡了的话第四屏直接白一块，而那是一屏真在用着的界面。
+_NO_STORE = {
+    "Cache-Control": "no-store",
+    "Pragma": "no-cache",
+    "Content-Security-Policy": "frame-ancestors 'self'",
+    "X-Frame-Options": "SAMEORIGIN",
+}
 
 # 一句都不带变量：整份 HTML 是常量，页面上一切会变的字都来自接口。
 _PAGE = """<!doctype html>

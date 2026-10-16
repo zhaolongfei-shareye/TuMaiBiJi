@@ -458,6 +458,10 @@ def test_ops页面匿名可取但只是一个口令框(client, admin_pw, store):
     assert "no-store" in r.headers["cache-control"] and 'content="noindex"' in r.text
     assert ADMIN_PW not in r.text, "口令写进 HTML = 谁 F12 都读得到，A7 那把钥匙当场作废"
     assert "sessionStorage" in r.text and "localStorage" not in r.text
+    # 10-16 审计（融合那一路第 3 条）：这一页拿着管理票，不许被任何别的站嵌进去做点击劫持。
+    # 'self' 不挡我们自己那一屏——图麦克那个 iframe 是同源的，同源就在 'self' 里面。
+    assert r.headers.get("content-security-policy") == "frame-ancestors 'self'", r.headers.get("content-security-policy")
+    assert r.headers.get("x-frame-options") == "SAMEORIGIN"
 
 
 def test_ops页面那段JS在node里过得去语法(client, store):

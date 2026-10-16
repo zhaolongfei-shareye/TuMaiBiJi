@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import logging
 from sqlalchemy import and_, or_
 from app.db.database import get_db
-from app.models.note import Note
+from app.models.note import Note, SOURCE_SHARE_IMPORT
 from app.models.share import Share
 from app.models.user import User
 from app.core.auth import get_current_user
@@ -510,7 +510,7 @@ def import_from_share(
         tags=share.tags,
         key_points=share.key_points,
         key_links=share.key_links,
-        source_type="share_import",
+        source_type=SOURCE_SHARE_IMPORT,
         source_url=share.source_url,
         imported_from={
             "share_token": share.token,
@@ -524,8 +524,11 @@ def import_from_share(
     db.add(note)
     db.commit()
     db.refresh(note)
-    # 转存也算"这个人真的开始用起来了"：他名下第一条如果是从别人那篇抄来的，
-    # 那份 +10 就记在原笔记作者头上（同一篇只挣一次，判定在 quota 里）。
+    # 转存给**那一篇的作者** +1（不是 +10）：`quota._credit_import` 挣的是"有人把我这篇存下来了"，
+    # 同一篇 × 同一个人只挣一次（判定与唯一索引都在 quota 里）。
+    # 这一趟**不结**邀请人那 +10：转存不是"他自己动笔"，`_is_his_first_note` 把 `share_import`
+    # 这一档排出去了，所以他哪天真自己写一篇时那 +10 照样结得出来（10-16 审计第二条，
+    # 原来这里写的"那份 +10 就记在原笔记作者头上"是句假话，一并改净）。
     # 和动笔那条一样，结不到账不能让转存本身失败。
     quota.credit_import(db, user, share.note_id)
     return note

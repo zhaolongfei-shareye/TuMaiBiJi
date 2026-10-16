@@ -456,6 +456,35 @@ class Test配额记账口径:
         assert put(client, u, n.id, size=1024).status_code == 200
         assert client.get("/api/user/storage-quota", headers=hdr(u)).json()["user_count"] == 0
 
+    def test_被顶成历史的那一张不再占体积(self, client, db):
+        """10-16 审计第五条。这一栏原来整表 SUM `note_cards`，于是**云上已经删掉的图还在算体积**：
+        `used_ratio` 只涨不降，那枚"快满了"迟早是句假话——而假的方向会让人不敢传图。
+
+        换模板重出时旧对象由回体 `replaced_file_ids` 交给客户端删（`cards.py` 的 `put_note_card` 那一趟），
+        撤那一张（`cards.py` 的 `drop_note_card`）与删那一篇（`notes.py` 的 `delete_note`）更是把历史行一起带出去删，
+        所以历史行指的是"已经不存在的字节"。与配图那一半的 `not_failed()` 同一条纪律：
+        **算进配额的必须是这会儿还在桶里的**。
+        """
+        u = mk_user(db, "q5")
+        n = mk_note(db, u)
+        q = lambda: client.get("/api/user/storage-quota", headers=hdr(u)).json()["user_bytes"]
+        assert put(client, u, n.id, file_id="cloud://x/first.jpg", size=200000).status_code == 200
+        first = q()
+        assert put(client, u, n.id, file_id="cloud://x/second.jpg", size=90000).status_code == 200
+        # 历史行必须还在（留档是设计，不是漏删），但它那份字节不许再进账
+        assert db.query(NoteCard).filter(NoteCard.note_id == n.id).count() == 2
+        assert q() == first - 200000 + 90000, "被顶成历史那一张还在占体积"
+
+    def test_历史行的字节被撤干净时全站那一栏也不虚涨(self, client, db):
+        """上一把量的是"自己那一格"，这一把量 `total_bytes`（全站口径，就是那枚"快满了"读的数）。"""
+        u = mk_user(db, "q6")
+        n = mk_note(db, u)
+        t = lambda: client.get("/api/user/storage-quota", headers=hdr(u)).json()["total_bytes"]
+        before = t()
+        assert put(client, u, n.id, file_id="cloud://x/a.jpg", size=150000).status_code == 200
+        assert put(client, u, n.id, file_id="cloud://x/b.jpg", size=50000).status_code == 200
+        assert t() - before == 50000, f"全站那一栏虚涨到 {t() - before}，删掉的那 150000 还在账上"
+
     def test_比旧上界大的卡片照样登记得进(self, client, db):
         u = mk_user(db, "s1")
         n = mk_note(db, u)

@@ -18,14 +18,14 @@
 """
 import logging
 
-from sqlalchemy import update
+from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.invitation import Invitation
-from app.models.note import Note
+from app.models.note import Note, SOURCE_SHARE_IMPORT
 from app.models.user import User
-from app.services.preset_note import authored_count
+from app.services.preset_note import PRESET_SOURCE_TYPE, authored_count
 
 logger = logging.getLogger(__name__)
 
@@ -106,14 +106,33 @@ def attribute_inviter(user: User, db: Session, inviter_id) -> bool:
     return True
 
 
-def _is_his_first_note(db: Session, user: User) -> bool:
-    """刚 commit 完这条，他**自己动笔**的名下正好一条 → 这就是他写下的第一篇。
+def _is_his_first_note(note: Note, db: Session, user: User) -> bool:
+    """本次这一篇，是不是他**自己动笔**那几篇里最早的一条。
 
-    ⚠ 2.1.11（§8.232）起这一条不能读 `used_count`：新用户出生就带着一篇预置笔记，
-    拿全表条数的话他真动笔那一篇是第 2 条 ⇒ 邀请人那 +10 永远不会结。
-    预置那一篇不算动笔——它是我们自己写进去的。
+    ⚠ 这里两条口径都不许拿"条数"当顺序证据（10-16 审计）。原来写的是 `authored_count(...) == 1`：
+    ① 两篇真同时提交（同步路由跑在线程池里，确实会并发）→ 两边都数到 2 → 那 +10 谁都没结，
+       而之后每一篇都数到 ≥2，**永不自愈**；
+    ② 他名下第一条如果是**转存**（`share_import` 不是预置那一篇，`authored_count` 会数上它），
+       等他自己真动笔时条数已经是 2 → 同样永久结不出来。
+    换成"按 id 取他动笔那几篇里最早的一条，判的是本次这一篇"之后，号小的那篇永远看得见自己是最早的；
+    两篇真撞车也只是其中一篇结、另一篇被 `_settle` 说的那半边唯一索引挡回 0——不靠这里判。
+
+    排出去的两档：预置那一篇（§8.232，不是他写的）、转存那一篇（抄别人的，不算动笔）。
+    **归因那一条（`attribute_inviter`）用的仍是 `authored_count`**——"这个人来过没有"与
+    "他动笔的第一篇是哪篇"是两件事，并成一个数会让只转存过的老账号被当成新人重新归因。
     """
-    return authored_count(db, user.id) == 1
+    if note.id is None:
+        return False
+    first_id = (
+        db.query(func.min(Note.id))
+        .filter(
+            Note.user_id == str(user.id),
+            Note.source_type != PRESET_SOURCE_TYPE,
+            Note.source_type != SOURCE_SHARE_IMPORT,
+        )
+        .scalar()
+    )
+    return first_id is not None and int(first_id) == int(note.id)
 
 
 def _settle(db: Session, inviter: User, invitee: User, source_note_id, reward: int, why: str) -> int:
@@ -155,7 +174,7 @@ def _credit_first_note(note: Note, db: Session, user: User) -> int:
     `source_note_id` 留空，`invitee_id` 上的部分唯一索引（只钉空行）保证同一个人
     第二次动笔也结不出第二笔。
     """
-    if not user.invited_by or not _is_his_first_note(db, user):
+    if not user.invited_by or not _is_his_first_note(note, db, user):
         return 0
 
     inviter = db.get(User, user.invited_by)

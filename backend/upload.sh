@@ -15,11 +15,15 @@ cd "$(dirname "$0")/.."
 # 打包（排除虚拟环境、数据库、日志等）
 # COPYFILE_DISABLE=1 阻止 macOS bsdtar 为扩展属性生成 AppleDouble（._xxx.py）垃圾文件；
 # 这些文件会以二进制形式落进生产代码树，并被 python -m compileall 判为语法错误。
+# ⚠ `*.db` 罩不住 WAL 那两个伴生文件（`wtsj.db-wal`／`-shm` 结尾不是 `.db`）。开 WAL 之后
+#    漏掉这两条排除，本机残留会被解到服务器上**正活着的那份 -wal 上**——那是整库损坏级别的事。
 echo ">>> 打包后端代码..."
 COPYFILE_DISABLE=1 tar czf /tmp/tumaibiji-backend.tar.gz \
     --exclude='.venv' \
     --exclude='venv' \
     --exclude='*.db' \
+    --exclude='*.db-wal' \
+    --exclude='*.db-shm' \
     --exclude='logs' \
     --exclude='.git' \
     --exclude='__pycache__' \
