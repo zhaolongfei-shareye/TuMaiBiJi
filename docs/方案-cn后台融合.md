@@ -153,6 +153,11 @@ Body    { "token": "<我们 /api/admin/login 发的那枚 session 票原样>" }
    - ✅ **我们这一侧已收**：`/ops` 那一页现在发 `Content-Security-Policy: frame-ancestors 'self'` ＋ `X-Frame-Options: SAMEORIGIN`
      （`ops_page.py` 的 `_NO_STORE` 两枚，用例在 `test_mp_assets_admin.py`「那一页 HTML 的两条纪律」那一节）。
      `'self'` 不挡我们自己的第四屏——那个 iframe 是**同源**的，同源就在 `'self'` 里面；这一句写进代码注释，是因为它看起来像会把刚做好的那一屏挡白。
+     **10-16 下午已随第三十三次部署上现网**（curl 现读那三行头都在：`no-store`／`frame-ancestors 'self'`／`SAMEORIGIN`，见台账 §8.278）。
+   - ⚠ **同一条链上又核出一处（本轮复核，一条代码没改、只是把它记对地方）**：`cloud/image-service/app/main.py` 的 `admin_generate_vip_code`
+     把发码人写进 `generated_by` 那一列，落的是我们票上的 `sub`＝常量 `admin`，而对面 `admin_users` 的主键是 `ADMIN_EMAIL`
+     ⇒ 那张 500 积分的码"是谁发的"归不到人。链三段都在（我们签票 → 对面 `admin_session_exchange` 原样带 `subject` → 对面 INSERT），
+     **写那一行的代码在对面那条线**，所以这条也挂在同一句"等点头"上；细节在 `docs/审计报告-20261016-四路清单与批次.md` 的 X4。
    - ⏸ **对端那 20 处与它那一口的 `frame-ancestors` 没动**：那是另一条工作区的文件，按"改另一条工作区要先点头"这条规矩等一句话。
      给我们的那一侧建议是同一份：那几处 `innerHTML` 换 `textContent`（我们这一页零 `innerHTML` 那套纪律可以照抄），
      它那一口也发 `frame-ancestors 'self'`。
