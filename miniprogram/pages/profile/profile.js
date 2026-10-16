@@ -85,7 +85,10 @@ Page({
       },
       () => this.renderThumbs()
     )
-    app.setNavTitle('navProfile', lang)
+    // 站长 10-16 夜（附真机图）「最顶上的都改为"设置"，他们是设置的二级菜单」⇒ 这一栏不再报
+    // 自己那一格的名字，改报它挂在谁下面（左上角那行大字才报"这是卡片模板"）。
+    // 键吃 `pillSettings`＝「我的」那一屏顶上那一栏用的同一枚，不新起字串。
+    app.setNavTitle('pillSettings', lang)
     // 下发那一路（P0-5）：进这一页就后台拉一次配方。放在 onLoad 而不是 onShow——
     // 这一页故意不吃 onShow 重绘（下面那条注释说的就是它），而每次从「我的」走进来
     // 都是一次新的 onLoad，所以"改一条配方、不重启就看到新样子"这条够用。

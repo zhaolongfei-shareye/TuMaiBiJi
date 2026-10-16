@@ -548,13 +548,25 @@
   text-overflow: ellipsis;
 }
 
+/* 站长 10-16 夜（附真机图）「第一个图亮度不能压暗，与密码设置的弹窗一样处理」⇒ 这一层从
+   `rgba(20,20,28,.55)` 改成**透明**，只留"点外面收口"那一个热区。同一件事 10-13 23:37 已经在
+   六位密码那一层做过一次（`styles/pwd-sheet.wxss` 的 `.pwd-mask`，他原话「密码弹窗突然变暗，
+   这个不合理，要亮度不变」），这一回是他指着邮箱这一层要同一档。
+   ⚠ 其余那两处压暗的层他没指，照旧压暗：`app.wxss` 的 `.ci-mask`（首页那张卡片小弹窗）与
+   `pages/categories/categories.wxss` 的 `.dialog-mask`（新增分类那一层）。别顺手一起改
+   （"去掉"只覆盖他指的那一处）。
+   ⚠ `styles/pwd-sheet.wxss` 那段注释里"其余四处同值的 `.dialog-mask`（app.wxss／me.wxss／
+   create.wxss／categories.wxss）"这一句今天对不上：全仓扫 `rgba(20, 20, 28, 0.55)` 实得三处，
+   类名分别是 `.ci-mask`／`.dialog-mask`／`.th-x`（最后一枚是缩略图右上角那枚 ✕ 的底色，不是遮罩），
+   而 `me.wxss` 这一处已经按他这一句改成透明了。那句历史话留着不改（它是 10-13 那天写的），
+   但别再照它去找"四处"。 */
 .me-email-mask {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(20, 20, 28, 0.55);
+  background: transparent;
   display: flex;
   align-items: flex-start;
   justify-content: center;

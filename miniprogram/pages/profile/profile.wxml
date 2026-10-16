@@ -1,4 +1,12 @@
 <view class="container {{themeClass}}">
+  <!-- 站长 10-16 夜（附真机图）「左上角统一为该菜单名称，字体风格要统一」⇒ 这一屏原来左上角
+       什么都没有（页名只住在最顶上那一栏），现在补一行大字念它自己那一格的名字。
+       键吃 `navProfile`＝「我的」设置列表里那一行菜单用的同一枚（不新起字串）；
+       类名吃 `.page-title`＝分类管理那一屏同一枚类，四条声明逐字相同（两条路早晚漂一次）。
+       ⚠ 这一枚**不是**首屏那枚书法位图：他同一夜第二句定过"图只在有背景图状态下加"，
+       这一屏没有背景图那一态。 -->
+  <text class="page-title">{{t.navProfile}}</text>
+
   <view class="card face-block">
     <!-- 一行四个、左右滑。以前排成 2×2 是我自己拍的（两字芯片一行放不下四格），
          站长 09-30 打回：效果图就是一行，两行太占地方。横滑这条外壳抄外观设置
@@ -30,8 +38,14 @@
     <view class="face-hint">{{allFull ? t.slotHintFull : t.slotHint}}</view>
   </view>
 
+  <!-- 站长 10-16 夜「名字，和一句话输入框太大了，变成一行……提示词放在框内提示，不单独一行」
+       ⇒ 那两行**标签**（`.field-label`）整行撤掉，一格只剩一只框；提示留在框内（`placeholder`
+       本来就是框内那一层，吃 `profileNamePh`／`profileSloganPh`，不是新造字串）。
+       撤的是这一屏这两处标签：`profileName`／`profileSlogan` 两个键在首页那张卡片小弹窗
+       （index.wxml 的 `.ci-label`）与分享页还在用，不是死键。
+       字数这一头本来就挡着：名称 `maxlength="16"`、一句话 `maxlength="24"`（出图那两把尺子
+       `验-海报模板几何`／`验-模板名称与占位字` 钉的就是打到这两条上限时卡片不溢出）。 -->
   <view class="card field">
-    <text class="field-label">{{t.profileName}}</text>
     <input
       class="field-input"
       value="{{name}}"
@@ -43,7 +57,6 @@
   </view>
 
   <view class="card field">
-    <text class="field-label">{{t.profileSlogan}}</text>
     <input
       class="field-input"
       value="{{slogan}}"

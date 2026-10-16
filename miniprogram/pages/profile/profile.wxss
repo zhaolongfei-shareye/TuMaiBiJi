@@ -1,5 +1,17 @@
 /* 分享形象页。头像这块是页面唯一的大色块，其余保持中性，免得抢小样的样子。 */
 
+/* 左上角那行大字（站长 10-16 夜「左上角统一为该菜单名称，字体风格要统一」）。
+   ⚠ 这一条与 `pages/categories/categories.wxss` 的 `.page-title` **四条声明逐字相同**——
+   他说的是"统一"，所以两边不许各写一份数；漂没漂由 `验-二级页左上角同档` 那把尺子钉着。 */
+.page-title {
+  display: block;
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -1rpx;
+  color: var(--text-primary);
+  margin: var(--sp-5) 0 var(--sp-4);
+}
+
 /* 四个形象槽：一行、左右滑。圆径 200 是按"两字芯片并排要 160 宽"倒推的最小档，
    四槽 200×4 + 24×3 = 872 > 卡内宽，所以这一条必然要滑——站长 09-30 要的就是这个
    （"效果图是一行，左右滚动，现在是两行，太占地方"）。外壳抄外观设置那排壁纸。 */
@@ -184,20 +196,19 @@
 
 /* ---------- 名称 / 一句话 ---------- */
 
+/* 站长 10-16 夜「名字，和一句话输入框太大了，变成一行……提示词放在框内提示，不单独一行」
+   ⇒ 每格只剩一只框：上面那行标签（原来那两条 `.field-label`）整行撤掉，提示留在框内
+   （`placeholder`）。`.field` 那枚 `gap` 是给"标签＋框"两样用的，现在一样都没了，跟着删——
+   留着不报错，但它是"看着有规则、其实一条都不生效"那一类。 */
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
 }
 
-.field-label {
-  font-size: var(--fs-meta);
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
+/* 字号降一档：`--fs-title` 31 → `--fs-body` 28（这一条阶梯自己的下一档）。
+   ⚠ 只降输入的字，不降框内那句提示——提示吃 `.field-ph`，它本来就比正文浅一档。 */
 .field-input {
-  font-size: var(--fs-title);
+  font-size: var(--fs-body);
   font-weight: 600;
   color: var(--text-primary);
 }

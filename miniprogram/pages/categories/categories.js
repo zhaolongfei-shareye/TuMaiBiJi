@@ -23,7 +23,10 @@ Page({
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
     })
-    app.setNavTitle('categories', lang)
+    // 站长 10-16 夜（附真机图）「最顶上的都改为"设置"，他们是设置的二级菜单」⇒ 这一栏不再报
+    // 自己那一格的名字（那是左上角那行大字的活），改报它挂在谁下面。键吃 `pillSettings`——
+    // 与「我的」那一屏顶上那一栏同一枚键、同一个数，不新起字串。
+    app.setNavTitle('pillSettings', lang)
     this.loadCategories()
   },
 
