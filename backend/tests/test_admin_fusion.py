@@ -28,12 +28,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from app.core.admin_access import create_session_token
 from app.core.auth import _create_token
 from app.core.config import settings
+from app.core.private_access import PRIVATE_CATEGORY_NAME
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
+from app.models.asset import Asset
+from app.models.category import Category
 from app.models.invitation import Invitation
 from app.models.note import Note
 from app.models.note_card import NoteCard
@@ -247,6 +251,100 @@ def test_days被夹在1到90之间而不是随便多大都算(client):
     assert client.get(f"{STATS}?days=-5", headers=h).json()["window_days"] == 1
 
 
+# ---------------- ③-b A4 分类 · A9 图片备份 ----------------
+
+def _seed_cats_and_assets():
+    """A4／A9 的样本：每一档都留一条能对上的行，并把两条最容易说谎的地方摆出来——
+    预置那一篇（永远没分类）与 `backup_status` 为 NULL 的老行（迁移留下的正是 NULL）。
+
+    ⚠ 那两行 NULL **不能用 ORM 写**。`Asset.backup_status` 上有 Python 端的
+    `default="uploaded"`，`Asset(backup_status=None)` 传进去会被填成 'uploaded'，
+    于是"NULL 并进已上传"那条判据永远量不到 NULL——本机第一轮就是这么假绿的
+    （INSERT 的参数字典里读回的是 `'uploaded'`，不是我写的 None）。
+    只能像迁移那样直接 `... set backup_status = null`。
+    """
+    db = SessionLocal()
+    a = User(openid="cats-a", nickname="甲")
+    db.add(a)
+    db.commit()
+    ua = str(a.id)
+
+    priv = Category(user_id=ua, name=PRIVATE_CATEGORY_NAME)
+    own = Category(user_id=ua, name="住院记录")
+    db.add_all([priv, own])
+    db.commit()
+
+    def note(cid, st="manual"):
+        n = Note(user_id=ua, title=f"标题-{cid}", source_type=st, category_id=cid)
+        db.add(n)
+        db.commit()
+
+    note(priv.id)
+    note(own.id)
+    note(None)
+    note(None)
+    note(None, PRESET_SOURCE_TYPE)  # 预置：不计进"动笔那几篇"
+
+    db.add_all([
+        Asset(user_id=ua, object_key="cloud://a1", file_size=1000, backup_status="uploaded"),
+        Asset(user_id=ua, object_key="cloud://a2", file_size=2500),
+        Asset(user_id=ua, object_key="cloud://a3", file_size=None),
+        Asset(user_id=ua, object_key="cloud://a4", file_size=9999, backup_status="failed"),
+    ])
+    db.commit()
+    db.execute(text("update assets set backup_status = null "
+                    "where object_key in ('cloud://a2', 'cloud://a3')"))
+    db.commit()
+    # 先自证样本真是 NULL：样本不对，下面三条判据量的就不是那件事
+    got = db.execute(text("select object_key, backup_status, file_size from assets "
+                          "where object_key in ('cloud://a2','cloud://a3') "
+                          "order by object_key")).all()
+    assert [tuple(r) for r in got] == [("cloud://a2", None, 2500), ("cloud://a3", None, None)], got
+    db.close()
+
+
+def test_分类那一栏只出计数不出一个分类名(client):
+    """规格 §5 那条硬边界的形状判据：分类名是**用户自己写的字**，屏上出现就等于把用户内容带进来了。
+    反向对照很直接——把名字塞进回体（`"names": [...]`）这条立刻红。"""
+    _seed_cats_and_assets()
+    h = {"Authorization": f"Bearer {create_session_token()}"}
+    r = client.get(STATS, headers=h)
+    body = r.json()
+    cat = body["categories"]
+    assert cat["authored"] == 4, cat
+    assert cat["uncategorized"] == 2 and cat["categorized"] == 2
+    assert cat["private"] == 1, "「私密」那一档是我们服务端自己写的名字，可以单列"
+    assert cat["slots"] == 2
+
+    raw = r.text
+    assert "住院记录" not in raw, "分类名上了屏：那是用户自己写的字"
+    assert PRIVATE_CATEGORY_NAME not in raw, "只出数，连那个服务端写的名字本身也不该回出来"
+    assert set(cat) == {"authored", "uncategorized", "categorized", "private", "slots"}, cat
+
+
+def test_未分类占比不许把预置那一篇算进去(client):
+    """和 A2 同一个坑：预置那篇永远没分类，混进来"未分类占比"就变成新用户数的影子。
+    这里库里 5 篇、预置 1 篇 ⇒ 分母必须是 4；写成 5 的话 3/5 与 2/4 两个占比都会偏。"""
+    _seed_cats_and_assets()
+    h = {"Authorization": f"Bearer {create_session_token()}"}
+    cat = client.get(STATS, headers=h).json()["categories"]
+    assert cat["authored"] == 4, "分母含了预置那一篇"
+    assert cat["uncategorized"] == 2, "分子含了预置那一篇"
+
+
+def test_图片健康度把NULL状态并进已上传但体积空的单独报(client):
+    """A9 两条说谎的形状：① `backup_status != 'failed'` 在 SQL 里对 NULL 不成立，
+    漏了那一支会让历史老行凭空从"已上传"里消失（库里 3 行上传变 1 行）；
+    ② `file_size` 为 NULL 当 0 加，总字节就少报——所以那一行单独给一个"不知道"的数。"""
+    _seed_cats_and_assets()
+    h = {"Authorization": f"Bearer {create_session_token()}"}
+    a = client.get(STATS, headers=h).json()["assets"]
+    assert a["total"] == 4 and a["failed"] == 1, a
+    assert a["uploaded"] == 3, "NULL 状态没并进已上传：老行从这一栏里悄悄消失了"
+    assert a["bytes_uploaded"] == 3500, "失败那行的 9999 不许进这个和"
+    assert a["size_unknown"] == 1, "体积为空的行要单独报出来，这个数是下界不是精确占用"
+
+
 # ---------------- ④ 那一页真把「数据」渲染出来了 ----------------
 
 def test_后台那一页有数据那一组格子():
@@ -280,10 +378,25 @@ def test_数据与配置是两屏不是一列():
     assert 'grp">数据</p>' not in body and 'grp">配置</p>' not in body, "又退回去做'一列加两行标题'了"
     # 卡要能被左栏点到：两边都挂 data-key
     assert "card.dataset.key = 'kind:'" in body and "card.dataset.key = 'text:'" in body
-    assert "keys = ['overview', 'perday', 'sources', 'templates', 'invites', 'shares']" in body
+    assert ("keys = ['overview', 'perday', 'sources', 'templates', 'categories', "
+            "'assets', 'invites', 'shares']") in body
     # 图麦克那枚：不再是"灰着并写着为什么灰"，两枚都是点得动的切换
     assert 'class="off"' not in body and 'id="swSelf"' in body and "$('swNote').textContent" in body
     assert "还没接上换票口" not in body, "对面已经上线了，那句旧话在屏上是假话"
+
+
+def test_新加的两张卡把两条边界写在屏上():
+    """A4／A9 各有一条"这一栏证明不了什么"的话（规格 §3 A4"只许出计数"、§3 A9"不许写成云端零孤儿"）。
+    口径不落在界面上就等于没写：接口对了，读的人仍然会把"登记为已上传"看成"云上零孤儿"。
+    这一条是静态钉子——那句话被谁顺手删短了，这里就红。"""
+    src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
+    body = src.split("_PAGE", 1)[1]
+    assert "d.categories" in body and "d.assets" in body, "两张卡没接上回体里那两键"
+    assert "分类与未分类" in body and "一个分类名都不列" in body
+    assert "图片云备份健康度" in body and "云端零孤儿" in body
+    assert "这个数是下界" in body, "体积为空那行的话没写：总数会被当成精确占用"
+    # 左栏那两条要点得动，否则新卡只能靠滚动碰到（与其余六条同一套挂法）
+    assert "key: 'categories'" in body and "key: 'assets'" in body
 
 
 def test_图麦克那一枚点下去是嵌它原页面不是跳走():

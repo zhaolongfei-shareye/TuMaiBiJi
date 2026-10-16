@@ -98,8 +98,9 @@ else:
 r = httpx.get(STATS, headers=H, timeout=30)
 check("登录后统计口 200", r.status_code == 200, f"HTTP {r.status_code}")
 d = r.json() if r.status_code == 200 else {}
-need = {"window_days", "tz", "totals", "per_day", "sources", "templates", "invitations", "shares"}
-check("回体八块齐全", need <= set(d), f"缺 {sorted(need - set(d))}" if d else "没拿到回体")
+need = {"window_days", "tz", "totals", "per_day", "sources", "templates",
+        "categories", "assets", "invitations", "shares"}
+check("回体十块齐全", need <= set(d), f"缺 {sorted(need - set(d))}" if d else "没拿到回体")
 check("日期口径写着 UTC（不擅自换算成北京时间）", d.get("tz") == "UTC", str(d.get("tz")))
 check("逐日行数＝窗口天数（缺的那一天补 0）", len(d.get("per_day", [])) == d.get("window_days"),
       f"{len(d.get('per_day', []))} vs {d.get('window_days')}")
@@ -117,6 +118,21 @@ else:
     check("转存量不等于笔记总量（等于就是 JSON 那个坑）", True, f"转存 {imp}／笔记 {notes_total}")
 check("邀请那两个数一起回（只回一个就是替操作者判等）",
       {"rewards_granted", "quota_bonus_held"} <= set(d.get("invitations", {})), str(d.get("invitations")))
+# A4 分类：这一块的用处是"只出计数"，所以判据是**键集封闭**——多一个键（比如哪天有人把分类名塞进回体）
+# 就等于把用户写的字带上这一屏，规格 §5 那条硬边界管到它。
+cat = d.get("categories", {})
+check("分类那一块五键封闭（多一个键就是往这一屏塞用户内容）",
+      set(cat) == {"authored", "uncategorized", "categorized", "private", "slots"}, str(sorted(cat)))
+check("分类三个数自洽：未分类＋已分类＝动笔数，且私密不超总数",
+      int(cat.get("uncategorized") or 0) + int(cat.get("categorized") or 0) == int(cat.get("authored") or 0)
+      and int(cat.get("private") or 0) <= int(cat.get("authored") or 0), str(cat))
+# A9 图片：uploaded 走的是 `not_failed()`（NULL 并进来），failed 走 `== 'failed'`，
+# 两边不重不漏 ⇒ uploaded＋failed＝总数。不相等说明库里出现了第三种状态，那一栏就开始漏账。
+asf = d.get("assets", {})
+check("图片那一块：已上传＋失败＝总行数（不等就是有第三种状态没被算）",
+      int(asf.get("uploaded") or 0) + int(asf.get("failed") or 0) == int(asf.get("total") or 0), str(asf))
+check("图片那一块带『体积不知道』那一格（缺它总字节会被读成精确占用）",
+      "size_unknown" in asf, str(sorted(asf)))
 srcs = {x.get("source_type") for x in d.get("sources", [])}
 # 判据钉的是"代码那个闭集没漏出第七种值"，不是"库里两种文章都出现过"——
 # 现网今天没有一条 `web_article`（实测六档只出五档），那是数据事实，拿它判红等于把尺子当产品。

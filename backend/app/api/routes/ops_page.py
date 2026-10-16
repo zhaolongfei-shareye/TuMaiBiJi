@@ -302,6 +302,8 @@ var NAV = [
     { label: '逐日', view: 'stats', key: 'perday' },
     { label: '来源分布', view: 'stats', key: 'sources' },
     { label: '模板热度', view: 'stats', key: 'templates' },
+    { label: '分类与未分类', view: 'stats', key: 'categories' },
+    { label: '图片备份', view: 'stats', key: 'assets' },
     { label: '邀请对账', view: 'stats', key: 'invites' },
     { label: '分享', view: 'stats', key: 'shares' }
   ] },
@@ -755,6 +757,10 @@ var TPL_HINT = '卡片记录时写下的模板代号，原样显示（这里不�
 
 function numOf(v) { return (v === null || v === undefined) ? '—' : String(v); }
 
+// 数据那一栏的字节量级到 MB（运营图那几枚走 fmtBytes 就够，这里累加的是全库图片）。
+// 新写一枚、不改 fmtBytes：那一枚的读数有现网探针钉着。
+function fmtVol(n) { return n >= 1048576 ? (Math.round(n / 10485.76) / 100) + ' MB' : fmtBytes(n); }
+
 function statCard(title, sub) {
   var c = el('section', 'card');
   c.appendChild(el('h2', null, title));
@@ -794,7 +800,7 @@ function renderStats(d) {
   var box = $('stats');
   while (box.firstChild) box.removeChild(box.firstChild);
 
-  var src = '现点现算，读的是业务库那五张表（笔记／账号／卡片／邀请／分享），不是行为埋点。';
+  var src = '现点现算，读的是业务库那七张表（笔记／账号／卡片／邀请／分享／分类／图片），不是行为埋点。';
   var t = d.totals || {};
   var per = d.per_day || [];
   var winNotes = 0, winAccounts = 0;
@@ -832,21 +838,39 @@ function renderStats(d) {
   }));
   box.appendChild(c4);
 
-  var iv = d.invitations || {};
-  var c5 = statCard('邀请对账', '两个数一起给，这一页不替你判等：台账发的奖励与账号里持有的加成今天应当相等，不等说明有一笔走到了别的路上——但"差多少算异常"没有公开标准。');
-  knum(c5, numOf(iv.invitations), '邀请记录条数', 'invitations 表');
-  knum(c5, numOf(iv.rewards_granted), '台账发出的奖励合计', '按 invitations 里那条 reward 累加');
-  knum(c5, numOf(iv.quota_bonus_held), '账号侧持有合计', 'users.quota_bonus 之和');
+  var ct = d.categories || {};
+  var c5 = statCard('分类与未分类', '只出计数，一个分类名都不列——那一列是用户自己写的字，规格 §5 那条"这一屏不许出现内容"管到它。三个数都按动笔那几篇算，官方预置的那一篇永远没分类。');
+  var catPct = (ct.authored && ct.authored > 0)
+    ? (Math.round(ct.uncategorized * 1000 / ct.authored) / 10) + '%' : '—';
+  knum(c5, catPct, '未分类占比', '动笔 ' + numOf(ct.authored) + ' 篇里有 ' + numOf(ct.uncategorized) +
+    ' 篇没进任何一格；剩下 ' + numOf(ct.categorized) + ' 篇分了类');
+  knum(c5, numOf(ct.private), '「私密」那一格的篇数', '这一档能单列是因为那个名字是我们服务端自己写的（判据只有"分类名等于它"这一条），不是用户内容；只出数，那些篇的标题一个字都不进这一屏');
+  knum(c5, numOf(ct.slots), '分类格子总数', 'categories 表的行数，跨账号累加，不做归并');
   box.appendChild(c5);
 
-  var sh = d.shares || {};
-  var c6 = statCard('分享', '活着的张数由那个"公开／不公开"开关说话（撤回置 0），不按有效期现算——过期还没清掉的一批在库里仍然是活着的行，两种数会打架。');
-  knum(c6, numOf(sh.created), '建过的分享', '包含已撤回的');
-  knum(c6, numOf(sh.active), '当前活着的', '只有这一部分能被扫码看到');
+  var as = d.assets || {};
+  var c6 = statCard('图片云备份健康度', '这一栏只证"上传侧"：库里那行写着已上传，只说明客户端登记那一刻报上来的是成功，不等于这个对象今天还在桶里、还读得出来。待删队列存在用户本机、不在库里，对象也只有客户端删得动——所以真孤儿在这一栏是看不见的，规格 §3 A9 那句"不许写成云端零孤儿"就是这条边界。');
+  knum(c6, numOf(as.uploaded) + ' / ' + numOf(as.total), '登记为已上传 / 记录总数', '含 backup_status 为空的老行：迁移给历史行留下的正是空，分开数会让老图凭空变成"没状态"');
+  knum(c6, numOf(as.failed), '登记为失败', '这些行云上没东西，配额那一侧也不计进来');
+  knum(c6, fmtVol(as.bytes_uploaded || 0), '上传侧总字节', '有 ' + numOf(as.size_unknown) +
+    ' 行没报体积，按"不知道"处理、不当 0 加进去——所以这个数是下界，不是精确占用');
   box.appendChild(c6);
 
-  // 左栏那六条要能各指到一张卡：按出场顺序挂 key，与 NAV 里那份名单一一对应。
-  var keys = ['overview', 'perday', 'sources', 'templates', 'invites', 'shares'];
+  var iv = d.invitations || {};
+  var c7 = statCard('邀请对账', '两个数一起给，这一页不替你判等：台账发的奖励与账号里持有的加成今天应当相等，不等说明有一笔走到了别的路上——但"差多少算异常"没有公开标准。');
+  knum(c7, numOf(iv.invitations), '邀请记录条数', 'invitations 表');
+  knum(c7, numOf(iv.rewards_granted), '台账发出的奖励合计', '按 invitations 里那条 reward 累加');
+  knum(c7, numOf(iv.quota_bonus_held), '账号侧持有合计', 'users.quota_bonus 之和');
+  box.appendChild(c7);
+
+  var sh = d.shares || {};
+  var c8 = statCard('分享', '活着的张数由那个"公开／不公开"开关说话（撤回置 0），不按有效期现算——过期还没清掉的一批在库里仍然是活着的行，两种数会打架。');
+  knum(c8, numOf(sh.created), '建过的分享', '包含已撤回的');
+  knum(c8, numOf(sh.active), '当前活着的', '只有这一部分能被扫码看到');
+  box.appendChild(c8);
+
+  // 左栏那八条要能各指到一张卡：按出场顺序挂 key，与 NAV 里那份名单一一对应。
+  var keys = ['overview', 'perday', 'sources', 'templates', 'categories', 'assets', 'invites', 'shares'];
   var cards = box.querySelectorAll('.card');
   for (var i = 0; i < cards.length && i < keys.length; i++) cards[i].dataset.key = keys[i];
 }
