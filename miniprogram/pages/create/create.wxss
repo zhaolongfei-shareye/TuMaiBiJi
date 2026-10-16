@@ -537,7 +537,10 @@
   margin-bottom: 36rpx;
   box-sizing: border-box;
   padding: 0 20rpx;
-  font-size: var(--fs-meta);
+  /* 10-17 站长「这一行字体也要同步压一档，与首屏的三个设置字体一样大」⇒ `--fs-meta`(24) 降到
+     `--fs-tiny`(21)。这一档不是新挑的数：首屏那三枚设置（`.swap-text`）10-14 就落在 21，
+     字距也同为 1rpx、字色也同为墨 @70 ⇒ 这一行与那一行现在是同一支字，静态尺子按三枚逐字比。 */
+  font-size: var(--fs-tiny);
   line-height: 1.4;
   letter-spacing: 1rpx;
   /* 10-15 02:5x「字体颜色，与图片标题一样，70% 黑透明。包括第二屏的 back」⇒ 从"跟页面级令牌
@@ -558,8 +561,8 @@
 /* 「原文翻译」那一枚搬进这一行之后的改法（10-16 站长三刀，第三刀是这一组的重排）：
    ① 外壳不再自己占一行高：原来 `height:48rpx; margin-top:8rpx` 是给卡里那一档定的，
       在这一行里由 `.out` 那 44rpx 管，垂直居中。
-   ② 热区用 padding 垫，不撑行高：轨道只有 40rpx 高，压在 44rpx 的行里上下各剩 2rpx，
-      手指点着太薄。上下各垫 10rpx 透明 padding ⇒ 可点区 60rpx，而 `.out` 那 44rpx 是定高的、
+   ② 热区用 padding 垫，不撑行高：10-17 药丸从 40 收到 30 之后，这一枚上下各垫 15rpx 透明 padding
+      ⇒ **可点区仍是原来那一档 60rpx**（缩小的是看得见的皮，不是按得着的面）。`.out` 那 44rpx 是定高的、
       溢出部分不裁（这一层没有 `overflow:hidden`），所以**站长拍过的两档面板高一个数没动**。
    ③「药丸按钮改为最靠左」＝次序写在模板里（轨道 → 名字 → 说明），这里不再用 justify 或 order 兜——
       两头分开仍由 `.out` 那条 `space-between` 管，左半这一组自己贴左排。
@@ -573,7 +576,7 @@
   min-width: 0;
   height: auto;
   margin-top: 0;
-  padding: 10rpx 0;
+  padding: 15rpx 0;
 }
 /* ⚠ 这两枚的 `color: inherit` 分成两条规则写，不并成一条选择器名单：静态尺子那把 `seg()` 是按
    "行首一整条选择器紧跟花括号"认规则的，并排写会点空、量到的是空串（假绿比红更难查）。 */
@@ -802,6 +805,12 @@
   opacity: 0.82;
 }
 
+/* 10-17 站长「相册，拍照，粘贴三个圆也要加发光」⇒ 与右滑条同一份配方（`0 0 24rpx 2rpx` 那一档模糊）。
+   ⚠ **不照抄右滑条那一枚令牌**：条吃的是 `--glass-plate-dock`（本档提亮 55% 那一支，墨档＝纯白），
+   它坐在深色面板上才读得出"光"；这三枚坐在**白卡**里（`--cp-card` 五档都是 #FFFFFF），
+   白纱压白卡＝对比 1.00，等于没画（同一条道理 10-08 用在"白环换墨环"上）。
+   ⇒ 这三枚吃 `--glass-chrome-dock`（本档玻璃**本色** .62，与底栏那排同一支）：彩色四档是那一支颜色的光晕，
+      墨档是淡墨晕——白卡上只有这一支读得出来。五档各带自己的光，不新起第六枚色。 */
 .mini-c {
   width: 105rpx;
   height: 105rpx;
@@ -810,6 +819,7 @@
   align-items: center;
   justify-content: center;
   background: var(--face);
+  box-shadow: 0 0 24rpx 2rpx var(--glass-chrome-dock);
 }
 
 .mini-glyph {
@@ -850,6 +860,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 与左右两枚小圆同一份发光（同一句"三个圆都要加发光"，三枚不许只有两枚有） */
+  box-shadow: 0 0 24rpx 2rpx var(--glass-chrome-dock);
 }
 
 .shut-core {
@@ -1114,7 +1126,11 @@
    面翻浅了，字必须跟着翻深——见下面 `.sld-txt` 那一段。 */
 .sld {
   position: relative;
-  overflow: hidden;
+  /* 10-17 这一层不再自己裁（原来 `overflow: hidden`）：站长「右滑的圆也要加发光」，
+     而那枚圆上下各只余 5rpx，外发光在这层里会被裁成一条横糊。裁切搬给下面那一层 `.sld-clip`
+     ——它只包进度填充那一片，圆与字都不在它肚子里。
+     ⚠ 填充左沿与行程那几个数一个都没动：`.sld-clip` 是 `inset: 0`（＝本层 padding box），
+        圆的落点仍从本层的 5rpx 边算（`验-录入面板沉底-真跑` 现量的是同一个数）。 */
   flex: none;
   box-sizing: border-box;
   margin-top: auto;
@@ -1128,6 +1144,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 只裁进度那一片：与条身同一个圆角，铺满 padding box。 */
+.sld-clip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50rpx;
+  overflow: hidden;
 }
 
 .sld-fill {
@@ -1167,11 +1194,21 @@
 }
 
 /* 圆停在最左那一格：left 由 JS 在第一次触摸时量出来（轨道与圆的实际宽度），
-   这里给的是"还没量过"那一帧的落点，与 5(边框) + 10(内缩) 对得上。 */
+   这里给的是"还没量过"那一帧的落点，与 5(边框) + 10(内缩) 对得上。
+   10-17 两刀：
+   ① 「右滑的圆也要加发光」⇒ 同一份外发光配方。这一枚与条身**不同色**是故意的：条吃
+      `--glass-plate-dock`（提亮那一支），圆吃 `--glass-chrome-dock`（本色那一支）——它压在条上，
+      同色就糊成一片，读不出"这一枚是钮"。
+   ② 上下不等边是量出来的，不是我看着像：`top: 5rpx` 那一条在这一台 390 宽的屏上换算成
+      2.6px 被取整成 2px，条高 110→57px、圆高 90→46px ⇒ 圆上沿离条顶 7.7rpx、下沿离条底 13.5rpx
+      （`探-药丸与三圆发光` 10-17 那一趟的读数）。改成 `top: 50%` ＋ `translateY(-50%)` 之后
+      上下各 3／4px（5.8／7.7rpx）——这是这一组整数像素下能取到的最平等的一档，
+      剩下的 1px 差是 750 折算取整留下的，不是落点写错。 */
 .sld-knob {
   position: absolute;
   left: 10rpx;
-  top: 5rpx;
+  top: 50%;
+  transform: translateY(-50%);
   width: 90rpx;
   height: 90rpx;
   border-radius: 50%;
@@ -1179,6 +1216,7 @@
   align-items: center;
   justify-content: center;
   background: var(--cp-extract);
+  box-shadow: 0 0 24rpx 2rpx var(--glass-chrome-dock);
   transition: left 160ms ease-out;
 }
 
@@ -1245,7 +1283,7 @@
 }
 
 .wr-sw-lab {
-  font-size: var(--fs-meta);
+  font-size: var(--fs-tiny);
 }
 
 /* 名字后面那句说明。站长 10-16 两句原话（开一句、关一句，写在 `i18n.js` 的 translateOn／translateOff），
@@ -1257,30 +1295,35 @@
   flex: 1;
   min-width: 0;
   margin-left: 12rpx;
-  font-size: var(--fs-meta);
+  font-size: var(--fs-tiny);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* 10-17 站长「前面的药丸要缩小一点，然后没有上下等边，歪了。不够精致」⇒ 72×40 收到 54×30
+   （两头各收 25%），点 32 收到 22、左右仍各留 4 ⇒ 位移 54−22−8＝24。
+   为什么这一改同时解掉"歪"：原来这一枚 40 高**比字那一行（24×1.4＝33.6）还高**，
+   上下各只余 2rpx 富余，屏上看着就是这一枚把行撑破、压不住中线；收到 30 之后它比字行还矮一档，
+   行里 44 高上下各余 7，中线由 `align-items: center` 钉死（真跑那把现量三枚中线，差 > 1px 就红）。 */
 .wr-sw-track {
   flex: none;
   position: relative;
-  width: 72rpx;
-  height: 40rpx;
+  width: 54rpx;
+  height: 30rpx;
   margin-right: 12rpx;
   border-radius: var(--r-pill);
   background: var(--cp-ink-50);
   transition: background 160ms ease-out;
 }
 
-/* 点两态都是白的（开＝橙面配白点，关＝灰面配白点），只有落点差 32rpx。 */
+/* 点两态都是白的（开＝橙面配白点，关＝灰面配白点），只有落点差 24rpx。 */
 .wr-sw-dot {
   position: absolute;
   top: 4rpx;
   left: 4rpx;
-  width: 32rpx;
-  height: 32rpx;
+  width: 22rpx;
+  height: 22rpx;
   border-radius: 50%;
   background: var(--cp-card);
   transition: transform 160ms ease-out;
@@ -1292,7 +1335,7 @@
 
 .wr-sw-on .wr-sw-dot {
   background: var(--solid-ink);
-  transform: translateX(32rpx);
+  transform: translateX(24rpx);
 }
 
 /* ---------- 小图形公共面 ----------

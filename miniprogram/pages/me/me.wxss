@@ -589,11 +589,19 @@
   color: var(--text-primary);
 }
 
+/* 10-17 站长「两个弹窗中间英文小字连在一起了，应该要改为与下方菜单栏后面备注的小字一样的字体」
+   ⇒ 撤掉这一条 `letter-spacing: -0.2rpx`，让它与 `.menu-hint` 一样吃默认字距。
+   ⚠ 根因量出来了，不是"看着紧"：**`letter-spacing` 里小于一整像素的 rpx 会被取整成 ±1px**。
+     这一条写的是 −0.2rpx，在 390 宽那一台上屏上读到的计算值是 **−1px**（`探-药丸与三圆发光`
+     现量，`.menu-hint` 同一趟读到 `normal`）——21rpx 的字吃 −1px 就是每字符退 4.8%，
+     空格先被吃掉（它本来只有 0.28em≈5.9rpx），于是英文读成 "Replies,corrections"。
+     中文一句 21rpx 一个字，退 1px 看不出来 ⇒ 他点的正是英文这一头。
+   ⚠ 全仓这样的小数点字距还有一批（大字那几枚 −0.5／−0.6／−1rpx），**他没指的那些一处没动**：
+     字越大那一 1px 占比越小，读得出来的是小字。要一起并是另一刀，等他话。 */
 .me-email-scene {
   display: block;
   margin-top: 12rpx;
   font-size: var(--fs-tiny);
-  letter-spacing: -0.2rpx;
   line-height: 1.5;
   color: var(--text-secondary);
 }

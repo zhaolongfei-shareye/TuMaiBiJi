@@ -833,9 +833,10 @@ ok('两态各吃一对令牌，不在规则里写死色（关＝灰面配白点�
   && /\.wr-sw-dot\s*\{[^}]*background: var\(--cp-card\)/.test(wxss)
   && /\.wr-sw-on \.wr-sw-track\s*\{[^}]*background: var\(--solid-bg\)/.test(wxss)
   && !/\.wr-sw[^{]*\{[^}]*(#[0-9A-Fa-f]{3,8}|rgba\()/.test(wxss))
-ok('几何闭合：面 72、点 32、左右各留 4 ⇒ 位移只能是 32',
-  num(seg('.wr-sw-track'), 'width') === 72 && num(seg('.wr-sw-dot'), 'width') === 32
-  && /transform: translateX\(32rpx\)/.test(seg('.wr-sw-on .wr-sw-dot')))
+ok('几何闭合：面 54、点 22、左右各留 4 ⇒ 位移只能是 24（10-17 站长「药丸要缩小一点」⇒ 从 72/32/32 并到这一档）',
+  num(seg('.wr-sw-track'), 'width') === 54 && num(seg('.wr-sw-dot'), 'width') === 22
+  && num(seg('.wr-sw-track'), 'height') === 30
+  && /transform: translateX\(24rpx\)/.test(seg('.wr-sw-on .wr-sw-dot')))
 /* 「药丸按钮改为最靠左」（站长 10-16 原话）＝这一组里**第一枚就是轨道**，名字与说明跟在后面。
    钉的是模板里的次序，不是样式里的 order：靠 order 翻出来的"最左"在朗读顺序与热区上都还是反的。 */
 ok('轨道排在这一组第一枚（模板次序，不是靠 order 翻的）',
@@ -868,8 +869,9 @@ ok('说明那句与「返回」同一档字号、同一支字色，且不再单�
   `说明 ${num(seg('.wr-sw-hint'), 'font-size')}／名字 ${num(seg('.wr-sw-lab'), 'font-size')}／那一行 ${num(seg('.out'), 'font-size')}rpx`)
 // 宽度：汉字按 1em、拉丁按 0.5em 估（与上面英文占位字那条同一口径）。
 // ⚠ 预算算在**框外那一行**上：750 − `.entry-wrap` 左右内缩 ×2 − `.out` 自己 padding ×2 −「返回」那一枚的字宽。
-//    10-16 这一档字号从 18 抬到 24（与「返回」同档），说明那句一下子宽了一整档 ⇒ 两态各算一次，
-//    取最宽那一态才拦得住"关掉之后折行"这一型（折行会把 44rpx 那一行顶破＝红）。
+//    这一档字号 10-16 从 18 抬到 24（与「返回」同档），10-17 又按「与首屏的三个设置字体一样大」压到 21；
+//    下面全部从文件现读，不写死数 ⇒ 换档不用改这条算式。
+//    10-16 那一趟同时定下：说明那句两态各算一次，取最宽那一态才拦得住"关掉之后折行"这一型（折行会把 44rpx 那一行顶破＝红）。
 const hintFs = num(seg('.wr-sw-hint'), 'font-size')
 const labFs = num(seg('.wr-sw-lab'), 'font-size')
 const trackW = num(seg('.wr-sw-track'), 'width')
@@ -1053,8 +1055,9 @@ ok('五枚别名抬到了 `.container`（`.panel` 里不再留一份，否则框
 ok('那一行里的标签与注释吃 inherit（跟着 `.out` 那支 @70 与深浅翻转），不写死卡里那套墨',
   /color:\s*inherit/.test(seg('.out .wr-sw-lab')) && /color:\s*inherit/.test(seg('.out .wr-sw-hint'))
   && !/color:\s*var\(--face-ink\)/.test(seg('.out .wr-sw-lab')))
-ok('热区靠 padding 垫、行高不动（`.out` 仍 44rpx，开关那一组上下各 10rpx）',
-  num(seg('.out'), 'height') === 44 && /padding:\s*10rpx 0/.test(seg('.out .wr-sw'))
+ok('热区靠 padding 垫、行高不动（`.out` 仍 44rpx；10-17 药丸从 40 收到 30，padding 从 10 抬到 15 ⇒ 可点区仍是 60 那一档）',
+  num(seg('.out'), 'height') === 44 && /padding:\s*15rpx 0/.test(seg('.out .wr-sw'))
+  && num(seg('.wr-sw-track'), 'height') + 30 === 60
   && /height:\s*auto/.test(seg('.out .wr-sw')) && /margin-top:\s*0/.test(seg('.out .wr-sw')))
 // ---------- 8. 上一代那些能力没被这批碰坏 ----------
 ok('忙态仍然挡住收起', /collapse\(\)\s*\{\s*if \(this\.data\.busy/.test(js))

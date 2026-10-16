@@ -341,7 +341,7 @@
   <view class="sld {{ready ? '' : 'sld-off'}} {{busy ? 'sld-busy' : ''}} {{done ? 'sld-done' : ''}} {{dragging ? 'sld-drag' : ''}}"
         catchtap="onSldTap"
         bindtouchstart="onSlideStart" catchtouchmove="onSlideMove" bindtouchend="onSlideEnd" bindtouchcancel="onSlideEnd">
-    <view class="sld-fill" style="width:{{fillPct}}%"></view>
+    <view class="sld-clip"><view class="sld-fill" style="width:{{fillPct}}%"></view></view>
     <view class="sld-txt">{{busy || done ? t.busyExtract : t.slideExtract}}</view>
     <view class="sld-knob" style="left:{{knobRpx}}rpx"><view class="sld-glyph glyph-{{sldIcon}}"></view></view>
   </view>
