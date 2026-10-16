@@ -14,6 +14,7 @@
 `db.get` 命中身份映射时会把"内存里还有"当成"库里还有"，删干净了也照样返回绿。
 """
 import os
+import re
 import sys
 import time
 
@@ -25,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import jwt
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text, update
 
 from app.core.auth import _create_token
 from app.db.database import Base, SessionLocal, engine
@@ -39,7 +41,7 @@ from app.models.share import Share
 from app.models.share_report import ShareReport
 from app.models.user import User
 from app.models.user_profile import UserProfile
-from app.services import preset_note, quota
+from app.services import deletion, preset_note, quota
 
 
 @pytest.fixture(scope="module")
@@ -293,6 +295,66 @@ class Test邀请台账跟着走:
         wipe(client, mine)
         db.expire_all()
         assert db.get(User, mine["inviter"]).quota_bonus == 0
+
+    def test_注销回退不许覆盖同一瞬间刚结的那一笔(self, client, db, mine):
+        """10-16 审计第二批第五条：加分那侧是 SQL 相对自增，回退这侧原来是"读出来减完写回去"。
+
+        两种写法落在同一列上，症状不是报错而是**钱静默少一笔**：注销这一趟手上攥着旧值，
+        把这一瞬间刚结的那一笔直接盖掉——台账多一行、余额却没那一分。
+        本地两个 session 真交错量过一次：库里 20（原本 10 ＋ 并发结的 10）被老写法写成 **0**，
+        新写法留 **10**。
+
+        不起线程（交错本身不是判据要钉的东西），而是把"旧值"这一格亲手造出来：
+        ① 先在**这条 session** 里把邀请人读进身份映射——`_release_invitations` 拿到的就是这一枚；
+        ② 再从**另一条 session** 给同一个人相对自增 10 并 commit，就是并发那一边真做的事；
+        ③ 然后走真代码 `deletion.purge`。所以中间那两条 assert 钉的是"坑确实造出来了"，
+        最后那条才钉"没被坑盖掉"。
+        """
+        inviter_id = mine["inviter"]
+        cached = db.get(User, inviter_id)
+        assert cached.quota_bonus == quota.INVITE_REWARD, cached.quota_bonus
+
+        side = SessionLocal()
+        try:
+            side.execute(
+                update(User)
+                .where(User.id == inviter_id)
+                .values(quota_bonus=User.quota_bonus + quota.INVITE_REWARD)
+            )
+            side.commit()
+            assert side.get(User, inviter_id).quota_bonus == quota.INVITE_REWARD * 2
+            assert cached.quota_bonus == quota.INVITE_REWARD, "坑没造出来：这条 session 读到新值了"
+
+            deletion.purge(db, [db.get(User, mine["id"])], None)
+            db.commit()
+        finally:
+            side.close()
+
+        fresh = SessionLocal()
+        try:
+            left = fresh.execute(
+                text("select quota_bonus from users where id = :i"), {"i": inviter_id}
+            ).scalar()
+        finally:
+            fresh.close()
+        assert left == quota.INVITE_REWARD, (
+            f"并发结的那一笔被注销回退盖掉了：应剩 {quota.INVITE_REWARD}（20 减 10），库里是 {left}"
+        )
+
+    def test_同一列不许再出现整列赋值那种写法(self, db):
+        """上一条量的是行为，这一条钉的是写法——同一条列上只准有一种更新机制。
+
+        先剥注释再测：这一支的注释本来就要解释"原来那里是读出来减完写回去"，
+        不去注释的话这条判据从写下那句解释的那天起就永远红。
+        """
+        src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "app", "services", "deletion.py")
+        with open(src, encoding="utf-8") as fh:
+            body = "\n".join(line.split("#", 1)[0] for line in fh)
+        assert ".quota_bonus" in body, "读错了文件，这一条就成了假绿"
+        assert not re.search(r"\w+\.quota_bonus\s*=[^=]", body), (
+            "注销这一支又用整列赋值改余额了：会和 `quota._settle` 的相对自增互相覆盖"
+        )
 
     def test_没结过钱的人注销不动邀请人余额(self, client, db):
         """只有 invited_by、没有台账行（还没写下第一篇）→ 邀请人本来就没拿到钱，不该被扣。"""

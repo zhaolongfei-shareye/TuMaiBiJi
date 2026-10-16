@@ -24,6 +24,7 @@
 """
 import logging
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models.account import Account, AccountIdentity
@@ -159,20 +160,30 @@ def _release_invitations(db: Session, user: User) -> None:
         inviter = db.get(User, record.inviter_id)
         if inviter is None:
             continue
-        if inviter.quota_bonus < record.reward:
-            # 正常情况下走不到：除了这里，没有别的地方会减 quota_bonus。真走到了说明
-            # 台账和余额已经对不上，宁可不追讨也不能把余额扣成负数（负数会把上限压到
-            # BASE_QUOTA 以下，那个人自己的笔记就存不下了）。留一条日志好事后对账。
+        # 扣减走 SQL 侧，且**同一趟把"不许扣成负数"写进 WHERE**（10-16 审计第二批第五条）。
+        # 原来这里是先读一次、在 Python 里减完再整列写回去，而加分那一侧（`quota._settle`）
+        # 用的是相对更新——两种写法落在同一列上，注销这一趟读到的旧值会把这一瞬间刚结的那一笔
+        # 直接覆盖掉：台账多一行、余额却没那一分（本地两个 session 真交错量过一次：库里 20 被写回 0）。
+        # `_settle` 的 docstring 早就写过这个坑（"临时库 6 线程真并发实测过"），这一支是没跟上。
+        # 判据从"先读一次比大小"改成"由 WHERE 当场判"：读回来的那个数本身就可能是旧的，
+        # 拿它当闸门等于闸门和写分开两次看，中间那一瞬照样能扣穿。0 行命中＝余额不足或那一行没了，
+        # 宁可不追讨（负数会把那个人自己的上限压到 BASE_QUOTA 以下，他的笔记就存不下了）。
+        matched = db.execute(
+            update(User)
+            .where(User.id == inviter.id, User.quota_bonus >= record.reward)
+            .values(quota_bonus=User.quota_bonus - record.reward)
+        ).rowcount
+        if not matched:
             logger.error(
-                "注销回退邀请奖励时发现余额不足，跳过：inviter=%s bonus=%s 应退=%s invitee=%s",
-                inviter.id, inviter.quota_bonus, record.reward, user.id,
+                "注销回退邀请奖励时没扣动（余额不足或这一行已不在），跳过：inviter=%s 应退=%s invitee=%s",
+                inviter.id, record.reward, user.id,
             )
             continue
-        before = inviter.quota_bonus
-        inviter.quota_bonus = before - record.reward
+        # 内存里那一枚现在和库里不是同一个数了，让它跟过去；日志和后面任何一次读的都不再是旧值。
+        db.refresh(inviter)
         logger.info(
-            "注销时回退邀请奖励：inviter=%s -%d（%d → %d）invitee=%s",
-            inviter.id, record.reward, before, inviter.quota_bonus, user.id,
+            "注销时回退邀请奖励：inviter=%s -%d（现 %d）invitee=%s",
+            inviter.id, record.reward, inviter.quota_bonus, user.id,
         )
 
     # 邀请台账两个方向都删：留着被邀请人那条，等于把"谁邀的他"这件事留在一个已注销的
