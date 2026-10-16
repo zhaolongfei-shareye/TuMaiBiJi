@@ -1117,6 +1117,47 @@ walkWxss(P('')).forEach((f) => {
 ok('全仓 wxss 里没有"注释被提前关掉后裸露的中文正文"（这一条红了＝模拟器起不来，不是某条判据红）',
   dangling.length === 0, dangling.slice(0, 4).join('；'))
 
+/* 同一级红，另一颗雷：**wxml 标签配不上对**。10-16 夜里就踩了一次——把一枚 `<image>` 换成
+   `<text>` 时，替换段里连 `.title-row` 那个闭合 `</view>` 一起写进去，而原文那一个还在 ⇒ 多一个闭合标签。
+   后果与上面那颗一模一样、而且更难查：`cli preview` 只回一句
+   「335:3:unexpected end tag: view」，`cli auto` 却照旧报 ✔，automator 连上之后
+   `getCurrentPages()` 是空数组、`currentPage()` 抛
+   「Cannot destructure property 'rawPath' of ... is null」——看着像"IDE 起不来/端口连错工作树"，
+   其实是整包没编译过。所以这一条自己扫，别等真跑那一趟两分钟才红。
+   口径：先按编译器的读法剥掉 `<!-- -->`，再拿一个栈过一遍标签；自闭合（结尾带斜杠）不入栈。
+   ⚠ 这一把只钉"配对"，不判语义（嵌套顺序错了、类名点空它都不管，那些归各自那把尺子）。 */
+const walkWxml = (d, acc = []) => {
+  fs.readdirSync(d, { withFileTypes: true }).forEach((e) => {
+    const p = path.join(d, e.name)
+    if (e.isDirectory()) walkWxml(p, acc); else if (p.endsWith('.wxml')) acc.push(p)
+  })
+  return acc
+}
+const stripWxmlComments = (src) => src.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '))
+const unbalanced = []
+walkWxml(P('')).forEach((f) => {
+  const src = stripWxmlComments(fs.readFileSync(f, 'utf8'))
+  const stack = []
+  const re = /<(\/)?([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^'"<>])*?)(\/)?>/g
+  let m
+  while ((m = re.exec(src))) {
+    const [, closing, name, attrs, selfClose] = m
+    const line = src.slice(0, m.index).split('\n').length
+    if (selfClose) continue
+    if (closing) {
+      if (!stack.length || stack[stack.length - 1].name !== name) {
+        unbalanced.push(`${path.relative(ROOT, f)}:${line} 多/错一个 </${name}>`
+          + `（栈顶是 ${stack.length ? `<${stack[stack.length - 1].name}>@${stack[stack.length - 1].line}` : '空'}）`)
+        if (!stack.length) return
+        stack.pop()
+      } else stack.pop()
+    } else stack.push({ name, line })
+  }
+  stack.forEach((s) => unbalanced.push(`${path.relative(ROOT, f)}:${s.line} <${s.name}> 没有闭合`))
+})
+ok('全仓 wxml 标签配对（这一条红了＝整包不编译、模拟器没有页面，不是某条判据红）',
+  unbalanced.length === 0, unbalanced.slice(0, 4).join('；'))
+
 // 这两叠高度是 §2 那两行算式的读数：改了字号/间距/控件之后它们会变，规格文档引的就是这两个数。
 // 10-16 站长那句「把原文翻译的开关上移到与返回同一行左边」之后，**展开那一档的卡里只剩两样**
 //（原来这三样：两行框 160 ＋ 开关 48＋8 ＋ 条 110＝326，卡内可用 348、富余 22）。

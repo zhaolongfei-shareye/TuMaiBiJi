@@ -148,7 +148,9 @@ Page({
     this.fitBand()
     // 这一页原来只有导航条标题跟着语言走、底色永远吃壁纸：另外两页铺了图会翻成深底白字，
     // 于是三个 tab 顶上两深一浅。站长 10-01 晚要"按背景深浅自动反差"，这里补上同一条出口。
-    app.setNavTitle('appName', lang)
+    // ⚠ 10-16 夜他自己把「三个 tab 顶上统一念应用名」那条翻了：左上角那行大字换成书法位图，
+    // 图不报页名 ⇒ "这是哪一页"改由导航条说。两版口径都留字，别当漏改补回去。
+    this.syncNavTitle(lang)
     bgTone.applyTone(this, this.data.bgSrc, toneZones())
     // 朋友圈这一路只在本页开：它要的是"单页可被转发"，别处不铺入口
     wx.showShareMenu({ menus: ['shareAppMessage', 'shareTimeline'], fail() {} })
@@ -224,6 +226,13 @@ Page({
     }
   },
 
+  // 导航条那一栏跟着这一屏当前那一档念（设置／关于）。左上角那行大字 10-16 夜换成位图之后，
+  // 这一页"我是哪一格"只剩这一处还在说，所以它必须与 `me.wxml` 里 `aria-label` 用的是同一个判据、
+  // 同一份字典键——写在两处早晚漂一次，故收成这一个出口（onShow 与 onTab 都走它）。
+  syncNavTitle(lang) {
+    app.setNavTitle(this.data.tab === 'about' ? 'pillAbout' : 'pillSettings', lang || this.data.lang)
+  },
+
   onTab(e) {
     const key = e.currentTarget.dataset.key
     if (key === this.data.tab) return
@@ -235,6 +244,8 @@ Page({
       tab: key,
       into: this.data.into === 'meTopA' ? 'meTopB' : 'meTopA',
     })
+    // 排在 setData **之后**：这一栏要念的是刚切过去那一档，写在前面读到的是旧的那一档。
+    this.syncNavTitle()
     this.onClosePwdPanel()
     this.onCloseEmailPanel()
   },

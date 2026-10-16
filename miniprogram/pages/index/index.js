@@ -208,7 +208,10 @@ Page({
     // 三个 tab 的导航条标题统一成应用名（站长 10-01 晚）：原来这一页是「图麦笔记」、
     // 新建页是「新建笔记」、「我的」页是「我的」，顶上跳来跳去读起来像三个应用。
     // 页面里本来就有左上角那行大字说"这是哪一页"，导航条不必再报一遍。
-    app.setNavTitle('appName', lang)
+    // ⚠ 10-16 夜他自己把这条翻了：左上角那行字换成首屏那枚书法位图（图不报页名），
+    // 于是"这是哪一页"改由导航条说 ⇒ 这一栏念的就是左上角原来那行原文字。
+    // 两版口径都留字在这里，别再当成漏改补回去。
+    app.setNavTitle('notesHeading', lang)
     this.fitHead(bgSrc)
     bgTone.applyTone(this, this.data.bgSrc, toneZones())
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {

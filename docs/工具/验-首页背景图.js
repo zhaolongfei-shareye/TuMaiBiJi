@@ -347,14 +347,21 @@ ck('「调亮度」那一截仍只在有图时画（无图态那层罩子不渲�
 // 「旧覆写必须删净」那条钉住不许回来。这里不再重复钉。
 
 const meCss = read('pages/me/me.wxss')
+const meCssNC = meCss.replace(/\/\*[\s\S]*?\*\//g, '')
 // 「我的」那一页没跟着这次翻极性（站长这三句点的是首屏那三枚与第二屏的返回），
 // 它仍是"基准纸白 ＋ 浅色那一态逐条覆墨"那一套 ⇒ `lightRule` 留着给这一页用。
 const lightRule = (src, host, sel) =>
   new RegExp(`\\.${host}\\.has-bg\\.bg-light \\.${sel.slice(1)}\\s*\\{`).test(src)
-ck('「我的」头部那三行（大字与 MIND 数字）浅色态也有对应规则',
-  ['.h1', '.score-n', '.score-l'].every((s) => lightRule(meCss, 'head-band', s)),
-  ['.h1', '.score-n', '.score-l']
-    .filter((s) => !lightRule(meCss, 'head-band', s)).join('、'))
+/* 这一发原来钉"三行"（大字＋两枚 MIND 数字）。10-16 夜左上角那一枚换成书法位图 ⇒
+   它不吃 `color`，浅图那一态的"翻回墨"由 `:not(.bg-light)` 那条 filter 自己成立（不满足＝不挂
+   invert＝本来就是那支墨），所以这里钉两件事：数字那两档的浅色规则还在，
+   且**不许**再给位图补一条空的 `color` 覆写（看着像有规则、其实一条都不生效）。 */
+ck('「我的」头部那两枚数字浅色态仍有对应规则；左上角那枚位图反过来钉"不许补空的浅色覆写"',
+  ['.score-n', '.score-l'].every((s) => lightRule(meCss, 'head-band', s))
+  && !/\.head-band\.has-bg\.bg-light \.h1\s*\{/.test(meCssNC)
+  && /\.head-band\.has-bg:not\(\.bg-light\) \.h1\s*\{[^}]*filter:\s*invert\(1\)/.test(meCssNC),
+  ['.score-n', '.score-l'].filter((s) => !lightRule(meCss, 'head-band', s)).join('、')
+  || 'invert 那条不在／或补了空的浅色覆写')
 ck('这一页不自己写 setNavigationBarColor（值只有一份）', !/setNavigationBarColor/.test(cjs))
 
 // ---------- ③b 10-12 站长把范围扩到"那两行固定字" ----------

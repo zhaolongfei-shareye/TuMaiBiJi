@@ -76,20 +76,25 @@ ok('这一页的取景走 poster.bandGeom（与「我的」页同一个函数，
 ok('bandGeom 只在 utils/poster.js 里有一份实现',
   (read('utils/poster.js').match(/function bandGeom\(/g) || []).length === 1
   && !/function bandGeom\(/.test(read('pages/me/me.js')))
-// 站长 10-01：「我的」页左上角补一行大字，"字体和大小都要一样"。两页各写一份迟早走样，
-// 所以这里不钉具体数值，钉的是"两页那三行声明一模一样"。
+/* 站长 10-01：「我的」页左上角补一行大字，"字体和大小都要一样" ⇒ 这一处原来钉的是两页 `.h1` 的
+   字号/字重/字距三项**逐字相同**。10-16 夜他自己把这一枚换成首屏那枚书法位图（「这个图片全量放在
+   其他页面左上角」）⇒ 那三项声明整组作废：位图不吃 `font-size`／`color`，钉它等于钉一层永远
+   不生效的东西。改钉两件事：① 两页挂的是**同一张图**、且吃 `app.wxss` 那一份共用皮（尺寸只有一份真相）；
+   ② 两页 `.h1` 里**不许残留任何文字声明**——留着不是无害，是"源码看着有规则、屏上一条都不生效"。
+   ⚠ 同一夜作废的还有白天那句「笔记列表的大标题放大一档」（42→50）：这一屏左上角不再是字。 */
 const meWxss = read('pages/me/me.wxss').replace(/\/\*[\s\S]*?\*\//g, '')
-const h1Of = (src) => {
-  const b = (src.match(/(?:^|\n)\.h1\s*\{([^}]*)\}/) || [, ''])[1]
-  return ['font-size', 'font-weight', 'letter-spacing'].map((p) => {
-    const m = b.match(new RegExp(`${p}:\\s*([^;]+)`))
-    return m ? m[1].trim() : ''
-  }).join('/')
-}
-ok('本页 .h1 与「我的」页 .h1 三项声明逐字相同（字号/字重/字距）',
-  h1Of(wxss) === h1Of(meWxss) && !!h1Of(wxss), `${h1Of(wxss)} vs ${h1Of(meWxss)}`)
-ok('「我的」页那一行也钉了图上翻纸白这一档',
-  /\.head-band\.has-bg \.h1\s*\{[^}]*rgba\(242, 239, 233, 0\.96\)/.test(meWxss))
+const brandOf = (src) => (src.match(/class="h1 brand-title"[^>]*src="([^"]+)"/) || [, ''])[1]
+ok('两页左上角那一枚是同一张位图（正本＝首屏那枚 `/assets/title-heading.png`）',
+  brandOf(wxml) === '/assets/title-heading.png' && brandOf(read('pages/me/me.wxml')) === '/assets/title-heading.png',
+  `本页 ${brandOf(wxml)}｜「我的」${brandOf(read('pages/me/me.wxml'))}`)
+const textDecl = (src) => /(?:^|\n)\.h1\s*\{[^}]*?(font-size|font-weight|letter-spacing|line-height|color):/.test(src)
+ok('两页 `.h1` 里没有残留任何文字声明（位图不吃这几条，留着＝看着有规则、其实一条都不生效）',
+  !textDecl(wxss) && !textDecl(meWxss))
+ok('两页都挂 app.wxss 那一份 `.brand-title`（宽与那一档透明度只有一份真相，抄两遍必然漂）',
+  /class="h1 brand-title"/.test(wxml) && /class="h1 brand-title"/.test(read('pages/me/me.wxml'))
+  && /\.brand-title\s*\{[^}]*width:\s*228rpx[^}]*opacity:\s*0\.8/.test(read('app.wxss').replace(/\/\*[\s\S]*?\*\//g, '')))
+ok('「我的」页那一枚也钉了图上反色那一档（filter invert，条件仍是"铺了图且图不浅"）',
+  /\.head-band\.has-bg:not\(\.bg-light\) \.h1\s*\{[^}]*filter:\s*invert\(1\)/.test(meWxss))
 ok('图区里有压暗罩那一层，且它吃「调亮度」递进来的透明度串',
   /class="head-scrim" style="\{\{dimScrim\}\}"/.test(wxml))
 ok('铺图时容器带 has-bg', /\{\{bgSrc \? 'has-bg' : ''\}\}/.test(wxml))
@@ -144,11 +149,18 @@ ok('顶上那一条的两支写死色从代码里退净（值只从 `palette.nav
   && !/#181a20/.test(read('pages/create/create.js'))
   && !/#181a20/.test(read('pages/me/me.js')),
   (read('app.js').replace(/^\s*\/\/.*$/gm, '').match(/#[0-9a-fA-F]{6}/g) || []).slice(0, 6).join(' '))
-ok('三个 tab 的导航条标题都吃 appName（顶部不再一页一个名字）',
-  /setNavTitle\('appName', lang\)/.test(cjs)
+/* 站长 10-01 晚定过「三个 tab 的导航条标题统一成应用名」，理由就写在 `index.js` 那段注释里
+   （"页面里本来就有左上角那行大字说这是哪一页，导航条不必再报一遍"）。
+   ⚠ 10-16 夜他自己翻案（「这个图片全量放在其他页面左上角，原来左上角的纯文字标题替换最顶上的标题」）：
+   左上角那行大字换成书法位图 ⇒ 图不报页名，"这是哪一页"只剩导航条能说。
+   现在钉的是：笔记页念 `notesHeading`、「我的」页跟着当前那一档（pillSettings／pillAbout）、
+   首屏仍念 `appName`（那一屏左上角本来就是品牌图，顶上不必再报一个页名）。
+   旧那一条"三页都吃 appName"随之作废，别拿它当现状改回去。 */
+ok('导航条那一栏报的是当前这一屏（笔记页＝notesHeading、「我的」跟着药丸、首屏仍 appName）',
+  /setNavTitle\('notesHeading', lang\)/.test(cjs)
   && /setNavTitle\('appName', lang\)/.test(read('pages/create/create.js'))
-  && /setNavTitle\('appName', lang\)/.test(read('pages/me/me.js'))
-  && i18n.includes("appName: '图麦笔记'") && i18n.includes("appName: 'TumarkNote'"))
+  && /setNavTitle\(\s*this\.data\.tab === 'about' \? 'pillAbout' : 'pillSettings'/.test(read('pages/me/me.js')),
+  `本页 ${/setNavTitle\('([a-zA-Z]+)'/.exec(cjs)?.[1]}｜「我的」${/setNavTitle\(\s*this\.data\.tab[^\n]*/.exec(read('pages/me/me.js'))?.[0].slice(0, 60)}`)
 
 // ---------- 3. v12：图守头部一段，圆角卡不描边 ----------
 const head = seg(wxss, '.head')
@@ -277,22 +289,35 @@ ok('那一支只改 color、不许带底色或纸白（底色归 R14 那枚 α .
 // 10-09 这一层从层色换成 `--bg-card` 之后，"压在层面上的那一支冷墨"（`--ink-on-layer*`）在分类
 // 这一行没有对象了：两档字与短杠改吃这一页的墨（`--text-primary`／`--text-secondary`），
 // 与「我的」页那四行同一对。留着旧那两个名字就是拿冷墨写暖底。
-ok('分类那两档吃这一页的墨（--text-secondary / --text-primary），短杠同色，不跟那支黄',
+/* 站长 10-16「分类名字，不要加粗，不要纯黑，下划线也一样」⇒ 三样一起撤：
+   字重 600→400、`.on` 那档从整档墨 `--text-primary` 落到 `--text-secondary`（与未选那一档同一档，
+   选中这件事只靠"它在最前"表达）、那枚短杠 `.ix-cat.on::after` 整枚删掉。
+   ⚠ 这一条从"两档不同色"翻成"两档同色"：判据的前提是他今天这一句，不是 10-09 那一句。
+   ⚠ 撤掉短杠之后**没有任何屏上标记**表示"当前是哪一枚分类"——那一条我没自己补，钉成待拍（D38）。 */
+ok('分类那两档同一档字色（都吃 --text-secondary）、都不加粗、短杠整枚撤掉（10-16 三样一起撤）',
   /color: var\(--text-secondary\)/.test(seg(wxss, '.ix-cat'))
-  && /color: var\(--text-primary\)/.test(seg(wxss, '.ix-cat\.on'))
-  && /\.ix-cat\.on::after[\s\S]*?background: var\(--text-primary\)/.test(wxss)
+  && /color: var\(--text-secondary\)/.test(seg(wxss, '.ix-cat\.on'))
+  && !/font-weight:\s*[5-9]00/.test(seg(wxss, '.ix-cat'))
+  && !/font-weight:\s*[5-9]00/.test(seg(wxss, '.ix-cat\.on'))
+  && !/\.ix-cat\.on::after/.test(wxss)
   && !/var\(--tip-dot\)/.test(seg(wxss, '.ix-cat\.on')))
 // 这一条比的是**代码**不是注释，所以吃文件顶上那把 `cjsCode`（第 90 行已经剥过注释）——
 // 拿原文正则扫会把自家注释判成残留（今天第二次踩同一坑，另一处是 #FCFBF8）。
 ok('index.js 不再给每一条分类挂 toneStyle（那一行的 --tone-bg/--tone-ink 没人消费了）',
   !/toneStyle/.test(cjsCode) && !/toneVars/.test(cjsCode), '分类行的色不再从 toneVars 出')
-ok('压在图上的那三行是纸白（标题 + 数字 + 小字各一档）',
-  /color: rgba\(242, 239, 233, 0\.96\)/.test(seg(wxss, '.container.has-bg .h1'))
-  && /color: rgba\(242, 239, 233, 0\.8\)/.test(seg(wxss, '.container.has-bg .stat .n'))
+/* 这一发原来钉"三行"（标题＋数字＋小字各一档 `color`）。10-16 夜左上角那一枚换成位图，
+   它不吃 `color`，翻色改挂 `filter: invert(1)`（见下面单独那一发）⇒ 这里只剩两行还比 `color`。
+   ⚠ 不许把标题那一档从这条里"删了就算"：它换的是**读法**，不是没了。 */
+ok('压在图上的那两行是纸白（数字 .8 ＋ 小字 .62 各一档）',
+  /color: rgba\(242, 239, 233, 0\.8\)/.test(seg(wxss, '.container.has-bg .stat .n'))
   && /color: rgba\(242, 239, 233, 0\.62\)/.test(seg(wxss, '.container.has-bg .stat .l')))
-ok('没铺图那一态这三行退回各自主题的墨色（不是写死白）',
-  /color: var\(--text-primary\)/.test(seg(wxss, '.h1'))
-  && /color: var\(--text-secondary\)/.test(seg(wxss, '.stat .l')))
+ok('没铺图那一态这两行退回各自主题的墨色（不是写死白）',
+  /color: var\(--text-secondary\)/.test(seg(wxss, '.stat .l')))
+ok('左上角那一枚位图的翻色只挂一处 invert(1)，条件＝"铺了图且图不浅"（浅图与无图两态都不许反白）',
+  /\.container\.has-bg:not\(\.bg-light\) \.h1\s*\{[^}]*filter:\s*invert\(1\)/.test(wxss)
+  && (wxss.match(/filter:\s*invert\(1\)/g) || []).length === 1
+  && !/\.bg-light \.h1/.test(wxss),
+  `invert 出现 ${(wxss.match(/filter:\s*invert\(1\)/g) || []).length} 次（只许一处）`)
 // 站长 10-01 晚：三列从"横贯整块"改成钉右上角、整块变窄，数字跟着从 100 收到 64。
 // 这一档不是新造的：「我的」页那枚 MIND 改成同一个数，两页的右上角才是同一个东西。
 ok('三列的数字与小字吃「我的」页那两个量（64rpx / 18rpx，两页同一个数）',

@@ -18,7 +18,16 @@
          列表左上角的人都去掉，维持只有首页有」）。这是对 10-10 深夜那一句的翻案
          （当时他说「首页人物延续到笔记列表和卡片列表」），两版都留字在这里，免得以后
          又当成漏画补回去。首页（pages/create）那两位与"点小人换大人"一个字没动。 -->
-    <view class="h1">{{t.notesHeading}}</view>
+    <!-- 站长 10-16 夜两句话，第二句把第一句收窄：
+         ①「这个图片全量放在其他页面左上角，原来左上角的纯文字标题替换最顶上的标题」
+         ②「这个图片，不需要所有页面加，只需要在有背景图状态下加」
+         铺了照片那一态画首屏那枚书法位图（宽与那一档透明度在 `app.wxss` 的 `.brand-title`），
+         没铺那一态回到原来那行纯文字。两态同一个落点（`.h1` 只管位置），文字那几条声明单独挂在
+         `.h1-txt` 那一支上：位图不吃 `font-size` 与 `color`，混在一条里就是"看着有规则、其实不生效"。
+         导航条那一栏两态都念「我的笔记」（`index.js` 的 setNavTitle），`aria-label` 与它同源。 -->
+    <image wx:if="{{bgSrc}}" class="h1 brand-title" src="/assets/title-heading.png" mode="widthFix"
+           aria-label="{{t.notesHeading}}" />
+    <view wx:else class="h1 h1-txt">{{t.notesHeading}}</view>
     <!-- 一列：笔记。数仍来自服务端那一次 /api/user/quota，本页不自己相加。 -->
     <view class="stats">
       <view class="stat" wx:for="{{stats}}" wx:key="key">
@@ -186,6 +195,10 @@
        窗外任意一处都是回列表的口：那层罩子是铺满整屏的，点在头部那两行字上也算。
        它绑的是 catchtap 不是 bindtap——冒泡到 .container 的 onBlankTap 会把搜索词一起清掉，
        一次点击只干一件事（词留着，✕ 才是清词的口）。 -->
+  <!-- 站长 10-16 两句，第二句把第一句扩到两枚：「详情页外面加一档暗的毛玻璃，突出笔记内文。
+       点击返回恢复」＋「卡片详情页外面也要做毛玻璃」⇒ 这一枚遮罩与下面卡片成品那一屏
+       共用同一档暗纱，那份写法在 `.float-mask` 本体上（一份实现，两屏同一档，不各抄一遍）。
+       "点击返回恢复"这条本来就在：这枚遮罩绑 catchtap=onCloseDetail，窗里上面那枚 grip 同一个口。 -->
   <view wx:if="{{detailOpen}}" class="float-mask" catchtap="onCloseDetail"></view>
   <view wx:if="{{detailOpen}}" class="float-sheet" style="{{detailNote.catStyle}}">
     <view class="grip" bindtap="onCloseDetail">

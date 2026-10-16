@@ -595,7 +595,12 @@ const i18n = {
     myEmailLoadFailed: 'Could not load the saved address — try again later',
     pillSettings: 'Settings',
     pillAbout: 'About',
-    meGreeting: 'Hello! I am Tumark',
+    // 站长 10-16 夜「英文下那句 hello！.... 被遮挡一部分，你修改一下，上下标题，意思差不多就行」。
+    // 那一行是单行截断（`nowrap` ＋ `text-overflow:ellipsis`），放不下就屏上打点。
+    // 预算是量出来的（`量-名片行英文不截断`）：中文态格子 317.3rpx，英文态因为药丸变宽只剩 **250.0rpx**。
+    // 原来这两句自然宽分别 278.8 ／ 250.0（离屏画布 `measureText`，且真机那支字比画布那支还宽一点
+    // ——他截图上 22 个字母只露出 18 个），两句都顶到线外 ⇒ 各短一截，意思照旧。
+    meGreeting: 'I am Tumark',
     brainScore: 'MIND',
     officialSite: 'Website',
     resetWithBioTitle: 'Reset password',
@@ -604,7 +609,11 @@ const i18n = {
     bioUnavailable: 'This phone has no fingerprint or face unlock — reset directly.',
     swipeHint: 'Swipe to change template',
     grip: 'Tap to close',
-    slogan: 'Make every read useful',
+    // 同一夜改短（理由见上面 `meGreeting` 那一段的预算）。这一枚还出现在「关于」页那一行
+    // （`about.wxml` 的 `.brand-slogan`，那一格宽得多，短了不会不好看）。
+    // ⚠ 分享卡片标题那一句 `shareCardTitle` 里仍写全 'TumarkNote | Make every read useful'——
+    // 那是另一处版面（横排长条，没有药丸抢宽），不为这一格去动它。
+    slogan: 'Make reads useful',
     shareToFriend: 'Recommend Tumark',
     mindRulesTitle: 'How MIND works',
     mindRuleNewUser: 'New account',

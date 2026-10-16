@@ -100,6 +100,17 @@ async function main() {
   }
   // 这一屏第一眼就该是收起态；带着上一趟的面板进来会把整组换掉（`wx:if="{{!active}}"`）。
   if ((await page.data()).active) { await mp.reLaunch('/pages/create/create'); await sleep(6000); page = await mp.currentPage() }
+  /* 本机人物残值也要归位。§3 那条"220 宽、女那张 264.6 高"量的是**默认态**，而上一趟跑到一半被打断
+     （10-16 那趟：包没编译过、进程被杀）就会把 `homePerson` 留在 `boy`，于是这一条量到 219.2×317.9
+     ——那是男那张 360×522 的比例，渲染没错，是尺子拿别人的残值当默认态打分。
+     归位（而不是"改成量男那张的比例"）才让 §3 与 §6 两条都还是真判据。清完要重新进页：
+     这一屏画的是进页那一刻从 storage 读出来的那一张。 */
+  const stalePerson = unwrap(await mp.callWxMethod('getStorageSync', PERSON_KEY))
+  if (stalePerson && stalePerson !== 'girl') {
+    await mp.callWxMethod('removeStorageSync', PERSON_KEY)
+    await mp.reLaunch('/pages/create/create'); await sleep(6000); page = await mp.currentPage()
+    console.log(`  · 进门残值 person=${JSON.stringify(stalePerson)} 已清，读回 ${JSON.stringify(unwrap(await mp.callWxMethod('getStorageSync', PERSON_KEY)))}（空＝走包内默认那张）`)
+  }
 
   const sys = await mp.systemInfo()
   const R = sys.windowWidth / 750           // 1rpx = 多少 px

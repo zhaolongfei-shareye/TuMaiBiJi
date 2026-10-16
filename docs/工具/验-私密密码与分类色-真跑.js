@@ -288,10 +288,17 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     const offCol = catEls.length > 1 ? String(await catEls[onIdx === 0 ? 1 : 0].style('color')) : '(只有一枚)'
     await list.setData({ bgSrc: listBg || '' })
     await sleep(600)
-    ck('没铺图那一态：亮着那一枚吃整档墨、没亮那一枚吃同一支墨的 .72 档（两支不同，短杠那一档才看得出来）',
-      /rgb/.test(onCol) && /rgb/.test(offCol) && onCol !== offCol
-      && Math.abs((alphaOf(offCol) === null ? 1 : alphaOf(offCol)) - 0.72) < 0.01
-      && rgbOf(onCol) === rgbOf(offCol), `亮 ${onCol}／暗 ${offCol}`)
+    /* 站长 10-16 一句「分类名字，不要加粗，不要纯黑，下划线也一样」⇒ 加粗、整档墨、短杠三样一起撤。
+       这一条的旧前提（"亮的那枚吃整档墨，所以两支不同"）当场没了：没铺图这一态两枚现在是**同一个数**。
+       所以这里翻成钉现状、并把"选中态目前没有标记"这件事钉在尺子上——他哪天给一句补标记，
+       这条要跟着翻回"两支不同"，不许让它悄悄绿着（同一形状翻车记在 [[feedback-removing-a-state-invalidates-rulers]]）。 */
+    const onW = onIdx > -1 ? String(await catEls[onIdx].style('font-weight')) : '(摸不到)'
+    const offW = catEls.length > 1 ? String(await catEls[onIdx === 0 ? 1 : 0].style('font-weight')) : '(只有一枚)'
+    ck('没铺图那一态：亮与不亮同一支 .72 墨、同一个 400 字重（三样撤净的必然结果＝选中态目前没有标记，等他一句）',
+      /rgb/.test(onCol) && /rgb/.test(offCol) && onCol === offCol
+      && Math.abs((alphaOf(onCol) === null ? 1 : alphaOf(onCol)) - 0.72) < 0.01
+      && rgbOf(onCol) === rgbOf(offCol)
+      && Number(onW) < 500 && Number(offW) < 500, `亮 ${onCol}／暗 ${offCol}｜字重 ${onW}／${offW}`)
     ck('铺图那一态：两枚一起抬成整档墨（10-12 那条 has-bg 抬档真的落到这一行，不是压在照片底下看不清）',
       !listBg || (alphaOf(onColBg) === null && rgbOf(onColBg) === rgbOf(offColBg)),
       `亮 ${onColBg}／暗 ${offColBg}｜bgSrc=${listBg ? '有' : '无'}`)

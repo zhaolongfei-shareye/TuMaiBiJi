@@ -21,7 +21,14 @@
            站长 10-01：三个 tab 的首页风格要一致，这一页原来只有右上角那枚药丸。
            站长 10-04：这一行不再写死「我的」，改成跟着下面那枚药丸走——停在设置就写设置、
            翻到关于就写关于，让这行大字报出当前这一屏是哪一档。-->
-      <view class="h1">{{tab === 'about' ? t.pillAbout : t.pillSettings}}</view>
+      <!-- 站长 10-16 夜两句话，第二句把第一句收窄（「只需要在有背景图状态下加」）：
+           铺了照片那一态画首屏那枚书法位图（宽与透明度在 `app.wxss` 的 `.brand-title`，
+           这一页只给落点），没铺那一态回到原来那行跟着药丸走的文字（设置／关于）。
+           原来那行字两态都同时住在最顶上那一栏（`me.js` 的 `syncNavTitle`）。
+           `aria-label` 与那一栏同源，屏读用户听到的话不因为换图而变成"图片"。 -->
+      <image wx:if="{{bgSrc}}" class="h1 brand-title" src="/assets/title-heading.png" mode="widthFix"
+             aria-label="{{tab === 'about' ? t.pillAbout : t.pillSettings}}" />
+      <view wx:else class="h1 h1-txt">{{tab === 'about' ? t.pillAbout : t.pillSettings}}</view>
       <!-- 数字没从 /api/user/quota 读回来之前整块不占位：宁可空着，也不先摆一个猜的数 -->
       <view wx:if="{{scoreText}}" class="score">
         <text class="score-n">{{scoreText}}</text>
