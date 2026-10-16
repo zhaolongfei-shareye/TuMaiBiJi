@@ -121,12 +121,17 @@ function evaluate(S) {
   const LADDER = {
     '--glass-veil': 0.30, '--glass-veil-band': 0.60, '--glass-plate': 0.50, '--glass-fill': 0.20,
     '--glass-plate-dock': 0.72, '--glass-fill-dock': 0.42,
-    '--stage-ink-strong': 0.96, '--stage-ink': 0.85, '--stage-ink-soft': 0.78, '--stage-ink-faint': 0.56,
+    /* `--glass-chrome-dock` 那枚 .62 不是审美值：它就是 `moodChromeOf()` 发给底栏组件的
+       `--chrome-bg`（第二屏那枚右滑长条吃它，站长 10-16「右滑要与下方三个按钮 bar 同色」）。
+       `--stage-ink-dim` 一起进梯子：条上"空着那一档"的退层字吃它，10-16 起有消费者了。 */
+    '--glass-chrome-dock': 0.62,
+    '--stage-ink-strong': 0.96, '--stage-ink': 0.85, '--stage-ink-soft': 0.78, '--stage-ink-dim': 0.72,
+    '--stage-ink-faint': 0.56,
   }
   P.MOODS.forEach((m) => {
     const v = V(m.key)
     const off = Object.keys(LADDER).filter((k) => alphaOf(v[k]) !== LADDER[k])
-    ck(`${m.key}：十枚 α 与他拍过的那一架逐档相同`, off.length === 0, off.join(',') || '齐')
+    ck(`${m.key}：十二枚 α 与他拍过的那一架逐档相同`, off.length === 0, off.join(',') || '齐')
     const face = (v['--stage-face'].match(/,\s*([\d.]+)\s*\)/g) || []).map((t) => Number(/([\d.]+)\s*\)/.exec(t)[1]))
     ck(`${m.key}：面板那一整面仍是 .16→.94→.95（10-13 两刀收出来的那一档，10-14 并成一条渐变）`,
       JSON.stringify(face) === JSON.stringify([0.16, 0.94, 0.95, 0.95]), face.join('→'))

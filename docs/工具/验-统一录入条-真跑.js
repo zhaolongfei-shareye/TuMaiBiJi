@@ -22,11 +22,29 @@ const I18N = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
 // 456 变 476；上一版把 456 抄在这里，改样式那一轮它只是**跟着红**，白费劲。
 const SLD_MAX = Number(/const SLD_MAX_RPX = (\d+)/.exec(
   fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/create/create.js'), 'utf8'))[1])
+// 「粘贴」那一枚的超时兜底也从同一个文件现读（同一套路）：P3 那一条要"等过它再说一句没来"，
+// 把 1500 抄进判据，换档那一趟它只会跟着红，不会跟着说明。
+const CJ_S = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/create/create.js'), 'utf8')
+const WAIT_PASTE_MS = Number(/const PASTE_WAIT_MS = (\d+)/.exec(CJ_S)[1])
 // 面板两档与快门那一枚的边长也从源码现读：10-08 那轮 700→500/580、10-10 那轮 →410/490 且快门
 // 210→180，两次都是判据里抄的数跟着红。环那一支同理——它 10-10 从纸白换成了 palette 算出来的
 // `--cp-ring`，判据要跟着换就得现读，不然下一轮换皮又是一次全红。
 const CWX = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/create/create.wxss'), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
+// 井这一层现在有两枚出处，两枚都不抄字面：
+// 框＝`--cp-card`（createSkin 那支白，从 palette 现读）；条＝底栏那一档，而这一枚的**权威出处就是 palette**
+// ——底栏组件拿到的 `--chrome-bg` 是 `moodChromeOf(心情).bg` 算出来的，CSS 里那一枚只是它的镜像。
+// 所以期望值现算：改 α、换心情、两处漂任何一处，C8b/C8c 当场红（与下面 RING_CSS 同一套路）。
+const PAL = require(path.resolve(__dirname, '../../miniprogram/utils/palette.js'))
+const CARD_HEX = (/--cp-card:\s*([^;\n]+)/.exec(PAL.createSkin()) || [0, ' #FFFFFF'])[1].trim()
+const INK_HEX = (/--cp-ink:\s*([^;\n]+)/.exec(PAL.createSkin()) || [0, ' #23252C'])[1].trim()
+// `#rrggbb` / `rgba(r,g,b,a)` → computed style 那个写法（逗号后一个空格、括号里不留空格）
+const toComputed = (c) => {
+  const h = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(c.trim())
+  if (h) return `rgb(${[1, 2, 3].map((i) => parseInt(h[i], 16)).join(', ')})`
+  const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/.exec(c)
+  if (!m) return ''
+  return m[4] === undefined ? `rgb(${m[1]}, ${m[2]}, ${m[3]})` : `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${m[4]})`
+}
 const PANEL_H = Number(/\.panel\s*\{[\s\S]*?height:\s*(\d+)rpx/.exec(CWX)[1])
 const PANEL_OPEN_H = Number(/\.panel-open\s*\{\s*height:\s*(\d+)rpx/.exec(CWX)[1])
 const SHUT_W = Number(/\.shut\s*\{[\s\S]*?width:\s*(\d+)rpx/.exec(CWX)[1])
@@ -125,6 +143,9 @@ const ck = (name, ok, got) => {
   const rpxEq = (px, want, tol = 2) => Math.abs(toRpx(px) - want) <= tol
   const tabTop = metric.h - 128 * R              // 底栏顶边（bottom 20 + 高 108）
   const styleOf = async (sel) => { const el = await page.$(sel); return el ? await el.style('background-color') : null }
+  // 10-16 加：井那一组（撤白线／上下渐变／反白／inset 顶影）判的是**画出来长什么样**，
+  // 样式表源码里对、被别一层覆掉或简写吃底色那几型只有 computed style 才抓得到（见 [[feedback-surface-css-silent-noop]]）。
+  const cssOf = async (sel, prop) => { const el = await page.$(sel); return el ? await el.style(prop) : null }
   const clsOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.attribute('class')) || '') : '' }
   const txtOf = async (sel) => { const el = await page.$(sel); return el ? ((await el.text()) || '').trim() : null }
 
@@ -220,10 +241,13 @@ const ck = (name, ok, got) => {
   ck(`B12 快门那一圈就是 palette 发下来那支环（现读 --cp-ring，不抄字面）`,
     (await (await page.$('.shut')).style('border-top-color')) === RING_RGB,
     await (await page.$('.shut')).style('border-top-color'))
-  ck('B13 三枚圈各带一个字：相册 / 拍照 / 链接',
-    (await txtOf('.mini-lb')) === '相册' && (await txtOf('.shut-lb')) === '拍照'
-    && (await page.$$('.mini-lb'))[1] && (await (await page.$$('.mini-lb'))[1].text()) === '链接',
-    `${await txtOf('.mini-lb')} / ${await txtOf('.shut-lb')}`)
+  // 第三枚 10-16 从「链接」换成「粘贴」（站长原话「照片第三个按钮，改为"粘贴"」）。
+  // 屏上那几个字是字典里读出来的，判据也从字典现读，不抄字面（抄了下一轮换词又是一次全红）。
+  const LBD = d.t
+  ck('B13 三枚圈各带一个字：相册 / 拍照 / 粘贴（第三枚不再写死"链接"）',
+    (await txtOf('.mini-lb')) === LBD.fromAlbum && (await txtOf('.shut-lb')) === LBD.takePhoto
+    && (await page.$$('.mini-lb'))[1] && (await (await page.$$('.mini-lb'))[1].text()) === LBD.paste,
+    `${await txtOf('.mini-lb')} / ${await txtOf('.shut-lb')} / ${await (await page.$$('.mini-lb'))[1].text()}`)
   ck('B14 这一态没有多余的提示词行（拍照下面那句撤了）',
     (await page.$$('.entry-desc')).length === 0 && (await page.$$('.note')).length === 0)
   /* ⑥ 他原话「照片，链接，文字，三个Tab很难点，把按键区域扩大」。量的是渲染出来的按键面：
@@ -256,7 +280,7 @@ const ck = (name, ok, got) => {
   const phAttr = await (await page.$('.field-input')).property('placeholder')
   ck('C3 提示词在框里（placeholder 就是 linkDesc 那句，从节点属性读）',
     phAttr === d.t.linkDesc, `${phAttr} vs ${d.t.linkDesc}`)
-  ck('C4 条高 110rpx、外圈那圈白边 5rpx',
+  ck('C4 条高 110rpx、外圈那一圈边 5rpx（10-16 起这一圈是墨，不再是白/浅灰）',
     !!sld1 && rpxEq(sld1.h, 110, 3), sld1 && `${toRpx(sld1.h).toFixed(1)}rpx`)
   const knob1 = (await rects(['.sld-knob']))[0]
   ck('C5 圆停在最左那一格（left ≈ 10rpx，与 SLD_REST 对得上）',
@@ -275,6 +299,102 @@ const ck = (name, ok, got) => {
   ck('C8 框与条之间有缝、框不贴面板上沿（两档 auto 边距真的分到了地方）',
     !!field1 && !!sld1 && sld1.top - field1.bottom >= 8 * R && field1.top - (await rects(['.card']))[0].top >= 8 * R,
     field1 && sld1 && `框底到条顶 ${toRpx(sld1.top - field1.bottom).toFixed(1)}rpx`)
+  /* C8b/C8c 站长 10-16 最后一趟（拿真机截图那句）：「输入框要纯白，右滑要与下方三个按钮 bar 同色」。
+     四条都在 computed style 上量（样式表里写对却被别一层覆掉、变量指空、简写吃底色那几型，
+     只有摸渲染才抓得到；这一格前面两趟就是这么骗过静态读数的）：
+     框＝`rgb(255, 255, 255)` 实心、零描边、零阴影、墨字；
+     条＝**当前心情那一档底栏色**（期望值现算：`moodChromeOf(屏上那档心情).bg`，与底栏组件同源），
+         那一圈与面同值（看不见＝没有分界线），字＝底栏那三枚图形同一支（也跟着心情翻）。 */
+  const moodKey = await mp.evaluate(() => getApp().glassMood().key)
+  const CHROME_RGB = toComputed(PAL.moodChromeOf(moodKey).bg)
+  const INK_RGB = toComputed(INK_HEX)
+  const CARD_RGB = toComputed(CARD_HEX)
+  const TXT_RGB = toComputed(PAL.moodOf(moodKey).text)
+  const fldBg = await cssOf('.field', 'background-color')
+  const fldBorder = await cssOf('.field', 'border-top-width')
+  const fldShadow = await cssOf('.field', 'box-shadow')
+  const fldInk = await cssOf('.field-input', 'color')
+  ck('C8b 那一格画出来：纯白实心＋零描边＋零阴影＋墨字（他要的那句"输入框要纯白"量在这四枚上）',
+    fldBg === CARD_RGB && parseFloat(fldBorder || '9') === 0 && /none/.test(fldShadow || '')
+    && fldInk === INK_RGB,
+    `面 ${fldBg}（该 ${CARD_RGB}）｜边框 ${fldBorder}｜影 ${fldShadow}｜字 ${fldInk}（该 ${INK_RGB}）`)
+  const sldBg = await cssOf('.sld', 'background-color')
+  const sldRing = await cssOf('.sld', 'border-top-color')
+  const sldInk = await cssOf('.sld-txt', 'color')
+  const sldBf = await cssOf('.sld', 'backdrop-filter')
+  /* 字这一枚要**跟着屏上那一档判**：C 段这一趟是"链接框还没填"那一刻量的，那时 `.sld-off` 正挂着，
+     屏上读到的就是退一层那档 `rgba(文字色, .72)`；拿满档去比会红成"实现错了"，其实是我拿错了期望值
+     （10-16 这条第一次跑就是这么红的）。两档都钉：off→.72、非 off→满档，极性仍必须是心情那一支。 */
+  const sldCls = await clsOf('.sld')
+  const TXT_DIM_RGB = toComputed(PAL.moodOf(moodKey).text).replace('rgb(', 'rgba(').replace(')', ', 0.72)')
+  const wantInk = /sld-off/.test(sldCls) ? TXT_DIM_RGB : TXT_RGB
+  ck(`C8c 右滑那一条＝底栏那一档（心情 ${moodKey}）：面吃那一枚、那一圈不刷色、字与底栏图形同一支（这一档：${/sld-off/.test(sldCls) ? '空着·退一层' : '有内容·满档'}）、糊挂着`,
+    sldBg === CHROME_RGB && /rgba\(0,\s*0,\s*0,\s*0\)/.test(sldRing || '') && sldInk === wantInk
+    && !/none/.test(sldBf || 'none'),
+    `面 ${sldBg}（该 ${CHROME_RGB}）／圈 ${sldRing}（该透明）｜字 ${sldInk}（该 ${wantInk}）｜糊 ${sldBf}`)
+  /* C8d 站长 10-16 17:2x 附真机截图：「墨色，右滑的 bar 黑边换成发光，其他也一样」。
+     这一条不读 computed style，读**屏上那一行像素**——因为"黑边"这件事在 computed style 里根本不存在：
+     上一版面与圈都是 `rgba(35,37,44,.62)`，两个读数一模一样，可 `background` 默认铺到 border-box、
+     border 又在同一像素上再刷一层 ⇒ 那一圈实算 α .856，屏上一条硬边（他那张截图穿过条左沿：
+     条身 113／边圈 65／面板 198）。只有采像素抓得到这一型（"改一层皮的十三种静默失效"里
+     "补色自己成新台阶"那一型）。
+     ⚠ 第一版拿 `boundingClientRect` × 一个缩放去对截图，被自己那条取景守卫打红：截图量的是**整块设备屏**
+       （390×844 → 734×1588），节点 y 却住在 **webview** 那一层（753 高，上面压着 47 状态栏＋44 导航栏），
+       两个比例对不上（1588/734＝2.16 ≠ 753/390＝1.93），采到的"条身"其实是上面那格白框（211 比面板还亮）。
+       ⇒ 改成**在图里自定位**，且只沿**水平方向**量：
+       ① 条＝下半屏那一横排里"整行中位最暗"连成的一段（取中位数不取最小值：那一行上有墨字，
+          取最小会把标题那行当成条；只在下半屏 45%~88% 里找，屏底那一排同色玻璃不吃进来）；
+       ② 沿条的**中线那一行**从左扫到右，找到条的右沿；
+       ③ 断层＝右沿往里 8 像素里最暗那一枚，与条身中段（往里 20~60）比；
+       ④ 发光＝右沿往外 3~26 的最亮一枚，与再往外 32~44 的中位比。
+     同一行 ⇒ 面板那条上深下浅的渐变在这一趟里是常量，不会把"发光"读成"坡"（第一版竖着量就栽在这上面）。
+     反向验过：同一把量法打在站长那张**改前**截图上，报 内圈 67 vs 身 113（差 −47）＝会红；
+     打在本构建上 113 vs 113（差 0）＝黑边确实没了。 */
+  {
+    const shot = `${OUT}/C-条身那一圈与外发光.png`
+    await mp.screenshot({ path: shot })
+    const { PNG } = require('pngjs')
+    const img = PNG.sync.read(fs.readFileSync(shot))
+    const W = img.width
+    const L = (x, y) => {
+      const i = (W * y + x) * 4
+      return 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2]
+    }
+    const rowMed = (y) => {
+      const a = []
+      for (let x = Math.round(W * 0.18); x < W * 0.82; x += 2) a.push(L(x, y))
+      a.sort((p, q) => p - q)
+      return a[Math.floor(a.length / 2)]
+    }
+    const lo = Math.round(img.height * 0.45), hi = Math.round(img.height * 0.88)
+    const rows = []
+    for (let y = lo; y < hi; y++) rows.push(rowMed(y))
+    const darkest = Math.min(...rows)
+    const band = rows.map((v) => v <= darkest + 14)
+    // 取**与最暗那一行连成一片**的那一段，不取"第一个／最后一个够格的行"：
+    // 屏底那一排是同一种玻璃，够格的行会一路连过去，把两段缝在一起。
+    const midRow = rows.indexOf(darkest)
+    let first = midRow
+    while (first > 0 && band[first - 1]) first -= 1
+    let last = midRow
+    while (last < band.length - 1 && band[last + 1]) last += 1
+    const yMid = lo + Math.round((first + last) / 2)
+    let rE = Math.round(W * 0.85)
+    while (rE < W - 1 && L(rE + 1, yMid) < 170) rE += 1
+    const seg = (a, b) => { const s = []; for (let x = rE + a; x <= rE + b; x++) s.push(L(x, yMid)); return s }
+    const med = (a) => a.slice().sort((p, q) => p - q)[Math.floor(a.length / 2)]
+    const inner = seg(-8, -1), body = seg(-60, -20), glow = seg(3, 26), base = seg(32, 44)
+    const bodyL = med(body)
+    ck('C8d-取景 下半屏那一段是一条横到底的暗带、右沿落在屏宽九成那一格',
+      last - first > 40 && Math.abs(rE / W - 0.90) <= 0.03 && rowMed(yMid) < 170,
+      `带高 ${last - first} 行／中线那一行中位 ${rowMed(yMid).toFixed(0)}／右沿 ${(rE / W * 100).toFixed(1)}%／截图 ${W}×${img.height}`)
+    ck('C8d 那一圈不再比条身深（黑边撤干净；同一把量法打在站长改前那张上量到 −47）',
+      Math.min(...inner) >= bodyL - 10,
+      `内圈最暗 ${Math.min(...inner).toFixed(0)}／条身 ${bodyL.toFixed(0)}／差 ${(Math.min(...inner) - bodyL).toFixed(0)}`)
+    ck('C8d-b 外沿真有一圈比它旁边那块面板亮的发光（同一行比，坡不参与）',
+      Math.max(...glow) >= med(base) + 6,
+      `条外最亮 ${Math.max(...glow).toFixed(0)}／再往外 ${med(base).toFixed(0)}（差 ${(Math.max(...glow) - med(base)).toFixed(0)}）`)
+  }
   ck('C9 链接档没有归类那一格、没有粘贴按钮', (await page.$$('.wr-cat-face')).length === 0 && !/pasteUrl/.test(JSON.stringify(d)))
 
   await (await page.$('.field-input')).input('not a link')
@@ -313,6 +433,11 @@ const ck = (name, ok, got) => {
   d = await page.data()
   ck('C12 合法链接：ready 翻成 true，sld-off 撤掉',
     d.urlHint === 'ok' && d.ready === true && !/sld-off/.test(await clsOf('.sld')), `ready=${d.ready} ${await clsOf('.sld')}`)
+  // 与 C8c 成对：那一头量的是"空着·退一层"，这一头量"有内容·满档"。
+  // 两档都必须是**心情那一支**字色（跟着底栏那三枚图形一起翻），换心情才不会一头深一头浅。
+  ck('C12b 撤掉 sld-off 之后，条上那句真的抬到满档（两档之间的落差在渲染上成立，不只是 class 换了）',
+    (await cssOf('.sld-txt', 'color')) === TXT_RGB,
+    `${await cssOf('.sld-txt', 'color')}（该 ${TXT_RGB}）`)
 
   // ---------- D 真拖：未就绪挡住、就绪触发 ----------
   await top()
@@ -439,7 +564,21 @@ const ck = (name, ok, got) => {
   ck('D7 接口回来 → 满格 + 完成那一帧（done=true、fillPct=100、草稿已清）',
     !!dDone && dDone.done === true && dDone.fillPct === 100 && !dDone.busy && dDone.urlInput === '',
     JSON.stringify(dDone))
-  ck('D8 完成那一帧整条转实心、白环仍然在', /sld-done/.test(await clsOf('.sld')) && !!dDone, await clsOf('.sld'))
+  /* D8 除了 class 还必须**摸到那一层橙**：10-16 之前"完成转实心"在铺了形象图那一态从没画出来过
+     （`.container.has-bg .sld` 那条 0-3-0 压住了 `.sld-done`），而 class 与圆的位置两条判据一直绿。
+     这一轮把那条覆盖整条撤了，覆盖没了、前提也没了——所以这里量的不再是"抬到 0-4-0 之后有没有现面"，
+     而是"撤完之后仍然现面"。字仍是配那支橙的纯白。
+     那一圈 17:2x 起不再跟着转橙，而是与常态同一档**不刷色**：站长那句"黑边"的根因就是同一枚色刷两层，
+     完成这一帧要是还写"圈＝面"，等于把同一个画法留在第二态里（D8b 吃的仍是那 5rpx 结构，宽度没动）。 */
+  const EXTRACT_RGB = toComputed((/--cp-extract:\s*([^;\n]+)/.exec(PAL.createSkin()) || [0, ' #C4541F'])[1].trim())
+  const doneBg = await cssOf('.sld', 'background-color')
+  const doneRing = await cssOf('.sld', 'border-top-color')
+  const doneInk = await cssOf('.sld-txt', 'color')
+  ck('D8 完成那一帧整条转实心、那一圈不刷第二层色（面摸到那支橙，不是只看 class）',
+    /sld-done/.test(await clsOf('.sld')) && !!dDone
+    && doneBg === EXTRACT_RGB && /rgba\(0,\s*0,\s*0,\s*0\)/.test(doneRing || '')
+    && /rgb\(255,\s*255,\s*255\)/.test(doneInk || ''),
+    `面 ${doneBg}（该 ${EXTRACT_RGB}）｜圈 ${doneRing}（该透明）｜字 ${doneInk}｜${await clsOf('.sld')}`)
   const knobDone = (await rects(['.sld-knob']))[0]
   ck('D8b 完成那一帧圆仍钉在最右那一格（没回弹）',
     !!knobDone && Math.abs(knobDone.left - ((await rects(['.sld']))[0].left + (SLD_MAX + 5) * R)) <= 3 * R,
@@ -470,12 +609,13 @@ const ck = (name, ok, got) => {
     !!ta && (await ta.property('placeholder')) === d.t.manualDesc && (await page.$$('input')).length === 0,
     `${await (await page.$('.field-area')).property('placeholder')} vs ${d.t.manualDesc}`)
   /* 这一格 10-10 深夜多包了一层壳（textarea 装不下子节点，粘贴钮只能做兄弟），所以两头都要量：
-     壳是屏上那个带皮的盒子（105/160），框是壳里面写字的那一层（扣掉壳那 3rpx 边框）。
-     框只写 `height:100%` ＋ 上内边距而没写 box-sizing 的话，读数会是 129/184 —— 字掉到圆角外面，
-     静态读源码一条都看不出来，只有在这里量渲染才抓得住。 */
+     壳是屏上那个带皮的盒子（105/160），框是壳里面写字的那一层。
+     ⚠ 10-16「不要白线」把壳那 3rpx 描边撤了 ⇒ 两层读数**并成同一个数**（原来 105／99、160／154，
+        现在 105／105、160／160）。框只写 `height:100%` ＋ 上内边距而没写 box-sizing 的话，
+        读数会是 136/191（内边距加在 100% 外面）—— 静态读源码看不出来，只有在这里量渲染才抓得住。 */
   const [shell3, ta3] = await rects(['.field-write', '.field-area'])
-  ck('E3 收起那一档这一格是一行（壳 105rpx，写字那一层 99rpx）',
-    !!shell3 && rpxEq(shell3.h, 105, 3) && !!ta3 && rpxEq(ta3.h, 99, 3),
+  ck('E3 收起那一档这一格是一行（壳 105rpx；撤了描边之后写字那一层与壳同高＝105）',
+    !!shell3 && rpxEq(shell3.h, 105, 3) && !!ta3 && rpxEq(ta3.h, 105, 3),
     `壳 ${shell3 && toRpx(shell3.h).toFixed(1)}／框 ${ta3 && toRpx(ta3.h).toFixed(1)}rpx`)
   /* ⑨ 文字档也要有粘贴钮，且这一枚点下去真把内容接进框里、不顶掉旧字。
      （只数节点的判据抓不到"钮在、但读的是别的键"，那正是链接档原来那个 bug 的形状。）
@@ -542,8 +682,8 @@ const ck = (name, ok, got) => {
     d.bodyFocus === true && d.panelOpen === true && rpxEq((await rects(['.panel']))[0].h, PANEL_OPEN_H, 4),
     `focus=${d.bodyFocus} open=${d.panelOpen} 高 ${toRpx((await rects(['.panel']))[0].h).toFixed(1)}rpx`)
   const [shell5, ta5] = await rects(['.field-write', '.field-area'])
-  ck('E5 壳跟着变成两行（160rpx，写在壳身上；写字那一层 154）',
-    !!shell5 && rpxEq(shell5.h, 160, 4) && !!ta5 && rpxEq(ta5.h, 154, 4),
+  ck('E5 壳跟着变成两行（160rpx，写在壳身上；撤了描边之后写字那一层同高＝160）',
+    !!shell5 && rpxEq(shell5.h, 160, 4) && !!ta5 && rpxEq(ta5.h, 160, 4),
     `壳 ${shell5 && toRpx(shell5.h).toFixed(1)}／框 ${ta5 && toRpx(ta5.h).toFixed(1)}rpx`)
   // E6~E9 这一组 10-16 改口径：站长「把原文翻译的开关上移到与返回同一行左边，三个tab全局都可用」
   // ＋「默认是翻译，关闭就不翻译」。原来那四条钉的是"展开态才出现、默认关、离开焦点跟着撤"，
@@ -563,6 +703,20 @@ const ck = (name, ok, got) => {
     !!swBox6 && !!panelBox6 && !!outBox6 && swBox6.bottom <= panelBox6.top + 1
     && Math.abs(swMid - outMid) <= 8,
     `开关 ${swBox6 && swBox6.top.toFixed(1)}~${swBox6 && swBox6.bottom.toFixed(1)}（中 ${swMid && swMid.toFixed(1)}）／那一行中 ${outMid && outMid.toFixed(1)}／面板顶 ${panelBox6 && panelBox6.top.toFixed(1)}`)
+  /* E6c/E6d 站长 10-16 第三刀的两头，在屏上量：
+       「药丸按钮改为最靠左」＝这一组**第一枚就是轨道**（左沿与整组左沿同一条线，名字与说明排在它右边）；
+       「文字说明字体样式与返回一样」＝同一档字号（computed font-size 逐字相等）。
+     钉渲染不钉源码：样式表里写了 `flex-start` 却被人用 order／margin 搬回右边，静态读不出来。 */
+  const [trackR6, labR6, hintR6] = await rects(['.wr-sw-track', '.wr-sw-lab', '.wr-sw-hint'])
+  ck('E6c 轨道落在这一组最左（名字在它右边、说明在名字右边，三枚按这个次序排）',
+    !!swBox6 && !!trackR6 && !!labR6 && !!hintR6
+    && Math.abs(trackR6.left - swBox6.left) <= 1
+    && trackR6.right <= labR6.left + 1 && labR6.right <= hintR6.left + 1,
+    `组左 ${swBox6 && swBox6.left.toFixed(1)}／轨道 ${trackR6 && `${trackR6.left.toFixed(1)}~${trackR6.right.toFixed(1)}`}／名字 ${labR6 && labR6.left.toFixed(1)}／说明 ${hintR6 && hintR6.left.toFixed(1)}`)
+  const hintFsPx = await cssOf('.wr-sw-hint', 'font-size')
+  const backFsPx = await cssOf('.out-r', 'font-size')
+  ck('E6d 那句说明与「返回」同一档字号（computed 逐字相等，不是各自写同一个 rpx 猜的）',
+    !!hintFsPx && hintFsPx === backFsPx, `说明 ${hintFsPx}／返回 ${backFsPx}`)
   await mp.screenshot({ path: `${OUT}/E-文字-展开两行.png` })
   await (await page.$('.wr-sw')).tap()
   await sleep(700)
@@ -571,10 +725,21 @@ const ck = (name, ok, got) => {
     d.writeTranslate === false && d.active === 'write' && !d.busy && (await page.$$('.panel')).length === 1,
     `${d.writeTranslate}/${d.active}/${d.busy}`)
   const offT = await styleOf('.wr-sw-track')
+  // 关掉那一刻屏上读到的那句：站长给的原话（字典里那一枚），两态必须换、且不许被截断成省略号。
+  const hintOff = await txtOf('.wr-sw-hint')
   await (await page.$('.wr-sw')).tap()
   await sleep(700)
   const onT = await styleOf('.wr-sw-track')
+  const dOn = await page.data()
+  const hintOn = await txtOf('.wr-sw-hint')
   ck('E8 开与关那一面换了色（两态看得出来）', !!offT && !!onT && offT !== onT, `${offT} → ${onT}`)
+  ck('E8b 关那一档的面是**灰**（这一页那支墨的 50%），开那一档才是提炼那支橙（站长「关闭状态，按钮变灰」）',
+    /rgba\(35,\s*37,\s*44,\s*0\.5\)/.test(offT || '') && /rgb\(196,\s*84,\s*31\)/.test(onT || ''),
+    `关 ${offT}／开 ${onT}`)
+  ck('E8c 文案跟着这一位换（开一句、关一句，都从字典现读；两态各自截不断）',
+    hintOn === dOn.t.translateOn && hintOff === dOn.t.translateOff && hintOn !== hintOff
+    && !/…$/.test(hintOn) && !/…$/.test(hintOff),
+    `开「${hintOn}」／关「${hintOff}」`)
   await (await page.$('.field-area')).trigger('blur')
   await sleep(800)
   d = await page.data()
@@ -734,11 +899,91 @@ const ck = (name, ok, got) => {
   ck('H5 英文那句放得进条里（不溢出轨道）',
     !!sldTxt && !!sldBox && sldTxt.left >= sldBox.left && sldTxt.right <= sldBox.right,
     sldTxt && sldBox && `字 ${Math.round(sldTxt.w)}px／轨道 ${Math.round(sldBox.w)}px`)
+  /* H6 10-16 说明那句从 18rpx 抬到与「返回」同档（24rpx）——英文那侧字比中文长，
+     这一档抬上去到底放不放得下，静态那把按 0.5em 折算是**估**，这一条量的是屏上真渲染：
+     ① 读出来就是字典那一枚（没被省略号吃掉），② 它的右沿不超过「返回」的左沿（超了就是折行/挤出）。 */
+  const hintEN = await txtOf('.wr-sw-hint')
+  const hintR = (await rects(['.wr-sw-hint']))[0]
+  ck('H6 英文那一档说明那句读得全、且不与「Back」打架（抬到同字号之后真量一次）',
+    hintEN === d.t.translateOn && !/…$/.test(hintEN || '') && !!hintR && !!outR && hintR.right <= outR.left + 1,
+    `读到的「${hintEN}」／字典「${d.t.translateOn}」／说明右 ${hintR && hintR.right.toFixed(1)}／Back 左 ${outR && outR.left.toFixed(1)}`)
   await mp.screenshot({ path: `${OUT}/H-英文链接档.png` })
   // 这里原来还有一句"改回 zh"的守卫式赋值（同上，空操作）。收尾本来就有
   // `lang.pin(mp, langBefore)` 把进来时那一档还回去，不需要第二个人做同一件事。
 
   await lang.pin(mp, langBefore)
+  /* ---------- P 照片那一档第三枚「粘贴」（站长 10-16 原话「照片第三个按钮，改为"粘贴"从剪贴板
+     粘贴图片，如果非图片，就直接跳转到链接，或者文字」）----------
+     放在最后、且在语言还回去之后：这一节要重新进页面、要改 `wx.getClipboardData`，
+     夹在中间会把后面几节的"零张照片态"顶掉。
+     ⚠ 不拿真系统剪贴板测：一把尺子每跑一趟就把站长按过的东西换掉一次，那是副作用不是取证。
+       替身按 F 节 `chooseMedia` 那一套路写（success 与 complete 都发完，只发一条是假绿），
+       三种回话各钉一次：文本＝像链接的串、文本＝不像链接的串、不回话（图片那一型的实测形状：
+       两个回调六秒零回话，所以这一型只能靠超时那一条认）。 */
+  await mp.evaluate(() => {
+    if (wx.__rawPaste) return
+    wx.__rawPaste = wx.getClipboardData
+    wx.__pasteData = ''
+    wx.__pasteMode = 'ok'
+    wx.getClipboardData = (o) => {
+      if (wx.__pasteMode === 'silent') return
+      if (wx.__pasteMode === 'fail') {
+        const e = { errMsg: 'getClipboardData:fail mock' }
+        if (o.fail) o.fail(e)
+        if (o.complete) o.complete(e)
+        return
+      }
+      const res = { errMsg: 'getClipboardData:ok', data: wx.__pasteData }
+      if (o.success) o.success(res)
+      if (o.complete) o.complete(res)
+    }
+  })
+  page = await enter('/pages/create/create')
+  await sleep(4000)
+  await top()
+  await openEntry()
+  const pasteMini = (await page.$$('.mini'))[1]
+  ck('P0 替身挂上了、且照片那一档那三枚圈在屏上（第三枚就是要点的那一枚）',
+    !!pasteMini && (await page.$$('.crow .mini')).length === 2)
+  const LINK_PROBE = 'https://mp.weixin.qq.com/s/pasteProbe'
+  await mp.evaluate((s) => { wx.__pasteMode = 'ok'; wx.__pasteData = s }, LINK_PROBE)
+  await pasteMini.tap()
+  await sleep(900)
+  d = await page.data()
+  ck('P1 剪贴板里是链接 → 跳到「链接」那一档，串填进框、且判成合法（不是只切了档没带东西）',
+    d.active === 'url' && d.urlInput === LINK_PROBE && d.urlHint === 'ok' && !d.hintLine,
+    `档 ${d.active}／框「${d.urlInput}」／hint ${d.urlHint}／气泡「${d.hintLine || '无'}」`)
+  await top()
+  await (await page.$$('.md'))[0].tap()
+  await sleep(700)
+  const TEXT_PROBE = '一句不像链接的中文'
+  await mp.evaluate((s) => { wx.__pasteMode = 'ok'; wx.__pasteData = s }, TEXT_PROBE)
+  await (await page.$$('.crow .mini'))[1].tap()
+  await sleep(900)
+  d = await page.data()
+  ck('P2 剪贴板里是别的文字 → 跳到「文字」那一档，且原文框里真有这句',
+    d.active === 'write' && String(d.writeBody || '').includes(TEXT_PROBE) && !d.hintLine,
+    `档 ${d.active}／原文「${String(d.writeBody || '').slice(0, 24)}」`)
+  await top()
+  await (await page.$$('.md'))[0].tap()
+  await sleep(700)
+  await mp.evaluate(() => { wx.__pasteMode = 'silent' })
+  await (await page.$$('.crow .mini'))[1].tap()
+  await sleep(WAIT_PASTE_MS + 900)
+  d = await page.data()
+  ck('P3 不回话那一型（图片就是这样）：超时那条把话说出来，不许按下去静默',
+    d.hintLine === d.t.pasteNoText, `气泡「${d.hintLine || '空'}」／该「${d.t.pasteNoText}」`)
+  await top()
+  await mp.evaluate(() => { wx.__pasteMode = 'fail' })
+  await (await page.$$('.crow .mini'))[1].tap()
+  await sleep(900)
+  d = await page.data()
+  ck('P4 fail 那一型单独一句（与"读不出文字"不是一件事，也不许多等那 1.5 秒）',
+    d.hintLine === d.t.pasteReadFail, `气泡「${d.hintLine || '空'}」／该「${d.t.pasteReadFail}」`)
+  await mp.evaluate(() => {
+    if (wx.__rawPaste) { wx.getClipboardData = wx.__rawPaste; delete wx.__rawPaste }
+  })
+  await mp.screenshot({ path: `${OUT}/P-粘贴那一枚.png` })
   await mp.close()
   console.log(bad.length ? `\n失败 ${bad.length} 条：\n  ✗ ` + bad.join('\n  ✗ ') : '\n真跑全过')
   process.exit(bad.length ? 1 : 0)

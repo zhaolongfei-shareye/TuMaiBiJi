@@ -87,6 +87,12 @@ const SLD_SLOP_RPX = 12
 // 3600ms 是"读完最长那句（英文 43 个字母）再抬眼"的那一档；再短会让人怀疑自己看漏了。
 const HINT_MS = 3600
 
+/* 照片那一档「粘贴」小圆等多久算"读不出文字"。这一枚不是拍的：10-16 在模拟器里做过 A/B—
+   剪贴板放纯文本时 getClipboardData 立刻回 success；放图片（pbpaste 侧确认是 «class PNGf» 41582 字节）
+   时 success 与 fail 两个回调六秒一个都没回来。图片这条平台根本不给东西，所以只能靠"没有回话"
+   认出它，然后说一句实话。2000ms 是"点了没反应、该给一句"那一档，比 HINT_MS 短。 */
+const PASTE_WAIT_MS = 2000
+
 /* 左块那一张人物与它的剪影：键名、两张路径、谁在前都在 utils/person.js（列表页那两处要画同一个人）。
    10-10 深夜改口：换性别不再靠"连点两下"，改成点右后方那枚淡灰剪影换位（见 swapPerson）。 */
 
@@ -757,6 +763,53 @@ Page({
       },
       fail: () => {
         this.sayErr(t('pasteFailed', this.data.lang))
+      },
+    })
+  },
+
+  // 照片那一档第三枚小圆（站长 10-16 原话「照片第三个按钮，改为"粘贴"从剪贴板粘贴图片，
+  // 如果非图片，就直接跳转到链接，或者文字」）。
+  // ⚠ 图片那一半平台做不到，这条是实测出来的、不是照文档猜的：剪贴板里确认放了 PNG
+  //   （`pbpaste` 那侧读到 «class PNGf» 41582 字节），模拟器里 `wx.getClipboardData` 的
+  //   **success 与 fail 两个回调六秒内一个都没回来**；换成纯文本就正常回 `{errMsg, data}`。
+  //   也就是说这一门只把"文字"给出来，图片它既不报错也不给东西 ⇒ 只能靠超时那一条认出来。
+  // 落点按他这句话分：像链接的字符串就跳「链接」那一档并把串填进去，其余的跳「文字」那一档。
+  // 多行原文框沿用 onPasteWrite 的语义（已有内容时接在后面，不顶掉他打好的字）。
+  onPasteAny() {
+    if (this.data.busy) return
+    if (this._pasteTimer) clearTimeout(this._pasteTimer)
+    this._pasteTimer = setTimeout(() => {
+      this._pasteTimer = null
+      this.sayErr(t('pasteNoText', this.data.lang))
+    }, PASTE_WAIT_MS)
+    const stop = () => {
+      if (this._pasteTimer) {
+        clearTimeout(this._pasteTimer)
+        this._pasteTimer = null
+      }
+    }
+    wx.getClipboardData({
+      success: (res) => {
+        stop()
+        const s = String((res && res.data) || '').trim()
+        if (!s) {
+          this.sayErr(t('pasteNoText', this.data.lang))
+          return
+        }
+        if (isLink(s)) {
+          // errLine 不在这里清：open() 那一段本来就把它与气泡一起抹了，
+          // 在这里再写一遍等于同一件事两处记（判据钉的就是"每一处写 errLine 都要过一遍 _sync"）。
+          this.setData({ urlInput: s })
+          this.open('url')
+          return
+        }
+        const had = this.data.writeBody
+        this.setData({ writeBody: had ? `${had.replace(/\s+$/, '')}\n${s}` : s })
+        this.open('write')
+      },
+      fail: () => {
+        stop()
+        this.sayErr(t('pasteReadFail', this.data.lang))
       },
     })
   },

@@ -511,17 +511,23 @@ ok('文字框配了 box-sizing:border-box（不配它 height:100% ＋ 上内边�
   /box-sizing:\s*border-box/.test(seg('.field-area')),
   seg('.field-area').replace(/\s+/g, ' '))
 // 上内边距是**算出来对齐**的数，不是留白：链接格那行字由 align-items:center 竖直居中，
-// 字顶离壳的内容上沿 = (壳 105 − 边框 3×2 − 行高 28×1.5) / 2 = 28.5；textarea 的字从自己
-// 的内容顶顺着排，所以给同一个数才齐。改了字号/边框/壳高，这一条会红着提醒三头要一起动。
-ok('框的上内边距就是"与链接格那行字对齐"算出来的那一个（±1rpx）',
+// 字顶离壳顶 = 边框 ＋ (壳 105 − 边框×2 − 行高 28×1.5) / 2；textarea 的字从自己的内容顶顺着排，
+// 所以给同一个数才齐。⚠ 边框这一枚**从 `.field` 自己身上现量**，不再吃全局 `--w-edge`：
+// 10-16 站长「输入框风格不要白线」⇒ 壳那条浅色描边整条撤了，边框＝0，算式跟着变成
+// (105 − 42) / 2 = 31.5（原来那条 `28 ＋ 边框 3 = 31` 的写法作废）。改了字号/边框/壳高，这条会红着提醒。
+ok('框的上内边距就是"与链接格那行字对齐"算出来的那一个（±1rpx，边框从 .field 现量）',
   (() => {
     const pt = parseFloat((seg('.field-area').match(/padding:\s*([\d.]+)rpx/) || [, ''])[1])
     const lh = parseFloat((seg('.field-area').match(/line-height:\s*([\d.]+)/) || [, ''])[1])
-    const edge = parseFloat(TOK['w-edge'])
+    const edge = num(seg('.field'), 'border') || 0          // 撤了白线就是 0
     const line = parseFloat(TOK['fs-body']) * lh
-    return Number.isFinite(pt) && Number.isFinite(lh) && Math.abs(pt - (fieldH - 2 * edge - line) / 2) <= 1
+    return Number.isFinite(pt) && Number.isFinite(lh) && Math.abs(pt - (edge + (fieldH - 2 * edge - line) / 2)) <= 1
   })(),
-  `padding ${(seg('.field-area').match(/padding:\s*([^;]+)/) || [, ''])[1]}／算出 ${(fieldH - 2 * parseFloat(TOK['w-edge']) - parseFloat(TOK['fs-body']) * parseFloat((seg('.field-area').match(/line-height:\s*([\d.]+)/) || [, '1'])[1])) / 2}`)
+  (() => {
+    const lh = parseFloat((seg('.field-area').match(/line-height:\s*([\d.]+)/) || [, '1'])[1])
+    const edge = num(seg('.field'), 'border') || 0
+    return `padding ${(seg('.field-area').match(/padding:\s*([^;]+)/) || [, ''])[1]}／算出 ${edge + (fieldH - 2 * edge - parseFloat(TOK['fs-body']) * lh) / 2}（壳边框 ${edge}）`
+  })())
 /* 10-10 深夜改的口：白卡里**上白边必须等于下白边**（站长原话「面板内最上面的白边高度，
    与最下面的白边高度不一样，应该调整为与最下面的一样，把多出来的高度放在三个tab部分」）。
    原来两档 auto（框上面＋条上面）把富余对半分，上白边就成了 padding＋半份、下白边只有 padding，
@@ -604,12 +610,17 @@ ok('空着不许起拖：onSlideStart 里 !ready 直接挡在门口，并且把�
 ok('三档共用同一枚 ready：readyFor() 只有一处定义、只有一处写进 data（"链接与文字一致"靠的就是这一条）',
   (js.match(/readyFor\(\)\s*\{/g) || []).length === 1 && (js.match(/ready: this\.readyFor\(\)/g) || []).length === 1,
   `定义 ${(js.match(/readyFor\(\)\s*\{/g) || []).length} 处 / 写入 ${(js.match(/ready: this\.readyFor\(\)/g) || []).length} 处`)
-// 那一圈与轨道同色（旧稿是纸白环、10-10 换浅面之后是井那一档），关键是它写在 .sld 的
-// border 上、而填充是绝对定位的兄弟节点——圆滑到最右也不会把它盖掉。
+/* 那一圈写在 .sld 的 border 上、而填充是绝对定位的兄弟节点——圆滑到最右也不会把它盖掉。
+   10-16 站长「右滑的一样设计」＋「不要明显的分界线」⇒ 我一度把面与这一圈刷成**同一枚**色，
+   以为"同色＝看不见"。他 17:2x 拿真机截图指着那条黑边打回：同色半透刷两层恰恰看得见——
+   `background` 默认铺到 border-box，边那一圈底下已经有一层，border 再刷一层 ⇒ 实算 α .856。
+   截图上竖着穿过条左沿：条身 (113,114,118)／边圈 (65,67,72)／面板 (198,199,202)。
+   ⇒ 边只留结构、不留颜色（`transparent`）；宽度仍是 5rpx：圆的落点、行程上界与填充左沿都从它算出来
+   （上面 SLD_MAX 那两条与 `验-录入面板沉底-真跑` 现量的是同一个数）。 */
 ok('圆外面那一圈是轨道自己的 border，进度填充盖不到它',
-  /border:\s*\d+rpx solid var\(--cp-field\)/.test(seg('.sld'))
-  && /background:\s*var\(--cp-field\)/.test(seg('.sld'))
-  && /position:\s*absolute/.test(seg('.sld-fill')) && !/z-index/.test(seg('.sld-fill')))
+  /border:\s*5rpx solid transparent/.test(seg('.sld'))
+  && /position:\s*absolute/.test(seg('.sld-fill')) && !/z-index/.test(seg('.sld-fill')),
+  seg('.sld').replace(/\s+/g, ' ').slice(0, 120))
 ok('进度那一格是假进度：封顶 90%、按 exp 曲线推、完成才钉满',
   /Math\.min\(90, Math\.round\(90 \* \(1 - Math\.exp\(-sec \/ 30\)\)\)\)/.test(js)
   && /fillPct: 100/.test(js))
@@ -817,43 +828,53 @@ ok('客户端把这一位显式发成 true／false 两个字符串（省掉就�
   `两处：${(apiJs.match(/translate: translate \? 'true' : 'false'/g) || []).length}`)
 ok('落点是整行、用 catchtap（面板外壳挂着收起，冒上去就顺手收了）',
   /class="wr-sw \{\{writeTranslate \? 'wr-sw-on' : ''\}\}" catchtap="onToggleTranslate">/.test(wxml))
-ok('两态各吃一对令牌，不在规则里写死色',
-  /\.wr-sw-track\s*\{[^}]*background: var\(--face\)/.test(wxss)
-  && /\.wr-sw-dot\s*\{[^}]*background: var\(--face-ink\)/.test(wxss)
+ok('两态各吃一对令牌，不在规则里写死色（关＝灰面配白点，开＝那枚橙面配白点）',
+  /\.wr-sw-track\s*\{[^}]*background: var\(--cp-ink-50\)/.test(wxss)
+  && /\.wr-sw-dot\s*\{[^}]*background: var\(--cp-card\)/.test(wxss)
   && /\.wr-sw-on \.wr-sw-track\s*\{[^}]*background: var\(--solid-bg\)/.test(wxss)
   && !/\.wr-sw[^{]*\{[^}]*(#[0-9A-Fa-f]{3,8}|rgba\()/.test(wxss))
 ok('几何闭合：面 72、点 32、左右各留 4 ⇒ 位移只能是 32',
   num(seg('.wr-sw-track'), 'width') === 72 && num(seg('.wr-sw-dot'), 'width') === 32
   && /transform: translateX\(32rpx\)/.test(seg('.wr-sw-on .wr-sw-dot')))
+/* 「药丸按钮改为最靠左」（站长 10-16 原话）＝这一组里**第一枚就是轨道**，名字与说明跟在后面。
+   钉的是模板里的次序，不是样式里的 order：靠 order 翻出来的"最左"在朗读顺序与热区上都还是反的。 */
+ok('轨道排在这一组第一枚（模板次序，不是靠 order 翻的）',
+  /class="wr-sw \{\{writeTranslate \? 'wr-sw-on' : ''\}\}" catchtap="onToggleTranslate">\s*<view class="wr-sw-track">/.test(wxml)
+  && !/order:/.test(seg('.wr-sw-track')) && !/order:/.test(seg('.wr-sw')),
+  wxml.slice(wxml.indexOf('class="wr-sw '), 0 + wxml.indexOf('class="wr-sw ') + 120).replace(/\s+/g, ' '))
 const HINT_W = {}
-/* ---------- 「原文翻译」那句小字注释（站长 10-11 13:5x 点的丙案） ----------
-   他先给的草稿是「开启后可自动把英文译成中文」，两处与事实不符：这一枚只改**提炼输出的语言**
-   （`llm.py` 里 `_LANG_ZH`／`_LANG_KEEP` 那两行），原文不动；而且吃的不是只有英文。
-   ⇒ 注释照它实际改的东西写。四条各钉一头：挂在同一行、两态都在、语义不许回退到"译原文"、宽度中英各算。 */
-const hintRow = (/class="wr-sw[\s\S]*?wr-sw-track/.exec(wxml) || [''])[0]
-ok('那句注释与开关同一行（另起一行要抬面板高，他两轮说过面板不许挡脸），且吃的是字典那一位',
-  /class="wr-sw-hint">\{\{t\.origTranslateHint\}\}<\/text>\s*<view class="wr-sw-track"/.test(wxml)
-  && !!zh.origTranslateHint && !!en.origTranslateHint, `zh「${zh.origTranslateHint}」／en「${en.origTranslateHint}」`)
-ok('注释不跟着开关走：节点上没有 `wx:if="{{writeTranslate`（开着那句、关掉不能没有注释）',
-  !/wx:if="\{\{writeTranslate/.test(hintRow) && /wr-sw-hint/.test(hintRow))
-ok('语义两头钉：说的是**摘要**，不是"把原文译成中文"（英文那侧也不许出现 translate）',
-  /摘要/.test(zh.origTranslateHint) && !/原文[^，。]*[译翻]/.test(zh.origTranslateHint)
-  && !/translat/i.test(en.origTranslateHint), `${zh.origTranslateHint} ｜ ${en.origTranslateHint}`)
-ok('注释比名字退一档：字号吃 --fs-micro、色吃 --face-ph，规则里没有写死的色',
-  num(seg('.wr-sw-hint'), 'font-size') === num(seg('.wr-sw-lab'), 'font-size') - 6
-  && /color:\s*var\(--face-ph\)/.test(seg('.wr-sw-hint'))
+/* ---------- 「原文翻译」旁边那句说明（10-16 第三刀换了口径） ----------
+   原来那句是一行不变的注释（站长 10-11 点的丙案「不管哪种语言，摘要都写成中文」），
+   10-16 他直接给了**两态各一句**：开→「识别到外文自动翻译成中文」，关→「已关闭自动翻译」，
+   并且要求这句的字体样式与「返回」一样。⇒ 原来那三条各钉一头（"注释不许跟着开关走"、
+   "说的是摘要不是原文"、"注释比名字退一档"）前提全没了，按「撤一个状态会作废一批判据」改口径：
+   现在钉的是①跟着这一位走 ②两枚键中英各一份 ③中文照他原话一个字不许改 ④那一句退役串一处不剩
+   ⑤字号字色与「返回」同档 ⑥两态宽度中英各算一次。 */
+const i18nSrc = fs.readFileSync(P('utils/i18n.js'), 'utf8')
+ok('说明那句跟着状态走（三元取 translateOn／translateOff），两枚键中英都有',
+  /class="wr-sw-hint">\{\{writeTranslate \? t\.translateOn : t\.translateOff\}\}<\/text>/.test(wxml)
+  && !!zh.translateOn && !!zh.translateOff && !!en.translateOn && !!en.translateOff,
+  `zh 开「${zh.translateOn}」关「${zh.translateOff}」／en 开「${en.translateOn}」关「${en.translateOff}」`)
+ok('两句中文照他 10-16 的原话，一个字不许改、不许缩',
+  zh.translateOn === '识别到外文自动翻译成中文' && zh.translateOff === '已关闭自动翻译',
+  `${zh.translateOn} ｜ ${zh.translateOff}`)
+ok('退役那句一处不剩（模板、字典、样式表里都不许还留着 origTranslateHint）',
+  !/origTranslateHint/.test(wxml) && !/origTranslateHint/.test(i18nSrc) && !zh.origTranslateHint)
+ok('说明那句与「返回」同一档字号、同一支字色，且不再单独压 α（"样式与返回一样"三条一起才算）',
+  num(seg('.wr-sw-hint'), 'font-size') === num(seg('.out'), 'font-size')
+  && num(seg('.wr-sw-lab'), 'font-size') === num(seg('.out'), 'font-size')
+  && /color:\s*inherit/.test(seg('.out .wr-sw-hint')) && !/opacity/.test(seg('.out .wr-sw-hint'))
   && !/(#[0-9A-Fa-f]{3,8}|rgba?\()/.test(seg('.wr-sw-hint')),
-  `注释 ${num(seg('.wr-sw-hint'), 'font-size')}rpx ／ 名字 ${num(seg('.wr-sw-lab'), 'font-size')}rpx`)
+  `说明 ${num(seg('.wr-sw-hint'), 'font-size')}／名字 ${num(seg('.wr-sw-lab'), 'font-size')}／那一行 ${num(seg('.out'), 'font-size')}rpx`)
 // 宽度：汉字按 1em、拉丁按 0.5em 估（与上面英文占位字那条同一口径）。
-// ⚠ 10-16 这一枚搬过家，**预算跟着换容器**：原来吃卡内宽 598，现在它住在框外那一行里，
-// 那一行的可用宽＝750 − `.entry-wrap` 左右内缩 ×2 − `.out` 自己 padding ×2 −「返回」那一枚的字宽
-// （两头靠 space-between 分开，中间没有 gap，所以不必再扣缝）。折行会把那一行顶破 ⇒ 红。
+// ⚠ 预算算在**框外那一行**上：750 − `.entry-wrap` 左右内缩 ×2 − `.out` 自己 padding ×2 −「返回」那一枚的字宽。
+//    10-16 这一档字号从 18 抬到 24（与「返回」同档），说明那句一下子宽了一整档 ⇒ 两态各算一次，
+//    取最宽那一态才拦得住"关掉之后折行"这一型（折行会把 44rpx 那一行顶破＝红）。
 const hintFs = num(seg('.wr-sw-hint'), 'font-size')
 const labFs = num(seg('.wr-sw-lab'), 'font-size')
 const trackW = num(seg('.wr-sw-track'), 'width')
-// `margin: 0 16 0 12` 那一条简写由 lens 拆成四个数，左右两头就是第 2 与第 4 位
-const mHint = lens(seg('.wr-sw-hint'), 'margin')
-const hintGap = (mHint[1] !== undefined ? mHint[1] : 0) + (mHint[3] !== undefined ? mHint[3] : mHint[1] || 0)
+// 缝现在写在两枚自己身上：轨道右边一条、说明左边一条（说明那句在这一组末尾，不再需要右缝）
+const hintGap = (num(seg('.wr-sw-track'), 'margin-right') || 0) + (num(seg('.wr-sw-hint'), 'margin-left') || 0)
 const dockInset2 = num(seg('.container.entry-dock .entry-wrap'), 'left')     // 与上面第 401 行那一枚同一个来源
 const mOut = lens(seg('.out'), 'padding')
 const outPad = mOut[1] !== undefined ? mOut[1] : mOut[0]
@@ -861,17 +882,145 @@ const backW = 2 * num(seg('.out'), 'font-size')      // 「返回」两个字，
 const outInnerW = 750 - 2 * dockInset2 - 2 * outPad - backW
 ;[['zh', zh], ['en', en]].forEach(([tag, d]) => {
   // 中日韩汉字＋全角标点算 1em，其余（拉丁字母、空格、半角标点）算 0.5em。
-  // ⚠ 名字与注释**两头都要过这道折算**：英文那侧名字 `Translate original` 也是 18 个字母，
-  //    只把注释按 0.5em 折、名字按 1em 算，会算出 690rpx 这种假红（第一版就栽在这）。
+  // ⚠ 名字与说明**两头都要过这道折算**：英文那侧名字 `Translate original` 也是 18 个字母，
+  //    只把说明按 0.5em 折、名字按 1em 算，会算出 690rpx 这种假红（第一版就栽在这）。
   const wOf = (str, fs) => {
     const cjk = (str.match(/[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]/g) || []).length
     return cjk * fs + (str.length - cjk) * fs * 0.5
   }
-  const w = wOf(d.origTranslate, labFs) + wOf(d.origTranslateHint, hintFs) + trackW + hintGap
-  HINT_W[tag] = `${Math.round(w)}/${outInnerW}`
-  ok(`${tag} 那一行四头放得下（名字＋注释＋轨道＋「返回」≤ 那一行的可用宽，折行=红）`,
-    w + backW <= outInnerW, `三头 ${Math.round(w)} ＋ 返回 ${backW} ＝ ${Math.round(w + backW)} ≤ ${outInnerW}`)
+  const head = trackW + hintGap + wOf(d.origTranslate, labFs)
+  const onW = head + wOf(d.translateOn, hintFs)
+  const offW = head + wOf(d.translateOff, hintFs)
+  const w = Math.max(onW, offW)
+  HINT_W[tag] = `开 ${Math.round(onW)}／关 ${Math.round(offW)}/${outInnerW}`
+  ok(`${tag} 两态都放得下（轨道＋名字＋说明＋「返回」≤ 那一行的可用宽，折行=红）`,
+    w + backW <= outInnerW,
+    `最宽 ${Math.round(w)} ＋ 返回 ${backW} ＝ ${Math.round(w + backW)} ≤ ${outInnerW}（开 ${Math.round(onW)}／关 ${Math.round(offW)}）`)
 })
+/* ---------- 10-16 第六刀：输入框＝纯白，右滑条＝与底栏那一排同色 ----------
+   这一格今天来回三趟，前两趟都是我把"他形容的质感"当成了"他要的画法"：
+   第一趟 暗一档的井＝上下渐变＋inset 顶影＋一圈更深的墨边 ⇒ 打回「不要明显的分界线」；
+   第二趟 一层 68% 暗墨（`--well`）＋透明边 ⇒ 他拿真机截图打回「完全不是我要的效果，
+          输入框要纯白，右滑要与下方三个按钮 bar 同色」。
+   ⇒ 这一版的口径是两句可以量出来的话，不是一种"质感"：
+   ① `.field` ＝ `--cp-card`（createSkin 那支白），**实心**：没有描边、没有渐变、没有阴影、不挂滤镜；
+   ② `.sld` ＝ `--glass-chrome-dock` ＋ `--glass-bf`，与底栏那排**同一个色、同一层糊**——
+      这一枚不是我在这一页另挑的数，它就是 `palette.moodChromeOf()` 发给底栏组件的 `--chrome-bg`
+      （下面那条按五档各比一次字面相等，漂一格就红）；
+   ③ **两态同一个值**：`.container.has-bg` 那一队里不许再有 `.field`/`.sld`。原来那条 0-3-0 的覆盖
+      把基条的值整层换掉过两次（真跑读数：屏上 `rgba(214,219,227,.42)`，不是基条写的值），
+      连带逼出 `.container.has-bg .sld.sld-done` 那条 0-4-0——覆盖撤了，`.sld-done` 自己就现面；
+   ④ 极性跟着面翻回去：白底上必须是墨字（漏一处就是白底白字），条上是浅玻璃 ⇒ 也回墨族；
+   ⑤ 还得读得清：**混成实心之后**再算（alpha 不落地就是假数，§6.1 那条规矩），数从令牌现读不抄字面。 */
+const CHROME_SEG = (/--glass-chrome-dock:\s*([^;]+)/.exec(seg('.sld')) || [, ''])[1]
+ok('① 输入框＝纯白实心：面是 createSkin 那支白，描边／渐变／阴影／滤镜一样都没有',
+  /background:\s*var\(--cp-card\)(?![\w-])/.test(seg('.field'))
+  && !/border:/.test(seg('.field')) && !/linear-gradient/.test(seg('.field'))
+  && !/box-shadow/.test(seg('.field')) && !/backdrop-filter/.test(seg('.field')),
+  seg('.field').replace(/\s+/g, ' ').slice(0, 120))
+ok('② 右滑条＝底栏那一档：面吃 `--glass-chrome-dock` 单单一层、那一圈不刷色，外沿换成发光，糊与底栏同一档、两条成对',
+  /background:\s*var\(--glass-chrome-dock\)(?![\w-])/.test(seg('.sld'))
+  && /border:\s*5rpx solid transparent/.test(seg('.sld'))
+  && /box-shadow:\s*0 0 24rpx 2rpx var\(--glass-plate-dock\)(?![\w-])/.test(seg('.sld'))
+  && !/linear-gradient/.test(seg('.sld'))
+  && /backdrop-filter:\s*var\(--glass-bf\)/.test(seg('.sld'))
+  && /-webkit-backdrop-filter:\s*var\(--glass-bf\)/.test(seg('.sld')),
+  seg('.sld').replace(/\s+/g, ' ').slice(0, 150))
+/* ②c 这一条钉的是"黑边"那个根因本身，不是它这一次的写法：
+   同一枚半透令牌既当 `background` 又当 `border` 的颜色 ⇒ border-box 上那一圈被刷两遍
+   （简写 `background:` 默认铺到 border-box 底下），实算 α 比面深一整档＝屏上一条硬边。
+   扫全页：任何一段里"面与圈同一枚玻璃令牌"都算回来了一版被打回的画法。 */
+const doublePaint = wxss.split(/\n(?=\S)/).filter((blk) => {
+  if (!/\{/.test(blk)) return false
+  const bg = /(?:^|;)\s*background:\s*var\((--glass-[a-z-]+)\)/.exec(blk)
+  const bd = /(?:^|;)\s*border(?:-color)?:[^;]*var\((--glass-[a-z-]+)\)/.exec(blk)
+  return !!(bg && bd && bg[1] === bd[1])
+}).map((blk) => (/[.#][\w-]+/.exec(blk) || ['?'])[0])
+ok('②c 全页没有"同一枚玻璃令牌既当面、又当那一圈"的画法（那就是那条黑边，撤了不许回来）',
+  doublePaint.length === 0, doublePaint.join(' ｜ ') || '零处')
+ok('②d 发光那一枚吃的是五档已有的 `piece` 那一档（不新起第六枚色），五档各带自己的浅色',
+  palette.MOODS.every((m) => {
+    const v = palette.moodVars(m.key)['--glass-plate-dock']
+    const c = /rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/.exec(v || '')
+    return !!c && Math.min(+c[1], +c[2], +c[3]) >= 150 && +c[4] === 0.72
+  }),
+  palette.MOODS.map((m) => `${m.key} ${palette.moodVars(m.key)['--glass-plate-dock'] || '缺'}`).join(' ／ '))
+/* ②b "同色"不能是我嘴上说的同色：底栏那枚面的值由 `moodChromeOf()` 现算，这一条把五档各抽一次，
+   与 app.wxss 里那一枚 `--glass-chrome-dock` 比字面。少这一条，下一轮换心情／改 α 就是两处各漂各的。 */
+const chromeDrift = palette.MOODS.filter((m) => m.key !== 'ink').map((m) => {
+  const css = (/\.mood-[a-z]+\s*\{([^}]*)\}/.exec(
+    (() => { const all = fs.readFileSync(P('app.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+      return (new RegExp(`\\.mood-${m.key}\\s*\\{[^}]*\\}`).exec(all) || [''])[0] })()) || [, ''])[1]
+  const tok = (/--glass-chrome-dock:\s*([^;]+)/.exec(css) || [, ''])[1].trim().replace(/\s*,\s*/g, ', ').replace(/\(\s+/g, '(')
+  const live = palette.moodChromeOf(m.key).bg.replace(/\s*,\s*/g, ', ').replace(/\(\s+/g, '(')
+  return tok === live ? '' : `${m.key}：app.wxss ${tok || '缺'} ≠ 底栏 ${live}`
+}).filter(Boolean)
+ok('②b 这一枚与底栏组件拿到的 `--chrome-bg` 五档各比一次字面相等（"与下方三个按钮 bar 同色"落在这条上）',
+  chromeDrift.length === 0, chromeDrift.join('；') || '五档齐')
+ok('③ 两态不分叉：`.container.has-bg` 那一队里不再有 `.field`／`.sld`／`.sld-done`（有＝基条白写，10-16 栽过两次）',
+  !/\.container\.has-bg[^{]*\.(field|sld)\b/.test(wxss),
+  (wxss.match(/\.container\.has-bg[^{]*\.(?:field|sld)\b[^{]*/g) || []).slice(0, 2).join(' ｜ ') || '一条没有')
+ok('③b 完成那一帧不必再抬权重：`.sld-done`（0-1-0）面是那支橙、那一圈同样不刷色，且这一页没有压它的第二层',
+  /background:\s*var\(--cp-extract\)(?![\w-])/.test(seg('.sld-done'))
+  && /border-color:\s*transparent/.test(seg('.sld-done'))
+  && !/--well\b/.test(wxss),
+  seg('.sld-done').replace(/\s+/g, ' ') || '没这一条')
+ok('④ 极性跟着面翻：白框上四处全是墨族（正文／占位／✕／粘贴图形），条上那三档跟着心情翻（不钉死墨）',
+  /color:\s*var\(--cp-ink\)(?![\w-])/.test(seg('.field'))
+  && /color:\s*var\(--cp-ink\)(?![\w-])/.test(seg('.field-input'))
+  && /color:\s*var\(--face-ph\)/.test(seg('.field-ph')) && /color:\s*var\(--cp-ink-62\)/.test(seg('.field-x'))
+  && /background:\s*var\(--cp-ink-62\)/.test(seg('.paste-glyph'))
+  && /color:\s*var\(--stage-ink-solid\)/.test(seg('.sld-txt'))
+  && /color:\s*var\(--stage-ink-dim\)/.test(seg('.sld-off .sld-txt'))
+  && /color:\s*var\(--stage-ink-solid\)/.test(seg('.sld-busy .sld-txt'))
+  && !/color:\s*var\(--cp-ink\)(?![\w-])/.test(seg('.sld-txt')))
+// ⑤ 混成实心再算（alpha 不落地就是假数——§6.1 那条规矩，也是 10-16 那条"PIL 画布丢 alpha"的同一条）。
+//    两枚背景都取**下界**那一档，不是某一态的快照：
+//    框：`--cp-card` 实心白，没有第二层可说；
+//    条：`.62` 那枚玻璃压在它能遇到的**最深**那块底上——底栏自己背后就是心情那一支玻璃满色，
+//        所以拿 mood.glass 满色当底（比压在白卡上深，墨字更难读）。
+const RGBA = (s) => {
+  const hex = /^\s*#([\da-f]{2})([\da-f]{2})([\da-f]{2})\s*$/i.exec(s)
+  if (hex) return [1, 2, 3].map((i) => parseInt(hex[i], 16)).concat(1)
+  const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/.exec(s)
+  return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null
+}
+// 把一枚可能带 alpha 的色混到 base（三元组）上，回 hex。
+const solid = (color, base) => {
+  const c = RGBA(color)
+  if (!c) return ''
+  const ch = (i) => Math.round(c[i] * c[3] + base[i] * (1 - c[3]))
+  return `#${[0, 1, 2].map((i) => ch(i).toString(16).padStart(2, '0')).join('')}`
+}
+const inkStr = (/--cp-ink:([^;]+)/.exec(skin) || [, '#23252C'])[1].trim()
+const phStr = (/--cp-ink-38:([^;]+)/.exec(skin) || [, ''])[1].trim()
+const cardStr = (/--cp-card:([^;]+)/.exec(skin) || [, '#FFFFFF'])[1].trim()
+const CARD = RGBA(cardStr)
+const inkHex = solid(inkStr, CARD)
+const phHexOnCard = solid(phStr, CARD)
+const cr = (fg, bg) => palette.crOf(fg, bg)
+// 条上那一档：五档各混一次，报最差那一档（"同色"是跟着心情走的，读数也必须跟着五档跑）
+const overA = (rgb, a, base) => {
+  const c = RGBA(rgb)
+  return c ? `#${[0, 1, 2].map((i) => Math.round(c[i] * a + base[i] * (1 - a)).toString(16).padStart(2, '0')).join('')}` : ''
+}
+const chromeReadings = palette.MOODS.map((m) => {
+  const bg = solid(palette.moodChromeOf(m.key).bg, palette.hexToRgb(palette.moodOf(m.key).glass))
+  const t = palette.moodOf(m.key).text
+  return { k: m.key, bg, ink: cr(t, bg), dim: cr(overA(t, 0.72, palette.hexToRgb(bg)), bg) }
+})
+const chromeWorst = chromeReadings.slice().sort((a, b) => a.ink - b.ink)[0]
+/* ⚠ 这一条只钉正文那一档（≥4.5 是 AA 对正文的线，也是 §6.1 那两枚橙用的同一条）。
+   占位那一枚（`--cp-ink-38`＝现网旧档，不是这一轮改出来的）**只报数不钉门槛**：
+   3.0 那道线是我 10-16 自己加的，站长没拍过——按"不许自加门槛"那条，撤掉判据、把读数留在后面。 */
+ok('⑤ 白框上那句正文压得起纯白（≥4.5，混成实心之后算）；占位那一档只报读数（现网旧档，门槛我没拍过）',
+  cr(inkHex, cardStr) >= 4.5,
+  `正文 ${inkHex} 压白 ${cr(inkHex, cardStr).toFixed(2)}｜占位 ${phStr.trim()} 混成 ${phHexOnCard} `
+  + `${cr(phHexOnCard, cardStr).toFixed(2)}（这一档现网一直如此，要抬得他一句）`)
+ok('⑤b 条上那句跟着心情翻的字，压在"底栏那一档混到最深那一底"上五档全 ≥4.5；退一层那档 ≥3',
+  chromeWorst.ink >= 4.5 && Math.min(...chromeReadings.map((x) => x.dim)) >= 3,
+  chromeReadings.map((x) => `${x.k} ${x.ink.toFixed(2)}/${x.dim.toFixed(2)}`).join('　')
+  + `｜最差 ${chromeWorst.k} 面 ${chromeWorst.bg}`)
 /* ---------- 10-16 搬家带出来的三条 ----------
    ① 皮吃的五枚别名必须定义在 `.container` 上：它们原来写在 `.panel` 里面，而这一行在 `.panel`
       **外面**——别名留在面板里，`var(--face)` 解析不到值，轨道当场画成透明（同一类坑的正本记在
@@ -918,6 +1067,41 @@ ok('一句停 8 秒', /\}, 8000\)/.test(js) && !/\}, 4000\)/.test(js))
 ok('图片备份那条 B 链仍与建笔记那条并行、不 await',
   /const backup = this\._backupShots\(batch\)/.test(js) && !/await this\._backupShots/.test(js))
 ok('失败时那批孤儿对象仍然删（_settleBackup(null, …)）', /this\._settleBackup\(null, backup\)/.test(js))
+
+/* ---------- 注释被自己写的"闭合符"提前关掉（10-16 真跑整批红过一次，根因在这） ----------
+   10-16 那一趟不是判据红，是**模拟器整页起不来**：pageStack 空、currentPage() 报
+   getPageMetaByWebviewId(...) is null，IDE 后台日志只有一句「编译 .wxss 文件错误」不给行号。
+   根因是 .field 上面那段说明里，我在中间写了一次注释闭合符（星杠连写），
+   注释到那儿就关掉了，后面三行中文正文直接落进样式表 ⇒ 微信的 WXSS 编译器整文件拒绝 ⇒ 全站没有页面。
+   ⚠ 静态尺子原来查不出来：它按"非贪婪"剥注释，与编译器同一口径，剥完剩下的正文它不读、也不钉。
+   这一条按编译器的口径重剥一遍，凡是剥完还剩"行首是中文"的，就是同一颗雷（不限这一页——
+   哪一个 wxss 踩了都是全站起不来，所以扫全仓）。⚠ 这一段注释里不许再出现那对连写的符号，
+   否则这条判据的说明自己就是那颗雷（写这条的当场就踩了一次）。 */
+const stripComments = (src) => {
+  let out = '', i = 0
+  while (i < src.length) {
+    if (src[i] === '/' && src[i + 1] === '*') { const j = src.indexOf('*/', i + 2); i = j < 0 ? src.length : j + 2; continue }
+    out += src[i]; i += 1
+  }
+  return out
+}
+const walkWxss = (d, acc = []) => {
+  fs.readdirSync(d, { withFileTypes: true }).forEach((e) => {
+    const p = path.join(d, e.name)
+    if (e.isDirectory()) walkWxss(p, acc); else if (p.endsWith('.wxss')) acc.push(p)
+  })
+  return acc
+}
+const dangling = []
+walkWxss(P('')).forEach((f) => {
+  stripComments(fs.readFileSync(f, 'utf8')).split('\n').forEach((line, n) => {
+    if (/^\s*[^\x00-\x7F]/.test(line) && !/^\s*[^\x00-\x7F]*\{\s*$/.test(line)) {
+      dangling.push(`${path.relative(ROOT, f)}:${n + 1} 「${line.trim().slice(0, 24)}」`)
+    }
+  })
+})
+ok('全仓 wxss 里没有"注释被提前关掉后裸露的中文正文"（这一条红了＝模拟器起不来，不是某条判据红）',
+  dangling.length === 0, dangling.slice(0, 4).join('；'))
 
 // 这两叠高度是 §2 那两行算式的读数：改了字号/间距/控件之后它们会变，规格文档引的就是这两个数。
 // 10-16 站长那句「把原文翻译的开关上移到与返回同一行左边」之后，**展开那一档的卡里只剩两样**

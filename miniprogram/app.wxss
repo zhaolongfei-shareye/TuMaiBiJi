@@ -304,7 +304,11 @@ page {
    ⚠ 值不许手改：改了要连着 `docs/工具/验-五档彩色玻璃.js` 一起改，那条尺子拿 palette 现算逐字对。
    ⚠ `page{}` 里那几枚玻璃原值一个字不动——它是**没挂上心情类时的兜底**，
       也是墨档那份的出处；`.mood-ink` 这一叠与它逐字相同，就是"默认态零变化"的证据。
-   ⚠ `--glass-hair` 不在这一叠里：描边那枚五档一律留白（玻璃自己的反光，不是玻璃的本色）。 */
+   ⚠ `--glass-hair` 不在这一叠里：描边那枚五档一律留白（玻璃自己的反光，不是玻璃的本色）。
+   ⚠ `--glass-chrome-dock` ＝**底栏那一排（＋／列表／人物）的本色**：α .62 这一档不是随手挑的，
+   它就是 `utils/palette.js` 里 `moodChromeOf()` 发给那枚组件的 `--chrome-bg`（同一个函数、同一个 .62）。
+   第二屏那枚右滑长条吃这一枚 ⇒ 站长那句"与下方三个按钮 bar 同色"是一枚令牌，不是两处各抄一遍。
+   两处不许漂：`验-玻璃令牌齐不齐` 现读 palette 那个 .62 与这一枚的 α 比，五档各比一次。 */
 
 .mood-ink {
   --glass-veil: rgba(255, 255, 255, 0.30);
@@ -313,6 +317,7 @@ page {
   --glass-fill: rgba(255, 255, 255, 0.20);
   --glass-plate-dock: rgba(255, 255, 255, 0.72);
   --glass-fill-dock: rgba(255, 255, 255, 0.42);
+  --glass-chrome-dock: rgba(35, 37, 44, 0.62);
   --stage-face: linear-gradient(180deg, rgba(35, 37, 44, 0.16) 0%, rgba(35, 37, 44, 0.94) 43.8%, rgba(35, 37, 44, 0.95) 43.8%, rgba(35, 37, 44, 0.95) 100%);
   --stage-face-open: linear-gradient(180deg, rgba(35, 37, 44, 0.16) 0%, rgba(35, 37, 44, 0.94) 36%, rgba(35, 37, 44, 0.95) 36%, rgba(35, 37, 44, 0.95) 100%);
   --stage-strip: linear-gradient(180deg, rgba(35, 37, 44, 0.94) 0%, rgba(35, 37, 44, 0.80) 55%, rgba(35, 37, 44, 0.16) 100%);
@@ -340,6 +345,7 @@ page {
   --glass-fill: rgba(220, 213, 209, 0.20);
   --glass-plate-dock: rgba(220, 213, 209, 0.72);
   --glass-fill-dock: rgba(220, 213, 209, 0.42);
+  --glass-chrome-dock: rgba(177, 162, 153, 0.62);
   --stage-face: linear-gradient(180deg, rgba(177, 162, 153, 0.16) 0%, rgba(177, 162, 153, 0.94) 43.8%, rgba(177, 162, 153, 0.95) 43.8%, rgba(177, 162, 153, 0.95) 100%);
   --stage-face-open: linear-gradient(180deg, rgba(177, 162, 153, 0.16) 0%, rgba(177, 162, 153, 0.94) 36%, rgba(177, 162, 153, 0.95) 36%, rgba(177, 162, 153, 0.95) 100%);
   --stage-strip: linear-gradient(180deg, rgba(177, 162, 153, 0.94) 0%, rgba(177, 162, 153, 0.80) 55%, rgba(177, 162, 153, 0.16) 100%);
@@ -367,6 +373,7 @@ page {
   --glass-fill: rgba(210, 225, 214, 0.20);
   --glass-plate-dock: rgba(210, 225, 214, 0.72);
   --glass-fill-dock: rgba(210, 225, 214, 0.42);
+  --glass-chrome-dock: rgba(155, 188, 163, 0.62);
   --stage-face: linear-gradient(180deg, rgba(155, 188, 163, 0.16) 0%, rgba(155, 188, 163, 0.94) 43.8%, rgba(155, 188, 163, 0.95) 43.8%, rgba(155, 188, 163, 0.95) 100%);
   --stage-face-open: linear-gradient(180deg, rgba(155, 188, 163, 0.16) 0%, rgba(155, 188, 163, 0.94) 36%, rgba(155, 188, 163, 0.95) 36%, rgba(155, 188, 163, 0.95) 100%);
   --stage-strip: linear-gradient(180deg, rgba(155, 188, 163, 0.94) 0%, rgba(155, 188, 163, 0.80) 55%, rgba(155, 188, 163, 0.16) 100%);
@@ -394,6 +401,7 @@ page {
   --glass-fill: rgba(222, 216, 226, 0.20);
   --glass-plate-dock: rgba(222, 216, 226, 0.72);
   --glass-fill-dock: rgba(222, 216, 226, 0.42);
+  --glass-chrome-dock: rgba(181, 168, 191, 0.62);
   --stage-face: linear-gradient(180deg, rgba(181, 168, 191, 0.16) 0%, rgba(181, 168, 191, 0.94) 43.8%, rgba(181, 168, 191, 0.95) 43.8%, rgba(181, 168, 191, 0.95) 100%);
   --stage-face-open: linear-gradient(180deg, rgba(181, 168, 191, 0.16) 0%, rgba(181, 168, 191, 0.94) 36%, rgba(181, 168, 191, 0.95) 36%, rgba(181, 168, 191, 0.95) 100%);
   --stage-strip: linear-gradient(180deg, rgba(181, 168, 191, 0.94) 0%, rgba(181, 168, 191, 0.80) 55%, rgba(181, 168, 191, 0.16) 100%);
@@ -421,6 +429,7 @@ page {
   --glass-fill: rgba(214, 219, 227, 0.20);
   --glass-plate-dock: rgba(214, 219, 227, 0.72);
   --glass-fill-dock: rgba(214, 219, 227, 0.42);
+  --glass-chrome-dock: rgba(164, 176, 192, 0.62);
   --stage-face: linear-gradient(180deg, rgba(164, 176, 192, 0.16) 0%, rgba(164, 176, 192, 0.94) 43.8%, rgba(164, 176, 192, 0.95) 43.8%, rgba(164, 176, 192, 0.95) 100%);
   --stage-face-open: linear-gradient(180deg, rgba(164, 176, 192, 0.16) 0%, rgba(164, 176, 192, 0.94) 36%, rgba(164, 176, 192, 0.95) 36%, rgba(164, 176, 192, 0.95) 100%);
   --stage-strip: linear-gradient(180deg, rgba(164, 176, 192, 0.94) 0%, rgba(164, 176, 192, 0.80) 55%, rgba(164, 176, 192, 0.16) 100%);

@@ -56,10 +56,55 @@ ok('粘进去的字走与手打同一趟：hintFor ＋ _sync（右滑那一枚�
   /this\.hintFor\(/.test(body) && /this\._sync\(\)/.test(body))
 ok('粘来的字符串先 trim（微信分享出去的那一坨前后常带空白与句子）', /\.trim\(\)/.test(body))
 
-for (const k of ['paste', 'pasteEmpty', 'pasteFailed']) {
+for (const k of ['paste', 'pasteEmpty', 'pasteFailed', 'pasteNoText', 'pasteReadFail']) {
   const n = (i18n.match(new RegExp(`\\n\\s*${k}:`, 'g')) || []).length
   ok(`字典里 ${k} 中英两边都有`, n === 2, `只找到 ${n} 处`)
 }
+
+/* ---------- 10-16 照片那一档第三枚小圆（站长原话「照片第三个按钮，改为"粘贴"从剪贴板粘贴图片，
+   如果非图片，就直接跳转到链接，或者文字」）----------
+   这一枚原来是"跳到链接那一档"，与上面 `.modes` 那三枚里的「链接」是同一个落点的第二个入口。
+   他这句是把它换成粘贴，不是把链接那一档撤了 ⇒ 模式行那三枚必须还在（下面第一条钉这个）。
+   图片那一半平台做不到（实测：剪贴板是图片时 success 与 fail 六秒一个都不回来），
+   所以钉三样：① 有一条超时的路能说话（不许静默）；② 说的话是"读不出文字／图片贴不进来"，
+   不许糊成"剪贴板是空的"；③ 像链接的串走 url 那一档、其余走 write 那一档，两档都真的把值填进去。 */
+const crowBlk = (() => {
+  const m = /class="crow">([\s\S]*?)\n {8}<\/view>/.exec(wxml)
+  return m ? m[1] : ''
+})()
+ok('照片那一排找得到（找不到说明结构变了，下面全判不了）', crowBlk.length > 0, '正则没捞到那一段')
+ok('那一排还是三枚（相册／拍照／粘贴），第三枚不再兼任跳链接',
+  (crowBlk.match(/class="mini"/g) || []).length === 2 && /catchtap="onPasteAny"/.test(crowBlk)
+  && !/data-tab="url"/.test(crowBlk))
+ok('链接那一档的入口没跟着丢（模式行那三枚仍在）',
+  (wxml.match(/data-tab="(photo|url|write)"/g) || []).length === 3)
+ok('第三枚的字与读屏标签都吃字典里的 paste（屏上不出现字典外的界面话）',
+  /aria-label="\{\{t\.paste\}\}"/.test(crowBlk) && /\{\{t\.paste\}\}<\/text>/.test(crowBlk))
+ok('第三枚用的是剪贴板那支图形，不是原来那支链接',
+  /glyph-clipboard/.test(crowBlk) && !/glyph-link/.test(crowBlk))
+
+const anyFn = (/onPasteAny\(\)\s*\{([\s\S]*?)\n  \},/).exec(js)
+ok('create.js 里有 onPasteAny', !!anyFn)
+const anyBody = anyFn ? anyFn[1] : ''
+ok('它先挡 busy（与另两枚粘贴同一条规矩）', /if \(this\.data\.busy\) return/.test(anyBody))
+ok('它真的读剪贴板：走 wx.getClipboardData', /wx\.getClipboardData\(/.test(anyBody))
+/* 平台那一半做不到，靠"没有回话"认出来 ⇒ 必须真有一条超时的路，而且它要说话。
+   钉 PASTE_WAIT_MS 那一枚：数写在页顶常量里（与 SLD_* 同一套路），判据现读，不抄字面毫秒。 */
+ok('有一条超时兜底，且它把话说出来（图片态两个回调都不回，不兜底就是按下去没反应）',
+  /setTimeout\([\s\S]*?PASTE_WAIT_MS/.test(anyBody) && /pasteNoText/.test(anyBody))
+ok('超时的毫秒数写在页顶常量、注释里带实测依据（不许在 handler 里手写一个数）',
+  /const PASTE_WAIT_MS = (\d+)/.test(js) && /getClipboardData/.test(js))
+ok('像链接的串跳「链接」那一档并把串填进 urlInput，其余跳「文字」那一档并填 writeBody',
+  /isLink\(s\)/.test(anyBody) && /urlInput: s/.test(anyBody) && /this\.open\('url'\)/.test(anyBody)
+  && /writeBody:/.test(anyBody) && /this\.open\('write'\)/.test(anyBody))
+ok('粘来的串先 trim（微信分享出去那一坨前后常带空白与句子）', /\.trim\(\)/.test(anyBody))
+ok('文字那一档不许顶掉已打好的字（有内容时接在后面，与 onPasteWrite 同一语义）',
+  /had \? `\$\{had\.replace\(\/\\s\+\$\/, ''\)\}\\n\$\{s\}` : s/.test(anyBody))
+ok('三条出口都说话、不静默，且用词分开：空或读不出＝pasteNoText，fail＝pasteReadFail',
+  (anyBody.match(/this\.sayErr\(/g) || []).length >= 3 && !/wx\.showToast/.test(anyBody)
+  && /pasteReadFail/.test(anyBody) && /fail:/.test(anyBody))
+ok('超时那条在 success／fail 任一回话时清掉（否则回话之后还会再补一句，气泡说两遍）',
+  /clearTimeout\(this\._pasteTimer\)/.test(anyBody))
 
 const seg = (sel) => {
   const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -83,8 +128,12 @@ ok('.glyph-clipboard 有图形，且与那批同 24 格、同 1.6 描边',
 // 那串 svg 是 URL 编码进 data-uri 的，尖括号在文件里长这样：%3Crect
 ok('图形是剪贴板（板身加夹子），不是随手画的别的形状',
   /%3Crect width='8' height='4' x='8' y='2'/.test(shape) && /M16 4h2a2 2 0 0 1 2 2v14/.test(shape))
-ok('那枚图形吃的是这一页的墨色档（跟 ✕ 同档，不抢输入框的视觉重心）',
-  /var\(--cp-ink-62\)/.test(glyph), glyph || '没读到')
+// 这一枚与 ✕ 同档（"跟 ✕ 同档"这一条从 10-10 起没变过），变的只是那一档压在哪一面：
+// 10-16 最后一趟他拿着真机截图定的「输入框要纯白」⇒ 面回到 `--cp-card` 实心白，
+// 字与图形跟着回到墨族那一档 `--cp-ink-62`（这一枚就是它 10-16 之前的值，等于把中间那两趟作废）。
+ok('那枚图形与 ✕ 同一档、且是白框上读得出的那一档（跟 ✕ 同档，不抢输入框的视觉重心）',
+  /var\(--cp-ink-62\)/.test(glyph) && /var\(--cp-ink-62\)/.test(seg('.field-x')),
+  `${glyph.replace(/\s+/g, ' ')}｜✕ ${seg('.field-x').replace(/\s+/g, ' ')}`)
 
 // 反向钉：三处各撤一下，判据必须红（证明钉的是真东西，不是恒真）
 const cutPaste = (src) => src.replace(/\s*<view class="field-paste"[\s\S]*?<\/view>/, '')

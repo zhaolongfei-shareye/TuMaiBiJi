@@ -197,27 +197,27 @@
   <view wx:if="{{active}}" class="entry-wrap">
     <!-- 框外那一行：左边「原文翻译」那枚开关，右边「返回」。
          「返回」的历史：10-08 站长「这一行移出框外」，10-14「第二屏，Tips 去掉，back 抬到暗面板上面」
-         ⇒ 这一行只剩它一枚，且整枚坐在深色面板**之上**（见 .out 那条的账）；Tips 仍在首屏右列那一格
-         （`.blk-tips`），一个功能只留一个入口。「返回」与笔记列表、笔记卡片右上角那一枚同一个词、同一个动作。
-         10-16 站长两刀落在同一句里：「把原文翻译的开关上移到与返回同一行左边，三个tab全局都可用」
-         ＋「默认是翻译，关闭就不翻译」。于是这一行从"只剩一枚"变成两枚：
-         ① 开关从卡子里搬进来，并撤掉 `active === 'write' && panelOpen` 那道闸——这一行三档都在，
-            开关就三档都在（照片那档 OCR 出来的英文与手打的英文到了提炼那一步是同一串字，没理由只让文字档翻）。
-         ② 默认改成开（`create.js` data 那一位），提炼完那一次复位也回 true，不然第一篇之后默认就悄悄变回关。
-         ⚠ 皮吃的 `--face`／`--face-ink`／`--solid-bg`／`--solid-ink` 四枚别名已跟着抬到 `.container`：
+         ⇒ 右半只剩它一枚，且整枚坐在深色面板**之上**（见 .out 那条的账）；Tips 仍在首屏右列那一格
+         （`.blk-tips`），一个功能只留一个入口。
+         10-16 站长在这一行上连下三刀：
+         ①「把原文翻译的开关上移到与返回同一行左边，三个tab全局都可用」⇒ 开关从卡里搬进来，并撤掉
+            `active === 'write' && panelOpen` 那道闸——这一行三档都在，开关就三档都在；
+         ②「默认是翻译，关闭就不翻译」⇒ 默认改成开（`create.js` data 那一位），提炼完那一次复位也回 true；
+         ③「药丸按钮改为最靠左，文字说明字体样式与返回一样」⇒ 这一组里三枚的**次序**是
+            轨道 → 名字 → 说明，说明那句与「返回」同字号同字色（吃 `.out` 那一支 @70）。
+         说明那句现在**跟着这一位走**（开一句、关一句，站长各给了原话），不再是一句两态共用的注释。
+         ⚠ 皮吃的 `--face`／`--face-ink`／`--face-ph`／`--solid-bg`／`--solid-ink` 五枚别名仍挂在 `.container`：
             它们原来写在 `.panel` 里面，这一行在 `.panel` 外面，不抬就解析不到值、轨道画成透明
             （同一类坑的正本记在 `验-第一屏三块.js` 钉的那条 `--cp-*` 上）。
          ⚠ 字色吃 `.out` 那一支 @70（`color: inherit`），深浅翻转跟的是**这一行整块矩形**
             （`toneRects()` 量的就是 `.out`）⇒ 左半那两行字与右半那个「返回」永远同一个极性。 -->
     <view class="out">
       <view class="wr-sw {{writeTranslate ? 'wr-sw-on' : ''}}" catchtap="onToggleTranslate">
-        <text class="wr-sw-lab">{{t.origTranslate}}</text>
-        <!-- 站长 10-11 13:5x 点的那句小字（丙：「不管哪种语言，摘要都写成中文」）。三头钉死：
-             ① 与开关**同一行**——搬进框外这一行之后这一条天然成立，行里放不下就得撤它，不许另起一行；
-             ② 不跟着 `writeTranslate` 走——开着那句、关掉不能没有注释；
-             ③ 说的是**摘要**不是原文：这一枚只改提炼输出的语言，原文存进来什么样就是什么样。 -->
-        <text class="wr-sw-hint">{{t.origTranslateHint}}</text>
         <view class="wr-sw-track"><view class="wr-sw-dot"></view></view>
+        <text class="wr-sw-lab">{{t.origTranslate}}</text>
+        <!-- 两态各一句，站长 10-16 给的原话（`i18n.js` 的 translateOn／translateOff）。
+             这句紧跟名字、与「返回」同一档字号同一支字色；放不下由 `验-统一录入条` 中英各算一次钉住。 -->
+        <text class="wr-sw-hint">{{writeTranslate ? t.translateOn : t.translateOff}}</text>
       </view>
       <text class="out-r" role="button" aria-label="{{t.back}}" catchtap="collapse">{{t.back}}</text>
     </view>
@@ -234,7 +234,8 @@
 
       <view class="card">
         <!-- 照片 · 还没选图：三枚圈。中间那枚大的（白环＋实心）就是快门，是全篇唯一的大钮；
-             左边小圆走相册、右边小圆跳到链接那一档。三个图形都带字，没有裸图。 -->
+             左边小圆走相册、右边小圆读剪贴板（10-16 站长把这一枚从"跳链接"改口成"粘贴"）。
+             三个图形都带字，没有裸图。 -->
         <view wx:if="{{active === 'photo' && !previewImages.length}}" class="crow">
           <view class="mini" catchtap="pickImage" data-source="album" aria-label="{{t.fromAlbum}}">
             <view class="mini-c"><view class="mini-glyph glyph-images"></view></view>
@@ -244,9 +245,9 @@
             <view class="shut"><view class="shut-core"><view class="shut-glyph glyph-camera"></view></view></view>
             <text class="shut-lb">{{t.takePhoto}}</text>
           </view>
-          <view class="mini" catchtap="onTab" data-tab="url" aria-label="{{t.modeUrl}}">
-            <view class="mini-c"><view class="mini-glyph glyph-link"></view></view>
-            <text class="mini-lb">{{t.modeUrl}}</text>
+          <view class="mini" catchtap="onPasteAny" aria-label="{{t.paste}}">
+            <view class="mini-c"><view class="mini-glyph glyph-clipboard"></view></view>
+            <text class="mini-lb">{{t.paste}}</text>
           </view>
         </view>
 

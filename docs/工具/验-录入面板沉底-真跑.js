@@ -326,7 +326,7 @@ const STATES = [
   ck('填充那一格真的按 fillPct 画出宽度（42% ≈ 轨道内宽的 42%）',
     !!sldFill && !!sldBox && near(sldFill.w, (sldBox.w - 2 * rpx(len(seg('.sld'), 'border'))) * 0.42, rpx(12)),
     sldFill && sldBox && `填充 ${(sldFill.w * 750 / win.windowWidth).toFixed(0)}rpx／轨道 ${(sldBox.w * 750 / win.windowWidth).toFixed(0)}rpx`)
-  ck('进度那一格仍然盖不到那圈白边（左沿 == 边框内侧）',
+  ck('进度那一格仍然盖不到那一圈结构边（左沿 == 边框内侧；10-16 起这一圈不刷色，量的是它还在不在）',
     !!sldFill && near(sldFill.left, sldBox.left + rpx(len(seg('.sld'), 'border')), 2),
     sldFill && `填充左 ${sldFill.left.toFixed(1)}｜轨道左 ${sldBox.left.toFixed(1)}`)
   await mp.screenshot({ path: `${OUT}/沉底-忙态进度42.png` })

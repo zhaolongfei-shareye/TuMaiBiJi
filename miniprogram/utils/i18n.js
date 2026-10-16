@@ -304,6 +304,11 @@ const i18n = {
     paste: '粘贴',
     pasteEmpty: '剪贴板里还没有链接',
     pasteFailed: '读不到剪贴板，麻烦长按输入框再粘',
+    // 10-16 照片那一档那枚「粘贴」小圆专用（它落点不在输入框上，所以不能复用上面那两句）。
+    // 平台事实：剪贴板里是图片时 getClipboardData 两个回调都不回来（实测六秒零回话），
+    // 所以这一句要把"图片贴不进来"直说，不许糊成"剪贴板是空的"。
+    pasteNoText: '剪贴板里读不出文字，图片贴不进来',
+    pasteReadFail: '读不到剪贴板，麻烦换到链接或文字那一档再粘',
     clear: '清空',
     // 10-08：那排「清空 / 开始提炼」的按钮整排撤了，改成"右滑才开始提炼"那一枚长条。
     // 好处是他给的那张参考图说的——先滑过去，等于让用户把这一屏看清楚再动手。
@@ -327,16 +332,18 @@ const i18n = {
     permCamera: '没拿到相机权限，点这里去设置',
     permAlbum: '没拿到相册权限，点这里去设置',
     pickFailed: '没能打开相机或相册，请再试一次',
-    // 站长 10-04：「我贴一条纯英文的，界面也是英文，不明白为什么提炼的时候自动翻译成中文」。这一枚开关默认关，
-    // 关＝摘要跟着原文的语言走；打开才整理成中文。叫法用他原话「原文翻译」，不改口。
+    // 站长 10-04 要的这枚开关，叫法用他原话「原文翻译」，不改口。10-16 两刀落在同一句里：搬到「返回」同一行
+    // ＋「默认是翻译，关闭就不翻译」⇒ 这一位现在**默认开**（`create.js` data 那一位，三档的请求都带上它）。
+    // 开＝提炼出来的标题／摘要／要点／标签写成中文；关＝跟着原文的语言走。原文本身两种状态下都不动。
     origTranslate: '原文翻译',
-    /* 站长 10-11 13:5x 点的那句小字注释（丙）。他先给的草稿是「开启后可自动把英文译成中文」，两处对不上事实：
-       ① 这一枚改的是**提炼出来的标题／摘要／要点／标签用什么语言写**（`backend/app/services/llm.py` 里
-         `_LANG_ZH`／`_LANG_KEEP` 那两行），原文本身一个字不动，笔记里存的还是那段英文；
-       ② 不止英文——日文、法文都吃这一枚（提示词里明写"是日文就写日文"）。
-       ⇒ 注释照**它实际改的那个东西**写，不照名字、也不照草稿。英文那侧没跟"不管哪种语言"这半句，
-       因为容器是按中文排的：`Translate original` 那 18 个字母已经吃掉 216rpx，再长就折行（折行＝红，宽度由尺子算）。 */
-    origTranslateHint: '不管哪种语言，摘要都写成中文',
+    /* 名字旁边那句说明：站长 10-16 直接给了两态各自的文案，跟着这一位走（开一句、关一句），
+       不再是一句两态共用的注释。原话照录，不改字、不缩句：
+         开 → 「识别到外文自动翻译成中文」
+         关 → 「已关闭自动翻译」
+       ⚠ 这一档现在与「返回」同字号（`--fs-meta` 24rpx），比原来那档小字宽大一整档 ⇒ 宽度由
+       `验-统一录入条` 中英各算一次钉住（放不下的是英文那句，折行＝红）。 */
+    translateOn: '识别到外文自动翻译成中文',
+    translateOff: '已关闭自动翻译',
     needBody: '原文还空着',
     extractSucceeded: '已存入笔记',
     extractFailed: '提取失败，请重试',
@@ -660,6 +667,8 @@ const i18n = {
     paste: 'Paste',
     pasteEmpty: 'Nothing to paste yet',
     pasteFailed: "Can't read the clipboard — long-press the field to paste",
+    pasteNoText: "No text on the clipboard — images can't be pasted",
+    pasteReadFail: "Can't read the clipboard — paste from the Link or Text tab",
     clear: 'Clear',
     // 「清空 / 开始提炼」那排按钮撤了，换成右滑才开始的那枚长条（中文那段注释写了为什么）。
     slideExtract: 'Slide to extract',
@@ -677,11 +686,13 @@ const i18n = {
     permCamera: 'No camera access — tap to open settings',
     permAlbum: 'No album access — tap to open settings',
     pickFailed: 'Could not open the camera or album — please try again',
-    // 与中文那枚同一个开关：关＝摘要用原文的语言写，开＝整理成中文。
-    // 这里不写 "Translate"（光秃秃会被读成"把界面翻译一下"），点明翻的是原文。
+    // 与中文同一枚：开＝摘要整理成中文，关＝跟着原文的语言走。这里不写 "Translate"
+    // （光秃秃会被读成"把界面翻译一下"），点明翻的是原文。
     origTranslate: 'Translate original',
-    // 中文那半句"不管哪种语言"这一侧省掉：容器是按中文排的，加上就折行（宽度由 `验-统一录入条` 算）。
-    origTranslateHint: 'Summary in Chinese',
+    // 两态各一句。中文那句 12 个字，这一侧同一个字号放不下（容器按中文排的，宽度由尺子算），
+    // 所以只报状态，不复述"译成中文"。
+    translateOn: 'Auto-translate on',
+    translateOff: 'Auto-translate off',
     needBody: 'Add the text to work from',
     extractSucceeded: 'Saved to notes',
     extractFailed: 'Extract failed, please retry',

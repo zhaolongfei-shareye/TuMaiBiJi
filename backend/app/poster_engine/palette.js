@@ -422,6 +422,10 @@ function moodVars(key) {
     '--glass-fill': rgba(piece, 0.20),
     '--glass-plate-dock': rgba(piece, 0.72),
     '--glass-fill-dock': rgba(piece, 0.42),
+    /* 底栏那一排（＋／列表／人物）的**本色**：色取 `m.glass` 本身（不是面板那一档提亮过的 `piece`），
+       α .62 与 `moodChromeOf()` 发给底栏组件的 `--chrome-bg` 是同一个数。
+       第二屏那枚右滑长条吃这一枚 ⇒ "与底栏同色"是一枚令牌，不是两处各抄一遍。 */
+    '--glass-chrome-dock': rgba(g, 0.62),
     /* 面板那一整面：一层画完，不留两层交界（10-14 那条"中间多了条线"的根因，见 create.wxss）。
        带高 240rpx 换算成"占面板这一截高的几成"：闭合 240/548＝43.8%，展开 240/666＝36%。
        用百分比不用 rpx——停点落在 linear-gradient() 的参数里，rpx 换算不保证跟得进去（同文件上面那条）。 */
