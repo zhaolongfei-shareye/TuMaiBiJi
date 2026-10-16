@@ -184,10 +184,12 @@ ok('那一行小字存在且排在面板之前（在框外）',
   outAt > -1 && panelAt > outAt && wrapAt > -1 && outAt > wrapAt
   && /<view wx:if="\{\{active\}\}" class="entry-wrap">/.test(wxml),
   `wrap@${wrapAt} out@${outAt} panel@${panelAt}`)
-// 10-10 深夜这两枚换过内容；10-14 站长「第二屏，Tips 去掉」⇒ 这一行只剩「返回」一枚。
-ok('那一行只剩「返回」那一枚按钮（与笔记列表右上角同一个词、同一个动作）',
-  /class="out"[^>]*>\s*<text class="out-r"[^>]*role="button"[^>]*aria-label="\{\{t\.back\}\}"[^>]*catchtap="collapse"/.test(wxml),
-  (wxml.match(/<view class="out">[\s\S]{0,160}/) || [''])[0].replace(/\s+/g, ' '))
+// 10-10 深夜这两枚换过内容；10-14 站长「第二屏，Tips 去掉」⇒ 这一行只剩「返回」一枚；
+// 10-16 站长「把原文翻译的开关上移到与返回同一行左边」⇒ 又变两枚：左开关、右「返回」。
+// 「返回」那一头三条一个没松（同一个词、role=button、catchtap=collapse），只是不再独占这一行。
+ok('那一行两枚：左边那枚开关，右边仍是「返回」（与笔记列表右上角同一个词、同一个动作）',
+  /class="out"[\s\S]*?<view class="wr-sw [\s\S]*?<text class="out-r"[^>]*role="button"[^>]*aria-label="\{\{t\.back\}\}"[^>]*catchtap="collapse"/.test(wxml),
+  (wxml.match(/<view class="out">[\s\S]{0,200}/) || [''])[0].replace(/\s+/g, ' '))
 // 原来这一条钉 `.out-l` 的 nowrap，理由是"这一行在流内，一折行就把整块面板顶下去，而它每 8 秒换一句"。
 // 载体撤了一处，这条风险就没有载体了；换成钉**还在的那一处**：首屏那一格允许折两三行
 // （它就是按两行排的），靠 `flex:1 + min-width:0 + max-width:9em` 那一套，不许有人为了单行改回写死。
@@ -238,10 +240,19 @@ ok('空着滑到底：说一句、圆回弹（效果图 off 态那条），只�
 // 真跑那把（验-录入面板沉底-真跑.js）量"卡里最后一块沉到底没有"时，只能按类名一枚一枚 selectAll：
 // 这台工具的 selectorQuery **不认子选择器 `>`，也不认逗号表**（10-08 实测，两种写法都回 0 块），
 // 于是名单漏一枚就是"量不到却一条不响"。这里把名单里每一枚钉成"wxml 里有这个 class、wxss 里有这条规则"，
-// 改名这一类漂移会红；真要往卡里加第六块，名单得跟着加（这条钉不住漏加，是它够不到的地方，写明白）。
-ok('卡里那一层的块名就是真跑名单那五枚（改名要一起改名单）',
-  ['crow', 'strip', 'field', 'wr-sw', 'sld'].every((c) => new RegExp(`class="${c}[ "]`).test(wxml)
-    && new RegExp(`\\.${c}\\s*\\{`).test(wxss)))
+// 改名这一类漂移会红；真要往卡里加第五块，名单得跟着加（这条钉不住漏加，是它够不到的地方，写明白）。
+// 10-16 站长「把原文翻译的开关上移到与返回同一行左边」⇒ `.wr-sw` 从卡里搬到框外那一行，名单从五枚并到四枚。
+// 搬走不是消失：它由下面那组 `.out` 的判据钉（在框外那一行里、三档都画、默认开）。
+// 位置这一头用**源码里的先后**判，不用"隔多少个字符"那种距离启发式：
+// `class="out"` < `class="wr-sw"` < `class="panel` ⇒ 开关在框外那一行、不在面板肚子里。
+const iOut = wxml.indexOf('class="out"')
+const iSw = wxml.indexOf('class="wr-sw ')
+const iPanel = wxml.indexOf('class="panel ')
+ok('卡里那一层的块名就是真跑名单那四枚（改名要一起改名单）',
+  ['crow', 'strip', 'field', 'sld'].every((c) => new RegExp(`class="${c}[ "]`).test(wxml)
+    && new RegExp(`\\.${c}\\s*\\{`).test(wxss))
+  && iOut >= 0 && iSw > iOut && iPanel > iSw,
+  `out@${iOut}／wr-sw@${iSw}／panel@${iPanel}`)
 
 // ---------- 3. 一个功能只留一个入口 ----------
 ok('换背景只是导流，不弹相册', /goHomeBg\(\)\s*\{\s*wx\.navigateTo/.test(js) && !/goHomeBg[\s\S]{0,200}chooseMedia/.test(js))
@@ -448,9 +459,13 @@ ok('一个框 + 一枚条放得进收起那一档（还留一条报错行的位�
 // 展开那一档的"两行框"高度 10-10 深夜起写在壳（.field-write-2）身上：那格多包了一层，
 // textarea 只负责字、壳负责那一格多高（原生组件装不下子节点，那枚粘贴钮只能做兄弟）。
 const write2H = num(seg('.field-write-2'), 'height')
-ok('展开那一档装得下两行框 + 开关 + 条',
-  write2H + num(seg('.wr-sw'), 'height') + num(seg('.wr-sw'), 'margin-top') + sldH <= openCardInnerH,
-  `需 ${write2H + num(seg('.wr-sw'), 'height') + num(seg('.wr-sw'), 'margin-top') + sldH} ≤ ${openCardInnerH.toFixed(1)}`)
+// 10-16 之前这一条加总里还含 `.wr-sw` 那 48＋8（开关住在卡里）。站长「把原文翻译的开关上移到与返回
+// 同一行左边」⇒ 卡里只剩两行框与那一枚条，加总跟着改口径（改判据不改代码迁就旧尺子）。
+// ⚠ 搬走之后展开那一档多出 56rpx 富余，**面板那两档 372／490 一个数没动**（他拍过的数，
+//   撤一截留白是另一刀）：这条把富余打在读数里，不许它悄悄变成"看起来本来就这样"。
+ok('展开那一档装得下两行框 + 条（开关 10-16 已搬出卡里）',
+  write2H + sldH <= openCardInnerH,
+  `需 ${write2H}+${sldH}=${write2H + sldH} ≤ ${openCardInnerH.toFixed(1)}　富余 ${(openCardInnerH - write2H - sldH).toFixed(1)}（其中 56 是原来给开关那一行的，面板高没动）`)
 ok('两行框那一档仍然只比一行多一行（105 → 160，"展开只多一行"那句没被这轮改动顶掉）',
   write2H === 160 && fieldH === 105, `一行 ${fieldH} / 两行 ${write2H}`)
 /* 文字那一档补一枚粘贴（站长 10-10 深夜「文字tab，里面输入框也要提供粘贴ICON，与链接tab一致」）。
@@ -739,9 +754,11 @@ ok('图形仍对回文字那一行（行高钉 34 不随字档走，margin-top �
 ok('Tips 抬档后那枚小黄点还在第一行正中间（margin-top 随字档重算，别只改字号）',
   Math.abs(num(seg('.tips-dot'), 'margin-top') - (tipFs * 1.4 - 14) / 2) <= 1,
   `margin-top ${num(seg('.tips-dot'), 'margin-top')}，该行高 ${tipFs}×1.4`)
-ok('那一行不再需要 gap／margin 补缝（行里只剩「返回」一枚，靠 justify-content 落右）',
+// 10-16 之前这一行只剩一枚，`flex-end` 与 `space-between` 等价；开关搬进来之后这两头分得很开：
+// 钉的就是**必须靠 justify-content 分两头**，不许有人回来给谁补一枚 gap／margin-left（那样两头都不干净）。
+ok('那一行靠 justify-content 分两头（space-between），不靠 gap／margin 补缝',
   !/gap:/.test(seg('.out')) && !/margin-left:/.test(seg('.out-r'))
-  && /justify-content:\s*flex-end/.test(seg('.out')),
+  && /justify-content:\s*space-between/.test(seg('.out')),
   `.out＝${seg('.out').replace(/\s+/g, ' ').trim().slice(0, 70)}／.out-r＝${seg('.out-r').replace(/\s+/g, ' ').trim()}`)
 
 // ---------- 7. 提交链路：三档共用同一趟忙态时序 ----------
@@ -779,10 +796,25 @@ const jsBare = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 const NINE = jsBare.match(/count:\s*9\b|slice\(\s*0\s*,\s*9\s*\)|previewImages[\s\S]{0,30}\b9\b|length\s*[><=]+\s*9\b/g) || []
 ok('张数 9 在这一侧只写一次（比较、count、截断里没有裸 9）', NINE.length === 0, NINE.join(' ⎪ '))
 
-// 「原文翻译」那一枚：功能还在，位置改到展开那一档（10-08 我定的放置，判据跟着钉住）
-ok('开关仍在文字档，且只在这一档的展开态出现',
-  /wx:if="\{\{active === 'write' && panelOpen\}\}" class="wr-sw/.test(wxml))
-ok('默认关那一位没动', /writeTranslate: false,/.test(js))
+/* 「原文翻译」那一枚。10-16 站长两刀同一句：「上移到与返回同一行左边，三个tab全局都可用」
+   ＋「默认是翻译，关闭就不翻译」⇒ 原来那两条（"仍在文字档、只在展开态出现"、"默认关那一位没动"）
+   的前提都不在了，按「撤一个状态会作废一批判据」改口径，不拿代码去迁就旧尺子：
+   现在钉的是①住在框外那一行、②三档都画（节点上不许再有 active/panelOpen 那道闸）、③默认开。 */
+ok('开关住在框外那一行里（`.out` 之内、`.panel` 之外）',
+  /<view class="out">[\s\S]*?class="wr-sw [\s\S]*?<\/view>\s*<text class="out-r"/.test(wxml))
+ok('三档全局：节点上没有 `active ===` 或 `panelOpen` 那道闸（这一行三档都画，开关就三档都在）',
+  /class="wr-sw \{\{writeTranslate \? 'wr-sw-on' : ''\}\}/.test(wxml)
+  && !/wx:if="[^"]*(active|panelOpen)[^"]*"\s+class="wr-sw/.test(wxml))
+ok('默认开那一位（站长 10-16「默认是翻译」）', /writeTranslate: true,/.test(js))
+ok('提炼成功那一次复位回的是**默认那一档**，不是回关（只改默认不改这里＝第一篇之后悄悄变回关）',
+  /_extractDone\(result\.note_id, \{ writeBody: '', writeTranslate: true, bodyFocus: false \}\)/.test(js))
+ok('三档的请求都带上这一位（原来只有文字那条带，链接与照片两条不带 ⇒ 开关是枚摆设）',
+  /api\.ingestUrl\(url, this\.data\.writeTranslate\)/.test(js)
+  && /api\.ingestScreenshots\(batch, this\.data\.writeTranslate\)/.test(js))
+const apiJs = fs.readFileSync(P('utils/api.js'), 'utf8')
+ok('客户端把这一位显式发成 true／false 两个字符串（省掉就等于让后端回落 None＝不表态）',
+  (apiJs.match(/translate: translate \? 'true' : 'false'/g) || []).length === 2,
+  `两处：${(apiJs.match(/translate: translate \? 'true' : 'false'/g) || []).length}`)
 ok('落点是整行、用 catchtap（面板外壳挂着收起，冒上去就顺手收了）',
   /class="wr-sw \{\{writeTranslate \? 'wr-sw-on' : ''\}\}" catchtap="onToggleTranslate">/.test(wxml))
 ok('两态各吃一对令牌，不在规则里写死色',
@@ -812,14 +844,21 @@ ok('注释比名字退一档：字号吃 --fs-micro、色吃 --face-ph，规则�
   && /color:\s*var\(--face-ph\)/.test(seg('.wr-sw-hint'))
   && !/(#[0-9A-Fa-f]{3,8}|rgba?\()/.test(seg('.wr-sw-hint')),
   `注释 ${num(seg('.wr-sw-hint'), 'font-size')}rpx ／ 名字 ${num(seg('.wr-sw-lab'), 'font-size')}rpx`)
-// 宽度：汉字按 1em、拉丁按 0.5em 估（与上面英文占位字那条同一口径）。折行会把 48rpx 那一行顶破，
-// 而这一行的高度是"展开那一档剩下的富余"，一顶破就是面板装不下（那笔账在 §2 的算式里）。
+// 宽度：汉字按 1em、拉丁按 0.5em 估（与上面英文占位字那条同一口径）。
+// ⚠ 10-16 这一枚搬过家，**预算跟着换容器**：原来吃卡内宽 598，现在它住在框外那一行里，
+// 那一行的可用宽＝750 − `.entry-wrap` 左右内缩 ×2 − `.out` 自己 padding ×2 −「返回」那一枚的字宽
+// （两头靠 space-between 分开，中间没有 gap，所以不必再扣缝）。折行会把那一行顶破 ⇒ 红。
 const hintFs = num(seg('.wr-sw-hint'), 'font-size')
 const labFs = num(seg('.wr-sw-lab'), 'font-size')
 const trackW = num(seg('.wr-sw-track'), 'width')
 // `margin: 0 16 0 12` 那一条简写由 lens 拆成四个数，左右两头就是第 2 与第 4 位
 const mHint = lens(seg('.wr-sw-hint'), 'margin')
 const hintGap = (mHint[1] !== undefined ? mHint[1] : 0) + (mHint[3] !== undefined ? mHint[3] : mHint[1] || 0)
+const dockInset2 = num(seg('.container.entry-dock .entry-wrap'), 'left')     // 与上面第 401 行那一枚同一个来源
+const mOut = lens(seg('.out'), 'padding')
+const outPad = mOut[1] !== undefined ? mOut[1] : mOut[0]
+const backW = 2 * num(seg('.out'), 'font-size')      // 「返回」两个字，字号就是 `.out` 那一档
+const outInnerW = 750 - 2 * dockInset2 - 2 * outPad - backW
 ;[['zh', zh], ['en', en]].forEach(([tag, d]) => {
   // 中日韩汉字＋全角标点算 1em，其余（拉丁字母、空格、半角标点）算 0.5em。
   // ⚠ 名字与注释**两头都要过这道折算**：英文那侧名字 `Translate original` 也是 18 个字母，
@@ -829,10 +868,31 @@ const hintGap = (mHint[1] !== undefined ? mHint[1] : 0) + (mHint[3] !== undefine
     return cjk * fs + (str.length - cjk) * fs * 0.5
   }
   const w = wOf(d.origTranslate, labFs) + wOf(d.origTranslateHint, hintFs) + trackW + hintGap
-  HINT_W[tag] = `${Math.round(w)}/${cardInnerW}`
-  ok(`${tag} 那一行三头放得下（名字＋注释＋轨道 ≤ 卡内宽，折行=红）`,
-    w <= cardInnerW, `「${d.origTranslate}」＋「${d.origTranslateHint}」`)
+  HINT_W[tag] = `${Math.round(w)}/${outInnerW}`
+  ok(`${tag} 那一行四头放得下（名字＋注释＋轨道＋「返回」≤ 那一行的可用宽，折行=红）`,
+    w + backW <= outInnerW, `三头 ${Math.round(w)} ＋ 返回 ${backW} ＝ ${Math.round(w + backW)} ≤ ${outInnerW}`)
 })
+/* ---------- 10-16 搬家带出来的三条 ----------
+   ① 皮吃的五枚别名必须定义在 `.container` 上：它们原来写在 `.panel` 里面，而这一行在 `.panel`
+      **外面**——别名留在面板里，`var(--face)` 解析不到值，轨道当场画成透明（同一类坑的正本记在
+      `验-第一屏三块.js` 钉的那条 `--cp-*` 上，那条说的是"发在 `.panel` 上首屏拿不到"）。
+   ② 那一行里的两行字必须吃 `inherit`：`.out` 那一支 @70 才是这一行的皮，深浅翻转由
+      `.container.has-bg(.bg-light-out) .out` 那两条接手；开关原来吃的是白卡里的满浓度墨
+      （`--face-ink`），搬到形象图上就成了"深图看不见字"。
+   ③ 热区用 padding 垫、不撑行高：轨道只有 40rpx，压在 44rpx 的行里上下各剩 2rpx；垫上下各 10rpx
+      ⇒ 可点 64rpx，而 `.out` 那 44rpx 与站长拍过的两档面板高一个数没动。 */
+const containerSeg = seg('.container')
+ok('五枚别名抬到了 `.container`（`.panel` 里不再留一份，否则框外那一行读不到＝轨道透明）',
+  ['--face', '--face-ink', '--face-ph', '--solid-bg', '--solid-ink']
+    .every((k) => new RegExp(`\\${k}:\\s*var\\(--cp-`).test(containerSeg))
+  && !/--face:/.test(seg('.panel')),
+  `.container 里 ${(containerSeg.match(/--(face|face-ink|face-ph|solid-bg|solid-ink):/g) || []).length} 枚／.panel 里 ${(seg('.panel').match(/--face:/g) || []).length} 枚`)
+ok('那一行里的标签与注释吃 inherit（跟着 `.out` 那支 @70 与深浅翻转），不写死卡里那套墨',
+  /color:\s*inherit/.test(seg('.out .wr-sw-lab')) && /color:\s*inherit/.test(seg('.out .wr-sw-hint'))
+  && !/color:\s*var\(--face-ink\)/.test(seg('.out .wr-sw-lab')))
+ok('热区靠 padding 垫、行高不动（`.out` 仍 44rpx，开关那一组上下各 10rpx）',
+  num(seg('.out'), 'height') === 44 && /padding:\s*10rpx 0/.test(seg('.out .wr-sw'))
+  && /height:\s*auto/.test(seg('.out .wr-sw')) && /margin-top:\s*0/.test(seg('.out .wr-sw')))
 // ---------- 8. 上一代那些能力没被这批碰坏 ----------
 ok('忙态仍然挡住收起', /collapse\(\)\s*\{\s*if \(this\.data\.busy/.test(js))
 const showBody = js.split('async onShow')[1].split('hintFor(value)')[0]
@@ -859,9 +919,11 @@ ok('图片备份那条 B 链仍与建笔记那条并行、不 await',
   /const backup = this\._backupShots\(batch\)/.test(js) && !/await this\._backupShots/.test(js))
 ok('失败时那批孤儿对象仍然删（_settleBackup(null, …)）', /this\._settleBackup\(null, backup\)/.test(js))
 
-// 这两叠高度是 §2 那两行算式的读数：改了字号/间距/控件之后它们会变，规格文档引的就是这两个数
-const writeOpenStack = num(seg('.field-write-2'), 'height') + num(seg('.wr-sw'), 'height')
-  + num(seg('.wr-sw'), 'margin-top') + sldH
+// 这两叠高度是 §2 那两行算式的读数：改了字号/间距/控件之后它们会变，规格文档引的就是这两个数。
+// 10-16 站长那句「把原文翻译的开关上移到与返回同一行左边」之后，**展开那一档的卡里只剩两样**
+//（原来这三样：两行框 160 ＋ 开关 48＋8 ＋ 条 110＝326，卡内可用 348、富余 22）。
+// 开关搬到卡外那一行 ⇒ 卡里少 56rpx，富余从 22 涨到 78；面板两档高度他拍过 372/490，那一截留白**没收**。
+const writeOpenStack = num(seg('.field-write-2'), 'height') + sldH
 console.log(`${fails.length ? '✗' : '✓'} 统一录入条：${pass}/${pass + fails.length} 条通过`
   + `　面板 ${PANEL_H}/${PANEL_OPEN_H}rpx、卡内 ${cardInnerW}×${cardInnerH.toFixed(1)}（展开 ${openCardInnerH.toFixed(1)}）rpx`
   + `　最占的一叠：照片圈 ${crowH.toFixed(1)}/${cardInnerH.toFixed(1)}、文字展开 ${writeOpenStack}/${openCardInnerH.toFixed(1)}`

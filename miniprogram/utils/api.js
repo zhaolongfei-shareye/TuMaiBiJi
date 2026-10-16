@@ -49,6 +49,29 @@ function _headers(contentType, extra, withUnlock = true) {
   return h
 }
 
+/**
+ * 401 之后"准备重登"要清的那几格，**只有这一份**（审计 #7）。
+ *
+ * 原来 `request()` 与 `uploadSingleImage()` 各写一遍同一段，而上传那一份**漏了 `privateUnlock`**：
+ * 症状是重登之后本机还留着上一身份的私密解锁凭证，下一次读私密笔记带着它打过去，
+ * 拿到的是按旧 `generation` 裁过的空壳——用户看到的是"我的笔记突然没了"，而不是"请重新解锁"。
+ * 两处各写一遍迟早漏一行，所以搬成一处。
+ */
+function _dropAuthForRelogin(app) {
+  app.globalData.token = ''
+  app.globalData.userId = ''
+  // 语言这一格不许跟着身份一起清：屏上已经换成英文，下一次 onShow 从 `userInfo` 读回来
+  // 就是 undefined ⇒ 当场弹回中文（10-14 真跑实测到的，站长那句「切换中英文失效」的另一半
+  // 成因）。身份该清（重登之后可能是另一个号），语言留到那一份被服务器覆盖为止。
+  const keepLang = (app.globalData.userInfo || {}).language
+  app.globalData.userInfo = keepLang ? { language: keepLang } : null
+  app.globalData.isLoggedIn = false
+  app.globalData.loginPromise = null // Reset login promise to allow retry
+  // 解锁凭证跟着登录态一起清：重登之后可能是另一个 generation 的账号，
+  // 留着旧凭证只会让下一次读私密笔记拿到一份裁过的空壳。
+  app.globalData.privateUnlock = null
+}
+
 const request = (url, method, data, options = {}, retryCount = 0) => {
   return new Promise((resolve, reject) => {
     wx.request({
@@ -75,18 +98,7 @@ const request = (url, method, data, options = {}, retryCount = 0) => {
           
           // Clear auth state on 401 and trigger re-login
           const app = getApp()
-          app.globalData.token = ''
-          app.globalData.userId = ''
-          // 语言这一格不许跟着身份一起清：屏上已经换成英文，下一次 onShow 从 `userInfo` 读回来
-          // 就是 undefined ⇒ 当场弹回中文（10-14 真跑实测到的，站长那句「切换中英文失效」的另一半
-          // 成因）。身份该清（重登之后可能是另一个号），语言留到那一份被服务器覆盖为止。
-          const keepLang = (app.globalData.userInfo || {}).language
-          app.globalData.userInfo = keepLang ? { language: keepLang } : null
-          app.globalData.isLoggedIn = false
-          app.globalData.loginPromise = null // Reset login promise to allow retry
-          // 解锁凭证跟着登录态一起清：重登之后可能是另一个 generation 的账号，
-          // 留着旧凭证只会让下一次读私密笔记拿到一份裁过的空壳。
-          app.globalData.privateUnlock = null
+          _dropAuthForRelogin(app)
           
           // Trigger login and retry after successful authentication
           app.getLoginPromise()
@@ -126,14 +138,9 @@ const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
           }
           
           // Handle 401 for uploads: clear auth and trigger re-login
+          // 与 `request()` 那一支**同一个函数**（审计 #7）：原来这里少清了一格解锁凭证。
           const app = getApp()
-          app.globalData.token = ''
-          app.globalData.userId = ''
-          // 与上面 `request()` 里同一句：语言这一格跟着身份清掉，界面会在下一次 onShow 弹回中文。
-          const keepLangUp = (app.globalData.userInfo || {}).language
-          app.globalData.userInfo = keepLangUp ? { language: keepLangUp } : null
-          app.globalData.isLoggedIn = false
-          app.globalData.loginPromise = null
+          _dropAuthForRelogin(app)
           
           app.getLoginPromise()
             .then(() => {
@@ -159,14 +166,17 @@ const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
   })
 }
 
-const ingestScreenshots = async (filePaths) => {
+const ingestScreenshots = async (filePaths, translate) => {
   let batchId = null
   for (const filePath of filePaths) {
     const formData = batchId ? { batch_id: batchId } : undefined
     const res = await uploadSingleImage('/api/ingest/screenshots/stage', filePath, formData)
     batchId = res.batch_id
   }
-  return request('/api/ingest/screenshots/process', 'POST', { batch_id: batchId }, { contentType: 'application/x-www-form-urlencoded' })
+  // translate 这一位 10-16 才接上：站长「把原文翻译的开关…三个tab全局都可用」。
+  // 显式发 'true'/'false' 而不是省掉——后端那一格默认是 None（不表态），老包不带才回落到今天的行为。
+  return request('/api/ingest/screenshots/process', 'POST',
+    { batch_id: batchId, translate: translate ? 'true' : 'false' }, { contentType: 'application/x-www-form-urlencoded' })
 }
 
 const getTaskStatus = (taskId) => request(`/api/tasks/${taskId}`)
@@ -240,7 +250,9 @@ module.exports = {
   // PUT 是补丁语义：只改传进来的那几栏（只提交亮度档那一趟不许抹掉名称）。
   // 回体里的 `file_ids` 是这次被换下／撤掉的旧地址，键名与删笔记、注销、撤卡片一致。
   putProfile: (patch) => request('/api/user/profile', 'PUT', patch),
-  ingestUrl: (url) => request('/api/ingest/url', 'POST', { url }, { contentType: 'application/x-www-form-urlencoded' }),
+  // 与截图那条同一个理由：translate 显式发字符串，后端不接就不动（10-16 站长「三个tab全局都可用」）。
+  ingestUrl: (url, translate) => request('/api/ingest/url', 'POST',
+    { url, translate: translate ? 'true' : 'false' }, { contentType: 'application/x-www-form-urlencoded' }),
   // 手打这一档也交给模型提炼：送的是用户自己写的标题 + 原文，回来的是摘要。
   // 归类跟着这一篇走（服务端认人不认客户端说的 source_type）。
   ingestText: (data) => request('/api/ingest/text', 'POST', data),

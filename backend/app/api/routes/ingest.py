@@ -30,6 +30,10 @@ _batch_staging: dict[str, dict] = {}
 async def ingest_url(
     request: Request,
     url: str = Form(...),
+    # 站长 10-16「把原文翻译的开关…三个tab全局都可用」⇒ 抓取这一条也要带这一位。
+    # 默认**必须是 None 不是 False**：None＝提示词里连"输出语言"那一段都不写＝今天的样子；
+    # 写成 False 就成了"明确要求跟随原文语言"，那些不带这一位的老包（2.2.x 及以前）会当场变味。
+    translate: Optional[bool] = Form(None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -42,6 +46,8 @@ async def ingest_url(
         str(user.id),
         url,
         user.generation,
+        # 排在最后一位，理由同 /text 那条：队列里的 job 按位置绑定，插中间会把 generation 挪位。
+        translate,
         job_id=task_id,
         job_timeout=600,
     )
@@ -244,6 +250,8 @@ async def stage_screenshot(
 async def process_screenshots(
     request: Request,
     batch_id: str = Form(...),
+    # 与 /url 同一刀：OCR 出来的文本进的是同一个提炼，开关就要能管到它。默认 None＝不表态。
+    translate: Optional[bool] = Form(None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -264,6 +272,7 @@ async def process_screenshots(
         str(user.id),
         batch["data"],
         user.generation,
+        translate,
         job_id=task_id,
         job_timeout=600,
     )

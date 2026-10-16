@@ -184,7 +184,7 @@ class TestExtractionDegradation:
         async def fake_ocr(images_data):
             return "OCR 正文"
 
-        async def fake_llm(text, fallback_title=""):
+        async def fake_llm(text, fallback_title="", translate=None):
             return {"title": "正常提炼标题", "summary": "摘要", "key_points": ["要点"], "tags": ["标签"]}
 
         mp.setattr(tasks, "ocr_images", fake_ocr)
@@ -219,7 +219,7 @@ class TestExtractionDegradation:
         async def fake_scrape(url):
             return {"content": "抓到的正文内容", "title": "抓到标题", "source_type": "web_article"}
 
-        async def fake_llm(text, fallback_title=""):
+        async def fake_llm(text, fallback_title="", translate=None):
             return {"title": "正常提炼标题", "summary": "s", "key_points": [], "tags": []}
 
         mp.setattr(tasks, "scrape_url", fake_scrape)

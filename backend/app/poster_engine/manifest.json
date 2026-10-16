@@ -3,8 +3,8 @@
  "files": [
   {
    "name": "api.js",
-   "bytes": 15986,
-   "md5": "eb96bcf4a84d53667d601da692f0b6b2"
+   "bytes": 16710,
+   "md5": "8b9e5a4cb38f782ad7f2281c9cd67d96"
   },
   {
    "name": "appInfo.js",
@@ -33,8 +33,8 @@
   },
   {
    "name": "poster.js",
-   "bytes": 108579,
-   "md5": "8c08eb194282921150d6604675cde3e5"
+   "bytes": 111733,
+   "md5": "3ab0ef54908de78747c23cd4bcd7787e"
   },
   {
    "name": "posterRecipe.js",

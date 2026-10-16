@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>原文翻译开关搬到「返回」同一行 · 效果图</title>
+<style>
+  /* 每一枚数都是从 create.wxss / app.wxss 现读的，折算按真跑量到的那台窗口：windowWidth 390（1rpx = 0.52px）。
+     令牌取的是这台模拟器当前那份内联 style（theme-blue / mood-mist），逐字抄自 10-16 真跑日志。 */
+  :root {
+    --u: 0.52px;                 /* 1rpx */
+    --cp-panel: #c1c4cd;
+    --cp-card: #FFFFFF;
+    --cp-field: #E5E5E6;
+    --cp-ink: #23252C;
+    --cp-ink-50: rgba(35,37,44,.5);
+    --cp-ink-38: rgba(35,37,44,.38);
+    --cp-edge-10: rgba(35,37,44,.1);
+    --cp-edge-14: rgba(35,37,44,.14);
+    --cp-extract: #C4541F;
+    --cp-extract-ink: #FFFFFF;
+    --stage-face: linear-gradient(180deg, rgba(164,176,192,.16) 0%, rgba(164,176,192,.94) 43.8%, rgba(164,176,192,.95) 43.8%, rgba(164,176,192,.95) 100%);
+    --stage-face-open: linear-gradient(180deg, rgba(164,176,192,.16) 0%, rgba(164,176,192,.94) 36%, rgba(164,176,192,.95) 36%, rgba(164,176,192,.95) 100%);
+    --sh-lift: 0 -6.24px 14.56px rgba(18,20,26,.16);
+    --fs-title: 16.12px;         /* 31rpx */
+    --fs-body: 14.56px;          /* 28rpx */
+    --fs-meta: 12.48px;          /* 24rpx */
+    --fs-micro: 9.36px;          /* 18rpx */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1b1c1f; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; padding: 22px 20px 30px; }
+  h1 { color: #F2EFE9; font-size: 19px; font-weight: 600; letter-spacing: .5px; }
+  .loud { color: #F2EFE9; font-size: 13px; line-height: 1.75; margin: 8px 0 18px; max-width: 1560px; opacity: .82; }
+  .loud b { color: #FFC58A; font-weight: 600; }
+  .row { display: flex; gap: 22px; align-items: flex-start; }
+  .cell { width: 390px; }
+  .cap { color: #F2EFE9; font-size: 12px; line-height: 1.6; margin: 9px 2px 0; opacity: .8; }
+
+  .scr { position: relative; width: 390px; height: 753px; overflow: hidden; border-radius: 22px;
+    /* 背景＝示意。真机这一层是你那张形象图（或壁纸），深浅两态由 bg-light-out 翻字色，这里画的是浅底那一态。 */
+    background: radial-gradient(120% 80% at 22% 18%, #EDE7DC 0%, #DCD3C6 42%, #C3BCB2 74%, #A9A49D 100%); }
+
+  /* 深色面板那层（.stage-panel）：顶＝100vh − 548rpx（收起）／− 666rpx（展开）＝卡顶往上 24rpx */
+  .glass { position: absolute; left: 0; right: 0; bottom: 0; top: 468px; border-radius: 28.6px 28.6px 0 0;
+    background: var(--stage-face); box-shadow: var(--sh-lift); backdrop-filter: blur(30px) saturate(1.15); z-index: 1; }
+  .open .glass { top: 406px; background: var(--stage-face-open); }
+  /* 抬起来那一屏：整块（玻璃＋dock）同量往上 229，与 10-16 真跑量到的位移一致 */
+  .lift .glass, .lift .dock { transform: translateY(-229px); }
+
+  /* 录入那一格（.entry-wrap）：左右 24rpx、离底 152rpx */
+  .dock { position: absolute; left: 12.48px; right: 12.48px; bottom: 79.04px; z-index: 6; }
+
+  /* 框外那一行（.out）：高 44rpx、下边距 36rpx、内缩 20rpx、字 24rpx、墨 @70。
+     这一版唯一改的结构：justify-content 从 flex-end 改成 space-between，左边多塞那枚开关。 */
+  .out { height: 22.88px; margin-bottom: 18.72px; padding: 0 10.4px; display: flex; align-items: center;
+    justify-content: space-between; font-size: var(--fs-meta); line-height: 1.4; letter-spacing: .52px;
+    color: rgba(20,22,26,.7); white-space: nowrap; }
+  .out .lft { display: flex; align-items: center; }
+  .lab { color: var(--cp-ink); font-size: var(--fs-meta); }
+  .hint { flex: 1; min-width: 0; margin: 0 6.24px 0 6.24px; font-size: var(--fs-micro); color: var(--cp-ink-38);
+    overflow: hidden; text-overflow: ellipsis; }
+  .trk { flex: none; position: relative; width: 37.44px; height: 20.8px; margin-left: 6.24px; border-radius: 999px;
+    background: var(--cp-field); }
+  .dot { position: absolute; top: 2.08px; left: 2.08px; width: 16.64px; height: 16.64px; border-radius: 50%; background: var(--cp-ink); }
+  .on .trk { background: var(--cp-extract); }
+  .on .dot { background: var(--cp-extract-ink); transform: translateX(16.64px); }
+
+  /* 面板（.panel 372rpx ／ .panel-open 490rpx）＋三个标签＋那张白卡 */
+  .panel { position: relative; height: 193.44px; background: var(--cp-panel); border: 1.04px solid var(--cp-edge-10);
+    border-radius: 28.6px; padding: 3.12px 12.48px 5.2px; display: flex; flex-direction: column; }
+  .open .panel { height: 254.8px; }
+  .modes { height: 33.28px; display: flex; align-items: stretch; justify-content: center; gap: 12.48px; }
+  .md { position: relative; display: flex; align-items: center; padding: 0 11.44px; font-size: var(--fs-title);
+    line-height: 1.2; letter-spacing: .52px; color: var(--cp-ink-50); white-space: nowrap; }
+  .md.on { color: var(--cp-ink); font-weight: 600; }
+  .md.on::after { content: ""; position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
+    width: 33.8px; height: 2.6px; border-radius: 999px; background: var(--cp-ink); }
+  .card { flex: 1; min-height: 0; margin-top: 3.12px; background: var(--cp-card); border: 1.56px solid var(--cp-edge-14);
+    border-radius: 20.8px; padding: 14.56px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+  .field { height: 54.6px; display: flex; align-items: center; padding: 0 14.56px; border-radius: 9.36px;
+    background: var(--cp-field); border: 1.56px solid var(--cp-edge-14); font-size: var(--fs-body); color: var(--cp-ink); }
+  .field .ph { color: var(--cp-ink-38); flex: 1; }
+  .field .pl { flex: none; width: 26px; height: 26px; border-radius: 7px; border: 1.3px solid var(--cp-ink-38); }
+  .field.two { height: 83.2px; align-items: flex-start; }   /* 展开那一档：框两行（160rpx） */
+  .area { height: 100%; padding-top: 14.56px; font-size: var(--fs-body); color: var(--cp-ink); line-height: 1.5; flex: 1; min-width: 0; }
+  .area .ph { color: var(--cp-ink-38); }
+
+  /* 照片档那三枚圈（快门居中） */
+  .crow { flex: 1; display: flex; align-items: center; justify-content: center; gap: 18px; }
+  .mini { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .mini-c { width: 44px; height: 44px; border-radius: 50%; border: 2.6px solid var(--cp-ink-38); }
+  .shutcol { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .shut { width: 62px; height: 62px; border-radius: 50%; border: 3px solid var(--cp-card); background: var(--cp-extract);
+    box-shadow: 0 0 0 2.6px var(--cp-ink-38) inset; display: flex; align-items: center; justify-content: center; }
+  .shut-core { width: 34px; height: 24px; border-radius: 5px; border: 2.4px solid var(--cp-extract-ink); }
+  .mini-lb, .shut-lb { font-size: var(--fs-micro); color: var(--cp-ink-38); }
+
+  .sld { margin-top: auto; position: relative; overflow: hidden; flex: none; height: 57.2px; border-radius: 28.6px;
+    background: var(--cp-field); border: 2.6px solid var(--cp-field); display: flex; align-items: center; justify-content: center; }
+  .sld-txt { font-size: var(--fs-title); font-weight: 700; letter-spacing: .52px; color: var(--cp-ink); }
+  .knob { position: absolute; left: 5.2px; top: 3.64px; width: 45.76px; height: 45.76px; border-radius: 50%;
+    background: var(--cp-card); box-shadow: 0 1px 4px rgba(18,20,26,.18); }
+
+  .kbd { position: absolute; left: 0; right: 0; bottom: 0; height: 300px; z-index: 9;
+    background: linear-gradient(180deg, #CFCBC4 0%, #D9D6D0 8%, #E6E3DE 100%); padding: 26px 3px 0; }
+  .kbd .kr { display: flex; gap: 6px; margin: 0 4px 6px; }
+  .kbd .kr i { flex: 1; height: 34px; border-radius: 5px; background: #FCFBF9; box-shadow: 0 1px 0 rgba(0,0,0,.22); }
+  .kbd .kr.wide i { height: 40px; }
+  .kbd .kr.wide i.sp { flex: 5; }
+  /* 底栏那一条（占位用）：现网 128rpx 高＋离底 20rpx ⇒ 面板离底 152rpx 的那 152 就是从这里来的 */
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 74px; z-index: 7;
+    display: flex; align-items: center; justify-content: space-around; padding: 0 26px; }
+  .bar i { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.55);
+    box-shadow: 0 0 0 1.04px rgba(35,37,44,.1) inset; }
+  .bar i.sel { background: var(--cp-ink); }
+  .tagline { position: absolute; left: 10px; top: 8px; z-index: 10; font-size: 10px; color: rgba(20,22,26,.55); }
+  .tagkb { position: absolute; left: 10px; top: 6px; font-size: 10px; color: rgba(20,22,26,.55); }
+
+  pre#report { color: #9CE8B4; font-size: 12px; line-height: 1.7; margin-top: 20px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <h1>「原文翻译」搬到「返回」同一行左边 · 三档全局 · 默认开</h1>
+  <div class="loud">
+    <b>先说清楚：当前真机与模拟器跑的还是旧版</b>——开关在卡子里、只在「文字」那档的展开态出现、默认关；<b>这一版图代码一行没动</b>，只是方案。
+    几何与颜色全部现读：窗口 390×753（10-16 真跑量到的那台）、面板 372／490rpx、离底 152rpx、那一行高 44rpx＋下边距 36rpx、字 24rpx、令牌抄的是模拟器那份内联 style（mood-mist）。
+  </div>
+
+  <div class="row">
+    <!-- ① 甲 · 照片档 -->
+    <div class="cell">
+      <div class="scr" id="s1">
+        <div class="glass"></div>
+        <div class="dock">
+          <div class="out">
+            <div class="lft on"><span class="lab">原文翻译</span><span class="trk"><span class="dot"></span></span></div>
+            <span class="bk">返回</span>
+          </div>
+          <div class="panel">
+            <div class="modes"><span class="md on">照片</span><span class="md">链接</span><span class="md">文字</span></div>
+            <div class="card">
+              <div class="crow">
+                <div class="mini"><div class="mini-c"></div><div class="mini-lb">相册</div></div>
+                <div class="shutcol"><div class="shut"><div class="shut-core"></div></div><div class="shut-lb">拍照</div></div>
+                <div class="mini"><div class="mini-c"></div><div class="mini-lb">链接</div></div>
+              </div>
+              <div class="sld"><div class="sld-txt">右滑开始提炼</div><div class="knob"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="bar"><i class="sel"></i><i></i><i></i><i></i></div>
+        <div class="tagline">键盘不在 · 面板不抬（152rpx 那一档）</div>
+      </div>
+      <div class="cap">① 甲 · 照片档：开关从卡子里搬出来，坐进「返回」那一行左边，默认<b>开</b></div>
+    </div>
+
+    <!-- ② 甲 · 链接档（关掉那一态） -->
+    <div class="cell">
+      <div class="scr" id="s2">
+        <div class="glass"></div>
+        <div class="dock">
+          <div class="out">
+            <div class="lft"><span class="lab">原文翻译</span><span class="trk"><span class="dot"></span></span></div>
+            <span class="bk">返回</span>
+          </div>
+          <div class="panel">
+            <div class="modes"><span class="md">照片</span><span class="md on">链接</span><span class="md">文字</span></div>
+            <div class="card">
+              <div class="field"><span class="ph">公众号文章 / 网页链接</span><span class="pl"></span></div>
+              <div class="sld"><div class="sld-txt">右滑开始提炼</div><div class="knob"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="bar"><i class="sel"></i><i></i><i></i><i></i></div>
+        <div class="tagline">关掉就是不翻译 · 轨道回灰、点回左</div>
+      </div>
+      <div class="cap">② 甲 · 链接档：同一枚开关，<b>关</b>的那一态长这样（轨道 #E5E5E6、墨点在左）</div>
+    </div>
+
+    <!-- ③ 甲 · 文字档，点了框、键盘在 -->
+    <div class="cell">
+      <div class="scr open lift" id="s3">
+        <div class="glass"></div>
+        <div class="dock">
+          <div class="out">
+            <div class="lft on"><span class="lab">原文翻译</span><span class="trk"><span class="dot"></span></span></div>
+            <span class="bk">返回</span>
+          </div>
+          <div class="panel">
+            <div class="modes"><span class="md">照片</span><span class="md">链接</span><span class="md on">文字</span></div>
+            <div class="card">
+              <div class="field two"><span class="area"><span class="ph">把原文贴在这里，摘要自动生成</span></span><span class="pl"></span></div>
+              <div class="sld"><div class="sld-txt">右滑开始提炼</div><div class="knob"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="kbd"><div class="kr"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="kr"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="kr"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="kr wide"><i></i><i class="sp"></i><i></i></div></div>
+        <div class="tagkb">键盘 300px（真跑打进去的就是这个数）· 整块抬 229</div>
+      </div>
+      <div class="cap">③ 甲 · 文字档：点框弹键盘，那一行在卡子<b>外面</b>、跟着整块抬 229 ⇒ 你报的遮挡从结构上没有了</div>
+    </div>
+
+    <!-- ④ 乙 · 那句小字也塞进同一行 -->
+    <div class="cell">
+      <div class="scr" id="s4">
+        <div class="glass"></div>
+        <div class="dock">
+          <div class="out">
+            <div class="lft on"><span class="lab">原文翻译</span><span class="hint">不管哪种语言，摘要都写成中文</span><span class="trk"><span class="dot"></span></span></div>
+            <span class="bk">返回</span>
+          </div>
+          <div class="panel">
+            <div class="modes"><span class="md">照片</span><span class="md">链接</span><span class="md on">文字</span></div>
+            <div class="card">
+              <div class="field"><span class="area"><span class="ph">把原文贴在这里，摘要自动生成</span></span><span class="pl"></span></div>
+              <div class="sld"><div class="sld-txt">右滑开始提炼</div><div class="knob"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="bar"><i class="sel"></i><i></i><i></i><i></i></div>
+        <div class="tagline">乙：那句小字（18rpx）留在同一行，放不下会被省略号截</div>
+      </div>
+      <div class="cap">④ 乙 · 同一行里带上那句小字：放得下才画给你看（下方量了实测宽度）</div>
+    </div>
+  </div>
+
+  <!-- 这一段是给浏览器现算的：判"放不放得下"不靠眼，靠 rect -->
+  <pre id="report">测量里…</pre>
+  <script>
+    function rect(el) { return el.getBoundingClientRect() }
+    var lines = []
+    function lum(hex, a) { // 对底色 #C3BCB2（示意中段）算对比度，浅底那一态
+      function lin(c) { c /= 255; return c <= .03928 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4) }
+      var bg = [195, 188, 178]
+      var f = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
+      var m = f.map(function (v, i) { return v * a + bg[i] * (1 - a) }).map(lin)
+      var L = 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]
+      var Lb = 0.2126 * lin(bg[0]) + 0.7152 * lin(bg[1]) + 0.0722 * lin(bg[2])
+      return ((Math.max(L, Lb) + .05) / (Math.min(L, Lb) + .05)).toFixed(2)
+    }
+    ['s1', 's2', 's3', 's4'].forEach(function (id, k) {
+      var out = document.querySelector('#' + id + ' .out')
+      var lft = out.querySelector('.lft'), bk = out.querySelector('.bk')
+      var o = rect(out), l = rect(lft), b = rect(bk)
+      var room = o.width - 20.8            // 减掉左右各 20rpx 内缩
+      var need = l.width + b.width + 8
+      lines.push(id + '  那一行：可用 ' + room.toFixed(1) + 'px／左组 ' + l.width.toFixed(1) + 'px ＋「返回」' +
+        b.width.toFixed(1) + 'px ＝ ' + (l.width + b.width).toFixed(1) + 'px ⇒ ' +
+        (l.right <= b.left + .5 ? '不碰' : '压上了') + '，余量 ' + (b.left - l.right).toFixed(1) + 'px')
+      var h = out.querySelector('.hint')
+      if (h) lines.push(id + '  那句小字：给的 ' + rect(h).width.toFixed(1) + 'px／要 ' + h.scrollWidth.toFixed(1) +
+        'px ⇒ ' + (h.scrollWidth <= rect(h).width + .5 ? '整句放得下' : '放不下，出省略号'))
+      var trk = lft.querySelector('.trk')
+      lines.push(id + '  开关热区（轨道本体）：' + rect(trk).width.toFixed(1) + '×' + rect(trk).height.toFixed(1) + 'px')
+    })
+    lines.push('「返回」那行字 rgba(20,22,26,.7) 压在示意浅底 #C3BCB2 上：' + lum('#14161A', .7) + ':1；' +
+      '「原文翻译」#23252C 同底：' + lum('#23252C', 1) + ':1（现网浅图那一档 < 4.5 会被 探-数字对比度 那类尺子挑出来）')
+    lines.push('行高 22.88px／轨道高 20.8px ⇒ 轨道顶到底只剩 1px：要么把这行抬到 48rpx（与卡里那一行原来那个数一致），要么给开关单独垫热区。')
+
+    // 几何自证：这几行不是给你看的，是给我自己看的——量 rect，不靠眼。
+    ;['s1', 's3'].forEach(function (id) {
+      var scr = document.getElementById(id), o = rect(scr)
+      var out = rect(scr.querySelector('.out')), pn = rect(scr.querySelector('.panel'))
+      var gl = rect(scr.querySelector('.glass')), bd = rect(scr.querySelector('.kbd') || scr.querySelector('.bar'))
+      lines.push(id + '  几何：屏 ' + o.width.toFixed(0) + '×' + o.height.toFixed(0) +
+        '｜那一行 顶 ' + (out.top - o.top).toFixed(1) + ' 高 ' + out.height.toFixed(1) +
+        '｜卡 顶 ' + (pn.top - o.top).toFixed(1) + ' 底 ' + (o.bottom - pn.bottom).toFixed(1) + '(离底)' +
+        '｜墨面顶 ' + (gl.top - o.top).toFixed(1) + '＝卡顶−' + (pn.top - gl.top).toFixed(1) +
+        '｜底缘占位高 ' + bd.height.toFixed(0))
+    })
+
+    // 中英两门 × 三种屏宽，现量「那句小字塞进同一行」放不放得下（乙案的前置）。
+    // 行壳照 s4 那份皮复制，只换字符串与宽度，不另起一套画法。
+    var probe = document.createElement('div')
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:390px'
+    document.body.appendChild(probe)
+    var CASES = [['zh', '原文翻译', '不管哪种语言，摘要都写成中文', '返回'],
+                 ['en', 'Translate original', 'Summary in Chinese', 'Back']]
+    ;[320, 375, 390].forEach(function (w) {
+      CASES.forEach(function (c) {
+        probe.style.width = w + 'px'
+        probe.innerHTML = '<div class="out"><div class="lft on"><span class="lab"></span>' +
+          '<span class="hint"></span><span class="trk"><span class="dot"></span></span></div><span class="bk"></span></div>'
+        var o = probe.querySelector('.out'), h = probe.querySelector('.hint')
+        o.querySelector('.lab').textContent = c[1]
+        h.textContent = c[2]
+        o.querySelector('.bk').textContent = c[3]
+        var lftR = rect(o.querySelector('.lft')), bkR = rect(o.querySelector('.bk'))
+        lines.push('乙 · ' + c[0] + ' @ 宽 ' + w + '：左组 ' + lftR.width.toFixed(1) + '＋右 ' + bkR.width.toFixed(1) +
+          '＝' + (lftR.width + bkR.width).toFixed(1) + '／可用 ' + (w - 20.8).toFixed(1) + ' ⇒ ' +
+          (lftR.right <= bkR.left + .5 && h.scrollWidth <= rect(h).width + .5 ? '整句放得下' : '放不下（省略号或挤压）'))
+      })
+    })
+    document.getElementById('report').textContent = lines.join('\n')
+  </script>
+</body>
+</html>

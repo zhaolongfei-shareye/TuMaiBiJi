@@ -123,9 +123,12 @@ Page({
     writeBody: '',
     // 原文框有没有焦点：它是「文字」那一档展开/收起的唯一开关。
     bodyFocus: false,
-    // 「原文翻译」那枚小开关（站长 10-04）：默认关＝摘要跟随原文的语言，打开才整理成中文。
-    // 只活在这一次提交里：落库成功后跟着原文一起归零，不留到下一篇。
-    writeTranslate: false,
+    // 「原文翻译」那枚小开关。站长 10-04 要它的时候默认关；10-16 改口「默认是翻译，关闭就不翻译」
+    // ⇒ 默认**开**＝摘要一律整理成中文，关掉才跟随原文的语言。同一句里他还要求「三个tab全局都可用」，
+    // 所以这一位不再只服务文字档：链接抓来的正文与照片 OCR 出来的字，提炼前是同一串文本，共用这一位。
+    // ⚠ 复位那一处（`_extractDone` 的 patch）必须跟着回到 true：只改默认不改那里，第一篇存成功之后
+    // 默认就悄悄变回关了——那是第二份真相，屏上看不出来。
+    writeTranslate: true,
     // 右滑那一枚的四个态（待滑 / 拖动中 / 就位 / 完成）都靠这几位说话。
     ready: false,   // 这一格有没有东西可提交（决定那枚圆让不让你拖，10-10 深夜起不再决定它的颜色）
     dragging: false,
@@ -769,7 +772,9 @@ Page({
     }
     this._extractBegin('url')
     try {
-      const { task_id } = await api.ingestUrl(url)
+      // 10-16 站长「三个tab全局都可用」⇒ 这一位要跟着送出去：原来只有文字那条请求带 translate，
+      // 链接与照片两条不带，后端拿到的就是 `None`（提示词里连"输出语言"那一段都不写）。
+      const { task_id } = await api.ingestUrl(url, this.data.writeTranslate)
       const result = await api.pollTask(task_id)
       this._extractDone(result.note_id, { urlInput: '', urlHint: 'idle' })
     } catch (err) {
@@ -870,7 +875,7 @@ Page({
     // CLOUD_ENV 没填时 cloudReady() 是 false，这一趟直接跳过，行为和今天一字不差。
     const backup = this._backupShots(batch)
     try {
-      const { task_id } = await api.ingestScreenshots(batch)
+      const { task_id } = await api.ingestScreenshots(batch, this.data.writeTranslate)
       const result = await api.pollTask(task_id)
       this._extractDone(result.note_id, { previewImages: [] })
       this._settleBackup(result.note_id, backup)
@@ -982,12 +987,14 @@ Page({
       const { task_id } = await api.ingestText({
         title: titleFromText(content),
         content,
-        // 后端字段名就叫 translate，默认 false。这一位一路走到提示词里那行「输出语言」，
-        // 关掉它才是要的效果：英文原文出英文摘要，不再被自动写成中文。
+        // 后端字段名就叫 translate。这一位一路走到提示词里那行「输出语言」：开＝一律整理成中文，
+        // 关＝跟随原文语言（英文原文出英文摘要）。后端那个默认值仍是 false，给的是不带这一位的
+        // 老包（1.9.24 及以前），新包三档都显式发，不靠默认。
         translate: this.data.writeTranslate,
       })
       const result = await api.pollTask(task_id)
-      this._extractDone(result.note_id, { writeBody: '', writeTranslate: false, bodyFocus: false })
+      // 复位回**默认那一档（开）**，不是回 false——站长 10-16「默认是翻译」。
+      this._extractDone(result.note_id, { writeBody: '', writeTranslate: true, bodyFocus: false })
     } catch (err) {
       console.error('文字提炼失败', err)
       this._extractFail(err)

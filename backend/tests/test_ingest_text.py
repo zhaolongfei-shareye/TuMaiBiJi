@@ -314,6 +314,94 @@ class Test原文翻译开关:
         assert seen["translate"] is False, seen
 
 
+class Test链接与截图两条也带这一位:
+    """站长 10-16 三句：「三个tab全局都可用」＋「默认是翻译，关闭就不翻译」＋「图片识别英文，不是也可以翻译吗」。
+
+    三样各钉一处，与上面那个类同一个形状：① 两个入口都把这一位带到队列，且落在**最后一个位置**
+    （放中间会把队列里正在跑的老 job 的 generation 挪一位，A6 那次串号就是这个形状）；
+    ② 到 worker 变成 extract_knowledge 的那个参数；③ **不带就不表态**——这一条与 /text 那头相反，
+    /text 的默认是 False（10-04 站长拍的"默认关"），链接／截图两条今天的现网行为是提示词里
+    根本不加"输出语言"那一段，所以默认必须是 None；写成 False 会让 2.2.x 那些不带这一位的老包当场变味。
+    """
+
+    def test_链接不带这个字段时入队的是None(self, client, db, rec):
+        u = mk_user(db, "url-tr-default", generation=4)
+        resp = client.post("/api/ingest/url", data={"url": "https://example.com/a"}, headers=hdr(u))
+        assert resp.status_code == 200, resp.text
+        args = rec.calls[0][0]
+        assert args[0] == "app.tasks.ingest_tasks.process_url_task"
+        assert len(args) == 6, f"这一位没进队列：{args}"
+        assert args[5] is None, f"不带字段的默认必须是不表态（None），不是 False：{args}"
+
+    def test_链接开关两态原样落到最后一位(self, client, db, rec):
+        u = mk_user(db, "url-tr-on", generation=4)
+        for sent, want in (("true", True), ("false", False)):
+            resp = client.post("/api/ingest/url",
+                               data={"url": "https://example.com/a", "translate": sent}, headers=hdr(u))
+            assert resp.status_code == 200, resp.text
+            assert rec.calls[-1][0][5] is want, (sent, rec.calls[-1][0])
+
+    def test_截图不带这个字段时入队的也是None(self, client, db, rec):
+        u = mk_user(db, "shot-tr-default", generation=9)
+        staged = client.post(
+            "/api/ingest/screenshots/stage",
+            files={"images": ("a.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+            headers=hdr(u),
+        )
+        assert staged.status_code == 200, staged.text
+        resp = client.post("/api/ingest/screenshots/process",
+                           data={"batch_id": staged.json()["batch_id"]}, headers=hdr(u))
+        assert resp.status_code == 200, resp.text
+        args = rec.calls[0][0]
+        assert args[0] == "app.tasks.ingest_tasks.process_screenshots_task"
+        assert len(args) == 6, f"这一位没进队列：{args}"
+        assert args[5] is None, f"同上：默认得是 None：{args}"
+
+    def test_两条的签名里这一位都排在最后(self):
+        import inspect
+
+        from app.tasks.ingest_tasks import process_screenshots_task, process_url_task
+
+        for fn in (process_url_task, process_screenshots_task):
+            names = list(inspect.signature(fn).parameters)
+            assert names[-1] == "translate", (fn.__name__, names)
+            assert names[names.index("generation") + 1] == "translate", (fn.__name__, names)
+
+    def test_两条worker把值原样交给提炼(self, worker, db):
+        tasks, statuses, uid, mp = worker
+
+        seen = []
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            seen.append(translate)
+            return {"title": "t", "summary": "s", "key_points": [], "tags": []}
+
+        async def fake_scrape(url):
+            return {"title": "抓来的标题", "content": "An English paragraph."}
+
+        async def fake_ocr(images):
+            return "English text from the screenshot"
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        mp.setattr(tasks, "scrape_url", fake_scrape)
+        mp.setattr(tasks, "ocr_images", fake_ocr)
+
+        tasks.process_url_task("u1", uid, "https://example.com/a", 1, True)
+        tasks.process_url_task("u2", uid, "https://example.com/a", 1, False)
+        tasks.process_url_task("u3", uid, "https://example.com/a", 1)      # 老 job：不带第七位
+        tasks.process_screenshots_task("s1", uid, [b"img"], 1, True)
+        tasks.process_screenshots_task("s2", uid, [b"img"], 1)             # 老 job
+        assert seen == [True, False, None, True, None], seen
+
+    def test_不表态那一份提示词与改动前逐字相同(self):
+        """这一条是上面那个 None 的落点：默认写成 False 就会在这里红。"""
+        from app.services import llm
+
+        assert llm.system_prompt(None) == llm.SYSTEM_PROMPT
+        assert "输出语言" not in llm.system_prompt(None)
+        assert "输出语言" in llm.system_prompt(True) and "输出语言" in llm.system_prompt(False)
+
+
 class Test提示词里的输出语言:
     def test_关_写明跟随原文不翻译(self):
         from app.services import llm

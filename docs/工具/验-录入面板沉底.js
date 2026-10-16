@@ -200,13 +200,20 @@ ok('展开那一档这一层跟着卡片一起长（顶＝底栏口 ＋ 展开�
   `读到 ${INK_OPEN_H}，应为 ${bottom + OPEN_H + BREATH}`)
 ok('这一条的闸挂在容器上、由 panelOpen 那一位说话',
   /panelOpen \? 'dock-open'/.test(wxml))
-// 框外那一行：10-14 起只剩「返回」一枚，并且整枚要在墨面之上。
-// 它自己那一段的高 ＋ 下面那档 margin 是这一条的全部：margin 小于那口呼吸 ⇒ 骑到墨面上。
+// 框外那一行：10-14 起只剩「返回」一枚，并且整枚要在墨面之上；10-16 站长「把原文翻译的开关上移到
+// 与返回同一行左边」⇒ 这一行现在两枚。这一条的本意没变（那排 Tips 与它前面那枚点不许回来），
+// 只是"只剩一枚"那半句作废——判据改成按**源码先后**认「返回」还在这一行里。
+// 原来那个 `[\s\S]*?<\/view>` 的非贪婪匹配现在会停在开关那一层的闭合标签上，读到半截就判红，
+// 是量法跟不上结构，不是东西丢了（同一形状见 [[feedback-ruler-units-and-box-model]]）。
 const outSeg = seg('.out')
 const OUT_MB = Number((/margin-bottom:\s*(\d+(?:\.\d+)?)rpx/.exec(outSeg) || [0, NaN])[1])
-ok('框外那一行只剩「返回」一枚（Tips 与它前面那枚点都不许回来）',
+const iOutRow = wxml.indexOf('class="out"')
+const iOutR = wxml.indexOf('class="out-r"')
+const iPanelRow = wxml.indexOf('class="panel ')
+ok('框外那一行里「返回」仍在（左边 10-16 多了一枚开关），且那排 Tips 与它前面那枚点都不许回来',
   !/class="out-l"/.test(wxml) && !/class="out-dot"/.test(wxml)
-  && (wxml.match(/class="out"[^>]*>[\s\S]*?<\/view>/) || [''])[0].includes('out-r'))
+  && iOutRow >= 0 && iOutR > iOutRow && iPanelRow > iOutR,
+  `out@${iOutRow}／out-r@${iOutR}／panel@${iPanelRow}`)
 ok(`那一行整枚坐在墨面之上（下面那档留白 ${OUT_MB} > 墨面那口呼吸 ${BREATH}）`,
   Number.isFinite(OUT_MB) && OUT_MB > BREATH, `margin-bottom ${OUT_MB}`)
 // 原来这一条钉的是"必须吃页面级令牌 `--text-secondary`"——10-15 02:5x 站长

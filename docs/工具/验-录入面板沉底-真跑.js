@@ -123,8 +123,10 @@ const STATES = [
   // ⚠️ 两个坑叠在这里：① 逗号写法（`'.card > view, .card > textarea'`）回空数组；② **子选择器 `>` 这台工具也不认**
   //（10-08 实测两种写法都是 0 块），于是 `Math.max(...[])` = −Infinity，"没被顶出卡外"那条会**假绿**。
   // 只能按类名一枚一枚 selectAll，并且把"一块都没摸到"本身当成红。这份名单由静态尺子
-  // （验-统一录入条.js「卡里那几块 direct child 就是名单那五枚」）钉住：卡里多一块而名单没跟上会红。
-  const CARD_KIDS = ['.crow', '.strip', '.field', '.wr-sw', '.sld']
+  // （验-统一录入条.js「卡里那几块 direct child 就是名单那四枚」）钉住：卡里多一块而名单没跟上会红。
+  // 10-16 站长「把原文翻译的开关上移到与返回同一行左边」⇒ `.wr-sw` 搬出卡里，名单从五枚并到四枚
+  //（同一把尺子 10-08 那次也并过一枚，形状一样：撤的是**卡里的成员**，不是能力）。
+  const CARD_KIDS = ['.crow', '.strip', '.field', '.sld']
   const kids = () => mp.evaluate((list) => new Promise((resolve) => {
     const q = wx.createSelectorQuery()
     list.forEach((s) => { q.selectAll(s).boundingClientRect() })

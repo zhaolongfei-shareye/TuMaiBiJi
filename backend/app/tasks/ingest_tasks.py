@@ -63,8 +63,13 @@ def _load_task_user(db, task_id: str, user_id: str, generation):
     return user
 
 
-def process_url_task(task_id: str, user_id: str, url: str, generation: int | None = None):
-    """RQ worker 同步任务：抓取 URL → LLM 提取 → 写入数据库。"""
+def process_url_task(task_id: str, user_id: str, url: str, generation: int | None = None,
+                     translate: bool | None = None):
+    """RQ worker 同步任务：抓取 URL → LLM 提取 → 写入数据库。
+
+    `translate` 排在最后一位（与 /url 那条 enqueue 同一个理由：老 job 不带这一位，插中间会挪 generation）。
+    None＝不给提示词加"输出语言"那一段，与这一刀之前的行为逐字相同；True/False 才表态。
+    """
     try:
         set_task_status(task_id, "processing")
 
@@ -74,7 +79,7 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
             set_task_status(task_id, "failed", {"error": "未能从 URL 提取到有效内容"})
             return
 
-        knowledge = asyncio.run(extract_knowledge(text, fallback_title=scraped["title"]))
+        knowledge = asyncio.run(extract_knowledge(text, fallback_title=scraped["title"], translate=translate))
 
         db = SessionLocal()
         try:
@@ -108,8 +113,14 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
         set_task_status(task_id, "failed", {"error": failure_message(e)})
 
 
-def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes], generation: int | None = None):
-    """RQ worker 同步任务：OCR → LLM 提取 → 写入数据库。"""
+def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes],
+                             generation: int | None = None, translate: bool | None = None):
+    """RQ worker 同步任务：OCR → LLM 提取 → 写入数据库。
+
+    `translate` 与 /url 那条同义：None＝不表态（今天的样子），True/False 才给提示词加那一段"输出语言"。
+    站长 10-16「图片识别英文，不是也可以翻译吗」——OCR 出来的字与手打的字进的是同一个提炼，
+    所以这一位一接上，界面上那枚开关就管得着照片这一档。
+    """
     try:
         set_task_status(task_id, "processing")
 
@@ -118,7 +129,8 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
             set_task_status(task_id, "failed", {"error": "OCR 未识别到文字内容"})
             return
 
-        knowledge = asyncio.run(extract_knowledge(ocr_text, fallback_title=title_hint(ocr_text)))
+        knowledge = asyncio.run(extract_knowledge(
+            ocr_text, fallback_title=title_hint(ocr_text), translate=translate))
 
         db = SessionLocal()
         try:

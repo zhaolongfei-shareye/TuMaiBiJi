@@ -102,6 +102,20 @@ const ck = (name, ok, got) => {
      拿着旧 handle 去 `page.data()` 就报 "page is not on top of page stack"，
      整把尺子一条判据都没吐就崩（10-08 真跑就这么红过一次，重跑立刻好——那是时序红，不是回归）。 */
   const top = async () => { page = await mp.currentPage(); return page }
+  /* 从首屏踏进第二屏那一枚人物角标，与上面同一味时序红：10-16 连着两趟在 D 节 reLaunch 之后
+     3.5s 仍摸不到 `.blk-person`（一趟拿到 null 整把崩，一趟崩在下一句）。判据内容一条不松，
+     只是给它三次机会、每次先重进页面——把"环境还没渲染完"与"这一枚真没了"分开。 */
+  const openEntry = async () => {
+    for (let i = 0; i < 3; i++) {
+      await top()
+      const p = await page.$('.blk-person')
+      if (p) { await p.tap(); await sleep(1200); return }
+      console.log(`第 ${i + 1} 次没摸到 .blk-person，重进一次再试`)
+      page = await enter('/pages/create/create')
+      await sleep(3500)
+    }
+    throw new Error('三次都没摸到 .blk-person——这一回不是时序，得查首屏那一枚还在不在')
+  }
   const metric = await mp.evaluate(() => {
     const i = wx.getSystemInfoSync()
     return { w: i.windowWidth, h: i.windowHeight }
@@ -163,8 +177,7 @@ const ck = (name, ok, got) => {
 
   // ---------- B 展开 · 照片档：三枚圈 ----------
   await top()
-  await (await page.$('.blk-person')).tap()
-  await sleep(1200)
+  await openEntry()
   d = await page.data()
   ck('B1 点条身进「照片」（10-08 起默认档不再是直接写）', d.active === 'photo', d.active)
   const [panel1, out1] = await rects(['.panel', '.out'])
@@ -184,11 +197,14 @@ const ck = (name, ok, got) => {
     !!panel1 && panel1.top / metric.h > 0.5, panel1 && `顶 ${Math.round(panel1.top)} / ${metric.h} = ${(panel1.top / metric.h).toFixed(2)}`)
   /* 10-14 站长「第二屏，Tips 去掉」⇒ 框外这一行只剩「返回」一枚，屏上查不到第二屏的 Tips。
      原来这一条比的是"左边那句等于六句里的一句"（两边都拿这一页自己那份字典比，不抄死字符串），
-     载体撤了一处，"比字典"那半件事搬到了首屏那一格（§A 那批管 `.blk-tips-line`）。 */
-  ck('B6 框外那一行只剩字典里那句「返回」，屏上没有第二屏的 Tips 与它前面那枚点',
+     载体撤了一处，"比字典"那半件事搬到了首屏那一格（§A 那批管 `.blk-tips-line`）。
+     10-16 站长「把原文翻译的开关上移到与返回同一行左边」⇒ 行里从一枚变两枚，这一条的前提跟着改：
+     数枚数钉的是**两枚且第二枚是那枚开关**，Tips 那两枚载体（`.out-l`／`.out-dot`）仍一条不许回来。 */
+  const outKids = (await page.$$('.out > *')).length
+  ck('B6 框外那一行两枚：左边那枚开关＋字典里那句「返回」，屏上没有第二屏的 Tips 与它前面那枚点',
     (await txtOf('.out-r')) === d.t.back && !(await page.$('.out-l')) && !(await page.$('.out-dot'))
-    && (await page.$$('.out > *')).length === 1,
-    `「${await txtOf('.out-r')}」／枚数 ${(await page.$$('.out > *')).length}`)
+    && outKids === 2 && (await page.$$('.out > .wr-sw')).length === 1,
+    `「${await txtOf('.out-r')}」／枚数 ${outKids}／开关 ${(await page.$$('.out > .wr-sw')).length}`)
   const mds = await page.$$('.md')
   ck('B7 三个标签（相册并进照片了）', mds.length === 3, mds.length)
   ck('B8 当前标签是照片', /(^|\s)md on(\s|$)/.test(await clsOf('.md')) && (await txtOf('.md.on')) === '照片', await txtOf('.md.on'))
@@ -320,6 +336,9 @@ const ck = (name, ok, got) => {
         probe.midLeft = toRpx(((await rects(['.sld-knob']))[0] || {}).left || 0) - toRpx(track.left) - 5
       }
     }
+    // 松手前一刻先读一次：红了就能分清"第 5~8 那几笔 touchmove 根本没进"（这里就还是中途那个数）
+    // 与"走到了最右、松手却没触发提交"（这里是 488 而 busy 空）。
+    probe.preEnd = (await page.data()).knobRpx
     await el.touchend({ touches: [] })
     await sleep(400)
     return probe
@@ -389,7 +408,8 @@ const ck = (name, ok, got) => {
   await mp.evaluate(() => { wx.__probePolls = 0 })   // 计数归零，"第 4 次才回 completed"才是硬时刻
   const pr = await drag()
   let dD = await page.data()
-  ck('D3 拖到底 → 真的进忙态（busy=url）', dD.busy === 'url', dD.busy)
+  ck('D3 拖到底 → 真的进忙态（busy=url）', dD.busy === 'url',
+    `${dD.busy}｜松手前一刻 knob=${pr.preEnd}`)
   ck('D3b 拖到一半屏上那枚圆真跟着走（不是只写在 data 里）',
     pr.midRpx > 120 && Math.abs(pr.midLeft - pr.midRpx) <= 8, `data ${pr.midRpx}rpx｜屏上 ${pr.midLeft.toFixed(0)}rpx`)
   await sleep(1400)
@@ -440,8 +460,7 @@ const ck = (name, ok, got) => {
 
   // ---------- E 文字档：一个框，展开才变两行 ----------
   await top()
-  await (await page.$('.blk-person')).tap()
-  await sleep(1200)
+  await openEntry()
   await (await page.$$('.md'))[2].tap()
   await sleep(900)
   d = await page.data()
@@ -458,23 +477,59 @@ const ck = (name, ok, got) => {
   ck('E3 收起那一档这一格是一行（壳 105rpx，写字那一层 99rpx）',
     !!shell3 && rpxEq(shell3.h, 105, 3) && !!ta3 && rpxEq(ta3.h, 99, 3),
     `壳 ${shell3 && toRpx(shell3.h).toFixed(1)}／框 ${ta3 && toRpx(ta3.h).toFixed(1)}rpx`)
-  /* ⑨ 文字档也要有粘贴钮，且与链接档一致——不只数节点：真往剪贴板塞一句话，点那枚钮，看进没进框。
-     （数节点的判据抓不到"钮在、但读的是别的键"，那正是链接档原来那个 bug 的形状。） */
-  await mp.evaluate(() => { wx.setClipboardData({ data: '验收用的那一句' }) })
-  await sleep(500)
+  /* ⑨ 文字档也要有粘贴钮，且这一枚点下去真把内容接进框里、不顶掉旧字。
+     （只数节点的判据抓不到"钮在、但读的是别的键"，那正是链接档原来那个 bug 的形状。）
+
+     ⚠⚠ 模拟器里剪贴板这一对 API 是**死的**，10-16 实测两次：
+       ① `evaluate(() => new Promise(d => wx.getClipboardData(...)))` 把整把尺子挂到
+          `timeout waiting for automator response` 退出（回调一个都不发，Promise 永远不落地）；
+       ② 改成"回调只往 wx 上写槽、第二趟当普通值读回"再探一次，set 与 get 各等 1.5s，
+          读数 `{set:"no-callback", get:"no-callback"}` —— success／fail／complete 三条全没走；
+       ③ 宿主机 `pbpaste` 在 `wx.setClipboardData` 前后都是空 ⇒ 模拟器根本不写系统板。
+       所以这一节**不许**再靠真剪贴板：靠系统能力的那半只有真机能证。
+     打法与本把 F 节（chooseMedia）／D 节（wx.request）同一套路子：把 `wx.getClipboardData` 换成桩、
+     桩把 success 与 complete 都发完，**点的仍是屏上那枚真钮、走的仍是 onPasteWrite 整趟**。
+     桩证明的是接线与语义（读到的那串真进了框、接在旧字后面、不亮报错气泡），
+     证明不了的是"iOS/安卓上长按系统剪贴板读得到东西"——那一句写在读数里，不糊过去。 */
+  const CLIP = '剪贴板里那一句'
+  const OLD = '第一段旧字'
+  // 连着两趟整把尺子死在 E3 之后（`timeout waiting for automator response`），而单独探针里这一串
+  // 三步全通（input 进得了 writeBody、点钮真把桩里那句接在旧字后面、errLine 空）。
+  // 所以先给这一段每一步落一行脚印：再挂就挂在哪一句，不用猜。
+  console.log('→ E3a 装剪贴板桩')
+  await mp.evaluate((sentinel) => {
+    if (!wx.__clipRaw) wx.__clipRaw = wx.getClipboardData
+    wx.getClipboardData = (o) => {
+      const res = { data: sentinel, errMsg: 'getClipboardData:ok' }
+      if (o.success) o.success(res)
+      if (o.complete) o.complete(res)
+    }
+  }, CLIP)
+  console.log('→ E3b 找那枚钮')
   const pasteBtn = await page.$('.field-write .field-paste')
   ck('E3b 文字档那格有粘贴钮（在格子里，与链接档同一个类名）', !!pasteBtn)
   if (pasteBtn) {
+    console.log('→ E3 往框里打旧字')
+    await (await page.$('.field-area')).input(OLD)   // 先让框里有旧字：这一位的语义是"接在后面"，不是替换
+    await sleep(400)
     const bodyBefore = (await page.data()).writeBody || ''
+    console.log('→ E3c 点那枚钮')
     await pasteBtn.tap()
     await sleep(700)
-    const bodyAfter = (await page.data()).writeBody || ''
-    ck('E3c 点一下真把剪贴板那句话接进框里（框里原来有字也不许把旧的顶掉）',
-      /验收用的那一句/.test(bodyAfter) && bodyAfter.length > bodyBefore.length,
-      `前 ${JSON.stringify(bodyBefore)} → 后 ${JSON.stringify(bodyAfter)}`)
+    const a3 = await page.data()
+    const bodyAfter = a3.writeBody || ''
+    ck('E3c 点那枚钮真走 onPasteWrite：读到的一串接在旧字**后面**（旧字一个字不许没）',
+      bodyBefore === OLD && bodyAfter === `${OLD}\n${CLIP}`,
+      `前 ${JSON.stringify(bodyBefore)} → 后 ${JSON.stringify(bodyAfter)}｜报错行 ${JSON.stringify(a3.errLine || '')}（桩证的接线，真读系统剪贴板只有真机能证）`)
     const bubAfter = await page.$$('.hint-bubble')
     ck('E3d 接进去了就不许再报"还没有内容"（那枚气泡不能因为粘贴而亮着）',
       bubAfter.length === 0 && !(await page.data()).hintLine, `${bubAfter.length} 枚`)
+    // 桩当场还原、旧字擦干净：后面 E4~E9 与 G 节量的是焦点／ready 那一套，
+    // 框里留一句哨兵会让"空着不许能提交"那类判据变成假绿（与 D 节 wx.request 那副替身同规矩）。
+    console.log('→ E3 还原桩并擦净框')
+    await mp.evaluate(() => { if (wx.__clipRaw) { wx.getClipboardData = wx.__clipRaw; delete wx.__clipRaw } })
+    await (await page.$('.field-area')).input('')
+    await sleep(400)
   }
   // ⚠️ 这里用 trigger('focus') 而不是 tap()：模拟器里 tap 一枚原生 <textarea> **不会**把焦点落上去
   //（实测 bodyFocus 一直是 false，E4/E5/E6 三条连着红，而面板高度那条量出来是 500 没错）。
@@ -490,14 +545,30 @@ const ck = (name, ok, got) => {
   ck('E5 壳跟着变成两行（160rpx，写在壳身上；写字那一层 154）',
     !!shell5 && rpxEq(shell5.h, 160, 4) && !!ta5 && rpxEq(ta5.h, 154, 4),
     `壳 ${shell5 && toRpx(shell5.h).toFixed(1)}／框 ${ta5 && toRpx(ta5.h).toFixed(1)}rpx`)
-  ck('E6 「原文翻译」那枚开关在展开态出现，默认关',
-    (await page.$$('.wr-sw')).length === 1 && d.writeTranslate === false)
+  // E6~E9 这一组 10-16 改口径：站长「把原文翻译的开关上移到与返回同一行左边，三个tab全局都可用」
+  // ＋「默认是翻译，关闭就不翻译」。原来那四条钉的是"展开态才出现、默认关、离开焦点跟着撤"，
+  // 这三条前提今天全不成立（撤一个状态会作废一批判据，见 [[feedback-removing-a-state-invalidates-rulers]]）。
+  // 现在钉的是：① 它一直在（展开收起都在，因为闸从节点上拿掉了）② 它落在面板**之上**（真的在框外那一行，
+  // 不是类名对却还在卡里）③ 默认是开 ④ 点一下只翻这一位。
+  const swE6 = await page.$$('.wr-sw')
+  const [swBox6, panelBox6, outBox6] = await rects(['.wr-sw', '.panel', '.out'])
+  ck('E6 「原文翻译」那枚一直在，且默认就是开（站长 10-16「默认是翻译」）',
+    swE6.length === 1 && d.writeTranslate === true, `${swE6.length} 枚／writeTranslate=${d.writeTranslate}`)
+  // 位置判据两头：① 整枚落在面板顶**之上**（真的搬出卡子了）；② 它与那一行**同轴**（垂直中心差 ≤ 8px）。
+  // 不钉"整枚在行的盒子内"——那枚开关故意上下各垫了 10rpx 透明 padding（热区），盒子比行高 4px 是设计值，
+  // 拿行的盒子当边界量它必红（量法要跟着实现改，预算不松：见 [[feedback-ruler-units-and-box-model]]）。
+  const swMid = swBox6 && swBox6.top + swBox6.h / 2
+  const outMid = outBox6 && outBox6.top + outBox6.h / 2
+  ck('E6b 它坐在框外那一行里：整枚落在面板顶**之上**、且与那一行同轴（搬对了位置，不是只改了类名）',
+    !!swBox6 && !!panelBox6 && !!outBox6 && swBox6.bottom <= panelBox6.top + 1
+    && Math.abs(swMid - outMid) <= 8,
+    `开关 ${swBox6 && swBox6.top.toFixed(1)}~${swBox6 && swBox6.bottom.toFixed(1)}（中 ${swMid && swMid.toFixed(1)}）／那一行中 ${outMid && outMid.toFixed(1)}／面板顶 ${panelBox6 && panelBox6.top.toFixed(1)}`)
   await mp.screenshot({ path: `${OUT}/E-文字-展开两行.png` })
   await (await page.$('.wr-sw')).tap()
   await sleep(700)
   d = await page.data()
-  ck('E7 点开关只翻这一位，面板不收、不提交',
-    d.writeTranslate === true && d.active === 'write' && !d.busy && (await page.$$('.panel')).length === 1,
+  ck('E7 点开关只翻这一位（开→关），面板不收、不提交',
+    d.writeTranslate === false && d.active === 'write' && !d.busy && (await page.$$('.panel')).length === 1,
     `${d.writeTranslate}/${d.active}/${d.busy}`)
   const offT = await styleOf('.wr-sw-track')
   await (await page.$('.wr-sw')).tap()
@@ -507,9 +578,9 @@ const ck = (name, ok, got) => {
   await (await page.$('.field-area')).trigger('blur')
   await sleep(800)
   d = await page.data()
-  ck('E9 离开焦点退回收起那一档，开关跟着撤',
-    d.panelOpen === false && (await page.$$('.wr-sw')).length === 0
-    && rpxEq((await rects(['.panel']))[0].h, PANEL_H, 4), `${d.panelOpen}`)
+  ck('E9 离开焦点只退回收起那一档，**开关不跟着撤**（三档全局＝这一档也在）',
+    d.panelOpen === false && (await page.$$('.wr-sw')).length === 1
+    && rpxEq((await rects(['.panel']))[0].h, PANEL_H, 4), `${d.panelOpen}／${(await page.$$('.wr-sw')).length} 枚`)
 
   // ---------- F 照片档：小图一行、展开只多一行、满了给话 ----------
   await top()
@@ -621,8 +692,7 @@ const ck = (name, ok, got) => {
   ck('G2 收起之后那三位都归位（不留在上一档的样子）',
     d.panelOpen === false && d.knobRpx === 10 && d.fillPct === 0 && d.done === false,
     `open=${d.panelOpen} knob=${d.knobRpx} fill=${d.fillPct}`)
-  await (await page.$('.blk-person')).tap()
-  await sleep(1200)
+  await openEntry()
   await set({ busy: 'url' })
   await (await page.$('.title-row')).tap()
   await sleep(700)
@@ -644,8 +714,7 @@ const ck = (name, ok, got) => {
   await sleep(4000)
   d = await page.data()
   ck('H1 英文左块那句吃的就是字典里那条', d.t.barIdle === I18N.texts('en').barIdle, d.t.barIdle)
-  await (await page.$('.blk-person')).tap()
-  await sleep(1200)
+  await openEntry()
   const labels = []
   for (const m of await page.$$('.md')) { labels.push(((await m.text()) || '').trim()) }
   ck('H2 三个英文标签：Photo / Link / Text', labels.join('|') === 'Photo|Link|Text', labels.join('|'))

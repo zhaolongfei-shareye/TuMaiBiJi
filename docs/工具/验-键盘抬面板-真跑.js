@@ -94,11 +94,14 @@ const ck = (name, cond, got) => {
   await page.callMethod('_sync')
   await sleep(900)
   let d = await page.data()
-  ck('展开态在（面板两行框 + 那枚「原文翻译」）', d.panelOpen === true && d.kbLift === 0, JSON.stringify([d.panelOpen, d.kbLift]))
+  ck('展开态在（框换成两行那一档；「原文翻译」那枚 10-16 起常驻框外那一行，不再算展开态的东西）',
+    d.panelOpen === true && d.kbLift === 0, JSON.stringify([d.panelOpen, d.kbLift]))
   const sw = await page.$('.wr-sw')
   const lab = await page.$('.wr-sw-lab')
   ck('「原文翻译」那一行渲染出来了（不是只有节点在、字是空的）',
     !!sw && !!lab && (await lab.text()) === '原文翻译', lab ? await lab.text() : '(没这枚字)')
+  // 这一枚现在坐在**框外那一行**里：它跟着那一行与面板一起抬，所以这一把它量的还是它。
+  // 位置本身（落在面板顶之上）由 `验-统一录入条-真跑` 的 E6b 钉，这里不重复钉。
 
   const SELS = ['.entry-wrap', '.stage-panel', '.wr-sw', '.sld']
   const base = await geo(SELS)

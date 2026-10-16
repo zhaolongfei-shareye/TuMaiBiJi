@@ -568,7 +568,7 @@ class Test邀请到账:
         async def fake_ocr(images):
             return "识别出来的文字内容"
 
-        async def fake_extract(text, fallback_title=None):
+        async def fake_extract(text, fallback_title=None, translate=None):
             return {
                 "title": "截图笔记",
                 "summary": "摘要",

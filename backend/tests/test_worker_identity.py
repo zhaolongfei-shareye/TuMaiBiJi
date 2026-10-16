@@ -112,7 +112,7 @@ class Test整条任务不串号:
         async def fake_scrape(url):
             return {"content": "抓回来的正文", "title": "原标题", "source_type": "article"}
 
-        async def fake_extract(text, fallback_title=None):
+        async def fake_extract(text, fallback_title=None, translate=None):
             return {"title": "提炼后的标题", "summary": "摘要", "key_points": [], "tags": [], "degraded": False}
 
         monkeypatch.setattr(ingest_tasks, "scrape_url", fake_scrape)
@@ -171,7 +171,7 @@ class Test整条任务不串号:
         async def fake_ocr(images):
             return "识别出来的文字"
 
-        async def fake_extract(text, fallback_title=None):
+        async def fake_extract(text, fallback_title=None, translate=None):
             return {"title": "标题", "summary": "摘要", "key_points": [], "tags": [], "degraded": False}
 
         monkeypatch.setattr(ingest_tasks, "ocr_images", fake_ocr)
