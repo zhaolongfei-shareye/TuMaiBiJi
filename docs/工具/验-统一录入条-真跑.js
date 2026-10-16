@@ -31,8 +31,9 @@ const WAIT_PASTE_MS = Number(/const PASTE_WAIT_MS = (\d+)/.exec(CJ_S)[1])
 // `--cp-ring`，判据要跟着换就得现读，不然下一轮换皮又是一次全红。
 const CWX = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/create/create.wxss'), 'utf8')
 // 井这一层现在有两枚出处，两枚都不抄字面：
-// 框＝`--cp-card`（createSkin 那支白，从 palette 现读）；条＝底栏那一档，而这一枚的**权威出处就是 palette**
-// ——底栏组件拿到的 `--chrome-bg` 是 `moodChromeOf(心情).bg` 算出来的，CSS 里那一枚只是它的镜像。
+// 框＝`--cp-card`（createSkin 那支白，从 palette 现读）；条＝`moodVars(心情)['--glass-chrome-slide']`
+// ——这一枚的**权威出处也在 palette**（彩色四档它等于底栏组件那枚 `--chrome-bg`，墨档 18:3x 按比例降了一半），
+// CSS 与 app.wxss 里那几行都只是它的镜像。
 // 所以期望值现算：改 α、换心情、两处漂任何一处，C8b/C8c 当场红（与下面 RING_CSS 同一套路）。
 const PAL = require(path.resolve(__dirname, '../../miniprogram/utils/palette.js'))
 const CARD_HEX = (/--cp-card:\s*([^;\n]+)/.exec(PAL.createSkin()) || [0, ' #FFFFFF'])[1].trim()
@@ -299,17 +300,20 @@ const ck = (name, ok, got) => {
   ck('C8 框与条之间有缝、框不贴面板上沿（两档 auto 边距真的分到了地方）',
     !!field1 && !!sld1 && sld1.top - field1.bottom >= 8 * R && field1.top - (await rects(['.card']))[0].top >= 8 * R,
     field1 && sld1 && `框底到条顶 ${toRpx(sld1.top - field1.bottom).toFixed(1)}rpx`)
-  /* C8b/C8c 站长 10-16 最后一趟（拿真机截图那句）：「输入框要纯白，右滑要与下方三个按钮 bar 同色」。
+  /* C8b/C8c 站长 10-16 最后一趟（拿真机截图那句）：「输入框要纯白，右滑要与下方三个按钮 bar 同色」，
+     18:3x 又追一句「墨版的右滑太深了，要对照其他色系深浅程度，按比例降低」。
      四条都在 computed style 上量（样式表里写对却被别一层覆掉、变量指空、简写吃底色那几型，
      只有摸渲染才抓得到；这一格前面两趟就是这么骗过静态读数的）：
      框＝`rgb(255, 255, 255)` 实心、零描边、零阴影、墨字；
-     条＝**当前心情那一档底栏色**（期望值现算：`moodChromeOf(屏上那档心情).bg`，与底栏组件同源），
-         那一圈与面同值（看不见＝没有分界线），字＝底栏那三枚图形同一支（也跟着心情翻）。 */
+     条＝**当前心情那一档的条面**（期望值现算：`moodVars(屏上那档心情)` 里的 `--glass-chrome-slide`，
+         彩色四档它等于底栏那一枚、墨档是他这一句降下来的 .28），那一圈不刷色，
+         字＝`--slide-ink`（色板在两支候选里挑压得住这张面的那一支，墨档 18:3x 之后是深字）。 */
   const moodKey = await mp.evaluate(() => getApp().glassMood().key)
-  const CHROME_RGB = toComputed(PAL.moodChromeOf(moodKey).bg)
+  const MOOD_V = PAL.moodVars(moodKey)
+  const CHROME_RGB = toComputed(MOOD_V['--glass-chrome-slide'])
   const INK_RGB = toComputed(INK_HEX)
   const CARD_RGB = toComputed(CARD_HEX)
-  const TXT_RGB = toComputed(PAL.moodOf(moodKey).text)
+  const TXT_RGB = toComputed(MOOD_V['--slide-ink'])
   const fldBg = await cssOf('.field', 'background-color')
   const fldBorder = await cssOf('.field', 'border-top-width')
   const fldShadow = await cssOf('.field', 'box-shadow')
@@ -323,77 +327,99 @@ const ck = (name, ok, got) => {
   const sldInk = await cssOf('.sld-txt', 'color')
   const sldBf = await cssOf('.sld', 'backdrop-filter')
   /* 字这一枚要**跟着屏上那一档判**：C 段这一趟是"链接框还没填"那一刻量的，那时 `.sld-off` 正挂着，
-     屏上读到的就是退一层那档 `rgba(文字色, .72)`；拿满档去比会红成"实现错了"，其实是我拿错了期望值
-     （10-16 这条第一次跑就是这么红的）。两档都钉：off→.72、非 off→满档，极性仍必须是心情那一支。 */
+     屏上读到的就是退一层那档 `--slide-ink-dim`（＝条上那支字淡到 .72）；拿满档去比会红成"实现错了"，
+     其实是我拿错了期望值（10-16 这条第一次跑就是这么红的）。两档都钉：off→.72、非 off→满档。 */
   const sldCls = await clsOf('.sld')
-  const TXT_DIM_RGB = toComputed(PAL.moodOf(moodKey).text).replace('rgb(', 'rgba(').replace(')', ', 0.72)')
+  const TXT_DIM_RGB = toComputed(MOOD_V['--slide-ink-dim'])
   const wantInk = /sld-off/.test(sldCls) ? TXT_DIM_RGB : TXT_RGB
-  ck(`C8c 右滑那一条＝底栏那一档（心情 ${moodKey}）：面吃那一枚、那一圈不刷色、字与底栏图形同一支（这一档：${/sld-off/.test(sldCls) ? '空着·退一层' : '有内容·满档'}）、糊挂着`,
+  ck(`C8c 右滑那一条＝这一档的条面（心情 ${moodKey}）：面吃 --glass-chrome-slide、那一圈不刷色、字吃这一档挑出来那支（这一档：${/sld-off/.test(sldCls) ? '空着·退一层' : '有内容·满档'}）、糊挂着`,
     sldBg === CHROME_RGB && /rgba\(0,\s*0,\s*0,\s*0\)/.test(sldRing || '') && sldInk === wantInk
     && !/none/.test(sldBf || 'none'),
     `面 ${sldBg}（该 ${CHROME_RGB}）／圈 ${sldRing}（该透明）｜字 ${sldInk}（该 ${wantInk}）｜糊 ${sldBf}`)
   /* C8d 站长 10-16 17:2x 附真机截图：「墨色，右滑的 bar 黑边换成发光，其他也一样」。
-     这一条不读 computed style，读**屏上那一行像素**——因为"黑边"这件事在 computed style 里根本不存在：
+     这一条不读 computed style，读**屏上那几行像素**——因为"黑边"这件事在 computed style 里根本不存在：
      上一版面与圈都是 `rgba(35,37,44,.62)`，两个读数一模一样，可 `background` 默认铺到 border-box、
      border 又在同一像素上再刷一层 ⇒ 那一圈实算 α .856，屏上一条硬边（他那张截图穿过条左沿：
      条身 113／边圈 65／面板 198）。只有采像素抓得到这一型（"改一层皮的十三种静默失效"里
      "补色自己成新台阶"那一型）。
-     ⚠ 第一版拿 `boundingClientRect` × 一个缩放去对截图，被自己那条取景守卫打红：截图量的是**整块设备屏**
-       （390×844 → 734×1588），节点 y 却住在 **webview** 那一层（753 高，上面压着 47 状态栏＋44 导航栏），
-       两个比例对不上（1588/734＝2.16 ≠ 753/390＝1.93），采到的"条身"其实是上面那格白框（211 比面板还亮）。
-       ⇒ 改成**在图里自定位**，且只沿**水平方向**量：
-       ① 条＝下半屏那一横排里"整行中位最暗"连成的一段（取中位数不取最小值：那一行上有墨字，
-          取最小会把标题那行当成条；只在下半屏 45%~88% 里找，屏底那一排同色玻璃不吃进来）；
-       ② 沿条的**中线那一行**从左扫到右，找到条的右沿；
-       ③ 断层＝右沿往里 8 像素里最暗那一枚，与条身中段（往里 20~60）比；
-       ④ 发光＝右沿往外 3~26 的最亮一枚，与再往外 32~44 的中位比。
-     同一行 ⇒ 面板那条上深下浅的渐变在这一趟里是常量，不会把"发光"读成"坡"（第一版竖着量就栽在这上面）。
-     反向验过：同一把量法打在站长那张**改前**截图上，报 内圈 67 vs 身 113（差 −47）＝会红；
-     打在本构建上 113 vs 113（差 0）＝黑边确实没了。 */
+     ⚠ 定位这一趟换过两次，两次都是自己的坑，别再改回去：
+       第一版拿 `boundingClientRect` × 一个缩放去对截图，被自己那条取景守卫打红：截图量的是**整块设备屏**
+         （390×844 → 734×1588），节点 y 却住在 **webview** 那一层（753 高，上面压着 47 状态栏＋44 导航栏），
+         两个比例对不上（1588/734＝2.16 ≠ 753/390＝1.93），采到的"条身"其实是上面那格白框（211 比面板还亮）。
+       第二版改用"在图里自定位"——在下半屏 45%~88% 找"整行中位最暗"连成的一段。这一版**建立在条是
+         那一横排里最暗的东西上**，而站长 18:3x 那句「墨版的右滑太深了…按比例降低」正好把这条前提撤掉了：
+         面从 113 抬到 ~185 之后，最暗那一段落回面板/屏底那一排，量到的"条身"不是条。
+       ⇒ 现在按节点矩形映射（`y = (cssY + statusBarHeight + 44) × 缩放`，与 `docs/工具/量-五档右滑深浅.js`
+         同一把），并且**自己核一遍映射对不对**：① 条上下两行取到的必须等值（同一层面）；
+         ② 条身必须比它左右那一窄条暗（暗才说明套在条上，不是套在上面的白框）；
+         ③ 字那一行的偏移符号必须与色板判出来的极性一致（浅字→偏亮、深字→偏暗）。
+         三条里任何一条反了就是取景错，不当"实现红"报。取样还统一取**字上下那两行**（条高 110rpx，
+         字压在 39~71rpx）：第一把的"条身 132"就是被纸白字抬上去的污染读数，量的时候躲开。 */
   {
     const shot = `${OUT}/C-条身那一圈与外发光.png`
     await mp.screenshot({ path: shot })
     const { PNG } = require('pngjs')
     const img = PNG.sync.read(fs.readFileSync(shot))
-    const W = img.width
+    const win = await mp.evaluate(() => { const w = wx.getWindowInfo(); return { ww: w.windowWidth, sbh: w.statusBarHeight } })
+    const S = img.width / win.ww
+    const xOf = (cssX) => Math.round(cssX * S)
+    const yOf = (cssY) => Math.round((cssY + win.sbh + 44) * S)   // ＋状态栏 ＋默认导航条
     const L = (x, y) => {
-      const i = (W * y + x) * 4
+      const i = (img.width * y + x) * 4
       return 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2]
     }
-    const rowMed = (y) => {
-      const a = []
-      for (let x = Math.round(W * 0.18); x < W * 0.82; x += 2) a.push(L(x, y))
-      a.sort((p, q) => p - q)
-      return a[Math.floor(a.length / 2)]
+    const med = (a, b, y) => {
+      const s = []
+      for (let x = a; x <= b; x += 2) s.push(L(x, y))
+      s.sort((p, q) => p - q)
+      return s[Math.floor(s.length / 2)]
     }
-    const lo = Math.round(img.height * 0.45), hi = Math.round(img.height * 0.88)
-    const rows = []
-    for (let y = lo; y < hi; y++) rows.push(rowMed(y))
-    const darkest = Math.min(...rows)
-    const band = rows.map((v) => v <= darkest + 14)
-    // 取**与最暗那一行连成一片**的那一段，不取"第一个／最后一个够格的行"：
-    // 屏底那一排是同一种玻璃，够格的行会一路连过去，把两段缝在一起。
-    const midRow = rows.indexOf(darkest)
-    let first = midRow
-    while (first > 0 && band[first - 1]) first -= 1
-    let last = midRow
-    while (last < band.length - 1 && band[last + 1]) last += 1
-    const yMid = lo + Math.round((first + last) / 2)
-    let rE = Math.round(W * 0.85)
-    while (rE < W - 1 && L(rE + 1, yMid) < 170) rE += 1
+    const inset = Math.round(sld1.w * 0.08)            // 躲开两端圆角，也躲开左边那枚 90rpx 圆钮
+    const xA = xOf(sld1.left + inset), xB = xOf(sld1.right - inset)
+    const yUp = yOf(sld1.top + sld1.h * 0.22)
+    const yDn = yOf(sld1.top + sld1.h * 0.78)
+    const yMid = yOf(sld1.top + sld1.h / 2)
+    const up = med(xA, xB, yUp), dn = med(xA, xB, yDn)
+    const bodyL = (up + dn) / 2
+    const txtRow = med(xA, xB, yMid)
+    const oA = xOf(sld1.left - 20), oB = xOf(sld1.left - 6)   // 条外那一窄条（发光够不到的地方）
+    const panelL = (med(oA, oB, yUp) + med(oA, oB, yDn)) / 2
+    // 极性：色板判出来那支字比这张面亮还是暗（面＝这一档玻璃按 α 混在白卡上，与静态 ⑤b 同一个算式）
+    const slideA = Number(/,\s*([\d.]+)\s*\)$/.exec(MOOD_V['--glass-chrome-slide'])[1])
+    const faceHex = PAL.mix(PAL.moodOf(moodKey).glass, CARD_HEX, slideA)
+    const wantSign = Math.sign(PAL.lumOf(MOOD_V['--slide-ink']) - PAL.lumOf(faceHex))
+    const gotSign = Math.sign(txtRow - bodyL)
+    const rE = xOf(sld1.right)
     const seg = (a, b) => { const s = []; for (let x = rE + a; x <= rE + b; x++) s.push(L(x, yMid)); return s }
-    const med = (a) => a.slice().sort((p, q) => p - q)[Math.floor(a.length / 2)]
-    const inner = seg(-8, -1), body = seg(-60, -20), glow = seg(3, 26), base = seg(32, 44)
-    const bodyL = med(body)
-    ck('C8d-取景 下半屏那一段是一条横到底的暗带、右沿落在屏宽九成那一格',
-      last - first > 40 && Math.abs(rE / W - 0.90) <= 0.03 && rowMed(yMid) < 170,
-      `带高 ${last - first} 行／中线那一行中位 ${rowMed(yMid).toFixed(0)}／右沿 ${(rE / W * 100).toFixed(1)}%／截图 ${W}×${img.height}`)
-    ck('C8d 那一圈不再比条身深（黑边撤干净；同一把量法打在站长改前那张上量到 −47）',
+    const inner = seg(-8, -1), body2 = seg(-60, -20), glow = seg(3, 26)
+    const segMed = (s) => s.slice().sort((p, q) => p - q)[Math.floor(s.length / 2)]
+    ck('C8d-取景 矩形映射真的套在条上：上下两行等值、条身比它左右暗、字那一行的偏移与色板判出来的极性同号',
+      Math.abs(up - dn) <= 4 && panelL - bodyL >= 5 && gotSign === wantSign && Math.abs(txtRow - bodyL) >= 5,
+      `上行 ${up.toFixed(0)}／下行 ${dn.toFixed(0)}｜条身 ${bodyL.toFixed(0)} 比条外 ${panelL.toFixed(0)} 低 ${(panelL - bodyL).toFixed(0)}`
+      + `｜字行偏移 ${(txtRow - bodyL).toFixed(0)}（该 ${wantSign > 0 ? '正' : '负'}＝这一档字比面${wantSign > 0 ? '亮' : '暗'}，面按 ${faceHex} 算）`)
+    ck('C8d 那一圈不再比条身深（黑边＝同一枚色刷两遍，撤了不许回来；判据不看绝对深度，换 α 不作废这一条）',
       Math.min(...inner) >= bodyL - 10,
-      `内圈最暗 ${Math.min(...inner).toFixed(0)}／条身 ${bodyL.toFixed(0)}／差 ${(Math.min(...inner) - bodyL).toFixed(0)}`)
-    ck('C8d-b 外沿真有一圈比它旁边那块面板亮的发光（同一行比，坡不参与）',
-      Math.max(...glow) >= med(base) + 6,
-      `条外最亮 ${Math.max(...glow).toFixed(0)}／再往外 ${med(base).toFixed(0)}（差 ${(Math.max(...glow) - med(base)).toFixed(0)}）`)
+      `心情 ${moodKey}｜内圈最暗 ${Math.min(...inner).toFixed(0)}／条身 ${bodyL.toFixed(0)}（右段中段现量 ${segMed(body2).toFixed(0)}）`
+      + `／差 ${(Math.min(...inner) - bodyL).toFixed(0)}`)
+    /* 发光"该亮多少"**不许写死一个数**：这一圈吃 `--glass-plate-dock`＝本档 `piece`（玻璃向白提亮 55%）@.72，
+       墨档那一边是**纯白**（压在条旁边能差三十几格），彩色四档那一边只是本色的浅 tint（同一行实测差 5 格）。
+       写死「≥6」的那一版在墨档一路绿，屏上切到象牙当场红——那是判据拿一档的数当五档的数，不是屏上没了光。
+       ⇒ 应有抬升现算：Δ应 ＝ α ×（piece 的亮度 − 条外那一窄条的实测亮度），**实测要到它的四成**才算有这圈光
+         （撤掉 box-shadow 实测 Δ≈0，当场红）。期望本身 ≤5 格的那一档（这块底上这圈光本来就几乎看不见）
+         只钉"不许比旁边暗"，读数照样报出来。
+       ⚠ 这一条顺带是一条**产品读数**：彩色四档那圈光实测只有 +5 格。站长那句「其他也一样」要不要把四档的光
+         也抬到墨档那个显眼度，等他一句话——**不在这一刀里改**。 */
+    const glowTok = MOOD_V['--glass-plate-dock']
+    const gc = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(glowTok || '')
+    const pieceL = gc ? 0.299 * +gc[1] + 0.587 * +gc[2] + 0.114 * +gc[3] : 0
+    const glowA = gc && gc[4] !== undefined ? Number(gc[4]) : 1
+    const baseL = med(rE + 32, rE + 44, yMid)
+    const wantD = glowA * (pieceL - baseL)
+    const gotD = Math.max(...glow) - baseL
+    ck('C8d-b 外沿那一圈比它旁边亮到应有抬升的四成（发光真的在画；这一档该差多少由色板现算，不写死）',
+      wantD > 5 ? gotD >= wantD * 0.4 : Math.max(...glow) >= baseL - 2,
+      `心情 ${moodKey}｜发光 ${glowTok}｜条外最亮 ${Math.max(...glow).toFixed(0)} 比再往外 ${baseL.toFixed(0)} 差 ${gotD.toFixed(0)}`
+      + `（该 ≥ ${(wantD * 0.4).toFixed(0)}＝应有 ${wantD.toFixed(0)} 的四成${wantD > 5 ? '' : '；这一档应有抬升本身 ≤5，只钉"不许比旁边暗"'}）`)
   }
   ck('C9 链接档没有归类那一格、没有粘贴按钮', (await page.$$('.wr-cat-face')).length === 0 && !/pasteUrl/.test(JSON.stringify(d)))
 

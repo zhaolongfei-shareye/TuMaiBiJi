@@ -904,22 +904,23 @@ const outInnerW = 750 - 2 * dockInset2 - 2 * outPad - backW
           输入框要纯白，右滑要与下方三个按钮 bar 同色」。
    ⇒ 这一版的口径是两句可以量出来的话，不是一种"质感"：
    ① `.field` ＝ `--cp-card`（createSkin 那支白），**实心**：没有描边、没有渐变、没有阴影、不挂滤镜；
-   ② `.sld` ＝ `--glass-chrome-dock` ＋ `--glass-bf`，与底栏那排**同一个色、同一层糊**——
-      这一枚不是我在这一页另挑的数，它就是 `palette.moodChromeOf()` 发给底栏组件的 `--chrome-bg`
-      （下面那条按五档各比一次字面相等，漂一格就红）；
+   ② `.sld` ＝ `--glass-chrome-slide` ＋ `--glass-bf`，与底栏那排**同一层糊**、彩色四档同一个色——
+      这一枚是 `palette.moodVars()` 按心情现算的（底栏那一枚 `--glass-chrome-dock` 与它同源）；
+      10-16 18:3x「墨版的右滑太深了…按比例降低」之后**只有墨档从 .62 降到 .28**，其余四档仍与底栏同值
+      （下面 ②b／②e 两条各钉一头：一头钉同值不许漂，一头钉分叉只许发生在墨档）；
    ③ **两态同一个值**：`.container.has-bg` 那一队里不许再有 `.field`/`.sld`。原来那条 0-3-0 的覆盖
       把基条的值整层换掉过两次（真跑读数：屏上 `rgba(214,219,227,.42)`，不是基条写的值），
       连带逼出 `.container.has-bg .sld.sld-done` 那条 0-4-0——覆盖撤了，`.sld-done` 自己就现面；
-   ④ 极性跟着面翻回去：白底上必须是墨字（漏一处就是白底白字），条上是浅玻璃 ⇒ 也回墨族；
+   ④ 极性跟着面翻回去：白底上必须是墨字（漏一处就是白底白字），条上那一档由色板在两支候选里现算
+      （墨档 18:3x 之后面翻浅了 ⇒ 它自己从纸白翻成深字，这一句就是这一条存在的理由）；
    ⑤ 还得读得清：**混成实心之后**再算（alpha 不落地就是假数，§6.1 那条规矩），数从令牌现读不抄字面。 */
-const CHROME_SEG = (/--glass-chrome-dock:\s*([^;]+)/.exec(seg('.sld')) || [, ''])[1]
 ok('① 输入框＝纯白实心：面是 createSkin 那支白，描边／渐变／阴影／滤镜一样都没有',
   /background:\s*var\(--cp-card\)(?![\w-])/.test(seg('.field'))
   && !/border:/.test(seg('.field')) && !/linear-gradient/.test(seg('.field'))
   && !/box-shadow/.test(seg('.field')) && !/backdrop-filter/.test(seg('.field')),
   seg('.field').replace(/\s+/g, ' ').slice(0, 120))
-ok('② 右滑条＝底栏那一档：面吃 `--glass-chrome-dock` 单单一层、那一圈不刷色，外沿换成发光，糊与底栏同一档、两条成对',
-  /background:\s*var\(--glass-chrome-dock\)(?![\w-])/.test(seg('.sld'))
+ok('② 右滑条＝这一档玻璃的面：吃 `--glass-chrome-slide` 单单一层、那一圈不刷色，外沿换成发光，糊与底栏同一档、两条成对',
+  /background:\s*var\(--glass-chrome-slide\)(?![\w-])/.test(seg('.sld'))
   && /border:\s*5rpx solid transparent/.test(seg('.sld'))
   && /box-shadow:\s*0 0 24rpx 2rpx var\(--glass-plate-dock\)(?![\w-])/.test(seg('.sld'))
   && !/linear-gradient/.test(seg('.sld'))
@@ -957,6 +958,18 @@ const chromeDrift = palette.MOODS.filter((m) => m.key !== 'ink').map((m) => {
 }).filter(Boolean)
 ok('②b 这一枚与底栏组件拿到的 `--chrome-bg` 五档各比一次字面相等（"与下方三个按钮 bar 同色"落在这条上）',
   chromeDrift.length === 0, chromeDrift.join('；') || '五档齐')
+/* ②e 10-16 18:3x 那一句「墨版的右滑太深了，要对照其他色系深浅程度，按比例降低」把条的面从底栏那一枚
+   分了出来。分叉只许发生在墨档一档上：彩色四档**必须仍与底栏同一个数**（他那句"与底栏同色"没被顶掉），
+   而墨档必须**更浅**（这一条反向钉：谁把 .28 抬回 .62 谁红）。数本身由 ⑤b 那把按屏上的量去核。 */
+const alphaOf = (s) => { const m = /,\s*([\d.]+)\s*\)$/.exec(String(s == null ? '' : s)); return m ? Number(m[1]) : -1 }
+const slideSplit = palette.MOODS.map((m) => {
+  const v = palette.moodVars(m.key)
+  return { k: m.key, a: alphaOf(v['--glass-chrome-slide']), d: alphaOf(v['--glass-chrome-dock']) }
+})
+ok('②e 条的面只在墨档与底栏分叉：彩色四档 α 与 `--glass-chrome-dock` 同一枚，墨档那一枚更浅（按比例降下来的那半截）',
+  slideSplit.filter((x) => x.k !== 'ink').every((x) => x.a === x.d)
+  && slideSplit.filter((x) => x.k === 'ink').every((x) => x.a < x.d && x.a === 0.28),
+  slideSplit.map((x) => `${x.k} 条 ${x.a}／底栏 ${x.d}`).join('　'))
 ok('③ 两态不分叉：`.container.has-bg` 那一队里不再有 `.field`／`.sld`／`.sld-done`（有＝基条白写，10-16 栽过两次）',
   !/\.container\.has-bg[^{]*\.(field|sld)\b/.test(wxss),
   (wxss.match(/\.container\.has-bg[^{]*\.(?:field|sld)\b[^{]*/g) || []).slice(0, 2).join(' ｜ ') || '一条没有')
@@ -965,20 +978,17 @@ ok('③b 完成那一帧不必再抬权重：`.sld-done`（0-1-0）面是那支�
   && /border-color:\s*transparent/.test(seg('.sld-done'))
   && !/--well\b/.test(wxss),
   seg('.sld-done').replace(/\s+/g, ' ') || '没这一条')
-ok('④ 极性跟着面翻：白框上四处全是墨族（正文／占位／✕／粘贴图形），条上那三档跟着心情翻（不钉死墨）',
+ok('④ 极性跟着面翻：白框上四处全是墨族（正文／占位／✕／粘贴图形），条上那三档吃 `--slide-ink` 那一族（跟着面翻、不钉死墨也不钉死纸白）',
   /color:\s*var\(--cp-ink\)(?![\w-])/.test(seg('.field'))
   && /color:\s*var\(--cp-ink\)(?![\w-])/.test(seg('.field-input'))
   && /color:\s*var\(--face-ph\)/.test(seg('.field-ph')) && /color:\s*var\(--cp-ink-62\)/.test(seg('.field-x'))
   && /background:\s*var\(--cp-ink-62\)/.test(seg('.paste-glyph'))
-  && /color:\s*var\(--stage-ink-solid\)/.test(seg('.sld-txt'))
-  && /color:\s*var\(--stage-ink-dim\)/.test(seg('.sld-off .sld-txt'))
-  && /color:\s*var\(--stage-ink-solid\)/.test(seg('.sld-busy .sld-txt'))
+  && /color:\s*var\(--slide-ink\)(?![\w-])/.test(seg('.sld-txt'))
+  && /color:\s*var\(--slide-ink-dim\)(?![\w-])/.test(seg('.sld-off .sld-txt'))
+  && /color:\s*var\(--slide-ink\)(?![\w-])/.test(seg('.sld-busy .sld-txt'))
   && !/color:\s*var\(--cp-ink\)(?![\w-])/.test(seg('.sld-txt')))
 // ⑤ 混成实心再算（alpha 不落地就是假数——§6.1 那条规矩，也是 10-16 那条"PIL 画布丢 alpha"的同一条）。
-//    两枚背景都取**下界**那一档，不是某一态的快照：
-//    框：`--cp-card` 实心白，没有第二层可说；
-//    条：`.62` 那枚玻璃压在它能遇到的**最深**那块底上——底栏自己背后就是心情那一支玻璃满色，
-//        所以拿 mood.glass 满色当底（比压在白卡上深，墨字更难读）。
+//    框：`--cp-card` 实心白，没有第二层可说；条：底怎么取写在下面那一段（10-16 换过一次口径）。
 const RGBA = (s) => {
   const hex = /^\s*#([\da-f]{2})([\da-f]{2})([\da-f]{2})\s*$/i.exec(s)
   if (hex) return [1, 2, 3].map((i) => parseInt(hex[i], 16)).concat(1)
@@ -999,17 +1009,21 @@ const CARD = RGBA(cardStr)
 const inkHex = solid(inkStr, CARD)
 const phHexOnCard = solid(phStr, CARD)
 const cr = (fg, bg) => palette.crOf(fg, bg)
-// 条上那一档：五档各混一次，报最差那一档（"同色"是跟着心情走的，读数也必须跟着五档跑）
-const overA = (rgb, a, base) => {
-  const c = RGBA(rgb)
-  return c ? `#${[0, 1, 2].map((i) => Math.round(c[i] * a + base[i] * (1 - a)).toString(16).padStart(2, '0')).join('')}` : ''
-}
-const chromeReadings = palette.MOODS.map((m) => {
-  const bg = solid(palette.moodChromeOf(m.key).bg, palette.hexToRgb(palette.moodOf(m.key).glass))
-  const t = palette.moodOf(m.key).text
-  return { k: m.key, bg, ink: cr(t, bg), dim: cr(overA(t, 0.72, palette.hexToRgb(bg)), bg) }
+// 条上那一档：10-16 18:3x 之后面**不再等于底栏那一枚**，底也不再取心情玻璃满色。
+/* 面按 `rgba(这一档的玻璃, --glass-chrome-slide 的 α)` 混在**白卡**上算：`.sld` 住在 `.field` 那张白卡里，
+   10-16 19:2x 屏上反推出来的底就是 237 那一档白（`docs/工具/量-五档右滑深浅.js` 那一趟）。
+   字取 `--slide-ink`——色板现算那两支候选（玻璃本色／这一档的字色）里压得住这张面的那一支。
+   ⚠ 换底必须跟着"墨档翻深字"一起换：老口径拿心情玻璃满色当底（**最深**那一底），那是替纸白字找最坏情况；
+   墨档现在用深字，最坏情况恰恰是**最浅**那张面。拿旧底算新字＝一条永远绿的假尺子。
+   ⚠ 这一条只覆盖"没铺背景照片"那一态（＝他现在屏上那一态）。铺了照片那一态条底下是近实心暗面板，
+   墨档那条会跟着变深、字仍是深字 ⇒ 那一态读不动；已记待拍 D36 等他拍甲/乙，没拍之前不塞进门槛。 */
+const slideReadings = palette.MOODS.map((m) => {
+  const v = palette.moodVars(m.key)
+  const face = solid(v['--glass-chrome-slide'], CARD)
+  const ink = v['--slide-ink']
+  return { k: m.key, face, ink, inkCr: cr(ink, face), dimCr: cr(solid(v['--slide-ink-dim'], face), face) }
 })
-const chromeWorst = chromeReadings.slice().sort((a, b) => a.ink - b.ink)[0]
+const slideWorst = slideReadings.slice().sort((a, b) => a.inkCr - b.inkCr)[0]
 /* ⚠ 这一条只钉正文那一档（≥4.5 是 AA 对正文的线，也是 §6.1 那两枚橙用的同一条）。
    占位那一枚（`--cp-ink-38`＝现网旧档，不是这一轮改出来的）**只报数不钉门槛**：
    3.0 那道线是我 10-16 自己加的，站长没拍过——按"不许自加门槛"那条，撤掉判据、把读数留在后面。 */
@@ -1017,10 +1031,10 @@ ok('⑤ 白框上那句正文压得起纯白（≥4.5，混成实心之后算）
   cr(inkHex, cardStr) >= 4.5,
   `正文 ${inkHex} 压白 ${cr(inkHex, cardStr).toFixed(2)}｜占位 ${phStr.trim()} 混成 ${phHexOnCard} `
   + `${cr(phHexOnCard, cardStr).toFixed(2)}（这一档现网一直如此，要抬得他一句）`)
-ok('⑤b 条上那句跟着心情翻的字，压在"底栏那一档混到最深那一底"上五档全 ≥4.5；退一层那档 ≥3',
-  chromeWorst.ink >= 4.5 && Math.min(...chromeReadings.map((x) => x.dim)) >= 3,
-  chromeReadings.map((x) => `${x.k} ${x.ink.toFixed(2)}/${x.dim.toFixed(2)}`).join('　')
-  + `｜最差 ${chromeWorst.k} 面 ${chromeWorst.bg}`)
+ok('⑤b 条上那句字压在自己那一档的面上（混成实心后算）五档全 ≥4.5；空着那一档退一层 ≥3',
+  slideWorst.inkCr >= 4.5 && Math.min(...slideReadings.map((x) => x.dimCr)) >= 3,
+  slideReadings.map((x) => `${x.k} ${x.inkCr.toFixed(2)}/${x.dimCr.toFixed(2)}`).join('　')
+  + `｜最差 ${slideWorst.k} 面 ${slideWorst.face} 字 ${slideWorst.ink}`)
 /* ---------- 10-16 搬家带出来的三条 ----------
    ① 皮吃的五枚别名必须定义在 `.container` 上：它们原来写在 `.panel` 里面，而这一行在 `.panel`
       **外面**——别名留在面板里，`var(--face)` 解析不到值，轨道当场画成透明（同一类坑的正本记在
