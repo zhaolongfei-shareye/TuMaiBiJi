@@ -103,9 +103,13 @@ Page({
     // 10-08 起相册不再是独立的一档（它是「照片」那一态左边那枚小圆），所以 mode 那一位也撤了：
     // 面板上只有三个标签，一个真相。
     active: '',
-    // 面板的两档高度：收起 500、展开 580（只多一行）。由 _syncPanelOpen 现算，
+    // 面板的两档高度：收起 372、展开 490（只多一行，10-14 压过一档）。由 _syncPanelOpen 现算，
     // 别在调用点手写 true/false——两个入口（原文框聚焦 / 图多了排不下）会各说一套。
     panelOpen: false,
+    // 键盘顶起来时整块面板的抬量（px，0＝键盘不在）。站长 10-16 真机报「原文翻译那一行被输入框
+    // 遮挡了，所以要抬高」——微信默认的 adjust-position 只保证**光标**露出来，而光标在框里，
+    // 所以框露了、框下面那行「原文翻译」与右滑那一枚还压在键盘底下。改成自己抬，见 onKeyboardHeight。
+    kbLift: 0,
     busy: '',
     errLine: '',
     // 框外那一行实际说的话：报错优先，其次"链接那一格正在输、但还不像链接"那句规则。
@@ -541,6 +545,9 @@ Page({
       active: '',
       panelOpen: false,
       bodyFocus: false,
+      // 收回这一屏时键盘也不在了。`keyboardheightchange` 在输入框被 `wx:if` 摘掉那一趟不保证补发 0，
+      // 所以这里自己归零，不留一个"面板悬在半空"的残态。
+      kbLift: 0,
       errLine: '',
       hintLine: '',
       errPerm: false,
@@ -940,6 +947,20 @@ Page({
   onBodyBlur() {
     this.setData({ bodyFocus: false })
     this._sync()
+  },
+
+  // 键盘进出 → 整块录入面板抬到键盘上沿之上。三档共用这一位（照片那一档没有文字输入，
+  // 永远收不到这个事件，抬量恒 0）。
+  // 抬量为什么是「键盘高 − 152rpx」而不是键盘高：面板本来就离底栏 152rpx（`.entry-wrap` 那条
+  // fixed 的 bottom），那 152 已经压在键盘里了；再抬整个键盘高就会多抬 152。
+  // ⚠ 抬的是 `.entry-wrap` 与 `.stage-panel` **两层同一个量**：那两层是一根链上的（玻璃面顶
+  //   按内框顶往上 24 算），只抬一层会把面板推出玻璃面之外。
+  onKeyboardHeight(e) {
+    const h = (e && e.detail && e.detail.height) || 0
+    const wi = wx.getWindowInfo()
+    const gap = (152 * wi.windowWidth) / 750
+    const lift = h > gap ? Math.round(h - gap) + 8 : 0
+    if (lift !== this.data.kbLift) this.setData({ kbLift: lift })
   },
 
   // 整行都是落点（wxml 把 catchtap 绑在这一行的外壳上），所以这里只管翻一下状态。

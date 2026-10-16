@@ -1,8 +1,11 @@
 <!-- `--cp-*` 这一整套变量改挂在容器上（原来挂在 `.panel` 那一枚元素上）：
      首屏那枚圆形 ➕ 要吃的 `--cp-cam`／`--cp-cam-ink` 与第二屏快门是同一支（站长 10-13 原话
      「带+号的按钮颜色与第二屏拍照按钮颜色一致」），而它在 `.panel` 外面，拿不到那一层的作用域。
-     `createSkin()` 发的全是变量声明、没有一条直接生效的属性，挂到根上不会把别处的皮带下来。 -->
-<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{bgLightTitle ? 'bg-light-title' : ''}} {{bgLightSwap ? 'bg-light-swap' : ''}} {{bgLightOut ? 'bg-light-out' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}}" style="{{skinPanel}}" bindtap="collapse">
+     `createSkin()` 发的全是变量声明、没有一条直接生效的属性，挂到根上不会把别处的皮带下来。
+     ⚠ 10-16 真跑量出来的一根刺：`skinPanel` 那串**末尾没有分号**，所以 `--kb` 拼在它后面会被
+     粘成上一条变量的值（`--cp-extract-ink:#FFFFFF --kb:229px` 是一条声明，不是两条），
+     变量根本没定义、位移恒 0。`--kb` 必须拼在前面，自己的分号自己带。 -->
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{bgLightTitle ? 'bg-light-title' : ''}} {{bgLightSwap ? 'bg-light-swap' : ''}} {{bgLightOut ? 'bg-light-out' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}} {{kbLift ? 'kb-up' : ''}}" style="{{kbLift ? '--kb:' + kbLift + 'px;' : ''}}{{skinPanel}}" bindtap="collapse">
   <!-- 首页背景。图就是「我的 → 卡片模板」最上面那张形象图，没设过就用包里这张站长人像。
        必须用 <image> 组件而不是 wxss 的 background-image：后者不认小程序包里的
        本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
@@ -257,6 +260,8 @@
             placeholder="{{t.linkDesc}}"
             placeholder-class="field-ph"
             confirm-type="done"
+            adjust-position="{{false}}"
+            bindkeyboardheightchange="onKeyboardHeight"
             bindinput="onUrlInput"
           />
           <view wx:if="{{urlInput}}" class="field-x" catchtap="clearUrl">✕</view>
@@ -279,6 +284,8 @@
             placeholder-class="field-ph"
             maxlength="2000"
             show-confirm-bar="{{false}}"
+            adjust-position="{{false}}"
+            bindkeyboardheightchange="onKeyboardHeight"
             bindinput="onWriteBody"
             bindfocus="onBodyFocus"
             bindblur="onBodyBlur"

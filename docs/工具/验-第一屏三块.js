@@ -348,7 +348,9 @@ ok('➕ 是第二屏那一配方（白 .50  plate ＋ 糊 ＋ 细边），且没
   decl(seg('.blk-plus'), 'background') || '(没写)')
 ok('容器仍发那套 --cp-*（图形吃 --cp-cam-ink；发在 .panel 上首屏拿不到＝透明）',
   /background:\s*var\(--cp-cam-ink\)/.test(seg('.blk-plus-glyph'))
-  && /class="container[^"]*"\s+style="\{\{skinPanel\}\}"/.test(wxml)
+  // 10-16 放宽成"容器那条 style 里含 skinPanel"：`--kb` 必须拼在 skinPanel **前面**
+  // （skinPanel 末尾没分号，拼在后面会把 --kb 吞成上一条变量的值），所以不再钉字面量顺序。
+  && /class="container[^"]*"\s+style="[^"]*\{\{skinPanel\}\}[^"]*"/.test(wxml)
   && !/class="panel[^"]*"[^>]*style="\{\{skinPanel\}\}"/.test(wxml))
 /* 10-13 D19 甲：首屏圆内那枚 ➕ 单独加粗到 2.4。这里钉的是**选择器的形状**，不只是"有个 2.4"——
    markup 是 `class="blk-plus-glyph glyph-plus"`，一枚元素两个类，写成裸 `.blk-plus-glyph` 就是

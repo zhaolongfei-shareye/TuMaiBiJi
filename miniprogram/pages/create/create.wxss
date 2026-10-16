@@ -1462,6 +1462,19 @@
   z-index: 6;
 }
 
+/* 键盘进来：录入面板与它背后那层玻璃面**同一个量**一起抬（抬量在 `create.js` 的 `onKeyboardHeight`
+   现算，已经扣掉面板本来就压在键盘里的那 152rpx，再多加 8px 呼吸）。
+   为什么两层要一起抬：那两层是一根链上的（玻璃顶＝内框顶往上 24，见 `.stage-panel` 那条的账），
+   只抬面板会把录入那一格推出玻璃面之外，玻璃面还留在原地当一块深色底。
+   ⚠ 配套：`textarea` 与链接那枚 `input` 都写了 `adjust-position="{{false}}"`。微信默认那套是
+   **推整个窗口**、只保证光标露出来——光标在框里，所以框露了、框底下那行「原文翻译」与右滑那一枚
+   还压在键盘底下（站长 10-16 真机报的就是这一条）。两套并存会抬两次，所以必须关掉它这一套。 */
+.container.kb-up .entry-wrap,
+.container.kb-up .stage-panel {
+  transform: translateY(calc(-1 * var(--kb)));
+  transition: transform .22s ease-out;
+}
+
 /* 铺图时把标题、这一行和条子抬到罩层之上。展开那一态的 entry-wrap 排除在外：
    它的 position 由上面那条 fixed 规则给，这里再写一遍 relative 会按源码顺序把它盖回去。
    10-09 站长拍甲把 `.home-swap` 加进来：它原来不在这份名单里，于是那两句字跟照片一起
