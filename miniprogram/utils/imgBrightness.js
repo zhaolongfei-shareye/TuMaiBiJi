@@ -35,29 +35,23 @@ const SIDE = 32
 /** 一张 w×h 的图按 `aspectFill` 摆进 750×boxH 这只盒子之后，**盒子里看到的是原图的哪一段**
     （两轴都用 0~1 的"原图比例"说话）。纵向那一段由 `anchor` 定（首页居中裁 0.5、
     列表与「我的」用全站那一枚 15%），横向 `aspectFill` 只有居中一种，所以写死 0.5。
-    按宽铺满时图比盒子高 ⇒ 裁上下、横向整幅（x0=0、x1=1）；按高铺满时图比盒子宽 ⇒ 裁左右、
-    纵向整幅。这正是原来 `rowsFor` 里那两行，抽出来是为了让横向也能算——
-    10-15 那一刀要把采样窗口收到元素自己的矩形，只会算上下截不够。 */
+
+    这一段算法从 10-16 起**不在这里写第二遍**：整只盒子的取景收在 `poster.bandBox` 一处，
+    画面上那只盒子（`bandGeom`）与这里读的那几行从此是同一次计算。原来这里自己抄了一遍
+    `(750*h)/w`，于是 `poster.js` 给盒子加封顶（超长图那条）这一天，
+    采样读的那一条和屏上显示的那一条就分家了——症状是字色判的是画面里根本没显示的那一段。
+    10-15 那几刀（只采字压着的那一条、上下两截各判、窗口收到元素矩形）口径一个字没动。 */
 function visible(w, h, boxH, anchor) {
-  const byWidth = (750 * h) / w
-  if (byWidth >= boxH) {
-    const y0 = ((byWidth - boxH) * anchor) / byWidth
-    return { x0: 0, x1: 1, y0, y1: y0 + boxH / byWidth }
-  }
-  // 按宽铺满时图不够高 ⇒ `aspectFill` 改按**高**铺满，这时候被裁的是左右。
-  // ⚠ 这一支第一次落码时把"按高铺满之后有多宽"写成了 `750×w/h`（那是"高铺到 750 时有多宽"，
-  //   与这只盒子 1448 的高没关系），拿它去除 750 会回一个 >1 的数 ⇒ x0 变成负数、
-  //   取列时越界成 undefined ⇒ 整块平均 NaN ⇒ 判据一律回 false。
-  //   站长 10-15 03:2x 那一刀当时屏上就是"三枚全按深底出白字"，靠这句才查回来。
-  const fitWidth = (boxH * w) / h
-  const x0 = (1 - 750 / fitWidth) * 0.5
-  return { x0, x1: x0 + 750 / fitWidth, y0: 0, y1: 1 }
+  const g = poster.bandBox(w, h, boxH, anchor)
+  if (!g) return null
+  return { x0: g.x0, x1: g.x1, y0: g.y0, y1: g.y1 }
 }
 
 /** 一截"盒子比例"落在画布的第几行到第几行。
  *  画布是整张图**压扁**成的 32×32，所以第 r 行＝原图高度 r/32 那一处，两个方向不用各算一遍。 */
 function rowsFor(w, h, boxH, anchor, f0, f1) {
   const v = visible(w, h, boxH, anchor)
+  if (!v) return null            // 读不出图尺寸＝判不出，交给调用方走"维持深底白字"那一档
   const r0 = Math.min(SIDE - 1, Math.floor((v.y0 + (v.y1 - v.y0) * f0) * SIDE))
   const r1 = Math.min(SIDE, Math.max(r0 + 1, Math.ceil((v.y0 + (v.y1 - v.y0) * f1) * SIDE)))
   return [r0, r1]
@@ -66,7 +60,9 @@ function rowsFor(w, h, boxH, anchor, f0, f1) {
 /** 那一截的亮度均值 >160 就是浅。剖面没算过（null）回 null，由 measure 补。 */
 function zoneLight(prof, box, range) {
   if (!prof || !box || !range) return null
-  const [r0, r1] = rowsFor(prof.w, prof.h, box.boxH, box.anchor, range[0], range[1])
+  const rows = rowsFor(prof.w, prof.h, box.boxH, box.anchor, range[0], range[1])
+  if (!rows) return null
+  const [r0, r1] = rows
   let sum = 0
   for (let r = r0; r < r1; r += 1) sum += prof.rows[r]
   return Math.round(sum / (r1 - r0)) > LIGHT_THRESHOLD
@@ -78,6 +74,7 @@ function zoneLight(prof, box, range) {
 function rectLight(prof, box, rect) {
   if (!prof || !prof.grid || !box || !rect || !rect.x || !rect.y) return null
   const v = visible(prof.w, prof.h, box.boxH, box.anchor)
+  if (!v) return null
   // 两头都夹进 [0, SIDE]：越界一格就会读到 undefined，`sum += undefined` 把整块平均变成 NaN，
   // 而 `NaN > 160` 是 false ⇒ **静默判成"深底"**，屏上表现为"三枚全出白字"、一句错都不报。
   const span = (a, b, f0, f1) => {

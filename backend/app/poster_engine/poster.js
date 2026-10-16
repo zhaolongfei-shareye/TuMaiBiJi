@@ -247,15 +247,50 @@ const BG_ANCHOR = 0.15
    这一枚取两页里**大的那一档**（列表 740＝头部 542＋延段 198）：图必须垫得到玻璃带底下（R12 那条），
    取小了「我的」那 646 底下会没图＝他抓过的"中间镂空"。带子各自多高是版式，写在两页的 wxss 里，与这一枚无关。 */
 const HEAD_IMG_H = 740
-function bandGeom(w, h, boxH = BAND_H) {
-  if (!w || !h) return ''
-  const byWidth = (750 * h) / w
+/* 一只盒子的封顶（10-16 审计第八条）。上面那条公式按宽铺满算盒高，遇到**超长图**会把这一层
+   拉成几千屏高：1080×20000 那张微信拼长图（约 1:18.5）算出来是 13889rpx ≈ 5.8 个视口高，
+   而把它选成头部形象图的人真会这么做（长截图就是这个产品最自然的素材）。
+   ⚠ 3000 是**我选的数，不是量到的平台上限**——那块白我没在真机上复现过，症状是从算式推的。
+      这一刀钉的是"不许再长出一只一万三千 rpx 的盒子"；要连取景一起保住原来的样子，
+      得在选图那一步就把长图裁掉（要 `wx.cropImage`，那条得真机验），那是另一件事。 */
+const BAND_MAX_H = 3000
+/* 取景只有一处说法。`utils/imgBrightness.js` 要照同一只盒子算"屏上那一条落在原图哪几行"
+   （字色深浅那一判吃的就是它），两处各写一遍 `(750*h)/w` 迟早走样——
+   `HEAD_IMG_H`／`BG_ANCHOR` 那两笔账走的都是同一条路，所以这一枚也从这里交出去。
+   返回的都是 0~1 的原图比例；`top`／`byWidth` 是 rpx。
+   ⚠ `anchor` 只有**深浅采样**那一头会传别的值（首页那一屏要居中裁 0.5），画面上这只盒子永远用
+      `BG_ANCHOR`——`bandGeom` 不接这一个参数，就是为了让"摆法"只有一种说法。 */
+function bandBox(w, h, boxH = BAND_H, anchor = BG_ANCHOR) {
+  if (!w || !h) return null
+  const natural = (750 * h) / w
+  const byWidth = Math.min(natural, BAND_MAX_H)
   if (byWidth >= boxH) {
-    const top = -Math.round((byWidth - boxH) * BG_ANCHOR)
-    return `width:750rpx;height:${Math.round(byWidth)}rpx;left:0;top:${top}rpx`
+    // `aspectFill` 只有居中一种裁法：没封顶时 cropFrac=1（整张图都在这只盒子里，靠 `top` 移位取景），
+    // 封顶之后盒子里剩下的就是原图**中段**那一条。
+    const cropFrac = byWidth / natural
+    const cropStart = (1 - cropFrac) / 2
+    const shift = (byWidth - boxH) * anchor
+    return {
+      wide: true, natural, byWidth, boxH, top: -Math.round(shift),
+      y0: cropStart + (shift / byWidth) * cropFrac,
+      y1: cropStart + ((shift + boxH) / byWidth) * cropFrac,
+      x0: 0, x1: 1,
+    }
   }
-  const bw = Math.round((boxH * w) / h)
-  return `width:${bw}rpx;height:${boxH}rpx;left:${Math.round((750 - bw) / 2)}rpx;top:0`
+  // 按宽铺满时图不够高 ⇒ `aspectFill` 改按**高**铺满，这时候被裁的是左右、纵向整幅。
+  // ⚠ 这一支第一次落码时把"按高铺满之后有多宽"写成了 `750×w/h`（那是"高铺到 750 时有多宽"，
+  //   与这只盒子 1448 的高没关系），拿它去除 750 会回一个 >1 的数 ⇒ x0 变成负数、
+  //   取列时越界成 undefined ⇒ 整块平均 NaN ⇒ 判据一律回 false。
+  //   站长 10-15 03:2x 那一刀当时屏上就是"三枚全按深底出白字"，靠这句才查回来。
+  const fitWidth = (boxH * w) / h
+  const x0 = (1 - 750 / fitWidth) * 0.5
+  return { wide: false, natural, byWidth, boxH, bw: Math.round(fitWidth), top: 0, y0: 0, y1: 1, x0, x1: x0 + 750 / fitWidth }
+}
+function bandGeom(w, h, boxH = BAND_H) {
+  const g = bandBox(w, h, boxH)
+  if (!g) return ''
+  if (g.wide) return `width:750rpx;height:${Math.round(g.byWidth)}rpx;left:0;top:${g.top}rpx`
+  return `width:${g.bw}rpx;height:${g.boxH}rpx;left:${Math.round((750 - g.bw) / 2)}rpx;top:0`
 }
 
 let avatarSeq = 0
@@ -2172,7 +2207,9 @@ module.exports = {
   cardPath,
   homeBg,
   bandGeom,
+  bandBox,
   BAND_H,
+  BAND_MAX_H,
   HEAD_IMG_H,
   /* 深浅采样要照同一条取景算"屏上那一条"落在原图哪几行，所以把这枚锚点也交出去：
      留着它不外露就得在别处再写一遍 0.15，两遍迟早走样（同 HEAD_IMG_H 那笔账）。 */
