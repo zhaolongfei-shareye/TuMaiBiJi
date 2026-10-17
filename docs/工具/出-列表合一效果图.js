@@ -22,6 +22,12 @@ const zh = i18n.texts('zh')
 const en = i18n.texts('en')
 
 const R = (n) => +(n / 2).toFixed(2) // rpx → CSS px
+// 令牌值里可能带 rpx（字号、阴影那几档）。rpx 在 Chrome 不是合法长度：
+// `font-size:var(--fs-body)` 摊开成 `font-size:28rpx` 会**整条声明静默作废**、退回继承值 16px，
+// box-shadow 同理退成 none——不报错、不红、守卫也量不出来（10-17 他一句"来源字体太大"才把这层炸出来：
+// 上一版稿子里来源／标题／分类三档其实全是 16px，我改的那两档字号一个字都没上屏）。
+// 所以任何塞进 :root 的令牌都要先过这一道，别指望"值是从 app.wxss 现读的"就等于"画上屏了"。
+const pxize = (v) => String(v).replace(/(-?[\d.]+)rpx/g, (_, n) => R(+n) + 'px')
 
 // ── 令牌：从 app.wxss 现读，读不到就抛（不许我给一个"看着差不多"的数）
 const wxss = fs.readFileSync(path.join(ROOT, 'miniprogram/app.wxss'), 'utf8')
@@ -202,7 +208,7 @@ function screen(opt) {
        <div class="cats">${catRow(D)}</div>
        <div class="list">${liveList(opt.lang)}</div>`
     : `${opt.headless ? '' : panelHead(D)}
-       <div class="cats">${catRow(D)}</div>
+       <div class="cats sm">${catRow(D)}</div>
        <div class="list">${opt.empty ? `<div class="empty">${esc(D.noNotes)}</div>` : mergedList(opt)}</div>`
   return `<div class="ph">
   <div class="cap">${opt.cap}</div>
@@ -290,7 +296,8 @@ const D = screen({
 const E = screen({
   lang: 'en', groupBy: true, rows: SAMPLE,
   cap: 'EN｜同一套皮、同一批件，只换字（来源与标题两档都要看放不放得下）',
-  note: '来源那一档吃 <code>--fs-tiny</code>＝' + T.fsTiny + '（＝' + R(parseFloat(T.fsTiny)) + 'px），'
+  note: '来源这一档从上一版的 <code>--fs-tiny</code>＝' + T.fsTiny + ' 压到 <code>--fs-micro</code>＝' + T.fsMicro +
+    '（＝' + R(parseFloat(T.fsMicro)) + 'px），与标题 <code>--fs-body</code>＝' + T.fsBody + '（＝' + R(parseFloat(T.fsBody)) + 'px）拉开一档；'
     + '英文那几串最长的是 <b>' + Object.keys(SRC).map((k) => srcLabel(en, k))
       .sort((a, b) => b.length - a.length)[0] + '</b>；标题可写宽实测 216px（量法 <code>docs/工具/验-英文挤不挤.js</code>），'
     + '灌 78 字符之后右端配图与轨的落点一个数没动 ⇒ 省略号只吃标题自己。',
@@ -302,12 +309,12 @@ const F = screen({
 })
 
 const html = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
-<title>列表合一 · 效果图（10-17 第二轮，代码一行没动）</title>
+<title>列表合一 · 效果图（10-17 第三轮，代码一行没动）</title>
 <style>
 :root{
-  --fs-body:${T.fsBody}; --fs-meta:${T.fsMeta}; --fs-tiny:${T.fsTiny}; --fs-micro:${T.fsMicro};
+  --fs-body:${pxize(T.fsBody)}; --fs-meta:${pxize(T.fsMeta)}; --fs-tiny:${pxize(T.fsTiny)}; --fs-micro:${pxize(T.fsMicro)};
   --r-card:${R(parseFloat(T.rCard))}px; --bg-page:${T.bgPage}; --bg-card:${T.bgCard};
-  --plate:${T.plateDock}; --sh-lift:${T.shLift}; --sh-drop:${T.shDrop}; --ink:${T.ink};
+  --plate:${T.plateDock}; --sh-lift:${pxize(T.shLift)}; --sh-drop:${pxize(T.shDrop)}; --ink:${T.ink};
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#EDEAE3;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;padding:34px;color:#22252B}
@@ -373,6 +380,9 @@ img{max-width:100%}
 .cats{display:flex;gap:${G.catGap}px;padding:6px 2px 4px;font-size:var(--fs-meta);color:rgba(44,47,54,.72);
   white-space:nowrap;overflow:hidden}
 .cats span{padding-bottom:5px}
+/* 分类行压一档（他 10-17：「分类字体也要小一点」）——**只压合一之后那一屏**：
+   现网对照那一格是尺子，仍吃 --fs-meta 24rpx，跟着改就量不出"改之前长什么样"了。 */
+.cats.sm{font-size:var(--fs-tiny)}
 .list{padding:2px 0 ${G.xlistPadB}px}
 /* 现网那一行：.xrow 内缩 0、上 ${G.xrowPadT} 下 10；.xd 宽 ${G.xdW}px（点 ${G.dot}px ＋ MM/DD）；标题 14／摘要 12×1.62 三行 */
 .lrow{display:flex;align-items:flex-start;gap:10px;padding:${G.xrowPadT}px 0 10px}
@@ -399,7 +409,7 @@ img{max-width:100%}
 .rd span{font-family:"WtsjMind","Poppins",sans-serif;font-weight:100;font-size:var(--fs-meta);line-height:1;
   color:rgba(44,47,54,.72)}
 .mid{flex:1;min-width:0}
-.src{font-size:var(--fs-tiny);line-height:1.2;letter-spacing:.4px;color:rgba(44,47,54,.55);white-space:nowrap;
+.src{font-size:var(--fs-micro);line-height:1.25;letter-spacing:.5px;color:rgba(35,37,44,.68);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 .tt{font-size:var(--fs-body);font-weight:600;line-height:1.35;color:rgba(35,37,44,.9);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
@@ -424,13 +434,18 @@ img{max-width:100%}
 .tabbar i{width:19px;height:19px;border-radius:6px;background:rgba(44,47,54,.18)}
 .tabbar i.on{background:#23252C}
 </style></head><body>
-<h1>列表合一 · 效果图（第二轮：来源一行 ＋ 标识一条轨 ＋ 面板顶两枚）</h1>
+<h1>列表合一 · 效果图（第三轮：来源压到最小一档 ＋ 分类再压一档；顺带修好"字号根本没上屏"那一刀）</h1>
 <div class="lead">
   <b>当前真机跑的是 2.2.9（他 10-17 自己点的提审），这一页的代码一行没动——下面全是稿。</b><br>
   他 10-17 第二轮这几句：「我倾向<b>乙</b>，但还要继续优化」「标题上面还要加上<b>来源</b>，小字，例如来自公众号、截图之类的，
   提醒用户信息源」「标题下方，参考图有一条线，<b>可以利用这条线做一些标识</b>：分享过的线上加一个小星星，私密的加个小锁，
   线上的 icon 可以很小，但辨识度要高，一眼就知道」「未来很多场景都可以叠加，例如分享后被朋友转存的加个 ♥ 代表被收藏」
   「<b>搜索的 icon 下移到面板右上角</b>」「<b>左边加一个分类管理 icon</b>，点击可以直接跳转修改分类」。<br>
+  他 10-17 第三轮这一句：「<b>来源和笔记标题要明显区分，现在来源的字体太大，要压缩成小字，分类字体也要小一点</b>」
+  ⇒ 来源 <code>--fs-tiny</code> 21rpx → <code>--fs-micro</code> 18rpx（9px），标题仍 <code>--fs-body</code> 28rpx（14px），
+  两档比从 1 : 1.33 拉到 <b>1 : 1.56</b>；来源同时把颜色压深一档（<code>rgba(35,37,44,.55)</code> → <code>.68</code>）
+  免得字一小的对比度跟着掉下去；分类行 <code>--fs-meta</code> 24rpx → <code>--fs-tiny</code> 21rpx，
+  <b>只压合一之后那几屏</b>——现网对照那一格是尺子，仍留 24rpx。<br>
   口径：字号／圆角／底色／阴影／行内缩／位图那两档全部从 <code>app.wxss</code>＋<code>pages/index/index.wxss</code> 现读，
   屏上每句中文从 <code>utils/i18n.js</code> 现读，<b>来源那六串从 <code>pages/index/index.js</code> 的
   <code>SOURCE_TYPE_KEYS</code> 现读</b>，参考图那几段比例是从他给的 JPG 量的（<code>docs/工具/量-参考图-比例.py</code>）。
@@ -446,7 +461,13 @@ img{max-width:100%}
   ③ 标识<b>配色</b>：主稿（乙·优化版）全用同一支墨，图例那一格并排画了彩色一版（★ 小黄／♥ 暗红／▢ 与 🔒 墨）——
   <b>单色还是彩色等他挑，我不替他定</b>。<br>
   一处<b>没落点</b>要他给话：「返回」那一枚原来挂在被撤掉的那行右端，现在面板右上角给了搜索、左上给了分类管理 ⇒
-  它是搬去左半边、还是就地撤掉？（合一之后这一屏不再往下一层，回第一屏靠底栏那枚 tab。）
+  它是搬去左半边、还是就地撤掉？（合一之后这一屏不再往下一层，回第一屏靠底栏那枚 tab。）<br>
+  <b>上一版那张 PNG 的字号是假的，这一版才是真的</b>：生成器把令牌原样塞进 <code>:root</code>（<code>--fs-body:28rpx</code>），
+  而 rpx 在 Chrome 不是合法长度 ⇒ <code>font-size:var(--fs-body)</code> 摊开就整条静默作废、退回继承的 16px，
+  两条 <code>box-shadow</code> 同理变 none。所以上一版里来源／标题／分类／日期<b>其实是同一个大小</b>，
+  您这句"来源的字体太大"是完全准确的实测，不是我改慢了一档。
+  现在令牌进 CSS 前一律换成 px，并加了两道闸：出 HTML 前扫 <code>&lt;style&gt;</code> 的声明、还有一个 rpx 就抛；
+  探针 <code>docs/工具/验-字号档位与对比.js</code> 逐屏比"令牌值／2 是否等于屏上算出来的 px"（九屏全过）。
 </div>
 <div class="grid">
   <div class="ph"><div class="cap">参考图（他给的那张，原样贴在这里）</div>
@@ -464,6 +485,13 @@ img{max-width:100%}
 </body></html>`
 
 fs.mkdirSync(DIR, { recursive: true })
+// 守卫：<style> 的**声明**里出现 rpx 就是"这条声明在 Chrome 里根本没生效"，画出来是继承值、图上看不出来。
+// 注释里的 rpx 不算（那些是写给他人看的口径话），所以先把 /* */ 整段摘掉再扫。
+const STYLE = /<style>([\s\S]*?)<\/style>/.exec(html)[1]
+const DECL = STYLE.replace(/\/\*[\s\S]*?\*\//g, '')
+const STRAY = [...new Set((DECL.match(/-?[\d.]+rpx/g) || []))]
+if (STRAY.length) throw new Error('CSS 里还有 ' + STRAY.length + ' 种 rpx 值没换成 px（' + STRAY.join(' ') +
+  '）——Chrome 不认 rpx，那几条声明会静默作废、量出来全是继承的 16px')
 // 位图路径是从 HTML 那一份的目录起算的，写错一级 Chrome 只会画一枚碎图标、守卫那道量不出来（10-17 就这么交过一次）
 if (!fs.existsSync(path.resolve(DIR, BRAND))) throw new Error('书法位图按这个相对路径找不到：' + BRAND)
 if (!fs.existsSync(path.join(DIR, REF))) throw new Error('参考图不在稿子旁边：' + REF)
