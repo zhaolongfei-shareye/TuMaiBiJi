@@ -95,59 +95,63 @@ ok('底栏那一块面由 moodChromeOf 递进来（且不再直接吃 chromeOf�
   /moodChromeOf\(/.test(barJs) && !/[^d]chromeOf\(/.test(barJs) && /style="\{\{chromeStyle\}\}"/.test(barWxml))
 ok('搜索条每次进页重算，不吃模块加载那一次的兜底',
   /const wallpaper = app\.getWallpaper\(\)/.test(idxJs)
-  // 09-28 深夜起多一个条件：头部铺了图就整串不发，让 CSS 那条"图上换纸白"生效
-  && /searchSkin: bgSrc \? '' : chromeOf\(wallpaper\)\.style/.test(idxJs))
+  // 10-17 合一：这一枚搬进圆角卡之后永远压在 `--bg-card` 上，"铺了图就整串不发"那道闸跟着拆
+  //（原来那道闸是为了让 CSS 里"图上换纸白"两条翻得动，那两条已经删净）。
+  && /searchSkin: chromeOf\(wallpaper\)\.style/.test(idxJs))
 ok('搜索条不再是一支固定的蓝（toneStyle 在这个页面已经不用了）',
   !/toneStyle\(/.test(idxJs), (idxJs.match(/toneStyle\([^)]*\)/g) || []).join(' '))
 ok('占位符给带 alpha 的色，不靠 opacity（textarea/input 的 placeholder 不吃 opacity）',
   !/\.srch-ph\s*\{[^}]*opacity/.test(idxWxss) && /--chrome-idle/.test(rule(idxWxss, 'srch-ph')))
 
-// ---------- 3. v19 这一屏：区内两枚 tab + X 式列表 + 卡片两列 ----------
-// 10-03 凌晨这一轮把 v18 那两种排布整个换掉了：纸片墙、一行、月份时间轴、置顶、
-// 「已分享」色块一起撤，列表区顶上改两枚 tab。所以这一节上一版钉的那些判据**前提已不存在**，
-// 留着就是自己钉死自己的假红——按新口径重写，并把撤掉的那几样反向钉住（回来一次红一次）。
-const vtRule = rule(idxWxss, 'vtabs'), vtabRule = rule(idxWxss, 'vtab')
-const xrowRule = rule(idxWxss, 'xrow'), xdRule = rule(idxWxss, 'xd')
-const xT = rule(idxWxss, 'x-t'), xS = rule(idxWxss, 'x-s'), xMore = rule(idxWxss, 'x-more')
-const padRule = rule(idxWxss, 'pad'), imgRule = rule(idxWxss, 'pad-img'), gcRule = rule(idxWxss, 'gc')
-const gridRule = rule(idxWxss, 'grid2')
+// ---------- 3. 10-17 合一之后这一屏：面板顶两枚 ＋ 一天一组 ＋ 一行三档 ----------
+// 上一版这一节钉的是"区内两枚 tab ＋ X 式列表 ＋ 卡片两列"。那三样整块没了：
+// 判据的前提被撤掉，所以这里改的是**尺子**，不是把代码改回去迁就旧读数（红了先问前提还在不在）。
+// 新主语是站长 10-17 那几句话（原文抄在 docs/方案-列表合一-20261017.md §1）。
+const barRule = rule(idxWxss, 'ixl-bar'), icRule = rule(idxWxss, 'ixl-ic')
+const grpRule = rule(idxWxss, 'ixl-grp'), gutRule = rule(idxWxss, 'ixl-gut')
+const dayRule = rule(idxWxss, 'ixl-day'), wdRule = rule(idxWxss, 'ixl-wd')
+const rowRule = rule(idxWxss, 'ixl-row'), srcRule = rule(idxWxss, 'ixl-src')
+const ttRule = rule(idxWxss, 'ixl-tt'), railRule = rule(idxWxss, 'ixl-rail')
+const mkRule = rule(idxWxss, 'ixl-mk'), lnRule = rule(idxWxss, 'ixl-ln'), thRule = rule(idxWxss, 'ixl-th')
 const srchRule = rule(idxWxss, 'srch'), goRule = rule(idxWxss, 'srch-go')
-// 分类那一行 v30 起不再吃 .chip（胶囊撤了），所以这一把量的是首页自己的 .ix-cat。
+// 分类那一行 v30 起不再吃 .chip（胶囊撤了），10-17 又压一档（--fs-meta 24 → --fs-tiny 21）。
 const ixCatRule = rule(idxWxss, 'ix-cat')
-const num = (src, name) => Number(new RegExp(`const ${name} = (\\d+)`).exec(src)[1])
-const SUM_LINES = num(idxJs, 'SUM_LINES'), SUM_CHARS = num(idxJs, 'SUM_CHARS')
+const DATE_JS = fs.readFileSync(P('utils/date.js'), 'utf8')
+// ⚠ 这一把的 `strip` 三种注释都剥：CSS/JS 的 `/* */` 与 `//`，**外加 wxml 的 `<!-- -->`**。
+// 10-17 合一在 wxml 里留了一段"这两枚 tab 与那枚返回为什么撤了"的来历，那些字面类名就写在注释里——
+// 反向钉（"旧那个类不许再出现"）拿没剥 HTML 注释的原文扫，会把注释判成残留＝假红。
 const strip = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  .replace(/<!--[\s\S]*?-->/g, '')
 const CODE_WXML = strip(idxWxml), CODE_JS = strip(idxJs), CODE_WXSS = strip(idxWxss)
 const dead = (re) => !re.test(CODE_WXSS) && !re.test(CODE_WXML) && !re.test(CODE_JS)
 
-// ①两枚 tab：默认第一枚、小字、已选深色未选浅色、下面一条通栏横线
-ok('两枚 tab 在滚动区之外，且默认那枚是「笔记列表」（view 初值 list）',
-  idxWxml.indexOf('class="vtabs"') < idxWxml.indexOf('class="cats"')
-  && idxWxml.indexOf('class="cats"') < idxWxml.indexOf('class="list"')
-  && /view: 'list'/.test(idxJs))
-ok('第一枚是新串 tabList、第二枚读现网 navShare（同一个词不在字典里抄第二份）',
-  /\{\{t\.tabList\}\}/.test(idxWxml) && /\{\{t\.navShare\}\}/.test(idxWxml)
-  && ZH.tabList === '笔记列表' && ZH.navShare === '笔记卡片', `${ZH.tabList} / ${ZH.navShare}`)
-ok('两枚都小字：tab 字号 = 分类那一行那几枚字的字号（都是 --fs-meta）',
-  /font-size: var\(--fs-meta\)/.test(vtabRule) && /font-size: var\(--fs-meta\)/.test(ixCatRule))
-// v30 那一版把这一行整块换成新建页那块深面（纸白两档 + 黄短杠），站长 10-09 对着「我的」页
-// 打回"太深"：那一面撤了，两枚字退回这一页的墨两档、短杠退回同一支墨（与分类那一行同一手法）。
-ok('已选那枚靠墨色+字重+一条同色短杠跳出来，未选同字号只 --text-secondary（不做按钮壳）',
-  /color: var\(--text-secondary\)/.test(vtabRule)
-  && /color: var\(--text-primary\)/.test(rule(idxWxss, 'vtab\.on'))
-  && /font-weight: 700/.test(rule(idxWxss, 'vtab\.on'))
-  && /\.vtab\.on::after[\s\S]*?height: 4rpx/.test(idxWxss)
-  && /\.vtab\.on::after[\s\S]*?background: var\(--text-primary\)/.test(idxWxss)
-  && !/background/.test(vtabRule))
-// 撤一个状态要把那面"撤净"：只删 `background` 一行不够，那支黄留着就是两版并存。
-// 范围收在这一行自己的四段里（`.xrow` 那枚小黄点仍吃 `--tip-dot`，那是站长点过要留的）。
-const vtAll = [vtRule, vtabRule, rule(idxWxss, 'vtab\.on'), rule(idxWxss, 'vtab\.on::after')].join('\n')
-ok('那一行不再有任何"自己那面"：`--cp-panel` 与那支黄都不在这四段里，底下那条通栏横线也仍撤着',
-  !/--cp-panel/.test(vtAll) && !/--tip-dot/.test(vtAll) && !/border-bottom/.test(vtRule), vtAll.trim().slice(0, 60))
-// 10-09 撤面之后这一段不再有"看得见的横线"，但负外扩留着：它管的是两枚字的落点
-// （离屏边 32），撤了字会跟着 .sheet 那 24 往里缩。钉的是"字的位置不许漂"，不是有条线。
-ok('两枚那一行的盒子仍走到整块卡的边（负外扩管的是字的落点，10-09 撤面之后这条不再是"有条横线"）',
-  /margin: 0 -24rpx/.test(vtRule) && /padding: 0 56rpx/.test(vtRule))
+// ①两枚 tab 整块撤：视图态那一栏、深面、通栏横线、负外扩、右端那枚「返回」一起没主人。
+ok('合一之后没有"第二枚可切"：`view` 那一栏、两枚 tab 与那枚「返回」四处都不在（节点／样式／绑定／初值）',
+  dead(/vtabs|class="vtab|ix-back|onViewTap|goFirstScreen|_keepView/)
+  && !/\bview:\s*['"]/.test(CODE_JS) && !/this\.data\.view/.test(CODE_JS))
+// 撤一个状态要把那一面"撤净"：只删 `background` 一行不够，那支黄与那条短杠留着就是两版并存。
+// 这一条现在只能钉"整段不存在"——那四段规则本身已经删了，没有"里面还有没有黄"可查了。
+ok('那一行不再有任何"自己那面"：`--cp-panel` 与那支黄在这张样式表里都没有宿主',
+  !/--cp-panel/.test(CODE_WXSS) && dead(/vtab\.on/))
+ok('两枚 tab 那串新字（tabList）在屏上已经没有消费者（`navShare` 仍被分享页那一栏导航条念着）',
+  !/t\.tabList/.test(CODE_WXML) && ZH.navShare === '笔记卡片',
+  '字典里那一串还挂着，留给下一次单独清理（效果图生成器那一格仍在读它）')
+// ②面板顶那一行（10-17 从照片段右下搬进来，左端新加一枚分类管理）
+ok('面板顶那一行：左分类管理、右搜索，各占一头，行与热区都是 88（照片段右下那一行整条撤）',
+  /justify-content: space-between/.test(barRule) && /height: 88rpx/.test(barRule)
+  && /height: 88rpx/.test(icRule) && (CODE_WXML.match(/class="ixl-ic/g) || []).length === 2
+  && dead(/class="tools|class="acts|class="ic /))
+ok('两枚不垫圆底也不描边，两档字吃这一页的墨（有搜索词那一枚才抬到 --text-primary）',
+  /color: var\(--text-secondary\)/.test(icRule)
+  && /color: var\(--text-primary\)/.test(rule(idxWxss, 'ixl-ic\\.on'))
+  && !/background|border/.test(icRule))
+ok('分类管理那枚点下去跳现成的那一页（不新开一页、不开弹层；与「我的」页那一格同一个目标）',
+  /catchtap="goCategories"/.test(CODE_WXML)
+  && /wx\.navigateTo\(\{ url: '\/pages\/categories\/categories' \}\)/.test(CODE_JS))
+ok('两枚图形都 CSS 画，这一页不引图标资源（整张样式表里一次 `url(` 都不出现）',
+  /\.glyph-search::before/.test(CODE_WXSS) && /^\.ixl-gq\s*\{[^}]*currentColor/m.test(CODE_WXSS)
+  && !/url\(/.test(CODE_WXSS)
+  && (CODE_WXML.match(/class="ixl-gq"/g) || []).length === 4)
 // ④置顶整个撤：分类行左边那一档、右边那句提示、详情窗那枚按钮、JS 那三个 handler
 ok('置顶这一屏整个撤净（档、提示句、窗里那枚按钮、handler 都不在）',
   dead(/pinb|pinn|pinFilter|pinnedOnly|onTogglePinned|onSheetPin/) && !/is_pinned \? t\.unpin/.test(idxWxml))
@@ -165,59 +169,92 @@ ok('字典里三串 + 全局那枚墨黑小标签一起删净（Poppins 里有 "
   !/^\s*(pin|unpin|pinned):/m.test(I18N) && !/^\s*\.pin\s*\{/m.test(appWxss))
 ok('字典里那五串跟着撤净，不留没人用的值',
   !/pinFilter|viewDesk|viewRows|pinnedOnly|sharedTag/.test(I18N))
-// ④时间轴撤净：竖线、月份档、月/日两层聚堆、stageH 那一整套坐标
+// ④时间轴撤净：竖线、月份档、月/日两层聚堆、stageH 那一整套坐标。
+// ⚠ 这一条原来还扫 `rail` 这个字，今天必须收窄——合一之后行上那条标识轨叫 `.ixl-rail`，
+//    拿子串扫会把自己新写的类名判成"旧时间轴回来了"。改按**旧类名的整行**与旧属性名扫。
+// ⚠ 2026-10-17 第二处自坑：`dayKey` 是旧时间轴那个变量名，而合一后新写的「今天」旗叫
+//    `todayKey`——拿子串扫，新代码里的 to**dayKey** 会被判成"旧那层回来了"。全部加词首锚。
 ok('时间轴那一整层没了（竖线、月份档、月—行—枚三层坐标一起撤）',
-  dead(/rail|rm-ym|bodyrow|class="stage"|class="gp"/) && !/byMonth|byDay|monthKey|dayKey|stageH/.test(idxJs))
-ok('一行只剩日期与一枚圆点：那一列 88 宽、竖向居中、行高由内容定（不写死 88）',
-  /width: 88rpx/.test(xdRule) && /align-items: center/.test(xdRule)
-  && /justify-content: center/.test(xdRule) && !/height: 88rpx/.test(xrowRule)
-  && !/border/.test(xrowRule))
-ok('横向内缩只挂一次：行、格、两列区都不再补一份 24（补了整屏往右缩 24）',
-  !/padding: [\d.]+rpx 24rpx/.test(xrowRule + gcRule + gridRule))
-// ②列表那三档：标题 90% 黑一行、摘要 70% 黑三行、末尾蓝字
-ok('标题 90% 黑、一行、放不下就省略号',
-  /color: rgba\(35, 37, 44, 0\.9\)/.test(xT) && /white-space: nowrap/.test(xT)
-  && /text-overflow: ellipsis/.test(xT))
-ok('摘要 70% 黑、字号吃 --fs-meta 那一档（原来跟的是头部那句 Tips，10-04 撤了）、最多三行',
-  /color: rgba\(35, 37, 44, 0\.7\)/.test(xS) && /font-size: var\(--fs-meta\)/.test(xS)
-  && /-webkit-line-clamp: 3/.test(xS))
-ok('「显示更多」那支蓝就是 palette 里那支（TONES[1]，与来源链接同一支，不新造蓝）',
-  xMore.toUpperCase().includes(p.TONES[1].bg.toUpperCase()) && /font-size: var\(--fs-meta\)/.test(xMore),
-  xMore.trim())
-ok('「显示更多」画不画的判据与代码同源：三行×每行字数，且从源码现读这两个常量',
-  /more: s\.replace\(\/\\s\/g, ''\)\.length > SUM_LINES \* SUM_CHARS/.test(idxJs)
-  && SUM_LINES === 3 && SUM_CHARS === 24, `${SUM_LINES}×${SUM_CHARS}`)
-ok('「显示更多」不另挂 handler：点整行浮详情窗（一个功能只留一个入口）',
-  !/onMoreTap/.test(idxJs + idxWxml) && /catchtap="onRowTap"/.test(idxWxml))
-ok('昵称那一截仍只在转存那篇出现，且挂在最后一行右端不抢标题的宽',
-  /n\.is_import = n\.source_type === 'share_import'/.test(idxJs)
-  && /margin-left: auto/.test(rule(idxWxss, 'x-who')) && !/class="x-t"[\s\S]{0,80}x-who/.test(idxWxml))
-ok('头像是一枚 CSS 画的通用 ICON，这一页不引头像图',
-  /\.glyph-who::before/.test(idxWxss) && /\.glyph-who::after/.test(idxWxss)
-  && !/\.glyph-who\s*\{[^}]*background-image/.test(idxWxss))
-ok('日期仍只走 utils/date.js 那一档 MM/DD，页面里不抄第二份补零',
-  /formatShortDate\(n\.created_at\)/.test(idxJs) && !/padStart/.test(idxJs)
-  && !/formatYearMonth/.test(idxJs))
-// ②bis 卡片那一枚：两列、白垫固定一档、图居中、第二行页码、只画生成过的
-ok('两列等宽铺满：340 + 22 + 340 = 区内净宽 702（.sheet 左右各内缩 24）',
-  /width: 340rpx/.test(gcRule) && /gap: 22rpx/.test(gridRule) && 340 * 2 + 22 === 702)
-ok('白垫固定一档 340×474、图 312×446 落在正中（比它扁的那几套上下各一道白）',
-  /width: 340rpx/.test(padRule) && /height: 474rpx/.test(padRule)
-  && /width: 312rpx/.test(imgRule) && /height: 446rpx/.test(imgRule)
-  && /align-items: center/.test(padRule) && /justify-content: center/.test(padRule))
-ok('图用 aspectFit（按宽贴合、不裁不拉），白垫 overflow:hidden 兜住圆角',
-  /mode="aspectFit"/.test(idxWxml) && /overflow: hidden/.test(padRule))
-/* 站长 10-03 23:40 做减法：「一个笔记同一时间只能生成一张笔记卡片，要改存量的必须删除旧的
-   才能新增。原来的 <1/3> 去掉。」→ 翻页那一套整块撤净，不是隐藏。 */
-ok('一篇一张：‹ i/n › 那一行两处都撤净（卡片那一屏与详情窗那一格），箭头与页码的类名也不留',
+  dead(/rm-ym|bodyrow|class="stage"|class="gp"/)
+  && !/\bbyMonth|\bbyDay|\bmonthKey|\bdayKey|\bstageH/.test(CODE_JS)
+  && !/^\.rail\s*\{/m.test(CODE_WXSS))
+// ⑤一天一组：左槽那个大数字就是组头（参考图最显眼的那条结构）
+ok('分组挂在 `groups` 上、一天一组；原来那一列的小黄点与 MM/DD 两档一起退场',
+  /const groups = \[\]/.test(CODE_JS) && /groups: \[\]/.test(CODE_JS)
+  && dead(/xd-dot|class="xd"|glyph-who|x-name/))
+ok('左槽宽 88、大数字吃内嵌那支细体 100（52rpx 不在字阶上，是参考图那一个大数字的量）',
+  /width: 88rpx/.test(gutRule) && /WtsjMind/.test(gutRule)
+  && /font-weight: 100/.test(dayRule) && /font-size: 52rpx/.test(dayRule))
+ok('星期那一档由 utils/date.js 给（三字母那张表只有一份，页面里不抄第二遍）',
+  /WEEKDAYS/.test(DATE_JS) && /formatWeekday/.test(DATE_JS)
+  && /w: formatWeekday\(n\.created_at\)/.test(CODE_JS) && !/WEEKDAYS/.test(CODE_JS))
+ok('「今天」那一档只画一条短杠、只挂在今天那一组（判的是组头，不是行）',
+  /wx:if="\{\{item\.today\}\}" class="ixl-today"/.test(CODE_WXML)
+  && /today: key === todayKey/.test(CODE_JS) && /todayKey = formatDate\(new Date\(\)\)/.test(CODE_JS))
+ok('日期不自己抄第二份补零：这一页只用 utils/date.js 那几只口',
+  !/padStart/.test(CODE_JS) && !/formatYearMonth/.test(CODE_JS))
+// ⑥一行三档：来源小字 → 标题 → 标识轨。摘要那三行、`SUM_LINES × SUM_CHARS` 那笔字数、
+// 「显示更多」那枚蓝字与它的 handler 整块退场——屏上不画的东西不许还在代码里被算。
+ok('一行三档都在（来源／标题／标识轨），旧那三档与那枚蓝字一个都不留',
+  /class="ixl-src"/.test(CODE_WXML) && /class="ixl-tt"/.test(CODE_WXML)
+  && /class="ixl-rail"/.test(CODE_WXML)
+  && dead(/class="x-s|class="x-more|class="x-m|SUM_LINES|SUM_CHARS|onMoreTap/))
+// 字号令牌存的是 rpx（Chrome 不认，小程序认），所以这一条量的是**令牌名落在哪一档**：
+// 从 app.wxss 现读那张阶梯（--fs-body / --fs-meta / --fs-tiny / --fs-micro 各是几 rpx），
+// 不拿源码里的字面数当结论——上一版效果图那"字号根本没生效"就是这么骗过我的。
+const FS = Object.fromEntries([...appWxss.matchAll(/(--fs-[a-z]+):\s*(\d+)rpx/g)].map((m) => [m[1], +m[2]]))
+const fsOf = (r) => { const t = /var\(--fs-([a-z]+)\)/.exec(r); return t ? FS['--fs-' + t[1]] : undefined }
+ok('来源压到最小一档，标题仍正文那一档，两档差的是一整号（现读令牌表，不比字面）',
+  /var\(--fs-micro\)/.test(srcRule) && /var\(--fs-body\)/.test(ttRule)
+  && fsOf(ttRule) - fsOf(srcRule) >= 8 && fsOf(srcRule) === Math.min(...Object.values(FS)),
+  `标题 ${fsOf(ttRule)}rpx／来源 ${fsOf(srcRule)}rpx／阶梯 ${JSON.stringify(FS)}`)
+ok('分类那一行跟着压一档（24 → `--fs-tiny` 21，站长 10-17「分类字体也要小一点」）',
+  /font-size: var\(--fs-tiny\)/.test(ixCatRule))
+ok('标题那一档没跟着改：90% 黑、一行、放不下省略号（从旧行原样搬过来）',
+  /color: rgba\(35, 37, 44, 0\.9\)/.test(ttRule) && /white-space: nowrap/.test(ttRule)
+  && /text-overflow: ellipsis/.test(ttRule))
+ok('转存那篇的昵称没撤信息：并进来源那一档的尾巴；省略号挂在昵称身上（来源名是短串，昵称才是用户数据）',
+  /class="ixl-who"/.test(CODE_WXML) && /n\.who = n\.is_import/.test(CODE_JS)
+  && /text-overflow: ellipsis/.test(rule(idxWxss, 'ixl-who'))
+  && !/text-overflow/.test(rule(idxWxss, 'ixl-src-t')))
+ok('标识轨三枚**同一支墨**＋一条自己收满剩余宽的线（彩色那一版只画在图例格里对照，他没挑）',
+  /flex: 1/.test(lnRule) && /color:/.test(mkRule) && !/color:/.test(rule(idxWxss, 'ixl-star'))
+  && (CODE_WXML.match(/class="ixl-mk/g) || []).length === 3
+  && ['ixl-star', 'ixl-card', 'ixl-lock'].every((s) => /currentColor/.test(rule(idxWxss, s)))
+  && !/clip-path/.test(mkRule)
+  // 那支黄不许回到这一屏（黄只许出现在首屏那两枚点上，规格 §4 他点了"不跟黄"）
+  && !/tip-dot|#f6c445/i.test(mkRule + rule(idxWxss, 'ixl-star') + rule(idxWxss, 'ixl-ln')))
+ok('整行只有一个落点：点一行浮详情窗，三枚标识与那条线都不另挂 handler',
+  (CODE_WXML.match(/catchtap="onRowTap"/g) || []).length === 1
+  && dead(/onCardTap|onMarkTap/))
+// ⑦行是一块浅面，不描边（09-28 那次打回的是"纸一圈描边 ＋ 每条笔记又一圈描边"）。
+// ⚠ 原来这条写的是 `!/border(?!-radius)/`——那一行没有 `box-sizing: border-box`，扫不到别的。
+//    现在这一块有 `border-box` 与 `border-radius`，`(?!-radius)` 对 "-box" 是放行 ⇒ 假红。
+//    改成按**描边这三形**扫：`border:` 简写、`border-color/width/style`、以及 inset 补画的那圈。
+ok('行是一块浅面：面吃 `--glass-plate-dock`、影吃 `--sh-drop`，自己一圈描边都没有',
+  /background: var\(--glass-plate-dock\)/.test(rowRule) && /box-shadow: var\(--sh-drop\)/.test(rowRule)
+  && !/border\s*:/.test(rowRule) && !/border-(color|width|style)/.test(rowRule) && !/inset/.test(rowRule))
+// ⑧横向内缩：`.sheet` 那 24 是给"整屏不往右缩"用的，所以组、左槽、轨都不许再补一份 24。
+// 但行那一块**自己是张卡**（浅面），它那份 24 是卡的内缩、不是屏的内缩——上一版没这一层，
+// 所以那时"任何一段里有 24rpx 横向 padding"就是坏；现在只有那一行是合法的。
+ok('横向内缩只挂一次：组、左槽、标识轨都不补 24（行的 24 是那张浅面自己的内缩）',
+  !/padding:[^;]*24rpx/.test(grpRule + gutRule + railRule)
+  && /padding: 20rpx 24rpx/.test(rowRule) && !/margin-left: 24rpx/.test(grpRule + rowRule))
+ok('右端配图定宽定高 94＋aspectFill，没有 max-height／flex-shrink（只定宽再让高被夹＝盒子被夹扁）',
+  /width: 94rpx/.test(thRule) && /height: 94rpx/.test(thRule) && /flex: none/.test(thRule)
+  && !/max-height|flex-shrink/.test(thRule) && /mode="aspectFill"/.test(CODE_WXML))
+// ⑧卡片那一屏整块撤：两列、白垫、图、页码、`cells` 那一排五个名字都不留（配图接管的是同一件事）
+ok('卡片那一屏整块撤净（两列／白垫／格子里的页码／`cells` 那一排都不在）',
+  dead(/grid2|class="gc|class="pad[ "]|g-cap|g-pg|\.pad-img/) && !/cells/.test(CODE_JS))
+// 原来钉"从小图开的那一趟收窗回卡片那一屏"（`const backToSheet = this._posterFrom !== 'grid'`）
+// 的那条，前提随卡片那一屏一起没了——现在只剩一层可回。改钉反向：那个分叉参数不许还在。
+ok('收窗只回一层（详情窗）：`_posterFrom` 那面旗与 grid 那个取值整撤',
+  /detailOpen: !!note/.test(CODE_JS) && dead(/_posterFrom|backToSheet|'grid'/))
+ok('一篇一张这条没变：‹ i/n › 那一行两处都撤净（列表这一格与详情窗那一格），箭头与页码的类名也不留',
   !/g-pg|g-step|onCardStep|ds-pg|ds-step|onSheetCardStep|detailCardIdx/.test(CODE_WXML)
   && !/\.g-pg|\.g-step|\.g-n|\.ds-pg|\.ds-step|\.ds-n/.test(CODE_WXSS))
-ok('一篇一张：js 里那个"当前第几张"的指针整个不存在（cells 也不再带 cur）',
+ok('一篇一张：js 里那个"当前第几张"的指针整个不存在',
   !/detailCardIdx|cur: 0|\.cur\b|onCardStep|onSheetCardStep/.test(CODE_JS))
-ok('卡片那一格只从同一份 notes 里挑（顺序与列表天然一致，不另拉一次数据）',
-  /const cells = \[\][\s\S]*notes\.forEach\(\(n, i\)/.test(idxJs) && !/getCards|cardList/.test(idxJs))
-ok('空台账那一格画的是空态那一句（不是白板）',
-  /class="empty"[\s\S]*?\{\{t\.noCards\}\}/.test(idxWxml) && ZH.noCards === '还没有生成过卡片')
 // ③搜索条：压高度 + 那两个字降到分类那一档
 ok('搜索条压到 60（分类那枚 chip 实测算高 59，同一档）',
   /height: 60rpx/.test(srchRule) && !/height: 88rpx/.test(srchRule))
@@ -272,29 +309,30 @@ ok('格子里第一张＝最近留下的那张（台账按 at 倒序；顺着放
 /* 小图 ↔ 大图必须一一对上（站长 10-03 真机报的严重 BUG：「点小图，和大图没有关联。
    无论点什么小图，都是同一个大图」）。两处根因：开窗那段读的是「我的→卡片模板」
    那套默认模板，跟台账里他刚点的这一张无关；而从卡片那一枚的格子点进去，指针一律归 0。
-   10-04 站长又要「点卡片小图直接拉大图」，两条入口合并成同一个 `_openPosterFor(note, from)`
-   ——所以这条判据的函数名跟着换，判据本身一个字没松。 */
-const sheetFn = (CODE_JS.split('async _openPosterFor(note, from)')[1] || '').split('\n  },')[0]
+   10-04 站长又要「点卡片小图直接拉大图」，两条入口合并成同一个 `_openPosterFor(note, from)`；
+   **10-17 卡片那一屏随合一撤了，`from` 那个参数也没有第二种取值可言，一起退成 `_openPosterFor(note)`**
+   ——所以这条判据的函数名与签名跟着换，判据本身一个字没松。 */
+const sheetFn = (CODE_JS.split('async _openPosterFor(note)')[1] || '').split('\n  },')[0]
 ok('点开大图取的是「台账里那一张」的模板，不是卡片模板页那套默认（那套已不在合并表里才退回默认）',
   /const cur = \(this\._cardsOf\(note\.id\) \|\| \[\]\)\[0\]/.test(sheetFn)
   && /posterTpl: known \? cur\.tpl : \(profile\.template \|\| poster\.DEFAULT_TEMPLATE\)/.test(sheetFn)
   // 判的是**合并后那张表**，不是包内 `TEMPLATES`：台账里那一格完全可能指着一条远端下发的模板，
   // 拿包内那张表去"认不认"会把真存在的模板判成不认识、开成默认那一套。
   && /poster\.templateList\(\)\.some\(\(x\) => x\.id === cur\.tpl\)/.test(sheetFn))
-ok('两条入口共用同一段开窗逻辑（各写一份就会走样：一条照台账、一条照默认）',
-  // 函数名 10-07 从 `onSheetToPoster` 改成 `onCardCell`：详情页右上那一格画的是同一份标记，
-  // 两页绑同一个名字，"那一格一模一样"那条尺子才能逐字节比。判据本身一个字没松。
-  /onCardCell\(\) \{ return this\._openPosterFor\(this\.data\.detailNote, 'sheet'\) \}/.test(CODE_JS)
-  && /return this\._openPosterFor\(note, 'grid'\)/.test(CODE_JS))
-ok('卡片那一格：小图直接开大图、标题那行仍进详情窗（两个落点各一个口，私密那篇仍走详情窗）',
-  // 那枚 `pad` 的 class 10-08 多了动态一段（待确认那一格要换描边），所以锚点从整串字面
-  // 改成"class 以 pad 开头 + 仍绑 onCardTap"。**判的还是同一件事**：小图那一个落点没被拆开。
-  /class="pad[^"]*" catchtap="onCardTap"/.test(CODE_WXML)
-  && /class="g-cap" catchtap="onRowTap"/.test(CODE_WXML)
-  && /if \(note\.is_private\) return this\.onRowTap\(e\)/.test(CODE_JS))
-ok('从小图开的那一趟，收窗回卡片那一屏、不再顺手浮详情窗（detailOpen 只在来源不是 grid 时才给 true）',
-  /const backToSheet = this\._posterFrom !== 'grid'/.test(CODE_JS)
-  && /detailOpen: backToSheet && !!note/.test(CODE_JS))
+/* 10-17 合一作废了"两条入口"这个前提：卡片那一屏没了，能开成品弹窗的只剩详情窗右上那一格。
+   原来这条钉的是"两条都走同一段"，现在钉的是**只剩一条、且那条没有分叉参数**——
+   判据换主语不换性质：还是在防"各写一份就会走样（一条照台账、一条照默认）"。
+   `验-卡片那一格两页同源.js` 那边钉的是"首页那一格与详情页那一格长得一样、绑同一个名字"。 */
+ok('开窗只剩一条入口：`_openPosterFor` 在这一页只有一个调用者，且它自己不接 from',
+  (CODE_JS.match(/this\._openPosterFor\(/g) || []).length === 1
+  && /onCardCell\(\) \{ return this\._openPosterFor\(this\.data\.detailNote\) \}/.test(CODE_JS)
+  && /async _openPosterFor\(note\) \{/.test(CODE_JS)
+  && !/_openPosterFor\([^)]*,\s*['"]/.test(CODE_JS))
+ok('那一格点下去开的是成品弹窗，不是又去生成：先收详情窗、再开窗，私密那篇这一趟根本不进',
+  /detailOpen: false,\s*templateOpen: true/.test(sheetFn)
+  // 旧那三条里"私密那篇仍走详情窗"是靠在 `onCardTap` 里 `return this.onRowTap(e)` 实现的；
+  // 卡片那一屏撤了，落点只剩一个，这条改钉"开窗那一段自己把私密挡在门外"。
+  && /if \(!note \|\| note\.is_private\) return/.test(sheetFn))
 ok('大图连二维码开关也照那一张摆（noQr 得先存进台账，两头才有一个共同来源）',
   /noQr: known \? !!cur\.noQr : false/.test(sheetFn)
   && /const entry = \{ p: filePath, tpl: tplId, at, noQr: !!noQr \}/.test(cardLogJs)
@@ -419,9 +457,16 @@ ok('删笔记时那一格的台账与文件一起清（不留孤儿位图，也�
 ok('莫兰迪那四枚仍只在 palette 活一份，样式表里一个字都没有',
   p.PAPERS.every((x) => !new RegExp(x.bg, 'i').test(idxWxss))
   && p.PAPERS.every((x) => !new RegExp(x.ink, 'i').test(idxWxss)))
-ok('「显示更多」那支蓝在样式表里只出现一次，且值就是 palette.TONES[1]（与 .ds-link 同一处先例）',
-  (idxWxss.match(new RegExp(p.TONES[1].bg, 'i')) || []).length === 1
-  && /color: #3F52D6/.test(rule(idxWxss, 'x-more')) === /color: #3F52D6/.test(rule(idxWxss, 'ds-link')))
+/* 这一条原来钉的是"列表里那枚蓝字与详情窗那条链接同值"。合一之后摘要、「显示更多」整块撤了，
+   `.x-more` 不再有规则可查 ⇒ 变成一句假红。前提变了，改钉**新前提**：
+   这支蓝在这张样式表里只剩一处宿主，而且那处就是详情窗那条「显示更多」链接。
+   扫的是剥注释后的样式表——"只剩一处"要是拿原文扫，注释里提一次就够把它判红。 */
+const blueHosts = [...CODE_WXSS.matchAll(/\.([a-z][\w.-]*)\s*\{([^}]*)\}/gi)]
+  .filter((m) => m[2].includes(p.TONES[1].bg)).map((m) => m[1])
+ok('那支蓝在样式表里只剩一处宿主＝详情窗那条链接（列表里那枚蓝字随摘要一起撤了）',
+  (CODE_WXSS.match(new RegExp(p.TONES[1].bg, 'i')) || []).length === 1
+  && blueHosts.join('|') === 'ds-link' && !/\.x-more\s*\{/.test(CODE_WXSS),
+  `宿主：${blueHosts.join(' | ') || '（一处都没有）'}`)
 // 扫的是剥掉注释之后的代码：index.js 里有一句"这一族随 v19 一起撤了"的说明，
 // 拿原文扫会被自己的注释判成假红。
 ok('这一屏不再读纸片那一族（paperSkinFor 在列表页没有后代了）',

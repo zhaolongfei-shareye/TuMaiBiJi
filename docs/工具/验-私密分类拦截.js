@@ -405,8 +405,15 @@ const ck = (name, ok, got) => {
   // 以及登记接口原本不判私密。
   const cardsPy = fs.readFileSync(path.join(__dirname, '../../backend/app/api/routes/cards.py'), 'utf8')
   const i18nJs = fs.readFileSync(path.join(__dirname, '../../miniprogram/utils/i18n.js'), 'utf8')
-  ck('首页卡片那一排：私密的不画，判不准（分类表还没拉回来）的也不画',
-    /if \(n\.is_private \|\| !n\.privKnown\) return/.test(idx))
+  // 10-17 两屏合一：原来这一条量的是「卡片那一排」(`cells` 里那句 early-return)，
+  // 那一排没了。闸没撤，只是换了住的地方——现在它算 `arrange()` 里那一栏 `cover`。
+  const idxWxml = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/index/index.wxml'), 'utf8')
+  ck('列表那一行右侧的配图：私密的不画，判不准（分类表还没拉回来）的也不画',
+    /const hideCover = n\.is_private \|\| !n\.privKnown/.test(idx)
+    && /cover: hideCover \|\| !canDrawCloud \? '' : n\.cover_file_id/.test(idx))
+  // 没有图就整块不画：画一个空框＝屏上多一块"这块屏坏了吗"的疑点，也是一格占位。
+  ck('那一格没图时是**不渲染**，不是渲染一张空框（wx:if 与 src 挂在同一枚 image 上）',
+    /<image wx:if="\{\{r\.cover\}\}"[^>]*class="ixl-th"/.test(idxWxml))
   ck('「判得准不准」单独留一栏——isPrivate(undefined) 回 false 是"不知道"，不是"不私密"',
     /n\.privKnown = n\.category_id == null \|\| nameOf\[n\.category_id\] !== undefined/.test(idx))
   ck('登记卡片那一口在服务端判私密（界面挡不住接口，与「私密笔记不能分享」同一形状）',

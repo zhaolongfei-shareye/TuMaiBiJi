@@ -366,18 +366,24 @@ ck('这一页不自己写 setNavigationBarColor（值只有一份）', !/setNavi
 
 // ---------- ③b 10-12 站长把范围扩到"那两行固定字" ----------
 // 需求原话：「自动切换的范围，扩展到笔记列表页和卡片列表页，关于和设置，固定的两行文字。一并改了。」
-// 这四条（列表/卡片的 tab 行＋返回＋分类行，「我的」名片行的 slogan）压的是卡顶那层白纱，
+// 这几条（列表那两行＋「我的」名片行的 slogan）压的是卡顶那层白纱，
 // 不是头部那层暗罩，白纱把暗图提成了中灰 —— 实测纸白压上去只有 1.9~2.2，所以这里跟着图翻的是
 // **墨的浓度**（深态整档墨、浅态留在 .72），不是极性。钉的就是带 `:not(.bg-light)` 那几条在不在。
+// ⚠ 10-17 两屏合一改了这两行的**成员**：`.vtab`（两枚切换）与 `.ix-back`（右端「返回」）整块撤，
+//    顶上那一行换成面板顶那两枚 icon（`.ixl-ic`）＋分类行（`.ix-cat`）。
+//    判的还是同一件事（"压在白纱上的固定字，深图抬墨、浅图留两档"），只是落点换了 ⇒
+//    这里改的是尺子，不是把代码改回去迁就旧读数。
 const deepSel = (src, sel) => src.includes(`.container.has-bg:not(.bg-light-low) ${sel}`)
 const ixCss = read('pages/index/index.wxss')
-ck('列表/卡片那两行固定字在深图那一态抬到整档墨（三条选择器一条不许少）',
-  ['.vtab', '.ix-back', '.ix-cat'].every((s) => deepSel(ixCss, s)),
-  ['.vtab', '.ix-back', '.ix-cat'].filter((s) => !deepSel(ixCss, s)).join('、'))
+ck('列表那两行固定字在深图那一态抬到整档墨（两条选择器一条不许少）',
+  ['.ixl-ic', '.ix-cat'].every((s) => deepSel(ixCss, s)),
+  ['.ixl-ic', '.ix-cat'].filter((s) => !deepSel(ixCss, s)).join('、'))
+ck('合一撤掉那两枚的翻色分支不许留着（选择器指点不存在的类＝这一条永远在读空，是假绿口）',
+  !deepSel(ixCss, '.vtab') && !deepSel(ixCss, '.ix-back'))
 ck('「我的」名片行 slogan 同一条（名称本来就是整档墨，抬它是白抬）',
   deepSel(meCss, '.sheet-slogan') && !deepSel(meCss, '.sheet-name'))
 ck('浅图那一态这两行仍是两档（基础规则里那支 --text-secondary 没被一起抬掉）',
-  /\.vtab\s*\{[^}]*--text-secondary/.test(ixCss) && /\.ix-cat\s*\{[^}]*--text-secondary/.test(ixCss)
+  /\.ixl-ic\s*\{[^}]*--text-secondary/.test(ixCss) && /\.ix-cat\s*\{[^}]*--text-secondary/.test(ixCss)
     && /\.sheet-slogan\s*\{[^}]*--text-secondary/.test(meCss))
 ck('这四条里没有一条写纸白（写了就是拿浅底那一档压中灰纱，实测 1.9~2.2）',
   !/has-bg:not\(\.bg-light-low\)[\s\S]{0,200}?242,\s*239,\s*233/.test(ixCss + meCss))

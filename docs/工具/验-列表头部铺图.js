@@ -100,9 +100,12 @@ ok('图区里有压暗罩那一层，且它吃「调亮度」递进来的透明�
 ok('铺图时容器带 has-bg', /\{\{bgSrc \? 'has-bg' : ''\}\}/.test(wxml))
 ok('v12：列表在 scroll-view 里（区域内滚，不再整页滚）',
   /<scroll-view[\s\S]{0,200}class="list"[\s\S]*?bindscrolltolower="onListToLower"/.test(wxml))
+// 三态的第三个原来叫 `empty` 两次（笔记那一屏与卡片那一屏各一份），合一之后只剩一份排布根，
+// 名字跟着改成 `ixl-groups`。这一条量的是**三态都在滚动区里**，不是那几个字。
 ok('三个状态（加载/空/排布）都在这块滚动区里，一个都没落在外面',
-  (wxml.match(/class="(loading|empty|bodyrow)"/g) || []).length === 3
-  && wxml.indexOf('class="list"') < wxml.indexOf('class="loading"'))
+  ['class="loading"', 'class="empty"', 'class="ixl-groups"'].every((s) => wxml.includes(s))
+  && wxml.indexOf('class="list"') < wxml.indexOf('class="loading"')
+  && (wxml.match(/class="empty"/g) || []).length === 1)
 ok('图区 + 圆角卡 + 滚动区三块都在容器里，页面自己不滚',
   // `class="sheet"` 后来多了一个"加宽"档（`sheet {{listWide ? 'ix-wide' : ''}}`，10-04 那一批），
   // 判据原来要求 `sheet">` 紧挨着，于是红的不是布局、是这一格多了个动态类。
@@ -117,10 +120,15 @@ ok('取下一批挂在 scroll-view 上，Page.onReachBottom 那条已经删了�
 // ---------- 2. 取图口只有一个 ----------
 ok('取图走 poster.homeBg()，和新建页是同一个函数',
   /const bgSrc = poster\.homeBg\(\)/.test(cjs) && /\n {6}bgSrc,/.test(cjs))
-// 内联的自定义属性优先级高于任何选择器：铺图那一态必须整串不发，
-// 否则 CSS 里那三行"图上换纸白"一行都翻不动（真跑第一版就是这么红的）。
-ok('铺图时那串 chrome 变量整串不发（searchSkin 留空）',
-  /searchSkin: bgSrc \? '' : chromeOf\(wallpaper\)\.style/.test(cjs))
+// 这条原来钉的是**反方向**（"铺了图就整串不发"），因为 10-17 之前那一枚搜索压在照片上，
+// CSS 里另有两条 `.has-bg .srch` 覆盖要生效，内联变量压着它们翻不动。
+// 10-17 搜索搬进圆角卡 ⇒ 那两条覆盖删了，这道闸跟着拆：**现在永远发**。
+// 更要命的是留着那道闸会出静默坏：不发 ⇒ `.srch` 的 `background: var(--chrome-bg)` IACVT 成 transparent，
+// 铺了图那一态搜索条直接看不见。所以这里同时钉三样：闸拆了、覆盖删了、变量还在发。
+ok('搜索条那一串 chrome 变量两态都发（铺没铺图都吃 `--chrome-*`）',
+  /searchSkin: chromeOf\(wallpaper\)\.style/.test(cjs) && !/bgSrc \? '' :/.test(cjs))
+ok('CSS 里那两条"图上换半透明白"的覆盖不许留着（留着就是给不存在的那一态兜底）',
+  !/has-bg\s+\.srch/.test(wxss) && !/has-bg\s+\.ic\b/.test(wxss))
 /* 这条写于 4a714d0（那一版这一页确实一处选图都没有），`9b42728` 给名片那四格加了换图，
    把 wx.chooseMedia 带进这一页却没跟进这条——所以它从那天起一直红着，10-04 才发现。
    它守的规矩仍然成立，只是范围要写准：**不许有的是"给笔记本身选图"的第二个入口**（那是
@@ -192,48 +200,54 @@ ok('容器竖排撑满一屏，列表区 flex:1 + min-height:0（少了 min-heig
   /display: flex/.test(seg(wxss, '.container')) && /height: 100vh/.test(seg(wxss, '.container'))
   && /flex: 1/.test(seg(wxss, '.list')) && /min-height: 0/.test(seg(wxss, '.list')))
 
-// ---------- 5. 压在图上的那一行（v18：一句 Tips + 三枚裸 icon，搜索摊开也在这条上） ----------
-// 站长 10-02 第三轮：圆底和描边整块撤掉，只留中间图形，之间一道竖线；搜索点开时
-// Tips 整条不渲染、搜索那枚向左摊成输入框。v8 那枚 59 圆钮和"搜索条与笔记行同高"
-// 那套对齐判据一起作废——现在钉的是"条子和那一行同高（88）"。
-const tools = seg(wxss, '.tools')
-ok('图上那一行：top 400、左右各 24、整行 88 高（下沿离列表区只留 14）',
-  /top: 400rpx/.test(tools) && /left: 24rpx/.test(tools) && /right: 24rpx/.test(tools)
-  && /height: 88rpx/.test(tools), tools.trim().slice(0, 60))
-ok('圆钮那种"圆底 + 描边"整个撤了（v18 只留裸图形）',
+// ---------- 5. 面板顶那一行（10-17 从照片段右下搬进圆角卡里） ----------
+// 站长 10-17 两句：「搜索的 icon，我要下移到面板右上角」＋「左边加一个分类管理 icon，点击可以直接跳转修改分类」。
+// ⇒ `.tools`（绝对定位 top 400、压在照片上）整条撤，换成 `.ixl-bar`（`.sheet` 里流内第一块）。
+// 这一节换了主语：原来钉的是"压在图上那一行的落点与那档纸白"，现在钉"面板顶那一行的落点与两档墨"。
+// 没变的三样：热区仍 88、放大镜仍是 CSS 画的同一枚、搜索那一态仍由 searchOpen 决定。
+const bar = seg(wxss, '.ixl-bar')
+ok('面板顶那一行与两枚热区都是 88 高（原来照片段那一行就是 88，搬下来不缩水）',
+  /height: 88rpx/.test(bar) && /\.ixl-ic\s*\{[^}]*height: 88rpx/.test(wxss))
+ok('两枚各占一头（左分类管理、右搜索）：space-between、不垫圆底也不描边',
+  /justify-content: space-between/.test(bar) && !/border(?!-radius)|border-radius/.test(bar)
+  && (wxml.match(/class="ixl-ic/g) || []).length === 2)
+ok('`.tools`／`.acts`／`.ic` 三条随那一行一起撤净（留着就是给不存在的落点定位置）',
+  !/^\.tools\s*\{/m.test(wxss) && !/^\.acts\s*\{/m.test(wxss) && !/^\.ic\s*\{/m.test(wxss)
+  && !/class="tools|class="acts|class="ic[ "]/.test(wxml)
+  // 中间那道竖线（10-02 那版三枚 icon 之间的分隔）10-03 就撤了，今天连它的宿主一起没：
+  && !/\.vr\s*\{/.test(wxss) && !/class="vr"/.test(wxml)
+  // 旧那两枚排布档的图形名也不许复活（`glyph-grid` 这串现在被新那枚 `ixl-glyph-grid` 吃着，
+  // 所以这里按**旧类名的整行**查，不按子串查，否则就是自己把自己判红）。
+  && !/^\.glyph-(grid|lines)\s*\{/m.test(wxss) && !/^\.ic\.on\s*\{/m.test(wxss))
+ok('左端那枚点下去跳分类管理那一页（复用现页，不是新页也不是弹层）',
+  /catchtap="goCategories"/.test(wxml)
+  && /wx\.navigateTo\(\{ url: '\/pages\/categories\/categories' \}\)/.test(cjs))
+ok('分类管理那枚＝四枚子 view 画的 2×2，吃 currentColor，没为它引图标资源',
+  (wxml.match(/class="ixl-gq"/g) || []).length === 4
+  && /^\.ixl-gq\s*\{[^}]*currentColor/m.test(wxss) && !/^\.ixl-glyph-grid\s*\{[^}]*url\(/m.test(wxss))
+ok('有搜索词那一枚只靠颜色翻档，笔画那一档仍是 3→4 两档整数（10-03 那套做法跟着皮搬过来）',
+  /^\.ixl-ic\.on\s*\{[^}]*color: var\(--text-primary\)/m.test(wxss)
+  && /\.ixl-ic\.on \.glyph-search::before\s*\{[^}]*border-width: 4rpx/.test(wxss))
+ok('圆钮那种"圆底 + 描边"整个撤了（只留裸图形）',
   !/\.sc-btn/.test(wxss + wxml) && !/\.head-tools/.test(wxss + wxml))
-// v19（站长 10-03 第四轮）：图上那一行只留搜索一枚——纸片墙 / 一行那两枚随整个排布档
-// 一起撤了，中间那道竖线跟着没有主人。所以原来钉"三枚同基准""选中重一档靠笔画"这两条
-// 改成反向钉：留着就是又给人埋一枚点不动的 icon。
-ok('那一组只剩搜索一枚，紧靠右（margin-left 26）且中间那道竖线跟着撤净',
-  !/\.vr\s*\{/.test(wxss) && !/class="vr"/.test(wxml) && /\.acts\s*\{[^}]*margin-left: 26rpx/.test(wxss)
-  && (wxml.match(/class="ic /g) || []).length === 1)
-ok('两枚排布 icon（四块方 / 三根线）整个撤了，只留放大镜一枚 38×38',
-  !/glyph-(grid|lines)/.test(wxss + wxml)
-  && new RegExp('glyph-search\\s*\\{[^}]*width: 38rpx').test(wxss))
-ok('选中那一档只靠颜色跳出来（笔画那一档随纸片墙一起撤了）',
-  /\.ic\.on\s*\{[^}]*color/.test(wxss) && !/border-width/.test(seg(wxss, '.ic.on')))
 /* 站长 10-04：图上那一行左边那句轮播 Tips 整条撤了。"撤干净"是三处：节点、样式、data
    （外加那个 8 秒定时器）——留一条没人挂的类，就是下一次改版的坑。 */
 ok('那句 Tips 整条撤净：节点、样式、data 与定时器四处都不在',
   !/class="tp"/.test(wxml) && !/\.tp\s*\{/.test(wxss) && !/\.tp-tx|\.tp-dot/.test(wxss)
   && !/tips: \[\]|tipIdx|startTips|stopTips|tipsFor/.test(read('pages/index/index.js')))
-ok('那枚小黄点还留着，但只服务搜索词那一行与详情窗要点（色仍从 style 递进来，不抄进 wxss）',
-  /class="xd-dot" style="\{\{tipDotStyle\}\}"/.test(wxml) && !/#f6c445/i.test(wxss))
-ok('压在图上的那一行只剩 icon 那一档纸白（Tips 那一档跟着撤净）',
-  /color: rgba\(255, 255, 255, 0\.86\)/.test(seg(wxss, '.container.has-bg .ic'))
-  && !/\.container\.has-bg \.tp\b/.test(wxss))
-ok('没铺图那一态不吃死白，且 Tips 撤了之后这一行改成贴着右沿（space-between 会把唯一那枚甩到左边）',
-  !/rgba\(255, 255, 255/.test(seg(wxss, '.ic'))
-  && /\.tools\s*\{[^}]*justify-content: flex-end/.test(wxss))
-// 搜索那一态在图上是半透明白 pill（效果图那两条 rgba 是压着照片量的：派生深色压在自己的
-// 照片上只有 1.0 出头）；没铺图时仍吃 chromeOf 那串 --chrome-*。两处都是"一条规则一个值"，
-// 没有第二份实色。
-ok('搜索 pill：图上是半透明白 + 白描边，没铺图时吃 --chrome-*',
-  /\.container\.has-bg \.srch\s*\{[^}]*rgba\(255, 255, 255, 0\.18\)[^}]*rgba\(255, 255, 255, 0\.36\)/.test(wxss)
-  && /background: var\(--chrome-bg\)/.test(seg(wxss, '.srch')))
-ok('铺图时那串 chrome 变量整串不发（内联自定义属性优先级高于任何选择器）',
-  /searchSkin: bgSrc \? '' : chromeOf\(wallpaper\)\.style/.test(cjs))
+ok('那枚小黄点跟着旧那一行一起撤了；`tipDotStyle` 只剩详情窗要点那四行在消费（色仍从 style 递进来，不抄进 wxss）',
+  !/class="xd-dot"/.test(wxml) && /class="ds-pt-dot" style="\{\{tipDotStyle\}\}"/.test(wxml)
+  && !/#f6c445/i.test(wxss))
+ok('这一行不再压在照片上 ⇒ `.has-bg` 那两组（`.ic`／`.srch`／`.srch-ph`）纸白覆盖一条都不许留',
+  !/has-bg\s+\.ic\b/.test(wxss) && !/has-bg\s+\.srch/.test(wxss) && !/has-bg\s+\.srch-ph/.test(wxss))
+ok('两枚 icon 的基础档吃这一页的墨（`--text-secondary`），不吃死白',
+  /color: var\(--text-secondary\)/.test(seg(wxss, '.ixl-ic'))
+  && !/rgba\(255, 255, 255/.test(seg(wxss, '.ixl-ic')))
+// 搜索条搬进卡之后只剩一个态：吃 chromeOf 那串 `--chrome-*`（与底栏那排胶囊同一个值）。
+// 原来"图上半透明白 + 白描边"那一支随 `.has-bg .srch` 一起删了。留着那道闸的坏法不是难看，是**看不见**：
+// 内联变量一旦不发，`background: var(--chrome-bg)` 当场 IACVT 成 transparent ⇒ 条子整条消失。
+ok('搜索 pill 只有一档面：吃 `--chrome-bg`，没有第二份实色、也没有铺图那一态的覆盖',
+  /background: var\(--chrome-bg\)/.test(seg(wxss, '.srch')) && !/rgba\(255, 255, 255, 0\.18\)/.test(wxss))
 ok('占位符给带 alpha 的色，不靠 opacity（input 的 placeholder 不吃 opacity）',
   !/\.srch-ph\s*\{[^}]*opacity/.test(wxss) && /--chrome-idle/.test(seg(wxss, '.srch-ph')))
 // v19 第三条：那两个字压到与分类同一档（原来吃 --fs-title 31，比正文还大一级）。
@@ -242,33 +256,34 @@ ok('「搜索笔记」与分类那枚 chip 吃同一条字号令牌（--fs-meta 
   /font-size: var\(--fs-meta\)/.test(seg(wxss, '.srch-go'))
   && /font-size: var\(--fs-meta\)/.test(seg(read('app.wxss'), '.chip'))
   && /font-weight: 600/.test(seg(wxss, '.srch-go')))
-ok('放大镜是 CSS 画的，这一页没为一枚 icon 引图标资源（四块方 / 三根线随排布档一起没了）',
+ok('两枚图形都是 CSS 画的，这一页没为任何一枚 icon 引图（全页 wxss 里一次 `url(` 都不许出现）',
   /\.glyph-search::before/.test(wxss) && /\.glyph-search::after/.test(wxss)
-  && !/\.glyph-(search|grid|lines)\s*\{[^}]*\burl\(/.test(wxss))
-ok('颜色全走 currentColor：翻色只改 .ic 一处，三枚图形一条都不用动',
+  && /^\.ixl-gq\s*\{/m.test(wxss) && !/\burl\(/.test(wxss))
+ok('颜色全走 currentColor：翻色只改 `.ixl-ic` 一处，两枚图形（放大镜与四格）一条都不用动',
   /currentColor/.test(seg(wxss, '.glyph-search::before'))
-  && /currentColor/.test(wxss.match(/\.glyph-who::before\s*\{[^}]*\}/)?.[0] || '')
-  && !/\.ic [^}]*#[0-9a-fA-F]{6}/.test(wxss))
+  && /currentColor/.test(seg(wxss, '.ixl-gq'))
+  && !/^\.ixl-ic\s*\{[^}]*#[0-9a-fA-F]{6}/m.test(wxss))
 
-// ---------- 5b. 搜索的两态与点击边界（v18） ----------
-ok('摊开那一条仍由 searchOpen 那一态决定；对面那一支 Tips 已撤净（这一行只剩搜索）',
+// ---------- 5b. 搜索的两态与点击边界（10-17 换了落点，这一节的口径不变） ----------
+ok('摊开那一条仍由 searchOpen 那一态决定；对面那一支 Tips 已撤净（这一行只剩这两枚）',
   /wx:if="\{\{searchOpen\}\}" class="srch"/.test(wxml) && !/class="tp"/.test(wxml))
-ok('摊开时搜索那枚 icon 自己让位（同一行不出现两枚搜索）',
-  /wx:if="\{\{!searchOpen\}\}" class="ic[^"]*" catchtap="onOpenSearch"/.test(wxml))
+ok('摊开时那两枚 icon 整体让位（`<block wx:else>` 那一支），同一行不出现两枚搜索',
+  /<block wx:else>[\s\S]{0,600}catchtap="onOpenSearch"/.test(wxml)
+  && (wxml.match(/catchtap="onOpenSearch"/g) || []).length === 1)
 ok('输入框自动聚焦（focus 跟着那一态走，不写死 true）',
   /focus="\{\{searchOpen\}\}"/.test(wxml))
-// v19 之后图上那一行只剩一枚搜索：条子内部与它都靠 catchtap 挡住冒泡，
+// 这一行只剩两枚 icon：条子内部与它们都靠 catchtap 挡住冒泡，
 // 原来那两枚 onToggleMode 随排布档一起撤了——留着不撤，点空白就缩不回来了。
-ok('点空白缩回挂在容器上，条子内部和搜索那一枚都靠 catchtap 挡住冒泡',
+ok('点空白缩回挂在容器上，条子内部和两枚 icon 都靠 catchtap 挡住冒泡',
   /class="container[^"]*" bindtap="onBlankTap"/.test(wxml) && /catchtap="noop"/.test(wxml)
   && !/onToggleMode/.test(wxml + cjs)
-  && /class="ic [^"]*" catchtap="onOpenSearch"/.test(wxml))
-// v19 第三条：行仍 88，条子压到 60——"同高"这条到此作废，改钉"条子比行矮 28、由它自己居中"。
+  && /class="ixl-ic \{\{searchKeyword \? 'on' : ''\}\}" catchtap="onOpenSearch"/.test(wxml))
+// 行仍 88，条子压到 60——"同高"这条作废，钉的是"条子比行矮 28、由行把它竖向居中"。
 ok('条子压到 60（与分类那枚 chip 实测 59 同一档），那一行仍 88、条子在行里竖向居中',
-  /\.srch\s*\{[^}]*height: 60rpx/.test(wxss) && /\.tools\s*\{[^}]*height: 88rpx/.test(wxss)
-  && /align-items: center/.test(seg(wxss, '.tools')))
+  /\.srch\s*\{[^}]*height: 60rpx/.test(wxss) && /^\.ixl-bar\s*\{[^}]*height: 88rpx/m.test(wxss)
+  && /align-items: center/.test(seg(wxss, '.ixl-bar')))
 ok('有词又缩回时那枚 icon 翻一档（列表被筛过这件事得有地方说）',
-  /class="ic \{\{searchKeyword \? 'on' : ''\}\}"/.test(wxml) && /\.ic\.on\s*\{/.test(wxss))
+  /class="ixl-ic \{\{searchKeyword \? 'on' : ''\}\}"/.test(wxml) && /^\.ixl-ic\.on\s*\{/m.test(wxss))
 // 分类那一行 v30 起是「文字 + 选中一条短杠」（首页自己的 .ix-cat），胶囊那四条一起删了：
 // `.container.has-bg .chip.all`／`.…all.active`／`.chip.tone`／`.chip.tone.active`。
 // 它整段在下面的圆角卡里、不压在形象图上，所以这一屏**不该再有任何 chip 的铺图态**——

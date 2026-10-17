@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { catSkinFor, chromeOf, createSkin, toneColor, withAlpha, paleStep, TIP_DOT } = require('../../utils/palette.js')
+const { catSkinFor, chromeOf, toneColor, withAlpha, paleStep, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
@@ -9,7 +9,7 @@ const { isPrivate, needsUnlock, unlockOn } = require('../../utils/privateGate.js
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
-const { formatShortDate, formatDateTime } = require('../../utils/date.js')
+const { formatDate, formatDateTime, formatShortDate, formatWeekday } = require('../../utils/date.js')
 const bgTone = require('../../utils/imgBrightness.js')
 
 /* 深浅分两截判（站长 10-12 21:1x：「请按照上下部分来分别判断，避免全图平均，造成差异」）。
@@ -46,17 +46,13 @@ const SOURCE_TYPE_KEYS = {
   preset: 'sourcePreset',
 }
 
-/* v19（站长 10-03 凌晨拍）：这一屏不再有两种排布，而是列表区顶上两枚 tab——
-   笔记列表（X 那种一行一条：左列日期 + 圆点，右列标题 / 摘要 /「显示更多」）
-   与笔记卡片（两列白垫网格，只画生成过的）。
-   上面那行 88 是搜索条压到 60 之后头部那一行的高，两枚 tab 那一行 70、通栏横线压在它下沿，
-   都写在 wxss 里；两枚 tab 每次进页都从第一枚起（他原话"默认第一个tab"），所以不落本机。 */
-/* 摘要那一列能放多少字：列宽 = 750 − 卡内缩 24×2 = 702，再减日期那一列 88 与间距 20 = 594，
-   字号 --fs-meta 24 → 一行 24 个汉字、三行 72。「显示更多」画不画就按这个估，
-   估的是汉字档（英文数字比汉字窄），所以这条线偏保守——宁可多给一枚出口，
-   也不要在真被截断的那条上什么都不给。 */
-const SUM_LINES = 3
-const SUM_CHARS = 24
+/* 10-17 列表合一（站长原话「合并笔记列表和卡片列表，只展示一个列表，就是围绕笔记本身，
+   然后只显示笔记标题，右侧是笔记的配图，如果有就显示，没有不显示」）：
+   v19 那两枚 tab 与卡片那一屏整块撤掉，摘要那三行与「显示更多」一起撤——
+   于是原来为「显示更多」估那笔字数的 `SUM_LINES`／`SUM_CHARS` 两个常量同时没有消费者，
+   删净（留着就是"屏上不再画的东西还在代码里被算"，下一轮谁都不敢撤）。
+   现在一行三档：来源小字 → 标题 → 标识轨（★ 分享过／▢ 出过卡片／🔒 私密），
+   左槽一天一组一个大数字。规格与效果图：docs/方案-列表合一-20261017.md。 */
 
 /* 重渲那一张要用**当年那份分享快照**的正文，不是笔记现在的内容（方案 §二：按快照渲出来的才是当年那张）。
    但快照只覆盖它真有的那几栏：`shares` 那几列都可能为 null（老行、没提炼的篇），
@@ -83,24 +79,16 @@ Page({
     // 那枚小黄点的色仍由 palette.TIP_DOT 从 style 递进来（wxss 里不许抄饱和色）：
     // 头部那一行轮播 Tips 站长 10-04 撤了，但搜索词下面那枚点和详情窗要点那四行还在吃它。
     tipDotStyle: `background:${TIP_DOT}`,
-    // 区内顶那一行（两枚 tab + 右端折叠口）v30 起整块换成新建页那块深面：面、纸白两档字
-    // 都从 `createSkin()` 那**同一个出口**递进来（抄一份 #23252C/#F2EFE9 就是第二份真相），
-    // 短杠那支黄也走 var 而不是把 `#F6C445` 写进 wxss。挂在行上而不是页上：这一行是深面，
-    // 它下面的分类行与列表是浅层，两套墨不能互相串色。
-    rowSkin: `${createSkin()};--tip-dot:${TIP_DOT}`,
-    // 「置顶」那枚下面一条短黄杠用的 --tip 自定义属性随置顶一起撤了；
-    // v19 那两枚 tab 的短杠吃墨，v30 起换成上面那支黄（就是 rowSkin 里这个 --tip-dot）。
+    // 10-17 合一之后这一屏不再有深面那一行：v19~v30 那两枚 tab 整块撤，`rowSkin`（那行
+    // 从 `createSkin()` 递进来的面/字/杠三个数）随之没有宿主。底色全走浅层那一张皮。
     // 头部那一列数字：只有「笔记」。v18 做减法把「分享」「种草」两列撤了
     // （那两列是给分享/种草两屏回看用的，那两屏不做）。值仍来自 /api/user/quota，本页不自己相加。
     stats: [],
-    // v19 这一屏的两枚 tab：'list' = 笔记列表（默认那一枚），'cards' = 笔记卡片。
-    // 这是视图态，不落本机——他原话"默认第一个 tab"，每次进这一屏都从第一枚起。
-    view: 'list',
-    // 整块纸卡加高那一态（10-05 那条）10-10 深夜随右上角那枚「点一下展开」一起撤：
-    // 那一枚改成了「返回」，折叠口没有第二个入口，留着 listWide 就是一块永远进不去的状态。
-    // 两枚 tab 各自画的那两批，都由 arrange() 从同一份 notes 现算（同一份序、同一份筛选）
-    rows: [],
-    cells: [],
+    // 合一之后只剩一批屏：`groups` 是一天一组（左槽那个大数字就是组头），组内一行一篇。
+    // 原来这两个位置放的是 `view`／`rows`／`cells`——视图态与第二屏一起撤，
+    // 「每次进页退回第一枚 tab」那条规矩连同它那两个一次性标记（`_keepView`、
+    // `globalData.ixOpenCardsTab`）一起作废：只剩一屏，没有"站错的那一枚"可退。
+    groups: [],
     // 私密解锁的状态**不记在这一格里**：它记在页面实例的 `_unlockedNoteId` 上，
     // 判据是服务端认得的那把凭证（来龙去脉见 utils/privateGate.js 的 unlockOn）。
     // 原来这是一个 data 里的 `_privateVerified`——首页是常驻 tab，它记一次就整个会话不再问；
@@ -173,35 +161,21 @@ Page({
     const wallpaper = app.getWallpaper()
     // 每次进页重取：在卡片模板页换完形象返回，这一屏的头部就该跟着换。
     const bgSrc = poster.homeBg()
-    // 这一趟是不是"从这一页 push 出去的页面返回"。是的话不许抹掉他自己选的那一枚 tab：
-    // 站长 10-06 真机「查看大图卡片 → 查看笔记 → 看完返回，没有回到笔记卡片」，人明明站在
-    // 第二枚上，被下面那句无条件复位甩回了第一枚。底栏切回来那一型仍照他 10-04 那句
-    // "默认第一个 tab"（不是本机偏好，不写存储）；标记只在 push 那两条口打：查看笔记、去编辑。
-    const keepView = !!this._keepView
-    this._keepView = false
-    // 从首页右下那一枚「卡片」进来的：站在那一枚上就该落在第二枚 tab。
-    // 这是**一次性**标记，读一次就清——留着的话他下一次从底栏切回这一屏也会被塞进卡片那一枚，
-    // 上面那条"默认第一个 tab"的规矩就废了。清在取值这一行，不靠后面的分支顺手清。
-    const openCardsTab = !!app.globalData.ixOpenCardsTab
-    app.globalData.ixOpenCardsTab = false
     this.setData({
       lang,
       t: texts(lang),
       themeClass,
       bgSrc,
-      // 卡片那一格的落点优先于复位，但**不**优先于"从这一页 push 出去再返回"那一型
-      // （keepView 那条已经把他自己站的 tab 保住了，这里不该越过去替他改）。
-      // 卡片那一格自己的台账在下面 loadNotes 里重读，从详情窗出完图回来就能看到新那一张。
-      view: keepView ? this.data.view : (openCardsTab ? 'cards' : 'list'),
       // 深浅这一档**不再跟随首页那枚「调亮度」**（站长 10-15 09:2x「笔记列表，卡片列表，我的，设置，
       // 上面的背景图，不需要跟随首页调亮度。首页调亮度只影响首屏和第二屏」）⇒ 锁在默认那一档，
       // 理由与"为什么不是完全不压暗"都写在 app.bgSkinLocked() 那一段。
       ...app.bgSkinLocked(),
       // 搜索条那一块面由当前壁纸的页面底派生（palette.chromeOf），和底部导航那条胶囊同一个值；
       // 每次进页重算，留着 data 字面量那份就等于永远停在象牙那一档。
-      // 但铺了图就整串不发：style 上的自定义属性优先级高于任何选择器，
-      // 带着它，CSS 里那条"图上换成纸白面"的规则一行都翻不动。
-      searchSkin: bgSrc ? '' : chromeOf(wallpaper).style,
+      // ⚠ 原来这里有一道"铺了图就整串不发"的闸（为了让 CSS 里那三条"图上换成纸白面"翻得动）。
+      // 10-17 搜索搬进圆角卡，那三条覆盖随 `.tools` 一起删了 ⇒ 闸也跟着拆：
+      // 变量不发，`.srch` 的 `background: var(--chrome-bg)` 会 IACVT 成 transparent，条子直接消失。
+      searchSkin: chromeOf(wallpaper).style,
       // 右上那枚淡底方形跟着壁纸走（象牙 #EAE0CE / 天青 #DDE7DF / 其余从窗口纸白掺 8% 墨）
       swatchBg: paleStep(wallpaper),
     })
@@ -292,11 +266,12 @@ Page({
   async loadCategories() {
     try {
       const categories = await api.getCategories()
-      // 分类行 v30 起是「文字 + 选中一条短杠」，不再穿各自分类的实色胶囊，所以这里不再给每一条
-      // 挂一份 toneStyle（`toneVars` 那对 --tone-bg/--tone-ink 在这一行没人消费了）。
-      // 分类身份还在的地方是行卡左边那枚方块与那枚点——它们照旧吃 catSkinFor，同一套派生规则。
+      // 分类行从 v30 起就不穿各自分类的实色胶囊，10-16 又把选中那条短杠撤了 ⇒ 这一行不吃分类色；
+      // 10-17 合一再撤一处：旧行左端那枚分类色点（`.xd-dot`）随整行一起没了。
+      // 所以分类色在这一屏只剩详情窗那一份（挂在 `detailNote.catStyle` 上）。
+      // 分类比笔记晚到是常态，这一趟重算**不只是补名字**：`is_private`／`privKnown` 都由分类名判，
+      // 表还没回来时它们一律"不私密"，合一之后那一行右侧还画配图 ⇒ 重算就是那道闸的一部分。
       this.setData({ categories })
-      // 分类比笔记晚到是常态：到了就得给已在屏上的行卡补上块内分类名，否则方块会一直空着。
       if (this.data.notes.length) {
         const notes = this.skin(this.data.notes)
         this.setData({ notes, ...this.arrange(notes) })
@@ -309,8 +284,10 @@ Page({
   skin(notes) {
     const nameOf = {}
     // 分类色仍按 V2 那套派生（详情窗里那几枚标签和要点序号吃 --cat-ink/--cat-dot/--cat-chip）。
-    // 纸片墙那一族莫兰迪（paperSkinFor）与「已分享」那一小块（SHARED_TAG）随 v19 一起撤了：
-    // 列表不再按分类铺底色，状态标记也不在列表上画——公不公开只在详情窗下沿那一句里说。
+    // 纸片墙那一族莫兰迪（paperSkinFor）随 v19 一起撤了：列表不按分类铺底色。
+    // ⚠ 这一句原来还带着"状态标记也不在列表上画，公不公开只在详情窗下沿那一句里说"——
+    // 10-17 合一把它翻了一半：行上那条标识轨（★ 分享过／▢ 出过卡片／🔒 私密）就是状态标记，
+    // 用的是同一支墨、不穿色块，所以"不按分类铺底色"照旧成立。
     this.data.categories.forEach((c) => { nameOf[c.id] = c.name })
     const wallpaper = getApp().getWallpaper()
     notes.forEach((n) => {
@@ -332,40 +309,51 @@ Page({
     return notes
   },
 
-  /* v19 的两批屏：两枚 tab 读同一份 notes，所以序、筛选、翻页天然同源（他那句"排列的顺序
-     与笔记列表排序一致"就是这么成立的）。
-     · rows = 笔记列表那一屏。一行一条，左列只有日期（MM/DD，现网 formatShortDate）+ 一枚
-       小黄点，右列标题 / 摘要 /「显示更多」。摘要真放不下三行才画「显示更多」（效果图
-       那一屏第三条就只有两行、没有那枚蓝字，他认的就是这一版）；放不下多少由下面那对
-       常量估，标题与摘要本身都交给 CSS 截（标题一行省略号、摘要三行折完）。
-     · cells = 笔记卡片那一屏。只有本机台账里有图的那几篇才进；一格一篇，格里的 ‹ i/n ›
-       由 cur 指当前那一张，n 是这篇留过档的张数。
-     ⚠ 只能由调用方把 notes 当参数递进来：setData 不是同步生效的，同一个 setData 里现读
-     this.data 算到的还是上一批（v18 那轮实测过）。 */
+  /* 合一之后只剩一批屏（10-17）：一天一组，组头是左槽那一个大数字，组内一行一篇。
+     序与筛选仍是 `notes` 那一份原样，所以"翻页/筛分类/搜一个词"三条都不必另算一遍。
+
+     一行三档，全部是**现成的数**，这一趟不新增任何请求：
+     · `src`    ← 服务端那栏 `source_type` 映出来的字典串（上面那六支，走 `SOURCE_TYPE_KEYS`）
+     · `title`  ← 只有标题一行（摘要那三行与「显示更多」随这次做减法一起撤）
+     · `shared` ← 服务端列表响应里那栏 `has_active_share`（今天就在下发，**这一枚是它的第一个消费者**）
+     · `card`   ← `cardCloud.hasCard(id)`：内存里那份全量名单，零请求
+     · `priv`   ← 客户端 `isPrivate(分类名)`（`skin()` 已经算在 `n.is_private` 上）
+     · `cover`  ← 服务端新那栏 `cover_file_id`（没部署／没配过图／备份失败 ⇒ 空 ⇒ 那一格不画）
+
+     ⚠ 私密那一行**一律不画配图**，这是闸不是装饰：服务端锁着时那一行按九栏白名单重建，
+     `cover_file_id` 天然拿不到（`tests/test_list_cover.py` 钉了正反两条）；这一句 `!n.is_private`
+     挡的是"凭证还留着、正文已解锁"那一态之外的一层——一张照片里可能正写着密码、脸、票据，
+     列表那一屏是最不该露它们的地方。
+     ⚠ `privKnown === false`（分类表还没拉回来）按甲处理：宁可少画一张图，不拿"不知道"当"不私密"。 */
   arrange(notes) {
-    const rows = notes.map((n, i) => {
-      const s = n.summary || ''
-      return {
-        i, id: n.id, title: n.title, tail: n.date_label, who: n.who, summary: s,
-        more: s.replace(/\s/g, '').length > SUM_LINES * SUM_CHARS,
-      }
-    })
-    const cells = []
-    // 只画真存在的图。2.0.1 曾经给"卡片找不回来"的那几篇画虚线空框 + 一句"待你确认"，
-    // 站长 10-08 打回：那是把"我们没存这条关联"的后果推给他点，而且看上去像加载失败。
+    const canDrawCloud = cloudUpload.cloudReady()
+    const todayKey = formatDate(new Date())
+    const groups = []
+    let cur = null
     notes.forEach((n, i) => {
-      // 私密那一格不进卡片这一排（站长 10-12：「设了密码的笔记是不能生成卡片的」）。
-      // 新出的卡片本来就走不到这里——`onCardTap`／`_openPosterFor` 对私密篇整个不开，
-      // 服务端也不给登记（`cards.py` 同一句闸）。这里挡的是**历史遗留**：
-      // 先出了卡片、后来才把这篇归进私密，那一张台账还在，画出来就是标题＋概要＋要点上屏。
-      // 判不准的那一型（分类表还没拉回来）一并挡掉＝甲：宁可偶尔少画几张，不拿"不知道"当"不私密"。
-      if (n.is_private || !n.privKnown) return
-      const list = this._cardsOf(n.id)
-      if (list.length) cells.push({ i, id: n.id, title: n.title, cards: list })
+      const key = formatDate(n.created_at)
+      if (!cur || cur.key !== key) {
+        cur = { key, d: key.slice(8), w: formatWeekday(n.created_at), today: key === todayKey, rows: [] }
+        groups.push(cur)
+      }
+      const hideCover = n.is_private || !n.privKnown
+      cur.rows.push({
+        i,
+        id: n.id,
+        title: n.title,
+        src: n.source_type_label,
+        // 转存来的那一篇，来源那一档后面跟着原分享者的昵称（服务端那栏 `share_author_name`）。
+        // 原来它钉在摘要那一行右端，摘要随这次做减法撤了——**信息没撤**，搬进同一档里念。
+        who: n.who || '',
+        shared: !!n.has_active_share,
+        card: cardCloud.hasCard(n.id),
+        priv: !!n.is_private,
+        cover: hideCover || !canDrawCloud ? '' : n.cover_file_id || '',
+      })
     })
-    // 两批都现算：切到卡片那一枚时台账可能刚被详情窗里那次出图改过，
-    // 而这一屏每次数据动过都会重算，不需要额外的脏标记。
-    return { rows, cells }
+    // 卡片那一叠的台账是异步读回来的（`loadNotes` 里那一趟 `cardCloud.refresh()`），
+    // 回来之后重算一遍 ▢ 那一枚才会补上；这一屏每次数据动过都重算，不需要额外的脏标记。
+    return { groups }
   },
 
   // 这一格画哪一张。**2.0.1 S2 起权威在服务器**：本机那张还在就画它（快、不花钱），
@@ -487,27 +475,20 @@ Page({
     this.loadNotes(true)
   },
 
-  // 列表区顶上那两枚 tab：只换视图，不重新拉数据——数据没变，变的是这一屏画哪一批。
-  // 也不落本机（他原话"默认第一个 tab"），所以这一枚点了只管这一次停留。
-  // 详情窗浮着的时候这两枚被盖得严严实实，点不到，也就不用在收窗上做文章。
-  onViewTap(e) {
-    const view = e.currentTarget.dataset.view
-    if (view === this.data.view) return
-    this.setData({ view })
+  // 面板顶左端那一枚「分类管理」（站长 10-17：「左边加一个分类管理 icon，点击可以直接跳转修改分类」）。
+  // 跳的就是「我的」页那一格同一个目标（`me.js` 里那条 `categories` 常量），不是新页：
+  // 那一页今天就能增、改名、删。`navigateTo` 不是 `switchTab`——它不在底栏那三格里。
+  goCategories() {
+    if (this.data.searchOpen) this.setData({ searchOpen: false })
+    wx.navigateTo({ url: '/pages/categories/categories' })
   },
 
-  // 右上角那一枚「返回」（站长 10-10 深夜：「'点一下展开'功能取消，改为'返回'，
-  // 点击返回默认首页。卡片列表页同样处理。这样每页右上角体验一致性」）。
-  // 两枚 tab 共用这一枚（它在这一行的右端，切到哪一枚都在同一个位置、同一个词）。
-  // "默认首页"= 底栏第一格那一屏（新建页），走 switchTab 不是 navigateBack——
-  // 这一屏是 tab 页，从底栏进来时没有返回栈可退。
-  goFirstScreen() {
-    wx.switchTab({ url: '/pages/create/create' })
-  },
+  // 10-17 合一：`onViewTap`（两枚 tab 只换视图、不重拉数据）与 `goFirstScreen`
+  // （那一行右端的「返回」，10-10 深夜由「点一下展开」翻成「返回」）一起撤——
+  // 只剩一屏，没有第二枚可切；回第一屏走底栏第一格，那一格本来就压在这一层上面。
+  // 两枚的旧口径都留在 docs/方案-列表合一-20261017.md §3，别再当成漏画补回去。
 
-  // v19：两枚 tab 那两批屏都不就地展开——点一行 / 点一格 = 直接浮详情窗。
-  // 列表那一行只给三行摘要的位置，就地展开会把下面那条顶歪、也把「显示更多」那枚的出口废掉；
-  // 摘要全文、要点、原文本来就在详情窗里。卡片那一格同理：白垫是固定一档，塞不下正文。
+  // 一行只给"来源／标题／标识轨"三档，不就地展开——摘要全文、要点、原文本来就在详情窗里。
   // 私密笔记进门前先验密码：**每一次点开一篇都要输**（站长 10-12「每次看详细都要输入一次」），
   // 密码不对或他取消就既不开窗也不发请求。判据与那一趟输入都在 utils/privateGate.js 的 unlockOn。
   async onRowTap(e) {
@@ -641,7 +622,6 @@ Page({
     // 出门前把窗收掉：改完回来 onShow 会重载列表，窗留着就是读旧内容。
     // 但记下这一篇，重排完在 onShow 里把窗重新开回来（取消没改也一样回窗，不是回列表）。
     this._backToDetail = note.id
-    this._keepView = true
     this.setData({ detailOpen: false })
     wx.navigateTo({ url: `/pages/write/write?id=${note.id}&mode=edit` })
   },
@@ -707,19 +687,7 @@ Page({
   // 一张都没有就是那枚淡底方形），底排不再留第二个把手。
   // 名字 10-07 改成 `onCardCell`：详情页右上那一格是同一份标记、同一个口，两页绑同一个名字，
   // 那份"两页那一格一模一样"的尺子才钉得住（各绑各的名字就没法逐字节比）。
-  onCardCell() { return this._openPosterFor(this.data.detailNote, 'sheet') },
-
-  // 站长 10-04：卡片那一格的小图点下去**直接拉大图**，不再先浮详情窗（原话「不需要再看原文」）。
-  // 私密那一篇照旧走详情窗：拉大图这一步会把这篇的活码建出来（`_ensurePosterAssets` 里
-  // 调 createShare），而服务端不允许私密笔记分享——给它开大图只会得到一枚失败吐司。
-  onCardTap(e) {
-    const idx = e.currentTarget.dataset.idx
-    const note = this.data.notes[idx]
-    if (!note) return
-    if (note.is_private) return this.onRowTap(e)
-    if (this.data.searchOpen) this.setData({ searchOpen: false })
-    return this._openPosterFor(note, 'grid')
-  },
+  onCardCell() { return this._openPosterFor(this.data.detailNote) },
 
   /* §8.232 首启那一张卡片：给服务端刚种下去的那一篇，静默走一遍**和用户自己出图完全同一条链**
      （`_ensurePosterAssets` → `_renderPoster` → `_keepPoster`，一篇一张、生成即上传都在里面）。
@@ -756,9 +724,8 @@ Page({
   },
 
   // 两条入口共用同一段开窗逻辑：from 记的是"关掉之后回哪一层"（见 _closeTemplate）。
-  async _openPosterFor(note, from) {
+  async _openPosterFor(note) {
     if (!note || note.is_private) return
-    this._posterFrom = from
     const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
     // 台账里那一格现在指着哪一张，这一趟就照那一张开：模板和二维码开关两样都跟它对齐。
     // 站长 10-03 真机报的"无论点哪张小图，大图都是同一张"——原来这里读的是「我的→卡片模板」
@@ -946,19 +913,16 @@ Page({
 
   // v7 ⑥：取消、保存成功、点把手三个口都收掉弹窗，回来的还是详情窗那一屏（不是列表）。
   // 生成失败也走这里——人留在原地，只是多一枚吐司。
-  // 站长 10-04 加的第二条：从卡片那一格的小图直接开大图的（`_posterFrom === 'grid'`），
-  // 收掉就回到卡片那一屏，不该顺手把详情窗浮出来——他要的就是"不再先看原文"，
-  // 而且这一路从没设过 detailNote，浮出来的是上一篇留在那儿的内容。
+  // 10-04 那条"从卡片那一格的小图直接开大图，收掉就回到卡片那一屏"（`_posterFrom === 'grid'`）
+  // 随卡片那一屏一起撤：现在只剩详情窗那一条入口，`_posterFrom` 这个分支没有第二种取值了。
   _closeTemplate() {
     const note = this.data.posterNote
-    const backToSheet = this._posterFrom !== 'grid'
-    this._posterFrom = null
     this.setData({
       templateOpen: false,
       posterImagePath: '',
       posterBusy: false,
       posterNote: null,
-      detailOpen: backToSheet && !!note,
+      detailOpen: !!note,
       // 刚刚真留下来的那张要立刻出现在右上那一格（台账是 _keepPoster 里写的），
       // 并把指针对到第一张——倒序之后第一张就是最新那张。
       detailCards: note ? this._cardsOf(note.id) : [],
@@ -976,13 +940,12 @@ Page({
   // 收窗那两条口没动（顶上「点一下收起」+ 点窗外那层遮罩），所以撤掉这枚"退出"不让人困在里面。
   // 先走 _closeTemplate 再跳：浮层状态留在页面上，从详情页返回会看见一张还盖着的大图
   // （而且 `_closeTemplate` 把 posterImagePath 清了，留下的是一张空窗）。
-  // 但这一趟不许顺手抹掉他站的那一枚 tab（10-06 真机报的就是这件事）——所以打 _keepView，
-  // 回来仍是「笔记卡片」那一屏，再点一下就是刚才那张大图。
+  // 原来这一趟还要打一个 `_keepView`，好让回来仍站在他自己那一枚 tab 上（10-06 真机报的
+  // 就是"被无条件甩回第一枚"）——合一之后只剩一屏，那个标记随两枚 tab 一起撤了。
   onViewNote() {
     const note = this.data.posterNote
     if (!note) return
     this._closeTemplate()
-    this._keepView = true
     wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}` })
   },
 

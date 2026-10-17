@@ -2,7 +2,8 @@
 // 规格正本 `docs/规格-列表层底色与区内顶那一行.md` §1/§2/§5.3/§6，落码清单 §9 第 1、2 步，
 // 它自己在 §10 里点名的两条新增判据也由这一把承担：
 //   · `.sheet` 的底色必须等于 palette 那个出口函数的返回值（四套各钉一条，逐字相等）；
-//   · `.xlist`／`.grid2` 那条 `padding-bottom:150rpx` 还在（§5.3 那条净空是规矩不是样式细节）。
+//   · 排布层那条 `padding-bottom:150rpx` 还在（§5.3 那条净空是规矩不是样式细节）。
+//     10-17 合一之后那一块叫 `.ixl-groups`（原来是 `.xlist` 与 `.grid2` 两块）。
 //
 // 跑法：node docs/工具/验-列表层底色.js            正向，期望全过
 //       node docs/工具/验-列表层底色.js --rev      反向：把镜像值改坏一格，**必须红的事前那一串**
@@ -129,10 +130,17 @@ function declIn(css, cls, token) {
     if (at < 0) return null
     return ix.slice(at, ix.indexOf('}', at))
   }
-  for (const sel of ['.xlist', '.grid2']) {
+  // 10-17 两屏合一：`.xlist`（笔记那一屏）与 `.grid2`（卡片那一屏）两块排布层并成一块
+  // `.ixl-groups` ⇒ 这一条跟着换落点，**量的还是同一件事**：滚到底最后一格不被底栏压住。
+  for (const sel of ['.ixl-groups']) {
     const body = grab(sel)
     ck(`${sel} 那条 padding-bottom:150rpx 还在（最后一格不许切进浮栏）`,
       !!body && /padding[^;]*150rpx/.test(body), body ? (body.match(/padding[^;]*/) || ['没写 padding'])[0].trim() : '那段读不到')
+  }
+  // 反向钉：旧那两块不许留在样式表里当"没人住的房子"（留着的话上面这条会同时读到三段，
+  // 改其一另其二还绿着——典型的假绿口）。
+  for (const sel of ['.xlist', '.grid2']) {
+    ck(`合一之后 ${sel} 那段整块撤净（排布层只剩 .ixl-groups 一块）`, grab(sel) === null)
   }
   // 层已经换成浅灰，"别顺手补一条描边"这条也得钉住（§5 第 1 条：那条缝撤掉，现网本来就没有）。
   const sheet = grab('.sheet')

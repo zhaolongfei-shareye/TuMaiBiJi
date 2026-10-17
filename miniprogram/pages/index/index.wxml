@@ -36,62 +36,51 @@
       </view>
     </view>
 
-    <!-- 图上这一行只剩搜索一枚**裸 icon**（站长 10-04：左边那句轮播 Tips 撤了）。
-         点搜索：搜索那枚就地向左摊成输入框；
-         点这一行以外的**真空白**缩回并清词（等于退出搜索，站长 10-03 改口，原来那条"缩回不清词"作废）；
-         点中某条笔记或某一枚分类只缩条子、词留着（那两枚是 catchtap，icon 亮着表示词还在），
-         ✕ 仍是就地清词的口。
-         icon 一律 catchtap：它在行内，不该被当成"点了空白"而把搜索收掉。
-         ⚠ 展开那一态整行不画（站长 10-05：「展开就不提供搜索」）。必须是 `wx:if` 摘掉、
-         不能指望"被卡盖住"：这一行 z-index 5，比这张纸卡的 2 高，抬上来的卡盖不住它——
-         不摘的话它正好压在卡面中间，变成一枚看得见、点不动的孤点。 -->
-    <!-- ⚠ 原来这一行是 `wx:if="{{!listWide}}"`（"展开就不提供搜索"那句落在这里）。
-         10-10 深夜右上角那枚折叠口改成「返回」，展开那一态进不去了，这一行也就没有不画的时候。 -->
-    <view class="tools">
-      <view wx:if="{{searchOpen}}" class="srch" style="{{searchSkin}}" catchtap="noop">
-        <view class="glyph-search"></view>
-        <input
-          class="srch-input"
-          focus="{{searchOpen}}"
-          value="{{searchKeyword}}"
-          placeholder="{{t.searchPh}}"
-          placeholder-class="srch-ph"
-          confirm-type="search"
-          bindinput="onSearchInput"
-          bindconfirm="onSearchConfirm"
-        />
-        <view wx:if="{{searchKeyword}}" class="srch-x" catchtap="clearSearch">✕</view>
-        <view class="srch-go" catchtap="onSearchConfirm">{{t.search}}</view>
-      </view>
-      <view class="acts">
-        <view wx:if="{{!searchOpen}}" class="ic {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">
-          <view class="glyph-search"></view>
-        </view>
-      </view>
-    </view>
+    <!-- 站长 10-17：「搜索的 icon，我要下移到面板右上角」⇒ 照片段右下这一整行（`.tools`）撤掉，
+         那一枚搜索搬进面板顶那一行（`.ixl-bar`，在下面的 .sheet 里）。
+         这一撤带出两件事，都记在这儿免得以后当成漏画：
+         ① 照片段右下从此是空的（效果图上就是空的，他点头那一版）；
+         ② 原来挂在 `.vtabs` 行右端那枚「返回」（10-10 深夜由「点一下展开」翻来）没有落点了，
+            跟着两枚 tab 一起撤 ⇒ 回第一屏走底栏第一格。 -->
   </view>
 
   <view class="sheet">
-  <!-- v19（站长 10-03 拍）：区内顶上两枚 tab，小字，默认落第一枚。第二枚那两个字仍读现网 navShare（笔记卡片）。
-       排布切换那两枚 icon 的活交给这里，所以头部那一行只剩搜索一枚。
-       v30（站长 10-08 拍）：这一行整块换成新建页那块深面，选中那枚下面一条黄短杠——
-       面/字/杠三个数都由 style="{{rowSkin}}" 从 palette 递进来，wxss 里一个都不写死。 -->
-  <view class="vtabs" style="{{rowSkin}}">
-    <view class="vtab {{view === 'list' ? 'on' : ''}}" catchtap="onViewTap" data-view="list">{{t.tabList}}</view>
-    <view class="vtab {{view === 'cards' ? 'on' : ''}}" catchtap="onViewTap" data-view="cards">{{t.navShare}}</view>
-    <!-- 这一行右端那一枚：10-05 那版是整块纸卡的折叠口（「点一下展开」／「收起」），
-         10-10 深夜站长把它整件换掉——「'点一下展开'功能取消，改为'返回'，点击返回默认首页。
-         卡片列表页同样处理。这样每页右上角体验一致性」。
-         两枚 tab 共用这一枚，位置与词都不随切 tab 变。
-         ⚠ 「我的」那一屏右上角仍是 MIND 那个数字——他这句只点到笔记列表与卡片两页，
-         第三页要不要也换成「返回」没提过，不许我替他推。
-         catchtap：它在 .container 的 bindtap 链上，冒泡上去会把搜索词一起清掉。 -->
-    <text class="ix-back" role="button" aria-label="{{t.back}}" catchtap="goFirstScreen">{{t.back}}</text>
+  <!-- 面板顶那一行（站长 10-17 两句：「搜索的 icon，我要下移到面板右上角」「左边加一个分类管理 icon，
+       点击可以直接跳转修改分类」）。左端跳 `pages/categories`（那一页今天就能增、改名、删，
+       与「我的」页那一格同一个目标）；右端搜索——点下去**这一整行**就地摊成输入框，
+       手法与原来挂在照片段右下那一行完全同一条，只是搬了位置。
+       原来那一行（`.tools`）只剩这一枚 icon 且已经搬家 ⇒ 整条撤掉，照片段右下空出来。
+       ⚠ 展开那一态整行仍不画（站长 10-05「展开就不提供搜索」那条口径跟着皮一起搬过来）。 -->
+  <view class="ixl-bar">
+    <view wx:if="{{searchOpen}}" class="srch" style="{{searchSkin}}" catchtap="noop">
+      <view class="glyph-search"></view>
+      <input
+        class="srch-input"
+        focus="{{searchOpen}}"
+        value="{{searchKeyword}}"
+        placeholder="{{t.searchPh}}"
+        placeholder-class="srch-ph"
+        confirm-type="search"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchConfirm"
+      />
+      <view wx:if="{{searchKeyword}}" class="srch-x" catchtap="clearSearch">✕</view>
+      <view class="srch-go" catchtap="onSearchConfirm">{{t.search}}</view>
+    </view>
+    <block wx:else>
+      <view class="ixl-ic" catchtap="goCategories" aria-label="{{t.categories}}">
+        <view class="ixl-glyph-grid">
+          <view class="ixl-gq"></view><view class="ixl-gq"></view><view class="ixl-gq"></view><view class="ixl-gq"></view>
+        </view>
+      </view>
+      <view class="ixl-ic {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">
+        <view class="glyph-search"></view>
+      </view>
+    </block>
   </view>
-  <!-- 分类这一行跟在两枚 tab 下面，两枚 tab 都留着：卡片那一格是从同一份筛选结果里出来的，
-       这里收掉分类，筛了「旅游」再切过去就会看到别的分类的卡片。
-       多到一排放不下时照旧左右滚（v18 那条"只能从时间轴右侧起排"随时间轴一起撤了）。
-       v30：撤胶囊，改「文字 + 选中一条短杠」，与上面那两枚同一种手法；色吃这一层自己的墨。 -->
+  <!-- 分类这一行仍在面板内、两枚 icon 下面（他这次没点到 ⇒ 不撤）。
+       10-16 那三样一起撤的口径不变：不加粗、不纯黑、下划线也没有 ⇒ 这一行**没有选中态标记**。
+       多到一排放不下时照旧左右滚。 -->
   <view class="cats">
     <scroll-view class="cat-scroll" scroll-x show-scrollbar="{{false}}">
       <view class="cat-chips">
@@ -118,8 +107,7 @@
   <!-- v12：列表不再整页滚，改在这块区域里自己滚、滚到底再取下一批。
        内缩挂在 .sheet 的 padding 上，不挂在 scroll-view 自己身上——挂在它身上时
        右侧要给滚动条留位，左右就不等宽了（详情浮窗那一层实测右移 12rpx，同一条坑）。
-       v19：这一区里两批屏共用同一份 rows / cells（同一份序、同一份筛选），
-       左边那一列不再有月份档，也不再有那根竖线。 -->
+       10-17 合一：一天一组，组头是左槽那一个大数字，组内一行一篇（序与筛选仍是同一份 notes）。 -->
   <scroll-view
     class="list"
     scroll-y
@@ -134,50 +122,38 @@
       <text>{{t.noNotes}}</text>
     </view>
 
-    <!-- 笔记列表那一枚（X 那种排）：左列只有日期 + 一枚小黄点、整组竖向居中于这一条；
-         右列三档——标题 90% 黑一行放不下就省略号、摘要 70% 黑最多三行、末尾「显示更多」蓝字。
-         「显示更多」只在摘要真放不下三行那几条上画（判据见 index.js 的 SUM_LINES）；
-         点整行任意处（含这枚蓝字）都浮详情窗，所以它不另挂 handler。
-         转存来的那篇在最后一行右端带昵称 + 通用头像：标题那一行不留位置给它，
-         否则标题能吃掉的字数要先减掉一截昵称。 -->
-    <view wx:elif="{{view === 'list'}}" class="xlist">
-      <view class="xrow" wx:for="{{rows}}" wx:key="id" catchtap="onRowTap" data-idx="{{item.i}}">
-        <view class="xd">
-          <view class="xd-dot" style="{{tipDotStyle}}"></view>
-          <text class="xd-d">{{item.tail}}</text>
+    <!-- 一行三档：来源小字 → 标题 → 标识轨。轨上从左到右是 ★ 分享过／▢ 出过卡片／🔒 私密，
+         末尾那条 2px 细线自己收满剩下的宽（站长 10-17：「标题下方，参考图有一条线，你可以利用这条线
+         做一些标识」「线上的 icon 可以很小，但辨识度要高，一眼就知道」）。
+         右端配图：**有就画、没有什么都不画**（他原话），它身上不挂任何东西——标识全在线上。
+         私密那一行一律不画配图（闸，不是装饰；判据与来历写在 index.js 的 arrange）。 -->
+    <view wx:else class="ixl-groups">
+      <view class="ixl-grp" wx:for="{{groups}}" wx:key="key">
+        <view class="ixl-gut">
+          <text class="ixl-day">{{item.d}}</text>
+          <text class="ixl-wd">{{item.w}}</text>
+          <view wx:if="{{item.today}}" class="ixl-today"></view>
         </view>
-        <view class="xm">
-          <text class="x-t">{{item.title}}</text>
-          <text class="x-s" wx:if="{{item.summary}}">{{item.summary}}</text>
-          <view class="x-m" wx:if="{{item.more || item.who}}">
-            <text wx:if="{{item.more}}" class="x-more">{{t.showMore}}</text>
-            <view wx:if="{{item.who}}" class="x-who">
-              <view class="glyph-who"></view>
-              <text class="x-name">{{item.who}}</text>
+        <view class="ixl-body">
+          <view class="ixl-row" wx:for="{{item.rows}}" wx:for-item="r" wx:key="id"
+                catchtap="onRowTap" data-idx="{{r.i}}">
+            <view class="ixl-mid">
+              <view class="ixl-src">
+                <text class="ixl-src-t">{{r.src}}</text>
+                <text wx:if="{{r.who}}" class="ixl-who">· {{r.who}}</text>
+              </view>
+              <text class="ixl-tt">{{r.title}}</text>
+              <view class="ixl-rail">
+                <view wx:if="{{r.shared}}" class="ixl-mk ixl-star"></view>
+                <view wx:if="{{r.card}}" class="ixl-mk ixl-card"></view>
+                <view wx:if="{{r.priv}}" class="ixl-mk ixl-lock"></view>
+                <view class="ixl-ln"></view>
+              </view>
             </view>
+            <image wx:if="{{r.cover}}" class="ixl-th" src="{{r.cover}}" mode="aspectFill" />
           </view>
         </view>
       </view>
-    </view>
-
-    <!-- 笔记卡片那一枚：两列等宽、只画本机台账里有图的那几篇、顺序与上面那批完全一致。
-         白垫固定一档，图按 aspectFit 落在正中——比白垫扁的那几套上下各留一道白，
-         这样十套模板混排也排得齐（站长原话"排列整齐归一"）。
-         一篇同时只留一张（站长 10-03 23:40 做减法）：第二行那枚 ‹ i/n › 整块撤掉，不支持来回切换。
-         站长 10-04：格子里那枚**小图**点下去直接拉大图（原来先浮详情窗，还得再点一次右上那一格，
-         他说"不需要再看原文"）；下面那行**标题**照旧进详情窗——两个落点各留一个口。
-         私密那一篇例外：小图也走详情窗（拉大图会把这篇的活码建出来，而私密不给分享）。 -->
-    <view wx:elif="{{cells.length}}" class="grid2">
-      <view class="gc" wx:for="{{cells}}" wx:key="id">
-        <view class="pad" catchtap="onCardTap" data-idx="{{item.i}}">
-          <image class="pad-img" src="{{item.cards[0].p}}" mode="aspectFit" />
-        </view>
-        <text class="g-cap" catchtap="onRowTap" data-idx="{{item.i}}">{{item.title}}</text>
-      </view>
-    </view>
-
-    <view wx:else class="empty">
-      <text>{{t.noCards}}</text>
     </view>
 
     <!-- 翻页那一句挂在排布之外：它不该占掉一格的位置 -->

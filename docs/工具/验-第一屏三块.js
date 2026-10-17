@@ -463,19 +463,22 @@ ok('每次进页重读这两个数（出完图回来该跟着涨）',
 ok('左块点下去仍是 openBar 那一档（拍照），没有另起一套开门逻辑',
   /openBar\(\)\s*\{[\s\S]{0,200}this\.open\('photo'\)/.test(js)
   && /class="blk-person"[^>]*catchtap="openBar"/.test(wxml))
-ok('笔记那一格切到列表 tab；卡片那一格切过去并落第二枚',
+/* 10-17 列表合一：首屏那两格原来一枚切第一枚 tab、一枚切第二枚（靠一个一次性标记），
+   合一之后 index 只剩一屏 ⇒ 三寸旧口径一起改。这两条钉的是**当下**的规矩：
+   ① 两格都还切得动（入口没撤，撤的只是"落到哪一枚"）；
+   ② 那枚标记全站不许再出现——留着就是给一个不存在的状态传话（旧键比新键更危险：
+      它会让人以为还有第二枚可落）。 */
+ok('首屏那两格都还是 switchTab 到笔记列表（合一之后两格同一个落点，入口一枚没撤）',
   /goNotes\(\)[\s\S]{0,160}switchTab\(\{ url: '\/pages\/index\/index' \}/.test(js)
-  && /goCards\(\)[\s\S]{0,200}ixOpenCardsTab = true[\s\S]{0,120}switchTab/.test(js))
-// 一次性标记：立一次、读一次、清一次。index 里读与清必须是同一段，
-// 且"默认第一枚"那条对底栏切回来仍然成立。
-const ixBody = ixJs.split('async onShow')[1] || ''
-ok('index 那头读这一枚标记并就地清掉（常驻就把「默认第一个 tab」废了）',
-  /openCardsTab = !!app\.globalData\.ixOpenCardsTab/.test(ixBody)
-  && /app\.globalData\.ixOpenCardsTab = false/.test(ixBody))
-ok('标记只赢过"无条件复位"，赢不过"从这一页 push 出去再返回"那一型',
-  /view: keepView \? this\.data\.view : \(openCardsTab \? 'cards' : 'list'\)/.test(ixBody))
-ok('清标记这一行排在取 view 之前（先算后清会读到上一趟的残值）',
-  ixBody.indexOf('ixOpenCardsTab = false') < ixBody.indexOf("view: keepView"))
+  && /goCards\(\)[\s\S]{0,160}switchTab\(\{ url: '\/pages\/index\/index' \}/.test(js))
+ok('那一枚一次性标记全站清零（写它的、读它的、清它的都不许在；注释里留来历不算）',
+  !/ixOpenCardsTab/.test(jsOnly)
+  && !/ixOpenCardsTab/.test(ixJs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
+ok('index 那头不再有"视图态"这一说（keepView／openCardsTab／view 三样在代码里都不许在）',
+  (() => {
+    const c = ixJs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    return !/keepView/.test(c) && !/openCardsTab/.test(c) && !/\bview:\s*['"]/.test(c)
+  })())
 
 /* ---------- 7. 人物与它的剪影（10-10 深夜换的切换方式） ----------
    他这一轮的原话：「两个人切换体验不太好，改为左右有人点击右侧人像切换，例如女人在前，

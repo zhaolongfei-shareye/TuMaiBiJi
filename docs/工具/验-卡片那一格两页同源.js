@@ -90,8 +90,14 @@ ck('两页那一格绑的是同一个处理函数名（各绑各的名字，上�
   (A.match(/catchtap="onCardCell"/g) || []).length === 2
   && (B.match(/catchtap="onCardCell"/g) || []).length === 2,
   `首页 ${A ? (A.match(/catchtap="(\w+)"/g) || []).join('|') : '—'} / 详情页 ${B ? (B.match(/catchtap="(\w+)"/g) || []).join('|') : '—'}`)
+// 10-17 合一：`_openPosterFor` 原来带一个"从哪一格开的"（'sheet' | 'grid'），因为卡片那一屏
+// 那枚小图是第二个入口。那一屏撤了 ⇒ 第二个取值没有调用者，参数本身跟着删（留着就是一段进不去的分支）。
+// 这一条量的还是同一件事：**开窗的路只有一条**，只是那条路口上不再挂来自哪一格的记号。
 ck('首页那一格点开的是成品弹窗（沿用 `_openPosterFor`，不在这里另开一条开窗路）',
-  /onCardCell\(\) \{ return this\._openPosterFor\(this\.data\.detailNote, 'sheet'\) \}/.test(INDEX_JS))
+  /onCardCell\(\) \{ return this\._openPosterFor\(this\.data\.detailNote\) \}/.test(INDEX_JS))
+ck('旧那第二个取值不许留在代码里（注释里留来历不算）',
+  !/'grid'/.test(INDEX_JS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    && !/_openPosterFor\(note, from\)/.test(INDEX_JS))
 ck('详情页那一格：有那张就看大图，没有才去生成（生成过之后这一格自己会翻成缩略图）',
   /onCardCell\(\)[\s\S]{0,400}cards\[0\]\.cloud \|\| cards\[0\]\.p[\s\S]{0,200}wx\.previewImage\(\{ urls: \[url\], current: url \}\)[\s\S]{0,200}wx\.navigateTo\(\{ url: `\/pages\/share\/share\?id=\$\{note\.id\}` \}/.test(DETAIL_JS))
 // 搬家的失败形态就是"屏上有那枚、js 里没那个函数"，所以两页每个接线的动作都点名查一遍。
@@ -149,16 +155,22 @@ ck('两页都从当前壁纸现算那一格底色（不是写死一个色号）'
 ck('品牌字仍是 poster.BRAND_GLYPH 那一个常量（两页同一个出处）',
   /brandGlyph: poster\.BRAND_GLYPH/.test(INDEX_JS) && /brandGlyph: poster\.BRAND_GLYPH/.test(DETAIL_JS))
 
-// 几何：这一格与卡片那一屏那枚白垫必须是同一个比例，两个数都从 wxss 现读，不抄在尺子里。
+// 几何：这一格的宽高比必须还是当年那一档（0.717 那条最竖的模板，340×474 等比缩到 252×352）。
+// ⚠ 10-17 两屏合一：原来这里是"两处相等"——拿 `.ds-pad` 对 `index.wxss` 的 `.pad`（卡片那一屏那枚白垫）。
+//    那一屏撤了，`.pad` 整块没了 ⇒ 第二个读数不存在。**这一条从"两处相等"降成"钉一个有出处的常量"**，
+//    出处就是 `docs/规格-笔记卡片这一条线.md` 那张表（340×474 → 乘 0.7412）。
+//    要改这个比例，得连规格那一行一起改，不许只动样式。
 const num = (src, sel, prop) => {
   const body = (new RegExp(`\\.${sel} \\{([^}]*)\\}`).exec(src) || [, ''])[1]
   return parseFloat((new RegExp(`${prop}: (\\d+(?:\\.\\d+)?)rpx`).exec(body) || [, 'NaN'])[1])
 }
-const padW = num(INDEX_WXSS, 'pad', 'width'), padH = num(INDEX_WXSS, 'pad', 'height')
+const padW = 340, padH = 474
 const cellW = num(APP_WXSS, 'ds-pad', 'width'), cellH = num(APP_WXSS, 'ds-pad', 'height')
-ck('那一格的白垫与卡片那一屏那枚白垫同比例（等比缩，不是各拍一个数）',
+ck('那一格的白垫比例还是当年那一档（钉常量，不再钉两处相等——第二处已随卡片那一屏撤掉）',
   padW > 0 && Math.abs(cellH / cellW - padH / padW) < 0.01,
-  `卡片那屏 ${padW}×${padH}（${(padH / padW).toFixed(4)}） vs 这一格 ${cellW}×${cellH}（${(cellH / cellW).toFixed(4)}）`)
+  `规格 ${padW}×${padH}（${(padH / padW).toFixed(4)}） vs 这一格 ${cellW}×${cellH}（${(cellH / cellW).toFixed(4)}）`)
+ck('卡片那一屏那枚白垫（`.pad`／`.pad-img`）不许留下半截（撤就撤净，留一条就是给不存在的屏定尺寸）',
+  !/^\.pad\s*\{/m.test(INDEX_WXSS) && !/^\.pad-img\s*\{/m.test(INDEX_WXSS) && !/^\.grid2\s*\{/m.test(INDEX_WXSS))
 ck('那一列的宽就是白垫的宽（格子不会在列里被挤扁或留白条）',
   num(APP_WXSS, 'ds-rt', 'width') === cellW, `${num(APP_WXSS, 'ds-rt', 'width')} vs ${cellW}`)
 
