@@ -1,6 +1,6 @@
-"""分类名的两档显示值与默认四格（站长 10-17 那一轮）。
+"""分类名的两档显示值、默认四格、删格问话里那个篇数（站长 10-17 那一轮）。
 
-五条不变量：
+六条不变量：
 ① `name` 仍是身份：建格与改名都**不许**把译文写回 `name`。
 ② 词表命中就当场填两列（零出网）；没命中那一列留 NULL，客户端回落到 `name`——
    这就是他那句"如果翻译不了，就维持原文"在数据层的形状。
@@ -9,6 +9,8 @@
 ④ 新用户四格：灵感／生活／工作／学习，两列写死、`sort_order` 依次排；幂等，不重复种。
 ⑤ 这一整套**不许发出出网请求**：conftest 把 `EXTRACT_PROVIDER` 钉成 none、
    云函数凭据钉成占位符，模型那一档在测试里必然走"跳过、留原文"那支。
+⑥ 删格那句二次确认要报的篇数由 GET 一趟 GROUP BY 给齐；POST／PUT 没算过它，
+   那一档就是 `None`，不许落一个假的 0。
 """
 import time
 
@@ -187,6 +189,56 @@ class Test新用户默认四格:
         names = [c["name"] for c in client.get("/api/categories/", headers=hdr(u)).json()]
         assert names[:4] == ["灵感", "生活", "工作", "学习"]
         assert "私密" in names, "私密那一格排在四格之后（它是跟着密码长出来的）"
+
+
+class Test删格那句问话里的篇数:
+    """站长 10-17「删除要二次确认」，问话要报"这一格里 N 篇会归到未分类"。
+    这个 N 只能服务端给——客户端手上只有已经加载的那几十篇，拿它当 N 是假话。
+    报小了最坏：人以为没几篇，删完一整格的归类全散了，而没有撤销口。"""
+
+    def _mk(self, client, db, name, n):
+        u = new_user(db, f"cnt-{name}-{n}")
+        r = client.post("/api/categories/", json={"name": name}, headers=hdr(u))
+        assert r.status_code == 200, r.text
+        cid = r.json()["id"]
+        for i in range(n):
+            r = client.post("/api/notes/", headers=hdr(u),
+                            json={"title": f"第{i}篇", "category_id": cid})
+            assert r.status_code == 200, r.text
+        return u, cid
+
+    def _row(self, client, u, cid):
+        rows = client.get("/api/categories/", headers=hdr(u)).json()
+        return next(r for r in rows if r["id"] == cid)
+
+    def test_格里有几篇就报几篇(self, client, db):
+        u, cid = self._mk(client, db, "读书", 3)
+        assert self._row(client, u, cid)["note_count"] == 3
+
+    def test_空的格子报零(self, client, db):
+        u, cid = self._mk(client, db, "旅行", 0)
+        assert self._row(client, u, cid)["note_count"] == 0
+
+    def test_不数别人家的也不数没归类的(self, client, db):
+        u, cid = self._mk(client, db, "育儿", 2)
+        other = new_user(db, "cnt-other")
+        ocid = client.post("/api/categories/", json={"name": "读书"},
+                           headers=hdr(other)).json()["id"]
+        for i in range(3):
+            client.post("/api/notes/", headers=hdr(other),
+                        json={"title": f"别{i}", "category_id": ocid})
+        client.post("/api/notes/", headers=hdr(u), json={"title": "没归类"})
+        assert self._row(client, u, cid)["note_count"] == 2
+
+    def test_新建与改名的响应里这个数是空而不是零(self, client, db):
+        """GROUP BY 只在 GET 那一趟跑，POST／PUT 的响应里没算过它。
+        写 0 就是"这一格一篇也没有"——改名那一格明明有，客户端照着 0 说话就成了假话。"""
+        u = new_user(db, "cnt-none")
+        cid = client.post("/api/categories/", json={"name": "笔记"}, headers=hdr(u)).json()["id"]
+        client.post("/api/notes/", headers=hdr(u), json={"title": "一篇", "category_id": cid})
+        body = client.put(f"/api/categories/{cid}", json={"name": "摘抄"}, headers=hdr(u)).json()
+        assert body["note_count"] is None
+        assert self._row(client, u, cid)["note_count"] == 1
 
 
 class Test模型那一档在测试里绝不出网:

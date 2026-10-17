@@ -86,11 +86,11 @@
               所以这一格留着＝同一件事两个入口（他定过"一个功能只留一个入口"）。
            路由表里那一位（me.js 的 wallpaper）与那一页都留着没删：删页要连着改 app.json、
            判据与那页的图标资源，是另一件事，等他拍要不要一起撤。 -->
-      <view class="menu-item" bindtap="onNavigate" data-page="categories">
-        <text class="menu-label">{{t.categories}}</text>
-        <text class="menu-hint">{{t.categoriesTip}}</text>
-        <view class="ico"><view class="cv"></view></view>
-      </view>
+      <!-- 「分类管理」那一行站长 10-17 关了（原话「分类做好好，原设置的分类入口关闭」）：
+           管理整条搬进笔记列表那一屏——按面板顶那枚井格就地增、删、拖，点空白存，不跳页。
+           `t.categories` 与 `t.categoriesTip` 那两枚键留着不删：`pages/categories/` 那一页还在
+           读它们（那一页的文件与注册也留着，理由写在 docs/方案-分类面板内管理-20261017.md §4），
+           撤键等于把那一页也判死，是另一刀。 -->
       <!-- 私密密码：这一行只是门，输入整块搬到屏幕下方那一层（站长 10-01 晚：
            「不在原菜单处理方式」——原来就地展开成两个长输入框，混在列表里像另一行菜单）。
            门仍然只吃服务端那条读数，读没读回来决定右边按钮是「重置密码」还是「确定」。 -->

@@ -414,6 +414,56 @@
   color: var(--text-secondary);
 }
 
+/* ---------- 面板内管理分类（站长 10-17「分类设置，改到当前面板，内完成，不需要跳转」） ----------
+   这一态只有三样新东西：分类 icon 右手边那枚输入框、每枚右上角的 ×、被按住那一枚的抬墨。
+   ⚠ 输入框那一格没有新皮：wxml 里它吃的就是搜索那一条 `.srch`，所以这一节只补一条左间距。 */
+.ixl-add {
+  margin-left: 12rpx;
+}
+
+/* 管理态这一行往下让 6、往右留 56：× 那枚的热区要 44×44（比字还大，点在字右上角那一片就删得掉），
+   44 塞不进原来那 40 的缝，硬塞会压到下一枚的名字上。
+   ⚠ 40 那一档是站长 10-09「拉开才不粘连」定的，只在**平时那一态**保留；这一态是他新要的 × 占的地方，
+   不是我把那一条改了。退出管理态缝就回到 40。 */
+.cats.ix-edit {
+  padding-top: 26rpx;
+}
+
+.ix-edit .cat-chips {
+  gap: 56rpx;
+  padding-right: 50rpx;
+}
+
+/* 绝对挂在那一枚的右上角，整块落在缝里：不但不压字，也不给 scroll-view 往上切掉
+   （`.cat-scroll` 那一条是 overflow，超出盒子的那一截是看不见的，所以 top 一律取 0 不取负数）。 */
+.ix-cat-x {
+  position: absolute;
+  top: 0;
+  right: -50rpx;
+  box-sizing: border-box;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-micro);
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+/* 「还没存上去的那几格」与「正按在手里的那一枚」都用这一页的墨抬一档：
+   这两档都是**临时状态**，不是选中态——站长 10-16 打回的是分类名"不加粗、不纯黑、不要下划线"，
+   那一句管的是他平时挑分类那一枚，不等于屏上任何时刻都不许有深浅差。
+   待建那一格总得看得出来"这一格还没上服务端"，否则保存失败时他不知道是哪几格没成。 */
+.ix-cat.pending,
+.ix-cat.dragging {
+  color: var(--text-primary);
+}
+
+.ix-cat.dragging {
+  font-weight: 500;
+}
+
 /* ---------- v12 下方那一整块：圆角朝上、往上盖住图 40、不描边 ----------
    和 pages/me 那张 .sheet 同一画法（margin-top:-40 + 半径 --r-card + 页面底色）。
    刻意不给 border：09-28 那次"纸一圈描边 + 每条笔记又一圈描边"就是框套框。

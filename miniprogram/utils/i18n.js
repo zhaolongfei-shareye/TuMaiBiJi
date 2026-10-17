@@ -117,6 +117,11 @@ const i18n = {
     newCategory: '新建分类',
     editCategory: '编辑分类',
     deleteCategoryConfirm: '确定删除？相关笔记将变为未分类',
+    // 面板内管理那三串（站长 10-17）。问话里那个 {n} 吃服务端 GET 带回的 `note_count`，
+    // 读不到那一档就回落到上面那句现网话术——报一个猜的篇数比不报更坏。
+    catAddPh: '新增分类，空格分开',
+    catDelBody: '这一格里有 {n} 篇，删掉会归到未分类。',
+    catSaveFailed: '没存上：{names}',
     noCategories: '暂无分类',
     // 「我的→设置」那几行右侧的小字说明（站长 10-05：「右侧要加小字说明，有哪些内容可以设置，
     // 也不要回行，提炼」）。放不放得下由 `docs/工具/探-小字不折行.js` 现量渲染盒子钉，改文案先跑它。
@@ -509,6 +514,10 @@ const i18n = {
     newCategory: 'New category',
     editCategory: 'Edit category',
     deleteCategoryConfirm: 'Delete? Notes will become uncategorized',
+    // 与中文侧同三串。占位那一句要放得进输入框，所以英文没有照"新增分类，空格分开"逐字写。
+    catAddPh: 'New categories, space separated',
+    catDelBody: '{n} notes here move to uncategorized.',
+    catSaveFailed: 'Not saved: {names}',
     noCategories: 'No categories yet',
     // 与中文那四串同一组（英文一律不直译，且必须放得进那一行——同一把尺子量两种语言）
     // 同样按"这行拿来干嘛"写，不写零件清单；长度由同一把尺子现量。

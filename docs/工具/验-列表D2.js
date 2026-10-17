@@ -129,6 +129,10 @@ const DATE_JS = fs.readFileSync(P('utils/date.js'), 'utf8')
 const strip = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   .replace(/<!--[\s\S]*?-->/g, '')
 const CODE_WXML = strip(idxWxml), CODE_JS = strip(idxJs), CODE_WXSS = strip(idxWxss)
+// 「我的」那一屏也在这一条判据里（他那句「原设置的分类入口关闭」点的就是那一行），
+// 一样先剥注释：撤那一格时留下的来历写在注释里，不剥就是自己把自己判红。
+const ME_WXML = strip(fs.readFileSync(P('pages/me/me.wxml'), 'utf8'))
+const ME_JS = strip(fs.readFileSync(P('pages/me/me.js'), 'utf8'))
 const dead = (re) => !re.test(CODE_WXSS) && !re.test(CODE_WXML) && !re.test(CODE_JS)
 
 // ①两枚 tab 整块撤：视图态那一栏、深面、通栏横线、负外扩、右端那枚「返回」一起没主人。
@@ -151,9 +155,14 @@ ok('两枚不垫圆底也不描边，两档字吃这一页的墨（有搜索词�
   /color: var\(--text-secondary\)/.test(icRule)
   && /color: var\(--text-primary\)/.test(rule(idxWxss, 'ixl-ic\\.on'))
   && !/background|border/.test(icRule))
-ok('分类管理那枚点下去跳现成的那一页（不新开一页、不开弹层；与「我的」页那一格同一个目标）',
-  /catchtap="goCategories"/.test(CODE_WXML)
-  && /wx\.navigateTo\(\{ url: '\/pages\/categories\/categories' \}\)/.test(CODE_JS))
+ok('分类管理那一枚点下去就在这一屏办事（站长 10-17 同日补的那句把"跳转"顶掉了：不跳页、两处入口都撤）',
+  /catchtap="onCatManageTap"/.test(CODE_WXML)
+  && !/goCategories/.test(CODE_WXML + CODE_JS)
+  && !/navigateTo\(\{ url: '\/pages\/categories\/categories' \}\)/.test(CODE_JS)
+  // 「原设置的分类入口关闭」＝「我的」那一行也撤：节点与路由表那一位都不许留着，
+  // 留着就是同一件事两个入口（他定过一条规矩）。
+  && !/data-page="categories"/.test(ME_WXML)
+  && !/categories:\s*'\/pages\/categories\/categories'/.test(ME_JS))
 ok('两枚图形都 CSS 画，这一页不引图标资源（整张样式表里一次 `url(` 都不出现）',
   /\.glyph-search::before/.test(CODE_WXSS) && /^\.ixl-gq\s*\{[^}]*currentColor/m.test(CODE_WXSS)
   && !/url\(/.test(CODE_WXSS)

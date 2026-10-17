@@ -46,11 +46,12 @@
 
   <view class="sheet">
   <!-- 面板顶那一行（站长 10-17 两句：「搜索的 icon，我要下移到面板右上角」「左边加一个分类管理 icon，
-       点击可以直接跳转修改分类」）。左端跳 `pages/categories`（那一页今天就能增、改名、删，
-       与「我的」页那一格同一个目标）；右端搜索——点下去**这一整行**就地摊成输入框，
-       手法与原来挂在照片段右下那一行完全同一条，只是搬了位置。
+       点击可以直接跳转修改分类」，同日又一句「分类设置，改到当前面板，内完成，不需要跳转」）。
+       第二句被第三句改了口径：井格不再跳转，按下去把这一屏换成管理态（增、删、拖都在这一屏办完）。
+       右端搜索——点下去**这一整行**就地摊成输入框，手法与原来挂在照片段右下那一行完全同一条，只是搬了位置。
        原来那一行（`.tools`）只剩这一枚 icon 且已经搬家 ⇒ 整条撤掉，照片段右下空出来。
-       ⚠ 展开那一态整行仍不画（站长 10-05「展开就不提供搜索」那条口径跟着皮一起搬过来）。 -->
+       ⚠ 展开那一态整行仍不画（站长 10-05「展开就不提供搜索」那条口径跟着皮一起搬过来）。
+       ⚠ 管理态与搜索条两立：`wx:if` 那一支先判 `searchOpen`，进来管理态时 js 先把条子收回。 -->
   <view class="ixl-bar">
     <view wx:if="{{searchOpen}}" class="srch" style="{{searchSkin}}" catchtap="noop">
       <view class="glyph-search"></view>
@@ -68,37 +69,61 @@
       <view class="srch-go" catchtap="onSearchConfirm">{{t.search}}</view>
     </view>
     <block wx:else>
-      <view class="ixl-ic" catchtap="goCategories" aria-label="{{t.categories}}">
+      <view class="ixl-ic {{catEdit ? 'on' : ''}}" catchtap="onCatManageTap" aria-label="{{t.categories}}">
         <view class="ixl-glyph-grid">
           <view class="ixl-gq"></view><view class="ixl-gq"></view><view class="ixl-gq"></view><view class="ixl-gq"></view>
         </view>
       </view>
-      <view class="ixl-ic {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">
+      <!-- 管理态：输入框就长在分类 icon 右手边（站长 10-17 原话「设置分类，在分类ICON右侧，
+           多一个输入框，代表新增分类，支持同时输入多个新增，用空格区隔」）。
+           皮整条复用搜索那一枚 `.srch`：同一行、同一种输入框，不该有两张皮；
+           ⚠ `style="{{searchSkin}}"` 那一串**不许省**——`--chrome-bg` 只由它内联递进来，
+           不发就是 IACVT 透明，输入框在屏上直接消失（同 index.wxss `.srch` 头那条坑）。
+           外层 `catchtap="noop"`：框里的点击不许冒泡成"点了空白"，否则一敲字就被保存退出。
+           这一态没有搜索那枚——两件事不在同一屏办，进管理态时 js 先把条子收回。 -->
+      <view wx:if="{{catEdit}}" class="srch ixl-add" style="{{searchSkin}}" catchtap="noop">
+        <input
+          class="srch-input"
+          value="{{catNewName}}"
+          placeholder="{{t.catAddPh}}"
+          placeholder-class="srch-ph"
+          confirm-type="done"
+          bindinput="onCatAddInput"
+          bindconfirm="onCatAddCommit"
+          bindblur="onCatAddCommit"
+        />
+      </view>
+      <view wx:else class="ixl-ic {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">
         <view class="glyph-search"></view>
       </view>
     </block>
   </view>
   <!-- 分类这一行仍在面板内、两枚 icon 下面（他这次没点到 ⇒ 不撤）。
        10-16 那三样一起撤的口径不变：不加粗、不纯黑、下划线也没有 ⇒ 这一行**没有选中态标记**。
-       多到一排放不下时照旧左右滚。 -->
-  <view class="cats">
+       多到一排放不下时照旧左右滚。
+       管理态（站长 10-17 原话逐条落）：
+       「下方已有的，右上角多个×，可以点击删除」＝每枚右上角一枚 ×，私密那一枚不画（他同轮拍「禁止删除」）；
+       「也可以按压拖动，排序」＝长按这枚起拖，横向越过相邻那枚的中线就换位置；
+       「点击页面空白区，就自动保存」＝改动全留在本机，点空白那一下批量提交（`onBlankTap`）。
+       这一态不画「全部」那一枚：它不是他的分类，没有可删可拖的东西。 -->
+  <view class="cats {{catEdit ? 'ix-edit' : ''}}">
     <scroll-view class="cat-scroll" scroll-x show-scrollbar="{{false}}">
       <view class="cat-chips">
         <view
-          class="ix-cat {{selectedCategory === null ? 'on' : ''}}"
-          catchtap="selectCategory"
-          data-id="{{null}}"
-        >
-          {{t.allCategories}}
-        </view>
-        <view
-          class="ix-cat {{selectedCategory === item.id ? 'on' : ''}}"
-          wx:for="{{categories}}"
-          wx:key="id"
-          catchtap="selectCategory"
+          class="ix-cat {{item.key === 'all' ? (selectedCategory === null ? 'on' : '') : (selectedCategory === item.id ? 'on' : '')}} {{item.state}}"
+          wx:for="{{catView}}"
+          wx:key="key"
+          data-key="{{item.key}}"
           data-id="{{item.id}}"
+          catchtap="onCatChipTap"
+          bindtouchstart="onCatTouchStart"
+          bindlongpress="onCatDragStart"
+          bindtouchmove="onCatDragMove"
+          bindtouchend="onCatDragEnd"
+          bindtouchcancel="onCatDragEnd"
         >
-          {{item.name}}
+          {{item.label}}
+          <view wx:if="{{item.x}}" class="ix-cat-x" catchtap="onCatDeleteTap" data-key="{{item.key}}">✕</view>
         </view>
       </view>
     </scroll-view>

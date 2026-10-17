@@ -2,6 +2,7 @@ const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const pwdSheet = require('../../utils/pwdSheet.js')
 const { allowPrivate, isPrivate, unlockOn, exitOrHome } = require('../../utils/privateGate.js')
+const { labelOf } = require('../../utils/catText.js')
 const cardCloud = require('../../utils/cardCloud.js')
 
 /* 这一页要发出去的那五栏，读回来时先存一份基线（站长 10-12 拍 C3 甲）。两个用途：
@@ -59,8 +60,14 @@ Page({
       const categories = await api.getCategories()
       this.setData({
         categories,
-        // 第一项是"未分类"这个概念，跟着界面语言走；后面那些是用户自己起的名字，不翻
-        categoryNames: [t('noCategory', this.data.lang)].concat(categories.map((c) => c.name)),
+        // 第一项是"未分类"这个概念，跟着界面语言走；后面那些是他自己起的名字——
+        // 10-17 起也跟着界面语言走（他那句「分类名称是中文，切换英文，自动翻译；如果翻译不了，就维持原文」），
+        // 规则只在 utils/catText.js 那一份里。
+        // ⚠ 上面 `categories` 那一栏原样留着：私密那道闸（`allowPrivate`）判的是 `c.name`，
+        //   那是身份，不许被译文换掉。
+        categoryNames: [t('noCategory', this.data.lang)].concat(
+          categories.map((c) => labelOf(c, this.data.lang))
+        ),
       })
     } catch (err) {
       console.error('加载分类失败', err)

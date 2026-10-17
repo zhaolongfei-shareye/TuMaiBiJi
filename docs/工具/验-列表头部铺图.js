@@ -114,6 +114,9 @@ ok('图区 + 圆角卡 + 滚动区三块都在容器里，页面自己不滚',
 // 判"有没有删干净"要看代码，不能连注释一起算——那条解释为什么删掉的注释里
 // 就写着这个函数名，算进来就是自己钉死自己。
 const cjsCode = cjs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+// wxml 那一侧同理：`<block wx:else>` 与右端那枚搜索 icon 之间现在夹着一段"为什么这一态没有搜索"
+// 的来历注释，拿原文量距离就先撞到注释、再撞到节点——钉的是**先后与归属**，不是注释有多长。
+const wxmlCode = wxml.replace(/<!--[\s\S]*?-->/g, '')
 ok('取下一批挂在 scroll-view 上，Page.onReachBottom 那条已经删了（整页不滚，它永远不触发）',
   /onListToLower\(\)/.test(cjs) && !/onReachBottom/.test(cjsCode))
 
@@ -219,9 +222,16 @@ ok('`.tools`／`.acts`／`.ic` 三条随那一行一起撤净（留着就是给�
   // 旧那两枚排布档的图形名也不许复活（`glyph-grid` 这串现在被新那枚 `ixl-glyph-grid` 吃着，
   // 所以这里按**旧类名的整行**查，不按子串查，否则就是自己把自己判红）。
   && !/^\.glyph-(grid|lines)\s*\{/m.test(wxss) && !/^\.ic\.on\s*\{/m.test(wxss))
-ok('左端那枚点下去跳分类管理那一页（复用现页，不是新页也不是弹层）',
-  /catchtap="goCategories"/.test(wxml)
-  && /wx\.navigateTo\(\{ url: '\/pages\/categories\/categories' \}\)/.test(cjs))
+// 左端那一枚的落点没变（仍在 `.ixl-bar` 左头），变的是按下去办事的地方：
+// 站长 10-17 同日补的那句「分类设置，改到当前面板，内完成，不需要跳转」把
+// 「点击可以直接跳转修改分类」那一句顶掉了 ⇒ 这里钉的是"就地管理态"，不是 `navigateTo`。
+// ⚠ 反向那半查 `cjsCode`／`wxmlCode`（都剥过注释）：js 里那段来历把旧写法整句抄在注释里
+//   （同上面 `onReachBottom` 那一条同一个理由），拿原文扫就是把"解释了为什么撤掉"判成残留。
+ok('左端那枚按下去就地开管理态（不跳页；原来那句 navigateTo 与它的 handler 都不在）',
+  /catchtap="onCatManageTap"/.test(wxml)
+  && /catEdit: true/.test(cjs)
+  && !/goCategories/.test(wxmlCode + cjsCode)
+  && !/navigateTo\(\{ url: '\/pages\/categories\/categories' \}\)/.test(cjsCode))
 ok('分类管理那枚＝四枚子 view 画的 2×2，吃 currentColor，没为它引图标资源',
   (wxml.match(/class="ixl-gq"/g) || []).length === 4
   && /^\.ixl-gq\s*\{[^}]*currentColor/m.test(wxss) && !/^\.ixl-glyph-grid\s*\{[^}]*url\(/m.test(wxss))
@@ -267,8 +277,16 @@ ok('颜色全走 currentColor：翻色只改 `.ixl-ic` 一处，两枚图形（�
 // ---------- 5b. 搜索的两态与点击边界（10-17 换了落点，这一节的口径不变） ----------
 ok('摊开那一条仍由 searchOpen 那一态决定；对面那一支 Tips 已撤净（这一行只剩这两枚）',
   /wx:if="\{\{searchOpen\}\}" class="srch"/.test(wxml) && !/class="tp"/.test(wxml))
-ok('摊开时那两枚 icon 整体让位（`<block wx:else>` 那一支），同一行不出现两枚搜索',
-  /<block wx:else>[\s\S]{0,600}catchtap="onOpenSearch"/.test(wxml)
+// 原来这一条量的是"从 `<block wx:else>` 起 600 字以内出现 onOpenSearch"——那是拿"挨得近"当"在同一支里"的替代写法。
+// 管理态在这一支里加了一枚输入框（节点本身三百多字），600 那一道预算撞到的不再是布局、是我新加的那段节点，
+// 所以换成更直接的结构判据：**取那一支自己的整段**，两枚 icon 都必须在段内（比原来只会量距离更严）。
+const elseBranch = (() => {
+  const i = wxmlCode.indexOf('<block wx:else>')
+  const j = wxmlCode.indexOf('</block>', i)
+  return i < 0 || j < 0 ? '' : wxmlCode.slice(i, j)
+})()
+ok('摊开时那两枚 icon 整体让位：分类那枚与搜索那枚都只在 `<block wx:else>` 这一支里，同一行不出现两枚搜索',
+  /catchtap="onCatManageTap"/.test(elseBranch) && /catchtap="onOpenSearch"/.test(elseBranch)
   && (wxml.match(/catchtap="onOpenSearch"/g) || []).length === 1)
 ok('输入框自动聚焦（focus 跟着那一态走，不写死 true）',
   /focus="\{\{searchOpen\}\}"/.test(wxml))

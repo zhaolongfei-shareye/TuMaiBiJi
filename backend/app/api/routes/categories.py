@@ -1,6 +1,7 @@
 import asyncio
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Annotated, List
 from pydantic import BaseModel, Field, model_validator
@@ -53,6 +54,12 @@ class CategoryResponse(BaseModel):
     color: str
     sort_order: int
     created_at: UTCDatetime
+    # 这一格里有几篇。删格那一下要说清这个数（站长 10-17「删除要二次确认」，
+    # 而这条链上唯一不可逆的就是"归好类的关系会丢"），客户端自己数不出来：
+    # 它手上只有已经加载的那 50 篇，不是这一格的全部。
+    # 默认 `None` 而不是 `0`：新建与改名那两趟的响应里没有这个数，
+    # 写 0 就是"这一格里一篇也没有"的一句假话——只有下面那一次 GROUP BY 才配给数。
+    note_count: int | None = None
 
     class Config:
         from_attributes = True
@@ -84,12 +91,23 @@ def list_categories(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return (
+    cats = (
         db.query(Category)
         .filter(Category.user_id == str(user.id))
         .order_by(Category.sort_order.asc(), Category.id.asc())
         .all()
     )
+    # 一次 GROUP BY 拿齐每格的篇数。不许写成循环里逐格 count——那是一屏 N 趟查询，
+    # 分类越多越慢，而这个接口是每次进列表都要打的。
+    counts = dict(
+        db.query(Note.category_id, func.count(Note.id))
+        .filter(Note.user_id == str(user.id), Note.category_id.isnot(None))
+        .group_by(Note.category_id)
+        .all()
+    )
+    for c in cats:
+        c.note_count = counts.get(c.id, 0)
+    return cats
 
 
 @router.post("/", response_model=CategoryResponse)

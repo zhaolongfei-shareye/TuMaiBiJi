@@ -5,6 +5,7 @@ const { formatDateTime, formatShortDate } = require('../../utils/date.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const privateGate = require('../../utils/privateGate.js')
+const { labelOf } = require('../../utils/catText.js')
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
 const poster = require('../../utils/poster.js')
@@ -97,9 +98,8 @@ Page({
         try {
           const categories = await api.getCategories()
           const category = categories.find(c => c.id === note.category_id)
-          if (category) {
-            categoryName = category.name
-          }
+          // 这一栏是给人看的，吃界面语言那一档（规则只在 utils/catText.js 那一份里）。
+          if (category) categoryName = labelOf(category, lang)
         } catch (err) {
           console.error('加载分类列表失败', err)
         }

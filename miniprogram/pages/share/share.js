@@ -25,6 +25,7 @@ const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const cardInfo = require('../../utils/cardInfo.js')
+const { labelOf } = require('../../utils/catText.js')
 
 Page({
   data: {
@@ -96,7 +97,8 @@ Page({
         try {
           const categories = await api.getCategories()
           const category = categories.find((c) => c.id === note.category_id)
-          if (category) note.category_name = category.name
+          // 海报上那一行小字是给人看的 ⇒ 吃界面语言那一档（`utils/catText.js` 那一份规则）。
+          if (category) note.category_name = labelOf(category, lang)
         } catch (err) {
           console.error('加载分类列表失败', err)
         }

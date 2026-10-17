@@ -252,8 +252,11 @@ Page({
 
   onNavigate(e) {
     const page = e.currentTarget.dataset.page
+    // `categories` 那一格站长 10-17 关了（原话「分类做好好，原设置的分类入口关闭」——
+    // 管理整条搬进笔记列表那一屏，见 pages/index 的 onCatManageTap）。
+    // 页面文件 `/pages/categories/categories` 与 `app.json` 里那条注册先留着没删，理由写在
+    // docs/方案-分类面板内管理-20261017.md §4：删页要连着判据与那页的资源一起动，是另一刀。
     const routes = {
-      categories: '/pages/categories/categories',
       wallpaper: '/pages/wallpaper/wallpaper',
       profile: '/pages/profile/profile',
       about: '/pages/about/about',

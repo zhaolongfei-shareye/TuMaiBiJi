@@ -6,6 +6,8 @@ const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const cardInfo = require('../../utils/cardInfo.js')
 const { isPrivate, needsUnlock, unlockOn } = require('../../utils/privateGate.js')
+// 分类名那一档显示值：一句规则四处吃（列表、录入、详情、海报），口径写在文件头。
+const { labelOf } = require('../../utils/catText.js')
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
@@ -46,6 +48,12 @@ const SOURCE_TYPE_KEYS = {
   preset: 'sourcePreset',
 }
 
+/* 话术里那一个 {n}／{names}。做法与「我的」页那份 `fmt` 一模一样；
+   没有把它提到 utils/i18n.js 去，是因为那一改要牵动几页共用的取键口，不属于这一轮。 */
+function fmt(tpl, map) {
+  return String(tpl || '').replace(/\{(\w+)\}/g, (m, k) => (map && map[k] !== undefined ? String(map[k]) : m))
+}
+
 /* 10-17 列表合一（站长原话「合并笔记列表和卡片列表，只展示一个列表，就是围绕笔记本身，
    然后只显示笔记标题，右侧是笔记的配图，如果有就显示，没有不显示」）：
    v19 那两枚 tab 与卡片那一屏整块撤掉，摘要那三行与「显示更多」一起撤——
@@ -65,6 +73,14 @@ Page({
   data: {
     notes: [],
     categories: [],
+    // 面板内管理分类（站长 10-17「分类设置，改到当前面板，内完成，不需要跳转」）。
+    // `catView` 是那一排芯片**唯一**的渲染源：平时那一态由 `categories` 现算，
+    // 管理态由本机草稿 `_catDraft` 现算——两份都走同一个口，所以 wxml 里只有一套标记。
+    // 草稿与"待删那几格"记在页面实例上（`_catDraft`／`_catDel`），不进 data：
+    // 它们只被 js 读，跟着 setData 白跑一趟（同上面 `_unlockedNoteId` 那条理由）。
+    catEdit: false,
+    catView: [],
+    catNewName: '',
     loading: true,
     searchKeyword: '',
     searchOpen: false,
@@ -271,7 +287,7 @@ Page({
       // 所以分类色在这一屏只剩详情窗那一份（挂在 `detailNote.catStyle` 上）。
       // 分类比笔记晚到是常态，这一趟重算**不只是补名字**：`is_private`／`privKnown` 都由分类名判，
       // 表还没回来时它们一律"不私密"，合一之后那一行右侧还画配图 ⇒ 重算就是那道闸的一部分。
-      this.setData({ categories })
+      this.setData({ categories, catView: this._catView(this.data.catEdit) })
       if (this.data.notes.length) {
         const notes = this.skin(this.data.notes)
         this.setData({ notes, ...this.arrange(notes) })
@@ -440,12 +456,16 @@ Page({
 
   // 搜索条收在分类那一行里（09-30 v8，站长："搜索条目前看起来太大，不美观"）。
   // 展开时 `focus="{{searchOpen}}"` 直接把键盘带起来。
-  // 站长 10-03 改口（原来那条"缩回不清词"作废）：点条子以外的**真空白**就是退出搜索——
-  // 条子收回、关键字清掉、列表重拉回未搜的状态。不这么做的话条子一收，
-  // 下面还挂着上一次的结果，看着像没退出来。
-  // 点中某条笔记或某一枚分类不算"点空白"：那两处在自己的 handler 里收条子、词留着
-  // （icon 那枚亮着表示词还在，✕ 仍是就地清词的口）。
-  onBlankTap() {
+  // 点条子以外的**真空白**：管理态里那一下是"存"（站长 10-17 原话「然后点击页面空白区，就自动保存」）；
+  // 搜索那一态里那一下是"退"（站长 10-03 改口那条：条子收回、关键字清掉、列表重拉回未搜的状态）。
+  // 两态不会同时开着（`onCatManageTap` 进来先把条子收回），所以先判管理、后判搜索。
+  // 点中某条笔记或某一枚分类不算"点空白"：那两处都是 catchtap，冒泡不上来；
+  // 行那一处在 `onRowTap` 里另有一条"管理态中 ⇒ 只存不开窗"的短路。
+  async onBlankTap() {
+    if (this.data.catEdit) {
+      await this._saveCatEdit()
+      return
+    }
     if (!this.data.searchOpen) return
     this.setData({ searchOpen: false, searchKeyword: '' })
     this.loadNotes(true)
@@ -475,12 +495,375 @@ Page({
     this.loadNotes(true)
   },
 
-  // 面板顶左端那一枚「分类管理」（站长 10-17：「左边加一个分类管理 icon，点击可以直接跳转修改分类」）。
-  // 跳的就是「我的」页那一格同一个目标（`me.js` 里那条 `categories` 常量），不是新页：
-  // 那一页今天就能增、改名、删。`navigateTo` 不是 `switchTab`——它不在底栏那三格里。
-  goCategories() {
-    if (this.data.searchOpen) this.setData({ searchOpen: false })
-    wx.navigateTo({ url: '/pages/categories/categories' })
+  /* ── 面板内管理分类（站长 10-17 那一轮，逐字原话与验收在 docs/方案-分类面板内管理-20261017.md）
+     「分类设置，改到当前面板，内完成，不需要跳转」＝按那枚井格就地换管理态，全程不跳页；
+     「在分类ICON右侧，多一个输入框，代表新增分类，支持同时输入多个新增，用空格区隔」＝输入框长在井格右手边；
+     「下方已有的，右上角多个×，可以点击删除」＝每枚右上角一枚 ×（私密那一枚不画，他同轮拍「禁止删除」）；
+     「也可以按压拖动，排序」＝长按起拖，越过相邻那枚的中线就换位置；
+     「点击页面空白区，就自动保存」＝改动全留本机，点空白那一下批量提交。
+     ⚠ 原来那枚井格是 `wx.navigateTo('/pages/categories/categories')`（`goCategories`），
+       这一轮撤掉：他说的是"不需要跳转"，而他补的那句「原设置的分类入口关闭」把另一处入口
+       （「我的」页那一行，`me.js`）也一起撤了。`pages/categories/` 那一页的文件先留着不删，
+       理由写在方案 §4——删页要连 `app.json` 注册与那页的判据一起动，是另一刀。
+     本机草稿三样记在页面实例上、不进 data（只被 js 读）：
+       `_catDraft` 当前顺序与待建那几格、`_catDel` 等着删的那几格、`_catOrder0` 进来时服务端那一份顺序。 */
+
+  _catFind(key) {
+    return (this._catDraft || []).find((x) => x.key === key)
+  },
+
+  _toDraft(list) {
+    return (list || []).map((c) => ({
+      key: 'c' + c.id, id: c.id, name: c.name, name_zh: c.name_zh, name_en: c.name_en,
+      note_count: c.note_count, isPrivate: isPrivate(c.name), renamed: false,
+    }))
+  },
+
+  // 那一排芯片**唯一**的渲染源。`edit` 由调用方传进来，不现读 `this.data.catEdit`：
+  // 进出管理态那两趟要在同一次 setData 里同时换 `catEdit` 与 `catView`，
+  // 现读 data 拿到的是旧的那一态，画出来就是一屏对不上号的混合体。
+  _catView(edit) {
+    const lang = this.data.lang
+    const out = []
+    if (!edit) {
+      out.push({ key: 'all', id: null, label: t('allCategories', lang), x: false, state: '' })
+      this.data.categories.forEach((c) => out.push({
+        key: 'c' + c.id, id: c.id, label: labelOf(c, lang), x: false, state: '',
+      }))
+      return out
+    }
+    ;(this._catDraft || []).forEach((it) => {
+      // 待建与待改那两档，屏上直接念他刚打的字：那两档服务端还没有对应译名，
+      // 拿旧行的 name_zh／name_en 去显示，显示的就是上一个名字的译名。
+      const raw = it.id === null || it.renamed
+      const st = (raw ? ' pending' : '')
+        + (this._drag && this._drag.key === it.key ? ' dragging' : '')
+      out.push({
+        key: it.key,
+        id: it.id,
+        label: raw ? it.name : labelOf(it, lang),
+        x: !it.isPrivate,
+        state: st.trim(),
+      })
+    })
+    return out
+  },
+
+  // 面板顶左端那一枚井格：按一下进管理态，再按一下存并退出（同一个口，不另设"完成"按钮——
+  // 他给的是「点击页面空白区，就自动保存」，多加一枚按钮就是第二个入口）。
+  onCatManageTap() {
+    if (this.data.catEdit) { this._saveCatEdit(); return }
+    this._catDraft = this._toDraft(this.data.categories)
+    this._catDel = []
+    this._catOrder0 = this.data.categories.map((c) => c.id)
+    this._drag = null
+    this._catSeq = 0
+    // 搜索条与管理态两立：进来先把条子收回（词不清，✕ 才是清词的口，与点分类那一枚同一条规矩）。
+    this.setData({
+      catEdit: true,
+      searchOpen: false,
+      catNewName: '',
+      catView: this._catView(true),
+    })
+  },
+
+  onCatChipTap(e) {
+    if (!this.data.catEdit) { this.selectCategory(e); return }
+    const it = this._catFind(e.currentTarget.dataset.key)
+    // 私密那一格：能拖动、不给改名（站长 10-17 拍的甲）。点下去什么都不发生是设计，
+    // 不是坏了——服务端那一道 PUT 也无条件挡着，两条腿都钉在尺子里。
+    if (!it || it.isPrivate) return
+    this._catRename(it)
+  },
+
+  onCatAddInput(e) {
+    this.setData({ catNewName: e.detail.value })
+  },
+
+  // 空格切段 ⇒ 一次落多格（「支持同时输入多个新增，用空格区隔」）。
+  // confirm（键盘那一枚"完成"）与 blur（点别处）都走这里：点空白那一下的次序正好是
+  // 先 blur 再 bindtap，所以新词先变成屏上的待建格，再跟着那一次保存一起发出去。
+  onCatAddCommit() {
+    if (!this.data.catEdit) return
+    const names = String(this.data.catNewName || '').split(/\s+/).filter(Boolean)
+    if (!names.length && !this.data.catNewName) return
+    const draft = this._catDraft || (this._catDraft = [])
+    names.forEach((n) => {
+      const low = String(n).toLowerCase()
+      // 同一次输入里重复的词只留第一次；与已有那几格重名的也先挡在本地（服务端那一道还会再挡一次，
+      // 但让他在屏上看到"这一格没有多出来"比等一次失败toast 便宜）。
+      if (draft.some((x) => String(x.name).toLowerCase() === low)) return
+      this._catSeq = (this._catSeq || 0) + 1
+      draft.push({ key: 'n' + this._catSeq, id: null, name: n, isPrivate: false, renamed: false })
+    })
+    this.setData({ catNewName: '', catView: this._catView(true) })
+  },
+
+  // × 那一下：先问一句再删（站长 10-17 补的那一句「删除要二次确认」）。
+  // 问话要报"这一格里 N 篇会归到未分类"——这条链上唯一不可逆的就是那个归类关系（笔记本身不动，
+  // 也没有撤销口）。N 读服务端 GET 带回的 `note_count`；读不到（老服务端）就退回原来那句不报数的现网话术，
+  // 绝不拿本机已加载的那几十篇凑一个数。
+  onCatDeleteTap(e) {
+    const key = e.currentTarget.dataset.key
+    const i = (this._catDraft || []).findIndex((x) => x.key === key)
+    if (i < 0) return
+    const it = this._catDraft[i]
+    if (it.isPrivate) return   // 那一枚本来不画 ×；这一道是给以后改皮的人留的闸
+    const lang = this.data.lang
+    const n = typeof it.note_count === 'number' ? it.note_count : null
+    wx.showModal({
+      title: t('delete', lang),
+      content: n === null ? t('deleteCategoryConfirm', lang) : fmt(t('catDelBody', lang), { n }),
+      confirmText: t('delete', lang),
+      cancelText: t('cancel', lang),
+      success: (res) => {
+        if (!res.confirm) return
+        this._catDraft.splice(i, 1)
+        this._catDel.push(it)
+        this.setData({ catView: this._catView(true) })
+      },
+    })
+  },
+
+  // 改名：这一轮他没提，但那是现网就有的能力，而他要求把别的入口关掉（方案 §4 记的是我这一条）。
+  // 走系统弹窗那一条可编辑的（`editable`），不自画一层皮；改动同样先留本机，点空白那一趟才发 PUT。
+  _catRename(it) {
+    const lang = this.data.lang
+    wx.showModal({
+      title: t('editCategory', lang),
+      editable: true,
+      placeholderText: t('categoryName', lang),
+      content: it.name,
+      confirmText: t('save', lang),
+      cancelText: t('cancel', lang),
+      success: (res) => {
+        if (!res.confirm) return
+        const name = String(res.content || '').trim()
+        if (!name || name === it.name) return
+        if (it.id === null) it.name = name        // 还没上服务端的待建格：就地改字，不算一次改动
+        else { it.name = name; it.renamed = true }
+        this.setData({ catView: this._catView(true) })
+      },
+    })
+  },
+
+  // ---------- 按压拖动 ----------
+  // 落点全靠现量：longpress 那个事件里 `touches` 在部分机型是空的，所以 touchstart 先把
+  // 手指那一处的 x 存下来当备胎。换过一次顺序之后**必须重新量**——数组一调序，手上那份 rect
+  // 全部过期，拿它再判第二次就滑到别处去了。
+  onCatTouchStart(e) {
+    if (!this.data.catEdit) return
+    const t0 = e.touches && e.touches[0]
+    if (t0) this._catFingerX = t0.clientX
+  },
+
+  onCatDragStart(e) {
+    if (!this.data.catEdit) return
+    const key = e.currentTarget.dataset.key
+    const i = (this._catDraft || []).findIndex((x) => x.key === key)
+    if (i < 0) return
+    const t0 = e.touches && e.touches[0]
+    const x = t0 ? t0.clientX : this._catFingerX
+    this._drag = { key, i, x: typeof x === 'number' ? x : 0 }
+    this.setData({ catView: this._catView(true) })
+  },
+
+  async onCatDragMove(e) {
+    const d = this._drag
+    if (!d || this._dragBusy) return
+    const t0 = e.touches && e.touches[0]
+    if (!t0) return
+    d.x = t0.clientX
+    this._dragBusy = true
+    try {
+      await this._catDragStep()
+    } finally {
+      this._dragBusy = false
+    }
+  },
+
+  async _catDragStep() {
+    // 一次移动最多换三格：手指甩得快时也不会把整排搅成一团，剩下的交给下一个 touchmove。
+    for (let guard = 0; guard < 3; guard++) {
+      const d = this._drag
+      if (!d) return
+      const rects = await this._catRects()
+      if (rects.length !== (this._catDraft || []).length || rects.length < 2) return
+      const mid = (r) => r.left + r.width / 2
+      const right = d.i + 1 < rects.length ? rects[d.i + 1] : null
+      const left = d.i - 1 >= 0 ? rects[d.i - 1] : null
+      let to = -1
+      if (right && d.x > mid(right)) to = d.i + 1
+      else if (left && d.x < mid(left)) to = d.i - 1
+      if (to < 0) return
+      const it = this._catDraft.splice(d.i, 1)[0]
+      this._catDraft.splice(to, 0, it)
+      d.i = to
+      this.setData({ catView: this._catView(true) })
+      // 排布是渲染层算的，setData 回来那一瞬量到的还是换之前的位置：等一帧再量。
+      await this._catNextFrame()
+    }
+  },
+
+  onCatDragEnd() {
+    if (!this._drag) return
+    this._drag = null
+    this.setData({ catView: this._catView(true) })
+    // 松手**不发请求**：顺序只是本机草稿，保存那一趟才发 reorder（他点的是"点空白自动保存"）。
+  },
+
+  _catRects() {
+    return new Promise((resolve) => {
+      wx.createSelectorQuery().selectAll('.ix-cat').boundingClientRect().exec((res) => {
+        resolve((res && res[0]) || [])
+      })
+    })
+  },
+
+  _catNextFrame() {
+    return new Promise((resolve) => setTimeout(resolve, 30))
+  },
+
+  // 要不要发 reorder：已有那几格的相对顺序变了，或者有待建格被放在了某一枚已有格之前
+  // （服务端"新增一律排最后"给的位置不是他拖的位置）。
+  _catOrderDirty() {
+    const draft = this._catDraft || []
+    const now = draft.filter((x) => typeof x.id === 'number').map((x) => x.id)
+    const base = (this._catOrder0 || []).filter((id) => now.indexOf(id) >= 0)
+    if (now.join() !== base.join()) return true
+    return draft.some((x, i) => x.id === null && draft.slice(i + 1).some((y) => typeof y.id === 'number'))
+  },
+
+  /* 批量提交那一条线：删 → 改名 → 建 → 排序。
+     这个次序是按"哪一步会失败"排的：改名与建格会被重名挡（可重来），删那一趟几乎不会失败，
+     而只有前三步全成，才配发最后那一次 reorder（否则新格还没身份 id，那份顺序是编出来的）。
+     没成的那几条**点名**报出来，人留在管理态里——不许"看起来保存了"。 */
+  async _saveCatEdit() {
+    if (this._savingCat) return
+    this._savingCat = true
+    const lang = this.data.lang
+    this.onCatAddCommit()
+    const dels = (this._catDel || []).slice()
+    const renames = (this._catDraft || []).filter((x) => typeof x.id === 'number' && x.renamed)
+    const news = (this._catDraft || []).filter((x) => x.id === null)
+    const dirty = dels.length || renames.length || news.length || this._catOrderDirty()
+    if (!dirty) {
+      this._catExit()
+      this._savingCat = false
+      return
+    }
+    wx.showLoading({ title: t('saving', lang), mask: true })
+    const bad = []
+    const stillDel = []
+    for (const it of dels) {
+      try { await api.deleteCategory(it.id) } catch (err) {
+        bad.push(it); stillDel.push(it)
+        console.error('分类没删掉', it.name, err)
+      }
+    }
+    this._catDel = stillDel
+    for (const it of renames) {
+      try {
+        const r = await api.updateCategory(it.id, { name: it.name })
+        it.name = r.name; it.name_zh = r.name_zh; it.name_en = r.name_en; it.renamed = false
+      } catch (err) {
+        bad.push(it)
+        console.error('分类名没改掉', it.name, err)
+      }
+    }
+    for (const it of news) {
+      try {
+        const r = await api.createCategory({ name: it.name })
+        // 服务端那份才是身份：id、两档显示值都按回来的写，本地那一格就此"落地"（pending 那一档自然消失）。
+        it.id = r.id; it.name = r.name; it.name_zh = r.name_zh; it.name_en = r.name_en
+      } catch (err) {
+        bad.push(it)
+        console.error('分类没建起来', it.name, err)
+      }
+    }
+    let orderErr = false
+    if (!bad.length && this._catOrderDirty()) {
+      const ids = this._catDraft.filter((x) => typeof x.id === 'number').map((x) => x.id)
+      try { await api.reorderCategories(ids) } catch (err) {
+        orderErr = true
+        console.error('分类顺序没存上', err)
+      }
+    }
+    wx.hideLoading()
+
+    if (bad.length || orderErr) {
+      // 有没成的：先把服务端那一份真的读回来（成的那些必须立刻在屏上落定），
+      // 再把没成的贴回草稿继续挂着。名字只报中文那一份就够了——那是他自己打的字。
+      const names = bad.map((x) => x.name).join('、')
+      await this.loadCategories()
+      this._catResync(bad)
+      const tail = orderErr ? (names ? '；' + t('sortFailed', lang) : t('sortFailed', lang)) : ''
+      wx.showToast({
+        title: names ? fmt(t('catSaveFailed', lang), { names }) + tail : tail,
+        icon: 'none',
+      })
+      this._savingCat = false
+      return
+    }
+    this._catExit()
+    await this.loadCategories()
+    // 他正筛着的那一格被删掉了 ⇒ 不把筛选撤回来，屏上就是一片空白加一个"还有筛选"的状态，
+    // 看着像列表坏了。清掉重拉一次，让他站在"全部"那一格上。
+    const live = {}
+    this.data.categories.forEach((c) => { live[c.id] = true })
+    const sel = this.data.selectedCategory
+    if (sel !== null && !live[sel]) {
+      this.setData({ selectedCategory: null })
+      this.loadNotes(true)
+      return
+    }
+    wx.showToast({ title: t('saveSucceeded', lang), icon: 'success' })
+    this._savingCat = false
+  },
+
+  _catExit() {
+    this._drag = null
+    this._catDraft = null
+    this._catDel = []
+    this.setData({ catEdit: false, catNewName: '', catView: this._catView(false) })
+  },
+
+  // 部分失败之后把草稿重建到"服务端真的那一份 ＋ 没成的那几条"上：
+  // 没成的删除继续挂着（从重建的草稿里摘掉那一格）、没成的改名继续显示他打的新字、
+  // 没成的新建回到末尾（他原来拖的位置随这一次失败一起丢了，重进管理态也读不回来——
+  // 这一点写在方案 §4，不是我漏了）。
+  _catResync(bad) {
+    const draft = this._toDraft(this.data.categories)
+    const stillDel = []
+    ;(this._catDel || []).forEach((it) => {
+      if (bad.indexOf(it) < 0) return
+      stillDel.push(it)
+      const k = draft.findIndex((x) => x.id === it.id)
+      if (k >= 0) draft.splice(k, 1)
+    })
+    this._catDel = stillDel
+    bad.forEach((it) => {
+      if (it.id === null) { draft.push(this._toLocal(it)); return }
+      const k = draft.findIndex((x) => x.id === it.id)
+      if (k >= 0 && it.renamed) draft[k] = Object.assign(draft[k], { name: it.name, renamed: true })
+    })
+    this._catDraft = draft
+    this._catOrder0 = draft.filter((x) => typeof x.id === 'number').map((x) => x.id)
+    this.setData({ catView: this._catView(true) })
+  },
+
+  _toLocal(it) {
+    return {
+      key: it.key, id: it.id, name: it.name, name_zh: it.name_zh, name_en: it.name_en,
+      note_count: it.note_count, isPrivate: it.isPrivate, renamed: it.renamed,
+    }
+  },
+
+  // 10-17 合一之后这一屏没有 onHide：他停在列表页切走 tab、或去编辑那一趟，管理态里的草稿
+  // 会静默丢掉（拖完一切照旧、回来顺序还是老的）。这一句把"切走"也接到同一条保存线上——
+  // 他要的是"点空白就存"，切走是同一件事的第二个出口，不另设一套写法。
+  onHide() {
+    if (this.data.catEdit) this._saveCatEdit()
   },
 
   // 10-17 合一：`onViewTap`（两枚 tab 只换视图、不重拉数据）与 `goFirstScreen`
@@ -495,6 +878,10 @@ Page({
     // 行是 catchtap：它不该被当成"点了空白"（那样会把关键字一起清掉）。
     // 但条子要收——收起来正好把结果让给这一屏。词留着，✕ 才是清词的口。
     if (this.data.searchOpen) this.setData({ searchOpen: false })
+    // 管理态里点某一行的笔记＝"点了别处"：只把这一屏的分类改动存下去，不开详情窗。
+    // 不开窗是对的——他要的是"点空白自动保存"，而人在管理分类时点到行上多半是想腾个地方；
+    // 反过来（先存再开窗）会把一次误触变成一个密码框。
+    if (this.data.catEdit) { await this._saveCatEdit(); return }
     const idx = e.currentTarget.dataset.idx
     const note = this.data.notes[idx]
     if (!note) return
@@ -767,7 +1154,7 @@ Page({
       try {
         const categories = await api.getCategories()
         const cat = categories.find((c) => c.id === note.category_id)
-        if (cat) note.category_name = cat.name
+        if (cat) note.category_name = labelOf(cat, this.data.lang)
       } catch (err) { /* 查不到就只写来源 */ }
     }
     if (cached) {
