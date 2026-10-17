@@ -30,4 +30,14 @@ function formatYearMonth(dateStr) {
   return `${String(d.getFullYear()).slice(-2)}/${pad(d.getMonth() + 1)}`
 }
 
-module.exports = { formatDateTime, formatShortDate, formatYearMonth }
+// 10-17 列表合一：左槽那一个大数字下面那一档星期（MON／TUE…）。
+// 三串拉丁字母是**图形**不是文案——站长给的那张参考图上就是这么排的，他点头那版效果图照它画；
+// 屏上其余每一句仍是中文。只在列表用，详情窗那一行仍走 formatDateTime 那档完整日期。
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+
+function formatWeekday(dateStr) {
+  if (!dateStr) return ''
+  return WEEKDAYS[new Date(dateStr).getDay()]
+}
+
+module.exports = { formatDateTime, formatShortDate, formatWeekday, formatYearMonth }
