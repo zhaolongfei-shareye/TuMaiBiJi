@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { blockSkinFor, toneVars, paleStep } = require('../../utils/palette.js')
+const { blockSkinFor, toneVars } = require('../../utils/palette.js')
 const { formatDateTime, formatShortDate } = require('../../utils/date.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const cardCloud = require('../../utils/cardCloud.js')
@@ -8,7 +8,6 @@ const privateGate = require('../../utils/privateGate.js')
 const { labelOf } = require('../../utils/catText.js')
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
-const poster = require('../../utils/poster.js')
 
 const SOURCE_TYPE_KEYS = {
   wechat_article: 'sourceWechatArticle',
@@ -32,11 +31,10 @@ Page({
     // 这篇的配图（云开发存储里的 fileID 列表）。这条链 10-07 整条上线了（后端 + 桶可写），
     // 没传过图的这篇才是空数组。
     noteImages: [],
-    // 右上那一格：这篇留过的那张卡片（图已经被系统清掉的那一条不算，见 cardLog.aliveFor）
-    // + 淡底方形的底色 + 品牌字。三个键的名字与详情窗那份逐字相同，两页画的是同一份标记。
+    // 右上那一格：这篇留过的那张卡片（图已经被系统清掉的那一条不算，见 cardLog.aliveFor）。
+    // 10-17 那一格只剩这一份数据：原来还跟着两枚键（淡底方形的底色 `swatchBg`、品牌字 `brandGlyph`），
+    // 站长那句「如果没卡片图，这个位置就完全被标题占满」把空态那一整块撤了，两枚键同时没有消费者。
     detailCards: [],
-    swatchBg: paleStep('default'),
-    brandGlyph: poster.BRAND_GLYPH,
     _loaded: false,
   },
 
@@ -47,9 +45,6 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
-      // 那一格淡底的底色与这一页的主题吃同一份快照（都在进页这一下从当前壁纸算出来）：
-      // 分两处取就会出现"纸面换了、淡底没换"的半新半旧。
-      swatchBg: paleStep(app.getWallpaper()),
     })
     app.setNavTitle('navDetail', lang)
     if (options.id) {
@@ -294,6 +289,10 @@ Page({
      · 一张都没有 → 去笔记卡片页生成。生成完回来这一格自己会翻成缩略图（见 loadNote）。
      私密笔记走不到这里：那一格整块不渲染（与详情窗同一条口径），服务端也不许私密篇分享。 */
   onCardCell() {
+    // 私密篇这一枚在屏上是置灰的，这里那一扇是它背后那一句：不发请求、不跳页
+    // （服务端 cards.py／shares.py 同一句；10-17 深夜他把这一格从"不画"改成"画出来但置灰"，
+    //  所以挡住这件事不能再靠"屏上没有落点"）。
+    if (this.data.note && this.data.note.is_private) return
     const cards = this.data.detailCards
     if (cards && cards.length) {
       // 大图吃云上那一份：本机那张在 USER_DATA_PATH 下，`<image>` 画得出来、previewImage 不认它

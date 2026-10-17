@@ -210,8 +210,12 @@
       scroll-into-view="{{dsTo}}" scroll-with-animation="{{true}}">
       <view class="ds-in" id="ds-top">
       <!-- 头一排两列：左标题那一叠，右这篇留过的卡片。窗内净宽 634 = 358 + 24 + 252。
-           私密笔记不出卡片（现网那条 wx:if 照搬），左列就摊满整宽。 -->
-      <view class="ds-hero {{detailNote.is_private ? 'solo' : ''}}">
+           站长 10-17 深夜这一句改了"没卡片"那一态：「如果没卡片图，这个位置就完全被标题占满」
+           ⇒ 那一格整块不画（原来这里画的是一枚淡底方形＋一个＋＋两句"分享为图片／还没有卡片"，
+           制作卡片的口挪到下面那枚「分享笔记」），左列跟着摊满整宽。
+           摊满走的是私密篇原来那一条 `.solo`，两态共用一条规则，不另起第二份皮。
+           出卡片那两态（有卡片／没卡片）现在都还过私密那道闸：私密篇连那一格都不给看。 -->
+      <view class="ds-hero {{detailNote.is_private || !detailCards.length ? 'solo' : ''}}">
         <view class="ds-lt">
           <view class="ds-meta">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</view>
           <view class="ds-h2">{{detailNote.title}}</view>
@@ -219,23 +223,29 @@
             <text class="ds-tag" wx:for="{{detailNote.tags}}" wx:key="*this" wx:for-item="tg">{{tg}}</text>
           </view>
         </view>
-        <view class="ds-rt" wx:if="{{!detailNote.is_private}}">
-          <block wx:if="{{detailCards.length}}">
-            <!-- 一篇一张，所以这一格没有 ‹ i/n ›：点它就是拉起这一张的大图（站长 10-03 23:40） -->
+        <view class="ds-rt" wx:if="{{!detailNote.is_private && detailCards.length}}">
+          <block>
+            <!-- 一篇一张，所以这一格没有 ‹ i/n ›：点它就是拉起这一张的大图（站长 10-03 23:40，
+                 10-17 深夜他追那一句"小图拉起大图的动作还保留"） -->
             <view class="ds-pad ds-entry" catchtap="onCardCell">
               <image class="ds-pad-img" src="{{detailCards[0].p}}" mode="aspectFit" />
             </view>
           </block>
-          <view wx:else class="ds-empty ds-entry" catchtap="onCardCell">
-            <view class="ds-swatch" style="background:{{swatchBg}}">
-              <view class="ds-logo"><view class="ds-logo-n">{{brandGlyph}}</view><text>{{t.appName}}</text></view>
-              <view class="ds-plus">+</view>
-            </view>
-            <text class="ds-e1">{{t.shareAsImage}}</text>
-            <text class="ds-e2">{{t.noCards}}</text>
-          </view>
         </view>
       </view>
+
+      <!-- 配图那一排（站长 10-17 深夜：「详情窗里加一排配图小图，点了拉大图」）。
+           独立详情页今天就有这一排，这里是照它同一组数搬过来（180 见方、`--r-block` 圆角、
+           横滑、点一下走 `wx.previewImage` 全屏大图），不是另起一张皮。
+           ⚠ 私密篇不画：`_openDetail` 对私密那一趟压根不发请求。
+           列表那一趟只给一栏 `cover_file_id`（右侧那枚封面），一排图要逐篇问一次
+           `/api/notes/{id}/assets`，所以只在开窗看这一篇时发。 -->
+      <view wx:if="{{detailImages.length}}" class="ds-lab">{{t.shotsLabel}}</view>
+      <scroll-view wx:if="{{detailImages.length}}" class="ix-shots" scroll-x show-scrollbar="{{false}}">
+        <image wx:for="{{detailImages}}" wx:key="id" class="ix-shot"
+          src="{{item.cloud_url}}" mode="aspectFill" lazy-load
+          catchtap="onPreviewDetailImage" data-url="{{item.cloud_url}}" />
+      </scroll-view>
 
       <view class="ds-lab" wx:if="{{detailNote.summary}}">{{t.summaryLabel}}</view>
       <view class="ds-para" wx:if="{{detailNote.summary}}">{{detailNote.summary}}</view>
@@ -269,12 +279,20 @@
 
     <!-- 动作条：v22 起两枚并排一行（「生成笔记卡片」那一枚挪进右上那一格，入口只留一个；
          「置顶」那枚 10-03 上午已随独立详情页一起撤净）。
-         私密笔记那枚不渲染，剩下两枚自动等宽；也不给公开状态那一行。 -->
+         10-17 深夜站长这一句把那一格又拆了一半：「在详情页下方，编辑和删除中间增加一按钮，分享笔记，
+         点击切换卡片大图窗口」＋「如果笔记没有生成卡片，右上角也不要加任何制作卡片的图标和文字」
+         ⇒ 这一行三枚。私密那一枚**照画但置灰**，话术就念他那句「私密笔记不支持分享」，点了不办事。 -->
     <view class="ds-dock">
       <view class="ds-irow">
         <view class="ds-ibtn" catchtap="onSheetEdit">{{t.edit}}</view>
+        <view class="ds-ibtn {{detailNote.is_private ? 'disabled' : ''}}" catchtap="onSheetShare">{{t.shareNote}}</view>
         <view class="ds-ibtn danger" catchtap="onSheetDelete">{{t.delete}}</view>
       </view>
+      <!-- 私密那一枚置灰，理由写在它下面那一行（站长这句：「私密不支持分享，按钮提示词显示
+           『私密笔记不支持分享』，置灰」）。这句没有直接塞进按钮里，是因为那一行三枚等宽
+           （窗内净宽 634 ÷ 3 ≈ 211rpx），十个字在 `--fs-meta` 那一档要 240rpx，塞进去就折行、
+           整排按钮高低不齐——现网那条 nowrap 尺子当场红。按钮在两态念同一串字，位置也不跳。 -->
+      <text wx:if="{{detailNote.is_private}}" class="ds-no-share">{{t.privateNoShare}}</text>
       <view wx:if="{{shared && !detailNote.is_private}}" class="ds-pub">
         <text class="ds-pub-l">{{t.sharedNow}}</text>
         <text class="ds-pub-act" catchtap="onSheetUnshare">{{t.unshare}}</text>
@@ -313,6 +331,13 @@
           class="tpl-dot {{item.id === posterTpl ? 'tpl-dot-on' : ''}}"
           style="background: {{item.color}}"></view>
       </view>
+      <!-- 模板名字常驻一行（站长 10-17 深夜：「我记得以前还有提醒模板名称的，现在好像看不见。你检查下」）。
+           查出来的实情：名字从来没有屏上那一格，只有**滑过那一下**一枚 1.2 秒的 toast
+           （`_advanceTemplate` 里那句 `wx.showToast`），开窗那一下从来不报，已生成态连滑都不给滑
+           ⇒ 从列表点进去基本看不见它。这一行就是把那一闪改成常驻，滑到哪一行就念哪一套；
+           toast 跟着撤（同一件事不留两处，而且 toast 会被画布出图那一趟压过去）。
+           已生成态那一行不画：那态模板锁死，念一个"你不能换"的名字没有意义。 -->
+      <text class="tpl-name" wx:if="{{!posterHasCard && posterTplName}}">{{posterTplName}}</text>
     </view>
     <view class="tpl-dock">
       <!-- 已生成态（站长 10-03 23:40）：底排两枚，模板不能滑、名片不能改，要换就先删这一张。

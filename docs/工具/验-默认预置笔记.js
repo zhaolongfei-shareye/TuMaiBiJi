@@ -213,8 +213,14 @@ ck('起手也挡弹窗正忙那一格（posterBusy 是那条链自己的旗）',
   /this\.data\.posterBusy/.test(auto.split('const note =')[0] || ''))
 ck('私密那一格与台账已有那一格都先挡（同一条既有口径，不是为它新起的）',
   /if \(!note \|\| note\.is_private \|\| this\._cardsOf\(noteId\)\.length\) return/.test(auto))
-ck('`noCards` 那句空态文案还留着（口径 5：不许把"一定有一张"写成承诺）',
-  !!texts('zh').noCards && !!texts('en').noCards, texts('zh').noCards)
+// 原来这一条钉的是"右上那一格没卡片时写一句『还没有生成过卡片』"——那句是口径 5 的另一半：
+// 首启播种可能静默失败，所以屏上不许把"一定有一张"写成承诺。
+// 10-17 深夜站长一句「如果没卡片图，这个位置就完全被标题占满」⇒ 那一整块空态撤净，
+// 那两枚键（`noCards`／`shareAsImage`）跟着从字典退（`验-卡片那一格两页同源` 钉它们不许回来）。
+// 撤的是那块落点，不是那句实话：现在没卡片时那一格什么都不画，更没有一句承诺；
+// "失败不出声、也不写成功"这半仍然由上面那条 console.warn 钉着。
+ck('播种失败那条链依旧不写成功（那一趟里一个 toast 都不许有）',
+  !/wx\.showToast/.test(auto), `${(auto.match(/wx\.showToast/g) || []).length} 次`)
 
 console.log(bad.length ? `\n${bad.length} 条没过：${bad.join('、')}` : '\n全过')
 process.exit(bad.length ? 1 : 0)

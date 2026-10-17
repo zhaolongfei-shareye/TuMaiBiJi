@@ -940,7 +940,31 @@
   width: 100%;
 }
 
-/* 右上那一格本身（`.ds-rt` / `.ds-pad` / `.ds-empty` 那一整套）10-07 搬进 `app.wxss`——
+/* 详情窗里那一排配图（站长 10-17 深夜「详情窗里加一排配图小图，点了拉大图」）。
+   数全部照独立详情页那排（detail.wxss 的 `.dt-shots`／`.dt-shot`：横滑、180 见方、
+   `--r-block` 圆角、图没落下来那一格不是白的），两页同一组数——`验-详情窗那一排配图` 钉着相等。
+   定宽定高＋`aspectFill`，所以不会有"图片盒子被夹扁"那一坑（只定宽不定高才需要 widthFix）。 */
+.ix-shots {
+  flex: none;
+  width: 100%;
+  margin-top: 24rpx;
+  white-space: nowrap;
+}
+
+.ix-shot {
+  display: inline-block;
+  width: 180rpx;
+  height: 180rpx;
+  margin-right: var(--sp-2);
+  border-radius: var(--r-block);
+  background: var(--accent-soft);
+}
+
+.ix-shot:last-child {
+  margin-right: 0;
+}
+
+/* 右上那一格本身（`.ds-rt` / `.ds-pad` / `.ds-pad-img`）10-07 搬进 `app.wxss`——
    详情页要画同一格，尺寸必须逐寸一样，不能有两份。这里只留这一页的分栏。 */
 
 /* 来源链接下面那行小字（站长 10-03 原话："链接无法直接打开，可复制链接在浏览器打开"）。
@@ -1004,7 +1028,9 @@
   align-items: center;
   justify-content: center;
   /* 两枚等宽，谁都不许折行：折一行这排按钮就高低不齐了。
-     英文文案因此必须短（Edit / Delete，不是 Edit this note）。 */
+   10-17 深夜这一行改成三枚（窗内净宽 634，两枚 310 → 三枚 202），所以话术还是只能短：
+   「分享笔记」四个字在 `--fs-meta` 那一档是 96rpx，位置宽裕；私密那句十个字要 240rpx，
+   塞进按钮就折行 ⇒ 那句改挂在下面那一行小字（`.ds-no-share`）。 */
   white-space: nowrap;
   font-size: var(--fs-meta);
   font-weight: 700;
@@ -1018,6 +1044,27 @@
 .ds-ibtn.danger {
   color: #8c2119;
   box-shadow: inset 0 0 0 var(--w-edge) rgba(140, 33, 25, 0.24);
+}
+
+/* 私密那一枚置灰（站长 10-17 深夜「私密不支持分享，按钮提示词显示『私密笔记不支持分享』，置灰」）。
+   只降字与那一圈边，**不给 `pointer-events:none`**：小程序不吃这一条，而且按下去要有回应——
+   挡住这件事的是 `onSheetShare` 里那一句 `is_private` return（服务端 cards.py／shares.py 同一句）。
+   字色 65% 墨：压在 L78 那一档浅面（象牙 #CDC9C1）上实测 **3.89:1**，左右两枚满墨是 9.27:1，
+   一眼读得出"这一枚不一样"；真正解释原因的那句整话在下面一行——`--text-tertiary`（72% 墨）
+   压在同一块 L78 面上实测 **4.19:1**（过 AA 小字那道 4.5 差一点，这一句是说明不是正文，
+   要过线就得把它抬到 `--text-secondary`，那一步等他）。
+   详情页那一枚同档（`.icon-btn.disabled`，它自己有 4% 淡底，同一个数算出来 4.51:1）。 */
+.ds-ibtn.disabled {
+  color: rgba(35, 37, 44, 0.65);
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.12);
+}
+
+.ds-no-share {
+  display: block;
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
 }
 
 .ds-pub {
@@ -1166,6 +1213,18 @@
   justify-content: center;
   gap: 12rpx;
   margin-top: var(--sp-2);
+}
+
+/* 模板名字常驻那一行（站长 10-17 深夜「以前还有提醒模板名称的，现在好像看不见，你检查下」）。
+   查出来的实情：名字从来没有屏上那一格，只有**滑过那一下**一枚 1.2 秒 toast，开窗那一下从来不报。
+   所以这一行是把那一闪搬成常驻，字号走 `--fs-tiny`（21）、 tertiary 字色，
+   与顶上「左右滑换模板」那句同档——两行都是"这一屏怎么办"的说明，不与卡片正文抢。 */
+.tpl-name {
+  flex: none;
+  margin-top: 10rpx;
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
+  text-align: center;
 }
 
 .tpl-dot {

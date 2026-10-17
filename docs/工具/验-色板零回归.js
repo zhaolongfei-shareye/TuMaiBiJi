@@ -450,24 +450,13 @@ for (const [nm, css, canvasSel, onSel] of [['分享页那一排', shareCss, 'pic
 }
 
 /* v22（站长 10-03）：详情窗右上那枚「淡底方形 + LOGO」的空态底。
-   他的原话是"用背景风格的主色阶"，所以这一色必须由壁纸现算、走 style 递进来；
-   三条规则钉在一起（少一条就会变成"换壁纸那一块不动"或者"深色下染出一块近黑"）。 */
+   他的原话是"用背景风格的主色阶"，所以这一色必须由壁纸现算、走 style 递进来。
+   ⚠ 10-17 深夜那一整块空态撤了（站长：「如果没卡片图，这个位置就完全被标题占满」）
+   ⇒ 上面那两条钉的是"那一格怎么写色"，落点没了就跟着撤；`paleStep` 这条色阶规则本身留着
+   （它是壁纸→最浅一档的一条函数，不是那一格私有的），所以"只有一条、页面里没有第二份函数"照旧钉。
+   样式表里 `.ds-swatch` 一名不留，由 `验-卡片那一格两页同源` 钉。 */
 {
-  const idxWxml = fs.readFileSync(path.join(pageDir, 'pages/index/index.wxml'), 'utf8')
-  // 10-07：那一格整套搬进 app.wxss（详情页要画同一格，尺寸必须逐寸一样）。所以"不写死 background"
-  // 这条要看的是 app.wxss，而两页自己的 wxss 里**不许再有一份** `.ds-swatch`——有第二份就是漂移的起点。
-  const bare = fs.readFileSync(path.join(pageDir, 'app.wxss'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-  const idxCss = fs.readFileSync(path.join(pageDir, 'pages/index/index.wxss'), 'utf8')
-  const detCss = fs.readFileSync(path.join(pageDir, 'pages/detail/detail.wxss'), 'utf8')
   const idxJs = fs.readFileSync(path.join(pageDir, 'pages/index/index.js'), 'utf8')
-  const sw = cssRule(bare, 'ds-swatch') || ''
-  ck('淡底那格的色从 style 递进来，wxss 里不写死 background',
-    /class="ds-swatch" style="background:\{\{swatchBg\}\}/.test(idxWxml) && !/background:/.test(sw),
-    sw.trim().replace(/\s+/g, ' ') || '没读到 .ds-swatch')
-  ck('那一格的样式只有 app.wxss 那一份（两页各自再写一条就是第二份真相）',
-    /\.ds-swatch\s*\{/.test(bare) && !/\.ds-swatch\s*\{/.test(idxCss) && !/\.ds-swatch\s*\{/.test(detCss),
-    `app=${/\.ds-swatch\s*\{/.test(bare)} index=${/\.ds-swatch\s*\{/.test(idxCss)} detail=${/\.ds-swatch\s*\{/.test(detCss)}`)
   // 10-04 压成四枚之后 paleStep 只剩一条真规则：都吃当前主题色阶的最浅那一档。
   // 后面那句 mix() 是给"新壁纸忘了写 ramp"兜底的死路，所以钉的是"它确实只在没 ramp 时才走"。
   // 10-07 这个函数从 pages/index/index.js 搬进 utils/palette.js（详情页也要用它，不能抄色号）。
@@ -477,8 +466,9 @@ for (const [nm, css, canvasSel, onSel] of [['分享页那一排', shareCss, 'pic
     && !/function paleStep/.test(idxJs),
     (palJs.match(/function paleStep[\s\S]*?\n}/) || ['没抓到 paleStep'])[0].replace(/\s+/g, ' ').slice(0, 120))
   // 这条不能拿 themeOf(t.key).steps[0] 和 t.steps[0] 比——那是同一个值自己跟自己比，永真。
-  // 要钉的是"四枚的第一档互不相同"，否则换壁纸那一块淡底根本不会变。
-  ck('四枚色阶第一档互不相同（换壁纸时这一块淡底一定跟着换）',
+  // 要钉的是"四枚的第一档互不相同"，否则 paleStep 这条规则算出来四套壁纸一个样，换壁纸没有反应。
+  // （10-17 之前它的落点是那一格淡底方形；落点撤了，这条钉的仍是"这条规则有没有用"。）
+  ck('四枚色阶第一档互不相同（paleStep 换壁纸一定跟着换）',
     new Set(after.THEMES.map((t) => t.ramp.steps[0])).size === after.THEMES.length,
     after.THEMES.map((t) => `${t.key}:${t.ramp.steps[0]}`).join(' '))
 }

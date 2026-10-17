@@ -110,7 +110,6 @@ const i18n = {
     // 列表区右上那枚折叠口的两句（"点一下展开"／"点一下收起"）10-10 深夜一起退了：
     // 那一枚改成「返回」，展开那一态没有入口，`.sheet.ix-wide` 那条死样式也删了。
     // ⚠ 键名本身不许再出现在这一份文件里——`验-统一录入条` 有一条全仓扫退役键名的判据，写在注释里也红。
-    noCards: '还没有生成过卡片',
     allCategories: '全部',
     addCategory: '添加分类',
     categoryName: '分类名称',
@@ -286,6 +285,13 @@ const i18n = {
     // 详情页那一排缩略图的栏名。不叫"原始图片"：存下来的是压过的那一张（长边 1920），
     // 叫"原始"会让人以为拿回来的是相机里那份原图。
     shotsLabel: '配图',
+    // 详情窗那一行三枚按钮中间那一枚（站长 10-17 深夜「在详情页下方，编辑和删除中间增加一按钮，
+    // 分享笔记，点击切换卡片大图窗口」）。四个字是量过的：那一枚宽只有约 202rpx，
+    // 再加一个字就在 nowrap 那一行里折出去。
+    shareNote: '分享笔记',
+    // 私密那一枚置灰时挂在按钮下面那一行的理由（他给的原话，一字没改：「私密笔记不支持分享」）。
+    // 这句话进不了按钮（十个字 240rpx > 202rpx），所以位置在按钮下面。
+    privateNoShare: '私密笔记不支持分享',
     keyPoints: '核心要点',
     tagsLabel: '标签',
     sourceLink: '来源链接',
@@ -294,7 +300,6 @@ const i18n = {
     originalContent: '原文内容',
     expand: '展开',
     collapse: '收起',
-    shareAsImage: '生成笔记卡片',
     editNote: '编辑笔记',
     titlePlaceholder: '输入笔记标题',
     summaryPlaceholder: '输入摘要内容...',
@@ -507,7 +512,6 @@ const i18n = {
     tabList: 'List',
     showMore: 'Show more',
     // 那两句折叠口的话（"点一下展开"／"点一下收起"的英文）随中文那一对一起退了。
-    noCards: 'No cards yet',
     allCategories: 'All',
     addCategory: 'Add category',
     categoryName: 'Category name',
@@ -662,6 +666,10 @@ const i18n = {
     summaryLabel: 'Summary',
     // Not "Original images" — what we keep is the compressed copy (long edge 1920).
     shotsLabel: 'Images',
+    // Same two keys as the zh block above: the button is only ~202rpx wide, so the label
+    // stays one short word and the reason for the disabled state sits on the line below it.
+    shareNote: 'Share',
+    privateNoShare: 'Private notes can’t be shared',
     keyPoints: 'Key Points',
     tagsLabel: 'Tags',
     sourceLink: 'Source Link',
@@ -669,9 +677,6 @@ const i18n = {
     originalContent: 'Original Content',
     expand: 'Expand',
     collapse: 'Collapse',
-    // 四枚并排一行，英文必须短：Generate note card 会折成两行。
-    // 与同排的 Pin / Edit / Delete 同一个语法：动词 + 名词。
-    shareAsImage: 'Make card',
     editNote: 'Edit note',
     titlePlaceholder: 'Enter note title',
     summaryPlaceholder: 'Enter summary...',

@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { catSkinFor, toneColor, withAlpha, paleStep, TIP_DOT } = require('../../utils/palette.js')
+const { catSkinFor, toneColor, withAlpha, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
@@ -66,8 +66,9 @@ function fmt(tpl, map) {
    但快照只覆盖它真有的那几栏：`shares` 那几列都可能为 null（老行、没提炼的篇），
    把 null 一起 Object.assign 进去就等于拿"没有"去盖掉"有"——渲出来是一张缺摘要缺要点的另一张。 */
 
-/* 详情窗右上那枚淡底方形的底色已经搬进 `palette.paleStep`——10-07 详情页要补同一格时，
-   规则只该有一份，不该让第二页抄一遍色号。这一页吃的是下面 import 里那一个。 */
+/* 详情窗右上那一格的空态（一枚淡底方形 + 「还没有生成过卡片」两行小字）10-17 撤净：
+   站长那句「如果没卡片图，这个位置就完全被标题占满」。它带的两枚 data 键（`swatchBg` 淡底色、
+   `brandGlyph` 品牌字）同时没有消费者，一起删——留着就是"屏上不再画的东西还在代码里被算"。 */
 
 Page({
   data: {
@@ -124,6 +125,10 @@ Page({
     // 一篇同时只有一张（站长 10-03 23:40 做减法）：这一组最多一条，‹ i/n › 那行随之撤掉，
     // 不支持来回切换。posterHasCard 决定成品弹窗底排是"生成那一套"还是"删除｜取消"。
     detailCards: [],
+    // 这篇的配图那一排（站长 10-17 深夜「详情窗里加一排配图小图，点了拉大图」）。
+    // 与列表右侧那枚封面不是一件事：那一枚由列表那一趟一栏 `cover_file_id` 带回来，
+    // 这一排只有开窗看这一篇时才问一次 `/api/notes/{id}/assets`（私密篇连这一趟都不发）。
+    detailImages: [],
     posterHasCard: false,
     // 「显示更多」要把正文滚到原文那一段，靠 scroll-into-view 换值才真会滚
     dsTo: '',
@@ -131,6 +136,9 @@ Page({
     templateOpen: false,
     posterNote: null,
     posterTpl: '',
+    // 成品弹窗里那一行常驻的模板名字（滑到哪一套念哪一套）。原来只有滑那一下一枚 1.2 秒 toast，
+    // 开窗那一下从来不报 ⇒ 站长那句"以前还有提醒模板名称的，现在好像看不见"。
+    posterTplName: '',
     // 弹窗底部那一排圆点：每套模板一枚，颜色吃分类那同一套色板（toneColor），
     // 谁被选中由 wxml 现比 posterTpl，所以换模板时不用再 setData 一次这个数组。
     tplIds: [],
@@ -161,10 +169,7 @@ Page({
     // 背景图浅到白字兜不住那一档：与新建页、「我的」页同一个口（utils/imgBrightness.js）。
     bgLight: false,
     bgLightLow: false,
-    // 淡底方形左上角那枚品牌字，与海报上无形象时的占位字是同一个常量（poster.BRAND_GLYPH）
-    brandGlyph: poster.BRAND_GLYPH,
-    // 右上那枚淡底方形的底：每次进页跟着壁纸重算（见 paleStep 那条规则）
-    swatchBg: paleStep('default'),
+    // 淡底方形左上角那枚品牌字 / 右上那枚淡底方形的底：两枚键随空态一起撤（理由见上面那段）
     // 头部那张图的摆法，由 fitHead() 问过图片尺寸之后现算（同一套数在 poster.bandGeom）
     imgStyle: '',
     // 详情窗那一态要把同一张图铺满整屏（站长 10-03："形象图贯穿，与其他页面保持风格统一"），
@@ -183,7 +188,6 @@ Page({
     await app.getLoginPromise().catch(() => {})
     const themeClass = app.applyTheme(app.getWallpaper())
     const lang = app.globalData.userInfo?.language || 'zh'
-    const wallpaper = app.getWallpaper()
     // 每次进页重取：在卡片模板页换完形象返回，这一屏的头部就该跟着换。
     const bgSrc = poster.homeBg()
     this.setData({
@@ -195,8 +199,6 @@ Page({
       // 上面的背景图，不需要跟随首页调亮度。首页调亮度只影响首屏和第二屏」）⇒ 锁在默认那一档，
       // 理由与"为什么不是完全不压暗"都写在 app.bgSkinLocked() 那一段。
       ...app.bgSkinLocked(),
-      // 右上那枚淡底方形跟着壁纸走（象牙 #EAE0CE / 天青 #DDE7DF / 其余从窗口纸白掺 8% 墨）
-      swatchBg: paleStep(wallpaper),
     })
     // 三个 tab 的导航条标题统一成应用名（站长 10-01 晚）：原来这一页是「图麦笔记」、
     // 新建页是「新建笔记」、「我的」页是「我的」，顶上跳来跳去读起来像三个应用。
@@ -920,6 +922,8 @@ Page({
     this.setData({
       detailOpen: true, detailNote: row, origOpen: false, shared: false,
       detailCards: this._cardsOf(row.id), dsTo: '',
+      // 上一配的配图不许留在这一屏上：那一排是"这一篇的"，不是全局的一份。
+      detailImages: [],
     })
     // 这一篇算不算私密，先按列表那一行那一份猜（本机按分类名现算的），拿到详情再换成服务端钉的。
     let priv = !!row.is_private
@@ -951,8 +955,37 @@ Page({
     } catch (err) {
       console.error('详情窗取全文失败', err)
     }
-    // 私密笔记不给分享这条线，公开状态那行也就不查了。
-    if (!priv) this._loadShareStatus(row.id)
+    // 私密笔记不给分享这条线，公开状态那行也就不查了。配图那一排同理：那一趟也不发。
+    if (!priv) {
+      this._loadShareStatus(row.id)
+      this._loadDetailImages(row.id)
+    }
+  },
+
+  // 这一排的数与那页独立详情页同一组（`.dt-shots`／`.dt-shot`），话也走同一个口：
+  // 先判 `cloudReady` 再打请求——`cloud://…` 那个地址在没 init 过云环境的地方画不出来，
+  // 判在前面就同时挡住"多一个请求""一片破图""让人以为图丢了"三件事。
+  async _loadDetailImages(noteId) {
+    if (!cloudUpload.cloudReady()) return
+    try {
+      const list = await api.getNoteAssets(noteId)
+      // 拿回来的路上窗可能已经关了、或开的是另一篇：对一下号再画，别把上一配的图挂在这一配上。
+      const cur = this.data.detailNote
+      if (!this.data.detailOpen || !cur || cur.id !== noteId) return
+      this.setData({ detailImages: list || [] })
+    } catch (err) {
+      // 配图读不到不该影响这篇笔记本身：那一排不画，正文照看
+      console.warn('详情窗配图读取失败（不影响正文）', err && (err.errMsg || err.statusCode))
+    }
+  },
+
+  // 点缩略图看大图：整排都给 `previewImage`，所以大图态里左右划能划到这篇其余几张
+  // （与独立详情页那一条一模一样，不是只给点到的那一张）。
+  onPreviewDetailImage(e) {
+    const urls = this.data.detailImages.map((x) => x && x.cloud_url).filter(Boolean)
+    if (!urls.length) return
+    const cur = e.currentTarget.dataset.url
+    wx.previewImage({ current: cur && urls.indexOf(cur) >= 0 ? cur : urls[0], urls })
   },
 
   // 列表整表重排之后按 id 把那一行找回来再开窗。现在只剩一条路走这里：从编辑那一趟回来。
@@ -1024,6 +1057,16 @@ Page({
     this._backToDetail = note.id
     this.setData({ detailOpen: false })
     wx.navigateTo({ url: `/pages/write/write?id=${note.id}&mode=edit` })
+  },
+
+  // 中间那一枚「分享笔记」（站长 10-17 深夜：「点击切换卡片大图窗口」）——
+  // 办事的还是那一个口 `_openPosterFor`，右上那一格（有卡片时）与这一枚绑同一个函数，
+  // 不另开第二条出图链。私密篇这一枚在屏上是置灰的，这里那道 `is_private` 是它背后那一扇：
+  // 置灰只是画，挡住了才是真挡（服务端 cards.py／shares.py 同一句，客户端不许自己客气）。
+  onSheetShare() {
+    const note = this.data.detailNote
+    if (!note || note.is_private) return
+    return this._openPosterFor(note)
   },
 
   onSheetDelete() {
@@ -1123,22 +1166,42 @@ Page({
     await this._keepPoster()
   },
 
+  /* 开窗起手那一套模板。站长 10-17 深夜：「制作时候，不再固定默认模板，随时出现模板，
+     然后用户自行滑动选择」＋追那一句「随机意思是，不要每次都固定出现同一样的模板，
+     新用户以为只有一种模板」⇒ 未生成态开窗从合并后的清单里取一套，且**不与上一套相同**
+     （连着两篇开出同一套，"随机"在读的人那儿就成了"固定"）。
+     台账里已经有那张的笔记不走这里——他同一轮拍「生产过就不支持换卡片模板」，照旧念台账那一套。
+     清单只有一套时没得随机，就是那一套；空清单（下发与包内都读不到）退回 DEFAULT_TEMPLATE。 */
+  _pickOpeningTemplate(list) {
+    if (!list || !list.length) return poster.DEFAULT_TEMPLATE
+    if (list.length === 1) return list[0].id
+    let pick
+    do {
+      pick = list[Math.floor(Math.random() * list.length)]
+    } while (pick.id === this._lastTplId)
+    this._lastTplId = pick.id
+    return pick.id
+  },
+
   // 两条入口共用同一段开窗逻辑：from 记的是"关掉之后回哪一层"（见 _closeTemplate）。
   async _openPosterFor(note) {
     if (!note || note.is_private) return
-    const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
     // 台账里那一格现在指着哪一张，这一趟就照那一张开：模板和二维码开关两样都跟它对齐。
     // 站长 10-03 真机报的"无论点哪张小图，大图都是同一张"——原来这里读的是「我的→卡片模板」
     // 存的那套默认模板，跟台账里这一张没有任何关系，所以 ‹ i/n › 滑得再欢，开出来还是那一套。
-    // 台账里那套模板要是已经不在合并后的模板列表里（改名／撤掉／下发收走了），退回默认那一套。
+    // 台账里那套模板要是已经不在合并后的模板列表里（改名／撤掉／下发收走了），走未生成那一支。
+    const list = poster.templateList()
     const cur = (this._cardsOf(note.id) || [])[0]
-    const known = !!(cur && cur.tpl && poster.templateList().some((x) => x.id === cur.tpl))
+    const known = !!(cur && cur.tpl && list.some((x) => x.id === cur.tpl))
+    const start = known ? cur.tpl : this._pickOpeningTemplate(list)
     this.setData({
       detailOpen: false,
       templateOpen: true,
       posterNote: note,
-      posterTpl: known ? cur.tpl : (profile.template || poster.DEFAULT_TEMPLATE),
-      tplIds: poster.templateList().map((x, i) => ({ id: x.id, color: toneColor(i) })),
+      posterTpl: start,
+      // 名字那一行常驻（原来只有滑那一下一枚 1.2 秒 toast，开窗那一下从来不报）
+      posterTplName: poster.templateLabel(start, this.data.lang),
+      tplIds: list.map((x, i) => ({ id: x.id, color: toneColor(i) })),
       posterImagePath: '',
       posterBusy: true,
       noQr: known ? !!cur.noQr : false,
@@ -1287,8 +1350,14 @@ Page({
     const cur = list.findIndex((x) => x.id === this.data.posterTpl)
     const next = list[(cur < 0 ? 0 : cur) + delta]
     if (!next) return
-    this.setData({ posterTpl: next.id, posterBusy: true })
-    wx.showToast({ title: poster.templateLabel(next.id, this.data.lang), icon: 'none', duration: 1200 })
+    this.setData({
+      posterTpl: next.id,
+      posterTplName: poster.templateLabel(next.id, this.data.lang),
+      posterBusy: true,
+    })
+    // 名字写在屏上那一行，不再发 toast：同一件事不留两处，而且原来那一枚 1.2 秒的 toast
+    // 就压在画布出图那一趟上（站长 10-17 深夜「以前还有提醒模板名称的，现在好像看不见」）。
+    this._lastTplId = next.id
     try {
       await this._renderPoster()
     } catch (err) {
@@ -1378,45 +1447,62 @@ Page({
     })
   },
 
+  /* 站长 10-17 深夜这一句改的是**次序**：「生成完，自动保存图片到手机，然后等用户选择分享路径。
+     用户再点保存图片，就静默。」
+     原来这一枚只开微信那排面板（保存那一步藏在面板里），存相册只是面板打不开时的退路；
+     现在按下去是三步：① 这张进相册 → ② 记台账（`_keepPoster`，生成即上传那条链在这一步里）
+     → ③ 把面板开起来让他自己挑发给谁。
+     ⚠ 幂等判据用的是那张临时文件的路径本身：`_renderPoster` 每换一次模板就出一张新文件，
+     所以"滑到另一套模板再按"照旧真存，不会被这一句挡掉；同一张再按才是他说的"静默"。
+     ⚠ 面板里那一枚「保存图片」是微信系统层（样式与行为都不归我们管），他真的再点一次，
+     相册里就是两张——这一条我们拦不住，所以不拿"已存过"当借口把面板关掉。 */
   onSavePoster() {
     const path = this.data.posterImagePath
     if (!path) return
-    this.setData({ shareDim: true })
-    wx.showShareImageMenu({
-      path,
-      success: async () => { await this._keepPoster(); this._closeTemplate() },
-      fail: (err) => {
-        const msg = (err && err.errMsg) || ''
-        if (msg.indexOf('cancel') >= 0) return
-        this._saveToAlbum()
-      },
-      complete: () => this.setData({ shareDim: false }),
-    })
+    if (this._savedPosterPath === path) { this._openShareMenu(path); return }
+    this._saveToAlbum(path)
   },
 
-  _saveToAlbum() {
-    if (!this.data.posterImagePath) return
+  _saveToAlbum(path) {
     const { lang } = this.data
     wx.saveImageToPhotosAlbum({
-      filePath: this.data.posterImagePath,
+      filePath: path,
       success: async () => {
+        this._savedPosterPath = path
         await this._keepPoster()
         wx.showToast({ title: t('savedToAlbum', lang), icon: 'success' })
-        setTimeout(() => this._closeTemplate(), 800)
+        this._openShareMenu(path)
       },
       fail: (err) => {
         const msg = (err && err.errMsg) || ''
-        if (msg.indexOf('cancel') >= 0) return
         if (msg.indexOf('auth') >= 0) {
+          // 没给相册权限：只给这一句引导，这一趟不开面板——两层系统浮层叠着会互相压住
+          // （10-12 那条"先浮密码面板再收详情窗，面板就画在窗底下"是同一类坑）。
+          // 他去设置里开完回来再按一次，那一趟就是正常那一趟。
           wx.showModal({
             title: t('needAlbumPermission', lang),
             content: t('permissionHint', lang),
             success: (res) => { if (res.confirm) wx.openSetting() },
           })
-        } else {
-          wx.showToast({ title: t('exportFailed', lang), icon: 'none' })
+          return
         }
+        // 存不成功（拒绝授权那一支走 cancel，不报错）不该把分享这条路一起堵死
+        if (msg.indexOf('cancel') < 0) wx.showToast({ title: t('exportFailed', lang), icon: 'none' })
+        this._openShareMenu(path)
       },
+    })
+  },
+
+  // 微信那排面板只在真机有——开发者工具里一定 fail，所以那条路什么都不做：
+  // 图已经在相册里了，再报一句"导出失败"是骗人。台账在存那一步已经记过，这里成功只收窗，
+  // 不记第二笔（一篇一张是这本账自己的规则）。
+  _openShareMenu(path) {
+    this.setData({ shareDim: true })
+    wx.showShareImageMenu({
+      path,
+      success: () => this._closeTemplate(),
+      fail: () => {},
+      complete: () => this.setData({ shareDim: false }),
     })
   },
 

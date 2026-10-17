@@ -308,7 +308,8 @@ const E = screen({
 const F = screen({
   lang: 'zh', groupBy: true, rows: [], empty: true,
   cap: '空态｜一篇都没有（原来卡片那一屏的「还没有生成过卡片」这句从此没有落点）',
-  note: `撤掉第二枚 tab 之后，字典里 <code>noCards</code>＝「${esc(zh.noCards)}」这一句在屏上不再有人念——留着还是删，等他一句。`,
+  note: '撤掉第二枚 tab 之后，卡片那一屏那句「还没有生成过卡片」在屏上不再有人念——10-17 深夜他一句'
+    + '「如果没卡片图，这个位置就完全被标题占满」把那一整块空态撤了，那两枚字典键跟着退（现在屏上没这一句）。',
 })
 
 const html = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">

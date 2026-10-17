@@ -113,9 +113,13 @@ ok('底栏那一块面由 moodChromeOf 递进来（且不再直接吃 chromeOf�
   /moodChromeOf\(/.test(barJs) && !/[^d]chromeOf\(/.test(barJs) && /style="\{\{chromeStyle\}\}"/.test(barWxml))
 // 原来这条钉的是"搜索条每次进页跟着壁纸重算"（`searchSkin: chromeOf(wallpaper).style`）。
 // 10-17 夜那一枚不再吃派生皮 ⇒ 钉的是反面：这一页既没有那一格 data、也没有那次调用。
-ok('搜索条不再要那一串派生皮（`searchSkin` 与 `chromeOf(` 一起撤净；壁纸那一档仍由 paleStep 现算）',
-  !/searchSkin:/.test(CODE_JS) && !/chromeOf\(/.test(CODE_JS)
-  && /swatchBg: paleStep\(wallpaper\)/.test(CODE_JS))
+ok('搜索条不再要那一串派生皮（`searchSkin` 与 `chromeOf(` 一起撤净）',
+  !/searchSkin:/.test(CODE_JS) && !/chromeOf\(/.test(CODE_JS))
+// 10-17 深夜站长又一句「如果没卡片图，这个位置就完全被标题占满」⇒ 右上那一格的空态整块撤了，
+// 它带的那两枚 data 键与 `paleStep` 那次调用跟着没有消费者。这一条钉反面：这一页不再算那一格底色。
+// （撤一个状态会作废一批判据——原来这条的后半句钉的正是"每一次进页都要重算那一格"，前提已经不在了。）
+ok('右上那一格的淡底色在本页不再算（`swatchBg`／`paleStep` 都撤净，样式与标记由 验-卡片那一格两页同源 钉）',
+  !/swatchBg/.test(CODE_JS) && !/paleStep/.test(CODE_JS))
 ok('搜索条不再是一支固定的蓝（toneStyle 在这个页面已经不用了）',
   !/toneStyle\(/.test(idxJs), (idxJs.match(/toneStyle\([^)]*\)/g) || []).join(' '))
 ok('占位符给带 alpha 的色，不靠 opacity（textarea/input 的 placeholder 不吃 opacity）',
@@ -287,8 +291,10 @@ ok('卡片那一屏整块撤净（两列／白垫／格子里的页码／`cells`
 ok('收窗只回一层（详情窗）：`_posterFrom` 那面旗与 grid 那个取值整撤',
   /detailOpen: !!note/.test(CODE_JS) && dead(/_posterFrom|backToSheet|'grid'/))
 ok('一篇一张这条没变：‹ i/n › 那一行两处都撤净（列表这一格与详情窗那一格），箭头与页码的类名也不留',
-  !/g-pg|g-step|onCardStep|ds-pg|ds-step|onSheetCardStep|detailCardIdx/.test(CODE_WXML)
-  && !/\.g-pg|\.g-step|\.g-n|\.ds-pg|\.ds-step|\.ds-n/.test(CODE_WXSS))
+  !/\b(g-pg|g-step|onCardStep|ds-pg|ds-step|onSheetCardStep|detailCardIdx)\b/.test(CODE_WXML)
+  // ⚠ 类名要钉到结尾：`\.ds-n` 会把这一轮新加的 `.ds-no-share`（私密那一枚的理由那行）读成页码类名，
+  //    红的是判据写歪，不是有人把 ‹ i/n › 加回来了。
+  && !/\.(g-pg|g-step|g-n|ds-pg|ds-step|ds-n)\s*[,{]/.test(CODE_WXSS))
 ok('一篇一张：js 里那个"当前第几张"的指针整个不存在',
   !/detailCardIdx|cur: 0|\.cur\b|onCardStep|onSheetCardStep/.test(CODE_JS))
 // ③搜索条：压高度 + 那两个字降到分类那一档
@@ -304,8 +310,13 @@ ok('输入里的字没动（仍 --fs-body，这轮只压条子和那两个字）
    右上那一格，底排只剩 编辑／删除，各 flex:1。原来这条钉的是"09-30 那批四枚并排留下的
    三枚 + 1/1/1.4 那一档"，`.ds-ibtn.primary` 这个类早就跟着那枚按钮一起没了——
    这条从 57227ff 起一直红着没人复跑，是判据过期，不是实现回退。 */
-ok('详情窗底排两枚（编辑／删除，出卡片的口已挪进右上那一格），等宽一档',
-  (idxWxml.match(/class="ds-ibtn/g) || []).length === 2
+/* 枚数从 2 改 3 是站长 10-17 深夜那句（§8.297）：「然后在详情页下方，编辑和删除中间增加一按钮，
+   分享笔记，点击切换卡片大图窗口……如果笔记没有生成卡片，右上角也不要加任何制作卡片的图标和文字，
+   统一移到编辑和删除中间增加一按钮」⇒ 没生成过卡片的人在这一屏的唯一出图口就是中间那一枚。
+   右上那一格现在只在**留过卡片**时才画（同一句的后半），所以两枚不是同一件事的两个把手：
+   一枚是"看这篇已经留过的那张"，一枚是"要分享／要出图"。私密那一枚置灰、第三枚永远在。 */
+ok('详情窗底排三枚（编辑／分享笔记／删除），等宽一档',
+  (idxWxml.match(/class="ds-ibtn/g) || []).length === 3
   && /display: flex/.test(rule(idxWxss, 'ds-irow')) && /flex: 1/.test(rule(idxWxss, 'ds-ibtn'))
   && !/ds-ibtn\.primary/.test(idxWxss) && !/class="ds-ibtn primary/.test(idxWxml))
 ok('窗里标题与要点前景 = 列表那档 90% 黑，正文段落 = 摘要那档 70% 黑',
@@ -325,8 +336,12 @@ ok('首页记在两条"留下"的口上：图片面板 success 与存相册 succ
   // 那一句 10-08 多了第六个参数（待确认那一档要带 origin 落账），所以锚点不再要求它正好以
   // `this)` 收尾。**判的还是同一件事**：五个入参一个没换顺序、记账只在这个口里发生。
   /cardLog\.record\(a\.noteId, this\.data\.posterTpl, this\.data\.noQr, this\._posterCanvas, this/.test(keepPoster)
-  && /success: async \(\) => \{ await this\._keepPoster\(\); this\._closeTemplate\(\) \}/.test(CODE_JS)
-  && /success: async \(\) => \{\s*await this\._keepPoster\(\)/.test(CODE_JS))
+  // 10-17 深夜站长把这一趟改成「生成完自动保存到手机，然后等用户选择分享路径」
+  // ⇒ 原来挂在 `showShareImageMenu` 的 success 上那一句没了（面板是存完成之后才开的），
+  //   记账挪到 `saveImageToPhotosAlbum` 的成功那一支。判的还是同一件事：**人真留下这张**才记。
+  //   那一支开头多了一句幂等标记（同一张再按不再写一遍相册），所以锚点吃的是"成功之后紧跟台账"。
+  && /success: async \(\) => \{[\s\S]{0,90}?await this\._keepPoster\(\)/.test(CODE_JS)
+  && !/showShareImageMenu[\s\S]{0,200}_keepPoster/.test(CODE_JS))
 ok('海报页同一条：存相册成功才走 _keepCard，模板与带没带码都是画那一趟存下来的',
   /cardLog\.record\(this\._note\.id, this\._renderedTpl, this\._renderedNoQr, this\._canvasNode, this\)/.test(keepCard)
   && /success: async \(\) => \{\s*await this\._keepCard\(\)/.test(strip(shareJs))
@@ -351,17 +366,25 @@ ok('格子里第一张＝最近留下的那张（台账按 at 倒序；顺着放
 const sheetFn = (CODE_JS.split('async _openPosterFor(note)')[1] || '').split('\n  },')[0]
 ok('点开大图取的是「台账里那一张」的模板，不是卡片模板页那套默认（那套已不在合并表里才退回默认）',
   /const cur = \(this\._cardsOf\(note\.id\) \|\| \[\]\)\[0\]/.test(sheetFn)
-  && /posterTpl: known \? cur\.tpl : \(profile\.template \|\| poster\.DEFAULT_TEMPLATE\)/.test(sheetFn)
+  // ⚠ 未生成那一支 10-17 深夜换法了：不再读「我的→卡片模板」那套默认，
+  //   改从合并后的清单里随机取一套、且不与上一套相同（他的原话是"不要每次都固定出现同一样的模板，
+  //   新用户以为只有一种模板"）。钉的还是同一件事：**这一趟的起手不来自那套页面默认**。
+  && /const start = known \? cur\.tpl : this\._pickOpeningTemplate\(list\)/.test(sheetFn)
+  && /posterTpl: start,/.test(sheetFn)
   // 判的是**合并后那张表**，不是包内 `TEMPLATES`：台账里那一格完全可能指着一条远端下发的模板，
   // 拿包内那张表去"认不认"会把真存在的模板判成不认识、开成默认那一套。
-  && /poster\.templateList\(\)\.some\(\(x\) => x\.id === cur\.tpl\)/.test(sheetFn))
+  && /list\.some\(\(x\) => x\.id === cur\.tpl\)/.test(sheetFn)
+  && /const list = poster\.templateList\(\)/.test(sheetFn))
 /* 10-17 合一作废了"两条入口"这个前提：卡片那一屏没了，能开成品弹窗的只剩详情窗右上那一格。
    原来这条钉的是"两条都走同一段"，现在钉的是**只剩一条、且那条没有分叉参数**——
    判据换主语不换性质：还是在防"各写一份就会走样（一条照台账、一条照默认）"。
    `验-卡片那一格两页同源.js` 那边钉的是"首页那一格与详情页那一格长得一样、绑同一个名字"。 */
 ok('开窗只剩一条入口：`_openPosterFor` 在这一页只有一个调用者，且它自己不接 from',
-  (CODE_JS.match(/this\._openPosterFor\(/g) || []).length === 1
+  // 调用者从一枚变两枚是上面那条的同一刀：右上那一格（有卡片那一态）与底排那枚「分享笔记」
+  // 都到同一个窗口。钉的仍是"只有一份开窗实现、且那条没有分叉参数"，不是"只有一个落点"。
+  (CODE_JS.match(/this\._openPosterFor\(/g) || []).length === 2
   && /onCardCell\(\) \{ return this\._openPosterFor\(this\.data\.detailNote\) \}/.test(CODE_JS)
+  && /onSheetShare\(\) \{[\s\S]{0,120}return this\._openPosterFor\(note\)/.test(CODE_JS)
   && /async _openPosterFor\(note\) \{/.test(CODE_JS)
   && !/_openPosterFor\([^)]*,\s*['"]/.test(CODE_JS))
 ok('那一格点下去开的是成品弹窗，不是又去生成：先收详情窗、再开窗，私密那篇这一趟根本不进',

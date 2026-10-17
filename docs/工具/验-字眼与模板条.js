@@ -263,18 +263,19 @@ const txt = async (els) => {
     // 「生成笔记卡片」原来就排在这一枚的位置上（09-30 把详情页所有功能搬到文档上方）。
     // 10-07 撤净：出卡片的口只剩**右上那一格**，同一件事不留两个把手
     // （站长原话"生成后，不应该出现生成卡片的入口，很多余，为什么不干掉"；这条是 v20 那一稿早拍过的）。
+    // ⚠ 10-17 深夜这一枚以「分享笔记」的名字回来（§8.297）：那时右上那一格改成**只在留过卡片时才画**，
+    // 没卡片的人在这一屏就没有任何出图口了。撤两次不是打脸，钉的都是同一件事——**一屏不许有两个口**。
     page = await mp.reLaunch(`/pages/detail/detail?id=${noteId}`)
     await sleep(2000)
     const barBtns = (await txt(await page.$$('.action-bar .icon-btn'))).join('|')
     // 期望值从这一屏自己那份 t 里取：账号切了英文也不会把这条尺子判成假红
     const tt = await page.data('t')
     // 10-03「置顶」那一枚跟着列表一起撤了（列表已不显示置顶状态，按下去只进不出）
-    const want = [tt.edit, tt.delete].join('|')
-    ck('详情页上方一排只剩两枚（编辑／删除），第三枚那一句已经不在这排上',
-      barBtns === want && barBtns.indexOf(tt.shareAsImage) < 0,
-      barBtns === want ? barBtns : `${barBtns} ≠ ${want}`)
-    ck('出卡片那一句只出现在右上那一格里（一屏两处同名就是两个把手）',
-      !!(await page.$('.ds-entry')), `那一格=${!!(await page.$('.ds-entry'))}`)
+    const want = [tt.edit, tt.shareNote, tt.delete].join('|')
+    ck('详情页上方一排三枚（编辑／分享笔记／删除），旧那枚「生成笔记卡片」那一句不许回来',
+      barBtns === want, barBtns === want ? barBtns : `${barBtns} ≠ ${want}`)
+    ck('这一屏出图只有一个口：有卡片时是右上那一格，没有卡片时是中间那一枚（不会两处同名）',
+      (await page.$$('.ds-entry')).length === 1, `把手 ${(await page.$$('.ds-entry')).length} 枚`)
     ck('这一排里没有置顶', !/置顶|[Pp]in/.test(barBtns), barBtns)
     ck('文末不再有底部操作区', !(await page.$('.bottom-actions')))
     await mp.screenshot({ path: `${SHOT}/c6-详情页.png` })

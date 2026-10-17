@@ -155,11 +155,23 @@ const JPG_B64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBk
   const bar1 = await d1.$$('.action-bar .icon-btn')
   const barTx1 = []
   for (const b of bar1) barTx1.push(await b.text())
-  ck('底排那枚「生成笔记卡片」撤净了，只剩编辑／删除', barTx1.length === 2, barTx1.join('|'))
+  // 10-07 撤的是"同一件事两个把手"；10-17 深夜那一枚以「分享笔记」的名字回来（那时那一格
+  // 只在留过卡片时才画，制作口不再重复）。所以这一条现在钉三枚、中间那枚是分享笔记。
+  ck('上方那一排三枚（编辑／分享笔记／删除）', barTx1.length === 3
+    && barTx1[0] === i18n.zh.edit && barTx1[1] === i18n.zh.shareNote && barTx1[2] === i18n.zh.delete,
+    barTx1.join('|'))
   const img = await d1.$('.ds-pad-img')
   const srcOfImg = img ? await attr(img, 'src') : ''
   ck('那张小图的 src 就是台账里那一条（贴别张就是"小图跟大图不匹对"那一类）',
     srcOfImg === FP, `${srcOfImg} vs ${FP}`)
+  // 站长那一句「去掉白边和阴影，只显示卡片图……但相对空间不要压缩」在这屏上的两个读数：
+  // 图的面＝盒子的面（白圈撤净）；盒子的面还是 252×352 那一份（布局没缩）。
+  if (img && pad) {
+    const isz = await img.size(), psz = await pad.size()
+    ck('里面那张图撑满那一格（图与盒子同宽同高，原来那 10rpx 白圈没有回来）',
+      Math.abs(num(isz.width) - num(psz.width)) <= 1.5 && Math.abs(num(isz.height) - num(psz.height)) <= 1.5,
+      `图 ${num(isz.width)}×${num(isz.height)}px vs 盒 ${num(psz.width)}×${num(psz.height)}px`)
+  }
   if (pad) {
     const s = await pad.size()
     const r = await (await d1.$('.ds-rt')).size()
@@ -203,35 +215,38 @@ const JPG_B64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBk
   await go(`/pages/detail/detail?id=${NOTE_ID}`)
   await sleep(3200)
   const d2 = await where()
-  ck('图没了就不画那块白板：那一格退回「+」那一态',
-    !(await d2.$('.ds-pad')) && !!(await d2.$('.ds-empty')),
-    `白垫=${!!(await d2.$('.ds-pad'))} 淡底方形=${!!(await d2.$('.ds-empty'))}`)
-  ck('退回空态之后屏上仍是唯一一个把手',
-    (await d2.$$('.ds-entry')).length === 1, `${(await d2.$$('.ds-entry')).length} 枚`)
-  const e1 = await d2.$('.ds-e1'); const e2 = await d2.$('.ds-e2')
-  ck('那两行小字是现网字典里那两句（不是这一轮新造的词）',
-    !!e1 && !!e2 && (await e1.text()) === i18n.zh.shareAsImage && (await e2.text()) === i18n.zh.noCards,
-    `${e1 ? await e1.text() : '—'} / ${e2 ? await e2.text() : '—'}`)
-  if (e1) {
-    const sw = await (await d2.$('.ds-swatch')).size()
-    ck('那枚淡底方形还是 176 见方（吃列表那一枚方块的数，不是一页一个尺寸）',
-      Math.abs(num(sw.height) - num(sw.width)) <= 2, `${num(sw.width)}×${num(sw.height)}px`)
-  }
-  await shot('02-图被清了退回那一格空态.png')
+  // 10-17 深夜之前这一态画的是「淡底方形 + 麦 + ＋ + 两行小字」那一格；他那一句
+  // 「如果没卡片图，这个位置就完全被标题占满」把整块空态撤了。所以现在量的是反面：
+  // 图没了 ⇒ 那一列一个节点都不剩，标题那一级自己铺满（`.solo`）。
+  ck('图没了就不画那块白板，也不补一块淡底方形：那一整列不渲染',
+    !(await d2.$('.ds-pad')) && !(await d2.$('.ds-rt')) && !(await d2.$('.ds-empty')),
+    `白垫=${!!(await d2.$('.ds-pad'))} 那一列=${!!(await d2.$('.ds-rt'))} 空态=${!!(await d2.$('.ds-empty'))}`)
+  ck('退回空态之后屏上没有残留把手（那一格撤干净了，制作口只剩下面那一枚）',
+    (await d2.$$('.ds-entry')).length === 0, `${(await d2.$$('.ds-entry')).length} 枚`)
+  const hero = await d2.$('.dt-hero')
+  ck('标题那一列摊满整行（hero 换成 solo 那一档）',
+    !!hero && /solo/.test((await hero.attribute('class')) || ''), await hero.attribute('class'))
+  const shareBtn = (await txt(await d2.$$('.action-bar .icon-btn'))).indexOf(i18n.zh.shareNote)
+  ck('那一排三枚里中间那枚是「分享笔记」，它就是这一屏唯一的出卡片口',
+    shareBtn === 1, `第 ${shareBtn + 1} 枚 / ${(await txt(await d2.$$('.action-bar .icon-btn'))).join('|')}`)
+  await shot('02-图被清了那一格整块不画.png')
 
-  /* ---------- 四、点空态那一格＝去生成（这一把只记不办：真去就会 POST 建码） ---------- */
+  /* ---------- 四、点「分享笔记」＝去生成（这一把只记不办：真去就会 POST 建码） ---------- */
   await ev('把 navigateTo 换成只记不办', () => {
     wx.__p2 = []
     if (!wx.__o2) wx.__o2 = wx.navigateTo
     wx.navigateTo = function (o) { wx.__p2.push((o && o.url) || ''); return { errMsg: 'navigateTo:ok(替身)' } }
     return true
   })
-  await hop('点空态那一格', async () => { await (await d2.$('.ds-entry')).tap() })
+  await hop('点中间那一枚分享笔记', async () => {
+    const btns = await d2.$$('.action-bar .icon-btn')
+    await btns[1].tap()
+  })
   await sleep(1200)
   const seen2 = await ev('读 navigateTo 收到的是什么', () => ({
     got: (wx.__p2 || [])[0] || null, still: getCurrentPages().slice(-1)[0].route,
   }))
-  ck('空态那一格点下去是去这一篇的笔记卡片页（带的就是这个 id，人没真跳过去）',
+  ck('那一枚点下去是去这一篇的笔记卡片页（带的就是这个 id，人没真跳过去）',
     seen2.got === `/pages/share/share?id=${NOTE_ID}` && seen2.still === 'pages/detail/detail',
     JSON.stringify(seen2))
   await ev('摘掉 navigateTo 替身', () => { if (wx.__o2) { wx.navigateTo = wx.__o2; delete wx.__o2 } return true })
