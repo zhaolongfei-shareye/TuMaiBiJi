@@ -1,6 +1,7 @@
 // 生成「列表合一」这一刀的效果图。**屏上每一句中文、每一枚色、每一档字号、每一段几何都不是手抄的**：
-// 字从 miniprogram/utils/i18n.js 现读，色／字号／圆角／阴影从 miniprogram/app.wxss 的令牌块现读，
-// 行的几何从 pages/index/index.wxss 现读，参考图那几段比例从站长给的那张 JPG 量出来（量法见 docs/工具/量-参考图-比例.py）。
+// 字从 miniprogram/utils/i18n.js 现读，来源那六个值从 pages/index/index.js 的 SOURCE_TYPE_KEYS 现读，
+// 色／字号／圆角／阴影从 miniprogram/app.wxss 现读，行的几何从 pages/index/index.wxss 现读，
+// 参考图那几段比例从站长给的那张 JPG 量出来（量法见 docs/工具/量-参考图-比例.py）。
 // 为什么非要现读＋量：站长定过「效果图文案必须抄现网字典」「效果图与代码同口径」「设计先对外部取证」，
 // 手抄与手拍的那一份下一轮必然走样。
 // 折算：设计稿 750rpx ＝ CSS 视口 375 ⇒ 1rpx = 0.5px（下面 R()）。
@@ -25,6 +26,7 @@ const R = (n) => +(n / 2).toFixed(2) // rpx → CSS px
 // ── 令牌：从 app.wxss 现读，读不到就抛（不许我给一个"看着差不多"的数）
 const wxss = fs.readFileSync(path.join(ROOT, 'miniprogram/app.wxss'), 'utf8')
 const idxwxss = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/index/index.wxss'), 'utf8')
+const idxjs = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/index/index.js'), 'utf8')
 function tok(name, from = wxss) {
   const m = new RegExp('--' + name + ':\\s*([^;]+);').exec(from)
   if (!m) throw new Error(`读不到令牌 --${name}`)
@@ -38,15 +40,9 @@ function rule(src, sel, prop) { // 从某个选择器那一块里取一条声明
   if (!m) throw new Error(`${sel} 里读不到 ${prop}`)
   return m[1].trim()
 }
-function rpxOf(src, sel, prop) { // 只要那一个 rpx 数
-  const v = rule(src, sel, prop)
-  const m = /(-?[\d.]+)rpx/.exec(v)
-  if (!m) throw new Error(`${sel} 的 ${prop} 不是 rpx：${v}`)
-  return +m[1]
-}
+function rpxOf(src, sel, prop) { const v = rule(src, sel, prop); const m = /(-?[\d.]+)rpx/.exec(v); if (!m) throw new Error(`${sel} 的 ${prop} 不是 rpx：${v}`); return +m[1] }
 function rpxs(src, sel, prop) { // 简写声明里那几档 rpx 全取出来（padding: 24rpx 0 20rpx 这种）
-  const parts = rule(src, sel, prop).split(/\s+/)
-  return parts.map((v) => {
+  return rule(src, sel, prop).split(/\s+/).map((v) => {
     if (v === '0') return 0 // 简写里的 0 不带单位，这是合法值，不是"读不到"
     const m = /^(-?[\d.]+)rpx$/.exec(v)
     if (!m) throw new Error(`${sel} 的 ${prop} 里 ${v} 不是 rpx`)
@@ -60,36 +56,30 @@ const INK = (() => {
 })()
 const T = {
   fsBody: tok('fs-body'), fsMeta: tok('fs-meta'), fsTiny: tok('fs-tiny'), fsMicro: tok('fs-micro'),
-  rCard: tok('r-card'), sp3: tok('sp-3'), sp4: tok('sp-4'),
+  rCard: tok('r-card'), sp4: tok('sp-4'),
   bgPage: tok('bg-page'), bgCard: tok('bg-card'),
   plateDock: /--glass-plate-dock:\s*([^;]+);/.exec(INK)[1].trim(),
-  chromeDock: /--glass-chrome-dock:\s*([^;]+);/.exec(INK)[1].trim(),
   shLift: tok('sh-lift'), shDrop: tok('sh-drop'),
   ink: /--slide-ink:\s*([^;]+);/.exec(INK)[1].trim(),
 }
-const TIPDOT = palette.TIP_DOT
-
-// 现网这一屏的真实几何（一格一格从 index.wxss 读，改一处稿子就得跟着重出，不许手写）
 const G = {
   head: R(rpxOf(idxwxss, '.head', 'height')),
   h1Top: R(rpxOf(idxwxss, '.h1', 'top')),
-  h1Size: R(rpxOf(idxwxss, '.h1-txt', 'font-size')),
   brandW: R(rpxOf(wxss, '.brand-title', 'width')),
   brandOp: rule(wxss, '.brand-title', 'opacity'),
   statRight: R(rpxOf(idxwxss, '.stats', 'right')),
   statTop: R(rpxOf(idxwxss, '.stats', 'top')),
   statN: R(rpxOf(idxwxss, '.stat .n', 'font-size')),
-  toolsTop: R(rpxOf(idxwxss, '.tools', 'top')),
+  toolsX: R(rpxOf(idxwxss, '.tools', 'left')),
+  toolsH: R(rpxOf(idxwxss, '.tools', 'height')),
   vtabGap: R(rpxOf(idxwxss, '.vtabs', 'gap')),
   vtabPadX: R(rpxs(idxwxss, '.vtabs', 'padding')[1]),
+  catGap: R(rpxOf(idxwxss, '.cat-chips', 'gap')),
   xrowPadT: R(rpxs(idxwxss, '.xrow', 'padding')[0]),
   xdW: R(rpxOf(idxwxss, '.xd', 'width')),
   dot: R(rpxOf(idxwxss, '.xd-dot', 'width')),
   sheetLift: R(-rpxOf(idxwxss, '.sheet', 'margin-top')),
   sheetPad: R(rpxs(idxwxss, '.sheet', 'padding')[1]),
-  toolsX: R(rpxOf(idxwxss, '.tools', 'left')),
-  toolsH: R(rpxOf(idxwxss, '.tools', 'height')),
-  catGap: R(rpxOf(idxwxss, '.cat-chips', 'gap')),
   xlistPadB: R(rpxOf(idxwxss, '.xlist', 'padding-bottom')),
   moreColor: rule(idxwxss, '.x-more', 'color'),
 }
@@ -105,38 +95,62 @@ const K = ['notesHeading', 'statNotes', 'allCategories', 'back', 'search', 'noNo
   'searchPh', 'loading', 'showMore']
 K.forEach((k) => { need(zh, k); need(en, k) })
 
-// 示意数据：标题与摘要是编的（真机上是用户自己的笔记），图位是 CSS 渐变——这一点在图例里写死。
-// 中英各一份：英文那一屏要看的正是"换了语言放不放得下"，拿中文标题去量英文那一屏就是自欺。
-// ⚠ 英文这几条是**压着可写宽挑的**（行内可写宽实测见下面 EN 那一屏的注）：真机上超过那一档
-//    就吃省略号（现网 .x-t 本来就有 text-overflow:ellipsis），所以稿子里不必故意放一条被切半截的。
-//    "被切的那一档会不会挤掉小标"这件事不靠稿子看，靠 docs/工具/验-英文挤不挤 那把一次性探针量。
+// 来源那一行小字：**现读 pages/index/index.js 的 SOURCE_TYPE_KEYS**，不另抄一份。
+// 这张表在 detail.js 与 poster.js 里各有一份同内容的（10-17 现读到的样子），稿子吃 index.js 那一份。
+const SRC_BLOCK = /const SOURCE_TYPE_KEYS = \{([\s\S]*?)\n\}/.exec(idxjs)
+if (!SRC_BLOCK) throw new Error('读不到 pages/index/index.js 的 SOURCE_TYPE_KEYS')
+const SRC = {}
+SRC_BLOCK[1].replace(/(\w+):\s*'(\w+)'/g, (_, k, v) => { SRC[k] = v; return '' })
+Object.keys(SRC).forEach((k) => { need(zh, SRC[k]); need(en, SRC[k]) })
+const srcLabel = (dict, k) => need(dict, SRC[k])
+
+// ── 示意数据：标题、来源、标识都是编的（真机上是用户自己的笔记），图位是 CSS 渐变——图例里写死。
+// 英文那几条压着可写宽挑（行内可写宽 216px，见 docs/工具/验-英文挤不挤.js 的实测）；
+// 真机上超那一档吃省略号（现网 .x-t 本来就有 text-overflow:ellipsis），稿子里不必故意放一条被切半截的。
 const SAMPLE = [
-  { t: '海港这一段值得走两回', te: 'Two laps round the harbour', d: '10/16', day: 14,
-    s: '从码头那一段往上走，前半是防波堤，风大；拐进第二条街开始有台阶，台阶上面那排房子是这一带最好看的一处。', img: ['#C9D7D2', '#8FA9A2'], card: true },
-  { t: '山里那一格信号', te: 'One bar up in the hills', d: '10/16', day: 14,
+  { t: '海港这一段值得走两回', te: 'Two laps round the harbour', d: '10/16', day: 14, src: 'wechat_article',
+    s: '从码头那一段往上走，前半是防波堤，风大；拐进第二条街开始有台阶，台阶上面那排房子是这一带最好看的一处。',
+    img: ['#C9D7D2', '#8FA9A2'], card: true, shared: true },
+  { t: '山里那一格信号', te: 'One bar up in the hills', d: '10/16', day: 14, src: 'screenshot',
     s: '观景台往北三百米就没信号了，导航提前把离线包装好。', img: ['#D8CFC4', '#A99C8C'], card: true },
-  { t: '缆车上那十分钟', te: 'Cable car, ten minutes', d: '10/16', day: 14,
-    s: '末班 17:40，排队二十分钟，往上那趟看得到整个湾。', img: null, card: false },
-  { t: '日落观景点要早到', te: 'Get to the view early', d: '10/15', day: 14,
-    s: '六点以后停车位全满，栈道只有单边有灯。', img: ['#E3D3CE', '#B79A93'], card: false },
-  { t: '灯塔那条路风大', te: 'Lighthouse road is windy', d: '10/15', day: 15,
-    s: '风大的时候那段栏杆会晃，别靠外沿。', img: ['#CFD6E0', '#93A0B4'], card: true },
+  { t: '缆车上那十分钟', te: 'Cable car, ten minutes', d: '10/16', day: 14, src: 'web_article',
+    s: '末班 17:40，排队二十分钟，往上那趟看得到整个湾。', img: null, shared: true },
+  { t: '日落观景点要早到', te: 'Get to the view early', d: '10/15', day: 14, src: 'manual',
+    s: '六点以后停车位全满，栈道只有单边有灯。', img: ['#E3D3CE', '#B79A93'] },
+  { t: '灯塔那条路风大', te: 'Lighthouse road is windy', d: '10/15', day: 15, src: 'share_import',
+    s: '风大的时候那段栏杆会晃，别靠外沿。', img: ['#CFD6E0', '#93A0B4'], card: true, shared: true },
 ]
-const PRIV = { t: '这一篇设了密码', te: 'This one is locked', d: '10/15', day: 15, s: '', img: null, card: false, priv: true }
+const PRIV = { t: '这一篇设了密码', te: 'This one is locked', d: '10/15', day: 15, src: 'manual',
+  s: '', img: null, priv: true }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-const px = (v) => v + 'px'
 
-// ── 行（合一之后）：左槽（甲＝日期／乙＝空）＋ 标题 ＋ 右端配图 ＋ 卡片小标
+// ── 标识轨：参考图标题下面那条线，改成"线上摆标识"（他 10-17 这句）
+// 每一枚的数据出处都写在这儿，别落码时凭印象找口。
+function rail(opt, r) {
+  const mk = []
+  if (r.shared) mk.push('<i class="mk star"></i>')          // 服务端列表响应里那栏 has_active_share
+  if (r.card) mk.push('<i class="mk card"></i>')             // cardCloud.hasCard(id)：内存里那份全量名单，零请求
+  if (r.fav) mk.push('<i class="mk heart"></i>')             // 未来：今天没有这一栏，要服务端数 imported_from
+  if (r.priv) mk.push('<b class="mk lock"></b>')             // 客户端 isPrivate(分类名)（index.js:326）
+  // 一枚都没有 ⇒ 只留那条线（不塞占位元素：占位会把轨上的间距撑出来）
+  return `<div class="rail${opt.color ? ' cl' : ''}">${mk.join('')}<i class="ln"></i></div>`
+}
+
+// ── 行（合一之后）：左槽（乙＝分组大数字，甲＝日期）＋ 来源小字／标题／标识轨 ＋ 右端配图
 function mergedRow(r, opt, lang) {
+  const D = lang === 'en' ? en : zh
   const title = lang === 'en' ? r.te : r.t
   const thumb = r.img
-    ? `<div class="th" style="background:linear-gradient(135deg,${r.img[0]},${r.img[1]})">${r.card ? '<i class="cmark"></i>' : ''}</div>`
-    : '' // 没图就什么都不画（他原话"没有不显示"）——不给它留一个虚线空框，那等于凭空多一句"这里本该有图"
+    ? `<div class="th" style="background:linear-gradient(135deg,${r.img[0]},${r.img[1]})"></div>`
+    : '' // 没图就什么都不画（他原话"没有不显示"），标识已经搬到线上，不再需要一枚"位置留着"的空框
   return `<div class="row">
       ${opt.groupBy ? '' : `<div class="rd"><b class="dot" style="background:${TIPDOT}"></b><span>${esc(r.d)}</span></div>`}
-      <div class="tt">${r.priv ? '<b class="lock"></b>' : ''}${esc(title)}</div>
-      ${r.card && !r.img ? `<div class="slot"><i class="cmark solo"></i></div>` : ''}
+      <div class="mid">
+        <div class="src">${esc(srcLabel(D, r.src))}</div>
+        <div class="tt">${esc(title)}</div>
+        ${rail(opt, r)}
+      </div>
       ${thumb}
     </div>`
 }
@@ -155,7 +169,7 @@ function mergedList(opt) {
   return out + (opt.rows.length ? '</div></div>' : '')
 }
 
-// ── 现网对照那一屏：两枚 tab + 分类行 + 日期列 + 标题 + 三行摘要 +「显示更多」
+// ── 现网对照那一屏：两枚 tab + 分类行 + 日期列 + 标题 + 三行摘要 +「显示更多」（一个字不改，当尺子用）
 function liveList(lang) {
   const D = lang === 'en' ? en : zh
   return SAMPLE.map((r) => `<div class="lrow">
@@ -164,6 +178,19 @@ function liveList(lang) {
         <div class="ls">${esc(r.s)}</div>
         <div class="lm">${esc(D.showMore)}</div></div>
     </div>`).join('')
+}
+function catRow(D) {
+  // 现网这一行只有「全部」那一枚是字典里的固定字，其余每枚都是用户自己起的分类名（服务端给的），
+  // 所以稿子里三枚一律标"示意"。`palette.UNCATEGORIZED`（墨黑）是**配色常量**，不是屏上一枚分类名——
+  // 10-17 第一版我把它当分类名画上去了，那是我自己读错的，不是现网的样子。
+  return `<span class="on">${esc(D.allCategories)}</span><span>示意 A</span><span>示意 B</span><span>示意 C</span>`
+}
+// 面板顶那一行：左「分类管理」跳 pages/categories，右「搜索」从上半那一段搬下来（他 10-17 这句）
+function panelHead(D) {
+  return `<div class="phead">
+    <i class="ic-grid" aria-label="分类管理"><b></b><b></b><b></b><b></b></i>
+    <i class="glass" aria-label="${esc(D.search)}"></i>
+  </div>`
 }
 
 // ── 一屏
@@ -174,7 +201,8 @@ function screen(opt) {
     ? `<div class="vtabs"><span class="on">${esc(D.tabList)}</span><span>${esc(D.navShare)}</span><em>${esc(D.back)}</em></div>
        <div class="cats">${catRow(D)}</div>
        <div class="list">${liveList(opt.lang)}</div>`
-    : `<div class="cats">${catRow(D)}</div>
+    : `${opt.headless ? '' : panelHead(D)}
+       <div class="cats">${catRow(D)}</div>
        <div class="list">${opt.empty ? `<div class="empty">${esc(D.noNotes)}</div>` : mergedList(opt)}</div>`
   return `<div class="ph">
   <div class="cap">${opt.cap}</div>
@@ -184,7 +212,7 @@ function screen(opt) {
     <div class="bg" style="height:${band}px">
       <img class="h1 brand" src="${BRAND}" alt="${esc(D.notesHeading)}">
       <div class="stats"><div class="stat"><b>30</b><span>${esc(D.statNotes)}</span></div></div>
-      <div class="tools"><i class="glass"></i></div>
+      ${opt.live ? `<div class="tools"><i class="glass"></i></div>` : ''}
       <div class="tag">照片位＝示意（不放真人图）</div>
     </div>
     <div class="sheet">${body}</div>
@@ -193,64 +221,93 @@ function screen(opt) {
   <div class="note">${opt.note}</div>
 </div>`
 }
-function catRow(D) {
-  // 现网这一行只有「全部」那一枚是字典里的固定字，其余每一枚都是用户自己起的分类名（服务端给的），
-  // 所以稿子里三枚一律标"示意"。`palette.UNCATEGORIZED`（墨黑）是**配色常量**，不是屏上一枚分类名——
-  // 10-17 第一版我把它当分类名画上去了，那是我自己读错的，不是现网的样子。
-  return `<span class="on">${esc(D.allCategories)}</span><span>示意 A</span><span>示意 B</span><span>示意 C</span>`
-}
+
+const TIPDOT = palette.TIP_DOT
 
 const LIVE = screen({
   lang: 'zh', live: true,
   cap: '⓪ 现网对照｜真机现在跑的这一版（2.2.9）：两枚 tab ＋ 分类行 ＋ 日期列 ＋ 标题 ＋ 三行摘要 ＋「显示更多」',
   note: '画这一屏只为给他一把尺：<b>合一之后少掉的就是这里那几样</b>——第二枚 tab、摘要那三行、「显示更多」、'
-    + '以及卡片那一屏的两列格子。上半那一段（书法位图＋右上角一列数字＋一枚裸搜索 icon＋圆角卡往上盖）<b>一个字没动，也不该动</b>。',
-})
-const A = screen({
-  lang: 'zh', groupBy: false, rows: SAMPLE,
-  cap: '甲｜合一之后，日期仍留在每一行左边（现网 .xd 那一列的手法不动）',
-  note: '改动只有三件：① 撤掉「笔记列表／笔记卡片」那两枚 tab（只剩一列）；② 行里撤摘要与「显示更多」，只留标题；'
-    + '③ 行右端补配图（有则画、没有不画）＋ 生成过卡片的小标。<b>分类行与搜索没撤</b>——他那句里没点到这两样。',
+    + '以及卡片那一屏的两列格子；搜索那一枚从上半那一段<b>搬进面板右上角</b>（他 10-17 这句）。'
+    + '上半那一段其余（书法位图＋右上角一列数字＋圆角卡往上盖）一个字没动。',
 })
 const B = screen({
   lang: 'zh', groupBy: true, rows: SAMPLE,
-  cap: '乙｜合一之后，照参考图按天分组（左槽一个大数字，管下面几条）',
-  note: '左槽从"每行一个日期"变成"一天一个大数字"（参考图量出来那一槽宽 ' + REF_R.gutW + 'css、卡片左界 '
-    + REF_R.cardLeft + 'css）。行里就只剩标题＋配图＋小标。<b>这是结构改动，不是样式改动，甲乙得挑一个。</b>',
+  cap: '乙·优化版（他 10-17 倾向那一版）｜来源小字 ＋ 标题 ＋ 标识轨 ＋ 右侧配图；面板顶左「分类管理」右「搜索」',
+  note: '一行三档：<b>来源</b>（小字，吃字典里那六个值）→ <b>标题</b>（只这一档吃 90% 墨）→ '
+    + '<b>标识轨</b>（参考图标题下面那条线，线上摆标识，末尾那条线自己收满剩下的宽）。'
+    + '配图仍在右、垂直居中，<b>它身上不再挂任何东西</b>——标识全搬到线上，这样"有没有出过卡""有没有分享过"两件事'
+    + '在同一个位置读，不用在图与图之间找。',
+})
+const LEG = screen({
+  lang: 'zh', groupBy: true, color: true, headless: true,
+  rows: [
+    { ...SAMPLE[0], day: 14, card: true, shared: true },
+    { ...SAMPLE[1], day: 14, card: true, shared: false },
+    { ...SAMPLE[2], day: 14, shared: true, card: false },
+    { ...PRIV, day: 14 },
+    { ...SAMPLE[4], day: 14, card: true, shared: true, fav: true },
+    { ...SAMPLE[3], day: 14, card: false, shared: false, img: null },
+  ],
+  cap: '标识轨图例（彩色那一版）｜每一枚的数据出处都标在下面，别落码时凭印象找口',
+  note: '① <b>★ 分享过</b>＝服务端列表响应里那栏 <code>has_active_share</code>（<b>今天已经在下发，客户端零消费者</b>，'
+    + '这一枚是它第一个用户）；② <b>▢ 出过卡片</b>＝<code>cardCloud.hasCard(id)</code>，读内存那份全量名单，零请求；'
+    + '③ <b>🔒 私密</b>＝客户端 <code>isPrivate(分类名)</code>（<code>index.js:326</code>；⚠ 列表响应里没有 <code>is_private</code>，'
+    + '这一枚靠分类名判，<code>privKnown</code> 那一档是"不知道"不是"不私密"）；'
+    + '④ <b>♥ 被转存</b>＝<b>今天没有这一栏</b>，但数得出来：<code>notes.imported_from</code> 里钉着 '
+    + '<code>share_token</code>／<code>source_note_id</code>，服务端按它数一次就知道"我分享出去的那张码被人存了几回"——'
+    + '这一枚是<b>未来</b>，要一条后端活，画在这里只为看它在轨上占不占得住。'
+    + '一枚都没有的那一行只留那条线（不然这一档看着像漏画）。',
+})
+const SRC6 = screen({
+  lang: 'zh', groupBy: false, headless: true,
+  rows: Object.keys(SRC).map((k, i) => ({
+    t: SAMPLE[i % SAMPLE.length].t, te: SAMPLE[i % SAMPLE.length].te, d: '10/16', day: 14, src: k,
+    s: '', img: i % 2 ? ['#C9D7D2', '#8FA9A2'] : null, card: i === 0, shared: i === 1,
+  })),
+  cap: `来源那一行只有这六种取值（<code>${Object.keys(SRC).length}</code> 支，全部现读 index.js 的 SOURCE_TYPE_KEYS）`,
+  note: '顺序就是那张表的顺序：<b>' + Object.keys(SRC).map((k) => esc(srcLabel(zh, k))).join('｜') + '</b>。'
+    + '<code>source_type</code> 本来就在列表响应的白名单里（<code>NOTE_BRIEF_FIELDS</code> 九栏之一），'
+    + '所以这一行小字<b>零后端代价</b>。⚠ 表外值的兜底：查不到键就把英文原文写上屏——'
+    + '这条站长 10-02 撞过一次，所以新加来源那一支必须同时进这张表。'
+    + '<b>「私密」不在这一行里</b>：它不是来源，是标识轨那一枚锁（同一篇的来源仍是它原本那一种）。',
 })
 const C = screen({
-  lang: 'zh', groupBy: false,
+  lang: 'zh', groupBy: true,
   rows: [{ ...SAMPLE[2], card: true }, SAMPLE[2], SAMPLE[0], { ...SAMPLE[4], card: false }],
-  cap: '无配图那一态：右侧不画，标题吃满整行（他原话"没有不显示"）',
-  note: '四行按"有没有图 × 有没有出过卡片"排：① 没图＋出过卡 ⇒ 小标钉在行最右端，与有图那几行的配图同一列；'
-    + '② 没图＋没出过卡 ⇒ 光一行标题；③ 有图＋出过卡 ⇒ 图右下角一枚小标；④ 有图＋没出过卡 ⇒ 只有图。'
-    + '<b>①那一处落点是我定的（让"出过卡"这一枚永远落在同一个位置，扫一眼对得齐），标出来等他看</b>：'
-    + '另一种画法是让标紧跟在标题末尾，标题短它就往左跑。',
+  cap: '无配图那一态：右侧不画，标题吃满整宽（他原话"没有不显示"）',
+  note: '四行按"有没有图 × 有没有出过卡片"排：① 没图＋出过卡 ⇒ 标识在线上，右端空着；② 没图＋没出过卡 ⇒ 只有来源与标题'
+    + '（轨上仍留那条线，让每一行的下沿对齐）；③ 有图＋出过卡；④ 有图＋没出过卡。'
+    + '<b>标识全在线上，不再钉在图的角上</b>——这一改是跟着他这句"利用这条线"走的，不是我自己换的。',
 })
 const D = screen({
-  lang: 'zh', groupBy: false, rows: [PRIV, SAMPLE[0], SAMPLE[2]],
-  cap: '私密那一行：不画配图、只留一枚锁（下面两行是普通行，用来对照）',
-  note: '⚠ <b>这条不是装饰是闸</b>：现网服务端锁着时不发正文与摘要，列表那一趟也不带解锁凭证。'
-    + '要是把配图缩略图画出来，就等于没解锁先把内容露一角（图里可能正写着密码、脸、票据）。所以私密那一行右侧一律不画。',
+  lang: 'zh', groupBy: true, rows: [{ ...PRIV, day: 14 }, SAMPLE[0], SAMPLE[2]],
+  cap: '私密那一行：线上只有一枚锁、右侧不画配图（下面两行是普通行，用来对照）',
+  note: '⚠ <b>这条不是装饰是闸</b>：现网列表那一趟锁着时是按白名单重建那几行的（九栏里没有图），'
+    + '所以配图天然漏不出去；锁这一枚是客户端按分类名判的。'
+    + '一张照片里可能正写着密码、脸、票据——没解锁先把内容露一角，与正文那把闸不同罪同等。',
 })
 const E = screen({
-  lang: 'en', groupBy: false, rows: SAMPLE,
-  cap: 'EN｜同一套皮、同一批件，只换字（英文那侧标题更长，看放不放得下）',
-  note: '这一屏存在的理由就是当场量"英文会不会把小标挤掉"：标题吃省略号那一档，小标与配图 flex:none。',
+  lang: 'en', groupBy: true, rows: SAMPLE,
+  cap: 'EN｜同一套皮、同一批件，只换字（来源与标题两档都要看放不放得下）',
+  note: '来源那一档吃 <code>--fs-tiny</code>＝' + T.fsTiny + '（＝' + R(parseFloat(T.fsTiny)) + 'px），'
+    + '英文那几串最长的是 <b>' + Object.keys(SRC).map((k) => srcLabel(en, k))
+      .sort((a, b) => b.length - a.length)[0] + '</b>；标题可写宽实测 216px（量法 <code>docs/工具/验-英文挤不挤.js</code>），'
+    + '灌 78 字符之后右端配图与轨的落点一个数没动 ⇒ 省略号只吃标题自己。',
 })
 const F = screen({
-  lang: 'zh', groupBy: false, rows: [], empty: true,
+  lang: 'zh', groupBy: true, rows: [], empty: true,
   cap: '空态｜一篇都没有（原来卡片那一屏的「还没有生成过卡片」这句从此没有落点）',
   note: `撤掉第二枚 tab 之后，字典里 <code>noCards</code>＝「${esc(zh.noCards)}」这一句在屏上不再有人念——留着还是删，等他一句。`,
 })
 
 const html = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
-<title>列表合一 · 效果图（10-17，代码一行没动）</title>
+<title>列表合一 · 效果图（10-17 第二轮，代码一行没动）</title>
 <style>
 :root{
   --fs-body:${T.fsBody}; --fs-meta:${T.fsMeta}; --fs-tiny:${T.fsTiny}; --fs-micro:${T.fsMicro};
   --r-card:${R(parseFloat(T.rCard))}px; --bg-page:${T.bgPage}; --bg-card:${T.bgCard};
-  --plate:${T.plateDock}; --chrome:${T.chromeDock}; --sh-lift:${T.shLift}; --sh-drop:${T.shDrop}; --ink:${T.ink};
+  --plate:${T.plateDock}; --sh-lift:${T.shLift}; --sh-drop:${T.shDrop}; --ink:${T.ink};
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#EDEAE3;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;padding:34px;color:#22252B}
@@ -259,6 +316,8 @@ h1{font-size:26px;letter-spacing:-.3px}
 .lead b{color:#22252B}
 .lead code{background:#E3DFD6;padding:1px 5px;border-radius:4px;font-size:12.5px}
 .rules{font-size:12.5px;line-height:1.8;color:#5A5F68;max-width:1240px;margin:0 0 22px}
+.rules b{color:#22252B}
+.rules code{background:#E3DFD6;padding:1px 5px;border-radius:4px;font-size:11.5px}
 .grid{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}
 .ph{width:400px;min-width:0}
 .cap{font-size:13.5px;font-weight:600;line-height:1.5;margin-bottom:9px}
@@ -269,8 +328,7 @@ img{max-width:100%}
 .refimg{display:block;width:100%;height:auto;border-radius:22px;box-shadow:0 16px 34px rgba(20,22,26,.2)}
 
 .phone{width:375px;height:812px;border-radius:38px;overflow:hidden;position:relative;background:var(--bg-page);
-  display:flex;flex-direction:column;
-  box-shadow:0 22px 46px rgba(20,22,26,.20),0 0 0 9px #1E2024}
+  display:flex;flex-direction:column;box-shadow:0 22px 46px rgba(20,22,26,.20),0 0 0 9px #1E2024}
 .status{position:absolute;left:0;right:0;top:0;height:34px;display:flex;align-items:center;
   padding:0 20px;font-size:12.5px;font-weight:600;color:#2C2F36;z-index:6}
 .status i{width:7px;height:7px;border-radius:50%;background:#2C2F36;opacity:.5;margin-left:4px;display:inline-block}
@@ -279,14 +337,14 @@ img{max-width:100%}
   padding:0 14px;font-size:13px;color:#2C2F36;z-index:6}
 .nav .pill{font-style:normal;font-size:11px;border:1px solid rgba(44,47,54,.22);border-radius:999px;padding:2px 10px;
   background:rgba(255,255,255,.55);letter-spacing:.5px}
-/* 上半那一段：现网 .head 高 ${G.head}px；参考图量出来那一段是屏高 ${REF_R.bandPct}%（＝${Math.round(812 * REF_R.bandPct / 100)}px）
-   两档差 ${Math.round(812 * REF_R.bandPct / 100) - G.head}px，这一档要不要抬，是待拍那一条 */
-.bg{position:relative;overflow:hidden;padding:0;flex:none}
+/* 上半那一段：现网 .head 高 ${G.head}px；参考图量出来那一段是屏高 ${REF_R.bandPct}%（＝${Math.round(812 * REF_R.bandPct / 100)}px），
+   两档差 ${Math.round(812 * REF_R.bandPct / 100) - G.head}px——这一档要不要抬是待拍 D49，甲乙两屏我照参考图那一档画的 */
+.bg{position:relative;overflow:hidden;flex:none}
 .bg::before{content:"";position:absolute;inset:0;background:
   linear-gradient(160deg,#DCC9BE 0%,#C9B6AE 34%,#BFCBC6 68%,#AFC0BC 100%)}
 .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0) 40%,rgba(255,255,255,.34) 100%)}
-.brand{position:absolute;left:${R(parseFloat(T.sp4))}px;top:${G.h1Top + 70}px;width:${G.brandW}px;opacity:${G.brandOp};z-index:2}
-.stats{position:absolute;right:${G.statRight}px;top:${G.statTop + 70}px;z-index:2;display:flex}
+.brand{position:absolute;left:${R(parseFloat(T.sp4))}px;top:${70 + G.h1Top}px;width:${G.brandW}px;opacity:${G.brandOp};z-index:2}
+.stats{position:absolute;right:${G.statRight}px;top:${70 + G.statTop}px;z-index:2;display:flex}
 .stat{width:52px;text-align:center}
 .stat b{display:block;font-family:"WtsjMind","Poppins",-apple-system,sans-serif;font-weight:100;
   font-size:${G.statN}px;line-height:.86;color:#2C2F36}
@@ -294,13 +352,16 @@ img{max-width:100%}
   letter-spacing:2px;color:rgba(44,47,54,.72)}
 .tools{position:absolute;left:${G.toolsX}px;right:${G.toolsX}px;bottom:12px;height:${G.toolsH}px;display:flex;
   align-items:center;justify-content:flex-end;z-index:3}
-.glass{width:19px;height:19px;border-radius:50%;border:1.6px solid rgba(44,47,54,.62);position:relative;display:block}
+.glass{width:19px;height:19px;border-radius:50%;border:1.6px solid rgba(44,47,54,.62);position:relative;display:block;flex:none}
 .glass::after{content:"";position:absolute;right:-5px;bottom:-3px;width:7px;height:1.8px;background:rgba(44,47,54,.62);
   transform:rotate(45deg)}
 .tag{position:absolute;left:${R(parseFloat(T.sp4))}px;bottom:${G.sheetLift + 10}px;z-index:3;font-size:9px;color:rgba(44,47,54,.55)}
-.sheet{position:relative;z-index:4;flex:1;min-height:0;margin-top:-${G.sheetLift}px;
-  background:var(--bg-card);border-radius:var(--r-card) var(--r-card) 0 0;box-shadow:var(--sh-lift);
-  padding:0 ${G.sheetPad}px;overflow:hidden}
+.sheet{position:relative;z-index:4;flex:1;min-height:0;margin-top:-${G.sheetLift}px;background:var(--bg-card);
+  border-radius:var(--r-card) var(--r-card) 0 0;box-shadow:var(--sh-lift);padding:0 ${G.sheetPad}px;overflow:hidden}
+/* 面板顶那一行（他 10-17：搜索下移到面板右上角，左边补一枚分类管理）*/
+.phead{display:flex;align-items:center;justify-content:space-between;height:38px;padding:4px 2px 0}
+.ic-grid{width:16px;height:16px;display:grid;grid-template:1fr 1fr/1fr 1fr;gap:3.5px;flex:none}
+.ic-grid b{background:rgba(44,47,54,.62);border-radius:2px;display:block}
 .vtabs{display:flex;gap:${G.vtabGap}px;padding:11px ${G.vtabPadX}px 0;font-size:var(--fs-meta);font-weight:600;
   color:rgba(44,47,54,.72);position:relative}
 .vtabs span{position:relative;padding-bottom:7px}
@@ -308,12 +369,12 @@ img{max-width:100%}
 .vtabs .on::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:1px;background:${TIPDOT}}
 .vtabs em{margin-left:auto;font-style:normal;font-size:var(--fs-meta);color:rgba(44,47,54,.72)}
 /* 分类行 10-16 三样一起撤（他原话「分类名字，不要加粗，不要纯黑，下划线也一样」）：
-   所以这一行**没有选中态标记**，稿子里 .on 与其余几枚同一个数——不是漏画，是现网就这样。 */
-.cats{display:flex;gap:${G.catGap}px;padding:10px 2px 4px;font-size:var(--fs-meta);color:rgba(44,47,54,.72);
+   这一行**没有选中态标记**，稿子里 .on 与其余几枚同一个数——不是漏画，是现网就这样。 */
+.cats{display:flex;gap:${G.catGap}px;padding:6px 2px 4px;font-size:var(--fs-meta);color:rgba(44,47,54,.72);
   white-space:nowrap;overflow:hidden}
 .cats span{padding-bottom:5px}
 .list{padding:2px 0 ${G.xlistPadB}px}
-/* 现网那一行：.xrow 内缩 0、上 12 下 10；.xd 宽 ${G.xdW}px（点 ${G.dot}px ＋ MM/DD）；标题 14／摘要 12×1.62 三行 */
+/* 现网那一行：.xrow 内缩 0、上 ${G.xrowPadT} 下 10；.xd 宽 ${G.xdW}px（点 ${G.dot}px ＋ MM/DD）；标题 14／摘要 12×1.62 三行 */
 .lrow{display:flex;align-items:flex-start;gap:10px;padding:${G.xrowPadT}px 0 10px}
 .xd{width:${G.xdW}px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4.5px;padding-top:4px}
 .dot{width:${G.dot}px;height:${G.dot}px;border-radius:50%;flex:none}
@@ -325,72 +386,80 @@ img{max-width:100%}
 .ls{margin-top:4px;font-size:var(--fs-meta);line-height:1.62;color:rgba(35,37,44,.7);display:-webkit-box;
   -webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
 .lm{margin-top:4px;font-size:var(--fs-meta);font-weight:600;color:${G.moreColor}}
-/* 合一之后那一行：一块浅面（不描边），左槽＋标题＋右端配图 */
+/* 合一之后那一行：一块浅面（不描边），左槽 ＋ 来源／标题／标识轨 ＋ 右端配图 */
 .grp{display:flex;gap:10px;align-items:flex-start}
-.gut{width:${REF_R.gutW}px;flex:none;text-align:center;padding-top:8px;font-family:"WtsjMind","Poppins",sans-serif}
+.gut{width:${REF_R.gutW}px;flex:none;text-align:center;padding-top:10px;font-family:"WtsjMind","Poppins",sans-serif}
 .gut b{display:block;font-weight:100;font-size:26px;line-height:1;color:rgba(44,47,54,.9)}
 .gut span{display:block;font-size:8.5px;font-weight:700;letter-spacing:1.4px;color:rgba(44,47,54,.6);margin-top:3px}
 .gut i{display:block;width:14px;height:2px;border-radius:1px;background:rgba(44,47,54,.35);margin:6px auto 0}
 .gbody{flex:1;min-width:0}
-.row{display:flex;align-items:center;gap:10px;margin:0 0 ${REF_R.cardGap}px;padding:11px 12px;border-radius:14px;
+.row{display:flex;align-items:center;gap:10px;margin:0 0 ${REF_R.cardGap}px;padding:10px 12px;border-radius:14px;
   min-width:0;background:var(--plate);box-shadow:var(--sh-drop)}
 .rd{width:${G.xdW}px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4.5px}
 .rd span{font-family:"WtsjMind","Poppins",sans-serif;font-weight:100;font-size:var(--fs-meta);line-height:1;
   color:rgba(44,47,54,.72)}
-.tt{flex:1;min-width:0;font-size:var(--fs-body);font-weight:600;line-height:1.35;color:rgba(35,37,44,.9);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lock{position:relative;width:8px;height:6.5px;flex:none;border:1.3px solid rgba(35,37,44,.55);border-radius:1.5px;
-  display:inline-block;margin-right:5px;vertical-align:-1px}
-.lock::before{content:"";position:absolute;left:50%;top:-4.6px;transform:translateX(-50%);width:5px;height:5px;
-  border:1.3px solid rgba(35,37,44,.55);border-bottom:none;border-radius:3px 3px 0 0}
-.th{width:${REF_R.thumb}px;height:${REF_R.thumb}px;flex:none;border-radius:12px;position:relative}
-.cmark{position:absolute;right:-5px;bottom:-5px;width:18px;height:18px;border-radius:6px;background:#fff;
-  box-shadow:0 1px 4px rgba(18,20,26,.22);display:block}
-.cmark::after{content:"";position:absolute;left:4px;top:5px;width:10px;height:8px;border:1.3px solid var(--ink);border-radius:2px}
-.cmark.solo{position:relative;right:auto;bottom:auto} /* 必须是 relative：static 的话它那个 ::after 会去找更外层的定位祖先，画到屏角上去；那两个偏移是绝对定位那一档用的，这里要撤掉 */
-.slot{width:${REF_R.thumb}px;flex:none;display:flex;align-items:center;justify-content:center}
+.mid{flex:1;min-width:0}
+.src{font-size:var(--fs-tiny);line-height:1.2;letter-spacing:.4px;color:rgba(44,47,54,.55);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.tt{font-size:var(--fs-body);font-weight:600;line-height:1.35;color:rgba(35,37,44,.9);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.rail{display:flex;align-items:center;gap:7px;margin-top:6px;height:12px}
+.rail .ln{flex:1;min-width:0;height:2px;border-radius:1px;background:rgba(44,47,54,.16)}
+.mk{width:12px;height:12px;flex:none;display:inline-block;position:relative;color:rgba(35,37,44,.62)}
+.mk.star{background:currentColor;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 71%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.mk.heart{background:currentColor;clip-path:polygon(50% 88%,8% 52%,0% 32%,12% 14%,30% 14%,50% 30%,70% 14%,88% 14%,100% 32%,92% 52%)}
+.mk.card{border:1.4px solid currentColor;border-radius:2.5px;height:11px}
+.mk.card::after{content:"";position:absolute;left:1.5px;right:1.5px;bottom:1.5px;height:2.6px;background:currentColor}
+.mk.lock{width:9px;height:7px;border:1.4px solid currentColor;border-radius:1.6px;top:2px}
+.mk.lock::before{content:"";position:absolute;left:50%;top:-4.2px;transform:translateX(-50%);width:5px;height:5px;
+  border:1.4px solid currentColor;border-bottom:none;border-radius:3px 3px 0 0}
+.rail.cl .mk.star{color:${TIPDOT}}
+.rail.cl .mk.card{color:rgba(35,37,44,.62)}
+.rail.cl .mk.heart{color:#C0504D}
+.rail.cl .mk.lock{color:rgba(35,37,44,.85)}
+.th{width:${REF_R.thumb}px;height:${REF_R.thumb}px;flex:none;border-radius:12px}
 .empty{padding:60px 0;text-align:center;font-size:var(--fs-meta);color:rgba(44,47,54,.5)}
 .tabbar{position:absolute;left:0;right:0;bottom:0;height:46px;display:flex;align-items:center;justify-content:space-around;
   background:rgba(255,255,255,.72);border-top:1px solid rgba(44,47,54,.06);z-index:5}
 .tabbar i{width:19px;height:19px;border-radius:6px;background:rgba(44,47,54,.18)}
 .tabbar i.on{background:#23252C}
 </style></head><body>
-<h1>列表合一 · 效果图（站长 10-17 那一刀：继续做减法）</h1>
+<h1>列表合一 · 效果图（第二轮：来源一行 ＋ 标识一条轨 ＋ 面板顶两枚）</h1>
 <div class="lead">
-  <b>当前真机跑的是 2.2.9（他 10-17 自己点的提审），这一页的代码一行没动——下面七屏全是稿。</b><br>
-  他的原话：「合并笔记列表和卡片列表，只展示一个列表，就是围绕笔记本身，然后只显示笔记标题，右侧是笔记的配图，如果有就显示，
-  没有不显示，然后，如果生成过卡片就显示小 ICON 提醒，界面风格就与参考图一致，只是更换了我们的元素。」<br>
-  口径：字号／圆角／底色／阴影／那枚小黄点／行内缩全部从 <code>app.wxss</code>＋<code>pages/index/index.wxss</code> 现读，
-  屏上每句中文从 <code>utils/i18n.js</code> 现读，参考图那几段比例是从他给的那张 JPG 量出来的（量法在
-  <code>docs/工具/量-参考图-比例.py</code>）；标题、摘要与分类名是<b>示意数据</b>（真机上是用户自己的笔记），
-  照片位用 CSS 渐变占位、不放真人图。
+  <b>当前真机跑的是 2.2.9（他 10-17 自己点的提审），这一页的代码一行没动——下面全是稿。</b><br>
+  他 10-17 第二轮这几句：「我倾向<b>乙</b>，但还要继续优化」「标题上面还要加上<b>来源</b>，小字，例如来自公众号、截图之类的，
+  提醒用户信息源」「标题下方，参考图有一条线，<b>可以利用这条线做一些标识</b>：分享过的线上加一个小星星，私密的加个小锁，
+  线上的 icon 可以很小，但辨识度要高，一眼就知道」「未来很多场景都可以叠加，例如分享后被朋友转存的加个 ♥ 代表被收藏」
+  「<b>搜索的 icon 下移到面板右上角</b>」「<b>左边加一个分类管理 icon</b>，点击可以直接跳转修改分类」。<br>
+  口径：字号／圆角／底色／阴影／行内缩／位图那两档全部从 <code>app.wxss</code>＋<code>pages/index/index.wxss</code> 现读，
+  屏上每句中文从 <code>utils/i18n.js</code> 现读，<b>来源那六串从 <code>pages/index/index.js</code> 的
+  <code>SOURCE_TYPE_KEYS</code> 现读</b>，参考图那几段比例是从他给的 JPG 量的（<code>docs/工具/量-参考图-比例.py</code>）。
+  标题、摘要、来源与标识是<b>示意数据</b>，照片位用 CSS 渐变占位、不放真人图。
 </div>
 <div class="rules">
-  要他挑的三处（都在图里标了数，我不替他定）：<br>
-  ① <b>甲 还是 乙</b>——日期留在每行左边（现网手法），还是照参考图一天一个大数字分组。<br>
-  ② <b>上半那一段多高</b>——现网 <code>.head</code> ＝ ${G.head}px（屏高 33%），参考图量出来是屏高 ${REF_R.bandPct}%（＝${Math.round(812 * REF_R.bandPct / 100)}px），
-  差 ${Math.round(812 * REF_R.bandPct / 100) - G.head}px。甲乙两屏我照<b>参考图</b>那一档画的（他说"风格与参考图一致"），
-  要是这一档不抬，只把行改掉就行。<br>
-  ③ <b>每行那一块浅面留不留</b>——参考图的卡面只比板面亮 4 级（很轻），现网令牌 <code>--glass-plate-dock</code>
-  ＝ ${T.plateDock} 落在卡底上差 12 级（重一档）。甲乙两屏吃的是现网那一枚。10-01 他打回过"框套框"，
-  这一版不描边、只换底色，够不够轻要看屏。<br>
-  两处先说明，免得当成我漏画：分类行那几枚<b>没有选中态标记</b>（10-16 他一句「不要加粗，不要纯黑，下划线也一样」撤掉的，
-  现网就是这样）；分类名<b>三枚一律标"示意"</b>——真机上除了"全部"那一枚，其余每枚都是用户自己起的名字，
-  而 <code>palette</code> 里那枚"墨黑"是配色常量、不是屏上的分类名。
+  <b>这一轮不再画甲</b>（他倾向乙）；上一版那张带甲的 PNG 在提交 <code>8a909cd</code> 里，要回头看随时抽得出来。<br>
+  三处先说明，免得当成我漏画或我替他定了：
+  ① 分类行那几枚<b>没有选中态标记</b>（10-16 他一句「不要加粗，不要纯黑，下划线也一样」撤掉的，现网就是这样）；
+  分类名<b>一律标"示意"</b>——真机上除"全部"那一枚，其余每枚都是用户自己起的名字。
+  ② 那条<b>线</b>在参考图里是一条约 8px 厚的浅灰骨架条（占位用的），我把它收成 2px 一条细轨、把标识挂在轨前头——
+  <b>这一改是我的手法，他没点到粗细</b>，两档都能画，看屏挑。
+  ③ 标识<b>配色</b>：主稿（乙·优化版）全用同一支墨，图例那一格并排画了彩色一版（★ 小黄／♥ 暗红／▢ 与 🔒 墨）——
+  <b>单色还是彩色等他挑，我不替他定</b>。<br>
+  一处<b>没落点</b>要他给话：「返回」那一枚原来挂在被撤掉的那行右端，现在面板右上角给了搜索、左上给了分类管理 ⇒
+  它是搬去左半边、还是就地撤掉？（合一之后这一屏不再往下一层，回第一屏靠底栏那枚 tab。）
 </div>
 <div class="grid">
   <div class="ph"><div class="cap">参考图（他给的那张，原样贴在这里）</div>
     <img class="refimg" src="${REF}" alt="参考图">
     <div class="note">我照的是它的<b>结构与比例</b>：上半照片贯穿到屏高 ${REF_R.bandPct}%，大字页名在左上、右上角一列数字、
-    一枚裸搜索 icon 落在照片段右下；下半一张圆角大玻璃板往上盖住照片 ${G.sheetLift}px，板内一天一组、一组一行一枚浅面卡、
-    卡左文右图。<br>
+    一枚裸搜索 icon 落在照片段右下（<b>这一枚他 10-17 改口要搬进面板右上角，所以稿子里照片段右下已经空着</b>）；
+    下半一张圆角大玻璃板往上盖住照片 ${G.sheetLift}px，板内一天一组、一组一行一枚浅面卡、卡左文右图。<br>
     换掉的"我们的元素"：色板走现网令牌（纸底 ${T.bgPage}／卡底 ${T.bgCard}／浅面 ${T.plateDock}）、
-    页名换成首屏那枚书法位图（<code>assets/title-heading.png</code>，宽 ${G.brandW}px、不透明度 ${G.brandOp}，
-    与真机同一张同一个数）、数字那档吃内嵌细体 <code>WtsjMind</code> 100 与 ${G.statN}px、导航条那一句与分类行吃字典里的值、
-    圆角与阴影吃 ${T.rCard} 与 ${T.shDrop}。<br>
-    <b>没照抄的两处</b>：① 它那张卡有"时间＋标题"两行，他那句只留标题一行；② 它左槽那个大数字下面有一条短杠，
-    我理解成"今天"那一档才画，只标在 14 那一组。</div></div>
-  ${LIVE}${A}${B}${C}${D}${E}${F}
+    页名换成首屏那枚书法位图（宽 ${G.brandW}px、不透明度 ${G.brandOp}，与真机同一张同一个数）、
+    数字那档吃内嵌细体 <code>WtsjMind</code> 100 与 ${G.statN}px、圆角与阴影吃 ${T.rCard} 与 ${T.shDrop}。<br>
+    <b>没照抄的两处</b>：① 它那张卡有"时间＋标题"两行，他那句只留标题一行（今天又补了一行来源在它上面）；
+    ② 它左槽那个大数字下面有一条短杠，我理解成"今天"那一档才画，只标在一组上——<b>这条是我的理解，他没说过</b>。</div></div>
+  ${LIVE}${B}${LEG}${SRC6}${C}${D}${E}${F}
 </div>
 </body></html>`
 
@@ -402,8 +471,9 @@ fs.writeFileSync(HTML, html)
 console.log('✓ HTML 已出 ' + path.relative(ROOT, HTML))
 console.log('  令牌现读：字号 ' + [T.fsBody, T.fsMeta, T.fsTiny, T.fsMicro].join('/') + '　圆角 ' + T.rCard +
   '　纸底 ' + T.bgPage + '　卡底 ' + T.bgCard + '　浅面 ' + T.plateDock)
-console.log('  几何现读：head ' + G.head + '　.h1-txt ' + G.h1Size + '　位图 ' + G.brandW + '@' + G.brandOp +
-  '　数字 ' + G.statN + '　.xd 宽 ' + G.xdW + '　点 ' + G.dot + '　卡顶上抬 ' + G.sheetLift)
+console.log('  几何现读：head ' + G.head + '　位图 ' + G.brandW + '@' + G.brandOp + '　数字 ' + G.statN +
+  '　.xd 宽 ' + G.xdW + '　点 ' + G.dot + '　卡顶上抬 ' + G.sheetLift + '　分类行距 ' + G.catGap)
+console.log('  来源现读（' + Object.keys(SRC).length + ' 支）：' + Object.keys(SRC).map((k) => srcLabel(zh, k)).join('／'))
 console.log('  参考图量出：照片段 ' + REF_R.bandPct + '%　卡间距 ' + REF_R.cardGap + '　缩略图 ' + REF_R.thumb +
   '　左槽 ' + REF_R.gutW + '　卡左界 ' + REF_R.cardLeft)
 execFileSync('node', [path.join(ROOT, 'docs/工具/出-效果图按页宽.js'), path.relative(ROOT, HTML)], { stdio: 'inherit' })
