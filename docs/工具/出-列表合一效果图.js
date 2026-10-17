@@ -65,7 +65,7 @@ const T = {
   rCard: tok('r-card'), sp4: tok('sp-4'),
   bgPage: tok('bg-page'), bgCard: tok('bg-card'),
   plateDock: /--glass-plate-dock:\s*([^;]+);/.exec(INK)[1].trim(),
-  shLift: tok('sh-lift'), shDrop: tok('sh-drop'),
+  shLift: tok('sh-lift'), shDrop: tok('sh-drop'), shRow: tok('sh-row'),
   ink: /--slide-ink:\s*([^;]+);/.exec(INK)[1].trim(),
 }
 const G = {
@@ -90,7 +90,10 @@ const G = {
   moreColor: rule(idxwxss, '.x-more', 'color'),
 }
 // 参考图量出来的那几档（929px 宽 ⇒ 假定 CSS 375，scale 2.4773；台阶法，量法在 py 脚本头里）
-const REF_R = { bandPct: 54.2, cardGap: 8.5, thumb: 47, gutW: 44, cardLeft: 97 }
+// ⚠ 卡间距这一档 10-17 起**不再写量出来的数**：站长那句"阴影太厚、上下面板几乎连起来"落码之后
+//   净距从 17rpx 抬到 28rpx，稿子改成现读 `.ixl-row` 的 margin-bottom，两边同一把尺子。
+const REF_R = { bandPct: 54.2, thumb: 47, gutW: 44, cardLeft: 97 }
+REF_R.cardGap = R(rpxOf(idxwxss, '.ixl-row', 'margin-bottom'))
 
 // ── 屏上每句话：按字典键取，键名缺了就抛
 function need(dict, k) {
@@ -314,7 +317,7 @@ const html = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
 :root{
   --fs-body:${pxize(T.fsBody)}; --fs-meta:${pxize(T.fsMeta)}; --fs-tiny:${pxize(T.fsTiny)}; --fs-micro:${pxize(T.fsMicro)};
   --r-card:${R(parseFloat(T.rCard))}px; --bg-page:${T.bgPage}; --bg-card:${T.bgCard};
-  --plate:${T.plateDock}; --sh-lift:${pxize(T.shLift)}; --sh-drop:${pxize(T.shDrop)}; --ink:${T.ink};
+  --plate:${T.plateDock}; --sh-lift:${pxize(T.shLift)}; --sh-drop:${pxize(T.shDrop)}; --sh-row:${pxize(T.shRow)}; --ink:${T.ink};
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#EDEAE3;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;padding:34px;color:#22252B}
@@ -404,7 +407,7 @@ img{max-width:100%}
 .gut i{display:block;width:14px;height:2px;border-radius:1px;background:rgba(44,47,54,.35);margin:6px auto 0}
 .gbody{flex:1;min-width:0}
 .row{display:flex;align-items:center;gap:10px;margin:0 0 ${REF_R.cardGap}px;padding:10px 12px;border-radius:14px;
-  min-width:0;background:var(--plate);box-shadow:var(--sh-drop)}
+  min-width:0;background:var(--plate);box-shadow:var(--sh-row)}
 .rd{width:${G.xdW}px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4.5px}
 .rd span{font-family:"WtsjMind","Poppins",sans-serif;font-weight:100;font-size:var(--fs-meta);line-height:1;
   color:rgba(44,47,54,.72)}
@@ -477,7 +480,7 @@ img{max-width:100%}
     下半一张圆角大玻璃板往上盖住照片 ${G.sheetLift}px，板内一天一组、一组一行一枚浅面卡、卡左文右图。<br>
     换掉的"我们的元素"：色板走现网令牌（纸底 ${T.bgPage}／卡底 ${T.bgCard}／浅面 ${T.plateDock}）、
     页名换成首屏那枚书法位图（宽 ${G.brandW}px、不透明度 ${G.brandOp}，与真机同一张同一个数）、
-    数字那档吃内嵌细体 <code>WtsjMind</code> 100 与 ${G.statN}px、圆角与阴影吃 ${T.rCard} 与 ${T.shDrop}。<br>
+    数字那档吃内嵌细体 <code>WtsjMind</code> 100 与 ${G.statN}px、圆角吃 ${T.rCard}、卡影吃从全站那本尊分出来的 <code>--sh-row</code>（＝${T.shRow}，比 <code>--sh-drop</code> 薄一档，站长 10-17「阴影太厚」那一刀）。<br>
     <b>没照抄的两处</b>：① 它那张卡有"时间＋标题"两行，他那句只留标题一行（今天又补了一行来源在它上面）；
     ② 它左槽那个大数字下面有一条短杠，我理解成"今天"那一档才画，只标在一组上——<b>这条是我的理解，他没说过</b>。</div></div>
   ${LIVE}${B}${LEG}${SRC6}${C}${D}${E}${F}

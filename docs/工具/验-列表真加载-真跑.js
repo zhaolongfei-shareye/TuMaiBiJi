@@ -106,6 +106,29 @@ const ck = (name, ok, got) => {
 
   await mp.evaluate(() => { delete globalThis.__errCap })
 
+  // ⑥ 卡与卡之间的**净距**用布局算出来的 rect 量，不拿像素量。
+  // 为什么搬到这里：像素那一把（`量-卡距与阴影-两图对比.py`）判"这一行是不是卡面"要靠一支亮度阈值，
+  // 而五档心情那支浅面（`--glass-plate-dock`）在墨档压出"比面板亮 9 级"、在雨雾档压出"比面板暗 17 级"，
+  // 同一把尺子换一档就切出 0 张卡——量法跟着皮的档位漂，读数就不能当判据。
+  // rect 与皮无关：净距＝下一行顶 − 上一行底，应当等于 CSS 里那 28rpx（1rpx＝窗口宽／750）。
+  const rowEls = await page.$$('.ixl-row')
+  const boxes = []
+  for (const el of rowEls.slice(0, 6)) {
+    const o = await el.offset()
+    const s = await el.size()
+    boxes.push({ top: Number(o.top), h: parseFloat(s.height) })
+  }
+  const winW = await mp.evaluate(() => wx.getSystemInfoSync().windowWidth)
+  const perRpx = winW / 750
+  const gaps = []
+  for (let i = 0; i + 1 < boxes.length; i++) gaps.push((boxes[i + 1].top - (boxes[i].top + boxes[i].h)) / perRpx)
+  const gTxt = gaps.map((g) => g.toFixed(1)).join('／')
+  ck('⑥ 相邻两行的净距＝CSS 那 28rpx（站长 10-17「上下面板几乎连起来」那一刀的落点）',
+    boxes.length >= 2 && gaps.every((g) => g > 26 && g < 30),
+    `窗口宽 ${winW}px⇒1rpx=${perRpx.toFixed(3)}px，量到净距 ${gTxt || '(不足两行)'}`)
+  console.log(`  · 行高（rpx）：${boxes.map((b) => (b.h / perRpx).toFixed(1)).join('／')}`
+    + `　这一档是"卡自己多高"，与净距两枚一起才决定"看不看得出缝"`)
+
   // 收尾留一张真数据的屏：上一轮就是"断言全绿可没人看过一眼"，而红恰好是断言够不着的那半句。
   const OUT = path.resolve(ROOT, 'docs/design/10-17列表合一/实测')
   fs.mkdirSync(OUT, { recursive: true })

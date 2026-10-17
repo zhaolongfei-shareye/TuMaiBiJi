@@ -37,6 +37,12 @@ const rule = (src, sel) => {
 }
 const appWxss = fs.readFileSync(P('app.wxss'), 'utf8')
 const appWxssRule = (sel) => rule(appWxss, sel)
+// 取 `page{}` 里那一枚令牌的字面值：先剥注释再扫，否则注释里那句"故意不复用 --sh-drop"会被当成声明。
+const APPSTRIP = appWxss.replace(/\/\*[\s\S]*?\*\//g, '')
+const APPDECL = (name) => {
+  const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(APPSTRIP)
+  return m ? m[1].trim() : ''
+}
 
 // 10-04 六枚压成四枚：WALLS 是"现在真实存在的四套"，LEGACY 是"服务端可能还存着的旧 key"。
 // 旧 key 不再有自己的派生色——themeOf 一层别名把它们送到这四枚之一，所以它们只配被验一件事。
@@ -231,9 +237,24 @@ ok('整行只有一个落点：点一行浮详情窗，三枚标识与那条线�
 // ⚠ 原来这条写的是 `!/border(?!-radius)/`——那一行没有 `box-sizing: border-box`，扫不到别的。
 //    现在这一块有 `border-box` 与 `border-radius`，`(?!-radius)` 对 "-box" 是放行 ⇒ 假红。
 //    改成按**描边这三形**扫：`border:` 简写、`border-color/width/style`、以及 inset 补画的那圈。
-ok('行是一块浅面：面吃 `--glass-plate-dock`、影吃 `--sh-drop`，自己一圈描边都没有',
-  /background: var\(--glass-plate-dock\)/.test(rowRule) && /box-shadow: var\(--sh-drop\)/.test(rowRule)
+ok('行是一块浅面：面吃 `--glass-plate-dock`、影吃薄那一枚 `--sh-row`，自己一圈描边都没有',
+  /background: var\(--glass-plate-dock\)/.test(rowRule) && /box-shadow: var\(--sh-row\)/.test(rowRule)
   && !/border\s*:/.test(rowRule) && !/border-(color|width|style)/.test(rowRule) && !/inset/.test(rowRule))
+// ⑦-b「阴影太厚、上下面板几乎连起来」（站长 10-17）⇒ 两枚数一起钉：净距抬到 28、影比全站那本尊薄。
+// 薄是**相对**判据（不写死字面量，免得以后调本尊这一条跟着假红）：偏移、模糊、α 三样都不许 ≥ 本尊。
+ok('卡距与阴影照站长那张参考原件收：净距 28rpx，且 `--sh-row` 三样都比 `--sh-drop` 薄',
+  /margin-bottom:\s*28rpx/.test(rowRule)
+  && (() => {
+    // 投影字面量里的数按 `x偏移 y偏移 模糊` 那三档取（第 4 个起是 rgba 的分量，别混进来）
+    const geo = (s) => (s.match(/-?[\d.]+rpx|-?\d+(?=\s)/g) || []).slice(0, 3).map(parseFloat)
+    const alpha = (s) => { const m = /rgba\([^)]*?,\s*([\d.]+)\s*\)/.exec(s); return m ? +m[1] : NaN }
+    const R = APPDECL('sh-row'), D = APPDECL('sh-drop')
+    const rg = geo(R), dg = geo(D)
+    return rg.length === 3 && dg.length === 3
+      && rg[0] === 0 && rg[1] === 6 && rg[2] === 14
+      && dg[0] === 0 && dg[1] === 12 && dg[2] === 28
+      && alpha(R) < alpha(D) && alpha(D) === 0.16
+  })())
 // ⑧横向内缩：`.sheet` 那 24 是给"整屏不往右缩"用的，所以组、左槽、轨都不许再补一份 24。
 // 但行那一块**自己是张卡**（浅面），它那份 24 是卡的内缩、不是屏的内缩——上一版没这一层，
 // 所以那时"任何一段里有 24rpx 横向 padding"就是坏；现在只有那一行是合法的。

@@ -548,18 +548,21 @@
 
 /* 一行一篇：一块浅面，**不描边**（09-28 那次"框套框"打回的正是描边套描边）。
    面吃 `--glass-plate-dock`——五档各有自己的白／彩，与底栏那一排"浮在卡面上的东西"同一枚；
-   影吃 `--sh-drop`（与 `--sh-lift` 只差一个方向，五档必须同值 .16）。 */
+   影吃 `--sh-row`（＝`--sh-drop` 薄一档的那一枚，10-17 站长那句"阴影太厚"之后从全站那本尊分出来的，
+   本尊仍归首屏 `.ai-line` 与面板用，一个字没动）。
+   站长 10-17「每条笔记的面板阴影太厚，上下面板几乎连起来」⇒ 卡距 17→28、阴影换薄那一枚，两刀一起。
+   数是从他给的那张参考原件量的（净距 ≈29rpx、缝里几乎读不出暗环），量法 `docs/工具/量-卡距与阴影-两图对比.py`。 */
 .ixl-row {
   box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 20rpx;
   min-width: 0;
-  margin-bottom: 17rpx;
+  margin-bottom: 28rpx;
   padding: 20rpx 24rpx;
   border-radius: var(--r-chip);
   background: var(--glass-plate-dock);
-  box-shadow: var(--sh-drop);
+  box-shadow: var(--sh-row);
 }
 
 .ixl-row:active {
