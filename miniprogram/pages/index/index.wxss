@@ -861,13 +861,14 @@
   gap: 10rpx;
 }
 
+/* 标签弱化（站长 10-17 深夜：「弱化标签，只需要显示标签名字，灰字，不加底色，不加粗」）。
+   灰档不另造，吃现成的 `--text-tertiary`（压窗白实测 12.12:1，比原来那档 `--cat-ink` 更稳）；
+   字号仍 `--fs-tiny`，只撤 `font-weight`／`background`／`border-radius`／`padding` 四样。
+   ⚠ 撤了 padding 之后每一枚的上下沿比原来矮 10rpx，那一排的折行行距靠 `.ds-tags` 的 gap 撑，
+   所以 gap 那 10rpx 不动——动了就成了"标签挤成一坨"。 */
 .ds-tag {
   font-size: var(--fs-tiny);
-  font-weight: 700;
-  color: var(--cat-ink);
-  background: var(--cat-chip);
-  border-radius: 8rpx;
-  padding: 5rpx 12rpx;
+  color: var(--text-tertiary);
 }
 
 .ds-lab {
@@ -921,51 +922,68 @@
   word-break: break-all;
 }
 
-/* ---------- v22：窗内头一排两列（左标题那一叠 + 右这篇留过的卡片） ----------
-   窗内净宽 634 = 750 − 左右窗边 24×2 − .ds-in 内缩 34×2，分给 358 + 24 + 252。
-   私密笔记那一格不出（现网那条 wx:if 照搬），左列就摊满整宽。 */
-.ds-hero {
-  display: flex;
-  align-items: flex-start;
-  gap: 24rpx;
-}
-
-.ds-hero .ds-lt {
-  flex: 1;
-  min-width: 0;
-}
-
-.ds-hero.solo .ds-lt {
+/* ---------- 配图那一块（站长 10-17 深夜：「固定高度图片区…通栏大图滑动，显示数字，和下方圆点，横杠」） ----------
+   三档数是照他附的那张视频号截图量的，不是挑的（量法与像素区间写在 docs/工具/出-详情窗抬头色块效果图.js 头上）：
+     图区 高＝宽×0.5627 ⇒ 窗内通栏 702rpx 配 395rpx；圆点 11rpx；当前那枚是 25×11rpx 的横杠；点与点间距 6rpx。
+   图区高是**定高**，所以不会有"图片盒子被夹扁"那一坑（只定宽不定高才需要 widthFix）；
+   `mode="aspectFill"` ＝ 铺满图区、竖图上下被裁（要左右留白那种就换 aspectFit，是一行的事）。
+   ⚠ 这一族挂在 `.ds-in` 外面：内缩 34rpx 一挂上左右就让出去了，那就不叫通栏。
+   原来那排 180rpx 小方格（`.ix-shots`/`.ix-shot`）与头一排两列（`.ds-hero`）整套撤净。 */
+.ds-fig {
   flex: none;
   width: 100%;
-}
-
-/* 详情窗里那一排配图（站长 10-17 深夜「详情窗里加一排配图小图，点了拉大图」）。
-   数全部照独立详情页那排（detail.wxss 的 `.dt-shots`／`.dt-shot`：横滑、180 见方、
-   `--r-block` 圆角、图没落下来那一格不是白的），两页同一组数——`验-详情窗那一排配图` 钉着相等。
-   定宽定高＋`aspectFill`，所以不会有"图片盒子被夹扁"那一坑（只定宽不定高才需要 widthFix）。 */
-.ix-shots {
-  flex: none;
-  width: 100%;
+  height: 395rpx;
   margin-top: 24rpx;
-  white-space: nowrap;
-}
-
-.ix-shot {
-  display: inline-block;
-  width: 180rpx;
-  height: 180rpx;
-  margin-right: var(--sp-2);
-  border-radius: var(--r-block);
   background: var(--accent-soft);
 }
 
-.ix-shot:last-child {
-  margin-right: 0;
+.ds-fig-img {
+  width: 100%;
+  height: 395rpx;
 }
 
-/* 右上那一格本身（`.ds-rt` / `.ds-pad` / `.ds-pad-img`）10-07 搬进 `app.wxss`——
-   详情页要画同一格，尺寸必须逐寸一样，不能有两份。这里只留这一页的分栏。 */
+/* 数字那一枚照参考图：浅灰实底压白字。实测 1.84:1（远低于 UI 元素那道 3）——
+   照抄还是抬深他没拍，这一行就是那个"照抄"的落点，要改只改这两个色。 */
+.ds-cnt {
+  margin-top: 20rpx;
+  padding-right: 34rpx;
+  text-align: right;
+}
+
+.ds-cnt-n {
+  display: inline-block;
+  min-width: 78rpx;
+  height: 51rpx;
+  line-height: 51rpx;
+  text-align: center;
+  border-radius: var(--r-pill);
+  background: #BFBFBF;
+  color: #FFFFFF;
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.ds-dots {
+  margin-top: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+}
+
+.ds-dot {
+  width: 11rpx;
+  height: 11rpx;
+  border-radius: 50%;
+  background: #E4E4E4;
+}
+
+/* 当前那枚不是点，是横杠：只加宽，高度与圆点同一档，圆角跟着半径走 */
+.ds-dot.on {
+  width: 25rpx;
+  border-radius: 6rpx;
+  background: #191919;
+}
 
 /* 来源链接下面那行小字（站长 10-03 原话："链接无法直接打开，可复制链接在浏览器打开"）。
    现网那枚链接点了就是"已复制"，不说明的话人会以为是我们没做。 */

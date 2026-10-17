@@ -209,44 +209,45 @@
     <scroll-view class="ds-body" scroll-y show-scrollbar="{{false}}"
       scroll-into-view="{{dsTo}}" scroll-with-animation="{{true}}">
       <view class="ds-in" id="ds-top">
-      <!-- 头一排两列：左标题那一叠，右这篇留过的卡片。窗内净宽 634 = 358 + 24 + 252。
-           站长 10-17 深夜这一句改了"没卡片"那一态：「如果没卡片图，这个位置就完全被标题占满」
-           ⇒ 那一格整块不画（原来这里画的是一枚淡底方形＋一个＋＋两句"分享为图片／还没有卡片"，
-           制作卡片的口挪到下面那枚「分享笔记」），左列跟着摊满整宽。
-           摊满走的是私密篇原来那一条 `.solo`，两态共用一条规则，不另起第二份皮。
-           出卡片那两态（有卡片／没卡片）现在都还过私密那道闸：私密篇连那一格都不给看。 -->
-      <view class="ds-hero {{detailNote.is_private || !detailCards.length ? 'solo' : ''}}">
-        <view class="ds-lt">
-          <view class="ds-meta">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</view>
-          <view class="ds-h2">{{detailNote.title}}</view>
-          <view class="ds-tags" wx:if="{{detailNote.tags && detailNote.tags.length}}">
-            <text class="ds-tag" wx:for="{{detailNote.tags}}" wx:key="*this" wx:for-item="tg">{{tg}}</text>
-          </view>
-        </view>
-        <view class="ds-rt" wx:if="{{!detailNote.is_private && detailCards.length}}">
-          <block>
-            <!-- 一篇一张，所以这一格没有 ‹ i/n ›：点它就是拉起这一张的大图（站长 10-03 23:40，
-                 10-17 深夜他追那一句"小图拉起大图的动作还保留"） -->
-            <view class="ds-pad ds-entry" catchtap="onCardCell">
-              <image class="ds-pad-img" src="{{detailCards[0].p}}" mode="aspectFit" />
-            </view>
-          </block>
-        </view>
+      <!-- 抬头（站长 10-17 深夜两句：「统一把右侧的笔记卡片图位置去掉，标题统一贯穿」＋
+           「大图上方是我们标题，不加背景色了，恢复之前那种标题设计」）：
+           头一排那两列分栏撤了 ⇒ 来源／标题／标签三行摊满整宽，标题底下不再有这篇留过的卡片那一格。
+           `.ds-rt`/`.ds-pad` 本体留在 `app.wxss` 没删——独立详情页那一屏还在用，这一轮没动它。
+           标签跟着他这一句弱化了（「只需要显示标签名字，灰字，不加底色，不加粗」），写法见 index.wxss 的 `.ds-tag`。 -->
+      <view class="ds-meta">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</view>
+      <view class="ds-h2">{{detailNote.title}}</view>
+      <view class="ds-tags" wx:if="{{detailNote.tags && detailNote.tags.length}}">
+        <text class="ds-tag" wx:for="{{detailNote.tags}}" wx:key="*this" wx:for-item="tg">{{tg}}</text>
+      </view>
       </view>
 
-      <!-- 配图那一排（站长 10-17 深夜：「详情窗里加一排配图小图，点了拉大图」）。
-           独立详情页今天就有这一排，这里是照它同一组数搬过来（180 见方、`--r-block` 圆角、
-           横滑、点一下走 `wx.previewImage` 全屏大图），不是另起一张皮。
-           ⚠ 私密篇不画：`_openDetail` 对私密那一趟压根不发请求。
+      <!-- 配图（站长 10-17 深夜：「配图改为这种形式，固定高度图片区（如果不配图，这部分空间就隐藏），
+           通栏大图滑动，显示数字，和下方圆点，横杠」）。三档数是照他附的那张截图量的：
+           图区高＝宽×0.5627（窗内通栏 702 ⇒ 395）、圆点 11rpx、当前那枚是 25×11rpx 的横杠、间距 6rpx。
+           通栏＝挂在 `.ds-in` 外面：那 34rpx 内缩一挂上左右就让出去了，那就不叫通栏。
+           没有配图这一整块（图区＋数字＋点）都不渲染，不留占位框。
+           ⚠ 私密篇不画：`_openDetail` 对私密那一趟压根不发 assets 请求。
            列表那一趟只给一栏 `cover_file_id`（右侧那枚封面），一排图要逐篇问一次
            `/api/notes/{id}/assets`，所以只在开窗看这一篇时发。 -->
-      <view wx:if="{{detailImages.length}}" class="ds-lab">{{t.shotsLabel}}</view>
-      <scroll-view wx:if="{{detailImages.length}}" class="ix-shots" scroll-x show-scrollbar="{{false}}">
-        <image wx:for="{{detailImages}}" wx:key="id" class="ix-shot"
-          src="{{item.cloud_url}}" mode="aspectFill" lazy-load
-          catchtap="onPreviewDetailImage" data-url="{{item.cloud_url}}" />
-      </scroll-view>
+      <block wx:if="{{detailImages.length}}">
+        <swiper class="ds-fig" current="{{dsFigAt}}" circular="{{false}}"
+          indicator-dots="{{false}}" bindchange="onDsFigChange">
+          <swiper-item wx:for="{{detailImages}}" wx:key="id" wx:for-item="im">
+            <image class="ds-fig-img" src="{{im.cloud_url}}" mode="aspectFill" lazy-load
+              catchtap="onPreviewDetailImage" data-url="{{im.cloud_url}}" />
+          </swiper-item>
+        </swiper>
+        <!-- 只有一张：数字与那一排点都不画（一条没有"下一张"的滑动条是噪音）。这条他没拍过，写在报告里。 -->
+        <view wx:if="{{detailImages.length > 1}}" class="ds-cnt">
+          <text class="ds-cnt-n">{{dsFigAt + 1}}/{{detailImages.length}}</text>
+        </view>
+        <view wx:if="{{detailImages.length > 1}}" class="ds-dots">
+          <view wx:for="{{detailImages}}" wx:key="id" wx:for-item="im"
+            class="ds-dot {{index === dsFigAt ? 'on' : ''}}"></view>
+        </view>
+      </block>
 
+      <view class="ds-in">
       <view class="ds-lab" wx:if="{{detailNote.summary}}">{{t.summaryLabel}}</view>
       <view class="ds-para" wx:if="{{detailNote.summary}}">{{detailNote.summary}}</view>
 

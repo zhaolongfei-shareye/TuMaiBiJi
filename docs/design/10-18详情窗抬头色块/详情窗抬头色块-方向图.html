@@ -1,0 +1,251 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
+<title>详情窗抬头 · 方向图（10-18 第三稿，代码一行没动）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1c1e22;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;padding:34px;color:#eee}
+h1{font-size:19px;font-weight:700;margin-bottom:6px}
+.lead{font-size:12.5px;color:#9aa0a6;margin-bottom:26px;line-height:1.7;max-width:1180px}
+.lead b{color:#cfe3f7}
+.row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.phone{position:relative;width:375px;height:760px;border-radius:30px;overflow:hidden;background:#0e1013;box-shadow:0 18px 40px rgba(0,0,0,.5)}
+.status{position:absolute;top:0;left:0;right:0;height:34px;display:flex;align-items:center;padding:0 16px;font-size:12px;font-weight:600;color:#fff;z-index:6}
+.status i{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.55);margin-left:4px}
+.status i:first-of-type{margin-left:auto}
+.nav{position:absolute;top:34px;left:0;right:0;height:44px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#222;background:#e9eef0;z-index:5}
+.nav .pill{position:absolute;right:8px;font-size:11px;font-weight:400;color:#333;background:rgba(255,255,255,.86);border-radius:999px;padding:5px 10px}
+.bg{position:absolute;top:78px;left:0;right:0;height:190px;background:linear-gradient(160deg,#8fb0a2 0%,#6d8f83 42%,#4f6f66 100%)}
+.dim{position:absolute;inset:0;background:rgba(10,12,16,.42)}
+.sheet{position:absolute;left:12px;right:12px;top:65px;bottom:96px;
+  background:#F3F3F1;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 15px 30px rgba(8,10,14,.32)}
+.grip{position:relative;height:44px;flex:none;display:flex;align-items:center;justify-content:center}
+.grip b{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:56px;height:4px;border-radius:999px;background:rgba(35,37,44,.18)}
+.grip em{position:absolute;right:17px;top:0;font-size:NaNpx;font-style:normal;color:rgba(35,37,44,.45)}
+.scr{flex:1;min-height:0;overflow:hidden}
+.dock{flex:none;padding:9px 17px 10px;border-top:1px solid rgba(35,37,44,.08);background:#F3F3F1}
+.irow{display:flex;gap:7px}
+.irow span{flex:1;height:36px;border-radius:999rpx;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:#23252C;background:rgba(53, 46, 29, 0.07);white-space:nowrap;
+  box-shadow:inset 0 0 0 0.75px rgba(53, 46, 29, 0.12)}
+.irow span.d{color:#8c2119;box-shadow:inset 0 0 0 0.75px rgba(140,33,25,.24)}
+.pub{margin-top:6px;display:flex;justify-content:space-between;font-size:NaNpx;color:rgba(35,37,44,.45)}
+.pub em{font-style:normal;color:rgba(35,37,44,.62);text-decoration:underline}
+.more{margin-top:10px;text-align:center;font-size:NaNpx;color:rgba(35,37,44,.55)}
+.cap{font-size:13px;font-weight:700;line-height:1.55;margin-bottom:5px}
+.sub{font-size:11px;color:#8fb3d9;line-height:1.6;margin-bottom:10px}
+.sub b{color:#cfe3f7;font-weight:700}
+.sub .no{color:#e0876a;font-weight:700}
+.note{font-size:11.5px;color:#9aa0a6;line-height:1.75;margin-top:10px}
+
+.s1 .h { padding-top:14px; }
+.s1 .h .meta { font-size:12px; color:rgba(35, 37, 44, 0.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.s1 .h .title { margin-top:4px; font-size:23px; font-weight:800; letter-spacing:-0.45px; line-height:1.3; color:rgba(35, 37, 44, 0.9); }
+.s1 .h .tags { margin-top:7px; display:flex; flex-wrap:wrap; gap:5px; }
+.s1 .h .tag { font-size:10.5px; font-weight:400; color:rgba(53, 46, 29, 0.72); }
+
+.s1 .fig { margin-top:12px; height:197.5px; position:relative; overflow:hidden; background:#e9e7e2; }
+.s1 .fig .pic { position:absolute; top:0; bottom:0; left:0; right:0; background:linear-gradient(168deg,#7f9a86 0%,#5c7d6b 38%,#3f5a4d 62%,#28392f 100%); }
+.s1 .fig .tag2 { position:absolute; right:8px; bottom:8px; font-size:NaNpx; color:rgba(255,255,255,.86); background:rgba(20,22,26,.34); border-radius:4px; padding:2px 5px; }
+.s1 .cnt { margin-top:10px; text-align:right; padding-right:17px; }
+.s1 .cnt b { display:inline-block; min-width:39px; height:25.5px; line-height:25.5px; text-align:center; border-radius:999rpx; background:#BFBFBF; color:#FFFFFF; font-size:NaNpx; font-weight:600; }
+.s1 .dots { margin-top:11px; display:flex; align-items:center; justify-content:center; gap:3px; }
+.s1 .dots i { width:5.5px; height:5.5px; border-radius:50%; background:#E4E4E4; }
+.s1 .dots i.on { width:12.5px; border-radius:2.75px; background:#191919; }
+.s1 .below { padding-top:15px; }
+.s1 .below .lab { font-size:10px; font-weight:800; letter-spacing:0.8px; color:rgba(35, 37, 44, 0.42); }
+.s1 .below .para { margin-top:6px; font-size:14px; line-height:1.7; color:rgba(35, 37, 44, 0.7); }
+
+.s2 .h { padding-top:14px; }
+.s2 .h .meta { font-size:12px; color:rgba(35, 37, 44, 0.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.s2 .h .title { margin-top:4px; font-size:23px; font-weight:800; letter-spacing:-0.45px; line-height:1.3; color:rgba(35, 37, 44, 0.9); }
+.s2 .h .tags { margin-top:7px; display:flex; flex-wrap:wrap; gap:5px; }
+.s2 .h .tag { font-size:10.5px; font-weight:400; color:rgba(53, 46, 29, 0.72); }
+
+.s2 .fig { margin-top:12px; height:197.5px; position:relative; overflow:hidden; background:#e9e7e2; }
+.s2 .fig .pic { position:absolute; top:0; bottom:0; left:0; right:0; background:linear-gradient(168deg,#7f9a86 0%,#5c7d6b 38%,#3f5a4d 62%,#28392f 100%); }
+.s2 .fig .tag2 { position:absolute; right:8px; bottom:8px; font-size:NaNpx; color:rgba(255,255,255,.86); background:rgba(20,22,26,.34); border-radius:4px; padding:2px 5px; }
+.s2 .cnt { margin-top:10px; text-align:right; padding-right:17px; }
+.s2 .cnt b { display:inline-block; min-width:39px; height:25.5px; line-height:25.5px; text-align:center; border-radius:999rpx; background:#BFBFBF; color:#FFFFFF; font-size:NaNpx; font-weight:600; }
+.s2 .dots { margin-top:11px; display:flex; align-items:center; justify-content:center; gap:3px; }
+.s2 .dots i { width:5.5px; height:5.5px; border-radius:50%; background:#E4E4E4; }
+.s2 .dots i.on { width:12.5px; border-radius:2.75px; background:#191919; }
+.s2 .below { padding-top:15px; }
+.s2 .below .lab { font-size:10px; font-weight:800; letter-spacing:0.8px; color:rgba(35, 37, 44, 0.42); }
+.s2 .below .para { margin-top:6px; font-size:14px; line-height:1.7; color:rgba(35, 37, 44, 0.7); }
+
+.s3 .h { padding-top:14px; }
+.s3 .h .meta { font-size:12px; color:rgba(35, 37, 44, 0.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.s3 .h .title { margin-top:4px; font-size:23px; font-weight:800; letter-spacing:-0.45px; line-height:1.3; color:rgba(35, 37, 44, 0.9); }
+.s3 .h .tags { margin-top:7px; display:flex; flex-wrap:wrap; gap:5px; }
+.s3 .h .tag { font-size:10.5px; font-weight:400; color:rgba(53, 46, 29, 0.72); }
+
+.s3 .below { padding-top:15px; }
+.s3 .below .lab { font-size:10px; font-weight:800; letter-spacing:0.8px; color:rgba(35, 37, 44, 0.42); }
+.s3 .below .para { margin-top:6px; font-size:14px; line-height:1.7; color:rgba(35, 37, 44, 0.7); }
+
+.s4 .h { padding-top:14px; }
+.s4 .h .meta { font-size:12px; color:rgba(35, 37, 44, 0.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.s4 .h .title { margin-top:4px; font-size:23px; font-weight:800; letter-spacing:-0.45px; line-height:1.3; color:rgba(35, 37, 44, 0.9); }
+.s4 .h .tags { margin-top:7px; display:flex; flex-wrap:wrap; gap:5px; }
+.s4 .h .tag { font-size:10.5px; font-weight:400; color:rgba(53, 46, 29, 0.72); }
+
+.s4 .fig { margin-top:12px; height:197.5px; position:relative; overflow:hidden; background:#e9e7e2; }
+.s4 .fig .pic { position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); width:148px; background:linear-gradient(168deg,#9d8aa6 0%,#7a6784 40%,#574a63 100%); }
+.s4 .fig .tag2 { position:absolute; right:8px; bottom:8px; font-size:NaNpx; color:rgba(255,255,255,.86); background:rgba(20,22,26,.34); border-radius:4px; padding:2px 5px; }
+.s4 .cnt { margin-top:10px; text-align:right; padding-right:17px; }
+.s4 .cnt b { display:inline-block; min-width:39px; height:25.5px; line-height:25.5px; text-align:center; border-radius:999rpx; background:#BFBFBF; color:#FFFFFF; font-size:NaNpx; font-weight:600; }
+.s4 .dots { margin-top:11px; display:flex; align-items:center; justify-content:center; gap:3px; }
+.s4 .dots i { width:5.5px; height:5.5px; border-radius:50%; background:#E4E4E4; }
+.s4 .dots i.on { width:12.5px; border-radius:2.75px; background:#191919; }
+.s4 .below { padding-top:15px; }
+.s4 .below .lab { font-size:10px; font-weight:800; letter-spacing:0.8px; color:rgba(35, 37, 44, 0.42); }
+.s4 .below .para { margin-top:6px; font-size:14px; line-height:1.7; color:rgba(35, 37, 44, 0.7); }
+</style></head><body>
+<h1>详情窗抬头 · 方向图（第三稿：图区改通栏大图，色块那两稿作废）</h1>
+<div class="lead">站长 10-17 深夜：「配图改为这种形式，固定高度图片区（如果不配图，这部分空间就隐藏），通栏大图滑动，显示数字，和下方圆点，横杠，大图上方是我们标题，不加背景色了，恢复之前那种标题设计，然后，弱化标签，只需要显示标签名字，灰字，不加底色，不加粗。」
+<b>前两稿那个"标题底下加一层底色色块"整条撤掉了</b>，标题恢复现网那一份。这四屏照这一句画，<b>代码一行没动</b>——真机现在跑的还是一排 180rpx 小方格、标签垫了色块的那一版。
+图区那一族的数是从你附的那张截图上量的（量法写在生成器文件头），字号／窗体几何／标题与摘要那几排全部从现网源码现读。挑一屏（或说改哪几处），我再落码。</div>
+<div class="row">
+<div class="s1"><div class="ph" data-v="1">
+  <div class="cap">甲｜有配图那一篇：通栏固定高图区，停在第 2 张</div>
+  <div class="sub">图区 702×395rpx（照参考图量的 宽×0.5627）｜点 11rpx、当前那枚横杠 25×11rpx、间距 6rpx｜闲时那几枚 #E4E4E4 压窗白实测 <span class="no">1.14:1</span>（这一档照抄过来等于看不见，要抬深）</div>
+  <div class="phone">
+    <div class="status">9:41<i></i><i></i><i></i></div>
+    <div class="nav"><span>我的笔记</span><em class="pill">•••&nbsp;&nbsp;◎</em></div>
+    <div class="bg"></div>
+    <div class="dim"></div>
+    <div class="sheet">
+      <div class="grip"><b></b><em>点一下收起</em></div>
+      <div class="scr"><div class="in h">
+    <div class="meta">截图识别 · 2026-10-17 11:23</div>
+    <div class="title">华语女歌手演唱会大麦想看人数历史排名</div>
+    <div class="tags"><span class="tag">华语女歌手</span><span class="tag">演唱会</span><span class="tag">大麦</span><span class="tag">想看人数</span><span class="tag">排名</span></div>
+  </div>
+  <div class="fig"><div class="pic"></div><div class="tag2">照片位＝示意</div></div><div class="cnt"><b>2/3</b></div><div class="dots"><i class=""></i><i class="on"></i><i class=""></i></div>
+  <div class="in below">
+    <div class="lab">摘要</div>
+    <div class="para">该内容展示了大麦平台上华语女歌手演唱会的历史想看人数排名。孙燕姿南京2025场次以248.4万位居第一，邓紫棋和蔡依林分列二三位。</div>
+    <div class="lab">核心要点</div>
+    <div class="more">显示更多 ⌄</div>
+  </div></div>
+      <div class="dock">
+        <div class="irow"><span>编辑</span><span>分享笔记</span><span class="d">删除</span></div>
+        <div class="pub"><span>这篇已经公开，别人扫码能看</span><em>撤掉分享</em></div>
+      </div>
+    </div>
+    <div class="tabbar"><i></i><i class="on"></i><i></i></div>
+  </div>
+  <div class="note">标题回到现网那一份（46rpx/800、墨色 rgba(35,37,44,.9)，不加任何底块），来源那行在它上面；标签改成灰字不垫底不加粗（--text-tertiary rgba(53, 46, 29, 0.72)）。图区在标签下面，左右通到窗边。</div>
+</div></div>
+<div class="s2"><div class="ph" data-v="2">
+  <div class="cap">乙｜只有一张配图那一篇</div>
+  <div class="sub">只有一张 ⇒ 数字与那一排点都不画（一条没有"下一张"的滑动条是噪音）</div>
+  <div class="phone">
+    <div class="status">9:41<i></i><i></i><i></i></div>
+    <div class="nav"><span>我的笔记</span><em class="pill">•••&nbsp;&nbsp;◎</em></div>
+    <div class="bg"></div>
+    <div class="dim"></div>
+    <div class="sheet">
+      <div class="grip"><b></b><em>点一下收起</em></div>
+      <div class="scr"><div class="in h">
+    <div class="meta">截图识别 · 2026-10-17 11:23</div>
+    <div class="title">华语女歌手演唱会大麦想看人数历史排名</div>
+    <div class="tags"><span class="tag">华语女歌手</span><span class="tag">演唱会</span><span class="tag">大麦</span><span class="tag">想看人数</span><span class="tag">排名</span></div>
+  </div>
+  <div class="fig"><div class="pic"></div><div class="tag2">照片位＝示意</div></div>
+  <div class="in below">
+    <div class="lab">摘要</div>
+    <div class="para">该内容展示了大麦平台上华语女歌手演唱会的历史想看人数排名。孙燕姿南京2025场次以248.4万位居第一，邓紫棋和蔡依林分列二三位。</div>
+    <div class="lab">核心要点</div>
+    <div class="more">显示更多 ⌄</div>
+  </div></div>
+      <div class="dock">
+        <div class="irow"><span>编辑</span><span>分享笔记</span><span class="d">删除</span></div>
+        <div class="pub"><span>这篇已经公开，别人扫码能看</span><em>撤掉分享</em></div>
+      </div>
+    </div>
+    <div class="tabbar"><i></i><i class="on"></i><i></i></div>
+  </div>
+  <div class="note">这一条你没拍过，是我自己定的：一张的时候图区还是那一个高，只是顶上不挂"1/1"、底下不挂一个孤零零的横杠。要留着就说一声。</div>
+</div></div>
+<div class="s3"><div class="ph" data-v="3">
+  <div class="cap">丙｜没有配图那一篇：这一整块空间隐藏</div>
+  <div class="sub">图区／数字／那一排点三样全不占位，标签下面直接是摘要</div>
+  <div class="phone">
+    <div class="status">9:41<i></i><i></i><i></i></div>
+    <div class="nav"><span>我的笔记</span><em class="pill">•••&nbsp;&nbsp;◎</em></div>
+    <div class="bg"></div>
+    <div class="dim"></div>
+    <div class="sheet">
+      <div class="grip"><b></b><em>点一下收起</em></div>
+      <div class="scr"><div class="in h">
+    <div class="meta">截图识别 · 2026-10-17 11:23</div>
+    <div class="title">华语女歌手演唱会大麦想看人数历史排名</div>
+    <div class="tags"><span class="tag">华语女歌手</span><span class="tag">演唱会</span><span class="tag">大麦</span><span class="tag">想看人数</span><span class="tag">排名</span></div>
+  </div>
+  
+  <div class="in below">
+    <div class="lab">摘要</div>
+    <div class="para">该内容展示了大麦平台上华语女歌手演唱会的历史想看人数排名。孙燕姿南京2025场次以248.4万位居第一，邓紫棋和蔡依林分列二三位。</div>
+    <div class="lab">核心要点</div>
+    <div class="more">显示更多 ⌄</div>
+  </div></div>
+      <div class="dock">
+        <div class="irow"><span>编辑</span><span>分享笔记</span><span class="d">删除</span></div>
+        <div class="pub"><span>这篇已经公开，别人扫码能看</span><em>撤掉分享</em></div>
+      </div>
+    </div>
+    <div class="tabbar"><i></i><i class="on"></i><i></i></div>
+  </div>
+  <div class="note">你这一句是"如果不配图，这部分空间就隐藏"，画的就是这一屏：不留空档、不留占位框。</div>
+</div></div>
+<div class="s4"><div class="ph" data-v="4">
+  <div class="cap">丁｜竖图那一篇（3:4）：图区照旧那一个高</div>
+  <div class="sub">这一屏画的是 contain（图完整放进、左右各空 203rpx）</div>
+  <div class="phone">
+    <div class="status">9:41<i></i><i></i><i></i></div>
+    <div class="nav"><span>我的笔记</span><em class="pill">•••&nbsp;&nbsp;◎</em></div>
+    <div class="bg"></div>
+    <div class="dim"></div>
+    <div class="sheet">
+      <div class="grip"><b></b><em>点一下收起</em></div>
+      <div class="scr"><div class="in h">
+    <div class="meta">截图识别 · 2026-10-17 11:23</div>
+    <div class="title">华语女歌手演唱会大麦想看人数历史排名</div>
+    <div class="tags"><span class="tag">华语女歌手</span><span class="tag">演唱会</span><span class="tag">大麦</span><span class="tag">想看人数</span><span class="tag">排名</span></div>
+  </div>
+  <div class="fig"><div class="pic"></div><div class="tag2">照片位＝示意</div></div><div class="cnt"><b>2/2</b></div><div class="dots"><i class=""></i><i class="on"></i></div>
+  <div class="in below">
+    <div class="lab">摘要</div>
+    <div class="para">该内容展示了大麦平台上华语女歌手演唱会的历史想看人数排名。孙燕姿南京2025场次以248.4万位居第一，邓紫棋和蔡依林分列二三位。</div>
+    <div class="lab">核心要点</div>
+    <div class="more">显示更多 ⌄</div>
+  </div></div>
+      <div class="dock">
+        <div class="irow"><span>编辑</span><span>分享笔记</span><span class="d">删除</span></div>
+        <div class="pub"><span>这篇已经公开，别人扫码能看</span><em>撤掉分享</em></div>
+      </div>
+    </div>
+    <div class="tabbar"><i></i><i class="on"></i><i></i></div>
+  </div>
+  <div class="note">甲／乙那两屏用的是 cover（铺满图区、竖图上下被裁）。固定高与"通栏大图"在竖图这一篇必然打架：要完整就左右留白，要通栏就得裁。这一屏给你看留白那一种长什么样。另外那枚计数照参考图是浅灰实底 #BFBFBF 压白字，实测 <span class="no">1.84:1</span>（远低于 4.5）——照抄还是换成白字压半透黑，你定。</div>
+</div></div>
+</div>
+<script>
+window.addEventListener('load', function () {
+  var out = []
+  var g = function (sel, f) { var e = document.querySelector(sel); if (!e) return null; out.push(f(e)) }
+  g('.s1 .title', function (e) { var c = getComputedStyle(e); return 'title=' + c.fontSize + '/' + c.fontWeight + '/' + c.color })
+  g('.s1 .tag', function (e) { var c = getComputedStyle(e); return 'tag=' + c.fontSize + '/' + c.fontWeight + '/' + c.color + '/bg:' + c.backgroundColor })
+  g('.s1 .fig', function (e) { var r = e.getBoundingClientRect(); var s = document.querySelector('.s1 .sheet').getBoundingClientRect(); return 'fig=' + Math.round(r.width) + 'x' + r.height + ' 通栏' + (Math.abs(r.width - s.width) < 0.6 ? 'OK' : 'NO') })
+  g('.s1 .cnt b', function (e) { var r = e.getBoundingClientRect(); return 'cnt=' + Math.round(r.width) + 'x' + r.height + '/' + e.textContent })
+  g('.s1 .dots i', function (e) { var r = e.getBoundingClientRect(); return 'dot=' + r.width + 'x' + r.height })
+  g('.s1 .dots i.on', function (e) { var r = e.getBoundingClientRect(); return 'bar=' + r.width + 'x' + r.height })
+  var has = function (sel) { return !!document.querySelector(sel) }
+  out.push('s2数字=' + has('.s2 .cnt') + ' s2点=' + has('.s2 .dots') + ' s2图区=' + has('.s2 .fig'))
+  out.push('s3图区=' + has('.s3 .fig') + ' s3数字=' + has('.s3 .cnt') + ' s3点=' + has('.s3 .dots'))
+  g('.s4 .pic', function (e) { var r = e.getBoundingClientRect(); return 'pic=' + Math.round(r.width) + 'x' + r.height })
+  g('.s1 .scr', function (e) { return '折线外=' + (e.scrollHeight - e.clientHeight) + 'px' })
+  document.title = 'PROBE ' + out.filter(Boolean).join(' | ')
+})
+</script></body></html>

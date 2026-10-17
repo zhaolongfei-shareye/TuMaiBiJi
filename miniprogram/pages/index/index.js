@@ -129,6 +129,9 @@ Page({
     // 与列表右侧那枚封面不是一件事：那一枚由列表那一趟一栏 `cover_file_id` 带回来，
     // 这一排只有开窗看这一篇时才问一次 `/api/notes/{id}/assets`（私密篇连这一趟都不发）。
     detailImages: [],
+    // 通栏大图停在第几张（10-17 深夜那一句：「显示数字，和下方圆点，横杠」）。
+    // 它是"这一篇的图"的一份游标，开窗与配图到货两处都归 0，不许带着上一配的号进来。
+    dsFigAt: 0,
     posterHasCard: false,
     // 「显示更多」要把正文滚到原文那一段，靠 scroll-into-view 换值才真会滚
     dsTo: '',
@@ -923,7 +926,7 @@ Page({
       detailOpen: true, detailNote: row, origOpen: false, shared: false,
       detailCards: this._cardsOf(row.id), dsTo: '',
       // 上一配的配图不许留在这一屏上：那一排是"这一篇的"，不是全局的一份。
-      detailImages: [],
+      detailImages: [], dsFigAt: 0,
     })
     // 这一篇算不算私密，先按列表那一行那一份猜（本机按分类名现算的），拿到详情再换成服务端钉的。
     let priv = !!row.is_private
@@ -972,11 +975,19 @@ Page({
       // 拿回来的路上窗可能已经关了、或开的是另一篇：对一下号再画，别把上一配的图挂在这一配上。
       const cur = this.data.detailNote
       if (!this.data.detailOpen || !cur || cur.id !== noteId) return
-      this.setData({ detailImages: list || [] })
+      this.setData({ detailImages: list || [], dsFigAt: 0 })
     } catch (err) {
       // 配图读不到不该影响这篇笔记本身：那一排不画，正文照看
       console.warn('详情窗配图读取失败（不影响正文）', err && (err.errMsg || err.statusCode))
     }
+  },
+
+  // 通栏大图左右滑：数字那一枚与下面那一排点都跟着这一份游标走（`dsFigAt`）。
+  // 只认 swiper 自己报的 current，不去猜方向。
+  onDsFigChange(e) {
+    const i = Number(e && e.detail && e.detail.current)
+    if (!(i >= 0) || i === this.data.dsFigAt) return
+    this.setData({ dsFigAt: i })
   },
 
   // 点缩略图看大图：整排都给 `previewImage`，所以大图态里左右划能划到这篇其余几张
@@ -1126,11 +1137,10 @@ Page({
 
   // v7 ④：出卡片这一个动作 = 详情窗整个藏掉、只浮模板预览这一个弹窗（两层不叠）。
   // 所以关掉弹窗后回来的是详情窗、里面内容还是这篇。
-  // v22（站长 10-03）：入口从底排那枚按钮挪到右上那一格（有卡片就是那张缩略图，
-  // 一张都没有就是那枚淡底方形），底排不再留第二个把手。
-  // 名字 10-07 改成 `onCardCell`：详情页右上那一格是同一份标记、同一个口，两页绑同一个名字，
-  // 那份"两页那一格一模一样"的尺子才钉得住（各绑各的名字就没法逐字节比）。
-  onCardCell() { return this._openPosterFor(this.data.detailNote) },
+  // 10-17 深夜站长那一句「统一把右侧的笔记卡片图位置去掉」把这一屏唯一的入口撤了，
+  // 所以这里不再有 `onCardCell`：出图那一趟现在只有下面那枚「分享笔记」（`onSheetShare`）一个口，
+  // 它绑的实现与原来那一格是同一个 `_openPosterFor`（一份实现，两枚口）。
+  // 独立详情页那一屏右上那一格与它自己的 `onCardCell` 这一轮没动。
 
   /* §8.232 首启那一张卡片：给服务端刚种下去的那一篇，静默走一遍**和用户自己出图完全同一条链**
      （`_ensurePosterAssets` → `_renderPoster` → `_keepPoster`，一篇一张、生成即上传都在里面）。
