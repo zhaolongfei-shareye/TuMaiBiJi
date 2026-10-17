@@ -59,9 +59,10 @@ ok('C1 老那一页没有被顺手删（他只说"入口关闭"）：app.json �
 ok('C2 输入框长在分类 icon **右手边**（他的原话是"在分类ICON右侧"，不是排在芯片那一行末尾）',
   WXML.indexOf('catchtap="onCatManageTap"') < WXML.indexOf('wx:if="{{catEdit}}"')
   && /wx:if="\{\{catEdit\}\}" class="srch ixl-add"/.test(WXML))
-ok('C2 皮复用搜索那一条 `.srch`，且内联那串 `--chrome-bg` 没省（省了就是 IACVT 透明＝框在屏上消失）',
-  /class="srch ixl-add" style="\{\{searchSkin\}\}"/.test(WXML)
-  && /\.srch\s*\{[^}]*var\(--chrome-bg\)/.test(WXSS))
+ok('C2 皮复用搜索那一条 `.srch`（10-17 夜这一枚与搜索条一起换成淡底＋淡边＋深色字，`--chrome-*` 不留）',
+  /class="srch ixl-add"/.test(WXML) && !/searchSkin/.test(WXML)
+  && /background: var\(--chip-idle\)/.test(WXSS.match(/\.srch\s*\{[^}]*\}/)[0])
+  && !/var\(--chrome-/.test(WXSS.match(/\.srch\s*\{[^}]*\}/)[0]))
 ok('C2 框里的点击不许冒泡成"点了空白"（否则一敲字就保存退出）：外层那一片 catchtap="noop"',
   /class="srch ixl-add"[^>]*catchtap="noop"/.test(WXML))
 ok('C2 占位那一句双语都有，且双语都点得清"空格分开"这件事',

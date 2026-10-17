@@ -53,11 +53,11 @@
        ⚠ 展开那一态整行仍不画（站长 10-05「展开就不提供搜索」那条口径跟着皮一起搬过来）。
        ⚠ 管理态与搜索条两立：`wx:if` 那一支先判 `searchOpen`，进来管理态时 js 先把条子收回。 -->
   <view class="ixl-bar">
-    <view wx:if="{{searchOpen}}" class="srch" style="{{searchSkin}}" catchtap="noop">
+    <view wx:if="{{searchOpen}}" class="srch" catchtap="noop">
       <view class="glyph-search"></view>
       <input
         class="srch-input"
-        focus="{{searchOpen}}"
+        focus="{{searchFocus}}"
         value="{{searchKeyword}}"
         placeholder="{{t.searchPh}}"
         placeholder-class="srch-ph"
@@ -76,12 +76,12 @@
       </view>
       <!-- 管理态：输入框就长在分类 icon 右手边（站长 10-17 原话「设置分类，在分类ICON右侧，
            多一个输入框，代表新增分类，支持同时输入多个新增，用空格区隔」）。
-           皮整条复用搜索那一枚 `.srch`：同一行、同一种输入框，不该有两张皮；
-           ⚠ `style="{{searchSkin}}"` 那一串**不许省**——`--chrome-bg` 只由它内联递进来，
-           不发就是 IACVT 透明，输入框在屏上直接消失（同 index.wxss `.srch` 头那条坑）。
+           皮整条复用搜索那一枚 `.srch`：同一行、同一种输入框，不该有两张皮。
+           站长 10-17「搜索框太深，笔记分类输入框同样，要改为透明输入框状态」⇒ 这一枚与搜索条
+           同一条 `.srch` 规则一起换皮，两枚还是同一张皮，不分第二份。
            外层 `catchtap="noop"`：框里的点击不许冒泡成"点了空白"，否则一敲字就被保存退出。
            这一态没有搜索那枚——两件事不在同一屏办，进管理态时 js 先把条子收回。 -->
-      <view wx:if="{{catEdit}}" class="srch ixl-add" style="{{searchSkin}}" catchtap="noop">
+      <view wx:if="{{catEdit}}" class="srch ixl-add" catchtap="noop">
         <input
           class="srch-input"
           value="{{catNewName}}"

@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
-const { catSkinFor, chromeOf, toneColor, withAlpha, paleStep, TIP_DOT } = require('../../utils/palette.js')
+const { catSkinFor, toneColor, withAlpha, paleStep, TIP_DOT } = require('../../utils/palette.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
@@ -83,7 +83,12 @@ Page({
     catNewName: '',
     loading: true,
     searchKeyword: '',
+    // 两枚分开：`searchOpen` 是"屏上显示着输入关键字那一态"，`searchFocus` 只是"刚点开那一下要键盘"。
+    // 原来 `focus` 直接吃 `searchOpen`，于是这两件事被绑成一件：点开一篇笔记就得先把条子收掉
+    // （否则键盘一直压着详情窗），而条子一收、关键字还留着 ⇒ 返回来只剩一枚放大镜，
+    // 列表却仍按那个词筛着，看着就像"别的笔记打不开了"（站长 10-17 报的那一条）。
     searchOpen: false,
+    searchFocus: false,
     selectedCategory: null,
     lang: 'zh',
     themeClass: 'theme-tint-paper',  // 未登录/首帧的占位：类名必须真的存在，四枚里象牙是 THEMES[0]
@@ -142,10 +147,14 @@ Page({
     noQr: false,
     // 「卡片上的信息」那一层那四个键由 utils/cardInfo.js 给初值（两页共用一份，别各写一份）。
     ...cardInfo.initial(),
-    // 搜索条那一块面不再是一支固定蓝，而是由当前壁纸的页面底派生（palette.chromeOf）。
-    // data 字面量里这一次是模块加载时算的，主题还没落地，所以按 default 走——
-    // 和 themeOf 拿不到 key 时回落 THEMES[0] 是同一条规则，不是另写一份兜底色。
-    searchSkin: chromeOf().style,
+    // 搜索条与分类输入框那一格不再有一支派生色：站长 10-17「搜索框太深，笔记分类输入框同样，
+    // 要改为透明输入框状态…类似邮箱输入框那种风格，淡淡的框体，还是深色字体」⇒ 皮抄 `.me-email-field`
+    // 那三条令牌（`--chip-idle` 面＋`--card-edge` 淡边＋`--text-primary` 深色字），全走 wxss 的类。
+    // 于是这一页不再需要 `--chrome-*` 那一场内联变量：`searchSkin` 这一格、`onShow` 里那一次重算、
+    // wxml 两处 `style="{{searchSkin}}"` 一起撤。⚠ 撤的是**这一页的消费**，不是那个派生函数——
+    // 底栏胶囊与实心按钮仍由 palette 的 chromeOf／moodChromeOf 一处给（`--chrome-bg` 那两条仍在 app.wxss）。
+    // 「不发内联变量 ⇒ `background: var(--chrome-bg)` 当场 IACVT 成透明」那条坑随这一刀自然消失：
+    // 现在屏上那层透明是**要的**，边框由 inset box-shadow 画，不靠变量。
     // 头部那一段铺不铺图：'' 表示不铺（用户在外观设置里关掉了，或形象文件被系统清了）。
     // 取图和新建页同一个口，不在这页另开一份判断。
     bgSrc: '',
@@ -186,12 +195,6 @@ Page({
       // 上面的背景图，不需要跟随首页调亮度。首页调亮度只影响首屏和第二屏」）⇒ 锁在默认那一档，
       // 理由与"为什么不是完全不压暗"都写在 app.bgSkinLocked() 那一段。
       ...app.bgSkinLocked(),
-      // 搜索条那一块面由当前壁纸的页面底派生（palette.chromeOf），和底部导航那条胶囊同一个值；
-      // 每次进页重算，留着 data 字面量那份就等于永远停在象牙那一档。
-      // ⚠ 原来这里有一道"铺了图就整串不发"的闸（为了让 CSS 里那三条"图上换成纸白面"翻得动）。
-      // 10-17 搜索搬进圆角卡，那三条覆盖随 `.tools` 一起删了 ⇒ 闸也跟着拆：
-      // 变量不发，`.srch` 的 `background: var(--chrome-bg)` 会 IACVT 成 transparent，条子直接消失。
-      searchSkin: chromeOf(wallpaper).style,
       // 右上那枚淡底方形跟着壁纸走（象牙 #EAE0CE / 天青 #DDE7DF / 其余从窗口纸白掺 8% 墨）
       swatchBg: paleStep(wallpaper),
     })
@@ -451,13 +454,17 @@ Page({
   },
 
   onOpenSearch() {
-    this.setData({ searchOpen: true })
+    this.setData({ searchOpen: true, searchFocus: true })
   },
 
   // 搜索条收在分类那一行里（09-30 v8，站长："搜索条目前看起来太大，不美观"）。
-  // 展开时 `focus="{{searchOpen}}"` 直接把键盘带起来。
+  // 展开时 `focus="{{searchFocus}}"` 把键盘带起来一次；之后键盘开不开由 `searchFocus` 单独管，
+  // 不再跟"屏上是不是输入关键字那一态"绑成一枚（站长 10-17 报的那一条的病根就在这一绑上）。
   // 点条子以外的**真空白**：管理态里那一下是"存"（站长 10-17 原话「然后点击页面空白区，就自动保存」）；
-  // 搜索那一态里那一下是"退"（站长 10-03 改口那条：条子收回、关键字清掉、列表重拉回未搜的状态）。
+  // 搜索那一态里那一下是"退"（站长 10-17 这一句：「如果点击空白区，就自动清空搜索框，恢复到放大镜状态」）。
+  // ⚠ 判"要不要退"不能只看 `searchOpen`：点分类那一枚与进管理态都会把条子收起而把词留着，
+  // 那时屏上是一枚放大镜＋一个还在筛列表的词——只看 `searchOpen` 就当场 return，
+  // 那正是"返回后清不掉、看不了别的笔记"的卡死处。所以词非空也算"还开着搜索"。
   // 两态不会同时开着（`onCatManageTap` 进来先把条子收回），所以先判管理、后判搜索。
   // 点中某条笔记或某一枚分类不算"点空白"：那两处都是 catchtap，冒泡不上来；
   // 行那一处在 `onRowTap` 里另有一条"管理态中 ⇒ 只存不开窗"的短路。
@@ -466,8 +473,8 @@ Page({
       await this._saveCatEdit()
       return
     }
-    if (!this.data.searchOpen) return
-    this.setData({ searchOpen: false, searchKeyword: '' })
+    if (!this.data.searchOpen && !this.data.searchKeyword) return
+    this.setData({ searchOpen: false, searchFocus: false, searchKeyword: '' })
     this.loadNotes(true)
   },
 
@@ -487,8 +494,10 @@ Page({
   },
 
   selectCategory(e) {
-    // 同 onRowTap：分类是 catchtap，收条子但不清词，于是这一次筛的是"结果里再挑这一类"。
-    if (this.data.searchOpen) this.setData({ searchOpen: false })
+    // 分类是 catchtap：它不该被当成"点了空白"。这一枚**照旧收条子、不清词**（10-03 那版口径，
+    // 站长这一轮点的是"点开笔记返回"那一条，没提分类），词仍由 ✕ 与点空白清。
+    // ⚠ 键盘那一样得跟着收——`focus` 不再吃 `searchOpen`，只收条子会一直压着这一屏。
+    if (this.data.searchOpen || this.data.searchFocus) this.setData({ searchOpen: false, searchFocus: false })
     const id = e.currentTarget.dataset.id
     this.setData({ selectedCategory: id === null ? null : parseInt(id) })
     this._closeFloats()
@@ -562,6 +571,7 @@ Page({
     this.setData({
       catEdit: true,
       searchOpen: false,
+      searchFocus: false,
       catNewName: '',
       catView: this._catView(true),
     })
@@ -876,8 +886,11 @@ Page({
   // 密码不对或他取消就既不开窗也不发请求。判据与那一趟输入都在 utils/privateGate.js 的 unlockOn。
   async onRowTap(e) {
     // 行是 catchtap：它不该被当成"点了空白"（那样会把关键字一起清掉）。
-    // 但条子要收——收起来正好把结果让给这一屏。词留着，✕ 才是清词的口。
-    if (this.data.searchOpen) this.setData({ searchOpen: false })
+    // 站长 10-17 这一句改的是**原来那句"收条子、留词"**：「搜索完结果，显示结果，上面的搜索框
+    // 应该依旧显示输入关键字状态」。原来收条子只为了腾地方，实际后果是返回来只剩一枚放大镜、
+    // 列表却仍按那个词筛着 ⇒ 看着像"别的笔记打不开了"。条子与词都留着，只把键盘收掉，
+    // 否则详情窗被键盘压着一半。词仍由 ✕ 与点空白清。
+    if (this.data.searchFocus) this.setData({ searchFocus: false })
     // 管理态里点某一行的笔记＝"点了别处"：只把这一屏的分类改动存下去，不开详情窗。
     // 不开窗是对的——他要的是"点空白自动保存"，而人在管理分类时点到行上多半是想腾个地方；
     // 反过来（先存再开窗）会把一次误触变成一个密码框。

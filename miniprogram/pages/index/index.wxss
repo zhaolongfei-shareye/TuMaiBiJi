@@ -295,11 +295,16 @@
 }
 
 /* ---------- 搜索那一态：搜索那枚就地向左摊成输入框 ----------
-   块面本身照效果图："图上就是一层 rgba(255,255,255,.18) 的白 + 一道 .36 的白描边"，
-   ⚠ 原来这里还挂着两条"压在照片上就换成半透明白＋白描边"的覆盖（`.container.has-bg .srch`
-   与浅图那一档），10-17 这一枚搬进圆角卡后**永远只压在 `--bg-card` 那一张浅面上**，
-   两条覆盖没有了对象 ⇒ 一起撤。连带 index.js 里"铺了图就整串不发"那道闸也必须撤：
-   内联变量不发 ⇒ `background: var(--chrome-bg)` 当场 IACVT 成透明，条子在屏上消失。 */
+   站长 10-17 夜这一句改的是皮：「搜索框太深，笔记分类输入框同样，要改为透明输入框状态。
+   类似，邮箱输入框那种风格，淡淡的框体，还是深色字体」⇒ 这三样逐字抄「我的」页那格邮箱输入框
+   （`me.wxss` 的 `.me-email-field`）：面 `--chip-idle`（掺 7% 墨的淡底，屏上读起来就是"透明"）、
+   边 `inset 0 0 0 var(--w-edge) var(--card-edge)`（12% 墨的一道淡边，不是投影）、字 `--text-primary`。
+   ⚠ 原来那一条 `background: var(--chrome-bg)` 是壁纸页面底的派生值（与底栏胶囊同一支），
+   压在这张 `--bg-card` 浅面上就是他说的"太深"。这一枚不再吃那一场内联变量 ⇒
+   `index.js` 的 `searchSkin` 与 wxml 两处 `style="{{searchSkin}}"` 一起撤了。
+   那条 IACVT 坑（变量不发就整条透明、条子看不见）随这一刀自然消失：
+   **现在浅底与淡边都由类里的令牌给，屏上没有任何一处要靠内联变量才画得出来。**
+   分类管理态那枚新增输入框（`.ixl-add`）复用同一条件，两枚一起换，不分第二张皮。 */
 .srch {
   box-sizing: border-box;
   flex: 1;
@@ -314,9 +319,9 @@
   gap: 16rpx;
   padding: 0 22rpx;
   border-radius: var(--r-pill);
-  border: 2rpx solid transparent;
-  background: var(--chrome-bg);
-  color: var(--chrome-ink);
+  background: var(--chip-idle);
+  box-shadow: inset 0 0 0 var(--w-edge) var(--card-edge);
+  color: var(--text-primary);
 }
 
 .srch-input {
@@ -327,7 +332,8 @@
 }
 
 .srch-ph {
-  color: var(--chrome-idle);
+  /* 占位字与邮箱那一格同一条（`me.wxss` 的 `.me-email-ph`）：三级字，仍是深色那一族。 */
+  color: var(--text-tertiary);
 }
 
 .srch-x {
@@ -1353,8 +1359,9 @@
 /* ⚠ 10-17 这一组少了一半：原来还有四条是给"搜索那一枚压在照片上"画的
    （`.has-bg .ic`／`.has-bg .ic.on`／`.has-bg .srch`／`.has-bg .srch-ph`，浅图那一档另有同名四条），
    搜索搬进圆角卡之后它永远压在 `--bg-card` 上 ⇒ 八条一起删，`.ic` 那两枚类名也随 `.tools` 没了。
-   连带 index.js 的 `searchSkin` 那道"铺了图就整串不发"的闸必须拆：
-   内联变量不发 ⇒ `.srch` 的 `background: var(--chrome-bg)` 当场 IACVT 成透明，搜索条在屏上消失。 */
+   10-17 夜里又追一刀：`.srch` 改吃 `--chip-idle`／`--card-edge`／`--text-primary` 那三条令牌，
+   `index.js` 的 `searchSkin` 与 wxml 两处内联 `style` 一起撤 ⇒ **这一页不再有任何一处读 `--chrome-*`**。
+   那两条派生仍在：底栏胶囊与实心按钮照旧走 palette 的 chromeOf／moodChromeOf（app.wxss 那一叠没动）。 */
 
 /* ---------- 背景图是浅色那一档（站长 10-12 下的需求；深浅判定与阈值在 utils/imgBrightness.js）
    上面那两档数字（加左上角那一枚 invert）把字翻成纸白，前提是罩子压得住那张图；

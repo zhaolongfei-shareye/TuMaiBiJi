@@ -22,6 +22,15 @@ function ok(name, cond, extra) {
 const idxWxml = fs.readFileSync(P('pages/index/index.wxml'), 'utf8')
 const idxWxss = fs.readFileSync(P('pages/index/index.wxss'), 'utf8')
 const idxJs = fs.readFileSync(P('pages/index/index.js'), 'utf8')
+// ⚠ 这一把的 `strip` 三种注释都剥：CSS/JS 的 `/* */` 与 `//`，**外加 wxml 的 `<!-- -->`**。
+// 10-17 合一在 wxml 里留了一段"这两枚 tab 与那枚返回为什么撤了"的来历，那些字面类名就写在注释里——
+// 反向钉（"旧那个类不许再出现"）拿没剥 HTML 注释的原文扫，会把注释判成残留＝假红。
+// 反过来也一样：撤掉一个值之后，来历注释里还留着那个名字，拿原文扫"还在不在"就是**假绿**。
+// 10-17 夜这一条被抓到过一次：`.srch` 早就不吃 `--chrome-bg` 了，而原文里那句来历把它判成"还在吃"。
+// ⇒ 这一把从读文件那一步就有剥好的三份，后面所有"读没读某一栏"的判据一律用 CODE_*。
+const strip = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  .replace(/<!--[\s\S]*?-->/g, '')
+const CODE_WXML = strip(idxWxml), CODE_JS = strip(idxJs), CODE_WXSS = strip(idxWxss)
 const barWxml = fs.readFileSync(P('custom-tab-bar/index.wxml'), 'utf8')
 const barJs = fs.readFileSync(P('custom-tab-bar/index.js'), 'utf8')
 const barWxssRaw = fs.readFileSync(P('custom-tab-bar/index.wxss'), 'utf8')
@@ -94,20 +103,23 @@ WALLS.forEach((w) => {
   ok(`派生色 ${hex} 没被抄进列表页样式`, !new RegExp(hex, 'i').test(idxWxss))
   ok(`派生色 ${hex} 没被抄进底栏样式`, !new RegExp(hex, 'i').test(barWxss))
 })
-ok('底栏和搜索条吃的是同一串 --chrome-*',
-  /var\(--chrome-bg\)/.test(barWxss) && /var\(--chrome-bg\)/.test(idxWxss))
+// 10-17 之前这两处是同一串派生皮（搜索条与底栏胶囊同一个值）。他那句「搜索框太深…改为透明输入框状态」
+// 把这一页那一份撤了 ⇒ 主语换成"底栏仍吃、这一页不再吃"。反向钉用剥过注释的三份，
+// 不然来历注释里那几个 `--chrome-bg` 字样会把它判成"还在吃"。
+ok('底栏那一块面仍吃 `--chrome-bg`；笔记列表这一页整页不再读 `--chrome-*`（撤干净，不留半截）',
+  /var\(--chrome-bg\)/.test(barWxss) && !/var\(--chrome-/.test(CODE_WXSS) && !/var\(--chrome-/.test(CODE_WXML))
 // 10-14 换心情：底栏那块面不再直接取壁纸那支，改由心情那一档的 moodChromeOf 递（上面换了下面必须跟着换）。
 ok('底栏那一块面由 moodChromeOf 递进来（且不再直接吃 chromeOf）',
   /moodChromeOf\(/.test(barJs) && !/[^d]chromeOf\(/.test(barJs) && /style="\{\{chromeStyle\}\}"/.test(barWxml))
-ok('搜索条每次进页重算，不吃模块加载那一次的兜底',
-  /const wallpaper = app\.getWallpaper\(\)/.test(idxJs)
-  // 10-17 合一：这一枚搬进圆角卡之后永远压在 `--bg-card` 上，"铺了图就整串不发"那道闸跟着拆
-  //（原来那道闸是为了让 CSS 里"图上换纸白"两条翻得动，那两条已经删净）。
-  && /searchSkin: chromeOf\(wallpaper\)\.style/.test(idxJs))
+// 原来这条钉的是"搜索条每次进页跟着壁纸重算"（`searchSkin: chromeOf(wallpaper).style`）。
+// 10-17 夜那一枚不再吃派生皮 ⇒ 钉的是反面：这一页既没有那一格 data、也没有那次调用。
+ok('搜索条不再要那一串派生皮（`searchSkin` 与 `chromeOf(` 一起撤净；壁纸那一档仍由 paleStep 现算）',
+  !/searchSkin:/.test(CODE_JS) && !/chromeOf\(/.test(CODE_JS)
+  && /swatchBg: paleStep\(wallpaper\)/.test(CODE_JS))
 ok('搜索条不再是一支固定的蓝（toneStyle 在这个页面已经不用了）',
   !/toneStyle\(/.test(idxJs), (idxJs.match(/toneStyle\([^)]*\)/g) || []).join(' '))
 ok('占位符给带 alpha 的色，不靠 opacity（textarea/input 的 placeholder 不吃 opacity）',
-  !/\.srch-ph\s*\{[^}]*opacity/.test(idxWxss) && /--chrome-idle/.test(rule(idxWxss, 'srch-ph')))
+  !/\.srch-ph\s*\{[^}]*opacity/.test(idxWxss) && /--text-tertiary/.test(rule(idxWxss, 'srch-ph')))
 
 // ---------- 3. 10-17 合一之后这一屏：面板顶两枚 ＋ 一天一组 ＋ 一行三档 ----------
 // 上一版这一节钉的是"区内两枚 tab ＋ X 式列表 ＋ 卡片两列"。那三样整块没了：
@@ -123,12 +135,6 @@ const srchRule = rule(idxWxss, 'srch'), goRule = rule(idxWxss, 'srch-go')
 // 分类那一行 v30 起不再吃 .chip（胶囊撤了），10-17 又压一档（--fs-meta 24 → --fs-tiny 21）。
 const ixCatRule = rule(idxWxss, 'ix-cat')
 const DATE_JS = fs.readFileSync(P('utils/date.js'), 'utf8')
-// ⚠ 这一把的 `strip` 三种注释都剥：CSS/JS 的 `/* */` 与 `//`，**外加 wxml 的 `<!-- -->`**。
-// 10-17 合一在 wxml 里留了一段"这两枚 tab 与那枚返回为什么撤了"的来历，那些字面类名就写在注释里——
-// 反向钉（"旧那个类不许再出现"）拿没剥 HTML 注释的原文扫，会把注释判成残留＝假红。
-const strip = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  .replace(/<!--[\s\S]*?-->/g, '')
-const CODE_WXML = strip(idxWxml), CODE_JS = strip(idxJs), CODE_WXSS = strip(idxWxss)
 // 「我的」那一屏也在这一条判据里（他那句「原设置的分类入口关闭」点的就是那一行），
 // 一样先剥注释：撤那一格时留下的来历写在注释里，不剥就是自己把自己判红。
 const ME_WXML = strip(fs.readFileSync(P('pages/me/me.wxml'), 'utf8'))

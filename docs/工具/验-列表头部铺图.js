@@ -125,11 +125,12 @@ ok('取图走 poster.homeBg()，和新建页是同一个函数',
   /const bgSrc = poster\.homeBg\(\)/.test(cjs) && /\n {6}bgSrc,/.test(cjs))
 // 这条原来钉的是**反方向**（"铺了图就整串不发"），因为 10-17 之前那一枚搜索压在照片上，
 // CSS 里另有两条 `.has-bg .srch` 覆盖要生效，内联变量压着它们翻不动。
-// 10-17 搜索搬进圆角卡 ⇒ 那两条覆盖删了，这道闸跟着拆：**现在永远发**。
-// 更要命的是留着那道闸会出静默坏：不发 ⇒ `.srch` 的 `background: var(--chrome-bg)` IACVT 成 transparent，
-// 铺了图那一态搜索条直接看不见。所以这里同时钉三样：闸拆了、覆盖删了、变量还在发。
-ok('搜索条那一串 chrome 变量两态都发（铺没铺图都吃 `--chrome-*`）',
-  /searchSkin: chromeOf\(wallpaper\)\.style/.test(cjs) && !/bgSrc \? '' :/.test(cjs))
+// 10-17 搜索搬进圆角卡 ⇒ 那两条覆盖删了，这道闸跟着拆：那一晚钉的是"永远发"。
+// 10-17 夜里再追一刀（他原话「搜索框太深」）：`.srch` 改吃 `--chip-idle`＋`--card-edge` 那组令牌，
+// `searchSkin` 与 `chromeOf` 在这一页**一起撤净** ⇒ 这条的主语从"两态都发"换成"这一页不再读"。
+// 那句 IACVT 的坏法（不发就整条透明、条子看不见）也随之作废：现在屏上那层淡底是类里给的，不靠内联变量。
+ok('这一页不再读 `--chrome-*`：`searchSkin` 与 `chromeOf(` 都不在 js 里（留着就是没人读的一串）',
+  !/searchSkin:/.test(cjs) && !/chromeOf\(/.test(cjs) && !/bgSrc \? '' :/.test(cjs))
 ok('CSS 里那两条"图上换半透明白"的覆盖不许留着（留着就是给不存在的那一态兜底）',
   !/has-bg\s+\.srch/.test(wxss) && !/has-bg\s+\.ic\b/.test(wxss))
 /* 这条写于 4a714d0（那一版这一页确实一处选图都没有），`9b42728` 给名片那四格加了换图，
@@ -253,13 +254,16 @@ ok('这一行不再压在照片上 ⇒ `.has-bg` 那两组（`.ic`／`.srch`／`
 ok('两枚 icon 的基础档吃这一页的墨（`--text-secondary`），不吃死白',
   /color: var\(--text-secondary\)/.test(seg(wxss, '.ixl-ic'))
   && !/rgba\(255, 255, 255/.test(seg(wxss, '.ixl-ic')))
-// 搜索条搬进卡之后只剩一个态：吃 chromeOf 那串 `--chrome-*`（与底栏那排胶囊同一个值）。
-// 原来"图上半透明白 + 白描边"那一支随 `.has-bg .srch` 一起删了。留着那道闸的坏法不是难看，是**看不见**：
-// 内联变量一旦不发，`background: var(--chrome-bg)` 当场 IACVT 成 transparent ⇒ 条子整条消失。
-ok('搜索 pill 只有一档面：吃 `--chrome-bg`，没有第二份实色、也没有铺图那一态的覆盖',
-  /background: var\(--chrome-bg\)/.test(seg(wxss, '.srch')) && !/rgba\(255, 255, 255, 0\.18\)/.test(wxss))
+// 搜索条搬进卡之后只剩一个态。10-17 夜里那一刀（「搜索框太深…改为透明输入框状态，类似邮箱输入框那种
+// 风格，淡淡的框体，还是深色字体」）把这**一个态**换成一组令牌：淡底 `--chip-idle` ＋一道 `--card-edge`
+// 的 inset 淡边 ＋ `--text-primary` 深色字。原来"图上半透明白 + 白描边"那一支随 `.has-bg .srch` 一起删了。
+ok('搜索 pill 只有一档面：淡底＋inset 淡边＋深色字，`--chrome-*` 与铺图那一态的覆盖一条都不留',
+  /background: var\(--chip-idle\)/.test(seg(wxss, '.srch'))
+  && /box-shadow: inset 0 0 0 var\(--w-edge\) var\(--card-edge\)/.test(seg(wxss, '.srch'))
+  && !/var\(--chrome-/.test(seg(wxss, '.srch'))
+  && !/rgba\(255, 255, 255, 0\.18\)/.test(wxss))
 ok('占位符给带 alpha 的色，不靠 opacity（input 的 placeholder 不吃 opacity）',
-  !/\.srch-ph\s*\{[^}]*opacity/.test(wxss) && /--chrome-idle/.test(seg(wxss, '.srch-ph')))
+  !/\.srch-ph\s*\{[^}]*opacity/.test(wxss) && /--text-tertiary/.test(seg(wxss, '.srch-ph')))
 // v19 第三条：那两个字压到与分类同一档（原来吃 --fs-title 31，比正文还大一级）。
 // 新建页那条标题不动，所以这里不再钉"两页同一个令牌"。
 ok('「搜索笔记」与分类那枚 chip 吃同一条字号令牌（--fs-meta 24，不再比正文大一级）',
@@ -288,8 +292,9 @@ const elseBranch = (() => {
 ok('摊开时那两枚 icon 整体让位：分类那枚与搜索那枚都只在 `<block wx:else>` 这一支里，同一行不出现两枚搜索',
   /catchtap="onCatManageTap"/.test(elseBranch) && /catchtap="onOpenSearch"/.test(elseBranch)
   && (wxml.match(/catchtap="onOpenSearch"/g) || []).length === 1)
-ok('输入框自动聚焦（focus 跟着那一态走，不写死 true）',
-  /focus="\{\{searchOpen\}\}"/.test(wxml))
+ok('键盘那一枚单独给（`focus="{{searchFocus}}"`）：条子开着不等于键盘一直开着，且不写死 true',
+  /focus="\{\{searchFocus\}\}"/.test(wxml) && !/focus="\{\{searchOpen\}\}"/.test(wxml)
+  && !/focus="\{\{true\}\}"/.test(wxml))
 // 这一行只剩两枚 icon：条子内部与它们都靠 catchtap 挡住冒泡，
 // 原来那两枚 onToggleMode 随排布档一起撤了——留着不撤，点空白就缩不回来了。
 ok('点空白缩回挂在容器上，条子内部和两枚 icon 都靠 catchtap 挡住冒泡',
