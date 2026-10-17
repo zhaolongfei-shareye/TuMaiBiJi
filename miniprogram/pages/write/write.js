@@ -4,6 +4,7 @@ const pwdSheet = require('../../utils/pwdSheet.js')
 const { allowPrivate, isPrivate, unlockOn, exitOrHome } = require('../../utils/privateGate.js')
 const { labelOf } = require('../../utils/catText.js')
 const cardCloud = require('../../utils/cardCloud.js')
+const cloudUpload = require('../../utils/cloudUpload.js')
 
 /* 这一页要发出去的那五栏，读回来时先存一份基线（站长 10-12 拍 C3 甲）。两个用途：
    ① 保存只发**真动过**的那几栏——原来这一页是整份 PUT，拿一份服务端裁过的空壳去存，
@@ -34,6 +35,7 @@ Page({
     keyPointsText: '',
     tagsText: '',
     tagList: [],
+    shots: [],
     categories: [],
     categoryNames: [],
     selectedCategoryIndex: -1,
@@ -117,6 +119,9 @@ Page({
         tags: normTags(note.tags),
         category_id: note.category_id == null ? null : note.category_id,
       }
+      // 配图那一排跟着这一篇一起铺（不等它：读图不该拖住表单出字）。
+      // 锁着的私密篇服务端回的是空数组，所以这里不用另判解锁。
+      this.loadShots()
     } catch (err) {
       console.error('加载笔记失败', err)
       wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
@@ -166,6 +171,54 @@ Page({
 
   onCancel() {
     wx.navigateBack()
+  },
+
+  // 配图那一排（站长 10-18：「编辑时，图片要展示，然后支持删除图片」）。
+  // 与详情页那一排同一个口、同一个前提：`cloud://` 那个地址只有在 wx.cloud.init 过的环境里
+  // 画得出来，所以 cloudReady() 假的时候连请求都不发。
+  // 读失败只留一行日志、不弹「加载失败」：这一排不在保存那条主流程上，
+  // 一句报错会让人以为这篇笔记坏了。
+  async loadShots() {
+    if (!cloudUpload.cloudReady()) return
+    try {
+      const list = await api.getNoteAssets(this.data.noteId)
+      this.setData({ shots: list || [] })
+    } catch (err) {
+      console.warn('配图读取失败（不影响正文）', err && (err.errMsg || err.statusCode))
+    }
+  },
+
+  // 删一张。两趟的顺序照 cardCloud.dropServer 那一条（10-11 审计严重①就是从它的反面来的）：
+  // ① 先把这张的地址记进待删那一格，**再**发请求——服务端那一步删的是行，而云上那个对象
+  //    只有这一侧删得动（那台后端没有云开发凭据）。回体要是丢在网络上，行没了、地址也没人
+  //    记得，那个对象就永久占着全站配额，而界面上谁也看不见它。
+  // ② 行删成之后拿回体刷新那一排（回的就是剩下的那批），再去清对象；清对象这一趟不等——
+  //    `deleteFiles` 自己不会抛，而「已删除」那声吐司不该被一次清库存的慢请求拖住。
+  // ③ 请求没成时把①那条预留撤掉：留着会让下一次进前台删掉一张**界面上还在**的图。
+  onDelShot(e) {
+    const { lang, noteId } = this.data
+    const { id, url } = e.currentTarget.dataset
+    wx.showModal({
+      title: t('confirmDelete', lang),
+      content: t('cannotRestore', lang),
+      success: async (res) => {
+        if (!res.confirm) return
+        if (url) cloudUpload.reservePurge([url])
+        try {
+          wx.showLoading({ title: t('deleting', lang), mask: true })
+          const left = await api.deleteNoteAsset(noteId, id)
+          wx.hideLoading()
+          this.setData({ shots: left || [] })
+          wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
+          if (url) cloudUpload.deleteFiles([url])
+        } catch (err) {
+          wx.hideLoading()
+          if (url) cloudUpload.unreservePurge([url])
+          console.error('删除配图失败', err)
+          wx.showToast({ title: (err.data && err.data.detail) || t('deleteFailed', lang), icon: 'none' })
+        }
+      }
+    })
   },
 
   // 私密解锁那一层（templates/pwd-sheet.wxml，与首页详情窗、独立详情页同一份）的三个把手。

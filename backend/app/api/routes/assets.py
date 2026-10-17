@@ -236,6 +236,57 @@ def list_note_assets(
     return _views(rows)
 
 
+@router.delete("/api/notes/{note_id}/assets/{asset_id}", response_model=List[AssetOut])
+def delete_note_asset(
+    request: Request,
+    note_id: int,
+    asset_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """从这篇笔记上删掉一张图，回**删完之后剩下的那一批**（前端不用再读一次列表）。
+
+    路径上带的是**那一行的数字 id**，不是 fileID。这不是省事：fileID 长这样
+    `cloud://env.xxxx/images/a/0.jpg`，**里面全是 `/`**，塞进路径段会多切出两截来，
+    FastAPI 直接不匹配（第一版就是这么 404 的，`{"detail":"Not Found"}` 是路由层的、
+    不是我那句 404）。列表那一口本来就回 `id`，客户端手里一直就有。
+
+    三条口径：
+    1. **删的是库里这一行**，配额当场掉下来（`_sum_bytes` 读的就是这张表）。云上那个对象
+       这台服务器删不了（云开发存储对象只能由客户端 SDK 删），所以**客户端这一趟必须把
+       fileID 塞进 `utils/assetPurge` 那本机账**，由它去删对象；只删库不塞账＝字节永远
+       躺在桶里白占那 5GB。
+    2. **不属于这篇、或不属于这个账号的行，一律 404**，不回 403、也不回"这行存在但在别人名下"。
+       fileID 是别人能读的地址（模块头第 3 条），多给一种回法就是多给一次探测机会。
+    3. **私密篇没解锁时这个口不开**（403）。读接口那一趟回的是空数组，界面上锁着那一态
+       本来就不画缩略图，所以正常客户端撞不到；撞得到就是有人在绕开界面直接打。
+    """
+    note = _owned_note_or_404(db, user, note_id)
+    if is_private_note(note, private_category_ids(db, user.id)) and not unlocked(request, user):
+        raise HTTPException(status_code=403, detail="这篇是私密笔记，先解锁")
+    uid = str(user.id)
+    row = (
+        db.query(Asset)
+        .filter(Asset.id == asset_id, Asset.note_id == note_id, Asset.user_id == uid)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="这篇笔记没有这张图")
+    db.delete(row)
+    db.commit()
+    left = (
+        db.query(Asset)
+        .filter(
+            Asset.note_id == note_id,
+            Asset.user_id == uid,
+            not_failed(),
+        )
+        .order_by(Asset.id.asc())
+        .all()
+    )
+    return _views(left)
+
+
 def _sum_bytes(db: Session, uid: Optional[str] = None) -> int:
     """**配图 + 卡片两张表**的真实字节。
 

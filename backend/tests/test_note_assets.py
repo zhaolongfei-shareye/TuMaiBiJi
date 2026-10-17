@@ -311,3 +311,92 @@ def test_注销只报自己名下的对象(client, db, two_users):
     ids = client.post("/api/user/deactivate", json={"confirm": True}, headers=b["hdr"]).json()["file_ids"]
     assert ids == [fid("b", 0)], f"把别人名下的 fileID 一起交出去，等于让注销顺带删了别人的图"
 
+
+
+# ---------------------------------------------------------- 六、删一张（10-18 站长那一句）
+
+# 路径上带的是**那一行的数字 id**（fileID 里全是 `/`，塞进路径段会被多切两截、路由直接不匹配，
+# 第一版就是这么 404 的）。所以这几条用例先拿 id 再打口。
+def row_id(db, file_id):
+    r = db.query(Asset).filter(Asset.object_key == file_id).first()
+    assert r is not None, f"库里没有这张 {file_id}，测试前提没了"
+    return r.id
+
+
+def dele(client, who, note_id, asset_id, extra=None):
+    h = dict(who["hdr"])
+    if extra:
+        h.update(extra)
+    return client.delete(f"/api/notes/{note_id}/assets/{asset_id}", headers=h)
+
+
+def test_删一张之后回的就是剩下的那批(client, db, two_users):
+    a = two_users["a"]
+    bind(client, a, a["note"], three(3))
+    r = dele(client, a, a["note"], row_id(db, fid("a", 1)))
+    assert r.status_code == 200, r.text
+    want = [fid("a", 0), fid("a", 2)]
+    assert [x["cloud_url"] for x in r.json()] == want, "回的不是剩下的那批，前端就得再读一次列表（多一次往返、还多一个不一致的窗口）"
+    assert [x["cloud_url"] for x in client.get(f"/api/notes/{a['note']}/assets", headers=a["hdr"]).json()] == want
+    assert db.query(Asset).filter(Asset.note_id == a["note"]).count() == 2
+
+
+def test_删掉那一张的字节当场从配额里掉下来(client, db, two_users):
+    a = two_users["a"]
+    bind(client, a, a["note"], three(3))
+    before = client.get("/api/user/storage-quota", headers=a["hdr"]).json()
+    dele(client, a, a["note"], row_id(db, fid("a", 0)))
+    after = client.get("/api/user/storage-quota", headers=a["hdr"]).json()
+    assert after["user_bytes"] == before["user_bytes"] - 400 * 1024, "行删了字节没掉＝这一张还在收他的钱"
+    assert after["user_count"] == before["user_count"] - 1
+
+
+def test_别人名下那张删不动而且还在(client, db, two_users):
+    a, b = two_users["a"], two_users["b"]
+    bind(client, a, a["note"], three(1))
+    r = dele(client, b, b["note"], row_id(db, fid("a", 0)))
+    assert r.status_code == 404, f"别人名下的行回的是 {r.status_code}：不许回 403，那等于告诉他「这串 fileID 是真的」"
+    assert db.query(Asset).filter(Asset.object_key == fid("a", 0)).count() == 1
+
+
+def test_这张不挂在这篇上就删不着(client, db, two_users):
+    a = two_users["a"]
+    n2 = Note(user_id=str(a["user"].id), title="第二篇", source_type="manual")
+    db.add(n2)
+    db.commit()
+    bind(client, a, a["note"], three(1))
+    assert dele(client, a, n2.id, row_id(db, fid("a", 0))).status_code == 404
+    assert db.query(Asset).filter(Asset.object_key == fid("a", 0)).count() == 1, "跨篇删＝从别的笔记上偷图"
+
+
+def test_删掉当封面那张之后列表那枚换到下一张(client, db, two_users):
+    a = two_users["a"]
+    bind(client, a, a["note"], three(2))
+    row = client.get("/api/notes/?skip=0&limit=50", headers=a["hdr"]).json()
+    mine = [x for x in row if x["id"] == a["note"]][0]
+    assert mine["cover_file_id"] == fid("a", 0)
+    dele(client, a, a["note"], row_id(db, fid("a", 0)))
+    row2 = client.get("/api/notes/?skip=0&limit=50", headers=a["hdr"]).json()
+    mine2 = [x for x in row2 if x["id"] == a["note"]][0]
+    assert mine2["cover_file_id"] == fid("a", 1), "删了封面那枚不许停在一张已经不存在的图上（列表右侧那枚会点不出东西）"
+
+
+def test_私密篇没解锁这个口不开而带着凭证就删得掉(client, db, two_users):
+    """正反各钉一条（10-15 那条教训：凭证类改动只钉一个方向，另一方向整条缺失）。"""
+    from app.models.category import Category
+    a = two_users["a"]
+    cat = Category(user_id=str(a["user"].id), name="私密", color="#23252C")
+    db.add(cat)
+    db.commit()
+    n = db.query(Note).filter(Note.id == a["note"]).first()
+    n.category_id = cat.id
+    db.commit()
+    bind(client, a, a["note"], three(1))
+    blocked = dele(client, a, a["note"], row_id(db, fid("a", 0)))
+    assert blocked.status_code == 403, "锁着的时候这个口必须关：读那一趟回的是空数组，绕开界面直接打也不给删"
+    assert db.query(Asset).filter(Asset.object_key == fid("a", 0)).count() == 1
+    client.put("/api/user/private-password", json={"password": "246810"}, headers=a["hdr"])
+    tok = client.post("/api/user/private-password/verify", json={"password": "246810"},
+                      headers=a["hdr"]).json()["unlock_token"]
+    ok = dele(client, a, a["note"], row_id(db, fid("a", 0)), extra={"X-Private-Token": tok})
+    assert ok.status_code == 200 and ok.json() == [], "解了锁还删不掉＝这一道闸把功能也一起锁死了"

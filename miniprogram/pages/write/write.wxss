@@ -95,6 +95,48 @@
   color: var(--text-tertiary);
 }
 
+/* 配图那一排（10-18 站长「编辑时，图片要展示，然后支持删除图片」）。
+   方格定宽**又**定高 + aspectFill：只定宽时 flex 会压高不压宽，那张图就被夹扁（详情页同一排那张
+   注释记的就是这一条）。类名带页面前缀 wr-。 */
+.wr-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.wr-shot {
+  position: relative;
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: var(--r-block);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.16);
+}
+
+.wr-shot-img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--r-block);
+  background: var(--accent-soft);  /* 图还没落下来时那一格不是白的 */
+}
+
+/* ✕ 浮在照片上、不浮在面板那套面上，所以不走 --cp-*：暗纱底 + #fff 字，与录入页 .th-x 同一支
+   （照片是亮的，墨字压上去读不出来）。 */
+.wr-shot-x {
+  position: absolute;
+  right: 10rpx;
+  top: 10rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: rgba(20, 20, 28, 0.55);
+  color: #fff;
+  font-size: var(--fs-micro);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .container {
   padding-bottom: 60rpx;
 }

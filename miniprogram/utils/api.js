@@ -227,6 +227,10 @@ module.exports = {
   // size 拿不到时可以不给，那一行就不计入配额，比"因为取不到大小而整张图存不上"好。
   bindNoteAssets: (id, items) => request(`/api/notes/${id}/assets`, 'POST', { items }),
   getNoteAssets: (id) => request(`/api/notes/${id}/assets`),
+  // 删掉这一篇里的某一张。路径上带的是**那一行的数字 id**，不是 fileID——fileID 里全是 `/`，
+  // 塞进路径段会被多切两截，路由直接不匹配（后端 routes/assets.py 那条注释记的就是这个）。
+  // 回的是**剩下的那批**（与 GET 同一个形状），界面拿它直接刷新那一排，不必再读一次列表。
+  deleteNoteAsset: (id, assetId) => request(`/api/notes/${id}/assets/${assetId}`, 'DELETE'),
   getStorageQuota: () => request('/api/user/storage-quota'),
   // 卡片留档那三个口（2.0.1 P0 · S1 的服务端，S2 接上客户端）。
   // 形状与配图那一路同型：图片字节不经过后端，这里传的每一项都是登记信息。
