@@ -16,6 +16,7 @@ fileID 是**假的**（`cloud://probe-…`）：这台后端删不掉云上的�
 真对象那半边由客户端真机那条链验（预览码）。
 """
 import sys
+import urllib.parse
 import uuid
 from pathlib import Path
 
@@ -219,12 +220,80 @@ def main():
     check("第十张仍被拦（400），库里还是 9 行（不是先写进去再报错）",
           r.status_code == 400 and still9 == CAP, f"HTTP {r.status_code} 库里 {still9} 行")
 
+    # ---- 9.6 删一张（2.3.7 那一个口：编辑这一屏按 ✕ 走的就是这条路）----------------
+    # 为什么非要在现网真打一次：pytest 那 30 条证的是逻辑，这里证的是**现网跑的就是这份字节**。
+    # 部署之前这一条路回的是路由层的 `{"detail":"Not Found"}`，症状是用户按 ✕ 念一句看不懂的错；
+    # 而"接口 200 但删错一张"这一类只有真打才看得见。删掉的这两张的 fileID 会一起从 §10 那份
+    # 清单里剔掉——那一句拿 `alive` 比，不比原九条，否则"删一张"会把"删一篇"的判据顶成假红。
+    alive = set(KEYS + FULL)
+    nine = client.get(f"/api/notes/{note_id}/assets", headers=hdr).json()
+    victim = nine[1]
+    rest = [x["cloud_url"] for x in nine if x["id"] != victim["id"]]
+    r = client.delete(f"/api/notes/{note_id}/assets/{victim['id']}", headers=hdr)
+    back = r.json() if r.status_code == 200 else []
+    alive.discard(victim["cloud_url"])
+    check("删一张：200，且回的就是**剩下的那批**、顺序原样（客户端拿它直接刷那一排，不再读一次列表）",
+          r.status_code == 200 and [x["cloud_url"] for x in back] == rest,
+          f"HTTP {r.status_code} 回 {len(back)} 张")
+    check("删一张：库里那一行真没了（不是只从回体里挑掉）",
+          len(client.get(f"/api/notes/{note_id}/assets", headers=hdr).json()) == CAP - 1)
+    qd = quota().json()
+    check("删一张：这一张的字节当场从配额里掉下来（行删了字节不掉＝还在收他的钱）",
+          qd["user_count"] == CAP - 1 and qd["user_bytes"] == q9["user_bytes"] - victim["size"],
+          f"{qd['user_count']} 张 / {qd['user_bytes']} B（删前 {q9['user_count']}/{q9['user_bytes']}，这张 {victim['size']} B）")
+
+    # 路径那一格放 fileID 而不是数字 id：`cloud://…` 里全是 `/`，塞进路径段会被多切两截。
+    # 第一版后端就是这么写的，四条用例当场拿到路由层的通用 404——这一条钉的是别再改回去。
+    r = client.delete(f"/api/notes/{note_id}/assets/"
+                      f"{urllib.parse.quote(victim['cloud_url'], safe='')}", headers=hdr)
+    check("拿 fileID 当路径那一格 → 404（数字 id 才是这个口的键，这一条就是被实测教的那一课）",
+          r.status_code == 404, f"HTTP {r.status_code} {r.text[:60]}")
+
+    if foreign:
+        target = back[0]
+        r = client.delete(f"/api/notes/{foreign}/assets/{target['id']}", headers=hdr)
+        db.expire_all()
+        still_row = db.query(Asset).filter(Asset.id == target["id"]).count()
+        check("拿别人那篇的 note_id 来删我这张 → 404，而且这一行还在（不回 403，多给一种回法＝多给一次探测）",
+              r.status_code == 404 and still_row == 1, f"HTTP {r.status_code} 行 {still_row}")
+
+    # 再删一张，删的是第一篇里现在排第一的那张（连着走两次，证明不是只有第一刀有效）
+    two = client.get(f"/api/notes/{note_id}/assets", headers=hdr).json()
+    r = client.delete(f"/api/notes/{note_id}/assets/{two[0]['id']}", headers=hdr)
+    alive.discard(two[0]["cloud_url"])
+    check("连着删第二张也是 200，回的还是剩下的那批（七张）",
+          r.status_code == 200 and len(r.json()) == CAP - 2, f"HTTP {r.status_code}")
+
+    # 只剩一张那一篇：**这一口回的是空数组**，界面上那一栏就该整个不见（不新增一种失败态）。
+    # 单独开一篇是因为这一格碰不得上面那篇的 §10——那一句要拿 `alive` 比七张的清单。
+    r = client.post("/api/notes/", headers=hdr, json={
+        "title": f"探针删尽{MARK}", "summary": f"探针摘要{MARK}", "content": f"探针正文{MARK}"})
+    if r.status_code == 200:
+        one_id = r.json()["id"]
+        solo = f"cloud://probe-{MARK}/solo.jpg"
+        client.post(f"/api/notes/{one_id}/assets", headers=hdr,
+                    json={"items": [{"file_id": solo, "size": 4321, "width": 100, "height": 100}]})
+        r2 = client.delete(f"/api/notes/{one_id}/assets/"
+                           f"{client.get(f'/api/notes/{one_id}/assets', headers=hdr).json()[0]['id']}",
+                           headers=hdr)
+        check("那张唯一的图删掉 → 200 且回**空数组**（不是 204、不是 null；前端那一栏靠这个整栏撤掉）",
+              r2.status_code == 200 and r2.json() == [], f"HTTP {r2.status_code} {str(r2.text)[:60]}")
+        q1 = quota().json()
+        check("这一张删完，配额里只少了它自己那 4321 B 和上一张的字节（别人的、别篇的一格没动）",
+              q1["user_bytes"] == qd["user_bytes"] - two[0]["size"],
+              f"{q1['user_bytes']} B vs 应为 {qd['user_bytes'] - two[0]['size']}（删前 {qd['user_bytes']}，"
+              f"这两张 {two[0]['size']}＋4321）")
+    else:
+        check("建不出第二篇探针笔记，空数组那一条验不了", False, f"HTTP {r.status_code} {r.text[:60]}")
+
     # ---- 10. 删笔记：行归零，那份 fileID 清单必须回给客户端 ------------------------
     r = client.delete(f"/api/notes/{note_id}", headers=hdr)
     body = r.json() if r.status_code == 200 else {}
     check("删掉这篇（200）", r.status_code == 200, f"HTTP {r.status_code} {r.text[:80]}")
-    check("回体里 file_ids 是这九个对象（这台后端删不掉云上的东西，清单是客户端唯一的出处）",
-          set(body.get("file_ids") or []) == set(KEYS + FULL), str(body.get("file_ids"))[:140])
+    check("回体里 file_ids 是**这一趟还留着的那些对象**（删过的那两张不该再出现在清单里）",
+          set(body.get("file_ids") or []) == alive,
+          f"回体 {len(body.get('file_ids') or [])} 条，应为 {len(alive)} 条")
+
     q_end = quota().json()
     check("删完之后我的配额回到基线",
           (q_end["user_count"], q_end["user_bytes"]) == (j0["user_count"], j0["user_bytes"]),
