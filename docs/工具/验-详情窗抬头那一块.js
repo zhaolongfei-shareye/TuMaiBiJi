@@ -136,8 +136,15 @@ const CSS = stripCss(IX_WXSS)
   const wantH = Math.round(FULL_W * REF_RATIO)
   ck(`图区高就是量出来的那一个：窗内通栏 ${FULL_W}rpx × ${REF_RATIO} = ${wantH}rpx`,
     h === wantH, `${h}rpx`)
-  ck('图与盒子同高（不等就会撑破盒子或底下留缝）',
-    numOf(IX_WXSS, 'ds-fig-img', 'height') === h, `${numOf(IX_WXSS, 'ds-fig-img', 'height')}rpx`)
+  /* 「图与盒子同大小」这一条 10-18 换了量法（判据跟着改口径，不是代码迁就旧尺子）：
+     395 这个数 2.3.6 起只写在 `.ds-fig` 一处，里面那张改成吃 `height: 100%`。
+     旧写法要求两处都是同一个字面数——那正是它自己要防的东西（两处各写一遍迟早漂一个）。
+     所以现在问的是"同一个出处"：要么 100%（跟着盒子），要么与盒子逐字同一个数；
+     写成第三个数（比如当年那个 232）就红。上面那条 ck 钉住盒子确实是量出来的那一个，
+     两条合起来才等价于原来那一条。 */
+  const imgH = declOf(IX_WXSS, 'ds-fig-img', 'height')
+  ck('图与盒子同一个出处：里面那张要么 height:100%（跟着盒子），要么与盒子逐字同一个数',
+    /100%/.test(imgH) || numOf(IX_WXSS, 'ds-fig-img', 'height') === h, `${imgH}（盒子 ${h}rpx）`)
   const iFig = WXML.indexOf('<swiper class="ds-fig"')
   // 通栏的判据是**它挂在谁的里面**，不是 width：`.ds-in` 里面写 width:100% 也照样左右各少 34rpx。
   // 也不是"谁在谁前面"那种 index 比法——那种比法在头一层 `.ds-in` 忘了闭合时还是绿的。
@@ -205,7 +212,7 @@ const CSS = stripCss(IX_WXSS)
     h.replace(/\s+/g, ' ').trim().slice(0, 90))
 }
 
-/* ---------- 反向自证：造七处漂移，上面那些判据必须红 ---------- */
+/* ---------- 反向自证：造八处漂移，上面那些判据必须红 ---------- */
 {
   const r = (src, sel) => { const x = new RegExp('\\.' + sel + '\\s*\\{([^}]*)\\}').exec(src); return x ? x[1] : '' }
   const n = (src, sel, prop) => { const x = new RegExp('(?:^|;)\\s*' + prop + ':\\s*(-?[\\d.]+)rpx').exec(r(src, sel)); return x ? parseFloat(x[1]) : NaN }
@@ -217,13 +224,15 @@ const CSS = stripCss(IX_WXSS)
       摊满: /class="ds-meta"[\s\S]*class="ds-h2"[\s\S]*class="ds-tags"/.test(W) && !/<view class="ds-lt"/.test(W),
       通栏: iFig > 0 && dsInDepthAt(W, iFig) === 0,
       图区高: n(C, 'ds-fig', 'height') === Math.round(FULL_W * REF_RATIO),
+      图跟盒子: /height:\s*100%/.test(';' + r(C, 'ds-fig-img'))
+        || n(C, 'ds-fig-img', 'height') === n(C, 'ds-fig', 'height'),
       横杠: n(C, 'ds-dot.on', 'width') > n(C, 'ds-dot', 'width'),
       标签: !/background:/.test(';' + r(C, 'ds-tag')),
       归零: /detailImages:\s*\[\],\s*dsFigAt:\s*0/.test(J) && /detailImages:\s*list \|\| \[\],\s*dsFigAt:\s*0/.test(J),
     }
   }
   const base = preds(IX_WXML, IX_WXSS, IX_JS)
-  ck('反向自证的底：七处都不漂移时这把全绿', Object.values(base).every(Boolean), JSON.stringify(base))
+  ck('反向自证的底：八处都不漂移时这把全绿', Object.values(base).every(Boolean), JSON.stringify(base))
   const mut = (src, from, to) => {
     if (!src.includes(from)) throw new Error('反向自证的锚点没找到，那条测不了：' + from.slice(0, 46))
     return src.replace(from, to)
@@ -239,6 +248,8 @@ const CSS = stripCss(IX_WXSS)
       ['wxml', mut(IX_WXML, '</view>\n\n      <!-- 配图', '<!-- 配图')], '通栏'],
     ['图区高被手写改回一个整数（395 → 300，窗边改了没人跟着改）',
       ['wxss', mut(IX_WXSS, '.ds-fig {\n  flex: none;\n  width: 100%;\n  height: 395rpx', '.ds-fig {\n  flex: none;\n  width: 100%;\n  height: 300rpx')], '图区高'],
+    ['里面那张图自己写死一个数（盒子 395、图 300＝底下留缝，而两行看着都还挺对）',
+      ['wxss', mut(IX_WXSS, 'width: 100%;\n  height: 100%;\n}', 'width: 100%;\n  height: 300rpx;\n}')], '图跟盒子'],
     ['横杠那一枚忘了加宽（当前那张与其余点同宽＝看不出现在第几张）',
       ['wxss', mut(IX_WXSS, '.ds-dot.on {\n  width: 25rpx', '.ds-dot.on {\n  width: 11rpx')], '横杠'],
     ['标签的底色被谁加回来（第二份皮）',

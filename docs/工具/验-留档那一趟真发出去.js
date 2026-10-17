@@ -134,8 +134,21 @@ async function main() {
   const cloud = R(CARD_CLOUD), det = R(DETAIL), app = R(APP)
   ck('cellFor 每一格都额外带 `cloud`（本机那一路也带，大图要用）',
     /const local = cardLog\.aliveFor\(noteId\)\.map\(\(x\) => Object\.assign\(\{\}, x, \{ cloud \}\)\)/.test(cloud))
+  /* 2.3.6 那一刀把这一页两处看大图并成一份 `_previewShot(urls, cur)`（详情页的 onShow 要分得开
+     "看大图退回来"与"别的回页"，两处各写一遍 `wx.previewImage` 就没法只记一格）。
+     判据跟着换量法，钉的还是同一件事：那一枚先取 cloud、cloud 不在才退回本机路径，
+     而且这串最后真交给 previewImage。⚠ 下面那条反向把入参改成只吃本机（`cards[0].p`），
+     这条必须红——红不了就是判据没钉住"吃云上那一份"。 */
+  const shotWired = (src) => /const url = cards\[0\]\.cloud \|\| cards\[0\]\.p/.test(src)
+    && /this\._previewShot\(\[url\], url\)/.test(src)
+    && /_previewShot\(urls, cur\)[\s\S]{0,400}wx\.previewImage\(\{/.test(src)
   ck('详情页那枚大图吃 cloud、退回本机路径（本机那张在 USER_DATA_PATH 下，previewImage 真机不认）',
-    /const url = cards\[0\]\.cloud \|\| cards\[0\]\.p/.test(det) && /wx\.previewImage\(\{ urls: \[url\], current: url \}\)/.test(det))
+    shotWired(det), `取 cloud ${/cards\[0\]\.cloud \|\| cards\[0\]\.p/.test(det) ? '在' : '没'}｜走那一份共用那趟 ${/this\._previewShot\(\[url\], url\)/.test(det) ? '在' : '没'}｜那一趟真调 previewImage ${/_previewShot\(urls, cur\)[\s\S]{0,400}wx\.previewImage\(\{/.test(det) ? '在' : '没'}`)
+  const localOnly = det.replace('this._previewShot([url], url)', 'this._previewShot([cards[0].p], cards[0].p)')
+  const 红5 = localOnly !== det && shotWired(localOnly) === false
+  console.log(`${红5 ? '✓' : '✗'} 反向⑤：那一枚改成只吃本机路径 → "吃云上那一份"这条当场红`)
+  if (!红5) bad.push('反向⑤没红在对的地方')
+
   ck('补传那一头挂在 app.onShow（与待补绑、待删、待补登记同一处）',
     /cardCloud\.backfillLocal\(\)/.test(app))
   ck('补传只处理"图还在本机"这一档，origin 走服务端已有的 backfilled',

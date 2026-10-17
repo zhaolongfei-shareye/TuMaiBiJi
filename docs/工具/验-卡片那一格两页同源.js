@@ -1,4 +1,5 @@
-// 「笔记卡片」那一格：详情窗与详情页是不是真的一份实现。跑法：node docs/工具/验-卡片那一格两页同源.js
+// 「笔记卡片」那一格：10-18 之后它只在独立详情页那一屏——这一把钉的是"哪页有、哪页没有、
+// 有的那一页不许漂"。跑法：node docs/工具/验-卡片那一格两页同源.js
 //
 // 为什么要这一把（站长 10-07 原话）：「生成后，不应该出现生成卡片的入口，很多余，为什么不干掉。
 // 然后我记得右上角是有笔记卡片的小图的，你是不是又漏了。」——那一格是 v20 那一稿（10-03）就画好、
@@ -8,10 +9,12 @@
 //
 // 这把尺子测的不是功能（功能由 验-详情页那一格-真跑 真点一遍），测的是**别再各画一份**：
 // ① 那一格的样式只有 app.wxss 一份，两页自己的 wxss 里一条都不许有；
-// ② 两页 wxml 里那一段，去掉注释、缩进与"这一篇"那个变量名之后必须逐字相同；
-// ③ 两页绑的是同一个处理函数名，且各自都有实现（搬家的失败形态就是"点了没反应"）；
+// ② ⚠ 10-18 那一版（通栏大图抬头）把**详情窗里那一格整块撤了** ⇒ "两页那一段逐字相同"没有第二个
+//    主语了。这一条改成钉**现状**：详情窗没有、详情页还有（跟不跟他一句，不替他决定）。
+//    留着一条常红的"两页相同"比改判据更坏——下一轮没人分得清是代码漂了还是口径变了。
+// ③ 绑的处理函数名在两页各自都得有实现（搬家的失败形态就是"点了没反应"）；
 // ④ 那一格只剩有卡片那一态：盒子 252×352 不许动、图撑满、不垫白底不投影（10-17 深夜那一句）；
-// ⑤ 详情页那一排三枚各管一件事，「分享笔记」与右上那一格不是同一件事的两个把手（制作口只有一个）；
+// ⑤ 详情页那一排三枚各管一件事，「分享」与右上那一格不是同一件事的两个把手（制作口只有一个）；
 // ⑥ 那条「图还在才算」的判据两页从同一个出处拿；空态那格用的色规则只有一份、当前已无消费者。
 // 最后一段是反向自证：故意造几处漂移，判据必须红——不然它只是在读文件，不是在守东西。
 const fs = require('fs')
@@ -95,38 +98,40 @@ function cellOf(src) {
     // 那四个键里只有"这一篇"的名字跟着页面走，格子本身不许差一个字。
     .replace(/detailNote/g, 'NOTE').replace(/\bnote\b/g, 'NOTE')
 }
-const A = cellOf(INDEX_WXML)
-const B = cellOf(DETAIL_WXML)
-ck('两页都找得到那一格', !!A && !!B, `${A ? '首页有' : '首页没有'} / ${B ? '详情页有' : '详情页没有'}`)
-ck('那一格在两页里逐字相同（改尺寸、改那两行字、改接线都必须一起改）',
-  !!A && !!B && A === B,
-  !!A && !!B && A !== B ? `首页\n${A}\n----\n详情页\n${B}` : '')
-ck('那一格只剩有卡片那一态：格子里只画那张缩略图，没有第二种画法',
-  !!A && /class="ds-pad ds-entry"/.test(A) && (A.match(/ds-entry/g) || []).length === 1)
+const A = cellOf(INDEX_WXML)   // 详情窗那一份：10-18 那一版撤了 ⇒ 读出来必须是 null
+const B = cellOf(DETAIL_WXML)  // 独立详情页那一份：还留着
+ck('详情窗里那一格真的撤净了（`.ds-rt` 在这一屏一处不剩，不是漏撤）',
+  A === null && !/ds-rt/.test(stripXml(INDEX_WXML)), A === null ? '不在' : '还在')
+ck('独立详情页那一屏还留着那一格（"两页同源"从 10-18 起是断的：跟不跟他一句，这里只钉现状）',
+  !!B, B ? '还在' : '也没了')
+// 下面这几条原来"两页各查一遍"，现在只剩一个主语，全部改成量详情页那一份。
+const cellFacts = (w) => (w ? {
+  只剩一态: /class="ds-pad ds-entry"/.test(w) && (w.match(/ds-entry/g) || []).length === 1,
+  没卡片不渲染: /wx:if="\{\{!NOTE\.is_private && detailCards\.length\}\}"/.test(w),
+  只绑一次: (w.match(/catchtap="onCardCell"/g) || []).length === 1,
+} : null)
+const FB = cellFacts(B) || {}
+ck('那一格只剩有卡片那一态：格子里只画那张缩略图，没有第二种画法', FB.只剩一态 === true)
 ck('没卡片（或私密）时那一整列不渲染，位置让给标题（站长 10-17 深夜「这个位置就完全被标题占满」）',
-  !!A && !!B && /wx:if="\{\{!NOTE\.is_private && detailCards\.length\}\}"/.test(A)
-  && /wx:if="\{\{!NOTE\.is_private && detailCards\.length\}\}"/.test(B))
-ck('分栏跟着换档：私密或没卡片那一态走 solo（两页同一条口径）',
-  /class="ds-hero \{\{detailNote\.is_private \|\| !detailCards\.length \? 'solo' : ''\}\}"/.test(INDEX_WXML)
-  && /class="dt-hero \{\{note\.is_private \|\| !detailCards\.length \? 'solo' : ''\}\}"/.test(DETAIL_WXML))
-ck('点小图仍然拉起大图（他追的那一句「小图的拉起大图的动作还保留」）',
-  !!A && /catchtap="onCardCell"/.test(A))
+  FB.没卡片不渲染 === true)
 
-// ---------- 三、接线：同一个名字，两页都得有实现 ----------
-ck('两页那一格绑的是同一个处理函数名（各绑各的名字，上面那条逐字比对就钉不住）',
-  (A.match(/catchtap="onCardCell"/g) || []).length === 1
-  && (B.match(/catchtap="onCardCell"/g) || []).length === 1,
-  `首页 ${A ? (A.match(/catchtap="(\w+)"/g) || []).join('|') : '—'} / 详情页 ${B ? (B.match(/catchtap="(\w+)"/g) || []).join('|') : '—'}`)
+// ---------- 三、接线：绑的那个名字在两页都得对得上 ----------
+ck('那一格绑的还是 `onCardCell`，而且这一屏只绑一次（多绑一处就是"同一件事两个把手"回来了）',
+  FB.只绑一次 === true, B ? '' : '详情页没有那一格')
+ck('首页那一格的实现也跟着撤净了（`onCardCell` 在 index.js 一处不剩，留着一段进不去的代码）',
+  !/onCardCell/.test(INDEX_JS))
+ck('详情窗这边开窗只剩那一条路：一枚「分享」→ `onSheetShare` → `_openPosterFor`',
+  /onSheetShare\(\)[\s\S]{0,300}_openPosterFor\(/.test(INDEX_JS))
 // 10-17 合一：`_openPosterFor` 原来带一个"从哪一格开的"（'sheet' | 'grid'），因为卡片那一屏
 // 那枚小图是第二个入口。那一屏撤了 ⇒ 第二个取值没有调用者，参数本身跟着删（留着就是一段进不去的分支）。
 // 这一条量的还是同一件事：**开窗的路只有一条**，只是那条路口上不再挂来自哪一格的记号。
-ck('首页那一格点开的是成品弹窗（沿用 `_openPosterFor`，不在这里另开一条开窗路）',
-  /onCardCell\(\) \{ return this\._openPosterFor\(this\.data\.detailNote\) \}/.test(INDEX_JS))
 ck('旧那第二个取值不许留在代码里（注释里留来历不算）',
   !/'grid'/.test(INDEX_JS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
     && !/_openPosterFor\(note, from\)/.test(INDEX_JS))
-ck('详情页那一格：有那张就看大图，没有才去生成（生成过之后这一格自己会翻成缩略图）',
-  /onCardCell\(\)[\s\S]{0,400}cards\[0\]\.cloud \|\| cards\[0\]\.p[\s\S]{0,200}wx\.previewImage\(\{ urls: \[url\], current: url \}\)[\s\S]{0,200}wx\.navigateTo\(\{ url: `\/pages\/share\/share\?id=\$\{note\.id\}` \}/.test(DETAIL_JS))
+ck('详情页那一格：有那张就看大图，没有才去生成——两页看大图走同一个 `_previewShot`（退回来那一趟不许重取整页）',
+  /onCardCell\(\)[\s\S]{0,400}cards\[0\]\.cloud \|\| cards\[0\]\.p[\s\S]{0,200}this\._previewShot\(\[url\], url\)[\s\S]{0,200}wx\.navigateTo\(\{ url: `\/pages\/share\/share\?id=\$\{note\.id\}` \}/.test(DETAIL_JS)
+  && /onPreviewImage\(e\)[\s\S]{0,240}this\._previewShot\(urls,/.test(DETAIL_JS)
+  && /onShow\(\)[\s\S]{0,400}_shotFrom[\s\S]{0,240}String\(shown\.id\)/.test(DETAIL_JS))
 // 搬家的失败形态就是"屏上有那枚、js 里没那个函数"，所以两页每个接线的动作都点名查一遍。
 function unwired(wxmlPath, jsPath, extra) {
   const wxml = read(wxmlPath)
@@ -251,8 +256,9 @@ ck('缓存只留给码：`createShare` 与下载码仍然只在没缓存那一�
 const driftWxss = DETAIL_WXSS + '\n.ds-pad { width: 200rpx; }\n'
 ck('反向①：谁在详情页 wxss 里再补一条 .ds-pad，"一条都不许有"这条必须红',
   cellRules(driftWxss).length > 0)
-const driftCell = B ? B.replace('mode="aspectFit"', 'mode="aspectFill"') : ''
-ck('反向②：把详情页那格的 mode 改一个属性，"逐字相同"这条必须红', !!A && !!driftCell && A !== driftCell)
+const driftHide = B ? B.replace(' && detailCards.length', '') : ''
+ck('反向②：从那一格的条件里摘掉"留过卡片才算"那一半（没卡片也画一格空白板），"没卡片不渲染"这条必须跟着红',
+  !!B && FB.没卡片不渲染 === true && cellFacts(driftHide).没卡片不渲染 === false)
 // 这一轮新落的那三数（撤白底、撤投影、图撑满）就是三条皮，最容易被人"顺手补回来"。
 const padBack = APP_WXSS.replace('.ds-pad {\n  box-sizing: border-box;', '.ds-pad {\n  background: #fff;\n  box-sizing: border-box;')
 ck('反向②b：谁给那一格补回白底，"不再垫白底"这条必须红',

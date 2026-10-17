@@ -221,6 +221,46 @@ ok('旧的框外那一行报错整条撤净（样式与 markup 一处不留，�
 ok('气泡是浮层：absolute 定位，不许占流内高度（占了一行就会把面板顶来顶去）',
   /position:\s*absolute/.test(seg('.hint-bubble')) && !/flex:\s*none/.test(seg('.hint-bubble')),
   seg('.hint-bubble').replace(/\s+/g, ' ').slice(0, 60))
+/* ---------- 10-18 00:1x 这一枚的皮（他拿着真机图那句） ----------
+   「提炼前的报错提示，不要用灰底白字，要换成白底，深灰字，不要加粗，外框用阴影浮起。加抖一抖动态」
+   四样各钉一条。⚠ 钉的是**吃哪一档令牌**，不是字面色值——色一律从 palette 递进来
+   （`--cp-*`），把 `#FFFFFF` 钉死等于把梯子钉成一处，换壁纸那一趟就红得没道理。
+   抖一抖那条只许动 transform：上面那三条量落点的判据（顶边／盖住框的一半／面板不动）
+   靠的是 left/top/width 不变，动画要是把位移写到那三枚上，量的就不再是同一件事。 */
+const bub = seg('.hint-bubble')
+const bubSkin = {
+  whiteFace: (s) => /background:\s*var\(--cp-card\)/.test(s) && !/background:\s*var\(--cp-ink/.test(s),
+  greyInk: (s) => /color:\s*var\(--cp-ink-78\)/.test(s) && !/color:\s*var\(--cp-card\)/.test(s),
+  thin: (s) => /font-weight:\s*400/.test(s) && !/font-weight:\s*700/.test(s),
+  floated: (s) => /box-shadow:/.test(s),
+  shake: (s) => /animation:\s*[\w-]*shake[\w-]*\s/.test(s),
+}
+ok('面换成白底（吃白卡那一档 --cp-card，与这一屏输入框同一个值；暗面 --cp-ink 不许回来）',
+  bubSkin.whiteFace(bub), bub.replace(/\s+/g, ' ').slice(0, 80))
+ok('字换成深灰（吃这一屏已经在用的 --cp-ink-78，快门那一行的字同一档；不另起一架梯子）',
+  bubSkin.greyInk(bub), `字色 ${(/color:[^;]*/.exec(bub) || ['(没写)'])[0].trim()}`)
+ok('不加粗（他这句明写"不要加粗"）', bubSkin.thin(bub),
+  `字重 ${(/font-weight:[^;]*/.exec(bub) || ['(没写)'])[0].trim()}`)
+ok('外框靠阴影浮起（白面压在白卡上，除了这一枚阴影，没有第二样把它和卡分开）',
+  bubSkin.floated(bub))
+ok('出现那一帧抖一下，且挂在基条上（不挂 .container.has-bg 那种覆盖里——两态都得抖）',
+  bubSkin.shake(bub) && /@keyframes\s+cre-hint-shake/.test(wxss),
+  `${(/animation:[^;]*/.exec(bub) || ['(没挂动画)'])[0].trim()}`)
+const frames = ((wxss.match(/@keyframes\s+cre-hint-shake\s*\{([\s\S]*?)\n\}/) || [, ''])[1])
+ok('抖的只有 transform：逐帧都不许写 left/top/width/margin（写了就把上面那三条落点判据作废）',
+  !!frames && frames.split('}').every((f) => !/\b(?:left|top|width|margin)\b/.test(f)),
+  frames.replace(/\s+/g, ' ').slice(0, 90))
+ok('不再有一档"铺图态暗面配浅字"的覆盖（10-11 §6.4 拍过的那一版被他这一句翻过来）',
+  !/\.container\.has-bg\s+\.hint-bubble\s*\{/.test(wxss))
+/* 反向一次就停手：把这一枚按 10-18 之前那一版放回去，白底／深灰字／不加粗／抖一抖四条要一起红。
+   阴影那条故意留 true——旧版本来就有阴影，他这次没打回它，这条判据不该对它表态。 */
+const oldSkin = bub.replace('var(--cp-card)', 'var(--cp-ink)')
+  .replace('var(--cp-ink-78)', 'var(--cp-card)')
+  .replace('font-weight: 400', 'font-weight: 700')
+  .replace(/animation:[^;]*;/, '')
+ok('反向：旧那一版皮（暗面浅字加粗、不抖）放回来，上面四条当场红',
+  [bubSkin.whiteFace, bubSkin.greyInk, bubSkin.thin, bubSkin.shake].every((f) => f(oldSkin) === false)
+    && bubSkin.floated(oldSkin) === true)
 ok('"几秒后消失"有人管：算出这一位之后统一上表，撤掉时统一撤表',
   /if \(patch\.hintLine\) this\._armHint\(\)/.test(js) && /else this\._clearHint\(\)/.test(js)
   && /onHide\(\)[\s\S]{0,300}_clearHint\(\)/.test(js) && /onUnload\(\)[\s\S]{0,200}_clearHint\(\)/.test(js))

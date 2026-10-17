@@ -10,6 +10,11 @@
 //
 // 图二＝`pages/profile`（卡片模板），图三＝`pages/categories`（分类管理）。
 // 这一把全是"结构＋字面"的判据：屏上到底对不对，看 `docs/design/10-16二级页收口/实测/` 那几张真截图。
+//
+// 10-18 00:0x 又把他指的第三层并进这一把（同一件事不留两处判据）：
+//   「这里不能突然压暗，要保存亮度，背景要变成毛玻璃」＝`app.wxss` 的 `.ci-mask`。
+//   原来这一把有一条钉的是"他没指的那两层照旧压暗（`.ci-mask`／`.dialog-mask`）"——
+//   名单里那一半他这一回指了，另一半没指，所以拆成两条各钉各的，不许合成一条和稀泥。
 const fs = require('fs')
 const path = require('path')
 
@@ -111,10 +116,18 @@ ok('这一层没顺手补上糊（他要的是"与密码弹窗一样"，那一�
 const pwdMask = blocksOf(NC(read('styles/pwd-sheet.wxss')), '.pwd-mask')
 ok('同一档的另一头（六位密码那一层）照旧透明——这一改不许把它带回压暗',
   /background:\s*transparent/.test(pwdMask), pwdMask.trim())
-ok('他没指的那两层照旧压暗（`.ci-mask` 首页卡片小弹窗／`.dialog-mask` 新增分类）：'
-    + '「去掉」只覆盖他指的那一处',
-  /background:\s*rgba\(20, 20, 28, 0\.55\)/.test(blocksOf(NC(read('app.wxss')), '.ci-mask'))
-    && /background:\s*rgba\(20, 20, 28, 0\.55\)/.test(blocksOf(NC(read('pages/categories/categories.wxss')), '.dialog-mask')))
+/* 10-18 00:0x 站长拿着真机图指的就是这一层：「这里不能突然压暗，要保存亮度，背景要变成毛玻璃」
+   ⇒ 上面那条"他没指的照旧压暗"名单里，`.ci-mask` 从 10-18 起变成他指过的那一处。
+   判据跟着改口径（改判据、不改代码去迁就旧尺子）：这一层要 transparent ＋ 挂上滤镜，
+   而且比密码／邮箱那两层多一条——他这一句指名要"毛玻璃"，那两层当时只撤暗、没补糊。 */
+const ciMask = blocksOf(NC(read('app.wxss')), '.ci-mask')
+ok('「卡片上的信息」那一层的遮罩不压暗（10-18 他指的这一处；那支 rgba(20,20,28,.55) 不许回来）',
+  /background:\s*transparent/.test(ciMask) && !/rgba\(\s*20,\s*20,\s*28/.test(ciMask), ciMask.trim())
+ok('同一层要真挂上毛玻璃（他这句后半段"背景要变成毛玻璃"；两条滤镜缺一半都不算）',
+  /backdrop-filter:\s*var\(--glass-bf\)/.test(ciMask)
+    && /-webkit-backdrop-filter:\s*var\(--glass-bf\)/.test(ciMask), ciMask.trim())
+ok('新增分类那一层的遮罩照旧压暗（`.dialog-mask` 他没指这一处）：「去掉」只覆盖他指的那一处',
+  /background:\s*rgba\(20, 20, 28, 0\.55\)/.test(blocksOf(NC(read('pages/categories/categories.wxss')), '.dialog-mask')))
 
 console.log(`${fails.length ? '✗' : '✓'} 二级页左上角同档：${pass}/${pass + fails.length} 过`)
 fails.forEach((f) => console.log('  ✗ ' + f))

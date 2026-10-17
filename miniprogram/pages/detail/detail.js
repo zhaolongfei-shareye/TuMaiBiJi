@@ -54,6 +54,12 @@ Page({
   },
 
   onShow() {
+    // 从看大图那一趟退回来不算"该重取"：内容还是这一篇，重取会让人看见整页闪一遍、
+    // 配图那一排先空再回来。只放过这一种入口——从编辑那一趟回来、或换了一篇，照旧重取。
+    const fromShot = this._shotFrom
+    this._shotFrom = 0
+    const shown = this.data.note
+    if (fromShot && shown && String(shown.id) === String(fromShot)) return
     // Skip first show (onLoad already loaded), only reload on navigateBack
     if (this.data.noteId && this.data._loaded) {
       this.loadNote(this.data.noteId)
@@ -183,8 +189,20 @@ Page({
   onPreviewImage(e) {
     const urls = this.data.noteImages.map((x) => x.cloud_url).filter(Boolean)
     if (!urls.length) return
-    const cur = e.currentTarget.dataset.url
-    wx.previewImage({ current: cur && urls.indexOf(cur) >= 0 ? cur : urls[0], urls })
+    this._previewShot(urls, e.currentTarget.dataset.url)
+  },
+
+  // 看大图那一趟开在新页面里（官方文档原话「在新页面中全屏预览图片」），退回来平台补发一次 onShow，
+  // 而这一页的 onShow 一进门就 `loadNote()`——整页重转一遍、配图那一排先空再回来（与详情窗那处同一个
+  // 根子，10-18 站长「那条 BUG 没修」查出来的）。出去前记一格"这一篇是为了看大图才出去的"，
+  // onShow 只放过那一趟；开不成就在 fail 里当场撤掉：没有"退回来"那一趟，留着会顶住下一次真从编辑那趟回来。
+  _previewShot(urls, cur) {
+    this._shotFrom = this.data.noteId || 0
+    wx.previewImage({
+      current: cur && urls.indexOf(cur) >= 0 ? cur : urls[0],
+      urls,
+      fail: () => { this._shotFrom = 0 },
+    })
   },
 
   // 这篇对外不对外，只有服务端知道（海报可能是在另一台手机上生成的）。
@@ -299,7 +317,7 @@ Page({
       // （10-08 测试包报的"看到小图，大图看不到"）。没登记过云时才退回本机路径。
       const url = cards[0].cloud || cards[0].p
       if (!url) return
-      wx.previewImage({ urls: [url], current: url })
+      this._previewShot([url], url)
       return
     }
     const { note } = this.data

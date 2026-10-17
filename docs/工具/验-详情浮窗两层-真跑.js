@@ -156,11 +156,12 @@ const readCi = (mp) => mp.evaluate(() => {
     ck('窗里大标题就是这篇', (await (await page.$('.ds-h2')).text()) === dl.notes[pick].title)
     const ibtn = []
     for (const b of await page.$$('.ds-ibtn')) ibtn.push(await b.text())
-    // v22（站长 10-03 第四轮）：底排从三枚减到两枚——「生成笔记卡片」那一枚整枚撤掉，
-    // 出卡片的入口挪进右上那一格（一个功能只留一个把手）。v19 撤「置顶」那条仍然成立。
-    ck('dock 只剩两枚并排一行（置顶、生成笔记卡片两枚都撤了）', ibtn.length === 2, ibtn.join('|'))
+    // v22（10-03）底排两枚 → 10-17 深夜站长那句「编辑和删除中间增加一按钮，分享笔记」变三枚 →
+    // 10-18 那枚的话改成两个字「分享」。这一条量的是**枚数与末枚**，不钉中间那枚的字（字归字典）。
+    ck('dock 三枚并排一行（编辑／分享／删除，置顶与「生成笔记卡片」两枚都撤了）', ibtn.length === 3, ibtn.join('|'))
     ck('底排不再有「生成笔记卡片」那枚（末枚是删除）', ibtn[ibtn.length - 1] === '删除', ibtn.join('|'))
-    ck('窗里右上那一格在，它就是出卡片的唯一入口', !!(await page.$('.ds-entry')))
+    // 10-18 抬头重排：右上那一格整块撤掉（出卡片的口只剩底排那枚「分享」），所以这一屏两态都不该有它。
+    ck('窗里右上那一格已经不在（撤净，不是靠哪一态挡住）', (await page.$$('.ds-entry')).length === 0)
     ck('带圈序号那批整块撤净（.ds-pt-n 一个都不许留在树上）', (await page.$$('.ds-pt-n')).length === 0,
       `${(await page.$$('.ds-pt-n')).length} 枚`)
     const kpN = (((await page.data()).detailNote || {}).key_points || []).length
@@ -214,31 +215,9 @@ const readCi = (mp) => mp.evaluate(() => {
     const boxOf = (sel) => mp.evaluate((s) => new Promise((done) => {
       wx.createSelectorQuery().select(s).boundingClientRect((r) => done(r || null)).exec()
     }), sel)
-    const hasThumb = !!(await page.$('.ds-pad'))
-    const pw = rpx(parseFloat((await (await page.$('.ds-entry')).size()).width))
-    ck(`右上那一格${hasThumb ? '（有卡片）是白垫那一档 252rpx' : '（空态）不窄于淡底那 176rpx'}，不是被挤成一条`,
-      hasThumb ? Math.abs(pw - 252) <= 3 : pw >= 173,
-      `${Math.round(pw)}rpx（窗宽 ${winInfo.windowWidth}px）`)
-    // 台账与屏上必须一起说话：图还在才画白垫，图被清掉（系统清缓存只清得掉文件，清不掉 storage
-    // 那本账）就退回淡底方形那一格。10-03 模拟器就是这么红过一次——src 递到了、文件不在，
-    // 屏上留下一块纯白板，看着像"卡片坏了"。判据不量文件在不在，就永远抓不到这一态。
-    const dNow = await page.data()
-    const led = await mp.evaluate((id) => (wx.getStorageSync('cardLog') || {})[String(id)] || [],
-      dl.notes[pick].id)
-    const dead = await mp.evaluate((list) => list.filter((x) => {
-      try { wx.getFileSystemManager().accessSync(x.p); return false } catch (e) { return true }
-    }).length, led)
-    ck(`右上那一格只列"文件真的在"那几张（台账 ${led.length} 张、图被清 ${dead} 张 → 窗里 ${dNow.detailCards.length} 张，屏上画的是${hasThumb ? '白垫' : '空态那一格'}）`,
-      dNow.detailCards.length === led.length - dead && hasThumb === (dNow.detailCards.length > 0))
-    if (hasThumb) {
-      const img = await page.$('.ds-pad-img')
-      const src = await img.attribute('src')
-      const rect = await img.size()
-      const want = (dNow.detailCards[0] || {}).p || ''
-      ck('白垫里画的就是台账那一张（src 递到了、图也有尺寸）',
-        !!src && src === want && parseFloat(rect.width) > 0 && parseFloat(rect.height) > 0,
-        `src=${src ? src.slice(-28) : '（空）'} 台账=${want.slice(-28)} 尺寸=${rect.width}×${rect.height}`)
-    }
+    /* 右上那一格那三段（盒子 252rpx／台账"文件真的在"才算／白垫里画的就是那一张）从 10-18 起没有主语了：
+       那一格被抬头重排整块撤掉。同一组事实不是没人管——独立详情页那一屏由 `验-详情页那一格-真跑` 量，
+       详情窗这一屏的抬头（通栏图区／数字／那一排点）由 `验-详情窗抬头那一块-真跑` 量。这里不重复造现场。 */
     ck('正文区有实际高度（能滚）', parseFloat(((await (await page.$('.ds-body')).size()).height || '0')) > 200)
     await mp.screenshot({ path: path.join(OUT, '03-详情浮窗.png') })
 
@@ -267,10 +246,10 @@ const readCi = (mp) => mp.evaluate(() => {
       `离底 ${sheetBox && Math.round(rpx(winInfo.windowHeight - sheetBox.bottom))}rpx`)
     await mp.screenshot({ path: path.join(OUT, '03b-窗开着只有一层.png') })
 
-    /* ---------- ④ 点右上那一格 → 只浮模板预览弹窗 ----------
+    /* ---------- ④ 点底排那枚「分享」→ 只浮模板预览弹窗 ----------
        一篇一张之后这一层分两态（未生成／已生成）。这一把量的是未生成态那一套：底排、药丸、
        滑动不循环、名片小弹窗。所以开窗之前把这一篇那本账临时挪开（detailCards 也一起清空——
-       onSheetToPoster 读的就是它），跑完原样放回 storage；已生成态那两问（底排只剩查看笔记｜删除、
+       `_openPosterFor` 读的就是它），跑完原样放回 storage；已生成态那两问（底排只剩查看笔记｜删除、
        左右滑不动）钉在 验-列表v19-真跑.js 的 ⑧b，不在这把里重复造现场。 */
     const ledKeep = await mp.evaluate((id) => {
       const m = wx.getStorageSync('cardLog') || {}
@@ -281,7 +260,14 @@ const readCi = (mp) => mp.evaluate(() => {
     }, dl.notes[pick].id)
     await page.setData({ detailCards: [] })
     await sleep(400)
-    await (await page.$('.ds-entry')).tap()
+    // 10-18 起这一屏开那个窗的口只剩底排中间那一枚「分享」（右上那一格整块撤了）。
+    // 按字面找那一枚、不按第几枚——底排再增减一次，按号找就把落点指到别人那枚上。
+    const wantTx = String((await page.data()).t.shareNote)
+    let shareBtn = null
+    for (const b of await page.$$('.ds-ibtn')) { if ((await b.text()).trim() === wantTx) { shareBtn = b; break } }
+    ck(`开那个窗的口就是底排念「${wantTx}」那一枚（按字面找得到，不是靠第几枚）`, !!shareBtn)
+    if (!shareBtn) throw new Error('底排找不到那一枚，④ 之后几节跑不了')
+    await shareBtn.tap()
     await sleep(7000)
     d = await page.data()
     ck('台账挪开之后开出来的这一层落在未生成态（底排有通栏那枚、能滑、能改名片）',
@@ -451,6 +437,23 @@ const readCi = (mp) => mp.evaluate(() => {
     ck('底下两枚是取消｜保存',
       (await (await page.$('.ci-btn.ghost')).text()) === '取消' &&
       (await (await page.$('.ci-btn.pri')).text()) === '保存')
+    /* ---------- 10-18 00:0x 这一层的遮罩（他拿着真机图那一句） ----------
+       原话：「这里不能突然压暗，要保存亮度，背景要变成毛玻璃。」
+       静态那把（`验-二级页左上角同档`）钉的是 app.wxss 里挂没挂；这两条钉**屏上算出来的是什么**：
+       `background` 涂没涂色与 `backdrop-filter` 生没生效，只有计算值说话——10-11 那次靠两张 PNG
+       才看出来"糊写了没上屏"（`拍-玻璃AB.js`＋`量-玻璃糊没糊.py` 那一趟），这一把不复造那套 A/B，
+       只读元素自己的计算值。读数口径沿用 10-16 邮箱那一层：读不到就报"读不到"，不判产品红。
+       ⚠ 量的是**遮罩**，不是那张卡：卡面吃 `--glass-veil` 那一档是 10-11 X4 拍过的，他没指，没动。 */
+    const ciMaskEl = await page.$('.ci-mask')
+    const ciMaskBg = ciMaskEl ? String(await ciMaskEl.style('background-color') || '') : ''
+    const ciMaskBf = ciMaskEl
+      ? String((await ciMaskEl.style('backdrop-filter')) || (await ciMaskEl.style('-webkit-backdrop-filter')) || '') : ''
+    ck('打开这一层不许突然压暗：遮罩算出来的底色是透明（那支 rgba(20,20,28,.55) 不许回来）',
+      /transparent/.test(ciMaskBg) || /rgba?\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(ciMaskBg),
+      ciMaskBg || '(这台工具读不到 background-color)')
+    ck('同一层屏上真挂着毛玻璃：backdrop-filter 算出来带 blur（写了没生效＝屏上还是原来那层）',
+      /blur\(/.test(ciMaskBf), ciMaskBf || '(读不到 backdrop-filter)')
+    await mp.screenshot({ path: path.join(OUT, '06b2-名片层不压暗.png') })
 
     /* 站长 10-03 22:47 真机两张：这一层整层看得见、选图也正常（**层序那一刀成了**），
        但一网点到下面那栏输入框，屏上就换回成品弹窗——那一拍 `cardInfoOpen` 被遮罩的
@@ -603,17 +606,29 @@ const readCi = (mp) => mp.evaluate(() => {
     /* ---------- 私密笔记：dock 两块整块不渲染 ---------- */
     await (await rowOf(pick)).tap()
     await sleep(3000)
-    ck('普通笔记：右上那一格与公开状态都在', !!(await page.$('.ds-entry')) && !!(await page.$('.ds-pub')))
+    // ⚠ 10-18 抬头重排把右上那一格整块撤了（换成通栏大图那一排），所以这一屏两态都不该有 `.ds-entry`。
+    // 原来这两条量的是"那一格在有／转私密后没了"，主语没了 ⇒ 改钉"这一屏压根没有"＋"公开状态那行照旧"。
+    ck('右上那一格在这一屏两态都不画（撤净了，不是靠私密那一态挡住）',
+      (await page.$$('.ds-entry')).length === 0 && (await page.$$('.ds-rt')).length === 0)
+    ck('公开状态那一行照旧在', !!(await page.$('.ds-pub')))
     await page.setData({ 'detailNote.is_private': true })
     await sleep(1200)
-    ck('转成私密后右上那一格整块不渲染（私密不出卡片）', !(await page.$('.ds-entry')))
     ck('转成私密后公开状态那一行不渲染', !(await page.$('.ds-pub')))
-    // v22 起两枚本来就是常态（「生成笔记卡片」挪走了），私密这一态不再"少一枚"，
-    // 所以这条从"剩两枚"改成"左列摊满整宽、两枚照常并排一行"。
-    ck('私密那一态两枚照常并排一行（dock 不空、不折行）', (await page.$$('.ds-ibtn')).length === 2,
+    ck('转成私密后那一排配图也不画（私密不发 assets 请求，屏上就不该有图区）',
+      (await page.$$('.ds-fig')).length === 0)
+    // 10-17 深夜底排从两枚变三枚（编辑／分享／删除）；10-18 撤的只是右上那一格，那一排一枚没少。
+    ck('私密那一态三枚照常并排一行（dock 不空、不折行）', (await page.$$('.ds-ibtn')).length === 3,
       `${(await page.$$('.ds-ibtn')).length} 枚`)
-    ck('私密那一态左列摊满整宽（右格没了就不留 252 的空位）',
-      !!(await page.$('.ds-hero.solo')))
+    ck('私密那一句写在行下面、屏上只出现一次', (await page.$$('.ds-no-share')).length === 1)
+    // 原来这一条量的是"右格没了 ⇒ 左列退回 solo 那一档"。右格整块撤了 ⇒ 没有换档这一回事，
+    // 现在的不变量是**标题那一行两态同宽**（这一条只有屏上量得出来，源码里看不出来）。
+    const h2w = async () => { const el = await page.$('.ds-h2'); return el ? Number((await el.size()).width) : -1 }
+    const privW = await h2w()
+    await page.setData({ 'detailNote.is_private': false })
+    await sleep(900)
+    const openW = await h2w()
+    ck('标题那一行在私密与非私密两态同宽（不再有"退回单列"那一档）',
+      privW > 0 && openW > 0 && Math.abs(privW - openW) < 1.5, `私密 ${privW}／非私密 ${openW}`)
     await mp.screenshot({ path: path.join(OUT, '07-私密窗.png') })
     await (await page.$('.grip')).tap()
     await sleep(800)

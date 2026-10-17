@@ -515,6 +515,74 @@ const ck = (name, ok, got) => {
     (await page.$$('.hint-bubble')).length === 0 && !(await page.data()).hintLine,
     `hint=${(await page.data()).hintLine}`)
 
+  /* ---------- D1d–D1j 这一枚的皮（站长 10-18 00:1x 拿着真机图那一句） ----------
+     原话：「提炼前的报错提示，不要用灰底白字，要换成白底，深灰字，不要加粗，外框用阴影浮起。
+     加抖一抖动态。」静态那把（`验-统一录入条`）钉的是样式表里挂的哪一档令牌；这几条钉
+     **屏上算出来的是什么**——皮这一类最容易"源码写了、渲染没生效"（`.mini-c` 那回是类名点空、
+     `.container.has-bg` 那回是权重不够，两回结构判据全绿、只有截图是坏的）。
+     阴影不在这队里：C11e 已经拿同一个元素量过 `box-shadow`，同一件事不留两处判据。
+     ⚠ 期望色一律现读（面＝`palette.createSkin()` 的 `--cp-card`，字＝`--cp-ink-78`），
+        写成 `rgb(255,255,255)` 那种字面就是给梯子钉第二份真相，下一轮换壁纸它只会跟着红。
+     ⚠ 对比这一条拿**屏上读回来的两支计算色**现算：alpha 先合成到它落的那块面上再按 WCAG 算。
+        样式注释里那句 7.46 是给人看的，漂了没人知道；读数不会。
+     ⚠ 抖一抖只有"节点真挪过"才算落：`@keyframes` 写了而渲染不认（或 transform 里那个单位掉下来），
+        屏上就是原地不动，而静态那几条照样全绿。动画只有几百毫秒，所以**手指按下之后立刻开始采**，
+        采完才松手——拿"拖一趟再回头看"那种写法一定采不到。 */
+  const kfText = (CWX.match(/@keyframes\s+cre-hint-shake\s*\{([\s\S]*?)\n\}/) || [0, ''])[1]
+  const SHAKE_RPX = Math.max(0, ...[...kfText.matchAll(/translateX\(\s*(-?[\d.]+)rpx\s*\)/g)].map((m) => Math.abs(Number(m[1]))))
+  const ANIM_MS = Number((/animation:\s*[\w-]+\s+(\d+)ms/.exec(segOf('.hint-bubble')) || [0, '420'])[1])
+  const BUB_FACE = toComputed(CARD_HEX)
+  const BUB_INK = toComputed((/--cp-ink-78:\s*([^;\n]+)/.exec(PAL.createSkin()) || [0, 'rgba(35,37,44,0.78)'])[1].trim())
+  const rgbOf = (s) => {
+    const m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,/.\s]+([\d.]+))?/.exec(String(s))
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] === undefined ? 1 : Number(m[4])] : null
+  }
+  const lin8 = (v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }
+  const lum8 = (p) => 0.2126 * lin8(p[0]) + 0.7152 * lin8(p[1]) + 0.0722 * lin8(p[2])
+  const cr8 = (f, g) => { const a = lum8(f), b = lum8(g); return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100 }
+  const sldEl2 = await page.$('.sld')
+  const knob2 = (await rects(['.sld-knob']))[0]
+  const seenLeft = []
+  await sldEl2.touchstart({ touches: [{ identifier: 0, clientX: knob2.left + knob2.w / 2, clientY: knob2.top + knob2.h / 2 }] })
+  const tShake = Date.now()
+  while (Date.now() - tShake < ANIM_MS + 380) {
+    const b = (await rects(['.hint-bubble']))[0]
+    if (b) seenLeft.push(b.left)
+    await sleep(20)
+  }
+  await sldEl2.touchend({ touches: [] })
+  await sleep(250)
+  const bubSkinEl = await page.$('.hint-bubble')
+  const spreadPx = seenLeft.length ? (Math.max(...seenLeft) - Math.min(...seenLeft)) : 0
+  const faceNow = bubSkinEl ? String(await bubSkinEl.style('background-color') || '') : ''
+  const inkNow = bubSkinEl ? String(await bubSkinEl.style('color') || '') : ''
+  const weightNow = bubSkinEl ? String(await bubSkinEl.style('font-weight') || '') : ''
+  const animNow = bubSkinEl ? String(await bubSkinEl.style('animation-name') || '') : ''
+  const faceRgb = rgbOf(faceNow)
+  const inkRgb = rgbOf(inkNow)
+  // 深灰字本身带 alpha ⇒ 先合成到它真正落的那块面上（读回来的面，不是我假设的白）再算对比
+  const onFace = inkRgb && faceRgb
+    ? [0, 1, 2].map((k) => inkRgb[k] * inkRgb[3] + faceRgb[k] * (1 - inkRgb[3])) : null
+  ck('D1d 面是白的：屏上算出来的 background-color 就是 palette 那支 --cp-card（暗面 --cp-ink 不许回来）',
+    !!faceNow && faceNow === BUB_FACE, `屏上 ${faceNow || '(读不到)'}／该 ${BUB_FACE}`)
+  ck('D1e 字是深灰：屏上算出来的 color 就是这一屏已有的那档 --cp-ink-78（不新起梯子）',
+    !!inkNow && inkNow === BUB_INK, `屏上 ${inkNow || '(读不到)'}／该 ${BUB_INK}`)
+  ck('D1f 不加粗：屏上算出来的 font-weight 是 400（他这句明写"不要加粗"）',
+    /^(400|normal)$/.test(weightNow), `屏上 ${weightNow || '(读不到)'}`)
+  const crBub = onFace ? cr8(onFace, faceRgb) : null
+  ck(`D1g 白底压深灰字读得清：这两支计算色合成后对比 ≥ 4.5（AA 小字线）`,
+    crBub !== null && crBub >= 4.5, crBub === null ? '(色没读全，不算数)' : `实测 ${crBub}:1`)
+  ck('D1h 抖一抖挂在屏上：这一枚算出来的 animation-name 就是样式表里那个 @keyframes',
+    animNow === 'cre-hint-shake', `屏上 ${animNow || '(读不到)'}`)
+  ck(`D1i 而且真动了：出现那几百毫秒里节点的 left 来回挪过（静止不动＝@keyframes 白写）`,
+    seenLeft.length >= 3 && spreadPx >= 1.5,
+    `采样 ${seenLeft.length} 拍／最大位移 ${spreadPx.toFixed(2)}px（源码写的摆幅 ±${SHAKE_RPX}rpx＝${(SHAKE_RPX * R).toFixed(2)}px、时长 ${ANIM_MS}ms）`)
+  // 采完把这一枚放干净：D1c 之后那几段（E 粘贴那一族）的前提是"屏上没有气泡"。
+  const tClear = Date.now()
+  while (Date.now() - tClear < 8000 && (await page.data()).hintLine) await sleep(400)
+  ck('D1j 这一枚还是几秒自己走（重新触发也一样，不用人再点一下）',
+    (await page.$$('.hint-bubble')).length === 0 && !(await page.data()).hintLine)
+
   // 换桩：只接提炼那两条，别的 URL 走回原函数，免得往现网落一条垃圾笔记
   const stubbed = await mp.evaluate(() => {
     if (wx.__probeRaw) return false
