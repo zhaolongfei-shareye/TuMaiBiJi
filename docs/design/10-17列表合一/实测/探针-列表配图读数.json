@@ -1,0 +1,167 @@
+{
+  "srcVersion": "2.2.9",
+  "windowWidth": 390,
+  "rows": [
+    131.0546875,
+    131.0546875,
+    131.0546875,
+    131.0546875,
+    131.0546875,
+    131.0546875
+  ],
+  "midWidths": [
+    551.9230769230769,
+    440.38461538461536,
+    440.38461538461536,
+    440.38461538461536,
+    440.38461538461536,
+    440.38461538461536
+  ],
+  "boxes": [
+    {
+      "x": 611.5384615384615,
+      "y": 835.0360576923076,
+      "w": 92.3076923076923,
+      "h": 92.3076923076923,
+      "src": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/__probe/p-wide.jpg"
+    },
+    {
+      "x": 611.5384615384615,
+      "y": 981.4753605769231,
+      "w": 92.3076923076923,
+      "h": 92.3076923076923,
+      "src": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/__probe/p-v.jpg"
+    },
+    {
+      "x": 611.5384615384615,
+      "y": 1127.9146634615383,
+      "w": 92.3076923076923,
+      "h": 92.3076923076923,
+      "src": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/__probe/p-tall.jpg"
+    },
+    {
+      "x": 611.5384615384615,
+      "y": 1274.3539663461538,
+      "w": 92.3076923076923,
+      "h": 92.3076923076923,
+      "src": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/__probe/p-sq.jpg"
+    },
+    {
+      "x": 611.5384615384615,
+      "y": 1420.7932692307693,
+      "w": 92.3076923076923,
+      "h": 92.3076923076923,
+      "src": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/assets/__probe/p-h.jpg"
+    }
+  ],
+  "px": {
+    "imgSize": [
+      734,
+      1588
+    ],
+    "scale": 0.9786666666666667,
+    "visibleRpx": 1622.6,
+    "shift": 172,
+    "shiftScore": 6.2,
+    "dyList": [
+      989.2,
+      1132.5,
+      1275.9,
+      1419.2,
+      1562.5
+    ],
+    "dySpread": 573.3,
+    "boxes": [
+      {
+        "src": "p-wide.jpg",
+        "srcMean": [
+          182.4,
+          180.7,
+          173.6
+        ],
+        "shotMean": [
+          187.6,
+          186.3,
+          180.1
+        ],
+        "colorDist": 5.8,
+        "variance": 53.4,
+        "y": 989.2,
+        "cornerGap": 117,
+        "inFrame": true
+      },
+      {
+        "src": "p-v.jpg",
+        "srcMean": [
+          93.1,
+          104.6,
+          110.9
+        ],
+        "shotMean": [
+          104.6,
+          113.4,
+          119
+        ],
+        "colorDist": 9.5,
+        "variance": 41.6,
+        "y": 1132.5,
+        "cornerGap": 135.7,
+        "inFrame": true
+      },
+      {
+        "src": "p-tall.jpg",
+        "srcMean": [
+          181.9,
+          181.9,
+          181.9
+        ],
+        "shotMean": [
+          185.3,
+          185.3,
+          185.3
+        ],
+        "colorDist": 3.4,
+        "variance": 37.7,
+        "y": 1275.9,
+        "cornerGap": 60.7,
+        "inFrame": true
+      },
+      {
+        "src": "p-sq.jpg",
+        "srcMean": [
+          119.1,
+          176.4,
+          214.1
+        ],
+        "shotMean": [
+          0,
+          0,
+          0
+        ],
+        "colorDist": 999,
+        "variance": 0,
+        "y": 1419.2,
+        "cornerGap": null,
+        "inFrame": false
+      },
+      {
+        "src": "p-h.jpg",
+        "srcMean": [
+          59.9,
+          70.8,
+          54.6
+        ],
+        "shotMean": [
+          0,
+          0,
+          0
+        ],
+        "colorDist": 999,
+        "variance": 0,
+        "y": 1562.5,
+        "cornerGap": null,
+        "inFrame": false
+      }
+    ]
+  }
+}
