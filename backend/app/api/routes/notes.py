@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import logging
 from sqlalchemy import and_, or_
 from app.db.database import get_db
+from app.models.asset import Asset, not_failed
 from app.models.note import Note, SOURCE_SHARE_IMPORT
 from app.models.share import Share
 from app.models.user import User
@@ -108,7 +109,7 @@ class NoteDetail(NoteBrief):
 
 
 class NoteListItem(NoteBrief):
-    """列表那一行比详情多出来的两样：这一篇此刻有没有开着的分享码、以及该显示谁的昵称。
+    """列表那一行比详情多出来的三样：这一篇此刻有没有开着的分享码、该显示谁的昵称、右侧那枚配图。
 
     只挂 GET /api/notes 这一条路由。详情页另走 getShareStatus，如果两处都发一份
     同样的事实，早晚会出现"列表说已分享、详情说没有"这种对不上的样子——所以
@@ -117,6 +118,11 @@ class NoteListItem(NoteBrief):
 
     has_active_share: bool = False
     share_author_name: str | None = None
+    # 列表右侧那枚缩略图（云开发 fileID，客户端拿去 getTempFileURL）。一篇只给一张，
+    # 取哪一张见 _attach_covers。没配过图、或那一张备份失败 ⇒ null，界面上那一格不画。
+    # ⚠ 这一栏**不许**进 NOTE_BRIEF_FIELDS：私密篇没解锁时那一行是按那九栏重建的，
+    #    白名单是这一闸唯一的屏障——一张照片里可能正写着密码、脸、票据。
+    cover_file_id: str | None = None
 
 
 class NoteCreate(BaseModel):
@@ -179,6 +185,41 @@ def _attach_share_marks(db: Session, notes: list) -> None:
         n.share_author_name = imported.get("author_name") or shared.get(n.id)
 
 
+def _attach_covers(db: Session, uid: str, notes: list) -> None:
+    """给这一页每条笔记挂上右侧那枚配图（`cover_file_id`，一篇一张）。
+
+    一次 IN 查完，理由与 `_attach_share_marks` 那行注释同：一页 20 篇逐篇问就是 20 个来回，
+    而这一栏本来一条查询就能取完。
+
+    三条口径写在这儿，免得下一个人按自己的读法改错：
+    ① **取哪一张**＝`Asset.id` 升序的第一张。这不是"随便挑一张"，而是**与详情页那组缩略图
+       同一个序**（`routes/assets.py` 的 `list_note_assets` 就是 `order_by(Asset.id.asc())`）——
+       两处各挑一张的话，"列表上那枚"和"点进去第一张"就会不是同一张图。
+    ② **必须过 `not_failed()`**：`backup_status='failed'` 的行云上根本没有对象，
+       拿它当封面就是一张碎图；历史遗留的 NULL 跟着算进来（那个函数头写清楚了为什么）。
+    ③ **带上 `user_id` 这一道**：`note_id` 已经由外层那条 `Note.user_id == user.id` 限过，
+       这里是第二把锁——B 链那批行是"先传图后绑 note_id"，绑错一篇的可能形状就在这儿。
+
+    没配过图、或那一篇的图全部备份失败 ⇒ 留 null，界面上那一格不画（他原话"没有不显示"）。
+    """
+    ids = [n.id for n in notes]
+    cover: dict = {}
+    if ids:
+        for nid, key in (
+            db.query(Asset.note_id, Asset.object_key)
+            .filter(
+                Asset.note_id.in_(ids),
+                Asset.user_id == uid,
+                not_failed(),
+            )
+            .order_by(Asset.note_id, Asset.id.asc())
+            .all()
+        ):
+            cover.setdefault(nid, key)  # 按 id 升序，第一篇命中的就是它最早那一张
+    for n in notes:
+        n.cover_file_id = cover.get(n.id)
+
+
 @router.get("/", response_model=List[NoteListItem])
 def list_notes(
     request: Request,
@@ -237,6 +278,11 @@ def list_notes(
     # 挂在这一步而不是最后一步：下面 locked 那支只裁私密那几行，普通笔记仍是原对象，
     # 两支出门都得带着这两样。
     _attach_share_marks(db, notes)
+    # 封面与它同一个位置、同一套规矩：先给每一行都算出来，私密那几行由下面那份白名单
+    # （`NOTE_BRIEF_FIELDS` 九栏，不含 `cover_file_id`）挡在门外。看着像多做了一遍，
+    # 但"少列一个字段就等于那个字段照给"是这份代码里反复踩过的一条 ⇒ 挡人的是白名单，
+    # 钉住它的是 tests/test_list_cover.py 那两条正反用例，不是这段的自觉。
+    _attach_covers(db, str(user.id), notes)
     if not locked:
         return notes
     # 概要跟着正文一起裁：界面上它只在验过密码、展开那一行时才画，所以裁掉不影响
