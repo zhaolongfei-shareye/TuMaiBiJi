@@ -177,7 +177,11 @@ class Test那一格私密跟着密码一起备好:
 
 class Test私密那一格不许被静默删掉:
     """删分类的通用逻辑会把名下笔记的 category_id 置空——对别的分类那叫取消归类，
-    对这一格等于把一批笔记静默解锁（判据就是分类名）。所以格里有东西时拦下，空着照旧能删。"""
+    对这一格等于把一批笔记静默解锁（判据就是分类名）。
+
+    10-17 站长拍的是这一格**禁止删除**，所以这一道从"格里有东西才拦"抬成无条件拦。
+    旧那一版留了一个洞：`/private-password/reset` 只清 `private_password_hash` 那一列、
+    不动分类，所以"先撤密码、那一格正好空了、再删"这条路是通的——那正是静默解锁。"""
 
     def _fill(self, client, me, db):
         from app.models.category import Category
@@ -196,13 +200,25 @@ class Test私密那一格不许被静默删掉:
         cat = self._fill(client, me, db)
         r = client.delete(f"/api/categories/{cat.id}", headers=hdr(me))
         assert r.status_code == 400, f"HTTP {r.status_code} {r.text}"
-        assert "私密" in r.text and "挪走" in r.text, r.text
+        assert "私密" in r.text and "不许删" in r.text, r.text
         assert "私密" in self._names(client, me), "拦下了就不该被删走"
 
-    def test_空的一格照旧能删(self, client, me, db):
+    def test_空的一格也不许删(self, client, me, db):
+        """这一条是 10-17 那一刀的正身：格里一篇都没有，照样删不掉。"""
         client.put("/api/user/private-password", json={"password": "246813"}, headers=hdr(me))
         cat_id = self._names(client, me)["私密"]
-        assert client.delete(f"/api/categories/{cat_id}", headers=hdr(me)).status_code == 200
+        r = client.delete(f"/api/categories/{cat_id}", headers=hdr(me))
+        assert r.status_code == 400, f"空着的私密格子照样不许删，实得 {r.status_code}：{r.text}"
+        assert "私密" in self._names(client, me)
+
+    def test_撤完密码那一格也不许删(self, client, me, db):
+        """反向钉那条洞：撤密码只清 hash、格子还在，此时删格子＝把锁的把手摘下来。"""
+        client.put("/api/user/private-password", json={"password": "246813"}, headers=hdr(me))
+        cat_id = self._names(client, me)["私密"]
+        assert client.post("/api/user/private-password/reset", headers=hdr(me)).status_code == 200
+        assert "私密" in self._names(client, me), "撤密码只清那一列，格子该还在（这是现网行为）"
+        r = client.delete(f"/api/categories/{cat_id}", headers=hdr(me))
+        assert r.status_code == 400, f"撤完密码再删这一格这条路必须堵死，实得 {r.status_code}"
 
     def test_别的分类照旧能带着笔记一起删(self, client, me, db):
         """反向钉：上面那道闸只针对「私密」，别把通用行为一起改掉。"""

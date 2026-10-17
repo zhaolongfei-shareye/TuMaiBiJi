@@ -385,10 +385,29 @@ class Test回体与旁路那五道口:
         assert db.query(Category).filter(Category.id == cat.id).first().name == "私密", \
             "拦下了就不许在库里留下痕迹"
 
-    def test_B2_空格子改名照旧(self, client, db):
+    def test_B2_空格子也不许改名(self, client, db):
+        """10-17 站长把口径抬成"私密那一格除了不能删，也不能改名"，所以原来那条
+        "格里没笔记就改得动"的放行**作废**了——这一格空不空都不给改。
+        留着旧断言等于把新规矩钉成旧规矩。"""
         u = new_user(db, "b2b")
         cat = make_private_category(db, u)
-        assert client.put(f"/api/categories/{cat.id}", json={"name": "回收站"},
+        r = client.put(f"/api/categories/{cat.id}", json={"name": "回收站"}, headers=hdr(u))
+        assert r.status_code == 400, f"空着的私密格子照样不许改名，实得 {r.status_code}：{r.text}"
+        db.expire_all()
+        assert db.get(Category, cat.id).name == "私密"
+
+    def test_B2_私密那一格只改颜色不改名照旧放行(self, client, db):
+        """挡的是"换名字"，不是"这一格什么都不能动"：只改颜色那趟必须照旧成。"""
+        u = new_user(db, "b2b2")
+        cat = make_private_category(db, u)
+        assert client.put(f"/api/categories/{cat.id}", json={"color": "#D2683F"},
+                          headers=hdr(u)).status_code == 200
+
+    def test_B2_名字原样交回来的改名不算改名(self, client, db):
+        """他把名字原样提交一次（管理态退出时批量发 PUT 是这条路），不许被当成改名挡掉。"""
+        u = new_user(db, "b2b3")
+        cat = make_private_category(db, u)
+        assert client.put(f"/api/categories/{cat.id}", json={"name": "私密"},
                           headers=hdr(u)).status_code == 200
 
     def test_B2_把别的格改名成私密会把那格的活码关掉(self, client, db):

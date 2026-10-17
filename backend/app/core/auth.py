@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.db.database import get_db
 from app.models.account import Account
 from app.models.user import User
-from app.services import accounts, generation, preset_note, quota
+from app.services import accounts, category_names, generation, preset_note, quota
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +199,15 @@ async def login_or_register(code: str, db: Session, inviter: int | None = None) 
     #   用户删掉预置那篇、下次打开它就回来了（§8.232 判据 2 要钉的反向就是这条）。
     seeded_note_id: int | None = None
     if is_new_user:
+        # 默认四格（站长 10-17「每个新用户默认提供四个分类，用户可以自行删除」）。
+        # 与预置笔记分开各挡一次异常：四格建不起来不该让首屏那篇预置笔记也没了，反过来也一样。
+        # 两档显示值在 `seed_default_categories` 里直接写死，这一趟不出网。
+        try:
+            category_names.seed_default_categories(db, str(user.id))
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("默认四格分类没种下去（不影响登录）：user=%s", user.id)
         try:
             note = preset_note.seed_note_for_new_user(db, user)
             seeded_note_id = note.id if note else None
