@@ -96,9 +96,9 @@ const CSS = stripCss(IX_WXSS)
   const leftCss = ['ds-hero', 'ds-lt', 'ix-shots', 'ix-shot'].filter((c) => new RegExp('\\.' + c + '\\b').test(CSS))
   ck('index.wxss 里那两列与那排小方格的样式也撤净（留着就是第二份真相的起点）',
     leftCss.length === 0, leftCss.join('|'))
-  ck('index.js 里那一格的口 `onCardCell` 撤了（出图那一趟只剩「分享笔记」一枚绑 `_openPosterFor`）',
+  ck('index.js 里那一格的口 `onCardCell` 撤了（出图那一趟只剩「分享」一枚绑 `_openPosterFor`）',
     !/onCardCell/.test(JS))
-  ck('`_openPosterFor` 这份实现还在，且「分享笔记」那枚还绑着它（撤的是入口，不是能力）',
+  ck('`_openPosterFor` 这份实现还在，且「分享」那枚还绑着它（撤的是入口，不是能力）',
     /_openPosterFor\(note\)|_openPosterFor \(note\)|_openPosterFor:/.test(JS.replace(/\s+/g, ' '))
     && /catchtap="onSheetShare"/.test(WXML))
 }

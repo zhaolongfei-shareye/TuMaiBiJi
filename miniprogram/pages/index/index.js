@@ -221,7 +221,14 @@ Page({
     this.loadQuota()
     // onShow 每次切回该 tab 都会触发，必须 reset：否则非 reset 分支会把结果追加到旧列表上，
     // 同一条笔记被贴两遍。
-    this._closeFloats()
+    // ⚠ 只放过"看大图退回来"这一种：窗里那份内容是按 id 存的一份快照（`.float-sheet` 一个地方
+    // 都不读 `notes[号]`），下面的重排指不到别人那一篇上去，所以不收它。对一下号：
+    // 回来的这一扇窗不是出去那一篇，就没有"接着站回窗前"这回事，照旧收。
+    // 其余四条重排整表的入口（下拉刷新／换筛选词／换分类／切走再回来）不受这一格影响。
+    const fromShot = this._shotFromDetail
+    this._shotFromDetail = 0
+    const openNote = this.data.detailOpen && this.data.detailNote
+    if (!(fromShot && openNote && openNote.id === fromShot)) this._closeFloats()
     // 去编辑那一趟回来要重新站到详情窗前（他 10-03：没保存点取消，回列表等于把人甩回原地找路）。
     // 和验完密码那条同一个做法：等整表重排完再按 id 找回那一行，先开窗后重排会开成别人的笔记。
     const reopen = this._backToDetail
@@ -996,7 +1003,18 @@ Page({
     const urls = this.data.detailImages.map((x) => x && x.cloud_url).filter(Boolean)
     if (!urls.length) return
     const cur = e.currentTarget.dataset.url
-    wx.previewImage({ current: cur && urls.indexOf(cur) >= 0 ? cur : urls[0], urls })
+    // 看大图这一趟是"开在新页面里"（官方文档那句「在新页面中全屏预览图片」），所以关掉大图＝切回
+    // 这一屏 ⇒ onShow 会补发一次（与 create.js:245 记的相机／相册那一条同一个做法）。而 onShow 里有
+    // `_closeFloats()`：人从大图退回来落在列表上，他那扇还没看完的窗没了（站长 10-17 报的这一条）。
+    // 出去前记下"这一扇窗是为了看大图才浮着的"，让 onShow 那一趟放过它。
+    this._shotFromDetail = (this.data.detailNote && this.data.detailNote.id) || 0
+    wx.previewImage({
+      current: cur && urls.indexOf(cur) >= 0 ? cur : urls[0],
+      urls,
+      // 开不成就没有"切回来"那一趟，不等 onShow 消费、当场撤掉：
+      // 留着会让下一次真的切走再回来时被这一格顶住（那一趟该收窗）。
+      fail: () => { this._shotFromDetail = 0 },
+    })
   },
 
   // 列表整表重排之后按 id 把那一行找回来再开窗。现在只剩一条路走这里：从编辑那一趟回来。
@@ -1070,7 +1088,7 @@ Page({
     wx.navigateTo({ url: `/pages/write/write?id=${note.id}&mode=edit` })
   },
 
-  // 中间那一枚「分享笔记」（站长 10-17 深夜：「点击切换卡片大图窗口」）——
+  // 中间那一枚「分享」（站长 10-17 深夜：「点击切换卡片大图窗口」；10-18 凌晨他把那四个字改成两个字）——
   // 办事的还是那一个口 `_openPosterFor`，右上那一格（有卡片时）与这一枚绑同一个函数，
   // 不另开第二条出图链。私密篇这一枚在屏上是置灰的，这里那道 `is_private` 是它背后那一扇：
   // 置灰只是画，挡住了才是真挡（服务端 cards.py／shares.py 同一句，客户端不许自己客气）。
@@ -1138,7 +1156,7 @@ Page({
   // v7 ④：出卡片这一个动作 = 详情窗整个藏掉、只浮模板预览这一个弹窗（两层不叠）。
   // 所以关掉弹窗后回来的是详情窗、里面内容还是这篇。
   // 10-17 深夜站长那一句「统一把右侧的笔记卡片图位置去掉」把这一屏唯一的入口撤了，
-  // 所以这里不再有 `onCardCell`：出图那一趟现在只有下面那枚「分享笔记」（`onSheetShare`）一个口，
+  // 所以这里不再有 `onCardCell`：出图那一趟现在只有下面那枚「分享」（`onSheetShare`）一个口，
   // 它绑的实现与原来那一格是同一个 `_openPosterFor`（一份实现，两枚口）。
   // 独立详情页那一屏右上那一格与它自己的 `onCardCell` 这一轮没动。
 

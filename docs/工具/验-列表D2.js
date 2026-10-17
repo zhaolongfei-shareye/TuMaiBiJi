@@ -436,8 +436,10 @@ ok('这一枚发的就是画布上那一张（直接递 posterImagePath，不重
 ok('面板走完那层黑一定撤（complete 那一环漏了就是把人关在黑屏里，1.9.13 栽过）',
   /complete:\s*\(\)\s*=>\s*this\.setData\(\{\s*shareDim:\s*false/.test(shareCardFn))
 ok('那行字三项照站长原话：微信好友 / 朋友圈 / 公众号，中英各一份（上一轮我砍成两项，这条钉死别再砍）',
-  /cardShare: '分享卡片：微信好友 \/ 朋友圈 \/ 公众号'/.test(I18N)
-  && /cardShare: 'Share card: Chat \/ Moments \/ Official Account'/.test(I18N)
+  // 前面那一句他 10-18 凌晨改过口：「分享卡片：XXXXX，改为分享到：XXXX」。
+  // 改的是引导句，**后面那三项一个字没动**——这一条判据守的就是那三项都在。
+  /cardShare: '分享到：微信好友 \/ 朋友圈 \/ 公众号'/.test(I18N)
+  && /cardShare: 'Share to: Chat \/ Moments \/ Official Account'/.test(I18N)
   && /<text>\{\{t\.cardShare\}\}<\/text>/.test(CODE_WXML))
 // 这一条原来写成一条 240 字符窗口的长正则，10-04 那段"按钮一律用系统默认那对"的注释
 // 一进去就把距离撑过了窗口——红的是尺子，代码一字没错。改成**位置比较**：
