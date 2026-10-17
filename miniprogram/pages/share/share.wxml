@@ -65,8 +65,16 @@
             <view class="ci-bin-lid"></view>
             <view class="ci-bin-body"></view>
           </view>
+          <!-- 两枚角色芯片，次序照他 10-18 01:3x 那句念的顺序：先「背景」、后「头像」。
+               原话「卡片上的信息，改为，图片设置 两个按钮，分别是背景，头像」——
+               「头像」就是原来那枚「卡片」（画在卡片头像上那一张），指的内容没换，只是叫法。 -->
+          <view wx:if="{{item.path}}" class="ci-bg {{item.bg ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetBg"
+            aria-label="{{item.bg ? t.slotBg : ''}}">
+            <view wx:if="{{item.bg}}" class="ci-tick"></view>
+            <text wx:else>{{t.slotBg}}</text>
+          </view>
           <view class="ci-cap {{item.card ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetCard"
-            aria-label="{{item.card ? t.slotCard : ''}}">
+            aria-label="{{item.card ? t.slotAvatar : ''}}">
             <view wx:if="{{item.card}}" class="ci-tick"></view>
             <text wx:else>{{item.cap}}</text>
           </view>

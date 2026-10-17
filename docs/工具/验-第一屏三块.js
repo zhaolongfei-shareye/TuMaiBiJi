@@ -729,10 +729,20 @@ const collect = (s) => {
 }
 for (const m of wxml.matchAll(/class="([^"]+)"/g)) collect(m[1])
 for (const m of wxml.matchAll(/hover-class="([^"]+)"/g)) collect(m[1])
-const collide = [...usedClasses].filter((c) => !SHARED_OK.includes(c)
+// 「图片设置」那一族（原名「卡片上的信息」）10-18 起也在这一屏——首页那枚「换背景」拉起同一层。
+// 那一族的样式**本来就在 app.wxss**、三页共用一份（`验-名片弹窗两页同源` 钉的是"页面 wxss 里
+// 一条 .ci-* 都不许有"），所以它"和全局同名"是设计，不是这一条要堵的事故。
+// 它自己那两枚状态词（role／ghost／pri）只在 .ci-* 那一族里出现，一并算进去。
+const CI_FAMILY = /^ci-/
+const CI_STATES = ['role', 'ghost', 'pri']
+const inCiFamily = (c) => CI_FAMILY.test(c) || CI_STATES.includes(c)
+const collide = [...usedClasses].filter((c) => !SHARED_OK.includes(c) && !inCiFamily(c)
   && new RegExp(`\\.${c}(?![\\w-])`).test(appWxss))
-ok('这一屏用的类名没有一枚和 app.wxss 同名（撞上的话全局那一份会静默补进来）',
+ok('这一屏用的类名没有一枚和 app.wxss 同名（撞上的话全局那一份会静默补进来；.ci-* 那一族除外，见上面）',
   collide.length === 0, collide.join(' '))
+ok('豁免那条前缀不是空转：这一屏确实在用 .ci-* 那一族，且那三枚状态词也在用',
+  [...usedClasses].some((c) => CI_FAMILY.test(c)) && CI_STATES.every((c) => usedClasses.has(c)),
+  `${[...usedClasses].filter((c) => CI_FAMILY.test(c)).length} 枚 .ci-* 类名`)
 ok('三元分支里那几枚也一起扫了（不是只扫了空格切出来的裸词）',
   ['entry-dock', 'has-bg', 'panel-open'].every((c) => usedClasses.has(c)),
   [...usedClasses].filter((c) => c.includes('-')).length + ' 枚带连字符的类名')

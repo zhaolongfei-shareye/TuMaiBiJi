@@ -1914,3 +1914,21 @@
       需要"铺图/不铺图都长一个样"的东西，就不要给它写 `.container.has-bg` 那一条。
    ⚠ 这条撤掉之后，`--cp-ink-78` 这一屏还有三处消费方（`.mini-glyph`／`.shut-lb`／`.th-plus`），
       令牌本身不许跟着删。 */
+
+/* X4「那三枚居中弹窗」里「卡片上的信息」这一枚（站长 10-11 逐条裁定原话「4、做」）。首页 10-18 也拉起
+   同一层（他那句「换背景，也要拉起这个弹窗，不需要跳到设置里面换」），这两条与 `pages/index` 那两条
+   逐字同一份：皮写在页内、只用 `--glass-veil`／`--glass-bf` 两枚 var()，不并进 app.wxss（原因抄在
+   那张表 X4 那段与首页那条注释里——闸名 `has-bg` 进全局表会让 `验-第一屏三块` 永久假红）。
+   写成 compound（`.ci-card.glass-dialog`）是为了压得过 app.wxss 里 `.ci-card` 自己的 `background:#FCFBF8`。
+   ⚠ 第二条（说明字提到整档墨）抄的是首页 10-11 拍的那一版**甲**，而甲当时量的是"白纱压在暗遮罩上落成
+   中灰、只有 2.60:1"；这一层的遮罩 10-18 起已经不压暗，那一档对比**没重算过**——要量走
+   `docs/工具/探-弹窗玻璃对比度.js`，不过线我不自己抬 α。 */
+.container.has-bg .ci-card.glass-dialog {
+  background: var(--glass-veil);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+}
+
+.container.has-bg .ci-card.glass-dialog .ci-hint {
+  color: #23252C;
+}

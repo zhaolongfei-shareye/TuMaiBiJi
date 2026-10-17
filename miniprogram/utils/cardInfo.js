@@ -1,7 +1,8 @@
 /**
- * 「卡片上的信息」那一层（改名片的小弹窗）——首页成品弹窗与笔记卡片页共用这一份实现。
+ * 「图片设置」那一层（原名「卡片上的信息」，10-18 站长改的口；改名片的小弹窗）——
+ * 首页成品弹窗、笔记卡片页、首页那枚「换背景」共用这一份实现。
  *
- * 为什么要收成一份：两个入口改的是同一份数据（`utils/poster.js` 的四槽 + 名称/一句话），
+ * 为什么要收成一份：三个入口改的是同一份数据（`utils/poster.js` 的四槽 + 名称/一句话），
  * 而里面有几条不是"随便挑个函数都行"的规则，走样的症状都是**同一张卡在两个入口改出来不一样**：
  * ① 往已填的格上换图必须走 `replaceSlot` 不是 `placeSlot`（后者会重算角色，实测结果是
  *    "没人当卡片"、海报头像当场消失）；② 勾掉卡片**不会**自动挪给还留着的别的张（09-30 在
@@ -9,7 +10,7 @@
  * ④ 那两只 input 的 `adjust-position` 必须关着（真机两轮 BUG，见 docs/产品需求.md §8.106/§8.107）。
  *
  * 页面侧要做的两件事：
- *   data 里带上 `cardInfo: cardInfo.initial()`（四个键），Page 方法里 spread 上 `cardInfo.handlers`；
+ *   data 里 spread 上 `cardInfo.initial()`（四个键），Page 方法里 spread 上 `cardInfo.handlers`；
  *   可选两个钩子——`_ciAfterCommit()` 回一份要一起 setData 的键（首页要顺手刷头部那张背景），
  *   `_ciAfterChange()` 在收窗且真动过时被调一次（两页都是重画那张成品图）。
  *
@@ -25,17 +26,18 @@ function initial() {
 }
 
 const handlers = {
-  // 四枚下面那一行只写它当前的角色；勾哪一格当卡片是这一层给的口，
-  // 而"这一格当不当首页背景"那个开关仍只在「我的→卡片模板」那一页——同一件事不留两个口。
+  // 有图那一格下面两枚角色芯片，次序与叫法都照站长 10-18 01:3x 那句：「两个按钮，分别是背景，头像」——
+  // 「头像」说的就是原来那枚「卡片」（画在卡片头像上那一张），指的内容没换。
+  // 「背景」这一枚的口从「我的→卡片模板」那一页搬进这一层，归他那句「首页换背景，也要拉起这个弹窗，
+  // 不需要跳到设置里面换」（10-18 01:1x）——那一句同时顶掉了本文件 10-03 记的"角色开关只留在那一页"。
+  // 空格那一格还是只写位置号：它没图，两个角色都点不动（点了不响应，见那两个 handler）。
   _ciCaps(slots) {
     const { lang } = this.data
     return slots.map((s, i) => ({
       path: s ? s.path : '',
       card: !!(s && s.card),
       bg: !!(s && s.bg),
-      cap: s && s.bg && !s.card
-        ? t('slotBg', lang)
-        : `${t('slotPos', lang)} ${i + 1}`,
+      cap: s ? t('slotAvatar', lang) : `${t('slotPos', lang)} ${i + 1}`,
     }))
   },
 
@@ -78,6 +80,22 @@ const handlers = {
     const next = cur.card
       ? slots.map((s, j) => (j === at && s ? Object.assign({}, s, { card: false }) : s))
       : poster.takeRole(slots, at, 'card')
+    this._ciCommit(next)
+  },
+
+  // 第二枚芯片＝「背景」：这一格当不当首页那张背景图。语义与上面那枚一条不差——
+  // 单选（别人那枚自己灭）、再点已亮的那枚就是取消、取消之后不自动挪给别的张（09-30 拍板"不挪"）、
+  // 空格不给点。取的角色不同，走的是同一个 poster.takeRole。
+  // 改完当场生效：`_ciCommit` 会问页面的 `_ciAfterCommit()` 要一份补丁，首页那一屏靠它把
+  // bgSrc 与深浅那一档一起换掉（不跳页，所以没人替它在 onShow 重取）。
+  onCiSetBg(e) {
+    const at = Number(e.currentTarget.dataset.i)
+    const cur = this.data.ciSlots[at]
+    if (!cur || !cur.path) return
+    const slots = poster.readSlots()
+    const next = cur.bg
+      ? slots.map((s, j) => (j === at && s ? Object.assign({}, s, { bg: false }) : s))
+      : poster.takeRole(slots, at, 'bg')
     this._ciCommit(next)
   },
 

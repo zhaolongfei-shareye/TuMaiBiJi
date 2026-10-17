@@ -201,8 +201,19 @@ ok('首屏那一格 Tips 仍是"吃余量、可折行"（行宽上限 9em，不�
 ok('面板里没有那排按钮（清空/粘贴/保存/取消全撤）', !/class="acts"/.test(wxml) && !/catchtap="pasteUrl|catchtap="clearShots|catchtap="cancelWrite/.test(wxml))
 ok('四步指引整批撤净（模板、引用、样式都没有）',
   !/entryGuide/.test(wxml) && !/\.guide\s*\{/.test(wxss) && !/guide1T/.test(js))
-ok('链接档只有一个输入框，没有第二个（标题格撤了）',
-  (wxml.match(/<input\b/g) || []).length === 1 && !/writeTitle/.test(wxml + js))
+// 「卡片上的信息」那一层 10-18 起也在这一屏（那枚「换背景」拉起同一层），它自己带两只输入框。
+// 上面那句"链接档只有一个输入框"的主语是**录入面板**，不是这一层 ⇒ 先把那一层从 wxml 里摘出去再数，
+// 否则一句"标题格撤了"会被一个毫不相干的弹窗顶红（判据写歪，不是实现坏了）。
+const ciFrom = wxml.indexOf('<view wx:if="{{cardInfoOpen}}" class="ci-mask"')
+const ciBlock = ciFrom < 0 ? '' : wxml.slice(ciFrom, wxml.indexOf('\n  </view>', ciFrom) + '\n  </view>'.length)
+const wxmlNoCi = ciBlock ? wxml.replace(ciBlock, '') : wxml
+ok('链接档只有一个输入框，没有第二个（标题格撤了；这一层那两只另算，见下面那条）',
+  (wxmlNoCi.match(/<input\b/g) || []).length === 1 && !/writeTitle/.test(wxml + js))
+ok('「卡片上的信息」那一层两只输入框齐全（名称 16 字、一句话 24 字），且都关着 adjust-position',
+  (ciBlock.match(/<input\b/g) || []).length === 2 && /maxlength="16"/.test(ciBlock)
+  && /maxlength="24"/.test(ciBlock)
+  && (ciBlock.match(/adjust-position="\{\{false\}\}"/g) || []).length === 2,
+  `框 ${(ciBlock.match(/<input\b/g) || []).length} 只`)
 ok('文字档是一个 textarea（长原文要能换行）', /<textarea/.test(wxml))
 // 提示词全在框里：placeholder 必须是字典里的句子，不是硬写的 https://
 ok('链接框的提示词吃 linkDesc（不再有写死的 https 样例）',
@@ -295,8 +306,15 @@ ok('卡里那一层的块名就是真跑名单那四枚（改名要一起改名�
   `out@${iOut}／wr-sw@${iSw}／panel@${iPanel}`)
 
 // ---------- 3. 一个功能只留一个入口 ----------
-ok('换背景只是导流，不弹相册', /goHomeBg\(\)\s*\{\s*wx\.navigateTo/.test(js) && !/goHomeBg[\s\S]{0,200}chooseMedia/.test(js))
-ok('导流目标还是那一页', /navigateTo\(\{ url: '\/pages\/profile\/profile' \}\)/.test(js))
+// 站长 10-18 01:1x「首页换背景，也要拉起这个弹窗，不需要跳到设置里面换」⇒ 这一枚不再导流去 profile。
+// 「这一枚自己不弹相册」那半条还在：起系统选图面板的是那一层里的「更换／＋」，不是点这一枚就弹。
+ok('换背景这一枚只拉起那一层，自己不弹相册',
+  /goHomeBg\(\)\s*\{\s*this\.onOpenCardInfo\(\)/.test(js) && !/goHomeBg[\s\S]{0,200}chooseMedia/.test(js))
+ok('反向：把那条导流（navigateTo profile）写回这一枚里，上面这条必须红',
+  !/goHomeBg\(\)\s*\{\s*this\.onOpenCardInfo\(\)/.test(
+    js.replace('this.onOpenCardInfo()', "wx.navigateTo({ url: '/pages/profile/profile' })")))
+ok('「我的」那一格去设置那一页的路由没被顺带撤掉（他这轮只说不必从这一枚跳过去）',
+  /\/pages\/profile\/profile/.test(fs.readFileSync(P('pages/me/me.js'), 'utf8')))
 ok('选图入口全页只有 pickImage 一处', (js.match(/wx\.chooseMedia/g) || []).length === 1)
 // 这一条改过三次口，来历留在注释里，别再照第一版判：
 // · 10-11 12:2x「调亮度，换背景，再第二屏也需要，第二屏就是带拍摄面板那个」⇒ 撤掉"展开态不渲染"，
@@ -410,8 +428,14 @@ ok('上屏文字全走字典，wxml 里没有写死的中文（✕ 是符号不�
 const handlers = new Set()
 wxml.replace(/(?:catch|bind)(?:tap|input|confirm|change|focus|blur|touchstart|touchmove|touchend|touchcancel)="(\w+)"/g, (_, h) => handlers.add(h))
 ok('页面上绑到的处理函数在 create.js 里都有', [...handlers].length >= 12, `${[...handlers].length} 个`)
+// 「卡片上的信息」那一层 10-18 起也在这一屏（那枚「换背景」拉起同一层），而它的实现整份在
+// utils/cardInfo.js、页面是 spread 进去的 ⇒ 这一句的真实主语是"这一屏点得到的东西有实现"，
+// 不是"字面必须出现在本页文件里"。允许来自那一份 spread，查不到照旧红。
+const CARD_INFO = fs.readFileSync(P('utils/cardInfo.js'), 'utf8')
+const sharedCi = (h) => /\.\.\.cardInfo\.handlers/.test(js) && new RegExp('^  ' + h + '[(:]', 'm').test(CARD_INFO)
 ;[...handlers].forEach((h) => {
-  ok(`处理函数 ${h} 在 create.js 里`, new RegExp('\\b' + h + '\\s*\\(').test(js))
+  ok(`处理函数 ${h} 有实现（本页，或 utils/cardInfo.js 那一份 spread）`,
+    new RegExp('\\b' + h + '\\s*\\(').test(js) || sharedCi(h))
 })
 
 // ---------- 5. 几何：面板两档高度、卡里那一段装不装得下，全是算出来的 ----------

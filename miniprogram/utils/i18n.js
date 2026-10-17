@@ -157,10 +157,14 @@ const i18n = {
     previewHint: '下面是成品样子；改完记得点上面的保存。',
     profileSaved: '已保存',
     // 成品弹窗底下那枚「编辑个人名片」浮出来的一层（站长 10-03：出卡片这一屏要能就地改名片，
-    // 不必绕去「我的→卡片模板」）。四枚下面只写它当前的角色，角色开关仍只在那一页——
-    // 同一件事不留两个口。
+    // 不必绕去「我的→卡片模板」）。
+    // 站长 10-18 01:3x 两句话：① 首页那枚「换背景」也拉起**同一层**，不必跳设置那一页
+    // （「角色开关只留在那一页」那条从这一句起作废，那一页的两枚芯片他没下撤的命令、照旧在）；
+    // ② 这一层的名字与两枚按钮：「卡片上的信息」改为**图片设置**，两枚按钮分别叫**背景**与**头像**。
+    // 「头像」说的是"画在卡片头像上"那一个角色（=原来那枚「卡片」），指的内容没变，只是叫法。
     editCard: '编辑个人名片',
-    cardInfo: '卡片上的信息',
+    cardInfo: '图片设置',
+    slotAvatar: '头像',
     cardInfoHint: '这四张就是卡片上的人和名字。换一张点「更换」，不想要了点右上角的垃圾桶。',
     cardReplace: '更换',
     slotPos: '位置',
@@ -549,7 +553,8 @@ const i18n = {
     previewHint: 'This is the finished card. Tap Save above to apply.',
     profileSaved: 'Saved',
     editCard: 'Edit my card',
-    cardInfo: 'Card details',
+    cardInfo: 'Image settings',
+    slotAvatar: 'Avatar',
     cardInfoHint: 'These four are the face and the name printed on your cards. Tap Replace to swap one, or the bin to remove it.',
     cardReplace: 'Replace',
     slotPos: 'Slot',

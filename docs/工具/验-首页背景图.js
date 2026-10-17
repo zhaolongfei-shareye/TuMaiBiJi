@@ -458,10 +458,14 @@ const wpWx = read('pages/wallpaper/wallpaper.wxml')
 const wpCss = read('pages/wallpaper/wallpaper.wxss')
 ck('外观设置里没有背景图那一节', !/onSetHomeBg|bg-cell|bgThumb|homeBgSection/.test(wpJs + wpWx))
 ck('那一节的样式也没留下', !/\.bg-cell|\.bg-thumb|\.bg-plain/.test(wpCss))
-ck('首页那枚「换背景」是导流、不弹相册',
-  /goHomeBg\(\)[\s\S]{0,120}navigateTo[\s\S]{0,60}pages\/profile\/profile/.test(read('pages/create/create.js'))
+// 站长 10-18 01:1x「首页换背景，也要拉起这个弹窗，不需要跳到设置里面换」⇒ 这一枚不再导流去 profile。
+// 「不弹相册」那半条还在：这一枚只把那一层浮出来，起系统选图面板的是层里的「＋／更换」。
+ck('首页那枚「换背景」只拉起那一层、自己不弹相册',
+  /goHomeBg\(\)\s*\{\s*this\.onOpenCardInfo\(\)/.test(read('pages/create/create.js'))
   && !/chooseMedia/.test(wpJs))
-ck('唯一的选图口还在卡片模板页', /wx\.chooseMedia/.test(read('pages/profile/profile.js')))
+ck('选图那两口都有出处（这一层走 utils/cardInfo.js 的 _ciPick，卡片模板页走 profile.js 自己那一套）',
+  /wx\.chooseMedia/.test(read('pages/profile/profile.js'))
+  && /wx\.chooseMedia/.test(read('utils/cardInfo.js')))
 // 09-30 形象图改成四槽，「换一张/去掉」那两行字没了，那句说明重写进 slotHint。
 // 口径没变：卡片模板页那页必须自己讲清"这张还会铺在首页"，两种语言都得讲。
 ck('卡片模板页那句话提了首页背景', /「背景」铺在首页/.test(read('utils/i18n.js'))

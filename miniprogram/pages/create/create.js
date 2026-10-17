@@ -8,6 +8,7 @@ const { compressForBackup } = require('../../utils/imageCompress.js')
 const person = require('../../utils/person.js')
 const bgTone = require('../../utils/imgBrightness.js')
 const mpAssets = require('../../utils/mpAssets.js')
+const cardInfo = require('../../utils/cardInfo.js')
 
 /* 深浅分两截判（站长 10-12 21:1x：「请按照上下部分来分别判断，避免全图平均，造成差异」）。
    这一页上截＝左上角那行大字与那枚标题图（实测落在屏高 9%~16%），
@@ -191,6 +192,8 @@ Page({
     // 语言角标前面那枚小黄点（站长 10-15 14:0x「中 EN 的下划线去掉，不要加粗，前面加小黄点就行」）。
     // 与上面那句 Tips 的点**同一支色、同一个出口**：色值只从 palette 来，一次都不许写进 WXSS。
     langDotStyle: 'background:' + TIP_DOT,
+    // 「卡片上的信息」那一层那四个键由 utils/cardInfo.js 给初值（三页共用一份，别各写一份）。
+    ...cardInfo.initial(),
   },
 
   // 横条上面那一行轮播 Tips：六句教人用现成的能力（拍照提炼、链接、分享选模板、
@@ -543,10 +546,28 @@ Page({
     })
   },
 
-  // 换背景图只是导流：选图这件事仍然只在「我的 → 卡片模板」那一页做一次。
+  // 「换背景」不再导流去「我的 → 卡片模板」：站长 10-18 01:1x 原话
+  // 「首页换背景，也要拉起这个弹窗，不需要跳到设置里面换」。这一层里那两枚芯片（卡片／背景）
+  // 改的就是同一份四槽，「背景」那一枚当场把首页这张图换掉（钩子在下面 `_ciAfterCommit`）。
+  // 那一页的两枚芯片这一轮没撤——他这句说的是"这一枚不必跳过去"，不是"那一页的开关不要了"。
   goHomeBg() {
-    wx.navigateTo({ url: '/pages/profile/profile' })
+    this.onOpenCardInfo()
   },
+
+  // ---------- 「卡片上的信息」（首页这一屏由上面那枚「换背景」拉起） ----------
+  // 实现整份在 utils/cardInfo.js（与首页成品弹窗、笔记卡片页同一份），这一页只给下面这一个钩子。
+
+  // 首页那张背景图就是四槽里挂着「背景」角色的那一张，而 bgSrc 平时只在进页那一趟重取。
+  // 这一层不跳页 ⇒ 不接这一刀，勾完芯片屏上还是旧图（他那句「背景图自动刷新为最新」）。
+  // 换图的同时把深浅那一档重算：新铺上来的这张可能是浅的，字不翻就白压白（10-12 那一族静默失效）。
+  _ciAfterCommit() {
+    const bg = poster.homeBg()
+    bgTone.applyTone(this, bg, toneZones())
+    this.toneRects()
+    return { bgSrc: bg }
+  },
+
+  ...cardInfo.handlers,
 
   // 条外任意空白都收回到默认那条；忙的时候不收，别把进度藏起来
   collapse() {

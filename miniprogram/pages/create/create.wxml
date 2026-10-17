@@ -330,6 +330,63 @@
     </view>
 
   </view>
+
+  <!-- 「卡片上的信息」：站长 10-18 01:1x「首页换背景，也要拉起这个弹窗，不需要跳到设置里面换」。
+       markup 与 `pages/index`／`pages/share` 那两屏逐字同一份（三页同源由 `验-名片弹窗两页同源` 钉），
+       逻辑同一份在 utils/cardInfo.js，样式同一组在 app.wxss 的 .ci-*；这一页只多两件事：
+       ① 上面那枚「换背景」不再 navigateTo profile，改成调 onOpenCardInfo；
+       ② `_ciAfterCommit()` 把 bgSrc 与深浅那一档当场带一下——这一层不跳页，没人替它在 onShow 重取，
+          不接这一刀就是"点完芯片屏上这张图还是旧的"（他这句里的"背景图自动刷新为最新"）。
+       皮照首页那一屏：铺了形象图时这张卡是白纱＋糊（X4），实心那条留在没铺图那一态。 -->
+  <view wx:if="{{cardInfoOpen}}" class="ci-mask" catchtap="">
+    <view class="ci-card glass-dialog" catchtap="">
+      <text class="ci-title">{{t.cardInfo}}</text>
+      <text class="ci-hint">{{t.cardInfoHint}}</text>
+      <view class="ci-slots">
+        <view wx:for="{{ciSlots}}" wx:key="index" class="ci-slot">
+          <view class="ci-disc {{item.path ? 'ci-filled' : 'ci-empty'}}" data-i="{{index}}" catchtap="onCiSlotTap">
+            <image wx:if="{{item.path}}" src="{{item.path}}" mode="aspectFill" class="ci-img" />
+            <text wx:else class="ci-plus">+</text>
+            <text wx:if="{{item.path}}" class="ci-repl" data-i="{{index}}" catchtap="onCiReplace">{{t.cardReplace}}</text>
+          </view>
+          <view wx:if="{{item.path}}" class="ci-bin" data-i="{{index}}" catchtap="onCiDrop">
+            <view class="ci-bin-lid"></view>
+            <view class="ci-bin-body"></view>
+          </view>
+          <!-- 两枚角色芯片，次序照他 10-18 01:3x 那句念的顺序：先「背景」、后「头像」。
+               原话「卡片上的信息，改为，图片设置 两个按钮，分别是背景，头像」——
+               「头像」就是原来那枚「卡片」（画在卡片头像上那一张），指的内容没换，只是叫法。 -->
+          <view wx:if="{{item.path}}" class="ci-bg {{item.bg ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetBg"
+            aria-label="{{item.bg ? t.slotBg : ''}}">
+            <view wx:if="{{item.bg}}" class="ci-tick"></view>
+            <text wx:else>{{t.slotBg}}</text>
+          </view>
+          <view class="ci-cap {{item.card ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetCard"
+            aria-label="{{item.card ? t.slotAvatar : ''}}">
+            <view wx:if="{{item.card}}" class="ci-tick"></view>
+            <text wx:else>{{item.cap}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileName}}</text>
+        <!-- adjust-position 关掉是抄「我的」页私密密码那一层在他 iPhone 11 上验过的口径：
+             微信只保证焦点框不被压住，它不知道这张卡底下还有别的控件，一顶整页就把这种
+             fixed 浮层顶得跟原生输入层对不上（首页那层的原话，同一条结论）。 -->
+        <input class="ci-input" value="{{ciName}}" maxlength="16" placeholder="{{t.profileNamePh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiName" />
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileSlogan}}</text>
+        <input class="ci-input" value="{{ciSlogan}}" maxlength="24" placeholder="{{t.profileSloganPh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiSlogan" />
+      </view>
+      <view class="ci-acts">
+        <view class="ci-btn ghost" catchtap="onCloseCardInfo">{{t.cancel}}</view>
+        <view class="ci-btn pri" catchtap="onCiSave">{{t.save}}</view>
+      </view>
+    </view>
+  </view>
 </view>
 
 <!-- 滑动确认那一枚长条。三个模式共用一份，所以写成模板；
