@@ -40,4 +40,4 @@ function formatWeekday(dateStr) {
   return WEEKDAYS[new Date(dateStr).getDay()]
 }
 
-module.exports = { formatDateTime, formatShortDate, formatWeekday, formatYearMonth }
+module.exports = { formatDate, formatDateTime, formatShortDate, formatWeekday, formatYearMonth }
