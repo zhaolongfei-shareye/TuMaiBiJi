@@ -13,7 +13,11 @@ const cardCloud = require('../../utils/cardCloud.js')
       否则"他一个字没改"也会被算成改过，这一刀就白补了。 */
 const normLines = (v) => (Array.isArray(v) ? v : (v == null ? [] : [v]))
   .map((x) => String(x || '').replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean).join('\n')
-const normTags = (v) => (Array.isArray(v) ? v : (v == null ? '' : String(v)))
+// ⚠ 这一把尺两头喂进来的形状不一样：库里 `tags` 是**数组**（`/api/notes/{id}` 直接回
+//   `["邓丽君","林青霞"]`），屏上那一只文本框读回来是**字符串**。原来这里只把非数组那支折成字符串，
+//   数组那一支原样交给 `.split` ⇒ 每次进「编辑笔记」都在建基线那一行抛 `split is not a function`，
+//   被 catch 接住就成了"内容都铺出来了、却弹一句加载失败"（10-18 站长真机抓到，模拟器同一篇复现）。
+const normTags = (v) => (Array.isArray(v) ? v.join(',') : (v == null ? '' : String(v)))
   .split(/[，,]/).map((x) => x.trim()).filter(Boolean).join(',')
 
 Page({
