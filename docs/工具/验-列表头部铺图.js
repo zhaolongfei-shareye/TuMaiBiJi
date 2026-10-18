@@ -208,10 +208,11 @@ ok('容器竖排撑满一屏，列表区 flex:1 + min-height:0（少了 min-heig
 // 站长 10-17 两句：「搜索的 icon，我要下移到面板右上角」＋「左边加一个分类管理 icon，点击可以直接跳转修改分类」。
 // ⇒ `.tools`（绝对定位 top 400、压在照片上）整条撤，换成 `.ixl-bar`（`.sheet` 里流内第一块）。
 // 这一节换了主语：原来钉的是"压在图上那一行的落点与那档纸白"，现在钉"面板顶那一行的落点与两档墨"。
-// 没变的三样：热区仍 88、放大镜仍是 CSS 画的同一枚、搜索那一态仍由 searchOpen 决定。
+// 没变的三样：两枚各占一头、放大镜仍是 CSS 画的同一枚、搜索那一态仍由 searchOpen 决定。
+// 变的：行高 88 → 64（站长 10-18「『全部』和上方 icon 之间浪费了一行空间，要去掉」）。
 const bar = seg(wxss, '.ixl-bar')
-ok('面板顶那一行与两枚热区都是 88 高（原来照片段那一行就是 88，搬下来不缩水）',
-  /height: 88rpx/.test(bar) && /\.ixl-ic\s*\{[^}]*height: 88rpx/.test(wxss))
+ok('面板顶那一行与两枚热区都是 64 高（10-18 从 88 收下来，行与热区必须同一个数，否则热区顶到分类那一行）',
+  /height: 64rpx/.test(bar) && /\.ixl-ic\s*\{[^}]*height: 64rpx/.test(wxss))
 ok('两枚各占一头（左分类管理、右搜索）：space-between、不垫圆底也不描边',
   /justify-content: space-between/.test(bar) && !/border(?!-radius)|border-radius/.test(bar)
   && (wxml.match(/class="ixl-ic/g) || []).length === 2)
@@ -301,10 +302,14 @@ ok('点空白缩回挂在容器上，条子内部和两枚 icon 都靠 catchtap 
   /class="container[^"]*" bindtap="onBlankTap"/.test(wxml) && /catchtap="noop"/.test(wxml)
   && !/onToggleMode/.test(wxml + cjs)
   && /class="ixl-ic \{\{searchKeyword \? 'on' : ''\}\}" catchtap="onOpenSearch"/.test(wxml))
-// 行仍 88，条子压到 60——"同高"这条作废，钉的是"条子比行矮 28、由行把它竖向居中"。
-ok('条子压到 60（与分类那枚 chip 实测 59 同一档），那一行仍 88、条子在行里竖向居中',
-  /\.srch\s*\{[^}]*height: 60rpx/.test(wxss) && /^\.ixl-bar\s*\{[^}]*height: 88rpx/m.test(wxss)
+// 行 64，条子 60——"同高"这条作废，钉的是"条子比行矮 4、由行把它竖向居中"。
+ok('条子压到 60（与分类那枚 chip 实测 59 同一档），那一行 64、条子在行里竖向居中',
+  /\.srch\s*\{[^}]*height: 60rpx/.test(wxss) && /^\.ixl-bar\s*\{[^}]*height: 64rpx/m.test(wxss)
   && /align-items: center/.test(seg(wxss, '.ixl-bar')))
+// 10-18 那一刀的另一半：分类那一行的上内缩归零。这一条钉的是"那一行空白不许自己长回来"——
+// 上下两档里只许动上面那档，下面的 8 是给列表留的缝，他没说要去。
+ok('分类那一行的上内缩是 0（浪费的那一行来自这里＋行高 88，两处一起收）且下内缩 8 没跟着动',
+  /^\.cats\s*\{[^}]*padding: 0 0 8rpx/m.test(wxss))
 ok('有词又缩回时那枚 icon 翻一档（列表被筛过这件事得有地方说）',
   /class="ixl-ic \{\{searchKeyword \? 'on' : ''\}\}"/.test(wxml) && /^\.ixl-ic\.on\s*\{/m.test(wxss))
 // 分类那一行 v30 起是「文字 + 选中一条短杠」（首页自己的 .ix-cat），胶囊那四条一起删了：

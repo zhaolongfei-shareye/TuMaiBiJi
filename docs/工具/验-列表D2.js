@@ -156,10 +156,11 @@ ok('那一行不再有任何"自己那面"：`--cp-panel` 与那支黄在这张�
 ok('两枚 tab 那串新字（tabList）在屏上已经没有消费者（`navShare` 仍被分享页那一栏导航条念着）',
   !/t\.tabList/.test(CODE_WXML) && ZH.navShare === '笔记卡片',
   '字典里那一串还挂着，留给下一次单独清理（效果图生成器那一格仍在读它）')
-// ②面板顶那一行（10-17 从照片段右下搬进来，左端新加一枚分类管理）
-ok('面板顶那一行：左分类管理、右搜索，各占一头，行与热区都是 88（照片段右下那一行整条撤）',
-  /justify-content: space-between/.test(barRule) && /height: 88rpx/.test(barRule)
-  && /height: 88rpx/.test(icRule) && (CODE_WXML.match(/class="ixl-ic/g) || []).length === 2
+// ②面板顶那一行（10-17 从照片段右下搬进来，左端新加一枚分类管理；2.3.13 行与热区 88→64，
+//   站长那一句「『全部』和上方 icon 之间浪费了一行空间，要去掉」——判据本体（各占一头、旧那三条撤净）没动）
+ok('面板顶那一行：左分类管理、右搜索，各占一头，行与热区都是 64（照片段右下那一行整条撤）',
+  /justify-content: space-between/.test(barRule) && /height: 64rpx/.test(barRule)
+  && /height: 64rpx/.test(icRule) && (CODE_WXML.match(/class="ixl-ic/g) || []).length === 2
   && dead(/class="tools|class="acts|class="ic /))
 ok('两枚不垫圆底也不描边，两档字吃这一页的墨（有搜索词那一枚才抬到 --text-primary）',
   /color: var\(--text-secondary\)/.test(icRule)

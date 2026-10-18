@@ -77,7 +77,9 @@ ok('C2 逐条走同一个创建接口，不新起批量口（后端一次只收�
 // ---------- C3 每枚右上角一枚 ×，点了删 ----------
 ok('C3 × 只在管理态画、且只在**不是私密**那一枚上画',
   /wx:if="\{\{item\.x\}\}" class="ix-cat-x" catchtap="onCatDeleteTap"/.test(WXML)
-  && /x: !it\.isPrivate/.test(seg(JS, '_catView(edit) {')))
+  // ⚠ 锚点跟着 2.3.13 那一刀改：`_catView(edit)` → `_catView(edit, cats)`（冷启第一屏只剩「全部」那条 bug
+  //   的修法就是让它吃外递的表）。判据本体一个字没动——钉的还是"× 只画在不私密那一枚上"。
+  && /x: !it\.isPrivate/.test(seg(JS, '_catView(edit, cats) {')))
 ok('C3 那一枚热区是 44×44（比字大，点在字右上角那一片就删得掉），整块落在缝里不被切',
   /\.ix-cat-x\s*\{[^}]*position: absolute/.test(WXSS)
   && /\.ix-cat-x\s*\{[^}]*width: 44rpx/.test(WXSS)

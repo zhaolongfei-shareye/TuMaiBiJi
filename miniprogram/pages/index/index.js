@@ -303,7 +303,12 @@ Page({
       // 所以分类色在这一屏只剩详情窗那一份（挂在 `detailNote.catStyle` 上）。
       // 分类比笔记晚到是常态，这一趟重算**不只是补名字**：`is_private`／`privKnown` 都由分类名判，
       // 表还没回来时它们一律"不私密"，合一之后那一行右侧还画配图 ⇒ 重算就是那道闸的一部分。
-      this.setData({ categories, catView: this._catView(this.data.catEdit) })
+      // ⚠ `catView` 必须把刚拿到的这张表**当参数递进去**，不许让它自己读 `this.data.categories`：
+      //   写在同一个对象字面量里的参数，求值发生在 setData 之前，读到的还是上一趟那份。
+      //   冷启第一屏那"上一趟"是空表 ⇒ 芯片排只剩「全部」，要点一下井格进管理态再退出来才恢复
+      //   （站长 10-18 报的 bug，尺子 `验-分类冷启第一屏-真跑` 量到的是 表 4 格／catView 1 枚）。
+      //   下面那句 `skin()` 不在此列——它在 setData 那一条**之后**才跑，读到的已经是新表。
+      this.setData({ categories, catView: this._catView(this.data.catEdit, categories) })
       if (this.data.notes.length) {
         const notes = this.skin(this.data.notes)
         this.setData({ notes, ...this.arrange(notes) })
@@ -555,12 +560,15 @@ Page({
   // 那一排芯片**唯一**的渲染源。`edit` 由调用方传进来，不现读 `this.data.catEdit`：
   // 进出管理态那两趟要在同一次 setData 里同时换 `catEdit` 与 `catView`，
   // 现读 data 拿到的是旧的那一态，画出来就是一屏对不上号的混合体。
-  _catView(edit) {
+  // `cats` 同理，且更狠：和 `categories` 写在同一次 setData 里时，`this.data.categories` 还是旧那份，
+  // 所以那一趟必须把新表递进来（默认值留给其余调用点——它们都在 setData 之后，读到的是新表）。
+  _catView(edit, cats) {
     const lang = this.data.lang
+    const src = cats || this.data.categories
     const out = []
     if (!edit) {
       out.push({ key: 'all', id: null, label: t('allCategories', lang), x: false, state: '' })
-      this.data.categories.forEach((c) => out.push({
+      src.forEach((c) => out.push({
         key: 'c' + c.id, id: c.id, label: labelOf(c, lang), x: false, state: '',
       }))
       return out
