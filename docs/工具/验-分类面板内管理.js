@@ -79,6 +79,7 @@ ok('C3 × 只在管理态画、且只在**不是私密**那一枚上画',
   /wx:if="\{\{item\.x\}\}" class="ix-cat-x" catchtap="onCatDeleteTap"/.test(WXML)
   // ⚠ 锚点跟着 2.3.13 那一刀改：`_catView(edit)` → `_catView(edit, cats)`（冷启第一屏只剩「全部」那条 bug
   //   的修法就是让它吃外递的表）。判据本体一个字没动——钉的还是"× 只画在不私密那一枚上"。
+  //   2.3.16 中间一度多收过第三参数（full），同一夜那枚「新增」被他打回、参数跟着没，锚点又回到这一版。
   && /x: !it\.isPrivate/.test(seg(JS, '_catView(edit, cats) {')))
 ok('C3 那一枚热区是 44×44（比字大，点在字右上角那一片就删得掉），整块落在缝里不被切',
   /\.ix-cat-x\s*\{[^}]*position: absolute/.test(WXSS)
@@ -153,15 +154,15 @@ ok('C5 不做"每敲一个字就发一次"：onCatAddInput 与 onCatAddCommit �
 ok('C5 他正筛着那一格被删掉时把筛选收回"全部"（否则屏上是一片空＋一个还在筛的状态，看着像坏了）',
   /selectedCategory: null/.test(SAVE))
 
-// ---------- C6 私密那一格不许删、不许改名、能拖动 ----------
+// ---------- C6 私密那一格不许删、不许改名、不许拖动（10-18 起） ----------
 ok('C6 服务端：那一格无条件 400（原来是"格里还有笔记才挡"，空格删得掉＝先撤密码再删格子那条路）',
   /if db_cat\.name == PRIVATE_CATEGORY_NAME:\s*\n\s*raise HTTPException/.test(CAT_API)
   && CAT_API.indexOf('if db_cat.name == PRIVATE_CATEGORY_NAME') < CAT_API.indexOf('# Set related notes'))
 ok('C6 服务端：改名那一趟同样无条件挡，但只挡"改掉那一格的名字"（原样交回来与只改颜色都放行）',
   /update_data\["name"\] != PRIVATE_CATEGORY_NAME/.test(CAT_API))
-ok('C6 客户端那一格不画 ×，点名字也不给改名的口（拖动照旧——他拍的是"能拖动，不能改名"）',
+ok('C6 客户端那一格不画 ×，点名字也不给改名的口（10-18 改口：连拖动也撤了，点下去给一句浮在它上面的话）',
   /if \(it\.isPrivate\) return/.test(DEL)
-  && /if \(!it \|\| it\.isPrivate\) return/.test(seg(JS, 'onCatChipTap(e) {')))
+  && /if \(it\.isPrivate\) \{ this\._catChipNote\(it\.key\); return \}/.test(seg(JS, 'onCatChipTap(e) {')))
 
 // ---------- C7 新用户默认四类 ----------
 ok('C7 四类就是灵感／生活／工作／学习，英文那一档是他挑的乙（Ideas／Life／Work／Study）',

@@ -58,7 +58,7 @@ const ck = (name, ok, got) => { results.push({ name, ok, got }); console.log(`  
 
   ck('这一台账号有东西可测：分类表非空且至少一行带封面（否则下面几条是假绿）',
     a.cats >= 1 && a.notes >= 1, `分类 ${a.cats}／笔记 ${a.notes}／封面 ${a.covers}`)
-  ck('冷启第一屏：屏上芯片数 = 分类数 ＋ 1（多出来那枚是「全部」）',
+  ck('冷启第一屏：屏上芯片数 = 分类数 ＋ 1（只多「全部」那一枚）',
     a.cats >= 1 && chipsA === a.cats + 1, `要 ${a.cats + 1} 枚，实得 ${chipsA} 枚`)
   ck('冷启第一屏：没有一行停在"私密没判过"（那一档会把封面一起抹掉）',
     a.unknownPriv === 0, `${a.unknownPriv} 行没判过`)
@@ -79,7 +79,7 @@ const ck = (name, ok, got) => { results.push({ name, ok, got }); console.log(`  
   console.log(`读数｜清空重跑那一趟之后：表 ${b.cats} 格／catView ${b.view} 枚／屏上芯片 ${chipsB} 枚／封面 ${b.covers} 张（屏上 ${thB} 枚）／私密没判过 ${b.unknownPriv} 行`)
 
   ck('重跑那一趟自己要把芯片排算齐（不许只填表不算渲染源）',
-    b.cats >= 1 && b.view === b.cats + 1, `要 ${b.cats + 1} 枚，实得 ${b.view} 枚`)
+    b.cats >= 1 && b.view === b.cats + 1, `要 ${b.cats + 1} 枚（全部＋${b.cats} 格），实得 ${b.view} 枚`)
   ck('屏上真的画出那些分类（不是只填了 data、wxml 那一排还空着）',
     b.cats >= 1 && chipsB === b.cats + 1, `${chipsB} 枚`)
   // 这条钉的是"第二处副作用"：那一趟重算了 skin，就不许把上一趟判好的私密/封面再抹一次。

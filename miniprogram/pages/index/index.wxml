@@ -85,7 +85,7 @@
         <input
           class="srch-input"
           value="{{catNewName}}"
-          placeholder="{{t.catAddPh}}"
+          placeholder="{{catPh}}"
           placeholder-class="srch-ph"
           confirm-type="done"
           bindinput="onCatAddInput"
@@ -122,12 +122,16 @@
           bindtouchend="onCatDragEnd"
           bindtouchcancel="onCatDragEnd"
         >
-          {{item.label}}
+          <text class="ix-cat-t">{{item.label}}</text>
           <view wx:if="{{item.x}}" class="ix-cat-x" catchtap="onCatDeleteTap" data-key="{{item.key}}">✕</view>
         </view>
       </view>
     </scroll-view>
   </view>
+  <!-- 压在元素上面那一句（站长 10-18「划过去的那一句，显示在对应的元素上面」）。
+       它是页面上的一枚浮层、不挂进芯片里面：那一排在横向 scroll-view 里，超出盒子的那一截会被切掉
+       （`.ix-cat-x` 那条注释钉的就是同一型，那一枚只能落在缝里）。落点是按下去那一下现量的。 -->
+  <view wx:if="{{catNote}}" class="ix-note" style="left:{{catNoteX}}px;top:{{catNoteY}}px">{{catNote}}</view>
 
   <!-- v12：列表不再整页滚，改在这块区域里自己滚、滚到底再取下一批。
        内缩挂在 .sheet 的 padding 上，不挂在 scroll-view 自己身上——挂在它身上时

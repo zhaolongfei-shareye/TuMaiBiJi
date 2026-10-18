@@ -49,6 +49,29 @@ const SOURCE_TYPE_KEYS = {
   preset: 'sourcePreset',
 }
 
+/* 分类那一排的两条上限（站长 10-18 原话「分类数量要做限制，最多8个包括私密分类，私密永远排最后一格」
+   「分类名称最多4个汉字。英文长度，你帮我设好」）。
+   · `CAT_MAX` **含"私密"那一格**——它就是服务端跟着密码一起补出来的那一格，在 `_toDraft` 的表里，不是额外一枚。
+   · 名称：汉字 4 个是他钉的；**10 个字母这一档是我定的**（他这句让我设，没给数）。两条各数各的，
+     所以 `AI读书`＝2 个字母＋2 个汉字，两条都没过、放过；数字与标点算进字母那一档（它们同宽）。
+     按码点算不按 `.length`：emoji 那种占两个码位的字符拿 `.length` 数会多数一个，把他一个字符的名字判成两个。
+   ⚠ 服务端那道**没加**（`backend/app/api/routes/categories.py` 的 `MAX_NAME` 仍是 100、没有数量闸）：
+     他这两句点的是"输入框提示"，服务端要不要一起钉，等他一句再说。 */
+const CAT_MAX = 8
+const CAT_NAME_CJK = 4
+const CAT_NAME_LATIN = 10
+const CJK = /[㐀-䶿一-鿿豈-﫿]/
+function catNameTooLong(name) {
+  const cs = Array.from(String(name || ''))
+  const cjk = cs.filter((c) => CJK.test(c)).length
+  return cjk > CAT_NAME_CJK || cs.length - cjk > CAT_NAME_LATIN
+}
+// 那三句话术里的数都由这里递进去（`{max}`／`{cjk}`／`{latin}`）：写死进字典就有第二个出处，
+// 抬上限时屏上那句还停在旧数上。
+function catLimits() {
+  return { max: CAT_MAX, cjk: CAT_NAME_CJK, latin: CAT_NAME_LATIN }
+}
+
 /* 话术里那一个 {n}／{names}。做法与「我的」页那份 `fmt` 一模一样；
    没有把它提到 utils/i18n.js 去，是因为那一改要牵动几页共用的取键口，不属于这一轮。 */
 function fmt(tpl, map) {
@@ -82,6 +105,16 @@ Page({
     // 它们只被 js 读，跟着 setData 白跑一趟（同下面那两行"解锁状态为什么不进 data"的理由）。
     catEdit: false,
     catView: [],
+    // 输入框那句占位话（换着说"还没满"与"满了先删一个"两种）。它挂在 data 上而不是 wxml 里做三元：
+    // 那一句里有 `{max}`，wxml 拿不到 `fmt`，把数写死进字典就成了第二个出处（改 `CAT_MAX` 时话术不会跟着走）。
+    // 它与 `catView` 同一趟算（见 `_catPaint`），分两趟 setData 会露一帧"格数已经变了、话还没改口"。
+    catPh: '',
+    // 压在元素上面那一句（站长 10-18「划过去的那一句，显示在对应的元素上面」）。
+    // 手机上没有鼠标可"划"，所以这一句挂在**按那一个东西的**那一下上；落点是现量的（见 `_catNoteAt`），
+    // 因为那一排在横向 scroll-view 里，超出盒子的那一截会被切掉（`.ix-cat-x` 那条注释钉的就是同一型）。
+    catNote: '',
+    catNoteX: 0,
+    catNoteY: 0,
     catNewName: '',
     loading: true,
     searchKeyword: '',
@@ -309,7 +342,7 @@ Page({
       //   冷启第一屏那"上一趟"是空表 ⇒ 芯片排只剩「全部」，要点一下井格进管理态再退出来才恢复
       //   （站长 10-18 报的 bug，尺子 `验-分类冷启第一屏-真跑` 量到的是 表 4 格／catView 1 枚）。
       //   下面那句 `skin()` 不在此列——它在 setData 那一条**之后**才跑，读到的已经是新表。
-      this.setData({ categories, catView: this._catView(this.data.catEdit, categories) })
+      this.setData({ categories, ...this._catPaint(this.data.catEdit, categories) })
       if (this.data.notes.length) {
         const notes = this.skin(this.data.notes)
         this.setData({ notes, ...this.arrange(notes) })
@@ -570,11 +603,47 @@ Page({
     return (this._catDraft || []).find((x) => x.key === key)
   },
 
+  // 「私密永远排最后一格」（站长 10-18 那句）。这一句只管**位置**，不管画不画、也不改身份：
+  // 判据仍是分类名（`isPrivate(c.name)`，全站那一条口径），沉一下不会把哪一格变成私密、也不会把私密那格判没。
+  // 两种表都吃它：草稿那一份带 `isPrivate` 标记，服务端那张原表只有 `name`。
+  // 平时那一态只在**渲染源**里沉（`this.data.categories` 那一份原表不动——它是序与筛选的依据）；
+  // 管理态那一态**沉草稿本身**（`_catDraft` 的顺序就是屏上那排的顺序，拖动拿 rect 下标对草稿下标，
+  // 两者一旦分开，第二次拖动就滑到别处去，10-17 那把尺子量过这一型）。
+  _catSink(list) {
+    const arr = list || []
+    const p = (x) => !!x && (x.isPrivate === true || isPrivate(x.name))
+    return arr.filter((x) => !p(x)).concat(arr.filter(p))
+  },
+
+  // 那一排的渲染源与"输入框那句占位话"必须同一趟算：分两趟 setData 会露一帧
+  // "芯片排已经变了、话还没改口"。占位话只报数，不挡任何操作——挡在他按下那一件事上的闸
+  // 在 `onCatAddCommit` 里（提示要在那一步给，不许静默吞字）。
+  // 挂在某一枚芯片上的那句话也在这一趟对一次账：他刚把那一格删掉，话还对着旧位置就是句假话。
+  // 挂在输入框上面那一句（`_add`）不归这里管——那一枚框还在屏上，话由 2.6 秒那一只表收。
+  _catPaint(edit, cats) {
+    const src = cats || (edit ? this._catDraft : this.data.categories)
+    const full = (src || []).length >= CAT_MAX
+    const view = this._catView(edit, cats)
+    let note = this.data.catNote
+    let noteKey = this.data.catNoteKey
+    if (noteKey && noteKey !== '_add') {
+      const held = view.filter((v) => v.key === noteKey && v.lock)[0]
+      note = held ? held.lock : ''
+      noteKey = held ? noteKey : ''
+    }
+    return {
+      catView: view,
+      catPh: fmt(t(full ? 'catAddFullPh' : 'catAddPh', this.data.lang), catLimits()),
+      catNote: note,
+      catNoteKey: noteKey,
+    }
+  },
+
   _toDraft(list) {
-    return (list || []).map((c) => ({
+    return this._catSink((list || []).map((c) => ({
       key: 'c' + c.id, id: c.id, name: c.name, name_zh: c.name_zh, name_en: c.name_en,
       note_count: c.note_count, isPrivate: isPrivate(c.name), renamed: false,
-    }))
+    })))
   },
 
   // 那一排芯片**唯一**的渲染源。`edit` 由调用方传进来，不现读 `this.data.catEdit`：
@@ -582,17 +651,22 @@ Page({
   // 现读 data 拿到的是旧的那一态，画出来就是一屏对不上号的混合体。
   // `cats` 同理，且更狠：和 `categories` 写在同一次 setData 里时，`this.data.categories` 还是旧那份，
   // 所以那一趟必须把新表递进来（默认值留给其余调用点——它们都在 setData 之后，读到的是新表）。
+  // ⚠ 这一排**只有**「全部」＋他那几格分类。站长 10-18 先要过一枚「新增」，同一夜又打回
+  //   （「列表上怎么多了一个“新增”，有点多余啊，去掉」）⇒ 芯片撤净，新增那一条口只剩管理态里那枚输入框。
+  //   尺子 `验-分类上限与长度.js` ⑤ 那一条钉的就是"不许再长出第二枚新增入口"。
   _catView(edit, cats) {
     const lang = this.data.lang
     const src = cats || this.data.categories
     const out = []
     if (!edit) {
-      out.push({ key: 'all', id: null, label: t('allCategories', lang), x: false, state: '' })
-      src.forEach((c) => out.push({
-        key: 'c' + c.id, id: c.id, label: labelOf(c, lang), x: false, state: '',
+      out.push({ key: 'all', id: null, label: t('allCategories', lang), x: false, state: '', lock: '' })
+      this._catSink(src).forEach((c) => out.push({
+        key: 'c' + c.id, id: c.id, label: labelOf(c, lang), x: false, state: '', lock: '',
       }))
       return out
     }
+    // 管理态直接按草稿那一份的顺序画——草稿进来时就沉过（`_toDraft`），
+    // 这里**不能再沉一次**：渲染顺序与草稿下标一旦分叉，拖动的 rect↔下标映射就错位（上面那条注释讲的正是这一型）。
     ;(this._catDraft || []).forEach((it) => {
       // 待建与待改那两档，屏上直接念他刚打的字：那两档服务端还没有对应译名，
       // 拿旧行的 name_zh／name_en 去显示，显示的就是上一个名字的译名。
@@ -605,6 +679,9 @@ Page({
         label: raw ? it.name : labelOf(it, lang),
         x: !it.isPrivate,
         state: st.trim(),
+        // 私密那一格在管理态点下去不动（既不删也不改名）——原来这里是**静默 return**，
+        // 屏上看不出坏了什么。站长 10-18 要的就是把这一句顶到那一枚上面。
+        lock: it.isPrivate ? t('catLockedPrivate', lang) : '',
       })
     })
     return out
@@ -625,32 +702,86 @@ Page({
       searchOpen: false,
       searchFocus: false,
       catNewName: '',
-      catView: this._catView(true),
+      ...this._catPaint(true),
     })
   },
 
   onCatChipTap(e) {
     if (!this.data.catEdit) { this.selectCategory(e); return }
     const it = this._catFind(e.currentTarget.dataset.key)
-    // 私密那一格：能拖动、不给改名（站长 10-17 拍的甲）。点下去什么都不发生是设计，
-    // 不是坏了——服务端那一道 PUT 也无条件挡着，两条腿都钉在尺子里。
-    if (!it || it.isPrivate) return
+    if (!it) return
+    // 私密那一格：不给删、不给改名（站长 10-17 拍的甲），10-18 又钉了「永远排最后一格」⇒ 连拖动也撤了。
+    // 原来点下去是静默 return——屏上看不出哪儿坏了，所以他这一句要"话浮在那一枚上面"。
+    if (it.isPrivate) { this._catChipNote(it.key); return }
     this._catRename(it)
   },
+
+  // 那句话浮在**按的那一个东西**上面（站长 10-18 第二句「显示在对应的元素上面」）。
+  // 手机上没有鼠标可"划"⇒ 挂在他按下去那一下；落点现量——那一排在横向 scroll-view 里，
+  // 超出盒子的那一截会被切掉（`.ix-cat-x` 那条注释钉的就是同一型），所以浮层不挂进元素里面，挂页面坐标。
+  _catNoteAt(key, sel, i, text) {
+    if (!text) return
+    wx.createSelectorQuery().selectAll(sel).boundingClientRect().exec((res) => {
+      const r = ((res && res[0]) || [])[i]
+      if (!r) return
+      // 那一枚可能被横向滚到屏边上（私密那一格正好排在最后）⇒ 中心点夹进屏宽里，
+      // 不然这句浮层一半在屏外，读到的是一句被切掉的话。
+      const info = (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()) || {}
+      const w = info.windowWidth || 375
+      const cx = Math.max(96, Math.min(w - 96, r.left + r.width / 2))
+      if (this._catNoteT) clearTimeout(this._catNoteT)
+      this.setData({ catNote: text, catNoteKey: key, catNoteX: cx, catNoteY: r.top - 8 })
+      this._catNoteT = setTimeout(() => {
+        this._catNoteT = 0
+        this.setData({ catNote: '', catNoteKey: '' })
+      }, 2600)
+    })
+  },
+
+  // 挂在某一枚芯片上面。`text` 不给就用那一枚自己带着的那句（私密那一格）；
+  // 给的话就是"这一枚刚被什么事挡下来了"（改名那一趟被长度闸挡回来走的就是这一支）。
+  _catChipNote(key, text) {
+    const view = this.data.catView || []
+    const i = view.findIndex((v) => v.key === key)
+    if (i < 0) return
+    const msg = text || view[i].lock
+    if (!msg) return
+    this._catNoteAt(key, '.ix-cat', i, msg)
+  },
+
+  // 那两道闸的话挂在**输入框那一片**上面（「新增」那一枚他 10-18 同一夜打回了，见 `_catView`）。
+  _catAddNote(text) { this._catNoteAt('_add', '.ixl-add', 0, text) },
 
   onCatAddInput(e) {
     this.setData({ catNewName: e.detail.value })
   },
 
-  // 空格切段 ⇒ 一次落多格（「支持同时输入多个新增，用空格区隔」）。
-  // confirm（键盘那一枚"完成"）与 blur（点别处）都走这里：点空白那一下的次序正好是
-  // 先 blur 再 bindtap，所以新词先变成屏上的待建格，再跟着那一次保存一起发出去。
+  /* 空格切段 ⇒ 一次落多格（「支持同时输入多个新增，用空格区隔」）。
+     confirm（键盘那一枚"完成"）与 blur（点别处）都走这里：点空白那一下的次序正好是
+     先 blur 再 bindtap，所以新词先变成屏上的待建格，再跟着那一次保存一起发出去。
+
+     站长 10-18 在这一格上又压了两道闸（「数量超过就，输入框就提示要删除才能添加」「分类名称最多4个汉字」）：
+     · 名字超长 ⇒ **只挡那一条**，合格的照常落格；没落的那几条**贴回框里**让他改——不许静默吞字。
+     · 落完会超过 `CAT_MAX`（含私密那一格）⇒ **这一批一条都不落**，报一句"先删掉一个才能加"，
+       他打的字原样留在框里。全有全无是故意的：落一半会让他看到"我打了三个词、屏上只多两格"，
+       那比不落实更难解释。
+     顺序是先判长度、再判数量：名字不合格的那条根本没资格去占格子。
+     ⚠ 那两句都走 `_catAddNote`——挂在**输入框那一片**上面，不再走屏中央那一条 `wx.showToast`
+       （站长 10-18 第二句「显示在对应的元素上面」；一句提示同时弹两下更吵）。这一条是我改的落点，标注在这儿。
+     ⚠ 两道都只挡**本机这一屏**：没走到 `_saveCatEdit` 就一个字都没上服务端（服务端那道今天没加，等他一句）。 */
   onCatAddCommit() {
     if (!this.data.catEdit) return
-    const names = String(this.data.catNewName || '').split(/\s+/).filter(Boolean)
-    if (!names.length && !this.data.catNewName) return
+    const lang = this.data.lang
+    const words = String(this.data.catNewName || '').split(/\s+/).filter(Boolean)
+    if (!words.length && !this.data.catNewName) return
     const draft = this._catDraft || (this._catDraft = [])
-    names.forEach((n) => {
+    const bad = words.filter((n) => catNameTooLong(n))
+    const ok = words.filter((n) => !catNameTooLong(n))
+    if (draft.length + ok.length > CAT_MAX) {
+      this._catAddNote(fmt(t('catMaxToast', lang), catLimits()))
+      return
+    }
+    ok.forEach((n) => {
       const low = String(n).toLowerCase()
       // 同一次输入里重复的词只留第一次；与已有那几格重名的也先挡在本地（服务端那一道还会再挡一次，
       // 但让他在屏上看到"这一格没有多出来"比等一次失败toast 便宜）。
@@ -658,7 +789,12 @@ Page({
       this._catSeq = (this._catSeq || 0) + 1
       draft.push({ key: 'n' + this._catSeq, id: null, name: n, isPrivate: false, renamed: false })
     })
-    this.setData({ catNewName: '', catView: this._catView(true) })
+    // 新格是追加在草稿末尾的，而"私密永远最后一格"要的是它在**最**后 ⇒ 落完把草稿重沉一次。
+    // 只沉草稿本身：管理态那一排的渲染源直接念草稿的顺序（`_catView`），两处都沉就滑位。
+    this._catDraft = this._catSink(draft)
+    if (bad.length) this._catAddNote(fmt(t('catNameLimit', lang), catLimits()))
+    // 超长那几条没落格，**贴回框里**让他自己改——不许静默吞字；全批合格时 bad 是空串，等于清空。
+    this.setData(Object.assign(this._catPaint(true), { catNewName: bad.join(' ') }))
   },
 
   // × 那一下：先问一句再删（站长 10-17 补的那一句「删除要二次确认」）。
@@ -682,13 +818,15 @@ Page({
         if (!res.confirm) return
         this._catDraft.splice(i, 1)
         this._catDel.push(it)
-        this.setData({ catView: this._catView(true) })
+        this.setData(this._catPaint(true))
       },
     })
   },
 
   // 改名：这一轮他没提，但那是现网就有的能力，而他要求把别的入口关掉（方案 §4 记的是我这一条）。
   // 走系统弹窗那一条可编辑的（`editable`），不自画一层皮；改动同样先留本机，点空白那一趟才发 PUT。
+  // 站长 10-18 那道长度闸同样管这一格（「分类名称最多4个汉字」）：超长就把弹窗关掉、
+  // 名字保持原样、报一句上限是多少——**不许悄悄截断**他打的字。
   _catRename(it) {
     const lang = this.data.lang
     wx.showModal({
@@ -702,9 +840,15 @@ Page({
         if (!res.confirm) return
         const name = String(res.content || '').trim()
         if (!name || name === it.name) return
+        if (catNameTooLong(name)) {
+          // 超长不改：弹窗已经关了（系统那枚可编辑框没有"拦下别关"这一档），
+          // 所以话回到**那一枚芯片上面**，名字保持原样，不许悄悄截断他打的字。
+          this._catChipNote(it.key, fmt(t('catNameLimit', lang), catLimits()))
+          return
+        }
         if (it.id === null) it.name = name        // 还没上服务端的待建格：就地改字，不算一次改动
         else { it.name = name; it.renamed = true }
-        this.setData({ catView: this._catView(true) })
+        this.setData(this._catPaint(true))
       },
     })
   },
@@ -719,15 +863,21 @@ Page({
     if (t0) this._catFingerX = t0.clientX
   },
 
+  /* 「私密永远排最后一格」（站长 10-18）落在拖动上是两道闸，不是一道：
+     · 私密那一格**不起拖**——它要恒在最后一格，能起拖就恒不住。
+       ⚠ 这一句改掉了 10-17 他拍的甲里那半条（「能拖动、不给改名」的"能拖动"）：拖动还能排别的格，
+         只是那一格不再跟着动。剩下能改的只有它左端那几格之间的先后。
+     · 别的格**不许越过它**（`_catDragStep` 里那道）——否则从右边一拖，它就变成倒数第二格了。 */
   onCatDragStart(e) {
-    if (!this.data.catEdit) return
     const key = e.currentTarget.dataset.key
+    if (!this.data.catEdit) return
     const i = (this._catDraft || []).findIndex((x) => x.key === key)
     if (i < 0) return
+    if (this._catDraft[i].isPrivate) return
     const t0 = e.touches && e.touches[0]
     const x = t0 ? t0.clientX : this._catFingerX
     this._drag = { key, i, x: typeof x === 'number' ? x : 0 }
-    this.setData({ catView: this._catView(true) })
+    this.setData(this._catPaint(true))
   },
 
   async onCatDragMove(e) {
@@ -750,18 +900,26 @@ Page({
       const d = this._drag
       if (!d) return
       const rects = await this._catRects()
-      if (rects.length !== (this._catDraft || []).length || rects.length < 2) return
+      const n = (this._catDraft || []).length
+      // 屏上那一排的枚数就是草稿那几格的枚数——管理态没有第二样东西挂在它们中间或末尾
+      // （站长 10-18 最后一句「列表上怎么多了一个"新增"，有点多余啊，去掉」，那一枚已经撤净）。
+      // 对不上就是渲染还没跟上这次 setData，宁可这一趟不换，也别拿过期的 rect 表去比中线。
+      if (rects.length !== n || n < 2) return
       const mid = (r) => r.left + r.width / 2
-      const right = d.i + 1 < rects.length ? rects[d.i + 1] : null
+      const right = d.i + 1 < n ? rects[d.i + 1] : null
       const left = d.i - 1 >= 0 ? rects[d.i - 1] : null
       let to = -1
       if (right && d.x > mid(right)) to = d.i + 1
       else if (left && d.x < mid(left)) to = d.i - 1
       if (to < 0) return
+      // 越过私密那一格 ⇒ 不换（上面那条注释）。这一排进来时沉过底，所以私密要么在两端那格、
+      // 根本碰不到，要么正好挡在右端；拿"对面那一格的身份"判，比拿固定下标判稳。
+      const other = this._catDraft[to]
+      if (!other || other.isPrivate) return
       const it = this._catDraft.splice(d.i, 1)[0]
       this._catDraft.splice(to, 0, it)
       d.i = to
-      this.setData({ catView: this._catView(true) })
+      this.setData(this._catPaint(true))
       // 排布是渲染层算的，setData 回来那一瞬量到的还是换之前的位置：等一帧再量。
       await this._catNextFrame()
     }
@@ -770,7 +928,7 @@ Page({
   onCatDragEnd() {
     if (!this._drag) return
     this._drag = null
-    this.setData({ catView: this._catView(true) })
+    this.setData(this._catPaint(true))
     // 松手**不发请求**：顺序只是本机草稿，保存那一趟才发 reorder（他点的是"点空白自动保存"）。
   },
 
@@ -887,7 +1045,10 @@ Page({
     this._drag = null
     this._catDraft = null
     this._catDel = []
-    this.setData({ catEdit: false, catNewName: '', catView: this._catView(false) })
+    if (this._catNoteT) { clearTimeout(this._catNoteT); this._catNoteT = 0 }
+    this.setData(Object.assign(this._catPaint(false), {
+      catEdit: false, catNote: '', catNoteKey: '', catNewName: '',
+    }))
   },
 
   // 部分失败之后把草稿重建到"服务端真的那一份 ＋ 没成的那几条"上：
@@ -909,9 +1070,9 @@ Page({
       const k = draft.findIndex((x) => x.id === it.id)
       if (k >= 0 && it.renamed) draft[k] = Object.assign(draft[k], { name: it.name, renamed: true })
     })
-    this._catDraft = draft
+    this._catDraft = this._catSink(draft)
     this._catOrder0 = draft.filter((x) => typeof x.id === 'number').map((x) => x.id)
-    this.setData({ catView: this._catView(true) })
+    this.setData(this._catPaint(true))
   },
 
   _toLocal(it) {
