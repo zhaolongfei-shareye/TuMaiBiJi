@@ -36,6 +36,9 @@ Page({
     tagsText: '',
     tagList: [],
     shots: [],
+    // 「原文」这一栏（站长 10-18 连着三句「看不到原文」）。编辑这一屏原来只有五栏，
+    // 原文只在详情那一屏、还默认收起——他要的是在改的这一屏就能看见它。
+    originalText: '',
     categories: [],
     categoryNames: [],
     selectedCategoryIndex: -1,
@@ -107,16 +110,18 @@ Page({
         keyPointsText: (note.key_points || []).join('\n'),
         tagsText: (note.tags || []).join(', '),
         tagList: (note.tags || []).map((s) => (s || '').trim()).filter(Boolean),
+        originalText: note.original_content || '',
         selectedCategoryIndex: categoryIndex,
         originalCategoryId: note.category_id, // Preserve original even if categories fail to load
       })
-      // 基线就是"这一页刚铺开的那五栏"，与上面 setData 同一趟建，别事后从 data 里回读
+      // 基线就是"这一页刚铺开的那六栏"，与上面 setData 同一趟建，别事后从 data 里回读
       // （回读会把他刚敲进去的字也算成改动）。
       this._baseline = {
         title: note.title || '',
         summary: note.summary || '',
         key_points: normLines(note.key_points),
         tags: normTags(note.tags),
+        original: note.original_content || '',
         category_id: note.category_id == null ? null : note.category_id,
       }
       // 配图那一排跟着这一篇一起铺（不等它：读图不该拖住表单出字）。
@@ -143,6 +148,10 @@ Page({
   onTagsInput(e) {
     const tagsText = e.detail.value
     this.setData({ tagsText, tagList: this.splitTags(tagsText) })
+  },
+
+  onOriginalInput(e) {
+    this.setData({ originalText: e.detail.value })
   },
 
   // 标签顺序就是"色块上显示哪个字"的顺序：第一位上列表方块。
@@ -265,6 +274,7 @@ Page({
         summary: this.data.formData.summary.trim() || null,
         key_points: keyPoints.length > 0 ? keyPoints : null,
         tags: tags.length > 0 ? tags : null,
+        original: this.data.originalText.trim() || null,
         category_id: categoryId,
       }
 
@@ -287,6 +297,9 @@ Page({
         if ((now.summary || '') !== (base.summary || '')) payload.summary = now.summary
         if (normLines(now.key_points) !== base.key_points) payload.key_points = now.key_points
         if (normTags(now.tags) !== base.tags) payload.tags = now.tags
+        // 原文：清空也要发得出去。后端那一条是 `model_dump(exclude_unset=True)`，
+        // 显式带 `null` 才代表"我要抹掉它"，不带这一栏才是"我没动"。
+        if ((now.original || '') !== (base.original || '')) payload.original_content = now.original
         if (now.category_id !== base.category_id) payload.category_id = now.category_id
         // 一个字没动就不打这一趟 PUT：PUT 会把 updated_at 顶上去、列表跟着换序，
         // 而这一趟没有任何东西要写。

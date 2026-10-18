@@ -24,16 +24,8 @@
   margin-bottom: var(--sp-2);
 }
 
-/* ⚠ 这两条声明一个都不许撤：`<textarea>` 是原生组件，CSS 不给宽时它按**固定 300px** 画，
-   而 300px 不随屏宽缩放（rpx 才随）。站长 10-18 真机（比模拟器窄一档）量到摘要／要点那两格
-   992px、标题／标签／分类那三格 901px——两格宽出 91px 压在卡片右沿上被裁掉，字跑到边上像被切，
-   就是他说的"页面错位"。模拟器 390 宽上 300px＋左右内边距正好等于内容区，所以这一刀在模拟器量不出来。
-   `width: 100%` 必须配 `box-sizing: border-box`，只写前者会让内边距加在 100% 之外、更宽。 */
 .input,
-.textarea,
 .picker-value {
-  width: 100%;
-  box-sizing: border-box;
   background: var(--chip-idle);
   border-radius: var(--r-btn);
   padding: var(--sp-3) var(--sp-4);
@@ -42,10 +34,33 @@
   color: var(--text-primary);
 }
 
+/* ⚠ `width: 100%` 与 `box-sizing: border-box` 只许挂在 `.textarea` 上，不许并回上面那一条：
+   10-18 我并在一起挂过一次，站长真机当场打回——`<input>` 自己带一个原生高度，换成 border-box
+   之后左右内边距把那点高度吃干净，标题与标签那两格的字被横切一半（模拟器同一趟量到那两格从 46 掉到 24，
+   数就在回体里，我没看出来）。
+   只有 `<textarea>` 需要这一对：CSS 不给宽时它退回原生**固定 300px**，而 300px 不随屏宽缩（rpx 才随），
+   卡片内容区是 rpx 的 ⇒ 屏一窄就溢出、压在卡片右沿被裁，字跑到边上像被切——就是"页面错位"那一条。
+   真机量到摘要／要点两格 992px、旁边三格 901px；模拟器 390 宽上两者只差 1.3pt，所以这一刀在模拟器量不出来。
+   `width: 100%` 必须配 `box-sizing: border-box`，只写前者会让内边距加在 100% 之外、更宽。 */
 .textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--chip-idle);
+  border-radius: var(--r-btn);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
   /* 198 不是新数：改前那 150 是 content-box 的高，画出来是 150＋上下内边距各 24 ＝ 198。
-     上面那条换成 border-box 之后，这个数必须跟着抬到 198，否则这两格的最短高度会悄悄矮 48rpx。 */
+     换成 border-box 之后这个数必须跟着抬，否则那两格最短高度会悄悄矮 48rpx。 */
   min-height: 198rpx;
+}
+
+/* 「原文」那一格不给 auto-height，定高让它自己滚：库里那一栏上限 50000 字，
+   跟着字数长高的话这一屏会拉成一条没有头的长卷。 */
+.textarea-orig {
+  height: 300rpx;
+  min-height: 0;
 }
 
 .char-count {

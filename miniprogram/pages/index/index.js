@@ -1119,10 +1119,12 @@ Page({
   onSheetEdit() {
     const note = this.data.detailNote
     if (!note || note.is_preset) return
-    // 出门前把窗收掉：改完回来 onShow 会重载列表，窗留着就是读旧内容。
-    // 但记下这一篇，重排完在 onShow 里把窗重新开回来（取消没改也一样回窗，不是回列表）。
+    // 窗**不提前收**（站长 10-18：「你的路径有无，点了编辑，先返回列表，再跳转编辑页面」）。
+    // 原来这里先 `detailOpen:false` 再 navigateTo，理由是"改完回来 onShow 会重载列表，窗留着就是读旧内容"——
+    // 但那一句管的是**回来**那一路，而回来这一趟本来就走 onShow 的收窗＋重排＋按 id 重新开（下面两行那个
+    // `_backToDetail` 就是干这个的）。提前收只换来出门时露一帧列表，旧内容一帧都没被人看见过。
+    // 记下这一篇，重排完在 onShow 里把窗重新开回来（取消没改也一样回窗，不是回列表）。
     this._backToDetail = note.id
-    this.setData({ detailOpen: false })
     wx.navigateTo({ url: `/pages/write/write?id=${note.id}&mode=edit` })
   },
 

@@ -81,6 +81,18 @@
         </view>
       </view>
     </view>
+
+    <!-- 「原文」放在最后一栏，与详情那一屏的排布同一个次序（标题→配图→摘要→要点→原文）。
+         框自己定高滚动，不跟着字数长（那一栏上限五万字）。 -->
+    <view class="form-group">
+      <text class="label">{{t.originalContent}}</text>
+      <textarea
+        class="textarea textarea-orig"
+        value="{{originalText}}"
+        bindinput="onOriginalInput"
+        maxlength="{{-1}}"
+      />
+    </view>
   </view>
 
   <view class="actions">
