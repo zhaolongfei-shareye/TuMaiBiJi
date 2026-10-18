@@ -31,7 +31,14 @@ from app.db.database import Base
 # 后台能管的那几栏。加一栏 = 加一个取值 + 客户端一处读法，所以这里是闭集，
 # 不接受任意字符串（`services/mp_assets.py` 的校验以它为准）。
 KIND_HOME_BG = "home_bg"
-KINDS = (KIND_HOME_BG,)
+# 站长 10-18「默认笔记，后台也应该支持上传图片」⇒ 官方那一篇也要能带一张图。
+# 这一格**是图片栏里加一栏，不是给 `preset_note` 那一栏再加一个字段**：笔记自己那排配图存在
+# 云开发桶里（`assets.object_key` 是 `cloud://`），而后台是浏览器，传不进那个桶——服务端至今
+# 没有写桶的凭据。所以这张官方图只能走已经上线的那条运营图下发链：存我们服务器、
+# `/api/mp/a/{token}` 匿名发字节、URL 随内容不可变；客户端拿那条 https 串**同时**画小图和喂
+# `previewImage`（本机 `USER_DATA_PATH` 那个路径 previewImage 不认，10-08 记过这条坑）。
+KIND_PRESET_NOTE_IMAGE = "preset_note_image"
+KINDS = (KIND_HOME_BG, KIND_PRESET_NOTE_IMAGE)
 # 站长 10-15「Tips 改为后台配置」⇒ 后台从此也能管**一句话**，不只管一张图。
 # 但**不把 tips 塞进上面那个 `KINDS`**：那一条是"图片栏"的闭集，`upload`/`publish`/`check_kind`
 # 全都假设里面的 kind 能收字节、能记账宽高。把 tips 混进去的代价不是报错，是
@@ -47,8 +54,17 @@ NOTE_KINDS = (KIND_PRESET_NOTE,)
 # 界面上的叫法。管理页那一栏的标题从这里读，免得网页和后端各写一份中文名。
 KIND_LABELS = {
     KIND_HOME_BG: "首页默认背景图",
+    KIND_PRESET_NOTE_IMAGE: "帮助文档那张配图",
     KIND_TIPS: "首屏那行 Tips",
     KIND_PRESET_NOTE: "帮助文档（官方那一篇）",
+}
+# 「这一栏空着的时候，小程序屏上是什么样」——后台那一页那两句话（"还没登记过这一栏"／"当前停用"）
+# 后半截从这里读，不写死在网页里。只给 `preset_note_image` 配一句：官方那一篇从来没有
+# "包里那一张"可以回落（这一栏上线之前它就没有图），照抄网页上那句模板话＝对站长念半句假话。
+# 首页背景那一栏留空＝沿用它界面上原来那句；10-14 之后那句其实也不准（包内默认图已撤、
+# 两级都空＝白底），但那一处站长没指过，不在这一刀里顺手改。
+KIND_EMPTY_TEXTS = {
+    KIND_PRESET_NOTE_IMAGE: "帮助文档那一篇不显示配图",
 }
 
 

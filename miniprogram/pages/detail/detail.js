@@ -3,6 +3,7 @@ const { t, texts } = require('../../utils/i18n.js')
 const { blockSkinFor, toneVars } = require('../../utils/palette.js')
 const { formatDateTime, formatShortDate } = require('../../utils/date.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
+const mpAssets = require('../../utils/mpAssets.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const privateGate = require('../../utils/privateGate.js')
 const { labelOf } = require('../../utils/catText.js')
@@ -161,12 +162,23 @@ Page({
   // 环境里才画得出来（app.js onLaunch 那一步），环境 ID 没填时就算把行读回来也只能画出一
   // 片破图。所以这一句同时挡住三件事：今天不新增任何请求、不出现破图、不让人以为"图丢了"。
   async loadImages(noteId) {
-    if (!cloudUpload.cloudReady()) return
+    // 后台那张官方配图（站长 10-18「默认笔记，后台也应该支持上传图片」）。这一页与详情窗
+    // 里那一排吃的是**同一个取口**（`mpAssets.serverPresetImage()`）、同一个形状（`{id, cloud_url}`），
+    // 所以那一格的分寸、横滑、点一下看大图都不用为它改画法。
+    const n = this.data.note
+    const remote = n && n.is_preset ? mpAssets.serverPresetImage() : null
+    const official = remote ? { id: 'preset-image', cloud_url: remote } : null
+    if (!cloudUpload.cloudReady()) {
+      // 用户自己那一排画不出来 ⇒ 不发这一趟请求（原口径）。后台那一张是 https、不吃这道门，
+      // 这一类该画的还是要画，否则会出现"列表右侧有图、点进来那一格是空的"那种自相矛盾的屏。
+      this.setData({ noteImages: official ? [official] : [] })
+      return
+    }
     try {
       const list = await api.getNoteAssets(noteId)
       // 拿回来的路上这一页可能已经切到别篇（onShow 重取）——按当前这一篇对一下号再画。
       if (String(this.data.noteId) !== String(noteId)) return
-      this.setData({ noteImages: list || [] })
+      this.setData({ noteImages: [...(list || []), ...(official ? [official] : [])] })
     } catch (err) {
       // 配图读不到不该影响这篇笔记本身，界面上也就是少一排缩略图
       console.warn('配图读取失败（不影响正文）', err && (err.errMsg || err.statusCode))

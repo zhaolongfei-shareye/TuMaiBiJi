@@ -33,9 +33,15 @@ const ASSETS = read('miniprogram/utils/mpAssets.js')
 const CREATE = read('miniprogram/pages/create/create.js')
 
 // ---------------- ① 两个 kind 闭集必须真的分开 ----------------
-ck('模型里文案栏是独立闭集（TEXT_KINDS），图片栏那个 KINDS 一个字都没加',
+ck('两份闭集真的分开：文案那一栏里不许出现图片 kind，图片那一栏里不许出现 KIND_TIPS',
   /TEXT_KINDS\s*=\s*\(\s*KIND_TIPS\s*,?\s*\)/.test(MODEL)
-    && /KINDS\s*=\s*\(\s*KIND_HOME_BG\s*,?\s*\)/.test(MODEL),
+    // 10-18 图片栏合法地加了第二栏（官方那一篇的配图），所以原来那句"图片栏一个字都没加"过期了。
+    // 这一条真正要守的是**别把文案混进图片栏**——混进去不会报错，只会让后台画出一格
+    // "给一句话上传一张 JPEG"的口子，点下去存进库而屏上永远读不到（模型里那段注释就是这个）。
+    && /KINDS\s*=\s*\(\s*KIND_HOME_BG\s*,\s*KIND_PRESET_NOTE_IMAGE\s*\)/.test(MODEL)
+    // 锚点要认行首：`KINDS` 是 `TEXT_KINDS`／`NOTE_KINDS` 的后缀，不带 `^` 会把那两栏自己也扫进来，
+    // 于是一条写对了的负向判据恒红（10-18 这条就是这么红的）。
+    && !/^KINDS\s*=\s*\([^)]*KIND_TIPS/m.test(MODEL),
   '两份闭集')
 ck('KIND_LABELS 两栏都有中文名（页面标题只从这一处读，不许网页自己写一份）',
   /KIND_LABELS\s*=\s*\{[^}]*KIND_HOME_BG[^}]*KIND_TIPS/s.test(MODEL))
@@ -98,8 +104,11 @@ ck('冻结闸打开时两边一律回空（提审期挡的是整条运营改动�
 ck('客户端判重用 updated_at、落账只落 zh/en/updatedAt（没有 content_hash 那一格，也不许自己造一份）',
   /cached\.updatedAt === entry\.updated_at/.test(ASSETS)
     && /wx\.setStorageSync\(TEXT_KEY, \{ zh: entry\.zh, en: entry\.en, updatedAt: entry\.updated_at \}\)/.test(ASSETS))
-ck('老包那条"没 content_hash 就 continue"仍在（这一句是兼容性本身，删了线上包就会拿文案当图下载）',
-  /if \(!entry \|\| !entry\.content_hash\) continue/.test(ASSETS))
+ck('老包那条"没 content_hash 就不下载"仍在（这一句是兼容性本身，删了线上包就会拿文案当图下载）',
+  // 10-18 这一句从一行 `continue` 长成了一段（服务端回 null 时要给官方那张撤账），
+  // 守的还是同一件事：**没有 content_hash 的那一条绝不允许走到 `_download`**。
+  // 所以判的是"在这个 if 的块里、在 _download 之前先 continue"，不是那句字面还在。
+  /if \(!entry \|\| !entry\.content_hash\) \{[\s\S]*?\n\s*continue\s*\n[\s\S]*?_download\(kind, entry\.url\)/.test(ASSETS))
 
 // ---------------- ⑤ 客户端读法：兜底顺序不许倒 ----------------
 ck('mpAssets 把文案单独一条分支落账，不挤进图片那个 kind 循环',
@@ -108,8 +117,8 @@ ck('服务端回 null（停用）时把本机账一起撤掉——只回 null �
   /function _saveTexts[\s\S]*?removeStorageSync\(TEXT_KEY\)/.test(ASSETS))
 ck('serverTips 认得"数组是空也算没有"（空数组会让那一行整条消失）',
   /function serverTips[\s\S]*?Array\.isArray\(arr\) && arr\.length/.test(ASSETS))
-ck('pull / serverBgPath / serverTips 三个都出了口',
-  /module\.exports = \{ pull, serverBgPath, serverTips \}/.test(ASSETS))
+ck('pull / serverBgPath / serverPresetImage / serverTips 四个都出了口',
+  /module\.exports = \{ pull, serverBgPath, serverPresetImage, serverTips \}/.test(ASSETS))
 ck('tipsFor 是「下发优先、包里兜底」，顺序不许反过来写',
   /const remote = mpAssets\.serverTips\(lang\)[\s\S]*?const arr = remote \|\| t\('tips', lang\)/.test(CREATE))
 // 反向那一条是真会红的：把上一句的顺序写反（`t('tips', lang) || remote`），后台就永远改不动屏上那行字。

@@ -273,5 +273,39 @@ ck('私密那一格与台账已有那一格都先挡（同一条既有口径，�
 ck('播种失败那条链依旧不写成功（那一趟里一个 toast 都不许有）',
   !/wx\.showToast/.test(auto), `${(auto.match(/wx\.showToast/g) || []).length} 次`)
 
+// ---------- ⑥ 后台那张官方配图（站长 10-18「默认笔记，后台也应该支持上传图片」） ----------
+// 这张图**不进 `assets` 表、不进用户配额**：它是官方内容，走的是运营图那条已上线的下发链。
+// 所以这一段的判据全是"三个落点吃同一个出处、图源是 https 不是本机路径"——
+// 这两件事错了都不会报错，只会让某一屏少一张图、或点了大图什么也不出来。
+const MP_ASSETS = fs.readFileSync(path.join(MP, 'utils/mpAssets.js'), 'utf8')
+const MODEL_PY = be('app/models/mp_asset.py')
+const IX_WXML = read('pages/index/index.wxml')
+const DETAIL_JS2 = read('pages/detail/detail.js')
+
+ck('图片闭集里多了那一格，且界面上有中文名（后台那一栏的标题只从 KIND_LABELS 读）',
+  /^KINDS = \(KIND_HOME_BG, KIND_PRESET_NOTE_IMAGE\)$/m.test(MODEL_PY)
+    && /KIND_PRESET_NOTE_IMAGE: "帮助文档/.test(MODEL_PY))
+ck('后台左栏那一格挂得到（NAV 里有 `kind:preset_note_image`，不是只加了个后端 kind 就完事）',
+  /key: 'kind:preset_note_image'/.test(be('app/api/routes/ops_page.py')))
+ck('取口只有一处（三个落点都调 `serverPresetImage()`，谁都不许自己去读 `MP_ASSET_KEY_…` 那本账）',
+  (MP_ASSETS.match(/function serverPresetImage/g) || []).length === 1
+    && /mpAssets\.serverPresetImage\(\)/.test(IX_JS) && /mpAssets\.serverPresetImage\(\)/.test(DETAIL_JS2)
+    && !/MP_ASSET_KEY_preset_note_image/.test(IX_JS + DETAIL_JS2))
+ck('画的是那条 https，不是本机 `USER_DATA_PATH`（`previewImage` 不认本机路径，10-08 记过：小图画得出来、大图看不到）',
+  /function serverPresetImage[\s\S]{0,200}?return \(cached && cached\.url\)/.test(MP_ASSETS))
+ck('每次落账都记 url，且**旧账缺 url 时当场补上**（不补的话那台机永远停在"有 filePath 没 url"，改了图才对）',
+  /wx\.setStorageSync\(_key\(kind\), \{ filePath, url: remote, contentHash: entry\.content_hash \}\)/.test(MP_ASSETS)
+    && /if \(!cached\.url\) wx\.setStorageSync\(_key\(kind\), \{ \.\.\.cached, url: remote \}\)/.test(MP_ASSETS))
+ck('后台撤了那张图要把本机账一起撤掉（只回 null 不撤账＝这台机一直画那张已经不生效的旧图）',
+  /if \(kind === 'preset_note_image'\) \{[\s\S]{0,80}?removeStorageSync\(_key\(kind\)\)/.test(MP_ASSETS))
+ck('云环境没 init 成那一支也要画这一张（否则出现"列表右侧有图、点进去那一排是空的"那种自相矛盾的屏）',
+  /if \(!cloudUpload\.cloudReady\(\)\) \{\s*\/\/[\s\S]{0,200}?detailImages: official \? \[official\] : \[\]/.test(IX_JS)
+    && /this\.setData\(\{ noteImages: official \? \[official\] : \[\] \}\)/.test(DETAIL_JS2))
+ck('这一张排在那一排的**最后一格**，两处同一个顺序（用户自己的配图在前，官方那张不与它抢第 0 格）',
+  /detailImages: \[\.\.\.\(list \|\| \[\]\), \.\.\.\(official \? \[official\] : \[\]\)\]/.test(IX_JS)
+    && /noteImages: \[\.\.\.\(list \|\| \[\]\), \.\.\.\(official \? \[official\] : \[\]\)\]/.test(DETAIL_JS2))
+ck('这一张不进 `assets` 那条链（`routes/assets.py` 里出现 preset_note_image＝有人开始给用户配额算一张官方的图）',
+  !/preset_note_image/.test(be('app/api/routes/assets.py')) && !/preset_note_image/.test(be('app/services/quota.py')))
+
 console.log(bad.length ? `\n${bad.length} 条没过：${bad.join('、')}` : '\n全过')
 process.exit(bad.length ? 1 : 0)

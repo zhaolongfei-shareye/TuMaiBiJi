@@ -205,7 +205,7 @@ const CSS = stripCss(IX_WXSS)
   ck('开窗那一趟归零（上一配停在第 3 张，不许带着这个号进下一篇）',
     /detailCards: this\._cardsOf\(row\.id\), dsTo: '',[\s\S]{0,220}?detailImages: \[\], dsFigAt: 0/.test(IX_JS))
   ck('配图到货那一趟也归零（图是后到的，到货时屏上那份游标可能是上一配的）',
-    /setData\(\{\s*detailImages:\s*list \|\| \[\],\s*dsFigAt:\s*0\s*\}\)/.test(JS))
+    /setData\(\{\s*detailImages: \[\.\.\.\(list \|\| \[\]\), \.\.\.\(official \? \[official\] : \[\]\)\], dsFigAt:\s*0\s*\}\)/.test(JS))
   const h = (/onDsFigChange\(e\)\s*\{([\s\S]*?)\n  \}/.exec(JS) || ['', ''])[1]
   ck('滑一下只认 swiper 报的 current，同号不 setData（不制造第二次渲染）',
     /e && e\.detail && e\.detail\.current/.test(h) && /i === this\.data\.dsFigAt\) return/.test(h),
@@ -228,7 +228,7 @@ const CSS = stripCss(IX_WXSS)
         || n(C, 'ds-fig-img', 'height') === n(C, 'ds-fig', 'height'),
       横杠: n(C, 'ds-dot.on', 'width') > n(C, 'ds-dot', 'width'),
       标签: !/background:/.test(';' + r(C, 'ds-tag')),
-      归零: /detailImages:\s*\[\],\s*dsFigAt:\s*0/.test(J) && /detailImages:\s*list \|\| \[\],\s*dsFigAt:\s*0/.test(J),
+      归零: /detailImages:\s*\[\],\s*dsFigAt:\s*0/.test(J) && /detailImages: \[\.\.\.\(list \|\| \[\]\), \.\.\.\(official \? \[official\] : \[\]\)\], dsFigAt: 0/.test(J),
     }
   }
   const base = preds(IX_WXML, IX_WXSS, IX_JS)
@@ -255,7 +255,7 @@ const CSS = stripCss(IX_WXSS)
     ['标签的底色被谁加回来（第二份皮）',
       ['wxss', mut(IX_WXSS, '.ds-tag {\n  font-size: var(--fs-tiny);', '.ds-tag {\n  background: #EEE;\n  font-size: var(--fs-tiny);')], '标签'],
     ['配图到货那一趟忘了归零游标（上一配停在第 3 张，这一配从第 3 张开）',
-      ['js', mut(IX_JS, 'this.setData({ detailImages: list || [], dsFigAt: 0 })', 'this.setData({ detailImages: list || [] })')], '归零'],
+      ['js', mut(IX_JS, 'this.setData({ detailImages: [...(list || []), ...(official ? [official] : [])], dsFigAt: 0 })', 'this.setData({ detailImages: [...(list || []), ...(official ? [official] : [])] })')], '归零'],
   ]
   for (const [name, [which, mutated], key] of cases) {
     const p = which === 'wxml' ? preds(mutated, IX_WXSS, IX_JS) : which === 'wxss' ? preds(IX_WXML, mutated, IX_JS) : preds(IX_WXML, IX_WXSS, mutated)

@@ -40,7 +40,7 @@ from app.core.config import settings
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
 from app.models.account import Account
-from app.models.mp_asset import KIND_HOME_BG, KIND_TIPS, MpAsset, MpSetting
+from app.models.mp_asset import KIND_HOME_BG, KIND_PRESET_NOTE_IMAGE, KIND_TIPS, MpAsset, MpSetting
 from app.models.user import User
 from app.services import mp_assets
 
@@ -637,3 +637,76 @@ def test_后台那一页有文案那一组可编辑的格子(client, store):
     assert "api/admin/mp/texts/" in body
     assert "state.texts" in body, "render() 没把文案那一组渲染出来"
     assert "ta.value =" in body
+
+
+# ---------------------------------------------------------------- 九、官方那一篇的配图（站长 10-18）
+# 图片栏从此有两栏。以下四条钉的全是"有了第二栏才会出"的那些事：
+# 生效位各走各的、发布口不许跨栏指图、下发里两栏各自成键。
+# 这些在只有一栏时都是**结构上不可能发生**的，所以旧那二十七条一条都盖不到它们。
+
+def test_官方配图那一格走完整条链(client, admin_pw, db, me, store):
+    """传上去 → 发布 → 下发里读到的是那一张 → 不要登录就能取字节 → 停用回 null 而不是缺键。"""
+    h = admin_h(client)
+    kind = KIND_PRESET_NOTE_IMAGE
+    a = upload(client, h, png(64, 64, (2, 2, 2)), kind=kind).json()
+    assert current_config(client, me)[kind] is None, "传上来就等于发布 ⇒ 用户还没点发布就换了图"
+
+    # 「这一栏空着」那半句话按栏给：官方那一篇没有"包里那一张"可回落（这一栏上线之前它就没有图），
+    # 照抄首页那一栏的模板话＝对着站长念半句假话。首页那句站长没指过，也不许在这刀里顺手改。
+    rows = {k["kind"]: k for k in client.get(STATE, headers=h).json()["kinds"]}
+    assert rows[kind]["empty_text"] and "包里" not in rows[kind]["empty_text"], rows[kind]
+    assert rows[KIND_HOME_BG]["empty_text"] is None, rows[KIND_HOME_BG]
+
+    r = client.put(f"/api/admin/mp/settings/{kind}", json={"asset_id": a["id"]}, headers=h)
+    assert r.status_code == 200, r.text
+    got = current_config(client, me)[kind]
+    assert got["content_hash"] == a["content_hash"] and got["url"].startswith("/api/mp/a/")
+    # 首页那一栏一个字都不该被这次发布带歪：两张图共用同一套 upload/publish 代码，
+    # 串了门的表现是"给帮助文档传一张，首页背景换了"——两边都读得到才抓得住。
+    assert current_config(client, me)[KIND_HOME_BG] is None
+
+    b = client.get(got["url"])
+    assert b.status_code == 200 and b.content == png(64, 64, (2, 2, 2)), "匿名取字节这条链对第二栏也得通"
+
+    client.put(f"/api/admin/mp/settings/{kind}", json={"asset_id": None}, headers=h)
+    assert kind in current_config(client, me) and current_config(client, me)[kind] is None, \
+        "停用要显式回 null：键整个没了客户端会以为后端还没上，那台机就永远画旧那一张"
+
+
+def test_发布口不许把另一栏的图指过来(client, admin_pw, db, store):
+    """两栏都是图片、都能收字节，所以"拿帮助文档那张去发首页背景"这一趟在结构上第一次变得可行。
+    它必须被拒——拒掉了才算`mp_settings` 那一行仍然只说"哪一栏用哪一张"。"""
+    h = admin_h(client)
+    for_bg = upload(client, h, png(30, 30, (1, 1, 1)), kind=KIND_HOME_BG).json()
+    for_note = upload(client, h, png(31, 31, (1, 1, 2)), kind=KIND_PRESET_NOTE_IMAGE).json()
+
+    r = client.put(f"/api/admin/mp/settings/{KIND_PRESET_NOTE_IMAGE}", json={"asset_id": for_bg["id"]}, headers=h)
+    assert r.status_code == 400 and "栏目" in r.json()["detail"], r.text
+    r2 = client.put(f"/api/admin/mp/settings/{KIND_HOME_BG}", json={"asset_id": for_note["id"]}, headers=h)
+    assert r2.status_code == 400 and "栏目" in r2.json()["detail"], r2.text
+    assert db.query(MpSetting).filter(MpSetting.asset_id.isnot(None)).count() == 0, "被拒那两趟一行生效位都不该写"
+
+
+def test_两栏各传各的落盘与账本互不混(client, admin_pw, db, store):
+    """同一份字节传到两栏是两件不同的事：账上必须是两行、盘上是两个文件。
+    合成一行那天下发就只能指着一张图，另一栏从此发不出任何东西。"""
+    h = admin_h(client)
+    data = png(40, 40, (7, 7, 7))
+    x = upload(client, h, data, kind=KIND_HOME_BG).json()
+    y = upload(client, h, data, kind=KIND_PRESET_NOTE_IMAGE).json()
+    assert x["id"] != y["id"] and x["token"] != y["token"], "两栏同字节塌成同一行＝后发布那一栏开不了门"
+    assert db.query(MpAsset).count() == 2
+    kinds = sorted(r[0] for r in db.query(MpAsset.kind).all())
+    assert kinds == sorted([KIND_HOME_BG, KIND_PRESET_NOTE_IMAGE])
+
+
+def test_后台那一页左栏两格图片栏都挂得上(client, admin_pw, store):
+    """只加后端 kind、忘了 NAV 那一格＝那一栏永远传不了图（界面是左栏一条条指点出来的）。
+    这一条把"模型里每一栏图片"与"页面左栏每一条 `kind:`"对起来数，不抄字面名单。"""
+    page = client.get("/ops").text
+    for kind in mp_assets.KINDS:
+        assert f"key: 'kind:{kind}'" in page, f"左栏少了 {kind} 那一格"
+    # 排反了的表现是"图明明发出去了，那一格还在念『当前停用』"：生效那一支必须走在按栏话术之前。
+    for needle in ("if (k.current)", "k.empty_text"):
+        assert needle in page, needle
+    assert page.index("if (k.current)") < page.index("k.empty_text")

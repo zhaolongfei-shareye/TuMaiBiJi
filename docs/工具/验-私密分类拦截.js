@@ -410,7 +410,10 @@ const ck = (name, ok, got) => {
   const idxWxml = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/index/index.wxml'), 'utf8')
   ck('列表那一行右侧的配图：私密的不画，判不准（分类表还没拉回来）的也不画',
     /const hideCover = n\.is_private \|\| !n\.privKnown/.test(idx)
-    && /cover: hideCover \|\| !canDrawCloud \? '' : n\.cover_file_id/.test(idx))
+    // 10-18 之后这一栏有三种来源（后台那张官方图／用户自己的云配图／没图），
+    // `hideCover` 必须是**第一道**：官方那一张走的也是这同一条闸。写成
+    // `cover: official ? official : ...` 就等于给这一类开后门绕过私密。
+    && /cover: hideCover \? '' : \(n\.is_preset && official\) \? official : \(!canDrawCloud \? '' : n\.cover_file_id/.test(idx))
   // 没有图就整块不画：画一个空框＝屏上多一块"这块屏坏了吗"的疑点，也是一格占位。
   ck('那一格没图时是**不渲染**，不是渲染一张空框（wx:if 与 src 挂在同一枚 image 上）',
     /<image wx:if="\{\{r\.cover\}\}"[^>]*class="ixl-th"/.test(idxWxml))

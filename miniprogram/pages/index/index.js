@@ -11,6 +11,7 @@ const { labelOf } = require('../../utils/catText.js')
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
+const mpAssets = require('../../utils/mpAssets.js')
 const { formatDate, formatDateTime, formatShortDate, formatWeekday } = require('../../utils/date.js')
 const bgTone = require('../../utils/imgBrightness.js')
 
@@ -361,6 +362,9 @@ Page({
      ⚠ `privKnown === false`（分类表还没拉回来）按甲处理：宁可少画一张图，不拿"不知道"当"不私密"。 */
   arrange(notes) {
     const canDrawCloud = cloudUpload.cloudReady()
+    // 后台那张官方配图（站长 10-18「默认笔记，后台也应该支持上传图片」）。整批取一次：
+    // 它在账上要么是同一个串，要么就没有，不值得每一行再读一遍存储。
+    const official = mpAssets.serverPresetImage()
     const todayKey = formatDate(new Date())
     const groups = []
     let cur = null
@@ -382,7 +386,12 @@ Page({
         shared: !!n.has_active_share,
         card: cardCloud.hasCard(n.id),
         priv: !!n.is_private,
-        cover: hideCover || !canDrawCloud ? '' : n.cover_file_id || '',
+        // 私密那一支仍然排在最前面：`hideCover` 为真时后台那张官方图也不许铺到列表上
+        // （这一类从来不该出现在私密格里，但判据的顺序要写成"先按归属挡、再按来源取图"，
+        //  反过来写就等于哪天有人给这一类开了分类，私密那一格漏出一张图）。
+        // 官方那一篇名下一张用户配图都没有（它不是拍的），后台那一张就是它唯一那张图，
+        // 而且它是 https 地址、不吃 `cloudReady()` 那扇门——云环境没 init 成也照样画得出来。
+        cover: hideCover ? '' : (n.is_preset && official) ? official : (!canDrawCloud ? '' : n.cover_file_id || ''),
       })
     })
     // 卡片那一叠的台账是异步读回来的（`loadNotes` 里那一趟 `cardCloud.refresh()`），
@@ -975,17 +984,35 @@ Page({
     }
   },
 
+  // 后台那张官方配图（站长 10-18「默认笔记，后台也应该支持上传图片」）：只给"这一类"那一篇。
+  // 返回的形状与 `getNoteAssets` 回的那几栏**一致**（`{id, cloud_url}`），所以详情窗里那一排的
+  // 枚数、数字角标、下面那排点、左右滑、点一下看大图全部照旧走同一条渲染，不为这一张开第二套画法。
+  // `cloud_url` 里装的是后台那条 https 地址而不是 `cloud://`——`previewImage` 两种都认，
+  // 而本机 `USER_DATA_PATH` 那个路径它不认（`detail.js` 的 `onCardCell` 里 10-08 记过这条坑）。
+  _officialImage() {
+    const n = this.data.detailNote
+    if (!n || !n.is_preset) return null
+    const url = mpAssets.serverPresetImage()
+    return url ? { id: 'preset-image', cloud_url: url } : null
+  },
+
   // 这一排的数与那页独立详情页同一组（`.dt-shots`／`.dt-shot`），话也走同一个口：
   // 先判 `cloudReady` 再打请求——`cloud://…` 那个地址在没 init 过云环境的地方画不出来，
   // 判在前面就同时挡住"多一个请求""一片破图""让人以为图丢了"三件事。
   async _loadDetailImages(noteId) {
-    if (!cloudUpload.cloudReady()) return
+    const official = this._officialImage()
+    if (!cloudUpload.cloudReady()) {
+      // 用户自己那排画不出来 ⇒ 这一趟请求干脆不发（原口径）。但后台那一张是 https、不吃这道门：
+      // 这一类该画的还是要画，否则会出现"列表右侧有图、点进去那一排是空的"这种自相矛盾的屏。
+      this.setData({ detailImages: official ? [official] : [], dsFigAt: 0 })
+      return
+    }
     try {
       const list = await api.getNoteAssets(noteId)
       // 拿回来的路上窗可能已经关了、或开的是另一篇：对一下号再画，别把上一配的图挂在这一配上。
       const cur = this.data.detailNote
       if (!this.data.detailOpen || !cur || cur.id !== noteId) return
-      this.setData({ detailImages: list || [], dsFigAt: 0 })
+      this.setData({ detailImages: [...(list || []), ...(official ? [official] : [])], dsFigAt: 0 })
     } catch (err) {
       // 配图读不到不该影响这篇笔记本身：那一排不画，正文照看
       console.warn('详情窗配图读取失败（不影响正文）', err && (err.errMsg || err.statusCode))

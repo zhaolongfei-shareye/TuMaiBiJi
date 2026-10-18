@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.errors import UserError
 from app.core.timefmt import _as_utc_iso
-from app.models.mp_asset import KINDS, KIND_LABELS, TEXT_KINDS, MpAsset, MpSetting
+from app.models.mp_asset import KINDS, KIND_EMPTY_TEXTS, KIND_LABELS, TEXT_KINDS, MpAsset, MpSetting
 
 logger = logging.getLogger(__name__)
 
@@ -410,6 +410,9 @@ def admin_state(db: Session) -> dict:
         kinds.append({
             "kind": kind,
             "label": KIND_LABELS.get(kind, kind),
+            # 空着那一句按栏给（见 `models/mp_asset.KIND_EMPTY_TEXTS`）。None＝这一栏沿用
+            # 网页上原来那句"小程序用包里那一张"。
+            "empty_text": KIND_EMPTY_TEXTS.get(kind),
             "registered": row is not None,
             "frozen": settings.MP_ASSETS_FREEZE,
             "current": describe(asset) if asset is not None else None,

@@ -311,6 +311,7 @@ var NAV = [
     { label: '运营图', view: 'config', key: 'kind:home_bg' },
     { label: '首屏 Tips', view: 'config', key: 'text:tips' },
     { label: '帮助文档', view: 'config', key: 'note:preset_note' },
+    { label: '帮助文档那张图', view: 'config', key: 'kind:preset_note_image' },
     { label: '卡片模板', view: 'tpl', key: 'tpl:list' }
   ] }
 ];
@@ -545,14 +546,17 @@ function cardFor(k) {
   card.appendChild(el('h2', null, k.label));
 
   var st;
-  if (!k.registered) {
-    st = el('p', 'state off', '这台后台还没登记过这一栏（小程序正在用包里那一张）。');
-  } else if (!k.current) {
-    st = el('p', 'state off', '当前停用：小程序用包里那一张。');
-  } else {
+  if (k.current) {
     var c = k.current;
     st = el('p', 'state on', '当前生效：#' + c.id + '　' + c.width + '×' + c.height +
       '　' + fmtBytes(c.file_size) + '　' + shortHash(c.content_hash) + '　上传于 ' + dayOf(c.created_at));
+  } else {
+    // 「这一栏空着」那半句话由服务端按栏给（models 里的 KIND_EMPTY_TEXTS）：帮助文档那一篇
+    // 没有"包里那一张"可回落，对它念那句模板话＝念半句假话。没给那一句话的栏原样照旧。
+    var off = k.empty_text
+      ? (k.registered ? '当前停用：' : '这台后台还没登记过这一栏，') + k.empty_text + '。'
+      : (k.registered ? '当前停用：小程序用包里那一张。' : '这台后台还没登记过这一栏（小程序正在用包里那一张）。');
+    st = el('p', 'state off', off);
   }
   card.appendChild(st);
 

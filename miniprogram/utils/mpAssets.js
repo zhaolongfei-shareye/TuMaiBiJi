@@ -71,16 +71,37 @@ async function pull() {
   const kinds = Object.keys(config)
   for (const kind of kinds) {
     const entry = config[kind]
-    if (!entry || !entry.content_hash) continue
+    if (!entry || !entry.content_hash) {
+      // 服务端这一格明说"没有生效的那张"（停用、从没登记、审核期冻结三种在回体里塌成同一个 null）。
+      // 官方那一篇的配图要把账一起撤掉：留着的话后台撤了图、屏上还画着那张已经不生效的旧图，
+      // 而他在后台看到的话是"已停用"——与 `_saveTexts` 那句"只回 null 不撤账，这台机就永远显示旧那一份"
+      // 是同一条纪律。**这里只管这一格，不管 `home_bg`**：背景图在冻结期该不该撤账是另一件事，
+      // 他这句里没点，我不动它（`§8.231` 那两级兜底链的行为跟着现网走，要改要单独拍）。
+      if (kind === 'preset_note_image') {
+        try { wx.removeStorageSync(_key(kind)) } catch (_) {}
+      }
+      continue
+    }
     const cached = wx.getStorageSync(_key(kind))
-    if (cached && cached.contentHash === entry.content_hash) continue
+    // 绝对地址每次落账都记一份：官方那一篇的配图要拿去喂 `previewImage`，而那条 API 只认
+    // https／cloud://，不认本机 `USER_DATA_PATH`（detail.js 的 `onCardCell` 里 10-08 就记过这条）。
+    // 后端那个口发的 URL 是唯一出处（`services/mp_assets.url_of`），域名那一半仍只在这台机上
+    // 由 `utils/api.js` 拼，与下面 `_download` 用的 `${API_BASE}${url}` 同一个串。
+    const remote = `${API_BASE}${entry.url}`
+    if (cached && cached.contentHash === entry.content_hash) {
+      // 这份账是旧版本写的（那时还没记 url）：内容没变、不必重下一遍，但**账要补上 url**。
+      // 不补的话这一台机永远停在"有 filePath 没 url"那一态，官方那张图的大图入口点了没反应，
+      // 而后台明明写着已发布——只有改了图才会重新落账，那种"等下一次才对"是最难查的半修。
+      if (!cached.url) wx.setStorageSync(_key(kind), { ...cached, url: remote })
+      continue
+    }
     try {
       const filePath = await _download(kind, entry.url)
       // 新文件落盘成功再清旧的，避免下载失败时把好的那份也删了。
       if (cached && cached.filePath && cached.filePath !== filePath) {
         try { FS.unlinkSync(cached.filePath) } catch (_) {}
       }
-      wx.setStorageSync(_key(kind), { filePath, contentHash: entry.content_hash })
+      wx.setStorageSync(_key(kind), { filePath, url: remote, contentHash: entry.content_hash })
     } catch (e) {
       console.warn(`mpAssets pull: ${kind} 下载失败`, e)
     }
@@ -105,6 +126,18 @@ function serverBgPath() {
     return null
   }
   return cached.filePath
+}
+
+// 官方那一篇（「帮助文档」）的那张配图。返回**后端那个匿名口的绝对地址**，没有就 null。
+/* 为什么这里给的是 https 串而不是像 `serverBgPath()` 那样给本机路径：这一张要画在三个落点上
+   （列表右侧那块封面、详情窗那一排、独立详情页那一格），而后两排点一下要看大图——
+   `wx.previewImage` 不认本机 `USER_DATA_PATH` 那个路径（`pages/detail/detail.js` 的 `onCardCell`
+   里 10-08 就记过这一条：小图画得出来、大图看不到）。同一条 URL 既能画小图也能看大图，
+   三个落点因此吃的是同一个出处，不用哪一处再单独退回本机路径。
+   那张图由 `pull()` 顺带下到本机（走的是图片栏那条通用链，没为它开分支），但屏上不读那个文件。 */
+function serverPresetImage() {
+  const cached = wx.getStorageSync(_key('preset_note_image'))
+  return (cached && cached.url) || null
 }
 
 // 运营文案（站长 10-15「Tips 改为后台配置」）。形状与图片那份完全不同：没有 url、没有字节、
@@ -134,4 +167,4 @@ function serverTips(lang) {
   return Array.isArray(arr) && arr.length ? arr : null
 }
 
-module.exports = { pull, serverBgPath, serverTips }
+module.exports = { pull, serverBgPath, serverPresetImage, serverTips }
