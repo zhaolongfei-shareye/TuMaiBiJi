@@ -95,7 +95,7 @@ def screen(bg, grad, tips, dim=1, band_h=240):
          'overflow:hidden;background:%s;backdrop-filter:%s;-webkit-backdrop-filter:%s;'
          'display:flex;align-items:center;gap:%dpx;padding:0 %dpx;'
          'box-sizing:border-box">' % (BAND_H, BAND_GRAD, GLASS_BF, GLASS_BF, BAND_GAP, BAND_PAD)]
-    for k, v in ((ZH['statNotes'], '16'), (ZH['statCards'], '13')):
+    for k, v in ((ZH['statNotes'], '16'), (ZH['statImages'], '13')):
         s.append('<div class="f" style="position:static;width:%dpx;display:flex;flex-direction:column;'
                  'align-items:center"><div class="n" style="font-size:%dpx;color:%s">%s</div>'
                  '<div class="f" style="position:static;height:2px;width:%dpx;margin:12px 0 8px;'

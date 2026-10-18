@@ -281,7 +281,7 @@ def home(panel=True, bar=3, plus=True, dim=1):
     s.append('<div class="f" style="left:0;right:0;bottom:0;height:%dpx;border-radius:0 0 34px 34px;'
              'overflow:hidden;background:%s;%s;display:flex;align-items:center;gap:%dpx;padding:0 %dpx;'
              'box-sizing:border-box">' % (BAND_H, BAND_GRAD, BF(GLASS_BF), BAND_GAP, BAND_PAD))
-    for k, v in ((ZH['statNotes'], '16'), (ZH['statCards'], '13')):
+    for k, v in ((ZH['statNotes'], '16'), (ZH['statImages'], '13')):
         s.append('<div class="f" style="position:static;width:%dpx;display:flex;flex-direction:column;'
                  'align-items:center"><div class="n" style="font-size:%dpx;color:%s">%s</div>'
                  '<div class="f" style="position:static;height:2px;width:%dpx;margin:12px 0 8px;'

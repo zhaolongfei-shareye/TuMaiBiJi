@@ -313,7 +313,7 @@ def screen_home(lang, big='f'):
                box(0, 0, CARD_W, NUM_H,
                    'background:' + ramp((18, 20, 26), (.45, .45, .38, .35, .50, .68, .92)) + ';'))
            + num_cell(22, (CARD_W - 44 - 20) / 2, '16', T(lang, 'statNotes'))
-           + num_cell(22 + (CARD_W - 44 - 20) / 2 + 20, (CARD_W - 44 - 20) / 2, '13', T(lang, 'statCards'))))
+           + num_cell(22 + (CARD_W - 44 - 20) / 2 + 20, (CARD_W - 44 - 20) / 2, '13', T(lang, 'statImages'))))
     # 卡这一层：只做圆角与那一圈描边，**不裁子节点**（出血靠它）
     card = ('<div style="{p}">{a}{f}{b}</div>').format(
         p=pbox(CARD_X, GRP_TOP, CARD_W, CARD_H,
@@ -727,7 +727,7 @@ def build(lang):
     # 光看渲染出来的图"面板是黑的"根本分不出是没画还是画了被盖住。
     for must in ('ic-person.png', 'ic-person-alt.png', 'class="num"', 'class="rule"', 'class="lab"', 'class="dot"', 'class="sw-track"',
                  'class="tabbar"', 'class="panel"', 'class="swt"', 'class="thumb p1"',
-                 T(lang, 'statNotes'), T(lang, 'statCards'), T(lang, 'back')):
+                 T(lang, 'statNotes'), T(lang, 'statImages'), T(lang, 'back')):
         if must not in html:
             sys.exit('HTML 里没有「%s」——有一层内容没发出去，别去猜图，先看这里' % must)
     open(os.path.join(HERE, name), 'w', encoding='utf-8').write(html)

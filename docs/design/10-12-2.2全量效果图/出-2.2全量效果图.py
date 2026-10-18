@@ -154,7 +154,7 @@ def c_home(lang, k, counts=('17', '16')):
                  'border-radius:%dpx;background:%s;border:2px solid %s;display:flex;align-items:center;'
                  'padding:0 26px 0 28px;' % (PILL['r'], k['pill'], k['pill_bd'])),
              mag(24, k['glyph']), k['ph'], T(lang, 'searchPh'), mic(26, k['mic'], k['mic_dot']))]
-    for y, key, val, face in ((CARD['xy'][1], 'statCards', counts[0], k['card1']),
+    for y, key, val, face in ((CARD['xy'][1], 'statImages', counts[0], k['card1']),
                               (CARD['y2'], 'statNotes', counts[1], k['card2'])):
         o.append('<div style="%s"><i style="width:11px;height:11px;border-radius:50%%;background:%s;flex:none"></i>'
                  '<span style="margin-left:12px;font-size:30px;color:%s;font-weight:600">%s</span>'

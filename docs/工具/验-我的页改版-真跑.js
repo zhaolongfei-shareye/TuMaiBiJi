@@ -443,9 +443,11 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
     !!m.mask && Math.abs(m.mask.height - m.windowHeight) <= 1 && Math.abs(m.mask.width - m.windowWidth) <= 1,
     m.mask ? `${m.mask.width}×${m.mask.height} 窗 ${m.windowWidth}×${m.windowHeight}` : '没有 .pwd-mask')
   // 这一条才是"不在原菜单处理方式"的正解：打开之后，菜单那一行本身不许长高。
+  // 行数跟着站长 10-17 那一刀改：分类那一格搬进面板里管理，设置这一排从五条成四条（与上面
+  // 「四格」那条同源，不是我在这把尺子里自己数的）。
   ck('打开时菜单行没被顶高（内容不就地展开）',
-    m.items.length === 5 && Math.abs(toRpx(m.items[iPwd].height, W) - 106) <= 2,
-    m.items[iPwd] ? toRpx(m.items[iPwd].height, W).toFixed(0) : '读不到那一行')
+    m.items.length === 4 && Math.abs(toRpx(m.items[iPwd].height, W) - 106) <= 2,
+    m.items[iPwd] ? `${toRpx(m.items[iPwd].height, W).toFixed(0)}（共 ${m.items.length} 行）` : '读不到那一行')
   const cardCx = m.pwdCard && m.pwdCard.left + m.pwdCard.width / 2
   // 「与分类管理相同」这句怎么钉？钉一个渲染出来的绝对宽数会假红：那张卡声明的是
   // `width:620rpx` 而 `.card` 的左右内边距是内容之外（box-sizing 没设 border-box），
