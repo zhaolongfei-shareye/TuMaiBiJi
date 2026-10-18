@@ -175,10 +175,13 @@ def bind_note_assets(
     uid = str(user.id)
     bound: List[Asset] = []
     for it in items:
+        # 归属这一刀走 `_assert_ours` 那一份，不在这里另写一遍短的：卡片口（`cards.py`）与
+        # 名片口（`profiles.py`）用它，它查的是 `assets` + `note_cards` + 名片四格**三处**；
+        # 而这里原来只查了 `assets` 一处。漏的那两处与 10-09 审计第五条同一个形状——
+        # 一条已经登记成别人卡片的地址，可以被绑成我的配图，再随我删笔记的回体
+        # （`delete_note` 把 `file_ids` 交回调用方去删）落到别人的对象上。
+        _assert_ours(db, uid, it.file_id)
         row = db.query(Asset).filter(Asset.object_key == it.file_id).first()
-        if row and row.user_id != uid:
-            # 别人的 fileID 想塞进自己的笔记：要么是他抄的，要么是他猜的。都不给。
-            raise HTTPException(status_code=400, detail="图片地址不属于当前账号")
         if row:
             # 已经绑到别篇笔记的行不抢过来——那意味着两篇笔记共用一张图，
             # 而今天的设计里没有任何一处支持"同一张图属于两篇"。

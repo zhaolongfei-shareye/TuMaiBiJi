@@ -968,7 +968,6 @@ Page({
       if (!(await unlockOn(this, gate))) return
       if (askFirst) this.setData({ detailOpen: true })
       if (this._unlockRenewed) full = await api.getNote(row.id)
-      if (this._unlockRenewed) full = await api.getNote(row.id)
       const note = Object.assign({}, row, full)
       note.source_type_label = row.source_type_label
       note.date_label = row.date_label
@@ -1025,6 +1024,15 @@ Page({
     const i = Number(e && e.detail && e.detail.current)
     if (!(i >= 0) || i === this.data.dsFigAt) return
     this.setData({ dsFigAt: i })
+  },
+
+  // 画的是远端地址那几枚 `<image>` 取不到时，屏上只留一格空白：不出声、不报错，而后台那一栏
+  // 写着"已发布"（10-18 全量审查第 1.5 条，"发布了却没看到"这一型最难查的那一面）。
+  // 这里只落日志，不新增话术——那一张该不该换个说法是他自己的事。
+  onRemoteImgError(e) {
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {}
+    const det = (e && e.detail) || {}
+    console.warn('远端配图取不到:', ds.slot || '?', ds.src || '?', det.errMsg || '')
   },
 
   // 点缩略图看大图：整排都给 `previewImage`，所以大图态里左右划能划到这篇其余几张

@@ -384,20 +384,28 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
      ② 小字那四句也跟着变：邮箱那一行**故意不给小字**（右侧那一档要留给现读回来的地址，
         两处都要字就挤了——整句说明搬进点开的那一层，见 `验-我的邮箱这一格` 那条反向钉）。
      ⇒ 期望值改成现在这一版，并注明出处；不是拿代码迁就旧尺子。 */
-  ck('设置态是五条：卡片模板/分类管理/私密密码/我的邮箱/注销账号（风格入口已按 §8.237 隐藏）',
-    labels.join('|') === '卡片模板|分类管理|私密密码|我的邮箱|注销账号', labels.join('|'))
-  /* 三行的小字说明常驻（他 10-05 打回过"切换开关就看不到注释"），钉数量也钉内容——
-     内容与字典比、不与硬写的中文比，换语言时这条不该红。注销账号那行没给说明，是他还没拍。 */
+  const mDict = (await page.data()).t || {}
+  ck('设置那一排是四格：卡片模板／私密密码／我的邮箱／注销账号（外观设置按 §8.237 隐藏、分类入口按站长 10-17 原话关掉）',
+    labels.join('|') === ['navProfile', 'privatePassword', 'myEmail', 'deleteAccount']
+      .map((k) => String(mDict[k] || '').replace(/\s+/g, '')).join('|'), labels.join('|'))
+  /* 反向钉这一刀：分类那一格不许回到这一排（管理整条搬进笔记列表那屏的井格面板）。
+     `categories` 那枚键必须还在字典里——`pages/categories/` 那一页还读它，撤键等于把那一页判死。 */
+  ck('「分类管理」不许回到设置那一排（原入口按站长 10-17 原话关闭，管理在笔记列表那一屏就地做）',
+    !!mDict.categories && !labels.includes(String(mDict.categories || '').replace(/\s+/g, '')), labels.join('|'))
+  /* 两行的小字说明常驻（他 10-05 打回过"切换开关就看不到注释"），钉数量也钉内容——
+     内容与字典比、不与硬写的中文比，换语言时这条不该红。
+     邮箱那行故意不给（右侧那一档留给现读回来的地址），注销那行他还没拍，
+     分类那一行随 10-17 那一刀一起没了。 */
   const hints = []
   for (const r of await page.$$('.menu-hint')) hints.push((await r.text()).replace(/\s+/g, ''))
-  const dict = (await page.data()).t || {}
-  const wantHints = [dict.navProfileTip, dict.categoriesTip, dict.privatePasswordTip]
+  const dict = mDict
+  const wantHints = [dict.navProfileTip, dict.privatePasswordTip]
     .map((x) => String(x || '').replace(/\s+/g, ''))
-  ck('三行有右侧小字且就是字典里那三句（邮箱那行故意不给，注销那行他还没拍）',
-    hints.length === 3 && hints.every((x, i) => x === wantHints[i]), hints.join('|'))
+  ck('两行有右侧小字且就是字典里那两句（邮箱那行故意不给，注销那行他还没拍）',
+    hints.length === 2 && hints.every((x, i) => x === wantHints[i]), hints.join('|'))
   ck('行高 106（不再是 118 那种大块头）', Math.abs(toRpx(m.items[0].height, W) - 106) <= 2, toRpx(m.items[0].height, W).toFixed(0))
   ck('每行右边一枚 46 见方的箭头位（盒子没跟着圆底一起撤，行右端那条竖线要照它对齐）',
-    m.icos.length === 5 && Math.abs(toRpx(m.icos[0].width, W) - 46) <= 2
+    m.icos.length === 4 && Math.abs(toRpx(m.icos[0].width, W) - 46) <= 2
       && Math.abs(m.icos[0].width - m.icos[0].height) <= 1,
     `${m.icos.length}/${toRpx(m.icos[0].width, W).toFixed(0)}`)
   /* 站长 10-04：「右侧的圆点+箭头太突兀，只留箭头符号即可」。

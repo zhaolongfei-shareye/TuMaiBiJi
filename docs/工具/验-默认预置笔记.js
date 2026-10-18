@@ -295,9 +295,13 @@ ck('画的是那条 https，不是本机 `USER_DATA_PATH`（`previewImage` 不�
   /function serverPresetImage[\s\S]{0,200}?return \(cached && cached\.url\)/.test(MP_ASSETS))
 ck('每次落账都记 url，且**旧账缺 url 时当场补上**（不补的话那台机永远停在"有 filePath 没 url"，改了图才对）',
   /wx\.setStorageSync\(_key\(kind\), \{ filePath, url: remote, contentHash: entry\.content_hash \}\)/.test(MP_ASSETS)
-    && /if \(!cached\.url\) wx\.setStorageSync\(_key\(kind\), \{ \.\.\.cached, url: remote \}\)/.test(MP_ASSETS))
+    // 10-18 全量审查之后，补账那一句必须**包在 try 里**：`setStorageSync` 在本机存储写满时会抛，
+    // 抛在外面等于把整趟 pull 打断，后面每一个 kind 一个都落不了账。
+    && /try \{ wx\.setStorageSync\(_key\(kind\), \{ \.\.\.cached, url: remote \}\)/.test(MP_ASSETS))
 ck('后台撤了那张图要把本机账一起撤掉（只回 null 不撤账＝这台机一直画那张已经不生效的旧图）',
-  /if \(kind === 'preset_note_image'\) \{[\s\S]{0,80}?removeStorageSync\(_key\(kind\)\)/.test(MP_ASSETS))
+  /if \(kind === 'preset_note_image'\)[\s\S]{0,400}?removeStorageSync\(_key\(kind\)\)/.test(MP_ASSETS))
+ck('撤账要连带删本机那一份文件（只清账不删文件＝那份字节没人认得了，下次换图也不会去删它）',
+  /if \(kind === 'preset_note_image'\)[\s\S]{0,400}?FS\.unlinkSync\(stale\.filePath\)/.test(MP_ASSETS))
 ck('云环境没 init 成那一支也要画这一张（否则出现"列表右侧有图、点进去那一排是空的"那种自相矛盾的屏）',
   /if \(!cloudUpload\.cloudReady\(\)\) \{\s*\/\/[\s\S]{0,200}?detailImages: official \? \[official\] : \[\]/.test(IX_JS)
     && /this\.setData\(\{ noteImages: official \? \[official\] : \[\] \}\)/.test(DETAIL_JS2))

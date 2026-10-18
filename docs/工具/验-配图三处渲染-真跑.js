@@ -140,8 +140,10 @@ const dataAttr = async (el, name) => {
   // 今天（CLOUD_ENV 空着）这一行必须不出现，而且 onShow 一个配额请求都不该打。
   ck('环境没填时这一行整个不出现', (await me.$$('.me-storage')).length === 0)
   const labels = await me.$$('.menu-label')
-  ck('设置那一排仍是五格（新加的脚注不是菜单里的一格，没把那条判据带跑）',
-    labels.length === 5, `${labels.length} 格`)
+  // 四格而不是五格：「分类管理」那一行按站长 10-17 原话从这一排关了（管理搬进笔记列表那屏的井格面板），
+  // 「外观设置」那一格更早按 §8.237 隐藏。这一条只钉数量——名字与反向钉在 `验-我的页改版-真跑` 里。
+  ck('设置那一排仍是四格（新加的脚注不是菜单里的一格，没把那条判据带跑）',
+    labels.length === 4, `${labels.length} 格`)
 
   const TIP1 = '全站已用 93%，满了之后新上传的图会存不下'
   const TIP2 = '全站已用 97%，满了之后新上传的图会存不下'

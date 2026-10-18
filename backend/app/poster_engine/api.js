@@ -129,7 +129,16 @@ const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
       formData,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(JSON.parse(res.data))
+          // `wx.uploadFile` 的 data 恒是字符串，所以这里必须 parse；而 parse 会抛。
+          // 不包起来的话异常吞在 wx 回调里，Promise 既不 resolve 也不 reject ——
+          // 症状是"点了快门一直没反应"，转圈收不掉、日志一行不留（10-18 全量审查那条）。
+          // 读不懂就按失败退，且**不编新话术**：把原始 res 交回调用方，页面走的还是它本来
+          // 那一句失败兜底文案（与下面非 2xx 那一支的 catch 同一个回法）。
+          try {
+            resolve(JSON.parse(res.data))
+          } catch (e) {
+            reject(res)
+          }
         } else if (res.statusCode === 401) {
           // Prevent infinite relogin loop: only retry once
           if (retryCount >= 1) {

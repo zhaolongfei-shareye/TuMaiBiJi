@@ -50,8 +50,17 @@ MAX_BODY = 16_000
 MAX_URL = 1000
 MAX_LIST_ITEMS = 50
 MAX_ITEM_LEN = 200
+# 列表翻页那一栏的上界（见 `list_notes` 里那条注释）。
+MAX_SKIP = 100_000
 
 Title = Annotated[str, Field(max_length=MAX_TITLE)]
+# 只有**写入口**才卡这一栏不许空着，读模型（`NoteBrief` 那一族）故意不吃它：
+# 库里万一已经躺着一行空标题，把 min_length 加到共享的那个 `Title` 上会让列表当场
+# 校验失败——那是拿一处脏数据去把一整屏打成 500。抓取那一条口本来就是 `min_length=1`
+# （`routes/ingest.py`），两条写入口一个拦一个不拦才是今天的不一致。
+# ⚠ 它拦的是"一个字也没有"，不拦"只有空格"——后者客户端 `write.js:234` 的 `!title.trim()` 拦着，
+#    服务端这一层要不要一起收严他没拍过，我不动。
+TitleIn = Annotated[str, Field(min_length=1, max_length=MAX_TITLE)]
 Summary = Annotated[str, Field(max_length=MAX_SUMMARY)]
 Body = Annotated[str, Field(max_length=MAX_BODY)]
 Url = Annotated[str, Field(max_length=MAX_URL)]
@@ -126,7 +135,7 @@ class NoteListItem(NoteBrief):
 
 
 class NoteCreate(BaseModel):
-    title: Title
+    title: TitleIn
     summary: Optional[Summary] = None
     key_points: Optional[Items] = None
     key_links: Optional[Items] = None
@@ -141,7 +150,7 @@ class NoteCreate(BaseModel):
 
 
 class NoteUpdate(BaseModel):
-    title: Optional[Title] = None
+    title: Optional[TitleIn] = None
     summary: Optional[Summary] = None
     key_points: Optional[Items] = None
     key_links: Optional[Items] = None
@@ -223,7 +232,12 @@ def _attach_covers(db: Session, uid: str, notes: list) -> None:
 @router.get("/", response_model=List[NoteListItem])
 def list_notes(
     request: Request,
-    skip: int = 0,
+    # 上下界都得卡，只卡 `limit` 是漏了一半：`skip` 裸 `int` 时框架原样放行超大整数
+    # （本地实测 `skip=10^21` 进得了业务层），而 SQLite 驱动绑一个超过 int64 的数会当场抛
+    # `OverflowError`——一个查询参数把接口打成 500。负数更阴：SQLite 不报错，等于回到第一页，
+    # 客户端翻页会翻出一堆重复行。这一档上界（10 万）远高于任何一个真人的篇数，
+    # 又远低于驱动那一层会炸的数，两头都不许从查询参数走进来。
+    skip: int = Query(0, ge=0, le=MAX_SKIP),
     limit: int = Query(20, ge=1, le=100),
     category_id: int | None = None,
     search: str | None = None,

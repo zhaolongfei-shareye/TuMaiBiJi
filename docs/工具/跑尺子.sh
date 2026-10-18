@@ -36,6 +36,11 @@ for f in "$@"; do
   open -a wechatwebdevtools; sleep 45
   "$CLI" auto --project "$PWD/miniprogram" --auto-port $PORT >/dev/null 2>&1
   sleep 45
+  # 每一把开跑前把屏上那一刻的语言钉成中文（10-18 那批 22 把红大半是这一型环境红：
+  # 服务端那一行 language=en，而 37 把里只有 9 把自己钉过）。读数打进日志，别当没有。
+  LANGLOG=/tmp/ruler-$f.lang.log
+  MP_PORT=$PORT NODE_PATH=/tmp/mpaauto/node_modules node "docs/工具/钉-屏上语言.js" $PORT >"$LANGLOG" 2>&1
+  echo "--- $(cat /tmp/ruler-$f.lang.log 2>/dev/null | tail -1)"
   LOG=/tmp/ruler-$f.log
   NODE_PATH=/tmp/mpaauto/node_modules node "docs/工具/$f.js" >"$LOG" 2>&1
   code=$?

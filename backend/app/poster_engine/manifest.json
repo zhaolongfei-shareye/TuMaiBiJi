@@ -3,8 +3,8 @@
  "files": [
   {
    "name": "api.js",
-   "bytes": 17185,
-   "md5": "12653e5095b5a26eca89b219722523f7"
+   "bytes": 17819,
+   "md5": "3f7e1ecc2ade8532d8bbe06e3ad5a93c"
   },
   {
    "name": "appInfo.js",
@@ -23,8 +23,8 @@
   },
   {
    "name": "mpAssets.js",
-   "bytes": 9442,
-   "md5": "849fcaac43288c7b90bc5a89d1f62e66"
+   "bytes": 10298,
+   "md5": "10994e1842331421c6968defae718d6f"
   },
   {
    "name": "palette.js",

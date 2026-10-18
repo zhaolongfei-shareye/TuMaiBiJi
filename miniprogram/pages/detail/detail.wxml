@@ -73,7 +73,8 @@
         <image wx:for="{{noteImages}}" wx:key="id"
                class="dt-shot"
                src="{{item.cloud_url}}" mode="aspectFill" lazy-load
-               bindtap="onPreviewImage" data-url="{{item.cloud_url}}" />
+               bindtap="onPreviewImage" data-url="{{item.cloud_url}}"
+               binderror="onRemoteImgError" data-slot="detail-page" data-src="{{item.cloud_url}}" />
       </scroll-view>
     </view>
 

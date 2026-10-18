@@ -200,7 +200,9 @@ App({
       })
       // 运营图（首页背景图）：后台传了新图就静默拉下来缓存，下一屏 homeBg() 自然取到。
       // 故意不 await：首屏不等它；失败也不出声（和 profileCloud.pull 同一纪律）。
-      mpAssets.pull()
+      // 但"不出声"不等于"不接"：不 catch 的话这趟一旦reject 就是一个未处理的 Promise 拒绝，
+      // 屏上什么都没有、日志里也捞不到（10-18 全量审查那条）。
+      mpAssets.pull().catch((e) => console.warn('mpAssets.pull 这一趟没走完:', e))
     } catch (err) {
       console.error('登录失败:', err)
       throw err

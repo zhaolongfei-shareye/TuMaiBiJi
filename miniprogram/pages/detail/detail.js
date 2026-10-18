@@ -200,6 +200,13 @@ Page({
     }
   },
 
+  // 远端那张图取不到时屏上只留一格空白，不出声（与首页那一条同一个探测器，10-18 全量审查）。
+  onRemoteImgError(e) {
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {}
+    const det = (e && e.detail) || {}
+    console.warn('远端配图取不到:', ds.slot || '?', ds.src || '?', det.errMsg || '')
+  },
+
   // 点缩略图看大图。urls 给整排而不是那一张：大图态里左右划能划到这篇的其余几张。
   onPreviewImage(e) {
     const urls = this.data.noteImages.map((x) => x.cloud_url).filter(Boolean)

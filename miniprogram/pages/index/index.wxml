@@ -175,7 +175,8 @@
                 <view class="ixl-ln"></view>
               </view>
             </view>
-            <image wx:if="{{r.cover}}" class="ixl-th" src="{{r.cover}}" mode="aspectFill" />
+            <image wx:if="{{r.cover}}" class="ixl-th" src="{{r.cover}}" mode="aspectFill"
+              binderror="onRemoteImgError" data-slot="list-cover" data-src="{{r.cover}}" />
           </view>
         </view>
       </view>
@@ -234,7 +235,8 @@
           indicator-dots="{{false}}" bindchange="onDsFigChange">
           <swiper-item wx:for="{{detailImages}}" wx:key="id" wx:for-item="im">
             <image class="ds-fig-img" src="{{im.cloud_url}}" mode="aspectFill" lazy-load
-              catchtap="onPreviewDetailImage" data-url="{{im.cloud_url}}" />
+              catchtap="onPreviewDetailImage" data-url="{{im.cloud_url}}"
+              binderror="onRemoteImgError" data-slot="detail-sheet" data-src="{{im.cloud_url}}" />
           </swiper-item>
         </swiper>
         <!-- 只有一张：数字与那一排点都不画（一条没有"下一张"的滑动条是噪音）。这条他没拍过，写在报告里。 -->

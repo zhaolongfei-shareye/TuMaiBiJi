@@ -78,6 +78,12 @@ async function pull() {
       // 是同一条纪律。**这里只管这一格，不管 `home_bg`**：背景图在冻结期该不该撤账是另一件事，
       // 他这句里没点，我不动它（`§8.231` 那两级兜底链的行为跟着现网走，要改要单独拍）。
       if (kind === 'preset_note_image') {
+        // 撤账要连带删本机那个文件：只清账不删文件，那份字节就没人认得了——
+        // 账上没它、屏上不读它、下次换图也不会去删它（换图那支只删"账上记着的那一份"）。
+        try {
+          const stale = wx.getStorageSync(_key(kind))
+          if (stale && stale.filePath) FS.unlinkSync(stale.filePath)
+        } catch (_) {}
         try { wx.removeStorageSync(_key(kind)) } catch (_) {}
       }
       continue
@@ -92,7 +98,14 @@ async function pull() {
       // 这份账是旧版本写的（那时还没记 url）：内容没变、不必重下一遍，但**账要补上 url**。
       // 不补的话这一台机永远停在"有 filePath 没 url"那一态，官方那张图的大图入口点了没反应，
       // 而后台明明写着已发布——只有改了图才会重新落账，那种"等下一次才对"是最难查的半修。
-      if (!cached.url) wx.setStorageSync(_key(kind), { ...cached, url: remote })
+      // 这一句也必须包起来：`setStorageSync` 在本机存储写满时会抛，而它抛在外面
+      // 等于把整趟 `pull()` 打断 —— 后面每一个 kind 一个都落不了账，而 `app.js` 那边
+      // 故意不 catch（首屏不许为它等、失败不许出声），最后变成一个没人接的拒绝。
+      if (!cached.url) {
+        try { wx.setStorageSync(_key(kind), { ...cached, url: remote }) } catch (e) {
+          console.warn(`mpAssets pull: ${kind} 补 url 没落进账`, e)
+        }
+      }
       continue
     }
     try {

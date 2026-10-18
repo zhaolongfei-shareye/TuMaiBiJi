@@ -291,6 +291,34 @@ def test_这一类比普通笔记多三条闸_读与归类与删照旧走得通(
     assert _reload(db).query(Note).filter(Note.id == nid).one().category_id == cat.id
 
 
+def test_闸的字段清单必须跟着编辑那道口走齐(client, db, monkeypatch):
+    """10-18 全量审查：`NoteUpdate` 有七栏可改，那道闸的清单当时只有六栏——漏的正是 `key_links`。
+    少一栏的后果不是"这一栏改得掉"这么轻：`resync_all` 只刷它自己那六栏，
+    所以官方那一篇的 `key_links` 被改过之后，管理员在后台重发一次也纠不回来。
+
+    两条一起钉：行为那条（只 PUT 这一栏要 400）＋静态那条（清单必须是编辑那七栏的超集，
+    只放行点名放的那两栏）。**将来有人给 `NoteUpdate` 加第八栏而忘了进清单，静态那条会红**——
+    这一类漏法只有拿模型自己现读才抓得住，读代码抓不住。
+    """
+    from app.api.routes.notes import NoteUpdate
+
+    resp = _login(client, monkeypatch, "pm-fields-1")
+    headers = _bearer(resp["token"])
+    nid = resp["seeded_note_id"]
+
+    edit = client.put(f"/api/notes/{nid}", headers=headers,
+                      json={"key_links": ["https://example.com/塞进来的那一条"]})
+    assert edit.status_code == 400, edit.text
+    assert edit.json()["detail"] == preset_note.PRESET_EDIT_MSG
+    assert _reload(db).query(Note).filter(Note.id == nid).one().key_links in (None, []), "拒了却写进去了"
+
+    放行的 = {"category_id", "is_pinned"}
+    可改的 = set(NoteUpdate.model_fields)
+    assert 可改的 - 放行的 <= set(preset_note.CONTENT_FIELDS), (
+        f"编辑那道闸漏栏：{sorted(可改的 - 放行的 - set(preset_note.CONTENT_FIELDS))}；"
+        f"要么补进 CONTENT_FIELDS，要么在这里点名放行并说清为什么")
+
+
 def test_他自己写的那一篇照旧能改能分享(client, db, monkeypatch):
     """三条闸的反向对照：判据只认 `source_type`，普通那一篇一个字都不受影响。
 

@@ -56,10 +56,18 @@ PRESET_EDIT_MSG = "帮助文档是官方写的那一篇，内容改不了"
 PRESET_SHARE_MSG = "帮助文档是官方写的那一篇，不能分享"
 PRESET_CARD_MSG = "帮助文档是官方写的那一篇，不生成卡片"
 
-# 编辑那一道闸挡的是"改内容"这五栏。**不挡分类与置顶**：他这句说的是"不能编辑"，
+# 编辑那一道闸挡的是"改内容"这八栏。**不挡分类与置顶**：他这句说的是"不能编辑"，
 # 而把自己名下的一篇归到哪一格、要不要钉在顶上，那是他整理自己的库，不是改官方那份内容。
 # 这一条我没问过他，判据里单独钉着，要连分类一起挡就说一句。
-CONTENT_FIELDS = ("title", "summary", "tags", "key_points", "content", "original_content")
+# ⚠ 这一份清单必须跟着 `routes/notes.py` 的 `NoteUpdate` 走齐（10-18 全量审查抓出来的就是漏栏——
+#    一次漏了两栏），由 `tests/test_preset_note.py::test_闸的字段清单必须跟着编辑那道口走齐`
+#    拿模型现读钉着：少一栏等于那一栏可以从这一道口改官方那一篇，而 `resync_all` 只刷下面那六栏、
+#    刷不到它——改完连管理员在后台重发一次都纠不回来。
+#    `key_links` 还在公开快照清单里（`services/sharing.SNAPSHOT_COLUMNS`），不是装饰。
+#    `source_url` 同罪：官方那一篇虽然分享不出去，但详情窗与独立详情页都会把「来源链接」那一行
+#    画出来、还给一枚能点的门——往官方那一篇上挂一条来路不明的链接，等于改了它显示的内容。
+CONTENT_FIELDS = ("title", "summary", "tags", "key_points", "key_links", "content",
+                  "original_content", "source_url")
 
 
 def is_help_doc(note) -> bool:
@@ -69,7 +77,7 @@ def is_help_doc(note) -> bool:
 
 
 def touches_content(fields) -> bool:
-    """这一次 PUT 里有没有内容那五栏。"""
+    """这一次 PUT 里有没有内容那八栏（清单只在上头那一个出处）。"""
     return bool(set(fields) & set(CONTENT_FIELDS))
 
 
