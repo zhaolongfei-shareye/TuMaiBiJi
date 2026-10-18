@@ -24,6 +24,7 @@ const { t, texts } = require('../../utils/i18n.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
+const noteImage = require('../../utils/noteImage.js')
 const cardInfo = require('../../utils/cardInfo.js')
 const { labelOf } = require('../../utils/catText.js')
 
@@ -106,6 +107,9 @@ Page({
       this._note = note
       this._token = share.token
       this._qrPath = await this.downloadQRImage(share.token)
+      // 卡片大图位那一张（站长 10-18「把配图第一张取代之前的头像图片」）：这一页每次进来现取，
+      // 删过／换过配图不许还画上一张。取不到就是 null ⇒ 大图位照旧吃头像。
+      this._noteImgPath = await noteImage.firstImage(noteId)
       await this.render()
       this.renderPicker()
     } catch (err) {
@@ -149,6 +153,8 @@ Page({
 
     const images = { qr: await this.loadQr(canvas) }
     if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 5000)
+    // 大图位吃这一篇的第一张配图（解码成功才算"有配图"，hasNote 与 images.note 同源）
+    if (this._noteImgPath) images.note = await poster.loadImage(canvas, this._noteImgPath, 5000)
 
     // 先量后画：两趟必须用同一套数，否则量出来的高度和画出来的位置对不上。
     // 改宽高会清掉画布状态，所以模板里每种字体都重新设过。
@@ -157,7 +163,7 @@ Page({
     canvas.width = poster.W
     canvas.height = 750
     // 默认沿用「卡片模板」里选的那套；这一页手动换过之后以这一页的为准（不回写设置）
-    const plan = poster.planPoster(ctx, this._note, this.data.picked || profile.template, profile, lang, { showQr: !this.data.noQr })
+    const plan = poster.planPoster(ctx, this._note, this.data.picked || profile.template, profile, lang, { showQr: !this.data.noQr, hasNote: !!images.note })
     canvas.width = plan.width
     canvas.height = plan.height
     poster.paintLayers(ctx, plan.layers, images)
@@ -222,9 +228,12 @@ Page({
         const ctx = canvas.getContext('2d')
         const images = { qr: await poster.loadImage(canvas, this._qrPath, 3000) }
         if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 4000)
+        // 那一排小样画的是"这一套长什么样"，用的就是当前这一篇 ⇒ 有配图时大图位也要跟着吃，
+        // 否则十格里六格还是头像，人会以为这次改动没生效（10-18 他报的正是"我试了，没显示"）
+        if (this._noteImgPath) images.note = await poster.loadImage(canvas, this._noteImgPath, 4000)
         canvas.width = poster.W
         canvas.height = MEASURE_H
-        const plan = poster.planPoster(ctx, this._note, x.id, profile, lang)
+        const plan = poster.planPoster(ctx, this._note, x.id, profile, lang, { hasNote: !!images.note })
         const h = Math.round((plan.height * PICK_W) / poster.W)
         // 先让视图层把这一格的高度改成真实比例，再落笔（同 profile.js 那条：
         // 圆角是画进位图的，显示框还压在 4:3 占位里就会被看成一个竖扁的椭圆角）。

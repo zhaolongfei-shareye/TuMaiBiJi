@@ -93,9 +93,12 @@ const rows = poster.TEMPLATES.map((t, i) => ({
   status: 'live',
   // 门槛比的是小程序版本号；配方 JSON 里那个 `min_version` 是解释器版本，两回事，
   // 所以这里带 app_ 前缀（模型里那条注释说的是同一件事）。
-  // 这十套写 1.0.0 而不是当前版本号：门槛的意义是"新加的模板别发给老包"，
-  // 不是把包内早就带着的十套一起锁到最新版。
-  min_app_version: '1.0.0',
+  // ⚠ 10-19 这十套从 1.0.0 抬到 2.3.18：画法第一次用到"只有新包才认的东西"——
+  //   图层里的 `avatar.key` 一栏、以及配方里那个 `hasNote` 变量（老包的 scope 没有这个名字，
+  //   `{var:'hasNote'}` 会抛）。老包真拿到了也不会画坏（抛了就整套丢掉、退回包内那一份），
+  //   但那是每次出图白抛一次，不该留着。门槛本来就是干这个的。
+  //   等下一次这几套退回到"只用老词汇"的画法，可以再把它降回 1.0.0。
+  min_app_version: '2.3.18',
   recipe: canon(recipes[t.id]),
 }))
 rows.forEach((r) => { r.content_hash = hash(dump(r.recipe)) })

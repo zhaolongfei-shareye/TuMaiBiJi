@@ -472,7 +472,25 @@ const L = {
   // 网点阵：波普/孔版印刷的质感来源。gap 是间距，r 是点半径，oddRowShift 让隔行错开。
   dots: (x, y, w, h, o) => Object.assign({ k: 'dots', x, y, w, h, gap: 30, r: 5, color: 'rgba(0,0,0,0.12)', oddRowShift: 0 }, o || {}),
   image: (key, x, y, w, h, o) => Object.assign({ k: 'image', key, x, y, w, h }, o || {}),
+  // 人像位吃哪一张由 key 说（见下面 bigSlot）：不给 key 就是头像，给了（'note'）就是那一张配图。
+  // ⚠ 这一栏**只许在真要换的那一态才塞**：恒写 'avatar' 会让十套模板的无图态图层多一个键，
+  //   480 组等价基线读出来就是"改了画法"。
   avatar: (x, y, d, o) => Object.assign({ k: 'avatar', x, y, d, ring: 0 }, o || {}),
+}
+
+// 大图位（＝不是"名字前面那枚圆形占位"的那一处人像位）吃哪一张。
+// 站长 10-18：「把配图第一张取代之前的头像图片，但只针对大图替换，
+// 小图（名字前面的圆形占位）仍然还是头像图片」。
+// 三级：这篇有配图 → 'note'；没配图 → 照旧 'avatar'；连头像也没设 → null（那一位子画「麦」）。
+// ⚠ 返回 null 和返回 'avatar' 不是一回事：前者是"这一处不落照片"，后者才要落笔。
+function bigKeyOf(d) {
+  return d.hasNote ? 'note' : d.hasAvatar ? 'avatar' : null
+}
+
+// 只有真换成配图那一态才把 key 塞进图层。恒写 key:'avatar' 是给无图态的图层凭空多一栏，
+// 480 组等价基线会把它读成"改了画法"——红得没有任何意义。
+function withBigKey(key, o) {
+  return key === 'note' ? Object.assign({ key: 'note' }, o) : o
 }
 
 // 头像、二维码都要先解码成位图才能进画布。解码异常时 onload/onerror 可能一个都不
@@ -795,7 +813,8 @@ function paintLayers(ctx, layers, images) {
         break
       }
       case 'avatar': {
-        const im = images && images.avatar
+        // key 不给就是头像位（无图态的图层清单里从来没有这一栏，见 bigKeyOf 上方那条注释）
+        const im = images && images[ly.key || 'avatar']
         const cx = ly.x + ly.d / 2
         const cy = ly.y + ly.d / 2
         if (im && im.img) {
@@ -1159,6 +1178,7 @@ function planQuote(ctx, d) {
 
 function planBlock(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
+  const big = bigKeyOf(d)
   const tone = paperOf(note.category_id)
   const pad = 44
   const qrSize = 120
@@ -1178,7 +1198,7 @@ function planBlock(ctx, d) {
   // 头像压在色块与白卡的那条边上，所以色块下沿留出一截，白卡再从下沿下方起
   const bandBottom = titleBottom + 96
   const cardTop = bandBottom + 40
-  const contentTop = cardTop + (hasAvatar ? avatarD / 2 + 24 : pad)
+  const contentTop = cardTop + (big ? avatarD / 2 + 24 : pad)
 
   font(ctx, 27, false)
   const summaryLines = note.summary ? fit(ctx, note.summary, innerW, 4) : []
@@ -1190,7 +1210,8 @@ function planBlock(ctx, d) {
   if (summaryLines.length) base += (summaryLines.length - 1) * 40 + 40
   const pointsY = points.length ? base + 8 : 0
   if (points.length) base = pointsY + 40 + (points.length - 1) * 42 + 26
-  // 这块本来就在色块与白卡交界画了一枚大头像，署名行再带一枚就成两个自己了
+  // 这块本来就在色块与白卡交界画一枚大图（有配图就吃配图，没配图吃头像），
+  // 署名行再带一枚就成两个自己了 ⇒ 那一枚永远不吃 big，只吃头像（站长 10-18 的"小图仍还是头像"）
   const sign = signRow({ ctx, x: cardX + pad, y: base + 36, maxW: innerW, size: 28, avatarD: 76, profile, hasAvatar: false })
   const cardBottom = (sign.h ? base + 36 + sign.h + 12 : base + 8) + pad
   const qrY = cardBottom + 44
@@ -1202,8 +1223,8 @@ function planBlock(ctx, d) {
   layers.push(L.text({ x: pad, y: metaY, lines: [metaLine], size: 22, weight: 'bold', color: tone.ink, alpha: 0.8 }))
   layers.push(L.text({ x: pad, y: titleTop + 40, lines: titleLines, lh: 54, size: 40, weight: 'bold', color: tone.ink }))
   layers.push(L.rrect(cardX, cardTop, cardW, cardBottom - cardTop, 44, { fill: PAPER, shadow: 'rgba(35, 37, 44, 0.10)' }))
-  if (hasAvatar) {
-    layers.push(L.avatar((W - avatarD) / 2, bandBottom - avatarD / 2, avatarD, { ring: 8, ringColor: PAPER }))
+  if (big) {
+    layers.push(L.avatar((W - avatarD) / 2, bandBottom - avatarD / 2, avatarD, withBigKey(big, { ring: 8, ringColor: PAPER })))
   }
   if (summaryLines.length) {
     layers.push(L.text({ x: cardX + pad, y: summaryY, lines: summaryLines, lh: 40, size: 27, color: BODY }))
@@ -1401,6 +1422,7 @@ function footH(qrSize) {
 
 function planPopGrid(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
+  const big = bigKeyOf(d)
   const s = schemeFor('pop', note.category_id)
   const pad = 44
   const gut = 10
@@ -1432,9 +1454,10 @@ function planPopGrid(ctx, d) {
     const x = (i % 2) * (cellW + gut)
     const y = Math.floor(i / 2) * (cellH + gut)
     layers.push(L.fill(x, y, cellW, cellH, c))
-    layers.push(hasAvatar
-      // 先转灰再压一层半透明的版色：四格是同一张脸的四次套印，不是四张不同的图
-      ? L.image('avatar', x, y, cellW, cellH, { gray: true, tint: withAlpha(c, 0.62) })
+    layers.push(big
+      // 先转灰再压一层半透明的版色：四格是同一张图的四次套印，不是四张不同的图
+      // （站长 10-18 那句"把配图**第一张**取代头像"——四格都吃第一张，不是 1..4 各一张）
+      ? L.image(big, x, y, cellW, cellH, { gray: true, tint: withAlpha(c, 0.62) })
       : glyphPlate(ctx, { x, y, w: cellW, h: cellH, color: withAlpha(HARD, 0.2) }))
   })
   layers.push(L.text({ x: pad, y: kickerY, lines: [kicker], size: 22, weight: 'bold', color: s.bg, track: 3 }))
@@ -1449,6 +1472,7 @@ function planPopGrid(ctx, d) {
 
 function planPopDots(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
+  const big = bigKeyOf(d)
   const s = schemeFor('pop', note.category_id)
   const pad = 46
   const avatarD = 200
@@ -1473,7 +1497,7 @@ function planPopDots(ctx, d) {
   const cardTop = titleBottom + 40
   const cardH = 44 + (sumLines.length ? (sumLines.length - 1) * 40 + 34 + 22 : 0) + (points.length ? points.length * 44 : 0) + 20
   const signTop = cardTop + cardH + 44
-  // 上面已经有一枚大头像了，署名行只留字：同一张脸上出现两次自己很难看
+  // 上面已经有一枚大图位了，署名行只留字：同一张脸上出现两次自己很难看
   const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 30, size: 28, avatarD: 74, profile, hasAvatar: false })
   const height = signTop + Math.max(sign.h, footH(qrSize)) + 48
 
@@ -1485,8 +1509,8 @@ function planPopDots(ctx, d) {
   layers.push(L.text({ x: pad, y: titleTop + 76, lines: titleLines, lh: 88, size: 76, weight: 'bold', color: dark }))
   layers.push(L.rrect(pad - 8, kickerY - 30, trackW(ctx, kicker, 2) + 32, 44, 22, { fill: s.accent }))
   layers.push(L.text({ x: pad + 8, y: kickerY, lines: [kicker], size: 22, weight: 'bold', color: s.accentInk, track: 2 }))
-  if (hasAvatar) {
-    layers.push(L.avatar(W - pad - avatarD, 40, avatarD, { ring: 10, ringColor: dark, fallback: withAlpha(dark, 0.16) }))
+  if (big) {
+    layers.push(L.avatar(W - pad - avatarD, 40, avatarD, withBigKey(big, { ring: 10, ringColor: dark, fallback: withAlpha(dark, 0.16) })))
   } else {
     layers.push(glyphPlate(ctx, { x: W - pad - avatarD, y: 40, w: avatarD, h: avatarD, color: withAlpha(dark, 0.18) }))
   }
@@ -1512,6 +1536,7 @@ function planPopDots(ctx, d) {
 
 function planAcid(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
+  const big = bigKeyOf(d)
   const s = schemeFor('neon', note.category_id)
   const pad = 48
   const avatarD = 380
@@ -1543,8 +1568,8 @@ function planAcid(ctx, d) {
   layers.push(L.radial(W - pad - avatarD / 2, avatarTop + avatarD / 2, 0, avatarD * 1.05,
     withAlpha('#FFFFFF', 0.38), withAlpha('#FFFFFF', 0), [0, 0, W, topH]))
   layers.push(L.fill(0, topH - 1, W, height - topH + 1, withAlpha(HARD, 0.28)))
-  if (hasAvatar) {
-    layers.push(L.avatar(W - pad - avatarD, avatarTop, avatarD, { ring: 6, ringColor: withAlpha('#FFFFFF', 0.6), fallback: withAlpha('#FFFFFF', 0.2) }))
+  if (big) {
+    layers.push(L.avatar(W - pad - avatarD, avatarTop, avatarD, withBigKey(big, { ring: 6, ringColor: withAlpha('#FFFFFF', 0.6), fallback: withAlpha('#FFFFFF', 0.2) })))
   } else {
     layers.push(glyphPlate(ctx, { x: W - pad - avatarD, y: avatarTop, w: avatarD, h: avatarD, color: withAlpha('#FFFFFF', 0.28) }))
   }
@@ -1564,6 +1589,7 @@ function planAcid(ctx, d) {
 
 function planCover(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
+  const big = bigKeyOf(d)
   const s = schemeFor('mono', note.category_id)
   const pad = 48
   const qrSize = 116
@@ -1588,11 +1614,11 @@ function planCover(ctx, d) {
 
   const layers = []
   layers.push(L.fill(0, 0, W, height, s.bg))
-  if (hasAvatar) {
-    // 彩色整幅人像铺满全张，眉标、标题、署名、码全部压在图上。
-    // 压得住靠这条渐变：脸那一段（上半张）几乎不加暗，到标题那一段已经到 0.88，
+  if (big) {
+    // 彩色整幅图铺满全张（有配图吃配图、没配图吃头像），眉标、标题、署名、码全部压在图上。
+    // 压得住靠这条渐变：图那一段（上半张）几乎不加暗，到标题那一段已经到 0.88，
     // 白字落在浅色衣服或白墙上也不会糊掉。
-    layers.push(L.image('avatar', 0, 0, W, height))
+    layers.push(L.image(big, 0, 0, W, height))
     layers.push(L.grad(0, 0, W, height, withAlpha(s.bg, 0.2), withAlpha(s.bg, 0.97), {
       stops: [
         { at: 0, color: withAlpha(s.bg, 0.2) },
@@ -1620,6 +1646,7 @@ function planCover(ctx, d) {
 
 function planLit(ctx, d) {
   const { note, profile, hasAvatar, lang } = d
+  const big = bigKeyOf(d)
   const s = schemeFor('riso', note.category_id)
   const pad = 56
   const archW = 380
@@ -1656,8 +1683,8 @@ function planLit(ctx, d) {
   layers.push(L.rrect(archX, archTop, archW, archH, archW / 2, { fill: s.accent }))
   layers.push(L.fill(archX, archTop + archH - archW / 2, archW, archW / 2, s.accent))
   const badge = 220
-  if (hasAvatar) {
-    layers.push(L.avatar(archX + (archW - badge) / 2, archTop + 56, badge, { ring: 8, ringColor: s.bg, fallback: withAlpha(s.bg, 0.3) }))
+  if (big) {
+    layers.push(L.avatar(archX + (archW - badge) / 2, archTop + 56, badge, withBigKey(big, { ring: 8, ringColor: s.bg, fallback: withAlpha(s.bg, 0.3) })))
   } else {
     layers.push(glyphPlate(ctx, { x: archX, y: archTop, w: archW, h: archH, color: withAlpha(s.accentInk, 0.22) }))
   }
@@ -1767,7 +1794,7 @@ const RECIPE_OP_KEYS = {
   dots: ['x', 'y', 'w', 'h', 'gap', 'r', 'color', 'oddRowShift'],
   text: ['x', 'y', 'lines', 'lh', 'size', 'weight', 'color', 'align', 'fam', 'alpha', 'track', 'stroke', 'strokeWidth', 'vert', 'colGap', 'vpunct'],
   image: ['key', 'x', 'y', 'w', 'h', 'placeholder', 'r', 'clipCircle', 'gray', 'tint', 'fadeFrom'],
-  avatar: ['x', 'y', 'd', 'ring', 'ringColor', 'fallback'],
+  avatar: ['x', 'y', 'd', 'ring', 'ringColor', 'fallback', 'key'],
 }
 // 哪些字段属于 L.xxx 最后那个"可选项"参数（其余按位置传）。没列进去的按位置传，
 // 这样图层的默认值仍然只有 L 这一份出处。
@@ -1777,7 +1804,7 @@ const RECIPE_OPT_KEYS = {
   circle: ['fill', 'stroke', 'strokeWidth'],
   dots: ['gap', 'r', 'color', 'oddRowShift'],
   image: ['placeholder', 'r', 'clipCircle', 'gray', 'tint', 'fadeFrom'],
-  avatar: ['ring', 'ringColor', 'fallback'],
+  avatar: ['ring', 'ringColor', 'fallback', 'key'],
   text: ['x', 'y', 'lines', 'lh', 'size', 'weight', 'color', 'align', 'fam', 'alpha', 'track', 'stroke', 'strokeWidth', 'vert', 'colGap', 'vpunct'],
 }
 
@@ -1944,12 +1971,12 @@ function callRecipePrim(env, name, rawArgs, scope) {
   return p.call(env, a)
 }
 
-// 跑一份配方。d 是 planner 那一套入参（note / profile / lang / hasAvatar）。
+// 跑一份配方。d 是 planner 那一套入参（note / profile / lang / hasAvatar / hasNote）。
 function planFromRecipe(ctx, d, recipe) {
   const env = {
-    ctx, note: d.note, profile: d.profile, lang: d.lang, hasAvatar: d.hasAvatar,
+    ctx, note: d.note, profile: d.profile, lang: d.lang, hasAvatar: d.hasAvatar, hasNote: d.hasNote,
     layers: [], width: W,
-    scope: { W, note: d.note, profile: d.profile, lang: d.lang, hasAvatar: d.hasAvatar },
+    scope: { W, note: d.note, profile: d.profile, lang: d.lang, hasAvatar: d.hasAvatar, hasNote: d.hasNote },
     opKeys: RECIPE_OP_KEYS,
     prims: RECIPE_PRIMS,
     buildLayer: buildRecipeLayer,
@@ -2167,13 +2194,18 @@ function stripQr(plan, ctx, lang) {
 }
 
 function planPoster(ctx, note, templateId, profile, lang, opts) {
+  // opts：showQr（不带码那态）、strict（尺子走的那条，配方跑坏就抛）、
+  //   **hasNote**（这一篇有没有配图可吃）。
+  //   ⚠ hasNote 只许在**位图真的解码成功**之后给真，并且必须与交给 paintLayers 的那个
+  //   images 对象同源（`hasNote ⇔ images.note`）。图层说了"这一位吃 note"而 images 里没那张，
+  //   落下来就是拱门／圆位上一块空底——那不是"降级成头像"，是画坏。三处出图口都照这条写。
   // 认得这一套的两条路：有一份 JS planner，或者有一份配方（下发的或包内的）。
   // 只查 PLANNERS 会把下发来的第 11 套判成"不认识的模板"、退回默认那一套——
   // 站长在服务端加了模板而客户端毫无反应，就是这一行造成的。
   const tpl = (PLANNERS[templateId] || recipeOf(templateId)) ? templateId : DEFAULT_TEMPLATE
   const p = profile || {}
   const o = opts || {}
-  const d = { note, profile: p, hasAvatar: !!p.avatarPath, lang: lang || 'zh' }
+  const d = { note, profile: p, hasAvatar: !!p.avatarPath, hasNote: !!o.hasNote, lang: lang || 'zh' }
   const recipe = recipeOf(tpl)
   let plan
   if (!recipe) plan = PLANNERS[tpl](ctx, d)

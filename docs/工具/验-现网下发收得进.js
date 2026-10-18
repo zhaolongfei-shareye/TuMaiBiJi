@@ -88,9 +88,12 @@ const profiles = (tpl, withAvatar) => ({
   name: '阿飞', slogan: '每天读一点再走', template: tpl,
   avatarPath: withAvatar ? '/u/ava.png' : '',
 })
-const imgsOf = (withAvatar) => {
+const imgsOf = (withAvatar, withNote) => {
   const m = { qr: { img: {}, width: 200, height: 200 } }
   if (withAvatar) m.avatar = { img: {}, width: 400, height: 400 }
+  // 与 验-模板配方等价 同一根轴（有/无配图）：这一把比的是"现网那十份收不收得进、画出来和包内一不一样"，
+  // 轴不一致就会有一半的组名对不上基线，那种对不上是尺子自己的错，不是产品的。
+  if (withNote) m.note = { img: {}, width: 900, height: 600 }
   return m
 }
 // 图层清单按键名排序规范化（键序对画面没有影响）；绘制序列不排序（它记的就是顺序）。
@@ -108,7 +111,13 @@ for (const tpl of poster.TEMPLATES) {
     for (const lang of ['zh', 'en']) {
       for (const showQr of [true, false]) {
         for (const withAvatar of [false, true]) {
-          cases.push({ id: `${tpl.id}#n${ni}#${lang}#${showQr ? 'qr' : 'noqr'}#${withAvatar ? 'ava' : 'noava'}`, tpl: tpl.id, ni, lang, showQr, withAvatar })
+          for (const withNote of [false, true]) {
+            // 尾巴只在有配图时拼上：与 验-模板配方等价 的组名规则一字不差
+            cases.push({
+              id: `${tpl.id}#n${ni}#${lang}#${showQr ? 'qr' : 'noqr'}#${withAvatar ? 'ava' : 'noava'}${withNote ? '#note' : ''}`,
+              tpl: tpl.id, ni, lang, showQr, withAvatar, withNote,
+            })
+          }
         }
       }
     }
@@ -118,8 +127,9 @@ for (const tpl of poster.TEMPLATES) {
 function run(c) {
   const { ctx, trace } = newCtx()
   // strict：走配方的那几套跑不通就抛，不许悄悄退回 JS planner——退回去这一组照样和基线一致，比就白比了。
-  const plan = poster.planPoster(ctx, notes[c.ni], c.tpl, profiles(c.tpl, c.withAvatar), c.lang, { showQr: c.showQr, strict: true })
-  poster.paintLayers(ctx, plan.layers, imgsOf(c.withAvatar))
+  const plan = poster.planPoster(ctx, notes[c.ni], c.tpl, profiles(c.tpl, c.withAvatar), c.lang,
+    { showQr: c.showQr, strict: true, hasNote: !!c.withNote })
+  poster.paintLayers(ctx, plan.layers, imgsOf(c.withAvatar, c.withNote))
   return { plan: sha(canon({ width: plan.width, height: plan.height, layers: plan.layers })), paint: sha(canon(trace)) }
 }
 
@@ -127,7 +137,7 @@ const results = []
 const ck = (name, pass, detail) => results.push([name, !!pass, pass ? '' : (detail || '')])
 
 const baseline = JSON.parse(fs.readFileSync(BASE, 'utf8')).cases
-ck(`基线那份在（${Object.keys(baseline).length} 组，它今天刚被 验-模板配方等价 判过 480 组红 0）`,
+ck(`基线那份在（${Object.keys(baseline).length} 组，与 验-模板配方等价 同一套组名与同一根"有/无配图"轴）`,
   Object.keys(baseline).length === cases.length, `基线 ${Object.keys(baseline).length} 组 / 本尺子要 ${cases.length} 组`)
 
 let rows
@@ -160,8 +170,11 @@ for (const c of cases) {
   if (got.plan !== want.plan) diff.push(`${c.id}：图层清单不一样 ${got.plan} vs ${want.plan}`)
   if (got.paint !== want.paint) diff.push(`${c.id}：绘制序列不一样 ${got.paint} vs ${want.paint}`)
 }
-ck(`${cases.length} 组（${poster.TEMPLATES.length} 套 × ${notes.length} 条笔记 × 中英 × 带不带码 × 有没形象）现网那一份画出来与基线逐组一致`,
-  diff.length === 0, `不同 ${diff.length} 处：${diff.slice(0, 3).join(' | ')}`)
+ck(`${cases.length} 组（${poster.TEMPLATES.length} 套 × ${notes.length} 条笔记 × 中英 × 带不带码 × 有没形象 × 有没配图）现网那一份画出来与基线逐组一致`,
+  diff.length === 0,
+  // 分两档报数：库里那十行还是**老画法**时，只有 `#note` 那一半会红（无配图那态两边一模一样）。
+  // 不分开写，"红 432 处"读起来像改坏了，而它真正的病名是"现网还没跟着重新灌种子"。
+  `不同 ${diff.length} 处（无配图 ${diff.filter((d) => d.indexOf('#note') < 0).length}／有配图 ${diff.filter((d) => d.indexOf('#note') >= 0).length}，涉及模板 ${[...new Set(diff.map((d) => String(d).split('#')[0]))].join('、')}）：${diff.slice(0, 3).join(' | ')}`)
 
 // ---------- 反向：这两条不红，上面那条就是恒真式 ----------
 const tampered = JSON.parse(fs.readFileSync(FILE, 'utf8'))

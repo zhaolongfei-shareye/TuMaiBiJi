@@ -300,6 +300,10 @@ module.exports = {
       { let: 'pad', value: 44 },
       { let: 'qrSize', value: 120 },
       { let: 'avatarD', value: 132 },
+      // 大图位吃不吃这一篇的第一张配图（站长 10-18「把配图第一张取代之前的头像图片，
+      // 但只针对大图替换，小图（名字前面的圆形占位）仍然还是头像图片」）。
+      // hasImg ＝ 有配图或有头像，任一在就落这一笔；具体吃哪一张由下面那两条 if 分岔。
+      { let: 'hasImg', value: { or: [{ var: 'hasNote' }, { var: 'hasAvatar' }] } },
       { let: 'cardX', value: 40 },
       { let: 'cardW', value: { '-': [{ var: 'W' }, { '*': [{ var: 'cardX' }, 2] }] } },
       { let: 'innerW', value: { '-': [{ var: 'cardW' }, { '*': [{ var: 'pad' }, 2] }] } },
@@ -323,7 +327,7 @@ module.exports = {
       // 头像压在色块与白卡那条边上，所以色块下沿留出一截，白卡再从下沿下方起
       { let: 'bandBottom', value: { '+': [{ var: 'titleBottom' }, 96] } },
       { let: 'cardTop', value: { '+': [{ var: 'bandBottom' }, 40] } },
-      { let: 'contentTop', value: { if: [{ truthy: { var: 'hasAvatar' } }, { '+': [{ var: 'cardTop' }, { '/': [{ var: 'avatarD' }, 2] }, 24] }, { '+': [{ var: 'cardTop' }, { var: 'pad' }] }] } },
+      { let: 'contentTop', value: { if: [{ truthy: { var: 'hasImg' } }, { '+': [{ var: 'cardTop' }, { '/': [{ var: 'avatarD' }, 2] }, 24] }, { '+': [{ var: 'cardTop' }, { var: 'pad' }] }] } },
 
       { do: { prim: 'setFont', args: { size: 27 } } },
       { let: 'summaryLines', value: [] },
@@ -346,7 +350,12 @@ module.exports = {
       { emit: { k: 'text', x: { var: 'pad' }, y: { var: 'metaY' }, lines: [{ var: 'metaLine' }], size: 22, weight: 'bold', color: { var: 'tone.ink' }, alpha: 0.8 } },
       { emit: { k: 'text', x: { var: 'pad' }, y: { '+': [{ var: 'titleTop' }, 40] }, lines: { var: 'titleLines' }, lh: 54, size: 40, weight: 'bold', color: { var: 'tone.ink' } } },
       { emit: { k: 'rrect', x: { var: 'cardX' }, y: { var: 'cardTop' }, w: { var: 'cardW' }, h: { '-': [{ var: 'cardBottom' }, { var: 'cardTop' }] }, r: 44, fill: { prim: 'token', args: { name: 'paper' } }, shadow: 'rgba(35, 37, 44, 0.10)' } },
-      { if: { cond: { truthy: { var: 'hasAvatar' } }, then: [{ emit: { k: 'avatar', x: { '/': [{ '-': [{ var: 'W' }, { var: 'avatarD' }] }, 2] }, y: { '-': [{ var: 'bandBottom' }, { '/': [{ var: 'avatarD' }, 2] }] }, d: { var: 'avatarD' }, ring: 8, ringColor: { prim: 'token', args: { name: 'paper' } } } }] } },
+      { if: { cond: { truthy: { var: 'hasImg' } }, then: [
+        // 两支只差一栏 `key`。⚠ 只许吃配图那一支带它：给 avatar 那支也补一条 key:'avatar'
+        // 就是给无图态的图层清单凭空多一栏，480 组等价基线红一次而画面一个像素都没变——那种红是噪声。
+        { if: { cond: { truthy: { var: 'hasNote' } }, then: [{ emit: { k: 'avatar', key: 'note', x: { '/': [{ '-': [{ var: 'W' }, { var: 'avatarD' }] }, 2] }, y: { '-': [{ var: 'bandBottom' }, { '/': [{ var: 'avatarD' }, 2] }] }, d: { var: 'avatarD' }, ring: 8, ringColor: { prim: 'token', args: { name: 'paper' } } } }],
+          else: [{ emit: { k: 'avatar', x: { '/': [{ '-': [{ var: 'W' }, { var: 'avatarD' }] }, 2] }, y: { '-': [{ var: 'bandBottom' }, { '/': [{ var: 'avatarD' }, 2] }] }, d: { var: 'avatarD' }, ring: 8, ringColor: { prim: 'token', args: { name: 'paper' } } } }] } },
+      ] } },
       { if: { cond: { truthy: { var: 'summaryLines' } }, then: [{ emit: { k: 'text', x: { '+': [{ var: 'cardX' }, { var: 'pad' }] }, y: { var: 'summaryY' }, lines: { var: 'summaryLines' }, lh: 40, size: 27, color: { prim: 'token', args: { name: 'body' } } } }] } },
       {
         if: {
@@ -389,6 +398,8 @@ module.exports = {
       { let: 'pad', value: 56 },
       { let: 'archW', value: 380 },
       { let: 'archH', value: 380 },
+      // 拱门里那一枚是大图位：有配图吃第一张配图，没配图吃头像（站长 10-18）
+      { let: 'hasImg', value: { or: [{ var: 'hasNote' }, { var: 'hasAvatar' }] } },
       { let: 'archX', value: { '/': [{ '-': [{ var: 'W' }, { var: 'archW' }] }, 2] } },
       { let: 'vertX', value: { '-': [{ var: 'W' }, 44] } },
       { let: 'contentCx', value: { '/': [{ '-': [{ var: 'W' }, 68] }, 2] } },
@@ -437,8 +448,13 @@ module.exports = {
       { let: 'badge', value: 220 },
       {
         if: {
-          cond: { truthy: { var: 'hasAvatar' } },
-          then: [{ emit: { k: 'avatar', x: { '+': [{ var: 'archX' }, { '/': [{ '-': [{ var: 'archW' }, { var: 'badge' }] }, 2] }] }, y: { '+': [{ var: 'archTop' }, 56] }, d: { var: 'badge' }, ring: 8, ringColor: { var: 's.bg' }, fallback: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0.3 } } } }],
+          cond: { truthy: { var: 'hasImg' } },
+          // 两支只差一栏 `key`（只许吃配图那一支带它，理由见 block 那一条同样的注释）
+          then: [{ if: {
+            cond: { truthy: { var: 'hasNote' } },
+            then: [{ emit: { k: 'avatar', key: 'note', x: { '+': [{ var: 'archX' }, { '/': [{ '-': [{ var: 'archW' }, { var: 'badge' }] }, 2] }] }, y: { '+': [{ var: 'archTop' }, 56] }, d: { var: 'badge' }, ring: 8, ringColor: { var: 's.bg' }, fallback: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0.3 } } } }],
+            else: [{ emit: { k: 'avatar', x: { '+': [{ var: 'archX' }, { '/': [{ '-': [{ var: 'archW' }, { var: 'badge' }] }, 2] }] }, y: { '+': [{ var: 'archTop' }, 56] }, d: { var: 'badge' }, ring: 8, ringColor: { var: 's.bg' }, fallback: { prim: 'withAlpha', args: { color: { var: 's.bg' }, alpha: 0.3 } } } }],
+          } }],
           else: [{ emitOne: { prim: 'glyphPlate', args: { x: { var: 'archX' }, y: { var: 'archTop' }, w: { var: 'archW' }, h: { var: 'archH' }, color: { prim: 'withAlpha', args: { color: { var: 's.accentInk' }, alpha: 0.22 } } } } }],
         },
       },
@@ -597,8 +613,10 @@ module.exports = {
             { emit: { k: 'fill', x: { var: 'px' }, y: { var: 'py' }, w: { var: 'cellW' }, h: { var: 'cellH' }, color: { var: 'c' } } },
             {
               if: {
-                cond: { var: 'hasAvatar' },
-                then: [{ emit: { k: 'image', key: 'avatar', x: { var: 'px' }, y: { var: 'py' }, w: { var: 'cellW' }, h: { var: 'cellH' }, gray: true, tint: { prim: 'withAlpha', args: { color: { var: 'c' }, alpha: 0.62 } } } }],
+                // 四格都吃**同一张**（第一张配图，或没配图时的头像）——"同一张图的四次套印"这条
+                // 设计不在这次改动里，站长那句是「把配图**第一张**取代头像」，不是四格各一张。
+                cond: { or: [{ var: 'hasNote' }, { var: 'hasAvatar' }] },
+                then: [{ emit: { k: 'image', key: { if: [{ truthy: { var: 'hasNote' } }, 'note', 'avatar'] }, x: { var: 'px' }, y: { var: 'py' }, w: { var: 'cellW' }, h: { var: 'cellH' }, gray: true, tint: { prim: 'withAlpha', args: { color: { var: 'c' }, alpha: 0.62 } } } }],
                 else: [{ emitOne: { prim: 'glyphPlate', args: { x: { var: 'px' }, y: { var: 'py' }, w: { var: 'cellW' }, h: { var: 'cellH' }, color: { prim: 'withAlpha', args: { color: { prim: 'token', args: { name: 'hard' } }, alpha: 0.2 } } } } }],
               },
             },
@@ -623,6 +641,8 @@ module.exports = {
       { let: 's', value: { prim: 'scheme', args: { name: 'pop', categoryId: { var: 'note.category_id' } } } },
       { let: 'pad', value: 46 },
       { let: 'avatarD', value: 200 },
+      // 大图位：有配图吃第一张配图，没配图吃头像（站长 10-18，正本见 poster.js 的 bigKeyOf）
+      { let: 'hasImg', value: { or: [{ var: 'hasNote' }, { var: 'hasAvatar' }] } },
       { let: 'qrSize', value: 116 },
       { let: 'light', value: { prim: 'mix', args: { c1: { var: 's.bg' }, c2: '#FFFFFF', w: 0.66 } } },
       // 主墨往 HARD 里渗这组的底色：权重是 HARD 的占比，写反过一次，描边就成了亮蓝。
@@ -666,8 +686,13 @@ module.exports = {
       { emit: { k: 'text', x: { '+': [{ var: 'pad' }, 8] }, y: { var: 'kickerY' }, lines: [{ var: 'kicker' }], size: 22, weight: 'bold', color: { var: 's.accentInk' }, track: 2 } },
       {
         if: {
-          cond: { var: 'hasAvatar' },
-          then: [{ emit: { k: 'avatar', x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: 40, d: { var: 'avatarD' }, ring: 10, ringColor: { var: 'dark' }, fallback: { prim: 'withAlpha', args: { color: { var: 'dark' }, alpha: 0.16 } } } }],
+          cond: { truthy: { var: 'hasImg' } },
+          // 两支只差一栏 `key`（只许吃配图那一支带它，理由见 block 那一条同样的注释）
+          then: [{ if: {
+            cond: { truthy: { var: 'hasNote' } },
+            then: [{ emit: { k: 'avatar', key: 'note', x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: 40, d: { var: 'avatarD' }, ring: 10, ringColor: { var: 'dark' }, fallback: { prim: 'withAlpha', args: { color: { var: 'dark' }, alpha: 0.16 } } } }],
+            else: [{ emit: { k: 'avatar', x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: 40, d: { var: 'avatarD' }, ring: 10, ringColor: { var: 'dark' }, fallback: { prim: 'withAlpha', args: { color: { var: 'dark' }, alpha: 0.16 } } } }],
+          } }],
           else: [{ emitOne: { prim: 'glyphPlate', args: { x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: 40, w: { var: 'avatarD' }, h: { var: 'avatarD' }, color: { prim: 'withAlpha', args: { color: { var: 'dark' }, alpha: 0.18 } } } } }],
         },
       },
@@ -709,6 +734,8 @@ module.exports = {
       { let: 's', value: { prim: 'scheme', args: { name: 'neon', categoryId: { var: 'note.category_id' } } } },
       { let: 'pad', value: 48 },
       { let: 'avatarD', value: 380 },
+      // 大图位：有配图吃第一张配图，没配图吃头像（站长 10-18，正本见 poster.js 的 bigKeyOf）
+      { let: 'hasImg', value: { or: [{ var: 'hasNote' }, { var: 'hasAvatar' }] } },
       { let: 'qrSize', value: 118 },
       { let: 'topH', value: 540 },
       { let: 'pillGap', value: 84 },
@@ -753,8 +780,13 @@ module.exports = {
       { emit: { k: 'fill', x: 0, y: { '-': [{ var: 'topH' }, 1] }, w: { var: 'W' }, h: { '+': [{ '-': [{ var: 'height' }, { var: 'topH' }] }, 1] }, color: { prim: 'withAlpha', args: { color: { prim: 'token', args: { name: 'hard' } }, alpha: 0.28 } } } },
       {
         if: {
-          cond: { var: 'hasAvatar' },
-          then: [{ emit: { k: 'avatar', x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: { var: 'avatarTop' }, d: { var: 'avatarD' }, ring: 6, ringColor: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.6 } }, fallback: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.2 } } } }],
+          cond: { truthy: { var: 'hasImg' } },
+          // 两支只差一栏 `key`（只许吃配图那一支带它，理由见 block 那一条同样的注释）
+          then: [{ if: {
+            cond: { truthy: { var: 'hasNote' } },
+            then: [{ emit: { k: 'avatar', key: 'note', x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: { var: 'avatarTop' }, d: { var: 'avatarD' }, ring: 6, ringColor: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.6 } }, fallback: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.2 } } } }],
+            else: [{ emit: { k: 'avatar', x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: { var: 'avatarTop' }, d: { var: 'avatarD' }, ring: 6, ringColor: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.6 } }, fallback: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.2 } } } }],
+          } }],
           else: [{ emitOne: { prim: 'glyphPlate', args: { x: { '-': [{ var: 'W' }, { var: 'pad' }, { var: 'avatarD' }] }, y: { var: 'avatarTop' }, w: { var: 'avatarD' }, h: { var: 'avatarD' }, color: { prim: 'withAlpha', args: { color: '#FFFFFF', alpha: 0.28 } } } } }],
         },
       },
@@ -817,11 +849,12 @@ module.exports = {
       { emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: { var: 's.bg' } } },
       {
         if: {
-          cond: { var: 'hasAvatar' },
+          cond: { or: [{ var: 'hasNote' }, { var: 'hasAvatar' }] },
           then: [
-            // 彩色整幅人像铺满全张，眉标、标题、署名、码全部压在图上。压得住靠这条渐变：
-            // 脸那一段几乎不加暗，到标题那一段已经到 0.88，白字落在浅色衣服或白墙上也不会糊掉。
-            { emit: { k: 'image', key: 'avatar', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' } } },
+            // 彩色整幅图铺满全张（有配图吃配图、没配图吃头像），眉标、标题、署名、码全部压在图上。
+            // 压得住靠这条渐变：图那一段几乎不加暗，到标题那一段已经到 0.88，
+            // 白字落在浅色衣服或白墙上也不会糊掉。
+            { emit: { k: 'image', key: { if: [{ truthy: { var: 'hasNote' } }, 'note', 'avatar'] }, x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' } } },
             {
               emit: {
                 k: 'grad', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' },

@@ -121,6 +121,18 @@ const i18n = {
     // 面板内管理那三串（站长 10-17）。问话里那个 {n} 吃服务端 GET 带回的 `note_count`，
     // 读不到那一档就回落到上面那句现网话术——报一个猜的篇数比不报更坏。
     catAddPh: '新增分类，空格分开',
+    // 站长 10-18 那两句「数量要做限制，最多 8 个包括私密分类」「数量超过就，输入框就提示要删除才能添加」
+    // 「分类名称最多 4 个汉字」。满那一档是**输入框那一格的占位话**（不点也看得见），
+    // 两句提示是在他按下完成／点空白那一步给的——不许静默吞掉他打的那几个字。
+    catAddFullPh: '满 {max} 个，先删一个',
+    catMaxToast: '分类最多 {max} 个，先删掉一个才能加',
+    catNameLimit: '分类名最多 {cjk} 个汉字或 {latin} 个字母',
+    // 私密那一格在管理态点下去不动（不给删、不给改名、不起拖），这句话挂在**那一枚上面**
+    // （站长 10-18「显示在对应的元素上面」；手机上没有鼠标可"划"⇒ 挂在他按下去那一下）。
+    catLockedPrivate: '私密分类固定在最后一格',
+    // 站长 10-18 先要过一枚「新增」芯片（「增加一个新增入口」），同一夜又打回：
+    // 「列表上怎么多了一个“新增”，有点多余啊，去掉」⇒ 那一串连同那一枚一起删净，
+    // 新增那一条口只剩管理态里那枚输入框（留着这两行字是防下一次有人把它补回来）。
     catDelBody: '这一格里有 {n} 篇，删掉会归到未分类。',
     catSaveFailed: '没存上：{names}',
     noCategories: '暂无分类',
@@ -531,6 +543,11 @@ const i18n = {
     deleteCategoryConfirm: 'Delete? Notes will become uncategorized',
     // 与中文侧同三串。占位那一句要放得进输入框，所以英文没有照"新增分类，空格分开"逐字写。
     catAddPh: 'New categories, space separated',
+    // 与中文那三串同一组（10-18 那两句：最多 8 个含私密、名称最多 4 个汉字；英文档我给的 10 个字母）。
+    catAddFullPh: 'max {max} · delete one',
+    catMaxToast: 'Up to {max} categories — delete one to add another.',
+    catNameLimit: 'Up to {cjk} Chinese characters or {latin} letters.',
+    catLockedPrivate: 'Private stays last',
     catDelBody: '{n} notes here move to uncategorized.',
     catSaveFailed: 'Not saved: {names}',
     noCategories: 'No categories yet',

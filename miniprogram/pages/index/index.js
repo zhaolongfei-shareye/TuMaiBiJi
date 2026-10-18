@@ -11,6 +11,7 @@ const { labelOf, bracketOf } = require('../../utils/catText.js')
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
+const noteImage = require('../../utils/noteImage.js')
 const mpAssets = require('../../utils/mpAssets.js')
 const { formatDate, formatDateTime, formatShortDate, formatWeekday } = require('../../utils/date.js')
 const bgTone = require('../../utils/imgBrightness.js')
@@ -1490,13 +1491,17 @@ Page({
         if (cat) note.category_name = labelOf(cat, this.data.lang)
       } catch (err) { /* 查不到就只写来源 */ }
     }
+    // 卡片大图位那一张（站长 10-18「把配图第一张取代之前的头像图片」）：也每次现读，
+    // 理由与上面"正文每次现读"是同一句——人在这一篇里删掉或换掉配图之后回到这扇弹窗，
+    // 画布不许还画上一张。取不到就是 null，大图位回退成头像，不影响这张卡出得出。
+    const noteImgPath = await noteImage.firstImage(noteId)
     if (cached) {
-      this._posterAssets = { noteId, note, token: cached.token, qrPath: cached.qrPath }
+      this._posterAssets = { noteId, note, token: cached.token, qrPath: cached.qrPath, noteImgPath }
       return
     }
     const share = await api.createShare(noteId, poster.readProfile().name)
     const qrPath = await this._downloadQR(share.token)
-    this._posterAssets = { noteId, note, token: share.token, qrPath }
+    this._posterAssets = { noteId, note, token: share.token, qrPath, noteImgPath }
   },
 
   _downloadQR(token) {
@@ -1543,9 +1548,11 @@ Page({
     const images = { qr: await poster.loadImage(canvas, a.qrPath, 3000) }
     const avatar = poster.cardPath()
     if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 5000)
+    // 大图位吃这一篇的第一张配图；解码成功才算"有配图"（hasNote 与 images.note 必须同源，见 poster.js）
+    if (a.noteImgPath) images.note = await poster.loadImage(canvas, a.noteImgPath, 5000)
     canvas.width = poster.W
     canvas.height = 750
-    const plan = poster.planPoster(ctx, a.note, this.data.posterTpl, profile, lang, { showQr: !this.data.noQr })
+    const plan = poster.planPoster(ctx, a.note, this.data.posterTpl, profile, lang, { showQr: !this.data.noQr, hasNote: !!images.note })
     // 成品外圈那一档纯黑只加在这里（MATTE 见 poster.js）：微信的图片面板是全黑底，
     // 卡片直边贴上去像被裁了一半。外圈跟着一起出，弹窗里预览到的就是递出去的那张。
     const outW = plan.width + poster.MATTE * 2
