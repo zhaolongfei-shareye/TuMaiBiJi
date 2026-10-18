@@ -296,6 +296,8 @@ const i18n = {
     // 私密那一枚置灰时挂在按钮下面那一行的理由（他给的原话，一字没改：「私密笔记不支持分享」）。
     // 这句话进不了按钮（十个字 240rpx > 202rpx），所以位置在按钮下面。
     privateNoShare: '私密笔记不支持分享',
+    // 站长 10-18「这类笔记，不能编辑（按钮置灰），不能分享，允许删除」——一句把三样都说清。
+    presetHint: '帮助文档不能编辑、不能分享，可以删除',
     keyPoints: '核心要点',
     tagsLabel: '标签',
     sourceLink: '来源链接',
@@ -408,7 +410,8 @@ const i18n = {
     sourceScreenshot: '截图识别',
     sourceManual: '亲自撰写',
     // §8.232 新用户出生那一篇预置笔记的来源标签。`source_type` 是 'preset' 时读这一串。
-    sourcePreset: '官方预置',
+    // 10-18 站长把它改念「帮助文档」（原话「官方预置，变成"帮助文档"」）——只改称呼，不新增分类格。
+    sourcePreset: '帮助文档',
     addCategoryPrompt: '请输入分类名',
     nameRequired: '名称不能为空',
     adding: '添加中...',
@@ -676,6 +679,7 @@ const i18n = {
     // stays one short word and the reason for the disabled state sits on the line below it.
     shareNote: 'Share',
     privateNoShare: 'Private notes can’t be shared',
+    presetHint: 'Help docs are read-only: no editing, no sharing. You can delete them.',
     keyPoints: 'Key Points',
     tagsLabel: 'Tags',
     sourceLink: 'Source Link',
@@ -755,7 +759,7 @@ const i18n = {
     sourceWebArticle: 'Web Article',
     sourceScreenshot: 'Screenshot',
     sourceManual: 'Written by me',
-    sourcePreset: 'Preset sample',
+    sourcePreset: 'Help doc',
     addCategoryPrompt: 'Enter category name',
     nameRequired: 'Name is required',
     adding: 'Adding...',

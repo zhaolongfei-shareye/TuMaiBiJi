@@ -7,10 +7,11 @@
 //    站长 10-02 在列表页撞过同一个形状）；
 // ③ 种子的落点与先后（挂在建号那一个分支、且排在邀请归因之后）——
 //    顺序反了或改成"名下没笔记就种"，表现是**所有邀请奖励从此结不出来**，接口一声不响；
-// ④ 不为这一篇开特殊分支：`preset` 只许出现在取数与结钱那几处判据里，
-//    编辑/私密/分享三条链路上出现它就是有人加了一格 if。
-//    ⚠ 10-14 起"删除"从这一条里出去了（站长「默认的不能删除」）：删除那一路**必须**有那一格 if，
-//    而且只许有那两格（一篇一张）。白名单按行给，不按文件给，见下面 GATE_OK 那段。
+// ④ 这一类多出来的三条闸只许开在那三张口上：编辑、分享、出卡片；删除那一路一格都不许有。
+//    ⚠ 10-14 起「删除」曾从"不许开分支"里出去（站长「默认的不能删除」），10-18 又整条翻案：
+//    他那句「允许删除」把那两道闸撤净，同时新加三道（不能编辑／不能分享／不生成卡片）。
+//    所以这一条从"扫字面量"改成"数闸的口"——见下面 GATES 那段。
+// ⑤ 后台一发布就刷存量，且刷新绑在写入那两只手上、不绑路由。
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
@@ -110,81 +111,131 @@ ck('归因那条不认的判据也改读 authored_count（同一条钱，第二�
 ck('页头那一列仍读 used_count（口径 6：新用户看到 1，不许被降成 0）',
   /def used_count/.test(QUOTA) && /"used": used/.test(QUOTA))
 
-// ---------- ④ 不许为它开特殊分支（删除那一路 10-14 起是**唯一**的例外） ----------
-// `preset` 只许出现在：种子读取、auth 的挂载点、结钱/归因的计数、卡片那一条"这一篇走同一条链"的注释里，
-// 以及下面 GATE_OK 白名单里那**几行**（一道闸两格：删那一篇、撤那一张）。
-// 白名单按行给、不按文件给：把整个 `notes.py` 放进 ALLOW，等于允许任何人以后在同一个文件里
-// 再加一格 `if preset: 跳过审核／跳过分享`，这把尺子一声不响。
-const ALLOW = ['app/core/auth.py', 'app/services/preset_note.py', 'app/services/quota.py', 'seed/preset_note.json']
-const GATE_OK = {
-  'app/api/routes/notes.py': [
-    /^from app\.services\.preset_note import/,
-    /^\s*if note\.source_type == PRESET_SOURCE_TYPE:$/,
-    /^\s*raise HTTPException\(status_code=400, detail=PRESET_NOTE_KEEP_MSG\)$/,
-  ],
-  'app/api/routes/cards.py': [
-    /^from app\.services\.preset_note import/,
-    /^\s*if note\.source_type == PRESET_SOURCE_TYPE:$/,
-    /^\s*raise HTTPException\(status_code=400, detail=PRESET_CARD_KEEP_MSG\)$/,
-  ],
-  'app/services/admin_stats.py': [
-    // 后台「数据」那一栏（10-15 融合这一期）：三行都是**只读聚合里的 where**，
-    // 语义正是上面 A2 那条口径"新增笔记不许把预置那篇算进去"，
-    // 不是给这一篇开一格行为分支（不跳审核、不跳分享、不特殊返回）。
-    /^from app\.services\.preset_note import/,
-    /^\s*\.where\(Note\.source_type != PRESET_SOURCE_TYPE\)$/,
-    /^\s*select\(func\.count\(\)\)\.select_from\(Note\)\.where\(Note\.source_type (!=|==) PRESET_SOURCE_TYPE\)$/,
-    // 10-16 A4 那三枚计数把 where 折成了多行（`_count(db, select(...).where(` 之后换行续条件），
-    // 条件那一行自己就是 `Note.source_type != PRESET_SOURCE_TYPE` 打头。仍然按行给、不放开整个文件：
-    // 这一条只认"以这个条件开头、后面跟的是取数条件或收尾括号"，行为分支那种写法（`if … == PRESET…:`）过不了。
-    /^\s*Note\.source_type != PRESET_SOURCE_TYPE\b[,)]/,
-  ],
-}
-const hits = []
-const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => {
-  const p = path.join(d, e.name)
-  if (e.isDirectory()) { if (e.name !== '__pycache__') walk(p); return }
-  if (!/\.(py|json)$/.test(e.name)) return
-  const rel = path.relative(path.join(ROOT, 'backend'), p)
-  if (ALLOW.includes(rel)) return
-  const src = fs.readFileSync(p, 'utf8')
-  src.split('\n').forEach((line, i) => {
-    // 只认这个枚举值本身：`WALLPAPER_PRESETS`（壁纸预设，09-24 就在了）里也含 "preset" 三个字母，
-    // 拿 /preset/i 扫会把无关的常量报成"为这一篇开了分支"。
-    if (!/(PRESET_SOURCE_TYPE|['"]preset['"])/.test(line) || /^\s*[#"]/.test(line.trim())) return
-    if ((GATE_OK[rel] || []).some((rx) => rx.test(line))) return
-    hits.push(`${rel}:${i + 1} ${line.trim().slice(0, 60)}`)
-  })
-})
-walk(path.join(ROOT, 'backend/app'))
-ck('编辑/私密/分享那几条链路上没有一格 `if preset`；删除那一路只有白名单里那两格（判据 4 改口之后）',
-  hits.length === 0, hits.join('　| ').slice(0, 300))
-
-// ---------- ④b 10-14「默认的不能删除」：那两格闸与念出原因的那三张嘴 ----------
+// ---------- ④ 这一类只多三格闸：编辑、分享、出卡片；删除那一路一格都不许有 ----------
+// 站长 10-18 那句「官方预置，变成"帮助文档"，然后这类笔记，不能编辑（按钮置灰），不能分享，允许删除」
+// 把 10-14 那条"不许为它开特殊分支"整条推翻——现在**就是要**为它开分支，只是只许开在那三张口上。
+// 判法跟着换：从"扫 `preset` 这个字面量出现在哪"改成"数每一张口上恰好有几格 `is_help_doc`"。
+// 前者在 10-18 这一改之后必然假红：播种、结钱计数、后台「数据」那三枚聚合、后台那一格注释里
+// 都还留着这个字面量，它们都不是"给这一篇开行为分支"。（第一版就是这么红了 4 条的。）
 const NOTES_PY = be('app/api/routes/notes.py')
 const CARDS_PY = be('app/api/routes/cards.py')
+const SHARES_PY = be('app/api/routes/shares.py')
 const PN_PY = be('app/services/preset_note.py')
-ck('删那一篇有闸：判据是播种时那个 source_type，不是"名下第一篇"（后者会误伤他自己写的第一篇）',
-  /if note\.source_type == PRESET_SOURCE_TYPE:\s*\n\s*raise HTTPException\(status_code=400, detail=PRESET_NOTE_KEEP_MSG\)/.test(NOTES_PY))
-ck('撤那一张有同一把闸（一篇一张，锁了卡片才算真锁住）',
-  /if note\.source_type == PRESET_SOURCE_TYPE:\s*\n\s*raise HTTPException\(status_code=400, detail=PRESET_CARD_KEEP_MSG\)/.test(CARDS_PY))
-ck('那两句原因只活一份（定义在 preset_note.py；两个 route 里出现中文字面量就是第二份真相）',
-  /PRESET_NOTE_KEEP_MSG = "/.test(PN_PY) && /PRESET_CARD_KEEP_MSG = "/.test(PN_PY)
-    && !/detail="[^"]*删不掉/.test(NOTES_PY + CARDS_PY))
+// 取一个 `def` 的函数体：从定义行往后，到下一个顶层 `@`／`def`／`class` 为止。
+// 锚点必须带那个换行、不能只靠 `^`：`rest.slice(1)` 的第 0 个字符也算"行首"，
+// 于是 `^def ` 会立刻匹配到被切开的那个函数自己那一行，量回来的是**空体**（10-18 第一版就红在这儿）。
+const pyBody = (src, name) => {
+  const m = new RegExp(`\\n(?:async )?def ${name}\\(`).exec(src)
+  if (!m) return ''
+  const rest = src.slice(m.index)
+  const next = rest.slice(1).search(/\n(@|def |async def |class )/)
+  return next < 0 ? rest : rest.slice(1, next + 1)
+}
+const GATES = [
+  ['编辑那一口 PUT', pyBody(NOTES_PY, 'update_note'), 'PRESET_EDIT_MSG'],
+  ['分享那一口 POST', pyBody(SHARES_PY, 'create_share'), 'PRESET_SHARE_MSG'],
+  ['出卡片那一口 POST', pyBody(CARDS_PY, 'put_note_card'), 'PRESET_CARD_MSG'],
+]
+GATES.forEach(([label, body, msg]) => ck(`${label} 恰好一格闸、挂在 400、念那一句`,
+  (body.match(/\bis_help_doc\(/g) || []).length === 1
+  && new RegExp(`raise HTTPException\\(status_code=400, detail=${msg}\\)`).test(body),
+  `${(body.match(/\bis_help_doc\(/g) || []).length} 格`))
+ck('删除那一路一格闸都没有（他那句「允许删除」；闸留着＝把他拍的规矩实现反了）',
+  !/is_help_doc|PRESET/.test(pyBody(NOTES_PY, 'delete_note')))
+ck('撤卡片那一路也没有闸（这一类本来就登记不出卡片，撤的动作不必特殊拦）',
+  !/is_help_doc|PRESET/.test(pyBody(CARDS_PY, 'drop_note_card')))
 ck('闸挂在 400 上，不挂 403／500（403 会被客户端念成"票坏了"去重登，500 会把它记进错误日志）',
-  !/status_code=403, detail=PRESET|status_code=500, detail=PRESET/.test(NOTES_PY + CARDS_PY))
+  !/status_code=(403|500), detail=PRESET/.test(NOTES_PY + CARDS_PY + SHARES_PY))
 // 注销那条路径不许被这道闸带累：人走了数据必须跟着走，那一趟按 user_id 整批清、不走 delete_note 这个口。
 ck('注销那一条不读这道闸（`deletion`／`v1_account` 里出现 PRESET 判据＝人走了他那一篇还留着）',
   !/PRESET/.test(be('app/api/routes/v1_account.py') + be('app/services/deletion.py')))
+// 站长这句只说了"不能编辑"，没说要连归类一起挡；而线上那个包里有一条**只发 category_id** 的 PUT
+// （`write.js` 只发真动过的那几栏），连归类一起挡＝打坏老包。这一条是我自己定的，单独钉着。
+const CF = (/CONTENT_FIELDS = \(([^)]*)\)/.exec(PN_PY) || [, ''])[1]
+ck('编辑闸只挡内容那几栏（闸的写法带 `and touches_content(...)`，不是无条件拦 PUT）',
+  /if is_help_doc\(db_note\) and touches_content\(update_data\):/.test(NOTES_PY))
+ck('内容那六栏的清单齐全、且不含 category_id（归类与置顶照旧放行）',
+  ['title', 'summary', 'tags', 'key_points', 'content', 'original_content'].every((f) => CF.includes(`"${f}"`))
+  && !/category_id|is_pinned/.test(CF), CF.trim().slice(0, 80))
+ck('三句原因只活一份（定义在 preset_note.py；三个 route 里出现中文字面量就是第二份真相）',
+  ['PRESET_EDIT_MSG', 'PRESET_SHARE_MSG', 'PRESET_CARD_MSG']
+    .every((n) => (PN_PY.match(new RegExp(`${n} = "`)) || []).length === 1)
+    && !/detail="[^"]*帮助文档/.test(NOTES_PY + CARDS_PY + SHARES_PY))
+ck('10-14 那两句「删不掉」的话术已从前后端退净（留着＝有人以为那两道闸还在）',
+  !/KEEP_MSG/.test(PN_PY + NOTES_PY + CARDS_PY + SHARES_PY
+    + read('pages/detail/detail.js') + read('pages/index/index.js') + read('utils/cardCloud.js')))
+
+// ---------- ④b 「后台更新后要新旧用户全量刷新」那一条绑在哪儿 ----------
+// 他选的是「无脑全覆盖」＋「不补：删了就没了」⇒ 刷新只许遍历库里还留着的那几行，
+// 且**不许顺手建行**（建成"删不掉的官方内容"就是违背他刚说的那句）。
+const RESYNC = pyBody(PN_PY, 'resync_all')
+ck('刷新绑在写入那两只手上（`save_seed`／`clear_seed` 各调一次），不绑在某个路由上',
+  /return resync_all\(db\)/.test(pyBody(PN_PY, 'save_seed'))
+  && /return resync_all\(db\)/.test(pyBody(PN_PY, 'clear_seed')))
+ck('刷新的遍历是"库里还有的行"，不是"所有账号"（后者＝替删掉的人补一篇）',
+  /db\.query\(Note\)\.filter\(Note\.source_type == PRESET_SOURCE_TYPE\)\.all\(\)/.test(RESYNC)
+  // 负向判据只认**调用形状**（`name(`／`db.add(`），不认光秃秃的名字：
+  // 这一格的 docstring 里就写着"新号那一路归 seed_note_for_new_user 管"，那是解释不是行为，
+  // 拿名字去扫注释会把一条写对了的实现读成红的（10-18 第一版红的就是这个）。
+  && !/seed_note_for_new_user\(/.test(RESYNC) && !/db\.add\(/.test(RESYNC))
+ck('五栏全覆盖、`original_content` 跟着正文走（不覆盖某栏＝库里留一份旧的那一栏）',
+  ['title', 'summary', 'tags', 'key_points', 'content', 'original_content']
+    .every((f) => new RegExp(`note\\.${f} = row\\[`).test(RESYNC)))
+ck('发布时顺手关掉这一类名下还开着的分享码（不关＝公开落地页继续供正文，而界面上那枚钮已经灰了）',
+  /close_shares\(db, note\.id\)/.test(RESYNC) && /from app\.services\.sharing import close_shares/.test(PN_PY))
+ck('回体带这一趟刷了几篇、关了几张码（后台那一屏要念得出，不然"发布了"三个字没有读数）',
+  /return \{"refreshed": len\(notes\), "closed_shares": closed\}/.test(RESYNC))
 const DETAIL_JS = read('pages/detail/detail.js')
 const IX_JS = read('pages/index/index.js')
 const CC_JS = read('utils/cardCloud.js')
-ck('删那一篇被拦下时，详情页与首页两处都把服务端那句原样念出来（只回"删除失败"＝按钮看起来坏了）',
+ck('删除被拦下时（服务端还有别的理由会拦），详情页与首页两处都把那句原样念出来（只回"删除失败"＝按钮看起来坏了）',
   (DETAIL_JS.match(/\(err\.data && err\.data\.detail\) \|\| t\('deleteFailed', lang\)/g) || []).length === 1
     && (IX_JS.match(/\(err\.data && err\.data\.detail\) \|\| t\('deleteFailed', lang\)/g) || []).length === 1)
 ck('撤那一张被拦下时走同一张嘴：`dropServer` 把 detail 交回调用方，没原因的那种才念"没连上后端"',
   /if \(typeof detail === 'string' && detail\) return detail/.test(CC_JS)
     && /typeof dropped === 'string' \? dropped : t\('cardDropOffline', lang\)/.test(IX_JS))
+
+// ---------- ④c 客户端那一半：置灰两枚、放开一枚、话一句 ----------
+// 「按钮置灰」只是服务端那三道闸的**表现**；这一段的判据是"表现和闸说的是同一件事"——
+// 灰了但服务端放行（老包不吃灰）或没灰但服务端拒（点了报 400），两边都是他撞一次才知道的 bug。
+const VIEWS = [
+  ['详情页', read('pages/detail/detail.wxml'), 'note', 'onEdit', 'onCardCell', 'onDelete'],
+  ['首页详情窗', read('pages/index/index.wxml'), 'detailNote', 'onSheetEdit', 'onSheetShare', 'onSheetDelete'],
+]
+const VIEWS_JS = [
+  ['详情页', DETAIL_JS, ['onEdit', 'onCardCell'], ['onDelete']],
+  ['首页详情窗', IX_JS, ['onSheetEdit', 'onSheetShare'], ['onSheetDelete']],
+]
+const RE = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+// 取一个页面方法的方法体：从 `  name(` 往后到下一个 `  },`（两空格缩进的那一层收尾）。
+const jsBody = (src, name) => {
+  const m = new RegExp(`\\n  (?:async )?${RE(name)}\\(`).exec(src)
+  if (!m) return ''
+  const rest = src.slice(m.index + 1)
+  const end = rest.slice(1).search(/\n  \},?\n/)
+  return end < 0 ? rest : rest.slice(0, end + 1)
+}
+VIEWS.forEach(([label, src, obj, edit, share, del]) => {
+  ck(`${label}：编辑那一枚按 ${obj}.is_preset 置灰`,
+    new RegExp(`\\{\\{${RE(obj)}\\.is_preset \\? 'disabled' : ''\\}\\}" [^>]*bindtap="${RE(edit)}|\\{\\{${RE(obj)}\\.is_preset \\? 'disabled' : ''\\}\\}" [^>]*catchtap="${RE(edit)}"`).test(src))
+  ck(`${label}：分享那一枚与私密那一格并列置灰`,
+    new RegExp(`\\{\\{\\(${RE(obj)}\\.is_private \\|\\| ${RE(obj)}\\.is_preset\\) \\? 'disabled' : ''\\}\\}`).test(src))
+  ck(`${label}：删除那一枚没被置灰（他那句「允许删除」；客户端加灰＝服务端撤了闸屏上还锁着）`,
+    src.split('\n').filter((l) => l.includes(`"${del}"`)).every((l) => !/is_preset/.test(l)))
+  ck(`${label}：这一类那一句提示只排在私密那一支之后（同一篇不会念出两句相反的话）`,
+    new RegExp(`wx:elif="\\{\\{${RE(obj)}\\.is_preset\\}\\}"[^>]*>\\{\\{t\\.presetHint\\}\\}`).test(src))
+})
+VIEWS_JS.forEach(([label, src, gated, free]) => {
+  gated.forEach((name) => ck(`${label}：${name} 的 guard 里读 is_preset 并早退（灰了还要挡，点击态靠这半）`,
+    /\bis_preset\b/.test(jsBody(src, name)) && /\breturn\b/.test(jsBody(src, name)), jsBody(src, name) ? '' : '没抓到方法体'))
+  free.forEach((name) => ck(`${label}：${name} 的 guard 里不许有 is_preset`, !/\bis_preset\b/.test(jsBody(src, name))))
+})
+ck('两本字典都有 presetHint，且那句同时说到"不能编辑／不能分享／可以删除"三件事（少一件就是半句假话）',
+  [zh, en].every((d) => d.presetHint && /不能编辑|read-only/.test(d.presetHint)
+    && /不能分享|no sharing/.test(d.presetHint) && /可以删除|You can delete/.test(d.presetHint)),
+  `${zh.presetHint} / ${en.presetHint}`)
+ck('叫法两本字典都改成「帮助文档」这一族（旧的"官方预置/产品说明"那一句不许还留在来源标签上）',
+  [zh, en].every((d) => /帮助文档|Help doc/.test(d.sourcePreset)), `${zh.sourcePreset} / ${en.sourcePreset}`)
 
 // ---------- ⑤ 首启那张卡片的触发是一次性的、静默的、排在列表之后 ----------
 const APP = read('app.js'), IX = read('pages/index/index.js')

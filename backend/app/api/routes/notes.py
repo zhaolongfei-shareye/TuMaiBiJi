@@ -32,7 +32,7 @@ from app.services.sharing import (
     sync_snapshot,
 )
 from app.services import quota
-from app.services.preset_note import PRESET_NOTE_KEEP_MSG, PRESET_SOURCE_TYPE
+from app.services.preset_note import PRESET_EDIT_MSG, is_help_doc, touches_content
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -371,7 +371,15 @@ def update_note(
         raise HTTPException(status_code=404, detail="笔记不存在或已删除")
     
     update_data = note.model_dump(exclude_unset=True)
-    
+
+    # 官方那一篇内容改不了（站长 10-18「这类笔记，不能编辑（按钮置灰）」）。闸必须在服务端：
+    # 界面上那一枚灰了挡不住线上那个老包，也挡不住直接打接口。
+    # **只挡内容那五栏，`category_id` 仍放行**：`pages/write/write.js:290` 只发"真动过的那几栏"，
+    # 线上那个包里有一条单纯挪分类的 PUT，把它一起挡掉等于把老包的归类功能打坏（那句"私密篇挪进私密
+    # 分类要顺手清卡片"的接线也跟着断）。新包里这一篇的编辑钮整个灰、进不去那一屏，所以界面上改不了。
+    if is_help_doc(db_note) and touches_content(update_data):
+        raise HTTPException(status_code=400, detail=PRESET_EDIT_MSG)
+
     # Validate category ownership if provided
     if "category_id" in update_data and update_data["category_id"] is not None:
         category = (
@@ -480,14 +488,10 @@ def delete_note(
     if not note:
         raise HTTPException(status_code=404, detail="笔记不存在或已删除")
 
-    # 站长 10-14「默认的不能删除」：§8.232 播种那一篇自带的产品说明删不掉。
-    # 闸必须在服务端——客户端那一层挡不住线上老版本，也挡不住直接打接口；判据是播种时那个
-    # `source_type == "preset"`，不是"名下第一篇"（那种写法会因为他改过标题、换过分类而误伤别人的笔记）。
-    # 注销账号那条路径**不受这一条影响**（`v1_account.delete_account` 按 user_id 整批清，不走这一个口），
-    # 否则就成了"人走了数据留着"，那是另一件事。
-    if note.source_type == PRESET_SOURCE_TYPE:
-        raise HTTPException(status_code=400, detail=PRESET_NOTE_KEEP_MSG)
-    
+    # 这一类**删得掉**（站长 10-18 改口，作废 10-14 那句「默认的不能删除」）。
+    # 删了也不会回来：播种只挂在建号那一个分支，后台那次全量刷新（`preset_note.resync_all`）
+    # 只改还留着的那几行，不替删掉的人补一行。
+
     # Delete related shares and jobs first to avoid foreign key constraint errors
     db.query(Share).filter(Share.note_id == note_id).delete()
     db.query(Job).filter(Job.note_id == note_id).delete()

@@ -44,15 +44,18 @@
          「置顶」那一枚 10-03 跟着列表一起撤了——列表已经不再显示置顶状态，按了只有一句话回应、
          笔记却会一直顶在最前面且没法解开，那是个只进不出的门。 -->
     <view class="action-bar">
-      <view class="icon-btn" bindtap="onEdit">{{t.edit}}</view>
+      <view class="icon-btn {{note.is_preset ? 'disabled' : ''}}" bindtap="onEdit">{{t.edit}}</view>
       <!-- 中间这一枚与详情窗同一件事（站长 10-17 深夜「编辑和删除中间增加一按钮，分享笔记」）。
            这一页没有画布，所以办事的口就是这一页原有的那一个 `onCardCell`：
            这篇留过卡片 → 拉那一张的大图；一张都没有 → 去笔记卡片页出图。
            私密篇置灰、理由写在这行下面，与详情窗同一套。 -->
-      <view class="icon-btn {{note.is_private ? 'disabled' : ''}}" bindtap="onCardCell">{{t.shareNote}}</view>
+      <view class="icon-btn {{(note.is_private || note.is_preset) ? 'disabled' : ''}}" bindtap="onCardCell">{{t.shareNote}}</view>
       <view class="icon-btn danger" bindtap="onDelete">{{t.delete}}</view>
     </view>
     <text wx:if="{{note.is_private}}" class="dt-no-share">{{t.privateNoShare}}</text>
+    <!-- 官方那一篇不能编辑也不能分享、但删得掉（站长 10-18）。这一行只在既不是私密、也没被私密那句
+         挡过的时候念，两条各占一格不叠加——上面那排三枚按钮等宽，字塞进按钮里会折行、整排高低不齐。 -->
+    <text wx:elif="{{note.is_preset}}" class="dt-no-share">{{t.presetHint}}</text>
     <!-- 海报上的码不过期，所以这一行是用户唯一能把已公开内容收回来的入口；只在真的公开着时出现 -->
     <view wx:if="{{shared && !note.is_private}}" class="share-state">
       <text class="state-hint">{{t.sharedNow}}</text>

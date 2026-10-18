@@ -329,6 +329,9 @@ Page({
       // 不用"有没有昵称"——自己分享出去的那篇，服务端那份快照是自己的名字，
       // 画在自己那一行上是噪声。
       n.is_import = n.source_type === 'share_import'
+      // 官方那一篇（屏上念「帮助文档」，站长 10-18）：编辑与分享两枚在详情窗里对它置灰、点了不办事。
+      // 判据用服务端那个 source_type，不靠标题也不靠"名下第一篇"。
+      n.is_preset = n.source_type === 'preset'
       n.who = n.is_import ? (n.share_author_name || '') : ''
       // 私密判据：分类名等于"私密"。跟后端 get_note、录入侧那道拦截是同一条口径（utils/privateGate.js）。
       n.is_private = isPrivate(nameOf[n.category_id])
@@ -1080,7 +1083,7 @@ Page({
   // 服务端那个 is_pinned 与 /pin 接口还在，只是客户端再没有写它的路径）。
   onSheetEdit() {
     const note = this.data.detailNote
-    if (!note) return
+    if (!note || note.is_preset) return
     // 出门前把窗收掉：改完回来 onShow 会重载列表，窗留着就是读旧内容。
     // 但记下这一篇，重排完在 onShow 里把窗重新开回来（取消没改也一样回窗，不是回列表）。
     this._backToDetail = note.id
@@ -1090,11 +1093,11 @@ Page({
 
   // 中间那一枚「分享」（站长 10-17 深夜：「点击切换卡片大图窗口」；10-18 凌晨他把那四个字改成两个字）——
   // 办事的还是那一个口 `_openPosterFor`，右上那一格（有卡片时）与这一枚绑同一个函数，
-  // 不另开第二条出图链。私密篇这一枚在屏上是置灰的，这里那道 `is_private` 是它背后那一扇：
+  // 不另开第二条出图链。私密篇与官方那一篇在这一枚上都是置灰的，这里那两扇是它们背后那一层：
   // 置灰只是画，挡住了才是真挡（服务端 cards.py／shares.py 同一句，客户端不许自己客气）。
   onSheetShare() {
     const note = this.data.detailNote
-    if (!note || note.is_private) return
+    if (!note || note.is_private || note.is_preset) return
     return this._openPosterFor(note)
   },
 

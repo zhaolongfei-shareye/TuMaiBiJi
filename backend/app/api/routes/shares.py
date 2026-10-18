@@ -17,6 +17,7 @@ from app.models.asset import Asset, not_failed
 from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
+from app.services.preset_note import PRESET_SHARE_MSG, is_help_doc
 from app.services.sharing import (
     active_share_by_token,
     active_shares,
@@ -101,6 +102,11 @@ def create_share(
     # 一个匿名可读的公开页，"私密"这句承诺当场作废，而且撤不回来（详情页也进不去）。
     if is_private_note(note, private_category_ids(db, user.id)):
         raise HTTPException(status_code=400, detail="私密笔记不能分享")
+    # 官方那一篇不能分享（站长 10-18「这类笔记……不能分享」）。与上面那条私密闸同一个形状：
+    # 界面上那一枚对这一类整个不渲染，接口不挡就等于没挡——老包还在外面跑，
+    # 而且 `POST /api/shares {note_id}` 一张匿名可读的公开页是发得出来的。
+    if is_help_doc(note):
+        raise HTTPException(status_code=400, detail=PRESET_SHARE_MSG)
     author = _author_name(req)
 
     # 一条笔记只留一个有效分享：卡片上的码是按 token 生成的，反复点"生成分享图"

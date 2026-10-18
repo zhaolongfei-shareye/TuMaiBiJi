@@ -16,13 +16,20 @@
    从现网 appInfo.js / about.js 抄的），所以这一条既不吃提炼那次静默降级，
    也不在注册链路上多烧一次混元调用。
 
-它**不是**一种新笔记类型：库里就是一行普通的 `notes`，能改、能设私密、能分享，
-读写那几条链都不为它开分支。唯一的痕迹是 `source_type == "preset"`——
-那本来只是为了让"他动笔的第一篇"和"他名下已经有几篇"这两句判据还能分得开。
+它**不是**一种新笔记类型：库里就是一行普通的 `notes`，唯一的痕迹是 `source_type == "preset"`——
+那本来只是为了让"他动笔的第一篇"和"他名下已经有几篇"这两句判据还能分得开。10-18 起这一条痕迹
+成了**这一类的身份**：屏上念「帮助文档」，官方写的、用户改不了。
 
-**10-14 起多一个例外：那一篇删不掉，它名下那张卡片也撤不掉**（站长「默认的不能删除」）。
-闸挂在下面那两个常量上，由 `delete_note` 与 `drop_note_card` 两个口各引一次；
-除这两处之外它和用户自建笔记一模一样（§8.232 判据 4 里"能删"那半句从他改口那天起作废）。
+**10-18 站长把这一类的规矩整批改了**（「官方预置，变成"帮助文档"，然后这类笔记，不能编辑（按钮置灰），
+不能分享，允许删除。然后后台更新后，要新旧用户全量刷新」），四条各自落点：
+- **允许删除**——10-14 那句「默认的不能删除」作废，`delete_note` 与 `drop_note_card` 那两道闸都撤了。
+  撤闸不能顺带撤掉另一条：**删了不许复活**（§8.232 判据 2）仍然成立，播种只挂在建号那一个分支上，
+  全量刷新只改**还留着的那几行**，绝不替删掉的人补一行（他这一句选的是"删了就没了"）。
+- **不许编辑／不许分享／不许生成卡片**——闸写在服务端（见下面那三句话术与三个调用点），
+  界面上按钮置灰只是表现：老包还在外面跑，接口不挡就等于没挡。
+- **后台一发布就全量刷新**——`resync_all` 按当前生效那份重写所有 `preset` 行的五栏，新旧账号一起刷。
+  他选的是"无脑全覆盖"：这一类从此没人能编辑，所以不存在覆盖掉用户自己写的东西那种风险。
+  停用那一栏也算一次更新（生效值换回包里那份），所以两条路都跟着刷。
 
 **10-18 起这份内容归后台管**（站长「默认笔记请在管理后台配置，我可以编辑修改，日后更新不需要发版」）：
 生效值存在 `mp_settings` 那一行（kind=`preset_note`），播种读的是**库里那一份**，库里没有或停用了
@@ -38,16 +45,32 @@ from app.core.errors import UserError
 from app.models.mp_asset import KIND_PRESET_NOTE
 from app.models.note import Note
 from app.services import mp_assets
+from app.services.sharing import close_shares
 
 SEED_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "seed", "preset_note.json")
 PRESET_SOURCE_TYPE = "preset"
 
-# 站长 10-14：「默认笔记，和默认卡片有没有做……然后默认的不能删除」。
-# 那两句要说给用户听的话只活在这一处：删笔记与撤卡片两个口共用，两处各写一遍迟早一边改了另一边没改。
-# 判据就是播种时那个 `source_type == "preset"`——不另起一列，也不靠"名下第一篇"猜（那种写法会
-# 因为他改过标题、换过分类而误伤别人的笔记）。
-PRESET_NOTE_KEEP_MSG = "自带那一篇是产品说明，删不掉；要改内容可以直接编辑"
-PRESET_CARD_KEEP_MSG = "自带那一篇的卡片删不掉"
+# 站长 10-18 那一改之后，这一类只剩三句"不许"，每句只活在这一处，三个口各引一次。
+# （10-14 那两句「删不掉」的提示随那两道闸一起删了，别在别处再写第四份。）
+PRESET_EDIT_MSG = "帮助文档是官方写的那一篇，内容改不了"
+PRESET_SHARE_MSG = "帮助文档是官方写的那一篇，不能分享"
+PRESET_CARD_MSG = "帮助文档是官方写的那一篇，不生成卡片"
+
+# 编辑那一道闸挡的是"改内容"这五栏。**不挡分类与置顶**：他这句说的是"不能编辑"，
+# 而把自己名下的一篇归到哪一格、要不要钉在顶上，那是他整理自己的库，不是改官方那份内容。
+# 这一条我没问过他，判据里单独钉着，要连分类一起挡就说一句。
+CONTENT_FIELDS = ("title", "summary", "tags", "key_points", "content", "original_content")
+
+
+def is_help_doc(note) -> bool:
+    """这一篇是不是官方那一篇。判据只有播种时那个 `source_type`，
+    不靠"名下第一篇"或标题猜（那种写法会误伤用户自己写的笔记）。"""
+    return getattr(note, "source_type", None) == PRESET_SOURCE_TYPE
+
+
+def touches_content(fields) -> bool:
+    """这一次 PUT 里有没有内容那五栏。"""
+    return bool(set(fields) & set(CONTENT_FIELDS))
 
 
 def seed_row(path: str = SEED_PATH) -> dict:
@@ -134,22 +157,50 @@ def clean_seed(value) -> dict:
     }
 
 
+def resync_all(db: Session) -> dict:
+    """按当前生效那一份重写库里所有 `preset` 行——站长 10-18「后台更新后，要新旧用户全量刷新」。
+
+    三件事钉死在这一处，别分头写：
+    1. **只改还留着的那几行**（他选的是"删了就没了"）：删掉的人**不会**在这里被补一篇，
+       新号那一路归 `seed_note_for_new_user` 管，两条路各管各的，混在一起就变成"删不掉的官方内容"。
+    2. **无脑全覆盖五栏**（他选的那条）＋ `original_content` 跟着正文走（播种时两处同一份，这里也同一份）。
+    3. 这一类从此不能分享，所以**顺手把它名下还开着的分享码关掉**——不关的话公开落地页继续供正文，
+       而界面上那一枚分享钮已经灰了，用户再没有第二个入口能收回它。（`notes.py` 里"改成私密顺手关码"
+       就是同一条理由，照它做。）
+    """
+    row = live_seed(db)
+    notes = db.query(Note).filter(Note.source_type == PRESET_SOURCE_TYPE).all()
+    closed = 0
+    for note in notes:
+        note.title = row["title"]
+        note.summary = row["summary"]
+        note.tags = row["tags"]
+        note.key_points = row["key_points"]
+        note.content = row["content"]
+        note.original_content = row["content"]
+        closed += close_shares(db, note.id)
+    db.commit()
+    return {"refreshed": len(notes), "closed_shares": closed}
+
+
 def save_seed(db: Session, value) -> dict:
+    """存生效值，**并顺手把存量刷一遍**（刷新绑在写入上，不绑在某个路由上：多开一个写入口也不会漏刷）。"""
     payload = clean_seed(value)
     row = mp_assets.setting_row(db, KIND_PRESET_NOTE, create=True)
     row.text_value = payload
     # 与文案栏同一条：这一栏永远不指图片行，免得"两半都填了一点"那种状态在库里存在。
     row.asset_id = None
     db.commit()
-    db.refresh(row)
-    return payload
+    return resync_all(db)
 
 
-def clear_seed(db: Session) -> None:
-    """停用＝写回 NULL，下一个新号落回包里那份 JSON。留行不留值，与 `clear_text` 同一条口径。"""
+def clear_seed(db: Session) -> dict:
+    """停用＝写回 NULL，下一个新号落回包里那份 JSON。留行不留值，与 `clear_text` 同一条口径。
+    停用也是一次"生效值变了"，所以存量照样跟着刷回包里那一份。"""
     row = mp_assets.setting_row(db, KIND_PRESET_NOTE, create=True)
     row.text_value = None
     db.commit()
+    return resync_all(db)
 
 
 def seed_row_from_db(db: Session) -> dict | None:

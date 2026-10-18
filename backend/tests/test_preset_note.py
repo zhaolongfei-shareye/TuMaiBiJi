@@ -105,37 +105,34 @@ def test_第二次登录不许再种第二篇(client, db, monkeypatch):
 def test_删掉预置那一篇之后_再冷启三次也不许回来(client, db, monkeypatch):
     """§8.232 判据 2 的唯一证明：种子挂在建号那一个分支上，不是挂在登录回调上。
 
-    ⚠ 10-14 起这一篇**从接口删不掉了**（站长「默认的不能删除」，见下面两条），所以这里改成
-    直接从库里抹掉那一行。这不影响这一条证明的东西——它判的是"名下没有预置篇了，再登录会不会补一篇"，
-    抹掉的方式是 API 还是 ORM 与那个分支无关。用 API 删反而会被新那道闸挡成 400。
+    10-18 之前这一条只能从库里抹那一行（那一道"删不掉"的闸把 API 那条路挡成 400）；
+    闸撤了之后这里改走**用户真能走的那条路**（`DELETE /api/notes/{id}`），判据本身没变：
+    名下没有这一篇了，再登录会不会补一篇。
     """
     first = _login(client, monkeypatch, "pm-kill-3")
-    s = _reload(db)
-    row = s.query(Note).filter(Note.id == first["seeded_note_id"]).one()
-    s.delete(row)
-    s.commit()
+    headers = _bearer(first["token"])
+    got = client.delete(f"/api/notes/{first['seeded_note_id']}", headers=headers)
+    assert got.status_code == 200, got.text
     for _ in range(3):
         resp = _login(client, monkeypatch, "pm-kill-3")
         assert resp["seeded_note_id"] is None
     assert _notes_of(db, "pm-kill-3") == []
 
 
-def test_那一篇删不掉_接口回那一句而且行还在(client, db, monkeypatch):
-    """站长 10-14「默认的不能删除」：闸在服务端，回体带一句能念给人听的原因。
+def test_那一篇现在删得掉了_页头那一列跟着归零(client, db, monkeypatch):
+    """站长 10-18「允许删除」——10-14 那句「默认的不能删除」作废，这一条就是那两句旧判据的反面。
 
-    钉三样：状态码是 400（不是 403／500——403 会被客户端念成"票坏了"去重登）、
-    那句原因是 `preset_note.PRESET_NOTE_KEEP_MSG` 那一枚（客户端原样当吐司念，两处不许各写一遍）、
-    库里那一行还在（只回一句话、把行删了，是最坏的那一种组合）。
+    钉两样：状态码是 200 且那一行真没了（只回一句话、把行留着，或反过来都算红）；
+    页头那一列跟着归零——它判的是"名下有几篇"，这一篇删掉了就该减一名。
+    "删完之后不许复活"那一半由上面 `test_删掉预置那一篇之后_再冷启三次也不许回来` 钉，这里不重复。
     """
     resp = _login(client, monkeypatch, "pm-keep-1")
     headers = _bearer(resp["token"])
-    nid = resp["seeded_note_id"]
-    got = client.delete(f"/api/notes/{nid}", headers=headers)
-    assert got.status_code == 400, got.text
-    assert got.json()["detail"] == preset_note.PRESET_NOTE_KEEP_MSG, got.json()
-    assert [n.id for n in _notes_of(db, "pm-keep-1")] == [nid]
-    # 页头那一列也不许跟着掉：它判的是"名下有几篇"，不是"删得掉几篇"
     assert client.get("/api/user/quota", headers=headers).json()["used"] == 1
+    got = client.delete(f"/api/notes/{resp['seeded_note_id']}", headers=headers)
+    assert got.status_code == 200, got.text
+    assert _notes_of(db, "pm-keep-1") == []
+    assert client.get("/api/user/quota", headers=headers).json()["used"] == 0
 
 
 def test_他自己写的那一篇照旧删得掉(client, db, monkeypatch):
@@ -156,24 +153,25 @@ def test_他自己写的那一篇照旧删得掉(client, db, monkeypatch):
     assert [n.id for n in _notes_of(db, "pm-keep-2")] == [resp["seeded_note_id"]]
 
 
-def test_那一篇的卡片撤不掉_普通那篇的卡片照旧撤得掉(client, db, monkeypatch):
-    """同一把闸的第二半：「默认的不能删除」说的是那一篇，也说的是那一张。
+def test_那一篇登记不出卡片_普通那篇照旧登记得出来(client, db, monkeypatch):
+    """站长 10-18「不能分享」那一句里点的其中一条：这一类的卡片图也一起撤。
+    闸写在服务端那个 POST 口——界面上那一枚对这一类不渲染，接口不挡就等于没挡。
 
-    代价记在台账 §8.236：一篇一张，而界面上"换一套模板"是先删再画 ⇒ 这一张会把预置那篇的模板钉死。
-    这一条同时钉住"只锁那一篇的卡片"——他自己那篇的卡片必须照旧撤得掉。
+    反向那半不许省：他自己那篇必须照旧登记得出来。一杆子打翻就是把手册外所有笔记的卡片堵死。
+    （10-14 那道"卡片撤不掉"的闸随「允许删除」一起撤了，这一类既然登记不出来就没有残留状态要挡，
+    所以这里不再测 DELETE。）
     """
     resp = _login(client, monkeypatch, "pm-keep-3")
     headers = _bearer(resp["token"])
     uid = resp["user_id"]
     nid = resp["seeded_note_id"]
-    assert client.post(f"/api/notes/{nid}/card", headers=headers,
-                       json={"file_id": f"cloud://tumaibiji.abc/cards/preset-{nid}.jpg",
-                             "tpl": "classic", "no_qr": False}).status_code == 200
 
-    got = client.delete(f"/api/notes/{nid}/card", headers=headers)
+    got = client.post(f"/api/notes/{nid}/card", headers=headers,
+                      json={"file_id": f"cloud://tumaibiji.abc/cards/preset-{nid}.jpg",
+                            "tpl": "classic", "no_qr": False})
     assert got.status_code == 400, got.text
-    assert got.json()["detail"] == preset_note.PRESET_CARD_KEEP_MSG, got.json()
-    assert client.get(f"/api/notes/{nid}/card", headers=headers).json()["card"], "那一行不许被撤掉"
+    assert got.json()["detail"] == preset_note.PRESET_CARD_MSG, got.json()
+    assert client.get(f"/api/notes/{nid}/card", headers=headers).json()["card"] is None, "不该留下行"
 
     s = _reload(db)
     mine = Note(user_id=str(uid), title="他自己写的一篇", content="正文", source_type="manual")
@@ -255,12 +253,18 @@ def test_预置篇存在时他自己写的第一篇_邀请人那十仍然结得�
     assert latest == after, (after, latest)
 
 
-def test_那一篇走的是普通笔记那条链(client, db, monkeypatch):
-    """§8.232 判据 4：能读、能改、能分享，服务端不为它开特殊分支。
+def test_这一类比普通笔记多三条闸_读与归类与删照旧走得通(client, db, monkeypatch):
+    """站长 10-18「不能编辑（按钮置灰），不能分享」：三条闸都必须在服务端，
+    界面上那一枚灰只是表现——线上那个老包不吃客户端的灰，直接打接口那条路也照样得拒。
 
-    ⚠ 这一条原来还写着"能删"——10-14 站长改口「默认的不能删除」，那半句作废，
-    删的那一半由上面 `test_那一篇删不掉_接口回那一句而且行还在` 钉。除"删"之外仍然没有分支。
+    反向那几条同样钉着，一杆子打翻是最坏的那种写法：详情照回、单纯挪分类照放行、删也照删
+    （删那一半由上面 `test_那一篇删得掉了_而且删完不再补回来` 钉）。
+    `category_id` 为什么必须放行：`pages/write/write.js:290` 只发"真动过的那几栏"，
+    线上那个包里有一条只带 `category_id` 的 PUT，把它一起挡掉等于把老包的归类功能打坏。
     """
+    from app.models.category import Category
+    from app.models.share import Share
+
     resp = _login(client, monkeypatch, "pm-plain-1")
     headers = _bearer(resp["token"])
     nid = resp["seeded_note_id"]
@@ -268,12 +272,42 @@ def test_那一篇走的是普通笔记那条链(client, db, monkeypatch):
     got = client.get(f"/api/notes/{nid}", headers=headers)
     assert got.status_code == 200 and got.json()["source_type"] == preset_note.PRESET_SOURCE_TYPE
 
-    put = client.put(f"/api/notes/{nid}", headers=headers, json={"title": "改过的标题"})
-    assert put.status_code == 200 and put.json()["title"] == "改过的标题", put.text
+    edit = client.put(f"/api/notes/{nid}", headers=headers, json={"title": "改过的标题"})
+    assert edit.status_code == 400, edit.text
+    assert edit.json()["detail"] == preset_note.PRESET_EDIT_MSG
+    assert _reload(db).query(Note).filter(Note.id == nid).one().title != "改过的标题"
 
     share = client.post("/api/shares/", headers=headers, json={"note_id": nid})
-    assert share.status_code == 200, share.text
-    assert share.json().get("token")
+    assert share.status_code == 400, share.text
+    assert share.json()["detail"] == preset_note.PRESET_SHARE_MSG
+    assert _reload(db).query(Share).filter(Share.note_id == nid).count() == 0, "拒了却留了一行"
+
+    s = _reload(db)
+    cat = Category(user_id=str(resp["user_id"]), name="pytest 挪去的那一格")
+    s.add(cat)
+    s.commit()
+    move = client.put(f"/api/notes/{nid}", headers=headers, json={"category_id": cat.id})
+    assert move.status_code == 200, move.text
+    assert _reload(db).query(Note).filter(Note.id == nid).one().category_id == cat.id
+
+
+def test_他自己写的那一篇照旧能改能分享(client, db, monkeypatch):
+    """三条闸的反向对照：判据只认 `source_type`，普通那一篇一个字都不受影响。
+
+    把闸写成"名下第一篇"或"id 最小的那条"，这一条会红——那正是最容易写错的形状：
+    他自己那一篇恰好也占那个位置，从此他改不了、也分享不了自己写的东西。
+    """
+    resp = _login(client, monkeypatch, "pm-plain-2")
+    headers = _bearer(resp["token"])
+    s = _reload(db)
+    mine = Note(user_id=str(resp["user_id"]), title="他自己写的一篇", content="正文",
+                source_type="manual")
+    s.add(mine)
+    s.commit()
+    assert client.put(f"/api/notes/{mine.id}", headers=headers,
+                      json={"title": "改过的标题"}).status_code == 200
+    assert client.post("/api/shares/", headers=headers,
+                       json={"note_id": mine.id}).status_code == 200
 
 
 def test_种子读不出来时登录照样成(client, db, monkeypatch):
@@ -356,7 +390,7 @@ def test_后台填过之后新号种的是库里那一份(client, db, monkeypatc
         GOOD["title"], GOOD["summary"], GOOD["tags"], GOOD["key_points"]
     )
     assert got.content == GOOD["content"] and got.original_content == got.content
-    # 仍然走的是预置那一条：删不掉那道闸吃的是 source_type，不是内容。
+    # 这一类的身份判据是 `source_type`，不是内容：种的是后台那一份，它仍然是官方那一篇。
     assert got.source_type == preset_note.PRESET_SOURCE_TYPE
 
 
@@ -370,15 +404,99 @@ def test_停用之后新号落回包里那一份(client, db, monkeypatch, seed_c
     assert got.title == seed["title"], "停用没落回包里那份"
 
 
-def test_改后台不回头改已经种下去的那一篇(client, db, monkeypatch, seed_clean):
-    """这一条是这批的正面：生效面只往前。已经种下去的那一篇属于那个用户，后台改不动它。"""
-    _login(client, monkeypatch, "pm-cfg-3")
-    before = _notes_of(db, "pm-cfg-3")[0].title
+def test_后台一发布就刷存量_新老账号那一篇都跟着变(client, db, monkeypatch, seed_clean):
+    """站长 10-18「后台更新后，要新旧用户全量刷新」——这一条把 10-15 立的"只往前不回头"推翻了。
+
+    先种一个老号（拿到的是包里那份），再让后台发布一份新的，然后回读那一行：
+    五栏全部等于后台那一份，`original_content` 跟着正文走。
+    """
+    _login(client, monkeypatch, "pm-sync-1")
+    before = _notes_of(db, "pm-sync-1")[0]
+    assert before.title == preset_note.seed_row()["title"]      # 起手确实是包里那份
     h = _admin_h(client, monkeypatch)
     assert _put_note(client, h, GOOD).status_code == 200
-    _login(client, monkeypatch, "pm-cfg-3")          # 老号再登录一次，不会再种
-    rows = _notes_of(db, "pm-cfg-3")
-    assert len(rows) == 1 and rows[0].title == before
+    got = _notes_of(db, "pm-sync-1")[0]
+    assert (got.title, got.summary, got.tags, got.key_points, got.content) == (
+        GOOD["title"], GOOD["summary"], GOOD["tags"], GOOD["key_points"], GOOD["content"]
+    )
+    assert got.original_content == GOOD["content"]
+    assert got.source_type == preset_note.PRESET_SOURCE_TYPE
+    # 只改那一行，不许把这个人自己写的东西也一起刷掉
+    assert got.id == before.id
+
+
+def test_刷存量只改还留着的那几行_删掉的那个不补(client, db, monkeypatch, seed_clean):
+    """他那一句选的是「删了就没了」：全量刷新**不是**全量补种。
+
+    两个号，一个留着那一篇、一个删掉了；后台发布一次 ⇒ 前者跟着变，后者仍然一篇都没有。
+    这一条是这批里最容易被写错的一支——`resync_all` 遍历的是"库里有的行"，
+    写成"遍历所有账号、缺的就补"就成了官方内容永远删不掉，与他这句话正相反。
+    """
+    kept = _login(client, monkeypatch, "pm-sync-2")
+    gone = _login(client, monkeypatch, "pm-sync-3")
+    gh = _bearer(gone["token"])
+    assert kept["seeded_note_id"] and gone["seeded_note_id"], "这两个号起手都该有那一篇"
+    assert client.delete(f"/api/notes/{gone['seeded_note_id']}", headers=gh).status_code == 200
+
+    h = _admin_h(client, monkeypatch)
+    r = _put_note(client, h, GOOD)
+    assert r.status_code == 200
+    assert r.json()["resync"]["refreshed"] == 1, "两个号都种过、删掉一个，这次只该刷一篇"
+
+    assert _notes_of(db, "pm-sync-2")[0].title == GOOD["title"]
+    assert _notes_of(db, "pm-sync-3") == [], "删掉的那个人的名下被补了一篇——他不该被补"
+    # 留着的那个名下仍然只有一篇预置，没被刷成两篇
+    assert len([n for n in _notes_of(db, "pm-sync-2")
+                if n.source_type == preset_note.PRESET_SOURCE_TYPE]) == 1
+
+
+def test_刷存量顺手关掉这一类名下的活分享码(client, db, monkeypatch, seed_clean):
+    """这一类从此不能分享，所以已经分享出去那几张要关掉。
+
+    不关的后果不是"多一张码"，是**公开落地页继续供正文**，而界面上那一枚分享钮已经灰了——
+    用户再没有第二个入口能收回它（`notes.py` 里"改成私密顺手关码"就是同一条理由）。
+    这一条绕过那道新闸直接往库里插一行活码，模拟闸上线之前就已经发出去的那几张。
+    """
+    from app.models.share import Share
+
+    resp = _login(client, monkeypatch, "pm-sync-4")
+    headers = _bearer(resp["token"])
+    nid = resp["seeded_note_id"]
+    s = _reload(db)
+    s.add(Share(user_id=str(resp["user_id"]), note_id=nid, token="pytest-live-code",
+                author_name="署名", title="旧标题", summary="旧摘要",
+                key_points=["旧要点"], tags=["旧标签"], is_active=True))
+    s.commit()
+
+    h = _admin_h(client, monkeypatch)
+    r = _put_note(client, h, GOOD)
+    assert r.status_code == 200
+    assert r.json()["resync"]["closed_shares"] == 1
+    row = _reload(db).query(Share).filter(Share.token == "pytest-live-code").one()
+    assert row.is_active is False, "码还开着，公开页就还在供这一篇"
+    # 关而不删：token 留着才对得了账。免鉴权那一口当场读回来是 404（"分享已关闭"），
+    # 拿"行还在"当"没关掉"是这条判据要避开的坑——撤回从来是关而不删。
+    assert client.get(f"/api/shares/{row.token}").status_code == 404
+
+
+def test_停用也刷_存量跟着回到包里那一份(client, db, monkeypatch, seed_clean):
+    """停用同样是"生效值变了"：存量得跟着刷回去，不然屏上留着一份后台已经撤下的文案。"""
+    _login(client, monkeypatch, "pm-sync-5")
+    h = _admin_h(client, monkeypatch)
+    assert _put_note(client, h, GOOD).status_code == 200
+    assert _notes_of(db, "pm-sync-5")[0].title == GOOD["title"]
+    assert _put_note(client, h, None).status_code == 200
+    assert _notes_of(db, "pm-sync-5")[0].title == preset_note.seed_row()["title"]
+
+
+def test_发布回体里带这次刷了几篇(client, db, monkeypatch, seed_clean):
+    """后台那一页要说得出"这一次动了几行"——刷存量是一趟写很多用户数据的动作，
+    不许只回一个 200 就完事。"""
+    _login(client, monkeypatch, "pm-sync-6")
+    h = _admin_h(client, monkeypatch)
+    body = _put_note(client, h, GOOD).json()
+    assert body["resync"] == {"refreshed": 1, "closed_shares": 0}
+    assert body["current"]["title"] == GOOD["title"], "回体里当前那份没跟着换"
 
 
 def test_库里那份不合格时落回包里而不是种一半(client, db, monkeypatch, seed_clean):
@@ -405,7 +523,7 @@ def test_不合格整份退回而且库里那份没动(client, db, monkeypatch, 
 
 
 def test_标题超过客户端那一栏的上限被拒(client, db, monkeypatch, seed_clean):
-    """后台放行 101 字的标题不是"长一点"，是用户点开编辑再保存时被截短——那一步没有提示。"""
+    """尺的出处见下面 `test_两把尺与客户端编辑那两栏相等`；这一条钉的是"超了一律整份退回，不收半份"。"""
     h = _admin_h(client, monkeypatch)
     r = _put_note(client, h, {**GOOD, "title": "字" * (preset_note.MAX_SEED_TITLE + 1)})
     assert r.status_code == 400 and str(preset_note.MAX_SEED_TITLE) in r.json()["detail"]
@@ -438,8 +556,11 @@ def test_这一栏不往小程序回体里下发(db, seed_clean):
 
 
 def test_两把尺与客户端编辑那两栏相等():
-    """标题/摘要那两枚上限的唯一理由是 `pages/write/write.wxml` 里那两个 maxlength。
-    那边改了数而这边没改，后台就会放进来存不进用户编辑器的内容。"""
+    """标题/摘要那两枚上限的出处是 `pages/write/write.wxml` 里那两个 maxlength（用户自己写笔记那一屏的尺）。
+
+    10-18 之后这一类改不了了，"存进去再被编辑器截短"那半句理由淡了一半；但这一篇在库里仍是一行普通笔记，
+    走的是同一套列表与详情渲染。两把尺保持同数，别让官方那一篇长出一栏别人的字装不下的形状。
+    那边改了数而这边没改，这一条照样红。"""
     import re
     from pathlib import Path
 

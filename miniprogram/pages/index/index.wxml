@@ -285,8 +285,8 @@
          ⇒ 这一行三枚。私密那一枚**照画但置灰**，话术就念他那句「私密笔记不支持分享」，点了不办事。 -->
     <view class="ds-dock">
       <view class="ds-irow">
-        <view class="ds-ibtn" catchtap="onSheetEdit">{{t.edit}}</view>
-        <view class="ds-ibtn {{detailNote.is_private ? 'disabled' : ''}}" catchtap="onSheetShare">{{t.shareNote}}</view>
+        <view class="ds-ibtn {{detailNote.is_preset ? 'disabled' : ''}}" catchtap="onSheetEdit">{{t.edit}}</view>
+        <view class="ds-ibtn {{(detailNote.is_private || detailNote.is_preset) ? 'disabled' : ''}}" catchtap="onSheetShare">{{t.shareNote}}</view>
         <view class="ds-ibtn danger" catchtap="onSheetDelete">{{t.delete}}</view>
       </view>
       <!-- 私密那一枚置灰，理由写在它下面那一行（站长这句：「私密不支持分享，按钮提示词显示
@@ -294,6 +294,9 @@
            （窗内净宽 634 ÷ 3 ≈ 211rpx），十个字在 `--fs-meta` 那一档要 240rpx，塞进去就折行、
            整排按钮高低不齐——现网那条 nowrap 尺子当场红。按钮在两态念同一串字，位置也不跳。 -->
       <text wx:if="{{detailNote.is_private}}" class="ds-no-share">{{t.privateNoShare}}</text>
+      <!-- 官方那一篇：不能编辑、不能分享、删得掉（站长 10-18）。与上面私密那一行同一个落点、同一支字，
+           两条不叠加（wx:elif）——那一排三枚按钮等宽，话塞进按钮里会折行、整排高低不齐。 -->
+      <text wx:elif="{{detailNote.is_preset}}" class="ds-no-share">{{t.presetHint}}</text>
       <view wx:if="{{shared && !detailNote.is_private}}" class="ds-pub">
         <text class="ds-pub-l">{{t.sharedNow}}</text>
         <text class="ds-pub-act" catchtap="onSheetUnshare">{{t.unshare}}</text>

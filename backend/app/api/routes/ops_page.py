@@ -310,7 +310,7 @@ var NAV = [
   { grp: '配置', items: [
     { label: '运营图', view: 'config', key: 'kind:home_bg' },
     { label: '首屏 Tips', view: 'config', key: 'text:tips' },
-    { label: '默认笔记', view: 'config', key: 'note:preset_note' },
+    { label: '帮助文档', view: 'config', key: 'note:preset_note' },
     { label: '卡片模板', view: 'tpl', key: 'tpl:list' }
   ] }
 ];
@@ -450,9 +450,11 @@ function textCardFor(t) {
   return card;
 }
 
-// 「新用户默认那一篇」（站长 10-18「默认笔记请在管理后台配置，我可以编辑修改，日后更新不需要发版」）。
-// 五个字段一张卡，不复用上面 textCardFor：那一格是"两份语言各一串句子"，这一格是"一篇笔记"，
-// 形状不一样、要说清的话也不一样（最要紧那句是"只往前不回头"）。
+// 「帮助文档」那一栏（站长 10-18「默认笔记请在管理后台配置，我可以编辑修改，日后更新不需要发版」
+// ＋同一天「后台更新后，要新旧用户全量刷新」）。五个字段一张卡，不复用上面 textCardFor：
+// 那一格是"两份语言各一串句子"，这一格是"一篇笔记"，形状不一样、要说清的话也不一样
+// （最要紧那句已经从"只往前不回头"换成"发布即刷存量"）。
+var lastNoteResync = null;   // 上一次发布刷了几篇存量。它是那次动作的回执，不是这一栏的状态，所以重进这一页就空着。
 function noteCardFor(n) {
   var card = el('section', 'card');
   card.dataset.key = 'note:' + n.kind;
@@ -471,13 +473,19 @@ function noteCardFor(n) {
       (cur.tags || []).length + ' 个。';
   }
   card.appendChild(st);
+  if (lastNoteResync) {
+    var rs = el('p', 'state on');
+    rs.textContent = '刚那一次发布刷了 ' + lastNoteResync.refreshed + ' 篇存量' +
+      (lastNoteResync.closed_shares ? '，顺手关掉它名下 ' + lastNoteResync.closed_shares + ' 张还开着的分享码' : '') + '。';
+    card.appendChild(rs);
+  }
   card.appendChild(el('p', 'note',
-    '改这里只影响以后新出生的账号。那一篇是在建号那一刻写进库里的，已经种下去的那几篇一个字都不会变' +
-    '（那是用户自己的数据，替他改掉自己写过的东西比不改危险）。这份文案从来不在小程序包里，' +
-    '所以改它不用发版；停用则回到包里那一份。'));
+    '发布即全量刷新：这一份立刻写进所有用户名下那一篇（新老账号一起），并关掉它名下还开着的分享码。' +
+    '名下已经删掉的那个不补——这一类现在允许删除，删了就没了，所以这里只改还留着的那几行。' +
+    '停用这一栏也算一次更新：存量跟着刷回包里那一份。这份文案从来不在小程序包里，所以改它不用发版。'));
   card.appendChild(el('p', 'note',
-    '标题与摘要那两把尺跟的是用户自己编辑那两栏的上限（' + n.limits.title + ' 字／' + n.limits.summary +
-    ' 字）：后台放行更长的标题，症状是用户点开编辑再保存，标题被那一栏截短。'));
+    '标题与摘要那两把尺仍与用户自己编辑那两栏同数（' + n.limits.title + ' 字／' + n.limits.summary +
+    ' 字），超限整份退回。这一篇从此改不了，但它留在库里仍是一行普通笔记——别让它长出一栏别人装不下的字。'));
 
   var f = {};
   function one(key, labelText, limit, asLines) {
@@ -524,7 +532,11 @@ function putNote(value, msg, done) {
   api('api/admin/preset-note', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: value })
-  }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
+  }).then(function (body) {
+    // 刷新那两枚数是这一趟 PUT 的回执（`resync_all` 报的），重画之后要落在卡片上才看得见。
+    lastNoteResync = (body && body.resync) || null;
+    return done && done();
+  }, function (e) { msg.textContent = e.message; });
 }
 
 function cardFor(k) {

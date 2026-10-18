@@ -210,21 +210,24 @@ def admin_preset_note_write(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_admin),
 ):
-    """改"新用户出生那一篇"长什么样。站长 10-18 那句「日后更新不需要发版」。
+    """改「帮助文档」那一篇长什么样。站长 10-18 两句：「日后更新不需要发版」＋「后台更新后，要新旧用户全量刷新」。
 
-    **生效面只往前，不回头**：这一格管的是下一个建号那一刻种下去的内容，库里已经种出来的那几篇
-    （包括他自己那一篇，如果他哪天补种）一个字都不改——那已经是用户的数据了，
-    替他改掉自己写过的东西比不改危险得多。这句话在后台那一页上也写着，别只留在这里。
+    **发布即刷存量**（10-18 那一改把 10-15 立的"只往前不回头"推翻了一半）：写完生效值之后，
+    `preset_note.resync_all` 会把库里所有 `source_type='preset'` 的行按新那份重写一遍（五栏全覆盖，
+    他选的那条），并顺手关掉这一类名下还开着的分享码。回体里 `resync` 那两枚数就是这次刷了几篇、关了几张。
+    **刷新绑在写入上（`save_seed`／`clear_seed` 各调一次），不绑在这个路由上**——多开一个写入口也不会漏刷。
+    唯一不动的是"名下已经没有这一篇的人"：他这一句选的是「删了就没了」，所以只改还留着的那几行，
+    补种那一路只归建号那一刻管。
 
-    播种这一条链从来在服务器上，所以"要不要发版"分两档说：小程序**本来就不发版**（包里没这份文案），
+    这一条链从来在服务器上，所以"要不要发版"分两档说：小程序**本来就不发版**（包里没这份文案），
     改文件那一档要一次后端部署，改后台这一档连部署也不用。
     """
     try:
-        if body.value is None:
-            preset_note.clear_seed(db)
-        else:
-            preset_note.save_seed(db, body.value)
-        return preset_note.admin_seed_state(db)
+        resync = (preset_note.clear_seed(db) if body.value is None
+                  else preset_note.save_seed(db, body.value))
+        state = preset_note.admin_seed_state(db)
+        state["resync"] = resync
+        return state
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -31,7 +31,7 @@ from app.api.routes.assets import (
     _owned_note_or_404,
 )
 from app.core.auth import get_current_user
-from app.services.preset_note import PRESET_CARD_KEEP_MSG, PRESET_SOURCE_TYPE
+from app.services.preset_note import PRESET_CARD_MSG, is_help_doc
 from app.core.private_access import is_private_note, private_category_ids, unlocked
 from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
@@ -175,6 +175,10 @@ def put_note_card(
     # 而这张卡片会跟着 `GET /api/user/cards` 回到任何一台登录设备上。
     if is_private_note(note, private_category_ids(db, user.id)):
         raise HTTPException(status_code=400, detail="私密笔记不能生成卡片")
+    # 官方那一篇不生成卡片（站长 10-18「不能分享」那一句里点的其中一条：这一类从这一屏撤掉）。
+    # 与上面那条私密闸同一个形状——界面上那一枚不渲染，接口不挡就等于没挡。
+    if is_help_doc(note):
+        raise HTTPException(status_code=400, detail=PRESET_CARD_MSG)
     if payload.origin not in CARD_ORIGINS:
         raise HTTPException(status_code=400, detail="卡片来源不认得")
     if any(c.isspace() for c in payload.tpl.strip()) or not payload.tpl.strip():
@@ -271,12 +275,11 @@ def drop_note_card(
     历史行（`is_current=0`）一起删：那些对象在这一趟一并从云上清掉，留一行指向已经不存在的
     地址就是 `assets` 那条说过的"幽灵行"——算进配额却什么都读不出来。
     """
-    note = _owned_note_or_404(db, user, note_id)
-    # 站长 10-14「默认的不能删除」：那一篇自带的卡片也撤不掉，与 `delete_note` 同一把闸、同一个判据。
-    # 代价要说给他听：一篇一张，而"换一套模板"在界面上是先删再画 ⇒ **这一张会把预置那篇的模板永久钉住**。
-    # （要松开只有两条路：允许在它身上覆盖重画，或只锁笔记不锁卡片。两条都不在他这句话里，我没动。）
-    if note.source_type == PRESET_SOURCE_TYPE:
-        raise HTTPException(status_code=400, detail=PRESET_CARD_KEEP_MSG)
+    # 撤掉那道闸之后这一句只剩"这篇是不是你的"那一层校验（返回值没人读了）：
+    # 别人名下的 note_id 仍然要 404，不能因为不判来源就省掉。
+    _owned_note_or_404(db, user, note_id)
+    # （10-14 那道「自带的卡片撤不掉」的闸随站长 10-18 那一句「允许删除」一起撤了；
+    #   这一类现在根本登记不出卡片——闸在上面那个 POST 口，所以这里没有残留状态要挡。）
     rows = (
         db.query(NoteCard)
         .filter(NoteCard.note_id == note_id, NoteCard.user_id == str(user.id))

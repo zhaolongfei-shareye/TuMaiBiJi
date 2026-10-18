@@ -91,6 +91,9 @@ Page({
       const lang = this.data.lang
       const key = SOURCE_TYPE_KEYS[note.source_type]
       note.source_type_label = key ? t(key, lang) : note.source_type
+      // 官方那一篇（站长 10-18 给它定了名「帮助文档」）：编辑与分享两枚在这一篇上置灰、点了不办事。
+      // 判据用服务端那个 `source_type`，不靠标题也不靠"名下第一篇"。
+      note.is_preset = note.source_type === 'preset'
       note.created_at_label = formatDateTime(note.created_at)
       
       // Resolve category name from categories list
@@ -239,6 +242,9 @@ Page({
 
   onEdit() {
     const { note } = this.data
+    // 官方那一篇改不了（站长 10-18「不能编辑（按钮置灰）」）。这一扇与 wxml 上那枚 `disabled` 是一对：
+    // 置灰只是画，挡住才是真挡；服务端 `notes.py` 那道 PUT 闸是第三层（老包打接口也一样拒）。
+    if (!note || note.is_preset) return
     wx.navigateTo({ 
       url: `/pages/write/write?id=${note.id}&mode=edit` 
     })
@@ -310,7 +316,7 @@ Page({
     // 私密篇这一枚在屏上是置灰的，这里那一扇是它背后那一句：不发请求、不跳页
     // （服务端 cards.py／shares.py 同一句；10-17 深夜他把这一格从"不画"改成"画出来但置灰"，
     //  所以挡住这件事不能再靠"屏上没有落点"）。
-    if (this.data.note && this.data.note.is_private) return
+    if (this.data.note && (this.data.note.is_private || this.data.note.is_preset)) return
     const cards = this.data.detailCards
     if (cards && cards.length) {
       // 大图吃云上那一份：本机那张在 USER_DATA_PATH 下，`<image>` 画得出来、previewImage 不认它

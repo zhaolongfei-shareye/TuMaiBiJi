@@ -48,7 +48,7 @@ NOTE_KINDS = (KIND_PRESET_NOTE,)
 KIND_LABELS = {
     KIND_HOME_BG: "首页默认背景图",
     KIND_TIPS: "首屏那行 Tips",
-    KIND_PRESET_NOTE: "新用户默认那一篇",
+    KIND_PRESET_NOTE: "帮助文档（官方那一篇）",
 }
 
 
