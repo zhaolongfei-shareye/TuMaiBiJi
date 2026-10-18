@@ -15,6 +15,7 @@ from app.models import Note, User, Category, Asset, Job, Share
 from app.models.user_profile import UserProfile  # noqa: F401  只要它把表挂进 Base.metadata
 from app.models.generation_seq import GenerationSeq  # noqa: F401  同上（10-10 那张代次水位线表）
 from app.models.mp_asset import MpAsset, MpSetting  # noqa: F401  同上（运营图账本 + 生效位，方案-cn后台资产管理 A1）
+from app.models.source_blocklist import SourceBlocklist  # noqa: F401  同上（来源黑名单，规格-来源黑名单）
 
 config = context.config
 

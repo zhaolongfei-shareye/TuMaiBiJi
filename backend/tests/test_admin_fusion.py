@@ -354,8 +354,11 @@ def test_后台那一页有数据那一组格子():
     body = src.split("_PAGE", 1)[1]
     assert "renderStats" in body and "loadStats" in body
     assert "api/admin/stats/overview" in body, "取数那句没写，或写成了别的口"
-    assert "refresh()" in body and "Promise.all([loadStats(), loadTemplates()])" in body, \
-        "登录进来那一趟没顺手拉数据（10-15 起三屏一起拉，这句就是那条调用）"
+    # 锚在前缀上而不是整串一字不差：10-19 加「来源黑名单」那一栏时这里红过一次，
+    # 而这条判据要钉的是"登录那一趟顺手把各屏都拉一遍"，不是那一排里恰好两个名字。
+    # 第三个读口在不在这一串里，由 tests/test_source_blocklist.py 那条页面钉子负责。
+    assert "refresh()" in body and "Promise.all([loadStats(), loadTemplates()" in body, \
+        "登录进来那一趟没顺手拉数据（10-15 起几屏一起拉，这句就是那条调用）"
     assert "id=\"stats\"" in body and "$('stats')" in body
     # 这一栏的硬纪律与整页一致：动态串一律 textContent，全页零 innerHTML
     assert "innerHTML" not in body

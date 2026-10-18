@@ -1,6 +1,7 @@
-"""后台那一页背后的十二个口：登录、看状态、上传、改图片生效位、改文案生效位、读默认笔记那一篇、
+"""后台那一页背后的十五个口：登录、看状态、上传、改图片生效位、改文案生效位、读默认笔记那一篇、
 改默认笔记那一篇、验票、看数、列卡片模板、改卡片模板（元数据与上下架，**改不了配方**）、
-吐预览引擎（把客户端那份绘制代码当数据交给那一页的浏览器，**这里一笔都不画**）。
+吐预览引擎（把客户端那份绘制代码当数据交给那一页的浏览器，**这里一笔都不画**）、
+列来源黑名单、手工加一条、手工移一条。
 
 路径都写在这一份文件里（`/api/admin/*`），所以 `app/main.py` 挂载时不给 prefix——
 与 `assets`/`cards`/`profiles`/`landing` 同一族做法。理由在这条链上更硬一层：
@@ -42,7 +43,7 @@ from app.core.config import settings
 from app.core.errors import UserError
 from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
-from app.services import admin_stats, admin_templates, mp_assets, poster_engine, preset_note
+from app.services import admin_stats, admin_templates, mp_assets, poster_engine, preset_note, source_blocklist
 
 logger = logging.getLogger(__name__)
 
@@ -358,4 +359,63 @@ def admin_poster_engine(
         media_type="application/json",
         headers={"ETag": f'"{etag}"', "Cache-Control": "private, must-revalidate"},
     )
+
+
+class BlockIn(BaseModel):
+    """手工加一条那一句。**只有 `host`**：形状与规范化的唯一出处是
+    `services/source_blocklist.clean_host`，这里再写一道校验就成了第二份真相。
+    """
+    host: str = Field(min_length=1, max_length=500)
+
+
+@router.get("/api/admin/source-blocklist")
+@limiter.limit("60/minute")
+def admin_blocklist_list(
+    request: Request, db: Session = Depends(get_db), _admin: str = Depends(get_admin)
+):
+    """「来源黑名单」那一栏：一台主机一行，含**还没够阈值**的那几行。
+
+    为什么够的不够的都给：规格 §五 那一列写的是"失败次数｜判『3 次』这条阈值真不真"。
+    只给已经拦住的，管理员看到的是"3"这一堆，永远看不出它是刚好跨线还是已经攒到十七次。
+    `threshold` 跟着回体给（不是页面里另抄一个 3）——那一栏要说"还差几次"，
+    两处各写一个数就是将来分叉的开始。
+    """
+    return {"rows": source_blocklist.list_rows(db), "threshold": source_blocklist.AUTO_THRESHOLD}
+
+
+@router.post("/api/admin/source-blocklist")
+@limiter.limit("30/minute")
+def admin_blocklist_add(
+    request: Request,
+    body: BlockIn,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """手工拉黑一个站。不要求先攒够 3 次（规格 §六第 5 条），否则这一格就成了摆设。
+
+    已经是自动攒出来的那一行也不新建：改它的 `source`。一台主机两行是这张表不能有的状态。
+    """
+    try:
+        return {"row": source_blocklist.add_manual(db, body.host)}
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/api/admin/source-blocklist/{host}")
+@limiter.limit("30/minute")
+def admin_blocklist_remove(
+    host: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """手工移出＝连账一起删，**当场放行**（规格 §六第 4 条钉的是反向：不许"移出还被拦"）。
+
+    路径参数而不是查询体：这一栏的唯一身份就是主机名，`{host}` 与 `/api/mp/settings/{kind}`
+    同一形状。校验走同一个 `clean_host`，所以这里能删的必然是当初能加的那种字。
+    """
+    try:
+        return {"removed": source_blocklist.remove(db, host)}
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 

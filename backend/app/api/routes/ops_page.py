@@ -187,7 +187,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
     <nav id="nav"></nav>
     <div id="main">
       <div id="view-stats" class="view"><div id="stats"></div></div>
-      <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div></div>
+      <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div><div id="block"></div></div>
       <div id="view-tpl" class="view hidden"><div id="tpls"></div></div>
       <div id="view-tumaike" class="view hidden"><iframe id="frameOther" class="frame" title="图麦克后台" src="about:blank"></iframe></div>
       <footer>
@@ -312,6 +312,7 @@ var NAV = [
     { label: '首屏 Tips', view: 'config', key: 'text:tips' },
     { label: '帮助文档', view: 'config', key: 'note:preset_note' },
     { label: '帮助文档那张图', view: 'config', key: 'kind:preset_note_image' },
+    { label: '来源黑名单', view: 'config', key: 'block:list' },
     { label: '卡片模板', view: 'tpl', key: 'tpl:list' }
   ] }
 ];
@@ -653,6 +654,123 @@ function putText(kind, value, msg, done) {
   }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
 }
 
+// ---- 「来源黑名单」那一栏（站长 10-18「提取失败 3 次以上自动落入黑名单，管理员可以查看到域名，
+// 可以手工增删」）。规格正本 docs/规格-来源黑名单.md §五：那一栏要给六个数，一个都不省。
+//
+// 还没攒够阈值的行**也列**：那一列「失败次数」存在的意义就是让人看出 3 这条线真不真，
+// 只给已经拦住的，屏幕上永远是清一色的"3"，看不出它是刚跨线还是已经攒到十七次。
+// 判「拦没拦」读的是回体里的 `blocked`（服务端那一份唯一判据），这一页不另写一条 OR 比较——
+// 阈值哪天改一次，页面里那条比较就成了一句假话，而它长得像真的。
+function renderBlocklist(d, flash) {
+  var box = $('block');
+  while (box.firstChild) box.removeChild(box.firstChild);
+  var th = d.threshold;
+  var rows = d.rows || [];
+  var card = el('section', 'card');
+  card.dataset.key = 'block:list';
+  card.appendChild(el('h2', null, '来源黑名单'));
+
+  var held = 0;
+  rows.forEach(function (r) { if (r.blocked) held++; });
+  var st = el('p', 'state ' + (held ? 'on' : 'off'));
+  st.textContent = held
+    ? '现在拦着 ' + held + ' 台主机（表里共 ' + rows.length + ' 行，另 ' + (rows.length - held) + ' 行还没攒够 ' + th + ' 次）。'
+    : '一条都没拦（表里 ' + rows.length + ' 行都还没攒够 ' + th + ' 次）。';
+  card.appendChild(st);
+  card.appendChild(el('p', 'note',
+    '只有「贴链接提取」这一条受它管：手动上传截图、拍照、亲自撰写一律照常。' +
+    '进去的账只有两种——站点自己回了 4xx／5xx，或它回了 200 而我们读出 0 字。' +
+    '我们这头的故障（模型额度、超时连不上、队列挂了）不记在这里，记了就会把好站拉黑。' +
+    '移出＝连账一起删、当场放行；它不会自动过期，也不会自己放回去。' +
+    '这一栏列得出主机名，是因为它是我们的代码从用户提交的链接里取出的**站点标识**，' +
+    '不是用户写的字——与「分类与未分类」那一栏"一个分类名都不列"不是同一条边界（规格 §五）。'));
+
+  var msg = el('div', 'err');   // 先造后挂：表里每一行的「移出」按钮要拿到它，红话才落得下
+
+  if (rows.length) {
+    var t = el('table', 'dt');
+    var head = el('tr');
+    ['主机名', '失败次数', '最后一次 HTTP', '最后一次失败', '进名单方式'].forEach(function (h) {
+      head.appendChild(el('th', null, h));
+    });
+    head.appendChild(el('th', null, '移出'));
+    var thead = el('thead');
+    thead.appendChild(head);
+    t.appendChild(thead);
+    var tb = el('tbody');
+    rows.forEach(function (r) { tb.appendChild(blockRow(r, th, msg)); });
+    t.appendChild(tb);
+    card.appendChild(t);
+  } else {
+    card.appendChild(el('p', 'note', '表里一行都没有：还没有站点攒过失败，也没人手工加过。'));
+  }
+
+  var row = el('div', 'row');
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.placeholder = '主机名，例如 www.example.com';
+  var btnAdd = el('button', 'danger', '拉黑这一台');
+  row.appendChild(inp);
+  row.appendChild(btnAdd);
+  card.appendChild(row);
+  card.appendChild(msg);
+
+  btnAdd.addEventListener('click', function () {
+    msg.textContent = '';
+    btnAdd.disabled = true;
+    api('api/admin/source-blocklist', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host: inp.value })
+    }).then(function () {
+      return loadBlocklist('已加入：这一台从现在开始不再出网。');
+    }, function (e) { msg.textContent = e.message; })
+      .then(function () { btnAdd.disabled = false; });
+  });
+
+  // 回执落在**重读之后那一栏**上：卡片是刚重建的，写进旧节点等于没写（与「卡片模板」那一栏同一条坑）。
+  if (flash) {
+    var hit = box.querySelector('.card[data-key="block:list"] .err');
+    if (hit) { hit.classList.add('ok'); hit.textContent = flash; }
+  }
+}
+
+function blockRow(r, th, msg) {
+  var tr = el('tr');
+  tr.appendChild(el('td', null, r.host));
+  tr.appendChild(el('td', null, numOf(r.fail_count)));
+  tr.appendChild(el('td', null, numOf(r.last_status)));
+  tr.appendChild(el('td', null, r.last_failed_at ? dayOf(r.last_failed_at) : '—'));
+  // 「自动／手工」这一列必须与"拦住了没"一起说：手工那一行是立刻生效的，
+  // 自动那一行要攒够；不写这一句，管理员看见两行同样的主机名却一个拦一个不拦。
+  tr.appendChild(el('td', null, r.source === 'manual' ? '手工（已拦）'
+    : (r.blocked ? '自动（已拦）' : '自动（还差 ' + Math.max(0, th - r.fail_count) + ' 次）')));
+  var td = el('td');
+  var btn = el('button', 'mini danger', '移出');
+  btn.addEventListener('click', function () {
+    msg.textContent = '';
+    btn.disabled = true;
+    api('api/admin/source-blocklist/' + encodeURIComponent(r.host), { method: 'DELETE' })
+      .then(function () { return loadBlocklist('已移出：这一台可以试了（计数从零重来）。'); },
+        function (e) { msg.textContent = e.message; btn.disabled = false; });
+  });
+  td.appendChild(btn);
+  tr.appendChild(td);
+  return tr;
+}
+
+function loadBlocklist(flash) {
+  return api('api/admin/source-blocklist').then(function (d) {
+    renderBlocklist(d, flash);
+  }, function (e) {
+    // 401 由 api() 统一收回口令框；其余红了也只空这一栏，不许把配置那一屏带走
+    // （与 loadStats／loadTemplates 同一个纪律：这一页"少一组卡"比"整页打不开"好）。
+    if (e.status === 401) return;
+    var box = $('block');
+    while (box.firstChild) box.removeChild(box.firstChild);
+    box.appendChild(el('p', 'note', '这一栏没读到：' + e.message));
+  });
+}
+
 // ---- 「卡片模板」那一栏（方案 docs/方案-cn后台资产管理.md 的 P1，站长 10-15「先补笔记模板管理界面」）。
 // 这一栏只改四样元数据＋上下架。配方（就是"画面长什么样"那份 JSON）**只给看，不给改**——
 // 在线编辑配方是 P2，是唯一一个"不发版就能改用户看到的画"的口子，它没被拍开，所以界面上
@@ -991,8 +1109,8 @@ function refresh() {
   return api('api/admin/mp/state').then(function (state) {
     showApp();
     render(state);
-    // 三屏各读各的口，互不牵连：统计或模板那一头红了，不许把配置那栏一起带走（两个函数自己吞错）。
-    return Promise.all([loadStats(), loadTemplates()]);
+    // 各读各的口，互不牵连：统计、模板、黑名单任何一头红了，不许把其余两屏一起带走（三个函数自己吞错）。
+    return Promise.all([loadStats(), loadTemplates(), loadBlocklist()]);
   }, function (e) {
     if (e.status === 503) { $('login').classList.remove('hidden'); $('loginErr').textContent = e.message; }
   });

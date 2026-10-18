@@ -22,6 +22,9 @@ from app.models.generation_seq import GenerationSeq
 # 运营图那两张表同一个文件（账本 + 生效位），两处一起挂：漏一处的症状是
 # 「下一次 --autogenerate 把库里那张真表 drop 掉」，与上面两条同型（见 test_模型注册齐不齐.py）。
 from app.models.mp_asset import MpAsset, MpSetting
+# 来源黑名单（规格-来源黑名单）。这张表建不出来时的症状不是"少一列静默降级"，
+# 是**每一条链接提取任务一起红**（worker 那一路第一句就查它），所以名单里必须有它。
+from app.models.source_blocklist import SourceBlocklist
 
-__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting"]
+__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting", "SourceBlocklist"]
 

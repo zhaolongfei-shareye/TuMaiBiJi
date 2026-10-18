@@ -34,6 +34,22 @@ EXTRA_BLOCKED_NETWORKS = [
 # 兜底文案：httpx 的异常文本是英文且带完整 URL，直接 str(e) 会进用户 toast（只两行，约 30 汉字）
 GENERIC_FETCH_ERROR = "读取网页失败，请稍后重试或改用截图"
 
+
+class SiteHttpError(UserError):
+    """站点回了 4xx／5xx。文案与 `_status_hint` 一字不差，只多带一个 `status_code`。
+
+    为什么要多这一枚类型（规格-来源黑名单 §三①）：黑名单要数"站点级确定性失败"，
+    而"这个站回了 403"和"我们连不上／提炼坏了／页面太大"在用户那边是同一句话（都是中文、
+    都进 toast），只有类型能把它们分开。**继承 UserError 而不是另起一支**：
+    `scrape_url` 那句 `except UserError: raise` 与 `failure_message()` 判的都是 UserError，
+    换成新分支就等于给这一型改口的同时把用户那句话也换了（判据 9 不许动那两句）。
+    """
+
+    def __init__(self, message: str, status_code: int):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 # 闸门拒一个链接时**只有这一句**话。为什么"解析不出来"与"解析到内网"不许分开说（审计 #11）：
 # 分开就等于把这道闸门做成一台内网判分机——提交者拿"哪个域名回哪一句"就能扫出内网有哪些
 # 主机名解析得动、落在哪个网段，一次请求都不用真发出去。真原因进日志，那一行的读者是操作者。
@@ -134,7 +150,9 @@ async def _fetch_and_parse(url: str) -> dict:
                     current_url = next_url
                     continue
                 if resp.status_code >= 400:
-                    raise UserError(_status_hint(resp.status_code))
+                    raise SiteHttpError(_status_hint(resp.status_code), resp.status_code)
+                # 走到这一行就说明这一发不是 3xx 也不是 4xx+；后面那句"正文 0 字"要记的就是它。
+                status_code = resp.status_code
                 
                 async for chunk in resp.aiter_bytes(chunk_size=8192):
                     total_bytes += len(chunk)
@@ -151,9 +169,14 @@ async def _fetch_and_parse(url: str) -> dict:
     source_type = _detect_source_type(url)
 
     if source_type == "wechat_article":
-        return _parse_wechat_article(html, url, source_type)
-
-    return _parse_general_url(html, url, source_type)
+        parsed = _parse_wechat_article(html, url, source_type)
+    else:
+        parsed = _parse_general_url(html, url, source_type)
+    # 带出这一枚数只为后台那一栏的"最后一次状态码"（规格-来源黑名单 §五）。
+    # 用 `.get()` 读的那一方是必须的：现网那几把尺子里 fake 出来的抓取回体没有这一键，
+    # 缺它只能退成"这个数不知道"，不许把一次本来成功的抓取报成失败。
+    parsed["status_code"] = status_code
+    return parsed
 
 
 def _detect_source_type(url: str) -> str:

@@ -6,8 +6,9 @@ from app.db.database import SessionLocal
 from app.models.note import Note
 from app.models.user import User
 from app.services import quota
+from app.services import source_blocklist
 from app.services.ocr import ocr_images, title_hint
-from app.services.scraper import scrape_url
+from app.services.scraper import SiteHttpError, scrape_url
 from app.services.llm import extract_knowledge
 from app.services.queue import set_task_status
 
@@ -15,6 +16,45 @@ logger = logging.getLogger(__name__)
 
 # 任务失败时这个字段会被前端直接塞进 toast，所以宁可笼统，也不要英文栈/onnxruntime/依赖名
 GENERIC_TASK_ERROR = "处理失败，请重新提交试试"
+
+
+def _blocked(url: str) -> bool:
+    """提取之前先查一次来源黑名单。命中＝一个字都不出网，这正是这条功能存在的理由（规格 §四）。
+
+    session 在这三行里开、在三行里关，**不横跨那次抓取**：一次抓取最长 30 秒还带 5 跳，
+    握着一个 SQLite 读连接等外网等于把 WAL 那扇窗口替全网用户开着。
+
+    ⚠ 读不出来按"没拦"处理，而且不许静默。这张表要靠迁移建，而这一台机器上"代码先上、
+    迁移后跑"是已经走过的形状（10-18 第三十九次部署点的就是那条「乙」）。
+    让这一句抛出去，症状是**每一条链接提取一起失败**——一条本来好得很的链被一个
+    还没上线的附属功能判死，那比黑名单失灵严重得多。日志里那一行的读者是操作者。
+    """
+    try:
+        db = SessionLocal()
+        try:
+            return source_blocklist.is_blocked_url(db, url)
+        finally:
+            db.close()
+    except Exception:
+        logger.exception("来源黑名单读不出来，这一条按没拦处理：url=%s", url)
+        return False
+
+
+def _note_site_failure(url: str, status_code: int | None) -> None:
+    """站点级确定性失败才进这里。全仓只有两个落点（见 `process_url_task`），规格 §三① 那条纪律的落地：
+    提炼失败／超时连不上／worker 挂了／单张贴图下载失败**一条都不许接进来**。
+
+    记账自己坏了不许把这次抓取也判失败：那句真话已经由 `raise` 或那句"未能从 URL 提取到有效内容"
+    说给用户了，这里再抛只会把"存不下"变成"我们的黑名单把用户的事也搞砸了"。
+    """
+    try:
+        db = SessionLocal()
+        try:
+            source_blocklist.note_site_failure(db, url, status_code)
+        finally:
+            db.close()
+    except Exception:
+        logger.exception("来源黑名单记账失败（不影响这一次抓取的结论）：url=%s", url)
 
 
 def failure_message(exc: Exception) -> str:
@@ -73,9 +113,23 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
     try:
         set_task_status(task_id, "processing")
 
-        scraped = asyncio.run(scrape_url(url))
+        # 命中黑名单就到此为止：不发 HTTP、不起提炼。用户那句「这个网站读不到内容，已停用」
+        # 是这一格唯一要说的话（规格 §四），它比"试一下再说"省下的是一整趟外网＋一次模型调用。
+        if _blocked(url):
+            set_task_status(task_id, "failed", {"error": source_blocklist.BLOCKED_HINT})
+            return
+
+        try:
+            scraped = asyncio.run(scrape_url(url))
+        except SiteHttpError as exc:
+            # 计入的那一型之一：站点自己回了 4xx／5xx（实测形状＝知乎 403 + 反爬页）。
+            _note_site_failure(url, exc.status_code)
+            raise
         text = scraped["content"]
         if not text.strip():
+            # 计入的另一型：200 但正文读出 0 字（实测形状＝微博那种访客壳页）。
+            # `status_code` 用 `.get()` 读——fake 出来的抓取回体没有这一键，缺它只是那个数空着。
+            _note_site_failure(url, scraped.get("status_code"))
             set_task_status(task_id, "failed", {"error": "未能从 URL 提取到有效内容"})
             return
 

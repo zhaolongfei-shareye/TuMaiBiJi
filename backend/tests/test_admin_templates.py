@@ -256,7 +256,7 @@ def test_页面真有第三屏且切得过去():
     assert "loadTemplates" in body and "renderTemplates" in body and "$('tpls')" in body
     assert "api/admin/poster/templates'" in body and "api/admin/poster/templates/' + r.id" in body, \
         "读口或写口没接上：这一栏会是空的"
-    assert "refresh" in body and "Promise.all([loadStats(), loadTemplates()])" in body
+    assert "refresh" in body and "Promise.all([loadStats(), loadTemplates()" in body  # 前缀锚：理由见 test_admin_fusion 同一条
 
 
 def test_保存成功的回执落在重读之后的那一行():
