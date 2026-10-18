@@ -26,7 +26,7 @@ sys.path.insert(0, str(BACKEND))
 
 from app.core.config import settings
 from app.db.database import Base, SessionLocal, engine
-from app.models.source_blocklist import AUTO_THRESHOLD, SOURCE_MANUAL, SourceBlocklist
+from app.models.source_blocklist import AUTO_THRESHOLD, MAX_HOST_LEN, SOURCE_MANUAL, SourceBlocklist
 from app.models.user import User
 from app.services import source_blocklist
 from app.services.scraper import SiteHttpError, UserError, _status_hint
@@ -357,6 +357,16 @@ class Test七_后台那三个口:
     PATH = "/api/admin/source-blocklist"
     ADMIN_PW = "pytest-admin-token-not-a-real-one-32"
 
+    def _hdr(self, client):
+        """换票那三行在五条用例里各写一遍，会变成"哪条的键名写错了"这种假红。
+
+        ⚠ 10-19 现网探针第一趟就栽在这一句上：`/api/admin/login` 回体的键叫 **`session`**，
+        我照常规写了 `token`，于是拿到空串、后面每一句 `Bearer ` 全 401——**22 条一起红，
+        红的不是产品，是量具自己没开门**。
+        """
+        tok = client.post("/api/admin/login", json={"token": self.ADMIN_PW}).json()["session"]
+        return {"Authorization": f"Bearer {tok}"}
+
     @pytest.fixture()
     def client(self):
         from fastapi.testclient import TestClient
@@ -412,6 +422,42 @@ class Test七_后台那三个口:
         r = client.post(self.PATH, json={"host": "localhost"}, headers={"Authorization": f"Bearer {tok}"})
         assert r.status_code == 400 and re.search(r"[\u4e00-\u9fff]", r.json()["detail"])
         assert client.get(self.PATH, headers={"Authorization": f"Bearer {tok}"}).json()["rows"] == []
+
+    def test_留空点加入回的是设计好那一句中文(self, client, admin_pw, db):
+        """10-19 现网探针撞出来的，不是推演：`Field(min_length=1)` 抢在 `clean_host` 之前响，
+
+        屏上出现的是「host不能为空」——操作者不认识那个英文词，而 `clean_host` 里那句
+        「要填一个主机名，例如 www.example.com」在 HTTP 这一路**永远走不到**（只有用例读得到）。
+        所以这一条钉的是"谁先响"，不是"有没有报错"：两者都返回错误，只有一个是人话。
+        """
+        h = self._hdr(client)
+        r = client.post(self.PATH, json={"host": ""}, headers=h)
+        assert r.status_code == 400, r.json()
+        assert r.json()["detail"] == "要填一个主机名，例如 www.example.com"
+        assert "host" not in r.json()["detail"]
+
+    def test_缺那个键时屏上也不许漏出英文字段名(self, client, admin_pw, db):
+        """钉的是"操作者看得懂"，不是"必然带字段名"。
+
+        ⚠ 第一趟我把它写成"这句里要出现『主机名』"，红在判据上：`main.py` 那个 422 翻译里认的
+        type 叫 `value_error.missing`，那是 **Pydantic v1 的名字**，v2 发的是 `missing`
+        （现读日志 `{'loc': ['body','host'], 'type': 'missing'}`）⇒ 缺任何必填键时屏上永远是
+        那句兜底话。今天这句是安全的（不含 `host`），但 `_FIELD_LABELS` 对"缺键"这一路**一个字节都没生效**，
+        这是整仓的旧账、不只这一栏，已记进台账等他点，不由我给 `BlockIn` 单独加一枚取不到的标签。
+        """
+        r = client.post(self.PATH, json={}, headers=self._hdr(client))
+        assert r.status_code == 422
+        detail = r.json()["detail"]
+        assert "host" not in detail and re.search(r"[一-鿿]", detail), detail
+
+    def test_长度这个数只许有一处(self, client, admin_pw, db):
+        """`max_length=500` 那种"顺手加一道"就是第二份真相：它念 500、`clean_host` 念 253，
+
+        改一边那天屏上那个数就是假的。这一条把上限钉回唯一出处 `MAX_HOST_LEN`。
+        """
+        r = client.post(self.PATH, json={"host": "z" * 300 + ".com"}, headers=self._hdr(client))
+        assert r.status_code == 400, r.json()
+        assert str(MAX_HOST_LEN) in r.json()["detail"], r.json()["detail"]
 
 
 class Test八_迁移接在那一头之后:

@@ -362,10 +362,16 @@ def admin_poster_engine(
 
 
 class BlockIn(BaseModel):
-    """手工加一条那一句。**只有 `host`**：形状与规范化的唯一出处是
-    `services/source_blocklist.clean_host`，这里再写一道校验就成了第二份真相。
+    """手工加一条那一句。**只有 `host`，且不带任何 Field 约束**：形状、空字、长度上限的唯一出处是
+    `services/source_blocklist.clean_host`，这里再写一道就成了第二份真相（与上面 `TextIn`、
+    `PresetNoteIn` 同一条纪律）。
+
+    ⚠ 10-19 现网探针撞出来的：这里原先写着 `Field(min_length=1, max_length=500)`，症状是
+    后台那一格**留空点加入**回的是 422「host不能为空」——屏上出现一个操作者不认识的英文词，
+    而 `clean_host` 里那句设计好的「要填一个主机名，例如 www.example.com」在 HTTP 这一路**永远走不到**
+    （只有用例读得到）。422 归 Pydantic、400 归我们那句人话，两条门谁先响是随机的，就叫分叉。
     """
-    host: str = Field(min_length=1, max_length=500)
+    host: str
 
 
 @router.get("/api/admin/source-blocklist")
