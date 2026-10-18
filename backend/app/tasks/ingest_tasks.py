@@ -139,9 +139,17 @@ def _archive_images(db, note, scraped: dict, user_id) -> dict | None:
     images = [u for u in (scraped.get("images") or []) if u]
     if not images or not note_images.channel_ready():
         return None
+    written = 0
+
+    def _booked(shot):
+        # 一张传完就落一行（见 note_images.archive 那段顺序注释）：崩在第五张时前四张已经有账，
+        # 不再是"桶里有对象、库里没行"的孤儿。
+        nonlocal written
+        written += note_images.register(db, note, [shot])
+
     try:
-        result = asyncio.run(note_images.archive(images, user_id, MAX_ASSETS_PER_NOTE))
-        written = note_images.register(db, note, result.kept) if result.kept else 0
+        result = asyncio.run(note_images.archive(
+            images, user_id, MAX_ASSETS_PER_NOTE, on_ready=_booked))
     except Exception:
         logger.exception("贴图整段没跑成（笔记已保存）：note=%s", note.id)
         return None

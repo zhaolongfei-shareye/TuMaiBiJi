@@ -80,9 +80,10 @@ class Prepared:
 
 @dataclass
 class Compressed:
-    """压完待传的那一张：字节＋**实际解出来的**宽高＋它属于哪一种格式。"""
+    """压完待传的那一张：字节＋**实际解出来的**宽高＋它属于哪一种格式＋该落成的文件尾巴。"""
     data: bytes
     mime: str
+    ext: str
     width: int
     height: int
     over_budget: bool
@@ -185,25 +186,54 @@ def _inspect(data: bytes):
     return im, long_edge
 
 
+# 动图原样存时要落的格式名。判据用的是 `is_animated`（Pillow 解出来的），**不限 GIF**——
+# 10-19 审查抓到原来那一判写的是 `fmt == "GIF"`，于是 APNG／动 WebP 会被压成静帧，
+# 而注释说的是"动图原样存"（名字比实现大）。认不出的格式一律走静图那一支，不冒充动图。
+_ANIMATED_KINDS = {
+    "GIF": ("image/gif", "gif"),
+    "PNG": ("image/apng", "png"),   # APNG 只有 Pillow 认得出它是动画时才落到这一档
+    "WEBP": ("image/webp", "webp"),
+}
+
+
+def _flatten(im):
+    """带透明通道的那张先垫到白底上，再交 JPEG（JPEG 没有 alpha）。
+
+    Pillow 的 `convert("RGB")` 是**直接丢掉 alpha、不做合成**：透明区显示成原图里存着的那层 RGB。
+    本机实测同一张 600×400（透明处底层分别是黑／白），压完四角读回 `(1,1,1)` 与 `(241,241,241)`
+    ——同一族图出来是黑块还是白块，全看原作者 PNG 里那层没人看的像素。
+    配图落在白底卡上（`--bg-card`），所以垫白：技术博客那种透明 logo／公式图不会糊成一团黑。
+    """
+    if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+        rgba = im.convert("RGBA")
+        base = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+        base.paste(rgba, mask=rgba.getchannel("A"))
+        return base.convert("RGB")
+    return im.convert("RGB")
+
+
 def _encode(im, long_edge: int, fmt: str, original: bytes) -> Compressed:
     """压到客户端那把尺子：长边 ≤1920、预算 ≤500KB、三档质量梯度，都超就交最后一档。
 
-    动图（`sz_mmbiz_gif` 那一系）**原样存、不压**——压掉就成静帧，代价比压静图大。
+    动图（`sz_mmbiz_gif` 那一系）**原样存、不压**——压掉就成静帧。
     ⚠ 这一条是我定的，站长没拍过（他只说「压缩图片」，没说要不要连动图一起压）。
     字节用的是下载那份原文：`load()` 之后 `im.fp` 已经被读过，从它再读一次是空的。
     """
-    if fmt == "GIF" and getattr(im, "is_animated", False):
-        # `over_budget` 在客户端那把尺子里是**纯字节比较**（`bytes > BUDGET_BYTES`，不问格式），
-        # 动图这一支也必须照同一个式子报：10-19 本机端到端实测，真文章里一张 1078×233 的动图
-        # 原样存就是 1,018,668 B，硬写 False 等于让账上出现"两倍预算却记成没超"。
-        return Compressed(original, "image/gif", im.width, im.height,
-                          len(original) > BUDGET_BYTES)
+    if getattr(im, "is_animated", False):
+        kind = _ANIMATED_KINDS.get(fmt)
+        if kind is not None:
+            mime, ext = kind
+            # `over_budget` 在客户端那把尺子里是**纯字节比较**（`bytes > BUDGET_BYTES`，不问格式），
+            # 动图这一支也必须照同一个式子报：10-19 本机端到端实测，真文章里一张 1078×233 的动图
+            # 原样存就是 1,018,668 B，硬写 False 等于让账上出现"两倍预算却记成没超"。
+            return Compressed(original, mime, ext, im.width, im.height,
+                              len(original) > BUDGET_BYTES)
 
-    rgb = im.convert("RGB")
     scale = min(1.0, MAX_LONG_EDGE / long_edge)
     size = (max(1, round(im.width * scale)), max(1, round(im.height * scale)))
-    if scale < 1.0:
-        rgb = rgb.resize(size, Image.LANCZOS)
+    # 先缩再垫白：带 alpha 那一趟按 RGBA 重采样才不吃边缘（先合成再缩等于把白底算进插值里两次）。
+    rgb = im.resize(size, Image.LANCZOS) if scale < 1.0 else im
+    rgb = _flatten(rgb)
 
     last = b""
     for q in QUALITY_LADDER:
@@ -211,10 +241,10 @@ def _encode(im, long_edge: int, fmt: str, original: bytes) -> Compressed:
         rgb.save(buf, "JPEG", quality=int(q * 100), optimize=True)
         last = buf.getvalue()
         if len(last) <= BUDGET_BYTES:
-            return Compressed(last, "image/jpeg", size[0], size[1], False)
+            return Compressed(last, "image/jpeg", "jpg", size[0], size[1], False)
     # 三档都超预算：按客户端同一套语义**照样存**（`compressForBackup` 里那句"宁可大一点也不丢图"），
     # 只把 overBudget 记下来。静默丢一张才是看得见的丢失。
-    return Compressed(last, "image/jpeg", size[0], size[1], True)
+    return Compressed(last, "image/jpeg", "jpg", size[0], size[1], True)
 
 
 async def _upload(client: httpx.AsyncClient, cloud_path: str, data: bytes) -> str:
@@ -256,8 +286,14 @@ async def _upload(client: httpx.AsyncClient, cloud_path: str, data: bytes) -> st
     return file_id
 
 
-async def archive(images: list[str], user_id, limit: int) -> ArchiveResult:
-    """按文档顺序取前 `limit` 张，逐张下载→压→进桶。任何一张失败都不抛。"""
+async def archive(images: list[str], user_id, limit: int, on_ready=None) -> ArchiveResult:
+    """按文档顺序取前 `limit` 张，逐张下载→压→进桶。任何一张失败都不抛。
+
+    `on_ready(Prepared)`：这一张**已经进了桶**就当场回调一次。存图那一趟是给 `_archive_images`
+    拿来登记 `assets` 行的，回调而不是"整批回来再登记"是因为顺序：对象已经占住真空间，
+    台账却排在九张之后一次性写 ⇒ 崩在第五张时前四张成了**桶里没人认的孤儿**（不进配额、
+    也没人删——对象只能客户端删）。落账紧跟写桶那一步，孤儿窗口就缩到"这一张传成、那一行没写"。
+    """
     want = [u for u in (images or []) if u][:limit]
     result = ArchiveResult(kept=[], failed=[], total=len([u for u in (images or []) if u]))
     if not want or not channel_ready():
@@ -268,17 +304,18 @@ async def archive(images: list[str], user_id, limit: int) -> ArchiveResult:
         timeout=DOWNLOAD_TIMEOUT, headers=IMAGE_HEADERS, follow_redirects=False
     ) as client:
         for url in want:
+            prepared = None
             try:
                 data = await _download(client, url)
                 im, long_edge = _inspect(data)
                 shot = _encode(im, long_edge, (im.format or "").upper(), data)
-                ext = "gif" if shot.mime == "image/gif" else "jpg"
-                file_id = await _upload(client, _cloud_path(user_id, ext), shot.data)
-                result.kept.append(Prepared(
+                file_id = await _upload(client, _cloud_path(user_id, shot.ext), shot.data)
+                prepared = Prepared(
                     file_id=file_id, mime=shot.mime, size=len(shot.data),
                     width=shot.width, height=shot.height,
                     over_budget=shot.over_budget, source_url=url,
-                ))
+                )
+                result.kept.append(prepared)
             except SkipImage as exc:
                 logger.info("贴图这一张没存上（不影响笔记）：%s url=%s", exc, url[:120])
                 result.failed.append(url)
@@ -286,6 +323,11 @@ async def archive(images: list[str], user_id, limit: int) -> ArchiveResult:
                 logger.warning("贴图这一张出了没预期的错：%s: %s url=%s",
                                type(exc).__name__, exc, url[:120])
                 result.failed.append(url)
+            # 落账写在 try **外面**：登记那一趟要是炸了（数据库、会话、约束都行），不许被上面那两个
+            # except 吞成"这一张没存上"——对象已经在桶里了，账没写就是孤儿，而且后面每一张都会同样炸，
+            # 继续传只会把孤儿堆到九张。往外抛，由 `_archive_images` 那层记一条并停在这一篇。
+            if prepared is not None and on_ready is not None:
+                on_ready(prepared)
     return result
 
 

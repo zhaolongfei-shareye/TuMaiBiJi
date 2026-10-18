@@ -27,7 +27,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 import pytest  # noqa: E402
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 
 from app.api.routes.notes import NoteUpdate  # noqa: E402
 from app.core.config import settings  # noqa: E402
@@ -403,6 +403,63 @@ class Test四_不许照URL猜:
         out = _run_archive(monkeypatch, fake, [url])
         assert not out.kept and out.failed == [url]
 
+    def test_动WebP与APNG也原样存不被压成静帧(self, channel, monkeypatch):
+        """10-19 审查抓到的"名字比实现大"：注释写"动图原样存"，那一判却写死 `fmt == "GIF"`。
+
+        这两族都是 `Accept` 里明说要收的格式，落到静图那一支就是**动画被吃掉**——
+        用户看到的是一张会动的图存下来不会动了，比"没存上"更难解释。
+        """
+        import base64
+
+        webp_frames = [Image.new("RGB", (300, 300), (c * 60 % 256, 40, 200))
+                       .convert("P", palette=Image.ADAPTIVE) for c in (1, 2)]
+        buf = io.BytesIO()
+        webp_frames[0].save(buf, "WEBP", save_all=True, append_images=webp_frames[1:],
+                            duration=100, loop=0)
+        webp = buf.getvalue()
+        png_frames = [Image.new("RGBA", (300, 300), (c * 50 % 256, 60, 180, 255)) for c in (1, 2)]
+        buf2 = io.BytesIO()
+        png_frames[0].save(buf2, "PNG", save_all=True, append_images=png_frames[1:],
+                           duration=100, loop=0)
+        apng = buf2.getvalue()
+
+        urls = ["https://a.test/anim.webp", "https://a.test/anim.png"]
+        routes = {
+            urls[0]: _img(urls[0], webp, ctype="image/webp"),
+            urls[1]: _img(urls[1], apng, ctype="image/png"),
+        }
+        flat = {k: v for d in routes.values() for k, v in d.items()}
+        fake = _wire(monkeypatch, FakeHttp(flat))
+        out = _run_archive(monkeypatch, fake, urls)
+        assert [s.mime for s in out.kept] == ["image/webp", "image/apng"], out.kept
+        sent = [base64.b64decode(p["json"]["data"]) for p in fake.posts]
+        assert sent == [webp, apng], "动图被重编码成静帧了"
+        assert [p["json"]["cloud_path"].split(".")[-1] for p in fake.posts] == ["webp", "png"]
+
+    def test_透明底那张压完垫白不糊成黑块(self, channel, monkeypatch):
+        """Pillow 的 `convert("RGB")` 是丢 alpha 不合成：原图透明处底层是黑，存出来就是一块黑。
+
+        本机实测同一张 600×400、透明区底层分别是黑／白，压完四角读回 `(1,1,1)` 与 `(241,241,241)`
+        ——同一族图出来是黑还是白全看原作者 PNG 里那层没人看的像素。配图落在白底卡上，所以垫白。
+        """
+        def shot(bg):
+            im = Image.new("RGBA", (600, 400), (bg, bg, bg, 0))
+            d = ImageDraw.Draw(im)
+            d.rectangle([80, 80, 520, 320], fill=(20, 22, 26, 255))
+            buf = io.BytesIO()
+            im.save(buf, "PNG")
+            return buf.getvalue()
+
+        for name, bg in (("底层黑", 0), ("底层白", 240)):
+            url = f"https://a.test/t-{bg}.png"
+            fake = _wire(monkeypatch, FakeHttp(_img(url, shot(bg), ctype="image/png")))
+            out = _run_archive(monkeypatch, fake, [url])
+            import base64
+            body = base64.b64decode(fake.posts[0]["json"]["data"])
+            corner = Image.open(io.BytesIO(body)).convert("RGB").getpixel((5, 5))
+            assert min(corner) > 240, f"{name}那一张四角读回 {corner}，alpha 没垫白"
+            assert out.kept[0].mime == "image/jpeg"
+
 
 # ------------------------------------------------------------------ 五、两头同值
 
@@ -565,11 +622,13 @@ class Test七_任务回体:
         statuses = []
         urls = [f"https://a.test/{i}.jpg" for i in range(12)]
 
-        async def fake_archive(images, user_id, limit):
-            return note_images.ArchiveResult(
-                kept=[note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u)
-                      for i, u in enumerate(images[:limit])],
-                failed=[], total=len(images))
+        async def fake_archive(images, user_id, limit, on_ready=None):
+            kept = [note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u)
+                    for i, u in enumerate(images[:limit])]
+            for s in kept:
+                if on_ready:
+                    on_ready(s)
+            return note_images.ArchiveResult(kept=kept, failed=[], total=len(images))
 
         note, statuses = self._run(db, statuses, monkeypatch, self._scraped(urls), fake_archive)
         payload = statuses[-1][2]
@@ -584,11 +643,13 @@ class Test七_任务回体:
         statuses = []
         urls = [f"https://a.test/{i}.jpg" for i in range(3)]
 
-        async def fake_archive(images, user_id, limit):
-            return note_images.ArchiveResult(
-                kept=[note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u)
-                      for i, u in enumerate(images)],
-                failed=[], total=len(images))
+        async def fake_archive(images, user_id, limit, on_ready=None):
+            kept = [note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u)
+                    for i, u in enumerate(images)]
+            for s_ in kept:
+                if on_ready:
+                    on_ready(s_)
+            return note_images.ArchiveResult(kept=kept, failed=[], total=len(images))
 
         monkeypatch.setattr(note_images, "register", lambda db_, note_, kept: 0)
         note, statuses = self._run(db, statuses, monkeypatch, self._scraped(urls), fake_archive)
@@ -600,7 +661,7 @@ class Test七_任务回体:
         """笔记已经落库、摘要已经出来——"存不下"不许变成"这次抓取失败"。"""
         statuses = []
 
-        async def explode(images, user_id, limit):
+        async def explode(images, user_id, limit, on_ready=None):
             raise RuntimeError("网关挂了")
 
         note, statuses = self._run(db, statuses, monkeypatch,
@@ -619,17 +680,53 @@ class Test七_任务回体:
         statuses = []
         urls = ["https://a.test/1.jpg", "https://a.test/2.jpg"]
 
-        async def fake_archive(images, user_id, limit):
-            return note_images.ArchiveResult(
-                kept=[note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 2048 + i, 40, 30, False, u)
-                      for i, u in enumerate(images)],
-                failed=[], total=len(images))
+        async def fake_archive(images, user_id, limit, on_ready=None):
+            kept = [note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 2048 + i, 40, 30, False, u)
+                    for i, u in enumerate(images)]
+            for s_ in kept:
+                if on_ready:
+                    on_ready(s_)
+            return note_images.ArchiveResult(kept=kept, failed=[], total=len(images))
 
         note, _ = self._run(db, statuses, monkeypatch, self._scraped(urls), fake_archive)
         rows = db.query(Asset).filter(Asset.note_id == note.id).all()
         assert len(rows) == 2
         assert all(r.file_size and r.width == 40 and r.height == 30 for r in rows)
         assert all(r.backup_status == "uploaded" for r in rows)
+
+    def test_登记崩在第二张时第一张已经有账且不再往下传(self, db, monkeypatch):
+        """10-19 审查那条孤儿：对象已经进桶、台账却排在整批之后一次性写。
+
+        改成"传成一张、当场落一行"之后，崩在第二张时第一张已经有行；且登记炸了不再往下传
+        （同一趟里第一张能写、第二张写不进，第三张照样写不进——继续传只会把孤儿堆到九张）。
+        """
+        statuses = []
+        urls = [f"https://a.test/{i}.jpg" for i in range(3)]
+        handed = []
+
+        async def fake_archive(images, user_id, limit, on_ready=None):
+            for i, u in enumerate(images):
+                handed.append(u)
+                on_ready(note_images.Prepared(
+                    f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u))
+            return note_images.ArchiveResult(kept=[], failed=[], total=len(images))
+
+        real = note_images.register
+        calls = {"n": 0}
+
+        def flaky(db_, note_, kept):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("数据库写不进去")
+            return real(db_, note_, kept)
+
+        monkeypatch.setattr(note_images, "register", flaky)
+        note, statuses = self._run(db, statuses, monkeypatch, self._scraped(urls), fake_archive)
+        assert note is not None and statuses[-1][1] == "completed", "存图炸了不许把这次转存判成失败"
+        assert len(handed) == 2, f"登记已经炸了还继续传：{len(handed)} 张"
+        rows = db.query(Asset).filter(Asset.note_id == note.id).all()
+        assert len(rows) == 1, f"崩之前那一张的账必须留下，现读 {len(rows)} 行"
+        assert "images_total" not in statuses[-1][2], "整段没做成时报数会被读成「一张都没存上」"
 
 
 def _make_user(db):
