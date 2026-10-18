@@ -43,7 +43,7 @@ OP_KEYS: dict[str, tuple[str, ...]] = {
     "text": ("x", "y", "lines", "lh", "size", "weight", "color", "align", "fam",
              "alpha", "track", "stroke", "strokeWidth", "vert", "colGap", "vpunct"),
     "image": ("key", "x", "y", "w", "h", "placeholder", "r", "clipCircle", "gray", "tint", "fadeFrom"),
-    "avatar": ("x", "y", "d", "ring", "ringColor", "fallback"),
+    "avatar": ("x", "y", "d", "ring", "ringColor", "fallback", "key"),
 }
 PRIM_KEYS: dict[str, tuple[str, ...]] = {
     "i18n": ("key",),
