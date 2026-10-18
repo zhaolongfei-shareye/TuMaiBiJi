@@ -145,7 +145,7 @@ async function main() {
     const d = await page.data()
     throw new Error(`${sel} 摸不到：等了 7.5 秒（active=${JSON.stringify(d.active)} busy=${d.busy} panelOpen=${d.panelOpen}）`)
   }
-  // 两枚计数**没有各自的类名**（B 方案就是两枚同类的 .blk-cell，靠 catchtap 分 goNotes/goCards），
+  // 两枚计数**没有各自的类名**（B 方案就是两枚同类的 .blk-cell，靠 catchtap 分 goNotes／goImages），
   // 所以这里不用 `:first-child` 那种伪类——automator 的选择器引擎认不认它没验过，认错了就是"摸不到＝红"。
   // 走 `$$` 拿到的那两个节点，再各自往节点里查（Element.$ 是带作用域的）。
   const cellRect = async (i, sel) => frame(await cells[i].$(sel))
@@ -309,11 +309,13 @@ async function main() {
     && near(q(parseFloat(await cellStyle(0, '.blk-lab', 'font-size'), 10)), 18, 1),
     `数字 ${q(parseFloat(await cellStyle(0, '.blk-num', 'font-size'), 10)).toFixed(1)}rpx／名 ${q(parseFloat(await cellStyle(0, '.blk-lab', 'font-size'), 10)).toFixed(1)}rpx`)
   ok('屏上两枚数字就是这个真数（不是 setData 里的另一份，也不是效果图那两个占位）',
-    (await cellText(0, '.blk-num')) === String(d4.noteCount) && (await cellText(1, '.blk-num')) === String(d4.cardCount)
-    && !(d4.noteCount === 128 && d4.cardCount === 46),
-    `屏上 ${(await cellText(0, '.blk-num'))}・${(await cellText(1, '.blk-num'))} vs data ${d4.noteCount}・${d4.cardCount}`)
-  ok('两枚名字就是屏上那两格已有的词（笔记／卡片），不借屏外新叫法',
-    (await cellText(0, '.blk-lab')) === t4.statNotes && (await cellText(1, '.blk-lab')) === t4.statCards,
+    (await cellText(0, '.blk-num')) === String(d4.noteCount) && (await cellText(1, '.blk-num')) === String(d4.imageCount)
+    && !(d4.noteCount === 128 && d4.imageCount === 46),
+    `屏上 ${(await cellText(0, '.blk-num'))}・${(await cellText(1, '.blk-num'))} vs data ${d4.noteCount}・${d4.imageCount}`)
+  /* 10-18 站长把右边那一枚从「卡片」改成「图片」（数也换成配图张数）⇒ 这两条读的名字跟着换，
+     量法一个字没改：仍是"屏上那一格的字 == 字典里那个键"，不抄字面。 */
+  ok('两枚名字就是屏上那两格已有的词（笔记／图片），不借屏外新叫法',
+    (await cellText(0, '.blk-lab')) === t4.statNotes && (await cellText(1, '.blk-lab')) === t4.statImages,
     `${await cellText(0, '.blk-lab')}／${await cellText(1, '.blk-lab')}`)
 
   /* ---------- 5. 读屏名字在渲染层也认（静态只能证明 markup 写了） ---------- */
@@ -325,7 +327,7 @@ async function main() {
   ok('左块与圆 ➕ 念的是同一句「记下来」（屏上写的和读屏念的同一句，不许两份真相）',
     aPerson === t4.barIdle && aPlus === t4.barIdle, `${JSON.stringify(aPerson)}／${JSON.stringify(aPlus)}`)
   ok('两枚计数念的是「数字＋那一格的名字」（不只念一个数）',
-    aNotes === `${d4.noteCount}${t4.statNotes}` && aCards === `${d4.cardCount}${t4.statCards}`,
+    aNotes === `${d4.noteCount}${t4.statNotes}` && aCards === `${d4.imageCount}${t4.statImages}`,
     `${JSON.stringify(aNotes)}／${JSON.stringify(aCards)}`)
   ok('剪影那枚透明热区也有读屏名字（换人这一下不能只有眼睛看得见）',
     aAlt === t4.personSwap, JSON.stringify(aAlt))

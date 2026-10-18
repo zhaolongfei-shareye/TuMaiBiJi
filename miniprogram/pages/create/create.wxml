@@ -153,17 +153,20 @@
         </view>
         <!-- 下面那一格墨黑毛玻璃里的两枚计数：数字在横线上方、名字在横线下方（他 10-13 原话
              「数字在横线上方，笔记和卡片文字在横线下方。数字稍微大一点，文字稍微小一点，与正常小字一样」）。
-             两枚都是整格可点（catchtap 不吃进左块那一点 openBar）。 -->
+             两枚都是整格可点（catchtap 不吃进左块那一点 openBar）。
+             ⚠ 10-18 他改口：「把首屏左下角的"卡片"和上面的"数量"，改为图片和数量」⇒ 右边那一枚
+             念的是「图片」＋配图张数（`storage-quota` 的 `user_count`），不再是卡片张数。
+             那一排几何一个字没动：还是同一枚 .blk-cell、同一条 .blk-rule、同一个 .blk-lab 档。 -->
         <view class="blk-count">
           <view class="blk-cell" role="button" aria-label="{{noteCount}}{{t.statNotes}}" catchtap="goNotes" hover-class="blk-cell-press" hover-stay-time="120">
             <text class="blk-num">{{noteCount}}</text>
             <view class="blk-rule"></view>
             <text class="blk-lab">{{t.statNotes}}</text>
           </view>
-          <view class="blk-cell" role="button" aria-label="{{cardCount}}{{t.statCards}}" catchtap="goCards" hover-class="blk-cell-press" hover-stay-time="120">
-            <text class="blk-num">{{cardCount}}</text>
+          <view class="blk-cell" role="button" aria-label="{{imageCount}}{{t.statImages}}" catchtap="goImages" hover-class="blk-cell-press" hover-stay-time="120">
+            <text class="blk-num">{{imageCount}}</text>
             <view class="blk-rule"></view>
-            <text class="blk-lab">{{t.statCards}}</text>
+            <text class="blk-lab">{{t.statImages}}</text>
           </view>
         </view>
       </view>

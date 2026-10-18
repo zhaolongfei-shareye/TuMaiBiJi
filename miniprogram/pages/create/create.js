@@ -159,7 +159,7 @@ Page({
     // 右两枚的计数。两个数都是装饰性的读数，拉不到就画 0（沿用笔记页那一条口径：
     // 空着或画杠读起来像坏了），但拉取本身绝不许把这一屏拖挂。
     noteCount: 0,
-    cardCount: 0,
+    imageCount: 0,
     // 首页背景：'' 表示这一屏不铺图（用户在外观设置里关掉了）
     bgSrc: '',
     // 这张背景图是浅色（字翻墨、罩子翻提亮）：每次进页由 bgTone.applyTone 定，
@@ -465,7 +465,7 @@ Page({
   },
 
   /**
-   * 右两枚的计数。两个口各自独立：笔记数拉不到不影响卡片数那一格，反之也一样。
+   * 右两枚的计数。两个口各自独立：笔记数拉不到不影响图片数那一格，反之也一样。
    * 口径与笔记页那一列一致（读不到当 0，不画杠也不留空），且整块包在 try 里——
    * 这两个数是装饰，绝不能把这一屏的门面拖挂。
    */
@@ -478,12 +478,14 @@ Page({
       this.setData({ noteCount: 0 })
     }
     try {
-      const r = await api.getMyCards()
-      const cards = (r && r.cards) || []
-      this.setData({ cardCount: Array.isArray(cards) ? cards.length : 0 })
+      // 站长 10-18「把首屏左下角的『卡片』和上面的『数量』，改为图片和数量」⇒ 这一枚数的是
+      // 名下笔记的配图张数，与服务端那一行配额同一个出处（`storage-quota` 的 `user_count`，
+      // 按 `not_failed()` 数）。不在客户端自己数第二遍——两份真相迟早分开错。
+      const s = await api.getStorageQuota()
+      this.setData({ imageCount: typeof s.user_count === 'number' && isFinite(s.user_count) ? s.user_count : 0 })
     } catch (err) {
-      console.warn('卡片那一格的数没读到（不影响界面）', err && (err.errMsg || err.statusCode))
-      this.setData({ cardCount: 0 })
+      console.warn('图片那一格的数没读到（不影响界面）', err && (err.errMsg || err.statusCode))
+      this.setData({ imageCount: 0 })
     }
   },
 
@@ -492,13 +494,12 @@ Page({
     wx.switchTab({ url: '/pages/index/index' })
   },
 
-  // 右下那枚原来指到「笔记卡片」那一枚 tab，并递一个一次性标记过去
-  // （站长 10-04 那句"每次进页默认第一个 tab"，所以必须靠标记才落得到第二枚）。
-  // ⚠ 10-17 两屏合一：那一枚 tab 没有了 ⇒ 标记与读它的那一段一起作废，这里只剩切过去这一个动作。
-  // 落点与上面那枚**变成同一个屏**——这是合一带出来的后果，不是我要改首屏那两格：
-  // 两格各自念的是"笔记几篇／卡片几张"那两个数，数还在、口径也没变（合一那一屏右侧就是配图，
-  // 线上 ▢ 就是出过卡片）。要不要合并成一格，等他一句，我不自己撤。
-  goCards() {
+  // 右下那枚原来指到「笔记卡片」那一枚 tab，并递一个一次性标记过去；10-17 两屏合一之后那枚 tab 没了，
+  // 标记与读它的那一段一起作废，这里只剩切过去这一个动作。
+  // ⚠ 10-18 这一枚改口念「图片」＋配图张数（站长那句），**落点没动**：合一那一屏右侧就是配图，
+  // 所以点「图片」跳去那里是对的。两枚现在落同一个屏——这是合一带出来的后果，不是这一刀引进的；
+  // 要不要并成一格，等他一句，我不自己撤。
+  goImages() {
     wx.switchTab({ url: '/pages/index/index' })
   },
 

@@ -447,15 +447,22 @@ ok('两枚数字那一格只能是 mustache，不许是写死的数字（稿上�
   (wxml.match(/class="blk-num">[^<{]*\d/g) || []).length === 0
   && (wxml.match(/class="blk-num">\{\{/g) || []).length === 2
   && !/>\{\{?(128|46|16|13)\}?\}/.test(wxml))
-ok('两枚各自绑自己的位（noteCount／cardCount），且都从接口来',
+/* 10-18 站长「把首屏左下角的『卡片』和上面的『数量』，改为图片和数量」⇒ 右边那一枚从
+   "卡片几张"（`getMyCards().cards.length`）换成"配图几张"（`storage-quota` 的 `user_count`，
+   服务端按 not_failed 数）。下面三条跟着改口，另补一条钉"不许在客户端数第二遍"。 */
+ok('两枚各自绑自己的位（noteCount／imageCount），且都从接口来',
   /class="blk-num">\{\{noteCount\}\}<\/text>/.test(wxml)
-  && /class="blk-num">\{\{cardCount\}\}<\/text>/.test(wxml)
-  && /api\.getQuota\(\)/.test(jsOnly) && /api\.getMyCards\(\)/.test(jsOnly))
+  && /class="blk-num">\{\{imageCount\}\}<\/text>/.test(wxml)
+  && /api\.getQuota\(\)/.test(jsOnly) && /api\.getStorageQuota\(\)/.test(jsOnly))
+ok('图片那一格的数只有服务端那一个出处（不许在客户端拿卡片清单或别的数组现数一遍）',
+  /imageCount: typeof s\.user_count === 'number'/.test(jsOnly)
+  && !/imageCount: Array\.isArray/.test(jsOnly)
+  && !/api\.getMyCards\(\)/.test(jsOnly))
 ok('两个口各自独立：任一拉不到不许把另一格和这一屏一起拖挂（各包各的 try）',
   (jsOnly.match(/try \{[\s\S]*?getQuota[\s\S]*?\} catch/g) || []).length === 1
-  && (jsOnly.match(/try \{[\s\S]*?getMyCards[\s\S]*?\} catch/g) || []).length === 1)
+  && (jsOnly.match(/try \{[\s\S]*?getStorageQuota[\s\S]*?\} catch/g) || []).length === 1)
 ok('读不到画 0，不画杠也不留空（沿用笔记页那一列 10-01 定的口径）',
-  /noteCount: 0/.test(js) && /cardCount: 0/.test(js))
+  /noteCount: 0/.test(js) && /imageCount: 0/.test(js))
 ok('每次进页重读这两个数（出完图回来该跟着涨）',
   /this\.loadEntryStats\(\)/.test(js.split('async onShow')[1].split('hintFor(value)')[0]))
 
@@ -470,7 +477,7 @@ ok('左块点下去仍是 openBar 那一档（拍照），没有另起一套开�
       它会让人以为还有第二枚可落）。 */
 ok('首屏那两格都还是 switchTab 到笔记列表（合一之后两格同一个落点，入口一枚没撤）',
   /goNotes\(\)[\s\S]{0,160}switchTab\(\{ url: '\/pages\/index\/index' \}/.test(js)
-  && /goCards\(\)[\s\S]{0,160}switchTab\(\{ url: '\/pages\/index\/index' \}/.test(js))
+  && /goImages\(\)[\s\S]{0,160}switchTab\(\{ url: '\/pages\/index\/index' \}/.test(js))
 ok('那一枚一次性标记全站清零（写它的、读它的、清它的都不许在；注释里留来历不算）',
   !/ixOpenCardsTab/.test(jsOnly)
   && !/ixOpenCardsTab/.test(ixJs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
@@ -664,9 +671,13 @@ ok('barIdle 那一键中英都在（屏上不写了，读屏还念它）',
 ok('屏面上不再出现那一整条白皮（`.blk-jot` 的 markup 与样式都没有，含它那句「照片 · 链接 · 文字」）',
   !/blk-jot/.test(wxml + wxss)
   && !/\{\{t\.modePhoto\}\} · \{\{t\.modeUrl\}\} · \{\{t\.modeWrite\}\}/.test(wxml))
-ok('两枚计数的标签成对（statNotes／statCards），且不借名片那一格的 slotCard',
-  !!zh.statNotes && !!zh.statCards && !!en.statNotes && !!en.statCards
-  && /t\.statNotes/.test(wxml) && /t\.statCards/.test(wxml) && !/t\.slotCard/.test(wxml))
+/* 10-18 那一句改口之后，右边那一枚的键叫 statImages（值是「图片」／"Images"）。
+   旧键 statCards 整把尺子扫全站确认没有第二个消费者，所以是**改名**不是加键——
+   留一个没人读的键，下次谁搜「卡片」会读到它并以为那一格还在数卡片。 */
+ok('两枚计数的标签成对（statNotes／statImages），且不借名片那一格的 slotCard',
+  !!zh.statNotes && !!zh.statImages && !!en.statNotes && !!en.statImages
+  && zh.statImages === '图片' && !/statCards/.test(JSON.stringify([zh, en]))
+  && /t\.statNotes/.test(wxml) && /t\.statImages/.test(wxml) && !/t\.slotCard/.test(wxml))
 // 这一组里每一枚"整块可点"的东西都得有 role＋aria-label，词**全部复用屏上已有的字典键**，
 // 不另编一句。枚数从 markup 现数：卡、两枚计数格、剪影热区、圆形 ➕ ＝ 5 枚，一枚都不能漏
 // （漏的那一枚读屏只念数字或不念，屏上看着没毛病）。
@@ -680,7 +691,7 @@ ok('这一组每一枚可点的都挂了 role="button" + aria-label（5 枚，�
   `${ariaHeads.length} 枚／缺 role 或 aria 的：` + ariaHeads.filter((t) => !/role="button"/.test(t)).length)
 ok('两枚计数的 aria-label 是「数字＋那一格的名字」拼出来的，不借屏外新词',
   /aria-label="\{\{noteCount\}\}\{\{t\.statNotes\}\}"/.test(wxml)
-  && /aria-label="\{\{cardCount\}\}\{\{t\.statCards\}\}"/.test(wxml))
+  && /aria-label="\{\{imageCount\}\}\{\{t\.statImages\}\}"/.test(wxml))
 ok('中英键数相等', Object.keys(zh).length === Object.keys(en).length,
   `${Object.keys(zh).length} vs ${Object.keys(en).length}`)
 // 旧胶囊那句撤干净没有，要扫整个 miniprogram 目录（不止这一页：别处也可能还写着那句）。

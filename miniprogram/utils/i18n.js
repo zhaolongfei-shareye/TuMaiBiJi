@@ -95,10 +95,12 @@ const i18n = {
     notesHeading: '我的笔记',
     // 首页右上角那一列的小字。原来三列（笔记/分享/种草），10-04 站长拍板把后两列废掉：
     // 分享与种草那两屏本就没做，服务端那两个字段一起撤了，所以这里只留「笔记」一串。
-    // 10-10 晚第一屏换成三块，右两枚各要一个计数标签：statCards 与 statNotes 配成一对，
-    // 不借名片那一格的 slotCard——那一枚说的是"这个槽当卡片用"，和"生成了几张笔记卡片"是两件事。
+    // 10-10 晚第一屏换成三块，右两枚各要一个计数标签：不借名片那一格的 slotCard——那一枚说的是
+    // "这个槽当卡片用"，和"名下有几张图"是两件事。**10-18 站长「把首屏左下角的卡片和上面的数量，
+    // 改为图片和数量」⇒ 下面那一枚念的是配图张数（`/api/user/storage-quota` 的 `user_count`），
+    // 所以键跟着改成 statImages；旧的 statCards 在这屏之外没有第二个消费者，不留死键。**
     statNotes: '笔记',
-    statCards: '卡片',
+    statImages: '图片',
     searchPh: '输入关键词',
     // v19 这一屏（站长 10-03 凌晨拍）：列表区顶上两枚 tab + X 式列表 + 卡片网格。
     // 第二枚那两个字不新造，仍读上面那串 navShare（现网原串「笔记卡片」）。
@@ -513,8 +515,9 @@ const i18n = {
     search: 'Search notes',
     notesHeading: 'My notes',
     statNotes: 'Notes',
-    // 与中文那一对同一个道理：这是"生成了几张笔记卡片"的计数标签，不是名片槽位那个 slotCard。
-    statCards: 'Cards',
+    // 与中文那一对同一个道理：这是"名下有几张图"的计数标签，不是名片槽位那个 slotCard。
+    // 10-18 随站长那句改成 Images（数的是配图张数，见 `create.js` 的 `loadEntryStats`）。
+    statImages: 'Images',
     searchPh: 'Enter keywords',
     // 与中文侧一一对应的三串（v19）。第二枚 tab 那两个字仍读 navShare。
     tabList: 'List',

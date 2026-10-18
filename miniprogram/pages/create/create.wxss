@@ -406,7 +406,7 @@
 }
 
 /* 两枚各 (308 − 44 − 20)/2 ＝ 122 宽，与效果图上那两个格子同一个等式。
-   整格可点：catchtap 各走 goNotes／goCards，不吃进左块那一点 openBar。 */
+   整格可点：catchtap 各走 goNotes／goImages，不吃进左块那一点 openBar。 */
 .blk-cell {
   flex: 1;
   min-width: 0;

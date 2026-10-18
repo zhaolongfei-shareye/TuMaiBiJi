@@ -54,7 +54,7 @@ MOODS.forEach((m) => {
       <div class="face"><span class="fig"></span><span class="fig2"></span></div>
       <div class="count" style="background:${rgb(band)};color:${ink}">
         <div><em>0</em><hr><span style="color:${inkDim}">${zh.statNotes}</span></div>
-        <div><em>0</em><hr><span style="color:${inkDim}">${zh.statCards}</span></div>
+        <div><em>0</em><hr><span style="color:${inkDim}">${zh.statImages}</span></div>
       </div>
       <div class="tips" style="color:${ink}"><i style="background:${TIP_DOT}"></i>${zh.tipsPrefix}${zh.tips[1]}</div>
       <div class="plus" style="background:${skin['cp-cam']};color:${skin['cp-cam-ink']}">+</div>

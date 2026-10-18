@@ -53,7 +53,7 @@ function frame(lang, kind) {
   ${swapAbovePanel}
   <div class="panel" style="background:${rgb(FACE)}">
     <div class="face"></div>
-    <div class="count" style="background:rgba(${ink.band},.94)"><div><em>0</em><hr><span>${t.statNotes}</span></div><div><em>0</em><hr><span>${t.statCards}</span></div></div>
+    <div class="count" style="background:rgba(${ink.band},.94)"><div><em>0</em><hr><span>${t.statNotes}</span></div><div><em>0</em><hr><span>${t.statImages}</span></div></div>
     <div class="tips"><i style="background:${TIP_DOT}"></i>${t.tipsPrefix}${t.tips[1]}</div>
     <div class="plus" style="background:${skin['cp-cam']};color:${skin['cp-cam-ink']}">+</div>
     <div class="tab"><b style="background:${skin['cp-cam']}">+</b><u></u><u></u></div>
