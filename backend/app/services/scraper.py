@@ -174,9 +174,10 @@ async def _fetch_and_parse(url: str) -> dict:
         parsed = _parse_wechat_article(html, url, source_type)
     else:
         parsed = _parse_general_url(html, url, source_type)
-        # 小红书那一族的笔记图不在 DOM 里（DOM 上只有 UI 图标），藏在 `__INITIAL_STATE__` 那段 JSON。
-        # **只用跳转后的末址判**（`xhslink.cn` 短链进来时 host 还不是它），文字仍走 trafilatura 那一份：
-        # 这一刀只往返回体里补 `images`／`author` 两键，不改用户看到的正文，也不改 `source_type`。
+        # 小红书那一族的笔记内容（标题、正文、图、作者）**都不在 DOM 里**，藏在 `__INITIAL_STATE__` 那段 JSON。
+        # **只用跳转后的末址判**（`xhslink.cn` 短链进来时 host 还不是它）。10-19 现读那篇：DOM 读出的 248 字是页面皮
+        # （`创作中心／© 2014-2026／行吟信息科技／地址／电话`），笔记真正的正文是 `note.desc` 那 41 字
+        # ⇒ 这一族四格全改吃 JSON（方案第三节第 1 项「要正经解析那段 JSON」）。
         if _is_xiaohongshu(current_url):
             parsed.update(_xiaohongshu_extras(html))
     # 带出这一枚数只为后台那一栏的"最后一次状态码"（规格-来源黑名单 §五）。
@@ -298,13 +299,14 @@ def _balanced_object(text: str, start: int) -> str:
 
 
 def _xiaohongshu_extras(html: str) -> dict:
-    """从小红书那篇的 `__INITIAL_STATE__` 里补两键：`images`（按顺序）与 `author`。
+    """从小红书那篇的 `__INITIAL_STATE__` 里取出这一族的四格：`title`／`content`／`images`／`author`。
 
-    10-19 现读那篇的形状（`/tmp/xhs.html`，noteId `6ad40f01000000002203c359`）：
-    `note.noteDetailMap[<noteId>].note.imageList[]` 共 **5 张**，每张有 `urlDefault`／`urlPre`
-    与 `infoList[{imageScene: WB_PRV|WB_DFT, url}]`；作者名在 `note.user.nickname`。
-    **取 `urlDefault`**——`urlPre` 是 `WB_PRV`（预览那张），不是笔记里的那一张。
-    解不开、结构不对、图列表为空，一律回空（这条不许把整次抓取带崩：文字本来读得到）。
+    10-19 现读那篇的形状（noteId `6ad40f01000000002203c359`）：
+    `note.noteDetailMap[<noteId>].note` 里有 `title`／`desc`／`imageList[]`／`user.nickname`；
+    `imageList` 共 **5 张**，每张有 `urlDefault`／`urlPre` 与 `infoList[{imageScene: WB_PRV|WB_DFT, url}]`。
+    **图取 `urlDefault`**——`urlPre` 是 `WB_PRV`（预览那张），不是笔记里的那一张。
+    哪一格在 JSON 里是空的就不覆盖那一格（有的笔记没有标题；跳到用户页／合集页时整段 `note` 都没有，
+    那时 DOM 那一份仍是唯一出口）。解不开、结构不对一律回空——这条不许把整次抓取带崩。
     """
     at = html.find(_XHS_STATE_KEY)
     if at < 0:
@@ -330,6 +332,12 @@ def _xiaohongshu_extras(html: str) -> dict:
         if isinstance(item, dict):
             urls.append(_http_image_url("", str(item.get("urlDefault") or item.get("url") or "")))
     out = {"images": _dedupe_order([u for u in urls if u])}
+    title = str(note.get("title") or "").strip()
+    if title:
+        out["title"] = title
+    desc = str(note.get("desc") or "").strip()
+    if desc:
+        out["content"] = desc
     name = ((note.get("user") or {}).get("nickname") or "").strip()
     if name:
         out["author"] = name

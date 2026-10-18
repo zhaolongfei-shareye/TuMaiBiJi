@@ -13,6 +13,7 @@
 
 全程不出网：下载与上传都换成记账的替身，域名解析一律 monkeypatch。
 """
+import asyncio
 import io
 import os
 import sys
@@ -558,13 +559,68 @@ class Test六_来源:
         assert parsed["images"] == ["https://mmbiz.qpic.cn/a.png", "https://mmbiz.qpic.cn/b.png"], \
             "地址要补成绝对、按文档顺序去重，而且只读 data-src（实测一条 src 都没有）"
 
-    def test_小红书那一篇的图不在DOM里(self):
+    def test_小红书那一篇四格全从那段JSON里取(self):
         extra = scraper._xiaohongshu_extras(XHS_HTML)
         assert extra["images"] == ["http://s.test/1.jpg", "http://s.test/2.jpg"], "取 urlDefault，不是 urlPre"
         assert extra["author"] == "护护"
+        # 10-19 现读那篇：DOM 那一份读出来是页面皮（`创作中心／© 2014-2026／行吟信息科技／地址／电话`），
+        # 笔记真正的正文只在 `note.desc`。所以标题与正文这两格也必须出自 JSON。
+        assert extra["title"] == "芭蕾第二集"
+        assert extra["content"] == "家长们看看吧"
+
+    def test_JSON里那一格是空的就不覆盖DOM(self):
+        """有的笔记没标题、跳到用户页／合集页时整段 note 都没有——那两格不许被写成空串。"""
+        empty = XHS_HTML.replace('"title":"芭蕾第二集","desc":"家长们看看吧"', '"title":"","desc":""')
+        extra = scraper._xiaohongshu_extras(empty)
+        assert "title" not in extra and "content" not in extra, "空串覆盖上去就是把已有的那一格抹掉"
+        assert extra["images"] and extra["author"] == "护护"
 
     def test_那段JSON解不开时只是没有图(self):
         assert scraper._xiaohongshu_extras("<script>window.__INITIAL_STATE__={坏掉的") == {}
+
+    def test_接线那一处_小红书走JSON那一份而不是页面皮(self, monkeypatch):
+        """只测 `parsed.update(_xiaohongshu_extras(...))` 这一行：撤掉它，屏上的正文就回成页面皮。"""
+        html = XHS_HTML.replace('<meta property="og:title" content="芭蕾第二集">',
+                                '<meta property="og:title" content="芭蕾第二集 - 小红书">') \
+                        .replace('<img src="https://fe-static.xhscdn.com/ui-icon.png">',
+                                 '<div>创作中心 业务合作 行吟信息科技（上海）有限公司</div>')
+
+        class _Resp:
+            status_code = 200
+            is_redirect = False
+            encoding = "utf-8"
+            headers: dict = {}
+
+            async def aiter_bytes(self, chunk_size=8192):
+                yield html.encode("utf-8")
+
+        class _Stream:
+            async def __aenter__(self):
+                return _Resp()
+
+            async def __aexit__(self, *a):
+                return False
+
+        class _Client:
+            def __init__(self, *a, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            def stream(self, method, url):
+                return _Stream()
+
+        monkeypatch.setattr(scraper, "_validate_url", lambda u: None)
+        monkeypatch.setattr(scraper.httpx, "AsyncClient", _Client)
+        parsed = asyncio.run(
+            scraper._fetch_and_parse("https://www.xiaohongshu.com/discovery/item/6ad40f01000000002203c359"))
+        assert parsed["content"] == "家长们看看吧", "这一族的正文必须出自 note.desc，不是 DOM 那一份页面皮"
+        assert parsed["title"] == "芭蕾第二集", "标题也一样：og:title 那一份带着「 - 小红书」这种站点后缀"
+        assert parsed["source_type"] == "web_article", "改的是取法，不是那一枚配额用得到的来源类型"
 
     def test_快照键名与转存那一路逐字同名(self):
         parsed = scraper._parse_wechat_article(WX_HTML, "https://mp.weixin.qq.com/s/x", "wechat_article")
