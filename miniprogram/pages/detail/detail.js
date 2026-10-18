@@ -6,7 +6,7 @@ const cloudUpload = require('../../utils/cloudUpload.js')
 const mpAssets = require('../../utils/mpAssets.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const privateGate = require('../../utils/privateGate.js')
-const { labelOf } = require('../../utils/catText.js')
+const { labelOf, bracketOf } = require('../../utils/catText.js')
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
 
@@ -109,7 +109,13 @@ Page({
           console.error('加载分类列表失败', err)
         }
       }
-      note.category_name = categoryName
+      // 没分到任何一格里也照样念「未分类」：站长 10-18 那一刀的排布丙就是 `「未分类」· 公众号文章 · 10月18日`，
+      // 那一档空着会让人以为这一行缺了一栏。查不到（分类表那一趟挂了）而 category_id 有值时仍念空串，
+      // 与首页 `skin()` 里 `privKnown` 同一个口径：不知道的时候宁可少念，不猜。
+      note.category_name = categoryName || (note.category_id == null ? this.data.t.noCategory : '')
+      // 那一档两边的那对引号（中英两档不一样，规则只在 utils/catText.js）。
+      // 屏上念的是这一串；`category_name` 那一份原样留着给卡片模板那行小字吃，那张上面不裹引号。
+      note.catSeg = bracketOf(note.category_name, lang)
 
       // 详情页头部沿用列表那一行的方块：颜色与构图必须和列表里那条一模一样，
       // 所以复用 blockSkinFor，不在这另写一套取色规则。

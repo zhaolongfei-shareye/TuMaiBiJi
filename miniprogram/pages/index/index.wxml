@@ -164,6 +164,7 @@
                 catchtap="onRowTap" data-idx="{{r.i}}">
             <view class="ixl-mid">
               <view class="ixl-src">
+                <text wx:if="{{r.cat}}" class="ixl-cat {{r.priv ? 'cat-priv' : ''}}">{{r.cat}}·</text>
                 <text class="ixl-src-t">{{r.src}}</text>
                 <text wx:if="{{r.who}}" class="ixl-who">· {{r.who}}</text>
               </view>
@@ -215,7 +216,7 @@
            头一排那两列分栏撤了 ⇒ 来源／标题／标签三行摊满整宽，标题底下不再有这篇留过的卡片那一格。
            `.ds-rt`/`.ds-pad` 本体留在 `app.wxss` 没删——独立详情页那一屏还在用，这一轮没动它。
            标签跟着他这一句弱化了（「只需要显示标签名字，灰字，不加底色，不加粗」），写法见 index.wxss 的 `.ds-tag`。 -->
-      <view class="ds-meta">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</view>
+      <view class="ds-meta"><text wx:if="{{detailNote.catSeg}}" class="ds-cat {{detailNote.is_private ? 'cat-priv' : ''}}">{{detailNote.catSeg}}·</text><text class="ds-rest">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</text></view>
       <view class="ds-h2">{{detailNote.title}}</view>
       <view class="ds-tags" wx:if="{{detailNote.tags && detailNote.tags.length}}">
         <text class="ds-tag" wx:for="{{detailNote.tags}}" wx:key="*this" wx:for-item="tg">#{{tg}}</text>

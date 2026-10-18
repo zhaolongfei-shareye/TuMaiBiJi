@@ -12,4 +12,14 @@ function labelOf(cat, lang) {
   return one || cat.name || ''
 }
 
-module.exports = { labelOf }
+/* 分类那一档两边的那对引号（站长 10-18「详情页顶部，来源前面加『分类』…列表页也同样加上」，
+   排布按他拍的丙＝`「未分类」· 公众号文章 · 10月18日`）。
+   ⚠ 中英两档**不一样**：现网那半张英文表里没有一句串用直角引号（`「`只出现在中文那一半，
+   逐条数过），英文态照旧套 `「」` 就是把 CJK 的排版习惯搬到英文上。所以英文用直排双引号。
+   口径仍然只有 `labelOf` 那一份，这一枚只管在外面裹那对符号、不碰名字本身。 */
+function bracketOf(name, lang) {
+  if (!name) return ''
+  return lang === 'zh' ? `「${name}」` : `"${name}"`
+}
+
+module.exports = { labelOf, bracketOf }

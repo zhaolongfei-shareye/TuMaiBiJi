@@ -64,6 +64,13 @@
   margin-bottom: 10rpx;
 }
 
+/* 分类那一档（站长 10-18 丙：`「分类」· 来源 · 时间`，分类在最左、不要竖线）。
+   与详情窗 `.ds-cat` 同一条规矩：那个点号写在文字里，空隙挂在自己身上，后面那段裹成
+   `.hero-rest` 让真跑量得到那道缝；颜色不写在这里——私密那一格的红只从 `app.wxss` 那枚 `--priv-ink` 走一处出口。 */
+.hero-cat {
+  margin-right: 8rpx;
+}
+
 .hero-title {
   font-size: 36rpx;
   font-weight: 800;

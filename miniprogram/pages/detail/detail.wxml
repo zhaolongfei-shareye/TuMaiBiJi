@@ -15,7 +15,7 @@
     <view class="card hero-flat">
       <view class="dt-hero {{note.is_private || !detailCards.length ? 'solo' : ''}}">
         <view class="dt-lt">
-          <view class="hero-meta">{{note.source_type_label}} · {{note.created_at_label}}</view>
+          <view class="hero-meta"><text wx:if="{{note.catSeg}}" class="hero-cat {{note.is_private ? 'cat-priv' : ''}}">{{note.catSeg}}·</text><text class="hero-rest">{{note.source_type_label}} · {{note.created_at_label}}</text></view>
           <view class="hero-title">{{note.title}}</view>
           <view class="tags" wx:if="{{note.tags && note.tags.length}}">
             <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">#{{tg}}</text>

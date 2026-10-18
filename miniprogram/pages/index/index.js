@@ -7,7 +7,7 @@ const cardCloud = require('../../utils/cardCloud.js')
 const cardInfo = require('../../utils/cardInfo.js')
 const { isPrivate, needsUnlock, unlockOn } = require('../../utils/privateGate.js')
 // 分类名那一档显示值：一句规则四处吃（列表、录入、详情、海报），口径写在文件头。
-const { labelOf } = require('../../utils/catText.js')
+const { labelOf, bracketOf } = require('../../utils/catText.js')
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
@@ -320,13 +320,20 @@ Page({
   },
 
   skin(notes) {
+    const lang = this.data.lang
     const nameOf = {}
+    // 分类**显示名**另存一张表：`nameOf` 那一支吃的是 `cat.name`（他自己打的字，是身份，
+    // 重名判据与私密判据都用它），下面这一支才是给人看的那一档译文（规则只在 utils/catText.js）。
+    const showOf = {}
     // 分类色仍按 V2 那套派生（详情窗里那几枚标签和要点序号吃 --cat-ink/--cat-dot/--cat-chip）。
     // 纸片墙那一族莫兰迪（paperSkinFor）随 v19 一起撤了：列表不按分类铺底色。
     // ⚠ 这一句原来还带着"状态标记也不在列表上画，公不公开只在详情窗下沿那一句里说"——
     // 10-17 合一把它翻了一半：行上那条标识轨（★ 分享过／▢ 出过卡片／🔒 私密）就是状态标记，
     // 用的是同一支墨、不穿色块，所以"不按分类铺底色"照旧成立。
-    this.data.categories.forEach((c) => { nameOf[c.id] = c.name })
+    this.data.categories.forEach((c) => {
+      nameOf[c.id] = c.name
+      showOf[c.id] = labelOf(c, lang)
+    })
     const wallpaper = getApp().getWallpaper()
     notes.forEach((n) => {
       const s = catSkinFor(n.category_id, wallpaper)
@@ -346,6 +353,16 @@ Page({
       // 时 nameOf 是空的，`isPrivate(undefined)` 一律回 false——那是**不知道**，不是**不私密**。
       // 卡片那一排不许拿"不知道"当"不私密"画（站长 10-12 拍 C1 甲：宁可偶尔少画几张）。
       n.privKnown = n.category_id == null || nameOf[n.category_id] !== undefined
+      // 分类那一档的显示名（站长 10-18「详情页顶部，来源前面加『分类』…列表页也同样加上」）。
+      // 没分到任何一格里也照样念「未分类」——那一档空着会让人以为这一行缺了一栏。
+      // 分类表还没回来（或那一趟挂了）时 `showOf` 是空的 ⇒ 念空串 ⇒ wxml 里那一段整块不画，
+      // 与上面 `privKnown` 那一条同一个口径：不知道的时候宁可少念，不猜。
+      n.category_name = n.category_id == null
+        ? t('noCategory', lang)
+        : (showOf[n.category_id] || '')
+      // 那一档两边的那对引号在中英两档不一样（规则只在 utils/catText.js），所以屏上念的是这一串、
+      // 不是 `category_name` 本身：后者还得留给海报，那张上面不裹引号。
+      n.catSeg = bracketOf(n.category_name, lang)
     })
     return notes
   },
@@ -385,6 +402,8 @@ Page({
         i,
         id: n.id,
         title: n.title,
+        // 分类那一档（`skin()` 现算、连那对引号一起）：空串＝还没知道，那一整段（连它后面那个点）都不画。
+        cat: n.catSeg || '',
         src: n.source_type_label,
         // 转存来的那一篇，来源那一档后面跟着原分享者的昵称（服务端那栏 `share_author_name`）。
         // 原来它钉在摘要那一行右端，摘要随这次做减法撤了——**信息没撤**，搬进同一档里念。

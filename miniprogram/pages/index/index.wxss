@@ -663,6 +663,13 @@
   white-space: nowrap;
 }
 
+/* 分类那一档（站长 10-18「列表页也同样加上」，排布按他拍的丙＝分类在最左、不要竖线）。
+   红与不红都只由 `app.wxss` 那枚 `.cat-priv` 管，这里只管"别被挤断"——与 `.ixl-src-t` 同一档。 */
+.ixl-cat {
+  flex: none;
+  white-space: nowrap;
+}
+
 .ixl-who {
   min-width: 0;
   white-space: nowrap;
@@ -846,6 +853,15 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 分类那一档：那个点号跟在文字里，与后面那段之间这 8rpx 写在**这一格自己身上**，
+   不靠源码里的空格（源码里两个标记之间那一段空白会被折掉，屏上就少一个空格）。
+   后面那段因此也裹成一枚 `<text class="ds-rest">`——不是为了样式，是为了真跑能量到这两面之间的缝
+   （`验-来源前加分类-真跑`；裸文本节点在 SelectorQuery 里没有 face，量不了）。
+   颜色同上：只有 `.cat-priv` 盖得上来，这一条不写 color，私密那一格才吃得动全局那一枚红。 */
+.ds-cat {
+  margin-right: 8rpx;
 }
 
 .ds-h2 {
