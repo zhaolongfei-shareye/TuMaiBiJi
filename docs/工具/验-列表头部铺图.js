@@ -26,6 +26,9 @@ const wxss = wxssRaw.replace(/\/\*[\s\S]*?\*\//g, '')
 const cjs = read('pages/index/index.js')
 const i18n = read('utils/i18n.js')
 const createWxss = read('pages/create/create.wxss')
+// 独立详情页那处分类段也在这把尺子的射程里（他点的是"筛选那一枚"，不是全站分类名都加粗加线）。
+const dwxssRaw = read('pages/detail/detail.wxss')
+const dwxss = dwxssRaw.replace(/\/\*[\s\S]*?\*\//g, '')
 
 // 选择器必须顶到行首才算"这一段自己"，但同一个选择器可能出现在两处：
 // `.container.has-bg .sheet` 既是四条并列抬层规则的最后一条，又是纸自己那一条。
@@ -35,6 +38,13 @@ const seg = (src, sel, hint) => {
   const all = [...src.matchAll(new RegExp(`(?:^|\\n)${esc}\\s*\\{([^}]*)\\}`, 'g'))].map((m) => m[1])
   if (!all.length) return ''
   return hint ? (all.find((b) => b.includes(hint)) || '') : all[0]
+}
+// 同一个选择器**写成两条**时 `seg` 只看第一条＝假牙（反向探针第三条就是这么躲过去的：
+// 往 `.ix-cat.on` 里补一条带 `text-decoration` 的规则，判据读的还是上面那一条，绿着）。
+// 负向判据一律用这个"全部并起来"的版本；正向（"必须有一处写着 600"）用 seg 就够。
+const segs = (src, sel) => {
+  const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return [...src.matchAll(new RegExp(`(?:^|\\n)${esc}\\s*\\{([^}]*)\\}`, 'g'))].map((m) => m[1]).join('\n')
 }
 
 // ---------- 1. 结构 ----------
@@ -332,18 +342,30 @@ ok('那一支只改 color、不许带底色或纸白（底色归 R14 那枚 α .
 // 10-09 这一层从层色换成 `--bg-card` 之后，"压在层面上的那一支冷墨"（`--ink-on-layer*`）在分类
 // 这一行没有对象了：两档字与短杠改吃这一页的墨（`--text-primary`／`--text-secondary`），
 // 与「我的」页那四行同一对。留着旧那两个名字就是拿冷墨写暖底。
-/* 站长 10-16「分类名字，不要加粗，不要纯黑，下划线也一样」⇒ 三样一起撤：
-   字重 600→400、`.on` 那档从整档墨 `--text-primary` 落到 `--text-secondary`（与未选那一档同一档，
-   选中这件事只靠"它在最前"表达）、那枚短杠 `.ix-cat.on::after` 整枚删掉。
-   ⚠ 这一条从"两档不同色"翻成"两档同色"：判据的前提是他今天这一句，不是 10-09 那一句。
-   ⚠ 撤掉短杠之后**没有任何屏上标记**表示"当前是哪一枚分类"——那一条我没自己补，钉成待拍（D38）。 */
-ok('分类那两档同一档字色（都吃 --text-secondary）、都不加粗、短杠整枚撤掉（10-16 三样一起撤）',
+/* 站长 10-16「分类名字，不要加粗，不要纯黑，下划线也一样」⇒ 三样一起撤（字重 600→400、`.on` 从整档墨
+   落到 `--text-secondary`、那枚短杠 `.ix-cat.on::after` 整枚删掉）。撤完的那一夜这一行**没有任何屏上标记**
+   表示"当前筛在哪一格"，钉成待拍 D38。
+   ⚠ 10-18 深夜他把其中两样给回来了（「选择笔记筛选某个分类，该分类要加下划线，字体加粗，提醒用户」）⇒
+   这一条从"两档同数"改回"两档拉开"：**只有选中那一枚**吃 600 ＋ 里层文字加下划线。
+   ⚠ 第三样（纯黑）他这次没提 ⇒ `.on` 照旧 `--text-secondary`，不许我顺手抬墨。
+   ⚠ 他要的是"下划线"＝`text-decoration`，不是 10-16 撤掉的那枚绝对定位的短杠（`::after`）——那枚仍不许回来。
+   ⚠ 10-17 那档字号（`--fs-meta` 24 → `--fs-tiny` 21）不在这次改动里，"选中态"靠的是字重与线，不是字号。 */
+ok('选中那一枚加粗到 600、里层文字加下划线；平时那一枚仍 400 无线；两档同字色（他没要纯黑）；短杠照旧不许回来',
   /color: var\(--text-secondary\)/.test(seg(wxss, '.ix-cat'))
   && /color: var\(--text-secondary\)/.test(seg(wxss, '.ix-cat\.on'))
   && !/font-weight:\s*[5-9]00/.test(seg(wxss, '.ix-cat'))
-  && !/font-weight:\s*[5-9]00/.test(seg(wxss, '.ix-cat\.on'))
+  && /font-weight:\s*600/.test(seg(wxss, '.ix-cat\.on'))
+  && /text-decoration:\s*underline/.test(seg(wxss, '.ix-cat.on .ix-cat-t'))
   && !/\.ix-cat\.on::after/.test(wxss)
   && !/var\(--tip-dot\)/.test(seg(wxss, '.ix-cat\.on')))
+ok('下划线挂在里层那枚 `<text>` 上、不挂在芯片自己身上，也**不许挂在里层的常驻规则上**（挂哪一处都行＝每一枚都带线，选中态又没了）',
+  !/text-decoration/.test(segs(wxss, '.ix-cat')) && !/text-decoration/.test(segs(wxss, '.ix-cat\.on'))
+  && !/text-decoration/.test(segs(wxss, '.ix-cat-t')))
+// 这一处必须用 `segs`（全部同名规则体并起来）：只读第一条时，往后再补一条带下划线的 `.ix-cat.on` 就量不到了。
+// 他点的是筛选那一枚（"提醒用户正在筛哪一格"），不是全站所有分类名。这三处跟着加粗加线就是自作主张。
+ok('反向钉：详情窗、列表那一行、独立详情页那三处分类段没有跟着加粗或加下划线',
+  ['.ixl-cat', '.ds-cat'].every((n) => !/font-weight:\s*[5-9]00|text-decoration/.test(segs(wxss, n)))
+  && !/font-weight:\s*[5-9]00|text-decoration/.test(segs(dwxss, '.hero-cat')))
 // 这一条比的是**代码**不是注释，所以吃文件顶上那把 `cjsCode`（第 90 行已经剥过注释）——
 // 拿原文正则扫会把自家注释判成残留（今天第二次踩同一坑，另一处是 #FCFBF8）。
 ok('index.js 不再给每一条分类挂 toneStyle（那一行的 --tone-bg/--tone-ink 没人消费了）',

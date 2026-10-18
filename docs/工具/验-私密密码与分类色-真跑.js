@@ -288,17 +288,24 @@ const tx = async (el) => (el ? await el.text() : '（元素不存在）')
     const offCol = catEls.length > 1 ? String(await catEls[onIdx === 0 ? 1 : 0].style('color')) : '(只有一枚)'
     await list.setData({ bgSrc: listBg || '' })
     await sleep(600)
-    /* 站长 10-16 一句「分类名字，不要加粗，不要纯黑，下划线也一样」⇒ 加粗、整档墨、短杠三样一起撤。
-       这一条的旧前提（"亮的那枚吃整档墨，所以两支不同"）当场没了：没铺图这一态两枚现在是**同一个数**。
-       所以这里翻成钉现状、并把"选中态目前没有标记"这件事钉在尺子上——他哪天给一句补标记，
-       这条要跟着翻回"两支不同"，不许让它悄悄绿着（同一形状翻车记在 [[feedback-removing-a-state-invalidates-rulers]]）。 */
+    /* 站长 10-16 一句「分类名字，不要加粗，不要纯黑，下划线也一样」⇒ 三样一起撤，撤完那一行**没有任何屏上标记**。
+       10-18 深夜他给回两样（「选择笔记筛选某个分类，该分类要加下划线，字体加粗，提醒用户」）⇒
+       这一条从"两支同一个数"翻回"两支拉开"：选中那一枚 600 ＋ 里层文字有下划线，未选那一枚 400 无线。
+       ⚠ 第三样（纯黑）他这次没提 ⇒ 两支仍同一支 `--text-secondary`，那条颜色判据一个字不改。
+       ⚠ 旧前提记在这儿防下次再翻：10-16 那一版这条能绿是因为**两支都轻**，不是因为颜色。 */
     const onW = onIdx > -1 ? String(await catEls[onIdx].style('font-weight')) : '(摸不到)'
     const offW = catEls.length > 1 ? String(await catEls[onIdx === 0 ? 1 : 0].style('font-weight')) : '(只有一枚)'
-    ck('没铺图那一态：亮与不亮同一支 .72 墨、同一个 400 字重（三样撤净的必然结果＝选中态目前没有标记，等他一句）',
+    // 下划线挂的是里层那枚 `<text>`（挂在芯片自己身上会把管理态那枚 × 一起划上），所以要量子节点。
+    const catTexts = await list.$$('.ix-cat-t')
+    const onDeco = onIdx > -1 && catTexts[onIdx] ? String(await catTexts[onIdx].style('text-decoration-line')) : '(摸不到)'
+    const offDeco = catTexts.length > 1 ? String(await catTexts[onIdx === 0 ? 1 : 0].style('text-decoration-line')) : '(只有一枚)'
+    ck('没铺图那一态：两支仍同一支 .72 墨（他没要纯黑），但选中那一枚字重 600＋带下划线、未选那枚 400 无线',
       /rgb/.test(onCol) && /rgb/.test(offCol) && onCol === offCol
       && Math.abs((alphaOf(onCol) === null ? 1 : alphaOf(onCol)) - 0.72) < 0.01
       && rgbOf(onCol) === rgbOf(offCol)
-      && Number(onW) < 500 && Number(offW) < 500, `亮 ${onCol}／暗 ${offCol}｜字重 ${onW}／${offW}`)
+      && Number(onW) >= 500 && Number(offW) < 500
+      && /underline/.test(onDeco) && !/underline/.test(offDeco),
+      `亮 ${onCol}／暗 ${offCol}｜字重 ${onW}／${offW}｜线 ${onDeco}／${offDeco}`)
     ck('铺图那一态：两枚一起抬成整档墨（10-12 那条 has-bg 抬档真的落到这一行，不是压在照片底下看不清）',
       !listBg || (alphaOf(onColBg) === null && rgbOf(onColBg) === rgbOf(offColBg)),
       `亮 ${onColBg}／暗 ${offColBg}｜bgSrc=${listBg ? '有' : '无'}`)
