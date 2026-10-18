@@ -18,7 +18,7 @@
           <view class="hero-meta">{{note.source_type_label}} · {{note.created_at_label}}</view>
           <view class="hero-title">{{note.title}}</view>
           <view class="tags" wx:if="{{note.tags && note.tags.length}}">
-            <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">{{tg}}</text>
+            <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">#{{tg}}</text>
           </view>
         </view>
         <view class="ds-rt" wx:if="{{!note.is_private && detailCards.length}}">

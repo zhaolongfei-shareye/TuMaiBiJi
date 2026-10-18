@@ -134,24 +134,38 @@ const ck = (name, ok, got) => {
   pg = freshPage()
   ck('私密 + 手上没凭证 → 浮那一层，六位验对了放行',
     (await gate.unlockOn(pg, PRIVATE)) === true && unlock.verifies.join() === '123456' && pg.data.pwdOpen === false)
-  ck('真验过这一次要标出来，让详情页知道第一份是空壳、得重取', pg._unlockRenewed === true && pg._unlockedNoteId === PRIVATE.id)
+  ck('真验过这一次要标出来，让详情页知道第一份是空壳、得重取', pg._unlockRenewed === true)
   ck('浮那一层之前先把手上那把作废（留着就是"问了只是形式、正文照旧读出来"）', unlock.clears === 1)
   ck('浮起来那三行字全吃现网字典（功能名 / 用在哪 / 校验提醒），且是"要输"那一态',
     !!pg._snap && pg._snap.name === i18n.zh.privatePassword && pg._snap.scene === i18n.zh.privatePasswordScene
     && pg._snap.tip === i18n.zh.privatePasswordHint && pg._snap.entering === true,
     `${pg._snap && pg._snap.name}｜${pg._snap && pg._snap.tip}`)
 
-  before(); afterOpen = null
-  pg = freshPage(); pg._unlockedNoteId = PRIVATE.id; unlock.has = true
-  ck('同一篇、凭证还活着 → 那一层根本不浮（从编辑那一趟回来那条路）',
-    (await gate.unlockOn(pg, PRIVATE)) === true && pg.data.pwdOpen === false && pg._unlockRenewed === false)
+  // ⚠ 2.3.14 起「验过哪一篇」记在 gate **模块里那一份**（原来记页面实例 ⇒ 编辑那一屏是新实例，同一篇问三回，
+  // 站长今天打回）。所以这三条一律**先用真流程验一次**拿到标记，不再手搭 `pg._unlockedNoteId`：
+  // 手搭测的是判据的内部记法，真流程才量得出"换一屏还问不问"。
+  before(); afterOpen = type('123456')
+  pg = freshPage()
+  await gate.unlockOn(pg, PRIVATE)                    // 列表那一屏：真验过一次
+  before(); afterOpen = null; unlock.has = true
+  pg = freshPage()                                    // 编辑那一屏：新实例
+  ck('同一篇换一屏不再问（列表→编辑→返回列表）——站长 10-18「编辑时候不应该再输入一次，返回列表又要输一次，这个要去掉」',
+    (await gate.unlockOn(pg, PRIVATE)) === true && pg.data.pwdOpen === false
+    && unlock.verifies.length === 0 && pg._unlockRenewed === false)
 
   before(); afterOpen = type('123456')
-  pg = freshPage(); pg._unlockedNoteId = PRIVATE.id; unlock.has = true
-  ck('换一篇必重问，哪怕上一把还管用', (await gate.unlockOn(pg, OTHER)) === true && unlock.verifies.length === 1)
+  pg = freshPage()
+  await gate.unlockOn(pg, PRIVATE)
+  before(); afterOpen = type('123456'); unlock.has = true
+  pg = freshPage()
+  ck('换一篇必重问，哪怕上一把还管用（标记记的是那一篇的号，不是"验过一次就全站放行"——10-12 那条口径）',
+    (await gate.unlockOn(pg, OTHER)) === true && unlock.verifies.length === 1)
 
   before(); afterOpen = type('123456')
-  pg = freshPage(); pg._unlockedNoteId = PRIVATE.id
+  pg = freshPage()
+  await gate.unlockOn(pg, PRIVATE)
+  before(); afterOpen = type('123456')                // `unlock.has` 归 false＝过期／重置密码
+  pg = freshPage()
   ck('凭证一没（过期／重置密码）就对同一篇再浮一次——站长 10-12 那条"重置后既不弹框又只见标题"',
     (await gate.unlockOn(pg, PRIVATE)) === true && unlock.verifies.length === 1)
 
@@ -275,8 +289,8 @@ const ck = (name, ok, got) => {
   // 详情那一份的 is_private 才是服务端钉的，所以开窗那一步要以它为准再走一次同一道闸。
   ck('开窗那一步以详情的 is_private 再走一次闸（列表那份是本机猜的）',
     openDetail.indexOf('full.is_private') >= 0
-    && openDetail.indexOf('full.is_private') < openDetail.indexOf('needsUnlock(this, gate)')
-    && openDetail.indexOf('needsUnlock(this, gate)') < openDetail.indexOf('unlockOn(this, gate)'))
+    && openDetail.indexOf('full.is_private') < openDetail.indexOf('needsUnlock(gate)')
+    && openDetail.indexOf('needsUnlock(gate)') < openDetail.indexOf('unlockOn(this, gate)'))
   // 审计严重④（我上一批自己引进来的）：那一层密码面板的 z-index 是 100，
   // 而首页详情窗 .float-sheet 是 101——先浮面板再收窗，面板就压在窗底下，
   // 人只看见一篇带标题的窗，屏上既没有输入框也没有能关的地方。所以收窗必须排在问之前。
@@ -287,9 +301,9 @@ const ck = (name, ok, got) => {
     /if \(askFirst\) this\.setData\(\{ detailOpen: true \}\)/.test(openDetail)
     && /if \(this\._unlockRenewed\) full = await api\.getNote\(row\.id\)/.test(openDetail))
   ck('"要不要问"只有一处判据（首页与 unlockOn 共用 needsUnlock，页面里不许自己算一遍）',
-    /function needsUnlock\(page, note\)/.test(gateJs)
-    && !/page\._unlockedNoteId === [a-z]+\.id && [a-zA-Z.]*hasPrivateUnlock\(\)/.test(idx)
-    && /needsUnlock\(this, gate\)/.test(idx))
+    /function needsUnlock\(note\)/.test(gateJs)
+    && !/unlockedNoteId\s*===/.test(idx)
+    && /needsUnlock\(gate\)/.test(idx))
 
   // 审计中等⑥：弱网下给 A 输完密码（verify 还在路上）再点 B，A 的迟到回包不许动 B 那一层。
   before()

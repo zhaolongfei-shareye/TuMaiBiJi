@@ -91,22 +91,30 @@ function _promptPassword(page, lang) {
  * 这一篇现在到底要不要问一遍。判据不是"这一屏问过没有"，而是服务端认得的那把凭证＋这一篇的号。
  * unlockOn 用它，首页"要不要先把详情窗收掉"也用它——同一个判据写两处就会长出一份记法，
  * 而首页那个窗的 z-index 是 101、密码面板是 100，收早了闪一下、收晚了面板看不见。
+ * ⚠ 「验过哪一篇」记在**模块里这一份**，不记在页面实例上（站长 10-18「看笔记已经输入一次密码，
+ * 编辑时候不应该再输入一次，然后返回列表又要输一次，这个要去掉」）：编辑那一屏是新起的页面实例，
+ * 原来它自己那份标记是空的 ⇒ 同一篇要问三回。服务端那把凭证本来就是发给"人"的短命 JWT
+ * （`backend/app/core/private_access.py`：绑的是密码列指纹 `pk`，不是笔记号），所以全站一份对得上语义。
+ * 仍然与 `api.hasPrivateUnlock()` 相与：改密／重置／过期都会把凭证清掉，那时这一格是死的，
+ * 不会像 10-12 那样"页面那个布尔没人清"。换一篇照旧必问（那一条是站长 10-12 拍的，今天这句没翻它）。
  */
-function needsUnlock(page, note) {
+let unlockedNoteId = 0
+
+function needsUnlock(note) {
   if (!note || !note.is_private) return false
-  return !(page._unlockedNoteId === note.id && api.hasPrivateUnlock())
+  return !(unlockedNoteId === note.id && api.hasPrivateUnlock())
 }
 
 async function unlockOn(page, note) {
   // 这一趟是**真验了一次**、还是手里那把还管用。详情页拿它决定要不要重取那一趟全文：
   // 凭证还活着时第一次读回来的就已经是全文，再打一趟是白要的。
   page._unlockRenewed = false
-  if (!needsUnlock(page, note)) return true
+  if (!needsUnlock(note)) return true
   // 先作废手上这把再问：留着的话"问了"只是形式，正文照旧拿旧凭证读出来。
   api.clearPrivateUnlock()
-  page._unlockedNoteId = 0
+  unlockedNoteId = 0
   if (!(await _promptPassword(page, page.data.lang))) return false
-  page._unlockedNoteId = note.id
+  unlockedNoteId = note.id
   page._unlockRenewed = true
   return true
 }

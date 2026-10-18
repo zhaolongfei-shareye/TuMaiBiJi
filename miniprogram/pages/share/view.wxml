@@ -49,7 +49,7 @@
       </view>
 
       <view wx:if="{{share.tags && share.tags.length > 0}}" class="tags-row">
-        <text wx:for="{{share.tags}}" wx:key="*this" class="tag">{{item}}</text>
+        <text wx:for="{{share.tags}}" wx:key="*this" class="tag">#{{item}}</text>
       </view>
     </view>
 

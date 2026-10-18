@@ -79,7 +79,7 @@ Page({
     // `catView` 是那一排芯片**唯一**的渲染源：平时那一态由 `categories` 现算，
     // 管理态由本机草稿 `_catDraft` 现算——两份都走同一个口，所以 wxml 里只有一套标记。
     // 草稿与"待删那几格"记在页面实例上（`_catDraft`／`_catDel`），不进 data：
-    // 它们只被 js 读，跟着 setData 白跑一趟（同上面 `_unlockedNoteId` 那条理由）。
+    // 它们只被 js 读，跟着 setData 白跑一趟（同下面那两行"解锁状态为什么不进 data"的理由）。
     catEdit: false,
     catView: [],
     catNewName: '',
@@ -112,9 +112,10 @@ Page({
     // 「每次进页退回第一枚 tab」那条规矩连同它那两个一次性标记（`_keepView`、
     // `globalData.ixOpenCardsTab`）一起作废：只剩一屏，没有"站错的那一枚"可退。
     groups: [],
-    // 私密解锁的状态**不记在这一格里**：它记在页面实例的 `_unlockedNoteId` 上，
-    // 判据是服务端认得的那把凭证（来龙去脉见 utils/privateGate.js 的 unlockOn）。
-    // 原来这是一个 data 里的 `_privateVerified`——首页是常驻 tab，它记一次就整个会话不再问；
+    // 私密解锁的状态**既不记在 data 里、也不记在页面实例上**：它记在 `utils/privateGate.js`
+    // 模块里那一份（`unlockedNoteId`），判据还要与服务端那把凭证相与（来龙去脉见那里的注释）。
+    // 原来记在页面实例的 `_unlockedNoteId` 上 ⇒ 编辑那一屏是新实例，同一篇要问三回（站长 10-18 打回）。
+    // 再早是一个 data 里的 `_privateVerified`——首页是常驻 tab，它记一次就整个会话不再问；
     // 重置／换密码把凭证清了却清不到它，症状是点开一篇私密笔记既不弹密码框、又只剩标题。
     // 再说这一格视图层根本不读，跟着 setData 白跑一趟。
     // 点一枚纸片 / 一行 = 直接浮详情窗（v18 两档排布都不就地展开，理由见 onRowTap）
@@ -971,7 +972,7 @@ Page({
       // （me.wxss 那份皮搬到 styles/pwd-sheet.wxss 时这一档一个字没改）。
       // 先浮面板再收窗，面板就画在窗底下——人只看见一篇带标题的窗，屏上没有输入框、
       // 也没有能关掉的地方（10-12 审计严重④，是上一批补闸时我自己引进来的）。
-      const askFirst = needsUnlock(this, gate)
+      const askFirst = needsUnlock(gate)
       if (askFirst) this.setData({ detailOpen: false, detailNote: row })
       if (!(await unlockOn(this, gate))) return
       if (askFirst) this.setData({ detailOpen: true })
