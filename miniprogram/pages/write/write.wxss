@@ -24,9 +24,16 @@
   margin-bottom: var(--sp-2);
 }
 
+/* ⚠ 这两条声明一个都不许撤：`<textarea>` 是原生组件，CSS 不给宽时它按**固定 300px** 画，
+   而 300px 不随屏宽缩放（rpx 才随）。站长 10-18 真机（比模拟器窄一档）量到摘要／要点那两格
+   992px、标题／标签／分类那三格 901px——两格宽出 91px 压在卡片右沿上被裁掉，字跑到边上像被切，
+   就是他说的"页面错位"。模拟器 390 宽上 300px＋左右内边距正好等于内容区，所以这一刀在模拟器量不出来。
+   `width: 100%` 必须配 `box-sizing: border-box`，只写前者会让内边距加在 100% 之外、更宽。 */
 .input,
 .textarea,
 .picker-value {
+  width: 100%;
+  box-sizing: border-box;
   background: var(--chip-idle);
   border-radius: var(--r-btn);
   padding: var(--sp-3) var(--sp-4);
@@ -36,7 +43,9 @@
 }
 
 .textarea {
-  min-height: 150rpx;
+  /* 198 不是新数：改前那 150 是 content-box 的高，画出来是 150＋上下内边距各 24 ＝ 198。
+     上面那条换成 border-box 之后，这个数必须跟着抬到 198，否则这两格的最短高度会悄悄矮 48rpx。 */
+  min-height: 198rpx;
 }
 
 .char-count {
