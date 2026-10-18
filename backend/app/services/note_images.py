@@ -41,8 +41,9 @@ BUDGET_BYTES = 500 * 1024
 # 客户端那三个数是 0–1 的 canvas quality，Pillow 吃的是 1–95 的整数，所以下面按 `q * 100` 折算。
 QUALITY_LADDER = (0.7, 0.5, 0.3)
 
-# 单张下载上限：与配图登记接口那枚 `MAX_FILE_BYTES` 同一个数，**不在这里重打一遍**（幽灵上限）。
-MAX_IMAGE_BYTES = 20 * 1024 * 1024
+# 单张下载上限：**读配图登记接口那一个常量**（`models/asset.MAX_FILE_BYTES`，20MB），
+# 这里不再抄第二个数。两处各写一份迟早走样，走样的症状是"接口收得下、下载这一头先判超限丢掉"。
+from app.models.asset import MAX_FILE_BYTES
 # 网关那一趟是 JSON＋base64，字节到函数那边会比本地这份大 4/3。函数侧还有一道同样的检查，
 # 两头都不许只靠"压缩之后应该不大"——真拿到一张超的，这一张算"没存上"，不能把整篇带崩。
 MAX_UPLOAD_BYTES = 4 * 1024 * 1024
@@ -155,8 +156,8 @@ async def _download(client: httpx.AsyncClient, url: str) -> bytes:
                 raise SkipImage(f"响应头不是图片（{ctype or '空'}）")
             async for chunk in resp.aiter_bytes(chunk_size=8192):
                 total += len(chunk)
-                if total > MAX_IMAGE_BYTES:
-                    raise SkipImage(f"单张超过 {MAX_IMAGE_BYTES // 1024 // 1024}MB")
+                if total > MAX_FILE_BYTES:
+                    raise SkipImage(f"单张超过 {MAX_FILE_BYTES // 1024 // 1024}MB")
                 chunks.append(chunk)
         return b"".join(chunks)
     raise SkipImage("跳转次数过多")
@@ -234,6 +235,10 @@ async def _upload(client: httpx.AsyncClient, cloud_path: str, data: bytes) -> st
         settings.IMAGE_STORE_CF_URL.strip(),
         json=payload,
         headers={"Authorization": f"Bearer {settings.IMAGE_STORE_CF_KEY.strip()}"},
+        # 单独给这一趟的超时：连接池那个 20 秒是按"下载一张 CDN 图"定的，而这里是**往自家
+        # 函数推 1MB 级字节**，两件事该分开调。`IMAGE_STORE_CF_TIMEOUT` 必须真被读一次——
+        # 配了一行却没人读的开关比没有这行更坏（下次它会静默变成"说不通的那半"）。
+        timeout=settings.IMAGE_STORE_CF_TIMEOUT,
     )
     if resp.status_code >= 400:
         raise SkipImage(f"存图函数回 HTTP {resp.status_code}：{resp.text[:120]!r}")

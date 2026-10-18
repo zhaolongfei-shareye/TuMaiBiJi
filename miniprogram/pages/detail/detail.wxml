@@ -114,8 +114,10 @@
       </scroll-view>
     </view>
 
-    <!-- 转存来源：这一栏由服务端钉在笔记上，编辑接口里没有它，界面上也没有任何改它的入口 -->
-    <view wx:if="{{note.imported_from}}" class="panel import-panel">
+    <!-- 转存来源：这一栏由服务端钉在笔记上，编辑接口里没有它，界面上也没有任何改它的入口。
+         判据是**有没有作者名**而不是"快照在不在"：10-19 起那份快照里还可能只装四个贴图计数
+         （那篇没取到作者名、但图存下了），按"在不在"判就会画出一格「作者：—」的空来源。 -->
+    <view wx:if="{{note.imported_from.author_name}}" class="panel import-panel">
       <text class="section-label">{{t.importedFromLabel}}</text>
       <text class="import-line">{{t.authorLabel}}{{t.colon}}{{note.imported_from.author_name || '—'}}</text>
       <text class="import-line">{{t.importedTitle}}{{t.colon}}{{note.imported_from.title_at_import || note.title}}</text>

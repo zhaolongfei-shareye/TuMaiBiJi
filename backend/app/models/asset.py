@@ -6,6 +6,13 @@ from app.db.database import Base
 # 这条上限今天第一次落在服务端，公开页露出的张数也认它（routes/shares.py）。
 MAX_ASSETS_PER_NOTE = 9
 
+# 云开发单文件上限 20MB（docs/图片云备份-开发方案.md §二那张表）。定义放在模型这一层而不是
+# 放在登记接口那个文件里，是因为 10-19 起有两个口在问同一个问题（客户端登记一张配图、服务端
+# 从外链下载一张正文图），而**两处各写一份 20 × 1024 × 1024 迟早走样**：走样的症状不是报错，
+# 是"接口收得下、下载那一头先把它判成超限丢掉"——看不见的那半最难查。
+# 守这条的是 tests/test_note_images.py 里那条"全仓只许模型这一处定义这个数"。
+MAX_FILE_BYTES = 20 * 1024 * 1024
+
 
 class Asset(Base):
     __tablename__ = "assets"

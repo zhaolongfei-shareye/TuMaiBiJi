@@ -49,6 +49,10 @@ ck('那句实话不在配图面板的 wx:if 里面（九张全没存上时也说
   /dt-shots-note/.test(WXML) && !/dt-shots-note/.test(PANEL[0]))
 ck('那一格自己带 wx:if，空串时整块不画（不留一行空白小字）',
   /<text wx:if="\{\{note\.shots_note\}\}" class="dt-shots-note">/.test(WXML))
+// 10-19 审查抓到的一条：计数钉进 imported_from 之后，那份快照可能是**只有计数、没有作者名**的
+// （那篇没取到作者名但图存下了）。来源那一格要是按"快照在不在"判，就会画出一格「作者：—」。
+ck('来源那一格的判据是"有没有作者名"，不是"快照在不在"',
+  /wx:if="\{\{note\.imported_from\.author_name\}\}" class="panel import-panel"/.test(WXML))
 
 // ④ 双语键齐、占位符同一套
 for (const k of ['shotsTruncated', 'shotsPartlyFailed']) {

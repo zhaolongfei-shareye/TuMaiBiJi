@@ -147,10 +147,15 @@ def _archive_images(db, note, scraped: dict, user_id) -> dict | None:
         return None
     counts = {
         "images_total": result.total,
-        "images_kept": written,
+        # 屏上那句"只留下了前 {k} 张"数的是**这次真存进桶的张数**，不是新写了几行 `assets`：
+        # 同一个 job 被重跑时 `register()` 会按 object_key 幂等跳过（回 0），
+        # 拿 `written` 当 k 就会对着一堆看得见的图说"留下了 0 张"。
+        "images_kept": len(result.kept),
         "images_failed": len(result.failed),
         "images_truncated": result.truncated,
     }
+    if written != len(result.kept):
+        logger.info("贴图登记幂等命中：本次存下 %d 张、新写 %d 行", len(result.kept), written)
     # 计数钉在来源那份快照里：它记的就是"转存那一刻那篇原文长什么样"，
     # 而详情页读的是同一份（`NoteDetail.imported_from`），不必为它新建列。
     # 注意 `has_source` 判的是那份快照里**有没有作者名**，不是快照在不在——

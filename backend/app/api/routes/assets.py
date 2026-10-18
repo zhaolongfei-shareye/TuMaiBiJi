@@ -29,7 +29,7 @@ from app.core.auth import get_current_user
 from app.core.private_access import is_private_note, private_category_ids, unlocked
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
-from app.models.asset import Asset, MAX_ASSETS_PER_NOTE, not_failed
+from app.models.asset import Asset, MAX_ASSETS_PER_NOTE, MAX_FILE_BYTES, not_failed
 from app.models.note import Note
 from app.models.note_card import NoteCard, current
 from app.models.user import User
@@ -38,9 +38,8 @@ from app.models.user_profile import UserProfile
 router = APIRouter()  # 路径写全（跨 /api/notes 与 /api/user 两个前缀），见 main.py 那行注释
 logger = logging.getLogger(__name__)
 
-# 云开发单文件上限 20MB（docs/图片云备份-开发方案.md §二那张表）；压完正常在几百 KB，
-# 这条是拦住客户端把别的什么东西塞进来记账。
-MAX_FILE_BYTES = 20 * 1024 * 1024
+# 云开发单文件上限 20MB：**定义在 models/asset.py**（10-19 起外链贴图那一路也问同一个问题，
+# 两处各抄一份迟早走样），这里只把它接进来用。
 # 一篇笔记的配图张数：常量在 models/asset.py 的 MAX_ASSETS_PER_NOTE，全仓只有那一个定义。
 # **只有绑这一个口卡它**，两个读的口（列表、公开页）都不截——读的口再卡一遍就会造出
 # "库里占着配额、界面上不存在"的幽灵行。守这条的是 docs/工具/验-张数只有一个出处.js。

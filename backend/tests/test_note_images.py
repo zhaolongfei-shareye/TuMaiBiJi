@@ -444,6 +444,24 @@ class Test五_两头同一把尺子:
         for bad in ("= 9", "limit=9", ", 9)", "range(9)"):
             assert bad not in body, f"新模块里出现了第二个上限写法 {bad!r}"
 
+    def test_单文件字节上限全仓只有模型那一处定义(self):
+        """10-19 审查里抓到的一条：新模块抄了第二份 `20 * 1024 * 1024`，注释却写着"不重打一遍"。
+
+        两处各写一份走样时的症状不是报错，是"接口收得下、下载这一头先判超限丢掉"——看不见的那半最难查。
+        """
+        import app.api.routes.assets as assets_route
+        for mod in (note_images, assets_route):
+            src = Path(mod.__file__).read_text(encoding="utf-8")
+            assert "20 * 1024 * 1024" not in src, f"{mod.__name__} 里又抄了一份 20MB"
+        assert note_images.MAX_FILE_BYTES == assets_route.MAX_FILE_BYTES \
+            == __import__("app.models.asset", fromlist=["MAX_FILE_BYTES"]).MAX_FILE_BYTES
+
+    def test_那条上传超时的配置必须真被读一次(self):
+        """配了一行却没人读的开关比没有这行更坏：下一次它静默变成"说不通的那半"。"""
+        src = Path(note_images.__file__).read_text(encoding="utf-8")
+        assert "IMAGE_STORE_CF_TIMEOUT" in src.split("async def _upload", 1)[1].split("async def archive")[0], \
+            "IMAGE_STORE_CF_TIMEOUT 没在 _upload 里被读——它是一行假配置"
+
 
 # ------------------------------------------------------------------ 六、来源那三件
 
@@ -559,6 +577,24 @@ class Test七_任务回体:
                 payload["images_truncated"]) == (12, MAX_ASSETS_PER_NOTE, 0, 12 - MAX_ASSETS_PER_NOTE)
         assert note.imported_from["author_name"] == "ZJU攻城狮"
         assert note.imported_from["images_total"] == 12
+
+    def test_屏上那句数的张数是真存下而不是新写了几行(self, db, monkeypatch):
+        """RQ 重跑同一个 job 时 `register()` 按 object_key 幂等跳过（新写 0 行），
+        但图确实在桶里、界面也列得出来。拿"新写几行"当 k 就是对着一堆看得见的图说"留下了 0 张"。"""
+        statuses = []
+        urls = [f"https://a.test/{i}.jpg" for i in range(3)]
+
+        async def fake_archive(images, user_id, limit):
+            return note_images.ArchiveResult(
+                kept=[note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u)
+                      for i, u in enumerate(images)],
+                failed=[], total=len(images))
+
+        monkeypatch.setattr(note_images, "register", lambda db_, note_, kept: 0)
+        note, statuses = self._run(db, statuses, monkeypatch, self._scraped(urls), fake_archive)
+        payload = statuses[-1][2]
+        assert payload["images_kept"] == 3, "计数把幂等跳过误读成一张都没存下"
+        assert note.imported_from["images_kept"] == 3
 
     def test_存图整段炸了这次转存不算失败(self, db, monkeypatch):
         """笔记已经落库、摘要已经出来——"存不下"不许变成"这次抓取失败"。"""
