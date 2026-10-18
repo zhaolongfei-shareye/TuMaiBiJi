@@ -187,7 +187,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
     <nav id="nav"></nav>
     <div id="main">
       <div id="view-stats" class="view"><div id="stats"></div></div>
-      <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div></div>
+      <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div></div>
       <div id="view-tpl" class="view hidden"><div id="tpls"></div></div>
       <div id="view-tumaike" class="view hidden"><iframe id="frameOther" class="frame" title="图麦克后台" src="about:blank"></iframe></div>
       <footer>
@@ -310,6 +310,7 @@ var NAV = [
   { grp: '配置', items: [
     { label: '运营图', view: 'config', key: 'kind:home_bg' },
     { label: '首屏 Tips', view: 'config', key: 'text:tips' },
+    { label: '默认笔记', view: 'config', key: 'note:preset_note' },
     { label: '卡片模板', view: 'tpl', key: 'tpl:list' }
   ] }
 ];
@@ -387,6 +388,11 @@ function render(state) {
   var tbox = $('texts');
   while (tbox.firstChild) tbox.removeChild(tbox.firstChild);
   (state.texts || []).forEach(function (t) { tbox.appendChild(textCardFor(t)); });
+  // 「默认笔记」那一格单独一张卡（后端也是第三个 kind 闭集）。`|| null` 同上一条理由：
+  // 新页配旧后端时回体里没有 `note`，那时候少一张卡，不能整页红。
+  var nbox = $('note');
+  while (nbox.firstChild) nbox.removeChild(nbox.firstChild);
+  if (state.note) nbox.appendChild(noteCardFor(state.note));
 }
 
 // 一行一句 ⇒ 一句一串。空行丢掉：手打的时候都会留个尾换行，那不该变成一句空文案
@@ -442,6 +448,83 @@ function textCardFor(t) {
   });
   btnOff.addEventListener('click', function () { putText(t.kind, null, msg, function () { return refresh(); }); });
   return card;
+}
+
+// 「新用户默认那一篇」（站长 10-18「默认笔记请在管理后台配置，我可以编辑修改，日后更新不需要发版」）。
+// 五个字段一张卡，不复用上面 textCardFor：那一格是"两份语言各一串句子"，这一格是"一篇笔记"，
+// 形状不一样、要说清的话也不一样（最要紧那句是"只往前不回头"）。
+function noteCardFor(n) {
+  var card = el('section', 'card');
+  card.dataset.key = 'note:' + n.kind;
+  card.appendChild(el('h2', null, n.label));
+
+  var cur = n.current || {};
+  var fromDb = n.source === '库里';
+  var st = el('p', 'state ' + (fromDb ? 'on' : 'off'));
+  if (!n.registered) {
+    st.textContent = '这台后台还没改过这一栏：现在用的是包里那一份。';
+  } else if (!fromDb) {
+    st.textContent = '这一栏停用着：现在用的是包里那一份。';
+  } else {
+    st.textContent = '当前生效的是后台填的那一份：标题「' + (cur.title || '') + '」，正文 ' +
+      String(cur.content || '').length + ' 字，要点 ' + (cur.key_points || []).length + ' 条，标签 ' +
+      (cur.tags || []).length + ' 个。';
+  }
+  card.appendChild(st);
+  card.appendChild(el('p', 'note',
+    '改这里只影响以后新出生的账号。那一篇是在建号那一刻写进库里的，已经种下去的那几篇一个字都不会变' +
+    '（那是用户自己的数据，替他改掉自己写过的东西比不改危险）。这份文案从来不在小程序包里，' +
+    '所以改它不用发版；停用则回到包里那一份。'));
+  card.appendChild(el('p', 'note',
+    '标题与摘要那两把尺跟的是用户自己编辑那两栏的上限（' + n.limits.title + ' 字／' + n.limits.summary +
+    ' 字）：后台放行更长的标题，症状是用户点开编辑再保存，标题被那一栏截短。'));
+
+  var f = {};
+  function one(key, labelText, limit, asLines) {
+    card.appendChild(el('div', 'langlabel', labelText +
+      (asLines ? '（一行一条，最多 ' + n.limits.items + ' 条、每条 ' + n.limits.item + ' 字）'
+        : '（最多 ' + limit + ' 字）')));
+    var ta = document.createElement('textarea');
+    ta.className = 'ta';
+    if (limit) ta.maxLength = limit;
+    // 现值走 .value 赋值，绝不拼进 HTML（与上面 textCardFor 同一条硬纪律）。
+    ta.value = asLines ? (cur[key] || []).join('\\n') : String(cur[key] || '');
+    f[key] = ta;
+    card.appendChild(ta);
+  }
+  one('title', '标题', n.limits.title, false);
+  one('summary', '摘要', n.limits.summary, false);
+  one('key_points', '核心要点', null, true);
+  one('tags', '标签', null, true);
+  one('content', '正文', n.limits.content, false);
+
+  var msg = el('div', 'err');
+  card.appendChild(msg);
+  var row = el('div', 'row');
+  var btnPub = el('button', null, '发布这一份');
+  var btnOff = el('button', 'danger', '停用，回到包里那份');
+  row.appendChild(btnPub); row.appendChild(btnOff);
+  card.appendChild(row);
+
+  btnPub.addEventListener('click', function () {
+    putNote({
+      title: f.title.value,
+      summary: f.summary.value,
+      key_points: linesOf(f.key_points.value),
+      tags: linesOf(f.tags.value),
+      content: f.content.value
+    }, msg, function () { return refresh(); });
+  });
+  btnOff.addEventListener('click', function () { putNote(null, msg, function () { return refresh(); }); });
+  return card;
+}
+
+function putNote(value, msg, done) {
+  msg.textContent = '';
+  api('api/admin/preset-note', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: value })
+  }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
 }
 
 function cardFor(k) {

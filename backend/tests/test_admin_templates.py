@@ -272,12 +272,22 @@ def test_保存成功的回执落在重读之后的那一行():
 
 
 def test_配方在页面上只有读的地方没有写的地方():
-    """P1 的安全边界在界面上的形状：配方只准出现在一个 `<pre>` 里，全页那唯一一枚 `textarea`
-    还是 Tips 那一栏的。**给配方长出输入框＝把"不发版就能改画面"做了出来**，那是 P2、没拍。"""
+    """P1 的安全边界在界面上的形状：配方只准出现在一个 `<pre>` 里，模板那一整栏不许有编辑框。
+    **给配方长出输入框＝把"不发版就能改画面"做了出来**，那是 P2、没拍。
+
+    ⚠ 判据改过一次（10-18）：原来钉的是"全页只有一枚 textarea"，那句前提被新加的
+    「默认笔记」那一栏顶掉了（站长「默认笔记请在管理后台配置」，见 test_preset_note.py 那一批）。
+    数整页的 textarea 从来就不是它防的东西——按 10-17 那条规矩改判据、没去动代码迁就它：
+    改成逐栏钉，"模板那一栏里没有编辑框"这一句比原来的计数更硬，也不会长出第二处合法例外就失效。
+    """
     src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
     body = src.split("_PAGE", 1)[1]
     assert "el('pre', null, JSON.stringify(r.recipe" in body, "配方连看得见的地方都没有，操作者怎么知道线上跑的是哪一份"
-    assert body.count("createElement('textarea')") == 1, "多出来的那枚 textarea 就是给配方开的口子"
+    assert body.count("createElement('textarea')") == 2, "现在合法的编辑框只有两栏：首屏 Tips 与默认笔记"
+    tpl = body.split("function tplCard", 1)[1].split("function renderTemplates", 1)[0]
+    assert tpl, "模板那一栏的函数没找到，判据就空转了"
+    for editable in ("createElement('textarea')", "createElement('input')", ".value ="):
+        assert editable not in tpl, f"模板那一栏里出现了 {editable} —— 那就是给配方开的口子"
     for leaked in ("body.recipe", "body.group_key", "body.content_hash", "body.template_id", "body.status ="):
         assert leaked not in body, f"{leaked} —— 这一栏的写体里不许有它（上下架走 {status: ...} 那句，不是赋值）"
     assert "JSON.stringify({ status: to })" in body

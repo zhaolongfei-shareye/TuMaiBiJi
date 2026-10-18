@@ -157,10 +157,14 @@ const i18n = {
     previewHint: '下面是成品样子；改完记得点上面的保存。',
     profileSaved: '已保存',
     // 成品弹窗底下那枚「编辑个人名片」浮出来的一层（站长 10-03：出卡片这一屏要能就地改名片，
-    // 不必绕去「我的→卡片模板」）。四枚下面只写它当前的角色，角色开关仍只在那一页——
-    // 同一件事不留两个口。
+    // 不必绕去「我的→卡片模板」）。
+    // 站长 10-18 01:3x 两句话：① 首页那枚「换背景」也拉起**同一层**，不必跳设置那一页
+    // （「角色开关只留在那一页」那条从这一句起作废，那一页的两枚芯片他没下撤的命令、照旧在）；
+    // ② 这一层的名字与两枚按钮：「卡片上的信息」改为**图片设置**，两枚按钮分别叫**背景**与**头像**。
+    // 「头像」说的是"画在卡片头像上"那一个角色（=原来那枚「卡片」），指的内容没变，只是叫法。
     editCard: '编辑个人名片',
-    cardInfo: '卡片上的信息',
+    cardInfo: '图片设置',
+    slotAvatar: '头像',
     cardInfoHint: '这四张就是卡片上的人和名字。换一张点「更换」，不想要了点右上角的垃圾桶。',
     cardReplace: '更换',
     slotPos: '位置',
@@ -286,9 +290,9 @@ const i18n = {
     // 叫"原始"会让人以为拿回来的是相机里那份原图。
     shotsLabel: '配图',
     // 详情窗那一行三枚按钮中间那一枚（站长 10-17 深夜「在详情页下方，编辑和删除中间增加一按钮，
-    // 分享笔记，点击切换卡片大图窗口」）。四个字是量过的：那一枚宽只有约 202rpx，
-    // 再加一个字就在 nowrap 那一行里折出去。
-    shareNote: '分享笔记',
+    // 分享笔记，点击切换卡片大图窗口」，站长 10-18 凌晨又改口：「分享笔记，改为"分享"」）。
+    // 四个字时是量过的：那一枚宽只有约 202rpx，多一个字就在 nowrap 那一行里折出去——现在两个字，更宽裕。
+    shareNote: '分享',
     // 私密那一枚置灰时挂在按钮下面那一行的理由（他给的原话，一字没改：「私密笔记不支持分享」）。
     // 这句话进不了按钮（十个字 240rpx > 202rpx），所以位置在按钮下面。
     privateNoShare: '私密笔记不支持分享',
@@ -380,9 +384,10 @@ const i18n = {
     qrOn: '开启二维码｜朋友扫码就能转存',
     qrOff: '关闭二维码｜只发这张图，扫不出原文',
     posterMake: '生成分享图',
-    // 已生成态那枚通栏：把台账里这一张再发一次。那三项是站长 10-04 的原话，一字不改照抄上来；
-    // 面板里实际给到哪几条落点由微信系统层决定（样式与文案都不给改），这一行只说"点它会拉起分享"。
-    cardShare: '分享卡片：微信好友 / 朋友圈 / 公众号',
+    // 已生成态那枚通栏：把台账里这一张再发一次。后面那三项是站长 10-04 的原话，一字不改照抄上来；
+    // 前面那一句他 10-18 凌晨改过两次口（「分享卡片」→「分享到」）。面板里实际给到哪几条落点由微信系统层
+    // 决定（样式与文案都不给改），这一行只说"点它会拉起分享"。
+    cardShare: '分享到：微信好友 / 朋友圈 / 公众号',
     // 大图底下左端那枚原来复用「取消」：站长 10-04 要它改成「查看笔记」，点了进这篇的详情页。
     // 收窗那两条口都留着（顶上「点一下收起」+ 点窗外那层遮罩），所以这一枚不必再兼"退出"。
     viewNote: '查看笔记',
@@ -548,7 +553,8 @@ const i18n = {
     previewHint: 'This is the finished card. Tap Save above to apply.',
     profileSaved: 'Saved',
     editCard: 'Edit my card',
-    cardInfo: 'Card details',
+    cardInfo: 'Image settings',
+    slotAvatar: 'Avatar',
     cardInfoHint: 'These four are the face and the name printed on your cards. Tap Replace to swap one, or the bin to remove it.',
     cardReplace: 'Replace',
     slotPos: 'Slot',
@@ -735,7 +741,8 @@ const i18n = {
     qrOn: 'QR code on | friends can scan and save',
     qrOff: 'QR code off | just this picture, nothing to scan',
     posterMake: 'Make a share image',
-    cardShare: 'Share card: Chat / Moments / Official Account',
+    // 跟着中文那一句同一件东西走：前面是"去哪儿"，后面那三项是微信系统层给的落点，不许另起一个新词。
+    cardShare: 'Share to: Chat / Moments / Official Account',
     // 英文不直译"查看笔记"成 View note：这一枚去的是那篇笔记本身，Open note 更像按钮。
     viewNote: 'Open note',
     cardDrop: 'Delete card',

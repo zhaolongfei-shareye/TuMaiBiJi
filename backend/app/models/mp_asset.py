@@ -38,8 +38,18 @@ KINDS = (KIND_HOME_BG,)
 # 后台会出现一个"给文案上传一张 JPEG"的格子——界面能点、点下去存进库，而屏上永远读不到它。
 KIND_TIPS = "tips"
 TEXT_KINDS = (KIND_TIPS,)
+# 站长 10-18「默认笔记请在管理后台配置，我可以编辑修改，日后更新不需要发版」⇒ 新用户出生那一篇
+# 那五个字段也能在后台改了。**单独第三组，不塞进上面那个 `TEXT_KINDS`**：那一组的校验
+# （`services/mp_assets.clean_text`）把形状钉死成"两份语言、各一串句子"，而这一栏是"一篇笔记的
+# 五个字段"。混进去不会报错，会让后台画出一张只有两个文本框的格子，他往里面填正文＝填进"一句话"。
+KIND_PRESET_NOTE = "preset_note"
+NOTE_KINDS = (KIND_PRESET_NOTE,)
 # 界面上的叫法。管理页那一栏的标题从这里读，免得网页和后端各写一份中文名。
-KIND_LABELS = {KIND_HOME_BG: "首页默认背景图", KIND_TIPS: "首屏那行 Tips"}
+KIND_LABELS = {
+    KIND_HOME_BG: "首页默认背景图",
+    KIND_TIPS: "首屏那行 Tips",
+    KIND_PRESET_NOTE: "新用户默认那一篇",
+}
 
 
 class MpAsset(Base):

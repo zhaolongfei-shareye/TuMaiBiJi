@@ -301,3 +301,173 @@ def test_authored_count_与_used_count_是两条口径(client, db, monkeypatch):
     user = _reload(db).query(User).filter(User.openid == "pm-two-counts").one()
     assert quota.used_count(db, user) == 1
     assert preset_note.authored_count(db, user.id) == 0
+
+
+# ==== 10-18 起这一篇归后台管（站长「默认笔记请在管理后台配置，我可以编辑修改，日后更新不需要发版」）====
+#
+# 这批钉的是"库里那份优先、坏了要落回包里、改它不许回头改已经种下去的那几篇"。
+# 三条里最硬的是第三条：它的反面是"后台一改，全站用户那篇自带的说明跟着变"，
+# 那是替用户改掉他自己名下的一条数据，比不生效危险得多。
+
+ADMIN_PW = "pytest-admin-token-not-a-real-one-32"
+GOOD = {
+    "title": "后台写的那一句标题",
+    "summary": "后台写的摘要",
+    "tags": ["后台标签", "产品说明"],
+    "key_points": ["第一条", "第二条"],
+    "content": "后台写的正文第一段。\n第二段。",
+}
+
+
+@pytest.fixture
+def seed_clean(db):
+    """`_fresh_session` 只删它那六张表，`mp_settings` 不在里面——不清就有一条跨用例活着，
+    而它一旦活着，本文件前面那批"种下去的必须逐字等于盘上那份种子"就成了假绿或假红。"""
+    from app.models.mp_asset import MpSetting
+
+    def wipe():
+        db.query(MpSetting).filter(MpSetting.kind == "preset_note").delete()
+        db.commit()
+
+    wipe()
+    yield
+    wipe()
+
+
+def _admin_h(client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ADMIN_TOKEN", ADMIN_PW)
+    r = client.post("/api/admin/login", json={"token": ADMIN_PW})
+    assert r.status_code == 200, r.text
+    return {"Authorization": "Bearer " + r.json()["session"]}
+
+
+def _put_note(client, headers, value):
+    return client.put("/api/admin/preset-note", json={"value": value}, headers=headers)
+
+
+def test_后台填过之后新号种的是库里那一份(client, db, monkeypatch, seed_clean):
+    h = _admin_h(client, monkeypatch)
+    assert _put_note(client, h, GOOD).status_code == 200
+    _login(client, monkeypatch, "pm-cfg-1")
+    got = _notes_of(db, "pm-cfg-1")[0]
+    assert (got.title, got.summary, got.tags, got.key_points) == (
+        GOOD["title"], GOOD["summary"], GOOD["tags"], GOOD["key_points"]
+    )
+    assert got.content == GOOD["content"] and got.original_content == got.content
+    # 仍然走的是预置那一条：删不掉那道闸吃的是 source_type，不是内容。
+    assert got.source_type == preset_note.PRESET_SOURCE_TYPE
+
+
+def test_停用之后新号落回包里那一份(client, db, monkeypatch, seed_clean):
+    h = _admin_h(client, monkeypatch)
+    assert _put_note(client, h, GOOD).status_code == 200
+    assert _put_note(client, h, None).status_code == 200
+    _login(client, monkeypatch, "pm-cfg-2")
+    seed = preset_note.seed_row()
+    got = _notes_of(db, "pm-cfg-2")[0]
+    assert got.title == seed["title"], "停用没落回包里那份"
+
+
+def test_改后台不回头改已经种下去的那一篇(client, db, monkeypatch, seed_clean):
+    """这一条是这批的正面：生效面只往前。已经种下去的那一篇属于那个用户，后台改不动它。"""
+    _login(client, monkeypatch, "pm-cfg-3")
+    before = _notes_of(db, "pm-cfg-3")[0].title
+    h = _admin_h(client, monkeypatch)
+    assert _put_note(client, h, GOOD).status_code == 200
+    _login(client, monkeypatch, "pm-cfg-3")          # 老号再登录一次，不会再种
+    rows = _notes_of(db, "pm-cfg-3")
+    assert len(rows) == 1 and rows[0].title == before
+
+
+def test_库里那份不合格时落回包里而不是种一半(client, db, monkeypatch, seed_clean):
+    """绕过那道口直接往库里写一份超限的（模拟人工改库/更早一版写进去的）。"""
+    from app.models.mp_asset import MpSetting
+
+    db.merge(MpSetting(kind="preset_note", asset_id=None,
+                       text_value={**GOOD, "title": "字" * 300}))
+    db.commit()
+    assert preset_note.seed_row_from_db(db) is None
+    assert preset_note.live_seed(db)["title"] == preset_note.seed_row()["title"]
+    _login(client, monkeypatch, "pm-cfg-4")
+    assert _notes_of(db, "pm-cfg-4")[0].title == preset_note.seed_row()["title"]
+
+
+def test_不合格整份退回而且库里那份没动(client, db, monkeypatch, seed_clean):
+    h = _admin_h(client, monkeypatch)
+    assert _put_note(client, h, GOOD).status_code == 200
+    bad = {**GOOD, "title": "   "}
+    r = _put_note(client, h, bad)
+    assert r.status_code == 400, r.text
+    assert "标题" in r.json()["detail"]
+    assert preset_note.live_seed(db)["title"] == GOOD["title"], "退回是退了，库里那份却被半份盖掉了"
+
+
+def test_标题超过客户端那一栏的上限被拒(client, db, monkeypatch, seed_clean):
+    """后台放行 101 字的标题不是"长一点"，是用户点开编辑再保存时被截短——那一步没有提示。"""
+    h = _admin_h(client, monkeypatch)
+    r = _put_note(client, h, {**GOOD, "title": "字" * (preset_note.MAX_SEED_TITLE + 1)})
+    assert r.status_code == 400 and str(preset_note.MAX_SEED_TITLE) in r.json()["detail"]
+
+
+def test_要点与标签一行一条空行丢掉(client, db, monkeypatch, seed_clean):
+    h = _admin_h(client, monkeypatch)
+    r = _put_note(client, h, {**GOOD, "tags": "甲\n\n 乙 \n", "key_points": "一\n二\n\n"})
+    assert r.status_code == 200, r.text
+    cur = r.json()["current"]
+    assert cur["tags"] == ["甲", "乙"] and cur["key_points"] == ["一", "二"]
+
+
+def test_两个口都要管理凭证(client, db, monkeypatch, seed_clean):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ADMIN_TOKEN", ADMIN_PW)
+    assert client.get("/api/admin/preset-note").status_code == 401
+    assert _put_note(client, {}, GOOD).status_code == 401
+    monkeypatch.setattr(settings, "ADMIN_TOKEN", "")
+    assert client.get("/api/admin/preset-note").status_code == 503
+
+
+def test_这一栏不往小程序回体里下发(db, seed_clean):
+    """播种在服务端完成，客户端从来不需要这份文案；下发出去只是白占一次登录回体。"""
+    from app.services import mp_assets
+
+    preset_note.save_seed(db, GOOD)
+    assert "preset_note" not in mp_assets.config_payload(db)
+
+
+def test_两把尺与客户端编辑那两栏相等():
+    """标题/摘要那两枚上限的唯一理由是 `pages/write/write.wxml` 里那两个 maxlength。
+    那边改了数而这边没改，后台就会放进来存不进用户编辑器的内容。"""
+    import re
+    from pathlib import Path
+
+    wxml = (Path(__file__).resolve().parents[2] / "miniprogram/pages/write/write.wxml").read_text(encoding="utf-8")
+    for handler, want in (("onTitleInput", preset_note.MAX_SEED_TITLE),
+                          ("onSummaryInput", preset_note.MAX_SEED_SUMMARY)):
+        tail = wxml.split(handler, 1)[1][:200]
+        got = re.search(r'maxlength="(\d+)"', tail)
+        assert got, f"{handler} 那一栏没读到 maxlength，判据要跟着界面改"
+        assert int(got.group(1)) == want, f"{handler} 那栏是 {got.group(1)}，这边写着 {want}"
+
+
+def test_三把尺与建笔记那道口同源():
+    """正文/每条/条数那三枚与 `routes/notes.py` 必须是同一组数——那边才是存一篇笔记的闸。
+    不 import 是因为 `core/auth.py` 已经 import 本模块，反向 import 会成环，所以靠这条用例钉。"""
+    from app.api.routes import notes
+
+    assert (notes.MAX_BODY, notes.MAX_ITEM_LEN, notes.MAX_LIST_ITEMS) == (
+        preset_note.MAX_SEED_CONTENT, preset_note.MAX_SEED_ITEM_LEN, preset_note.MAX_SEED_ITEMS
+    )
+
+
+def test_后台那一页真有默认笔记这一格():
+    """静态钉页面：少一行 `state.note` 渲染，后端全对、那一页上也还是没有这一栏。"""
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
+    body = src.split("_PAGE", 1)[1]
+    assert "noteCardFor" in body and "state.note" in body
+    assert "api/admin/preset-note" in body
+    assert "note:preset_note" in body, "导航那一行没加，他点开后台找不到这一栏"

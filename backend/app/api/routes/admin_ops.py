@@ -1,6 +1,6 @@
-"""后台那一页背后的十个口：登录、看状态、上传、改图片生效位、改文案生效位、验票、看数、
-列卡片模板、改卡片模板（元数据与上下架，**改不了配方**）、吐预览引擎（把客户端那份绘制代码
-当数据交给那一页的浏览器，**这里一笔都不画**）。
+"""后台那一页背后的十二个口：登录、看状态、上传、改图片生效位、改文案生效位、读默认笔记那一篇、
+改默认笔记那一篇、验票、看数、列卡片模板、改卡片模板（元数据与上下架，**改不了配方**）、
+吐预览引擎（把客户端那份绘制代码当数据交给那一页的浏览器，**这里一笔都不画**）。
 
 路径都写在这一份文件里（`/api/admin/*`），所以 `app/main.py` 挂载时不给 prefix——
 与 `assets`/`cards`/`profiles`/`landing` 同一族做法。理由在这条链上更硬一层：
@@ -42,7 +42,7 @@ from app.core.config import settings
 from app.core.errors import UserError
 from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
-from app.services import admin_stats, admin_templates, mp_assets, poster_engine
+from app.services import admin_stats, admin_templates, mp_assets, poster_engine, preset_note
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +103,15 @@ def admin_login(request: Request, body: LoginIn):
 @router.get("/api/admin/mp/state")
 @limiter.limit("60/minute")
 def admin_mp_state(request: Request, db: Session = Depends(get_db), _admin: str = Depends(get_admin)):
-    """那一页要显示的全部事实：每一栏的生效位、是否被冻结、历史（含一键回滚要挑的那几张）。"""
-    return mp_assets.admin_state(db)
+    """那一页要显示的全部事实：每一栏的生效位、是否被冻结、历史（含一键回滚要挑的那几张）。
+
+    `note` 那一格是 10-18 加的（默认笔记归后台管）。它不在 `mp_assets.admin_state` 里是故意的：
+    `services/mp_assets.py` 与 `services/preset_note.py` 目前是单向依赖（后者用前者的 `setting_row`），
+    要前者回头读后者就成一个 import 环。合流放在这一道口上，一处一次。
+    """
+    state = mp_assets.admin_state(db)
+    state["note"] = preset_note.admin_seed_state(db)
+    return state
 
 
 @router.post("/api/admin/mp/assets")
@@ -173,6 +180,51 @@ def admin_mp_text(
             return {"kind": kind, "current": None}
         value = mp_assets.set_text(db, kind, body.value)
         return {"kind": kind, "current": value}
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class PresetNoteIn(BaseModel):
+    """`value` 给那五个字段是"发这一份"，给 null 是"停用，回到包里那份 JSON"。
+
+    与上面 `TextIn` 同一条纪律：形状与上限的唯一出处是 `services/preset_note.clean_seed`，
+    路由再写一道就成了第二份真相，改上限那天必然有一处忘。
+    """
+    value: dict | None = None
+
+
+@router.get("/api/admin/preset-note")
+@limiter.limit("60/minute")
+def admin_preset_note_read(
+    request: Request, db: Session = Depends(get_db), _admin: str = Depends(get_admin)
+):
+    """当前生效的那一份，加三样后台要说清的事实：来源（库里／包里）、包里那份、三把尺。"""
+    return preset_note.admin_seed_state(db)
+
+
+@router.put("/api/admin/preset-note")
+@limiter.limit("20/minute")
+def admin_preset_note_write(
+    body: PresetNoteIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """改"新用户出生那一篇"长什么样。站长 10-18 那句「日后更新不需要发版」。
+
+    **生效面只往前，不回头**：这一格管的是下一个建号那一刻种下去的内容，库里已经种出来的那几篇
+    （包括他自己那一篇，如果他哪天补种）一个字都不改——那已经是用户的数据了，
+    替他改掉自己写过的东西比不改危险得多。这句话在后台那一页上也写着，别只留在这里。
+
+    播种这一条链从来在服务器上，所以"要不要发版"分两档说：小程序**本来就不发版**（包里没这份文案），
+    改文件那一档要一次后端部署，改后台这一档连部署也不用。
+    """
+    try:
+        if body.value is None:
+            preset_note.clear_seed(db)
+        else:
+            preset_note.save_seed(db, body.value)
+        return preset_note.admin_seed_state(db)
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
