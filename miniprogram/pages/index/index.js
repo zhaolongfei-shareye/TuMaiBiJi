@@ -373,10 +373,11 @@ Page({
       const s = catSkinFor(n.category_id, wallpaper)
       // --cat-chip 只给详情窗里的那几枚标签当底色（分类色 12% 铺在纸白卡上）。
       n.catStyle = `--cat-dot:${s.dot};--cat-ink:${s.text};--cat-chip:${withAlpha(s.dot, 0.12)}`
-      // 昵称那一格只在"这篇是别人那儿转存来的"时出现（②）。判据用 source_type，
-      // 不用"有没有昵称"——自己分享出去的那篇，服务端那份快照是自己的名字，
-      // 画在自己那一行上是噪声。
-      n.is_import = n.source_type === 'share_import'
+      // 昵称那一格只在"这篇是从别人那儿来的"时出现（②）。判据换成服务端那一枚 `has_source`
+      // ＋仍留着 `share_import` 那一档：外链转存（公众号／小红书）也带来源，但它的 `source_type`
+      // 是 `wechat_article`／`web_article`，**不许改成 `share_import`**（那枚值在配额里有专门用途）。
+      // 不拿"有没有昵称"当判据这条仍然成立：自己分享出去的那一篇，快照里是自己名字，画在自己行上是噪声。
+      n.is_import = n.source_type === 'share_import' || !!n.has_source
       // 官方那一篇（屏上念「帮助文档」，站长 10-18）：编辑与分享两枚在详情窗里对它置灰、点了不办事。
       // 判据用服务端那个 source_type，不靠标题也不靠"名下第一篇"。
       n.is_preset = n.source_type === 'preset'

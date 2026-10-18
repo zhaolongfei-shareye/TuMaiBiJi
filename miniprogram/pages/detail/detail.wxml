@@ -77,6 +77,11 @@
                binderror="onRemoteImgError" data-slot="detail-page" data-src="{{item.cloud_url}}" />
       </scroll-view>
     </view>
+    <!-- 那两句实话（原文一共几张、这次留下几张；有几张没存下来）。
+         落点写在面板**外面**：九张全没存上时那个面板压根不渲染，那句话恰恰最该出现的场合
+         要是被面板的 wx:if 圈在里面，就成了"越该说的时候越不说"。
+         没有这一句就是静默截断——库里 9 行看着像"这篇只有 9 张图"。 -->
+    <text wx:if="{{note.shots_note}}" class="dt-shots-note">{{note.shots_note}}</text>
 
     <!-- 长文本一律回中性卡：方块只承担"这一条是什么"，不承担阅读 -->
     <view wx:if="{{note.summary}}" class="panel">

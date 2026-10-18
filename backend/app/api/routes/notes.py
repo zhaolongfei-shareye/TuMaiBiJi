@@ -127,6 +127,14 @@ class NoteListItem(NoteBrief):
 
     has_active_share: bool = False
     share_author_name: str | None = None
+    # 「这一格该不该画名字」由服务端回答，不再让前端拿 `source_type === 'share_import'` 自己猜。
+    # 为什么必须换：外链转存那一族（公众号／小红书）也带来源，但它的 `source_type` 是
+    # `wechat_article`／`web_article`，**不许改成 `share_import`**（那枚值在配额里有专门用途，
+    # `quota._is_his_first_note` 把它从"他自己动笔"里排出去、`credit_import` 的账也认它）。
+    # 判的是"快照里有没有一个真的作者名"，不是"快照存不存在"——只有贴图计数、没有名字那一态
+    # 不该在屏上画出一个空名字。它不进 `NOTE_BRIEF_FIELDS`：私密篇锁着时那一行按九栏重建，
+    # 出不了 `False` 之外的东西。
+    has_source: bool = False
     # 列表右侧那枚缩略图（云开发 fileID，客户端拿去 getTempFileURL）。一篇只给一张，
     # 取哪一张见 _attach_covers。没配过图、或那一张备份失败 ⇒ null，界面上那一格不画。
     # ⚠ 这一栏**不许**进 NOTE_BRIEF_FIELDS：私密篇没解锁时那一行是按那九栏重建的，
@@ -192,6 +200,9 @@ def _attach_share_marks(db: Session, notes: list) -> None:
         n.has_active_share = n.id in shared
         imported = n.imported_from if isinstance(n.imported_from, dict) else {}
         n.share_author_name = imported.get("author_name") or shared.get(n.id)
+        # 名字来自"抄自谁"那一份快照时才算来源篇；只来自自己那张分享码的不算
+        # （画在自己纸片上不说明任何事——这条判据原来只能靠 `source_type` 猜，见 NoteListItem 那行注释）。
+        n.has_source = bool(imported.get("author_name"))
 
 
 def _attach_covers(db: Session, uid: str, notes: list) -> None:

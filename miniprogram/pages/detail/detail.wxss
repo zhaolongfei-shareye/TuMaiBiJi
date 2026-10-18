@@ -126,6 +126,17 @@
   color: var(--text-tertiary);
 }
 
+/* 那两句实话（截了几张、几张没存上）。与 `.dt-no-share` 同一档小字、同一个三级色：它是说明不是内容。
+   落点在配图那一块的**面板外面**（wxml 那条注释写了原因：九张全没存上时那块面板不渲染）。
+   下缘留一档：它下面就是正文那几张卡，贴着读成上一块的脚注。 */
+.dt-shots-note {
+  display: block;
+  margin: 12rpx 0 var(--sp-2);
+  font-size: var(--fs-tiny);
+  line-height: var(--lh-body);
+  color: var(--text-tertiary);
+}
+
 /* 中性面板：长文本在这里读 */
 .panel {
   background: var(--bg-card);

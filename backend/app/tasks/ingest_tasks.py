@@ -1,10 +1,13 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 
 from app.core.errors import UserError
 from app.db.database import SessionLocal
+from app.models.asset import MAX_ASSETS_PER_NOTE
 from app.models.note import Note
 from app.models.user import User
+from app.services import note_images
 from app.services import quota
 from app.services import source_blocklist
 from app.services.ocr import ocr_images, title_hint
@@ -103,6 +106,63 @@ def _load_task_user(db, task_id: str, user_id: str, generation):
     return user
 
 
+def _source_snapshot(scraped: dict, url: str) -> dict | None:
+    """把"这篇是从谁那儿来的"钉一份快照进 `notes.imported_from`。
+
+    键名与转存那一路**逐字同名**（`routes/notes.py` 的 `import_from_share` 写的那六个），
+    因为读的那一头本来就只认这个名字：`_attach_share_marks` 取 `imported.get("author_name")`。
+    对不上物的三键（`share_token`／`source_note_id`／`author_user_id`）**干脆不写**——
+    塞空串或 0 等于多造一种"画了个空名字"的态（方案第五节第 2 项）。
+    取不到作者名就整份不写：宁可不带来源，也不拿站名之类的东西去填那一格。
+    """
+    author = (scraped.get("author") or "").strip()
+    if not author:
+        return None
+    return {
+        "author_name": author[:200],
+        "title_at_import": (scraped.get("title") or "")[:500],
+        "imported_at": datetime.now(timezone.utc).isoformat(),
+        "source_url": url[:1000],
+    }
+
+
+def _archive_images(db, note, scraped: dict, user_id) -> dict | None:
+    """正文里的图存进桶、账落进 `assets`，回一份给界面上那两句实话读的计数。
+
+    三条口径：
+    ① **排在建笔记之后**（可重来的那几步排在唯一会失败的那步之后，这是这台机器上定过的规矩）——
+       存图整段炸了也只进日志，绝不把这次转存判成失败，摘要照出、笔记照在；
+    ② 通道没配（`.env` 里那两行 IMAGE_STORE_CF_* 缺一）就整段不做，回 None，
+       屏上一句都不报——"这一版还没开始存图"与"这篇文章的图存不下"是两件事，不许混成一句；
+    ③ 张数上限读 `MAX_ASSETS_PER_NOTE` 那一枚常量，不在这里重打一个 9。
+    """
+    images = [u for u in (scraped.get("images") or []) if u]
+    if not images or not note_images.channel_ready():
+        return None
+    try:
+        result = asyncio.run(note_images.archive(images, user_id, MAX_ASSETS_PER_NOTE))
+        written = note_images.register(db, note, result.kept) if result.kept else 0
+    except Exception:
+        logger.exception("贴图整段没跑成（笔记已保存）：note=%s", note.id)
+        return None
+    counts = {
+        "images_total": result.total,
+        "images_kept": written,
+        "images_failed": len(result.failed),
+        "images_truncated": result.truncated,
+    }
+    # 计数钉在来源那份快照里：它记的就是"转存那一刻那篇原文长什么样"，
+    # 而详情页读的是同一份（`NoteDetail.imported_from`），不必为它新建列。
+    # 注意 `has_source` 判的是那份快照里**有没有作者名**，不是快照在不在——
+    # 所以"没有名字、只有计数"这一态不会在屏上画出一个空名字。
+    if isinstance(note.imported_from, dict):
+        note.imported_from = {**note.imported_from, **counts}
+    else:
+        note.imported_from = dict(counts)
+    db.commit()
+    return counts
+
+
 def process_url_task(task_id: str, user_id: str, url: str, generation: int | None = None,
                      translate: bool | None = None):
     """RQ worker 同步任务：抓取 URL → LLM 提取 → 写入数据库。
@@ -149,16 +209,19 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
                 original_content=text[:50000],
                 source_type=scraped["source_type"],
                 source_url=url,
+                imported_from=_source_snapshot(scraped, url),
             )
             db.add(note)
             db.commit()
             db.refresh(note)
             credit_first_note(db, user_id, note)
-            set_task_status(
-                task_id,
-                "completed",
-                {"note_id": note.id, "title": note.title, "degraded": bool(knowledge.get("degraded"))},
-            )
+            # 贴图排在这一切之后：它是这条链上唯一会失败、且失败了也不该影响笔记的那一步。
+            counts = _archive_images(db, note, scraped, user_id)
+            payload = {"note_id": note.id, "title": note.title,
+                       "degraded": bool(knowledge.get("degraded"))}
+            if counts:
+                payload.update(counts)
+            set_task_status(task_id, "completed", payload)
         finally:
             db.close()
 

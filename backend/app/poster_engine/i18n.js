@@ -303,6 +303,10 @@ const i18n = {
     // 详情页那一排缩略图的栏名。不叫"原始图片"：存下来的是压过的那一张（长边 1920），
     // 叫"原始"会让人以为拿回来的是相机里那份原图。
     shotsLabel: '配图',
+    // 外链贴图随笔记存档那两句实话（方案 docs/方案-公众号贴图随笔记存档.md §八.4／§八.11）：
+    // 「被上限截了」与「有几张没存上」各一句，谁也不替谁兜底——合成一句就必然有一边是假话。
+    shotsTruncated: '这篇原文有 {n} 张图，只留下了前 {k} 张。',
+    shotsPartlyFailed: '有 {n} 张图没能存下来。',
     // 详情窗那一行三枚按钮中间那一枚（站长 10-17 深夜「在详情页下方，编辑和删除中间增加一按钮，
     // 分享笔记，点击切换卡片大图窗口」，站长 10-18 凌晨又改口：「分享笔记，改为"分享"」）。
     // 四个字时是量过的：那一枚宽只有约 202rpx，多一个字就在 nowrap 那一行里折出去——现在两个字，更宽裕。
@@ -695,6 +699,9 @@ const i18n = {
     summaryLabel: 'Summary',
     // Not "Original images" — what we keep is the compressed copy (long edge 1920).
     shotsLabel: 'Images',
+    // Two separate truths (see the zh block): "cut by the 9-image cap" and "some failed to save".
+    shotsTruncated: 'The source had {n} images; we kept the first {k}.',
+    shotsPartlyFailed: '{n} images could not be saved.',
     // Same two keys as the zh block above: the button is only ~202rpx wide, so the label
     // stays one short word and the reason for the disabled state sits on the line below it.
     shareNote: 'Share',

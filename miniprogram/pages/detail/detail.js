@@ -19,6 +19,28 @@ const SOURCE_TYPE_KEYS = {
   preset: 'sourcePreset',   // §8.232 那一篇预置笔记，同上一条口径
 }
 
+/**
+ * 那一排配图下面的两句实话（方案 docs/方案-公众号贴图随笔记存档.md §八.4／§八.11）。
+ *
+ * 两个数都读服务端钉在 `notes.imported_from` 里那一份快照，不拿"现在库里有几行"去倒推：
+ * 那篇原文当时一共 26 张图，这件事只有转存那一刻知道——之后用户删掉一张配图，
+ * "原文有 26 张"就再也问不出来了。截断与没存上是两件事，一句都不许替另一句兜底。
+ * 两个数都是 0（或这一篇压根不是外链转存来的）时回空串，那一格整块不画。
+ */
+function shotsTruth(src, lang) {
+  const s = src || {}
+  const bits = []
+  if (s.images_truncated > 0) {
+    bits.push(t('shotsTruncated', lang)
+      .replace('{n}', s.images_total)
+      .replace('{k}', s.images_kept))
+  }
+  if (s.images_failed > 0) {
+    bits.push(t('shotsPartlyFailed', lang).replace('{n}', s.images_failed))
+  }
+  return bits.join('')
+}
+
 Page({
   data: {
     note: null,
@@ -130,6 +152,8 @@ Page({
       note.date_label = formatShortDate(note.created_at)
       // 转存进来的那一条才有：来源是服务端钉住的，编辑接口碰不到这一栏，所以这里只读。
       note.imported_label = note.imported_from ? formatShortDate(note.imported_from.imported_at) : ''
+      // 那一排配图下面那两句实话（截了 N 张、M 张没存上），读的是同一份快照里的计数。
+      note.shots_note = shotsTruth(note.imported_from, this.data.lang)
       
       // noteImages 跟着这一篇重新起头：这一页会从"另一篇"navigateTo 进来，onShow 也会
       // 用新的 id 重取。读图那一步要是慢了或失败了，留着上一篇的图就等于张冠李戴。

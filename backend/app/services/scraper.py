@@ -1,7 +1,9 @@
 import ipaddress
+import json
 import logging
+import re
 import socket
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 import trafilatura
@@ -172,6 +174,11 @@ async def _fetch_and_parse(url: str) -> dict:
         parsed = _parse_wechat_article(html, url, source_type)
     else:
         parsed = _parse_general_url(html, url, source_type)
+        # 小红书那一族的笔记图不在 DOM 里（DOM 上只有 UI 图标），藏在 `__INITIAL_STATE__` 那段 JSON。
+        # **只用跳转后的末址判**（`xhslink.cn` 短链进来时 host 还不是它），文字仍走 trafilatura 那一份：
+        # 这一刀只往返回体里补 `images`／`author` 两键，不改用户看到的正文，也不改 `source_type`。
+        if _is_xiaohongshu(current_url):
+            parsed.update(_xiaohongshu_extras(html))
     # 带出这一枚数只为后台那一栏的"最后一次状态码"（规格-来源黑名单 §五）。
     # 用 `.get()` 读的那一方是必须的：现网那几把尺子里 fake 出来的抓取回体没有这一键，
     # 缺它只能退成"这个数不知道"，不许把一次本来成功的抓取报成失败。
@@ -185,6 +192,148 @@ def _detect_source_type(url: str) -> str:
     if "weixin.qq.com" in url:
         return "wechat_article"
     return "web_article"
+
+
+def _is_xiaohongshu(url: str) -> bool:
+    """这一跳最终落在小红书的那一站上吗（`xhslink.cn` 短链跳完才是 `xiaohongshu.com`）。
+
+    ⚠ 这一枚判定只用来**选解析器**（那一族的图不在 DOM 里，得去解 JSON），不用来放行或拦下任何一次下载。
+    贴图能不能存一律按形状判（响应头＋实际解出的宽高），按域名列黑白名单是错的方向，
+    理由与读数在 `docs/方案-公众号贴图随笔记存档.md` 第十一节。
+    """
+    host = (urlparse(url).hostname or "").lower()
+    return host == "xiaohongshu.com" or host.endswith(".xiaohongshu.com")
+
+
+def _http_image_url(base: str, src: str) -> str:
+    """把图地址补成一个能直接下的绝对 http(s) 地址，补不出来的回空串。
+
+    公众号那边见过 `//mmbiz.qpic.cn/...`（缺协议）与 `data:image/...`（内联，压根不是地址），
+    小红书那边给的是 `http://`（不是 https）。这两种都得先归一化再交给闸门，
+    否则要么整批漏图，要么把一条 `data:` 串送进出网口。
+    """
+    raw = (src or "").strip()
+    if not raw or raw.startswith("data:"):
+        return ""
+    absed = urljoin(base, raw) if base else raw
+    if absed.startswith("//"):
+        absed = "https:" + absed
+    return absed if absed.startswith(("http://", "https://")) else ""
+
+
+def _dedupe_order(urls: list[str]) -> list[str]:
+    """按文档顺序去重（同一张图在源属性与占位属性上各出现一次是常态）。"""
+    seen: set[str] = set()
+    out: list[str] = []
+    for u in urls:
+        if u and u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
+def _content_images(el, base_url: str) -> list[str]:
+    """正文容器里每一张图的地址，按文档顺序。
+
+    读的是 `data-src` 不是 `src`：**10-18 夜四条真文章实测 26/26 与 3/3 全在 `data-src`，
+    一条 `src` 都没有**——只读 `src` 的实现一张都取不到（那条坑写在方案第二节）。
+    """
+    if el is None:
+        return []
+    urls = []
+    for img in el.find_all("img"):
+        for attr in ("data-src", "src"):
+            candidate = _http_image_url(base_url, img.get(attr) or "")
+            if candidate:
+                urls.append(candidate)
+                break
+    return _dedupe_order(urls)
+
+
+def _wechat_account(soup) -> str:
+    """公众号名字，实测在 `#js_name`（那篇取到「玉树芝兰」）；备选那格是 profile 里的昵称。"""
+    el = soup.find(id="js_name")
+    if el and el.get_text(strip=True):
+        return el.get_text(strip=True)
+    profile = soup.find(id="profileBt")
+    if profile:
+        nick = profile.find(class_="rich_media_meta_nickname")
+        if nick and nick.get_text(strip=True):
+            return nick.get_text(strip=True)
+    return ""
+
+
+_XHS_STATE_KEY = "window.__INITIAL_STATE__="
+# `__INITIAL_STATE__` 里 JS 的 `undefined` 不是合法 JSON，替换成 null 才解得开（10-19 现读那篇要替 15 处）。
+_XHS_UNDEFINED = re.compile(r"(?<=[:,\[])\s*undefined(?=\s*[,\]}])")
+
+
+def _balanced_object(text: str, start: int) -> str:
+    """从 `start` 那枚 `{` 起截出配对完整的那一段 JSON。
+
+    脚本标签后面还跟着别的语句，所以不能"取到行尾"也不能取到文件尾——必须按花括号配对截，
+    并且**字符串里的花括号不算**（配一个扫引号的开关）。
+    """
+    depth = 0
+    in_str = False
+    escaped = False
+    for i, ch in enumerate(text[start:]):
+        if in_str:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:start + i + 1]
+    return ""
+
+
+def _xiaohongshu_extras(html: str) -> dict:
+    """从小红书那篇的 `__INITIAL_STATE__` 里补两键：`images`（按顺序）与 `author`。
+
+    10-19 现读那篇的形状（`/tmp/xhs.html`，noteId `6ad40f01000000002203c359`）：
+    `note.noteDetailMap[<noteId>].note.imageList[]` 共 **5 张**，每张有 `urlDefault`／`urlPre`
+    与 `infoList[{imageScene: WB_PRV|WB_DFT, url}]`；作者名在 `note.user.nickname`。
+    **取 `urlDefault`**——`urlPre` 是 `WB_PRV`（预览那张），不是笔记里的那一张。
+    解不开、结构不对、图列表为空，一律回空（这条不许把整次抓取带崩：文字本来读得到）。
+    """
+    at = html.find(_XHS_STATE_KEY)
+    if at < 0:
+        return {}
+    blob = _balanced_object(html, at + len(_XHS_STATE_KEY))
+    if not blob:
+        return {}
+    try:
+        data = json.loads(_XHS_UNDEFINED.sub("null", blob))
+    except (ValueError, TypeError):
+        logger.info("小红书那段 JSON 解不开，这一篇只存文字")
+        return {}
+    detail = ((data.get("note") or {}).get("noteDetailMap") or {})
+    note = {}
+    for value in detail.values():
+        if isinstance(value, dict) and isinstance(value.get("note"), dict):
+            note = value["note"]
+            break
+    if not note:
+        return {}
+    urls = []
+    for item in (note.get("imageList") or []):
+        if isinstance(item, dict):
+            urls.append(_http_image_url("", str(item.get("urlDefault") or item.get("url") or "")))
+    out = {"images": _dedupe_order([u for u in urls if u])}
+    name = ((note.get("user") or {}).get("nickname") or "").strip()
+    if name:
+        out["author"] = name
+    return out
 
 
 def _parse_wechat_article(html: str, url: str, source_type: str) -> dict:
@@ -205,7 +354,13 @@ def _parse_wechat_article(html: str, url: str, source_type: str) -> dict:
         og_title = soup.find("meta", property="og:title")
         title = og_title["content"] if og_title and og_title.get("content") else "微信文章"
 
-    return {"title": title, "content": text, "source_type": source_type}
+    return {
+        "title": title,
+        "content": text,
+        "source_type": source_type,
+        "images": _content_images(content_el, url),
+        "author": _wechat_account(soup),
+    }
 
 
 def _parse_general_url(html: str, url: str, source_type: str) -> dict:

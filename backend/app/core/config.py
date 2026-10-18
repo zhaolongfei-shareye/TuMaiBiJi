@@ -81,6 +81,22 @@ class Settings(BaseSettings):
     # 票的可信由这一台当场判——所以轮换这一行只影响"能不能换票"，不影响任何已发出去的登录态。
     ADMIN_EXCHANGE_SECRET: str = ""
 
+    # ---- 外链贴图随笔记存档（方案 docs/方案-公众号贴图随笔记存档.md）----
+    # 服务端手里没有云开发存储的写凭据（.env 现读：只有 WECHAT_*/JWT_*/ADMIN_*/DATABASE_URL/
+    # REDIS_URL/CORS_ORIGINS 那一串），而那把 API Key 的形状是"网关地址＋Bearer Key 打一个云函数"。
+    # 站长拍的是"图存放的路径与用户主动上传/拍照一样处理"＝对象必须真进云开发那个桶，
+    # 所以字节要穿一层云函数（`cloudfunctions/image_store`）才能落桶并换回 `cloud://` fileID。
+    # **两行里任何一行没配＝整条不做**（一张都不下载、屏上也不报"没存上"）：代码可以先上现网，
+    # 通道配好的那天才生效。这与 `MP_ASSETS_FREEZE`／`POSTER_TEMPLATES` 同型——
+    # 半条链挂在屏上、静默少图，是这台机器上被打回过的那类事。
+    IMAGE_STORE_CF_URL: str = ""
+    # 同一个环境签发的管理员 API Key（不设有效期那一种）。故意与 `HUNYUAN_CF_KEY` 分两枚：
+    #  Key 能单独轮换而地址不变，而且"提炼那把钥匙顺手也能往桶里写"这种事不该靠巧合成立。
+    IMAGE_STORE_CF_KEY: str = ""
+    # 客户端（这里是 worker）等待上限必须大于云函数自己的执行超时，理由同 `HUNYUAN_CF_TIMEOUT` 那段。
+    # 现网这个新函数默认只有 3 秒（抬它要控制台那一下），所以这里先给 20 秒兜住，别照抄 90。
+    IMAGE_STORE_CF_TIMEOUT: float = 20.0
+
     @model_validator(mode="after")
     def _require_jwt_secret(self) -> "Settings":
         placeholder = "change-me-in-production-use-a-long-random-string"
