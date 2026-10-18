@@ -458,6 +458,13 @@ class Test九_那一页真有这一栏:
         # 登录那一趟要把它一起拉（第三个读口；两处旧判据的锚已改前缀，这里补全串）
         assert "Promise.all([loadStats(), loadTemplates(), loadBlocklist()])" in body
 
+    def test_卡真的挂进了那一格(self):
+        """10-19 本机真点抓出来的那条：`renderBlocklist` 一路只往 `card` 自己身上挂，
+        漏一句 `box.appendChild(card)` 的症状是"函数跑了、一个字没抛、屏上一片空"。
+        静态钉子量不出"没挂"——所以这一条只算第二道，真判据是那支浏览器 harness 第一条。"""
+        seg = self._page().split("function renderBlocklist", 1)[1].split("function blockRow", 1)[0]
+        assert "box.appendChild(card)" in seg, "那一格永远是空的，而且不报错"
+
     def test_六个数一个都不省(self):
         """§五那张表逐列对：少一列管理员就少一个判断依据，而那正是「能管理」与「能看」的分别。"""
         body = self._page()
