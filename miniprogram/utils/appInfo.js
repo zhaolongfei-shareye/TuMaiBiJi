@@ -81,8 +81,8 @@
          没图整栏不画），确认句用的是删一篇那两句（`confirmDelete`／`cannotRestore`，没另造话术）；
          删的次序照 `cardCloud.dropServer`：先把这张地址记进待删那一格、再发那趟 DELETE，
          成了拿回体少一枚并去清云上对象，没成把预留撤回去。
-         ⚠ 后端那个口（`DELETE /api/notes/{id}/assets/{asset_id}`）**只在工作树里，现网还没有**——
-         这一栏要上真机得先把后端那一趟部署上去，否则按 ✕ 只会念一句"Not Found"。 */
+         后端那个口（`DELETE /api/notes/{id}/assets/{asset_id}`）**10-18 02:58 已上现网**（第三十六次部署，
+         定向那一个文件；现网探针 49/49）⇒ 真机扫这一张码按 ✕ 走的是真删，不是"Not Found"。 */
 const VERSION = '2.3.7'
 
 // 官网地址以站点自己的 canonical 为准（curl 读到的 <link rel=canonical> 是不带 www 的那个）。
