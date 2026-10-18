@@ -6,11 +6,15 @@
  *
  * 为什么①要拿像素说：白块有两种，**码位那块位图没拿到**（`paintLayers` 的 image 分支回退成
  * `ly.placeholder` 那块浅底圆角）与**这一套模板压根没画码位**。前者换一张真码就出黑白点，后者换不出来。
- * 所以这一把把同一篇、同一套模板画三遍：
- *   画 A＝现网那一份 cover ＋ 真码 → 码位该有黑白点（证明"码位本身是好的"，与配方无关）
- *   画 B＝新种子那一份 cover ＋ 真码 → 码位有黑白点 **且**上半截色数抬起来（配图画上去了）
+ * 所以这一把把同一篇、同一套模板画四遍：
+ *   画 A＝现网那一份 cover ＋ 真码 → 码位有黑白点，且大图位吃这篇配图
+ *   画 B＝新种子那一份 cover ＋ 真码 → 与画 A 逐点一致（灌进去的就是这一版）
  *   画 C＝新种子那一份 cover ＋ 空码 → 码位退回**单色**（复现他截图那一态，把归因钉死）
- * 三张截图落在 docs/design/卡片大图位-自证-20261019/，屏上有没有图由图说，不由我说。
+ *   画 D＝现网那一份 cover ＋ 这一篇没配图 → 大图位不出现（这条是 A/B 那两条的牙）
+ * 四张截图落在 docs/design/卡片大图位-自证-20261019/，屏上有没有图由图说，不由我说。
+ *
+ * ⚠ 10-19 01:5x 种子已灌进现网（第四十一次部署那一格），画 A 与画 B 从此**应当一样**；
+ *   之前那两条口径（"现网那份没有大图位"／"换配方之后像素要变"）已随前提一起改掉，别再照旧的判。
  *
  * ⚠ 全程零写：拿码走的是 `GET /api/shares/status`（这一篇本来就有一张活码）＋`GET /api/shares/{token}/qrcode`，
  *   **刻意不走 `_ensurePosterAssets`**——那里面没码时会 POST 建码。非 GET 一律挡下并记名，最后一条判据钉＝0。
@@ -41,6 +45,9 @@ const ck = (name, ok, got) => {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${got === undefined || got === '' ? '' : '　→ ' + got}`)
 }
 
+// 提到模块作用域：崩溃那条路（下面 .catch）也要能把 wx 那三个原函数装回去。
+let 还原 = null
+
 ;(async () => {
   if (!SEED_ROW) { console.log('!! 环境红：种子里没有 ' + TPL + ' 这一行'); process.exit(2) }
   let mp
@@ -69,13 +76,20 @@ const ck = (name, ok, got) => {
   await sleep(5000)
 
   // ---------- 第 0 段：零写记账（非 GET 挡下并记名）＋等列表真加载完 ----------
+  // ⚠ 这三个 wrap 装在 globalThis.wx 上，**reLaunch 不清、只随开发者工具进程死**。
+  //   10-19 就是收尾没还原，站长接着在同一台模拟器上点「生成卡片」，
+  //   POST /api/shares/ 被这道记账连挡 7 次 ⇒ 他看到的是"生成卡片都失败"，而现网一行日志都没有。
+  //   所以原函数存进 globalThis.__wrapOrig，收尾（含每一条环境红退出路径）必须装回去。
   await mp.evaluate(() => {
     const w = globalThis.wx
     if (w.__zhangji) return 'already'
     w.__zhangji = 1
     w.__feiGET = []
+    const g = globalThis
+    g.__wrapOrig = g.__wrapOrig || {}
     const wrap = (name) => {
       const orig = w[name]
+      g.__wrapOrig[name] = orig
       w[name] = function (opt) {
         const m = String((opt && opt.method) || 'GET').toUpperCase()
         if (m !== 'GET') {
@@ -90,6 +104,22 @@ const ck = (name, ok, got) => {
     wrap('request'); wrap('uploadFile'); wrap('downloadFile')
     return 'ok'
   })
+  // 收尾还原：把三个原函数装回去、抹掉记账标记。任何一条退出路径都要过这里，
+  // 否则这一台模拟器剩下的整个会话都在挡非 GET（就是上面那条 10-19 的账）。
+  还原 = async () => {
+    try {
+      return await mp.evaluate(() => {
+        const w = globalThis.wx
+        const o = globalThis.__wrapOrig || {}
+        Object.keys(o).forEach((k) => { if (typeof o[k] === 'function') w[k] = o[k] })
+        globalThis.__wrapOrig = null
+        const n = (w.__feiGET || []).length
+        w.__zhangji = 0
+        w.__feiGET = []
+        return { 还原了几个: Object.keys(o).length, 这一趟挡过: n, 还挡着吗: String(w.request).indexOf('blocked') >= 0 }
+      })
+    } catch (e) { return { 还原失败: String((e && e.message) || e).slice(0, 80) } }
+  }
   let ready = 0
   for (let i = 0; i < 10; i++) {
     try {
@@ -101,7 +131,7 @@ const ck = (name, ok, got) => {
     if (ready > 0) break
     await sleep(6000)
   }
-  if (!ready) { console.log('!! 环境红：这一台没把笔记列表加载出来（不是产品红，是这一趟没起来）'); process.exit(2) }
+  if (!ready) { console.log('!! 环境红：这一台没把笔记列表加载出来（不是产品红，是这一趟没起来）'); console.log('    收尾还原：' + JSON.stringify(await 还原())); process.exit(2) }
 
   // ---------- 第 1 段：模块、版本、身份，和**上一把尺子留没留东西在这一页上** ----------
   const s1 = await call('第1段 开局读数', (tpl) => {
@@ -132,7 +162,7 @@ const ck = (name, ok, got) => {
       这页缓存的token长: a && a.token != null ? String(a.token).length : null,
     }
   }, TPL)
-  if (s1.环境红) { console.log('!! 环境红：' + s1.环境红); mp.close(); process.exit(2) }
+  if (s1.环境红) { console.log('!! 环境红：' + s1.环境红); console.log('    收尾还原：' + JSON.stringify(await 还原())); mp.close(); process.exit(2) }
   ck('屏上这一台＝本工作树的包（防连到另一棵工作树）', s1.version === LOCAL.VERSION, `${s1.version} / 本地 ${LOCAL.VERSION}`)
   ck('跑在站长自己那个账号上（id=3，读数才是他真能撞到的）', s1.userId === 3, `userId=${s1.userId}`)
   ck('这台机器已经吃到下发那十套', s1.下发套数 === 10, `${s1.下发套数} 套，${TPL}=${s1.当前来源}`)
@@ -147,7 +177,7 @@ const ck = (name, ok, got) => {
     if (!t.brief) return { 环境红: '列表里没有一篇带配图的（捞不到样本，不是产品红）' }
     return { noteId: t.brief.id, 标题: String(t.brief.title || '').slice(0, 16), 带配图候选: withCover.length }
   }, WANT_NOTE)
-  if (s2.环境红) { console.log('!! 环境红：' + s2.环境红); mp.close(); process.exit(2) }
+  if (s2.环境红) { console.log('!! 环境红：' + s2.环境红); console.log('    收尾还原：' + JSON.stringify(await 还原())); mp.close(); process.exit(2) }
   const s2b = await call('第2b段 现读正文', async () => {
     const t = globalThis.__cv
     t.note = await t.api.getNote(t.brief.id)
@@ -199,14 +229,14 @@ const ck = (name, ok, got) => {
       posterTplName: t.poster.templateLabel(arg.use, p.data.lang), noQr: false,
       posterHasCard: false, posterBusy: false, posterImagePath: '',
     })
-    p._posterAssets = { noteId: t.note.id, note: t.note, token: arg.qr ? t.token : '', qrPath: arg.qr ? t.qrPath : '', noteImgPath: t.path }
+    p._posterAssets = { noteId: t.note.id, note: t.note, token: arg.qr ? t.token : '', qrPath: arg.qr ? t.qrPath : '', noteImgPath: arg.noImg ? '' : t.path }
     return new Promise((resolve) => {
       p._renderPoster().catch((e) => { t.渲染fail = String((e && e.errMsg) || (e && e.message) || e).slice(0, 60) }).then(async () => {
         try {
           const c = await p._getCanvas()
           const ctx = c.getContext('2d')
           const prof = t.poster.posterProfile()
-          const plan = t.poster.planPoster(ctx, t.note, arg.use, prof, p.data.lang, { showQr: true, hasNote: !!t.img })
+          const plan = t.poster.planPoster(ctx, t.note, arg.use, prof, p.data.lang, { showQr: true, hasNote: arg.noImg ? false : !!t.img })
           const M = t.poster.MATTE || 0
           const q = plan.layers.filter((l) => l.k === 'image' && l.key === 'qr')[0] || null
           const stat = (x, y, w, h) => {
@@ -250,19 +280,32 @@ const ck = (name, ok, got) => {
   await sleep(1200); await mp.screenshot({ path: path.join(OUT, '画B-新种子那份-真码.png') })
   const C = await paint({ tag: 'C', rows: SEED_ROW, qr: false, use: TPL })
   await sleep(1200); await mp.screenshot({ path: path.join(OUT, '画C-新种子那份-空码复现.png') })
+  // 画D 是这一把的牙：同一份现网配方、同一篇，只把"这一篇有配图"翻成没有。
+  // 少了它，"大图位吃配图"这条可以是"谁都画得出 image:note"的假绿。
+  const D = await paint({ tag: 'D', rows: 'live', qr: true, use: TPL, noImg: true })
+  await sleep(1200); await mp.screenshot({ path: path.join(OUT, '画D-现网那份-这篇没配图.png') })
 
   const fmt = (x) => `${x.来源}｜大块 ${x.大块 || '（无）'}｜码位 ${x.码位 ? x.码位.色数 + '色/深色' + x.码位.深色占比 + '%' : '?'}｜上半截 ${x.上半截色数}色`
   console.log(`  · 画A ${fmt(A)}`)
   console.log(`  · 画B ${fmt(B)}`)
   console.log(`  · 画C ${fmt(C)}`)
-  ck('三趟都真画出来了（没有渲染失败）', !A.崩 && !B.崩 && !C.崩 && !A.渲染fail && !B.渲染fail && !C.渲染fail, `${A.渲染fail || ''}${B.渲染fail || ''}${C.渲染fail || ''}`)
-  ck('现网那份 cover 里**没有**大图位（这就是他看不见配图的原因）', !/image:note/.test(A.大块 || ''), A.大块 || '（无大块）')
+  console.log(`  · 画D ${fmt(D)}`)
+  ck('四趟都真画出来了（没有渲染失败）', !A.崩 && !B.崩 && !C.崩 && !D.崩 && !A.渲染fail && !B.渲染fail && !C.渲染fail && !D.渲染fail, `${A.渲染fail || ''}${B.渲染fail || ''}${C.渲染fail || ''}${D.渲染fail || ''}`)
+  // ⚠ 10-19 01:5x 灌成之后这两条改了口径：原来钉的是"现网那份**没有**大图位（所以他看不见配图）"
+  //   ＋"换配方之后上半截像素真的变了"。种子灌进现网之后那个前提不成立了——现网那份就是新种子那份，
+  //   两趟读数逐点相同才是对的，再按旧口径判就是拿过期前提去红一把好代码。
+  ck('现网那份 cover 里大图位吃这篇配图（＝已灌成，不再是他看不见配图那一版）', /image:note/.test(A.大块 || ''), A.大块 || '（无大块）')
   ck('新种子那份 cover 里大图位吃这篇配图', /image:note/.test(B.大块 || ''), B.大块)
-  ck('换配方之后上半截像素真的变了（配图落笔了）', B.上半截色数 > A.上半截色数 * 1.5, `现网 ${A.上半截色数} → 新种子 ${B.上半截色数}`)
+  ck('现网那份与新种子那份逐点一致（灌进去的就是这一版，不是库里留着旧行）',
+    A.上半截色数 === B.上半截色数 && A.大块 === B.大块 && A.码位框 === B.码位框 && A.来源 === 'remote',
+    `上半截 ${A.上半截色数} / ${B.上半截色数}，大块 ${A.大块} / ${B.大块}`)
+  ck('反向：这一篇没有配图时大图位就不出现（上一条不是"谁都一样"的假绿）',
+    !/image:note/.test(D.大块 || '') && D.上半截色数 < A.上半截色数,
+    `有配图 ${A.上半截色数}色／大块 ${A.大块}　→　没配图 ${D.上半截色数}色／大块 ${D.大块 || '（无）'}`)
   ck('码位拿得到图就画得出来（现网那份也一样画得出）', A.码位.色数 >= 8 && A.码位.深色占比 >= 3, `现网那份码位 ${A.码位.色数}色、深色 ${A.码位.深色占比}%`)
   ck('新种子那份的码位同样画得出来', B.码位.色数 >= 8 && B.码位.深色占比 >= 3, `${B.码位.色数}色、深色 ${B.码位.深色占比}%`)
   ck('qrPath 为空 ⇒ 码位退成单色占位块（他截图那一态复现，归因钉死）', C.码位.色数 <= 2 && C.码位.深色占比 < 1, `${C.码位.色数}色、深色 ${C.码位.深色占比}%`)
-  ck('空白那格与模板无关：三趟用的是同一套 cover、同一个码位框', A.码位框 === B.码位框 && B.码位框 === C.码位框, `框 ${A.码位框}`)
+  ck('空白那格与模板无关：四趟用的是同一套 cover、同一个码位框', A.码位框 === B.码位框 && B.码位框 === C.码位框 && C.码位框 === D.码位框, `框 ${A.码位框}`)
 
   // ---------- 收尾：还原下发、关掉手动开的弹窗、报零写 ----------
   const s9 = await call('收尾 还原', (tpl) => {
@@ -284,9 +327,18 @@ const ck = (name, ok, got) => {
   ck('收尾下发原样还原（十套都在，没把新种子留在内存里）', s9.还原后套数 === 10, `${s9.还原后套数} 套，restore 装回 ${s9.本机缓存装回}`)
   ck('全程零写（非 GET 请求 0 条）', s9.非GET === 0, s9.清单)
 
+  // 这一句是 10-19 那条账的封口：不还原的话，这一台模拟器剩下的整个会话都在挡非 GET，
+  // 站长接着点「生成卡片」就只看到"生成失败"（POST /api/shares/ 被挡），现网一行日志都没有。
+  const back = await 还原()
+  ck('收尾把 wx 那三个原函数装回去了（不再挡非 GET）', !!back && back.还挡着吗 === false, JSON.stringify(back))
+
   const red = results.filter((r) => !r.ok)
   console.log(`\n结论：${results.length} 条，红 ${red.length} 条${red.length ? '（红＝结论，不是环境）' : ''}`)
-  console.log(`截图三张：${OUT}`)
+  console.log(`截图四张：${OUT}`)
   mp.close()
   process.exit(red.length ? 1 : 0)
-})().catch((e) => { console.log('!! 这把自己抛了：', (e && e.stack) || e); process.exit(2) })
+})().catch(async (e) => {
+  console.log('!! 这把自己抛了：', (e && e.stack) || e)
+  if (还原) { try { console.log('    崩溃收尾还原：' + JSON.stringify(await 还原())) } catch (e2) { console.log('    崩溃收尾还原也挂了：' + String((e2 && e2.message) || e2).slice(0, 80)) } }
+  process.exit(2)
+})
