@@ -267,7 +267,10 @@ Page({
     if (!(fromShot && openNote && openNote.id === fromShot)) this._closeFloats()
     // 去编辑那一趟回来要重新站到详情窗前（他 10-03：没保存点取消，回列表等于把人甩回原地找路）。
     // 和验完密码那条同一个做法：等整表重排完再按 id 找回那一行，先开窗后重排会开成别人的笔记。
-    const reopen = this._backToDetail
+    // 第二个来源是**刚提炼成的那一篇**（站长 10-19：「提炼完，直接跳到这个详情页，就是带背景毛玻璃这个，
+    // 用户有需要再修改」）：录入页是另一枚 tab，`switchTab` 带不了参数，id 经 `app.consumePendingDetail()`
+    // 取走一次。取走即清——这一格是一次导航意图，不是本机状态，留着它下次进列表会莫名弹出一扇旧窗。
+    const reopen = this._backToDetail || app.consumePendingDetail()
     this._backToDetail = 0
     await this.loadNotes(true)
     if (reopen) await this._reopenDetail(reopen)

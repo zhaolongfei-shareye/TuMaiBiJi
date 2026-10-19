@@ -63,6 +63,17 @@ App({
     // 私密笔记的解锁凭证（{ token, expireAt }）。只存内存：杀了重进就要重新输密码，
     // 这一闸防的正是"手机在别人手里"那一段时间。读写都在 utils/api.js 里收口。
     privateUnlock: null,
+    // 提炼成了之后"要站到哪一扇窗前"的那一次交接（站长 10-19：「提炼完，直接跳到这个详情页，
+    // 就是带背景毛玻璃这个，用户有需要再修改」）。`switchTab` 带不了参数，只能放这里等列表页取走。
+    // 同样只放内存：这是一次导航意图，不是一台设备的状态——留着它，下次进列表页会莫名弹出一扇
+    // 他三分钟前刚存过的笔记。取走即清，见 consumePendingDetail()。
+    pendingDetailNoteId: 0,
+  },
+
+  consumePendingDetail() {
+    const id = this.globalData.pendingDetailNoteId
+    this.globalData.pendingDetailNoteId = 0
+    return id || 0
   },
 
   onLaunch(options) {

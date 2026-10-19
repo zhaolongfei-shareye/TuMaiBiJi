@@ -26,6 +26,10 @@ const wxml = fs.readFileSync(P('pages/create/create.wxml'), 'utf8')
 const wxssRaw = fs.readFileSync(P('pages/create/create.wxss'), 'utf8')
 const wxss = wxssRaw.replace(/\/\*[\s\S]*?\*\//g, '')
 const js = fs.readFileSync(P('pages/create/create.js'), 'utf8')
+// 10-19 那一刀（提炼完落回列表那扇窗）跨三个文件，判据也得跟着跨：
+// 交出去那一半在 create，取走那一半在 index，"取走即清"那一半在 app。只查 create 会漏掉"没人取"这一种失效。
+const IX_JS = fs.readFileSync(P('pages/index/index.js'), 'utf8')
+const APP_JS = fs.readFileSync(P('app.js'), 'utf8')
 const i18n = require(P('utils/i18n.js'))
 const palette = require(P('utils/palette.js'))
 const zh = i18n.texts('zh')
@@ -847,9 +851,18 @@ ok('轨道被点但这一格还没东西：说出来，不静默（沿用灰按�
 })
 ok('忙态时序收在一处（begin / done / fail 三个小段，三档共用）',
   /_extractBegin\(kind\)/.test(js) && /_extractDone\(noteId, patch\)/.test(js) && /_extractFail\(err\)/.test(js))
-ok('成功那一趟还是"吐司 800ms 后跳详情页"（现网口径没改）',
+ok('成功那一趟的落点＝列表那一扇详情窗（吐司 800ms 后交一次 id 再 switchTab，站长 10-19 拍的）',
   /wx\.showToast\(\{ title: t\('extractSucceeded', lang\), icon: 'success' \}\)/.test(js)
-  && /setTimeout\(\(\) => \{\s*wx\.navigateTo\(\{ url: `\/pages\/detail\/detail\?id=\$\{noteId\}` \}\)/.test(js))
+  && /setTimeout\(\(\) => \{[\s\S]{0,400}?getApp\(\)\.globalData\.pendingDetailNoteId = noteId\s*wx\.switchTab\(\{ url: '\/pages\/index\/index' \}\)/.test(js))
+// 反向钉：这一条钉的是"别再退回那一版"。独立详情页本身没死（卡片大图底下那枚「查看笔记」
+// 与编辑保存那两条还进得去），撤的只是"提炼完把人塞进一个带返回条的整页"这一个落点。
+ok('反向：提炼完不再推独立详情页（那一趟整条链上不该再有 navigateTo detail）',
+  !/\/pages\/detail\/detail\?id=/.test(js))
+ok('列表页那一趟真的取走这一次交接（onShow 重排完整表之后按 id 开窗，不是开窗在前）',
+  /const reopen = this\._backToDetail \|\| app\.consumePendingDetail\(\)/.test(IX_JS)
+  && /await this\.loadNotes\(true\)\s*if \(reopen\) await this\._reopenDetail\(reopen\)/.test(IX_JS))
+ok('交接那一格取走即清（留着它，下次进列表会莫名弹出一扇三分钟前那篇的窗）',
+  /consumePendingDetail\(\)\s*\{[\s\S]{0,160}pendingDetailNoteId = 0[\s\S]{0,60}return id \|\| 0/.test(APP_JS))
 ok('失败那一趟把这一枚退回待滑那一帧', /knobRpx: SLD_REST_RPX,\s*errLine:/.test(js))
 ok('这一档不再自己建笔记（手打那条路只留提炼一个入口）', !/api\.createNote\(/.test(js))
 ok('文字档送进去的是"原文 + 开关"，标题由首行派生（面板里没有标题格）',

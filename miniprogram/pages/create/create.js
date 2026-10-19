@@ -683,14 +683,19 @@ Page({
   _extractDone(noteId, patch) {
     const { lang } = this.data
     this.stopProgress()
-    // 满格 + 完成那一帧（整条转实心、白环仍在），紧接着吐司一句「已存入笔记」，800ms 后跳详情页。
+    // 满格 + 完成那一帧（整条转实心、白环仍在），紧接着吐司一句「已存入笔记」，800ms 后切回列表那扇详情窗。
     // 草稿按 patch 清，面板这一趟先不收起：跳走之前那一帧要看得见"成了"。
     this.setData({ busy: '', fillPct: 100, done: true, knobRpx: SLD_MAX_RPX, ...patch })
-    // 草稿清完跟着把"能不能提交"重算一遍——不然从详情页返回时那一枚还停在已完成的样子。
+    // 草稿清完跟着把"能不能提交"重算一遍——不然从详情窗返回时那一枚还停在已完成的样子。
     this._sync()
     wx.showToast({ title: t('extractSucceeded', lang), icon: 'success' })
     setTimeout(() => {
-      wx.navigateTo({ url: `/pages/detail/detail?id=${noteId}` })
+      // 落点是**列表那一扇详情窗**，不是独立详情页（站长 10-19 原话：「提炼完，直接跳到这个详情页，
+      // 就是带背景毛玻璃这个，用户有需要再修改」）——他要的是"先看见成品，要改他自己点编辑"，
+      // 而不是把人塞进一个带返回条的整页。id 交给 app 那一次交接，列表页重排完整表再按 id 开窗
+      // （`_reopenDetail`，与"去编辑那趟回来站回窗前"同一条路，先开窗后重排会开成别人的笔记）。
+      getApp().globalData.pendingDetailNoteId = noteId
+      wx.switchTab({ url: '/pages/index/index' })
     }, 800)
   },
 
