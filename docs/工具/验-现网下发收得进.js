@@ -148,17 +148,30 @@ try {
   process.exit(3)
 }
 ck('回体是数组（客户端第一眼就问这条，不是数组整批判脏）', Array.isArray(rows), typeof rows)
-ck(`回体是 ${poster.RECIPE_IDS.length} 条（库里 live 几条它就是几条，少一条就是少一套）`,
-  Array.isArray(rows) && rows.length === poster.TEMPLATES.length, `${Array.isArray(rows) ? rows.length : 'n/a'} 条`)
+// 这条原来写的是「回体条数 == 包内套数」，钉的是"库里那十行就是包内那十套的一份抄本"这个前提。
+// 10-19 起前提变了：走"加模板不发版"这条路灌进去的那一套（图文卡）**在包内根本没有对应**，条数必然多出来。
+// 所以拆成两条，各咬一头，一条都没放松：① 包内那十套在回体里**一条都不许少**（漏部署就在这儿红，
+// 少了客户端会静默回包内那份、谁都不报错）；② 回体里**不许有重复 id**（同一套两条 live，客户端按 id 合并留哪条看查询顺序）。
+// 多出来的那几套只报读数，不当判据——它们本来就是这条架构允许长出来的那一层。
+const liveIds = Array.isArray(rows) ? rows.map((r) => r && r.template_id) : []
+const bundledIds = poster.TEMPLATES.map((t) => t.id)
+const extraIds = liveIds.filter((id) => bundledIds.indexOf(id) < 0)
+ck(`包内那 ${bundledIds.length} 套在回体里一条不少（少一条＝下发漏了那套，客户端静默回包内那份）`,
+  bundledIds.every((id) => liveIds.indexOf(id) >= 0),
+  `回体 ${liveIds.length} 条／缺：${bundledIds.filter((id) => liveIds.indexOf(id) < 0).join('、') || '无'}／包内没有的：${extraIds.join('、') || '无'}`)
+ck('回体里没有重复的 template_id（同一套两条 live，客户端按 id 合并留哪条看查询顺序）',
+  new Set(liveIds).size === liveIds.length, `${liveIds.length} 条 / 去重后 ${new Set(liveIds).size} 个`)
 
 // ---------- 收不收 ----------
 poster.applyRemoteTemplates([])
 const rep = poster.applyRemoteTemplates(rows)
-ck(`客户端那份名单十条全收（accepted ${rep.accepted}）`, rep.accepted === rows.length && rep.rejected.length === 0,
+ck(`客户端那份名单把回体${rows.length}条整套收下（accepted ${rep.accepted}）`, rep.accepted === rows.length && rep.rejected.length === 0,
   `收 ${rep.accepted} 拒 ${rep.rejected.length}：${rep.rejected.slice(0, 3).join(' | ')}`)
 // 少了这条，"全收"也可能是"收完没人用"：出的图仍来自包内那份，肉眼与基线全一样。
-const srcs = poster.TEMPLATES.map((t) => `${t.id}=${poster.recipeSource(t.id)}`)
-ck('十条的 recipeSource 全是 remote（真在用下发那一份，不是收进抽屉）',
+// 覆盖面从"包内那十套"扩到**回体里每一条**——数据模板那一套包内没有对应，
+// 它要是没真吃下发（`recipeSource` 回 'js'），列表里那一格会画不出来，这条才抓得到。
+const srcs = liveIds.map((id) => `${id}=${poster.recipeSource(id)}`)
+ck(`回体那 ${liveIds.length} 条的 recipeSource 全是 remote（真在用下发那一份，不是收进抽屉）`,
   srcs.every((s) => /remote$/.test(s)), srcs.join(' '))
 
 // ---------- 画得一样吗 ----------
@@ -201,8 +214,15 @@ ck('反向②：把某行的 min_app_version 抬到 9.9.9，客户端按段筛�
   `收 ${rep3.accepted} 拒 ${JSON.stringify(rep3.rejected.slice(0, 2))}`)
 
 poster.applyRemoteTemplates([])
-ck('收尾：清干净了（回体撤掉之后十条都退回包内那一份）',
+ck('收尾：清干净了（回体撤掉之后包内那十套都退回各自那一份）',
   poster.TEMPLATES.every((t) => poster.recipeSource(t.id) !== 'remote'))
+// 这一条是今天多出来的那一套带来的：**库里少一行／撤回那一行，列表里就得真的少那一格**。
+// 包内没有对应的 id 只能靠下发活着——它一旦不在回体里，合并列表就必须把它吐出去，
+// 否则"撤回来"那句话对数据模板是假的（现网 §6 那一句 status→archived 走的正是这条路）。
+ck(`收尾：多出来那 ${extraIds.length} 套（包内没有的）在回体撤掉后从合并列表里消失`,
+  extraIds.every((id) => poster.templateList().every((x) => x.id !== id)) &&
+  poster.templateList().length === bundledIds.length,
+  `撤空后合并列表 ${poster.templateList().length} 格／包内 ${bundledIds.length} 套`)
 
 let n = 0
 for (const [name, pass, detail] of results) {
