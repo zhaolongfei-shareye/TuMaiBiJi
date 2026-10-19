@@ -1,0 +1,36 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { width:1280px; height:1024px; overflow:hidden; }
+@font-face { font-family:'Playfair'; src:url('../分享图-20261015/playfair-display-latin-400-normal.woff2') format('woff2'); font-weight:400; }
+@font-face { font-family:'Playfair'; src:url('../分享图-20261015/playfair-display-latin-500-normal.woff2') format('woff2'); font-weight:500; }
+.card { position:relative; width:1280px; height:1024px; background:#E9E7DC; color:#14161A;
+  font-family:'Songti SC','STSong',serif; overflow:hidden; }
+.kick { position:absolute; left:96px; top:88px; font-family:'Playfair'; font-weight:500; font-size:15px;
+  letter-spacing:.42em; color:#C0552F; }
+.hair { position:absolute; left:96px; top:128px; width:64px; height:2px; background:#14161A; }
+.h1 { position:absolute; left:96px; top:172px; width:660px; font-size:88px; line-height:1.22;
+  font-weight:700; letter-spacing:-.015em; }
+.sub { position:absolute; left:98px; top:434px; font-size:25px; letter-spacing:.16em;
+  color:rgba(20,22,26,.56); white-space:nowrap; }
+.sub i { font-style:normal; color:rgba(20,22,26,.26); padding:0 12px; }
+.dom { position:absolute; left:98px; bottom:74px; font-family:'Playfair'; font-size:14px;
+  letter-spacing:.34em; color:rgba(20,22,26,.38); }
+.grp { position:absolute; }
+.grp img { width:100%; height:100%; display:block; }
+.logos { position:absolute; display:grid; grid-template-columns:repeat(3, auto);
+  justify-content:space-between; align-content:space-between; }
+.m { display:flex; align-items:center; justify-content:center; }
+.cap { position:absolute; font-size:17px; letter-spacing:.16em; color:rgba(20,22,26,.55); white-space:nowrap; }
+
+.bwrap { position:absolute; width:600px; background:#FFFFFF; border-radius:6px; overflow:hidden;
+  box-shadow:0 1px 0 rgba(20,22,26,.06); font-family:-apple-system,'PingFang SC',sans-serif; }
+.bhead { display:flex; align-items:center; gap:9px; padding:16px 18px 10px; }
+.bhead .av { width:30px; height:30px; border-radius:5px; background:conic-gradient(from 210deg,#7FC8F8,#B9A6F0,#F6C445,#7ED8A8,#7FC8F8); }
+.bhead .nm { font-size:15px; color:#7A7F89; }
+.btitle { padding:0 18px 12px; font-size:19px; line-height:1.42; color:#1A1A1A; font-weight:400; }
+.bimg { margin:0 18px 14px; width:564px; height:451px; }
+.bimg img { width:100%; height:100%; display:block; }
+.bfoot { display:flex; align-items:center; gap:7px; padding:0 18px 16px; font-size:13px; color:#5A628C; }
+.bfoot .lnk { width:14px; height:14px; border:1.4px solid #5A628C; border-radius:50%; position:relative; }
+.tag { position:absolute; font-size:15px; letter-spacing:.1em; color:#C0552F; font-family:'Songti SC',serif; }
+</style></head><body><div class="card" style="height:1024px"><div style="position:absolute;left:96px;top:64px;font-size:30px;font-weight:700">分享标题改口对照</div><div class="tag" style="left:96px;top:120px">① 现网这句（i18n `shareCardTitle`）</div><div class="bwrap" style="left:96px;top:150px"><div class="bhead"><div class="av"></div><div class="nm">图麦笔记</div></div><div class="btitle">图麦笔记 | 把图文提炼成有用的干货</div><div class="bimg"><img src="甲-logo右下.png"></div><div class="bfoot"><div class="lnk"></div>未发布的小程序 · 体验版</div></div><div class="tag" style="left:676px;top:120px">② 你说的那句（白底黑紫第一行）</div><div class="bwrap" style="left:676px;top:150px"><div class="bhead"><div class="av"></div><div class="nm">图麦笔记</div></div><div class="btitle">仅需15秒 | 拍照截图网页转笔记</div><div class="bimg"><img src="甲-logo右下.png"></div><div class="bfoot"><div class="lnk"></div>未发布的小程序 · 体验版</div></div><div style="position:absolute;left:96px;top:940px;font-size:16px;color:rgba(20,22,26,.6);letter-spacing:.06em">两气泡里那张封面图都是同一张新图；改的只有标题这一行。标题现网取自 miniprogram/utils/i18n.js 的 shareCardTitle，12 语各一份，改中文这句要连带定其余 11 语。</div></div></body></html>
