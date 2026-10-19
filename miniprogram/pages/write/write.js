@@ -36,6 +36,7 @@ Page({
     tagsText: '',
     tagList: [],
     shots: [],
+    shotDrag: -1,   // 拖动中那一枚的下标（-1＝没在拖）。只用来给它挂一枚浮起来的皮
     // 「原文」这一栏（站长 10-18 连着三句「看不到原文」）。编辑这一屏原来只有五栏，
     // 原文只在详情那一屏、还默认收起——他要的是在改的这一屏就能看见它。
     originalText: '',
@@ -227,6 +228,105 @@ Page({
           wx.showToast({ title: (err.data && err.data.detail) || t('deleteFailed', lang), icon: 'none' })
         }
       }
+    })
+  },
+
+  // ---------- 配图拖动排序（站长 10-19「笔记编辑时候，配图要支持拖动排序，方便用户选择好的图片作为头图」）
+  // 构造照抄笔记页分类那一排（`pages/index/index.js` 的 `onCatDragStart` 那一组），两处按这一屏重算：
+  // ① 分类那一排是一行横着滚，越过相邻那枚的中线就换；这一排是**会换行的方格**（一行四枚、最多九枚两行），
+  //    只看 x 会在换行那两枚之间滑不动，所以落点改成"手指离谁的中心最近就换到谁的位置"——
+  //    横竖两个方向一次判掉，不必为"上一行末"与"下一行首"那一条缝另写规则。
+  // ② 分类那一排的顺序只是本机草稿，点空白才提交；这一排**松手就发**：同一排的 ✕ 本来就是
+  //    当场删到服务端（10-18 那一条），一排东西两种落库时机比两种都发更让人摸不着。
+  //    ⚠ 这一条他没拍过，我按"这一排本来就即时改服务端"落的；要挪到「保存」那一趟一起发，说一声。
+  // ⚠ 事件一律 bind 不 catch，与分类那一排同一条：那一排也是拖得动、页面也滚得动。
+  //    代价写在这儿——手指压在方格上往下滑，这一屏会跟着滚，同时顺序也可能被他改掉一格。
+  // 落点全靠现量：每次换完必须重新量 rect，数组一调序手上那份就全部过期（分类那一排同一条）。
+  //    起拖那一枚不需要手指坐标——第一次 touchmove 就带着，比 `longpress` 那个事件里
+  //    在部分机型会空掉的 `touches` 可靠。
+  onShotDragStart(e) {
+    const i = Number(e.currentTarget.dataset.index)
+    const shots = this.data.shots || []
+    if (!(i >= 0 && i < shots.length) || shots.length < 2) return
+    this._shotDrag = { i, from: shots.map((s) => s.id) }
+    this.setData({ shotDrag: i })
+  },
+
+  async onShotDragMove(e) {
+    const d = this._shotDrag
+    if (!d || this._shotBusy) return
+    const t0 = e.touches && e.touches[0]
+    if (!t0) return
+    this._shotBusy = true
+    try {
+      await this._shotDragStep(t0.clientX, t0.clientY)
+    } finally {
+      this._shotBusy = false
+    }
+  },
+
+  async _shotDragStep(x, y) {
+    const d = this._shotDrag
+    if (!d) return
+    const shots = this.data.shots || []
+    const rects = await this._shotRects()
+    // 量回来的枚数与草稿对不上 ⇒ 渲染还没跟上这一次 setData，宁可这一趟不换，
+    // 也别拿过期的 rect 表去比中心（分类那一排同一条，10-18 就是栽在这儿）。
+    if (rects.length !== shots.length || shots.length < 2) return
+    let to = -1, best = Infinity
+    for (let k = 0; k < rects.length; k++) {
+      const r = rects[k]
+      if (!r) continue
+      const dx = x - (r.left + r.width / 2)
+      const dy = y - (r.top + r.height / 2)
+      const dist = dx * dx + dy * dy
+      if (dist < best) { best = dist; to = k }
+    }
+    if (to < 0 || to === d.i) return
+    const next = shots.slice()
+    const it = next.splice(d.i, 1)[0]
+    next.splice(to, 0, it)
+    d.i = to
+    this.setData({ shots: next, shotDrag: to })
+    // 排布是渲染层算的，setData 回来那一瞬量到的还是换之前的位置：等一帧再量。
+    await new Promise((resolve) => setTimeout(resolve, 30))
+  },
+
+  onShotDragEnd() {
+    const d = this._shotDrag
+    if (!d) return
+    this._shotDrag = null
+    this.setData({ shotDrag: -1 })
+    const now = (this.data.shots || []).map((s) => s.id)
+    if (now.join() === d.from.join()) return   // 拖了一圈又回到原位：不发那一趟
+    this._saveShotOrder(now, d.from)
+  },
+
+  async _saveShotOrder(now, from) {
+    const { lang, noteId } = this.data
+    try {
+      const left = await api.reorderNoteAssets(noteId, now)
+      // 服务端那份才是准的：它可能把这一屏没见过的行（另一台手机刚补的一张）挪到末尾，
+      // 拿回体铺一遍，屏上就不会留一份"看着存好了、其实与服务端不同序"的假象。
+      if (Array.isArray(left) && left.length) this.setData({ shots: left })
+    } catch (err) {
+      // 发失败 ⇒ 把那一排摆回拖之前的样子再说实话。留着新序不改，屏上那枚头图就是句假话：
+      // 列表、详情窗、卡片大图位读的都是服务端那一份，它们不会跟着换。
+      const back = (this.data.shots || []).slice()
+      const byId = {}
+      back.forEach((s) => { byId[s.id] = s })
+      const restored = from.map((id) => byId[id]).filter(Boolean)
+      this.setData({ shots: restored.length === back.length ? restored : back })
+      console.error('配图排序失败', err)
+      wx.showToast({ title: (err.data && err.data.detail) || t('saveFailed', lang), icon: 'none' })
+    }
+  },
+
+  _shotRects() {
+    return new Promise((resolve) => {
+      wx.createSelectorQuery().selectAll('.wr-shot').boundingClientRect().exec((res) => {
+        resolve((res && res[0]) || [])
+      })
     })
   },
 

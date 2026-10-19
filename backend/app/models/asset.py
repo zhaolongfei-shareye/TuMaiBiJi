@@ -41,7 +41,37 @@ class Asset(Base):
     # 'uploaded' | 'failed'。failed 的行云上没东西，不计配额；历史遗留的 NULL 按 uploaded 算
     # （判据就是本文件下面的 `not_failed()`——`NULL != 'failed'` 在 SQL 里是"不过"，不写清楚就漏账）。
     backup_status = Column(String(20), default="uploaded")
+    # 一篇之内那几张的先后（10-19 站长「编辑时，配图要支持拖动排序，方便用户选择好的图片作为头图」）。
+    # 这一列就是"头图是谁"的唯一答案：四处读口一律 `ORDER BY (sort_order, id)`，而头图取第一张
+    # （`routes/notes.py` 的 `_attach_covers`）——所以拖动改的不只是编辑那一屏的排布，列表右侧那枚、
+    # 详情窗那张大图、卡片模板的大图位、公开页那一批，五处跟着一起换。
+    # 0 是"从没手动排过"：存量行全带 server_default '0'，第一档排序键相等 ⇒ 退回 `id` 升序
+    # ＝这一刀之前的样子，老笔记的头图一张都不会换。新登记的走 `_next_sort_order`（当前最大值 +1）
+    # 永远追加在最后，不会插到人家前面。与 `categories.sort_order` 同一套构造。
+    sort_order = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+def order_by_note():
+    """一篇之内那几张的排序键。**四处读口只许从这里拿**，别处再写一遍 `asc()` 就是第五份真相。
+
+    为什么钉这一条：`_attach_covers` 那份注释早就写着"两处各挑一张的话，列表上那枚和点进去
+    第一张就会不是同一张图"——拖动排序把这句话从"注释里的约定"变成了屏上看得见的差别，
+    少改一处不是颜色不对，是**他拖完在列表上看到的还是旧那张**。
+    """
+    return (Asset.sort_order.asc(), Asset.id.asc())
+
+
+def next_sort_order(db, note_id) -> int:
+    """这一篇**下一张新图**该排第几＝当前最大值 +1。
+
+    为什么不让新图直接吃默认值 0：0 是"从没排过"那一档，而存量行全是 0；新图拿 0 会在
+    排过序的那一批（1..N）之前冒到第一格，等于**给一篇老笔记悄悄换了头图**。
+    最大值 +1 两种态都对：没排过的篇里 max=0 ⇒ 新图拿 1，仍排在所有 0 之后；
+    排过的篇里 max=N ⇒ 新图拿 N+1，追加在最后。
+    """
+    cur = db.query(func.max(Asset.sort_order)).filter(Asset.note_id == note_id).scalar() or 0
+    return int(cur) + 1
 
 
 def not_failed():

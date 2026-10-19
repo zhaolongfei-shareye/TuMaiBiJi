@@ -240,6 +240,11 @@ module.exports = {
   // 塞进路径段会被多切两截，路由直接不匹配（后端 routes/assets.py 那条注释记的就是这个）。
   // 回的是**剩下的那批**（与 GET 同一个形状），界面拿它直接刷新那一排，不必再读一次列表。
   deleteNoteAsset: (id, assetId) => request(`/api/notes/${id}/assets/${assetId}`, 'DELETE'),
+  // 把这一篇配图的先后改成 `ids` 这个次序（10-19 站长「编辑时，配图要支持拖动排序，
+  // 方便用户选择好的图片作为头图」）。**第一张就是头图**：列表右侧那枚、详情窗那张大图、
+  // 卡片模板的大图位、公开页那一批，五处读的都是服务端这一个序号。
+  // 与删除那一口同一条：路径上带数字 id，回的是**排完之后按新序的那一批**，界面直接拿它刷新那一排。
+  reorderNoteAssets: (id, ids) => request(`/api/notes/${id}/assets/reorder`, 'POST', { ids }),
   getStorageQuota: () => request('/api/user/storage-quota'),
   // 卡片留档那三个口（2.0.1 P0 · S1 的服务端，S2 接上客户端）。
   // 形状与配图那一路同型：图片字节不经过后端，这里传的每一项都是登记信息。

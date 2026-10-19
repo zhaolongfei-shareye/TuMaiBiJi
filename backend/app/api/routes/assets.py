@@ -29,7 +29,14 @@ from app.core.auth import get_current_user
 from app.core.private_access import is_private_note, private_category_ids, unlocked
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
-from app.models.asset import Asset, MAX_ASSETS_PER_NOTE, MAX_FILE_BYTES, not_failed
+from app.models.asset import (
+    Asset,
+    MAX_ASSETS_PER_NOTE,
+    MAX_FILE_BYTES,
+    next_sort_order,
+    not_failed,
+    order_by_note,
+)
 from app.models.note import Note
 from app.models.note_card import NoteCard, current
 from app.models.user import User
@@ -59,6 +66,15 @@ class AssetIn(BaseModel):
 
 class AssetBindIn(BaseModel):
     items: List[AssetIn] = Field(default_factory=list)
+
+
+class AssetOrderIn(BaseModel):
+    """拖动排序那一趟送的：这篇配图**新的先后**，一行一个数字 id（不是 fileID，理由同删除那一口）。
+
+    上界只卡请求体，不卡业务：一篇最多 9 张，给到 100 是留给"客户端那份名单比库里旧"的余量，
+    多出来的 id 在业务层一律不理（见 `reorder_note_assets` 第 2 条）。
+    """
+    ids: List[int] = Field(default_factory=list, max_length=100)
 
 
 class AssetOut(BaseModel):
@@ -173,6 +189,10 @@ def bind_note_assets(
 
     uid = str(user.id)
     bound: List[Asset] = []
+    # 这一批里**新建**的那几张排到最后去（当前最大值 +1，一张一递增）。
+    # 已存在的行不动 `sort_order`：幂等补绑改的是尺寸不是位置——补绑一次就把人家拖好的顺序
+    # 打回原形，是这一列最难受的一种错法，而且屏上看不出来（图还是那几张，只是头图换了）。
+    next_order = next_sort_order(db, note_id)
     for it in items:
         # 归属这一刀走 `_assert_ours` 那一份，不在这里另写一遍短的：卡片口（`cards.py`）与
         # 名片口（`profiles.py`）用它，它查的是 `assets` + `note_cards` + 名片四格**三处**；
@@ -202,7 +222,9 @@ def bind_note_assets(
                 width=it.width,
                 height=it.height,
                 backup_status="uploaded",
+                sort_order=next_order,
             )
+            next_order += 1
             db.add(row)
         bound.append(row)
     db.commit()
@@ -232,7 +254,7 @@ def list_note_assets(
             # "这一张算进配额却列不出来"的幽灵行——看得见的是钱，看不见的是图。
             not_failed(),
         )
-        .order_by(Asset.id.asc())
+        .order_by(*order_by_note())
         .all()
     )
     return _views(rows)
@@ -283,10 +305,70 @@ def delete_note_asset(
             Asset.user_id == uid,
             not_failed(),
         )
-        .order_by(Asset.id.asc())
+        .order_by(*order_by_note())
         .all()
     )
     return _views(left)
+
+
+@router.post("/api/notes/{note_id}/assets/reorder", response_model=List[AssetOut])
+def reorder_note_assets(
+    request: Request,
+    note_id: int,
+    body: AssetOrderIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """把这篇配图的先后改成客户端送来的这个次序，回**排完之后按新序的那一批**（同删除那一口：
+    客户端不用再读一次列表，回体本身就是"服务端认下的新顺序"这份读数）。
+
+    站长 10-19 原话「笔记编辑时候，配图要支持拖动排序，方便用户选择好的图片作为头图」——
+    这一口就是那句"方便选头图"落库的地方：**第一张就是头图**，列表右侧那枚、详情窗那张大图、
+    卡片模板的大图位、公开页那一批，五处读的都是同一个 `order_by_note()`。
+
+    四条口径：
+    1. **序号从 1 起，0 永远空着**。0 是"从没手动排过"那一档（迁移给存量行留的就是它），
+       让第一名也拿 0 就把两种意思挤进同一个数了——混着读的篇（排过的行＋没排过的行）会当场
+       按 `id` 决胜，等于他拖了没生效。
+    2. **一次查完再在内存里派号**，不照 `categories/reorder` 那样一格一问：那边最多 8 格，
+       这一列 9 张、且这个口在拖动松手那一瞬打，两趟查询够用就别再留一条 N 次查询的样例。
+       行为与它一致（不属于这篇的 id 一律不理），只是不烧 N 个来回。
+    3. **名单里没有的行不留在原地，一律按现有先后排到末尾**。留着它身上那个旧序号会与新写的数撞上同一个值，
+       撞了就只能由 `id` 决胜——症状是"我明明把它拖到第二了，它又跑回第一"，而回体看着是 200。
+       （新补进来的那张不会撞：登记那一趟走 `next_sort_order`，本来就落在最后。）
+    4. **私密篇没解锁时这个口不开**（403），与删除那一口同一条：读的那一趟本来回空数组，
+       锁着的篇在界面上根本没有可拖的东西。
+    """
+    note = _owned_note_or_404(db, user, note_id)
+    if is_private_note(note, private_category_ids(db, user.id)) and not unlocked(request, user):
+        raise HTTPException(status_code=403, detail="这篇是私密笔记，先解锁")
+    uid = str(user.id)
+    rows = (
+        db.query(Asset)
+        .filter(
+            Asset.note_id == note_id,
+            Asset.user_id == uid,
+            not_failed(),
+        )
+        .order_by(*order_by_note())
+        .all()
+    )
+    by_id = {r.id: r for r in rows}
+    order = 1
+    for asset_id in body.ids:
+        row = by_id.pop(asset_id, None)   # 同一个 id 送两次只算第一次；不是这篇的直接不理
+        if row is None:
+            continue
+        row.sort_order = order
+        order += 1
+    for row in rows:                      # 没被点名的退到最后，按它自己现在的先后
+        if by_id.get(row.id) is not None:
+            row.sort_order = order
+            order += 1
+    db.commit()
+    for row in rows:
+        db.refresh(row)
+    return _views(sorted(rows, key=lambda r: (r.sort_order, r.id)))
 
 
 def _sum_bytes(db: Session, uid: Optional[str] = None) -> int:

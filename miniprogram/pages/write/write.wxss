@@ -161,6 +161,16 @@
   justify-content: center;
 }
 
+/* 拖动中的那一枚浮起来（10-19「配图要支持拖动排序」）。只给"哪一枚在你手上"这一个读数，
+   不给位移：换位置靠的是列表调序后它自己落到那一格，跟着手指飞会露出"两套位置"。
+   ⚠ 这一枚不许加 `transition: transform`——换序那一瞬它正被挪到新位置，带缓动的缩放会把
+   那一帧拉成一段漂移，看着像没换成功（分类那一排同一条）。 */
+.wr-shot.wr-drag {
+  transform: scale(1.06);
+  z-index: 3;
+  box-shadow: 0 10rpx 26rpx rgba(18, 20, 26, 0.30);
+}
+
 .container {
   padding-bottom: 60rpx;
 }

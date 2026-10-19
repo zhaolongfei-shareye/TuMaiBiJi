@@ -475,7 +475,12 @@ class Test八_迁移接在那一头之后:
         assert "sa.Column('fail_count', sa.Integer(), server_default='0', nullable=False)" in src
 
     def test_整条链只有一个头(self):
-        """多头会让 `alembic upgrade head` 直接报"重复"，而那一趟是在现网跑的。"""
+        """多头会让 `alembic upgrade head` 直接报"重复"，而那一趟是在现网跑的。
+
+        两条断言各管一件事：**枚数**（链不许分叉）与**链尾是谁**。后一条红的时候不是 bug，
+        是提醒——新挂一支迁移上来，链尾就换人了，跟着要一起改的是部署台账里那个"迁移头"，
+        两处必须同一个数（现网那台跑的是哪一个头，只有它说得清）。
+        """
         heads = set()
         seen = {}
         for f in (BACKEND / "alembic" / "versions").glob("*.py"):
@@ -486,7 +491,9 @@ class Test八_迁移接在那一头之后:
                 seen[rev.group(1)] = down.group(1) if down else None
         parents = {p for p in seen.values() if p}
         heads = {r for r in seen if r not in parents}
-        assert heads == {"f0a3b9c6d172"}, f"链上不止一个头（或这条没挂上）：{heads}"
+        assert len(heads) == 1, f"链分叉了，`upgrade head` 当场报重复：{sorted(heads)}"
+        assert heads == {"a4d7e2b91c58"}, \
+            f"链尾换了（现网台账里那个迁移头要一起改）：{sorted(heads)}"
 
 
 class Test九_那一页真有这一栏:

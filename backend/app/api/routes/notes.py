@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import logging
 from sqlalchemy import and_, or_
 from app.db.database import get_db
-from app.models.asset import Asset, not_failed
+from app.models.asset import Asset, not_failed, order_by_note
 from app.models.note import Note, SOURCE_SHARE_IMPORT
 from app.models.share import Share
 from app.models.user import User
@@ -212,9 +212,11 @@ def _attach_covers(db: Session, uid: str, notes: list) -> None:
     而这一栏本来一条查询就能取完。
 
     三条口径写在这儿，免得下一个人按自己的读法改错：
-    ① **取哪一张**＝`Asset.id` 升序的第一张。这不是"随便挑一张"，而是**与详情页那组缩略图
-       同一个序**（`routes/assets.py` 的 `list_note_assets` 就是 `order_by(Asset.id.asc())`）——
-       两处各挑一张的话，"列表上那枚"和"点进去第一张"就会不是同一张图。
+    ① **取哪一张**＝`order_by_note()` 的第一张（`sort_order` 升序、同值再按 `id`）。这不是
+       "随便挑一张"，而是**与详情页那组缩略图同一个序**（`routes/assets.py` 的 `list_note_assets`
+       吃的就是同一个函数）——两处各挑一张的话，"列表上那枚"和"点进去第一张"就会不是同一张图。
+       10-19 起这一档从"注释里的约定"变成屏上看得见的差别：编辑那一屏拖动排序改的就是
+       `sort_order`，少改一处就是他拖完、列表上那枚还是旧那张。
     ② **必须过 `not_failed()`**：`backup_status='failed'` 的行云上根本没有对象，
        拿它当封面就是一张碎图；历史遗留的 NULL 跟着算进来（那个函数头写清楚了为什么）。
     ③ **带上 `user_id` 这一道**：`note_id` 已经由外层那条 `Note.user_id == user.id` 限过，
@@ -232,10 +234,10 @@ def _attach_covers(db: Session, uid: str, notes: list) -> None:
                 Asset.user_id == uid,
                 not_failed(),
             )
-            .order_by(Asset.note_id, Asset.id.asc())
+            .order_by(Asset.note_id, *order_by_note())
             .all()
         ):
-            cover.setdefault(nid, key)  # 按 id 升序，第一篇命中的就是它最早那一张
+            cover.setdefault(nid, key)  # 按 (sort_order, id) 升序，第一篇命中的就是它当前排第一那一张
     for n in notes:
         n.cover_file_id = cover.get(n.id)
 

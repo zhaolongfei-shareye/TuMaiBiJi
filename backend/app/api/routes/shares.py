@@ -13,7 +13,7 @@ from app.core.private_access import is_private_note, private_category_ids
 from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
-from app.models.asset import Asset, not_failed
+from app.models.asset import Asset, not_failed, order_by_note
 from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
@@ -266,7 +266,7 @@ def _public_assets(db: Session, note_id: int | None) -> list[ShareAsset]:
     rows = (
         db.query(Asset.object_key)
         .filter(Asset.note_id == note_id, not_failed())
-        .order_by(Asset.id.asc())
+        .order_by(*order_by_note())
         .all()
     )
     return [ShareAsset(cloud_url=r[0]) for r in rows]

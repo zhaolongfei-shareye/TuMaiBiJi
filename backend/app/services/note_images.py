@@ -339,9 +339,14 @@ def register(db, note, kept: list) -> int:
     这一刻写进桶才存在的那一个，`cloud://` 那一关在 `_upload` 里已经过了（过不去这张直接算没存上），
     而笔记也是这一刻新建的，不存在"这行已经在别人账上"的存量。
     """
-    from app.models.asset import Asset
+    from app.models.asset import Asset, next_sort_order
 
     written = 0
+    # 新登记的这几张一律追加在这一篇的**最后**（当前最大值 +1，一张一递增）。
+    # 不赋这一列它会吃模型默认 0，而 0 是"从没手动排过"那一档——一篇已经排过序的笔记
+    # 被外链转存补进来一张图，那张会冒到第一格把**头图换掉**，而他什么都没拖。
+    # 这一路今天只给新建的笔记补图（撞不到），但"默认值刚好对"这种前提最脆，当场钉死。
+    next_order = next_sort_order(db, note.id)
     for shot in kept:
         if db.query(Asset).filter(Asset.object_key == shot.file_id).first():
             # 幂等：同一个 job 被 RQ 重跑一次不该多堆一行（多出来的行看不见，却占全站配额）。
@@ -355,7 +360,9 @@ def register(db, note, kept: list) -> int:
             width=shot.width,
             height=shot.height,
             backup_status="uploaded",
+            sort_order=next_order,
         ))
+        next_order += 1
         written += 1
     db.commit()
     if written:
