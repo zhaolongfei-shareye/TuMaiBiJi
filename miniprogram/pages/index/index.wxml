@@ -334,7 +334,14 @@
   <view wx:if="{{templateOpen && !cardInfoOpen}}" class="float-mask" catchtap="onCancelTemplate"></view>
   <view wx:if="{{templateOpen && !cardInfoOpen}}" class="float-sheet tpl-sheet">
     <view class="grip" bindtap="onHandleTap">
-      <view class="grip-bar"></view>
+      <!-- 顶上中间那一格：未生成态念模板名，其余时候（已生成态、卡片那一屏）仍是那根把手条。
+           站长 10-19「卡片名称，被遮挡，要提到顶上中间」——被遮挡的根因不在样式，在几何：
+           `_tplBoxRpx()` 给展示框预留的是「左右 48 ＋ 下面那一排圆点 32」，10-17 新加的名字那行
+           从来没算进预留，而 `.tpl-body` 是居中＋`overflow:hidden`，超出的高度上下各切一刀，
+           切到的正是最后一行。搬到顶上之后那一列只剩「海报＋圆点」，预留又回到原值。
+           左右各有一句（滑动手势／收窗），所以中间这枚限宽加省略号，不许把两句挤走。 -->
+      <text wx:if="{{!posterHasCard && posterTplName}}" class="grip-tx grip-tx-c">{{posterTplName}}</text>
+      <view wx:else class="grip-bar"></view>
       <!-- 左右各一句、同一行同一档：右边收窗，左边告诉他这一屏能左右滑。
            原来那句挂在卡片下面，卡片一高就被顶到看不见。 -->
       <text class="grip-tx grip-tx-l" wx:if="{{!posterHasCard}}">{{t.swipeHint}}</text>
@@ -350,13 +357,10 @@
           class="tpl-dot {{item.id === posterTpl ? 'tpl-dot-on' : ''}}"
           style="background: {{item.color}}"></view>
       </view>
-      <!-- 模板名字常驻一行（站长 10-17 深夜：「我记得以前还有提醒模板名称的，现在好像看不见。你检查下」）。
-           查出来的实情：名字从来没有屏上那一格，只有**滑过那一下**一枚 1.2 秒的 toast
-           （`_advanceTemplate` 里那句 `wx.showToast`），开窗那一下从来不报，已生成态连滑都不给滑
-           ⇒ 从列表点进去基本看不见它。这一行就是把那一闪改成常驻，滑到哪一行就念哪一套；
-           toast 跟着撤（同一件事不留两处，而且 toast 会被画布出图那一趟压过去）。
-           已生成态那一行不画：那态模板锁死，念一个"你不能换"的名字没有意义。 -->
-      <text class="tpl-name" wx:if="{{!posterHasCard && posterTplName}}">{{posterTplName}}</text>
+      <!-- 模板名字不在这条列里（站长 10-19 搬到顶上中间，见上面 `.grip` 那一段）。
+           ⚠ 别把它挪回来：这一列的高度是 `_tplBoxRpx()` 按「海报＋圆点」预留算的，
+           多一行就被 `justify-content:center` ＋ `overflow:hidden` 上下各切一刀。
+           滑到哪一套就念哪一套那枚 1.2 秒 toast 也早已撤净（同一件事不留两处）。 -->
     </view>
     <view class="tpl-dock">
       <!-- 已生成态（站长 10-03 23:40）：底排两枚，模板不能滑、名片不能改，要换就先删这一张。

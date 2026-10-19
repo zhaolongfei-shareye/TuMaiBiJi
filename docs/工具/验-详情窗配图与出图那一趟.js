@@ -112,10 +112,15 @@ const numOf = (src, sel, prop) => {
     !!open && !/posterTpl: poster\.DEFAULT_TEMPLATE/.test(open))
 }
 
-/* ---------- ③ 模板名字：常驻那一行，不是那枚一闪而过的 toast ---------- */
+/* ---------- ③ 模板名字：常驻在顶上中间那一格，不是那枚一闪而过的 toast ---------- */
 {
+  // 站长 10-19「卡片名称，被遮挡，要提到顶上中间」。旧判据钉的是 `class="tpl-name"` 挂在 `.tpl-body` 那一列里，
+  // 而那一列正是被 `justify-content:center` ＋ `overflow:hidden` 上下切一刀的地方 ⇒ 落点搬了，判据跟着搬，
+  // 并且**反向钉死它不许回到那一列**（回到那一列就是把他报的那个遮挡改回来一次）。
   ck('屏上真有一行常驻的模板名（历史上它只是一枚 1.2 秒 toast，从来没有这一行）',
-    /class="tpl-name"/.test(IX_WXML) && />\{\{posterTplName\}\}<\/text>/.test(IX_WXML))
+    /class="grip-tx grip-tx-c"/.test(IX_WXML) && />\{\{posterTplName\}\}<\/text>/.test(IX_WXML))
+  ck('名字那一枚不许回到海报那一列里（那一列的预留只算到圆点，多一行就被切）',
+    !/class="tpl-name"/.test(IX_WXML))
   ck('那一行只在未生成态画（已生成态模板不能换，报着名字会以为还能换）',
     /wx:if="\{\{!posterHasCard && posterTplName\}\}"/.test(IX_WXML))
   ck('开窗那一下就把名字 setData 进去（原来开窗从来不报）',
@@ -133,8 +138,11 @@ const numOf = (src, sel, prop) => {
     `${(adv.match(/wx\.showToast/g) || []).length} 枚`)
   ck('滑动那一趟也记 _lastTplId（滑过的那套不该是下一次开窗的"上一套"以外）',
     !!adv && /this\._lastTplId = next\.id/.test(adv))
-  ck('这一行有样式，不是裸 text（常驻的东西没皮就是没做）',
-    /\.tpl-name\s*\{/.test(stripCss(IX_WXSS)), rule(IX_WXSS, 'tpl-name').replace(/\s+/g, ' ').trim())
+  ck('那一枚有样式，不是裸 text（常驻的东西没皮就是没做）',
+    /\.grip-tx-c\s*\{/.test(stripCss(IX_WXSS)), rule(IX_WXSS, 'grip-tx-c').replace(/\s+/g, ' ').trim())
+  // 顶上那一行左右各有一句，中间这枚不限宽就会把「点一下收起」挤成竖排（本仓记过那一形状）。
+  ck('中间那枚限宽＋省略号，不许把左右两句挤走',
+    /max-width:/.test(rule(IX_WXSS, 'grip-tx-c')) && /text-overflow: ellipsis/.test(rule(IX_WXSS, 'grip-tx-c')))
 }
 
 /* ---------- ④ 存相册 → 台账 → 等用户选分享路径；再点静默 ---------- */

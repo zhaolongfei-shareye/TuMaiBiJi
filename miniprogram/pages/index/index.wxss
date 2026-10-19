@@ -1337,16 +1337,21 @@
   margin-top: var(--sp-2);
 }
 
-/* 模板名字常驻那一行（站长 10-17 深夜「以前还有提醒模板名称的，现在好像看不见，你检查下」）。
-   查出来的实情：名字从来没有屏上那一格，只有**滑过那一下**一枚 1.2 秒 toast，开窗那一下从来不报。
-   所以这一行是把那一闪搬成常驻，字号走 `--fs-tiny`（21）、 tertiary 字色，
-   与顶上「左右滑换模板」那句同档——两行都是"这一屏怎么办"的说明，不与卡片正文抢。 */
-.tpl-name {
-  flex: none;
-  margin-top: 10rpx;
-  font-size: var(--fs-tiny);
-  color: var(--text-tertiary);
-  text-align: center;
+/* 顶上中间那一格改念模板名（站长 10-19「卡片名称，被遮挡，要提到顶上中间」）。
+   被遮挡的根因不在样式在几何：`_tplBoxRpx()` 给展示框预留的是「左右 48 ＋ 下面那一排圆点 32」，
+   10-17 加的名字那行从来没算进预留，而 `.tpl-body` 是居中＋`overflow:hidden`
+   ⇒ 超出的高度上下各切一刀，切到的正是最后一行。搬到顶上后那一列只剩「海报＋圆点」，预留又回到原值。
+   左右各有一句（滑动手势／收窗，各占 34 ＋ 约 130rpx），所以中间这枚必须限宽并省略号：
+   不写 `max-width` 的话，英文那套模板名会把右边那句「点一下收起」挤成竖排。 */
+.grip-tx-c {
+  left: 0;
+  right: 0;
+  justify-content: center;
+  max-width: 340rpx;
+  margin: 0 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .tpl-dot {
