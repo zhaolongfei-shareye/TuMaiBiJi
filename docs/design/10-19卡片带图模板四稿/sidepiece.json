@@ -1,0 +1,764 @@
+{
+ "template_id": "sidepiece",
+ "label": "侧影",
+ "label_en": "Side Piece",
+ "group_key": "classic",
+ "sort_order": 140,
+ "min_app_version": "2.3.18",
+ "recipe": {
+  "id": "sidepiece",
+  "min_version": 1,
+  "steps": [
+   {
+    "let": "pad",
+    "value": 48
+   },
+   {
+    "let": "qrSize",
+    "value": 116
+   },
+   {
+    "let": "sq",
+    "value": 236
+   },
+   {
+    "let": "gap",
+    "value": 26
+   },
+   {
+    "let": "tone",
+    "value": {
+     "prim": "paperOf",
+     "args": {
+      "categoryId": {
+       "var": "note.category_id"
+      }
+     }
+    }
+   },
+   {
+    "let": "innerW",
+    "value": {
+     "-": [
+      {
+       "var": "W"
+      },
+      {
+       "*": [
+        {
+         "var": "pad"
+        },
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "let": "titleW",
+    "value": {
+     "-": [
+      {
+       "var": "innerW"
+      },
+      {
+       "var": "sq"
+      },
+      {
+       "var": "gap"
+      }
+     ]
+    }
+   },
+   {
+    "let": "meta",
+    "value": {
+     "prim": "clipLine",
+     "args": {
+      "text": {
+       "prim": "joinNonEmpty",
+       "args": {
+        "sep": " · ",
+        "parts": [
+         {
+          "prim": "blockName",
+          "args": {}
+         },
+         {
+          "prim": "sourceLabel",
+          "args": {}
+         },
+         {
+          "prim": "noteDate",
+          "args": {}
+         }
+        ]
+       }
+      },
+      "maxW": {
+       "var": "innerW"
+      },
+      "size": 22,
+      "bold": true
+     }
+    }
+   },
+   {
+    "let": "titleLines",
+    "value": {
+     "prim": "fitLines",
+     "args": {
+      "text": {
+       "var": "note.title"
+      },
+      "maxW": {
+       "var": "titleW"
+      },
+      "n": 4,
+      "size": 40,
+      "bold": true
+     }
+    }
+   },
+   {
+    "let": "tagLine",
+    "value": {
+     "prim": "clipLine",
+     "args": {
+      "text": {
+       "prim": "tagsJoined",
+       "args": {
+        "sep": " / "
+       }
+      },
+      "maxW": {
+       "var": "innerW"
+      },
+      "size": 24
+     }
+    }
+   },
+   {
+    "let": "sumLines",
+    "value": []
+   },
+   {
+    "if": {
+     "cond": {
+      "truthy": {
+       "var": "note.summary"
+      }
+     },
+     "then": [
+      {
+       "let": "sumLines",
+       "value": {
+        "prim": "fitLines",
+        "args": {
+         "text": {
+          "var": "note.summary"
+         },
+         "maxW": {
+          "var": "innerW"
+         },
+         "n": 8,
+         "size": 28
+        }
+       }
+      }
+     ],
+     "else": []
+    }
+   },
+   {
+    "let": "metaTop",
+    "value": 56
+   },
+   {
+    "let": "titleTop",
+    "value": {
+     "+": [
+      {
+       "var": "metaTop"
+      },
+      22,
+      34
+     ]
+    }
+   },
+   {
+    "let": "titleBottom",
+    "value": {
+     "+": [
+      {
+       "var": "titleTop"
+      },
+      {
+       "*": [
+        {
+         "-": [
+          {
+           "len": {
+            "var": "titleLines"
+           }
+          },
+          1
+         ]
+        },
+        54
+       ]
+      },
+      40
+     ]
+    }
+   },
+   {
+    "let": "photoTop",
+    "value": {
+     "+": [
+      {
+       "var": "metaTop"
+      },
+      22,
+      22
+     ]
+    }
+   },
+   {
+    "let": "rowBottom",
+    "value": {
+     "max": [
+      {
+       "var": "titleBottom"
+      },
+      {
+       "+": [
+        {
+         "var": "photoTop"
+        },
+        {
+         "var": "sq"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "let": "tagTop",
+    "value": {
+     "+": [
+      {
+       "var": "rowBottom"
+      },
+      30
+     ]
+    }
+   },
+   {
+    "let": "afterTag",
+    "value": {
+     "if": [
+      {
+       "truthy": {
+        "var": "tagLine"
+       }
+      },
+      {
+       "+": [
+        {
+         "var": "tagTop"
+        },
+        24
+       ]
+      },
+      {
+       "var": "tagTop"
+      }
+     ]
+    }
+   },
+   {
+    "let": "sumTop",
+    "value": {
+     "+": [
+      {
+       "var": "afterTag"
+      },
+      22
+     ]
+    }
+   },
+   {
+    "let": "bodyBottom",
+    "value": {
+     "+": [
+      {
+       "var": "sumTop"
+      },
+      {
+       "if": [
+        {
+         "truthy": {
+          "var": "sumLines"
+         }
+        },
+        {
+         "+": [
+          {
+           "*": [
+            {
+             "-": [
+              {
+               "len": {
+                "var": "sumLines"
+               }
+              },
+              1
+             ]
+            },
+            44
+           ]
+          },
+          28
+         ]
+        },
+        0
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "let": "signTop",
+    "value": {
+     "+": [
+      {
+       "var": "bodyBottom"
+      },
+      46
+     ]
+    }
+   },
+   {
+    "let": "sign",
+    "value": {
+     "prim": "signRow",
+     "args": {
+      "x": {
+       "var": "pad"
+      },
+      "y": {
+       "var": "signTop"
+      },
+      "maxW": {
+       "-": [
+        {
+         "var": "innerW"
+        },
+        {
+         "var": "qrSize"
+        },
+        30
+       ]
+      },
+      "size": 30,
+      "avatarD": 76
+     }
+    }
+   },
+   {
+    "let": "height",
+    "value": {
+     "+": [
+      {
+       "var": "signTop"
+      },
+      {
+       "max": [
+        {
+         "var": "sign.h"
+        },
+        {
+         "prim": "footH",
+         "args": {
+          "qrSize": {
+           "var": "qrSize"
+          }
+         }
+        }
+       ]
+      },
+      56
+     ]
+    }
+   },
+   {
+    "emit": {
+     "k": "fill",
+     "x": 0,
+     "y": 0,
+     "w": {
+      "var": "W"
+     },
+     "h": {
+      "var": "height"
+     },
+     "color": {
+      "var": "tone.bg"
+     }
+    }
+   },
+   {
+    "emit": {
+     "k": "text",
+     "x": {
+      "var": "pad"
+     },
+     "y": {
+      "+": [
+       {
+        "var": "metaTop"
+       },
+       22
+      ]
+     },
+     "lines": [
+      {
+       "var": "meta"
+      }
+     ],
+     "size": 22,
+     "weight": "bold",
+     "color": {
+      "prim": "token",
+      "args": {
+       "name": "muted"
+      }
+     }
+    }
+   },
+   {
+    "emit": {
+     "k": "text",
+     "x": {
+      "var": "pad"
+     },
+     "y": {
+      "+": [
+       {
+        "var": "titleTop"
+       },
+       40
+      ]
+     },
+     "lines": {
+      "var": "titleLines"
+     },
+     "lh": 54,
+     "size": 40,
+     "weight": "bold",
+     "color": {
+      "var": "tone.ink"
+     }
+    }
+   },
+   {
+    "if": {
+     "cond": {
+      "truthy": {
+       "var": "hasNote"
+      }
+     },
+     "then": [
+      {
+       "emit": {
+        "k": "rrect",
+        "x": {
+         "-": [
+          {
+           "-": [
+            {
+             "var": "W"
+            },
+            {
+             "var": "pad"
+            }
+           ]
+          },
+          {
+           "var": "sq"
+          }
+         ]
+        },
+        "y": {
+         "var": "photoTop"
+        },
+        "w": {
+         "var": "sq"
+        },
+        "h": {
+         "var": "sq"
+        },
+        "r": 20,
+        "fill": {
+         "prim": "token",
+         "args": {
+          "name": "paper"
+         }
+        }
+       }
+      },
+      {
+       "emit": {
+        "k": "image",
+        "key": "note",
+        "x": {
+         "-": [
+          {
+           "-": [
+            {
+             "var": "W"
+            },
+            {
+             "var": "pad"
+            }
+           ]
+          },
+          {
+           "var": "sq"
+          }
+         ]
+        },
+        "y": {
+         "var": "photoTop"
+        },
+        "w": {
+         "var": "sq"
+        },
+        "h": {
+         "var": "sq"
+        },
+        "r": 20
+       }
+      }
+     ],
+     "else": [
+      {
+       "emit": {
+        "k": "rrect",
+        "x": {
+         "-": [
+          {
+           "-": [
+            {
+             "var": "W"
+            },
+            {
+             "var": "pad"
+            }
+           ]
+          },
+          {
+           "var": "sq"
+          }
+         ]
+        },
+        "y": {
+         "var": "photoTop"
+        },
+        "w": {
+         "var": "sq"
+        },
+        "h": {
+         "var": "sq"
+        },
+        "r": 20,
+        "fill": {
+         "prim": "token",
+         "args": {
+          "name": "paper"
+         }
+        }
+       }
+      },
+      {
+       "emitOne": {
+        "prim": "glyphPlate",
+        "args": {
+         "x": {
+          "-": [
+           {
+            "-": [
+             {
+              "var": "W"
+             },
+             {
+              "var": "pad"
+             }
+            ]
+           },
+           {
+            "var": "sq"
+           }
+          ]
+         },
+         "y": {
+          "var": "photoTop"
+         },
+         "w": {
+          "var": "sq"
+         },
+         "h": {
+          "var": "sq"
+         },
+         "color": {
+          "prim": "withAlpha",
+          "args": {
+           "color": {
+            "var": "tone.ink"
+           },
+           "alpha": 0.1
+          }
+         }
+        }
+       }
+      }
+     ]
+    }
+   },
+   {
+    "if": {
+     "cond": {
+      "truthy": {
+       "var": "tagLine"
+      }
+     },
+     "then": [
+      {
+       "emit": {
+        "k": "text",
+        "x": {
+         "var": "pad"
+        },
+        "y": {
+         "+": [
+          {
+           "var": "tagTop"
+          },
+          24
+         ]
+        },
+        "lines": [
+         {
+          "var": "tagLine"
+         }
+        ],
+        "size": 24,
+        "color": {
+         "prim": "token",
+         "args": {
+          "name": "muted"
+         }
+        }
+       }
+      }
+     ],
+     "else": []
+    }
+   },
+   {
+    "if": {
+     "cond": {
+      "truthy": {
+       "var": "sumLines"
+      }
+     },
+     "then": [
+      {
+       "emit": {
+        "k": "text",
+        "x": {
+         "var": "pad"
+        },
+        "y": {
+         "+": [
+          {
+           "var": "sumTop"
+          },
+          28
+         ]
+        },
+        "lines": {
+         "var": "sumLines"
+        },
+        "lh": 44,
+        "size": 28,
+        "color": {
+         "prim": "token",
+         "args": {
+          "name": "body"
+         }
+        }
+       }
+      }
+     ],
+     "else": []
+    }
+   },
+   {
+    "emitMany": {
+     "var": "sign.layers"
+    }
+   },
+   {
+    "let": "qr",
+    "value": {
+     "prim": "qrSticker",
+     "args": {
+      "x": {
+       "-": [
+        {
+         "-": [
+          {
+           "var": "W"
+          },
+          {
+           "var": "pad"
+          }
+         ]
+        },
+        {
+         "var": "qrSize"
+        }
+       ]
+      },
+      "y": {
+       "var": "signTop"
+      },
+      "size": {
+       "var": "qrSize"
+      },
+      "ink": {
+       "prim": "token",
+       "args": {
+        "name": "muted"
+       }
+      },
+      "label": {
+       "prim": "i18n",
+       "args": {
+        "key": "scanToView"
+       }
+      }
+     }
+    }
+   },
+   {
+    "emitMany": {
+     "var": "qr.layers"
+    }
+   }
+  ]
+ }
+}

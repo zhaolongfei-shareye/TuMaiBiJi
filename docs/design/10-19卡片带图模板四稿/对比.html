@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>卡片带图模板四稿（10-19）</title>
+<style>
+  body { margin: 0; padding: 40px 32px 64px; background: #EDEAE3; color: #14161A;
+         font: 15px/1.75 -apple-system, "PingFang SC", sans-serif; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  .lead { max-width: 900px; color: #55524C; margin-bottom: 28px; }
+  .lead b { color: #14161A; }
+  .row { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+  .cell { width: 320px; flex: none; }
+  .cell img { width: 100%; display: block; border-radius: 10px;
+              box-shadow: 0 8px 26px rgba(20,22,26,.14); }
+  .name { font-size: 17px; font-weight: 600; margin: 16px 0 2px; }
+  .name span { font-weight: 400; color: #8A857C; font-size: 13px; margin-left: 6px; }
+  .say { color: #3A3833; }
+  .con { color: #8A6A2F; font-size: 13.5px; margin-top: 6px; }
+  .note { max-width: 900px; margin-top: 34px; padding-top: 18px;
+          border-top: 1px solid #D6D1C6; color: #55524C; font-size: 13.5px; }
+  .note p { margin: 4px 0; }
+</style>
+</head>
+<body>
+<h1>卡片带图模板四稿</h1>
+<p class="lead">
+站长 10-19 那一句：「默认这个带图片的模板，风格样式参考这个排版，分享时候基本上按照这个。但要加上我们一些特定元素，例如，名字，一句话，二维码等。你安排设计几个版本，我选择。」
+四张都是<b>模拟器里真点那一格出的成品图</b>（不是画的效果图）：同一篇真笔记、同一张配图、同一个账号的名片与一句话、同一枚小程序码，只有版式不一样。
+读序照详情窗那一屏：<b>分类 · 来源 · 日期 → 大标题 → 标签 → 图 → 摘要</b>，底排是名字＋一句话（左）与扫码那一枚（右）。
+</p>
+
+<div class="row">
+  <div class="cell">
+    <img src="sash.png" alt="推窗">
+    <div class="name">① 推窗 <span>sash</span></div>
+    <div class="say">最贴你说的那张排版：图就嵌在标题与摘要中间，四角圆、四周留边，像开着一扇窗。字和图各占各的，谁也不压谁。</div>
+    <div class="con">代价：四稿里最长的一档（这一篇量出来 1159 高，其余 1194／1206／836）。</div>
+  </div>
+  <div class="cell">
+    <img src="fullsweep.png" alt="满幅">
+    <div class="name">② 满幅 <span>fullsweep</span></div>
+    <div class="say">图顶到卡边、通栏出血占最上面一段，字全在纸上。转发出去第一眼就是那张照片。</div>
+    <div class="con">与已有「杂志封面」的区别：封面把标题压在图上，这一稿标题在图下面，不会被一张脸或一件白衣服吃掉。</div>
+  </div>
+  <div class="cell">
+    <img src="postcard.png" alt="信片">
+    <div class="name">③ 信片 <span>postcard</span></div>
+    <div class="say">全居中：图当一张冲印片摆在正中（外面垫一圈纸白，看着就是带白边的相纸），字在图下面居中，最下一条细线压住署名与码。</div>
+    <div class="con">十套里没有一稿是通栏居中的；摘要走宋体，最"文艺"的一版。</div>
+  </div>
+  <div class="cell">
+    <img src="sidepiece.png" alt="侧影">
+    <div class="name">④ 侧影 <span>sidepiece</span></div>
+    <div class="say">图缩到右上那一块方形，标题从左侧绕过去。四稿里最紧凑、塞得下最多字的一版。</div>
+    <div class="con">代价：方格裁切，截图类的图放大看会糊；照片类的图更合适。</div>
+  </div>
+</div>
+
+<div class="note">
+<p><b>都不用发版。</b>四稿只用包内那十种绘制 op 与那三十条排版原语拼出来，加一套卡＝服务端多一条数据（规范在 产品需求.md §11.1）。已实测：下发闸门收 4 退 0，客户端读回的是 <code>remote</code>（画它的是数据、不是包内代码）。</p>
+<p><b>有一件我没画，也做不到不發版就画：每枚标签前面那个「#」。</b>那个 # 是屏上一枚一枚加的，卡片画布侧只有"数组拼一行"这一条原语，配方里的加号又是纯算数的（喂文字当场抛）⇒ 没有逐枚加前缀的口。四稿的标签行统一是「标签1 / 标签2」。要 # 就得包内加一条原语，那才是真发版。</p>
+<p><b>还有一格要说清：</b>卡片上放配图这个<b>能力</b>是 2.3.18 那号包带的（老包按 min_app_version 自己不收这一套）。商店上现在那号是 2.2.0 ⇒ 模板随时能下发，但带图的卡要等 2.3.18 之后那号上线，真用户手机上看得到。</p>
+<p><b>我看过、但你还没看到的：</b>这四张都是<b>有配图</b>那一态。<b>没配图</b>那一态我只在 node 里量过几何（那一格会落一枚品牌印，不留空框），<b>还没看过图</b>——要的话我再跑一趟拿一篇没图的笔记出四张。</p>
+<p style="margin-top:14px">挑一稿（或说"②的底排配①的图"这类拼法也行），我把那一份复制进 <code>backend/seed/poster_extra/</code> 走完整流程；上现网那三步要另外单独点头。</p>
+</div>
+</body>
+</html>

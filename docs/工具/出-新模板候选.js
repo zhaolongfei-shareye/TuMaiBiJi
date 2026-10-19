@@ -17,6 +17,17 @@
 //     让模拟器去报"名单里有野字段"，回来的是一串克隆失败的错，看不出病名。
 //   第 1 关在模拟器里跑：下发到客户端 → 十二格 → 真点新格子 → 真成品图。
 // 跑法：bash docs/工具/跑尺子.sh 9431 出-新模板候选
+// ⚠ 假 wx 必须挂在所有 require **之前**：poster.js 现在引了 utils/mpAssets.js，
+//   那一只在模块装载时就 `wx.getFileSystemManager()`／读 `wx.env.USER_DATA_PATH`。
+//   挂在下面那个"第 0 关"段落里（原来就挂在那儿）时，require poster.js 第一行就
+//   `ReferenceError: wx is not defined` 崩掉——第 0 关一条都跑不到，红字还看着像配方的病。
+//   与 docs/工具/验-模板配方可执行.js 同一份替身、同一个位置。
+global.wx = {
+  getStorageSync: () => ({ name: '阿飞', slogan: '每天读一点再走', template: 'quote', avatarPath: '' }),
+  setStorageSync: () => {},
+  getFileSystemManager: () => ({ accessSync: () => true }),
+  env: { USER_DATA_PATH: '/u' },
+}
 const automator = require('miniprogram-automator')
 const fs = require('fs')
 const path = require('path')
@@ -216,12 +227,7 @@ console.log(`这一趟跑 ${cases.length} 套：${cases.map((c) => `${c.id}（${
 
 // ---------------------------------------------------------------- 第 0 关：node 侧规划
 // 假画布：只需要 measureText 和切字号，与 docs/工具/验-模板配方可执行.js 同一套量法。
-global.wx = {
-  getStorageSync: () => ({ name: '阿飞', slogan: '每天读一点再走', template: 'quote', avatarPath: '' }),
-  setStorageSync: () => {},
-  getFileSystemManager: () => ({ accessSync: () => true }),
-  env: { USER_DATA_PATH: '/u' },
-}
+// （假 wx 已经挪到文件顶上——require 时就该在场，见那里那条 ⚠。）
 let fontPx = 28
 const charW = (c) => (c.codePointAt(0) > 0x2e80 ? fontPx : fontPx * 0.55)
 const fakeCtx = new Proxy({}, {
@@ -274,11 +280,20 @@ ck(`合并列表：${nBundled} 套包内 + ${ids.length} 套新的 = ${nBundled 
   poster.templateList().map((x) => x.id).join(','))
 
 const profile = { name: '阿飞', slogan: '每天读一点再走', avatarPath: '' }
-const notes = [['中文小样', poster.SAMPLE_NOTE], ['英文小样', poster.SAMPLE_NOTE_EN]]
-notes.forEach(([tag, note]) => {
+// ⚠ 这一趟原来只测**没配图**那一态（`planPoster` 没接 hasNote，默认假）。
+//   对"大图位吃这一篇配图"那六套（以及这一轮那四稿）来说，图占的那一段高度是从 hasNote
+//   那一条 if 里算出来的——不传它就等于**新版本真正要画的那一态从来没被量过**。
+//   现在两种态都各跑一遍：语言 × 有没有配图。
+const notes = [
+  ['中文小样', poster.SAMPLE_NOTE, 'zh', false],
+  ['中文·带配图', poster.SAMPLE_NOTE, 'zh', true],
+  ['英文小样', poster.SAMPLE_NOTE_EN, 'en', false],
+  ['英文·带配图', poster.SAMPLE_NOTE_EN, 'en', true],
+]
+notes.forEach(([tag, note, lang, hasNote]) => {
   cases.forEach((c) => {
     let plan = null
-    try { plan = poster.planPoster(fakeCtx, note, c.id, profile, tag === '中文小样' ? 'zh' : 'en', { strict: true }) } catch (e) {
+    try { plan = poster.planPoster(fakeCtx, note, c.id, profile, lang, { strict: true, hasNote }) } catch (e) {
       ck(`${c.id}·${tag}：strict 规划跑得通`, false, e.message)
       return
     }
@@ -378,8 +393,17 @@ const enter = async (mp, url) => {
   await sleep(9000)
   const home = await (await mp.currentPage()).data()
   const list = (home.notes && home.notes.length ? home.notes : home.list) || []
-  const noteId = list.length ? (list[0].id || list[0].note_id) : null
-  ck('首页列表里拿到一篇真笔记当画芯（不自己造数据）', !!noteId, noteId ? `note.id=${noteId}「${list[0].title || ''}」` : `读到 ${list.length} 篇`)
+  // ⚠ 画芯这一篇**要挑带配图的那一篇**：这一轮的卖点就是"大图位吃这一篇的第一张配图"，
+  //   原来那句 list[0] 拿到哪篇算哪篇 ⇒ 四稿渲出来全是"没配图、那一格落品牌印"的那一态，
+  //   挑图的人根本看不到图。cover_file_id 是列表那一趟带回的那一栏（空＝这篇没有能画的图）。
+  const withImg = list.find((n) => !!(n && n.cover_file_id))
+  const pickedNote = withImg || list[0] || null
+  const noteId = pickedNote ? (pickedNote.id || pickedNote.note_id) : null
+  ck('首页列表里拿到一篇真笔记当画芯（不自己造数据）', !!noteId,
+    noteId ? `note.id=${noteId}「${pickedNote.title || ''}」配图=${pickedNote.cover_file_id ? '有' : '这篇没有'}` : `读到 ${list.length} 篇`)
+  ck('画芯那一篇真带配图（四稿的大图位才有东西可画；这一条红＝这台机上一篇带图的笔记都没有）',
+    !!(pickedNote && pickedNote.cover_file_id),
+    pickedNote ? `列表 ${list.length} 篇里${withImg ? '第一篇带图的是' : '没有一篇带'}` : '没有画芯')
   if (!noteId) throw new Error('没有画芯，往下走没有意义')
 
   const page = await enter(mp, `/pages/share/share?id=${noteId}`)

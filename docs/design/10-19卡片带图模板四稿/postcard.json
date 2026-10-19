@@ -1,0 +1,816 @@
+{
+ "template_id": "postcard",
+ "label": "信片",
+ "label_en": "Postcard",
+ "group_key": "classic",
+ "sort_order": 130,
+ "min_app_version": "2.3.18",
+ "recipe": {
+  "id": "postcard",
+  "min_version": 1,
+  "steps": [
+   {
+    "let": "pad",
+    "value": 56
+   },
+   {
+    "let": "qrSize",
+    "value": 112
+   },
+   {
+    "let": "inset",
+    "value": 14
+   },
+   {
+    "let": "tone",
+    "value": {
+     "prim": "paperOf",
+     "args": {
+      "categoryId": {
+       "var": "note.category_id"
+      }
+     }
+    }
+   },
+   {
+    "let": "frameW",
+    "value": {
+     "-": [
+      {
+       "var": "W"
+      },
+      {
+       "*": [
+        {
+         "var": "pad"
+        },
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "let": "photoH",
+    "value": {
+     "+": [
+      {
+       "*": [
+        {
+         "var": "frameW"
+        },
+        0.62
+       ]
+      },
+      {
+       "*": [
+        {
+         "var": "inset"
+        },
+        2
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "let": "cx",
+    "value": {
+     "/": [
+      {
+       "var": "W"
+      },
+      2
+     ]
+    }
+   },
+   {
+    "let": "textW",
+    "value": {
+     "-": [
+      {
+       "var": "frameW"
+      },
+      40
+     ]
+    }
+   },
+   {
+    "let": "meta",
+    "value": {
+     "prim": "clipLine",
+     "args": {
+      "text": {
+       "prim": "joinNonEmpty",
+       "args": {
+        "sep": " · ",
+        "parts": [
+         {
+          "prim": "blockName",
+          "args": {}
+         },
+         {
+          "prim": "sourceLabel",
+          "args": {}
+         },
+         {
+          "prim": "noteDate",
+          "args": {}
+         }
+        ]
+       }
+      },
+      "maxW": {
+       "var": "textW"
+      },
+      "size": 22,
+      "bold": true
+     }
+    }
+   },
+   {
+    "let": "titleLines",
+    "value": {
+     "prim": "fitLines",
+     "args": {
+      "text": {
+       "var": "note.title"
+      },
+      "maxW": {
+       "var": "textW"
+      },
+      "n": 3,
+      "size": 42,
+      "bold": true
+     }
+    }
+   },
+   {
+    "let": "tagLine",
+    "value": {
+     "prim": "clipLine",
+     "args": {
+      "text": {
+       "prim": "tagsJoined",
+       "args": {
+        "sep": " / "
+       }
+      },
+      "maxW": {
+       "var": "textW"
+      },
+      "size": 24
+     }
+    }
+   },
+   {
+    "let": "sumLines",
+    "value": []
+   },
+   {
+    "if": {
+     "cond": {
+      "truthy": {
+       "var": "note.summary"
+      }
+     },
+     "then": [
+      {
+       "let": "sumLines",
+       "value": {
+        "prim": "fitLines",
+        "args": {
+         "text": {
+          "var": "note.summary"
+         },
+         "maxW": {
+          "var": "textW"
+         },
+         "n": 4,
+         "size": 27
+        }
+       }
+      }
+     ],
+     "else": []
+    }
+   },
+   {
+    "let": "metaTop",
+    "value": 68
+   },
+   {
+    "let": "frameTop",
+    "value": {
+     "+": [
+      {
+       "var": "metaTop"
+      },
+      22,
+      34
+     ]
+    }
+   },
+   {
+    "let": "titleTop",
+    "value": {
+     "+": [
+      {
+       "var": "frameTop"
+      },
+      {
+       "var": "photoH"
+      },
+      44
+     ]
+    }
+   },
+   {
+    "let": "titleBottom",
+    "value": {
+     "+": [
+      {
+       "var": "titleTop"
+      },
+      {
+       "*": [
+        {
+         "-": [
+          {
+           "len": {
+            "var": "titleLines"
+           }
+          },
+          1
+         ]
+        },
+        58
+       ]
+      },
+      42
+     ]
+    }
+   },
+   {
+    "let": "tagTop",
+    "value": {
+     "+": [
+      {
+       "var": "titleBottom"
+      },
+      24
+     ]
+    }
+   },
+   {
+    "let": "afterTag",
+    "value": {
+     "if": [
+      {
+       "truthy": {
+        "var": "tagLine"
+       }
+      },
+      {
+       "+": [
+        {
+         "var": "tagTop"
+        },
+        24
+       ]
+      },
+      {
+       "var": "tagTop"
+      }
+     ]
+    }
+   },
+   {
+    "let": "sumTop",
+    "value": {
+     "+": [
+      {
+       "var": "afterTag"
+      },
+      22
+     ]
+    }
+   },
+   {
+    "let": "bodyBottom",
+    "value": {
+     "+": [
+      {
+       "var": "sumTop"
+      },
+      {
+       "if": [
+        {
+         "truthy": {
+          "var": "sumLines"
+         }
+        },
+        {
+         "+": [
+          {
+           "*": [
+            {
+             "-": [
+              {
+               "len": {
+                "var": "sumLines"
+               }
+              },
+              1
+             ]
+            },
+            42
+           ]
+          },
+          27
+         ]
+        },
+        0
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "let": "ruleY",
+    "value": {
+     "+": [
+      {
+       "var": "bodyBottom"
+      },
+      44
+     ]
+    }
+   },
+   {
+    "let": "signTop",
+    "value": {
+     "+": [
+      {
+       "var": "ruleY"
+      },
+      34
+     ]
+    }
+   },
+   {
+    "let": "sign",
+    "value": {
+     "prim": "signRow",
+     "args": {
+      "x": {
+       "var": "pad"
+      },
+      "y": {
+       "var": "signTop"
+      },
+      "maxW": {
+       "-": [
+        {
+         "var": "frameW"
+        },
+        {
+         "var": "qrSize"
+        },
+        30
+       ]
+      },
+      "size": 28,
+      "avatarD": 72
+     }
+    }
+   },
+   {
+    "let": "height",
+    "value": {
+     "+": [
+      {
+       "var": "signTop"
+      },
+      {
+       "max": [
+        {
+         "var": "sign.h"
+        },
+        {
+         "prim": "footH",
+         "args": {
+          "qrSize": {
+           "var": "qrSize"
+          }
+         }
+        }
+       ]
+      },
+      56
+     ]
+    }
+   },
+   {
+    "emit": {
+     "k": "fill",
+     "x": 0,
+     "y": 0,
+     "w": {
+      "var": "W"
+     },
+     "h": {
+      "var": "height"
+     },
+     "color": {
+      "var": "tone.bg"
+     }
+    }
+   },
+   {
+    "emit": {
+     "k": "text",
+     "x": {
+      "var": "cx"
+     },
+     "y": {
+      "+": [
+       {
+        "var": "metaTop"
+       },
+       22
+      ]
+     },
+     "lines": [
+      {
+       "var": "meta"
+      }
+     ],
+     "size": 22,
+     "weight": "bold",
+     "color": {
+      "prim": "token",
+      "args": {
+       "name": "muted"
+      }
+     },
+     "align": "center"
+    }
+   },
+   {
+    "if": {
+     "cond": {
+      "truthy": {
+       "var": "hasNote"
+      }
+     },
+     "then": [
+      {
+       "emit": {
+        "k": "rrect",
+        "x": {
+         "var": "pad"
+        },
+        "y": {
+         "var": "frameTop"
+        },
+        "w": {
+         "var": "frameW"
+        },
+        "h": {
+         "var": "photoH"
+        },
+        "r": 18,
+        "fill": {
+         "prim": "token",
+         "args": {
+          "name": "paper"
+         }
+        },
+        "shadow": "rgba(35, 37, 44, 0.12)"
+       }
+      },
+      {
+       "emit": {
+        "k": "image",
+        "key": "note",
+        "x": {
+         "+": [
+          {
+           "var": "pad"
+          },
+          {
+           "var": "inset"
+          }
+         ]
+        },
+        "y": {
+         "+": [
+          {
+           "var": "frameTop"
+          },
+          {
+           "var": "inset"
+          }
+         ]
+        },
+        "w": {
+         "-": [
+          {
+           "var": "frameW"
+          },
+          {
+           "*": [
+            {
+             "var": "inset"
+            },
+            2
+           ]
+          }
+         ]
+        },
+        "h": {
+         "-": [
+          {
+           "var": "photoH"
+          },
+          {
+           "*": [
+            {
+             "var": "inset"
+            },
+            2
+           ]
+          }
+         ]
+        },
+        "r": 8
+       }
+      }
+     ],
+     "else": [
+      {
+       "emit": {
+        "k": "rrect",
+        "x": {
+         "var": "pad"
+        },
+        "y": {
+         "var": "frameTop"
+        },
+        "w": {
+         "var": "frameW"
+        },
+        "h": {
+         "var": "photoH"
+        },
+        "r": 18,
+        "fill": {
+         "prim": "token",
+         "args": {
+          "name": "paper"
+         }
+        },
+        "shadow": "rgba(35, 37, 44, 0.12)"
+       }
+      },
+      {
+       "emitOne": {
+        "prim": "glyphPlate",
+        "args": {
+         "x": {
+          "var": "pad"
+         },
+         "y": {
+          "var": "frameTop"
+         },
+         "w": {
+          "var": "frameW"
+         },
+         "h": {
+          "var": "photoH"
+         },
+         "color": {
+          "prim": "withAlpha",
+          "args": {
+           "color": {
+            "var": "tone.ink"
+           },
+           "alpha": 0.1
+          }
+         }
+        }
+       }
+      }
+     ]
+    }
+   },
+   {
+    "emit": {
+     "k": "text",
+     "x": {
+      "var": "cx"
+     },
+     "y": {
+      "+": [
+       {
+        "var": "titleTop"
+       },
+       42
+      ]
+     },
+     "lines": {
+      "var": "titleLines"
+     },
+     "lh": 58,
+     "size": 42,
+     "weight": "bold",
+     "color": {
+      "var": "tone.ink"
+     },
+     "align": "center"
+    }
+   },
+   {
+    "if": {
+     "cond": {
+      "truthy": {
+       "var": "tagLine"
+      }
+     },
+     "then": [
+      {
+       "emit": {
+        "k": "text",
+        "x": {
+         "var": "cx"
+        },
+        "y": {
+         "+": [
+          {
+           "var": "tagTop"
+          },
+          24
+         ]
+        },
+        "lines": [
+         {
+          "var": "tagLine"
+         }
+        ],
+        "size": 24,
+        "color": {
+         "prim": "token",
+         "args": {
+          "name": "muted"
+         }
+        },
+        "align": "center"
+       }
+      }
+     ],
+     "else": []
+    }
+   },
+   {
+    "if": {
+     "cond": {
+      "truthy": {
+       "var": "sumLines"
+      }
+     },
+     "then": [
+      {
+       "emit": {
+        "k": "text",
+        "x": {
+         "var": "cx"
+        },
+        "y": {
+         "+": [
+          {
+           "var": "sumTop"
+          },
+          27
+         ]
+        },
+        "lines": {
+         "var": "sumLines"
+        },
+        "lh": 42,
+        "size": 27,
+        "color": {
+         "prim": "token",
+         "args": {
+          "name": "body"
+         }
+        },
+        "align": "center",
+        "fam": {
+         "prim": "token",
+         "args": {
+          "name": "serif"
+         }
+        }
+       }
+      }
+     ],
+     "else": []
+    }
+   },
+   {
+    "emit": {
+     "k": "line",
+     "x1": {
+      "var": "pad"
+     },
+     "y1": {
+      "var": "ruleY"
+     },
+     "x2": {
+      "-": [
+       {
+        "var": "W"
+       },
+       {
+        "var": "pad"
+       }
+      ]
+     },
+     "y2": {
+      "var": "ruleY"
+     },
+     "w": 2,
+     "color": {
+      "prim": "mix",
+      "args": {
+       "c1": {
+        "var": "tone.ink"
+       },
+       "c2": {
+        "prim": "token",
+        "args": {
+         "name": "paper"
+        }
+       },
+       "w": 0.82
+      }
+     }
+    }
+   },
+   {
+    "emitMany": {
+     "var": "sign.layers"
+    }
+   },
+   {
+    "let": "qr",
+    "value": {
+     "prim": "qrSticker",
+     "args": {
+      "x": {
+       "-": [
+        {
+         "-": [
+          {
+           "var": "W"
+          },
+          {
+           "var": "pad"
+          }
+         ]
+        },
+        {
+         "var": "qrSize"
+        }
+       ]
+      },
+      "y": {
+       "var": "signTop"
+      },
+      "size": {
+       "var": "qrSize"
+      },
+      "ink": {
+       "prim": "token",
+       "args": {
+        "name": "muted"
+       }
+      },
+      "label": {
+       "prim": "i18n",
+       "args": {
+        "key": "scanToView"
+       }
+      }
+     }
+    }
+   },
+   {
+    "emitMany": {
+     "var": "qr.layers"
+    }
+   }
+  ]
+ }
+}
