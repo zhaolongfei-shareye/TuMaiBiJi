@@ -400,6 +400,15 @@ const enter = async (mp, url) => {
   //      看着像新配方画不出来，其实是**画芯挑错了一篇**（配方那侧第 0 关 29 条全绿）。
   //   所以这里不再"拿到哪篇算哪篇"，改成**一篇一篇试到出得来为止**：进那一页、模板格数对上整套才算数，最多试 6 篇。
   const cands = list.filter((n) => n && n.cover_file_id).concat(list.filter((n) => n && !n.cover_file_id))
+  // `TPL_NOTE=<note.id>` 可以点名要哪一篇当画芯（默认还是"第一篇带图的"）。
+  // 为什么留这个口：挑图的人要看的是"版式对不对"，而列表里第一篇带图的那一篇会被别的尺子换来换去
+  // ——10-19 这一晚就从一张风景照换成了一篇白底文档截图，**通栏出血那三边到底是照片还是卡纸白，用白底图根本量不出来**。
+  const wantId = process.env.TPL_NOTE ? Number(process.env.TPL_NOTE) : null
+  if (wantId) {
+    const one = list.find((n) => n && (n.id === wantId || n.note_id === wantId))
+    if (!one) throw new Error(`TPL_NOTE=${wantId}：这台机的列表里没有这一篇（现有 id：${list.slice(0, 12).map((n) => n && (n.id || n.note_id)).join(',')}…）`)
+    cands.unshift(one)
+  }
   let pickedNote = null, noteId = null, page = null, tpls = []
   const tried = []
   for (const n of cands.slice(0, 6)) {
@@ -417,6 +426,7 @@ const enter = async (mp, url) => {
     if (tl.length === nBundled + ids.length) { pickedNote = n; noteId = id; page = pg; tpls = tl; break }
   }
   const want = nBundled + ids.length
+  if (wantId && noteId !== wantId) throw new Error(`TPL_NOTE=${wantId} 点名要它当画芯，但它那一页读到 ${tried[tried.length - 1] || '没读到'} ⇒ 不许悄悄换成别篇`)
   ck('首页列表里拿到一篇真笔记当画芯（不自己造数据；出不了卡的那几篇会自动跳过）', !!noteId,
     `${noteId ? `note.id=${noteId}「${pickedNote.title || ''}」` : '没有一篇出得了卡'}　试过的：${tried.join(' ')}`)
   ck('画芯那一篇真带配图（大图位才有东西可画；这一条红＝这台机上一篇带图的笔记都没有）',
