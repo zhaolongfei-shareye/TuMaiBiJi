@@ -94,7 +94,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     if errors:
         first = errors[0]
         loc = [str(p) for p in first.get("loc", ()) if p not in ("body", "query", "path")]
-        label = _FIELD_LABELS.get(loc[-1], loc[-1] if loc else "")
+        # `loc` 可以是空的：pydantic 的 `model_attributes_type`（该给对象却给了别的）只到 `body` 那一层，
+        # 而 `body` 在上面已被滤掉。取 `[-1]` 要放在判空之后——先 `.get(loc[-1], … if loc else …)` 会把
+        # IndexError 留在实参里，处理器自己炸成 500，客户端就拿不到这句中文 422 了。
+        field = loc[-1] if loc else ""
+        label = _FIELD_LABELS.get(field, field)
         kind = first.get("type", "")
         limit = (first.get("ctx") or {}).get("max_length")
         if kind == "string_too_long" and limit:

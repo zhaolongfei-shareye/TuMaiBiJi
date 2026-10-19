@@ -164,6 +164,24 @@ def test_缺标题时的报错也是中文(env):
     assert isinstance(r.json()["detail"], str)
 
 
+def test_body整体类型不对时也回中文422而不是500(env):
+    """定位信息只剩 `body` 那一层时，处理器不许自己炸。
+
+    该给对象却给了字符串／表单（`model_attributes_type`）时，pydantic 的 `loc` 就是 `("body",)`，
+    而 `body` 在翻译那一步已被滤掉 ⇒ 取到的是**空列表**。旧写法把 `loc[-1]` 放在判空之前，
+    在这里 IndexError ⇒ 客户端拿到 500 和一句英文，前端那句 `(err.data && err.data.detail)` 就空手了。
+    """
+    c, h, s = env
+    before = s.query(Note).count()
+    for body in ("这一串根本不是对象", ["不是对象"]):
+        r = c.post("/api/notes/", headers=h, json=body)
+        assert r.status_code == 422, f"{body!r} 那趟没回 422，回的是 {r.status_code}"
+        detail = r.json()["detail"]
+        assert isinstance(detail, str) and detail, f"detail 不可读：{detail!r}"
+        assert "[object" not in detail and "Traceback" not in detail
+    assert s.query(Note).count() == before, "拒收那两趟不该落库"
+
+
 def test_正常业务不受影响(env):
     """这一整套卡的是极端值，不能顺手把真人写笔记也挡了。"""
     c, h, _ = env
