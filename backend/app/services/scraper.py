@@ -251,6 +251,55 @@ def _content_images(el, base_url: str) -> list[str]:
     return _dedupe_order(urls)
 
 
+_WX_ALBUM_KEY = "picture_page_info_list"
+_WX_ALBUM_CDN = re.compile(r"""cdn_url\s*:\s*(['"])(.*?)\1""")
+
+
+def _wechat_album_images(html: str) -> list[str]:
+    """图片消息／相册型的那一种公众号帖：图**不在 `#js_content` 的 `<img>` 里**，在页面 JS 的
+    `picture_page_info_list: [ { cdn_url: '…', width: '585' * 1, … }, … ]`。
+
+    10-19 现读那条（`mp.weixin.qq.com/s/1FOoWv45lty7r7MZ88V9aQ`）：整页 2,592,904 B、`mmbiz` 251 次、
+    `cdn_url` 33 次，而 `<img` 整页只有 7 张、`data-src` 只有 4 处 ⇒ 只读 DOM 的那一路回 0 张。
+    这一段是 JS 对象字面量不是 JSON（键不带引号、值里有 `'585' * 1` 这种表达式），所以**按结构扫**：
+    先截出配对完整的 `[ … ]`，再逐张截出顶层 `{ … }`，取其中**第一个** `cdn_url`——
+    一张图那一段里还嵌着 `live_photo`／`pic_window_product` 这些子对象，整段一把正则会把它们也捞进来。
+    平台自己在那一行写着 `.slice(0, 20)`（一帖最多 20 张），我们那 9 张上限照旧在后面截。
+    """
+    urls: list[str] = []
+    at = 0
+    while True:
+        at = html.find(_WX_ALBUM_KEY, at)
+        if at < 0:
+            break
+        at += len(_WX_ALBUM_KEY)
+        br = html.find("[", at)
+        if br < 0:
+            continue
+        array = _balanced(html, br, "[", "]")
+        if not array:
+            continue
+        pos = 0
+        while True:
+            ob = array.find("{", pos)
+            if ob < 0:
+                break
+            item = _balanced(array, ob, "{", "}")
+            if not item:
+                break
+            pos = ob + len(item)
+            hit = _WX_ALBUM_CDN.search(item)
+            if hit:
+                urls.append(_http_image_url("", hit.group(2)))
+    return _dedupe_order([u for u in urls if u])
+
+
+def _wechat_album_account(html: str) -> str:
+    """相册型那一帖的公众号名：`#js_name` 那一格这种页面根本没有（实测命中 0），名字在 JS 的 `nick_name: '…'`。"""
+    hit = re.search(r"""nick_name\s*:\s*(['"])(.*?)\1""", html)
+    return (hit.group(2) or "").strip() if hit else ""
+
+
 def _wechat_account(soup) -> str:
     """公众号名字，实测在 `#js_name`（那篇取到「玉树芝兰」）；备选那格是 profile 里的昵称。"""
     el = soup.find(id="js_name")
@@ -269,14 +318,15 @@ _XHS_STATE_KEY = "window.__INITIAL_STATE__="
 _XHS_UNDEFINED = re.compile(r"(?<=[:,\[])\s*undefined(?=\s*[,\]}])")
 
 
-def _balanced_object(text: str, start: int) -> str:
-    """从 `start` 那枚 `{` 起截出配对完整的那一段 JSON。
+def _balanced(text: str, start: int, open_ch: str = "{", close_ch: str = "}") -> str:
+    """从 `start` 那枚 `open_ch` 起截出配对完整的那一段。
 
-    脚本标签后面还跟着别的语句，所以不能"取到行尾"也不能取到文件尾——必须按花括号配对截，
-    并且**字符串里的花括号不算**（配一个扫引号的开关）。
+    脚本标签后面还跟着别的语句，所以不能"取到行尾"也不能取到文件尾——必须按括号配对截，
+    并且**字符串里的括号不算**（配一个扫引号的开关，转义符也认）。截不出配对的那一段就回空串。
     """
     depth = 0
     in_str = False
+    quote = ""
     escaped = False
     for i, ch in enumerate(text[start:]):
         if in_str:
@@ -284,18 +334,23 @@ def _balanced_object(text: str, start: int) -> str:
                 escaped = False
             elif ch == "\\":
                 escaped = True
-            elif ch == '"':
+            elif ch == quote:
                 in_str = False
             continue
-        if ch == '"':
+        if ch in ("'", '"'):
             in_str = True
-        elif ch == "{":
+            quote = ch
+        elif ch == open_ch:
             depth += 1
-        elif ch == "}":
+        elif ch == close_ch:
             depth -= 1
             if depth == 0:
                 return text[start:start + i + 1]
     return ""
+
+
+def _balanced_object(text: str, start: int) -> str:
+    return _balanced(text, start, "{", "}")
 
 
 def _xiaohongshu_extras(html: str) -> dict:
@@ -362,12 +417,30 @@ def _parse_wechat_article(html: str, url: str, source_type: str) -> dict:
         og_title = soup.find("meta", property="og:title")
         title = og_title["content"] if og_title and og_title.get("content") else "微信文章"
 
+    images = _content_images(content_el, url)
+    account = _wechat_account(soup)
+    if not images:
+        album = _wechat_album_images(html)
+        if album:
+            # 这一族还有第二种形状（图片消息／相册型）：`#js_content` 里一张图都没有，图在 JS 的
+            # `picture_page_info_list[].cdn_url`。这种页面也**没有长正文**——DOM 那一份读出来是 129 字
+            # 页面皮（`知道了／微信扫一扫／使用小程序／取消／允许／赞／在看／分享／留言／收藏`），
+            # 拿它去提炼就得到"内容可通过微信扫一扫打开小程序浏览"这种废话要点；
+            # 这一种帖子真正的文字在 `<meta name="description">` 那一格。
+            images = album
+            desc = soup.find("meta", attrs={"name": "description"})
+            if desc and desc.get("content"):
+                text = desc["content"].strip()
+            # 这一种页面连 `#js_name` 那一格都没有（实测命中 0），公众号名在 JS 的 `nick_name: '…'` 里。
+            # 不补这一格就是"图存下了、来源那一整行不画"——他那句"加来源像转存一样"要的就是那一行。
+            account = account or _wechat_album_account(html)
+
     return {
         "title": title,
         "content": text,
         "source_type": source_type,
-        "images": _content_images(content_el, url),
-        "author": _wechat_account(soup),
+        "images": images,
+        "author": account,
     }
 
 

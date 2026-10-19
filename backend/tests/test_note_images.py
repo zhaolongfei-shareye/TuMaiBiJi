@@ -552,6 +552,34 @@ XHS_HTML = """
 """
 
 
+WX_ALBUM_HTML = """
+<html><head>
+<meta name="description" content="周慧敏是 1990 年代红遍亚洲的玉女掌门人。" />
+</head><body>
+<h1 class="rich_media_title">90年港圈玉女女神</h1>
+<div class="rich_media_content" id="js_content">知道了 微信扫一扫 使用小程序 取消 允许 赞 在看 分享 留言 收藏</div>
+<img src="https://res.wx.qq.com/ui-icon.png">
+<script>
+window.cgiDataNew = {
+  picture_page_info_list: [
+    { cdn_url: 'https://mmbiz.qpic.cn/mmbiz_jpg/A/0?wx_fmt=jpeg',
+      width: '585' * 1, height: '780' * 1,
+      live_photo: { format_info: [ { cdn_url: 'https://mmbiz.qpic.cn/inside-live/1' } ] },
+      pic_window_product: { title: '' } },
+    { cdn_url: 'https://mmbiz.qpic.cn/sz_mmbiz_jpg/B/0?wx_fmt=jpeg',
+      width: '404' * 1, height: '540' * 1 },
+    { cdn_url: 'https://mmbiz.qpic.cn/mmbiz_jpg/A/0?wx_fmt=jpeg',
+      width: '585' * 1, height: '780' * 1 }
+  ],
+  nick_name: '悦悦的日常琐碎',
+  user_name: 'gh_41b550ee1638',
+};
+window.picture_page_info_list = ((window.cgiDataNew && window.cgiDataNew.picture_page_info_list) || []).slice(0, 20);
+</script>
+</body></html>
+"""
+
+
 class Test六_来源:
     def test_公众号那一篇取到作者名与正文图(self):
         parsed = scraper._parse_wechat_article(WX_HTML, "https://mp.weixin.qq.com/s/x", "wechat_article")
@@ -577,6 +605,34 @@ class Test六_来源:
 
     def test_那段JSON解不开时只是没有图(self):
         assert scraper._xiaohongshu_extras("<script>window.__INITIAL_STATE__={坏掉的") == {}
+
+    def test_相册型那一帖的图在JS里不在DOM(self):
+        """10-19 他甩那条真链接逼出来的第二种形状：整页 `<img` 只有 UI 图标，图在 `picture_page_info_list[].cdn_url`。"""
+        urls = scraper._wechat_album_images(WX_ALBUM_HTML)
+        assert urls == ["https://mmbiz.qpic.cn/mmbiz_jpg/A/0?wx_fmt=jpeg",
+                        "https://mmbiz.qpic.cn/sz_mmbiz_jpg/B/0?wx_fmt=jpeg"], \
+            "按顺序、重复的并成一条，而且**每张只取顶层那一条 cdn_url**——`live_photo` 里那条嵌套的不算第二张"
+
+    def test_相册型那一帖四格都补齐(self):
+        parsed = scraper._parse_wechat_article(
+            WX_ALBUM_HTML, "https://mp.weixin.qq.com/s/album", "wechat_article")
+        assert len(parsed["images"]) == 2
+        assert parsed["author"] == "悦悦的日常琐碎", "这种页面没有 `#js_name`，名字在 JS 的 `nick_name`"
+        assert parsed["content"].startswith("周慧敏"), \
+            "DOM 那一份是页面皮（知道了／微信扫一扫／允许／赞／在看），拿它去提炼就是屏上那五条废话要点"
+        assert parsed["source_type"] == "wechat_article"
+
+    def test_相册型那一格括号不配对时退回原行为(self):
+        broken = WX_ALBUM_HTML.replace("pic_window_product: { title: '' } },", "pic_window_product: { title: '' },")
+        assert scraper._wechat_album_images(broken) == []
+        parsed = scraper._parse_wechat_article(broken, "https://mp.weixin.qq.com/s/album", "wechat_article")
+        assert parsed["images"] == [], "解不出就不许硬凑一张，也不许把页面皮当正文换成别的说法"
+
+    def test_图文型那一篇一行行为没变(self):
+        """反向钉：新加的那一路只在"`#js_content` 里一张图都没有"时才走，普通图文型不许被它带偏。"""
+        parsed = scraper._parse_wechat_article(WX_HTML, "https://mp.weixin.qq.com/s/x", "wechat_article")
+        assert parsed["content"] == "正文在这里" and parsed["author"] == "ZJU攻城狮"
+        assert len(parsed["images"]) == 2
 
     def test_接线那一处_小红书走JSON那一份而不是页面皮(self, monkeypatch):
         """只测 `parsed.update(_xiaohongshu_extras(...))` 这一行：撤掉它，屏上的正文就回成页面皮。"""
