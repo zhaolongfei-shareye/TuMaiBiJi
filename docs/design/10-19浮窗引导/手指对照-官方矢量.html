@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<!-- 手指这一枚不该我自己画。这张表里四枚全是**别人家的官方矢量**，原样嵌进来（路径未改一个字节）：
+     ① Font Awesome `hand-pointer`（Fonticons，CC BY 4.0）＝Windows 那枚"手型链接光标"的形状；
+     ② Bootstrap Icons `hand-index-thumb-fill`（Twitter，MIT）；
+     ③ Bootstrap Icons `hand-index-thumb`（同上一枚的描线版）；
+     ④ Lucide `hand`（ISC）。
+     每枚都按我们屏上真用的两个尺寸（26×46 与 20×36 CSS px）× 三种配色各画一遍，
+     并且**垫在真底色上**（左＝那条玻璃带 rgba(34,37,44,.80)，右＝你那张实拍的墙），
+     因为小尺寸下糊不糊只有放在真背景上才量得出来。 -->
+<html lang="zh"><head><meta charset="utf-8">
+<title>手指这一枚 · 四枚官方矢量对照</title>
+<style>
+  body{margin:0;padding:24px;background:#EDEBE6;color:#14161A;
+       font:13px/1.6 -apple-system,"PingFang SC",sans-serif}
+  h1{font-size:19px;margin:0 0 6px}
+  p.lede{max-width:1060px;color:#4a4d55;margin:0 0 18px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;max-width:1060px}
+  .card{background:#fff;border:1px solid #dcd8d0;border-radius:12px;padding:12px 12px 10px}
+  .nm{font-weight:600;font-size:13px}
+  .lic{font-size:11px;color:#8a8d94;margin:1px 0 9px}
+  .strip{display:flex;align-items:flex-end;gap:12px;padding:8px;border-radius:8px}
+  .on-glass{background:rgba(34,37,44,.86)}
+  .on-wall{background:#E3E2DE}   /* 你那张实拍里墙的实际均值 (227,226,222)，铺平了的 */
+  .cap2{font-size:11px;color:#4a4d55;margin:7px 2px 0}
+  svg{display:block}
+  .lbl{font-size:10px;color:#8a8d94;text-align:center;margin-top:3px}
+  .col{display:flex;flex-direction:column;align-items:center}
+  .mir{transform:scaleX(-1)}
+  table{border-collapse:collapse;font-size:12.5px;background:#fff;margin-top:22px;max-width:1060px}
+  th,td{border:1px solid #dcd8d0;padding:6px 9px;text-align:left}
+  th{background:#F2EFE9;font-weight:600}
+  td.s{font-family:ui-monospace,Menlo,monospace}
+  .bad{color:#B4462F;font-weight:600}.good{color:#2C6E49;font-weight:600}
+</style></head><body>
+
+<h1>手指这一枚 · 四枚官方矢量对照</h1>
+<p class="lede">路径全是原样嵌的，没改一个字节。每枚按我们屏上真用的两个尺寸各画一遍，
+左半垫在那条玻璃带的实际底色上、右半垫在你那张实拍的墙上。<b>代码一行没动。</b></p>
+
+<div class="grid" id="g"></div>
+<h2 style="font-size:15px;margin:26px 0 0">这枚黄到底读不读得动——现算的对比度</h2>
+<table id="ct"></table>
+
+<script>
+// 四枚官方矢量（viewBox 与 path 逐字抄自各自仓库的 raw 文件）
+const SETS = [
+  { nm: 'Font Awesome · hand-pointer', lic: 'Fonticons／CC BY 4.0（要署名）', vb: '0 0 448 512', kind: 'fill',
+    d: ['M128 40c0-22.1 17.9-40 40-40s40 17.9 40 40l0 148.2c8.5-7.6 19.7-12.2 32-12.2c20.6 0 38.2 13 45 31.2c8.8-9.3 21.2-15.2 35-15.2c25.3 0 46 19.5 47.9 44.3c8.5-7.7 19.8-12.3 32.1-12.3c26.5 0 48 21.5 48 48l0 48 0 16 0 48c0 70.7-57.3 128-128 128l-16 0-64 0-.1 0-5.2 0c-5 0-9.9-.3-14.7-1-55.3-5.6-106.2-34-140-79L8 336c-13.3-17.7-9.7-42.7 8-56s42.7-9.7 56 8l56 74.7L128 40zM240 304c0-8.8-7.2-16-16-16s-16 7.2-16 16l0 96c0 8.8 7.2 16 16 16s16-7.2 16-16l0-96zm48-16c-8.8 0-16 7.2-16 16l0 96c0 8.8 7.2 16 16 16s16-7.2 16-16l0-96c0-8.8-7.2-16-16-16zm80 16c0-8.8-7.2-16-16-16s-16 7.2-16 16l0 96c0 8.8 7.2 16 16 16s16-7.2 16-16l0-96z'] },
+  { nm: 'Bootstrap Icons · hand-index-thumb-fill', lic: 'Twitter／MIT（只需留版权声明）', vb: '0 0 16 16', kind: 'fill',
+    d: ['M8.5 1.75v2.716l.047-.002c.312-.012.742-.016 1.051.046.28.056.543.18.738.288.273.152.456.385.56.642l.132-.012c.312-.024.794-.038 1.158.108.37.148.689.487.88.716q.113.137.195.248h.582a2 2 0 0 1 1.99 2.199l-.272 2.715a3.5 3.5 0 0 1-.444 1.389l-1.395 2.441A1.5 1.5 0 0 1 12.42 16H6.118a1.5 1.5 0 0 1-1.342-.83l-1.215-2.43L1.07 8.589a1.517 1.517 0 0 1 2.373-1.852L5 8.293V1.75a1.75 1.75 0 0 1 3.5 0'] },
+  { nm: 'Bootstrap Icons · hand-index-thumb（描线）', lic: 'Twitter／MIT', vb: '0 0 16 16', kind: 'fill',
+    d: ['M6.75 1a.75.75 0 0 1 .75.75V8a.5.5 0 0 0 1 0V5.467l.086-.004c.317-.012.637-.008.816.027.134.027.294.096.448.182.077.042.15.147.15.314V8a.5.5 0 0 0 1 0V6.435l.106-.01c.316-.024.584-.01.708.04.118.046.3.207.486.43.081.096.15.19.2.259V8.5a.5.5 0 1 0 1 0v-1h.342a1 1 0 0 1 .995 1.1l-.271 2.715a2.5 2.5 0 0 1-.317.991l-1.395 2.442a.5.5 0 0 1-.434.252H6.118a.5.5 0 0 1-.447-.276l-1.232-2.465-2.512-4.185a.517.517 0 0 1 .809-.631l2.41 2.41A.5.5 0 0 0 6 9.5V1.75A.75.75 0 0 1 6.75 1M8.5 4.466V1.75a1.75 1.75 0 1 0-3.5 0v6.543L3.443 6.736A1.517 1.517 0 0 0 1.07 8.588l2.491 4.153 1.215 2.43A1.5 1.5 0 0 0 6.118 16h6.302a1.5 1.5 0 0 0 1.302-.756l1.395-2.441a3.5 3.5 0 0 0 .444-1.389l.271-2.715a2 2 0 0 0-1.99-2.199h-.581a5 5 0 0 0-.195-.248c-.191-.229-.51-.568-.88-.716-.364-.146-.846-.132-1.158-.108l-.132.012a1.26 1.26 0 0 0-.56-.642 2.6 2.6 0 0 0-.738-.288c-.31-.062-.739-.058-1.05-.046z'] },
+  { nm: 'Lucide · hand', lic: 'Lucide／ISC', vb: '0 0 24 24', kind: 'stroke',
+    d: ['M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2','M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2','M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8','M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'] },
+];
+const TREAT = [
+  ['原样（黑）', '#14161A', 'none'],
+  ['我们的黄', '#F6C445', 'rgba(20,20,28,.55)'],
+  ['纸白', '#F2EFE9', 'rgba(20,20,28,.55)'],
+];
+function svg(s, w, h, fill, stroke) {
+  const body = s.kind === 'stroke'
+    ? s.d.map((d) => '<path d="' + d + '"/>').join('')
+    : '<path d="' + s.d.join(' ') + '"/>';
+  const st = stroke === 'none' ? '' : ' stroke="' + stroke + '" stroke-width="' + (s.kind === 'stroke' ? 2 : (w/16)) + '"';
+  return '<svg width="' + w + '" height="' + h + '" viewBox="' + s.vb + '" fill="' +
+    (s.kind === 'stroke' ? 'none' : fill) + '"' + st +
+    (s.kind === 'stroke' ? ' stroke-linecap="round" stroke-linejoin="round" stroke="' + fill + '"' : '') +
+    '>' + body + '</svg>';
+}
+const g = document.getElementById('g');
+SETS.forEach((s) => {
+  const c = document.createElement('div'); c.className = 'card';
+  let html = '<div class="nm">' + s.nm + '</div><div class="lic">' + s.lic + '</div>';
+  TREAT.forEach((t) => {
+    html += '<div class="strip on-glass"><div class="col">' + svg(s, 26, 46, t[1], t[2]) +
+            '<div class="lbl">玻璃带上 26×46</div></div><div class="col">' + svg(s, 20, 36, t[1], t[2]) +
+            '<div class="lbl">20×36</div></div><div class="col"><span class="mir">' + svg(s, 26, 46, t[1], t[2]) +
+            '</span><div class="lbl">镜像 26×46</div></div></div>';
+    html += '<div class="strip on-wall" style="margin-top:6px"><div class="col">' + svg(s, 26, 46, t[1], t[2]) +
+            '<div class="lbl">墙上 26×46</div></div><div class="col">' + svg(s, 20, 36, t[1], t[2]) +
+            '<div class="lbl">20×36</div></div><div class="col"><span class="mir">' + svg(s, 26, 46, t[1], t[2]) +
+            '</span><div class="lbl">镜像 26×46</div></div></div>';
+    html += '<div class="cap2">' + t[0] + '</div>';
+  });
+  c.innerHTML = html; g.appendChild(c);
+});
+// 黄／纸白／黑 压在两种底色上的 WCAG 对比度（现算，不是印象；注意 palette.lumOf 是朴素亮度、不能拿来算对比度）
+const hex2rgb = (h) => [1,3,5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const lin = (c) => { const s = c / 255; return s <= .03928 ? s / 12.92 : Math.pow((s + .055) / 1.055, 2.4) };
+const L = (rgb) => .2126 * lin(rgb[0]) + .7152 * lin(rgb[1]) + .0722 * lin(rgb[2]);
+const ratio = (a, b) => { const x = L(a), y = L(b); return +(((x > y ? x : y) + .05) / ((x > y ? y : x) + .05)).toFixed(2) };
+const BG = { 玻璃带: [62, 64, 69], 墙: [227, 226, 222] };
+const FG = { '我们的黄 #F6C445': '#F6C445', '纸白 #F2EFE9': '#F2EFE9', '墨 #14161A': '#14161A' };
+let rows = '';
+Object.keys(FG).forEach((k) => {
+  const f = hex2rgb(FG[k]);
+  rows += '<tr><td>' + k + '</td>' + Object.keys(BG).map((b) => {
+    const r = ratio(f, BG[b]);
+    return '<td class="s">' + b + ' ' + r + (r >= 3 ? ' <span class="good">够（图形件 ≥3:1）</span>'
+      : ' <span class="bad">不够</span>') + '</td>';
+  }).join('') + '</tr>';
+});
+document.getElementById('ct').innerHTML =
+  '<tr><th>前景</th><th>压在玻璃带上</th><th>压在那面墙上</th></tr>' + rows;
+</script>
+</body></html>

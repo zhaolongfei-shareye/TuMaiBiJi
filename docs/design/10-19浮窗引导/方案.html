@@ -66,27 +66,32 @@
         box-shadow:0 4px 10px rgba(18,20,26,.22)}
   .hint .sep{opacity:.45;margin:0 1px}
   .hint .k{color:var(--yellow)}
-  .finger{position:absolute;width:26px;height:46px}
-  .finger.big{width:40px;height:56px}
+  /* 手型＝Bootstrap Icons `hand-index-thumb-fill`（Twitter／MIT）原路径，一个字节没改，只换色：
+     黄填 #F6C445（现网 TIP_DOT）＋墨描边。描边不是装饰——黄压在那面墙上只有 1.26:1，
+     全靠这圈墨把轮廓撑住（墨压墙 13.97:1）。16×16 那一方＝手本身是方的，宽高 1:1。 */
+  .finger{position:absolute;width:30px;height:30px}
+  .finger.big{width:44px;height:44px}
 
   /* 甲：胶囊挂在带子下沿之外那一行，手指从它顶边伸出去、穿过玻璃带的下半截点住三个点。
      手指中轴 278.5＝实拍量的三个点那半区中轴；带子里 x 245–296 那一段是空的（短句到 191、EN 从 331.7 起），
      所以手指压在带上不挡任何字。 */
-  .a .hint{left:205px;top:140px}
-  .a .finger{left:265.5px;top:92px}
+  .a .hint{left:205px;top:126px}
+  .a .finger{left:263.5px;top:92px}
   /* 乙：并进那一行——手指竖不进去（带子只有 40.2px 高），这一屏就是给"它为什么不成立"看的 */
-  .b .hint{position:static}
-  .b .lang{margin-left:6px}
+  /* 乙重测：手指 26×26 塞得进 40.2px 的带子，但它的中轴必须钉在 278.5（三个点），
+     于是提示枚只能往左挤——挤到与短句**重叠 6.5px**。差的就是这 6.5px，不是"放不下"。 */
+  .b .hint{position:absolute;left:160.5px;top:6.3px}
+  .b .finger{left:265.5px;top:4.3px;width:26px;height:26px}
+  .b .lang{margin-left:auto}
   .b .hint{padding:3px 8px;background:rgba(var(--paper),.14);box-shadow:none;
            -webkit-backdrop-filter:none;backdrop-filter:none}
-  .b .finger{display:none}
   /* 丙：一次性引导浮层——只挖空右上角那一块，其余压暗，手指放大 */
   /* 挖空那一块：导航条本来就是暗的，只压暗读不出"这里是要点的"，所以再补一圈黄环。 */
   .hole{position:absolute;left:250px;top:50px;width:105px;height:41px;border-radius:20px;
         box-shadow:0 0 0 9999px rgba(20,20,28,.62), 0 0 0 2px var(--yellow)}
   .c .hint{left:196px;top:150px;font-size:11px;padding:7px 12px;border-radius:15px;
            background:rgba(var(--ink),.92)}
-  .c .finger{left:258.5px;top:88px}
+  .c .finger{left:256.5px;top:88px}
 
   /* ── 话术与读数 ─────────────────────────────────────── */
   table{border-collapse:collapse;font-size:12.5px;background:#fff;max-width:1050px}
@@ -123,32 +128,29 @@
       </div>
       <div class="tip bob">
         <div class="hint">点这里<span class="sep">｜</span>选浮窗<span class="sep">｜</span><span class="k">我</span></div>
-        <svg class="finger" viewBox="0 0 26 34" aria-hidden="true">
-          <g fill="#F6C445" stroke="rgba(20,20,28,.28)" stroke-width="1.4" stroke-linejoin="round">
-            <rect x="9.5" y="1" width="9" height="19" rx="4.5"/>
-            <path d="M9 18h11a6 6 0 0 1 6 6v2a8 8 0 0 1-8 8H12a7 7 0 0 1-7-7v-3a6 6 0 0 1 4-5.7z"/>
-          </g>
-          <path d="M13 24v5M18 24v5" stroke="rgba(20,20,28,.30)" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
+        <svg class="finger" viewBox="0 0 16 16" aria-hidden="true"><path fill="#F6C445" stroke="rgba(20,20,28,.62)" stroke-width="0.55" d="M8.5 1.75v2.716l.047-.002c.312-.012.742-.016 1.051.046.28.056.543.18.738.288.273.152.456.385.56.642l.132-.012c.312-.024.794-.038 1.158.108.37.148.689.487.88.716q.113.137.195.248h.582a2 2 0 0 1 1.99 2.199l-.272 2.715a3.5 3.5 0 0 1-.444 1.389l-1.395 2.441A1.5 1.5 0 0 1 12.42 16H6.118a1.5 1.5 0 0 1-1.342-.83l-1.215-2.43L1.07 8.589a1.517 1.517 0 0 1 2.373-1.852L5 8.293V1.75a1.75 1.75 0 0 1 3.5 0"/></svg>
       </div>
     </div>
     <p class="cap"><span class="tag ok">甲</span><b>挂在带子下沿之外</b>（我推荐这一屏）。
     那一行的高度、圆角、阴影、EN 的位子全不动 ⇒ 不会再犯"多出来的一行没算进几何预算"那条错（§8.353 就是这么红过一次的）。
-    提示那一枚压在墙上，手指从它顶边伸出去、穿过玻璃带下半截点住三个点（那一段带子里是空的，不挡任何字），整块 0.9 秒上下动一档（行程 14rpx）。</p>
+    手指压在玻璃带里那一段**空的地方**（短句到 191 就收、EN 从 331.7 才起，不挡任何字），指尖离那三个点 5.0px；提示枚挂在带子下沿之外。整块 0.9 秒上下动一档（行程 14rpx）。</p>
   </div>
 
   <div class="cell">
     <div class="ph b" id="f-b">
       <div class="band">
         <span class="dot"></span><span class="txt">拍照 · 截图 · 链接 → 笔记</span>
-        <span class="hint" style="display:inline-block;margin-left:auto;align-self:center">点这里<span class="sep">｜</span>选浮窗<span class="sep">｜</span><span class="k">我</span></span>
+        <svg class="finger" viewBox="0 0 16 16" aria-hidden="true"><path fill="#F6C445" stroke="rgba(20,20,28,.62)" stroke-width="0.55" d="M8.5 1.75v2.716l.047-.002c.312-.012.742-.016 1.051.046.28.056.543.18.738.288.273.152.456.385.56.642l.132-.012c.312-.024.794-.038 1.158.108.37.148.689.487.88.716q.113.137.195.248h.582a2 2 0 0 1 1.99 2.199l-.272 2.715a3.5 3.5 0 0 1-.444 1.389l-1.395 2.441A1.5 1.5 0 0 1 12.42 16H6.118a1.5 1.5 0 0 1-1.342-.83l-1.215-2.43L1.07 8.589a1.517 1.517 0 0 1 2.373-1.852L5 8.293V1.75a1.75 1.75 0 0 1 3.5 0"/></svg>
+        <span class="hint">点这里<span class="sep">｜</span>选浮窗<span class="sep">｜</span><span class="k">我</span></span>
         <span class="lang"><span class="dot"></span>EN</span>
       </div>
     </div>
     <p class="cap"><span class="tag warn">乙</span><b>并进那一行</b>（带子里，不换行）。
-    <b>这一屏我没画手指，因为竖不进去</b>：那条带子只有 40.2px 高，一枚手指要 46px，
-    放进去就压住那行字；小程序也画不到导航条上面去。而且提示枚右沿离 EN 左沿只剩
-    <b>6.0px</b>（下面读数有），短句再长一点就撞上。<b>结论：乙不成立。</b></p>
+    <b>上一轮我说它"竖不进去"，那句是我自己画歪了</b>——那时那枚手是我随手画的 46px 高，
+    换成真的官方矢量（Bootstrap 那枚是方的，26×26）之后<b>塞得进</b>那条 40.2px 的带子。
+    重测的真数是：手指中轴必须钉在 278.5（不然指到右边那枚关闭键去了），于是提示枚只能往左挤，
+    <b>挤到与短句重叠 6.5px</b>（读数里那个 −6.5）。<b>所以乙不是"不成立"，是差 6.5px</b>：
+    短句再缩两个字它就成立，代价是那枚手压在玻璃带里、切进带子的圆角下沿。</p>
   </div>
 
   <div class="cell">
@@ -160,13 +162,7 @@
       <div class="hole"></div>
       <div class="tip bob">
         <div class="hint">点这里<span class="sep">｜</span>选浮窗<span class="sep">｜</span><span class="k">我</span></div>
-        <svg class="finger big" viewBox="0 0 26 34" aria-hidden="true">
-          <g fill="#F6C445" stroke="rgba(20,20,28,.28)" stroke-width="1.4" stroke-linejoin="round">
-            <rect x="9.5" y="1" width="9" height="19" rx="4.5"/>
-            <path d="M9 18h11a6 6 0 0 1 6 6v2a8 8 0 0 1-8 8H12a7 7 0 0 1-7-7v-3a6 6 0 0 1 4-5.7z"/>
-          </g>
-          <path d="M13 24v5M18 24v5" stroke="rgba(20,20,28,.30)" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
+        <svg class="finger big" viewBox="0 0 16 16" aria-hidden="true"><path fill="#F6C445" stroke="rgba(20,20,28,.62)" stroke-width="0.55" d="M8.5 1.75v2.716l.047-.002c.312-.012.742-.016 1.051.046.28.056.543.18.738.288.273.152.456.385.56.642l.132-.012c.312-.024.794-.038 1.158.108.37.148.689.487.88.716q.113.137.195.248h.582a2 2 0 0 1 1.99 2.199l-.272 2.715a3.5 3.5 0 0 1-.444 1.389l-1.395 2.441A1.5 1.5 0 0 1 12.42 16H6.118a1.5 1.5 0 0 1-1.342-.83l-1.215-2.43L1.07 8.589a1.517 1.517 0 0 1 2.373-1.852L5 8.293V1.75a1.75 1.75 0 0 1 3.5 0"/></svg>
       </div>
     </div>
     <p class="cap"><span class="tag">丙</span><b>一次性引导</b>：只在头一次进这一屏时盖一层，
@@ -174,6 +170,31 @@
     最清楚，也最容易招人烦。<b>常驻（甲）还是只提一次（丙），这一格归你拍。</b></p>
   </div>
 </div>
+
+<h2>手指这一枚是从哪来的（我上一版自己画的那枚已作废）</h2>
+<p class="note">你说"手指是类似鼠标那种设计，不是你这种随便画"。所以我没再自己画，去取了四枚<b>别人家的官方矢量</b>，
+原样嵌进 <a href="file:///Users/zlfmac/Documents/TuMaiBiJi/docs/design/10-19%E6%B5%AE%E7%AA%97%E5%BC%95%E5%AF%BC/%E6%89%8B%E6%8C%87%E5%AF%B9%E7%85%A7-%E5%AE%98%E6%96%B9%E7%9F%A2%E9%87%8F.html">手指对照-官方矢量.html</a>
+（合图 <a href="file:///Users/zlfmac/Documents/TuMaiBiJi/docs/design/10-19%E6%B5%AE%E7%AA%97%E5%BC%95%E5%AF%BC/%E5%AE%9E%E6%B5%8B-%E6%89%8B%E6%8C%87%E5%AF%B9%E7%85%A7.png">实测-手指对照.png</a>），
+每枚按我们屏上真用的两个尺寸、垫在两种真底色上各排一遍：</p>
+<table>
+  <tr><th>哪一枚</th><th>谁画的</th><th>许可证</th><th>26×46 下</th><th>20×36 下</th></tr>
+  <tr><td>Font Awesome <span class="s">hand-pointer</span></td><td>Fonticons</td><td>CC BY 4.0（<b>要署名</b>）</td>
+      <td>指缝清楚</td><td class="no">三指缝糊成一团</td></tr>
+  <tr><td><b>Bootstrap Icons <span class="s">hand-index-thumb-fill</span></b></td><td>Twitter</td><td>MIT（留一行版权声明就够）</td>
+      <td><b>读</b></td><td><b>读</b>（剪影粗，小尺寸不糊）</td></tr>
+  <tr><td>Bootstrap Icons <span class="s">hand-index-thumb</span>（描线）</td><td>Twitter</td><td>MIT</td>
+      <td>读</td><td class="no">线上太细，墙上消失</td></tr>
+  <tr><td>Lucide <span class="s">hand</span></td><td>Lucide</td><td>ISC</td>
+      <td colspan="2" class="no">张开五指＝"手掌"，不是"指给你看"，喻体不对，淘汰</td></tr>
+</table>
+<p class="note"><b>选：Bootstrap 那枚实心</b>（路径一个字节没改，只换色）。理由不是好看，是它在 20×36 那档还读得出剪影，
+而 FA 那枚糊。<b>配色是黄填 ＋ 墨描边，描边不是装饰</b>：现算的 WCAG 对比度——
+黄 <span class="s">#F6C445</span> 压在那面墙（实拍均值 227,226,222）只有 <b class="no">1.26:1</b>、
+纸白压墙 1.13:1，<b>都读不出形</b>；墨压墙 <b>13.97:1</b> ⇒ 那圈描边才是把轮廓撑住的东西。
+同两枚压在那条玻璃带上：黄 6.37:1、纸白 9.04:1，都够。<b>所以"黄＋墨边"两种底色通吃，纯黄不行。</b><br>
+⚠ 落码时这一枚建议<b>出一张 2× 位图</b>进包，不要塞 SVG：<span class="s">&lt;image&gt;</span> 吃 SVG 在部分安卓 webview 上不稳。
+⚠ 我这台机上<b>没有 SF Symbols 字体文件</b>（<span class="s">/System/Library/Fonts</span> 与 Supplemental 都查过），
+所以 Apple 那枚 <span class="s">hand.point.up</span> 我<b>没取到、也没照它画</b>——不许写成"比对过苹果的"。</p>
 
 <h2>那一行的话术（宽度是渲染端现读的，不是我估的）</h2>
 <table id="tbl-copy">
@@ -272,7 +293,7 @@ const cross = (a, b) => !(a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t);
   out.push(fin ? '手指中轴 ' + ((fin.l + fin.r) / 2).toFixed(1) + '（三个点 278.5，差 ' +
                (((fin.l + fin.r) / 2) - 278.5).toFixed(1) + 'px）· 指尖离胶囊底 ' +
                (fin.t - 87.0).toFixed(1) + 'px · 手指与带子' + (cross(fin, band) ? '叠' : '不叠')
-             : '手指放不下（带子 ' + (band.b - band.t).toFixed(1) + 'px 高，一枚手指要 46px）');
+             : '这一屏没画手指（带子 ' + (band.b - band.t).toFixed(1) + 'px 高）');
   out.push('右沿离屏 ' + (375 - tip.r).toFixed(1) + 'px');
   lines.push(out.join(' · '));
 });
