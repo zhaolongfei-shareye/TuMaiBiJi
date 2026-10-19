@@ -49,7 +49,9 @@ def diagnose():
     for n in rows:
         snap = n.imported_from or {}
         print(f"  笔记 {n.id}｜{n.created_at}｜user {n.user_id}｜source_type {n.source_type}｜"
-              f"正文 {len(n.content or '')} 字")
+              # 两个列名别混：`process_url_task` 写的是 `original_content`（ingest_tasks.py:222），
+              # `content` 这一格外链转存的篇一直是 None——上一版这里读 `content`，读出过一句"正文 0 字"的假话。
+              f"original_content {len(n.original_content or '')} 字｜content {len(n.content or '')} 字")
         print(f"    imported_from 键 = {sorted(snap.keys())}")
         print(f"    四个计数 = " + str({k: snap.get(k) for k in
                                        ('images_total', 'images_kept', 'images_failed', 'images_truncated')}))
