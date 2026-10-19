@@ -7,8 +7,8 @@
 ③ 改名要把旧译名冲掉：留着旧值，英文界面会把「读书」那一格显示成上一个名字的 "Reading"
    之外的东西，比如 "Travel"。
 ④ 新用户四格：灵感／生活／工作／学习，两列写死、`sort_order` 依次排；幂等，不重复种。
-⑤ 这一整套**不许发出出网请求**：conftest 把 `EXTRACT_PROVIDER` 钉成 none、
-   云函数凭据钉成占位符，模型那一档在测试里必然走"跳过、留原文"那支。
+⑤ 这一整套**不许发出出网请求**：10-19 他拍甲之后，出网那一半整个删掉了——
+   这里钉的是"模块里没有异步口、两个写接口没挂后台任务"，红了就说明那一半又长回来。
 ⑥ 删格那句二次确认要报的篇数由 GET 一趟 GROUP BY 给齐；POST／PUT 没算过它，
    那一档就是 `None`，不许落一个假的 0。
 """
@@ -241,19 +241,58 @@ class Test删格那句问话里的篇数:
         assert self._row(client, u, cid)["note_count"] == 1
 
 
-class Test模型那一档在测试里绝不出网:
-    def test_凭据是占位符时直接回空表(self, db):
-        import asyncio
-        u = new_user(db, "m1")
-        got = asyncio.run(category_names.call_model(["噶玛噶举"]))
-        assert got == {}
+class Test表外那一档绝不出网:
+    """站长 10-17 拍的通道是"先查词表，表里没有才叫混元"；10-19 他把后半句撤了（甲）。
+    撤的理由是现网实测（台账 §8.344「第四十七次部署」那一条）：这里复用的是**提炼**那一只云函数，它的回体固定成笔记那四栏，
+    `items` 不在契约里、会被丢掉——那一趟永远回空表，每次还多烧一次调用与一次冷启动。
+    所以这一类钉的是"表外那档就停在那里"＋"出网那一半不许再长回来"。"""
 
-    def test_补译那趟不许把已建好的格子弄没(self, client, db):
-        u = new_user(db, "m2")
-        client.post("/api/categories/", json={"name": "噶玛噶举"}, headers=hdr(u))
-        import asyncio
-        changed = asyncio.run(category_names.fill_missing(db, str(u.id)))
-        assert changed == 0
+    ODD = "噶玛噶举"  # 词表里没有的一个真实专名：拿它当怪词，比造一串乱码更像他实际会起的名字
+
+    def test_表外的中文名只落中文那一档(self, client, db):
+        u = new_user(db, "odd-zh")
+        body = client.post("/api/categories/", json={"name": self.ODD}, headers=hdr(u)).json()
+        assert body["name_zh"] == self.ODD, "中文那一档原样落他打的字，客户端不需要回落"
+        assert body["name_en"] is None, "表里没有 ⇒ 英文那一档就是没有，不许猜一个填进去"
+
+    def test_表外的英文名只落英文那一档(self, client, db):
+        u = new_user(db, "odd-en")
+        body = client.post("/api/categories/", json={"name": "Karma Kagyu"}, headers=hdr(u)).json()
+        assert body["name_en"] == "Karma Kagyu", "他自己打的那一档原样落进对应列"
+        assert body["name_zh"] is None, "表里没有 ⇒ 中文那一档留 NULL，屏上仍显示他打的那几个字"
+
+    def test_改名成表外的词两档跟着停住(self, client, db):
+        """旧译名不属于新名字，必须清掉；清完不许再等谁补——甲之后没有第二趟。"""
+        u = new_user(db, "odd-rename")
+        cid = client.post("/api/categories/", json={"name": "旅行"}, headers=hdr(u)).json()["id"]
+        body = client.put(f"/api/categories/{cid}", json={"name": self.ODD}, headers=hdr(u)).json()
+        assert body["name"] == self.ODD
+        assert body["name_zh"] == self.ODD, f"旧译名没换过来，实读 {body['name_zh']!r}"
+        assert body["name_en"] is None, '旧的 "Travel" 必须清干净，留着就是替他的分类编一个他没起过的英文名'
+
+    def test_格子不会因为没译名就没建出来(self, client, db):
+        u = new_user(db, "odd-keep")
+        r = client.post("/api/categories/", json={"name": self.ODD}, headers=hdr(u))
+        assert r.status_code == 200, r.text
         rows = client.get("/api/categories/", headers=hdr(u)).json()
-        assert [r["name"] for r in rows] == ["噶玛噶举"]
-        assert rows[0]["name_zh"] == "噶玛噶举" and rows[0]["name_en"] is None
+        assert [x["name"] for x in rows] == [self.ODD], "身份那一列不许被译文改写"
+
+    def test_模块里没有出网那一半(self):
+        gone = [n for n in ("call_model", "fill_missing", "fill_from_glossary", "display_names")
+                if hasattr(category_names, n)]
+        assert gone == [], f"这些名字又长回来了（{gone}）——甲撤的就是这一整半"
+        assert not hasattr(category_names, "httpx"), "这一条链上不该绑任何一只 HTTP 客户端"
+        assert not hasattr(category_names, "settings"), "不该再去读云函数的地址与凭据"
+
+    def test_两个写接口不挂后台任务(self):
+        import inspect
+
+        from app.api.routes.categories import create_category, update_category
+
+        for fn in (create_category, update_category):
+            params = inspect.signature(fn).parameters
+            assert "background" not in params, (
+                f"{fn.__name__} 又接了 BackgroundTasks——建格那一下不该在响应之后再出一趟"
+            )
+        coros = [n for n, v in vars(category_names).items() if inspect.iscoroutinefunction(v)]
+        assert coros == [], f"词表那一档是同步查表，不该有异步口（{coros}）"

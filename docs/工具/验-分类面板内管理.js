@@ -187,15 +187,18 @@ ok('C11 身份那一栏没被译文换掉：私密那道闸与"选到私密要�
   !/isPrivate\(labelOf/.test(JS + WJS)
   && /allowPrivate\(name, this\.data\.lang\)/.test(WJS)
   && /\|\| \{\}\)\.name : ''/.test(WJS))
-ok('C11 那两列只在**写**的那两趟填，读路径不挂模型（读一次慢一次、模型挂了读接口跟着挂）',
+ok('C11 只做词表（10-19 他拍甲，撤掉"表里没有才叫混元"那半句）：两档只在写的那两趟当场填，这一条链零出网',
   CAT_API.indexOf('pair_from_glossary') >= 0
-  // 读那一段（`def list_categories` 到 `def create_category` 之间）里不许出现补译那一趟。
   // ⚠ 端点标记要用**函数名**，不能用 `@router.post("/")`：现网那行写的是 `@router.post("/", response_model=…)`，
   //   带参数的整串查不到 → indexOf 回 −1 → slice 直接把整个文件当成"读那一段"，判据假绿。
   && CAT_API.indexOf('def list_categories') >= 0
   && CAT_API.indexOf('def create_category') > CAT_API.indexOf('def list_categories')
-  && !/fill_missing/.test(CAT_API.slice(CAT_API.indexOf('def list_categories'), CAT_API.indexOf('def create_category')))
-  && /_schedule_name_fill\(background/.test(CAT_API))
+  // 响应之后再出一趟补名：这一半整个撤了，路由里连参数都不该留
+  && !/fill_missing|call_model|BackgroundTasks|_schedule_name_fill/.test(CAT_API)
+  // 词表这一侧：绑不得 HTTP 客户端、不得读云函数凭据、不得有异步口。
+  // ⚠ 不查 `call_model` 这个**字面串**——模块顶上记着撤它的理由，那里引用了一次这个名字（那是话，不是代码）。
+  && !/import httpx|from app\.core\.config|async def |await /.test(CAT_NAMES)
+  && !/HUNYUAN_CF/.test(CAT_NAMES))
 
 // ---------- C10 原「设置」里那一格关闭 ----------
 ok('C10 「我的」那一行与路由表那一位都撤净（留着就是同一件事两个入口）',

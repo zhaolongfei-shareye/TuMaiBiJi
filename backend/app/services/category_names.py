@@ -1,34 +1,31 @@
 """分类名的两档显示值（中／英）。
 
 站长 10-17：「分类要支持自动翻译，就是分类名称是中文，切换英文，自动翻译，分类是英文，
-切换中文，也是自动翻译。如果翻译不了，就维持原文。」三条拍定：
-  ① 通道走甲——**先查一张固定词表，表里没有才叫混元**；
-  ② 默认四类在英文界面叫 Ideas／Life／Work／Study；
-  ③ 译不出来维持原文。
+切换中文，也是自动翻译。如果翻译不了，就维持原文。」当时通道拍的是甲——**先查一张固定词表，
+表里没有才叫混元**。10-19 他把后半句撤了，这一条**只做词表**：表里有就填，表里没有就留空、
+屏上显示他打的那几个字，**这一条链上没有任何一次出网**。
+撤的理由是现网实测（台账 §8.344「第四十七次部署」那一条，commit `0f6c956`）：这里复用的是**提炼**那一只云函数（`cloudfunctions/extract/index.js`），
+它把模型输出统一交给 `normalize(parsed, fallbackTitle)`，**回体固定成笔记那四栏**——
+`items` 不在它的契约里，会被丢掉。独立打一次 `call_model(["马拉松","家常菜"])` 回空表，
+同一份 payload 直接打函数回的是 `{"title":"未命名笔记",…}`：问也白问，每次还多烧一次调用与一次冷启动。
+要真做长尾，得先改那只函数的返回契约（另一条链，他没点）。
 
-三条规矩钉在这里，改代码别把它们改散：
+四条规矩钉在这里，改代码别把它们改散：
 * `name` 那一列仍是**身份**（重名判据、私密判据都看它），译文只进 `name_zh`／`name_en` 两列，
   两列都可以是 NULL。NULL 不是失败，是"这一档没有译名"，客户端拿它回落到 `name`。
-* 建格与改名那两趟**绝不等模型**：词表命中就当场填上，没命中两列留空、由后台补。
-  一次调用把这个用户**所有**还缺译名的格子一起带走（见 `fill_missing`），
-  所以"一次输入三个新词"最多花一次 token，不是三次。
-* 模型挂了／没配凭据／回的东西不像话——一律什么都不写，那一格继续显示原文。
-  这一条不许改成"抛出去让创建失败"：名字已经建好了，缺的只是一档显示值。
+* 填这两列的只有**写**的那两趟（建格、改名），读路径不查表也不算数——读一次慢一次不值得。
+* 想补进来的词**往这张表里加**，一行一条，零出网、零延迟；不许在这里重新接一只模型或 HTTP 客户端。
+* 默认四类那两档是**写死的常量**，播种那一步不出网也不查表。
 """
 
-import logging
 import re
 
-import httpx
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.models.category import Category
 
-logger = logging.getLogger(__name__)
-
 # 默认四类（站长 10-17 直接给的四个词，英文那档是他挑的乙）。
-# 这四个词**不走词表也不走模型**：播种那趟照这两列直接写死，新用户零调用。
+# 这四个词**连词表都不查**：播种那趟照这两列直接写死。
 DEFAULT_CATEGORIES = [
     ("灵感", "Ideas"),
     ("生活", "Life"),
@@ -36,7 +33,7 @@ DEFAULT_CATEGORIES = [
     ("学习", "Study"),
 ]
 
-# 词表：常见分类名 → 英文显示值。命中就填，没命中才轮到模型。
+# 词表：常见分类名 → 英文显示值。命中就填，没命中两列留空、屏上显示他打的那几个字。
 # 键一律小写比较（见 `_norm`），值才是给他看的写法。
 GLOSSARY_ZH_EN = {
     **{zh: en for zh, en in DEFAULT_CATEGORIES},
@@ -254,165 +251,13 @@ def pair_from_glossary(name: str) -> tuple[str | None, str | None]:
     return None, None
 
 
-# ── 模型那一档 ──────────────────────────────────────────────────────────────
-
-_SYS = """你是一个只做短词翻译的助手。用户给出若干个分类名称，每个名称占一行。
-请把每一个名称同时给出简体中文与英文两种写法。
-
-严格按以下 JSON 格式输出，不要输出其他内容：
-{
-  "items": [
-    {"src": "原样照抄用户给的那个名称", "zh": "简体中文写法", "en": "英文写法"}
-  ]
-}
-
-规矩：
-1. "src" 必须与用户给的那一行**逐字相同**，不要改写、不要补空格、不要换大小写。
-2. 用户给的是中文，就把 "en" 译成英文；"zh" 原样照抄那串中文。
-3. 用户给的是英文，就把 "zh" 译成简体中文；"en" 原样照抄那个英文词。
-4. 译不出来的（人名、品牌、乱码、他自己造的缩写），"zh" 与 "en" 都照抄原名称。
-5. 只给两档写法，不要解释、不要近义词、不要加引号以外的任何符号。"""
-
-
-async def call_model(names: list[str]) -> dict[str, tuple[str, str]]:
-    """把一批名字交给云函数那头的混元，拿回 {原名: (zh, en)}。
-
-    复用提炼那一条通道（同一个 URL、同一个凭据、同一份 `system_prompt` 入参），
-    不新开第二个供应商、也不直连混元端点——免费额度只从这条来源抵扣。
-    任何一步不对都回空表：这一档是"锦上添花"，不是"缺了就报错"。
-    """
-    cleaned = [_norm(n) for n in names if _norm(n)]
-    if not cleaned:
-        return {}
-    url = (settings.HUNYUAN_CF_URL or "").strip()
-    key = (settings.HUNYUAN_CF_KEY or "").strip()
-    from app.services.llm import key_usable
-
-    if not url or not key_usable(key):
-        logger.info("分类译名跳过：云函数地址或凭据没配（%d 个名字留着原文）", len(cleaned))
-        return {}
-
-    payload = {"text": "\n".join(cleaned), "fallback_title": "", "system_prompt": _SYS}
-    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-    try:
-        async with httpx.AsyncClient(timeout=settings.HUNYUAN_CF_TIMEOUT) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-        if resp.status_code >= 400:
-            logger.info("分类译名没成（HTTP %s），留着原文", resp.status_code)
-            return {}
-        data = resp.json()
-    except Exception as e:  # 网络／JSON／网关回 HTML，一律"这一档没有"，不许冒到创建那趟
-        logger.info("分类译名没成（%s），留着原文", type(e).__name__)
-        return {}
-
-    if not isinstance(data, dict):
-        return {}
-    # 云函数把模型的 JSON 原样带回来；不同部署形态下可能再套一层 result／content，
-    # 这里只认拿得到 items 的那一种，拿不到就当没译。
-    items = data.get("items")
-    if items is None and isinstance(data.get("result"), dict):
-        items = data["result"].get("items")
-    if not isinstance(items, list):
-        logger.info("分类译名回的不是 items 列表（键：%s），留着原文", ",".join(sorted(data)[:6]))
-        return {}
-
-    want = {_norm(n): (n) for n in cleaned}
-    out: dict[str, tuple[str, str]] = {}
-    for row in items:
-        if not isinstance(row, dict):
-            continue
-        src = _norm(str(row.get("src") or ""))
-        if src not in want:
-            continue
-        zh = str(row.get("zh") or "").strip()[:100]
-        en = str(row.get("en") or "").strip()[:100]
-        if not zh or not en:
-            continue
-        out[want[src]] = (zh, en)
-    return out
-
-
-def fill_from_glossary(db: Session, user_id: str) -> int:
-    """把该用户所有"还缺译名"的格子先按词表补一遍，回改了多少行。零出网。"""
-    rows = (
-        db.query(Category)
-        .filter(
-            Category.user_id == user_id,
-            ((Category.name_zh.is_(None)) | (Category.name_en.is_(None))),
-        )
-        .all()
-    )
-    changed = 0
-    for row in rows:
-        zh, en = pair_from_glossary(row.name)
-        own_zh = row.name if is_cjk(row.name) else zh
-        own_en = row.name if is_latin(row.name) and not is_cjk(row.name) else en
-        hit = False
-        if row.name_zh is None and own_zh:
-            row.name_zh = own_zh[:100]
-            hit = True
-        if row.name_en is None and own_en:
-            row.name_en = own_en[:100]
-            hit = True
-        if hit:
-            changed += 1
-    if changed:
-        db.commit()
-    return changed
-
-
-async def fill_missing(db: Session, user_id: str) -> int:
-    """一个用户所有还缺译名的格子：先词表、剩下的才交模型，一次调用全带走。
-
-    返回模型那一趟真补上了几行。整趟失败也不抛——创建那趟已经成了，这里只是补显示值。
-    """
-    try:
-        fill_from_glossary(db, user_id)
-    except Exception:
-        db.rollback()
-        logger.exception("分类译名：词表那一趟就出岔子（不影响已建好的格子）")
-
-    rows = (
-        db.query(Category)
-        .filter(
-            Category.user_id == user_id,
-            ((Category.name_zh.is_(None)) | (Category.name_en.is_(None))),
-        )
-        .all()
-    )
-    if not rows:
-        return 0
-    names = [r.name for r in rows]
-    try:
-        got = await call_model(names)
-    except Exception:
-        logger.exception("分类译名：模型那一趟崩了（格子继续显示原文）")
-        return 0
-    if not got:
-        return 0
-    changed = 0
-    for row in rows:
-        hit = got.get(row.name)
-        if not hit:
-            continue
-        zh, en = hit
-        if row.name_zh is None and zh:
-            row.name_zh = zh[:100]
-        if row.name_en is None and en:
-            row.name_en = en[:100]
-        changed += 1
-    if changed:
-        db.commit()
-    return changed
-
-
 def seed_default_categories(db: Session, user_id: str) -> int:
     """新用户那四格：灵感／生活／工作／学习。返回建了几格（不 commit，跟着调用方那次一起）。
 
     站长 10-17「每个新用户默认提供四个分类，用户可以自行删除」——四格都是普通分类，
     删得掉，与「私密」那一格（那道锁的把手，不许删）是两回事。
 
-    两档显示值**直接写死**，不走词表也不走模型：新建账号那一下不该为四句常量话出网。
+    两档显示值**直接写死在常量里**，连词表都不查：新建账号那一下不该为四句常量话绕一圈。
     幂等按"名下已有那个名字"判，与 `_ensure_private_category` 同一路子（这一列没唯一约束）。
     只给新用户：存量账号一律回填＝往别人已经归好类的库里塞四格，那是他的库不是我的。
     """
@@ -433,23 +278,11 @@ def seed_default_categories(db: Session, user_id: str) -> int:
     return made
 
 
-def display_names(db: Session, user_id: str) -> dict[int, dict[str, str | None]]:
-    """给读接口用：{id: {zh, en}}。两列没值就是没值，客户端自己回落。"""
-    rows = db.query(Category.id, Category.name_zh, Category.name_en).filter(
-        Category.user_id == user_id
-    ).all()
-    return {r[0]: {"zh": r[1], "en": r[2]} for r in rows}
-
-
 __all__ = [
     "DEFAULT_CATEGORIES",
     "GLOSSARY_EN_ZH",
     "GLOSSARY_EN_ZH_BY_LOWER",
     "GLOSSARY_ZH_EN",
-    "call_model",
-    "display_names",
-    "fill_from_glossary",
-    "fill_missing",
     "is_cjk",
     "is_latin",
     "pair_from_glossary",

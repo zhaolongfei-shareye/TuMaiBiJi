@@ -1,12 +1,10 @@
-import asyncio
-
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Annotated, List
 from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
-from app.db.database import get_db, SessionLocal
+from app.db.database import get_db
 from app.models.category import Category
 from app.models.note import Note
 from app.models.user import User
@@ -18,22 +16,6 @@ from app.services.sharing import close_shares
 
 router = APIRouter()
 
-
-def _schedule_name_fill(background: BackgroundTasks, user_id: str) -> None:
-    """把"补译名"这一趟推到响应之后。
-
-    为什么必须推开：这一趟要走云函数，冷启动是秒级。他拍的是"分类名自动翻译"，
-    不是"新建分类要等模型"——建格那一下必须立刻成，译名晚一点自己回来。
-    后台这一趟自己开一条 session：请求那条在响应发出时就关了。
-    """
-    def run() -> None:
-        db = SessionLocal()
-        try:
-            asyncio.run(category_names.fill_missing(db, user_id))
-        finally:
-            db.close()
-
-    background.add_task(run)
 
 # String(100) 在 SQLite 上不生效，实测百万字的分类名照样存进去；而分类名会出现在
 # 首页每一条笔记上，一条就能把列表撑爆。上限跟模型声明的列宽对齐。
@@ -113,7 +95,6 @@ def list_categories(
 @router.post("/", response_model=CategoryResponse)
 def create_category(
     cat: CategoryCreate,
-    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -127,15 +108,14 @@ def create_category(
         raise HTTPException(status_code=400, detail="分类名称已存在")
     max_order = db.query(Category).filter(Category.user_id == str(user.id)).count()
     db_cat = Category(user_id=str(user.id), name=cat.name, color=cat.color, sort_order=max_order)
-    # 词表命中就当场填上两档显示值（零出网、零延迟）；没命中留着 NULL，
-    # 由下面那一趟后台补——建格这一下绝不等模型。
+    # 词表命中就当场填上两档显示值（零出网、零延迟）；没命中留 NULL，
+    # 屏上显示他打的那几个字。这一条链不出网，也不会有第二趟来补。
     zh, en = category_names.pair_from_glossary(cat.name)
     db_cat.name_zh = (cat.name if category_names.is_cjk(cat.name) else zh) or None
     db_cat.name_en = (cat.name if category_names.is_latin(cat.name) and not category_names.is_cjk(cat.name) else en) or None
     db.add(db_cat)
     db.commit()
     db.refresh(db_cat)
-    _schedule_name_fill(background, str(user.id))
     return db_cat
 
 
@@ -143,7 +123,6 @@ def create_category(
 def update_category(
     category_id: int,
     cat: CategoryUpdate,
-    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -192,7 +171,7 @@ def update_category(
     for key, value in update_data.items():
         setattr(db_cat, key, value)
     if renamed:
-        # 旧名字的两档显示值不属于新名字，先清空再按词表现填；表外那档由后台补。
+        # 旧名字的两档显示值不属于新名字，先清空再按词表现填；表外那档留 NULL、显示新名字本身。
         # 清空这一步不能省：留着旧译名，英文界面就会把「旅行」那一格显示成上一个名字的 "Trip"。
         zh, en = category_names.pair_from_glossary(db_cat.name)
         db_cat.name_zh = (db_cat.name if category_names.is_cjk(db_cat.name) else zh) or None
@@ -216,8 +195,6 @@ def update_category(
 
     db.commit()
     db.refresh(db_cat)
-    if renamed:
-        _schedule_name_fill(background, str(user.id))
     return db_cat
 
 

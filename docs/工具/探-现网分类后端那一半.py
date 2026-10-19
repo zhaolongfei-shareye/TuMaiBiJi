@@ -9,12 +9,12 @@
 六把：
   ① 新用户默认四格：现网真跑一次 `seed_default_categories`，量产物——四行、两档显示值逐字等于那四组常量
      （期望值在本探针里**另写一份**，不 import 被测的表），再核幂等（第二次调回 0）。
-  ② 词表命中当场填：建「旅行」→ 回体 `name_en` 逐字 `Travel`、`name_zh` 逐字 `旅行`，**没等模型**（建那一下立刻回 200）；
+  ② 词表命中当场填：建「旅行」→ 回体 `name_en` 逐字 `Travel`、`name_zh` 逐字 `旅行`，建那一下立刻回 200；
      `note_count` 只在 **GET 列表**那一趟要求是数字（建／改两口回体故意不带，客户端 `index.js:816` 读不到就退成不报数）。
-  ③ 表外那一档：**两档要分开量**——中文那一格是词表那一趟自己填的（填的就是原名，零出网），
-     `name_en` 才是模型那一档。等的是 `name_en`；另外独立打一次 `call_model` 把"通道回什么"摆出来。
-     补上了＝模型跑通；回体空＝那一档留空、屏上显示原文（**这一档两种读数都合格**）；
-     回体有东西而库里没落＝两边对不上，那才是红。
+  ③ 表外那一档（甲：只做词表）：建一个词表里没有的怪名 → 中文那一格填的是**他自己打的那几个字**，
+     `name_en` 必须是 NULL；等 24 秒再读，**仍然 NULL**（这一条链上没有后台那一趟了）。
+     另外抽现网那一份模块：`call_model` 与 `fill_missing` 这两个名字**不许存在**——
+     它们存在就说明出网那一半又长回来了。
   ④ 改名不许留旧译名：把词表里的「摄影」改进来，量两档跟着新名字走。
   ⑤ 私密那一格两道闸：探针自己在测试号名下插一行 `name="私密"`（真实账号一个不碰），
      改它的名 → 400「名字不许改」；删它 → 400「不许删」。**这两条量的就是"无条件挡"**——旧那一版只在格里还有笔记时才挡。
@@ -23,7 +23,6 @@
 没在这一把里的：**把别的格改名成「私密」那一条反向闸**（要连着关活码，而测试号名下没有活码，量出来不是那条规矩）——
 它只有 pytest 钉着，这里如实声明缺口，不许算进"已覆盖"。
 """
-import asyncio
 import time
 
 import httpx
@@ -97,37 +96,31 @@ print(f"   GET 列表里那一格的 note_count = {counts}（应是数字，不�
 if not counts or not isinstance(counts[0], int):
     red.append(f"② GET 列表没带出 `note_count` 这个数字（实读 {counts}）")
 
-# ── ③ 表外那一档 ─────────────────────────────────────────────────────────────
-# 分清两档：中文那一格是**词表那一趟自己填的**（`own_zh = 原名`，零出网），
-# `name_en` 才是模型那一档的读数。第一版我拿"name_zh 有值"当"模型跑通了"报，读的是词表那一趟——
-# 那是假绿。这里等的是 `name_en`，并且另外独立打一次 `call_model`，把"通道通不通、回什么形状"摆出来。
+# ── ③ 表外那一档（甲：只做词表，这一条链不出网）──────────────────────────────
+# 两档分开量：中文那一格填的就是他打的那几个字（`own_zh = 原名`），`name_en` 该留 NULL。
+# 第一版这里等的是"name_en 被后台补上"，而补它的那一趟已经被撤掉——留着不改，这把尺子会永远红。
 r = post("/api/categories/", {"name": ODD})
 body = r.json() if r.status_code < 500 else {}
 odd_id = body.get("id")
 print(f"\n③ 建「{ODD}」→ HTTP {r.status_code}｜建那一瞬两档 = {body.get('name_zh')!r} / {body.get('name_en')!r}")
 if r.status_code != 200:
     red.append(f"③ 表外的名字没建出来（{r.status_code}）")
+if body.get("name_zh") != ODD:
+    red.append(f"③ 表外的名字，中文那一格该原样落他打的字，实读 {body.get('name_zh')!r}")
 if body.get("name_en") is not None:
-    print(f"   ⚠ 词表里竟然有「{ODD}」这个键，那一档当场就被填了——这条怪词得换一个")
-print("   后台那一趟等的是 name_en（模型那一档）…", end=" ")
-en_after = None
-for _ in range(12):
-    time.sleep(2)
-    db.expire_all()
-    row = db.get(Category, odd_id) if odd_id else None
-    if row and row.name_en:
-        en_after = row.name_en
-        break
-print(repr(en_after) if en_after else "24 秒后 name_en 仍是 NULL")
-raw = asyncio.run(cn.call_model([ODD]))
-print(f"   独立打一次模型通道（只问这一个词，不改库）→ 回体 {raw!r}")
-if en_after:
-    print(f"   ⇒ 模型通道在现网真把英文那一档补上了：{ODD} → {en_after!r}")
-elif raw:
-    print("   ⇒ 通道回得来东西，但后台那一趟没把它落到格子上（回体里 src 对不上、或 zh/en 有空值）——这一格要继续查")
-    red.append(f"③ 模型回体 {raw!r} 里有东西，库里 name_en 却仍是 NULL，两边对不上")
-else:
-    print("   ⇒ 模型那一趟没回东西（回体空），那一档留空、屏上显示原文——按他拍的『译不了维持原文』，这是合格读数")
+    red.append(f"③ 词表里没有「{ODD}」，英文那一格却当场被填了（{body.get('name_en')!r}）——表里混进了怪词，或代码又在猜")
+print("   等 24 秒再看英文那一格（甲之后不该有任何一趟来补）…", end=" ")
+time.sleep(24)
+db.expire_all()
+row = db.get(Category, odd_id) if odd_id else None
+late_en = row.name_en if row else None
+print(repr(late_en) if late_en else "仍是 NULL")
+if late_en is not None:
+    red.append(f"③ 24 秒后英文那一格被补成了 {late_en!r}——后台那一趟没撤干净")
+ghosts = [n for n in ("call_model", "fill_missing", "fill_from_glossary", "display_names") if hasattr(cn, n)]
+print(f"   现网那一份 `category_names` 里残留的出网/补名口：{ghosts or '没有'}")
+if ghosts:
+    red.append(f"③ 模块里还剩 {ghosts}——甲撤的那一半在现网又长回来了")
 
 # ── ④ 改名不许留旧译名 ───────────────────────────────────────────────────────
 if row_travel:
