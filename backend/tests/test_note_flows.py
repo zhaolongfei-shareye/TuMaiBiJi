@@ -6,7 +6,9 @@
 """
 import asyncio
 import os
+import re
 import sys
+from datetime import datetime, timedelta, timezone
 
 os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest.db"
 os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
@@ -23,9 +25,23 @@ from app.models.category import Category
 from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
+from app.models.user_profile import UserProfile
 
 MARK_A = "只有A知道的正文串AZ3K"
 MARK_B = "只有B知道的正文串BQ7L"
+
+
+def _fresh_user(db, tag: str, nickname=None) -> User:
+    """给"标题组装"那几条尺子单独造一个人。
+
+    不复用 module 级 `users` 里的 a：那一位要留给搜索／隔离那一堆，而这几条要往他身上写
+    名片名称、昵称、以及一批带尾号的笔记——共用一个人名下攒下的号会把邻居那条一起改掉。
+    """
+    user = User(openid=f"pytest-img-note-{tag}", nickname=nickname)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @pytest.fixture(scope="module")
@@ -193,11 +209,106 @@ class TestExtractionDegradation:
         status, result = statuses[-1]
         assert (status, result["degraded"]) == ("completed", False)
 
-    def test_empty_ocr_still_fails(self, worker):
-        tasks, statuses, uid, mp = worker
+    def test_empty_ocr_downgrades_to_an_image_note(self, worker, db):
+        """站长 10-19：认不出字不许报错，降档成一篇只有图的笔记，标题自动组装。
+
+        这一条以前叫 `test_empty_ocr_still_fails`，钉的是"就该失败"。判据跟着他改口径，
+        不是为旧尺子迁就代码。
+        """
+        tasks, statuses, _, mp = worker
+        user = _fresh_user(db, "plain")
         mp.setattr(tasks, "ocr_images", lambda images_data: asyncio.sleep(0, result="   "))
-        tasks.process_screenshots_task("t-empty", uid, [b"fake-png"])
-        assert statuses[-1][0] == "failed"
+
+        seen = []
+        async def fake_extract(text, fallback_title="", translate=None):
+            seen.append(text)
+            return {"title": "不该出现", "summary": "不该出现", "key_points": [], "tags": []}
+        mp.setattr(tasks, "extract_knowledge", fake_extract)
+
+        tasks.process_screenshots_task("t-img", str(user.id), [b"fake-png"], generation=user.generation)
+        status, result = statuses[-1]
+        assert (status, result["image_only"]) == ("completed", True)
+        assert "degraded" not in result, "这一趟不是「LLM 不可用、原文照存」，两枚标记不许混用"
+        assert seen == [], "一个字的都没有，不该再花一次提炼"
+
+        note = db.get(Note, result["note_id"])
+        assert note.source_type == "screenshot"  # 他点甲：来源那一格不动，仍念「截图识别」
+        assert not note.original_content and not note.summary and not note.key_points
+        mmdd = tasks._cn_day_window(datetime.now(timezone.utc))[2]
+        assert result["title"] == f"我的图片笔记 {mmdd}01"
+        assert note.title == result["title"]
+
+    def test_image_note_seq_takes_max_existing_tail_plus_one(self, worker, db):
+        """序号＝当天已有尾号取最大 +1（他点的正是这一条，不是数行数）。"""
+        tasks, statuses, _, mp = worker
+        user = _fresh_user(db, "seq")
+        mp.setattr(tasks, "ocr_images", lambda images_data: asyncio.sleep(0, result=" "))
+        uid = str(user.id)
+        mmdd = tasks._cn_day_window(datetime.now(timezone.utc))[2]
+
+        got = []
+        for i in (1, 2):
+            tasks.process_screenshots_task(f"t-seq-{i}", uid, [b"p"], generation=user.generation)
+            got.append(statuses[-1][1]["title"])
+        assert got == [f"我的图片笔记 {mmdd}01", f"我的图片笔记 {mmdd}02"]
+
+        # 他自己把第二篇改成占着 07：下一篇跳 08。宁可空掉 02–06，也不发一个已存在的号
+        db.query(Note).filter(Note.user_id == uid, Note.title == got[1]).update(
+            {"title": f"我的图片笔记 {mmdd}07"})
+        db.commit()
+        db.expire_all()
+        tasks.process_screenshots_task("t-seq-3", uid, [b"p"], generation=user.generation)
+        assert statuses[-1][1]["title"] == f"我的图片笔记 {mmdd}08"
+
+    def test_image_note_seq_only_reads_todays_window(self, worker, db):
+        """窗口先按北京那一天筛，尾号只在筛出来的那些里取。
+
+        造一条"标题带着今天的四位、其实写在昨天那一格"的笔记：它不许把今天的 01 顶成 07。
+        """
+        tasks, statuses, _, mp = worker
+        from app.tasks.ingest_tasks import _cn_day_window
+
+        user = _fresh_user(db, "window")
+        uid = str(user.id)
+        _, _, mmdd = _cn_day_window(datetime.now(timezone.utc))
+        db.add(Note(user_id=uid, title=f"我的图片笔记 {mmdd}06", source_type="screenshot",
+                    created_at=(datetime.now(timezone.utc) - timedelta(days=1)).replace(tzinfo=None)))
+        db.commit()
+        db.expire_all()
+
+        mp.setattr(tasks, "ocr_images", lambda images_data: asyncio.sleep(0, result=""))
+        tasks.process_screenshots_task("t-win", uid, [b"p"], generation=user.generation)
+        assert statuses[-1][1]["title"] == f"我的图片笔记 {mmdd}01"
+
+    def test_beijing_day_window_conversion(self):
+        """库里 `created_at` 是朴素 UTC（实测：北京 11:03 那篇存成 `03:03:57`），
+        所以"今天"必须先换成北京日、再把窗口两端折算回朴素 UTC。凌晨那两个小时最容易错一天。"""
+        from app.tasks.ingest_tasks import _cn_day_window
+
+        start, end, mmdd = _cn_day_window(datetime(2026, 10, 18, 17, 0, tzinfo=timezone.utc))
+        assert mmdd == "1019", "北京 10-19 凌晨 1 点，不是 10-18"
+        assert (start, end) == (datetime(2026, 10, 18, 16), datetime(2026, 10, 19, 16))
+
+    def test_title_prefix_three_level_fallback(self, worker, db):
+        """名称 → 微信昵称 → 固定词「我的」；空白串那一格按"没填"处理。"""
+        tasks = worker[0]
+        user = _fresh_user(db, "name")
+        uid = str(user.id)
+        assert tasks._owner_name(db, uid, user) == "我的"
+
+        user.nickname = "微信那串昵称"
+        db.commit()
+        assert tasks._owner_name(db, uid, user) == "微信那串昵称"
+
+        db.add(UserProfile(user_id=uid, name="阿麦"))
+        db.commit()
+        db.expire_all()
+        assert tasks._owner_name(db, uid, user) == "阿麦"
+
+        db.query(UserProfile).filter(UserProfile.user_id == uid).update({"name": "   "})
+        db.commit()
+        db.expire_all()
+        assert tasks._owner_name(db, uid, user) == "微信那串昵称"
 
     def test_multi_page_screenshot_title_is_not_the_page_marker(self, worker, db):
         """R17：多张图仍带分页标记，降级标题必须跳过它取真正的正文行。"""

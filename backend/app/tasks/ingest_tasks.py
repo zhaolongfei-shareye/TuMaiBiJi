@@ -1,12 +1,14 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timedelta, timezone
 
 from app.core.errors import UserError
 from app.db.database import SessionLocal
 from app.models.asset import MAX_ASSETS_PER_NOTE
 from app.models.note import Note
 from app.models.user import User
+from app.models.user_profile import UserProfile
 from app.services import note_images
 from app.services import quota
 from app.services import source_blocklist
@@ -104,6 +106,61 @@ def _load_task_user(db, task_id: str, user_id: str, generation):
         set_task_status(task_id, "failed", {"error": "账号已变更，无法保存笔记"})
         return None
     return user
+
+
+# 认不出字那一趟自动起的标题（站长 10-19 的原话形状）：「阿麦图片笔记 101901」。
+IMAGE_NOTE_FALLBACK_NAME = "我的"
+IMAGE_NOTE_TAIL = re.compile(r"图片笔记 (\d{4})(\d{2,})$")
+CN_TZ = timezone(timedelta(hours=8))
+
+
+def _cn_day_window(now: datetime) -> tuple[datetime, datetime, str]:
+    """把"今天"折算成库里那把尺子：北京日的起止，用朴素 UTC 表示。
+
+    现网这一台是 SQLite，`created_at` 由 `func.now()` 写成**朴素 UTC**（实测：北京 11:03 存的那篇
+    库里是 `03:03:57`）。所以按北京时间切的窗口要先减 8 小时再拿 naive 去比——把一个带 +08:00 的
+    aware datetime 塞进 SQLite 会存成一串带偏移的文本，字符串比较当场错位。
+    折算写法照 `services/report_ledger.py` 那一处，同一个口径不许有两把尺子。
+    """
+    midnight_cn = now.astimezone(CN_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = (midnight_cn - timedelta(hours=8)).replace(tzinfo=None)
+    return start, start + timedelta(days=1), midnight_cn.strftime("%m%d")
+
+
+def _owner_name(db, user_id: str, user) -> str:
+    """标题前缀那一格的三级兜底：名片名称 → 微信昵称 → 固定词「我的」。
+
+    最后一级为什么不落 openid／账号 id 之类的东西：那是标识符不是名字，进标题等于把他的 id
+    印在自己每篇笔记的第一行。他 10-19 点的是"空了用固定词垫上"，所以这一格永不为空。
+    """
+    row = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+    for candidate in ((row.name if row else None), user.nickname):
+        name = (candidate or "").strip()
+        if name:
+            return name
+    return IMAGE_NOTE_FALLBACK_NAME
+
+
+def _image_note_title(db, user_id: str, user, now: datetime) -> str:
+    r"""`{名称}图片笔记 {MMDD}{序号}`，序号＝**当天这一族已有的最大尾号 +1**。
+
+    取最大而不数行数：数行数在"删掉一篇再存"时会把已有那篇的号重新发一遍，屏上出现两行逐字
+    同名（他点的正是"扫当天已有尾号取最大"）。尾号只从标题尾巴那串数字读，所以他手动改出来的
+    号也算得进去——宁可往后跳一号，也不发重号。第 100 篇起 `:02d` 自然变三位（`1019100`），
+    那条 `\d{2,}` 接得住。
+    """
+    start, end, mmdd = _cn_day_window(now)
+    highest = 0
+    for (title,) in db.query(Note.title).filter(
+        Note.user_id == user_id,
+        Note.source_type == "screenshot",
+        Note.created_at >= start,
+        Note.created_at < end,
+    ).all():
+        found = IMAGE_NOTE_TAIL.search(title or "")
+        if found and found.group(1) == mmdd:
+            highest = max(highest, int(found.group(2)))
+    return f"{_owner_name(db, user_id, user)}图片笔记 {mmdd}{highest + 1:02d}"
 
 
 def _source_snapshot(scraped: dict, url: str) -> dict | None:
@@ -256,7 +313,34 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
 
         ocr_text = asyncio.run(ocr_images(images_data))
         if not ocr_text.strip():
-            set_task_status(task_id, "failed", {"error": "OCR 未识别到文字内容"})
+            # 站长 10-19「图片提炼无法识别文字不要直接报错，直接降档为贴图笔记，标题默认提取用户名称，
+            # 组装成名称+图片笔记+日期+序号」。改之前这一格是 `failed` ＋「OCR 未识别到文字内容」，
+            # 真正的代价不在那句红字上，在**图也一起没了**：客户端那条 B 链拿不到 note_id 就走
+            # `_settleBackup(null, …)`，把刚传进云的原件当孤儿删掉（pages/create/create.js:1002）。
+            # 现在照建一篇，正文／摘要／要点三格留空（`notes` 表里三列都可空，只有 title 非空），
+            # 标题由 `_image_note_title` 现读名称与当天尾号组装。
+            # 图不在这条链上：它由客户端并行传完再 bind，服务端不知道那批图最后成没成，也不猜——
+            # 云没配那台上照旧会建出一篇只有标题的笔记，这与今天"提炼成功但云没配"是同一个形状。
+            db = SessionLocal()
+            try:
+                user = _load_task_user(db, task_id, user_id, generation)
+                if user is None:
+                    return
+                note = Note(
+                    user_id=user_id,
+                    title=_image_note_title(db, user_id, user, datetime.now(timezone.utc)),
+                    source_type="screenshot",
+                )
+                db.add(note)
+                db.commit()
+                db.refresh(note)
+                credit_first_note(db, user_id, note)
+                # `image_only` 是给判据与探针读的那一枚：认不出字建的这篇和"LLM 不可用、原文照存"
+                # 那一篇是两件事，不许挤在同一个 `degraded` 标记里（那一枚说的是提炼，不是识字）。
+                set_task_status(task_id, "completed",
+                                {"note_id": note.id, "title": note.title, "image_only": True})
+            finally:
+                db.close()
             return
 
         knowledge = asyncio.run(extract_knowledge(
