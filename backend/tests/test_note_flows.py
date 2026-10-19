@@ -262,7 +262,7 @@ class TestExtractionDegradation:
     def test_the_five_char_boundary_is_not_a_downgrade(self, worker, db):
         """边界那一格钉死：去掉空白之后**正好 5 个字符**算认得出来，照旧走提炼。
 
-        `OK 3` 去空白 4 个字符 ⇒ 降档；`HELLO` 与 `a b c d e` 都是 5 个 ⇒ 老路。数法他点的是甲，
+        `OK 3` 去空白 3 个字符 ⇒ 降档；`HELLO` 与 `a b c d e` 都是 5 个 ⇒ 老路。数法他点的是甲，
         所以中英文数字一个字符算一字、空格不参与计数，不按词数。
         """
         tasks, statuses, _, mp = worker
@@ -272,11 +272,12 @@ class TestExtractionDegradation:
                     "key_points": ["要点"], "tags": []}
         mp.setattr(tasks, "extract_knowledge", fake_extract)
 
-        for tid, ocr_out, want_downgrade in (
-            ("t-b4", "OK 3", True),          # 去空白 4 个字符 ⇒ 降档
-            ("t-b5", "HELLO", False),        # 正好 5 个字符 ⇒ 老路
-            ("t-b6", "a b c d e", False),    # 空格不参与计数，字符仍是 5 个 ⇒ 老路
+        for tid, ocr_out, chars, want_downgrade in (
+            ("t-b4", "OK 3", 3, True),        # 去空白 3 个字符 ⇒ 降档
+            ("t-b5", "HELLO", 5, False),      # 正好 5 个字符 ⇒ 老路
+            ("t-b6", "a b c d e", 5, False),  # 空格不参与计数，字符仍是 5 个 ⇒ 老路
         ):
+            assert tasks._meaningful_chars(ocr_out) == chars, f"{ocr_out!r} 数出的字符数不是 {chars}"
             mp.setattr(tasks, "ocr_images",
                        lambda images_data, _o=ocr_out: asyncio.sleep(0, result=_o))
             statuses.clear()
