@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>10-19 第二稿：白底灰框两版（推窗白框 / 满幅白框）</title>
+<style>
+  body { margin:0; padding:32px; background:#F2EFE9; color:#14161A;
+         font:14px/1.75 -apple-system,"PingFang SC",sans-serif; }
+  h1 { font-size:20px; margin:0 0 6px; }
+  .lead { max-width:820px; margin:0 0 24px; color:#5b5750; }
+  .loud { background:#14161A; color:#F2EFE9; padding:12px 16px; border-radius:10px;
+          max-width:820px; margin:0 0 24px; }
+  .row { display:flex; gap:28px; align-items:flex-start; flex-wrap:wrap; margin-bottom:36px; }
+  .cell { width:375px; }
+  .cell img { width:375px; height:auto; display:block; border-radius:12px;
+              box-shadow:0 6px 24px rgba(20,22,26,.14); }
+  .cell h2 { font-size:16px; margin:14px 0 4px; }
+  .cell .id { font:12px/1.5 ui-monospace,Menlo,monospace; color:#8a8478; margin:0 0 8px; }
+  .cell p { margin:0 0 6px; color:#4a4740; }
+  ul { margin:8px 0 0; padding-left:20px; color:#4a4740; }
+  li { margin-bottom:4px; }
+  .note { max-width:820px; border-top:1px solid #ded8cc; padding-top:18px; }
+  .note h3 { font-size:15px; margin:0 0 8px; }
+</style>
+</head>
+<body>
+
+<h1>10-19 第二稿：白底灰框两版</h1>
+<p class="lead">
+按「标红的去掉，然后图片要白底，加灰色边框。这两个设计，再出一稿」改的：
+上一稿的推窗、满幅两版，各去掉「分类·来源·日期」那一行和标签那一行，
+照片外面垫一圈白衬（18）＋一枚灰色描边（3px，颜色 = 墨黑与纸白按 3:7 混出来的浅灰）。
+</p>
+
+<div class="loud">
+  <b>当前真机跑的仍是线上那十套，这两版一行代码没进包、没进种子、没下发现网。</b>
+  它们现在只是 <code>docs/design/10-19卡片白框两稿/</code> 下两份配方 + 两张成品图，
+  等你挑定才走「抄进 <code>backend/seed/poster_extra/</code> → 跑流水线 → 开闸灌库」那条路，
+  后三步各要单独点头。
+</div>
+
+<div class="row">
+  <div class="cell">
+    <img src="推窗白框.png" alt="推窗白框成品">
+    <h2>① 推窗白框</h2>
+    <p class="id">id: sashMat ｜ 名字: 推窗白框 ｜ 750 × 1129</p>
+    <p>大标题打头，下面一整块带白衬灰框的照片，再摘要，底下一句话＋名字＋二维码。</p>
+    <ul>
+      <li>照片框：外框圆角 20，白衬 18，照片内圆角 10</li>
+      <li>标题最多 3 行（46/64），摘要最多 5 行（28/44）</li>
+      <li>中文 977 高、英文 1149 高（内容小样）；这一篇真笔记渲出来 1129</li>
+    </ul>
+  </div>
+  <div class="cell">
+    <img src="满幅白框.png" alt="满幅白框成品">
+    <h2>② 满幅白框</h2>
+    <p class="id">id: topMat ｜ 名字: 满幅白框 ｜ 750 × 1152</p>
+    <p>照片顶到最上面（左右各留 32），下面依次是标题、摘要、一句话＋名字＋二维码。</p>
+    <ul>
+      <li>照片框：外框圆角 20，白衬 18，照片内圆角 10，照片高 470</li>
+      <li>标题最多 3 行（48/66），摘要最多 6 行（28/44）</li>
+      <li>中文 1064 高、英文 1174 高（内容小样）；这一篇真笔记渲出来 1152</li>
+    </ul>
+  </div>
+</div>
+
+<div class="note">
+  <h3>这一稿量到的四条实话</h3>
+  <ul>
+    <li><b>灰框在浅色卡片上很弱。</b>那一枚灰是 <code>mix(墨黑, 纸白, 0.3)</code>，实测画布上落的是
+        <code>#BDBEC0</code>；它和浅宣纸底色 <code>#E4DCC7</code> 只差 <b>1.39:1</b>，
+        和深色档 <code>#55625C</code> 差 3.37:1。所以浅色那两档上，这枚框主要靠里面那圈纯白衬
+        （实测 <code>#FFFFFF</code>）把照片分出来，框本身几乎读不出来。要它明显，改一个数就够（把 0.3 往 0.55 抬），
+        那是配方里的数——<b>不发版</b>。</li>
+    <li><b>照片是被居中裁满的，截图类配图会被切掉一截。</b>画布上只有 <code>drawCover</code> 这一种铺法
+        （poster.js:795），一张 640×851 的截图塞进 654×405 的框里，纵向只留中间 47%——
+        两版顶部那行白字都被切成了半截。想「完整显示整张图」（contain）得在包内给 <code>image</code>
+        加一个模式参数，<b>那是要发版的</b>，这一稿做不到。</li>
+    <li><b>这一篇没配图时画的是底纹，不是空框。</b>没图那一态走 <code>glyphPlate</code>（一枚大字底纹），
+        框和白衬照旧留位，所以两种态高度一模一样。<b>这一格他没拍过</b>，是我定的：
+        不画空框（不许画空框），也不拿头像冒充照片（会把「这篇没图」画成「这篇有张脸」）。</li>
+    <li><b>标签前那枚「#」还是没有。</b>屏上每枚标签前的 # 是客户端显示时一枚一枚加的，
+        画布侧只有 <code>tagsJoined</code>（数组直接 join），而配方里的 <code>+</code> 是纯数值算子。
+        这一稿两版把标签整行撤了，所以这条不影响这两版；只要以后哪版要恢复标签行，# 就得包内加原语＝发版。</li>
+  </ul>
+</div>
+
+<div class="note">
+  <h3>自证读数（不是承诺，是跑出来的）</h3>
+  <ul>
+    <li>第 0 关（node，静态名单 + strict 规划）：<b>29 条判据，红 0</b>。四态各测：中文／英文 × 有配图／无配图，
+        两版高度在「有图 / 无图」两态完全相等（977/977、1064/1064）——证明图位是恒定占位的。</li>
+    <li>下发闸门：收 2 退 0；<code>recipeSource</code> 两版都是 <code>remote</code>（吃的是下发配方，不是包内那份）。</li>
+    <li>第 1 关（模拟器真点出图）：模板页 12 格（10 包内 + 2 新）、分享页那一排同样 12 格、
+        画芯用的是列表里第一篇真带配图的笔记（id 146），两版各搬回一张成品图；
+        收尾本机缓存读回 <code>storage=""</code>、<code>wx.request</code> 已换回真的。</li>
+    <li>白衬与灰框是逐像素量过的，不是眼看（y=500 那一行，步长 1）：底色 <code>#E4DCC7</code>
+        → 抗锯齿 <code>#D1CDC4</code> → 灰框 <code>#BDBEC0</code>（占 2 列，配的 3px）
+        → 白衬 <code>#FFFFFF</code> 连续 16px（配的 18，圆角处抗锯齿吃掉两列）→ 照片 <code>#2E5E86</code>。</li>
+    <li>包内那十套没被碰：<code>验-模板配方等价</code> 960 组 0 处不同。</li>
+  </ul>
+</div>
+
+</body>
+</html>
