@@ -393,22 +393,36 @@ const enter = async (mp, url) => {
   await sleep(9000)
   const home = await (await mp.currentPage()).data()
   const list = (home.notes && home.notes.length ? home.notes : home.list) || []
-  // ⚠ 画芯这一篇**要挑带配图的那一篇**：这一轮的卖点就是"大图位吃这一篇的第一张配图"，
-  //   原来那句 list[0] 拿到哪篇算哪篇 ⇒ 四稿渲出来全是"没配图、那一格落品牌印"的那一态，
-  //   挑图的人根本看不到图。cover_file_id 是列表那一趟带回的那一栏（空＝这篇没有能画的图）。
-  const withImg = list.find((n) => !!(n && n.cover_file_id))
-  const pickedNote = withImg || list[0] || null
-  const noteId = pickedNote ? (pickedNote.id || pickedNote.note_id) : null
-  ck('首页列表里拿到一篇真笔记当画芯（不自己造数据）', !!noteId,
-    noteId ? `note.id=${noteId}「${pickedNote.title || ''}」配图=${pickedNote.cover_file_id ? '有' : '这篇没有'}` : `读到 ${list.length} 篇`)
-  ck('画芯那一篇真带配图（四稿的大图位才有东西可画；这一条红＝这台机上一篇带图的笔记都没有）',
-    !!(pickedNote && pickedNote.cover_file_id),
-    pickedNote ? `列表 ${list.length} 篇里${withImg ? '第一篇带图的是' : '没有一篇带'}` : '没有画芯')
+  // ⚠ 画芯这一篇要同时满足两件事：**带配图**、而且**真出得了卡**。
+  //   ① 这一轮的卖点就是"大图位吃这一篇的第一张配图" ⇒ 优先 `cover_file_id` 非空（列表那一趟带回的那一栏，空＝这篇没有能画的图）。
+  //   ② 但列表里有些篇**根本不能出卡**（私密那一篇没解锁、帮助文档那一类服务端直接闸掉）——它们的分享页连模板条都不渲染。
+  //      10-19 实测：挑中 note.id=143 那一趟，`tpls` 读到 **0 格**，第 1 关红成"新格子里没有格子"，
+  //      看着像新配方画不出来，其实是**画芯挑错了一篇**（配方那侧第 0 关 29 条全绿）。
+  //   所以这里不再"拿到哪篇算哪篇"，改成**一篇一篇试到出得来为止**：进那一页、模板格数对上整套才算数，最多试 6 篇。
+  const cands = list.filter((n) => n && n.cover_file_id).concat(list.filter((n) => n && !n.cover_file_id))
+  let pickedNote = null, noteId = null, page = null, tpls = []
+  const tried = []
+  for (const n of cands.slice(0, 6)) {
+    const id = n.id || n.note_id
+    if (!id) continue
+    const pg = await enter(mp, `/pages/share/share?id=${id}`)
+    // 那一排是进页之后异步填的，读太早会把"出得来"的一篇误判成 0 格直接跳过 ⇒ 给它几秒。
+    let tl = []
+    for (let i = 0; i < 8; i++) {
+      tl = (await pg.data('tpls')) || []
+      if (tl.length) break
+      await sleep(1500)
+    }
+    tried.push(`${id}→${tl.length}格`)
+    if (tl.length === nBundled + ids.length) { pickedNote = n; noteId = id; page = pg; tpls = tl; break }
+  }
+  const want = nBundled + ids.length
+  ck('首页列表里拿到一篇真笔记当画芯（不自己造数据；出不了卡的那几篇会自动跳过）', !!noteId,
+    `${noteId ? `note.id=${noteId}「${pickedNote.title || ''}」` : '没有一篇出得了卡'}　试过的：${tried.join(' ')}`)
+  ck('画芯那一篇真带配图（大图位才有东西可画；这一条红＝这台机上一篇带图的笔记都没有）',
+    !!(pickedNote && pickedNote.cover_file_id), `带图的有 ${list.filter((n) => n && n.cover_file_id).length} 篇`)
+  ck(`分享页那一排跟着变 ${want} 格`, tpls.length === want, tpls.map((x) => x.id).join(','))
   if (!noteId) throw new Error('没有画芯，往下走没有意义')
-
-  const page = await enter(mp, `/pages/share/share?id=${noteId}`)
-  const tpls = (await page.data('tpls')) || []
-  ck(`分享页那一排跟着变 ${nBundled + ids.length} 格`, tpls.length === nBundled + ids.length, tpls.map((x) => x.id).join(','))
 
   const stamp = Date.now()
   for (const id of ids) {
