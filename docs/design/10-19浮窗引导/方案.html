@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<!-- 10-19 深夜：浮窗引导这一屏的效果图（站长一句「我想在下方做个黄色小手指着这三个点，然后上下动，
+     提示词，点这里 | 选浮窗 | 我。原在这一行的文字压缩」）。
+     底图＝他那张现网实拍，只把中间那条玻璃带（含带里那行字）逐列填成它背后的墙（_建底图.py），
+     所以导航条与那枚胶囊是**真的**，手指指的就是实拍里那三个点；带子按现网令牌重画。
+     折算：750rpx = 375px ⇒ 1rpx = 0.5px（rpx 直接进 Chrome 整条作废，全部先换成 px）。
+     代码一行没动：这一页只是给他挑方向的。 -->
+<html lang="zh"><head><meta charset="utf-8">
+<title>10-19 浮窗引导 · 三屏</title>
+<style>
+  :root{
+    --ink: 34,37,44;            /* 现网"墨黑" #23252C；实拍导航条量到 (34,37,44) */
+    --paper: #F2EFE9;
+    --yellow: #F6C445;          /* palette.TIP_DOT，只从这里出，不许抄进样式表 */
+    --fs-meta: 12px;            /* 24rpx */
+    --fs-micro: 9px;            /* 18rpx */
+    --sp-3: 12px;               /* 24rpx */
+    --r-card: 20px;             /* 40rpx */
+    --sh-drop: 0 6px 14px rgba(18,20,26,.16);
+    --stage-strip: linear-gradient(180deg, rgba(var(--ink),.94) 0%, rgba(var(--ink),.80) 55%, rgba(var(--ink),.16) 100%);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:26px;background:#EDEBE6;color:#14161A;
+       font:14px/1.6 -apple-system,"PingFang SC",sans-serif}
+  h1{font-size:19px;margin:0 0 6px}
+  h2{font-size:15px;margin:30px 0 10px}
+  .lede{max-width:1050px;color:#4a4d55;margin:0 0 4px}
+  .row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;margin-top:14px}
+  .cell{width:375px}
+  .cap{font-size:12.5px;color:#4a4d55;margin:8px 2px 0;white-space:normal}
+  .cap b{color:#14161A}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;
+       background:#14161A;color:#fff;margin-right:6px;vertical-align:2px}
+  .tag.warn{background:#B4462F}
+  .tag.ok{background:#2C6E49}
+
+  /* ── 手机屏 ─────────────────────────────────────────── */
+  .ph{position:relative;width:375px;height:470px;overflow:hidden;
+      border-radius:26px;box-shadow:0 10px 30px rgba(18,20,26,.18);
+      background:url("底图-抹掉旧带.png") top left/375px 470px no-repeat}
+  .ph.ref{background:url("参考-现网实拍.png") top left/375px 470px no-repeat}
+  .ph.ref .band,.ph.ref .tip{display:none}
+
+  .band{position:absolute;left:0;right:0;top:87.7px;height:40.2px;
+        display:flex;align-items:flex-start;
+        padding:7px var(--sp-3) 17px;
+        border-radius:0 0 var(--r-card) var(--r-card);
+        background:var(--stage-strip);
+        -webkit-backdrop-filter:blur(15px) saturate(1.15);
+        backdrop-filter:blur(15px) saturate(1.15);
+        box-shadow:var(--sh-drop);color:var(--paper)}
+  .dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--yellow);margin:5px 5px 0 0}
+  .txt{font-size:var(--fs-meta);line-height:1.35;white-space:nowrap}
+  .lang{flex:none;margin-left:auto;padding-left:6px;display:flex;align-items:flex-start;
+        font-size:var(--fs-meta);line-height:1.35;white-space:nowrap}
+  .lang .dot{width:5px;height:5px;margin:5.6px 4px 0 0}
+
+  /* 一枚"胶囊 + 手指"＝一个整体，整块上下动（他要的是手指动，不是只有字动）。
+     .tip 自己撑满整屏、只当动画的容器；里面两枚各按屏坐标摆，手指才伸得进那条半透玻璃带。 */
+  .tip{position:absolute;inset:0;pointer-events:none}
+  .bob{animation:bob .9s ease-in-out infinite alternate}
+  @keyframes bob{from{transform:translateY(0)}to{transform:translateY(-7px)}}
+  .hint{position:absolute;padding:5px 9px;border-radius:13px;background:rgba(var(--ink),.80);
+        -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+        color:var(--paper);font-size:var(--fs-micro);line-height:1.25;white-space:nowrap;
+        box-shadow:0 4px 10px rgba(18,20,26,.22)}
+  .hint .sep{opacity:.45;margin:0 1px}
+  .hint .k{color:var(--yellow)}
+  .finger{position:absolute;width:26px;height:46px}
+  .finger.big{width:40px;height:56px}
+
+  /* 甲：胶囊挂在带子下沿之外那一行，手指从它顶边伸出去、穿过玻璃带的下半截点住三个点。
+     手指中轴 278.5＝实拍量的三个点那半区中轴；带子里 x 245–296 那一段是空的（短句到 191、EN 从 331.7 起），
+     所以手指压在带上不挡任何字。 */
+  .a .hint{left:205px;top:140px}
+  .a .finger{left:265.5px;top:92px}
+  /* 乙：并进那一行——手指竖不进去（带子只有 40.2px 高），这一屏就是给"它为什么不成立"看的 */
+  .b .hint{position:static}
+  .b .lang{margin-left:6px}
+  .b .hint{padding:3px 8px;background:rgba(var(--paper),.14);box-shadow:none;
+           -webkit-backdrop-filter:none;backdrop-filter:none}
+  .b .finger{display:none}
+  /* 丙：一次性引导浮层——只挖空右上角那一块，其余压暗，手指放大 */
+  /* 挖空那一块：导航条本来就是暗的，只压暗读不出"这里是要点的"，所以再补一圈黄环。 */
+  .hole{position:absolute;left:250px;top:50px;width:105px;height:41px;border-radius:20px;
+        box-shadow:0 0 0 9999px rgba(20,20,28,.62), 0 0 0 2px var(--yellow)}
+  .c .hint{left:196px;top:150px;font-size:11px;padding:7px 12px;border-radius:15px;
+           background:rgba(var(--ink),.92)}
+  .c .finger{left:258.5px;top:88px}
+
+  /* ── 话术与读数 ─────────────────────────────────────── */
+  table{border-collapse:collapse;font-size:12.5px;background:#fff;max-width:1050px}
+  th,td{border:1px solid #dcd8d0;padding:6px 9px;text-align:left;vertical-align:top}
+  th{background:#F2EFE9;font-weight:600;white-space:nowrap}
+  td.s{font-family:ui-monospace,Menlo,monospace;white-space:nowrap}
+  .no{color:#B4462F;font-weight:600}
+  pre{background:#14161A;color:#DDE3EA;padding:11px 13px;border-radius:9px;
+      font-size:11.5px;line-height:1.55;overflow:auto;max-width:1050px;white-space:pre}
+  .note{max-width:1050px;font-size:12.5px;color:#4a4d55}
+  .note b{color:#14161A}
+</style></head><body>
+
+<h1>浮窗引导 · 三屏（10-19 深夜）</h1>
+<p class="lede">你要的那一枚黄色小手指、上下动、指的就是右上角那三个点。底图是你那张现网实拍，
+只把中间那条玻璃带抹成它背后的墙，所以<b>导航条与那枚胶囊是真的</b>，手指落的是真位置。
+三屏差在"提示那一枚住在哪儿"。<b>代码一行没动。</b>那圈红是你自己在截图上标的靶子，不是设计的一部分（底图整块用的就是你的实拍）。
+玻璃带与提示枚的色按现网令牌画：带子 <span class="s">rgba(34,37,44,.94→.80@55%→.16)</span>、
+黄 <span class="s">#F6C445</span>（palette.TIP_DOT）、字 <span class="s">24rpx／18rpx</span>。</p>
+
+<div class="row">
+
+  <div class="cell">
+    <div class="ph ref"></div>
+    <p class="cap"><span class="tag">参考</span><b>现网实拍</b>（你刚发那张，原样）。
+    那一行现在是「用 AI 帮你读懂一切：拍照 | 读图 | 翻译 | 提炼 | 分享」，通栏一条玻璃带，右端一枚 EN。</p>
+  </div>
+
+  <div class="cell">
+    <div class="ph a" id="f-a">
+      <div class="band">
+        <span class="dot"></span><span class="txt">拍照 · 截图 · 链接 → 一条笔记</span>
+        <span class="lang"><span class="dot"></span>EN</span>
+      </div>
+      <div class="tip bob">
+        <div class="hint">点这里<span class="sep">｜</span>选浮窗<span class="sep">｜</span><span class="k">我</span></div>
+        <svg class="finger" viewBox="0 0 26 34" aria-hidden="true">
+          <g fill="#F6C445" stroke="rgba(20,20,28,.28)" stroke-width="1.4" stroke-linejoin="round">
+            <rect x="9.5" y="1" width="9" height="19" rx="4.5"/>
+            <path d="M9 18h11a6 6 0 0 1 6 6v2a8 8 0 0 1-8 8H12a7 7 0 0 1-7-7v-3a6 6 0 0 1 4-5.7z"/>
+          </g>
+          <path d="M13 24v5M18 24v5" stroke="rgba(20,20,28,.30)" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+    <p class="cap"><span class="tag ok">甲</span><b>挂在带子下沿之外</b>（我推荐这一屏）。
+    那一行的高度、圆角、阴影、EN 的位子全不动 ⇒ 不会再犯"多出来的一行没算进几何预算"那条错（§8.353 就是这么红过一次的）。
+    提示那一枚压在墙上，手指从它顶边伸出去、穿过玻璃带下半截点住三个点（那一段带子里是空的，不挡任何字），整块 0.9 秒上下动一档（行程 14rpx）。</p>
+  </div>
+
+  <div class="cell">
+    <div class="ph b" id="f-b">
+      <div class="band">
+        <span class="dot"></span><span class="txt">拍照 · 截图 · 链接 → 笔记</span>
+        <span class="hint" style="display:inline-block;margin-left:auto;align-self:center">点这里<span class="sep">｜</span>选浮窗<span class="sep">｜</span><span class="k">我</span></span>
+        <span class="lang"><span class="dot"></span>EN</span>
+      </div>
+    </div>
+    <p class="cap"><span class="tag warn">乙</span><b>并进那一行</b>（带子里，不换行）。
+    <b>这一屏我没画手指，因为竖不进去</b>：那条带子只有 40.2px 高，一枚手指要 46px，
+    放进去就压住那行字；小程序也画不到导航条上面去。而且提示枚右沿离 EN 左沿只剩
+    <b>6.0px</b>（下面读数有），短句再长一点就撞上。<b>结论：乙不成立。</b></p>
+  </div>
+
+  <div class="cell">
+    <div class="ph c" id="f-c">
+      <div class="band">
+        <span class="dot"></span><span class="txt">拍照 · 截图 · 链接 → 一条笔记</span>
+        <span class="lang"><span class="dot"></span>EN</span>
+      </div>
+      <div class="hole"></div>
+      <div class="tip bob">
+        <div class="hint">点这里<span class="sep">｜</span>选浮窗<span class="sep">｜</span><span class="k">我</span></div>
+        <svg class="finger big" viewBox="0 0 26 34" aria-hidden="true">
+          <g fill="#F6C445" stroke="rgba(20,20,28,.28)" stroke-width="1.4" stroke-linejoin="round">
+            <rect x="9.5" y="1" width="9" height="19" rx="4.5"/>
+            <path d="M9 18h11a6 6 0 0 1 6 6v2a8 8 0 0 1-8 8H12a7 7 0 0 1-7-7v-3a6 6 0 0 1 4-5.7z"/>
+          </g>
+          <path d="M13 24v5M18 24v5" stroke="rgba(20,20,28,.30)" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+    <p class="cap"><span class="tag">丙</span><b>一次性引导</b>：只在头一次进这一屏时盖一层，
+    右上角那三个点挖空亮着，其余压暗，手指放大一档；点任意处就消失、本机记一次不再来。
+    最清楚，也最容易招人烦。<b>常驻（甲）还是只提一次（丙），这一格归你拍。</b></p>
+  </div>
+</div>
+
+<h2>那一行的话术（宽度是渲染端现读的，不是我估的）</h2>
+<table id="tbl-copy">
+  <tr><th>号</th><th>中文</th><th>英文（这一行有 EN 态，必须配一句）</th><th>现读宽</th><th>备注</th></tr>
+</table>
+<p class="note"><b>「16 国语言」这一句我现在不能替你写上去。</b>
+正本 <span class="s">docs/规格-多语言整理成中文.md</span> §4 写死了：那句"16 种语言实测通过"<b>跑后的读数一条都没有</b>
+（探针 <span class="s">backend/probes/multilingual_zh_probe.py</span> 在、16 种语料齐，但仓库里查不到那次跑的任何记录），
+所以"现在不许写、不许说，包括对外文案"。<b>要写就先拿读数</b>：服务器上跑那一趟 ≈ 3 分钟 + 36 次送检
+（未上架每天只有 100 次，只用 deploy-test 那个账号，建的笔记删净）。
+——这不是我砍你那条需求，是它现在确实是半句假话；跑完就有数，我立刻把它写进甲那一行。</p>
+
+<h2>提示那一枚的话术（"我"那一个字我没读懂，两版都摆上）</h2>
+<table id="tbl-hint">
+  <tr><th>号</th><th>中文</th><th>英文</th><th>现读宽</th><th>备注</th></tr>
+</table>
+<p class="note">我的两种读法：① <b>三拍</b>＝「点这里 ｜ 选浮窗 ｜ 我」，"我"＝图麦笔记自称，像一句口语收尾；
+② 那个"我"其实是你下一句「我[把]原在这一行的文字压缩」的开头，提示词只有两拍「点这里 ｜ 选浮窗」。
+<b>指不出你点到哪一个，所以两版都在表里，你点一号。</b>另外「浮窗」那两个字是微信菜单里原来的叫法，
+照抄它比写"收到浮窗"好认。</p>
+
+<h2>读数（这一页自己量的）</h2>
+<pre id="out">量取中…</pre>
+
+<h2>落码之前先说清的四条（都不是设计问题，是实现口径）</h2>
+<p class="note">
+① <b>手指的 x 不许写死。</b>那三个点的位子每台机不一样（刘海机、iPad、安卓各一档），
+要用 <span class="s">wx.getMenuButtonBoundingClientRect()</span> 现算——这个口全仓库现在<b>一处都没用过</b>（我 grep 过），
+落码时新加一次。<br>
+② <b>压在照片上那一枚要跟着判深浅。</b>现网那三枚各按自己那块矩形判一次深浅（<span class="s">create.js:408 toneRects()</span>），
+照片那一块要是深墙，暗胶囊＋纸白字才读得动；这一枚得进那份名单，不然就是 §8.240 量出来的那一档（纸白压浅玻璃 2.35～2.79:1）。<br>
+③ <b>动效只动它自己。</b>上下动 7px 用 CSS keyframes 就够了，不许顺手给那一行加 transition——
+带着一层 <span class="s">backdrop-filter</span> 的玻璃带一旦参与动画，模拟器与真机的帧率差会让它读成"抖"。<br>
+④ <b>英文态那一句必须一起给。</b>这一屏有 EN 切换，提示枚要是只有中文，英文用户就看到一行汉字
+（<span class="s">验-中英文缺口</span> 那把尺子当场红）。
+</p>
+
+<script>
+const R = (el) => el ? el.getBoundingClientRect() : null;
+const doc = document;
+const lines = [];
+
+function measure(t) {
+  const s = doc.createElement('span');
+  s.style.cssText = 'position:absolute;left:-9999px;white-space:nowrap;font:12px/1.35 -apple-system,"PingFang SC",sans-serif';
+  s.textContent = t; doc.body.appendChild(s);
+  const w = +R(s).width.toFixed(1); s.remove(); return w;
+}
+function measure9(t) {
+  const s = doc.createElement('span');
+  s.style.cssText = 'position:absolute;left:-9999px;white-space:nowrap;font:9px/1.25 -apple-system,"PingFang SC",sans-serif';
+  s.textContent = t; doc.body.appendChild(s);
+  const w = +R(s).width.toFixed(1); s.remove(); return w;
+}
+
+const COPIES = [
+  ['现网', '用 AI 帮你读懂一切：拍照 | 读图 | 翻译 | 提炼 | 分享', 'AI reads it for you: shoot · read · translate · distill · share', '你 10-14 定那一句，最长的一版', measure],
+  ['甲', '拍照 · 截图 · 链接 → 一条笔记', 'Shoot · snap · link → one note', '只说"丢进来变笔记"这一件，人人懂', measure],
+  ['乙', '拍照 · 截图 · 网页链接，转成笔记', 'Photos, screenshots and links become notes', '最白话，也最长', measure],
+  ['丙', '拍照 · 截图 · 链接 → 笔记｜16 国语言', 'Shoot · snap · link → note | 16 languages', '带你要那半句，但"16 国"现在没读数 ⇒ 不许上屏', measure],
+];
+const HINTS = [
+  ['A', '点这里｜选浮窗｜我', 'Tap here · Float · Me', '照你原话那一版', measure9],
+  ['B', '点这里｜选浮窗', 'Tap here · Floating window', '两拍；「浮窗」照抄微信菜单里那两个字', measure9],
+  ['C', '点这里，收进浮窗随时回来', 'Tap here to keep us one tap away', '一句话说完用途，最长', measure9],
+];
+function fill(id, rows) {
+  const t = doc.getElementById(id);
+  rows.forEach((r) => {
+    const tr = doc.createElement('tr');
+    tr.innerHTML = '<td class="s">' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] +
+      '</td><td class="s">中 ' + r[4](r[1]) + 'px<br>英 ' + r[4](r[2]) + 'px</td><td>' + r[3] + '</td>';
+    t.appendChild(tr);
+  });
+}
+fill('tbl-copy', COPIES); fill('tbl-hint', HINTS);
+
+// 2D 相交判定：只在两块真的上下都重叠时才算"压上了"（甲那一枚在带子下面一行，横向重叠不算）。
+const box = (el, pb) => { const r = R(el); return {
+  l: +(r.left - pb.left).toFixed(1), r: +(r.right - pb.left).toFixed(1),
+  t: +(r.top - pb.top).toFixed(1), b: +(r.bottom - pb.top).toFixed(1) }; };
+const cross = (a, b) => !(a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t);
+
+[['a', '甲'], ['b', '乙'], ['c', '丙']].forEach(([k, nm]) => {
+  const ph = doc.getElementById('f-' + k), pb = R(ph);
+  const band = box(ph.querySelector('.band'), pb), txt = box(ph.querySelector('.txt'), pb),
+        lang = box(ph.querySelector('.lang'), pb), tip = box(ph.querySelector('.hint'), pb),
+        fin = (ph.querySelector('.finger') && getComputedStyle(ph.querySelector('.finger')).display !== 'none')
+              ? box(ph.querySelector('.finger'), pb) : null;
+  const out = [];
+  out.push(nm + ' 提示枚 ' + tip.l + '→' + tip.r + ' × ' + tip.t + '→' + tip.b);
+  out.push('与短句' + (cross(tip, txt) ? '【压上了】' : '不碰') +
+           '（横向余 ' + (tip.l - txt.r).toFixed(1) + 'px、纵向余 ' + (tip.t - txt.b).toFixed(1) + 'px）');
+  out.push('与 EN ' + (cross(tip, lang) ? '【压上了】' : '不碰') +
+           '（横向余 ' + (lang.l - tip.r).toFixed(1) + 'px）');
+  out.push(fin ? '手指中轴 ' + ((fin.l + fin.r) / 2).toFixed(1) + '（三个点 278.5，差 ' +
+               (((fin.l + fin.r) / 2) - 278.5).toFixed(1) + 'px）· 指尖离胶囊底 ' +
+               (fin.t - 87.0).toFixed(1) + 'px · 手指与带子' + (cross(fin, band) ? '叠' : '不叠')
+             : '手指放不下（带子 ' + (band.b - band.t).toFixed(1) + 'px 高，一枚手指要 46px）');
+  out.push('右沿离屏 ' + (375 - tip.r).toFixed(1) + 'px');
+  lines.push(out.join(' · '));
+});
+doc.getElementById('out').textContent =
+  '屏宽 375px（1rpx = 0.5px）· 玻璃带 80.4rpx = 40.2px · 字 24rpx = 12px · 内边距 12px · 圆角 40rpx = 20px\n' +
+  '胶囊（实拍量的）x 255.4–348.8、y 53.8–87.0 ⇒ 三个点那半区中轴 ≈ 278.5\n' +
+  '那一行可写宽 = 375 − 2×12 − 点 11 − EN 31.3 = 307.7px\n\n' + lines.join('\n');
+</script>
+</body></html>
