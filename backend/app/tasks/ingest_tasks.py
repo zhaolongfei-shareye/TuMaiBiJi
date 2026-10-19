@@ -110,8 +110,31 @@ def _load_task_user(db, task_id: str, user_id: str, generation):
 
 # 认不出字那一趟自动起的标题（站长 10-19 的原话形状）：「阿麦图片笔记 101901」。
 IMAGE_NOTE_FALLBACK_NAME = "我的"
+# 一个都没认出来时写进摘要那格的话（站长 10-19：「完全识别不了，也不要空白字段，默认写"图册"」）。
+IMAGE_NOTE_PLACEHOLDER = "图册"
+# 认出的字数少于这个数就降档（站长 10-19：「字数少于 5 个字也一样降档」）。数法他点甲：
+# **去掉所有空白之后数字符**，中英文数字一律一个字符算一字，标点算字符（不是按"词"数）。
+MIN_OCR_CHARS = 5
 IMAGE_NOTE_TAIL = re.compile(r"图片笔记 (\d{4})(\d{2,})$")
 CN_TZ = timezone(timedelta(hours=8))
+
+
+def _meaningful_chars(text: str) -> int:
+    """那把尺子：去掉所有空白（空格、换行、制表）之后剩多少个字符。
+
+    阈值和写进摘要的那份**必须是同一个读法**，否则会出现"数出来 4 个、屏上写着 5 个"这种
+    没人能解释的差。标点照旧算——它跟着那几个字一起进摘要，不另外处理。
+    """
+    return len(re.sub(r"\s+", "", text or ""))
+
+
+def _fold_blank(text: str) -> str:
+    """把内部连续空白压成一个空格、首尾去掉：换行在 `<view>` 里本来就会被折成空格。
+
+    英文那一路不能学计数那样全删——`OK 3` 数出来 4 个字符要降档，但写出来还得是 `OK 3`，
+    不是 `OK3`。
+    """
+    return re.sub(r"\s+", " ", (text or "").strip())
 
 
 def _cn_day_window(now: datetime) -> tuple[datetime, datetime, str]:
@@ -312,15 +335,16 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
         set_task_status(task_id, "processing")
 
         ocr_text = asyncio.run(ocr_images(images_data))
-        if not ocr_text.strip():
+        if _meaningful_chars(ocr_text) < MIN_OCR_CHARS:
             # 站长 10-19「图片提炼无法识别文字不要直接报错，直接降档为贴图笔记，标题默认提取用户名称，
-            # 组装成名称+图片笔记+日期+序号」。改之前这一格是 `failed` ＋「OCR 未识别到文字内容」，
-            # 真正的代价不在那句红字上，在**图也一起没了**：客户端那条 B 链拿不到 note_id 就走
-            # `_settleBackup(null, …)`，把刚传进云的原件当孤儿删掉（pages/create/create.js:1002）。
-            # 现在照建一篇，正文／摘要／要点三格留空（`notes` 表里三列都可空，只有 title 非空），
-            # 标题由 `_image_note_title` 现读名称与当天尾号组装。
+            # 组装成名称+图片笔记+日期+序号」，当天补的半句「字数少于 5 个字也一样降档，然后字自动写入
+            # 其他空白字段，如果完全识别不了，也不要空白字段，默认写"图册"」。改之前这一格是 `failed` ＋
+            # 「OCR 未识别到文字内容」，真正的代价不在那句红字上，在**图也一起没了**：客户端那条 B 链拿不到
+            # note_id 就走 `_settleBackup(null, …)`，把刚传进云的原件当孤儿删掉（pages/create/create.js:1002）。
+            # 摘要那一格填的是**认出来的那几个字本身**（他点：只写摘要这一格，原文与要点两栏继续不画），
+            # 一个都没认出来才落「图册」。
             # 图不在这条链上：它由客户端并行传完再 bind，服务端不知道那批图最后成没成，也不猜——
-            # 云没配那台上照旧会建出一篇只有标题的笔记，这与今天"提炼成功但云没配"是同一个形状。
+            # 云没配那台上照旧会建出一篇只有标题＋一句摘要的笔记，这与今天"提炼成功但云没配"是同一个形状。
             db = SessionLocal()
             try:
                 user = _load_task_user(db, task_id, user_id, generation)
@@ -329,6 +353,7 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
                 note = Note(
                     user_id=user_id,
                     title=_image_note_title(db, user_id, user, datetime.now(timezone.utc)),
+                    summary=_fold_blank(ocr_text) or IMAGE_NOTE_PLACEHOLDER,
                     source_type="screenshot",
                 )
                 db.add(note)

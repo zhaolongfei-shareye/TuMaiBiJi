@@ -13,6 +13,7 @@
 """
 import asyncio
 import os
+import re
 import sys
 from io import BytesIO
 
@@ -39,11 +40,22 @@ for suffix in ("", "-journal", "-wal", "-shm"):
 Base.metadata.create_all(bind=engine)
 
 
-def png_with_text() -> bytes:
+def png_with_text(text: str = "HELLO 12345") -> bytes:
     img = Image.new("RGB", (760, 220), "white")
     d = ImageDraw.Draw(img)
-    d.text((40, 90), "HELLO 12345", fill="black")
+    d.text((40, 90), text, fill="black")
     d.rectangle([36, 84, 250, 118], outline="black", width=2)
+    buf = BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+def png_short_text(text: str = "OK 3", scale: int = 10) -> bytes:
+    """先画小再按最近邻放大到 10 倍——试下来这种硬边短串仍然读回空，见下面 ⑤ 那段说明。"""
+    img = Image.new("L", (140, 34), 255)
+    d = ImageDraw.Draw(img)
+    d.text((8, 10), text, fill=0)
+    img = img.resize((img.width * scale, img.height * scale), Image.NEAREST)
     buf = BytesIO()
     img.save(buf, "PNG")
     return buf.getvalue()
@@ -101,6 +113,25 @@ row = db.get(Note, last[1]["note_id"]) if last[1] else None
 print(f"④ 有字那张的任务：{last[0]}｜回体带 image_only={bool((last[1] or {}).get('image_only'))}｜"
       f"库里那行 title={row.title!r}｜原文 {len(row.original_content or '')} 字")
 
+# ⑤ 短字那一档（1–4 个字符）：**合成图造不出来**，这里如实记下，不许它看起来像被覆盖了。
+# 试过默认字体、10 倍最近邻放大、28／48／72 号字，「OK 3」「AB」这种短串在 rapidocr 那里一律读回空串
+# ——检测模型要一整行才起得来（同一张画布上 10 个字符那行 ① 就读到了）。所以这一档落回"0 字"那一格，
+# 1–4 字那半条只能靠 pytest 里精确的替身钉（test_note_flows.py 那三条边界用例）。
+few = png_short_text("OK 3")
+expect_text = asyncio.run(ocr_images([few]))
+chars = len(re.sub(r"\s+", "", expect_text or ""))
+print(f"⑤ 短字这张，引擎读回 {expect_text!r}｜去空白 {chars} 个字符")
+statuses.clear()
+tasks.process_screenshots_task("e2e-4", UID, [few], generation=GEN)
+last = statuses[-1]
+row = db.get(Note, last[1]["note_id"]) if last[1] else None
+downgraded = bool((last[1] or {}).get("image_only"))
+print(f"   这一趟：{last[0]}｜image_only={downgraded}｜标题={row.title!r}｜摘要={row.summary!r}｜"
+      f"原文 {len(row.original_content or '')} 字｜要点 {row.key_points!r}")
+assert downgraded is (chars < 5), f"阈值判断与独立算出的字符数对不上：{chars} 个字符、降档={downgraded}"
+if chars == 0:
+    print("   ⇒ 读数落在「0 字」那一档（摘要写「图册」）。**1–4 字那一档这一趟没量到**，别把它记成覆盖。")
+
 print(f"收尾读数：库里 notes 共 {db.query(Note).count()} 行"
-      f"（对照那趟 1 行＋降档 2 行；降档那两行标题应带「阿麦」与同一个日期）")
+      f"（对照那趟 1 行＋降档 3 行；降档那几行标题应带「阿麦」与同一个日期）")
 db.close()

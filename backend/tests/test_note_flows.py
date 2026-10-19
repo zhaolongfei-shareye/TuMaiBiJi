@@ -233,10 +233,62 @@ class TestExtractionDegradation:
 
         note = db.get(Note, result["note_id"])
         assert note.source_type == "screenshot"  # 他点甲：来源那一格不动，仍念「截图识别」
-        assert not note.original_content and not note.summary and not note.key_points
+        # 他补的那半句：完全识别不了也不许留空白格——摘要那一格写「图册」，原文与要点两格照旧空着
+        assert note.summary == "图册", f"摘要那格该落「图册」，实读 {note.summary!r}"
+        assert not note.original_content and not note.key_points
         mmdd = tasks._cn_day_window(datetime.now(timezone.utc))[2]
         assert result["title"] == f"我的图片笔记 {mmdd}01"
         assert note.title == result["title"]
+
+    def test_few_chars_downgrade_and_fill_the_summary(self, worker, db):
+        """认出来不到 5 个字：一样降档，而那几个字本身写进摘要那一格（不再送去提炼）。"""
+        tasks, statuses, _, mp = worker
+        user = _fresh_user(db, "few-chars")
+        mp.setattr(tasks, "ocr_images", lambda images_data: asyncio.sleep(0, result="你好\n世界"))
+
+        async def fake_extract(text, fallback_title="", translate=None):
+            raise AssertionError(f"不到 5 个字这一趟不该进提炼：{text!r}")
+        mp.setattr(tasks, "extract_knowledge", fake_extract)
+
+        tasks.process_screenshots_task("t-few", str(user.id), [b"p"], generation=user.generation)
+        status, result = statuses[-1]
+        note = db.get(Note, result["note_id"])
+        mmdd = tasks._cn_day_window(datetime.now(timezone.utc))[2]
+        assert (status, result["image_only"]) == ("completed", True)
+        assert note.title == f"我的图片笔记 {mmdd}01"
+        assert note.summary == "你好 世界", f"换行折成一个空格后应写「你好 世界」，实读 {note.summary!r}"
+        assert not note.original_content and not note.key_points
+
+    def test_the_five_char_boundary_is_not_a_downgrade(self, worker, db):
+        """边界那一格钉死：去掉空白之后**正好 5 个字符**算认得出来，照旧走提炼。
+
+        `OK 3` 去空白 4 个字符 ⇒ 降档；`HELLO` 与 `a b c d e` 都是 5 个 ⇒ 老路。数法他点的是甲，
+        所以中英文数字一个字符算一字、空格不参与计数，不按词数。
+        """
+        tasks, statuses, _, mp = worker
+
+        async def fake_extract(text, fallback_title="", translate=None):
+            return {"title": "提炼给的标题", "summary": "提炼给的摘要",
+                    "key_points": ["要点"], "tags": []}
+        mp.setattr(tasks, "extract_knowledge", fake_extract)
+
+        for tid, ocr_out, want_downgrade in (
+            ("t-b4", "OK 3", True),          # 去空白 4 个字符 ⇒ 降档
+            ("t-b5", "HELLO", False),        # 正好 5 个字符 ⇒ 老路
+            ("t-b6", "a b c d e", False),    # 空格不参与计数，字符仍是 5 个 ⇒ 老路
+        ):
+            mp.setattr(tasks, "ocr_images",
+                       lambda images_data, _o=ocr_out: asyncio.sleep(0, result=_o))
+            statuses.clear()
+            user = _fresh_user(db, tid)
+            tasks.process_screenshots_task(tid, str(user.id), [b"p"], generation=user.generation)
+            status, result = statuses[-1]
+            note = db.get(Note, result["note_id"])
+            assert bool(result.get("image_only")) is want_downgrade, f"{ocr_out!r} 降档判断错位"
+            if want_downgrade:
+                assert note.summary == "OK 3"
+            else:
+                assert note.summary == "提炼给的摘要", f"{ocr_out!r} 五个字符该送去提炼"
 
     def test_image_note_seq_takes_max_existing_tail_plus_one(self, worker, db):
         """序号＝当天已有尾号取最大 +1（他点的正是这一条，不是数行数）。"""

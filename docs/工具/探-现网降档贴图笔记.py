@@ -116,12 +116,15 @@ try:
             expect_seq += 1
             print(f"  库里那一行：title={note.title!r}（独立重算的期望 {want!r}）"
                   f"｜source_type={note.source_type!r}｜原文 {len(note.original_content or '')} 字"
-                  f"｜摘要 {len(note.summary or '')} 字｜要点 {note.key_points!r}"
+                  f"｜摘要 {note.summary!r}｜要点 {note.key_points!r}"
                   f"｜imported_from {note.imported_from!r}")
             assert note.title == want, f"标题对不上：实读 {note.title!r} ≠ 期望 {want!r}"
             assert payload.get("image_only") is True
             assert note.source_type == "screenshot", "他点的是来源那一格不动"
-            assert not note.original_content and not note.summary
+            # 他补的那半句：完全识别不了也不许留空白格——纯白图这篇的摘要该落「图册」，
+            # 而原文与要点两格照旧空着（他点甲：只写摘要那一格）。
+            assert note.summary == "图册", f"纯白图这篇摘要该是「图册」，实读 {note.summary!r}"
+            assert not note.original_content and not note.key_points
             det = httpx.get(f"{BASE}/api/notes/{nid}", headers=H, timeout=30)
             print(f"  详情接口 HTTP {det.status_code}｜回体 title={det.json().get('title')!r}")
 finally:
