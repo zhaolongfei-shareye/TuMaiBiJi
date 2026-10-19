@@ -1,7 +1,7 @@
 {
  "template_id": "topBleedEdge",
- "label": "顶格描边",
- "label_en": "Bleed, Framed",
+ "label": "图文卡",
+ "label_en": "Photo & Text",
  "group_key": "classic",
  "sort_order": 180,
  "min_app_version": "2.3.18",

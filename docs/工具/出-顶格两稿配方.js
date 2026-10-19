@@ -5,7 +5,8 @@
 //   压在画布边上的那一半直接出画布，读出来只剩 1.5px，而且三边都这样 ⇒ 等于没有框。
 //   所以这一趟出两版，把"灰色边框"这一枚落到两个还能落的地方，让他挑：
 //     ① `topBleed`「满幅顶格」——灰线压在**照片底边**那一刀（照片与文字的分界），三边出血、只有这一条边有线；
-//     ② `topBleedEdge`「顶格描边」——灰框描在**整张卡的外沿**一圈，照片在框底下出血到顶。
+//     ② `topBleedEdge`「图文卡」——灰框描在**整张卡的外沿**一圈，照片在框底下出血到顶。**这一版他挑了，10-19 深夜定名「图文卡」**
+//        （我起的那个"顶格描边"是描述话、不是叫法；`label_en` 那枚 Photo & Text 仍是我起的，他没点过）。
 //
 // 两版都留着前面几趟已定的口径：整卡纸白、红框里那两行（分类·来源·日期／标签）撤着、
 // 字色一律走全局令牌（底不再随分类换档，见 §11.2 第 11 条）、`signRow` 显式 `onDark:false`。
@@ -96,7 +97,7 @@ function build(id, edgeFrame) {
 
 const ROWS = [
   { template_id: 'topBleed', label: '满幅顶格', label_en: 'Full Bleed Top', group_key: 'classic', sort_order: 170, min_app_version: MIN_APP, recipe: build('topBleed', false) },
-  { template_id: 'topBleedEdge', label: '顶格描边', label_en: 'Bleed, Framed', group_key: 'classic', sort_order: 180, min_app_version: MIN_APP, recipe: build('topBleedEdge', true) },
+  { template_id: 'topBleedEdge', label: '图文卡', label_en: 'Photo & Text', group_key: 'classic', sort_order: 180, min_app_version: MIN_APP, recipe: build('topBleedEdge', true) },
 ]
 
 fs.mkdirSync(OUT_DIR, { recursive: true })
