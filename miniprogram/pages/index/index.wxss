@@ -1002,7 +1002,8 @@
    三档数是照他附的那张视频号截图量的，不是挑的（量法与像素区间写在 docs/工具/出-详情窗抬头色块效果图.js 头上）：
      图区 高＝宽×0.5627 ⇒ 窗内通栏 702rpx 配 395rpx；圆点 11rpx；当前那枚是 25×11rpx 的横杠；点与点间距 6rpx。
    图区高是**定高**，所以不会有"图片盒子被夹扁"那一坑（只定宽不定高才需要 widthFix）；
-   `mode="aspectFill"` ＝ 铺满图区、竖图上下被裁（要左右留白那种就换 aspectFit，是一行的事）。
+   10-19 起里面是**两层**：底＝同照片 aspectFill＋blur，上＝aspectFit 完整放进来那张（站长：「图片展示不全，
+   改为按比例缩小，其他部分空间用同照片毛玻璃铺满」）。改之前是单层 aspectFill——竖图上下被裁掉一截。
    ⚠ 这一族挂在 `.ds-in` 外面：内缩 34rpx 一挂上左右就让出去了，那就不叫通栏。
    原来那排 180rpx 小方格（`.ix-shots`/`.ix-shot`）与头一排两列（`.ds-hero`）整套撤净。 */
 .ds-fig {
@@ -1011,11 +1012,35 @@
   height: 395rpx;
   margin-top: 24rpx;
   background: var(--accent-soft);
+  overflow: hidden;
+}
+
+/* 一层格子装两张图（底＋上）。swiper-item 自己的定位不靠它默认值，显式套一层。 */
+.ds-fig-cell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ds-fig-bg {
+  /* 外挪 6% ＋ 112% 见 wxml 那条注释：把模糊带出的渐隐圈推到盒子外。
+     高斯半径 30rpx 是"看得出是同一张照片糊了、又读不出第二张内容"那一档，要更糊只改这一个数。 */
+  position: absolute;
+  left: -6%;
+  top: -6%;
+  width: 112%;
+  height: 112%;
+  filter: blur(30rpx);
 }
 
 .ds-fig-img {
   /* 高跟盒子走同一个数（395rpx 只在 `.ds-fig` 写一遍）：两处各写一遍就是两个落点，
-     改一处忘另一处＝图与盒子之间露缝或撑破，而源码里那两行看着都还挺对。 */
+     改一处忘另一处＝图与盒子之间露缝或撑破，而源码里那两行看着都还挺对。
+     10-19 起这一张是**盒子那么大、图在里面居中留白**（aspectFit），被留白盖不住的那部分由 `.ds-fig-bg` 铺。 */
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 100%;
   height: 100%;
 }

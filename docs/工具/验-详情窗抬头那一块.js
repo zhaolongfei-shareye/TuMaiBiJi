@@ -16,8 +16,11 @@
 // ④ 没配图 ⇒ 图区＋数字＋那一排点三样全不渲染（不留占位框）。
 // ⑤ 数字与那一排点只在**多于一张**时出现；当前那一枚不是点，是横杠（宽与点不同、高相同）。
 // ⑥ 标签只剩名字：灰字、不垫底、不加粗。灰档吃现成的 `--text-tertiary`，不另造色号。
+// ⑦ 10-19 站长「图片展示不全，改为按比例缩小，其他部分空间用同照片毛玻璃铺满」⇒ 图区里是**两层**：
+//    底＝同一张 aspectFill ＋ blur 且比盒子大一圈，上＝aspectFit 完整那张。这一把钉三件会静默失效的事：
+//    上面那张又回 aspectFill（竖图又被裁）、底忘了糊（两层一样＝留白没填）、底与盒子同尺寸（模糊的渐隐露成一条脏边）。
 //
-// 最后一段是反向自证：故意造五处漂移，判据必须红——不然它只是在读文件，不是在守东西。
+// 最后一段是反向自证：故意造十一处漂移，判据必须红——不然它只是在读文件，不是在守东西。
 const fs = require('fs')
 const path = require('path')
 
@@ -129,9 +132,25 @@ const CSS = stripCss(IX_WXSS)
   ck('平台自带那排点关掉（我们要的是"当前那枚是横杠"，它给不了）',
     /indicator-dots="\{\{false\}\}"/.test(fig[0]))
   const img = /<image[^>]*class="ds-fig-img"[\s\S]*?\/>/.exec(WXML) || ['']
-  ck('大图 aspectFill（定高盒子里不被夹扁）＋点它还是拉全屏大图',
-    /mode="aspectFill"/.test(img[0]) && /catchtap="onPreviewDetailImage"/.test(img[0])
+  ck('大图 aspectFit（整张完整放进定高图区，不裁）＋点它还是拉全屏大图',
+    /mode="aspectFit"/.test(img[0]) && /catchtap="onPreviewDetailImage"/.test(img[0])
     && /data-url="\{\{im\.cloud_url\}\}"/.test(img[0]), img[0].replace(/\s+/g, ' ').slice(0, 70))
+  /* 10-19 他这一刀把"留白"换成了"同照片毛玻璃"：底必须与上是**同一张**（`im.cloud_url` 同一个绑定），
+     而且必须 aspectFill 铺满——底要是也 aspectFit，两层一样大、留白还是留白，那一刀等于没做。 */
+  const bg = /<image[^>]*class="ds-fig-bg"[\s\S]*?\/>/.exec(WXML) || ['']
+  ck('底那一层在：同一张 `im.cloud_url`、aspectFill 铺满（不是另找一张图、也不是纯色）',
+    /src="\{\{im\.cloud_url\}\}"/.test(bg[0]) && /mode="aspectFill"/.test(bg[0]),
+    bg[0].replace(/\s+/g, ' ').slice(0, 70))
+  ck('底真的糊了：`.ds-fig-bg` 带 filter:blur，且半径不是 0',
+    /filter:\s*blur\(\s*(?!0)\d/.test(rule(IX_WXSS, 'ds-fig-bg')), declOf(IX_WXSS, 'ds-fig-bg', 'filter'))
+  /* 模糊会在四边带出一圈半透明渐隐 ⇒ 底必须比盒子大（外挪＋放大，或 transform:scale）。
+     这一条钉的是"别露一条脏边"，不是钉 112% 这个数——写死数就会变成两处各写一遍。 */
+  const bgRule = ';' + rule(IX_WXSS, 'ds-fig-bg')
+  const bgPct = parseFloat((/width:\s*([\d.]+)%/.exec(bgRule) || [, '0'])[1])
+  ck('底比盒子大一圈（渐隐圈被推到盒子外，四边不露脏边）',
+    bgPct > 100 || /transform:\s*scale\(\s*1\./.test(bgRule), `width ${bgPct}%`)
+  ck('底不许吃点击（两层叠着，点上去还得是拉大图那一层）',
+    !/catchtap|bindtap/.test(bg[0]))
   const h = numOf(IX_WXSS, 'ds-fig', 'height')
   const wantH = Math.round(FULL_W * REF_RATIO)
   ck(`图区高就是量出来的那一个：窗内通栏 ${FULL_W}rpx × ${REF_RATIO} = ${wantH}rpx`,
@@ -226,13 +245,18 @@ const CSS = stripCss(IX_WXSS)
       图区高: n(C, 'ds-fig', 'height') === Math.round(FULL_W * REF_RATIO),
       图跟盒子: /height:\s*100%/.test(';' + r(C, 'ds-fig-img'))
         || n(C, 'ds-fig-img', 'height') === n(C, 'ds-fig', 'height'),
+      大图不裁: /class="ds-fig-img"[^>]*mode="aspectFit"/.test(W.replace(/\n\s*/g, ' ')),
+      糊底: /class="ds-fig-bg"[^>]*mode="aspectFill"/.test(W.replace(/\n\s*/g, ' '))
+        && /filter:\s*blur\(\s*(?!0)\d/.test(';' + r(C, 'ds-fig-bg'))
+        && parseFloat(((/width:\s*([\d.]+)%/.exec(';' + r(C, 'ds-fig-bg')) || [, '0'])[1])) > 100,
       横杠: n(C, 'ds-dot.on', 'width') > n(C, 'ds-dot', 'width'),
       标签: !/background:/.test(';' + r(C, 'ds-tag')),
       归零: /detailImages:\s*\[\],\s*dsFigAt:\s*0/.test(J) && /detailImages: \[\.\.\.\(list \|\| \[\]\), \.\.\.\(official \? \[official\] : \[\]\)\], dsFigAt: 0/.test(J),
     }
   }
   const base = preds(IX_WXML, IX_WXSS, IX_JS)
-  ck('反向自证的底：八处都不漂移时这把全绿', Object.values(base).every(Boolean), JSON.stringify(base))
+  ck(`反向自证的底：${Object.keys(base).length} 处都不漂移时这把全绿`,
+    Object.values(base).every(Boolean), JSON.stringify(base))
   const mut = (src, from, to) => {
     if (!src.includes(from)) throw new Error('反向自证的锚点没找到，那条测不了：' + from.slice(0, 46))
     return src.replace(from, to)
@@ -250,6 +274,13 @@ const CSS = stripCss(IX_WXSS)
       ['wxss', mut(IX_WXSS, '.ds-fig {\n  flex: none;\n  width: 100%;\n  height: 395rpx', '.ds-fig {\n  flex: none;\n  width: 100%;\n  height: 300rpx')], '图区高'],
     ['里面那张图自己写死一个数（盒子 395、图 300＝底下留缝，而两行看着都还挺对）',
       ['wxss', mut(IX_WXSS, 'width: 100%;\n  height: 100%;\n}', 'width: 100%;\n  height: 300rpx;\n}')], '图跟盒子'],
+    ['大图又改回 aspectFill（＝竖图上下又被裁一截，他这次要的就是这一句反着来）',
+      ['wxml', mut(IX_WXML, 'class="ds-fig-img" src="{{im.cloud_url}}" mode="aspectFit"',
+        'class="ds-fig-img" src="{{im.cloud_url}}" mode="aspectFill"')], '大图不裁'],
+    ['底那一层忘了糊（两层同一张同样铺满＝留白根本没被毛玻璃填上，这一刀等于没做）',
+      ['wxss', mut(IX_WXSS, 'filter: blur(30rpx);', 'filter: none;')], '糊底'],
+    ['底与盒子一样大（模糊带出的那圈渐隐露在四边上，读成一条脏边）',
+      ['wxss', mut(IX_WXSS, 'width: 112%;\n  height: 112%;', 'width: 100%;\n  height: 100%;')], '糊底'],
     ['横杠那一枚忘了加宽（当前那张与其余点同宽＝看不出现在第几张）',
       ['wxss', mut(IX_WXSS, '.ds-dot.on {\n  width: 25rpx', '.ds-dot.on {\n  width: 11rpx')], '横杠'],
     ['标签的底色被谁加回来（第二份皮）',

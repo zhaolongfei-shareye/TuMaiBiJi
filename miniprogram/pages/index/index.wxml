@@ -239,9 +239,17 @@
         <swiper class="ds-fig" current="{{dsFigAt}}" circular="{{false}}"
           indicator-dots="{{false}}" bindchange="onDsFigChange">
           <swiper-item wx:for="{{detailImages}}" wx:key="id" wx:for-item="im">
-            <image class="ds-fig-img" src="{{im.cloud_url}}" mode="aspectFill" lazy-load
-              catchtap="onPreviewDetailImage" data-url="{{im.cloud_url}}"
-              binderror="onRemoteImgError" data-slot="detail-sheet" data-src="{{im.cloud_url}}" />
+            <view class="ds-fig-cell">
+              <!-- 底那一层：同一张照片放大铺满＋高斯模糊（站长 10-19 原话「图片展示不全，改为按比例缩小，
+                   其他部分空间用同照片毛玻璃铺满」）。放大 12% 且左上各外挪 6% 不是装饰：模糊会把图自己
+                   边缘那一圈半透明渐隐带出来，不外推就露在图区四边上（读成"框了一条脏边"）。 -->
+              <image class="ds-fig-bg" src="{{im.cloud_url}}" mode="aspectFill" lazy-load />
+              <!-- 上面那张按宽或按高取小的一边完整放进 395rpx 的图区（aspectFit＝不裁，剩下的交给底）。
+                   点它还是拉全屏大图，这条没改。 -->
+              <image class="ds-fig-img" src="{{im.cloud_url}}" mode="aspectFit" lazy-load
+                catchtap="onPreviewDetailImage" data-url="{{im.cloud_url}}"
+                binderror="onRemoteImgError" data-slot="detail-sheet" data-src="{{im.cloud_url}}" />
+            </view>
           </swiper-item>
         </swiper>
         <!-- 只有一张：数字与那一排点都不画（一条没有"下一张"的滑动条是噪音）。这条他没拍过，写在报告里。 -->
