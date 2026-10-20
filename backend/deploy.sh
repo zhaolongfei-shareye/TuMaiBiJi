@@ -224,6 +224,21 @@ if int(seq_val) < int(gen_max):
           "users 被删空之后取出的号会撞上旧 token（旧钥匙开得了新人的门）")
     raise SystemExit(1)
 print(f"  ✓ generation_seq 那一格 = {seq_val}（≥ 库里最高代次 {gen_max}）")
+# assets.sort_order 是"编辑那一屏拖动配图"唯一的落点（迁移 a4d7e2b91c58，2026-10-19）。
+# 少了这一列，读那一组缩略图的 `order_by_note()` 会在**第一条请求**上炸 no such column——
+# 症状不是"排序不生效"，是详情窗/列表封面/卡片大图位三处一起 500。
+# 存量行必须全是 0（0 的语义＝"从没手动排过"，排序退回 id 升序），否则升级当天会把他
+# 某篇的头图悄悄换成另一张——他没拖任何东西。这条正反都钉在 tests/test_asset_order.py。
+asset_cols = {c["name"] for c in insp.get_columns("assets")}
+if "sort_order" not in asset_cols:
+    print("  ✗ assets 缺 sort_order（迁移 a4d7e2b91c58 没跑到）：配图三处读图口当场 500")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    nonzero = conn.execute(text("SELECT COUNT(*) FROM assets WHERE sort_order <> 0")).scalar()
+if nonzero:
+    print(f"  ✗ 升级之后有 {nonzero} 行 sort_order 不是 0：头图会在没人拖动的情况下换掉")
+    raise SystemExit(1)
+print("  ✓ assets.sort_order 到位（存量行全为 0＝升级当天不换任何一篇的头图）")
 print("  ✓ users.quota_bonus / users.invited_by / users.generation / users.contact_email / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / note_cards（含「一篇一张」那条部分唯一索引）/ user_profiles（含「一人一份」那条唯一索引）/ 一篇笔记一张有效码的索引 / generation_seq（代次水位线，含「那一格不许落后库里代次」那条不变量） 到位")
 PY
 if [[ $? -ne 0 ]]; then
