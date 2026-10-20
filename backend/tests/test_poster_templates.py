@@ -66,14 +66,16 @@ def me(db):
 
 def good_recipe():
     """能画出东西的最小配方。每条"故意写坏"的用例都是从它改一个地方来的——
-    不然一条坏配方红得可能是因为另一处本来就写错了，那这条判据就没牙了。"""
+    不然一条坏配方红得可能是因为另一处本来就写错了，那这条判据就没牙了。
+    起手那笔（steps[2]）是 10-20 N11 那道闸门要的整幅底：w/h 必须取 var W／var height，
+    写死数字在这里过不了。"""
     return {
         "id": "t",
         "min_version": 1,
         "steps": [
             {"let": "s", "value": {"prim": "scheme", "args": {"name": "pop", "categoryId": 1}}},
             {"let": "lines", "value": {"prim": "fitLines", "args": {"text": {"var": "note.title"}, "maxW": 600, "n": 2, "size": 40}}},
-            {"emit": {"k": "fill", "x": 0, "y": 0, "w": 750, "h": 900, "color": {"var": "s.bg"}}},
+            {"emit": {"k": "fill", "x": 0, "y": 0, "w": {"var": "W"}, "h": {"var": "height"}, "color": {"var": "s.bg"}}},
             {"emit": {"k": "text", "x": 40, "y": 120, "lines": {"var": "lines"}, "size": 40}},
             {"emit": {"k": "grad", "x": 0, "y": 0, "w": 750, "h": 400, "c1": {"var": "s.c1"}, "c2": {"var": "s.c2"},
                       "stops": [{"obj": {"at": 0, "color": {"var": "s.c1"}}}, {"obj": {"at": 1, "color": {"var": "s.c2"}}}]}},
@@ -138,41 +140,76 @@ def test_hash两边算出来是同一个串():
 # ---------------------------------------------------------------- 三、坏配方逐条要拦
 
 CASES = [
-    ("未知 op", break_it(lambda r: r["steps"][2]["emit"].__setitem__("k", "notAnOp"))),
-    ("未知字段", break_it(lambda r: r["steps"][2]["emit"].__setitem__("radius", 8))),
-    ("未知原语", break_it(lambda r: r["steps"][0].__setitem__("value", {"prim": "noSuchPrim", "args": {}}))),
-    ("原语参数名写错", break_it(lambda r: r["steps"][0]["value"]["args"].__setitem__("style", "pop"))),
-    ("未知算子", break_it(lambda r: r["steps"][5].__setitem__("value", {"pow": [2, 3]}))),
-    ("变长算子空参数", break_it(lambda r: r["steps"][5].__setitem__("value", {"+": []}))),
-    ("定长算子多给一个", break_it(lambda r: r["steps"][5].__setitem__("value", {"/": [1, 2, 3]}))),
-    ("没 let height", break_it(lambda r: r["steps"].pop(5))),
-    ("解释器版本太新", break_it(lambda r: r.__setitem__("min_version", 99))),
-    ("步型不认识", break_it(lambda r: r["steps"].append({"repeat": {"times": 3, "do": []}}))),
-    ("多键的一步", break_it(lambda r: r["steps"].append({"emit": {"k": "fill"}, "let": "x"}))),
-    ("each 少了 as", break_it(lambda r: r["steps"].append({"each": {"over": {"var": "lines"}, "do": []}}))),
+    # 每条都带"必须是哪一句红"：10-20 加了"第一笔得是整幅底"那道闸门（N11）之后，
+    # 只验"有报错"就分不清是名单咬的还是闸门咬的——跟客户端那把尺子同一个规矩。
+    ("未知 op", break_it(lambda r: r["steps"][2]["emit"].__setitem__("k", "notAnOp")), "notAnOp"),
+    ("未知字段", break_it(lambda r: r["steps"][2]["emit"].__setitem__("radius", 8)), "没有字段「radius」"),
+    ("未知原语", break_it(lambda r: r["steps"][0].__setitem__("value", {"prim": "noSuchPrim", "args": {}})), "noSuchPrim"),
+    ("原语参数名写错", break_it(lambda r: r["steps"][0]["value"]["args"].__setitem__("style", "pop")), "没有参数「style」"),
+    ("未知算子", break_it(lambda r: r["steps"][5].__setitem__("value", {"pow": [2, 3]})), "不认的算子「pow」"),
+    ("变长算子空参数", break_it(lambda r: r["steps"][5].__setitem__("value", {"+": []})), "算子「+」至少要一个参数"),
+    ("定长算子多给一个", break_it(lambda r: r["steps"][5].__setitem__("value", {"/": [1, 2, 3]})), "算子「/」要 2 个参数"),
+    ("没 let height", break_it(lambda r: r["steps"].pop(5)), "必须有一步 let 出 height"),
+    ("解释器版本太新", break_it(lambda r: r.__setitem__("min_version", 99)), "版解释器"),
+    ("步型不认识", break_it(lambda r: r["steps"].append({"repeat": {"times": 3, "do": []}})), "不认的步型"),
+    ("多键的一步", break_it(lambda r: r["steps"].append({"emit": {"k": "fill"}, "let": "x"})), "let 那一步里多了 emit"),
+    ("each 少了 as", break_it(lambda r: r["steps"].append({"each": {"over": {"var": "lines"}, "do": []}})), "each 少了 as"),
     ("死 else 分支里藏坏 op", break_it(lambda r: r["steps"].append(
-        {"if": {"cond": {"truthy": False}, "then": [], "else": [{"emit": {"k": "ghost", "x": 0}}]}}))),
-    ("obj 给的是数组", break_it(lambda r: r["steps"][4]["emit"].__setitem__("stops", [{"obj": [0, 1]}]))),
+        {"if": {"cond": {"truthy": False}, "then": [], "else": [{"emit": {"k": "ghost", "x": 0}}]}})), "ghost"),
+    ("obj 给的是数组", break_it(lambda r: r["steps"][4]["emit"].__setitem__("stops", [{"obj": [0, 1]}])), "obj 得是个键值对象"),
     ("obj 值里藏未知算子", break_it(lambda r: r["steps"][4]["emit"].__setitem__("stops",
-        [{"obj": {"at": 0, "color": {"nope": 1}}}]))),
+        [{"obj": {"at": 0, "color": {"nope": 1}}}])), "不认的算子「nope」"),
     ("prim 那一项多带一个键", break_it(lambda r: r["steps"][0].__setitem__("value",
-        {"prim": "blockName", "args": {}, "extra": 1}))),
-    ("var 不是名字", break_it(lambda r: r["steps"][3]["emit"].__setitem__("lines", {"var": 7}))),
-    ("配方不是对象", {"id": "t", "min_version": 1, "steps": "不是数组"}),
-    ("emit 没写 k", break_it(lambda r: r["steps"][2]["emit"].pop("k"))),
+        {"prim": "blockName", "args": {}, "extra": 1})), "原语那一项里多了 extra"),
+    ("var 不是名字", break_it(lambda r: r["steps"][3]["emit"].__setitem__("lines", {"var": 7})), "var 得是个名字"),
+    ("配方不是对象", {"id": "t", "min_version": 1, "steps": "不是数组"}, "steps 得是非空数组"),
+    ("emit 没写 k", break_it(lambda r: r["steps"][2]["emit"].pop("k")), "（没写 k）"),
+    # ---- N11 那两条新闸门（客户端 posterRecipe.js 的 validate 同文同序）----
+    ("一笔都不落", break_it(lambda r: r.__setitem__(
+        "steps", [{"let": "height", "value": 900}, {"let": "s", "value": {"lit": 1}}])), "没有一笔真的落笔"),
+    ("起手那笔不铺满整张", break_it(lambda r: r["steps"][2]["emit"].__setitem__("w", 750)), "第一笔不是盖住整张卡的底"),
+    ("起手那笔是带圆角的 rrect（字段表含 r，铺不满）", break_it(lambda r: r.__setitem__("steps", [
+        r["steps"][0], r["steps"][1],
+        {"emit": {"k": "rrect", "x": 0, "y": 0, "w": {"var": "W"}, "h": {"var": "height"}, "r": 6, "fill": {"var": "s.bg"}}},
+        r["steps"][5]])), "第一笔不是盖住整张卡的底"),
+    ("起手那笔是 emitOne（几何要跑出来才知道，静态证不了铺满）", break_it(lambda r: r.__setitem__("steps", [
+        r["steps"][0], r["steps"][1],
+        {"emitOne": {"lit": {"k": "fill", "x": 0, "y": 0, "w": 750, "h": 900, "color": "#fff"}}},
+        r["steps"][5]])), "第一笔不是盖住整张卡的底"),
 ]
 
 
-@pytest.mark.parametrize("名字,配方", CASES, ids=[c[0] for c in CASES])
-def test_坏配方逐条拦得住(名字, 配方):
-    assert validate_recipe(配方), f"「{名字}」这条居然放行了"
+@pytest.mark.parametrize("名字,配方,应当报", CASES, ids=[c[0] for c in CASES])
+def test_坏配方逐条拦得住(名字, 配方, 应当报):
+    errs = validate_recipe(配方)
+    assert errs, f"「{名字}」这条居然放行了"
+    assert any(应当报 in e for e in errs), f"「{名字}」红是红了，报的却是别的：{errs}"
+
+
+def test_坏配方每条各自只越一条线():
+    # 上面那批必须"只因为自己那一句红"：夹具改坏了别处，那条判据就没在测它说的那件事。
+    # 唯一例外是"起手不铺满"那三条——它们同时也会让别的检查失效，所以这里按条数放宽到 ≤2。
+    for 名字, 配方, 应当报 in CASES:
+        errs = validate_recipe(配方)
+        assert len(errs) <= 2, f"「{名字}」一次报出 {len(errs)} 条：{errs}"
 
 
 def test_改一个数字之后照样是好的():
     # 反向对照：上面那一堆红必须是"名单拦的"，不是"这份最小配方本来就不通"。
+    # 动的是第二层那笔的坐标和 height，不是起手那笔的 w／h（那两个只许取 var W／var height）。
     r = good_recipe()
     assert validate_recipe(r) == []
-    r["steps"][2]["emit"]["w"] = 700
+    r["steps"][3]["emit"]["x"] = 60
+    r["steps"][5]["value"] = 1000
+    assert validate_recipe(r) == []
+
+
+def test_起手那笔改回整幅底就放行():
+    # 反向对照 N11：这条闸门不是"见 emit 就咬"，是只认那一笔字面量写法的整幅底。
+    r = good_recipe()
+    r["steps"][2]["emit"]["w"] = 750
+    assert any("第一笔不是" in e for e in validate_recipe(r))
+    r["steps"][2]["emit"]["w"] = {"var": "W"}
     assert validate_recipe(r) == []
 
 

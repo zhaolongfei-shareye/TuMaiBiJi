@@ -105,11 +105,15 @@ exports.main = async (event) => {
   try {
     parsed = JSON.parse(content)
   } catch (e) {
+    // 认不出 JSON ≠ 提炼成功：这一支的摘要就是原文前 500 字、要点标签全空。
+    // 不带这个标记，后端 `services/llm.py` 那句 `result.setdefault("degraded", False)`
+    // 会把"只是没提炼"记成"提炼成功"。字段名与口径照 llm.py 里 `_degraded` 那一份，不另立一名。
     return {
       title: (fallbackTitle || '未命名笔记').trim().slice(0, 500),
       summary: content.slice(0, 500),
       key_points: [],
       tags: [],
+      degraded: true,
     }
   }
 

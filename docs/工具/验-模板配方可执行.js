@@ -120,22 +120,26 @@ ok('配方里改一个数（pad 52→70）成品高度真的变了', moved.heigh
 const throws = (fn) => { try { fn(); return false } catch (e) { return e } }
 // staticToo=false：变量名对不对这种事静态查不出来（要跑过才知道有没有算出来），
 // 那类只钉"跑的时候抛"，其余一律两条都钉。
-const strictRejects = (mutate, name, staticToo) => {
+// expect：这条必须是因为它自己那句红。10-20 加了"第一笔得是整幅底"那道闸门（审计 N11）之后，
+// 拿 quote 当底本改坏任意一笔都可能顺带把起手那笔也改没了——只验"有报错"就成了假绿。
+const strictRejects = (mutate, name, staticToo, expect) => {
   const r = quoteRecipe()
   mutate(r)
   const errs = validateIt(r)
   const caught = throws(() => poster.planFromRecipe(ctx, d, r))
-  ok(name, !!caught && (staticToo === false || errs.length > 0), errs[0] || (caught && caught.message) || '')
+  const why = errs.join('；') || (caught && caught.message) || ''
+  ok(name, !!caught && (staticToo === false || errs.length > 0) && (!expect || expect.test(why)),
+    expect && expect.test(why) ? '' : why)
 }
 
-strictRejects((r) => { r.steps.find((s) => s.emit && s.emit.k === 'fill').emit.k = 'squircle' }, '未知绘制 op：静态检查报出来、跑的时候抛')
-strictRejects((r) => { r.steps.find((s) => s.emit && s.emit.k === 'fill').emit.shadowBlur = 10 }, 'op 里没有的字段（fill 不能带 shadowBlur）报出来')
-strictRejects((r) => { r.steps[0] = { let: 'x', value: { prim: 'doSomethingEvil', args: {} } } }, '名单外的原语报出来')
-strictRejects((r) => { r.steps[0] = { let: 'x', value: { pow: [{ var: 'W' }, 2] } } }, '名单外的算子报出来')
-strictRejects((r) => { r.steps[0] = { let: 'x', value: { '+': [] } } }, '空的变长算子（{"+":[]} 会算成 0）报出来')
+strictRejects((r) => { r.steps.find((s) => s.emit && s.emit.k === 'fill').emit.k = 'squircle' }, '未知绘制 op：静态检查报出来、跑的时候抛', null, /squircle/)
+strictRejects((r) => { r.steps.find((s) => s.emit && s.emit.k === 'fill').emit.shadowBlur = 10 }, 'op 里没有的字段（fill 不能带 shadowBlur）报出来', null, /shadowBlur/)
+strictRejects((r) => { r.steps[0] = { let: 'x', value: { prim: 'doSomethingEvil', args: {} } } }, '名单外的原语报出来', null, /doSomethingEvil/)
+strictRejects((r) => { r.steps[0] = { let: 'x', value: { pow: [{ var: 'W' }, 2] } } }, '名单外的算子报出来', null, /pow/)
+strictRejects((r) => { r.steps[0] = { let: 'x', value: { '+': [] } } }, '空的变长算子（{"+":[]} 会算成 0）报出来', null, /\+/)
 strictRejects((r) => { r.steps[0] = { let: 'x', value: { var: 'notThere.yet' } } }, '还没算出来的变量：跑的时候抛', false)
-strictRejects((r) => { r.steps.forEach((s) => { if (s.let === 'height') s.let = 'h' }) }, '没有 let height 这一步就报（画布高度只许这一处说）')
-strictRejects((r) => { r.min_version = 99 }, '配方要的解释器版本比这台客户端新 → 报')
+strictRejects((r) => { r.steps.forEach((s) => { if (s.let === 'height') s.let = 'h' }) }, '没有 let height 这一步就报（画布高度只许这一处说）', null, /height/)
+strictRejects((r) => { r.min_version = 99 }, '配方要的解释器版本比这台客户端新 → 报', null, /版/)
 
 // 死分支里藏错误：这一篇笔记不走 else，但静态检查必须照样抓到
 strictRejects((r) => {
@@ -173,11 +177,15 @@ ok('换回来之后包内那份配方又是好的（这条是给上一条兜底�
   validateIt(RECIPES.quote).length === 0, validateIt(RECIPES.quote)[0] || '')
 
 // 步型覆盖：quote 没碰到的 emitOne / each / lit，用一份合成配方打一遍
+// 起手那笔是 10-20 那道新闸门（N11）要的整幅底：包外合成的配方也得照着规矩来，
+// 不然红的是闸门不是步型本身。加了这一笔，下面所有 layers 下标整体往后挪一位。
+const BASE = () => ({ emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: '#ffffff' } })
 const synth = {
   id: 'synth',
   min_version: 1,
   steps: [
     { let: 'height', value: 400 },
+    BASE(),
     { emit: { k: 'radial', x: 100, y: 100, r0: 0, r1: 90, c1: '#fff', c2: '#000', box: { lit: [0, 0, 200, 200] } } },
     { emitOne: { prim: 'glyphPlate', args: { x: 10, y: 10, w: 60, h: 60, color: '#000' } } },
     { each: { over: { lit: [1, 2, 3] }, as: 'i', do: [{ emit: { k: 'circle', x: 20, y: { '*': [{ var: 'i' }, 40] }, r: 6, fill: '#fff' } }] } },
@@ -188,53 +196,88 @@ const synth = {
 let synthPlan = null
 const synthErr = throws(() => { synthPlan = poster.planFromRecipe(ctx, d, synth) })
 const kinds = synthPlan ? synthPlan.layers.map((l) => l.k) : []
-ok('emitOne / each / lit / do 这几种步型都跑得通（合成配方 6 层）',
-  !synthErr && kinds.join(',') === 'radial,text,circle,circle,circle,text',
+ok('emitOne / each / lit / do 这几种步型都跑得通（合成配方 7 层）',
+  !synthErr && kinds.join(',') === 'fill,radial,text,circle,circle,circle,text',
   synthErr ? synthErr.message : kinds.join(','))
 ok('glyphPlate 交回来的是带品牌字的一层文字',
-  !!synthPlan && synthPlan.layers[1].lines[0] === poster.BRAND_GLYPH,
-  synthPlan && JSON.stringify(synthPlan.layers[1].lines))
+  !!synthPlan && synthPlan.layers[2].lines[0] === poster.BRAND_GLYPH,
+  synthPlan && JSON.stringify(synthPlan.layers[2].lines))
 ok('each 里那个 index 前的乘算真按元素走（三枚圆 40/80/120）',
-  !!synthPlan && [synthPlan.layers[2].y, synthPlan.layers[3].y, synthPlan.layers[4].y].join(',') === '40,80,120',
-  synthPlan && [synthPlan.layers[2].y, synthPlan.layers[3].y, synthPlan.layers[4].y].join(','))
+  !!synthPlan && [synthPlan.layers[3].y, synthPlan.layers[4].y, synthPlan.layers[5].y].join(',') === '40,80,120',
+  synthPlan && [synthPlan.layers[3].y, synthPlan.layers[4].y, synthPlan.layers[5].y].join(','))
 
 // emitOne/emitMany 交回来的层不经过 buildRecipeLayer，所以字段名单要在这里再查一遍：
 // 否则一份坏配方可以拿 {lit:{k:'fill',…,随便一个键:1}} 绕开名单夹带字段，而那些键画的时候会被静默吃掉。
+// 两份都先垫上整幅底：不然拦下它的是"第一笔不是底"，这条就没在测字段名单了。
 const smuggle = {
   id: 'smuggle', min_version: 1,
-  steps: [{ let: 'height', value: 300 }, { emitOne: { lit: { k: 'fill', x: 0, y: 0, w: 10, h: 10, color: '#000', bogus: 1 } } }],
+  steps: [{ let: 'height', value: 300 }, BASE(), { emitOne: { lit: { k: 'fill', x: 0, y: 0, w: 10, h: 10, color: '#000', bogus: 1 } } }],
 }
+const smuggleCaught = throws(() => poster.planFromRecipe(ctx, d, smuggle))
 ok('emitOne 用 lit 夹带一个名单外的字段：抛（不给"画的时候忽略掉"那条宽容路）',
-  !!throws(() => poster.planFromRecipe(ctx, d, smuggle)), '居然放行了')
+  !!smuggleCaught && /bogus/.test(String(smuggleCaught && smuggleCaught.message)), smuggleCaught && smuggleCaught.message)
 const smuggleOk = {
   id: 'smuggle-ok', min_version: 1,
-  steps: [{ let: 'height', value: 300 }, { emitOne: { lit: { k: 'fill', x: 0, y: 0, w: 10, h: 10, color: '#000' } } }],
+  steps: [{ let: 'height', value: 300 }, BASE(), { emitOne: { lit: { k: 'fill', x: 0, y: 0, w: 10, h: 10, color: '#000' } } }],
 }
 ok('同一份去掉那个野字段就放行（证明上面那条红是字段名单抓的，不是 emitOne 本身不通）',
-  !throws(() => poster.planFromRecipe(ctx, d, smuggleOk)), '好的也被拦了')
+  !throws(() => poster.planFromRecipe(ctx, d, smuggleOk)), throws(() => poster.planFromRecipe(ctx, d, smuggleOk)) || '')
 // obj 是新加的项型（渐变色标那种 [{at,color}]）：形状写错要在静态检查就红，而不是跑起来才知道
 const gradStep = (stops) => ({
   id: 'x', min_version: 1,
-  steps: [{ let: 'height', value: 300 }, { emit: { k: 'grad', x: 0, y: 0, w: 10, h: 10, c1: '#fff', c2: '#000', stops } }],
+  steps: [{ let: 'height', value: 300 }, BASE(), { emit: { k: 'grad', x: 0, y: 0, w: 10, h: 10, c1: '#fff', c2: '#000', stops } }],
 })
 ok('obj 给的是数组而不是键值对象 → validate 红',
-  validateIt(gradStep([{ obj: [0, 1] }])).length > 0, '居然放行了')
+  validateIt(gradStep([{ obj: [0, 1] }])).some((e) => /obj/.test(e)), validateIt(gradStep([{ obj: [0, 1] }])).join('；'))
 // 这条是关键：obj 的键值必须也当表达式走一遍名单，否则一个不认的算子藏在色标里就能混过静态检查
 ok('obj 的值里藏一个不认的算子 → validate 红（不是"跳过不查"）',
-  validateIt(gradStep([{ obj: { at: 0, color: { 不存在的算子: 1 } } }])).length > 0, '居然放行了')
+  validateIt(gradStep([{ obj: { at: 0, color: { 不存在的算子: 1 } } }])).some((e) => /不存在的算子/.test(e)),
+  validateIt(gradStep([{ obj: { at: 0, color: { 不存在的算子: 1 } } }])).join('；'))
 ok('obj 里的值可以现算（色标那一档混色真的落到图层里）',
   (() => {
     const p = poster.planFromRecipe(ctx, d, {
       id: 'x', min_version: 1,
       steps: [
         { let: 'height', value: 300 },
+        BASE(),
         { let: 's', value: { prim: 'scheme', args: { name: 'neon', categoryId: 1 } } },
         { emit: { k: 'grad', x: 0, y: 0, w: 10, h: 10, c1: { var: 's.c1' }, c2: { var: 's.c2' }, stops: [{ obj: { at: 0.5, color: { prim: 'mix', args: { c1: { var: 's.c1' }, c2: { var: 's.c2' }, w: 0.5 } } } }] } },
       ],
     })
-    const st = p.layers[0].stops
+    const st = p.layers[1].stops
     return Array.isArray(st) && st.length === 1 && st[0].at === 0.5 && typeof st[0].color === 'string' && st[0].color !== '{'
   })(), '')
+
+// ---------- N11 那两道新闸门自己得有钉子（撤掉检查，这几条就得红） ----------
+// 注意不能拿"把 quote 里落笔的那几步 filter 掉"当夹具：if／each 体里还有 emit，
+// 剪掉顶层剩下的嵌套层会让红变成"第一笔不是底"而不是"没有一笔落笔"（第一版就是这么错的）。
+const onlyLetDo = () => ({ id: 'no-paint', min_version: 1, steps: [{ let: 'height', value: 400 }, { do: { prim: 'setFont', args: { size: 30 } } }] })
+strictRejects((r) => { r.steps = onlyLetDo().steps },
+  '只有 let／do、一笔都不落的配方：静态检查红（旧写法能过闸门、跑出一张 750×800 的空卡）', null, /没有一笔真的落笔/)
+ok('上面那条不是因为"少 let height"红的：height 留着、只缺落笔，报的就是那一句',
+  validateIt(onlyLetDo()).length === 1 && /没有一笔真的落笔/.test(validateIt(onlyLetDo())[0]),
+  validateIt(onlyLetDo()).join('；'))
+strictRejects((r) => { const b = r.steps.find((s) => s.emit && (s.emit.k === 'fill' || s.emit.k === 'grad')); b.emit.w = 300 },
+  '起手那笔不铺满整张（w 写死 300）：红——底下漏一条，图上就露出一块未定义像素', null, /第一笔不是/)
+ok('反向：把起手那笔改回整幅底就放行（闸门不是见 emit 就咬）',
+  (() => {
+    const r = quoteRecipe()
+    const b = r.steps.find((s) => s.emit && (s.emit.k === 'fill' || s.emit.k === 'grad'))
+    b.emit.w = 300
+    if (!validateIt(r).length) return false
+    b.emit.w = { var: 'W' }
+    return validateIt(r).length === 0 && !throws(() => poster.planFromRecipe(ctx, d, r))
+  })(), '')
+ok('十套包内配方逐套的第一笔都真的是整幅底（这条是给上面那道闸门兜底的，改画法忘了起手就红）',
+  (() => {
+    const bad = poster.TEMPLATES.map((t) => t.id).filter((id) => {
+      const first = RECIPES[id].steps.find((s) => s.emit || s.emitOne || s.emitMany)
+      return !first || !first.emit || !['fill', 'grad'].includes(first.emit.k) ||
+        first.emit.x !== 0 || first.emit.y !== 0 || !first.emit.w || first.emit.w.var !== 'W' ||
+        !first.emit.h || first.emit.h.var !== 'height'
+    })
+    return bad.length === 0
+  })(), poster.TEMPLATES.map((t) => t.id).filter((id) => validateIt(RECIPES[id]).length).join('、'))
 
 // 十套模板 × 六条笔记里凡是走配方的那几套，逐套都要能出图（不许有哪一篇跑不出来）
 const sampleNotes = [
@@ -450,6 +493,52 @@ if (eg) {
     !!bg && bg.k === 'fill' && bg.x === 0 && bg.y === 0 && bg.w && bg.w.var === 'W' && bg.h && bg.h.var === 'height',
     bg ? `第 ${row.recipe.steps.indexOf(firstEmit) + 1} 步=${bg.k} w=${JSON.stringify(bg.w)} h=${JSON.stringify(bg.h)}` : '整份没有落笔')
 }
+
+// ---------- N10：只有配方、没有 JS 那份的那一套跑坏了，画出来的是默认那一张 ----------
+// 这一套在包里找不到 planXxx，兜底只能落到默认模板 ⇒ 屏上名字与画的内容会各说各话。
+// 规矩：plan 要带 fellBack（说清"本想画哪套"），界面拿它改名字；带 JS 兜底的那十套不许标。
+const probeRow = {
+  template_id: 'probe-only', label: '探针套', label_en: 'Probe', group_key: 'bold', sort_order: 99,
+  min_app_version: '1.0.0', content_hash: 'probe',
+  recipe: {
+    id: 'probe-only', min_version: 1,
+    steps: [
+      { let: 'height', value: 800 },
+      { emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: '#ffffff' } },
+      { emit: { k: 'text', x: { var: 'notComputed' }, y: 40, lines: [{ lit: 'x' }], size: 20 } },
+    ],
+  },
+}
+const probeApply = poster.applyRemoteTemplates([probeRow])
+let probePlan = null
+let probePlanNoQr = null
+const probeErr = throws(() => { probePlan = poster.planPoster(ctx, note, 'probe-only', d.profile, 'zh', { showQr: true }) })
+const probeErr2 = throws(() => { probePlanNoQr = poster.planPoster(ctx, note, 'probe-only', d.profile, 'zh', { showQr: false }) })
+ok('下发那一套过闸门收下（recipe 自己合法，坏在跑的时候：少这一步就不是在测 N10）',
+  probeApply.accepted === 1 && probeApply.rejected.length === 0, JSON.stringify(probeApply))
+ok('纯数据那一套跑坏了：不抛、出图、且带 fellBack 说清本想画哪套（N10）',
+  !!probePlan && !probeErr && probePlan.fellBack === 'probe-only' && probePlan.template === poster.DEFAULT_TEMPLATE,
+  probeErr ? probeErr.message : probePlan && `fellBack=${probePlan.fellBack} template=${probePlan.template}`)
+ok('不带码那一态也要留着这一栏（重拼图层对象时漏带＝界面又读不到）',
+  !!probePlanNoQr && !probeErr2 && probePlanNoQr.fellBack === 'probe-only',
+  probeErr2 ? probeErr2.message : probePlanNoQr && probePlanNoQr.fellBack)
+// 反向：包内那十套有 JS 兜底，画的还是那一套自己 ⇒ 不许标 fellBack（界面不许平白改名字）
+const originalQuote2 = RECIPES.quote
+let lenient2
+try {
+  const broken2 = deep(originalQuote2)
+  broken2.steps.find((s) => s.emit && s.emit.k === 'fill').emit.k = 'squircle'
+  RECIPES.quote = broken2
+  lenient2 = poster.planPoster(ctx, note, 'quote', d.profile, 'zh', { showQr: true })
+} catch (e) {
+  lenient2 = { error: e.message }
+} finally {
+  RECIPES.quote = originalQuote2
+}
+ok('有 JS 兜底的那一套跑坏了不许标 fellBack（画的就是这一套，只是旧版）',
+  !!lenient2 && !lenient2.error && lenient2.fellBack === undefined && lenient2.template === 'quote',
+  lenient2 && (lenient2.error || `fellBack=${lenient2.fellBack} template=${lenient2.template}`))
+poster.applyRemoteTemplates([])
 
 let n = 0
 for (const [name, pass, detail] of results) {

@@ -117,9 +117,15 @@ setTimeout(() => {
   console.log('\n———— ④ #16 图层里的值也查（NaN／null／缺字段都要抛） ————')
   const d = { note: poster.SAMPLE_NOTE, profile: {}, lang: 'zh', hasAvatar: false }
   // 配方的一步长这样：`{emit:{k:op 名，其余每个字段是一个表达式}}`（`posterRecipe.js` 那张算子表），
-  // 而闸门要求 `steps` 里必须有一步 let 出 height——不带上它，抛的是"配方不合格"，
-  // 下面那几条会全部假绿（第一版就是这么绿的）。
-  const step = (fields) => ({ id: 'probe', min_version: 1, steps: [{ let: 'height', value: 600 }, { emit: fields }] })
+  // 而闸门要求 `steps` 里必须有一步 let 出 height、且第一笔得是盖住整张卡的底（10-20 加的 N11）——
+  // 不带上这两样，抛的是"配方不合格"，下面那几条会全部假绿（第一版就是这么绿的）。
+  // 所以探针那一层前面垫一笔整幅底：被量的那一步落到 layers[1]，值那道闸门照样逐层查。
+  const step = (fields) => ({
+    id: 'probe', min_version: 1,
+    steps: [{ let: 'height', value: 600 },
+      { emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: '#fff' } },
+      { emit: fields }],
+  })
   const fill = (over) => Object.assign({ k: 'fill', x: 0, y: 0, w: 100, h: 50, color: '#fff' }, over)
   const threw = (recipe) => {
     try { poster.planFromRecipe(ctx, d, recipe); return false } catch (e) { return String(e.message) }

@@ -281,6 +281,61 @@ def _scan_steps(steps: Any, bad: list, where: str) -> None:
                 bad.append(f"{at}: each 项里多了 {k}")
 
 
+PAINT_STEP_KINDS = ("emit", "emitOne", "emitMany")
+
+
+def _paint_steps(steps: Any) -> list:
+    """按执行顺序找出真的往画布上落笔的那几步（[(kind, payload), …]）。
+
+    `let`／`do` 只算数；`if`／`each` 自己不产层，层在它们体里，所以要钻进体里按顺序收。
+    与客户端 `posterRecipe.js` 的 `paintStepsIn` 是同一道规矩（N11）的又一处抄本。
+    """
+    out: list = []
+    if not isinstance(steps, list):
+        return out
+    for raw in steps:
+        kind, payload = _step_shape(raw)
+        if kind is None:
+            continue
+        if kind in PAINT_STEP_KINDS:
+            out.append((kind, payload))
+        elif kind == "if":
+            a = payload if isinstance(payload, dict) else {}
+            out.extend(_paint_steps(a.get("then")))
+            out.extend(_paint_steps(a.get("else")))
+        elif kind == "each":
+            a = payload if isinstance(payload, dict) else {}
+            out.extend(_paint_steps(a.get("do")))
+    return out
+
+
+def _is_full_bleed_base(paint) -> bool:
+    """起手那一笔是不是真的盖住整张卡——判据全从 OP_KEYS 现读，不另立一份 op 名单。
+
+    字段表同时含 x、y、w、h 又不含 r 的，客户端 `paintLayers` 才会拿一次 plain fillRect 铺满那块矩形
+    （今天是 fill 与 grad 两枚）。坐标写死 0,0、w 取 var W、h 取 var height 才算"整幅"。
+    """
+    kind, a = paint
+    if kind != "emit" or not isinstance(a, dict):
+        return False
+    op = a.get("k")
+    fields = OP_KEYS.get(op if isinstance(op, str) else "")
+    if not fields:
+        return False
+    if any(n not in fields for n in ("x", "y", "w", "h")) or "r" in fields:
+        return False
+
+    def is_var(v: Any, name: str) -> bool:
+        return isinstance(v, dict) and set(v) == {"var"} and v["var"] == name
+
+    # bool 是 int 的子类：`False == 0` 在 Python 里成立，而 JS 那边 `false === 0` 不成立。
+    # 不挡掉的话 `{"x": false}` 两边一边算铺满、一边算没铺满。
+    def is_zero(v: Any) -> bool:
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and v == 0
+
+    return is_zero(a.get("x")) and is_zero(a.get("y")) and is_var(a.get("w"), "W") and is_var(a.get("h"), "height")
+
+
 def validate_recipe(recipe: Any) -> list[str]:
     """返回错误清单，空列表＝这份配方这一版解释器读得懂。写回前、下发前都过它。
 
@@ -304,6 +359,14 @@ def validate_recipe(recipe: Any) -> list[str]:
         _scan_steps(steps, bad, "steps")
         if not any(isinstance(s, dict) and s.get("let") == "height" for s in steps):
             bad.append("steps 里必须有一步 let 出 height")
+        # 下面两条与客户端 posterRecipe.js 的 validate 同文同序（10-20 审计 N11 加的）：
+        # 一份只有 let 的配方能过上面所有名单、"跑出"一张零层的空卡。这里放行而客户端拒＝整条静默
+        # 退回包内那一份，站长以为新模板生效了、用户看到的还是老卡片——所以两边都得拦在同一处。
+        paints = _paint_steps(steps)
+        if not paints:
+            bad.append("steps 里没有一笔真的落笔（只有 let／do 的配方撑得出画布却画不出东西）")
+        elif not _is_full_bleed_base(paints[0]):
+            bad.append("第一笔不是盖住整张卡的底（要一步 emit 一个 x=0、y=0、w 为 var W、h 为 var height 的实心矩形层）")
     n_bytes = len(canonical_json(recipe).encode("utf-8"))
     if n_bytes > LIMITS["max_bytes"]:
         bad.append(f"整条配方 {n_bytes} 字节，超过上限 {LIMITS['max_bytes']}")

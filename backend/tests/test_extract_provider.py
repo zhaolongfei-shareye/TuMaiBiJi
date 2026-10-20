@@ -290,10 +290,17 @@ class TestContractStaysSingle:
             ["grep", "-rn", "--include=*.py", "extract_knowledge", str(root)],
             capture_output=True, text=True,
         ).stdout
-        callsites = {
-            ln.split(":")[0] for ln in out.splitlines()
-            if "def extract_knowledge" not in ln and "import" not in ln
-        }
+        callsites = set()
+        for ln in out.splitlines():
+            parts = ln.split(":", 2)  # grep -rn 给的是 `路径:行号:那一行的内容`
+            if len(parts) != 3:
+                continue
+            content = parts[2].strip()
+            # 注释里提一次函数名不等于多一个调用点（10-20 给 degraded 写的那句说明就这么红过）。
+            # 这一条钉的是调用图，所以只认代码行；调用点真漂到第二个文件照样红。
+            if content.startswith("#") or "def extract_knowledge" in content or "import" in content:
+                continue
+            callsites.add(parts[0])
         app_dir = str(root)
         rel = sorted(p.replace(app_dir + "/", "") for p in callsites)
         assert rel == ["tasks/ingest_tasks.py"], f"提炼调用点漂移了：{rel}"
@@ -304,3 +311,26 @@ class TestContractStaysSingle:
             src = f.read()
         assert "deepseek" not in src.lower()
         assert not hasattr(settings, "DEEPSEEK_API_KEY")
+
+
+class TestDegradedFlagSurvivesParsing:
+    """10-20 审计 N9：云函数那份兜底是**合法 JSON**，所以它一路走到 `_parse_response` 重拼四栏。
+
+    原来那里只拼四栏、`degraded` 被丢，外面 `setdefault("degraded", False)` 再补一个 False
+    ⇒ 库里把"其实没提炼出来"记成提炼成功。正反两条都要钉：带着要活下来，不带才是 False。
+    """
+
+    async def test_云函数带degraded_不许在重拼时被丢掉(self, monkeypatch, cf_ready):
+        body = {"title": "未命名笔记", "summary": "原文头一段", "key_points": [], "tags": [],
+                "degraded": True}
+        _patch_transport(monkeypatch, lambda n: FakeResponse(200, body))
+
+        result = await llm.extract_knowledge("正文内容", "参考标题")
+        assert result["degraded"] is True, "degraded 在 _parse_response 那一趟被丢了"
+
+    async def test_云函数没带degraded_才算真的提炼成功(self, monkeypatch, cf_ready):
+        body = {"title": "混元给的标题", "summary": "摘要", "key_points": ["要点一"], "tags": ["技术"]}
+        _patch_transport(monkeypatch, lambda n: FakeResponse(200, body))
+
+        result = await llm.extract_knowledge("正文内容", "参考标题")
+        assert result["degraded"] is False

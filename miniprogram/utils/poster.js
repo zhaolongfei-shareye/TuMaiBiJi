@@ -983,8 +983,24 @@ function clipTrack(ctx, text, maxW, track) {
 }
 
 // 海报上"这条笔记属于哪儿"那行小字，和列表/详情同一条规则：第一个标签优先
+// 卡片只认字符串。key_points / tags 的元素类型从来没人钉：写入侧只查到"是个 list"，
+// 库里躺进一个数字（x.trim 不是函数）或整条写成字符串（.map/.slice/.join 不是函数）就当场抛，
+// 而线上那一路是"配方抛了拿 JS 兜底"——同一处再抛一次，planPoster 整体失败，吃要点的六套全出不来卡。
+// 归一口径：任何标量都收成字符串，数组之外当空。null 仍旧收成空串，
+// "无要点退摘要首句、再退标题"那条既有兜底路一步没动。
+// 这里不 trim：clip/fit 那几处要原样交给量字函数，顺手 trim 会让逐层等价基线多出差异。
+function textList(v) {
+  if (!Array.isArray(v)) return []
+  return v.map((x) => {
+    const ty = typeof x
+    if (ty === 'string') return x
+    if (ty === 'number' || ty === 'boolean') return String(x)
+    return ''
+  })
+}
+
 function blockNameOf(note, lang) {
-  const firstTag = (note.tags || []).map((x) => (x || '').trim()).find(Boolean) || ''
+  const firstTag = textList(note.tags).map((x) => x.trim()).find(Boolean) || ''
   return firstTag || note.category_name || (note.category_id == null ? t('noCategory', lang) : '')
 }
 
@@ -1005,7 +1021,7 @@ function sourceLabelOf(note, lang) {
 
 // 金句：要点第一条最像"值得转发的一句话"，没有就退到摘要首句，再退到标题
 function quoteOf(note) {
-  const kp = (note.key_points || []).map((x) => (x || '').trim()).find(Boolean)
+  const kp = textList(note.key_points).map((x) => x.trim()).find(Boolean)
   if (kp) return kp
   const sum = (note.summary || '').trim()
   if (sum) {
@@ -1080,13 +1096,13 @@ function planCard(ctx, d) {
   const bandH = pad * 2 + Math.max(block, titleLines.length * titleLH)
 
   font(ctx, metaSize, true)
-  const metaLine = clip(ctx, [sourceLabelOf(note, lang), (note.tags || []).join(' / ')].filter(Boolean).join(' · '), contentW)
+  const metaLine = clip(ctx, [sourceLabelOf(note, lang), textList(note.tags).join(' / ')].filter(Boolean).join(' · '), contentW)
 
   font(ctx, bodySize, false)
   const summaryLines = note.summary ? fit(ctx, note.summary, contentW, 4) : []
 
   font(ctx, pointSize, false)
-  const points = (note.key_points || []).slice(0, 5).map((p) => clip(ctx, p, contentW - 50))
+  const points = textList(note.key_points).slice(0, 5).map((p) => clip(ctx, p, contentW - 50))
 
   const metaY = cardY + bandH + 56
   let bottom = metaY + 8
@@ -1225,7 +1241,7 @@ function planBlock(ctx, d) {
   font(ctx, 27, false)
   const summaryLines = note.summary ? fit(ctx, note.summary, innerW, 4) : []
   font(ctx, 26, false)
-  const points = (note.key_points || []).slice(0, 3).map((p) => clip(ctx, p, innerW - 46))
+  const points = textList(note.key_points).slice(0, 3).map((p) => clip(ctx, p, innerW - 46))
 
   let base = contentTop + 27
   const summaryY = summaryLines.length ? base : 0
@@ -1511,7 +1527,7 @@ function planPopDots(ctx, d) {
   font(ctx, 26, false)
   const sumLines = note.summary ? fit(ctx, note.summary, W - pad * 2 - 56, 3) : []
   font(ctx, 25, false)
-  const points = (note.key_points || []).slice(0, 2).map((p) => clip(ctx, p, W - pad * 2 - 120))
+  const points = textList(note.key_points).slice(0, 2).map((p) => clip(ctx, p, W - pad * 2 - 120))
 
   const kickerY = 100
   const titleTop = Math.max(kickerY + 60, avatarD + 56) + 76
@@ -1573,7 +1589,7 @@ function planAcid(ctx, d) {
   font(ctx, 72, true)
   const titleLines = fit(ctx, note.title || '', W - pad * 2, 2)
   font(ctx, 25, false)
-  const points = (note.key_points || []).slice(0, 3).map((p) => clip(ctx, p, W - pad * 2 - 76))
+  const points = textList(note.key_points).slice(0, 3).map((p) => clip(ctx, p, W - pad * 2 - 76))
 
   const avatarTop = 76
   const kickerY = topH + 74
@@ -1749,7 +1765,7 @@ function planSpec(ctx, d) {
   font(ctx, 26, false)
   const sumLines = note.summary ? fit(ctx, note.summary, W - pad * 2 - 60, 3) : []
   font(ctx, 26, false)
-  const points = (note.key_points || []).slice(0, 4).map((p) => clip(ctx, p, W - pad * 2 - 150))
+  const points = textList(note.key_points).slice(0, 4).map((p) => clip(ctx, p, W - pad * 2 - 150))
 
   const metaY = pad + 20
   const barY = metaY + 26
@@ -1904,7 +1920,7 @@ const RECIPE_PRIMS = {
   sourceLabel: { keys: [], call: (env) => sourceLabelOf(env.note, env.lang) },
   quoteText: { keys: [], call: (env) => quoteOf(env.note) },
   noteDate: { keys: [], call: (env) => formatShortDate(env.note.created_at) },
-  tagsJoined: { keys: ['sep'], call: (env, a) => (env.note.tags || []).join(a.sep) },
+  tagsJoined: { keys: ['sep'], call: (env, a) => textList(env.note.tags).join(a.sep) },
   paperOf: { keys: ['categoryId'], call: (env, a) => paperOf(a.categoryId) },
   // 活泼那六套不吃宣纸那两档，吃 palette 里的"配色方案"：一个名字 + 一个分类 → 一组色。
   scheme: { keys: ['name', 'categoryId'], call: (env, a) => schemeFor(a.name, a.categoryId) },
@@ -1918,7 +1934,7 @@ const RECIPE_PRIMS = {
   joinNonEmpty: { keys: ['sep', 'parts'], call: (env, a) => (a.parts || []).filter(Boolean).join(a.sep) },
   points: {
     keys: ['limit', 'maxW', 'size', 'bold', 'fam'],
-    call: (env, a) => measureWithFont(env, a, (ctx) => (env.note.key_points || []).slice(0, a.limit).map((p) => clip(ctx, p, a.maxW))),
+    call: (env, a) => measureWithFont(env, a, (ctx) => textList(env.note.key_points).slice(0, a.limit).map((p) => clip(ctx, p, a.maxW))),
   },
   fitLines: { keys: ['text', 'maxW', 'n', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => fit(ctx, a.text, a.maxW, a.n)) },
   wrapLines: { keys: ['text', 'maxW', 'size', 'bold', 'fam'], call: (env, a) => measureWithFont(env, a, (ctx) => wrap(ctx, a.text, a.maxW)) },
@@ -2214,7 +2230,9 @@ function stripQr(plan, ctx, lang) {
   kept.push(L.text({
     x: cx, y: cy + qr.w * 0.2 + s2 * 0.34, lines: [hint], size: s2, color: ink, align: 'center',
   }))
-  return { width: plan.width, height: plan.height, layers: kept, template: plan.template }
+  // fellBack 要跟着搬过去：不带的话"不带码"那一态就把"画的是默认那一张"这条事实弄丢了
+  // （与 llm.py 那个 degraded 栏同一型：重拼对象时漏一格，界面上的实话就没了出处）。
+  return { width: plan.width, height: plan.height, layers: kept, template: plan.template, fellBack: plan.fellBack }
 }
 
 function planPoster(ctx, note, templateId, profile, lang, opts) {
@@ -2239,9 +2257,32 @@ function planPoster(ctx, note, templateId, profile, lang, opts) {
     // JS 一份份删，兜底也就一份份少，最后一份兜到默认模板）。
     // 尺子走 strict：坏了就抛。少了这道区分，一份从没跑起来的坏配方会一路用 JS 分支，
     // 等价基线照样全绿，那把尺子就白立了。
-    try { plan = planFromRecipe(ctx, d, recipe) } catch (e) { plan = (PLANNERS[tpl] || PLANNERS[DEFAULT_TEMPLATE])(ctx, d) }
+    try { plan = planFromRecipe(ctx, d, recipe) } catch (e) {
+      const js = PLANNERS[tpl]
+      plan = (js || PLANNERS[DEFAULT_TEMPLATE])(ctx, d)
+      // 有 JS 那份兜底时画的就是这一套，只是版本旧；只有"这套压根是纯数据下发来的"
+      // 那一格，画出来的其实是默认那一张，而屏上名字还念着它自己的（审计 N10）。
+      // 标出来给界面用：名字要跟着换、台账要记画的那一套、要说一句实话。
+      if (!js) plan.fellBack = tpl
+    }
   }
   return o.showQr === false ? stripQr(plan, ctx, lang || 'zh') : plan
+}
+
+// 只为尺子留的一个口子（与上面 `fitSize` 同一类，界面没有一处用它）：拿同一篇笔记**只跑 JS 那一份 planner**。
+// 为什么必须能单独跑到：十套全进了 `RECIPE_IDS`，`planPoster` 从此永远走配方那一支，
+// 于是"只改 `poster.js` 里那十枚 `planXxx`"这种漂移没有任何东西在看（10-20 审计 N5）。
+// 包内那份 planner 是"下发挂了时的兜底"，它要是与配方画的不是同一张卡，兜底那一刻就露馅。
+function planFromJs(ctx, note, templateId, profile, lang, opts) {
+  const planner = PLANNERS[templateId] || PLANNERS[DEFAULT_TEMPLATE]
+  const plan = planner(ctx, {
+    note,
+    profile: profile || {},
+    hasAvatar: !!(profile && profile.avatarPath),
+    hasNote: !!(opts && opts.hasNote),
+    lang: lang || 'zh',
+  })
+  return opts && opts.showQr === false ? stripQr(plan, ctx, lang || 'zh') : plan
 }
 
 // 设置页那几格小样用的内置笔记：不依赖用户数据，每套模板都能立刻看到效果。
@@ -2277,6 +2318,7 @@ module.exports = {
   // 只为尺子留的一个口子（`验-审计第一批客户端三条.js` 要直接喂 NaN 看它死不死循环）。
   // 界面没有一处用它：那一头要的是整张 plan，不是这一枚字号。
   fitSize,
+  planFromJs,
   TEMPLATES,
   paperOf,
   PAPER_A,

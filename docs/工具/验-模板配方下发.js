@@ -101,8 +101,11 @@ async function main() {
   // ---------- ③ 改一个数，不重启就该看得见（这条同时是上面那条的反证） ----------
   const bump = (recipe) => {
     const copy = JSON.parse(JSON.stringify(recipe))
-    const step = copy.steps.find((s) => s.emit && s.emit.k === 'fill')
-    if (!step) throw new Error('这份配方里没有 fill 那一步，探针得换一个字段')
+    // 起手那一笔是"盖住整张卡的底"，闸门钉死它的 x/y/w/h（N11）——动它会被当脏行整条丢掉，
+    // 就不是在测"改一个数不用重启"了。所以挑**第二处**落笔动。
+    const emits = copy.steps.filter((s) => s.emit)
+    const step = emits[1] || emits[0]
+    if (!step) throw new Error('这份配方里没有可动的 emit，探针得换一个字段')
     step.emit.x = { lit: 10 }
     return copy
   }
@@ -205,7 +208,12 @@ async function main() {
   // 这正是"validate 全过但这一篇笔记就是画不出来"那类，只能靠 planPoster 那道 try 兜。
   const runtimeBad = ALL.map((r) => rowOf(r.template_id, {
     content_hash: `rb-${r.template_id}`,
-    recipe: { id: r.template_id, min_version: 1, steps: [{ let: 'height', value: 1200 }, { do: { var: 'no_such_var' } }] },
+    // 起手那笔整幅底留着（N11 之后没有它闸门就当脏行收了，这条测的就不是"静态查不出"那一类了）
+    recipe: { id: r.template_id, min_version: 1, steps: [
+      { let: 'height', value: 1200 },
+      { emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: '#ffffff' } },
+      { do: { var: 'no_such_var' } },
+    ] },
   }))
   poster.applyRemoteTemplates(runtimeBad)
   ok('这一种静态名单挑不出错，十条照样全收（红就说明闸门把它当脏的了）',

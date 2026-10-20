@@ -383,6 +383,49 @@ function scanSteps(steps, allow, bad, where) {
   })
 }
 
+// 哪几种步型真的往画布上落笔：`runStep` 里只有这三条会 push env.layers。
+// `let`／`do` 只算数，`if`／`each` 自己不产层——层在它们体内，所以找第一笔要钻进体里按执行顺序走。
+const PAINT_STEPS = ['emit', 'emitOne', 'emitMany']
+
+function paintStepsIn(steps, out) {
+  if (!Array.isArray(steps)) return out
+  steps.forEach((raw) => {
+    const s = stepShape(raw)
+    if (s.err) return
+    if (PAINT_STEPS.indexOf(s.kind) >= 0) { out.push(s); return }
+    if (s.kind === 'if') {
+      paintStepsIn(s.a && s.a.then, out)
+      paintStepsIn(s.a && s.a.else, out)
+      return
+    }
+    if (s.kind === 'each') paintStepsIn(s.a && s.a.do, out)
+  })
+  return out
+}
+
+// "整幅底"怎么判——判据全从调用方交回来的那张 op 字段表（poster.js 的 RECIPE_OP_KEYS，
+// 出处是 paintLayers 里每个 case 真正读的 ly.xxx）现读，这里不另立一份 op 名单：
+// 字段表同时含 x、y、w、h 又不含圆角 r 的，paintLayers 才会拿一次 plain fillRect 把那块矩形铺满
+//（今天恰好是 fill 与 grad 两枚；rrect／image 带 r 会露四角、dots 带 r 又只铺点、
+//  radial 铺的是 box 而不是 w／h、circle／line／text／avatar 更盖不住整幅）。
+// 坐标要写死成 0,0、w 取 var W、h 取 var height：包内十套的起手层全是这一笔，
+// 也只有 `emit` 这种几何写成字面量的步能静态证"铺满"——emitOne／emitMany 的层是原语跑出来才知道的。
+function isFullBleedBase(s, opKeys) {
+  if (s.kind !== 'emit') return false
+  const a = s.a
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return false
+  const keys = opKeys[a.k]
+  if (!keys) return false
+  if (['x', 'y', 'w', 'h'].some((n) => keys.indexOf(n) < 0)) return false
+  if (keys.indexOf('r') >= 0) return false
+  const isVar = (v, n) => {
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) return false
+    const ks = Object.keys(v)
+    return ks.length === 1 && ks[0] === 'var' && v.var === n
+  }
+  return a.x === 0 && a.y === 0 && isVar(a.w, 'W') && isVar(a.h, 'height')
+}
+
 // 返回错误清单（空数组＝这份配方这个客户端读得懂）。写回接口、下发前、渲染前都用它。
 function validate(recipe, allow) {
   const bad = []
@@ -397,6 +440,13 @@ function validate(recipe, allow) {
     // 画布多高只有这一处能说：planFromRecipe 拿 scope.height 当成品高度，
     // 少这一步就是每张卡都塌成同一档，而那正是几何自检查得出的第一条。
     if (!recipe.steps.some((s) => s && typeof s === 'object' && s.let === 'height')) bad.push('steps 里必须有一步 let 出 height')
+    // 上面那条只钉住"画布多高有人说了算"，钉不住"这套到底画不画东西"：
+    // 一份只有 let 的配方能过全部名单校验、跑出 750×800 零层的空卡，闸门照收（审计 N11）。
+    // 守"整套能用才用"——不合格就整行拒，不做"跳过这一层继续画"。
+    const opKeys = (allow && allow.opKeys) || {}
+    const paints = paintStepsIn(recipe.steps, [])
+    if (!paints.length) bad.push('steps 里没有一笔真的落笔（只有 let／do 的配方撑得出画布却画不出东西）')
+    else if (!isFullBleedBase(paints[0], opKeys)) bad.push('第一笔不是盖住整张卡的底（要一步 emit 一个 x=0、y=0、w 为 var W、h 为 var height 的实心矩形层）')
   }
   // 三条上界放在最后：就算形状全错，尺寸也要量——否则一份"合法但十万步"的配方
   // 会在渲染那一次把主线程吃干。这三条与后端 validate_recipe 那三条是同一道闸门的两头。
