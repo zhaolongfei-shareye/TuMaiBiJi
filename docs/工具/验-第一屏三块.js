@@ -822,6 +822,14 @@ const { i18n: I18N } = require(P('utils/i18n.js'))
 ok('zh 那一格逐字＝⑫ 那四个字「告诉好友」（④ 四字→⑤ 五字→⑫ 又换一句），en 非空',
   I18N.zh.recBarTitle === '告诉好友' && !!I18N.en.recBarTitle,
   `zh ${I18N.zh.recBarTitle}／en ${I18N.en.recBarTitle}`)
+/* ⑯「切换到英文，按钮黄色的英文超出按钮，这个能否换个字母」：那一格从 'Recommend' 换成 'Share'。
+   换的词不许是我起的——本字典 `shareNote` 的 en 值就是 'Share'（详情页与详情窗那两枚分享按钮
+   屏上已经叫这个），所以钉"与它同一串"：有人再改成 'Recommend friends' 之类，这一条当场红。
+   ⚠ 这一条钉的是**出处**，不是"塞不塞得下"：字宽只有渲染端量得出来（开发者工具把 21rpx 取整成
+   10px，量出来的比真机窄一成），所以宽度那一档交给真跑那把两门各量一次，这里不写字宽表推算。 */
+ok('⑯ 英文那一格钉的是「Share」，且与本字典已有的 shareNote 同一串（不是我另起的一句）',
+  I18N.en.recBarTitle === I18N.en.shareNote && I18N.en.recBarTitle === 'Share',
+  `recBarTitle ${I18N.en.recBarTitle}／shareNote ${I18N.en.shareNote}`)
 // 皮：两档必须真的从 createSkin 发下来。少发一档不是"颜色浅一点"，是那条属性整个没有值＝静默失效。
 const recVars = ['--cp-rec-plate', '--cp-rec-ink']
 const skinOut = palette.createSkin()
@@ -935,11 +943,17 @@ ok('墨迹抬回中线：吃相对定位、top 为负且≈ 0.118×框宽（不�
   /position:\s*relative/.test(planeSeg) && num(planeSeg, 'top') < 0
   && Math.abs(-num(planeSeg, 'top') - num(planeSeg, 'width') * PLANE_SHIFT_RATIO) <= 1,
   `top ${decl(planeSeg, 'top') || '(没写)'} vs 该抬 ${(num(planeSeg, 'width') * PLANE_SHIFT_RATIO).toFixed(1)}rpx`)
-ok('胶囊里两列横向排在一条线上：flex row ＋ align-items:center ＋ 靠左起点，字那一列吃写死的 margin-left',
+/* ⑯「英文超出按钮」那一刀之后：整组（飞机＋字）在板里**居中**，两档内缩由"板宽−组宽"平摊。
+   原来这一格钉的是 flex-start（靠左钉死），那是我为躲 ⑩ 那一刀自己写的落点，不是他的话；
+   中文四个字正好占满 84 那一格，靠左与居中屏上差 0.4rpx 看不出来，而英文 'Share' 只有 ~55
+   就变成"字挤在左边、右边空 48rpx"。缝仍由 `.rec-tx` 的 margin-left 写死（⑩ 那一格没作废）。 */
+ok('胶囊里两列横向排在一条线上：flex row ＋ align-items:center ＋ 整组居中，字那一列吃写死的 margin-left',
   /display:\s*flex/.test(recSeg) && !/flex-direction:\s*column/.test(recSeg)
-  && /align-items:\s*center/.test(recSeg) && /justify-content:\s*flex-start/.test(recSeg)
+  && /align-items:\s*center/.test(recSeg) && /justify-content:\s*center/.test(recSeg)
   && !/(?:^|;)\s*gap:/.test(recSeg) && num(txSeg, 'margin-left') > 0,
-  `direction ${decl(recSeg, 'flex-direction') || '(默认 row)'}／justify ${decl(recSeg, 'justify-content')}／gap ${decl(recSeg, 'gap') || '(无)'}／字左沿 ${decl(txSeg, 'margin-left')}`)
+  `direction ${decl(recSeg, 'flex-direction') || '(默认 row)'}／justify ${decl(recSeg, 'justify-content')}／gap ${decl(recSeg, 'gap') || '(无)'}／字那一格 ${decl(txSeg, 'margin-left')}`)
+ok('飞机自己不带 margin-left（左内缩由居中平摊；再写一条就变成"居中＋又往右推"，两档内缩不再相等）',
+  !/(?:^|;)\s*margin-left:/.test(planeSeg), `飞机那一段 ${(planeSeg.match(/(?:^|;)\s*margin[^;]+/g) || ['(没写)']).join('；').trim()}`)
 ok('⑦「字体不要加粗」⇒ 这一枚不许再写 700（那一档是我上一版自己抬的，他这一句撤掉）',
   !/font-weight:\s*(?:700|bold)/.test(recSeg), `字重 ${decl(recSeg, 'font-weight') || '(跟默认)'}`)
 ok('字面那一枚不许折行（nowrap）：折了之后 44rpx 的定高把「推荐给好友」切成两截',
@@ -986,10 +1000,14 @@ const REC_H = num(recSeg, 'height')
 const SIDE = num(planeSeg, 'width')
 const inkW = SIDE * PLANE_INK_RATIO
 const shift = SIDE * PLANE_SHIFT_RATIO
-const PLANE_ML = num(planeSeg, 'margin-left')
 const PLANE_T = num(planeSeg, 'top') // 负＝把墨迹抬回中线
 const TX_ML = num(txSeg, 'margin-left')
-// 两枚都在流里、padding 整条为 0 ⇒ 飞机框从内容左沿起：横占 [PLANE_ML, PLANE_ML＋SIDE]，字框紧跟其后。
+/* ⑯ 之后左内缩不再写在皮里，是居中平摊出来的：组宽＝框 18＋缝 5＋四个汉字 84＝107，
+   板 144 ⇒ 两头各 (144−107)/2＝18.5。所以这一档是**算出来的**，不是 `num()` 读出来的——
+   读出来只会是 undefined，而 undefined 参与下面那串减法＝整段几何算成 NaN，
+   而 `NaN >= 0` 为假会红，红话说的是"墨迹出板"，那是把尺子自己的洞赖给实现（同一族记过几回）。
+   上面那两条已经把"居中写在皮里、飞机不带 margin-left"钉住，这里负责把剩下的数算对。 */
+const PLANE_ML = (REC_W - (SIDE + TX_ML + zhInk)) / 2
 // 竖：`align-items: center` 居中的是**框**（胶囊 44、框 18 ⇒ 框中心在 22），`top` 再抬 PLANE_T。
 const boxCx = PLANE_ML + SIDE / 2
 const boxCy = REC_H / 2 + PLANE_T
@@ -1012,6 +1030,12 @@ ok('飞机与字不重叠，那道缝＝图里量到的 0.190H＝8.4rpx（⑩「
 ok('四个字的右沿留出图里那档右内缩 0.413H＝18.2（±2 以内；贴到圆角就是"字压在帽上"）',
   rightInset > 0 && Math.abs(rightInset - 0.413 * REC_H) <= 2,
   `右内缩 ${rightInset.toFixed(1)}rpx（到 ${txLeft + zhInk} ＝ 缝 ${gapInk.toFixed(1)}＋四个字 ${zhInk} vs 板 ${REC_W}）`)
+/* ⑯ 那一格（英文超出胶囊）在这里只剩"中文那一门排得下"这一档算得出：汉字一个字正好一个 em，
+   八个是估的。拉丁字母每一枚宽度都不同（i 0.24、m 0.87），而开发者工具把 21rpx 字号取整成 10px
+   之后量出来的又比真机窄一成——拿一张我抄进来的字宽表在这儿推算，就是"尺子里再抄一份被测值"
+   （那条规矩记过两次）。所以英文能不能塞下**只在渲染端量**：真跑那把中英两门各量一次，
+   钉的是"看得见的墨迹左沿与字面右沿两头都不许进圆角帽"。 */
+console.log(`  · 备忘（不是判据）：中文那一门组宽 ${SIDE + TX_ML + zhInk}rpx／板 ${REC_W}；英文那一门要量屏（真跑那把），这里不推算`)
 /* ⚠ 那行英文墨迹的几何（位图 500×246、英文带 x 101~422、屏上宽 146.8、中心 126.48）我留在尺子里
    当参照打数，不再当判据：它今天仍然算得出，只是没有任何东西再对齐它（哪天他要说"回到英文下面"就是这些数）。 */
 /* ⚠ 「按钮长度不要超过英文」→ ⑧「长一点、能容纳纸飞机和文字」→ ⑬ 1:1 复刻又回到 144：

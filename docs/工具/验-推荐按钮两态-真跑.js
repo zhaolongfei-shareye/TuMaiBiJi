@@ -5,6 +5,8 @@
 //       （黄底实心、图标与字是墨、飞机收进胶囊、圆角 13、投影撤）
 //   落点：③英文下面＋列表页 → ④只留首屏与拍照屏 → **⑭移到左上角，住在那句话前面**
 //   话术：④"推荐好友" → ⑤"推荐给好友" → ⑫"告诉好友" ＋ ⑮那一行改成「图麦笔记：仅需10秒拍照截图网页转笔记」
+//         ＋ ⑯「切换到英文，按钮黄色的英文超出按钮，这个能否换个字母」⇒ 英文那一格换 'Share'、
+//          整组改成在板里居中（中英两门这一把**各量一次**，超出这件事只有渲染端读得出来）
 //   ⇒ ⑤⑥⑦⑨⑪ 那一串（暗纱、白字、出头、与英文居中、整枚透明度）到这一版全部作废，
 //     留在尺子里就是假绿／假红，所以这一把从头重写。
 // 跑法：docs/工具/跑尺子.sh 9431 验-推荐按钮两态-真跑
@@ -24,6 +26,8 @@
 //   所以下面一律先取**框心**，再从框心按 0.884／0.1178 那两个比例反算"看得见的墨迹"在哪，
 //   绝不拿读回来的宽高直接当墨迹（28 那一版把"黄的框 32.2"当成屏上该读到的数，连着假红两次）。
 const automator = require('miniprogram-automator')
+// 字典现读：⑯ 那一格英文换成什么词由 i18n 说了算，判据里不抄第二份串（抄了＝下一次改口的假红）。
+const { i18n: I18N, texts } = require('../../miniprogram/utils/i18n.js')
 
 const TIP_DOT = 'rgb(246, 196, 69)'   // 色板里唯一那支黄（实心，⑫「改为黄底」之后屏上就该读到它）
 const INK = 'rgb(35, 37, 44)'         // LAYER_INK：图标与字共用这一档（⑬ 那张图是"一块实心色＋同色的图标与字"）
@@ -33,11 +37,11 @@ const INK = 'rgb(35, 37, 44)'         // LAYER_INK：图标与字共用这一档
    这一把只证"屏上真的按这个数渲染了"。 */
 const MODEL = {
   barW: 144, barH: 44, radius: 13,
-  side: 18, planeML: 18, txML: 5,
-  aiPad: 24,                         // 落点：`.ai-line` 的左右内缩就是这一枚的最左沿
-  inkRatio: 0.884,                   // 斜 45° 后看得见的墨迹 ÷ 元素框（六个顶点现算，见静态那把的注释）
-  shiftRatio: 0.1178,                // 墨迹中心比框中心偏左／偏下这么多 × 框宽
-  stripMax: 96,                      // 10-15 00:3x 那一档：这一行整枚 ≤96rpx
+  side: 18, txML: 5,                   // ⑯ 之后飞机不带 margin-left：左内缩由居中平摊，不再是常数
+  aiPad: 24,                           // 落点：`.ai-line` 的左右内缩就是这一枚的最左沿
+  inkRatio: 0.884,                     // 斜 45° 后看得见的墨迹 ÷ 元素框（六个顶点现算，见静态那把的注释）
+  shiftRatio: 0.1178,                  // 墨迹中心比框中心偏左／偏下这么多 × 框宽
+  stripMax: 96,                        // 10-15 00:3x 那一档：这一行整枚 ≤96rpx
 }
 MODEL.ink = MODEL.side * MODEL.inkRatio                 // 15.9 见方
 MODEL.aabb = MODEL.side * Math.SQRT2                    // 有的端口读回来的是这一格：25.5
@@ -46,6 +50,7 @@ MODEL.inkCyFromCy = MODEL.side * MODEL.shiftRatio       // 墨迹中心比框中
 
 let pass = 0
 const fails = []
+const extraShots = []   // 中英两态之外另拍的（英文那一门在 ②b 那一段里拍，收尾一起报路径）
 const ck = (name, cond, extra) => {
   if (cond) { pass += 1; console.log('  ✓ ' + name); return }
   fails.push(name + (extra ? ' —— 实得：' + extra : ''))
@@ -162,21 +167,27 @@ async function measure(page, tag, R, toRpx) {
         `墨迹右沿 ${inkR.toFixed(1)} → 字左 ${txL.toFixed(1)}＝${(txL - inkR).toFixed(1)}rpx（皮里 ${MODEL.planeML}＋${MODEL.side}＋${MODEL.txML}）`)
       ck(`${tag}墨迹与字同一条中线（斜过来之后墨迹比框低 0.118×size，那一格 top:-2rpx 没写就是屏上低一截）`,
         Math.abs(inkCy - txCy) <= 2.5, `墨迹心 y ${inkCy.toFixed(1)} vs 字心 ${txCy.toFixed(1)}rpx`)
-      /* 字面左沿＝18＋18＋5＝41rpx，这一档是源码写死的、两端口都一样；
-         而"右内缩"＝板宽−字左沿−**渲染出来的字宽**，四个汉字在开发者工具里被取整成 10px（76.9rpx）、
-         真机按 1em 走是 84rpx——同一句源码两块屏差 7rpx（§8.393 那一刀就是这么红的）。
-         所以这里钉两条：左沿必须正好 41（±2），右内缩只卡"不许小于图里那档 18.2、也不许多出
-         模拟器那一档取整量（7）再加 5 的余量"。拿 18.2 直接卡死＝把模拟器判成错。 */
-      /* ±4rpx 不是放松预算，是这条链上**三段取整**的量：18／18／5rpx 在屏上分别是 9.36／9.36／2.6px，
-         三头各吃掉不到半像素，最坏能差到 2px＝这一档窗口下 3.8rpx。⑩ 那一刀真错的时候量到的是 11.5
-         对 1.6（差 10rpx），这一档卡得住。 */
-      ck(`${tag}字那一列的左沿＝皮里写死的 18＋18＋5＝41rpx（两端口都一样，差只许到取整那一档）`,
-        Math.abs(txL - (MODEL.planeML + MODEL.side + MODEL.txML)) <= 4,
-        `字左沿 ${txL.toFixed(1)}rpx vs 应有 ${MODEL.planeML + MODEL.side + MODEL.txML}`)
+      /* ⑯「切换到英文，按钮黄色的英文超出按钮」那一格：原来钉的是"字左沿＝皮里写死的 41rpx"，
+         而 ⑯ 之后左内缩由**居中平摊**出来（中文 41.5、英文 33 起），那一档不再是常数，删。
+         换成钉两件事，两件都只有屏上量得出：
+         ① 整组真的在板里居中——看得见的墨迹左沿离左帽 ＝ 字面右沿离右帽（±3rpx）。
+            容差 3 的来源：墨迹那一档是从读回的框心按 0.884／0.1178 反算的，框心本身有 ±1px 取整，
+            这一档窗口下 1px≈1.92rpx，两头各算一次 ⇒ 3rpx；⑩ 那一刀真错的时候量到的是差 10rpx。
+         ② 两头都不许进那圈圆角帽——内缩 ≥ 圆角 13−1。**这一条就是他这一句要的那件事**：
+            'Recommend' 那一版字面右沿越过板的右沿（屏上读到的是负内缩），nowrap 让它不折行、
+            直接顶出板外被裁，静态那把一条都不会红。 */
+      const inkLeft = cx - MODEL.side * MODEL.shiftRatio - MODEL.ink / 2
+      const lInset = inkLeft
       const rInset = (bar.right - tx.right) / R
-      ck(`${tag}四个字的右沿离胶囊右沿＝图里那档 0.413H≈18.2（真机那一头），模拟器取整那一档也不许多过 30`,
-        rInset >= 0.413 * MODEL.barH - 1 && rInset <= 0.413 * MODEL.barH + 12,
-        `右内缩 ${rInset.toFixed(1)}rpx、字面宽 ${toRpx(tx.width).toFixed(1)}rpx（模拟器 10px/字＝76.9、真机 1em＝84）`)
+      ck(`${tag}整组在板里居中（⑯）：墨迹左沿离左帽 ${lInset.toFixed(1)} ＝ 字面右沿离右帽 ${rInset.toFixed(1)}，差 ≤3rpx`,
+        Math.abs(lInset - rInset) <= 3, `左 ${lInset.toFixed(1)}／右 ${rInset.toFixed(1)}（字面宽 ${toRpx(tx.width).toFixed(1)}rpx）`)
+      ck(`${tag}两头都不进圆角帽（≥13−1rpx）——英文那一格超出的正是这一条，屏上读成"字被板沿裁掉"`,
+        lInset >= MODEL.radius - 1 && rInset >= MODEL.radius - 1,
+        `左 ${lInset.toFixed(1)}／右 ${rInset.toFixed(1)} vs 圆角 ${MODEL.radius}（板 ${MODEL.barW}、字面宽 ${toRpx(tx.width).toFixed(1)}）`)
+      /* 中文那一门另有一档参照（不是判据）：图里量到的右内缩 0.413H≈18.2，而模拟器把 21rpx
+         字号取整成 10px ⇒ 四个汉字量到 76.9rpx、真机按 1em 走是 84rpx，同一句源码两块屏差 7rpx。
+         居中之后这一档平摊到两头（模拟器 ≈22、真机 ≈18.5），所以只把数打出来，不卡阈值。 */
+      console.log(`  · 备忘（不是判据）${tag}：字面宽 ${toRpx(tx.width).toFixed(1)}rpx、两头内缩 ${lInset.toFixed(1)}／${rInset.toFixed(1)}（图里 17.1／18.2）`)
     }
   }
   /* ---------- ⑭⑮ 那一格：这一枚现在住在首屏最上面那一行里 ---------- */
@@ -215,6 +226,15 @@ async function measure(page, tag, R, toRpx) {
   // ---------- ① 首屏（收起那一态）----------
   await mp.switchTab('/pages/create/create')
   const hp = await mp.currentPage(); await hp.waitFor(900)
+  /* 语言不能指望跑尺子.sh 那颗钉子：它改的是 `getApp().globalData.userInfo.language`，
+     而 `switchTab` 切到**自己这一枚 tab 是空操作、onShow 根本不发**（那条坑记在 10-15 那次：
+     屏上那一串类名/语言是页自己的 data，只有 onShow 里那句重取才会跟 globalData 对账）。
+     10-20 这一趟就是这么红的：钉子打了"钉成 zh"，屏上念的仍是上一刻的 'Share'。
+     ⇒ 这一把自己钉：进门先读、不是中文就按页面自己那一句 setData 翻过去，并读回 lang 自证。 */
+  const lang0 = (await hp.data('lang')) || 'zh'
+  if (lang0 !== 'zh') { await hp.setData({ lang: 'zh', t: texts('zh') }); await hp.waitFor(900) }
+  ck('中文那一门在屏上（钉子改 globalData、`switchTab` 回自己这一枚不发 onShow，页里那份可能还是上一刻的）',
+    (await hp.data('lang')) === 'zh', `进门 ${lang0}→ 现在 ${await hp.data('lang')}`)
   const dockClass0 = (await (await hp.$('.container')).attribute('class')) || ''
   const bar0 = await measure(hp, '首屏', R, toRpx)
   const txEl = await hp.$('.rec-bar .rec-tx')
@@ -238,6 +258,29 @@ async function measure(page, tag, R, toRpx) {
     `首屏 ${bar0 && bar0.left.toFixed(1)},${bar0 && bar0.top.toFixed(1)} ${bar0 && bar0.width.toFixed(1)}×${bar0 && bar0.height.toFixed(1)}px／拍照屏 ${bar1 && bar1.left.toFixed(1)},${bar1 && bar1.top.toFixed(1)} ${bar1 && bar1.width.toFixed(1)}×${bar1 && bar1.height.toFixed(1)}px`)
   await hp.setData({ active: '' })
 
+  /* ---------- ②b 英文那一门（⑯ 他这一句要量的正是这一档）----------
+     必须在切去列表页**之前**做完：`hp` 是新建页那一枚句柄，切走之后它不在栈顶，
+     `hp.setData` 直接报 `page is not on top of page stack`（10-20 第一趟就挂在这儿）。
+     走的是页面自己那一句 `setData({ lang, t: texts(lang) })`——`create.js` 的 onSwitchLang
+     落屏的就是这一句，所以量的是同一条渲染路径；**不发那条 PUT**：服务端那一栏由他手机上
+     点角标那一下改，与"字塞不塞得进胶囊"无关，我不该在自证里动他账号的语言设置。
+     只量首屏那一态：拍照屏与它共用同一份皮、同一个落点式子，上面已经两态各量过一遍。 */
+  await hp.setData({ lang: 'en', t: texts('en') })
+  await hp.waitFor(900)
+  ck('英文那一门真的翻到了（读回 lang，不假定 setData 成了——没翻过去下面量的就还是中文那一格）',
+    (await hp.data('lang')) === 'en', await hp.data('lang'))
+  const txEn = await hp.$('.rec-bar .rec-tx')
+  ck('英文那一枚屏上念的就是 ⑯ 换过的那一格（读渲染端的字，不读字典：字典发了而屏上没换＝另有来源）',
+    txEn ? ((await txEn.text()) || '').trim() === I18N.en.recBarTitle : false,
+    txEn ? `${JSON.stringify(await txEn.text())}／字典 ${JSON.stringify(I18N.en.recBarTitle)}` : '没抓到 .rec-bar .rec-tx')
+  await measure(hp, '英文首屏', R, toRpx)
+  await mp.screenshot({ path: '/tmp/rec-bar-英文.png' })
+  extraShots.push('/tmp/rec-bar-英文.png')
+  await hp.setData({ lang: 'zh', t: texts('zh') })
+  await hp.waitFor(600)
+  ck('收尾切回中文（跑尺子.sh 每把之前钉的是中文，别给它留英文状态）',
+    (await hp.data('lang')) === 'zh', `进门 ${lang0}／现在 ${await hp.data('lang')}`)
+
   // ---------- ③ 列表那一屏：④ 说"不再放在列表页"，撤掉的东西不许还在屏上 ----------
   await mp.switchTab('/pages/index/index')
   const ip = await mp.currentPage(); await ip.waitFor(900)
@@ -258,7 +301,7 @@ async function measure(page, tag, R, toRpx) {
     if (fs.existsSync(f)) shots.push(f)
   }
   await cp.setData({ active: '' })
-  console.log('  两张图：' + shots.join('　'))
+  console.log('  图：' + shots.concat(extraShots).join('　'))
 
   await mp.disconnect()
   console.log(`\n验-推荐按钮两态-真跑：${pass} 过${fails.length ? `　✗ ${fails.length} 条：\n  ` + fails.join('\n  ') : '　全绿'}`)

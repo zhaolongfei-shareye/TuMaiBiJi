@@ -475,11 +475,12 @@ const i18n = {
     aiLine: 'TumarkNote: any shot, noted in 10s',
     createHeading: 'Save what matters',
     createHeading2: '',
-    // 英文这一格是从本字典已有的那句砍出来的（`shareToFriend` 的 en 值是 'Recommend Tumark'，
-    // 这一格去掉后半截留 'Recommend'），不另起一句新话：站长只给了中文那一格，英文态总得有字，
-    // 而"推荐给别人用"这件事的英文叫法现网早就有了。
-    // 中文加到五个字（10-20 第五句）而这一格不动：'Recommend' 比五个汉字短，横排里撑盒子宽的是中文那一门。
-    recBarTitle: 'Recommend',
+    // 10-20 ⑯「切换到英文，按钮黄色的英文超出按钮，这个能否换个字母」：'Recommend' 那一格塞不进
+    // 144rpx 的板（字那一列只有 84rpx＝四个汉字的位置，'Recommend' 九个拉丁字符按 21rpx 要 ~118）。
+    // 换的词仍从**本字典已有的**那格里挑，不另起一句新话：`shareNote` 的 en 值就是 'Share'
+    // （详情页与详情窗那两枚分享按钮屏上就叫这个），zh 是「分享」。
+    // ⚠ 中文那一格「告诉好友」是他 ⑫ 给的原话，一字没动；这一处只动英文那一门。
+    recBarTitle: 'Share',
     tabMe: 'Me',
     appName: 'TumarkNote',
     navDetail: 'Note detail',
