@@ -226,12 +226,16 @@ def _parse_response(content: str, fallback_title: str) -> dict:
     try:
         result = json.loads(content)
     except json.JSONDecodeError:
+        # ⚠ 这一支以前不带 `degraded`，而 `extract_knowledge` 是 `setdefault("degraded", False)`
+        # ⇒ 库里把"模型吐回来的不是 JSON"记成提炼成功（N9，与云函数那一支同一个洞）。
+        # 摘要其实是原文前 500 字、要点与标签空、卡片眉标退到分类名，这些都得能被下游分清。
         title = (fallback_title or "未命名笔记").strip()[:500]
         return {
             "title": title,
             "summary": content[:500],
             "key_points": [],
             "tags": [],
+            "degraded": True,
         }
 
     # Validate structure and types
@@ -242,6 +246,7 @@ def _parse_response(content: str, fallback_title: str) -> dict:
             "summary": content[:500],
             "key_points": [],
             "tags": [],
+            "degraded": True,
         }
 
     title = result.get("title")
@@ -272,4 +277,9 @@ def _parse_response(content: str, fallback_title: str) -> dict:
         "summary": summary,
         "key_points": key_points,
         "tags": tags,
+        # ⚠ 这一栏必须跟着走（N9 真正咬人的那一处）。云函数认不出模型回体时走的是它自己的兜底
+        # （标题"未命名笔记"＋摘要原文前 500 字＋要点标签空），那是一份**合法 JSON**，
+        # 于是 `:196` 把它交给这里重拼四栏——原来只拼四栏，`degraded` 就在这一步被丢掉，
+        # 外面 `setdefault("degraded", False)` 再补一个 False ⇒ 库里记成"提炼成功"。
+        "degraded": bool(result.get("degraded", False)),
     }
