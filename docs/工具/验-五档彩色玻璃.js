@@ -456,7 +456,9 @@ const KNIVES = [
   ['★换档从一个没对过账的值起（壁纸是青的，点一下跳回象牙＋纸底）', 'appjs',
     (s) => s.replace('moodNext(this.glassMood().key)', 'moodNext(wx.getStorageSync(MOOD_KEY))')],
   ['★壁纸不留本机缓存（登录没回来那一趟，天青／樱落／雨雾三档被对账判成"对不上"⇒ 首页那枚只剩两档能点）', 'appjs',
-    (s) => s.replace('    wx.setStorageSync(WALLPAPER_CACHE_KEY, key)\n', '')],
+    // 10-20 那一刀把这枚写进 try（存储写满不许挡住按下那一下，N8），锚点跟着换成整句；
+    // 撤掉整句才是这一条要验的坏法——只撤 try 里面的那一半，界面照样留缓存。
+    (s) => s.replace("    try { wx.setStorageSync(WALLPAPER_CACHE_KEY, key) } catch (e) { console.warn('壁纸本机缓存没存住:', e) }\n", '')],
   ['★把缓存排到服务端那一枚前面（换手机后他选的壁纸被本机旧值顶掉，10-04 那条"服务端当家"就翻了）', 'appjs',
     (s) => s.replace("const wanted = fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper)\n      || wx.getStorageSync(WALLPAPER_CACHE_KEY) || 'default'",
       "const wanted = wx.getStorageSync(WALLPAPER_CACHE_KEY) || fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper) || 'default'")],

@@ -31,7 +31,9 @@ async function allowPrivate(categoryName, lang) {
 // 那一列空着的时候输什么都不会对，人就卡在"既进不去、又不知道该去哪儿"（站长 10-12 报的死路）。
 // 所以这一种失败单独认，认出来就给一个能走的口；其余失败照旧回那句"密码不正确"。
 function _noPasswordSet(err) {
-  const d = (err && err.data && err.data.detail) || ''
+  // 收口走 api.friendlyDetail（N7）：框架那类英文兜底短语在这里一律当没有，
+  // 认的就是服务端自己写的这一句中文。
+  const d = api.friendlyDetail(err && err.data && err.data.detail)
   return d.indexOf('尚未设置私密密码') > -1
 }
 

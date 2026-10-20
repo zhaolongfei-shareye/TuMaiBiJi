@@ -49,6 +49,20 @@ function _headers(contentType, extra, withUnlock = true) {
   return h
 }
 
+// 后端回体里的 `detail` 有两种来源：一种是我们服务端自己写的中文话术（能给他看），
+// 一种是框架兜底的英文短语（"Method Not Allowed" 那类，10-20 被它顶到屏上，审计 N7）。
+// 判据与 write.js 排序那一处同一条：带中文才留，其余一律当没有——各屏现有的
+// `|| t('…Failed')` 兜底就此接得住。reject 前在这里洗一次，页面不许各写一份。
+function friendlyDetail(text) {
+  return typeof text === 'string' && /[\u4e00-\u9fff]/.test(text) ? text : ''
+}
+
+function _washRes(res) {
+  const d = res && res.data
+  if (d && typeof d === 'object' && d.detail !== undefined) d.detail = friendlyDetail(d.detail)
+  return res
+}
+
 /**
  * 401 之后"准备重登"要清的那几格，**只有这一份**（审计 #7）。
  *
@@ -87,7 +101,7 @@ const request = (url, method, data, options = {}, retryCount = 0) => {
           // 注销这一类不可逆的写操作不带静默重登：401 之后换一个新账号重试，删掉的就是
           // 那个新号，用户看到"已注销"而自己的旧数据还在原地。宁可让他重进一次小程序。
           if (options.noRelogin) {
-            reject(res)
+            reject(_washRes(res))
             return
           }
           // Prevent infinite relogin loop: only retry once
@@ -109,7 +123,7 @@ const request = (url, method, data, options = {}, retryCount = 0) => {
             .then(resolve)
             .catch(reject)
         } else {
-          reject(res)
+          reject(_washRes(res))
         }
       },
       fail(err) {
@@ -137,7 +151,7 @@ const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
           try {
             resolve(JSON.parse(res.data))
           } catch (e) {
-            reject(res)
+            reject(_washRes(res))
           }
         } else if (res.statusCode === 401) {
           // Prevent infinite relogin loop: only retry once
@@ -162,9 +176,9 @@ const uploadSingleImage = (url, filePath, formData, retryCount = 0) => {
           // wx.uploadFile 拿到的 data 是字符串，而 wx.request 的是对象。不统一成对象，
           // 页面里 err.data.detail 这种取法在上传失败时会拿到 undefined，用户只能看到兜底文案。
           try {
-            reject(Object.assign({}, res, { data: JSON.parse(res.data) }))
+            reject(_washRes(Object.assign({}, res, { data: JSON.parse(res.data) })))
           } catch (e) {
-            reject(res)
+            reject(_washRes(res))
           }
         }
       },
@@ -203,7 +217,12 @@ const pollTask = (taskId, intervalMs = 2000, maxWaitMs = 300000) => {
           if (data.status === 'completed') {
             resolve(data.result)
           } else if (data.status === 'failed') {
-            reject(data.result || { error: 'unknown' })
+            // 同一条收口（N7）：任务失败回体里的 `error` 常常是英文甚至字面 "unknown"，
+            // 上屏就是框外气泡一句天书（create.js 的 errLine 直接吃 err.error）；洗成空，让它落回那句「处理失败，请重试」。
+            const r = data.result && typeof data.result === 'object' ? data.result : {}
+            if (r.error !== undefined) r.error = friendlyDetail(r.error)
+            if (r.detail !== undefined) r.detail = friendlyDetail(r.detail)
+            reject(r)
           } else {
             setTimeout(poll, intervalMs)
           }
@@ -216,6 +235,9 @@ const pollTask = (taskId, intervalMs = 2000, maxWaitMs = 300000) => {
 
 module.exports = {
   request,
+  // 收口后的那一句：只有带中文的才留得下来（N7）——utils 里自己读 `err.data.detail` 的
+  // 两处（privateGate／cardCloud）都走这一枚，别再各写一份判据。
+  friendlyDetail,
   getNotes: (skip = 0, limit = 20, categoryId, search) => {
     let url = `/api/notes/?skip=${skip}&limit=${limit}`
     if (categoryId != null) url += `&category_id=${categoryId}`

@@ -154,7 +154,13 @@ Page({
           // 骨架里那是个 4:3 的占位数。等整轮画完再一次性 setData，画的过程中这十格
           // 都被压在占位框里竖着挤一挤——圆角跟着挤成椭圆（clipRounded 是画进位图的，
           // 位图不弯、显示弯）。一格里一次 setData 只改一个字段，代价比看到的问题小。
-          this.setData({ [`groups[${gi}].items[${ii}].h`]: h })
+          const shown = plan.fellBack ? poster.templateLabel(plan.template, lang) : tpl.label
+          this.setData({
+            [`groups[${gi}].items[${ii}].h`]: h,
+            // 跑坏退到默认那一套时，这一格的名字跟着**画出来的那张**念（N10）：
+            // 念着「图文卡」而格子里是笔记卡，人会以为那套模板长这样。
+            [`groups[${gi}].items[${ii}].label`]: shown,
+          })
           await new Promise((r) => wx.nextTick(r))
           // 改宽高会重置画布状态，所以 scale 必须在之后设
           canvas.width = Math.round(plan.width * THUMB_SCALE)
@@ -166,7 +172,7 @@ Page({
           // 后落笔的覆盖先落笔的——旧内容反而成了最终画面。
           if (this._renderGen !== gen) return
           poster.paintLayers(ctx, plan.layers, images)
-          groups[gi].items[ii] = Object.assign({}, tpl, { h })
+          groups[gi].items[ii] = Object.assign({}, tpl, { h, label: shown })
         } catch (err) {
           console.error('模板小样没画出来', tpl.id, err)
           groups[gi].items[ii] = Object.assign({}, tpl, { h: Math.round(THUMB_W * 1.4) })
@@ -195,7 +201,14 @@ Page({
   // 2.1：这一个是四格变动的**唯一出口**（放一张、换一张、勾角色、撤掉都走它），
   // 所以登记也只挂在这里一处——挂到各按钮上就会漏掉某一条路，而漏掉的表现为"换台手机那格是空的"。
   _commitSlots(next) {
-    poster.writeSlots(next)
+    // 存储写满时这一句会抛，抛了这一格其实没改：当场说实话、界面不动，不许留一句假的成功（N8）。
+    try {
+      poster.writeSlots(next)
+    } catch (e) {
+      console.error('形象图槽没存下', e)
+      wx.showToast({ title: t('avatarSaveFailed', this.data.lang), icon: 'none' })
+      return
+    }
     this.setData({ slots: next, allFull: !next.some((s) => !s) })
     this.renderThumbs()
     profileCloud.pushSlots(next).then(() => {

@@ -256,8 +256,8 @@ async function dropServer(noteId) {
     // 服务端回了一句原因的（10-14 那道「自带的卡片删不掉」就是）把那句原样交回去，
     // 调用方拿它当吐司——只回 false 会被念成"没连上后端"，而真实原因是"这一张不许删"。
     // 判据 4 那类"没原因"的失败（离线、超时、401）仍然回 false，走原来那句实话。
-    const detail = e && e.data && e.data.detail
-    if (typeof detail === 'string' && detail) return detail
+    const detail = api.friendlyDetail(e && e.data && e.data.detail)
+    if (detail) return detail
     console.warn('服务器那一行没撤掉，这一格先照原样留着', e && (e.errMsg || e.statusCode))
     return false
   }

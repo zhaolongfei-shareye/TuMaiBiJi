@@ -14,7 +14,9 @@ const MAX_QUEUE = 50
 
 /** @returns {Array<{noteId:number, items:Array}>} 原样读出，不解释内容 */
 function take() {
-  const raw = wx.getStorageSync(KEY)
+  // 读也会抛（与同仓 posterTemplates／person 同一口径）：这一抛不许打断 flush 或调用方（N8）。
+  let raw
+  try { raw = wx.getStorageSync(KEY) } catch (e) { raw = null }
   return Array.isArray(raw) ? raw : []
 }
 

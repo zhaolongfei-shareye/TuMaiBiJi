@@ -13,6 +13,7 @@ const { labelOf, bracketOf } = require('../../utils/catText.js')
 const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const noteImage = require('../../utils/noteImage.js')
+const posterMatte = require('../../utils/posterMatte.js')
 const mpAssets = require('../../utils/mpAssets.js')
 const { formatDate, formatDateTime, formatShortDate, formatWeekday } = require('../../utils/date.js')
 const bgTone = require('../../utils/imgBrightness.js')
@@ -473,12 +474,16 @@ Page({
   },
 
   async loadNotes(reset = false) {
+    // 闸门只挡翻页：滚到底的当口点芯片／下拉刷新／提炼完回列表，表已清空，这时把重载也挡掉
+    // 就是"空表等旧筛选那批追加回来"（N3）。在飞的翻页回包靠代次作废，不靠 loadingMore 那一枚布尔。
     if (reset) {
+      this._notesGen = (this._notesGen || 0) + 1
       this.setData({ skip: 0, notes: [], hasMore: true })
     }
-    
+    const gen = this._notesGen || 0
+
     const { skip, limit, searchKeyword, selectedCategory, loadingMore } = this.data
-    if (loadingMore) return
+    if (loadingMore && !reset) return
 
     // reset 走整表重载：显示加载态并清空，避免残留上一次的筛选结果；
     // 翻页走追加：保持列表可见，用 loadingMore 单独提示。
@@ -489,6 +494,7 @@ Page({
     
     try {
       const notes = await api.getNotes(skip, limit, selectedCategory, searchKeyword)
+      if (gen !== (this._notesGen || 0)) return
       const lang = this.data.lang
       notes.forEach(n => {
         const key = SOURCE_TYPE_KEYS[n.source_type]
@@ -526,6 +532,7 @@ Page({
       }
     } catch (err) {
       console.error('加载笔记失败', err)
+      if (gen !== (this._notesGen || 0)) return
       this.setData({ loading: false, loadingMore: false })
       wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
     }
@@ -1183,6 +1190,10 @@ Page({
   async _openDetail(idx) {
     const row = this.data.notes[idx]
     if (!row) return
+    // 代次号（N6）：左右快滑时上一趟回包晚到也不许落进这一扇窗——落笔前对号，不对就丢，
+    // 与 _loadDetailImages 里 `cur.id !== noteId` 同一口径，这里只是把"还是不是这一趟"收得更准。
+    const gen = (this._detailGen || 0) + 1
+    this._detailGen = gen
     // 「左右滑动看下一篇」那一对邻居（站长 10-20，含夜里追加的「滑动遇到私密，自动跳过」）。
     // 存的是**邻居的 id 不是行号**：窗浮着的那一段时间里人会切到底栏另一格再回来，onShow 那趟
     // 重拉整表、序也变——拿着号滑就滑到别的篇上去了（同一型坑见 onRowTap 里"验的是 A、开的是 B"那一段）。
@@ -1203,7 +1214,7 @@ Page({
     let priv = !!row.is_private
     try {
       let full = await api.getNote(row.id)
-      if (!this.data.detailOpen) return
+      if (!this.data.detailOpen || gen !== this._detailGen) return
       // 详情那一份的 is_private 才是服务端钉的（backend/app/core/private_access.py 的
       // locked_response），列表那一行的不是——列表响应里根本没这一栏，本机是拿分类名现算的。
       // 分类那一张表没拉到或拉挂的当口，现算的那份会一律判成"不私密"，上面那道闸就被跳过：
@@ -1218,8 +1229,10 @@ Page({
       const askFirst = needsUnlock(gate)
       if (askFirst) this.setData({ detailOpen: false, detailNote: row })
       if (!(await unlockOn(this, gate))) return
+      if (gen !== this._detailGen) return
       if (askFirst) this.setData({ detailOpen: true })
       if (this._unlockRenewed) full = await api.getNote(row.id)
+      if (gen !== this._detailGen) return
       const note = Object.assign({}, row, full)
       note.source_type_label = row.source_type_label
       note.date_label = row.date_label
@@ -1598,7 +1611,7 @@ Page({
     return { w: Math.round(toRpx(rect.width)) - 48, h: Math.round(toRpx(rect.height)) - 32 }
   },
 
-  // 与 share.js render() 同一套：先量后画、canvas 尺寸切两次、paintLayers 落笔、canvasToTempFilePath 出成品。
+  // 与 share.js render() 同一套（外圈画法同吃 utils/posterMatte.js 一份）：先量后画、canvas 尺寸切两次、paintLayers 落笔、canvasToTempFilePath 出成品。
   // 画布藏在 left:-9999rpx 位置、不进 fixed，弹窗里只放成品 <image>——绕开 canvas-in-fixed 那条历史坑。
   async _renderPoster() {
     const a = this._posterAssets
@@ -1620,18 +1633,19 @@ Page({
        ②「为什么还是有黑边……要简单」→ 我按①改的那版往墨渗，深底那套渗完还是深色，真机读出来仍是黑边；
        ③「不是说去掉边框，而是不要黑色边框」→ 边框不撤，只是绝对不出深色。
        ⇒ 颜色只往纸白那一头渗（matteColor 见 poster.js），这一条公式下去每一套出来都是淡的。
-       画布这一格永远等于成品本身（含这一圈），不跟着展示框走：出的是 750 + 20×2 = 790 宽的一张。 */
-    const outW = plan.width + poster.MATTE * 2
-    const outH = plan.height + poster.MATTE * 2
-    canvas.width = outW
-    canvas.height = outH
+       画布这一格永远等于成品本身（含这一圈），不跟着展示框走：出的是 750 + 20×2 = 790 宽的一张。
+       具体画法收进 utils/posterMatte.js——分享页那两条出口走的是同一个函数（N4）。 */
+    const out = posterMatte.paint(canvas, ctx, plan, images)
+    const outW = out.w
+    const outH = out.h
     this.setData({ canvasW: outW, canvasH: outH })
-    ctx.fillStyle = poster.matteColor(plan)
-    ctx.fillRect(0, 0, outW, outH)
-    ctx.save()
-    ctx.translate(poster.MATTE, poster.MATTE)
-    poster.paintLayers(ctx, plan.layers, images)
-    ctx.restore()
+    // 这套配方跑坏了、画的是默认那一张（N10）：那一行名字要跟着真画出来的念，再实说一句。
+    // 不动 posterTpl——人挑的还是那一套，下一次滑回来照旧挑得动；只有"画出来的是什么"这一句不许说错。
+    this._posterDrawn = plan.template
+    if (plan.fellBack) {
+      this.setData({ posterTplName: poster.templateLabel(plan.template, lang) })
+      wx.showToast({ title: t('tplFellBack', lang), icon: 'none' })
+    }
     // 展示框按海报自己的比例算，宽和高吃同一个 scale——分开定就会变形。
     const box = await this._tplBoxRpx()
     if (box) {
@@ -1655,7 +1669,7 @@ Page({
   async _keepPoster() {
     const a = this._posterAssets
     if (!a || !this._posterCanvas) return
-    await cardLog.record(a.noteId, this.data.posterTpl, this.data.noQr, this._posterCanvas, this)
+    await cardLog.record(a.noteId, this._posterDrawn || this.data.posterTpl, this.data.noQr, this._posterCanvas, this)
     // 记完这一张就"有了"：底排立刻换成「删除｜取消」，不给第二张的入口（一篇一张）
     this.setData(Object.assign({ posterHasCard: true }, this.arrange(this.data.notes)))
   },

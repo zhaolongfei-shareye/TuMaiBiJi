@@ -61,7 +61,14 @@ const handlers = {
   },
 
   _ciCommit(next) {
-    poster.writeSlots(next)
+    // 存储写满时 writeSlots 会抛：这一格没存住就得当场说实话，不许让人以为改好了（N8）。
+    try {
+      poster.writeSlots(next)
+    } catch (e) {
+      console.error('形象图槽没存下', e)
+      wx.showToast({ title: t('avatarSaveFailed', this.data.lang), icon: 'none' })
+      return
+    }
     this._ciDirty = true
     const patch = { ciSlots: this._ciCaps(next) }
     if (typeof this._ciAfterCommit === 'function') Object.assign(patch, this._ciAfterCommit() || {})
@@ -180,7 +187,14 @@ const handlers = {
       name: (this.data.ciName || '').trim().slice(0, 16),
       slogan: (this.data.ciSlogan || '').trim().slice(0, 24),
     }
-    poster.writeProfile(patch)
+    // 点「保存」那一下 writeProfile 抛了什么都不发生，他以为存住了（N8）：包起来，没住就念实话、窗留着。
+    try {
+      poster.writeProfile(patch)
+    } catch (e) {
+      console.error('名片没存下', e)
+      wx.showToast({ title: t('saveFailed', lang), icon: 'none' })
+      return
+    }
     if (patch.name !== (before.name || '') || patch.slogan !== (before.slogan || '')) this._ciDirty = true
     wx.showToast({ title: t('profileSaved', lang), icon: 'success' })
     this.onCloseCardInfo()

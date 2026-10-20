@@ -192,7 +192,9 @@ ck('删除被拦下时（服务端还有别的理由会拦），详情页与首�
   (DETAIL_JS.match(/\(err\.data && err\.data\.detail\) \|\| t\('deleteFailed', lang\)/g) || []).length === 1
     && (IX_JS.match(/\(err\.data && err\.data\.detail\) \|\| t\('deleteFailed', lang\)/g) || []).length === 1)
 ck('撤那一张被拦下时走同一张嘴：`dropServer` 把 detail 交回调用方，没原因的那种才念"没连上后端"',
-  /if \(typeof detail === 'string' && detail\) return detail/.test(CC_JS)
+  // 10-20（N7）那句"是不是我们自己写的中文"不再在这里各写一份，收口进 api.friendlyDetail 一枚：
+  // 洗完整串为空 ⇒ 走下面那句"没连上后端"的实话。判的还是同一件事：有原因就照实念、没原因不猜。
+  /const detail = api\.friendlyDetail\(e && e\.data && e\.data\.detail\)\s*\n\s*if \(detail\) return detail/.test(CC_JS)
     && /typeof dropped === 'string' \? dropped : t\('cardDropOffline', lang\)/.test(IX_JS))
 
 // ---------- ④c 客户端那一半：置灰两枚、放开一枚、话一句 ----------

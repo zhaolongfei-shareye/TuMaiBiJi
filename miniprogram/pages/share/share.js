@@ -25,6 +25,7 @@ const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const noteImage = require('../../utils/noteImage.js')
+const posterMatte = require('../../utils/posterMatte.js')
 const cardInfo = require('../../utils/cardInfo.js')
 const { labelOf } = require('../../utils/catText.js')
 
@@ -164,11 +165,12 @@ Page({
     canvas.height = 750
     // 默认沿用「卡片模板」里选的那套；这一页手动换过之后以这一页的为准（不回写设置）
     const plan = poster.planPoster(ctx, this._note, this.data.picked || profile.template, profile, lang, { showQr: !this.data.noQr, hasNote: !!images.note })
-    canvas.width = plan.width
-    canvas.height = plan.height
-    poster.paintLayers(ctx, plan.layers, images)
+    // 外圈与首页出口同吃 utils/posterMatte.js 那一份画法（N4）：同一篇同一套模板，两个入口存出来必须是一张图。
+    const out = posterMatte.paint(canvas, ctx, plan, images)
+    // 这套配方跑坏了、画的是默认那一张（N10）：说一句实话，台账也按真画出来的那套记。
+    if (plan.fellBack) wx.showToast({ title: t('tplFellBack', lang), icon: 'none' })
 
-    this.setData(previewBox(plan.width, plan.height))
+    this.setData(previewBox(out.w, out.h))
 
     await new Promise((done, fail) => {
       wx.canvasToTempFilePath({
@@ -181,7 +183,9 @@ Page({
           // 画布与这一张用的是哪套模板、带没带码留着备用：台账只在人真存下这张时才记（见 _keepCard）。
           // 这两样都要在画布落图这一趟取，不能等记账那一刻现读 data——中途换过就不匹了。
           this._canvasNode = canvas
-          this._renderedTpl = this.data.picked || profile.template
+          // 记的是**真画出来那一张**的模板号（N10）：配方跑坏退了默认那套时，挑着的那套没画出来，
+          // 拿它记账会让台账与图对不上（与 index.js 的 _posterDrawn 同一条口径）。
+          this._renderedTpl = plan.template
           this._renderedNoQr = !!this.data.noQr
           done()
         },
@@ -238,14 +242,20 @@ Page({
         // 先让视图层把这一格的高度改成真实比例，再落笔（同 profile.js 那条：
         // 圆角是画进位图的，显示框还压在 4:3 占位里就会被看成一个竖扁的椭圆角）。
         const i = tpls.indexOf(x)
-        this.setData({ [`tpls[${i}].h`]: h })
+        // 跑坏退到默认那一套时，这一格的名字要跟着**画出来的那张**念（N10）：
+        // 念着「图文卡」而格子里是笔记卡，人只会以为这套模板长这样。
+        const shown = plan.fellBack ? poster.templateLabel(plan.template, lang) : x.label
+        this.setData({ [`tpls[${i}].h`]: h, [`tpls[${i}].label`]: shown })
         await new Promise((r) => wx.nextTick(r))
+        // 这一排小样画的是"这一套长什么样"，不带成品那一圈外圈（与 profile.js 模板页那一排同一画法）：
+        // N4 修的是**存出去的那张图**两条出口不一致，不是小样要跟着加边——两页小样必须长得一样。
         canvas.width = Math.round(plan.width * PICK_SCALE)
         canvas.height = Math.round(plan.height * PICK_SCALE)
         ctx.scale(PICK_SCALE, PICK_SCALE)
         poster.clipRounded(ctx, plan.width, plan.height, PICK_R, PICK_W)
         poster.paintLayers(ctx, plan.layers, images)
         x.h = h
+        x.label = shown
       } catch (err) {
         console.error('模板小图没画出来', x.id, err)
       }

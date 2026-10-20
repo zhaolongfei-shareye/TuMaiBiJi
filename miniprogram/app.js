@@ -45,8 +45,11 @@ function rememberInviter(options) {
   const raw = options && options.query ? options.query.inviter : ''
   const id = parseInt(raw, 10)
   if (!id || id <= 0) return
-  if (wx.getStorageSync(INVITER_KEY) === id) return
-  wx.setStorageSync(INVITER_KEY, id)
+  // 这一枚只是归因用的编号，存储写满抛一下不许挡住 onLaunch 里的 login()（N8）——丢就丢了。
+  try {
+    if (wx.getStorageSync(INVITER_KEY) === id) return
+    wx.setStorageSync(INVITER_KEY, id)
+  } catch (e) { console.warn('邀请编号没存下:', e) }
 }
 
 App({
@@ -113,27 +116,29 @@ App({
    */
   flushQueues() {
     if (!this.globalData.isLoggedIn) return
+    // 这五趟补账只 .then 不 .catch 的话，一旦 reject 就是未处理的 Promise 拒绝：
+    // 屏上无声、日志捞不到（10-18 修过同型，这里是漏网的几只，N8）。补账失败照旧不打扰用户，但必须被接住。
     assetQueue.flush(apiModule).then((r) => {
       if (r && r.sent) console.log(`补绑回 ${r.sent} 张图`)
-    })
+    }).catch((e) => console.warn('补绑这一趟没走完:', e))
     // 待删队列：笔记删了、云上对象没删成的那批（同一族，另一头）。不 await、不提示。
     cloudUpload.flushPurge().then((n) => {
       if (n) console.log(`补删掉 ${n} 个云上对象`)
-    })
+    }).catch((e) => console.warn('补删这一趟没走完:', e))
     // 卡片待补登记：成品图传上去了、但"这一张归哪篇"那一步没做成的那批（同一族，第三个头）。
     // 这批最坏的情况是"云上有一张图、库里没有那一行"——界面上看不见，换台手机更看不见。
     cardCloud.flush().then((r) => {
       if (r && r.sent) console.log(`补登记回 ${r.sent} 张卡片`)
-    })
+    }).catch((e) => console.warn('补登记这一趟没走完:', e))
     // 卡片补传：图还在本机、云上却没有那一行的那几张（10-08 那一趟留档静默死掉留下的存量）。
     cardCloud.backfillLocal().then((r) => {
       if (r && r.sent) console.log(`补传上云 ${r.sent} 张卡片`)
-    })
+    }).catch((e) => console.warn('补传卡片这一趟没走完:', e))
     // 名片待补写：换图／改名那一下 PUT 没成的那一笔。不补的话下一次 pull 会拿服务器那份
     // 覆盖本机，把用户刚换的那张删掉（profileCloud 顶上那格注释写着这条）。
     profileCloud.flushPending().then((cleared) => {
       if (!cleared) console.warn('名片那一笔这次还没补成，留在本机')
-    })
+    }).catch((e) => console.warn('名片补写这一趟没走完:', e))
   },
 
   async _reportInviter() {
@@ -208,7 +213,7 @@ App({
       // 故意不 await：读不到就维持本机这一份，首屏不许为它多等一趟；失败也不出声（那条链按设计静默）。
       profileCloud.pull().then((r) => {
         if (r && !r.ok) console.warn('名片那份这次没对齐:', r.reason)
-      })
+      }).catch((e) => console.warn('名片那份没对齐:', e))
       // 运营图（首页背景图）：后台传了新图就静默拉下来缓存，下一屏 homeBg() 自然取到。
       // 故意不 await：首屏不等它；失败也不出声（和 profileCloud.pull 同一纪律）。
       // 但"不出声"不等于"不接"：不 catch 的话这趟一旦reject 就是一个未处理的 Promise 拒绝，
@@ -281,7 +286,8 @@ App({
    */
   setWallpaper(key) {
     if (this.globalData.userInfo) this.globalData.userInfo.wallpaper = key
-    wx.setStorageSync(WALLPAPER_CACHE_KEY, key)
+    // 本机这一份只是缓存（权威在服务端），存储写满抛一下不许把按下去的那一下打死（N8）。
+    try { wx.setStorageSync(WALLPAPER_CACHE_KEY, key) } catch (e) { console.warn('壁纸本机缓存没存住:', e) }
     return key
   },
 
@@ -293,8 +299,11 @@ App({
   // 这一档**不上云**（2.1 定）：它不是"没备份"，是不该同步——理由见上面 UI_FONT_KEY 那段。
   setUIFont(key) {
     const k = UI_FONT_CLASS[key] ? key : 'default'
-    if (k === 'default') wx.removeStorageSync(UI_FONT_KEY)
-    else wx.setStorageSync(UI_FONT_KEY, k)
+    // 这一档只影响这台设备的字长什么样，写不进去只丢这一次记忆，不许抛打断调用方（N8）。
+    try {
+      if (k === 'default') wx.removeStorageSync(UI_FONT_KEY)
+      else wx.setStorageSync(UI_FONT_KEY, k)
+    } catch (e) { console.warn('界面字体没存住:', e) }
     return k
   },
 
@@ -335,7 +344,8 @@ App({
   // 看不出来已经变了——静默的差别最难查，所以跟着名片那一条链一起收口。
   cycleBgDim() {
     const v = dimNext(dimAt(wx.getStorageSync(BG_DIM_KEY)).v)
-    wx.setStorageSync(BG_DIM_KEY, v)
+    // 「调亮度」按下去屏上就要动：本机那一档写不进去只丢持久性，不许当场抛（N8）。
+    try { wx.setStorageSync(BG_DIM_KEY, v) } catch (e) { console.warn('亮度那一档没存住:', e) }
     profileCloud.pushDim(v)
     return { dimV: v, dimDot: dimDotStyle(v), dimScrim: dimScrimStyle(v) }
   },
@@ -349,7 +359,8 @@ App({
 
   setBgDim(v, fromServer) {
     const got = dimAt(v).v
-    wx.setStorageSync(BG_DIM_KEY, got)
+    // 同 cycleBgDim：这一档写不进去不许抛打断服务端那一趟与界面（N8）。
+    try { wx.setStorageSync(BG_DIM_KEY, got) } catch (e) { console.warn('亮度那一档没存住:', e) }
     if (!fromServer) profileCloud.pushDim(got)
     return { dimV: got, dimDot: dimDotStyle(got), dimScrim: dimScrimStyle(got) }
   },
@@ -379,7 +390,8 @@ App({
    */
   cycleGlassMood() {
     const m = moodNext(this.glassMood().key)
-    wx.setStorageSync(MOOD_KEY, m.key)
+    // 「换心情」按下去整屏要跟着换：本机这一档写不进去只丢重启后的记忆，不许当场抛（N8）。
+    try { wx.setStorageSync(MOOD_KEY, m.key) } catch (e) { console.warn('心情那一档没存住:', e) }
     this.setWallpaper(m.theme)
     this.applyTheme(m.theme)
     return m

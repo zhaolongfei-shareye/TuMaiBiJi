@@ -336,7 +336,9 @@ const renderPoster = (CODE_JS.split('async _renderPoster()')[1] || '').split('as
 ok('首页记在两条"留下"的口上：图片面板 success 与存相册 success 都走 _keepPoster',
   // 那一句 10-08 多了第六个参数（待确认那一档要带 origin 落账），所以锚点不再要求它正好以
   // `this)` 收尾。**判的还是同一件事**：五个入参一个没换顺序、记账只在这个口里发生。
-  /cardLog\.record\(a\.noteId, this\.data\.posterTpl, this\.data\.noQr, this\._posterCanvas, this/.test(keepPoster)
+  // 10-20（N10）第二枚换成"真画出来那一套"（`_posterDrawn`，配方跑坏退默认时台账不许念着挑的那套），
+  // 判的还是同一件事：模板号来自画那一趟存下来的值，不是记账那一刻现读 data。
+  /cardLog\.record\(a\.noteId, this\._posterDrawn \|\| this\.data\.posterTpl, this\.data\.noQr, this\._posterCanvas, this/.test(keepPoster)
   // 10-17 深夜站长把这一趟改成「生成完自动保存到手机，然后等用户选择分享路径」
   // ⇒ 原来挂在 `showShareImageMenu` 的 success 上那一句没了（面板是存完成之后才开的），
   //   记账挪到 `saveImageToPhotosAlbum` 的成功那一支。判的还是同一件事：**人真留下这张**才记。
@@ -346,10 +348,13 @@ ok('首页记在两条"留下"的口上：图片面板 success 与存相册 succ
 ok('海报页同一条：存相册成功才走 _keepCard，模板与带没带码都是画那一趟存下来的',
   /cardLog\.record\(this\._note\.id, this\._renderedTpl, this\._renderedNoQr, this\._canvasNode, this\)/.test(keepCard)
   && /success: async \(\) => \{\s*await this\._keepCard\(\)/.test(strip(shareJs))
-  && /this\._renderedTpl = this\.data\.picked \|\| profile\.template/.test(strip(shareJs))
+  && /this\._renderedTpl = plan\.template/.test(strip(shareJs))
   && /this\._renderedNoQr = !!this\.data\.noQr/.test(strip(shareJs)))
 ok('画布落图那一步不再记账（_renderPoster 里不许出现 record，滑一次模板多一张就是它）',
-  !/cardLog\.record/.test(renderPoster) && /this\._posterCanvas = canvas/.test(renderPoster))
+  // 同一趟要把"真画出来那一套"留个号（N10）：漏了这一句，台账那枚会拿 `|| data` 现读，
+  // 配方跑坏退了默认那一张、账上还念着挑的那套——正是这条要防的。
+  !/cardLog\.record/.test(renderPoster) && /this\._posterCanvas = canvas/.test(renderPoster)
+  && /this\._posterDrawn = plan\.template/.test(renderPoster))
 const SORT_RE = /sort\(\(x, y\) => \(y\.at \|\| 0\) - \(x\.at \|\| 0\)\)/
 const SORT_SHORT = /sort\(\(x, y\) => \(y\.at/
 ok('格子里第一张＝最近留下的那张（台账按 at 倒序；顺着放就会拿最早那张当封面）',
