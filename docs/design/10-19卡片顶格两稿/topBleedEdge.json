@@ -407,37 +407,6 @@
     "emitMany": {
      "var": "qr.layers"
     }
-   },
-   {
-    "emit": {
-     "k": "rrect",
-     "x": 1.5,
-     "y": 1.5,
-     "w": {
-      "-": [
-       {
-        "var": "W"
-       },
-       3
-      ]
-     },
-     "h": {
-      "-": [
-       {
-        "var": "height"
-       },
-       3
-      ]
-     },
-     "r": 0,
-     "stroke": {
-      "prim": "token",
-      "args": {
-       "name": "muted"
-      }
-     },
-     "strokeWidth": 3
-    }
    }
   ]
  }
