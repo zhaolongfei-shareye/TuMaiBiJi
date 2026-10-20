@@ -674,7 +674,10 @@ module.exports = {
       { let: 'cardH', value: { '+': [44, { if: [{ truthy: { var: 'sumLines' } }, { '+': [{ '*': [{ '-': [{ len: { var: 'sumLines' } }, 1] }, 40] }, 34, 22] }, 0] }, { if: [{ truthy: { var: 'points' } }, { '*': [{ len: { var: 'points' } }, 44] }, 0] }, 20] } },
       { let: 'signTop', value: { '+': [{ var: 'cardTop' }, { var: 'cardH' }, 44] } },
       // 上面已经有一枚大头像了，署名行只留字：同一张脸上出现两次自己很难看
-      { let: 'sign', value: { prim: 'signRow', args: { x: { var: 'pad' }, y: { var: 'signTop' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, { var: 'qrSize' }, 30] }, size: 28, avatarD: 74, hasAvatar: false } } },
+      // ⚠ 10-20 站长「这个模板一句话，看不清，请变成白色字」：这一套的底是紫（他那张卡量出来 (114,133,254)），
+      //   可署名行以前**没传 onDark** ⇒ 那句拿到的是浅底专用的灰 #9A9EA6，对底只有 1.20:1（等于看不见）。
+      //   补成 true 与它那三套深色兄弟（波普分格／荧光渐变／杂志封面）同一口径：那句走白 72%（2.42:1）、名字走纸白。
+      { let: 'sign', value: { prim: 'signRow', args: { x: { var: 'pad' }, y: { var: 'signTop' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, { var: 'qrSize' }, 30] }, size: 28, avatarD: 74, onDark: true, hasAvatar: false } } },
       { let: 'height', value: { '+': [{ var: 'signTop' }, { max: [{ var: 'sign.h' }, { prim: 'footH', args: { qrSize: { var: 'qrSize' } } }] }, 48] } },
 
       { emit: { k: 'fill', x: 0, y: 0, w: { var: 'W' }, h: { var: 'height' }, color: { var: 'light' } } },

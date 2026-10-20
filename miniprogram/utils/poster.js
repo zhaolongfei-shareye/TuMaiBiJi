@@ -1520,7 +1520,9 @@ function planPopDots(ctx, d) {
   const cardH = 44 + (sumLines.length ? (sumLines.length - 1) * 40 + 34 + 22 : 0) + (points.length ? points.length * 44 : 0) + 20
   const signTop = cardTop + cardH + 44
   // 上面已经有一枚大图位了，署名行只留字：同一张脸上出现两次自己很难看
-  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 30, size: 28, avatarD: 74, profile, hasAvatar: false })
+  // onDark 这一档 10-20 才补上：这一套的底是紫，以前没传 ⇒ 那句 slogan 拿的是浅底用的灰（对底 1.20:1，看不清）。
+  // 与配方那一份（posterRecipes.js 的 popDots）同一处改动，两边必须一起改，不然"包内兜底"与"下发"画出来不是一张卡。
+  const sign = signRow({ ctx, x: pad, y: signTop, maxW: W - pad * 2 - qrSize - 30, size: 28, avatarD: 74, onDark: true, profile, hasAvatar: false })
   const height = signTop + Math.max(sign.h, footH(qrSize)) + 48
 
   const layers = []
