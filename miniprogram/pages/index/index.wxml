@@ -210,6 +210,10 @@
   <view wx:if="{{detailOpen}}" class="float-sheet" style="{{detailNote.catStyle}}">
     <view class="grip" bindtap="onCloseDetail">
       <view class="grip-bar"></view>
+      <!-- 站长 10-20：「（详情窗）左上角，加提示词"左右滑动看下一篇"」。字照他给的抄，
+           落点与卡片那一屏左端那一句「左右滑换模板」同一档（`.grip-tx-l`：同一行、左端 34rpx）。
+           只在真有一前一后时画——列表筛完只剩这一篇时这一句就是假话。 -->
+      <text class="grip-tx grip-tx-l" wx:if="{{dsHasNav}}">{{t.noteSwipeHint}}</text>
       <text class="grip-tx">{{t.grip}}</text>
     </view>
     <scroll-view class="ds-body" scroll-y show-scrollbar="{{false}}"
@@ -221,7 +225,9 @@
            `.ds-rt`/`.ds-pad` 本体留在 `app.wxss` 没删——独立详情页那一屏还在用，这一轮没动它。
            标签跟着他这一句弱化了（「只需要显示标签名字，灰字，不加底色，不加粗」），写法见 index.wxss 的 `.ds-tag`。 -->
       <view class="ds-meta"><text wx:if="{{detailNote.catSeg}}" class="ds-cat {{detailNote.is_private ? 'cat-priv' : ''}}">{{detailNote.catSeg}}·</text><text class="ds-rest">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</text></view>
-      <view class="ds-h2">{{detailNote.title}}</view>
+      <!-- 手势只挂在这一枚上（不挂整窗）：窗里正文要上下滚、配图那一排点了要开大图，
+           整窗吃横向手势会把那两件事挡掉。来历三条口径写在 index.js 的 onDsTitleTouchStart。 -->
+      <view class="ds-h2" bindtouchstart="onDsTitleTouchStart" bindtouchend="onDsTitleTouchEnd">{{detailNote.title}}</view>
       <view class="ds-tags" wx:if="{{detailNote.tags && detailNote.tags.length}}">
         <text class="ds-tag" wx:for="{{detailNote.tags}}" wx:key="*this" wx:for-item="tg">#{{tg}}</text>
       </view>
@@ -339,8 +345,14 @@
            `_tplBoxRpx()` 给展示框预留的是「左右 48 ＋ 下面那一排圆点 32」，10-17 新加的名字那行
            从来没算进预留，而 `.tpl-body` 是居中＋`overflow:hidden`，超出的高度上下各切一刀，
            切到的正是最后一行。搬到顶上之后那一列只剩「海报＋圆点」，预留又回到原值。
-           左右各有一句（滑动手势／收窗），所以中间这枚限宽加省略号，不许把两句挤走。 -->
-      <text wx:if="{{!posterHasCard && posterTplName}}" class="grip-tx grip-tx-c">{{posterTplName}}</text>
+           左右各有一句（滑动手势／收窗），所以中间这枚限宽加省略号，不许把两句挤走。
+           ⚠ 10-20 站长追一句「卡片模板名称（字体加粗）左右加小箭头，例如 < 图文卡 >，
+           提醒用户知道可以左右滑」：加粗那一格本来就成立（`.grip-tx` 那一条写死 700，
+           屏上实测 font-weight 也读到 700），这一刀只补两枚箭头。写成表达式 `'< ' + … + ' >'` 而不是把
+           尖括号直接敲进标签里——WXML 是 XML，正文里的裸 `<` 不是"难看"而是解析不了。
+           两边各留一个空格照他写的原样；箭头与名字同一条 `text`，所以点它照旧走
+           `onTplNameTap`（一枚可点的东西不拆成三枚），限宽那 340rpx 也仍是整条一起省略。 -->
+      <text wx:if="{{!posterHasCard && posterTplName}}" class="grip-tx grip-tx-c" catchtap="onTplNameTap">{{'< ' + posterTplName + ' >'}}</text>
       <view wx:else class="grip-bar"></view>
       <!-- 左右各一句、同一行同一档：右边收窗，左边告诉他这一屏能左右滑。
            原来那句挂在卡片下面，卡片一高就被顶到看不见。 -->
@@ -352,7 +364,15 @@
       <view wx:else class="tpl-loading">{{t.loading}}</view>
       <!-- 一共多少套、现在第几套：每套一枚，当前那枚大一点、其余淡一档 -->
       <!-- 已生成态不给换模板，那排圆点跟着不画（留着会以为还能滑） -->
-      <view class="tpl-dots" wx:if="{{!posterHasCard}}">
+      <!-- 站长 10-20：「生成笔记时候，切换模板，支持手指在几个小点上面拖动切换（支持循环，
+           滚动最后一个，再切到第一个，不要卡死），否则用户不知道怎么切换」。
+           这一排现在能**按着一枚枚拖着走**：手指每挪过一枚圆点的间距（22rpx）就换一套。
+           ⚠ 三枚都是 `catch` 不是 `bind`：这一排在 `.tpl-body` 里面，而 `.tpl-body` 自己挂着
+           那一条"滑过 60px 换一套"。用 bind 的话拖一次点会**同时**触发两条，一次跨两套。
+           热区比那一排点本身高（见 index.wxss 的 `.tpl-dots`：16rpx 的一条按不住）。 -->
+      <view class="tpl-dots" wx:if="{{!posterHasCard}}"
+        catchtouchstart="onTplDotsTouchStart" catchtouchmove="onTplDotsTouchMove"
+        catchtouchend="onTplDotsTouchEnd" catchtouchcancel="onTplDotsTouchEnd">
         <view wx:for="{{tplIds}}" wx:key="id"
           class="tpl-dot {{item.id === posterTpl ? 'tpl-dot-on' : ''}}"
           style="background: {{item.color}}"></view>

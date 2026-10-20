@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { catSkinFor, toneColor, withAlpha, TIP_DOT } = require('../../utils/palette.js')
+const { appSharePayload } = require('../../utils/shareCard.js')
 const poster = require('../../utils/poster.js')
 const cardLog = require('../../utils/cardLog.js')
 const cardCloud = require('../../utils/cardCloud.js')
@@ -563,6 +564,12 @@ Page({
     if (!this.data.searchOpen && !this.data.searchKeyword) return
     this.setData({ searchOpen: false, searchFocus: false, searchKeyword: '' })
     this.loadNotes(true)
+  },
+
+  // 与首屏那枚、与「我的」页那行「推荐图麦」共用 utils/shareCard.js 一份载荷：
+  // 三个入口点出去的必须是同一张卡（标题／落地页／封面）。
+  onShareAppMessage() {
+    return appSharePayload(this.data.lang, getApp().globalData.userId || '')
   },
 
   // 挂在展开的条子上专门挡冒泡：条子里头（包括输入框右边那片空白）的点击
@@ -1128,6 +1135,47 @@ Page({
     this._openDetail(at)
   },
 
+  /* 站长 10-20：「笔记详情页，要支持手指在页面大标题左右滑动，切换前后笔记。左上角，加提示词
+     "左右滑动看下一篇"」——他这一句里的"详情页"指的是**这扇带毛玻璃背景的详情窗**，不是全屏那一页
+     （同一轮第三句「是指带毛玻璃背景的那个界面，不是全屏那个」钉死了这一处）。
+     三条口径：
+     ① 手势只挂在 `.ds-h2` 那一枚大标题上。整窗吃横向手势会把"窗里上下滚正文"和"点配图拉大图"挡掉。
+     ② 阈值 60px 与卡片那一屏"左右滑换模板"同一个数（`onPosterTouchEnd`），两处同一把手感。
+     ③ 换一篇还是走 `_openDetail(号)`：这扇窗本来就住在列表页里，开与收都是它自己，不涉及页面栈。
+     ④ 邻居**跳过私密那几行**（站长 10-20 追加「滑动遇到私密，自动跳过」）：滑的落点永远是左右
+        最近的一行不私密的，密码闸因此在这一条把手上不会被撞响。判的是列表那一行本机现算的
+        `is_private`（按分类名算的，列表响应里没这一栏）——分类表没拉到的当口它一律判成"不私密"，
+        那一格就可能还是被滑到；真滑到了也照旧走 `_openDetail` 里那道**以服务端详情为准**的闸，
+        既不漏正文，也不会不问自开。点行进去那一条完全没改：想看的还是想看，照样问密码。 */
+  onDsTitleTouchStart(e) {
+    this._dsTitleX = ((e.touches || [{}])[0] || {}).clientX
+  },
+
+  onDsTitleTouchEnd(e) {
+    const x = ((e.changedTouches || [{}])[0] || {}).clientX
+    const from = this._dsTitleX
+    this._dsTitleX = undefined
+    if (typeof from !== 'number' || typeof x !== 'number') return
+    const dx = x - from
+    if (Math.abs(dx) < 60) return
+    const id = dx < 0 ? this.data.dsNext : this.data.dsPrev
+    if (id === null || id === undefined) return
+    const at = (this.data.notes || []).findIndex((n) => n.id === id)
+    // 找不着就是这一屏换过序（切过底栏、onShow 重拉过整表）——那一篇不在眼前了，不办事。
+    if (at < 0) return
+    this._openDetail(at)
+  },
+
+  // 从 `from` 那一行往 `dir`（−1 上一行／＋1 下一行）走，取**第一行不私密的**；走到头回 null。
+  // 「自动跳过」落在这一条而不是落在手势里：滑的那一下只认"下一格是谁"，谁该被跳过只有一处说了算。
+  _dsNeighbour(from, dir) {
+    const list = this.data.notes || []
+    for (let i = from + dir; i >= 0 && i < list.length; i += dir) {
+      if (!list[i].is_private) return list[i]
+    }
+    return null
+  },
+
   // v7 ③：详情浮窗。列表项身上那些派生字段（分类色、来源、日期）这一屏早就算好了，
   // 直接拿来当开窗的第一帧；窗里多出来的三块（核心要点、来源链接、原文）只有详情接口有，
   // 所以再取一次全文。取失败不拦窗——列表上有的那几块照样能看，只是窗里没有要点和原文。
@@ -1135,11 +1183,21 @@ Page({
   async _openDetail(idx) {
     const row = this.data.notes[idx]
     if (!row) return
+    // 「左右滑动看下一篇」那一对邻居（站长 10-20，含夜里追加的「滑动遇到私密，自动跳过」）。
+    // 存的是**邻居的 id 不是行号**：窗浮着的那一段时间里人会切到底栏另一格再回来，onShow 那趟
+    // 重拉整表、序也变——拿着号滑就滑到别的篇上去了（同一型坑见 onRowTap 里"验的是 A、开的是 B"那一段）。
+    // 取邻居走 `_dsNeighbour`：左右**最近的一行不私密的**，不是紧挨着的那一行。
+    const prev = this._dsNeighbour(idx, -1)
+    const next = this._dsNeighbour(idx, 1)
     this.setData({
       detailOpen: true, detailNote: row, origOpen: false, shared: false,
       detailCards: this._cardsOf(row.id), dsTo: '',
       // 上一配的配图不许留在这一屏上：那一排是"这一篇的"，不是全局的一份。
       detailImages: [], dsFigAt: 0,
+      dsPrev: prev ? prev.id : null,
+      dsNext: next ? next.id : null,
+      // 左上角那一句提示只在真有一前一后时念：列表只剩这一篇（或筛完只剩一篇）时它是假话。
+      dsHasNav: !!(prev || next),
     })
     // 这一篇算不算私密，先按列表那一行那一份猜（本机按分类名现算的），拿到详情再换成服务端钉的。
     let priv = !!row.is_private
@@ -1557,16 +1615,18 @@ Page({
     canvas.width = poster.W
     canvas.height = 750
     const plan = poster.planPoster(ctx, a.note, this.data.posterTpl, profile, lang, { showQr: !this.data.noQr, hasNote: !!images.note })
-    // 成品外圈那一档纯黑只加在这里（MATTE 见 poster.js）：微信的图片面板是全黑底，
-    // 卡片直边贴上去像被裁了一半。外圈跟着一起出，弹窗里预览到的就是递出去的那张。
+    /* 外圈那一档**留着，但不许是黑的**（站长 10-20 三句话合起来的口径：
+       ①「黑边不好看，换成同色阶，淡一点边框，宽度减一半」→ 40 改 20、颜色跟着这张卡走；
+       ②「为什么还是有黑边……要简单」→ 我按①改的那版往墨渗，深底那套渗完还是深色，真机读出来仍是黑边；
+       ③「不是说去掉边框，而是不要黑色边框」→ 边框不撤，只是绝对不出深色。
+       ⇒ 颜色只往纸白那一头渗（matteColor 见 poster.js），这一条公式下去每一套出来都是淡的。
+       画布这一格永远等于成品本身（含这一圈），不跟着展示框走：出的是 750 + 20×2 = 790 宽的一张。 */
     const outW = plan.width + poster.MATTE * 2
     const outH = plan.height + poster.MATTE * 2
     canvas.width = outW
     canvas.height = outH
-    // 画布那一格永远等于成品本身（含上面那圈黑），不跟着展示框走：
-    // 出的是 750 + 40×2 = 830 宽的一张，而不是"缩到弹窗里那么大"的那张。
     this.setData({ canvasW: outW, canvasH: outH })
-    ctx.fillStyle = '#000'
+    ctx.fillStyle = poster.matteColor(plan)
     ctx.fillRect(0, 0, outW, outH)
     ctx.save()
     ctx.translate(poster.MATTE, poster.MATTE)
@@ -1612,27 +1672,90 @@ Page({
     this._advanceTemplate(dx < 0 ? 1 : -1)
   },
 
-  // v7 ⑤：按合并后那份模板列表（包内 ∪ 下发）的顺序走，走到头就滑不动、不循环（效果图原话）。
-  async _advanceTemplate(delta) {
-    const list = poster.templateList()
-    const cur = list.findIndex((x) => x.id === this.data.posterTpl)
-    const next = list[(cur < 0 ? 0 : cur) + delta]
-    if (!next) return
-    this.setData({
-      posterTpl: next.id,
-      posterTplName: poster.templateLabel(next.id, this.data.lang),
-      posterBusy: true,
-    })
-    // 名字写在屏上那一行，不再发 toast：同一件事不留两处，而且原来那一枚 1.2 秒的 toast
-    // 就压在画布出图那一趟上（站长 10-17 深夜「以前还有提醒模板名称的，现在好像看不见」）。
-    this._lastTplId = next.id
-    try {
-      await this._renderPoster()
-    } catch (err) {
-      console.error('换模板重画失败', err)
-      wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
-      this.setData({ posterBusy: false })
+  /* 站长 10-20 第一句：「生成笔记时候，切换模板，支持手指在几个小点上面拖动切换（支持循环，
+     滚动最后一个，再切到第一个，不要卡死），否则用户不知道怎么切换」。
+     这一排按**一枚圆点的间距**计步：点 10 ＋ 间隙 12 ＝ 22rpx，手指每挪过一格换一套，
+     往回挪就退回去（所以来回拖不会多跳），拖到最后一套再往前回到第一套。
+     ⚠ wxml 里这三枚事件写的是 `catch` 不是 `bind`：这一排住在 `.tpl-body` 里面，
+       而 `.tpl-body` 自己挂着上面那条"滑过 60px 换一套"。用 bind 的话同一次拖动喂两条，
+       一次跨两套。
+     ⚠ 热区比那一排点本身高（`.tpl-dots` 上下各借 22rpx，排布占位不变）——16rpx 的一条按不住。 */
+  onTplDotsTouchStart(e) {
+    this._dotsX = e.touches[0].clientX
+    this._dotsLeft = 0
+  },
+
+  onTplDotsTouchMove(e) {
+    if (this.data.posterHasCard) return
+    const x = (e.touches[0] || {}).clientX
+    if (x === undefined) return
+    const step = 22 * (wx.getWindowInfo().windowWidth / 750)   // 一枚圆点的间距，rpx → px
+    if (!(step > 0)) return
+    this._dotsLeft += x - this._dotsX
+    this._dotsX = x
+    while (Math.abs(this._dotsLeft) >= step) {
+      const dir = this._dotsLeft < 0 ? 1 : -1     // 往左拖＝下一套，与海报上那条滑动手势同一个方向
+      this._advanceTemplate(dir)
+      this._dotsLeft += dir * step                // 扣掉这一步用掉的距离，剩下的零头留着
     }
+  },
+
+  onTplDotsTouchEnd() {
+    this._dotsLeft = 0
+  },
+
+  /* 顶上中间那一句模板名也是把手（站长 10-20「然后上方模板的名字，点击也支持切换」）：
+     点一下换下一套，走到最后一套回到第一套。
+     ⚠ 必须 `catchtap`：这一句住在 `.grip` 里，而 `.grip` 那一条 bindtap 是"点把手收窗"——
+       不截住的话点名字顺手把整层收了，等于换不成。 */
+  onTplNameTap() {
+    if (this.data.posterHasCard) return
+    this._advanceTemplate(1)
+  },
+
+  /* 按合并后那份模板列表（包内 ∪ 下发）的顺序走。**10-20 起循环**（站长原话「支持循环，
+     滚动最后一个，再切到第一个，不要卡死」）：原来走到头 `list[i]` 取到 undefined 就 return，
+     手指还在动、屏上纹丝不动——那就是他说的"卡死"的一半。另一半在下面 `_flushTplRender`。 */
+  _advanceTemplate(delta) {
+    const list = poster.templateList()
+    if (list.length < 2) return
+    const cur = list.findIndex((x) => x.id === this.data.posterTpl)
+    const n = list.length
+    const at = ((((cur < 0 ? 0 : cur) + delta) % n) + n) % n
+    this._tplPick(list[at].id)
+  },
+
+  // 换"选中哪一套"与"画那一张"拆成两步：一次拖动能跨过好几套，而画一张要几百毫秒。
+  // 原来那一趟是每跨一步都 await 一次重画，于是手指到了第六枚、屏上还停在第二枚，
+  // 而且画的过程中 `posterBusy` 一挡，后续几步全丢——拖到头上就再也拖不动。
+  // 现在改选立刻上屏（圆点与名字跟着手指走），画只画**最新那一版**，中间那些跳过。
+  _tplPick(id) {
+    if (id === this.data.posterTpl) return
+    this.setData({
+      posterTpl: id,
+      posterTplName: poster.templateLabel(id, this.data.lang),
+    })
+    this._lastTplId = id
+    this._tplWanted = id
+    this._flushTplRender()
+  },
+
+  async _flushTplRender() {
+    if (this._tplDrawing) return   // 正在画的那一趟收尾时会自己看到 _tplWanted 变了
+    this._tplDrawing = true
+    let wanted
+    do {
+      wanted = this._tplWanted
+      this.setData({ posterBusy: true })
+      try {
+        await this._renderPoster()
+      } catch (err) {
+        console.error('换模板重画失败', err)
+        wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
+        this.setData({ posterBusy: false })
+      }
+    } while (wanted !== this._tplWanted)
+    this._tplDrawing = false
   },
 
   // 码的开关只影响这一张成品图：翻一下重画一次（与海报页同一条语义）。

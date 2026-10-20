@@ -27,9 +27,14 @@ const PAPER = '#FFFFFF'
 // 下面三个是"结构色"，不参与分类配色：波普的描边与压底黑带、文艺的暖纸。
 const HARD = '#12121A'
 const WARM = '#FFF6E5'
-// 递给微信图片面板的那张成品外圈留一档纯黑（站长 10-01 深夜：面板本身是全黑底，
-// 卡片直边贴上去像被裁了一半；加一圈黑后看着就是一整块）。只在导出那一步用。
-const MATTE = 40
+// 递给微信图片面板的那张成品外圈留一档（只在导出那一步用，配方里没有这一笔）。
+// 站长 10-20 这一轮说了三句，合起来才是口径：
+// ① 「卡片模板的黑边不好看，换成同色阶，淡一点边框，宽度减一半」⇒ 宽 40 → 20，颜色跟着这一张卡走；
+// ② 「为什么还是有黑边……要简单」⇒ 我按①改成"往墨渗"那一版真机上还是黑（深底那套渗完仍是深色）；
+// ③ 「不是说去掉边框，而是不要黑色边框」⇒ 边框**留着**，只是绝对不许是黑的。
+// 所以这一档的颜色只往**纸白**走（见 matteColor）：不管这张卡自己的底多深，出来都是淡的。
+// ⚠ 上一版（10-20 午，2.4.5）错的不是"加了一圈"，是那一份的权重方向——往墨渗，深底必然渗成黑。
+const MATTE = 20
 // 实测模拟器里 serif / sans-serif / Georgia 三种量出来的宽度互不相同，说明真能解析出
 // 衬线体；机型没有这个字族时会退回默认字体，属于可接受降级，不会报错。
 const SERIF = 'serif'
@@ -51,6 +56,23 @@ function paperOf(categoryId) {
   // 不至于经典三款全长成一张脸。
   return lumOf(toneFor(categoryId).bg) >= 137 ? PAPER_A : PAPER_B
 }
+
+// 外圈那一档吃什么色：拿这一张卡**自己的底**（配方铺满画布的那一层——平涂取 color、渐变取 c1），
+// 但只往纸白那一头渗：纸白占 MATTE_PAPER 那一份。所以每套各是各的色系（黛青那族出来淡青灰、
+// 墨黑那族出来淡灰），而**结构上出不来深色**——这一条是站长③句「不要黑色边框」的落点。
+// 为什么从算好的 plan 里读、不在配方上另开一栏：底本来就已经画在 layers 第一笔上，
+// 再抄一份"这套的底色是什么"就是两处真相，改配方的人不会记得改它。
+// 认不得的写法（那一格是 rgba、或这套压根没有整幅底）就取纸白：宁可不带这套的色，
+// 也不要悄悄画回原来那种纯黑。
+const MATTE_PAPER = 0.8
+function matteColor(plan) {
+  const ground = ((plan && plan.layers) || []).find(
+    (l) => l && (l.k === 'fill' || l.k === 'grad') && l.x === 0 && l.y === 0 && l.w === W)
+  const raw = ground && (ground.k === 'fill' ? ground.color : ground.c1)
+  const base = typeof raw === 'string' && /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : PAPER
+  return mix(PAPER, base, MATTE_PAPER)
+}
+
 const DEFAULT_TEMPLATE = 'card'
 // 头像文件的统一前缀，名字每次挑都换一个（见 mintAvatar）。
 // 之前是"暂存""正式"两个固定名字，1.4.0 真机报出：换第二张图预览还是第一张。
@@ -2248,10 +2270,11 @@ const SAMPLE_NOTE_EN = {
 
 module.exports = {
   W,
+  MATTE,
+  matteColor,
   // 只为尺子留的一个口子（`验-审计第一批客户端三条.js` 要直接喂 NaN 看它死不死循环）。
   // 界面没有一处用它：那一头要的是整张 plan，不是这一枚字号。
   fitSize,
-  MATTE,
   TEMPLATES,
   paperOf,
   PAPER_A,

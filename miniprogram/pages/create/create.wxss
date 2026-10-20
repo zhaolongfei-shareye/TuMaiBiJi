@@ -1,3 +1,7 @@
+/* 首屏那枚「推荐好友使用」的皮（10-20 起两屏共用一份：新建页与笔记列表同一枚按钮，
+   站长原话「首屏和笔记列表都要，相同的位置」）。@import 必须在最前面，与 index.wxss 那几条同一条规矩。 */
+@import '../../styles/rec-bar.wxss';
+
 /* 首屏最上面那一行（站长 10-14 22:4x 点名要的那句＋那一层玻璃；23:5x 与 00:0x 追的两句改成通栏反向渐变）。
    原话一：「最上面的，要做成通栏的渐变毛玻璃，与下方的面板渐变方向相反。浅在下，深在上」
    原话二：「都说跟下面面板相反，左上右不需要留空间，要通栏。左下和右下有圆弧，然后与背景之间带阴影。
@@ -88,49 +92,24 @@
   margin: 0 0 0 -17rpx;
 }
 
-/* ---------- 首屏那枚「推荐好友使用」（站长 10-20 原话「黄色醒目立体横条按钮」）----------
-   落点＝那枚书法图片字（三行：看到好内容／随手记下来／Save what matters）的正下方。
-   「立体」这一刀不靠新色：面是芥末黄，顶掺 22% 白、底下那 6rpx 掺 38% 墨，四档全由
-   `palette.createSkin()` 经 `--cp-rec-*` 递下来，这份样式表里一个饱和色都不写。
-   88rpx 这一档不是挑的——它就是下面 `.home-swap` 那一行的高度，同一屏两条横带同一档，
-   不另起第三种尺寸。
-   ⚠ `margin-bottom: 40rpx` 里那 14 是给下面那条 `.home-swap` 的 `margin-top: -14rpx` 预留的：
-   它自己带一道负 top margin（原来贴 `.title-row` 的 32 时净缝 18），所以这一枚要给到 40，
-   黄条与「调亮度」那一行的实际缝才是 26；再扣掉下面那 6rpx 的立体边，肉眼留 20。
-   ⚠ 小程序 `button` 默认那一套（灰底、5px 圆角、::after 描边、14px 左右内缩、居中）必须逐条推平，
-   少写一条就静默留一层皮——同形状的账见 pages/me/me.wxss 的 `.menu-item.share-row`。 */
-.rec-bar {
-  box-sizing: border-box;
-  width: 100%;
-  height: 88rpx;
-  line-height: 88rpx;
-  margin: 0 0 40rpx;
-  padding: 0;
-  border: none;
-  border-radius: 22rpx;
-  background: linear-gradient(180deg, var(--cp-rec-top), var(--cp-rec) 62%);
-  box-shadow: 0 6rpx 0 var(--cp-rec-edge), 0 12rpx 26rpx var(--cp-rec-shadow);
-  color: var(--cp-rec-ink);
-  font-size: var(--fs-body);
-  font-weight: 700;
-  text-align: center;
-}
-
-.rec-bar::after {
-  border: none;
-}
-
-/* 按下去＝把那 6rpx 的厚边压回地面：整枚下沉 6、硬边收掉，只留投影。
-   这是"立体"的另一半——不压下去的话它只是一块带阴影的色块，按着没有反馈。 */
-.rec-bar:active {
-  transform: translateY(6rpx);
-  box-shadow: 0 0 0 var(--cp-rec-edge), 0 4rpx 10rpx var(--cp-rec-shadow);
-}
-
-/* 展开那一屏（点圆形 ➕ 升起来的那一态）整条不画，与下面 `.home-swap` 同进同退：
-   那一态的屏要给输入框和右滑条，首屏这两条横带都不该留在上面。 */
-.container.entry-dock .rec-bar {
-  display: none;
+/* ---------- 这一枚「· 推荐好友 ·」的落点（皮在 styles/rec-bar.wxss）----------
+   站长 10-20 四句话，后三句改的都是前一句的形：
+   ①「随手记下来英文的下方增加一个黄色醒目立体横条按钮，推荐好友使用，点击就是拉起微信小程序分享页面」
+   ②「按钮太大了，要精致小巧，不能盖住人，按钮长度不要超过英文」
+   ③「位置要在英文下放，首屏和笔记列表都要，相同的位置」
+   ④「推荐好友使用的按钮，只放在首屏和拍照屏，不再放在列表页」＋「整体80%透明度。字体压缩成"推荐好友"前后加小圆点」
+   ⇒ ③ 那一版把它挂到了列表页，④ 又收回来：现在只有这一页的两态有（第一屏 ＋ 展开那一屏＝他说的
+     拍照屏，与 `.home-swap` 那一行 10-11 拍的"两屏都在"是同一个口径）。
+   ⇒ 这一枚现在就是那行 "Save what matters" 的宽度，并贴着它的左沿。数是从位图上量的，不是挑的：
+     `assets/title-heading.png` 500×246px，逐行扫 α>40 分出三带，最下面那一带（英文）占 x 101~422；
+     屏上这一枚图宽 228rpx ⇒ 0.456 rpx/px ⇒ 英文宽 146.8rpx、左沿在图内 46.1rpx。
+     图自己 `margin-left: -17rpx`、容器内缩 `--sp-3` 24rpx ⇒ 英文左沿落在屏上 53.1rpx；
+     所以这一枚左外边距 29rpx（24＋29＝53）、宽 146rpx ⇒ 右沿 199rpx，正好把英文框在下面，
+     右边离脸还有一截——第一版那枚通栏的压在她下巴上，这一版不压人。
+   ⚠ 44rpx 这一档比微信推荐的点击下限（88rpx）小一半，是"精致小巧"的直接代价；
+     与「中/EN 那枚角标实测 63.6×31.1rpx、要不要垫到 88」是同一件待拍的事（D21），不是新账。 */
+button.rec-bar {
+  margin: 0 0 32rpx 29rpx;
 }
 
 /* 「10月9日 周四」那一行 10-10 随效果图 c5 撤了：稿上标题下面那一格直接是「调亮度｜换背景」
@@ -1693,10 +1672,17 @@
    这与标题现在的行为一致。日期行 10-10 随那一行一起撤了，名单里那一笔也删。
    ⚠ 10-14 22:4x 新加的 `.ai-line`（首屏最上面那一行）**必须跟着进这份名单**：它第一次落码时没进，
    于是铺图那一态它整条压在罩层与照片底下——屏上直接看不见这一行，而计算样式那几条判据照样绿
-   （层序这件事读 `color` 读不出来）。与 10-09 站长抓 `.home-swap` 那一次是同一个形状（§8.178）。 */
+   （层序这件事读 `color` 读不出来）。与 10-09 站长抓 `.home-swap` 那一次是同一个形状（§8.178）。
+   ⚠ 10-20 同一族第三次，但这一回症状不是"看不见"而是"按不动"：那枚「· 推荐好友 ·」落码时
+   也没进这份名单。屏上实测读数：罩子 `position:fixed` ＋ `z-index:1` ＋ `pointer-events:auto`
+   ＋ 铺满 750rpx×100vh，按钮 computed `z-index:auto` ⇒ 罩子排在按钮之上，
+   **opacity 为 0 也照样吃点击**（透明不等于不可点，只有 `pointer-events:none` 才让过去）。
+   所以站长那一句「推荐好友要拉起分享的页面」在铺图那一态点不动——`open-type="share"` 那一下
+   从来没能落到按钮上。抬进名单＝z-index 2 > 1，点击回到按钮；无图那一态本来就没有这层罩子。 */
 .container.has-bg .title-row,
 .container.has-bg .ai-line,
 .container.has-bg .home-swap,
+.container.has-bg .rec-bar,
 .container.has-bg:not(.entry-dock) .entry-wrap {
   position: relative;
   z-index: 2;

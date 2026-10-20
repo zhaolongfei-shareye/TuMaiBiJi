@@ -9,7 +9,9 @@ const i18n = {
     createHeading2: '随手记下来',
     // 首屏那枚黄色横条（站长 10-20 原话「增加一个黄色醒目立体横条按钮，推荐好友使用」）。
     // 这六个字是他给的原话，不是我从「推荐图麦」改出来的；那一行仍叫「推荐图麦」，两枚各说各的。
-    recBarTitle: '推荐好友使用',
+    // 站长 10-20 第四句「字体压缩成"推荐好友"」：原来那六个字（推荐好友使用）压成四个，
+    // 前后各加一颗小圆点（那两颗点在 styles/rec-bar.wxss 里，不占这一格的字）。
+    recBarTitle: '推荐好友',
     tabCreate: '新建',
     tabMe: '我的',
     appName: '图麦笔记',
@@ -258,6 +260,8 @@ const i18n = {
     resetWithBioOk: '继续',
     bioUnavailable: '这台手机没有可用的指纹或面容，直接重置即可。',
     swipeHint: '左右滑换模板',
+    // 站长 10-20 原话逐字：「左上角，加提示词"左右滑动看下一篇"」——这一格不许我改口径。
+    noteSwipeHint: '左右滑动看下一篇',
     grip: '点一下收起',
     slogan: '把图文，提炼成有用的干货',
     shareToFriend: '推荐图麦',
@@ -465,7 +469,8 @@ const i18n = {
     createHeading2: '',
     // 英文这一格抄的是本字典里已有的那句（shareToFriend 的 en 值），不另起一句新话：
     // 站长只给了中文六个字，英文态总得有字，而"推荐给别人用"这件事的英文叫法现网早就有了。
-    recBarTitle: 'Recommend Tumark',
+    // 跟着中文那一格压短（原来 'Recommend Tumark' 16 个字符，加两颗点会顶出那一枚的宽 ⇒ 折行）。
+    recBarTitle: 'Recommend',
     tabMe: 'Me',
     appName: 'TumarkNote',
     navDetail: 'Note detail',
@@ -661,6 +666,8 @@ const i18n = {
     resetWithBioOk: 'Go',
     bioUnavailable: 'This phone has no fingerprint or face unlock — reset directly.',
     swipeHint: 'Swipe to change template',
+    // 不直译"左右"（英文里 swipe 本来就是横向），也放得进详情页顶上那一行小字。
+    noteSwipeHint: 'Swipe for the next note',
     grip: 'Tap to close',
     // 同一夜改短（理由见上面 `meGreeting` 那一段的预算）。这一枚还出现在「关于」页那一行
     // （`about.wxml` 的 `.brand-slogan`，那一格宽得多，短了不会不好看）。

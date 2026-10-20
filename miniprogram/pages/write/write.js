@@ -318,7 +318,12 @@ Page({
       const restored = from.map((id) => byId[id]).filter(Boolean)
       this.setData({ shots: restored.length === back.length ? restored : back })
       console.error('配图排序失败', err)
-      wx.showToast({ title: (err.data && err.data.detail) || t('saveFailed', lang), icon: 'none' })
+      // detail 有两种来源，屏上只许出现那一种是我们自己写的：
+      // 这条口唯一的业务错是 403「这篇是私密笔记，先解锁」（中文，能给他看）；
+      // 而 405/404 那种是框架兜底短语（"Method Not Allowed"），站长 10-20 就是被它顶到屏上截了图。
+      // ⇒ 带中文才上屏，其余一律改说本机那句「保存失败，请重试」。
+      const detail = (err.data && err.data.detail) || ''
+      wx.showToast({ title: /[一-龥]/.test(detail) ? detail : t('saveFailed', lang), icon: 'none' })
     }
   },
 
