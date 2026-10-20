@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { TIP_DOT, createSkin } = require('../../utils/palette.js')
+const { appSharePayload } = require('../../utils/shareCard.js')
 const poster = require('../../utils/poster.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const assetQueue = require('../../utils/assetQueue.js')
@@ -242,6 +243,13 @@ Page({
     this.stopTips()
     this.stopProgress()
     this._clearHint()
+  },
+
+  // 首屏那枚黄色横条「推荐好友使用」是 `button open-type="share"`，微信弹分享面板时来这一取载荷。
+  // 与「我的」页那行「推荐图麦」共用 utils/shareCard.js 那一份实现：同一个 App 的两个入口
+  // 转出去的必须是同一张卡（标题、落地页、封面），否则两张卡在群里长得不一样，而屏上看不出来。
+  onShareAppMessage() {
+    return appSharePayload(this.data.lang, getApp().globalData.userId || '')
   },
 
   // onShow 只同步主题/语言/tab，**绝不重置草稿**。

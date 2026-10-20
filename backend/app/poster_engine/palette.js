@@ -789,6 +789,23 @@ const CREATE_X = (a) => withAlpha(LAYER_INK, a)
 const CREATE_CAM = { bg: '#E9723D', ink: '#2C1204' }
 const CREATE_EXTRACT = { bg: '#C4541F', ink: '#FFFFFF' }
 /**
+ * 首屏那枚「推荐好友使用」横条（站长 10-20 原话「增加一个黄色醒目立体横条按钮」）。
+ * 面就是 TIP_DOT 那一支芥末黄——屏上已经有两枚点吃它（Tips 前那枚、中/EN 角标前那枚），
+ * 再起第二支黄就是色板散架。`ink` 写死 #2A2005 而不写 `TONES[0].ink`，理由与上面
+ * TIP_DOT 那一段一样：那五支是"分类身份"，排序一变这里就静默换色。
+ * 「立体」那一刀不引入新色，只从面上派两档：顶＝面掺 22% 白（受光），
+ * 边＝面掺 38% 墨（压在最底下那 6rpx，就是"厚"）。三档实测（WCAG）：
+ * 墨字压面 9.87、压顶 10.97（门槛 4.5）；边压白底 3.44、压面 2.63（图形门槛 3.0 只看前者，
+ * 后者是同一块按钮内部的分层，不是边界）。投影＝墨 @30，中性色、不跟心情走。
+ */
+const RECOMMEND_BAR = {
+  face: TIP_DOT,
+  top: mix('#FFFFFF', TIP_DOT, 0.22),
+  edge: mix('#2A2005', TIP_DOT, 0.38),
+  ink: '#2A2005',
+  shadow: withAlpha('#2A2005', 0.3),
+}
+/**
  * 快门那一圈环与滑动条外面那一圈（稿上是同一笔）。浅面上不能再画纸白环——白环压白卡
  * 对比 1.0，等于没画（站长 10-08 那句"白环换墨环"就是这个意思）。浓度不另起一架梯子：
  * 复用 `layerEdgeOf`（图形边界门槛 3.0，规格 §5.1 那条），底取白卡那一档。
@@ -798,6 +815,7 @@ const CREATE_EXTRACT = { bg: '#C4541F', ink: '#FFFFFF' }
 function createSkin(wallpaper) {
   const cam = CREATE_CAM
   const extract = CREATE_EXTRACT
+  const rec = RECOMMEND_BAR
   const vars = {
     'cp-panel': listLayerOf(wallpaper),
     'cp-card': CREATE_SURFACE.card,
@@ -816,6 +834,12 @@ function createSkin(wallpaper) {
     'cp-cam-ink': cam.ink,
     'cp-extract': extract.bg,
     'cp-extract-ink': extract.ink,
+    // 首屏那枚「推荐好友使用」横条的四档皮（不随壁纸／心情走，五档下同一支黄，理由见 RECOMMEND_BAR）
+    'cp-rec': rec.face,
+    'cp-rec-top': rec.top,
+    'cp-rec-edge': rec.edge,
+    'cp-rec-ink': rec.ink,
+    'cp-rec-shadow': rec.shadow,
   }
   return Object.keys(vars).map((k) => `--${k}:${vars[k]}`).join(';')
 }
@@ -982,6 +1006,7 @@ module.exports = {
   layerSkinOf,
   layerEdgeOf,
   INNER_FACE,
+  RECOMMEND_BAR,
   createSkin,
   // entryBlocks（首屏三块那六枚 `--eb-*`）随 2.2 B 方案删掉：消费方 create.js 不再发这一位，
   // 样式表里没有一处还吃 --eb-*，留着一份没人读的派生只会让"新加一枚壁纸忘了写 ramp.inks"

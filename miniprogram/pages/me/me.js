@@ -5,6 +5,7 @@ const { t, texts } = require('../../utils/i18n.js')
 const { CONTACT_EMAIL } = require('../../utils/contact.js')
 const { VERSION, SITE, introLead } = require('../../utils/appInfo.js')
 const { TIP_DOT } = require('../../utils/palette.js')
+const { appSharePayload } = require('../../utils/shareCard.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const bgTone = require('../../utils/imgBrightness.js')
@@ -497,13 +498,9 @@ Page({
   // 源件在 docs/design/分享图-10-20竖壳圆标/甲-圆底白字形.html（由同目录 _生成新壳.py 生成，
   // 右半那只壳的几何一处不目测），改字改色改几何都从它重出、别手改图；
   // ⚠ 压图必须走 ffmpeg -q:v 4：-q:v 2/3 两张都越 131,072（174,866 / 142,319），越线微信静默退回截屏。
+  // 载荷那三格现在住在 utils/shareCard.js：首屏那枚「推荐好友使用」与这一行点出去的是同一张卡。
   onShareAppMessage() {
-    const inviter = app.globalData.userId || ''
-    return {
-      title: t('shareCardTitle', this.data.lang),
-      path: `/pages/create/create${inviter ? `?inviter=${inviter}` : ''}`,
-      imageUrl: '/assets/share-card.jpg',
-    }
+    return appSharePayload(this.data.lang, app.globalData.userId || '')
   },
 
   // 朋友圈那条只能带 query、不能指定路径，所以它开的是本页；

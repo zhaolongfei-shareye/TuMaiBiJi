@@ -7,6 +7,9 @@ const i18n = {
     // 英文态就是这一档：他 10-14 23:0x 追「英文能否精简一点，不希望回行」，所以 en 只留一句。
     createHeading: '看到好内容',
     createHeading2: '随手记下来',
+    // 首屏那枚黄色横条（站长 10-20 原话「增加一个黄色醒目立体横条按钮，推荐好友使用」）。
+    // 这六个字是他给的原话，不是我从「推荐图麦」改出来的；那一行仍叫「推荐图麦」，两枚各说各的。
+    recBarTitle: '推荐好友使用',
     tabCreate: '新建',
     tabMe: '我的',
     appName: '图麦笔记',
@@ -460,6 +463,9 @@ const i18n = {
     aiLine: 'AI reads it all: Shoot | Scan | Translate | Distill | Share',
     createHeading: 'Save what matters',
     createHeading2: '',
+    // 英文这一格抄的是本字典里已有的那句（shareToFriend 的 en 值），不另起一句新话：
+    // 站长只给了中文六个字，英文态总得有字，而"推荐给别人用"这件事的英文叫法现网早就有了。
+    recBarTitle: 'Recommend Tumark',
     tabMe: 'Me',
     appName: 'TumarkNote',
     navDetail: 'Note detail',

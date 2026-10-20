@@ -766,5 +766,68 @@ ok('三块那几段样式表自己也不许再出现裸 `.blk`（组名带前缀
 ok('全局那枚 `.blk` 还在为笔记列表服务（这条不是"删掉全局"，是"这一屏别同名"）',
   /\.blk\s*\{[^}]*width:\s*var\(--blk\)/.test(appWxss))
 
+/* ---------- 首屏那枚「推荐好友使用」黄色横条（站长 10-20）----------
+   他原话：「随手记下来英文的下方增加一个黄色醒目立体横条按钮，推荐好友使用，
+   点击就是拉起微信小程序分享页面」。"英文"＝那枚书法图片字最下面一行 "Save what matters"，
+   所以落点是图的正下方。下面十条钉的就是这句话里能落成判据的每一格。 */
+const recSeg = seg('.rec-bar')
+const recIdxTitle = wxml.indexOf('class="page-title"')
+const recIdxBar = wxml.indexOf('class="rec-bar"')
+const recIdxSwap = wxml.indexOf('class="home-swap"')
+ok('黄条排在标题图之后、「调亮度｜换背景｜换心情」那一行之前（＝他指的"英文的下方"）',
+  recIdxTitle > 0 && recIdxBar > recIdxTitle && recIdxSwap > recIdxBar,
+  `模板里三个位置 ${recIdxTitle} / ${recIdxBar} / ${recIdxSwap}`)
+const recBtn = /<button[^>]*class="rec-bar"[^>]*>[\s\S]*?<\/button>/.exec(wxml)
+ok('这一枚本身就是 button[open-type=share]（拉起微信原生分享面板，不自己画一层）',
+  !!recBtn && /open-type="share"/.test(recBtn[0]), recBtn && recBtn[0].slice(0, 60))
+ok('文案从字典取，不在模板里写死一句', !!recBtn && /\{\{t\.recBarTitle\}\}/.test(recBtn[0]))
+const { i18n: I18N } = require(P('utils/i18n.js'))
+ok('zh 那一格逐字就是他给的六个字「推荐好友使用」，en 那一格非空',
+  I18N.zh.recBarTitle === '推荐好友使用' && !!I18N.en.recBarTitle,
+  `zh ${I18N.zh.recBarTitle}／en ${I18N.en.recBarTitle}`)
+// 皮：四档必须真的从 createSkin 发下来。少发一档不是"颜色浅一点"，是那条属性整个没有值＝静默失效。
+const recVars = ['--cp-rec', '--cp-rec-top', '--cp-rec-edge', '--cp-rec-ink', '--cp-rec-shadow']
+const skinOut = palette.createSkin()
+ok('createSkin() 五档 cp-rec 全发得出来（发不出来时 wxss 那几条 var 静默没有值）',
+  recVars.every((v) => skinOut.includes(v + ':')), recVars.filter((v) => !skinOut.includes(v + ':')).join(','))
+ok('.rec-bar 里那五档全走 var，样式表这一段一支 hex 都不写（饱和色只住在 palette）',
+  recVars.every((v) => recSeg.includes(`var(${v})`)) && !/#[0-9a-fA-F]{3,8}/.test(recSeg), recSeg.slice(0, 80))
+const REC = palette.RECOMMEND_BAR
+const isHex6 = (v) => /^#[0-9a-fA-F]{6}$/.test(v || '')
+ok('墨字压得住黄色面与受光那一端（两头都 ≥4.5；芥末黄压白字只有 1.63，所以字必须是墨）',
+  isHex6(REC.ink) && isHex6(REC.face) && isHex6(REC.top)
+  && palette.crOf(REC.ink, REC.face) >= 4.5 && palette.crOf(REC.ink, REC.top) >= 4.5,
+  `面 ${palette.crOf(REC.ink, REC.face).toFixed(2)}／顶 ${palette.crOf(REC.ink, REC.top).toFixed(2)}`)
+ok('面就是 TIP_DOT 那一支芥末黄，屏上不起第二支黄', REC.face.toUpperCase() === palette.TIP_DOT.toUpperCase())
+ok('「立体」那一档有硬边也有按压：底下 6rpx 实边 ＋ :active 下沉',
+  /box-shadow:[^;]*0 6rpx 0 var\(--cp-rec-edge\)/.test(recSeg)
+  && /translateY\(/.test(seg('.rec-bar:active')), seg('.rec-bar:active'))
+ok('展开那一屏整条不画（与 .home-swap 同进同退，那一态的屏要给输入框和右滑条）',
+  /display:\s*none/.test(seg('.container.entry-dock .rec-bar')))
+// 40 与下面那条 -14 是一对：净缝 26，再扣掉 6rpx 的立体边才轮到下一行字。
+// `num()` 只认 `prop: NNNrpx` 这种单条属性，而这两处写的都是 `margin:` 简写，所以自己拆那几档
+// （10-20 这一条第一版就是拿 `num(…,'margin-top')` 读的，读出 NaN 把"算不出来"当成了"算出来够"）。
+const marginOf = (raw, side) => {
+  const parts = (raw.match(/(?:^|;)\s*margin:\s*([^;]+)/) || [, ''])[1].trim().split(/\s+/)
+  if (!parts.length || !parts[0]) return NaN
+  const v = (i) => parseInt(parts[i] !== undefined ? parts[i] : parts[0], 10)
+  return side === 'top' ? v(0) : v(2)          // 三/四档＝上 右 下 左；两档＝上下 左右
+}
+const recMb = marginOf(recSeg, 'bottom')
+const swapMt = marginOf(seg('.home-swap'), 'top')
+const edgeH = (new RegExp('box-shadow:\\s*0 (\\d+)rpx').exec(recSeg) || [, '0'])[1]
+ok('黄条与「调亮度」那一行的实际缝算得出来（margin 简写第三档抵掉 .home-swap 那道负 top，且容得下立体边）',
+  Number.isFinite(recMb) && Number.isFinite(swapMt) && recMb - Math.abs(swapMt) >= Number(edgeH) + 12,
+  `margin-bottom ${recMb}／.home-swap margin-top ${swapMt}／立体边 ${edgeH}`)
+// 两个入口一张卡：载荷只许有一个出处。me.js 那枚先存在，这一屏是第二枚。
+const meJs = fs.readFileSync(P('pages/me/me.js'), 'utf8')
+const shareJs = fs.readFileSync(P('utils/shareCard.js'), 'utf8')
+ok('两枚分享入口的载荷共用 utils/shareCard.js 一份实现（两页自己都不许再写 imageUrl）',
+  /appSharePayload\(/.test(jsOnly) && /appSharePayload\(/.test(meJs)
+  && !/imageUrl:/.test(jsOnly) && !/imageUrl:/.test(meJs))
+ok('那份载荷落的就是新建页 ＋ assets/share-card.jpg（与「我的」页那枚真跑尺子钉的同一组值）',
+  /path: `\/pages\/create\/create/.test(shareJs) && shareJs.includes("'/assets/share-card.jpg'"),
+  shareJs.split('\n').filter((l) => /path:|SHARE_IMAGE =/.test(l)).join(' ⏎ '))
+
 console.log(fails.length ? `✗ 第一屏三块：${pass}/${pass + fails.length} 条通过` : `✓ 第一屏三块：${pass} 条全过`)
 if (fails.length) { fails.forEach((f) => console.log('  · ' + f)); process.exit(1) }

@@ -88,6 +88,51 @@
   margin: 0 0 0 -17rpx;
 }
 
+/* ---------- 首屏那枚「推荐好友使用」（站长 10-20 原话「黄色醒目立体横条按钮」）----------
+   落点＝那枚书法图片字（三行：看到好内容／随手记下来／Save what matters）的正下方。
+   「立体」这一刀不靠新色：面是芥末黄，顶掺 22% 白、底下那 6rpx 掺 38% 墨，四档全由
+   `palette.createSkin()` 经 `--cp-rec-*` 递下来，这份样式表里一个饱和色都不写。
+   88rpx 这一档不是挑的——它就是下面 `.home-swap` 那一行的高度，同一屏两条横带同一档，
+   不另起第三种尺寸。
+   ⚠ `margin-bottom: 40rpx` 里那 14 是给下面那条 `.home-swap` 的 `margin-top: -14rpx` 预留的：
+   它自己带一道负 top margin（原来贴 `.title-row` 的 32 时净缝 18），所以这一枚要给到 40，
+   黄条与「调亮度」那一行的实际缝才是 26；再扣掉下面那 6rpx 的立体边，肉眼留 20。
+   ⚠ 小程序 `button` 默认那一套（灰底、5px 圆角、::after 描边、14px 左右内缩、居中）必须逐条推平，
+   少写一条就静默留一层皮——同形状的账见 pages/me/me.wxss 的 `.menu-item.share-row`。 */
+.rec-bar {
+  box-sizing: border-box;
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  margin: 0 0 40rpx;
+  padding: 0;
+  border: none;
+  border-radius: 22rpx;
+  background: linear-gradient(180deg, var(--cp-rec-top), var(--cp-rec) 62%);
+  box-shadow: 0 6rpx 0 var(--cp-rec-edge), 0 12rpx 26rpx var(--cp-rec-shadow);
+  color: var(--cp-rec-ink);
+  font-size: var(--fs-body);
+  font-weight: 700;
+  text-align: center;
+}
+
+.rec-bar::after {
+  border: none;
+}
+
+/* 按下去＝把那 6rpx 的厚边压回地面：整枚下沉 6、硬边收掉，只留投影。
+   这是"立体"的另一半——不压下去的话它只是一块带阴影的色块，按着没有反馈。 */
+.rec-bar:active {
+  transform: translateY(6rpx);
+  box-shadow: 0 0 0 var(--cp-rec-edge), 0 4rpx 10rpx var(--cp-rec-shadow);
+}
+
+/* 展开那一屏（点圆形 ➕ 升起来的那一态）整条不画，与下面 `.home-swap` 同进同退：
+   那一态的屏要给输入框和右滑条，首屏这两条横带都不该留在上面。 */
+.container.entry-dock .rec-bar {
+  display: none;
+}
+
 /* 「10月9日 周四」那一行 10-10 随效果图 c5 撤了：稿上标题下面那一格直接是「调亮度｜换背景」
    （站长 10-09 夜原话「调亮度和换背景，之前不是说了换到日期位置吗？」＋指着 c5 说「这个方案完全没做」）。
    它占的那一段流内高度由下面 `.home-swap` 原样接手，所以录入条的落点一个字不用改（见那一条的账）。 */
