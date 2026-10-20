@@ -25,6 +25,10 @@ function ok(name, cond, extra) {
 const wxml = fs.readFileSync(P('pages/create/create.wxml'), 'utf8')
 const wxssRaw = fs.readFileSync(P('pages/create/create.wxss'), 'utf8')
 const wxss = wxssRaw.replace(/\/\*[\s\S]*?\*\//g, '')
+/* 首屏那枚「推荐好友使用」的皮 10-20 搬进了 styles/rec-bar.wxss（两屏共用一份）。
+   搬出去的东西必须跟着进这一节的扫描——否则往那份共用样式表里抄一支饱和色，
+   这条尺子一声不吭。下面那两条（扫 hex 与扫 var 拼错）都把它并进来一起量。 */
+const REC_WXSS = fs.readFileSync(P('styles/rec-bar.wxss'), 'utf8')
 const js = fs.readFileSync(P('pages/create/create.js'), 'utf8')
 // 10-19 那一刀（提炼完落回列表那扇窗）跨三个文件，判据也得跟着跨：
 // 交出去那一半在 create，取走那一半在 index，"取走即清"那一半在 app。只查 create 会漏掉"没人取"这一种失效。
@@ -722,11 +726,11 @@ ok('圆的位置真的绑到了 knobRpx 上（不是绑一个不存在的字段�
 
 // ---------- 6. 颜色：一处出处，wxss 里不许长出第二份色板 ----------
 const banned = palette.TONES.map((x) => x.bg.toUpperCase()).concat('#F6C445')
-const wxssHexes = (wxss.match(/#[0-9a-fA-F]{6}\b/g) || []).map((h) => h.toUpperCase())
+const wxssHexes = ((wxss + REC_WXSS).match(/#[0-9a-fA-F]{6}\b/g) || []).map((h) => h.toUpperCase())
 ok('wxss 里没有抄色板里的饱和色', !wxssHexes.some((h) => banned.includes(h)),
   wxssHexes.filter((h) => banned.includes(h)).join(','))
 // --cp-* 这一组由 palette.createSkin() 发下来：拼错一个令牌名不会红，只会静默透明（"同底色压透明度等于没画"那一类）
-const usedVars = [...new Set((wxssRaw.match(/var\(--cp-[a-z0-9-]+\)/g) || []).map((x) => x.slice(4, -1)))]
+const usedVars = [...new Set(((wxssRaw + REC_WXSS).match(/var\(--cp-[a-z0-9-]+\)/g) || []).map((x) => x.slice(4, -1)))]
 const skin = palette.createSkin()
 ok('wxss 用到的每一枚 --cp-* 都由 createSkin() 发得出来',
   usedVars.length > 0 && usedVars.every((v) => skin.includes(`${v}:`)),

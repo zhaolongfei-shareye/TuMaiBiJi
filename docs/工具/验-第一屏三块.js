@@ -797,12 +797,13 @@ const blockOf = (src, sel) => {
    皮仍然只有一份（rec-bar.wxss），落点仍然只在 create.wxss 那一条 margin（挂在按钮上）。 */
 const recSeg = `${blockOf(recWxss, 'button.rec-bar')}\n${seg('button.rec-bar')}`
 const ixWxss2 = fs.readFileSync(P('pages/index/index.wxss'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-const recIdxTitle = wxml.indexOf('class="page-title"')
+const recIdxAi = wxml.indexOf('class="ai-line"')
 const recIdxBar = wxml.indexOf('class="rec-bar"')
-const recIdxSwap = wxml.indexOf('class="home-swap"')
-ok('黄条排在标题图之后、「调亮度｜换背景｜换心情」那一行之前（＝他指的"英文的下方"）',
-  recIdxTitle > 0 && recIdxBar > recIdxTitle && recIdxSwap > recIdxBar,
-  `模板里三个位置 ${recIdxTitle} / ${recIdxBar} / ${recIdxSwap}`)
+const recIdxDot = wxml.indexOf('class="ai-dot"')
+const recIdxTitle = wxml.indexOf('class="page-title"')
+ok('⑭ 那一格成立：这一枚住在首屏最上面那一行（`.ai-line`）里、且排在那句新话之前',
+  recIdxAi > 0 && recIdxBar > recIdxAi && recIdxDot > recIdxBar && recIdxTitle > recIdxAi,
+  `模板里四个位置 ai-line ${recIdxAi} / 按钮 ${recIdxBar} / 黄点 ${recIdxDot} / 图片字 ${recIdxTitle}`)
 const recBtn = /<button[^>]*class="rec-bar"[^>]*>[\s\S]*?<\/button>/.exec(wxml)
 ok('这一枚本身就是 button[open-type=share]（拉起微信原生分享面板，不自己画一层）',
   !!recBtn && /open-type="share"/.test(recBtn[0]), recBtn && recBtn[0].slice(0, 60))
@@ -818,53 +819,55 @@ ok('模板＝按钮里"飞机 → 字"两枚（飞机不外挂、不另起一层
   && !/rec-dot/.test(wxml) && !/rec-slot/.test(wxml),
   recBtn && recBtn[0].replace(/\s+/g, ' ').slice(0, 130))
 const { i18n: I18N } = require(P('utils/i18n.js'))
-ok('zh 那一格逐字＝⑤ 那五个字「推荐给好友」（④ 压成四字、⑤ 又加回一个字），en 非空',
-  I18N.zh.recBarTitle === '推荐给好友' && !!I18N.en.recBarTitle,
+ok('zh 那一格逐字＝⑫ 那四个字「告诉好友」（④ 四字→⑤ 五字→⑫ 又换一句），en 非空',
+  I18N.zh.recBarTitle === '告诉好友' && !!I18N.en.recBarTitle,
   `zh ${I18N.zh.recBarTitle}／en ${I18N.en.recBarTitle}`)
-// 皮：四档必须真的从 createSkin 发下来。少发一档不是"颜色浅一点"，是那条属性整个没有值＝静默失效。
-const recVars = ['--cp-rec', '--cp-rec-plate', '--cp-rec-ink', '--cp-rec-shadow']
+// 皮：两档必须真的从 createSkin 发下来。少发一档不是"颜色浅一点"，是那条属性整个没有值＝静默失效。
+const recVars = ['--cp-rec-plate', '--cp-rec-ink']
 const skinOut = palette.createSkin()
-ok('createSkin() 四档 cp-rec 全发得出来（发不出来时 wxss 那几条 var 静默没有值）',
+ok('createSkin() 两档 cp-rec 全发得出来（发不出来时 wxss 那几条 var 静默没有值）',
   recVars.every((v) => skinOut.includes(v + ':')), recVars.filter((v) => !skinOut.includes(v + ':')).join(','))
-ok('旧形那两档（受光面 top／底下实边 edge）不再发、也没人偷偷吃（留着就是下一次往回挂的把手）',
-  !skinOut.includes('--cp-rec-top:') && !skinOut.includes('--cp-rec-edge:')
-  && !/--cp-rec-(top|edge)/.test(recSeg) && !/--cp-rec-(top|edge)/.test(recWxss),
-  `这一页 ${recSeg.match(/--cp-rec-(?:top|edge)/g) || '无'}／共用那份 ${(recWxss.match(/--cp-rec-(?:top|edge)/g) || []).length} 处`)
-ok('.rec-bar 那一份皮（连那枚纸飞机）四档全走 var，整份样式表一支 hex 都不写（饱和色只住在 palette）',
+/* ⑫⑬ 之后这一枚只剩两档皮：底（黄）与"图标＋字"（同一支墨）。旧那四档里废掉的两档
+   （--cp-rec＝那支黄的图标色、--cp-rec-shadow＝投影）反向钉一条"不再发、也没人偷偷吃"——
+   留着就是下一次往回挂的把手，而图标与字发两档同值正是"下一次各说一套"的起点。 */
+ok('旧形那四档（受光面 top／实边 edge／图标另色 cp-rec／投影 cp-rec-shadow）都不再发、也没人偷偷吃',
+  !/--cp-rec-(top|edge|shadow):/.test(skinOut) && !/(^|;)\s*--cp-rec:/.test(skinOut)
+  && !/--cp-rec-(top|edge|shadow)|\bvar\(--cp-rec\)/.test(recSeg) && !/--cp-rec-(top|edge|shadow)|\bvar\(--cp-rec\)/.test(recWxss),
+  `这一页 ${(recSeg.match(/--cp-rec-(?:top|edge|shadow)|var\(--cp-rec\)/g) || []).join(',') || '无'}／共用那份 ${(recWxss.match(/--cp-rec-(?:top|edge|shadow)|var\(--cp-rec\)/g) || []).length} 处`)
+ok('.rec-bar 那一份皮（连那枚图标）两档全走 var，整份样式表一支 hex 都不写（饱和色只住在 palette）',
   recVars.every((v) => recWxss.includes(`var(${v})`)) && !/#[0-9a-fA-F]{3,8}/.test(recWxss),
   recVars.filter((v) => !recWxss.includes(`var(${v})`)).join(',') || `写了 hex：${(/#[0-9a-fA-F]{3,8}/.exec(recWxss) || ['(无)'])[0]}`)
 const REC = palette.RECOMMEND_BAR
 const isHex6 = (v) => /^#[0-9a-fA-F]{6}$/.test(v || '')
-/* ⑤「黑色半透明，字体变成白色」这一档不能只钉"色板里写的是白"——白字压不压得住要看**板铺在
-   什么底上**，再算上整枚那一档 `opacity: .8`（④ 那句他没撤）。最坏的底是纯白（照片亮到爆），
-   所以这里现算：板（rgba .8）over 纯白 → 再吃整枚 .8 → 拿这一个数与白字比。
-   逐档试过才取 .8：板 @.6 白字只有 3.69（不过线），@.7 是 4.88、@.8 是 6.69。
-   那支黄压同一块板走图形门槛 3.0（纸飞机是图形不是正文，项目里那条口径见 §5.1）。 */
-const plateWorst = palette.mix(palette.mix('#000000', '#FFFFFF', REC.plateAlpha), '#FFFFFF', 0.8)
-ok('白字压得住黑半透明板（最浅底＋整枚 80% 两层都算进去，≥4.5）',
-  isHex6(REC.ink) && REC.ink.toUpperCase() === '#FFFFFF'
-  && palette.crOf(REC.ink, plateWorst) >= 4.5,
-  `字 ${REC.ink} 压 ${plateWorst}＝${palette.crOf(REC.ink, plateWorst).toFixed(2)}（板 alpha ${REC.plateAlpha}）`)
-/* ⑧ 之后飞机回到纱**之上**（不再是躲在纱后面），所以这一枚有两笔各钉一头的账：
-   · 白字压板（正文门槛 4.5）——它成立的前提是"黄与字横向不重叠"，那一格由几何那一段现算，
-     一旦哪天字挪到黄底上，这一条的数就不再是屏上真正的数（所以那条不许撤）。
-   · 黄压板（图形门槛 3.0，§5.1 那一条口径）：黄吃整枚 .8 之后与那块板比。 */
-ok('那支黄压得住黑半透明板（图形门槛 3.0；它现在是画在纱之上的）',
-  palette.crOf(palette.mix(REC.face, '#FFFFFF', 0.8), plateWorst) >= 3.0,
-  `黄 ${REC.face}（吃整枚 .8 后 ${palette.mix(REC.face, '#FFFFFF', 0.8)}）压最浅底那块板 ${plateWorst}`
-  + `＝${palette.crOf(palette.mix(REC.face, '#FFFFFF', 0.8), plateWorst).toFixed(2)}`)
-/* ⚠ 这一笔账在这一夜跟着落点换过两次方向，别再照旧话读：
-   ⑥ 那一版飞机整支在按钮上方 ⇒ 黄压在板外，"黄压板"那一格不存在，我改钉"白字压板＋板压在黄面上"；
-   ⑦⑧ 这一版飞机回到纱之上、与字左右分列 ⇒ 黄压板（上一条 3.0）回来了，而"板压在黄面上"作废。
-   仍要念一句实话：飞机出头那两截**飘到板外**，那一段对的是页面底——铺照片那态看照片，
-   白底那一态对纯白只有 1.63（低于 §5.1 图形门槛 3.0）。这一格我没钉阈值：它是装饰图形，
-   识别这一枚靠的是"推荐给好友"那五个字。要按 3.0 达标得给那支黄描一圈深边或换深色——他没提，我不做。 */
-console.log(`  · 备忘（不是判据）：飞机飘到板外那一圈对纯白底 ${palette.crOf(REC.face, '#FFFFFF').toFixed(2)}，对纯黑底 ${palette.crOf(REC.face, '#000000').toFixed(2)}`)
+const isRgba = (v) => /rgba?\(|[0-9a-fA-F]{8}$/.test(String(v || ''))
+/* ⑫「改为黄底」＋⑬「1比1复刻」把 ⑤ 那句「黑色半透明，字体变成白色」整条作废：
+   底回到**实心那支黄**，图标与字变成压在黄上的同一支墨。所以这一格的账换了对象——
+   原来算的是"白字压那块板（板铺在最浅的底上）"，现在算"墨压黄"：
+     · 字（正文门槛 4.5）：#23252C 对 #F6C445 ＝ **9.40** ✓
+     · 图标（图形门槛 3.0，§5.1 那条口径）：同一对数，同样 9.40 ✓
+   ⚠ 他这句里的"白色"我没能照做：白压那支黄只有 **1.63**（门槛 4.5 与 3.0 都不过，屏上就是糊），
+     而"黄底"是同一句里点名要的那一头——两头的门槛都保不住时我保了"看得清"（⑦ 那句「要清晰」），
+     把字与图标换成墨。这一处不是复刻的偏差，是他这张参考图本身是"白图标白字压蓝底"、
+     我们换成黄底之后那一层关系必须反过来；他给的那张图里没有"白字压黄"这件事。 */
+ok('⑫ 黄底＋墨字墨图标成立：那一支墨压黄 9.40，正文门槛 4.5（图标走同一对数，图形门槛 3.0 一并过）',
+  isHex6(REC.ink) && isHex6(REC.face) && palette.crOf(REC.ink, REC.face) >= 4.5,
+  `墨 ${REC.ink} 压黄 ${REC.face}＝${palette.crOf(REC.ink, REC.face).toFixed(2)}（门槛 4.5）`)
+ok('⑦「要清晰」到这一版仍成立：图标与字共用同一档 ink，不发第二档（两档同值＝下一次各说一套的把手）',
+  /background-color:\s*var\(--cp-rec-ink\)/.test(blockOf(recWxss, 'button.rec-bar .rec-plane'))
+  && /color:\s*var\(--cp-rec-ink\)/.test(blockOf(recWxss, 'button.rec-bar')),
+  blockOf(recWxss, 'button.rec-bar .rec-plane').match(/background-color:[^;]+/)?.[0] || '(图标没吃 --cp-rec-ink)')
+/* 底必须是**实心色**：⑫ 那句"黄底"落在屏上是整块色，不是又一层纱。
+   旧那一档 rgba 板（⑤「黑色半透明」）留在色板里就是"哪天再叠一层"的把手，所以这里反向钉一条。 */
+ok('底是实心色（色板那一档是 hex、样式表里一个 rgba 都不手写）',
+  isHex6(REC.face) && !isRgba(REC.ink) && !/rgba?\(/.test(recWxss),
+  `face ${REC.face}／ink ${REC.ink}／这一份样式表里 rgba ${(recWxss.match(/rgba?\(/g) || []).length} 处`)
+console.log(`  · 备忘（不是判据）：白字压这一支黄只有 ${palette.crOf('#FFFFFF', REC.face).toFixed(2)}（门槛 4.5），所以 ⑫ 那句"黄底"与⑤ 那句"白字"不可能同时成立`)
+console.log(`  · 备忘（不是判据）：黄压纯白页面底 ${palette.crOf(REC.face, '#FFFFFF').toFixed(2)}——整枚现在是实心色块，边界靠色块本身，不靠描边`)
 ok('黄还是 TIP_DOT 那一支，屏上不起第二支黄', REC.face.toUpperCase() === palette.TIP_DOT.toUpperCase())
-ok('按压反馈留着（:active 下沉），而"立体"那档底下 3rpx 实边已随黑半透明撤掉',
+ok('按压反馈留着（:active 下沉）；投影随 ⑬「1:1 复刻」撤掉（他那张图边缘量不到第二层暗边）',
   /translateY\(/.test(blockOf(recWxss, 'button.rec-bar:active'))
-  && !/0 \d+rpx 0 var\(--cp-rec/.test(recSeg),
-  blockOf(recWxss, 'button.rec-bar:active'))
+  && !/box-shadow/.test(recWxss) && !/--cp-rec-shadow/.test(recWxss),
+  `${blockOf(recWxss, 'button.rec-bar:active').trim().replace(/\s+/g, ' ')}／阴影 ${(recWxss.match(/box-shadow/g) || []).length} 条`)
 /* ⚠ 这一枚的选择器必须带 `button` 前缀（0,1,1），裸 `.rec-bar`（0,1,0）压不住微信给 button
    自带的那层 `.wx-btn` 默认值。10-20 第一版就是那么写的：高度、渐变、阴影、下边距全生效了，
    **只有 `width: 100%` 静默不生效**，模拟器屏上量到 184px 一枚居中小胶囊——他要的是横条。
@@ -878,78 +881,83 @@ ok('展开那一屏照旧画（④「只放在首屏和拍照屏」＝两态都�
   !/display:\s*none/.test(recSeg) && !/display:\s*none/.test(seg('button.rec-bar'))
   && !/\.rec-bar[^{]*\{[^}]*display:\s*none/.test(wxss) && !/wx:if/.test(recBtn[0].slice(0, recBtn[0].search(/>/))),
   `这一页 ${seg('button.rec-bar').trim().replace(/\s+/g, ' ') || '(无落点)'}／皮里 display ${/display:/.test(recSeg) ? '有' : '无'}`)
-/* ④「按钮整体80%透明度」落在 `opacity` 这一档——⑤ 换皮时这一句他没撤，照旧钉。
-   但⑤ 把"半透明"这件事另落在了**面上**（黑色半透明），所以现在两档各有各的差事：
-   板（`--cp-rec-plate`）必须是 rgba，字与那支黄必须是实心色。
-   只留板半透明而撤掉整枚那一档，屏上读出来是"一块实黑底上贴淡字"；只留整枚那一档而板是实心，
-   读出来是"一块不透明的黑方块"——两种都不是他那句「黑色半透明」。 */
+/* ④「按钮整体80%透明度」→ ⑪「再大一点，50%」→ ⑫⑬「黄底 / 1:1 复刻」：透明度这一整条线走完了
+   一个来回，现在**这一枚没有透明度**——底是实心黄，字与图标是实心墨。这一格反过来钉"皮里不许再
+   有一条 opacity"：旧那层挂着＝整枚跟着淡，实心黄变回一层纱，上面那笔"墨压黄 9.40"就不再是屏上的数。
+   :active 里同样不许写（按下去会跳变）。 */
 const recActive = blockOf(recWxss, 'button.rec-bar:active')
 const opVal = parseFloat((/(?:^|;)\s*opacity:\s*([0-9.]+)/.exec(recSeg) || [, ''])[1])
-const isRgba = (v) => /rgba?\(|[0-9a-fA-F]{8}$/.test(String(v || ''))
-ok('整枚 80% 不透明＝皮里那一条 opacity: 0.8（⑤ 换皮没撤它），且:active 里不重复写（按下去会跳变）',
-  Math.abs(opVal - 0.8) < 1e-9 && !/opacity/.test(recActive),
-  `皮里 ${(/(?:^|;)\s*opacity:[^;]+/.exec(recSeg) || ['(无)'])[0].trim()}／:active 里 ${/opacity/.test(recActive) ? '也写了一条' : '没写'}`)
-ok('「黑色半透明」落在面上（板那一档是 rgba 且样式表吃的是 var），字与那支黄仍是实心色',
-  isRgba(REC.plate) && /var\(--cp-rec-plate\)/.test(recSeg)
-  && [REC.face, REC.ink].every((v) => !isRgba(v)),
-  `板 ${REC.plate}／字 ${REC.ink}／黄 ${REC.face}`)
-ok('rgba 这一支黑只住在色板：整份皮里一个 rgba 都不许手写（写第二处就是两档各说一套）',
-  !/rgba?\(/.test(recWxss) && isHex6(REC.face) && isHex6(REC.ink),
-  `这一份样式表里 rgba ${(recWxss.match(/rgba?\(/g) || []).length} 处`)
-/* ⑤「黄色纸飞机 ICON」＋「纸飞机在文字左边…纸飞机要大一点。高度斜45度，有飞行的感觉」
-   ＋⑦「上尖超过、下尖也超过」＋⑧「胶囊加宽、能容纳纸飞机和文字」（他指的那一格）
-   ⇒ 飞机那一格钉三件事：正方、色走 --cp-rec（那支芥末黄，不另起一支）、形状靠 mask 出，外加一条"斜过来了"；
-   落点＝**住在按钮里面、吃绝对定位**（top 是负数，所以它跨出胶囊的上下沿；不占流，字才轮得到右边那一列）。
-   这几格任一松掉，屏上读出来分别是"糊成一块"、"跟着字色变白"、"一整块实心黄方块"、"平躺着的纸飞机"、
-   "又缩回胶囊里不出头"——mask／transform／absolute 都是静默失效那一族，写错一句错都不报，
-   所以两支前缀都要在、旋转角与定位那两格必须现读。 */
+ok('整枚没有任何 opacity（④ 那层 .8 与 ⑪ 那一档都随 ⑫「黄底」撤净；皮里与 :active 里都不许再有一条）',
+  Number.isNaN(opVal) && !/opacity/.test(recWxss),
+  `皮里 ${(/(?:^|;)\s*opacity:[^;]+/.exec(recWxss) || ['(无)'])[0].trim()}／:active 里 ${/opacity/.test(recActive) ? '也写了一条' : '没写'}`)
+ok('底那一条吃 var(--cp-rec-plate)（色板发下来的，不是样式表里写死的一支黄）',
+  /background:\s*var\(--cp-rec-plate\)/.test(blockOf(recWxss, 'button.rec-bar')),
+  (/(?:^|;)\s*background[^;]*/.exec(blockOf(recWxss, 'button.rec-bar')) || ['(没写 background)'])[0].trim())
+/* ⑤「纸飞机在文字左边…斜45度」＋⑫「参考这个ICON设计」＋⑬「1比1复刻」⇒ 飞机的**朝向**留、
+   **落点**换回胶囊里面（他 ⑫ 之后当场拍的那一句：照这张图收进去），**颜色**从黄换成墨（跟着底走反）。
+   ⇒ 这一格钉五件事：正方、尺寸＝照图量到的那档、色走 --cp-rec-ink（图标与字同一档，不发第二档）、
+   形状靠 mask 出、斜过来了；落点＝**住在流里**（`flex: none` ＋ `margin-left`），不再吃绝对定位。
+   mask／transform／flex 子项收缩都是静默失效那一族，写错一句错都不报，所以两支前缀都要在、
+   旋转角与"在不在流里"必须现读。 */
 const planeSeg = blockOf(recWxss, 'button.rec-bar .rec-plane')
 const txSeg = blockOf(recWxss, 'button.rec-bar .rec-tx')
-ok('那枚飞机是正方形、色从 --cp-rec 取（不另起一支黄），而 ④ 那两颗点已随新形撤净',
+ok('那枚飞机是正方形、色从 --cp-rec-ink 取（跟字同一档，不再另起一支黄），而 ④ 那两颗点已撤净',
   num(planeSeg, 'width') > 0 && num(planeSeg, 'width') === num(planeSeg, 'height')
-  && num(planeSeg, 'width') >= 40 && /background-color:\s*var\(--cp-rec\)/.test(planeSeg)
+  && /background-color:\s*var\(--cp-rec-ink\)/.test(planeSeg)
   && blockOf(recWxss, 'button.rec-bar .rec-dot') === '',
   planeSeg.trim().replace(/\s+/g, ' '))
-ok('飞机斜 45°、且是**机头朝上**那一头（−45；CSS 正角顺时针，取正就变成朝下扎）',
+/* 尺寸 18 不是挑的：他那张图里**看得见的墨迹**是 0.365×胶囊高，而斜 45° 之后那支墨迹＝元素框的
+   0.884 倍（算法见下面几何那一段）。所以这里钉的是"墨迹对胶囊高的比例"，框只是它的反解结果。 */
+const PLANE_INK_RATIO = 0.884
+const PLANE_SHIFT_RATIO = 0.1178
+ok('⑬「1比1复刻」那格成立：飞机看得见的墨迹占胶囊高 0.365（图里量到的那一档），误差 ±0.03',
+  (() => {
+    const s = num(planeSeg, 'width'), h = num(recSeg, 'height')
+    return s > 0 && h > 0 && Math.abs((s * PLANE_INK_RATIO) / h - 0.365) <= 0.03
+  })(),
+  `墨迹 ${(num(planeSeg, 'width') * PLANE_INK_RATIO).toFixed(1)}rpx ÷ 高 ${num(recSeg, 'height')} ＝ ${(num(planeSeg, 'width') * PLANE_INK_RATIO / num(recSeg, 'height')).toFixed(3)}（图里 0.365）`)
+ok('飞机斜 45°、且是**机头朝右上**那一头（−45；CSS 正角顺时针，取正就变成朝下扎）',
   /transform:\s*rotate\(\s*-45deg\s*\)/.test(planeSeg),
   (/(?:^|;)\s*transform:[^;]+/.exec(planeSeg) || ['(无)'])[0].trim())
-ok('飞机靠 mask 出形，两支前缀都写（漏 -webkit- 那一支在某些机型就是一块实心黄）',
+ok('飞机靠 mask 出形，两支前缀都写（漏 -webkit- 那一支在某些机型就是一块实心墨方块）',
   /-webkit-mask-image:\s*url\("data:image\/svg\+xml,/.test(planeSeg)
   && /(?:^|;)\s*mask-image:\s*url\("data:image\/svg\+xml,/.test(planeSeg),
   `mask ${(planeSeg.match(/mask-image:/g) || []).length} 条／svg ${(planeSeg.match(/data:image\/svg/g) || []).length} 条`)
-/* ⑦ 那两截出头靠的是"绝对定位 ＋ 负 top"，而父级必须给得起坐标系且不裁切：
-   这四格（absolute／top 为负／父级 relative／父级 overflow:visible）少任一格，屏上分别读成
-   "缩回胶囊里"／"整支飞到按钮下面"／"按整页定位、跑到别处"／"上下尖被削平"——同样一句错都不报。
-   ⚠ 上一版（⑥ 之后）钉的是 `bottom: 100%`＝整支悬在按钮上方；⑦⑧ 改成跨在按钮上，
-     所以那一格现在反过来：出现 `bottom` 定位就是旧形没撤净。 */
-ok('飞机吃绝对定位、负 top 跨出胶囊，父级给得起坐标系又不裁切（relative ＋ overflow:visible）',
-  /position:\s*absolute/.test(planeSeg) && num(planeSeg, 'top') < 0 && !/bottom:/.test(planeSeg)
-  && /position:\s*relative/.test(recSeg) && /overflow:\s*visible/.test(recSeg),
-  `飞机 ${decl(planeSeg, 'position')}／top ${decl(planeSeg, 'top')}／按钮 position ${decl(recSeg, 'position')}／overflow ${decl(recSeg, 'overflow')}`)
-/* ⑧「能容纳纸飞机和文字」⇒ 两列横向要排得开：字那一列靠右（justify-content: flex-end ＋ 右内缩），
-   飞机那一列吃绝对定位（不占流）。竖排那一版（⑤ 第一回）的 `flex-direction: column` 不许回来。 */
-ok('胶囊里两列横向分工：字靠右那一列（flex-end＋右内缩），不许竖排、不许再挤一个 gap',
+/* ⑥⑦ 那两版靠"绝对定位 ＋ 负 top"把飞机顶出胶囊上下沿；⑫ 之后整支收进胶囊 ⇒ 那一套全作废，
+   这里**反过来钉**：出现 absolute／left／bottom 就是旧形没撤净（旧形留在屏上是"飞机压出盒子"，
+   不是"收在里面"）。相对定位那一格另有用：`top` 只用来把墨迹抬回中线（斜过来之后墨迹中心
+   比元素框中心低 0.118×size，而 `align-items: center` 居中的是**框**）。 */
+ok('飞机住在流里（flex 子项、不收缩），绝对定位那一套已随「照这张图收进去」撤净',
+  /flex:\s*none/.test(planeSeg) && !/position:\s*absolute/.test(planeSeg)
+  && !/(?:^|;)\s*left:/.test(planeSeg) && !/(?:^|;)\s*bottom:/.test(planeSeg),
+  `flex ${decl(planeSeg, 'flex') || '(跟默认 shrink)'}／position ${decl(planeSeg, 'position') || '(无)'}`)
+ok('墨迹抬回中线：吃相对定位、top 为负且≈ 0.118×框宽（不抬的话屏上图标比字低一截，他那张图里同一条中线）',
+  /position:\s*relative/.test(planeSeg) && num(planeSeg, 'top') < 0
+  && Math.abs(-num(planeSeg, 'top') - num(planeSeg, 'width') * PLANE_SHIFT_RATIO) <= 1,
+  `top ${decl(planeSeg, 'top') || '(没写)'} vs 该抬 ${(num(planeSeg, 'width') * PLANE_SHIFT_RATIO).toFixed(1)}rpx`)
+ok('胶囊里两列横向排在一条线上：flex row ＋ align-items:center ＋ 靠左起点，字那一列吃写死的 margin-left',
   /display:\s*flex/.test(recSeg) && !/flex-direction:\s*column/.test(recSeg)
-  && /align-items:\s*center/.test(recSeg) && /justify-content:\s*flex-end/.test(recSeg)
-  && !/(?:^|;)\s*gap:/.test(recSeg),
-  `direction ${decl(recSeg, 'flex-direction') || '(默认 row)'}／justify ${decl(recSeg, 'justify-content')}／gap ${decl(recSeg, 'gap') || '(无)'}`)
+  && /align-items:\s*center/.test(recSeg) && /justify-content:\s*flex-start/.test(recSeg)
+  && !/(?:^|;)\s*gap:/.test(recSeg) && num(txSeg, 'margin-left') > 0,
+  `direction ${decl(recSeg, 'flex-direction') || '(默认 row)'}／justify ${decl(recSeg, 'justify-content')}／gap ${decl(recSeg, 'gap') || '(无)'}／字左沿 ${decl(txSeg, 'margin-left')}`)
 ok('⑦「字体不要加粗」⇒ 这一枚不许再写 700（那一档是我上一版自己抬的，他这一句撤掉）',
   !/font-weight:\s*(?:700|bold)/.test(recSeg), `字重 ${decl(recSeg, 'font-weight') || '(跟默认)'}`)
 ok('字面那一枚不许折行（nowrap）：折了之后 44rpx 的定高把「推荐给好友」切成两截',
   /white-space:\s*nowrap/.test(txSeg), txSeg.trim().replace(/\s+/g, ' '))
-/* 那行英文的墨迹宽仍是**左沿对齐**要用的数（③「在英文下放、贴着左沿」这一半没被顶掉）：
-   位图 500×246，逐行扫 α>40 分带，最下面那一带（英文）占 x 101~422。
+/* 那行英文的墨迹位置是**居中对齐**要用的数（⑨「英文下方与按钮应该是居中对齐」顶掉了原来
+   ③ 那一半的"贴着左沿"）：位图 500×246，逐行扫 α>40 分带，最下面那一带（英文）占 x 101~422。
    重量法（改图后要重新量）：
      python3 -c "from PIL import Image; a=Image.open('miniprogram/assets/title-heading.png').getchannel('A') …"
-   宽按屏上那一枚 `.page-title` 的实际宽折算，所以改了标题字号这一档跟着动，不会各说一套。
+   宽与中心都按屏上那一枚 `.page-title` 的实际宽折算，所以改了标题字号这一档跟着动，不会各说一套。
    ⚠ ② 那句「按钮长度不要超过英文」已被 ⑧「按钮长度要长一点，能容纳纸飞机和文字」顶掉：
-     这一档不再是上限，只是一个**参照**（208 对 146.8 ⇒ 右沿越过英文 61.2），所以这里不钉阈值，
-     只把两个数一起打出来——原先那条 `REC_W <= EN_W` 留在尺子里就是假红（他会说"我后来改过主意"）。 */
+     这一档不再是上限，只是一个**参照**，所以这里不钉阈值，只把两个数一起打出来——
+     原先那条 `REC_W <= EN_W` 留在尺子里就是假红（他会说"我后来改过主意"）。 */
 const EN_BAND = { x0: 101, x1: 422 }
 const PNG_W = (() => { const b = fs.readFileSync(P('assets/title-heading.png')); return b.readUInt32BE(16) })()
 const TITLE_W = num(seg('.page-title'), 'width')
 const EN_W = ((EN_BAND.x1 + 1 - EN_BAND.x0) * TITLE_W) / PNG_W
 const EN_LEFT = (EN_BAND.x0 * TITLE_W) / PNG_W
+const EN_CX = (((EN_BAND.x0 + EN_BAND.x1 + 1) / 2) * TITLE_W) / PNG_W
 const REC_W = num(recSeg, 'width')
 /* ⑦ 钉竖直（高 44 不动、飞机两头都要出头）＋⑧ 钉横向（宽要排得下"飞机那一列＋五个字"）。
    横向＝字面宽（汉字一个字正好一个 em，等宽 advance，不是估的）；内框＝width − 右内缩。 */
@@ -966,43 +974,64 @@ const padParts = (src) => {
 const REC_PAD = padParts(recSeg) || { right: NaN, left: NaN }
 const zhInk = I18N.zh.recBarTitle.length * FS_TINY
 const REC_H = num(recSeg, 'height')
-/* 斜 45° 之后那一格占多少，只能算不能猜，而且**要算两个数**（这一格是本轮真跑现量出来的差别）：
-   · 看得见的那一支黄：路径自己在 24 格画布上占宽 21／高 18（x 2→23、y 3→21；换形状要重量——
-     把 SVG path 的顶点打出来取 min/max 即可），折到 size 那一档是 size×21/24 与 size×18/24；
-     绕中心转 45° 后横竖两向都变成 (宽＋高)×sin45。**⑦ 那句「超过按钮高度」量的就是这一个数。**
-   · 屏上量得到的那一格＝元素的外接矩形 size×√2（mask 之外那圈空白也算进去，而且是透明的）——
-     真跑尺子读回来的是它，不是上面那个数（28 那一版推 32.2、屏上量到 38.1，就是这个差别）。
-     它比墨迹大一圈，所以**不许拿它去卡"有没有出板"**：那半截是空的，画不出东西。 */
-const PLANE_INK = { w: 21, h: 18, box: 24 }
+/* 斜 45° 之后**看得见的墨迹**有多大——只能算，而且不能拿"外接框再转 45°"那个数：
+   算法（换形状要重算）：把 mask 那支 path 的六个顶点绕画布中心 (12,12) 转 −45°，取 min/max：
+     x 占 −13.433 ～ ＋7.778、y 占 −7.778 ～ ＋13.433 ⇒ 两向都是 21.211 格＝元素框的 **0.884 倍**；
+     而墨迹中心比框中心**偏左 2.828 格、偏下 2.828 格**＝各 0.1178×size（形状不对称，不是居中转的）。
+   ⚠ 旧那一版我拿 (21＋18)/24×sin45＝1.149×size 当墨迹宽——那是"先取形状的外接框、再把外接框转 45°"，
+     形状本身不填满自己的外接框，所以凭空大了 30%。这一格错过一次的代价记在 §8.394：
+     推出来的"上尖凸出 30.4rpx"对屏上现量只有 12.3，整笔账（含 ⑥ 那句给飞机让净空要不要那么多）都被它带偏。
+   · 真跑尺子读回来的是元素**布局外接矩形** size×√2（含 mask 之外那圈全透明的空白）——
+     它比墨迹又大一圈，别拿它当"看得见的飞机"，也别拿它去卡"有没有出板"。 */
 const SIDE = num(planeSeg, 'width')
-const tilt = (SIDE * (PLANE_INK.w + PLANE_INK.h) / PLANE_INK.box) * Math.SQRT1_2
-const aabb = SIDE * Math.SQRT2
-const PLANE_L = num(planeSeg, 'left')
-const PLANE_T = num(planeSeg, 'top') // 负数＝元素顶边在胶囊顶边之上
-const inkL = PLANE_L + SIDE / 2 - tilt / 2
-const inkR = PLANE_L + SIDE / 2 + tilt / 2
-const inkTop = PLANE_T + SIDE / 2 - tilt / 2 // 相对胶囊顶边（负＝在顶边之上）
-const inkBottom = PLANE_T + SIDE / 2 + tilt / 2
-const txLeft = REC_W - REC_PAD.right - zhInk // 字靠右那一列的左沿（justify-content: flex-end）
-ok('⑦ 那句「高度要超过按钮高度」成立：斜过来的那支黄（不是按钮里那格）比 44 的胶囊高',
-  REC_H > 0 && tilt > REC_H, `黄 ${tilt.toFixed(1)}rpx vs 按钮高 ${REC_H}rpx（外接框 ${aabb.toFixed(1)} 是空的，不算这一格）`)
-ok('⑦ 那两句「上尖超过、下尖也超过」两头都为正：墨迹顶边在胶囊之上、底边在胶囊之下',
-  REC_H > 0 && inkTop < 0 && inkBottom > REC_H,
-  `上凸 ${(-inkTop).toFixed(1)}／下超 ${(inkBottom - REC_H).toFixed(1)}rpx（元素 ${PLANE_T}～${PLANE_T + SIDE}）`)
-ok('飞机的墨迹横向仍在板内（左沿不出板、飘出去就直接压在照片上——这一层不裁溢出）',
-  PLANE_L >= 0 && inkL >= 0 && inkR <= REC_W,
-  `left ${PLANE_L}＋居中一半 ⇒ 墨迹 ${inkL.toFixed(1)}～${inkR.toFixed(1)} vs 板宽 ${REC_W}`)
-ok('⑧「能容纳纸飞机和文字」横向排得开：黄那一列与五个字之间还留 ≥4 的缝，字也不许贴出右内缩',
-  REC_W > 0 && zhInk > 0 && txLeft >= inkR + 4 && txLeft + zhInk <= REC_W - 8,
-  `黄右沿 ${inkR.toFixed(1)}＋缝 ${(txLeft - inkR).toFixed(1)}＋字 ${zhInk}＝到 ${txLeft + zhInk} vs 板 ${REC_W}／右内缩 ${REC_PAD.right}`)
-console.log(`  · 备忘（不是判据）：⑧ 顶掉 ② 之后板宽 ${REC_W} 对那行英文墨迹 ${EN_W.toFixed(1)}＝越过 ${(REC_W - EN_W).toFixed(1)}rpx`)
-ok('五个字的横向宽压得进这一枚的内容盒（宽 − 左右内缩；英文那一门由真跑尺子量实际矩形）',
-  zhInk <= REC_W - REC_PAD.left - REC_PAD.right,
-  `${I18N.zh.recBarTitle.length}×${FS_TINY}＝${zhInk}rpx vs 内容盒 ${REC_W - REC_PAD.left - REC_PAD.right}rpx`)
-ok('高维持 ④ 那一档 44（他「按钮高度维持之前高度」；竖排那一版抬到 70 已撤回），字仍吃 --fs-tiny',
+const inkW = SIDE * PLANE_INK_RATIO
+const shift = SIDE * PLANE_SHIFT_RATIO
+const PLANE_ML = num(planeSeg, 'margin-left')
+const PLANE_T = num(planeSeg, 'top') // 负＝把墨迹抬回中线
+const TX_ML = num(txSeg, 'margin-left')
+// 两枚都在流里、padding 整条为 0 ⇒ 飞机框从内容左沿起：横占 [PLANE_ML, PLANE_ML＋SIDE]，字框紧跟其后。
+// 竖：`align-items: center` 居中的是**框**（胶囊 44、框 18 ⇒ 框中心在 22），`top` 再抬 PLANE_T。
+const boxCx = PLANE_ML + SIDE / 2
+const boxCy = REC_H / 2 + PLANE_T
+const inkL = boxCx - shift - inkW / 2
+const inkR = boxCx - shift + inkW / 2
+const inkTop = boxCy + shift - inkW / 2
+const inkBottom = boxCy + shift + inkW / 2
+const txLeft = PLANE_ML + SIDE + TX_ML
+const gapInk = txLeft - inkR
+const rightInset = REC_W - (txLeft + zhInk)
+ok('⑫「照这张图收进去」成立：整支墨迹四边都在胶囊内——⑥⑦ 那两截出头随这一句作废',
+  REC_H > 0 && REC_W > 0 && inkTop >= 0 && inkBottom <= REC_H && inkL >= 0 && inkR <= REC_W,
+  `墨迹 横 ${inkL.toFixed(1)}～${inkR.toFixed(1)}（板 0～${REC_W}）／纵 ${inkTop.toFixed(1)}～${inkBottom.toFixed(1)}（高 0～${REC_H}）`)
+ok('墨迹回到与字同一条中线：上下留的空白一样多（±1.5rpx 以内；不抬那一格就低 2.1）',
+  REC_H > 0 && Math.abs((inkTop + inkBottom) / 2 - REC_H / 2) <= 1.5,
+  `墨迹中心 ${(inkTop + inkBottom) / 2}rpx vs 胶囊中线 ${REC_H / 2}rpx（框顶 ${boxCy - SIDE / 2}、top ${PLANE_T}）`)
+ok('飞机与字不重叠，那道缝＝图里量到的 0.190H＝8.4rpx（⑩「空隙太大」在 1:1 那版里的落点，±2 以内）',
+  gapInk > 0 && Math.abs(gapInk - 0.190 * REC_H) <= 2,
+  `框 ${PLANE_ML}＋${SIDE}、字左沿 ${txLeft}、墨迹右沿 ${inkR.toFixed(1)} ⇒ 缝 ${gapInk.toFixed(1)}rpx（图里 8.4）`)
+ok('四个字的右沿留出图里那档右内缩 0.413H＝18.2（±2 以内；贴到圆角就是"字压在帽上"）',
+  rightInset > 0 && Math.abs(rightInset - 0.413 * REC_H) <= 2,
+  `右内缩 ${rightInset.toFixed(1)}rpx（到 ${txLeft + zhInk} ＝ 缝 ${gapInk.toFixed(1)}＋四个字 ${zhInk} vs 板 ${REC_W}）`)
+/* ⚠ 那行英文墨迹的几何（位图 500×246、英文带 x 101~422、屏上宽 146.8、中心 126.48）我留在尺子里
+   当参照打数，不再当判据：它今天仍然算得出，只是没有任何东西再对齐它（哪天他要说"回到英文下面"就是这些数）。 */
+/* ⚠ 「按钮长度不要超过英文」→ ⑧「长一点、能容纳纸飞机和文字」→ ⑬ 1:1 复刻又回到 144：
+     这一句被他改过两回主意，所以**不钉阈值**，只把两个数打出来当参照（钉住了就是下一次他一句
+     "长一点"时的假红；144 < 146.8 这一版刚好成立，纯属照图量出来的巧合）。 */
+console.log(`  · 备忘（不是判据）：板宽 ${REC_W}rpx vs 那行英文墨迹 ${EN_W.toFixed(1)}rpx＝${REC_W <= EN_W ? '不超过（② 那句这一版刚好成立）' : '长出 ' + (REC_W - EN_W).toFixed(1) + '（⑧ 顶掉了 ②）'}`)
+console.log(`  · 备忘（不是判据）：真跑读回来的是布局外接矩形 ${(SIDE * Math.SQRT2).toFixed(1)}rpx（含空白），比看得见的墨迹 ${inkW.toFixed(1)} 大 ${(SIDE * Math.SQRT2 - inkW).toFixed(1)}`)
+/* 内缩整条撤是 `.wx-btn` 那一族的一条（它自带左右 1.34em）：不写死 0，"左内缩 18、右内缩 19"
+   这两档就坐在一段没人知道的偏移里，屏上读回来的不是这些数。四格都要钉住 0。 */
+ok('内缩整条撤（`.wx-btn` 自带左右 1.34em，留着它上面那五个"量出来的内缩"就不是屏上那个数）',
+  REC_PAD && REC_PAD.left === 0 && REC_PAD.right === 0 && REC_PAD.top === 0 && REC_PAD.bottom === 0,
+  `padding ${(recSeg.match(/(?:^|;)\s*padding:[^;]+/) || ['(整条没写——`.wx-btn` 那 1.34em 会自己回来)'])[0].trim()}`)
+ok('高维持 ④ 那一档 44（⑤⑥⑦ 三句钉着「按钮高度维持之前高度」，到 ⑬ 没被撤），字仍吃 --fs-tiny',
   REC_H === 44 && /font-size:\s*var\(--fs-tiny\)/.test(recSeg),
   `高 ${REC_H}／字 ${decl(recSeg, 'font-size')}`)
-// 左沿对齐：这一枚的左边要和那行英文的左边在同一条线上（这才叫"在英文下放"）。
+ok('⑬ 那一档圆角：图里量到 0.286H＝12.6 → 13rpx（原来那档 22 的"胶囊帽"随 1:1 复刻换掉）',
+  Math.abs(num(recSeg, 'border-radius') - 0.286 * REC_H) <= 1,
+  `圆角 ${decl(recSeg, 'border-radius')} vs 图里 ${(0.286 * REC_H).toFixed(1)}rpx`)
+// 居中对齐：⑨「没有对齐，英文下方与按钮应该是居中对齐」。这一枚的中心要和那行英文墨迹的中心
+// 落在同一条竖线上——原来那一条比的是左沿（③「贴着左沿」），被他这一句顶掉，改口径不改代码迁就旧尺子。
 // 同一个选择器在一个文件里可以写两条（`.title-row .page-title` 一条管 opacity、一条管 margin-left），
 // 而 `seg()` 只回第一条——拿它读 margin 会读出 NaN，再把"算不出来"当成"算出来够"。
 // 所以按需要的那条属性去挑块，而不是按出现顺序拿第一块。
@@ -1026,25 +1055,28 @@ const marginParts = (raw) => {
 const SP3 = parseInt(/--sp-3:\s*(\d+)rpx/.exec(appWxss)[1], 10)
 const TITLE_ML = (marginParts(segProp('.title-row .page-title', 'margin')) || { left: NaN }).left
 const recM = marginParts(recSeg)
-const swapM = marginParts(seg('.home-swap'))
-ok('左沿与那行英文的左沿在同一条线上（±3rpx 以内）',
-  recM && Math.abs((SP3 + recM.left) - (SP3 + TITLE_ML + EN_LEFT)) <= 3,
-  `按钮左沿 ${SP3 + (recM ? recM.left : NaN)}rpx／英文左沿 ${(SP3 + TITLE_ML + EN_LEFT).toFixed(1)}rpx`)
-/* 与「调亮度｜换背景｜换心情」那一行的实际缝：抵掉 .home-swap 那道负 margin-top 之后还剩多少。
-   原来这一格还要"容得得下立体那 3rpx 实边"，⑤ 把实边撤了 ⇒ 这一档只剩呼吸量，取 12rpx。
-   ⚠ 不许再从 `box-shadow: 0 (\d+)rpx` 里读那个数：⑤ 之后那条 shadow 是投影（0 6rpx 14rpx），
-   把它当"实边厚度"会凭空多要 6rpx，判据红在一支跟落点无关的属性上。 */
-ok('与「调亮度」那一行的实际缝算得出来（抵掉 .home-swap 那道负 top，且 ≥12rpx 呼吸）',
-  recM && swapM && recM.bottom - Math.abs(swapM.top) >= 12,
-  `margin-bottom ${recM && recM.bottom}／.home-swap margin-top ${swapM && swapM.top}`)
-/* ⑤「按钮位置再上移一点」⇒ 32 收到 8；⑥「目前按钮离英文太近了，往下一点，留出空间给纸飞机ICON」
-   ⇒ 8 放到 60。钉的是同一个数、方向相反，两句都是他本人的话，所以判据跟着第二次改（不改代码迁就旧尺子）。
-   这一档必须 ≥ 飞机凸出量＋一点透气；反向再钉一条"按钮自己不许有 margin-top"：缝要只住一处，
-   两处各写一半就没人说得清屏上那道缝是谁给的——同一类账在 §8.170 那行日期、10-01 那行 Tips 上各欠过一次。 */
-const TITLE_MB = parseInt((/(?:^|;)\s*margin-bottom:\s*(\d+)rpx/.exec(segProp('.title-row', 'margin-bottom')) || [, ''])[1], 10)
-ok('⑥ 那一刀落了：标题行底下那道缝 ≥ 飞机凸出量＋8（给纸飞机留出空间），且这一枚自己没有 margin-top 来分这笔账',
-  TITLE_MB >= -inkTop + 8 && recM && recM.top === 0,
-  `.title-row margin-bottom ${TITLE_MB}rpx vs 飞机上尖凸出 ${(-inkTop).toFixed(1)}rpx／按钮 margin-top ${recM && recM.top}rpx`)
+/* ⑭「移到左上角，就是用AI帮你XXXX的前面」把 ①③⑨ 那一串落点话整块顶掉：这一枚现在住在首屏最上面
+   那一条玻璃带（`.ai-line`）里，最左沿就是那一行自己的 `padding-left: var(--sp-3)`（24rpx），
+   所以它自己**不许再带 margin-left**——带了就是"左上角"往右偏，而偏多少没人说得出（那一行的内缩
+   与这一枚的外缩两处各写一半，同一类账在 §8.170 那行日期、10-01 那行 Tips 上各欠过一次）。
+   ⚠ 原来那一条钉的是"按钮中心＝那行英文墨迹中心（126.48）"，靠 margin-left 30 反解。被他这一句顶掉后
+   留在尺子里就是假红（这一枚已经不在图片字下面了，跟那条中线没关系），故删；英文墨迹那三个数仍打出来
+   当参照（哪天他说"回到英文下面"，用的还是这些数）。 */
+ok('⑭ 左上角那一格：这一枚不带 margin-left（最左沿就是 `.ai-line` 那 24rpx 内缩，缝不许住两处）',
+  recM && recM.left === 0 && /padding:\s*[^;]*var\(--sp-3\)/.test(seg('.ai-line')),
+  `按钮 margin ${recM && `${recM.top} ${recM.right} ${recM.bottom} ${recM.left}`}／.ai-line padding ${(seg('.ai-line').match(/(?:^|;)\s*padding:[^;]+/) || ['(没写)'])[0].trim()}`)
+/* 那一行是 `align-items: flex-start`：字 line-height 1.35×24＝32.4、黄点靠自己的 margin-top 10 抬到
+   中线 16，而这一枚 44 高 ⇒ 不抬的话它的中线在 22，屏上读成"黄块比那行字低一截"。
+   6 这一档是算出来的（(44−32.4)/2＝5.8），不是挑的；真跑尺子量渲染端那三个矩形的中心差来证这条算术。 */
+const FS_META = parseInt(/--fs-meta:\s*(\d+)rpx/.exec(appWxss)[1], 10)
+const LINE_MID = (FS_META * 1.35) / 2
+ok('与那行字同一条中线：margin-top ≈ −(按钮高／2 − 字中线)（把 44 那一枚抬回 16.2 那条线）',
+  recM && Math.abs(-recM.top - (REC_H / 2 - LINE_MID)) <= 1,
+  `margin-top ${recM && recM.top} vs 该抬 ${(REC_H / 2 - LINE_MID).toFixed(1)}（按钮中线 ${REC_H / 2}、字中线 ${LINE_MID.toFixed(1)}）`)
+ok('这一枚与那枚黄点之间留缝（margin-right > 0），且旧落点那两笔账已撤净（margin-bottom 归 0）',
+  recM && recM.right > 0 && recM.bottom === 0,
+  `margin-right ${recM && recM.right}／margin-bottom ${recM && recM.bottom}（⑤⑥ 那两档 8／60／32 都随 ⑭ 作废）`)
+console.log(`  · 备忘（不是判据）：那行英文墨迹仍在 屏上 ${(SP3 + TITLE_ML + EN_LEFT).toFixed(1)}～${(SP3 + TITLE_ML + EN_LEFT + EN_W).toFixed(1)}、中心 ${(SP3 + TITLE_ML + EN_CX).toFixed(1)}——⑭ 之后没有任何东西对齐它`)
 /* ④「只放在首屏和拍照屏，不再放在列表页」——这一句把 ③ 里"首屏和笔记列表都要"那一半收掉了。
    于是那份共用皮现在只有一页吃（新建页的两态），三件事必须一起成立：
    ① 列表页真撤净（代码、样式、发下来的那五档变量都不留残；留残是下一次往回挂的诱饵）；

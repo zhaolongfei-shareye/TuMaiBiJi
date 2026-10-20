@@ -1,53 +1,48 @@
-// 「推荐给好友」那一枚的**真跑**尺子（站长 10-20 一夜八句：加在英文下方 → 精致小巧不盖人、
-// 长度不许超过英文 → 首屏和笔记列表都要、相同的位置 → 只放在首屏和拍照屏、整体80%透明度＋
-// 字压成"推荐好友"前后加小圆点 → 字改「推荐给好友」、位置再上移、底＝黑半透明、字＝白、
-// 一支黄色纸飞机 → 「纸飞机在文字左边，按钮高度维持之前高度」→ 「不是嵌入按钮，是在按钮上面，
-// 高度要超过按钮高度，往下一点留出空间」→ 「按钮在纸飞机的底部，上尖超过、下尖也超过，
-// 字体不要加粗，要清晰」→ 「按钮长度要长一点，能容纳纸飞机和文字」，最后这一句我摆出它与上一句
-// 的矛盾请他指，他指的是"胶囊加宽、飞机照旧上下出头"那一格）。
+// 首屏那一枚「告诉好友」的**真跑**尺子（站长 10-20 一夜十五句，逐句原文与谁顶掉谁记在
+// create.wxml 那一块注释与 PRD §8.393～§8.395；这里只留"屏上必须读到什么"）：
+//   形：①黄色横条 → ②精致小巧 → ⑤黑半透明＋白字＋一支斜 45° 黄纸飞机 → ⑥⑦飞机上下出头 →
+//       ⑧胶囊加宽 → ⑨与英文居中 → ⑩收缝 → ⑪透明度 50% → **⑫⑬ 照他给的图 1:1 复刻**
+//       （黄底实心、图标与字是墨、飞机收进胶囊、圆角 13、投影撤）
+//   落点：③英文下面＋列表页 → ④只留首屏与拍照屏 → **⑭移到左上角，住在那句话前面**
+//   话术：④"推荐好友" → ⑤"推荐给好友" → ⑫"告诉好友" ＋ ⑮那一行改成「图麦笔记：仅需10秒拍照截图网页转笔记」
+//   ⇒ ⑤⑥⑦⑨⑪ 那一串（暗纱、白字、出头、与英文居中、整枚透明度）到这一版全部作废，
+//     留在尺子里就是假绿／假红，所以这一把从头重写。
 // 跑法：docs/工具/跑尺子.sh 9431 验-推荐按钮两态-真跑
 //
 // 为什么静态那批不够、非要连 IDE：这一枚的坑正是**静态全绿、屏上是另一颗**。
-// 微信给 button 自带一条 `.wx-btn { width:184px }`，特异度 0,1,0，与裸类 `.rec-bar` 同分却排在
-// 后面 ⇒ 源码里 `width:146rpx` 写得清清楚楚，屏上渲染出来是 184px 居中的大胶囊，压在人脸上下巴
-// 之间，其余属性一条不缺地生效。只有把屏拉起来量真实矩形才抓得到（第一版就是这么打回的）。
-// 换皮之后同一族又添的格，全是"写在源码里、屏上未必吃进去"那一类：
-// ① 半透明落在面上（`background` 从渐变换成一支 rgba，`.wx-btn` 那层要是不让，读回来是实心色）；
-// ② 白字落在 `color` 上（色板发漏一档就读回框架给的默认字色）；
-// ③ 不加粗落在 `font-weight` 上（⑦「字体不要加粗」——我上一版自己抬的 700 得从屏上撤掉）；
-// ④ 「高度斜45度」落在 `transform` 上——转错了方向屏上照样是一支斜的飞机，只有计算值会说；
-// ⑤ 出头那两截落在**渲染矩形**上：微信那层默认皮带裁切，源码写了 visible 而屏上被削平，
-//    只有量矩形才看出来（所以下面按外接框的四条边现算）。
+// 微信给 button 自带一条 `.wx-btn { width:184px }`（特异度 0,1,0，与裸类同分却排在后面）⇒
+// 源码 `width:144rpx` 写得清清楚楚，屏上渲染出来是 184px 居中的大胶囊。只有把屏拉起来量真实矩形才抓得到。
+// 这一版另加三格也只有屏上会说：
+// ① 「照这张图收进去」＝**四个边都在胶囊内**，源码不写 absolute 不等于屏上没被别处抬出去；
+// ② ⑭ 那一刀把这一枚塞进一条 `nowrap` 的 flex 行 ⇒ 挤不挤得下只有量右沿知道（挤了不折行，
+//    是把最右那枚中/EN 角标顶出屏，而静态三条声明一条都不会红）；
+// ③ ⑮ 那句改短换来的正是这一行的**高度**：他 10-15 00:3x 钉过"这一行只要一行字那么高，不要浪费空间"
+//    （≤96rpx），按钮 44 比那行字 32.4 高，撑没撑破那一档只有量渲染高度知道。
 //
-// ⚠ 关于"量到的是哪一格"：飞机是 mask 出来的，屏上读回来的矩形＝**元素的外接框**
-//   （72×√2≈101.8 见方，含 mask 之外那圈全透明的空白），不是那支黄本身的框（82.7）。
-//   判据按外接框钉、再把黄的位置从外接框**反算**回去（下面 MODEL 那几行），两个数不许混——
-//   28 那一版就是把"黄的框 32.2"当成屏上该读到的数，连着假红两次。
-//
-// ⚠ 这一把管不了"不盖住人"那一句的全部：背景是站长自己挑的照片，脸上沿在哪一像素没有可编程的
-// 依据。这里只能钉住可量的那一半，剩下那一半＋「纸飞机那张形状到底像不像」靠末尾那两张截图用眼睛过。
+// ⚠ 关于"量到的是哪一格"：飞机是 mask 出来再转 45° 的，屏上读回来的矩形各端不一致——
+//   有的端口报**转过的外接框**（18×√2≈25.5 见方，含 mask 之外那圈全透明的空白），有的只报布局框（18）。
+//   所以下面一律先取**框心**，再从框心按 0.884／0.1178 那两个比例反算"看得见的墨迹"在哪，
+//   绝不拿读回来的宽高直接当墨迹（28 那一版把"黄的框 32.2"当成屏上该读到的数，连着假红两次）。
 const automator = require('miniprogram-automator')
 
-const PNG_W = 500
-const EN_BAND = { x0: 101, x1: 422 }   // 位图画布上的英文墨迹（第三行 `Save what matters`）
-const TIP_DOT = 'rgb(246, 196, 69)'    // 色板里那支芥末黄在屏上 read 回来的样子（rgb 写法）
-const WHITE = 'rgb(255, 255, 255)'
+const TIP_DOT = 'rgb(246, 196, 69)'   // 色板里唯一那支黄（实心，⑫「改为黄底」之后屏上就该读到它）
+const INK = 'rgb(35, 37, 44)'         // LAYER_INK：图标与字共用这一档（⑬ 那张图是"一块实心色＋同色的图标与字"）
 
-/* 下面这一组是**源文件里那一组数**（styles/rec-bar.wxss），抄在这儿是为了先把"屏上该读到什么"算出来。
-   谁改了皮，静态那把 `验-第一屏三块.js` 会先把这几格的账逐条对一遍（斜过来那支黄多大、
-   出头两头各多少、两列横向排不排得开都在那边钉着）；这一把只证"屏上真的按这个数渲染了"。 */
+/* 下面这一组是**源文件里那一组数**（styles/rec-bar.wxss ＋ pages/create/create.wxss）。
+   静态那把 `验-第一屏三块.js` 先把这几格的账逐条对一遍（每一档都是从站长那张图按 H 比例量回来的），
+   这一把只证"屏上真的按这个数渲染了"。 */
 const MODEL = {
-  barW: 208, barH: 44, padR: 12, fsTiny: 21, zhChars: 5,
-  side: 72, top: -25, left: 6,
-  // 路径自己在 24 格画布上占宽 21／高 18（x 2→23、y 3→21）：转 45° 后横竖都变成 (宽＋高)×sin45。
-  inkRatio: ((21 + 18) / 24) * Math.SQRT1_2,
+  barW: 144, barH: 44, radius: 13,
+  side: 18, planeML: 18, txML: 5,
+  aiPad: 24,                         // 落点：`.ai-line` 的左右内缩就是这一枚的最左沿
+  inkRatio: 0.884,                   // 斜 45° 后看得见的墨迹 ÷ 元素框（六个顶点现算，见静态那把的注释）
+  shiftRatio: 0.1178,                // 墨迹中心比框中心偏左／偏下这么多 × 框宽
+  stripMax: 96,                      // 10-15 00:3x 那一档：这一行整枚 ≤96rpx
 }
-MODEL.tilt = MODEL.side * MODEL.inkRatio                      // 看得见的那一支黄＝82.7
-MODEL.aabb = MODEL.side * Math.SQRT2                          // 屏上读回来的那一格＝101.8
-MODEL.inkTop = MODEL.top + MODEL.side / 2 - MODEL.tilt / 2    // 相对胶囊顶边（负＝在顶边之上）
-MODEL.inkBottom = MODEL.top + MODEL.side / 2 + MODEL.tilt / 2 // 相对胶囊顶边（>44＝在底边之下）
-MODEL.inkRight = MODEL.left + MODEL.side / 2 + MODEL.tilt / 2 // 黄那一列的右沿
-MODEL.txLeft = MODEL.barW - MODEL.padR - MODEL.zhChars * MODEL.fsTiny // 五个字那一列的左沿
+MODEL.ink = MODEL.side * MODEL.inkRatio                 // 15.9 见方
+MODEL.aabb = MODEL.side * Math.SQRT2                    // 有的端口读回来的是这一格：25.5
+MODEL.inkRightFromCx = -MODEL.side * MODEL.shiftRatio + MODEL.ink / 2   // 墨迹右沿离框心 ＋5.84
+MODEL.inkCyFromCy = MODEL.side * MODEL.shiftRatio       // 墨迹中心比框中心低 2.12
 
 let pass = 0
 const fails = []
@@ -71,55 +66,50 @@ const boxes = async (page, sel) => {
 }
 const st = async (page, sel, prop) => { const el = await page.$(sel); return el ? await el.style(prop) : null }
 
-// 英文墨迹换算到屏上（b 是那一枚 <image> 的真实矩形；等比，所以直接按宽的比例切）
-const ink = (b) => ({
-  left: b.left + b.width * (EN_BAND.x0 / PNG_W),
-  width: b.width * ((EN_BAND.x1 - EN_BAND.x0) / PNG_W),
-})
-
 // 一屏该量的全量一遍：两态用的是同一份皮、同一个落点式子，判据也必须是同一组。
 async function measure(page, tag, R, toRpx) {
   const bar = await box(page, '.rec-bar')
-  const title = await box(page, '.page-title')
+  const strip = await box(page, '.ai-line')
+  const tx = await box(page, '.rec-bar .rec-tx')
+  const aiTx = await box(page, '.ai-text')
+  const corner = await box(page, '.lang-corner')
   const panel = await box(page, '.home-blk')
-  console.log(`  读数 ${tag}：bar ` + JSON.stringify(bar) + `\n           title ` + JSON.stringify(title))
+  console.log(`  读数 ${tag}：bar ` + JSON.stringify(bar) + `\n           ai-line ` + JSON.stringify(strip))
   ck(`${tag}这一枚渲染得出来（静态全绿不代表屏上有东西，button 里塞子元素这一族更要量）`, !!bar, JSON.stringify(bar))
   if (!bar) return null
-  ck(`${tag}屏上宽度是 ⑧ 那一档 ${MODEL.barW}rpx，不是微信默认那条 184px 静默顶上来`,
+  ck(`${tag}屏上宽度＝照那张图一排加出来的 ${MODEL.barW}rpx，不是微信默认那条 184px 静默顶上来`,
     Math.abs(toRpx(bar.width) - MODEL.barW) <= 3 && bar.width < 130,
     `${bar.width.toFixed(1)}px ≈ ${toRpx(bar.width).toFixed(1)}rpx（184px 那一档会是 ${toRpx(184).toFixed(1)}rpx）`)
-  ck(`${tag}高维持 ④ 那一档 44rpx（⑤⑥⑦ 三句都钉「按钮高度维持之前高度」；竖排那一版抬到 70 已撤回）`,
+  ck(`${tag}高维持 ④ 那一档 ${MODEL.barH}rpx（⑤⑥⑦ 三句钉「按钮高度维持之前高度」，到 ⑮ 没被撤）`,
     Math.abs(toRpx(bar.height) - MODEL.barH) <= 2, `${bar.height.toFixed(1)}px ≈ ${toRpx(bar.height).toFixed(1)}rpx`)
-  ck(`${tag}整枚在下方那块面板之上（不许爬进面板里盖东西）`,
+  ck(`${tag}圆角读回来是图里那档 0.286H＝${MODEL.radius}rpx（不是原来 22 那一档胶囊帽）`,
+    Math.abs(toRpx(parseFloat(await st(page, '.rec-bar', 'border-top-left-radius')) || 0) - MODEL.radius) <= 2,
+    await st(page, '.rec-bar', 'border-top-left-radius'))
+  ck(`${tag}整枚不在这下方那块面板之上（⑭ 之后它住在最上面那一行，爬进面板就是落点错了）`,
     !panel || bar.bottom <= panel.top + 1, `按钮底 ${bar.bottom.toFixed(1)} / 面板顶 ${panel && panel.top.toFixed(1)}`)
-  // ④「整体80%透明度」：从**渲染端**读回那一档。写在 wxss 里不等于吃进去了——
-  // 与 `.wx-btn` 那一族同一个病：选择器／作用域不对时它静默回 1。
-  const op = await st(page, '.rec-bar', 'opacity')
-  ck(`${tag}渲染出来的 opacity 就是 0.8（不是写在源码里、屏上静默回 1）`,
-    parseFloat(op) === 0.8, JSON.stringify(op))
-  // ⑤「黑色半透明」：这一档落在**面上**，而 `background-image` 从渐变变成了 none——
-  // 所以这一格改读 `background-color`，并且钉两条：alpha 必须是 .8（不是框架那层实心色顶回来）、
-  // `background-image` 里不许还挂着旧的渐变（旧皮没换干净时屏上是一块黄，静态看不出来）。
+  /* ⑫「改为黄底」：底是**实心**那支黄。屏上读到 rgba 就是旧那层暗纱（⑤⑪）还挂着；
+     读到框架默认那支灰白就是色板那一档没发下来（`--cp-rec-plate` 漏一档＝那条属性整条没值）。 */
   const bgc = await st(page, '.rec-bar', 'background-color')
-  ck(`${tag}面上读回来是黑色的半透明那一档（alpha 0.8，不是被微信那层实心色顶掉）`,
-    /rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\.8\s*\)/.test(bgc || ''), JSON.stringify(bgc))
+  ck(`${tag}面上读回来就是色板那支实心黄（⑫「改为黄底」；不是 rgba、不是旧暗纱、不是微信那层默认灰）`,
+    bgc === TIP_DOT, JSON.stringify(bgc))
   const bgi = await st(page, '.rec-bar', 'background-image')
-  ck(`${tag}旧的那层黄渐变已经不在这枚上（换皮换干净了）`,
-    !/gradient/.test(bgi || ''), JSON.stringify(bgi))
-  // ⑤「字体变成白色」：字色吃 --cp-rec-ink，色板那一档发漏了会静默回框架默认（黑）。
-  ck(`${tag}字面渲染出来是纯白（不是色板没发下来时那支墨）`,
-    (await st(page, '.rec-bar', 'color')) === WHITE, await st(page, '.rec-bar', 'color'))
-  // ⑦「字体不要加粗，要清晰」：这一格只能屏上读——继承链上任何一层写了 700，源码那条声明管不住。
+  ck(`${tag}旧那层渐变／立体那档已经不在这枚上（⑬ 那张图是扁平的）`, !/gradient/.test(bgi || ''), JSON.stringify(bgi))
+  const shd = await st(page, '.rec-bar', 'box-shadow')
+  ck(`${tag}屏上没有投影（⑬「1:1 复刻」随那张图一起撤的，它边缘量不到第二层暗边）`,
+    !shd || /none/.test(shd), JSON.stringify(shd))
+  ck(`${tag}整枚没有 opacity（④ 那层 .8 与 ⑪ 那一档都随「黄底」撤净；实心黄跟着淡就又是一层纱）`,
+    parseFloat(await st(page, '.rec-bar', 'opacity')) === 1, await st(page, '.rec-bar', 'opacity'))
+  /* ⑫ 之后图标与字**共用同一档墨**：白压那支黄只有 1.63（正文门槛 4.5），所以这一枚不可能白字。
+     字色读回框架默认（黑）或纯白都算红——前者＝色板没发下来，后者＝有人把 ⑤ 那句"字体白色"挂回去。 */
+  ck(`${tag}字面渲染出来是色板那支墨（不是白、也不是没发下来时框架给的那支）`,
+    (await st(page, '.rec-bar', 'color')) === INK, await st(page, '.rec-bar', 'color'))
   const fw = await st(page, '.rec-bar', 'font-weight')
-  ck(`${tag}字重渲染出来不是 700（⑦ 撤掉的那一档；700 是我上一版自己抬的）`,
+  ck(`${tag}字重渲染出来不是 700（⑦「字体不要加粗」；700 是我上一版自己抬的）`,
     fw !== '700' && fw !== 'bold', JSON.stringify(fw))
-  /* 层序那一刀（站长 10-20「推荐好友要拉起分享的页面」）：这一屏有一层 fixed ＋ z-index:1 ＋
-     铺满 750rpx×100vh 的调亮度罩子，而微信给 button 的默认皮只给到 `position:relative`、
-     z-index 停在 auto ⇒ 罩子排在按钮之上，**opacity 为 0 也照样吃点击**（透明≠不可点）。
-     屏上实测过：罩子 z-index 1 / pointer-events auto，按钮 z-index auto ⇒ 那一下 `open-type="share"`
-     从来落不到按钮上。修法＝把 `.rec-bar` 抬进这份名单（z-index 2）。
-     这一条钉的是渲染端的两个计算值，不是源码里那条声明——同一族前两次（.home-swap／.ai-line）
-     都是"声明在、屏上没生效"。 */
+  /* 层序那一刀（10-20「推荐好友要拉起分享的页面」）：这一屏有一层 fixed ＋ z-index:1 ＋ 铺满
+     750rpx×100vh 的调亮度罩子 ⇒ **opacity 为 0 也照样吃点击**（透明≠不可点）。
+     ⑭ 之后这一枚住在 `.ai-line` 里，而那一行本来就在抬层名单里；名单里 `.rec-bar` 那一笔我没删，
+     这一条钉的就是渲染端真的按它排（同一族前两次：.home-swap／.ai-line 都是"声明在、屏上没生效"）。 */
   const scrim = await page.$('.page-scrim')
   const zBar = parseFloat(await st(page, '.rec-bar', 'z-index'))
   if (scrim) {
@@ -129,95 +119,90 @@ async function measure(page, tag, R, toRpx) {
     ck(`${tag}罩子仍吃点击（这一条是"为什么原来按不动"的根，撤了它上一条就没意义了）`,
       (await scrim.style('pointer-events')) !== 'none', await scrim.style('pointer-events'))
   } else ck(`${tag}这一态没有那层罩子（无图态本来就没有，按钮不需要抬）`, true, '没渲染 .page-scrim')
-  /* ⑤「黄色纸飞机 ICON」＋他纠回来的「纸飞机在文字左边…高度斜45度，有飞行的感觉」
-     ⇒ 横排两格，飞机在左、字在右，并且飞机真的被转了 45°。
-     这几格只有屏上会说：`flex-direction` 被 `.wx-btn` 顶掉时静态全绿而屏上是竖的；
-     `transform` 那一条没生效时屏上是**一支平躺的纸飞机**，形状照样对、读不出"飞行"。
-     ⚠ 渲染框报回来的是"转过的框"还是"没转的框"，各端不一致，所以这里不猜：
-     直接读 `transform` 那一个计算值，并把飞机的实际矩形原样打进读数——
-     32 见方＝量到了转过之后的框；28 见方＝这个端口只报布局框（那"转过没有"就只由 transform 那条判）。 */
   const dots = await boxes(page, '.rec-bar .rec-dot')
-  ck(`${tag}④ 那两颗点已经不在这枚上（⑤ 换图标时撤的——**这一处是我自己撤的、他没点名**）`,
+  ck(`${tag}④ 那两颗点不在这一枚上（⑤ 换图标时撤的——**这一处是我自己撤的、他没点名**）`,
     dots.length === 0, `${dots.length} 枚：${JSON.stringify(dots)}`)
-  // ⑥ 那一版曾把飞机挂成按钮的兄弟、外面套一层 `.rec-slot`；⑦⑧ 改成"住回按钮里"，旧壳不许还在屏上。
   const slot = await box(page, '.rec-slot')
-  ck(`${tag}⑥ 那一版的壳不在屏上（留着一层就是两版摆法同时挂在屏上）`, !slot, JSON.stringify(slot))
+  ck(`${tag}⑥ 那一版"飞机外挂一层壳"不在屏上（留着一层就是两版摆法同时挂在屏上）`, !slot, JSON.stringify(slot))
   const plane = await box(page, '.rec-bar .rec-plane')
-  const tx = await box(page, '.rec-bar .rec-tx')
   ck(`${tag}纸飞机那一格画得出来（button 里装子元素这一族，屏上有没有东西只有量知道）`,
     !!plane && plane.width > 0 && plane.height > 0, JSON.stringify(plane))
   const tf = await st(page, '.rec-bar .rec-plane', 'transform')
   const mat = /matrix\(([^)]*)\)/.exec(tf || '')
-  /* 转角必须钉**方向**：纯位移读回来是 matrix(1,0,0,1,tx,ty)，正弦项（第二位）为 0；
-     −45° 那一位是 −0.707，+45° 是 +0.707——取错符号机头就朝下扎，看着仍是"斜的"。 */
   const isUpTilt = /rotate\(\s*-45deg\s*\)/.test(tf || '') || (!!mat && parseFloat(mat[1].split(',')[1]) <= -0.5)
-  ck(`${tag}飞机真的斜过来了、且是机头朝上那一头（−45°；读回 none 或正值＝平躺／朝下扎）`,
+  ck(`${tag}飞机真的斜过来了、且是机头朝右上那一头（−45°；读回 none 或正值＝平躺／朝下扎）`,
     isUpTilt, JSON.stringify(tf))
+  const planeInkBgc = await st(page, '.rec-bar .rec-plane', 'background-color')
+  const barColor = await st(page, '.rec-bar', 'color')
+  ck(`${tag}图标吃的是**字同一档墨**（⑬ 那张图是"实心色块＋同色的图标与字"；发两档就是下一次各说一套）`,
+    planeInkBgc === barColor && planeInkBgc === INK, `图标 ${JSON.stringify(planeInkBgc)}／字 ${JSON.stringify(barColor)}`)
   if (plane) {
-    ck(`${tag}飞机那一格是正方、屏上读回来＝72×√2≈${MODEL.aabb.toFixed(1)}rpx（读成 72 说明 transform 没进渲染框）`,
-      Math.abs(plane.width - plane.height) <= 1 && Math.abs(toRpx(plane.width) - MODEL.aabb) <= 3,
-      `${plane.width.toFixed(1)}×${plane.height.toFixed(1)}px ≈ ${toRpx(plane.width).toFixed(1)}rpx 见方`)
-    ck(`${tag}那一格吃的是色板那支芥末黄（不是跟着字色变白、也不是没发下来时的透明）`,
-      (await st(page, '.rec-bar .rec-plane', 'background-color')) === TIP_DOT,
-      await st(page, '.rec-bar .rec-plane', 'background-color'))
-    /* ⑦「上尖超过、下尖也超过」：按屏上那一圈**透明外接框**的四条边判——它是那支黄的超集，
-       外接框都没出头，黄一定没出头；出头量再按 MODEL 那组数打进读数里给眼睛对。
-       ⚠ 原来这一格钉的是"整枚还在板子里"（⑤⑥ 两版飞机都没出头），⑦ 把它反过来了：
-       现在**不许**读到"还在板子里"，那条旧判据留在尺子里就是假绿。 */
-    const overTop = (bar.top - plane.top) / R
-    const overBottom = (plane.bottom - bar.bottom) / R
-    ck(`${tag}飞机整支比按钮高、两头都出头（外接框顶边在胶囊之上、底边在胶囊之下）`,
-      plane.top < bar.top - 1 && plane.bottom > bar.bottom + 0.5,
-      `外接框上凸 ${overTop.toFixed(1)}／下超 ${overBottom.toFixed(1)}rpx（那支黄该是 ${(-MODEL.inkTop).toFixed(1)}／${(MODEL.inkBottom - MODEL.barH).toFixed(1)}）`)
-    ck(`${tag}出头那两截没被削平（微信那层默认皮带裁切，overflow 没吃进去时上下尖会成一条直线）`,
-      toRpx(plane.height) >= MODEL.aabb - 3 && toRpx(plane.width) >= MODEL.aabb - 3,
-      `外接框 ${toRpx(plane.width).toFixed(1)}×${toRpx(plane.height).toFixed(1)}rpx vs 应有 ${MODEL.aabb.toFixed(1)}`)
-    ck(`${tag}飞机的中心还落在胶囊的竖直范围内（不许整支飞到按钮上面或下面去）`,
-      plane.top + plane.height / 2 >= bar.top - 1 && plane.top + plane.height / 2 <= bar.bottom + 1,
-      `框心 y ${(plane.top + plane.height / 2).toFixed(1)} vs 胶囊 ${bar.top.toFixed(1)}–${bar.bottom.toFixed(1)}`)
-    ck(`${tag}黄那一列的左尖不许飘出板的左沿（⑧ 要"容纳"；飘出去就是压在照片上，这一层不裁溢出）`,
-      plane.left + (plane.width - MODEL.tilt * R) / 2 >= bar.left - 0.5,
-      `黄的左尖 ${(plane.left + (plane.width - MODEL.tilt * R) / 2).toFixed(1)}px vs 板左 ${bar.left.toFixed(1)}px`)
+    /* ⑫ 那一句「照这张图收进去」＝顶、底、左、右四条边都不许出胶囊。
+       读回来的框不管是 18 还是 25.5（转过的外接框），它一定是墨迹的超集 ⇒ 外接框都在里面，
+       墨迹一定在里面。⑥⑦ 那一版反过来钉"两头都出头"，那两条旧判据不许回来。 */
+    ck(`${tag}飞机整枚收在胶囊里（⑫「照这张图收进去」；⑥⑦ 那两截出头已作废）`,
+      plane.left >= bar.left - 0.5 && plane.right <= bar.right + 0.5
+      && plane.top >= bar.top - 0.5 && plane.bottom <= bar.bottom + 0.5,
+      `框 ${toRpx(plane.left - bar.left).toFixed(1)},${toRpx(plane.top - bar.top).toFixed(1)} 起、${toRpx(plane.width).toFixed(1)}×${toRpx(plane.height).toFixed(1)}rpx vs 胶囊 ${MODEL.barW}×${MODEL.barH}`)
+    ck(`${tag}那一格读回来是 18 或 18×√2≈25.5 见方（两端口两样，但一定是正方；读出 72＝旧那一档没撤）`,
+      Math.abs(plane.width - plane.height) <= 1
+      && (Math.abs(toRpx(plane.width) - MODEL.side) <= 2 || Math.abs(toRpx(plane.width) - MODEL.aabb) <= 2),
+      `${plane.width.toFixed(1)}×${plane.height.toFixed(1)}px ≈ ${toRpx(plane.width).toFixed(1)}rpx 见方（布局框 ${MODEL.side}／转过的框 ${MODEL.aabb.toFixed(1)}）`)
+    if (tx) {
+      /* 下面三格量的都是**看得见的墨迹**：从框心按 0.884／0.1178 那两个比例反算，
+         不拿读回来的框直接当墨迹（框外面那一圈是 mask 的空白，压到字上什么也画不出来）。 */
+      const cx = (plane.left + plane.width / 2 - bar.left) / R
+      const cy = (plane.top + plane.height / 2 - bar.top) / R
+      const inkR = cx + MODEL.inkRightFromCx
+      const inkCy = cy + MODEL.inkCyFromCy
+      const txL = (tx.left - bar.left) / R
+      const txCy = (tx.top + tx.height / 2 - bar.top) / R
+      ck(`${tag}墨迹与字之间那道缝＝图里量到的 0.190H≈8.4rpx（⑩「空隙太大」在 1:1 那版的落点，±2.5）`,
+        txL > inkR && Math.abs((txL - inkR) - 0.190 * MODEL.barH) <= 2.5,
+        `墨迹右沿 ${inkR.toFixed(1)} → 字左 ${txL.toFixed(1)}＝${(txL - inkR).toFixed(1)}rpx（皮里 ${MODEL.planeML}＋${MODEL.side}＋${MODEL.txML}）`)
+      ck(`${tag}墨迹与字同一条中线（斜过来之后墨迹比框低 0.118×size，那一格 top:-2rpx 没写就是屏上低一截）`,
+        Math.abs(inkCy - txCy) <= 2.5, `墨迹心 y ${inkCy.toFixed(1)} vs 字心 ${txCy.toFixed(1)}rpx`)
+      /* 字面左沿＝18＋18＋5＝41rpx，这一档是源码写死的、两端口都一样；
+         而"右内缩"＝板宽−字左沿−**渲染出来的字宽**，四个汉字在开发者工具里被取整成 10px（76.9rpx）、
+         真机按 1em 走是 84rpx——同一句源码两块屏差 7rpx（§8.393 那一刀就是这么红的）。
+         所以这里钉两条：左沿必须正好 41（±2），右内缩只卡"不许小于图里那档 18.2、也不许多出
+         模拟器那一档取整量（7）再加 5 的余量"。拿 18.2 直接卡死＝把模拟器判成错。 */
+      /* ±4rpx 不是放松预算，是这条链上**三段取整**的量：18／18／5rpx 在屏上分别是 9.36／9.36／2.6px，
+         三头各吃掉不到半像素，最坏能差到 2px＝这一档窗口下 3.8rpx。⑩ 那一刀真错的时候量到的是 11.5
+         对 1.6（差 10rpx），这一档卡得住。 */
+      ck(`${tag}字那一列的左沿＝皮里写死的 18＋18＋5＝41rpx（两端口都一样，差只许到取整那一档）`,
+        Math.abs(txL - (MODEL.planeML + MODEL.side + MODEL.txML)) <= 4,
+        `字左沿 ${txL.toFixed(1)}rpx vs 应有 ${MODEL.planeML + MODEL.side + MODEL.txML}`)
+      const rInset = (bar.right - tx.right) / R
+      ck(`${tag}四个字的右沿离胶囊右沿＝图里那档 0.413H≈18.2（真机那一头），模拟器取整那一档也不许多过 30`,
+        rInset >= 0.413 * MODEL.barH - 1 && rInset <= 0.413 * MODEL.barH + 12,
+        `右内缩 ${rInset.toFixed(1)}rpx、字面宽 ${toRpx(tx.width).toFixed(1)}rpx（模拟器 10px/字＝76.9、真机 1em＝84）`)
+    }
   }
-  if (plane && tx) {
-    /* ⑧「能容纳纸飞机和文字」＋⑦「要清晰」：屏上必须真的排成两列——比的是**那支黄的右沿**
-       （从外接框框心反算回来，不是外接框的右沿：外接框比黄宽 ${(MODEL.aabb - MODEL.tilt).toFixed(1)}rpx，
-       那一圈是透明的，压到字上什么也画不出来，拿它当判据会假红）。
-       黄压白字＝1.63:1，等于糊掉——所以这一格才是"清晰"真正的落点。 */
-    const inkRightPx = plane.left + plane.width / 2 + (MODEL.tilt / 2) * R
-    const gapPx = tx.left - inkRightPx
-    ck(`${tag}排布是"飞机在左、字在右"两列：黄那一列的右沿在第一个字之前（≥4rpx 缝）`,
-      gapPx >= 4 * R - 0.5,
-      `黄右沿 ${inkRightPx.toFixed(1)}px → 字左 ${tx.left.toFixed(1)}px＝${toRpx(gapPx).toFixed(1)}rpx（屏上按 ${MODEL.inkRight.toFixed(1)}／${MODEL.txLeft.toFixed(1)}rpx 排）`)
-    ck(`${tag}字面没折行（折了的话「推荐给好友」五个字被切成两截、这一枚变成两行高）`,
-      tx.height > 0 && tx.height <= MODEL.barH * R + 2 && tx.right <= bar.right + 1,
-      `字面 ${tx.width.toFixed(1)}×${tx.height.toFixed(1)}px（高上限 ${(MODEL.barH * R).toFixed(1)}px）`)
-  }
-  if (title) {
-    const e = ink(title)
-    ck(`${tag}左沿对齐英文墨迹（±3px；③「在英文下放」那一半，⑧ 之后仍不动）`,
-      Math.abs(bar.left - e.left) <= 3, `按钮 ${bar.left.toFixed(1)} vs 墨迹 ${e.left.toFixed(1)}`)
-    /* ⚠ 这一档**不再是判据**：②「按钮长度不要超过英文」已被 ⑧「按钮长度要长一点，能容纳
-       纸飞机和文字」顶掉（他本人前后两句话，后一句算）。这里只念一句屏上的实话，不钉阈值。 */
-    console.log(`  · 备忘（不是判据）${tag}：板宽 ${bar.width.toFixed(1)}px 对那行英文墨迹 ${e.width.toFixed(1)}px`
-      + `＝越过 ${toRpx(bar.width - e.width).toFixed(1)}rpx`)
-    /* ⑤「再上移」32→8、⑥「往下一点」8→60、⑦⑧ 之后上尖只凸出 30.4 ⇒ 40。
-       按 **rpx** 量（⚠ 这一条原来写的是 `toRpx(24) * R`，那两个函数互为逆运算、乘回来正好是 24
-       **px**，等于把 24px＝48rpx 当门槛，32rpx 那一档一直是从这条松掉的缝里混过去的）。
-       判的是"那支黄的上尖不许咬进位图"——从胶囊顶往回推 30.4rpx，再与位图底比。 */
-    const gapR = toRpx(bar.top - title.bottom)
-    ck(`${tag}落在英文正下方、缝给得上上尖那一截（≥凸出量＋6rpx 透气，⑥ 那句"往下一点"）`,
-      gapR >= -1 && gapR >= -MODEL.inkTop + 6,
-      `位图底 ${title.bottom.toFixed(1)} → 按钮顶 ${bar.top.toFixed(1)}＝${gapR.toFixed(1)}rpx vs 上凸 ${(-MODEL.inkTop).toFixed(1)}rpx`)
-    // 上尖不许咬进那行英文的位图（这一条量的就是屏上真实的两条边，不靠上面那组数自证）
-    const planeTop = plane ? plane.top + (plane.height - MODEL.tilt * R) / 2 : null
-    if (planeTop !== null) ck(`${tag}那支黄的上沿还在位图之下（不许咬进"Save what matters"那一行）`,
-      planeTop >= title.bottom - 0.5, `黄上沿 ${planeTop.toFixed(1)}px vs 位图底 ${title.bottom.toFixed(1)}px`)
-    // 下尖不许压进下方那块面板（首屏那一态面板顶由 `.home-blk` 给；无面板时跳过）
-    const planeBottom = plane ? plane.bottom - (plane.height - MODEL.tilt * R) / 2 : null
-    if (planeBottom !== null && panel) ck(`${tag}那支黄的下沿还在面板之上（下尖出头不许盖住面板）`,
-      planeBottom <= panel.top + 0.5, `黄下沿 ${planeBottom.toFixed(1)}px vs 面板顶 ${panel.top.toFixed(1)}px`)
-  } else ck(`${tag}能读到英文那枚位图`, false, '.page-title 没抓到')
+  /* ---------- ⑭⑮ 那一格：这一枚现在住在首屏最上面那一行里 ---------- */
+  if (strip && aiTx && corner) {
+    ck(`${tag}⑭ 左上角：这一枚的最左沿就是那一行的内缩 ${MODEL.aiPad}rpx（不另带 margin-left，缝不许住两处）`,
+      Math.abs(toRpx(bar.left - strip.left) - MODEL.aiPad) <= 2,
+      `按钮左 ${bar.left.toFixed(1)} − 行左 ${strip.left.toFixed(1)}＝${toRpx(bar.left - strip.left).toFixed(1)}rpx`)
+    ck(`${tag}这一枚整枚在那一条玻璃带之内（住进来了，不是飘在带子上面／下面）`,
+      bar.top >= strip.top - 0.5 && bar.bottom <= strip.bottom + 0.5,
+      `按钮 ${bar.top.toFixed(1)}–${bar.bottom.toFixed(1)} vs 带 ${strip.top.toFixed(1)}–${strip.bottom.toFixed(1)}`)
+    /* 抬 6 那一格（`margin-top: -6rpx`）：静态那把按声明算，这一条按屏上两个矩形的中心比。
+       读回来差得多＝那一行的 `align-items` 或那行字的 line-height 与这里假设的不是同一档。 */
+    ck(`${tag}与那行字同一条中线（±2rpx；不抬那一格屏上黄块比字低一截）`,
+      Math.abs((bar.top + bar.height / 2) - (aiTx.top + aiTx.height / 2)) / R <= 2,
+      `按钮心 ${(bar.top + bar.height / 2).toFixed(1)} vs 字心 ${(aiTx.top + aiTx.height / 2).toFixed(1)}＝${toRpx((bar.top + bar.height / 2) - (aiTx.top + aiTx.height / 2)).toFixed(1)}rpx`)
+    /* ⑮ 那句改短换来的正是这一格：那一行是 `nowrap`，挤不下**不折行**，而是把最右那枚角标顶出屏。
+       所以这里钉两条：字与角标不许重叠、角标的右沿不许越过那一行的内缩。 */
+    ck(`${tag}⑮ 之后这一行仍然排得下：那行字与最右那枚中/EN 角标不重叠`,
+      aiTx.right <= corner.left + 0.5, `字右 ${aiTx.right.toFixed(1)} vs 角标左 ${corner.left.toFixed(1)}`)
+    ck(`${tag}角标没被顶出那一行（右沿离带右沿＝${MODEL.aiPad}rpx 内缩，±3）`,
+      Math.abs(toRpx(strip.right - corner.right) - MODEL.aiPad) <= 3,
+      `带右 ${strip.right.toFixed(1)} − 角标右 ${corner.right.toFixed(1)}＝${toRpx(strip.right - corner.right).toFixed(1)}rpx`)
+    console.log(`  · 备忘（不是判据）${tag}：这一行现在 ${toRpx(strip.height).toFixed(1)}rpx 高（按钮 ${toRpx(bar.height).toFixed(1)}、字 ${toRpx(aiTx.height).toFixed(1)}；上限那一档 ${MODEL.stripMax}）`)
+  } else ck(`${tag}那一行读得全（玻璃带／那行字／角标三枚都要在）`, false, `strip ${JSON.stringify(strip)} aiTx ${JSON.stringify(aiTx)} corner ${JSON.stringify(corner)}`)
+  ck(`${tag}首屏那一行整枚不超过 10-15 00:3x 那一档 ≤${MODEL.stripMax}rpx（塞进 44 高的按钮不许把它撑破）`,
+    !!strip && toRpx(strip.height) <= MODEL.stripMax, strip && `${toRpx(strip.height).toFixed(1)}rpx`)
   return bar
 }
 
@@ -232,19 +217,25 @@ async function measure(page, tag, R, toRpx) {
   const hp = await mp.currentPage(); await hp.waitFor(900)
   const dockClass0 = (await (await hp.$('.container')).attribute('class')) || ''
   const bar0 = await measure(hp, '首屏', R, toRpx)
+  const txEl = await hp.$('.rec-bar .rec-tx')
+  const aiEl = await hp.$('.ai-text')
+  ck('首屏那一枚屏上念的就是 ⑫ 那四个字（读渲染端的 text，不读字典——字典发了而屏上没换＝另有来源）',
+    txEl ? ((await txEl.text()) || '').trim() === '告诉好友' : false, txEl ? JSON.stringify(await txEl.text()) : '没抓到 .rec-bar .rec-tx')
+  ck('那一行屏上念的是 ⑮ 那一句（「图麦笔记：仅需10秒拍照截图网页转笔记」）',
+    aiEl ? ((await aiEl.text()) || '').trim() === '图麦笔记：仅需10秒拍照截图网页转笔记' : false,
+    aiEl ? JSON.stringify(await aiEl.text()) : '没抓到 .ai-text')
 
   // ---------- ② 展开那一屏（快门／拍照那一档＝他说的"拍照屏"）----------
-  // 走 setData 而不是点那枚圆形 ➕：这一把要量的是"两态同一份皮"，那一下点击归
-  // `验-首页背景图-真跑` 那类尺子管；这里只把 `active` 摆成拍照那一档（同型走法见 `验-精致化四刀-真跑`）。
   await hp.setData({ active: 'photo' })
   await hp.waitFor(900)
   const dockClass = (await (await hp.$('.container')).attribute('class')) || ''
   ck('展开那一态容器真挂上了 entry-dock（不然量的还是首屏那一态）',
     /(?:^|\s)entry-dock(?:\s|$)/.test(dockClass) && !/(?:^|\s)entry-dock(?:\s|$)/.test(dockClass0), dockClass)
   const bar1 = await measure(hp, '拍照屏', R, toRpx)
-  ck('两态是同一颗：屏上宽高一模一样（两态各画一枚、迟早长得不一样）',
-    !!bar0 && !!bar1 && Math.abs(bar0.width - bar1.width) <= 1 && Math.abs(bar0.height - bar1.height) <= 1,
-    `首屏 ${bar0 && bar0.width.toFixed(1)}×${bar0 && bar0.height.toFixed(1)}px／拍照屏 ${bar1 && bar1.width.toFixed(1)}×${bar1 && bar1.height.toFixed(1)}px`)
+  ck('两态是同一颗：屏上位置与大小一模一样（两态各画一枚、迟早长得不一样）',
+    !!bar0 && !!bar1 && Math.abs(bar0.width - bar1.width) <= 1 && Math.abs(bar0.height - bar1.height) <= 1
+    && Math.abs(bar0.left - bar1.left) <= 1 && Math.abs(bar0.top - bar1.top) <= 1,
+    `首屏 ${bar0 && bar0.left.toFixed(1)},${bar0 && bar0.top.toFixed(1)} ${bar0 && bar0.width.toFixed(1)}×${bar0 && bar0.height.toFixed(1)}px／拍照屏 ${bar1 && bar1.left.toFixed(1)},${bar1 && bar1.top.toFixed(1)} ${bar1 && bar1.width.toFixed(1)}×${bar1 && bar1.height.toFixed(1)}px`)
   await hp.setData({ active: '' })
 
   // ---------- ③ 列表那一屏：④ 说"不再放在列表页"，撤掉的东西不许还在屏上 ----------
