@@ -8,8 +8,8 @@
   },
   {
    "name": "appInfo.js",
-   "bytes": 36669,
-   "md5": "ac40a83d9224e84edf31e17fbfc82887"
+   "bytes": 37884,
+   "md5": "126e554099fbab7efc01c95da0462db4"
   },
   {
    "name": "date.js",
@@ -18,8 +18,8 @@
   },
   {
    "name": "i18n.js",
-   "bytes": 50001,
-   "md5": "1e281b5f5a26bdf84819f44c7d4e43df"
+   "bytes": 49983,
+   "md5": "535ece161eaac8fb2c5f7a9dc36b718d"
   },
   {
    "name": "mpAssets.js",

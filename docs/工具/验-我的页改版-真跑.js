@@ -17,6 +17,11 @@ const fs = require('fs')
 // 规则块那枚点的颜色只认这一份真相：色值从 palette 读进来比在这里写死一个十六进制强
 // （写死了就是"尺子里还有第二份色板"，改了 palette 这一把不会跟着红）。
 const { TIP_DOT } = require(path.resolve(__dirname, '../../miniprogram/utils/palette.js'))
+// 分享标题不许在尺子里再抄一份：走 i18n 那个 t() 现读（和 me.js 里 `t('shareCardTitle', lang)` 同一条口），
+// 改文案不用来改尺子（10-20 换过一次，抄死在尺子里的那条当天就红了）。
+// ⚠ 别写成 `texts.zh.…`——i18n 导出的 `texts` 是个函数，真正的表在 `i18n` 那个键上，读错会得到 undefined 判成假红。
+const { t: I18N_T } = require(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'))
+const SHARE_TITLE_ZH = I18N_T('shareCardTitle', 'zh')
 
 const OUT = path.resolve(__dirname, '../design/我的-改版-实测')
 const APORT = 'ws://localhost:9431'
@@ -359,8 +364,10 @@ const pinLang = (mp, lang) => mp.evaluate((l) => {
   /* ---------- ④b 分享载荷：封面换成新图之后，路径写错微信会静默退回"截当前页"，
      那种事在界面上看不出来，只能把 onShareAppMessage 真调一次、再让包去解这张图。 ---------- */
   const payload = await page.callMethod('onShareAppMessage')
-  ck('转发标题是新那句「把图文提炼成有用的干货」',
-    payload && payload.title === '图麦笔记 | 把图文提炼成有用的干货', payload && payload.title)
+  // 标题这句 10-20 换过一次（站长：「改为"图麦笔记懒人记录神器"」）。不再把话术钉死在尺子里——
+  // 钉死了每改一次文案就要来改一把尺子，改成从 i18n 现读，钉的是「分享出去的那句＝zh 那一格」。
+  ck('转发标题就是 i18n 里 zh.shareCardTitle 那一句（两处不许各说一套）',
+    payload && payload.title === SHARE_TITLE_ZH, `${payload && payload.title} vs ${SHARE_TITLE_ZH}`)
   ck('封面指向 assets/share-card.jpg（旧的 .png 已删）',
     payload && payload.imageUrl === '/assets/share-card.jpg', payload && payload.imageUrl)
   const img = await mp.evaluate(() => new Promise((resolve) => {

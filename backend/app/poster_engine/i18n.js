@@ -266,7 +266,7 @@ const i18n = {
     mindRuleInvite: '推荐朋友使用',
     mindRuleSaved: '笔记被朋友种草',
     mindPlusN: '+{n}',
-    shareCardTitle: '图麦笔记 | 把图文提炼成有用的干货',
+    shareCardTitle: '图麦笔记懒人记录神器',
     // 额度与注销：数字全部来自 /api/user/quota 和 /api/user/deactivate，模板里不写死。
     // 「新写作者 +10」那一串原来挂在分享那一行右边，10-02 撤了——同一个数只在上面
     // 那块魅力值规则里说一次（见 mindRuleInvite）。
