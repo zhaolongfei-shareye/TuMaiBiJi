@@ -253,7 +253,10 @@ def list_notes(
     skip: int = Query(0, ge=0, le=MAX_SKIP),
     limit: int = Query(20, ge=1, le=100),
     category_id: int | None = None,
-    search: str | None = None,
+    # 搜索串也要有上界：这一栏原样进 `LIKE '%…%'` 扫全表正文，一条没有长度的串等于
+    # 拿一次请求烧一轮 CPU（N13）。档位用的是现成的 `MAX_ITEM_LEN`（一条标签/要点那两栏的尺），
+    # 不是新造的数——搜索框本来就装不下 200 字。
+    search: Annotated[str | None, Query(max_length=MAX_ITEM_LEN)] = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):

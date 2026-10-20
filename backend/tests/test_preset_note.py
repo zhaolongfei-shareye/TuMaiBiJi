@@ -351,6 +351,43 @@ def test_种子读不出来时登录照样成(client, db, monkeypatch):
     assert _notes_of(db, "pm-bad-seed-1") == []
 
 
+def test_包里那份坏了_后台那一栏仍读得出库里那一份(client, db, monkeypatch, seed_clean):
+    """10-20 审计 N14：上面那条补的是登录这一半，后台那一栏是同一个洞的另一半。
+
+    反面症状是"包里种子坏了 ⇒ 后台整栏 500"，而库里那份是好的、操作者正需要看一眼
+    现在生效的是哪一份。所以这里要的是 200＋一句实话，不是白屏。
+    """
+    from app.services import preset_note as pn
+
+    h = _admin_h(client, monkeypatch)
+    assert _put_note(client, h, GOOD).status_code == 200
+
+    def boom(path: str = "") -> dict:
+        raise ValueError("种子读不到")
+
+    monkeypatch.setattr(pn, "seed_row", boom)
+    r = client.get("/api/admin/preset-note", headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["source"] == "库里"
+    assert body["current"]["title"] == GOOD["title"]
+    assert body["fallback"] is None
+    assert "读不出来" in body["fallback_error"]
+
+
+def test_库里包里两头都坏_后台说一句中文而不是甩堆栈(client, db, monkeypatch, seed_clean):
+    from app.services import preset_note as pn
+
+    def boom(path: str = "") -> dict:
+        raise ValueError("种子读不到")
+
+    h = _admin_h(client, monkeypatch)
+    monkeypatch.setattr(pn, "seed_row", boom)
+    r = client.get("/api/admin/preset-note", headers=h)
+    assert r.status_code == 400, r.text
+    assert "帮助文档" in r.json()["detail"]
+
+
 def test_authored_count_与_used_count_是两条口径(client, db, monkeypatch):
     """一条数全表（页头那一列照实算），一条只数他自己写的（归因与结钱判的是它）。
 

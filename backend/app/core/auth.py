@@ -190,8 +190,14 @@ async def login_or_register(code: str, db: Session, inviter: int | None = None) 
 
     # 归因放在拿到 user 之后、发token之前：新老用户都会走到这一行，attribute_inviter
     # 内部自己判"要不要认"（已有归属、名下已有笔记、自己邀自己都不认）。
+    # ⚠ 这一趟崩了不许挡住登录（N1）：`?inviter=` 是客户端每次登录都带上的一栏，
+    #   把它打成 500 等于把那台设备永久关在门外，而这一笔最多只是少一笔邀请奖励。
     if inviter is not None:
-        quota.attribute_inviter(user, db, inviter)
+        try:
+            quota.attribute_inviter(user, db, inviter)
+        except Exception:
+            db.rollback()
+            logger.exception("邀请归因失败（不影响登录）：inviter=%s", inviter)
 
     # ⚠ 播种必须排在归因**之后**：那条判据里"名下已经有笔记"就不认。
     #   先种后认，每个新用户出生带着一篇，归因这条路对他永久关着，那笔 +10 MIND 凭空没了。

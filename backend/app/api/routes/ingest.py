@@ -14,7 +14,7 @@ from app.models.user import User
 from app.core.auth import get_current_user
 from app.core.errors import UserError
 from app.core.rate_limit import limiter
-from app.api.routes.notes import MAX_BODY, MAX_TITLE
+from app.api.routes.notes import MAX_BODY, MAX_TITLE, MAX_URL
 from app.services.queue import get_queue, set_task_status
 from app.services.wechat import enforce_text_safety
 
@@ -29,7 +29,7 @@ _batch_staging: dict[str, dict] = {}
 @limiter.limit("10/minute")
 async def ingest_url(
     request: Request,
-    url: str = Form(...),
+    url: str = Form(..., max_length=MAX_URL),
     # 站长 10-16「把原文翻译的开关…三个tab全局都可用」⇒ 抓取这一条也要带这一位。
     # 默认**必须是 None 不是 False**：None＝提示词里连"输出语言"那一段都不写＝今天的样子；
     # 写成 False 就成了"明确要求跟随原文语言"，那些不带这一位的老包（2.2.x 及以前）会当场变味。

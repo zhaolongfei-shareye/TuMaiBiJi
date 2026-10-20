@@ -111,7 +111,13 @@ def admin_mp_state(request: Request, db: Session = Depends(get_db), _admin: str 
     要前者回头读后者就成一个 import 环。合流放在这一道口上，一处一次。
     """
     state = mp_assets.admin_state(db)
-    state["note"] = preset_note.admin_seed_state(db)
+    # 帮助文档那一格读不出来时不许把**整页**读数打成 500：其它几栏（背景图、Tips、运营图）
+    # 照样要看（N14）。这一格退回一个 `note_error`，那一页把它念成一行实话。
+    # 不能直接塞一个缺字段的假 `note` 进去——`noteCardFor` 要读 `n.limits.title`，形状不对它会崩在浏览器里。
+    try:
+        state["note"] = preset_note.admin_seed_state(db)
+    except UserError as e:
+        state["note_error"] = str(e)
     return state
 
 
@@ -200,7 +206,10 @@ def admin_preset_note_read(
     request: Request, db: Session = Depends(get_db), _admin: str = Depends(get_admin)
 ):
     """当前生效的那一份，加三样后台要说清的事实：来源（库里／包里）、包里那份、三把尺。"""
-    return preset_note.admin_seed_state(db)
+    try:
+        return preset_note.admin_seed_state(db)
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/api/admin/preset-note")

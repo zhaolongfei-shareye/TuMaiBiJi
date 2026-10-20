@@ -29,6 +29,11 @@ from app.services.preset_note import PRESET_SOURCE_TYPE, authored_count
 
 logger = logging.getLogger(__name__)
 
+# SQLite 驱动绑一个超过 int64 的整数会当场抛 `OverflowError`（本地实测：`10^18` 与
+# `2^63-1` 正常，`10^21` 抛）。这一档在 `MAX_SKIP` 那一类"查询参数上界"之上、驱动那一层之下，
+# 凡是要拿去当主键用的整数都先过它一次（N1）。
+MAX_PK = 9223372036854775807
+
 BASE_QUOTA = 100        # MIND 的起始值（不再是"每人几篇"的上限）
 INVITE_REWARD = 10      # 带来一个新的写作者
 IMPORT_REWARD = 1       # 有人把某一篇转存进自己库里
@@ -91,7 +96,7 @@ def attribute_inviter(user: User, db: Session, inviter_id) -> bool:
         inviter_pk = int(inviter_id)
     except (TypeError, ValueError):
         return False
-    if inviter_pk <= 0 or inviter_pk == user.id or user.invited_by is not None:
+    if inviter_pk <= 0 or inviter_pk > MAX_PK or inviter_pk == user.id or user.invited_by is not None:
         return False
     if db.get(User, inviter_pk) is None:
         return False

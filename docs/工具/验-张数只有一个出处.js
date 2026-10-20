@@ -63,8 +63,13 @@ ck('卡张数的那一句读的是常量，不是抄的第二份数',
 // 多出来的行照样占全站配额，却没人看得见它们。
 // 判"公开页有没有自己截一刀"要看它**有没有把这个常量拿进自己作用域**，不能数注释里提没提
 // （`_public_assets` 的说明文字里就写着这个常量的名字，直扫文本会假红）。
+// 10-20 那一刀（N13②）把卡点从"读现集合→并集判长→写"改成"bind 之后再数一次"，
+// 于是这一个口里出现两句 `> MAX_ASSETS_PER_NOTE`（判在写之前、复核在写之后）。
+// 数出现次数是审计 N18 点名的那一族假钉子，这里改成管住真正的那件事：
+// 常量只许这一个口拿着，别的读口（分享落地页那条）一律不许自己截一刀。
+// "被拒不留行"那条行为不变量由 backend/tests/test_audit_20261020_backend.py 钉，不靠数行数。
 ck('只有绑定那一个口卡张数（读的口不许再截一刀）',
-  (ASSETS_ROUTE.match(/>\s*MAX_ASSETS_PER_NOTE/g) || []).length === 1
+  (ASSETS_ROUTE.match(/>\s*MAX_ASSETS_PER_NOTE/g) || []).length >= 1
     && !/import[^#]*MAX_ASSETS_PER_NOTE/.test(SHARES_ROUTE)
     && !/limit\(MAX/.test(SHARES_ROUTE),
   `卡点 ${(ASSETS_ROUTE.match(/>\s*MAX_ASSETS_PER_NOTE/g) || []).length} 处`)

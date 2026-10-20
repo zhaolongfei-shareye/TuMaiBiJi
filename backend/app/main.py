@@ -54,6 +54,9 @@ _FIELD_LABELS = {
     "ids": "分类顺序",
     "inviter": "邀请人",
     "url": "链接",
+    # 列表页那一枚搜索框。不给这一格，超长时屏上会出现"search太长了，最多 200 字"——
+    # 用户不认识那个词（10-20 审计同一条道理：屏上不许露英文字段名）。
+    "search": "搜索的内容",
     # 后台「卡片模板」那一栏的四个可改字段。类型不对时（排序填了汉字）走的就是这个字典，
     # 不给中文名的话屏上会出现"sort_order格式不对"——操作者不认识那个词。
     "label": "中文名",
@@ -110,6 +113,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         elif kind in ("int_parsing", "string_parsing", "bool_parsing"):
             detail = f"{label}格式不对" if label else detail
     return JSONResponse(status_code=422, content={"detail": detail})
+
+
+@app.exception_handler(OverflowError)
+async def overflow_exception_handler(request: Request, exc: OverflowError):
+    """编号越界这一类，回一句中文 400，不许留成 500（N1 剩下的那 33 处裸 `int` 入口）。
+
+    逐个参数补 `le=` 要改三十多个签名，而它们的错法是同一条：整数进 SQLite 绑定，
+    超过 int64 驱动当场抛 `OverflowError: Python int too large to convert to SQLite INTEGER`
+    （本地实测 `10^21` 抛、`10^18` 与 `2^63-1` 正常）。这里收一次口，路径进日志便于查是谁在打。
+    ⚠ 只挡 `OverflowError`，别扩到 `Exception`——那会把真正的编程错误一并抹成 400。
+    """
+    logger.warning("编号越界 path=%s: %s", request.url.path, exc)
+    return JSONResponse(status_code=400, content={"detail": "这个编号不对，请退出这一屏再试一次"})
 
 _origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 

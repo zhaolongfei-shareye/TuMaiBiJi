@@ -47,7 +47,7 @@ class LanguageRequest(BaseModel):
 
 
 @router.put("/wallpaper")
-async def update_wallpaper(
+def update_wallpaper(
     req: WallpaperRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -65,7 +65,7 @@ async def get_wallpaper_options():
 
 
 @router.put("/language")
-async def update_language(
+def update_language(
     req: LanguageRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -96,15 +96,17 @@ class ContactEmailRequest(BaseModel):
     email: str
 
 
+# 这一族写口一律是同步 `def`：Session 是同步的，挂在 `async def` 上就等于在事件循环里
+# 直接提交 SQLite 事务，撞上写锁会把循环上所有 async 口（登录、小程序码）一起晾住（N13）。
 @router.get("/contact-email")
-async def get_contact_email(user: User = Depends(get_current_user)):
+def get_contact_email(user: User = Depends(get_current_user)):
     """只有本人（当前 token 那个 user）读得到；这一格不进任何公开响应。"""
     return {"email": user.contact_email or ""}
 
 
 @router.put("/contact-email")
 @limiter.limit("20/hour")
-async def update_contact_email(
+def update_contact_email(
     req: ContactEmailRequest,
     request: Request,
     user: User = Depends(get_current_user),

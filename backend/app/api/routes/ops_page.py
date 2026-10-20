@@ -395,6 +395,7 @@ function render(state) {
   var nbox = $('note');
   while (nbox.firstChild) nbox.removeChild(nbox.firstChild);
   if (state.note) nbox.appendChild(noteCardFor(state.note));
+  else if (state.note_error) nbox.appendChild(el('p', 'state off', state.note_error));
 }
 
 // 一行一句 ⇒ 一句一串。空行丢掉：手打的时候都会留个尾换行，那不该变成一句空文案
@@ -475,6 +476,8 @@ function noteCardFor(n) {
       (cur.tags || []).length + ' 个。';
   }
   card.appendChild(st);
+  // 库里那份是好的、包里那一份读不出来：这一格照样看，但那句实话要跟着念出来（N14）。
+  if (n.fallback_error) card.appendChild(el('p', 'state off', n.fallback_error));
   if (lastNoteResync) {
     var rs = el('p', 'state on');
     rs.textContent = '刚那一次发布刷了 ' + lastNoteResync.refreshed + ' 篇存量' +

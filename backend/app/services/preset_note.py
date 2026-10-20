@@ -234,10 +234,22 @@ def live_seed(db: Session) -> dict:
 
 
 def admin_seed_state(db: Session) -> dict:
-    """给后台那一页的读数：当前生效的是哪一份、填回去的形状、三把尺。"""
+    """给后台那一页的读数：当前生效的是哪一份、填回去的形状、三把尺。
+
+    ⚠ 包里那一份读不出来时不许把整栏打成 500（N14）：库里那份是好的，操作者正需要看一眼
+    "现在生效的是哪一份"。所以这里把读包那一步挡下来，回 `fallback=None` 加一句实话；
+    两头都没有（库里也没有）才是真的没东西可看，那时响一句中文，别响一片英文堆栈。
+    """
     row = mp_assets.setting_row(db, KIND_PRESET_NOTE)
     from_db = seed_row_from_db(db)
-    fallback = seed_row()
+    fallback_error = None
+    try:
+        fallback = seed_row()
+    except (OSError, ValueError) as e:
+        fallback = None
+        fallback_error = f"包里那份读不出来：{e}"
+    if fallback is None and from_db is None:
+        raise UserError(f"帮助文档这一篇库里没有、包里那份也坏了（{fallback_error}），先修包再进这一栏")
     return {
         "kind": KIND_PRESET_NOTE,
         "label": mp_assets.KIND_LABELS.get(KIND_PRESET_NOTE, KIND_PRESET_NOTE),
@@ -245,6 +257,7 @@ def admin_seed_state(db: Session) -> dict:
         "source": "库里" if from_db is not None else "包里",
         "current": from_db if from_db is not None else fallback,
         "fallback": fallback,
+        "fallback_error": fallback_error,
         "fields": list(SEED_FIELDS),
         "limits": {
             "title": MAX_SEED_TITLE,

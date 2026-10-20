@@ -227,6 +227,12 @@ def bind_note_assets(
             next_order += 1
             db.add(row)
         bound.append(row)
+    # 上面那道"现集合 ∪ 新送来"是读头写尾：两趟并发绑同一篇会各自读到旧集合、各自放行，
+    # 落库就能超过 9 张（N13②）。这里在提交前按真数再数一遍，超了整批回滚——
+    # 宁可这一次没绑上、让用户重试，也不留"屏上只画前 9 张、多出来的看不见却占配额"的幽灵行。
+    if db.query(Asset).filter(Asset.note_id == note_id).count() > MAX_ASSETS_PER_NOTE:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"一篇笔记最多 {MAX_ASSETS_PER_NOTE} 张图")
     db.commit()
     for row in bound:
         db.refresh(row)
