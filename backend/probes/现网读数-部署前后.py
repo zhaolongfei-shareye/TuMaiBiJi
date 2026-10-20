@@ -21,7 +21,10 @@ pairs = cur.execute("select id, generation from users order by id").fetchall()
 blob = "|".join(f"{i}:{g}" for i, g in pairs).encode()
 print("users(id,generation) 条数:", len(pairs))
 print("users 指纹:", hashlib.sha256(blob).hexdigest()[:16])
-print("users 代次读数:", (min(g for _, g in pairs), max(g for _, g in pairs), len(pairs)))
+# `users` 是空表时（注销走完那一次，正是 `generation_seq` 设计要防的那个态）`min()` 会抛
+# ValueError，把后面那几行逐表读数、孤儿行、`generation_seq` 内容全带上不打（10-20 审计 N18）。
+gens = [g for _, g in pairs]
+print("users 代次读数:", (min(gens), max(gens), len(gens)) if gens else ("—", "—", 0))
 print("users(id,generation) 全量:", pairs)
 print("openid 为空:", cur.execute("select count(*) from users where openid is null").fetchone()[0])
 print("account_id 为空:", cur.execute("select count(*) from users where account_id is null").fetchone()[0])

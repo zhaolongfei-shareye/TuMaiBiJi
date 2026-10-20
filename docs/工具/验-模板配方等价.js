@@ -16,6 +16,11 @@
 // 基线文件在仓库里：docs/design/模板配方-等价基线.json。它记的是**当前这份产品代码的真实输出**，
 // 不是我以为它应该输出什么；所以第一次生成之后，任何一条红都必须解释成"我改了什么导致它变"，
 // 而不是"基线过期了"顺手重生成一次。
+//
+// ⚠ 10-19 加了一根轴（有/无配图）⇒ 组数 480 → 960，基线重生成过一次。
+//   重生成前后**老那 480 组的两枚指纹逐条对过、一字没变**（比对办法见本轮报告），
+//   因为这次改画法走的是"没配图时图层清单原样落笔"那条路：JS 与配方两边都只在
+//   真要吃配图时才多写一栏 `key`。新那 480 组才是这次改动的证据。
 global.wx = {
   getStorageSync: () => ({ name: '阿飞', slogan: '每天读一点再走', template: 'cover', avatarPath: '' }),
   setStorageSync: () => {},
@@ -88,9 +93,13 @@ const profiles = (tpl, withAvatar) => ({
   avatarPath: withAvatar ? '/u/ava.png' : '',
 })
 // `image`/`avatar` 两层在替身里要有"图"才会走裁剪那一段；宽高给定的整数，免得比例算出来带浮点噪声。
-const imgsOf = (withAvatar) => {
+// note 那一枚是"这一篇有配图"（站长 10-18「把配图第一张取代之前的头像图片，只针对大图替换」）：
+// 六套有大图位的模板（叠翠／波普分格／网点漫画／荧光渐变／杂志封面／纸间文艺）在这一态走的是
+// 一条从没被基线走过的分支，不给它一组，等价就只证明了老那一条。
+const imgsOf = (withAvatar, withNote) => {
   const m = { qr: { img: {}, width: 200, height: 200 } }
   if (withAvatar) m.avatar = { img: {}, width: 400, height: 400 }
+  if (withNote) m.note = { img: {}, width: 900, height: 600 }
   return m
 }
 
@@ -114,7 +123,14 @@ for (const tpl of poster.TEMPLATES) {
     for (const lang of ['zh', 'en']) {
       for (const showQr of [true, false]) {
         for (const withAvatar of [false, true]) {
-          cases.push({ id: `${tpl.id}#n${ni}#${lang}#${showQr ? 'qr' : 'noqr'}#${withAvatar ? 'ava' : 'noava'}`, tpl: tpl.id, ni, lang, showQr, withAvatar })
+          for (const withNote of [false, true]) {
+            // 尾巴那一段**只在有配图时拼上**：老的 480 个组名一个都不动，
+            // 这样重生成基线之后还能逐条对——"老那一半指纹没变"本身就是这次改动的验收项。
+            cases.push({
+              id: `${tpl.id}#n${ni}#${lang}#${showQr ? 'qr' : 'noqr'}#${withAvatar ? 'ava' : 'noava'}${withNote ? '#note' : ''}`,
+              tpl: tpl.id, ni, lang, showQr, withAvatar, withNote,
+            })
+          }
         }
       }
     }
@@ -125,8 +141,9 @@ function run(c) {
   const { ctx, trace } = newCtx()
   // strict：走配方的那几套要是跑不通就抛出来，不许悄悄退回 JS 那份 planner——
   // 退回去这一组照样和基线一致，基线就白立了（poster.js 里 planPoster 那段写了为什么）。
-  const plan = poster.planPoster(ctx, notes[c.ni], c.tpl, profiles(c.tpl, c.withAvatar), c.lang, { showQr: c.showQr, strict: true })
-  poster.paintLayers(ctx, plan.layers, imgsOf(c.withAvatar))
+  const plan = poster.planPoster(ctx, notes[c.ni], c.tpl, profiles(c.tpl, c.withAvatar), c.lang,
+    { showQr: c.showQr, strict: true, hasNote: !!c.withNote })
+  poster.paintLayers(ctx, plan.layers, imgsOf(c.withAvatar, c.withNote))
   return {
     plan: norm({ width: plan.width, height: plan.height, layers: plan.layers }),
     paint: norm(trace),
@@ -135,6 +152,27 @@ function run(c) {
 
 const all = {}
 for (const c of cases) all[c.id] = run(c)
+
+// ---------- 10-20 审计 N5：两份正本互比（跑 JS 那一份 planner vs 跑配方） ----------
+// 上面那 960 组走的是 `strict: true`，而十套全在 `RECIPE_IDS` 里 ⇒ `planPoster` 一次都不走 JS 分支。
+// 也就是说：**只改 `poster.js` 里那十枚 `planXxx`，跟基线比是完全绿的**——
+// 包内那份"下发挂了时的兜底"就此没人看管。这一节把同一批用例再跑一遍 JS 那一份，
+// 两枚指纹必须逐组一字不差；漂一处就红，并指出是哪一套。
+const drift = []
+for (const c of cases) {
+  const { ctx, trace } = newCtx()
+  const plan = poster.planFromJs(ctx, notes[c.ni], c.tpl, profiles(c.tpl, c.withAvatar), c.lang,
+    { showQr: c.showQr, hasNote: !!c.withNote })
+  poster.paintLayers(ctx, plan.layers, imgsOf(c.withAvatar, c.withNote))
+  const jsPlan = norm({ width: plan.width, height: plan.height, layers: plan.layers })
+  const jsPaint = norm(trace)
+  const rec = all[c.id]
+  if (jsPlan !== rec.plan) drift.push(`${c.id}：图层清单`)
+  else if (jsPaint !== rec.paint) drift.push(`${c.id}：绘制序列`)
+}
+console.log(`两份正本互比：${cases.length} 组 JS planner vs 配方，漂 ${drift.length} 处`)
+drift.slice(0, 8).forEach((x) => console.log('  ✗', x))
+const DRIFT_RED = drift.length > 0
 
 if (DUMP) {
   fs.writeFileSync(DUMP, JSON.stringify(all, null, 0))
@@ -176,7 +214,7 @@ if (WRITE) {
   for (const c of cases) out[c.id] = { plan: sha(all[c.id].plan), paint: sha(all[c.id].paint), layers: all[c.id].plan.split('"k":').length - 1 }
   fs.writeFileSync(BASE, JSON.stringify({ 生成: '验-模板配方等价.js --写基线', 组数: cases.length, 说明: '每组两个指纹：plan=图层清单，paint=绘制调用序列；都取 sha256 前 16 位', cases: out }, null, 1))
   console.log(`基线已生成：${cases.length} 组 → ${BASE}`)
-  console.log(`覆盖：${poster.TEMPLATES.length} 套模板 × ${notes.length} 条笔记 × 中英 × 码开关 × 有/无形象`)
+  console.log(`覆盖：${poster.TEMPLATES.length} 套模板 × ${notes.length} 条笔记 × 中英 × 码开关 × 有/无形象 × 有/无配图`)
   process.exit(0)
 }
 
@@ -193,7 +231,7 @@ for (const c of cases) {
   if (b.plan !== sha(now.plan)) red.push(`${c.id}: 图层清单变了`)
   if (b.paint !== sha(now.paint)) red.push(`${c.id}: 绘制序列变了`)
 }
-console.log(`${cases.length} 组（${poster.TEMPLATES.length} 套 × ${notes.length} 条笔记 × 中英 × 码开关 × 有/无形象）与基线比对，不同 ${red.length} 处`)
+console.log(`${cases.length} 组（${poster.TEMPLATES.length} 套 × ${notes.length} 条笔记 × 中英 × 码开关 × 有/无形象 × 有/无配图）与基线比对，不同 ${red.length} 处`)
 red.slice(0, 8).forEach((x) => console.log('  ✗', x))
 if (red.length) {
   // 只给指纹没法定位，所以这里把前三条红的现场指纹打出来，并留一条导 diff 的路。
@@ -201,4 +239,5 @@ if (red.length) {
   if (first) console.log(`  第一处现场：${first.id} 图层 ${all[first.id].plan.length} 字符 / 绘制 ${all[first.id].paint.length} 字符`)
   console.log('  定位办法：node docs/工具/验-模板配方等价.js --导出 /tmp/now.json，再拿改动前那份 trace 逐字段比')
 }
-process.exit(red.length ? 1 : 0)
+if (DRIFT_RED) console.log('  ✗ 两份正本漂了：要么改 `posterRecipes.js` 跟上一块，要么改回 `planXxx`（规矩是两边一起改）')
+process.exit(red.length || DRIFT_RED ? 1 : 0)

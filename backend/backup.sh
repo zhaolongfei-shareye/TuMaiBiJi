@@ -49,7 +49,10 @@ import sys
 import time
 
 db_path, store, log_path, verify_only = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == '1'
-RESTORE = '/tmp/wtsj_restore.sqlite'
+# 演练那一份落在**进程独有的路径**上（N15④）：cron 03:40 与 `deploy.sh §1.5` 撞在同一秒时，
+# 固定路径会让两边互相 `os.remove` 对面那一份，症状是"演练忽然红/忽然找不到文件"，
+# 而这两种都会被人当成"备份坏了"。文件名带 pid，撤自己的那一份，谁也碰不到谁。
+RESTORE = f'/tmp/wtsj_restore-{os.getpid()}.sqlite'
 
 
 def say(msg):
@@ -167,6 +170,16 @@ if [[ -d "$ASSETS" ]] && [[ -n "$(ls -A "$ASSETS" 2>/dev/null)" ]]; then
         rm -f "$path"
         log "运营图保留 14 份：删除 $(basename "$path")"
     done
+else
+    # 原来这一支什么都没有（N15①）：目录不存在或为空就整段跳过、`RC` 不动、脚本退 0，
+    # 而 `deploy.sh:61` 正是拿这个退出码当重启闸门 ⇒ "运营图一个字都没备"与"备好了"是同一种静音。
+    # 这里只出声、不报红：新装的机器上 `var/mp-assets` 本来就可以还没有（后台还没发过图），
+    # 为它拦住部署是误伤；但它必须在这一份日志里留下痕迹，别让人以为它一直在备。
+    if [[ ! -d "$ASSETS" ]]; then
+        log "运营图那一个目录不存在（$ASSETS），这一份归档里不包含它"
+    else
+        log "运营图那一个目录是空的，这一份归档里不包含它"
+    fi
 fi
 
 exit $RC

@@ -351,7 +351,12 @@ finally:
     db.close()
 PY
 if [[ $? -ne 0 ]]; then
-    echo "✗ 卡片模板配方这一步没过，终止部署（服务未重启，线上仍是旧版本）"
+    # 这句话以前写的是"线上仍是旧版本"——那一半是假的（N16）：这一步真走到过落库那一支时，
+    # 旧行已经 status='archived'、新行已经 live，而 `/api/poster/templates/` 读的是库不是进程。
+    # 所以这里必须让操作者去看上面那几行到底动了什么，再决定要不要按 archived 那把把手撤回去。
+    echo "✗ 卡片模板配方这一步没过，终止部署（服务未重启）"
+    echo "  ⚠ 库里那一行可能已经翻了：旧行 archived、新行 live，下发口读的是库不是进程。"
+    echo "     上面每条被拒的都印了原因；要退回去，把那一行 status 改回 live、新行改 archived（秒级，不发版、不删行）。"
     exit 1
 fi
 
@@ -392,7 +397,11 @@ print(f"  识别耗时 {dt:.2f}s  峰值 RSS {peak:.1f} MB  文本={text!r}")
 assert "OCR" in text and "123" in text, "自检图像未识别出预期文字"
 PY
 if [[ $? -ne 0 ]]; then
-    echo "✗ OCR 预检失败，终止部署（未重启服务，线上保持旧版本继续运行）"
+    # 同样不许说"线上保持旧版本"就完事：走到这一行时 §1.6 的迁移与 §1.7 的种子（开闸那一次）
+    # 已经在库里了，进程确实是旧的、库不一定是旧的（N16）。
+    echo "✗ OCR 预检失败，终止部署（未重启服务）"
+    echo "  ⚠ 上面 §1.6/§1.7 已经动过的东西不会自动退回去：schema 迁移与（若开了 POSTER_TEMPLATES=1）"
+    echo "     模板那几行都已落库。撤模板走那一行 status→archived，撤迁移要另走 downgrade，别顺手跑。"
     exit 1
 fi
 echo "  ✓ OCR 链路可用（含首次模型加载；常驻进程复用同一引擎，后续单张更快）"
