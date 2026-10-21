@@ -1,4 +1,5 @@
-// 反向探针：`验-模板配方下发.js` 第⑩节那十三条（两屏挂拉取）到底会不会红。
+// 反向探针：`验-模板配方下发.js` 第⑩节那十三条＋第⑪节那六条（两屏挂拉取、以及"先问清单"那一趟）
+// 到底会不会红。
 // 规矩与前几把一样：**每条坏样本都在临时复制品上动刀，仓库里一个字不改**；
 // 最后拿一份没动过的复制品再跑一遍，期望全绿——不然"改坏了会红"这句话没证据。
 // 跑法：node docs/工具/反向探针-两屏挂拉取.js
@@ -12,6 +13,7 @@ const RULER = '验-模板配方下发.js'
 const UTILS = 'miniprogram/utils'
 const IDX = 'miniprogram/pages/index/index.js'
 const SHR = 'miniprogram/pages/share/share.js'
+const PT = 'miniprogram/utils/posterTemplates.js'
 const PAGES = [IDX, SHR, 'miniprogram/pages/profile/profile.js', 'miniprogram/pages/me/me.js']
 
 function mk() {
@@ -77,7 +79,28 @@ const CASES = [
     apply: (d) => cut(d, IDX, '      const list = poster.templateList()',
       "      const list = poster.templateList(); this.setData({ posterTpl: 'card' })") },
   { name: '第三屏也挂上拉取（多一处没人补判据）', want: '⑩-12',
-    apply: (d) => cut(d, 'miniprogram/pages/me/me.js', 'Page({', '// 有人在这里也挂了一次 posterTemplates.refresh()\nPage({') },
+    apply: (d) => cut(d, 'miniprogram/pages/me/me.js', 'Page({',
+      'Page({\n  _tplProbe() { posterTemplates.refresh(() => api.getPosterTemplates()) },') },
+  // ---- ⑪ 那一问要便宜：清单口那六条 ----
+  { name: '撤掉清单那一步（退回每次直接拉整批 50 KB）', want: '⑪-1',
+    apply: (d) => cut(d, IDX, '      () => api.getPosterTemplateManifest(),\n', '') },
+  { name: '缓存里存"本机收过的"那份清单（跟服务端逐行对不上→永远有变化）', want: '⑪-2',
+    apply: (d) => cut(d, PT, 'manifest: manifestOf(rows)', 'manifest: manifestOf(keep)') },
+  { name: '清单读不出来当成"没有变化"（新模板被永久挡在门外）', want: '⑪-3',
+    apply: (d) => cut(d, PT,
+      "if (typeof got !== 'string' || !got.length) return refresh(fetchAll)",
+      "if (typeof got !== 'string' || !got.length) return { accepted: 0, rejected: [], skipped: true }") },
+  { name: '本机一批都没有时也直接跳过（第一次永远拿不到下发）', want: '⑪-4',
+    apply: (d) => cut(d, PT, '  if (!known) return refresh(fetchAll)',
+      '  if (!known) return { accepted: 0, rejected: [], skipped: true }') },
+  { name: '客户端自己补一份 sha256（第二份真相）', want: '⑪-5',
+    apply: (d) => cut(d, PT, 'function manifestOf(rows) {',
+      'function sha256(s) { return s }\nfunction manifestOf(rows) {') },
+  { name: '客户端引 createHash 自己算（同一条，换一种写法）', want: '⑪-5',
+    apply: (d) => cut(d, PT, 'function cachedManifest() {',
+      'const createHash = () => {}\nfunction cachedManifest() {') },
+  { name: '清单不再用换行连接（行序一变就比不出来）', want: '⑪-6',
+    apply: (d) => cut(d, PT, `).join('\\n')`, `).join('|')`) },
 ]
 
 let bad = 0

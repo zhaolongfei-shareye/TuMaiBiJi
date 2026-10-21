@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.poster_template import PosterTemplate
-from app.services.poster_templates import live_templates
+from app.services.poster_templates import live_manifest, live_templates
 
 router = APIRouter()
 
@@ -44,3 +44,19 @@ def list_poster_templates(
     _user=Depends(get_current_user),
 ):
     return live_templates(db)
+
+
+class PosterTemplateManifest(BaseModel):
+    manifest: str
+    rows: int
+
+
+# 不到 1 KB 那一问：客户端先比这一枚，清单一字不差就不去拉上面那整批（约 50 KB）。
+# 鉴权与那个 GET 同一条（要登录票），所以它不多暴露任何信息——回得下的只有每行的代号与内容 hash，
+# 那两样本来就在整批里。
+@router.get("/manifest", response_model=PosterTemplateManifest)
+def poster_template_manifest(
+    db: Session = Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    return PosterTemplateManifest(manifest=live_manifest(db), rows=len(live_templates(db)))

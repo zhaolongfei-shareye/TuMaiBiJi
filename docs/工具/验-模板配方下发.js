@@ -259,15 +259,21 @@ async function main() {
 
   const IDX = 'miniprogram/pages/index/index.js'
   const SHR = 'miniprogram/pages/share/share.js'
-  const idxSrc = readSrc(IDX)
-  const shrSrc = readSrc(SHR)
-  const idxPull = bodyOf(idxSrc, '_pullTemplatesForPoster')
-  const shrPull = bodyOf(shrSrc, '_pullTemplatesForPicker')
-  const shrRender = bodyOf(shrSrc, 'renderPicker')
+  // 只整行丢掉"这一行从头就是注释"的那些，代码行一个字不动。
+  // 为什么要剥：那句"⚠ 不许在这里再算 sha256"本身就是注释，`indexOf('sha256') < 0` 把它当成了违反——
+  // 禁止的话本身成了违反，今天就是这么红了一条 ⑪-5。同一型坑 ⑩-5 早就踩过一次（注释里的 `{ }`
+  // 把大括号配对提前收口），所以这一节的抓取／行序／计数全走剥过的那一份，不只 ⑪-5 一处。
+  // 为什么不做行内剥：那一刀会切进字符串里的 `//`（URL 也算），代码被切掉判据只会变绿不会变红，比假红更坏。
+  const codeOnly = (src2) => src2.split('\n').filter((l) => !/^\s*(\/\/|\*\/?)/.test(l)).join('\n')
+  const idxSrc = codeOnly(readSrc(IDX))
+  const shrSrc = codeOnly(readSrc(SHR))
   // 挂没挂在正确那一步**之后**，用行序判，不用大括号配对：`onLoad`／`_openPosterFor` 里那些
   // 注释带着 `{ }` 字样，配对会在注释处提前收口（今天实测收在 :88 那一行，判据假红）。
   const lineOf = (src2, needle) => { const i = src2.split('\n').findIndex((l) => l.indexOf(needle) >= 0); return i }
   const onlyCall = (src2, needle) => linesWith(src2, needle).length === 1
+  const idxPull = bodyOf(idxSrc, '_pullTemplatesForPoster')
+  const shrPull = bodyOf(shrSrc, '_pullTemplatesForPicker')
+  const shrRender = bodyOf(shrSrc, 'renderPicker')
 
   ok('⑩ 这一节在量的三个函数都找得到（改名叫走了＝下面十一条全是假绿）',
     idxPull.length > 0 && shrPull.length > 0 && shrRender.length > 0)
@@ -275,7 +281,7 @@ async function main() {
     onlyCall(idxSrc, 'this._pullTemplatesForPoster()')
       && lineOf(idxSrc, 'this._pullTemplatesForPoster()') < lineOf(idxSrc, 'await this._ensurePosterAssets(note.id)'))
   ok('⑩-2 那一屏的拉取不挡出图（开窗那一句与函数内取数那一句都不带 await）',
-    !awaited(idxSrc, 'this._pullTemplatesForPoster()') && !awaited(idxPull, 'posterTemplates.refresh('))
+    !awaited(idxSrc, 'this._pullTemplatesForPoster()') && !awaited(idxPull, 'posterTemplates.pullIfChanged('))
   ok('⑩-3 拉到新名单不许顺手重画眼前那一张（函数体里不出现 `_renderPoster`／`_flushTplRender`）',
     idxPull.indexOf('_renderPoster') < 0 && idxPull.indexOf('_flushTplRender') < 0)
   ok('⑩-4 回执先认弹窗还在不在（`this.data.templateOpen` 那一道挡着）',
@@ -284,7 +290,7 @@ async function main() {
     onlyCall(shrSrc, 'this._pullTemplatesForPicker()')
       && lineOf(shrSrc, 'this._pullTemplatesForPicker()') > lineOf(shrSrc, 'this.renderPicker()'))
   ok('⑩-6 那一屏的拉取也不挡出图（两处都不带 await）',
-    !awaited(shrSrc, 'this._pullTemplatesForPicker()') && !awaited(shrPull, 'posterTemplates.refresh('))
+    !awaited(shrSrc, 'this._pullTemplatesForPicker()') && !awaited(shrPull, 'posterTemplates.pullIfChanged('))
   ok('⑩-7 第一趟还在画的时候不许重排那一排（回执读 `_pickerBusy`、只记一笔 `_pickerRerun`）',
     shrPull.indexOf('this._pickerBusy') >= 0 && shrPull.indexOf('this._pickerRerun') >= 0)
   ok('⑩-8 `renderPicker` 那枚忙碌旗有置有收（各一处），收尾按待办重排一次',
@@ -297,8 +303,26 @@ async function main() {
     /if \(this\._tplPulling\) return/.test(idxPull) && /if \(this\._tplPulling\) return/.test(shrPull))
   ok('⑩-11 当前选中那一套不许因为名单变了而跳掉（两处都不写 `posterTpl:`／`picked:`）',
     idxPull.indexOf('posterTpl:') < 0 && shrPull.indexOf('picked:') < 0)
-  ok('⑩-12 全仓挂拉取就三处（「卡片模板」那一屏＋这两屏），多挂一处要连带补判据',
-    jsFiles('miniprogram').filter((f) => readSrc(f).indexOf('posterTemplates.refresh(') >= 0).length === 3)
+  ok('⑩-12 全仓挂拉取就三处（「卡片模板」那一屏走整批，这两屏走"先问清单"），多挂一处要连带补判据',
+    jsFiles('miniprogram').filter((f) => {
+      const s = codeOnly(readSrc(f))
+      return s.indexOf('posterTemplates.refresh(') >= 0 || s.indexOf('posterTemplates.pullIfChanged(') >= 0
+    }).length === 3)
+
+  // ---------- ⑪ 那一问要便宜（清单口，站长 10-21 提"判断很便宜"、随后一句「部署」）----------
+  const PT = codeOnly(readSrc('miniprogram/utils/posterTemplates.js'))
+  ok('⑪-1 两屏都先问清单，不直接拉整批（函数体里出现 `getPosterTemplateManifest`）',
+    idxPull.indexOf('getPosterTemplateManifest') >= 0 && shrPull.indexOf('getPosterTemplateManifest') >= 0)
+  ok('⑪-2 本机缓存里留着那份清单（`manifest` 存的是服务端原样那一批，不是收过的 `keep`）',
+    /manifest:\s*manifestOf\(rows\)/.test(PT))
+  ok('⑪-3 清单读不出来一律去拉整批（不许把"拿不到清单"当成"没有变化"——那正是把新模板永久挡在门外那一型）',
+    /typeof got !== 'string' \|\| !got\.length\) return refresh\(fetchAll\)/.test(PT))
+  ok('⑪-4 只有"一字不差"那一种才跳过（去拉整批那四个出口都在：没缓存／没清单口／清单读不出／清单变了）',
+    (PT.match(/return refresh\(fetchAll\)/g) || []).length === 4 && PT.indexOf('skipped: true') >= 0)
+  ok('⑪-5 客户端不许自带一份哈希实现（清单比对只做字符串相等；小程序里没有 sha256，补一份就是第二份真相）',
+    PT.indexOf('sha256') < 0 && PT.indexOf('createHash') < 0)
+  ok('⑪-6 清单比对认的是整串相等，行序变了就算变化（顺序与 live_templates 那个 ORDER BY 绑死）',
+    PT.indexOf("join('\\n')") >= 0 || PT.indexOf('join(`\\n`)') >= 0 || /join\(['"]\n['"]\)/.test(PT))
 
   let n = 0
   for (const [name, pass, detail] of results) {

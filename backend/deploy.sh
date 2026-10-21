@@ -76,6 +76,20 @@ fi
 echo ""
 echo ">>> 数据库迁移（alembic upgrade head）..."
 echo "  迁移前: $(python -m alembic current 2>&1 | tail -1)"
+# 迁移前先给"每篇的头图是哪张"留一个指纹，迁移之后回来对一次（下面的 2.3 那一段）。
+# 为什么在这里量：这一趟要动的那条不变量只有在这一刻量得出来——晚一步，真拖过序的行就混进来了。
+ASSET_ORDER_PRE=$(python <<'PY'
+import hashlib
+from sqlalchemy import create_engine, text
+from app.core.config import settings
+with create_engine(settings.DATABASE_URL).connect() as c:
+    rows = c.execute(text("SELECT note_id, object_key FROM assets ORDER BY note_id, sort_order, id")).all()
+    nz = c.execute(text("SELECT COUNT(*) FROM assets WHERE sort_order <> 0")).scalar()
+print(hashlib.md5("|".join(f"{a}:{b}" for a, b in rows).encode()).hexdigest() + " " + str(len(rows)) + " " + str(nz))
+PY
+)
+if [ -z "${ASSET_ORDER_PRE:-}" ]; then echo "✗ 迁移前那个头图指纹取不出来，终止部署"; exit 1; fi
+export ASSET_ORDER_PRE
 if python -m alembic upgrade head 2>&1 | sed 's/^/  /'; then
     echo "  迁移后: $(python -m alembic current 2>&1 | tail -1)"
 else
@@ -227,18 +241,35 @@ print(f"  ✓ generation_seq 那一格 = {seq_val}（≥ 库里最高代次 {gen
 # assets.sort_order 是"编辑那一屏拖动配图"唯一的落点（迁移 a4d7e2b91c58，2026-10-19）。
 # 少了这一列，读那一组缩略图的 `order_by_note()` 会在**第一条请求**上炸 no such column——
 # 症状不是"排序不生效"，是详情窗/列表封面/卡片大图位三处一起 500。
-# 存量行必须全是 0（0 的语义＝"从没手动排过"，排序退回 id 升序），否则升级当天会把他
-# 某篇的头图悄悄换成另一张——他没拖任何东西。这条正反都钉在 tests/test_asset_order.py。
 asset_cols = {c["name"] for c in insp.get_columns("assets")}
 if "sort_order" not in asset_cols:
     print("  ✗ assets 缺 sort_order（迁移 a4d7e2b91c58 没跑到）：配图三处读图口当场 500")
     raise SystemExit(1)
+# 这一条 10-21 改过口径，改的原因值得留着：原先钉的是"存量行必须全是 0"，
+# 那是**迁移当天**的一次性前提（那天空列刚建出来，非 0 只可能是迁移自己写的，症状＝他没拖东西、头图却换了）。
+# 拖动排序上线之后非 0 就是常态（第五十二次部署被它挡下那次，现网已经有 28 行是真拖出来的），
+# 前提没了，这条判据从此每次部署都红——而它挡的仍然不是它以为那件事。
+# 现在钉的是不变量本身：**这一趟部署前后，每篇的头图与那一排的顺序都不许变**。
+# 比旧的强：旧那条只看"有没有非 0"，看不见"顺序被改了什么"；新这条迁移真把顺序动了就红。
+import hashlib
+import os
 with engine.connect() as conn:
-    nonzero = conn.execute(text("SELECT COUNT(*) FROM assets WHERE sort_order <> 0")).scalar()
-if nonzero:
-    print(f"  ✗ 升级之后有 {nonzero} 行 sort_order 不是 0：头图会在没人拖动的情况下换掉")
+    rows = conn.execute(text("SELECT note_id, object_key FROM assets ORDER BY note_id, sort_order, id")).all()
+    nz = conn.execute(text("SELECT COUNT(*) FROM assets WHERE sort_order <> 0")).scalar()
+now = hashlib.md5("|".join(f"{a}:{b}" for a, b in rows).encode()).hexdigest()
+_pre = (os.environ.get("ASSET_ORDER_PRE") or "").split()
+if len(_pre) != 3:
+    print("  ✗ 迁移前那个头图指纹没读进来（deploy.sh 上面那一步 ASSET_ORDER_PRE 挂了）：这一档等于没验")
     raise SystemExit(1)
-print("  ✓ assets.sort_order 到位（存量行全为 0＝升级当天不换任何一篇的头图）")
+pre_n, pre_total, pre_nz = _pre
+if now != pre_n:
+    print(f"  ✗ 这一趟部署改动了配图顺序（头图指纹 {pre_n[:12]}… → {now[:12]}…）："
+          "没人拖东西，头图却会换——用 1.5 那份快照还原，别重启")
+    raise SystemExit(1)
+if str(len(rows)) != pre_total:
+    print(f"  ✗ assets 行数在这一趟里变了：迁移前 {pre_total} 行，现在 {len(rows)} 行")
+    raise SystemExit(1)
+print(f"  ✓ assets.sort_order 到位（顺序指纹与迁移前一字不差；其中 {nz} 行非 0＝{pre_nz} 行，都是真拖过的那几行）")
 print("  ✓ users.quota_bonus / users.invited_by / users.generation / users.contact_email / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / note_cards（含「一篇一张」那条部分唯一索引）/ user_profiles（含「一人一份」那条唯一索引）/ 一篇笔记一张有效码的索引 / generation_seq（代次水位线，含「那一格不许落后库里代次」那条不变量） 到位")
 PY
 if [[ $? -ne 0 ]]; then

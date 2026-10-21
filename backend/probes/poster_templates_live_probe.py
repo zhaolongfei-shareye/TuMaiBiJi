@@ -113,6 +113,34 @@ anon = httpx.get(f"{BASE}{PATH}", timeout=30)
 ck("不带 token 打过去回 401（这接口要登录；openid 从不下发，但配方也不该谁都能读）",
    anon.status_code == 401, f"HTTP {anon.status_code}")
 
+# ---------- 那份清单（10-21「部署」这一刀；本地 pytest 证的是逻辑，这一段证现网跑的正是它）----------
+# 客户端拿这一串跟本机缓存**逐字**比。所以这一头最要紧的一条不是"回得对不对"，
+# 而是"跟整批那一份对不对得上"：对不上的症状不是报错，是每一次开窗都白拉一整批 50 KB——
+# 比不加这一口更慢，而且一声不响。
+MPATH = "/api/poster/templates/manifest"
+mr = httpx.get(f"{BASE}{MPATH}", headers=hdr, timeout=30, follow_redirects=False)
+ck("清单口在现网存在且回 200（404＝这一批没部署；客户端那一头把任何失败都当\"这次没拿到\"，红会静默）",
+   mr.status_code == 200, f"HTTP {mr.status_code}")
+ck("清单这一条路径不带斜杠、也不用重定向（wx.request 对 307 的处理各端不一致，别拿它赌）",
+   mr.status_code not in (301, 302, 307, 308), f"HTTP {mr.status_code}")
+mbody = mr.json() if mr.status_code == 200 else {}
+mkeys = set(mbody.keys()) if isinstance(mbody, dict) else set()
+ck("清单回的是对象、就两个键（客户端读的是 body.manifest 那一格）",
+   mkeys == {"manifest", "rows"}, f"{type(mbody).__name__} 键 {sorted(mkeys)}")
+mline = mbody.get("manifest") if isinstance(mbody, dict) else None
+expect = "\n".join(f"{x.get('template_id')}:{x.get('content_hash')}" for x in rows)
+ck("清单与整批那一份逐行同序同值（这两头分叉＝客户端永远比不出\"没变化\"，每次白拉整批）",
+   isinstance(mline, str) and mline == expect,
+   f"清单 {len(mline or '')} B / 整批算出来 {len(expect)} B")
+ck(f"清单行数与库里 live 行数一致（清单 {mbody.get('rows')} / 接口 {len(rows)} / 库里 {len(db_rows)}）",
+   mbody.get("rows") == len(db_rows), f"清单 {mbody.get('rows')} vs 库里 {len(db_rows)}")
+mb = len((mline or "").encode("utf-8"))
+ck(f"清单真的很便宜（{mb} B，整批那一份 {len(r.content)} B）——不然这一问省不出什么",
+   "steps" not in (mline or "") and mb * 10 < len(r.content), f"{mb} B vs {len(r.content)} B")
+manon = httpx.get(f"{BASE}{MPATH}", timeout=30)
+ck("不带 token 打清单口也回 401（这一口轻，但不是另一扇门）",
+   manon.status_code == 401, f"HTTP {manon.status_code}")
+
 red = sum(1 for ok, _ in results if not ok)
 print(f"\n{len(results)} 条，红 {red} 条")
 sys.exit(1 if red else 0)

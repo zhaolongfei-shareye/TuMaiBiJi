@@ -108,6 +108,22 @@ def live_templates(db: Session):
     )
 
 
+def live_manifest(db: Session) -> str:
+    """那一整批 live 行的"清单"：`template_id:content_hash` 逐行用 \\n 连起来，原样回给客户端。
+
+    为什么要有它：下发那个 GET 回的是**整批含配方**（十套实测 50,016 字节），客户端想知道
+    "有没有新模板"本来只能把整批拉回来再比。这一枚让客户端先花不到 1 KB 问一句，
+    一字不差就不去拉整批（站长 10-21 提的那条"判断很便宜"，缺的就是这个）。
+
+    ⚠ **故意回明文清单、不回 hash**：小程序里没有 sha256，客户端要么自带一份哈希实现、
+    要么在服务端两边各抄一份算法——两条都是"第二份真相"。清单本身可比、又能顺手当调试读数看，
+    代价只是这一问从几十 B 变成不到 1 KB，仍然比整批 50 KB 便宜两个数量级。
+    顺序必须与 `live_templates` 那个 `ORDER BY sort_order, id` 一字不差；
+    不一致的症状是"每次都要拉整批"，静默、不报错，所以 pytest 里钉了一条拿同一批行两边对数的用例。
+    """
+    return "\n".join(f"{row.template_id}:{row.content_hash}" for row in live_templates(db))
+
+
 def content_hash_of(recipe) -> str:
     """与 docs/工具/出-模板配方种子.js 那个 hash 同一条口径：键名排序的紧凑 JSON 取 sha256。
 

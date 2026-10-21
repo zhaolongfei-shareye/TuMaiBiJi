@@ -320,9 +320,13 @@ module.exports = {
   getWallpaperOptions: () => request('/api/user/wallpaper/options'),
   // 卡片模板配方下发（P0-5）。路径尾巴那个斜杠是必须的：FastAPI 那里注册的是 ""，
   // 少一个斜杠服务端回 307，而 wx.request 对重定向的处理在各端不一致——别拿它赌。
-  // 现网那张表还没建（这一批没部署），所以现在打过来只会 404，
-  // posterTemplates.refresh 那边把任何失败都当"这次没拿到"，包内那十套照样画。
+  // 这一口 10-21 在现网实测回 200、11 行、54,185 字节（老话"那张表还没建、只会 404"已作废）。
+  // 真打不通的时候（弱网／那一口没部署），posterTemplates 那边一律当"这次没拿到"，包内那十套照样画。
   getPosterTemplates: () => request('/api/poster/templates/'),
+  // 那份"清单"（每行 `代号:内容 hash`，现网 11 行实测 787 字节）：两屏开局先比这一枚，
+  // 一字不差就不去拉上面那 54 KB 的整批。服务端 `services/poster_templates.py:live_manifest`。
+  // 尾巴不带斜杠，注册的也是不带斜杠那条（10-21 现网探针钉过：回 200，不是 307）。
+  getPosterTemplateManifest: () => request('/api/poster/templates/manifest'),
   getQuota: () => request('/api/user/quota'),
   // 确认标志必须在服务端看得见的地方，所以是 POST 带 body，不是 DELETE 带 body
   deactivateAccount: () =>

@@ -144,7 +144,8 @@ app.include_router(shares.router, prefix="/api/shares", tags=["shares"])
 app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"])
 app.include_router(user.router, prefix="/api/user", tags=["user"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
-# 卡片模板配方下发。只有 GET——这张表能改画面，写路径留在部署脚本里（见 routes/poster_templates.py）
+# 卡片模板配方下发。两个 GET（整批配方＋那份清单），没有写口——这张表能改画面，
+# 写路径留在部署脚本里（见 routes/poster_templates.py）
 app.include_router(poster_templates.router, prefix="/api/poster/templates", tags=["poster-templates"])
 # 笔记配图：路径写在模块里（跨 /api/notes/{id}/assets 与 /api/user/storage-quota 两个前缀），
 # 所以这里不再给 prefix——一个模块两组路径，是为了让"归属校验"和"配额口径"只有一份实现。

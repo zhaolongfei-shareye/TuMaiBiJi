@@ -1569,7 +1569,10 @@ Page({
     this._tplPulling = true
     const before = poster.remoteSignature()
     const done = (rep) => { this._tplPulling = false; return rep }
-    return posterTemplates.refresh(() => api.getPosterTemplates()).then((rep) => {
+    return posterTemplates.pullIfChanged(
+      () => api.getPosterTemplateManifest(),
+      () => api.getPosterTemplates(),
+    ).then((rep) => {
       if (!rep || rep.error || poster.remoteSignature() === before) return done(rep)
       if (!this.data.templateOpen) return done(rep)
       const list = poster.templateList()

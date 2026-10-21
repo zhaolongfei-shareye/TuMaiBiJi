@@ -391,3 +391,92 @@ def test_脏种子一条都不落库(db):
     rep = seed_poster_templates(db, path)
     assert rep["inserted"] == len(seed_rows()) - 1 and len(rep["rejected"]) == 1
     assert db.query(PosterTemplate).count() == len(seed_rows()) - 1
+
+
+# ---------------------------------------------------- 五、那份清单（10-21 站长「部署」这一刀）
+
+MANIFEST = "/api/poster/templates/manifest"
+LIST = "/api/poster/templates/"
+
+
+def _hdr(me):
+    return {"Authorization": f"Bearer {_create_token(me.id, me.generation)}"}
+
+
+def test_清单口未登录也一样拿不到(db, client):
+    # 这一口只回 id 与 hash，理论上"不算内容"，但它照样数得出台上架了几套、叫什么。
+    # 鉴权必须与整批口同一道，不许因为"轻"就单开一扇门。
+    assert client.get(MANIFEST).status_code == 401
+
+
+def test_清单与整批逐行同序同值(db, client, me):
+    # 这一条是整个"先问清单"设计成立的前提：客户端拿这条串跟本机缓存**逐字比**，
+    # 两边口径错一格（少一行、换一行序、分隔符不一样）症状都是"每次都去拉整批"——
+    # 白跑那一趟 50 KB，比不加这一口更慢，而且一声不响。
+    _seed(db)
+    rows = client.get(LIST, headers=_hdr(me)).json()
+    body = client.get(MANIFEST, headers=_hdr(me)).json()
+    assert body["manifest"].split("\n") == [f'{r["template_id"]}:{r["content_hash"]}' for r in rows]
+    assert body["rows"] == len(rows)
+
+
+def test_清单里没有配方所以真的很便宜(db, client, me):
+    # 站长那句话是"这个逻辑应该不会增加时长"。这条把"便宜"量出来：
+    # 清单里一个字都不许带配方，否则这一问跟整批拉回来一样贵，那一趟就白省了。
+    _seed(db)
+    body = client.get(MANIFEST, headers=_hdr(me)).json()
+    assert "steps" not in body["manifest"] and "prim" not in body["manifest"]
+    assert len(body["manifest"].encode("utf-8")) < 2048
+    assert len(body["manifest"].encode("utf-8")) * 10 < len(
+        client.get(LIST, headers=_hdr(me)).content)
+
+
+def test_收回去那一套当天就从清单里消失(db, client, me):
+    # 撤回走 status，不发版（§四 第 5 条）。清单这一头必须跟着掉，
+    # 否则客户端比出"没变化"，本地那份永远留着——撤回看起来没生效。
+    _seed(db)
+    before = client.get(MANIFEST, headers=_hdr(me)).json()["manifest"]
+    row = db.query(PosterTemplate).filter(PosterTemplate.template_id == "quote").first()
+    row.status = "archived"
+    db.commit()
+    body = client.get(MANIFEST, headers=_hdr(me)).json()
+    after = body["manifest"]
+    # 两头都取 `["manifest"]` 再比：第一版写的是一边字符串一边整份字典，`!=` 恒真，
+    # 拿"清单回常量"那种坏样本去钉它压根不红（10-21 反向取证抓出来的）。
+    assert before != after, f"收了 quote 那一条，清单却说没变化：客户端据此不会去拉整批，本地那份永远留着"
+    assert not any(l.startswith("quote:") for l in after.split("\n"))
+    assert body["rows"] == len(_live_rows()) - 1
+
+
+def test_配方换版清单跟着变(db, client, me):
+    # 另一头也得钉：内容变了 hash 就得变，不然这一问会说"没变化"，新配方永远下不去。
+    _seed(db)
+    before = client.get(MANIFEST, headers=_hdr(me)).json()["manifest"]
+    row = db.query(PosterTemplate).filter(PosterTemplate.template_id == "quote").first()
+    row.recipe["steps"].append({"let": "unused", "value": 1})
+    row.content_hash = content_hash_of(row.recipe)
+    db.commit()
+    after = client.get(MANIFEST, headers=_hdr(me)).json()["manifest"]
+    assert before != after
+    assert len([l for l in after.split("\n") if l.startswith("quote:")]) == 1
+
+
+def test_draft那一行不进清单(db, client, me):
+    _seed(db)
+    before = client.get(MANIFEST, headers=_hdr(me)).json()
+    db.add(PosterTemplate(template_id="newone", label="新", label_en="New", group_key="bold",
+                          sort_order=5, recipe=good_recipe(), status="draft",
+                          min_app_version="9.9.9", content_hash="0" * 64))
+    db.commit()
+    after = client.get(MANIFEST, headers=_hdr(me)).json()
+    assert before["manifest"] == after["manifest"] and "newone" not in after["manifest"]
+    # 还在改的那一套不许让所有人每次都去拉整批：清单得对 draft 免疫。
+    assert after["rows"] == before["rows"]
+
+
+def test_表空时清单是空串而不是null(db, client, me):
+    # 客户端那一头认的是"拿不到清单就去拉整批"。这里回 null／回 500 都会被当成
+    # "读不出来"，于是每一次开窗都白拉一整批——正是 ⑪-3 那条判据挡的同一型毛病。
+    body = client.get(MANIFEST, headers=_hdr(me)).json()
+    assert body["manifest"] == "" and body["rows"] == 0
+

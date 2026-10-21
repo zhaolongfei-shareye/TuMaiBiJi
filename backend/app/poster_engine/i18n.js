@@ -675,7 +675,15 @@ const i18n = {
     resetWithBioBody: 'Resetting needs your fingerprint or face. Once it passes, type the new code twice.',
     resetWithBioOk: 'Go',
     bioUnavailable: 'This phone has no fingerprint or face unlock — reset directly.',
-    swipeHint: 'Swipe to change template',
+    // 10-20 ⑰「英文版，左上角与中间重叠了，你要压缩左侧英文」。那一行只有 702rpx（窗 750−左右各 24），
+    // 中间那枚模板名限到 340rpx、左右两句各内缩 34rpx——**这一格是按中文排的**：`左右滑换模板` 六个汉字
+    // 折 126rpx，离中间那枚还有 120rpx；英文旧那句 24 个字母折 ≈252rpx，右沿压到中间那枚的左沿里面，
+    // 屏上读成 `Swipe to change te…` 骑在 `< Vertical Letter >` 上（他截图那一眼）。
+    // 收成 `Swipe to switch`（15 字母 ≈163rpx）：宾语不写死成 template 是因为**那一格就住在模板名旁边**，
+    // 中间那枚正在念它的名字，重复一次既长又绕（同 ⑯ 那条「名字里不承诺别处已经显示的东西」）。
+    // ⚠ 中文那一格是他 10-19 的原话，一字没动；这一处只动英文那一门。折算宽度是**算的不是量的**，
+    // 量的那条在真跑那把（逐套模板在英文态量三枚矩形不相撞）。
+    swipeHint: 'Swipe to switch',
     // 不直译"左右"（英文里 swipe 本来就是横向），也放得进详情页顶上那一行小字。
     noteSwipeHint: 'Swipe for the next note',
     grip: 'Tap to close',

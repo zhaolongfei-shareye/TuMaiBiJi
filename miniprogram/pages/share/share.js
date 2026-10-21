@@ -285,7 +285,10 @@ Page({
     this._tplPulling = true
     const before = poster.remoteSignature()
     const done = (rep) => { this._tplPulling = false; return rep }
-    return posterTemplates.refresh(() => api.getPosterTemplates()).then((rep) => {
+    return posterTemplates.pullIfChanged(
+      () => api.getPosterTemplateManifest(),
+      () => api.getPosterTemplates(),
+    ).then((rep) => {
       if (!rep || rep.error || poster.remoteSignature() === before) return done(rep)
       if (!this._note) return done(rep)                  // 页面已经收了：名单进内存与缓存就够，屏上不动
       if (this._pickerBusy) this._pickerRerun = true      // 第一趟还在画：只记一笔待办，由它收尾时重排
