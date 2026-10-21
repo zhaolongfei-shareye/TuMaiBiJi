@@ -14,6 +14,7 @@ const pwdSheet = require('../../utils/pwdSheet.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
 const noteImage = require('../../utils/noteImage.js')
 const posterMatte = require('../../utils/posterMatte.js')
+const posterTemplates = require('../../utils/posterTemplates.js')
 const mpAssets = require('../../utils/mpAssets.js')
 const { formatDate, formatDateTime, formatShortDate, formatWeekday } = require('../../utils/date.js')
 const bgTone = require('../../utils/imgBrightness.js')
@@ -1541,6 +1542,9 @@ Page({
       // 台账里有这一篇那一张＝已生成态：底排给「查看笔记｜删除」，模板不能滑、名片不能改
       posterHasCard: known,
     })
+    // 乙（站长 10-21 一句「乙」）：开这一屏也去拉一次下发名单，于是"新模板要先自己去一趟
+    // 「卡片模板」那一屏才选得到"这一格不再存在。这一句**故意不 await**，理由见下面那个函数。
+    this._pullTemplatesForPoster()
     try {
       await this._ensurePosterAssets(note.id)
       await this._renderPoster()
@@ -1549,6 +1553,32 @@ Page({
       wx.showToast({ title: t('generateFailed', this.data.lang), icon: 'none' })
       this._closeTemplate()
     }
+  },
+
+  // 与「卡片模板」那一屏（pages/profile）同一条路、同一个 `posterTemplates.refresh`，
+  // 三条硬语义是为"不许影响这一屏其余功能"写的：
+  // ① **不挡出图**——开窗第一张照用内存里那份名单画，这一趟排在它后面自己走；
+  // ② **失败一律当"这次没拿到"**——`refresh` 本身任何一步出错只回一份报告、绝不抛，
+  //    所以这里不弹任何东西、不灰任何一枚按钮，弱网下屏上跟没挂这一句时一字不差；
+  // ③ **回执回来先认弹窗还在不在**——收了就不往已销毁的那一屏上写（与 :1494 那三句"让位"判断同源）。
+  // 拉到新名单**绝不重画用户眼前那一张**：`applyRemoteTemplates` 是整份替换，服务端要是刚好
+  // 把当前这套收成 archived，当场重画＝那张卡自己变成另一套（或对包外那几套直接回 null 抛出去）。
+  // 所以这里只换那一排圆点与那一行名字；重画只由用户自己的动作触发（滑动、翻码、改名片）。
+  _pullTemplatesForPoster() {
+    if (this._tplPulling) return Promise.resolve(null)   // 单飞：连点两篇不许并排发两趟
+    this._tplPulling = true
+    const before = poster.remoteSignature()
+    const done = (rep) => { this._tplPulling = false; return rep }
+    return posterTemplates.refresh(() => api.getPosterTemplates()).then((rep) => {
+      if (!rep || rep.error || poster.remoteSignature() === before) return done(rep)
+      if (!this.data.templateOpen) return done(rep)
+      const list = poster.templateList()
+      this.setData({
+        tplIds: list.map((x, i) => ({ id: x.id, color: toneColor(i) })),
+        posterTplName: poster.templateLabel(this.data.posterTpl, this.data.lang),
+      })
+      return done(rep)
+    }, (e) => done(e))
   },
 
   async _ensurePosterAssets(noteId) {

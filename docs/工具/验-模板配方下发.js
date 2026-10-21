@@ -11,6 +11,9 @@
 //
 // 跑法：node docs/工具/验-模板配方下发.js
 const crypto = require('crypto')
+const fs = require('fs')
+const path = require('path')
+const ROOT = path.resolve(__dirname, '../..')
 
 // 存储要真存：这一把有一半在测缓存（写进去哪几条、读回来什么、读回来坏了怎么办）。
 // 真机里"键不存在"时 getStorageSync 回空串而不是 undefined，替身照这个来。
@@ -226,6 +229,76 @@ async function main() {
   try { poster.planPoster(newCtx(), NOTES[0], 'acid', PROFILE, 'zh', { strict: true }) } catch (e) { threw = e.message }
   ok('同一份在尺子那一路（strict）必须抛——少了这道区分，坏配方会一路用 JS 分支而基线照样全绿',
     threw.length > 0, threw.slice(0, 70))
+
+  // ---------- ⑩ 两屏挂拉取（乙，站长 10-21 一句「乙」＋追一句「一起挂上」）----------
+  // 这一节量的是"接线"：拉取挂没挂、挡不挡出图、会不会顺手重画用户眼前那一张。
+  // 上面那九节全在 utils 里（闸门、合并、缓存、回退），页面接错一处它们照样全绿——
+  // 而接错的两种症状（开窗转圈等网、卡片自己变一张）都是站长先看见、我们后知道。
+  const readSrc = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8')
+  const bodyOf = (src2, name) => {
+    // 必须锚在"某一行的开头、缩进两格、函数名后面紧跟参数与 `) {`"那一形状上。
+    // ⚠ 别退回去用 `indexOf('\n  ' + name + '(')`：注释里那句"见 onLoad(...)"会先被匹配上，
+    //   于是抓到一段从注释中间开始的小体，判据看着像"没挂"——今天就是这么红了一条 ⑩-5。
+    const m = new RegExp(`^  (?:async )?${name}\\s*\\([^)]*\\)\\s*\\{`, 'm').exec(src2)
+    if (!m) return ''
+    const open = m.index + m[0].length - 1
+    let depth = 0
+    for (let i = open; i < src2.length; i++) {
+      if (src2[i] === '{') depth++
+      else if (src2[i] === '}') { depth--; if (!depth) return src2.slice(open, i + 1) }
+    }
+    return ''
+  }
+  const linesWith = (src2, needle) => src2.split('\n').filter((l) => l.indexOf(needle) >= 0)
+  const awaited = (src2, needle) => linesWith(src2, needle).some((l) => /^\s*await\s/.test(l))
+  const jsFiles = (dir) => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).reduce((acc, e) => {
+    const rel = `${dir}/${e.name}`
+    if (e.isDirectory()) return acc.concat(jsFiles(rel))
+    return /\.js$/.test(e.name) ? acc.concat(rel) : acc
+  }, [])
+
+  const IDX = 'miniprogram/pages/index/index.js'
+  const SHR = 'miniprogram/pages/share/share.js'
+  const idxSrc = readSrc(IDX)
+  const shrSrc = readSrc(SHR)
+  const idxPull = bodyOf(idxSrc, '_pullTemplatesForPoster')
+  const shrPull = bodyOf(shrSrc, '_pullTemplatesForPicker')
+  const shrRender = bodyOf(shrSrc, 'renderPicker')
+  // 挂没挂在正确那一步**之后**，用行序判，不用大括号配对：`onLoad`／`_openPosterFor` 里那些
+  // 注释带着 `{ }` 字样，配对会在注释处提前收口（今天实测收在 :88 那一行，判据假红）。
+  const lineOf = (src2, needle) => { const i = src2.split('\n').findIndex((l) => l.indexOf(needle) >= 0); return i }
+  const onlyCall = (src2, needle) => linesWith(src2, needle).length === 1
+
+  ok('⑩ 这一节在量的三个函数都找得到（改名叫走了＝下面十一条全是假绿）',
+    idxPull.length > 0 && shrPull.length > 0 && shrRender.length > 0)
+  ok('⑩-1 生成卡片那一屏挂了拉取（`_openPosterFor` 里调 `_pullTemplatesForPoster()`，且排在取数之前）',
+    onlyCall(idxSrc, 'this._pullTemplatesForPoster()')
+      && lineOf(idxSrc, 'this._pullTemplatesForPoster()') < lineOf(idxSrc, 'await this._ensurePosterAssets(note.id)'))
+  ok('⑩-2 那一屏的拉取不挡出图（开窗那一句与函数内取数那一句都不带 await）',
+    !awaited(idxSrc, 'this._pullTemplatesForPoster()') && !awaited(idxPull, 'posterTemplates.refresh('))
+  ok('⑩-3 拉到新名单不许顺手重画眼前那一张（函数体里不出现 `_renderPoster`／`_flushTplRender`）',
+    idxPull.indexOf('_renderPoster') < 0 && idxPull.indexOf('_flushTplRender') < 0)
+  ok('⑩-4 回执先认弹窗还在不在（`this.data.templateOpen` 那一道挡着）',
+    idxPull.indexOf('this.data.templateOpen') >= 0)
+  ok('⑩-5 分享那一屏挂了拉取（`onLoad` 里调 `_pullTemplatesForPicker()`，且排在第一次画那一排之后）',
+    onlyCall(shrSrc, 'this._pullTemplatesForPicker()')
+      && lineOf(shrSrc, 'this._pullTemplatesForPicker()') > lineOf(shrSrc, 'this.renderPicker()'))
+  ok('⑩-6 那一屏的拉取也不挡出图（两处都不带 await）',
+    !awaited(shrSrc, 'this._pullTemplatesForPicker()') && !awaited(shrPull, 'posterTemplates.refresh('))
+  ok('⑩-7 第一趟还在画的时候不许重排那一排（回执读 `_pickerBusy`、只记一笔 `_pickerRerun`）',
+    shrPull.indexOf('this._pickerBusy') >= 0 && shrPull.indexOf('this._pickerRerun') >= 0)
+  ok('⑩-8 `renderPicker` 那枚忙碌旗有置有收（各一处），收尾按待办重排一次',
+    linesWith(shrRender, 'this._pickerBusy = true').length === 1
+      && linesWith(shrRender, 'this._pickerBusy = false').length === 1
+      && shrRender.indexOf('this._pickerRerun') >= 0)
+  ok('⑩-9 分享那一屏拉到新名单不许重画上面那张成品图（函数体里不出现 `this.render()`）',
+    shrPull.indexOf('this.render()') < 0)
+  ok('⑩-10 两屏各自单飞（函数开头那道 `if (this._tplPulling) return` 要在——只查旗名会被反向探针打红：这一条今天就没牙，被探针抓出来了）',
+    /if \(this\._tplPulling\) return/.test(idxPull) && /if \(this\._tplPulling\) return/.test(shrPull))
+  ok('⑩-11 当前选中那一套不许因为名单变了而跳掉（两处都不写 `posterTpl:`／`picked:`）',
+    idxPull.indexOf('posterTpl:') < 0 && shrPull.indexOf('picked:') < 0)
+  ok('⑩-12 全仓挂拉取就三处（「卡片模板」那一屏＋这两屏），多挂一处要连带补判据',
+    jsFiles('miniprogram').filter((f) => readSrc(f).indexOf('posterTemplates.refresh(') >= 0).length === 3)
 
   let n = 0
   for (const [name, pass, detail] of results) {

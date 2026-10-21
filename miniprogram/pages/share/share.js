@@ -27,6 +27,7 @@ const cardCloud = require('../../utils/cardCloud.js')
 const noteImage = require('../../utils/noteImage.js')
 const posterMatte = require('../../utils/posterMatte.js')
 const cardInfo = require('../../utils/cardInfo.js')
+const posterTemplates = require('../../utils/posterTemplates.js')
 const { labelOf } = require('../../utils/catText.js')
 
 Page({
@@ -113,6 +114,9 @@ Page({
       this._noteImgPath = await noteImage.firstImage(noteId)
       await this.render()
       this.renderPicker()
+      // 乙（站长 10-21 一句「乙」＋追一句「一起挂上」）：这一屏也去拉一次下发名单。
+      // 与 pages/index 那一处同一条路、同三条硬语义（不挡出图／失败当没拿到／回执先认页面还在）。
+      this._pullTemplatesForPicker()
     } catch (err) {
       console.error('生成分享图失败', err)
       wx.showToast({ title: t('generateFailed', lang), icon: 'none' })
@@ -215,6 +219,7 @@ Page({
   async renderPicker() {
     if (this._pickerDone || !this._note) return
     this._pickerDone = true
+    this._pickerBusy = true   // 这一排每格一块原生画布；这枚旗是给下面那个拉取回执看的（见 _pullTemplatesForPicker）
     const { lang } = this.data
     const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
     const picked = this.data.picked || profile.template || poster.DEFAULT_TEMPLATE
@@ -261,6 +266,32 @@ Page({
       }
     }
     this.setData({ tpls: tpls.slice() })
+    this._pickerBusy = false
+    // 画这一排的期间拉到了新名单 ⇒ 收尾时重排一次，**最多一次**（`_pickerRerun` 先清再跑，不会循环）。
+    // 不在回执里直接重跑：那样第一趟还在落笔、第二趟已经开画，两趟并行往同一批 `#pick-<id>`
+    // 画布上交替下笔——与 pages/index :1489 那条"共享位被两趟踩出来"是同一件事。
+    if (this._pickerRerun) {
+      this._pickerRerun = false
+      this._pickerDone = false
+      this.renderPicker()
+    }
+  },
+
+  // 拉到新名单之后重排那一排。当前选中那一套（`this.data.picked`）不改：
+  // 它要是刚被服务端收成 archived，那一格就不在这排里了，但上面那张成品图照旧画它——
+  // 不许人看着的一张自己跳成另一套（与 pages/index 那一处同一条口径）。
+  _pullTemplatesForPicker() {
+    if (this._tplPulling) return Promise.resolve(null)   // 单飞：同一屏内不许并排发两趟
+    this._tplPulling = true
+    const before = poster.remoteSignature()
+    const done = (rep) => { this._tplPulling = false; return rep }
+    return posterTemplates.refresh(() => api.getPosterTemplates()).then((rep) => {
+      if (!rep || rep.error || poster.remoteSignature() === before) return done(rep)
+      if (!this._note) return done(rep)                  // 页面已经收了：名单进内存与缓存就够，屏上不动
+      if (this._pickerBusy) this._pickerRerun = true      // 第一趟还在画：只记一笔待办，由它收尾时重排
+      else { this._pickerDone = false; this.renderPicker() }
+      return done(rep)
+    }, (e) => done(e))
   },
 
   // 开关只管上面那张成品图；下面那排小图按他说的保持固定样式，不跟着变。
