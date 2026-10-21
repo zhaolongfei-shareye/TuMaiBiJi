@@ -197,9 +197,11 @@ const i18n = {
     unshareConfirm: '撤掉',
     // 扫码落地页与"存到我的笔记"
     authorLabel: '原创作者',
-    saveToMine: '存到我的笔记',
+    // 站长 10-21：落地页底部那一枚照他原话念「存入笔记」（原来是「存到我的笔记」六个字，
+    // 挪进图二那种动作条之后要与其他按钮同一份量、不许折行）。英文那两串他没提，保持原样。
+    saveToMine: '存入笔记',
     savingMine: '正在存…',
-    alreadySaved: '已存到我的笔记',
+    alreadySaved: '已存入笔记',
     savedToMine: '已经存进你的笔记了',
     saveMineFailed: '没存上，再试一次',
     importedFromLabel: '转存来源',
