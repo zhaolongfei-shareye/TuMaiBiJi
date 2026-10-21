@@ -313,7 +313,7 @@
   声明 `image/jpeg` + `immutable`；`/api/admin/mp/state` 读得到、**生效位仍是 null（没发布）**。
   只读那批另证：`/ops` 200、config/state/上传/发布 匿名一律 401、错口令 401、瞎写的 token 404，
   既有链路没回归（`/health` 200、`/api/poster/templates/` 401、`agentsbin.cn/n/…` 200）。
-- **系统层自证（不靠回体推理）**：journald 里有 `后台登录 remote=219.137.141.147` 与
+- **系统层自证（不靠回体推理）**：journald 里有 `后台登录 remote=〈后台登录那台出口 IP·已抹〉` 与
   `运营图已存 kind=home_bg id=1 …`——真实客户端 IP 进了日志，说明 `--proxy-headers` +
   `X-Forwarded-For` 这条链在新口上也成立（限流按真实 IP 分桶不是空话）。
 - **配套第 1 条真跑过一次**：`backup.sh` 新增那段产出 `mp-assets-20261012-105846.tar.gz`，
