@@ -3,7 +3,8 @@ const api = require('../../utils/api.js')
 const poster = require('../../utils/poster.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { CONTACT_EMAIL } = require('../../utils/contact.js')
-const { VERSION, SITE, introLead } = require('../../utils/appInfo.js')
+const { VERSION, SITE } = require('../../utils/appInfo.js')
+const mpAssets = require('../../utils/mpAssets.js')
 const { TIP_DOT } = require('../../utils/palette.js')
 const { appSharePayload } = require('../../utils/shareCard.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
@@ -121,7 +122,7 @@ Page({
     version: VERSION,
     site: SITE,
     contactEmail: CONTACT_EMAIL,
-    introLead: introLead('zh'),
+    introLead: mpAssets.introText('zh'),
   },
 
   onShow() {
@@ -144,7 +145,7 @@ Page({
       nameText: t('meGreeting', lang),
       sloganText: t('slogan', lang),
       // 介绍卡那句话是这一页唯一不在 t 里的中文长句，所以跟着 lang 一起重取
-      introLead: introLead(lang),
+      introLead: mpAssets.introText(lang),
     })
     this.fitBand()
     // 这一页原来只有导航条标题跟着语言走、底色永远吃壁纸：另外两页铺了图会翻成深底白字，

@@ -469,6 +469,7 @@ var NAV = [
   { grp: '配置', items: [
     { label: '运营图', view: 'config', key: 'kind:home_bg' },
     { label: '首屏 Tips', view: 'config', key: 'text:tips' },
+    { label: '关于介绍', view: 'config', key: 'text:about_intro' },
     { label: '帮助文档', view: 'config', key: 'note:preset_note' },
     { label: '帮助文档那张图', view: 'config', key: 'kind:preset_note_image' },
     { label: '来源黑名单', view: 'config', key: 'block:list' },
@@ -629,19 +630,31 @@ function textCardFor(t) {
   card.appendChild(head);
   addDirtyChip(head);
 
+  // 两种形状两套话术与两条编解码：`lines`＝一句一行、发上去是数组；`paragraph`＝一整段、
+  // 发上去是串。**按换行切句那一步对整段是错的**——他要是把一段介绍打成一排短句，
+  // 界面读出来就成了"一句一段"，而他要的是那一整段连着排。
+  var isPara = t.shape === 'paragraph';
   var cur = t.current;
   if (!t.registered) {
     card.appendChild(el('p', 'state off', '这台后台还没登记过这一栏（小程序用包里那一份）。'));
   } else if (!cur) {
-    card.appendChild(el('p', 'state off', '当前停用：小程序用包里那六句。'));
+    // 停用那一句的后半截从后端读（`empty_text`）：网页里那句"包里那六句"是 Tips 一栏的话，
+    // 关于那一段落回的是"包里那一段"，照抄就是对站长念半句假话。读不到才用兜底那句。
+    card.appendChild(el('p', 'state off',
+      '当前停用：' + (t.empty_text || '小程序用包里那一份') + '。'));
+  } else if (isPara) {
+    card.appendChild(el('p', 'state on', '当前生效：中文 ' + String(cur.zh || '').length +
+      ' 字／英文 ' + String(cur.en || '').length + ' 字。'));
   } else {
     card.appendChild(el('p', 'state on', '当前生效：中文 ' + (cur.zh || []).length + ' 句／英文 ' +
       (cur.en || []).length + ' 句。'));
   }
-  card.appendChild(el('p', 'note',
-    '一行一句，最多 ' + t.max_items + ' 句、每句 ' + t.max_chars + ' 字（超了整份退回，不收半份——' +
-    '这一行是按顺序轮播的，丢一句就变成"少一句且没人知道少了哪句"）。两份语言都要填，' +
-    '少一份切过去那一门会读到空、那一行整条消失。'));
+  card.appendChild(el('p', 'note', isPara
+    ? '一整段填一次，最多 ' + t.max_chars + ' 字（超了整份退回，不收半份）。两份语言都要填，' +
+      '少一份切过去那一门读到空、那一屏就落回包里那一段。这一段连着排进那张卡、会把卡撑高，填之前看一眼字数。'
+    : '一行一句，最多 ' + t.max_items + ' 句、每句 ' + t.max_chars + ' 字（超了整份退回，不收半份——' +
+      '这一行是按顺序轮播的，丢一句就变成"少一句且没人知道少了哪句"）。两份语言都要填，' +
+      '少一份切过去那一门会读到空、那一行整条消失。'));
 
   var areas = {};
   (t.langs || ['zh', 'en']).forEach(function (lang) {
@@ -650,7 +663,7 @@ function textCardFor(t) {
     ta.className = 'ta';
     // 现值走 .value 赋值，绝不用拼字符串造节点：这一页的硬纪律是"任何动态串都不当 HTML 拼"
     // （tests/test_mp_assets_admin.py 里那条静态扫描就是在钉这件事，它扫的就是那几个属性名）。
-    var value = ((cur || {})[lang] || []).join('\\n');
+    var value = isPara ? String((cur || {})[lang] || '') : ((cur || {})[lang] || []).join('\\n');
     ta.value = value;
     bindField(ta, 'text:' + t.kind, lang, value);
     areas[lang] = ta;
@@ -668,7 +681,9 @@ function textCardFor(t) {
   // 这两枚都直接动线上那一份下发内容，所以各要两下（见上面 arm() 那段为什么）。
   arm(btnPub, '再点一次=发上线', function () {
     var value = {};
-    Object.keys(areas).forEach(function (lang) { value[lang] = linesOf(areas[lang].value); });
+    Object.keys(areas).forEach(function (lang) {
+      value[lang] = isPara ? areas[lang].value.trim() : linesOf(areas[lang].value);
+    });
     busyRun(btnPub, '发布中…', function () {
       return putText(t.kind, value, msg, function () { clearDrafts(card); return refresh(); });
     });

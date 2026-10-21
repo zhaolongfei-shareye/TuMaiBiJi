@@ -7,10 +7,14 @@
 // 文案没有字节可哈希，判重那一格改用 updated_at。
 //
 // 存储结构（wx.setStorageSync）：
-//   MP_ASSET_KEY_home_bg → { filePath, contentHash }
-//   MP_TEXT_KEY_tips     → { zh: [...], en: [...], updatedAt }
-// filePath 是 FileSystemManager.saveFile 落到的永久路径；contentHash 用来和服务器那次比对。
+//   MP_ASSET_KEY_home_bg      → { filePath, contentHash }
+//   MP_TEXT_KEY_tips          → { zh: [...], en: [...], updatedAt }
+//   MP_TEXT_KEY_about_intro   → { zh: '一整段', en: '一整段', updatedAt }
+// filePath 是 FileSystemManager.saveFile 落到的永久路径；content_hash 用来和服务器那次比对。
 const { request } = require('./api.js')
+// 包里那段介绍是这一格的兜底出处（站长 10-21 之前它是唯一出处）。放在这里而不是各页各写一条
+// `||`：两处消费者（「我的」里那一块与 pages/about）必须念同一句，规则写两遍就会漂成两套。
+const { introLead } = require('./appInfo.js')
 
 const API_BASE = 'https://api.agentsbin.cn/wtsj'
 const FS = wx.getFileSystemManager()
@@ -19,8 +23,11 @@ const FS = wx.getFileSystemManager()
 const DIR = `${wx.env.USER_DATA_PATH}/mp-assets`
 
 function _key(kind) { return `MP_ASSET_KEY_${kind}` }
-// 文案只有一栏，不需要按 kind 拼键名；单独一个键也方便上面那条"撤账"一步到位。
-const TEXT_KEY = 'MP_TEXT_KEY_tips'
+// 文案栏从一栏变两栏（站长 10-21「关于里面，图麦笔记的介绍，放在后台配置」）⇒ 键名跟着 kind 拼。
+// ⚠ `MP_TEXT_KEY_tips` 那把**一个字母没改**：老手机本机已经有那份账，换键名等于把已经下发的文案
+//   读成"从没拿到过"，屏上落回包里那六句，而后台写着"当前生效"——那是最难查的那半坏。
+const TEXT_KINDS = ['tips', 'about_intro']
+function _textKey(kind) { return `MP_TEXT_KEY_${kind}` }
 
 function _ensureDir() {
   try { FS.accessSync(DIR) } catch (_) { FS.mkdirSync(DIR, true) }
@@ -153,31 +160,59 @@ function serverPresetImage() {
   return (cached && cached.url) || null
 }
 
-// 运营文案（站长 10-15「Tips 改为后台配置」）。形状与图片那份完全不同：没有 url、没有字节、
+// 运营文案（10-15 那行 Tips ＋ 10-21 那段关于介绍）。形状与图片那份完全不同：没有 url、没有字节、
 // 也没有 content_hash 可哈希，所以**不挤进上面那个 kind 循环**——挤进去就要在循环里判
 // "这一条是图还是话"，那等于把后端的两个 kind 闭集在客户端抄第三份。
 // 判重那一格用 updated_at（服务端那条链里"改过没有"的唯一证据）。
-function _saveTexts(config) {
-  const entry = Object.prototype.hasOwnProperty.call(config, 'tips') ? config.tips : null
-  if (!entry || !Array.isArray(entry.zh) || !Array.isArray(entry.en)) {
-    // 服务端明说"停用"（回 null）时要把账一起撤掉，和 `serverBgPath()` 那句"账对不上文件就撤账"
-    // 是同一条纪律。只回 null 不撤账，这台机就会永远显示旧那一份，而后台写着"已停用"。
-    // 老后端根本没这个键时走的是同一条路径：撤一个从没写过的键，无害。
-    try { wx.removeStorageSync(TEXT_KEY) } catch (_) {}
-    return
+// ⚠ 只认**形状**、不抄上限：字数上限是后台那一栏的策略（服务端 `TEXT_SPECS`），客户端抄一份数
+//   就是两边各有一个数，将来改一边、另一边静默放过脏数据。
+function _textShapeOk(kind, entry) {
+  if (kind === 'about_intro') {
+    // 整段那一格是串不是数组（服务端 `clean_text` 的 paragraph 分支）。数组一律不收：
+    // 收了之后界面按"一句一段"排，而他要的是连着排的那一整段。
+    return typeof entry.zh === 'string' && !!entry.zh && typeof entry.en === 'string' && !!entry.en
   }
-  const cached = wx.getStorageSync(TEXT_KEY)
-  if (cached && cached.updatedAt === entry.updated_at) return
-  wx.setStorageSync(TEXT_KEY, { zh: entry.zh, en: entry.en, updatedAt: entry.updated_at })
+  return Array.isArray(entry.zh) && Array.isArray(entry.en)
+}
+
+function _saveTexts(config) {
+  TEXT_KINDS.forEach((kind) => {
+    const key = _textKey(kind)
+    const entry = Object.prototype.hasOwnProperty.call(config, kind) ? config[kind] : null
+    if (!entry || !_textShapeOk(kind, entry)) {
+      // 服务端明说"停用"（回 null）时要把账一起撤掉，和 `serverBgPath()` 那句"账对不上文件就撤账"
+      // 是同一条纪律。只回 null 不撤账，这台机就会永远显示旧那一份，而后台写着"已停用"。
+      // 老后端根本没这个键时走的是同一条路径：撤一个从没写过的键，无害。
+      try { wx.removeStorageSync(key) } catch (_) {}
+      return
+    }
+    const cached = wx.getStorageSync(key)
+    if (cached && cached.updatedAt === entry.updated_at) return
+    wx.setStorageSync(key, { zh: entry.zh, en: entry.en, updatedAt: entry.updated_at })
+  })
 }
 
 // 当前缓存的那一份文案；没有（从没下发过、或已停用、或那一门是空数组）就 null。
 // 返回 null 是**正常状态不是错误**：调用方（create.js 的 tipsFor）落回包里那六句。
 function serverTips(lang) {
-  const cached = wx.getStorageSync(TEXT_KEY)
+  const cached = wx.getStorageSync(_textKey('tips'))
   if (!cached) return null
   const arr = cached[lang]
   return Array.isArray(arr) && arr.length ? arr : null
 }
 
-module.exports = { pull, serverBgPath, serverPresetImage, serverTips }
+// 「关于」那一屏的介绍段（站长 10-21 那句「关于里面，图麦笔记的介绍，放在后台配置」）。
+// 读到 null 是正常态，不是错误：调用方落回包里 `INTRO_LEADS` 那一段。
+// ⚠ 两处消费者（「我的」页里那一块与 `pages/about` 那一页）都走这一枚读法——同一个号在两屏
+//   各念一套话，比"没搬进后台"更糟：他会先看到新的、再在另一屏看到旧的。
+function serverIntro(lang) {
+  const cached = wx.getStorageSync(_textKey('about_intro'))
+  if (!cached) return null
+  const text = cached[lang]
+  return typeof text === 'string' && text ? text : null
+}
+
+// 「关于」那一屏该念哪一段：本机缓存那份优先，没拿到就念包里那段。两屏都调这一枚。
+function introText(lang) { return serverIntro(lang) || introLead(lang) }
+
+module.exports = { pull, serverBgPath, serverPresetImage, serverTips, serverIntro, introText }

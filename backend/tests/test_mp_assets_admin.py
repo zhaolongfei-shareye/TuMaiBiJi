@@ -40,7 +40,9 @@ from app.core.config import settings
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
 from app.models.account import Account
-from app.models.mp_asset import KIND_HOME_BG, KIND_PRESET_NOTE_IMAGE, KIND_TIPS, MpAsset, MpSetting
+from app.models.mp_asset import (
+    KIND_ABOUT_INTRO, KIND_HOME_BG, KIND_PRESET_NOTE_IMAGE, KIND_TIPS, MpAsset, MpSetting,
+)
 from app.models.user import User
 from app.services import mp_assets
 
@@ -50,6 +52,7 @@ STATE = "/api/admin/mp/state"
 UPLOAD = "/api/admin/mp/assets"
 SETTING = f"/api/admin/mp/settings/{KIND_HOME_BG}"
 TEXT = f"/api/admin/mp/texts/{KIND_TIPS}"
+TEXT2 = f"/api/admin/mp/texts/{KIND_ABOUT_INTRO}"
 
 
 def png(w=40, h=60, color=(200, 180, 150)) -> bytes:
@@ -710,3 +713,109 @@ def test_后台那一页左栏两格图片栏都挂得上(client, admin_pw, stor
     for needle in ("if (k.current)", "k.empty_text"):
         assert needle in page, needle
     assert page.index("if (k.current)") < page.index("k.empty_text")
+
+
+# ------------------------------------------------ 六·B　第二格文案栏（站长 10-21「关于里面，图麦笔记的介绍，放在后台配置」）
+
+GOOD_INTRO = {
+    "zh": "图麦笔记做的事很窄：把看到的好东西变成能用的笔记。",
+    "en": "TumarkNote does one narrow thing: turn what you read into notes you can use.",
+}
+
+
+def put_intro(client, headers, value):
+    return client.put(TEXT2, json={"value": value}, headers=headers)
+
+
+def test_整段那一格发上去之后读到的是串而不是句子数组(client, admin_pw, db, me, store):
+    """形状是这一格的**内容**，不是实现细节：客户端 `serverIntro` 拿它当一句话直接排进卡里。
+    要是这里塌成数组，界面读出来就是"一句一段"，而他要的是连着排的那一整段。"""
+    h = admin_h(client)
+    r = put_intro(client, h, GOOD_INTRO)
+    assert r.status_code == 200, r.text
+    got = current_config(client, me)[KIND_ABOUT_INTRO]
+    assert got is not None and got["zh"] == GOOD_INTRO["zh"] and got["en"] == GOOD_INTRO["en"], got
+    assert isinstance(got["zh"], str) and isinstance(got["en"], str), "整段那格回体必须是串"
+    assert got["updated_at"] and got["updated_at"].endswith("Z")
+    assert "content_hash" not in got, "文案不许混图片那套字段（老包靠这个键决定跳不跳过）"
+    # 停用那一条与 tips 同一句 A1：键还在、值是 null，客户端才落回包里那段
+    assert put_intro(client, h, None).status_code == 200
+    body = current_config(client, me)
+    assert KIND_ABOUT_INTRO in body and body[KIND_ABOUT_INTRO] is None
+
+
+def test_整段那一格的四种不合格一律整份退回(client, admin_pw, db, me, store):
+    h = admin_h(client)
+    bad = [
+        ({}, "空对象"),
+        ({"zh": GOOD_INTRO["zh"]}, "缺英文那份"),
+        ({"zh": ["一句", "两句"], "en": GOOD_INTRO["en"]}, "按句子列表给（那是 Tips 的形状）"),
+        ({"zh": "   ", "en": GOOD_INTRO["en"]}, "只有一段空白"),
+        ({"zh": "字" * (mp_assets.MAX_INTRO_CHARS + 1), "en": GOOD_INTRO["en"]}, "整段越线"),
+    ]
+    for value, why in bad:
+        r = put_intro(client, h, value)
+        assert r.status_code == 400, f"{why} 竟然收下了：{r.text}"
+    assert current_config(client, me)[KIND_ABOUT_INTRO] is None, "退回一份都不许收（不收半份）"
+
+
+def test_两格文案栏的上限各归各不许共用一个数(client, admin_pw, db, me, store):
+    """10-15 那两枚常量（12 句／48 字）是被首屏那只 9em 小盒子逼出来的；关于那一段是整段进通栏卡。
+    共用一个数有两种坏法：介绍放不进去（他填自家文案被自家闸门挡住），或 tips 能填到 600 字撑爆那只盒子。"""
+    h = admin_h(client)
+    long_one = "字" * (mp_assets.MAX_INTRO_CHARS)
+    assert put_intro(client, h, {"zh": long_one, "en": GOOD_INTRO["en"]}).status_code == 200
+    r = put_text(client, h, {"zh": [long_one], "en": GOOD_INTRO["en"]})
+    assert r.status_code == 400 and "超过" in r.json()["detail"], "Tips 那格被新栏的宽上限放松了＝撑爆那只盒子"
+
+
+def test_上限不许比自家现在那两份文案还小(client, admin_pw, db, me, store):
+    """这条就是 10-15 那次事故的反向钉：包里那段中文 85 字／英文 264 字符，
+    上限一旦比它小，他打开后台想原样填回自己现在这段，会被自家闸门挡在门外、还整份退回零提示。"""
+    src = (Path(__file__).resolve().parents[2] / "miniprogram/utils/appInfo.js").read_text(encoding="utf-8")
+    # ⚠ 解析锚在 `const INTRO_LEADS = {` 那一行，不许裸搜 "INTRO_LEADS"：那三个字在版本说明的注释里
+    #   也出现（10-21 那一号起），裸搜会把注释后面那一截当定义体，当场 IndexError——
+    #   红话就说不清是"上限小了"还是"这条判据的解析跟不上了"。
+    body = src.split("const INTRO_LEADS = {", 1)[1].split("\n}", 1)[0]
+
+    def grab(key: str) -> str:
+        for line in body.splitlines():
+            stripped = line.strip()
+            if stripped.startswith(f"{key}: '"):
+                return stripped[len(key) + 3:].strip().strip("',")
+        raise AssertionError(f"appInfo.js 里 INTRO_LEADS 的 {key} 写法变了，这条判据的解析要跟上一眼")
+
+    zh, en = grab("zh"), grab("en")
+    caps = [t["max_chars"] for t in client.get(STATE, headers=admin_h(client)).json()["texts"]
+            if t["kind"] == KIND_ABOUT_INTRO]
+    assert len(caps) == 1
+    for piece, why in ((zh, "中文那段"), (en, "英文那段")):
+        n = len(piece)
+        assert n <= caps[0], f"包里{why} {n} 字 > 后台上限 {caps[0]}，原样填回会被挡在门外"
+
+
+def test_后台状态里两格文案栏的规格一起给(client, admin_pw, db, me, store):
+    """回体按栏给 `shape`/`max_items`/`max_chars`/`empty_text`，是为了让网页上那几句话与服务层
+    那张表同一个出处。少给一栏＝后台画不出那一格，而屏上照旧念包里那段、零报错。"""
+    h = admin_h(client)
+    assert put_text(client, h, GOOD).status_code == 200
+    assert put_intro(client, h, GOOD_INTRO).status_code == 200
+    texts = {t["kind"]: t for t in client.get(STATE, headers=h).json()["texts"]}
+    assert set(texts) == set(mp_assets.TEXT_KINDS)
+    assert texts[KIND_TIPS]["shape"] == "lines" and texts[KIND_ABOUT_INTRO]["shape"] == "paragraph"
+    assert texts[KIND_TIPS]["current"]["zh"] == GOOD["zh"]
+    assert texts[KIND_ABOUT_INTRO]["current"]["zh"] == GOOD_INTRO["zh"]
+    for kind, t in texts.items():
+        spec = mp_assets.TEXT_SPECS[kind]
+        assert (t["max_items"], t["max_chars"]) == (spec["max_items"], spec["max_chars"]), kind
+        assert t["empty_text"], f"{kind} 停用那一句没有出处，网页只能抄一句假话"
+
+
+def test_后台那一页左栏每一格文案栏都挂得上(client, admin_pw, store):
+    """与上面那条图片栏的同一句：只加后端 kind、忘了左栏那一格＝那一栏永远发不出去。"""
+    page = client.get("/ops").text
+    for kind in mp_assets.TEXT_KINDS:
+        assert f"key: 'text:{kind}'" in page, f"左栏少了 {kind} 那一格"
+    # 两种形状两套编解码都得在页面里，否则新那栏会被按换行切成一排短句
+    for needle in ("t.shape === 'paragraph'", "areas[lang].value.trim()", "linesOf(areas[lang].value)"):
+        assert needle in page, needle

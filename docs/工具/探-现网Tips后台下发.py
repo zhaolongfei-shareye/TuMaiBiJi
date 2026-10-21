@@ -157,6 +157,29 @@ check("页面里有文案那一栏的挂载点", 'id="texts"' in html)
 check("页面标题已改口成「运营后台」", "运营后台" in html, "标题/大标题里读到了" if "运营后台" in html else "")
 check("两份语言各一个文本框（不是只有一个）", html.count("textarea") >= 2, f"textarea 出现 {html.count('textarea')} 次")
 
+print("⑥·B 第二栏（关于那一段介绍，站长 10-21）只读核形状——这一段不写、不放、不撤")
+# ⚠ 这一节故意**一次 PUT 都没有**：探针往现网写文案这条动作，每多一栏就多一处"跑到一半崩了、
+#   他线上那栏留着探针那份测试话"的风险。Tips 那一栏的写-放回路已经有上面那几节在跑，新栏先只核
+#   "注册上了没有、形状对不对、上限是不是按栏给的"这三件——那是加一栏最容易漏的三件。
+st2 = state()
+texts2 = {t.get("kind"): t for t in (st2.get("texts") or [])}
+check("文案组里两栏都在（少一栏＝后端注册了、后台画不出，屏上永远读不到）",
+      {"tips", "about_intro"} <= set(texts2), f"组里：{sorted(texts2)}")
+i0 = texts2.get("about_intro")
+if i0:
+    check("整段那一栏 shape 是 paragraph、Tips 那栏是 lines（两栏共用形状＝后台会把一段切成一排短句）",
+          i0.get("shape") == "paragraph" and (texts2.get("tips") or {}).get("shape") == "lines",
+          f"about_intro.shape={i0.get('shape')}")
+    cap_i = i0.get("max_chars")
+    cap_t = (texts2.get("tips") or {}).get("max_chars")
+    check("两栏上限各归各（同一个数＝要么介绍放不进去，要么 Tips 撑爆那只 9em 盒子）",
+          bool(cap_i) and bool(cap_t) and cap_i != cap_t, f"介绍 {cap_i}／Tips {cap_t}")
+    check("停用那一句有出处（网页抄一句『包里那六句』对这一栏就是念半句假话）",
+          bool(i0.get("empty_text")), str(i0.get("empty_text"))[:60])
+    print(f"   这一栏当前：{'已有一份生效' if i0.get('current') else '空的（屏上用包里那段介绍）'}")
+check("用户口那一条仍要登录才给（多一栏不改鉴权口径）",
+      h.get(f"{BASE}/api/mp/config").status_code == 401)
+
 print("⑦ 收尾")
 if KEEP:
     check("--keep：留在位上的就是探针那一份（下一步要拿它验用户口，验完记得 --revert）",

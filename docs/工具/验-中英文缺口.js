@@ -173,7 +173,8 @@ ok('关于页删掉"只有中文"那句旧口径', !/只有中文/.test(src))
 ok('关于页行标签走字典', /label: t\('aboutVersionRow', lang\)/.test(src) &&
   /label: t\('aboutEntityRow', lang\)/.test(src) && /value: t\('aboutEntityValue', lang\)/.test(src))
 ok('关于页 updatedAt 走字典', /updatedAt: t\('aboutUpdatedAt', lang\)/.test(src))
-ok('关于页 introLead 走 appInfo', /introLead: introLead\(lang\)/.test(src))
+ok('关于页 introLead 走"缓存优先、包里兜底"那一枚（10-21 搬进后台配置之后 appInfo 只是兜底那份）',
+  /introLead: mpAssets\.introText\(lang\)/.test(src) && !/introLead: introLead\(lang\)/.test(src))
 
 // 公众号那行的值是真实账号名，是一个专有名词，**故意不翻译**——
 // 写成英文用户在微信里就搜不到这个号了。这条钉在这里，免得下轮"补缺口"把它一起改了。

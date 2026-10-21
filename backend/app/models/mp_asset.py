@@ -44,7 +44,13 @@ KINDS = (KIND_HOME_BG, KIND_PRESET_NOTE_IMAGE)
 # 全都假设里面的 kind 能收字节、能记账宽高。把 tips 混进去的代价不是报错，是
 # 后台会出现一个"给文案上传一张 JPEG"的格子——界面能点、点下去存进库，而屏上永远读不到它。
 KIND_TIPS = "tips"
-TEXT_KINDS = (KIND_TIPS,)
+# 站长 10-21 夜「关于里面，图麦笔记的介绍，放在后台配置」⇒ 文案栏从此有两格。
+# ⚠ **形状与 Tips 不是一回事**：那一格是"一串句子"（8 秒轮一句），这一格是"一整段"（屏上就是
+# 一只 `<text class="about-p">`）。所以校验不许共用一句"1~12 句、每句 ≤48 字"——硬套的话
+# 他往后台填一段 85 字的介绍会被自家闸门挡在门外（10-15 那句"填自己家的文案被自家闸门挡住"同型）。
+# 分形状那张表在 `services/mp_assets.TEXT_SPECS`，一个 kind 一条，界面上的上限也从那儿读。
+KIND_ABOUT_INTRO = "about_intro"
+TEXT_KINDS = (KIND_TIPS, KIND_ABOUT_INTRO)
 # 站长 10-18「默认笔记请在管理后台配置，我可以编辑修改，日后更新不需要发版」⇒ 新用户出生那一篇
 # 那五个字段也能在后台改了。**单独第三组，不塞进上面那个 `TEXT_KINDS`**：那一组的校验
 # （`services/mp_assets.clean_text`）把形状钉死成"两份语言、各一串句子"，而这一栏是"一篇笔记的
@@ -56,6 +62,7 @@ KIND_LABELS = {
     KIND_HOME_BG: "首页默认背景图",
     KIND_PRESET_NOTE_IMAGE: "帮助文档那张配图",
     KIND_TIPS: "首屏那行 Tips",
+    KIND_ABOUT_INTRO: "关于那一段介绍",
     KIND_PRESET_NOTE: "帮助文档（官方那一篇）",
 }
 # 「这一栏空着的时候，小程序屏上是什么样」——后台那一页那两句话（"还没登记过这一栏"／"当前停用"）
@@ -65,6 +72,10 @@ KIND_LABELS = {
 # 两级都空＝白底），但那一处站长没指过，不在这一刀里顺手改。
 KIND_EMPTY_TEXTS = {
     KIND_PRESET_NOTE_IMAGE: "帮助文档那一篇不显示配图",
+    # 文案栏那两句话原先写死在网页模板里（"小程序用包里那六句"）。第二格文案栏一进来那句就不成立了
+    # ——关于那一屏不念"六句"，它落的是一段整话。与图片栏同一个出处，界面上只读这一份。
+    KIND_TIPS: "首屏那一行还是包里那六句轮着念",
+    KIND_ABOUT_INTRO: "关于那一屏用包里那段介绍",
 }
 
 

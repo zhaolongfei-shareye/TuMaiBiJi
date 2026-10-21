@@ -4,7 +4,8 @@ const { toneStyle } = require('../../utils/palette.js')
 const { CONTACT_EMAIL } = require('../../utils/contact.js')
 // 版本号、官网、公众号、介绍语——「我的」那一页现在也要说这几句，
 // 所以它们搬到 utils/appInfo.js 里只留一份。
-const { VERSION, SITE, OFFICIAL_ACCOUNT, introLead } = require('../../utils/appInfo.js')
+const { VERSION, SITE, OFFICIAL_ACCOUNT } = require('../../utils/appInfo.js')
+const mpAssets = require('../../utils/mpAssets.js')
 
 // 每条都写清"做什么"和"什么情况下做不到"。宁可写边界，不堆形容词：
 // 这些句子最后都要能拿代码对上，读者照着做不会撞墙。
@@ -245,7 +246,7 @@ function content(lang, skin) {
   const priv = lang === 'en' ? PRIVACY_EN : PRIVACY_ZH
   return {
     updatedAt: t('aboutUpdatedAt', lang),
-    introLead: introLead(lang),
+    introLead: mpAssets.introText(lang),
     infoRows: [
       { label: t('aboutVersionRow', lang), value: `v${VERSION}` },
       { label: t('officialSite', lang), value: SITE, copy: SITE },

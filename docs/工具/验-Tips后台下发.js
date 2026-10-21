@@ -33,15 +33,18 @@ const ASSETS = read('miniprogram/utils/mpAssets.js')
 const CREATE = read('miniprogram/pages/create/create.js')
 
 // ---------------- ① 两个 kind 闭集必须真的分开 ----------------
-ck('两份闭集真的分开：文案那一栏里不许出现图片 kind，图片那一栏里不许出现 KIND_TIPS',
-  /TEXT_KINDS\s*=\s*\(\s*KIND_TIPS\s*,?\s*\)/.test(MODEL)
+ck('两份闭集真的分开：文案那一栏里不许出现图片 kind，图片那一栏里不许出现任何文案 kind',
+  // 10-21 文案栏合法地有了第二栏（关于那一段），所以原来那句"TEXT_KINDS 里只有 KIND_TIPS"过期了。
+  // 守的还是同一件事：两个闭集不许互相串——串进去不报错，只会让后台画出一格点得动、
+  // 存进库、屏上永远读不到的口子（模型那段注释写的就是这个坏法）。
+  /TEXT_KINDS\s*=\s*\(\s*KIND_TIPS\s*,\s*KIND_ABOUT_INTRO\s*\)/.test(MODEL)
     // 10-18 图片栏合法地加了第二栏（官方那一篇的配图），所以原来那句"图片栏一个字都没加"过期了。
     // 这一条真正要守的是**别把文案混进图片栏**——混进去不会报错，只会让后台画出一格
     // "给一句话上传一张 JPEG"的口子，点下去存进库而屏上永远读不到（模型里那段注释就是这个）。
     && /KINDS\s*=\s*\(\s*KIND_HOME_BG\s*,\s*KIND_PRESET_NOTE_IMAGE\s*\)/.test(MODEL)
     // 锚点要认行首：`KINDS` 是 `TEXT_KINDS`／`NOTE_KINDS` 的后缀，不带 `^` 会把那两栏自己也扫进来，
     // 于是一条写对了的负向判据恒红（10-18 这条就是这么红的）。
-    && !/^KINDS\s*=\s*\([^)]*KIND_TIPS/m.test(MODEL),
+    && !/^KINDS\s*=\s*\([^)]*(KIND_TIPS|KIND_ABOUT_INTRO)/m.test(MODEL),
   '两份闭集')
 ck('KIND_LABELS 两栏都有中文名（页面标题只从这一处读，不许网页自己写一份）',
   /KIND_LABELS\s*=\s*\{[^}]*KIND_HOME_BG[^}]*KIND_TIPS/s.test(MODEL))
@@ -102,8 +105,11 @@ ck('下发把图片栏与文案栏一起遍历（少一边＝那一边永远拉�
 ck('冻结闸打开时两边一律回空（提审期挡的是整条运营改动，不只挡图）',
   /MP_ASSETS_FREEZE[\s\S]{0,160}?for kind in \(\*KINDS, \*TEXT_KINDS\)/.test(SVC))
 ck('客户端判重用 updated_at、落账只落 zh/en/updatedAt（没有 content_hash 那一格，也不许自己造一份）',
+  // ⚠ 10-21 键名按 kind 拼（两栏文案共用同一段落账代码），所以那句 `setStorageSync(TEXT_KEY, …)`
+  //   换成了 `setStorageSync(key, …)`。守的两件事一条没减：判重只看服务端那个时间戳、账里没有哈希格。
   /cached\.updatedAt === entry\.updated_at/.test(ASSETS)
-    && /wx\.setStorageSync\(TEXT_KEY, \{ zh: entry\.zh, en: entry\.en, updatedAt: entry\.updated_at \}\)/.test(ASSETS))
+    && /wx\.setStorageSync\(key, \{ zh: entry\.zh, en: entry\.en, updatedAt: entry\.updated_at \}\)/.test(ASSETS)
+    && !/MP_TEXT_KEY_\$\{kind\}.*contentHash/.test(ASSETS))
 ck('老包那条"没 content_hash 就不下载"仍在（这一句是兼容性本身，删了线上包就会拿文案当图下载）',
   // 10-18 这一句从一行 `continue` 长成了一段（服务端回 null 时要给官方那张撤账），
   // 守的还是同一件事：**没有 content_hash 的那一条绝不允许走到 `_download`**。
@@ -114,11 +120,13 @@ ck('老包那条"没 content_hash 就不下载"仍在（这一句是兼容性本
 ck('mpAssets 把文案单独一条分支落账，不挤进图片那个 kind 循环',
   /function _saveTexts/.test(ASSETS) && /_saveTexts\(config\)/.test(ASSETS))
 ck('服务端回 null（停用）时把本机账一起撤掉——只回 null 不撤账，这台机永远显示旧那份',
-  /function _saveTexts[\s\S]*?removeStorageSync\(TEXT_KEY\)/.test(ASSETS))
+  // 撤的是"这一栏自己那把键"，不是全部文案键：一栏停用不许把另一栏的账一起清掉。
+  /function _saveTexts[\s\S]*?removeStorageSync\(key\)/.test(ASSETS)
+    && /TEXT_KINDS\.forEach/.test(ASSETS))
 ck('serverTips 认得"数组是空也算没有"（空数组会让那一行整条消失）',
   /function serverTips[\s\S]*?Array\.isArray\(arr\) && arr\.length/.test(ASSETS))
-ck('pull / serverBgPath / serverPresetImage / serverTips 四个都出了口',
-  /module\.exports = \{ pull, serverBgPath, serverPresetImage, serverTips \}/.test(ASSETS))
+ck('pull / serverBgPath / serverPresetImage / serverTips / serverIntro / introText 六个都出了口',
+  /module\.exports = \{ pull, serverBgPath, serverPresetImage, serverTips, serverIntro, introText \}/.test(ASSETS))
 ck('tipsFor 是「下发优先、包里兜底」，顺序不许反过来写',
   /const remote = mpAssets\.serverTips\(lang\)[\s\S]*?const arr = remote \|\| t\('tips', lang\)/.test(CREATE))
 // 反向那一条是真会红的：把上一句的顺序写反（`t('tips', lang) || remote`），后台就永远改不动屏上那行字。
@@ -232,6 +240,48 @@ const NEW_CFG = {
     Object.keys(r2.store).join() === 'MP_ASSET_KEY_home_bg', `账上：${JSON.stringify(Object.keys(r2.store))}`)
   ck('两条一起：现网用户那侧最坏的读法也就是"这一栏没生效"，不是崩',
     r2.threw === null, r2.threw && String(r2.threw.message || r2.threw))
+
+
+// ---------------- ⑧ 第二格文案栏：关于那一段介绍（站长 10-21「放在后台配置」） ----------------
+ck('模型里注册了 about_intro：闭集、界面名、停用话术三处一起有（少一处就是后台画得出、屏上读不到）',
+  /KIND_ABOUT_INTRO\s*=\s*"about_intro"/.test(MODEL)
+    && /KIND_LABELS[\s\S]*?KIND_ABOUT_INTRO: "关于那一段介绍"/.test(MODEL)
+    && /KIND_EMPTY_TEXTS[\s\S]*?KIND_ABOUT_INTRO: "关于那一屏用包里那段介绍"/.test(MODEL))
+ck('服务端形状按栏分：TEXT_SPECS 一栏一条，整段那格是 paragraph 不是句子列表',
+  /TEXT_SPECS\s*=\s*\{[\s\S]*?KIND_TIPS:\s*\{\s*"shape":\s*"lines"/.test(SVC)
+    && /KIND_ABOUT_INTRO:\s*\{\s*"shape":\s*"paragraph"/.test(SVC)
+    && /def clean_text\(kind: str, value\)/.test(SVC) && /clean_text\(kind, value\)/.test(SVC))
+ck('两栏的上限各归各：整段那格不许共用 Tips 那个 48 字（共用＝他填自家那段被自家闸门挡在门外）',
+  /MAX_INTRO_CHARS\s*=\s*\d+/.test(SVC)
+    && Number((SVC.match(/MAX_INTRO_CHARS\s*=\s*(\d+)/) || [])[1]) >
+       Number((SVC.match(/MAX_TIP_CHARS\s*=\s*(\d+)/) || [])[1]))
+ck('加栏配了专门的迁移补那一行空值（不靠 setting_row 懒建，否则后台念成"这一栏不存在"）',
+  fs.readdirSync(path.join(ROOT, 'backend/alembic/versions')).some((f) => f.includes('about_intro_row')))
+ck('页面两种形状两套编解码都在：整段那格走 trim、绝不按换行切成一排短句',
+  /t\.shape === 'paragraph'/.test(PAGE) && /areas\[lang\]\.value\.trim\(\)/.test(PAGE)
+    && /'text:about_intro'/.test(PAGE))
+ck('客户端那串文案 kind 名单与服务端闭集逐条同序（少一条＝新栏永远落不了账）',
+  (() => {
+    const clientList = (ASSETS.match(/const TEXT_KINDS = \[([^\]]*)\]/) || ['', ''])[1]
+      .split(',').map((x) => x.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
+    const serverList = (MODEL.match(/TEXT_KINDS = \(([^)]*)\)/) || ['', ''])[1]
+      .split(',').map((x) => x.trim()).filter(Boolean)
+      .map((name) => (name.match(/"([^"]+)"/) ? RegExp.$1 : (MODEL.match(new RegExp(name + '\\s*=\\s*"([^"]+)"')) || [])[1]))
+    return clientList.length >= 2 && clientList.join() === serverList.filter(Boolean).join()
+  })(), `客户端 ${JSON.stringify((ASSETS.match(/const TEXT_KINDS = \[[^\]]*\]/) || [''])[0])}`)
+ck('整段那格落账认形状：是串才收、按数组给一律不收（收了就排成"一句一段"）',
+  /function _textShapeOk[\s\S]*?kind === 'about_intro'[\s\S]*?typeof entry\.zh === 'string'[\s\S]*?Array\.isArray\(entry\.zh\)/.test(ASSETS))
+ck('兜底顺序：缓存那段优先、包里那段兜底（写反＝后台怎么发都不生效，而且一句错都不报）',
+  /function introText\(lang\) \{ return serverIntro\(lang\) \|\| introLead\(lang\) \}/.test(ASSETS))
+ck('两处消费者都走同一枚 introText（「我的」里那一块与 pages/about；各写一遍就会两屏念两套）',
+  /introLead: mpAssets\.introText\('zh'\)/.test(read('miniprogram/pages/me/me.js'))
+    && /introLead: mpAssets\.introText\(lang\)/.test(read('miniprogram/pages/me/me.js'))
+    && /introLead: mpAssets\.introText\(lang\)/.test(read('miniprogram/pages/about/about.js')))
+ck('反向：两屏都不许再直接 import 包里那段当唯一出处（那样后台改了也读不到）',
+  !/introLead: introLead\(/.test(read('miniprogram/pages/me/me.js'))
+    && !/introLead: introLead\(/.test(read('miniprogram/pages/about/about.js')))
+ck('客户端不抄上限那枚数（抄一份就是两边各有一个数，改一边静默放过脏数据）',
+  !/MAX_INTRO_CHARS|MAX_TIP_CHARS/.test(ASSETS))
 
   console.log(`\nTips 后台下发（静态）：通过 ${n - bad.length} / ${n}`)
   if (bad.length) {

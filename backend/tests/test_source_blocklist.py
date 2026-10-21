@@ -480,6 +480,11 @@ class Test八_迁移接在那一头之后:
         两条断言各管一件事：**枚数**（链不许分叉）与**链尾是谁**。后一条红的时候不是 bug，
         是提醒——新挂一支迁移上来，链尾就换人了，跟着要一起改的是部署台账里那个"迁移头"，
         两处必须同一个数（现网那台跑的是哪一个头，只有它说得清）。
+
+        ⚠ 两条数**不是同一时刻改**：这一条钉的是**本地这棵链**的尾（写完迁移就得跟着改，
+        否则全量 pytest 一直红）；`docs/版本与发布现状.md` 里「迁移头 `alembic current`」那一行钉的是
+        **现网实读**的那一个，只有真跑过 `upgrade head` 才跟着改。没部署时两者差一支是正常的，
+        差两支就是漏了一趟部署。
         """
         heads = set()
         seen = {}
@@ -492,7 +497,7 @@ class Test八_迁移接在那一头之后:
         parents = {p for p in seen.values() if p}
         heads = {r for r in seen if r not in parents}
         assert len(heads) == 1, f"链分叉了，`upgrade head` 当场报重复：{sorted(heads)}"
-        assert heads == {"a4d7e2b91c58"}, \
+        assert heads == {"b7f2c4d9a310"}, \
             f"链尾换了（现网台账里那个迁移头要一起改）：{sorted(heads)}"
 
 

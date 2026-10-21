@@ -51,7 +51,7 @@ function featuresZh(src) {
 
 const appInfo = fs.readFileSync(APPINFO, 'utf8')
 const about = fs.readFileSync(ABOUT, 'utf8')
-const introZh = quoted(appInfo, 'zh:', 'INTRO_LEADS')
+const introZh = quoted(appInfo, 'zh:', 'const INTRO_LEADS')
 const feats = featuresZh(about)
 
 // 「四字段写死在种子里，不走模型」（§8.232 口径 3）：标题与那枚标签是这一条需求当场定的，

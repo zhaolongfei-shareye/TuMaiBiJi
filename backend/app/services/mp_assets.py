@@ -27,7 +27,9 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.errors import UserError
 from app.core.timefmt import _as_utc_iso
-from app.models.mp_asset import KINDS, KIND_EMPTY_TEXTS, KIND_LABELS, TEXT_KINDS, MpAsset, MpSetting
+from app.models.mp_asset import (
+    KINDS, KIND_ABOUT_INTRO, KIND_EMPTY_TEXTS, KIND_LABELS, KIND_TIPS, TEXT_KINDS, MpAsset, MpSetting,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -277,6 +279,23 @@ MAX_TIPS_ITEMS = 12
 MAX_TIP_CHARS = 48
 # 两份语言都得齐。只给一份就是后台漏填，客户端切过去会读到空数组 ⇒ 那一行整条消失（`wx:if="{{tips.length}}"`）。
 TIP_LANGS = ("zh", "en")
+# 「关于那一段介绍」整段的上限（站长 10-21 夜「关于里面，图麦笔记的介绍，放在后台配置」）。
+# ⚠ **这个数与 Tips 那两枚不是一套口径，别当"文案栏统一上限"读**：Tips 那一格屏上是
+# `.blk-tips-line { max-width: 9em }` 那只小盒子，48 字是被**盒子**逼出来的；这一格整段落进
+# 「关于」那张通栏卡里，卡跟着字长高，所以卡的是"别把那一屏撑坏"，不是"放不放得进盒子"。
+# 包里那段现读是中文 85 字／英文 264 字符，600 是给两种语言都留一倍以上余量——**故意不给中文
+# 单独收紧**：10-15 那次教训就是拿中文的数去卡英文，结果他填自家文案被自家闸门挡在门外。
+MAX_INTRO_CHARS = 600
+# 一栏一条：形状＋上限。`clean_text` 与后台那一页的话术、探针读的 `max_items`/`max_chars` 全从这张表读，
+# 不许在网页里再写一遍数（10-15 那条"上限跟着回体走，两处同一个出处"的口径不变，只是从共用变成按栏给）。
+TEXT_SPECS = {
+    KIND_TIPS: {"shape": "lines", "max_items": MAX_TIPS_ITEMS, "max_chars": MAX_TIP_CHARS},
+    KIND_ABOUT_INTRO: {"shape": "paragraph", "max_items": 1, "max_chars": MAX_INTRO_CHARS},
+}
+
+
+def text_spec(kind: str) -> dict:
+    return TEXT_SPECS[kind]
 
 
 def check_text_kind(kind: str) -> str:
@@ -290,21 +309,39 @@ def check_text_kind(kind: str) -> str:
     return kind
 
 
-def clean_text(value) -> dict:
-    """把送来的那份文案洗成唯一形状 `{"zh": […], "en": […]}`；任何不合格整份退回，不部分收。
+def clean_text(kind: str, value) -> dict:
+    """按那一栏自己的形状洗一遍；任何不合格整份退回，不部分收。
 
     整份退回而不是"收合格那几行"（卡片模板那条是收合格的）：文案是一轮播报的序列，
     丢一句就把顺序改了，界面上读出来的是"少一句且我不知道少了哪句"。宁可让后台红着。
+    两份语言都要齐这一条对两种形状都成立（少一份＝那一门读到空，屏上那一块直接没了）。
+
+    · `lines`（Tips）：`{"zh": [句子…], "en": [句子…]}`，1~max_items 句、每句 ≤max_chars 字。
+    · `paragraph`（关于介绍）：`{"zh": "一整段", "en": "…"}`，一段 ≤max_chars 字。
+      ⚠ 这一格**不接句子列表**：整段是"一次填完的一段话"，把它拆成数组会在客户端多一次 join，
+      而两处 join 的换行口径迟早对不上——形状钉死成串，回体里也就是串。
     """
+    spec = text_spec(check_text_kind(kind))
     if not isinstance(value, dict):
         raise UserError("文案要按语言给两份")
     out = {}
     for lang in TIP_LANGS:
-        lines = value.get(lang)
+        got = value.get(lang)
+        if spec["shape"] == "paragraph":
+            if not isinstance(got, str):
+                raise UserError(f"{lang} 那份要一整段文字")
+            text = got.strip()
+            if not text:
+                raise UserError(f"{lang} 那一段是空的")
+            if len(text) > spec["max_chars"]:
+                raise UserError(f"{lang} 那一段超过 {spec['max_chars']} 字：{text[:12]}…")
+            out[lang] = text
+            continue
+        lines = got
         if not isinstance(lines, list):
             raise UserError(f"{lang} 那份要是句子列表")
-        if not 1 <= len(lines) <= MAX_TIPS_ITEMS:
-            raise UserError(f"{lang} 那份要 1~{MAX_TIPS_ITEMS} 句")
+        if not 1 <= len(lines) <= spec["max_items"]:
+            raise UserError(f"{lang} 那份要 1~{spec['max_items']} 句")
         cleaned = []
         for s in lines:
             if not isinstance(s, str):
@@ -312,16 +349,23 @@ def clean_text(value) -> dict:
             t = s.strip()
             if not t:
                 raise UserError(f"{lang} 那份里有空句")
-            if len(t) > MAX_TIP_CHARS:
-                raise UserError(f"{lang} 有一句超过 {MAX_TIP_CHARS} 字：{t[:12]}…")
+            if len(t) > spec["max_chars"]:
+                raise UserError(f"{lang} 有一句超过 {spec['max_chars']} 字：{t[:12]}…")
             cleaned.append(t)
         out[lang] = cleaned
     return out
 
 
+def _text_summary(payload: dict) -> str:
+    """日志里那一句按这一栏自己的形状数：句子数还是字数。"""
+    if isinstance(payload.get("zh"), str):
+        return f"中文 {len(payload['zh'])} 字／英文 {len(payload.get('en') or '')} 字"
+    return f"zh {len(payload['zh'])} 句／en {len(payload.get('en') or [])} 句"
+
+
 def set_text(db: Session, kind: str, value) -> dict:
     check_text_kind(kind)
-    payload = clean_text(value)
+    payload = clean_text(kind, value)
     row = setting_row(db, kind, create=True)
     row.text_value = payload
     # 文案栏永远不指图片行。写死这一格，是为了让"两栏都填了一半"这种状态在库里无法存在——
@@ -329,7 +373,7 @@ def set_text(db: Session, kind: str, value) -> dict:
     row.asset_id = None
     db.commit()
     db.refresh(row)
-    logger.info("运营文案已生效 kind=%s（zh %d 句／en %d 句）", kind, len(payload["zh"]), len(payload["en"]))
+    logger.info("运营文案已生效 kind=%s（%s）", kind, _text_summary(payload))
     return payload
 
 
@@ -420,18 +464,27 @@ def admin_state(db: Session) -> dict:
         })
     # 文案栏单列一组，不混进上面那个 `kinds`：后台那一页的 `cardFor()` 整段假设一栏是一张图
     # （有文件框、有预览、有历史色块），文案要的是两栏 textarea。混在一起只会画出一个没用的图框。
-    # 上限跟着回体走，是为了让网页上那句"最多几句、每句几字"与服务层那两枚常量是同一个出处。
+    # 上限跟着回体走，是为了让网页上那句"最多几句、每句几字"与服务层那张表是同一个出处；
+    # ⚠ 10-21 起这份上限**按栏给**（`TEXT_SPECS`）：Tips 那一格是被 9em 那只小盒子卡的，
+    #   关于那一段是整段落进通栏卡，两个数不一样，共用一句"1~12 句、每句 48 字"就会把
+    #   他填自家那段介绍挡在门外（10-15 撞过的同一型：拿中文的数卡英文）。
     texts = []
     for kind in TEXT_KINDS:
         row = setting_row(db, kind)
+        spec = text_spec(kind)
+        value = row.text_value if row is not None else None
         texts.append({
             "kind": kind,
             "label": KIND_LABELS.get(kind, kind),
             "registered": row is not None,
             "frozen": settings.MP_ASSETS_FREEZE,
-            "current": row.text_value if row is not None else None,
-            "max_items": MAX_TIPS_ITEMS,
-            "max_chars": MAX_TIP_CHARS,
+            "current": value,
+            "shape": spec["shape"],
+            "max_items": spec["max_items"],
+            "max_chars": spec["max_chars"],
             "langs": list(TIP_LANGS),
+            # 停用／没登记过那两句的后半截（"屏上现在是什么样"）。不写死在网页里：网页那份
+            # 是从 Tips 一栏长出来的话，第二格文案栏照抄就对站长念半句假话（"那六句"）。
+            "empty_text": KIND_EMPTY_TEXTS.get(kind),
         })
     return {"kinds": kinds, "texts": texts, "frozen": settings.MP_ASSETS_FREEZE}
