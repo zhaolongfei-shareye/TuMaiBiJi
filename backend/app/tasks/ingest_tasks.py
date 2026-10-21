@@ -16,6 +16,7 @@ from app.services.ocr import ocr_images, title_hint
 from app.services.scraper import SiteHttpError, scrape_url
 from app.services.llm import extract_knowledge
 from app.services.queue import set_task_status
+from app.services.wechat import enforce_text_safety
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,55 @@ def _note_site_failure(url: str, status_code: int | None) -> None:
 def failure_message(exc: Exception) -> str:
     """只有 UserError 的文案是写给用户的；其余异常原文只进日志。"""
     return str(exc) if isinstance(exc, UserError) else GENERIC_TASK_ERROR
+
+
+class OcrTextBlocked(RuntimeError):
+    """截图 OCR 出来的字被判违规／需复核 ⇒ 这一篇不建（站长 10-22「接吧」）。
+
+    为什么不复用 `UserError`：`app.core.errors.UserError` 这一族在本模块里说的是
+    「图太大／识别不可用／图已损坏」（`ocr.py` 那四处），而 `failure_message` 按它是不是
+    `UserError` 决定给用户看原文还是通用那句。把"被内容安全拒了"也塞进同一族，
+    日志里两种成因就挤成一行了——同一条规矩见 `note_images.Blocked`。
+    屏上那句话仍用 `enforce_text_safety` 现成那两句中文，不为这一路新造文案。
+    """
+
+
+def _guard_screenshot_text(user_id: str, ocr_text: str) -> None:
+    """截图那条：OCR 那段字在**落库之前**过一遍内容安全。
+
+    站长 10-22 一句「接吧」接的就是这一条，撤的是 10-03 那句口径里"识别的原文保存时不检"那**一半**；
+    URL 抓取那条原文照旧不检（那一半他没松口，公开那一刻由 `shares.py` 那道闸兜），所以这个函数
+    只挂在 `process_screenshots_task` 上，不许顺手挪给另外两条。
+
+    为什么挂在 OCR 之后而不是 stage 那一刻：截图这条路的"图上的内容"只有 OCR 这一份读法，
+    而这一段字本来就要落进 `original_content` 与摘要——检它等于检这篇笔记的正文，一趟 OCR 都不多花。
+    排在提炼之前是为了**不为注定要被拒的笔记花掉混元那一趟**。
+
+    策略不另立一套，全吃 `enforce_text_safety`：真违规／需复核才拒，`unavailable` 放行
+    （微信侧抖动不许变成"用户存不了自己的笔记"），空白文本压根不送检（按次计配额）。
+    ⚠ 那条函数自己的窗口是 2,000 字 × 8 段＝一次最多检 16,000 字，超出部分它会在日志里写明"未送检"；
+    截图能读出五万字，所以"这一篇只检了前段"是这条链的已知边界，不是坏了。
+    """
+    if not ocr_text.strip():
+        return
+    # session 只开着取一枚 openid，**不横跨那次出网**：这条纪律在本文件里有前例（见 `_blocked`），
+    # 一次内容安全最长要等八段 HTTP，握着一个 WAL 读连接等外网等于替全网用户把这扇窗开着。
+    db = SessionLocal()
+    try:
+        user = db.get(User, int(user_id))
+        openid = (user.openid if user is not None else "") or ""
+    finally:
+        db.close()
+    if user is None:
+        # 号都没了就没"检不检"的问题：写笔记那一步自会按账号注销收口，这里不替它下结论。
+        return
+    if not openid:
+        logger.warning("截图这一趟没有可用的 openid，按没检成放行（这不是「图没问题」）：user=%s", user_id)
+        return
+    try:
+        enforce_text_safety(openid, ocr_text)
+    except UserError as exc:
+        raise OcrTextBlocked(str(exc)) from exc
 
 
 def credit_first_note(db, user_id: str, note: Note) -> None:
@@ -341,6 +391,8 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
         set_task_status(task_id, "processing")
 
         ocr_text = asyncio.run(ocr_images(images_data))
+        # 检在**降档那一岔之前**：降档建的那篇也把认出来的字写进摘要，所以两条岔口都要被这一句管住。
+        _guard_screenshot_text(user_id, ocr_text)
         if _meaningful_chars(ocr_text) < MIN_OCR_CHARS:
             # 站长 10-19「图片提炼无法识别文字不要直接报错，直接降档为贴图笔记，标题默认提取用户名称，
             # 组装成名称+图片笔记+日期+序号」，当天补的半句「字数少于 5 个字也一样降档，然后字自动写入
@@ -403,6 +455,13 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
         finally:
             db.close()
 
+    except OcrTextBlocked as exc:
+        # 这一条排在下面那个大闸**前面**，而且故意不走 `failure_message`：那两句中文是
+        # `enforce_text_safety` 现写的、本来就是讲给用户看的；`OcrTextBlocked` 不是 UserError，
+        # 走那条会退成「处理失败，请重新提交试试」——既没道理、又撺掇人再试一次（试一百次也还是违规）。
+        # 也不打栈：这是一次正常的拒绝，不是一次故障。
+        logger.warning("截图这一趟被内容安全挡下（不建笔记）：%s user_id=%s", exc, user_id)
+        set_task_status(task_id, "failed", {"error": str(exc)})
     except Exception as e:
         logger.exception("截图任务失败: %s: %s", type(e).__name__, e)
         set_task_status(task_id, "failed", {"error": failure_message(e)})

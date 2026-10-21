@@ -79,7 +79,9 @@ async def ingest_text(
     与 /url、/screenshots/process 唯一多出来的一步，是入队前先把这两段字过内容安全。
     worker 落库那条路不经过 notes 的 `_guard_manual_text`（那道闸按 source_type=manual
     才检，而它只在 HTTP 建笔记时跑），所以这一趟漏了就没有第二处会检——创建分享那道
-    只管"要公开"那一刻。抓取／截图两条不带这一步，是因为那两段是外部原文，不是用户写的。
+    只管"要公开"那一刻。截图那条**不在这里检**、改在 worker 里检（站长 10-22「接吧」，
+    见 `ingest_tasks._guard_screenshot_text`：那段字要等 OCR 跑完才存在，HTTP 这一刻手上只有图）；
+    URL 抓取那条原文仍然不检（他 10-03 那句口径的这一半没撤，公开那一刻由 shares 那道闸兜）。
     """
     title = payload.title.strip()
     content = payload.content.strip()
