@@ -86,8 +86,8 @@ const BRAND_GLYPH = '麦'
 const GRAY_ZERO_SAT = '#808080'
 
 // 站长 10-21 夜「规格卡和图文卡要放在同一行，可以把素宣放在个性款」⇒ 这两条 `group` 对调。
-// 只挪分组、不动数组位置：位置就是没收到下发时的那套 `ord`（见 templateList），
-// 所以这一屏上经典款仍是「图文卡、玉版宣、摘句、叠翠、规格卡」，个性款多了个素宣信笺。
+// 只挪分组、不动数组位置：位置就是没收到下发时的那套 `ord`（见 templateList），先后由那一列管，
+// 这里不写死顺序。改完是经典款五套（玉版宣、摘句、叠翠、规格卡＋下发的图文卡）、个性款六套（多了素宣信笺）。
 const TEMPLATES = [
   { id: 'card', label: '玉版宣', labelEn: 'Jade Paper', group: 'classic' },
   { id: 'quote', label: '摘句', labelEn: 'Verse Slip', group: 'classic' },
