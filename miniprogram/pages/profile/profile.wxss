@@ -1,8 +1,12 @@
-/* 分享形象页。头像这块是页面唯一的大色块，其余保持中性，免得抢小样的样子。 */
+/* 卡片市场。这一屏只剩两样：标题右侧那一枚「编辑卡片信息」，和下面那一排排货架。
+   原来摊在页面上的四格形象图、名称框、一句话框与那条「保存」全部收进弹窗
+   （标记在 templates/card-info-sheet.wxml，实现在 utils/cardInfo.js，与首页那一层同一份）。 */
 
 /* 左上角那行大字（站长 10-16 夜「左上角统一为该菜单名称，字体风格要统一」）。
    ⚠ 这一条与 `pages/categories/categories.wxss` 的 `.page-title` **四条声明逐字相同**——
-   他说的是"统一"，所以两边不许各写一份数；漂没漂由 `验-二级页左上角同档` 那把尺子钉着。 */
+   他说的是"统一"，所以两边不许各写一份数；漂没漂由 `验-二级页左上角同档` 那把尺子钉着。
+   10-21 这一行右边多了一枚按钮，所以它从"整页第一个块"变成"标题行的左半"——
+   行这一层的几何在 `.mk-head`，这一条一个字没动（动它就是动那五页同档的那一条）。 */
 .page-title {
   display: block;
   font-size: var(--fs-h1);
@@ -12,225 +16,43 @@
   margin: var(--sp-5) 0 var(--sp-4);
 }
 
-/* 四个形象槽：一行、左右滑。圆径 200 是按"两字芯片并排要 160 宽"倒推的最小档，
-   四槽 200×4 + 24×3 = 872 > 卡内宽，所以这一条必然要滑——站长 09-30 要的就是这个
-   （"效果图是一行，左右滚动，现在是两行，太占地方"）。外壳抄外观设置那排壁纸。 */
-.face-block {
+/* 标题行：左标题、右那一枚。`align-items:center` 而不是 baseline——右边那枚是个有高度的胶囊，
+   按基线对齐会把它顶到标题那一行的下沿上。 */
+.mk-head {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: var(--sp-4);
-}
-
-.slots-scroll {
-  width: 100%;
-  white-space: nowrap;
-}
-
-.slots {
-  display: inline-flex;
   flex-direction: row;
-  align-items: flex-start;
-  gap: var(--sp-3);
-  /* 底下这条留白是给芯片的：它们浮在圆的下沿外 4rpx，scroll-view 会裁掉越界的内层，
-     壁纸那一排的勾就是被这么切掉过。左右留 sp-3 是让第一枚不贴死卡的边。 */
-  padding: 0 var(--sp-3) 16rpx;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.slot {
-  position: relative;
+/* 「编辑卡片信息」：六个汉字，比这一屏原来那三块加起来都轻，所以不给实心色——
+   描边胶囊（与分享落地页底部那枚、首页那两枚芯片同一支语言），字号走 --fs-tiny 那一档。
+   右边留 8rpx 与下面那一排格子的内缩同一档（`.grid-inner` 那条注释说的就是这 8）。 */
+.mk-edit {
   flex: none;
-  width: 200rpx;
-}
-
-.disc {
-  width: 200rpx;
-  height: 200rpx;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--chip-idle);
-  border: var(--w-edge) solid var(--card-edge);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.slot.empty .disc {
-  border: 3rpx dashed rgba(35, 37, 44, 0.22);
-  background: transparent;
-}
-
-.disc-img {
-  width: 100%;
-  height: 100%;
-}
-
-.plus {
-  font-size: 64rpx;
-  font-weight: 300;
-  color: var(--text-tertiary);
-  line-height: 1;
-}
-
-/* 图上那两枚开关：贴在圆的下沿、一半压在外头。全压在照片里面的话，
-   人像的脸下面会糊一片底，反而看不清这一格挑的是谁。
-   字用 --fs-micro 18（现网最底一档），就是站长要的"按钮字体可以小点"。 */
-.chips {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -4rpx;
-  display: flex;
-  gap: 6rpx;
-  justify-content: center;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5rpx;
-  height: 34rpx;
-  padding: 0 11rpx;
+  margin-right: 8rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 20rpx;
   border-radius: var(--r-pill);
-  border: 2rpx solid rgba(35, 37, 44, 0.16);
-  background: rgba(255, 255, 255, 0.94);
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.24);
   color: var(--text-secondary);
-  font-size: var(--fs-micro);
-  font-weight: 700;
+  font-size: var(--fs-tiny);
+  font-weight: 600;
   white-space: nowrap;
 }
 
-.chip-dot {
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  border: 2rpx solid rgba(92, 96, 104, 0.45);
-  flex: none;
-}
+/* ---------- 货架：一组一条、左右滑 ---------- */
 
-.chip.on {
-  background: var(--accent);
-  color: var(--bg-page);
-  border-color: var(--accent);
-}
-
-.chip.on .chip-dot {
-  border-color: transparent;
-  background: var(--bg-page);
-  position: relative;
-}
-
-.chip.on .chip-dot::after {
-  content: "";
-  position: absolute;
-  left: 3.5rpx;
-  top: 1rpx;
-  width: 4rpx;
-  height: 8rpx;
-  border: solid var(--accent);
-  border-width: 0 2rpx 2rpx 0;
-  transform: rotate(42deg);
-}
-
-/* 右上角小垃圾桶：三段分开画（提手、盖、桶身）。
-   先前想用一条 ::after 同时当盖和提手，渲出来是一团糊的方块，认不出是什么。 */
-.bin {
-  position: absolute;
-  right: 2rpx;
-  top: 2rpx;
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 50%;
-  background: rgba(20, 22, 26, 0.72);
-  border: 2rpx solid rgba(255, 255, 255, 0.92);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.bin-glyph {
-  position: relative;
-  width: 18rpx;
-  height: 17rpx;
-}
-
-.bin-lid {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 4rpx;
-  height: 2rpx;
-  background: #fff;
-  border-radius: 1rpx;
-}
-
-.bin-lid::before {
-  content: "";
-  position: absolute;
-  left: 5rpx;
-  right: 5rpx;
-  top: -3rpx;
-  height: 2rpx;
-  background: #fff;
-  border-radius: 2rpx;
-}
-
-.bin-body {
-  position: absolute;
-  left: 2rpx;
-  right: 2rpx;
-  top: 6rpx;
-  bottom: 0;
-  border: 2rpx solid #fff;
-  border-top: none;
-  border-radius: 0 0 4rpx 4rpx;
-}
-
-.face-hint {
-  margin-top: var(--sp-4);
-  font-size: var(--fs-meta);
-  line-height: var(--lh-body);
-  color: var(--text-tertiary);
-  text-align: center;
-}
-
-/* ---------- 名称 / 一句话 ---------- */
-
-/* 站长 10-16 夜「名字，和一句话输入框太大了，变成一行……提示词放在框内提示，不单独一行」
-   ⇒ 每格只剩一只框：上面那行标签（原来那两条 `.field-label`）整行撤掉，提示留在框内
-   （`placeholder`）。`.field` 那枚 `gap` 是给"标签＋框"两样用的，现在一样都没了，跟着删——
-   留着不报错，但它是"看着有规则、其实一条都不生效"那一类。 */
-.field {
-  display: flex;
-  flex-direction: column;
-}
-
-/* 字号降一档：`--fs-title` 31 → `--fs-body` 28（这一条阶梯自己的下一档）。
-   ⚠ 只降输入的字，不降框内那句提示——提示吃 `.field-ph`，它本来就比正文浅一档。 */
-.field-input {
-  font-size: var(--fs-body);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.field-ph {
-  color: var(--text-tertiary);
-  font-weight: 400;
-}
-
-/* ---------- 模板格子 ---------- */
-
+/* 站长 10-21「经典款，个性款字体大一档」⇒ 24（--fs-meta）抬到 28（--fs-body），
+   就是这条阶梯的上一档，不另造数。加粗与字色照原样（他只点字号）。 */
 .grid-head {
   margin: var(--sp-4) 0 var(--sp-2);
-  font-size: var(--fs-meta);
+  font-size: var(--fs-body);
   font-weight: 700;
   color: var(--text-secondary);
 }
 
-/* 一组一条、左右滑（站长 10-01 晚：上下排成五行，「保存」被顶到页面最底下看不见）。
-   外壳抄这一页上面那排形象槽和分享页那排模板条：外壳只管横滚，格子内容不动。
-   上下各留 sp-2：选中那格描的是 3rpx 外环，scroll-view 会裁掉越界的内层——
-   壁纸那一排的勾就是被这么切掉过（结论写在 .slots 那条注释上）。 */
 .grid {
   width: 100%;
   box-sizing: border-box;
@@ -244,7 +66,7 @@
   align-items: flex-start;
   gap: var(--sp-3);
   /* 左右各留 8rpx 是给选中那一格的 3rpx 外环：scroll-view 按自己的盒子裁内层，
-     不留这一点首格（滚到底时是末格）那圈环会被削掉一边——和壁纸那排被切掉的勾同一件事。
+     不留这一点首格（滚到底时是末格）那圈环会被削掉一边。
      只留 8 不留 24：这一排的组名离容器边 24，横条再内缩 24 就成"标题和卡不对齐"了。 */
   padding: 0 8rpx;
 }
@@ -299,56 +121,8 @@
   background: var(--accent);
 }
 
-/* ---------- 保存 ---------- */
-
-/* 站长 10-01 真机：模板小样滚到下面那一排时把「保存」盖住了。
-   这不是 z-index 没写够——`type="2d"` 的画布是**原生层**，不按 CSS 的层级合成，
-   浮着的元素压不住它（同一条坑在详情浮窗那次是靠"画布不进 fixed"绕开的，
-   结论写在 share.wxss 的 .pick-on 与 docs/产品需求.md §8.60 附近）。
-   这一页十张画布都在流内，所以让按钮也回到流内：谁都不浮在谁上面，就没有谁盖谁。 */
-/* 保存上移之后它不在整页末尾了，原来那条 safe-area 底部留白撤掉（留着会在卡与预览
-   之间凭空多出一大段，屏幕上就是"这两块不是一组"）。 */
-.save-bar {
-  padding: var(--sp-2) 0 0;
-}
-
-/* 「保存」上移之后它不再是整页最后一样的了：现在末尾是最后一条模板小样。
-   原来那档 safe-area 底部留白跟着搬到这里——少了它，iPhone 上最后一排小样会压在横条上。 */
+/* 整页最后一样是最后一排小样：这一条留白是给 iPhone 底部那根横条的，
+   少了它最后一排格子会压在横条上（原来它挂在「保存」那一条上，10-01 那次搬过一次家）。 */
 .container {
   padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
-}
-
-/* 卡片预览分区头：一条虚线 + 小标 + 一句提示。虚线而不是实线——上面那几组卡片的
-   边界语言是描边实线，这里要读得出"分隔的是两块内容，不是一张卡的边"。 */
-.preview-head {
-  margin-top: var(--sp-5);
-  padding-top: var(--sp-3);
-  border-top: 2rpx dashed var(--card-edge);
-}
-
-.preview-title {
-  display: block;
-  font-size: var(--fs-meta);
-  font-weight: 700;
-  letter-spacing: 0.6rpx;
-  color: var(--text-secondary);
-}
-
-.preview-hint {
-  display: block;
-  margin-top: 6rpx;
-  font-size: var(--fs-label);
-  line-height: var(--lh-body);
-  color: var(--text-secondary);
-  opacity: 0.72;
-}
-
-.save-btn {
-  text-align: center;
-  padding: var(--sp-3) 0;
-  font-size: var(--fs-body);
-}
-
-.dim {
-  opacity: 0.45;
 }

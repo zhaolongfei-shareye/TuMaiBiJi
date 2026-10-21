@@ -1,89 +1,19 @@
+<import src="../../templates/card-info-sheet.wxml"/>
 <view class="container {{themeClass}}">
-  <!-- 站长 10-16 夜（附真机图）「左上角统一为该菜单名称，字体风格要统一」⇒ 这一屏原来左上角
-       什么都没有（页名只住在最顶上那一栏），现在补一行大字念它自己那一格的名字。
-       键吃 `navProfile`＝「我的」设置列表里那一行菜单用的同一枚（不新起字串）；
-       类名吃 `.page-title`＝分类管理那一屏同一枚类，四条声明逐字相同（两条路早晚漂一次）。
-       ⚠ 这一枚**不是**首屏那枚书法位图：他同一夜第二句定过"图只在有背景图状态下加"，
-       这一屏没有背景图那一态。 -->
-  <text class="page-title">{{t.navProfile}}</text>
-
-  <view class="card face-block">
-    <!-- 一行四个、左右滑。以前排成 2×2 是我自己拍的（两字芯片一行放不下四格），
-         站长 09-30 打回：效果图就是一行，两行太占地方。横滑这条外壳抄外观设置
-         那排壁纸（scroll-view + nowrap + 内层 flex），那条真机验过。 -->
-    <scroll-view id="slotsScroll" class="slots-scroll" scroll-x enhanced show-scrollbar="{{false}}">
-      <view class="slots">
-        <view wx:for="{{slots}}" wx:key="index" class="slot {{item ? 'filled' : 'empty'}}">
-          <view class="disc" data-i="{{index}}" catchtap="onTapSlot">
-            <image wx:if="{{item}}" src="{{item.path}}" mode="aspectFill" class="disc-img" />
-            <text wx:else class="plus">+</text>
-          </view>
-          <view wx:if="{{item}}" class="bin" data-i="{{index}}" catchtap="onDropSlot">
-            <view class="bin-glyph">
-              <view class="bin-lid"></view>
-              <view class="bin-body"></view>
-            </view>
-          </view>
-          <view wx:if="{{item}}" class="chips">
-            <view class="chip {{item.card ? 'on' : ''}}" data-i="{{index}}" data-role="card" catchtap="onToggleRole">
-              <view class="chip-dot"></view><text>{{t.slotCard}}</text>
-            </view>
-            <view class="chip {{item.bg ? 'on' : ''}}" data-i="{{index}}" data-role="bg" catchtap="onToggleRole">
-              <view class="chip-dot"></view><text>{{t.slotBg}}</text>
-            </view>
-          </view>
-        </view>
-      </view>
-    </scroll-view>
-    <view class="face-hint">{{allFull ? t.slotHintFull : t.slotHint}}</view>
+  <!-- 站长 10-21 一句「卡片模板改为"卡片市场"，进去后"卡片模板"改为"卡片市场"（类似商店货架形式），
+       之前的图片，名字，一句话都去掉。只保留按钮，按钮就是修改图片，名字和一句话的弹窗，
+       按钮名字"编辑卡片信息"，按钮放在卡片市场标题的右侧」。
+       · 两处叫法吃同一枚键 `navProfile`：「我的」菜单那一行与这一屏的大标题，一处改口另一处跟着改
+         （10-16 夜「左上角统一为该菜单名称」定的就是这一条，不新起字串）。
+       · 上面那三块（四个形象槽／名称框／一句话框）与那条「保存」整片撤掉，收进标题右侧那一枚按钮
+         拉起的那一层——层的标记在 templates/card-info-sheet.wxml，收数据与推格在 utils/cardInfo.js（与首页同一份）。
+       · 货架那一排（一组一条、左右滑着挑）的**结构一个字没换**：他还是按分组标题＋一排格子来认这一屏的，
+         下面 `.grid-head` 那两行字要大一档，也是同一句里点的。 -->
+  <view class="mk-head">
+    <text class="page-title">{{t.navProfile}}</text>
+    <view class="mk-edit" bindtap="onOpenCardInfo">{{t.editCardInfo}}</view>
   </view>
 
-  <!-- 站长 10-16 夜「名字，和一句话输入框太大了，变成一行……提示词放在框内提示，不单独一行」
-       ⇒ 那两行**标签**（`.field-label`）整行撤掉，一格只剩一只框；提示留在框内（`placeholder`
-       本来就是框内那一层，吃 `profileNamePh`／`profileSloganPh`，不是新造字串）。
-       撤的是这一屏这两处标签：`profileName`／`profileSlogan` 两个键在首页那张卡片小弹窗
-       （index.wxml 的 `.ci-label`）与分享页还在用，不是死键。
-       字数这一头本来就挡着：名称 `maxlength="16"`、一句话 `maxlength="24"`（出图那两把尺子
-       `验-海报模板几何`／`验-模板名称与占位字` 钉的就是打到这两条上限时卡片不溢出）。 -->
-  <view class="card field">
-    <input
-      class="field-input"
-      value="{{name}}"
-      maxlength="16"
-      placeholder="{{t.profileNamePh}}"
-      placeholder-class="field-ph"
-      bindinput="onNameInput"
-    />
-  </view>
-
-  <view class="card field">
-    <input
-      class="field-input"
-      value="{{slogan}}"
-      maxlength="24"
-      placeholder="{{t.profileSloganPh}}"
-      placeholder-class="field-ph"
-      bindinput="onSloganInput"
-    />
-  </view>
-
-  <!-- 保存上移（站长 10-01 深夜：原来它在整页最底下，人先看到那一排模板、
-       以为那一片也是设置区）。它下面整片是"成品预览"，另起一条分区头说明这是看的地方。
-       ⚠️ 这一条不许改回 position:fixed——下面那些格子是 type="2d" 画布（原生层），
-       fixed 的东西盖不住它，反而会被画布穿出来（那条历史坑见 docs/产品需求.md）。 -->
-  <view class="save-bar">
-    <view class="btn-primary save-btn {{saving ? 'dim' : ''}}" bindtap="onSave">{{t.save}}</view>
-  </view>
-
-  <view class="preview-head">
-    <text class="preview-title">{{t.previewTitle}}</text>
-    <text class="preview-hint">{{t.previewHint}}</text>
-  </view>
-
-  <!-- 模板小样：一组一条、左右滑着挑（站长 10-01 晚：原来是上下两列，十格排五行）。
-       承载方式抄笔记选模板那一排（share 页 .tpl-strip）与这一页上面那排形象槽：
-       scroll-view + nowrap + 内层 flex，两条真机都验过。格子本身一个字没改：
-       还是 320rpx 宽、画布仍按各自比例定高。 -->
   <block wx:for="{{groups}}" wx:for-item="g" wx:key="id">
     <view class="grid-head">{{g.label}}</view>
     <scroll-view class="grid" scroll-x enhanced show-scrollbar="{{false}}">
@@ -109,4 +39,9 @@
       </view>
     </scroll-view>
   </block>
+
+  <!-- 改名片那一层（图片／名称／一句话）：与首页成品弹窗里那枚入口同一份标记、同一份实现。
+       这一屏没有"背景图那一态"，所以 index.wxss 那条 `.container.has-bg .ci-card.glass-dialog`
+       的补皮不吃得到——遮罩与卡片那两层皮都在 app.wxss 全局那份里。 -->
+  <template is="cardInfoSheet" data="{{cardInfoOpen, ciSlots, ciName, ciSlogan, t}}"/>
 </view>

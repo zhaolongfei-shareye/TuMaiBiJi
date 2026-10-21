@@ -1,5 +1,8 @@
 const poster = require('../../utils/poster.js')
 const profileCloud = require('../../utils/profileCloud.js')
+// 改名片那一层（图片／名称／一句话）的标记在 templates/card-info-sheet.wxml，收数据与推格在
+// utils/cardInfo.js——站长 10-21 把这一屏上面那三块收进标题右侧那一枚按钮，走的就是首页同一份实现。
+const cardInfo = require('../../utils/cardInfo.js')
 const posterTemplates = require('../../utils/posterTemplates.js')
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
@@ -51,14 +54,12 @@ Page({
     lang: 'zh',
     t: texts('zh'),
     themeClass: '',
-    // 四个形象槽（null=空位，画那枚虚线 ➕）。这一块即时生效，不等下面的「保存」。
-    slots: poster.blankSlots(),
-    allFull: false,
-    name: '',
-    slogan: '',
+    // 挑中哪一套（点一格就当场落盘，见 onPickTemplate 那一条）
     template: 'card',
     groups: groupSkeleton('zh'),
-    saving: false,
+    // 弹窗那四个键（cardInfoOpen/ciSlots/ciName/ciSlogan）由 cardInfo.initial() 给初值：
+    // 页面自己写死一份就会与首页那一层漂开。
+    ...cardInfo.initial(),
   },
 
   onLoad() {
@@ -69,18 +70,13 @@ Page({
     poster.pruneAvatars()
     const lang = app.globalData.userInfo?.language || 'zh'
     const saved = poster.readProfile()
-    const slots = poster.readSlots()
     // 小样要等骨架落到视图层之后再画，否则按选择器取不到画布节点
     this.setData(
       {
         lang,
         t: texts(lang),
         themeClass: app.applyTheme(app.getWallpaper()),
-        name: saved.name || '',
-        slogan: saved.slogan || '',
         template: saved.template || poster.DEFAULT_TEMPLATE,
-        slots,
-        allFull: !slots.some((s) => !s),
         groups: groupSkeleton(lang),
       },
       () => this.renderThumbs()
@@ -117,11 +113,9 @@ Page({
   // 十格小样要的那份：名称/一句话/模板用这一页还没保存的输入，头像取「卡片」那张
   // （posterProfile 里现算，见 utils/poster.js 那条注释——直接 readProfile 会让小样没头像）
   draftProfile() {
-    return Object.assign(poster.posterProfile(), {
-      name: this.data.name,
-      slogan: this.data.slogan,
-      template: this.data.template,
-    })
+    // 这一屏不再有两只输入框，名称与一句话只住在 storage 里（`poster.posterProfile()` 读的就是那一份）；
+    // 改完那两格由弹窗的「保存」落盘，落盘之后 `_ciAfterChange()` 会重画这十格。
+    return Object.assign(poster.posterProfile(), { template: this.data.template })
   },
 
   async renderThumbs() {
@@ -196,114 +190,6 @@ Page({
     })
   },
 
-  // 落盘 + 同步界面。这一块即时生效（点芯片、删图都当场写），不像名称/一句话那样等
-  // 「保存」——因为删除那一步有二次确认，确认完还要等保存才真删，那句确认就是假话。
-  // 2.1：这一个是四格变动的**唯一出口**（放一张、换一张、勾角色、撤掉都走它），
-  // 所以登记也只挂在这里一处——挂到各按钮上就会漏掉某一条路，而漏掉的表现为"换台手机那格是空的"。
-  _commitSlots(next) {
-    // 存储写满时这一句会抛，抛了这一格其实没改：当场说实话、界面不动，不许留一句假的成功（N8）。
-    try {
-      poster.writeSlots(next)
-    } catch (e) {
-      console.error('形象图槽没存下', e)
-      wx.showToast({ title: t('avatarSaveFailed', this.data.lang), icon: 'none' })
-      return
-    }
-    this.setData({ slots: next, allFull: !next.some((s) => !s) })
-    this.renderThumbs()
-    profileCloud.pushSlots(next).then(() => {
-      // 刚传上去那几张的 `fileID` 只写回 storage、不在这一页的 data 里：不接回来，
-      // 下一次动任意一格都会把已有那几张**整批重传**一遍，而每一趟 PUT 都算一次"换下旧地址"
-      //（10-11 审计中④：两趟并发时后到的那份会把刚传的那个对象当旧的删掉）。
-      const fresh = poster.readSlots()
-      if (JSON.stringify(fresh) !== JSON.stringify(this.data.slots)) this.setData({ slots: fresh })
-    })
-  },
-
-  // 只有空槽响应整枚圆的点击。已经放了图的那一格，动作全在芯片和垃圾桶上，
-  // 点照片本身什么都不做——误一下就把在用的图换掉，代价太大。
-  onTapSlot(e) {
-    const i = Number(e.currentTarget.dataset.i)
-    if (!(i >= 0) || this.data.slots[i]) return
-    const { lang } = this.data
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      // 挑原图，不用微信那档 compressed：它给竖图只到 750 宽（实测存下来 750×1448），
-      // 而头部那一段是 `width:750rpx`＝整屏宽，真机 1116 物理像素，750 的源件被放大 1.49 倍
-      // ——站长 10-04 报的"底图看上去被拉伸"就是这一条。落盘前由 poster.mintAvatar
-      // 自己缩到 1440 宽（实测 300~500KB 一张），10MB 本机配额照样够四个槽用。
-      sizeType: ['original'],
-      success: async (res) => {
-        const temp = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
-        if (!temp) return
-        try {
-          this._commitSlots(poster.placeSlot(this.data.slots, i, await poster.mintAvatar(temp)))
-        } catch (err) {
-          console.error('形象图存不下来', err)
-          poster.dropUncommitted()
-          wx.showToast({ title: t('avatarSaveFailed', lang), icon: 'none' })
-        }
-      },
-      fail: (err) => {
-        console.error('选图失败', err)
-        if (((err && err.errMsg) || '').indexOf('cancel') >= 0) return
-        wx.showToast({ title: t('pickFailed', lang), icon: 'none' })
-      },
-    })
-  },
-
-  // 两个角色各自单选：点亮这一张的「卡片」，别的张那枚自己灭掉（takeRole 在 poster.js）。
-  // 再点一次已经亮着的那枚就是关掉它——关掉之后这个位置没人占，
-  // 不会自动挪给别的张（站长 09-30 拍板：不挪）。
-  onToggleRole(e) {
-    const { i, role } = e.currentTarget.dataset
-    const at = Number(i)
-    const cur = this.data.slots[at]
-    if (!cur) return
-    const key = role === 'card' ? 'card' : 'bg'
-    const next = cur[key]
-      ? this.data.slots.map((s, j) => (j === at ? Object.assign({}, s, { [key]: false }) : s))
-      : poster.takeRole(this.data.slots, at, key)
-    this._commitSlots(next)
-  },
-
-  onDropSlot(e) {
-    const at = Number(e.currentTarget.dataset.i)
-    const cur = this.data.slots[at]
-    if (!cur) return
-    const { lang } = this.data
-    // 删之前把后果说全：它要是正当着首页背景，删完首页就没有背景图了（§8.231 把包里那张硬编码的删了，露壁纸底色）——
-    // 这个跳变是当场看得见的，不提前讲一句，看起来像界面自己坏了。
-    // 中文每句自带句号，接着写就行；英文要留空格，不然 "uploaded.Your poster" 粘成一坨。
-    const parts = [t('slotDropBody', lang)]
-    if (cur.card) parts.push(t('slotDropWasCard', lang))
-    if (cur.bg) parts.push(t('slotDropWasBg', lang))
-    wx.showModal({
-      title: t('slotDropTitle', lang),
-      content: parts.join(lang === 'zh' ? '' : ' '),
-      confirmText: t('slotDropOk', lang),
-      cancelText: t('cancel', lang),
-      success: (res) => {
-        if (!res.confirm) return
-        const next = this.data.slots.slice()
-        next[at] = null
-        this._commitSlots(next)
-      },
-    })
-  },
-
-  // 改了名称/一句话，十格小样上印的还是旧的那一份——保存之后成品才变，预览就是骗人。
-  // 但逐字重画太贵（十张画布，每张都要重排一遍、解一遍头像），所以输入停下 400ms 画一次。
-  scheduleThumbs() {
-    if (this._thumbTimer) clearTimeout(this._thumbTimer)
-    this._thumbTimer = setTimeout(() => {
-      this._thumbTimer = null
-      this.renderThumbs()
-    }, 400)
-  },
-
   onUnload() {
     if (this._thumbTimer) clearTimeout(this._thumbTimer)
     // 四个槽那一块是即时落盘的，走到这里通常已经没东西可收；留着这一句是为了
@@ -311,43 +197,46 @@ Page({
     poster.dropUncommitted()
   },
 
-  onNameInput(e) {
-    this.setData({ name: e.detail.value })
-    this.scheduleThumbs()
-  },
-
-  onSloganInput(e) {
-    this.setData({ slogan: e.detail.value })
-    this.scheduleThumbs()
-  },
-
+  // 点一格就当场落盘。这一屏原来靠最上面那条「保存」把模板与名称/一句话一起写，
+  // 站长 10-21 那句「只保留按钮」把那条撤了 ⇒ 挑模板这一步不再有等它的那一次保存：
+  // 不当场写，人退出这一屏挑的那套就没了（那是**丢功能**，不是简化）。
+  // 名称与一句话不在这条上：它们在弹窗里，由那层的「保存」写（utils/cardInfo.js `onCiSave`）。
   onPickTemplate(e) {
-    this.setData({ template: e.currentTarget.dataset.id })
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.template) return
+    this.setData({ template: id })
+    try {
+      poster.writeProfile({ template: id })
+    } catch (err) {
+      console.error('这一套模板没记下', err)
+      return
+    }
+    profileCloud.pushText({ template: id })
   },
 
-  async onSave() {
-    if (this.data.saving) return
-    const { lang } = this.data
-    this.setData({ saving: true })
-    try {
-      const patch = {
-        name: (this.data.name || '').trim().slice(0, 16),
-        slogan: (this.data.slogan || '').trim().slice(0, 24),
-        template: this.data.template,
-      }
-      // 形象那一块不在这里：四个槽当场就写了，这一句只管名称/一句话/模板
-      poster.writeProfile(patch)
-      // 顺手登记名称与一句话（2.1）。不 await、不出声：这条链按设计与卡片留档同一条纪律——
-      // 附属品失败不许把"本机已经存好"这件事报成失败。没登记上时本机那一份照旧是对的，
-      // 代价是"换台手机这一格是空的"，而那由下一次进这一页再写一遍补回来。
-      profileCloud.pushText({ name: patch.name, slogan: patch.slogan, template: patch.template })
-      wx.showToast({ title: t('profileSaved', lang), icon: 'success' })
-      setTimeout(() => wx.navigateBack(), 900)
-    } catch (err) {
-      console.error('保存分享形象失败', err)
-      wx.showToast({ title: t('setFailed', lang), icon: 'none' })
-    } finally {
-      this.setData({ saving: false })
-    }
+  // ── 弹窗那一份实现的两个钩子（约定写在 utils/cardInfo.js 头上）
+  // 动过四格里任何一张：重画这十格小样（头像画在卡片上），并把四格推上云（2.1 那条链，
+  // 全仓只有这一页推——弹窗自己只写本机，不接这一句就是"换台手机那格是空的"）。
+  _ciAfterCommit() {
+    this.renderThumbs()
+    profileCloud.pushSlots(poster.readSlots()).then(() => {
+      // 刚传上去那几张的 fileID 只写回 storage：不接回来，下一次动任意一格都会把已有那几张
+      // 整批重传一遍，而每一趟 PUT 都算一次"换下旧地址"（10-11 审计中④）。
+      if (typeof this.setData === 'function') this.setData({ ciSlots: this._ciCaps(poster.readSlots()) })
+    })
+    return {}
   },
+
+  // 收窗且真动过：名称/一句话已经由 onCiSave 写进本机，这里补上云那一句＋重画十格。
+  _ciAfterChange() {
+    const saved = poster.readProfile()
+    profileCloud.pushText({
+      name: (saved.name || '').trim().slice(0, 16),
+      slogan: (saved.slogan || '').trim().slice(0, 24),
+      template: this.data.template,
+    })
+    this.renderThumbs()
+  },
+
+  ...cardInfo.handlers,
 })

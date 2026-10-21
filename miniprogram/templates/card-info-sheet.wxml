@@ -1,0 +1,66 @@
+<!-- 改名片那一层（屏上念「图片设置」）的标记，两页共用：首页成品弹窗里那枚入口、
+     与「卡片市场」标题右侧那枚「编辑卡片信息」（站长 10-21 一句「只保留按钮，按钮就是修改图片、
+     名字和一句话的弹窗……弹窗与之前的修改的弹窗一致，然后背景是毛玻璃」）。
+
+     这一份是从 pages/index/index.wxml 里整段搬过来的，几何、类名、数据键名、事件名一个字没改；
+     皮在 app.wxss（`.ci-*` 那一组，本来就是全局的，两页不必各自 @import），
+     毛玻璃挂在 `.ci-card.glass-dialog` 那一枚上（10-11 那张逐条裁定表 X4）。
+     收数据与推格在 utils/cardInfo.js——三个入口改的是同一份 storage，那份实现也只有一份。
+
+     数据键就吃各页自己 data 里那四个同名的（cardInfoOpen/ciSlots/ciName/ciSlogan），
+     由 `cardInfo.initial()` 给初值；事件名也是 index 原来那一套（onCiSlotTap/onCiReplace/onCiDrop/
+     onCiSetBg/onCiSetCard/onCiName/onCiSlogan/onCloseCardInfo）——模板只能按名字找页面自己的方法，
+     换名字就得两头一起改。
+
+     ⚠ 遮罩这一层**不绑收回**，只留 catchtap 挡穿透：站长 10-03 22:47 那两张真机图——点之前整层好好的，
+       一网点到下面那栏输入框，屏上就换回成品弹窗。收回只留「取消｜保存」两枚。
+       首页的根 `.container` 挂着 onBlankTap（点空白收搜索条），冒泡上去就会在"关掉这一层"的同时
+       把他打的词一起清掉，一次点击只干一件事。
+     ⚠ 那两只 input 的 `adjust-position` 必须关着（真机两轮 BUG，§8.106／§8.107）：微信只保证焦点框
+       不被压住，它不知道这张卡底下还有别的控件，一顶整页就把这种 fixed 浮层顶得跟原生输入层对不上。 -->
+<template name="cardInfoSheet">
+  <view wx:if="{{cardInfoOpen}}" class="ci-mask" catchtap="">
+    <view class="ci-card glass-dialog" catchtap="">
+      <text class="ci-title">{{t.cardInfo}}</text>
+      <text class="ci-hint">{{t.cardInfoHint}}</text>
+      <view class="ci-slots">
+        <view wx:for="{{ciSlots}}" wx:key="index" class="ci-slot">
+          <view class="ci-disc {{item.path ? 'ci-filled' : 'ci-empty'}}" data-i="{{index}}" catchtap="onCiSlotTap">
+            <image wx:if="{{item.path}}" src="{{item.path}}" mode="aspectFill" class="ci-img" />
+            <text wx:else class="ci-plus">+</text>
+            <text wx:if="{{item.path}}" class="ci-repl" data-i="{{index}}" catchtap="onCiReplace">{{t.cardReplace}}</text>
+          </view>
+          <view wx:if="{{item.path}}" class="ci-bin" data-i="{{index}}" catchtap="onCiDrop">
+            <view class="ci-bin-lid"></view>
+            <view class="ci-bin-body"></view>
+          </view>
+          <!-- 两枚角色芯片，次序照他 10-18 01:3x 那句念的顺序：先「背景」、后「头像」。 -->
+          <view wx:if="{{item.path}}" class="ci-bg {{item.bg ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetBg"
+            aria-label="{{item.bg ? t.slotBg : ''}}">
+            <view wx:if="{{item.bg}}" class="ci-tick"></view>
+            <text wx:else>{{t.slotBg}}</text>
+          </view>
+          <view class="ci-cap {{item.card ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetCard"
+            aria-label="{{item.card ? t.slotAvatar : ''}}">
+            <view wx:if="{{item.card}}" class="ci-tick"></view>
+            <text wx:else>{{item.cap}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileName}}</text>
+        <input class="ci-input" value="{{ciName}}" maxlength="16" placeholder="{{t.profileNamePh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiName" />
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileSlogan}}</text>
+        <input class="ci-input" value="{{ciSlogan}}" maxlength="24" placeholder="{{t.profileSloganPh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiSlogan" />
+      </view>
+      <view class="ci-acts">
+        <view class="ci-btn ghost" catchtap="onCloseCardInfo">{{t.cancel}}</view>
+        <view class="ci-btn pri" catchtap="onCiSave">{{t.save}}</view>
+      </view>
+    </view>
+  </view>
+</template>

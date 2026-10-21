@@ -2149,20 +2149,31 @@ function recipeSource(id) {
 // 得让站长点头，不能让服务端一次改名字就把「玉版宣」挪到列表末尾。
 // 下发里新出现的 id 排在尾巴上，按 sort_order 定点。
 function templateList() {
-  const out = TEMPLATES.map((x) => {
-    const r = REMOTE[x.id]
-    if (!r) return x
-    return { id: x.id, label: r.label, labelEn: r.label_en || r.label, group: r.group_key }
-  })
+  // 站长 10-21「图文卡，纳入经典款，第一个」把这条排法逼出来了：原来"下发里新出现的 id
+  // 一律排在尾巴上"，所以库里那一列 `sort_order` 只能排**下发新增的那几套之间**的先后，
+  // 排不到包内那十套前面去——光把图文卡那一行改成 5，界面上它还是经典款最后一格。
+  // 现在整份列表都吃 `sort_order`：包内那一套有下发行就用它的数，没有就按数组位置 ×10
+  // 定点（与种子那一列同一档间距），所以"一次下发都没收到"的那台机器顺序与旧版逐字相同。
   const known = TEMPLATES.map((x) => x.id)
+  const out = TEMPLATES.map((x, i) => {
+    const r = REMOTE[x.id]
+    if (!r) return { id: x.id, label: x.label, labelEn: x.labelEn, group: x.group, ord: (i + 1) * 10 }
+    return {
+      id: x.id, label: r.label, labelEn: r.label_en || r.label, group: r.group_key,
+      ord: r.sort_order == null ? (i + 1) * 10 : r.sort_order,
+    }
+  })
   Object.keys(REMOTE)
     .filter((id) => known.indexOf(id) < 0)
-    .sort((a, b) => ((REMOTE[a].sort_order || 0) - (REMOTE[b].sort_order || 0)) || (a < b ? -1 : 1))
     .forEach((id) => {
       const r = REMOTE[id]
-      out.push({ id, label: r.label, labelEn: r.label_en || r.label, group: r.group_key })
+      out.push({
+        id, label: r.label, labelEn: r.label_en || r.label, group: r.group_key,
+        // 没写这一列的新行落在最后：给一个比种子里任何一档都大的数，而不是 0（0 会把它顶到整排最前）
+        ord: r.sort_order == null ? Number.MAX_SAFE_INTEGER : r.sort_order,
+      })
     })
-  return out
+  return out.sort((a, b) => (a.ord - b.ord) || (a.id < b.id ? -1 : 1))
 }
 
 // ---------------------------------------------------------------- 入口

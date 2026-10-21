@@ -156,11 +156,13 @@ const i18n = {
     // 卡片模板页的形象图：四个槽，每槽自己带两枚开关——「卡片」= 画在卡片头像上，
     // 「背景」= 铺在首页与笔记页头部。两个角色各自单选，同一张可以两个都当。
     // 图只存在本机，不上传。
-    navProfile: '卡片模板',
+    // 站长 10-21 一句「卡片模板改为"卡片市场"」：菜单那一行与进去后那行大字吃的是同一枚键，
+    // 改一次两处一起改口（10-16 夜「左上角统一为该菜单名称」定的就是这一条）。
+    navProfile: '卡片市场',
+    // 标题右侧那一枚。他给的原话是「编辑卡片信息」，点开的是首页同一份那层（图片／名称／一句话）。
+    editCardInfo: '编辑卡片信息',
     slotCard: '卡片',
     slotBg: '背景',
-    slotHint: '四个位置，先点 ＋ 放一张图进来。图下面两枚开关：「背景」铺在首页、也垫在笔记页头部，「卡片」画在卡片头像上。',
-    slotHintFull: '四个位置都放满了。要换一张，先点哪张右上角的垃圾桶删掉一个。',
     slotDropTitle: '删掉这张',
     slotDropOk: '删掉',
     slotDropBody: '这张图会从这四个位置里去掉，只影响这台手机。',
@@ -175,8 +177,6 @@ const i18n = {
     profileSloganPh: '想印在图上的一句话，可不填',
     // 卡片模板页分区（站长 10-01 深夜：「保存」上移之后，下面那一块要读得出是成品样子，
     // 不是另一组还能设置的区域）。
-    previewTitle: '卡片预览',
-    previewHint: '下面是成品样子；改完记得点上面的保存。',
     profileSaved: '已保存',
     // 成品弹窗底下那枚「编辑个人名片」浮出来的一层（站长 10-03：出卡片这一屏要能就地改名片，
     // 不必绕去「我的→卡片模板」）。
@@ -584,11 +584,10 @@ const i18n = {
     wallpaperTip: 'Pick the look of the whole app',
     categoriesTip: 'How notes are grouped and ordered',
     privatePasswordTip: 'Locks notes you keep private',
-    navProfile: 'Card templates',
+    navProfile: 'Card market',
+    editCardInfo: 'Edit card info',
     slotCard: 'Card',
     slotBg: 'Home',
-    slotHint: 'Four slots. Tap + to add a photo, then pick its role below: Home lays it behind the home page and the head of the notes list, Card is the poster avatar.',
-    slotHintFull: 'All four slots are full. Delete one first, then add another.',
     slotDropTitle: 'Remove this photo',
     slotDropOk: 'Yes',
     slotDropBody: 'It is only stored on this phone — nothing is uploaded.',
@@ -599,8 +598,6 @@ const i18n = {
     profileNamePh: 'Your name or nickname',
     profileSlogan: 'One line',
     profileSloganPh: 'A line to print on the image, optional',
-    previewTitle: 'Card preview',
-    previewHint: 'This is the finished card. Tap Save above to apply.',
     profileSaved: 'Saved',
     editCard: 'Edit my card',
     cardInfo: 'Image settings',

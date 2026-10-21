@@ -1,6 +1,7 @@
 <!-- 私密密码那一层：解锁要看私密笔记时浮这一层（与「我的」设／改／重置那一层同一份标记、
      同一张皮，来历写在 templates/pwd-sheet.wxml 头里）。放在根节点外面，只声明不渲染。 -->
 <import src="../../templates/pwd-sheet.wxml"/>
+<import src="../../templates/card-info-sheet.wxml"/>
 <view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{detailOpen || templateOpen ? 'float-thru' : ''}}" bindtap="onBlankTap">
   <!-- v12（站长 10-01 拍）：图只守头部这一段 542，下面整块是一张圆角卡往上盖住它 40，
        于是接缝四个角都是弧——和「我的」页那张 sheet 同一画法、同一个量。
@@ -423,67 +424,9 @@
   </view>
 
   <!-- 「卡片上的信息」：站长 10-03 要的是出卡片这一屏就地改名片，不必绕去「我的→卡片模板」。
-       外壳照「我的」页密码那一层（宽 620、离顶 180），读写的就是那一页同一份数据
-       （utils/poster.js 的四槽与名称/一句话）。遮罩这一层 10-18 起不压暗、只糊
-       （`app.wxss` 的 `.ci-mask`：他那张真机图那句「不能突然压暗，要保存亮度，背景要变成毛玻璃」），
-       密码／邮箱那两层当时只撤暗、没补糊，这一层是三条里唯一挂滤镜的。
-       有图那一格下面两枚芯片＝两个角色（「卡片」／「背景」），实现同一份在 utils/cardInfo.js；
-       「背景」这一枚 10-18 起也在这一层（他那句「不需要跳到设置里面换」顶掉了原来"只留在那一页"）。 -->
-  <!-- 遮罩这一层不绑收回（站长 10-03 22:47 真机两张：点之前整层好好的，一网点到下面那栏输入框，
-       屏上就换回成品弹窗）。收回只留「取消｜保存」两枚：`cardInfoOpen` 只有两处写，那一拍
-       就是被这只 bindtap 收走的——键盘弹起那一下原生输入层与 webview 的落点对不上，
-       点输入框会被算成"点空白"。这一层只留 catchtap 挡穿透（不挡住会冒到 .container 的
-       onBlankTap，连带清掉搜索词），点空白不再收它。 -->
-  <view wx:if="{{cardInfoOpen}}" class="ci-mask" catchtap="">
-    <view class="ci-card glass-dialog" catchtap="">
-      <text class="ci-title">{{t.cardInfo}}</text>
-      <text class="ci-hint">{{t.cardInfoHint}}</text>
-      <view class="ci-slots">
-        <view wx:for="{{ciSlots}}" wx:key="index" class="ci-slot">
-          <view class="ci-disc {{item.path ? 'ci-filled' : 'ci-empty'}}" data-i="{{index}}" catchtap="onCiSlotTap">
-            <image wx:if="{{item.path}}" src="{{item.path}}" mode="aspectFill" class="ci-img" />
-            <text wx:else class="ci-plus">+</text>
-            <text wx:if="{{item.path}}" class="ci-repl" data-i="{{index}}" catchtap="onCiReplace">{{t.cardReplace}}</text>
-          </view>
-          <view wx:if="{{item.path}}" class="ci-bin" data-i="{{index}}" catchtap="onCiDrop">
-            <view class="ci-bin-lid"></view>
-            <view class="ci-bin-body"></view>
-          </view>
-          <!-- 两枚角色芯片，次序照他 10-18 01:3x 那句念的顺序：先「背景」、后「头像」。
-               原话「卡片上的信息，改为，图片设置 两个按钮，分别是背景，头像」——
-               「头像」就是原来那枚「卡片」（画在卡片头像上那一张），指的内容没换，只是叫法。 -->
-          <view wx:if="{{item.path}}" class="ci-bg {{item.bg ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetBg"
-            aria-label="{{item.bg ? t.slotBg : ''}}">
-            <view wx:if="{{item.bg}}" class="ci-tick"></view>
-            <text wx:else>{{t.slotBg}}</text>
-          </view>
-          <view class="ci-cap {{item.card ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetCard"
-            aria-label="{{item.card ? t.slotAvatar : ''}}">
-            <view wx:if="{{item.card}}" class="ci-tick"></view>
-            <text wx:else>{{item.cap}}</text>
-          </view>
-        </view>
-      </view>
-      <view class="ci-field">
-        <text class="ci-label">{{t.profileName}}</text>
-        <!-- adjust-position 关掉是抄「我的」页私密密码那一层（me.wxml:133）在他 iPhone 11 上
-             验过的口径：微信只保证焦点框不被压住，它不知道这张卡底下还有别的控件，
-             一顶整页就把这种 fixed 浮层顶得跟原生输入层对不上。这张卡离顶 180、高 789，
-             他这台键盘上沿在 965rpx——不顶也已经放得下，顶一下反而出事。 -->
-        <input class="ci-input" value="{{ciName}}" maxlength="16" placeholder="{{t.profileNamePh}}"
-          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiName" />
-      </view>
-      <view class="ci-field">
-        <text class="ci-label">{{t.profileSlogan}}</text>
-        <input class="ci-input" value="{{ciSlogan}}" maxlength="24" placeholder="{{t.profileSloganPh}}"
-          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiSlogan" />
-      </view>
-      <view class="ci-acts">
-        <view class="ci-btn ghost" catchtap="onCloseCardInfo">{{t.cancel}}</view>
-        <view class="ci-btn pri" catchtap="onCiSave">{{t.save}}</view>
-      </view>
-    </view>
-  </view>
+  <!-- 这一层的标记搬到 templates/card-info-sheet.wxml（10-21 起两页共用一份：这里与「卡片市场」标题
+       右侧那枚「编辑卡片信息」）。皮在 app.wxss 的 `.ci-*`，收数据与推格在 utils/cardInfo.js。 -->
+  <template is="cardInfoSheet" data="{{cardInfoOpen, ciSlots, ciName, ciSlogan, t}}"/>
 
   <!-- 微信图片面板那五枚按钮是半透明底，会把我们这一页透出来（站长 10-02 iPhone 11：
        "背景并没有全黑，看到后面杂乱无章"）。这一层盖在它底下那一页上：整屏纯黑，
