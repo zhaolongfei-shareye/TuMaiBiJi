@@ -304,21 +304,24 @@ async function main() {
       cs[3].querySelector('.tpltoggle').click();
       return new Promise(function (res) { setTimeout(function () { res(JSON.stringify(${FOLD})); }, 1800); }); })()`)
     say(`── 再点第四行（第二行应当自己合上）：${open2}`)
-    const back = await ev(`(() => { const cs = [...document.querySelectorAll('#tpls .card[data-id]')];
+    // 往格子里打一句"没保存的字"只在**本机那一份测试库**上做：现网那一趟一个字都不许进输入框。
+    // （它不发请求，但"在现网界面上留下过什么"这件事本身就不该发生。）
+    const back = LOCAL ? await ev(`(() => { const cs = [...document.querySelectorAll('#tpls .card[data-id]')];
       const inp = [...document.querySelectorAll('#tpls .tplbody:not(.hidden) input')];
       if (inp.length) { inp[0].value = '甲-自证没保存'; inp[0].dispatchEvent(new Event('input', { bubbles: true })); }
       return new Promise(function (res) { setTimeout(function () {
         const chip = cs[3].querySelector('.dirty');
         res(JSON.stringify({ 没保存的角标: chip ? chip.textContent : '(没有)', 角标在屏上: !!(chip && chip.offsetParent !== null) }));
-      }, 400); }); })()`)
-    say(`── 展开那一行里打一格字：${back}`)
+      }, 400); }); })()`) : null
+    if (LOCAL) say(`── 展开那一行里打一格字：${back}`)
     const close = await ev(`(() => { const cs = [...document.querySelectorAll('#tpls .card[data-id]')];
       cs[3].querySelector('.tpltoggle').click();
       return new Promise(function (res) { setTimeout(function () {
         res(JSON.stringify({ 折叠后角标还在: !!([...cs[3].querySelectorAll('.dirty')].find(function (x) { return x.offsetParent !== null })),
           那一格的字: (cs[3].querySelector('.tplbody input') || {}).value || '(没有框)' }));
       }, 400); }); })()`)
-    say(`── 合上那一行（刚打的字与角标都不许丢）：${close}`)
+    say(LOCAL ? `── 合上那一行（刚打的字与角标都不许丢）：${close}`
+      : `── 合上那一行（现网这一趟一个字没打过，只核折叠本身）：${close}`)
     await ev(`(() => { var b = document.getElementById('swOther'); if (b) b.click(); return 1; })()`)
     await sleep(1200)
     const other = await ev(`JSON.stringify({ 屏上可见卡: [...document.querySelectorAll('#main .view')].filter(function (v) { return v.offsetParent !== null }).map(function (v) { return v.id }).join(',') })`)

@@ -168,6 +168,26 @@ try {
     await shot(`${TAG}-${W}宽-${v}.png`)
   }
 
+  // 一栏一屏之后"某一栏多长"这件事只能逐条量：上面那一圈 `showView` 只落到每一栏的第一条。
+  // 这一段仍然只读——点的是左栏那 14 条，一枚写口都不碰。
+  const PER = `(() => {
+    const on = document.querySelector('#nav .navitem.on');
+    const c = on && document.querySelector('#main .card[data-key="' + on.getAttribute('data-key') + '"]');
+    const view = c && c.closest('.view');
+    const vis = view ? [...view.querySelectorAll('.card[data-key]')].filter((x) => x.offsetParent !== null).length : -1;
+    return JSON.stringify({ 条: on ? (on.textContent || '').trim() : '(没有选中条)', 可见带key卡: vis,
+      那张高: c ? Math.round(c.getBoundingClientRect().height) : -1,
+      文档高: Math.round(document.documentElement.scrollHeight), 屏: Math.round(document.documentElement.scrollHeight / window.innerHeight * 100) / 100 });
+  })()`
+  const nNav = await ev(`document.querySelectorAll('#nav .navitem').length`)
+  say(`\n══ 逐条点左栏那 ${nNav} 条（一栏一屏之后每一屏多长）`)
+  for (let i = 0; i < nNav; i++) {
+    await ev(`document.querySelectorAll('#nav .navitem')[${i}].click(); 1`)
+    await sleep(900)
+    const p = await parse(PER)
+    say(`   ${String(i + 1).padStart(2, '0')}. ${p.条}　这一屏 ${p.文档高}px ＝ ${p.屏} 屏　那一张 ${p.那张高}px　这一栏可见的卡 ${p.可见带key卡} 张${p.可见带key卡 === 1 ? '' : '　← 不是一栏一屏'}`)
+  }
+
   // 对面那一栏：图麦克。切过去之后**只看框里是什么态**，一个字都不输、一枚按钮都不点。
   say('\n══ 切到「图麦克」那一枚之后（只看，不碰）')
   try {
