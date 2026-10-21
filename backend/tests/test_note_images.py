@@ -15,6 +15,7 @@
 """
 import asyncio
 import io
+import logging
 import os
 import sys
 import time
@@ -734,7 +735,7 @@ class Test七_任务回体:
         statuses = []
         urls = [f"https://a.test/{i}.jpg" for i in range(12)]
 
-        async def fake_archive(images, user_id, limit, on_ready=None):
+        async def fake_archive(images, user_id, limit, on_ready=None, *, openid):
             kept = [note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u)
                     for i, u in enumerate(images[:limit])]
             for s in kept:
@@ -755,7 +756,7 @@ class Test七_任务回体:
         statuses = []
         urls = [f"https://a.test/{i}.jpg" for i in range(3)]
 
-        async def fake_archive(images, user_id, limit, on_ready=None):
+        async def fake_archive(images, user_id, limit, on_ready=None, *, openid):
             kept = [note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u)
                     for i, u in enumerate(images)]
             for s_ in kept:
@@ -792,7 +793,7 @@ class Test七_任务回体:
         statuses = []
         urls = ["https://a.test/1.jpg", "https://a.test/2.jpg"]
 
-        async def fake_archive(images, user_id, limit, on_ready=None):
+        async def fake_archive(images, user_id, limit, on_ready=None, *, openid):
             kept = [note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 2048 + i, 40, 30, False, u)
                     for i, u in enumerate(images)]
             for s_ in kept:
@@ -816,7 +817,7 @@ class Test七_任务回体:
         urls = [f"https://a.test/{i}.jpg" for i in range(3)]
         handed = []
 
-        async def fake_archive(images, user_id, limit, on_ready=None):
+        async def fake_archive(images, user_id, limit, on_ready=None, *, openid):
             for i, u in enumerate(images):
                 handed.append(u)
                 on_ready(note_images.Prepared(
@@ -847,3 +848,182 @@ def _make_user(db):
     db.commit()
     db.refresh(u)
     return u, None
+
+
+# ------------------------------------------------------------------ 八、图上的字（内容安全）
+# 站长 10-21「任何图文都要」⇒ 外链贴图这条链（后端本来就握着字节）在进桶之前读一遍字送 msgSecCheck。
+# 这一节把三条口径钉住：① 判违规的那一张**不许进桶**；② 四种"检不了"一律放行（开关关着／没有 openid／
+# OCR 自己抛了／微信那边没检成）——把抖动变成"存不下图"是现网最坏的误伤；③ 认不出字不送检（按次计配额）。
+# 反向钉的一条是日志形状：拦下的那张不许被写成"站点下不动"，否则以后没法归因。
+
+_RISKY = "线上赌场 六合彩 特码"   # 文字接口实测 risky label=20006（PRD §8.33），拿它当已知违规样本
+
+
+def _sec(monkeypatch, enabled=True):
+    monkeypatch.setattr(settings, "SEC_CHECK_ENABLED", enabled)
+
+
+def _stub_ocr(monkeypatch, text=_RISKY, raises=None):
+    seen: list = []
+
+    async def _fake(data):
+        seen.append(data)
+        if raises is not None:
+            raise raises
+        return text
+
+    monkeypatch.setattr(note_images, "ocr_image", _fake)
+    return seen
+
+
+def _stub_check(monkeypatch, verdict="risky"):
+    seen: list = []
+
+    def _fake(openid, content):
+        seen.append((openid, content))
+        return verdict
+
+    monkeypatch.setattr(note_images, "check_text", _fake)
+    return seen
+
+
+def _run_sec_archive(monkeypatch, fake, urls, openid="o" * 28):
+    return asyncio.run(note_images.archive(urls, "1", MAX_ASSETS_PER_NOTE, openid=openid))
+
+
+class Test八_图上的字:
+    def test_图上写着违规字时这一张不进桶(self, channel, monkeypatch):
+        url = "https://a.test/bad.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        _stub_ocr(monkeypatch)
+        checks = _stub_check(monkeypatch, "risky")
+        out = _run_sec_archive(monkeypatch, fake, [url])
+        assert not out.kept and out.failed == [url]
+        assert len(checks) == 1 and checks[0][1] == _RISKY
+        assert fake.posts == [], "拦下就不该往桶里传：传了就是公开页上摊着一张没人认的图"
+
+    def test_待人工复核那一档同样挡(self, channel, monkeypatch):
+        url = "https://a.test/maybe.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        _stub_ocr(monkeypatch)
+        _stub_check(monkeypatch, "review")
+        out = _run_sec_archive(monkeypatch, fake, [url])
+        assert not out.kept and out.failed == [url] and fake.posts == []
+
+    def test_判成正常时照常进桶(self, channel, monkeypatch):
+        url = "https://a.test/ok.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        _stub_ocr(monkeypatch)
+        _stub_check(monkeypatch, "pass")
+        out = _run_sec_archive(monkeypatch, fake, [url])
+        assert len(out.kept) == 1 and len(fake.posts) == 1
+
+    def test_认不出字时一次都不送检(self, channel, monkeypatch):
+        """msgSecCheck 按次计配额：一张纯风景图没有可检的东西，白打一趟就是白烧额度。"""
+        url = "https://a.test/plain.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        _stub_ocr(monkeypatch, text="   \n ")
+        checks = _stub_check(monkeypatch)
+        out = _run_sec_archive(monkeypatch, fake, [url])
+        assert checks == [] and len(out.kept) == 1
+
+    def test_开关关着时连OCR都不跑(self, channel, monkeypatch):
+        """整套用例默认 SEC_CHECK_ENABLED=false（conftest 显式关的，为的是不出网）——
+        这一条证的是"关了就连识字这一趟都省了"，而不是"照跑只是不看结果"。"""
+        url = "https://a.test/1.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch, enabled=False)
+        ocr_seen = _stub_ocr(monkeypatch)
+        checks = _stub_check(monkeypatch)
+        out = _run_sec_archive(monkeypatch, fake, [url])
+        assert ocr_seen == [] and checks == [] and len(out.kept) == 1
+
+    def test_没有openid时放行并留下一句实话(self, channel, monkeypatch, caplog):
+        """openid 是 msgSecCheck v2 的必填项，拿不到就只能算"没检成"。
+        但必须留一行 WARNING，否则「检了」与「根本没检」在日志里长得一模一样。"""
+        url = "https://a.test/1.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        ocr_seen = _stub_ocr(monkeypatch)
+        checks = _stub_check(monkeypatch)
+        with caplog.at_level(logging.WARNING, logger="app.services.note_images"):
+            out = _run_sec_archive(monkeypatch, fake, [url], openid=None)
+        assert len(out.kept) == 1, "缺 openid 是我们的问题，不该让一张好图存不下"
+        assert ocr_seen == [] and checks == []
+        assert any("openid" in r.getMessage() for r in caplog.records), "关掉这一趟不许不留痕"
+
+    def test_OCR自己抛了不许把好图判死(self, channel, monkeypatch):
+        """libGL／内存／模型这类基础设施故障走"没检成"，不走"这张图违规"。"""
+        url = "https://a.test/1.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        _stub_ocr(monkeypatch, raises=UserError("图片识别暂不可用，请稍后重试"))
+        checks = _stub_check(monkeypatch)
+        out = _run_sec_archive(monkeypatch, fake, [url])
+        assert len(out.kept) == 1 and checks == []
+
+    def test_微信没检成时这张照常存进去(self, channel, monkeypatch, caplog):
+        url = "https://a.test/1.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        _stub_ocr(monkeypatch)
+        _stub_check(monkeypatch, "unavailable")
+        with caplog.at_level(logging.ERROR, logger="app.services.note_images"):
+            out = _run_sec_archive(monkeypatch, fake, [url])
+        assert len(out.kept) == 1, "与文字那条同口径：unavailable 是「这次没检成」，不是「这图有问题」"
+        assert any("没检成" in r.getMessage() for r in caplog.records)
+
+    def test_送检的就是真进桶那一份字节(self, channel, monkeypatch):
+        """认字的对象必须是**要存进公开页的那一张**，不是下载下来的原件：
+        原件可能比它大一倍，压完才是用户实际会看到的那份像素。"""
+        import base64
+        url = "https://a.test/big.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(3000, 2000, quality=95))))
+        _sec(monkeypatch)
+        ocr_seen = _stub_ocr(monkeypatch)
+        _stub_check(monkeypatch, "pass")
+        out = _run_sec_archive(monkeypatch, fake, [url])
+        uploaded = base64.b64decode(fake.posts[0]["json"]["data"])
+        assert ocr_seen[0] == uploaded, "检的字节与存的字节分家＝检的是一张、存的另一张"
+        assert out.kept[0].size == len(uploaded)
+
+    def test_拦下的那张在日志里不许写成下不动(self, channel, monkeypatch, caplog):
+        """`Blocked` 是 `SkipImage` 的子类，except 顺序写反了行为不变、日志会变：
+        以后有人拿"下不动的那几张"算站点失败率，就会把拦下的违规图一起算进去。"""
+        url = "https://a.test/bad.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        _stub_ocr(monkeypatch)
+        _stub_check(monkeypatch, "risky")
+        with caplog.at_level(logging.INFO, logger="app.services.note_images"):
+            _run_sec_archive(monkeypatch, fake, [url])
+        msgs = [r.getMessage() for r in caplog.records]
+        assert any("内容安全" in m for m in msgs), f"拦下的一张都没标出来：{msgs}"
+        assert not any("没存上" in m for m in msgs), "违规图不许混进「站点下不动」那一族"
+
+
+class Test八之补_worker把真openid递下来:
+    def test_归档那一趟用的是库里的openid而不是user_id(self, db, monkeypatch):
+        """闸在 archive 里，但 openid 是 worker 现查的——这一条钉的是接线，不是闸。
+        传错成 user_id 的话微信回 40003＝没检成＝放行，整条链会绿着什么都不检。"""
+        user, _ = _make_user(db)
+        grabbed: dict = {}
+
+        async def spy(images, user_id, limit, on_ready=None, *, openid):
+            grabbed["openid"] = openid
+            return note_images.ArchiveResult(kept=[], failed=[], total=len(images))
+
+        monkeypatch.setattr(note_images, "archive", spy)
+        monkeypatch.setattr(note_images.settings, "IMAGE_STORE_CF_URL", CF_URL)
+        monkeypatch.setattr(note_images.settings, "IMAGE_STORE_CF_KEY", CF_KEY)
+        note = Note(user_id=str(user.id), title="外链篇", source_type="wechat_article")
+        db.add(note)
+        db.commit()
+        db.refresh(note)
+        scraped = {"images": ["https://a.test/1.jpg"], "author": "someone"}
+        ingest_tasks._archive_images(db, note, scraped, str(user.id))
+        assert grabbed.get("openid") == user.openid, f"递给内容安全的是 {grabbed.get('openid')!r}，不是那个人的 openid"

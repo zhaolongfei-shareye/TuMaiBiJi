@@ -3,8 +3,11 @@
 正本 `docs/方案-公众号贴图随笔记存档.md`（站长 10-18 夜拍的五句＋「加一条：支持来源」）。
 四条形状不许下一个人改错：
 
-1. **只存，不读内容。** 这些字节不进 OCR、不进摘要／要点／标签那一步（第 1 句「图片不需要提炼」），
-   所以这一整段发生在笔记已经建好、提炼已经出来**之后**。
+1. **只存，不提炼。** 这些字节不进摘要／要点／标签那一步（第 1 句「图片不需要提炼」），
+   所以那一部分发生在笔记已经建好、提炼已经出来**之后**。
+   ⚠ 10-21 起这一句**不再涵盖内容安全**：站长「任何图文都要」⇒ 每一张在进桶之前会被自家 OCR 读一遍字，
+   读出来的字送 `msgSecCheck`，判违规的那一张**不进桶**（见 `_guard_image_text`）。读字只为拦图，
+   认出来的字**一个都不入库、不进提炼**，所以"图片不需要提炼"那句承诺仍然原样成立。
 2. **通道与用户自己上传那一路完全同一个。** 对象进云开发那个桶、落在 `images/{userId}/{YYYYMMDD}/`
    那一层（与 `miniprogram/utils/cloudUpload.js` 同一条路径规则），账记进 `assets` 表，
    于是配额／私密闸／公开页露图／列表那排缩略图一行代码都不用为新功能重写。
@@ -16,6 +19,7 @@
    笔记照建、摘要照出，与现网"B 链任何一次失败都不该让笔记没存下来"同口径。
    但失败也不许静默：那一个数要交回任务回体，由界面上那句话说出来。
 """
+import asyncio
 import base64
 import io
 import logging
@@ -30,6 +34,8 @@ from PIL import Image
 from app.core.config import settings
 from app.services import scraper
 from app.services.llm import key_usable
+from app.services.ocr import ocr_image
+from app.services.wechat import check_text
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +71,15 @@ IMAGE_HEADERS = {
 
 class SkipImage(Exception):
     """这一张存不下（下载失败／不是图／占位图／传不上桶）。**只进日志，不进用户那句话**。"""
+
+
+class Blocked(SkipImage):
+    """这一张被内容安全挡下（图上的字判成违规或待人工复核）。
+
+    它是 `SkipImage` 的子类：站长定的第四条口径是「一张的失败不许变成整篇的失败」，
+    被拦下的那一张走的正是同一条形状（进 `failed`、笔记照在、屏上那句实话的数照加一）。
+    单独立一个名字只为一件事：日志里"下不动"与"被判违规"必须分得开，否则以后没法归因。
+    """
 
 
 @dataclass
@@ -286,8 +301,45 @@ async def _upload(client: httpx.AsyncClient, cloud_path: str, data: bytes) -> st
     return file_id
 
 
-async def archive(images: list[str], user_id, limit: int, on_ready=None) -> ArchiveResult:
-    """按文档顺序取前 `limit` 张，逐张下载→压→进桶。任何一张失败都不抛。
+async def _guard_image_text(openid, data: bytes, url: str) -> None:
+    """图上的字 → msgSecCheck。判违规就抛 `Blocked`，这一张不进桶。
+
+    四条形状都照着已有的文字闸走，不另立一套：
+
+    · **检不了不等于图有问题**：开关关着、拿不到 openid、OCR 自己抛了、微信那边没检成——
+      这四种一律放行，最多留一行日志。把微信侧的抖动变成「这张图存不下」是现网最坏的误伤。
+    · **认不出字就不送检**：msgSecCheck 按次计配额，一张纯风景图没有可检的东西。
+    · 送的是**压完那一份字节**（长边 ≤1920／预算 ≤500KB）：认字的对象正是真要进桶、
+      真要出现在公开页上的那一张，而不是下载下来的原件（原件可能比它大一倍）。
+    · `check_text` 里那趟是同步 HTTP，不许在 `async def archive` 的事件循环里直接跑，裹进 `to_thread`。
+    """
+    if not settings.SEC_CHECK_ENABLED:
+        return
+    if not openid:
+        logger.warning("贴图这一张没有可用的 openid，按没检成放行：url=%s", url[:120])
+        return
+    try:
+        text = await ocr_image(data)
+    except Exception as exc:
+        # OCR 挂了（libGL、内存、模型）是基础设施问题，不该让一张好图被判死
+        logger.warning("贴图这一张 OCR 没跑成，按没检成放行：%s: %s url=%s",
+                       type(exc).__name__, exc, url[:120])
+        return
+    if not text.strip():
+        return
+    verdict = await asyncio.to_thread(check_text, openid, text)
+    if verdict in ("risky", "review"):
+        raise Blocked(f"图上的字被判为{'违规' if verdict == 'risky' else '需人工复核'}（{verdict}）")
+    if verdict == "unavailable":
+        logger.error("贴图内容安全这一张没检成，照旧放行（这不是「图没问题」）：url=%s", url[:120])
+
+
+async def archive(images: list[str], user_id, limit: int, on_ready=None, openid=None) -> ArchiveResult:
+    """按文档顺序取前 `limit` 张，逐张下载→压→**读字送检**→进桶。任何一张失败都不抛。
+
+    `openid`：给内容安全用的那一个真人 openid（v2 的 `msgSecCheck` 必填，假串会被微信回 40003）。
+    拿不到就整段按「没检成」放行——与文字那条同一个口径，但**必须留一行 WARNING**，
+    否则"检了"与"根本没检"在日志里会长得一模一样。
 
     `on_ready(Prepared)`：这一张**已经进了桶**就当场回调一次。存图那一趟是给 `_archive_images`
     拿来登记 `assets` 行的，回调而不是"整批回来再登记"是因为顺序：对象已经占住真空间，
@@ -309,6 +361,7 @@ async def archive(images: list[str], user_id, limit: int, on_ready=None) -> Arch
                 data = await _download(client, url)
                 im, long_edge = _inspect(data)
                 shot = _encode(im, long_edge, (im.format or "").upper(), data)
+                await _guard_image_text(openid, shot.data, url)
                 file_id = await _upload(client, _cloud_path(user_id, shot.ext), shot.data)
                 prepared = Prepared(
                     file_id=file_id, mime=shot.mime, size=len(shot.data),
@@ -316,6 +369,11 @@ async def archive(images: list[str], user_id, limit: int, on_ready=None) -> Arch
                     over_budget=shot.over_budget, source_url=url,
                 )
                 result.kept.append(prepared)
+            except Blocked as exc:
+                # 这一条必须在 `except SkipImage` **前面**：Blocked 是它的子类，反过来的话
+                # 违规图会被记成「站点下不动」，日志里两种成因就再也分不开了。
+                logger.warning("贴图这一张被内容安全挡下（笔记照在）：%s url=%s", exc, url[:120])
+                result.failed.append(url)
             except SkipImage as exc:
                 logger.info("贴图这一张没存上（不影响笔记）：%s url=%s", exc, url[:120])
                 result.failed.append(url)

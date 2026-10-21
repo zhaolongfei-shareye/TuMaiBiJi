@@ -227,9 +227,15 @@ def _archive_images(db, note, scraped: dict, user_id) -> dict | None:
         nonlocal written
         written += note_images.register(db, note, [shot])
 
+    # 内容安全那一趟要一个**真人** openid（msgSecCheck v2 必填，假串微信回 40003＝没检成＝放行）。
+    # 这一路手上只有 user_id，所以现查一次；查不到就交空串，让 archive 里那条 WARNING 说实话，
+    # 而不是在这里悄悄把闸关掉。
+    db_user = db.get(User, int(user_id))
+    openid = (db_user.openid if db_user is not None else "") or ""
+
     try:
         result = asyncio.run(note_images.archive(
-            images, user_id, MAX_ASSETS_PER_NOTE, on_ready=_booked))
+            images, user_id, MAX_ASSETS_PER_NOTE, on_ready=_booked, openid=openid))
     except Exception:
         logger.exception("贴图整段没跑成（笔记已保存）：note=%s", note.id)
         return None
