@@ -210,9 +210,12 @@ ck('看大图给的是整排 urls，不是只给被点那一张（详情页与�
     && /const urls = list\.map\(\(x\) => x && x\.cloud_url\)/.test(VIEW))
 ck('缩略图定宽又定高 + aspectFill（只定宽用 widthFix 会被夹扁那条坑）',
   /mode="aspectFill"/.test(DETAIL_WXML) && /width: 180rpx;[\s\S]{0,40}?height: 180rpx/.test(read('miniprogram/pages/detail/detail.wxss')))
-ck('落地页那一排也是定宽定高 + aspectFill',
-  /mode="aspectFill"/.test(VIEW_WXML)
-    && /width: 150rpx;[\s\S]{0,40}?height: 150rpx/.test(read('miniprogram/pages/share/view.wxss')))
+/* 落地页这一排 10-21 照列表详情窗重画了：原来那排 150rpx 小方格整套撤掉，换成**通栏定高图区＋两层**。
+   钉的还是同一件事（"只定宽不定高会被夹扁"那条坑不许在这重犯），只是数从 150×150 换成 395 定高，
+   并且多钉一层：底那张糊掉铺满（aspectFill）、上面那张完整放进（aspectFit）——两层少一层就是"图被裁"或"四边露脏圈"。 */
+ck('落地页那一屏是通栏定高图区＋两层（底 aspectFill 铺满、上 aspectFit 完整放）',
+  /mode="aspectFill"/.test(VIEW_WXML) && /mode="aspectFit"/.test(VIEW_WXML)
+    && /\.sv-fig\s*\{[\s\S]{0,120}?height: 395rpx/.test(read('miniprogram/pages/share/view.wxss')))
 // 只看类体里那些"字段行"（四个空格 + 名字 + 冒号），docstring 里的中文行不算——
 // 直接对整段正则会被说明文字里那句"id / file_size / user_id"骗红（第一趟就是这么红的），
 // 而 `[\s\S]*?\n\n` 与 `(?:\n[ \t].*)*` 都会在 docstring 中间那个**空行**处截断
@@ -248,9 +251,11 @@ ck('配额那句说的是"全站"那一池，不写成"你的空间"',
   /全站/.test(DICT.zh.storageTip) && !/你的空间/.test(DICT.zh.storageTip), DICT.zh.storageTip)
 ck('栏名不叫"原始图片"（存下来的是压过的那一张）',
   !/原始/.test(DICT.zh.shotsLabel), DICT.zh.shotsLabel)
+// 落地页那族类名 10-21 起是 `.sv-sheet`/`.sv-fig`/...（原来那一族叫 `.sv-shots`，方格撤了名字跟着换）。
+// 这条钉的一直是"带页面前缀、不跟别的页面串"，不钉具体叫什么。
 ck('新写类名带页面前缀（dt- / sv- / me-storage），别的页面同名 class 不会串',
   /\.dt-shots/.test(read('miniprogram/pages/detail/detail.wxss'))
-    && /\.sv-shots/.test(read('miniprogram/pages/share/view.wxss'))
+    && /\.sv-sheet\s*\{/.test(read('miniprogram/pages/share/view.wxss'))
     && /\.me-storage/.test(read('miniprogram/pages/me/me.wxss')))
 
 /* ---------- 九、队列跑起来（不以正则为准：真把产品那份 require 进来打一遍） ---------- */

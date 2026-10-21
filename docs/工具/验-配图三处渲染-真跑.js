@@ -115,7 +115,14 @@ const dataAttr = async (el, name) => {
     nineFace.every((f, i) => i === 0 || f.left > nineFace[i - 1].left),
     nineFace.map((f) => f.left).join(','))
 
-  /* ================= 二、分享落地页那一排 ================= */
+  /* ================= 二、分享落地页那一屏 =================
+     10-21 这一屏照列表详情窗重画：原来那排 150rpx 小方格（`.sv-shot`）整套撤了，
+     换成**通栏大图轮播**（一格一张，底＝同照片糊掉、上＝aspectFit 完整放进）。
+     所以这一段的三条老判据（"两格方格""九格排一横排""点第 2 张拿第 2 个地址"）
+     前提没了，跟着改口径：数的还是那两张图，只是从"数方格"改成"数轮播格子＋那一排点"。
+     ⚠ 这里**不量 395rpx 那个绝对高**：模拟器那台设备的 rpx→px 系数这把尺子拿不到
+     （不猜 `mp.systemInfo()` 有没有这个口），定高那一条写在 wxss 里只有一处，
+     量"图区宽 > 高（通栏横条、没被夹成竖的）"与"两张格子一模一样大"这两条才是它管得住的。 */
   const view = await enter('/pages/share/view')
   await sleep(3000)
   await view.setData({
@@ -124,15 +131,35 @@ const dataAttr = async (el, name) => {
     share: { token: 'tok', title: '替身这一篇', author_name: '阿麦', key_points: [], assets: assets(2) },
   })
   await sleep(1200)
-  const sv = await view.$$('.sv-shot')
-  ck('落地页画出分享带着的那两张', sv.length === 2, `${sv.length} 个`)
-  const svBox = []
-  for (const el of sv) svBox.push(await face(el))
-  ck('落地页那两格也是方格（同一个坑不在这重犯一次）',
-    svBox.every((b) => b.w > 0 && Math.abs(b.w - b.h) <= 1), svBox.map((b) => `${b.w}x${b.h}`).join(' '))
+  const cells = await view.$$('.sv-fig-cell')
+  ck('落地页画出分享带着的那两张（轮播一格一张）', cells.length === 2, `${cells.length} 个`)
+  const cellBox = []
+  for (const el of cells) cellBox.push(await face(el))
+  const fig = await face(await view.$('.sv-fig'))
+  ck('图区是通栏横条（宽 > 高，且两张格子同宽同高）',
+    fig.w > fig.h && fig.h > 0 && cellBox.every((b) => b.w === cellBox[0].w && b.h === cellBox[0].h),
+    `图区 ${fig.w}x${fig.h}　格子 ${cellBox.map((b) => `${b.w}x${b.h}`).join(' / ')}`)
+  ck('两张就出那一排两枚点', (await view.$$('.sv-dot')).length === 2)
+  const cnt1 = await view.$('.sv-cnt-n')
+  ck('数字第一张念 1/2', cnt1 && (await cnt1.text()) === '1/2', cnt1 && await cnt1.text())
+  await view.callMethod('onFigChange', { detail: { current: 1 } })
+  await sleep(600)
+  const cnt2 = await view.$('.sv-cnt-n')
+  ck('划到第二张之后数字跟着走（同一个数，不是两处各写一遍）',
+    cnt2 && (await cnt2.text()) === '2/2', cnt2 && await cnt2.text())
+  const dotOn = await view.$$('.sv-dot.on')
+  ck('当前那一枚点换成横杠、只有一枚', dotOn.length === 1)
+  // `data-url` 挂在那张 aspectFit 的图上（`.sv-fig-img`），不在格子上——点的是它，看大图取的也是它。
+  const imgs = await view.$$('.sv-fig-img')
+  const url0 = imgs.length ? await dataAttr(imgs[0], 'url') : ''
+  ck('第 1 格带的就是第 1 个地址（点这张不许跳出另一张）', url0 === URLS[0], url0)
+  const url1 = imgs.length > 1 ? await dataAttr(imgs[1], 'url') : ''
+  ck('第 2 格带的是第 2 个地址（两格不许绑同一个）', url1 === URLS[1], url1)
   await view.setData({ share: { token: 'tok', title: '替身这一篇', assets: [] } })
   await sleep(800)
-  ck('这一篇没图时落地页那一排不出现', (await view.$$('.sv-shot')).length === 0)
+  ck('这一篇没图时整块都不出现（图区＋数字＋点，不留占位框）',
+    (await view.$$('.sv-fig')).length === 0 && (await view.$$('.sv-cnt')).length === 0
+    && (await view.$$('.sv-dot')).length === 0)
 
   /* ================= 三、「我的」那行脚注 ================= */
   const me = await enter('/pages/me/me')

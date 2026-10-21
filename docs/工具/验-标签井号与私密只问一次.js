@@ -32,7 +32,9 @@ ok('详情窗那一排每枚前面带 #（`#{{tg}}`，纯标记层，不改数�
   /class="ds-tag"[^>]*>#\{\{tg\}\}<\/text>/.test(idxW))
 ok('独立详情页那一排同样带 #', /class="tag"[^>]*>#\{\{tg\}\}<\/text>/.test(detW))
 ok('分享落地页那一排也带 #（他说的是"所有标签"，这一屏也是页面）',
-  /class="tag">#\{\{item\}\}<\/text>/.test(viewW))
+  // 10-21 这一屏照详情窗重画，类名从 `.tag` 换成 `.sv-tag`、循环变量从 `item` 换成 `tg`，
+  // 验的还是同一件事：# 在标记层逐枚加。
+  /class="sv-tag"[^>]*>#\{\{tg\}\}<\/text>/.test(viewW))
 ok('三处都还在各自的 wx:for 里（# 是逐枚加，不是在那一排前面加一枚总的）',
   (idxW.match(/wx:for="\{\{detailNote\.tags\}\}"/g) || []).length === 1
   && (detW.match(/wx:for="\{\{note\.tags\}\}"/g) || []).length === 1

@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
+const { TIP_DOT } = require('../../utils/palette.js')
 
 Page({
   data: {
@@ -11,6 +12,10 @@ Page({
     authorInitial: '',
     saving: false,
     saved: false,
+    // 通栏大图那一块是**滑动**的，当前第几张必须有状态（数字与那一排点都吃它）。
+    figAt: 0,
+    // 那枚小黄点的色只从 palette 出，不许抄进 wxss（与列表那扇详情窗同一条规矩）。
+    tipDotStyle: `background:${TIP_DOT}`,
   },
 
   async onLoad(options) {
@@ -41,7 +46,9 @@ Page({
       const share = await api.getShare(token)
       // 首字在 JS 里取：WXML 的表达式取不了 String.prototype.slice，
       // 而那个圆形色块上必须印昵称的第一个字。
-      this.setData({ share, authorInitial: (share.author_name || '').slice(0, 1), loading: false })
+      // figAt 一起归零：这一页可以被复用（好友那条与朋友圈那条开的都是本页），
+      // 不换 token 时它停在上一篇划到的那一张上，数字与点就跟着念错的张数。
+      this.setData({ share, authorInitial: (share.author_name || '').slice(0, 1), figAt: 0, loading: false })
       if (share.title) {
         wx.setNavigationBarTitle({ title: share.title })
       }
@@ -78,7 +85,12 @@ Page({
     }
   },
 
-  // 点缩略图看大图：urls 给整排，大图态里左右划能划完这一篇的图（与详情页同一个动作）。
+  // 划到第几张：那一枚「1/5」与下面那一排点都吃这一个数。
+  onFigChange(e) {
+    this.setData({ figAt: (e && e.detail && e.detail.current) || 0 })
+  },
+
+  // 点大图看全屏：urls 给整排，大图态里左右划能划完这一篇的图（与详情页同一个动作）。
   onPreviewShot(e) {
     const list = (this.data.share && this.data.share.assets) || []
     const urls = list.map((x) => x && x.cloud_url).filter(Boolean)

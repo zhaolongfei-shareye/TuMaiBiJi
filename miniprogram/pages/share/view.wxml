@@ -11,51 +11,88 @@
   <block wx:elif="{{share}}">
     <text class="eyebrow">{{t.sharedNote}}</text>
 
-    <view class="share-card">
-      <!-- 作者行：昵称是分享者自己在「分享形象」里填的，只在他主动分享的那一刻才对外可见 -->
-      <view wx:if="{{share.author_name}}" class="author-row">
-        <view class="author-mark">{{authorInitial}}</view>
-        <text class="author-name">{{t.authorLabel}}{{t.colon}}{{share.author_name}}</text>
-      </view>
+    <!-- 作者行留在窗外：这一行说的是"谁写的"，不是这一篇的内容，跟图二那一窗里没有对位的东西。
+         他这一句只说"形式改为图二"，没说撤作者，所以照旧在。 -->
+    <view wx:if="{{share.author_name}}" class="author-row">
+      <view class="author-mark">{{authorInitial}}</view>
+      <text class="author-name">{{t.authorLabel}}{{t.colon}}{{share.author_name}}</text>
+    </view>
 
-      <text class="card-title">{{share.title}}</text>
-
-      <!-- 分享带图（方案 §3.1.7）：清单是服务端在读这一页时现查的（routes/shares.py 的
-           _public_assets），只有 cloud:// 这一个字段从公开口出去。撤回分享之后整页 404，图跟着一起不见。
-           ⚠ 这一排画不画得出来**不取决于这一页公不公开**，取决于云开发存储的「读」权限那一档：
-           默认「仅创建者可读写」时，别人打开就是九格空白（站长 10-12 报的那条 BUG，10-12 由他在
-           控制台把读放开给所有用户）。所以这一排要出问题的话，先去看那一档，别先怀疑这条接口。 -->
-      <view wx:if="{{share.assets && share.assets.length}}" class="sv-shots">
-        <image wx:for="{{share.assets}}" wx:key="cloud_url"
-               class="sv-shot"
-               src="{{item.cloud_url}}" mode="aspectFill" lazy-load
-               bindtap="onPreviewShot" data-url="{{item.cloud_url}}" />
-      </view>
-
-      <text wx:if="{{share.summary}}" class="card-summary">{{share.summary}}</text>
-
-      <view wx:if="{{share.key_points && share.key_points.length}}" class="points">
-        <text class="section-label">{{t.keyPoints}}</text>
-        <view class="point-item" wx:for="{{share.key_points}}" wx:key="index">
-          <text class="point-num">{{index + 1}}</text>
-          <text class="point-text">{{item}}</text>
+    <!-- 这一整块照列表那扇详情窗（站长 10-21 附的图二）的排布重画：
+         标题 → 标签 → 通栏大图轮播（数字＋圆点）→ 摘要 → 核心要点（小黄点、不带序号）→ 来源链接。
+         数从 `pages/index/index.wxss` 的 `.ds-*` 那一份抄（同一把尺子），色仍写死成这一页的中性壳：
+         外人打开的，不吃用户壁纸。
+         ⚠ 三样图二有、这里**故意不画**：窗顶那行「左右滑动看下一篇／点一下收起」（落地页只有一篇，
+         划不走也没有可收起的东西）、正文与动作条之间那枚「显示更多」（公开快照里没有原文那一栏，
+         画一枚跳不到地方的按钮是假话）、抬头那行「分类·来源类型·时间」（这三栏都不在 `shares` 的
+         公开快照里，要画得先扩对外字段——那是数据口径，他没下过这一句）。 -->
+    <view class="sv-sheet">
+      <view class="sv-in">
+        <view class="sv-h2">{{share.title}}</view>
+        <view class="sv-tags" wx:if="{{share.tags && share.tags.length}}">
+          <text class="sv-tag" wx:for="{{share.tags}}" wx:key="*this" wx:for-item="tg">#{{tg}}</text>
         </view>
       </view>
 
-      <!-- 小程序打不开任意外链，所以"去看原文"= 复制链接，和详情页同一套动作 -->
-      <view wx:if="{{share.source_url}}" class="source" bindtap="copySource">
-        <text class="section-label">{{t.sourceLink}}</text>
-        <text class="source-url">{{share.source_url}}</text>
+      <!-- 配图：10-21 之前这一排是九格小方格（`.sv-shots`），现在换成图二那种通栏大图滑动。
+           两层画法与详情窗同源——底＝同一张放大 112% 且左上各外挪 6% 后糊掉（把模糊带出的半透明
+           渐隐圈推出盒子外），上＝按比例完整放进盒子那一张（aspectFit，不裁）。点上面那张还是拉全屏大图。
+           ⚠ 这一排画不画得出来**不取决于这一页公不公开**，取决于云开发存储的「读」权限那一档：
+           默认「仅创建者可读写」时，别人打开就是空白（站长 10-12 报的那条 BUG，当天由他在控制台放开）。
+           清单本身是服务端在读这一页时现查的（routes/shares.py 的 `_public_assets`），只有 `cloud_url`
+           这一个字段从公开口出去；撤回分享之后整页 404，图跟着一起不见。 -->
+      <block wx:if="{{share.assets && share.assets.length}}">
+        <swiper class="sv-fig" current="{{figAt}}" circular="{{false}}"
+          indicator-dots="{{false}}" bindchange="onFigChange">
+          <swiper-item wx:for="{{share.assets}}" wx:key="cloud_url" wx:for-item="im">
+            <view class="sv-fig-cell">
+              <image class="sv-fig-bg" src="{{im.cloud_url}}" mode="aspectFill" lazy-load />
+              <image class="sv-fig-img" src="{{im.cloud_url}}" mode="aspectFit" lazy-load
+                catchtap="onPreviewShot" data-url="{{im.cloud_url}}" />
+            </view>
+          </swiper-item>
+        </swiper>
+        <!-- 只有一张：数字与那一排点都不画（一条没有"下一张"的滑动条是噪音），与详情窗同一条口径。 -->
+        <view wx:if="{{share.assets.length > 1}}" class="sv-cnt">
+          <text class="sv-cnt-n">{{figAt + 1}}/{{share.assets.length}}</text>
+        </view>
+        <view wx:if="{{share.assets.length > 1}}" class="sv-dots">
+          <view wx:for="{{share.assets}}" wx:key="cloud_url" wx:for-item="im"
+            class="sv-dot {{index === figAt ? 'on' : ''}}"></view>
+        </view>
+      </block>
+
+      <view class="sv-in">
+        <view class="sv-lab" wx:if="{{share.summary}}">{{t.summaryLabel}}</view>
+        <view class="sv-para" wx:if="{{share.summary}}">{{share.summary}}</view>
+
+        <block wx:if="{{share.key_points && share.key_points.length}}">
+          <view class="sv-lab">{{t.keyPoints}}</view>
+          <view class="sv-pt" wx:for="{{share.key_points}}" wx:key="index" wx:for-item="kp">
+            <!-- 带圈序号 1 2 3 撤了（图二那一排就是小黄点、不显示序号：这四条是并列要点，不是步骤）。
+                 黄点的色从 palette.TIP_DOT 由 style 递进来，不抄进 wxss。 -->
+            <view class="sv-pt-dot" style="{{tipDotStyle}}"></view>
+            <view class="sv-pt-x">{{kp}}</view>
+          </view>
+        </block>
+
+        <!-- 小程序打不开任意外链，所以"去看原文"= 复制链接。链接下面那行小字是图二有的那句实话，
+             这一页原来没有：不说，人会以为是我们没做。 -->
+        <block wx:if="{{share.source_url}}">
+          <view class="sv-lab">{{t.sourceLink}}</view>
+          <view class="sv-link" catchtap="copySource">{{share.source_url}}</view>
+          <view class="sv-hint">{{t.linkHint}}</view>
+        </block>
+        <view class="sv-pad-b"></view>
       </view>
 
-      <view wx:if="{{share.tags && share.tags.length > 0}}" class="tags-row">
-        <text wx:for="{{share.tags}}" wx:key="*this" class="tag">#{{item}}</text>
+      <!-- 底部动作条：图二那一排是三枚（编辑／分享／删除），这一页换成他这一句点名的那一枚「存入笔记」。
+           抄的是这份公开快照，存进自己库之后来源那一栏永久留着。 -->
+      <view class="sv-dock">
+        <view class="sv-irow">
+          <view class="sv-ibtn {{saved ? 'done' : ''}}" catchtap="saveToMine">{{saved ? t.alreadySaved : (saving ? t.savingMine : t.saveToMine)}}</view>
+        </view>
       </view>
-    </view>
-
-    <!-- 转存：抄的是这份公开快照，存进自己库之后来源那一栏永久留着 -->
-    <view class="save-row {{saved ? 'done' : ''}}" bindtap="saveToMine">
-      <text class="save-text">{{saved ? t.alreadySaved : (saving ? t.savingMine : t.saveToMine)}}</text>
     </view>
 
     <view class="brand-row">

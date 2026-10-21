@@ -97,17 +97,19 @@ const txt = async (els) => {
     ck('落地页显示「原创作者：×××」', authorRow === `原创作者：${authorName}`, authorRow || '没找到 .author-name')
     const initial = (await txt(await page.$$('.author-mark'))).join('')
     ck('作者前面那个圆形标记取昵称第一个字', initial === [...authorName][0], `标记=${initial}`)
-    const saveText = (await txt(await page.$$('.save-text'))).join('|')
-    ck('落地页底部有「存到我的笔记」这颗按钮', saveText === '存到我的笔记', saveText)
+    // 10-21 这一屏照列表详情窗重画：那颗通栏墨底胶囊（`.save-row`/`.save-text`）挪进了底部动作条，
+    // 字也照他原话从「存到我的笔记」改成「存入笔记」。选择器与文案两处跟着改口径。
+    const saveText = (await txt(await page.$$('.sv-ibtn'))).join('|')
+    ck('落地页底部动作条里就是那枚「存入笔记」', saveText === '存入笔记', saveText)
     await mp.screenshot({ path: `${SHOT}/v1-落地页作者与按钮.png` })
 
     // ---- 真点一下转存 ----
     const before = await (await fetch(`${BASE}/api/notes/?limit=100`, { headers: H })).json()
-    await (await page.$('.save-row')).tap()
+    await (await page.$('.sv-ibtn')).tap()
     const done = await wait(async () => ((await page.data('saved')) ? 'y' : null), 20000, 700)
     ck('点一下之后按钮变成已存的状态', !!done, `saved=${await page.data('saved')}`)
-    const afterRow = (await txt(await page.$$('.save-text'))).join('|')
-    ck('按钮文案换成「已存到我的笔记」', afterRow === '已存到我的笔记', afterRow)
+    const afterRow = (await txt(await page.$$('.sv-ibtn'))).join('|')
+    ck('按钮文案换成「已存入笔记」', afterRow === '已存入笔记', afterRow)
     await mp.screenshot({ path: `${SHOT}/v2-点完转存.png` })
 
     const after = await (await fetch(`${BASE}/api/notes/?limit=100`, { headers: H })).json()

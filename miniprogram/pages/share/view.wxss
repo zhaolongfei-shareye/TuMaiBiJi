@@ -1,4 +1,8 @@
-/* 分享落地页：外人打开的，不吃用户壁纸，所以整套颜色写死成 V2 的中性壳。 */
+/* 分享落地页：外人打开的，不吃用户壁纸，所以整套颜色写死成 V2 的中性壳。
+   10-21 这一屏的**排布**照列表那扇详情窗重画（站长附的图二），但**色不跟**：详情窗那几档灰吃的是
+   `--text-tertiary`／`--accent-soft`，这两枚随四套莫兰迪与五档心情换底色的墨（app.wxss 里一份套一档），
+   借过来就成了"读者自己那套壁纸决定别人这篇的字色"。所以这里只借数（字号、行高、半径、间距、图区高），
+   色一律按这一页自己的墨 #23252c 现出 alpha——与详情窗同一档，只是钉死。 */
 .container {
   min-height: 100vh;
   box-sizing: border-box;
@@ -52,129 +56,6 @@
   margin-bottom: var(--sp-2);
 }
 
-.share-card {
-  background: #ffffff;
-  border: var(--w-edge) solid rgba(35, 37, 44, 0.1);
-  border-radius: var(--r-card);
-  padding: var(--sp-5) var(--sp-4) var(--sp-5);
-}
-
-.card-title {
-  display: block;
-  font-size: var(--fs-h1);
-  font-weight: 800;
-  line-height: var(--lh-tight);
-  letter-spacing: -1rpx;
-  color: #23252c;
-}
-
-.card-summary {
-  display: block;
-  font-size: var(--fs-body);
-  line-height: 1.68;
-  color: #3c4046;
-  margin-top: var(--sp-4);
-}
-
-.tags-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-1);
-  margin-top: var(--sp-5);
-}
-
-.section-label {
-  display: block;
-  font-size: var(--fs-label);
-  font-weight: 800;
-  letter-spacing: 2rpx;
-  color: #9a9ea6;
-}
-
-.points {
-  margin-top: var(--sp-5);
-}
-
-.point-item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-2);
-  margin-top: var(--sp-3);
-}
-
-.point-num {
-  flex: none;
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  background: #23252c;
-  color: #ffffff;
-  /* 与详情页那一格同一写法：纯数字吃全局那一档，只出 Thin 的字体不许留着 700 让系统假加粗 */
-  font-family: 'WtsjMind', 'Poppins', sans-serif;
-  font-size: 22rpx;
-  font-weight: 100;
-  text-align: center;
-  line-height: 40rpx;
-}
-
-.point-text {
-  flex: 1;
-  font-size: var(--fs-body);
-  line-height: 1.62;
-  color: #3c4046;
-}
-
-.source {
-  margin-top: var(--sp-5);
-  padding-top: var(--sp-4);
-  border-top: var(--w-edge) solid rgba(35, 37, 44, 0.1);
-}
-
-.source-url {
-  display: block;
-  margin-top: 10rpx;
-  font-size: var(--fs-meta);
-  line-height: 1.5;
-  color: #2e6bff;
-  word-break: break-all;
-}
-
-.tag {
-  font-size: var(--fs-tiny);
-  font-weight: 700;
-  color: #23252c;
-  background: rgba(35, 37, 44, 0.06);
-  padding: 8rpx 18rpx;
-  border-radius: 14rpx;
-}
-
-.brand-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-5) var(--sp-1) 0;
-}
-
-.brand-mark {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 18rpx;
-  background: #23252c;
-  color: #ffffff;
-  font-size: 26rpx;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
-.brand-text {
-  font-size: var(--fs-meta);
-  font-weight: 600;
-  color: #5c6068;
-}
-
 /* 作者行：昵称前面那个圆形色块是这一行唯一的装饰，墨底白字，和错误态那颗同源。 */
 .author-row {
   display: flex;
@@ -204,44 +85,242 @@
   color: #5c6068;
 }
 
-/* 转存按钮：通栏胶囊，和详情页那颗 btn-share 同一份量。 */
-.save-row {
-  margin-top: var(--sp-5);
-  height: 96rpx;
-  border-radius: 48rpx;
-  background: #23252c;
+/* ---------- 这一窗（照 `.float-sheet` 那一份的份量，挂在流里而不是 fixed） ---------- */
+.sv-sheet {
+  background: #ffffff;
+  border: var(--w-edge) solid rgba(35, 37, 44, 0.1);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+/* 内缩挂在内容层，不挂在窗自己身上：与详情窗那条同一写法（挂在带滚动的那一层上左右会不等宽）。
+   通栏那一段（配图）挂在这一层**外面**——34rpx 一让出去就不叫通栏了。 */
+.sv-in {
+  padding: 0 34rpx;
+}
+
+.sv-h2 {
+  padding-top: 34rpx;
+  font-size: 46rpx;
+  font-weight: 800;
+  letter-spacing: -0.9rpx;
+  line-height: 1.3;
+  color: rgba(35, 37, 44, 0.9);
+}
+
+.sv-tags {
+  margin-top: 14rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+/* 标签弱化那一档照抄（灰字、不加底色、不加粗）。撤了 padding 之后上下沿比原来矮 10rpx，
+   这一排的折行行距全靠上面 `.sv-tags` 那 10rpx gap 撑，动 gap 就成了"标签挤成一坨"。 */
+.sv-tag {
+  font-size: var(--fs-tiny);
+  color: rgba(35, 37, 44, 0.72);
+}
+
+/* 图区 高＝宽×0.5627 ⇒ 通栏 702rpx 配 395rpx（这数是 10-17 深夜照他附的视频号截图量的，不是挑的）。
+   定高，所以不会撞"只定宽不定高被夹扁"那一坑。 */
+.sv-fig {
+  width: 100%;
+  height: 395rpx;
+  margin-top: 24rpx;
+  background: rgba(35, 37, 44, 0.07);
+  overflow: hidden;
+}
+
+.sv-fig-cell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sv-fig-bg {
+  /* 外挪 6% ＋ 112%：模糊会把图自己边缘那一圈半透明渐隐带出来，不外推就露在图区四边上（读成"框了一条脏边"）。
+     高斯半径 30rpx 是"看得出是同一张照片糊了、又读不出第二张内容"那一档，要更糊只改这一个数。 */
+  position: absolute;
+  left: -6%;
+  top: -6%;
+  width: 112%;
+  height: 112%;
+  filter: blur(30rpx);
+}
+
+.sv-fig-img {
+  /* 高跟盒子走同一个数（395rpx 只在 `.sv-fig` 写一遍）：两处各写一遍就是两个落点。
+     aspectFit＝完整放进盒子、剩下的白交给底那一层铺。 */
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 数字那一枚照参考图：浅灰实底压白字。实测 1.84:1（远低于 UI 元素那道 3）——
+   详情窗那一枚当时就是"照抄不抬深"，这一页跟它同一档，要改两处一起改。 */
+.sv-cnt {
+  margin-top: 20rpx;
+  padding-right: 34rpx;
+  text-align: right;
+}
+
+.sv-cnt-n {
+  display: inline-block;
+  min-width: 78rpx;
+  height: 51rpx;
+  line-height: 51rpx;
+  text-align: center;
+  border-radius: var(--r-pill);
+  background: #BFBFBF;
+  color: #FFFFFF;
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.sv-dots {
+  margin-top: 22rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6rpx;
 }
 
-.save-row.done {
-  background: rgba(35, 37, 44, 0.12);
+.sv-dot {
+  width: 11rpx;
+  height: 11rpx;
+  border-radius: 50%;
+  background: #E4E4E4;
 }
 
-.save-text {
-  font-size: var(--fs-body);
+/* 当前那枚不是点，是横杠：只加宽，高度与圆点同一档，圆角跟着半径走 */
+.sv-dot.on {
+  width: 25rpx;
+  border-radius: 6rpx;
+  background: #191919;
+}
+
+.sv-lab {
+  margin-top: 30rpx;
+  font-size: var(--fs-label);
   font-weight: 800;
-  color: #ffffff;
+  letter-spacing: 1.6rpx;
+  color: rgba(35, 37, 44, 0.42);
 }
 
-.save-row.done .save-text {
-  color: #5c6068;
+.sv-para {
+  margin-top: 12rpx;
+  font-size: var(--fs-body);
+  line-height: 1.7;
+  color: rgba(35, 37, 44, 0.7);
+  /* 宿主是 `<view>`＝一个 div，默认会把串里的 `\n` 折成一个空格（详情窗同一坑，见 [[mp-view-folds-newline]]）。
+     库里那一份带着 `\n`，所以必须在渲染这一层认回来。 */
+  white-space: pre-wrap;
 }
 
-/* 分享带图那一排（方案 §3.1.7）：定宽**又**定高 + aspectFill，九张排成一行自动换行。
-   和详情页那一排同一个尺子，只是这一页的卡窄一些，方格也跟着小一档。 */
-.sv-shots {
+.sv-pt {
+  margin-top: 14rpx;
   display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  margin-top: var(--sp-3);
+  gap: 16rpx;
+  align-items: flex-start;
 }
 
-.sv-shot {
+.sv-pt + .sv-pt {
+  margin-top: 16rpx;
+}
+
+.sv-pt-dot {
   flex: none;
-  width: 150rpx;
-  height: 150rpx;
-  border-radius: var(--r-chip);
-  background: var(--accent-soft);
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  margin-top: 18rpx;
+}
+
+.sv-pt-x {
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: rgba(35, 37, 44, 0.9);
+}
+
+.sv-link {
+  margin-top: 12rpx;
+  font-size: var(--fs-meta);
+  color: #3F52D6;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+/* 链接下面那行小字：点了就是"已复制"，不说明的话人会以为是我们没做。 */
+.sv-hint {
+  margin-top: 8rpx;
+  font-size: var(--fs-tiny);
+  line-height: 1.5;
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.sv-pad-b {
+  height: 24rpx;
+}
+
+/* ---------- 底部动作条（图二那一排的位置，这一页只有一枚） ---------- */
+.sv-dock {
+  padding: 22rpx 30rpx 30rpx;
+}
+
+.sv-irow {
+  display: flex;
+  gap: 14rpx;
+}
+
+.sv-ibtn {
+  flex: 1;
+  height: 72rpx;
+  border-radius: var(--r-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: #23252C;
+  /* 描边 24% 墨：借详情窗 `.ds-ibtn.danger` 那一档现成的 alpha，不另造数。
+     这一页的卡是纯白，比详情窗那层 L78 浅面更亮，所以不能用 `--layer-edge`（那是随壁纸换的）。 */
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.24);
+}
+
+/* 已存态：字与那一圈一起降一档（与详情窗 `.ds-ibtn.disabled` 同一对数），位置不动、字不换行。 */
+.sv-ibtn.done {
+  color: rgba(35, 37, 44, 0.65);
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.12);
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-5) var(--sp-1) 0;
+}
+
+.brand-mark {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 18rpx;
+  background: #23252c;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.brand-text {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: #5c6068;
 }
