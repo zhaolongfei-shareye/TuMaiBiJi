@@ -1,0 +1,37 @@
+登进去了　http://127.0.0.1:8123/ops　视口 1440×900
+
+══ stats：8 张卡　整屏文档高 3626px ＝ 4.03 屏（一屏 900px）
+    1. 总量与这一段时间（overview）　高 445px ＝ 0.49 屏　顶在 181px → 要滚 0.2 屏才碰到
+       超过 60px 的那几块：DIV.krow 71px、DIV.krow 71px、DIV.krow 71px、DIV.krow 70px
+    2. 逐日（perday）　高 635px ＝ 0.71 屏　顶在 642px → 要滚 0.71 屏才碰到
+       超过 60px 的那几块：DIV.tw 525px
+    3. 来源分布（sources）　高 360px ＝ 0.40 屏　顶在 1293px → 要滚 1.44 屏才碰到
+       超过 60px 的那几块：DIV.tw 249px
+    4. 模板热度榜（templates）　高 312px ＝ 0.35 屏　顶在 1669px → 要滚 1.85 屏才碰到
+       超过 60px 的那几块：DIV.tw 181px
+    5. 分类与未分类（categories）　高 366px ＝ 0.41 屏　顶在 1997px → 要滚 2.22 屏才碰到
+       超过 60px 的那几块：DIV.krow 71px、DIV.krow 93px、DIV.krow 70px
+    6. 图片云备份健康度（assets）　高 366px ＝ 0.41 屏　顶在 2379px → 要滚 2.64 屏才碰到
+       超过 60px 的那几块：P.note 64px、DIV.krow 71px、DIV.krow 71px、DIV.krow 70px
+    7. 邀请对账（invites）　高 344px ＝ 0.38 屏　顶在 2760px → 要滚 3.07 屏才碰到
+       超过 60px 的那几块：DIV.krow 71px、DIV.krow 71px、DIV.krow 70px
+    8. 分享（shares）　高 273px ＝ 0.30 屏　顶在 3120px → 要滚 3.47 屏才碰到
+       超过 60px 的那几块：DIV.krow 71px、DIV.krow 70px
+
+══ config：5 张卡　整屏文档高 3974px ＝ 4.42 屏（一屏 900px）
+    1. 首页默认背景图（kind:home_bg）　高 473px ＝ 0.53 屏　顶在 181px → 要滚 0.2 屏才碰到
+       超过 60px 的那几块：DIV.hist 230px
+    2. 帮助文档那张配图（kind:preset_note_image）　高 821px ＝ 0.91 屏　顶在 670px → 要滚 0.74 屏才碰到
+       超过 60px 的那几块：IMG.big 320px、DIV.hist 230px
+    3. 首屏那行 Tips（text:tips）　高 569px ＝ 0.63 屏　顶在 1507px → 要滚 1.67 屏才碰到
+       超过 60px 的那几块：TEXTAREA.ta 120px、TEXTAREA.ta 120px
+    4. 帮助文档（官方那一篇）（note:preset_note）　高 1152px ＝ 1.28 屏　顶在 2093px → 要滚 2.33 屏才碰到
+       超过 60px 的那几块：P.note 64px、TEXTAREA.ta 120px、TEXTAREA.ta 120px、TEXTAREA.ta 120px、TEXTAREA.ta 120px、TEXTAREA.ta 120px
+    5. 来源黑名单（block:list）　高 481px ＝ 0.53 屏　顶在 3261px → 要滚 3.62 屏才碰到
+       超过 60px 的那几块：P.note 107px、DIV.tw 172px
+
+══ 切到「图麦克」那一枚之后（只看，不碰）
+   {"框在":true,"src":"/admin.html"，"同域读得到":true,"它的标题":""，"它的正文头":"{\"detail\":\"Not Found\"}"，"它的口令框":false,"它的存储键":[]}
+   我们这一侧存的：{"我们的会话键":{"opsSession":261},"我们的本地键":[]}
+
+未捕获异常 0 条

@@ -1,0 +1,64 @@
+登进去了　https://api.agentsbin.cn/wtsj/ops　视口 1440×900
+
+══ stats：8 张卡　整屏文档高 3716px ＝ 4.13 屏（一屏 900px）
+    1. 总量与这一段时间（overview）　高 445px ＝ 0.49 屏　顶在 163px → 要滚 0.18 屏才碰到
+       超过 60px 的那几块：DIV.krow 71px、DIV.krow 71px、DIV.krow 71px、DIV.krow 70px
+    2. 逐日（perday）　高 625px ＝ 0.69 屏　顶在 625px → 要滚 0.69 屏才碰到
+       超过 60px 的那几块：TABLE.dt 515px
+    3. 来源分布（sources）　高 315px ＝ 0.35 屏　顶在 1266px → 要滚 1.41 屏才碰到
+       超过 60px 的那几块：TABLE.dt 205px
+    4. 模板热度榜（templates）　高 474px ＝ 0.53 屏　顶在 1597px → 要滚 1.77 屏才碰到
+       超过 60px 的那几块：TABLE.dt 343px
+    5. 分类与未分类（categories）　高 366px ＝ 0.41 屏　顶在 2087px → 要滚 2.32 屏才碰到
+       超过 60px 的那几块：DIV.krow 71px、DIV.krow 93px、DIV.krow 70px
+    6. 图片云备份健康度（assets）　高 366px ＝ 0.41 屏　顶在 2469px → 要滚 2.74 屏才碰到
+       超过 60px 的那几块：P.note 64px、DIV.krow 71px、DIV.krow 71px、DIV.krow 70px
+    7. 邀请对账（invites）　高 344px ＝ 0.38 屏　顶在 2850px → 要滚 3.17 屏才碰到
+       超过 60px 的那几块：DIV.krow 71px、DIV.krow 71px、DIV.krow 70px
+    8. 分享（shares）　高 273px ＝ 0.30 屏　顶在 3211px → 要滚 3.57 屏才碰到
+       超过 60px 的那几块：DIV.krow 71px、DIV.krow 70px
+
+══ config：5 张卡　整屏文档高 4235px ＝ 4.71 屏（一屏 900px）
+    1. 首页默认背景图（kind:home_bg）　高 801px ＝ 0.89 屏　顶在 163px → 要滚 0.18 屏才碰到
+       超过 60px 的那几块：IMG.big 320px、DIV.hist 210px
+    2. 帮助文档那张配图（kind:preset_note_image）　高 801px ＝ 0.89 屏　顶在 981px → 要滚 1.09 屏才碰到
+       超过 60px 的那几块：IMG.big 320px、DIV.hist 210px
+    3. 首屏那行 Tips（text:tips）　高 569px ＝ 0.63 屏　顶在 1798px → 要滚 2 屏才碰到
+       超过 60px 的那几块：TEXTAREA.ta 120px、TEXTAREA.ta 120px
+    4. 帮助文档（官方那一篇）（note:preset_note）　高 1175px ＝ 1.31 屏　顶在 2384px → 要滚 2.65 屏才碰到
+       超过 60px 的那几块：P.note 64px、TEXTAREA.ta 120px、TEXTAREA.ta 120px、TEXTAREA.ta 120px、TEXTAREA.ta 120px、TEXTAREA.ta 120px
+    5. 来源黑名单（block:list）　高 428px ＝ 0.48 屏　顶在 3575px → 要滚 3.97 屏才碰到
+       超过 60px 的那几块：P.note 107px、TABLE.dt 119px
+
+══ tpl：20 张卡　整屏文档高 12738px ＝ 14.15 屏（一屏 900px）
+    1. 线上几套（tpl:list）　高 344px ＝ 0.38 屏　顶在 163px → 要滚 0.18 屏才碰到
+       超过 60px 的那几块：DIV.krow 71px、DIV.krow 71px、DIV.krow 70px
+    2. card（）　高 561px ＝ 0.62 屏　顶在 523px → 要滚 0.58 屏才碰到
+       超过 60px 的那几块：DIV.prev 233px
+    3. quote（）　高 520px ＝ 0.58 屏　顶在 1100px → 要滚 1.22 屏才碰到
+       超过 60px 的那几块：DIV.prev 192px
+    4. block（）　高 590px ＝ 0.66 屏　顶在 1636px → 要滚 1.82 屏才碰到
+       超过 60px 的那几块：DIV.prev 262px
+    5. block（）　高 590px ＝ 0.66 屏　顶在 2242px → 要滚 2.49 屏才碰到
+       超过 60px 的那几块：DIV.prev 262px
+    6. letter（）　高 641px ＝ 0.71 屏　顶在 2848px → 要滚 3.16 屏才碰到
+       超过 60px 的那几块：DIV.prev 313px
+    7. popGrid（）　高 639px ＝ 0.71 屏　顶在 3505px → 要滚 3.89 屏才碰到
+       超过 60px 的那几块：DIV.prev 311px
+    8. popGrid（）　高 639px ＝ 0.71 屏　顶在 4160px → 要滚 4.62 屏才碰到
+       超过 60px 的那几块：DIV.prev 311px
+    9. popDots（）　高 603px ＝ 0.67 屏　顶在 4815px → 要滚 5.35 屏才碰到
+       超过 60px 的那几块：DIV.prev 275px
+   10. popDots（）　高 603px ＝ 0.67 屏　顶在 5434px → 要滚 6.04 屏才碰到
+       超过 60px 的那几块：DIV.prev 275px
+   11. popDots（）　高 603px ＝ 0.67 屏　顶在 6052px → 要滚 6.72 屏才碰到
+       超过 60px 的那几块：DIV.prev 275px
+   12. acid（）　高 660px ＝ 0.73 屏　顶在 6671px → 要滚 7.41 屏才碰到
+       超过 60px 的那几块：DIV.prev 332px
+   另 8 张同类卡（660、674、674、625、625、603、592、592px）——**整屏就是被这一串同类卡撑长的**
+
+══ 切到「图麦克」那一枚之后（只看，不碰）
+   {"框在":true,"src":"/admin.html"，"同域读得到":true,"它的标题":"图麦克管理后台"，"它的正文头":"管理后台 / 图麦克 / 修改密码 退出登录"，"它的口令框":true,"口令框在屏上":false,"口令框所在块":"form-group"，"可见行数":145,"可见表行数":116,"可见大数字":1,"它的存储键":[]}
+   我们这一侧存的：{"我们的会话键":{"opsSession":261},"我们的本地键":["adminToken"]}
+
+未捕获异常 0 条

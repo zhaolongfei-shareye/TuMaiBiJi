@@ -174,6 +174,10 @@ button.mini.cur { background:var(--ink); color:#fff; border-color:var(--ink) }
    输入框比配置那一栏矮一档，是因为一屏要放十套，不是把它当次要内容。 */
 .tplhead { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap }
 .tplhead code { font:13px/1.5 ui-monospace,Menlo,monospace; color:var(--ink) }
+/* 一栏一屏（站长 10-21 拍甲）：这一栏 20 套全摊开实测 14.15 屏，改一套的名字要滚过十九张预览图。
+   默认只留这一行（代号＋状态＋"展开这一套"），点开才出预览与那四个框。
+   那一枚按钮靠右是因为它是这一行唯一的动词，挤在代号后面会被读成状态的一部分。 */
+button.tpltoggle { margin-left:auto; flex:none }
 .tag { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted) }
 /* "这一格里还有刚打进去、没保存的字"——屏上必须自己说出来。见下面 JS 里 DRAFTS 那一段：
    每一次保存都会重建整栏卡片，不垫这一句的话症状是"我刚才打的字没了，也没人告诉我"。 */
@@ -476,10 +480,17 @@ function showView(v) {
   ['stats', 'config', 'tpl', 'tumaike'].forEach(function (name) {
     $('view-' + name).classList.toggle('hidden', v !== name);
   });
+  // 切栏之后焦点必须落回这一栏自己的那一条。少了这一步的是顶部那枚「图麦笔记」：
+  // 它只 showView('stats')，而手上那把 FOCUS 可能是配置栏的 key —— 一栏一屏的藏法
+  // 会把数据栏那八张全藏掉，症状是"回来一片空白"。
+  if (v !== 'tumaike' && (!FOCUS || !$('view-' + v).querySelector('.card[data-key="' + FOCUS + '"]'))) {
+    showKey(VIEW_FIRST[v]);
+  }
 }
 
 // 左栏那一条是不是"当前在看的那一栏"，两路来源共用这一个口：点左栏，与滚到那张卡。
 var NAVKEYS = {};
+var VIEW_FIRST = {};
 function markNav(key) {
   var all = $('nav').querySelectorAll('.navitem');
   for (var i = 0; i < all.length; i++) {
@@ -497,61 +508,49 @@ function buildNav() {
     nav.appendChild(el('i', 'grp', g.grp));
     g.items.forEach(function (it) {
       NAVKEYS[it.key] = true;
+      if (!VIEW_FIRST[it.view]) VIEW_FIRST[it.view] = it.key;
       var b = el('button', 'navitem', it.label);
       b.type = 'button';
       b.dataset.key = it.key;
       b.addEventListener('click', function () {
         setProduct('self');
         showView(it.view);
-        // 必须限定在 `#main` 里找：这一枚按钮自己也带着 `data-key`（markNav 靠它认条），
-        // 整页查的话第一条命中的是**左栏这一条自己**——症状是"点「总览」只把页面挪了 42px，
-        // 然后滚动跟随把高亮改成别的这一栏"。10-21 本机探-左栏落点.mjs 量出来的：
-        // 点完落在那张卡文档位置 732 之外，那张卡本身高 32px（那是导航按钮，不是卡）。
-        var target = document.querySelector('#main [data-key="' + it.key + '"]');
-        if (target) target.scrollIntoView({ block: 'start' });
-        navLock = Date.now() + 700;
-        markNav(it.key);
+        showKey(it.key);
+        // 一栏一屏之后没有"滚过去"这回事了：那一栏就是屏上唯一的一张卡，回到顶就行。
+        window.scrollTo(0, 0);
       });
       nav.appendChild(b);
     });
   });
-  markNav(NAV[0].items[0].key);
   showView('stats');
+  showKey(NAV[0].items[0].key);
 }
 
-// 滚动跟随：主区那一屏实测 3,493／4,012／12,515 像素高，左栏 14 条的高亮要是停在「总览」不动，
-// "我现在看的是哪一栏"就只能滚回顶部读标题。rAF 节流一次，滚一格只算一遍。
-var VIEWS = ['stats', 'config', 'tpl', 'tumaike'];
-// 点完左栏那一条之后的一小段"别来抢"窗口：最后那两条（分享／来源黑名单）本来就滚不到顶
-// ——它下面没有那么多内容了。这时候滚动跟随会按"顶上那一张"重新判，把高亮挪到隔壁那一栏，
-// 症状是**我点了「来源黑名单」，下面划线的却是「帮助文档」**。落点已经尽力了，意图要留住。
-var navLock = 0;
-function currentView() {
-  for (var i = 0; i < VIEWS.length; i++) {
-    var v = $('view-' + VIEWS[i]);
-    if (v && !v.classList.contains('hidden')) return v;
+// 一栏一屏（站长 10-21 拍甲）。以前点一条只是把整组里那一张滚到顶上，整组还是摊在一列里——
+// 现网实测配置屏 4.71 屏、卡片模板屏 14.15 屏，改一句 Tips 要先滚过两张图片卡才碰到它。
+// 这一刀只作用在**左栏那 14 条各自对应的那张卡**上（NAVKEYS 那份名单）：卡片模板那一栏里
+// 那 20 行预览卡不带左栏 key，它们归那一栏自己管（默认折叠，见 tplCard），不许被这里一起藏掉。
+var FOCUS = '';
+function focusKey(key) {
+  FOCUS = key;
+  var all = document.querySelectorAll('#main .card[data-key]');
+  var hit = false;
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].dataset.key === key) hit = true;
   }
-  return null;
-}
-function spyNav() {
-  if (Date.now() < navLock) return;
-  var v = currentView();
-  if (!v) return;
-  var cards = v.querySelectorAll('.card[data-key]');
-  if (!cards.length) return;
-  var best = cards[0];
-  for (var i = 0; i < cards.length; i++) {
-    if (cards[i].getBoundingClientRect().top <= 140) best = cards[i]; else break;
+  // 那一张卡不在了就整组摊着，不许藏光：这一栏的卡是后端那几组 kind 决定的，
+  // 「新页配旧后端」或某一格没读出来时（见 render 里那三处 `|| []`），屏上一度会没有那张卡。
+  // 那时候把其余四张也藏掉的症状是"点这条之后主区全白"，比多滚两屏糟。
+  if (!hit) return;
+  for (var j = 0; j < all.length; j++) {
+    var k = all[j].dataset.key;
+    if (NAVKEYS[k]) all[j].classList.toggle('hidden', k !== key);
   }
-  // 认不出来的 key 一律不动高亮：宁可停在上一条，也不许把 14 条全清成"哪一栏都没选中"。
-  if (NAVKEYS[best.dataset.key]) markNav(best.dataset.key);
 }
-var spyPending = false;
-window.addEventListener('scroll', function () {
-  if (spyPending) return;
-  spyPending = true;
-  window.requestAnimationFrame(function () { spyPending = false; spyNav(); });
-});
+// 卡片是每次重画新建的，`hidden` 不会自己长回来 ⇒ 每一处重画末尾补一遍。
+function repaintFocus() { if (FOCUS) focusKey(FOCUS); }
+// 左栏那一条与主区那一张卡是同一件事的两半，共用这一个口：藏别的、把高亮挪过来。
+function showKey(key) { if (!key) return; focusKey(key); markNav(key); }
 
 $('btnLogin').addEventListener('click', function () {
   $('loginErr').textContent = '';
@@ -613,6 +612,7 @@ function render(state) {
   if (state.note) nbox.appendChild(noteCardFor(state.note));
   else if (state.note_error) nbox.appendChild(el('p', 'state off', state.note_error));
   resyncDirty();
+  repaintFocus();
 }
 
 // 一行一句 ⇒ 一句一串。空行丢掉：手打的时候都会留个尾换行，那不该变成一句空文案
@@ -1080,10 +1080,9 @@ function fieldInt(labelText, cls, value, cardKey, field) {
 var PREV = [];
 var PREVIEW_PROFILE = { name: '阿飞', slogan: '每天读一点', avatarPath: '' };
 
-function previewBox(r) {
+function previewBox() {
   var box = el('div', 'prev');
   box.appendChild(el('p', 'no', '预览：正在装载绘制引擎…'));
-  PREV.push({ box: box, row: r });
   return box;
 }
 
@@ -1131,21 +1130,49 @@ function paintPreviews() {
   });
 }
 
+// 折叠／展开只翻 `.hidden`，不重建卡片：重建会把刚打还没保存的那四格换掉（DRAFTS 能填回值，
+// 但那句"这一行一个字都没改"的判断读的是输入框现值，一次无谓重建就把它抹平了）。
+// 一次只开一套（站长 10-21 拍甲）：20 套全摊开实测 14.15 屏，摊开的两套会互相把对方顶出屏。
+var TPL_OPEN = null;
+function tplFold(card, open) {
+  var b = card.querySelector('.tplbody');
+  var t = card.querySelector('.tpltoggle');
+  if (!b || !t) return;
+  b.classList.toggle('hidden', !open);
+  t.textContent = open ? '收起这一套' : '展开这一套';
+  t.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!open) return;
+  // 点开才画：折叠态把二十张图全画一遍是白干，那一栏的预览每张要跑一次配方。
+  var box = card.querySelector('.prev');
+  if (!box || box._painted) return;
+  box._painted = true;
+  PREV.push({ box: box, row: card._row });
+  paintPreviews();
+}
+
 function tplCard(r) {
   var card = el('section', 'card');
   card.dataset.id = r.id;  // 重读之后还要找得到这一行（回执要落在它身上，见 loadTemplates 的 flash）
+  card._row = r;           // 展开时要按这一行重画预览
   var head = el('div', 'tplhead');
   head.appendChild(el('code', null, r.template_id));
   head.appendChild(el('span', 'tag ' + r.status, TPL_STATUS_LABEL[r.status] || r.status));
   head.appendChild(el('span', 'note', '分组 ' + r.group_key + '　hash ' + shortHash(r.content_hash)));
   card.appendChild(head);
   addDirtyChip(head);
-  card.appendChild(previewBox(r));
+  var btnOpen = el('button', 'mini ghost tpltoggle', '展开这一套');
+  btnOpen.type = 'button';
+  btnOpen.setAttribute('aria-expanded', 'false');
+  head.appendChild(btnOpen);
 
-  card.appendChild(el('p', 'state ' + (r.status === 'live' ? 'on' : 'off'),
+  var body = el('div', 'tplbody');
+  card.appendChild(body);
+  body.appendChild(previewBox());
+
+  body.appendChild(el('p', 'state ' + (r.status === 'live' ? 'on' : 'off'),
     r.status === 'live' ? '在线上：用户那道口能拿到这一套。'
       : (r.status === 'draft' ? '草稿：不下发，只有本地拿真机验的人看得见。' : '已下架：不再下发，但记录还在（历史行不许删）。')));
-  card.appendChild(el('p', 'note', '出图 ' + r.used + ' 张　其中当前挂着 ' + r.used_current + ' 张　' +
+  body.appendChild(el('p', 'note', '出图 ' + r.used + ' 张　其中当前挂着 ' + r.used_current + ' 张　' +
     '改完要等客户端下一次冷启才换；' + (r.updated_at ? '上次改动 ' + dayOf(r.updated_at) + '。' : '今天还没改过。')));
 
   var fZh = fieldInt('中文名', 'w2', r.label, 'tpl:' + r.id, 'label');
@@ -1155,15 +1182,22 @@ function tplCard(r) {
   var fields = el('div', 'fields');
   fields.appendChild(fZh.lab); fields.appendChild(fEn.lab);
   fields.appendChild(fSort.lab); fields.appendChild(fVer.lab);
-  card.appendChild(fields);
+  body.appendChild(fields);
 
   var msg = el('div', 'err');
-  card.appendChild(msg);
+  body.appendChild(msg);
   var row = el('div', 'row');
   var btnSave = el('button', null, '保存这几项');
   var btnSt = el('button', r.status === 'live' ? 'danger' : 'ghost', r.status === 'live' ? '下架这一版' : '上架这一版');
   row.appendChild(btnSave); row.appendChild(btnSt);
-  card.appendChild(row);
+  body.appendChild(row);
+
+  btnOpen.addEventListener('click', function () {
+    var open = TPL_OPEN !== String(r.id);
+    TPL_OPEN = open ? String(r.id) : null;
+    var cs = $('tpls').querySelectorAll('.card[data-id]');
+    for (var i = 0; i < cs.length; i++) tplFold(cs[i], open && cs[i].dataset.id === String(r.id));
+  });
 
   // 只送"跟刚读出来的不一样"的那几项：全量回写会把没碰过的字段也重新判一遍，
   // 报回来的错就不是"我改错了"而是"我没改的那格错了"。
@@ -1209,7 +1243,7 @@ function tplCard(r) {
   var rec = el('details', 'rec');
   rec.appendChild(el('summary', null, '配方（只读，' + ((r.recipe && r.recipe.steps) || []).length + ' 步）'));
   rec.appendChild(el('pre', null, JSON.stringify(r.recipe, null, 1)));
-  card.appendChild(rec);
+  body.appendChild(rec);
   return card;
 }
 
@@ -1228,8 +1262,14 @@ function renderTemplates(d, flash) {
 
   (d.rows || []).forEach(function (r) { box.appendChild(tplCard(r)); });
   if (!(d.rows || []).length) box.appendChild(el('p', 'note', '库里一行模板都没有（闸没开或种子没灌）。'));
-  paintPreviews();  // 卡片是刚重建的，图也得跟着重画：预览认的是库里这一行，不缓存上一次那张
+  // 卡片是刚重建的，`.hidden` 不会自己长回来 ⇒ 折叠态按上一次那一条复原。
+  // 更要紧的是 flash 那一条：保存／上架之后那句"已写入"落在这一行的 `.err` 里，
+  // 而 `.err` 住在折叠体内——不自动展开的话，症状是"点下去什么回执都没有"。
+  if (flash && box.querySelector('.card[data-id="' + flash.id + '"]')) TPL_OPEN = String(flash.id);
+  var rows = box.querySelectorAll('.card[data-id]');
+  for (var i = 0; i < rows.length; i++) tplFold(rows[i], rows[i].dataset.id === TPL_OPEN);
   resyncDirty();    // 刚打还没保存的那四格要带着"有 N 处没保存"回来（见上面那段）
+  repaintFocus();
 
   // 回执落在**重读之后那一行**上：卡片是刚重建的，写进旧节点等于没写
   // （本机 10-15 真点出来过——保存成功了屏上却一个字没变，只剩顺序自己动了）。
@@ -1388,6 +1428,7 @@ function renderStats(d) {
   var keys = ['overview', 'perday', 'sources', 'templates', 'categories', 'assets', 'invites', 'shares'];
   var cards = box.querySelectorAll('.card');
   for (var i = 0; i < cards.length && i < keys.length; i++) cards[i].dataset.key = keys[i];
+  repaintFocus();
 }
 
 function loadStats() {

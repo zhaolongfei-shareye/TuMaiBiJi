@@ -475,23 +475,66 @@ def test_置灰那几枚等的是真结果():
     assert body.count("busyRun(") >= 12, "写口少了：这一轮该被置灰的提交一次都没落下"
 
 
-def test_点左栏那条要落到主区那张卡():
-    """现网实测（前-量数.txt）：点「逐日」之后那张卡顶在视口下方 362px，点「来源分布」892px，
-    点配置那几条反而飞出 -1625px。根因是整页查 `[data-key=…]` 先撞见左栏自己那枚按钮
-    （它也带 data-key，markNav 靠它认条），于是滚的是一个高 32px 的导航按钮。"""
+def test_点左栏那条只出那一张卡():
+    """一栏一屏（站长 10-21 拍甲）。改这一条的实测底数是 `docs/design/后台布局-量数-20261021/`：
+    配置屏 4.71 屏、卡片模板屏 14.15 屏——点「首屏 Tips」要先把两张图片卡滚过去才碰到它。
+    以前那一版只是把那张卡滚到顶上（`scrollIntoView`），整组还是摊着；现在把它藏到只剩一张。
+
+    反面两条都撞过：① 整页查 `[data-key=…]` 会先撞见左栏自己那枚按钮（它也带 data-key），
+    于是拿高 32px 的导航按钮当落点（现网读数：点「逐日」顶在视口下方 362px）；
+    ② 那一张卡不在的时候（某一格没读出来、或新页配旧后端）还把其余四张一起藏掉＝主区全白。"""
     body = _ops_body()
-    assert 'querySelector(\'#main [data-key="' in body, "落点没限定在主区：又会滚到左栏那枚按钮身上"
+    assert "function focusKey(key)" in body and "function showKey(key)" in body
+    assert 'document.querySelectorAll(\'#main .card[data-key]\')' in body, "藏卡没限定在主区：会连左栏那枚按钮一起选中"
     assert "querySelector('[data-key=\"" not in body, "留着整页查那一句，等于把 bug 留在原地"
-    assert "target.scrollIntoView({ block: 'start' })" in body
+    assert "if (NAVKEYS[k]) all[j].classList.toggle('hidden', k !== key);" in body, \
+        "藏的不是'左栏那 14 条各自那张卡'：卡片模板那一栏的 20 行会被这一刀一起藏光"
+    assert "if (!hit) return;" in body, "那一张卡不在了还把整栏藏光：主区一片空白"
+    assert "scrollIntoView" not in body, "还留着滚过去：一栏一屏之后没有'滚到那一张'这回事"
+    assert "window.scrollTo(0, 0);" in body
+    for fn in ["render(state)", "renderStats(d)", "renderTemplates(d, flash)"]:
+        seg = body.split("function " + fn, 1)[1].split("\nfunction ", 1)[0]
+        assert "repaintFocus();" in seg, f"{fn} 重画完没补藏卡：卡片是新建的，hidden 不会自己长回来"
 
 
-def test_滚动跟随不许把高亮从刚点那一条抢走():
-    """scroll-spy 装上之后第一趟实测：点「来源黑名单」，滚到位之后高亮停在别的栏上
-    （spyNav 在 scrollIntoView 之后又判了一次"当前是哪张卡"）。所以点下去要锁 700ms。"""
+def test_滚动不再改高亮切栏也不许留空白():
+    """滚动跟随（scroll-spy）是为"整组摊在一列"那版配的：滚到哪张卡就把左栏那一条挪过去。
+    一栏一屏之后它没有存在理由了，而且会跟刚点那一条抢高亮（现网撞过：点「来源黑名单」，
+    落位之后亮的是别栏那条）。这一条钉的是**撤净**——不留半个监听器，也不留 navLock 那三行。
+
+    另一头是甲带来的新洞：顶部那枚「图麦笔记」只 showView('stats')，手上那把 FOCUS 可能是
+    配置栏的 key ⇒ 数据栏八张全被藏掉、回来一片空白。所以切栏要退回那一栏第一条。"""
     body = _ops_body()
-    assert "var navLock = 0;" in body
-    assert "navLock = Date.now() + 700;" in body, "点完没锁：高亮会被滚动跟随抢走"
-    assert "if (Date.now() < navLock) return;" in body, "跟随那一趟没读锁"
+    for gone in ["spyNav", "navLock", "VIEWS", "addEventListener('scroll'"]:
+        assert gone not in body, f"跟随那一套没撤净：还留着 {gone}"
+    assert "showKey(VIEW_FIRST[v]);" in body, "切栏没退回那一栏第一条：从图麦克那屏回来是空白"
+    assert "if (!VIEW_FIRST[it.view]) VIEW_FIRST[it.view] = it.key;" in body
+    assert "$('swSelf').addEventListener('click', function () { setProduct('self'); showView('stats'); });" in body, \
+        "那枚直接绕开 showView 的话，上面两条一起失效"
+
+
+def test_卡片模板那一栏默认折叠一次只开一套():
+    """这一栏 20 套全摊开实测 14.15 屏（`docs/design/后台布局-量数-20261021/现网-量数.txt`，
+    一张套卡 640px 上下）。拍定的甲是"20 套先只出一列名＋状态，点一套才展开预览与配方"。
+    四条都得钉住，少一条的症状各不相同：
+    ① 一次只开一套 ⇒ 两套并排会把彼此顶出屏；② 回执那行自动展开 ⇒ 不然"已写入"那句藏在
+    折叠体里，屏上看着像点下去没反应（本机 10-15 真点撞过同一类）；③ 只翻 hidden 不重建 ⇒
+    重建会把刚打没保存的字换掉；④ 点开才画预览 ⇒ 折叠态跑二十遍配方是白干。"""
+    body = _ops_body()
+    assert "var TPL_OPEN = null;" in body
+    assert "el('div', 'tplbody')" in body and "b.classList.toggle('hidden', !open);" in body
+    assert "el('button', 'mini ghost tpltoggle', '展开这一套')" in body
+    assert "t.textContent = open ? '收起这一套' : '展开这一套';" in body
+    assert "t.setAttribute('aria-expanded', open ? 'true' : 'false');" in body
+    # 一次只开一套：点开这一枚时把其余各行一起过一遍 tplFold
+    assert "for (var i = 0; i < cs.length; i++) tplFold(cs[i], open && cs[i].dataset.id === String(r.id));" in body, \
+        "只改自己那一行＝两套同时摊着"
+    assert "TPL_OPEN = String(flash.id);" in body, "回执落在折叠体里＝屏上看不到那句'已写入'"
+    assert "box._painted = true;" in body and "if (!box || box._painted) return;" in body, \
+        "预览没等点开才画（或那层「画过了」的守卫没了）：一进来就跑二十套配方"
+    assert "card.appendChild(previewBox" not in body, "预览挂在卡上而不是折叠体里＝折叠折不掉它"
+    # 折叠只作用在这一栏：模板行带 data-id、不带 data-key，一栏一屏那一刀扫的是 [data-key]
+    assert "card.dataset.id = r.id;" in body and "card.dataset.key = 'tpl:" not in body
 
 
 def test_换窗口重画不许丢掉滚动位置():
