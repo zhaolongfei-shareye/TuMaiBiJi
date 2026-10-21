@@ -425,3 +425,127 @@ def test_图麦克那一枚点下去是嵌它原页面不是跳走():
     assert "main.wide" in body and "classList.toggle('wide'" in body
     # 顶上那句"看不到任何用户…"原来是无条件的——嵌进它那一页之后就成了半句假话（框里就看得到它的用户）
     assert '这里只能看到运营内容本身' not in body and '这两栏只看运营内容本身' in body
+
+
+# ---------------- ⑦ 界面与交互这一轮（10-21 那两遍实测读数驱动） ----------------
+#
+# 尺子是 `docs/工具/读-后台那一屏现状.mjs`（本机测试库跑一遍、现网只读跑一遍，读数落在
+# docs/design/后台优化-自证-20261021/）。它量出来的十条里，有两条**读代码读不出来**：
+# 点左栏那条根本没落到对应那张卡（现网读数：点「逐日」落点顶 362px、点「模板热度榜」1077px），
+# 以及置灰那几枚等的是假结果（三个写口没 return 那条 promise）。下面每条钉子都对应一个屏上撞过的症状。
+#
+# 这一组全部走 `_ops_body()`：`OPS_PAGE_SRC` 指到一份临时副本时读副本。那是给
+# `docs/工具/反向探针-后台那一屏交互.py` 用的——判据要是不会因为改动而红，就等于没写。
+
+def _ops_body():
+    src = Path(os.environ.get("OPS_PAGE_SRC") or
+               (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py"))
+    return src.read_text(encoding="utf-8").split("_PAGE", 1)[1]
+
+
+def test_改线上那几枚一律先染橙再点第二下():
+    """读数量到的是"这一屏点下去就改线上的按钮 40 枚"，而屏上没有任何一道闸：
+    手一滑就把首页背景换了，而且换完屏上连一句"我刚点了什么"都没有。
+    口径只有一条：改线上用户看到的东西要两下，保存类的一下。"""
+    body = _ops_body()
+    assert "function arm(btn, ask, run)" in body and "var ARM_MS = 6000;" in body
+    assert "setTimeout(reset, ARM_MS)" in body, "第一下悬着不许永久染橙：六秒不点第二下就自己撤回去"
+    # 五枚会改线上的（两处发布／两处停用／拉黑／上下架那一枚）都得挂上闸
+    for site in ["arm(btnPub", "arm(btnOff", "arm(btnAdd", "arm(btnSt"]:
+        assert site in body, f"{site} 那一枚没了二次确认"
+    assert body.count("'再点一次=") >= 6, "闸的话术被删短了：染橙之后屏上得写明第二下干什么"
+    # 历史那一格整张缩略图都是落点，比按钮更容易误点，所以它自己那一套染橙也要在
+    assert "one.setAttribute('data-armed', '1')" in body and "timer = setTimeout(disarm, ARM_MS)" in body
+    # 反面：保存那一枚不许被顺手加上两下（它改错了再存一次就回来，两下只会添麻烦）
+    assert "arm(btnSave" not in body and "arm(btnUp" not in body
+
+
+def test_置灰那几枚等的是真结果():
+    """第一版的置灰是"点下去灰一下"就回来了：三个写口没把 promise 递出来，
+    busyRun 拿不到"什么时候写完"，于是慢的时候看着像没点上——正是这一轮要治的那个症状。"""
+    body = _ops_body()
+    for fn in ["function put(kind", "function putText(kind", "function putNote(value"]:
+        seg = body.split(fn, 1)[1].split("\nfunction ", 1)[0]
+        assert "return api(" in seg, f"{fn} 没 return 那条 promise：忙态会假绿"
+    # 每一个 busyRun 的回调里必须有一条 return；少一条就是那一枚又在"自己觉得自己完成了"
+    for piece in body.split("busyRun(")[1:]:
+        if not piece[:1].isalpha():
+            continue   # 注释里提到这个名字的两处不算调用
+        assert "return " in piece[:240], f"busyRun 那一趟没把请求递回去：{piece[:60]}"
+    assert body.count("busyRun(") >= 12, "写口少了：这一轮该被置灰的提交一次都没落下"
+
+
+def test_点左栏那条要落到主区那张卡():
+    """现网实测（前-量数.txt）：点「逐日」之后那张卡顶在视口下方 362px，点「来源分布」892px，
+    点配置那几条反而飞出 -1625px。根因是整页查 `[data-key=…]` 先撞见左栏自己那枚按钮
+    （它也带 data-key，markNav 靠它认条），于是滚的是一个高 32px 的导航按钮。"""
+    body = _ops_body()
+    assert 'querySelector(\'#main [data-key="' in body, "落点没限定在主区：又会滚到左栏那枚按钮身上"
+    assert "querySelector('[data-key=\"" not in body, "留着整页查那一句，等于把 bug 留在原地"
+    assert "target.scrollIntoView({ block: 'start' })" in body
+
+
+def test_滚动跟随不许把高亮从刚点那一条抢走():
+    """scroll-spy 装上之后第一趟实测：点「来源黑名单」，滚到位之后高亮停在别的栏上
+    （spyNav 在 scrollIntoView 之后又判了一次"当前是哪张卡"）。所以点下去要锁 700ms。"""
+    body = _ops_body()
+    assert "var navLock = 0;" in body
+    assert "navLock = Date.now() + 700;" in body, "点完没锁：高亮会被滚动跟随抢走"
+    assert "if (Date.now() < navLock) return;" in body, "跟随那一趟没读锁"
+
+
+def test_换窗口重画不许丢掉滚动位置():
+    """实测读数：点「总览」之后 y 从 2816 跳到 3367（换了 30 天窗口，整屏重画把位置丢了），
+    人要重新找刚才那一张。读数量到的"落点"也靠这一条才站得住。"""
+    body = _ops_body()
+    assert "function keepScroll(fn)" in body
+    assert body.count("keepScroll(function") >= 5, "有几处重画没垫这一层：读数里的落点会自己飘"
+    for name in ["renderStats(d)", "renderTemplates(d, flash)", "renderBlocklist(d, flash)"]:
+        assert f"keepScroll(function () {{ {name}; }}" in body, f"{name} 那一趟重画没保住位置"
+
+
+def test_没保存的草稿要留得住也要看得见():
+    """整卡重画（发布成功之后 refresh）会把 textarea／输入框连人带字一起重建：
+    刚打的字没了，而且屏上不说。所以草稿按"卡片+字段"存着，重建后填回去，标题上挂一句角标。"""
+    body = _ops_body()
+    assert "var DRAFTS = {};" in body and "function bindField(" in body
+    assert "node.setAttribute('data-server', String(serverValue));" in body, "没有服务器那份值就分不清什么算改过"
+    assert "card._dirty.textContent = n ? ('有 ' + n + ' 处没保存') : '';" in body
+    assert body.count("addDirtyChip(head);") >= 3, "带输入格的卡有一张没挂角标"
+    assert body.count("resyncDirty();") >= 2, "重画完没重算角标：字还在、那句'有 N 处没保存'没了（实测撞过）"
+    assert "window.addEventListener('beforeunload'" in body, "带着草稿直接关页＝静默丢字"
+
+
+def test_键盘和读屏那一套语义():
+    """左栏那 14 条原来是 `<s>`／`<div>`：Tab 一次都进不去（实测可聚焦 0/14），
+    读屏也念不出"现在在哪一栏"。改真 button 之后是 14/14＋aria-current 1。"""
+    body = _ops_body()
+    assert ":focus-visible { outline:2px solid var(--clay)" in body
+    assert "el('button', 'navitem', it.label)" in body and "b.type = 'button'" in body
+    assert "setAttribute('aria-current', 'true')" in body and "removeAttribute('aria-current')" in body
+    assert 'aria-pressed="true"' in body and 'aria-pressed="false"' in body
+    assert "$('swSelf').setAttribute('aria-pressed'" in body, "切完产品那两枚的状态得跟着改，不然 aria-pressed 是假话"
+
+
+def test_窄屏那一档触摸目标与横滚壳():
+    """390 那一档实测：最矮的可点是 30px，六列那张宽表伸出容器；历史那一排在有 4 张以上时伸出视口 33px。
+    改法只有"加滚动壳／抬到 44px"这两种，不换结构：宽表还是那张表，历史还是那一排。"""
+    body = _ops_body()
+    seg = body.split("@media (max-width:720px)", 1)[1]
+    assert "min-height:44px" in seg, "窄屏那档没抬触摸目标"
+    assert ".tw { overflow-x:auto" in body and "table.dt.wide { min-width:560px }" in body
+    assert ".swatches { display:flex; gap:10px; margin-top:10px; overflow-x:auto" in body, \
+        "历史那一排没横滚壳：四条以上就把整页顶出视口"
+    assert "flex:none; width:90px; box-sizing:border-box" in body, \
+        "每一枚没定宽：那句'再点一次'和长备注会把相邻那几枚顶得往右跳"
+    # 那句确认话术常驻一行，只换 visibility：跟着 display 出现／消失会把整排往下顶，一点就抖
+    assert ".swatch .ask {" in body and "visibility:hidden" in body and ".swatch.arm .ask { visibility:visible }" in body
+    assert "ask.classList" not in body, "又在用 hidden 类切那句话＝一点抖一下"
+
+
+def test_小字那两档的对比度下限():
+    """实测压在纸底上：组标题与 .note 那两档 2.2:1／4.39:1，11–12px 的字在屏幕阅读器之外
+    也读不动（WCAG 正文要求 4.5:1）。并到 --muted:#5f636c 之后两档都是 5.25:1。"""
+    body = _ops_body()
+    assert "--muted:#5f636c" in body, "小字那档的底色被改回去或改浅了"
+    assert ":#a2a49c" not in body, "旧的那个浅灰又回到声明里了（实测 2.2:1）"

@@ -39,7 +39,10 @@ _PAGE = """<!doctype html>
 <meta name="robots" content="noindex">
 <title>运营后台 · 图麦笔记</title>
 <style>
-:root { --ink:#14161A; --muted:#6b6f78; --line:#e3e0d8; --paper:#F2EFE9; --clay:#D2683F; }
+/* --muted 这一档 10-21 从 #6b6f78 抬深到 #5f636c：现网 1440 那一屏实测 #6b6f78 压在纸底上
+   只有 4.39:1，而它管的是 13px 的小字（WCAG 那一档要 4.5:1）。同一族冷灰，只动明度，
+   抬深之后 5.25:1。别改回浅的那一档——那不是"更淡一点"，那是有人读不到。 */
+:root { --ink:#14161A; --muted:#5f636c; --line:#e3e0d8; --paper:#F2EFE9; --clay:#D2683F; }
 * { box-sizing:border-box }
 body { margin:0; padding:28px 20px 60px; background:var(--paper); color:var(--ink);
   font:15px/1.65 -apple-system,"PingFang SC",system-ui,sans-serif; }
@@ -61,6 +64,12 @@ button { border:0; border-radius:8px; padding:9px 15px; font-size:14px; cursor:p
 button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line) }
 button.danger { background:#fff; color:var(--clay); border:1px solid var(--clay) }
 button:disabled { opacity:.45; cursor:default }
+/* 键盘走到哪一枚，屏上要看得见。这一页以前用 `<s>`/`<b>` 当按钮，Tab 键根本走不进去
+   （现网实测：左栏 14 条可聚焦 0 条），所以这一条不只是给无障碍检查用的。 */
+:focus-visible { outline:2px solid var(--clay); outline-offset:2px }
+/* 写口的第二下：第一下只把这一枚换成"确认"话术并染成橙，六秒内不再点就自己退回。 */
+button.arm { background:var(--clay); color:#fff; border-color:var(--clay) }
+button.danger.arm { background:var(--clay); color:#fff }
 .err { color:var(--clay); font-size:13px; margin-top:10px; min-height:18px }
 .err.ok { color:#1d6b3f }
 .thumb { width:96px; height:96px; object-fit:cover; border-radius:8px; border:1px solid var(--line); display:block }
@@ -70,10 +79,21 @@ button:disabled { opacity:.45; cursor:default }
 .hitem { display:flex; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid #f1efe9 }
 .hitem .meta { flex:1; min-width:0; font-size:13px }
 .hitem .meta b { font-weight:600 }
-.swatches { display:flex; gap:10px; margin-top:10px }
+/* 历史那一排在 390 那一档本来就装不下（实测现网 0 条历史看不出来，本机灌到 4 条就伸出视口 33px）：
+   给它一层横滚的壳，与宽表那几层同一个写法——一排还是那一排，不换成两行。
+   每一枚定宽 90px 是因为里面那行"再点一次"和备注都比 72px 的图宽：不设宽，点一下染橙
+   就把相邻那几枚顶得往右跳，图上看着像整排抖了一下。 */
+.swatches { display:flex; gap:10px; margin-top:10px; overflow-x:auto; -webkit-overflow-scrolling:touch }
 .swatch { border:1px solid var(--line); border-radius:10px; padding:8px; background:#fff; cursor:pointer;
-  text-align:center; font-size:12px; color:var(--muted) }
+  text-align:center; font-size:12px; color:var(--muted); flex:none; width:90px; box-sizing:border-box;
+  overflow-wrap:anywhere }
 .swatch.cur { border-color:var(--ink); box-shadow:0 0 0 2px rgba(20,22,26,.08) }
+/* 历史那一张点下去就是"把它发到线上"，所以它也得先染橙再点第二下（与上面 button.arm 同一句话）。 */
+.swatch.arm { border-color:var(--clay); box-shadow:0 0 0 2px rgba(210,104,63,.28) }
+/* 那句"再点一次"是常驻的一行，只用 visibility 换：跟着文字一起出现／消失会把整排往下顶，
+   手一点屏就抖，六秒后自动撤时再抖回去。 */
+.swatch .ask { color:var(--clay); font-weight:600; visibility:hidden }
+.swatch.arm .ask { visibility:visible }
 .swatch img { width:72px; height:72px; object-fit:cover; border-radius:6px; display:block }
 /* 文案那一栏：一行一句，所以给的是 textarea 而不是输入框。字号与正文同档，
    行高留宽一点是为了数得清句子。 */
@@ -82,7 +102,9 @@ textarea.ta { width:100%; box-sizing:border-box; border:1px solid var(--line); b
   resize:vertical; margin-top:8px }
 .langlabel { font-size:12.5px; color:var(--muted); margin-top:12px }
 .hidden { display:none }
-.grp { font-size:11px; color:#a2a49c; letter-spacing:.08em; margin:14px 0 4px }
+/* 组标题也从 #a2a49c（现网实测压在纸底 2.2:1，11px 字）并到 --muted：
+   这一行是"数据／配置"两组的名字，读不到就等于左栏少了分组的钥匙。 */
+.grp { font-size:11px; color:var(--muted); letter-spacing:.08em; margin:14px 0 4px }
 /* 壳页那一层（方向图 docs/design/后台融合-方向图-20261015.html 的 A 版信息架构）：
    顶栏一枚产品切换 → 左栏「数据／配置」两组 → 主区一屏只放一组。
    选中态是"文字加粗＋左边走一条墨线"，不是按钮：整页只有主按钮一种实心块，别处不再长第二套皮。 */
@@ -90,29 +112,43 @@ textarea.ta { width:100%; box-sizing:border-box; border:1px solid var(--line); b
   border-bottom:1px solid var(--line); padding-bottom:14px; margin-bottom:20px }
 .sw { display:flex; gap:0; border:1px solid var(--line); border-radius:9px; overflow:hidden;
   background:#fff; flex:none }
-.sw b { font-weight:500; font-size:13px; padding:7px 13px; color:var(--muted); white-space:nowrap }
-.sw b.on { background:var(--ink); color:#fff; font-weight:600 }
-.sw b { cursor:pointer }
+/* 这两枚以前是 `<b>`：能点、看着像 tab，但 Tab 键走不进去、读屏也念不出"这是个可切换的按钮"。
+   换成 button 之后皮一字不改（还是文字＋选中那一格填墨），只是真的能用键盘走到。 */
+.sw .switem { font-family:inherit; font-weight:500; font-size:13px; line-height:1.4; padding:7px 13px;
+  border:0; border-radius:0; background:none; color:var(--muted); white-space:nowrap; cursor:pointer }
+.sw .switem.on { background:var(--ink); color:#fff; font-weight:600 }
 /* 图麦克那一屏嵌的是它自己那一页（站长 10-16 拍「用 frame 模式实现图麦克的原页面」）。
    它那套皮按 1200 排，我们这一栏只有 704，所以那一屏要把整页放宽一档。 */
 main.wide { max-width:1180px }
 .frame { display:block; width:100%; height:calc(100vh - 150px); min-height:560px;
   border:1px solid var(--line); border-radius:12px; background:#fff }
 .swnote { font-size:12px; color:var(--muted); margin:6px 0 0; text-align:right; max-width:280px }
+.topacts { display:flex; justify-content:flex-end; gap:8px; margin-top:8px }
 .shell { display:flex; gap:24px; align-items:flex-start }
 nav#nav { width:132px; flex:none; font-size:13px; color:var(--muted); position:sticky; top:20px }
-nav#nav s { display:block; text-decoration:none; padding:6px 0 6px 11px; margin:1px 0;
-  border-left:2px solid transparent; cursor:pointer; color:var(--ink) }
-nav#nav s:hover { color:var(--clay) }
-nav#nav s.on { border-left-color:var(--ink); font-weight:600 }
+/* 左栏那 14 条同理：`<s>` 是"划掉"的语义，且不可聚焦。换成 button 之后皮照旧是
+   "文字＋左边一条墨线"（站长 10-15 拍的就是这个样式，不是按钮块），只是键盘走得到、
+   并且带 `aria-current` 说清"当前是哪一栏"。 */
+nav#nav .navitem { display:block; width:100%; text-align:left; font:inherit; line-height:1.5;
+  background:none; border:0; border-left:2px solid transparent; border-radius:0;
+  padding:6px 0 6px 11px; margin:1px 0; cursor:pointer; color:var(--ink) }
+nav#nav .navitem:hover { color:var(--clay) }
+nav#nav .navitem.on { border-left-color:var(--ink); font-weight:600 }
 #main { flex:1; min-width:0 }
 @media (max-width:720px) {
   body { padding:20px 14px 48px }
   .top { display:block } .swnote { text-align:left; max-width:none }
   .shell { display:block }
   nav#nav { width:auto; position:static; display:flex; flex-wrap:wrap; gap:2px 14px; margin-bottom:16px }
-  nav#nav i { width:100% } nav#nav s { border-left:0; padding:4px 0; border-bottom:2px solid transparent }
-  nav#nav s.on { border-left:0; border-bottom-color:var(--ink) }
+  nav#nav i { width:100% }
+  nav#nav .navitem { border-left:0; padding:4px 0; border-bottom:2px solid transparent;
+    width:auto; display:flex; align-items:center; min-height:44px }
+  nav#nav .navitem.on { border-left:0; border-bottom-color:var(--ink) }
+  /* 现网实测：窄屏上「7 天／14 天／30 天」与「移出」这几枚只有 30px 高，
+     手机上点不准（苹果与人机指南都按 44px 起）。只在这一档抬，宽屏那一档一字不动。 */
+  button, input[type=text], input[type=password], textarea.ta { min-height:44px }
+  button { display:inline-flex; align-items:center; justify-content:center }
+  input[type=file] { min-height:44px }
 }
 /* 「数据」那一栏：数在左、口径在右，一行一条。数字统一右对齐 + 等宽数字，
    不然竖着看三行"12 / 1,204 / 7"会以为最后一行最大。 */
@@ -122,6 +158,11 @@ nav#nav s.on { border-left-color:var(--ink); font-weight:600 }
   font-variant-numeric:tabular-nums }
 .kmeta { flex:1; min-width:0 }
 table.dt { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px }
+/* 表外面垫一层可横滚的壳：390 那一档「来源黑名单」有六列，不垫的话只有两条路——
+   要么把整页撑出横向溢出（手指一划就丢内容），要么把字挤成竖排。垫了之后是这一张表自己横滚。
+   `.wide` 只给六列那一张定最小宽；四列那几张（逐日／来源）实测在 390 不溢出，不加。 */
+.tw { overflow-x:auto; -webkit-overflow-scrolling:touch }
+table.dt.wide { min-width:560px }
 table.dt th, table.dt td { text-align:right; padding:6px 4px; border-bottom:1px solid #f1efe9;
   font-variant-numeric:tabular-nums }
 table.dt th { color:var(--muted); font-weight:500; font-size:12px }
@@ -134,6 +175,10 @@ button.mini.cur { background:var(--ink); color:#fff; border-color:var(--ink) }
 .tplhead { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap }
 .tplhead code { font:13px/1.5 ui-monospace,Menlo,monospace; color:var(--ink) }
 .tag { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted) }
+/* "这一格里还有刚打进去、没保存的字"——屏上必须自己说出来。见下面 JS 里 DRAFTS 那一段：
+   每一次保存都会重建整栏卡片，不垫这一句的话症状是"我刚才打的字没了，也没人告诉我"。 */
+.dirty { font-size:11.5px; font-weight:400; color:var(--clay); border:1px solid #f0c48a;
+  border-radius:999px; padding:1px 8px; margin-left:8px; white-space:nowrap }
 .tag.live { color:#1d6b3f; border-color:#bcd8c4 }
 .tag.draft { color:var(--clay); border-color:#f0c48a }
 .fields { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px }
@@ -166,7 +211,11 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
       <p class="sub">左边切「数据」与「配置」两栏，这两栏只看运营内容本身，看不到任何用户的笔记与图片；图麦克那一屏是它自己的后台，看得到它自己的用户。</p>
     </div>
     <div>
-      <div class="sw"><b class="on" id="swSelf">图麦笔记</b><b id="swOther">图麦克</b></div>
+      <div class="sw" role="group" aria-label="产品切换">
+        <button type="button" class="switem on" id="swSelf" aria-pressed="true">图麦笔记</button>
+        <button type="button" class="switem" id="swOther" aria-pressed="false">图麦克</button>
+      </div>
+      <div class="topacts"><button type="button" class="mini ghost hidden" id="btnLogout">退出这一台</button></div>
       <p class="swnote" id="swNote"></p>
     </div>
   </header>
@@ -184,7 +233,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
   </section>
 
   <div id="app" class="hidden shell">
-    <nav id="nav"></nav>
+    <nav id="nav" aria-label="后台分栏"></nav>
     <div id="main">
       <div id="view-stats" class="view"><div id="stats"></div></div>
       <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div><div id="block"></div></div>
@@ -290,9 +339,115 @@ function loadEngine() {
   return ENGINE_AT;
 }
 
-function showLogin() { $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
-function showApp() { $('login').classList.add('hidden'); $('app').classList.remove('hidden'); }
+function showLogin() {
+  $('app').classList.add('hidden'); $('login').classList.remove('hidden');
+  $('btnLogout').classList.add('hidden');
+}
+function showApp() {
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+  $('btnLogout').classList.remove('hidden');
+}
 function $(id) { return document.getElementById(id); }
+
+// ---- 这一轮「界面与交互」的公共件（站长 10-21「把之前官网后台优化的事情先做了」）。
+// 三件各对着一个现网量出来的毛病，不是顺手加的：
+//   arm()     —— 这一屏点下去当场改线上的按钮有 51 枚，其中"历史里点一张缩略图"就是直接发布。
+//                第一下只把这一枚换成确认话术并染橙，六秒内不点第二下就自己退回原样。
+//                **哪些要两下（整页就这一条口径）**：改线上用户看到的东西（发布／停用／上架／下架）
+//                与把别人挡出去的东西（拉黑这一台、历史那一张）。
+//                哪些仍是一下：上传（只存文件，不碰线上）、保存这几项（改错了再存一次就回来，
+//                给它加一道闸只是让改字变麻烦）、移出（那是把人家放回能试的那一侧）。
+//   busyRun() —— 提交期间置灰＋写明"发布中"。以前只有部分口置灰，症状是"以为没点上，再点一次"
+//                ＝同一件事发两遍。
+//   DRAFTS    —— 每一次保存都会把整栏卡片重建（refresh()／loadTemplates() 都是清空再挂），
+//                重建会把**别处正在打、还没保存的字**一起抹掉且不报错。这一份把改过的字按
+//                "卡片+字段"存着，重建之后原样填回去，并在标题上挂一句"有 N 处没保存"。
+var ARM_MS = 6000;
+function arm(btn, ask, run) {
+  var label = btn.textContent, timer = null;
+  function reset() {
+    if (timer) { clearTimeout(timer); timer = null; }
+    btn.classList.remove('arm'); btn.removeAttribute('data-armed'); btn.textContent = label;
+  }
+  btn.addEventListener('click', function () {
+    if (btn.disabled) return;
+    if (btn.getAttribute('data-armed')) { reset(); run(); return; }
+    btn.setAttribute('data-armed', '1'); btn.classList.add('arm'); btn.textContent = ask;
+    timer = setTimeout(reset, ARM_MS);
+  });
+  btn.unarm = reset;   // 提交失败时立刻退回原话术：确认那一句挂在屏上骗人
+  return reset;
+}
+
+function busyRun(btn, doing, run) {
+  var label = btn.textContent, was = btn.disabled;
+  btn.disabled = true; btn.textContent = doing;
+  function restore() { btn.disabled = was; btn.textContent = label; }
+  return Promise.resolve().then(run).then(function (v) { restore(); return v; },
+    function (e) { restore(); throw e; });
+}
+
+var DRAFTS = {};
+function dk(card, field) { return card + '|' + field; }
+function bindField(node, cardKey, field, serverValue) {
+  node.setAttribute('data-card', cardKey);
+  node.setAttribute('data-field', field);
+  node.setAttribute('data-server', String(serverValue));
+  var v = DRAFTS[dk(cardKey, field)];
+  if (v !== undefined) node.value = v;   // 重建之前刚打的字，填回来
+  return node;
+}
+function syncDirty(card) {
+  if (!card || !card._dirty) return;
+  var fs = card.querySelectorAll('[data-field]'), n = 0;
+  for (var i = 0; i < fs.length; i++) {
+    if (DRAFTS[dk(fs[i].getAttribute('data-card'), fs[i].getAttribute('data-field'))] !== undefined) n++;
+  }
+  card._dirty.textContent = n ? ('有 ' + n + ' 处没保存') : '';
+  card._dirty.classList.toggle('hidden', !n);
+}
+function clearDrafts(card) {
+  var fs = card.querySelectorAll('[data-field]');
+  for (var i = 0; i < fs.length; i++) {
+    delete DRAFTS[dk(fs[i].getAttribute('data-card'), fs[i].getAttribute('data-field'))];
+  }
+}
+// 标题旁边那一枚"没保存"的角标：每张卡造的时候就挂上（默认藏着），重建之后由 syncDirty 数。
+function addDirtyChip(head) {
+  var card = head.closest ? head.closest('.card') : null;
+  if (!card || card._dirty) return card;
+  var chip = el('span', 'dirty hidden', '');
+  head.appendChild(chip);
+  card._dirty = chip;
+  return card;
+}
+// 整栏重建之后要把角标补回来：卡片是新的，`_dirty` 与字段也都是新的，
+// 而 DRAFTS 里那份"刚打的字"还在——不重数一遍的症状是**字给你留着了，角标却没了**，
+// 屏上看着像"已经保存过了"。（本机 10-21 真点量出来的。）
+function resyncDirty() {
+  var cs = document.querySelectorAll('.card');
+  for (var i = 0; i < cs.length; i++) syncDirty(cs[i]);
+}
+document.addEventListener('input', function (ev) {
+  var n = ev.target;
+  if (!n || !n.getAttribute || !n.getAttribute('data-field')) return;
+  var k = dk(n.getAttribute('data-card'), n.getAttribute('data-field'));
+  if (n.value === n.getAttribute('data-server')) delete DRAFTS[k]; else DRAFTS[k] = n.value;
+  syncDirty(n.closest ? n.closest('.card') : null);
+});
+window.addEventListener('beforeunload', function (ev) {
+  // 只管"带着没保存的字关掉这一页"那一件事；这一页内部切屏、切产品都不走这条。
+  for (var k in DRAFTS) {
+    if (Object.prototype.hasOwnProperty.call(DRAFTS, k)) { ev.preventDefault(); ev.returnValue = ''; return; }
+  }
+});
+
+// 重画之后不许把页面甩到别处去：现网实测点一下「30 天」，滚动位置从顶部跳到 3,367px。
+function keepScroll(fn) {
+  var y = window.scrollY;
+  return Promise.resolve().then(fn).then(function (v) { window.scrollTo(0, y); return v; },
+    function (e) { window.scrollTo(0, y); throw e; });
+}
 
 // 左栏那两组：**一屏只放一组**（站长 10-15 17:5x「数据分析和配置要分开」，结构照方向图 A 版）。
 // key 指向主区里那张卡的 data-key；点一条＝切到那一屏再滚到那张卡。
@@ -323,9 +478,16 @@ function showView(v) {
   });
 }
 
+// 左栏那一条是不是"当前在看的那一栏"，两路来源共用这一个口：点左栏，与滚到那张卡。
+var NAVKEYS = {};
 function markNav(key) {
-  var all = $('nav').querySelectorAll('s');
-  for (var i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i].dataset.key === key);
+  var all = $('nav').querySelectorAll('.navitem');
+  for (var i = 0; i < all.length; i++) {
+    var on = all[i].dataset.key === key;
+    all[i].classList.toggle('on', on);
+    // aria-current 是给读屏与键盘的那句话："现在在这一栏"。以前只有 class，屏幕阅读器读不出来。
+    if (on) all[i].setAttribute('aria-current', 'true'); else all[i].removeAttribute('aria-current');
+  }
 }
 
 function buildNav() {
@@ -334,21 +496,62 @@ function buildNav() {
   NAV.forEach(function (g) {
     nav.appendChild(el('i', 'grp', g.grp));
     g.items.forEach(function (it) {
-      var s = el('s', null, it.label);
-      s.dataset.key = it.key;
-      s.addEventListener('click', function () {
+      NAVKEYS[it.key] = true;
+      var b = el('button', 'navitem', it.label);
+      b.type = 'button';
+      b.dataset.key = it.key;
+      b.addEventListener('click', function () {
         setProduct('self');
         showView(it.view);
-        var target = document.querySelector('[data-key="' + it.key + '"]');
+        // 必须限定在 `#main` 里找：这一枚按钮自己也带着 `data-key`（markNav 靠它认条），
+        // 整页查的话第一条命中的是**左栏这一条自己**——症状是"点「总览」只把页面挪了 42px，
+        // 然后滚动跟随把高亮改成别的这一栏"。10-21 本机探-左栏落点.mjs 量出来的：
+        // 点完落在那张卡文档位置 732 之外，那张卡本身高 32px（那是导航按钮，不是卡）。
+        var target = document.querySelector('#main [data-key="' + it.key + '"]');
         if (target) target.scrollIntoView({ block: 'start' });
+        navLock = Date.now() + 700;
         markNav(it.key);
       });
-      nav.appendChild(s);
+      nav.appendChild(b);
     });
   });
   markNav(NAV[0].items[0].key);
   showView('stats');
 }
+
+// 滚动跟随：主区那一屏实测 3,493／4,012／12,515 像素高，左栏 14 条的高亮要是停在「总览」不动，
+// "我现在看的是哪一栏"就只能滚回顶部读标题。rAF 节流一次，滚一格只算一遍。
+var VIEWS = ['stats', 'config', 'tpl', 'tumaike'];
+// 点完左栏那一条之后的一小段"别来抢"窗口：最后那两条（分享／来源黑名单）本来就滚不到顶
+// ——它下面没有那么多内容了。这时候滚动跟随会按"顶上那一张"重新判，把高亮挪到隔壁那一栏，
+// 症状是**我点了「来源黑名单」，下面划线的却是「帮助文档」**。落点已经尽力了，意图要留住。
+var navLock = 0;
+function currentView() {
+  for (var i = 0; i < VIEWS.length; i++) {
+    var v = $('view-' + VIEWS[i]);
+    if (v && !v.classList.contains('hidden')) return v;
+  }
+  return null;
+}
+function spyNav() {
+  if (Date.now() < navLock) return;
+  var v = currentView();
+  if (!v) return;
+  var cards = v.querySelectorAll('.card[data-key]');
+  if (!cards.length) return;
+  var best = cards[0];
+  for (var i = 0; i < cards.length; i++) {
+    if (cards[i].getBoundingClientRect().top <= 140) best = cards[i]; else break;
+  }
+  // 认不出来的 key 一律不动高亮：宁可停在上一条，也不许把 14 条全清成"哪一栏都没选中"。
+  if (NAVKEYS[best.dataset.key]) markNav(best.dataset.key);
+}
+var spyPending = false;
+window.addEventListener('scroll', function () {
+  if (spyPending) return;
+  spyPending = true;
+  window.requestAnimationFrame(function () { spyPending = false; spyNav(); });
+});
 
 $('btnLogin').addEventListener('click', function () {
   $('loginErr').textContent = '';
@@ -362,6 +565,19 @@ $('btnLogin').addEventListener('click', function () {
   }, function (e) { $('loginErr').textContent = e.message; });
 });
 $('pw').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') $('btnLogin').click(); });
+
+// 退出：只清这一页自己那把票（含融合那条链盖的"跟这把票走"的戳），不碰图麦克存在它自己
+// 那一侧的票——那把不是这一页写的（`test_admin_fusion` 里钉的就是这个方向：它那一侧退出
+// 也不许顺手抹掉这一侧的票；这一页只吃 sessionStorage 那一条硬纪律由 `test_mp_assets_admin`
+// 那条静态扫描钉着，它扫的就是"整页不许出现另一种存储"那四个字）。
+// 共享一台电脑时，"关掉标签页"之外还得有一个能按的出口。
+$('btnLogout').addEventListener('click', function () {
+  sessionStorage.removeItem('opsSession');
+  sessionStorage.removeItem('opsSessionSetBy');
+  for (var k in DRAFTS) if (Object.prototype.hasOwnProperty.call(DRAFTS, k)) delete DRAFTS[k];
+  showLogin();
+  $('loginErr').textContent = '已退出这一台。口令还在服务器那边，只是这个标签页不再带着它。';
+});
 
 function fmtBytes(n) { return n >= 1024 ? (Math.round(n / 102.4) / 10) + ' KB' : n + ' B'; }
 function shortHash(h) { return String(h || '').slice(0, 8); }
@@ -396,6 +612,7 @@ function render(state) {
   while (nbox.firstChild) nbox.removeChild(nbox.firstChild);
   if (state.note) nbox.appendChild(noteCardFor(state.note));
   else if (state.note_error) nbox.appendChild(el('p', 'state off', state.note_error));
+  resyncDirty();
 }
 
 // 一行一句 ⇒ 一句一串。空行丢掉：手打的时候都会留个尾换行，那不该变成一句空文案
@@ -408,7 +625,9 @@ function linesOf(v) {
 function textCardFor(t) {
   var card = el('section', 'card');
   card.dataset.key = 'text:' + t.kind;
-  card.appendChild(el('h2', null, t.label));
+  var head = el('h2', null, t.label);
+  card.appendChild(head);
+  addDirtyChip(head);
 
   var cur = t.current;
   if (!t.registered) {
@@ -431,7 +650,9 @@ function textCardFor(t) {
     ta.className = 'ta';
     // 现值走 .value 赋值，绝不用拼字符串造节点：这一页的硬纪律是"任何动态串都不当 HTML 拼"
     // （tests/test_mp_assets_admin.py 里那条静态扫描就是在钉这件事，它扫的就是那几个属性名）。
-    ta.value = ((cur || {})[lang] || []).join('\\n');
+    var value = ((cur || {})[lang] || []).join('\\n');
+    ta.value = value;
+    bindField(ta, 'text:' + t.kind, lang, value);
     areas[lang] = ta;
     card.appendChild(ta);
   });
@@ -444,12 +665,19 @@ function textCardFor(t) {
   row.appendChild(btnPub); row.appendChild(btnOff);
   card.appendChild(row);
 
-  btnPub.addEventListener('click', function () {
+  // 这两枚都直接动线上那一份下发内容，所以各要两下（见上面 arm() 那段为什么）。
+  arm(btnPub, '再点一次=发上线', function () {
     var value = {};
     Object.keys(areas).forEach(function (lang) { value[lang] = linesOf(areas[lang].value); });
-    putText(t.kind, value, msg, function () { return refresh(); });
+    busyRun(btnPub, '发布中…', function () {
+      return putText(t.kind, value, msg, function () { clearDrafts(card); return refresh(); });
+    });
   });
-  btnOff.addEventListener('click', function () { putText(t.kind, null, msg, function () { return refresh(); }); });
+  arm(btnOff, '再点一次=停用', function () {
+    busyRun(btnOff, '停用中…', function () {
+      return putText(t.kind, null, msg, function () { clearDrafts(card); return refresh(); });
+    });
+  });
   return card;
 }
 
@@ -461,7 +689,9 @@ var lastNoteResync = null;   // 上一次发布刷了几篇存量。它是那次
 function noteCardFor(n) {
   var card = el('section', 'card');
   card.dataset.key = 'note:' + n.kind;
-  card.appendChild(el('h2', null, n.label));
+  var head = el('h2', null, n.label);
+  card.appendChild(head);
+  addDirtyChip(head);
 
   var cur = n.current || {};
   var fromDb = n.source === '库里';
@@ -501,7 +731,9 @@ function noteCardFor(n) {
     ta.className = 'ta';
     if (limit) ta.maxLength = limit;
     // 现值走 .value 赋值，绝不拼进 HTML（与上面 textCardFor 同一条硬纪律）。
-    ta.value = asLines ? (cur[key] || []).join('\\n') : String(cur[key] || '');
+    var value = asLines ? (cur[key] || []).join('\\n') : String(cur[key] || '');
+    ta.value = value;
+    bindField(ta, 'note:' + n.kind, key, value);
     f[key] = ta;
     card.appendChild(ta);
   }
@@ -519,22 +751,30 @@ function noteCardFor(n) {
   row.appendChild(btnPub); row.appendChild(btnOff);
   card.appendChild(row);
 
-  btnPub.addEventListener('click', function () {
-    putNote({
-      title: f.title.value,
-      summary: f.summary.value,
-      key_points: linesOf(f.key_points.value),
-      tags: linesOf(f.tags.value),
-      content: f.content.value
-    }, msg, function () { return refresh(); });
+  // 发布这一枚比上面那两枚更重：它当场改写所有用户名下那一篇（新老账号一起），
+  // 所以更要两下。见上面 arm() 那段。
+  arm(btnPub, '再点一次=刷所有账号', function () {
+    busyRun(btnPub, '发布中…', function () {
+      return putNote({
+        title: f.title.value,
+        summary: f.summary.value,
+        key_points: linesOf(f.key_points.value),
+        tags: linesOf(f.tags.value),
+        content: f.content.value
+      }, msg, function () { clearDrafts(card); return refresh(); });
+    });
   });
-  btnOff.addEventListener('click', function () { putNote(null, msg, function () { return refresh(); }); });
+  arm(btnOff, '再点一次=停用', function () {
+    busyRun(btnOff, '停用中…', function () {
+      return putNote(null, msg, function () { clearDrafts(card); return refresh(); });
+    });
+  });
   return card;
 }
 
 function putNote(value, msg, done) {
   msg.textContent = '';
-  api('api/admin/preset-note', {
+  return api('api/admin/preset-note', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: value })
   }).then(function (body) {
@@ -592,30 +832,36 @@ function cardFor(k) {
   card.appendChild(acts);
 
   btnUp.addEventListener('click', function () {
-    msg.textContent = '';
+    msg.textContent = ''; msg.className = 'err';
     var f = file.files && file.files[0];
     if (!f) { msg.textContent = '先选一张 JPG 或 PNG'; return; }
     var fd = new FormData();
     fd.append('kind', k.kind);
     fd.append('note', note.value);
     fd.append('file', f);
-    btnUp.disabled = true;
-    api('api/admin/mp/assets', { method: 'POST', body: fd }).then(function (asset) {
-      btnPub.disabled = false;
-      btnPub.assetId = asset.id;
-      prev.src = u(asset.url);
-      prev.classList.remove('hidden');
-      msg.className = 'note';
-      msg.textContent = '已存到服务器上：#' + asset.id + '　' + asset.width + '×' + asset.height +
-        '　' + fmtBytes(asset.file_size) + '。上面这张就是它，还没动线上——看一眼再点「发布这一张」。';
-    }, function (e) { msg.textContent = e.message; }).then(function () { btnUp.disabled = false; });
+    // 上传这一枚不套两下：它只把文件存到服务器，一点都碰不到线上。但"上传中"要写明——
+    // 一张几 MB 的图在这条线上要走几秒，屏上没反应就等于"再点一次"，那就存出两份重复的。
+    busyRun(btnUp, '上传中…', function () {
+      return api('api/admin/mp/assets', { method: 'POST', body: fd }).then(function (asset) {
+        btnPub.disabled = false;
+        btnPub.assetId = asset.id;
+        prev.src = u(asset.url);
+        prev.classList.remove('hidden');
+        msg.className = 'note';
+        msg.textContent = '已存到服务器上：#' + asset.id + '　' + asset.width + '×' + asset.height +
+          '　' + fmtBytes(asset.file_size) + '。上面这张就是它，还没动线上——看一眼再点「发布这一张」。';
+      }, function (e) { msg.textContent = e.message; });
+    });
   });
 
-  btnPub.addEventListener('click', function () {
-    if (!btnPub.assetId) return;
-    put(k.kind, btnPub.assetId, msg, function () { return refresh(); });
+  // 发布与停用都是"当场换线上那一张"，各要两下（见上面 arm() 那段为什么）。
+  arm(btnPub, '再点一次=发到线上', function () {
+    if (!btnPub.assetId) { msg.textContent = '先上传一张，再点发布。'; return; }
+    busyRun(btnPub, '发布中…', function () { return put(k.kind, btnPub.assetId, msg, refresh); });
   });
-  btnOff.addEventListener('click', function () { put(k.kind, null, msg, function () { return refresh(); }); });
+  arm(btnOff, '再点一次=停用', function () {
+    busyRun(btnOff, '停用中…', function () { return put(k.kind, null, msg, refresh); });
+  });
 
   if (k.history.length) {
     var h = el('div', 'hist');
@@ -627,9 +873,27 @@ function cardFor(k) {
       one.appendChild(el('div', null, '#' + a.id));
       one.appendChild(el('div', null, dayOf(a.created_at)));
       one.appendChild(el('div', null, a.note || shortHash(a.content_hash)));
+      // 缩略图整张都是落点，点一下就把那一张发到线上——这一枚最要两下：
+      // 手一滑就换了首页背景，而屏上连一句"我刚点了什么"都没有。
+      var ask = el('div', 'ask', '再点一次');
+      one.appendChild(ask);
+      var timer = null;
+      function disarm() {
+        if (timer) { clearTimeout(timer); timer = null; }
+        one.removeAttribute('data-armed'); one.classList.remove('arm');
+      }
       one.addEventListener('click', function () {
         if (k.current && k.current.id === a.id) return;
-        put(k.kind, a.id, msg, function () { return refresh(); });
+        if (one._busy) return;
+        if (!one.getAttribute('data-armed')) {
+          one.setAttribute('data-armed', '1'); one.classList.add('arm');
+          timer = setTimeout(disarm, ARM_MS);
+          return;
+        }
+        disarm();
+        one._busy = true;
+        msg.className = 'err'; msg.textContent = '正在把这一张发到线上…';
+        put(k.kind, a.id, msg, refresh).then(function () { one._busy = false; });
       });
       sw.appendChild(one);
     });
@@ -639,9 +903,12 @@ function cardFor(k) {
   return card;
 }
 
+// 三个写口一律 `return` 那条 promise：busyRun() 要靠它知道"什么时候才算写完"。
+// 少了这个 return，调用点当场就 resolve 了——按钮的"发布中…"会闪一下就恢复，
+// 而请求还在路上，症状与"没反应，再点一次"一模一样。
 function put(kind, assetId, msg, done) {
   msg.textContent = '';
-  api('api/admin/mp/settings/' + encodeURIComponent(kind), {
+  return api('api/admin/mp/settings/' + encodeURIComponent(kind), {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ asset_id: assetId })
   }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
@@ -651,7 +918,7 @@ function put(kind, assetId, msg, done) {
 // 分开写而不是给 put 加一个参数：那参数会变成"这一栏到底是图还是话"的第三处猜测。
 function putText(kind, value, msg, done) {
   msg.textContent = '';
-  api('api/admin/mp/texts/' + encodeURIComponent(kind), {
+  return api('api/admin/mp/texts/' + encodeURIComponent(kind), {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: value })
   }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
@@ -691,19 +958,21 @@ function renderBlocklist(d, flash) {
   var msg = el('div', 'err');   // 先造后挂：表里每一行的「移出」按钮要拿到它，红话才落得下
 
   if (rows.length) {
-    var t = el('table', 'dt');
+    // 六列这一张在 390 那一档装不下，垫一层横滚的壳（`.tw`），见上面 CSS 里那条注释。
+    var t = el('table', 'dt wide');
     var head = el('tr');
-    ['主机名', '失败次数', '最后一次 HTTP', '最后一次失败', '进名单方式'].forEach(function (h) {
+    ['主机名', '失败次数', '最后一次 HTTP', '最后一次失败', '进名单方式', '移出'].forEach(function (h) {
       head.appendChild(el('th', null, h));
     });
-    head.appendChild(el('th', null, '移出'));
     var thead = el('thead');
     thead.appendChild(head);
     t.appendChild(thead);
     var tb = el('tbody');
     rows.forEach(function (r) { tb.appendChild(blockRow(r, th, msg)); });
     t.appendChild(tb);
-    card.appendChild(t);
+    var wrap = el('div', 'tw');
+    wrap.appendChild(t);
+    card.appendChild(wrap);
   } else {
     card.appendChild(el('p', 'note', '表里一行都没有：还没有站点攒过失败，也没人手工加过。'));
   }
@@ -722,16 +991,16 @@ function renderBlocklist(d, flash) {
   // 有没有那几行），本机真点 `docs/工具/验-后台来源黑名单栏.mjs` 第一条就是把它跑红的（10-19）。
   box.appendChild(card);
 
-  btnAdd.addEventListener('click', function () {
-    msg.textContent = '';
-    btnAdd.disabled = true;
-    api('api/admin/source-blocklist', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ host: inp.value })
-    }).then(function () {
-      return loadBlocklist('已加入：这一台从现在开始不再出网。');
-    }, function (e) { msg.textContent = e.message; })
-      .then(function () { btnAdd.disabled = false; });
+  // 拉黑一台 = 所有用户从此贴不开这一台的链接，且它不会自己过期。两下。
+  arm(btnAdd, '再点一次=拉黑', function () {
+    busyRun(btnAdd, '拉黑中…', function () {
+      return api('api/admin/source-blocklist', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: inp.value })
+      }).then(function () {
+        return loadBlocklist('已加入：这一台从现在开始不再出网。');
+      }, function (e) { msg.textContent = e.message; });
+    });
   });
 
   // 回执落在**重读之后那一栏**上：卡片是刚重建的，写进旧节点等于没写（与「卡片模板」那一栏同一条坑）。
@@ -753,12 +1022,16 @@ function blockRow(r, th, msg) {
     : (r.blocked ? '自动（已拦）' : '自动（还差 ' + Math.max(0, th - r.fail_count) + ' 次）')));
   var td = el('td');
   var btn = el('button', 'mini danger', '移出');
+  // 移出不套两下：它是把这一台放回"能试"那一侧，砸了随时能再拉黑；要两下的是**把别人挡出去**
+  // 与**改线上看到的东西**那两类（这一栏上面那枚「拉黑这一台」就是）。
+  // 整页的口径就这一句，写在 arm() 上面那段注释里。
   btn.addEventListener('click', function () {
     msg.textContent = '';
-    btn.disabled = true;
-    api('api/admin/source-blocklist/' + encodeURIComponent(r.host), { method: 'DELETE' })
-      .then(function () { return loadBlocklist('已移出：这一台可以试了（计数从零重来）。'); },
-        function (e) { msg.textContent = e.message; btn.disabled = false; });
+    busyRun(btn, '移出中…', function () {
+      return api('api/admin/source-blocklist/' + encodeURIComponent(r.host), { method: 'DELETE' })
+        .then(function () { return loadBlocklist('已移出：这一台可以试了（计数从零重来）。'); },
+          function (e) { msg.textContent = e.message; });
+    });
   });
   td.appendChild(btn);
   tr.appendChild(td);
@@ -767,14 +1040,16 @@ function blockRow(r, th, msg) {
 
 function loadBlocklist(flash) {
   return api('api/admin/source-blocklist').then(function (d) {
-    renderBlocklist(d, flash);
+    keepScroll(function () { renderBlocklist(d, flash); });
   }, function (e) {
     // 401 由 api() 统一收回口令框；其余红了也只空这一栏，不许把配置那一屏带走
     // （与 loadStats／loadTemplates 同一个纪律：这一页"少一组卡"比"整页打不开"好）。
     if (e.status === 401) return;
-    var box = $('block');
-    while (box.firstChild) box.removeChild(box.firstChild);
-    box.appendChild(el('p', 'note', '这一栏没读到：' + e.message));
+    keepScroll(function () {
+      var box = $('block');
+      while (box.firstChild) box.removeChild(box.firstChild);
+      box.appendChild(el('p', 'note', '这一栏没读到：' + e.message));
+    });
   });
 }
 
@@ -784,12 +1059,14 @@ function loadBlocklist(flash) {
 // 连一个能输入配方的地方都不许出现：有落点就有人会去点它。
 var TPL_STATUS_LABEL = { live: '线上', draft: '草稿（不下发）', archived: '已下架' };
 
-function fieldInt(labelText, cls, value) {
+function fieldInt(labelText, cls, value, cardKey, field) {
   var lab = el('label', cls);
   lab.appendChild(el('span', null, labelText));
   var inp = document.createElement('input');
   inp.type = 'text';
   inp.value = String(value === null || value === undefined ? '' : value);
+  // 传了卡片标识才登记：这四格会被"别处一次保存"重建掉，登记过的那份刚打进去的字要能回来。
+  if (cardKey) bindField(inp, cardKey, field, inp.value);
   lab.appendChild(inp);
   return { lab: lab, inp: inp };
 }
@@ -862,6 +1139,7 @@ function tplCard(r) {
   head.appendChild(el('span', 'tag ' + r.status, TPL_STATUS_LABEL[r.status] || r.status));
   head.appendChild(el('span', 'note', '分组 ' + r.group_key + '　hash ' + shortHash(r.content_hash)));
   card.appendChild(head);
+  addDirtyChip(head);
   card.appendChild(previewBox(r));
 
   card.appendChild(el('p', 'state ' + (r.status === 'live' ? 'on' : 'off'),
@@ -870,10 +1148,10 @@ function tplCard(r) {
   card.appendChild(el('p', 'note', '出图 ' + r.used + ' 张　其中当前挂着 ' + r.used_current + ' 张　' +
     '改完要等客户端下一次冷启才换；' + (r.updated_at ? '上次改动 ' + dayOf(r.updated_at) + '。' : '今天还没改过。')));
 
-  var fZh = fieldInt('中文名', 'w2', r.label);
-  var fEn = fieldInt('英文名', 'w2', r.label_en);
-  var fSort = fieldInt('排序（小的在前）', null, r.sort_order);
-  var fVer = fieldInt('最低包版本', null, r.min_app_version);
+  var fZh = fieldInt('中文名', 'w2', r.label, 'tpl:' + r.id, 'label');
+  var fEn = fieldInt('英文名', 'w2', r.label_en, 'tpl:' + r.id, 'label_en');
+  var fSort = fieldInt('排序（小的在前）', null, r.sort_order, 'tpl:' + r.id, 'sort_order');
+  var fVer = fieldInt('最低包版本', null, r.min_app_version, 'tpl:' + r.id, 'min_app_version');
   var fields = el('div', 'fields');
   fields.appendChild(fZh.lab); fields.appendChild(fEn.lab);
   fields.appendChild(fSort.lab); fields.appendChild(fVer.lab);
@@ -889,6 +1167,7 @@ function tplCard(r) {
 
   // 只送"跟刚读出来的不一样"的那几项：全量回写会把没碰过的字段也重新判一遍，
   // 报回来的错就不是"我改错了"而是"我没改的那格错了"。
+  // 保存是一下（改错了再存一次就回来），上架／下架是两下（它当场决定用户能不能选到这一套）。
   btnSave.addEventListener('click', function () {
     msg.textContent = ''; msg.className = 'err';
     var body = {};
@@ -897,29 +1176,34 @@ function tplCard(r) {
     if (fSort.inp.value !== String(r.sort_order)) body.sort_order = fSort.inp.value;
     if (fVer.inp.value !== String(r.min_app_version)) body.min_app_version = fVer.inp.value;
     if (!Object.keys(body).length) { msg.textContent = '这一行一个字都没改。'; return; }
-    btnSave.disabled = true; btnSt.disabled = true;
-    api('api/admin/poster/templates/' + r.id, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-    }).then(function () {
-      return loadTemplates({ id: r.id, text: '已写入。用户那道口下一次冷启读到的是这一版。' });
-    }, function (e) { msg.textContent = e.message; })
-      .then(function () { btnSave.disabled = false; btnSt.disabled = false; });
-  });
-  btnSt.addEventListener('click', function () {
-    msg.textContent = '';
-    var to = r.status === 'live' ? 'archived' : 'live';
     btnSt.disabled = true;
-    api('api/admin/poster/templates/' + r.id, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: to })
-    }).then(function () {
-      return loadTemplates({ id: r.id, text: to === 'live'
-        ? '已上架：用户那道口下一次冷启能选到它。'
-        : '已下架：不再下发，记录还在。' });
-    },
-      // 被挡下（同一套已经有一版在线上）时**只报错、不重读**：400 意味着库里一个字没动，
-      // 屏上那份还是真的；而重读会把卡片连同这句"为什么没成"一起重建掉——
-      // 症状是"点下架没反应，也没说为什么"。（本机 10-15 真点撞出来过。）
-      function (e) { msg.textContent = e.message; btnSt.disabled = false; });
+    busyRun(btnSave, '保存中…', function () {
+      return api('api/admin/poster/templates/' + r.id, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      }).then(function () {
+        clearDrafts(card);
+        return loadTemplates({ id: r.id, text: '已写入。用户那道口下一次冷启读到的是这一版。' });
+      }, function (e) { msg.textContent = e.message; })
+        .then(function () { btnSt.disabled = false; });
+    });
+  });
+  arm(btnSt, r.status === 'live' ? '再点一次=下架' : '再点一次=上架', function () {
+    msg.textContent = ''; msg.className = 'err';
+    var to = r.status === 'live' ? 'archived' : 'live';
+    btnSave.disabled = true;
+    busyRun(btnSt, to === 'live' ? '上架中…' : '下架中…', function () {
+      return api('api/admin/poster/templates/' + r.id, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: to })
+      }).then(function () {
+        return loadTemplates({ id: r.id, text: to === 'live'
+          ? '已上架：用户那道口下一次冷启能选到它。'
+          : '已下架：不再下发，记录还在。' });
+      },
+        // 被挡下（同一套已经有一版在线上）时**只报错、不重读**：400 意味着库里一个字没动，
+        // 屏上那份还是真的；而重读会把卡片连同这句"为什么没成"一起重建掉——
+        // 症状是"点下架没反应，也没说为什么"。（本机 10-15 真点撞出来过。）
+        function (e) { msg.textContent = e.message; btnSave.disabled = false; });
+    });
   });
 
   var rec = el('details', 'rec');
@@ -945,6 +1229,7 @@ function renderTemplates(d, flash) {
   (d.rows || []).forEach(function (r) { box.appendChild(tplCard(r)); });
   if (!(d.rows || []).length) box.appendChild(el('p', 'note', '库里一行模板都没有（闸没开或种子没灌）。'));
   paintPreviews();  // 卡片是刚重建的，图也得跟着重画：预览认的是库里这一行，不缓存上一次那张
+  resyncDirty();    // 刚打还没保存的那四格要带着"有 N 处没保存"回来（见上面那段）
 
   // 回执落在**重读之后那一行**上：卡片是刚重建的，写进旧节点等于没写
   // （本机 10-15 真点出来过——保存成功了屏上却一个字没变，只剩顺序自己动了）。
@@ -960,12 +1245,14 @@ function renderTemplates(d, flash) {
 
 function loadTemplates(flash) {
   return api('api/admin/poster/templates').then(function (d) {
-    renderTemplates(d, flash);
+    keepScroll(function () { renderTemplates(d, flash); });
   }, function (e) {
     if (e.status === 401) return;
-    var box = $('tpls');
-    while (box.firstChild) box.removeChild(box.firstChild);
-    box.appendChild(el('p', 'note', '这一栏没读到：' + e.message));
+    keepScroll(function () {
+      var box = $('tpls');
+      while (box.firstChild) box.removeChild(box.firstChild);
+      box.appendChild(el('p', 'note', '这一栏没读到：' + e.message));
+    });
   });
 }
 
@@ -1017,7 +1304,11 @@ function tableOf(parent, head, rows) {
     tb.appendChild(tr);
   });
   t.appendChild(tb);
-  parent.appendChild(t);
+  // 一律垫一层 `.tw`：宽屏上它什么都不做（表没超出容器就不出滚动条），
+  // 窄屏上表挤不下时是这一张表自己横滚，而不是整页被撑出屏外。
+  var wrap = el('div', 'tw');
+  wrap.appendChild(t);
+  parent.appendChild(wrap);
 }
 
 function renderStats(d) {
@@ -1101,21 +1392,23 @@ function renderStats(d) {
 
 function loadStats() {
   return api('api/admin/stats/overview?days=' + statsDays).then(function (d) {
-    renderStats(d);
+    keepScroll(function () { renderStats(d); });
   }, function (e) {
     // 401 那条由 api() 统一处理（把这一页收回口令框），这里只接其余的：
     // 红了不许整页空白——配置那一栏读到了就照常能用，方案里那句"少一组卡比整页打不开好"同理。
     if (e.status === 401) return;
-    var box = $('stats');
-    while (box.firstChild) box.removeChild(box.firstChild);
-    box.appendChild(el('p', 'note', '这一栏没读到数：' + e.message));
+    keepScroll(function () {
+      var box = $('stats');
+      while (box.firstChild) box.removeChild(box.firstChild);
+      box.appendChild(el('p', 'note', '这一栏没读到数：' + e.message));
+    });
   });
 }
 
 function refresh() {
   return api('api/admin/mp/state').then(function (state) {
     showApp();
-    render(state);
+    keepScroll(function () { render(state); });
     // 各读各的口，互不牵连：统计、模板、黑名单任何一头红了，不许把其余两屏一起带走（三个函数自己吞错）。
     return Promise.all([loadStats(), loadTemplates(), loadBlocklist()]);
   }, function (e) {
@@ -1132,6 +1425,9 @@ function setProduct(which) {
   var other = which === 'other';
   $('swSelf').classList.toggle('on', !other);
   $('swOther').classList.toggle('on', other);
+  // 这两枚是"当前看的是哪一个产品"，不是两个链接：aria-pressed 让读屏念得出按下没按下。
+  $('swSelf').setAttribute('aria-pressed', other ? 'false' : 'true');
+  $('swOther').setAttribute('aria-pressed', other ? 'true' : 'false');
   document.querySelector('main').classList.toggle('wide', other);
   $('swNote').textContent = other
     ? '这一屏是图麦克自己的后台（嵌它那一页）。它那边的钱、用户与图片不流到我们这一侧来。'
