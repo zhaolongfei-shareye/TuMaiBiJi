@@ -85,17 +85,20 @@ const BRAND_GLYPH = '麦'
 // 饱和度混合模式下，这个颜色的饱和度正好是 0：用它压一层等于把下面的图去色。
 const GRAY_ZERO_SAT = '#808080'
 
+// 站长 10-21 夜「规格卡和图文卡要放在同一行，可以把素宣放在个性款」⇒ 这两条 `group` 对调。
+// 只挪分组、不动数组位置：位置就是没收到下发时的那套 `ord`（见 templateList），
+// 所以这一屏上经典款仍是「图文卡、玉版宣、摘句、叠翠、规格卡」，个性款多了个素宣信笺。
 const TEMPLATES = [
   { id: 'card', label: '玉版宣', labelEn: 'Jade Paper', group: 'classic' },
   { id: 'quote', label: '摘句', labelEn: 'Verse Slip', group: 'classic' },
   { id: 'block', label: '叠翠', labelEn: 'Layered Paper', group: 'classic' },
-  { id: 'letter', label: '素宣信笺', labelEn: 'Vertical Letter', group: 'classic' },
+  { id: 'letter', label: '素宣信笺', labelEn: 'Vertical Letter', group: 'bold' },
   { id: 'popGrid', label: '波普分格', labelEn: 'Pop Panels', group: 'bold' },
   { id: 'popDots', label: '网点漫画', labelEn: 'Ben-Day Comic', group: 'bold' },
   { id: 'acid', label: '荧光渐变', labelEn: 'Acid Gradient', group: 'bold' },
   { id: 'cover', label: '杂志封面', labelEn: 'Magazine Cover', group: 'bold' },
   { id: 'lit', label: '纸间文艺', labelEn: 'Paper & Ink', group: 'bold' },
-  { id: 'spec', label: '规格卡', labelEn: 'Spec Sheet', group: 'bold' },
+  { id: 'spec', label: '规格卡', labelEn: 'Spec Sheet', group: 'classic' },
 ]
 const TEMPLATE_GROUPS = [
   { id: 'classic', label: '经典款', labelEn: 'Classic' },
@@ -2159,7 +2162,12 @@ function templateList() {
     const r = REMOTE[x.id]
     if (!r) return { id: x.id, label: x.label, labelEn: x.labelEn, group: x.group, ord: (i + 1) * 10 }
     return {
-      id: x.id, label: r.label, labelEn: r.label_en || r.label, group: r.group_key,
+      id: x.id, label: r.label, labelEn: r.label_en || r.label, group: x.group,
+      // ⚠ 分组**不吃这一行**：站长 10-21 夜「规格卡和图文卡要放在同一行」逼出来的。
+      // 后端那把锁（`test_admin_templates.py:219`「分组归客户端那份名单管，后台不许改」）说的
+      // 就是同一件事，但合并这一头先前是让 `group_key` 赢——而现网库里那行仍写着旧的组，
+      // 于是收到过下发的手机永远按库里那一列摆，包内怎么改都看不见。
+      // 排次（`sort_order`）照旧吃下发：那一条是"新模板插在哪个位置"，与分组不是一件事。
       ord: r.sort_order == null ? (i + 1) * 10 : r.sort_order,
     }
   })

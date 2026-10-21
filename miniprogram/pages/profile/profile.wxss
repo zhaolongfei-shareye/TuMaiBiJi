@@ -25,20 +25,24 @@
   justify-content: space-between;
 }
 
-/* 「编辑卡片信息」：六个汉字，比这一屏原来那三块加起来都轻，所以不给实心色——
-   描边胶囊（与分享落地页底部那枚、首页那两枚芯片同一支语言），字号走 --fs-tiny 那一档。
-   右边留 8rpx 与下面那一排格子的内缩同一档（`.grid-inner` 那条注释说的就是这 8）。 */
+/* 「编辑卡片信息」：站长 10-21 夜「按钮太小，要大一档，然后用反白字的按钮」
+   ⇒ 字号走这条阶梯的上一档（--fs-tiny 21 → --fs-meta 24，与上面那两行组名同一档），
+   胶囊跟着从 56 抬到 64（正好一档间距模数），左右留白 20 → 24（--sp-3）。
+   皮从描边换成实心反白：底色/字色用 --btn-bg / --btn-ink 那两枚，就是 `.btn-primary`
+   在用的同一支——不写死墨黑，四套莫兰迪与五档心情才跟着一起换。
+   加粗一并抬到 700：那枚实心按钮的语言里字重是它的一部分，反白底压 600 读着像没换皮。
+   右边仍留 8rpx，与下面那一排格子的内缩同一档（`.grid-inner` 那条注释说的就是这 8）。 */
 .mk-edit {
   flex: none;
   margin-right: 8rpx;
-  height: 56rpx;
-  line-height: 56rpx;
-  padding: 0 20rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  padding: 0 var(--sp-3);
   border-radius: var(--r-pill);
-  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.24);
-  color: var(--text-secondary);
-  font-size: var(--fs-tiny);
-  font-weight: 600;
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  font-size: var(--fs-meta);
+  font-weight: 700;
   white-space: nowrap;
 }
 
