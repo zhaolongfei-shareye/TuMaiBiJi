@@ -3,8 +3,10 @@
 三条不变量必须钉住，它们都是这轮实测出来的口径：
 ① 判 risky/review 才拒；**接口没检成（unavailable）一律放行**——微信侧抖动不能变成
    "用户存不了自己的笔记"。
-② 只有 manual 在落库前检；外部抓取/识别的原文不检，公开出口（创建分享）才检。
+② 只有 manual 在**路由那一层**落库前检；外部抓取的原文不检、公开出口（创建分享）才检。
    **而 source_type 由服务端钉死，不是客户端能填的**——否则"我不检"就成了一个入参。
+   ⚠ 10-22「接吧」加了一条岔口：**截图那一路在 worker 里 OCR 之后检**（`ingest_tasks._guard_screenshot_text`，
+   用例在 `tests/test_ocr_flows.py::TestScreenshotContentSafety`），这条文件只管路由与分享那两侧。
 ③ 长文本分段送，段与段之间不能漏字。
 
 整套不出网：conftest 已把 SEC_CHECK_ENABLED 置 false，需要走判定逻辑的用例
@@ -268,6 +270,26 @@ def test_长文本分段不漏字(monkeypatch):
     assert "尾部脏词" in seen[-1]
 
 
+def test_超窗那句日志不许带openid原值(monkeypatch, caplog):
+    """10-22 现网探针撞出来的：那句"只检了前 16000 字"原来把 openid 整串打进日志（站长一句「改」）。
+
+    两边都要钉：那句**还在**（超窗这件事必须有人看得见），且句里**不能有原值**——
+    只把参数删掉、留一句"长度 0"的糊话，也算这道闸白装。
+    """
+    import logging
+
+    seen = _stub_verdicts(monkeypatch, {})
+    sentinel = "oPYTESTSENTINELabcdefghijkl1234567890"
+    text = "厦" * (wechat.SEC_CHUNK * wechat.SEC_MAX_CHUNKS + 10)
+    with caplog.at_level(logging.WARNING, logger="app.services.wechat"):
+        wechat.enforce_text_safety(sentinel, text)
+    lines = [r.getMessage() for r in caplog.records if "未送检" in r.getMessage()]
+    assert lines, "超窗那句日志没了 ⇒ 没人知道这一篇只检了前段"
+    assert all(sentinel not in m for m in lines), f"日志里还带着 openid 原值：{lines}"
+    assert f"openid 长度 {len(sentinel)}" in lines[0]
+    assert len("".join(seen)) == wechat.SEC_CHUNK * wechat.SEC_MAX_CHUNKS
+
+
 def test_列表字段和空值都能吃(monkeypatch):
     seen = _stub_verdicts(monkeypatch, {})
     wechat.enforce_text_safety("openid-x", "标题", ["要点一", "要点二"], None, [], "")
@@ -320,8 +342,11 @@ def test_客户端自称抓取来源也没用_照检不误(client, db_session, p
 def test_只有manual在落库前检_抓取与截图来源不检(st, should_check):
     """这条口径本身没变，变的是"谁说了算"——判定依据只能是服务端写进去的值。
 
-    外部原文里出现一个敏感词就让整条笔记存不下来是误伤，所以 worker 落库的
-    web_article / wechat_article / screenshot 不过这道闸，真正要检的是公开出口。
+    外部原文里出现一个敏感词就让整条笔记存不下来是误伤，所以**路由这一道闸**只检 manual。
+    ⚠ 10-22 站长「接吧」之后，"screenshot 完全不检"这句**不再成立**：截图那一路在 **worker 里 OCR 跑完之后**
+    检（`ingest_tasks._guard_screenshot_text`，PRD §8.431／§8.432 已上现网）。
+    这条用例钉的只是"路由那一层照旧放过它"，别拿它的绿去说"截图没人检"。
+    URL 抓取（web_article／wechat_article）的原文确实这一层不检，公开那一刻由 shares 那道闸兜。
     """
     from app.api.routes import notes as notes_route
 

@@ -231,9 +231,10 @@ def enforce_text_safety(openid: str, *parts) -> None:
             continue
         window = SEC_CHUNK * SEC_MAX_CHUNKS
         if len(text) > window:
+            # 这里不许出现 openid 原值：它是这个人在这家平台上的身份标识，而 journald 谁都能翻
             logger.warning(
-                "内容安全只检了前 %d 字，后面 %d 字未送检（openid=%s）",
-                window, len(text) - window, openid,
+                "内容安全只检了前 %d 字，后面 %d 字未送检（openid 长度 %d）",
+                window, len(text) - window, len(openid or ""),
             )
         for i in range(0, min(len(text), window), SEC_CHUNK):
             chunks.append(text[i:i + SEC_CHUNK])
