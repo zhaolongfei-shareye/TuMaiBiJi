@@ -282,6 +282,16 @@ ck('反向：两屏都不许再直接 import 包里那段当唯一出处（那�
     && !/introLead: introLead\(/.test(read('miniprogram/pages/about/about.js')))
 ck('客户端不抄上限那枚数（抄一份就是两边各有一个数，改一边静默放过脏数据）',
   !/MAX_INTRO_CHARS|MAX_TIP_CHARS/.test(ASSETS))
+// 探针那三支钉子（10-21 准备跑它时查出来的：`tips` 那栏此刻装着站长亲手填的七句真文案，
+// 而旧版收尾 `put({zh: BEFORE, en: BEFORE})` 只抄了 zh——跑一趟就把他那份英文顶成中文）。
+ck('现网探针的写口只指向 about_intro：全脚本不许出现指向 tips 的那条 PUT（那是真人正在看的那一份）',
+  !/mp\/texts\/tips/.test(read('docs/工具/探-现网Tips后台下发.py'))
+    && /KIND = "about_intro"/.test(read('docs/工具/探-现网Tips后台下发.py')))
+ck('探针收尾放回的是"进来时那一份"整体，不许再写成只抄 zh 那排（两份内容不同时会顶掉另一份）',
+  /r = put\(BEFORE\)/.test(read('docs/工具/探-现网Tips后台下发.py'))
+    && !/zh: BEFORE/.test(read('docs/工具/探-现网Tips后台下发.py')))
+ck('探针打哪一台由 PROBE_BASE 决定（改过这一支要先在本地彩排，与 poster 那支同一条规矩）',
+  /os\.environ\.get\("PROBE_BASE"/.test(read('docs/工具/探-现网Tips后台下发.py')))
 
   console.log(`\nTips 后台下发（静态）：通过 ${n - bad.length} / ${n}`)
   if (bad.length) {
