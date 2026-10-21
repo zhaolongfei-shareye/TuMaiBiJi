@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.assets import MAX_FILE_ID_LEN, _assert_ours, _clean_file_id
 from app.core.auth import get_current_user
+from app.core.errors import UserError
 from app.core.rate_limit import limiter
 from app.core.timefmt import UTCDatetime
 from app.db.database import get_db
@@ -43,9 +44,23 @@ from app.models.user_profile import (
     SLOT_COUNT,
     UserProfile,
 )
+from app.services.wechat import enforce_text_safety
 
 router = APIRouter()  # 路径写全（/api/user/profile），与 cards.py 同一做法
 logger = logging.getLogger(__name__)
+
+
+def _guard_card_text(user: User, data: dict) -> None:
+    """名称与一句话会印在每一张分享卡片上＝公开可见，落库前必须过内容安全（站长 10-21「前端能接都接」）。
+
+    只送这次请求里出现的那两栏：这个接口按次计配额，没改的字段不该重打一趟。
+    策略沿用 `enforce_text_safety` 那两条——真违规才拒，接口没检成放行，微信侧抖动不许变成"名片存不了"。
+    """
+    try:
+        enforce_text_safety(user.openid, *[data[k] for k in ("name", "slogan") if k in data])
+    except UserError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
 
 # 名片图的上界拦的是"这不像一张形象图"，不是配额（配额那条见 models/user_profile.py 第 3 条）。
 # 与 assets/cards 同值：云开发单文件上限 20MB。
@@ -176,6 +191,8 @@ def write_profile(
 
     dropped: List[str] = []
     data = body.model_dump(exclude_unset=True)
+    # 检在改之前：命中违规要整趟不落地，不能留下"名称已换、一句话被拒"这种半张名片。
+    _guard_card_text(user, data)
 
     if "tpl" in data:
         t = (data["tpl"] or "").strip()

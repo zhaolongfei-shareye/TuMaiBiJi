@@ -393,3 +393,78 @@ def test_请求体必须是原样UTF8不能转义中文(monkeypatch):
     assert "线上赌场" in body.decode("utf-8")
     assert b"\\u7ebf" not in body, "中文被转义了，微信会一律判正常"
     assert json.loads(body.decode("utf-8"))["content"] == "线上赌场 六合彩 特码"
+
+
+# ------------------------------------------------- 名片与分类这两个写口（站长 10-21「前端能接都接」）
+def test_名片名称命中违规时存不下来(client, db_session, person, monkeypatch):
+    """名称会印在每一张分享卡片上＝公开可见，此前这条口一个字都没送检。"""
+    from app.models.user_profile import UserProfile
+
+    _stub_verdicts(monkeypatch, {"脏内容": "risky"})
+    r = client.put("/api/user/profile", headers=_hdr(person.id), json={"name": "我的脏内容名片"})
+    assert r.status_code == 400, f"名称没过内容安全就存下了：{r.status_code}"
+    assert "违规" in r.json()["detail"]
+    row = db_session.query(UserProfile).filter_by(user_id=str(person.id)).first()
+    assert row is None or not (row.name or "").strip(), "被拒的名称落库了"
+
+
+def test_一句话命中违规同样拒(client, db_session, person, monkeypatch):
+    from app.models.user_profile import UserProfile
+
+    _stub_verdicts(monkeypatch, {"脏内容": "risky"})
+    r = client.put("/api/user/profile", headers=_hdr(person.id), json={"slogan": "脏内容一句话"})
+    assert r.status_code == 400
+    row = db_session.query(UserProfile).filter_by(user_id=str(person.id)).first()
+    assert row is None or not (row.slogan or "").strip()
+
+
+def test_只改亮度那一档时不许白打配额(client, person, monkeypatch):
+    """这个接口按次计配额：请求里没有名称与一句话，就该一趟都不出。"""
+    seen = _stub_verdicts(monkeypatch, {})
+    r = client.put("/api/user/profile", headers=_hdr(person.id), json={"bg_dim": 5})
+    assert r.status_code == 200
+    assert seen == [], f"这一趟没带任何要检的字段，却打了 {len(seen)} 次内容安全"
+
+
+def test_接口没检成时名片照存(client, person, monkeypatch):
+    """微信侧挂了不能变成"名片存不了"——这条策略与笔记那道口一字一样。"""
+    from app.models.user_profile import UserProfile
+
+    _stub_verdicts(monkeypatch, {"脏内容": "unavailable"})
+    r = client.put("/api/user/profile", headers=_hdr(person.id), json={"name": "没检成的名字"})
+    assert r.status_code == 200, r.text
+    assert r.json()["profile"]["name"] == "没检成的名字"
+
+
+def test_新建分类命中违规时建不出来(client, db_session, person, monkeypatch):
+    from app.models.category import Category
+
+    _stub_verdicts(monkeypatch, {"脏内容": "risky"})
+    r = client.post("/api/categories/", headers=_hdr(person.id), json={"name": "脏内容分类"})
+    assert r.status_code == 400, f"分类名没过内容安全就建出来了：{r.status_code}"
+    assert db_session.query(Category).filter_by(user_id=str(person.id), name="脏内容分类").first() is None
+
+
+def test_改分类名也要复检(client, db_session, person, monkeypatch):
+    """新建检了、改名不检＝同一个字段两条路两种口径，绕过去只要多点一下"改名"。"""
+    from app.models.category import Category
+
+    ok = client.post("/api/categories/", headers=_hdr(person.id), json={"name": "旅行"})
+    assert ok.status_code == 200, ok.text
+    cid = ok.json()["id"]
+    _stub_verdicts(monkeypatch, {"脏内容": "risky"})
+    r = client.put(f"/api/categories/{cid}", headers=_hdr(person.id), json={"name": "脏内容改名"})
+    assert r.status_code == 400
+    db_session.expire_all()
+    assert db_session.query(Category).filter_by(id=cid).first().name == "旅行"
+
+
+def test_本地那道闸先挡所以不花配额(client, db_session, person, monkeypatch):
+    """重名这种本地就能判掉的请求，不该先花一趟真额度再被打回。"""
+    _stub_verdicts(monkeypatch, {})
+    first = client.post("/api/categories/", headers=_hdr(person.id), json={"name": "重复格子"})
+    assert first.status_code == 200, first.text
+    seen = _stub_verdicts(monkeypatch, {})
+    dup = client.post("/api/categories/", headers=_hdr(person.id), json={"name": "重复格子"})
+    assert dup.status_code == 400
+    assert seen == [], f"重名那次先打了 {len(seen)} 次内容安全才判重"

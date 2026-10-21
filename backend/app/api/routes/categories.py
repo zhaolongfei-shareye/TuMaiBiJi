@@ -9,12 +9,26 @@ from app.models.category import Category
 from app.models.note import Note
 from app.models.user import User
 from app.core.auth import get_current_user
+from app.core.errors import UserError
 from app.core.private_access import PRIVATE_CATEGORY_NAME
 from app.core.timefmt import UTCDatetime
 from app.services import category_names
 from app.services.sharing import close_shares
+from app.services.wechat import enforce_text_safety
 
 router = APIRouter()
+
+
+def _guard_category_name(user: User, name: str) -> None:
+    """分类名是用户自己写的、会出现在列表与详情每一格上的字，落库前过一遍内容安全（站长 10-21「前端能接都接」）。
+
+    放在本地那两道闸（重名、不许改「私密」）**之后**：反正要被打回的请求不该花真额度——
+    这个接口按次计配额。判定策略不另立一套：真违规才拒，接口没检成放行。
+    """
+    try:
+        enforce_text_safety(user.openid, name)
+    except UserError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # String(100) 在 SQLite 上不生效，实测百万字的分类名照样存进去；而分类名会出现在
@@ -106,6 +120,7 @@ def create_category(
     )
     if existing:
         raise HTTPException(status_code=400, detail="分类名称已存在")
+    _guard_category_name(user, cat.name)
     max_order = db.query(Category).filter(Category.user_id == str(user.id)).count()
     db_cat = Category(user_id=str(user.id), name=cat.name, color=cat.color, sort_order=max_order)
     # 词表命中就当场填上两档显示值（零出网、零延迟）；没命中留 NULL，
@@ -167,6 +182,8 @@ def update_category(
         )
 
     was_private = db_cat.name == PRIVATE_CATEGORY_NAME
+    if "name" in update_data and update_data["name"]:
+        _guard_category_name(user, update_data["name"])
     renamed = "name" in update_data and update_data["name"] and update_data["name"] != db_cat.name
     for key, value in update_data.items():
         setattr(db_cat, key, value)
