@@ -639,6 +639,7 @@ def test_开关关着时图片这道也不出网(monkeypatch):
 ② 这一口一个字都不进 `_batch_staging`——否则"选完又放弃"也在占现网内存，还凭空多一批孤儿字节；
 ③ 解不开的字节当场 400、**不送**——10-22 实测微信对小段非图片字节一律回 0，送过去等于自己给自己造假绿灯；
 ④ 它是提示层，process 那条链上 OCR 之前的闸必须还在、还在 OCR 之前——驳回原话要的是"任意发布场景生效"。
+⑤ 检图那一步不许跑在事件循环上（10-22 代码审查重开的口径，见本节末那条用例）。
 """
 from app.api.routes import ingest as ingest_routes  # noqa: E402
 from app.tasks import ingest_tasks  # noqa: E402
@@ -712,4 +713,20 @@ def test_提交那条链上的图片闸还在而且排在OCR之前():
     assert "_guard_screenshot_images(" in src, "提交那条链上的图片闸没了"
     assert src.index("_guard_screenshot_images(") < src.index("ocr_images("), \
         "闸挪到 OCR 之后了：命中那张也白花一趟识别"
+
+
+def test_那只口不许在事件循环里同步检图():
+    """10-22 代码审查第一条红：`async def` 里直接调 `check_image` 会按住整个 API。
+
+    不是风格问题：uvicorn 单进程无 --workers，而 `check_image` 里是同步 httpx
+    （timeout=10，token 失效还要重试一趟）＋ >1MB 时 PIL 全解码重编码。一次选九张
+    就是九趟，期间**所有人**的请求（连 /health）一起排队——症状是"整站卡"。
+    同仓 `_guard_image_pixels` 早就是 `asyncio.to_thread` 的写法，这里没跟上。
+    """
+    import inspect
+
+    src = inspect.getsource(ingest_routes.check_screenshot)
+    assert "asyncio.to_thread(check_image" in src, "检图回到事件循环里了：会堵整站"
+    assert "verdict = check_image(" not in src, "还留着一句裸调用"
+
 

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 import uuid
@@ -282,7 +283,12 @@ async def check_screenshot(
     if _image_format(data) is None:
         raise HTTPException(status_code=400, detail=UNSUPPORTED_IMAGE_HINT)
 
-    verdict = check_image(data)
+    # ⚠ 必须甩进线程：`check_image` 里是同步 httpx（timeout=10，token 失效还会重试一趟），
+    #   而 >1MB 那张还要 PIL 全解码再重编码。uvicorn 是**单进程无 --workers**，
+    #   在这一条 `async def` 里直接调它＝把整个 API 的事件循环按住十几秒，
+    #   期间所有人的请求（连 `/health`）一起排队——症状是"整站卡"，不是"这一张慢"。
+    #   同仓外链贴图那条 `_guard_image_pixels` 早就是 `asyncio.to_thread` 这个写法，照它。
+    verdict = await asyncio.to_thread(check_image, data)
     if verdict == "risky":
         # 这条日志是下一次"你说没生效"时唯一能现读的证据，别省。
         logger.warning("导入即检拦下一张（用户 %s）", user.id)
