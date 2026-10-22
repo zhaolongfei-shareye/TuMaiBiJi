@@ -234,8 +234,8 @@ ok('来源压到最小一档，标题仍正文那一档，两档差的是一整�
   /var\(--fs-micro\)/.test(srcRule) && /var\(--fs-body\)/.test(ttRule)
   && fsOf(ttRule) - fsOf(srcRule) >= 8 && fsOf(srcRule) === Math.min(...Object.values(FS)),
   `标题 ${fsOf(ttRule)}rpx／来源 ${fsOf(srcRule)}rpx／阶梯 ${JSON.stringify(FS)}`)
-ok('分类那一行跟着压一档（24 → `--fs-tiny` 21，站长 10-17「分类字体也要小一点」）',
-  /font-size: var\(--fs-tiny\)/.test(ixCatRule))
+ok('分类那一行抬回「关于」正文那一档（21 → `--fs-body` 28，站长 10-22「分类字体大小提高一档，与关于里面的字号一样，现在太小了」；10-17 那档 21 是他自己压下去的，这一刀把它翻回来）',
+  /font-size: var\(--fs-body\)/.test(ixCatRule))
 ok('标题那一档没跟着改：90% 黑、一行、放不下省略号（从旧行原样搬过来）',
   /color: rgba\(35, 37, 44, 0\.9\)/.test(ttRule) && /white-space: nowrap/.test(ttRule)
   && /text-overflow: ellipsis/.test(ttRule))
@@ -301,9 +301,10 @@ ok('一篇一张：js 里那个"当前第几张"的指针整个不存在',
 // ③搜索条：压高度 + 那两个字降到分类那一档
 ok('搜索条压到 60（分类那枚 chip 实测算高 59，同一档）',
   /height: 60rpx/.test(srchRule) && !/height: 88rpx/.test(srchRule))
-ok('「搜索笔记」与分类同字号同字重（原来 31/800 比正文还大一级）',
-  /font-size: var\(--fs-meta\)/.test(goRule) && /font-weight: 600/.test(goRule)
-  && !/fs-title/.test(goRule))
+ok('「搜索笔记」与分类同字号同字重（站长 10-03 定「搜索笔记字变成与下方分类字体大小」⇒ 两枚必须吃同一档令牌，10-22 分类抬到 --fs-body 后这句照样成立；原来那档 31/800 比正文还大一级）',
+  /font-size: var\(--fs-body\)/.test(goRule) && /font-weight: 600/.test(goRule)
+  && !/fs-title/.test(goRule)
+  && /font-size: var\(--fs-body\)/.test(ixCatRule))
 ok('输入里的字没动（仍 --fs-body，这轮只压条子和那两个字）',
   /font-size: var\(--fs-body\)/.test(appWxssRule('srch-input') || rule(idxWxss, 'srch-input')))
 // ②末尾：全文窗还是现网那一层，只把墨色对齐列表那两档
