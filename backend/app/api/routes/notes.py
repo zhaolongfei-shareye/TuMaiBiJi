@@ -7,6 +7,7 @@ import logging
 from sqlalchemy import and_, or_
 from app.db.database import get_db
 from app.models.asset import Asset, not_failed, order_by_note
+from app.models.invitation import Invitation
 from app.models.note import Note, SOURCE_SHARE_IMPORT
 from app.models.share import Share
 from app.models.user import User
@@ -118,7 +119,8 @@ class NoteDetail(NoteBrief):
 
 
 class NoteListItem(NoteBrief):
-    """列表那一行比详情多出来的三样：这一篇此刻有没有开着的分享码、该显示谁的昵称、右侧那枚配图。
+    """列表那一行比详情多出来的四样：这一篇此刻有没有开着的分享码、有没有被人存下来、
+    该显示谁的昵称、右侧那枚配图。
 
     只挂 GET /api/notes 这一条路由。详情页另走 getShareStatus，如果两处都发一份
     同样的事实，早晚会出现"列表说已分享、详情说没有"这种对不上的样子——所以
@@ -126,6 +128,14 @@ class NoteListItem(NoteBrief):
     """
 
     has_active_share: bool = False
+    # 列表上那一枚星现在念的是「有人把这一篇存下来了」（站长 10-23 一句「我要改为，有人转存，就加星」）。
+    # 真相只有一处：`invitations` 里 `source_note_id` 非空那一路的凭据行。它天然不含"自己转自己"
+    # （`quota._credit_import` 那一刀挡着，`test_quota_and_invite.py::test_自己转存自己的笔记不给钱`
+    # 连"一行都不写"都钉了），也天然一人一行（`(source_note_id, invitee_id)` 那条部分唯一索引挡着），
+    # 所以这一枚不数人头。⚠ 不许改回吃 `shares`：撤掉分享那张码，已经被人存走的几份收不回来，
+    # 星跟着灭就是假话。`has_active_share` 仍照发——它在 1.x 那份契约快照里撤不得，
+    # 只是列表上再没有哪一枚图形读它（"此刻开不开着码"改由详情窗那句念，走 getShareStatus 另一条真相源）。
+    has_saved: bool = False
     share_author_name: str | None = None
     # 「这一格该不该画名字」由服务端回答，不再让前端拿 `source_type === 'share_import'` 自己猜。
     # 为什么必须换：外链转存那一族（公众号／小红书）也带来源，但它的 `source_type` 是
@@ -177,7 +187,7 @@ class NoteUpdate(BaseModel):
 
 
 def _attach_share_marks(db: Session, notes: list) -> None:
-    """给这一页的每条笔记挂上「此刻有没有开着的码」和「那一格该显示谁的昵称」。
+    """给这一页的每条笔记挂上「此刻有没有开着的码」「有没有人把它存下来」和「那一格该显示谁的昵称」。
 
     一次 IN 查完，不逐篇查：一页 20 篇各自查一次，首页拉一次就是 20 个来回。
     shares 上有"一篇只留一张开着的码"那个部分唯一索引（models/share.py），所以一个
@@ -186,9 +196,11 @@ def _attach_share_marks(db: Session, notes: list) -> None:
     从别人那儿转存来、之后自己又分享出去的那一篇，两张名字同时可得，取的是原分享者那份
     （码上快照的 author_name 是他自己，画在自己纸片上不说明任何事）。
     两头都没有就留空——界面上那一格不画名字，不拿"图麦"这类假名去填。
+    「存过没有」只问 `invitations` 有没有那一行，不问几个人存的：星是一枚布尔，不是计数。
     """
     ids = [n.id for n in notes]
     shared: dict = {}
+    saved: set = set()
     if ids:
         shared = {
             row[0]: row[1]
@@ -196,8 +208,15 @@ def _attach_share_marks(db: Session, notes: list) -> None:
             .filter(Share.note_id.in_(ids), Share.is_active == True)  # noqa: E712
             .all()
         }
+        saved = {
+            row[0]
+            for row in db.query(Invitation.source_note_id)
+            .filter(Invitation.source_note_id.in_(ids),
+                    Invitation.source_note_id.is_not(None)).distinct().all()
+        }
     for n in notes:
         n.has_active_share = n.id in shared
+        n.has_saved = n.id in saved
         imported = n.imported_from if isinstance(n.imported_from, dict) else {}
         n.share_author_name = imported.get("author_name") or shared.get(n.id)
         # 名字来自"抄自谁"那一份快照时才算来源篇；只来自自己那张分享码的不算

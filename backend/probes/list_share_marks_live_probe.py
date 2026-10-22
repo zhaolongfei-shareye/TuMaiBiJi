@@ -1,4 +1,4 @@
-"""现网探针：列表那两样派生值真的从 https 那条路上发出来了（10-02 这批）。
+"""现网探针：列表那几样派生值真的从 https 那条路上发出来了（10-02 这批，10-23 加 `has_saved`）。
 
 和 pytest 的分工：单元用例证"逻辑对不对"，这一支证"部署到现网的那份字节真的是它"——
 少传一个文件、重启错一个 unit，pytest 全绿也照样是旧行为（这条记录在案过不止一次）。
@@ -10,12 +10,19 @@
 只用 deploy-test（users.id=1）名下**已经存在**的那三篇笔记，不建新笔记；
 第②组会临时建一张真码、第③组当场撤掉，收尾断言回到起点。别的账号一行都不碰。
 
-要看的四件事：
+要看的五件事：
 ① 列表里每一行都带这两键，且 `has_active_share` 与库里 `is_active=1` 的行逐篇对得上
    （拿库当另一只眼，不让接口自己证明自己）。
 ② 码上带昵称的那一篇，列表里读出来的就是那个昵称。
 ③ 撤掉之后当场灭——它读的是状态量，不是"曾经分享过"。
 ④ 详情那条路由**不发**这两键：两处各发一份真相，早晚会出现"列表说已分享、详情说没有"。
+⑤（10-23 那一枚星改口径）`has_saved` 与库里 `invitations.source_note_id` 那一路逐篇对得上，
+   并且**正反两向都能动**：插一行凭据它当场亮、把那行删掉它当场灭。
+   ⚠ 为什么这一组要自己插一行：现网那 7 笔转存全在站长名下（users.id=3，探针一行不许碰），
+   deploy-test 名下**一笔都没有**——只读不写的话，"全 False"既能证明接线对、也能证明接口把这一栏
+   写死成了 False，那条绿灯是假的。插的那行只归 deploy-test 自己（`inviter` 与 `invitee` 同一人、
+   `reward=0`，不碰任何人的配额），而且它挡不住真人的账：唯一索引钉的是"(源笔记, 转存人)"，
+   别人来存同一篇是另一行。删就按记下的那个主键删，收尾再数一遍残留。
 """
 import sys
 import uuid
@@ -27,6 +34,7 @@ import httpx
 
 from app.core.auth import _create_token
 from app.db.database import SessionLocal
+from app.models.invitation import Invitation
 from app.models.note import Note
 from app.models.share import Share
 from app.models.user import User
@@ -79,6 +87,38 @@ def main():
     check("① has_active_share 与库里 is_active=1 的行逐篇一致", not mismatch,
           f"起点活码 {sorted(base_live)}；不一致 {mismatch}")
 
+    # ---- ⑤ 那一枚星＝有人转存：接线正反两向都验 -------------------------------
+    # 放在②③之前：那两组可能被内容安全那道闸拦掉（拦了就直接 finish 回上游），
+    # 而这一组只依赖库里那一行，不该跟着它们的成败一起变成"没跑"。
+    def saved_ids():
+        db.expire_all()
+        return {r[0] for r in db.query(Invitation.source_note_id).filter(
+            Invitation.source_note_id.in_(list(mine)),
+            Invitation.source_note_id.is_not(None)).all()}
+
+    base_saved = saved_ids()
+    check("⑤ 每一行都带着 has_saved 这一键", all("has_saved" in x for x in rows.values()))
+    wrong = {i: (rows[i].get("has_saved"), i in base_saved)
+             for i in rows if bool(rows[i].get("has_saved")) != (i in base_saved)}
+    check("⑤ has_saved 与库里 invitations 那一路逐篇一致", not wrong,
+          f"起点存过的 {sorted(base_saved)}；不一致 {wrong}")
+    probe_note = sorted(mine)[0]
+    inv = Invitation(inviter_id=user.id, invitee_id=user.id, source_note_id=probe_note, reward=0)
+    db.add(inv)
+    db.commit()
+    pk = inv.id
+    db.expire_all()
+    lit = listing().get(probe_note, {}).get("has_saved")
+    check("⑤ 插一行转存凭据，列表那一枚当场亮", lit is True, f"笔记 {probe_note} → {lit}")
+    db.query(Invitation).filter(Invitation.id == pk).delete()
+    db.commit()
+    db.expire_all()
+    out = listing().get(probe_note, {}).get("has_saved")
+    check("⑤ 把那行删回去，那一枚当场灭", out is False, f"笔记 {probe_note} → {out}")
+    residue = db.query(Invitation).filter(Invitation.id == pk).count()
+    check("⑤ 收尾：探针那行凭据没留残留", residue == 0 and saved_ids() == base_saved,
+          f"残留 {residue} 行")
+
     # ---- ② 建一张带昵称的码，列表里就该读出那个昵称 --------------------------
     target = next((i for i in mine if i not in base_live), None)
     if target is None:
@@ -109,9 +149,10 @@ def main():
 
     # ---- ④ 详情那条路由不发这两键 --------------------------------------------
     d = client.get(f"/api/notes/{target}", headers=hdr)
-    check("④ 详情响应里没有这两键", d.status_code == 200
-          and "has_active_share" not in d.json() and "share_author_name" not in d.json(),
-          f"HTTP {d.status_code}，键 {[k for k in d.json() if 'share' in k]}")
+    check("④ 详情响应里没有这几键", d.status_code == 200
+          and "has_active_share" not in d.json() and "share_author_name" not in d.json()
+          and "has_saved" not in d.json(),
+          f"HTTP {d.status_code}，键 {[k for k in d.json() if 'share' in k or 'saved' in k]}")
 
     return finish(client, hdr, db)
 

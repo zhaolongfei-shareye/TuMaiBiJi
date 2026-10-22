@@ -175,7 +175,7 @@
               </view>
               <text class="ixl-tt">{{r.title}}</text>
               <view class="ixl-rail">
-                <view wx:if="{{r.shared}}" class="ixl-mk ixl-star"></view>
+                <view wx:if="{{r.saved}}" class="ixl-mk ixl-star"></view>
                 <view wx:if="{{r.card}}" class="ixl-mk ixl-card"></view>
                 <view wx:if="{{r.priv}}" class="ixl-mk ixl-lock"></view>
                 <view class="ixl-ln"></view>
