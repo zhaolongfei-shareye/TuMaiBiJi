@@ -369,6 +369,12 @@ const i18n = {
     manualDesc: '把原文贴在这里，摘要自动生成',
     noImagePicked: '没拿到图片，换一张或再试一次',
     pickFirst: '先选一张截图再开始',
+    // 导入即检那三句（站长 10-22 拍丙）。`shotBlocked` 与后端 `wechat.enforce_image_safety`
+    // 那句**逐字同一支**：驳回通知的原话要的就是"提示用户所发布内容含违规信息"，
+    // 一个产品里两句不同的违规话是会让人怀疑到底哪句作数。
+    shotBlockedTag: '违规',
+    shotBlocked: '图片包含违规信息，无法保存，请换一张再试',
+    shotChecking: '图片正在检查，稍等一下',
     takePhoto: '拍照',
     fromAlbum: '相册',
     // 满 9 张还点 ➕：原来是静默截掉（选了没看见，界面上什么都不说），现在给一句吐司。
@@ -770,6 +776,11 @@ const i18n = {
     manualDesc: 'Paste the text, get a summary',
     noImagePicked: 'No image came back — try another one',
     pickFirst: 'Pick a screenshot first',
+    // 导入即检那三句，与上面中文一一对应。`shotBlockedTag` 要放进 100rpx 那一格，
+    // 字号是 --fs-micro（18rpx），所以英文不许长过 "Blocked" 这一档。
+    shotBlockedTag: 'Blocked',
+    shotBlocked: 'This image was blocked — try another one',
+    shotChecking: 'Checking the images, one moment',
     takePhoto: 'Camera',
     fromAlbum: 'Album',
     maxShots: 'Up to {n} images — delete one first',

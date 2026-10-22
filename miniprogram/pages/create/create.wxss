@@ -1090,6 +1090,33 @@ button.rec-bar {
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* 检体没回来那一格：占位色块（站长 10-22 拍丙「检查前有小色块占位图临时展示」）。
+   面与描边照 ➕ 那一枚同一支（`--cp-field` + `--cp-edge-14`），不新开色板、不加动画——
+   他要的是"这一格还没好"，不是"这里有个spinner"。 */
+.th-wait {
+  width: 100%;
+  height: 100%;
+  border-radius: 18rpx;
+  background: var(--cp-field);
+  box-sizing: border-box;
+  border: var(--w-edge) solid var(--cp-edge-14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 拦下那一态：同一块面压暗一档（用 ➕ 满了那一档那支中性暗，不是第二支饱和色），
+   中间两个字说清"是这张不行"。图不回显，✕ 留着——删不删由他，我们不替他扔图。 */
+.th-bad {
+  background: rgba(20, 22, 26, 0.28);
+  border-color: transparent;
+}
+
+.th-bad-lb {
+  color: #fff;
+  font-size: var(--fs-micro);
+}
+
 /* 删这一张的那枚 ✕：右上角、离边 10，遮罩 0.55 是站长 10-04 拍的③那一档，与弹窗那枚同值。
    放在图里面而不是压出界，是因为 .th 要 overflow:hidden 才切得出圆角。 */
 .th-x {
@@ -1927,6 +1954,15 @@ button.rec-bar {
    ⚠ `:not(.th-add-dis)` 那一刀是必须的：满了那一态 `.th-add-dis` 只有一枚类（选择器权重 1），
    而这条是 3 枚，直接写会把"➕ 转灰、边撤掉"那一条静默吃掉（同一元素两个类，权重说话）。 */
 .container.has-bg .th-add:not(.th-add-dis) {
+  background: var(--glass-fill);
+  border-color: var(--glass-hair);
+}
+
+/* 10-22 导入即检那块占位色（`.th-wait`）与上面那枚 ➕ **是同一块面**（`--cp-field` 实心浅灰），
+   所以有背景图那一态必须跟着进这份玻璃名单——否则一排队还没检完，屏上就是五块不透明的灰饼压在玻璃上。
+   ⚠ `:not(.th-bad)` 那一刀照上面那条的写法：拦下那一态用的是中性暗面（与 ➕ 满了那一档同一支），
+   它本来就该是一块"压得住暗"的实心面，不该跟着翻成玻璃。 */
+.container.has-bg .th-wait:not(.th-bad) {
   background: var(--glass-fill);
   border-color: var(--glass-hair);
 }

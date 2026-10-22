@@ -202,8 +202,11 @@ const ingestScreenshots = async (filePaths, translate) => {
     { batch_id: batchId, translate: translate ? 'true' : 'false' }, { contentType: 'application/x-www-form-urlencoded' })
 }
 
-const getTaskStatus = (taskId) => request(`/api/tasks/${taskId}`)
+// 导入即检那一只：一张压过的小图送过去，回 {verdict: pass|risky|unavailable}，服务端不存。
+// 与 ingestScreenshots 共用 `uploadSingleImage`（表单字段名 `images` 是那边定的，这一口照抄）。
+const checkShot = (filePath) => uploadSingleImage('/api/ingest/screenshots/check', filePath)
 
+const getTaskStatus = (taskId) => request(`/api/tasks/${taskId}`)
 const pollTask = (taskId, intervalMs = 2000, maxWaitMs = 300000) => {
   return new Promise((resolve, reject) => {
     const start = Date.now()
@@ -297,6 +300,7 @@ module.exports = {
   // 归类跟着这一篇走（服务端认人不认客户端说的 source_type）。
   ingestText: (data) => request('/api/ingest/text', 'POST', data),
   ingestScreenshots,
+  checkShot,
   getTaskStatus,
   pollTask,
   getCategories: () => request('/api/categories/'),

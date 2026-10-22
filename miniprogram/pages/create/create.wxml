@@ -331,7 +331,13 @@
              第二张再也进不了相机。 -->
         <view wx:elif="{{active === 'photo'}}" class="strip">
           <view class="th" wx:for="{{previewImages}}" wx:key="*this">
-            <image class="th-img" src="{{item}}" mode="aspectFill" />
+            <!-- 检体没回来之前那一格是块占位色，回来才把图换上去（站长 10-22 拍丙）。
+                 'bad'＝微信说违规：不换图、钉成拦下那一态，✕ 由他自己删。 -->
+            <view wx:if="{{shotStates[index] !== 'ok'}}"
+                  class="th-wait {{shotStates[index] === 'bad' ? 'th-bad' : ''}}">
+              <text wx:if="{{shotStates[index] === 'bad'}}" class="th-bad-lb">{{t.shotBlockedTag}}</text>
+            </view>
+            <image wx:else class="th-img" src="{{item}}" mode="aspectFill" />
             <view class="th-x" data-index="{{index}}" catchtap="removeShot">✕</view>
             <text class="th-no">{{index + 1}}</text>
           </view>

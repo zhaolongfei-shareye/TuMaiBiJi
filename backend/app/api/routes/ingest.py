@@ -16,7 +16,7 @@ from app.core.errors import UserError
 from app.core.rate_limit import limiter
 from app.api.routes.notes import MAX_BODY, MAX_TITLE, MAX_URL
 from app.services.queue import get_queue, set_task_status
-from app.services.wechat import enforce_text_safety
+from app.services.wechat import check_image, enforce_text_safety
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +245,48 @@ async def stage_screenshot(
     batch["bytes"] += len(data)
 
     return {"batch_id": batch_id, "count": len(batch["data"])}
+
+
+@router.post("/screenshots/check")
+@limiter.limit("30/minute")
+async def check_screenshot(
+    request: Request,
+    images: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """站长 10-22 拍丙：选完图当场先检一次，屏上给一块占位色，检过才把缩略图换回去。
+
+    **只检不存**：字节读完就送接口，回来就丢，不进 `_batch_staging`。所以"选完又放弃"
+    那一批不会占服务器内存，也不会有人替他把图留在现网。
+
+    这一条是**提示层**，不是闸。闸在 `process` 那条链上（worker 里 OCR 之前的
+    `_guard_screenshot_images`），那一道一个字没动，提交时照旧整批重检。理由写在
+    驳回通知的原话里：内容安全 API 要在**任意发布场景**生效——如果把检挪成"导入时检过、
+    提交就不检"，绕开导入直接打 `process`（老包、别的入口）就成了一条现成的旁路。
+
+    ⚠ 两边检的字节不是同一份：这一条检的是客户端压过的那一张，闸检的是原图。
+    所以出现过"这里回 pass、提交时被拦下"完全可能，以闸为准——屏上那句提示本来就是"提示"。
+
+    命中违规**不算接口失败**，所以回 200 加 `verdict`，不用 4xx：调用方要按三态分支，
+    把 risky 做成 HTTP 错误会让它在客户端长成"网络不好"那一类。
+    `unavailable`（微信抖动、开关关着、额度打光）照原样交出去，由客户端回显放行——
+    与 `enforce_image_safety` 同一条纪律：微信侧抖动不许变成"用户存不了自己的笔记"。
+    """
+    data = await images.read(MAX_IMAGE_BYTES + 1)
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=400, detail=f"图片超过 {MAX_IMAGE_BYTES // 1048576}MB 限制"
+        )
+    # 与 stage 同一把尺子：解不开的字节送过去微信也只回 0（10-22 实测），
+    # 那是"检不出"不是"没问题"，更早一步当场拒掉更省一趟出网。
+    if _image_format(data) is None:
+        raise HTTPException(status_code=400, detail=UNSUPPORTED_IMAGE_HINT)
+
+    verdict = check_image(data)
+    if verdict == "risky":
+        # 这条日志是下一次"你说没生效"时唯一能现读的证据，别省。
+        logger.warning("导入即检拦下一张（用户 %s）", user.id)
+    return {"verdict": verdict}
 
 
 @router.post("/screenshots/process")

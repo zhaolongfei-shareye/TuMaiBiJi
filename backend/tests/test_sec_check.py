@@ -629,3 +629,87 @@ def test_开关关着时图片这道也不出网(monkeypatch):
     monkeypatch.setattr(wechat.httpx, "Client", lambda *a, **k: _Recording({}, sent))
     assert wechat.check_image(b"png") == "unavailable"
     assert sent == []
+
+
+# ---------------------------------------------------------------- 导入即检那一口
+"""站长 10-22 拍丙：「导入后自动检查是否合规，检查前有小色块占位图临时展示，等过审后再回显，
+然后全部回显才允许提炼」。落成服务端一只**只检不存**的路由 `POST /api/ingest/screenshots/check`。
+钉四条，每条都是"少钉一条就会有一种静默失效"：
+① risky 回 200 不是 4xx——它是这口活干成了，做成错误会在客户端长成"网络不好"那一类；
+② 这一口一个字都不进 `_batch_staging`——否则"选完又放弃"也在占现网内存，还凭空多一批孤儿字节；
+③ 解不开的字节当场 400、**不送**——10-22 实测微信对小段非图片字节一律回 0，送过去等于自己给自己造假绿灯；
+④ 它是提示层，process 那条链上 OCR 之前的闸必须还在、还在 OCR 之前——驳回原话要的是"任意发布场景生效"。
+"""
+from app.api.routes import ingest as ingest_routes  # noqa: E402
+from app.tasks import ingest_tasks  # noqa: E402
+
+_PNG = b"\x89PNG\r\n\x1a\npytest-fake-payload"
+
+
+def _stub_image_verdict(monkeypatch, verdict):
+    seen = []
+
+    def fake(data):
+        seen.append(data)
+        return verdict
+
+    monkeypatch.setattr(ingest_routes, "check_image", fake)
+    return seen
+
+
+def test_导入即检命中违规也回二百而不是错误(client, person, monkeypatch):
+    seen = _stub_image_verdict(monkeypatch, "risky")
+    r = client.post("/api/ingest/screenshots/check",
+                    files={"images": ("a.png", _PNG, "image/png")}, headers=_hdr(person.id))
+    assert r.status_code == 200, r.text
+    assert r.json() == {"verdict": "risky"}
+    assert seen and seen[0].startswith(b"\x89PNG"), "这张没送出去"
+
+
+def test_导入即检那一口不落暂存(client, person, monkeypatch):
+    """只检不存：`_batch_staging` 是进程内那块内存，这一口一张都不许往里写。"""
+    _stub_image_verdict(monkeypatch, "pass")
+    before = dict(ingest_routes._batch_staging)
+    r = client.post("/api/ingest/screenshots/check",
+                    files={"images": ("a.png", _PNG, "image/png")}, headers=_hdr(person.id))
+    assert r.status_code == 200, r.text
+    assert ingest_routes._batch_staging == before, "这一口把图存进暂存了，等于改了上传时机"
+
+
+def test_未检成原样透传而不是替微信说没问题(client, person, monkeypatch):
+    """`unavailable` 必须照原样交回客户端：它不是"这张图没问题"，是"这次没检成"。"""
+    _stub_image_verdict(monkeypatch, "unavailable")
+    r = client.post("/api/ingest/screenshots/check",
+                    files={"images": ("a.png", _PNG, "image/png")}, headers=_hdr(person.id))
+    assert r.status_code == 200, r.text
+    assert r.json() == {"verdict": "unavailable"}
+
+
+def test_解不开的字节当场拒掉而且根本不送(client, person, monkeypatch):
+    """这条钉的是 10-22 实测到的那个形状：微信对小段非图片字节一律回 0。
+
+    所以"送过去让它判"是个假动作——它一定判过。必须在门口按文件头拦掉，
+    并且**一个字节都不出网**（seen 为空才算：拦了还送，等于白拦）。
+    """
+    seen = _stub_image_verdict(monkeypatch, "pass")
+    r = client.post("/api/ingest/screenshots/check",
+                    files={"images": ("a.bin", b"not an image at all", "application/octet-stream")},
+                    headers=_hdr(person.id))
+    assert r.status_code == 400, r.text
+    assert ingest_routes.UNSUPPORTED_IMAGE_HINT in r.json()["detail"]
+    assert seen == [], f"格式没过关还送出去了：{seen}"
+
+
+def test_提交那条链上的图片闸还在而且排在OCR之前():
+    """提示层不许变成唯一的一道检：绕开导入直接打 process 也照样得被拦。
+
+    按源码现读，不写死行号（挪一行就红是假红）；但顺序钉死——闸排到 OCR 之后
+    就变成"先花一趟 OCR 再说"，那是这条链 10-22 那刀特意避开的位置。
+    """
+    import inspect
+
+    src = inspect.getsource(ingest_tasks.process_screenshots_task)
+    assert "_guard_screenshot_images(" in src, "提交那条链上的图片闸没了"
+    assert src.index("_guard_screenshot_images(") < src.index("ocr_images("), \
+        "闸挪到 OCR 之后了：命中那张也白花一趟识别"
+

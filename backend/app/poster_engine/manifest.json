@@ -3,8 +3,8 @@
  "files": [
   {
    "name": "api.js",
-   "bytes": 20388,
-   "md5": "22bd55f3ffb10a249f96f4f88ec58419"
+   "bytes": 20732,
+   "md5": "8bf04b6e799cf1dd06076c37cb1012b9"
   },
   {
    "name": "appInfo.js",
@@ -18,8 +18,8 @@
   },
   {
    "name": "i18n.js",
-   "bytes": 53488,
-   "md5": "ab5fc8dbf25d70dc510718845a744f6a"
+   "bytes": 54310,
+   "md5": "90d8ad2d665468f42e077b6e56c428ca"
   },
   {
    "name": "mpAssets.js",

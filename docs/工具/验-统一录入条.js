@@ -1140,6 +1140,55 @@ ok('热区靠 padding 垫、行高不动（`.out` 仍 44rpx；10-17 药丸从 40
   num(seg('.out'), 'height') === 44 && /padding:\s*15rpx 0/.test(seg('.out .wr-sw'))
   && num(seg('.wr-sw-track'), 'height') + 30 === 60
   && /height:\s*auto/.test(seg('.out .wr-sw')) && /margin-top:\s*0/.test(seg('.out .wr-sw')))
+// ---------- 7.5 导入即检那一格（站长 10-22 拍丙）----------
+/* 他原话：「导入后自动检查是否合规，检查前有小色块占位图临时展示，等过审后再回显，然后全部回显才允许提炼」。
+   这一节钉的是"这一整套真接上了没有"：两串状态同不同步、滑条卡不卡、色块有没有皮、话术与后端是不是同一支。
+   ⚠ 它验不了"微信会不会判违规"——那一格只有真送一张已知违规的图才知道，不在这把尺子的射程里。 */
+const BE_WECHAT = fs.readFileSync(path.join(ROOT, 'backend', 'app/services/wechat.py'), 'utf8')
+ok('shotStates 那一串在四个写入点都跟着 previewImages 一起动（漏一处＝下标指到别的图上）',
+  /shotStates: \[\],/.test(js)
+  && /shotStates: this\.data\.shotStates\.concat\(fresh\.map\(\(\) => 'wait'\)\)/.test(js)
+  && /states\.splice\(index, 1\)/.test(js)
+  && /previewImages: \[\], shotStates: \[\]/.test(js))
+ok('全部回显才允许提炼：readyFor 里那条长度等式与 every 都在',
+  /previewImages\.length === shotStates\.length/.test(js)
+  && /shotStates\.every\(\(s\) => s === 'ok'\)/.test(js))
+const submitShotHead = js.split('async submitScreenshots')[1].split('_extractBegin')[0]
+ok('点轨道那一条岔口也卡住了：没先过一遍 readyFor 就 return（不许静默，两句话分开说）',
+  /if \(!this\.readyFor\(\)\)/.test(submitShotHead)
+  && /shotBlocked' : 'shotChecking/.test(submitShotHead))
+const submitShotBody = js.split('async submitScreenshots')[1].split('async _backupShots')[0]
+ok('那一刀真的排在发出去之前：!readyFor 的位置比 ingestScreenshots 早',
+  submitShotBody.indexOf('!this.readyFor()') > -1
+  && submitShotBody.indexOf('!this.readyFor()') < submitShotBody.indexOf('api.ingestScreenshots'))
+const checkBody = js.split('async _checkShots')[1].split('removeShot(e)')[0]
+/* catch 那一支的射程只到"第一次写状态"为止：再往下就是 `if (!risky)` 那两条正路，
+   拿整段去查 'bad' 会把正路自己判成违规（第一版就红在这一句上）。 */
+const catchArm = ((checkBody.split('catch (e) {')[1] || '').split('_setShotState')[0])
+ok('只有微信明说 risky 才算违规：catch 那一支只留日志、不改判',
+  /let risky = false/.test(checkBody)
+  && /risky = !!\(res && res\.verdict === 'risky'\)/.test(checkBody)
+  && /console\.warn/.test(catchArm) && !/'bad'/.test(catchArm))
+ok('逐张串行送检，不并行（九张一起重绘离屏 canvas 会把内存吃穿，与 B 链同一条理由）',
+  /for \(const p of paths\)/.test(checkBody) && !/Promise\.all/.test(checkBody))
+ok('这一口只是提示层：提交仍然走 stage→process 那一趟（闸在 worker 里 OCR 之前，撤了就没人拦）',
+  /ingestScreenshots\(batch, this\.data\.writeTranslate\)/.test(js))
+ok('占位那一格绑在状态上、检过才把图换回来（wxml 两态都在）',
+  /shotStates\[index\] !== 'ok'/.test(wxml) && /<image wx:else class="th-img"/.test(wxml))
+ok('三块皮各有自己的规则（.th-wait／.th-bad／.th-bad-lb）',
+  ['th-wait', 'th-bad', 'th-bad-lb'].every((c) => new RegExp(`^\\.${c} \\{`, 'm').test(wxss)))
+/* 这一条钉的是 10-13 那次已经踩过的毛病换了个载体回来：`.th-add` 因为吃 `--cp-field` 实心浅灰，
+   在"有背景图"那一态被单独搬进玻璃名单（否则就是压在玻璃上的一块不透明灰饼）。
+   占位那块用的是**同一枚令牌**，所以它必须跟着进名单——漏了不会红任何一条现成的判据，只会难看。 */
+ok('有背景图那一态：占位那块也进了玻璃名单（与 ➕ 同一份毛病，换个类不许又犯一遍）',
+  /--glass-fill/.test(seg('.container.has-bg .th-wait:not(.th-bad)')))
+ok('那三句中英各一份（切英文不许念中文）',
+  ['shotBlocked', 'shotBlockedTag', 'shotChecking'].every((k) => zh[k] && en[k]))
+const srvSentence = (/raise UserError\('(图片包含违规信息[^']*)'\)/.exec(BE_WECHAT) || [])[1]
+ok('违规那句话全站只有一支：客户端这句与后端 enforce_image_safety 逐字相等',
+  !!srvSentence && zh.shotBlocked === srvSentence,
+  `后端「${srvSentence}」／前端「${zh.shotBlocked}」`)
+
 // ---------- 8. 上一代那些能力没被这批碰坏 ----------
 ok('忙态仍然挡住收起', /collapse\(\)\s*\{\s*if \(this\.data\.busy/.test(js))
 const showBody = js.split('async onShow')[1].split('hintFor(value)')[0]

@@ -127,6 +127,11 @@ Page({
     urlInput: '',
     urlHint: 'idle',
     previewImages: [],
+    // 站长 10-22 拍丙：「导入后自动检查是否合规，检查前有小色块占位图临时展示，等过审后再回显，
+    // 然后全部回显才允许提炼」。这一串与 previewImages **同下标同长度**，三态：
+    // 'wait'＝体还没回来（屏上是占位色块）／'ok'＝检过了（缩略图回显）／'bad'＝微信说违规。
+    // ⚠ 它不是"审核员"，是提示层：提交那一趟服务端照旧整批重检（闸在 worker 里 OCR 之前，没撤）。
+    shotStates: [],
     shotsFull: false,
     writeBody: '',
     // 原文框有没有焦点：它是「文字」那一档展开/收起的唯一开关。
@@ -325,10 +330,15 @@ Page({
   // 圆的颜色（实心/灰）与滑到底触不触发。判据与三个 submit 里的校验逐字一致，
   // 所以不会出现"看着能滑、滑到底报一句不能提交"。
   readyFor() {
-    const { active, urlHint, writeBody, previewImages } = this.data
+    const { active, urlHint, writeBody, previewImages, shotStates } = this.data
     if (active === 'url') return urlHint === 'ok'
     if (active === 'write') return !!writeBody.trim()
+    // 照片这一档多一条（10-22 丙「全部回显才允许提炼」）：还有占位没回来就不许滑到底。
+    // 那个长度等式是不变量而不是装饰：shotStates 少一格（漏了一处 splice）就会让 every
+    // 对着一串"看起来都过了"的状态点头，而屏上还有一张根本没检——那是空闸，不是校验。
     return previewImages.length > 0
+      && previewImages.length === shotStates.length
+      && shotStates.every((s) => s === 'ok')
   },
 
   // 一处算、三处用（ready / shotsFull / panelOpen 都从当前状态推出来）。
@@ -903,8 +913,16 @@ Page({
         }
         // 这里**不再截一刀**：还能选几张已经交给系统选择器（count = 剩余位），满了根本不开选择器。
         // 原来那一刀是静默的（slice(0, MAX_SHOTS)），症状是"能选 9 张、只留 9 张里被砍掉的那几张"。
-        this.setData({ previewImages: this.data.previewImages.concat(files.map((f) => f.tempFilePath)) })
+        //
+        // 每张新图先落一格 'wait'（屏上是占位色块），再逐张送检；检回来才换缩略图。
+        // 不 await 这一趟：它慢、它挂，都不该让"图没选上"这件事发生（与下面 B 链同一取舍）。
+        const fresh = files.map((f) => f.tempFilePath)
+        this.setData({
+          previewImages: this.data.previewImages.concat(fresh),
+          shotStates: this.data.shotStates.concat(fresh.map(() => 'wait')),
+        })
         this._sync()
+        this._checkShots(fresh)
       },
       // 原来这里只有 success：权限被拒或系统选择器起不来时界面静默无反应，
       // 用户只能对着屏幕再点一次。fail 补上。
@@ -939,12 +957,56 @@ Page({
     wx.openSetting({})
   },
 
+  /** 按**路径**找那一格现在在第几位，写它的检查态。返回 false＝这张已经被 ✕ 掉了，
+   *  这一体的结果没有落点（下标会指到别的图上，所以宁可丢也不能写）。 */
+  _setShotState(path, state) {
+    const i = this.data.previewImages.indexOf(path)
+    if (i < 0) return false
+    const states = this.data.shotStates.slice()
+    states[i] = state
+    this.setData({ shotStates: states })
+    this._sync()
+    return true
+  },
+
+  /**
+   * 选完图当场逐张送检（10-22 丙）。**串行**，与 B 链 `_backupShots` 同一个理由：
+   * 九张 4000×3000 一起重绘离屏 canvas 会把内存吃穿，而真机在这件事上比模拟器诚实得多。
+   *
+   * 除"微信明确回 risky"以外一律算过：压不动、传不上、回体读不懂、后端回 unavailable、
+   * 格式不支持被 400 拒——这一条是提示层，不许把"存不了自己的笔记"变成用户的损失
+   * （与 `wechat.enforce_image_safety` 同一条纪律；权威闸在提交那一趟，一个字没撤）。
+   *
+   * 检的是压过的那一张、闸检的是原图，两边判定可能不同：以闸为准。所以屏上这一句是"提示"，
+   * 而 'bad' 那一格也根本进不到提交（`readyFor` 卡着），不会有一张违规图靠这条路漏进去。
+   */
+  async _checkShots(paths) {
+    for (const p of paths) {
+      if (this.data.previewImages.indexOf(p) < 0) continue  // 半路被 ✕ 掉了，不再为它花一趟出网
+      let risky = false
+      try {
+        const small = await compressForBackup(p)
+        const res = await api.checkShot(small ? small.path : p)
+        risky = !!(res && res.verdict === 'risky')
+      } catch (e) {
+        // 没检成 ≠ 这张有问题。留一行日志，屏上照常回显。
+        console.warn('导入即检这一趟没走通，按未检成放行', e)
+      }
+      if (!risky) { this._setShotState(p, 'ok'); continue }
+      if (this._setShotState(p, 'bad')) this.sayErr(t('shotBlocked', this.data.lang))
+    }
+  },
+
   removeShot(e) {
     if (this.data.busy) return
     const index = e.currentTarget.dataset.index
     const left = this.data.previewImages.slice()
+    const states = this.data.shotStates.slice()
     left.splice(index, 1)
-    this.setData({ previewImages: left })
+    // 两串必须一起缩：只缩 previewImages 会让 shotStates 长出一格，
+    // 那一格正好顶在**别的图**身上（下面那条长度等式当场把这一档判成"不许滑"）。
+    states.splice(index, 1)
+    this.setData({ previewImages: left, shotStates: states })
     this._sync()
   },
 
@@ -953,6 +1015,15 @@ Page({
     if (this.data.previewImages.length === 0) {
       // 灰圆被点到也要给话，不能静默
       this.setData({ errLine: t('pickFirst', this.data.lang) })
+      this._sync()
+      return
+    }
+    // 「全部回显才允许提炼」那一格的另一半：滑条被 readyFor 卡住之外，点轨道那一条
+    // （`onSldTap` 在 !ready 时也走进这一句）同样不许把还没检完的那一批发出去。
+    // 两句话分开说：有 'bad' 就说违规，其余（还在路上、或两串长度对不上）说还在检查。
+    if (!this.readyFor()) {
+      const blocked = this.data.shotStates.indexOf('bad') >= 0
+      this.setData({ errLine: t(blocked ? 'shotBlocked' : 'shotChecking', this.data.lang) })
       this._sync()
       return
     }
@@ -966,7 +1037,7 @@ Page({
     try {
       const { task_id } = await api.ingestScreenshots(batch, this.data.writeTranslate)
       const result = await api.pollTask(task_id)
-      this._extractDone(result.note_id, { previewImages: [] })
+      this._extractDone(result.note_id, { previewImages: [], shotStates: [] })
       this._settleBackup(result.note_id, backup)
     } catch (err) {
       console.error('截图导入失败', err)
