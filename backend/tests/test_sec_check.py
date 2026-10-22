@@ -3,10 +3,13 @@
 三条不变量必须钉住，它们都是这轮实测出来的口径：
 ① 判 risky/review 才拒；**接口没检成（unavailable）一律放行**——微信侧抖动不能变成
    "用户存不了自己的笔记"。
-② 只有 manual 在**路由那一层**落库前检；外部抓取的原文不检、公开出口（创建分享）才检。
+② 只有 manual 在**路由那一层**落库前检；**外部抓取的原文在路由这一层不检**，公开出口（创建分享）检。
    **而 source_type 由服务端钉死，不是客户端能填的**——否则"我不检"就成了一个入参。
    ⚠ 10-22「接吧」加了一条岔口：**截图那一路在 worker 里 OCR 之后检**（`ingest_tasks._guard_screenshot_text`，
-   用例在 `tests/test_ocr_flows.py::TestScreenshotContentSafety`），这条文件只管路由与分享那两侧。
+   用例在 `tests/test_ocr_flows.py::TestScreenshotContentSafety`）。
+   ⚠ 同日站长被审核驳回后「导入时候，要审查」又加一条：**URL 导入那一路也在 worker 里落库前检**
+   （`ingest_tasks._guard_scraped_text`，用例 `tests/test_ocr_flows.py::TestUrlImportContentSafety`，PRD §8.438）。
+   ⇒ 这条文件只管**路由与分享**那两侧；worker 那两路都在 `test_ocr_flows.py`。
 ③ 长文本分段送，段与段之间不能漏字。
 
 整套不出网：conftest 已把 SEC_CHECK_ENABLED 置 false，需要走判定逻辑的用例
@@ -345,8 +348,9 @@ def test_只有manual在落库前检_抓取与截图来源不检(st, should_chec
     外部原文里出现一个敏感词就让整条笔记存不下来是误伤，所以**路由这一道闸**只检 manual。
     ⚠ 10-22 站长「接吧」之后，"screenshot 完全不检"这句**不再成立**：截图那一路在 **worker 里 OCR 跑完之后**
     检（`ingest_tasks._guard_screenshot_text`，PRD §8.431／§8.432 已上现网）。
-    这条用例钉的只是"路由那一层照旧放过它"，别拿它的绿去说"截图没人检"。
-    URL 抓取（web_article／wechat_article）的原文确实这一层不检，公开那一刻由 shares 那道闸兜。
+    这条用例钉的只是"路由那一层照旧放过抓取与截图"，别拿它的绿去说"截图或 URL 导入没人检"。
+    ⚠ 10-22「导入时候，要审查」之后，URL 抓取（web_article／wechat_article）的原文**在 worker 落库前检**
+    （`ingest_tasks._guard_scraped_text`，PRD §8.438）；这一层放过它，是因为那道闸不该搬到这里来重做一遍。
     """
     from app.api.routes import notes as notes_route
 

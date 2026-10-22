@@ -450,9 +450,13 @@ def test_快照列与对外响应字段是同一份():
 def test_手动笔记复检覆盖所有可写文本列():
     """NoteCreate/NoteUpdate 收的每一个文本列，都必须在落库那道闸的清单里。
 
-    original_content 是唯一豁免：它是"外部原文"那一格（抓来的文章、识别出的文字），
-    落库不检是既定口径——旧文章里一个敏感词不该让人存不下笔记。它仍然在 public_fields
-    里，也就是"要分享出去的那一刻"照样过闸，所以豁免只覆盖到存，不覆盖到公开。
+    original_content 是这一层唯一的豁免：它是"原文"那一格。**10-22「导入时候，要审查」之后，
+    "外部原文落库不检"这句已经不是全局口径了**——URL 抓取与截图 OCR 那两路都在 **worker 里落库前检**
+    （`ingest_tasks._guard_scraped_text`／`_guard_screenshot_text`，PRD §8.431／§8.438）。
+    这里留豁免只覆盖一条路：用户在"编辑笔记"里手改那一格（`write.js` 只在内容真的变了才提交），
+    它不进 `MANUAL_TEXT_FIELDS`，所以那一格此刻仍没人检；公开那一刻由建分享那道闸兜
+    （`sharing.public_fields` 里带着 `note.original_content`——公开页不渲染它，建分享时仍一并送检）。
+    这条用例钉的是"客户端能写的其余文本列都得过闸"，别拿它的绿去说"原文那一格有人管"。
     """
     from app.api.routes import notes as notes_route
 

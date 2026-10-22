@@ -440,8 +440,9 @@ async def _raise_connect_error(url):
 class TestScreenshotContentSafety:
     """站长 10-22 一句「接吧」：截图那条也在**落库之前**过一遍内容安全。
 
-    撤的是 10-03 那句「外部抓取／识别的原文保存时不检」里**识别**那一半；抓取那一半他没松口，
-    所以最后一条用例专门钉住"URL 那条一个字都没被顺手接上"。
+    撤的是 10-03 那句「外部抓取／识别的原文保存时不检」里**识别**那一半；抓取那一半同日稍晚也被
+    「导入时候，要审查」接上（见下面的 `TestUrlImportContentSafety`），所以本类最后那条
+    `test_URL抓取那条没被顺手接上` 已**整条反向**——它现在钉的是"确实也检了"。
     这一路不多花一趟 OCR——检的就是那趟识别本来就要落进 `original_content` 与摘要的字。
     每一把都换一个 openid 与一个新的 user_id：这张库在文件里不清，`users.openid` 上有唯一约束。
     """
@@ -599,7 +600,10 @@ class TestScreenshotContentSafety:
         assert "截图任务失败" not in caplog.text, "这是一次正常拒绝，不该进那条带栈的 ERROR"
 
     def test_URL抓取那条没被顺手接上(self, env):
-        """他 10-22 那句「接吧」接的是截图；抓取那条原文保存时不检，这一半仍然算数。"""
+        """⚠ 这一条已被站长 10-22 后一句「导入时候，要审查」**整条反向**，保留只为留下这一格的历史：
+        新形状由下面的 `TestUrlImportContentSafety` 钉。这一条现在**必须红**（红＝URL 那条也检了），
+        所以它改成断言"确实被检"，不许留一条假绿挡着。
+        """
         async def fake_scrape(url):
             return {"content": self.RISKY, "title": "旧文章", "source_type": "url",
                     "status_code": 200, "images": []}
@@ -607,6 +611,162 @@ class TestScreenshotContentSafety:
         env.monkeypatch.setattr(env.tasks, "scrape_url", fake_scrape)
         env.monkeypatch.setattr(env.tasks, "_blocked", lambda url: False)
         env.tasks.process_url_task("t-url", env.uid, "https://mp.weixin.qq.com/s/x")
-        assert env.statuses[-1][0] == "completed"
-        assert env.checked == [], "URL 那条一旦也被检＝把没批的那一半也改了"
-        assert self._notes(env.uid) == 1, "旧文章里一个敏感词就让笔记存不下来，那是他明确否过的误伤"
+        assert env.statuses[-1][0] == "failed"
+        assert env.checked != [], "URL 导入这一条现在也要检（10-22「导入时候，要审查」）"
+        assert self._notes(env.uid) == 0, "抓来的原文里有违规词，这一篇就不该建"
+
+
+class TestUrlImportContentSafety:
+    """站长 10-22 一句「导入时候，要审查」：URL 导入抓回来的那段字也在**提炼与落库之前**过内容安全。
+
+    撤的是 10-03 那句「外部抓取／识别的原文保存时不检」里剩下的**抓取**那一半（识别那一半同日「接吧」已接）。
+    翻过来的直接后果就是上面那条 `test_URL抓取那条没被顺手接上`：它钉的是"没被接上"，
+    现在立的口径相反 ⇒ **判据整条反向，不是它坏了**（同 [[feedback-removing-a-state-invalidates-rulers]]）。
+    为什么这一刀非接不可：微信后台「版本审核修改指引」那句「要求所调用 API 可在小程序内任意发布的场景生效」
+    ⇒ 三条录入路里只剩这一条没检，就是那句"任意场景"没做到。
+    ⚠ 代价（写在这里，别当没看见）：**被拒的那段字是别人写的**，一篇旧文章里一个敏感词就让整条导入存不下来。
+    """
+
+    RISKY = "线上赌场 六合彩 特码"
+    BLOCK_MSG = "内容包含违规信息，无法保存，请修改后再试"
+
+    @pytest.fixture
+    def env(self, monkeypatch):
+        import uuid
+
+        import app.tasks.ingest_tasks as tasks
+        from app.core.errors import UserError
+
+        Base.metadata.create_all(bind=engine)
+        openid = f"pytest-url-{uuid.uuid4().hex[:16]}"
+        db = SessionLocal()
+        u = User(openid=openid)
+        db.add(u)
+        db.commit()
+        uid = str(u.id)
+        db.close()
+
+        statuses, checked, llm_calls = [], [], []
+        monkeypatch.setattr(tasks, "set_task_status",
+                            lambda tid, st, res=None, **kw: statuses.append((st, res)))
+
+        def fake_enforce(real_openid, *parts):
+            joined = " | ".join(str(p or "") for p in parts)
+            checked.append((real_openid, joined))
+            if self.RISKY in joined:
+                raise UserError(self.BLOCK_MSG)
+
+        monkeypatch.setattr(tasks, "enforce_text_safety", fake_enforce)
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            llm_calls.append(text)
+            return {"title": "提炼标题", "summary": "摘要", "key_points": ["要点"], "tags": ["标签"]}
+
+        monkeypatch.setattr(tasks, "extract_knowledge", fake_llm)
+        monkeypatch.setattr(tasks, "_blocked", lambda url: False)
+
+        def run(content, title="一篇旧文章", user_id=None):
+            async def fake_scrape(url):
+                return {"content": content, "title": title, "source_type": "web_article",
+                        "status_code": 200, "images": []}
+
+            monkeypatch.setattr(tasks, "scrape_url", fake_scrape)
+            tasks.process_url_task("t-url-sec", user_id or uid, "https://example.com/a")
+            return statuses
+
+        yield SimpleNamespace(tasks=tasks, uid=uid, openid=openid, statuses=statuses,
+                              checked=checked, llm=llm_calls, run=run,
+                              monkeypatch=monkeypatch, UserError=UserError)
+        # 收尾删净本把自己建的那一个号与它名下的篇（SQLite 会复用刚空出来的 rowid，不删则下一跑的
+        # "名下零篇／一篇"两句都打不到真数据）——同 `TestScreenshotContentSafety` 那一段的理由。
+        db = SessionLocal()
+        db.query(Note).filter(Note.user_id == uid).delete(synchronize_session=False)
+        db.query(User).filter(User.id == int(uid)).delete(synchronize_session=False)
+        db.commit()
+        db.close()
+
+    def _notes(self, uid):
+        db = SessionLocal()
+        try:
+            return db.query(Note).filter(Note.user_id == uid).count()
+        finally:
+            db.close()
+
+    def test_原文带违规字时这一篇不建也不花模型(self, env):
+        statuses = env.run("开头一段正常话，中间夹一句" + self.RISKY + "，后面还是正常话。")
+        assert statuses[-1] == ("failed", {"error": self.BLOCK_MSG}), "屏上那句得是现网真话，不是「处理失败请重试」"
+        assert self._notes(env.uid) == 0
+        assert env.llm == [], "注定被拒的一篇不许再花混元那一趟 ⇒ 检必须排在提炼之前"
+
+    def test_只有标题带违规字也挡得住(self, env):
+        """标题是屏上第一眼看得到的一行，它和正文来自同一次抓取，不该留一个不检的口子。"""
+        statuses = env.run("一段完全正常的正文。", title=self.RISKY)
+        assert statuses[-1][0] == "failed"
+        assert self._notes(env.uid) == 0
+        assert self.RISKY in env.checked[0][1]
+
+    def test_判成正常时照常建笔记且标题正文一起只送一趟(self, env):
+        body = "楼下药房到 21:30，记得带旧盒子换折扣。"
+        statuses = env.run(body, title="药房那条通知")
+        assert statuses[-1][0] == "completed"
+        assert self._notes(env.uid) == 1
+        assert len(env.checked) == 1, "一次导入只问一趟，不许按字段重复打"
+        openid, joined = env.checked[0]
+        assert openid == env.openid, "送检用的是库里那一枚真 openid"
+        assert "药房那条通知" in joined and body in joined, "标题与正文都要在那一段里"
+
+    def test_待人工复核那一档同样挡(self, env):
+        msg = "内容需人工复核，请调整表述后再试"
+
+        def strict(real_openid, *parts):
+            raise env.UserError(msg)
+
+        env.monkeypatch.setattr(env.tasks, "enforce_text_safety", strict)
+        statuses = env.run("任何一段字")
+        assert statuses[-1] == ("failed", {"error": msg})
+        assert self._notes(env.uid) == 0
+
+    def test_没有openid时放行并留下一句实话(self, env, caplog):
+        import logging
+
+        db = SessionLocal()
+        # NULL 不用空串：`users.openid` 是 nullable＋unique（同截图那一类的写法与理由）。
+        db.get(User, int(env.uid)).openid = None
+        db.commit()
+        db.close()
+        caplog.set_level(logging.WARNING)
+        statuses = env.run(self.RISKY)
+        assert env.checked == [], "没有 openid 就不该去打那一趟（必然 40003）"
+        assert statuses[-1][0] == "completed", "检不了不许变成用户存不了自己的笔记"
+        assert "URL 导入这一趟没有可用的 openid" in caplog.text
+
+    def test_号没了不去送检也不炸(self, env):
+        """注销与串号由 `_load_task_user` 那一格收口，闸不许替它下结论、更不许自己抛。"""
+        statuses = env.run(self.RISKY, user_id="999999999")
+        assert env.checked == []
+        assert statuses[-1] == ("failed", {"error": "账号已注销，无法保存笔记"})
+
+    def test_抓取本身失败不许被记成内容安全拒绝(self, env, caplog):
+        """两种成因必须分得开：抓不到字＝没有东西可检，不是"这段字有问题"。"""
+        import logging
+
+        from app.services.scraper import SiteHttpError
+
+        caplog.set_level(logging.WARNING)
+
+        async def boom(url):
+            raise SiteHttpError("https://example.com/a", 403)
+
+        env.monkeypatch.setattr(env.tasks, "scrape_url", boom)
+        env.tasks.process_url_task("t-url-fail", env.uid, "https://example.com/a")
+        assert env.checked == []
+        assert env.statuses[-1][0] == "failed"
+        assert "被内容安全挡下" not in caplog.text
+
+    def test_拦下那一趟的日志是拒绝不是故障(self, env, caplog):
+        import logging
+
+        caplog.set_level(logging.WARNING)
+        env.run(self.RISKY)
+        assert "被内容安全挡下" in caplog.text
+        assert "URL 任务失败" not in caplog.text, "这是一次正常拒绝，不该进那条带栈的 ERROR"

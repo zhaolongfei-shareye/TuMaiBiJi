@@ -79,12 +79,23 @@ class OcrTextBlocked(RuntimeError):
     """
 
 
+class ScrapedTextBlocked(RuntimeError):
+    """URL 导入抓回来的字被判违规／需复核 ⇒ 这一篇不建（站长 10-22「导入时候，要审查」）。
+
+    为什么不与 `OcrTextBlocked` 合成一支：那一条说的是"图上的字"，这一条说的是"抓回来的别人的文章"，
+    两条链的成因、代价与后面要谈的口径都不一样，挤成一个名字，日志里就再分不出是哪一扇闸拦的
+    （同 `note_images.Blocked` 与 `OcrTextBlocked` 各立一支的理由）。
+    为什么也不复用 `UserError`：URL 这一条链上 `UserError` 那一族说的是**链接本身有问题**
+    （`scraper.py` 那几处：不支持的协议／链接里没有网址／黑名单／抓取失败），混进来两种日志挤成一行。
+    """
+
+
 def _guard_screenshot_text(user_id: str, ocr_text: str) -> None:
     """截图那条：OCR 那段字在**落库之前**过一遍内容安全。
 
     站长 10-22 一句「接吧」接的就是这一条，撤的是 10-03 那句口径里"识别的原文保存时不检"那**一半**；
-    URL 抓取那条原文照旧不检（那一半他没松口，公开那一刻由 `shares.py` 那道闸兜），所以这个函数
-    只挂在 `process_screenshots_task` 上，不许顺手挪给另外两条。
+    另一半（外部抓取的原文）同日稍晚由「导入时候，要审查」接上，走的是 `_guard_scraped_text`——
+    两条各挂各的任务，本函数只管截图这一条（合并成一支会把"图上的字"与"别人的文章"两种成因挤成一行日志）。
 
     为什么挂在 OCR 之后而不是 stage 那一刻：截图这条路的"图上的内容"只有 OCR 这一份读法，
     而这一段字本来就要落进 `original_content` 与摘要——检它等于检这篇笔记的正文，一趟 OCR 都不多花。
@@ -115,6 +126,42 @@ def _guard_screenshot_text(user_id: str, ocr_text: str) -> None:
         enforce_text_safety(openid, ocr_text)
     except UserError as exc:
         raise OcrTextBlocked(str(exc)) from exc
+
+
+def _guard_scraped_text(user_id: str, title: str, text: str) -> None:
+    """URL 导入那条：抓回来的标题＋正文在**提炼与落库之前**过一遍内容安全。
+
+    站长 10-22 一句「导入时候，要审查」接的就是这一条，撤的是 10-03 那句口径里
+    "外部抓取的原文保存时不检"那一半（另一半"识别的原文"由同日「接吧」接上，见 `_guard_screenshot_text`）。
+    ⚠ 代价要说在前面，这一条比截图那条贵：**被拒的那段字是别人写的**——
+    一篇旧文章里出现一个敏感词，整条导入就存不下来，而这正是 10-03 当初选择不检的理由。
+    今天反过来，是因为微信后台「版本审核修改指引」那句：内容安全 API 要**覆盖小程序内任意发布场景**。
+
+    排在 `extract_knowledge` 之前：不为注定被拒的一篇再花掉混元那一趟（与截图那条同一个理由）。
+    标题也一起送：它是这一篇屏上第一眼看得到的一行，而 `scraped["title"]` 与正文来自同一次抓取，不多花一趟。
+    策略仍不另立一套，全吃 `enforce_text_safety`：真违规／需复核才拒，`unavailable` 放行并留日志，
+    空白不送检。⚠ 窗口 2,000 字 × 8 段＝一次最多 16,000 字，而 `original_content` 存 5 万字
+    ⇒ "这一篇只检了前 16,000 字"是这条链的已知边界，不是坏了。
+    """
+    if not (text or "").strip() and not (title or "").strip():
+        return
+    # 与 `_guard_screenshot_text` 同一条纪律：session 只开着取一枚 openid，**不横跨那次出网**。
+    db = SessionLocal()
+    try:
+        user = db.get(User, int(user_id))
+        openid = (user.openid if user is not None else "") or ""
+    finally:
+        db.close()
+    if user is None:
+        # 号都没了就没"检不检"的问题：下面 `_load_task_user` 那一岔自会按账号注销收口。
+        return
+    if not openid:
+        logger.warning("URL 导入这一趟没有可用的 openid，按没检成放行（这不是「原文没问题」）：user=%s", user_id)
+        return
+    try:
+        enforce_text_safety(openid, title, text)
+    except UserError as exc:
+        raise ScrapedTextBlocked(str(exc)) from exc
 
 
 def credit_first_note(db, user_id: str, note: Note) -> None:
@@ -342,6 +389,11 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
             set_task_status(task_id, "failed", {"error": "未能从 URL 提取到有效内容"})
             return
 
+        # 站长 10-22「导入时候，要审查」：抓回来的这段字在提炼与落库之前先过内容安全。
+        # 排在 `extract_knowledge` 之前＝注定被拒的那一篇不再花混元那一趟；排在抓取之后＝这一段字
+        # 本来就要落进 `original_content`，检它等于检这一篇的正文，一趟都不多花。
+        _guard_scraped_text(user_id, scraped["title"], text)
+
         knowledge = asyncio.run(extract_knowledge(text, fallback_title=scraped["title"], translate=translate))
 
         db = SessionLocal()
@@ -374,6 +426,11 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
         finally:
             db.close()
 
+    except ScrapedTextBlocked as exc:
+        # 与截图那一条同一形状：排在大闸前面、不走 `failure_message`、不打栈。
+        # 走那条会退成「处理失败，请重新提交试试」——既没道理、又撺掇人再试（再试一百次也还是违规）。
+        logger.warning("URL 导入被内容安全挡下（不建笔记）：%s user_id=%s", exc, user_id)
+        set_task_status(task_id, "failed", {"error": str(exc)})
     except Exception as e:
         logger.exception("URL 任务失败: %s: %s", type(e).__name__, e)
         set_task_status(task_id, "failed", {"error": failure_message(e)})
