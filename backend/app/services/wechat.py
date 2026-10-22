@@ -325,9 +325,11 @@ def _ask_img_sec_check(data: bytes) -> dict:
         if errcode in (45009, 44991):
             logger.error("图片内容安全额度已打光（errcode=%s），此后今天的检查看作没做：%s",
                          errcode, body.get("errmsg"))
-        elif errcode in (40001, 42001, 48001, 40004, 40006, 44003):
+        elif errcode in (40001, 42001, 48001, 40004, 40006, 41005, 44003, 45002):
             # 40004/40006/44003 都是"这一张送得不合规格"（空／不是图片／过大或格式不对）。
             # 它们不会自己好，必须留 ERROR——否则它长得像一次普通的网络抖动。
+            # 10-22 现网实测补进两族：41005=media data missing（空体）、45002=content size out of limit
+            # （同一份 2MB 全零字节回 45002，而 1.5MB 随机字节回 40006，两族都得认）。
             logger.error("图片内容安全接口配置或参数异常 errcode=%s errmsg=%s",
                          errcode, body.get("errmsg"))
         else:

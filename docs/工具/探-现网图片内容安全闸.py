@@ -6,11 +6,13 @@
 # 只读：不写库、不改任何状态、不出网除微信那两个检查类接口。token 与 openid 只报长度。
 #
 # 这一把钉得住什么、钉不住什么，先说在前面（钉不住那一格不许混进"验过了"）：
-# ✓ 管路：真凭据调得通、真按字节解析、真按 errcode 判定、命中时真抛得出那一句中文、
+# ✓ 管路：真凭据调得通、回码随上送形状而变（不是常量端点）、命中时真抛得出那一句中文、
 #   超上限的图真被压回 1MB 以内再送（不压＝图越大越安全，是一条现成的绕过路径）。
 # ✗ **判定能力**：要证"涉黄判得下来"得有一张已知违规的图当正样本。今天没有，也不该自己造
 #   （§8.428 同一句），所以这一格只能留给真样本，或上线后拿真流量的统计。
+# ✗ 同一条理由，"无法解码但客户端渲染得出来的图"会不会被当成 pass，也证不了——见 ② 末段。
 import json
+import os
 
 from app.core.config import settings
 from app.core.errors import UserError
@@ -58,12 +60,33 @@ ck("access_token 拿得到", bool(tok), f"长度 {len(tok)}")
 r = wechat.probe_img_sec_check(png())
 ck("纯色 benign 图 → pass（errcode 0）", r["verdict"] == "pass", json.dumps(r, ensure_ascii=False))
 
-print("② 它真在解析我们送上去的字节，不是空转端点")
-r = wechat.probe_img_sec_check(b"not-an-image-at-all")
-ck("送一段不是图片的字节 → 拿不到 pass（微信自己拒）", r["verdict"] == "unavailable",
-   json.dumps(r, ensure_ascii=False))
-ck("  且回的是「送得不合规格」那一族错误码",
-   r.get("errcode") in (40004, 40006, 41004, 44003), json.dumps(r, ensure_ascii=False))
+print("② 它真在看我们送上去的字节——上送形状不同，回码就不同（不是常量端点）")
+# 10-22 实测改的判据：原来这一格写的是"送一段不是图片的字节→微信自己拒"，红了两条。
+# 复打出来的平台事实是：**img_sec_check 对小段非图片字节回 errcode 0**（19 字节垃圾、
+# 4KB 随机、截断到一半的 PNG、IHDR 吹成 40000×40000 的 PNG，四种一律 pass）。
+# 所以"垃圾字节该被拒"这个前提是错的，拿它当判据等于装了牙打在微信不咬的地方。
+# 真正会咬的是**大小**那一维：空／1.5MB 非图／2MB 全零，三种形状各回各的码。
+r_empty = wechat.probe_img_sec_check(b"")
+ck("空体 → unavailable（41005 media data missing：请求真被受理了）",
+   r_empty["verdict"] == "unavailable" and r_empty["errcode"] == 41005,
+   json.dumps(r_empty, ensure_ascii=False))
+r_big_garbage = wechat.probe_img_sec_check(os.urandom(1536 * 1024))
+ck("1.5MB 非图片字节 → unavailable（40006 invalid media size）",
+   r_big_garbage["verdict"] == "unavailable" and r_big_garbage["errcode"] == 40006,
+   json.dumps(r_big_garbage, ensure_ascii=False))
+r_zeros = wechat.probe_img_sec_check(b"\0" * (2 * 1024 * 1024))
+ck("2MB 全零字节 → unavailable（45002 content size out of limit，与 40006 不同一族）",
+   r_zeros["verdict"] == "unavailable" and r_zeros["errcode"] == 45002,
+   json.dumps(r_zeros, ensure_ascii=False))
+ck("三种形状回码互不相同 ⇒ 回体不是写死的常量",
+   len({r_empty["errcode"], r_big_garbage["errcode"], r_zeros["errcode"]}) == 3,
+   json.dumps([r_empty["errcode"], r_big_garbage["errcode"], r_zeros["errcode"]]))
+r_small_garbage = wechat.probe_img_sec_check(b"not-an-image-at-all")
+print("   记下这条平台事实（不当判据）：小段非图片字节回的是",
+      json.dumps(r_small_garbage, ensure_ascii=False))
+print("   ⇒ 残余口子（未证实也未能排除）：若有一张图客户端渲染得出来而微信解不出来，")
+print("     它拿到的就是 pass。我们这边送之前都过一遍 PIL，能解码的已归一化；")
+print("     真要判这条，得有一张已知违规的图当正样本——今天仍然没有。")
 
 print("③ 超上限的图先压再送（不压就留下一条「图越大越安全」的绕过路径）")
 big = noise_png(1600, 1600)

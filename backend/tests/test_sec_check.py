@@ -566,6 +566,34 @@ def test_图片接口没检成时一律放行(monkeypatch):
     wechat.enforce_image_safety(b"png")   # 不抛
 
 
+def test_图片送得不合规格那一族必须打成ERROR(monkeypatch, caplog):
+    """10-22 现网实测的形状：41005／45002／40006 都属"我们送的东西不合规格"，不是抖动。
+
+    分级只按一条：**会不会自己好**。额度打光与"送得不合规格"都是要人去改配置的，日志里
+    跟一次普通网络抖动长得一样就等于没有告警；-1／47001 那一族才是真抖动。
+    """
+    import logging
+
+    for code in (40006, 41005, 45002):
+        _wire_image(monkeypatch, {"errcode": code, "errmsg": "x"})
+        with caplog.at_level(logging.DEBUG, logger="app.services.wechat"):
+            assert wechat.check_image(b"png") == "unavailable"
+        lines = [r for r in caplog.records if "图片内容安全" in r.getMessage()]
+        assert lines, f"errcode {code} 在日志里没留下痕迹"
+        assert all(r.levelno >= logging.ERROR for r in lines), \
+            f"errcode {code} 只是 warning：它不会自己好，等抖动恢复就把配置错误放过去了"
+        caplog.clear()
+
+    for code in (-1, 47001):
+        _wire_image(monkeypatch, {"errcode": code, "errmsg": "x"})
+        with caplog.at_level(logging.DEBUG, logger="app.services.wechat"):
+            assert wechat.check_image(b"png") == "unavailable"
+        lines = [r for r in caplog.records if "图片内容安全" in r.getMessage()]
+        assert lines and all(r.levelno == logging.WARNING for r in lines), \
+            f"errcode {code} 被升成 ERROR：真抖动会把日志刷满，反而淹掉那条配置错误"
+        caplog.clear()
+
+
 def test_空字节不送检(monkeypatch):
     """按次计配额的接口，一张没有字节的图没有可检的东西。"""
     sent = _wire_image(monkeypatch, {"errcode": 87014})
