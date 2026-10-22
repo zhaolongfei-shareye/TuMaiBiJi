@@ -399,6 +399,24 @@ def _xiaohongshu_extras(html: str) -> dict:
     return out
 
 
+# 微信那一族的正文是塞在 JS 字符串里发出来的：换行写成 `\x0a`、`&` 写成 `\x26`
+# （10-22 那篇实测 96／374 处），而「话题」是**转义过**的 `<a class="wx_topic_link">…#词…</a>`。
+# 不先解 `\xHH`，`_WX_TOPIC_LINK` 连模式都匹配不上——屏上就整串念成
+# `\x0a\x0a…\x26lt;a class=\x26quot;wx_topic_link\x26quot;…`，全是无效字。
+_WX_HEX_ESCAPE = re.compile(r"\\x([0-9a-fA-F]{2})")
+_WX_TOPIC_LINK = re.compile(r"&lt;a class=&quot;wx_topic_link&quot;.*?&gt;(.*?)&lt;/a&gt;", re.S)
+
+
+def _decode_wechat_text(text: str) -> str:
+    r"""把 JS 字符串那层 `\xHH` 还原成字，再把话题链接压回它显示的那几个字。
+
+    只压话题这一种标签：整段 `html.unescape` 会把讲代码的文章里那些举例用的
+    `&lt;div&gt;` 一起当标签吃掉。
+    """
+    decoded = _WX_HEX_ESCAPE.sub(lambda m: chr(int(m.group(1), 16)), text)
+    return _WX_TOPIC_LINK.sub(lambda m: f"{m.group(1)} ", decoded)
+
+
 def _parse_wechat_article(html: str, url: str, source_type: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
 
@@ -437,7 +455,7 @@ def _parse_wechat_article(html: str, url: str, source_type: str) -> dict:
 
     return {
         "title": title,
-        "content": text,
+        "content": _decode_wechat_text(text),
         "source_type": source_type,
         "images": images,
         "author": account,
