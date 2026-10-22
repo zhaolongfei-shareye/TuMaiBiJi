@@ -7,7 +7,8 @@ r"""公众号正文里那两层转义：`\x0a`／`\x26` 与话题链接的转义
 `&` 写成 `\x26`，而「话题」是**转义过**的 `<a>` 标签（现网抓回来的原始 HTML 里同形，实测 96／374 处）。
 我们的抓取只做了"取 DOM 文字"那一层，没解这一层，于是照抄进笔记。
 
-⇒ 两道都要拆：先解 `\xHH`（不先解，话题那串连模式都匹配不上），再把话题标签压回它显示的那几个字。
+⇒ 两道都要拆：先解 `\xHH`（不先解，话题那串连模式都匹配不上），再把**转义过的 `<a>`** 压回它显示的那几个字
+（挂件不止话题一种，10-22 又扫出「音乐卡片」那一枚，所以按标签类走、不按 class 枚举）。
 **不做整段 `html.unescape`**——那会把讲代码的文章里举例用的 `&lt;div&gt;` 一起当标签吃掉。
 
 用例一律不出网。
@@ -43,6 +44,20 @@ def test_话题标签压回它显示的那几个字():
     assert "&lt;" not in out and "&quot;" not in out
     assert "#周润发" in out and "#港星" in out
     assert "\\x" not in out
+
+
+def test_音乐卡片那一串也一起压掉():
+    """10-22 全库扫出来第二种形状：note 146 里那枚公众号「音乐卡片」，class 不是话题那枚。
+    规则按"转义的 `<a>`"整类走，不再一种挂件补一条——现网 145 篇里解完 `\\xHH` 之后
+    剩下的转义标签只有 `<a>` 这一种（30 处），这条用例钉住第二枚不被漏掉。"""
+    src = ("任凭外界喧嚣，一路向阳。\\x0a\\x26lt;a target=\\x26quot;_blank\\x26quot; "
+           "class=\\x26quot;js_plain-music_entry wx_plain-music_link\\x26quot; "
+           "data-music_name=\\x26quot;女人花 (Live)\\x26quot; data-singer=\\x26quot;梅艳芳\\x26quot;\\x26gt;"
+           "女人花 (Live)\\x26lt;/a\\x26gt;")
+    out = scraper._decode_wechat_text(src)
+    assert "plain-music" not in out and "data-music_name" not in out and "\\x" not in out
+    assert "女人花 (Live)" in out
+    assert out.count("女人花 (Live)") == 1
 
 
 def test_整篇现文形状的量级():

@@ -400,21 +400,25 @@ def _xiaohongshu_extras(html: str) -> dict:
 
 
 # 微信那一族的正文是塞在 JS 字符串里发出来的：换行写成 `\x0a`、`&` 写成 `\x26`
-# （10-22 那篇实测 96／374 处），而「话题」是**转义过**的 `<a class="wx_topic_link">…#词…</a>`。
-# 不先解 `\xHH`，`_WX_TOPIC_LINK` 连模式都匹配不上——屏上就整串念成
+# （10-22 那篇实测 96／374 处），而文章里插的「话题」「音乐卡片」这类挂件是**转义过**的 `<a>` 标签
+# （话题 `\x26lt;a class=\x26quot;wx_topic_link\x26quot;…\x26gt;#词\x26lt;/a\x26gt;`、
+# 音乐 `…class=\x26quot;js_plain-music_entry wx_plain-music_link\x26quot;…\x26gt;歌名 (Live)\x26lt;/a\x26gt;`）。
+# 不先解 `\xHH`，下面那条连模式都匹配不上——屏上就整串念成
 # `\x0a\x0a…\x26lt;a class=\x26quot;wx_topic_link\x26quot;…`，全是无效字。
+# 现网 145 篇全扫过：解完 `\xHH` 之后剩下的转义标签**只有 `<a>` 这一种**（30 处），
+# 所以按"转义的 a 标签"整类压回它的显示字，不必一种挂件补一条规则。
 _WX_HEX_ESCAPE = re.compile(r"\\x([0-9a-fA-F]{2})")
-_WX_TOPIC_LINK = re.compile(r"&lt;a class=&quot;wx_topic_link&quot;.*?&gt;(.*?)&lt;/a&gt;", re.S)
+_WX_ESCAPED_ANCHOR = re.compile(r"&lt;a\b.*?&gt;(.*?)&lt;/a&gt;", re.S)
 
 
 def _decode_wechat_text(text: str) -> str:
-    r"""把 JS 字符串那层 `\xHH` 还原成字，再把话题链接压回它显示的那几个字。
+    r"""把 JS 字符串那层 `\xHH` 还原成字，再把转义过的 `<a>` 压回它显示的那几个字。
 
-    只压话题这一种标签：整段 `html.unescape` 会把讲代码的文章里那些举例用的
+    只压 `<a>` 这一种标签：整段 `html.unescape` 会把讲代码的文章里那些举例用的
     `&lt;div&gt;` 一起当标签吃掉。
     """
     decoded = _WX_HEX_ESCAPE.sub(lambda m: chr(int(m.group(1), 16)), text)
-    return _WX_TOPIC_LINK.sub(lambda m: f"{m.group(1)} ", decoded)
+    return _WX_ESCAPED_ANCHOR.sub(lambda m: f"{m.group(1)} ", decoded)
 
 
 def _parse_wechat_article(html: str, url: str, source_type: str) -> dict:
