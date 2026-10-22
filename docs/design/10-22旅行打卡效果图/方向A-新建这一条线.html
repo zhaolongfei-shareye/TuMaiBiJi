@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>旅行打卡 App · 方向 A · 新建这一条线</title>
+<style>
+  :root{--paper:#F2EFE9;--paper2:#FBFAF7;--ink:#14161A;--ink2:#4A4E57;--ink3:#8A8F99;
+    --clay:#D2683F;--yellow:#F6C445;--teal:#1F6F63;--indigo:#2E3A8C;--line:#DDD8CE;}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{background:#E7E3DA;font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;color:var(--ink)}
+  .sheet{width:1440px;padding:40px 44px 46px;background:var(--paper)}
+  .kicker{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--clay);font-weight:700}
+  h1{font-size:28px;letter-spacing:-.01em;margin:5px 0 3px}
+  h2{font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:20px}
+  .flag{float:right;font-size:11px;letter-spacing:.08em;color:var(--ink3);border:1px solid var(--line);padding:5px 9px;border-radius:6px;background:var(--paper2)}
+  .grid2{display:grid;grid-template-columns:repeat(3,1fr);gap:22px 26px}
+  .cell{display:flex;flex-direction:column}
+  .tag{font-size:10.5px;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:var(--clay);margin-bottom:6px}
+  .cap{font-size:11.5px;color:var(--ink2);line-height:1.55;margin-top:9px}
+  .cap b{color:var(--ink)}
+  .frame{width:100%;max-width:330px;aspect-ratio:330/640;border:2px solid var(--ink);border-radius:38px;background:var(--paper2);overflow:hidden;position:relative;display:flex;flex-direction:column}
+  .island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:88px;height:22px;background:var(--ink);border-radius:13px;z-index:9}
+  .status{height:42px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 16px 3px;font-size:10.5px;font-weight:600}
+  .scr{padding:0 13px;flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+  .nav{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:750;padding:2px 0 8px}
+  .nav .x{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--ink2);background:#fff}
+  .placebar{display:flex;align-items:center;gap:7px;border-radius:11px;padding:8px 10px;font-size:10.5px;font-weight:650;background:#fff;border:1px solid var(--line)}
+  .placebar.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .dot{width:5px;height:5px;border-radius:50%;background:var(--yellow);display:inline-block;flex:none}
+  .placebar .chg{margin-left:auto;font-size:9.5px;font-weight:600;opacity:.75}
+  .placebar.unknown{background:#fff;border:1.5px dashed #C9A08C;color:#8A3B18;font-weight:600}
+  .placebar.unknown .q{width:12px;height:12px;border-radius:50%;border:1.5px solid #C9A08C;color:#8A3B18;font-size:8.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+  .placebar.unknown .chg{color:#8A3B18;font-weight:750;opacity:1}
+  .ladder{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px}
+  .ladder .row{display:flex;gap:7px;align-items:baseline;font-size:9.5px;padding:4px 0;color:var(--ink2)}
+  .ladder .row .no{font-size:8.5px;font-weight:800;color:var(--ink3);width:12px;flex:none}
+  .ladder .row.cur{background:#F6E7DE;border-radius:7px;padding-left:5px;color:#8A3B18;font-weight:650}
+  .ladder .row.dead{opacity:.45;text-decoration:line-through}
+  .ent{display:flex;gap:9px;margin-top:10px}
+  .entcard{flex:1;border-radius:14px;padding:10px 9px 11px;color:#fff;min-height:154px;display:flex;flex-direction:column}
+  .entcard .k{font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.8}
+  .entcard .n{font-size:12.5px;font-weight:800;margin-top:auto;line-height:1.25}
+  .card{display:flex;gap:9px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:9px}
+  .blk{width:30px;border-radius:7px;flex:none}
+  .t{font-size:11.5px;font-weight:700;line-height:1.35}
+  .s{font-size:9.5px;color:var(--ink2);line-height:1.45;margin-top:3px}
+  .meta{font-size:8.8px;color:var(--ink3);margin-top:4px}
+  .btn{border-radius:12px;padding:11px;text-align:center;font-size:11.5px;font-weight:750}
+  .y{background:var(--yellow);color:var(--ink)}
+  .ghost{border:1px solid var(--line);color:var(--ink2);background:#fff}
+  .tabbar{margin-top:auto;display:flex;align-items:center;justify-content:space-around;height:52px;border-top:1px solid var(--line);font-size:10px;color:var(--ink3);background:var(--paper2)}
+  .tabbar .on{color:var(--ink);font-weight:700}
+  .fab{width:50px;height:32px;border-radius:999px;background:var(--yellow);color:var(--ink);display:flex;align-items:center;justify-content:center;font-weight:750;font-size:11px}
+  .shot{height:118px;border-radius:12px;background:linear-gradient(150deg,#2A2E36,#4A3226);position:relative;overflow:hidden}
+  .shot .ocr{position:absolute;left:10px;right:10px;top:34px;height:44px;border:1.5px dashed var(--yellow);border-radius:6px}
+  .lines i{display:block;height:6px;border-radius:3px;background:#EAE5DB;margin:7px 0}
+  .lines i.h{height:9px;background:#D9D2C5;width:52%}
+  .lines i.q{background:#F0E7D6}
+  .kbd{height:74px;border-radius:12px 12px 0 0;background:#E9E5DC;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:9.5px;color:#9A948A;margin-top:auto}
+  .fail{border:1px solid #E4B7A6;background:#FDF1EC;border-radius:12px;padding:11px}
+  .fail .t{color:#8A3B18}
+  .chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:5px 9px;font-size:9.5px;font-weight:650;border:1px solid var(--line);background:#fff}
+  .foot{margin-top:26px;border-top:1px solid var(--line);padding-top:14px;font-size:11.5px;color:var(--ink2);line-height:1.6}
+  .foot b{color:var(--ink)}
+</style></head><body>
+<div class="sheet">
+  <div class="flag">全部 CSS 画的示意 · 非真机渲染 · 代码一行没动</div>
+  <div class="kicker">Direction A · create flow</div>
+  <h1>新建这一条线 · 八屏</h1>
+  <h2>顶部那条<b>地点条</b>是这条产品与"普通笔记"唯一的新东西——它常驻在新建全流程里，不是最后一步的表单字段。<b>N7／N8 那一态现在是主路，不是异常态</b>（理由见页脚）</h2>
+
+  <div class="grid2">
+
+    <!-- N1 入口 -->
+    <div class="cell"><div class="tag">N1 新建 · 入口</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="nav"><span class="x">&#2153;</span><span>New note</span></div>
+        <div class="placebar on"><span class="dot"></span>Fushimi Inari Taisha · ±12 m<span class="chg">Change</span></div>
+        <div class="ent">
+          <div class="entcard" style="background:var(--clay)"><span class="k">camera</span><span class="n">Take a photo</span></div>
+          <div class="entcard" style="background:var(--teal)"><span class="k">link</span><span class="n">From a link</span></div>
+          <div class="entcard" style="background:var(--indigo)"><span class="k">write</span><span class="n">Write it out</span></div>
+        </div>
+        <div style="font-size:9.5px;color:var(--ink3);margin-top:10px;line-height:1.5">The photo is read on this device. Nothing is uploaded.</div>
+        <div class="tabbar"><span>Feed</span><span>Map</span><span class="fab">New</span><span>Search</span><span>Me</span></div>
+      </div></div>
+      <div class="cap"><b>三入口＝三块高饱和色卡</b>（沿用图麦那套母题，不共码）。<b>⚠ 中央那枚这稿从 "Check in" 改成了 "New"</b>——打卡是"给这条笔记定地点"，不该和"记一条"抢同一个按钮。A1／A2 那两屏要跟着改。</div>
+    </div>
+
+    <!-- N2 拍照识字 -->
+    <div class="cell"><div class="tag">N2 新建 · 拍照识字</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="nav"><span class="x">&#2153;</span><span>New note</span><span style="margin-left:auto;font-size:9.5px;color:var(--ink3);font-weight:600">Reading text&#8230;</span></div>
+        <div class="placebar on"><span class="dot"></span>Fushimi Inari Taisha · ±12 m<span class="chg">Change</span></div>
+        <div class="shot" style="margin-top:10px;height:172px"><div class="ocr"></div>
+          <div style="position:absolute;left:9px;bottom:8px;font-size:8.5px;color:#fff;background:rgba(0,0,0,.35);padding:3px 6px;border-radius:5px">photo slot 示意</div></div>
+        <div class="lines" style="margin-top:9px"><i class="h"></i><i></i><i></i><i class="q"></i><i></i><i></i><i style="width:88%"></i><i></i><i class="q"></i><i></i><i style="width:64%"></i></div>
+        <div class="meta" style="margin-top:6px">14 lines read · tap to edit</div>
+        <div class="btn y" style="margin-top:auto;margin-bottom:10px">Save note</div>
+      </div></div>
+      <div class="cap"><b>识字结果直接进正文，不压缩、不改写</b>——这版没有 AI 摘要（拍板⑤），所以屏上只说 "Reading text&#8230;" 与 "14 lines read"，<b>不许出现"整理／提炼／摘要"这类词</b>。</div>
+    </div>
+
+    <!-- N3 链接预览 -->
+    <div class="cell"><div class="tag">N3 新建 · 链接抓到正文</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="nav"><span class="x">&#2153;</span><span>New note</span></div>
+        <div class="placebar on"><span class="dot"></span>Fushimi Inari Taisha · ±12 m<span class="chg">Change</span></div>
+        <div class="card" style="margin-top:10px"><div class="blk" style="background:var(--teal)"></div><div>
+          <div class="t">Kyoto: three mornings, one map</div>
+          <div class="meta">kyoto-travel.example · 6,120 words fetched</div></div></div>
+        <div class="lines" style="margin-top:8px"><i class="h"></i><i></i><i></i><i></i><i class="q"></i><i></i><i></i><i style="width:91%"></i><i></i><i class="q"></i><i></i><i></i><i style="width:58%"></i></div>
+        <div style="display:flex;gap:7px;margin-top:9px"><span class="chip">Keep all</span><span class="chip" style="border-color:var(--ink);font-weight:750">Select part</span></div>
+        <div class="btn y" style="margin-top:auto;margin-bottom:10px">Save note</div>
+      </div></div>
+      <div class="cap"><b>抓到之后给两个选择：整份留 / 只挑一段</b>。这一屏没有"AI 帮你总结"那一枚——按拍板⑤，它不存在，所以也不摆。</div>
+    </div>
+
+    <!-- N4 链接失败 -->
+    <div class="cell"><div class="tag">N4 新建 · 链接读不出来</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="nav"><span class="x">&#2153;</span><span>New note</span></div>
+        <div class="placebar on"><span class="dot"></span>Fushimi Inari Taisha · ±12 m<span class="chg">Change</span></div>
+        <div class="fail" style="margin-top:10px">
+          <div class="t">Couldn't read that page</div>
+          <div class="s" style="color:#8A3B18">It may need a login, or it blocks reading. The link is kept either way.</div>
+        </div>
+        <div class="btn y" style="margin-top:10px">Try again</div>
+        <div class="btn ghost" style="margin-top:7px">Paste the text instead</div>
+        <div class="btn ghost" style="margin-top:7px">Save with just the link</div>
+        <div class="card" style="margin-top:12px;background:var(--paper2)"><div class="blk" style="background:var(--ink3)"></div><div>
+          <div class="t" style="font-size:10.5px">Link kept</div>
+          <div class="meta" style="word-break:break-all">kyoto-travel.example/morning-map</div></div></div>
+        <div class="tabbar" style="margin-top:auto"><span>Feed</span><span>Map</span><span class="fab">New</span><span>Search</span><span>Me</span></div>
+      </div></div>
+      <div class="cap"><b>失败态给三条出路，且屏上不出现英文错误码</b>（这条是图麦那期"Method Not Allowed 那串英文顶在屏上"的直接教训）——<b>错误码只进日志，那是给我们的，不是给他读的</b>。<b>链接本身要留住</b>——读不出来不等于没存，所以这一屏底部那块"Link kept"是屏上的字，不是效果图标注。</div>
+    </div>
+
+    <!-- N5 手写 -->
+    <div class="cell"><div class="tag">N5 新建 · 手写</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="nav"><span class="x">&#2153;</span><span>New note</span></div>
+        <div class="placebar on"><span class="dot"></span>Fushimi Inari Taisha · ±12 m<span class="chg">Change</span></div>
+        <div style="border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px;margin-top:10px;min-height:150px;flex:1 1 auto">
+          <div class="t" style="font-size:12.5px">山门口的御朱印排队时间</div>
+          <div style="height:1px;background:var(--line);margin:8px 0"></div>
+          <div class="s" style="line-height:1.6">朱印所 09:00 开门，两种墨色……<span style="display:inline-block;width:1.5px;height:11px;background:var(--clay);vertical-align:-2px"></span></div>
+        </div>
+        <div style="display:flex;align-items:center;margin-top:7px"><span class="chip">+ photo</span><span style="margin-left:auto;font-size:9px;color:var(--ink3)">412 / 2000</span></div>
+        <div class="kbd">keyboard</div>
+      </div></div>
+      <div class="cap"><b>标题＋正文同一屏，不弹二级页。</b>字数上限那个 <b>2000</b> 是沿用母体那一档的<b>数值</b>（不是它的代码），要不要改由你点；改之前屏上就按这一档显示。</div>
+    </div>
+
+    <!-- N6 存下那一下 -->
+    <div class="cell"><div class="tag">N6 新建 · 存下那一下</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="nav"><span class="x">&#2153;</span><span>New note</span></div>
+        <div class="placebar on"><span class="dot"></span>Fushimi Inari Taisha · ±12 m<span class="chg">Change</span></div>
+        <div class="card" style="margin-top:10px"><div class="blk" style="background:var(--clay)"></div><div>
+          <div class="t">山门口的御朱印排队时间</div>
+          <div class="s">朱印所 09:00 开门，两种墨色……</div>
+          <div class="meta">412 words · 1 photo</div></div></div>
+        <div style="margin-top:auto;background:#fff;border:1px solid var(--line);border-radius:16px 16px 0 0;margin-left:-13px;margin-right:-13px;padding:13px 13px 20px">
+          <div style="font-size:12.5px;font-weight:750">Save this note?</div>
+          <div style="font-size:10px;color:var(--ink2);margin:4px 0 11px;line-height:1.5">Filed under <b>Fushimi Inari Taisha</b> · Apr 3, 18:05<br><span style="color:var(--ink3)">±12 m · precise location on</span></div>
+          <div class="btn y">Save note</div>
+          <div class="btn ghost" style="margin-top:7px">Change the place first</div>
+          <div style="font-size:8.8px;color:var(--ink3);text-align:center;margin-top:9px">Saved on this device only · travels with a backup only if you export one</div>
+        </div>
+      </div></div>
+      <div class="cap"><b>存的动作里把"归到哪个地点"念出来</b>——这是这一条产品最该被看见的一句话。地点不对，就在这一屏改，不用存完再编辑。</div>
+    </div>
+
+  </div>
+
+  <div class="grid2" style="margin-top:26px">
+    <!-- N7 地名拿不到 · 新建中 -->
+    <div class="cell"><div class="tag">N7 新建 · 地名拿不到</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="nav"><span class="x">&#2153;</span><span>New note</span></div>
+        <div class="placebar unknown"><span class="q">?</span>35.6812, 139.7671 · ±12 m<span class="chg">Name it</span></div>
+        <div class="card" style="margin-top:10px"><div class="blk" style="background:var(--clay)"></div><div>
+          <div class="t">山门口的御朱印排队时间</div>
+          <div class="s">朱印所 09:00 开门，两种墨色……</div>
+          <div class="meta">412 words · 1 photo</div></div></div>
+        <div class="lines" style="margin-top:9px"><i class="h"></i><i></i><i></i><i class="q"></i><i></i><i style="width:72%"></i><i></i><i></i><i class="q"></i><i style="width:56%"></i></div>
+        <div style="font-size:9.5px;color:var(--ink2);margin-top:11px;line-height:1.55">We know <b>where</b> this is. We couldn't get a <b>name</b> for it. The map still shows the pin.</div>
+        <div style="display:flex;gap:7px;margin-top:9px"><span class="chip" style="border-color:var(--ink);font-weight:750">Name this place</span><span class="chip">Keep it unnamed</span></div>
+        <div class="btn y" style="margin-top:auto;margin-bottom:10px">Save note</div>
+      </div></div>
+      <div class="cap"><b>地名拿不到时，地点条退到"只有坐标"，正文字照常能存。</b>这一态不弹窗、不打断、不拦住保存——它只是把那句话说清楚。<b>屏上没有"搜附近地名"那枚按钮</b>，那是照读数删的（见页脚）。</div>
+    </div>
+
+    <!-- N8 地名拿不到 · 存下那一下 -->
+    <div class="cell"><div class="tag">N8 新建 · 无名地点怎么归档</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="nav"><span class="x">&#2153;</span><span>New note</span></div>
+        <div class="placebar unknown"><span class="q">?</span>35.6812, 139.7671 · ±12 m<span class="chg">Name it</span></div>
+        <div class="card" style="margin-top:10px"><div class="blk" style="background:var(--clay)"></div><div>
+          <div class="t">山门口的御朱印排队时间</div>
+          <div class="s">朱印所 09:00 开门，两种墨色……</div>
+          <div class="meta">412 words · 1 photo</div></div></div>
+        <div class="lines" style="margin-top:9px"><i class="h"></i><i></i><i></i><i class="q"></i><i style="width:68%"></i></div>
+        <div style="margin-top:auto;background:#fff;border:1px solid var(--line);border-radius:16px 16px 0 0;margin-left:-13px;margin-right:-13px;padding:13px 13px 18px">
+          <div style="font-size:12.5px;font-weight:750">Save this note?</div>
+          <div style="font-size:10px;color:var(--ink2);margin:4px 0 9px;line-height:1.5">This one has no place name yet, so it files by <b>coordinates</b>.<br><span style="color:var(--ink3)">35.6812, 139.7671 · Apr 3, 18:05 · ±12 m</span></div>
+          <div class="ladder" style="margin-top:0">
+            <div class="row dead"><span class="no">1</span>Place name from the system</div>
+            <div class="row cur"><span class="no">2</span>Your own name for this spot</div>
+            <div class="row"><span class="no">3</span>Coordinates · unnamed place</div>
+          </div>
+          <div class="btn y" style="margin-top:10px">Name this place</div>
+          <div class="btn ghost" style="margin-top:7px">Save as unnamed</div>
+        </div>
+      </div></div>
+      <div class="cap"><b>归档用的那一行字有三级台阶</b>：系统给的地名 → 你自己给这个点起的名字 → 坐标。<b>第 1 级在境外目前是划掉的</b>，所以台阶必须在屏上念出来，不然用户会以为"我的笔记丢了地点"。地点分组（甲：只读视图）靠坐标聚类，不靠地名——这一条是这一屏成立的唯一理由。</div>
+    </div>
+
+  </div>
+
+  <!-- 读数 · 为什么这一态是主路 -->
+  <div style="margin-top:26px">
+    <div class="tag">读数 · 为什么这不是异常态</div>
+      <div style="background:var(--paper2);border:1px solid var(--line);border-radius:14px;padding:16px 18px;font-size:11.5px;color:var(--ink2);line-height:1.7;max-width:1010px">
+        <b style="color:var(--ink)">另一路 10-22 夜的真机读数（不是我量的，来源在下方）：</b><br>
+        境外坐标（东京站、巴黎）上，三条拿地名的路<b style="color:#8A3B18">一起回空</b>：<br>
+        · <code>CLGeocoder</code> 反查 → <code>kCLErrorDomain/8</code><br>
+        · <code>MKReverseGeocodingRequest</code> → <code>MKErrorDomain/4</code><br>
+        · <code>MKLocalSearch</code>（搜附近地标）→ 同码 <code>MKErrorDomain/4</code><br>
+        中英查询词、换 <code>en_US</code>、把 App 语言切成英文都试过，照样空。<br><br>
+        <b style="color:var(--ink)">这三条推翻了本稿第一版的前提</b>：N1–N6 里那条地点条<b>默认永远有地名</b>。按这个读数，<b>一个"海外为主"的产品，"地名拿不到"就是主路</b>，所以它必须有屏（N7／N8），文案表里必须有键。<br><br>
+        <b style="color:var(--ink)">两处我没画死：</b><br>
+        ① 这读数来自<b>中国区那台设备＋这个网络</b>，是不是"账号地区"造成的<b>还没换设备复量</b>——那一格空着，不许拿它作保；<br>
+        ② <code>MKErrorDomain/4</code> 的 4 <b>是什么含义没读到</b>（那份 SDK 里找不到 MKError 枚举定义），所以我没给它编名字。<br><br>
+        <span style="color:var(--ink3);font-size:10px">来源：<code>/Users/zlfmac/Documents/TmNote/取证-N0/读数-真机/T1-真机-东京站-中文.jsonl</code>、<code>T1b-巴黎-中文反查.jsonl</code>、<code>T1c-巴黎-App英文.jsonl</code>（2026-10-22 22:23–22:26 落盘）</span>
+      </div>
+  </div>
+
+  <div class="foot">
+    <b>这一稿改了你已看过的两处，都摊开说：</b>
+    ① 底部中央那枚 <b>Check in → New</b>（A1、A2 两屏的 tabbar 要跟着改，文案表里 <code>tab.*</code> 与 <code>action.checkIn</code> 两行也要改）；<br>
+    ② 打卡抽屉（A3/A4/A5）在新建流程里<b>不再是独立一步</b>，它变成"地点条"点开之后的那一层——A3 那屏还成立，只是入口位置变了。<br><br>
+    <b>这一稿新增的一态（N7／N8）不是设计偏好，是被读数逼出来的</b>：见中间那块"为什么这不是异常态"。它同时意味着<b>第二稿（A3/A4/A5 打卡抽屉）里那句"地名总拿得到"的隐含前提要重画</b>。<br><br>
+    <b>还欠四件</b>：这一稿的屏上字<b>已在文案表落成 N1–N8 段</b>（新键 <code>place.unnamed*</code>／<code>save.unnamed*</code>），但 A1–A6 那批的改动还没同步；<b>±12 m 那个数仍是 T3 占位</b>；键盘那一屏（N5）的真实高度与地点条会不会被顶上去，<b>只有真机能判</b>；<b>"换一台非中国区设备复量"这一格还空着</b>——它没量完之前，N7 到底是主路还是那台设备的地区墙，只能算<b>两种可能都成立</b>。<br><br>
+    <b>代码一行没动</b>：没建工程、没 fork、没动 TumarkNote 仓库一个字，也没动 TmNote 那个工作区里任何一只文件。
+  </div>
+</div>
+</body></html>
