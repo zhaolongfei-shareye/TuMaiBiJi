@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>旅行打卡 App · 方向 A 第二稿（含异常态）</title>
+<style>
+  :root{
+    --paper:#F2EFE9; --paper2:#FBFAF7; --ink:#14161A; --ink2:#4A4E57; --ink3:#8A8F99;
+    --clay:#D2683F; --yellow:#F6C445; --teal:#1F6F63; --indigo:#2E3A8C; --line:#DDD8CE;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{background:#E7E3DA;font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;color:var(--ink)}
+  .sheet{width:1440px;padding:40px 44px 46px;background:var(--paper)}
+  .kicker{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--clay);font-weight:700}
+  h1{font-size:28px;letter-spacing:-.01em;margin:5px 0 3px}
+  h2{font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:20px}
+  .flag{float:right;font-size:11px;letter-spacing:.08em;color:var(--ink3);border:1px solid var(--line);padding:5px 9px;border-radius:6px;background:var(--paper2)}
+  .grid2{display:grid;grid-template-columns:repeat(3,1fr);gap:22px 26px}
+  .cell{display:flex;flex-direction:column}
+  .tag{font-size:10.5px;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:var(--clay);margin-bottom:6px}
+  .cap{font-size:11.5px;color:var(--ink2);line-height:1.55;margin-top:9px}
+  .cap b{color:var(--ink)}
+  .frame{width:100%;max-width:330px;aspect-ratio:330/640;border:2px solid var(--ink);border-radius:38px;background:var(--paper2);overflow:hidden;position:relative}
+  .island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:88px;height:22px;background:var(--ink);border-radius:13px;z-index:9}
+  .status{height:42px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 16px 3px;font-size:10.5px;font-weight:600}
+  .scr{padding:0 13px;height:calc(100% - 42px);display:flex;flex-direction:column;position:relative}
+  .map{background:linear-gradient(160deg,#12222B 0%,#0B141B 60%,#0E1A22 100%);border-radius:14px;position:relative;overflow:hidden;flex:none}
+  .map .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:24px 24px}
+  .pin{position:absolute;width:20px;height:20px;border-radius:50%;border:2px solid #fff}
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:6px 11px;font-size:10.5px;font-weight:650}
+  .tabbar{margin-top:auto;display:flex;align-items:center;justify-content:space-around;height:52px;border-top:1px solid var(--line);font-size:10px;color:var(--ink3);background:var(--paper2)}
+  .tabbar .on{color:var(--ink);font-weight:700}
+  .fab{width:50px;height:32px;border-radius:999px;background:var(--yellow);color:var(--ink);display:flex;align-items:center;justify-content:center;font-weight:750;font-size:11px}
+  .card{display:flex;gap:9px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:9px}
+  .blk{width:30px;border-radius:7px;flex:none}
+  .t{font-size:11.5px;font-weight:700;line-height:1.35}
+  .s{font-size:9.5px;color:var(--ink2);line-height:1.45;margin-top:3px}
+  .meta{font-size:8.8px;color:var(--ink3);margin-top:4px}
+  .place{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;color:var(--teal)}
+  .dot{width:4px;height:4px;border-radius:50%;background:var(--clay);display:inline-block}
+  .title2{font-size:12px;font-weight:750;margin:9px 0 6px}
+  .btn{border-radius:12px;padding:11px;text-align:center;font-size:11.5px;font-weight:750}
+  .y{background:var(--yellow);color:var(--ink)}
+  .ghost{border:1px solid var(--line);color:var(--ink2);background:#fff}
+  .dim{background:#EDEAE3;color:#B4AEA3;border:1px dashed #CFC8BC}
+  .warn{background:#FFF6E8;border:1px solid #E9C87A;color:#7A5A15}
+  .foot{margin-top:26px;border-top:1px solid var(--line);padding-top:14px;font-size:11.5px;color:var(--ink2);line-height:1.6}
+  .foot b{color:var(--ink)}
+</style></head><body>
+
+<div class="sheet">
+  <div class="flag">全部 CSS 画的示意 · 非真机渲染 · 代码一行没动</div>
+  <div class="kicker">Direction A · second pass</div>
+  <h1>地图当顶 · 六屏，含三个异常态</h1>
+  <h2>第一行是顺路，第二行是"事情没成"的时候屏上说什么——异常态不是补丁，这一族 App 的口碑全在这三屏</h2>
+
+  <div class="grid2">
+
+    <!-- 1 首页·有内容 -->
+    <div class="cell"><div class="tag">A1 首页 · 正常</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+        <div class="map" style="height:186px"><div class="grid"></div>
+          <svg viewBox="0 0 300 186" style="position:absolute;inset:0"><path d="M34 140 C 80 100, 110 46, 176 56 S 236 120, 262 128" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="4 4" opacity=".75"/></svg>
+          <div class="pin" style="left:26px;top:132px;background:var(--clay)"></div>
+          <div class="pin" style="left:110px;top:48px;background:var(--teal)"></div>
+          <div class="pin" style="left:252px;top:120px;background:var(--yellow)"></div>
+          <div class="pill" style="position:absolute;right:7px;top:7px;background:rgba(255,255,255,.92)">Today · Kyoto</div>
+          <div class="pill" style="position:absolute;left:7px;bottom:7px;background:rgba(0,0,0,.42);color:#fff">3 places this week</div>
+        </div>
+        <div class="title2">Notes near today</div>
+        <div class="card"><div class="blk" style="background:var(--clay)"></div><div>
+          <div class="place"><span class="dot"></span>Fushimi Inari Taisha · Apr 3</div>
+          <div class="t" style="margin-top:2px">三千座鸟居的登山道，走到第四段才没人</div>
+          <div class="s">山门 06:40 起开放；上山道两侧每百步一座朱红鸟居，光线在 07:30 前最好……</div>
+          <div class="meta">3 photos · 1,240 words · ±12 m</div></div></div>
+        <div class="card" style="margin-top:6px"><div class="blk" style="background:var(--teal)"></div><div>
+          <div class="place"><span class="dot"></span>Nishiki Market · Apr 2</div>
+          <div class="t" style="margin-top:2px">三条巷子的食材地图：哪家带得走</div>
+          <div class="meta">5 photos · link import</div></div></div>
+        <div class="tabbar"><span class="on">Feed</span><span>Map</span><span class="fab">Check in</span><span>Search</span><span>Me</span></div>
+      </div></div>
+      <div class="cap"><b>地图 186pt 固定高</b>（不是百分比）——理由：笔记卡最小可读高度要 78pt，两卡＋标题＋tabbar 之后剩下的就是地图的上限。</div>
+    </div>
+
+    <!-- 2 首页·空态 -->
+    <div class="cell"><div class="tag">A2 首页 · 第一次用</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="map" style="height:186px"><div class="grid"></div>
+          <div class="pin" style="left:140px;top:82px;background:var(--ink3);opacity:.5"></div>
+          <div class="pill" style="position:absolute;left:7px;top:7px;background:rgba(0,0,0,.42);color:#fff">map is illustrative</div>
+        </div>
+        <div class="title2">Nothing here yet</div>
+        <div class="card dim" style="min-height:120px;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:16px">
+          <div style="font-size:12px;font-weight:700;color:#8B857B">Take a photo, drop a link, or write it out</div>
+          <div style="font-size:9.5px;color:#A29B90;margin-top:5px;line-height:1.5">Your first note will appear here with the place you made it</div>
+          <div class="btn y" style="margin-top:12px;width:100%">Check in here</div>
+        </div>
+        <div class="tabbar"><span class="on">Feed</span><span>Map</span><span class="fab">Check in</span><span>Search</span><span>Me</span></div>
+      </div></div>
+      <div class="cap"><b>空态不许摆假入口</b>：没有笔记时那一格只说"怎么开始"，不放"示例数据"。地图此时<b>不画任何针</b>，也不显示"3 places this week"。</div>
+    </div>
+
+    <!-- 3 打卡·正常 -->
+    <div class="cell"><div class="tag">A3 打卡抽屉 · 正常</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="map" style="flex:1;min-height:150px"><div class="grid"></div>
+          <div class="pin" style="left:146px;top:62px;width:24px;height:24px;background:var(--yellow)"></div>
+          <div style="position:absolute;left:136px;top:88px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(246,196,69,.55)"></div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--line);border-radius:16px 16px 0 0;margin:0 -13px 0;padding:13px 13px 20px;margin-top:auto">
+          <div style="width:32px;height:3px;background:var(--line);border-radius:2px;margin:0 auto 10px"></div>
+          <div style="font-size:12.5px;font-weight:750">Check in here?</div>
+          <div style="font-size:10px;color:var(--ink2);margin:4px 0 11px;line-height:1.5">Fushimi Inari Taisha, Uji-ward, Kyoto<br><span style="color:var(--ink3)">±12 m · precise location on</span></div>
+          <div class="btn y">Use this place</div>
+          <div class="btn ghost" style="margin-top:7px">Pick on map instead</div>
+          <div style="font-size:8.8px;color:var(--ink3);text-align:center;margin-top:9px">Saved on this device only · travels with a backup only if you export one</div>
+        </div>
+      </div></div>
+      <div class="cap"><b>这一屏就是任务单 T3 的落点。</b>"±12 m" 与那句"precise location on"是<b>读数驱动</b>的字——量不到就不许印。</div>
+    </div>
+
+    <!-- 4 打卡·拒权限 -->
+    <div class="cell"><div class="tag">A4 打卡 · 权限被拒</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="map" style="flex:1;min-height:150px"><div class="grid"></div>
+          <div class="pill" style="position:absolute;left:7px;top:7px;background:rgba(0,0,0,.5);color:#fff">no location access</div>
+          <div class="pin" style="left:150px;top:96px;background:#fff;border-color:var(--ink)"></div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--line);border-radius:16px 16px 0 0;margin:0 -13px 0;padding:13px 13px 20px;margin-top:auto">
+          <div style="width:32px;height:3px;background:var(--line);border-radius:2px;margin:0 auto 10px"></div>
+          <div style="font-size:12.5px;font-weight:750">Where was this?</div>
+          <div style="font-size:10px;color:var(--ink2);margin:4px 0 11px;line-height:1.5">We can't read your position — that's fine, drop the pin yourself.</div>
+          <div class="btn y">Pick on map</div>
+          <div class="btn ghost" style="margin-top:7px">Save without a place</div>
+          <div style="font-size:8.8px;color:var(--ink3);text-align:center;margin-top:9px">You can turn location on later in Settings — nothing is lost meanwhile</div>
+        </div>
+      </div></div>
+      <div class="cap"><b>拒权限不是死路</b>：主按钮换成"Pick on map"，并给一条<b>"不标地点也存得下"</b>。这一屏不许出现红色报错，也不许弹第二次系统权限框。</div>
+    </div>
+
+    <!-- 5 打卡·精确关闭 -->
+    <div class="cell"><div class="tag">A5 打卡 · 精确位置关闭</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div class="map" style="flex:1;min-height:150px"><div class="grid"></div>
+          <div style="position:absolute;left:100px;top:52px;width:120px;height:120px;border-radius:50%;border:1px dashed rgba(246,196,69,.7);background:rgba(246,196,69,.10)"></div>
+          <div class="pin" style="left:150px;top:102px;background:var(--yellow)"></div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--line);border-radius:16px 16px 0 0;margin:0 -13px 0;padding:13px 13px 20px;margin-top:auto">
+          <div style="width:32px;height:3px;background:var(--line);border-radius:2px;margin:0 auto 10px"></div>
+          <div style="font-size:12.5px;font-weight:750">Approximate area</div>
+          <div class="warn" style="font-size:9.5px;border-radius:9px;padding:8px 9px;line-height:1.45;margin-bottom:9px">Your iPhone shares an approximate position (city level). We'll file this note under <b>Kyoto</b>, not a specific spot.</div>
+          <div class="btn y">Use Kyoto as the place</div>
+          <div class="btn ghost" style="margin-top:7px">Pick exact spot on map</div>
+          <div style="font-size:8.8px;color:var(--ink3);text-align:center;margin-top:9px">Turn on Precise Location in Settings for street-level filing</div>
+        </div>
+      </div></div>
+      <div class="cap"><b>⚠ 这一屏有个空着的数</b>：城市级到底多粗，要 T3 量出来才敢写；<b>图里"city level"那句是占位，不许当已定稿</b>。量完之前，这一屏不进开发。</div>
+    </div>
+
+    <!-- 6 地点页 -->
+    <div class="cell"><div class="tag">A6 单地点页 · 点针进来</div>
+      <div class="frame"><div class="island"></div><div class="scr">
+        <div class="status"><span>9:41</span><span>●●● ⌁ </span></div>
+        <div style="height:78px;border-radius:14px;background:linear-gradient(135deg,var(--clay),#8E2F1A);position:relative;overflow:hidden;margin-top:2px">
+          <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px);background-size:100% 11px"></div>
+          <div style="position:absolute;left:11px;bottom:9px;color:#fff">
+            <div style="font-size:13.5px;font-weight:800">Fushimi Inari Taisha</div>
+            <div style="font-size:9px;opacity:.85">Uji-ward, Kyoto · 3 notes · Apr 1–3</div></div>
+          <div style="position:absolute;right:9px;top:9px;font-size:8px;color:#fff;background:rgba(0,0,0,.3);padding:3px 6px;border-radius:5px">photo slot 示意</div>
+        </div>
+        <div style="margin-left:5px;padding-left:12px;border-left:2px solid var(--line)">
+          <div style="display:flex;align-items:center;gap:7px;margin:9px 0 5px"><span class="dot"></span><span style="font-size:10.5px;font-weight:750">Apr 3 · 07:42</span><span style="font-size:8.5px;color:var(--ink3);margin-left:auto">±12 m</span></div>
+          <div class="card"><div class="blk" style="background:var(--clay)"></div><div>
+            <div class="t">三千座鸟居的登山道，走到第四段才没人</div><div class="s">山门 06:40 起开放……</div></div></div>
+          <div style="display:flex;align-items:center;gap:7px;margin:9px 0 5px"><span class="dot" style="background:var(--yellow)"></span><span style="font-size:10.5px;font-weight:750">Apr 2 · 18:05</span><span style="font-size:8.5px;color:var(--ink3);margin-left:auto">manual pin</span></div>
+          <div class="card"><div class="blk" style="background:var(--yellow)"></div><div>
+            <div class="t">山门口的御朱印排队时间</div><div class="s">朱印所 09:00 开门，两种墨色…</div></div></div>
+          <div style="display:flex;align-items:center;gap:7px;margin:9px 0 5px"><span class="dot" style="background:var(--teal)"></span><span style="font-size:10.5px;font-weight:750">Apr 1 · 09:20</span><span style="font-size:8.5px;color:var(--ink3);margin-left:auto">±12 m</span></div>
+          <div class="card"><div class="blk" style="background:var(--teal)"></div><div>
+            <div class="t">到站第一件事：把 JR 票留好</div></div></div>
+        </div>
+        <div class="btn y" style="margin-top:auto;margin-bottom:10px">Add note here</div>
+        <div class="tabbar" style="margin-top:0"><span>Feed</span><span class="on">Map</span><span class="fab">Check in</span><span>Search</span><span>Me</span></div>
+      </div></div>
+      <div class="cap"><b>每条右侧那个词就是"两条腿"在屏上的样子</b>：±12 m＝现场定位／manual pin＝手动点针。没有第三种，也不许出现"unknown"。</div>
+    </div>
+
+  </div>
+
+  <div class="foot">
+    <b>这一稿欠着的四件事（写明白，免得被当成已定稿）：</b>
+    ① <b>A5 那个"城市级"是占位</b>——要 T3 的米数；
+    ② <b>所有地图底图都是 CSS 画的格子，不是真地图渲染</b>——针的落点与偏移要等 T1；地名那一行能不能在离线念出来要等 T2；
+    ③ <b>屏上每句英文都还没进字典</b>——这个 App 没有"现网字典"可抄（新工程），第二稿之后要先落一份文案表，之后所有屏上的字都从那张表取；
+    ④ <b>异常态只画了三个</b>（无内容／拒权限／精度不足），还没画的至少四个：抓链接失败、拍照没认出字、备份导出被取消、地点改名后分组怎么显示——要不要我下一稿补齐，你说一声。
+    <br><br><b>代码一行没动</b>：这一稿是 HTML＋CSS 画的示意，没建工程、没 fork、没动 TumarkNote 仓库一个字。
+  </div>
+</div>
+</body></html>
