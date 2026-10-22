@@ -497,3 +497,107 @@ def test_本地那道闸先挡所以不花配额(client, db_session, person, mon
     dup = client.post("/api/categories/", headers=_hdr(person.id), json={"name": "重复格子"})
     assert dup.status_code == 400
     assert seen == [], f"重名那次先打了 {len(seen)} 次内容安全才判重"
+
+
+
+# ============================ 图片侧那一道（10-22 补）============================
+# 站长 10-22「为什么图片审查没有生效，我导入敏感照片，没有任何提示」。
+# 读出来的事实：图片侧原来零代码，只有两行注释写着"个人主体拿不到 imgSecCheck"——那句 10-21
+# 已被实测推翻（§8.428），10-22 又复打一次：`wxa/img_sec_check` 回 `errcode 0 / ok`。
+# 这一节钉的是这条接口自己的形状：判定全在 errcode 上（它没有 result.suggest，也没有 label），
+# 所以图片侧只有"过"与"不过"两态，没有"需人工复核"那一档。
+
+
+class _Recording:
+    """记下送出去的每一份 multipart，用来验"压没压"与"送没送"。"""
+
+    def __init__(self, payload, sent):
+        self.payload, self.sent = payload, sent
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def post(self, *a, **k):
+        self.sent.append(k.get("files") or {})
+
+        class Resp:
+            def json(self_inner):
+                return self.payload
+
+        return Resp()
+
+
+def _wire_image(monkeypatch, payload):
+    sent: list = []
+    monkeypatch.setattr(settings, "SEC_CHECK_ENABLED", True)
+    monkeypatch.setattr(wechat, "_access_token_sync", lambda: "fake-token")
+    monkeypatch.setattr(wechat.httpx, "Client", lambda *a, **k: _Recording(payload, sent))
+    return sent
+
+
+def test_图片接口回0就是过回87014就是不过(monkeypatch):
+    """这条接口没有 `result.suggest` 那一层，判定只能读 errcode——写错这一个数就是一道空闸。"""
+    _wire_image(monkeypatch, {"errcode": 0, "errmsg": "ok"})
+    assert wechat.check_image(b"png-bytes") == "pass"
+    _wire_image(monkeypatch, {"errcode": 87014, "errmsg": "risky content url"})
+    assert wechat.check_image(b"png-bytes") == "risky"
+
+
+def test_图片命中时那一句是讲给用户听的(monkeypatch):
+    """驳回通知的原话是「仅需提示用户所发布内容含违规信息」，所以拒的时候必须有一句中文，不是 500。"""
+    _wire_image(monkeypatch, {"errcode": 87014})
+    with pytest.raises(UserError) as got:
+        wechat.enforce_image_safety(b"ok", b"bad")
+    assert str(got.value) == "图片包含违规信息，无法保存，请换一张再试"
+
+
+def test_图片接口没检成时一律放行(monkeypatch):
+    """40006（送得不合规格）／45009（额度打光）／-1（系统繁忙）都不是"这张图有问题"。
+
+    把抖动变成"用户的图存不下"是现网最坏的误伤，所以这一档与文字那条同口径：放行＋留日志。
+    """
+    for code in (40006, 45009, -1, 47001):
+        _wire_image(monkeypatch, {"errcode": code, "errmsg": "x"})
+        assert wechat.check_image(b"png") == "unavailable", f"errcode {code} 被当成了判定"
+    _wire_image(monkeypatch, {"errcode": 40006})
+    wechat.enforce_image_safety(b"png")   # 不抛
+
+
+def test_空字节不送检(monkeypatch):
+    """按次计配额的接口，一张没有字节的图没有可检的东西。"""
+    sent = _wire_image(monkeypatch, {"errcode": 87014})
+    assert wechat.check_image(b"") == "pass"
+    wechat.enforce_image_safety(b"", None)
+    assert sent == []
+
+
+def test_超过接口上限的图先压再送(monkeypatch):
+    """不压会怎样：>1MB 微信回 40006 ⇒ unavailable ⇒ 放行。那样一来**图越大越安全**，是一条现成的绕过路径。"""
+    from PIL import Image
+    import io
+
+    import os as _os
+
+    buf = io.BytesIO()
+    # 必须用噪声：纯色 2400×2400 的 PNG 被压到几 KB，样本根本没越过那道上限，这条用例就成了空闸
+    Image.frombytes("RGB", (1600, 1600), _os.urandom(1600 * 1600 * 3)).save(buf, format="PNG")
+    big = buf.getvalue()
+    assert len(big) > wechat.IMG_SEC_MAX_BYTES, f"样本没造大：{len(big)} B"
+
+    sent = _wire_image(monkeypatch, {"errcode": 0})
+    assert wechat.check_image(big) == "pass"
+    assert len(sent) == 1
+    body = list(sent[0].values())[0][1]
+    assert len(body) <= wechat.IMG_SEC_MAX_BYTES, f"压完还是 {len(body)} B，等于没压"
+
+
+def test_开关关着时图片这道也不出网(monkeypatch):
+    """整套用例默认 SEC_CHECK_ENABLED=false（conftest 显式关的）。它必须两道都管住。"""
+    monkeypatch.setattr(settings, "SEC_CHECK_ENABLED", False)
+    sent = []
+    monkeypatch.setattr(wechat.httpx, "Client", lambda *a, **k: _Recording({}, sent))
+    assert wechat.check_image(b"png") == "unavailable"
+    assert sent == []

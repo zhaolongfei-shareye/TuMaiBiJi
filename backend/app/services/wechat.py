@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 WX_STABLE_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/stable_token"
 WX_QRCODE_URL = "https://api.weixin.qq.com/wxa/getwxacodeunlimit"
 WX_SEC_CHECK_URL = "https://api.weixin.qq.com/wxa/msg_sec_check"
+# 图片侧那一条。`media_check_async`（异步、要配消息推送回调才拿得到结论）今天不接，
+# 接的是这条同步的：站长 10-22 那句「能过审就行」要的是**当场给个说法**，
+# 而回调那条的结论最快也是几秒后另开一趟，图已经进桶、屏上已经画出来了。
+# 2026-10-22 现网凭据实测：这张口活着（纯色图回 `errcode 0 / ok`），并且**不要 openid**。
+# 官方口径的三条硬限制在下面那道字节闸里认（≤1MB、bmp/png/jpeg/jpg/gif、单次一张）。
+WX_IMG_SEC_URL = "https://api.weixin.qq.com/wxa/img_sec_check"
+IMG_SEC_MAX_BYTES = 1024 * 1024
+# 命中违规那一个码。87014 是这条接口**唯一**会给出的"不通过"，它没有 pass/risky 那层
+# `result.suggest`，也没有 label——所以图片侧没有"需人工复核"这一档，只有过与不过。
+IMG_RISKY_ERRCODE = 87014
 # 这三种都是"token 这一环不对"，不是我们送的内容有问题：清缓存重取一次再判。
 TOKEN_ERRORS = {40001, 42001, 40014}
 
@@ -245,6 +255,120 @@ def enforce_text_safety(openid: str, *parts) -> None:
             raise UserError('内容包含违规信息，无法保存，请修改后再试')
         if verdict == 'review':
             raise UserError('内容需人工复核，请调整表述后再试')
+
+
+def _shrink_for_img_sec(data: bytes) -> bytes:
+    """把一张超过接口上限的图压回 1MB 以内，压完再送。
+
+    为什么不"超了就不检"：`img_sec_check` 收到 >1MB 回的是 `40006 invalid media size`，
+    按下面的策略那等于 `unavailable` ⇒ 放行。那样一来**图越大越安全**，是一条现成的绕过路径，
+    而审核员随手一张原图就可能过线。压一遍的成本是几百毫秒 CPU，换的是这条口子不存在。
+
+    只降质量不缩尺寸（先 82 再逐档降到 45）：判图看的是画面内容，不是像素数，
+    而缩尺寸会动到长图／截图那一族的版面。压完还过线就按原样送出去，让接口自己判
+    ——那一刻它是"没检成"，日志会写明，不假装成"检过且没问题"。
+    """
+    if len(data) <= IMG_SEC_MAX_BYTES:
+        return data
+    try:
+        import io
+
+        from PIL import Image
+
+        im = Image.open(io.BytesIO(data))
+        im = im.convert("RGB")
+        for quality in (82, 70, 58, 45):
+            buf = io.BytesIO()
+            im.save(buf, format="JPEG", quality=quality)
+            out = buf.getvalue()
+            if len(out) <= IMG_SEC_MAX_BYTES:
+                logger.info("送检前把一张 %d 字节的图压到 %d 字节（JPEG q=%d）",
+                            len(data), len(out), quality)
+                return out
+    except Exception as exc:
+        logger.warning("送检前压图没成，按原样送：%s: %s", type(exc).__name__, exc)
+    return data
+
+
+def _ask_img_sec_check(data: bytes) -> dict:
+    """真打一趟 imgSecCheck，回 {"verdict": "pass"|"risky"|"unavailable", "errcode": ...}。
+
+    这条接口没有 `result.suggest` 那一层，判定全在 errcode 上：0＝正常，87014＝命中违规。
+    所以它给不出"需人工复核"，也没有 label——图片侧只有过与不过两态。
+    """
+    try:
+        data = _shrink_for_img_sec(data)
+        body = None
+        for attempt in (1, 2):
+            token = _access_token_sync()
+            with httpx.Client(timeout=10) as client:
+                resp = client.post(
+                    f"{WX_IMG_SEC_URL}?access_token={token}",
+                    files={"media": ("media", data, "application/octet-stream")},
+                )
+            body = resp.json()
+            # 与文字那条同一句：40001 这一类是"这一份 token 不算数了"，清缓存重试一趟就够。
+            if body.get("errcode") in TOKEN_ERRORS and attempt == 1:
+                _invalidate_access_token()
+                logger.warning("图片内容安全拿到 %s（token 已失效），清缓存重试一趟", body.get("errcode"))
+                continue
+            break
+    except Exception as exc:
+        # httpx 异常文本可能带整条含 token 的 URL，只进日志
+        logger.error("图片内容安全接口异常 %s: %s", type(exc).__name__, exc)
+        return {"verdict": "unavailable", "errcode": "exception"}
+
+    errcode = body.get("errcode")
+    if errcode == IMG_RISKY_ERRCODE:
+        return {"verdict": "risky", "errcode": errcode}
+    if errcode != 0:
+        if errcode in (45009, 44991):
+            logger.error("图片内容安全额度已打光（errcode=%s），此后今天的检查看作没做：%s",
+                         errcode, body.get("errmsg"))
+        elif errcode in (40001, 42001, 48001, 40004, 40006, 44003):
+            # 40004/40006/44003 都是"这一张送得不合规格"（空／不是图片／过大或格式不对）。
+            # 它们不会自己好，必须留 ERROR——否则它长得像一次普通的网络抖动。
+            logger.error("图片内容安全接口配置或参数异常 errcode=%s errmsg=%s",
+                         errcode, body.get("errmsg"))
+        else:
+            logger.warning("图片内容安全接口暂不可用 errcode=%s errmsg=%s",
+                           errcode, body.get("errmsg"))
+        return {"verdict": "unavailable", "errcode": errcode}
+    return {"verdict": "pass", "errcode": 0}
+
+
+def check_image(data: bytes) -> str:
+    """送一张图给微信内容安全，返回 pass / risky / unavailable。
+
+    `unavailable` 是"这次没检成"而不是"这张图没问题"——与 `check_text` 同一条纪律，
+    调用方必须把它和 pass 分开，否则自检会拿一次挂掉的接口当绿灯。
+    """
+    if not settings.SEC_CHECK_ENABLED:
+        return "unavailable"
+    if not data:
+        return "pass"
+    return _ask_img_sec_check(data)["verdict"]
+
+
+def probe_img_sec_check(data: bytes) -> dict:
+    """部署自检用的那一趟：必定真打，并把微信原样回的 errcode 交出来（同 `probe_sec_check`）。"""
+    if not settings.SEC_CHECK_ENABLED:
+        return {"verdict": "unavailable", "errcode": "disabled"}
+    return _ask_img_sec_check(data)
+
+
+def enforce_image_safety(*images) -> None:
+    """用户传进来的图，逐张送检；命中违规直接拒。
+
+    文案与文字那两句同一句式（驳回通知的原话是「仅需提示用户所发布内容含违规信息」，
+    不要求点名是哪一张）。**不另立一套策略**：`unavailable` 放行并留日志，与文字那条同一条
+    纪律——微信侧抖动不许变成"用户存不了自己的笔记"。
+    """
+    for data in images:
+        if not data:
+            continue
+        if check_image(data) == "risky":
+            raise UserError('图片包含违规信息，无法保存，请换一张再试')
 
 
 async def get_qr_code_image(scene: str, page: str = "") -> bytes:

@@ -1027,3 +1027,79 @@ class Test八之补_worker把真openid递下来:
         scraped = {"images": ["https://a.test/1.jpg"], "author": "someone"}
         ingest_tasks._archive_images(db, note, scraped, str(user.id))
         assert grabbed.get("openid") == user.openid, f"递给内容安全的是 {grabbed.get('openid')!r}，不是那个人的 openid"
+
+
+def _stub_check_image(monkeypatch, verdict="risky"):
+    """画面那道闸的替身：记下载到的字节，按 verdict 回。"""
+    seen: list = []
+
+    def _fake(data):
+        seen.append(data)
+        return verdict
+
+    monkeypatch.setattr(note_images, "check_image", _fake)
+    return seen
+
+
+class Test九_画面本身:
+    """站长 10-22 那一句「为什么图片审查没有生效，我导入敏感照片，没有任何提示」。
+
+    读出来的事实：这一条链上只有"图上的字"那道闸，**画面**一行代码都没检过；而涉黄图往往
+    一个字都没有，连送检都送不到。这一类钉的是补上的第二道——它必须排在进桶之前，
+    并且与文字那道**各自独立**（合成一道，日志就分不出是谁拦的，今天这一趟就是靠这个分别读出来的）。
+    """
+
+    def test_画面判违规时这一张不进桶(self, channel, monkeypatch):
+        url = "https://a.test/porn.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        checks = _stub_check_image(monkeypatch, "risky")
+        out = _run_sec_archive(monkeypatch, fake, [url])
+        assert not out.kept and out.failed == [url]
+        assert len(checks) == 1
+        assert fake.posts == [], "拦下就不该往桶里传：传了就是公开页上摊着一张没人认的图"
+
+    def test_检的是压完那一份字节而不是原件(self, channel, monkeypatch):
+        """与文字那道同一条理由：进桶、会出现在公开页上的是压完那一份。"""
+        url = "https://a.test/big.jpg"
+        raw = _jpeg(3000, 3000)
+        fake = _wire(monkeypatch, FakeHttp(_img(url, raw)))
+        _sec(monkeypatch)
+        checks = _stub_check_image(monkeypatch, "pass")
+        _run_sec_archive(monkeypatch, fake, [url])
+        assert len(checks) == 1
+        assert len(checks[0]) < len(raw), f"送的是 {len(checks[0])} B，原件 {len(raw)} B ⇒ 没压过"
+
+    def test_检不成时放行并留下一句实话(self, channel, monkeypatch, caplog):
+        """`unavailable` 是"这次没检成"，不是"这张图没问题"——不许变成"存不下图"。"""
+        import logging
+
+        url = "https://a.test/抖动.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        _stub_check_image(monkeypatch, "unavailable")
+        with caplog.at_level(logging.ERROR):
+            out = _run_sec_archive(monkeypatch, fake, [url])
+        assert len(out.kept) == 1, "接口抖一下不该让用户存不下图"
+        assert "没检成" in caplog.text and "这不是「图没问题」" in caplog.text
+
+    def test_开关关着时一次都不许多打(self, channel, monkeypatch):
+        url = "https://a.test/off.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch, enabled=False)
+        checks = _stub_check_image(monkeypatch, "risky")
+        _run_sec_archive(monkeypatch, fake, [url])
+        assert checks == [], "SEC_CHECK_ENABLED=false 是测试环境的出口，它必须两道都管住"
+
+    def test_画面那道不许把拦下的写成站点下不动(self, channel, monkeypatch, caplog):
+        """`Blocked` 是 `SkipImage` 的子类：except 顺序写反了行为不变、日志会变，以后没法归因。"""
+        import logging
+
+        url = "https://a.test/bad2.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(600, 600))))
+        _sec(monkeypatch)
+        _stub_check_image(monkeypatch, "risky")
+        with caplog.at_level(logging.INFO):
+            _run_sec_archive(monkeypatch, fake, [url])
+        assert "被内容安全挡下" in caplog.text, caplog.text
+        assert "没存上" not in caplog.text

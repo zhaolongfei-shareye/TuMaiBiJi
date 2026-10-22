@@ -8,6 +8,9 @@
    ⚠ 10-21 起这一句**不再涵盖内容安全**：站长「任何图文都要」⇒ 每一张在进桶之前会被自家 OCR 读一遍字，
    读出来的字送 `msgSecCheck`，判违规的那一张**不进桶**（见 `_guard_image_text`）。读字只为拦图，
    认出来的字**一个都不入库、不进提炼**，所以"图片不需要提炼"那句承诺仍然原样成立。
+   ⚠ 10-22 起这一张还过**第二道**：画面本身送 `imgSecCheck`（`_guard_image_pixels`）。
+   加这一道的直接原因是站长那一句「我导入敏感照片，没有任何提示」——只有文字那道时，
+   一张没有字的违规图连送检都送不到。两道都在进桶之前，都不改"不提炼"那一句。
 2. **通道与用户自己上传那一路完全同一个。** 对象进云开发那个桶、落在 `images/{userId}/{YYYYMMDD}/`
    那一层（与 `miniprogram/utils/cloudUpload.js` 同一条路径规则），账记进 `assets` 表，
    于是配额／私密闸／公开页露图／列表那排缩略图一行代码都不用为新功能重写。
@@ -35,7 +38,7 @@ from app.core.config import settings
 from app.services import scraper
 from app.services.llm import key_usable
 from app.services.ocr import ocr_image
-from app.services.wechat import check_text
+from app.services.wechat import check_image, check_text
 
 logger = logging.getLogger(__name__)
 
@@ -301,6 +304,25 @@ async def _upload(client: httpx.AsyncClient, cloud_path: str, data: bytes) -> st
     return file_id
 
 
+async def _guard_image_pixels(data: bytes, url: str) -> None:
+    """**画面本身**送 imgSecCheck，判违规就不进桶（站长 10-22「为什么图片审查没有生效」）。
+
+    与 `_guard_image_text` 是两道，不是一道拆两半：那一条读的是图上的字（要 OCR、要 openid、
+    认不出字就跳过），这一条看的是画面（不要 openid、没有"没字就放过"那一格）。涉黄图往往
+    一个字都没有，所以只有文字那道时它一路绿灯——今天就是这么被问出来的。
+
+    检的是**压完那一份字节**（与 `_guard_image_text` 同一条理由：进桶、会出现在公开页上的是这一份）。
+    策略照旧：检不了＝放行＋一行日志，只有 `risky` 才拦。
+    """
+    if not settings.SEC_CHECK_ENABLED:
+        return
+    verdict = await asyncio.to_thread(check_image, data)
+    if verdict == "risky":
+        raise Blocked("画面被判为违规（risky）")
+    if verdict == "unavailable":
+        logger.error("贴图内容安全（画面）这一张没检成，照旧放行（这不是「图没问题」）：url=%s", url[:120])
+
+
 async def _guard_image_text(openid, data: bytes, url: str) -> None:
     """图上的字 → msgSecCheck。判违规就抛 `Blocked`，这一张不进桶。
 
@@ -361,6 +383,7 @@ async def archive(images: list[str], user_id, limit: int, on_ready=None, openid=
                 data = await _download(client, url)
                 im, long_edge = _inspect(data)
                 shot = _encode(im, long_edge, (im.format or "").upper(), data)
+                await _guard_image_pixels(shot.data, url)
                 await _guard_image_text(openid, shot.data, url)
                 file_id = await _upload(client, _cloud_path(user_id, shot.ext), shot.data)
                 prepared = Prepared(

@@ -16,7 +16,7 @@ from app.services.ocr import ocr_images, title_hint
 from app.services.scraper import SiteHttpError, scrape_url
 from app.services.llm import extract_knowledge
 from app.services.queue import set_task_status
-from app.services.wechat import enforce_text_safety
+from app.services.wechat import enforce_image_safety, enforce_text_safety
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,16 @@ class OcrTextBlocked(RuntimeError):
     """
 
 
+class ImageBlocked(RuntimeError):
+    """照片／相册那一张**画面本身**被判违规 ⇒ 这一篇不建（站长 10-22「为什么图片审查没有生效」）。
+
+    为什么单独一支、不与 `OcrTextBlocked` 共用：那一条说的是"图上的字有问题"，这一条说的是
+    "画面有问题"。两种成因在日志里必须分得开——今天这一趟就是靠这个分别才读出
+    "文字闸是活的、图片侧一行代码都没有"。也不复用 `UserError`：那条在本模块里说的是
+    图太大／图已损坏／识别不可用（`ocr.py` 那四处），混进来两种日志挤成一行。
+    """
+
+
 class ScrapedTextBlocked(RuntimeError):
     """URL 导入抓回来的字被判违规／需复核 ⇒ 这一篇不建（站长 10-22「导入时候，要审查」）。
 
@@ -126,6 +136,26 @@ def _guard_screenshot_text(user_id: str, ocr_text: str) -> None:
         enforce_text_safety(openid, ocr_text)
     except UserError as exc:
         raise OcrTextBlocked(str(exc)) from exc
+
+
+def _guard_screenshot_images(images_data: list[bytes]) -> None:
+    """照片／相册那一条：**画面本身**在 OCR 之前过一遍内容安全。
+
+    站长 10-22 那一句「为什么图片审查没有生效，我导入敏感照片，没有任何提示」读出来的事实是：
+    这一条链上从来没有图片检查，只有 OCR 之后那道文字闸。而涉黄图通常没有字，
+    所以它连送检都送不到（`_guard_screenshot_text` 第一句就是"空白文本不送检"）。
+
+    排在 OCR **之前**：命中就不必再花一趟 OCR，也不必再花混元那一趟（与文字那条同一个理由）。
+    逐张检、检到第一张命中就抛：一批四张时最坏打四次，这是这条链的配额代价，说在明面上。
+    策略不另立一套，全吃 `enforce_image_safety`：命中才拒，`unavailable` 放行并留日志——
+    微信侧抖动不许变成"用户存不了自己的笔记"。
+    ⚠ 这一条**不要 openid**（同步图片接口的形状如此），所以它不受"某个号的 openid 是假的"
+    那一格影响：库里读到的那一行 11 位 openid（id=1）走文字那条会 40003→放行，走这一条照检。
+    """
+    try:
+        enforce_image_safety(*images_data)
+    except UserError as exc:
+        raise ImageBlocked(str(exc)) from exc
 
 
 def _guard_scraped_text(user_id: str, title: str, text: str) -> None:
@@ -447,6 +477,7 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
     try:
         set_task_status(task_id, "processing")
 
+        _guard_screenshot_images(images_data)
         ocr_text = asyncio.run(ocr_images(images_data))
         # 检在**降档那一岔之前**：降档建的那篇也把认出来的字写进摘要，所以两条岔口都要被这一句管住。
         _guard_screenshot_text(user_id, ocr_text)
@@ -512,12 +543,15 @@ def process_screenshots_task(task_id: str, user_id: str, images_data: list[bytes
         finally:
             db.close()
 
-    except OcrTextBlocked as exc:
+    except (OcrTextBlocked, ImageBlocked) as exc:
         # 这一条排在下面那个大闸**前面**，而且故意不走 `failure_message`：那两句中文是
-        # `enforce_text_safety` 现写的、本来就是讲给用户看的；`OcrTextBlocked` 不是 UserError，
-        # 走那条会退成「处理失败，请重新提交试试」——既没道理、又撺掇人再试一次（试一百次也还是违规）。
+        # `enforce_text_safety`／`enforce_image_safety` 现写的、本来就是讲给用户看的；
+        # `OcrTextBlocked` 与 `ImageBlocked` 不是 UserError，走那条会退成「处理失败，请重新提交试试」
+        # ——既没道理、又撺掇人再试一次（试一百次也还是违规）。
         # 也不打栈：这是一次正常的拒绝，不是一次故障。
-        logger.warning("截图这一趟被内容安全挡下（不建笔记）：%s user_id=%s", exc, user_id)
+        # 两支并成一个 except 是因为处置完全一样；日志里打的 `exc` 带着各自的类名，分得开是谁拦的。
+        logger.warning("截图这一趟被内容安全挡下（不建笔记）：%s: %s user_id=%s",
+                       type(exc).__name__, exc, user_id)
         set_task_status(task_id, "failed", {"error": str(exc)})
     except Exception as e:
         logger.exception("截图任务失败: %s: %s", type(e).__name__, e)

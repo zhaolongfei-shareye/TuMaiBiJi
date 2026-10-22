@@ -770,3 +770,111 @@ class TestUrlImportContentSafety:
         env.run(self.RISKY)
         assert "被内容安全挡下" in caplog.text
         assert "URL 任务失败" not in caplog.text, "这是一次正常拒绝，不该进那条带栈的 ERROR"
+
+
+class TestScreenshotImageSafety:
+    """站长 10-22 那一句「为什么图片审查没有生效，我导入敏感照片，没有任何提示」。
+
+    这一条链上原来只有 OCR 之后那道文字闸；一张没有字的违规图连送检都送不到
+    （`_guard_screenshot_text` 第一句就是"空白文本不送检"）。这一类钉补上的**画面**那道：
+    它排在 OCR 之前，且与文字那道各自独立。
+    ⚠ 每一把换一个 openid／一个新 user_id，收尾删净——同上面那两类的理由（SQLite 复用 rowid）。
+    """
+
+    BLOCK_MSG = "图片包含违规信息，无法保存，请换一张再试"
+    BAD = b"RISKY-PICTURE-BYTES"
+
+    @pytest.fixture
+    def env(self, monkeypatch):
+        import uuid
+
+        import app.tasks.ingest_tasks as tasks
+        from app.core.errors import UserError
+
+        Base.metadata.create_all(bind=engine)
+        openid = f"pytest-img-{uuid.uuid4().hex[:16]}"
+        db = SessionLocal()
+        u = User(openid=openid)
+        db.add(u)
+        db.commit()
+        uid = str(u.id)
+        db.close()
+
+        statuses, sent, ocr_calls, llm_calls = [], [], [], []
+        monkeypatch.setattr(tasks, "set_task_status",
+                            lambda tid, st, res=None, **kw: statuses.append((st, res)))
+
+        def fake_enforce_images(*images):
+            sent.append(list(images))
+            if self.BAD in images:
+                raise UserError(self.BLOCK_MSG)
+
+        monkeypatch.setattr(tasks, "enforce_image_safety", fake_enforce_images)
+
+        async def fake_ocr(images_data):
+            ocr_calls.append(images_data)
+            return "一段正常的识别文字，够长，不会降档成贴图笔记。"
+
+        monkeypatch.setattr(tasks, "ocr_images", fake_ocr)
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            llm_calls.append(text)
+            return {"title": "提炼标题", "summary": "摘要", "key_points": ["要点"], "tags": ["标签"]}
+
+        monkeypatch.setattr(tasks, "extract_knowledge", fake_llm)
+
+        def run(images, user_id=None):
+            tasks.process_screenshots_task("t-img", user_id or uid, images)
+            return statuses
+
+        yield SimpleNamespace(tasks=tasks, uid=uid, statuses=statuses, sent=sent,
+                              ocr=ocr_calls, llm=llm_calls, run=run,
+                              monkeypatch=monkeypatch, UserError=UserError)
+        db = SessionLocal()
+        db.query(Note).filter(Note.user_id == uid).delete(synchronize_session=False)
+        db.query(User).filter(User.id == int(uid)).delete(synchronize_session=False)
+        db.commit()
+        db.close()
+
+    def _notes(self, uid):
+        db = SessionLocal()
+        try:
+            return db.query(Note).filter(Note.user_id == uid).count()
+        finally:
+            db.close()
+
+    def test_画面命中时不建笔记也不跑OCR(self, env):
+        """检必须排在 OCR 之前：注定被拒的一篇，不该再花一趟识别与一趟混元。"""
+        statuses = env.run([self.BAD])
+        assert statuses[-1] == ("failed", {"error": self.BLOCK_MSG}), \
+            "屏上那句得是现网真话，不是「处理失败请重试」"
+        assert self._notes(env.uid) == 0
+        assert env.ocr == [], "OCR 一次都不该跑"
+        assert env.llm == []
+
+    def test_一批四张逐张检(self, env):
+        """一张命中就整篇不建：贴图笔记的正文与摘要是这一批合出来的，留一半等于赌它干净。"""
+        statuses = env.run([b"a", b"b", self.BAD, b"d"])
+        assert statuses[-1][0] == "failed"
+        assert self._notes(env.uid) == 0
+        assert len(env.sent) == 1, "只问一趟，那一趟里带上这一批"
+
+    def test_判正常时照常建笔记(self, env):
+        statuses = env.run([b"ok-1", b"ok-2"])
+        assert statuses[-1][0] == "completed"
+        assert self._notes(env.uid) == 1
+        assert env.sent == [[b"ok-1", b"ok-2"]]
+        assert env.ocr, "画面过了才轮到 OCR"
+
+    def test_画面过了但字违规仍然挡得住(self, env):
+        """两道各管各的：合成一道，日志就分不出是谁拦的——今天正是靠这个分别读出"图片侧零代码"。"""
+        msg = "内容包含违规信息，无法保存，请修改后再试"
+
+        def strict_text(real_openid, *parts):
+            raise env.UserError(msg)
+
+        monkeypatch = env.monkeypatch
+        monkeypatch.setattr(env.tasks, "enforce_text_safety", strict_text)
+        statuses = env.run([b"clean-picture"])
+        assert statuses[-1] == ("failed", {"error": msg})
+        assert self._notes(env.uid) == 0
