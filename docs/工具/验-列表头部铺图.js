@@ -275,11 +275,15 @@ ok('搜索 pill 只有一档面：淡底＋inset 淡边＋深色字，`--chrome-
   && !/rgba\(255, 255, 255, 0\.18\)/.test(wxss))
 ok('占位符给带 alpha 的色，不靠 opacity（input 的 placeholder 不吃 opacity）',
   !/\.srch-ph\s*\{[^}]*opacity/.test(wxss) && /--text-tertiary/.test(seg(wxss, '.srch-ph')))
-// v19 第三条：那两个字压到与分类同一档（原来吃 --fs-title 31，比正文还大一级）。
-// 新建页那条标题不动，所以这里不再钉"两页同一个令牌"。
-ok('「搜索笔记」与分类那枚 chip 吃同一条字号令牌（--fs-meta 24，不再比正文大一级）',
-  /font-size: var\(--fs-meta\)/.test(seg(wxss, '.srch-go'))
-  && /font-size: var\(--fs-meta\)/.test(seg(read('app.wxss'), '.chip'))
+// v19 第三条的现行口径（站长 10-22「分类字体大小提高一档，与关于里面的字号一样」⇒ 两处一起抬到 --fs-body 28）。
+// 钉的是"这两行吃同一枚令牌"这件事本身（他那句原话就是"搜索笔记字变成与下方分类字体大小"），
+// 而不是钉死某一个数——将来他再换档，只改这一行期望的令牌名，不会出现两行各自飘。
+ok('「搜索笔记」与分类那一行吃同一条字号令牌（现值 --fs-body 28＝关于页正文那一档）',
+  (() => {
+    const tok = (sel) => (String(seg(wxss, sel)).match(/font-size:\s*var\((--[\w-]+)\)/) || ['', ''])[1]
+    const go = tok('.srch-go'), cat = tok('.ix-cat')
+    return !!go && go === cat && go === '--fs-body'
+  })()
   && /font-weight: 600/.test(seg(wxss, '.srch-go')))
 ok('两枚图形都是 CSS 画的，这一页没为任何一枚 icon 引图（全页 wxss 里一次 `url(` 都不许出现）',
   /\.glyph-search::before/.test(wxss) && /\.glyph-search::after/.test(wxss)
@@ -316,10 +320,11 @@ ok('点空白缩回挂在容器上，条子内部和两枚 icon 都靠 catchtap 
 ok('条子压到 60（与分类那枚 chip 实测 59 同一档），那一行 64、条子在行里竖向居中',
   /\.srch\s*\{[^}]*height: 60rpx/.test(wxss) && /^\.ixl-bar\s*\{[^}]*height: 64rpx/m.test(wxss)
   && /align-items: center/.test(seg(wxss, '.ixl-bar')))
-// 10-18 那一刀的另一半：分类那一行的上内缩归零。这一条钉的是"那一行空白不许自己长回来"——
-// 上下两档里只许动上面那档，下面的 8 是给列表留的缝，他没说要去。
-ok('分类那一行的上内缩是 0（浪费的那一行来自这里＋行高 88，两处一起收）且下内缩 8 没跟着动',
-  /^\.cats\s*\{[^}]*padding: 0 0 8rpx/m.test(wxss))
+// 10-18 那一刀的另一半：分类那一行的上内缩归零（这一条不许长回来）。下内缩 10-22 被他翻案：
+// 原话「与下方卡片的行距不足，很容易误触，请加一点点空间」⇒ 8 → 24。
+// 两档分开钉：只钉"上 0"就守不住"下别被顺手改回 8"，这两处各自有过一次反向改口。
+ok('分类那一行上内缩仍是 0（浪费的那一行来自这里＋行高 88，两处一起收）且下内缩按 10-22 抬到 24',
+  /^\.cats\s*\{[^}]*padding: 0 0 24rpx/m.test(wxss))
 ok('有词又缩回时那枚 icon 翻一档（列表被筛过这件事得有地方说）',
   /class="ixl-ic \{\{searchKeyword \? 'on' : ''\}\}"/.test(wxml) && /^\.ixl-ic\.on\s*\{/m.test(wxss))
 // 分类那一行 v30 起是「文字 + 选中一条短杠」（首页自己的 .ix-cat），胶囊那四条一起删了：

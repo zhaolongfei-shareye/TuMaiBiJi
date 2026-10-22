@@ -350,9 +350,9 @@
 /* 线上的文字动作：没有底色、没有圆角框，靠字重和位置表示可点 */
 .srch-go {
   flex: none;
-  /* 与下面分类那几枚同字号同字重（.chip 是 --fs-meta 24 / 600）：站长原话
-     "搜索笔记字变成与下方分类字体大小"。原来那档 31/800 比正文还大一级。 */
-  font-size: var(--fs-meta);
+  /* 与下面分类那几枚同字号同字重：站长原话"搜索笔记字变成与下方分类字体大小"。
+     10-22 分类抬到 --fs-body 28，这一行跟着一起抬——"同档"那句是他拍的，不抬就自己作废了。 */
+  font-size: var(--fs-body);
   font-weight: 600;
   color: inherit;
 }
@@ -384,7 +384,9 @@
   flex: none;
   display: flex;
   align-items: center;
-  padding: 0 0 8rpx;
+  /* 8 → 24（站长 10-22「与下方卡片的行距不足，很容易误触，请加一点点空间」）。
+     芯片自己的热区往下还伸 12，所以原来那 8 就是"点分类会不会碰到卡片"的全部余量。 */
+  padding: 0 0 24rpx;
 }
 
 /* 一排放不下就左右滚那一节（v18 之前就有，这轮只把"只能从时间轴右侧起排"那道 126 撤了） */
@@ -416,7 +418,9 @@
   position: relative;
   display: inline-block;
   padding: 10rpx 0 12rpx;
-  font-size: var(--fs-tiny);
+  /* 站长 10-22「分类字体大小提高一档，与关于里面的字号一样」⇒ 吃 --fs-body 28（关于页正文同一枚令牌）。
+     10-17 那档 21 是被「分类字体也要小一点」压下去的，这一刀把它翻回来；`验-字号档位与对比` 与规格 §4 跟着改。 */
+  font-size: var(--fs-body);
   font-weight: 400;
   letter-spacing: 1rpx;
   white-space: nowrap;
