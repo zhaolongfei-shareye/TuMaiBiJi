@@ -375,6 +375,10 @@ const i18n = {
     shotBlockedTag: '违规',
     shotBlocked: '图片包含违规信息，无法保存，请换一张再试',
     shotChecking: '图片正在检查，稍等一下',
+    // 门口就被拒的那两种（不是能识别的图片、或大过那一道）。屏上优先念后端回的那句 `detail`，
+    // 这一句是**读不懂回体时**的退路，所以与 `ingest.UNSUPPORTED_IMAGE_HINT` 逐字同一支
+    // （上面 `shotBlocked` 那条"一个产品里两句不同的话"的理由，在这里同样成立）。
+    shotBadFormat: '暂不支持该图片格式，请改用 JPG 或 PNG',
     takePhoto: '拍照',
     fromAlbum: '相册',
     // 满 9 张还点 ➕：原来是静默截掉（选了没看见，界面上什么都不说），现在给一句吐司。
@@ -781,6 +785,8 @@ const i18n = {
     shotBlockedTag: 'Blocked',
     shotBlocked: 'This image was blocked — try another one',
     shotChecking: 'Checking the images, one moment',
+    // 与上面中文一一对应；这一句是后端那句格式提示的退路（屏上优先念后端回的 detail）。
+    shotBadFormat: 'That format isn’t supported — use JPG or PNG',
     takePhoto: 'Camera',
     fromAlbum: 'Album',
     maxShots: 'Up to {n} images — delete one first',

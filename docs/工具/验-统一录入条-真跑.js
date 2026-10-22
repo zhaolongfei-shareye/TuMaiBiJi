@@ -613,10 +613,18 @@ const ck = (name, ok, got) => {
     }
     // 跳转这一趟也挡住：完成那一帧只活 800ms，靠 sleep 去撞它必然掷硬币（10-08 D8 就这么红过一次——
     // 红的是"读不到"而不是"画错了"）。桩把目标 url 记下来，D8 从容态里量，D9 改判"有没有约成这一跳"。
+    // ⚠ 10-19 那一刀把落点从独立详情页换成**列表那扇详情窗**（站长原话「提炼完直接跳到这个详情页」），
+    //   代码里那一跳跟着从 navigateTo('/pages/detail/…') 换成 switchTab('/pages/index/index')＋把 id 交给
+    //   app.globalData 那一次交接。尺子当时没跟着改，D9/D9b 就从 10-19 起一直红着（红的还是"读不到"那一型：
+    //   只挡了 navigateTo，真 switchTab 把创建页整个销毁了，后面每一节都得重新 enter 一次）。
+    //   所以这里两跳都挡：记到同一只数组里，页面留在创建这一屏，D8b 之后那几段量的是同一份字节。
     if (!wx.__probeRawNav) {
       wx.__probeRawNav = wx.navigateTo
+      wx.__probeRawTab = wx.switchTab
       wx.__probeNav = []
-      wx.navigateTo = (o) => { wx.__probeNav.push((o && o.url) || '') }
+      const rec = (o) => { wx.__probeNav.push((o && o.url) || ''); if (o && o.success) o.success({}) }
+      wx.navigateTo = rec
+      wx.switchTab = rec
     }
     return true
   })
@@ -679,14 +687,30 @@ const ck = (name, ok, got) => {
     knobDone && `圆左 ${toRpx(knobDone.left).toFixed(0)}rpx`)
   await mp.screenshot({ path: `${OUT}/D-完成那一帧.png` })
   await sleep(1200)
-  const nav = await mp.evaluate(() => wx.__probeNav || [])
-  ck('D9 吐司之后约成了跳笔记详情页这一跳（url 带 probe-note）',
-    nav.length === 1 && nav[0] === '/pages/detail/detail?id=probe-note', JSON.stringify(nav))
+  /* D9 吃的这一跳 10-19 换过一次载体：站长那句「提炼完，直接跳到这个详情页，就是带背景毛玻璃这个」把落点
+     从独立详情页换成**列表那扇详情窗** ⇒ 代码里是 `switchTab('/pages/index/index')` ＋把 note_id 交给
+     `globalData.pendingDetailNoteId` 那一次交接。两条都算这一跳的组成部分，所以两条一起判：
+     只跳回列表而 id 没交接＝回来站错窗前；id 交接了但没跳＝人还留在创建这一屏。 */
+  const nav = await mp.evaluate(() => {
+    let handoff = ''
+    try { handoff = (getApp().globalData || {}).pendingDetailNoteId || '' } catch (e) { handoff = '(读不到)' }
+    return { list: wx.__probeNav || [], handoff }
+  })
+  ck('D9 吐司之后约成了"回列表开那扇详情窗"这一跳（跳回列表 ＋ id 交给 globalData）',
+    nav.list.length === 1 && nav.list[0] === '/pages/index/index' && nav.handoff === 'probe-note',
+    `${JSON.stringify(nav.list)}／交接 id「${nav.handoff}」`)
   const route = await mp.evaluate(() => getCurrentPages().slice(-1)[0].route)
   ck('D9b 探针自己没把页面跳走（还停在创建这一屏，桩挡住的那跳不会真发生）', route === 'pages/create/create', route)
   await mp.evaluate(() => {
     if (wx.__probeRaw) { wx.request = wx.__probeRaw; delete wx.__probeRaw }
-    if (wx.__probeRawNav) { wx.navigateTo = wx.__probeRawNav; delete wx.__probeRawNav; delete wx.__probeNav }
+    if (wx.__probeRawNav) {
+      wx.navigateTo = wx.__probeRawNav
+      wx.switchTab = wx.__probeRawTab
+      delete wx.__probeRawNav; delete wx.__probeRawTab; delete wx.__probeNav
+    }
+    // 那一枚 id 是探针造的（'probe-note' 云上根本没有这篇），不清掉的话后面任何一次进列表都会
+    // 去追开一扇不存在的窗（`_reopenDetail` 拿它当"用户自己提炼完要看的窗"）。
+    try { getApp().globalData.pendingDetailNoteId = null } catch (e) {}
   })
   page = await enter('/pages/create/create')
   await sleep(3500)
@@ -1078,6 +1102,109 @@ const ck = (name, ok, got) => {
     if (wx.__rawPaste) { wx.getClipboardData = wx.__rawPaste; delete wx.__rawPaste }
   })
   await mp.screenshot({ path: `${OUT}/P-粘贴那一枚.png` })
+  // ---------- R 导入即检那一排（10-22 丙；站长 15:2x 那趟"删掉违规那张、换正常的还念违规"）----------
+  /* 这一节判的是**屏上那句话跟不跟着状态走**，不是"微信判得准不准"——后者要一张已知会被判违规的样本，
+     手里至今没有（那一格从 10-22 12:3x 起一直开着，别把这一节的绿读成"判定能力已验证"）。
+     所以把 wx.uploadFile 也换成桩，按"哪一张路径"回 risky / pass / 400；
+     走的仍是真入口：点 ➕ → pickImage → wx.chooseMedia(桩) → _checkShots → setData → _sync → 渲染。 */
+  await top()
+  await mp.evaluate(() => {
+    /* 两枚替身都**无条件重挂**（只把"存原始函数"那一步守住一次）：上一趟跑到一半崩了就会留下
+       一个挂着的替身，条件式一跳过，`__uploadCalls` 不再清零 ⇒ R5 那一条数到的是上一趟的账。 */
+    if (!wx.__rawChoose) wx.__rawChoose = wx.chooseMedia
+    wx.__shots = []
+    wx.chooseMedia = (o) => {
+      const res = { type: 'image', tempFiles: (wx.__shots || []).map((p) => ({ tempFilePath: p })) }
+      if (o.success) o.success(res)
+      if (o.complete) o.complete(res)
+    }
+    if (!wx.__rawUpload) wx.__rawUpload = wx.uploadFile
+    wx.__uploadCalls = []
+    wx.__verdicts = {}
+    wx.uploadFile = (o) => {
+      wx.__uploadCalls.push(o.filePath)
+      const mode = (wx.__verdicts || {})[o.filePath] || 'pass'
+      const res = mode === 'bad400'
+        ? { statusCode: 400, data: JSON.stringify({ detail: '暂不支持该图片格式，请改用 JPG 或 PNG' }) }
+        : { statusCode: 200, data: JSON.stringify({ verdict: mode === 'risky' ? 'risky' : 'pass' }) }
+      if (o.success) o.success(res)
+      if (o.complete) o.complete(res)
+    }
+  })
+  // 上一节(P)收尾时框上方还挂着那句"读不到剪贴板"，而 R2 判的是"气泡里没有话"。
+  // 所以这一节从**重新进这一屏**起步（reLaunch 会重建页面，气泡与草稿里的图都不带走），
+  // 再把面板开到照片那一档——与 F/P 两节同一味起手式，不留"上一节停在哪"这种依赖。
+  page = await enter('/pages/create/create')
+  await sleep(3500)
+  await top()
+  await openEntry()
+  await (await page.$$('.md'))[0].tap()
+  await sleep(800)
+  for (let i = 0; i < 20 && (await page.data()).hintLine; i++) await sleep(400)
+  const rClear = async () => {
+    for (let i = 0; i < 12; i++) {
+      const x = await page.$('.th-x')
+      if (!x) break
+      await x.tap()
+      await sleep(200)
+    }
+    await sleep(400)
+  }
+  const rPick = async (paths, verdicts) => {
+    await mp.evaluate((v, ps) => { wx.__verdicts = v; wx.__shots = ps }, verdicts || {}, paths)
+    /* 空着那一态**没有 ➕**：`create.wxml:311` 那排快门圈的条件是 `active==='photo' && !previewImages.length`，
+       井那一排（`.th-add` 住在里面）是它的接替者（`:332` 的 `wx:elif`）。所以第一张只能点快门排第一枚（相册）
+       ——F 节 `setShots` 早就留了这一手（`add || $$('.mini')[0]`），我上一版只找 ➕，
+       于是清空之后那一趟必然报「屏上没有 .th-add」。两条都走 pickImage 真入口，没有绕过去。 */
+    const el = (await page.$('.th-add')) || (await page.$$('.mini'))[0]
+    if (!el) throw new Error('屏上既没有 ➕ 也没有快门排那一枚：照片那一档没开成，这一节的读数都不算')
+    await el.tap()
+    await sleep(1500)
+    return page.data()
+  }
+  await rClear()
+  const rA = 'http://usr/risky-one.png'
+  const r1 = await rPick([rA], { [rA]: 'risky' })
+  /* 先证屏上跑的是今天这一份构建：`shotBadFormat` 是今天才加进 i18n 的那枚键。
+     不先钉这一格，R2 万一红了分不清是"IDE 没重编译"还是"修错了"——那是两件事。 */
+  ck('R0 屏上这一构建里有今天新加的那枚键（先排除"量的是旧包"）',
+    !!r1.t && !!r1.t.shotBadFormat, `t.shotBadFormat「${(r1.t || {}).shotBadFormat || '没有这枚键'}」`)
+  ck('R1 桩回 risky 那一格钉成 bad：滑条不实、气泡念那句违规',
+    String(r1.shotStates) === 'bad' && r1.ready === false && r1.hintLine === r1.t.shotBlocked,
+    `态 ${r1.shotStates}／ready ${r1.ready}／气泡「${r1.hintLine || '空'}」`)
+  const rX = await page.$('.th-x')
+  await rX.tap()
+  await sleep(400)
+  const rB = 'http://usr/normal-one.png'
+  const r2 = await rPick([rB], { [rB]: 'pass' })
+  ck('R2 删掉违规那张、换一张正常的：那句违规必须跟着走（站长 10-22 报的就是这一条）',
+    String(r2.shotStates) === 'ok' && r2.ready === true && !r2.errLine && !r2.hintLine,
+    `态 ${r2.shotStates}／ready ${r2.ready}／errLine「${r2.errLine || '空'}」／气泡「${r2.hintLine || '空'}」`)
+  await rClear()
+  /* 同一路径出现两次：原来 `_setShotState` 按 `indexOf(path)` 找格子，两体的结果全落在第一格上，
+     第二格永久 'wait' ⇒ 滑条永久放不开。这一条同时量出 `wx:key="*this"` 撞键会不会少渲染一格。 */
+  const rD = 'http://usr/dup.png'
+  const r3 = await rPick([rD, rD], { [rD]: 'pass' })
+  const r3cells = (await page.$$('.strip .th')).length
+  ck('R3 两张同路径也各回各的格（按下标写，不再假设路径唯一）',
+    String(r3.shotStates) === 'ok,ok' && r3.ready === true && r3cells === 3,
+    `态 ${r3.shotStates}／ready ${r3.ready}／屏上 ${r3cells} 格（含 ➕）`)
+  await rClear()
+  const rE = 'http://usr/not-an-image.png'
+  const r4 = await rPick([rE], { [rE]: 'bad400' })
+  const r4tags = (await page.$$('.th-bad-lb')).length
+  ck('R4 后端回 400 那一档：当场念那句格式话，但格子照常回显、角标不许念「违规」',
+    r4.hintLine === '暂不支持该图片格式，请改用 JPG 或 PNG' && String(r4.shotStates) === 'ok' && r4tags === 0,
+    `气泡「${r4.hintLine || '空'}」／态 ${r4.shotStates}／违规角标 ${r4tags} 枚`)
+  const r4calls = await mp.evaluate(() => (wx.__uploadCalls || []).length)
+  ck('R5 一张图只出一趟检（桩里数得出：两张同路径也是两趟，不是四趟）',
+    r4calls === 5, `桩记到 ${r4calls} 次 uploadFile（R1 1＋R2 1＋R3 2＋R4 1）`)
+  await rClear()
+  await mp.evaluate(() => {
+    if (wx.__rawUpload) { wx.uploadFile = wx.__rawUpload; delete wx.__rawUpload; delete wx.__uploadCalls; delete wx.__verdicts }
+    if (wx.__rawChoose) { wx.chooseMedia = wx.__rawChoose; delete wx.__rawChoose; delete wx.__shots }
+  })
+  await mp.screenshot({ path: `${OUT}/R-导入即检那一排.png` })
   await mp.close()
   console.log(bad.length ? `\n失败 ${bad.length} 条：\n  ✗ ` + bad.join('\n  ✗ ') : '\n真跑全过')
   process.exit(bad.length ? 1 : 0)

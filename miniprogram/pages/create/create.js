@@ -345,18 +345,25 @@ Page({
   // 每次动到 urlInput、writeBody、previewImages、active 都要过一遍，
   // 漏一处就是"界面停在上一档的样子"。
   _sync() {
-    const { active, previewImages, errLine, urlHint, lang } = this.data
+    const { active, previewImages, errLine, urlHint, lang, shotStates } = this.data
+    // 「包含违规信息」那一句只许在**还挂着一格 'bad'** 的时候说。
+    // 站长 10-22 实测：违规那一张 ✕ 掉、换一张正常的，检过了、滑条也实了，屏上却还念那句违规
+    // ——气泡是从 errLine 重算的，而"删掉那一格"与"这一格检过了"两件事谁都没清它，
+    // 于是每回来一张图这一句就被重新念一遍、计时器再续一次。
+    // 比的是句子而不是另记一枚布尔：多一格状态，就多一处会漏同步的真相。
+    const line = errLine === t('shotBlocked', lang) && shotStates.indexOf('bad') < 0 ? '' : errLine
     const patch = {
       ready: this.readyFor(),
       // 报错优先；没有报错时，链接那一档"正在输但不像链接"仍然要说一句（现网就是这么演的：
       // 那行规则字跟着 urlHint 走，不是等点下去才说）。
-      hintLine: errLine || (active === 'url' && urlHint === 'bad' ? t('linkRule', lang) : ''),
+      hintLine: line || (active === 'url' && urlHint === 'bad' ? t('linkRule', lang) : ''),
       shotsFull: previewImages.length >= MAX_SHOTS,
       // 「文字」那一档的展开由原文框的焦点说话；「照片」那一档由"这一行放不下了"说话
       // （5 格是行宽，第 6 格起要第二排）。链接只有单行输入，永远不展开。
       panelOpen: active === 'write' ? this.data.bodyFocus
         : active === 'photo' && previewImages.length + 1 > ROW_CELLS,
     }
+    if (line !== errLine) patch.errLine = ''
     this.setData(patch)
     // 气泡"几秒后消失"（站长 10-10 深夜那句）。计时挂在算出这一位之后，不在各个报错点各排一次——
     // 那样会有人忘了排；同一趟里再报一句就把表重头走，读的人看到的是"这条是新的"。
@@ -916,13 +923,18 @@ Page({
         //
         // 每张新图先落一格 'wait'（屏上是占位色块），再逐张送检；检回来才换缩略图。
         // 不 await 这一趟：它慢、它挂，都不该让"图没选上"这件事发生（与下面 B 链同一取舍）。
+        // ⚠ 送检的是**下标**不是路径（10-22 站长拍甲）：原来按 `indexOf(path)` 找那一格，
+        //   同一个 tempFilePath 出现两次时，两体的结果全落在第一格上，第二格永久 'wait'
+        //   ⇒ 滑条永久放不开、屏上一直念「图片正在检查」。按下标写就不依赖"路径唯一"这个假设。
+        const base = this.data.previewImages.length
         const fresh = files.map((f) => f.tempFilePath)
+        this._shotComps = (this._shotComps || []).concat(fresh.map(() => null))
         this.setData({
           previewImages: this.data.previewImages.concat(fresh),
           shotStates: this.data.shotStates.concat(fresh.map(() => 'wait')),
         })
         this._sync()
-        this._checkShots(fresh)
+        this._checkShots(fresh.map((_, k) => base + k))
       },
       // 原来这里只有 success：权限被拒或系统选择器起不来时界面静默无反应，
       // 用户只能对着屏幕再点一次。fail 补上。
@@ -957,11 +969,10 @@ Page({
     wx.openSetting({})
   },
 
-  /** 按**路径**找那一格现在在第几位，写它的检查态。返回 false＝这张已经被 ✕ 掉了，
-   *  这一体的结果没有落点（下标会指到别的图上，所以宁可丢也不能写）。 */
-  _setShotState(path, state) {
-    const i = this.data.previewImages.indexOf(path)
-    if (i < 0) return false
+  /** 按**下标**写那一格的检查态，写之前先核一眼这一格还是不是当初那一张（`src` 对不上＝
+   *  半路被 ✕ 掉或整排往前漂了，这一体的结果就不该落到别的图上——宁可丢也不能写错格子）。 */
+  _setShotStateAt(i, src, state) {
+    if (this.data.previewImages[i] !== src) return false
     const states = this.data.shotStates.slice()
     states[i] = state
     this.setData({ shotStates: states })
@@ -980,20 +991,38 @@ Page({
    * 检的是压过的那一张、闸检的是原图，两边判定可能不同：以闸为准。所以屏上这一句是"提示"，
    * 而 'bad' 那一格也根本进不到提交（`readyFor` 卡着），不会有一张违规图靠这条路漏进去。
    */
-  async _checkShots(paths) {
-    for (const p of paths) {
-      if (this.data.previewImages.indexOf(p) < 0) continue  // 半路被 ✕ 掉了，不再为它花一趟出网
+  async _checkShots(idxs) {
+    for (const i of idxs) {
+      const src = this.data.previewImages[i]
+      if (src === undefined) continue  // 半路被 ✕ 掉了，不再为它花一趟出网
       let risky = false
+      let formatLine = ''
       try {
-        const small = await compressForBackup(p)
-        const res = await api.checkShot(small ? small.path : p)
+        const small = await compressForBackup(src)
+        // 压出来的那一张留给 B 链复用（10-22 站长拍甲：原来检图与备份各压一遍，
+        // 一次选九张＝滑到底要重绘十八次离屏 canvas）。存的时候连原料一起记，
+        // 复用那一头认一次 `src`——下标会因为 ✕ 而漂，按下标存而不校验原料就是"同名换内容仍画第一张"那一坑的翻版。
+        if (small) this._shotComps[i] = { src, small }
+        const res = await api.checkShot(small ? small.path : src)
         risky = !!(res && res.verdict === 'risky')
       } catch (e) {
-        // 没检成 ≠ 这张有问题。留一行日志，屏上照常回显。
-        console.warn('导入即检这一趟没走通，按未检成放行', e)
+        if (e && e.statusCode === 400) {
+          // 门口就拒的那两种：不是能识别的图片、或大过那一道。**不钉成 'bad'**——
+          // 那一格的角标念「违规」，把"格式不对"说成"内容违规"是一句冤枉话。
+          // 只把这句实话提前说出来：格子照常回显，滑得动，提交那一趟服务端还会再说一次同一句。
+          formatLine = (e.data && e.data.detail) || t('shotBadFormat', this.data.lang)
+        } else {
+          // 没检成 ≠ 这张有问题。留一行日志，屏上照常回显。
+          console.warn('导入即检这一趟没走通，按未检成放行', e)
+        }
       }
-      if (!risky) { this._setShotState(p, 'ok'); continue }
-      if (this._setShotState(p, 'bad')) this.sayErr(t('shotBlocked', this.data.lang))
+      if (formatLine) {
+        this._setShotStateAt(i, src, 'ok')
+        this.sayErr(formatLine)
+        continue
+      }
+      if (!risky) { this._setShotStateAt(i, src, 'ok'); continue }
+      if (this._setShotStateAt(i, src, 'bad')) this.sayErr(t('shotBlocked', this.data.lang))
     }
   },
 
@@ -1006,6 +1035,9 @@ Page({
     // 两串必须一起缩：只缩 previewImages 会让 shotStates 长出一格，
     // 那一格正好顶在**别的图**身上（下面那条长度等式当场把这一档判成"不许滑"）。
     states.splice(index, 1)
+    // 压完那一份的缓存也住在同一批下标上，跟着缩；漏缩不会画错图（复用那一头认 `src`），
+    // 只会白多存几份字节，所以这里跟着缩是"顺手"，不是"救命"。
+    if (this._shotComps) this._shotComps.splice(index, 1)
     this.setData({ previewImages: left, shotStates: states })
     this._sync()
   },
@@ -1030,13 +1062,16 @@ Page({
     this._extractBegin('shot')
     // 提交的是点下去那一刻的那批图，后面列表再怎么变都不影响这一单
     const batch = this.data.previewImages.slice()
+    // 压完那一份与这一批**同一刻**取，下标才对得上（B 链复用那一份，不再重压一遍）
+    const comps = (this._shotComps || []).slice()
     // B 链（把图留下来）与 A 链（提炼建笔记）同时起跑，谁也不等谁。这里**不 await**：
     // 它慢、它失败，都不该让"笔记没存下来"这件事发生（方案 §3.1.4 那条关键原则）。
     // CLOUD_ENV 没填时 cloudReady() 是 false，这一趟直接跳过，行为和今天一字不差。
-    const backup = this._backupShots(batch)
+    const backup = this._backupShots(batch, comps)
     try {
       const { task_id } = await api.ingestScreenshots(batch, this.data.writeTranslate)
       const result = await api.pollTask(task_id)
+      this._shotComps = []
       this._extractDone(result.note_id, { previewImages: [], shotStates: [] })
       this._settleBackup(result.note_id, backup)
     } catch (err) {
@@ -1052,13 +1087,20 @@ Page({
    * B 链：逐张压、逐张传，攒出 bind 要的那批 items。
    * **串行不并行**——九张 4000×3000 的截图一起重绘离屏 canvas 会把内存吃穿，
    * 而真机在这件事上比模拟器诚实得多。
+   *
+   * `comps` 是检图那一趟按同一批下标存下来的 `{src, small}`：命中就复用（一次选九张
+   * 原本要重绘十八遍，站长 10-22 拍甲砍掉一半）。复用之前认一次原料 `hit.src === p`，
+   * 对不上就照旧自己压一遍——**这一趟不许因为缓存而丢图或传错图**，最多是白压一次。
    */
-  async _backupShots(paths) {
+  async _backupShots(paths, comps) {
     if (!cloudUpload.cloudReady()) return { skipped: true, items: [], fileIDs: [] }
     const userId = getApp().globalData.userId
     const items = []
-    for (const p of paths || []) {
-      const small = await compressForBackup(p)
+    const list = paths || []
+    for (let k = 0; k < list.length; k++) {
+      const p = list[k]
+      const hit = (comps || [])[k]
+      const small = hit && hit.src === p ? hit.small : await compressForBackup(p)
       // 压不动（读不到尺寸/画不出来）就传原图：宁可这一张大一点，也不要"图丢了"
       const src = small || { path: p, bytes: null }
       const up = await cloudUpload.uploadImage(src.path, userId)

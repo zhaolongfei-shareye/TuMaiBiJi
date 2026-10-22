@@ -287,7 +287,7 @@ ok('"几秒后消失"有人管：算出这一位之后统一上表，撤掉时�
    10-08 把它并进 hintLine 一位驱动——并的时候漏掉过一半：只剩 errLine，打字过程中界面一句都不说，
    要等滑到底才报。所以这里两头都钉：一位算出来要含那句规则，且每个会改 errLine 的出口都要过一遍 _sync。 */
 ok('hintLine = 报错优先，其次链接那一档"还不像链接"那句规则',
-  /hintLine: errLine \|\| \(active === 'url' && urlHint === 'bad' \? t\('linkRule', lang\) : ''\)/.test(js))
+  /hintLine: line \|\| \(active === 'url' && urlHint === 'bad' \? t\('linkRule', lang\) : ''\)/.test(js))
 const errSets = (js.match(/setData\(\{[^}]*errLine:/g) || []).length
 const syncAfterErr = (js.match(/errLine:[^\n]*\n[\s\S]{0,320}?this\._sync\(\)/g) || []).length
 ok('每一处写 errLine 的路径都跟着过一遍 _sync（否则那一行会停在上一句）',
@@ -1164,13 +1164,24 @@ ok('那一刀真的排在发出去之前：!readyFor 的位置比 ingestScreensh
 const checkBody = js.split('async _checkShots')[1].split('removeShot(e)')[0]
 /* catch 那一支的射程只到"第一次写状态"为止：再往下就是 `if (!risky)` 那两条正路，
    拿整段去查 'bad' 会把正路自己判成违规（第一版就红在这一句上）。 */
-const catchArm = ((checkBody.split('catch (e) {')[1] || '').split('_setShotState')[0])
-ok('只有微信明说 risky 才算违规：catch 那一支只留日志、不改判',
+const catchArm = ((checkBody.split('catch (e) {')[1] || '').split('if (formatLine)')[0])
+ok('只有微信明说 risky 才算违规：catch 里"没检成"那一支只留日志、不改判',
   /let risky = false/.test(checkBody)
   && /risky = !!\(res && res\.verdict === 'risky'\)/.test(checkBody)
-  && /console\.warn/.test(catchArm) && !/'bad'/.test(catchArm))
+  && /console\.warn/.test(catchArm) && !/_setShotStateAt\(i, src, 'bad'\)/.test(catchArm))
+ok('400 那一档说实话但不冤枉人：念那句格式话，格子照常回显（角标「违规」只跟 risky）',
+  /e\.statusCode === 400/.test(checkBody)
+  && /formatLine = \(e\.data && e\.data\.detail\) \|\| t\('shotBadFormat'/.test(checkBody)
+  && /this\._setShotStateAt\(i, src, 'ok'\)\s*\n\s*this\.sayErr\(formatLine\)/.test(checkBody))
+ok('送检与写状态都走下标，不许再用 indexOf(path) 找那一格（同一张出现两次＝第二格永久 wait）',
+  /for \(const i of idxs\)/.test(checkBody) && !/previewImages\.indexOf\(/.test(js))
+ok('按下标写之前先核一眼还是不是当初那一张（对不上宁可丢，不落进别的图身上）',
+  /_setShotStateAt\(i, src, state\)\s*\{\s*if \(this\.data\.previewImages\[i\] !== src\) return false/.test(js))
 ok('逐张串行送检，不并行（九张一起重绘离屏 canvas 会把内存吃穿，与 B 链同一条理由）',
-  /for \(const p of paths\)/.test(checkBody) && !/Promise\.all/.test(checkBody))
+  /for \(const i of idxs\)/.test(checkBody) && !/Promise\.all/.test(checkBody))
+ok('「包含违规信息」那一句只许在还挂着一格 bad 的时候说（站长 10-22：删掉违规那张、换正常的，屏上还念违规）',
+  /const line = errLine === t\('shotBlocked', lang\) && shotStates\.indexOf\('bad'\) < 0 \? '' : errLine/.test(js)
+  && /hintLine: line \|\|/.test(js) && /if \(line !== errLine\) patch\.errLine = ''/.test(js))
 ok('这一口只是提示层：提交仍然走 stage→process 那一趟（闸在 worker 里 OCR 之前，撤了就没人拦）',
   /ingestScreenshots\(batch, this\.data\.writeTranslate\)/.test(js))
 ok('占位那一格绑在状态上、检过才把图换回来（wxml 两态都在）',
@@ -1182,19 +1193,24 @@ ok('三块皮各有自己的规则（.th-wait／.th-bad／.th-bad-lb）',
    占位那块用的是**同一枚令牌**，所以它必须跟着进名单——漏了不会红任何一条现成的判据，只会难看。 */
 ok('有背景图那一态：占位那块也进了玻璃名单（与 ➕ 同一份毛病，换个类不许又犯一遍）',
   /--glass-fill/.test(seg('.container.has-bg .th-wait:not(.th-bad)')))
-ok('那三句中英各一份（切英文不许念中文）',
-  ['shotBlocked', 'shotBlockedTag', 'shotChecking'].every((k) => zh[k] && en[k]))
+ok('那四句中英各一份（切英文不许念中文）',
+  ['shotBlocked', 'shotBlockedTag', 'shotChecking', 'shotBadFormat'].every((k) => zh[k] && en[k]))
 const srvSentence = (/raise UserError\('(图片包含违规信息[^']*)'\)/.exec(BE_WECHAT) || [])[1]
 ok('违规那句话全站只有一支：客户端这句与后端 enforce_image_safety 逐字相等',
   !!srvSentence && zh.shotBlocked === srvSentence,
   `后端「${srvSentence}」／前端「${zh.shotBlocked}」`)
+const BE_INGEST = fs.readFileSync(path.join(ROOT, 'backend', 'app', 'api', 'routes', 'ingest.py'), 'utf8')
+const srvFormat = (/UNSUPPORTED_IMAGE_HINT = "([^"]*)"/.exec(BE_INGEST) || [])[1]
+ok('格式那句也是全站一支：客户端这句与后端门口那道 400 的提示逐字相等',
+  !!srvFormat && zh.shotBadFormat === srvFormat,
+  `后端「${srvFormat}」／前端「${zh.shotBadFormat}」`)
 
 // ---------- 8. 上一代那些能力没被这批碰坏 ----------
 ok('忙态仍然挡住收起', /collapse\(\)\s*\{\s*if \(this\.data\.busy/.test(js))
 const showBody = js.split('async onShow')[1].split('hintFor(value)')[0]
 ok('onShow 仍然不重置草稿', !/previewImages: \[\]/.test(showBody) && !/active: ''/.test(showBody))
 ok('选完图返回仍然重算那三位（ready / 满 / 展开）',
-  /this\._sync\(\)/.test(js) && /_sync\(\)\s*\{[\s\S]{0,600}panelOpen:/.test(js))
+  /this\._sync\(\)/.test(js) && /_sync\(\)\s*\{[\s\S]{0,900}panelOpen:/.test(js))
 ok('链接校验那条正则没被顺手改松', js.includes('const LINK_RE = /^https?:\\/'))
 // Tips 那一行仍然**只在收起态**渲染。原来它住在整组最上面那一整行（`.tips`）；
 // 2.2 B 方案把它搬进右列那一格（`.blk-tips`），闸还是同一套：组外壳 `wx:if="{{!active}}"` 把，
@@ -1212,7 +1228,10 @@ ok('Tips 六句中英各一份、句数相等', Array.isArray(zh.tips) && Array.
   && zh.tips.length === 6 && en.tips.length === zh.tips.length)
 ok('一句停 8 秒', /\}, 8000\)/.test(js) && !/\}, 4000\)/.test(js))
 ok('图片备份那条 B 链仍与建笔记那条并行、不 await',
-  /const backup = this\._backupShots\(batch\)/.test(js) && !/await this\._backupShots/.test(js))
+  /const backup = this\._backupShots\(batch, comps\)/.test(js) && !/await this\._backupShots/.test(js))
+ok('B 链复用检图压过那一份、复用前认一次原料（一次选九张不再重绘十八遍）',
+  /const comps = \(this\._shotComps \|\| \[\]\)\.slice\(\)/.test(js)
+  && /const small = hit && hit\.src === p \? hit\.small : await compressForBackup\(p\)/.test(js))
 ok('失败时那批孤儿对象仍然删（_settleBackup(null, …)）', /this\._settleBackup\(null, backup\)/.test(js))
 
 /* ---------- 注释被自己写的"闭合符"提前关掉（10-16 真跑整批红过一次，根因在这） ----------
