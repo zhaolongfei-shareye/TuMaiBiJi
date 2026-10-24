@@ -1,7 +1,7 @@
-"""后台那一页背后的十五个口：登录、看状态、上传、改图片生效位、改文案生效位、读默认笔记那一篇、
+"""后台那一页背后的十八个口：登录、看状态、上传、改图片生效位、改文案生效位、读默认笔记那一篇、
 改默认笔记那一篇、验票、看数、列卡片模板、改卡片模板（元数据与上下架，**改不了配方**）、
 吐预览引擎（把客户端那份绘制代码当数据交给那一页的浏览器，**这里一笔都不画**）、
-列来源黑名单、手工加一条、手工移一条。
+列来源黑名单、手工加一条、手工移一条，加看密钥、存密钥、删密钥。
 
 路径都写在这一份文件里（`/api/admin/*`），所以 `app/main.py` 挂载时不给 prefix——
 与 `assets`/`cards`/`profiles`/`landing` 同一族做法。理由在这条链上更硬一层：
@@ -43,7 +43,7 @@ from app.core.config import settings
 from app.core.errors import UserError
 from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
-from app.services import admin_stats, admin_templates, mp_assets, poster_engine, preset_note, source_blocklist
+from app.services import admin_stats, admin_templates, mp_assets, poster_engine, preset_note, service_secrets, source_blocklist
 
 logger = logging.getLogger(__name__)
 
@@ -431,6 +431,67 @@ def admin_blocklist_remove(
     """
     try:
         return {"removed": source_blocklist.remove(db, host)}
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class SecretIn(BaseModel):
+    """存一把凭据。`value` 只在写的那一刻过界，读的一侧永远拿不到它。
+
+    **两个字段都不带 Field 约束**——照上面 `BlockIn` 那条 10-19 现网探针撞出来的纪律：
+    形状、空字、长度上限的唯一出处是 `services/service_secrets.py`（`canonical_name` 那一句、
+    "密钥值是空的"那一句、`MAX_VALUE_CHARS` 那一句）。这里再写一道 422 就成了第二份真相，
+    而症状是屏上冒出一句操作者不认识的英文校验话。缺 `value` 那一种（422）是 Pydantic 的领域，
+    用例里分开钉着。
+    """
+    value: str
+    note: str | None = None
+
+
+@router.get("/api/admin/secrets")
+@limiter.limit("60/minute")
+def admin_secrets(
+    request: Request, db: Session = Depends(get_db), _admin: str = Depends(get_admin)
+):
+    """那一页要显示的密钥账：名字、长度、指纹、备注、更新时间，加两句"能不能回到 .env"。
+
+    这里没有 `value`，所以这一句不需要"记得删掉敏感字段"——判据从源头上就不往外给。
+    `consumed_names` 与每一行上的 `consumed` 是同一句实话的两个半边：存一个还没代码在读的名字，
+    界面要说"存进去了，但现网行为不变"，不许画成已经生效了。
+    """
+    return {
+        "rows": service_secrets.list_items(db),
+        "consumed_names": list(service_secrets.CONSUMED_NAMES),
+    }
+
+
+@router.put("/api/admin/secrets/{name}")
+@limiter.limit("30/minute")
+def admin_secret_put(
+    name: str,
+    body: SecretIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """存一把（没有就建、有就整把覆盖）。**回体里没有提交的那一把**，只有长度与指纹。"""
+    try:
+        return service_secrets.put(db, name, body.value, body.note)
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/api/admin/secrets/{name}")
+@limiter.limit("30/minute")
+def admin_secret_delete(
+    name: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """删一行 = 那个名字当场回到 `.env`。所以"撤销一次改动"不必知道旧值是什么。"""
+    try:
+        return {"name": name, "deleted": service_secrets.delete(db, name)}
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

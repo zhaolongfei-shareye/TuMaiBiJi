@@ -240,7 +240,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
     <nav id="nav" aria-label="后台分栏"></nav>
     <div id="main">
       <div id="view-stats" class="view"><div id="stats"></div></div>
-      <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div><div id="block"></div></div>
+      <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div><div id="block"></div><div id="secrets"></div></div>
       <div id="view-tpl" class="view hidden"><div id="tpls"></div></div>
       <div id="view-tumaike" class="view hidden"><iframe id="frameOther" class="frame" title="图麦克后台" src="about:blank"></iframe></div>
       <footer>
@@ -473,6 +473,7 @@ var NAV = [
     { label: '帮助文档', view: 'config', key: 'note:preset_note' },
     { label: '帮助文档那张图', view: 'config', key: 'kind:preset_note_image' },
     { label: '来源黑名单', view: 'config', key: 'block:list' },
+    { label: '密钥配置', view: 'config', key: 'secret:list' },
     { label: '卡片模板', view: 'tpl', key: 'tpl:list' }
   ] }
 ];
@@ -1068,6 +1069,166 @@ function loadBlocklist(flash) {
   });
 }
 
+// ---- 「密钥配置」那一栏（站长 10-24 两句：「密钥配置功能请加到cn的官网后台，我自己去加」、
+// 「配置功能放错地方了，你放在图麦克，应该放在图麦笔记下面进行配置」）。
+// 这一栏只干一件事：**库里那一行优先于服务器上的 .env**，删一行就当场回到 .env。
+// 三条纪律（值只进不出／库里只是覆盖层／读侧不许抛）写在 `services/service_secrets.py` 文件头，
+// 页面这一侧只跟着做两条能看见的：
+//   1) 接口回体里根本没有 `value` 那一个键，所以这里不存在"忘了清"——原值从服务端就没出来过；
+//   2) 值那一格在发请求**之前**就清空，失败也不回填（重粘一次的代价，换的是刷新一次就读不出东西）。
+// 「还没有代码读这个名字」这一句必须留在屏上：存一个还没接上的名字（例：先存 `DEEPSEEK_API_KEY`，
+// 等哪天真接上读法）不许画成"配置已生效"，否则下一次查"为什么没生效"又要从头查一遍。
+function localDay(iso) {
+  // 接口回的 `updated_at` 是带 Z 的 UTC 串。上面那把 `dayOf()` 切前 10 位，切出来是 UTC 那一天：
+  // 本机 00:2x 存的一把会写成"更新于 昨天"。凭据这一栏"刚没刚存对"是最要紧的读感，
+  // 所以按浏览器本地那一天算（与 `core/timefmt.py` 文件头那条老坑同一个病，只是这次落在后台页上）。
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso || '').slice(0, 10);
+  var m = ('0' + (d.getMonth() + 1)).slice(-2), day = ('0' + d.getDate()).slice(-2);
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+
+function secretSourceLine(r) {
+  // 三件事各说各的：值从哪一层来、删了会落到哪一层、今天有没有代码在读这个名字。
+  // 后半句只说"删掉就没有值了"，不说".env 里没有这一行"：服务端能确定的只有
+  // "回退那一路拿不拿得到值"这一件事——`_env_present` 查的是 settings，而一个没在
+  // `config.py` 声明过的名字，`.env` 里就算写着那一行也读不进来（`extra="ignore"`）。
+  // 屏幕上写一句关于文件的断言，就是把一个量不到的东西说成量到了。
+  var s = r.env_present ? '库里这一行（删掉回到 .env）' : '库里这一行（删掉就没有值了）';
+  if (!r.consumed) s += '　·　还没有代码读这个名字';
+  return s;
+}
+
+function secretRow(r, msg) {
+  var tr = el('tr');
+  tr.appendChild(el('td', null, r.name));
+  tr.appendChild(el('td', null, numOf(r.length)));
+  tr.appendChild(el('td', null, r.fingerprint));
+  tr.appendChild(el('td', null, localDay(r.updated_at)));
+  tr.appendChild(el('td', null, r.note || '—'));
+  tr.appendChild(el('td', null, secretSourceLine(r)));
+  var td = el('td');
+  var btn = el('button', 'mini danger', '删掉');
+  // 按整页那条口径，这一枚要两下：它改的是**线上正在用的值**——`.env` 里没有同一个名字时，
+  // 删下去登录就断；有同名那行时也是当场换回 .env 那一把。跟「发布／停用／上架」同一类。
+  arm(btn, '再点一次=删掉', function () {
+    busyRun(btn, '删除中…', function () {
+      return api('api/admin/secrets/' + encodeURIComponent(r.name), { method: 'DELETE' }).then(
+        function (d) {
+          if (!d.deleted) return loadSecrets(r.name + '：库里本来就没有这一行。');
+          return loadSecrets('已删掉 ' + r.name + (r.env_present ? '（这个名字回到 .env 的值）。'
+            : '（这个名字现在没有值了）。'));
+        }, function (e) { msg.textContent = e.message; });
+    });
+  });
+  td.appendChild(btn);
+  tr.appendChild(td);
+  return tr;
+}
+
+function renderSecrets(d, flash) {
+  var box = $('secrets');
+  while (box.firstChild) box.removeChild(box.firstChild);
+  var rows = d.rows || [];
+  var card = el('section', 'card');
+  card.dataset.key = 'secret:list';
+  card.appendChild(el('h2', null, '密钥配置'));
+
+  var st = el('p', 'state ' + (rows.length ? 'on' : 'off'));
+  st.textContent = rows.length
+    ? '库里现在管着 ' + rows.length + ' 个名字；其余名字仍用服务器 .env 里的值。'
+    : '库里一条都没有：每一个名字都还在用 .env 的值。';
+  card.appendChild(st);
+  card.appendChild(el('p', 'note',
+    '值只有长度与指纹回得来，原值这一页读不回去（填错了只能重新粘一次整把覆盖）。' +
+    '今天真被代码读的名字：' + (d.consumed_names || []).join('、') + '。' +
+    '名字要与代码里读的那一个一致；改完不用重启，下一次用到这个名字的请求就是新值。'));
+
+  var msg = el('div', 'err');   // 先造后挂：每一行的「删掉」按钮要拿到它，红话才落得下
+
+  if (rows.length) {
+    var t = el('table', 'dt wide');
+    var head = el('tr');
+    ['名字', '长度', '指纹', '更新', '备注', '生效值', '删掉'].forEach(function (h) {
+      head.appendChild(el('th', null, h));
+    });
+    var thead = el('thead');
+    thead.appendChild(head);
+    t.appendChild(thead);
+    var tb = el('tbody');
+    rows.forEach(function (r) { tb.appendChild(secretRow(r, msg)); });
+    t.appendChild(tb);
+    var wrap = el('div', 'tw');
+    wrap.appendChild(t);
+    card.appendChild(wrap);
+  } else {
+    card.appendChild(el('p', 'note', '表里一行都没有：还没有人在后台存过凭据。'));
+  }
+
+  var row = el('div', 'row');
+  var inName = document.createElement('input');
+  inName.type = 'text';
+  inName.placeholder = '名字，例 DEEPSEEK_API_KEY';
+  var inValue = document.createElement('input');
+  inValue.type = 'password';
+  inValue.autocomplete = 'off';
+  inValue.placeholder = '粘贴密钥值（保存后清空，不回显）';
+  var inNote = document.createElement('input');
+  inNote.type = 'text';
+  inNote.placeholder = '备注（可选）';
+  var btnSave = el('button', null, '保存这一把');
+  row.appendChild(inName);
+  row.appendChild(inValue);
+  row.appendChild(inNote);
+  row.appendChild(btnSave);
+  card.appendChild(row);
+  card.appendChild(msg);
+  box.appendChild(card);   // 漏这一句的症状是"函数跑了、屏上一片空"（见「来源黑名单」那条注释）
+
+  // 保存是一下：改错了再存一次就回来，给它加一道闸只是让改字变麻烦（整页那条口径）。
+  btnSave.addEventListener('click', function () {
+    var name = inName.value.trim();
+    var value = inValue.value;
+    msg.textContent = '';
+    msg.className = 'err';
+    if (!name) { msg.textContent = '先写名字，例 DEEPSEEK_API_KEY'; return; }
+    if (!value) { msg.textContent = '再粘贴密钥值'; return; }
+    inValue.value = '';
+    busyRun(btnSave, '保存中…', function () {
+      return api('api/admin/secrets/' + encodeURIComponent(name), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: value, note: inNote.value })
+      }).then(function (r) {
+        inName.value = '';
+        inNote.value = '';
+        return loadSecrets('已存下：' + r.name + '　长度 ' + r.length + ' 字　指纹 ' + r.fingerprint +
+          '（原值不再回显）。');
+      }, function (e) { msg.textContent = '存不下：' + e.message; });
+    });
+  });
+
+  // 回执落在**重读之后那一栏**上：卡片是刚重建的，写进旧节点等于没写（与其余几栏同一条坑）。
+  if (flash) {
+    var hit = box.querySelector('.card[data-key="secret:list"] .err');
+    if (hit) { hit.classList.add('ok'); hit.textContent = flash; }
+  }
+}
+
+function loadSecrets(flash) {
+  return api('api/admin/secrets').then(function (d) {
+    keepScroll(function () { renderSecrets(d, flash); });
+  }, function (e) {
+    // 401 由 api() 统一收回口令框；其余红了也只空这一栏，不许把配置那一屏带走。
+    // 这一句尤其要紧：读不到与"库里一条都没有"是两件事，写成一句会让人以为服务器上的凭据全没了。
+    if (e.status === 401) return;
+    keepScroll(function () {
+      var box = $('secrets');
+      while (box.firstChild) box.removeChild(box.firstChild);
+      box.appendChild(el('p', 'note', '这一栏没读到：' + e.message));
+    });
+  });
+}
+
 // ---- 「卡片模板」那一栏（方案 docs/方案-cn后台资产管理.md 的 P1，站长 10-15「先补笔记模板管理界面」）。
 // 这一栏只改四样元数据＋上下架。配方（就是"画面长什么样"那份 JSON）**只给看，不给改**——
 // 在线编辑配方是 P2，是唯一一个"不发版就能改用户看到的画"的口子，它没被拍开，所以界面上
@@ -1466,7 +1627,7 @@ function refresh() {
     showApp();
     keepScroll(function () { render(state); });
     // 各读各的口，互不牵连：统计、模板、黑名单任何一头红了，不许把其余两屏一起带走（三个函数自己吞错）。
-    return Promise.all([loadStats(), loadTemplates(), loadBlocklist()]);
+    return Promise.all([loadStats(), loadTemplates(), loadBlocklist(), loadSecrets()]);
   }, function (e) {
     if (e.status === 503) { $('login').classList.remove('hidden'); $('loginErr').textContent = e.message; }
   });

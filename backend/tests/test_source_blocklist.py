@@ -497,7 +497,7 @@ class Test八_迁移接在那一头之后:
         parents = {p for p in seen.values() if p}
         heads = {r for r in seen if r not in parents}
         assert len(heads) == 1, f"链分叉了，`upgrade head` 当场报重复：{sorted(heads)}"
-        assert heads == {"b7f2c4d9a310"}, \
+        assert heads == {"c9f2a6d4e831"}, \
             f"链尾换了（现网台账里那个迁移头要一起改）：{sorted(heads)}"
 
 
@@ -513,8 +513,11 @@ class Test九_那一页真有这一栏:
         assert "api('api/admin/source-blocklist')" in body, "读口没接上"
         assert "api('api/admin/source-blocklist', {" in body, "手工加那一句没接上"
         assert "api('api/admin/source-blocklist/' + encodeURIComponent(r.host), { method: 'DELETE' })" in body
-        # 登录那一趟要把它一起拉（第三个读口；两处旧判据的锚已改前缀，这里补全串）
-        assert "Promise.all([loadStats(), loadTemplates(), loadBlocklist()])" in body
+        # 登录那一趟要把它一起拉。原来钉的是整串三个名字，10-25 上「密钥配置」那第四只读口时红过：
+        # 这句要判的是"在不在同一趟里"，不是那一排恰好有几个名字——改成读那一段的括号内容。
+        # "几屏一起拉"这条纪律本身由 tests/test_admin_fusion.py 那两处前缀锚负责。
+        seg = body.split("Promise.all([", 1)[1].split("]", 1)[0]
+        assert "loadBlocklist()" in seg, "登录那一趟没把它一起拉"
 
     def test_卡真的挂进了那一格(self):
         """10-19 本机真点抓出来的那条：`renderBlocklist` 一路只往 `card` 自己身上挂，

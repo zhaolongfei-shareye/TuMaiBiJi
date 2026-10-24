@@ -25,6 +25,10 @@ from app.models.mp_asset import MpAsset, MpSetting
 # 来源黑名单（规格-来源黑名单）。这张表建不出来时的症状不是"少一列静默降级"，
 # 是**每一条链接提取任务一起红**（worker 那一路第一句就查它），所以名单里必须有它。
 from app.models.source_blocklist import SourceBlocklist
+# 后台那一页存的凭据（密钥配置，站长 10-24 两句「密钥配置功能请加到cn的官网后台，我自己去加」
+# 「应该放在图麦笔记下面进行配置」）。漏挂的症状与上面几条同型：`create_all` 建不出这张表，
+# 而 `/api/admin/secrets` 第一趟写入就报 no such table（test_模型注册齐不齐.py 钉这一条）。
+from app.models.service_secret import ServiceSecret
 
-__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting", "SourceBlocklist"]
+__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting", "SourceBlocklist", "ServiceSecret"]
 
