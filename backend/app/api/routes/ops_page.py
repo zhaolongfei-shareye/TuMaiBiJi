@@ -5,9 +5,10 @@
 一处部署、跟着 `backend/deploy.sh` 走、不用配 CORS、**口令不落在 nginx 静态目录里**。
 
 这一页零构建：原生 HTML + 原生 JS，没有打包步骤、没有依赖、不引前端框架。它的全部数据都从
-`/api/admin/*` 那四个口现取，页面本身不含任何服务端拼出来的用户内容——所以这里没有一处
+`/api/admin/*` 那七个口现取，页面本身不含任何服务端拼出来的用户内容——所以这里没有一处
 需要 HTML 转义，也就没有"漏了一个 `_e()`"这种坑。JS 里同理：**动态字符串一律走
-`textContent`，全页零 `innerHTML`**，因为历史那些 `note` 是操作者手打的，谁也不知道他会粘什么进来。
+`textContent`，全页零 `innerHTML`**，因为历史那些 `note` 与密钥备注是操作者手打的，
+谁也不知道他会粘什么进来。
 
 地址这一头有两个坑，都在 `u()` 那一个函数里处理掉了，别在别处再拼一遍：
 1. 浏览器看到的地址带 nginx 前缀（`https://api.agentsbin.cn/wtsj/ops`），而后端注册的路径不带
@@ -29,7 +30,7 @@ _PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>运营图后台 · 图麦笔记</title>
+<title>图麦笔记后台</title>
 <style>
 :root { --ink:#14161A; --muted:#6b6f78; --line:#e3e0d8; --paper:#F2EFE9; --clay:#D2683F; }
 * { box-sizing:border-box }
@@ -72,8 +73,9 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
 </head>
 <body>
 <main>
-  <h1>运营图后台</h1>
-  <p class="sub">换小程序的默认背景图，不用发版。这里只能看到运营图本身，看不到任何用户的笔记与图片。</p>
+  <h1>图麦笔记后台</h1>
+  <p class="sub">换小程序的默认背景图、改服务器上的凭据，都在这里，不用发版也不用重启服务。
+  这里看不到任何用户的笔记与图片；密钥存进去之后只显示长度与指纹，原值页面读不回来。</p>
 
   <div id="frozen" class="banner hidden"></div>
 
@@ -89,8 +91,23 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
 
   <div id="app" class="hidden">
     <div id="kinds"></div>
+
+    <section class="card">
+      <h2>密钥配置</h2>
+      <p class="note" id="secHint">库里这一行优先于服务器上的 <code>.env</code>；删掉一行，那个名字当场回到 <code>.env</code> 的值。</p>
+      <div id="secList"></div>
+      <div class="row">
+        <input id="secName" type="text" placeholder="名字，例 DEEPSEEK_API_KEY">
+        <input id="secValue" type="password" placeholder="粘贴密钥值（保存后清空，不回显）" autocomplete="off">
+        <input id="secNote" type="text" placeholder="备注（可选，只显示这一次存的是哪一把）">
+        <button id="btnSaveSec">保存</button>
+      </div>
+      <div id="secErr" class="err"></div>
+    </section>
+
     <footer>
-      <div>换完之后：线上小程序要<strong>退出重进（冷启）</strong>才看到新图，正在用的用户不会当场被换。</div>
+      <div><strong>换图之后</strong>：线上小程序要<strong>退出重进（冷启）</strong>才看到新图，正在用的用户不会当场被换。</div>
+      <div><strong>改密钥之后</strong>：不用重启，下一次用到这个名字的请求就是新值（服务只按名字查库，没有缓存）。</div>
       <div>提醒：换一张明暗和原图差很多的，会把首页那几行字的对比度带偏——第一屏的字色是按壁纸档派生的，
       运营图不在这条派生链里。发布后请在真机上看一眼那一屏。</div>
     </footer>
@@ -144,6 +161,16 @@ $('pw').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') $('b
 function fmtBytes(n) { return n >= 1024 ? (Math.round(n / 102.4) / 10) + ' KB' : n + ' B'; }
 function shortHash(h) { return String(h || '').slice(0, 8); }
 function dayOf(iso) { return String(iso || '').slice(0, 10); }
+// 密钥那一栏用这个，不用上面那个：接口回的是带 Z 的 UTC 串，`slice(0,10)` 切出来是 UTC 那一天。
+// 实测（本机 00:45 存的一把）账上写的是"更新于 2026-10-24"，而他那边已经是 10-25——
+// 刚存完就看到"昨天"，正是 `core/timefmt.py` 文件头那条老坑在这一页上的形状。
+// 运营图那几栏仍用 `dayOf`：那是已经在他用的显示，改它得单独说一句。
+function localDay(iso) {
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso || '').slice(0, 10);
+  var m = ('0' + (d.getMonth() + 1)).slice(-2), day = ('0' + d.getDate()).slice(-2);
+  return d.getFullYear() + '-' + m + '-' + day;
+}
 
 // 图片地址：接口回的是给小程序拼 BASE 用的根相对路径，这一页改成相对当前目录。
 function imgUrl(asset) { return asset ? u(asset.url) : ''; }
@@ -264,10 +291,102 @@ function put(kind, assetId, msg, done) {
   }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
 }
 
+// ---------------------------------------------------------------- 密钥配置
+// 这一节只有一个口：`api/admin/secrets`。接口回体里根本没有 value 那一个字段，
+// 所以这一侧不可能"忘了清"——原值从服务端就没出来过。
+var SEC = 'api/admin/secrets';
+
+function secSourceLine(it) {
+  // 三句话分别管三件事：值从哪一层来、删了会去哪、这个名字今天有没有人读。
+  // 第三句必须说：他存一个还没接上的名字时，页面不许装作"配好了"。
+  var s = '生效值：库里这一行（删除后回到 .env）';
+  if (!it.env_present) s = '生效值：库里这一行（.env 里没有这一行，删除后就没有值了）';
+  if (!it.consumed) s += '　·　还没有代码读这个名字';
+  return s;
+}
+
+function renderSecrets(items) {
+  var box = $('secList');
+  while (box.firstChild) box.removeChild(box.firstChild);
+  if (!items.length) {
+    box.appendChild(el('p', 'note', '库里现在一条都没有：下面那几个名字都还在用 .env 的值。'));
+    return;
+  }
+  items.forEach(function (it) {
+    var row = el('div', 'hitem');
+    var meta = el('div', 'meta');
+    meta.appendChild(el('b', null, it.name));
+    meta.appendChild(el('div', null, '长度 ' + it.length + ' 字　指纹 ' + it.fingerprint +
+      '　更新于 ' + localDay(it.updated_at)));
+    meta.appendChild(el('div', null, it.note ? '备注：' + it.note : '（没写备注）'));
+    meta.appendChild(el('div', null, secSourceLine(it)));
+    row.appendChild(meta);
+    var del = el('button', 'danger', '删除');
+    del.addEventListener('click', function () { removeSecret(it); });
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+function secMsg(cls, text) {
+  var n = $('secErr');
+  n.className = cls;
+  n.textContent = text;
+}
+
+function removeSecret(it) {
+  // 删除这一句必须写清楚"删掉之后值从哪来"：库里这一行是覆盖层，
+  // 而 .env 里到底有没有同一个名字，只有服务端知道（`env_present`）。
+  var q = '删除 ' + it.name + '？';
+  q += it.env_present ? '删掉后这个名字回到 .env 的值。' : '删掉后这个名字就没有值了（.env 里没有这一行）。';
+  if (!window.confirm(q)) return;
+  secMsg('err', '');
+  api(SEC + '/' + encodeURIComponent(it.name), { method: 'DELETE' })
+    .then(function () { return refreshSecrets(); }, function (e) { secMsg('err', '删不掉：' + e.message); });
+}
+
+function saveSecret() {
+  var name = $('secName').value.trim();
+  var value = $('secValue').value;
+  secMsg('err', '');
+  if (!name) { secMsg('err', '先写名字，例 DEEPSEEK_API_KEY'); return; }
+  if (!value) { secMsg('err', '再粘贴密钥值'); return; }
+  // 先清空再发：这一句是"值不在 DOM 里过夜"的唯一防线，失败也不回填（重粘一次的成本
+  // 换的是这一页刷新一次就什么都读不出来了）。
+  $('secValue').value = '';
+  $('btnSaveSec').disabled = true;
+  api(SEC + '/' + encodeURIComponent(name), {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: value, note: $('secNote').value })
+  }).then(function (it) {
+    $('secName').value = '';
+    $('secNote').value = '';
+    secMsg('note', '已存下：' + it.name + '　长度 ' + it.length + ' 字　指纹 ' + it.fingerprint +
+      '（原值不再回显，只能重新粘贴覆盖）');
+    return refreshSecrets();
+  }, function (e) {
+    secMsg('err', '存不下：' + e.message);
+  }).then(function () { $('btnSaveSec').disabled = false; });
+}
+
+$('btnSaveSec').addEventListener('click', saveSecret);
+
+function refreshSecrets() {
+  return api(SEC).then(function (body) {
+    renderSecrets(body.items);
+  }, function (e) {
+    // 这一句不能写成"一条都没有"：401/503 与真空表是两件事，写成一句会让人以为
+    // 服务器上的密钥全没了（与运营图那一栏同一纪律）。
+    $('secList').textContent = '';
+    secMsg('err', '密钥那一份读不到：' + e.message);
+  });
+}
+
 function refresh() {
   return api('api/admin/mp/state').then(function (state) {
     showApp();
     render(state);
+    return refreshSecrets();
   }, function (e) {
     if (e.status === 503) { $('login').classList.remove('hidden'); $('loginErr').textContent = e.message; }
   });

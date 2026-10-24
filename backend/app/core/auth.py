@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.db.database import get_db
 from app.models.account import Account
 from app.models.user import User
-from app.services import accounts, generation, preset_note, quota
+from app.services import accounts, generation, preset_note, quota, service_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,10 @@ async def _wechat_code2session(code: str) -> dict:
     url = "https://api.weixin.qq.com/sns/jscode2session"
     params = {
         "appid": settings.WECHAT_APP_ID,
-        "secret": settings.WECHAT_APP_SECRET,
+        # 与 `services/wechat.py:_token_body` 同一个读法：库里那一行优先，没有就回 `.env`。
+        # 两处必须一起走这一句，否则会出现"登录用新 AppSecret、取 token 用旧的那把"——
+        # 那种不一致两边都回 200，只在偶发的 40001 里露出来，是最难查的一类。
+        "secret": service_secrets.resolve("WECHAT_APP_SECRET", settings.WECHAT_APP_SECRET),
         "js_code": code,
         "grant_type": "authorization_code",
     }

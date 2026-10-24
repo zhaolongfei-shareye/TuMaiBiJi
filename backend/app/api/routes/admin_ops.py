@@ -1,4 +1,4 @@
-"""后台那一页背后的四个口：登录、看状态、上传、改生效位。
+"""后台那一页背后的七个口：登录、看状态、上传、改生效位，加看密钥、存密钥、删密钥。
 
 路径都写在这一份文件里（`/api/admin/*`），所以 `app/main.py` 挂载时不给 prefix——
 与 `assets`/`cards`/`profiles`/`landing` 同一族做法。理由在这条链上更硬一层：
@@ -6,11 +6,12 @@
 路径写在一起（而不是靠 prefix 拼）才看得出全貌。
 
 鉴权一律走 `app/core/admin_access.py` 那把独立的钥匙，**除了 `/api/admin/login` 本身**。
-口令没配的时候四个口全回 503（不是 401）：401 会让人以为"口令打错了"，
+口令没配的时候其余六个口全回 503（不是 401）：401 会让人以为"口令打错了"，
 而真实情况是"这台服务器还没开这一页"，两句话得靠不同状态码分开。
 
 这一段上现网之后现网小程序的行为一行都不变：客户端还没有读 `/api/mp/config` 的代码，
-`mp_assets` / `mp_settings` 两张表除了这一页以外没有任何写入者（方案 §四 P0-a 的副作用声明）。
+`mp_assets` / `mp_settings` 两张表除了这一页以外没有任何写入者（方案 §四 P0-a 的副作用声明）；
+`service_secrets` 同理，且它空表时 `resolve()` 回的就是 `.env` 那一份（10-25 加的三个口）。
 """
 import logging
 
@@ -23,7 +24,7 @@ from app.core.config import settings
 from app.core.errors import UserError
 from app.core.rate_limit import limiter
 from app.db.database import get_db
-from app.services import mp_assets
+from app.services import mp_assets, service_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -117,5 +118,65 @@ def admin_mp_setting(
             return {"kind": kind, "current": None}
         asset = mp_assets.publish(db, kind, body.asset_id)
         return {"kind": kind, "current": mp_assets.describe(asset)}
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class SecretIn(BaseModel):
+    """存一把凭据。`value` 只在写的那一刻过界，读的一侧永远拿不到它。
+
+    这里只留一个 64KB 的"防粘错东西"护栏，**上限那句话说的是服务层那一个 4096**：
+    两处各写一条判据，改上限的那天就会有一处忘了改，而 422 与 400 的文案是两个出处
+    （与 `mp_assets.over_bytes_hint` 同一条纪律）。空串与"全是空白"也不在这里判——
+    那是服务层那一句"密钥值是空的"，与它自己的 4096 那一句同一个出处。
+    """
+    value: str = Field(max_length=65536)
+    note: str | None = Field(default=None, max_length=service_secrets.MAX_NOTE_CHARS)
+
+
+@router.get("/api/admin/secrets")
+@limiter.limit("60/minute")
+def admin_secrets(
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """那一页要显示的密钥账：名字、长度、指纹、备注、更新时间，加两句"能不能回到 .env"。
+
+    这里没有 `value`，所以这一句不需要"记得删掉敏感字段"——判据从源头上就不往外给。
+    """
+    return {
+        "items": service_secrets.list_items(db),
+        "consumed_names": list(service_secrets.CONSUMED_NAMES),
+    }
+
+
+@router.put("/api/admin/secrets/{name}")
+@limiter.limit("20/minute")
+def admin_secret_put(
+    name: str,
+    body: SecretIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """存一把（没有就建、有就整把覆盖）。**回体里没有提交的那一把**，只有长度与指纹。"""
+    try:
+        return service_secrets.put(db, name, body.value, body.note)
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/api/admin/secrets/{name}")
+@limiter.limit("20/minute")
+def admin_secret_delete(
+    name: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """删一行 = 那个名字当场回到 `.env`。所以"撤销一次改动"不必知道旧值是什么。"""
+    try:
+        return {"name": name, "deleted": service_secrets.delete(db, name)}
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))

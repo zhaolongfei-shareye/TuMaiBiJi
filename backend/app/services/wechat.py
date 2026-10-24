@@ -8,6 +8,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.errors import UserError
+from app.services import service_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +61,13 @@ def _invalidate_access_token() -> None:
 def _token_body() -> dict:
     # 凭据走 POST body，不进 URL：httpx 的异常文本会把整条 URL 拼进去，
     # 而日志里只要出现过一次这种异常，AppSecret 就出去了。
+    # secret 那一句走 `service_secrets.resolve`：后台换了库里那一行就当场生效，
+    # 库里没有这一行时回的就是 `.env` 那一份（与 `core/auth.py` 的 code2session 同一把，
+    # 两边必须走同一个读法，否则登录用新钥匙、取 token 用旧钥匙）。
     return {
         "grant_type": "client_credential",
         "appid": settings.WECHAT_APP_ID,
-        "secret": settings.WECHAT_APP_SECRET,
+        "secret": service_secrets.resolve("WECHAT_APP_SECRET", settings.WECHAT_APP_SECRET),
     }
 
 

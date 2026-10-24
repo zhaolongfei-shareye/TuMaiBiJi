@@ -6,6 +6,7 @@ import re
 import httpx
 
 from app.core.config import settings
+from app.services import service_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,9 @@ async def _call_llm(text: str, fallback_title: str = "", translate=None) -> dict
 
 async def _call_hunyuan_cloud_function(text: str, fallback_title: str, translate=None) -> dict:
     url = (settings.HUNYUAN_CF_URL or "").strip()
-    key = (settings.HUNYUAN_CF_KEY or "").strip()
+    # key 走 `service_secrets.resolve`：后台那一页换了库里那一行就当场生效，不用重启 worker；
+    # 库里没这一行时回的就是 `.env` 那一份，`key_usable` 那一句占位符判据两种来源都照旧管得住。
+    key = (service_secrets.resolve("HUNYUAN_CF_KEY", settings.HUNYUAN_CF_KEY) or "").strip()
 
     if not url:
         raise RuntimeError("HUNYUAN_CF_URL 未配置，无法调用提炼云函数")
