@@ -58,6 +58,9 @@ Page({
     // 10-17 那一格只剩这一份数据：原来还跟着两枚键（淡底方形的底色 `swatchBg`、品牌字 `brandGlyph`），
     // 站长那句「如果没卡片图，这个位置就完全被标题占满」把空态那一整块撤了，两枚键同时没有消费者。
     detailCards: [],
+    // 落地页「存入笔记」之后跳进来的那一态：页底那一条 bar（只有带着 `saved=1` 进来才画，
+    // 平时从列表点开同一篇不许再提醒一遍）。
+    savedBar: false,
     _loaded: false,
   },
 
@@ -68,6 +71,7 @@ Page({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
+      savedBar: options.saved === '1',
     })
     app.setNavTitle('navDetail', lang)
     if (options.id) {

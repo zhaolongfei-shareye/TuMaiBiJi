@@ -315,6 +315,142 @@ const ck = (name, ok, got) => {
   }
   console.log('　截图 ' + await shot('69-落地页同窗-没铺图那一态.png'))
 
+  // ---------- 存完跳到详情页＋页底那条 bar（站长 10-25「存入后，自动跳转到转存用户的图麦笔记
+  // 该笔记详情页，就是下方多了 bar，提醒用户，你已收藏该笔记」）----------
+  // ⚠ 这一节**只读现网、一行都不写**：拿他名下已有的一篇，带 `saved=1` 开一次、不带再开一次。
+  //    为什么不在这儿真点那枚「存入笔记」：那一下会在现网多造一篇笔记＋最多九行云上配图，
+  //    跑一遍留一次残留（#337 那一格还挂着没清，不能再往里添）。真点那一段归
+  //    `验-转存与作者.js`——它跑在本地临时库上、吃的就是这一份树，去重与跳转都归它验。
+  const APIJS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/api.js'), 'utf8')
+  const BASE_URL = (APIJS.match(/const API_BASE = '([^']+)'/) || [])[1] || ''
+  const VIEWJS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/share/view.js'), 'utf8')
+  const DETAILJS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/detail/detail.js'), 'utf8')
+  const DETAILWXSS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/detail/detail.wxss'), 'utf8')
+  const DETAILWXML = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/detail/detail.wxml'), 'utf8')
+  const I18N = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'), 'utf8')
+  const DCODE = DETAILWXSS.replace(/\/\*[\s\S]*?\*\//g, '')
+  // 落地页那一头的接线（源码级）：存完拿服务端回的 `note.id` 跳详情页，带上 `saved=1`。
+  const saveBody = (VIEWJS.match(/async saveToMine\(\)[\s\S]*?\n  \},/) || [''])[0]
+  ck('存完那一趟跳详情页，url 带的是服务端回的 `note.id` ＋ `saved=1`（源码级）',
+    /wx\.navigateTo\(\{ url: `\/pages\/detail\/detail\?id=\$\{note\.id\}&saved=1` \}\)/.test(saveBody),
+    saveBody ? '这一句在' : 'saveToMine 函数体没抠出来')
+  // ⚠ 只看**成功那一段**（`} catch` 之前）：失败那一路的 toast 是留着的（念服务端回的那句原因），
+  //   拿整段函数体判"有没有 showToast"会把这条留着的正确行为判成红——第一版就红在这枚括号上。
+  ck('成功那枚 toast 撤了（同一句话由详情页那条 bar 说，两页各念一遍是重复）',
+    !/wx\.showToast/.test((saveBody.split('} catch')[0] || '').split('await api.importFromShare')[1] || ''),
+    '源码级断言')
+  ck('那一枚开关只认 `saved === \'1\'`（平时从列表点开同一篇不许再提醒一遍）',
+    /savedBar: options\.saved === '1'/.test(DETAILJS), '源码级断言')
+  ck('那句话写死两支都在，中文逐字＝他原话「你已收藏该笔记」（屏上不许拼词、也不许留英文占位）',
+    /savedNoteBar: '你已收藏该笔记'/.test(I18N) && /savedNoteBar: 'Saved to your notes'/.test(I18N),
+    '源码级断言（i18n 双语两支）')
+
+  const nid = await mp.evaluate((b) => new Promise((resolve) => {
+    const app = getApp()
+    const tk = app.globalData.token
+    if (!tk || !b) { resolve(null); return }
+    wx.request({
+      url: `${b}/api/notes/?limit=1`,
+      header: { Authorization: 'Bearer ' + tk },
+      success: (r) => {
+        const arr = Array.isArray(r.data) ? r.data : (r.data && r.data.items) || []
+        resolve(r.statusCode === 200 && arr.length ? arr[0].id : null)
+      },
+      fail: () => resolve(null),
+    })
+  }), BASE_URL)
+  ck(`拿到他名下已有的一篇笔记（这一节的前置；API_BASE=${BASE_URL}）`, !!nid,
+    nid ? `id=${nid}` : '列表口回空／这台模拟器没登录——环境红，下面那几条没跑')
+  if (nid) {
+    await mp.navigateTo(`/pages/detail/detail?id=${nid}&saved=1`)
+    await sleep(4000)
+    const dp = await mp.currentPage()
+    const dd = await dp.data()
+    const dRoute = await mp.evaluate(() => getCurrentPages().slice(-1)[0].route)
+    ck('带 `saved=1` 落的就是详情页那一屏', dRoute === 'pages/detail/detail', dRoute)
+    ck('这一页的内容真到手了（不是停在加载／报错）', !!dd.note, `note=${!!dd.note}`)
+    ck('页面 data 里那一枚开关是开着的', dd.savedBar === true, `savedBar=${dd.savedBar}`)
+    const bars = await dp.$$('.saved-bar')
+    ck('页底那条 bar 画出来了，且只有一条', bars.length === 1, `${bars.length} 条`)
+    const wantTxt = String((dd.t && dd.t.savedNoteBar) || '')
+    const gotTxt = bars.length ? String(await bars[0].text()).trim() : ''
+    ck('那条 bar 念的字＝字典里那一支（屏上文本与 `t.savedNoteBar` 逐字相等，不许写死在 wxml）',
+      !!wantTxt && gotTxt === wantTxt, `屏上「${gotTxt}」｜字典「${wantTxt}」`)
+    ck('那条 bar 的面吃的是这一页 `.panel` 同一枚令牌（源码里不许写死一支色）',
+      /\.saved-bar\s*\{[^}]*background:\s*var\(--bg-card\)/.test(DCODE), '源码级断言')
+    const barBox = await live('.saved-bar')
+    ck('那条 bar 贴在视口下沿那一档（底距＝24rpx 起跳，多出来的只可能是系统底部安全区）',
+      !!barBox && barBox.top !== null,
+      barBox && barBox.top !== null
+        ? `条底 ${(barBox.top + barBox.h).toFixed(1)}｜视口 ${win.h}＝差 ${(win.h - barBox.top - barBox.h).toFixed(1)}px`
+        : '读不到')
+    const barEl = bars.length ? bars[0] : null
+    let zBar = null
+    if (barEl) {
+      const bs = await barEl.size(), bo = await barEl.offset()
+      ck('那条 bar 的左右内缩与全站那扇窗同一枚（24rpx，误差 ≤1px）',
+        Math.abs(bo.left - 24 * R) <= 1 && Math.abs((win.w - (bo.left + bs.width)) - 24 * R) <= 1,
+        `左 ${bo.left.toFixed(1)}｜右 ${(win.w - bo.left - bs.width).toFixed(1)}｜24rpx=${(24 * R).toFixed(1)}px`)
+      const face = String(await barEl.style('background-color'))
+      const fc2 = (face.match(/\d+/g) || []).map(Number)
+      ck('屏上读回的 bar 面＝墨档那一份 #F3F3F1（容 ±8：色域转换会造出个位数差）',
+        fc2.length === 3 && fc2.every((v, i) => Math.abs(v - [243, 243, 241][i]) <= 8), `屏上 ${face}`)
+      // ⚠ 这一条量的是**那一行字**（`.saved-bar-x`），不是外面那只盒子：`.saved-bar` 自己没写 color，
+      //   拿它读"这行字什么色"读到的是页面继承下来的那支（这台模拟器回 rgb(53,46,29)），假红一条。
+      const xEl = await dp.$('.saved-bar-x')
+      const xColor = xEl ? String(await xEl.style('color')) : ''
+      ck('bar 里那行字仍是这一页那档墨（rgba(35,37,44,.9)，与 `.sv-h2`／`.panel` 同一支）',
+        /rgba\(\s*35,\s*37,\s*44,\s*0?\.9\s*\)/.test(xColor), xColor || '读不到 .saved-bar-x')
+      ck('那一行字吃的是 `--fs-meta`、并且带 700（与列表那几格同档，不新造字号）',
+        /\.saved-bar-x\s*\{[^}]*font-size:\s*var\(--fs-meta\)/.test(DCODE) &&
+        /\.saved-bar-x\s*\{[^}]*font-weight:\s*700/.test(DCODE), '源码级断言')
+      // 层序现在读（再往下一趟就 reLaunch 了，`barEl` 会成"不在栈顶那一页"的元素、一读就崩）。
+      zBar = Number(await barEl.style('z-index'))
+    }
+    // fixed 这件事只有真跑读得出：写成 absolute 就跟着内容走，屏上看着"在底下"、一滚就上来。
+    const barA = await live('.saved-bar')
+    await mp.evaluate(() => wx.pageScrollTo({ scrollTop: 600, duration: 0 }))
+    await sleep(1200)
+    const barMid = await live('.saved-bar')
+    ck('整页滚了 600 那条 bar 一毫米都没动（它是钉住的那一层，不是流里的一格）',
+      !!barA && !!barMid && barA.top !== null && barMid.top !== null && Math.abs(barMid.top - barA.top) <= 0.5,
+      barA && barMid ? `${barA.top.toFixed(1)} → ${barMid.top.toFixed(1)}` : '读不到')
+    // 钉住的那一层最容易压住最后一格：流里那一段留白（`.saved-space`）就是给它让的位置。
+    // ⚠ 判"压没压住"必须**先真滚到底**：只 `scrollTop:600` 时文档还没到底，读到的落点是中间态。
+    await mp.evaluate(() => wx.pageScrollTo({ scrollTop: 99999, duration: 0 }))
+    await sleep(1200)
+    const spaceA = await live('.saved-space')
+    ck('流里给 bar 留的那一段在（没有它，最后一格会被钉住的那层压住）',
+      !!spaceA && spaceA.top !== null && spaceA.h > 0,
+      spaceA && spaceA.top !== null ? `留白高 ${spaceA.h.toFixed(1)}px` : '没读到 .saved-space')
+    const barAtBottom = await live('.saved-bar')
+    const lastPanel = (await dp.$$('.panel')).slice(-1)[0]
+    if (lastPanel && barAtBottom && barAtBottom.top !== null) {
+      const lp = await lastPanel.size(), lo = await lastPanel.offset()
+      ck('滚到底时最后一格内容仍在 bar 上方（屏上不许出现"字压在条上"）',
+        lo.top + lp.height <= barAtBottom.top + 1,
+        `最后一格底 ${(lo.top + lp.height).toFixed(1)}｜bar 顶 ${barAtBottom.top.toFixed(1)}`)
+    }
+    console.log('　截图 ' + await shot('70-详情页存完那条bar.png'))
+    // 反向：同一篇不带 `saved=1` 再开一次 ⇒ 那条 bar 不许在。这一条是那枚开关唯一的牙
+    // （留着它就等于"每次点开任何一篇都在页底提醒一句已收藏"）。
+    await mp.reLaunch(`/pages/detail/detail?id=${nid}`)
+    await sleep(4000)
+    const dp2 = await mp.currentPage()
+    const dd2 = await dp2.data()
+    ck('不带 `saved=1` 从列表那一头开同一篇：那条 bar 不画',
+      dd2.savedBar === false && (await dp2.$$('.saved-bar')).length === 0
+      && (await dp2.$('.saved-space')) === null,
+      `savedBar=${dd2.savedBar}｜bar ${(await dp2.$$('.saved-bar')).length} 条｜留白 ${await dp2.$('.saved-space') ? '在' : '不在'}`)
+    console.log('　截图 ' + await shot('70-详情页平时态没有bar.png'))
+    // 层序：bar 60 在内容之上、私密那一层 `.pwd-mask`（100）之下 ⇒ 锁着的笔记弹出密码面板时不被条压住。
+    const PWD = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/styles/pwd-sheet.wxss'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+    const zPwd = Number(((PWD.match(/\.pwd-mask\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]) || NaN)
+    ck('层序对：那条 bar（60）压在内容之上、私密那一层 `.pwd-mask` 之下',
+      Number.isFinite(zBar) && Number.isFinite(zPwd) && zBar < zPwd, `bar=${zBar}｜pwd-mask=${zPwd}`)
+  }
+
   console.log(`\n${bad.length ? '红 ' + bad.length + ' 条：' + bad.join(' / ') : '全过'}`)
   process.exit(bad.length ? 1 : 0)
 })().catch((e) => { console.error('崩：', e && e.message ? e.message : e); process.exit(3) })

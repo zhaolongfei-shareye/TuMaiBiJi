@@ -100,9 +100,15 @@ Page({
       // 落地页是免登录可读的，但"存进我的笔记"必须有身份。扫码进来时 onLaunch 那条
       // 静默登录通常早就回来了，这里只是兜住它还没回来的那一瞬。
       if (!app.globalData.token) await app.getLoginPromise()
-      await api.importFromShare(share.token)
+      const note = await api.importFromShare(share.token)
       this.setData({ saving: false, saved: true })
-      wx.showToast({ title: t('savedToMine', lang), icon: 'success' })
+      // 存完直接把人送到自己那一篇上（站长 10-25「存入后，自动跳转到转存用户的图麦笔记该笔记
+      // 详情页，就是下方多了 bar，提醒用户，你已收藏该笔记」）。那一口的回体就是新建的这篇
+      // （`response_model=NoteDetail`），`id` 由服务端给，客户端不猜。
+      // ⚠ 原来这一句是一枚 toast，现在那句话由那一页页底那条 bar 说 ⇒ toast 撤了：
+      //    它是全屏的、跟着跳到下一页还会挂着，同一句话在两页各念一遍。
+      // 用 navigateTo 不用 redirectTo：返回那一枚留着，读者还能回到刚才那一屏接着看。
+      wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}&saved=1` })
     } catch (err) {
       console.error('转存失败', err)
       this.setData({ saving: false })

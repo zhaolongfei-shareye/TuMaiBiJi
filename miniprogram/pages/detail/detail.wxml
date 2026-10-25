@@ -125,6 +125,15 @@
       <text class="import-hint">{{t.importedFromHint}}</text>
     </view>
 
+    <!-- 页底那条 bar 占的那一段高度（它是 fixed 的，不占流；不留这一段，最后一格会被它压住）。 -->
+    <view wx:if="{{savedBar}}" class="saved-space"></view>
+  </view>
+
+  <!-- 落地页存完跳进来时那一条提醒（站长 10-25「存入后，自动跳转到转存用户的图麦笔记该笔记详情页，
+       就是下方多了 bar，提醒用户，你已收藏该笔记」）。字照他原话念。
+       只有带着 `saved=1` 进来才画——平时从列表点开同一篇不许再提醒一遍。 -->
+  <view wx:if="{{savedBar}}" class="saved-bar">
+    <text class="saved-bar-x">{{t.savedNoteBar}}</text>
   </view>
 
   <!-- 私密密码那一层（与「我的」那一条链同一份标记、同一张皮）。

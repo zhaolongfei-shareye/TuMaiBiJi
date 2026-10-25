@@ -30,7 +30,7 @@ from fastapi.testclient import TestClient
 from app.core.auth import _create_token
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
-from app.models.note import Note
+from app.models.note import Note, SOURCE_SHARE_IMPORT
 from app.models.share import Share
 from app.models.user import User
 from app.services import sharing, wechat
@@ -633,10 +633,154 @@ def test_已关闭或不存在的码转存不了(client, db_session, person):
     assert _import(client, _hdr(reader.id), token).status_code == 404
 
 
-def test_转存自己分享的也走同一条路(client, db_session, person):
-    """不设"不能转自己的"这种特例：它就是公开页上那一份内容。"""
+def test_自己转存自己那一趟被挡下且一行都不写(client, db_session, person):
+    """站长 10-24 一句「为什么自己可以转存自己的，这个不合理，要限制，否则浪费资源，要改」
+    ⇒ 推翻本文件原来那条「不设"不能转自己的"这种特例」。按**翻案**记，不按漏做记。
+
+    挡的到底是什么：分数那侧本来就结不到（`quota._credit_import` 见 `author_pk == importer.id`
+    直接 return 0），**漏的是笔记那一行**——它当时照样 commit，而名下笔记数从 10-01 起没有上限，
+    所以一个人反复扫自己那张码就能堆任意多条重复笔记。这一条钉的是"当场拒＋一行都不写"，
+    顺带钉"闸只认自己、没顺手把别人的门关上"。
+    """
     nid = _mknote(db_session, person.id, "自己抄自己")
     token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    before = db_session.query(Note).filter_by(user_id=str(person.id)).count()
+
     r = _import(client, _hdr(person.id), token)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "这是你自己的笔记", r.text
+
+    db_session.expire_all()
+    assert db_session.query(Note).filter_by(user_id=str(person.id)).count() == before, "被拒那一趟不该写下任何一行"
+
+    # 反向：同一张码，别人照旧存得进来——这条闸不许把门整个关上
+    reader = _other(db_session)
+    assert _import(client, _hdr(reader.id), token).status_code == 200
+
+
+def test_被挡的只有写这一侧公开页照读不误(client, db_session, person):
+    """挡的是"写"那一侧，不是"读"。落地页免登录可读这条一个字不改，否则别人扫不到内容。"""
+    nid = _mknote(db_session, person.id, "只挡写不挡读")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    assert client.get(f"/api/shares/{token}").status_code == 200
+    assert client.get(f"/api/shares/{token}").json()["title"] == "只挡写不挡读"
+
+
+# ------------------------------------------------- 同一个人对同一篇只留一份（站长 10-25）
+def _mine(db, uid, source_note_id):
+    """这一篇在这个人名下的那几份副本。
+
+    只数"这一篇"：`_other` 回的是全文件共用的那一个读者，他名下已经被前面几条存过别篇
+    ⇒ 按"他名下总共几条"下尺子，量出来的是别人那几笔账（第一趟就是这么打红的）。
+    """
+    return [n for n in db.query(Note).filter_by(user_id=str(uid), source_type="share_import").all()
+            if (n.imported_from or {}).get("source_note_id") == source_note_id]
+
+
+def test_同一个人第二次存同一篇回的是那一条不多造一行(client, db_session, person):
+    """站长 10-25 一句「一个用户不能重复收藏同一篇笔记，除非删了再收藏，避免冗余数据」。
+
+    挡的是**行**，不是那次点击：第二趟照样 200、照样回同一条 `id`，屏上那句
+    「你已收藏该笔记」由详情页页底那条 bar 说（他同一句里刚拍的下一条）。
+    """
+    nid = _mknote(db_session, person.id, "被存了两回的那篇")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    reader = _other(db_session)
+
+    first = _import(client, _hdr(reader.id), token)
+    assert first.status_code == 200, first.text
+    again = _import(client, _hdr(reader.id), token)
+    assert again.status_code == 200, again.text
+    assert again.json()["id"] == first.json()["id"], "第二趟造出了第二条，正是要避免的冗余数据"
+
+    db_session.expire_all()
+    assert len(_mine(db_session, reader.id, nid)) == 1, _mine(db_session, reader.id, nid)
+
+
+def test_删掉那一条之后可以重新收藏(client, db_session, person):
+    """他那句里的"除非删了再收藏"：笔记是硬删，删完那一查就空了 ⇒ 新的那一条造得出来。
+
+    这一条同时钉住反向：闸不许把门焊死到"这辈子只能存一次"。
+    """
+    nid = _mknote(db_session, person.id, "删了再存的那篇")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    reader = _other(db_session)
+    first = _import(client, _hdr(reader.id), token).json()["id"]
+
+    assert client.delete(f"/api/notes/{first}", headers=_hdr(reader.id)).status_code == 200
+    db_session.expire_all()
+    assert len(_mine(db_session, reader.id, nid)) == 0, "删没删成都没核，下面那句「重新存得进」就是空话"
+
+    r = _import(client, _hdr(reader.id), token)
     assert r.status_code == 200, r.text
-    assert r.json()["imported_from"]["source_note_id"] == nid
+    db_session.expire_all()
+    fresh = _mine(db_session, reader.id, nid)
+    assert len(fresh) == 1, f"删了存不回来：{[x.id for x in fresh]}"
+    # 尺子不许用"id 变没变"：删掉的正好是表里最大那一行时，SQLite 会把同一个 id 发给下一行
+    # （实测量到 39 → 删 → 39）。"前面那一刻名下是 0 条、现在又是 1 条"才是那一条真被重造出来的证据。
+    assert client.get(f"/api/notes/{fresh[0].id}", headers=_hdr(reader.id)).status_code == 200
+
+
+def test_作者换了一张新码同一篇也不许多存一份(client, db_session, person):
+    """判"同一篇"认的是原笔记那一栏，不是那张码。
+
+    撤回再分享会换一张新码（test_撤掉分享之后旧码扫不开再分享是新码钉的就是这件事），
+    拿 `share_token` 当尺子的话，同一篇在同一个人名下会因为换了码而多堆一份——
+    这一条就是把那个写法当场打红的牙。
+    """
+    nid = _mknote(db_session, person.id, "换了一张码的那篇")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    reader = _other(db_session)
+    first = _import(client, _hdr(reader.id), token).json()["id"]
+
+    assert client.post("/api/shares/revoke", headers=_hdr(person.id),
+                       json={"note_id": nid}).json()["closed"] == 1
+    new_token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    assert new_token != token, "前提：作者这一趟真的换了一张码"
+
+    r = _import(client, _hdr(reader.id), new_token)
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == first, "认码不认篇：同一篇在同一个人名下多造了一行"
+    db_session.expire_all()
+    assert len(_mine(db_session, reader.id, nid)) == 1
+
+
+def test_两个人各存一篇互不影响(client, db_session, person):
+    """闸只认"同一个人 × 同一篇"，不许顺手把别人也关在外面（作者那边照旧 +1 分）。"""
+    nid = _mknote(db_session, person.id, "两个人都存了的那篇")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    a = User(openid="pytest-openid-dup-a")
+    b = User(openid="pytest-openid-dup-b")
+    db_session.add_all([a, b])
+    db_session.commit()
+
+    ra = _import(client, _hdr(a.id), token)
+    rb = _import(client, _hdr(b.id), token)
+    assert ra.status_code == 200 and rb.status_code == 200, (ra.text, rb.text)
+    assert ra.json()["id"] != rb.json()["id"], "两个人回成了同一条，归属串了"
+    db_session.expire_all()
+    assert len(_mine(db_session, a.id, nid)) == 1 and len(_mine(db_session, b.id, nid)) == 1
+
+
+def test_来源那一栏没写那一键的笔记不许挡成真转存(client, db_session, person):
+    """去重认的是 `imported_from.source_note_id` 那一枚键，而外链贴图那一路**故意不写它**
+    （`ingest_tasks._source_snapshot` 那三键取不到就不写）。这一条钉的是"别把没那一键的笔记
+    认成同一篇"：现在靠两层（SQL 只捞 `source_type=share_import` ＋ `shares.note_id` 是
+    `nullable=False`、`.get()` 回的 None 永远撞不上一个整数），哪天有人把贴图那类也归进
+    `share_import`，这一条当场红。
+    """
+    reader = _other(db_session)
+    stray = Note(user_id=str(reader.id), title="贴图那一类的那种来源", source_type=SOURCE_SHARE_IMPORT,
+                 tags=[], key_points=[], key_links=[],
+                 imported_from={"author_name": "某公众号", "title_at_import": "旧的那篇",
+                                "imported_at": "2026-10-19T00:00:00+00:00"})
+    db_session.add(stray)
+    db_session.commit()
+    nid = _mknote(db_session, person.id, "照样存得进来的一篇")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+
+    r = _import(client, _hdr(reader.id), token)
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] != stray.id, "被那一格没写来源键的笔记顶掉了：真转存回了一张别的纸"
+    db_session.expire_all()
+    assert len(_mine(db_session, reader.id, nid)) == 1

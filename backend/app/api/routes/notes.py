@@ -602,6 +602,31 @@ def import_from_share(
     if share is None:
         raise HTTPException(status_code=404, detail="这条分享不存在、已关闭或已删除")
 
+    # 站长 10-24 一句「为什么自己可以转存自己的，这个不合理，要限制，否则浪费资源，要改」
+    # ⇒ 自己存自己这一路当场拒。**这一刀只能落在这里**：分数那侧早就结不到了
+    # （`quota._credit_import` 里 `author_pk == importer.id` 直接 return 0），但**笔记那一行当时
+    # 照样 commit 了**，而 10-01 之后名下笔记数没有上限 ⇒ 一个人扫自己那张码能堆任意多条重复笔记。
+    # 那句 `detail` 会由落地页那枚按钮原样念出来（`pages/share/view.js` 的 toast 直接读它），
+    # 所以这一趟**不需要出包**：现网部署完，屏上立刻是这个口径。
+    if str(share.user_id) == str(user.id):
+        raise HTTPException(status_code=400, detail="这是你自己的笔记")
+
+    # 同一个人对同一篇只留一份（站长 10-25 一句「一个用户不能重复收藏同一篇笔记，除非删了
+    # 再收藏，避免冗余数据」）。判"同一篇"认的是**原笔记那一栏** `imported_from.source_note_id`，
+    # 不是 `share_token`：作者撤回再分享会换一张新码（见 test_撤掉分享之后旧码扫不开再分享是新码），
+    # 拿 token 当尺子的话，同一篇在他名下就会因为换了码而多堆一份。
+    # 笔记是**硬删**（上面 `DELETE /api/notes/{note_id}` 走 `db.delete`，没有软删标记栏），
+    # 所以"删了再收藏"不需要任何代码：那一条查不到了，下一趟自然走得进。
+    # 为什么这一趟回 200 而不是 400：他同一句里刚拍的下一条是"存入后跳到详情页、页底 bar 念
+    # 『你已收藏该笔记』"，那句话本来就是完成时——第二次点还是跳那一篇、还是这一句，屏上不必
+    # 造第二种态；而 400 会让落地页把那一句念成错误气泡。
+    # 已有的那一份**原样回**，一个副作用都不重跑：分早被 `(source_note_id, invitee_id)` 那条
+    # 部分唯一索引挡着结不到第二次，而配图再跑一遍就是给同一篇多堆最多九行 assets——那正是他
+    # 这句要避免的冗余数据。
+    mine = _find_share_import_copy(db, str(user.id), share.note_id)
+    if mine is not None:
+        return mine
+
     note = Note(
         user_id=str(user.id),
         title=share.title or "（未命名笔记）",
@@ -630,4 +655,48 @@ def import_from_share(
     # 原来这里写的"那份 +10 就记在原笔记作者头上"是句假话，一并改净）。
     # 和动笔那条一样，结不到账不能让转存本身失败。
     quota.credit_import(db, user, share.note_id)
+    _copy_share_images(db, note, share.note_id)
     return note
+
+
+def _find_share_import_copy(db, user_id, source_note_id):
+    """这个人名下有没有已经存过这一篇（认 `imported_from.source_note_id`）。
+
+    只取 `id` 与 `imported_from` 两栏、比法落在 Python：JSON 栏的路径写法两个引擎不一样
+    （SQLite 的 json_extract 回整数、MySQL 回一个 JSON 值），而一个人名下的转存份数是小数
+    ⇒ 不为一趟小查询引入一层引擎方言。
+    ⚠ 拿 `.get()` 回 None 当"没存过"是安全的，靠的是两件事同时成立：`shares.note_id` 写的是
+    `nullable=False`（永远是个整数，撞不上 None），而外链贴图那一路（`ingest_tasks._source_snapshot`）
+    根本不写 `source_note_id` 这一键 ⇒ 它那些笔记不会被误认成"这一篇已经存过了"。
+    """
+    rows = (
+        db.query(Note.id, Note.imported_from)
+        .filter(Note.user_id == user_id, Note.source_type == SOURCE_SHARE_IMPORT)
+        .all()
+    )
+    for note_id, snap in rows:
+        if (snap or {}).get("source_note_id") == source_note_id:
+            return db.get(Note, note_id)
+    return None
+
+
+def _copy_share_images(db, note, from_note_id) -> None:
+    """原篇那几张配图逐张复制一份到这一篇名下（站长 10-24：「转存必须带图。乙，复制一份到自己名下」）。
+
+    整段裹住是**必须的**：图是转存的加值，笔记已经建好、分已经结好都在它前面 ⇒ 任何一趟出事
+    都不许把这一次变成一次失败（屏上那句"存下了"退成报错，而他那篇笔记其实已经有了）。
+    为什么这一段落在请求里而不是排进后台任务：客户端那枚按钮成功时只念一句"已存入笔记"、
+    不轮询，图排在九张之后异步落账的话，他点完立刻进列表看到的那一篇还是没图——而他这次要的就是图。
+    代价直说：最多九张、每张一趟网关，转存那一次的响应会慢几秒（`IMAGE_STORE_CF_TIMEOUT` 一张一算）。
+    """
+    from app.services import note_images
+
+    try:
+        shots = note_images.copy_for_import(db, note, from_note_id)
+    except Exception:
+        logger.exception("转存配图整段没跑成（笔记已建）：note=%s src_note=%s", note.id, from_note_id)
+        return
+    if shots.failed or shots.truncated:
+        logger.warning("转存配图：%s 张跟过来、%s 张没跟过来、%s 张超出上限没带（笔记已建）："
+                       "note=%s src_note=%s",
+                       len(shots.kept), len(shots.failed), shots.truncated, note.id, from_note_id)
