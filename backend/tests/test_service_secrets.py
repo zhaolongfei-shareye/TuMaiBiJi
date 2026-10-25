@@ -16,6 +16,7 @@
 
 跑法：cd backend && .venv/bin/python -m pytest tests/test_service_secrets.py -q
 """
+import ast
 import asyncio
 import hashlib
 import json
@@ -343,12 +344,36 @@ def test_读不到不许写成一条都没有(client, admin_pw, db):
 # ---------------------------------------------------------------- 四、读侧真覆盖：名单要改得出行为
 
 def _resolve_literals() -> set:
-    """源码里真出现过的 `resolve("名字")` 字面量集合（测试目录不算：那里的是断言不是读法）。"""
+    """源码里真被读过的名字集合（测试目录不算：那里的是断言不是读法）。
+
+    原来这一条拿正则找 `resolve("名字")`。10-25 第八轮审计 M2 那一刀把其中两处读法裹进
+    `asyncio.to_thread(resolve, "名字", …)`，字面量就挪到第二枚实参上了——正则看不见时它红成
+    "这个名字没人读"，而实际上天天在读。所以改按 AST 认两种形状：**直接调** `resolve(...)`，
+    与 **`to_thread(resolve, ...)` 的第一枚实参**。以后再加形状（比如包进 functools.partial）
+    就得再认一次，红在这里比红在名单上诚实。
+    """
+    def _callee_name(node):
+        return getattr(node.func, "attr", None) or getattr(node.func, "id", None)
+
     found = set()
     for f in BACKEND.rglob("app/**/*.py"):
         if f.name == "service_secrets.py":
             continue
-        found |= set(re.findall(r'resolve\(\s*"([A-Z][A-Z0-9_]{1,63})"', f.read_text(encoding="utf-8")))
+        for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+            if not isinstance(n, ast.Call):
+                continue
+            base = _callee_name(n)
+            if base == "resolve" and n.args:
+                target = n.args[0]
+            elif base == "to_thread" and len(n.args) >= 2:
+                inner = n.args[0]
+                if (getattr(inner, "attr", None) or getattr(inner, "id", None)) != "resolve":
+                    continue
+                target = n.args[1]
+            else:
+                continue
+            if isinstance(target, ast.Constant) and isinstance(target.value, str):
+                found.add(target.value)
     return found
 
 

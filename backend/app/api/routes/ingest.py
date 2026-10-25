@@ -39,9 +39,12 @@ async def ingest_url(
     user: User = Depends(get_current_user),
 ):
     task_id = uuid.uuid4().hex
-    set_task_status(task_id, "queued", user_id=str(user.id))
-    q = get_queue()
-    q.enqueue(
+    # 10-25 第八轮审计 M2：这一口是 `async def`，而"登记 queued"与"推进队列"两趟都要真打 Redis。
+    # 留在循环里，Redis 慢的那几百毫秒是**全站**（含 /health）一起排队，所以两步各裹一次工作线程。
+    # 替身仍挂在 `get_queue`／`set_task_status` 这两枚名字上（三处录入用例都靠它们），别改成整块搬走。
+    await asyncio.to_thread(set_task_status, task_id, "queued", user_id=str(user.id))
+    await asyncio.to_thread(
+        get_queue().enqueue,
         "app.tasks.ingest_tasks.process_url_task",
         task_id,
         str(user.id),
@@ -104,9 +107,10 @@ async def ingest_text(
         raise HTTPException(status_code=400, detail=str(e))
 
     task_id = uuid.uuid4().hex
-    set_task_status(task_id, "queued", user_id=str(user.id))
-    q = get_queue()
-    q.enqueue(
+    # 两步都挪出事件循环，理由与位置绑定那条口径见 `/url` 那一处（M2 同一刀）。
+    await asyncio.to_thread(set_task_status, task_id, "queued", user_id=str(user.id))
+    await asyncio.to_thread(
+        get_queue().enqueue,
         "app.tasks.ingest_tasks.process_manual_text_task",
         task_id,
         str(user.id),
@@ -314,9 +318,10 @@ async def process_screenshots(
         raise HTTPException(status_code=400, detail="无暂存图片，请先上传")
 
     task_id = uuid.uuid4().hex
-    set_task_status(task_id, "queued", user_id=str(user.id))
-    q = get_queue()
-    q.enqueue(
+    # 两步都挪出事件循环，理由与位置绑定那条口径见 `/url` 那一处（M2 同一刀）。
+    await asyncio.to_thread(set_task_status, task_id, "queued", user_id=str(user.id))
+    await asyncio.to_thread(
+        get_queue().enqueue,
         "app.tasks.ingest_tasks.process_screenshots_task",
         task_id,
         str(user.id),

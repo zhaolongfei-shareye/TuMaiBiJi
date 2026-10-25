@@ -10,9 +10,19 @@ logger = logging.getLogger(__name__)
 
 TASK_TTL = 3600
 
+# 按 URL 缓存连接：`redis.from_url` 每调一次就新建一个 ConnectionPool，也就是每次 Redis 往返
+# 之前先付一次 TCP＋握手（10-25 第八轮审计 M2 里"每次新建连接"那一处）。
+# 键指着 URL 而不是单纯缓存一枚：测试与部署都可能换 REDIS_URL，粘住第一枚就会读到另一台库。
+# redis-py 的连接池本身是线程安全的，同步路由（线程池里跑）与异步路由共用一份没问题。
+_conns: dict[str, redis.Redis] = {}
+
 
 def get_redis_conn() -> redis.Redis:
-    return redis.from_url(settings.REDIS_URL)
+    url = settings.REDIS_URL
+    conn = _conns.get(url)
+    if conn is None:
+        conn = _conns[url] = redis.from_url(url)
+    return conn
 
 
 def get_queue() -> Queue:

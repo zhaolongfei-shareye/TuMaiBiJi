@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import logging
@@ -94,8 +95,13 @@ async def get_access_token() -> str:
     if _access_token_cache["token"] and _access_token_cache["expires_at"] > now + 300:
         return _access_token_cache["token"]
 
+    # `_token_body` 里那句读密钥是同步查库（`service_secrets.resolve`）。这一口站在每一条打微信
+    # 接口的路上（内容安全、二维码…），10-25 第八轮审计 M2 把它挪出事件循环：库里那一行慢／
+    # 连接池排满时，卡的是整站的循环，不只是这一次取 token。
+    # 同步版 `_access_token_sync` 不动——那条本来就跑在线程池里（同步路由自己用）。
+    body = await asyncio.to_thread(_token_body)
     async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(WX_STABLE_TOKEN_URL, json=_token_body())
+        resp = await client.post(WX_STABLE_TOKEN_URL, json=body)
         if resp.status_code >= 400:
             logger.error("获取 access_token 失败：HTTP %s，响应=%s", resp.status_code, resp.text[:200])
             raise UserError("微信接口暂不可用，请稍后重试")

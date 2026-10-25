@@ -143,7 +143,10 @@ async def _call_hunyuan_cloud_function(text: str, fallback_title: str, translate
     url = (settings.HUNYUAN_CF_URL or "").strip()
     # key 走 `service_secrets.resolve`：后台那一页换了库里那一行就当场生效，不用重启 worker；
     # 库里没这一行时回的就是 `.env` 那一份，`key_usable` 那句占位符判据两种来源都照旧管得住。
-    key = (service_secrets.resolve("HUNYUAN_CF_KEY", settings.HUNYUAN_CF_KEY) or "").strip()
+    # 裹 `to_thread` 是 10-25 第八轮审计 M2：这一句同步查库，而这里是 `async def`——
+    # 提炼一趟最多四发重试，每次都把整站的循环按在库上，症状是"别人也在等"。
+    key = (await asyncio.to_thread(
+        service_secrets.resolve, "HUNYUAN_CF_KEY", settings.HUNYUAN_CF_KEY) or "").strip()
 
     if not url:
         raise RuntimeError("HUNYUAN_CF_URL 未配置，无法调用提炼云函数")

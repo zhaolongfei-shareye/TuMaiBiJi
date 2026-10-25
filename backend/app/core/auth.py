@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 import logging
 import uuid
@@ -74,12 +75,16 @@ def _bearer_payload(authorization: str | None) -> dict:
 
 async def _wechat_code2session(code: str) -> dict:
     url = "https://api.weixin.qq.com/sns/jscode2session"
+    # 与 `services/wechat.py:_token_body` 同一个读法：库里那一行优先，没有就回 `.env`。
+    # 两处必须一起走这一句，否则"登录用新 AppSecret、取 token 用旧的那把"——
+    # 两边都回 200，只在偶发的 40001 里露出来，是最难查的一类不一致。
+    # 两处也都裹了 `to_thread`（10-25 第八轮审计 M2）：这一句是同步查库，而登录是 `async def`，
+    # 库被写满／锁住时它排在整站请求的最前面。
+    app_secret = await asyncio.to_thread(
+        service_secrets.resolve, "WECHAT_APP_SECRET", settings.WECHAT_APP_SECRET)
     params = {
         "appid": settings.WECHAT_APP_ID,
-        # 与 `services/wechat.py:_token_body` 同一个读法：库里那一行优先，没有就回 `.env`。
-        # 两处必须一起走这一句，否则"登录用新 AppSecret、取 token 用旧的那把"——
-        # 两边都回 200，只在偶发的 40001 里露出来，是最难查的一类不一致。
-        "secret": service_secrets.resolve("WECHAT_APP_SECRET", settings.WECHAT_APP_SECRET),
+        "secret": app_secret,
         "js_code": code,
         "grant_type": "authorization_code",
     }
