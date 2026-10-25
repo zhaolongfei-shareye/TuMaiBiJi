@@ -266,3 +266,71 @@ def test_测试件不许留非法转义():
             compile(path.read_text(encoding="utf-8"), str(path), "exec")
         bad = [w for w in caught if issubclass(w.category, SyntaxWarning)]
         assert not bad, (path.name, [str(w.message) for w in bad])
+
+
+# ------------------------------------------------------------------ 那只"念出来"的口
+# ⚠ 下面两条是 10-25 第七十次部署现网自证逼出来的：那只口当时注册成了
+# `/api/user/api/user/usage-today`（`user.py` 里路径要写光秃秃的名字，`/api/user` 是
+# `main.py` 挂 router 时加的前缀），本地 1387 条用例**一条都没打过它**——
+# 新加一只口却没有任何一条用例真从 HTTP 走进去，这在当时没人看得见。
+
+def test_挂前缀的路由不许自己再写一遍前缀():
+    """全局闸门：`main.py` 里每一枚 `prefix="/api/xxx"`，都不许有路由把这一段再写一遍。
+
+    这一条不点名某一只口——点名就又是"手抄名单"（M8 那条的成因）。判据方向是硬的：
+    出现 `prefix + prefix` 这种叠写即红。
+    """
+    src = (BACKEND / "app" / "main.py").read_text(encoding="utf-8")
+    prefixes = set(re.findall(r'include_router\([^,]+,\s*prefix="([^"]+)"', src))
+    # 反向验证的牙：先证明这一条真读得出前缀，读不出来这把尺子是空转的
+    assert prefixes, "main.py 里一枚 prefix= 都没读到 ⇒ 这条用例没有牙"
+    from app.main import app
+
+    doubled = sorted({p for p in (getattr(r, "path", "") for r in app.routes)
+                      for pf in prefixes if p.startswith(pf + pf)})
+    assert not doubled, f"这些路径把前缀写了两遍（客户端按一半的名字打过来就是 404）：{doubled}"
+
+
+def test_今天用掉多少_那只口真从HTTP走得进去():
+    """`GET /api/user/usage-today`：有票 200＋两档形状齐，没票 401，读的一路不记账。"""
+    import os
+
+    from fastapi.testclient import TestClient
+    from sqlalchemy.orm import Session
+
+    from app.core.auth import _create_token
+    from app.db.database import Base, SessionLocal, engine
+    from app.main import app
+    from app.models.daily_usage import DailyUsage
+    from app.models.user import User
+
+    assert os.environ.get("SEC_CHECK_ENABLED") == "false", (
+        "这套用例必须在『送检开关关着』的环境里跑，否则下面那句『读的一路不记账』判不住")
+
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    app.state.limiter.enabled = False
+    db: Session = SessionLocal()
+    try:
+        u = User(openid="pytest-usage-today", generation=1)
+        db.add(u)
+        db.commit()
+        db.refresh(u)
+        with TestClient(app) as c:
+            r = c.get("/api/user/usage-today",
+                      headers={"Authorization": f"Bearer {_create_token(u.id, u.generation)}"})
+            assert r.status_code == 200, r.text
+            body = r.json()
+            for kind in ("extract", "sec_check"):
+                assert set(body[kind]) >= {"used", "limit", "left", "sentence"}, body
+            # 档位与 `daily_budget.limit_of` 同源，不许这里再抄一份数
+            from app.services import daily_budget
+            assert body["extract"]["limit"] == daily_budget.limit_of(daily_budget.KIND_EXTRACT)
+            assert body["sec_check"]["limit"] == daily_budget.limit_of(daily_budget.KIND_SEC_CHECK)
+            assert db.query(DailyUsage).filter(DailyUsage.user_id == str(u.id)).count() == 0, \
+                "读额度把额度打掉一条——进「我的」那一屏就不该有这种副作用"
+            r401 = c.get("/api/user/usage-today")
+            assert r401.status_code == 401, r401.text
+    finally:
+        app.state.limiter.enabled = True
+        db.close()

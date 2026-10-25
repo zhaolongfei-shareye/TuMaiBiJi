@@ -353,7 +353,11 @@ def deactivate_account(
     return {"message": "账号已注销", "deleted": deleted, "file_ids": file_ids}
 
 
-@router.get("/api/user/usage-today")
+# ⚠ 这一只文件里的路径**一律写光秃秃的名字**（`/quota`、`/inviter`…），`/api/user` 那一段是
+# `main.py:145` 挂 router 时加的前缀。写成 `/api/user/usage-today` 不会报错，只会悄悄注册成
+# `/api/user/api/user/usage-today`——10-25 第七十次部署现网自证当场抓到，客户端按 `/api/user/usage-today`
+# 打过来是个 404。用例 `tests/test_日量闸与登记齐.py::真打这只口` 钉住这一条。
+@router.get("/usage-today")
 def read_usage_today(user: User = Depends(get_current_user)):
     """今天这两档各已用／还剩几条（10-25 第八轮审计 M33 的"念出来"那一半）。
 
