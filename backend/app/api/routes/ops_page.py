@@ -239,7 +239,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
   <div id="app" class="hidden shell">
     <nav id="nav" aria-label="后台分栏"></nav>
     <div id="main">
-      <div id="view-stats" class="view"><div id="stats"></div></div>
+      <div id="view-stats" class="view"><div id="stats"></div><div id="aiusage"></div></div>
       <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div><div id="block"></div><div id="secrets"></div></div>
       <div id="view-tpl" class="view hidden"><div id="tpls"></div></div>
       <div id="view-tumaike" class="view hidden"><iframe id="frameOther" class="frame" title="图麦克后台" src="about:blank"></iframe></div>
@@ -473,7 +473,8 @@ var NAV = [
     { label: '分类与未分类', view: 'stats', key: 'categories' },
     { label: '图片备份', view: 'stats', key: 'assets' },
     { label: '邀请对账', view: 'stats', key: 'invites' },
-    { label: '分享', view: 'stats', key: 'shares' }
+    { label: '分享', view: 'stats', key: 'shares' },
+    { label: '用量看板', view: 'stats', key: 'aiusage' }
   ] },
   { grp: '配置', items: [
     { label: '运营图', view: 'config', key: 'kind:home_bg' },
@@ -1633,12 +1634,101 @@ function loadStats() {
   });
 }
 
+// 「用量看板」这一栏：一条链两个产品，**各写一张卡**（站长 10-25 原话「DeepSeek 才是付费的，
+// 那是 iPhone 版的，不要和小程序搞混了，两个不同产品」）。所以这里不许出现一个"总用量"的数——
+// 一个是次数、一个是余额，加在一起没有任何含义。
+//
+// 单独吃 `api/admin/usage/board` 而不并进 stats/overview：那一栏要出网打一次 DeepSeek，
+// 它红了、慢了（上限 8 秒）都不该把库里那八栏统计一起拖走。两张卡都挂同一枚左栏 key，
+// 点「用量看板」时它们一起留下、其余藏掉（focusKey 那一段按 data-key 判，不看容器）。
+function usageCard(title, sub) {
+  var c = statCard(title, sub);
+  c.dataset.key = 'aiusage';
+  return c;
+}
+
+function renderUsage(d) {
+  var box = $('aiusage');
+  while (box.firstChild) box.removeChild(box.firstChild);
+  // 数据当参数递进来（与 renderStats／renderBlocklist 同一族规矩）：这一页不留模块级状态，
+  // 少一个全局就少一处"上一趟的数还没刷掉"的地方。
+  d = d || {};
+  var mp = d.mini_program || {};
+  var ds = d.deepseek || {};
+
+  var c1 = usageCard('图麦笔记这一侧的调用计数',
+    '数只来自我们自己那张 `daily_usage`（每人每天那两道闸落的账），**不来自任何外部接口**；'
+    + '这一条链走的是云开发那份**免费 Token 包**，不产生现金（站长 10-25 原话）。'
+    + '⚠ 这张表分不清验收号与真人，下面的数**含我们自己跑验收时打的那些**，看绝对值前先记住这一句。');
+  var t = mp.by_kind || {};
+  var ex = t.extract || {};
+  var sc = t.sec_check || {};
+  knum(c1, numOf(ex.today) + ' / ' + numOf(ex.limit), '今天已提炼（条）',
+    '档位读的是服务端配置那一栏，不是这里抄的字面数；上限 ' + numOf(ex.limit) + ' 是站长 10-25 拍的');
+  knum(c1, numOf(sc.today) + ' / ' + numOf(sc.limit), '今天已送检（次）',
+    '文字与图片都算一次；' + numOf(sc.people) + ' 个账号在今天动过这一档');
+  knum(c1, numOf(ex.used) + ' / ' + numOf(sc.used), '这 ' + numOf(mp.window_days) + ' 天合计（提炼／送检）',
+    '日期按 ' + (mp.tz || 'UTC+08') + ' 分桶——与限额那句"明天再来"同一套日子');
+  tableOf(c1, ['日期', '提炼', '送检'], (mp.per_day || []).map(function (r) {
+    return [r.date, numOf(r.extract), numOf(r.sec_check)];
+  }));
+  box.appendChild(c1);
+
+  var c2 = usageCard('RoamMark（iPhone 版）那一侧的 DeepSeek 余额',
+    '付费的那一条是这一条链。余额是**点开这一栏那一刻现读**的（`GET /user/balance`，'
+    + '同一把钥），不是缓存、不是上一趟的数。');
+  knum(c2, ds.sentence || '—', '上游回的话',
+    (ds.fetched_at ? '读取时刻 ' + ds.fetched_at + '（UTC）' : '还没读到过')
+    + '；' + (ds.forward_route_mounted
+      ? '那条转发链此刻挂在这台服务上'
+      : '那条转发链**今天还没上现网**（仓库里有那两只文件、现网的路由表里没有这一条），'
+        + '所以这一刻它一次调用也不会发生'));
+  knum(c2, ds.calls_today === null ? '这一档还没开始记' : numOf(ds.calls_today),
+    '今天转发了几条景点初稿',
+    '这个数只来自我们自己那张调用账（`daily_usage` 里那一档）。上游只给余额、不给明细，'
+    + '所以"今天花了多少条"必须我们自己记；那一笔记在转发那一条链里（`services/spot_draft.py`），'
+    + '归 RoamMark 那一趟，不在本栏这一刀里。⚠ 这里念"还没开始记"而不是 0：'
+    + '0 的意思是"今天没人用"，而现在的真实情况是"这一件事没人在记"，两句话指向相反的决定');
+  (ds.balances || []).forEach(function (b, i) {
+    knum(c2, numOf(b.total) + ' ' + (b.currency || ''), '余额那一行 ' + (i + 1),
+      '赠金 ' + numOf(b.granted) + '／充值 ' + numOf(b.topped_up)
+      + '——两者同时在的时候官方口径是先扣赠金，所以"会过期的那一部分"要分开看');
+  });
+  knum(c2, ds.key_present ? ('有（长度 ' + numOf(ds.key_length) + '，指纹 ' + numOf(ds.key_fingerprint) + '）') : '没有',
+    '这一栏拿去打上游的那把钥',
+    '值本身一次都不出去（与「密钥配置」那一栏同一条纪律）。这里的"没有"**包含"仍是占位符"那一种**：'
+    + '占位符不当成能用的钥送出去，屏上念"没有一把能用的钥"，而不是念一个长度说它在。');
+  var note2 = el('p', 'note', '官方只有"查询余额"这一个接口，**没有按天用量／账单明细接口**，'
+    + '所以这一栏不画消耗曲线：要曲线只能我们自己按时采样余额再取差值（那要新表＋定时任务，'
+    + '不在这句话里）。token 明细只有 DeepSeek 控制台那一处。');
+  c2.appendChild(note2);
+  var btn = el('button', 'mini', '重新读一次');
+  btn.addEventListener('click', function () { loadUsage(); });
+  c2.appendChild(btn);
+  box.appendChild(c2);
+  repaintFocus();
+}
+
+function loadUsage() {
+  return api('api/admin/usage/board?days=14').then(function (d) {
+    keepScroll(function () { renderUsage(d); });
+  }, function (e) {
+    if (e.status === 401) return;
+    // 红了不许整栏空白：那八栏统计照常在读到的地方，这一栏只念自己没读到。
+    keepScroll(function () {
+      var box = $('aiusage');
+      while (box.firstChild) box.removeChild(box.firstChild);
+      box.appendChild(el('p', 'note err', '这一栏没读到数：' + e.message));
+    });
+  });
+}
+
 function refresh() {
   return api('api/admin/mp/state').then(function (state) {
     showApp();
     keepScroll(function () { render(state); });
     // 各读各的口，互不牵连：统计、模板、黑名单任何一头红了，不许把其余两屏一起带走（三个函数自己吞错）。
-    return Promise.all([loadStats(), loadTemplates(), loadBlocklist(), loadSecrets()]);
+    return Promise.all([loadStats(), loadTemplates(), loadBlocklist(), loadSecrets(), loadUsage()]);
   }, function (e) {
     if (e.status === 503) { $('login').classList.remove('hidden'); $('loginErr').textContent = e.message; }
   });

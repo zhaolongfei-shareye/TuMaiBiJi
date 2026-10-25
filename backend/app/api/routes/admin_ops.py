@@ -1,7 +1,7 @@
-"""后台那一页背后的十八个口：登录、看状态、上传、改图片生效位、改文案生效位、读默认笔记那一篇、
+"""后台那一页背后的十九个口：登录、看状态、上传、改图片生效位、改文案生效位、读默认笔记那一篇、
 改默认笔记那一篇、验票、看数、列卡片模板、改卡片模板（元数据与上下架，**改不了配方**）、
 吐预览引擎（把客户端那份绘制代码当数据交给那一页的浏览器，**这里一笔都不画**）、
-列来源黑名单、手工加一条、手工移一条，加看密钥、存密钥、删密钥。
+列来源黑名单、手工加一条、手工移一条，加看密钥、存密钥、删密钥，加看用量看板。
 
 路径都写在这一份文件里（`/api/admin/*`），所以 `app/main.py` 挂载时不给 prefix——
 与 `assets`/`cards`/`profiles`/`landing` 同一族做法。理由在这条链上更硬一层：
@@ -43,7 +43,7 @@ from app.core.config import settings
 from app.core.errors import UserError
 from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
-from app.services import admin_stats, admin_templates, mp_assets, poster_engine, preset_note, service_secrets, source_blocklist
+from app.services import admin_stats, admin_templates, mp_assets, poster_engine, preset_note, service_secrets, source_blocklist, usage_board
 
 logger = logging.getLogger(__name__)
 
@@ -495,3 +495,32 @@ def admin_secret_delete(
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+
+@router.get("/api/admin/usage/board")
+@limiter.limit("30/minute")
+def admin_usage_board(
+    request: Request,
+    days: int = 14,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """「用量看板」那一栏：一条链两个产品，各读各的（算法与口径都在 `services/usage_board.py`）。
+
+    为什么单独一只口而不并进 `/api/admin/stats/overview`：那一只是纯库内聚合，快而且稳；
+    这一只**要出网打一次 DeepSeek**，它红了慢了都不该把统计那一栏一起拖走。分开之后
+    页面那一侧的错法也就只有一种："这一栏没读到"，而不是"整页空白"。
+
+    为什么是同步 `def`（这一族其余各口一样）：Starlette 把同步端点丢进工作线程跑，
+    所以那一发出网天然不占事件循环；写成 `async def` 反而要自己 `to_thread`，
+    少写一次就是 `test_事件循环里不许同步调用.py` 那把尺子管的那一型。
+
+    回体里**没有密钥值**（只回长度与指纹，同 `/api/admin/secrets` 那条纪律），
+    上游非 200 时也只回状态码与一句话，不转述回体。
+    """
+    data = usage_board.board(db, days=days, forward_route_mounted=any(
+        str(getattr(route, "path", "")).startswith("/api/roammark") for route in request.app.routes
+    ))
+    # `forward_route_mounted` 是从**真实路由表**现读的，不拿"文件在不在仓库里"当证据
+    # （10-25 现网 `main.py` 里 roammark 命中 0 处、仓库 HEAD 命中 3 处，差的就是这一格）。
+    return data
