@@ -66,8 +66,11 @@ def test_stray_keys_do_not_raise_and_never_echo_their_values(tmp_path, monkeypat
 def test_current_directory_env_file_is_ignored(tmp_path, monkeypatch):
     _decoy_env(tmp_path)
     monkeypatch.chdir(tmp_path)
-    for key in ("CORS_ORIGINS", "DATABASE_URL"):
-        monkeypatch.delenv(key, raising=False)
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    # DATABASE_URL 这一栏**不许跟着删**（10-25 M1 那一刀留下的坑）：它现在没有可用的默认值，
+    # 干净检出（没有本地 `.env`）时删掉它会让 `Settings()` 先撞那道启动校验，这条用例就红在
+    # 一个和"cwd 那份 .env 读不读"无关的地方上。留一个非空值，判据仍然由 CORS_ORIGINS 扛。
+    monkeypatch.setenv("DATABASE_URL", "sqlite:////tmp/cwd-probe-not-the-decoy.db")
     loaded = Settings()
     assert loaded.CORS_ORIGINS != DECOY_CORS
     assert loaded.DATABASE_URL != DECOY_DB
