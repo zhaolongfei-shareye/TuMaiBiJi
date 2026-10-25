@@ -203,6 +203,8 @@ const i18n = {
     savingMine: '正在存…',
     alreadySaved: '已存入笔记',
     savedToMine: '已经存进你的笔记了',
+    // 落地页存完跳进自己那一篇时，页底那一条 bar 的话（站长 10-25 原话「提醒用户，你已收藏该笔记」，字照念）
+    savedNoteBar: '你已收藏该笔记',
     saveMineFailed: '没存上，再试一次',
     importedFromLabel: '转存来源',
     importedFromHint: '来源信息会一直保留，不能编辑',
@@ -626,6 +628,7 @@ const i18n = {
     savingMine: 'Saving…',
     alreadySaved: 'Saved to my notes',
     savedToMine: 'Saved into your notes',
+    savedNoteBar: 'Saved to your notes',
     saveMineFailed: 'Could not save, try again',
     importedFromLabel: 'Imported from',
     importedFromHint: 'This source line stays and cannot be edited',

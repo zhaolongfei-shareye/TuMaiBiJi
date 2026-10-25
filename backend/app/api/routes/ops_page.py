@@ -298,6 +298,10 @@ function api(path, opts) {
 // 装载器要是 async，require 返回一个 Promise，而解构一个 Promise 不报错、只是每个名字都成
 // undefined——那时 poster.js 会跑到第 800 行才报 "toneFor is not a function"，看着像源文件的毛病。
 var POSTER = null;
+// 外圈那一档的画法与客户端同吃一份（`utils/posterMatte.js`，由名单带进来）。
+// 页面自己再写一遍那圈底＋平移落笔就是长出第二份画法——那正是 N4／M4 那处漂移的形状：
+// 预览没外圈、真机存出去有外圈，站长照预览调好的配方发出去是另一张图。
+var MATTE = null;
 var ENGINE_AT = null;
 
 var FAKE_WX = {
@@ -334,7 +338,12 @@ function loadEngine() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }).then(function (d) {
-    POSTER = makeRequire(d.files)(d.entry);
+    // 同一个 req：两次 makeRequire 会把 poster.js 评估两遍，得到两份互不相干的模块实例。
+    // 那时 `applyRemoteTemplates` 写进一份的名单、`planPoster` 读的是另一份，
+    // 症状是"刚发布的那一套在预览里画不出来"，而两边单独看都自洽。
+    var req = makeRequire(d.files);
+    POSTER = req(d.entry);
+    MATTE = req('posterMatte.js');
     return POSTER;
   }, function (e) {
     ENGINE_AT = null;                      // 失败不缓存：下一次进这一栏还得再试一次
@@ -1282,11 +1291,13 @@ function drawInto(box, r) {
       + '。线上遇到它，用户看到的是退回默认那一套的卡。'));
     return;
   }
-  cv.width = plan.width;
-  cv.height = plan.height;
-  POSTER.paintLayers(ctx, plan.layers, {});
+  // 外圈那一层与首页／分享页同吃 `posterMatte.js` 那一份画法：预览画的必须是存出去的那一张纸。
+  // 原来这里把画布开成内容区那块尺寸、直接落笔，比真机少一圈 20：站长照预览调好配方，
+  // 发出去四周多一圈边，而那一行尺寸也少报 40×40。
+  var out = MATTE.paint(cv, ctx, plan, {});
   box.appendChild(cv);
-  box.appendChild(el('p', 'cap', '现画：这一行的配方，' + plan.width + '×' + plan.height + '、'
+  box.appendChild(el('p', 'cap', '现画：这一行的配方，' + out.w + '×' + out.h
+    + '（含外圈 ' + POSTER.MATTE + '，与真机存出去的是同一张纸）、'
     + plan.layers.length + ' 层。内容是内置小样那一篇，不是任何人的笔记；署名那两行是占位；'
     + '那格码是占位方块，不印真码。字宽按浏览器本机字体量，真机上断行可能略有差。点图放大。'));
   box.addEventListener('click', function () { box.classList.toggle('big'); });

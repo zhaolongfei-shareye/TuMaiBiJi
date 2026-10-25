@@ -8,8 +8,8 @@
   },
   {
    "name": "appInfo.js",
-   "bytes": 68207,
-   "md5": "240ca6c5f4fcbbec5bcb38924d43debb"
+   "bytes": 71386,
+   "md5": "22519978f76dcfc059ccf99fb62d6a78"
   },
   {
    "name": "date.js",
@@ -18,8 +18,8 @@
   },
   {
    "name": "i18n.js",
-   "bytes": 54938,
-   "md5": "2d23abd7c90b79bc89efff0d62c7c457"
+   "bytes": 55177,
+   "md5": "ab91eaba71d9bd5da74736e1108aeb48"
   },
   {
    "name": "mpAssets.js",
@@ -35,6 +35,11 @@
    "name": "poster.js",
    "bytes": 121037,
    "md5": "973e91f52027a7e64483196cec56f505"
+  },
+  {
+   "name": "posterMatte.js",
+   "bytes": 951,
+   "md5": "4047d78b872b178d1853bf956407f7b8"
   },
   {
    "name": "posterRecipe.js",

@@ -5,7 +5,8 @@
 所以这一批判据全部围绕**同一份实现**这一件事——它是这条路上唯一真正有风险的地方：
 一旦副本与源文件分叉，屏上那张就成了看着像的假图，而它比"没有预览"更坏。
 
-- **① 同源性**：名单与 md5 逐只对得上客户端源文件；名单本身是顺着 `require` 走出来的真闭包。
+- **① 同源性**：名单与 md5 逐只对得上客户端源文件；名单是顺着 `require` 走出来的真闭包，
+  再加页面上那一句 `req('posterMatte.js')` 点名的那只（外圈画法，`poster.js` 不 require 它）。
 - **② 门**：这一口吐的是自家源码，要管理票；口令没配 503；用户那把开不了。
 - **③ 宁缺勿假**：副本被改过／没拷全 ⇒ 整口 503，而不是回一份能 parse 但少几个函数的引擎。
 - **④ 走不出去**：名单是唯一入口，`../` 这类名字进不来也读不到。
@@ -81,18 +82,46 @@ def test_副本与客户端那一份逐字相同():
         assert len(src) == f["bytes"]
 
 
-def test_名单就是真依赖闭包而不是手写的一串():
+def test_名单就是真闭包加页面点名的那几只():
     """客户端新加一只 `require('./x.js')` 而名单没跟着长 ⇒ 这一条红。
-    少了它，症状是后台"预览引擎没加载成：名单里没有 x.js"——那要等到有人点开那一栏才发现。"""
-    assert _sync.closure() == sorted(f["name"] for f in _manifest()["files"])
+    少了它，症状是后台"预览引擎没加载成：名单里没有 x.js"——那要等到有人点开那一栏才发现。
+
+    规则只有一份出处（`_sync.roster()`：闭包 ∪ `PAGE_EXTRA`）。这一条不许改成手写一串名字，
+    那样等于把规则复制成两份、以后改一处漏一处，红的是测试而不是那条真规则。
+    """
+    assert _sync.roster() == sorted(f["name"] for f in _manifest()["files"])
     assert _manifest()["entry"] == "poster.js"
 
 
+def test_外圈那一只确实在名单里():
+    """`posterMatte.js` 不在 `poster.js` 的 require 链上，所以它只能靠 `PAGE_EXTRA` 点名进来。
+    名单里少了它，症状不是报错而是**预览静默少一圈边**：页面 `req('posterMatte.js')` 抛
+    "名单里没有"，整栏预览变成一句话，而那一格本来正是给站长看"发出去长什么样"的。
+    """
+    assert "posterMatte.js" in _sync.PAGE_EXTRA
+    assert "posterMatte.js" in [f["name"] for f in _manifest()["files"]]
+
+
+def test_预览吃的是那一份外圈画法(body):
+    """M4 的牙：预览必须走 `MATTE.paint`，不许退回"画布=plan 尺寸＋一句 paintLayers"。
+
+    反向验过：把 `drawInto` 里那一行换回旧写法，这一条与上面那条名单条一起红。
+    """
+    seg = body.split("function drawInto", 1)[1].split("function paintPreviews", 1)[0]
+    assert "MATTE.paint(cv, ctx, plan, {})" in seg, "预览没走那一份外圈画法"
+    assert "cv.width = plan.width" not in seg, "画布又按不含外圈的尺寸开了"
+    assert "out.w" in seg and "out.h" in seg, "caption 那行尺寸得念画出去的那张纸，不是 plan 的那块内容区"
+
+
 def test_入口那一只导出的东西页面真的在用():
-    """预览只吃这四个名字。少一个就是屏上一句"预览引擎没加载成"，而它多半是被重构掉的。"""
+    """预览只吃这几个名字。少一个就是屏上一句"预览引擎没加载成"，而它多半是被重构掉的。
+
+    `MATTE` 是这一轮新加进去的：caption 那一行念的"含外圈 20"吃的就是它，
+    它从导出里被摘掉时屏上不会报错，只会念成"含外圈 undefined"。
+    """
     poster = (CLIENT_DIR / "poster.js").read_text(encoding="utf-8")
     exports = poster.split("module.exports = {", 1)[1]
-    for name in ("planPoster", "paintLayers", "applyRemoteTemplates", "recipeSource", "SAMPLE_NOTE"):
+    for name in ("planPoster", "paintLayers", "applyRemoteTemplates", "recipeSource", "SAMPLE_NOTE", "MATTE"):
         assert re.search(rf"^\s*{name},\s*$", exports, re.M), f"poster.js 不再导出 {name}"
 
 

@@ -22,6 +22,10 @@ ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = ROOT / "miniprogram" / "utils"
 OUT_DIR = ROOT / "backend" / "app" / "poster_engine"
 ENTRY = "poster.js"
+# 页面直接点名要的那只：它不在 `poster.js` 的 require 链上（外圈是**画布外面**那一层，
+# 客户端由页面自己 require，见 `miniprogram/pages/index/index.js` 与 `pages/share/share.js`），
+# 所以闭包走不到它，而后台预览必须吃同一只。理由与代价都写在这里，别再靠注释之外的人记忆。
+PAGE_EXTRA = ("posterMatte.js",)
 # 只认这一种名字：单层、纯文件名、.js 结尾。带 `/` 的、带 `..` 的、`node:` 的一律不当依赖，
 # 于是这一条闭包走不出 SRC_DIR 这一个目录（后台要吐的是绘制代码，不是任意磁盘文件）。
 REQ = re.compile(r"""require\(\s*['"]([^'"]+)['"]\s*\)""")
@@ -44,8 +48,25 @@ def closure() -> list[str]:
     return sorted(seen)
 
 
+def roster() -> list[str]:
+    """名单＝真闭包＋页面额外点名的那几只。
+
+    `posterMatte.js` 不在 `poster.js` 的 require 里（它是**页面**那一层给画布套外圈用的），
+    但它必须进名单：后台预览要吃它，才能和首页／分享页用的是同一份外圈画法。
+    少了它，那一栏只能自己再写一遍 `fillRect`＋`translate`——那正是 N4／M4 说的那处漂移
+    （预览没外圈、存出去有外圈），而本仓的判据明写"这一栏不许长出第二份画法"。
+    """
+    missing = [n for n in PAGE_EXTRA if not (SRC_DIR / n).is_file()]
+    if missing:
+        print(f"FAIL 页面点名的那几只源文件不在 {SRC_DIR}：{missing}", file=sys.stderr)
+        return []
+    return sorted(set(closure()) | set(PAGE_EXTRA))
+
+
 def main() -> int:
-    names = closure()
+    names = roster()
+    if not names:
+        return 1
     if ENTRY not in names:
         print(f"FAIL 闭包里连 {ENTRY} 都没有，多半是路径不对：{SRC_DIR}", file=sys.stderr)
         return 1
