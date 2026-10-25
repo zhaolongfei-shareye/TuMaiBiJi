@@ -18,13 +18,13 @@
   },
   {
    "name": "i18n.js",
-   "bytes": 55177,
-   "md5": "ab91eaba71d9bd5da74736e1108aeb48"
+   "bytes": 55812,
+   "md5": "01a10585993de8a1db58be384e8ba1ac"
   },
   {
    "name": "mpAssets.js",
-   "bytes": 12658,
-   "md5": "6f73eab67fa812c1647da3f6d97e6f0f"
+   "bytes": 13231,
+   "md5": "ce723f6a01fff1ba43af688bdab23ea1"
   },
   {
    "name": "palette.js",
@@ -33,8 +33,8 @@
   },
   {
    "name": "poster.js",
-   "bytes": 121037,
-   "md5": "973e91f52027a7e64483196cec56f505"
+   "bytes": 123340,
+   "md5": "b87e549816e142de4550a3582ecbf4ca"
   },
   {
    "name": "posterMatte.js",
@@ -50,6 +50,11 @@
    "name": "posterRecipes.js",
    "bytes": 69543,
    "md5": "ed2135a9302caea7dfda097533979b39"
+  },
+  {
+   "name": "safeStorage.js",
+   "bytes": 2745,
+   "md5": "fd1f353506a523999951b0f8e82b1764"
   }
  ]
 }

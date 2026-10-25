@@ -44,6 +44,7 @@ from app.models.user_profile import (
     SLOT_COUNT,
     UserProfile,
 )
+from app.services import daily_budget
 from app.services.wechat import enforce_text_safety
 
 router = APIRouter()  # 路径写全（/api/user/profile），与 cards.py 同一做法
@@ -56,8 +57,16 @@ def _guard_card_text(user: User, data: dict) -> None:
     只送这次请求里出现的那两栏：这个接口按次计配额，没改的字段不该重打一趟。
     策略沿用 `enforce_text_safety` 那两条——真违规才拒，接口没检成放行，微信侧抖动不许变成"名片存不了"。
     """
+    parts = [data[k] for k in ("name", "slogan") if k in data]
+    if not parts:
+        # 两栏都没带＝这一趟根本不会出网，记一笔就是把"没花的钱"算进额度（只改头像那一趟
+        # 会被这条误伤），而日量闸的全部意义是"花掉的次数对得上"。
+        return
     try:
-        enforce_text_safety(user.openid, *[data[k] for k in ("name", "slogan") if k in data])
+        budget = daily_budget.charge(str(user.id), daily_budget.KIND_SEC_CHECK)
+        if not budget.ok:
+            raise HTTPException(status_code=429, detail=budget.message)
+        enforce_text_safety(user.openid, *parts)
     except UserError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

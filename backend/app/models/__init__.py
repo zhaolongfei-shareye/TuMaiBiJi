@@ -29,6 +29,10 @@ from app.models.source_blocklist import SourceBlocklist
 # 「应该放在图麦笔记下面进行配置」）。漏挂的症状与上面几条同型：`create_all` 建不出这张表，
 # 而 `/api/admin/secrets` 第一趟写入就报 no such table（test_模型注册齐不齐.py 钉这一条）。
 from app.models.service_secret import ServiceSecret
+# 每人每天的花费计数（10-25 第八轮审计 M33）。同一族坑：没人 import 它，`create_all` 就建不出
+# 这张表，而第一趟记账（`services/daily_budget.py:charge`）当场 no such table——症状是"所有限额
+# 都变成 429"，不是"限额没生效"，所以更要挂在版本里而不是靠某只路由顺手 import。
+from app.models.daily_usage import DailyUsage
 
-__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting", "SourceBlocklist", "ServiceSecret"]
+__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting", "SourceBlocklist", "ServiceSecret", "DailyUsage"]
 

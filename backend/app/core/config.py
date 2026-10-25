@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     # （conftest 里那条不变量），而不是为了让用例好写——部署自检会拿一段已知违规的
     # 文本打一次，断言必须被拦下来，所以这里不存在"关了也没人发现"的静默失效。
     SEC_CHECK_ENABLED: bool = True
+    # ---- 每人每天的花费上限（10-25 第八轮审计 M33；计数落在 `models/daily_usage.py`）----
+    # 分钟闸只挡"一时打满"，挡不住"一天里陆陆续续打满"：一次提炼内部最多打四趟上游
+    # （`services/llm.py:MAX_RETRIES`），分钟闸 × 重试＝一个人一分钟最多 40 发花钱调用。
+    # 档位是站长 10-25 拍的：提炼 50 条/天、内容检查 200 次/天。数值放这里而不是代码常量里，
+    # 因为"抬一档"是运营决定，不该等于一次改代码＋一次部署；判据（`tests/test_日量闸.py`）
+    # 读的是这两栏，改档位不会让用例假绿。
+    EXTRACT_DAILY_LIMIT: int = 50
+    SEC_CHECK_DAILY_LIMIT: int = 200
     # 分享卡片上那张小程序码指向哪个版本。微信的默认值是 release，而"page 必须存在于该版本"
     # 这条只在正式版里成立——所以在过审之前，那张码扫开必然是打不开的。填 trial 可以让
     # 它指向体验版（只有体验成员扫得动），**发布前必须改回 release**，否则真实用户扫到的
@@ -115,7 +123,12 @@ class Settings(BaseSettings):
     IMAGE_STORE_CF_KEY: str = ""
     # 客户端（这里是 worker）等待上限必须大于云函数自己的执行超时，理由同 `HUNYUAN_CF_TIMEOUT` 那段。
     # 现网这个新函数默认只有 3 秒（抬它要控制台那一下），所以这里先给 20 秒兜住，别照抄 90。
-    IMAGE_STORE_CF_TIMEOUT: float = 20.0
+    # 10-25 第八轮审计 M31 抬到 30 秒：自家现网实测 1 MB→4882 ms、3 MB→504（15308 ms）、
+    # 4 MB→200（**18231 ms**）＝20 秒预算只剩 9%，一张正常的 4 MB 原图随时会变成"没跟过来"。
+    # 为什么停在这里：客户端 `utils/api.js:96` 那枚整请求上限是 30 秒，转存那一趟（最多九张、
+    # 每张一趟）本来就可能超出它——那一半由 M6 的闸与 M7 的补抄兜住（超时后第二次点会补抄回来），
+    # 不是靠压低这一档兜住。再抬到 45 秒只会让"客户端早就走了、服务端还在写"那一段更长。
+    IMAGE_STORE_CF_TIMEOUT: float = 30.0
 
     @model_validator(mode="after")
     def _require_jwt_secret(self) -> "Settings":

@@ -468,7 +468,7 @@ def test_ops页面匿名可取但只是一个口令框(client, admin_pw, store):
 
 
 def test_ops页面那段JS在node里过得去语法(client, store):
-    """这一条查的不是 JS 写得对不对，查的是**Python 的转义有没有把 JS 吃掉**。
+    r"""这一条查的不是 JS 写得对不对，查的是**Python 的转义有没有把 JS 吃掉**。
 
     那份 HTML 是普通 Python 字符串，`\\/` 出来是一个反斜杠；JS 那边正则里又要写 `\/`。
     两层各剥一次就差一个字，而 Python 与 pytest 都不看 JS 语法——症状是页面打开一片空白，

@@ -1,6 +1,5 @@
 """service_secrets：把"换一把凭据 = 改 .env + 重启"变成"后台填一次就生效"
 
-Revision ID: e7b3a9c1d482
 Revision ID: c9f2a6d4e831
 Revises: b7f2c4d9a310
 

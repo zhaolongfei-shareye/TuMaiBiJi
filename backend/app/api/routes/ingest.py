@@ -17,6 +17,7 @@ from app.core.errors import UserError
 from app.core.rate_limit import limiter
 from app.api.routes.notes import MAX_BODY, MAX_TITLE, MAX_URL
 from app.services.queue import get_queue, set_task_status
+from app.services import daily_budget
 from app.services.wechat import check_image, enforce_text_safety
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,15 @@ async def ingest_url(
     user: User = Depends(get_current_user),
 ):
     task_id = uuid.uuid4().hex
+    # 10-25 第八轮审计 M33：每人每天 50 条提炼，档位读 `settings.EXTRACT_DAILY_LIMIT`。
+    # 记在**门口**而不是记在花钱那一刻——一次提炼内部最多打四趟上游（`llm.MAX_RETRIES`），
+    # 按上游次数记账会让"50 条"变成没人看得懂的数；按请求条数记才与站长那句话对得上。
+    # `charge` 里是同步 DB 写，这一口是 `async def` ⇒ 按 M2 那条纪律甩进工作线程。
+    budget = await asyncio.to_thread(
+        daily_budget.charge, str(user.id), daily_budget.KIND_EXTRACT
+    )
+    if not budget.ok:
+        raise HTTPException(status_code=429, detail=budget.message)
     # 10-25 第八轮审计 M2：这一口是 `async def`，而"登记 queued"与"推进队列"两趟都要真打 Redis。
     # 留在循环里，Redis 慢的那几百毫秒是**全站**（含 /health）一起排队，所以两步各裹一次工作线程。
     # 替身仍挂在 `get_queue`／`set_task_status` 这两枚名字上（三处录入用例都靠它们），别改成整块搬走。
@@ -101,7 +111,20 @@ async def ingest_text(
         if not category:
             raise HTTPException(status_code=400, detail="分类不存在或无权使用")
 
+    # M33 两档的顺序是定的：提炼那一档先判。额度已经用完时不必再花一次送检——
+    # 与分类/名片那道"要被打回的请求不该花真额度"是同一条纪律。
+    budget = await asyncio.to_thread(
+        daily_budget.charge, str(user.id), daily_budget.KIND_EXTRACT
+    )
+    if not budget.ok:
+        raise HTTPException(status_code=429, detail=budget.message)
+
     try:
+        sec = await asyncio.to_thread(
+            daily_budget.charge, str(user.id), daily_budget.KIND_SEC_CHECK
+        )
+        if not sec.ok:
+            raise HTTPException(status_code=429, detail=sec.message)
         enforce_text_safety(user.openid, title, content)
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -292,6 +315,11 @@ async def check_screenshot(
     #   在这一条 `async def` 里直接调它＝把整个 API 的事件循环按住十几秒，
     #   期间所有人的请求（连 `/health`）一起排队——症状是"整站卡"，不是"这一张慢"。
     #   同仓外链贴图那条 `_guard_image_pixels` 早就是 `asyncio.to_thread` 这个写法，照它。
+    budget = await asyncio.to_thread(
+        daily_budget.charge, str(user.id), daily_budget.KIND_SEC_CHECK
+    )
+    if not budget.ok:
+        raise HTTPException(status_code=429, detail=budget.message)
     verdict = await asyncio.to_thread(check_image, data)
     if verdict == "risky":
         # 这条日志是下一次"你说没生效"时唯一能现读的证据，别省。
@@ -316,6 +344,19 @@ async def process_screenshots(
         raise HTTPException(status_code=404, detail="批次不存在或已失效，请重新上传")
     if not batch["data"]:
         raise HTTPException(status_code=400, detail="无暂存图片，请先上传")
+
+    # M33 两档：这一趟会结一条提炼，也会在 worker 里逐张送检（OCR 之前那道闸），
+    # 所以送检那一档按**张数**记——一批九张就是九次出网，记一次等于把数说小九倍。
+    budget = await asyncio.to_thread(
+        daily_budget.charge, str(user.id), daily_budget.KIND_EXTRACT
+    )
+    if not budget.ok:
+        raise HTTPException(status_code=429, detail=budget.message)
+    sec = await asyncio.to_thread(
+        daily_budget.charge, str(user.id), daily_budget.KIND_SEC_CHECK, len(batch["data"])
+    )
+    if not sec.ok:
+        raise HTTPException(status_code=429, detail=sec.message)
 
     task_id = uuid.uuid4().hex
     # 两步都挪出事件循环，理由与位置绑定那条口径见 `/url` 那一处（M2 同一刀）。

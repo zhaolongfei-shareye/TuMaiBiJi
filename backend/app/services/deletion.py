@@ -43,6 +43,8 @@ from app.models.user_profile import UserProfile
 logger = logging.getLogger(__name__)
 
 # 顺序是**先子后父**，逐条写在下面的注释里，别打乱。
+from app.models.daily_usage import DailyUsage
+
 _BUSINESS_TABLES = (
     ("shares", Share),
     ("jobs", Job),
@@ -53,6 +55,10 @@ _BUSINESS_TABLES = (
     ("assets", Asset),
     ("cards", NoteCard),
     ("profile", UserProfile),
+    # 日量计数（10-25 审计 M33）。这一条不是补上去的选项：`tests/test_v1_account_deletion.py`
+    # 那把尺子按"每张挂 user_id 的表都必须在场"枚举，漏一行就是**删了号还留着这个人用过几次**——
+    # 那是个人信息留存问题，不是脏数据问题。它不引用任何人，删它不需要顺序。
+    ("daily_usage", DailyUsage),
 )
 
 

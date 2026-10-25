@@ -28,6 +28,7 @@ from app.services.sharing import (
     sync_snapshot,
     visible_fields,
 )
+from app.services import daily_budget
 from app.services.wechat import enforce_text_safety, get_qr_code_image
 
 logger = logging.getLogger(__name__)
@@ -130,6 +131,9 @@ def create_share(
     # 作者名一并进这一次送检：它是这次新增的对外可见字段，漏了它就等于开了一条
     # 不经内容安全的公开出口（key_links 当初就是这么漏的）。
     try:
+        budget = daily_budget.charge(str(user.id), daily_budget.KIND_SEC_CHECK)
+        if not budget.ok:
+            raise HTTPException(status_code=429, detail=budget.message)
         enforce_text_safety(user.openid, *public_check_fields(note, author))
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))

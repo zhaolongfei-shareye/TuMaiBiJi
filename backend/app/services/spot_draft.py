@@ -203,10 +203,24 @@ def build_prompt(*, lang: str, captured_at: list[str], place_hint: str | None, c
     )
 
 
+def mime_of(data: bytes) -> str:
+    """按**文件头**认 MIME（10-25 第八轮审计 M13）。
+
+    校验那一头本来就放行 JPEG/PNG/WebP 三种（见 `_clean_images` 里那道 `head.startswith` 闸），
+    而拼 data URL 那一头原先一律写 `image/jpeg` ⇒ 一张 PNG 是带着 JPEG 的标签送进模型的。
+    认格式的尺子与放行格式的尺子必须是同一把：这里吃的还是那三枚常量，不另立一份签名表。
+    """
+    if data.startswith(PNG):
+        return "image/png"
+    if data.startswith(WEBP) and data[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"
+
+
 def build_messages(images: list[bytes], prompt: str) -> list[dict]:
     parts = [
         {"type": "image_url",
-         "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(b).decode()}}
+         "image_url": {"url": f"data:{mime_of(b)};base64," + base64.b64encode(b).decode()}}
         for b in images
     ]
     parts.append({"type": "text", "text": prompt})

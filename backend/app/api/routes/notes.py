@@ -26,6 +26,7 @@ from app.core.private_access import (
 )
 from app.core.timefmt import UTCDatetime, UTCDatetimeOrNone
 from app.core.errors import UserError
+from app.services import daily_budget
 from app.services.wechat import enforce_text_safety
 from app.services.sharing import (
     SNAPSHOT_COLUMNS,
@@ -87,6 +88,9 @@ def _guard_manual_text(user: User, note) -> None:
     if getattr(note, "source_type", None) != "manual":
         return
     try:
+        budget = daily_budget.charge(str(user.id), daily_budget.KIND_SEC_CHECK)
+        if not budget.ok:
+            raise HTTPException(status_code=429, detail=budget.message)
         enforce_text_safety(
             user.openid,
             *(getattr(note, f, None) for f in MANUAL_TEXT_FIELDS),
@@ -470,6 +474,9 @@ def update_note(
     if set(update_data) & set(SNAPSHOT_COLUMNS):
         if not now_private and active_shares(db, db_note.id):
             try:
+                budget = daily_budget.charge(str(user.id), daily_budget.KIND_SEC_CHECK)
+                if not budget.ok:
+                    raise HTTPException(status_code=429, detail=budget.message)
                 enforce_text_safety(user.openid, *public_fields(db_note))
             except UserError as e:
                 db.rollback()
@@ -582,7 +589,27 @@ class NoteFromShare(BaseModel):
     token: str
 
 
-@router.post("/from-share", response_model=NoteDetail)
+class NoteFromShareOut(NoteDetail):
+    """转存那一趟的回体＝详情那一份 ＋ 三个配图数（10-25 第八轮审计 M7 的第二半）。
+
+    为什么必须有这三个数：抄图那一段是"笔记优先"的设计（整段失败也不许把这一次变成失败），
+    而失败此前**只进日志**——回体里一个数都没有、响应码也不变，于是屏上那句"已存入笔记"
+    是一句半假话：笔记真有了，图可能一张都没跟过来，而用户没有任何办法知道。
+    旧包读不到这三栏（不在它的模型里），一个字节都不变——这是**纯前向**加字段。
+    """
+
+    images_kept: int = 0        # 真复制过来并登记成的张数
+    images_failed: int = 0      # 试了没成的张数（含超字节、网关拒、云上写不成）
+    images_skipped: int = 0     # 超出单篇上限、根本没去取的那几张
+
+
+def _share_out(note, kept: int, failed: int, skipped: int) -> NoteFromShareOut:
+    return NoteFromShareOut.model_validate(note, from_attributes=True).model_copy(
+        update={"images_kept": kept, "images_failed": failed, "images_skipped": skipped}
+    )
+
+
+@router.post("/from-share", response_model=NoteFromShareOut)
 # 10-25 第八轮审计 M8：这一次转存内部最多扇九趟存图网关（`_copy_share_images`），而它前面
 # 一道门闩都没有 ⇒ 一张有效票能反复把这份成本打上来。分钟档按人分桶（`get_user_key`）。
 @limiter.limit("10/minute")
@@ -631,8 +658,8 @@ def import_from_share(
     # 这句要避免的冗余数据。
     mine = _find_share_import_copy(db, str(user.id), share.note_id)
     if mine is not None:
-        _top_up_share_images(db, mine, share.note_id)
-        return mine
+        kept, failed, skipped = _top_up_share_images(db, mine, share.note_id)
+        return _share_out(mine, kept, failed, skipped)
 
     note = Note(
         user_id=str(user.id),
@@ -664,7 +691,9 @@ def import_from_share(
         raced = _find_share_import_copy(db, str(user.id), share.note_id)
         if raced is None:
             raise HTTPException(status_code=409, detail="这篇笔记的收藏状态刚变过，请再试一次")
-        return raced
+        # 抢输的这一趟**不报配图数**：图由先落那一趟在抄，这一刻这里没有任何可念的数，
+        # 而 0 在客户端那一侧读成"一张没少"——宁可不说话，不许编一个数。
+        return _share_out(raced, 0, 0, 0)
     db.refresh(note)
     # 转存给**那一篇的作者** +1（不是 +10）：`quota._credit_import` 挣的是"有人把我这篇存下来了"，
     # 同一篇 × 同一个人只挣一次（判定与唯一索引都在 quota 里）。
@@ -673,8 +702,8 @@ def import_from_share(
     # 原来这里写的"那份 +10 就记在原笔记作者头上"是句假话，一并改净）。
     # 和动笔那条一样，结不到账不能让转存本身失败。
     quota.credit_import(db, user, share.note_id)
-    _copy_share_images(db, note, share.note_id)
-    return note
+    kept, failed, skipped = _copy_share_images(db, note, share.note_id)
+    return _share_out(note, kept, failed, skipped)
 
 
 def _find_share_import_copy(db, user_id, source_note_id):
@@ -729,15 +758,15 @@ def _top_up_share_images(db, note, from_note_id) -> None:
     """
     have = db.query(Asset.id).filter(Asset.note_id == note.id, not_failed()).count()
     if have:
-        return
+        return 0, 0, 0
     src = db.query(Asset.id).filter(Asset.note_id == from_note_id, not_failed()).count()
     if not src:
-        return
+        return 0, 0, 0
     logger.warning("转存配图补一次：副本 %s 名下零张而原篇 %s 有 %s 张", note.id, from_note_id, src)
-    _copy_share_images(db, note, from_note_id)
+    return _copy_share_images(db, note, from_note_id)
 
 
-def _copy_share_images(db, note, from_note_id) -> None:
+def _copy_share_images(db, note, from_note_id):
     """原篇那几张配图逐张复制一份到这一篇名下（站长 10-24：「转存必须带图。乙，复制一份到自己名下」）。
 
     整段裹住是**必须的**：图是转存的加值，笔记已经建好、分已经结好都在它前面 ⇒ 任何一趟出事
@@ -745,15 +774,27 @@ def _copy_share_images(db, note, from_note_id) -> None:
     为什么这一段落在请求里而不是排进后台任务：客户端那枚按钮成功时只念一句"已存入笔记"、
     不轮询，图排在九张之后异步落账的话，他点完立刻进列表看到的那一篇还是没图——而他这次要的就是图。
     代价直说：最多九张、每张一趟网关，转存那一次的响应会慢几秒（`IMAGE_STORE_CF_TIMEOUT` 一张一算）。
+
+    回 `(kept, failed, skipped)` 三个数（10-25 第八轮审计 M7 第二半）：这一趟原来只进日志，
+    于是"笔记优先"这个正确的设计在屏上变成一句半假话。整段没跑成时 `failed` 按**原篇张数**报，
+    不是报 0——原篇有九张而这里报"0 张没跟过来"，念出去的还是一个反的数。
     """
     from app.services import note_images
+
+    def _src_count() -> int:
+        try:
+            return db.query(Asset.id).filter(Asset.note_id == from_note_id, not_failed()).count()
+        except Exception:
+            return 0
 
     try:
         shots = note_images.copy_for_import(db, note, from_note_id)
     except Exception:
         logger.exception("转存配图整段没跑成（笔记已建）：note=%s src_note=%s", note.id, from_note_id)
-        return
+        n = _src_count()
+        return 0, n, 0
     if shots.failed or shots.truncated:
         logger.warning("转存配图：%s 张跟过来、%s 张没跟过来、%s 张超出上限没带（笔记已建）："
                        "note=%s src_note=%s",
                        len(shots.kept), len(shots.failed), shots.truncated, note.id, from_note_id)
+    return len(shots.kept), len(shots.failed), int(shots.truncated or 0)

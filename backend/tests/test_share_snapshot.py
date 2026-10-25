@@ -971,6 +971,9 @@ def _spy_copy(monkeypatch):
 
     def fake(db, note, from_note_id):
         calls.append((note.id, from_note_id))
+        # 回体那三个数（M7 第二半）必须有值：这一路真函数回 (kept, failed, skipped)，
+        # 替身回 None 会让路由在解包上炸——那是一条与产品无关的假红。
+        return 1, 0, 0
 
     monkeypatch.setattr(notes_route, "_copy_share_images", fake)
     return calls

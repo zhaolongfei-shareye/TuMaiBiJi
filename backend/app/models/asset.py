@@ -33,7 +33,12 @@ class Asset(Base):
     # 顺带：加上它还会和 `notes.cover_asset_id` 组成一个环，pytest 每次开局多一条
     # "Can't sort tables for DROP" 的警告。
     note_id = Column(Integer, nullable=True, index=True)
-    object_key = Column(String(500), nullable=False)  # 云开发 fileID（cloud://...），不是 S3 key
+    # 云开发 fileID（cloud://...），不是 S3 key。
+    # index=True 是 10-25 第八轮审计 M32：归属校验（`routes/assets.py` 与 `note_images.py`）
+    # 每次都按这一栏反查，而现网在册索引此前只有 user_id/id/note_id ⇒ 全表扫。
+    # ⚠ 换 MySQL 时这一条要改成前缀索引（String(500) 在 utf8mb4 下超过 767 字节的键长上限）；
+    #   本仓只有 SQLite，这里先按现读的引擎写，别到时候静默建不上。
+    object_key = Column(String(500), nullable=False, index=True)
     file_type = Column(String(50), nullable=True)
     file_size = Column(Integer, nullable=True)
     width = Column(Integer, nullable=True)

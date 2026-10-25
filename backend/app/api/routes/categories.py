@@ -13,6 +13,7 @@ from app.core.errors import UserError
 from app.core.private_access import PRIVATE_CATEGORY_NAME
 from app.core.timefmt import UTCDatetime
 from app.services import category_names
+from app.services import daily_budget
 from app.services.sharing import close_shares
 from app.services.wechat import enforce_text_safety
 
@@ -26,6 +27,9 @@ def _guard_category_name(user: User, name: str) -> None:
     这个接口按次计配额。判定策略不另立一套：真违规才拒，接口没检成放行。
     """
     try:
+        budget = daily_budget.charge(str(user.id), daily_budget.KIND_SEC_CHECK)
+        if not budget.ok:
+            raise HTTPException(status_code=429, detail=budget.message)
         enforce_text_safety(user.openid, name)
     except UserError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

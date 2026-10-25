@@ -14,7 +14,7 @@ from app.db.database import get_db
 from app.models.account import Account
 from app.models.category import Category
 from app.models.user import User
-from app.services import deletion, quota
+from app.services import daily_budget, deletion, quota
 
 logger = logging.getLogger(__name__)
 
@@ -351,3 +351,20 @@ def deactivate_account(
     deleted, file_ids = deletion.purge(db, [user], _account_to_take_along(db, user))
     db.commit()
     return {"message": "账号已注销", "deleted": deleted, "file_ids": file_ids}
+
+
+@router.get("/api/user/usage-today")
+def read_usage_today(user: User = Depends(get_current_user)):
+    """今天这两档各已用／还剩几条（10-25 第八轮审计 M33 的"念出来"那一半）。
+
+    为什么必须有这一只口：站长加日量闸那一句的前提是"界面上把那个数念出来"——只加闸不念，
+    就变成一条从没说过的限制，撞上的是「没说过的限制」那一族最坏的错（他 10-22 定过的口径）。
+    屏上落点归客户端那一趟（要出包），这一趟先把数交出去：老包不读它，一个字节都不变。
+
+    放在 `user.py` 而不是新开一只路由模块：新开模块要在 `app/main.py` 挂一次，而现网那份
+    `main.py` 此刻不能换（HEAD 里它 import 了另一条路尚未上现网的 `roammark`，见 §8.492 收尾
+    那一格）。这一条是**部署通道的约束**，不是设计偏好。
+
+    只读，一个副作用都没有：进「我的」那一屏不该把额度打掉一条（`daily_budget.snapshot` 同义）。
+    """
+    return daily_budget.snapshot(str(user.id))

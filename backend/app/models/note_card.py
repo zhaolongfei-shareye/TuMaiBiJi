@@ -56,7 +56,10 @@ class NoteCard(Base):
     # `tests/test_quota_and_invite.py` 那条"alembic 升级后的库和模型一字不差"永远对不上
     # （`models/asset.py` 那段记的是同一个坑）。删笔记那一路本来就显式清这批行。
     note_id = Column(Integer, nullable=False, index=True)
-    object_key = Column(String(500), nullable=False)  # 云开发 fileID（cloud://…），不是 S3 key
+    # 云开发 fileID（cloud://…），不是 S3 key。index=True 与 `models/asset.py:36` 同一刀
+    # （10-25 审计 M32：归属校验按这一栏反查，现网此前只有 id/user_id/note_id 三枚索引 ⇒ 全表扫；
+    #  换 MySQL 同样要改前缀索引，理由写在那一只文件里）。
+    object_key = Column(String(500), nullable=False, index=True)
     # 哪套模板、当时带没带二维码——重渲那一档全靠这两栏，缺一样就渲不回同一张。
     tpl = Column(String(50), nullable=False)
     no_qr = Column(Boolean, nullable=False, default=False)

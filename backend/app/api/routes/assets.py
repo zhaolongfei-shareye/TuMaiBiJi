@@ -144,8 +144,16 @@ def _assert_ours(db: Session, uid: str, fid: str) -> None:
         hit = db.query(model).filter(col == fid).first()
         if hit and hit.user_id != uid:
             raise HTTPException(status_code=400, detail="图片地址不属于当前账号")
-    # 名片那一行的四格存在一个 JSON 列里，没有可查的列，只能整列捞出来在内存里比。
-    for (slots,) in db.query(UserProfile.slots).filter(UserProfile.user_id != uid).all():
+    # 名片那一行的四格存在一个 JSON 列里，没有可查的列，只能捞出来在内存里比（模型注释自己写着）。
+    # 但**只捞真有四格的那几行**（10-25 第八轮审计 M32）：原先除自己以外所有人的 `slots` 整列都进
+    # Python，底数 96 人时无感，攒到几万行就是一趟归属校验把全表读一遍。
+    # ⚠ 这一条治的是"捞多少行"，治不了"JSON 里查不动"——真要按 file_id 反查名片，得把那一格
+    # 拆成可查的列（另一次迁移），今天不做：这条链的判据是"这一张属不属于你"，不是"这张在谁名下"。
+    for (slots,) in (
+        db.query(UserProfile.slots)
+        .filter(UserProfile.user_id != uid, UserProfile.slots.isnot(None))
+        .all()
+    ):
         for s in (slots or []):
             if s and s.get("file_id") == fid:
                 raise HTTPException(status_code=400, detail="图片地址不属于当前账号")

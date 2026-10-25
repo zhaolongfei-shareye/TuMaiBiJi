@@ -15,6 +15,9 @@ const { request } = require('./api.js')
 // 包里那段介绍是这一格的兜底出处（站长 10-21 之前它是唯一出处）。放在这里而不是各页各写一条
 // `||`：两处消费者（「我的」里那一块与 pages/about）必须念同一句，规则写两遍就会漂成两套。
 const { introLead } = require('./appInfo.js')
+// 本机存储读写统一走这一枚（M15）：`serverBgPath()` 在三个 tab 每次 onShow 的路上，
+// 那一处裸调用一抛，页面 setData 之前整屏就起不来。
+const storage = require('./safeStorage.js')
 
 const API_BASE = 'https://api.agentsbin.cn/wtsj'
 const FS = wx.getFileSystemManager()
@@ -95,7 +98,7 @@ async function pull() {
       }
       continue
     }
-    const cached = wx.getStorageSync(_key(kind))
+    const cached = storage.read(_key(kind))
     // 绝对地址每次落账都记一份：官方那一篇的配图要拿去喂 `previewImage`，而那条 API 只认
     // https／cloud://，不认本机 `USER_DATA_PATH`（detail.js 的 `onCardCell` 里 10-08 就记过这条）。
     // 后端那个口发的 URL 是唯一出处（`services/mp_assets.url_of`），域名那一半仍只在这台机上
@@ -137,12 +140,14 @@ async function pull() {
    ② 光回 null 不够：`pull()` 判的是 `contentHash` 相等就 `continue`，留着这条账这台机
       **永远不会再下第二次**，运营图就永久白底。撤掉账，下一趟 `pull()` 才把它补回来。 */
 function serverBgPath() {
-  const cached = wx.getStorageSync(_key('home_bg'))
+  // 读不到就当作"没有这一栏"（与文件里"账对不上文件就回 null"同一出口）：首页落白底，
+  // 下一趟 `pull()` 因为对不上哈希会重下一次，所以是**多下一次**而不是少发一次请求。
+  const cached = storage.read(_key('home_bg'))
   if (!cached || !cached.filePath) return null
   try {
     FS.accessSync(cached.filePath)
   } catch (_) {
-    wx.removeStorageSync(_key('home_bg'))
+    storage.remove(_key('home_bg'))
     return null
   }
   return cached.filePath
@@ -156,7 +161,7 @@ function serverBgPath() {
    三个落点因此吃的是同一个出处，不用哪一处再单独退回本机路径。
    那张图由 `pull()` 顺带下到本机（走的是图片栏那条通用链，没为它开分支），但屏上不读那个文件。 */
 function serverPresetImage() {
-  const cached = wx.getStorageSync(_key('preset_note_image'))
+  const cached = storage.read(_key('preset_note_image'))
   return (cached && cached.url) || null
 }
 
@@ -186,16 +191,17 @@ function _saveTexts(config) {
       try { wx.removeStorageSync(key) } catch (_) {}
       return
     }
-    const cached = wx.getStorageSync(key)
+    const cached = storage.read(key)
     if (cached && cached.updatedAt === entry.updated_at) return
-    wx.setStorageSync(key, { zh: entry.zh, en: entry.en, updatedAt: entry.updated_at })
+    // 写不进只当"这一栏还没落账"：两栏文案各自独立，一栏坏掉不许连累另一栏（与顶上那条纪律一致）。
+    storage.write(key, { zh: entry.zh, en: entry.en, updatedAt: entry.updated_at })
   })
 }
 
 // 当前缓存的那一份文案；没有（从没下发过、或已停用、或那一门是空数组）就 null。
 // 返回 null 是**正常状态不是错误**：调用方（create.js 的 tipsFor）落回包里那六句。
 function serverTips(lang) {
-  const cached = wx.getStorageSync(_textKey('tips'))
+  const cached = storage.read(_textKey('tips'))
   if (!cached) return null
   const arr = cached[lang]
   return Array.isArray(arr) && arr.length ? arr : null
@@ -206,7 +212,7 @@ function serverTips(lang) {
 // ⚠ 两处消费者（「我的」页里那一块与 `pages/about` 那一页）都走这一枚读法——同一个号在两屏
 //   各念一套话，比"没搬进后台"更糟：他会先看到新的、再在另一屏看到旧的。
 function serverIntro(lang) {
-  const cached = wx.getStorageSync(_textKey('about_intro'))
+  const cached = storage.read(_textKey('about_intro'))
   if (!cached) return null
   const text = cached[lang]
   return typeof text === 'string' && text ? text : null

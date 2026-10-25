@@ -113,11 +113,20 @@ async def extract_knowledge(text: str, fallback_title: str = "", translate=None)
 
 
 def _build_user_content(text: str, fallback_title: str) -> str:
+    """拼交给云函数的那段正文：**只截断，不拼标题**（10-25 第八轮审计 M18）。
+
+    原先这里也拼一次 `参考标题：`，而 `cloudfunctions/extract/index.js:54` 收到之后又拼一次
+    ⇒ 模型每次多吃一行重复标题（本地只读脚本实测：`参考标题：` 出现 2 次）。
+    为什么删这一头而不是那一头：函数是**先切 `MAX_INPUT` 再拼标题**，所以留下"截断＋标记"在这一头、
+    标题交给那一头，两件事各只有一处做，而且长文那条的 `[...内容过长，已截断...]` 这一回**真能送到**
+    ——旧写法里它在函数那一刀被挤掉了（送出的 12037 字符切成 12000，标记正好在尾巴上），
+    也就是说今天屏上从来没有一篇笔记告诉过模型"这是从中间掐断的"。
+
+    口径写死在这里：**拼标题只有函数那一处**。要改就先改函数并重传云函数，别在这里补回一行。
+    """
     content = text
     if len(content) > 12000:
         content = content[:12000] + "\n\n[...内容过长，已截断...]"
-    if fallback_title:
-        content = f"参考标题：{fallback_title}\n\n{content}"
     return content
 
 

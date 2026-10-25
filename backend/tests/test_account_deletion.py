@@ -157,6 +157,9 @@ class Test删干净:
         assert resp.json()["deleted"] == {
             "notes": 1, "categories": 1, "shares": 1, "jobs": 1, "assets": 1, "cards": 1,
             "profile": 1, "reports": 1,
+            # 日量计数（10-25 审计 M33 之后新增的一类）：这一格在场是**枚举尺子**逼出来的——
+            # 删了号却留着"这个人今天用过几次"是个人信息留存问题。这个人没打过提炼，所以 0。
+            "daily_usage": 0,
             # 这三格 2026-10-10 起**一律在场**（`purge` 预先摆平），不再随"这一路带不带 account"
             # 出现或消失。这个人是直接 `User(openid=…)` 造的、没有 account_id，所以三格都是 0；
             # 走真登录路造的人那一格会是 1。键集合会变形的那一版，这两个字典比的是八格。
@@ -186,15 +189,24 @@ class Test删干净:
         empty = User(openid="nothing-here")
         db.add(empty)
         db.commit()
+        # 留两条日量计数在这一行名下：这一格不许"删了号还在"（M33）。
+        # `test_v1_account_deletion.py` 那把枚举尺子钉的是"表必须在名单里"，这里钉的是真删得掉。
+        from app.models.daily_usage import DailyUsage
+        from app.services import daily_budget
+
+        db.add(DailyUsage(user_id=str(empty.id), day=daily_budget.today(),
+                          kind=daily_budget.KIND_EXTRACT, count=2))
+        db.commit()
         resp = wipe(client, {"user": empty})
         assert resp.status_code == 200
         assert resp.json()["deleted"] == {"notes": 0, "categories": 0, "shares": 0,
                                           "jobs": 0, "assets": 0, "cards": 0, "profile": 0,
-                                          "reports": 0,
+                                          "reports": 0, "daily_usage": 1,
                                           # 这个人压根没有 account（`account_id` 为 NULL，那道闸
                                           # 直接回 None），所以那三格是 0 而不是缺席——键集合不许
                                           # 随"这一路带不带 account"变形。
                                           "identities": 0, "link_codes": 0, "account": 0}
+        assert db.query(DailyUsage).filter(DailyUsage.user_id == str(empty.id)).count() == 0
         assert rows(db, Note, other["id"]) == 1
 
 
