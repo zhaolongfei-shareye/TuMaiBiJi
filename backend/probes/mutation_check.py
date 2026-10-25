@@ -2,10 +2,18 @@
 
 全绿本身不证明测到了——断言可能压根没经过被改的那行，或者观测量本身就是被修的东西。
 每条变异跑完立刻还原；任何一条"改坏了还全绿"都说明那处修复是裸奔的。
+10-25 审计 M23 给这把秤自己补了三道闸（口径抄本仓的正答案 `反向验证-lib.sh`）：
+语法没崩才算牙、非零退出要数得出 FAILED／ERROR、锚点多处或改动面超 2 行一律出声；
+还原一律做字节校验，且不调任何 BSD-only 的外部命令（那套 lib 用 `md5 -q`，Linux 上没有）。
 前 11 条是额度/注销那一轮，S1~S10 是分享快照这一轮，N1~N7 是 09-24 那次改口径
 （100 篇基础 + 动笔首篇或转存都算激活 + 同一篇只挣一次 + 带来几个人不限），
 L1~L3 是日志装配那一轮，RM1~RM5 是 RoamMark 景点初稿转发那一腿（10-25）。
 """
+import ast
+import atexit
+import difflib
+import hashlib
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -429,56 +437,168 @@ MUTATIONS = [
 ]
 
 
-def run(rel, old, new):
-    """把 old 全量替换成 new。
+def _sha(raw: bytes) -> str:
+    """字节指纹。
+
+    为什么不调 `md5 -q`：那是 BSD/macOS 才有的外部命令（`反向验证-lib.sh:72/:194/:257` 全靠它），
+    这一把秤要能在 Linux 的现网机上跑——搬到那边去只会每条刀都报"没落盘"。
+    """
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _surface(before: str, after: str) -> int:
+    """这一刀在文件里实际改了多少行（增、删都算，上下文不算）。"""
+    return sum(1 for ln in difflib.unified_diff(before.splitlines(), after.splitlines(), n=0)
+               if ln[:1] in "+-" and ln[:3] not in ("+++", "---"))
+
+
+_INFLIGHT = []          # 正被改坏的那只文件 [(path, 原字节)]——崩在半路时按它兜底还原
+_ORIG = {}              # 每只文件进这一把之前的字节；用来认出"上一趟没还原干净"
+
+
+def _sweep_inflight():
+    while _INFLIGHT:
+        p, raw = _INFLIGHT.pop()
+        try:
+            p.write_bytes(raw)
+            print("· 兜底还原 %s" % p.name)
+        except OSError as exc:
+            print("!! 兜底还原失败：%s —— %s 还停在手改坏的那版上，手工按 git 那份还原" % (exc, p))
+
+
+def apply_mutation(rel, old, new):
+    """把 old 换成 new，返回 (原文, 命中处数, 报错说明)。
 
     不要求"恰好一次"：A3 那条额度复查在两个 worker 里各有一处，两处都该一起改坏，
     只改一处的话另一处仍然兜着，测出来的结果会偏乐观。
+    ⚠ 但"多处"必须出声（10-25 审计 M23）：一处都没换是 SKIP，换了 5 处却只报一条刀名，
+    读的人会把"这五处都红了"当成"这一处红了"。
     """
     p = BACKEND / rel
     src = p.read_text(encoding="utf-8")
     n = src.count(old)
     if n < 1:
-        return None, f"锚点没命中，变异没打上"
-    p.write_text(src.replace(old, new), encoding="utf-8")
-    return src, None
+        return src, 0, "锚点没命中，变异没打上"
+    mutated = src.replace(old, new)
+    if mutated == src:
+        return src, n, "★突变没落盘★：替换跑完了文件一字未改，这条不算数"
+    p.write_bytes(mutated.encode("utf-8"))
+    return src, n, None
 
 
 def main():
-    leaked = []
+    # 刀名重复＝同一只文件的两份备份互相覆盖（`反向验证-lib.sh:174-178` 那一家）：
+    # 台账上只看得到一条名字，分不清红的是哪一刀。这种账拒开，别跑一半才发现。
+    names = [m[0] for m in MUTATIONS]
+    dupes = sorted({x for x in names if names.count(x) > 1})
+    if dupes:
+        print("★刀名重复★，这一趟不开跑：%s" % "；".join(dupes))
+        return 1
+
+    leaked = []        # 没牙的刀（假绿／红得不明不白／语法崩／没落盘）
+    wide = []          # 宽刀（锚点多处、或改动面 >2 行）：不改结论，只出声
     for name, rel, old, new, tests in MUTATIONS:
-        original, err = run(rel, old, new)
+        p = BACKEND / rel
+        try:
+            original = p.read_bytes()
+        except OSError as exc:
+            print(f"SKIP  {name}  · 读不到 {rel}：{exc}")
+            leaked.append((name, "读不到目标文件"))
+            continue
+        # 记下每只文件进刀前的字节：收尾那一次"还原干净了吗"只对得到这个数，
+        # 而它认的是整趟跑完之后工作树的账（一把刀没还原干净，后面每一把的基线都是脏的）。
+        _ORIG.setdefault(str(p), original)
+
+        # —— 第一道闸：改动面（锚点出现几处、一共动了几行）先出声，再谈红不红 ——
+        src, hits, err = apply_mutation(rel, old, new)
         if err:
             print(f"SKIP  {name}  · {err}")
             leaked.append((name, err))
             continue
+        after = p.read_bytes()
+        if _sha(after) == _sha(original):
+            # 写进去了却没变＝这一刀压根没打到东西，报"用例咬住了"是自欺（lib.sh:194 那一条）
+            print(f"BAD   {name}  · ★突变没落盘★（写完字节却没变）")
+            leaked.append((name, "突变没落盘"))
+            continue
+        if hits > 1:
+            print(f"⚠ {name} · 锚点在这只文件里出现 {hits} 处，这一刀把每一处都换掉了 —— 核一下改动面对不对")
+            wide.append((name, f"锚点 {hits} 处全换"))
+        nlines = _surface(src, src.replace(old, new))
+        if nlines > 2:
+            print(f"⚠ {name} · 这一刀动了 {nlines} 行，屏幕上那句刀名报不出这么大的面")
+            wide.append((name, f"改动 {nlines} 行"))
+
+        # —— 第二道闸：语法。改崩语法之后 pytest 一定非零，那种红不是牙（lib.sh:202）——
+        mutated_text = after.decode("utf-8", "replace")
+        try:
+            ast.parse(mutated_text)
+        except SyntaxError as exc:
+            print(f"BAD   {name}  · ★突变把文件改崩了★：%s 行 %s —— 语法都不通了，这种红不算牙，重写这一刀"
+                  % (exc.msg, exc.lineno))
+            leaked.append((name, "突变把语法改崩了"))
+            p.write_bytes(original)
+            continue
+
+        _INFLIGHT.append((p, original))
         try:
             r = subprocess.run(
                 [PY, "-m", "pytest", *tests.split(), "-q", "--no-header", "-p", "no:cacheprovider"],
                 cwd=str(BACKEND), capture_output=True, text=True,
             )
-            caught = r.returncode != 0
-            tail = [ln for ln in r.stdout.strip().splitlines() if "passed" in ln or "failed" in ln]
-            print(f"{'CAUGHT' if caught else 'LEAKED'}  {name}  · {tail[-1] if tail else r.stdout[-120:]}")
-            if not caught:
+            out = (r.stdout or "") + (r.stderr or "")
+            lines = out.splitlines()
+            tail = [ln for ln in lines if "passed" in ln or "failed" in ln]
+            # —— 第三道闸：数 FAILED／ERROR 那几行。非零退出却一条都没有，说明这一趟压根没跑起来
+            # （用法错／收集中断／解释器问题），把它记成"有牙"就是 M23 说的那副假牙（lib.sh:237）。——
+            teeth = sum(1 for ln in lines if ln.startswith("FAILED") or ln.startswith("ERROR "))
+            if r.returncode == 0:
+                print(f"LEAKED  {name}  · {tail[-1] if tail else out[-120:]}")
                 leaked.append((name, "改坏了但用例全绿"))
+            elif teeth == 0:
+                print(f"BAD     {name}  · ★红得不明不白★（退出码 {r.returncode}，一条 FAILED／ERROR 都没有）"
+                      f" —— 那不是牙，先问这一趟怎么没跑起来")
+                leaked.append((name, f"退出码 {r.returncode} 却没有 FAILED／ERROR 行"))
+            else:
+                print(f"CAUGHT  {name}  · {tail[-1] if tail else '%d 条 FAILED／ERROR' % teeth}")
         finally:
-            (BACKEND / rel).write_text(original, encoding="utf-8")
+            p.write_bytes(original)
+            _INFLIGHT[:] = [x for x in _INFLIGHT if x[0] != p]
+            # —— 还原做字节校验：写完就当没事，是进程被 SIGKILL 时把手改坏的那版留在工作树的入口。
+            if _sha(p.read_bytes()) != _sha(original):
+                print(f"!! {name} 还原后字节对不上 ⇒ {rel} 停在手改坏的那版上，先停下别往下跑")
+                return 1
 
     # 还原后再跑一遍全套，确认没把文件改坏
     r = subprocess.run([PY, "-m", "pytest", "tests/", "-q", "--no-header", "-p", "no:cacheprovider"],
                        cwd=str(BACKEND), capture_output=True, text=True)
     restored = r.returncode == 0
     print(f"\n还原后全套：{'PASS' if restored else 'FAIL'}  · "
-          f"{[ln for ln in r.stdout.strip().splitlines() if 'passed' in ln or 'failed' in ln][-1:]}")
+          f"{[ln for ln in (r.stdout or '').splitlines() if 'passed' in ln or 'failed' in ln][-1:]}")
 
-    if leaked:
-        print(f"\n{len(leaked)} 条变异没被测到：")
-        for n, why in leaked:
-            print(f"  ✗ {n} — {why}")
+    # 收尾再对一次全盘指纹：逐把那一次只保证"这一把还原了"，这一句保证的是"整趟跑完工作树是干净的"。
+    drift = sorted(str(Path(q)) for q, raw in _ORIG.items() if _sha(Path(q).read_bytes()) != _sha(raw))
+    if drift:
+        print("\n★还原后仍有文件与进刀前对不上★：%s" % "；".join(drift))
+    if wide:
+        print(f"\n宽刀 {len(wide)} 条（不改结论，只报改动面）：")
+        for n, why in wide:
+            print(f"  ⚠ {n} — {why}")
+
+    if leaked or drift:
+        if leaked:
+            print(f"\n{len(leaked)} 条变异没被测到：")
+            for n, why in leaked:
+                print(f"  ✗ {n} — {why}")
+        if drift:
+            print("\n工作树没还原干净 ⇒ 这一趟每一把的基线都可能是脏的，上面的红与绿都不作数")
         return 1
     print(f"\n{len(MUTATIONS)} 条变异全部被测到，还原后全套通过" if restored else "\n还原失败")
     return 0 if (restored and not leaked) else 1
+
+
+atexit.register(_sweep_inflight)
+signal.signal(signal.SIGTERM, lambda *_: (_sweep_inflight(), sys.exit(143)))
 
 
 if __name__ == "__main__":

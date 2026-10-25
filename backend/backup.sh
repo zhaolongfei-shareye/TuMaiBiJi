@@ -83,7 +83,10 @@ def fingerprint(path):
 
 
 def gunzip(src, dst):
-    with gzip.open(src, 'rb') as f, open(dst, 'wb') as o:
+    # 落盘就以 0600 **创建**，不是先 644 再补 chmod：dst 是 `/tmp` 上那份可读的明文全库，
+    # 同机任何进程在"创建出来"到"chmod"之间那几毫秒里就能把它打开（这台机器上还跑着别的项目）。
+    fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'wb') as o, gzip.open(src, 'rb') as f:
         o.write(f.read())
 
 
@@ -91,52 +94,64 @@ if sqlite3.connect(db_path).execute('pragma integrity_check').fetchone()[0] != '
     say('!! 源库 integrity_check 不是 ok，先查源库再谈备份')
     raise SystemExit(1)
 
-if verify_only:
-    cands = sorted(glob.glob(f'{store}/wtsj-*.sqlite.gz'))
-    if not cands:
-        say('!! 演练模式：一份备份都没有')
-        raise SystemExit(1)
-    gunzip(cands[-1], RESTORE)
-    say(f'演练：还原最近一份备份 {os.path.basename(cands[-1])}')
-else:
-    stamp = time.strftime('%Y%m%d-%H%M%S')
-    out = f'{store}/wtsj-{stamp}.sqlite.gz'
-    tmp = f'{store}/.staging-{stamp}.sqlite'
-    src = sqlite3.connect(db_path)
-    dst = sqlite3.connect(tmp)
-    with dst:
-        src.backup(dst)              # 在线安全备份，不是 cp
-    src.close()
-    dst.close()
-    if sqlite3.connect(tmp).execute('pragma integrity_check').fetchone()[0] != 'ok':
+# M27：RESTORE 那一份是**生产库的完整明文副本**，而它落在共享的 /tmp 上。
+# 原来唯一那句 os.remove 关在 `if not verify_only:` 分支里，两条 raise SystemExit
+# （还原库完整性不过、内容散列不一致）都在它前面 ⇒ "只做演练"或"演练红"这两种情况下，
+# 那份库会永久留在 /tmp（deploy.sh §1.5 每趟都跑它，红的次数只多不少）。
+# 所以整段包 try/finally：**无论绿、无论红、无论中途抛什么，一律删**。
+try:
+    if verify_only:
+        cands = sorted(glob.glob(f'{store}/wtsj-*.sqlite.gz'))
+        if not cands:
+            say('!! 演练模式：一份备份都没有')
+            raise SystemExit(1)
+        gunzip(cands[-1], RESTORE)
+        say(f'演练：还原最近一份备份 {os.path.basename(cands[-1])}')
+    else:
+        stamp = time.strftime('%Y%m%d-%H%M%S')
+        out = f'{store}/wtsj-{stamp}.sqlite.gz'
+        tmp = f'{store}/.staging-{stamp}.sqlite'
+        src = sqlite3.connect(db_path)
+        dst = sqlite3.connect(tmp)
+        with dst:
+            src.backup(dst)              # 在线安全备份，不是 cp
+        src.close()
+        dst.close()
+        if sqlite3.connect(tmp).execute('pragma integrity_check').fetchone()[0] != 'ok':
+            os.remove(tmp)
+            say('!! 快照 integrity_check 不通过，本次备份作废')
+            raise SystemExit(1)
+        with open(tmp, 'rb') as f_in, gzip.open(out, 'wb', compresslevel=6) as f_out:
+            f_out.write(f_in.read())
         os.remove(tmp)
-        say('!! 快照 integrity_check 不通过，本次备份作废')
+        gunzip(out, RESTORE)
+        say(f'备份完成 {os.path.basename(out)}（{os.path.getsize(out)} 字节）')
+
+    if sqlite3.connect(RESTORE).execute('pragma integrity_check').fetchone()[0] != 'ok':
+        say('!! 还原出来的库 integrity_check 不通过，这份备份不可用')
         raise SystemExit(1)
-    with open(tmp, 'rb') as f_in, gzip.open(out, 'wb', compresslevel=6) as f_out:
-        f_out.write(f_in.read())
-    os.remove(tmp)
-    gunzip(out, RESTORE)
-    say(f'备份完成 {os.path.basename(out)}（{os.path.getsize(out)} 字节）')
+    src_fp, src_counts = fingerprint(db_path)
+    res_fp, res_counts = fingerprint(RESTORE)
+    if src_fp != res_fp:
+        say(f'!! 恢复演练不一致：源 {src_counts} / 备份 {res_counts}')
+        raise SystemExit(1)
+    say(f'✓ 恢复演练通过：还原库与源库内容散列一致，{sum(src_counts.values())} 行'
+        f'（notes={src_counts.get("notes", 0)} users={src_counts.get("users", 0)} shares={src_counts.get("shares", 0)}）')
 
-if sqlite3.connect(RESTORE).execute('pragma integrity_check').fetchone()[0] != 'ok':
-    say('!! 还原出来的库 integrity_check 不通过，这份备份不可用')
-    raise SystemExit(1)
-src_fp, src_counts = fingerprint(db_path)
-res_fp, res_counts = fingerprint(RESTORE)
-if src_fp != res_fp:
-    say(f'!! 恢复演练不一致：源 {src_counts} / 备份 {res_counts}')
-    raise SystemExit(1)
-say(f'✓ 恢复演练通过：还原库与源库内容散列一致，{sum(src_counts.values())} 行'
-    f'（notes={src_counts.get("notes", 0)} users={src_counts.get("users", 0)} shares={src_counts.get("shares", 0)}）')
-
-if not verify_only:
-    for path in sorted(glob.glob(f'{store}/wtsj-*.sqlite.gz'))[:-14]:
-        os.remove(path)
-        say(f'保留 14 份：删除 {os.path.basename(path)}')
-    kept = glob.glob(f'{store}/wtsj-*.sqlite.gz')
-    free_gb = os.statvfs(store).f_bavail * os.statvfs(store).f_frsize // 2**30
-    say(f'当前 {len(kept)} 份备份，备份目录所在盘剩余约 {free_gb} GB')
-    os.remove(RESTORE)
+    if not verify_only:
+        for path in sorted(glob.glob(f'{store}/wtsj-*.sqlite.gz'))[:-14]:
+            os.remove(path)
+            say(f'保留 14 份：删除 {os.path.basename(path)}')
+        kept = glob.glob(f'{store}/wtsj-*.sqlite.gz')
+        free_gb = os.statvfs(store).f_bavail * os.statvfs(store).f_frsize // 2**30
+        say(f'当前 {len(kept)} 份备份，备份目录所在盘剩余约 {free_gb} GB')
+finally:
+    try:
+        os.remove(RESTORE)
+    except FileNotFoundError:
+        # 演练在 gunzip 之前就没走到（没备份可演练）时本来就什么都没生成——
+        # 这一支不许把退出码换成一句 traceback，否则日志里"没备份可演"变成"备份脚本崩了"。
+        pass
 PY
 RC=$?
 [[ $RC -eq 0 ]] || log "!! 备份流程退出码 $RC"

@@ -26,6 +26,23 @@ source "$VENV_DIR/bin/activate"
 
 RC=0
 
+# ---- 0. 版本指纹（只念，不判红）----
+# 为什么只念不判：`upload.sh` 打的是工作树，而工作树里常年躺着另一条线没提交的文件
+# （§8.492 收尾那一格：现网与 HEAD 此刻差 8 只，全是故意没上的）⇒ "不等"是常态，
+# 判红会把这道读数用废。真正"现网 ≠ 仓库"两个方向的判据在
+# `docs/工具/对账-现网那四目录.py --compare`，那把才负责红。
+# 放在重启之前而不是之后：下面任何一步 exit 1（语法闸门、libGL、备不出快照、迁移失败）
+# 都得先留下"这一趟上来的字节出自哪一次提交、当时工作树有多脏"，否则出事那一趟反而没记录。
+echo ""
+echo ">>> 版本指纹（upload.sh 打进包里的 DEPLOY_STAMP.txt）..."
+if [[ -f "$PROJECT_DIR/DEPLOY_STAMP.txt" ]]; then
+    sed 's/^/  /' "$PROJECT_DIR/DEPLOY_STAMP.txt"
+    echo "  · 只念不判：现网与仓库不等是常态（另一条路那 8 只故意没上）"
+else
+    echo "  · 包里没有 DEPLOY_STAMP.txt —— 这一趟没走 upload.sh（逐只 scp 或手工放的字节）；"
+    echo '  · 这一条不算红，但「现网那批字节等于哪一次提交」这个问题此刻没有证据可答。'
+fi
+
 # ---- 1. 语法闸门：坏代码不要推上去，否则 systemd 会反复拉起又崩溃 ----
 echo ""
 echo ">>> 语法检查..."

@@ -110,11 +110,17 @@ const CSS = stripCss(IX_WXSS)
 {
   // `.ds-meta`／`.ds-h2`／`.ds-tags` 必须是 id="ds-top" 那个 `.ds-in` 的**直接子节点**：
   // 中间再套一层带 flex 的 view，"摊满整宽"就成了那一层的事，不是这一屏的事。
-  const m = /<view class="ds-in" id="ds-top">([\s\S]*?)<\/view>\s*\n\s*\n/.exec(WXML)
-  const seg = m ? m[1] : ''
+  // ⚠ 取这一段**不靠空行**：原来那道 `([\s\S]*?)</view>\s*\n\s*\n` 是拿"注释后面那个空行"当段落边界的，
+  //   而注释删掉之后留下的是一行**只有空格**的行——它在 `</view>\s*\n\s*\n` 眼里就是空行。
+  //   于是 10-20 往标题那一行上面加一句来历注释，这一段被从 `.ds-meta` 那里截断，标题与标签读不到＝假红。
+  //   现在按"两个真边界之间"取：从这一格开到配图那一块 `<block>` 之前，注释加多少行都不影响。
+  const from = WXML.indexOf('<view class="ds-in" id="ds-top">')
+  const to = WXML.indexOf('<block wx:if="{{detailImages.length}}">')
+  const seg = from >= 0 && to > from ? WXML.slice(from, to) : ''
   ck('来源／标题／标签三行直接挂在窗内那一格上（中间没有再套分栏层）',
     /class="ds-meta"/.test(seg) && /class="ds-h2"/.test(seg) && /class="ds-tags"/.test(seg)
-    && !/<view class="ds-(hero|lt|rt)"/.test(seg), seg.replace(/\s+/g, ' ').slice(0, 60))
+    && !/<view class="ds-(hero|lt|rt)"/.test(seg),
+    `段长 ${seg.length} 字（开口 ${from}／配图块 ${to}）`)
   ck('标题这一轮没动：还是现网那一份 46rpx／800',
     numOf(IX_WXSS, 'ds-h2', 'font-size') === 46 && /font-weight:\s*800/.test(rule(IX_WXSS, 'ds-h2')),
     `${numOf(IX_WXSS, 'ds-h2', 'font-size')}rpx／${declOf(IX_WXSS, 'ds-h2', 'font-weight')}`)

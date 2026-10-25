@@ -14,7 +14,16 @@ const path = require('path')
 
 const PORT = process.env.MP_PORT || 9431
 const OUT = path.resolve(__dirname, '../design/笔记列表-背景图/实测')
-// 黑边那一档的宽度只有一份真相：界面加的是 poster.MATTE，判据也读同一个数。
+// 成品外圈那一档留着、宽 20（站长 10-20 三句合起来的口径，见 poster.js 那一段注释）。
+// ⚠ 这一把在 node 里 require 产品那份 poster.js，而 poster.js 顶层就摸 wx（mpAssets 那一句
+// getFileSystemManager）——不先立替身，整把尺子在 require 那一步就 ReferenceError 死掉，
+// 一条判据都不会红，看着像"这把没跑"。同一形状的先例见 验-海报模板几何.js 文件头。
+global.wx = {
+  getStorageSync: () => ({ name: '', slogan: '', template: '', avatarPath: '' }),
+  setStorageSync: () => {},
+  getFileSystemManager: () => ({ accessSync: () => true }),
+  env: { USER_DATA_PATH: '/u' },
+}
 const posterLib = require(path.resolve(__dirname, '../../miniprogram/utils/poster.js'))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -65,17 +74,33 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
     await sleep(4000)
     const page = await mp.currentPage()
     let d = await page.data()
-    // 私密笔记进不了这个弹窗（dock 那枚不渲染），所以挑一条能用的
-    const at = (d.notes || []).findIndex((n) => !n.is_private)
-    if (at < 0) { console.log('!! 库里没有非私密笔记，无法自证'); process.exit(3) }
+    // 私密篇与官方那一篇（帮助文档）在「分享」那一枚上都是挡着的（onSheetShare 第一行就 return），
+    // 所以挑一条两样都不是的。
+    // ⚠ 还要再加一条：**这篇不能已经出过卡**。一篇一张是台账自己的规则，出过卡的那篇开窗直接进
+    //   "已生成态"——那一态不画底部那排圆点、也不画顶上中间那一句模板名（两处都是 `wx:if="{{!posterHasCard}}"`），
+    //   于是"几套就几枚"读到 0、把手行读到 1。10-20 傍晚这一把撞的就是这个：上一篇被前一趟跑测量时
+    //   落进过台账，量出来的不是屏错了、是这一把挑错了篇。问页面自己要那份账（`_cardsOf`），不另数一遍。
+    let at = -1
+    const notes = d.notes || []
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i]
+      if (n.is_private || n.is_preset) continue
+      const got = await page.callMethod('_cardsOf', n.id)
+      if (Array.isArray(got) && got.length) continue
+      at = i; break
+    }
+    if (at < 0) { console.log('!! 库里没有"非私密、非官方、且没出过卡"的那一篇，无法自证'); process.exit(3) }
     await page.setData({ detailOpen: false, templateOpen: false })
     await sleep(800)
 
     // v18 起列表没有"就地展开"那一态：点一行就直接浮详情窗（原来要两下）。
     // 而屏上那一批的顺序不等于 notes 的下标（分类筛选会挪位），
     // 所以按 data-idx 找那一条，不按下标取。
+    // ⚠ 行的类名跟着列表改版换过一次（`.xrow` → `.ixl-row`，10-17 列表合一那一轮）：
+    // 选择器写死旧名时这把尺子不是"量到 0 枚"，而是在这里 throw 一句"进不去弹窗"就整把死掉——
+    // 10-20 这一趟就是先撞 require 崩（poster.js 顶层摸 wx）、再撞这一条，两处都修完才量到东西。
     const rowOf = async (want) => {
-      for (const e of await page.$$('.xrow')) {
+      for (const e of await page.$$('.ixl-row')) {
         if (Number(await e.attribute('data-idx')) === want) return e
       }
       return null
@@ -86,11 +111,14 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
     await sleep(3000)
     d = await page.data()
     ck('详情窗浮起来了', d.detailOpen === true, `detailOpen=${d.detailOpen}`)
-    // v22 起「生成笔记卡片」不是 dock 里的一枚按钮，是窗右上那一格（有卡片是缩略图、没有是淡底方块）。
-    const entry = await page.$('.ds-entry')
-    ck('详情窗右上有出卡片的入口（.ds-entry）', !!entry)
-    if (!entry) throw new Error('进不去弹窗，后面量不了')
-    await entry.tap()
+    // v22 起「生成笔记卡片」不是 dock 里的一枚按钮，是窗右上那一格；10-18 又搬进窗内那一排
+    // 「分享／编辑／删除」（`.ds-ibtn`，index.wxml 那一条 catchtap="onSheetShare"）。
+    // 这一把量的是**成品几何**，不是那枚按钮点得到点不到（点击那一层归 验-详情浮窗两层-真跑），
+    // 所以这里只钉"那一排画出来了"，开弹窗直接走它绑的那一个函数——同一个口，不另画一条链。
+    const ibtn = await page.$$('.ds-ibtn')
+    ck('详情窗里那一排出图入口画得出来（三枚：分享／编辑／删除）', ibtn.length === 3, `${ibtn.length} 枚`)
+    if (!ibtn.length) throw new Error('进不去弹窗，后面量不了')
+    await page.callMethod('onSheetShare')
     let prevCanvasW = 0
     let prevCanvasH = 0
 
@@ -127,10 +155,14 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
       ck(`第 ${round + 1} 套：js 算给 style 的那两个数也同比例`,
         Math.abs(d.posterW / d.posterH - trueRatio) < 0.01,
         `style ${d.posterW}×${d.posterH}rpx`)
-      // 站长 10-01 深夜：递给微信那个图片面板的成品，外圈要留一档纯黑（面板本身全黑底，
-      // 卡片直边贴上去像被裁一半）。canvasW 就是这张成品的宽，少那一档就是黑边没加上。
-      ck(`第 ${round + 1} 套：成品外圈带着那一档纯黑（宽 = ${posterLib.W} + ${posterLib.MATTE}×2）`,
-        d.canvasW === posterLib.W + posterLib.MATTE * 2, `${d.canvasW}`)
+      // 站长 10-20 在这一圈上说了三句，最后一句把我前一版的理解顶回来了：
+      // 「为什么还是有黑边…要简单」我读成"整圈撤掉"，他这句「不是说去掉边框，而是不要黑色边框」
+      // 说的是**边框留着、颜色不许黑**。所以这里钉的还是"外圈加上了没有、宽等于几"，
+      // 色对不对不归这一把：那一格由 验-详情窗配图与出图那一趟.js ③′ 拿包内十套真 plan 逐套数出来，
+      // 再用本把已存的截图（实测-卡片预览比例-<模板>.png）采那一圈的色复验一次。
+      ck(`第 ${round + 1} 套：成品外圈那一档加上了、宽是原来的一半（${posterLib.W} + ${posterLib.MATTE}×2）`,
+        d.canvasW === posterLib.W + posterLib.MATTE * 2,
+        `${d.canvasW}（比卡本身多 ${d.canvasW - posterLib.W}）`)
       // 不能溢出可视框，否则又会被压回去
       ck(`第 ${round + 1} 套：整张卡都在可视框里（没有溢出被裁）`,
         box.height <= body.height + 1 && box.width <= body.width + 1,
@@ -160,12 +192,17 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
       }
 
       /* ---------- 「左右滑换模板」挪到把手行左端，与「点一下收起」对称 ---------- */
+      // ⚠ 这一行从两句变成**三句**是 10-19 那一刀（「卡片名称，被遮挡，要提到顶上中间」⇒ 名字
+      // 搬进把手行的正中）。原来这条钉 `=== 2`，名字一进来它就红——红的是判据过期，不是屏上错了，
+      // 所以改成钉三句，并且**按左右位置取那两句对称的**，不按 DOM 顺序（中间那枚在标记里排第一）。
       const gt = m2.gripTx || []
-      ck('第 1 句提示挪到了把手行：这一行有两个文本', gt.length === 2, `读到 ${gt.length} 个`)
-      if (gt.length === 2 && m2.grip) {
-        const [L, R] = gt
+      ck('第 1 句提示挪到了把手行：这一行现在有三句（左提示／中间模板名／右收窗）',
+        gt.length === 3, `读到 ${gt.length} 个`)
+      if (gt.length === 3 && m2.grip) {
+        const by = gt.slice().sort((a, b) => a.left - b.left)
+        const [L, , R] = by
         const edge = 34 * windowWidth / 750   // 样式里那 34rpx 折回 px
-        ck('两句在同一行、同一顶边、同一高度',
+        ck('左右两句在同一行、同一顶边、同一高度',
           Math.abs(L.top - R.top) < 1 && Math.abs(L.height - R.height) < 1,
           `top ${Math.round(L.top)}/${Math.round(R.top)} 高 ${Math.round(L.height)}/${Math.round(R.height)}`)
         ck('左右各留 34rpx，两句真的对称',
@@ -174,6 +211,12 @@ const toRpx = (px, windowWidth) => px * 750 / windowWidth
           `左距 ${Math.round(L.left - m2.grip.left)}px 右距 ${Math.round(m2.grip.left + m2.grip.width - R.left - R.width)}px`)
         ck('两句都在把手行里、没压到把手上',
           L.top >= m2.grip.top - 1 && L.top + L.height <= m2.grip.top + m2.grip.height + 1)
+        // 中间那枚是模板名（10-20 起左右各带一枚小箭头），它不许挤掉左右两句：
+        // 三句各自占位、中间那枚的左右沿都落在两句之间。
+        const M = by[1]
+        ck('中间那枚模板名坐在两句之间，没把左右任一句挤出这一行',
+          M.left >= L.left + L.width - 1 && M.left + M.width <= R.right + 1,
+          `中 ${Math.round(M.left)}–${Math.round(M.left + M.width)} 左句止 ${Math.round(L.left + L.width)} 右句起 ${Math.round(R.left)}`)
       }
       ck('卡片下面那句旧提示已经撤掉', !(await page.$('.tpl-swipe-hint')))
 

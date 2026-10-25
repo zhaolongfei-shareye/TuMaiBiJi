@@ -1,4 +1,4 @@
-// 十套海报模板的几何与图层自检：10 模板 × 6 种笔记 × 中英 × 码开/关 = 240 组，
+// 十套海报模板的几何与图层自检：10 模板 × 6 种笔记 × 中英 × 码开/关 × 有/无配图 = 480 组，
 // 全部在 node 里用替身 ctx 跑真代码（poster.js 就是产品那份），不靠肉眼看图。
 // 查五件事：图层不许出画布、高度不许塌、开码时恰好一张码、关码时码和"扫码"那行都得没、
 // 换成的是那两行纯文字；最后一段另量小样圆角画进位图后有没有咬到字和码。
@@ -61,9 +61,13 @@ for (const lang of ['zh', 'en']) {
   for (const note of notes) {
     for (const tpl of poster.TEMPLATES) {
       for (const showQr of [true, false]) {
+        // 有配图那一态（站长 10-18「卡片模板要能显示笔记图片」）走的是另一条分支：
+        // 叠翠那套的正文起点会为大图位让位（contentTop），杂志封面整幅换一张。
+        // 不加这一根轴，这一态的"图层不许出画布""高度不许塌"就一条都没量过。
+        for (const hasNote of [false, true]) {
         combos++
-        const tag = `${tpl.id}/${lang}/${showQr ? '带码' : '无码'}`
-        const plan = poster.planPoster(ctx, note, tpl.id, { name: '阿飞', slogan: '每天读一点再走', template: tpl.id }, lang, { showQr })
+        const tag = `${tpl.id}/${lang}/${showQr ? '带码' : '无码'}/${hasNote ? '有配图' : '无配图'}`
+        const plan = poster.planPoster(ctx, note, tpl.id, { name: '阿飞', slogan: '每天读一点再走', template: tpl.id }, lang, { showQr, hasNote })
         if (!(plan.height > 300)) bad.push(`${tag}: 高度异常 ${plan.height}`)
         // 底部码贴纸的上沿：竖排列不许一路戳进这块署名区
         const qrLy = plan.layers.find((l) => l.k === 'image' && l.key === 'qr')
@@ -146,12 +150,13 @@ for (const lang of ['zh', 'en']) {
           if (hasScanLine) bad.push(`${tag}: 关了码还留着「${scan}」那行`)
           if (!hasMark) bad.push(`${tag}: 关了码没换成文字「${mark}」`)
         }
-        poster.paintLayers(ctx, plan.layers, imgs)
+        poster.paintLayers(ctx, plan.layers, hasNote ? Object.assign({}, imgs, { note: { img: {}, width: 900, height: 600 } }) : imgs)
+      }
       }
     }
   }
 }
-console.log(`${combos} 组排版+绘制（10 模板 × 6 笔记 × 中英 × 码开关），问题 ${bad.length} 处`)
+console.log(`${combos} 组排版+绘制（10 模板 × 6 笔记 × 中英 × 码开关 × 有/无配图），问题 ${bad.length} 处`)
 
 // ---------- 小样的圆角不许咬掉内容 ----------
 // 真机上 canvas type="2d" 不吃 CSS 的 border-radius，所以分享页那一排和卡片模板那十格
