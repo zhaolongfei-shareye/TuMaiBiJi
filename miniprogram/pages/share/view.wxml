@@ -30,15 +30,17 @@
 
     <block wx:else>
       <scroll-view class="sv-body" scroll-y show-scrollbar="{{false}}">
-        <!-- 抬头（照 `.ds-in` 第一块：一行小字 → 标题 → 标签）。
-             眉标与作者行今天搬进这一格：他们原来住在窗外，是"另外设计"的那一半。
-             色一支没动（还是这一页自己的灰），只是从窗外搬进窗内。
+        <!-- 抬头（照 `.ds-in` 第一块：标题 → 标签）。
+             ⚠ 眉标「分享笔记」10-25 撤掉了：他把自己那扇详情窗与这一屏并排发来，一句
+             「对比两个，把多余的去掉，我都说要一比一……不要自己加需求」——参考那一窗里
+             没有这么一行，它是这一页自己加的那一枚标签，所以整行撤掉，不是搬走。
+             作者行照旧留着（他 10-21 点名要的那一行，另有 `验-转存与作者` 钉着）；
+             撤不撤等他一句，我不自己砍。
              ⚠ 图二有、这里仍故意不画的三样没变：窗顶那行「左右滑动看下一篇／点一下收起」
              （这一页只有一篇，划不走也没有可收起的东西，写了是假话）、正文与动作条之间那枚
              「显示更多」（公开快照里没有原文那一栏）、抬头那行「分类·来源类型·时间」
              （这三栏都不在 `shares` 的对外快照里，要画得先扩对外字段——他没下过这一句）。 -->
         <view class="sv-in">
-          <text class="eyebrow">{{t.sharedNote}}</text>
           <view wx:if="{{share.author_name}}" class="author-row">
             <view class="author-mark">{{authorInitial}}</view>
             <text class="author-name">{{t.authorLabel}}{{t.colon}}{{share.author_name}}</text>

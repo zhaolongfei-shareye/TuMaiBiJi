@@ -191,16 +191,24 @@ const ck = (name, ok, got) => {
   if (bodyEl) await bodyEl.scrollTo(0, 0)
   await sleep(600)
   const eb = await live('.eyebrow')
-  ck('眉标搬进窗内了（落在窗的上下沿之间，不再压在纱上）',
-    !!eb && !!sheet && eb.top > before.top && eb.top < before.top + before.h,
-    eb ? `眉标 top=${eb.top.toFixed(1)}｜窗 ${before.top.toFixed(1)}~${(before.top + before.h).toFixed(1)}` : '没有 .eyebrow')
-  // ⚠ 色不许拿源码那三位数当尺子：模拟器把 sRGB 折进显示色域，#9a9ea6 在屏上读回 (154,158,166)——
-  // 差 4 是色域转换造的，不是有人改了色。所以按"逐通道 ±8"判，并把两个数一起报出来。
-  const ebColor = String(await css('.eyebrow', 'color'))
-  const ch = (ebColor.match(/\d+/g) || []).map(Number)
-  const near = (a, b) => a.length === 3 && a.every((v, i) => Math.abs(v - b[i]) <= 8)
-  ck('眉标吃的还是这一页自己那支灰 #9a9ea6（搬进来不改色；屏上读数容 ±8，色域转换会造出个位数差）',
-    near(ch, [154, 158, 162]), `屏上 ${ebColor}｜源码 #9a9ea6`)
+  // ⚠ `live()` 找不到元素时回的是**一个 top 为 null 的对象**，不是 null（这一坑在这一把里第二次踩）。
+  const ebGone = !eb || eb.top === null
+  ck('眉标「分享笔记」已经不画了（他 10-25「把多余的去掉，一比一」——参考那一窗里没有这一行）',
+    ebGone && !/class="eyebrow"/.test(MARKUP) && !/\.eyebrow\s*\{/.test(CODE),
+    ebGone ? '屏上与源码都读不到 .eyebrow' : `还在，top=${eb.top.toFixed(1)}`)
+  // 撤一行不许顺手把窗顶那一档也撤掉：第一行到窗顶仍是 34rpx（原来挂在眉标上，现在挂在作者行上）。
+  const ar = await live('.author-row')
+  const firstRow = ar && ar.top !== null ? ar : await live('.sv-h2')
+  ck('窗顶到第一行字那一档没跟着漂（34rpx 搬到了现在的第一行身上）',
+    ebGone && !!firstRow && firstRow.top !== null
+      && firstRow.top - before.top >= 34 * R - 2 && firstRow.top - before.top <= 34 * R + 6,
+    firstRow && firstRow.top !== null
+      ? `第一行 top=${firstRow.top.toFixed(1)}｜窗顶 ${before.top.toFixed(1)}＝差 ${(firstRow.top - before.top).toFixed(1)}px（34rpx=${(34 * R).toFixed(1)}px）`
+      : '第一行都读不到')
+  // ⚠ 原来这里还有一条"眉标吃的那支灰 #9a9ea6 不许改"——元素 10-25 整枚撤掉了，那条判据跟着撤
+  // （撤一个状态会作废一批判据，反过来留着它就是一条永远红得没道理的尺子）。
+  // 留在这里的那几条色判同一条老规矩：**不许拿源码那三位数当尺子**，模拟器把 sRGB 折进显示色域，
+  // 差个位数是色域转换造的，所以一律逐通道 ±8。
   ck('窗的面吃的是与列表那扇同一枚 `--bg-card`（源码里不许写死成一支色）',
     /\.sv-sheet\s*\{[^}]*background:\s*var\(--bg-card\)/.test(CODE), '源码级断言')
   const face = String(await css('.sv-sheet', 'background-color'))
@@ -227,9 +235,8 @@ const ck = (name, ok, got) => {
   const bs = String(await css('.sv-ibtn', 'box-shadow'))
   ck('屏上读回的描边是 60% 那一档墨（rgba(35, 37, 44, 0.6)，不是这一页自己那枚 24%）',
     /rgba\(\s*35,\s*37,\s*44,\s*0?\.6\s*\)/.test(bs), bs)
-  ck('屏上没有窗外的字了（眉标／作者行／品牌行三家都在 `.sv-sheet` 里面）',
+  ck('屏上没有窗外的字了（作者行／品牌行两家都在 `.sv-sheet` 里面；眉标 10-25 整枚撤了，不再数它）',
     !/class="sv-fg"/.test(MARKUP) &&
-    MARKUP.indexOf('class="sv-sheet"') < MARKUP.indexOf('class="eyebrow"') &&
     MARKUP.indexOf('class="sv-sheet"') < MARKUP.indexOf('class="brand-row"') &&
     MARKUP.indexOf('class="sv-sheet"') < MARKUP.indexOf('class="author-row"'),
     '源码级断言')
