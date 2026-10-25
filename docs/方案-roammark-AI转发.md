@@ -34,13 +34,23 @@
   `/api/*` 回一句中文、`/v1/*` 回中文加四个 code，这一路回英文：RoamMark 面向全球、界面是英文的。
   `tests/test_error_text_language.py` 两把尺子分开钉——对本文件放行中文产品那条纪律，
   同时要求这一文件的 `detail` 必须真是英文；哪一天串线，红的是尺子，不是用户的屏。
-  code 五枚：`not_configured`／`unauthorized`／`busy`／`bad_request`／`too_large`／`upstream`（客户端按 code 分支，`detail` 只做兜底文案）。
+  code 八枚：`not_configured`／`unauthorized`／`busy`／`bad_request`／`too_large`／`upstream`／
+  `upstream_timeout`／`rate_limited`（客户端按 code 分支，`detail` 只做兜底文案）。
+  后两枚是 10-25 审计补的，各修一处"这一路唯一的例外"：`upstream_timeout` 之前 httpx 的连接与超时异常
+  一条都没接、冒成 500 且无 code（B1）；`rate_limited` 之前 429 只有**我们自己的 `_fail()`** 那一条遵守
+  这句契约，限流器那一条回的是中文且没有 code（B2）——它由 `core/rate_limit.py` 里按
+  `/api/roammark/` 前缀分出来，**没有**动 `error_codes.attach()`（那句"`/api/*` 一个字都不许多"
+  由 `tests/test_v1_error_codes.py` 逐格钉着，现网小程序全在读 `/api/*`）。
+  ⚠ 同一发 429 今天有两个名字：取不到在飞位是我们说的 `busy`，敲得太快是限流器说的 `rate_limited`。
+  两句话在用户屏上必须分开（"服务器忙"与"你按太快"责任不同），客户端也就分支成两条。
 - **钥的读法只有一处**：`current_key()` = 库里那一行 `DEEPSEEK` 优先，删掉回落到 `settings.DEEPSEEK`。
   现网 `.env` 里那行 `DEEPSEEK_API_KEY`（10-25 现读：长度 24、是个占位符；指纹不写进仓）**这一路不吃**——
   吃两个名字就会有两处真相，后台那句"删掉这一行会回到哪一层"也就没法说对。
   过 `key_usable()`：占位符一律当"没配"，回 503 说人话，不打出去挨一次 401 再猜为什么。
 - **状态码分得很细，因为责任不同**：`NotConfigured`→503（服务器没开门，不是用户送错了东西）、
-  `UserError`→400、字节超了→413、在飞位取不到→429、上游非 200→502。
+  `UserError`→400、字节超了→413、在飞位取不到→429（`busy`）、敲得太快→429（`rate_limited`）、
+  上游非 200→502、**上游没在 90 秒内回话→504**。最后这一格单开是因为它对用户的句子不一样，
+  而且那一发**钱可能已经算了**——服务端不扣客户端那道每日闸，但日志留了用时给站长对账。
 
 ## 三、四条锚点（缺一条这一组口就不能开）
 

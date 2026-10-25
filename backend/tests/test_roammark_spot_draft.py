@@ -302,10 +302,20 @@ def test_形状不对的图在门口就换回中文那句(client, gate, upstream
 
 
 def test_单张超上限的粗筛发生在解码之前(client, gate, upstream, key_in_db):
-    """编码后的串长按 4/3 粗筛：不粗筛就得先把 5 MB 的串解成字节才发现它超限。"""
-    huge = "A" * (spot_draft.MAX_IMAGE_BYTES * 4 // 3 + 5000)
+    """编码后的串长按 4/3 粗筛：不粗筛就得先把 5 MB 的串解成字节才发现它超限。
+
+    ⚠ 第一版的样本是 `"A" * (上限*4/3 + 5000)`，它解出来 4,198,053 字节**仍然超单张上限**，
+    于是"解码前粗筛"与"解码后逐张拒"两支回的是**同一句** "too large"——把粗筛整段删了，
+    那条断言照样绿（10-25 审计 T3，`RM7` 那把变异第一次跑就是没咬住）。
+    改法：拿一枚**超长且非法 base64**的串。两支的句子从此不同——粗筛在 ⇒ "too large"；
+    粗筛被删 ⇒ 先解码 ⇒ "could not be read"。（上一版的 `"A"*…` 长度不是 4 的倍数，
+    歪打正着地也非法，所以那把变异是碰巧抓到的，不能当判据。）
+    """
+    huge = ("A" * (spot_draft.MAX_IMAGE_BYTES * 4 // 3 + 5004)) + "!!"
     r = post(client, images=[huge])
-    assert r.status_code == 400 and "too large" in r.json()["detail"]
+    assert r.status_code == 400, r.text
+    assert "too large" in r.json()["detail"], \
+        f"回的是「{r.json()['detail']}」⇒ 解码前那道串长粗筛没在，白解了一次几十 MB"
     assert not upstream.calls
 
 
@@ -355,10 +365,18 @@ def test_合计超限那句要写明分两次(client, gate, upstream, key_in_db)
 
 
 def test_声明的体长超了当场413不读体(client, gate, upstream, key_in_db):
+    """`Content-Length` 那一发要在**读体之前**拒掉，且这一路自己的 code 是 `too_large`。
+
+    ⚠ 第一版写的是 `assert r.status_code in (400, 413, 422)`——把那三行守卫整段删了，
+    那 64 字节会走进 `read_body` 变 400，**仍在允许集合里**（审计 T2）。
+    `RM6` 那把变异第一次跑就是 **LEAKED**，红的是这条断言，不是那行守卫没了。
+    """
     r = client.post(DRAFT_URL, content=b"x" * 64, headers={
         "X-RoamMark-Gate": GATE, "Content-Length": str(spot_draft.MAX_TOTAL_BYTES * 10),
         "Content-Type": "application/json"})
-    assert r.status_code in (400, 413, 422), r.text
+    assert r.status_code == 413, r.text
+    assert r.json()["code"] == "too_large"
+    assert not upstream.calls, "拒了还打上游"
 
 
 # ---------------------------------------------------------------- 五、不留痕
@@ -516,3 +534,127 @@ def test_这两份新文件里不许留没人叫的函数():
 @pytest.fixture()
 def spot_draft_mod():
     return spot_draft
+
+
+# ---------------------------------------------------------------- 九、10-25 代码审计补的尺子
+# 正本在 `TmNote/审计-RoamMark代码-20261025.md` §五。这一组的存在理由只有一条：
+# 前面几组里有三把尺子"把产品那一行删掉照样绿"（T2/T3/T5），另有两段真代码从来没有用例叫过
+# （限流那一发 429 的形状、以及真 `_post` 整支）。写的时候逐条问过"删掉哪一行它会红"。
+
+def test_第一道闸挂在这一路上(client):
+    """IP 限流这一路整份文件都是关着测的（`no_ip_limit`：要连打几十发同一枚口，绕不开）。
+
+    摘掉装饰器这件事因此**从来没有用例拦过**（审计 T4）。端到端那一发本地做不了：
+    slowapi 的存储指着 `redis://localhost:6379`，测试机上没那台 Redis
+    （同一条边界写在 `tests/test_v1_error_codes.py` 顶上）。所以这里钉装饰器本身的三件事——
+    摘掉 `@limiter.limit(...)` ⇒ 红；把 10 抬成一个没人算过的数 ⇒ 红；
+    换成吃 JWT 的 `get_user_key` ⇒ 红（那把函数顶上写着为什么不能用：谁有票谁换一条额度）。
+    """
+    from app.core.rate_limit import get_ip_key, limiter
+
+    limits = limiter._route_limits.get("app.api.routes.roammark.spot_draft_create")
+    assert limits, "这一路没挂限流器：匿名 AI 出口的第一道闸没了"
+    one = limits[0]
+    assert one.limit.amount == 10, "每分钟几发这个数改过就得回头改方案 §四那道成本账"
+    assert type(one.limit).__name__ == "RateLimitItemPerMinute"
+    assert one.key_func is get_ip_key
+
+
+def test_同一支429handler三种路径各回各的(client):
+    """`rate_limit_exception_handler` 是**全局注册**的一支，所以它同时管着三张脸。
+
+    10-25 审计 B2 抓的是：这一路自订的契约（英文 detail ＋稳定 code）以前只盖住了我们自己的
+    `_fail()`，限流器那一条回的是中文且没有 code ⇒ 客户端落进"形状不对"那句兜底。
+    修法是给这一路加一支前置分支，**两句旧门一个字不许动**——所以三条都钉：
+    `/api/roammark/*` 英文＋code、`/api/*` 只有中文（现网小程序在读，多一个键就是变更）、
+    `/v1/*` 中文＋code（那条契约 §六钉的格子）。
+    """
+    from fastapi import Request
+
+    from app.core.rate_limit import rate_limit_exception_handler
+
+    def body(path):
+        scope = {"type": "http", "method": "POST", "path": path, "root_path": "",
+                 "headers": [(b"host", b"api.agentsbin.cn")], "query_string": b"",
+                 "scheme": "https", "server": ("127.0.0.1", 8000), "client": ("1.2.3.4", 52000)}
+        resp = rate_limit_exception_handler(Request(scope), Exception("too many"))
+        assert resp.status_code == 429
+        return json.loads(resp.body)
+
+    mine = body("/api/roammark/spot-draft")
+    assert mine == {"detail": "Too many requests right now. Wait a minute and try again.",
+                    "code": "rate_limited"}, "这一路的 429 又变回中文或丢了 code"
+    assert body("/api/notes") == {"detail": "请求过于频繁，请稍后再试"}, "旧门多了一个键＝已上线行为变更"
+    assert body("/v1/account") == {"detail": "请求过于频繁，请稍后再试", "code": "rate_limited"}
+
+
+def _patched_upstream(monkeypatch, *, response=None, error=None):
+    """把 httpx 那一层假掉，**让真 `_post` 跑起来**。
+
+    ⚠ 这一枚是 10-25 审计 T5 的落点：前面每条用例都把 `spot_draft._post` 整个 monkeypatch 掉，
+    于是这一路里唯一可能把钥写进日志的那两行（`_post` 里那句 `logger.error(... body)` 与它前面的
+    `.replace(key, "<key>")`）**从来没有被执行过**。
+    """
+    import httpx
+
+    async def fake_post(self, url, **kwargs):
+        if error is not None:
+            raise error
+        return response
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+    return httpx
+
+
+def test_真上游回401时哨兵钥进不了日志但日志里得有痕迹(client, gate, key_in_db, monkeypatch, caplog):
+    import httpx
+
+    req = httpx.Request("POST", "https://api.deepseek.com/chat/completions")
+    leaky = f'{{"error": {{"message": "Authentication Fails, api key {KEY_SENTINEL} is invalid"}}}}'
+    _patched_upstream(monkeypatch, response=httpx.Response(401, text=leaky, request=req))
+
+    with caplog.at_level("ERROR"):
+        r = post(client)
+    assert r.status_code == 502, r.text
+    assert r.json()["code"] == "upstream"
+    assert KEY_SENTINEL not in r.text, "回体把上游那句原样吐出去＝把钥递出去"
+    assert KEY_SENTINEL not in caplog.text, "脱敏那一行（replace）坏了"
+    # 前一句是"没有"，单钉它会把"根本没走到那一行"也算通过；这一句才是"真走到了"。
+    assert "<key>" in caplog.text, "日志里没有 <key> ⇒ 那发压根没进脱敏那一步，上一条是空闸"
+
+
+def test_上游超时回504与独立code而不是500(client, gate, key_in_db, monkeypatch):
+    """10-25 审计 B1：这里原来一条异常都没接，`httpx.ReadTimeout` 直接穿到路由外面变 500。
+
+    屏上那句因此是"形状不对"而不是"太慢了"，而超时那一发**钱大概率已经算了**——
+    两件事都得让客户端分得开，所以 504 与 `upstream_timeout` 单独立一枚。
+    """
+    import httpx
+
+    req = httpx.Request("POST", "https://api.deepseek.com/chat/completions")
+    _patched_upstream(monkeypatch, error=httpx.ReadTimeout("too slow", request=req))
+
+    r = post(client)
+    assert r.status_code == 504, r.text
+    assert r.json()["code"] == "upstream_timeout"
+    assert r.json()["detail"] == "The AI took too long to answer. Try again.", \
+        "detail 必须是给人看的那句，不是异常字符串（异常里可能带 URL、带超时秒数）"
+    assert spot_draft.in_flight() == 0, "超时那一发要把在飞位还回去，否则三发占死这一路就死了"
+
+
+def test_上游切连接回502而不是500(client, gate, key_in_db, monkeypatch):
+    """DeepSeek 对超限请求的拦法是**直接切 TLS**（10-25 实测：`SSLEOFError`、没有 HTTP 码）。
+
+    字节闸就是为了别走到这一步，但一旦走到（比如对方把上限改了），这一发也得回成人话：
+    `httpx.HTTPError` 那一族收进 `AIUpstreamError` ⇒ 502 ＋ `code: upstream`，
+    而不是让 uvicorn 甩一段 traceback 给用户一个 500。
+    """
+    import httpx
+
+    req = httpx.Request("POST", "https://api.deepseek.com/chat/completions")
+    _patched_upstream(monkeypatch, error=httpx.ReadError("connection closed", request=req))
+
+    r = post(client)
+    assert r.status_code == 502, r.text
+    assert r.json()["code"] == "upstream"
+    assert spot_draft.in_flight() == 0

@@ -110,6 +110,18 @@ class AIUpstreamError(RuntimeError):
     """DeepSeek 那侧回非 2xx／回的东西解不出来。面向用户的句子由路由那一层给，这里只带原因。"""
 
 
+class AIUpstreamTimeout(AIUpstreamError):
+    """上游那一发没在 `DEEPSEEK_TIMEOUT` 内回话。
+
+    单独立一个类型只为两件事：
+    1. **它是 504 不是 502**——"对方没答"与"对方答得慢"在用户屏上是两句话，混在一起
+       客户端就只能给一句"形状不对"（10-25 审计 B1 抓的正是这个：`httpx` 的连接／超时异常
+       原来一条都没接，全冒成 500 ＋ 一段 traceback）。
+    2. **钱可能已经花了**：超时是"我们不等了"，不是"对方没算"。这一发服务端不记账
+       （客户端那 5 次闸也刻意不扣），但日志必须留下 `took`，否则账单上多出来的那一发没法对账。
+    """
+
+
 def current_key() -> str:
     """现在这一刻生效的那把钥。库里那一行优先（后台改完不用重启），进程环境变量那一条只在本机开发时用。
 
@@ -230,19 +242,33 @@ def _parse(content: str) -> dict:
 async def _post(key: str, payload: dict) -> dict:
     url = (settings.DEEPSEEK_BASE_URL or "https://api.deepseek.com").rstrip("/") + "/chat/completions"
     timeout = httpx.Timeout(settings.DEEPSEEK_TIMEOUT, connect=10.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        r = await client.post(url, json=payload, headers={
-            "Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-        if r.status_code != 200:
-            # 不回显任何凭据，也尽量把对方那句原因带着走日志（排查 401/429/超限全靠它）。
-            # 用 replace 不用 re.sub：钥里可能带着正则元字符，拿它当模式会当场抛。
-            body = r.text[:300].replace(key, "<key>")
-            logger.error("DeepSeek 回 %s：%s", r.status_code, body)
-            raise AIUpstreamError(f"HTTP {r.status_code}")
-        try:
-            return r.json()
-        except Exception as exc:
-            raise AIUpstreamError(f"回体不是 JSON：{type(exc).__name__}") from exc
+    t0 = time.monotonic()
+    # 连接类与超时类异常必须在这里收口：10-25 审计 B1 抓到原来这里一条都没接，
+    # `httpx.ConnectError`／`ReadTimeout`／`RemoteProtocolError`（超限时 DeepSeek 直接切 TLS 那一发）
+    # 全部穿到路由外面变 500 ＋ 一段 traceback，用户屏上只剩"形状不对"那句——
+    # 而超时那一发钱大概率已经算了，症状却是"我们这边坏了"。
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            r = await client.post(url, json=payload, headers={
+                "Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+    except httpx.TimeoutException as exc:
+        # 日志只带类型名与用时，不带异常字符串：那一串里可能有完整请求（含 Authorization 头）。
+        logger.error("DeepSeek 没在 %ss 内回话（已等 %.1fs）：%s",
+                     settings.DEEPSEEK_TIMEOUT, time.monotonic() - t0, type(exc).__name__)
+        raise AIUpstreamTimeout(f"upstream no answer in {settings.DEEPSEEK_TIMEOUT}s") from exc
+    except httpx.HTTPError as exc:
+        logger.error("DeepSeek 连接失败：%s", type(exc).__name__)
+        raise AIUpstreamError(f"upstream connection failed: {type(exc).__name__}") from exc
+    if r.status_code != 200:
+        # 不回显任何凭据，也尽量把对方那句原因带着走日志（排查 401/429/超限全靠它）。
+        # 用 replace 不用 re.sub：钥里可能带着正则元字符，拿它当模式会当场抛。
+        body = r.text[:300].replace(key, "<key>")
+        logger.error("DeepSeek 回 %s：%s", r.status_code, body)
+        raise AIUpstreamError(f"HTTP {r.status_code}")
+    try:
+        return r.json()
+    except Exception as exc:
+        raise AIUpstreamError(f"回体不是 JSON：{type(exc).__name__}") from exc
 
 
 async def draft_spot(images: list[bytes], *, lang: str | None = None,

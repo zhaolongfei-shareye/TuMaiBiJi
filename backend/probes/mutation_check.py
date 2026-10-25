@@ -389,6 +389,43 @@ MUTATIONS = [
         "    if False:\n",
         "tests/test_roammark_spot_draft.py::test_口令没配时这一路整组关闭而不是不检",
     ),
+    # RM6~RM10：10-25 代码全面审计补的五把（正本 `TmNote/审计-RoamMark代码-20261025.md` §五）。
+    # 这五把打的都是"旧尺子量不到的那一格"：RM6/RM7 是两条吞变异的断言，RM8/RM9/RM10 是三段从没被执行过的代码。
+    (
+        "RM6 摘掉 declared-length 那道守卫（先把几十 MB 读进来才拒＝舱壁白装）",
+        "app/api/routes/roammark.py",
+        "    if declared.isdigit() and int(declared) > BODY_LIMIT:",
+        "    if False and declared.isdigit() and int(declared) > BODY_LIMIT:",
+        "tests/test_roammark_spot_draft.py::test_声明的体长超了当场413不读体",
+    ),
+    (
+        "RM7 摘掉解码前的串长粗筛（超没超限都得先白解一次几十 MB）",
+        "app/services/spot_draft.py",
+        "        if len(item) > MAX_IMAGE_BYTES * 4 // 3 + 1024:",
+        "        if False and len(item) > MAX_IMAGE_BYTES * 4 // 3 + 1024:",
+        "tests/test_roammark_spot_draft.py::test_单张超上限的粗筛发生在解码之前",
+    ),
+    (
+        "RM8 摘掉这一路的限流装饰器（三道闸的第一道；测试件整体关着限流所以一直没人叫它）",
+        "app/api/routes/roammark.py",
+        '@limiter.limit("10/minute", key_func=get_ip_key)\n',
+        "",
+        "tests/test_roammark_spot_draft.py::test_第一道闸挂在这一路上",
+    ),
+    (
+        "RM9 去掉上游错误体里的钥脱敏（排查 401 全靠那一句，而那句里可能带着钥）",
+        "app/services/spot_draft.py",
+        '        body = r.text[:300].replace(key, "<key>")',
+        "        body = r.text[:300]",
+        "tests/test_roammark_spot_draft.py::test_真上游回401时哨兵钥进不了日志但日志里得有痕迹",
+    ),
+    (
+        "RM10 超时不再单立一类（504 退化回 502：屏上「太慢了」与「对方没答」成了同一句话）",
+        "app/services/spot_draft.py",
+        '        raise AIUpstreamTimeout(f"upstream no answer in',
+        '        raise AIUpstreamError(f"upstream no answer in',
+        "tests/test_roammark_spot_draft.py::test_上游超时回504与独立code而不是500",
+    ),
 ]
 
 

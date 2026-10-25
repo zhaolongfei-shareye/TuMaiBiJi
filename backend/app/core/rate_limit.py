@@ -46,10 +46,24 @@ def rate_limit_exception_handler(request, exc):
 
     from app.core.error_codes import attach, route_path
 
+    path = route_path(request)
+    if path.startswith("/api/roammark/"):
+        # RoamMark 那一路是英文界面、且**按 code 分支**（口径写在 `app/api/routes/roammark.py` 顶上
+        # 第 12-16 行："这一组回英文 detail ＋稳定 code"）。以前这一发是整条路上唯一两句例外：
+        # 我们的 `_fail()` 都按契约回，而限流器那一支回中文且没 code ⇒ 客户端只能落进
+        # "形状不对"那句兜底（10-25 审计 B2）。
+        # ⚠ 分支写在 handler 里，不写进 `attach()`：`tests/test_v1_error_codes.py` 逐格钉的是
+        # "`/api/*` 回体一个字都不许多"，而现网小程序读的全是 `/api/*`——`attach()` 那句不动旧门
+        # 的承诺被那把尺子钉死了，这里加一支前置分支才既不碰旧门、又让这一路拿到 code。
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests right now. Wait a minute and try again.",
+                     "code": "rate_limited"},
+        )
     # 这一发只有 `/v1` 那一路会多带一个 `code`（`app/core/error_codes.py` 里那句路径判断，
     # 以及它为什么读 `route_path` 而不是 `request.url.path`）。现网小程序读的是 `/api/*`，
     # 回体一个字都不许变。
     return JSONResponse(
         status_code=429,
-        content=attach(route_path(request), 429, {"detail": "请求过于频繁，请稍后再试"}),
+        content=attach(path, 429, {"detail": "请求过于频繁，请稍后再试"}),
     )

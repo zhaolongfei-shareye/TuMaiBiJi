@@ -109,6 +109,12 @@ async def spot_draft_create(request: Request):
         except UserError as e:
             # 句子由服务层给（那里是唯一出处），这里只负责装进 400 的形状。
             return _fail(400, "bad_request", str(e))
+        except spot_draft.AIUpstreamTimeout as e:
+            # ⚠ 这一支必须排在 `AIUpstreamError` 前面：它是那一支的子类，写反了永远轮不到。
+            # 504 与 502 分开是因为"对方没答"和"对方答得慢"在用户屏上是两句话；
+            # 而且这一发**钱可能已经花了**，日志里那句用时是给站长对账单用的（`spot_draft._post`）。
+            logger.warning("景点初稿上游超时 remote=%s 原因=%s", get_ip_key(request), e)
+            return _fail(504, "upstream_timeout", "The AI took too long to answer. Try again.")
         except spot_draft.AIUpstreamError as e:
             # 日志只带来源与原因，不带钥、不带图、不带正文；回体里一个字都不带。
             logger.warning("景点初稿上游失败 remote=%s 原因=%s", get_ip_key(request), e)
