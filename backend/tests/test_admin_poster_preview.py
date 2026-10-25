@@ -105,7 +105,11 @@ def test_外圈那一只确实在名单里():
 def test_预览吃的是那一份外圈画法(body):
     """M4 的牙：预览必须走 `MATTE.paint`，不许退回"画布=plan 尺寸＋一句 paintLayers"。
 
-    反向验过：把 `drawInto` 里那一行换回旧写法，这一条与上面那条名单条一起红。
+    两把反向都真跑过，红的是哪几条按实测写：
+    甲**把 `drawInto` 那一行换回旧写法**（画布按 plan 开、直接 paintLayers）⇒ 只有这一条红；
+    乙**把 `posterMatte.js` 从名单与副本里抹掉**⇒ 红的是上面两条名单条，这一条不红
+    （页面那句 `MATTE.paint` 还在，坏的只是它 require 不到的那只）。
+    所以这一条管"页面有没有走那一份画法"，名单那两条管"那份画法在不在家"，两边不重复也不互保。
     """
     seg = body.split("function drawInto", 1)[1].split("function paintPreviews", 1)[0]
     assert "MATTE.paint(cv, ctx, plan, {})" in seg, "预览没走那一份外圈画法"
