@@ -16,6 +16,8 @@
 const api = require('./api.js')
 const cloudUpload = require('./cloudUpload.js')
 const poster = require('./poster.js')
+// 本机存储读写统一走这一枚（M15），见 utils/safeStorage.js 顶上那段。
+const storage = require('./safeStorage.js')
 
 // 名片图放哪一层前缀。⚠ 复用已经量过的 `images` 那一层，**不自开 `profile/` 前缀**：
 // 桶权限完全可能是按前缀给的，而这条链按设计不报错，写不进的症状是"每张都静默没上云"。
@@ -244,9 +246,16 @@ async function bootstrap() {
  * 不同栏各留各的——这正是 `Object.assign` 的语义，不需要队列。 */
 const PENDING_KEY = 'profilePendingPatch'
 
+/** 读出欠着的那一笔，并把"到底读没读到"一并交回：读不到 ≠ 没欠着（见下面 `hasPending`）。 */
+function _pendingRead() {
+  const r = storage.tryRead(PENDING_KEY)
+  const v = r.value
+  const patch = v && typeof v === 'object' && Object.keys(v).length ? v : null
+  return { ok: r.ok, patch }
+}
+
 function _pending() {
-  const v = wx.getStorageSync(PENDING_KEY)
-  return v && typeof v === 'object' && Object.keys(v).length ? v : null
+  return _pendingRead().patch
 }
 
 function _putPending(patch) {
@@ -259,11 +268,16 @@ function _putPending(patch) {
   }
 }
 
-function hasPending() { return !!_pending() }
+// 读不到时按"还欠着"算：这一格回 false 会让 `pull()` 不敢动本机那几张图，而把读不到当成
+// "没欠着"放行 pull，正是 10-09 审计严重①那一族（用户刚换的那张被服务器那份顶掉）。
+function hasPending() { const r = _pendingRead(); return r.ok ? !!r.patch : true }
 
 function _mergePending(patch) {
   if (!patch) return
-  _putPending(Object.assign(_pending() || {}, patch))
+  const cur = _pendingRead()
+  // 旧的那半读不到就不要写回：这一格是补丁语义，只带新那几栏写回去会把别的栏欠账盖掉。
+  if (!cur.ok) { console.warn('名片待补那一格这次没读到，先不合并写回'); return }
+  _putPending(Object.assign(cur.patch || {}, patch))
 }
 
 /** 送成了只摘这一笔涉及的那几栏：别的栏可能还欠着，整格清会把它们一起抹掉。 */
@@ -282,7 +296,10 @@ function _subPending(patch) {
 let _flushing = null
 function flushPending() {
   if (_flushing) return _flushing
-  const patch = _pending()
+  const r = _pendingRead()
+  // 读不到时回 false（"这次还没补成"）：`pull()` 据此不去动本机那几张图，与 hasPending 同一保守向。
+  if (!r.ok) return Promise.resolve(false)
+  const patch = r.patch
   if (!patch) return Promise.resolve(true)
   _flushing = _push(patch).then(() => !hasPending())
     .finally(() => { _flushing = null })

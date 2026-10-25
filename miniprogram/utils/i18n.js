@@ -409,6 +409,10 @@ const i18n = {
     generatingShare: '生成分享图...',
     generateFailed: '生成失败',
     tplFellBack: '这套模板没画出来，用了默认那张',
+    // M19：`utils/poster.js` 的 `templateLabel` 对一个名单外（＝已下架）的模板 id 不许回空串——
+    // 首页成品弹窗顶上那一行模板名是直接上屏的，空串就是一条空白。它要读的就是这一枚键
+    // （中文这一句的字由它定的，这里只按它原话落字典，页面层一个字都不再拼一遍）。
+    tplRetired: '这套已下架',
     saveToAlbum: '保存到相册',
     savedToAlbum: '已保存到相册',
     needAlbumPermission: '需要相册权限',
@@ -811,6 +815,9 @@ const i18n = {
     generatingShare: 'Generating share image...',
     generateFailed: 'Generate failed',
     tplFellBack: "Template can't draw — used the default",
+    // Same key as the zh block above (M19): the fallback string `utils/poster.js` shows in the
+    // template-name row when the id is no longer in the merged list — never an empty string.
+    tplRetired: 'Retired template',
     saveToAlbum: 'Save to album',
     savedToAlbum: 'Saved to album',
     needAlbumPermission: 'Album permission required',

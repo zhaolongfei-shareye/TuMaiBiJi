@@ -13,14 +13,22 @@
 // 但比队列无界长下去把 storage 撑爆要好，而且这条路径只在弱网下才会走到。丢了要能看见，所以留日志。
 const KEY = 'pendingNoteCards'
 const MAX_QUEUE = 50
+// 本机存储读写统一走这一枚（M15），见 utils/safeStorage.js 顶上那段。
+const storage = require('./safeStorage.js')
+
+// take() 读不到时回一份空队列，但**这一趟不许整表写回**：队列里已经欠着的那几条一被空表盖掉，
+// 就是"云上有对象、库里没那一行"，而界面上谁都看不见它（与 utils/assetQueue.js 同一笔账）。
+let readFailed = false
 
 /** @returns {Array<{noteId:number, item:object}>} 原样读出，不解释内容 */
 function take() {
-  const raw = wx.getStorageSync(KEY)
-  return Array.isArray(raw) ? raw : []
+  const r = storage.tryRead(KEY)
+  readFailed = !r.ok
+  return Array.isArray(r.value) ? r.value : []
 }
 
 function _put(list) {
+  if (readFailed) { console.warn('卡片待补队列这次没读到，先不写回（免得把欠着的几条盖掉）'); return }
   try {
     wx.setStorageSync(KEY, list)
   } catch (e) {

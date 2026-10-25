@@ -23,6 +23,8 @@
 // 键按路径存，写新值时把旧的 bgLum 全扫掉，所以换过多少张壁纸都不留残值。
 
 const poster = require('./poster')
+// 本机存储读写统一走这一枚（M15）：这三处都在三个 tab 的 onShow 路上，一抛就把整屏打死。
+const storage = require('./safeStorage.js')
 
 /* 键前缀带版本号：同一张图换统计口径不会自己重算，不升前缀的话旧值还在，
    这一刀在他手机上等于没改（V1 全图平均 → V2 只采一条 → V3 存逐行剖面 → V4 存二维网格）。
@@ -96,7 +98,8 @@ function rectLight(prof, box, rect) {
 /** 本机算过的就读网格，第一帧直接给对的深浅；没算过回 null。 */
 function readProfile(src) {
   if (!src) return null
-  const v = wx.getStorageSync(LUM_KEY + src)
+  // 读不到＝"这一张没算过"（本来就是这一支的出口），下一次 measure 会把它补回来。
+  const v = storage.read(LUM_KEY + src)
   if (!v || typeof v !== 'object' || !Array.isArray(v.rows) || v.rows.length !== SIDE) return null
   // V4 才有 grid；V3 那份读回来 rows 是好的、grid 没有 ⇒ 两截那一档照判，
   // 矩形那一档回 null（`rectLight` 自己挡），下一次 measure 会把它补成 V4。
@@ -108,7 +111,7 @@ function sweepKeep(src) {
   const keep = LUM_KEY + src
   const info = wx.getStorageInfoSync()
   ;(info.keys || []).forEach((k) => {
-    if (k.indexOf(LUM_HEAD) === 0 && k !== keep) wx.removeStorageSync(k)
+    if (k.indexOf(LUM_HEAD) === 0 && k !== keep) storage.remove(k)
   })
 }
 
@@ -147,7 +150,8 @@ function measure(src) {
         rows.push(Math.round(line.reduce((s, v) => s + v, 0) / SIDE))
       }
       const prof = { w: img.width || SIDE, h: img.height || SIDE, rows, grid }
-      wx.setStorageSync(LUM_KEY + src, prof)
+      // 这一句在 `img.onload` 回调里，原来裸着抛就是一个没人接的未捕获异常；写不进只当"下一次再算"。
+      storage.write(LUM_KEY + src, prof)
       sweepKeep(src)
       resolve(prof)
     }

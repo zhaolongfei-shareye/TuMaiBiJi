@@ -18,6 +18,8 @@ const RECIPES = require('./posterRecipes.js')
 // 配方 JSON 里那个 `min_version` 是解释器版本，两回事，别拿这一个去判那一个。
 const { VERSION: APP_VERSION } = require('./appInfo.js')
 const mpAssets = require('./mpAssets.js')
+// 本机存储读写统一走这一枚（M15），见 utils/safeStorage.js 顶上那段。
+const storage = require('./safeStorage.js')
 
 const W = 750
 const INK = '#23252C'
@@ -111,7 +113,9 @@ const TEMPLATE_GROUPS = [
 // 界面得跟着改口——这正是"不走发版"那两个把手里的第二个（改文案不用发版，也不用清缓存）。
 function templateLabel(id, lang) {
   const tpl = templateList().find((x) => x.id === id)
-  if (!tpl) return ''
+  // 认不出的 id 不许回空串：那一格在首页成品弹窗顶上就是一行模板名，空串＝屏上一条空白
+  // （10-25 第八轮审计 M19）。话走字典，英文界面才不会念出中文。
+  if (!tpl) return t('tplRetired', lang)
   return lang === 'en' ? tpl.labelEn || tpl.label : tpl.label
 }
 
@@ -124,13 +128,20 @@ function groupName(id, lang) {
 // ---------------------------------------------------------------- 本地形象
 
 function readProfile() {
-  const p = wx.getStorageSync(PROFILE_KEY)
+  const p = storage.read(PROFILE_KEY)
   return p && typeof p === 'object' ? p : {}
 }
 
+// 形象那一栏**读没读到**（与"读到一份空的"是两件事）：读不到时 `readProfile` 回 `{}`，
+// 而 `{}` 在下面那三条清理链里会被当成"四个槽都空了"，坏一次读就把自己那几张本机图全收掉。
+// 所以那三条链各先问一次这一句——宁可这一趟什么都不删。
+function slotsReadable() { return storage.tryRead(PROFILE_KEY).ok }
+
 function writeProfile(patch) {
   const next = Object.assign({}, readProfile(), patch)
-  wx.setStorageSync(PROFILE_KEY, next)
+  // 写不进去**照旧抛**：`profileCloud.pull()` 那一格 try 就是靠这一抛决定"一个文件都不删"
+  // （10-11 审计严重②），把它收成静默就等于让对齐停在半路还照删本机。
+  if (!storage.write(PROFILE_KEY, next)) throw new Error('本机形象那一格没落进存储')
   return next
 }
 
@@ -337,16 +348,22 @@ function unlinkFile(p) {
 
 // 本机存过的头像文件，路径记在这里。名字改成一张一个之后，"这个目录里哪张是我存的"
 // 就没法再从命名规则推出来了——清扫时只认这份名单，名单外的一个都不碰。
+// 名单读不到时回空表，但 `trackAvatar` 这一趟不许写回：写回就等于把"这台机存过哪几张头像"
+// 只剩这一张，其余那些从此没人认得、也永远清不掉（与 utils/cardQueue.js 同一保守向）。
+let avatarsUnreadable = false
+
 function trackedAvatars() {
-  const v = wx.getStorageSync(AVATAR_FILES_KEY)
-  return Array.isArray(v) ? v : []
+  const r = storage.tryRead(AVATAR_FILES_KEY)
+  avatarsUnreadable = !r.ok
+  return Array.isArray(r.value) ? r.value : []
 }
 
 function trackAvatar(p) {
   const all = trackedAvatars()
   if (all.indexOf(p) < 0) {
     all.push(p)
-    wx.setStorageSync(AVATAR_FILES_KEY, all)
+    if (avatarsUnreadable) { console.warn('头像名单这次没读到，先不写回（免得把别张的记号盖掉）'); return }
+    storage.write(AVATAR_FILES_KEY, all)
   }
 }
 
@@ -355,7 +372,7 @@ function untrackAvatar(p) {
   const i = all.indexOf(p)
   if (i >= 0) {
     all.splice(i, 1)
-    wx.setStorageSync(AVATAR_FILES_KEY, all)
+    storage.write(AVATAR_FILES_KEY, all)
   }
 }
 
@@ -452,6 +469,7 @@ function mintAvatar(tempPath) {
 // 四槽这一块是即时生效的（点芯片、删图都当场落盘），不像名称/一句话那样等「保存」——
 // 因为删除那一步有二次确认，确认完却还要等保存才真删，那句确认就是假话。
 function writeSlots(slots) {
+  if (!slotsReadable()) return
   const before = readSlots()
   // avatarPath 这一栏一并清成空串：留着它就是第二条真相来源，早晚跟 images 漂开
   writeProfile({ images: slots, avatarPath: '' })
@@ -464,6 +482,7 @@ function writeSlots(slots) {
 
 // 这一页临时生成、但没被任何槽用上的那些张（挑完没点、或者当场又删了）收掉。
 function dropUncommitted() {
+  if (!slotsReadable()) return
   const live = readSlots().filter(Boolean).map((s) => s.path)
   minted.filter((p) => live.indexOf(p) < 0).forEach(removeAvatar)
   minted = minted.filter((p) => live.indexOf(p) >= 0)
@@ -473,6 +492,7 @@ function dropUncommitted() {
 // 已经没人认得，dropUncommitted 手里没有它的路径。开页时按名单扫一遍，除四个槽正在用的
 // 那些张之外全收掉。
 function pruneAvatars() {
+  if (!slotsReadable()) return
   const keep = readSlots().filter(Boolean).map((s) => s.path).concat(minted)
   trackedAvatars()
     .filter((p) => keep.indexOf(p) < 0)
@@ -1019,7 +1039,8 @@ function sourceLabelOf(note, lang) {
     preset: 'sourcePreset',
   }
   const key = keys[note.source_type]
-  return key ? t(key, lang) : note.source_type || ''
+  // 认不出键就念空串，不把英文原词画上卡片（10-25 第八轮审计 M17，与 index.js／detail.js 同一口径）。
+  return key ? t(key, lang) : ''
 }
 
 // 金句：要点第一条最像"值得转发的一句话"，没有就退到摘要首句，再退到标题
@@ -2263,7 +2284,8 @@ function planPoster(ctx, note, templateId, profile, lang, opts) {
   // 认得这一套的两条路：有一份 JS planner，或者有一份配方（下发的或包内的）。
   // 只查 PLANNERS 会把下发来的第 11 套判成"不认识的模板"、退回默认那一套——
   // 站长在服务端加了模板而客户端毫无反应，就是这一行造成的。
-  const tpl = (PLANNERS[templateId] || recipeOf(templateId)) ? templateId : DEFAULT_TEMPLATE
+  const known = !!(PLANNERS[templateId] || recipeOf(templateId))
+  const tpl = known ? templateId : DEFAULT_TEMPLATE
   const p = profile || {}
   const o = opts || {}
   const d = { note, profile: p, hasAvatar: !!p.avatarPath, hasNote: !!o.hasNote, lang: lang || 'zh' }
@@ -2285,6 +2307,10 @@ function planPoster(ctx, note, templateId, profile, lang, opts) {
       if (!js) plan.fellBack = tpl
     }
   }
+  // 认不出这一套（既没 JS planner 也没配方）同样是"退回默认那一套"，也得标出来：原来这一支落在
+  // try **之前**，下面那句 `plan.fellBack` 永远撞不到它（审计 M19，屏上名字还念着它自己的）。
+  // `templateId` 为空（从没选过）不标——那不是"这套已下架"，那是今天这一屏本来那一态。
+  if (!known && templateId) plan.fellBack = templateId
   return o.showQr === false ? stripQr(plan, ctx, lang || 'zh') : plan
 }
 

@@ -70,13 +70,19 @@ Page({
     poster.pruneAvatars()
     const lang = app.globalData.userInfo?.language || 'zh'
     const saved = poster.readProfile()
+    // M19：本机存的那套默认可能已经被下架（＝不在合并后的那份名单里）——这一口以前没挡。
+    // 判据与首页 `_openPosterFor` 那一道同一个出处（`poster.templateList()`）。认不出时高亮跟着
+    // **真会画出来的那一套**（默认）走，否则十格一格都不亮，看着像"从没选过"，而人挑的那套
+    // 已经画不出来了。这里只改屏上那一格亮着，**不写 storage**：他真点一格才落盘（见 onPickTemplate）。
+    const stored = saved.template
+    const known = !!stored && poster.templateList().some((x) => x.id === stored)
     // 小样要等骨架落到视图层之后再画，否则按选择器取不到画布节点
     this.setData(
       {
         lang,
         t: texts(lang),
         themeClass: app.applyTheme(app.getWallpaper()),
-        template: saved.template || poster.DEFAULT_TEMPLATE,
+        template: known ? stored : poster.DEFAULT_TEMPLATE,
         groups: groupSkeleton(lang),
       },
       () => this.renderThumbs()

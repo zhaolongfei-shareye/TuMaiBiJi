@@ -61,17 +61,25 @@ Page({
     // 落地页「存入笔记」之后跳进来的那一态：页底那一条 bar（只有带着 `saved=1` 进来才画，
     // 平时从列表点开同一篇不许再提醒一遍）。
     savedBar: false,
+    // 那条 bar 后面接的那半句实话（M7：这次有几张配图没跟过来）。没数＝空串＝一个字不加。
+    savedBarExtra: '',
     _loaded: false,
   },
 
   onLoad(options) {
     const app = getApp()
     const lang = app.globalData.userInfo?.language || 'zh'
+    // M7：那句"有 N 张图没能存下来"接在同一条 bar 后面，数由落地页 `saveToMine` 那一趟随 query 带过来
+    // （"这次少带了几张"只有那一趟知道，`GET /notes/{id}` 那份回答不了）。
+    // ⚠ `imgFail` 是一段外部输入，且老包／服务端那一半没部署时这一栏根本没有 ⇒ 只认非负整数串，
+    // 别的（缺、非数字、负号、小数）一律当"没少"，屏上一个字都不加，也绝不把 undefined 拼上屏。
+    const imgFail = /^\d+$/.test(options.imgFail || '') ? parseInt(options.imgFail, 10) : 0
     this.setData({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
       savedBar: options.saved === '1',
+      savedBarExtra: imgFail > 0 ? ' · ' + t('shotsPartlyFailed', lang).replace('{n}', imgFail) : '',
     })
     app.setNavTitle('navDetail', lang)
     if (options.id) {
@@ -117,7 +125,10 @@ Page({
       }
       const lang = this.data.lang
       const key = SOURCE_TYPE_KEYS[note.source_type]
-      note.source_type_label = key ? t(key, lang) : note.source_type
+      // 认不出 key 就念空串（M17）——照本页分类那一档的同一口径（上面 `category_name` 查不到时
+      // 也是空串、由 wxml 那一段自己不画）。原来这一支回的是服务端那栏英文原词，
+      // 加第七种 source_type 或老包读新值时就把内部串直接写上屏（站长 10-02 撞过两次）。
+      note.source_type_label = key ? t(key, lang) : ''
       // 官方那一篇（站长 10-18 给它定了名「帮助文档」）：编辑与分享两枚在这一篇上置灰、点了不办事。
       // 判据用服务端那个 `source_type`，不靠标题也不靠"名下第一篇"。
       note.is_preset = note.source_type === 'preset'

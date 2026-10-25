@@ -6,6 +6,8 @@ const cloudUpload = require('./utils/cloudUpload')
 const cardCloud = require('./utils/cardCloud')
 const profileCloud = require('./utils/profileCloud')
 const mpAssets = require('./utils/mpAssets')
+// 本机存储读写统一走这一枚（M15）：这一抛不许打断 onLaunch／onShow 那两条起屏的路。
+const storage = require('./utils/safeStorage')
 const { themeOf, setActiveTheme, dimAt, dimNext, dimDotStyle, dimScrimStyle, DIM_PLAIN, moodOf, moodNext, moodOfWallpaper, navFor } = require('./utils/palette')
 const { t } = require('./utils/i18n')
 
@@ -83,7 +85,7 @@ App({
     rememberInviter(options)
     // 字体那一排入口已撤（iOS 与安卓真机都不换字），但测试期可能在这台机器上留下过选择。
     // 留着它就等于一个看不见的开关在生效，所以启动先清掉；重新做字体时删掉这一行即可。
-    wx.removeStorageSync(UI_FONT_KEY)
+    storage.remove(UI_FONT_KEY)
     // 云开发存储（图片备份那条 B 链）。CLOUD_ENV 没填之前这是一个空操作——
     // 不 init 就不会有任何一次上传，行为和今天一字不差（见 utils/cloudUpload.js 顶上那段）。
     cloudUpload.initCloud()
@@ -98,7 +100,7 @@ App({
   onShow(options) {
     rememberInviter(options)
     // 冷启由 _doLogin 带着 inviter 一起走；这里只管"已经登录着"的热启那条路。
-    if (this.globalData.isLoggedIn && wx.getStorageSync(INVITER_KEY)) {
+    if (this.globalData.isLoggedIn && storage.read(INVITER_KEY)) {
       this._reportInviter()
     }
     // 待补绑队列：图传上去了但"归到哪篇笔记"没做成（B 链比 A 链慢、或 bind 那一下弱网）。
@@ -142,13 +144,13 @@ App({
   },
 
   async _reportInviter() {
-    const inviter = wx.getStorageSync(INVITER_KEY)
+    const inviter = storage.read(INVITER_KEY)
     if (!inviter) return
     try {
       await request('/api/user/inviter', 'POST', { inviter })
       // 认不认都由服务端判，而且判过就不会再改（已有归属/名下已有笔记都挡着），
       // 所以只要这一趟通了就把本地这份扔掉——留着它每次启动都要白跑一次请求。
-      wx.removeStorageSync(INVITER_KEY)
+      storage.remove(INVITER_KEY)
     } catch (err) {
       // 网络这一类失败要留着下次再报，不然这次归因就永久丢了。
       console.error('邀请归因上报失败，保留待下次重试:', err)
@@ -187,7 +189,7 @@ App({
         })
       })
       const body = { code: loginRes.code }
-      const inviter = wx.getStorageSync(INVITER_KEY)
+      const inviter = storage.read(INVITER_KEY)
       if (inviter) body.inviter = inviter
       const res = await request('/api/auth/wechat', 'POST', body)
       this.globalData.token = res.token
@@ -253,7 +255,7 @@ App({
     // 待删队列**故意不跟着清**：注销那一步自己就是往这里塞东西的一方（删云上对象没成的那批），
     // 清了等于把"云端那份一并删除"那句承诺刚欠下的账抹掉。下一个身份替上一个人重试删除没有害处
     // ——deleteFile 只会把对象删掉，不会改谁的归属。
-    wx.removeStorageSync(INVITER_KEY)
+    storage.remove(INVITER_KEY)
   },
 
   /**
@@ -272,7 +274,7 @@ App({
    */
   getWallpaper(fromServer) {
     const wanted = fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper)
-      || wx.getStorageSync(WALLPAPER_CACHE_KEY) || 'default'
+      || storage.read(WALLPAPER_CACHE_KEY) || 'default'
     return themeOf(wanted).key
   },
 
@@ -292,7 +294,7 @@ App({
   },
 
   uiFont() {
-    const k = wx.getStorageSync(UI_FONT_KEY)
+    const k = storage.read(UI_FONT_KEY)
     return UI_FONT_CLASS[k] ? k : 'default'
   },
 
@@ -320,7 +322,7 @@ App({
    * 照片就等于原图，站长拿原图对过才认的这一档。
    */
   bgSkin() {
-    const v = dimAt(wx.getStorageSync(BG_DIM_KEY)).v
+    const v = dimAt(storage.read(BG_DIM_KEY)).v
     return { dimV: v, dimDot: dimDotStyle(v), dimScrim: dimScrimStyle(v) }
   },
 
@@ -343,7 +345,7 @@ App({
   // 顺手登记一次（2.1）：这一档以前只在本机，换台手机就回到默认，而界面上那句"你选的亮度"
   // 看不出来已经变了——静默的差别最难查，所以跟着名片那一条链一起收口。
   cycleBgDim() {
-    const v = dimNext(dimAt(wx.getStorageSync(BG_DIM_KEY)).v)
+    const v = dimNext(dimAt(storage.read(BG_DIM_KEY)).v)
     // 「调亮度」按下去屏上就要动：本机那一档写不进去只丢持久性，不许当场抛（N8）。
     try { wx.setStorageSync(BG_DIM_KEY, v) } catch (e) { console.warn('亮度那一档没存住:', e) }
     profileCloud.pushDim(v)
@@ -354,7 +356,7 @@ App({
   // 脏值（别的版本写过的数、云上以后加了新档而本机还不认）由 dimAt 兜回默认那一档，
   // 所以这里不收范围——收范围等于再写一份规则，两处迟早对不上。
   bgDim() {
-    return dimAt(wx.getStorageSync(BG_DIM_KEY)).v
+    return dimAt(storage.read(BG_DIM_KEY)).v
   },
 
   setBgDim(v, fromServer) {
@@ -377,7 +379,7 @@ App({
    */
   glassMood(wallpaper) {
     const w = wallpaper || this.getWallpaper()
-    const m = moodOf(wx.getStorageSync(MOOD_KEY))
+    const m = moodOf(storage.read(MOOD_KEY))
     return m.theme === themeOf(w).key ? m : moodOfWallpaper(w)
   },
 

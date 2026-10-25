@@ -504,7 +504,10 @@ Page({
       const lang = this.data.lang
       notes.forEach(n => {
         const key = SOURCE_TYPE_KEYS[n.source_type]
-        n.source_type_label = key ? t(key, lang) : n.source_type
+        // 认不出 key 就念空串（M17）——照本页分类那一档的同一口径（`skin()` 里 `showOf[...] || ''`、
+        // `privKnown`：不知道的时候宁可少念，不猜）。原来这一支回的是服务端那栏英文原词，
+        // 加第七种值或老包读新值时就把 `share_import` 这类内部串直接写上屏。
+        n.source_type_label = key ? t(key, lang) : ''
         // 左边那一列只有这一档：MM/DD（年份在这条上没用，跨年看详情窗那一行完整日期）
         n.date_label = formatShortDate(n.created_at)
       })
@@ -1476,7 +1479,10 @@ Page({
      和 `_openPosterFor` 的差别只有一处：不开那层弹窗——`templateOpen` 这一栏一个字都不碰。
      画布本来就在屏外（`poster-canvas-offscreen`，wxml 里是常驻节点，不跟着弹窗的 wx:if 走），
      所以弹窗关着也画得出来；`_tplBoxRpx()` 量不到展示框时返回 null，那一条自己就跳过了。
-     模板与"带不带码"取的是这台设备存的那套默认（`posterProfile().template`），不是替用户猜一套。 */
+     模板与"带不带码"取的是这台设备存的那套默认（`posterProfile().template`），不是替用户猜一套。
+     ⚠ 码解不开时这一趟整个抛掉（M5：`_renderPoster` 现在吃 `_loadQr`，重试一次仍解不开就抛）——
+     静默那张宁可不出，也不出一张扫不开还把这篇锁进台账的废卡；接它的是下面 `loadNotes` 里
+     那条 `.catch`，口径本来就是"失败不出声"。 */
   async _autoFirstCard(noteId) {
     // `posterBusy` 那一格是弹窗那条链自己的忙碌旗：它开着就说明有人在这条链上，这一趟不挤进去。
     if (this.data.templateOpen || this.data.detailOpen || this.data.posterBusy) return
@@ -1485,9 +1491,14 @@ Page({
     // 台账里已经有了也不重复出——一篇一张是这本账自己的规则，不是为这一条新起的。
     if (!note || note.is_private || this._cardsOf(noteId).length) return
     const profile = poster.posterProfile()
+    // M19：这一套还认不认得（＝在合并后的名单里）先认一次，与 `_openPosterFor` 里那道同一个判据。
+    // 这一趟不开窗、屏上没有那一行模板名可念，所以认不出时按真会画出来的那一套（默认）落状态：
+    // 留着下架的那个 id，`posterTpl` 与画布上那张就是两套东西，台账与屏上的说法会分家。
+    const storedTpl = profile.template
+    const tplKnown = !!storedTpl && poster.templateList().some((x) => x.id === storedTpl)
     this.setData({
       posterNote: note,
-      posterTpl: profile.template || poster.DEFAULT_TEMPLATE,
+      posterTpl: tplKnown ? storedTpl : poster.DEFAULT_TEMPLATE,
       noQr: false,
     })
     /* ⚠ 每 await 一步都回头看一眼这一趟还占不占着画布：`_posterAssets`、`#posterCanvas`、
@@ -1617,6 +1628,25 @@ Page({
     this._posterAssets = { noteId, note, token: share.token, qrPath, noteImgPath }
   },
 
+  /* 码解不开就重下一趟再试，还不行直接抛（M5）。画法抄 pages/share/share.js 的 `loadQr`——
+     那是这条链上唯一一份正确的两道防线，页面之间 require 不到对方的 Page 方法，所以这里
+     复用本页现成的 `_downloadQR`（不新写下载逻辑，只把"重试一次＋抛"这两步补上）。
+     ⚠ 为什么必须抛：解不开还照旧套外圈、导出、登记台账，出的是一张"看上去完整、谁也扫不开"
+     的废卡，而一篇一张的台账会把这篇锁死（要先把废卡删掉才能重出）。抛出去由调用口已有的
+     catch 念那一句"生成失败"（`_openPosterFor` 里那一条／首启那一张由 `loadNotes` 里
+     `_autoFirstCard(...).catch` 那一条接住，那条的口径本来就是"失败不出声"）。
+     ⚠ 吃的是调用口**已经拿在手里的那一份** `_posterAssets`（第二枚参数），不在这儿现读：
+     画布与这份资产都是和成品弹窗共用的，中途被另一趟换过就拿别人的码画这篇的图。 */
+  async _loadQr(canvas, a) {
+    let qr = await poster.loadImage(canvas, a.qrPath, 3000)
+    if (!qr) {
+      a.qrPath = await this._downloadQR(a.token)
+      qr = await poster.loadImage(canvas, a.qrPath, 3000)
+    }
+    if (!qr) throw new Error('小程序码解不开')
+    return qr
+  },
+
   _downloadQR(token) {
     return new Promise((resolve, reject) => {
       wx.downloadFile({
@@ -1658,7 +1688,7 @@ Page({
     const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
     const canvas = await this._getCanvas()
     const ctx = canvas.getContext('2d')
-    const images = { qr: await poster.loadImage(canvas, a.qrPath, 3000) }
+    const images = { qr: await this._loadQr(canvas, a) }
     const avatar = poster.cardPath()
     if (avatar) images.avatar = await poster.loadImage(canvas, avatar, 5000)
     // 大图位吃这一篇的第一张配图；解码成功才算"有配图"（hasNote 与 images.note 必须同源，见 poster.js）

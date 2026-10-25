@@ -1,11 +1,14 @@
-// 本机存储（`wx.getStorageSync` / `setStorageSync` / `removeStorageSync`）在这一侧唯一的出口。
+// 本机存储（`wx.getStorageSync` / `setStorageSync` / `removeStorageSync`）的共用出口。
 //
 // 为什么要有这一只：那三个 API 是**会抛**的（存储写满、某一栏的数据坏掉、被系统清了一半）。
 // 本仓早就自己认这一点——`utils/assetQueue.js`、`utils/person.js`、`utils/posterTemplates.js`
-// 三把都各自包了 try。但 10-25 全面审计（M15）现数出工具层与 app.js 还剩三十来处裸调用，
-// 咬人最重的一处在 `utils/mpAssets.js` 的 `serverBgPath()`：它在列表／创建／「我的」每次
-// `onShow` 的路上，一抛就把整屏打死（它前面那句 setData 还没发出去）。所以这里收成一枚共用
-// helper，工具层不再直接碰那三个 API，也不再三十个地方各写一个 try。
+// 三把都各自包了 try。但 10-25 全面审计（M15）现数出工具层与 app.js 还剩三十来处**没有** try 的
+// 裸调用，咬人最重的一处在 `utils/mpAssets.js` 的 `serverBgPath()`：它在列表／创建／「我的」每次
+// `onShow` 的路上，一抛就把整屏打死（它前面那句 setData 还没发出去）。所以这里收成一枚共用 helper，
+// 那三十来处裸调用改吃它（10-25 现数：35 个调用点）。
+// 原来自己包了 try 的那 30 处**保持原样**——它们的行为已经是对的，搬过来只会多一处会漂的规则。
+// 这一刀的落点是「三个目录里再也没有裸调用」，不是「只剩一个出口」；`grep` 那三个 API 名
+// 逐处看它有没有 try，才是这条闸的真实形状。
 //
 // 返回值口径（**照调用点原有的语义定，不另起一套规则**）：
 //   · `read` 读不到时回 `''`——这正是微信对"本机没有这一栏"的原样返回，所以调用点那些

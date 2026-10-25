@@ -349,6 +349,14 @@ Page({
       wx.showToast({ title: t('enterTitle', lang), icon: 'none' })
       return
     }
+    // M16：在飞闸钉在 handler 入口，不钉在 `wx.showLoading({mask:true})` 的时机上。
+    // 原来这一趟唯一挡重复按的就是那层蒙层，而成功那一路 `hideLoading` 之后还有一枚吐司＋800ms
+    // 才跳转——那 800 毫秒里按钮可点、无任何判据，连按两下真造得出第二篇。写法照本页编辑模式
+    // 那一道早退闸（`!base` 那一支：入口判一条判据，不满足就 return，不碰按钮的视觉）。
+    // 放闸的时机是"人已跳走"，任何一条失败路径当场放；
+    // 闸门只在 handler 里，不写进按钮的 disabled／视觉（本仓定过的口径）。
+    if (this._saving) return
+    this._saving = true
 
     wx.showLoading({ title: t('saving', lang), mask: true })
 
@@ -392,6 +400,8 @@ Page({
         // 宁可存不下，也不拿一份不知道哪来的东西去覆盖。
         const base = this._baseline
         if (!base) {
+          // 这一支同样是"没打成这一趟"：闸当场放，否则人回到那一屏再点一次保存就永远没反应了。
+          this._saving = false
           wx.hideLoading()
           wx.showToast({ title: t('loadFailed', lang), icon: 'none' })
           exitOrHome()
@@ -440,6 +450,10 @@ Page({
         ? { title: dropNote, icon: 'none', duration: 2600 }
         : { title: isEdit ? t('updateSucceeded', lang) : t('saveSucceeded', lang), icon: 'success' })
       setTimeout(() => {
+        // 闸放到这一格才放（M16）：上面那枚吐司的 800 毫秒正是原来无人看管的窗口。
+        // 先放再跳是留给"跳转本身失败"那一态（页面栈满／redirectTo 被拒）——那时人还站在
+        // 这一屏，闸若还立着就再也点不动了，而那篇是真存过的。
+        this._saving = false
         if (isEdit) {
           // Navigate back to detail page instead of creating duplicate
           wx.navigateBack()
@@ -448,6 +462,7 @@ Page({
         }
       }, 800)
     } catch (err) {
+      this._saving = false
       wx.hideLoading()
       console.error('保存失败', err)
       const msg = (err.data && err.data.detail) || t('saveFailed', lang)

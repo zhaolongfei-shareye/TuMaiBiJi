@@ -30,6 +30,20 @@ const cardInfo = require('../../utils/cardInfo.js')
 const posterTemplates = require('../../utils/posterTemplates.js')
 const { labelOf } = require('../../utils/catText.js')
 
+/* M19：这一套还认不认得（＝在合并后的那份名单里）先认一次，判据与首页 `_openPosterFor`
+   那一道同一个出处（`poster.templateList()`）。「卡片模板」里挑过的那套哪天被下架之后，
+   `profile.template` 是个名单外的 id：不认就出现上面画的是默认那一张、下面那一排
+   一格都不高亮（看着像没选过），而且挑中的那套名字也跟着错。 */
+function isKnownTpl(id) {
+  return !!id && poster.templateList().some((x) => x.id === id)
+}
+
+// 起手那套：本页挑过的优先，没有就看本机存的那套默认，名单外的（下架的）按真会画出来的默认摆。
+function startingTpl(picked, stored) {
+  const want = picked || stored
+  return isKnownTpl(want) ? want : poster.DEFAULT_TEMPLATE
+}
+
 Page({
   data: {
     noteId: null,
@@ -168,7 +182,8 @@ Page({
     canvas.width = poster.W
     canvas.height = 750
     // 默认沿用「卡片模板」里选的那套；这一页手动换过之后以这一页的为准（不回写设置）
-    const plan = poster.planPoster(ctx, this._note, this.data.picked || profile.template, profile, lang, { showQr: !this.data.noQr, hasNote: !!images.note })
+    // 名单外的那套（下架的）不喂给画布——见 `startingTpl`，M19。
+    const plan = poster.planPoster(ctx, this._note, startingTpl(this.data.picked, profile.template), profile, lang, { showQr: !this.data.noQr, hasNote: !!images.note })
     // 外圈与首页出口同吃 utils/posterMatte.js 那一份画法（N4）：同一篇同一套模板，两个入口存出来必须是一张图。
     const out = posterMatte.paint(canvas, ctx, plan, images)
     // 这套配方跑坏了、画的是默认那一张（N10）：说一句实话，台账也按真画出来的那套记。
@@ -222,7 +237,7 @@ Page({
     this._pickerBusy = true   // 这一排每格一块原生画布；这枚旗是给下面那个拉取回执看的（见 _pullTemplatesForPicker）
     const { lang } = this.data
     const profile = poster.posterProfile()   // avatarPath 这一栏要现算，见 poster.js
-    const picked = this.data.picked || profile.template || poster.DEFAULT_TEMPLATE
+    const picked = startingTpl(this.data.picked, profile.template)
     const avatar = poster.cardPath()
     // 合并后的那份（包内 ∪ 下发）：服务端多一套，这一排就多一格；收成 archived 就自己少一格。
     const tpls = poster.templateList().map((x) => ({

@@ -13,14 +13,22 @@
 
 const KEY = 'pendingCloudPurge'
 const MAX_QUEUE = 50
+// 本机存储读写统一走这一枚（M15），见 utils/safeStorage.js 顶上那段。
+const storage = require('./safeStorage.js')
+
+// take() 读不到时回一份空队列，但**这一趟不许整表写回**：这批 fileID 一被空表盖掉，
+// 云上那个对象就再也没人删得动了（占的是全站那 5GB，库里账已经没了）。
+let readFailed = false
 
 /** @returns {string[]} 待删的 fileID */
 function take() {
-  const raw = wx.getStorageSync(KEY)
-  return Array.isArray(raw) ? raw.filter((x) => typeof x === 'string' && x) : []
+  const r = storage.tryRead(KEY)
+  readFailed = !r.ok
+  return Array.isArray(r.value) ? r.value.filter((x) => typeof x === 'string' && x) : []
 }
 
 function _put(list) {
+  if (readFailed) { console.warn('待删队列这次没读到，先不写回（免得把欠着的对象编号盖掉）'); return }
   try {
     wx.setStorageSync(KEY, list)
   } catch (e) {

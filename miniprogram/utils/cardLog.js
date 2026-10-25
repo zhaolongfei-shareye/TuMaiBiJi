@@ -24,13 +24,21 @@
  */
 const KEY = 'cardLog'
 const DIR = `${wx.env.USER_DATA_PATH}/cards`
+// 本机存储读写统一走这一枚（M15）：这本账是缓存，读坏一次不许把引它的页面一起打死。
+const storage = require('./safeStorage.js')
 
 const fm = () => wx.getFileSystemManager()
+// 读不到时这一本账当作空账看（不许抛，见 utils/safeStorage.js）。但**空账不许写回盘**：
+// 写回去就是把这台机上其它篇目的留档线索与补传依据一起抹掉，而那正是"读不到"被当成"是空的"。
+let readFailed = false
 const read = () => {
-  const v = wx.getStorageSync(KEY)
+  const r = storage.tryRead(KEY)
+  readFailed = !r.ok
+  const v = r.value
   return v && typeof v === 'object' ? v : {}
 }
 const write = (map) => {
+  if (readFailed) { console.warn('卡片台账这次没读到，先不写回（免得把别的篇目盖掉）'); return }
   try { wx.setStorageSync(KEY, map) } catch (e) { console.error('卡片台账写不进本机', e) }
 }
 const dropFile = (p) => { try { fm().unlinkSync(p) } catch (e) { /* 早被系统清了也算删掉了 */ } }
@@ -162,7 +170,9 @@ function markUploaded(noteId, p) {
 // 另外给一次性的归一（下面 migrateOnePerNote）——他手机上那几篇留过两张以上的，进页就归成
 // 最新那一张，其余连文件删掉。 ‹ 1/3 › 那一行随之撤净，不支持来回切换。
 function migrateOnePerNote() {
-  if (wx.getStorageSync(ONE_KEY) === 1) return false
+  // 那一枚"已经归过"的标记读不到时这一趟什么都不动：读不到不等于"还没归过"，往下走就是白归一次。
+  const flag = storage.tryRead(ONE_KEY)
+  if (!flag.ok || flag.value === 1) return false
   const map = read()
   Object.keys(map).forEach((id) => {
     const list = map[id] || []
@@ -180,7 +190,9 @@ function migrateOnePerNote() {
 const MODE_KEY = 'cardLogKeepOnly'
 const ONE_KEY = 'cardLogOnePerNote'
 function migrateKeepOnly() {
-  if (wx.getStorageSync(MODE_KEY) === 1) return false
+  // 同上：那一枚"已经清过"的标记读不到时这一趟什么都不动，免得把整本台账当成空的清掉。
+  const flag = storage.tryRead(MODE_KEY)
+  if (!flag.ok || flag.value === 1) return false
   const map = read()
   Object.keys(map).forEach((id) => (map[id] || []).forEach((x) => dropFile(x.p)))
   write({})

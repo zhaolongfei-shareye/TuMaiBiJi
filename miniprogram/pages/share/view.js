@@ -90,6 +90,21 @@ Page({
     if (src !== this.data.bgSrc) this.setData({ bgSrc: src })
   },
 
+  /* M10：从详情页 `navigateBack` 退回来这一趟，把「已存入笔记」清回未存。
+     为什么这一类要复位：存完那一跳把人送到他自己那一篇的详情页，而删除按钮就在那一屏底下——
+     他删掉之后库里再没有这篇，落地页还念完成时，而且 `saveToMine` 见 `saved` 就 return，
+     按下去一个字都不发生（要重存只能退出小程序重新扫码）。
+     ⚠ 只认这一类入口，不在 `onShow` 里无条件复位：原生全屏层收回（`wx.previewImage` 那类，
+     本页那排大图就走它）与从后台切回前台也都会补发一次 `onShow`，那两类里笔记一个字没动，
+     清了就等于把真存过的那一篇重新亮成"还能再存一次"。所以复位与否由 `saveToMine` 跳出去
+     时立的那面旗判定，跳一次只认一次。
+     服务端那一道"同一人同一篇只留一份"的闸兜得住重按：删没删都回同一条、跳的还是同一篇。 */
+  onShow() {
+    if (!this._backFromDetail) return
+    this._backFromDetail = false
+    this.setData({ saved: false })
+  },
+
   // 存进自己的库：抄的是服务端那份公开快照，来源由服务端钉在笔记上，客户端改不掉。
   async saveToMine() {
     const { lang, share, saving, saved } = this.data
@@ -108,7 +123,20 @@ Page({
       // ⚠ 原来这一句是一枚 toast，现在那句话由那一页页底那条 bar 说 ⇒ toast 撤了：
       //    它是全屏的、跟着跳到下一页还会挂着，同一句话在两页各念一遍。
       // 用 navigateTo 不用 redirectTo：返回那一枚留着，读者还能回到刚才那一屏接着看。
-      wx.navigateTo({ url: `/pages/detail/detail?id=${note.id}&saved=1` })
+      // M7 客户端半：服务端这一趟开始在回体里多带 `images_kept`／`images_failed` 两个整数。
+      // ⚠ 现网那半还没部署时这一栏是 `undefined` ⇒ 先判类型再用：不是数字就当一个没少，
+      // 绝不把 `undefined` 拼上屏；一张没少（0）时一个字都不加，不啰嗦。
+      const failed = note && typeof note.images_failed === 'number' ? note.images_failed : 0
+      // 那句实话挂在详情页底下那条已有的 bar 后面，所以数随 query 带过去：
+      // "这次少带了几张"只有存成这一趟知道，`GET /notes/{id}` 那份回答不了。
+      // 这一句 `saved=1` 之外只多带一枚 `imgFail`，是给那句实话的数，不是新功能。
+      this._backFromDetail = true
+      wx.navigateTo({
+        url: `/pages/detail/detail?id=${note.id}&saved=1${failed > 0 ? '&imgFail=' + Math.floor(failed) : ''}`,
+        // 页面栈满时这一跳是失败的：人还站在这一屏、笔记是真存过的，那面旗就不该立着
+        // （立着会让下一次任何一类 `onShow` 误把 `saved` 清掉）。
+        fail: () => { this._backFromDetail = false },
+      })
     } catch (err) {
       console.error('转存失败', err)
       this.setData({ saving: false })

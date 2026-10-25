@@ -33,8 +33,8 @@
   },
   {
    "name": "poster.js",
-   "bytes": 123340,
-   "md5": "b87e549816e142de4550a3582ecbf4ca"
+   "bytes": 123197,
+   "md5": "22632a76396da7ce726dd3033d5069b2"
   },
   {
    "name": "posterMatte.js",
@@ -53,8 +53,8 @@
   },
   {
    "name": "safeStorage.js",
-   "bytes": 2745,
-   "md5": "fd1f353506a523999951b0f8e82b1764"
+   "bytes": 3070,
+   "md5": "42572fa773219aa3ff215e3fb4adfc50"
   }
  ]
 }

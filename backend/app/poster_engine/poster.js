@@ -113,7 +113,6 @@ const TEMPLATE_GROUPS = [
 // 界面得跟着改口——这正是"不走发版"那两个把手里的第二个（改文案不用发版，也不用清缓存）。
 function templateLabel(id, lang) {
   const tpl = templateList().find((x) => x.id === id)
-  // 认不出那一套**不许回空串**：页面拿它直接写上屏就是一条空白（审计 M19，那一屏看起来像没选过）。
   // 认不出的 id 不许回空串：那一格在首页成品弹窗顶上就是一行模板名，空串＝屏上一条空白
   // （10-25 第八轮审计 M19）。话走字典，英文界面才不会念出中文。
   if (!tpl) return t('tplRetired', lang)
