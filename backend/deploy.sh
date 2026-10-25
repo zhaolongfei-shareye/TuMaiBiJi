@@ -535,7 +535,7 @@ code_pub=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_URL" || echo 000)
 echo ""
 echo ">>> 配置自检..."
 python <<'PY'
-from app.core.config import settings as s
+from app.core.config import Settings, settings as s
 from app.services.llm import KNOWN_PROVIDERS, key_usable, provider_implemented
 
 # 缺失即【功能完全不可用】
@@ -615,6 +615,21 @@ if _baks:
         print("  !! 少键的症状通常是【静默降级】而不是报错——请逐个确认是故意删的还是重写时丢了。")
     else:
         print(f"  ✓ 键名与最新备份一致（{len(_keys('.env'))} 个，值不比对）")
+
+# 上面那一道只拿"最新一份备份"当基准，所以备份自己也缺键时它是绿的（10-25 审计 M1 附带的那条）。
+# 这一道换一个不会一起烂掉的基准：代码里现读的字段清单（Settings 的字段名）。双向都比——
+# 少了就是静默降级，多了就是打错字或留着已废弃的键。只念键名与值的长度，值一个字不打。
+_declared = set(Settings.model_fields.keys())
+_in_env = _keys(".env")
+_lost2 = sorted(_declared - _in_env)
+_extra = sorted(_in_env - _declared)
+if _lost2:
+    print(f"  !! .env 比代码少 {len(_lost2)} 个键：{', '.join(_lost2)}")
+    print("  !! 其中 JWT_SECRET_KEY / DATABASE_URL 缺失会让服务直接拒起，其余的键缺失是静默降级。")
+if _extra:
+    print(f"  · .env 里有 {len(_extra)} 个代码不读的键（不参与 pydantic 校验）：{', '.join(_extra)}")
+if not _lost2:
+    print(f"  ✓ 代码声明的 {len(_declared)} 个键在 .env 里全有（值不比对）")
 
 # 运营图这一条链：口令有没有配、闸门开没开，两件事都只在这台服务器上看得见，
 # 而它们的症状都是"点了没反应"——不念出来的话，下一次查这个问题的人（可能是我）

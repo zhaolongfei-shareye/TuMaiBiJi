@@ -26,10 +26,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
+from app.api.routes import notes as notes_route
 from app.core.auth import _create_token
 from app.db.database import Base, SessionLocal, engine
 from app.main import app
+from app.models.asset import Asset
 from app.models.note import Note, SOURCE_SHARE_IMPORT
 from app.models.share import Share
 from app.models.user import User
@@ -784,3 +788,301 @@ def test_来源那一栏没写那一键的笔记不许挡成真转存(client, db
     assert r.json()["id"] != stray.id, "被那一格没写来源键的笔记顶掉了：真转存回了一张别的纸"
     db_session.expire_all()
     assert len(_mine(db_session, reader.id, nid)) == 1
+
+
+# ============================ 数据库层兜底／补账／脏行（10-25 第八轮审计 M6／M7／M14）
+def _fresh_reader(db, openid):
+    """每一条用例各开一个读者。
+
+    故意不复用 `_other`：`share_copy_key` 是按人分键的，而下面几条要在**同一个人的名下**做
+    "撞索引"那件事——共用一个读者时，前面那几条存下的副本会把这一条的前提改掉
+    （`test_同一个人第二次存同一篇…` 那一族的账）。
+    """
+    u = User(openid=openid)
+    db.add(u)
+    db.commit()
+    return u
+
+
+def _give_assets(db, note_id, user_id, n):
+    ids = []
+    for i in range(n):
+        a = Asset(user_id=str(user_id), note_id=note_id,
+                  object_key=f"cloud://pytest-env/images/{note_id}/{i}.jpg",
+                  backup_status="uploaded")
+        db.add(a)
+        db.commit()
+        ids.append(a.id)
+    return ids
+
+
+def test_那枚去重索引在测试库里真的有牙(db_session):
+    """索引必须**同时**声明在模型（`models/note.py` 的 `__table_args__`）和迁移里。
+
+    只写迁移的话，测试库是 `Base.metadata.create_all` 建的、压根没有那条索引 ⇒
+    下面"撞索引能领回先落那篇"那条用例会以"根本没撞上"的方式通过——那是最坏的一种绿：
+    代码是对的、尺子是空的，改坏也测不出来。所以这里不看行为，直接读 sqlite_master 那句 SQL，
+    UNIQUE／WHERE／IS NOT NULL 三个词都得在场（少了 WHERE 就成了把所有 NULL 行也一起挡掉的全表唯一）。
+    """
+    row = db_session.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' AND name='ux_notes_one_share_copy_per_user'"
+    )).first()
+    assert row is not None, (
+        "测试库里没有 ux_notes_one_share_copy_per_user ⇒ `models/note.py` 那条 Index 声明漏了；"
+        "这一族用例全部会假绿（包括下面撞索引那两条）"
+    )
+    sql = (row[0] or "").upper()
+    assert "UNIQUE" in sql, f"索引建成了普通索引，挡不住第二行：{sql}"
+    assert "WHERE" in sql and "IS NOT NULL" in sql, f"部分索引的 WHERE 那半没了，手写笔记那些 NULL 行会被一起挡：{sql}"
+
+
+def test_同一个键的第二行被数据库直接拒掉而NULL行照样写得进(db_session):
+    """索引的两面都得钉：有牙（拒第二行）与不吃存量（NULL 互不冲突）。
+
+    只钉前一面的话，把 WHERE 那一半删掉也能过——那等于给"所有没走过转存那一路的笔记"
+    加了一道 NULL 唯一约束，而 SQLite 恰好允许（判据在这儿不成立），MySQL 上就是另一回事。
+    """
+    u = _fresh_reader(db_session, "pytest-openid-key-teeth")
+    key = f"{u.id}:900001"
+    db_session.add(Note(user_id=str(u.id), title="键的第一行", source_type=SOURCE_SHARE_IMPORT,
+                        tags=[], key_points=[], key_links=[], share_copy_key=key))
+    db_session.commit()
+    db_session.add(Note(user_id=str(u.id), title="键的第二行", source_type=SOURCE_SHARE_IMPORT,
+                        tags=[], key_points=[], key_links=[], share_copy_key=key))
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+    # 反向：那一栏留 NULL 的行（手写、抓取、以及闸上线之前落的所有老行）不受这条约束
+    for i in range(2):
+        db_session.add(Note(user_id=str(u.id), title=f"没有键的第{i}篇", source_type="manual",
+                            tags=[], key_points=[], key_links=[]))
+    db_session.commit()
+    assert db_session.query(Note).filter_by(user_id=str(u.id), share_copy_key=None).count() >= 2
+
+
+def test_转存写下来的那一行带着键而手写的没有(db_session, client, person):
+    """键的**内容**也要钉：写成 `share_token` 就白写了——作者撤一次分享换一张新码，
+    同一个人在同一篇名下就能再堆一行（这正是 test_作者换了一张新码… 那条要挡的）。
+    """
+    nid = _mknote(db_session, person.id, "看一眼键写了什么")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    reader = _fresh_reader(db_session, "pytest-openid-key-shape")
+    copy_id = _import(client, _hdr(reader.id), token).json()["id"]
+
+    db_session.expire_all()
+    copy = db_session.get(Note, copy_id)
+    assert copy.share_copy_key == f"{reader.id}:{nid}", copy.share_copy_key
+    assert db_session.get(Note, nid).share_copy_key is None, "手写那一行被写上了转存的键"
+
+
+def test_两真同时点转存_后落的那一个领回先落的那一篇(client, db_session, person, monkeypatch):
+    """并发那一窗口的真实形状：A 查过"没存过"→ B 也查过"没存过"→ B 先 commit → A commit 撞索引。
+
+    这里没法真起两个线程（TestClient 是同步的，且线程池那一层的时序在这台机上不可控），
+    所以钉的是**同一段代码**：把闸那一趟的第一次查询按成"没查到"（=A 眼中的世界），
+    库里那一条先落好的行就是 B 的产物。撞完之后第二次查询走真实实现 ⇒ 应当领回 B 那一篇，
+    而不是回一条 500、也不是多留一行。
+    """
+    nid = _mknote(db_session, person.id, "被同时点的那篇")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    reader = _fresh_reader(db_session, "pytest-openid-race")
+    existing = Note(user_id=str(reader.id), title="B 先落的那一篇", source_type=SOURCE_SHARE_IMPORT,
+                    tags=[], key_points=[], key_links=[],
+                    share_copy_key=notes_route._share_copy_key(str(reader.id), nid),
+                    imported_from={"share_token": token, "source_note_id": nid,
+                                   "author_user_id": person.id, "author_name": "阿飞",
+                                   "title_at_import": "被同时点的那篇"})
+    db_session.add(existing)
+    db_session.commit()
+
+    real = notes_route._find_share_import_copy
+    seen = []
+
+    def race(db, user_id, source_note_id):
+        seen.append(user_id)
+        if len(seen) == 1:
+            return None          # A 那一趟看到的正是"还没人存过"
+        return real(db, user_id, source_note_id)
+
+    monkeypatch.setattr(notes_route, "_find_share_import_copy", race)
+    r = _import(client, _hdr(reader.id), token)
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == existing.id, f"没领回先落的那一篇，而是回了 {r.json()['id']}"
+
+    db_session.expire_all()
+    rows = db_session.query(Note).filter_by(share_copy_key=notes_route._share_copy_key(str(reader.id), nid)).all()
+    assert len(rows) == 1, f"索引兜住了第二行，但路由多留了一行：{[x.id for x in rows]}"
+
+
+def test_撞了索引而认不出先落那一行时念的是重试而不是500(client, db_session, person, monkeypatch):
+    """`except IntegrityError` 那一路的**另一半**：撞上了、却按 `source_note_id` 找不到人。
+
+    这种行今天怎么来：键写上而 `imported_from` 那一栏没带 source_note_id（手工 SQL、或将来
+    有人把贴图那一类也归进 share_import）。此时不能把 500 甩给用户，也不能悄悄建第二行；
+    念一句"请再试一次"是唯一不撒谎的回法。这一条同时钉住话是中文的（那族错误直接上屏）。
+    """
+    nid = _mknote(db_session, person.id, "撞上一行认不出的键")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    reader = _fresh_reader(db_session, "pytest-openid-race-blind")
+    ghost = Note(user_id=str(reader.id), title="占着那一格键的行", source_type=SOURCE_SHARE_IMPORT,
+                 tags=[], key_points=[], key_links=[],
+                 share_copy_key=notes_route._share_copy_key(str(reader.id), nid),
+                 imported_from={"author_name": "某公众号"})   # 故意没有 source_note_id
+    db_session.add(ghost)
+    db_session.commit()
+
+    r = _import(client, _hdr(reader.id), token)
+    assert r.status_code == 409, r.text
+    detail = r.json()["detail"]
+    assert "再试一次" in detail and "500" not in detail, detail
+    db_session.expire_all()
+    assert db_session.query(Note).filter_by(share_copy_key=ghost.share_copy_key).count() == 1, "拒了却还多留一行"
+
+
+def test_来源那一栏是数组时不许把这个人以后每次转存都撞成500(client, db_session, person):
+    """10-25 审计 M14：`(snap or {}).get(...)` 只防了 None，没防"这一栏根本不是字典"。
+
+    一行脏 JSON 的代价不是那一行读错，是这个人的**每一次**转存都在循环里抛 AttributeError：
+    坏一行、全堵死，而且他没法自救（要存的篇就在同一张表里）。修法只加一道 `isinstance`，
+    **不动任何一行数据**——所以下面还钉"那行脏数据还在原样躺着"。
+    """
+    reader = _fresh_reader(db_session, "pytest-openid-dirty-snap")
+    stray = Note(user_id=str(reader.id), title="来源被写成数组的那一行", source_type=SOURCE_SHARE_IMPORT,
+                 tags=[], key_points=[], key_links=[],
+                 imported_from=["这不该是个数组"])
+    db_session.add(stray)
+    db_session.commit()
+    stray_id = stray.id
+
+    nid = _mknote(db_session, person.id, "脏行之后照样存得进")
+    token = _share(client, _hdr(person.id), nid, author="阿飞")["token"]
+    r = _import(client, _hdr(reader.id), token)
+    assert r.status_code == 200, f"一行非字典的 JSON 把他撞成 {r.status_code}：{r.text[:120]}"
+    assert r.json()["title"] == "脏行之后照样存得进"
+
+    db_session.expire_all()
+    assert db_session.get(Note, stray_id).imported_from == ["这不该是个数组"], "顺手洗了那行数据，而这一刀的口径是不动数据"
+
+
+def _spy_copy(monkeypatch):
+    """把"抄图"换成一个只记账不触网的替身（这一段真跑要打存图网关，本地没有凭据）。"""
+    calls = []
+
+    def fake(db, note, from_note_id):
+        calls.append((note.id, from_note_id))
+
+    monkeypatch.setattr(notes_route, "_copy_share_images", fake)
+    return calls
+
+
+def test_副本名下零张而原篇有图时第二次点补一次(client, db_session, person, monkeypatch):
+    """M7 那一刀要修的症状：第一次抄图整段失败 → 屏上已是完成时 → 第二次被闸领回**同一篇没图的**，
+    怎么重试都补不回来，唯一的自救是删掉再存。
+
+    替身只记账不真插行，所以副本名下始终零张 ⇒ 正好是"那一趟什么都没做成"的那一态。
+    """
+    calls = _spy_copy(monkeypatch)
+    src_nid = _mknote(db_session, person.id, "挂了图的一篇")
+    _give_assets(db_session, src_nid, person.id, 3)
+    token = _share(client, _hdr(person.id), src_nid, author="阿飞")["token"]
+    reader = _fresh_reader(db_session, "pytest-openid-topup")
+
+    first = _import(client, _hdr(reader.id), token)
+    assert first.status_code == 200, first.text
+    assert calls == [(first.json()["id"], src_nid)], f"第一次转存本该抄一趟：{calls}"
+
+    again = _import(client, _hdr(reader.id), token)
+    assert again.status_code == 200, again.text
+    assert again.json()["id"] == first.json()["id"], "闸没领回同一篇，而是多造了一行"
+    assert len(calls) == 2, f"零张而原篇有图时第二趟该补一次：{calls}"
+    assert calls[1] == (first.json()["id"], src_nid)
+
+
+def test_副本已经有图时第二趟一个字都不许多动(client, db_session, person, monkeypatch):
+    """反向那一面：**部分成功（九张里成了五张）刻意不补**。
+
+    补它会给同一篇再堆最多九行 assets，那正是站长 10-25 那句"避免冗余数据"要挡的东西。
+    这一条与上面那条配成一对——只有一条的话，把判据删掉也能绿。
+    """
+    calls = _spy_copy(monkeypatch)
+    src_nid = _mknote(db_session, person.id, "已经有副本图的一篇")
+    _give_assets(db_session, src_nid, person.id, 2)
+    token = _share(client, _hdr(person.id), src_nid, author="阿飞")["token"]
+    reader = _fresh_reader(db_session, "pytest-openid-topup-skip")
+    copy_id = _import(client, _hdr(reader.id), token).json()["id"]
+    assert len(calls) == 1
+
+    # 副本名下有一张真行（不是替身插的，是这里手工摆的态）
+    _give_assets(db_session, copy_id, reader.id, 1)
+    r = _import(client, _hdr(reader.id), token)
+    assert r.status_code == 200, r.text
+    assert len(calls) == 1, f"已经有图还再抄一趟 ⇒ 同一篇多堆重复 assets：{calls}"
+
+
+def test_原篇一张图也没有时第二趟不去空转网关(client, db_session, person, monkeypatch):
+    """零张要补的前提是**原篇有**；两边都零张时补它只是白打一趟存图网关。"""
+    calls = _spy_copy(monkeypatch)
+    src_nid = _mknote(db_session, person.id, "本来就没图的一篇")
+    token = _share(client, _hdr(person.id), src_nid, author="阿飞")["token"]
+    reader = _fresh_reader(db_session, "pytest-openid-topup-empty")
+    assert _import(client, _hdr(reader.id), token).status_code == 200
+
+    n = len(calls)
+    assert _import(client, _hdr(reader.id), token).status_code == 200
+    assert len(calls) == n, f"原篇零张还去补：{calls}"
+
+
+def test_带着那一对重复存量也能一路升上来(tmp_path):
+    """这一条钉的是**为什么不能**把那枚索引直接建在 `imported_from` 的 JSON 路径上。
+
+    现网存量里真有一对"同一人同一篇两行"（那道闸 10-25 13:40 才上，上线前每点一次 `+1` 行）。
+    走 JSON 路径唯一索引的话，`upgrade` 会在那一对上撞 `UNIQUE constraint failed` —— 而那一趟是
+    在部署脚本里跑的，**迁移失败等于把整站挡在重启之前**。这一版加的是新栏＋部分索引：老行留 NULL、
+    一行都不动，所以它必须真能在"带着重复行"的库上跑通。这里就照着那个形状演一遍：
+    升到父级 → 手工插一对重复行 → 再升到 head → 迁移过得去、那两行还在、索引带着 WHERE 建起来了。
+
+    ⚠ 只在这台机的临时库上跑，一个字节都不碰现网。
+    """
+    import sqlite3
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    db_file = tmp_path / "dup.db"
+    url = f"sqlite:///{db_file}"
+    env = dict(os.environ, DATABASE_URL=url)
+
+    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "c9f2a6d4e831"],
+                   cwd=str(root), env=env, check=True, capture_output=True, text=True)
+
+    con = sqlite3.connect(db_file)
+    snap = '{"source_note_id": 77, "author_name": "阿飞"}'
+    # `version` / `is_pinned` 是 `nullable=False` 而默认值只写在 Python 侧（`default=1`），
+    # 绕开 ORM 直插就得自己补上——这正是"两条建表路对不上"那一族坑，别把它当用例的杂音删掉。
+    con.executemany(
+        "INSERT INTO notes (user_id, title, source_type, imported_from, version, is_pinned) "
+        "VALUES (?, ?, ?, ?, 1, 0)",
+        [("4242", "重复的第一行", "share_import", snap),
+         ("4242", "重复的第二行", "share_import", snap)],
+    )
+    con.commit()
+    con.close()
+
+    done = subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"],
+                          cwd=str(root), env=env, capture_output=True, text=True)
+    assert done.returncode == 0, f"迁移在重复存量上跑挂了：{done.stderr[-400:]}"
+
+    con = sqlite3.connect(db_file)
+    try:
+        keep = con.execute(
+            "SELECT count(*) FROM notes WHERE user_id='4242' AND source_type='share_import'"
+        ).fetchone()[0]
+        assert keep == 2, f"迁移把用户的笔记删掉了（{keep} 行）——这一刀的口径是一行都不动"
+        sql = (con.execute("SELECT sql FROM sqlite_master WHERE name='ux_notes_one_share_copy_per_user'"
+                           ).fetchone() or [""])[0].upper()
+        assert "UNIQUE" in sql and "WHERE" in sql, f"索引没建上或建成了全表唯一：{sql}"
+    finally:
+        con.close()
+
+

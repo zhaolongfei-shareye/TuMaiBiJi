@@ -91,7 +91,11 @@ class ShareResponse(BaseModel):
 
 
 @router.post("/", response_model=ShareResponse)
+# 10-25 第八轮审计 M8：下面那一段注释早就写明"这张码每次真打都要花接口额度"，而这一趟前面
+# 一直没有门闩。建码那一路走 msgSecCheck ＋一次微信生成，是这批写口里最贵的一只。
+@limiter.limit("20/minute")
 def create_share(
+    request: Request,
     req: ShareCreateRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),

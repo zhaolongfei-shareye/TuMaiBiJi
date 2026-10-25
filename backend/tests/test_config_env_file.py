@@ -119,3 +119,64 @@ def test_this_process_holds_only_disposable_config_values():
     assert settings.HUNYUAN_CF_KEY == conftest.PLACEHOLDER_CF_KEY
     assert settings.WECHAT_APP_SECRET == conftest.FAKE_WECHAT_APP_SECRET
     assert settings.WECHAT_APP_ID == conftest.FAKE_WECHAT_APP_ID
+
+
+# ---------------- DATABASE_URL 不许退到默认值（10-25 第八轮审计 M1）
+def test_database_url_没有可用的默认值():
+    """默认值那一栏**必须是空串**。
+
+    原来这里是 `sqlite:///./tmbj.db`：`.env` 少抄一栏时服务照样起、`/health` 照样 200，
+    只是连的是一只当场新建的空库——站长的第一反应是"笔记全丢了"，而真库一个字节都没动。
+    盘上那两只 0 字节的壳文件（现网 `app.db`、本机 `backend/tmbj.db`）就是这一族默认值活过的证据。
+    空串本身不是配置，它只是"让下面那条校验去说话"的那个值。
+    """
+    default = Settings.model_fields["DATABASE_URL"].default
+    assert default == "", f"DATABASE_URL 又长出默认值了：{default!r}——退到默认＝连上一只新建的空库"
+
+
+def test_database_url_空白一律拒起而话里不许带出别的值(monkeypatch):
+    """`mode="after"` 的整模型校验器出来的 `loc` 是**空的**（本仓 `_load_settings` 里那句
+    `or '(整体)'` 就是为它写的），所以这一条不许按 `loc == ("DATABASE_URL",)` 下尺子——
+    那样写会永远红，而红的原因跟代码对不对没关系。说的是哪一栏，只能看消息本身。
+    """
+    for bad in ("", "   ", "\t"):
+        monkeypatch.setenv("DATABASE_URL", bad)
+        with pytest.raises(ValidationError) as excinfo:
+            Settings()
+        msgs = "；".join(e["msg"] for e in excinfo.value.errors())
+        assert "DATABASE_URL" in msgs, f"拒起了却没说是哪一栏：{msgs}"
+        assert ".env" in msgs, f"报错没告诉人去哪儿改：{msgs}"
+        assert SENTINEL_DB_PASSWORD not in msgs and bad.strip() == ""
+
+
+def test_database_url_没走校验时另两栏照样拦得住(monkeypatch):
+    """反证上面那两条不是"随便填个非空就过"：非空但仍是公开占位符的 JWT 必须照样被拦。
+
+    这一族校验最容易悄悄变成只对新加的那一栏生效，而老那一栏（`JWT_SECRET_KEY`）没人再看。
+    """
+    monkeypatch.setenv("DATABASE_URL", "sqlite:////tmp/whatever-is-set-here.db")
+    monkeypatch.setenv("JWT_SECRET_KEY", JWT_PLACEHOLDER)
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_少了database_url_真起一个进程也拒绝启动(tmp_path):
+    """子进程走真实通道：这一条要证的正是"uvicorn 那一侧起不来"，而不是单元测试里的一个异常。
+
+    故意不删 `.env`：`env_file` 钉的是绝对路径，进程环境里那一栏空串会盖住文件里的值，
+    这样这一刀量的就是"哪天真去重写 .env 时漏了这一行"那一个形状。
+    """
+    child_env = {k: v for k, v in os.environ.items()
+                 if not k.startswith(("DATABASE_", "WECHAT_", "JWT_", "HUNYUAN_", "EXTRACT_", "REDIS_", "CORS_"))}
+    child_env.update({
+        "DATABASE_URL": "",
+        "JWT_SECRET_KEY": "child-proc-secret-not-a-real-one",
+        "PYTHONPATH": str(PROJECT_ROOT),
+    })
+    result = subprocess.run([sys.executable, "-c", "import app.core.config"],
+                            cwd=str(tmp_path), env=child_env, capture_output=True, text=True)
+    assert "ModuleNotFoundError" not in result.stderr, "子进程没找到包，这条测试就成了空跑"
+    assert result.returncode != 0, "少 DATABASE_URL 而服务照样起得来——那正是这条要挡的事"
+    assert "配置校验未通过" in result.stderr
+    assert "DATABASE_URL" in result.stderr, "拒起了却没说清是哪一栏"
+

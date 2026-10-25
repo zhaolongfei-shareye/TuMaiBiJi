@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field, model_validator
 from datetime import datetime, timezone
 import logging
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
+from app.core.rate_limit import limiter
 from app.db.database import get_db
 from app.models.asset import Asset, not_failed, order_by_note
 from app.models.invitation import Invitation
@@ -581,7 +583,11 @@ class NoteFromShare(BaseModel):
 
 
 @router.post("/from-share", response_model=NoteDetail)
+# 10-25 第八轮审计 M8：这一次转存内部最多扇九趟存图网关（`_copy_share_images`），而它前面
+# 一道门闩都没有 ⇒ 一张有效票能反复把这份成本打上来。分钟档按人分桶（`get_user_key`）。
+@limiter.limit("10/minute")
 def import_from_share(
+    request: Request,
     req: NoteFromShare,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -625,6 +631,7 @@ def import_from_share(
     # 这句要避免的冗余数据。
     mine = _find_share_import_copy(db, str(user.id), share.note_id)
     if mine is not None:
+        _top_up_share_images(db, mine, share.note_id)
         return mine
 
     note = Note(
@@ -636,6 +643,7 @@ def import_from_share(
         key_links=share.key_links,
         source_type=SOURCE_SHARE_IMPORT,
         source_url=share.source_url,
+        share_copy_key=_share_copy_key(str(user.id), share.note_id),
         imported_from={
             "share_token": share.token,
             "source_note_id": share.note_id,
@@ -646,7 +654,17 @@ def import_from_share(
         },
     )
     db.add(note)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 两个请求真同时进来（同步路由跑在线程池里）、各自都在对方落库前查过"存过没有"，
+        # 于是都要建。索引让后到的那一个失败，这里把他领回先落的那一篇（10-25 第八轮审计 M6）。
+        # 领回这一趟**一个副作用都不许多跑**：分与配图都由先落那一趟做过了。
+        db.rollback()
+        raced = _find_share_import_copy(db, str(user.id), share.note_id)
+        if raced is None:
+            raise HTTPException(status_code=409, detail="这篇笔记的收藏状态刚变过，请再试一次")
+        return raced
     db.refresh(note)
     # 转存给**那一篇的作者** +1（不是 +10）：`quota._credit_import` 挣的是"有人把我这篇存下来了"，
     # 同一篇 × 同一个人只挣一次（判定与唯一索引都在 quota 里）。
@@ -675,9 +693,48 @@ def _find_share_import_copy(db, user_id, source_note_id):
         .all()
     )
     for note_id, snap in rows:
-        if (snap or {}).get("source_note_id") == source_note_id:
+        if not isinstance(snap, dict):
+            # 只防 None 是不够的（10-25 第八轮审计 M14）：这一栏是 JSON，历史上被手工 SQL 写成
+            # 数组或字符串的那一行会在这里抛 AttributeError，而那等于让这个人以后每一次转存都 500、
+            # 坏一行就全堵死。同文件读这一栏的别处（列表那一趟）早就有同一道 `isinstance` 闸，
+            # 两处口径必须一样，否则"哪一处先脏"要看运气。
+            continue
+        if snap.get("source_note_id") == source_note_id:
             return db.get(Note, note_id)
     return None
+
+
+def _share_copy_key(user_id: str, source_note_id: int) -> str:
+    """这一篇在这个人名下的数据库层身份证：`user_id:原笔记 id`。
+
+    唯一索引只吃非 NULL 的行（见那条迁移），所以它约束的是"从这一趟起写的转存"；闸上线之前
+    落的那一对重复行留 NULL ⇒ **不必删任何人的笔记**，迁移当场就建得上。
+    判"同一篇"的口径与 `_find_share_import_copy` 同一处：都认原笔记 id，不认 `share_token`。
+    """
+    return f"{user_id}:{source_note_id}"
+
+
+def _top_up_share_images(db, note, from_note_id) -> None:
+    """闸命中那一路唯一允许的一次补账：这一篇名下**一张图都没有**、而原篇有 ⇒ 补抄一次。
+
+    为什么要有这一刀（10-25 第八轮审计 M7）：第一次转存时抄图那一段整段失败（存图网关抖一下、
+    通道没配上）会留下"存下了但没图"的那一篇，而屏上那一句已经是完成时；第二次点被闸领回的
+    正是这篇没图的，用户怎么重试都补不回来，唯一的自救是删掉再存。
+    为什么只认"零张"这一档：部分成功（九张里成了五张）刻意不补——再跑一遍就是给同一篇多堆重复
+    assets，那正是站长 10-25 那句"避免冗余数据"要挡的。零张是那一趟**什么都没做成**的那一态，
+    补它不会产生重复行，只会再花一趟网关。
+    ⚠ 通道整段没配好时，这个人每点一次都会再扇九趟——这一刀**不封那个顶**。封顶靠的是同一趟
+    请求前面那道 10/分钟的门闩（M8 那一刀），不是靠这里的判据；写这一行是为了让下一次加"每次点
+    都记一次、记过就不再补"那种状态时，别以为现在已经有了。
+    """
+    have = db.query(Asset.id).filter(Asset.note_id == note.id, not_failed()).count()
+    if have:
+        return
+    src = db.query(Asset.id).filter(Asset.note_id == from_note_id, not_failed()).count()
+    if not src:
+        return
+    logger.warning("转存配图补一次：副本 %s 名下零张而原篇 %s 有 %s 张", note.id, from_note_id, src)
+    _copy_share_images(db, note, from_note_id)
 
 
 def _copy_share_images(db, note, from_note_id) -> None:

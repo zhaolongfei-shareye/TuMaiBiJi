@@ -196,7 +196,12 @@ def _ensure_private_category(db: Session, user: User) -> bool:
 
 
 @router.put("/private-password")
+# 10-25 第八轮审计 M8：这一趟每次都要算一枚 PBKDF2 摘要，而它前面一道门闩都没有。
+# ⚠ 这一档**挡不住猜密码**——这条接口根本不验旧密码（见下面 `reset` 那段注释），
+# 它挡的是"一张票被脚本反复打"把 CPU 与写入成本堆上去。要的是"少打几次"，不是"防暴力"。
+@limiter.limit("5/minute")
 def set_private_password(
+    request: Request,
     req: PrivatePasswordRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -244,7 +249,13 @@ def verify_private_password(
 
 
 @router.post("/private-password/reset")
-def reset_private_password(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+# 与上面 PUT 同一档门闩（10-25 第八轮审计 M8）：这一趟清的是那一列，反复打它等于反复拆锁。
+@limiter.limit("5/minute")
+def reset_private_password(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     # 不校验旧密码：能拿到这条接口的前提是 Bearer token 有效，而拿得到 token 的人
     # 本来就能直接删掉整篇笔记——密码只防"手机在别人手里时被人翻开"，不防 token。
     # 重置只清那一列，笔记与分类一个字不动；清完要重新输两遍才再上锁。

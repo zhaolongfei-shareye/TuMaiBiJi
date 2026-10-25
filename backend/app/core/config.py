@@ -8,7 +8,8 @@ from pydantic import ValidationError, model_validator
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "sqlite:///./tmbj.db"
+    # 故意**不给可用的默认值**：理由与那条 `@model_validator` 一起看（`_require_database_url`）。
+    DATABASE_URL: str = ""
     # 提炼走云函数中转混元：只有云函数内部的 cloud.ai() 才抵扣成长计划的免费额度，
     # 本服务直连混元端点会导致额度不抵扣、改扣套餐，所以这里只有云函数的触发信息。
     EXTRACT_PROVIDER: str = "hunyuan_cf"
@@ -122,6 +123,22 @@ class Settings(BaseSettings):
         if not self.JWT_SECRET_KEY or self.JWT_SECRET_KEY == placeholder:
             raise ValueError(
                 "JWT_SECRET_KEY 未配置或仍为公开占位符，请在 .env 中设置一个长随机字符串后重启服务"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _require_database_url(self) -> "Settings":
+        """数据库地址**不许退到内置默认值**（10-25 第八轮审计 M1）。
+
+        原来这里默认 `sqlite:///./tmbj.db`，于是 `.env` 少抄这一栏时服务照样起、`/health` 照样 200，
+        只是连的是一只当场新建的空库——站长的第一反应是"笔记全丢了"，而真库一个字节都没动，
+        查账的人还会先去看备份。盘上那两只 0 字节的壳文件（现网 `app.db`、本机 `backend/tmbj.db`）
+        就是这一条活过的证据。少一栏现在与 `JWT_SECRET_KEY` 同型：拒绝启动，说人话。
+        """
+        if not self.DATABASE_URL.strip():
+            raise ValueError(
+                "DATABASE_URL 未配置：请在 .env 中写明数据库地址后重启服务"
+                "（这一栏没有可用的默认值——退到默认会连上一只新建的空库，症状与丢数据一模一样）"
             )
         return self
 

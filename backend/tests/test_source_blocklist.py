@@ -497,7 +497,7 @@ class Test八_迁移接在那一头之后:
         parents = {p for p in seen.values() if p}
         heads = {r for r in seen if r not in parents}
         assert len(heads) == 1, f"链分叉了，`upgrade head` 当场报重复：{sorted(heads)}"
-        assert heads == {"c9f2a6d4e831"}, \
+        assert heads == {"d3a86f1c75b4"}, \
             f"链尾换了（现网台账里那个迁移头要一起改）：{sorted(heads)}"
 
 
