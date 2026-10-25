@@ -1,6 +1,13 @@
 const api = require('../../utils/api.js')
 const { t, texts } = require('../../utils/i18n.js')
 const { TIP_DOT } = require('../../utils/palette.js')
+const poster = require('../../utils/poster.js')
+
+/* 这一屏的底图与首页／列表**同一个出处**：`poster.homeBg()`＝本机那一枚「背景」槽 → 后台下发的
+   运营图 → 空。取不到就是空，那一态两层都不画（见 view.wxml 那两条 `wx:if`），整屏退回原来那层米白。
+   ⚠ 这一页原来还吃 `utils/imgBrightness.js` 的深浅两态（窗外那几行字要跟着壁纸翻墨／翻纸白）。
+   站长 10-24 第二句「打开的风格布局要一致性，不要另外设计」之后窗外一个字都不留 ⇒ 这一页不再判深浅，
+   共用实现本身一个字没动（首页／列表／详情窗照旧吃它）。 */
 
 Page({
   data: {
@@ -16,13 +23,23 @@ Page({
     figAt: 0,
     // 那枚小黄点的色只从 palette 出，不许抄进 wxss（与列表那扇详情窗同一条规矩）。
     tipDotStyle: `background:${TIP_DOT}`,
+    // 壁纸那一层的路径；**空＝只有这一层不画，窗外那档暗纱照旧铺满整屏**
+    // （与列表 `.float-mask` 同一条口径：纱跟着"窗开着"走，不跟着"有没有壁纸"走）。
+    bgSrc: '',
+    // 顶上那一条导航条与整屏那套皮，走全站唯一出口 `app.applyTheme`（详见 view.wxml 头里那条）。
+    themeClass: '',
   },
 
   async onLoad(options) {
     const app = getApp()
     const lang = app.globalData.userInfo?.language || 'zh'
-    this.setData({ lang, t: texts(lang) })
+    // themeClass 与其余页面同一句：这一屏外面那档暗纱要压在哪层底色上、窗那张面吃哪一档
+    // `--bg-card`，全由它决定。原来这一页没走这一句 ⇒ 导航条停在 `app.json` 那条写死的
+    // `#f4f2ec`，而列表那扇窗顶上是一条深色（站长 10-25「外面没有毛玻璃，一比一复刻」里
+    // 最上面那截就是这么来的）。
+    this.setData({ lang, t: texts(lang), themeClass: app.applyTheme(app.getWallpaper()) })
     app.setNavTitle('navShareView', lang)
+    this._readBg()
 
     // 小程序码带进来的 scene 是一段没保证的外部输入：一个残缺的百分号就能让
     // decodeURIComponent 抛 URIError。原来这一句写在 try 外面，抛了之后 loading
@@ -52,6 +69,10 @@ Page({
       if (share.title) {
         wx.setNavigationBarTitle({ title: share.title })
       }
+      // 正文到手再读一次底图：运营图是 app.js 进门那趟 pull 下来的，从扫码**直达**这一页时
+      // 它很可能比 onLoad 晚到几百毫秒，只读一次会让人停在"没有皮"那一态（同一台机第二次开就正常，
+      // 最难复现的那种"有时有有时没有"）。
+      this._readBg()
     } catch (err) {
       console.error('获取分享失败', err)
       this.setData({
@@ -61,6 +82,12 @@ Page({
           : t('loadFailed', lang),
       })
     }
+  },
+
+  // 底图取一次；同一个值不重复 setData。
+  _readBg() {
+    const src = poster.homeBg() || ''
+    if (src !== this.data.bgSrc) this.setData({ bgSrc: src })
   },
 
   // 存进自己的库：抄的是服务端那份公开快照，来源由服务端钉在笔记上，客户端改不掉。

@@ -1259,7 +1259,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  background: rgba(8, 10, 14, 0.45);
+  background: var(--glass-veil-dim);
   backdrop-filter: var(--glass-bf);
   -webkit-backdrop-filter: var(--glass-bf);
   z-index: 100;
