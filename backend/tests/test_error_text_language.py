@@ -66,10 +66,24 @@ def _english_problem(text):
     return None
 
 
+# 例外按**文件**放，不按词放。RoamMark 那一组口（`/api/roammark/*`）的用户界面是英文的、面向全球，
+# 而这条尺子钉的是图麦笔记那一侧"屏上不许出现英文"——两句都成立，所以只能分开钉。
+# ⚠ 不许把 `RoamMark`、`AI` 这类词加进 `ALLOWED_LATIN` 来"过尺子"：那等于给全站稀释判据，
+#   以后任何一句英文都过得去。反面那一条见下面 `test_RoamMark那一路的句子必须真是英文`，
+#   它和这一条共用同一个名单，所以名单里多一个文件就必须同时多写一条反面尺子。
+OTHER_PRODUCT_FILES = {"app/api/routes/roammark.py", "app/services/spot_draft.py"}
+
+
+def _rel(path) -> str:
+    return str(path.relative_to(APP_ROOT.parent)).replace("\\", "/")
+
+
 def test_所有路由文件里的detail字面量都是中文():
     offenders = []
     scanned = 0
     for path in sorted(APP_ROOT.rglob("*.py")):
+        if _rel(path) in OTHER_PRODUCT_FILES:
+            continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for lineno, text in _literal_detail_calls(tree):
             scanned += 1
@@ -78,6 +92,41 @@ def test_所有路由文件里的detail字面量都是中文():
                 offenders.append(f"{path.relative_to(APP_ROOT.parent)}:{lineno} {problem} → {text!r}")
     assert scanned >= 20, f"只扫到 {scanned} 处 detail，扫描本身可能失效了"
     assert not offenders, "这些 detail 会让用户看到英文：\n  " + "\n  ".join(offenders)
+
+
+def test_RoamMark那一路的句子必须真是英文():
+    """上面那条放行了这两个文件，这一条就是它的反面：这两个文件里的用户句子必须是英文。
+
+    钉的形状：`_fail(状态, code, 句子)` 的第三个参数、以及 `UserError(...)` / `NotConfigured(...)`
+    的字面参数。判据与那条中文尺子同一条、方向相反（有汉字＝红，因为海外包上没人看得懂）。
+    """
+    checked = []
+    for name in sorted(OTHER_PRODUCT_FILES):
+        path = APP_ROOT.parent / name
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            fname = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+            if fname == "_fail" and len(node.args) >= 3:
+                texts = [node.args[2]]
+            elif fname in ("UserError", "NotConfigured") and node.args:
+                texts = [node.args[0]]
+            else:
+                continue
+            for value in texts:
+                if isinstance(value, ast.JoinedStr):
+                    text = "".join(v.value for v in value.values if isinstance(v, ast.Constant) and isinstance(v.value, str))
+                elif isinstance(value, ast.Constant) and isinstance(value.value, str):
+                    text = value.value
+                else:
+                    continue
+                if text.strip():
+                    checked.append((f"{name}:{value.lineno}", text))
+    assert len(checked) >= 10, f"只扫到 {len(checked)} 句，这一条尺子本身可能失效了"
+    backslash = [f"{where} → {text!r}" for where, text in checked if _CJK.search(text)]
+    assert not backslash, "这两个文件是 RoamMark（英文界面）那一路，屏上句子回中文了：\n  " + "\n  ".join(backslash)
 
 
 def test_扫描器自己没瞎():

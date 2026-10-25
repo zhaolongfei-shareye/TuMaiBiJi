@@ -8,7 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import logging
 
-from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing, v1_auth, v1_account, mp_config, admin_ops, ops_page
+from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing, v1_auth, v1_account, mp_config, admin_ops, ops_page, roammark
 from app.core.error_codes import http_exception_handler
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
@@ -170,6 +170,11 @@ app.include_router(ops_page.router, tags=["admin"])
 # token 认的是后者）。两组门并存、互不开对方的房间，判据在 tests/test_v1_auth_and_link.py。
 app.include_router(v1_auth.router, prefix="/v1/auth", tags=["v1-auth"])
 app.include_router(v1_account.router, prefix="/v1/account", tags=["v1-account"])
+# RoamMark 那一路的 AI 转发（方案 docs/方案-roammark-AI转发.md）：路径写在模块里（/api/roammark/*），
+# 所以这里不给 prefix。⚠ 这一组口**不吃用户 JWT**，靠的是 `ROAMMARK_APP_GATE` 那枚门闩＋IP 限流＋三发舱壁，
+# 与上面两组门的钥匙来源完全不同——挂错依赖就等于给整条小程序用户开了一个匿名 AI 出口。
+# 现网是 inert 的：`.env` 里还没有 `ROAMMARK_APP_GATE` 那一行，所以两个口今天一律 503。
+app.include_router(roammark.router, tags=["roammark"])
 
 @app.get("/")
 async def root():

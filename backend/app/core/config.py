@@ -81,6 +81,25 @@ class Settings(BaseSettings):
     # 票的可信由这一台当场判——所以轮换这一行只影响"能不能换票"，不影响任何已发出去的登录态。
     ADMIN_EXCHANGE_SECRET: str = ""
 
+    # ---- RoamMark 那一路的景点初稿转发（方案 docs/方案-roammark-AI转发.md）----
+    # 这一组的钥**正常不在这里配**：站长 10-24 拍的是"后台那一栏我自己填"，所以它的正身是
+    # `service_secrets` 表里那行 `DEEPSEEK`；下面这一栏只是"库里那一行删掉之后回到哪一层"的那一层，
+    # 现网 `.env` 里今天**没有**这一行（有的那行叫 `DEEPSEEK_API_KEY`、是个占位符，这一路不吃它，
+    # 理由见 `services/spot_draft.py:current_key`）。留空就是"这一路没配"，接口回 503 说人话。
+    DEEPSEEK: str = ""
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
+    # ⚠ 能读图的只有 flash：官方价目页 Vision 那一栏 `deepseek-v4-pro` 写的是 Not supported（10-25 现读，
+    # 且现网那把钥真打 /models 回的就是这两枚）。换 model 名要一起换提示词那一路的期望，别只改这一行。
+    DEEPSEEK_VISION_MODEL: str = "deepseek-flash"
+    # 单发实测 19.6 秒（一次 9 图、服务器侧、峰时）⇒ 客户端那一侧的超时**必须比这个数大**，
+    # 否则服务器还在等、手机已经断了，看起来像我们的错（与 `HUNYUAN_CF_TIMEOUT` 上面那条同一个理由）。
+    DEEPSEEK_TIMEOUT: float = 90.0
+    # 这组口的门闩（`routes/roammark.py:_check_gate`）。**留空 = 整组 503**，与 `ADMIN_TOKEN`、
+    # `APPLE_CLIENT_ID` 同型：没配就必须是"这个功能不可用"，不能退化成"没配就当不检"。
+    # ⚠ 它不是密钥：这一串编在 RoamMark 的包里，逆向我就能拿到，所以它挡的是"随手 curl 刷钱"，
+    # 不挡铁了心的人——真正兜底的是 IP 限流与三发在飞那道舱壁。**别拿它当凭据轮换**。
+    ROAMMARK_APP_GATE: str = ""
+
     # ---- 外链贴图随笔记存档（方案 docs/方案-公众号贴图随笔记存档.md）----
     # 服务端手里没有云开发存储的写凭据（.env 现读：只有 WECHAT_*/JWT_*/ADMIN_*/DATABASE_URL/
     # REDIS_URL/CORS_ORIGINS 那一串），而那把 API Key 的形状是"网关地址＋Bearer Key 打一个云函数"。

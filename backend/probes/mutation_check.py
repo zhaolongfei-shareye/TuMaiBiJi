@@ -3,7 +3,8 @@
 全绿本身不证明测到了——断言可能压根没经过被改的那行，或者观测量本身就是被修的东西。
 每条变异跑完立刻还原；任何一条"改坏了还全绿"都说明那处修复是裸奔的。
 前 11 条是额度/注销那一轮，S1~S10 是分享快照这一轮，N1~N7 是 09-24 那次改口径
-（100 篇基础 + 动笔首篇或转存都算激活 + 同一篇只挣一次 + 带来几个人不限）。
+（100 篇基础 + 动笔首篇或转存都算激活 + 同一篇只挣一次 + 带来几个人不限），
+L1~L3 是日志装配那一轮，RM1~RM5 是 RoamMark 景点初稿转发那一腿（10-25）。
 """
 import subprocess
 import sys
@@ -349,6 +350,44 @@ MUTATIONS = [
         "    _app_log.addHandler(_app_handler)\n",
         "",
         "tests/test_logging_wired.py",
+    ),
+    # RM1~RM5：RoamMark 景点初稿那一腿（10-25，方案 docs/方案-roammark-AI转发.md §六）。
+    # ⚠ RM1、RM2、RM3 三把在 10-25 第一遍跑是**扑空**的（尺子有洞），补了尺子才咬住，
+    # 所以三条都留名在这里：谁动这八组用例，先读那三条对应的注释。
+    (
+        "RM1 留一枚没人叫的旧函数（舱壁从 Semaphore 换成一个整数后，那种一被叫上就当场 AttributeError 的死码）",
+        "app/services/spot_draft.py",
+        "async def draft_spot(images: list[bytes]",
+        "def _probe_dead_slot_state() -> bool:\n    return _inflight > 0\n\n\nasync def draft_spot(images: list[bytes]",
+        "tests/test_roammark_spot_draft.py::test_这两份新文件里不许留没人叫的函数",
+    ),
+    (
+        "RM2 舱壁从 3 发抬到 99 发（单发实测 19.6 秒，同一台机器上还跑着图麦笔记现网）",
+        "app/services/spot_draft.py",
+        "INFLIGHT_LIMIT = 3\n",
+        "INFLIGHT_LIMIT = 99\n",
+        "tests/test_roammark_spot_draft.py::test_舱壁就是三发这个数字",
+    ),
+    (
+        "RM3 摘掉合计字节那道闸（超限那一发交给 DeepSeek 去切 TLS，用户手机上只剩\"网络异常\"）",
+        "app/services/spot_draft.py",
+        "    if total > MAX_TOTAL_BYTES:\n",
+        "    if False and total > MAX_TOTAL_BYTES:\n",
+        "tests/test_roammark_spot_draft.py::test_合计字节那道闸真的在拦",
+    ),
+    (
+        "RM4 回体里多带一个图字节（\"只回话不回图\"那句成假话）",
+        "app/services/spot_draft.py",
+        '    out["took_ms"] = took_ms\n',
+        '    out["took_ms"] = took_ms\n    out["leak"] = images[0][:20].hex()\n',
+        "tests/test_roammark_spot_draft.py::test_回体只有那几键多一个都不行",
+    ),
+    (
+        "RM5 口令没配时当成\"不检\"（等于给整台机器开一个匿名 AI 出口）",
+        "app/api/routes/roammark.py",
+        "    if not gate:\n",
+        "    if False:\n",
+        "tests/test_roammark_spot_draft.py::test_口令没配时这一路整组关闭而不是不检",
     ),
 ]
 
