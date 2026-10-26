@@ -166,6 +166,33 @@ def test_有钥才打上游且打的是余额那只口(client, admin_pw, db, mon
     assert "赠金" in body["sentence"] and "充值" in body["sentence"] and "12.5" in body["sentence"]
 
 
+def test_官方把金额回成字符串时屏上那个数不许消失(client, admin_pw, db, monkeypatch):
+    """现网 10-26 现读：`/user/balance` 回的是 **字符串** `'11.02'`／`'0.00'`，不是数。
+
+    上面那一条用例喂的是浮点，所以它绿着而屏上念「共 —」——断言依赖的形状必须与真上游一致，
+    否则"测试全绿" cover 的是我自己编的那份回体。这一条就是照现网那一份逐字喂的。
+    """
+    monkeypatch.setattr(settings, "DEEPSEEK", SENTINEL_KEY)
+    resp = FakeResp(payload={"is_available": True, "balance_infos": [
+        {"currency": "CNY", "total_balance": "11.02", "granted_balance": "0.00", "topped_up_balance": "11.02"}]})
+    install_fake_get(monkeypatch, resp=resp)
+    body = client.get(BOARD, headers=ah(client)).json()["deepseek"]
+    assert body["state"] == "ok"
+    assert body["balances"] == [{"currency": "CNY", "total": 11.02, "granted": 0.0, "topped_up": 11.02}]
+    assert "—" not in body["sentence"], body["sentence"]
+    assert "11.02" in body["sentence"]
+
+
+def test_金额那几栏读不出数时保持没报不许补零(client, admin_pw, db, monkeypatch):
+    """空串与 `'abc'` 都不能变成 0.0：0 的意思是"没钱了"，读不出是"没报"，两句话相反。"""
+    monkeypatch.setattr(settings, "DEEPSEEK", SENTINEL_KEY)
+    install_fake_get(monkeypatch, resp=FakeResp(payload={"is_available": True, "balance_infos": [
+        {"currency": "CNY", "total_balance": "", "granted_balance": "abc", "topped_up_balance": None}]})
+    )
+    row = client.get(BOARD, headers=ah(client)).json()["deepseek"]["balances"][0]
+    assert row["total"] is None and row["granted"] is None and row["topped_up"] is None
+
+
 def test_回体里有指纹但没有钥值(client, admin_pw, db, monkeypatch):
     monkeypatch.setattr(settings, "DEEPSEEK", SENTINEL_KEY)
     install_fake_get(monkeypatch, resp=FakeResp(payload={"is_available": True, "balance_infos": []}))

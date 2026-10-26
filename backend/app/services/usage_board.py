@@ -135,10 +135,23 @@ def _is_json(resp: httpx.Response) -> bool:
 
 
 def _balance_row(info: Dict[str, Any]) -> Dict[str, Any]:
-    """官方那四栏原样收成数；缺哪一栏就是 None，不补 0（补 0 会把"没报"念成"是零"）。"""
+    """官方那四栏原样收成数；缺哪一栏就是 None，不补 0（补 0 会把"没报"念成"是零"）。
+
+    ⚠ 官方把金额回成**字符串**（现网 10-26 现读 `total_balance='11.02'`），所以这一把必须吃
+    数字串；只认 int/float 的话症状是"接口 200、余额明明在、屏上念「共 —」"。
+    """
     def num(key: str):
         value = info.get(key)
-        return float(value) if isinstance(value, (int, float)) else None
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value.strip())
+            except ValueError:
+                return None
+        return None
     return {
         "currency": (info.get("currency") or "").strip() or None,
         "total": num("total_balance"),
