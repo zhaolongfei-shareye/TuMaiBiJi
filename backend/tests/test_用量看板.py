@@ -335,6 +335,16 @@ def test_两张卡各说各的产品():
     assert "总用量" not in seg
 
 
+def test_那一栏屏上不许露出markdown痕迹():
+    """这一页零 `innerHTML`、动态文字一律走 `textContent`（页面顶部那条纪律），所以 `**粗体**`
+    与 `` `代码` `` 在这里**不会被渲染成样式，只会把符号原样念给人看**。
+    10-26 是本机真点那把尺子的屏照先看出来的（同一族：10-22 预置 84 篇那批字面星号）。"""
+    page = page_body()
+    seg = page.split("function renderUsage", 1)[1].split("function loadUsage", 1)[0]
+    assert "**" not in seg, "屏上那几句话里混进了 markdown 粗体标记"
+    assert "`" not in seg, "屏上那几句话里混进了反引号（这一页没有等宽渲染，只会露出符号）"
+
+
 def test_那一页里没有钥值():
     page = page_body()
     assert SENTINEL_KEY not in page
