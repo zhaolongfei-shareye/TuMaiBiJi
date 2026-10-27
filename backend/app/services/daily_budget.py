@@ -1,7 +1,9 @@
-"""每人每天的花费闸门（10-25 第八轮审计 M33；表见 `models/daily_usage.py`）。
+"""每人（以及 `/v1` 那一档全站）每天的花费闸门（10-25 第八轮审计 M33；表见 `models/daily_usage.py`）。
 
 站长 10-25 拍的档位：**提炼每人每天 50 条、内容检查每人每天 200 次**。数值不在这里写死，
 读 `settings.EXTRACT_DAILY_LIMIT`／`SEC_CHECK_DAILY_LIMIT`（`.env` 可抬，`deploy.sh` 每次都念键名）。
+10-27 起多一档 `KIND_EXTRACT_GLOBAL`（读 `EXTRACT_GLOBAL_DAILY_LIMIT`）：那一档记的不是人，是
+**全站一天**，因为 `/v1/extract` 没有账号可记人（理由全文在 config 那一栏的注释里）。
 
 三条口径写在这里，因为它们决定了这一条链的行为，而不是实现细节：
 
@@ -35,12 +37,22 @@ DAILY_TZ = timezone(timedelta(hours=8))
 KIND_EXTRACT = "extract"
 KIND_SEC_CHECK = "sec_check"
 KINDS = (KIND_EXTRACT, KIND_SEC_CHECK)
+# `/v1/extract` 的全站日闸（档位见 `settings.EXTRACT_GLOBAL_DAILY_LIMIT`，为什么需要这一档
+# 写在 config 那一栏的注释里）。**故意不并进 `KINDS`**：`KINDS` 同时是
+# `GET /api/user/usage-today` 回体的键集合，那是现网小程序正在读的接口，多一个键就是
+# 已上线行为的变更（契约 §六 开头那句"现有 `/api/...` 全部保留不动"）。这一档记的是
+# **全站**，不是"这个人今天用了多少"，念给单个用户看也没有意义。
+KIND_EXTRACT_GLOBAL = "extract_global"
+CHARGEABLE_KINDS = KINDS + (KIND_EXTRACT_GLOBAL,)
 
 # 屏上那两句中文的唯一个出处：接口回 429 时念它，`GET /api/user/usage-today` 也把它回给客户端，
 # 所以"限制是多少"这句话只有一份，不会一处写 50、一处写 20。
 _SENTENCE = {
     KIND_EXTRACT: "今天的提炼次数用完了（每天 {limit} 条），明天再来",
     KIND_SEC_CHECK: "今天的内容检查次数用完了（每天 {limit} 次），明天再来",
+    # 全站那一档被打满时**不是坏了**，是今天的口子用完了：话术里带档位与"明天"，
+    # 与上面两档同一个形状（这一句会原样发到 iPhone 那一端念出来，所以两边只此一份）。
+    KIND_EXTRACT_GLOBAL: "今天服务器上的提炼都用完了（全站每天 {limit} 条），明天再来",
 }
 
 
@@ -62,7 +74,9 @@ def limit_of(kind: str) -> int:
         return settings.EXTRACT_DAILY_LIMIT
     if kind == KIND_SEC_CHECK:
         return settings.SEC_CHECK_DAILY_LIMIT
-    raise KeyError(f"未登记的日量种类：{kind!r}（要加一档请先加进 KINDS 与 _SENTENCE）")
+    if kind == KIND_EXTRACT_GLOBAL:
+        return settings.EXTRACT_GLOBAL_DAILY_LIMIT
+    raise KeyError(f"未登记的日量种类：{kind!r}（要加一档请先加进 CHARGEABLE_KINDS 与 _SENTENCE）")
 
 
 def today() -> str:

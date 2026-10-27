@@ -8,7 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import logging
 
-from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing, v1_auth, v1_account, mp_config, admin_ops, ops_page, roammark
+from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing, v1_auth, v1_account, v1_extract, mp_config, admin_ops, ops_page, roammark
 from app.core.error_codes import http_exception_handler
 from app.core.rate_limit import limiter, rate_limit_exception_handler
 from app.core.config import settings
@@ -170,6 +170,11 @@ app.include_router(ops_page.router, tags=["admin"])
 # token 认的是后者）。两组门并存、互不开对方的房间，判据在 tests/test_v1_auth_and_link.py。
 app.include_router(v1_auth.router, prefix="/v1/auth", tags=["v1-auth"])
 app.include_router(v1_account.router, prefix="/v1/account", tags=["v1-account"])
+# iPhone 那一发"只要提炼结果"的口（站长 10-27 拍的甲）。它挂在 `/v1` 下**但不吃 token**：
+# 那一端没有账号（`ios/Sources` 全仓 0 处 `AuthenticationServices`），靠的是门闩＋IP 限流＋
+# 舱壁＋全站日闸那四样叠起来，理由与"为什么不在服务端建笔记"的全文在 `routes/v1_extract.py` 顶上。
+# ⚠ 现网 `TUMARKNOTE_APP_GATE` 还没配 ⇒ 这一口今天一律 503（inert），配了才真的开始花钱。
+app.include_router(v1_extract.router, prefix="/v1/extract", tags=["v1-extract"])
 # RoamMark 那一路的 AI 转发（方案 docs/方案-roammark-AI转发.md）：路径写在模块里（/api/roammark/*），
 # 所以这里不给 prefix。⚠ 这一组口**不吃用户 JWT**，靠的是 `ROAMMARK_APP_GATE` 那枚门闩＋IP 限流＋三发舱壁，
 # 与上面两组门的钥匙来源完全不同——挂错依赖就等于给整条小程序用户开了一个匿名 AI 出口。

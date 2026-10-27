@@ -281,7 +281,13 @@ class TestCloudFunctionOutcomes:
 
 class TestContractStaysSingle:
     def test_entry_point_count_is_two(self):
-        """F6 约束 2：换供应商不得新增第三个 extract_knowledge 调用点。"""
+        """F6 约束 2：换供应商不得新增第三个 extract_knowledge 调用点。
+
+        名单 10-27 从一格变两格，**加的那一格不是第二家供应商**：`api/routes/v1_extract.py`
+        是同一份提炼的第二个**客户**（iPhone 那一路，站长拍的甲），它照样只调 `llm.extract_knowledge`，
+        换供应商时该改的还是 `llm.py` 那一个文件。约束本身没松——它钉的是"provider 分支不许散落"，
+        而这一条名单的作用是让下一次散落的**人**必须停下来想一想自己加的是客户还是分支。
+        """
         import subprocess
         from pathlib import Path
 
@@ -303,7 +309,8 @@ class TestContractStaysSingle:
             callsites.add(parts[0])
         app_dir = str(root)
         rel = sorted(p.replace(app_dir + "/", "") for p in callsites)
-        assert rel == ["tasks/ingest_tasks.py"], f"提炼调用点漂移了：{rel}"
+        assert rel == ["api/routes/v1_extract.py", "tasks/ingest_tasks.py"], \
+            f"提炼调用点漂移了：{rel}"
 
     def test_deepseek_is_fully_gone(self):
         """定案是"只维护一家大模型"，留着旧分支等于下一个人还要问这 key 填不填。"""

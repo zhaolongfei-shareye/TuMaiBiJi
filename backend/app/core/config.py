@@ -50,6 +50,23 @@ class Settings(BaseSettings):
     # 读的是这两栏，改档位不会让用例假绿。
     EXTRACT_DAILY_LIMIT: int = 50
     SEC_CHECK_DAILY_LIMIT: int = 200
+    # `/v1/extract`（iPhone 那一发"只回提炼结果、不在服务端建笔记"的口）的**全站**日闸。
+    # 为什么那一档 50 挡不住这一口：`EXTRACT_DAILY_LIMIT` 记在"人"身上，而 iPhone 这一路
+    # 没有账号（现读：`ios/Sources` 全仓 0 处 `AuthenticationServices`，隐私那一屏明写
+    # 「这个应用没有账号」），能拿来记账的最多是一枚**设备自己生成的随机串**——那种串
+    # 每换一枚就多 50 条，所以**按设备记的只是公平，不是钱的上限**。钱的上限只能由这一栏
+    # 给：全站一天打满多少条，是一个能在控制台核对的数，不是一个"大概不会超"的乐观值。
+    # 档位推的哪一档写在 `services/daily_budget.py` 顶部那段（口径是"满输入一次约 1.2 万
+    # token"，那是**下界推算不是实付**——CloudBase 的 token→资源点折算系数官方不公开）。
+    EXTRACT_GLOBAL_DAILY_LIMIT: int = 200
+    # `/v1/extract` 那一步的墙钟上限（秒）。为什么这一口要自己掐一道而 `/api/ingest/*` 不掐：
+    # 那三路是 worker 里跑的，没有人在屏前等；这一路是用户在新建那一屏按下右滑条之后**等的那几秒**，
+    # 上游的 `HUNYUAN_CF_TIMEOUT` 是 90 秒、外面还套 `MAX_RETRIES=3`，最坏一分多钟，
+    # 那已经不是"提炼中"而是"看起来坏了"。到点按降级那一档回（摘要留空），与
+    # `llm.py:_degraded` 同一个形状，不另造一种"超时态"。
+    # ⚠ iPhone 那一端的请求超时必须比这一枚大（同 `DEEPSEEK_TIMEOUT` 上面那两条的理由：
+    # 服务器还在等、手机先断了，看起来像我们的错）。
+    EXTRACT_DEADLINE_SECONDS: float = 45.0
     # 分享卡片上那张小程序码指向哪个版本。微信的默认值是 release，而"page 必须存在于该版本"
     # 这条只在正式版里成立——所以在过审之前，那张码扫开必然是打不开的。填 trial 可以让
     # 它指向体验版（只有体验成员扫得动），**发布前必须改回 release**，否则真实用户扫到的
@@ -108,6 +125,14 @@ class Settings(BaseSettings):
     # ⚠ 它不是密钥：这一串编在 RoamMark 的包里，逆向我就能拿到，所以它挡的是"随手 curl 刷钱"，
     # 不挡铁了心的人——真正兜底的是 IP 限流与三发在飞那道舱壁。**别拿它当凭据轮换**。
     ROAMMARK_APP_GATE: str = ""
+    # 图麦笔记 iPhone 那一路匿名口的门闩（`routes/v1_extract.py:_check_gate`），形状照上面那枚抄，
+    # 理由也一样：**留空 = 这一口 503**，不是"没配就当不检"。
+    # 为什么 iPhone 这一口需要它：那一端**没有账号**（现读 `ios/Sources` 全仓 0 处
+    # `AuthenticationServices`，隐私那一屏明写「这个应用没有账号」），所以它拿不出一个"只有本人
+    # 才有"的东西；能把刷钱从"随手 curl"抬到"先从包里把这串扒出来"的，就只有这一枚共享门闩
+    # ＋ IP 限流 ＋ 在飞舱壁 ＋ 全站日闸那四样叠起来。单独任何一样都不够，这句要留在账上。
+    # ⚠ 它不是凭据，别按密钥轮换它；换它要连 App 包一起重发。
+    TUMARKNOTE_APP_GATE: str = ""
 
     # ---- 外链贴图随笔记存档（方案 docs/方案-公众号贴图随笔记存档.md）----
     # 服务端手里没有云开发存储的写凭据（.env 现读：只有 WECHAT_*/JWT_*/ADMIN_*/DATABASE_URL/
