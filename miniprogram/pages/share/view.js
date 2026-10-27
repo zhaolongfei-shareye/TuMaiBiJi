@@ -90,22 +90,19 @@ Page({
     if (src !== this.data.bgSrc) this.setData({ bgSrc: src })
   },
 
-  /* M10：从详情页 `navigateBack` 退回来这一趟，把「已存入笔记」清回未存。
-     为什么这一类要复位：存完那一跳把人送到他自己那一篇的详情页，而删除按钮就在那一屏底下——
-     他删掉之后库里再没有这篇，落地页还念完成时，而且 `saveToMine` 见 `saved` 就 return，
-     按下去一个字都不发生（要重存只能退出小程序重新扫码）。
-     ⚠ 只认这一类入口，不在 `onShow` 里无条件复位：原生全屏层收回（`wx.previewImage` 那类，
-     本页那排大图就走它）与从后台切回前台也都会补发一次 `onShow`，那两类里笔记一个字没动，
-     清了就等于把真存过的那一篇重新亮成"还能再存一次"。所以复位与否由 `saveToMine` 跳出去
-     时立的那面旗判定，跳一次只认一次。
-     服务端那一道"同一人同一篇只留一份"的闸兜得住重按：删没删都回同一条、跳的还是同一篇。 */
-  onShow() {
-    if (!this._backFromDetail) return
-    this._backFromDetail = false
-    this.setData({ saved: false })
-  },
-
   // 存进自己的库：抄的是服务端那份公开快照，来源由服务端钉在笔记上，客户端改不掉。
+  /* 存完落在**他自己的笔记列表**（站长 10-27 原话「存入后，不要跳到这里，要直接跳到用户的笔记
+     列表」——把 10-25 那句「自动跳转到…该笔记详情页」翻了，落点从整页详情换成列表那一屏）。
+     列表是 tab 页 ⇒ 只有 `switchTab` 进得去（`navigateTo`／`redirectTo` 对 tab 页一律失败）。
+     ⚠ 这一跳会把落地页整个销毁（官方那句"并关闭所有其它页面"），三条连带都在这儿，别当漏改补回去：
+     · 原来给"从详情页退回来"准备的那一面 `saved` 复位旗（M10）没有对象了 ⇒ 一并撤掉。
+       "删了再存"那条路现在必然始于一屏全新的落地页（`saved` 出生就是假），不复位也存得进。
+     · 服务端回体里那个 `id` 在这一屏没有消费者了，所以不接变量：列表 `onShow` 那趟按
+       `created_at` 倒序重取整表，刚存那一篇自己就落在顶上第一行 ⇒ **回执由那一行给**。
+       （原来那句「你已收藏该笔记」是详情页页底那条 bar 说的，换落点之后这一屏没有那条 bar；
+        「有 N 张图没能存下来」那半句同理暂时没有说它的地方——已摆成待拍，不替他决定补不补。）
+     · `saved` 这一枚仍置真：`switchTab` 万一没成（页面栈异常那一类），人留在这一屏，
+       按钮得念「已存入笔记」，而不是让他再按一次。 */
   async saveToMine() {
     const { lang, share, saving, saved } = this.data
     if (!share || saving || saved) return
@@ -115,28 +112,9 @@ Page({
       // 落地页是免登录可读的，但"存进我的笔记"必须有身份。扫码进来时 onLaunch 那条
       // 静默登录通常早就回来了，这里只是兜住它还没回来的那一瞬。
       if (!app.globalData.token) await app.getLoginPromise()
-      const note = await api.importFromShare(share.token)
+      await api.importFromShare(share.token)
       this.setData({ saving: false, saved: true })
-      // 存完直接把人送到自己那一篇上（站长 10-25「存入后，自动跳转到转存用户的图麦笔记该笔记
-      // 详情页，就是下方多了 bar，提醒用户，你已收藏该笔记」）。那一口的回体就是新建的这篇
-      // （`response_model=NoteDetail`），`id` 由服务端给，客户端不猜。
-      // ⚠ 原来这一句是一枚 toast，现在那句话由那一页页底那条 bar 说 ⇒ toast 撤了：
-      //    它是全屏的、跟着跳到下一页还会挂着，同一句话在两页各念一遍。
-      // 用 navigateTo 不用 redirectTo：返回那一枚留着，读者还能回到刚才那一屏接着看。
-      // M7 客户端半：服务端这一趟开始在回体里多带 `images_kept`／`images_failed` 两个整数。
-      // ⚠ 现网那半还没部署时这一栏是 `undefined` ⇒ 先判类型再用：不是数字就当一个没少，
-      // 绝不把 `undefined` 拼上屏；一张没少（0）时一个字都不加，不啰嗦。
-      const failed = note && typeof note.images_failed === 'number' ? note.images_failed : 0
-      // 那句实话挂在详情页底下那条已有的 bar 后面，所以数随 query 带过去：
-      // "这次少带了几张"只有存成这一趟知道，`GET /notes/{id}` 那份回答不了。
-      // 这一句 `saved=1` 之外只多带一枚 `imgFail`，是给那句实话的数，不是新功能。
-      this._backFromDetail = true
-      wx.navigateTo({
-        url: `/pages/detail/detail?id=${note.id}&saved=1${failed > 0 ? '&imgFail=' + Math.floor(failed) : ''}`,
-        // 页面栈满时这一跳是失败的：人还站在这一屏、笔记是真存过的，那面旗就不该立着
-        // （立着会让下一次任何一类 `onShow` 误把 `saved` 清掉）。
-        fail: () => { this._backFromDetail = false },
-      })
+      wx.switchTab({ url: '/pages/index/index' })
     } catch (err) {
       console.error('转存失败', err)
       this.setData({ saving: false })

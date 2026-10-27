@@ -315,12 +315,15 @@ const ck = (name, ok, got) => {
   }
   console.log('　截图 ' + await shot('69-落地页同窗-没铺图那一态.png'))
 
-  // ---------- 存完跳到详情页＋页底那条 bar（站长 10-25「存入后，自动跳转到转存用户的图麦笔记
-  // 该笔记详情页，就是下方多了 bar，提醒用户，你已收藏该笔记」）----------
+  // ---------- 存完落在哪一屏（10-25 拍"跳详情页＋页底那条 bar"→ 10-27 他翻成「存入后，不要跳到
+  // 这里，要直接跳到用户的笔记列表」）＋详情页那一枚 `saved=1` 开关本身 ----------
   // ⚠ 这一节**只读现网、一行都不写**：拿他名下已有的一篇，带 `saved=1` 开一次、不带再开一次。
   //    为什么不在这儿真点那枚「存入笔记」：那一下会在现网多造一篇笔记＋最多九行云上配图，
   //    跑一遍留一次残留（#337 那一格还挂着没清，不能再往里添）。真点那一段归
-  //    `验-转存与作者.js`——它跑在本地临时库上、吃的就是这一份树，去重与跳转都归它验。
+  //    `验-转存与作者.js`——它跑在本地临时库上、吃的就是这一份树，去重与落点都归它验。
+  // ⚠ 下面那一大段量的是**详情页那一枚开关自己**（带 `saved=1` 才画那条 bar）。10-27 换落点之后
+  //    链上**没有任何一处再带这个参数** ⇒ 那条 bar 此刻在真跑路径上走不到；开关代码还留着，
+  //    "要不要一并撤"是他的待拍（见 §8.499）。这几条读的是代码与那一屏的行为，不是链上落点。
   const APIJS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/api.js'), 'utf8')
   const BASE_URL = (APIJS.match(/const API_BASE = '([^']+)'/) || [])[1] || ''
   const VIEWJS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/share/view.js'), 'utf8')
@@ -329,16 +332,22 @@ const ck = (name, ok, got) => {
   const DETAILWXML = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/detail/detail.wxml'), 'utf8')
   const I18N = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'), 'utf8')
   const DCODE = DETAILWXSS.replace(/\/\*[\s\S]*?\*\//g, '')
-  // 落地页那一头的接线（源码级）：存完拿服务端回的 `note.id` 跳详情页，带上 `saved=1`。
+  // 落地页那一头的接线（源码级）：存完落的是**笔记列表**那一枚 tab。
   const saveBody = (VIEWJS.match(/async saveToMine\(\)[\s\S]*?\n  \},/) || [''])[0]
-  ck('存完那一趟跳详情页，url 带的是服务端回的 `note.id` ＋ `saved=1`（源码级）',
-    /wx\.navigateTo\(\{ url: `\/pages\/detail\/detail\?id=\$\{note\.id\}&saved=1` \}\)/.test(saveBody),
+  ck('存完那一趟落的是笔记列表（`switchTab` 到 /pages/index/index；列表是 tab，只有这一条进得去）',
+    /wx\.switchTab\(\{ url: '\/pages\/index\/index' \}\)/.test(saveBody),
     saveBody ? '这一句在' : 'saveToMine 函数体没抠出来')
+  // 反向的牙：老那一跳（推独立详情页、带 `saved=1`）要是一天被人写回来，上面那条绿不算数、这一条必须红。
+  ck('反向：那一趟不再推独立详情页，也不再把 `saved=1`／`imgFail` 拼进 url',
+    !/navigateTo[\s\S]{0,200}pages\/detail\/detail/.test(saveBody) && !/saved=1/.test(saveBody),
+    '源码级断言')
   // ⚠ 只看**成功那一段**（`} catch` 之前）：失败那一路的 toast 是留着的（念服务端回的那句原因），
   //   拿整段函数体判"有没有 showToast"会把这条留着的正确行为判成红——第一版就红在这枚括号上。
-  ck('成功那枚 toast 撤了（同一句话由详情页那条 bar 说，两页各念一遍是重复）',
+  ck('成功那枚 toast 仍然没有（回执由列表顶上那一行给，屏上不另造一句话）',
     !/wx\.showToast/.test((saveBody.split('} catch')[0] || '').split('await api.importFromShare')[1] || ''),
     '源码级断言')
+  ck('落地页不再需要 `onShow` 复位那一面旗（M10 随换落点一起作废）',
+    !/_backFromDetail/.test(VIEWJS) && !/onShow\s*\(/.test(VIEWJS), '源码级断言（整只文件）')
   ck('那一枚开关只认 `saved === \'1\'`（平时从列表点开同一篇不许再提醒一遍）',
     /savedBar: options\.saved === '1'/.test(DETAILJS), '源码级断言')
   ck('那句话写死两支都在，中文逐字＝他原话「你已收藏该笔记」（屏上不许拼词、也不许留英文占位）',

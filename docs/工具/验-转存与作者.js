@@ -140,28 +140,38 @@ const mintOther = () => {
     await mp.screenshot({ path: `${SHOT}/v1-落地页作者与按钮.png` })
 
     // ---- 真点一下转存 ----
-    // 10-25 起这一枚点完**不再停在扫码那一屏**（站长「存入后，自动跳转到转存用户的图麦笔记
-    // 该笔记详情页，就是下方多了 bar，提醒用户，你已收藏该笔记」）⇒ 落点是详情页、那句话由页底
-    // 那条 bar 说。原来这两条读的是"按钮换文案"，现在那一页退到栈底，改读**落在哪一屏**与
-    // **那条 bar 念什么**；按钮那一态另外 navigateBack 回这一屏再读（它仍然要跟着变）。
+    // 落点这一条链改过两回：10-25 拍「存入后…自动跳转到该笔记详情页，下方多了 bar 提醒『你已收藏
+    // 该笔记』」；10-27 他看着那一屏说「**存入后，不要跳到这里，要直接跳到用户的笔记列表**」⇒ 现在
+    // 落在**笔记列表**（列表是 tab 页，代码里只有 `switchTab` 进得去）。判据跟着换三条口径：
+    //   · 读的是"落在哪一屏"，不再读那条 `.saved-bar`——它只在带 `saved=1` 进详情页时才画，
+    //     而换落点之后链上**没有任何一处再带这个参数**（那一枚开关本身还在 `detail.js` 里，归待拍）。
+    //   · `switchTab` 会把落地页整个销毁 ⇒ "回到扫码那一屏"不再是 `navigateBack`，只能重新进一次页，
+    //     而这一条正是 M10 那面复位旗撤掉后的替代判据：每次进来都是一屏新的。
+    //   · 回执改由列表顶上那一行给 ⇒ 所以这一节必须钉住"屏上第一行就是刚存的这一篇"。
     const before = await (await fetch(`${BASE}/api/notes/?limit=100`, { headers: H })).json()
     await (await page.$('.sv-ibtn')).tap()
     const routeNow = () => mp.evaluate(() => getCurrentPages().slice(-1)[0].route)
-    const landOn = await wait(async () => ((await routeNow()) === 'pages/detail/detail' ? 'y' : null), 25000, 700)
-    ck('点完那一枚，人落在自己的详情页上（不再停在扫码那一屏）', !!landOn, `现在这一屏=${await routeNow()}`)
-    const dp = await mp.currentPage()
-    const barTxt = (await txt(await dp.$$('.saved-bar'))).join('|')
-    ck('页底那条 bar 念的是那句「你已收藏该笔记」', barTxt === '你已收藏该笔记', barTxt || '屏上没有 .saved-bar')
-    await mp.screenshot({ path: `${SHOT}/v2-点完转存.png` })
+    const landOn = await wait(async () => ((await routeNow()) === 'pages/index/index' ? 'y' : null), 25000, 700)
+    ck('点完那一枚，人落在自己的笔记列表上（不再停在扫码那一屏，也不再进详情页）', !!landOn, `现在这一屏=${await routeNow()}`)
+    await mp.screenshot({ path: `${SHOT}/v2-点完转存落列表.png` })
 
     const after = await (await fetch(`${BASE}/api/notes/?limit=100`, { headers: H })).json()
     const a0 = (before.items || before).length, a1 = (after.items || after).length
     ck('库里只多出这一篇（点一次只存一篇）', a1 === a0 + 1, `${a0} → ${a1}`)
     const mine = (after.items || after).find((x) => x.source_type === 'share_import')
     ck('多篇笔记里能认出这一篇是转存来的', !!mine, `id=${mine && mine.id}`)
-    ck('跳过来这一屏认的就是刚存那一篇（页面 noteId＝列表里那一条）',
-      String((await dp.data('noteId')) || '') === String(mine && mine.id),
-      `页面 noteId=${await dp.data('noteId')}｜列表那一条=${mine && mine.id}`)
+    // ⚠ 这一条必须**等**：`switchTab` 把路由切到列表那一瞬，列表 `onShow` 那趟整表重取还没回来，
+    //   当场读 `notes` 读到的是空表或上一批 ⇒ 不轮询就是环境红，不是判据红。
+    const topNotes = () => mp.currentPage().then((p) => p.data('notes')).then((v) => v || [])
+    const landList = await wait(async () => {
+      const arr = await topNotes()
+      return arr.length && String(arr[0].id) === String(mine && mine.id) ? 'y' : null
+    }, 25000, 700)
+    const listNotes = await topNotes()
+    const topRow = listNotes[0] || {}
+    ck('列表屏上第一行就是刚存那一篇（回执由那一行给，不再靠详情页那条 bar）',
+      !!landList,
+      `屏上第一行=${topRow.id}｜刚存那一篇=${mine && mine.id}｜notes ${listNotes.length} 篇`)
     ids.push(mine.id)
     const copy = await (await fetch(`${BASE}/api/notes/${mine.id}`, { headers: H })).json()
     const same = ['title', 'summary', 'tags', 'key_points', 'key_links', 'source_url']
@@ -172,32 +182,30 @@ const mintOther = () => {
       copy.imported_from.title_at_import === other.title && !!copy.imported_from.imported_at,
       JSON.stringify(copy.imported_from))
 
-    // ---- 回到扫码那一屏：按钮那一态 + 再存一次不该复制第二篇 ----
-    await mp.navigateBack()
-    await sleep(2000)
-    const afterRow = (await txt(await page.$$('.sv-ibtn'))).join('|')
-    ck('按钮文案换成「已存入笔记」', afterRow === '已存入笔记', afterRow)
-    ck('这一页自己那枚开关也置上了', !!(await page.data('saved')), `saved=${await page.data('saved')}`)
-    // 再点这一枚会被**本页那枚 `saved`** 挡住，请求根本发不出去，所以"重复入库"这件事必须换一次
-    // 进页面才试得出来（读者第二天又扫同一张码，就是这个态）。挡它的正闸是服务端那道去重
-    // （站长 10-25「一个用户不能重复收藏同一篇笔记，除非删了再收藏，避免冗余数据」）：
-    // 第二趟照样 200、照样跳详情页、但回的是**已有那一条的 id**，库里一行都不许多。
+    // ---- 重新进一次扫码那一屏：按钮那一态 + 再存一次不该复制第二篇 ----
+    // 原来这一段是 `navigateBack` 回落地页读按钮态。10-27 换落点之后回不去：`switchTab` 会把
+    // 落地页整个销毁（官方那句"并关闭所有其它页面"），那一枚页面实例上连 DOM 都没有了 ⇒ 改成
+    // 重新进页。这恰好就是"读者第二天又扫同一张码"那一态，也是 M10 那面复位旗撤掉后的正面证据：
+    // 每次进来都是一屏新的（`saved` 出生就是假），要重存不需要谁去清它。
     const c1 = await (await fetch(`${BASE}/api/notes/?limit=100`, { headers: H })).json()
     page = await mp.reLaunch(`/pages/share/view?token=${other.share_token}`)
     await sleep(3500)
+    const reRow = (await txt(await page.$$('.sv-ibtn'))).join('|')
+    ck('重新进这一屏，按钮念回「存入笔记」而且 `saved` 是假（落地页每回都是一屏新的）',
+      reRow === '存入笔记' && !(await page.data('saved')), `${reRow}｜saved=${await page.data('saved')}`)
+    // 挡"重复入库"的正闸是服务端那道去重（站长 10-25「一个用户不能重复收藏同一篇笔记，除非删了
+    // 再收藏，避免冗余数据」）：第二趟照样 200、照样落列表，但库里回的是**已有那一条**，一行都不许多。
     await (await page.$('.sv-ibtn')).tap()
-    const landOn2 = await wait(async () => ((await routeNow()) === 'pages/detail/detail' ? 'y' : null), 25000, 700)
-    ck('第二次存同一篇照样跳进详情页（第二趟也是那一句提醒，不另造一种屏上态）',
-      !!landOn2, `现在这一屏=${await routeNow()}`)
-    const dp2 = await mp.currentPage()
-    ck('第二次跳过来认的还是那一条（服务端回的是已有的那条 id，不是新造的那条）',
-      String((await dp2.data('noteId')) || '') === String(mine.id),
-      `页面 noteId=${await dp2.data('noteId')}｜第一次存的那条=${mine.id}`)
-    ck('第二次那条 bar 照旧念那一句', (await txt(await dp2.$$('.saved-bar'))).join('|') === '你已收藏该笔记')
-    await mp.screenshot({ path: `${SHOT}/v2b-第二次存同一篇.png` })
+    const landOn2 = await wait(async () => ((await routeNow()) === 'pages/index/index' ? 'y' : null), 25000, 700)
+    ck('第二次存同一篇照样落在笔记列表（第二趟不另造一种屏上态）', !!landOn2, `现在这一屏=${await routeNow()}`)
+    await mp.screenshot({ path: `${SHOT}/v2b-第二次存同一篇落列表.png` })
     const c2 = await (await fetch(`${BASE}/api/notes/?limit=100`, { headers: H })).json()
-    ck('已经存过之后再存不许多造一行（避免冗余数据）', (c2.items || c2).length === (c1.items || c1).length,
-      `${(c1.items || c1).length} → ${(c2.items || c2).length}`)
+    const arr2 = c2.items || c2
+    ck('已经存过之后再存不许多造一行（避免冗余数据）', arr2.length === (c1.items || c1).length,
+      `${(c1.items || c1).length} → ${arr2.length}`)
+    ck('那一篇在名下仍然只有一份（服务端回的是已有那条 id，没新造）',
+      arr2.filter((x) => x.id === mine.id).length === 1,
+      `${arr2.filter((x) => x.id === mine.id).length} 份｜第一次存的那条=${mine.id}`)
 
     // ---- 详情页那一栏来源 ----
     page = await mp.reLaunch(`/pages/detail/detail?id=${mine.id}`)
