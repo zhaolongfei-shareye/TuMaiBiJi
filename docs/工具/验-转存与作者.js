@@ -144,7 +144,8 @@ const mintOther = () => {
     // 该笔记』」；10-27 他看着那一屏说「**存入后，不要跳到这里，要直接跳到用户的笔记列表**」⇒ 现在
     // 落在**笔记列表**（列表是 tab 页，代码里只有 `switchTab` 进得去）。判据跟着换三条口径：
     //   · 读的是"落在哪一屏"，不再读那条 `.saved-bar`——它只在带 `saved=1` 进详情页时才画，
-    //     而换落点之后链上**没有任何一处再带这个参数**（那一枚开关本身还在 `detail.js` 里，归待拍）。
+    //     而换落点之后链上没有任何一处再带这个参数；10-27 他那句「按你建议来」之后那条 bar 连同
+    //     标记、皮、字典两支一起撤了（撤净没有由 `验-落地页玻璃-真跑.js` 那几条源码级断言钉）。
     //   · `switchTab` 会把落地页整个销毁 ⇒ "回到扫码那一屏"不再是 `navigateBack`，只能重新进一次页，
     //     而这一条正是 M10 那面复位旗撤掉后的替代判据：每次进来都是一屏新的。
     //   · 回执改由列表顶上那一行给 ⇒ 所以这一节必须钉住"屏上第一行就是刚存的这一篇"。
@@ -206,6 +207,55 @@ const mintOther = () => {
     ck('那一篇在名下仍然只有一份（服务端回的是已有那条 id，没新造）',
       arr2.filter((x) => x.id === mine.id).length === 1,
       `${arr2.filter((x) => x.id === mine.id).length} 份｜第一次存的那条=${mine.id}`)
+
+    // ---- 筛正开着时存完看不见那一篇（10-27 他拍甲＝存完把筛与词清回「全部」，且**只在这一趟**清）----
+    // 上面那两跳之后人停在列表、栈里只有列表这一页。这一节先用 setData 把列表摁成"筛着一格＋带一个词"
+    // （生产上这就是他自己正在翻某个分类），再从列表 `navigateTo` 进落地页——列表是 tab 页，
+    // `navigateTo` 不销毁它 ⇒ 那一格状态真的留在栈里等着被清；换成 `reLaunch` 就量不到东西了。
+    // 然后点第三枚「存入笔记」：服务端去重回的还是已有那条（200），落点仍是列表，但这一趟必须把他
+    // 挑的那一格清回「全部」，否则刚存的（默认「未分类」）不在筛出的那批里 ⇒ 人到了列表却看不见它。
+    const listPage = await mp.currentPage()
+    await listPage.setData({ selectedCategory: 999, searchKeyword: '筛着某一格时存进来的' })
+    ck('先把列表摁成"筛着一格＋带一个词"（这一节的前置；没摁上后面三条都是假绿）',
+      (await listPage.data('selectedCategory')) === 999
+      && (await listPage.data('searchKeyword')) === '筛着某一格时存进来的',
+      `筛=${await listPage.data('selectedCategory')}｜词=${await listPage.data('searchKeyword')}`)
+    page = await mp.navigateTo(`/pages/share/view?token=${other.share_token}`)
+    const gotBack = await wait(async () => ((await page.data('share')) ? 'y' : null), 30000, 800)
+    ck('从列表那一头进同一张码的落地页（列表那一页留在栈里，这一节才量得到"那一格"）', !!gotBack)
+    await (await page.$('.sv-ibtn')).tap()
+    const landOn3 = await wait(async () => ((await routeNow()) === 'pages/index/index' ? 'y' : null), 25000, 700)
+    ck('第三趟点完仍落回笔记列表（去重那一趟的落点与第一趟同一，不另造一种屏上态）',
+      !!landOn3, `现在这一屏=${await routeNow()}`)
+    const list3 = await mp.currentPage()
+    const f3 = await list3.data('selectedCategory')
+    const k3 = await list3.data('searchKeyword')
+    ck('存完这一趟筛与词清回「全部」（甲：不清就看不见刚存那一篇）',
+      (f3 === null || f3 === undefined) && (k3 === '' || k3 === undefined),
+      `筛=${f3}｜词=${k3}`)
+    const visTop = await wait(async () => {
+      const arr = (await list3.data('notes')) || []
+      return arr.length && String(arr[0].id) === String(mine.id) ? 'y' : null
+    }, 25000, 700)
+    const arr3 = (await list3.data('notes')) || []
+    ck('清完之后屏上第一行就是刚存那一篇（这一节要证的正是"看得见"）', !!visTop,
+      `第一行=${(arr3[0] || {}).id}｜刚存那一篇=${mine.id}｜notes ${arr3.length} 篇`)
+    await mp.screenshot({ path: `${SHOT}/v2c-筛着某格时存完清回全部.png` })
+    // 反向的牙：这一刀只能是**一次性交接**，不能是"每次进列表都清"。这里再摁一格、用 tab 之间正常
+    // 的来回（不带那一枚旗）走一趟，那一格必须原样留着——留了才证明上面那条绿是旗造成的，
+    // 而不是 onShow 里无条件清了一刀（那会把他自己浏览时挑的格子改掉，不是他要的）。
+    await list3.setData({ selectedCategory: 888 })
+    await mp.evaluate(() => wx.switchTab({ url: '/pages/me/me' }))
+    await sleep(1500)
+    await mp.evaluate(() => wx.switchTab({ url: '/pages/index/index' }))
+    const still = await wait(async () => {
+      const p = await mp.currentPage()
+      const v = await p.data('selectedCategory')
+      return v === 888 ? 'y' : null
+    }, 20000, 700)
+    const list4 = await mp.currentPage()
+    ck('反向：不带那一枚旗的正常进列表，那一格原样留着（清只跟着那一趟走）',
+      !!still, `筛=${await list4.data('selectedCategory')}`)
 
     // ---- 详情页那一栏来源 ----
     page = await mp.reLaunch(`/pages/detail/detail?id=${mine.id}`)

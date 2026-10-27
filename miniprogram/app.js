@@ -73,12 +73,24 @@ App({
     // 同样只放内存：这是一次导航意图，不是一台设备的状态——留着它，下次进列表页会莫名弹出一扇
     // 他三分钟前刚存过的笔记。取走即清，见 consumePendingDetail()。
     pendingDetailNoteId: 0,
+    // 「这一次进列表页要把筛选与搜索词清回全部」那一次交接（站长 10-27「存入后…直接跳到用户的
+    // 笔记列表」之后定的一条）：读者从扫码那一屏存完跳过来时，列表若正筛着某个分类或带着一个搜索词，
+    // 刚存的那一篇（默认「未分类」）就不在筛出的那批里 ⇒ 看着像没存上。
+    // ⚠ 只在这一趟清，不是"每次进列表都清"——后者会把他自己浏览时挑的那一格改掉。同样只放内存、
+    // 取走即清（这是一次导航意图，不是一台设备的状态，留着它下次进列表会莫名把筛丢掉）。
+    pendingResetFilter: false,
   },
 
   consumePendingDetail() {
     const id = this.globalData.pendingDetailNoteId
     this.globalData.pendingDetailNoteId = 0
     return id || 0
+  },
+
+  consumePendingResetFilter() {
+    const v = !!this.globalData.pendingResetFilter
+    this.globalData.pendingResetFilter = false
+    return v
   },
 
   onLaunch(options) {

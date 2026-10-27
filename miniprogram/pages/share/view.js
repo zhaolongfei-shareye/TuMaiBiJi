@@ -97,10 +97,10 @@ Page({
      ⚠ 这一跳会把落地页整个销毁（官方那句"并关闭所有其它页面"），三条连带都在这儿，别当漏改补回去：
      · 原来给"从详情页退回来"准备的那一面 `saved` 复位旗（M10）没有对象了 ⇒ 一并撤掉。
        "删了再存"那条路现在必然始于一屏全新的落地页（`saved` 出生就是假），不复位也存得进。
-     · 服务端回体里那个 `id` 在这一屏没有消费者了，所以不接变量：列表 `onShow` 那趟按
-       `created_at` 倒序重取整表，刚存那一篇自己就落在顶上第一行 ⇒ **回执由那一行给**。
-       （原来那句「你已收藏该笔记」是详情页页底那条 bar 说的，换落点之后这一屏没有那条 bar；
-        「有 N 张图没能存下来」那半句同理暂时没有说它的地方——已摆成待拍，不替他决定补不补。）
+     · 服务端回体里那三个配图数**只在这一趟拿得到**（`_share_out` 走 `model_copy(update=…)`，
+       没写进 `imported_from`，`GET /notes/{id}` 那份回答不了）⇒ 少带图那一句必须在这一跳之前说完。
+       原来那句「你已收藏该笔记」是详情页页底那条 bar 说的，落点换掉之后那一屏走不到了，
+       那条 bar 与它的皮、字典那两支串一起撤净（他 10-27「按你建议来」那一句，§8.500）。
      · `saved` 这一枚仍置真：`switchTab` 万一没成（页面栈异常那一类），人留在这一屏，
        按钮得念「已存入笔记」，而不是让他再按一次。 */
   async saveToMine() {
@@ -112,9 +112,23 @@ Page({
       // 落地页是免登录可读的，但"存进我的笔记"必须有身份。扫码进来时 onLaunch 那条
       // 静默登录通常早就回来了，这里只是兜住它还没回来的那一瞬。
       if (!app.globalData.token) await app.getLoginPromise()
-      await api.importFromShare(share.token)
+      const note = await api.importFromShare(share.token)
       this.setData({ saving: false, saved: true })
-      wx.switchTab({ url: '/pages/index/index' })
+      // 落地页销毁 ⇒ 列表那趟是唯一一次"进自己的库"，交接一次"把筛与词清回全部"（取走即清，
+      // 理由与 `pendingDetailNoteId` 同一条：这是一次导航意图，不是本机状态）。
+      app.globalData.pendingResetFilter = true
+      // 一张没少不出声（列表顶上那一行就是回执）；**少带图那一态要说一句**：抄图那一段是"笔记优先"
+      // 的设计，整段失败也不许把这次点击变成失败，于是回体里那两个数是唯一的痕迹——不说就是"存成了
+      // 却图不全"，屏上看不出来（第八轮审计 M7 那半条，10-25 已批准过一次）。
+      // ⚠ 先判类型：现网那半没回这一栏时是 `undefined`，绝不把 `undefined` 拼上屏。
+      const failed = note && typeof note.images_failed === 'number' ? Math.floor(note.images_failed) : 0
+      if (failed > 0) {
+        wx.showToast({ title: t('shotsPartlyFailed', lang).replace('{n}', failed), icon: 'none', duration: 2000 })
+        // 这一跳会销毁本页，吐司不等它就没人念得到；800ms 是录入页"提炼完→落列表"那条同一条数。
+        setTimeout(() => { wx.switchTab({ url: '/pages/index/index' }) }, 800)
+      } else {
+        wx.switchTab({ url: '/pages/index/index' })
+      }
     } catch (err) {
       console.error('转存失败', err)
       this.setData({ saving: false })

@@ -275,6 +275,13 @@ Page({
     // 取走一次。取走即清——这一格是一次导航意图，不是本机状态，留着它下次进列表会莫名弹出一扇旧窗。
     const reopen = this._backToDetail || app.consumePendingDetail()
     this._backToDetail = 0
+    // 从扫码落地页存完跳过来这一趟：筛与词清回「全部」再重取。不清的话，列表若正筛着某个分类或带着
+    // 一个搜索词，刚存的那一篇（默认「未分类」）就不在筛出的那批里 ⇒ 人到了列表却看不见它，读起来
+    // 跟"没存上"一模一样。⚠ 只在这一趟清（一次性交接，取走即清）——每次进列表都清会把他自己浏览时
+    // 挑的那一格改掉，那不是他要的。setData 之后 `this.data` 已是新值，下面那趟 loadNotes 吃的就是它。
+    if (app.consumePendingResetFilter() && (this.data.selectedCategory !== null || this.data.searchKeyword)) {
+      this.setData({ selectedCategory: null, searchKeyword: '', searchOpen: false, searchFocus: false })
+    }
     await this.loadNotes(true)
     if (reopen) await this._reopenDetail(reopen)
   },

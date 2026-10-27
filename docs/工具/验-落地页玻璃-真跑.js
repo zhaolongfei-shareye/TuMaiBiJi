@@ -316,14 +316,13 @@ const ck = (name, ok, got) => {
   console.log('　截图 ' + await shot('69-落地页同窗-没铺图那一态.png'))
 
   // ---------- 存完落在哪一屏（10-25 拍"跳详情页＋页底那条 bar"→ 10-27 他翻成「存入后，不要跳到
-  // 这里，要直接跳到用户的笔记列表」）＋详情页那一枚 `saved=1` 开关本身 ----------
-  // ⚠ 这一节**只读现网、一行都不写**：拿他名下已有的一篇，带 `saved=1` 开一次、不带再开一次。
+  // 这里，要直接跳到用户的笔记列表」）＋那条 bar 撤净没有 ----------
+  // ⚠ 这一节**只读现网、一行都不写**：拿他名下已有的一篇，从列表那一头开一次。
   //    为什么不在这儿真点那枚「存入笔记」：那一下会在现网多造一篇笔记＋最多九行云上配图，
   //    跑一遍留一次残留（#337 那一格还挂着没清，不能再往里添）。真点那一段归
   //    `验-转存与作者.js`——它跑在本地临时库上、吃的就是这一份树，去重与落点都归它验。
-  // ⚠ 下面那一大段量的是**详情页那一枚开关自己**（带 `saved=1` 才画那条 bar）。10-27 换落点之后
-  //    链上**没有任何一处再带这个参数** ⇒ 那条 bar 此刻在真跑路径上走不到；开关代码还留着，
-  //    "要不要一并撤"是他的待拍（见 §8.499）。这几条读的是代码与那一屏的行为，不是链上落点。
+  // ⚠ 10-27 他那句「只要跟我需求不冲突，按你建议来」把那条 bar 判成撤（标记／皮／字典两支一起没），
+  //    链上也不再有 `saved=1` 这枚开关 ⇒ 下面那几条量的是**撤净没有**，不再是"bar 长什么样"。
   const APIJS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/api.js'), 'utf8')
   const BASE_URL = (APIJS.match(/const API_BASE = '([^']+)'/) || [])[1] || ''
   const VIEWJS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/share/view.js'), 'utf8')
@@ -331,9 +330,12 @@ const ck = (name, ok, got) => {
   const DETAILWXSS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/detail/detail.wxss'), 'utf8')
   const DETAILWXML = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/detail/detail.wxml'), 'utf8')
   const I18N = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/utils/i18n.js'), 'utf8')
+  const APPJS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/app.js'), 'utf8')
+  const INDEXJS = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/pages/index/index.js'), 'utf8')
   const DCODE = DETAILWXSS.replace(/\/\*[\s\S]*?\*\//g, '')
   // 落地页那一头的接线（源码级）：存完落的是**笔记列表**那一枚 tab。
   const saveBody = (VIEWJS.match(/async saveToMine\(\)[\s\S]*?\n  \},/) || [''])[0]
+  const okBranch = (saveBody.split('} catch')[0] || '').split('await api.importFromShare')[1] || ''
   ck('存完那一趟落的是笔记列表（`switchTab` 到 /pages/index/index；列表是 tab，只有这一条进得去）',
     /wx\.switchTab\(\{ url: '\/pages\/index\/index' \}\)/.test(saveBody),
     saveBody ? '这一句在' : 'saveToMine 函数体没抠出来')
@@ -341,18 +343,29 @@ const ck = (name, ok, got) => {
   ck('反向：那一趟不再推独立详情页，也不再把 `saved=1`／`imgFail` 拼进 url',
     !/navigateTo[\s\S]{0,200}pages\/detail\/detail/.test(saveBody) && !/saved=1/.test(saveBody),
     '源码级断言')
-  // ⚠ 只看**成功那一段**（`} catch` 之前）：失败那一路的 toast 是留着的（念服务端回的那句原因），
-  //   拿整段函数体判"有没有 showToast"会把这条留着的正确行为判成红——第一版就红在这枚括号上。
-  ck('成功那枚 toast 仍然没有（回执由列表顶上那一行给，屏上不另造一句话）',
-    !/wx\.showToast/.test((saveBody.split('} catch')[0] || '').split('await api.importFromShare')[1] || ''),
-    '源码级断言')
+  // ⚠ 10-27 定了乙：那句「有 N 张图没能存下来。」只在 `images_failed > 0` 那一态由落地页跳走前
+  //   那一枚 toast 说（数来自转存口回体，这一态本来就在屏上）；一张没少＝不出声，回执由列表顶上那一行给。
+  //   判的是"toast 关在那个 if 里"，不是"有没有 toast"——失败那一路的 toast 是留着的（念服务端回的那句原因），
+  //   所以只抠 `} catch` 之前、`await api.importFromShare` 之后那一段。
+  ck('那句实话只在少带图那一态说（成功段有且只有一枚 toast，且它锁在 `failed > 0` 那一支里）',
+    /images_failed/.test(okBranch) && (okBranch.match(/wx\.showToast/g) || []).length === 1
+    && /if \(failed > 0\)[\s\S]{0,600}wx\.showToast[\s\S]{0,300}switchTab/.test(okBranch),
+    `成功段 toast ${(okBranch.match(/wx\.showToast/g) || []).length} 枚`)
   ck('落地页不再需要 `onShow` 复位那一面旗（M10 随换落点一起作废）',
     !/_backFromDetail/.test(VIEWJS) && !/onShow\s*\(/.test(VIEWJS), '源码级断言（整只文件）')
-  ck('那一枚开关只认 `saved === \'1\'`（平时从列表点开同一篇不许再提醒一遍）',
-    /savedBar: options\.saved === '1'/.test(DETAILJS), '源码级断言')
-  ck('那句话写死两支都在，中文逐字＝他原话「你已收藏该笔记」（屏上不许拼词、也不许留英文占位）',
-    /savedNoteBar: '你已收藏该笔记'/.test(I18N) && /savedNoteBar: 'Saved to your notes'/.test(I18N),
-    '源码级断言（i18n 双语两支）')
+  // 存完落列表时"筛正开着、这一篇不在那一格里"那一坑：他拍甲＝只在这一趟清回「全部」，
+  // 所以三端都得在：落地页置旗、app.js 那枚一次性消费口、列表 onShow 消费它。
+  ck('换筛那一交接三端都在（落地页置旗 → `consumePendingResetFilter()` 取走即清 → 列表 onShow 消费）',
+    /globalData\.pendingResetFilter = true/.test(VIEWJS)
+    && /pendingResetFilter: false/.test(APPJS) && /consumePendingResetFilter\(\)/.test(APPJS)
+    && /consumePendingResetFilter\(\)/.test(INDEXJS),
+    '源码级断言（三只文件）')
+  // 那条 bar 撤净的牙：四处落点（页面 data、标记、皮、字典）一处不许留，留了就是"半撤"——
+  // 屏上画不出但代码还在，下一趟被人接上参数又能长出来。
+  ck('反向：那条 bar 四处落点全没了（data／标记／皮／字典两支），屏上再也长不出「你已收藏该笔记」',
+    !/savedBar/.test(DETAILJS) && !/saved-bar|saved-space/.test(DETAILWXML)
+    && !/\.saved-bar|\.saved-space/.test(DCODE) && !/savedNoteBar/.test(I18N),
+    '源码级断言（四只文件）')
 
   const nid = await mp.evaluate((b) => new Promise((resolve) => {
     const app = getApp()
@@ -371,93 +384,34 @@ const ck = (name, ok, got) => {
   ck(`拿到他名下已有的一篇笔记（这一节的前置；API_BASE=${BASE_URL}）`, !!nid,
     nid ? `id=${nid}` : '列表口回空／这台模拟器没登录——环境红，下面那几条没跑')
   if (nid) {
-    await mp.navigateTo(`/pages/detail/detail?id=${nid}&saved=1`)
+    // 平时态：从列表那一头点开同一篇（不带任何参数）。这一屏从头到尾不许出现那条 bar。
+    // ⚠ 上面源码级那一条已经证明标记、皮、字典都没了；这一条量的是**屏上**——它验的是
+    //   "这一页现在和别人家那几页同一张皮"这件事没被那一刀的残留破坏（比如 `.container` 底下
+    //   多出空的 fixed 层），也钉住"以后谁再把 `saved=1` 接回来"时这一条会跟着红。
+    await mp.reLaunch(`/pages/detail/detail?id=${nid}`)
     await sleep(4000)
     const dp = await mp.currentPage()
     const dd = await dp.data()
     const dRoute = await mp.evaluate(() => getCurrentPages().slice(-1)[0].route)
-    ck('带 `saved=1` 落的就是详情页那一屏', dRoute === 'pages/detail/detail', dRoute)
+    ck('从列表那一头开同一篇：落的就是详情页那一屏（这一节的前置）',
+      dRoute === 'pages/detail/detail', dRoute)
     ck('这一页的内容真到手了（不是停在加载／报错）', !!dd.note, `note=${!!dd.note}`)
-    ck('页面 data 里那一枚开关是开着的', dd.savedBar === true, `savedBar=${dd.savedBar}`)
-    const bars = await dp.$$('.saved-bar')
-    ck('页底那条 bar 画出来了，且只有一条', bars.length === 1, `${bars.length} 条`)
-    const wantTxt = String((dd.t && dd.t.savedNoteBar) || '')
-    const gotTxt = bars.length ? String(await bars[0].text()).trim() : ''
-    ck('那条 bar 念的字＝字典里那一支（屏上文本与 `t.savedNoteBar` 逐字相等，不许写死在 wxml）',
-      !!wantTxt && gotTxt === wantTxt, `屏上「${gotTxt}」｜字典「${wantTxt}」`)
-    ck('那条 bar 的面吃的是这一页 `.panel` 同一枚令牌（源码里不许写死一支色）',
-      /\.saved-bar\s*\{[^}]*background:\s*var\(--bg-card\)/.test(DCODE), '源码级断言')
-    const barBox = await live('.saved-bar')
-    ck('那条 bar 贴在视口下沿那一档（底距＝24rpx 起跳，多出来的只可能是系统底部安全区）',
-      !!barBox && barBox.top !== null,
-      barBox && barBox.top !== null
-        ? `条底 ${(barBox.top + barBox.h).toFixed(1)}｜视口 ${win.h}＝差 ${(win.h - barBox.top - barBox.h).toFixed(1)}px`
-        : '读不到')
-    const barEl = bars.length ? bars[0] : null
-    let zBar = null
-    if (barEl) {
-      const bs = await barEl.size(), bo = await barEl.offset()
-      ck('那条 bar 的左右内缩与全站那扇窗同一枚（24rpx，误差 ≤1px）',
-        Math.abs(bo.left - 24 * R) <= 1 && Math.abs((win.w - (bo.left + bs.width)) - 24 * R) <= 1,
-        `左 ${bo.left.toFixed(1)}｜右 ${(win.w - bo.left - bs.width).toFixed(1)}｜24rpx=${(24 * R).toFixed(1)}px`)
-      const face = String(await barEl.style('background-color'))
-      const fc2 = (face.match(/\d+/g) || []).map(Number)
-      ck('屏上读回的 bar 面＝墨档那一份 #F3F3F1（容 ±8：色域转换会造出个位数差）',
-        fc2.length === 3 && fc2.every((v, i) => Math.abs(v - [243, 243, 241][i]) <= 8), `屏上 ${face}`)
-      // ⚠ 这一条量的是**那一行字**（`.saved-bar-x`），不是外面那只盒子：`.saved-bar` 自己没写 color，
-      //   拿它读"这行字什么色"读到的是页面继承下来的那支（这台模拟器回 rgb(53,46,29)），假红一条。
-      const xEl = await dp.$('.saved-bar-x')
-      const xColor = xEl ? String(await xEl.style('color')) : ''
-      ck('bar 里那行字仍是这一页那档墨（rgba(35,37,44,.9)，与 `.sv-h2`／`.panel` 同一支）',
-        /rgba\(\s*35,\s*37,\s*44,\s*0?\.9\s*\)/.test(xColor), xColor || '读不到 .saved-bar-x')
-      ck('那一行字吃的是 `--fs-meta`、并且带 700（与列表那几格同档，不新造字号）',
-        /\.saved-bar-x\s*\{[^}]*font-size:\s*var\(--fs-meta\)/.test(DCODE) &&
-        /\.saved-bar-x\s*\{[^}]*font-weight:\s*700/.test(DCODE), '源码级断言')
-      // 层序现在读（再往下一趟就 reLaunch 了，`barEl` 会成"不在栈顶那一页"的元素、一读就崩）。
-      zBar = Number(await barEl.style('z-index'))
-    }
-    // fixed 这件事只有真跑读得出：写成 absolute 就跟着内容走，屏上看着"在底下"、一滚就上来。
-    const barA = await live('.saved-bar')
-    await mp.evaluate(() => wx.pageScrollTo({ scrollTop: 600, duration: 0 }))
-    await sleep(1200)
-    const barMid = await live('.saved-bar')
-    ck('整页滚了 600 那条 bar 一毫米都没动（它是钉住的那一层，不是流里的一格）',
-      !!barA && !!barMid && barA.top !== null && barMid.top !== null && Math.abs(barMid.top - barA.top) <= 0.5,
-      barA && barMid ? `${barA.top.toFixed(1)} → ${barMid.top.toFixed(1)}` : '读不到')
-    // 钉住的那一层最容易压住最后一格：流里那一段留白（`.saved-space`）就是给它让的位置。
-    // ⚠ 判"压没压住"必须**先真滚到底**：只 `scrollTop:600` 时文档还没到底，读到的落点是中间态。
+    ck('屏上没有那条 bar，也没有给它让位的那一段留白（撤净之后这一屏只有一种态）',
+      (await dp.$$('.saved-bar')).length === 0 && (await dp.$('.saved-space')) === null
+      && dd.savedBar === undefined,
+      `bar ${(await dp.$$('.saved-bar')).length} 条｜留白 ${await dp.$('.saved-space') ? '在' : '不在'}｜data savedBar=${dd.savedBar}`)
+    // 撤掉 fixed 那一层之后，最后一格（转存来源那一栏）就是这一屏最底下的一格：
+    // 它离视口下沿那点距离由这一页自己的 padding 给，不再由一段专门让位的留白给 ⇒ 滚到底不许被裁。
     await mp.evaluate(() => wx.pageScrollTo({ scrollTop: 99999, duration: 0 }))
     await sleep(1200)
-    const spaceA = await live('.saved-space')
-    ck('流里给 bar 留的那一段在（没有它，最后一格会被钉住的那层压住）',
-      !!spaceA && spaceA.top !== null && spaceA.h > 0,
-      spaceA && spaceA.top !== null ? `留白高 ${spaceA.h.toFixed(1)}px` : '没读到 .saved-space')
-    const barAtBottom = await live('.saved-bar')
     const lastPanel = (await dp.$$('.panel')).slice(-1)[0]
-    if (lastPanel && barAtBottom && barAtBottom.top !== null) {
-      const lp = await lastPanel.size(), lo = await lastPanel.offset()
-      ck('滚到底时最后一格内容仍在 bar 上方（屏上不许出现"字压在条上"）',
-        lo.top + lp.height <= barAtBottom.top + 1,
-        `最后一格底 ${(lo.top + lp.height).toFixed(1)}｜bar 顶 ${barAtBottom.top.toFixed(1)}`)
+    if (lastPanel) {
+      const lo = await lastPanel.offset(), ls = await lastPanel.size()
+      ck('滚到底时最后一格整格在视口内（那条钉住的层没了，不该再有东西压在它上面）',
+        lo.top + ls.height <= win.h + 1,
+        `最后一格底 ${(lo.top + ls.height).toFixed(1)}｜视口高 ${win.h}`)
     }
-    console.log('　截图 ' + await shot('70-详情页存完那条bar.png'))
-    // 反向：同一篇不带 `saved=1` 再开一次 ⇒ 那条 bar 不许在。这一条是那枚开关唯一的牙
-    // （留着它就等于"每次点开任何一篇都在页底提醒一句已收藏"）。
-    await mp.reLaunch(`/pages/detail/detail?id=${nid}`)
-    await sleep(4000)
-    const dp2 = await mp.currentPage()
-    const dd2 = await dp2.data()
-    ck('不带 `saved=1` 从列表那一头开同一篇：那条 bar 不画',
-      dd2.savedBar === false && (await dp2.$$('.saved-bar')).length === 0
-      && (await dp2.$('.saved-space')) === null,
-      `savedBar=${dd2.savedBar}｜bar ${(await dp2.$$('.saved-bar')).length} 条｜留白 ${await dp2.$('.saved-space') ? '在' : '不在'}`)
-    console.log('　截图 ' + await shot('70-详情页平时态没有bar.png'))
-    // 层序：bar 60 在内容之上、私密那一层 `.pwd-mask`（100）之下 ⇒ 锁着的笔记弹出密码面板时不被条压住。
-    const PWD = fs.readFileSync(path.resolve(__dirname, '../../miniprogram/styles/pwd-sheet.wxss'), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-    const zPwd = Number(((PWD.match(/\.pwd-mask\s*\{[^}]*z-index:\s*(\d+)/) || [])[1]) || NaN)
-    ck('层序对：那条 bar（60）压在内容之上、私密那一层 `.pwd-mask` 之下',
-      Number.isFinite(zBar) && Number.isFinite(zPwd) && zBar < zPwd, `bar=${zBar}｜pwd-mask=${zPwd}`)
+    console.log('　截图 ' + await shot('70-详情页撤掉bar之后.png'))
   }
 
   console.log(`\n${bad.length ? '红 ' + bad.length + ' 条：' + bad.join(' / ') : '全过'}`)

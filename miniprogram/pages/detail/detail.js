@@ -58,28 +58,20 @@ Page({
     // 10-17 那一格只剩这一份数据：原来还跟着两枚键（淡底方形的底色 `swatchBg`、品牌字 `brandGlyph`），
     // 站长那句「如果没卡片图，这个位置就完全被标题占满」把空态那一整块撤了，两枚键同时没有消费者。
     detailCards: [],
-    // 落地页「存入笔记」之后跳进来的那一态：页底那一条 bar（只有带着 `saved=1` 进来才画，
-    // 平时从列表点开同一篇不许再提醒一遍）。
-    savedBar: false,
-    // 那条 bar 后面接的那半句实话（M7：这次有几张配图没跟过来）。没数＝空串＝一个字不加。
-    savedBarExtra: '',
     _loaded: false,
   },
 
   onLoad(options) {
     const app = getApp()
     const lang = app.globalData.userInfo?.language || 'zh'
-    // M7：那句"有 N 张图没能存下来"接在同一条 bar 后面，数由落地页 `saveToMine` 那一趟随 query 带过来
-    // （"这次少带了几张"只有那一趟知道，`GET /notes/{id}` 那份回答不了）。
-    // ⚠ `imgFail` 是一段外部输入，且老包／服务端那一半没部署时这一栏根本没有 ⇒ 只认非负整数串，
-    // 别的（缺、非数字、负号、小数）一律当"没少"，屏上一个字都不加，也绝不把 undefined 拼上屏。
-    const imgFail = /^\d+$/.test(options.imgFail || '') ? parseInt(options.imgFail, 10) : 0
+    // ⚠ 原来这一屏还认一枚 `saved=1` 开关（落地页存完跳进来时页底画一条「你已收藏该笔记」的 bar，
+    // 后面接半句「有 N 张图没能存下来」）。站长 10-27 把存完的落点翻成笔记列表 ⇒ 那一跳不再进来，
+    // 这一枚开关与那条 bar（含皮与字典那两支串）一并撤净——"这次少带了几张"那句实话现在由**落地页
+    // 自己在跳走之前**说一句（`pages/share/view.js` 的 `saveToMine`），因为它只在那一次回体里拿得到。
     this.setData({
       lang,
       t: texts(lang),
       themeClass: app.applyTheme(app.getWallpaper()),
-      savedBar: options.saved === '1',
-      savedBarExtra: imgFail > 0 ? ' · ' + t('shotsPartlyFailed', lang).replace('{n}', imgFail) : '',
     })
     app.setNavTitle('navDetail', lang)
     if (options.id) {
