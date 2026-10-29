@@ -10,6 +10,8 @@
 const { toneFor, mix, schemeFor, plateColors, withAlpha, lumOf } = require('./palette.js')
 const { formatShortDate } = require('./date.js')
 const { t } = require('./i18n.js')
+// 来源那一格那一句（有站名只念站名）与两个页面共用同一只实现，见 utils/sourceLabel.js 顶上那段。
+const { sourceLabelOf } = require('./sourceLabel.js')
 // 配方的求值与步型解释器（纯逻辑，不认识任何色和字号），以及包内自带那几套配方（纯数据）。
 // 方向是单向的：poster.js 认识这两份，它们不认识 poster.js。
 const engine = require('./posterRecipe.js')
@@ -1027,21 +1029,9 @@ function blockNameOf(note, lang) {
   return firstTag || note.category_name || (note.category_id == null ? t('noCategory', lang) : '')
 }
 
-function sourceLabelOf(note, lang) {
-  // 这一张表和 pages/index、pages/detail 那两条 `SOURCE_TYPE_KEYS` 必须是同一套值：
-  // 漏一支就把英文原文（`share_import`／`preset`）直接画上卡片（站长 10-02 对 v18 时撞过一次同一型）。
-  const keys = {
-    wechat_article: 'sourceWechatArticle',
-    web_article: 'sourceWebArticle',
-    screenshot: 'sourceScreenshot',
-    manual: 'sourceManual',
-    share_import: 'sourceShareImport',
-    preset: 'sourcePreset',
-  }
-  const key = keys[note.source_type]
-  // 认不出键就念空串，不把英文原词画上卡片（10-25 第八轮审计 M17，与 index.js／detail.js 同一口径）。
-  return key ? t(key, lang) : ''
-}
+// 来源那一格（`sourceLabelOf`）现在住在 utils/sourceLabel.js：列表／详情／卡片三处共用一份。
+// 原来这里另抄了一张六支的表，漏一支就把英文原词画上卡片（站长 10-02 撞过同一型，
+// 10-25 第八轮审计 M17 又记了一次）；站名这一级加进来之后，再抄一遍就是"哪一处忘了改"。
 
 // 金句：要点第一条最像"值得转发的一句话"，没有就退到摘要首句，再退到标题
 function quoteOf(note) {

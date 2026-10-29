@@ -16,6 +16,8 @@ const noteImage = require('../../utils/noteImage.js')
 const posterMatte = require('../../utils/posterMatte.js')
 const posterTemplates = require('../../utils/posterTemplates.js')
 const mpAssets = require('../../utils/mpAssets.js')
+// 「来源那一格念什么」三处共用同一只实现（列表／详情／卡片），见 utils/sourceLabel.js 顶上那段。
+const { sourceLabelOf } = require('../../utils/sourceLabel.js')
 const { formatDate, formatDateTime, formatShortDate, formatWeekday } = require('../../utils/date.js')
 const bgTone = require('../../utils/imgBrightness.js')
 
@@ -40,18 +42,6 @@ function toneZones() {
    `poster.HEAD_IMG_H`（同一个人两页必须同一个落点，否则切 tab 背景图上下跳，他抓过两次）。
    这一枚只留作本页那笔版式账，由 `验-玻璃令牌齐不齐` 钉它等于 542＋198。 */
 const GLASS_BAND_H = 542 + 198
-
-const SOURCE_TYPE_KEYS = {
-  wechat_article: 'sourceWechatArticle',
-  web_article: 'sourceWebArticle',
-  screenshot: 'sourceScreenshot',
-  manual: 'sourceManual',
-  // 转存别人分享的那一篇。这一支以前漏在表外：source_type 是 'share_import' 的行
-  // 查不到键就直接把英文原文写到屏上了（站长 10-02 对 v18 时撞见）。字典里那串早就有。
-  share_import: 'sourceShareImport',
-  // §8.232 新用户出生那一篇（服务端 source_type='preset'）。漏在表外的值会把英文原文写上屏（站长 10-02 撞过一次）。
-  preset: 'sourcePreset',
-}
 
 /* 分类那一排的两条上限（站长 10-18 原话「分类数量要做限制，最多8个包括私密分类，私密永远排最后一格」
    「分类名称最多4个汉字。英文长度，你帮我设好」）。
@@ -419,7 +409,7 @@ Page({
      序与筛选仍是 `notes` 那一份原样，所以"翻页/筛分类/搜一个词"三条都不必另算一遍。
 
      一行三档，全部是**现成的数**，这一趟不新增任何请求：
-     · `src`    ← 服务端那栏 `source_type` 映出来的字典串（上面那六支，走 `SOURCE_TYPE_KEYS`）
+     · `src`    ← 来源那一格：有站名只念站名，没站名退到那六档通用文案（一份实现在 `utils/sourceLabel.js`）
      · `title`  ← 只有标题一行（摘要那三行与「显示更多」随这次做减法一起撤）
      · `saved`  ← 服务端列表响应里那栏 `has_saved`＝**有人把这一篇存进过自己的库**（站长 10-23
                   原话「我要改为，有人转存，就加星」）。这一枚换掉的是原来那枚「已分享」（同一格、
@@ -510,11 +500,9 @@ Page({
       if (gen !== (this._notesGen || 0)) return
       const lang = this.data.lang
       notes.forEach(n => {
-        const key = SOURCE_TYPE_KEYS[n.source_type]
-        // 认不出 key 就念空串（M17）——照本页分类那一档的同一口径（`skin()` 里 `showOf[...] || ''`、
-        // `privKnown`：不知道的时候宁可少念，不猜）。原来这一支回的是服务端那栏英文原词，
-        // 加第七种值或老包读新值时就把 `share_import` 这类内部串直接写上屏。
-        n.source_type_label = key ? t(key, lang) : ''
+        // 有站名就只念站名，没站名才退到那六档通用文案（②拍丙：一个字都不许多拼）。
+        // 规则只在 utils/sourceLabel.js 那一份里，这一页不重抄表也不重判档。
+        n.source_type_label = sourceLabelOf(n, lang)
         // 左边那一列只有这一档：MM/DD（年份在这条上没用，跨年看详情窗那一行完整日期）
         n.date_label = formatShortDate(n.created_at)
       })
@@ -1250,7 +1238,9 @@ Page({
       if (this._unlockRenewed) full = await api.getNote(row.id)
       if (gen !== this._detailGen) return
       const note = Object.assign({}, row, full)
-      note.source_type_label = row.source_type_label
+      // 来源那一格按**全文那一份**重算：`full` 里的站名是这一篇最新的那一份快照，
+      // 列表那一趟拿的可能是几分钟前下的（同一只实现，见 utils/sourceLabel.js）。
+      note.source_type_label = sourceLabelOf(note, this.data.lang)
       note.date_label = row.date_label
       note.created_at_label = formatDateTime(full.created_at)
       this.setData({ detailNote: note })

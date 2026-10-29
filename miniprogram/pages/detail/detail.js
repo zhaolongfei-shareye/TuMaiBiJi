@@ -9,15 +9,8 @@ const privateGate = require('../../utils/privateGate.js')
 const { labelOf, bracketOf } = require('../../utils/catText.js')
 // 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
 const pwdSheet = require('../../utils/pwdSheet.js')
-
-const SOURCE_TYPE_KEYS = {
-  wechat_article: 'sourceWechatArticle',
-  web_article: 'sourceWebArticle',
-  screenshot: 'sourceScreenshot',
-  manual: 'sourceManual',
-  share_import: 'sourceShareImport',
-  preset: 'sourcePreset',   // §8.232 那一篇预置笔记，同上一条口径
-}
+// 「来源那一格念什么」三处共用同一只实现（列表／详情／卡片绘制），见 utils/sourceLabel.js 顶上那段。
+const { sourceLabelOf } = require('../../utils/sourceLabel.js')
 
 /**
  * 那一排配图下面的两句实话（方案 docs/方案-公众号贴图随笔记存档.md §八.4／§八.11）。
@@ -116,11 +109,8 @@ Page({
         note = await api.getNote(id)
       }
       const lang = this.data.lang
-      const key = SOURCE_TYPE_KEYS[note.source_type]
-      // 认不出 key 就念空串（M17）——照本页分类那一档的同一口径（上面 `category_name` 查不到时
-      // 也是空串、由 wxml 那一段自己不画）。原来这一支回的是服务端那栏英文原词，
-      // 加第七种 source_type 或老包读新值时就把内部串直接写上屏（站长 10-02 撞过两次）。
-      note.source_type_label = key ? t(key, lang) : ''
+      // 有站名就只念站名，没站名才退到那六档（与列表、卡片那一格同一份实现）。
+      note.source_type_label = sourceLabelOf(note, lang)
       // 官方那一篇（站长 10-18 给它定了名「帮助文档」）：编辑与分享两枚在这一篇上置灰、点了不办事。
       // 判据用服务端那个 `source_type`，不靠标题也不靠"名下第一篇"。
       note.is_preset = note.source_type === 'preset'
