@@ -19,6 +19,7 @@ import asyncio
 import os
 import sys
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -391,3 +392,20 @@ def test_脏表不会把转存那一趟带崩(db):
     row.text_value = [{"domain": "ok.com"}, "一个字符串混在行里"]
     db.commit()
     assert site_names.table_site(db, "https://ok.com/") == {}
+
+
+def test_后台那一页有表栏那一组可编辑的格子():
+    """静态钉页面：这一栏要真挂进主区那一格、真走那个新口、左栏还点得到。
+    这条不是装饰——`render()` 里少那一句 `appendChild`，卡片照样造得出来、函数照样跑得完，
+    屏上却是一片空（10-19 那次「函数跑了、一个字没抛、屏上什么都没有」就是这一型）；
+    而本文件其余那二十八条查的全是回体，一条都不会跟着红。
+    真正会跟着红的是那把真点尺子 `docs/工具/验-后台来源站点名栏.mjs`（它第一条就是这个）。"""
+    src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
+    body = src.split("_PAGE", 1)[1]
+    assert "tableCardFor" in body
+    assert "api/admin/mp/tables/" in body, "页面没走表栏那一个新口（多半是手拼了别的地址）"
+    assert "state.tables" in body, "render() 没把表栏那一组渲染出来"
+    assert "tbbox.appendChild(tableCardFor(b))" in body, "卡片造出来了却没挂进那一格"
+    assert "'来源站点名'" in body, "左栏没有那一条：一栏一屏之后，点不到就等于这一栏不存在"
+    # 加行/删行之前那一步收字：漏了它不报错，症状是"打到一半点一下加一行，那几个字没了"。
+    assert "harvestTable(key, rows)" in body
