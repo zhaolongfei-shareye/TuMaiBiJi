@@ -236,19 +236,72 @@ def _dedupe_order(urls: list[str]) -> list[str]:
 def _content_images(el, base_url: str) -> list[str]:
     """正文容器里每一张图的地址，按文档顺序。
 
-    读的是 `data-src` 不是 `src`：**10-18 夜四条真文章实测 26/26 与 3/3 全在 `data-src`，
-    一条 `src` 都没有**——只读 `src` 的实现一张都取不到（那条坑写在方案第二节）。
+    属性名单按"先懒加载、`src` 兜底"排，这一条是两回实测逼出来的：
+    · 公众号——**10-18 夜四条真文章 26/26 与 3/3 全在 `data-src`，一条 `src` 都没有**，
+      只读 `src` 的实现一张都取不到（那条坑写在方案第二节）；
+    · 网易——**10-29 那篇 `c.m.163.com` 8/8 全在 `data-echo`，而 8 张的 `src` 清一色是
+      `https://static.ws.126.net/163/frontend/images/2022/empty.png` 那枚占位图**，
+      真尺寸在旁边的 `data-width`／`data-height` 上（595×781 那种）。
+    兜底那一位 `src` 必须留着：掘金／博客园那种普通页面只有 `src`，没有懒加载属性。
     """
     if el is None:
         return []
     urls = []
     for img in el.find_all("img"):
-        for attr in ("data-src", "src"):
+        for attr in _LAZY_ATTRS:
             candidate = _http_image_url(base_url, img.get(attr) or "")
             if candidate:
                 urls.append(candidate)
                 break
     return _dedupe_order(urls)
+
+
+# 正文图藏在哪一个属性上，各站不一样（出处见上面 `_content_images` 那段实测）。
+# 顺序就是优先级：懒加载属性一律排在 `src` 前面，否则懒加载站点取回来的是一整排占位图。
+_LAZY_ATTRS = ("data-src", "data-echo", "data-original", "data-lazy-src", "data-actualsrc", "src")
+
+# 正文容器的常见落点。`_main_container` 只在这些提示里挑，不整棵树扫：一篇大页面的 `div`
+# 有几百个，逐个取全文字数会把抓取这一趟拖成秒级，而正文容器基本都带 article/post/content 这类名。
+_MAIN_HINTS = (
+    "article", "main",
+    '[class*="article"]', '[class*="post_body"]', '[class*="rich"]', '[class*="content"]',
+    '[id*="article"]', '[id*="content"]', '[id*="post"]',
+)
+# 每个提示最多看几枚（再深的推荐位／评论列表不进入选择）。
+_MAIN_CANDIDATES_PER_HINT = 12
+
+
+def _main_container(soup):
+    """通用那一档的正文容器，取不到就回 None（回 None＝这一篇按"没有配图"走，不猜）。
+
+    两步选择，缺一不可：**先按字数定上限，再在字数够多（≥上限 80%）的候选里取树中最深的那一层**。
+    只走第一步会撞上网易那一型——最长的是外层 `div.article`（5,730 字、11 张图），
+    比里面那层 `div.article-body`（4,599 字、8 张图）多出来的三张正是站点 logo、作者头像与分享图标：
+    它们没有懒加载属性，于是会走 `src` 兜底那一路被一起捞进来，用户在配图那一排看见三张站皮。
+    往深一层取（80% 那道闸保证不会因为钻进了小节标题而把正文丢了），装饰一张不进。
+    """
+    cands: list = []
+    seen: set[int] = set()
+    for hint in _MAIN_HINTS:
+        try:
+            found = soup.select(hint)[:_MAIN_CANDIDATES_PER_HINT]
+        except Exception:
+            continue
+        for el in found:
+            if id(el) in seen:
+                continue
+            seen.add(id(el))
+            cands.append(el)
+    if not cands:
+        return None
+    scored = [(len(el.get_text(strip=True)), sum(1 for _ in el.parents), el) for el in cands]
+    ceiling = max(s[0] for s in scored)
+    if ceiling <= 0:
+        return None
+    # 字数够多这一档先过，再取最深；同深时字数多的赢。
+    qualified = [s for s in scored if s[0] >= ceiling * 0.8]
+    qualified.sort(key=lambda s: (s[1], s[0]), reverse=True)
+    return qualified[0][2]
 
 
 _WX_ALBUM_KEY = "picture_page_info_list"
@@ -480,4 +533,15 @@ def _parse_general_url(html: str, url: str, source_type: str) -> dict:
     if not title:
         title = "网页摘录"
 
-    return {"title": title, "content": text, "source_type": source_type}
+    # 10-29 这一档才开始取配图。之前这里**连 `images` 那一键都没有**，
+    # 所以站长那篇网易文章（标题与 4,541 字正文都取到了）屏上只有字、一张图也没跟过来——
+    # 不是抓图失败，是这条路压根没去抓。现挑正文容器、按 `_LAZY_ATTRS` 逐张取一枚：
+    # 网易那篇现读 8 张正文图全在 `data-echo`，`src` 全是 `empty.png` 占位。
+    # 取到几张、几张没存下，仍然由下游那两条实话负责（`images_kept`／`images_failed`），
+    # 上限也还是 `MAX_ASSETS_PER_NOTE` 那一枚常量，这里不另立一个数。
+    return {
+        "title": title,
+        "content": text,
+        "source_type": source_type,
+        "images": _content_images(_main_container(soup), url),
+    }
