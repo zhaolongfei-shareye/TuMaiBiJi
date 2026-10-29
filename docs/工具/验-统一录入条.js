@@ -1211,7 +1211,11 @@ const showBody = js.split('async onShow')[1].split('hintFor(value)')[0]
 ok('onShow 仍然不重置草稿', !/previewImages: \[\]/.test(showBody) && !/active: ''/.test(showBody))
 ok('选完图返回仍然重算那三位（ready / 满 / 展开）',
   /this\._sync\(\)/.test(js) && /_sync\(\)\s*\{[\s\S]{0,900}panelOpen:/.test(js))
-ok('链接校验那条正则没被顺手改松', js.includes('const LINK_RE = /^https?:\\/'))
+// 10-29 那条正则从这一页搬进了 `utils/link.js`（为的是那把不连模拟器的尺子能 require 同一份真字节，
+// 而不是在尺子里重抄一遍近似版）⇒ 判的文件换了地方，判的是同一条：开头仍然钉死 `^https?:`。
+const LINK_JS = fs.readFileSync(P('utils/link.js'), 'utf8')
+ok('链接校验那条正则没被顺手改松（搬到 utils/link.js 之后仍然钉 ^https?:）',
+  LINK_JS.includes('const LINK_RE = /^https?:\\/') && /require\('\.\.\/\.\.\/utils\/link\.js'\)/.test(js))
 // Tips 那一行仍然**只在收起态**渲染。原来它住在整组最上面那一整行（`.tips`）；
 // 2.2 B 方案把它搬进右列那一格（`.blk-tips`），闸还是同一套：组外壳 `wx:if="{{!active}}"` 把，
 // 自己只留 `tips.length`。所以这一条钉的是"落在组里、且排在展开态之前"——

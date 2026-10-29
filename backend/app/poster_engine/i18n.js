@@ -385,6 +385,7 @@ const i18n = {
     // 张数从 create.js 的 MAX_SHOTS 拼进来，不在这个串里写死第二个 9。
     maxShots: '最多 {n} 张，先删一张再加',
     linkRule: '链接要以 http:// 或 https:// 开头',
+    linkFirstOfMany: '取的是第一条链接',
     permCamera: '没拿到相机权限，点这里去设置',
     permAlbum: '没拿到相册权限，点这里去设置',
     pickFailed: '没能打开相机或相册，请再试一次',
@@ -795,6 +796,7 @@ const i18n = {
     fromAlbum: 'Album',
     maxShots: 'Up to {n} images — delete one first',
     linkRule: 'Link must start with http:// or https://',
+    linkFirstOfMany: 'Took the first link',
     permCamera: 'No camera access — tap to open settings',
     permAlbum: 'No album access — tap to open settings',
     pickFailed: 'Could not open the camera or album — please try again',

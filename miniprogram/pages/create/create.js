@@ -10,6 +10,7 @@ const person = require('../../utils/person.js')
 const bgTone = require('../../utils/imgBrightness.js')
 const mpAssets = require('../../utils/mpAssets.js')
 const cardInfo = require('../../utils/cardInfo.js')
+const { isLink, extractLink } = require('../../utils/link.js')
 
 /* 深浅分两截判（站长 10-12 21:1x：「请按照上下部分来分别判断，避免全图平均，造成差异」）。
    这一页上截＝左上角那行大字与那枚标题图（实测落在屏高 9%~16%），
@@ -31,16 +32,8 @@ function toneZones() {
   }
 }
 
-// 链接规范：必须有协议头、主机名里要有顶级域、整串不能出现空白。
-// 之前只判"以 http 开头且某处有个点"，`https://a.com 后面还有字` 和 `http:///a.b` 都能过，
-// 到了服务端才失败，用户在卡里看到的是一句和输入对不上的错。
-const LINK_RE = /^https?:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d{1,5})?(\/[^\s]*)?$/i
-
-function isLink(value) {
-  const s = (value || '').trim()
-  if (!s || /\s/.test(s)) return false
-  return LINK_RE.test(s)
-}
+// 链接那一档的判与抽取都在 `utils/link.js`（这一页与那把不连模拟器的尺子 require 同一份，
+// 判据钉的是发货的那一截字节、不是尺子里重抄的近似版）。
 
 /**
  * 「文字」那一档的标题：10-08 从面板上撤了（站长原话「标题和分类在详情页再修改」），
@@ -769,6 +762,21 @@ Page({
     this._sync()
   },
 
+  // 他拍的 A：打字中途不撕字，收键盘那一刻才抽。所以 bindinput 那一条一个字不改（半截链接
+  // 正在写的时候被顶掉过一次，人就再也不信这一格了），只在失焦时按同一把抽取过一遍。
+  // 抽不出＝不改（`findLinks` 里 isLink 那道滤把 `https://a` 这种半截挡住了）；
+  // 抽出就是框里原有那一串＝也不改（不许多嘴、也不许动光标）。
+  onUrlBlur() {
+    if (this.data.busy) return
+    const s = String(this.data.urlInput || '').trim()
+    if (!s) return
+    const { link, count } = extractLink(s)
+    if (!link || link === s) return
+    this.setData({ urlInput: link, urlHint: this.hintFor(link) })
+    this._sync()
+    if (count > 1) this.sayErr(t('linkFirstOfMany', this.data.lang))
+  },
+
   clearUrl() {
     if (this.data.busy) return
     this.setData({ urlInput: '', urlHint: 'idle' })
@@ -787,8 +795,14 @@ Page({
           this.sayErr(t('pasteEmpty', this.data.lang))
           return
         }
-        this.setData({ urlInput: s, urlHint: this.hintFor(s), errLine: '' })
+        // 抽得出就落那一枚，抽不出就照原样贴（不把人剪贴板里的东西悄悄吞掉，
+        // 而那行「要以 http:// 开头」的规则字本来就会跟着 urlHint 出来，不算静默）。
+        const { link, count } = extractLink(s)
+        const put = link || s
+        this.setData({ urlInput: put, urlHint: this.hintFor(put), errLine: '' })
         this._sync()
+        // 只有一枚时不多嘴：框里那一眼看见的就是抽完的结果。两枚以上要说一句取的是哪条。
+        if (count > 1) this.sayErr(t('linkFirstOfMany', this.data.lang))
       },
       fail: () => {
         // 读不到与"里面没东西"是两件事，不许合成一句糊过去
@@ -854,6 +868,17 @@ Page({
           // 在这里再写一遍等于同一件事两处记（判据钉的就是"每一处写 errLine 都要过一遍 _sync"）。
           this.setData({ urlInput: s })
           this.open('url')
+          return
+        }
+        // 10-29 与「粘贴」那一枚并成一把尺子（连带，不是新需求）：同一坨剪贴板从两枚按钮进来
+        // 不许落到两个档——「标题＋空格＋网址」这一型以前被 `isLink(s)` 判成"不是链接"、
+        // 直接进「文字」那一档存成原文，现在按抽取：抽得出就走「链接」那一档。
+        const { link, count } = extractLink(s)
+        if (link) {
+          this.setData({ urlInput: link })
+          this.open('url')
+          // 这一句必须在 open() 之后：open() 会把 errLine 抹掉（上面那条注释说的就是它）。
+          if (count > 1) this.sayErr(t('linkFirstOfMany', this.data.lang))
           return
         }
         const had = this.data.writeBody

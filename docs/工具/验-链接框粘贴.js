@@ -56,7 +56,7 @@ ok('粘进去的字走与手打同一趟：hintFor ＋ _sync（右滑那一枚�
   /this\.hintFor\(/.test(body) && /this\._sync\(\)/.test(body))
 ok('粘来的字符串先 trim（微信分享出去的那一坨前后常带空白与句子）', /\.trim\(\)/.test(body))
 
-for (const k of ['paste', 'pasteEmpty', 'pasteFailed', 'pasteNoText', 'pasteReadFail']) {
+for (const k of ['paste', 'pasteEmpty', 'pasteFailed', 'pasteNoText', 'pasteReadFail', 'linkFirstOfMany']) {
   const n = (i18n.match(new RegExp(`\\n\\s*${k}:`, 'g')) || []).length
   ok(`字典里 ${k} 中英两边都有`, n === 2, `只找到 ${n} 处`)
 }
@@ -149,6 +149,86 @@ ok('反向对照三：从基础组那一行抹掉 .paste-glyph，上一条立刻
     const cut = line.replace(/\.paste-glyph\s*/, '')
     return line.includes('.paste-glyph') && cut !== line && !inMaskGroup(wxss.replace(line, cut))
   })(), '这一枚从名单里抹掉之后谓词仍然为真＝它上面那条没在管任何东西')
+
+/* ---------- 10-29 链接那一档从"整串必须是链接"改成"抽取"（站长原话「提取链接，剪贴板自动删除
+   非链接的内容，例如：谷歌Gemini，重夺AI第一 https://c.m.163.com/…，自动删除http前面的文字」，
+   随后拍板「按默认选 A/B/C/D」：A＝粘贴当场抽＋失焦再抽、打字中途不撕字；B＝多枚取第一枚并说一句；
+   C＝参数一个不抹；D＝裸域名不自动补协议）。
+   ⚠ 这一节的行为判据**不在尺子里重抄一遍正则**：抽取那几个纯函数 10-29 搬进了 `utils/link.js`，
+   这里直接 `require` 页面发货的那一份真模块——跑的就是进包里的那截字节。
+   （不用 `new Function` 现编译源码：那是把字符串当代码跑，安全闸门点过这一型。）
+   样本里那两枚分享标识的**值改写过**（`spsnuid`／`spstoken` 是他设备上生成的，不进仓库），
+   形状与转义（`%2B`／`%253D`／`%3D%3D`、四个 `&`）照他那一串留全。 */
+let extract = null
+try { extract = require(P('utils/link.js')).extractLink } catch (e) { }
+ok('抽取那一只在 utils/link.js 里、页面外也 require 得动（这次搬家的全部理由就在这）',
+  typeof extract === 'function')
+ok('页面不再自己留第二份规则：create.js 里不许再定义 LINK_RE，只 require 那一份',
+  !/const LINK_RE =/.test(js) && /require\('\.\.\/\.\.\/utils\/link\.js'\)/.test(js))
+
+const WANT = 'https://c.m.163.com/news/a/LAD6VGQO00097U7T.html?spsshare=newsapp'
+  + '&spsnuid=abc%2Bdef%3D%3D&spsdevid=MTQw%253D&spsts=1793243657323&spstoken=xyz%2Bq3YD%3D%3D'
+const HIS = `谷歌Gemini，重夺AI第一 ${WANT}，自动删除http前面的文字`
+if (extract) {
+  const r1 = extract(HIS)
+  ok('他那一串抽得出、而且前后都剥（前面那句标题与后面那句中文一起掉，只剩从 https 到 spstoken 那一枚）',
+    r1.link === WANT, `抽出＝${r1.link}`)
+  ok('C 那一拍＝参数一个不抹：`%2B`／`%253D`／`%3D%3D` 与四个 `&` 都在抽出的那一枚里',
+    ['%2B', '%253D', '%3D%3D'].every((s) => r1.link.includes(s)) && (r1.link.match(/&/g) || []).length === 4,
+    r1.link)
+  ok('只有一枚时 count 就是 1（不许对着一枚链接念"取的是第一条"）', r1.count === 1, `${r1.count}`)
+  const TWO = `看这两条 https://a.com/x 还有 https://b.cn/y`
+  ok('B 那一拍＝两枚以上取第一枚并把数报出来（页面拿 count>1 才念那一句）',
+    extract(TWO).link === 'https://a.com/x' && extract(TWO).count === 2,
+    `${extract(TWO).link}｜${extract(TWO).count}`)
+  ok('D 那一拍＝裸域名不自动补协议（`t.cn/xxx` 抽不出就抽不出，猜一个 https 出来等于抓错站）',
+    extract('t.cn/xxxxx 与 c.m.163.com/news/a/X.html').link === '')
+  ok('正在写的半截不许被当成一枚（`https://a` 没有顶级域＝失焦那一条不能顶掉人打了一半的字）',
+    extract('https://a').link === '')
+  ok('框里本来就是一枚合格链接时抽完还是它（失焦那一条一根字符都不许动）',
+    extract('https://a.com/x?y=1').link === 'https://a.com/x?y=1')
+  ok('中文句号收尾不吃进来，句末那几个 ASCII 标点剥掉；带括号的地址不剥（`)` 不在那一小撮里）',
+    extract('文章在这儿 https://a.com/x。').link === 'https://a.com/x'
+    && extract('https://a.com/a.,').link === 'https://a.com/a'
+    && extract('看这里 https://en.wikipedia.org/wiki/Foo_(bar) 。').link === 'https://en.wikipedia.org/wiki/Foo_(bar)')
+}
+
+const urlFn = (/onUrlBlur\(\)\s*\{([\s\S]*?)\n  \},/).exec(js)
+ok('失焦那一只在（onUrlBlur）：先挡 busy、抽不出或抽出的就是原有那一串时一个字不改', !!urlFn
+  && /if \(this\.data\.busy\) return/.test(urlFn[1]) && /if \(!link \|\| link === s\) return/.test(urlFn[1]))
+ok('那只失焦真挂在链接输入框上（bindblur → onUrlBlur）', /bindblur="onUrlBlur"/.test(blk))
+const typing = (/onUrlInput\(e\)\s*\{([\s\S]*?)\n  \},/).exec(js)
+ok('A 那一拍的后半边＝打字中途不撕字：bindinput 那一条里不许出现抽取', !!typing
+  && !/extractLink|findLinks/.test(typing[1]), typing ? '那一条里出现了抽取' : '找不到 onUrlInput')
+ok('「粘贴」那一枚走同一把抽取，且抽不出仍原样贴进框（不许把剪贴板里的东西悄悄吞掉）',
+  /extractLink\(s\)/.test(body) && /const put = link \|\| s/.test(body))
+ok('照片那一档第三枚与链接那一档共用同一把抽取（同一坨剪贴板不许从两枚按钮落进两个档）',
+  /extractLink\(s\)/.test(anyBody))
+ok('多枚那一句吃字典键、页面里没有写死的中文（屏上不出现字典外的界面话）',
+  /t\('linkFirstOfMany'/.test(body) && /t\('linkFirstOfMany'/.test(anyBody) && !/取的是第一条/.test(js))
+// 动了字典就必须三边一起（引擎那份逐字相同＋名单里那一格跟得上），少一步＝后台预览口当场 503。
+const crypto = require('crypto')
+const engSrc = fs.readFileSync(path.join(ROOT, 'backend', 'app', 'poster_engine', 'i18n.js'), 'utf8')
+const mf = JSON.parse(fs.readFileSync(path.join(ROOT, 'backend', 'app', 'poster_engine', 'manifest.json'), 'utf8'))
+const ent = (mf.files || []).find((x) => x.name === 'i18n.js')
+ok('字典那三边齐：引擎那份与客户端逐字相同，名单里那一格的 bytes／md5 就是盘上这一份',
+  engSrc === i18n && !!ent && ent.bytes === Buffer.byteLength(engSrc)
+  && ent.md5 === crypto.createHash('md5').update(engSrc).digest('hex'),
+  ent ? `名单 ${ent.bytes}／${ent.md5.slice(0, 8)}` : '名单里没有 i18n.js')
+
+// 反向钉：这一节的三条各撤一下，对应判据必须红（证明钉的是真东西）。
+if (extract) {
+  ok('反向对照·抽取：把"后面那句中文"并进链接那一枚去判，那条就该红（WANT 不等于整串尾巴）',
+    extract(HIS).link !== HIS.slice(HIS.indexOf('https://')))
+  ok('反向对照·字典：把名单里那一格的字节数改小一位，上一条立刻红',
+    (() => {
+      const cut = { ...ent, bytes: ent.bytes - 1 }
+      return !(engSrc === i18n && cut.bytes === Buffer.byteLength(engSrc)
+        && cut.md5 === crypto.createHash('md5').update(engSrc).digest('hex'))
+    })())
+  ok('反向对照·接线：把 bindblur 那一枚摘掉，"真挂在输入框上"那条就该红',
+    !/bindblur="onUrlBlur"/.test(blk.replace(' bindblur="onUrlBlur"', '')) && /bindblur="onUrlBlur"/.test(blk))
+}
 
 console.log(`验-链接框粘贴：过 ${pass} 条`)
 if (fails.length) {

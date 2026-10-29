@@ -360,6 +360,7 @@
             adjust-position="{{false}}"
             bindkeyboardheightchange="onKeyboardHeight"
             bindinput="onUrlInput"
+            bindblur="onUrlBlur"
           />
           <view wx:if="{{urlInput}}" class="field-x" catchtap="clearUrl">✕</view>
           <view class="field-paste" catchtap="onPasteUrl" aria-label="{{t.paste}}">
