@@ -84,7 +84,7 @@ exports.main = async (event) => {
       }
     }
     return {
-      error: `cloud.ai 调用异常: ${e2 && e2.message ? e2.message : String(e2)}`,
+      error: `cloud.ai 调用异常: ${callErr && callErr.message ? callErr.message : String(callErr)}`,
       retryable: true,
     }
   }
