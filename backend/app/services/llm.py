@@ -298,3 +298,77 @@ def _parse_response(content: str, fallback_title: str) -> dict:
         # 外面 `setdefault("degraded", False)` 再补一个 False ⇒ 库里记成"提炼成功"。
         "degraded": bool(result.get("degraded", False)),
     }
+
+
+# ────────────── 站名识别（①默认乙：四级链最后那一发，方案 `docs/方案-来源站点名.md` 第三节） ──────────────
+# 为什么这一发**单独一条云函数**而不是在 `extract` 那条里加一个分支：
+# 那条函数的文件头写着"契约：文本进 → 4 字段 JSON 出，不含业务分支"，而站名要回的是另一个形状
+# （一个名字，不是四栏）。塞进去的代价不是报错，是那条契约以后没人敢信——
+# 而 `extract_knowledge` 的调用方正是靠这条契约把回体按四栏重拼的（上面 `_parse_response` 那段）。
+#
+# 为什么**重试一次都不做**：这一枚值排在"这篇存不存得下"之后、且失败只损失一个名字。
+# 提炼那一路重试三次是因为摘要没了用户看得见；站名没了屏上退到通用那档，用户看不出缺了什么。
+# 拿 1+2+4 秒的退避去换一枚可有可无的名字，是把 worker 那一条队列按住了陪等。
+SITE_NAME_PROMPT = (
+    "你是一名网站识别器。输入是一个网页的域名、标题和开头几句，"
+    "你要回答这个页面属于哪一家网站/哪个平台。\n"
+    '只输出一个 JSON 对象，形如 {"site_name": "站点名"}。\n'
+    "硬性要求：\n"
+    "1. 站点名只写这一家的名字，**不要**加「文章」「平台」「网站」「笔记」这类后缀；\n"
+    "2. 用这个平台自己最常用的中文名叫法；纯英文平台保留英文原名；\n"
+    "3. 拿不准就输出 {\"site_name\": \"\"}。不许猜一个相近的名字，也不许多输出任何字段。"
+)
+
+
+def site_channel_ready() -> bool:
+    """第 4 级这一发能不能发。三道闸：provider 没关、那条函数的地址配了、`.env` 里那把凭据不是占位符。
+
+    与 `note_images.channel_ready` 同一条口径：**代码可以先上现网，`.env` 里那一行加上才算开工**，
+    没配就是整级跳过、一次出网都不发。这一句必须存在的原因是那条云函数还没部署
+    （部署要站长另给一句口令），而这四级链今天已经在跑前三级了。
+
+    ⚠ 这一句只读 `.env`、**不进数据库**：库里那一行凭据（`service_secrets`）留给
+    `guess_site_name` 在 `to_thread` 里读——这里是 `async def` 那条路上的一道闸，
+    同步查库会把整个循环按在库上（10-25 第八轮审计 M2 就是这一型）。
+    """
+    provider = (settings.EXTRACT_PROVIDER or PROVIDER_HUNYUAN_CF).strip()
+    if provider != PROVIDER_HUNYUAN_CF:
+        return False
+    return bool((settings.SITE_NAME_CF_URL or "").strip()) and key_usable(settings.HUNYUAN_CF_KEY)
+
+
+async def guess_site_name(host: str, title: str = "", snippet: str = "") -> str:
+    """问模型"这是哪家"，回一个名字；任何不对都回空串（调用方退到"这一篇没有站名"）。
+
+    ⚠ 这一句**不许抛**：调用它的是外链转存那一趟的最后一步，把一次本来成功的转存
+    变成一个失败的任务，是拿整篇换一枚名字（方案第三节那条硬约束第 2 条）。
+    所以这里连 HTTP 状态码都不往上抛——非 2xx、非 JSON、回体形状不对，一律空串＋一行日志。
+    """
+    url = (settings.SITE_NAME_CF_URL or "").strip()
+    key = (await asyncio.to_thread(
+        service_secrets.resolve, "HUNYUAN_CF_KEY", settings.HUNYUAN_CF_KEY) or "").strip()
+    if not url or not key_usable(key):
+        return ""
+    payload = {
+        "system_prompt": SITE_NAME_PROMPT,
+        "host": host,
+        "title": title,
+        "snippet": snippet,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=settings.SITE_NAME_CF_TIMEOUT) as client:
+            resp = await client.post(
+                url, json=payload,
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            )
+        if resp.status_code >= 400:
+            logger.info("站名那一发没成（HTTP %s），这一篇就退到没有站名", resp.status_code)
+            return ""
+        data = resp.json()
+    except Exception as exc:
+        logger.info("站名那一发没成（%s），这一篇就退到没有站名", type(exc).__name__)
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    name = data.get("site_name")
+    return name.strip() if isinstance(name, str) else ""
