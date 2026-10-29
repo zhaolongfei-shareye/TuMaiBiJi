@@ -167,6 +167,14 @@ table.dt th, table.dt td { text-align:right; padding:6px 4px; border-bottom:1px 
   font-variant-numeric:tabular-nums }
 table.dt th { color:var(--muted); font-weight:500; font-size:12px }
 table.dt th:first-child, table.dt td:first-child { text-align:left }
+/* 「来源站点名」那张表是**可编辑的**：每一格就是一个输入框，所以字要左对齐（右对齐会让
+   打进去的域名贴着光标看不全），四列各给一条最小宽——装不下时还是整张在 `.tw` 里横滚，
+   与「来源黑名单」那一张同一个写法，不换行、也不把整页撑出横向溢出。 */
+table.ed { min-width:660px }
+table.ed th, table.ed td { text-align:left }
+table.ed td { padding:4px 5px }
+table.ed input[type=text] { width:100%; min-width:0; font-size:13px; padding:7px 9px }
+
 button.mini { padding:5px 11px; font-size:13px; background:#fff; color:var(--ink);
   border:1px solid var(--line) }
 button.mini.cur { background:var(--ink); color:#fff; border-color:var(--ink) }
@@ -240,7 +248,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
     <nav id="nav" aria-label="后台分栏"></nav>
     <div id="main">
       <div id="view-stats" class="view"><div id="stats"></div><div id="aiusage"></div></div>
-      <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div><div id="block"></div><div id="secrets"></div></div>
+      <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div><div id="tables"></div><div id="block"></div><div id="secrets"></div></div>
       <div id="view-tpl" class="view hidden"><div id="tpls"></div></div>
       <div id="view-tumaike" class="view hidden"><iframe id="frameOther" class="frame" title="图麦克后台" src="about:blank"></iframe></div>
       <footer>
@@ -482,6 +490,7 @@ var NAV = [
     { label: '关于介绍', view: 'config', key: 'text:about_intro' },
     { label: '帮助文档', view: 'config', key: 'note:preset_note' },
     { label: '帮助文档那张图', view: 'config', key: 'kind:preset_note_image' },
+    { label: '来源站点名', view: 'config', key: 'table:site_names' },
     { label: '来源黑名单', view: 'config', key: 'block:list' },
     { label: '密钥配置', view: 'config', key: 'secret:list' },
     { label: '卡片模板', view: 'tpl', key: 'tpl:list' }
@@ -623,6 +632,11 @@ function render(state) {
   while (nbox.firstChild) nbox.removeChild(nbox.firstChild);
   if (state.note) nbox.appendChild(noteCardFor(state.note));
   else if (state.note_error) nbox.appendChild(el('p', 'state off', state.note_error));
+  // 表格栏（今天只有「来源站点名」一栏）单列第三组：`cardFor` 假设一栏是一张图、
+  // `textCardFor` 假设两份语言各一串，这一组要的是"行"。`|| []` 同上面两条理由。
+  var tbbox = $('tables');
+  while (tbbox.firstChild) tbbox.removeChild(tbbox.firstChild);
+  (state.tables || []).forEach(function (b) { tbbox.appendChild(tableCardFor(b)); });
   resyncDirty();
   repaintFocus();
 }
@@ -808,6 +822,222 @@ function putNote(value, msg, done) {
     lastNoteResync = (body && body.resync) || null;
     return done && done();
   }, function (e) { msg.textContent = e.message; });
+}
+
+// ---- 「来源站点名」那一栏（站长 10-29「后台提供后台配置…人工修改」＋那一句「只存网易」）----
+//
+// 行模型存在页面里（TABLE_ROWS），不是每次重画都从服务端那一份重建：这一页的卡片是
+// 每次 refresh 整张新建的，别的栏靠 DRAFTS 按"栏+语言"把刚打的字填回去，而这一栏是**行**——
+// 他新加的那一行还没保存，服务端那份里没有它，从服务端重建就等于那一行凭空消失。
+// 10-21 量出来的那一型在这儿更狠：不是"字留着了、角标没了"，是整行没了。
+//
+// 每一行一枚本页内部的戳（rid，只在模型活着这段时间里唯一且不变），DRAFTS 的键就挂它上面。
+// 保存成功／停用之后整份模型与那些键一起丢掉，下一张从服务端那份重新长出来。
+var TABLE_ROWS = {};
+var TABLE_SEED = 0;
+var TABLE_COLS = ['domain', 'zh', 'en', 'note'];
+
+function tableRowOf(src, base) {
+  var r = { rid: 'r' + (++TABLE_SEED) };
+  TABLE_COLS.forEach(function (c) { r[c] = String(src[c] || ''); });
+  r.base = {};
+  TABLE_COLS.forEach(function (c) { r.base[c] = base[c]; });
+  return r;
+}
+
+function tableModel(t) {
+  var key = 'table:' + t.kind;
+  if (TABLE_ROWS[key]) return TABLE_ROWS[key];
+  var saved = t.current || [];
+  TABLE_ROWS[key] = saved.map(function (row) {
+    var base = {};
+    TABLE_COLS.forEach(function (c) { base[c] = String(row[c] || ''); });
+    return tableRowOf(row, base);
+  });
+  return TABLE_ROWS[key];
+}
+
+// 把屏上那几格当前的字收回模型里。加行／删行之前必须先收一遍：不然重画就是把模型
+// 里那份旧字再写回输入框，他刚打的这几个字就地丢掉。
+function harvestTable(key, rows) {
+  var nodes = document.querySelectorAll('#tables input[data-card="' + key + '"]');
+  for (var i = 0; i < nodes.length; i++) {
+    var field = nodes[i].getAttribute('data-field') || '';
+    var cut = field.lastIndexOf('.');
+    if (cut < 0) continue;
+    var rid = field.slice(0, cut), col = field.slice(cut + 1);
+    for (var j = 0; j < rows.length; j++) {
+      if (rows[j].rid === rid) rows[j][col] = nodes[i].value;
+    }
+  }
+}
+
+// 这一行的字还留在 DRAFTS 里就得手动抹掉：删掉的那一行不会再出现在 DOM 上，
+// 而清不掉的那几枚键会让关掉这一页时的"还有东西没保存"一直拦着人（那句角标倒是数不到的）。
+// 比的时候带上后面那个点：`r1.` 不许把 `r11.zh` 那一枚也捎上。
+function dropTableDrafts(key, rid) {
+  for (var k in DRAFTS) {
+    if (!Object.prototype.hasOwnProperty.call(DRAFTS, k)) continue;
+    if (k.slice(0, key.length + 1) !== key + '|') continue;
+    var field = k.slice(key.length + 1);
+    if (rid === undefined || field.slice(0, rid.length + 1) === rid + '.') delete DRAFTS[k];
+  }
+}
+
+function tableCardFor(t) {
+  var key = 'table:' + t.kind;
+  var rows = tableModel(t);
+  var card = el('section', 'card');
+  card.dataset.key = key;
+  var head = el('h2', null, t.label);
+  card.appendChild(head);
+  addDirtyChip(head);
+
+  var offText = t.empty_text || '屏上那一枚照旧念通用那一句。';
+  var st = el('p', 'state ' + (rows.length ? 'on' : 'off'));
+  if (!t.registered) st.textContent = '这台后台还没登记过这一栏：' + offText;
+  else if (!rows.length) st.textContent = '这一栏空着：' + offText;
+  else st.textContent = '现在表里 ' + rows.length + ' 家。命中哪一家，屏上就念那一行写的那个名字，' +
+    '后面那几级一次都不问。';
+  card.appendChild(st);
+
+  // 上限四枚数全部从回体读（`services/mp_assets.TABLE_SPECS` 是唯一出处）：网页里抄一份，
+  // 改上限那天就是"服务端收 24 字、界面上写 20 字"那种对不上的话。
+  card.appendChild(el('p', 'note',
+    '这一栏是四级链的第一级，也是**止血开关**：某一家自报了个怪名字、或认错了，' +
+    '在这里加一行就永久盖住它。只填站名本身，别在后面补「文章」「笔记」这类字——' +
+    '屏上念的就是这一个名字，代码不替它拼任何后缀。'));
+  card.appendChild(el('p', 'note',
+    '域名只写主机名（www.163.com 这样），不带 https:// 也不带路径；带了的行不是报错，' +
+    '是**永远命中不了**——症状是这里改了、屏上没变。同一家在一张表里只许占一行。' +
+    '中文与英文两格：小程序切到英文那一门时念 English 那一格，只填一格也行，两门都念那一个。'));
+  card.appendChild(el('p', 'note',
+    '最多 ' + t.max_rows + ' 行；域名 ' + t.max_domain_chars + ' 字、站名 ' + t.max_site_chars +
+    ' 字、备注 ' + t.max_note_chars + ' 字。任何一行不合格，整张表退回、不收半张。' +
+    '保存就是发布：worker 下一趟转存就按这张表念，不用发版；之前已经存进去的那些不回改' +
+    '（那一份来源快照当时就钉在那一篇上了）。'));
+
+  var table = el('table', 'dt ed');
+  var thead = el('thead');
+  var hrow = el('tr');
+  ['域名', '中文站名', 'English', '备注（只给自己看）', '删掉'].forEach(function (h) {
+    hrow.appendChild(el('th', null, h));
+  });
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+  var body = el('tbody');
+  table.appendChild(body);
+  var wrap = el('div', 'tw');
+  wrap.appendChild(table);
+  card.appendChild(wrap);
+
+  var msg = el('div', 'err');
+  card.appendChild(msg);
+
+  function rowFor(r) {
+    var tr = el('tr');
+    TABLE_COLS.forEach(function (col) {
+      var td = el('td');
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.maxLength = col === 'domain' ? t.max_domain_chars
+        : (col === 'note' ? t.max_note_chars : t.max_site_chars);
+      inp.placeholder = col === 'domain' ? 'www.163.com'
+        : (col === 'zh' ? '网易' : (col === 'en' ? 'NetEase' : '为什么这么写'));
+      // 现值走 .value 赋值，绝不拼进 HTML（与 textCardFor、noteCardFor 同一条硬纪律）。
+      inp.value = r[col];
+      bindField(inp, key, r.rid + '.' + col, r.base[col]);
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+    var op = el('td');
+    var btn = el('button', 'mini danger', '删');
+    // 删一行不套两下：它只动这一张还没保存的表，按下「保存这张表」才真的改到线上；
+    // 删错了再打回来，代价是重打一行。要两下的是那两枚直接动线上的。
+    btn.addEventListener('click', function () { remove(r); });
+    op.appendChild(btn);
+    tr.appendChild(op);
+    return tr;
+  }
+  function paint() {
+    while (body.firstChild) body.removeChild(body.firstChild);
+    rows.forEach(function (r) { body.appendChild(rowFor(r)); });
+    syncDirty(card);
+  }
+  // 收字 → 改模型 → 重画，三步都走这一个口：先收是因为模型里那份是上一次画的字，
+  // 他这中间又打了几笔，不收回重画就把那几笔顶回旧的。
+  function mutate(fn) {
+    harvestTable(key, rows);
+    fn();
+    paint();
+  }
+  function remove(r) {
+    mutate(function () {
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].rid === r.rid) { rows.splice(i, 1); return; }
+      }
+    });
+    dropTableDrafts(key, r.rid);
+  }
+  paint();
+
+  var row = el('div', 'row');
+  var btnAdd = el('button', 'ghost', '加一行');
+  var btnPub = el('button', null, '保存这张表');
+  var btnOff = el('button', 'danger', '停用这一栏');
+  row.appendChild(btnAdd); row.appendChild(btnPub); row.appendChild(btnOff);
+  card.appendChild(row);
+
+  // 加一行不动服务端，所以一下；保存与停用都直接改用户屏上念到的东西，所以两下（见 arm() 那段）。
+  btnAdd.addEventListener('click', function () {
+    mutate(function () {
+      var blank = {};
+      TABLE_COLS.forEach(function (c) { blank[c] = ''; });
+      rows.push(tableRowOf(blank, blank));
+    });
+    var last = body.lastChild ? body.lastChild.querySelector('input') : null;
+    if (last) last.focus();
+  });
+
+  arm(btnPub, '再点一次=立刻生效', function () {
+    harvestTable(key, rows);
+    var value = [];
+    rows.forEach(function (r) {
+      var one = {}, any = false;
+      TABLE_COLS.forEach(function (c) {
+        one[c] = String(r[c] || '').trim();
+        if (one[c]) any = true;
+      });
+      // 四个格子全空＝还没填，不是"要发的一行"：把它送去服务端只会让整张表退回，
+      // 而他可能只是加了一行还没打字。填了一半的那一行照送——哪一格不对由服务端那一句告诉我们。
+      if (any) value.push(one);
+    });
+    busyRun(btnPub, '保存中…', function () {
+      return putTable(t.kind, value, msg, function () {
+        delete TABLE_ROWS[key];
+        dropTableDrafts(key);
+        return refresh();
+      });
+    });
+  });
+  arm(btnOff, '再点一次=停用', function () {
+    busyRun(btnOff, '停用中…', function () {
+      return putTable(t.kind, null, msg, function () {
+        delete TABLE_ROWS[key];
+        dropTableDrafts(key);
+        return refresh();
+      });
+    });
+  });
+  return card;
+}
+
+function putTable(kind, value, msg, done) {
+  msg.textContent = '';
+  return api('api/admin/mp/tables/' + encodeURIComponent(kind), {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: value })
+  }).then(function () { return done && done(); }, function (e) { msg.textContent = e.message; });
 }
 
 function cardFor(k) {
