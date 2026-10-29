@@ -100,6 +100,24 @@ def _pair(zh: str, en: str = "") -> dict:
     return {"zh": zh, "en": _clean(en) or zh, "via": ""}
 
 
+# 模型那一级专属的一道闸：回的名字**以这些字收尾**就当没认出来（第九轮审计 Y7）。
+# 为什么只挂在第 4 级：第 1 级是他自己填的表（他说念成「网易文章」就念「网易文章」，代码不许驳），
+# 第 2／3 级来自页面自报与词表，那两处的脏话另有各自的判法。
+# 名单只列我们自己界面里出现过的那几个词——「新闻」「周刊」这类是真名字里的字，不许进来。
+_SUFFIX_WORDS = ("文章", "笔记", "网页", "网站", "页面", "客户端")
+
+
+def _drop_mixed_name(raw) -> str:
+    """模型把"这一家"答成"这一家的某篇文章"时，整枚不认（**不替它砍掉后面那几个字**）。
+
+    ②丙拍的是「只存网易」：屏上念的就是那一格里那几个字，代码既不补也不削。
+    所以这里唯一的动作是退回通用那一句——顺手砍后缀看起来更省事，
+    实际是把站长那句"不许再加工"反过来执行了一次。
+    """
+    text = str(raw or "").strip()
+    return "" if any(text.endswith(w) for w in _SUFFIX_WORDS) else text
+
+
 def builtin_site(url: str) -> dict:
     """第 3 级：内置词表。按域名后缀匹配，命中即止（表里同一家的多个子域各占一行，互不覆盖）。"""
     host = _host(url)
@@ -150,7 +168,7 @@ async def ai_site(url: str, title: str, content: str) -> dict:
     以及混元只能从云函数里调那件事（同 `llm.py` 顶上那段注释）。
     失败一律退成"没有名字"，不许把整篇转存判成失败、也不许重试到把 worker 拖住。
     """
-    if not llm.site_channel_ready():
+    if not await llm.site_channel_ready():
         return {}
     try:
         guess = await llm.guess_site_name(
@@ -162,7 +180,7 @@ async def ai_site(url: str, title: str, content: str) -> dict:
         # 站名是这一格里最便宜的一枚：模型没回、回得不像话，都只是"这一篇没有站名"。
         logger.info("站名识别没走成（不影响这一篇存不存）：%s: %s", type(exc).__name__, exc)
         return {}
-    out = _pair(guess)
+    out = _pair(_drop_mixed_name(guess))
     if out:
         out["via"] = "ai"
         logger.info("站名由模型认出 host=%s → %s", _host(url), out["zh"])

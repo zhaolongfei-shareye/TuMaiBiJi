@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 INITIAL_BACKOFF = 1.0
 
+# 交给那条云函数的正文字符上限，与 `cloudfunctions/extract/index.js` 的 `MAX_INPUT` 同一枚数。
+# 两处各写一份是事实（一头是本服务、一头是函数，没有共用的一层），所以**改这一枚必须连重传函数一起**。
+_CF_INPUT_LIMIT = 12000
+
 # 提炼供应商的唯一开关。三个取值的含义严格区分：
 #   hunyuan_cf —— 默认。打云函数的 HTTP 触发，云函数内部再用 cloud.ai() 走混元。
 #                 免费额度只有从这个来源调用才会被抵扣，所以不能由本服务直连混元端点。
@@ -118,16 +122,22 @@ def _build_user_content(text: str, fallback_title: str) -> str:
     原先这里也拼一次 `参考标题：`，而 `cloudfunctions/extract/index.js:54` 收到之后又拼一次
     ⇒ 模型每次多吃一行重复标题（本地只读脚本实测：`参考标题：` 出现 2 次）。
     为什么删这一头而不是那一头：函数是**先切 `MAX_INPUT` 再拼标题**，所以留下"截断＋标记"在这一头、
-    标题交给那一头，两件事各只有一处做，而且长文那条的 `[...内容过长，已截断...]` 这一回**真能送到**
-    ——旧写法里它在函数那一刀被挤掉了（送出的 12037 字符切成 12000，标记正好在尾巴上），
-    也就是说今天屏上从来没有一篇笔记告诉过模型"这是从中间掐断的"。
+    标题交给那一头，两件事各只有一处做。
+    ⚠ 但 10-25 那一版**顺带写下的那句"标记这一回真能送到"是没量过的话**（见下面 Y4），
+    送到与否由长度决定，不由"删了哪一行"决定。
 
     口径写死在这里：**拼标题只有函数那一处**。要改就先改函数并重传云函数，别在这里补回一行。
+
+    ⚠ **截断那一句要把标记自己算进预算**（第九轮审计 Y4）。上一版写的是"切到 12000 再追加标记"，
+    送出去就是 **12,018** 个字符；而 `cloudfunctions/extract/index.js:53` 按**同一个** 12000 再切一刀
+    ⇒ 那七个字符的标记必在尾巴上被削掉，模型从头到尾不知道自己拿到的是半篇。
+    上一版的注释与第八轮的账都写着"这一回真能送到"——那是**没量过的话**，本轮起改成先算长度。
+    留 12000 这一格不动是因为函数那一头吃的就是这一枚上限，改那一头要连重传云函数一起（另一句口令）。
     """
-    content = text
-    if len(content) > 12000:
-        content = content[:12000] + "\n\n[...内容过长，已截断...]"
-    return content
+    if len(text) <= _CF_INPUT_LIMIT:
+        return text
+    marker = "\n\n[...内容过长，已截断...]"
+    return text[:_CF_INPUT_LIMIT - len(marker)] + marker
 
 
 async def _call_llm(text: str, fallback_title: str = "", translate=None) -> dict:
@@ -320,21 +330,27 @@ SITE_NAME_PROMPT = (
 )
 
 
-def site_channel_ready() -> bool:
-    """第 4 级这一发能不能发。三道闸：provider 没关、那条函数的地址配了、`.env` 里那把凭据不是占位符。
+async def site_channel_ready() -> bool:
+    """第 4 级这一发能不能发。三道闸：provider 没关、那条函数的地址配了、那把凭据不是占位符。
 
     与 `note_images.channel_ready` 同一条口径：**代码可以先上现网，`.env` 里那一行加上才算开工**，
-    没配就是整级跳过、一次出网都不发。这一句必须存在的原因是那条云函数还没部署
-    （部署要站长另给一句口令），而这四级链今天已经在跑前三级了。
+    没配就是整级跳过、一次出网都不发。
 
-    ⚠ 这一句只读 `.env`、**不进数据库**：库里那一行凭据（`service_secrets`）留给
-    `guess_site_name` 在 `to_thread` 里读——这里是 `async def` 那条路上的一道闸，
-    同步查库会把整个循环按在库上（10-25 第八轮审计 M2 就是这一型）。
+    ⚠ **这一句与 `guess_site_name` 必须同源**（第九轮审计 Y3）：两边都走
+    `service_secrets.resolve`（库优先、`.env` 兜底），而且是**同一句 resolve**。
+    以前这里只读 `.env`，于是"把凭据存进后台「密钥配置」、再把 `.env` 那一行删掉"这条路
+    会让提炼照常工作、第四级**整级静默关**、一行日志都不打——那一页存在的理由就是不重启换钥匙，
+    所以这条路早晚有人走。
+    仍然不进事件循环：查库甩进 `to_thread`（10-25 第八轮审计 M2 那一型，改的是取数来源不是跑法）。
     """
     provider = (settings.EXTRACT_PROVIDER or PROVIDER_HUNYUAN_CF).strip()
     if provider != PROVIDER_HUNYUAN_CF:
         return False
-    return bool((settings.SITE_NAME_CF_URL or "").strip()) and key_usable(settings.HUNYUAN_CF_KEY)
+    if not (settings.SITE_NAME_CF_URL or "").strip():
+        return False
+    key = (await asyncio.to_thread(
+        service_secrets.resolve, "HUNYUAN_CF_KEY", settings.HUNYUAN_CF_KEY) or "").strip()
+    return key_usable(key)
 
 
 async def guess_site_name(host: str, title: str = "", snippet: str = "") -> str:

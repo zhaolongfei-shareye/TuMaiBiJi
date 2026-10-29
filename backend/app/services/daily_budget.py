@@ -128,6 +128,33 @@ def charge(user_id: str, kind: str, times: int = 1) -> Budget:
     return Budget(True, kind, used, limit, "")
 
 
+def peek(user_id: str, kind: str, times: int = 1) -> Budget:
+    """只读看一眼这一档今天还剩多少，**一个字都不写库**。
+
+    为什么要有这一句（第九轮审计 Y1）：`/v1/extract` 原来是"先记全站、再判这台设备"，于是一台
+    设备被打回 429 的那一发，一次上游都没打，却已经把**全站**当天那一行 ＋1——纯打约 20 分钟
+    就能把当天所有人的提炼额度吃光，而库里数字看着完全正常、看板照念。正确形状＝先读、都过才记。
+
+    ⚠ 这一句是 check-then-act 的前半，**单独用会留竞态**（两个并发各自 peek 过、然后各自 charge）。
+    所以调用方紧接着必须真 `charge`：`charge` 仍是"先加一再判"，最坏是多记几格然后一起被拒，
+    不会反过来把"根本没通过的请求"记进账。与文件头第 2 条口径同一条。
+    """
+    limit = limit_of(kind)
+    db = SessionLocal()
+    try:
+        row = (db.query(DailyUsage)
+                 .filter(DailyUsage.user_id == str(user_id),
+                         DailyUsage.day == today(),
+                         DailyUsage.kind == kind)
+                 .one_or_none())
+        used = int((row.count if row is not None else 0) or 0) + times
+    finally:
+        db.close()
+    if used > limit:
+        return Budget(False, kind, used, limit, _SENTENCE[kind].format(limit=limit))
+    return Budget(True, kind, used, limit, "")
+
+
 def snapshot(user_id: str) -> dict:
     """这个人今天两类各已用／还剩多少（只读，`GET /api/user/usage-today` 吃它）。
 

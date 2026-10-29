@@ -184,9 +184,17 @@ def mini_program(db: Session, days: int = 14) -> Dict[str, Any]:
     数据源只有一处＝`daily_usage`（M33 落的账）。⚠ 这一张表**分不清验收号与真人**，
     所以这里不做"剔除测试号"那种猜测——`daily_usage` 里今天有什么就念什么，
     页面那一侧必须把"含验收自己写的行"这句话一起念出来（钉在 `tests/test_用量看板.py`）。
+
+    ⚠ 但**分得清"是不是人"**（第九轮审计 Y8）：`/v1/extract` 那一口按设备记
+    （`device:<随机串>`）与按全站记（`global:extract`）的那两族**都不是小程序的用户**。
+    上一版两条查询都不看 `user_id` 装的是谁，于是 iPhone 那一路的条数被并进"小程序提炼"、
+    换一枚随机串就多一个"人"，而**唯一真正管钱那一档（全站）一个格子都不念**——
+    这一栏的说明当时已经是假话。现在：这两族从上面三个数里剔出去，全站那一档单独念一格。
     """
     today = datetime.now(daily_budget.DAILY_TZ).strftime("%Y-%m-%d")
     window_start = (datetime.now(daily_budget.DAILY_TZ) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    # 记账用的两个前缀，不是人名（`routes/v1_extract.py` 里拼的那两串，口径在同一处写死）。
+    not_a_person = ("device:", "global:")
 
     per_day: Dict[str, Dict[str, int]] = {}
     by_kind: Dict[str, Dict[str, Any]] = {
@@ -195,7 +203,8 @@ def mini_program(db: Session, days: int = 14) -> Dict[str, Any]:
     rows = (db.query(DailyUsage)
               .filter(DailyUsage.day >= window_start, DailyUsage.day <= today)
               .order_by(DailyUsage.day).all())
-    for row in rows:
+    global_today = 0
+    for row in (r for r in rows if not (r.user_id or "").startswith(not_a_person)):
         bucket = per_day.setdefault(row.day, {kind: 0 for kind in daily_budget.KINDS})
         if row.kind in bucket:
             bucket[row.kind] += int(row.count or 0)
@@ -203,10 +212,15 @@ def mini_program(db: Session, days: int = 14) -> Dict[str, Any]:
             by_kind[row.kind]["used"] += int(row.count or 0)
             if row.day == today:
                 by_kind[row.kind]["today"] = by_kind[row.kind].get("today", 0) + int(row.count or 0)
+    for row in rows:
+        if row.kind == daily_budget.KIND_EXTRACT_GLOBAL and row.day == today:
+            global_today += int(row.count or 0)
     for kind in daily_budget.KINDS:
         by_kind[kind].setdefault("today", 0)
         by_kind[kind]["people"] = (db.query(DailyUsage.user_id)
                                    .filter(DailyUsage.day == today, DailyUsage.kind == kind)
+                                   .filter(~DailyUsage.user_id.startswith("device:"),
+                                           ~DailyUsage.user_id.startswith("global:"))
                                    .distinct().count())
     # 缺的那一天补 0：与「逐日」那一栏同一条口径，"三天没数"与"那三天没人来"得能分开。
     series = []
@@ -223,6 +237,10 @@ def mini_program(db: Session, days: int = 14) -> Dict[str, Any]:
         "per_day": series,
         # 档位来自 `core/config.py` 那两栏（他拍的 50／200），这里现读不写死，抬一档不用改这一处。
         "limits": {kind: daily_budget.limit_of(kind) for kind in daily_budget.KINDS},
+        # 全站那一档单独一格：它不在 `KINDS` 里（`KINDS` 同时是小程序接口回体的键集合，
+        # 多一个键就是已上线行为的变更），而它恰恰是**唯一真正管钱**的那一档（Y8）。
+        "extract_global": {"today": global_today,
+                           "limit": daily_budget.limit_of(daily_budget.KIND_EXTRACT_GLOBAL)},
     }
 
 

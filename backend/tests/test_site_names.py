@@ -218,12 +218,31 @@ def test_模型那一发坏了只损失名字不损失这一篇(db, monkeypatch)
     assert resolve(db, "https://nowhere.example.com/article/1", meta="") == {}
 
 
-def test_模型回的那种怪串不上屏(db, monkeypatch):
+def test_模型回的名字带后缀就当没认出(db, monkeypatch):
     """回体是「网易文章」（模型不守提示词）⇒ 这一条**认不下来**，宁可退到通用那档。
 
     ⚠ 为什么不在这里替它砍掉后缀：砍成「网易」看着更好，但那是拿一条规则去改他家的名字，
-    而"这一篇到底叫什么"只有链上那四级说了算。回得不合形状就当没认出（`MAX_SITE_CHARS` 那一道）。
+    而"这一篇到底叫什么"只有链上那四级说了算。整枚不认＝②丙那句「只存网易」唯一的执行方式。
+
+    ⚠ 10-30 前这一条是**假绿**：docstring 写着测「网易文章」，桩实际回的是一串超长的怪名，
+    量的其实是 `MAX_SITE_CHARS` 那道长度闸。桩换成 docstring 说的那一串，牙才长出来（Y7）。
     """
+    async def sloppy(**kw):
+        return "网易文章"
+
+    monkeypatch.setattr(settings, "EXTRACT_PROVIDER", "hunyuan_cf")
+    monkeypatch.setattr(settings, "SITE_NAME_CF_URL", "https://example.invalid/site_name")
+    monkeypatch.setattr(settings, "HUNYUAN_CF_KEY", "a-real-looking-trigger-credential")
+    monkeypatch.setattr(llm, "guess_site_name", sloppy)
+    # 用一条**内置词表也不认识**的 URL：换 163 那一族会在第 3 级就命中「网易」，
+    # 那一发根本问不到模型，这条就变成"量了别的东西"（10-30 第一版就这么红过一次）。
+    got = resolve(db, "https://nowhere.example.com/article/1", meta="")
+    assert got == {}, f"带后缀的那一枚该整枚不认，结果读出 {got}"
+    assert got.get("zh") != "网易", "不许顺手砍后缀——砍一次就是把『不许加工』反过来执行"
+
+
+def test_模型回的那种怪串也不上屏(db, monkeypatch):
+    """长度超上限（`MAX_SITE_CHARS`）那一族照旧不认——与上面那条是两道不同的闸。"""
     async def sloppy(**kw):
         return "我不知道的一家网站名称长度已经远远超过那一只盒子能放下的字了真的放不下"
 
@@ -232,6 +251,48 @@ def test_模型回的那种怪串不上屏(db, monkeypatch):
     monkeypatch.setattr(settings, "HUNYUAN_CF_KEY", "a-real-looking-trigger-credential")
     monkeypatch.setattr(llm, "guess_site_name", sloppy)
     assert resolve(db, "https://nowhere.example.com/article/1", meta="") == {}
+
+
+def test_那道后缀闸只管模型那一级(client, admin_pw, db, monkeypatch):
+    """他自己在那张表里写「网易文章」，屏上就得念「网易文章」——第 1 级不受这道闸管。
+
+    为什么单独钉这一条：把闸做宽一级，症状是"后台填了、屏上没变"，而这句话在后台那一栏的
+    说明里正好是他被警告过的那种形状（改了屏上没变＝最难查的那一类）。
+    """
+    monkeypatch.setattr(settings, "EXTRACT_PROVIDER", "hunyuan_cf")
+    monkeypatch.setattr(settings, "SITE_NAME_CF_URL", "https://example.invalid/site_name")
+    monkeypatch.setattr(settings, "HUNYUAN_CF_KEY", "a-real-looking-trigger-credential")
+
+    async def 不该被叫到(**kw):
+        raise AssertionError("第 1 级命中了就不该问模型")
+
+    monkeypatch.setattr(llm, "guess_site_name", 不该被叫到)
+    h = admin_h(client)
+    r = client.put(TABLE, json={"value": [
+        {"domain": "c.m.163.com", "zh": "网易文章", "en": "NetEase Article"}]}, headers=h)
+    assert r.status_code == 200, r.text
+    got = resolve(db, "https://c.m.163.com/news/a/BAR9.jpg", meta="")
+    assert (got.get("zh"), got.get("via")) == ("网易文章", "table"), got
+
+
+def test_闸门与真调用取的是同一把凭据(db, monkeypatch):
+    """Y3：把钥存进后台「密钥配置」、`.env` 那一行删掉 ⇒ 第四级**不许**静默关。
+
+    旧写法闸门只看 `.env`、真调用走"库优先"，两处不同源；那一页存在的理由就是不重启换钥匙，
+    所以这条路早晚有人走，而走完的症状是"提炼照常、站名那一格从此永远是通用的"，一行日志都不打。
+    """
+    from app.services import service_secrets
+
+    monkeypatch.setattr(settings, "EXTRACT_PROVIDER", "hunyuan_cf")
+    monkeypatch.setattr(settings, "SITE_NAME_CF_URL", "https://example.invalid/site_name")
+    monkeypatch.setattr(settings, "HUNYUAN_CF_KEY", "sk-your-key")   # `.env` 里只剩占位符
+    monkeypatch.setattr(service_secrets, "resolve",
+                        lambda name, fallback="": "库里那一把真凭据" if name == "HUNYUAN_CF_KEY" else fallback)
+    assert asyncio.run(llm.site_channel_ready()) is True, \
+        "凭据在库里而 `.env` 没写 ⇒ 闸门该开（与 `guess_site_name` 同一把钥）"
+
+    monkeypatch.setattr(service_secrets, "resolve", lambda name, fallback="": fallback)
+    assert asyncio.run(llm.site_channel_ready()) is False, "两处都只有占位符时闸门必须关着"
 
 
 # ---------------------------------------------------------------- 四、写入、下发与那枚来源标

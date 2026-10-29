@@ -904,12 +904,12 @@ function tableCardFor(t) {
   // 上限四枚数全部从回体读（`services/mp_assets.TABLE_SPECS` 是唯一出处）：网页里抄一份，
   // 改上限那天就是"服务端收 24 字、界面上写 20 字"那种对不上的话。
   card.appendChild(el('p', 'note',
-    '这一栏是四级链的第一级，也是**止血开关**：某一家自报了个怪名字、或认错了，' +
+    '这一栏是四级链的第一级，也是「止血开关」：某一家自报了个怪名字、或认错了，' +
     '在这里加一行就永久盖住它。只填站名本身，别在后面补「文章」「笔记」这类字——' +
     '屏上念的就是这一个名字，代码不替它拼任何后缀。'));
   card.appendChild(el('p', 'note',
     '域名只写主机名（www.163.com 这样），不带 https:// 也不带路径；带了的行不是报错，' +
-    '是**永远命中不了**——症状是这里改了、屏上没变。同一家在一张表里只许占一行。' +
+    '是「永远命中不了」——症状是这里改了、屏上没变。同一家在一张表里只许占一行。' +
     '中文与英文两格：小程序切到英文那一门时念 English 那一格，只填一格也行，两门都念那一个。'));
   card.appendChild(el('p', 'note',
     '最多 ' + t.max_rows + ' 行；域名 ' + t.max_domain_chars + ' 字、站名 ' + t.max_site_chars +
@@ -1893,8 +1893,13 @@ function renderUsage(d) {
   var t = mp.by_kind || {};
   var ex = t.extract || {};
   var sc = t.sec_check || {};
+  var gl = mp.extract_global || {};
   knum(c1, numOf(ex.today) + ' / ' + numOf(ex.limit), '今天已提炼（条）',
-    '档位读的是服务端配置那一栏，不是这里抄的字面数；上限 ' + numOf(ex.limit) + ' 是站长 10-25 拍的');
+    '档位读的是服务端配置那一栏，不是这里抄的字面数；上限 ' + numOf(ex.limit) + ' 是站长 10-25 拍的。'
+    + '⚠ 这一格只数小程序自己人：iPhone 那一路按设备记的那几行不进这里（10-30 起分开念）。');
+  knum(c1, numOf(gl.today) + ' / ' + numOf(gl.limit), '今天全站提炼（另一条口）',
+    '这一档才是管钱的那一格：iPhone 那一口没有账号，按"全站一天"记，'
+    + '上限 ' + numOf(gl.limit) + ' 条打满时两边一起等明天。');
   knum(c1, numOf(sc.today) + ' / ' + numOf(sc.limit), '今天已送检（次）',
     '文字与图片都算一次；' + numOf(sc.people) + ' 个账号在今天动过这一档');
   knum(c1, numOf(ex.used) + ' / ' + numOf(sc.used), '这 ' + numOf(mp.window_days) + ' 天合计（提炼／送检）',

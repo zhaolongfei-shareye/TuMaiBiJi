@@ -311,6 +311,43 @@ def test_档位与limit_of同源不许抄字面数(client, admin_pw, db, no_key,
         assert body["by_kind"][kind]["limit"] == daily_budget.limit_of(kind)
 
 
+def test_设备串不许当人算进来(client, admin_pw, db, no_key, monkeypatch):
+    """Y8：`/v1/extract` 按设备记的那几行**不是小程序的人**。
+
+    旧写法两条查询都不看 `user_id` 装的是谁 ⇒ iPhone 那一路的条数并进"小程序提炼"，
+    换一枚随机串还多一个"人"，而那一栏的说明自己写着"小程序这一侧、几个真人参与的"。
+    """
+    install_fake_get(monkeypatch)
+    seed(db, "ub-真人", today(), daily_budget.KIND_EXTRACT, 3)
+    seed(db, "device:" + "a" * 32, today(), daily_budget.KIND_EXTRACT, 40)
+    seed(db, "device:" + "b" * 32, today(), daily_budget.KIND_EXTRACT, 40)
+    body = client.get(BOARD + "?days=7", headers=ah(client)).json()["mini_program"]
+    ex = body["by_kind"]["extract"]
+    assert (ex["today"], ex["used"], ex["people"]) == (3, 3, 1), \
+        f"设备那两行被当成人并进小程序那一格了：{ex}"
+    assert body["per_day"][-1]["extract"] == 3, body["per_day"][-1]
+
+
+def test_全站那一档要单独念一格(client, admin_pw, db, no_key, monkeypatch):
+    """Y8 的另一半：唯一真正管钱那一档（全站）以前一个格子都不念。
+
+    它不在 `KINDS` 里（那是小程序接口回体的键集合），所以必须单独一格，不能塞进 `by_kind`。
+    """
+    install_fake_get(monkeypatch)
+    seed(db, "global:extract", today(), daily_budget.KIND_EXTRACT_GLOBAL, 7)
+    body = client.get(BOARD, headers=ah(client)).json()["mini_program"]
+    assert body["extract_global"]["today"] == 7, body.get("extract_global")
+    assert body["extract_global"]["limit"] == daily_budget.limit_of(daily_budget.KIND_EXTRACT_GLOBAL)
+    assert "extract_global" not in body["by_kind"], "全站那一档不该混进按人算的那几格里"
+
+
+def test_那一栏屏上念得出全站那一格():
+    """后端补了一格、页面没念＝Y8 只修了一半（症状是"改了屏上没变"那一族）。"""
+    seg = page_body().split("function renderUsage", 1)[1].split("function loadUsage", 1)[0]
+    assert "extract_global" in seg, "页面没读那一格"
+    assert "今天全站提炼" in seg, "那一格没有名字"
+
+
 # ---------------------------------------------------------------- 五、那一页：左栏挂得上、两个产品不许混
 
 def test_左栏那一格与那张卡都挂得上():
@@ -343,6 +380,27 @@ def test_那一栏屏上不许露出markdown痕迹():
     seg = page.split("function renderUsage", 1)[1].split("function loadUsage", 1)[0]
     assert "**" not in seg, "屏上那几句话里混进了 markdown 粗体标记"
     assert "`" not in seg, "屏上那几句话里混进了反引号（这一页没有等宽渲染，只会露出符号）"
+
+
+def test_整页都不许露出markdown痕迹():
+    """⚠ 上面那把尺子只看「用量看板」那一段——所以 10-29 在另一栏新加的两对星号**绿着上了现网**
+    （现网 `curl -s /ops` 现读：那两串各命中 1）。第九轮审计 Y6，口径换成整页。
+
+    剥注释这一刀是必要的：那一页源码里的星号对绝大多数住在注释里（进不了屏），
+    不剥就是"红了但没坏"；`://` 不当注释起点，否则协议串会把整行尾巴吃掉（假绿的方向）。
+    """
+    import re as _re
+
+    src = _re.sub(r"/\*[\s\S]*?\*/", "", page_body())
+    kept = []
+    for one in src.splitlines():
+        s = one.strip()
+        if s.startswith("//") or s.startswith("*"):
+            continue
+        kept.append(_re.split(r"(?<!:)//", one, maxsplit=1)[0])
+    body = "\n".join(kept)
+    bad = _re.findall(r"\*\*[^*\n]{1,60}\*\*", body)
+    assert not bad, f"这些星号会原样念给操作者：{bad[:3]}"
 
 
 def test_那一页里没有钥值():

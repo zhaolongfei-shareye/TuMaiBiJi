@@ -146,6 +146,17 @@ def _device_id(request: Request) -> str:
     return token if _DEVICE_TOKEN.match(token) else ""
 
 
+async def _reject_if_full(key: str, kind: str) -> None:
+    """只读判一眼这一档今天还开不开着：开着就**一个字都不写**，满了当场 429。
+
+    与 `charge` 的分工写在这里，免得下一个人把它合并回一步：判档不许有副作用，
+    记账是判过之后的事（第九轮审计 Y1 的成因就是这两步合成了一步）。
+    """
+    budget = await asyncio.to_thread(daily_budget.peek, key, kind)
+    if not budget.ok:
+        raise HTTPException(status_code=429, detail=budget.message)
+
+
 @router.post("", response_model=ExtractResponse)
 @limiter.limit("10/minute", key_func=get_ip_key)
 async def extract(request: Request, payload: ExtractRequest):
@@ -165,19 +176,20 @@ async def extract(request: Request, payload: ExtractRequest):
     if not try_acquire_slot():
         raise HTTPException(status_code=429, detail="服务器上现在提炼排满了，稍一下再试")
     try:
-        # 两档日闸的顺序是定的，抄 `ingest_text` 那条纪律：**先判全站，再判这台设备**——
-        # 全站打满时不该再花掉某台设备的那一条额度。两步都要真写库，而这一口是 `async def`
-        # ⇒ 按 M2 那条纪律甩进工作线程，否则 SQLite 慢的那几百毫秒是全站（含 /health）一起排队。
-        budget = await asyncio.to_thread(
-            daily_budget.charge, GLOBAL_LEDGER_KEY, daily_budget.KIND_EXTRACT_GLOBAL
-        )
-        if not budget.ok:
-            raise HTTPException(status_code=429, detail=budget.message)
-        per_device = await asyncio.to_thread(
-            daily_budget.charge, f"device:{device}", daily_budget.KIND_EXTRACT
-        )
-        if not per_device.ok:
-            raise HTTPException(status_code=429, detail=per_device.message)
+        # 两档日闸＝**先都只读判一遍，都过了才记账**（第九轮审计 Y1）。
+        # 旧写法是先记全站那一行、再判这台设备，于是被打回 429 的那一发一次上游都没打，
+        # 却已经把全站当天那一格吃掉一条——一台设备纯打约 20 分钟就能把当天所有人的额度吃光。
+        # 顺序仍然保留"全站先于设备"的那句话术：全站打满时回的是那一句，不是"你这台用完了"。
+        # 两步都要碰库，而这一口是 `async def` ⇒ 按 M2 那条纪律甩进工作线程，
+        # 否则 SQLite 慢的那几百毫秒是全站（含 /health）一起排队。
+        ledgers = ((GLOBAL_LEDGER_KEY, daily_budget.KIND_EXTRACT_GLOBAL),
+                   (f"device:{device}", daily_budget.KIND_EXTRACT))
+        for key, kind in ledgers:
+            await _reject_if_full(key, kind)
+        for key, kind in ledgers:
+            # 记账仍走 `charge`（先加一再判）：peek 与 charge 之间的那道缝里可能挤进并发，
+            # 那种情况下宁可多记一格再拒，也不把"没通过的请求"记进账。
+            await asyncio.to_thread(daily_budget.charge, key, kind)
 
         # `extract_knowledge` 自己不抛错（里面那条 except 兜住一切出网失败并降级），
         # 所以这里不 try 它：真出事是它兜不住的那一类，让它抛、让 500 如实红。

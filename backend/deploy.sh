@@ -54,6 +54,22 @@ else
     exit 1
 fi
 
+# ---- 1.2 入口 import 闸门（第九轮审计 Y5）----
+# 上面那道只编字节码：**"某一栏导不到"这种形状它过得去**（compileall 不执行 import），
+# 而那一形状重启之后就是全站起不来——症状不是"某个功能坏了"，是"整站没响应"。
+# 10-30 凌晨工作树里正摆着这一形状（主程序导一只已被标删的栏），所以补这一道。
+# 副作用先说清楚：`main.py` 里没有 `create_all`（见下面第 90 行那条注释），
+# 所以这一步只导模块、不建表，放在迁移之前不影响 alembic。
+echo ""
+echo ">>> 入口 import 检查（这一道量的不是语法，是「服务起不起得来」）..."
+if python -c "import app.main" > /tmp/tumaibiji_import.err 2>&1; then
+    echo "✓ 入口导得动"
+else
+    echo "✗ 入口 import 失败，终止部署（未重启服务，线上保持旧版本继续运行）"
+    tail -30 /tmp/tumaibiji_import.err
+    exit 1
+fi
+
 # ---- 1.5 系统库预检 + 数据库快照 ----
 # libGL / libglib 是当时手工 apt 装的，不在任何脚本里：换机器或重装系统后 opencv 会
 # 以 "ImportError: libGL.so.1" 复发（R13）。先查这两样，缺了就停下给命令，

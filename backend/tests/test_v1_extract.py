@@ -217,7 +217,12 @@ class Test只回结果不建笔记:
 
 class Test额度:
     def test全站打满时不许吃掉那台设备的额度(self, client, monkeypatch):
-        """⑤：先判全站、再判设备。顺序反了，被全站挡住的那一发会白扣用户一条。"""
+        """⑤：先判全站、再判设备。顺序反了，被全站挡住的那一发会白扣用户一条。
+
+        ⚠ 10-30 起这一条同时钉住 Y1 那一面：被全站拦下的那一发**两格都不许写**
+        （旧写法是"先记全站、再判设备"，所以全站那一行会把这条被拒的请求也数进去）。
+        两格都是 1 ＝ 只有真发出去的那一发记了账。
+        """
         _fake_knowledge(monkeypatch)
         monkeypatch.setattr(settings, "EXTRACT_GLOBAL_DAILY_LIMIT", 1)
         第一发 = client.post("/v1/extract", json={"text": BODY}, headers=HEADERS)
@@ -229,8 +234,29 @@ class Test额度:
         记录 = _usage_rows()
         全站 = [c for u, _, c in 记录 if u == v1_extract.GLOBAL_LEDGER_KEY]
         设备 = [c for u, _, c in 记录 if u.startswith("device:")]
-        assert 全站 == [2], f"两发都该顶到全站那一格：{记录}"
+        assert 全站 == [1], f"被全站拦下的那一发不该给全站那一行也 ＋1：{记录}"
         assert 设备 == [1], f"被全站挡住的那一发把设备那一格也顶上一格：{记录}"
+
+    def test被设备那一档打回的那一发不许吃掉全站的账(self, client, monkeypatch):
+        """第九轮审计 Y1 那一面：设备用完了，全站那一行必须是**干净**的。
+
+        旧形状下这一发已经把全站 ＋1 才回 429；一台设备按 IP 闸 10/分纯打，约 20 分钟
+        就能把全站当天那一格（默认 200）吃干——一次上游都没打、看板照念"正常"。
+        这一条把那条路钉死：全站放宽、设备设 0，连打三发 429，全站那一行仍是 0。
+        """
+        calls = _fake_knowledge(monkeypatch)
+        monkeypatch.setattr(settings, "EXTRACT_GLOBAL_DAILY_LIMIT", 10_000)
+        monkeypatch.setattr(settings, "EXTRACT_DAILY_LIMIT", 0)
+        for 第几发 in range(3):
+            回 = client.post("/v1/extract", json={"text": BODY}, headers=HEADERS)
+            assert 回.status_code == 429, f"第 {第几发} 发：{回.text}"
+            assert "每天" in 回.json()["detail"], "该念设备那一档的话，不是全站那一档"
+        assert not calls, "设备档拦下了还把提炼发出去了"
+        记录 = _usage_rows()
+        assert [c for u, _, c in 记录 if u == v1_extract.GLOBAL_LEDGER_KEY] == [], \
+            f"被拒的三发把全站额度白吃了：{记录}"
+        assert [c for u, _, c in 记录 if u.startswith("device:")] == [], \
+            f"设备那一档 0 条时拦下的请求仍留了行：{记录}"
 
     def test换一枚设备编号照样能用而全站仍然挡着(self, client, monkeypatch):
         """⑥：按设备记的是公平，不是钱的上限。这句要能被量出来，否则下一轮会有人拿 50 当总闸。"""
