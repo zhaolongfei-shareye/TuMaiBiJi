@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.user_profile import UserProfile
 from app.services import note_images
 from app.services import quota
+from app.services import site_names
 from app.services import source_blocklist
 from app.services.ocr import ocr_images, title_hint
 from app.services.scraper import SiteHttpError, scrape_url
@@ -313,24 +314,32 @@ def _image_note_title(db, user_id: str, user, now: datetime) -> str:
     return f"{_owner_name(db, user_id, user)}图片笔记 {mmdd}{highest + 1:02d}"
 
 
-def _source_snapshot(scraped: dict, url: str) -> dict | None:
+def _source_snapshot(scraped: dict, url: str, site: dict | None = None) -> dict | None:
     """把"这篇是从谁那儿来的"钉一份快照进 `notes.imported_from`。
 
     键名与转存那一路**逐字同名**（`routes/notes.py` 的 `import_from_share` 写的那六个），
     因为读的那一头本来就只认这个名字：`_attach_share_marks` 取 `imported.get("author_name")`。
     对不上物的三键（`share_token`／`source_note_id`／`author_user_id`）**干脆不写**——
     塞空串或 0 等于多造一种"画了个空名字"的态（方案第五节第 2 项）。
-    取不到作者名就整份不写：宁可不带来源，也不拿站名之类的东西去填那一格。
+
+    ⚠ 10-29 改过一次（`docs/方案-来源站点名.md` 待拍⑤，他一句「继续实现剩余的四项配置」按默认甲落）：
+    原来这一句是"取不到作者名就整份不写，宁可不带来源也不拿站名填那一格"。
+    现在**有作者名或有站名都写**——他这次点的就是「来源标注」那一格，
+    只做名字而那一行照样不画（网易那一类页今天就是这副样子：有字有图、来源那一整行空的），
+    等于改了一半。两个都没有才整份不写。
     """
     author = (scraped.get("author") or "").strip()
-    if not author:
+    fields = site_names.snapshot_fields(site or {})
+    if not author and not fields:
         return None
-    return {
-        "author_name": author[:200],
-        "title_at_import": (scraped.get("title") or "")[:500],
-        "imported_at": datetime.now(timezone.utc).isoformat(),
-        "source_url": url[:1000],
-    }
+    snap: dict = {}
+    if author:
+        snap["author_name"] = author[:200]
+    snap["title_at_import"] = (scraped.get("title") or "")[:500]
+    snap["imported_at"] = datetime.now(timezone.utc).isoformat()
+    snap["source_url"] = url[:1000]
+    snap.update(fields)
+    return snap
 
 
 def _archive_images(db, note, scraped: dict, user_id) -> dict | None:
@@ -431,6 +440,12 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
             user = _load_task_user(db, task_id, user_id, generation)
             if user is None:
                 return
+            # 站名这一格排在建笔记之前、排在提炼之后：它要读后台那张表（要有 db），
+            # 而它失败只损失一个名字——屏上退到通用那档，这篇照存。
+            # ⚠ 四级链的次序与"哪一级都不许拼后缀"全在 `services/site_names.py`，这里只管写。
+            site = asyncio.run(site_names.resolve(
+                db, url, scraped.get("site_name_meta", ""),
+                title=scraped.get("title", ""), content=text))
             note = Note(
                 user_id=user_id,
                 title=knowledge["title"],
@@ -440,7 +455,7 @@ def process_url_task(task_id: str, user_id: str, url: str, generation: int | Non
                 original_content=text[:50000],
                 source_type=scraped["source_type"],
                 source_url=url,
-                imported_from=_source_snapshot(scraped, url),
+                imported_from=_source_snapshot(scraped, url, site),
             )
             db.add(note)
             db.commit()

@@ -358,6 +358,11 @@ def test_迁移把空值那一行显式建出来(tmp_path):
     将来谁加了一栏（图片或文案）而忘了在迁移里补那一行空值，这里就红——
     那正是要防的那件事（"这一栏不存在"与"这一栏空着"在界面上是两句话）。
     顺带 `select text_value` 本身就是那条加栏的判据：栏没加上，这条 SQL 直接报错。
+
+    10-29 加表格栏（「来源站点名」，`TABLE_KINDS`）之后改成**数三个闭集的并**，不是放宽这条：
+    ⚠ 这一栏空着的含义与上面两组**不一样**，别拿"回到包里那份"那句去理解它——
+    四级链后面还有页面自报、内置词表、AI 那三级在跑（`services/site_names.py`），
+    所以界面上那句话说的是"退到后面那三级"（`KIND_EMPTY_TEXTS`），这一条只管"行在不在"。
     """
     db_file = tmp_path / "mig.db"
     env = dict(os.environ, DATABASE_URL=f"sqlite:///{db_file}")
@@ -367,7 +372,9 @@ def test_迁移把空值那一行显式建出来(tmp_path):
     )
     conn = sqlite3.connect(db_file)
     rows = conn.execute("select kind, asset_id, text_value from mp_settings order by kind").fetchall()
-    want = sorted([(k, None, None) for k in (*mp_assets.KINDS, *mp_assets.TEXT_KINDS)])
+    want = sorted([
+        (k, None, None) for k in (*mp_assets.KINDS, *mp_assets.TEXT_KINDS, *mp_assets.TABLE_KINDS)
+    ])
     assert rows == want, f"迁移没把每一已知栏目的「空」那一格显式建出来：{rows}"
     idx = conn.execute("select name from sqlite_master where type='index' and tbl_name='mp_assets'").fetchall()
     assert {"ux_mp_assets_token", "ux_mp_assets_kind_hash"} <= {r[0] for r in idx}, idx

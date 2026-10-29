@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     # 否则函数还会跑完、我们先放弃，看起来像失败。5.4 秒那个墙是微信
     # /tcb/invokecloudfunction 的调用方限制，走网关不受它约束，但仍要实测一次。
     HUNYUAN_CF_TIMEOUT: float = 90.0
+    # 站名识别那一发走的**是另一条云函数**（`cloudfunctions/site_name`），地址单独一栏：
+    # 它与提炼共用同一个云开发环境、同一把触发凭据（`HUNYUAN_CF_KEY`），但函数不同、契约不同。
+    # 默认空＝这一级整段跳过（`llm.site_channel_ready`），因为那条函数还没部署——部署要站长一句口令。
+    SITE_NAME_CF_URL: str = ""
+    # 故意比提炼那枚短得多（90 秒 → 15 秒）：这一枚值失败了只损失一个名字，屏上退到通用那档，
+    # 不值得让 worker 陪它等一分多钟。函数自己的执行超时必须比这一枚小，否则我们先放弃它还在跑。
+    SITE_NAME_CF_TIMEOUT: float = 15.0
     WECHAT_APP_ID: str = ""
     WECHAT_APP_SECRET: str = ""
     # Sign in with Apple 那张 `identityToken` 里 `aud` 应当等于的值。10-10 拍**甲**：它是我们

@@ -16,6 +16,7 @@ HEIC 也一样不收——那是 MVP 就定过的口径（PRD 决策台账"不�
 import hashlib
 import logging
 import os
+import re
 import secrets
 from io import BytesIO
 from pathlib import Path
@@ -28,7 +29,8 @@ from app.core.config import settings
 from app.core.errors import UserError
 from app.core.timefmt import _as_utc_iso
 from app.models.mp_asset import (
-    KINDS, KIND_ABOUT_INTRO, KIND_EMPTY_TEXTS, KIND_LABELS, KIND_TIPS, TEXT_KINDS, MpAsset, MpSetting,
+    KINDS, KIND_ABOUT_INTRO, KIND_EMPTY_TEXTS, KIND_LABELS, KIND_SITE_NAMES, KIND_TIPS,
+    TABLE_KINDS, TEXT_KINDS, MpAsset, MpSetting,
 )
 
 logger = logging.getLogger(__name__)
@@ -393,6 +395,119 @@ def current_text(db: Session, kind: str) -> dict | None:
     return row.text_value
 
 
+# ────────────── 表栏（站长 10-29「后台提供后台配置…人工修改」那一栏：域名 → 站名） ──────────────
+# 站名这一格的字数上限**只有这一个出处**：四级链里那四级的清洗都读它（`services/site_names.py`），
+# 界面上那句"最多几字"也从这儿读。它卡的是屏上那只盒子，不是"随手给个数"。
+MAX_SITE_CHARS = 24
+# 这三枚上限是**我定的，站长没拍过**（他拍的是②那一格的形状＝只存站名，没管一张表能填几行）：
+#   · 200 行——他今天要点名的是"这批主流站"（内置词表 20 家），留十倍余量；行多了读的一面是线性扫，
+#     而这一趟扫发生在每次外链转存里，不建索引（一张两百行的表不值得）。
+#   · 域名 60 字／站名 24 字／备注 100 字——域名那枚跟着 `MpAsset.kind` 那一栏的量级，
+#     站名那枚与 `site_names.MAX_SITE_CHARS` **同一枚常量**（两处各写一个数＝改一处漏一处）。
+TABLE_SPECS = {
+    KIND_SITE_NAMES: {
+        "max_rows": 200,
+        "max_domain_chars": 60,
+        "max_site_chars": MAX_SITE_CHARS,
+        "max_note_chars": 100,
+        "columns": ("domain", "zh", "en", "note"),
+    },
+}
+# 域名的形状。只收"主机名"，不收协议、路径、端口、通配符：
+# 四级链那一级是拿 `urlparse(url).hostname` 来比这一栏的（`services/site_names.py`），
+# 存进去一个带 `https://` 或带 `/article` 的值不是"报错"，是**那一行永远命中不了**——
+# 症状是他后台改了、屏上没变，而这种不一致在这一条链上没有任何一条其他读数会喊。
+_DOMAIN = re.compile(r"^(?=.{1,60}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$")
+
+
+def table_spec(kind: str) -> dict:
+    return TABLE_SPECS[kind]
+
+
+def check_table_kind(kind: str) -> str:
+    """第三道闸门，与 `check_kind`（图片栏）、`check_text_kind`（文案栏）并列，互不收对方的 kind。
+
+    分成三道而不是合成一道，是为了让"往错的那组里填"这件事在写口就红，而不是等到屏上读不到。
+    """
+    if kind not in TABLE_KINDS:
+        raise UserError("这一栏不是表格栏，请刷新后台页面")
+    return kind
+
+
+def clean_table(kind: str, value) -> list:
+    """整份退回（与 `clean_text` 同一条纪律）：不合格不收半张表。
+
+    为什么不收合格那几行：这张表是**按域名查**的，收半张的症状是"他以为改好了、
+    某一家还在念页面自报那个怪名字"，而后台上一行"已生效 N 家"照样绿——比整份红着难查得多。
+    同一张表里域名不许重复：四级链取的是第一行命中，两行同一家＝第二行永远不生效，
+    那种"填了没用"的格子比报错更气人。
+    """
+    spec = table_spec(check_table_kind(kind))
+    if not isinstance(value, list):
+        raise UserError("这一栏要一张表（行的列表）")
+    if len(value) > spec["max_rows"]:
+        raise UserError(f"这张表最多 {spec['max_rows']} 行，现在有 {len(value)} 行")
+    rows: list = []
+    seen: set = set()
+    for idx, raw in enumerate(value, start=1):
+        if not isinstance(raw, dict):
+            raise UserError(f"第 {idx} 行不是一个格子")
+        domain = str(raw.get("domain") or "").strip().lower()
+        if not _DOMAIN.match(domain):
+            raise UserError(
+                f"第 {idx} 行的域名形状不对：{domain[:30] or '（空的）'}——只写主机名，不带 https:// 和路径"
+            )
+        if domain in seen:
+            raise UserError(f"「{domain}」在这张表里出现了两次，请合并成一行")
+        seen.add(domain)
+        pair = []
+        for lang in ("zh", "en"):
+            text = re.sub(r"\s+", " ", str(raw.get(lang) or "")).strip()
+            if len(text) > spec["max_site_chars"]:
+                raise UserError(f"第 {idx} 行的{lang}站名超过 {spec['max_site_chars']} 字：{text[:12]}…")
+            pair.append(text)
+        if not pair[0] and not pair[1]:
+            raise UserError(f"第 {idx} 行（{domain}）两个名字都没填")
+        note = re.sub(r"\s+", " ", str(raw.get("note") or "")).strip()
+        if len(note) > spec["max_note_chars"]:
+            raise UserError(f"第 {idx} 行的备注超过 {spec['max_note_chars']} 字")
+        rows.append({"domain": domain, "zh": pair[0], "en": pair[1], "note": note})
+    return rows
+
+
+def set_table(db: Session, kind: str, value) -> list:
+    check_table_kind(kind)
+    rows = clean_table(kind, value)
+    row = setting_row(db, kind, create=True)
+    row.text_value = rows
+    row.asset_id = None
+    db.commit()
+    db.refresh(row)
+    logger.info("来源站点名已生效 kind=%s（%d 家）", kind, len(rows))
+    return rows
+
+
+def clear_table(db: Session, kind: str) -> None:
+    """停用＝写回 NULL，留行不留值（A1 那句「发布过、现在停用」要的就是这一格）。"""
+    check_table_kind(kind)
+    row = setting_row(db, kind, create=True)
+    row.text_value = None
+    db.commit()
+    logger.info("来源站点名已停用 kind=%s（四级链退到后面那三级）", kind)
+
+
+def site_table(db: Session) -> list:
+    """四级链第 1 级读的那张表。形状不对（手工 SQL 写进去的东西）一律当"没有这张表"。
+
+    这一句必须永远不抛：它在 worker 转存那一趟的最前面，一张脏表把整篇转存带崩是错的比例。
+    """
+    row = setting_row(db, KIND_SITE_NAMES)
+    value = row.text_value if row is not None else None
+    if not isinstance(value, list):
+        return []
+    return [r for r in value if isinstance(r, dict)]
+
+
 def config_payload(db: Session) -> dict:
     """给小程序的那一份。每一已知 kind（图片栏与文案栏都算）都在，值要么是当前那份要么是 null。
 
@@ -487,4 +602,33 @@ def admin_state(db: Session) -> dict:
             # 是从 Tips 一栏长出来的话，第二格文案栏照抄就对站长念半句假话（"那六句"）。
             "empty_text": KIND_EMPTY_TEXTS.get(kind),
         })
-    return {"kinds": kinds, "texts": texts, "frozen": settings.MP_ASSETS_FREEZE}
+    return {"kinds": kinds, "texts": texts, "tables": _admin_tables(db), "frozen": settings.MP_ASSETS_FREEZE}
+
+
+def _admin_tables(db: Session) -> list:
+    """表栏那一组（今天只有「来源站点名」一栏）。单列一组，理由与上面 `texts` 那段一样：
+    `cardFor()` 整段假设一栏是一张图、`textCardFor()` 假设两份语言各一串，表格要的是"行"。
+
+    ⚠ ③拍的是甲（先不给每族命中读数）：所以这一组里**没有**"这一家今天命中几次"那一栏。
+    今天带来源链接的存量只有 28 篇、只落在 3 个站，读数没有内容可看；等有量了再加，
+    加了就多一栏要维护的统计（方案第七节③那行的代价栏）。
+    """
+    out = []
+    for kind in TABLE_KINDS:
+        row = setting_row(db, kind)
+        spec = table_spec(kind)
+        value = row.text_value if row is not None else None
+        out.append({
+            "kind": kind,
+            "label": KIND_LABELS.get(kind, kind),
+            "registered": row is not None,
+            "frozen": settings.MP_ASSETS_FREEZE,
+            "current": value if isinstance(value, list) else [],
+            "max_rows": spec["max_rows"],
+            "max_domain_chars": spec["max_domain_chars"],
+            "max_site_chars": spec["max_site_chars"],
+            "max_note_chars": spec["max_note_chars"],
+            "columns": list(spec["columns"]),
+            "empty_text": KIND_EMPTY_TEXTS.get(kind),
+        })
+    return out

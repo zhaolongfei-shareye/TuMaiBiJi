@@ -109,6 +109,15 @@ class NoteBrief(BaseModel):
     category_id: int | None
     is_pinned: bool
     created_at: UTCDatetime
+    # 这一篇是从哪一家存的（站长 10-29「把目前来源标注的网页文章，改为具体的网站文章，
+    # 例如：小红书文章，网易文章」）。两栏都直接读 `Note` 上那对 property，接口这里不重算一遍
+    # ——读的实现只有模型那一处，写在 `services/site_names.snapshot_fields` 那一处。
+    # 空串＝四级链没认出来，屏上退到 `source_type` 那六档通用文案（不许画出一个空格）。
+    # ⚠ 这两栏**不许进** `core/private_access.NOTE_BRIEF_FIELDS`／`NOTE_DETAIL_FIELDS`：
+    #    私密篇没解锁时行是按那两份名单重建的，站名虽然不是正文，也告诉别人这篇是从哪儿抄的。
+    #    钉住这一条的是 `tests/test_site_names.py` 里那条正反用例，与封面那两条同一个路子。
+    source_site: str = ""
+    source_site_en: str = ""
 
     class Config:
         from_attributes = True
@@ -147,9 +156,12 @@ class NoteListItem(NoteBrief):
     # 为什么必须换：外链转存那一族（公众号／小红书）也带来源，但它的 `source_type` 是
     # `wechat_article`／`web_article`，**不许改成 `share_import`**（那枚值在配额里有专门用途，
     # `quota._is_his_first_note` 把它从"他自己动笔"里排出去、`credit_import` 的账也认它）。
-    # 判的是"快照里有没有一个真的作者名"，不是"快照存不存在"——只有贴图计数、没有名字那一态
-    # 不该在屏上画出一个空名字。它不进 `NOTE_BRIEF_FIELDS`：私密篇锁着时那一行按九栏重建，
-    # 出不了 `False` 之外的东西。
+    # 判的是"快照里有没有一个真的作者名**或有站名**"，不是"快照存不存在"——只有贴图计数、
+    # 两个名字都没有那一态不该在屏上画出一个空名字。
+    # ⚠ 后半句是 10-29 加的（待拍⑤按默认甲落，他一句「继续实现剩余的四项配置」）：
+    # 网易那一类页今天没有作者名、只有站名，原来这一枚回 `False` ⇒ 来源那一整行不画，
+    # 他这次点的就是那一格，只做名字而那一行还不画＝改了一半（方案第五节）。
+    # 它不进 `NOTE_BRIEF_FIELDS`：私密篇锁着时那一行按九栏重建，出不了 `False` 之外的东西。
     has_source: bool = False
     # 列表右侧那枚缩略图（云开发 fileID，客户端拿去 getTempFileURL）。一篇只给一张，
     # 取哪一张见 _attach_covers。没配过图、或那一张备份失败 ⇒ null，界面上那一格不画。
@@ -227,7 +239,7 @@ def _attach_share_marks(db: Session, notes: list) -> None:
         n.share_author_name = imported.get("author_name") or shared.get(n.id)
         # 名字来自"抄自谁"那一份快照时才算来源篇；只来自自己那张分享码的不算
         # （画在自己纸片上不说明任何事——这条判据原来只能靠 `source_type` 猜，见 NoteListItem 那行注释）。
-        n.has_source = bool(imported.get("author_name"))
+        n.has_source = bool(imported.get("author_name") or imported.get("site_name"))
 
 
 def _attach_covers(db: Session, uid: str, notes: list) -> None:

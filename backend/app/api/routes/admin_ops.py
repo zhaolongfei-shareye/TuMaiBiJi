@@ -1,4 +1,5 @@
-"""后台那一页背后的十九个口：登录、看状态、上传、改图片生效位、改文案生效位、读默认笔记那一篇、
+"""后台那一页背后的二十个口：登录、看状态、上传、改图片生效位、改文案生效位、改表格栏生效位、
+读默认笔记那一篇、
 改默认笔记那一篇、验票、看数、列卡片模板、改卡片模板（元数据与上下架，**改不了配方**）、
 吐预览引擎（把客户端那份绘制代码当数据交给那一页的浏览器，**这里一笔都不画**）、
 列来源黑名单、手工加一条、手工移一条，加看密钥、存密钥、删密钥，加看用量看板。
@@ -186,6 +187,44 @@ def admin_mp_text(
             mp_assets.clear_text(db, kind)
             return {"kind": kind, "current": None}
         value = mp_assets.set_text(db, kind, body.value)
+        return {"kind": kind, "current": value}
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class TableIn(BaseModel):
+    """`value` 给一张表（行的列表）是"发这一张"，给 null 是"停用，退到后面那三级"。
+
+    与上面 `TextIn`、下面 `PresetNoteIn` 同一条纪律：形状与上限的唯一出处是
+    `services/mp_assets.clean_table`（域名形状、重复域名、两份站名都空、行数上限），
+    路由再写一道就成了第二份真相，改上限那天必然有一处忘。
+
+    ⚠ 这一栏**不发字节**：它是四级链的第 1 级（`services/site_names.table_site`），
+    写口一提交，worker 下一趟转存就读得到——不像图片那条要"传了再点发布"，
+    这一栏的"保存"就是发布，所以界面上那一枚按钮要两下确认（`arm()` 那一条纪律）。
+    """
+    value: list | None = None
+
+
+@router.put("/api/admin/mp/tables/{kind}")
+@limiter.limit("30/minute")
+def admin_mp_table(
+    kind: str,
+    body: TableIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """表格栏的生效位（今天只有「来源站点名」一栏）。与图片、文案两口同一路子：一个口两种写法。
+
+    整份退回，不收半张表——这张表是**按域名查**的，收了合格那几行的症状是
+    "他以为改好了、某一家还在念页面自报那个怪名字"，而后台那句"已生效 N 家"照样绿。
+    """
+    try:
+        if body.value is None:
+            mp_assets.clear_table(db, kind)
+            return {"kind": kind, "current": []}
+        value = mp_assets.set_table(db, kind, body.value)
         return {"kind": kind, "current": value}
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))

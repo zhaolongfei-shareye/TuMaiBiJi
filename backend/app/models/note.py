@@ -51,3 +51,30 @@ class Note(Base):
     version = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # 屏上那枚来源标读的两栏（站长 10-29「把来源标注的网页文章，改为具体的网站文章」）。
+    # **为什么是 property 而不是新列**：值本来就钉在 `imported_from` 那份快照里（与作者名同一份、
+    # 同一时刻、同一个"抄自哪里"的事实），加一栏就是第二份真相——而且加栏要迁移，
+    # 那份快照的读法在 `routes/notes.py`、`poster_engine`、后台统计三处各有一份抄本，
+    # 迁一次表不会让那三处一起改口。写的那一头只有一个出处：`services/site_names.snapshot_fields`。
+    # ⚠ 两栏都**不许进** `core/private_access.NOTE_BRIEF_FIELDS`／`NOTE_DETAIL_FIELDS`：
+    #    私密篇没解锁时行是按那两份名单重建的，站名虽不是正文，也会告诉别人这篇是从哪儿抄的。
+    @property
+    def source_site(self) -> str:
+        """中文门里那一站的名字；认不出就空串（客户端退到那六档通用文案）。"""
+        snap = self.imported_from if isinstance(self.imported_from, dict) else {}
+        return str(snap.get("site_name") or "").strip()
+
+    @property
+    def source_site_en(self) -> str:
+        """英文门里那一站的名字。
+
+        空主名 ⇒ 空串（没认出就是没认出，两种语言都不许造一个名字出来）。
+        主名有、英文栏空 ⇒ 回主名：`og:site_name` 与模型那两级本来就只回一个名字，
+        而站名是专有名词，英文门里念「微信公众平台」和念「WeChat」指的都是那一家。
+        """
+        zh = self.source_site
+        if not zh:
+            return ""
+        snap = self.imported_from if isinstance(self.imported_from, dict) else {}
+        return str(snap.get("site_name_en") or "").strip() or zh

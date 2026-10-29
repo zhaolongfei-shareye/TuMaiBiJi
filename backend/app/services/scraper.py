@@ -474,6 +474,36 @@ def _decode_wechat_text(text: str) -> str:
     return _WX_ESCAPED_ANCHOR.sub(lambda m: f"{m.group(1)} ", decoded)
 
 
+def _site_name_meta(soup) -> str:
+    """第 2 级那一手：页面自己写下来的站名（`og:site_name`，其次结构化数据里的 `publisher.name`）。
+
+    只取、不判——"这个串脏不脏"归 `site_names.meta_site` 一处判，这里再判一遍就是第二份真相
+    （10-29 实测少数派报的是「少数派 - 高品质数字消费指南」，那一判写在链上、不写在解析里）。
+
+    ⚠ 这一趟解不开一律回空串：站名是这一格里最便宜的一枚，
+    任何解析意外都不许把一次本来成功的抓取带崩（与 `_xiaohongshu_extras` 同一条纪律）。
+    """
+    try:
+        og = soup.find("meta", property="og:site_name")
+        if og and (og.get("content") or "").strip():
+            return og["content"].strip()
+        for block in soup.find_all("script", type="application/ld+json"):
+            raw = block.string or block.get_text() or ""
+            if '"publisher"' not in raw:
+                continue
+            data = json.loads(raw)
+            for item in (data if isinstance(data, list) else [data]):
+                if not isinstance(item, dict):
+                    continue
+                publisher = item.get("publisher")
+                name = publisher.get("name") if isinstance(publisher, dict) else publisher
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+    except Exception as exc:
+        logger.info("页面自报站名没读出来（不影响这一篇存不存）：%s", type(exc).__name__)
+    return ""
+
+
 def _parse_wechat_article(html: str, url: str, source_type: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
 
@@ -516,6 +546,7 @@ def _parse_wechat_article(html: str, url: str, source_type: str) -> dict:
         "source_type": source_type,
         "images": images,
         "author": account,
+        "site_name_meta": _site_name_meta(soup),
     }
 
 
@@ -544,4 +575,5 @@ def _parse_general_url(html: str, url: str, source_type: str) -> dict:
         "content": text,
         "source_type": source_type,
         "images": _content_images(_main_container(soup), url),
+        "site_name_meta": _site_name_meta(soup),
     }
