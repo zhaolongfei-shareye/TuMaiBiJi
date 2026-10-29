@@ -440,13 +440,35 @@ for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker'], ['
   ck('卡片模板那十格：落笔前对号，且对完到落笔之间不让出主线程',
     at >= 0 && !/await /.test(gap), b ? `最后一次对号@${at}，落笔@${paint}，中间${/await /.test(gap) ? '有 await' : '没有 await'}` : '没抓到 renderThumbs 函数体')
 }
-for (const [nm, css, canvasSel, onSel] of [['分享页那一排', shareCss, 'pick-canvas', 'pick-on'], ['卡片模板那十格', profCss, 'cell-canvas', 'cell-on']]) {
+/* 原来这个循环里有两格：分享页那一排＋「卡片模板那十格」。10-30 站长一句「卡片市场，取消选择的
+   黑边和黑点，这里只是浏览功能，不需要选择」⇒ profile 那一屏的选中态整块没了
+   （`.cell-on`／`.cell-on-dot`／`.cell-on .cell-label` 三处一起删）。
+   「选中态不改 border-width」这一条在这一屏**没有落点了**，再钉下去读到的是「没读到 .cell-on」
+   那种红——红的是尺子不是产品，所以按落点撤；分享页那一排仍有点中态（那是真正在挑一套的地方），照旧钉。
+   ⚠ 「画布底色透明」那条**没跟着撤**，只是搬出循环单独钉：底色这一格还在（画布还在这十格里），
+   撤了就等于把"四个角外垫直角灰斑"那个老坑的钉子一起丢了。 */
+for (const [nm, css, canvasSel, onSel] of [['分享页那一排', shareCss, 'pick-canvas', 'pick-on']]) {
   const rule = cssRule(css, canvasSel)
   ck(`${nm}的画布底色透明（不留直角灰斑）`, !!rule && /background:\s*transparent/.test(rule),
     rule ? rule.trim().replace(/\s+/g, ' ') : `没读到 .${canvasSel}`)
   const on = cssRule(css, onSel)
   ck(`${nm}的选中态不改 border-width`, !!on && !/border-width/.test(on) && /box-shadow/.test(on),
     on ? on.trim().replace(/\s+/g, ' ') : `没读到 .${onSel}`)
+}
+{
+  const rule = cssRule(profCss, 'cell-canvas')
+  ck('卡片模板那十格的画布底色透明（不留直角灰斑）', !!rule && /background:\s*transparent/.test(rule),
+    rule ? rule.trim().replace(/\s+/g, ' ') : '没读到 .cell-canvas')
+  // 这一屏不再有选中态是**拍过的口径**，不是漏做的皮：留一条反向钉，谁要再加回外环/圆点，
+  // 得先把站长这句撤了才能过尺子。
+  // ⚠ 判据只认"标记里真在用"，所以先把 wxml 的注释整段剥掉再找——这一屏的注释里正写着
+  // 这三枚类名（记的就是"撤了什么"），不剥的话第一条就跑红的是说明文字。
+  const profWxml = fs.readFileSync(path.join(pageDir, 'pages/profile/profile.wxml'), 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, '')
+  ck('卡片市场这一屏没有点中态（黑边与黑点 10-30 撤净，不许悄悄加回）',
+    !cssRule(profCss, 'cell-on') && !cssRule(profCss, 'cell-on-dot') && !/cell-on/.test(profWxml),
+    `wxss 里 .cell-on=${!!cssRule(profCss, 'cell-on')}／.cell-on-dot=${!!cssRule(profCss, 'cell-on-dot')}／`
+    + `剥掉注释的标记里还出现 cell-on=${/cell-on/.test(profWxml)}`)
 }
 
 /* v22（站长 10-03）：详情窗右上那枚「淡底方形 + LOGO」的空态底。

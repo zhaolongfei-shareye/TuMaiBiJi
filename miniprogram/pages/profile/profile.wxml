@@ -8,7 +8,11 @@
        · 上面那三块（四个形象槽／名称框／一句话框）与那条「保存」整片撤掉，收进标题右侧那一枚按钮
          拉起的那一层——层的标记在 templates/card-info-sheet.wxml，收数据与推格在 utils/cardInfo.js（与首页同一份）。
        · 货架那一排（一组一条、左右滑着挑）的**结构一个字没换**：他还是按分组标题＋一排格子来认这一屏的，
-         下面 `.grid-head` 那两行字要大一档，也是同一句里点的。 -->
+         下面 `.grid-head` 那两行字要大一档，也是同一句里点的。
+       · 站长 10-30 一句「卡片市场，取消选择的黑边和黑点，这里只是浏览功能，不需要选择」⇒ 这一排不再有点中那一格：
+         外环（`.cell-on`）、名字后面那枚圆点（`.cell-on-dot`）、名字变深（`.cell-on .cell-label`）三样一起没，
+         连"点一格就当场落盘"那一下（`bindtap`／`onPickTemplate`）也一起撤——留着它就是屏上不动、背后偷偷改默认模板。
+         格子左右那 8rpx 内缩**没跟着撤**：那一档是这一排的几何，他这次点的是皮不是位置。 -->
   <view class="mk-head">
     <text class="page-title">{{t.navProfile}}</text>
     <view class="mk-edit" bindtap="onOpenCardInfo">{{t.editCardInfo}}</view>
@@ -21,9 +25,7 @@
         <view
           wx:for="{{g.items}}"
           wx:key="id"
-          class="cell {{template === item.id ? 'cell-on' : ''}}"
-          data-id="{{item.id}}"
-          bindtap="onPickTemplate"
+          class="cell"
         >
           <canvas
             type="2d"
@@ -33,7 +35,6 @@
           ></canvas>
           <view class="cell-label">
             <text>{{item.label}}</text>
-            <text wx:if="{{template === item.id}}" class="cell-on-dot"></text>
           </view>
         </view>
       </view>

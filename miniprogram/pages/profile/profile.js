@@ -54,8 +54,6 @@ Page({
     lang: 'zh',
     t: texts('zh'),
     themeClass: '',
-    // 挑中哪一套（点一格就当场落盘，见 onPickTemplate 那一条）
-    template: 'card',
     groups: groupSkeleton('zh'),
     // 弹窗那四个键（cardInfoOpen/ciSlots/ciName/ciSlogan）由 cardInfo.initial() 给初值：
     // 页面自己写死一份就会与首页那一层漂开。
@@ -69,20 +67,12 @@ Page({
     poster.dropUncommitted()
     poster.pruneAvatars()
     const lang = app.globalData.userInfo?.language || 'zh'
-    const saved = poster.readProfile()
-    // M19：本机存的那套默认可能已经被下架（＝不在合并后的那份名单里）——这一口以前没挡。
-    // 判据与首页 `_openPosterFor` 那一道同一个出处（`poster.templateList()`）。认不出时高亮跟着
-    // **真会画出来的那一套**（默认）走，否则十格一格都不亮，看着像"从没选过"，而人挑的那套
-    // 已经画不出来了。这里只改屏上那一格亮着，**不写 storage**：他真点一格才落盘（见 onPickTemplate）。
-    const stored = saved.template
-    const known = !!stored && poster.templateList().some((x) => x.id === stored)
     // 小样要等骨架落到视图层之后再画，否则按选择器取不到画布节点
     this.setData(
       {
         lang,
         t: texts(lang),
         themeClass: app.applyTheme(app.getWallpaper()),
-        template: known ? stored : poster.DEFAULT_TEMPLATE,
         groups: groupSkeleton(lang),
       },
       () => this.renderThumbs()
@@ -116,12 +106,12 @@ Page({
   // 会把用户刚填还没保存的名称、slogan 冲掉（新建页选完图没反应就是这个成因）。
   // 形象那一块不受这条影响——它是即时生效的，重读 storage 读到的就是刚写进去的。
 
-  // 十格小样要的那份：名称/一句话/模板用这一页还没保存的输入，头像取「卡片」那张
-  // （posterProfile 里现算，见 utils/poster.js 那条注释——直接 readProfile 会让小样没头像）
+  // 十格小样要的那份：名称/一句话只住在 storage 里，头像取「卡片」那张
+  // （posterProfile 里现算，见 utils/poster.js 那条注释——直接 readProfile 会让小样没头像）。
+  // 10-30 这一屏不再挑模板 ⇒ 那份 `template` 也不再从页面状态盖进去：画哪一套由循环里的
+  // `tpl.id` 说了算，十格本来就各画各的，这一枚键在这一屏已经没有读者。
   draftProfile() {
-    // 这一屏不再有两只输入框，名称与一句话只住在 storage 里（`poster.posterProfile()` 读的就是那一份）；
-    // 改完那两格由弹窗的「保存」落盘，落盘之后 `_ciAfterChange()` 会重画这十格。
-    return Object.assign(poster.posterProfile(), { template: this.data.template })
+    return poster.posterProfile()
   },
 
   async renderThumbs() {
@@ -203,22 +193,11 @@ Page({
     poster.dropUncommitted()
   },
 
-  // 点一格就当场落盘。这一屏原来靠最上面那条「保存」把模板与名称/一句话一起写，
-  // 站长 10-21 那句「只保留按钮」把那条撤了 ⇒ 挑模板这一步不再有等它的那一次保存：
-  // 不当场写，人退出这一屏挑的那套就没了（那是**丢功能**，不是简化）。
-  // 名称与一句话不在这条上：它们在弹窗里，由那层的「保存」写（utils/cardInfo.js `onCiSave`）。
-  onPickTemplate(e) {
-    const id = e.currentTarget.dataset.id
-    if (!id || id === this.data.template) return
-    this.setData({ template: id })
-    try {
-      poster.writeProfile({ template: id })
-    } catch (err) {
-      console.error('这一套模板没记下', err)
-      return
-    }
-    profileCloud.pushText({ template: id })
-  },
+  // 站长 10-30 一句「卡片市场……这里只是浏览功能，不需要选择」⇒ 这一屏不再有"点一格挑模板"那一下
+  // （原来它叫 `onPickTemplate`：当场写 storage 再推上云，10-21 撤掉那条「保存」后靠它兜住挑的那套）。
+  // 屏上既然没有任何一格亮着，点了却还在偷偷改默认模板比留着黑边更糟，所以连着撤。
+  // 默认模板今天还有两个写者：换手机/重装时云端那份拉回来（`profileCloud.pull` → `writeProfile({template})`），
+  // 以及新用户从没改过的本机默认；读者仍是首页"第一篇自动出那张卡"那一路（`index.js` 读 `profile.template`）。
 
   // ── 弹窗那一份实现的两个钩子（约定写在 utils/cardInfo.js 头上）
   // 动过四格里任何一张：重画这十格小样（头像画在卡片上），并把四格推上云（2.1 那条链，
@@ -239,7 +218,8 @@ Page({
     profileCloud.pushText({
       name: (saved.name || '').trim().slice(0, 16),
       slogan: (saved.slogan || '').trim().slice(0, 24),
-      template: this.data.template,
+      // 这一屏不再挑模板 ⇒ 推的是本机存的那一套原样（没有就不带这一枚键，`pushText` 自己会跳）。
+      template: saved.template,
     })
     this.renderThumbs()
   },
