@@ -8,8 +8,25 @@
 详情接口的 `imported_from` / 配图那一口的条数与配额那一格的增量，最后删净。
 期望值一律**不从应用自己的常量或谓词里 import**（共用一把尺子就永远红不了），
 只有张数上限这一枚是故意读模型的——那条判的就是"现网跑的这份代码里那个数是 9"。
+
+⚠ 10-29 第七十四次补的一格：**这一族（通用档）本来就没有作者名**，而列表那一枚来源标
+判的正是"快照里有没有作者名"（`notes.py:230` 那句 `has_source = bool(imported.get("author_name"))`），
+所以拿原来那两条硬判据去打网易这类文章页会当场两条红——那两条红不是坏，是尺子只会量两族。
+现在换成可换档：**默认还是那两条老链接**，要量别的族用环境变量递进去（值不进 argv、不落仓库）：
+    PROBE_URL=https://… PROBE_LABEL=网易·文章页 PROBE_EXPECT_AUTHOR=0 \\
+      ssh agentsbin 'cd /home/ubuntu/wtsj-backend && .venv/bin/python -' < docs/工具/探-现网外链贴图.py
+`PROBE_EXPECT_AUTHOR=0` 那档把两条判据翻成"这一族的现状"：作者名**该是空**、来源标**该是 False**，
+仍然逐条念出来，不许静默跳过——空着不判就等于没量。
+
+⚠ 默认那两条里**小红书这一条从 10-21 起必然红**（10-29 现读现网黑名单表：`xhslink.cn` 在列，
+`fail_count` 3／`last_status` 200／`last_failed_at` 10-21 16:07）：命中黑名单的站**不发 HTTP、不起提炼**，
+当场回"这个网站读不到内容，已停用"，所以 `status=completed` 那一条判据对它注定不成立。
+这一条红＝这一族在现网已被站长停用，不是这条链坏了；那一族的取法改由本地用例钉
+（`backend/tests/test_note_images.py` 里 591／600／638 那三条：四格全出 JSON、空格不覆盖 DOM、接线那一处不吃页面皮）。
+别拿这条红去追代码。
 """
 import json
+import os
 import time
 
 import httpx
@@ -26,6 +43,9 @@ URLS = {
     "公众号": "https://mp.weixin.qq.com/s/H2BANSW_U-Jjl1Ic_ZuZKA",
     "小红书": "https://xhslink.cn/o/9F1fAXNBL1I",
 }
+if os.environ.get("PROBE_URL"):
+    URLS = {os.environ.get("PROBE_LABEL") or "自定义一族": os.environ["PROBE_URL"]}
+EXPECT_AUTHOR = os.environ.get("PROBE_EXPECT_AUTHOR", "1") != "0"
 
 ok = bad = 0
 leftovers = []
@@ -96,7 +116,12 @@ for label, url in URLS.items():
     say(len(rows) <= MAX_ASSETS_PER_NOTE, "不超过那一枚上限",
         f"{len(rows)} ≤ {MAX_ASSETS_PER_NOTE}（现网跑的这份代码里的数）")
     snap = note.imported_from if isinstance(note.imported_from, dict) else {}
-    say(bool(snap.get("author_name")), "来源快照里有作者名（不是空那一格）", repr(snap.get("author_name")))
+    if EXPECT_AUTHOR:
+        say(bool(snap.get("author_name")), "来源快照里有作者名（不是空那一格）", repr(snap.get("author_name")))
+    else:
+        say(not snap.get("author_name"),
+            "这一族本来就不取作者名（现状钉着，不是放行——要它亮来源得先补抽取）",
+            repr(snap.get("author_name")))
     say(all(k in snap for k in ("images_total", "images_kept")),
         "四个计数也钉进了那份快照", str({k: snap.get(k) for k in ('images_total', 'images_kept', 'images_failed')}))
     det = httpx.get(f"{BASE}/api/notes/{note_id}", headers=H, timeout=30).json()
@@ -110,8 +135,11 @@ for label, url in URLS.items():
     lst = httpx.get(f"{BASE}/api/notes/", headers=H, params={"limit": 50}, timeout=30).json()
     items = lst if isinstance(lst, list) else lst.get("items", [])
     mine = [n for n in items if n.get("id") == note_id]
-    say(bool(mine) and mine[0].get("has_source") is True,
-        "列表那一行带 has_source（这一包客户端按它画来源）", str([n.get("has_source") for n in mine]))
+    # 这一枚与上一条同一条根：服务端 `has_source = bool(author_name)`，所以通用档那趟它必然 False。
+    # 判据跟着档位走，两条不许各判各的（否则换一族就两条永红）。
+    say(bool(mine) and mine[0].get("has_source") is EXPECT_AUTHOR,
+        "列表那一行带 has_source（这一包客户端按它画来源；通用档那一档判的是它此刻该为假）",
+        str([n.get("has_source") for n in mine]))
     dr = httpx.delete(f"{BASE}/api/notes/{note_id}", headers=H, timeout=60)
     say(dr.status_code == 200, "收尾：这一篇删掉了", f"HTTP {dr.status_code}")
     obj_bytes = sum(r.file_size or 0 for r in rows)
