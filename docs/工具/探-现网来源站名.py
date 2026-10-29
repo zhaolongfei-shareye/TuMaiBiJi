@@ -1,4 +1,5 @@
-"""现网探针：来源站名这一格（第七十五次部署，2026-10-29 他一句「部署」）。
+"""现网探针：来源站名这一格（第七十五次部署起用，2026-10-29 他一句「部署」；
+第七十六次他一句「全部搞完」，第 4 级那一档从"整级跳过"改成"开工并在真发几发"）。
 
 跑法（口令一律不出那台机器、不进 argv、不回显）：
     ssh agentsbin 'cd /home/ubuntu/wtsj-backend && .venv/bin/python -' < docs/工具/探-现网来源站名.py
@@ -7,15 +8,17 @@
 ① 那条迁移真跑了——`mp_settings` 里多出第四组那一行、且今天是**空的**（④甲：不回填存量）；
 ② 后台那一栏的 HTML 里有那一条（本机那把真点尺子量的是本机进程，这一半只有部署后才读得到）；
 ③ 四级链的**次序**在现网也成立：人工表赢过页面自报，表一撤就退到下一级；
-④ 第 4 级（AI）在现网是**关着**的——`.env` 里那一行没配（部署云函数另要他一句口令），
-   所以这一趟一道模型调用都不该发；这里直接量闸门的读数，不拿"日志里没看到"当证据；
+④ 第 4 级（AI）**已经开工**：第七十六次那一句「全部搞完」之后，`.env` 里那一行配上、
+   云函数 `site_name` 已部署 ⇒ 这里量闸门的**开**读数、并真发几发看认不认得出长尾那一家；
+   这一节还留一条反向的牙：认不出那一家时**不许编一个名字出来**（宁可这一篇没有站名）；
 ⑤ 端到端真存一篇（他点名那一族：网易文章页），看**库里那一格**、**详情接口**、**列表接口**
    三处是不是同一个名字，并逐字判"不许出现「文章」「笔记」后缀"（②丙唯一的牙）；
 ⑥ 卡片引擎那只新文件（`sourceLabel.js`）进了名单、且每一只与名单里记的 md5 对得上——
    对不上就 503，那一栏屏上念"预览引擎没加载成"（这一族"一变必重启"，重启没做成就红在这）。
 
-⚠ 第 1/2 级那两条只喂**主机名**与页面自报那一句，`resolve()` 在前三级一次网络都不发，
-   所以那两条用的地址形状是夹具，不是"现网真读过这一家"的证据——真读过的是第 5 节那一发。
+⚠ 第 1/2/3 级那几条只喂**主机名**与页面自报那一句，`resolve()` 在前三级一次网络都不发，
+   所以那几条用的地址形状是夹具，不是"现网真读过这一家"的证据——真读过的是第 5 节那一发；
+   第 4 级那几条**确实真出网**，但出的是**那一发模型调用**（送域名＋标题），仍然不抓那一页。
 """
 import asyncio
 import json
@@ -39,6 +42,11 @@ NETEASE_URL = "https://c.m.163.com/news/a/LAD6VGQO00097U7T.html"
 LONGTAIL_HOST = "www.guancha.cn"
 LONGTAIL_FIXTURE = "https://www.guancha.cn/"
 PROBE_ZH = "观察者网"
+# 第 4 级那两档用的域名。⚠ `36kr.com` **现读不在内置词表那 21 族里**，而路径是编的：
+# 这一条链的前三级只看域名与页面自报那一句，第 4 级送给模型的也就是域名＋标题＋开头，
+# 一次都不抓这一页 ⇒ 这里没有"现网真读过 36氪"的意思，真出网的是**那一发模型调用**。
+AI_LONGTAIL_URL = "https://36kr.com/p/3070000000000"
+AI_UNKNOWN_URL = "https://totally-unknown-host-76.example/page.html"
 
 fails = []
 
@@ -105,22 +113,29 @@ AU = {"Authorization": "Bearer " + (login.get("session") or "")}
 ck("拿口令换到 session 票（值不进输出）", len(login.get("session") or "") > 20,
    f"{len(login.get('session') or '')} 位")
 
-print("\n== 3. 四级链的次序（在现网进程里走一遍，前三级一次网络都不发） ==")
+print("\n== 3. 四级链的次序（在现网进程里走一遍；除挂在「认得出的域名」上的那一条，都不发网络） ==")
 r1 = resolve(NETEASE_URL)
 ck("第 3 级：网易这一族由内置词表报出「网易」",
    r1.get("zh") == "网易" and r1.get("via") == "builtin", json.dumps(r1, ensure_ascii=False))
 # ⚠ 第 2 级吃的是**已经从页面里抽出来的那一句**（`scraper` 那一层负责抽），不是整段 HTML。
 #    第一版探针把整枚 `<meta property=… content=…>` 标签当值喂进来，当场读到空——
-#    红的是探针不是这一级：那串远超 12 字那道闸，本来就该判脏。下面补两条把这件事钉住。
+#    红的是探针不是这一级：那串远超 12 字那道闸，本来就该判脏。下面补三条把这件事钉住。
+#    ⚠ 第七十六次起第 4 级开工，"判脏"不再是"这一篇没名字"而是"这一句不许上屏、链子往下走"，
+#    所以前两条把域名换成**模型也认不出的一家**（整条链落空才量得到"那一句没进屏"），
+#    第三条再拿同一句脏值换到认得出的域名上，量它退到了哪一级。
 META = "滑风网 "
 r2 = resolve(LONGTAIL_FIXTURE, META)
 ck("第 2 级：词表不认识这一家时，用页面自报那一句（尾随空格清掉）",
    r2.get("zh") == "滑风网" and r2.get("via") == "meta", json.dumps(r2, ensure_ascii=False))
-r2b = resolve(LONGTAIL_FIXTURE, '<meta property="og:site_name" content="滑风网">')
-ck("整段标签当值喂进来也不采纳（脏值在这一级判掉，不上屏）", r2b == {},
+r2b = resolve(AI_UNKNOWN_URL, '<meta property="og:site_name" content="滑风网">')
+ck("整段标签当值喂进来绝不作为站名上屏（脏值在这一级判掉）", r2b == {},
    json.dumps(r2b, ensure_ascii=False))
-r2c = resolve(LONGTAIL_FIXTURE, "滑风网 - 旗下原创平台")
-ck("站名后面挂 slogan（带分隔符）也判脏", r2c == {}, json.dumps(r2c, ensure_ascii=False))
+r2c = resolve(AI_UNKNOWN_URL, "滑风网 - 旗下原创平台")
+ck("站名后面挂 slogan（带分隔符）也判脏：那一句没上屏", r2c == {},
+   json.dumps(r2c, ensure_ascii=False))
+r2d = resolve(LONGTAIL_FIXTURE, "滑风网 - 旗下原创平台")
+ck("同一句脏值换到模型认得出的域名：判脏后**退下一级**，屏上那个名字不来自这一句",
+   r2d.get("via") == "ai" and r2d.get("zh") == PROBE_ZH, json.dumps(r2d, ensure_ascii=False))
 
 st = table_put([{"domain": LONGTAIL_HOST, "zh": PROBE_ZH, "en": "Guanchazhe", "note": "探针临时行"}], AU)
 ck("写一行进第 1 级 → 200", st.status_code == 200, f"HTTP {st.status_code}")
@@ -156,15 +171,23 @@ r4 = resolve(LONGTAIL_FIXTURE, META)
 ck("撤掉第 1 级之后，同一条 URL 退到第 2 级（不是当场没名字）",
    r4.get("zh") == "滑风网" and r4.get("via") == "meta", json.dumps(r4, ensure_ascii=False))
 
-print("\n== 4. 第 4 级那道闸门（他还没给「部署云函数」那一句） ==")
-ck("现网 `.env` 里没有那条函数的地址（这一趟一行 `.env` 都没动）",
-   "SITE_NAME_CF_URL" not in env, f"键数 {len(env)}")
-ck("闸门读数＝这一级整级跳过", llm.site_channel_ready() is False, llm.site_channel_ready())
-ck("直接打第 4 级也回空＝一次出网都不发",
-   asyncio.run(site_names.ai_site("https://anything.example/x", "任意标题", "任意正文")) == {})
-r5 = resolve("https://totally-unknown-host-75.example/page.html")
-ck("前三级全落空 ⇒ 这一篇就是没有站名（不许猜、不许编「未知网站」这种串）",
-   r5 == {}, json.dumps(r5, ensure_ascii=False))
+print("\n== 4. 第 4 级那道闸门（第七十六次起已开工：函数已部署＋`.env` 那一行已配） ==")
+ck("现网 `.env` 里有那条函数的地址（尾巴＝site_name）",
+   env.get("SITE_NAME_CF_URL", "").endswith("/site_name"),
+   f"键数 {len(env)}｜地址长度 {len(env.get('SITE_NAME_CF_URL', ''))}")
+ck("闸门读数＝这一级开工（provider 没关／地址配了／凭据不是占位符）",
+   llm.site_channel_ready() is True, llm.site_channel_ready())
+ai_hit = asyncio.run(site_names.ai_site(AI_LONGTAIL_URL, "小米发布新款自研芯片", "开头一段正文。"))
+ck("真发一发：长尾那一家认得出来（名字非空、via 记的是 ai）",
+   bool(ai_hit.get("zh")) and ai_hit.get("via") == "ai", json.dumps(ai_hit, ensure_ascii=False))
+r5 = resolve(AI_LONGTAIL_URL)
+ck("前三级全落空的那一条 ⇒ 链子走到第 4 级才拿到名字（内置表里没这一族，不是抄表抄来的）",
+   r5.get("via") == "ai" and bool(r5.get("zh")), json.dumps(r5, ensure_ascii=False))
+ai_miss = asyncio.run(site_names.ai_site(AI_UNKNOWN_URL, "", ""))
+ck("认不出那一家就是没有站名（不许拿「未知网站」这类串顶上——那条硬约束在现网唯一的牙）",
+   ai_miss == {}, json.dumps(ai_miss, ensure_ascii=False))
+ck("同一条 URL 走完整条链也是空（闸门开了不等于非要凑一个）",
+   resolve(AI_UNKNOWN_URL) == {}, repr(resolve(AI_UNKNOWN_URL)))
 
 print("\n== 5. 端到端：真存一篇网易文章页（走真 worker、真出网、真建篇） ==")
 db = database.SessionLocal()
