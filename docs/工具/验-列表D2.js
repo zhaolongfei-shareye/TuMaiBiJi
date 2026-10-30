@@ -239,10 +239,17 @@ ok('分类那一行抬回「关于」正文那一档（21 → `--fs-body` 28，�
 ok('标题那一档没跟着改：90% 黑、一行、放不下省略号（从旧行原样搬过来）',
   /color: rgba\(35, 37, 44, 0\.9\)/.test(ttRule) && /white-space: nowrap/.test(ttRule)
   && /text-overflow: ellipsis/.test(ttRule))
-ok('转存那篇的昵称没撤信息：并进来源那一档的尾巴；省略号挂在昵称身上（来源名是短串，昵称才是用户数据）',
+ok('转存那篇的昵称没撤信息：并进来源那一档的尾巴；来源与昵称两支各自带省略号（站名最长 24 字，站长 10-30 拍甲；`flex: none` 不许回到来源那一枚）',
   /class="ixl-who"/.test(CODE_WXML) && /n\.who = n\.is_import/.test(CODE_JS)
   && /text-overflow: ellipsis/.test(rule(idxWxss, 'ixl-who'))
-  && !/text-overflow/.test(rule(idxWxss, 'ixl-src-t')))
+  && /text-overflow: ellipsis/.test(rule(idxWxss, 'ixl-src-t'))
+  && !/flex: none/.test(rule(idxWxss, 'ixl-src-t')))
+ok('详情窗与独立详情页：来源自己出点、时间钉住不让位（站长 10-30 拍甲＋「一起并平」；两屏同一形状，Y10 那句"独立详情页行为又不同"一并抹平）',
+  /text-overflow: ellipsis/.test(rule(idxWxss, 'ds-src')) && /flex: none/.test(rule(idxWxss, 'ds-time'))
+  && /text-overflow: ellipsis/.test(rule(detWxss, 'hero-src')) && /flex: none/.test(rule(detWxss, 'hero-time'))
+  && /class="ds-src"/.test(CODE_WXML) && /class="hero-src"/.test(detWxml)
+  // 那条共用的省略号不许回来（回来的形状＝站名一长先吃时间）
+  && !/text-overflow/.test(rule(idxWxss, 'ds-meta')) && !/text-overflow/.test(rule(detWxss, 'hero-meta')))
 ok('标识轨三枚**同一支墨**＋一条自己收满剩余宽的线（彩色那一版只画在图例格里对照，他没挑）',
   /flex: 1/.test(lnRule) && /color:/.test(mkRule) && !/color:/.test(rule(idxWxss, 'ixl-star'))
   && (CODE_WXML.match(/class="ixl-mk/g) || []).length === 3

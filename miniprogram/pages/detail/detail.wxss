@@ -56,7 +56,12 @@
   width: 100%;
 }
 
+/* 与详情窗 `.ds-meta` 同一套骨架（站长 10-30 拍「一起并平」）。这一屏原来一条省略号都没挂：
+   站名一长就自己折第二行，跟详情窗那种"把时间吃掉"是两种坏法（第九轮审计 Y10 的最后一句）。
+   现在两处同一形状：来源可缩可出点，时间与分类都不让位。 */
 .hero-meta {
+  display: flex;
+  align-items: baseline;
   font-size: var(--fs-tiny);
   font-weight: 800;
   letter-spacing: 1rpx;
@@ -65,10 +70,24 @@
 }
 
 /* 分类那一档（站长 10-18 丙：`「分类」· 来源 · 时间`，分类在最左、不要竖线）。
-   与详情窗 `.ds-cat` 同一条规矩：那个点号写在文字里，空隙挂在自己身上，后面那段裹成
-   `.hero-rest` 让真跑量得到那道缝；颜色不写在这里——私密那一格的红只从 `app.wxss` 那枚 `--priv-ink` 走一处出口。 */
+   与详情窗 `.ds-cat` 同一条规矩：那个点号写在文字里，空隙挂在自己身上，后面两段各裹成一枚
+   `<text>`（`.hero-src`／`.hero-time`）让真跑量得到那道缝；颜色不写在这里——私密那一格的红
+   只从 `app.wxss` 那枚 `--priv-ink` 走一处出口。 */
 .hero-cat {
+  flex: none;
   margin-right: 8rpx;
+}
+
+.hero-src {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero-time {
+  flex: none;
+  margin-left: 8rpx;
 }
 
 .hero-title {

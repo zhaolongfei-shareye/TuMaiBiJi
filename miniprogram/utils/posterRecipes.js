@@ -426,7 +426,7 @@ module.exports = {
       { if: { cond: { truthy: { var: 'note.summary' } }, then: [{ let: 'sumLines', value: { prim: 'fitLines', args: { text: { var: 'note.summary' }, maxW: { '-': [{ var: 'W' }, { '*': [{ var: 'pad' }, 2] }, 50] }, n: 3 } } }] } },
       // 竖排那一列写来源；没有来源标签就退回日期。slogan 不写在这里——它已经在署名行里了，
       // 同一句话出现两次很廉价（planner 里那句注释的原话）。
-      { let: 'vertText', value: { slice: [{ if: [{ truthy: { prim: 'sourceLabel' } }, { prim: 'sourceLabel' }, { prim: 'noteDate' }] }, 0, 10] } },
+      { let: 'vertText', value: { prim: 'clipVertLabel', args: { text: { if: [{ truthy: { prim: 'sourceLabel' } }, { prim: 'sourceLabel' }, { prim: 'noteDate' }] } } } },
       { let: 'vertStep', value: 40 },
 
       { let: 'archTop', value: 92 },

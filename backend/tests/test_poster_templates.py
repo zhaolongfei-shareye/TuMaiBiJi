@@ -106,7 +106,11 @@ def test_种子白名单不是空壳():
     with open(SEED_JSON, encoding="utf-8") as f:
         js = json.load(f)
     assert len(js["op_keys"]) == 10
-    assert len(js["prim_keys"]) == 30
+    assert len(js["prim_keys"]) == 31
+    # 31＝30＋10-30 那一刀新加的一枚（不是名单自己长出来的）：卡片竖排那把尺 `clipVertLabel`，
+    # 站名超 10 字切到 10 字再补省略号（站长拍乙）。包内那份 `lit`／纸间文艺 真带上它了，
+    # 服务器这份若不认，后台预览画那张卡会当场报「不认的 prim」——所以两枚都要钉住。
+    assert js["prim_keys"]["clipVertLabel"] == ["text"]
     assert "vpunct" in js["op_keys"]["text"] and "tint" in js["op_keys"]["image"]
     assert js["prim_keys"]["signRow"] == ["x", "y", "maxW", "size", "avatarD", "onDark", "hasAvatar"]
 

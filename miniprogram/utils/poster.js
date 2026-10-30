@@ -11,7 +11,7 @@ const { toneFor, mix, schemeFor, plateColors, withAlpha, lumOf } = require('./pa
 const { formatShortDate } = require('./date.js')
 const { t } = require('./i18n.js')
 // 来源那一格那一句（有站名只念站名）与两个页面共用同一只实现，见 utils/sourceLabel.js 顶上那段。
-const { sourceLabelOf } = require('./sourceLabel.js')
+const { sourceLabelOf, clipVertLabel } = require('./sourceLabel.js')
 // 配方的求值与步型解释器（纯逻辑，不认识任何色和字号），以及包内自带那几套配方（纯数据）。
 // 方向是单向的：poster.js 认识这两份，它们不认识 poster.js。
 const engine = require('./posterRecipe.js')
@@ -1717,7 +1717,8 @@ function planLit(ctx, d) {
   font(ctx, 27, false)
   const sumLines = note.summary ? fit(ctx, note.summary, W - pad * 2 - 50, 3) : []
   // 竖排那一列写来源。不写 slogan：slogan 已经在署名行里，同一句话出现两次很廉价。
-  const vertText = (sourceLabelOf(note, lang) || formatShortDate(note.created_at)).slice(0, 10)
+  // 超过 10 字切到 10 字再补省略号（站长 10-30 拍乙；与配方里那一条共用 `clipVertLabel` 一只出口）。
+  const vertText = clipVertLabel(sourceLabelOf(note, lang) || formatShortDate(note.created_at))
   const vertStep = 40
   const archTop = 92
   const kickerY = archTop + archH + 76
@@ -1932,6 +1933,9 @@ const RECIPE_PRIMS = {
   i18n: { keys: ['key'], call: (env, a) => t(a.key, env.lang) },
   blockName: { keys: [], call: (env) => blockNameOf(env.note, env.lang) },
   sourceLabel: { keys: [], call: (env) => sourceLabelOf(env.note, env.lang) },
+  // 竖排那一列那把尺只住在这里一份：配方里 `vertText` 调它，planner 里 `vertText` 直接调同一只函数，
+  // 两条路不再是各写一遍 `slice(0, 10)`（第九轮审计 Y9 的根子就是这个）。
+  clipVertLabel: { keys: ['text'], call: (env, a) => clipVertLabel(a.text) },
   quoteText: { keys: [], call: (env) => quoteOf(env.note) },
   noteDate: { keys: [], call: (env) => formatShortDate(env.note.created_at) },
   tagsJoined: { keys: ['sep'], call: (env, a) => textList(env.note.tags).join(a.sep) },

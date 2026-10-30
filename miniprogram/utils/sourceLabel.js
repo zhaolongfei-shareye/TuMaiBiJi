@@ -38,4 +38,14 @@ function sourceLabelOf(note, lang) {
   return key ? t(key, lang) : ''
 }
 
-module.exports = { sourceLabelOf, SOURCE_TYPE_KEYS }
+// 卡片竖排那一列放得下的字数（站长 10-30 拍乙：「切 10 字，末尾补省略号」）。
+// 站名最长 24 字（后台那张人工表的上限），所以第 11 字起一定被切到——切了就要在屏上留个记号，
+// 不许像原来那样无声腰斩。按码点数、不按 UTF-16 长度：出图引擎里那句 `len` 也是这个口径，
+// 两边数不一样，卡片高度就会自己算错。
+const VERT_MAX = 10
+function clipVertLabel(text) {
+  const chars = Array.from(String(text == null ? '' : text))
+  return chars.length > VERT_MAX ? `${chars.slice(0, VERT_MAX).join('')}…` : chars.join('')
+}
+
+module.exports = { sourceLabelOf, SOURCE_TYPE_KEYS, clipVertLabel, VERT_MAX }

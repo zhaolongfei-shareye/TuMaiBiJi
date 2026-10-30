@@ -5,7 +5,8 @@
  *
  * 为什么静态那把不够、这一把必须真跑（静态只能证明"代码这么写了"）：
  *  ① 那个点号与后面那段之间那道缝，列表靠 flex 的 `gap`、两行 meta 靠挂在分类段自己身上的
- *    `margin-right` ⇒ 只能量面与面，读 innerText 量不出来（所以后面那段特意裹成 `.ds-rest`/`.hero-rest`）；
+ *    `margin-right` ⇒ 只能量面与面，读 innerText 量不出来（所以后面那两段特意各裹成一枚
+ *    `.ds-src`／`.ds-time`、`.hero-src`／`.hero-time`；10-30 拆成两枚之前是 `.ds-rest`／`.hero-rest` 一枚）；
  *  ② 那一支红由 `.cat-priv` 上屏，加不加由 `priv`/`is_private` 决定 ⇒ 不实测就只是"应该是对的"。
  * ③ 私密那一行有没有，这台账号说了算：**没有就大声写"未量"，绝不拿非私密那一行冒充**。
  *    冒充出来的绿＝下一次改坏了也没人知道。
@@ -141,10 +142,18 @@ const gapOk = (px) => px >= 2 && px <= 12
   ck('详情窗：那一行以 `「分类」·` 打头，后面才是来源与时间（丙那一版）',
     /^「.+」·.+·.+$/.test(metaTx) || /^".+"·.+·.+$/.test(metaTx), `实得「${metaTx}」`)
   const dCat = (await rect('.ds-cat'))[0]
-  const dRest = (await rect('.ds-rest'))[0]
-  ck('详情窗：分类段与后面那段之间那道缝在屏上（margin-right 8rpx）',
-    !!dCat && !!dRest && gapOk(dRest.left - dCat.right),
-    dCat && dRest ? `${(dRest.left - dCat.right).toFixed(1)}px` : '两枚没读齐')
+  const dSrc = (await rect('.ds-src'))[0]
+  ck('详情窗：分类段与来源之间那道缝在屏上（margin-right 8rpx）',
+    !!dCat && !!dSrc && gapOk(dSrc.left - dCat.right),
+    dCat && dSrc ? `${(dSrc.left - dCat.right).toFixed(1)}px` : '两枚没读齐')
+  // 10-30 拍甲新添的那颗牙：站名再长也不许吃掉时间。
+  const dTimeEl = await page.$('.ds-time')
+  const dTimeTx = dTimeEl ? String(await dTimeEl.text() || '').replace(/^\s*·\s*/, '').trim() : ''
+  const dTimeWant = await mp.evaluate(() => (getCurrentPages().slice(-1)[0].data.detailNote || {}).created_at_label || '')
+  const dTimeRect = (await rect('.ds-time'))[0]
+  ck('详情窗：时间没被站名吃掉（宽度非零、且屏上念的就是数据里那一句）',
+    !!dTimeRect && dTimeRect.width > 0 && !!dTimeWant && dTimeTx === dTimeWant,
+    `屏上「${dTimeTx}」／数据「${dTimeWant}」`)
   const dsCatEl = await page.$('.ds-cat')
   const dsCol = dsCatEl && await dsCatEl.style('color')
   const dsPriv = await mp.evaluate(() => !!(getCurrentPages().slice(-1)[0].data.detailNote || {}).is_private)
@@ -163,10 +172,20 @@ const gapOk = (px) => px >= 2 && px <= 12
   ck('独立详情页：与详情窗同一版排布 `「分类」· 来源 · 时间`，且没有竖线',
     (/^「.+」·.+·.+$/.test(heroTx) || /^".+"·.+·.+$/.test(heroTx)) && !/[|｜]/.test(heroTx), `实得「${heroTx}」`)
   const hCat = (await rect('.hero-cat'))[0]
-  const hRest = (await rect('.hero-rest'))[0]
-  ck('独立详情页：那一枚也画出来了，与后面那段之间同样留着一道缝',
-    !!hCat && !!hRest && gapOk(hRest.left - hCat.right),
-    hCat && hRest ? `${(hRest.left - hCat.right).toFixed(1)}px` : '两枚没读齐')
+  const hSrc = (await rect('.hero-src'))[0]
+  ck('独立详情页：那一枚也画出来了，与来源之间同样留着一道缝',
+    !!hCat && !!hSrc && gapOk(hSrc.left - hCat.right),
+    hCat && hSrc ? `${(hSrc.left - hCat.right).toFixed(1)}px` : '两枚没读齐')
+  // 并平的第二面：这一屏以前一条省略号都没挂（站名一长就自己折第二行），现在与详情窗同一形状。
+  const hTimeEl = await page.$('.hero-time')
+  const hTimeTx = hTimeEl ? String(await hTimeEl.text() || '').replace(/^\s*·\s*/, '').trim() : ''
+  const hTimeWant = await mp.evaluate(() => (getCurrentPages().slice(-1)[0].data.note || {}).created_at_label || '')
+  const hTimeRect = (await rect('.hero-time'))[0]
+  const hSrcRect = (await rect('.hero-src'))[0]
+  ck('独立详情页：时间与来源各占一面、都在同一行内（没折成第二行、也没被站名吃掉）',
+    !!hTimeRect && hTimeRect.width > 0 && !!hSrcRect && !!hTimeWant && hTimeTx === hTimeWant
+    && Math.abs(hTimeRect.top - (hSrcRect ? hSrcRect.top : hTimeRect.top)) < 1,
+    `时间「${hTimeTx}」／数据「${hTimeWant}」`)
   await mp.navigateBack()
   await sleep(1000)
 

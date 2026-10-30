@@ -49,6 +49,10 @@ PRIM_KEYS: dict[str, tuple[str, ...]] = {
     "i18n": ("key",),
     "blockName": (),
     "sourceLabel": (),
+    # 卡片竖排那一列那把尺（站长 10-30 拍乙：超 10 字切 10 字＋省略号）。
+    # 实现只住一份：`miniprogram/utils/sourceLabel.js` 的 `clipVertLabel`，这里只是服务器这份名单认它——
+    # 名单不跟着认，后台预览画那张卡会当场报「不认的 prim」，而包内那份配方是真带上它的。
+    "clipVertLabel": ("text",),
     "quoteText": (),
     "noteDate": (),
     "tagsJoined": ("sep",),

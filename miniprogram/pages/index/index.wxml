@@ -225,7 +225,7 @@
            头一排那两列分栏撤了 ⇒ 来源／标题／标签三行摊满整宽，标题底下不再有这篇留过的卡片那一格。
            `.ds-rt`/`.ds-pad` 本体留在 `app.wxss` 没删——独立详情页那一屏还在用，这一轮没动它。
            标签跟着他这一句弱化了（「只需要显示标签名字，灰字，不加底色，不加粗」），写法见 index.wxss 的 `.ds-tag`。 -->
-      <view class="ds-meta"><text wx:if="{{detailNote.catSeg}}" class="ds-cat {{detailNote.is_private ? 'cat-priv' : ''}}">{{detailNote.catSeg}}·</text><text class="ds-rest">{{detailNote.source_type_label}} · {{detailNote.created_at_label}}</text></view>
+      <view class="ds-meta"><text wx:if="{{detailNote.catSeg}}" class="ds-cat {{detailNote.is_private ? 'cat-priv' : ''}}">{{detailNote.catSeg}}·</text><text class="ds-src">{{detailNote.source_type_label}}</text><text class="ds-time">· {{detailNote.created_at_label}}</text></view>
       <!-- 手势只挂在这一枚上（不挂整窗）：窗里正文要上下滚、配图那一排点了要开大图，
            整窗吃横向手势会把那两件事挡掉。来历三条口径写在 index.js 的 onDsTitleTouchStart。 -->
       <view class="ds-h2" bindtouchstart="onDsTitleTouchStart" bindtouchend="onDsTitleTouchEnd">{{detailNote.title}}</view>

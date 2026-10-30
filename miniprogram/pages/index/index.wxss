@@ -694,7 +694,9 @@
       落码在小程序里 rpx 是真单位，所以这一档照令牌写；屏上到底是几 px 由
       `验-字号档位与对比` 现读计算值，不拿源码里的数当结论。
    转存那篇的昵称仍要看得见：并进这一档尾巴（· 昵称），不另起一行、也不把信息撤掉。
-   省略号挂在昵称那一支上——来源名是字典里的短串，昵称是用户数据，可能很长。 */
+   省略号挂在来源与昵称两支上（站长 10-30 拍甲：「来源自己带省略号」）。原来那句"来源名是字典里的
+   短串"的前提已经被站名推翻：站名最长 24 字，不给它自己出点，它就先把昵称挤没、再多出的一截
+   被父层无声裁掉（第九轮审计 Y10）。 */
 .ixl-src {
   display: flex;
   align-items: baseline;
@@ -707,8 +709,10 @@
 }
 
 .ixl-src-t {
-  flex: none;
+  min-width: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 分类那一档（站长 10-18「列表页也同样加上」，排布按他拍的丙＝分类在最左、不要竖线）。
@@ -894,22 +898,38 @@
   padding: 0 34rpx;
 }
 
+/* 站长 10-30 拍甲：时间钉住不让位、来源自己带省略号。原来整条挂一条省略号 ⇒ 站名一长，
+   第一个被吃掉的是时间（第九轮审计 Y10）。拆成两枚各管各的，`.ds-time` 那枚 `flex: none`。 */
 .ds-meta {
+  display: flex;
+  align-items: baseline;
   margin-top: 10rpx;
   font-size: var(--fs-meta);
   color: rgba(35, 37, 44, 0.5);
+}
+
+/* 分类那一档：那个点号跟在文字里，与后面那段之间这 8rpx 写在**这一格自己身上**，
+   不靠源码里的空格（源码里两个标记之间那一段空白会被折掉，屏上就少一个空格）。
+   后面两段各裹成一枚 `<text>`（`.ds-src`／`.ds-time`）——不只是为了样式，是为了真跑能量到
+   面与面之间的缝（`验-来源前加分类-真跑`；裸文本节点在 SelectorQuery 里没有 face，量不了）。
+   颜色同上：只有 `.cat-priv` 盖得上来，这一条不写 color，私密那一格才吃得动全局那一枚红。
+   ⚠ 这一行改完后，来源与时间之间那道缝是 `.ds-time` 的 8rpx（与分类那道同一个数），
+      不再是源码里那两个空格——真跑量出来若比改前宽几 rpx，是这一条，不是回归。 */
+.ds-cat {
+  flex: none;
+  margin-right: 8rpx;
+}
+
+.ds-src {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 分类那一档：那个点号跟在文字里，与后面那段之间这 8rpx 写在**这一格自己身上**，
-   不靠源码里的空格（源码里两个标记之间那一段空白会被折掉，屏上就少一个空格）。
-   后面那段因此也裹成一枚 `<text class="ds-rest">`——不是为了样式，是为了真跑能量到这两面之间的缝
-   （`验-来源前加分类-真跑`；裸文本节点在 SelectorQuery 里没有 face，量不了）。
-   颜色同上：只有 `.cat-priv` 盖得上来，这一条不写 color，私密那一格才吃得动全局那一枚红。 */
-.ds-cat {
-  margin-right: 8rpx;
+.ds-time {
+  flex: none;
+  margin-left: 8rpx;
 }
 
 .ds-h2 {
