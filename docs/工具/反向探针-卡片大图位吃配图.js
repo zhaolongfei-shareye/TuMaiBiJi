@@ -104,9 +104,13 @@ const CASES = [
     expect: '「第一张」跟着服务端那一行的顺序' },
   { name: '取不到改成抛（一张卡因为取不到配图而出不来）', file: 'miniprogram/utils/noteImage.js',
     find: 'return path || null', to: 'if (!path) throw new Error("取不到配图"); return path', expect: '任何一步拿不到都回 null，不抛' },
-  // 落点：种子那道版本门槛
+  // 落点：种子那道版本门槛（门槛只管"这套配方用了什么"，所以三把各咬一头）
   { name: '六套新画法的种子把门槛降回 1.0.0', file: 'backend/seed/poster_templates.json', all: true,
-    find: '"min_app_version":"2.3.18"', to: '"min_app_version":"1.0.0"', expect: '六套新画法的种子把 min_app_version 抬到 2.3.18' },
+    find: '"min_app_version":"2.3.18"', to: '"min_app_version":"1.0.0"', expect: '六套新画法的种子逐行门槛＝各自画法所需' },
+  { name: '纸间文艺那一行的门槛又掉回 2.3.18（那枚新原语重新发给认不来的老包）', file: 'backend/seed/poster_templates.json',
+    find: '"min_app_version":"2.4.25"', to: '"min_app_version":"2.3.18"', expect: '六套新画法的种子逐行门槛＝各自画法所需' },
+  { name: '抬门槛连坐（其余五套一起抬＝2.3.18~2.4.24 那些包本来画得出，也被摘掉下发）', file: 'backend/seed/poster_templates.json', all: true,
+    find: '"min_app_version":"2.3.18"', to: '"min_app_version":"2.4.25"', expect: '反向钉：只有用到新原语的那一行被抬' },
 ]
 
 const results = []

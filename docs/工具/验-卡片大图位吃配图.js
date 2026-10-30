@@ -137,9 +137,15 @@ ok('清单每次都现读、只有第一张的 fileID 换了才重新下字节�
 // ---------- 下发那一路的版本门槛 ----------
 const seed = JSON.parse(rd(path.join(ROOT, 'backend/seed/poster_templates.json')))
 const bundled = seed.filter((r) => (BIG.indexOf(r.template_id) >= 0))
-ok('六套新画法的种子把 min_app_version 抬到 2.3.18（老包认不了 avatar.key 与 hasNote，别把新画法发给它们）',
-  bundled.length === 6 && bundled.every((r) => r.min_app_version === '2.3.18'),
-  bundled.map((r) => `${r.template_id}=${r.min_app_version}`).join(' '))
+const GATE_OF = { block: '2.3.18', popGrid: '2.3.18', popDots: '2.3.18', acid: '2.3.18', cover: '2.3.18', lit: '2.4.25' }
+ok('六套新画法的种子逐行门槛＝各自画法所需（那五套要 2.3.18 起的 avatar.key／hasNote，纸间文艺还要 2.4.25 起的 clipVertLabel；老包整行不收、退回包内那份）',
+  bundled.length === 6 && bundled.every((r) => r.min_app_version === GATE_OF[r.template_id]),
+  bundled.map((r) => `${r.template_id}=${r.min_app_version}(要${GATE_OF[r.template_id]})`).join(' '))
+// 反向钉：门槛这一格只管"用了新词汇的那一行"，不许连坐——其余五套仍停在 2.3.18，
+// 抬高了等于把五套老画法一起从 2.3.18~2.4.24 那些包的下发名单里摘掉（它们本来画得出）。
+ok('反向钉：只有用到新原语的那一行被抬，其余五套的门槛没被连坐抬走',
+  bundled.filter((r) => r.template_id !== 'lit').every((r) => r.min_app_version === '2.3.18'),
+  bundled.filter((r) => r.template_id !== 'lit').map((r) => `${r.template_id}=${r.min_app_version}`).join(' '))
 
 console.log(`${pass} 条，红 ${fails.length} 条`)
 fails.slice(0, 10).forEach((f) => console.log('  ✗ ' + f))

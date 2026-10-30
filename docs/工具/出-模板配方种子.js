@@ -98,6 +98,8 @@ const rows = poster.TEMPLATES.map((t, i) => ({
   //   `{var:'hasNote'}` 会抛）。老包真拿到了也不会画坏（抛了就整套丢掉、退回包内那一份），
   //   但那是每次出图白抛一次，不该留着。门槛本来就是干这个的。
   //   等下一次这几套退回到"只用老词汇"的画法，可以再把它降回 1.0.0。
+  //   ⚠ 这一枚是"这一批一起抬"时抄下来的号；后来某一单独一套用到只有更新包才认的原语，
+  //     由下面那份 MIN_APP_BY_PRIM 按配方实际用了什么再抬一档，别回来改这一枚（一改就连坐十套）。
   min_app_version: '2.3.18',
   recipe: canon(recipes[t.id]),
 }))
@@ -167,6 +169,27 @@ if (extraProblems.length) {
   process.exit(1)
 }
 
+// ---------------------------------------------------------------- 门槛跟着配方用词汇走
+// 门槛的根据是"这一套配方用了什么"，不是抄下来的一个号。10-30 那一刀第一次把 clipVertLabel
+// 用进配方（竖排那一列切十字补省略号），而上面那枚写死的 2.3.18 让这一行照样发给 2.3.18～2.4.24
+// 那些包——它们名单里没有这枚原语，整行丢掉、白拿一次下发（画面上退回包内那一份，不坏但不该这样）。
+// 所以这里按实际用到的词汇把不够的门槛抬上去；没用到的行一个字节都不动（抬了就是连坐）。
+// ⚠ 名单里新加一枚"只有新包认得"的原语＝这里同步加一行；撤掉时一起撤，不然门槛一直虚高。
+const MIN_APP_BY_PRIM = { clipVertLabel: '2.4.25' }
+const verCmp = (a, b) => {
+  const pa = String(a).split('.').map(Number)
+  const pb = String(b).split('.').map(Number)
+  for (let i = 0; i < 3; i += 1) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0) }
+  return 0
+}
+rows.forEach((r) => {
+  const s = dump(r.recipe)
+  Object.keys(MIN_APP_BY_PRIM).forEach((prim) => {
+    const want = MIN_APP_BY_PRIM[prim]
+    if (s.includes(`"prim":"${prim}"`) && verCmp(r.min_app_version, want) < 0) r.min_app_version = want
+  })
+})
+
 fs.mkdirSync(OUT_DIR, { recursive: true })
 fs.writeFileSync(path.join(OUT_DIR, 'poster_whitelist.json'), JSON.stringify(canon(whitelist), null, 1) + '\n')
 fs.writeFileSync(path.join(OUT_DIR, 'poster_templates.json'), dump(rows) + '\n')
@@ -177,5 +200,5 @@ const nPrim = Object.keys(whitelist.prim_keys).length
 const nOp = Object.keys(whitelist.arith).length + Object.keys(whitelist.logic).length + Object.keys(whitelist.conv).length
 console.log(`名单：op ${nOps} 种 × ${nFields} 字段 / 原语 ${nPrim} 条 / 算子 ${nOp} 个 / 步型 ${whitelist.steps.length} 种 / 项形 ${whitelist.term_forms.length} 种`)
 console.log(`种子：${rows.length} 套（包内 ${rows.length - extraFiles.length} + 数据模板 ${extraFiles.length}），合计 ${Buffer.byteLength(dump(rows))} 字节`)
-rows.forEach((r) => console.log(`  ${r.template_id.padEnd(8)} ${String(Buffer.byteLength(dump(r.recipe))).padStart(6)} 字节  ${r.content_hash.slice(0, 12)}`))
+rows.forEach((r) => console.log(`  ${r.template_id.padEnd(8)} ${String(Buffer.byteLength(dump(r.recipe))).padStart(6)} 字节  ${r.content_hash.slice(0, 12)}  门槛 ${r.min_app_version}`))
 console.log('→ backend/seed/poster_whitelist.json、backend/seed/poster_templates.json')
