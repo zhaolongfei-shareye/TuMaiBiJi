@@ -181,11 +181,16 @@ const gapOk = (px) => px >= 2 && px <= 12
   const hTimeTx = hTimeEl ? String(await hTimeEl.text() || '').replace(/^\s*·\s*/, '').trim() : ''
   const hTimeWant = await mp.evaluate(() => (getCurrentPages().slice(-1)[0].data.note || {}).created_at_label || '')
   const hTimeRect = (await rect('.hero-time'))[0]
-  const hSrcRect = (await rect('.hero-src'))[0]
-  ck('独立详情页：时间与来源各占一面、都在同一行内（没折成第二行、也没被站名吃掉）',
-    !!hTimeRect && hTimeRect.width > 0 && !!hSrcRect && !!hTimeWant && hTimeTx === hTimeWant
-    && Math.abs(hTimeRect.top - (hSrcRect ? hSrcRect.top : hTimeRect.top)) < 1,
-    `时间「${hTimeTx}」／数据「${hTimeWant}」`)
+  const hMetaRect = (await rect('.hero-meta'))[0]
+  ck('独立详情页：时间与来源各占一面、都还在同一行里（容器只有一行高、时间右沿没越过容器右沿）',
+    // 第一版这里量的是"两枚顶边相等"，跑出来是**假红**：baseline 对齐下不同内容的盒子顶边本来就能差 1px
+    // （实测来源 h=14.0／顶 26，时间 h=11.5／顶 27）。真坏的形状是容器长到两行高或时间被挤出右沿，
+    // 所以这一条改量容器高与右沿——顶边那个数没有区分度，不该当判据。
+    !!hTimeRect && !!hSrc && !!hMetaRect && hTimeRect.width > 0
+    && hMetaRect.height <= 1.9 * hTimeRect.height
+    && hTimeRect.right <= hMetaRect.right + 0.5
+    && !!hTimeWant && hTimeTx === hTimeWant,
+    `时间「${hTimeTx}」／数据「${hTimeWant}」／容器高 ${hMetaRect ? hMetaRect.height.toFixed(1) : '?'}／时间右沿 ${hTimeRect ? hTimeRect.right.toFixed(1) : '?'} 对容器右沿 ${hMetaRect ? hMetaRect.right.toFixed(1) : '?'}`)
   await mp.navigateBack()
   await sleep(1000)
 
