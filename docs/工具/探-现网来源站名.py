@@ -5,9 +5,13 @@
     ssh agentsbin 'cd /home/ubuntu/wtsj-backend && .venv/bin/python -' < docs/工具/探-现网来源站名.py
 
 它证的六件事，按"这一格在现网真长什么样"排：
-① 那条迁移真跑了——`mp_settings` 里多出第四组那一行、且今天是**空的**（④甲：不回填存量）；
+① 那条迁移真跑了——`mp_settings` 里多出第四组那一行；**这一栏今天有没有内容是变的**
+   （10-29 灌之前是空的，10-30 站长一句「要把前期测试的对应表补充进去」⇒ 走
+   `docs/工具/灌-后台来源站点名表.py` 灌进 21 行），所以这一支**开跑前先把那一行备份、
+   收尾逐字还回去**，不再假设它是空的、也不许把它跑成空的；
 ② 后台那一栏的 HTML 里有那一条（本机那把真点尺子量的是本机进程，这一半只有部署后才读得到）；
-③ 四级链的**次序**在现网也成立：人工表赢过页面自报，表一撤就退到下一级；
+③ 四级链的**次序**在现网也成立：人工表赢过页面自报，表一撤就退到下一级
+   （10-30 起这一栏非空 ⇒ "词表那一级本身认不认得网易"要临时撤开第 1 级才量得到，撤完立刻装回）；
 ④ 第 4 级（AI）**已经开工**：第七十六次那一句「全部搞完」之后，`.env` 里那一行配上、
    云函数 `site_name` 已部署 ⇒ 这里量闸门的**开**读数、并真发几发看认不认得出长尾那一家；
    这一节还留一条反向的牙：认不出那一家时**不许编一个名字出来**（宁可这一篇没有站名）；
@@ -21,6 +25,7 @@
    第 4 级那几条**确实真出网**，但出的是**那一发模型调用**（送域名＋标题），仍然不抓那一页。
 """
 import asyncio
+import atexit
 import json
 import re
 import time
@@ -91,8 +96,13 @@ ck("库里那一行存在（迁移 d8a3f1c60b47 跑过的直接证据）",
    SQL("select count(*) from mp_settings where kind='site_names'") == 1)
 ck("alembic 头已是这一条", SQL("select version_num from alembic_version") == "d8a3f1c60b47",
    SQL("select version_num from alembic_version"))
-ck("④甲：那一行今天是空的（存量没回填）", not stored(), repr(stored()))
-ck("④甲：库里没有一篇带站名（部署前不该有）",
+原表 = stored()
+BAK = f"/tmp/探针备份-site_names-{time.strftime('%Y%m%d-%H%M%S')}.json"
+with open(BAK, "w", encoding="utf-8") as f:
+    json.dump(原表, f, ensure_ascii=False)
+ck("开跑前那一行已备份（收尾要还回这一份，**不是**还回空）", True,
+   f"{len(原表) if isinstance(原表, list) else 0} 行 → {BAK}")
+ck("④甲：库里没有一篇带站名（存量不回填）",
    SQL("select count(*) from notes where imported_from like '%site_name%'") == 0)
 notes0 = SQL("select count(*) from notes")
 print(f"  · 底数：notes={notes0}｜这一栏的上限现读模型＝站名 {mp_assets.MAX_SITE_CHARS} 字")
@@ -106,17 +116,53 @@ ck("卡片真挂进那一格（少这一句就是函数跑了、屏上什么都�
 
 print("\n== 2. 管理口：没票不许写 ==")
 st = httpx.put(f"{BASE}/api/admin/mp/tables/{KIND}", json={"value": []}, timeout=30)
-ck("不带票 PUT → 401，且那一行没被写", st.status_code == 401 and not stored(),
-   f"HTTP {st.status_code}")
+ck("不带票 PUT → 401，且那一行逐字没动（拿开跑前那一份比，不比「是不是空」）",
+   st.status_code == 401 and stored() == 原表, f"HTTP {st.status_code}")
 login = httpx.post(f"{BASE}/api/admin/login", json={"token": ADMIN}, timeout=30).json()
 AU = {"Authorization": "Bearer " + (login.get("session") or "")}
 ck("拿口令换到 session 票（值不进输出）", len(login.get("session") or "") > 20,
    f"{len(login.get('session') or '')} 位")
 
+
+已还原 = False
+
+
+def 还原():
+    """收尾必须把这一栏还回开跑前那一份——10-30 起那一栏**有内容了**（站长灌的那张对应表），
+    还回空＝把人家填的东西删了。挂在 `atexit` 上：中途抛异常也照跑（Y12 兜底那一半）。
+    做成只跑一次：第 7 节自己调一遍好让判据量到还原之后的读数，`atexit` 那一遍就跳过。"""
+    global 已还原
+    if 已还原:
+        return
+    已还原 = True
+    try:
+        back = httpx.put(f"{BASE}/api/admin/mp/tables/{KIND}",
+                         json={"value": 原表 if 原表 else None}, headers=AU, timeout=30)
+        print(f"  · 收尾还原：PUT {back.status_code}｜库里现在 "
+              f"{len(stored()) if isinstance(stored(), list) else 0} 行"
+              f"（开跑前 {len(原表) if isinstance(原表, list) else 0} 行）")
+    except Exception as exc:
+        print(f"  ! 收尾还原没走成 ⇒ 手工把 {BAK} 那一份 PUT 回去：{type(exc).__name__}: {exc}")
+
+
+atexit.register(还原)
+
 print("\n== 3. 四级链的次序（在现网进程里走一遍；除挂在「认得出的域名」上的那一条，都不发网络） ==")
+# ⚠ 10-30 起这一栏里灌着站长那张对应表（`灌-后台来源站点名表.py`），第 1 级会盖住第 3 级。
+#    所以"词表这一级本身对不对"要先把第 1 级临时撤开、量完立刻装回去——
+#    撤与装这两步本身就是「谁说了算」那条次序的现网读数，不是绕开判据。
+table_put(None, AU)
 r1 = resolve(NETEASE_URL)
-ck("第 3 级：网易这一族由内置词表报出「网易」",
+ck("第 3 级：临时撤掉第 1 级之后，网易这一族由内置词表报出「网易」",
    r1.get("zh") == "网易" and r1.get("via") == "builtin", json.dumps(r1, ensure_ascii=False))
+back = table_put(原表, AU)
+ck("装回开跑前那一份（PUT 回 200 且库里逐字相等；这一句红＝后面每一条量的都是空表那一态）",
+   back.status_code == 200 and stored() == 原表,
+   f"HTTP {back.status_code}｜库里 {len(stored()) if isinstance(stored(), list) else 0} 行"
+   f"｜开跑前 {len(原表) if isinstance(原表, list) else 0} 行")
+r1b = resolve(NETEASE_URL)
+ck("第 1 级装回去就盖住第 3 级：同一条 URL 改由这张表报出（次序不许重排的那条牙）",
+   r1b.get("zh") == "网易" and r1b.get("via") == "table", json.dumps(r1b, ensure_ascii=False))
 # ⚠ 第 2 级吃的是**已经从页面里抽出来的那一句**（`scraper` 那一层负责抽），不是整段 HTML。
 #    第一版探针把整枚 `<meta property=… content=…>` 标签当值喂进来，当场读到空——
 #    红的是探针不是这一级：那串远超 12 字那道闸，本来就该判脏。下面补三条把这件事钉住。
@@ -176,7 +222,9 @@ ck("现网 `.env` 里有那条函数的地址（尾巴＝site_name）",
    env.get("SITE_NAME_CF_URL", "").endswith("/site_name"),
    f"键数 {len(env)}｜地址长度 {len(env.get('SITE_NAME_CF_URL', ''))}")
 ck("闸门读数＝这一级开工（provider 没关／地址配了／凭据不是占位符）",
-   llm.site_channel_ready() is True, llm.site_channel_ready())
+   # 10-30 起这一句是 `async`（与真调用同取一把钥，见 Y3），所以要 `asyncio.run` 取。
+   asyncio.run(llm.site_channel_ready()) is True,
+   f"闸门回 {asyncio.run(llm.site_channel_ready())}")
 ai_hit = asyncio.run(site_names.ai_site(AI_LONGTAIL_URL, "小米发布新款自研芯片", "开头一段正文。"))
 ck("真发一发：长尾那一家认得出来（名字非空、via 记的是 ai）",
    bool(ai_hit.get("zh")) and ai_hit.get("via") == "ai", json.dumps(ai_hit, ensure_ascii=False))
@@ -254,10 +302,11 @@ eng = httpx.get(f"{BASE}/api/admin/poster/engine", headers=AU, timeout=30)
 ck("预览口回 200（对不上就是 503，那一栏念「预览引擎没加载成」）",
    eng.status_code == 200, f"HTTP {eng.status_code}｜{len(eng.content):,} B")
 
-print("\n== 7. 那一栏恢复成迁移刚建出来那一态 ==")
-ck("收尾时这一栏是停用的（探针写的那几行没留在现网）",
-   not stored() and SQL("select count(*) from mp_settings where kind='site_names'") == 1,
-   repr(stored()))
+print("\n== 7. 收尾：这一栏还回开跑前那一份（10-30 起那一份是站长灌进去的对应表，不是空态） ==")
+还原()
+ck("还回开跑前那一份、逐字相等（探针写的那几行没留下，人家填的也没被删）",
+   stored() == 原表 and SQL("select count(*) from mp_settings where kind='site_names'") == 1,
+   f"{len(stored()) if isinstance(stored(), list) else 0} 行｜备份 {BAK}")
 
 print(f"\n结论：{'全部过，0 条红' if not fails else str(len(fails)) + ' 条红'}"
       + ("" if not fails else "　｜" + "、".join(fails)))
