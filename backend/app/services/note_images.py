@@ -14,10 +14,25 @@
 2. **通道与用户自己上传那一路完全同一个。** 对象进云开发那个桶、落在 `images/{userId}/{YYYYMMDD}/`
    那一层（与 `miniprogram/utils/cloudUpload.js` 同一条路径规则），账记进 `assets` 表，
    于是配额／私密闸／公开页露图／列表那排缩略图一行代码都不用为新功能重写。
-3. **下载一律不带 Referer。** 两族防盗链的失败形状**相反**：`mmbiz.qpic.cn` 带错 Referer 回的是
-   **200 ＋ 2,090 B 那张 140×140 的占位 jpeg**（状态码抓不到），`sns-webpic-qc.xhscdn.com` 带错 Referer
-   回的是**硬 403**。10-19 02:1x 又各打三次复现过这两读数。所以既不能带任何一个 Referer，
-   也不能只写"非 200 就跳过"。
+3. **默认不带 Referer，只有抓取那一层点名要的那一批才带。** 两族防盗链的失败形状**相反**：
+   `mmbiz.qpic.cn` 带错 Referer 回的是 **200 ＋ 2,090 B 那张 140×140 的占位 jpeg**（状态码抓不到），
+   `sns-webpic-qc.xhscdn.com` 带错 Referer 回的是**硬 403**。10-19 02:1x 又各打三次复现过这两读数。
+   所以既不能带任何一个 Referer，也不能只写"非 200 就跳过"。
+   ⚠ 10-31 加了一个**按批**的例外（不是全局开关）：微博那张图床 `wx*.sinaimg.cn` 卡的其实不是 Referer，
+   是**任何 User-Agent**——现网出口逐档量过（生产那套头＝桌面 UA＋`Accept: image/*`）：
+   只带 UA 不带 Referer → **403／238 B**；带 UA ＋ `Referer: https://m.weibo.cn/` 或 `https://weibo.com/`
+   → **200**（`orj360` 22,521 B／`mw2000` 1,248,453 B／`large` 2,853,517 B，同一条地址三档全回 200）；
+   带 UA ＋ 随便一枚外站 Referer（`https://example.com/`）→ 仍是 **403／304 B**。
+   ⇒ 这一族的正确形状是"来路必须是微博"，而那枚来路只有**抓取那一层**知道自己落在哪一站，
+   所以出口是 `archive(..., referer=…)` 这一个参数，由抓取回体里的 `image_referer` 传下来：
+   微博那一批传 `https://m.weibo.cn/`，**其余各族一律传空串＝一个字的 Referer 都不加**，
+   与这一条老读数逐字相同（判据在 `test_note_images.py` 里钉着"默认那一批不许带上 Referer"）。
+   ⚠ 10-31 还有**第二枚按批点名的例外**：`archive(..., user_agent=…)`，现只有搜狐一族用。
+   它那台图床 `q*.itc.cn` 顶的正是**我们这枚 Windows 桌面 UA**——现网出口把三篇文章的九张逐张打过：
+   带生产那套头 **6 张 403／3 张 200**，把 UA 换成 `scraper._SOHU_IMAGE_UA`（Mac 桌面）或干脆一枚头都不带
+   → **九张全 200**；而**带 Referer（本站、整篇地址）救不回来**，所以给这一族点名的不是来路、是 UA。
+   同一枚纪律：空串＝那一项照 `IMAGE_HEADERS` 一字不改，**不许做成全局开关**
+   （判据钉着"默认那一批不许换 UA"）。
 4. **一张的失败不许变成整篇的失败。** 下不动／压不了／传不上去 ⇒ 那一张记进 `failed`，
    笔记照建、摘要照出，与现网"B 链任何一次失败都不该让笔记没存下来"同口径。
    但失败也不许静默：那一个数要交回任务回体，由界面上那句话说出来。
@@ -27,6 +42,7 @@ import base64
 import io
 import logging
 import random
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -52,7 +68,12 @@ QUALITY_LADDER = (0.7, 0.5, 0.3)
 
 # 单张下载上限：**读配图登记接口那一个常量**（`models/asset.MAX_FILE_BYTES`，20MB），
 # 这里不再抄第二个数。两处各写一份迟早走样，走样的症状是"接口收得下、下载这一头先判超限丢掉"。
-from app.models.asset import MAX_FILE_BYTES
+from app.models.asset import (
+    MAX_ASSETS_PER_NOTE,
+    MAX_FILE_BYTES,
+    not_failed,
+    order_by_note,
+)
 # 网关那一趟是 JSON＋base64，字节到函数那边会比本地这份大 4/3。函数侧还有一道同样的检查，
 # 两头都不许只靠"压缩之后应该不大"——真拿到一张超的，这一张算"没存上"，不能把整篇带崩。
 MAX_UPLOAD_BYTES = 4 * 1024 * 1024
@@ -265,7 +286,30 @@ def _encode(im, long_edge: int, fmt: str, original: bytes) -> Compressed:
     return Compressed(last, "image/jpeg", "jpg", size[0], size[1], True)
 
 
-async def _upload(client: httpx.AsyncClient, cloud_path: str, data: bytes) -> str:
+def _checked(resp) -> tuple:
+    """存图函数那一趟的回体判据：HTTP／JSON／`error`／像样的 fileID 四道一次过，回 `(fileID, 整个回体)`。
+
+    抽成一处不是为了好看：现在有两个口打同一个函数（base64 直写、环境内复制），回体形状一模一样
+    （`{fileID, bytes}` 或 `{error}`）。判据抄两份迟早走样，走样时最坏的一种是"其中一个口把函数
+    报的那句 `{error}` 当成成功"——那会往账上写一行指向不存在对象的行，而那一行只能客户端删。
+    """
+    if resp.status_code >= 400:
+        raise SkipImage(f"存图函数回 HTTP {resp.status_code}：{resp.text[:120]!r}")
+    try:
+        body = resp.json()
+    except (ValueError, TypeError) as exc:
+        raise SkipImage(f"存图函数回的不是 JSON：{resp.text[:120]!r}") from exc
+    if not isinstance(body, dict):
+        raise SkipImage(f"存图函数回的是 {type(body).__name__}")
+    if body.get("error"):
+        raise SkipImage(f"存图函数报错：{str(body['error'])[:160]}")
+    file_id = str(body.get("fileID") or "")
+    if not file_id.startswith("cloud://") or len(file_id) <= len("cloud://"):
+        raise SkipImage(f"没拿到像样的 fileID：{file_id[:80]!r}")
+    return file_id, body
+
+
+async def _upload(client: httpx.AsyncClient, cloud_path: str, data: bytes) -> tuple:
     """字节穿一层云函数进桶，换回一个 `cloud://` fileID。
 
     为什么必须有这一层：`assets.object_key` 存的是云开发 fileID，而服务端**没有**直写云开发存储的
@@ -288,20 +332,7 @@ async def _upload(client: httpx.AsyncClient, cloud_path: str, data: bytes) -> st
         # 配了一行却没人读的开关比没有这行更坏（下次它会静默变成"说不通的那半"）。
         timeout=settings.IMAGE_STORE_CF_TIMEOUT,
     )
-    if resp.status_code >= 400:
-        raise SkipImage(f"存图函数回 HTTP {resp.status_code}：{resp.text[:120]!r}")
-    try:
-        body = resp.json()
-    except (ValueError, TypeError) as exc:
-        raise SkipImage(f"存图函数回的不是 JSON：{resp.text[:120]!r}") from exc
-    if not isinstance(body, dict):
-        raise SkipImage(f"存图函数回的是 {type(body).__name__}")
-    if body.get("error"):
-        raise SkipImage(f"存图函数报错：{str(body['error'])[:160]}")
-    file_id = str(body.get("fileID") or "")
-    if not file_id.startswith("cloud://") or len(file_id) <= len("cloud://"):
-        raise SkipImage(f"没拿到像样的 fileID：{file_id[:80]!r}")
-    return file_id
+    return _checked(resp)
 
 
 async def _guard_image_pixels(data: bytes, url: str) -> None:
@@ -356,8 +387,18 @@ async def _guard_image_text(openid, data: bytes, url: str) -> None:
         logger.error("贴图内容安全这一张没检成，照旧放行（这不是「图没问题」）：url=%s", url[:120])
 
 
-async def archive(images: list[str], user_id, limit: int, on_ready=None, openid=None) -> ArchiveResult:
+async def archive(images: list[str], user_id, limit: int, on_ready=None, openid=None,
+                  referer: str = "", user_agent: str = "") -> ArchiveResult:
     """按文档顺序取前 `limit` 张，逐张下载→压→**读字送检**→进桶。任何一张失败都不抛。
+
+    `referer`：**只有抓取那一层点名要的那一批才给**（现在只有微博——那张图床卡的是 UA，
+    不带微博自己的来路就整批 403，读数写在文件头第 3 条）。空串＝一个字的 Referer 都不加，
+    与其余各族今天的形状逐字相同。这不是全局开关，也不许变成全局开关。
+
+    `user_agent`：同一套纪律的另一枚——**抓取那一层点名说"这一族要换 UA"才换**。
+    现在只有搜狐：它那台图床顶的就是我们那枚 Windows 桌面 UA（现网出口九张里 6 张 403，
+    换成点名那枚九张全 200，带来路救不回来）。空串＝照 `IMAGE_HEADERS` 那枚，一字不改。
+    ⚠ 也不许变成全局开关，理由与 `referer` 同一批读数。
 
     `openid`：给内容安全用的那一个真人 openid（v2 的 `msgSecCheck` 必填，假串会被微信回 40003）。
     拿不到就整段按「没检成」放行——与文字那条同一个口径，但**必须留一行 WARNING**，
@@ -374,8 +415,13 @@ async def archive(images: list[str], user_id, limit: int, on_ready=None, openid=
         return result
     # 一次抓取共用一个连接池：九张图各开一条 TLS 连接没必要，但**不许跨任务复用**（超时与关闭
     # 归这一段管，`async with` 出去就断干净）。
+    头 = dict(IMAGE_HEADERS)
+    if referer:
+        头["Referer"] = referer
+    if user_agent:
+        头["User-Agent"] = user_agent
     async with httpx.AsyncClient(
-        timeout=DOWNLOAD_TIMEOUT, headers=IMAGE_HEADERS, follow_redirects=False
+        timeout=DOWNLOAD_TIMEOUT, headers=头, follow_redirects=False
     ) as client:
         for url in want:
             prepared = None
@@ -385,7 +431,7 @@ async def archive(images: list[str], user_id, limit: int, on_ready=None, openid=
                 shot = _encode(im, long_edge, (im.format or "").upper(), data)
                 await _guard_image_pixels(shot.data, url)
                 await _guard_image_text(openid, shot.data, url)
-                file_id = await _upload(client, _cloud_path(user_id, shot.ext), shot.data)
+                file_id, _body = await _upload(client, _cloud_path(user_id, shot.ext), shot.data)
                 prepared = Prepared(
                     file_id=file_id, mime=shot.mime, size=len(shot.data),
                     width=shot.width, height=shot.height,
@@ -449,3 +495,123 @@ def register(db, note, kept: list) -> int:
     if written:
         db.refresh(note)
     return written
+
+
+# 复制那一路的文件尾巴：照**源那一张原本的格式**落，不重压、不改格式。
+# 尾巴取自源那一行的 `object_key`（桶里那个对象真叫什么），拿不到才退回按 `file_type` 折算。
+_SAFE_EXT = re.compile(r"^[a-z0-9]{1,8}$")
+_MIME_EXT = {
+    "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/apng": "png",
+    "image/gif": "gif", "image/webp": "webp", "image/bmp": "bmp", "image/heic": "heic",
+}
+
+
+def _ext_of(row) -> str:
+    """复制出来的那一张该落什么文件尾巴——**必须是安全的那一小撮字符**。
+
+    这一条不只是格式问题：`cloud_path` 会进云函数那个 `badPath`（不许空白、不许 `..`、必须以
+    `images/` 开头），而这里拼进去的尾巴来自**数据库里的一行**（客户端登记那张时，`file_type`
+    是它报上来的）。不校验就等于把"路径里能写什么"交回给写那一行的人。
+    收不进正则就退回 `jpg`：宁可尾巴不对，也不让它带着分隔符进桶的路径。
+    """
+    tail = str(row.object_key or "").rsplit(".", 1)[-1].lower()
+    if _SAFE_EXT.match(tail):
+        return tail
+    return _MIME_EXT.get(str(row.file_type or "").lower(), "jpg")
+
+
+def copy_for_import(db, note, from_note_id, limit: int = MAX_ASSETS_PER_NOTE) -> ArchiveResult:
+    """把原篇那几张配图**逐张复制一份到转存者名下**（站长 10-24：「转存必须带图。乙，复制一份到自己名下」）。
+
+    为什么不共用同一个 `object_key`（甲那条）：`routes/notes.py:delete_note` 删笔记时把这一列的
+    `cloud://` 交回调用方去 `wx.cloud.deleteFile` —— 两个人挂同一个对象时，**谁先删笔记就把
+    另一个人正在用的那张图一起删了**，而删的人屏上看不见自己干了什么。所以要各有一份。
+
+    为什么复制必须在云函数里做完（而不是下载到服务端再传一次）：后端手里没有存储凭据，字节得穿
+    网关两趟，而 base64 让每一趟都比真字节胖 4/3 —— 九张图就这么白走一趟公网。
+    `copy_from` 那一型（`cloudfunctions/image_store/index.js`）在环境里 downloadFile＋uploadFile，
+    一趟网关把事办完，只有新 fileID 回出来。
+
+    两件**故意没做**的事：
+
+    · **不重压、不改格式**：源那一张已经按客户端那把尺子压过（用户自己上传）或按本模块同一把尺子
+      压过（外链转存），再压一次等于换一张图。
+    · **不重新送内容安全**：这几张本来就在公开分享页上露着（`LIVE_PUBLIC_FIELDS` 那一路），
+      复制不新增任何暴露；而 `imgSecCheck`／`msgSecCheck` 一天百来次的额度会被一次批量转存榨干。
+
+    本模块头第 4 条在这一路同样成立：任何一张复制不动只进 `failed`，笔记照在、其余照落。
+    落账紧跟写桶那一步（一张一次 `commit`），不许攒到九张之后一并写——对象已经占住真空间，
+    账排在后面就等于崩在中途时前面那几张成了桶里没人认的孤儿（对象只能客户端删）。
+    """
+    from app.models.asset import Asset, next_sort_order
+
+    src_rows = (db.query(Asset)
+                .filter(Asset.note_id == from_note_id, not_failed())
+                .order_by(*order_by_note())
+                .all())
+    if not src_rows:
+        return ArchiveResult(kept=[], failed=[], total=0)
+    if not channel_ready():
+        # 计数全零、`failed` 也空：与 `archive()` 里"通道没配＝整条没开工"同一个记法，
+        # 不许报成「源篇那几张全没跟过来」——那会把一个开关状态说成九次失败。
+        logger.warning("转存配图这一趟没开工：存图通道没配（笔记已建，只是图没跟过来）")
+        return ArchiveResult(kept=[], failed=[], total=0)
+
+    want = src_rows[:limit]
+    result = ArchiveResult(kept=[], failed=[], total=len(src_rows))
+
+    next_order = next_sort_order(db, note.id)
+    with httpx.Client(
+        timeout=settings.IMAGE_STORE_CF_TIMEOUT,
+        headers={"Authorization": f"Bearer {settings.IMAGE_STORE_CF_KEY.strip()}"},
+    ) as client:
+        for row in want:
+            file_id = None
+            body = None
+            try:
+                resp = client.post(
+                    settings.IMAGE_STORE_CF_URL.strip(),
+                    json={"copy_from": row.object_key,
+                          "cloud_path": _cloud_path(note.user_id, _ext_of(row))},
+                )
+                file_id, body = _checked(resp)
+            except SkipImage as exc:
+                logger.info("转存配图这一张没跟过来（笔记照在）：%s src=%s", exc, row.object_key[:120])
+                result.failed.append(row.object_key)
+            except Exception as exc:
+                logger.warning("转存配图这一张出了没预期的错：%s: %s src=%s",
+                               type(exc).__name__, exc, row.object_key[:120])
+                result.failed.append(row.object_key)
+            if file_id is None:
+                continue
+            # 落账写在 try **外面**（与 `archive()` 同一个理由）：数据库那一趟炸了不许被上面那两个
+            # except 吞成"这一张没跟过来"——对象已经进桶了，账没写就是孤儿，而且后面每一张都会同样炸。
+            size = body.get("bytes")
+            if not isinstance(size, int) or size <= 0:
+                size = row.file_size
+            elif row.file_size and size != int(row.file_size):
+                # 函数报的字节与源那一行记的不一致：新那一行按**函数报的**落（配额加的是这一张真占的
+                # 空间），差值留一行日志。今天唯一的成因是桶里那张被换过，值得留个响。
+                logger.warning("转存配图这一张字节对不上（新行按函数报的落）：src=%s 行里=%s 函数=%s",
+                               row.object_key[:120], row.file_size, size)
+            db.add(Asset(
+                user_id=str(note.user_id),
+                note_id=note.id,
+                object_key=file_id,
+                file_type=row.file_type,
+                file_size=size,
+                width=row.width,
+                height=row.height,
+                backup_status="uploaded",
+                sort_order=next_order,
+            ))
+            next_order += 1
+            db.commit()
+            result.kept.append(Prepared(
+                file_id=file_id, mime=row.file_type, size=size,
+                width=row.width, height=row.height,
+                over_budget=bool(size) and size > BUDGET_BYTES,
+                # 这一路没有"来源网址"这个东西：填**源那一张的 fileID**，让日志里能对回是哪一张。
+                source_url=row.object_key,
+            ))
+    return result

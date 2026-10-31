@@ -131,6 +131,14 @@ def _status_hint(code: int) -> str:
 async def _fetch_and_parse(url: str) -> dict:
     _validate_url(url)
 
+    # 微博这一族走它自己那份数据（上面那一段注释写了为什么）。认不出号码、或站点回的形状
+    # 不认识时 `_fetch_weibo` 给 None ⇒ 照旧落回下面那条网页那一路，与今天一模一样，
+    # 这一刀只可能把"取不到"变成"取得到"，不许把任何一种旧形状改得比今天更差。
+    if _is_weibo(url):
+        weibo = await _fetch_weibo(url)
+        if weibo is not None:
+            return weibo
+
     async with httpx.AsyncClient(
         follow_redirects=False, timeout=30, headers=HEADERS
     ) as client:
@@ -180,6 +188,18 @@ async def _fetch_and_parse(url: str) -> dict:
         # ⇒ 这一族四格全改吃 JSON（方案第三节第 1 项「要正经解析那段 JSON」）。
         if _is_xiaohongshu(current_url):
             parsed.update(_xiaohongshu_extras(html))
+        # 搜狐那两型的真图地址不在 DOM 上（DOM 那枚 `data-src` 是密文，见 `_SOHU_HOSTS` 上面那段）。
+        # 认得出键就用它并点名换 UA；认不出（键改了名）就照旧走通用那一路——形状与今天逐字相同。
+        if _is_sohu(current_url):
+            索 = _sohu_images(html)
+            if 索 is not None:
+                parsed["images"] = 索
+                parsed["image_user_agent"] = _SOHU_IMAGE_UA
+    # 图床卡来源的那几族由这里点名（读数在 `_IMAGE_REFERER_BY_HOST`）。微博那一族在自己那一段里已经给了，
+    # 这一句只对认得出的站赋值，其余每一族那一格仍是空串＝一个字的 Referer 都不加。
+    来路 = _named_image_referer(current_url)
+    if 来路:
+        parsed["image_referer"] = 来路
     # 带出这一枚数只为后台那一栏的"最后一次状态码"（规格-来源黑名单 §五）。
     # 用 `.get()` 读的那一方是必须的：现网那几把尺子里 fake 出来的抓取回体没有这一键，
     # 缺它只能退成"这个数不知道"，不许把一次本来成功的抓取报成失败。
@@ -204,6 +224,90 @@ def _is_xiaohongshu(url: str) -> bool:
     """
     host = (urlparse(url).hostname or "").lower()
     return host == "xiaohongshu.com" or host.endswith(".xiaohongshu.com")
+
+
+# ---------- 搜狐一族：图地址不在 DOM 上，DOM 那枚 `data-src` 是密文（10-31 现网出口量出来的） ----------
+# 现读三篇真文章：`<img>` 身上只有 `img_width`／`img_height` 与一枚 **不是地址** 的 `data-src`
+# （108 字符、base64 解出来是 80 B 密文，要搜狐自己的 JS 才解得开）。把它当地址补成绝对址，
+# 下游打过去回的是 `text/html`——这就是屏上那句"2 张图没能存下来"的来历（10-29 清单第 5 行）。
+# 真地址在页面内联脚本里，www 那型的键叫 `imgsList`、m 那型叫 `imageList`，形状是
+# `[{"url":"https://q9.itc.cn/…","width":"1080","height":"720"}, …]`，**顺序与张数都跟容器里的
+# `<img>` 逐篇对上**（现读三篇 2/2、4/4、3/3，另一篇两格都是 0）。
+# ⚠ 只列量过的那两型主机名：`k.sohu.com`、`news.sohu.com` 之类没有读数，不许顺手扩。
+_SOHU_HOSTS = ("www.sohu.com", "m.sohu.com")
+_SOHU_LIST_KEYS = ("imgsList", "imageList")
+# 这一族的图床卡的是**我们那枚 Windows 桌面 UA**：现网出口把上面三篇的九张逐张打了一遍——
+# 带生产那套下载头 **6 张 403／3 张 200**，把 UA 换成下面这枚（或干脆一枚头都不带）**九张全 200**；
+# 带来路（本站／整篇地址）都救不回来，所以这一族点名的不是来路、是 UA。
+# ⚠ 不许把这枚 UA 塞进全局 `IMAGE_HEADERS`：微博那族卡的是"UA 与来路必须配对"、微信那族带来路会被
+#   静默换成 2,090 B 占位图、小红书那族带来路硬 403（三族读数在 `note_images` 文件头第 3 条）。
+_SOHU_IMAGE_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+# 图床要**带来源**的那几族，同一枚"由抓取这一层点名"的出口给的另一个值（微博那一族在它自己那一段里）。
+_IMAGE_REFERER_BY_HOST = {
+    # 10-31 现网出口连打三条：`cdnfile.sspai.com` 不带来源 **三条全 403**、带 `https://sspai.com/`
+    # 三条全 200（带微博那枚也 200 ⇒ 这一族只要"带"，不看来路是谁家的——与微博那族方向相反）。
+    "sspai.com": "https://sspai.com/",
+}
+
+
+def _is_sohu(url: str) -> bool:
+    """这一跳最终落在搜狐正文那两型页面上吗（判定只用来选取法，不用来放行或拦下任何一次下载）。"""
+    return (urlparse(url).hostname or "").lower() in _SOHU_HOSTS
+
+
+def _named_image_referer(url: str) -> str:
+    """这一站的配图要不要带一枚来源、带哪一枚。认不出来回空串＝一个字都不加（今天的样子）。
+
+    后缀匹配必须带点边界：`sspai.com` 认 `www.sspai.com`，不认 `notsspai.com`，也不认
+    `sspai.com.evil.cn`（那种主机名的后缀是 `.evil.cn`）。
+    """
+    host = (urlparse(url).hostname or "").lower()
+    for 站, 来路 in _IMAGE_REFERER_BY_HOST.items():
+        if host == 站 or host.endswith("." + 站):
+            return 来路
+    return ""
+
+
+def _js_array_after(html: str, key: str) -> str:
+    """取 `key: [...]` 那一段方括号里的原文（按括号配平，不看行数）。找不到回空串。
+
+    搜狐那两型的名单不带引号（`imgsList:`），所以这里只按"键名＋冒号或等号＋紧跟左括号"认。
+    """
+    for m in re.finditer(re.escape(key) + r"\s*[:=]\s*", html):
+        i = m.end()
+        while i < len(html) and html[i] in " \t\r\n":
+            i += 1
+        if i >= len(html) or html[i] != "[":
+            continue
+        深 = 0
+        for j in range(i, len(html)):
+            if html[j] == "[":
+                深 += 1
+            elif html[j] == "]":
+                深 -= 1
+                if 深 == 0:
+                    return html[i:j + 1]
+    return ""
+
+
+def _sohu_images(html: str) -> "list[str] | None":
+    """搜狐那两型的正文图地址，按页面自己给的顺序。
+
+    回 **None**（不是空列表）＝这两个键都不认 ⇒ 调用方退回通用那条取法，与今天一模一样。
+    这一刀只可能把"取回一串密文"变成"取回地址"，不许把任何一种旧形状改得更差。
+    """
+    for 键 in _SOHU_LIST_KEYS:
+        段 = _js_array_after(html, 键)
+        if not 段:
+            continue
+        return _dedupe_order(
+            _http_image_url("", m.group(1))
+            for m in re.finditer(r"""["']url["']\s*:\s*["'](https?://[^"']+)["']""", 段)
+        )
+    return None
 
 
 def _http_image_url(base: str, src: str) -> str:
@@ -450,6 +554,206 @@ def _xiaohongshu_extras(html: str) -> dict:
     if name:
         out["author"] = name
     return out
+
+
+# ==================== 微博这一族 ====================
+# 它的桌面页与移动页在浏览器之外**都是访客壳**（10-18 与 10-29 两轮实测同判：
+# 302 → `passport…/visitor` → 200、9,158～9,648 B、标题 `Sina Visitor System`、正文 0 字），
+# 而微博给自家移动网页用的那一份数据不要登录、不要 cookie、也不要签名，只认三枚手机身份头。
+# 10-31 现读同一条链接：`https://weibo.com/1649679354/5359090512694626`
+# · 老那条（桌面 UA 打网页）＝200、9,648 B、0 字（本机与现网两个出口读数一样）；
+# · 这一条（手机头打数据口）＝现网出口 0.2 秒、200、8,500 B、正文 722 字、作者与 6 张图地址全在里。
+# 台账里那句"微博要靠浏览器渲染才拿得到"从今天起不再成立（至少这一条不靠）。
+_WEIBO_HOSTS = {"weibo.com", "www.weibo.com", "m.weibo.cn"}
+_WEIBO_SHOW = "https://m.weibo.cn/statuses/show?id={}"
+_WEIBO_EXTEND = "https://m.weibo.cn/statuses/extend?id={}"
+# 链接里那个号码两种形状，都实测打得开：19 位以内的纯数字（mid），或 9 位字母数字
+# （bid，例 `weibo.com/2656274875/H5Ro3mlPz`——它 302 时给的 Location 里就是 `m.weibo.cn/status/H5Ro3mlPz`）。
+_WEIBO_TOKEN = r"\d{8,20}|[0-9A-Za-z]{9}"
+_WEIBO_ID_PATTERNS = (
+    re.compile(r"weibo\.com/\d{6,20}/(" + _WEIBO_TOKEN + r")(?:[?#/]|$)"),
+    re.compile(r"m\.weibo\.cn/(?:status|detail)/(" + _WEIBO_TOKEN + r")(?:[?#/]|$)"),
+)
+# 四枚里**真正承重的是那两枚**：`Referer` 与 `X-Requested-With`。10-31 在现网出口逐枚摘头发过六发：
+# 四枚全带 200／`ok:1`／8,500 B；**摘掉 `Referer` → 403／81 B／`ok:0 errno 100015`**；
+# **摘掉 `X-Requested-With` → 302 进访客壳**（与一枚不带时同一个落点）；
+# 摘掉 `User-Agent`（连 curl 默认那枚都不给）与摘掉 `MWeibo-Pwa` 都仍 200／8,499～8,500 B——
+# 那两枚是浏览器本来就会带的，留着只为"像同一个客户端"，不许谁把它们当可省的那一枚删掉。
+_WEIBO_HEADERS = {
+    **HEADERS,
+    "User-Agent": (
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://m.weibo.cn/",
+    "X-Requested-With": "XMLHttpRequest",
+    "MWeibo-Pwa": "1",
+}
+# 错误码 → 用户那一句（toast 两行）。为什么按错误码而不是 HTTP 状态：删帖与设权限都回
+# **HTTP 200**，状态码上什么都看不见，只有 `errno` 分得开"这条没了"和"这条不给看"。
+# 两枚码都是 10-31 现读到的真形状（`5007815001244072` → 20101 该微博不存在；
+# `1736988591/5218886967890075` → 20170 由于博主设置，目前内容暂不可见）。
+_WEIBO_ERRNO_HINT = {
+    "20101": "这条微博不存在或已被删除",
+    "20170": "这条微博设置了权限，看不到内容",
+}
+# 配图那一张要带来的来路。为什么这一族要给值（10-31 现网出口逐档量）：
+# 生产那套下载头（桌面 UA＋`Accept: image/*`）不带 Referer 时 `wx*.sinaimg.cn` 整批 **403／238 B**，
+# 带 `https://m.weibo.cn/` 或 `https://weibo.com/` 时 `orj360`／`mw2000`／`large` 三档全 **200**
+# （22,521／1,248,453／2,853,517 B），带一枚外站 Referer（example.com）仍 **403／304 B**。
+# ⇒ 卡的是"来路必须是微博"，而那只有抓取这一层知道；细则与另两族相反的形状在 `note_images` 文件头第 3 条。
+_WEIBO_IMAGE_REFERER = "https://m.weibo.cn/"
+
+
+def _is_weibo(url: str) -> bool:
+    """这一条链接是不是微博的那几台站（只用来选取法，不参与放行或拦下任何一次下载）。"""
+    return (urlparse(url).hostname or "").lower() in _WEIBO_HOSTS
+
+
+def _weibo_status_id(url: str) -> str:
+    """从链接里取出那条微博的号码，取不出来回空串（回空＝落回网页那一路，不猜）。"""
+    for pattern in _WEIBO_ID_PATTERNS:
+        hit = pattern.search(url or "")
+        if hit:
+            return hit.group(1)
+    return ""
+
+
+def _weibo_text(raw) -> str:
+    """微博那一份数据里的正文是一小段 HTML（10-31 现读四种形状都是），压回屏上那几个字。
+
+    · `<br />` → 换行；
+    · 表情是 `<img alt="[衰]" src="https://face.t.sinajs.cn/…png">`——**留 alt 那个名字**。
+      它在屏上就是"衰"那张脸，整枚删掉会把"…大大的反差[衰][猪头]"削成半句话；
+    · 超话／话题那枚芯片是 `<a>…<span class='url-icon'><img 图标></span><span class='surl-text'>周深</span></a>`，
+      那张图标不带 alt ⇒ 按上一条整枚丢掉，剩下的 `周深` 正是屏上那几个字；
+    · 「网页链接」「某某的微博视频」那几枚锚文本照原样留着（与公众号那一条纪律同源：压回显示字，不砍整枚）。
+    """
+    soup = BeautifulSoup(raw or "", "html.parser")
+    for br in soup.find_all("br"):
+        br.replace_with("\n")
+    for img in soup.find_all("img"):
+        img.replace_with((img.get("alt") or "").strip())
+    # 零宽空格是微博排在表情与话题之间的老手筋，留着会在屏上撑出一个看不见的洞
+    text = soup.get_text().replace("\u200b", "")
+    lines = [line.strip() for line in text.split("\n")]
+    return re.sub(r"\n{2,}", "\n", "\n".join(lines)).strip()
+
+
+def _weibo_pics(node) -> list[str]:
+    """一条微博的配图地址，按文档顺序，优先 `large.url`。
+
+    10-31 现读那条六张：`url` 是 `orj360`（360×479），`large.url` 是 `mw2000`（2048×2730）。
+    取大那张的理由在下游：转存那条链最后要压到单张预算里，从 360 起压只会更糊。
+    现网出口不带 Referer 直下 `mw2000` 实测 200／1,248,453 B／JPEG 2000×2667
+    （台账表四第 3 行那条"微博图床不带 Referer 就 403"是 360 那一档的读数，两头对不上，
+    已就地记进 `docs/枚举-URL转存全部情况.md`，这里按现读的这一条取）。
+    """
+    if not isinstance(node, dict):
+        return []
+    urls = []
+    for pic in (node.get("pics") or []):
+        if not isinstance(pic, dict):
+            continue
+        large = pic.get("large")
+        big = large.get("url") if isinstance(large, dict) else ""
+        urls.append(_http_image_url("", big or pic.get("url") or ""))
+    return [u for u in urls if u]
+
+
+def _parse_weibo(data: dict, own_full: str = "") -> dict:
+    """一份微博数据 → 抓取那一层约定的回体（`title`／`content`／`images`／`author`／`site_name_meta`）。
+
+    `own_full` 是全文口那一份（只有标了长文才会去要）；给了而且比主口长就用它，
+    否则用主口——**取更大的那一份，不是无条件替换**，因为全文口回空是常态（老微博、被删的楼）。
+
+    转发那一型（10-31 现读 `5208601192040603`：转发语 46 字＋原文 139 字）把原文接在后面，
+    用 `//@原作者：` 开头——那正是微博自己在屏上用的写法，用户认得；
+    两边的图并在一起（先自己的、再原文的），张数与"几张没存下"仍由下游那两条实话记。
+    """
+    rt = data.get("retweeted_status")
+    own = own_full or _weibo_text(data.get("text"))
+    parts = [own] if own else []
+    if isinstance(rt, dict):
+        orig = _weibo_text(rt.get("text"))
+        name = ((rt.get("user") or {}).get("screen_name") or "").strip()
+        if orig:
+            parts.append("//@%s：%s" % (name, orig) if name else "//@%s" % orig)
+    author = ((data.get("user") or {}).get("screen_name") or "").strip()
+    title = (data.get("status_title") or "").strip()
+    if title.endswith("..."):  # 主口给的是掐过头的标题（现读那条图文就是「…咱们主...」）
+        title = title[:-3].strip()
+    return {
+        "title": title or (f"{author} 的微博" if author else "微博正文"),
+        "content": "\n\n".join(part for part in parts if part),
+        "source_type": "web_article",
+        "images": _dedupe_order(_weibo_pics(data) + _weibo_pics(rt)),
+        # 微博那张图床认的是**来路**不是UA缺失：现网出口逐档量过，生产那套头（桌面 UA＋`Accept: image/*`）
+        # 不带 Referer 整批 403／238 B，带 `https://m.weibo.cn/` 或 `https://weibo.com/` 三档全 200，
+        # 带随便一枚外站 Referer 仍然 403。这一枚由 `_archive_images` 原样递给 `archive(referer=…)`，
+        # 只有这一族给值，其余各族那一格是空串（细则在 `note_images` 文件头第 3 条）。
+        "image_referer": _WEIBO_IMAGE_REFERER,
+        "author": author,
+        # 站名这一格这里给不出来（这一族不读 HTML，没有 `og:site_name` 那一枚 meta），
+        # 空串不是"没名字"：`site_names.builtin_site` 那张表按域名后缀认 weibo.com／weibo.cn＝微博。
+        "site_name_meta": "",
+    }
+
+
+async def _fetch_weibo_extend(client: httpx.AsyncClient, status_id: str) -> str:
+    """长文那一型的全文那一发。取不到一律回空串（主口那一份照用）——多要这一发是为了"更全"，
+    它失败不该把整篇判死。两发样本里它与主口逐字等长（1,697／1,697 与 2,280／2,280 HTML 字符），
+    但"数据里写着还有更多"不能拿两条样本读成"主口永远给全"，所以这一发要发、并且只取更大的那一份。
+    """
+    try:
+        resp = await client.get(_validate_url(_WEIBO_EXTEND.format(status_id)))
+        payload = resp.json() if resp.status_code < 400 else None
+    except Exception as exc:
+        logger.info("微博全文那一发没成（%s），用主口那一份", type(exc).__name__)
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    return _weibo_text(((payload.get("data") or {}).get("longTextContent")) or "")
+
+
+async def _fetch_weibo(url: str) -> dict | None:
+    """微博链接走那份数据；None＝这条路这次走不通（认不出号码／解不开），由调用方落回网页那一路。"""
+    status_id = _weibo_status_id(url)
+    if not status_id:
+        return None
+    fetch_url = _validate_url(_WEIBO_SHOW.format(status_id))
+    async with httpx.AsyncClient(follow_redirects=False, timeout=20, headers=_WEIBO_HEADERS) as client:
+        resp = await client.get(fetch_url)
+        if resp.status_code >= 400:
+            raise SiteHttpError(_status_hint(resp.status_code), resp.status_code)
+        if len(resp.content) > MAX_RESPONSE_SIZE:
+            raise UserError(f"这条微博内容超过 {MAX_RESPONSE_SIZE // 1024 // 1024}MB 限制")
+        try:
+            payload = resp.json()
+        except ValueError:
+            logger.info("微博那一份数据解不开（可能是登录壳），这一条落回网页那一路")
+            return None
+        status_code = resp.status_code
+        if not isinstance(payload, dict):
+            return None
+        if payload.get("ok") != 1:
+            # 这一型**不进黑名单**：它是"这一条微博"的事，不是"weibo.com 这个站"的事。
+            # 计数只挂在 `SiteHttpError` 与"200 且正文 0 字"那两岔上，这里直接抛 UserError 就绕开了。
+            errno = str(payload.get("errno") or "")
+            raise UserError(_WEIBO_ERRNO_HINT.get(errno) or "这条微博读不到内容")
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            return None
+        own_full = await _fetch_weibo_extend(client, status_id) if data.get("isLongText") else ""
+
+    parsed = _parse_weibo(data, own_full)
+    if not parsed["content"]:
+        # 只有视频、连一句字都没有的那条：当场说一句人话，也不回 0 字——
+        # 回 0 字会被下游算成"这个站读不到"，攒三次就把整台 weibo.com 拉黑（现网此刻计 2，只差一次）。
+        raise UserError("这条微博只有视频，没有文字内容")
+    parsed["status_code"] = status_code
+    return parsed
 
 
 # 微信那一族的正文是塞在 JS 字符串里发出来的：换行写成 `\x0a`、`&` 写成 `\x26`

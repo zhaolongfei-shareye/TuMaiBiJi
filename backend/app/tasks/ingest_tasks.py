@@ -371,7 +371,12 @@ def _archive_images(db, note, scraped: dict, user_id) -> dict | None:
 
     try:
         result = asyncio.run(note_images.archive(
-            images, user_id, MAX_ASSETS_PER_NOTE, on_ready=_booked, openid=openid))
+            images, user_id, MAX_ASSETS_PER_NOTE, on_ready=_booked, openid=openid,
+            # 微博那一批的图床卡的是 UA、必须要微博自己的来路（读数在 `note_images` 文件头第 3 条）；
+            # 搜狐那一批卡的是我们那枚 Windows 桌面 UA，要换的是 UA 不是来路（同一条注释）。
+            # 其余各族这两格都是空串＝今天的样子，一个字的 Referer 都不加、一枚头都不换。
+            referer=(scraped.get("image_referer") or "").strip(),
+            user_agent=(scraped.get("image_user_agent") or "").strip()))
     except Exception:
         logger.exception("贴图整段没跑成（笔记已保存）：note=%s", note.id)
         return None
