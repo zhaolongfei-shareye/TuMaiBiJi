@@ -1,0 +1,827 @@
+{
+  "template_id": "postcard",
+  "label": "明信片",
+  "label_en": "Postcard",
+  "group_key": "classic",
+  "sort_order": 1,
+  "min_app_version": "2.4.25",
+  "recipe": {
+    "id": "postcard",
+    "min_version": 1,
+    "steps": [
+      {
+        "let": "s",
+        "value": {
+          "prim": "scheme",
+          "args": {
+            "name": "riso",
+            "categoryId": {
+              "var": "note.category_id"
+            }
+          }
+        }
+      },
+      {
+        "let": "pad",
+        "value": 44
+      },
+      {
+        "let": "imgH",
+        "value": 560
+      },
+      {
+        "let": "qrSize",
+        "value": 112
+      },
+      {
+        "let": "zoneTop",
+        "value": {
+          "+": [
+            {
+              "var": "pad"
+            },
+            {
+              "var": "imgH"
+            },
+            40
+          ]
+        }
+      },
+      {
+        "let": "divX",
+        "value": 470
+      },
+      {
+        "let": "leftW",
+        "value": {
+          "-": [
+            {
+              "var": "divX"
+            },
+            {
+              "var": "pad"
+            },
+            24
+          ]
+        }
+      },
+      {
+        "let": "kick",
+        "value": {
+          "prim": "clipTrack",
+          "args": {
+            "text": {
+              "prim": "joinNonEmpty",
+              "args": {
+                "sep": " · ",
+                "parts": [
+                  {
+                    "prim": "blockName",
+                    "args": {}
+                  },
+                  {
+                    "prim": "noteDate",
+                    "args": {}
+                  }
+                ]
+              }
+            },
+            "maxW": {
+              "var": "leftW"
+            },
+            "track": 3,
+            "size": 20,
+            "bold": true
+          }
+        }
+      },
+      {
+        "let": "titleLines",
+        "value": {
+          "prim": "fitLines",
+          "args": {
+            "text": {
+              "var": "note.title"
+            },
+            "maxW": {
+              "var": "leftW"
+            },
+            "n": 2,
+            "size": 40,
+            "bold": true
+          }
+        }
+      },
+      {
+        "let": "titleY",
+        "value": {
+          "+": [
+            {
+              "var": "zoneTop"
+            },
+            56
+          ]
+        }
+      },
+      {
+        "let": "titleBottom",
+        "value": {
+          "+": [
+            {
+              "var": "titleY"
+            },
+            {
+              "*": [
+                {
+                  "-": [
+                    {
+                      "len": {
+                        "var": "titleLines"
+                      }
+                    },
+                    1
+                  ]
+                },
+                54
+              ]
+            },
+            40
+          ]
+        }
+      },
+      {
+        "let": "sumLines",
+        "value": {
+          "if": [
+            {
+              "truthy": {
+                "var": "note.summary"
+              }
+            },
+            {
+              "prim": "fitLines",
+              "args": {
+                "text": {
+                  "var": "note.summary"
+                },
+                "maxW": {
+                  "var": "leftW"
+                },
+                "n": 2,
+                "size": 22
+              }
+            },
+            []
+          ]
+        }
+      },
+      {
+        "let": "sumY",
+        "value": {
+          "+": [
+            {
+              "var": "titleBottom"
+            },
+            30
+          ]
+        }
+      },
+      {
+        "let": "sumBottom",
+        "value": {
+          "if": [
+            {
+              "truthy": {
+                "len": {
+                  "var": "sumLines"
+                }
+              }
+            },
+            {
+              "+": [
+                {
+                  "var": "sumY"
+                },
+                {
+                  "*": [
+                    {
+                      "-": [
+                        {
+                          "len": {
+                            "var": "sumLines"
+                          }
+                        },
+                        1
+                      ]
+                    },
+                    32
+                  ]
+                },
+                22
+              ]
+            },
+            {
+              "var": "titleBottom"
+            }
+          ]
+        }
+      },
+      {
+        "let": "signTop",
+        "value": {
+          "+": [
+            {
+              "var": "sumBottom"
+            },
+            48
+          ]
+        }
+      },
+      {
+        "let": "sign",
+        "value": {
+          "prim": "signRow",
+          "args": {
+            "x": {
+              "var": "pad"
+            },
+            "y": {
+              "var": "signTop"
+            },
+            "maxW": {
+              "var": "leftW"
+            },
+            "size": 24,
+            "avatarD": 56,
+            "onDark": false
+          }
+        }
+      },
+      {
+        "let": "leftBottom",
+        "value": {
+          "+": [
+            {
+              "var": "signTop"
+            },
+            {
+              "var": "sign.h"
+            }
+          ]
+        }
+      },
+      {
+        "let": "vk",
+        "value": {
+          "prim": "vertCols",
+          "args": {
+            "text": {
+              "slice": [
+                {
+                  "prim": "joinNonEmpty",
+                  "args": {
+                    "sep": " · ",
+                    "parts": [
+                      {
+                        "prim": "blockName",
+                        "args": {}
+                      },
+                      {
+                        "prim": "noteDate",
+                        "args": {}
+                      }
+                    ]
+                  }
+                },
+                0,
+                14
+              ]
+            },
+            "colH": 340,
+            "step": 26,
+            "maxCols": 1,
+            "size": 20,
+            "fam": {
+              "prim": "token",
+              "args": {
+                "name": "serif"
+              }
+            }
+          }
+        }
+      },
+      {
+        "let": "vs",
+        "value": {
+          "prim": "vertCols",
+          "args": {
+            "text": {
+              "if": [
+                {
+                  "truthy": {
+                    "var": "profile.slogan"
+                  }
+                },
+                {
+                  "var": "profile.slogan"
+                },
+                ""
+              ]
+            },
+            "colH": 340,
+            "step": 26,
+            "maxCols": 1,
+            "size": 22,
+            "fam": {
+              "prim": "token",
+              "args": {
+                "name": "serif"
+              }
+            }
+          }
+        }
+      },
+      {
+        "let": "rightUsed",
+        "value": {
+          "max": [
+            {
+              "prim": "maxOf",
+              "args": {
+                "values": {
+                  "var": "vk.advs"
+                },
+                "seed": 0
+              }
+            },
+            {
+              "prim": "maxOf",
+              "args": {
+                "values": {
+                  "var": "vs.advs"
+                },
+                "seed": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "let": "zoneH",
+        "value": {
+          "max": [
+            {
+              "-": [
+                {
+                  "var": "leftBottom"
+                },
+                {
+                  "var": "zoneTop"
+                }
+              ]
+            },
+            {
+              "+": [
+                {
+                  "var": "rightUsed"
+                },
+                24
+              ]
+            },
+            364
+          ]
+        }
+      },
+      {
+        "let": "qr",
+        "value": {
+          "prim": "qrSticker",
+          "args": {
+            "x": {
+              "-": [
+                {
+                  "var": "W"
+                },
+                {
+                  "var": "pad"
+                },
+                {
+                  "var": "qrSize"
+                }
+              ]
+            },
+            "y": {
+              "+": [
+                {
+                  "var": "pad"
+                },
+                24
+              ]
+            },
+            "size": {
+              "var": "qrSize"
+            },
+            "offset": {
+              "var": "s.accent"
+            },
+            "ink": {
+              "prim": "withAlpha",
+              "args": {
+                "color": {
+                  "prim": "token",
+                  "args": {
+                    "name": "hard"
+                  }
+                },
+                "alpha": 0.82
+              }
+            },
+            "label": {
+              "prim": "i18n",
+              "args": {
+                "key": "scanToView"
+              }
+            }
+          }
+        }
+      },
+      {
+        "let": "height",
+        "value": {
+          "+": [
+            {
+              "var": "zoneTop"
+            },
+            {
+              "var": "zoneH"
+            },
+            {
+              "var": "pad"
+            }
+          ]
+        }
+      },
+      {
+        "emit": {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": {
+            "var": "W"
+          },
+          "h": {
+            "var": "height"
+          },
+          "color": {
+            "var": "s.bg"
+          }
+        }
+      },
+      {
+        "if": {
+          "cond": {
+            "truthy": {
+              "var": "hasNote"
+            }
+          },
+          "then": [
+            {
+              "emit": {
+                "k": "image",
+                "key": "note",
+                "x": {
+                  "var": "pad"
+                },
+                "y": {
+                  "var": "pad"
+                },
+                "w": {
+                  "-": [
+                    {
+                      "var": "W"
+                    },
+                    {
+                      "*": [
+                        {
+                          "var": "pad"
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                "h": {
+                  "var": "imgH"
+                },
+                "r": 4
+              }
+            }
+          ],
+          "else": [
+            {
+              "emitOne": {
+                "prim": "glyphPlate",
+                "args": {
+                  "x": {
+                    "var": "pad"
+                  },
+                  "y": {
+                    "var": "pad"
+                  },
+                  "w": {
+                    "-": [
+                      {
+                        "var": "W"
+                      },
+                      {
+                        "*": [
+                          {
+                            "var": "pad"
+                          },
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  "h": {
+                    "var": "imgH"
+                  },
+                  "color": {
+                    "prim": "withAlpha",
+                    "args": {
+                      "color": {
+                        "prim": "token",
+                        "args": {
+                          "name": "ink"
+                        }
+                      },
+                      "alpha": 0.12
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "emit": {
+          "k": "rrect",
+          "x": {
+            "var": "pad"
+          },
+          "y": {
+            "var": "pad"
+          },
+          "w": {
+            "-": [
+              {
+                "var": "W"
+              },
+              {
+                "*": [
+                  {
+                    "var": "pad"
+                  },
+                  2
+                ]
+              }
+            ]
+          },
+          "h": {
+            "var": "imgH"
+          },
+          "r": 4,
+          "stroke": {
+            "prim": "withAlpha",
+            "args": {
+              "color": {
+                "var": "s.ink"
+              },
+              "alpha": 0.22
+            }
+          },
+          "strokeWidth": 2
+        }
+      },
+      {
+        "emitMany": {
+          "var": "qr.layers"
+        }
+      },
+      {
+        "emit": {
+          "k": "line",
+          "x1": {
+            "var": "divX"
+          },
+          "y1": {
+            "var": "zoneTop"
+          },
+          "x2": {
+            "var": "divX"
+          },
+          "y2": {
+            "+": [
+              {
+                "var": "zoneTop"
+              },
+              {
+                "var": "zoneH"
+              }
+            ]
+          },
+          "w": 2,
+          "color": {
+            "prim": "withAlpha",
+            "args": {
+              "color": {
+                "var": "s.ink"
+              },
+              "alpha": 0.2
+            }
+          }
+        }
+      },
+      {
+        "emit": {
+          "k": "text",
+          "x": {
+            "var": "pad"
+          },
+          "y": {
+            "+": [
+              {
+                "var": "zoneTop"
+              },
+              20
+            ]
+          },
+          "lines": [
+            {
+              "var": "kick"
+            }
+          ],
+          "size": 20,
+          "weight": "bold",
+          "color": {
+            "var": "s.accent"
+          },
+          "track": 3
+        }
+      },
+      {
+        "emit": {
+          "k": "text",
+          "x": {
+            "var": "pad"
+          },
+          "y": {
+            "var": "titleY"
+          },
+          "lines": {
+            "var": "titleLines"
+          },
+          "lh": 54,
+          "size": 40,
+          "weight": "bold",
+          "color": {
+            "var": "s.ink"
+          }
+        }
+      },
+      {
+        "if": {
+          "cond": {
+            "truthy": {
+              "len": {
+                "var": "sumLines"
+              }
+            }
+          },
+          "then": [
+            {
+              "emit": {
+                "k": "text",
+                "x": {
+                  "var": "pad"
+                },
+                "y": {
+                  "var": "sumY"
+                },
+                "lines": {
+                  "var": "sumLines"
+                },
+                "lh": 32,
+                "size": 22,
+                "color": {
+                  "var": "s.sub"
+                }
+              }
+            }
+          ],
+          "else": []
+        }
+      },
+      {
+        "emitMany": {
+          "var": "sign.layers"
+        }
+      },
+      {
+        "if": {
+          "cond": {
+            "truthy": {
+              "len": {
+                "var": "vk.cols"
+              }
+            }
+          },
+          "then": [
+            {
+              "emit": {
+                "k": "text",
+                "x": 684,
+                "y": {
+                  "+": [
+                    {
+                      "var": "zoneTop"
+                    },
+                    8
+                  ]
+                },
+                "lines": {
+                  "var": "vk.cols"
+                },
+                "vert": true,
+                "lh": 26,
+                "size": 20,
+                "color": {
+                  "prim": "withAlpha",
+                  "args": {
+                    "color": {
+                      "var": "s.ink"
+                    },
+                    "alpha": 0.62
+                  }
+                },
+                "fam": {
+                  "prim": "token",
+                  "args": {
+                    "name": "serif"
+                  }
+                },
+                "vpunct": true
+              }
+            }
+          ],
+          "else": []
+        }
+      },
+      {
+        "if": {
+          "cond": {
+            "truthy": {
+              "len": {
+                "var": "vs.cols"
+              }
+            }
+          },
+          "then": [
+            {
+              "emit": {
+                "k": "text",
+                "x": 628,
+                "y": {
+                  "+": [
+                    {
+                      "var": "zoneTop"
+                    },
+                    8
+                  ]
+                },
+                "lines": {
+                  "var": "vs.cols"
+                },
+                "vert": true,
+                "lh": 26,
+                "size": 22,
+                "color": {
+                  "var": "s.ink"
+                },
+                "fam": {
+                  "prim": "token",
+                  "args": {
+                    "name": "serif"
+                  }
+                },
+                "vpunct": true
+              }
+            }
+          ],
+          "else": []
+        }
+      }
+    ]
+  }
+}

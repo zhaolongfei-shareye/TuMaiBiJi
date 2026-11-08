@@ -30,6 +30,10 @@ const wxss = wxssRaw.replace(/\/\*[\s\S]*?\*\//g, '')
    这条尺子一声不吭。下面那两条（扫 hex 与扫 var 拼错）都把它并进来一起量。 */
 const REC_WXSS = fs.readFileSync(P('styles/rec-bar.wxss'), 'utf8')
 const js = fs.readFileSync(P('pages/create/create.js'), 'utf8')
+// 11-08 起"一篇能挂几张图"那个数搬进了 `utils/api.js`（前后端那道边界）：编辑页补传配图
+// 那一条也要它。两页各写一份 9 的话，改了服务端那一份就会出现"选得上来的服务端收不下"
+// ——症状是静默少图，界面不报错、接口也不报错。所以这一把尺子读数也改从那一处读。
+const apiJs = fs.readFileSync(P('utils/api.js'), 'utf8')
 // 10-19 那一刀（提炼完落回列表那扇窗）跨三个文件，判据也得跟着跨：
 // 交出去那一半在 create，取走那一半在 index，"取走即清"那一半在 app。只查 create 会漏掉"没人取"这一种失效。
 const IX_JS = fs.readFileSync(P('pages/index/index.js'), 'utf8')
@@ -640,7 +644,7 @@ const thW = num(seg('.th'), 'width')
 const thGap = num(seg('.strip'), 'gap')
 const cols = Math.floor((cardInnerW + thGap) / (thW + thGap))
 const ROW_CELLS = Number(/const ROW_CELLS = (\d+)/.exec(js)[1])
-const MAX_SHOTS = Number(/const MAX_SHOTS = (\d+)/.exec(js)[1])
+const MAX_SHOTS = Number(/const MAX_SHOTS = (\d+)/.exec(apiJs)[1])
 ok('WXSS 实际放得下的列数 == JS 的 ROW_CELLS（两个数必须是一件事）',
   cols === ROW_CELLS, `算出 ${cols} 行宽 / JS 写 ${ROW_CELLS}`)
 ok('收起一行、展开两行放得下 上限张数 + ➕（这就是"只多一行"落得下去的理由）',
@@ -903,7 +907,6 @@ ok('提炼成功那一次复位回的是**默认那一档**，不是回关（只
 ok('三档的请求都带上这一位（原来只有文字那条带，链接与照片两条不带 ⇒ 开关是枚摆设）',
   /api\.ingestUrl\(url, this\.data\.writeTranslate\)/.test(js)
   && /api\.ingestScreenshots\(batch, this\.data\.writeTranslate\)/.test(js))
-const apiJs = fs.readFileSync(P('utils/api.js'), 'utf8')
 ok('客户端把这一位显式发成 true／false 两个字符串（省掉就等于让后端回落 None＝不表态）',
   (apiJs.match(/translate: translate \? 'true' : 'false'/g) || []).length === 2,
   `两处：${(apiJs.match(/translate: translate \? 'true' : 'false'/g) || []).length}`)

@@ -1,0 +1,716 @@
+{
+  "template_id": "filmframe",
+  "label": "胶片",
+  "label_en": "Film Frame",
+  "group_key": "bold",
+  "sort_order": 4,
+  "min_app_version": "2.4.25",
+  "recipe": {
+    "id": "filmframe",
+    "min_version": 1,
+    "steps": [
+      {
+        "let": "s",
+        "value": {
+          "prim": "scheme",
+          "args": {
+            "name": "mono",
+            "categoryId": {
+              "var": "note.category_id"
+            }
+          }
+        }
+      },
+      {
+        "let": "sp",
+        "value": {
+          "prim": "scheme",
+          "args": {
+            "name": "riso",
+            "categoryId": {
+              "var": "note.category_id"
+            }
+          }
+        }
+      },
+      {
+        "let": "pad",
+        "value": 40
+      },
+      {
+        "let": "imgY",
+        "value": 84
+      },
+      {
+        "let": "imgH",
+        "value": 780
+      },
+      {
+        "let": "qrSize",
+        "value": 108
+      },
+      {
+        "let": "frame",
+        "value": {
+          "prim": "joinNonEmpty",
+          "args": {
+            "sep": " ",
+            "parts": [
+              "FR",
+              {
+                "padStart": [
+                  {
+                    "var": "note.id"
+                  },
+                  2
+                ]
+              },
+              {
+                "prim": "noteDate",
+                "args": {}
+              }
+            ]
+          }
+        }
+      },
+      {
+        "let": "titleY",
+        "value": {
+          "+": [
+            {
+              "var": "imgY"
+            },
+            {
+              "var": "imgH"
+            },
+            72
+          ]
+        }
+      },
+      {
+        "let": "titleLines",
+        "value": {
+          "prim": "fitLines",
+          "args": {
+            "text": {
+              "var": "note.title"
+            },
+            "maxW": {
+              "-": [
+                {
+                  "var": "W"
+                },
+                {
+                  "*": [
+                    {
+                      "var": "pad"
+                    },
+                    2
+                  ]
+                }
+              ]
+            },
+            "n": 2,
+            "size": 48,
+            "bold": true
+          }
+        }
+      },
+      {
+        "let": "titleBottom",
+        "value": {
+          "+": [
+            {
+              "var": "titleY"
+            },
+            {
+              "*": [
+                {
+                  "-": [
+                    {
+                      "len": {
+                        "var": "titleLines"
+                      }
+                    },
+                    1
+                  ]
+                },
+                62
+              ]
+            },
+            48
+          ]
+        }
+      },
+      {
+        "let": "sumLines",
+        "value": {
+          "if": [
+            {
+              "truthy": {
+                "var": "note.summary"
+              }
+            },
+            {
+              "prim": "fitLines",
+              "args": {
+                "text": {
+                  "var": "note.summary"
+                },
+                "maxW": {
+                  "-": [
+                    {
+                      "var": "W"
+                    },
+                    {
+                      "*": [
+                        {
+                          "var": "pad"
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                "n": 2,
+                "size": 24
+              }
+            },
+            []
+          ]
+        }
+      },
+      {
+        "let": "sumBottom",
+        "value": {
+          "if": [
+            {
+              "truthy": {
+                "len": {
+                  "var": "sumLines"
+                }
+              }
+            },
+            {
+              "+": [
+                {
+                  "var": "titleBottom"
+                },
+                36,
+                {
+                  "*": [
+                    {
+                      "-": [
+                        {
+                          "len": {
+                            "var": "sumLines"
+                          }
+                        },
+                        1
+                      ]
+                    },
+                    36
+                  ]
+                },
+                24
+              ]
+            },
+            {
+              "var": "titleBottom"
+            }
+          ]
+        }
+      },
+      {
+        "let": "signTop",
+        "value": {
+          "+": [
+            {
+              "var": "sumBottom"
+            },
+            56
+          ]
+        }
+      },
+      {
+        "let": "H",
+        "value": {
+          "+": [
+            {
+              "var": "signTop"
+            },
+            216
+          ]
+        }
+      },
+      {
+        "let": "sign",
+        "value": {
+          "prim": "signRow",
+          "args": {
+            "x": {
+              "var": "pad"
+            },
+            "y": {
+              "var": "signTop"
+            },
+            "maxW": {
+              "-": [
+                {
+                  "var": "W"
+                },
+                {
+                  "*": [
+                    {
+                      "var": "pad"
+                    },
+                    2
+                  ]
+                },
+                {
+                  "var": "qrSize"
+                },
+                30
+              ]
+            },
+            "size": 28,
+            "avatarD": 72,
+            "onDark": {
+              "if": [
+                {
+                  "truthy": {
+                    "var": "hasNote"
+                  }
+                },
+                true,
+                false
+              ]
+            }
+          }
+        }
+      },
+      {
+        "let": "qr",
+        "value": {
+          "prim": "qrSticker",
+          "args": {
+            "x": {
+              "-": [
+                {
+                  "var": "W"
+                },
+                {
+                  "var": "pad"
+                },
+                {
+                  "var": "qrSize"
+                }
+              ]
+            },
+            "y": {
+              "var": "signTop"
+            },
+            "size": {
+              "var": "qrSize"
+            },
+            "offset": {
+              "var": "s.accent"
+            },
+            "ink": {
+              "if": [
+                {
+                  "truthy": {
+                    "var": "hasNote"
+                  }
+                },
+                {
+                  "var": "s.sub"
+                },
+                {
+                  "var": "sp.sub"
+                }
+              ]
+            },
+            "label": {
+              "prim": "i18n",
+              "args": {
+                "key": "scanToView"
+              }
+            }
+          }
+        }
+      },
+      {
+        "let": "height",
+        "value": {
+          "var": "H"
+        }
+      },
+      {
+        "emit": {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": {
+            "var": "W"
+          },
+          "h": {
+            "var": "height"
+          },
+          "color": {
+            "if": [
+              {
+                "truthy": {
+                  "var": "hasNote"
+                }
+              },
+              {
+                "var": "s.bg"
+              },
+              {
+                "var": "sp.bg"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "each": {
+          "over": [
+            56,
+            146,
+            236,
+            326,
+            416,
+            506,
+            596,
+            686
+          ],
+          "as": "hx",
+          "do": [
+            {
+              "emit": {
+                "k": "rrect",
+                "x": {
+                  "var": "hx"
+                },
+                "y": 26,
+                "w": 44,
+                "h": 30,
+                "r": 6,
+                "fill": {
+                  "if": [
+                    {
+                      "truthy": {
+                        "var": "hasNote"
+                      }
+                    },
+                    {
+                      "prim": "withAlpha",
+                      "args": {
+                        "color": {
+                          "prim": "token",
+                          "args": {
+                            "name": "paper"
+                          }
+                        },
+                        "alpha": 0.14
+                      }
+                    },
+                    {
+                      "prim": "withAlpha",
+                      "args": {
+                        "color": {
+                          "prim": "token",
+                          "args": {
+                            "name": "ink"
+                          }
+                        },
+                        "alpha": 0.14
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "emit": {
+                "k": "rrect",
+                "x": {
+                  "var": "hx"
+                },
+                "y": {
+                  "-": [
+                    {
+                      "var": "H"
+                    },
+                    56
+                  ]
+                },
+                "w": 44,
+                "h": 30,
+                "r": 6,
+                "fill": {
+                  "if": [
+                    {
+                      "truthy": {
+                        "var": "hasNote"
+                      }
+                    },
+                    {
+                      "prim": "withAlpha",
+                      "args": {
+                        "color": {
+                          "prim": "token",
+                          "args": {
+                            "name": "paper"
+                          }
+                        },
+                        "alpha": 0.14
+                      }
+                    },
+                    {
+                      "prim": "withAlpha",
+                      "args": {
+                        "color": {
+                          "prim": "token",
+                          "args": {
+                            "name": "ink"
+                          }
+                        },
+                        "alpha": 0.14
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "if": {
+          "cond": {
+            "truthy": {
+              "var": "hasNote"
+            }
+          },
+          "then": [
+            {
+              "emit": {
+                "k": "image",
+                "key": "note",
+                "x": {
+                  "var": "pad"
+                },
+                "y": {
+                  "var": "imgY"
+                },
+                "w": {
+                  "-": [
+                    {
+                      "var": "W"
+                    },
+                    {
+                      "*": [
+                        {
+                          "var": "pad"
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                "h": {
+                  "var": "imgH"
+                },
+                "r": 4
+              }
+            }
+          ],
+          "else": [
+            {
+              "emitOne": {
+                "prim": "glyphPlate",
+                "args": {
+                  "x": {
+                    "var": "pad"
+                  },
+                  "y": {
+                    "var": "imgY"
+                  },
+                  "w": {
+                    "-": [
+                      {
+                        "var": "W"
+                      },
+                      {
+                        "*": [
+                          {
+                            "var": "pad"
+                          },
+                          2
+                        ]
+                      }
+                    ]
+                  },
+                  "h": {
+                    "var": "imgH"
+                  },
+                  "color": {
+                    "prim": "withAlpha",
+                    "args": {
+                      "color": {
+                        "prim": "token",
+                        "args": {
+                          "name": "ink"
+                        }
+                      },
+                      "alpha": 0.12
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "emit": {
+          "k": "text",
+          "x": {
+            "-": [
+              {
+                "var": "W"
+              },
+              {
+                "var": "pad"
+              }
+            ]
+          },
+          "y": 70,
+          "lines": [
+            {
+              "var": "frame"
+            }
+          ],
+          "size": 20,
+          "fam": {
+            "prim": "token",
+            "args": {
+              "name": "mono"
+            }
+          },
+          "color": {
+            "if": [
+              {
+                "truthy": {
+                  "var": "hasNote"
+                }
+              },
+              {
+                "var": "s.accent"
+              },
+              {
+                "var": "sp.accent"
+              }
+            ]
+          },
+          "align": "right"
+        }
+      },
+      {
+        "emit": {
+          "k": "text",
+          "x": {
+            "var": "pad"
+          },
+          "y": {
+            "var": "titleY"
+          },
+          "lines": {
+            "var": "titleLines"
+          },
+          "lh": 62,
+          "size": 48,
+          "weight": "bold",
+          "color": {
+            "if": [
+              {
+                "truthy": {
+                  "var": "hasNote"
+                }
+              },
+              {
+                "var": "s.ink"
+              },
+              {
+                "var": "sp.ink"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "if": {
+          "cond": {
+            "truthy": {
+              "len": {
+                "var": "sumLines"
+              }
+            }
+          },
+          "then": [
+            {
+              "emit": {
+                "k": "text",
+                "x": {
+                  "var": "pad"
+                },
+                "y": {
+                  "+": [
+                    {
+                      "var": "titleBottom"
+                    },
+                    36
+                  ]
+                },
+                "lines": {
+                  "var": "sumLines"
+                },
+                "lh": 36,
+                "size": 24,
+                "color": {
+                  "if": [
+                    {
+                      "truthy": {
+                        "var": "hasNote"
+                      }
+                    },
+                    {
+                      "var": "s.sub"
+                    },
+                    {
+                      "var": "sp.sub"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "else": []
+        }
+      },
+      {
+        "emitMany": {
+          "var": "sign.layers"
+        }
+      },
+      {
+        "emitMany": {
+          "var": "qr.layers"
+        }
+      }
+    ]
+  }
+}

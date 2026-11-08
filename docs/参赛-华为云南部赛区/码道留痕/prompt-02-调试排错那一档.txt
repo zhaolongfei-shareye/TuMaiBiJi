@@ -1,0 +1,45 @@
+【第 5 轮·调试排错这一档】这是我们仓库 2026-10-19 真修过的一个缺陷：入参校验的 422 处理器自己崩成 500。我把相关那一段抽成能独立跑的最小复现（去掉 FastAPI 依赖，取值顺序原样保留）。沙箱里没有我们的项目代码，下面两段就是全部输入，请照原样落盘。
+
+文件一 repro.py：
+```python
+FIELD_LABELS = {"title": "标题", "text": "正文", "summary": "摘要"}
+FALLBACK = "提交的内容格式不对，请检查后重试"
+
+
+def build_detail(errors):
+    if not errors:
+        return FALLBACK
+    first = errors[0]
+    loc = [str(p) for p in first.get("loc", ()) if p not in ("body", "query", "path")]
+    label = FIELD_LABELS.get(loc[-1], loc[-1] if loc else "")
+    kind = first.get("type", "")
+    limit = (first.get("ctx") or {}).get("max_length")
+    if kind == "string_too_long" and limit:
+        return f"{label}太长了，最多 {limit} 字"
+    return FALLBACK
+```
+
+文件二 test_repro.py：
+```python
+from repro import build_detail, FALLBACK
+
+
+def test_too_long_uses_field_label():
+    errs = [{"loc": ("body", "title"), "type": "string_too_long", "ctx": {"max_length": 50}}]
+    assert build_detail(errs) == "标题太长了，最多 50 字"
+
+
+def test_body_only_error_returns_fallback():
+    errs = [{"loc": ("body",), "type": "model_attributes_type"}]
+    assert build_detail(errs) == FALLBACK
+```
+
+请做三件事，每件都要给依据：
+1) 在沙箱里跑 pytest，把失败读数原样贴出来：异常类型、落在哪一行。
+2) 定位根因：为什么 loc 只剩 ("body",) 这一层时处理器自己炸、而不是回那句中文兜底。要说清求值顺序——判空写在哪一头、实参先算的是哪一个。
+3) 只改取值那一行。不许改测试断言，不许改 FALLBACK 那几个字，不许顺手加日志、类型注解或新函数。改完再跑一次 pytest，两条都要绿。
+
+产出要求（我要逐字节抄回，别只写在对话里）：
+- 产物文件 repro-修后.txt：第一行 `===== BEGIN-REPRO =====`，最后一行 `===== END-REPRO =====`，中间是修后的 repro.py 全文，一行都不许多也不许多删。
+- 产物文件 排错读数.txt：第一行 `===== BEGIN-DIAG =====`，最后一行 `===== END-DIAG =====`，中间写：改前 pytest 输出、改后 pytest 输出、根因那段话（含你判断的行号）。
+- 上面两份以外的任何已有文件，一份都不许修改或覆盖。

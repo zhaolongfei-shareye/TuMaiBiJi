@@ -1,0 +1,41 @@
+{
+  "pdf_pages": 16,
+  "pdf_bytes": 4366111,
+  "html_bytes": 4204920,
+  "page_image_size": [
+    1440,
+    1800
+  ],
+  "page_images": 16,
+  "out_of_page_words": [],
+  "feature_tokens": {
+    "图片": true,
+    "链接": true,
+    "文字": true,
+    "原文翻译": true,
+    "搜索": true,
+    "分类": true,
+    "置顶": true,
+    "配图": true,
+    "模板": true,
+    "转存": true,
+    "撤回": true,
+    "私密": true,
+    "心情": true,
+    "名片": true,
+    "注销": true,
+    "举报": true
+  },
+  "old_visuals_checked": 14,
+  "old_visuals_in_embedded_html_or_assets": 0,
+  "image_nodes": 27,
+  "min_footer_gap_px": 33,
+  "page_errors": [],
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390,
+    "firstPageWidth": 390
+  },
+  "image_provenance": "4 developer-tool UI assets and 1 physical-device extraction slider; 10 new card renders from local 2.4.16; 3 retained AI scenes",
+  "product_entry_qr_live_scan": false
+}

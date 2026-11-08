@@ -1,0 +1,44 @@
+{
+  "pages": [
+    "pages/create/create",
+    "pages/index/index",
+    "pages/me/me",
+    "pages/detail/detail",
+    "pages/write/write",
+    "pages/share/share",
+    "pages/share/view",
+    "pages/categories/categories",
+    "pages/wallpaper/wallpaper",
+    "pages/profile/profile",
+    "pages/about/about"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#f4f2ec",
+    "navigationBarTitleText": "图麦笔记",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f4f2ec"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#8a8f98",
+    "selectedColor": "#23252c",
+    "backgroundColor": "#23252c",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/create/create",
+        "text": "新建"
+      },
+      {
+        "pagePath": "pages/index/index",
+        "text": "笔记"
+      },
+      {
+        "pagePath": "pages/me/me",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

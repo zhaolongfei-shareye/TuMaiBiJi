@@ -1,0 +1,60 @@
+{
+  "source": "docs/产品白皮书-图麦笔记-20261023.md",
+  "basis": "逐项读取白皮书全部用户功能，并核对当前本地小程序2.4.16的入口与实现；不把接口存在当作用户有入口，不把旧界面行为当作新版能力。",
+  "structure": "不沿用旧16页目录或版式。先以国外地标与旅行记录困境起笔，突出16种外文、最多9张照片与中文笔记的组合价值，再展示成果并逐步拆解功能；完整12章77项作为后续详细说明，不预设固定页数挤压文字。", 
+  "domains": [
+    {"whitepaper":"§1 产品介绍、基本概念","destination":"01 首页总览；03 整理；07 分享；11 魅力值与帮助","treatment":"把概念融入使用说明，不向大众解释内部数据表、代次或哑管道。"},
+    {"whitepaper":"§2.2 客户端与界面组成","destination":"01 三个主入口；05 详情编辑；06 卡片市场；09—11 设置","treatment":"以当前实际可见入口为准；旧路由存在不代表新界面仍提供入口。"},
+    {"whitepaper":"§3.1 录入","destination":"02 全章；01 首页入口","treatment":"分别展开相册、拍照、已选图片、粘贴分流、链接、文字追加、右滑状态及图片笔记。"},
+    {"whitepaper":"§3.2 整理","destination":"03 全章；05 原文阅读与编辑","treatment":"四栏用途、原文核对、翻译开关、失败区别各自说明；翻译与字数采用核对后的口径。"},
+    {"whitepaper":"§3.3 组织与检索","destination":"04 资料库；05 阅读编辑；10 删除笔记","treatment":"搜索、分类筛选与管理、滑篇、配图、文字编辑分别展开；旧双视图与置顶纳入差异表，不宣传为当前入口。"},
+    {"whitepaper":"§3.4 卡片生成","destination":"06 全章","treatment":"十一套模板逐套描述，补卡片市场、名片编辑、制作与已有卡片两种状态。图文卡保留内容，不用另一套样式冒充它的成品图。"},
+    {"whitepaper":"§3.5 分享、公开与转存","destination":"07 全章；01 推荐；11 魅力值","treatment":"产品推荐、笔记公开、图片分享、隐藏码、撤回和读者转存分开写，不混成一次分享。"},
+    {"whitepaper":"§3.6 私密笔记","destination":"08 全章；04 状态标记；05 阅读限制","treatment":"密码设定、解锁、重置、禁止分享与改私密后的公开状态分别说明。"},
+    {"whitepaper":"§3.7 外观与个性化","destination":"09 全章；01 外观入口；06 名片","treatment":"五心情、四色阶、三档亮度、背景角色、四个图片位、署名及保存范围逐项说明。"},
+    {"whitepaper":"§3.8 账号身份与删除","destination":"10 全章；11 反馈","treatment":"微信进入、联系邮箱、存储、删除、注销分别说明；跨端Apple与本机清理的旧说明列入差异表，不擅自伪造入口。"},
+    {"whitepaper":"§3.9 运营内容与后台","destination":"01 Tips；06 模板；11 示例、帮助与关于","treatment":"介绍大众实际看到的背景、Tips、默认笔记与模板。后台编辑、黑名单和运营统计是维护侧能力，不当成用户菜单。"},
+    {"whitepaper":"§4 关键特性","destination":"02 提交与限制；03 失败；08 私密；10 保存删除；使用边界","treatment":"保留影响使用的安全、可靠性、容量和恢复边界；部署脚本、队列、秘钥、QPS及服务商免费额度不放进推广正文。"},
+    {"whitepaper":"§5 产品优势","destination":"各功能的“有什么用”字段","treatment":"用具体场景说明收益，不重复堆一页没有功能依据的宣传词。"},
+    {"whitepaper":"§6 应用场景","destination":"12 三条完整场景","treatment":"学习阅读、旅行生活、观点创作都写清输入、操作组合、产物与限制；人物图沿用已确认的成年中国大学生。"},
+    {"whitepaper":"§7 产品边界","destination":"每个相关功能的边界段与文末使用边界","treatment":"语音、手写、HEIC、商品识别、多人协作、永久保存等均明确对应，不以小字统一免责代替具体说明。"}
+  ],
+  "differences": [
+    {"topic":"原文翻译","old":"§3.2：只在文字档、默认关、每篇复位为关。","current":"三条录入路径共用开关，初始开启；文字提交成功复位为开。","decision":"正文写三档共用、默认开启，区分界面语言与内容语言。","evidence":["miniprogram/pages/create/create.wxml:269-295","miniprogram/pages/create/create.js:1195-1199"]},
+    {"topic":"文字长度与标题","old":"§3.1、§4.4：统一说单次最多12000字；整理统一生成新标题。","current":"直接输入框2000字；粘贴追加不按2000截断；文字提交与提炼另有16000/12000边界。文字标题取原文首行。","decision":"正文按操作路径说明，不混写统一上限，不承诺文字标题必为中文自动新标题。","evidence":["miniprogram/pages/create/create.wxml:382","miniprogram/pages/create/create.js:804-815","miniprogram/pages/create/create.js:1189-1195","backend/app/api/routes/ingest.py:58-67","backend/app/services/llm.py:114-120"]},
+    {"topic":"图片不仅是OCR","old":"§3.1以拍照识字为主，未展开无字图片路径。","current":"少字或无字会转为图片笔记，完全无字时摘要为图册；图片是否留存仍依赖上传。","decision":"增加独立功能项02-06，不把无字图片都写成失败，也不声称能理解画面。","evidence":["backend/app/tasks/ingest_tasks.py:484-515"]},
+    {"topic":"拍照追加","old":"§3.1：一批只出一次快门。","current":"已有图片后，加号可以继续调用拍照或相册。","decision":"写已选图片可增删，不宣传只允许一张；不等于连续快门自动连拍。","evidence":["miniprogram/pages/create/create.wxml:326-347","miniprogram/pages/create/create.js:907-912"]},
+    {"topic":"列表与卡片双视图","old":"§3.3：可切换两种浏览视图。","current":"当前列表与卡片入口合并，面板左上井格是分类管理，不是切换视图。","decision":"正文写日期列表、已有卡片标记与详情分享入口；旧双视图明确在此保留对账，不伪造按钮。","evidence":["miniprogram/pages/index/index.wxml:48-100","miniprogram/pages/create/create.js:522-528"]},
+    {"topic":"置顶","old":"§3.3：用户可以置顶。","current":"客户端置顶入口已移除，服务端字段与接口仍在。","decision":"不写用户可操作置顶；明确记录白皮书该条已过时，而不是从覆盖表悄悄删去。","evidence":["miniprogram/pages/index/index.js:1387-1389","miniprogram/pages/index/index.wxml:303-313"]},
+    {"topic":"分类删除","old":"§3.3：分类有笔记就删不掉。","current":"普通分类可删，原有笔记归未分类；私密分类无条件禁止删除。","decision":"正文分普通与私密说明，避免把不同条件混成一句话。","evidence":["backend/app/api/routes/categories.py:236-268","miniprogram/pages/index/index.js:825-849"]},
+    {"topic":"分类入口与颜色","old":"§2.2、§3.3暗示独立分类页与选色。","current":"当前分类管理在列表面板内，可新增、改名、拖动、删除；我的页分类入口已关闭，当前面板无选色操作。","decision":"引导在列表就地管理；保留旧选色能力差异，不因旧路由仍注册就宣称用户能进入。","evidence":["miniprogram/pages/me/me.wxml:89-93","miniprogram/pages/index/index.wxml:48-128"]},
+    {"topic":"原文保留与编辑","old":"§1.1、§3.2：原文永远一个字不动。","current":"录入保留实际读入的原文，但用户在编辑页可以修改或清空；抓取和OCR也非逐字保真。","decision":"写原文与整理结果并存可核对，不写不可修改或永久证据存档。","evidence":["miniprogram/pages/write/write.wxml:99-109","miniprogram/pages/write/write.js:400-408"]},
+    {"topic":"被转存标记","old":"§3.5：用几次表述列表标记。","current":"列表星形只表示有人转存，并不在该图标上展示次数。","decision":"正文分开讲状态标记与MIND结算，不称星形为收藏或公开状态。","evidence":["miniprogram/pages/index/index.wxml:177-180","miniprogram/pages/index/index.js:432-470"]},
+    {"topic":"图文卡第十一套","old":"§3.4：十一套；同时指出本地包内十份，图文卡依赖下发。","current":"本地种子包含topBleedEdge；已有十张本地绘制样图不含这套。","decision":"文字必须覆盖图文卡，成品图需按其真实配方出图，不以其他模板顶替或从清单删去。","evidence":["docs/产品白皮书-图麦笔记-20261023.md:394-396","backend/seed/poster_templates.json:1"]},
+    {"topic":"Apple身份与本机清理","old":"§3.8：跨端Apple身份合并、本机数据清理。","current":"本次完整读取当前首页和我的页面，未发现Apple登录/合并或独立清空本机数据入口；本机清理检索未找到对应界面处理器。","decision":"不在小程序大众说明中绘制这些按钮；白皮书中的跨端身份保留为技术范围，本机清理保留为待核对差异，不宣称能力不存在。","evidence":["miniprogram/pages/me/me.wxml:75-126","miniprogram/pages/create/create.wxml:1","docs/产品白皮书-图麦笔记-20261023.md:471-487"]},
+    {"topic":"我的邮箱与反馈邮箱","old":"§3.8将邮箱主要描述为存储字段，并称没有可写的联系邮箱。","current":"我的页有可编辑的个人联系邮箱和关于页的反馈邮箱复制条目；未实测邮件投递。","decision":"正文介绍真实界面用途，不承诺自动发邮件、邮箱登录或邮件备份，也不编造可达性。","evidence":["miniprogram/pages/me/me.wxml:102-115","miniprogram/pages/me/me.wxml:146-150","miniprogram/pages/me/me.js:427-475"]},
+    {"topic":"公开内容并非全部冻结","old":"§3.5用分享时快照概括公开内容。","current":"修改已公开笔记的公开字段会同步并重新检查；公开配图读取当前清单。已发送图片与已转存副本仍不跟随修改。","decision":"分别讲公开页、导出图片、转存副本，避免承诺公开页永远保持首次分享版本。","evidence":["backend/app/api/routes/notes.py:463-475","backend/app/api/routes/shares.py:235-272"]},
+    {"topic":"转存范围与网页入口","old":"§3.5统一说公开落地页可存入独立副本。","current":"转存在微信小程序阅读页，需要登录身份；普通网页有举报但无同样存入按钮。转存不复制配图、完整正文、识别原文或分类。","decision":"明确两种阅读入口和副本所含内容，不把能看到配图等同于配图已进入读者笔记库。","evidence":["miniprogram/pages/share/view.js:66-85","backend/app/api/routes/notes.py:583-633","backend/app/api/routes/landing.py:229-238"]},
+    {"topic":"名片同步依赖编辑入口","old":"§3.7概括名片信息会保存到账号。","current":"卡片市场的提交钩子会推送图片与文字到账号；首页和笔记制作弹窗只更新本机数据或重绘。","decision":"区分各入口的保存范围，不承诺在任一名片弹窗编辑后都会自动跨设备恢复。","evidence":["miniprogram/pages/profile/profile.js:217-239","miniprogram/pages/index/index.js:1958-1979","miniprogram/pages/create/create.js:586-596"]},
+    {"topic":"进入制作即可能建立公开","old":"§3.5描述点击分享创建公开，读者容易误以为最后发送才公开。","current":"制作过程为取得小程序码调用创建分享；取消预览不撤回已建立公开。","decision":"在进入制作操作与二维码开关附近说明，不只放在末尾免责。","evidence":["miniprogram/pages/index/index.js:1592-1617","miniprogram/pages/index/index.wxml:405-421"]}
+  ],
+  "boundaries": [
+    "相机识别针对文字，不提供手写识别、商品识别或估价；少字图片可保存为图片笔记，不等于能分析画面。",
+    "不提供语音录入，不支持HEIC；公开网页读取受登录、付费和站点限制影响。",
+    "内容整理可能遗漏或出错，原文和来源用于核对；没有可靠读数时不承诺几秒生成。",
+    "发布内容会接受相关安全检查，拒绝时按提示处理；本产品不提供审核豁免。",
+    "没有团队、席位和协作权限，不承诺多端实时同步或任何内容永久保存。",
+    "撤回公开不等于收回已经下载的图片或转存副本；隐藏码也不等于撤回。",
+    "云端保存不代表图片都有可恢复备份；已经丢失的对象不能靠重新登录保证找回。",
+    "AI生成标识和来源信息不提供付费移除档位；图片、原文和肖像应有相应使用权。"
+  ],
+  "visual_rules": [
+    "保留文艺、国际化与潮流笔记应用气质：暖纸色、深绿、陶土点缀，旅行摄影与卡片作品；不改成硬科技，不用金属展台或科技蓝光。",
+    "加白框不等于修饰。撤下露出无关人物腿部的整块录入裁片，只分离需要的真实按钮、开关、滑块，透明边缘重组并注明控件拆解示意。",
+    "先讲旅行困境、16种外文与最多9张照片的组合价值，再展示中文笔记成果，最后逐步拆解功能；每页一个主要信息，留白优先，不缩字塞满。",
+    "截图中的用户私照、笔记正文和真实笔记二维码不进入对外稿，演示内容使用虚构资料。",
+    "区分真机控件、开发者工具控件、本地代码绘制卡面与AI旅行影像；控件重组不能冒充完整真机截图，虚构游记不能冒充自动提炼实测。",
+    "图文卡缺图不删功能，不用错误模板顶替；完整77项逐步展开，不漏首页非拍照功能。",
+    "A至D系列均为历史稿；当前为瑞士排版旅行故事版。人物景别与衣着变化，国外朋友圈远程分享，回国打印手账与照片墙，闺蜜来家扫码；保留77项功能与11模板。"
+  ]
+}

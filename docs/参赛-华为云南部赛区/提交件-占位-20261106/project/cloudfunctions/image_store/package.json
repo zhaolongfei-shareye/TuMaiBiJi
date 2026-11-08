@@ -1,0 +1,9 @@
+{
+  "name": "image_store",
+  "version": "1.0.0",
+  "description": "图麦笔记贴图进桶的哑管道：base64 字节进 → 云开发 fileID 出（服务端没有直写存储的凭据，必须穿这一层）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": ">=4.0.1"
+  }
+}

@@ -1,0 +1,268 @@
+.page-head {
+  padding: var(--sp-5) 0 var(--sp-4);
+}
+
+.page-title {
+  display: block;
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -1rpx;
+  color: var(--text-primary);
+  margin-bottom: var(--sp-1);
+}
+
+.page-hint {
+  display: block;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+/* ---------- 分节标题 ---------- */
+.sec-head {
+  margin: var(--sp-4) 0 var(--sp-3);
+}
+
+.sec-title {
+  display: block;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  letter-spacing: -0.6rpx;
+  color: var(--text-primary);
+  margin-bottom: 6rpx;
+}
+
+.sec-hint {
+  display: block;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+/* 界面字体那一排的样式已随入口一起删掉（iOS 与安卓真机都证伪，见 wallpaper.wxml 那条注释）。
+   字体类 .font-song / .font-fang / .font-kai 仍在 app.wxss 和 tab 栏组件里，没删。 */
+
+/* ---------- 手机模拟预览 ----------
+   外框走当前主题的卡片色（它是这一页的壳），里面那一屏走那一套主题的字面值。
+   站长 10-04 之后这一块只看不点：点下面的色块就直接生效了。 */
+.stage {
+  padding: 28rpx 0 20rpx;
+  border-radius: var(--r-card);
+  border: var(--w-edge) solid var(--card-edge);
+  background: var(--bg-card);
+}
+
+.mock {
+  width: 396rpx;
+  margin: 0 auto;
+  padding: 12rpx;
+  border-radius: 54rpx;
+}
+
+.mock-screen {
+  display: flex;
+  flex-direction: column;
+  height: 636rpx;
+  border-radius: 42rpx;
+  overflow: hidden;
+}
+
+.mock-notch {
+  width: 100rpx;
+  height: 8rpx;
+  margin: 10rpx auto 0;
+  border-radius: 4rpx;
+  opacity: 0.3;
+}
+
+.mock-nav {
+  height: 46rpx;
+  line-height: 46rpx;
+  text-align: center;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.mock-body {
+  flex: 1;
+  padding: 12rpx 18rpx;
+}
+
+.mock-h1 {
+  margin: 4rpx 0 14rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+  letter-spacing: -0.6rpx;
+}
+
+.mock-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 12rpx;
+  margin-bottom: 12rpx;
+  border: 1rpx solid;
+  border-radius: 14rpx;
+  box-sizing: border-box;
+}
+
+.mock-blk {
+  flex: none;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 12rpx;
+}
+
+.mock-lines {
+  flex: 1;
+}
+
+.mock-ln {
+  height: 10rpx;
+  margin-bottom: 8rpx;
+  border-radius: 5rpx;
+}
+
+.mock-ln-short {
+  width: 56%;
+  margin-bottom: 0;
+}
+
+.mock-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 58rpx;
+  border-top: 1rpx solid;
+}
+
+.mock-tab {
+  width: 40rpx;
+  height: 14rpx;
+  border-radius: 7rpx;
+}
+
+.stage-hint {
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+/* 这行只讲这一排怎么用。点了就生效，没有"下一步该点哪儿"了，所以不再提亮。 */
+.stage-hint {
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+/* ---------- 壁纸那一排：四枚一行，横向不滚（10-04 压成四枚） ----------
+   宽度不写死、交给 flex 分：写死了换台机器（或改一次 --sp-3 内缩）又会滚起来。
+   枚数从 6 变 4 之后每格会自动宽一档（高仍钉死 102rpx），这一排本来就是"色块 + 名字"，
+   宽一点不影响认色。 */
+.wp-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 18rpx;
+  margin-top: var(--sp-4);
+}
+
+.wp-chip {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+/* 一枚就是一个色块：底就是那一套主题的页面底，由 itemStyle 带进来。
+   描边和勾的颜色也一并从 JS 走，不取当前主题的变量——
+   停在象牙时去看雾蓝那一格，勾和框不能吃象牙的墨。 */
+.wp-tile {
+  position: relative;
+  height: 102rpx;
+  box-sizing: border-box;
+  border: 2rpx solid var(--wp-edge);
+  border-radius: var(--r-btn);
+  transition: border-color 0.2s;
+}
+
+/* 选中态不许改 border-width：边框一粗，这一格就高出去 2px，整排跟着抖
+   （分享页那一排踩过的坑，他要求这一排是"固定样式"）。所以选中只用外环。 */
+.wp-chip-on .wp-tile {
+  border-color: var(--wp-label);
+  box-shadow: 0 0 0 3rpx var(--wp-label);
+}
+
+/* 勾放在格子内侧靠下，不浮在角上：原来那一排是横滑容器，浮出角去会被它的裁剪边切到；
+   现在整排在页面里，浮出去还会被选中那一格的外环切掉一半。 */
+.wp-dot {
+  position: absolute;
+  bottom: 8rpx;
+  right: 8rpx;
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  background: var(--wp-label, #23252c);
+  color: var(--wp-opp, #ffffff);
+  font-size: 20rpx;
+  font-weight: 700;
+  line-height: 32rpx;
+  text-align: center;
+}
+
+.wp-name {
+  display: block;
+  margin-top: 10rpx;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  letter-spacing: -0.2rpx;
+  color: var(--text-secondary);
+}
+
+.wp-chip-on .wp-name {
+  color: var(--text-primary);
+}
+
+/* 这一行只讲现在在用哪一枚，不是标签，所以不用 18rpx 那一档；
+   也不叠 opacity：--text-secondary 已经是退让过的墨，再乘 0.75 在深色壁纸下就读不动了。 */
+.strip-foot {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-tiny);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+/* 等接口那一瞬的遮罩。原来写死半透明白，深色壁纸下会闪一下白；
+   但直接给容器加 opacity 会把"应用中"那行字一起冲淡，所以底色放伪元素上。 */
+.applying-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.applying-mask::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-page);
+  opacity: 0.6;
+}
+
+.applying-text {
+  position: relative;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-secondary);
+}

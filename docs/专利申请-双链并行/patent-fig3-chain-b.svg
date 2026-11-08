@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1496" viewBox="0 0 880 1496">
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="7" refX="8.5" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#000"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="880" height="1496" fill="#fff" stroke="none"/>
+  <rect x="120" y="32" width="330" height="40" rx="20" ry="20" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="56.68" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="13" fill="#000">以串行方式取本批下一份图像</text>
+  <path d="M 285 72 L 285 106" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <polygon points="285,106 445,148 285,190 125,148" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="143.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">能否读取该份图像的</text>
+  <text x="285" y="160.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">原始尺寸信息？</text>
+  <path d="M 285 190 L 285 244" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="296" y="207" width="18" height="17" fill="#fff" stroke="none"/>
+  <text x="305" y="218" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">能</text>
+  <path d="M 445 148 L 660 148 L 660 319" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="505" y="132" width="30" height="17" fill="#fff" stroke="none"/>
+  <text x="520" y="143" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">不能</text>
+  <rect x="530" y="319" width="260" height="62" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="660" y="337.28" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">以未经压缩的原始图像数据</text>
+  <text x="660" y="354.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">作为本份的输出</text>
+  <text x="660" y="371.36" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">（宁可增大体积也不得丢弃原件）</text>
+  <rect x="120" y="244" width="330" height="48" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="263.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">按长边阈值计算缩放比例，在离屏</text>
+  <text x="285" y="280.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">绘图表面上重绘</text>
+  <path d="M 285 292 L 285 326" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <polygon points="285,326 445,368 285,410 125,368" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="363.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">重绘与逐档导出</text>
+  <text x="285" y="380.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">是否可完成？</text>
+  <path d="M 285 410 L 285 468" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="296" y="429" width="18" height="17" fill="#fff" stroke="none"/>
+  <text x="305" y="440" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">可</text>
+  <path d="M 445 368 L 530 368" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="472" y="352" width="30" height="17" fill="#fff" stroke="none"/>
+  <text x="487" y="363" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">不可</text>
+  <rect x="120" y="468" width="330" height="40" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="492.68" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="13" fill="#000">取质量阶梯中的下一档</text>
+  <path d="M 285 508 L 285 555" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="120" y="555" width="330" height="46" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="573.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">以该档质量参数导出为</text>
+  <text x="285" y="590.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">有损编码文件</text>
+  <path d="M 285 601 L 285 636" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <polygon points="285,636 445,678 285,720 125,678" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="673.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">能否读取导出文件</text>
+  <text x="285" y="690.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">的字节数？</text>
+  <path d="M 285 720 L 285 756" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="296" y="728" width="18" height="17" fill="#fff" stroke="none"/>
+  <text x="305" y="739" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">能</text>
+  <path d="M 445 678 L 530 678" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="472" y="662" width="30" height="17" fill="#fff" stroke="none"/>
+  <text x="487" y="673" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">不能</text>
+  <rect x="530" y="652" width="260" height="52" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="660" y="673.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">不拦截：仍将该档导出结果</text>
+  <text x="660" y="690.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">作为本份的输出</text>
+  <polygon points="285,756 445,798 285,840 125,798" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="793.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">字节数是否不超过</text>
+  <text x="285" y="810.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">预设预算阈值？</text>
+  <path d="M 285 840 L 285 980" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="264" y="897" width="42" height="17" fill="#fff" stroke="none"/>
+  <text x="285" y="908" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">不超过</text>
+  <path d="M 445 798 L 530 798" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="472" y="782" width="30" height="17" fill="#fff" stroke="none"/>
+  <text x="487" y="793" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">超过</text>
+  <polygon points="660,756 790,798 660,840 530,798" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="660" y="793.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">阶梯档位</text>
+  <text x="660" y="810.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">是否已用尽？</text>
+  <path d="M 660 840 L 660 902" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="639" y="864" width="42" height="17" fill="#fff" stroke="none"/>
+  <text x="660" y="875" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">已用尽</text>
+  <rect x="530" y="902" width="260" height="48" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="660" y="921.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">以最低档结果作为本份的输出</text>
+  <text x="660" y="938.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">（不丢弃原件）</text>
+  <path d="M 660 756 L 660 730 L 500 730 L 500 488 L 450 488" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="479" y="612" width="42" height="17" fill="#fff" stroke="none"/>
+  <text x="500" y="623" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">未用尽</text>
+  <path d="M 790 350 L 848 350" fill="none" stroke="#000" stroke-width="1.6"/>
+  <path d="M 790 678 L 848 678" fill="none" stroke="#000" stroke-width="1.6"/>
+  <path d="M 790 926 L 848 926" fill="none" stroke="#000" stroke-width="1.6"/>
+  <path d="M 848 350 L 848 1000" fill="none" stroke="#000" stroke-width="1.6"/>
+  <path d="M 848 1000 L 450 1000" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="120" y="980" width="330" height="40" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="1004.68" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="13" fill="#000">确定本份的输出</text>
+  <path d="M 285 1020 L 285 1050" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="120" y="1050" width="330" height="40" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="1074.68" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="13" fill="#000">客户端直传至云对象存储</text>
+  <path d="M 285 1090 L 285 1120" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <polygon points="285,1120 435,1160 285,1200 135,1160" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="1164.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">直传是否成功？</text>
+  <path d="M 285 1200 L 285 1240" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="296" y="1210" width="18" height="17" fill="#fff" stroke="none"/>
+  <text x="305" y="1221" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">是</text>
+  <path d="M 435 1160 L 530 1160" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="473" y="1144" width="18" height="17" fill="#fff" stroke="none"/>
+  <text x="482" y="1155" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">否</text>
+  <rect x="530" y="1099" width="260" height="62" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="660" y="1117.28" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">输出空值且不向调用方抛出</text>
+  <text x="660" y="1134.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">异常；调用方跳过该份并继续</text>
+  <text x="660" y="1151.36" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">处理下一份</text>
+  <path d="M 660 1161 L 660 1352 L 435 1352" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="523" y="1336" width="54" height="17" fill="#fff" stroke="none"/>
+  <text x="550" y="1347" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">跳过该份</text>
+  <rect x="120" y="1240" width="330" height="40" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="1264.68" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="13" fill="#000">记录该份的存储标识</text>
+  <path d="M 285 1280 L 285 1311" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <polygon points="285,1311 435,1352 285,1393 135,1352" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="1347.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">本批是否还有</text>
+  <text x="285" y="1364.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">未处理的图像？</text>
+  <path d="M 135 1352 L 100 1352 L 100 52 L 120 52" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="91" y="692" width="18" height="17" fill="#fff" stroke="none"/>
+  <text x="100" y="703" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">是</text>
+  <path d="M 285 1393 L 285 1430" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#ah)"/>
+  <rect x="296" y="1402" width="18" height="17" fill="#fff" stroke="none"/>
+  <text x="305" y="1413" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">否</text>
+  <rect x="120" y="1430" width="330" height="40" rx="20" ry="20" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="285" y="1454.68" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="13" fill="#000">输出本批的存储标识集合</text>
+</svg>

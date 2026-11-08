@@ -1,0 +1,65 @@
+{
+ "entry": "poster.js",
+ "files": [
+  {
+   "name": "api.js",
+   "bytes": 20732,
+   "md5": "8bf04b6e799cf1dd06076c37cb1012b9"
+  },
+  {
+   "name": "appInfo.js",
+   "bytes": 78787,
+   "md5": "caf285d67b0e6de7957d175a3857c8ed"
+  },
+  {
+   "name": "date.js",
+   "bytes": 1988,
+   "md5": "db17a72b7f0dd1299b254e029331f616"
+  },
+  {
+   "name": "i18n.js",
+   "bytes": 55666,
+   "md5": "db5a9117393bb59903e5b574108fd4ea"
+  },
+  {
+   "name": "mpAssets.js",
+   "bytes": 13231,
+   "md5": "ce723f6a01fff1ba43af688bdab23ea1"
+  },
+  {
+   "name": "palette.js",
+   "bytes": 61570,
+   "md5": "452211d532671ccc421f6eeada1627ac"
+  },
+  {
+   "name": "poster.js",
+   "bytes": 123495,
+   "md5": "d474ad8d7e5b3b1b3399e3d33ed92408"
+  },
+  {
+   "name": "posterMatte.js",
+   "bytes": 951,
+   "md5": "4047d78b872b178d1853bf956407f7b8"
+  },
+  {
+   "name": "posterRecipe.js",
+   "bytes": 25351,
+   "md5": "e7d8942368063acd5009b887dfa7685f"
+  },
+  {
+   "name": "posterRecipes.js",
+   "bytes": 69566,
+   "md5": "7070104203d9d66b231116708bc1f884"
+  },
+  {
+   "name": "safeStorage.js",
+   "bytes": 3070,
+   "md5": "42572fa773219aa3ff215e3fb4adfc50"
+  },
+  {
+   "name": "sourceLabel.js",
+   "bytes": 3053,
+   "md5": "85668684e9e1b23871a03a5ce73583e5"
+  }
+ ]
+}

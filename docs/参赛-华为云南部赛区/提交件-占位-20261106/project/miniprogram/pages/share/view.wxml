@@ -1,0 +1,123 @@
+<!-- 站长 10-24 两句连着看：「我要是这种界面，三个按钮变成一个，存入笔记」（附列表详情窗实拍）
+     ＋「你干嘛要自己重新设计……无论是自己看笔记，还是别人看笔记，打开的风格布局要一致性。
+     不要另外设计」。⇒ 这一屏从这一趟起**不再自有一套骨架**，整块照列表那扇详情窗那一份抄：
+     窗锁死（页面不滚）→ 中间只有 `scroll-view` 滚 → 底部动作条钉在窗底。
+     窗外一个字都不留：原来压在暗纱上的眉标／作者行／底部品牌行全部搬进窗里，加载中与报错
+     两态也进同一张窗（三态同一张壳，不再有两种底色）。
+     ⚠ 深浅翻色那一套在这一页整条作废：它存在的唯一理由是"窗外那几行字压在壁纸上"，窗外没字了
+     就没有可翻的东西——判定、两个类、五条规则一起撤，不留空转的代码。 -->
+<view class="container {{themeClass}}">
+  <!-- 底图与窗外面那档暗纱：数一枚不新造，糊吃 `--glass-bf`、纱吃 `--glass-veil-dim`、
+       层序吃详情窗那一对（纱 100、窗 101），四枚都与列表 `.float-mask`／`.float-sheet` 同一份。
+       ⚠ 10-25 站长真机打回「外面没有毛玻璃，我都说了要一比一复刻」：这两层原来共用一个
+       `wx:if="{{bgSrc}}"` ⇒ 这台机既没设过背景、运营图那趟 pull 又还没落地时，**纱跟着壁纸一起没了**，
+       整屏退回一层平米白。列表那一扇的 `.float-mask` 只吃"窗开没开"（`index.wxml` 那两条 `wx:if`），
+       从来没跟着壁纸翻。这一页的窗永远开着 ⇒ 纱这一层现在一个字都不条件，壁纸那一层照旧
+       （首页 `.head-img` 也是 `wx:if="{{bgSrc}}"`，同一条规矩）。没壁纸时纱底下是 `--bg-page`，
+       糊不出花纹但暗档照压——与列表那扇在同一个人在同一台机上看到的完全同一态。 -->
+  <image wx:if="{{bgSrc}}" class="sv-bg" src="{{bgSrc}}" mode="aspectFill" />
+  <view class="sv-veil"></view>
+
+  <view class="sv-sheet">
+    <view wx:if="{{loading}}" class="loading">
+      <text>{{t.loading}}</text>
+    </view>
+
+    <view wx:elif="{{error}}" class="error-state">
+      <text class="error-icon">!</text>
+      <text class="error-text">{{error}}</text>
+    </view>
+
+    <block wx:else>
+      <scroll-view class="sv-body" scroll-y show-scrollbar="{{false}}">
+        <!-- 抬头（照 `.ds-in` 第一块：标题 → 标签）。
+             ⚠ 眉标「分享笔记」10-25 撤掉了：他把自己那扇详情窗与这一屏并排发来，一句
+             「对比两个，把多余的去掉，我都说要一比一……不要自己加需求」——参考那一窗里
+             没有这么一行，它是这一页自己加的那一枚标签，所以整行撤掉，不是搬走。
+             作者行照旧留着（他 10-21 点名要的那一行，另有 `验-转存与作者` 钉着）；
+             撤不撤等他一句，我不自己砍。
+             ⚠ 图二有、这里仍故意不画的三样没变：窗顶那行「左右滑动看下一篇／点一下收起」
+             （这一页只有一篇，划不走也没有可收起的东西，写了是假话）、正文与动作条之间那枚
+             「显示更多」（公开快照里没有原文那一栏）、抬头那行「分类·来源类型·时间」
+             （这三栏都不在 `shares` 的对外快照里，要画得先扩对外字段——他没下过这一句）。 -->
+        <view class="sv-in">
+          <view wx:if="{{share.author_name}}" class="author-row">
+            <view class="author-mark">{{authorInitial}}</view>
+            <text class="author-name">{{t.authorLabel}}{{t.colon}}{{share.author_name}}</text>
+          </view>
+          <view class="sv-h2">{{share.title}}</view>
+          <view class="sv-tags" wx:if="{{share.tags && share.tags.length}}">
+            <text class="sv-tag" wx:for="{{share.tags}}" wx:key="*this" wx:for-item="tg">#{{tg}}</text>
+          </view>
+        </view>
+
+        <!-- 配图：图二那种通栏大图滑动。两层画法与详情窗同源——底＝同一张放大 112% 且左上各外挪 6%
+             后糊掉（把模糊带出的半透明渐隐圈推出盒子外），上＝按比例完整放进盒子那一张（aspectFit，不裁）。
+             通栏挂在这一块外面、不套 `.sv-in`：那 34rpx 一让出去就不叫通栏了（与详情窗同一条）。
+             ⚠ 这一排画不画得出来**不取决于这一页公不公开**，取决于云开发存储的「读」权限那一档：
+             默认「仅创建者可读写」时，别人打开就是空白（站长 10-12 报的那条 BUG，当天由他在控制台放开）。
+             清单本身是服务端在读这一页时现查的（routes/shares.py 的 `_public_assets`），只有 `cloud_url`
+             这一个字段从公开口出去；撤回分享之后整页 404，图跟着一起不见。 -->
+        <block wx:if="{{share.assets && share.assets.length}}">
+          <swiper class="sv-fig" current="{{figAt}}" circular="{{false}}"
+            indicator-dots="{{false}}" bindchange="onFigChange">
+            <swiper-item wx:for="{{share.assets}}" wx:key="cloud_url" wx:for-item="im">
+              <view class="sv-fig-cell">
+                <image class="sv-fig-bg" src="{{im.cloud_url}}" mode="aspectFill" lazy-load />
+                <image class="sv-fig-img" src="{{im.cloud_url}}" mode="aspectFit" lazy-load
+                  catchtap="onPreviewShot" data-url="{{im.cloud_url}}" />
+              </view>
+            </swiper-item>
+          </swiper>
+          <!-- 只有一张：数字与那一排点都不画（一条没有"下一张"的滑动条是噪音），与详情窗同一条口径。 -->
+          <view wx:if="{{share.assets.length > 1}}" class="sv-cnt">
+            <text class="sv-cnt-n">{{figAt + 1}}/{{share.assets.length}}</text>
+          </view>
+          <view wx:if="{{share.assets.length > 1}}" class="sv-dots">
+            <view wx:for="{{share.assets}}" wx:key="cloud_url" wx:for-item="im"
+              class="sv-dot {{index === figAt ? 'on' : ''}}"></view>
+          </view>
+        </block>
+
+        <view class="sv-in">
+          <view class="sv-lab" wx:if="{{share.summary}}">{{t.summaryLabel}}</view>
+          <view class="sv-para" wx:if="{{share.summary}}">{{share.summary}}</view>
+
+          <block wx:if="{{share.key_points && share.key_points.length}}">
+            <view class="sv-lab">{{t.keyPoints}}</view>
+            <view class="sv-pt" wx:for="{{share.key_points}}" wx:key="index" wx:for-item="kp">
+              <!-- 带圈序号 1 2 3 撤了（图二那一排就是小黄点、不显示序号：这四条是并列要点，不是步骤）。
+                   黄点的色从 palette.TIP_DOT 由 style 递进来，不抄进 wxss。 -->
+              <view class="sv-pt-dot" style="{{tipDotStyle}}"></view>
+              <view class="sv-pt-x">{{kp}}</view>
+            </view>
+          </block>
+
+          <!-- 小程序打不开任意外链，所以"去看原文"= 复制链接。链接下面那行小字是图二有的那句实话，
+               这一页原来没有：不说，人会以为是我们没做。 -->
+          <block wx:if="{{share.source_url}}">
+            <view class="sv-lab">{{t.sourceLink}}</view>
+            <view class="sv-link" catchtap="copySource">{{share.source_url}}</view>
+            <view class="sv-hint">{{t.linkHint}}</view>
+          </block>
+
+          <!-- 品牌行搬进正文末尾（跟着滚）：窗外不留字，这一行不能自己留在外面。 -->
+          <view class="brand-row">
+            <view class="brand-mark">麦</view>
+            <text class="brand-text">{{t.fromTuMaiBiJi}}</text>
+          </view>
+          <view class="sv-pad-b"></view>
+        </view>
+      </scroll-view>
+
+      <!-- 底部动作条钉在窗底（照 `.ds-dock`：挂在 scroll-view 外面、吃 `flex: none`，
+           窗滚多少它都不动）。图二那一排是三枚（编辑／分享／删除），这一页是他这一句点名的
+           那一枚「存入笔记」；抄的是这份公开快照，存进自己库之后来源那一栏永久留着。 -->
+      <view class="sv-dock">
+        <view class="sv-irow">
+          <view class="sv-ibtn {{saved ? 'done' : ''}}" catchtap="saveToMine">{{saved ? t.alreadySaved : (saving ? t.savingMine : t.saveToMine)}}</view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

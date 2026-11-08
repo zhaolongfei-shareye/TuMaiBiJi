@@ -1,0 +1,205 @@
+.page-title {
+  display: block;
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -1rpx;
+  color: var(--text-primary);
+  margin: var(--sp-5) 0 var(--sp-4);
+}
+
+.loading {
+  text-align: center;
+  padding: var(--sp-6) 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 120rpx 0;
+}
+
+.empty-text {
+  display: block;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  letter-spacing: -0.4rpx;
+  color: var(--text-primary);
+  margin-bottom: var(--sp-2);
+}
+
+.empty-hint {
+  display: block;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-row);
+}
+
+.category-info {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+  min-width: 0;
+}
+
+.category-name {
+  font-size: var(--fs-body);
+  font-weight: 800;
+  letter-spacing: -0.5rpx;
+  color: var(--text-primary);
+}
+
+.category-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+}
+
+/* 排序箭头不做成按钮样：一行里只留"编辑/删除"两个看得见的动作 */
+.action-btn {
+  min-width: 48rpx;
+  text-align: center;
+  font-size: var(--fs-title);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-secondary);
+  padding: 10rpx 6rpx;
+}
+
+.action-btn.disabled {
+  opacity: 0.24;
+}
+
+.edit-btn,
+.delete-btn {
+  font-size: var(--fs-meta);
+  padding: 12rpx 24rpx;
+  border-radius: var(--r-pill);
+}
+
+.edit-btn {
+  color: var(--text-primary);
+  background: var(--chip-idle);
+}
+
+.delete-btn {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.edit-input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-body);
+  color: var(--text-primary);
+  padding: 18rpx var(--sp-3);
+  background: var(--chip-idle);
+  border-radius: var(--r-btn);
+}
+
+.edit-actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex: none;
+}
+
+.edit-confirm {
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--btn-ink);
+  background: var(--btn-bg);
+  padding: 12rpx 26rpx;
+  border-radius: var(--r-pill);
+}
+
+.edit-cancel {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--chip-idle);
+  padding: 12rpx 26rpx;
+  border-radius: var(--r-pill);
+}
+
+.add-btn {
+  margin-top: var(--sp-4);
+}
+
+.container {
+  padding-bottom: 140rpx;
+}
+
+/* 新增分类弹窗 */
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(20, 20, 28, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.dialog-card {
+  width: 620rpx;
+  padding: var(--sp-5) var(--sp-4) var(--sp-4);
+  margin-bottom: 0;
+  box-shadow: var(--sh-float);
+}
+
+.dialog-title {
+  display: block;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  letter-spacing: -0.6rpx;
+  color: var(--text-primary);
+  text-align: left;
+  margin-bottom: var(--sp-4);
+}
+
+.dialog-input {
+  display: block;
+  font-size: var(--fs-body);
+  color: var(--text-primary);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--chip-idle);
+  border-radius: var(--r-btn);
+  margin-bottom: var(--sp-5);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.dialog-btn {
+  flex: 1;
+  text-align: center;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  padding: var(--sp-3) 0;
+  border-radius: var(--r-pill);
+}
+
+.dialog-btn.cancel {
+  color: var(--text-primary);
+  background: var(--chip-idle);
+}
+
+.dialog-btn.confirm {
+  color: var(--btn-ink);
+  background: var(--btn-bg);
+  font-weight: 700;
+}

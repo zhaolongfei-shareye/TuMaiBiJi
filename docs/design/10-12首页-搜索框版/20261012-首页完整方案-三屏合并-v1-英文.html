@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html,body{margin:0;padding:0;}
+  body{background:#EAE7E2;padding:24px;display:flex;gap:24px;}
+  .wrap{width:787px;flex:none;}
+  .stage{position:relative;width:787px;height:1653px;background:url("source.png") 0 0 no-repeat;overflow:hidden;}
+  .cap{margin-top:12px;text-align:center;font-size:16px;color:#59564F;
+       font-family:-apple-system,"PingFang SC",sans-serif;}
+
+  /* ---------- 第一屏：搜索框版（与 20261012-首页-搜索去重-按钮加高-v1 完全同参） ---------- */
+  .s1-panel{position:absolute;left:360px;top:1089px;width:391px;height:534px;background:#212221;
+            border-top-right-radius:40px;border-bottom-right-radius:40px;}
+  .s1-pill{position:absolute;left:366px;top:1113px;width:364px;height:84px;box-sizing:border-box;
+           border-radius:42px;border:2px solid #C6B49A;
+           background:linear-gradient(90deg,#ADA18D 0%,#8A8580 55%,#706E6F 100%);
+           display:flex;align-items:center;padding:0 32px 0 34px;}
+  .s1-mag{width:24px;height:24px;position:relative;flex:none;}
+  .s1-mr{position:absolute;left:0;top:0;width:18px;height:18px;border:3px solid #D8CAB6;border-radius:50%;box-sizing:border-box;}
+  .s1-mh{position:absolute;left:14px;top:14px;width:9px;height:3px;background:#D8CAB6;border-radius:2px;transform:rotate(45deg);transform-origin:0 50%;}
+  .s1-ph{margin-left:16px;font-family:"Arial Rounded MT Bold","Arial Rounded",sans-serif;font-size:28px;
+         color:rgba(255,252,244,0.82);letter-spacing:0.5px;}
+  .s1-mic{margin-left:auto;width:26px;height:26px;border:2px solid #C9B79C;border-radius:50%;box-sizing:border-box;position:relative;flex:none;}
+  .s1-mic::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;background:#F4EFE4;border-radius:50%;}
+  .s1-card{position:absolute;left:367px;width:363px;height:96px;border-radius:28px;box-sizing:border-box;
+           display:flex;align-items:center;padding:0 23px 0 25px;}
+  .s1-c2{top:1227px;background:#59575A;}
+  .s1-c3{top:1353px;background:#535255;}
+  .s1-dot{width:11px;height:11px;border-radius:50%;background:#D4BEA1;flex:none;}
+  .s1-lbl{margin-left:12px;font-family:"Arial Rounded MT Bold","Arial Rounded",sans-serif;font-size:30px;color:#FFFFFF;}
+  .s1-dash{flex:1;height:2px;background:rgba(255,255,255,0.18);margin:0 11px 0 30px;border-radius:1px;}
+  .s1-num{font-family:-apple-system,"Helvetica Neue",sans-serif;font-weight:200;font-size:68px;color:#FFFFFF;line-height:1;flex:none;}
+  .s1-btn{position:absolute;left:367px;top:1478px;width:361px;height:110px;border-radius:55px;
+          background:linear-gradient(90deg,#CDB797 0%,#A3947C 50%,#9F886C 100%);
+          display:flex;align-items:center;justify-content:center;
+          font-family:"Arial Rounded MT Bold","Arial Rounded",sans-serif;font-size:31px;color:#FCFAF3;}
+
+  /* ---------- 第二屏：同位置面板，四个横条 → 圆按钮 Tab ----------
+     默认 = 拍摄（橙色大圆，参考图同款外环）；下面两枚文字圆钮 = 其他 tab，点击切换。 */
+  .s2-panel{position:absolute;left:360px;top:1089px;width:391px;height:534px;background:#212221;
+            border-top-right-radius:40px;border-bottom-right-radius:40px;}
+  .s2-ring{position:absolute;left:449.5px;top:1155px;width:212px;height:212px;border-radius:50%;
+           border:10px solid #5C5C60;box-sizing:border-box;}
+  .s2-cam{position:absolute;left:477.5px;top:1183px;width:156px;height:156px;border-radius:50%;background:#DA794A;}
+  .s2-camlbl{position:absolute;left:555.5px;top:1407px;transform:translate(-50%,-50%);color:#FCFAF3;
+             font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:24px;font-weight:700;white-space:nowrap;}
+  .s2-tb{position:absolute;top:1453px;width:104px;height:104px;border-radius:50%;background:#DEDEDE;
+         display:flex;align-items:center;justify-content:center;
+         font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:20px;color:#434247;}
+  .s2-tb1{left:423.5px;}
+  .s2-tb2{left:583.5px;}
+
+  /* ---------- 第三屏：提炼态（按现网布局：标签行 → 缩略图 → 右滑提炼条） ---------- */
+  .s3-panel{position:absolute;left:360px;top:1089px;width:391px;height:534px;background:#212221;
+            border-top-right-radius:40px;border-bottom-right-radius:40px;}
+  .s3-tabs{position:absolute;left:360px;top:1112px;width:391px;display:flex;align-items:center;
+           justify-content:center;gap:26px;}
+  .s3-tcam{width:56px;height:56px;border-radius:50%;background:#DA794A;flex:none;
+           display:flex;align-items:center;justify-content:center;}
+  .s3-tx{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:21px;
+         color:rgba(252,250,243,0.55);white-space:nowrap;}
+  .s3-strip{position:absolute;left:360px;top:1280px;width:391px;display:flex;justify-content:center;gap:10px;}
+  .s3-th{position:relative;width:80px;height:80px;border-radius:18px;background:url("source.png") no-repeat;flex:none;}
+  .s3-x{position:absolute;right:4px;top:4px;width:18px;height:18px;border-radius:50%;background:rgba(15,15,15,0.55);
+        color:#FFFFFF;font-size:11px;line-height:18px;text-align:center;font-family:-apple-system,sans-serif;}
+  .s3-no{position:absolute;left:6px;bottom:3px;color:#FCFAF3;font-size:12px;font-family:-apple-system,sans-serif;
+         text-shadow:0 1px 2px rgba(0,0,0,0.6);}
+  .s3-add{width:80px;height:80px;border-radius:18px;background:#32312F;flex:none;
+          display:flex;align-items:center;justify-content:center;}
+  .s3-sld{position:absolute;left:375.5px;top:1478px;width:361px;height:96px;border-radius:48px;
+          background:linear-gradient(90deg,#CDB797 0%,#A3947C 50%,#9F886C 100%);}
+  .s3-knob{position:absolute;left:10px;top:10px;width:76px;height:76px;border-radius:50%;background:#DA794A;
+           border:3px solid #FCFAF3;box-sizing:border-box;display:flex;align-items:center;justify-content:center;}
+  .s3-sldtxt{position:absolute;left:96px;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;
+             font-family:"Arial Rounded MT Bold","Arial Rounded",sans-serif;font-size:23px;color:#FCFAF3;white-space:nowrap;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="stage">
+    <div class="s1-panel"></div>
+    <div class="s1-pill">
+      <div class="s1-mag"><div class="s1-mr"></div><div class="s1-mh"></div></div>
+      <div class="s1-ph">Search</div>
+      <div class="s1-mic"></div>
+    </div>
+    <div class="s1-card s1-c2"><div class="s1-dot"></div><div class="s1-lbl">Cards</div><div class="s1-dash"></div><div class="s1-num">17</div></div>
+    <div class="s1-card s1-c3"><div class="s1-dot"></div><div class="s1-lbl">Notes</div><div class="s1-dash"></div><div class="s1-num">16</div></div>
+    <div class="s1-btn">Jot it down</div>
+  </div>
+  <div class="cap">第一屏 · 首页（搜索框版，未动）</div>
+</div>
+
+<div class="wrap">
+  <div class="stage">
+    <div class="s2-panel"></div>
+    <div class="s2-ring"></div>
+    <div class="s2-cam"></div>
+    <svg style="position:absolute;left:524.5px;top:1230px" width="62" height="62" viewBox="0 0 24 24" fill="none" stroke="#291306" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+    <div class="s2-camlbl">Camera</div>
+    <div class="s2-tb s2-tb1">Album</div>
+    <div class="s2-tb s2-tb2">Link</div>
+  </div>
+  <div class="cap">第二屏 · 右半面板换成圆按钮 Tab：默认「拍摄」橙色，点文字圆钮切换</div>
+</div>
+
+<div class="wrap">
+  <div class="stage">
+    <div class="s3-panel"></div>
+    <div class="s3-tabs">
+      <div class="s3-tcam">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#291306" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+      </div>
+      <div class="s3-tx">Album</div>
+      <div class="s3-tx">Link</div>
+    </div>
+    <div class="s3-strip">
+      <div class="s3-th" style="background-position:-140px -280px"><div class="s3-x">✕</div><div class="s3-no">1</div></div>
+      <div class="s3-th" style="background-position:-250px -280px"><div class="s3-x">✕</div><div class="s3-no">2</div></div>
+      <div class="s3-th" style="background-position:-360px -280px"><div class="s3-x">✕</div><div class="s3-no">3</div></div>
+      <div class="s3-add">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FCFAF3" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>
+      </div>
+    </div>
+    <div class="s3-sld">
+      <div class="s3-knob">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#291306" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+      </div>
+      <div class="s3-sldtxt">Slide to extract</div>
+    </div>
+  </div>
+  <div class="cap">第三屏 · 提炼（按现网布局：标签行 → 缩略图 → 右滑提炼条）</div>
+</div>
+
+</body>
+</html>

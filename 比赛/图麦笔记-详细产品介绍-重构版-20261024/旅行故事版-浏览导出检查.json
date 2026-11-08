@@ -1,0 +1,20 @@
+{
+  "result": "PASS",
+  "pages": 67,
+  "features": 77,
+  "bullets": 231,
+  "cautions": 77,
+  "templates": 11,
+  "images": 60,
+  "minHeaderGap": 18.71875,
+  "minFooterGap": 31.171875,
+  "navigation": true,
+  "chapterLinks": true,
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390,
+    "bodyFont": "16px",
+    "columns": "1fr"
+  },
+  "errors": []
+}

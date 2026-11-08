@@ -1,0 +1,451 @@
+"""笔记配图：绑定、读回、全站配额。
+
+这一组接口是 2.0 图片那条链路的后端半边（方案 docs/图片云备份-开发方案.md §3.2，
+路线 docs/方案-2.0大版本.md §3 阶段 3）。**图片字节不经过这台服务器**——前端压完
+直接传到微信云开发存储，拿到 fileID 再来这里登记一行；所以这里没有上传接口，只有账。
+
+三条口径要先讲明白，它们都是"不写下来就会被下一个人改错"的那种：
+
+1. **配额是全站合计，不是每人。** 云开发免费额度那 5GB 是整个环境一个池子，
+   所以 `used_ratio` 按**全站** uploaded 求和算，不是按当前用户。方案文档 §3.2.3 原来
+   写的是 `SELECT SUM(file_size) WHERE user_id = ?` 再除以 5GB——那个比值会让人以为
+   "我才用了 0.4%"而实际全站已经 92%。这里两个数都回，比值只认全站那个。
+2. **一篇最多 9 张，这条上限第一次落在服务端。** 前端 `create.js` 的 9 是"选图时最多
+   选 9 张"，`ingest.py` 的 10 是"一批最多 10 张"（管的是一次 OCR 请求，不是归属）。
+   图能留下来之后，"一篇笔记挂着多少行 assets"才是要钉的那个量。
+3. **fileID 是别人能读的地址。** 存进库的这串 `cloud://...` 客户端拿去就能
+   `getTempFileURL`，所以入口必须校格式与长度，读接口必须校归属——否则第 2 个人的
+   笔记链接能换来第 1 个人的截图。
+"""
+import logging
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.core.auth import get_current_user
+from app.core.private_access import is_private_note, private_category_ids, unlocked
+from app.core.timefmt import UTCDatetime
+from app.db.database import get_db
+from app.models.asset import (
+    Asset,
+    MAX_ASSETS_PER_NOTE,
+    MAX_FILE_BYTES,
+    next_sort_order,
+    not_failed,
+    order_by_note,
+)
+from app.models.note import Note
+from app.models.note_card import NoteCard, current
+from app.models.user import User
+from app.models.user_profile import UserProfile
+
+router = APIRouter()  # 路径写全（跨 /api/notes 与 /api/user 两个前缀），见 main.py 那行注释
+logger = logging.getLogger(__name__)
+
+# 云开发单文件上限 20MB：**定义在 models/asset.py**（10-19 起外链贴图那一路也问同一个问题，
+# 两处各抄一份迟早走样），这里只把它接进来用。
+# 一篇笔记的配图张数：常量在 models/asset.py 的 MAX_ASSETS_PER_NOTE，全仓只有那一个定义。
+# **只有绑这一个口卡它**，两个读的口（列表、公开页）都不截——读的口再卡一遍就会造出
+# "库里占着配额、界面上不存在"的幽灵行。守这条的是 docs/工具/验-张数只有一个出处.js。
+# Asset.object_key 是 String(500)，但 SQLite 上那只是装饰（notes.py 顶上那条注释说的就是
+# 这个坑）：长度只能在入口卡。fileID 实测一百多字符，500 是给云开发自己留的余量。
+MAX_FILE_ID_LEN = 500
+
+
+class AssetIn(BaseModel):
+    file_id: str = Field(min_length=1, max_length=MAX_FILE_ID_LEN)
+    # 尺寸与字节数都可选：拿不到不该拦人存图，但拿不到就等于这一张不计入配额，
+    # 所以宁可让它可空也别在客户端任何一条取不到信息的分支上抛错。
+    size: Optional[int] = Field(default=None, ge=0, le=MAX_FILE_BYTES)
+    width: Optional[int] = Field(default=None, ge=0, le=20000)
+    height: Optional[int] = Field(default=None, ge=0, le=20000)
+
+
+class AssetBindIn(BaseModel):
+    items: List[AssetIn] = Field(default_factory=list)
+
+
+class AssetOrderIn(BaseModel):
+    """拖动排序那一趟送的：这篇配图**新的先后**，一行一个数字 id（不是 fileID，理由同删除那一口）。
+
+    上界只卡请求体，不卡业务：一篇最多 9 张，给到 100 是留给"客户端那份名单比库里旧"的余量，
+    多出来的 id 在业务层一律不理（见 `reorder_note_assets` 第 2 条）。
+    """
+    ids: List[int] = Field(default_factory=list, max_length=100)
+
+
+class AssetOut(BaseModel):
+    id: int
+    cloud_url: str
+    size: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    created_at: UTCDatetime = None
+
+    class Config:
+        from_attributes = True
+
+
+class QuotaOut(BaseModel):
+    user_bytes: int
+    total_bytes: int
+    cap_bytes: int
+    used_ratio: float
+    user_count: int
+    total_count: int
+
+
+def _owned_note_or_404(db: Session, user: User, note_id: int) -> Note:
+    """归属校验：不是你的笔记和不存在，回同一个 404。
+
+    与 notes.py 那几条同口径（`get_note` 也是 `.filter(Note.id==, Note.user_id==)` 查不到就
+    404）——区分"不存在"与"不是你的"等于给外人一篇一篇试 id 的探测器。
+    """
+    note = (
+        db.query(Note)
+        .filter(Note.id == note_id, Note.user_id == str(user.id))
+        .first()
+    )
+    if not note:
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
+    return note
+
+
+def _clean_file_id(fid: str) -> str:
+    """一条 fileID 的格式校法，**三张表共用**：`assets`（配图）、`note_cards`（卡片）、
+    `user_profiles`（名片）。原来三处各写一遍（这边内联在 `_clean_items` 里、cards.py 叫
+    `_check_file_id`、profiles.py 叫 `_clean_file_id`），结果 cards.py 那一份查空白、
+    profiles.py 那一份查长度——**同一条脏数据在三个口有三种命运**（10-09 审计）。
+    """
+    s = (fid or "").strip()
+    # 光看前缀不够：`cloud://` 自己也算"以 cloud:// 开头"，那是一条指向空的地址，
+    # 存进去之后前端拿它换临时链接只会拿到一个看不懂的错。
+    rest = s[len("cloud://"):] if s.startswith("cloud://") else ""
+    if not rest or any(c.isspace() for c in rest):
+        raise HTTPException(status_code=400, detail="图片地址格式不对")
+    if len(s) > MAX_FILE_ID_LEN:
+        raise HTTPException(status_code=400, detail="图片地址过长")
+    return s
+
+
+def _assert_ours(db: Session, uid: str, fid: str) -> None:
+    """这个地址如果已经在**别人**的账上，直接拒。
+
+    为什么必须有：fileID 是能被读到的地址，谁拿到都能往自己名下登记一行；而"删笔记／撤档／注销"
+    的回体会把这些地址交回**调用方**去删。不校这一条，就是"把你的对象登记成我的，再替我删掉"。
+    （10-09 审计第五条：卡片那个口当时只校形状，没校这一条。）
+
+    没登记过的新地址走不到这里被拒——它是这条链的常态（客户端先传后登记，服务器无从预知）。
+    """
+    for model, col in ((Asset, Asset.object_key), (NoteCard, NoteCard.object_key)):
+        hit = db.query(model).filter(col == fid).first()
+        if hit and hit.user_id != uid:
+            raise HTTPException(status_code=400, detail="图片地址不属于当前账号")
+    # 名片那一行的四格存在一个 JSON 列里，没有可查的列，只能捞出来在内存里比（模型注释自己写着）。
+    # 但**只捞真有四格的那几行**（10-25 第八轮审计 M32）：原先除自己以外所有人的 `slots` 整列都进
+    # Python，底数 96 人时无感，攒到几万行就是一趟归属校验把全表读一遍。
+    # ⚠ 这一条治的是"捞多少行"，治不了"JSON 里查不动"——真要按 file_id 反查名片，得把那一格
+    # 拆成可查的列（另一次迁移），今天不做：这条链的判据是"这一张属不属于你"，不是"这张在谁名下"。
+    for (slots,) in (
+        db.query(UserProfile.slots)
+        .filter(UserProfile.user_id != uid, UserProfile.slots.isnot(None))
+        .all()
+    ):
+        for s in (slots or []):
+            if s and s.get("file_id") == fid:
+                raise HTTPException(status_code=400, detail="图片地址不属于当前账号")
+
+
+def _clean_items(items: List[AssetIn]) -> List[AssetIn]:
+    """校格式 + 去重 + 卡张数。脏数据一律 400，不静默丢——静默丢会让"传上去 9 张、
+    笔记里只剩 6 张"这种问题变成查不到的玄学。"""
+    seen = set()
+    out: List[AssetIn] = []
+    for it in items:
+        fid = _clean_file_id(it.file_id)
+        if fid in seen:
+            continue
+        seen.add(fid)
+        out.append(AssetIn(file_id=fid, size=it.size, width=it.width, height=it.height))
+    return out
+
+
+@router.post("/api/notes/{note_id}/assets", response_model=List[AssetOut])
+def bind_note_assets(
+    note_id: int,
+    payload: AssetBindIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """把一批 fileID 归到这篇笔记上。**幂等**：同一个 fileID 重复 bind 只更新那一行。
+
+    幂等这条不是可选项：B 链的设计是"上传失败不阻断主流程 + 下次进详情页补绑"
+    （§3.1.4 第 4 步），所以同一条 fileID 一定会被送来第二次。不幂等就是每次补绑
+    多堆一行，配额求和跟着虚高，而用户看到的还是那 9 张图。
+    """
+    _owned_note_or_404(db, user, note_id)
+    items = _clean_items(payload.items)
+    # 卡的是**这篇笔记最终挂着的张数**，不是"这一次送来几条"：只卡后者，补绑一次加一条
+    # 就能一路加到十几张，而屏上那排缩略图永远只画前 9 张——多出来的就成了看不见又占配额的幽灵。
+    # 用集合并一下是为了让重复绑同一批（幂等那条）不计新增。
+    current = {r[0] for r in db.query(Asset.object_key).filter(Asset.note_id == note_id).all()}
+    if len(current | {it.file_id for it in items}) > MAX_ASSETS_PER_NOTE:
+        raise HTTPException(status_code=400, detail=f"一篇笔记最多 {MAX_ASSETS_PER_NOTE} 张图")
+
+    uid = str(user.id)
+    bound: List[Asset] = []
+    # 这一批里**新建**的那几张排到最后去（当前最大值 +1，一张一递增）。
+    # 已存在的行不动 `sort_order`：幂等补绑改的是尺寸不是位置——补绑一次就把人家拖好的顺序
+    # 打回原形，是这一列最难受的一种错法，而且屏上看不出来（图还是那几张，只是头图换了）。
+    next_order = next_sort_order(db, note_id)
+    for it in items:
+        # 归属这一刀走 `_assert_ours` 那一份，不在这里另写一遍短的：卡片口（`cards.py`）与
+        # 名片口（`profiles.py`）用它，它查的是 `assets` + `note_cards` + 名片四格**三处**；
+        # 而这里原来只查了 `assets` 一处。漏的那两处与 10-09 审计第五条同一个形状——
+        # 一条已经登记成别人卡片的地址，可以被绑成我的配图，再随我删笔记的回体
+        # （`delete_note` 把 `file_ids` 交回调用方去删）落到别人的对象上。
+        _assert_ours(db, uid, it.file_id)
+        row = db.query(Asset).filter(Asset.object_key == it.file_id).first()
+        if row:
+            # 已经绑到别篇笔记的行不抢过来——那意味着两篇笔记共用一张图，
+            # 而今天的设计里没有任何一处支持"同一张图属于两篇"。
+            if row.note_id and row.note_id != note_id:
+                raise HTTPException(status_code=400, detail="图片已归到别的笔记")
+            row.note_id = note_id
+            row.user_id = uid
+            row.file_size = it.size if it.size is not None else row.file_size
+            row.width = it.width if it.width is not None else row.width
+            row.height = it.height if it.height is not None else row.height
+            row.backup_status = "uploaded"
+        else:
+            row = Asset(
+                user_id=uid,
+                note_id=note_id,
+                object_key=it.file_id,
+                file_type="image/jpeg",
+                file_size=it.size,
+                width=it.width,
+                height=it.height,
+                backup_status="uploaded",
+                sort_order=next_order,
+            )
+            next_order += 1
+            db.add(row)
+        bound.append(row)
+    # 上面那道"现集合 ∪ 新送来"是读头写尾：两趟并发绑同一篇会各自读到旧集合、各自放行，
+    # 落库就能超过 9 张（N13②）。这里在提交前按真数再数一遍，超了整批回滚——
+    # 宁可这一次没绑上、让用户重试，也不留"屏上只画前 9 张、多出来的看不见却占配额"的幽灵行。
+    if db.query(Asset).filter(Asset.note_id == note_id).count() > MAX_ASSETS_PER_NOTE:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"一篇笔记最多 {MAX_ASSETS_PER_NOTE} 张图")
+    db.commit()
+    for row in bound:
+        db.refresh(row)
+    return _views(bound)
+
+
+@router.get("/api/notes/{note_id}/assets", response_model=List[AssetOut])
+def list_note_assets(
+    request: Request,
+    note_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    note = _owned_note_or_404(db, user, note_id)
+    # 截图类笔记的正文就在图里，所以私密篇没验密码时连配图列表都不给。回空数组而不是
+    # 403：界面上"锁着"那一态本来就不画缩略图，保持"这篇没有图"的形状不会多出一种失败态。
+    if is_private_note(note, private_category_ids(db, user.id)) and not unlocked(request, user):
+        return []
+    rows = (
+        db.query(Asset)
+        .filter(
+            Asset.note_id == note_id,
+            Asset.user_id == str(user.id),
+            # 与配额用的是同一个判断（not_failed）：两处写法一旦分叉，就会出现
+            # "这一张算进配额却列不出来"的幽灵行——看得见的是钱，看不见的是图。
+            not_failed(),
+        )
+        .order_by(*order_by_note())
+        .all()
+    )
+    return _views(rows)
+
+
+@router.delete("/api/notes/{note_id}/assets/{asset_id}", response_model=List[AssetOut])
+def delete_note_asset(
+    request: Request,
+    note_id: int,
+    asset_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """从这篇笔记上删掉一张图，回**删完之后剩下的那一批**（前端不用再读一次列表）。
+
+    路径上带的是**那一行的数字 id**，不是 fileID。这不是省事：fileID 长这样
+    `cloud://env.xxxx/images/a/0.jpg`，**里面全是 `/`**，塞进路径段会多切出两截来，
+    FastAPI 直接不匹配（第一版就是这么 404 的，`{"detail":"Not Found"}` 是路由层的、
+    不是我那句 404）。列表那一口本来就回 `id`，客户端手里一直就有。
+
+    三条口径：
+    1. **删的是库里这一行**，配额当场掉下来（`_sum_bytes` 读的就是这张表）。云上那个对象
+       这台服务器删不了（云开发存储对象只能由客户端 SDK 删），所以**客户端这一趟必须把
+       fileID 塞进 `utils/assetPurge` 那本机账**，由它去删对象；只删库不塞账＝字节永远
+       躺在桶里白占那 5GB。
+    2. **不属于这篇、或不属于这个账号的行，一律 404**，不回 403、也不回"这行存在但在别人名下"。
+       fileID 是别人能读的地址（模块头第 3 条），多给一种回法就是多给一次探测机会。
+    3. **私密篇没解锁时这个口不开**（403）。读接口那一趟回的是空数组，界面上锁着那一态
+       本来就不画缩略图，所以正常客户端撞不到；撞得到就是有人在绕开界面直接打。
+    """
+    note = _owned_note_or_404(db, user, note_id)
+    if is_private_note(note, private_category_ids(db, user.id)) and not unlocked(request, user):
+        raise HTTPException(status_code=403, detail="这篇是私密笔记，先解锁")
+    uid = str(user.id)
+    row = (
+        db.query(Asset)
+        .filter(Asset.id == asset_id, Asset.note_id == note_id, Asset.user_id == uid)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="这篇笔记没有这张图")
+    db.delete(row)
+    db.commit()
+    left = (
+        db.query(Asset)
+        .filter(
+            Asset.note_id == note_id,
+            Asset.user_id == uid,
+            not_failed(),
+        )
+        .order_by(*order_by_note())
+        .all()
+    )
+    return _views(left)
+
+
+@router.post("/api/notes/{note_id}/assets/reorder", response_model=List[AssetOut])
+def reorder_note_assets(
+    request: Request,
+    note_id: int,
+    body: AssetOrderIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """把这篇配图的先后改成客户端送来的这个次序，回**排完之后按新序的那一批**（同删除那一口：
+    客户端不用再读一次列表，回体本身就是"服务端认下的新顺序"这份读数）。
+
+    站长 10-19 原话「笔记编辑时候，配图要支持拖动排序，方便用户选择好的图片作为头图」——
+    这一口就是那句"方便选头图"落库的地方：**第一张就是头图**，列表右侧那枚、详情窗那张大图、
+    卡片模板的大图位、公开页那一批，五处读的都是同一个 `order_by_note()`。
+
+    四条口径：
+    1. **序号从 1 起，0 永远空着**。0 是"从没手动排过"那一档（迁移给存量行留的就是它），
+       让第一名也拿 0 就把两种意思挤进同一个数了——混着读的篇（排过的行＋没排过的行）会当场
+       按 `id` 决胜，等于他拖了没生效。
+    2. **一次查完再在内存里派号**，不照 `categories/reorder` 那样一格一问：那边最多 8 格，
+       这一列 9 张、且这个口在拖动松手那一瞬打，两趟查询够用就别再留一条 N 次查询的样例。
+       行为与它一致（不属于这篇的 id 一律不理），只是不烧 N 个来回。
+    3. **名单里没有的行不留在原地，一律按现有先后排到末尾**。留着它身上那个旧序号会与新写的数撞上同一个值，
+       撞了就只能由 `id` 决胜——症状是"我明明把它拖到第二了，它又跑回第一"，而回体看着是 200。
+       （新补进来的那张不会撞：登记那一趟走 `next_sort_order`，本来就落在最后。）
+    4. **私密篇没解锁时这个口不开**（403），与删除那一口同一条：读的那一趟本来回空数组，
+       锁着的篇在界面上根本没有可拖的东西。
+    """
+    note = _owned_note_or_404(db, user, note_id)
+    if is_private_note(note, private_category_ids(db, user.id)) and not unlocked(request, user):
+        raise HTTPException(status_code=403, detail="这篇是私密笔记，先解锁")
+    uid = str(user.id)
+    rows = (
+        db.query(Asset)
+        .filter(
+            Asset.note_id == note_id,
+            Asset.user_id == uid,
+            not_failed(),
+        )
+        .order_by(*order_by_note())
+        .all()
+    )
+    by_id = {r.id: r for r in rows}
+    order = 1
+    for asset_id in body.ids:
+        row = by_id.pop(asset_id, None)   # 同一个 id 送两次只算第一次；不是这篇的直接不理
+        if row is None:
+            continue
+        row.sort_order = order
+        order += 1
+    for row in rows:                      # 没被点名的退到最后，按它自己现在的先后
+        if by_id.get(row.id) is not None:
+            row.sort_order = order
+            order += 1
+    db.commit()
+    for row in rows:
+        db.refresh(row)
+    return _views(sorted(rows, key=lambda r: (r.sort_order, r.id)))
+
+
+def _sum_bytes(db: Session, uid: Optional[str] = None) -> int:
+    """**配图 + 卡片两张表**的真实字节。
+
+    原来这里只 SUM `Asset`，而卡片对象住在同一个桶里（`cards/` 那一层）却一个字节都没进账——
+    那枚"快满了"因此长期偏低，报的是一句"明明快满了界面还说有余量"的假话（10-09 审计）。
+    站长 10-08 定 ≤200KB 上界入账时说得很清楚：那是**没量到实测之前的估算口径**，
+    "量到实测再校"。S2 起每一条登记都带真实 `file_size`，实测数就在这一列里，所以口径换成真数，
+    那个估算常量随之退休（`models/note_card.py`、`验-卡片留档S1.js`、方案 §四.4、PRD §8.149 同批改）。
+
+    张数那一栏（`_count`）**不跟着加卡片**：界面上那一句说的是"你存了几张图"，
+    把成品卡片混进去会变成"我明明只传了 3 张图，怎么显示 7 张"。
+
+    卡片那一半只算 `current()` 那几行（10-16 审计）。历史行（`is_current=0`）的对象是**已经不在桶里**
+    的那几张：同一篇换模板重出时回体把地址交回客户端删（`cards.py` 的 `put_note_card` 那句 `replaced_file_ids`），
+    撤那一张（`cards.py` 的 `drop_note_card`）与删那一篇（`notes.py` 的 `delete_note`）更是把历史行一起带出去删。
+    原来这一栏整表 SUM，于是"删掉的图还在算体积"——`used_ratio` 只涨不降，那枚"快满了"迟早是句假话。
+    **这一刀往哪边错要说清楚**：少数情况下那个对象客户端没删成（手机重装、待删队列丢掉），
+    它还躺在桶里却不再进账 ⇒ 比值**偏低**。选择偏低而不是偏高，是因为偏高会让人以为满了而不敢传图，
+    而偏低那一半由桶本身兜（真满了上传当场失败，那句错是准的）。与配图那一半同一纪律——
+    **失败的、已经不在了的字节都不许进账**，否则就是本仓反复警告的幽灵行。
+    """
+    q1 = db.query(func.coalesce(func.sum(Asset.file_size), 0)).filter(not_failed())
+    q2 = db.query(func.coalesce(func.sum(NoteCard.file_size), 0)).filter(current())
+    if uid:
+        q1 = q1.filter(Asset.user_id == uid)
+        q2 = q2.filter(NoteCard.user_id == uid)
+    return int(q1.scalar() or 0) + int(q2.scalar() or 0)
+
+
+def _count(db: Session, uid: Optional[str] = None) -> int:
+    q = db.query(func.count(Asset.id)).filter(not_failed())
+    if uid:
+        q = q.filter(Asset.user_id == uid)
+    return int(q.scalar() or 0)
+
+
+@router.get("/api/user/storage-quota", response_model=QuotaOut)
+def storage_quota(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """前端那枚"快满了"的提示读这里。**used_ratio 是全站口径**（见文件头第 1 条）。"""
+    uid = str(user.id)
+    cap = 5 * 1024 * 1024 * 1024  # 云开发免费档 5GB；升档改这一处（别在客户端抄第二份）
+    total_bytes = _sum_bytes(db)
+    return QuotaOut(
+        user_bytes=_sum_bytes(db, uid),
+        total_bytes=total_bytes,
+        cap_bytes=cap,
+        used_ratio=round(total_bytes / cap, 4),
+        user_count=_count(db, uid),
+        total_count=_count(db),
+    )
+
+
+def _views(rows: List[Asset]) -> List[AssetOut]:
+    return [
+        AssetOut(
+            id=r.id,
+            cloud_url=r.object_key,
+            size=r.file_size,
+            width=r.width,
+            height=r.height,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]

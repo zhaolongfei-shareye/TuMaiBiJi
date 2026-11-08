@@ -1,0 +1,1634 @@
+/* 私密密码那一层的皮（10-12 起三页共用一份，站长原话「看笔记提示输入密码的框，跟设置密码的
+   框风格不一致。要统一」）。@import 必须在最前面，所以这一句压在 v12 那段头注释上面。 */
+@import '../../styles/pwd-sheet.wxss';
+/* 卡顶那一段玻璃（10-15 起两页共用一份，站长原话「两个渐变框架为什么不一样，要统一到
+   笔记列表那种」）。@import 必须在最前面，与上面那一句同一条规矩。 */
+@import '../../styles/glass-sheet.wxss';
+
+/* ---------- v12 头部那一段：图 + 罩 + 标题 + 数字 ----------
+   站长 10-01 的口径逐条落成数：块高 542（= 现网「我的」那条 .band 同一个量）。
+   v18（10-02 夜）右上角只剩「笔记」一列，「分享」「种草」两列随那两个屏一起撤，
+   于是那两道分隔细线也没有主人了，一并删净。
+   数字那两档字号在「我的」页那枚 MIND 上是同一个数（weight 100 / 行高 .86 +
+   小字 --fs-micro + 字距），字体族 WtsjMind 声明只在 app.wxss 里那一份。 */
+.head {
+  position: relative;
+  height: 542rpx;
+  flex: none;
+  overflow: hidden;
+  background: var(--bg-page);
+}
+
+.head-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 750rpx;
+  height: 542rpx;
+}
+
+/* 停点仍照新建页那条（同一张图、同一条明暗），只是收进这一段里；
+   底部压深一档，是为了让下面那张圆角卡的影子有着落、不飘在亮面上。 */
+.head-scrim {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%, rgba(18, 20, 26, 0.5) 30%,
+    rgba(18, 20, 26, 0.44) 62%, rgba(18, 20, 26, 0.52) 100%);
+}
+
+/* 10-11 毛玻璃 R12（站长原话「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：
+   卡顶那 238 里超出头部 542 的一段底下原本没有图可糊，所以把头部这一格的**裁切放开**，
+   让形象图按 `bandGeom(w,h,740)` 往下垫到卡顶后面（那枚 740 从 10-11 11:2x 起是**全站唯一的一枚**
+   `poster.HEAD_IMG_H`，不再由本页递——两页各写一个数就是"切 tab 背景图上下跳"，见 §3.5 那笔账）。
+   ⚠ 两道保险一条都不能撤：① 下面那条 `.head-scrim::after` 把罩层平延到 740，否则 542 那条线上
+   会出现一道亮度接缝；② `.sheet` 自己有 z-index 2、238 以下是实心卡，图溢出那一段全靠它盖住——
+   「我的」页那一格"中间镂空"就是这么来的（图铺到整页底下、容器又是透明的）。 */
+.container.has-bg .head {
+  overflow: visible;
+}
+
+/* 延下去那一段必须挂在**罩层自己身上**，不能挂在 `.head` 上：「调亮度」那一枚点拧的是
+   `.head-scrim` 的 `opacity`（wxml 里 `style="{{dimScrim}}"`，默认半月那一档就是 .5），
+   伪元素是它的子节点，跟着一起沉；若画在 `.head` 上，那一段就永远吃满档 .52，
+   默认档下 542 那条线上正好一道硬边＝他打回的"一刀切"（R6）。
+   颜色取这条罩子渐变自己的末档（0.52）＝连续，不是第三支写死的暗值。
+   详情／模板那一态 `.head-scrim` 铺满整屏，`top:100%` 落在屏外，不会从 `.float-sheet`
+   左右那 24rpx 缝里露出来。 */
+.container.has-bg .head-scrim::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 198rpx;
+  background: rgba(18, 20, 26, 0.52);
+}
+
+/* 首帧与取图失败那一态：`imgStyle` 还是空串，`.head-img` 只有类里那 542 高，
+   玻璃段下半截（542～740）底下就没图了——闪一下＋那道线又露出来。
+   这一条把铺图态下的默认高度先给到 740（`mode="aspectFill"` 自己居中裁），
+   `bandGeom` 那一份算回来之后由 inline style 覆盖，两态都是"整段有图"。 */
+.container.has-bg .head-img {
+  height: 740rpx;
+}
+
+/* R4／R5／R6：卡顶从上往下糊两行字（两枚 tab 那一行＋分类行那两行＝这一段 158，
+   这个数实测由 `验-列表头部铺图-真跑` 量 `.ix-cat` 底边对 `.sheet` 顶边核，不靠手算），
+   158～238 交叉淡入到实心，238 以下是实心 `--bg-card`，正文第一行起读数和改之前一致。
+   白纱与实心是**同一张背景的两个色标**，不是另叠一层皮——上一稿那层皮是定位元素，
+   画在这两行字上面＝给字蒙白。
+   ⚠ 10-12 21:4x 站长拍甲：这一段（还有「我的」那 144）单独走 `--glass-veil-band`＝**.60**，
+   不再是全站那枚 .30。理由与全部数在 `app.wxss` 那枚令牌自己的注释里（一句话：.30 把近黑的图
+   只提到灰阶 89~175，那两行落在"墨嫌暗、白嫌亮"的死区，换哪一极都挂一半）。**这一页仍然一支裸 alpha
+   都没有**——多出来的是 app.wxss 里第二枚令牌，不是页面里写死的数。
+   ⚠ 10-15 03:5x：那条 `.container.has-bg .sheet` 整条搬进 `styles/glass-sheet.wxss`（两页共用一份，
+   理由抄在那份表头）。本页只留两枚面令牌，写在下面 `.sheet` 自己那一块里（**不在这里另开一块**：
+   `验-向上阴影全局一枚` 与 `验-列表头部铺图` 都按选择器取"第一个 `.sheet{}`"，多一块同名的
+   就把真身遮掉了——今天这两把同时红过一次）。那两枚是 `--glass-surface`／`--glass-fade-surface`，
+   说的是"这一段最后淡到哪一层"：列表淡到卡面，「我的」淡到页面底。 */
+
+/* X4「那三枚居中弹窗」这一枚（站长 10-11 逐条裁定原话「4、做」）。
+   皮写在页内、只有 `--glass-veil`/`--glass-bf` 两枚 var()，理由与"为什么不写在 app.wxss"
+   同一条，记在那张表 X4 那段注释里。写成 compound（`.ci-card.glass-dialog`）是为了压得过
+   app.wxss 里 `.ci-card` 自己的 `background: #FCFBF8`——效果图那一稿 13/12 两块就是栽在
+   类数不够、静默不生效。`pages/share` 那一屏没有 has-bg，那张同名卡照旧实心。 */
+.container.has-bg .ci-card.glass-dialog {
+  background: var(--glass-veil);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+}
+
+/* 站长 10-11 拍**甲**：白纱压暗遮罩落成中灰（实测面 rgb(164,164,169)），那句说明字当时只有
+   2.60:1（门槛 4.5），甲＝"只把这三枚的说明字提到整档墨"。
+   ⚠ 这一枚用的是它自己标题那支 `#23252C` 的**满档**（去掉 .55 那档 alpha），不是换成 `--text-primary`——
+   后者是象牙那套的暖墨 #352E1D，换过去连色相一起换了，不在他那句"整档墨"里；这一处是我在他批的方向里定的口径。
+   闸写在 `.container.has-bg` 上：没铺图那一态这张卡还是实心 #FCFBF8（对比 ≈7:1，本来就过），一个字不回改。
+   同一条规则也**不会**碰到 `pages/share` 那一屏同名的 `.ci-hint`——那一页根本没有 has-bg（X4 那一格）。 */
+.container.has-bg .ci-card.glass-dialog .ci-hint {
+  color: #23252C;
+}
+
+/* 这里原来画着框外左上角那一个小人（`.ix-person`，宽 150、底边压在纸卡上沿那一条 502、z-index 4，
+   与第一屏同一个来源同一个本机键）。
+   ★10-11 撤，依据只有一条——站长原话「左上角的人，透明底侵入主图，列表左上角的人都去掉，
+   维持只有首页有」（需求清单 R8）。撤的是**这一屏**那一位，首页（pages/create）那两位与
+   "点小人换大人"一个字没动（他另一句：「我哪个需求说要去掉首页两个人？」）。
+   markup 里那枚 `<image>`、这一段的样式、index.js 里的 require 与 `person.figure()` 三头一起撤净；
+   `utils/person.js` 本身留着，首页那一屏还在用。判据改写见 `验-第一屏三块`／`验-列表右上角返回`。 */
+/* 站长 10-16 夜两句话：①「这个图片全量放在其他页面左上角，原来左上角的纯文字标题替换最顶上的
+   标题」②「这个图片，不需要所有页面加，只需要在有背景图状态下加」
+   ⇒ 这一格两态：**铺了照片**画首屏那枚书法位图（宽与那一档透明度在 `app.wxss` 的 `.brand-title`，
+   这里只给落点），**没铺**照旧画原来那行字「我的笔记」。两态同一落点，所以 `.h1` 只剩位置三条。
+   原来那行字两态都还搬进了最顶上那一栏（`index.js` 的 setNavTitle）。
+   ⚠ 深浅翻色跟着从 `color` 搬到 `filter`（见下面 `.container.has-bg:not(.bg-light) .h1` 那一条）。
+   原来那两条 `color` 一起撤净——位图不吃 `color`，留着就是"看着有规则、其实一条都不生效"。 */
+.h1 {
+  position: absolute;
+  left: var(--sp-4);
+  top: 22rpx;
+}
+
+/* 只有"没铺背景图"那一态才画这行字（第二句收窄），所以这几条声明单独一支——
+   挂在 `.h1` 上会让位图也"看起来有字号有字色"，而那两条它一条都不吃。
+   字号 50 是他 10-16 白天那句「笔记列表的大标题字体要放大一档」（42→50），一档＝这一条阶梯
+   自己的步长（`--fs-h2` 34 → `--fs-h1` 42 就是 8），写在页面级、不动全局那枚 `--fs-h1`。 */
+.h1-txt {
+  font-size: 50rpx;
+  font-weight: 700;
+  letter-spacing: -1rpx;
+  color: var(--text-primary);
+}
+
+/* 一列钉在图区右上角。锚点 right 32 / top 24 和「我的」页那枚 MIND 是同一个数——
+   两个 tab 的右上角对齐，这一格读起来就是"这页的状态数字"。 */
+.stats {
+  position: absolute;
+  right: 32rpx;
+  top: 24rpx;
+  display: flex;
+  align-items: flex-start;
+}
+
+.stat {
+  flex: none;
+  width: 104rpx;
+  position: relative;
+  text-align: center;
+}
+
+.stat .n {
+  display: block;
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-weight: 100;
+  font-size: 64rpx;
+  line-height: 0.86;
+  color: var(--text-primary);
+}
+
+.stat .l {
+  display: block;
+  margin-top: 10rpx;
+  padding-left: 4rpx;
+  text-align: center;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 4rpx;
+  color: var(--text-secondary);
+}
+
+/* ---------- 面板顶那一行：左「分类管理」、右「搜索」（站长 10-17 两句） ----------
+   「搜索的 icon，我要下移到面板右上角」＋「左边加一个分类管理 icon，点击可以直接跳转修改分类」。
+   这一行原来挂在照片段右下（`.tools`，绝对定位 top 400、左右各内缩 24、整行 88 高），
+   搬进圆角卡之后它不再压在照片上 ⇒ 绝对定位没有意义，改成流内第一块；
+   `.tools`／`.acts`／`.ic` 三条随之撤净，照片段右下空出来（他点头那一版就是空的）。
+   ⚠ 两处没照效果图抄，写清免得以后当成漏改：
+   ① 井格用四枚子 view 画（稿子里就是四枚 `<b>`），不引图。
+   ② 行高原来 88（稿子那 76 也没抄），站长 10-18 一句「『全部』和上方 icon 之间浪费了一行空间，
+      要去掉」⇒ 抬到 64。图形 32／38 上下各只剩 13／16 的空，加上分类行原本那 20 的上内缩一起收掉，
+      图形底到「全部」字顶从 55rpx 降到 23rpx（≈12pt）。
+      ⚠ 这一刀的代价我摊开写：那两枚的热区跟着从 88 高（46pt）降到 64（33pt）——宽本来就只有
+      48rpx（25pt），44pt 那条线在横向上早就没满足，这次是竖向也一起降。要点不顺就把行抬回去，
+      抬回去那一行空白一定跟着回来，两者不能同时要。 */
+.ixl-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64rpx;
+}
+
+/* 一整枚 64 高都是热区（图形只有 32／38），沿用原来 `.ic` 的做法：不垫圆底，只翻色。
+   两档字吃这一页的墨，与下面分类那一行同一对令牌（`--text-secondary` / `--text-primary`）。
+   `.on` 这一档说的是"搜索框里已经有词"——点开了还没打字时两枚仍是同一档。 */
+.ixl-ic {
+  flex: none;
+  height: 64rpx;
+  padding: 0 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.ixl-ic.on {
+  color: var(--text-primary);
+}
+
+/* 分类管理那枚＝2×2 四格：稿子 `.ic-grid` 16px 见方、缝 3.5px ⇒ 32rpx 见方、缝 6、格 13
+   （13+6+13=32 正好铺满，不留半个）。四格都吃 currentColor ⇒ 上面那两档翻色一条就够。 */
+.ixl-glyph-grid {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  width: 32rpx;
+  height: 32rpx;
+  gap: 6rpx;
+}
+
+.ixl-gq {
+  width: 13rpx;
+  height: 13rpx;
+  border-radius: 4rpx;
+  background: currentColor;
+}
+
+/* 两枚图形都纯 CSS 画（这一页没有图标资源，也不为一枚钮引一张图）。
+   笔画基准 3rpx、有搜索词那一枚抬到 4rpx——效果图用 stroke-width 2.1→3 说"这是当前那一档"，
+   在 CSS 边框这一档对应不上小数，就取最接近的两档整数。 */
+.glyph-search {
+  position: relative;
+  width: 38rpx;
+  height: 38rpx;
+  flex: none;
+}
+
+.glyph-search::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 27rpx;
+  height: 27rpx;
+  box-sizing: border-box;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+}
+
+.glyph-search::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 2rpx;
+  width: 16rpx;
+  height: 3rpx;
+  border-radius: 2rpx;
+  background: currentColor;
+  transform: rotate(45deg);
+  transform-origin: 100% 50%;
+}
+
+.ixl-ic.on .glyph-search::before {
+  border-width: 4rpx;
+}
+
+.ixl-ic.on .glyph-search::after {
+  height: 4rpx;
+}
+
+/* 搜索条里那一枚收到 30：条子本身只有 60 高、里面还要放输入框和「搜索笔记」，
+   38 的图形会把字挤走。这一档就是现网原来那枚放大镜的尺寸，不是新数。 */
+.srch .glyph-search {
+  width: 30rpx;
+  height: 30rpx;
+  opacity: 0.55;
+}
+
+.srch .glyph-search::before {
+  width: 21rpx;
+  height: 21rpx;
+}
+
+.srch .glyph-search::after {
+  width: 13rpx;
+  height: 2rpx;
+}
+
+/* ---------- 搜索那一态：搜索那枚就地向左摊成输入框 ----------
+   站长 10-17 夜这一句改的是皮：「搜索框太深，笔记分类输入框同样，要改为透明输入框状态。
+   类似，邮箱输入框那种风格，淡淡的框体，还是深色字体」⇒ 这三样逐字抄「我的」页那格邮箱输入框
+   （`me.wxss` 的 `.me-email-field`）：面 `--chip-idle`（掺 7% 墨的淡底，屏上读起来就是"透明"）、
+   边 `inset 0 0 0 var(--w-edge) var(--card-edge)`（12% 墨的一道淡边，不是投影）、字 `--text-primary`。
+   ⚠ 原来那一条 `background: var(--chrome-bg)` 是壁纸页面底的派生值（与底栏胶囊同一支），
+   压在这张 `--bg-card` 浅面上就是他说的"太深"。这一枚不再吃那一场内联变量 ⇒
+   `index.js` 的 `searchSkin` 与 wxml 两处 `style="{{searchSkin}}"` 一起撤了。
+   那条 IACVT 坑（变量不发就整条透明、条子看不见）随这一刀自然消失：
+   **现在浅底与淡边都由类里的令牌给，屏上没有任何一处要靠内联变量才画得出来。**
+   分类管理态那枚新增输入框（`.ixl-add`）复用同一条件，两枚一起换，不分第二张皮。 */
+.srch {
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+  /* 88 → 60（站长 10-03：搜索展开的输入框太大）。当时那个数不是新调的：分类那一枚 chip
+     实测算高 59（app.wxss 的 .chip：14 上下内缩 + 24 字），压到同一档就不会从分类行上高出来一截。
+     v30 起分类行换成「文字 + 短杠」（.ix-cat，不再吃 .chip 那个高度），这个 60 就只是**保留值**：
+     改它不属于这一版，头部那一行仍是 88 高，条子竖向坐在里面。 */
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 0 22rpx;
+  border-radius: var(--r-pill);
+  background: var(--chip-idle);
+  box-shadow: inset 0 0 0 var(--w-edge) var(--card-edge);
+  color: var(--text-primary);
+}
+
+.srch-input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-body);
+  color: inherit;
+}
+
+.srch-ph {
+  /* 占位字与邮箱那一格同一条（`me.wxss` 的 `.me-email-ph`）：三级字，仍是深色那一族。 */
+  color: var(--text-tertiary);
+}
+
+.srch-x {
+  flex: none;
+  padding: 0 6rpx;
+  font-size: var(--fs-meta);
+  opacity: 0.7;
+}
+
+/* 线上的文字动作：没有底色、没有圆角框，靠字重和位置表示可点 */
+.srch-go {
+  flex: none;
+  /* 与下面分类那几枚同字号同字重：站长原话"搜索笔记字变成与下方分类字体大小"。
+     10-22 分类抬到 --fs-body 28，这一行跟着一起抬——"同档"那句是他拍的，不抬就自己作废了。 */
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: inherit;
+}
+
+.srch-go:active {
+  opacity: 0.66;
+}
+
+/* ---------- 区内顶上那两枚 tab：10-17 随两屏合一一起撤净 ----------
+   `.vtabs`／`.vtab`／`.vtab.on`／`.vtab.on::after`／`.vtab:active` 五条＋右端那枚 `.ix-back` 两条
+   （「返回」，前身是 10-05 那个折叠口）都删了。来历留在下面这三行里，别当"漏画"补回去：
+   ① 两枚 tab 说的是"这一屏切两块屏"，合一之后只剩一块 ⇒ 没有可切的东西；
+   ② 那枚「返回」原来靠 `.vtabs` 的 `margin-left:auto` 停在行尾，那一行没了它就没有落点
+      （面板顶那一行左给了分类管理、右给了搜索），回第一屏走底栏第一格；
+   ③ 站长 10-09 判过这一行"太深"（v30 那版吃创建页 `--cp-panel` 那块深面＋黄短杠），
+      撤深面之后它已经与下面分类行同一种手法，这一次连行本身一起撤。
+   `--cp-*` 那三个数在这一屏归零消费；`createSkin()` 仍贴在创建页那屏，不是这里的事。 */
+
+/* 分类这一行紧跟在那一行下面（置顶那一档、右边那句「只看置顶」随置顶一起撤）。
+   v30：撤胶囊改「文字 + 选中一条短杠」，与上面那两枚同一种手法。
+   10-09 站长改口之后这两档字与那条短杠吃的是**这一页的墨**（`--text-primary` /
+   `--text-secondary`，与「我的」页那四行同一对），不再吃 `--ink-on-layer*`——那两个名字讲的是
+   "压在层色那一面上的字"，而这一层现在就是 `--bg-card` 那张浅卡，再留着就是拿冷墨写暖底。
+   也不跟那支黄：黄在这屏只许出现在首屏那两枚点上（规格 §4 那条他点了"不跟黄"）。
+   ⚠ 上内缩原来 20，站长 10-18「『全部』和上方 icon 之间浪费了一行空间，要去掉」⇒ 归零。
+   字上面还剩的那 10 是 `.ix-cat` 自己的上内缩（那一枚的热区），不是这一行的。 */
+.cats {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  /* 8 → 24（站长 10-22「与下方卡片的行距不足，很容易误触，请加一点点空间」）。
+     芯片自己的热区往下还伸 12，所以原来那 8 就是"点分类会不会碰到卡片"的全部余量。 */
+  padding: 0 0 24rpx;
+}
+
+/* 一排放不下就左右滚那一节（v18 之前就有，这轮只把"只能从时间轴右侧起排"那道 126 撤了） */
+.cat-scroll {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* 底色撤掉之后要拉开才不粘连：14 → 40（规格 §4）。 */
+.cat-chips {
+  display: inline-flex;
+  gap: 40rpx;
+}
+
+/* 站长 10-16 三样一起撤（原话「分类名字，不要加粗，不要纯黑，下划线也一样」）：撤完之后
+   「选中那一枚」与「其余那几枚」在屏上是同一个数——这一条 consequence 当时就写在这儿，
+   10-18 深夜他给回来了（原话「**选择笔记筛选某个分类，该分类要加下划线，字体加粗，提醒用户**」）。
+   ⚠ 只给他指的那**两样**：加粗与下划线。**第三样（纯黑）他没提，照旧不抬**，
+     `.on` 仍吃 `--text-secondary`；要抬墨说一句就换。
+   ⚠ 加粗落的是 **600**（10-16 之前那一档同一个数，不是我新挑的），不是一行里最重的 700/800——
+     这一排上面那行 icon 与旁边那排笔记标题都比它重，抬到 800 这一行就抢了标题。
+   ⚠ 下划线挂在**里层那枚 `<text>`** 上、不挂在 `.ix-cat` 自己身上：管理态那枚 × 也在 `.ix-cat` 里面，
+     挂外面就是「名字＋✕」一起划一条线。里层这一枚同时是裁切那一档（下面 `.ix-cat-t`），
+     被裁掉的长译名只会划到看得见的那一段，不会划出盒子外。
+   ⚠ 「全部」那一枚也在筛（它是"没筛"那一档的身份），所以它选中时吃同一档——这一条他没单独说，
+     我按"正在筛哪一格"这一个信号统一处理，不许它两样都没有而其余那几枚有。 */
+.ix-cat {
+  position: relative;
+  display: inline-block;
+  padding: 10rpx 0 12rpx;
+  /* 站长 10-22「分类字体大小提高一档，与关于里面的字号一样」⇒ 吃 --fs-body 28（关于页正文同一枚令牌）。
+     10-17 那档 21 是被「分类字体也要小一点」压下去的，这一刀把它翻回来；`验-字号档位与对比` 与规格 §4 跟着改。 */
+  font-size: var(--fs-body);
+  font-weight: 400;
+  letter-spacing: 1rpx;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.ix-cat.on {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ix-cat.on .ix-cat-t {
+  text-decoration: underline;
+}
+
+/* 名字过长就裁到省略号（站长 10-18「在列表页多个分类排列时候进行裁切。避免过长，无法显示全」，
+   同一句里写明「不影响详情页显示」⇒ 这一条只挂列表这一排，详情窗与独立详情页那三枚分类段不裁）。
+   ⚠ 150rpx 这一档是我定的：他给的名称上限（4 个汉字／10 个字母）在这一档下**整名都放得下**
+     （汉字 88rpx、十个字母约 115rpx），被裁的只有服务端自动翻出来的长译名（如 Machine Learning）。
+   ⚠ 裁切挂在里层那枚 `<text>` 上、不挂在 `.ix-cat` 自己身上：× 那枚是绝对定位、包含块就是
+     `.ix-cat`，把 `overflow: hidden` 写到它身上会连那枚 × 一起裁掉（管理态就删不了格了）。
+     里层定成块级才有省略号——`text-overflow` 只认块级容器的那一行。 */
+.ix-cat-t {
+  display: block;
+  max-width: 150rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 面板内管理分类（站长 10-17「分类设置，改到当前面板，内完成，不需要跳转」） ----------
+   这一态只有三样新东西：分类 icon 右手边那枚输入框、每枚右上角的 ×、被按住那一枚的抬墨。
+   ⚠ 输入框那一格没有新皮：wxml 里它吃的就是搜索那一条 `.srch`，所以这一节只补一条左间距。 */
+.ixl-add {
+  margin-left: 12rpx;
+}
+
+/* 管理态这一行往下让 6、往右留 56：× 那枚的热区要 44×44（比字还大，点在字右上角那一片就删得掉），
+   44 塞不进原来那 40 的缝，硬塞会压到下一枚的名字上。
+   ⚠ 40 那一档是站长 10-09「拉开才不粘连」定的，只在**平时那一态**保留；这一态是他新要的 × 占的地方，
+   不是我把那一条改了。退出管理态缝就回到 40。
+   ⚠ 26 → 6：那 26 是"平时那 20 ＋ 我自己加的 6"，10-18 把平时的 20 归零之后照抄 26 等于给管理态
+   凭空抬 20，一进那一态整行往下跳一截。× 是绝对挂在 chip 自己的顶（`top: 0`，44 高塞得进那 51
+   的盒子，不会被 `.cat-scroll` 切掉），要的那 6 一分没少。 */
+.cats.ix-edit {
+  padding-top: 6rpx;
+}
+
+.ix-edit .cat-chips {
+  gap: 56rpx;
+  padding-right: 50rpx;
+}
+
+/* 绝对挂在那一枚的右上角，整块落在缝里：不但不压字，也不给 scroll-view 往上切掉
+   （`.cat-scroll` 那一条是 overflow，超出盒子的那一截是看不见的，所以 top 一律取 0 不取负数）。 */
+.ix-cat-x {
+  position: absolute;
+  top: 0;
+  right: -50rpx;
+  box-sizing: border-box;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-micro);
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+/* 「还没存上去的那几格」与「正按在手里的那一枚」都用这一页的墨抬一档：
+   这两档都是**临时状态**，不是选中态——站长 10-16 打回的是分类名"不加粗、不纯黑、不要下划线"，
+   那一句管的是他平时挑分类那一枚，不等于屏上任何时刻都不许有深浅差。
+   待建那一格总得看得出来"这一格还没上服务端"，否则保存失败时他不知道是哪几格没成。 */
+.ix-cat.pending,
+.ix-cat.dragging {
+  color: var(--text-primary);
+}
+
+.ix-cat.dragging {
+  font-weight: 500;
+}
+
+/* 那一排末尾**不许**再长出一枚「新增」：站长 10-18 先要过（「增加一个新增入口，点击或长按时和输入框效果一样」），
+   同一夜自己打回（「列表上怎么多了一个“新增”，有点多余啊，去掉」）⇒ 芯片、`.add`／`.dim` 两档皮、
+   `catAddChip`／`catLockedMax` 两串话术全部删净，新增那一条口只剩管理态里那枚输入框。
+   尺子 `验-分类上限与长度.js` ⑤ 那一条钉的就是"不许再长出第二枚新增入口"。 */
+
+/* 压在元素上面那一句（站长 10-18 第二句的下半：「显示在对应的元素上面」）。
+   手机上没有鼠标可"划"⇒ 这一句挂在他**按那一枚**的那一下上，浮在那一枚正上方 8px。
+   皮照这一版报错气泡那一条（白底、深灰小字、不加粗、投影浮起），不另起一张皮。
+   ⚠ 落点是 js 现量再夹进屏宽（`_catNote`），所以这里只做居中上移，不再自己算边界。 */
+.ix-note {
+  position: fixed;
+  z-index: 20;
+  transform: translate(-50%, -100%);
+  padding: 10rpx 20rpx;
+  border-radius: 999rpx;
+  background: var(--bg-card);
+  box-shadow: 0 6rpx 20rpx rgba(20, 22, 26, .16);
+  font-size: var(--fs-micro);
+  line-height: 1.4;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ---------- v12 下方那一整块：圆角朝上、往上盖住图 40、不描边 ----------
+   和 pages/me 那张 .sheet 同一画法（margin-top:-40 + 半径 --r-card + 页面底色）。
+   刻意不给 border：09-28 那次"纸一圈描边 + 每条笔记又一圈描边"就是框套框。
+   横向内缩挂在这一层的 padding 上，不挂到 scroll-view 自己身上（挂在它身上时
+   右侧要给滚动条留位，实测左右差 12rpx）。
+   下内缩 150 是给底栏胶囊让位；分类行自己带上下留白，所以这里 top 归零。 */
+.sheet {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: -40rpx;
+  padding: 0 24rpx;
+  /* 站长 10-09 对着「我的」页打回：这两屏要那两层浅背景，不要 v31 那层灰。
+     于是这一张圆角纸卡回到 `--bg-card`（象牙档实测 #F3F3F1），外面那一层是页面底
+     `--bg-page`（实测 #E2DED4）——与「我的」页那两层逐字同一对，量法见 §8.180。
+     v31（10-08 拍「饱和 35%／明度 L78」）那版吃的是 `--bg-layer` #CDC9C1，比页面底还暗一档，
+     他今天判"太深"。`--bg-layer` 与它那两档字在这屏不再有人消费——详情浮窗那张窗也在同一轮
+     （15:2x，§8.184）跟着换成 `--bg-card`；派生函数与镜像值留着，撤它们要连 `验-列表层底色` 一起动。 */
+  background: var(--bg-card);
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  /* 这一枚是**正本**：站长 10-14 说的"这个是对的"指的就是它。值搬进 `app.wxss` 的 `--sh-lift`，
+     像素一个数没改，只是让首屏／二屏／关于／设置跟着同一枚。 */
+  box-shadow: var(--sh-lift);
+  /* 卡顶那一段玻璃（`styles/glass-sheet.wxss`，两页共用）问"淡到哪一层"，这一页答卡面。
+     两枚都只写 var()，页面里不许再出现第三支 alpha。 */
+  --glass-surface: var(--bg-card);
+  --glass-fade-surface: var(--glass-fade-card);
+  overflow: hidden;
+}
+
+/* 「展开整块纸卡」那一态（.sheet.ix-wide）10-10 深夜随右上角那枚折叠口一起撤了：
+   他把那一枚改成了「返回」，这一态没有第二个入口，规则留着就是一段进不去的死样式。 */
+
+/* ---------- v22（站长 10-03 第四轮）：浮窗开着这一态，背后只留一层 ----------
+   头部那一段从"图只守 542"改成铺满整屏（fixed 到 webview 四边），图本身换 imgStyleThru
+   那一串——同一套 poster.bandGeom，只是盒子高换成 webview 实测高，锚点公式不分第二条；
+   中间那批列表件（这张圆角纸卡本体、两枚 tab、通栏横线、分类行、行卡）整块藏掉。
+   藏用 visibility 不用 display：scroll-view 一旦被 display:none，收窗回来滚动位置就没了，
+   他会看到列表又跳回第一条。
+   头部 z-index 抬到 3（.sheet 本来就是 2）压住它，于是「我的笔记」和右上角那列数字
+   清清楚楚留在窗上面那一格里——他要的就是这个状态感。浮窗和遮罩在 100/101，
+   所以点在头部那两行字上照样落到 .float-mask，也就是"点窗外任意一处=收起"。
+   底栏不在这两条里：它是自定义组件、z-index 999，页面这一层本来就压不住它
+   （要盖住它得像 .share-dim 那样写到 1000，见 wxml 里那条注释）。 */
+.container.float-thru .head {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  height: auto;
+  z-index: 3;
+}
+
+.container.float-thru .sheet {
+  visibility: hidden;
+}
+
+/* ---------- 列表这一区自己滚 ---------- */
+.list {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+/* ---------- 合一之后那一屏：一天一组、一组一行一枚浅面卡（站长 10-17「确认，开工」） ----------
+   结构照他点头那一版（乙·优化版）：左槽一个大数字 → 中间三档（来源小字／标题／标识轨）→
+   右端一枚配图；标识全挂在那条细线上，线上从左到右 ★ 分享过／▢ 出过卡片／🔒 私密。
+   数一律从他点头那张稿子换算（1rpx = 0.5px）：`.gut` 44px→88、`.row` 内缩 10/12→20/24、
+   圆角 14→28（＝令牌 `--r-chip`）、卡距 8.5→17、配图 47→94、轨上图形 12→24、线 2→4。
+   撤掉的那批（`.glyph-who`／`.xlist`／`.xrow`／`.xd*`／`.xm`／`.x-*`／`.grid2`／`.gc`／`.pad*`／`.g-cap`）
+   不是删了功能：昵称并进来源那一档的尾巴、日期升成左槽那个大数字、卡片那一屏整块由"右端配图"接管。 */
+.ixl-groups {
+  /* 下面那 150 的内缩挂在排布层而不是 scroll-view 上（原来 `.xlist` 与 `.grid2` 同一个数）：
+     滚到底时最后一条不被底栏那条胶囊压住，理由同 `.sheet` 那条。
+     ⚠ 规格里 §5.3 把这一条钉成规矩（「最后一格不许切进浮栏」），改它要连规格一起改。 */
+  padding: 4rpx 0 150rpx;
+}
+
+.ixl-grp {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+}
+
+/* 左槽：日（大数字）＋星期（三个字母）＋"今天"那一档才画的一条短杠。
+   ⚠ 那条短杠是我在参考图上看到的画法，**他没说过**；稿子的说明里也标了这一条是我的理解。
+   字体吃内嵌那支细体（与右上那两枚数字、原来 `.xd-d` 同一族）。 */
+.ixl-gut {
+  flex: none;
+  width: 88rpx;
+  padding-top: 20rpx;
+  text-align: center;
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+}
+
+.ixl-day {
+  display: block;
+  font-weight: 100;
+  /* 52 不在字号阶梯上：它是参考图那一个大数字的量（稿子 26px），不是又一档正文。
+     原来是 `--text-secondary`（.72）——那一档是 24rpx 的日期抬上来的（实测 4.67:1）；
+     这一枚是 52rpx 的大字，走整档墨既过线又与右边标题同一支。 */
+  font-size: 52rpx;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.ixl-wd {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 17rpx;
+  font-weight: 700;
+  letter-spacing: 3rpx;
+  color: var(--text-secondary);
+}
+
+.ixl-today {
+  width: 28rpx;
+  height: 4rpx;
+  margin: 12rpx auto 0;
+  border-radius: 2rpx;
+  background: rgba(35, 37, 44, 0.35);
+}
+
+.ixl-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 一行一篇：一块浅面，**不描边**（09-28 那次"框套框"打回的正是描边套描边）。
+   面吃 `--glass-plate-dock`——五档各有自己的白／彩，与底栏那一排"浮在卡面上的东西"同一枚；
+   影吃 `--sh-row`（＝`--sh-drop` 薄一档的那一枚，10-17 站长那句"阴影太厚"之后从全站那本尊分出来的，
+   本尊仍归首屏 `.ai-line` 与面板用，一个字没动）。
+   站长 10-17「每条笔记的面板阴影太厚，上下面板几乎连起来」⇒ 卡距 17→28、阴影换薄那一枚，两刀一起。
+   数是从他给的那张参考原件量的（净距 ≈29rpx、缝里几乎读不出暗环），量法 `docs/工具/量-卡距与阴影-两图对比.py`。 */
+.ixl-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  min-width: 0;
+  margin-bottom: 28rpx;
+  padding: 20rpx 24rpx;
+  border-radius: var(--r-chip);
+  background: var(--glass-plate-dock);
+  box-shadow: var(--sh-row);
+}
+
+.ixl-row:active {
+  opacity: 0.66;
+}
+
+.ixl-mid {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 来源那一档＝这一行最小的字（`--fs-micro` 18）＋ .68 的浅墨，与标题差一整档字号差一档色。
+   站长 10-17 两句连着：「来源和笔记标题要明显区分」「来源的字体太大，要压缩成小字」。
+   ⚠ 上一轮效果图看起来"没压小"不是我没改，是稿子里那一句根本没生效：
+      `font-size:var(--fs-body)` 里存的是 `28rpx`，Chrome 不认 rpx ⇒ IACVT 回落成继承来的 16px。
+      落码在小程序里 rpx 是真单位，所以这一档照令牌写；屏上到底是几 px 由
+      `验-字号档位与对比` 现读计算值，不拿源码里的数当结论。
+   转存那篇的昵称仍要看得见：并进这一档尾巴（· 昵称），不另起一行、也不把信息撤掉。
+   省略号挂在来源与昵称两支上（站长 10-30 拍甲：「来源自己带省略号」）。原来那句"来源名是字典里的
+   短串"的前提已经被站名推翻：站名最长 24 字，不给它自己出点，它就先把昵称挤没、再多出的一截
+   被父层无声裁掉（第九轮审计 Y10）。 */
+.ixl-src {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+  min-width: 0;
+  font-size: var(--fs-micro);
+  line-height: 1.25;
+  letter-spacing: 1rpx;
+  color: rgba(35, 37, 44, 0.68);
+}
+
+.ixl-src-t {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 分类那一档（站长 10-18「列表页也同样加上」，排布按他拍的丙＝分类在最左、不要竖线）。
+   红与不红都只由 `app.wxss` 那枚 `.cat-priv` 管，这里只管"别被挤断"——与 `.ixl-src-t` 同一档。 */
+.ixl-cat {
+  flex: none;
+  white-space: nowrap;
+}
+
+.ixl-who {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ixl-tt {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(35, 37, 44, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 标识轨：三枚小标＋一条自己收满剩余宽的细线（他原话「标题下方…利用这条线做一些标识」
+   「线上的 icon 可以很小，但辨识度要高，一眼就知道」）。
+   ⚠ 主稿（乙·优化版）三枚**同一支墨**；彩色那一版只画在图例那一格做对照，他没挑彩色。
+   每枚都用 CSS 画（clip-path／边框），不引图标资源也不写第二份色——都吃 currentColor。 */
+.ixl-rail {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin-top: 12rpx;
+  height: 24rpx;
+}
+
+.ixl-ln {
+  flex: 1;
+  min-width: 0;
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: rgba(35, 37, 44, 0.16);
+}
+
+.ixl-mk {
+  position: relative;
+  box-sizing: border-box;
+  flex: none;
+  width: 24rpx;
+  height: 24rpx;
+  color: rgba(35, 37, 44, 0.62);
+}
+
+.ixl-star {
+  background: currentColor;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 71%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.ixl-card {
+  height: 22rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 5rpx;
+}
+
+.ixl-card::after {
+  content: '';
+  position: absolute;
+  left: 3rpx;
+  right: 3rpx;
+  bottom: 3rpx;
+  height: 5rpx;
+  background: currentColor;
+}
+
+.ixl-lock {
+  top: 4rpx;
+  width: 18rpx;
+  height: 14rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 3rpx;
+}
+
+.ixl-lock::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -8rpx;
+  transform: translateX(-50%);
+  width: 10rpx;
+  height: 10rpx;
+  box-sizing: border-box;
+  border: 3rpx solid currentColor;
+  border-bottom: none;
+  border-radius: 6rpx 6rpx 0 0;
+}
+
+/* 右端配图：**有就画、没有什么都不画**（他原话），身上不挂任何标识（标识全在线上）。
+   94×94＝稿子那枚 47px 方，圆角 24。
+   ⚠ 定宽定高＋`mode="aspectFill"`：不给 max-height、不给 flex-shrink——只定宽再让高被夹，
+      就是已记的"图片盒子被夹扁"那条坑（压高不压宽＝变形）。 */
+.ixl-th {
+  flex: none;
+  width: 94rpx;
+  height: 94rpx;
+  border-radius: 24rpx;
+}
+
+/* 两枚箭头各画一笔：一个直角框转 45° / -135°，不引图标资源也不写第二份色 */
+.chev {
+  width: 14rpx;
+  height: 14rpx;
+  box-sizing: border-box;
+  border-left: 3rpx solid currentColor;
+  border-bottom: 3rpx solid currentColor;
+  border-radius: 2rpx;
+}
+
+
+
+
+.loading, .empty, .loading-more {
+  text-align: center;
+  padding: var(--sp-6) 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+/* ---------- v7 ③ 详情浮窗（点一枚纸片 / 一行才浮它） ----------
+   行内不再有操作条：编辑/删除/转卡片 全部钉在这个窗口的下沿 dock 里。
+   窗口的底色是写死的纸白（和上面模板弹窗同一张卡），所以里面的字色一律用十六进制
+   实值、不吃 --text-primary——深色壁纸下那个变量是浅色，压在纸白上就读不出来了。 */
+.grip {
+  flex: none;
+  /* 海报那一屏的 .tpl-sheet 是 align-items:center，不写死宽度这行会缩到内容宽，
+     「点一下收起」就被挤成竖排、压到把手上。两个浮窗都要占满整条。 */
+  width: 100%;
+  box-sizing: border-box;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.grip-bar {
+  width: 88rpx;
+  height: 8rpx;
+  border-radius: var(--r-pill);
+  background: rgba(35, 37, 44, 0.16);
+}
+
+.grip-tx {
+  position: absolute;
+  right: 34rpx;
+  top: 0;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  letter-spacing: 0.4rpx;
+  color: rgba(35, 37, 44, 0.42);
+}
+
+/* 挂在把手行左端的那一句：与右边「点一下收起」同字号同字重同色，只换一边。
+   左右都留 34rpx，两句在同一行两端对称。 */
+.grip-tx-l {
+  right: auto;
+  left: 34rpx;
+}
+
+.ds-body {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 内缩挂在内容层，不挂在 scroll-view 自己身上：
+   挂在它身上时右侧要给滚动条留位，左右就不等宽了（实测右移 12rpx）。 */
+.ds-in {
+  padding: 0 34rpx;
+}
+
+/* 站长 10-30 拍甲：时间钉住不让位、来源自己带省略号。原来整条挂一条省略号 ⇒ 站名一长，
+   第一个被吃掉的是时间（第九轮审计 Y10）。拆成两枚各管各的，`.ds-time` 那枚 `flex: none`。 */
+.ds-meta {
+  display: flex;
+  align-items: baseline;
+  margin-top: 10rpx;
+  font-size: var(--fs-meta);
+  color: rgba(35, 37, 44, 0.5);
+}
+
+/* 分类那一档：那个点号跟在文字里，与后面那段之间这 8rpx 写在**这一格自己身上**，
+   不靠源码里的空格（源码里两个标记之间那一段空白会被折掉，屏上就少一个空格）。
+   后面两段各裹成一枚 `<text>`（`.ds-src`／`.ds-time`）——不只是为了样式，是为了真跑能量到
+   面与面之间的缝（`验-来源前加分类-真跑`；裸文本节点在 SelectorQuery 里没有 face，量不了）。
+   颜色同上：只有 `.cat-priv` 盖得上来，这一条不写 color，私密那一格才吃得动全局那一枚红。
+   ⚠ 这一行改完后，来源与时间之间那道缝是 `.ds-time` 的 8rpx（与分类那道同一个数），
+      不再是源码里那两个空格——真跑量出来若比改前宽几 rpx，是这一条，不是回归。 */
+.ds-cat {
+  flex: none;
+  margin-right: 8rpx;
+}
+
+.ds-src {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-time {
+  flex: none;
+  margin-left: 8rpx;
+}
+
+.ds-h2 {
+  margin-top: 8rpx;
+  /* 站长 10-16 同一句里的第二处：「笔记…详细页的大标题字体要放大一档」⇒ 38 抬到 46。
+     步长与上面 `.h1` 那一个数（8rpx，取自阶梯 34→42 那一档）同一个，两处不再是随手两个数。
+     ⚠ 这一屏的详情是**浮窗**（`detailOpen`，`index.wxml` 那枚 `.ds-h2`）。另有一屏独立详情页
+     `pages/detail/detail.wxss` 的 `.hero-title` 仍是 36rpx，他没指那一屏，我没动（要去要对齐说一声）。
+     行高仍 1.3：窗体是定高 fixed（top 130／bottom 192），内文靠 scroll-view 滚，抬字号不会顶穿外壳。 */
+  font-size: 46rpx;
+  font-weight: 800;
+  letter-spacing: -0.9rpx;
+  line-height: 1.3;
+  /* v19：与列表那一屏同一档墨色（标题 90% 黑）。窗口是纸白底，仍不吃 --text-primary */
+  color: rgba(35, 37, 44, 0.9);
+}
+
+.ds-tags {
+  margin-top: 14rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+/* 标签弱化（站长 10-17 深夜：「弱化标签，只需要显示标签名字，灰字，不加底色，不加粗」）。
+   灰档不另造，吃现成的 `--text-tertiary`（压窗白实测 12.12:1，比原来那档 `--cat-ink` 更稳）；
+   字号仍 `--fs-tiny`，只撤 `font-weight`／`background`／`border-radius`／`padding` 四样。
+   ⚠ 撤了 padding 之后每一枚的上下沿比原来矮 10rpx，那一排的折行行距靠 `.ds-tags` 的 gap 撑，
+   所以 gap 那 10rpx 不动——动了就成了"标签挤成一坨"。 */
+.ds-tag {
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
+}
+
+.ds-lab {
+  margin-top: 30rpx;
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 1.6rpx;
+  color: rgba(35, 37, 44, 0.42);
+}
+
+.ds-para {
+  margin-top: 12rpx;
+  font-size: var(--fs-body);
+  line-height: 1.7;
+  /* 正文段落 = 摘要那一档的 70% 黑（原来是 #3a3e46 一支单独的灰） */
+  color: rgba(35, 37, 44, 0.7);
+  /* 站长 10-18「笔记里正文都是一段文字，没有任何换行、段落」。宿主是 `<view>`＝一个 div，
+     默认 `white-space: normal` 会把串里的 `\n` 折成一个空格；独立详情页那一格是 `<text>`，
+     微信的 text 组件认 `\n`，所以同一个字段在两屏念出来不一样。
+     实测（docs/工具/量-正文换行两屏.js，9431 一趟）：喂「甲\n\n乙\n\n丙\n\n丁\n\n戊」与喂空格版
+     在这一格量出来都是 23.8px（＝一行高），换行根本没画；`<text>` 那格 179.6 对 14。
+     库里与后台那两份数据都带着 `\n`（现网 76 篇每篇 10 个），所以丢在渲染这一层，不在存取那一层。 */
+  white-space: pre-wrap;
+}
+
+.ds-pt {
+  margin-top: 14rpx;
+  display: flex;
+  gap: 16rpx;
+  align-items: flex-start;
+}
+
+.ds-pt + .ds-pt {
+  margin-top: 16rpx;
+}
+
+/* v22：带圈序号 1 2 3 撤了，换成头部 Tips 那种 14 小黄点（同一个 palette.TIP_DOT，
+   同一个 style 出口 tipDotStyle）。这四条是并列要点、不是步骤，序号本来就不显示。 */
+.ds-pt-dot {
+  flex: none;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  margin-top: 18rpx;
+}
+
+.ds-pt-x {
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: rgba(35, 37, 44, 0.9);
+}
+
+.ds-link {
+  margin-top: 12rpx;
+  font-size: var(--fs-meta);
+  color: #3F52D6;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+/* ---------- 配图那一块（站长 10-17 深夜：「固定高度图片区…通栏大图滑动，显示数字，和下方圆点，横杠」） ----------
+   三档数是照他附的那张视频号截图量的，不是挑的（量法与像素区间写在 docs/工具/出-详情窗抬头色块效果图.js 头上）：
+     图区 高＝宽×0.5627 ⇒ 窗内通栏 702rpx 配 395rpx；圆点 11rpx；当前那枚是 25×11rpx 的横杠；点与点间距 6rpx。
+   图区高是**定高**，所以不会有"图片盒子被夹扁"那一坑（只定宽不定高才需要 widthFix）；
+   10-19 起里面是**两层**：底＝同照片 aspectFill＋blur，上＝aspectFit 完整放进来那张（站长：「图片展示不全，
+   改为按比例缩小，其他部分空间用同照片毛玻璃铺满」）。改之前是单层 aspectFill——竖图上下被裁掉一截。
+   ⚠ 这一族挂在 `.ds-in` 外面：内缩 34rpx 一挂上左右就让出去了，那就不叫通栏。
+   原来那排 180rpx 小方格（`.ix-shots`/`.ix-shot`）与头一排两列（`.ds-hero`）整套撤净。 */
+.ds-fig {
+  flex: none;
+  width: 100%;
+  height: 395rpx;
+  margin-top: 24rpx;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+/* 一层格子装两张图（底＋上）。swiper-item 自己的定位不靠它默认值，显式套一层。 */
+.ds-fig-cell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ds-fig-bg {
+  /* 外挪 6% ＋ 112% 见 wxml 那条注释：把模糊带出的渐隐圈推到盒子外。
+     高斯半径 30rpx 是"看得出是同一张照片糊了、又读不出第二张内容"那一档，要更糊只改这一个数。 */
+  position: absolute;
+  left: -6%;
+  top: -6%;
+  width: 112%;
+  height: 112%;
+  filter: blur(30rpx);
+}
+
+.ds-fig-img {
+  /* 高跟盒子走同一个数（395rpx 只在 `.ds-fig` 写一遍）：两处各写一遍就是两个落点，
+     改一处忘另一处＝图与盒子之间露缝或撑破，而源码里那两行看着都还挺对。
+     10-19 起这一张是**盒子那么大、图在里面居中留白**（aspectFit），被留白盖不住的那部分由 `.ds-fig-bg` 铺。 */
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 数字那一枚照参考图：浅灰实底压白字。实测 1.84:1（远低于 UI 元素那道 3）——
+   照抄还是抬深他没拍，这一行就是那个"照抄"的落点，要改只改这两个色。 */
+.ds-cnt {
+  margin-top: 20rpx;
+  padding-right: 34rpx;
+  text-align: right;
+}
+
+.ds-cnt-n {
+  display: inline-block;
+  min-width: 78rpx;
+  height: 51rpx;
+  line-height: 51rpx;
+  text-align: center;
+  border-radius: var(--r-pill);
+  background: #BFBFBF;
+  color: #FFFFFF;
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.ds-dots {
+  margin-top: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+}
+
+.ds-dot {
+  width: 11rpx;
+  height: 11rpx;
+  border-radius: 50%;
+  background: #E4E4E4;
+}
+
+/* 当前那枚不是点，是横杠：只加宽，高度与圆点同一档，圆角跟着半径走 */
+.ds-dot.on {
+  width: 25rpx;
+  border-radius: 6rpx;
+  background: #191919;
+}
+
+/* 来源链接下面那行小字（站长 10-03 原话："链接无法直接打开，可复制链接在浏览器打开"）。
+   现网那枚链接点了就是"已复制"，不说明的话人会以为是我们没做。 */
+.ds-hint {
+  margin-top: 8rpx;
+  font-size: var(--fs-tiny);
+  line-height: 1.5;
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.ds-pad-b {
+  height: 24rpx;
+}
+
+/* 「显示更多」钉在正文与动作条之间（站长 10-03：第一屏要有个口，点了跳到下面看原文）。
+   它是这一屏唯一的展开出口，所以原来挂在「原文内容」右边那枚 展开/收起 撤了。
+   吃动作条上面那条线的语义：小字、居中、墨色五成，不与正文抢。 */
+.ds-more {
+  flex: none;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  font-size: var(--fs-tiny);
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.ds-more:active {
+  opacity: 0.55;
+}
+
+/* 箭头朝下＝还没看、朝上＝已经展开。复用卡片那一屏那两枚 .chev 的那一笔，
+   只多两个转角，不引图标资源也不写第二份色。 */
+.chev.down {
+  transform: rotate(-45deg);
+}
+
+.chev.up {
+  transform: rotate(135deg);
+}
+
+.ds-dock {
+  flex: none;
+  /* 这条 2rpx 的墨色 10% 顶边是 v23 给"深面"画的缝，面换成 L78 这一档浅灰之后它就变成
+     一条白边——规格 §5.1 第④条一起撤。浮窗自己有那圈 30/60 的投影，与背后那层分得开。 */
+  padding: 22rpx 30rpx 30rpx;
+}
+
+.ds-irow {
+  display: flex;
+  gap: 14rpx;
+}
+
+.ds-ibtn {
+  flex: 1;
+  height: 72rpx;
+  border-radius: var(--r-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 两枚等宽，谁都不许折行：折一行这排按钮就高低不齐了。
+   10-17 深夜这一行改成三枚（窗内净宽 634，两枚 310 → 三枚 202），所以话术还是只能短：
+   「分享」两个字放得进（10-17 那一版是「分享笔记」四个字，在 `--fs-meta` 那一档实测 96rpx），位置宽裕；
+   私密那句十个字要 240rpx，
+   塞进按钮就折行 ⇒ 那句改挂在下面那一行小字（`.ds-no-share`）。 */
+  white-space: nowrap;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: #23252C;
+  /* 那一圈从 16% 墨抬到 `--layer-edge`（四套都反解到 60% 墨，压层 3.35~3.46）：
+     16% 是给深面画的，压在 L78 这一档浅灰上只有 1.32~1.33，按钮边界基本看不见（规格 §5.1 第一行）。
+     数只在 palette.layerEdgeOf 有一份，这里只写 var。 */
+  box-shadow: inset 0 0 0 var(--w-edge) var(--layer-edge);
+}
+
+.ds-ibtn.danger {
+  color: #8c2119;
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(140, 33, 25, 0.24);
+}
+
+/* 私密那一枚置灰（站长 10-17 深夜「私密不支持分享，按钮提示词显示『私密笔记不支持分享』，置灰」）。
+   只降字与那一圈边，**不给 `pointer-events:none`**：小程序不吃这一条，而且按下去要有回应——
+   挡住这件事的是 `onSheetShare` 里那一句 `is_private` return（服务端 cards.py／shares.py 同一句）。
+   字色 65% 墨：压在 L78 那一档浅面（象牙 #CDC9C1）上实测 **3.89:1**，左右两枚满墨是 9.27:1，
+   一眼读得出"这一枚不一样"；真正解释原因的那句整话在下面一行——`--text-tertiary`（72% 墨）
+   压在同一块 L78 面上实测 **4.19:1**（过 AA 小字那道 4.5 差一点，这一句是说明不是正文，
+   要过线就得把它抬到 `--text-secondary`，那一步等他）。
+   详情页那一枚同档（`.icon-btn.disabled`，它自己有 4% 淡底，同一个数算出来 4.51:1）。 */
+.ds-ibtn.disabled {
+  color: rgba(35, 37, 44, 0.65);
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.12);
+}
+
+.ds-no-share {
+  display: block;
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
+}
+
+.ds-pub {
+  margin-top: 14rpx;
+  display: flex;
+  align-items: flex-start;
+  gap: 14rpx;
+  font-size: var(--fs-tiny);
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.ds-pub-l {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+}
+
+.ds-pub-act {
+  flex: none;
+  text-decoration: underline;
+  font-weight: 700;
+  color: rgba(35, 37, 44, 0.62);
+}
+
+/* ---------- v7 ③④ · v22：两个浮窗共用同一条几何 ----------
+   详情窗（点一行 / 点一格浮它）和模板预览弹窗（点右上那一格出卡片浮它）是同一条窗口：
+   左右 24、上沿 130（webview 内，也就是落在头部那一段 542 里面——「我的笔记」那行字
+   和右上角那列数字在它上面，露着）、下沿离底栏 64、同一支层色面（v31 之前那一张是共用的纸白 #FCFBF8，
+   换层色之后两张窗仍共用一支面）、同一个圆角、同一枚把手。
+   detailOpen 与 templateOpen 互斥，页面上永远只有一个浮层。
+   v22（站长 10-03 第四轮）改了一条：这一态背后不再让列表原样透出来——中间那批
+   （圆角纸卡本体 + 两枚 tab + 通栏横线 + 分类行 + 行卡）整块 visibility 藏掉，
+   头部那一段 fixed 到铺满整屏，于是只看到形象图贯穿 + 头部那两样 + 底栏。
+   他要的是"避免看到两层结构"，但"我的笔记"和那列数字得留着，否则不知道自己在哪一层。
+   见下面 .container.float-thru 那三条。遮罩仍透明，只挡穿透点击（点窗外任意一处=收起，
+   绑的是 catchtap：不挡住冒泡的话会把 .container 的 onBlankTap 一起触发、连带清掉搜索词）。
+   画布不进 fixed：canvas 藏在 left:-9999rpx 只用来生成图片，
+   弹窗里放 canvasToTempFilePath 出的成品 <image>，绕开 share.wxml 顶部记的那条错位坑。 */
+.poster-canvas-offscreen {
+  position: absolute;
+  left: -9999rpx;
+  top: 0;
+}
+
+/* 站长 10-16 两句，第二句把第一句扩到两枚：
+   「详情页外面加一档暗的毛玻璃，突出笔记内文」＋「卡片详情页外面也要做毛玻璃」
+   ⇒ 这一档纱写在 `.float-mask` **本体**上，笔记详情那张窗与卡片成品那张窗共用一份。
+   原来它单独挂在 `.detail-dim` 那一支上、卡片那一屏照旧透明，理由是"他这句点的是笔记详情，
+   不是海报预览"——那半句现在由他自己补掉了，所以合并成一份实现（两页共用 UI 抄两遍必然漂）。
+   ⚠ 两条口径不变：
+   ① 色不新起一支：吃这一张窗自己那道投影同一支暗（`rgba(8, 10, 14, …)`，见下面 `.float-sheet` 的
+      box-shadow），也与本页拉起微信图片面板那层纯黑 `.share-dim` 同族。这一档不吃五档心情：
+      五档那五支玻璃/纱全是**浅色**（含墨档那枚白纱），拿心情色做"暗纱"做不出来，
+      要跟着心情走就得先有一支"每档都暗"的第六枚色——那是他 10-11 定过的"不新起第六枚色"，不动。
+   ② α **.45 这条他没拍过数**（他说的是"一档暗"，两回都没给数）。定 .45 的根据：这一张窗的面是
+      `--bg-card`（象牙档 #F3F3F1，灰阶 ≈ 243），纱压在页底（象牙 #E2DED4，≈ 222）上混出来是 122；
+      窗与底的灰阶差从改前的 21 抬到 121，"突出内文"这件事在数上成立，而 122 这一档还没把列表
+      压成看不见（再往上一档 .6 就 96，列表那几行字开始糊成一团灰）。真跑那把现读现报。
+   糊吃全局那一枚 `--glass-bf`（blur(23px) saturate(1.8)），与卡顶纱／「我的」那两块同一个来源；
+   `-webkit-` 那一行不许省——iOS 的 webview 只认带前缀的那条（同一类坑记在"改一层皮的十三种静默失效"）。
+   ⚠ 底栏（自定义组件 `.tab-bar`，z-index 999）在这一层之上，所以那一排**不会被这档纱盖住**，
+   仍旧是亮的。要让整屏都沉下去得把这层抬到 1000、连带把窗也抬，那是动结构，不在他这两句里。 */
+.float-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--glass-veil-dim);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+  z-index: 100;
+}
+
+.float-sheet {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  top: 130rpx;
+  bottom: 192rpx;  /* 底栏顶到 128（离底 20 + 高 108）+ 64 空隙。站长 10-03：原来那 24 太贴 */
+  /* 站长 10-09（15:2x，对着 v19-3 与 v19-5b 两张图）：窗口内改成与列表页底色一致。
+     列表那张卡刚换成 `--bg-card`，这一层再吃 `--bg-layer` 就成了"窗比背后暗"——方向反了。
+     ⚠ 详情独立页与分享落地页那两处的主面**没有跟着改**，不是漏：那两屏里面一段段的块本身就是
+     `--bg-card`，主面再换成同一支，白卡会和页面同色、分离只剩描边（规格 §7 第一条量过 1.64~1.74）。
+     所以 v31 那条"三屏同一支面"到这一轮只剩半个，两条已拍口径打架，等他一句（§8.184 末）。 */
+  background: var(--bg-card);
+  border-radius: var(--r-block);
+  box-shadow: 0 30rpx 60rpx rgba(8, 10, 14, 0.32);
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 海报那一屏要上下左右居中，所以在共用几何上再叠这两条 */
+.tpl-sheet {
+  align-items: center;
+  padding: 20rpx 0 24rpx;
+}
+
+/* 拉起微信图片面板时垫在它底下的一整屏纯黑（见 index.wxml 那条与 onSavePoster）。
+   1000 这个数是量出来的：底栏是自定义组件、自己的 .tab-bar 写死 z-index 999，
+   压过它才算盖住——那枚胶囊正是他截图里"杂乱"的一条。 */
+.share-dim {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  z-index: 1000;
+}
+
+.tpl-body {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+}
+
+/* 宽高都由 js 按海报自己的比例算好写进 style，所以这里两件事都不能做：
+   flex-shrink（默认是 1）会把这一格压回可视框，max-height 同理——压的是高、宽留着，
+   卡片就扁了。09-30 站长真机截图打回的就是这个。 */
+.tpl-poster {
+  flex: none;
+  border-radius: 20rpx;
+  box-shadow: 0 12rpx 30rpx rgba(8, 10, 14, 0.18);
+}
+
+.tpl-loading {
+  color: #6b6f77;
+  font-size: var(--fs-body);
+}
+
+/* 一共多少套、现在第几套。10 枚各吃分类那同一套色板的一档（toneColor 按序号取模），
+   当前那枚从 10 抬到 16 并去掉淡——只靠"大一点"在十枚里认不出来，得再差一档亮度。 */
+.tpl-dots {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  /* 站长 10-20「支持手指在几个小点上面拖动切换」——那一排点本身只有 16rpx 高（8px），
+     按不住、也拖不动，所以把热区上下各撑开 22rpx。**排布占位一个字没变**：
+     padding 上下各 22 ＋ margin 上 -6 下 -22 ⇒ 净占位仍是「16 上间距 ＋ 16 那一枚点」= 32rpx，
+     而 `_tplBoxRpx()` 给展示框预留的正是这 32。直接加高会让展示框缩一档、海报跟着变小。
+     ⚠ 上下各 22 是"往海报那一边和往底排那一边各借一点"，不是留白：点上面 22rpx 落在海报下沿，
+     那一条上的滑动从此归这一排（左右滑换模板那条本来也从这里冒泡上来）。 */
+  padding: 22rpx 0;
+  margin: calc(var(--sp-2) - 22rpx) 0 -22rpx;
+}
+
+/* 顶上中间那一格改念模板名（站长 10-19「卡片名称，被遮挡，要提到顶上中间」）。
+   被遮挡的根因不在样式在几何：`_tplBoxRpx()` 给展示框预留的是「左右 48 ＋ 下面那一排圆点 32」，
+   10-17 加的名字那行从来没算进预留，而 `.tpl-body` 是居中＋`overflow:hidden`
+   ⇒ 超出的高度上下各切一刀，切到的正是最后一行。搬到顶上后那一列只剩「海报＋圆点」，预留又回到原值。
+   左右各有一句（滑动手势／收窗，各占 34 ＋ 约 130rpx），所以中间这枚必须限宽并省略号：
+   不写 `max-width` 的话，英文那套模板名会把右边那句「点一下收起」挤成竖排。 */
+.grip-tx-c {
+  left: 0;
+  right: 0;
+  justify-content: center;
+  max-width: 340rpx;
+  margin: 0 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tpl-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+.tpl-dot-on {
+  width: 16rpx;
+  height: 16rpx;
+  opacity: 1;
+}
+
+/* 弹窗下沿（站长 10-03 第三稿）：取消｜编辑个人名片 一行，通栏那枚组合按钮一行，
+   小字在按钮下面。左右内缩交给 dock。 */
+.tpl-dock {
+  flex: none;
+  width: 100%;
+  padding: 0 32rpx;
+  box-sizing: border-box;
+}
+
+/* 通栏组合按钮：整条 638 宽，上下内缩照 .tpl-btn 那 22，中间被药丸的 52 顶起来 → 96 高。
+   药丸绝对摆在左边内缩 28、垂直居中；那行字吃整条居中，所以两态刻意等长（都六个字），
+   切开关时字不会左右跳位。底色与字色跟 .tpl-btn.primary 同一对变量，不另立真相。 */
+.tpl-main {
+  position: relative;
+  margin-top: 20rpx;
+  height: 96rpx;
+  border-radius: var(--r-pill);
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.tpl-main.disabled {
+  opacity: 0.45;
+}
+
+/* 药丸压在墨底上，现网那对色号不能照抄：.pill-on 的轨道本来就是 #23252C，
+   跟这一枚的底同一支，抄过来就是看不见。只反色，几何（92×52、点 40、离边 6、行程 40）不动。 */
+.tpl-main .pill {
+  position: absolute;
+  left: 28rpx;
+  top: 22rpx;
+  background: rgba(242, 239, 233, 0.16);
+}
+
+/* 站长 10-03 23:40：「药丸内部底色要有明显区别，代表开启和默认」。原来那两档是 .16 / .42
+   两层淡白，压在墨底上分不出来。现在开着那档直接给实心纸白，圆点反成墨色。 */
+.tpl-main .pill-on {
+  background: #F2EFE9;
+}
+
+.tpl-main .pill-on .pill-dot {
+  background: var(--btn-bg);
+  box-shadow: none;
+}
+
+/* 药丸上面那行小字说的是当前状态（开启／关闭二维码），左沿跟药丸同一档 28 */
+.pill-lab {
+  display: block;
+  margin: 20rpx 0 8rpx 28rpx;
+  font-size: var(--fs-tiny);
+  line-height: 1.4;
+  /* 原来写死旧墨黑 `rgba(35,37,44,.52)`——天青那一套的页底上实测只有 3.03:1，
+     站长 10-05 真机点的"部分数字太浅"里就有这一行（它说的是开关态＋后果，不是装饰字）。
+     改吃三级字令牌，四套壁纸各有各的墨，不再单独留一份写死色。 */
+  color: var(--text-tertiary);
+}
+
+.tpl-main-hint {
+  display: block;
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: var(--fs-tiny);
+  line-height: 1.45;
+  color: rgba(35, 37, 44, 0.52);
+}
+
+/* 「卡片上的信息」那一层那组 .ci-* 样式 10-07 挪进 app.wxss——笔记卡片页也要同一层，
+   两处一份迟早走样（走样的形态是"同一个弹窗在两个入口长得不一样"）。 */
+
+.pill {
+  flex: none;
+  position: relative;
+  width: 92rpx;
+  height: 52rpx;
+  border-radius: var(--r-pill);
+  background: rgba(35, 37, 44, 0.16);
+  transition: background 160ms ease-out;
+}
+
+.pill-on {
+  background: #23252C;
+}
+
+.pill-dot {
+  position: absolute;
+  top: 6rpx;
+  left: 6rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #F2EFE9;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.2);
+  transition: transform 160ms ease-out;
+}
+
+.pill-on .pill-dot {
+  transform: translateX(40rpx);
+}
+
+.tpl-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 20rpx;
+  flex: none;
+}
+
+/* 两张浮窗都是写死的纸白底，所以按钮用实值色、不吃 --text-primary：
+   深色壁纸主题下那个变量是浅色，压在纸白上就读不出来了。 */
+.tpl-btn {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: var(--r-pill);
+  background: rgba(35, 37, 44, 0.06);
+  color: #23252C;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.tpl-btn.ghost {
+  background: transparent;
+  color: rgba(35, 37, 44, 0.62);
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.16);
+}
+
+.tpl-btn.primary {
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+}
+
+.tpl-btn.disabled {
+  opacity: 0.45;
+}
+
+/* 「删除」那一枚吃全局那对危险色（与「我的」页私密密码重置同一写法），不另立色号 */
+.tpl-btn.danger {
+  color: var(--danger);
+  box-shadow: inset 0 0 0 var(--w-edge) var(--danger-soft);
+}
+
+/* ---------- v12：这一屏不再整页滚 ----------
+   容器自己撑满一屏并竖排：图区固定 542，剩下的全给那张圆角卡，卡里再切分类行与列表区。
+   底栏胶囊那一档让位挂在 .sheet 的下内缩上，滚不滚都留那么大；
+   排布层自己再留 150，为的是滚到底时最后一片纸片还能整片露出来。 */
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+/* 铺了图才把这一片翻成纸白；没铺图时它们吃各自主题的墨色——和「我的」页那两块是同一条规则，
+   不新造字色档。下面那两档（右上那一列数字）仍是 `color`，只有左上角那一枚换了做法：
+   它现在是位图，翻色只能挂 `filter: invert(1)`（与首屏那枚同一个做法：invert 的矩阵
+   只动 RGB 三行、alpha 那一行不动 ⇒ 透明底不会被涂白）。
+   条件与原来那两条 `color` 的净效果一字不差：**铺了图、且图不浅**才翻。
+   原来那两条（一条给纸白、一条在浅图那一态翻回墨）撤净。 */
+.container.has-bg:not(.bg-light) .h1 {
+  filter: invert(1);
+}
+
+.container.has-bg .stat .n {
+  color: rgba(242, 239, 233, 0.8);
+}
+
+.container.has-bg .stat .l {
+  color: rgba(242, 239, 233, 0.62);
+}
+
+/* ⚠ 10-17 这一组少了一半：原来还有四条是给"搜索那一枚压在照片上"画的
+   （`.has-bg .ic`／`.has-bg .ic.on`／`.has-bg .srch`／`.has-bg .srch-ph`，浅图那一档另有同名四条），
+   搜索搬进圆角卡之后它永远压在 `--bg-card` 上 ⇒ 八条一起删，`.ic` 那两枚类名也随 `.tools` 没了。
+   10-17 夜里又追一刀：`.srch` 改吃 `--chip-idle`／`--card-edge`／`--text-primary` 那三条令牌，
+   `index.js` 的 `searchSkin` 与 wxml 两处内联 `style` 一起撤 ⇒ **这一页不再有任何一处读 `--chrome-*`**。
+   那两条派生仍在：底栏胶囊与实心按钮照旧走 palette 的 chromeOf／moodChromeOf（app.wxss 那一叠没动）。 */
+
+/* ---------- 背景图是浅色那一档（站长 10-12 下的需求；深浅判定与阈值在 utils/imgBrightness.js）
+   上面那两档数字（加左上角那一枚 invert）把字翻成纸白，前提是罩子压得住那张图；
+   图本身很浅时这条前提不成立，所以这里逐条翻回墨（同一个 #14161A 那一族）。
+   ⚠ 左上角那一枚不在这一组里了：10-16 夜它换成位图，浅图那一档不翻色就是它本来那支墨，
+   所以"浅 ⇒ 撤掉 invert"这件事由上面那条 `:not(.bg-light)` 自己成立，这里不再补一条。
+   ⚠ 延段那条（`.head-scrim::after`）的暗值必须等于浅色渐变自己的末档，
+   与深态同一个规矩（`验-玻璃令牌齐不齐` 两态都钉着）：不等＝542 那条线一道硬边＝R6 打回的"一刀切"。 */
+.container.has-bg.bg-light .stat .n {
+  color: rgba(20, 22, 26, 0.78);
+}
+
+.container.has-bg.bg-light .stat .l {
+  color: rgba(20, 22, 26, 0.56);
+}
+
+/* 10-13 23:36 站长撤了浅照片那一档的提亮罩（「调亮度应该是压暗，现在变成提亮」）。
+   这一页与新建页、「我的」页吃**同一枚本机键**，所以三页一起改：罩层恒为压暗那一支。
+   延段（`.head-scrim::after`）跟着留回压暗那档——它必须等于罩层渐变自己的末档，否则 542 那条线上出硬边。 */
+
+/* ---------- 卡顶那两行固定字跟着图翻（站长 10-12：「自动切换的范围，扩展到笔记列表页和卡片
+   列表页…固定的两行文字」）
+   这两行现在＝面板顶那一行（分类管理＋搜索两枚 `.ixl-ic`）＋下面分类那一排（`.ix-cat`）。
+   它们压的不是头部那层暗罩，是卡顶那 158rpx 的**白纱**，所以上面那条"图深就翻纸白"在这儿方向是反的：
+   白纱把暗图提成了中灰。
+   真机那张演唱会图实测（`docs/design/背景图深浅/量-分段候选.py`，每段只取亮的那 40% 当底）：
+   底中位灰阶 161~175 → 纸白@.96 只有 1.9~2.2，现网 `.72` 那一档 3.2~3.5，整档墨 5.2~6.1。
+   所以这一处跟着图翻的是**墨的浓度**，不是极性：图深→整档墨；图浅→照旧 `.72`
+   （浅那一态同一处量到 5.15、100% 的点过 4.5，本来就够，抬了是白抬）。
+   ⚠ 原来这一组里有 `.vtab` 与 `.ix-back` 两枚，10-17 随两屏合一删掉 ⇒ 剩这一条选择器；
+      `.ixl-ic` 是**新加**的：那一行搬进卡里之后正好落在同一片白纱上，不加就是两行字一行翻一行不翻。
+      代价与 `.ix-cat` 一样：抬到整档墨后"有搜索词那一枚"与另一枚并成一档。
+   ⚠ `:not(.bg-light-low)` 这一档不许省：浅态的容器同样带 `has-bg`，不带这一档的话浅态会被这条一起吃掉
+   （写法同 pages/create/create.wxss 那枚 `.has-bg:not(.entry-dock)`）。
+   ⚠ 吃的是**下那一档**（`bg-light-low`），不是整页那一枚：站长 10-12 21:1x「请按照上下部分来分别判断」，
+   这两行本来就压在卡顶那 158 的白纱上，判的也是那一截的亮度，跟头部大字各判各的。
+   ⚠ 那个 158 是原来两行（`.vtabs`＋`.cats`）量出来的落点（`styles/glass-sheet.wxss` 的头一条停点，
+      由 `验-列表头部铺图-真跑` 按 `.ix-cat` 底边核）。换成 88 高的 icon 行之后这一条线要重新量，
+      **不在这一改里顺手挪**——挪它等于同时改三页共用的那组停点。 */
+.container.has-bg:not(.bg-light-low) .ixl-ic,
+.container.has-bg:not(.bg-light-low) .ix-cat {
+  color: var(--text-primary);
+}
+
+/* 分类筛选 v30 起改「文字 + 短杠」（见上面 .ix-cat 那段）。这里原来那四条
+   `.chip.tone`／`.chip.tone.active`／`.container.has-bg .chip.all`／`.…all.active` 一起删掉：
+   胶囊的底与描边没有了，`toneVars` 那对 --tone-bg/--tone-ink 在这一行不再被消费。
+   `.chip` 本身留着——「我的」页形象那两枚勾选（pages/profile）还在吃它。 */
+
+/* 这一段原来最后还有一句「分类行在图上没有对应态 ⇒ 刻意不写 .has-bg 分支」——那是 10-12 之前，
+   卡顶那片白纱还没算进判据时写的，已经被上面那条 `:not(.bg-light-low)` 推翻，删掉。
+   列表那一批（`.ixl-*`）在纱下面、压在实心卡面上，确实没有 has-bg 分支：那一处不写是对的。 */
+

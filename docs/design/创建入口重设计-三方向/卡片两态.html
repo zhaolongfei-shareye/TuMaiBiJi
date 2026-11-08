@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>创建卡片 · Detent 两态</title>
+<style>
+* { box-sizing: border-box; margin: 0; }
+body { background: #161616; padding: 40px; font-family: -apple-system, "SF Pro Display", system-ui; }
+h1 { color: #fff; text-align: center; font-size: 22px; margin-bottom: 6px; }
+.subtitle { color: #888; text-align: center; font-size: 12px; margin-bottom: 36px; }
+.row { display: flex; gap: 36px; justify-content: center; flex-wrap: wrap; }
+.stage { text-align: center; }
+.stage h2 { color: #e6e6e6; font-size: 13px; margin-bottom: 3px; }
+.stage .cap { color: #777; font-size: 10.5px; max-width: 260px; margin: 0 auto 14px; line-height: 1.5; }
+.phone { width: 268px; height: 480px; border-radius: 30px; background: #000; padding: 7px; box-shadow: 0 10px 36px rgba(0,0,0,.65); }
+.screen { width: 100%; height: 100%; border-radius: 24px; overflow: hidden; position: relative;
+  background: linear-gradient(160deg,#4a3f5c 0%,#2c2836 55%,#1f1c26 100%); }
+.wall { position:absolute; inset:0; }
+.wall::after{ content:""; position:absolute; inset:0; background:radial-gradient(120% 60% at 50% 12%, rgba(255,255,255,.10), transparent 60%); }
+.statusbar { position:absolute; top:0; left:0; right:0; height:26px; display:flex; align-items:center; justify-content:space-between; padding:0 14px; color:#fff; font-size:9px; font-weight:700; opacity:.85; }
+.headline { position:absolute; top:40px; left:18px; color:#fff; }
+.headline .h { font-size:22px; font-weight:800; letter-spacing:.5px; }
+.headline .d { font-size:9px; opacity:.6; margin-top:3px; }
+.tabbar { position:absolute; bottom:0; left:0; right:0; height:44px; display:flex; align-items:center; justify-content:space-around; }
+.tabbar .ti { width:26px; height:26px; border-radius:50%; background:rgba(255,255,255,.16); }
+.tabbar .ti.on { background:#f2efe9; }
+.arrow { position:absolute; top:50%; transform:translateY(-50%); color:#555; font-size:22px; }
+
+/* ===== 态A：高卡片（选择 + 大按钮） ===== */
+.sheetA { position:absolute; left:10px; right:10px; bottom:0; height:196px; background:#fff;
+  border-radius:26px 26px 0 0; box-shadow:0 -6px 28px rgba(0,0,0,.28); padding:16px 16px 18px; }
+.grab { width:34px; height:4px; border-radius:2px; background:rgba(35,37,44,.14); margin:0 auto 12px; }
+.sheetA .lab { font-size:11px; color:rgba(35,37,44,.5); font-weight:600; margin-bottom:10px; }
+.bigbtn { height:56px; border-radius:28px; background:#E9723D; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 6px 16px rgba(233,114,61,.38); }
+.bigbtn svg { width:20px; height:20px; }
+.bigbtn span { font-size:16px; font-weight:800; color:#2C1204; letter-spacing:.5px; }
+.modes { display:flex; gap:8px; margin-top:14px; }
+.mode { flex:1; height:40px; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:rgba(35,37,44,.045); }
+.mode svg { width:14px; height:14px; }
+.mode span { font-size:8.5px; font-weight:700; color:rgba(35,37,44,.5); }
+.mode.on { background:rgba(233,114,61,.14); }
+.mode.on span { color:#C2551F; }
+
+/* ===== 态B/C：压扁横条 + 背后二级内容 ===== */
+.content { position:absolute; left:10px; right:10px; bottom:0; height:250px; background:rgba(242,239,233,.96);
+  border-radius:26px 26px 0 0; padding:16px; }
+.content .ct-lab { font-size:11px; color:rgba(35,37,44,.5); font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.ct-lab .re { margin-left:auto; font-size:9px; color:#C2551F; font-weight:700; }
+.thumbs { display:flex; gap:8px; }
+.thumb { width:64px; height:80px; border-radius:12px; position:relative; overflow:hidden;
+  background:linear-gradient(150deg,#8a7fb0,#5a5170); }
+.thumb:nth-child(2){ background:linear-gradient(150deg,#b08f7f,#705a51);}
+.thumb:nth-child(3){ background:linear-gradient(150deg,#7fae91,#51705c);}
+.thumb .x { position:absolute; top:3px; right:3px; width:14px; height:14px; border-radius:50%; background:rgba(0,0,0,.5); color:#fff; font-size:9px; display:flex; align-items:center; justify-content:center; }
+.field { height:34px; border-radius:10px; background:#fff; border:1px solid rgba(35,37,44,.1); display:flex; align-items:center; padding:0 12px; font-size:12px; color:rgba(35,37,44,.7); margin-bottom:10px; }
+.field .cat { margin-left:auto; font-size:10px; color:rgba(35,37,44,.4); }
+.area { height:78px; border-radius:10px; background:#fff; border:1px solid rgba(35,37,44,.1); padding:10px 12px; font-size:11px; color:rgba(35,37,44,.4); line-height:1.6; }
+.cta { position:absolute; left:10px; right:10px; bottom:44px; height:56px; border-radius:20px; background:#23252C;
+  display:flex; align-items:center; padding:0 8px 0 14px; box-shadow:0 -4px 20px rgba(0,0,0,.24); z-index:5; }
+.cta .badge { width:34px; height:34px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex:none; }
+.cta .badge svg { width:17px; height:17px; }
+.cta .txt { flex:1; text-align:center; font-size:15px; font-weight:800; color:#F2EFE9; letter-spacing:.5px; margin-right:34px; }
+.tabbar.dim { opacity:.9; }
+</style></head><body>
+<h1>创建卡片 · 一张卡片的两个高度</h1>
+<p class="subtitle">收起=选择大按钮 · 采完自动压扁成横条，二级内容从后面露出来 · 示意非终稿</p>
+<div class="row">
+
+  <!-- 态A -->
+  <div class="stage">
+    <h2>① 默认态：一张卡片</h2>
+    <p class="cap">大按钮默认"拍照"，下方四枚可切换功能。整体就在这一张卡里，背后是空的。</p>
+    <div class="phone"><div class="screen">
+      <div class="wall"></div>
+      <div class="statusbar"><span>9:41</span><span>图麦笔记</span></div>
+      <div class="headline"><div class="h">记一笔</div><div class="d">10月7日 周二</div></div>
+      <div class="sheetA">
+        <div class="grab"></div>
+        <div class="lab">采进来，AI 帮你整理成笔记</div>
+        <div class="bigbtn"><svg viewBox="0 0 24 24" fill="none" stroke="#2C1204" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>拍照</span></div>
+        <div class="modes">
+          <div class="mode on"><svg viewBox="0 0 24 24" fill="none" stroke="#C2551F" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>拍照</span></div>
+          <div class="mode"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(35,37,44,.5)" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>相册</span></div>
+          <div class="mode"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(35,37,44,.5)" stroke-width="2.2"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span>链接</span></div>
+          <div class="mode"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(35,37,44,.5)" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span>直接写</span></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 态B -->
+  <div class="stage">
+    <h2>② 采完图：卡片压扁</h2>
+    <p class="cap">选完图，卡片缩成底部大横条"提炼生成笔记"，刚拍的图从后面露出来。</p>
+    <div class="phone"><div class="screen">
+      <div class="wall"></div>
+      <div class="statusbar"><span>9:41</span><span>图麦笔记</span></div>
+      <div class="headline"><div class="h">记一笔</div><div class="d">10月7日 周二</div></div>
+      <div class="tabbar dim"><div class="ti"></div><div class="ti on"></div><div class="ti"></div></div>
+      <div class="content">
+        <div class="ct-lab">已选 3 张<span class="re">重选</span></div>
+        <div class="thumbs">
+          <div class="thumb"><div class="x">✕</div></div>
+          <div class="thumb"><div class="x">✕</div></div>
+          <div class="thumb"><div class="x">✕</div></div>
+        </div>
+      </div>
+      <div class="cta">
+        <div class="badge" style="background:#E9723D"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+        <div class="txt">提炼生成笔记</div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 态C -->
+  <div class="stage">
+    <h2>③ 直接写：同一机制</h2>
+    <p class="cap">切到"直接写"，压扁后露出的换成标题 + 原文框。横条那枚徽标可点回换模式。</p>
+    <div class="phone"><div class="screen">
+      <div class="wall"></div>
+      <div class="statusbar"><span>9:41</span><span>图麦笔记</span></div>
+      <div class="headline"><div class="h">记一笔</div><div class="d">10月7日 周二</div></div>
+      <div class="tabbar dim"><div class="ti"></div><div class="ti on"></div><div class="ti"></div></div>
+      <div class="content">
+        <div class="ct-lab">写点什么<span class="re">换模式</span></div>
+        <div class="field">标题<span class="cat">未分类 ›</span></div>
+        <div class="area">粘贴或输入原文，AI 会提炼成标题、摘要、要点…</div>
+      </div>
+      <div class="cta">
+        <div class="badge" style="background:#F6C445"><svg viewBox="0 0 24 24" fill="none" stroke="#2A2005" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+        <div class="txt">提炼生成笔记</div>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+<p class="subtitle" style="margin-top:30px; color:#666;">关键：① 那张大白卡 与 ②③ 那条深色横条，是<b style="color:#999;">同一个组件的两个高度</b>；二级内容永远住在它"后面"那张浅卡里，横条压住它的下缘。切换只靠状态自动收放，不需要拖拽手势。</p>
+</body></html>

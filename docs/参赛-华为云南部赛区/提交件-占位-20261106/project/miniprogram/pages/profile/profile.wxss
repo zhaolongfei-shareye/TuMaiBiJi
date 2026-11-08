@@ -1,0 +1,115 @@
+/* 卡片市场。这一屏只剩两样：标题右侧那一枚「编辑卡片信息」，和下面那一排排货架。
+   原来摊在页面上的四格形象图、名称框、一句话框与那条「保存」全部收进弹窗
+   （标记在 templates/card-info-sheet.wxml，实现在 utils/cardInfo.js，与首页那一层同一份）。 */
+
+/* 左上角那行大字（站长 10-16 夜「左上角统一为该菜单名称，字体风格要统一」）。
+   ⚠ 这一条与 `pages/categories/categories.wxss` 的 `.page-title` **四条声明逐字相同**——
+   他说的是"统一"，所以两边不许各写一份数；漂没漂由 `验-二级页左上角同档` 那把尺子钉着。
+   10-21 这一行右边多了一枚按钮，所以它从"整页第一个块"变成"标题行的左半"——
+   行这一层的几何在 `.mk-head`，这一条一个字没动（动它就是动那五页同档的那一条）。 */
+.page-title {
+  display: block;
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -1rpx;
+  color: var(--text-primary);
+  margin: var(--sp-5) 0 var(--sp-4);
+}
+
+/* 标题行：左标题、右那一枚。`align-items:center` 而不是 baseline——右边那枚是个有高度的胶囊，
+   按基线对齐会把它顶到标题那一行的下沿上。 */
+.mk-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 「编辑卡片信息」：站长 10-21 夜「按钮太小，要大一档，然后用反白字的按钮」
+   ⇒ 字号走这条阶梯的上一档（--fs-tiny 21 → --fs-meta 24，与上面那两行组名同一档），
+   胶囊跟着从 56 抬到 64（正好一档间距模数），左右留白 20 → 24（--sp-3）。
+   皮从描边换成实心反白：底色/字色用 --btn-bg / --btn-ink 那两枚，就是 `.btn-primary`
+   在用的同一支——不写死墨黑，四套莫兰迪与五档心情才跟着一起换。
+   加粗一并抬到 700：那枚实心按钮的语言里字重是它的一部分，反白底压 600 读着像没换皮。
+   右边仍留 8rpx，与下面那一排格子的内缩同一档（`.grid-inner` 那条注释说的就是这 8）。 */
+.mk-edit {
+  flex: none;
+  margin-right: 8rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-pill);
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ---------- 货架：一组一条、左右滑 ---------- */
+
+/* 站长 10-21「经典款，个性款字体大一档」⇒ 24（--fs-meta）抬到 28（--fs-body），
+   就是这条阶梯的上一档，不另造数。加粗与字色照原样（他只点字号）。 */
+.grid-head {
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--fs-body);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.grid {
+  width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  padding: var(--sp-2) 0;
+}
+
+.grid-inner {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  /* 左右各留 8rpx：这一档从"选中那一格有一圈 3rpx 外环"那时代留下的，10-30 那枚外环撤了
+     （站长「这里只是浏览功能，不需要选择」），但**内缩没跟着撤**——它是这一排的几何，
+     撤了整排会往容器边挪 8rpx，而他点的是皮不是位置。
+     只留 8 不留 24：这一排的组名离容器边 24，横条再内缩 24 就成"标题和卡不对齐"了。 */
+  padding: 0 8rpx;
+}
+
+.cell {
+  flex: none;
+  width: 320rpx;
+  box-sizing: border-box;
+  padding: var(--sp-2);
+  border-radius: var(--r-card);
+  border: var(--w-edge) solid var(--card-edge);
+  background: var(--bg-card);
+}
+
+/* 画布位图 750 宽，格子只有 320，高度由 JS 按比例算好写进 style，
+   这里给个兜底值，别让它在小样画出来之前塌成 0。
+   底色只能透明：圆角现在是画进位图的（poster.clipRounded），而真机上原生画布不吃
+   CSS 的 border-radius，留着 --chip-idle 就是在四个角外各垫一块直角灰斑——
+   站长 09-26 圈的"四个角跟卡片叠在一起"正是这个形状。 */
+.cell-canvas {
+  width: 288rpx;
+  height: 403rpx;
+  border-radius: var(--r-chip);
+  background: transparent;
+}
+
+.cell-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* 整页最后一样是最后一排小样：这一条留白是给 iPhone 底部那根横条的，
+   少了它最后一排格子会压在横条上（原来它挂在「保存」那一条上，10-01 那次搬过一次家）。 */
+.container {
+  padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
+}

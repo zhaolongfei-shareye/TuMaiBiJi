@@ -1,0 +1,116 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>官网改版四屏</title><style>
+@font-face{font-family:'Playfair Display';src:url(素材/playfair-display-latin-400-normal.woff2) format('woff2');font-display:swap}
+@font-face{font-family:'Playfair Display';src:url(素材/playfair-display-latin-500-normal.woff2) format('woff2');font-display:swap}
+:root{--paper:#F2EFE9;--ink:#14161A;--soft:rgba(20,22,26,.64);--faint:rgba(20,22,26,.42);--hair:rgba(20,22,26,.15);--clay:#D2683F;--sage:#6E9070}
+*{box-sizing:border-box}body{margin:0;background:#ddd9d0;font:17px/1.75 -apple-system,'PingFang SC','Helvetica Neue',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+.panel{width:1440px;height:900px;background:var(--paper);padding:56px 88px;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.kicker{margin:0;font:500 13px/1 'Playfair Display',Didot,Georgia,serif;letter-spacing:.24em;text-transform:uppercase;color:var(--clay)}
+h2{margin:14px 0 0;font-weight:400;font-size:46px;line-height:1.2}
+h2 .cn{font-family:'Songti SC',STSong,SimSun,serif;letter-spacing:.01em}
+.lead{margin:16px 0 0;max-width:1040px;color:var(--soft);font-size:18px}
+.grp{margin-top:26px}
+.glab{display:flex;align-items:baseline;gap:12px;font:500 13px/1 'Playfair Display',Didot,Georgia,serif;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.glab .gs{font-family:'Songti SC',serif;font-size:13px;letter-spacing:0;text-transform:none;color:var(--faint)}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.chip{display:inline-flex;align-items:center;gap:9px;padding:9px 15px 9px 10px;border:1px solid var(--hair);border-radius:999px;background:#fff;font-size:16px;font-family:'Songti SC',serif}
+.chip img{width:26px;height:26px;border-radius:6px;object-fit:contain}
+.chip .mn{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;font:600 15px/1 'Songti SC',serif;color:var(--paper);background:var(--ink);flex:0 0 auto}
+.chip.on{border-color:rgba(210,104,63,.55);box-shadow:none;background:#fff}
+.chip.on:after{content:"";width:6px;height:6px;border-radius:50%;background:var(--clay)}
+.chip.gen,.chip.more{padding-left:15px;color:var(--soft);background:transparent;border-style:dashed}
+.disclaim{margin-top:auto;padding-top:18px;font-size:14px;line-height:1.8;color:var(--faint);max-width:1160px;border-top:1px solid var(--hair)}
+.disclaim b{color:var(--ink);font-weight:600}
+.tpls{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-top:12px}
+.tpl{margin:0;flex:0 0 auto;text-align:center}
+.tpl img{width:auto;height:196px;max-width:100%;margin:0 auto;border:1px solid var(--hair);border-radius:4px;display:block;background:#fff}
+.tpl figcaption{margin-top:7px;font:13px/1.4 'Songti SC',serif;color:var(--soft)}
+.log{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:0 46px}
+.log article{border-top:1px solid var(--hair);padding:16px 0 14px}
+.log article:first-child{background:rgba(210,104,63,.06);border-top:2px solid var(--clay);padding:16px 12px 14px;margin:-1px -12px 0}
+.log header{display:flex;align-items:baseline;gap:14px}
+.log .v{font:500 30px/1 'Playfair Display',Didot,Georgia,serif;letter-spacing:-.01em}
+.log .d{font-size:13px;color:var(--faint)}
+.log .now{margin-left:auto;font:13px/1 'Songti SC',serif;color:#fff;background:var(--clay);padding:5px 9px;border-radius:3px}
+.log ul{margin:12px 0 0;padding-left:18px}
+.log li{font-size:15.5px;line-height:1.75;color:var(--soft);margin-bottom:5px}
+.wrap{margin:26px auto;width:1440px;position:relative}
+.tag{position:absolute;left:0;top:-24px;font:13px/1 'Songti SC',serif;color:#6b6b66}
+.row.langs{gap:9px}
+.lg{padding:8px 15px;border:1px solid var(--hair);border-radius:999px;background:#fff;font:15px/1.4 'Songti SC',serif;color:var(--ink)}
+.sw{display:flex;align-items:center;gap:11px;margin-top:14px;padding:13px 18px;border:1px solid var(--hair);border-radius:10px;background:#fff;width:max-content}
+.sw .dot{width:34px;height:20px;border-radius:999px;background:var(--clay);position:relative;flex:0 0 auto}
+.sw .dot:after{content:"";position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff}
+.sw b{font:16px/1 'Songti SC',serif;font-weight:600}
+.sw .hint{font:14px/1 'Songti SC',serif;color:var(--faint)}
+.demo{display:grid;grid-template-columns:1fr 34px 1.15fr;gap:14px;align-items:stretch;margin-top:14px}
+.src,.out{border:1px solid var(--hair);border-radius:8px;background:#fff;padding:14px 16px}
+.src p{display:flex;gap:10px;margin:0 0 11px;font:13.5px/1.55 -apple-system,'Helvetica Neue',sans-serif;color:var(--soft)}
+.src p:last-child{margin-bottom:0}
+.src i{flex:0 0 40px;font:500 10px/1.7 'Playfair Display',Didot,Georgia,serif;letter-spacing:.06em;font-style:normal;color:var(--faint);text-transform:uppercase}
+.src span{flex:1 1 auto}
+.src p[dir],.src span[dir]{text-align:right}
+.arrow{align-self:center;text-align:center;color:var(--clay);font-size:20px}
+.out .ti{margin:0;font:600 17px/1.4 'Songti SC',serif;color:var(--ink)}
+.out .su{margin:7px 0 0;font:13.5px/1.7 'Songti SC',serif;color:var(--soft)}
+.out ul{margin:9px 0 0;padding-left:17px}
+.out li{font:13px/1.65 'Songti SC',serif;color:var(--soft);margin-bottom:2px}
+.out .tg{margin:10px 0 0;font:13px/1 'Songti SC',serif;color:var(--clay)}</style></head><body><div class="wrap"><span class="tag">屏一 · 首页新增：支持的网站（现网没有这一屏）</span><section class="panel">
+  <p class="kicker">Sources · 图麦笔记</p>
+  <h2><span class="cn">贴进来就认得出处</span></h2>
+  <p class="lead">链接粘进去，正文读成一条笔记、配图能存下来的跟着一起存住；来源那一格写的是<b>具体站名</b>，不是一串 http。</p>
+  <div class="grp"><span class="glab">正文和配图都存得下<span class="gs">这六家逐张真下过图（10-29 现网那一趟）</span></span>
+    <div class="row"><span class="chip on"><img src="素材/站标-公众号.png" alt="">公众号</span><span class="chip on"><span class="mn">网</span>网易</span><span class="chip on"><img src="素材/站标-博客园.png" alt="">博客园</span><span class="chip on"><img src="素材/站标-新浪.png" alt="">新浪</span><span class="chip on"><img src="素材/站标-凤凰.png" alt="">凤凰</span><span class="chip on"><img src="素材/站标-CSDN.png" alt="">CSDN</span><span class="chip gen">其它任意网页</span></div></div>
+  <div class="grp"><span class="glab">最新认得这十八家的名字<span class="gs">10-30 灌进后台，来源那一格优先念站名</span></span>
+    <div class="row"><span class="chip "><img src="素材/站标-少数派.png" alt="">少数派</span><span class="chip "><span class="mn">搜</span>搜狐</span><span class="chip "><img src="素材/站标-GitHub.png" alt="">GitHub</span><span class="chip "><img src="素材/站标-arXiv.png" alt="">arXiv</span><span class="chip "><img src="素材/站标-澎湃.png" alt="">澎湃</span><span class="chip "><img src="素材/站标-新华网.png" alt="">新华网</span><span class="chip "><img src="素材/站标-豆瓣.png" alt="">豆瓣</span><span class="chip "><img src="素材/站标-B站.png" alt="">B站</span><span class="chip "><img src="素材/站标-知乎.png" alt="">知乎</span><span class="chip "><img src="素材/站标-微博.png" alt="">微博</span><span class="chip "><img src="素材/站标-小红书.png" alt="">小红书</span><span class="chip "><img src="素材/站标-StackOverflow.png" alt="">StackOverflow</span><span class="chip more">＋ 上面那六家</span></div></div>
+  <p class="disclaim">「认得名字」和「存得进来」是两件事。<b>少数派、搜狐、GitHub、arXiv</b> 这四家正文存得下、配图那一格还差一步
+     （图床要带 Referer 没落码／取回来的是头像和站点图标）；<b>小红书、微博、知乎、B 站、Stack Overflow</b> 这五家被对方的登录墙或反爬挡住，
+     现在只能存下链接那一行；<b>澎湃、新华网、豆瓣</b> 是样本那条正文里本来没图，图这一格没量到。所以第一排只放真存下过的那六家。
+     以上站点名称仅用于说明兼容范围，不代表任何合作或官方背书。</p>
+</section></div><div class="wrap"><span class="tag">屏二 · 模板屏（现网是重画示意 → 换成真实成品）</span><section class="panel">
+  <p class="kicker">Templates · 十一套</p>
+  <h2><span class="cn">同一篇笔记，十一种样子</span></h2>
+  <div class="grp"><span class="glab">经典款（5）<span class="gs">配色跟着你笔记的分类走</span></span>
+    <div class="tpls"><figure class="tpl "><img src="素材/真卡-topBleedEdge.png" alt="图文卡模板真实导出成品"><figcaption>图文卡</figcaption></figure><figure class="tpl "><img src="素材/真卡-card.png" alt="玉版宣模板真实导出成品"><figcaption>玉版宣</figcaption></figure><figure class="tpl "><img src="素材/真卡-quote.png" alt="摘句模板真实导出成品"><figcaption>摘句</figcaption></figure><figure class="tpl "><img src="素材/真卡-block.png" alt="叠翠模板真实导出成品"><figcaption>叠翠</figcaption></figure><figure class="tpl "><img src="素材/真卡-spec.png" alt="规格卡模板真实导出成品"><figcaption>规格卡</figcaption></figure></div></div>
+  <div class="grp"><span class="glab">个性款（6）<span class="gs">敢玩颜色，各自一套版式</span></span>
+    <div class="tpls"><figure class="tpl "><img src="素材/真卡-letter.png" alt="素宣信笺模板真实导出成品"><figcaption>素宣信笺</figcaption></figure><figure class="tpl "><img src="素材/真卡-popGrid.png" alt="波普分格模板真实导出成品"><figcaption>波普分格</figcaption></figure><figure class="tpl "><img src="素材/真卡-popDots.png" alt="网点漫画模板真实导出成品"><figcaption>网点漫画</figcaption></figure><figure class="tpl "><img src="素材/真卡-acid.png" alt="荧光渐变模板真实导出成品"><figcaption>荧光渐变</figcaption></figure><figure class="tpl "><img src="素材/真卡-cover.png" alt="杂志封面模板真实导出成品"><figcaption>杂志封面</figcaption></figure><figure class="tpl "><img src="素材/真卡-lit.png" alt="纸间文艺模板真实导出成品"><figcaption>纸间文艺</figcaption></figure></div></div>
+  <p class="disclaim">上面这十一张是<b>本机产品代码画出来的真实导出成品</b>（同一篇笔记、同一组配图，逐套跑一遍存下来的），不是按版式重画的示意。
+     十一套都在小程序里现选现出，不要钱、没有次数墙。</p>
+</section></div><div class="wrap"><span class="tag">屏三 · 版本更新（现网列到 2.2.0 小版本 → 只留大版本）</span><section class="panel panel-log">
+  <p class="kicker">Changelog · 图麦笔记</p>
+  <h2><span class="cn">改到哪儿了，写在这儿</span></h2>
+  <div class="log">    <article><header><b class="v">2.4</b><span class="d">2026-10-19 起</span><span class="now">当前线上 2.4.16</span></header><ul><li>新增「图文卡」那一套：大图铺在上半、文字压在下沿，卡片模板到十一套</li><li>笔记里的图片能随笔记一起存住，删笔记时云端那份一并删掉</li><li>卡片模板改成「卡片市场」：一排版式摆出来只看，不再点中一格就落盘</li><li>列表那枚星改成「有人转存」；分类字号抬到关于页那一档</li></ul></article>
+    <article><header><b class="v">2.3</b><span class="d">2026-10-17 起</span></header><ul><li>笔记列表与卡片列表合成一屏，看完笔记返回停在原来那一枚标签</li><li>详情窗补上配图那一排；编辑笔记时能单独删掉某一张</li><li>私密密码不再一篇问一回</li><li>卡片的大图位改用这一篇的第一张配图</li></ul></article>
+    <article><header><b class="v">2.2</b><span class="d">2026-10-14 起</span></header><ul><li>界面换成五档彩色毛玻璃：墨、象牙、天青、樱落、雨雾，点「换心情」整屏一起换</li><li>底下三个 tab 跟着玻璃一起换色，面板投影也进同一档</li><li>首页改成通栏那一块深色面板</li></ul></article>
+    <article><header><b class="v">2.1</b><span class="d">2026-10-09 起</span></header><ul><li>名片、昵称、卡片版式、背景亮度存进账号，换手机还在</li><li>首页改版：录入入口更直接，背景图能换、明暗能单独调</li><li>「我的」页新增邮箱一栏；带图的笔记分享出去，朋友能看到图了</li></ul></article>
+    <article><header><b class="v">2.0</b><span class="d">2026-10-08</span></header><ul><li>图片云备份整条打通：随笔记保存、详情页原样看回</li><li>十套卡片模板一次上线，配方走服务端下发</li><li>一篇笔记只留一张卡片图</li></ul></article>
+  </div>
+  <p class="disclaim">只写大版本，小版本号不列（一份包一个号，逐号看没意义）。版本号与上线日期取自微信后台的发布记录；当前线上正式版 2.4.16（2026-10-24 15:19 发布）。</p>
+</section></div><div class="wrap"><span class="tag">屏四 · 十六种外文那一屏（现网没有这一屏）</span><section class="panel">
+  <p class="kicker">Languages · 十六种外文</p>
+  <h2><span class="cn">贴进来是外文，整理出来是中文</span></h2>
+  <p class="lead">英文、阿拉伯文还是泰文都一样——<b>标题、摘要、要点、标签那四栏一律写成中文</b>；
+     原文一个字不动，照原样存在同一篇里，想核对随时切回去看。</p>
+  <div class="grp"><span class="glab">这十六种备着语料<span class="gs">一条探针、每语一段等义短文，埋四个可对数的细节</span></span>
+    <div class="row langs"><span class="lg">英语</span><span class="lg">日语</span><span class="lg">韩语</span><span class="lg">法语</span><span class="lg">德语</span><span class="lg">西班牙语</span><span class="lg">俄语</span><span class="lg">阿拉伯语</span><span class="lg">葡萄牙语</span><span class="lg">意大利语</span><span class="lg">泰语</span><span class="lg">越南语</span><span class="lg">印地语</span><span class="lg">印尼语</span><span class="lg">土耳其语</span><span class="lg">荷兰语</span></div></div>
+  <div class="grp"><span class="glab">屏上就这一枚开关<span class="gs">三条录入路都带着它，默认开着</span></span>
+    <div class="sw"><span class="dot"></span><b>原文翻译</b><span class="hint">识别到外文自动翻译成中文</span></div></div>
+  <div class="grp"><span class="glab">同一段海外原文，三种写法进去<span class="gs">示例语料：英、阿、泰三种文字写的是同一篇纽约高线公园的介绍</span></span>
+    <div class="demo">
+      <div class="src">
+        <p><i>EN</i><span>The High Line opened its first section in 2009 on a disused elevated freight rail line in Manhattan. It runs 2.33 km through the city, planted with over 360 species…</span></p>
+        <p><i>عربى</i><span dir="rtl">افتتح هاي لاين أول قسم له في عام ٢٠٠٩ على خط سكة حديد مرتفع مهجور في مانهاتن، ويمتد لمسافة ٢٫٣٣ كم مزروعًا بأكثر من ٣٦٠ نوعًا…</span></p>
+        <p><i>ไทย</i><span>ไฮไลน์เปิดส่วนแรกในปี 2009 บนทางรถไฟสินค้ายกระดับที่เลิกใช้ในแมนฮัตตัน ยาว 2.33 กิโลเมตร ปลูกมากกว่า 360 ชนิด…</span></p>
+      </div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="out">
+        <p class="ti">纽约高线：老货运铁轨上造的 2.3 公里</p>
+        <p class="su">高线公园第一段 2009 年开放，走的是曼哈顿一条废弃的高架货运铁轨；整条 2.33 公里穿城向北，两侧种了 360 多种草、树和宿根花卉，每年约 800 万人上去走一圈。</p>
+        <ul><li>2009 年开放第一段</li><li>老高架货运铁轨改的，不是新建的公园</li><li>全长 2.33 公里</li><li>360 多种植物，年均约 800 万人次</li></ul>
+        <p class="tg">城市改造 · 公共空间 · 纽约</p>
+      </div>
+    </div></div>
+  <p class="disclaim">三句实话：① <b>它不翻译原文</b>——原文照原样存着，这枚开关只管整理结果用什么语言写；
+     ② <b>界面语言只有中文和英文两种</b>，跟着微信语言走，"十六种"说的是能被整理成中文的原文语言；
+     ③ 截图那一路要先认图上的字，<b>认字这一环的语种边界我们没量过</b>，糊的、字太小的一张可能读不全。
+     上面那三行是<b>示例语料</b>，右边那四栏是这枚开关该出来的样子——<b>上线前这一格要换成一篇真跑出来的读数</b>。</p>
+</section></div></body></html>

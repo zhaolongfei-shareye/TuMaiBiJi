@@ -1,0 +1,444 @@
+<!-- 私密密码那一层：解锁要看私密笔记时浮这一层（与「我的」设／改／重置那一层同一份标记、
+     同一张皮，来历写在 templates/pwd-sheet.wxml 头里）。放在根节点外面，只声明不渲染。 -->
+<import src="../../templates/pwd-sheet.wxml"/>
+<import src="../../templates/card-info-sheet.wxml"/>
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{detailOpen || templateOpen ? 'float-thru' : ''}}" bindtap="onBlankTap">
+  <!-- v12（站长 10-01 拍）：图只守头部这一段 542，下面整块是一张圆角卡往上盖住它 40，
+       于是接缝四个角都是弧——和「我的」页那张 sheet 同一画法、同一个量。
+       09-28 那版"图贯穿全屏"到此结束：当时打回的是"纸一圈描边 + 每条笔记又一圈描边"的框套框，
+       这张圆角卡不描边，只换底色，所以不会再框套框。
+       图取口仍是 utils/poster.js 的 homeBg()，和新建页同一张、同一个开关。
+       v18（站长 10-02 夜里拍做减法）：右上角只剩「笔记」这一列，「分享」「种草」两列
+       跟着那两个屏一起撤；图上这一行由"分类 + 圆钮"换成"一句 Tips + 三枚裸 icon"。 -->
+  <view class="head">
+    <image wx:if="{{bgSrc}}" class="head-img" style="{{detailOpen || templateOpen ? imgStyleThru : imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
+    <!-- 这一层就是「调亮度」那一枚点拧的东西：dimScrim 空串＝全铺（最沉那一档＝现网样子），
+         opacity:0＝一点不压（＝原图亮度）。与新建页 .page-scrim 同一个数、同一个本机键。 -->
+    <view class="head-scrim" style="{{dimScrim}}"></view>
+    <!-- 框外左上角那一个小人 **10-11 撤掉**（站长原话：「左上角的人，透明底侵入主图，
+         列表左上角的人都去掉，维持只有首页有」）。这是对 10-10 深夜那一句的翻案
+         （当时他说「首页人物延续到笔记列表和卡片列表」），两版都留字在这里，免得以后
+         又当成漏画补回去。首页（pages/create）那两位与"点小人换大人"一个字没动。 -->
+    <!-- 站长 10-16 夜两句话，第二句把第一句收窄：
+         ①「这个图片全量放在其他页面左上角，原来左上角的纯文字标题替换最顶上的标题」
+         ②「这个图片，不需要所有页面加，只需要在有背景图状态下加」
+         铺了照片那一态画首屏那枚书法位图（宽与那一档透明度在 `app.wxss` 的 `.brand-title`），
+         没铺那一态回到原来那行纯文字。两态同一个落点（`.h1` 只管位置），文字那几条声明单独挂在
+         `.h1-txt` 那一支上：位图不吃 `font-size` 与 `color`，混在一条里就是"看着有规则、其实不生效"。
+         导航条那一栏两态都念「我的笔记」（`index.js` 的 setNavTitle），`aria-label` 与它同源。 -->
+    <image wx:if="{{bgSrc}}" class="h1 brand-title" src="/assets/title-heading.png" mode="widthFix"
+           aria-label="{{t.notesHeading}}" />
+    <view wx:else class="h1 h1-txt">{{t.notesHeading}}</view>
+    <!-- 一列：笔记。数仍来自服务端那一次 /api/user/quota，本页不自己相加。 -->
+    <view class="stats">
+      <view class="stat" wx:for="{{stats}}" wx:key="key">
+        <text class="n">{{item.n}}</text>
+        <text class="l">{{item.l}}</text>
+      </view>
+    </view>
+
+    <!-- 站长 10-17：「搜索的 icon，我要下移到面板右上角」⇒ 照片段右下这一整行（`.tools`）撤掉，
+         那一枚搜索搬进面板顶那一行（`.ixl-bar`，在下面的 .sheet 里）。
+         这一撤带出两件事，都记在这儿免得以后当成漏画：
+         ① 照片段右下从此是空的（效果图上就是空的，他点头那一版）；
+         ② 原来挂在 `.vtabs` 行右端那枚「返回」（10-10 深夜由「点一下展开」翻来）没有落点了，
+            跟着两枚 tab 一起撤 ⇒ 回第一屏走底栏第一格。 -->
+  </view>
+
+  <view class="sheet">
+  <!-- 面板顶那一行（站长 10-17 两句：「搜索的 icon，我要下移到面板右上角」「左边加一个分类管理 icon，
+       点击可以直接跳转修改分类」，同日又一句「分类设置，改到当前面板，内完成，不需要跳转」）。
+       第二句被第三句改了口径：井格不再跳转，按下去把这一屏换成管理态（增、删、拖都在这一屏办完）。
+       右端搜索——点下去**这一整行**就地摊成输入框，手法与原来挂在照片段右下那一行完全同一条，只是搬了位置。
+       原来那一行（`.tools`）只剩这一枚 icon 且已经搬家 ⇒ 整条撤掉，照片段右下空出来。
+       ⚠ 展开那一态整行仍不画（站长 10-05「展开就不提供搜索」那条口径跟着皮一起搬过来）。
+       ⚠ 管理态与搜索条两立：`wx:if` 那一支先判 `searchOpen`，进来管理态时 js 先把条子收回。 -->
+  <view class="ixl-bar">
+    <view wx:if="{{searchOpen}}" class="srch" catchtap="noop">
+      <view class="glyph-search"></view>
+      <input
+        class="srch-input"
+        focus="{{searchFocus}}"
+        value="{{searchKeyword}}"
+        placeholder="{{t.searchPh}}"
+        placeholder-class="srch-ph"
+        confirm-type="search"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchConfirm"
+      />
+      <view wx:if="{{searchKeyword}}" class="srch-x" catchtap="clearSearch">✕</view>
+      <view class="srch-go" catchtap="onSearchConfirm">{{t.search}}</view>
+    </view>
+    <block wx:else>
+      <view class="ixl-ic {{catEdit ? 'on' : ''}}" catchtap="onCatManageTap" aria-label="{{t.categories}}">
+        <view class="ixl-glyph-grid">
+          <view class="ixl-gq"></view><view class="ixl-gq"></view><view class="ixl-gq"></view><view class="ixl-gq"></view>
+        </view>
+      </view>
+      <!-- 管理态：输入框就长在分类 icon 右手边（站长 10-17 原话「设置分类，在分类ICON右侧，
+           多一个输入框，代表新增分类，支持同时输入多个新增，用空格区隔」）。
+           皮整条复用搜索那一枚 `.srch`：同一行、同一种输入框，不该有两张皮。
+           站长 10-17「搜索框太深，笔记分类输入框同样，要改为透明输入框状态」⇒ 这一枚与搜索条
+           同一条 `.srch` 规则一起换皮，两枚还是同一张皮，不分第二份。
+           外层 `catchtap="noop"`：框里的点击不许冒泡成"点了空白"，否则一敲字就被保存退出。
+           这一态没有搜索那枚——两件事不在同一屏办，进管理态时 js 先把条子收回。 -->
+      <view wx:if="{{catEdit}}" class="srch ixl-add" catchtap="noop">
+        <input
+          class="srch-input"
+          value="{{catNewName}}"
+          placeholder="{{catPh}}"
+          placeholder-class="srch-ph"
+          confirm-type="done"
+          bindinput="onCatAddInput"
+          bindconfirm="onCatAddCommit"
+          bindblur="onCatAddCommit"
+        />
+      </view>
+      <view wx:else class="ixl-ic {{searchKeyword ? 'on' : ''}}" catchtap="onOpenSearch" aria-label="{{t.search}}">
+        <view class="glyph-search"></view>
+      </view>
+    </block>
+  </view>
+  <!-- 分类这一行仍在面板内、两枚 icon 下面（他这次没点到 ⇒ 不撤）。
+       10-16 那三样一起撤的口径不变：不加粗、不纯黑、下划线也没有 ⇒ 这一行**没有选中态标记**。
+       多到一排放不下时照旧左右滚。
+       管理态（站长 10-17 原话逐条落）：
+       「下方已有的，右上角多个×，可以点击删除」＝每枚右上角一枚 ×，私密那一枚不画（他同轮拍「禁止删除」）；
+       「也可以按压拖动，排序」＝长按这枚起拖，横向越过相邻那枚的中线就换位置；
+       「点击页面空白区，就自动保存」＝改动全留在本机，点空白那一下批量提交（`onBlankTap`）。
+       这一态不画「全部」那一枚：它不是他的分类，没有可删可拖的东西。 -->
+  <view class="cats {{catEdit ? 'ix-edit' : ''}}">
+    <scroll-view class="cat-scroll" scroll-x show-scrollbar="{{false}}">
+      <view class="cat-chips">
+        <view
+          class="ix-cat {{item.key === 'all' ? (selectedCategory === null ? 'on' : '') : (selectedCategory === item.id ? 'on' : '')}} {{item.state}}"
+          wx:for="{{catView}}"
+          wx:key="key"
+          data-key="{{item.key}}"
+          data-id="{{item.id}}"
+          catchtap="onCatChipTap"
+          bindtouchstart="onCatTouchStart"
+          bindlongpress="onCatDragStart"
+          bindtouchmove="onCatDragMove"
+          bindtouchend="onCatDragEnd"
+          bindtouchcancel="onCatDragEnd"
+        >
+          <text class="ix-cat-t">{{item.label}}</text>
+          <view wx:if="{{item.x}}" class="ix-cat-x" catchtap="onCatDeleteTap" data-key="{{item.key}}">✕</view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+  <!-- 压在元素上面那一句（站长 10-18「划过去的那一句，显示在对应的元素上面」）。
+       它是页面上的一枚浮层、不挂进芯片里面：那一排在横向 scroll-view 里，超出盒子的那一截会被切掉
+       （`.ix-cat-x` 那条注释钉的就是同一型，那一枚只能落在缝里）。落点是按下去那一下现量的。 -->
+  <view wx:if="{{catNote}}" class="ix-note" style="left:{{catNoteX}}px;top:{{catNoteY}}px">{{catNote}}</view>
+
+  <!-- v12：列表不再整页滚，改在这块区域里自己滚、滚到底再取下一批。
+       内缩挂在 .sheet 的 padding 上，不挂在 scroll-view 自己身上——挂在它身上时
+       右侧要给滚动条留位，左右就不等宽了（详情浮窗那一层实测右移 12rpx，同一条坑）。
+       10-17 合一：一天一组，组头是左槽那一个大数字，组内一行一篇（序与筛选仍是同一份 notes）。 -->
+  <scroll-view
+    class="list"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    lower-threshold="160"
+    bindscrolltolower="onListToLower"
+  >
+    <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
+
+    <view wx:elif="{{notes.length === 0 && !loading}}" class="empty">
+      <text>{{t.noNotes}}</text>
+    </view>
+
+    <!-- 一行三档：来源小字 → 标题 → 标识轨。轨上从左到右是 ★ 分享过／▢ 出过卡片／🔒 私密，
+         末尾那条 2px 细线自己收满剩下的宽（站长 10-17：「标题下方，参考图有一条线，你可以利用这条线
+         做一些标识」「线上的 icon 可以很小，但辨识度要高，一眼就知道」）。
+         右端配图：**有就画、没有什么都不画**（他原话），它身上不挂任何东西——标识全在线上。
+         私密那一行一律不画配图（闸，不是装饰；判据与来历写在 index.js 的 arrange）。 -->
+    <view wx:else class="ixl-groups">
+      <view class="ixl-grp" wx:for="{{groups}}" wx:key="key">
+        <view class="ixl-gut">
+          <text class="ixl-day">{{item.d}}</text>
+          <text class="ixl-wd">{{item.w}}</text>
+          <view wx:if="{{item.today}}" class="ixl-today"></view>
+        </view>
+        <view class="ixl-body">
+          <view class="ixl-row" wx:for="{{item.rows}}" wx:for-item="r" wx:key="id"
+                catchtap="onRowTap" data-idx="{{r.i}}">
+            <view class="ixl-mid">
+              <view class="ixl-src">
+                <text wx:if="{{r.cat}}" class="ixl-cat {{r.priv ? 'cat-priv' : ''}}">{{r.cat}}·</text>
+                <text class="ixl-src-t">{{r.src}}</text>
+                <text wx:if="{{r.who}}" class="ixl-who">· {{r.who}}</text>
+              </view>
+              <text class="ixl-tt">{{r.title}}</text>
+              <view class="ixl-rail">
+                <view wx:if="{{r.saved}}" class="ixl-mk ixl-star"></view>
+                <view wx:if="{{r.card}}" class="ixl-mk ixl-card"></view>
+                <view wx:if="{{r.priv}}" class="ixl-mk ixl-lock"></view>
+                <view class="ixl-ln"></view>
+              </view>
+            </view>
+            <image wx:if="{{r.cover}}" class="ixl-th" src="{{r.cover}}" mode="aspectFill"
+              binderror="onRemoteImgError" data-slot="list-cover" data-src="{{r.cover}}" />
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 翻页那一句挂在排布之外：它不该占掉一格的位置 -->
+    <view wx:if="{{loadingMore}}" class="loading-more">{{t.loading}}</view>
+  </scroll-view>
+  </view>
+
+  <!-- v22（站长 10-03 第四轮）：详情窗这一态不再让列表从窗四周透出来。中间那批整块藏掉
+       （圆角纸卡本体 + 两枚 tab + 那条通栏横线 + 分类行 + 行卡），形象图贯穿到屏底，
+       只留头部那两样（「我的笔记」和右上角那列数字）、底栏和系统导航条——
+       他的原话：留头部那两样才知道自己还在哪一层，图贯穿才和别的页统一。
+       窗下沿从 152 抬到 192（离底栏 24 → 64）。
+       出卡片的入口挪到右上那一格（有卡片就是那张缩略图，一张都没有就是那枚淡底方形），
+       底排只剩 编辑／删除 + 公开状态那一行，不留第二个把手。
+       窗外任意一处都是回列表的口：那层罩子是铺满整屏的，点在头部那两行字上也算。
+       它绑的是 catchtap 不是 bindtap——冒泡到 .container 的 onBlankTap 会把搜索词一起清掉，
+       一次点击只干一件事（词留着，✕ 才是清词的口）。 -->
+  <!-- 站长 10-16 两句，第二句把第一句扩到两枚：「详情页外面加一档暗的毛玻璃，突出笔记内文。
+       点击返回恢复」＋「卡片详情页外面也要做毛玻璃」⇒ 这一枚遮罩与下面卡片成品那一屏
+       共用同一档暗纱，那份写法在 `.float-mask` 本体上（一份实现，两屏同一档，不各抄一遍）。
+       "点击返回恢复"这条本来就在：这枚遮罩绑 catchtap=onCloseDetail，窗里上面那枚 grip 同一个口。 -->
+  <view wx:if="{{detailOpen}}" class="float-mask" catchtap="onCloseDetail"></view>
+  <view wx:if="{{detailOpen}}" class="float-sheet" style="{{detailNote.catStyle}}">
+    <view class="grip" bindtap="onCloseDetail">
+      <view class="grip-bar"></view>
+      <!-- 站长 10-20：「（详情窗）左上角，加提示词"左右滑动看下一篇"」。字照他给的抄，
+           落点与卡片那一屏左端那一句「左右滑换模板」同一档（`.grip-tx-l`：同一行、左端 34rpx）。
+           只在真有一前一后时画——列表筛完只剩这一篇时这一句就是假话。 -->
+      <text class="grip-tx grip-tx-l" wx:if="{{dsHasNav}}">{{t.noteSwipeHint}}</text>
+      <text class="grip-tx">{{t.grip}}</text>
+    </view>
+    <scroll-view class="ds-body" scroll-y show-scrollbar="{{false}}"
+      scroll-into-view="{{dsTo}}" scroll-with-animation="{{true}}">
+      <view class="ds-in" id="ds-top">
+      <!-- 抬头（站长 10-17 深夜两句：「统一把右侧的笔记卡片图位置去掉，标题统一贯穿」＋
+           「大图上方是我们标题，不加背景色了，恢复之前那种标题设计」）：
+           头一排那两列分栏撤了 ⇒ 来源／标题／标签三行摊满整宽，标题底下不再有这篇留过的卡片那一格。
+           `.ds-rt`/`.ds-pad` 本体留在 `app.wxss` 没删——独立详情页那一屏还在用，这一轮没动它。
+           标签跟着他这一句弱化了（「只需要显示标签名字，灰字，不加底色，不加粗」），写法见 index.wxss 的 `.ds-tag`。 -->
+      <view class="ds-meta"><text wx:if="{{detailNote.catSeg}}" class="ds-cat {{detailNote.is_private ? 'cat-priv' : ''}}">{{detailNote.catSeg}}·</text><text class="ds-src">{{detailNote.source_type_label}}</text><text class="ds-time">· {{detailNote.created_at_label}}</text></view>
+      <!-- 手势只挂在这一枚上（不挂整窗）：窗里正文要上下滚、配图那一排点了要开大图，
+           整窗吃横向手势会把那两件事挡掉。来历三条口径写在 index.js 的 onDsTitleTouchStart。 -->
+      <view class="ds-h2" bindtouchstart="onDsTitleTouchStart" bindtouchend="onDsTitleTouchEnd">{{detailNote.title}}</view>
+      <view class="ds-tags" wx:if="{{detailNote.tags && detailNote.tags.length}}">
+        <text class="ds-tag" wx:for="{{detailNote.tags}}" wx:key="*this" wx:for-item="tg">#{{tg}}</text>
+      </view>
+      </view>
+
+      <!-- 配图（站长 10-17 深夜：「配图改为这种形式，固定高度图片区（如果不配图，这部分空间就隐藏），
+           通栏大图滑动，显示数字，和下方圆点，横杠」）。三档数是照他附的那张截图量的：
+           图区高＝宽×0.5627（窗内通栏 702 ⇒ 395）、圆点 11rpx、当前那枚是 25×11rpx 的横杠、间距 6rpx。
+           通栏＝挂在 `.ds-in` 外面：那 34rpx 内缩一挂上左右就让出去了，那就不叫通栏。
+           没有配图这一整块（图区＋数字＋点）都不渲染，不留占位框。
+           ⚠ 私密篇不画：`_openDetail` 对私密那一趟压根不发 assets 请求。
+           列表那一趟只给一栏 `cover_file_id`（右侧那枚封面），一排图要逐篇问一次
+           `/api/notes/{id}/assets`，所以只在开窗看这一篇时发。 -->
+      <block wx:if="{{detailImages.length}}">
+        <swiper class="ds-fig" current="{{dsFigAt}}" circular="{{false}}"
+          indicator-dots="{{false}}" bindchange="onDsFigChange">
+          <swiper-item wx:for="{{detailImages}}" wx:key="id" wx:for-item="im">
+            <view class="ds-fig-cell">
+              <!-- 底那一层：同一张照片放大铺满＋高斯模糊（站长 10-19 原话「图片展示不全，改为按比例缩小，
+                   其他部分空间用同照片毛玻璃铺满」）。放大 12% 且左上各外挪 6% 不是装饰：模糊会把图自己
+                   边缘那一圈半透明渐隐带出来，不外推就露在图区四边上（读成"框了一条脏边"）。 -->
+              <image class="ds-fig-bg" src="{{im.cloud_url}}" mode="aspectFill" lazy-load />
+              <!-- 上面那张按宽或按高取小的一边完整放进 395rpx 的图区（aspectFit＝不裁，剩下的交给底）。
+                   点它还是拉全屏大图，这条没改。 -->
+              <image class="ds-fig-img" src="{{im.cloud_url}}" mode="aspectFit" lazy-load
+                catchtap="onPreviewDetailImage" data-url="{{im.cloud_url}}"
+                binderror="onRemoteImgError" data-slot="detail-sheet" data-src="{{im.cloud_url}}" />
+            </view>
+          </swiper-item>
+        </swiper>
+        <!-- 只有一张：数字与那一排点都不画（一条没有"下一张"的滑动条是噪音）。这条他没拍过，写在报告里。 -->
+        <view wx:if="{{detailImages.length > 1}}" class="ds-cnt">
+          <text class="ds-cnt-n">{{dsFigAt + 1}}/{{detailImages.length}}</text>
+        </view>
+        <view wx:if="{{detailImages.length > 1}}" class="ds-dots">
+          <view wx:for="{{detailImages}}" wx:key="id" wx:for-item="im"
+            class="ds-dot {{index === dsFigAt ? 'on' : ''}}"></view>
+        </view>
+      </block>
+
+      <view class="ds-in">
+      <view class="ds-lab" wx:if="{{detailNote.summary}}">{{t.summaryLabel}}</view>
+      <view class="ds-para" wx:if="{{detailNote.summary}}">{{detailNote.summary}}</view>
+
+      <block wx:if="{{detailNote.key_points && detailNote.key_points.length}}">
+        <view class="ds-lab">{{t.keyPoints}}</view>
+        <view class="ds-pt" wx:for="{{detailNote.key_points}}" wx:key="index" wx:for-item="kp">
+          <!-- v22：换头部 Tips 那种 14 小黄点，带圈序号 1 2 3 撤了、序号也不再显示
+               （这四条是并列要点、不是步骤，读的人不需要数到第几条）。 -->
+          <view class="ds-pt-dot" style="{{tipDotStyle}}"></view>
+          <view class="ds-pt-x">{{kp}}</view>
+        </view>
+      </block>
+
+      <view class="ds-lab" wx:if="{{detailNote.source_url}}">{{t.sourceLink}}</view>
+      <view class="ds-link" wx:if="{{detailNote.source_url}}" catchtap="openSourceUrl">{{detailNote.source_url}}</view>
+      <view class="ds-hint" wx:if="{{detailNote.source_url}}">{{t.linkHint}}</view>
+
+      <view class="ds-lab" id="ds-orig" wx:if="{{detailNote.original_content}}">{{t.originalContent}}</view>
+      <view class="ds-para" wx:if="{{origOpen && detailNote.original_content}}">{{detailNote.original_content}}</view>
+      <view class="ds-pad-b"></view>
+      </view>
+    </scroll-view>
+
+    <!-- 「显示更多」钉在正文与动作条之间（站长 10-03：第一屏要有个口，点了跳到下面看原文）。
+         没有原文的这篇不画——那等于给一个跳不到的地方。 -->
+    <view class="ds-more" wx:if="{{detailNote.original_content}}" catchtap="onSheetMore">
+      <text>{{origOpen ? t.collapse : t.showMore}}</text>
+      <view class="chev {{origOpen ? 'up' : 'down'}}"></view>
+    </view>
+
+    <!-- 动作条：v22 起两枚并排一行（「生成笔记卡片」那一枚挪进右上那一格，入口只留一个；
+         「置顶」那枚 10-03 上午已随独立详情页一起撤净）。
+         10-17 深夜站长这一句把那一格又拆了一半：「在详情页下方，编辑和删除中间增加一按钮，分享笔记，
+         点击切换卡片大图窗口」＋「如果笔记没有生成卡片，右上角也不要加任何制作卡片的图标和文字」
+         ⇒ 这一行三枚。私密那一枚**照画但置灰**，话术就念他那句「私密笔记不支持分享」，点了不办事。 -->
+    <view class="ds-dock">
+      <view class="ds-irow">
+        <view class="ds-ibtn {{detailNote.is_preset ? 'disabled' : ''}}" catchtap="onSheetEdit">{{t.edit}}</view>
+        <view class="ds-ibtn {{(detailNote.is_private || detailNote.is_preset) ? 'disabled' : ''}}" catchtap="onSheetShare">{{t.shareNote}}</view>
+        <view class="ds-ibtn danger" catchtap="onSheetDelete">{{t.delete}}</view>
+      </view>
+      <!-- 私密那一枚置灰，理由写在它下面那一行（站长这句：「私密不支持分享，按钮提示词显示
+           『私密笔记不支持分享』，置灰」）。这句没有直接塞进按钮里，是因为那一行三枚等宽
+           （窗内净宽 634 ÷ 3 ≈ 211rpx），十个字在 `--fs-meta` 那一档要 240rpx，塞进去就折行、
+           整排按钮高低不齐——现网那条 nowrap 尺子当场红。按钮在两态念同一串字，位置也不跳。 -->
+      <text wx:if="{{detailNote.is_private}}" class="ds-no-share">{{t.privateNoShare}}</text>
+      <!-- 官方那一篇：不能编辑、不能分享、删得掉（站长 10-18）。与上面私密那一行同一个落点、同一支字，
+           两条不叠加（wx:elif）——那一排三枚按钮等宽，话塞进按钮里会折行、整排高低不齐。 -->
+      <text wx:elif="{{detailNote.is_preset}}" class="ds-no-share">{{t.presetHint}}</text>
+      <view wx:if="{{shared && !detailNote.is_private}}" class="ds-pub">
+        <text class="ds-pub-l">{{t.sharedNow}}</text>
+        <text class="ds-pub-act" catchtap="onSheetUnshare">{{t.unshare}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- v7：海报画布藏在屏幕外、不进 fixed——这条是历史坑（fixed 里的原生 canvas 会整体错位）。
+       弹窗里显示的是 canvasToTempFilePath 出的成品 <image>，image 进 fixed 是常规做法。 -->
+  <canvas id="posterCanvas" type="2d" class="poster-canvas-offscreen" style="width: {{canvasW}}rpx; height: {{canvasH}}rpx"></canvas>
+
+  <!-- v7 ④⑤：模板独浮弹窗——拉弹窗时详情窗整个藏起来，页面上只剩这一个浮层，
+       背后什么都不垫。取消 / 保存成功 / 点把手三个口收掉弹窗后回到详情窗那一屏（不是回列表）。 -->
+  <!-- 真机两轮都没治好，第二轮（藏 visibility）他原话「还没修好，依旧这样」。所以这一态不再
+       跟层序讲道理：小弹窗开着时把成品弹窗这一整层**从渲染树里摘掉**（`wx:if`，不是 `visibility`），
+       这一态页面上就只剩小弹窗一个浮层——和「我的」页私密密码那一层一模一样，那一层在他
+       iPhone 11 真机上是好的。摘掉不会重出图：画布在屏幕外（上面那条 `posterCanvas`），
+       收掉小弹窗由 onCloseCardInfo 按 `_ciDirty` 决定要不要重画一次。
+       遮罩那一条本来就不渲染：它透明，留着会抢走「点窗外收小弹窗」那一下，变成收成品弹窗。 -->
+  <view wx:if="{{templateOpen && !cardInfoOpen}}" class="float-mask" catchtap="onCancelTemplate"></view>
+  <view wx:if="{{templateOpen && !cardInfoOpen}}" class="float-sheet tpl-sheet">
+    <view class="grip" bindtap="onHandleTap">
+      <!-- 顶上中间那一格：未生成态念模板名，其余时候（已生成态、卡片那一屏）仍是那根把手条。
+           站长 10-19「卡片名称，被遮挡，要提到顶上中间」——被遮挡的根因不在样式，在几何：
+           `_tplBoxRpx()` 给展示框预留的是「左右 48 ＋ 下面那一排圆点 32」，10-17 新加的名字那行
+           从来没算进预留，而 `.tpl-body` 是居中＋`overflow:hidden`，超出的高度上下各切一刀，
+           切到的正是最后一行。搬到顶上之后那一列只剩「海报＋圆点」，预留又回到原值。
+           左右各有一句（滑动手势／收窗），所以中间这枚限宽加省略号，不许把两句挤走。
+           ⚠ 10-20 站长追一句「卡片模板名称（字体加粗）左右加小箭头，例如 < 图文卡 >，
+           提醒用户知道可以左右滑」：加粗那一格本来就成立（`.grip-tx` 那一条写死 700，
+           屏上实测 font-weight 也读到 700），这一刀只补两枚箭头。写成表达式 `'< ' + … + ' >'` 而不是把
+           尖括号直接敲进标签里——WXML 是 XML，正文里的裸 `<` 不是"难看"而是解析不了。
+           两边各留一个空格照他写的原样；箭头与名字同一条 `text`，所以点它照旧走
+           `onTplNameTap`（一枚可点的东西不拆成三枚），限宽那 340rpx 也仍是整条一起省略。 -->
+      <text wx:if="{{!posterHasCard && posterTplName}}" class="grip-tx grip-tx-c" catchtap="onTplNameTap">{{'< ' + posterTplName + ' >'}}</text>
+      <view wx:else class="grip-bar"></view>
+      <!-- 左右各一句、同一行同一档：右边收窗，左边告诉他这一屏能左右滑。
+           原来那句挂在卡片下面，卡片一高就被顶到看不见。 -->
+      <text class="grip-tx grip-tx-l" wx:if="{{!posterHasCard}}">{{t.swipeHint}}</text>
+      <text class="grip-tx">{{t.grip}}</text>
+    </view>
+    <view class="tpl-body" bindtouchstart="onPosterTouchStart" bindtouchend="onPosterTouchEnd">
+      <image wx:if="{{posterImagePath}}" class="tpl-poster" src="{{posterImagePath}}" mode="aspectFit" style="width: {{posterW}}rpx; height: {{posterH}}rpx" />
+      <view wx:else class="tpl-loading">{{t.loading}}</view>
+      <!-- 一共多少套、现在第几套：每套一枚，当前那枚大一点、其余淡一档 -->
+      <!-- 已生成态不给换模板，那排圆点跟着不画（留着会以为还能滑） -->
+      <!-- 站长 10-20：「生成笔记时候，切换模板，支持手指在几个小点上面拖动切换（支持循环，
+           滚动最后一个，再切到第一个，不要卡死），否则用户不知道怎么切换」。
+           这一排现在能**按着一枚枚拖着走**：手指每挪过一枚圆点的间距（22rpx）就换一套。
+           ⚠ 三枚都是 `catch` 不是 `bind`：这一排在 `.tpl-body` 里面，而 `.tpl-body` 自己挂着
+           那一条"滑过 60px 换一套"。用 bind 的话拖一次点会**同时**触发两条，一次跨两套。
+           热区比那一排点本身高（见 index.wxss 的 `.tpl-dots`：16rpx 的一条按不住）。 -->
+      <view class="tpl-dots" wx:if="{{!posterHasCard}}"
+        catchtouchstart="onTplDotsTouchStart" catchtouchmove="onTplDotsTouchMove"
+        catchtouchend="onTplDotsTouchEnd" catchtouchcancel="onTplDotsTouchEnd">
+        <view wx:for="{{tplIds}}" wx:key="id"
+          class="tpl-dot {{item.id === posterTpl ? 'tpl-dot-on' : ''}}"
+          style="background: {{item.color}}"></view>
+      </view>
+      <!-- 模板名字不在这条列里（站长 10-19 搬到顶上中间，见上面 `.grip` 那一段）。
+           ⚠ 别把它挪回来：这一列的高度是 `_tplBoxRpx()` 按「海报＋圆点」预留算的，
+           多一行就被 `justify-content:center` ＋ `overflow:hidden` 上下各切一刀。
+           滑到哪一套就念哪一套那枚 1.2 秒 toast 也早已撤净（同一件事不留两处）。 -->
+    </view>
+    <view class="tpl-dock">
+      <!-- 已生成态（站长 10-03 23:40）：底排两枚，模板不能滑、名片不能改，要换就先删这一张。
+           下面那行小字说的是删完之后会怎样——服务端那张活码一行都不碰。
+           左端那枚原来复用「取消」：站长 10-04 改成「查看笔记」，点了进这篇的详情页；
+           收窗仍留着顶上那句「点一下收起」和点窗外那层遮罩，两条口一条都没撤。 -->
+      <block wx:if="{{posterHasCard}}">
+        <!-- 站长 10-04：已生成态上面先给一枚通栏「分享卡片」，把台账里这一张再发一次。
+             吃的是 .tpl-main 同一套（--accent 深墨底 + --bg-page 纸白字），不另起色阶。
+             面板里那几枚是微信系统层，样式与文案都不给改；"发到公众号"不在这一格里，
+             所以这行字只写它真给的两项（微信好友／朋友圈）。 -->
+        <view class="tpl-main {{posterImagePath ? '' : 'disabled'}}" bindtap="onShareCard">
+          <text>{{t.cardShare}}</text>
+        </view>
+        <view class="tpl-actions">
+          <view class="tpl-btn ghost" bindtap="onViewNote">{{t.viewNote}}</view>
+          <view class="tpl-btn danger" bindtap="onDropCard">{{t.cardDrop}}</view>
+        </view>
+        <text class="tpl-main-hint">{{t.cardDropHint}}</text>
+      </block>
+      <block wx:else>
+      <view class="tpl-actions">
+        <view class="tpl-btn ghost" bindtap="onCancelTemplate">{{t.cancel}}</view>
+        <view class="tpl-btn" bindtap="onOpenCardInfo">{{t.editCard}}</view>
+      </view>
+      <!-- 通栏这一枚是组合按钮：整条按下去就是分享，左边那枚药丸只切开关。
+           药丸这层必须留 catchtap（现网 `.tpl-qr` 上本来就是）——冒泡上去会连带触发分享，
+           等于关个二维码把图顺手发出去了。站长 10-03：「取消和编辑个人名片放同一行，
+           二维码药丸与分享做成组合按钮，通栏」。 -->
+      <!-- 药丸上面那行小字说的是"现在开着还是关着"（默认开启，点药丸切成关闭二维码）；
+           按钮中间那行只说这一枚要干什么＝生成分享图，原来那两句"带／无二维码分享"随之撤掉。
+           原来挂在按钮下面那句长说明挪走了：它同时挂在海报页 share.wxml:16，那页照留。 -->
+      <text class="pill-lab">{{noQr ? t.qrOff : t.qrOn}}</text>
+      <view class="tpl-main {{posterImagePath ? '' : 'disabled'}}" bindtap="onSavePoster">
+        <view class="pill {{noQr ? '' : 'pill-on'}}" catchtap="onToggleQr"><view class="pill-dot"></view></view>
+        <text>{{t.posterMake}}</text>
+      </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- 「卡片上的信息」：站长 10-03 要的是出卡片这一屏就地改名片，不必绕去「我的→卡片模板」。
+  <!-- 这一层的标记搬到 templates/card-info-sheet.wxml（10-21 起两页共用一份：这里与「卡片市场」标题
+       右侧那枚「编辑卡片信息」）。皮在 app.wxss 的 `.ci-*`，收数据与推格在 utils/cardInfo.js。 -->
+  <template is="cardInfoSheet" data="{{cardInfoOpen, ciSlots, ciName, ciSlogan, t}}"/>
+
+  <!-- 微信图片面板那五枚按钮是半透明底，会把我们这一页透出来（站长 10-02 iPhone 11：
+       "背景并没有全黑，看到后面杂乱无章"）。这一层盖在它底下那一页上：整屏纯黑，
+       连弹窗和底栏一起盖住（底栏是自定义组件、z-index 999，所以这里要压过它）。
+       面板一收就由 onSavePoster 的 complete 撤掉，不常驻。 -->
+  <view wx:if="{{shareDim}}" class="share-dim"></view>
+
+  <!-- 私密密码那一层：点一行私密笔记，先浮这一层问一串（与「我的」设／改／重置那一层
+       同一份标记、同一张皮，站长 10-12「要统一」）。收键与判定在 utils/pwdSheet.js，
+       三个方法（onPwdBuf／onPwdOk／onClosePwdPanel）在本页只是转给它。
+       遮罩那一条用的是 catchtap：本页根节点挂着 onBlankTap（点空白收搜索条），
+       冒泡上去就会在关这一层的同时把他打的词一起清掉。
+       这一层和详情窗不会同时浮着：点那一行是先问密码、后开窗（onRowTap），验不过连窗都不开。 -->
+  <template is="pwdSheet" data="{{pwdOpen, pwdEntering, pwdName, pwdScene, pwdTip, pwdBuf, pwdFocus, t}}"/>
+</view>

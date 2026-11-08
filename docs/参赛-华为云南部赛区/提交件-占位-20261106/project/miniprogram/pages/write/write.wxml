@@ -1,0 +1,118 @@
+<!-- 私密解锁那一层的标记在 templates/pwd-sheet.wxml（10-12 起三页共用一份，站长拍「两个密码框要统一」；
+     这一页 10-12 起也自己问一次，判据出处见 utils/privateGate.js 的 unlockOn 与 loadNoteForEdit）。 -->
+<import src="../../templates/pwd-sheet.wxml"/>
+<view class="container {{themeClass}}">
+  <view class="form-section card">
+    <view class="form-group">
+      <text class="label">{{t.title}} *</text>
+      <input 
+        class="input" 
+        placeholder="{{t.titlePlaceholder}}"
+        value="{{formData.title}}"
+        bindinput="onTitleInput"
+        maxlength="100"
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">{{t.summary}}</text>
+      <textarea 
+        class="textarea" 
+        placeholder="{{t.summaryPlaceholder}}"
+        value="{{formData.summary}}"
+        bindinput="onSummaryInput"
+        maxlength="500"
+        auto-height
+      />
+      <text class="char-count">{{formData.summary.length || 0}}/500</text>
+    </view>
+
+    <view class="form-group">
+      <text class="label">{{t.keyPointsHint}}</text>
+      <textarea 
+        class="textarea" 
+        placeholder="{{t.keyPointsPlaceholder}}"
+        value="{{keyPointsText}}"
+        bindinput="onKeyPointsInput"
+        auto-height
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">{{t.tagsHint}}</text>
+      <input 
+        class="input" 
+        placeholder="{{t.tagsPlaceholder}}"
+        value="{{tagsText}}"
+        bindinput="onTagsInput"
+      />
+      <view class="tag-order" wx:if="{{tagList.length}}">
+        <view
+          class="tag-chip {{index === 0 ? 'first' : ''}}"
+          wx:for="{{tagList}}"
+          wx:key="index"
+          data-index="{{index}}"
+          bindtap="promoteTag"
+        >{{item}}</view>
+      </view>
+      <text class="tag-order-hint" wx:if="{{tagList.length > 1}}">{{t.tagOrderHint}}</text>
+    </view>
+
+    <view class="form-group">
+      <text class="label">{{t.categoryLabel}}</text>
+      <picker mode="selector" range="{{categoryNames}}" value="{{selectedCategoryIndex >= 0 ? selectedCategoryIndex + 1 : 0}}" bindchange="onCategoryChange">
+        <view class="picker-value">
+          {{selectedCategoryIndex >= 0 ? categoryNames[selectedCategoryIndex + 1] : t.noCategory}}
+        </view>
+      </picker>
+    </view>
+
+    <!-- 配图（站长 10-18「编辑时，图片要展示，然后支持删除图片」）。一排方格 + 每枚右上角一枚 ✕
+         （与录入页"已选"那一排的 .th-x 同一画法）。
+         没有图时整栏不画：他没提空态要说什么，而"还没有配图"那一句下面既没有图也没有加图的口，
+         念起来像坏了。加图这一条也没做——选图只在录入那一屏，这一页只管看和删。
+         方格定宽定高 + aspectFill：只定宽不定高时会被 flex 压扁（那条坑记在详情页同一排）。 -->
+    <!-- 配图（站长 10-18「编辑时，图片要展示，然后支持删除图片」＋ 10-19「要支持拖动排序，
+         方便用户选择好的图片作为头图」）。一排方格 + 每枚右上角一枚 ✕
+         （与录入页"已选"那一排的 .th-x 同一画法）。
+         没有图时整栏不画：他没提空态要说什么，而"还没有配图"那一句下面既没有图也没有加图的口，
+         念起来像坏了。加图这一条也没做——选图只在录入那一屏，这一页只管看、删和排。
+         方格定宽定高 + aspectFill：只定宽不定高时会被 flex 压扁（那条坑记在详情页同一排）。
+         拖动那一趟：长按起拖 → 越过谁的中心就换到谁的位置 → 松手发一次 reorder（第一张＝头图）。
+         事件全用 bind 不用 catch，与笔记页分类那一排同一画法——那一排也是拖得动、页面也滚得动。 -->
+    <view class="form-group" wx:if="{{shots.length}}">
+      <text class="label">{{t.shotsLabel}}</text>
+      <view class="wr-shots">
+        <view class="wr-shot {{shotDrag === index ? 'wr-drag' : ''}}"
+          wx:for="{{shots}}" wx:key="id"
+          data-index="{{index}}"
+          bindlongpress="onShotDragStart"
+          bindtouchmove="onShotDragMove"
+          bindtouchend="onShotDragEnd"
+          bindtouchcancel="onShotDragEnd">
+          <image class="wr-shot-img" src="{{item.cloud_url}}" mode="aspectFill" lazy-load />
+          <view class="wr-shot-x" data-id="{{item.id}}" data-url="{{item.cloud_url}}" catchtap="onDelShot">✕</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 「原文」放在最后一栏，与详情那一屏的排布同一个次序（标题→配图→摘要→要点→原文）。
+         框自己定高滚动，不跟着字数长（那一栏上限五万字）。 -->
+    <view class="form-group">
+      <text class="label">{{t.originalContent}}</text>
+      <textarea
+        class="textarea textarea-orig"
+        value="{{originalText}}"
+        bindinput="onOriginalInput"
+        maxlength="{{-1}}"
+      />
+    </view>
+  </view>
+
+  <view class="actions">
+    <view class="btn-secondary" bindtap="onCancel">{{t.cancel}}</view>
+    <view class="btn-primary" bindtap="onSave">{{t.save}}</view>
+  </view>
+
+  <template is="pwdSheet" data="{{pwdOpen, pwdEntering, pwdName, pwdScene, pwdTip, pwdBuf, pwdFocus, t}}"/>
+</view>

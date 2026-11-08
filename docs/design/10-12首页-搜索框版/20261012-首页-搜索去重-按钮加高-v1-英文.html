@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html,body{margin:0;padding:0;}
+  .stage{position:relative;width:787px;height:1653px;background:url("source.png") 0 0 no-repeat;overflow:hidden;}
+
+  /* 面板右半重绘（左侧 Tips 区保留原像素） */
+  .panel{position:absolute;left:360px;top:1089px;width:391px;height:534px;background:#212221;
+         border-top-right-radius:40px;border-bottom-right-radius:40px;}
+
+  /* 条1：搜索框（原金边胶囊，几何不变） */
+  .pill{position:absolute;left:366px;top:1113px;width:364px;height:84px;box-sizing:border-box;
+        border-radius:42px;border:2px solid #C6B49A;
+        background:linear-gradient(90deg,#ADA18D 0%,#8A8580 55%,#706E6F 100%);
+        display:flex;align-items:center;padding:0 32px 0 34px;}
+  .mag{width:24px;height:24px;position:relative;flex:none;}
+  .mag .ring{position:absolute;left:0;top:0;width:18px;height:18px;border:3px solid #D8CAB6;border-radius:50%;box-sizing:border-box;}
+  .mag .handle{position:absolute;left:14px;top:14px;width:9px;height:3px;background:#D8CAB6;border-radius:2px;transform:rotate(45deg);transform-origin:0 50%;}
+  .ph{margin-left:16px;font-family:"Arial Rounded MT Bold","Arial Rounded",sans-serif;font-size:28px;
+      color:rgba(255,252,244,0.82);letter-spacing:0.5px;}
+  .mic{margin-left:auto;width:26px;height:26px;border:2px solid #C9B79C;border-radius:50%;box-sizing:border-box;position:relative;flex:none;}
+  .mic::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;background:#F4EFE4;border-radius:50%;}
+
+  /* 条2/条3：去重后的单行卡片 */
+  .card{position:absolute;left:367px;width:363px;height:96px;border-radius:28px;box-sizing:border-box;
+        display:flex;align-items:center;padding:0 23px 0 25px;}
+  .c2{top:1227px;background:#59575A;}
+  .c3{top:1353px;background:#535255;}
+  .dot{width:11px;height:11px;border-radius:50%;background:#D4BEA1;flex:none;}
+  .lbl{margin-left:12px;font-family:"Arial Rounded MT Bold","Arial Rounded",sans-serif;font-size:30px;color:#FFFFFF;}
+  .dash{flex:1;height:2px;background:rgba(255,255,255,0.18);margin:0 11px 0 30px;border-radius:1px;}
+  .num{font-family:-apple-system,"Helvetica Neue",sans-serif;font-weight:200;font-size:68px;color:#FFFFFF;line-height:1;flex:none;}
+
+  /* 条4：按钮加高 75 → 110，底边锚在原位 */
+  .btn{position:absolute;left:367px;top:1478px;width:361px;height:110px;border-radius:55px;
+       background:linear-gradient(90deg,#CDB797 0%,#A3947C 50%,#9F886C 100%);
+       display:flex;align-items:center;justify-content:center;
+       font-family:"Arial Rounded MT Bold","Arial Rounded",sans-serif;font-size:31px;color:#FCFAF3;}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="panel"></div>
+  <div class="pill">
+    <div class="mag"><div class="ring"></div><div class="handle"></div></div>
+    <div class="ph">Search</div>
+    <div class="mic"></div>
+  </div>
+  <div class="card c2"><div class="dot"></div><div class="lbl">Cards</div><div class="dash"></div><div class="num">17</div></div>
+  <div class="card c3"><div class="dot"></div><div class="lbl">Notes</div><div class="dash"></div><div class="num">16</div></div>
+  <div class="btn">Jot it down</div>
+</div>
+</body>
+</html>

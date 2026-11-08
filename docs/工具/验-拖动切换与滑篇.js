@@ -270,12 +270,13 @@ console.log(`  现读：点 ${DOT}rpx／当前那枚 ${DOT_ON}rpx／间隙 ${GAP
   const worst = names.length ? names.reduce((a, b) => (wOf(b) > wOf(a) ? b : a), names[0]) : '< >'
   const centreW = Math.min(wOf(worst), cap)
   const budget = (rowW - centreW) / 2 - inset - 12
-  const enW = wOf(EN.swipeHint)
+  // 11-08 起左端那一句是「浏览卡片市场」（原来那句「左右滑换模板」屏上不再画，字典里也已撤）。
+  const enW = wOf(EN.browseMarket)
   const note = `那句折 ${Math.round(enW)} ≤ 预算 ${Math.round(budget)}｜行 ${rowW}／左内缩 ${inset}／中间限宽 ${cap}／字 ${tiny}＋字距 ${ls}／最坏名字「${worst}」撑到 ${Math.round(centreW)}`
   ck('㉞ 左端那句英文放得进最坏那一档（名字最长那套把中间那枚撑到最左）',
     [rowW, inset, cap, tiny, ls, enW, budget].every(Number.isFinite) && enW <= budget, note)
-  ck('㉟ 中文那一格仍是他 10-19 的原话「左右滑换模板」——这一刀只动英文那一门',
-    ZH.swipeHint === '左右滑换模板', JSON.stringify(ZH.swipeHint))
+  ck('㉟ 中文那一格仍是他 11-08 的原话「浏览卡片市场」',
+    ZH.browseMarket === '浏览卡片市场', JSON.stringify(ZH.browseMarket))
   // 反向自证：把那句换回他截图上那一版，同一条算式必须红；不红就是 ㉞ 没牙。
   ck('㊱ 反向：旧那句 `Swipe to change template` 用同一式子算就是超的（㉞ 真的有牙）',
     wOf('Swipe to change template') > budget,

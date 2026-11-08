@@ -5,7 +5,7 @@
    "page": "/pages/index/index",
    "wallpaper": "tint-paper",
    "wallpaperLabel": "象牙",
-   "containerClass": "container theme-tint-paper",
+   "containerClass": "container theme-tint-paper mood-ink",
    "png": "无图-首页-tint-paper.png",
    "win": {
     "w": 390,
@@ -16,17 +16,17 @@
      "name": "头部大字",
      "sel": ".h1",
      "color": "rgb(53, 46, 29)",
-     "text": "我的笔记",
+     "text": "My notes",
      "x": 16,
      "y": 11,
-     "w": 80,
-     "h": 29.5
+     "w": 102.984375,
+     "h": 30.5
     },
     {
      "name": "页头数字",
      "sel": ".stats .n",
      "color": "rgb(53, 46, 29)",
-     "text": "27",
+     "text": "30",
      "x": 320,
      "y": 12,
      "w": 54,
@@ -36,40 +36,40 @@
      "name": "页头小字",
      "sel": ".stats .l",
      "color": "rgba(53, 46, 29, 0.72)",
-     "text": "笔记",
+     "text": "Notes",
      "x": 320,
      "y": 45.375,
      "w": 54,
-     "h": 12.5
+     "h": 10.5
     },
     {
      "name": "搜索条那两个字",
      "sel": ".srch-go",
      "color": "rgb(242, 239, 233)",
-     "text": "搜索笔记",
-     "x": 305,
-     "y": 222.25,
-     "w": 48,
-     "h": 16.5
+     "text": "Search notes",
+     "x": 275.5625,
+     "y": 223.5,
+     "w": 77.4375,
+     "h": 14
     },
     {
      "name": "两枚 tab 未选中那枚",
      "sel": ".vtab",
      "color": "rgb(53, 46, 29)",
-     "text": "笔记列表",
+     "text": "List",
      "x": 29,
      "y": 261,
-     "w": 52,
-     "h": 34.5
+     "w": 26.3046875,
+     "h": 32
     },
     {
      "name": "分类行未选中那枚",
      "sel": ".ix-cat",
-     "color": "rgb(53, 46, 29)",
-     "text": "全部",
+     "color": "rgba(53, 46, 29, 0.72)",
+     "text": "All",
      "x": 12,
-     "y": 305.5,
-     "w": 26,
+     "y": 303,
+     "w": 17.15625,
      "h": 27.5
     },
     {
@@ -85,7 +85,7 @@
    "page": "/pages/create/create",
    "wallpaper": "tint-paper",
    "wallpaperLabel": "象牙",
-   "containerClass": "container theme-tint-paper",
+   "containerClass": "container theme-tint-paper mood-ink",
    "png": "无图-新建-tint-paper.png",
    "win": {
     "w": 390,
@@ -96,21 +96,17 @@
      "name": "头部大字",
      "sel": ".page-title",
      "color": "rgb(53, 46, 29)",
-     "text": "看到好内容，随手记下来",
-     "x": 12,
-     "y": 25,
-     "w": 220,
-     "h": 29.5
+     "text": "",
+     "x": 4,
+     "y": 64.1953125,
+     "w": 118,
+     "h": 58.0546875
     },
     {
      "name": "框外那行 Tips",
      "sel": ".tips-line",
-     "color": "rgba(53, 46, 29, 0.72)",
-     "text": "Tips：拍照或截图存进来，会自动提",
-     "x": 49,
-     "y": 475,
-     "w": 319,
-     "h": 16.796875
+     "kind": "opt",
+     "missing": false
     },
     {
      "name": "铺满那层底图",
@@ -127,11 +123,11 @@
     {
      "name": "「换背景」那两字",
      "sel": ".swap-text",
-     "color": "rgba(53, 46, 29, 0.72)",
-     "text": "换背景",
-     "x": 17,
-     "y": 63.5,
-     "w": 39,
+     "color": "rgba(20, 22, 26, 0.7)",
+     "text": "Background",
+     "x": 12,
+     "y": 443,
+     "w": 67.5234375,
      "h": 17
     }
    ]
@@ -141,7 +137,7 @@
    "page": "/pages/me/me",
    "wallpaper": "tint-paper",
    "wallpaperLabel": "象牙",
-   "containerClass": "container theme-tint-paper",
+   "containerClass": "container theme-tint-paper mood-ink",
    "png": "无图-我的-tint-paper.png",
    "win": {
     "w": 390,
@@ -152,40 +148,40 @@
      "name": "头部大字",
      "sel": ".h1",
      "color": "rgb(53, 46, 29)",
-     "text": "设置",
+     "text": "Settings",
      "x": 16,
      "y": 11,
-     "w": 40,
-     "h": 29.5
+     "w": 74.7109375,
+     "h": 25
     },
     {
      "name": "脑力值数字",
      "sel": ".score-n",
      "color": "rgba(20, 22, 26, 0.86)",
-     "text": "144",
-     "x": 328.65625,
+     "text": "154",
+     "x": 328.0625,
      "y": 12,
-     "w": 45.34375,
+     "w": 45.9375,
      "h": 28.375
     },
     {
      "name": "脑力值小字",
      "sel": ".score-l",
      "color": "rgba(20, 22, 26, 0.68)",
-     "text": "魅力",
-     "x": 328.65625,
+     "text": "MIND",
+     "x": 328.0625,
      "y": 45.375,
-     "w": 45.34375,
-     "h": 12.5
+     "w": 45.9375,
+     "h": 10.5
     },
     {
      "name": "名片行 slogan",
      "sel": ".sheet-slogan",
      "color": "rgba(53, 46, 29, 0.72)",
-     "text": "把图文，提炼成有用的干货",
+     "text": "Make every read us",
      "x": 82,
-     "y": 301.1015625,
-     "w": 165,
+     "y": 301.6015625,
+     "w": 125.6796875,
      "h": 16.796875
     },
     {
@@ -207,7 +203,7 @@
    "page": "/pages/index/index",
    "wallpaper": "tint-celadon",
    "wallpaperLabel": "天青",
-   "containerClass": "container theme-tint-celadon",
+   "containerClass": "container theme-tint-celadon mood-celadon",
    "png": "无图-首页-tint-celadon.png",
    "win": {
     "w": 390,
@@ -218,17 +214,17 @@
      "name": "头部大字",
      "sel": ".h1",
      "color": "rgb(29, 53, 34)",
-     "text": "我的笔记",
+     "text": "My notes",
      "x": 16,
      "y": 11,
-     "w": 80,
-     "h": 29.5
+     "w": 102.984375,
+     "h": 30.5
     },
     {
      "name": "页头数字",
      "sel": ".stats .n",
      "color": "rgb(29, 53, 34)",
-     "text": "27",
+     "text": "30",
      "x": 320,
      "y": 12,
      "w": 54,
@@ -238,40 +234,40 @@
      "name": "页头小字",
      "sel": ".stats .l",
      "color": "rgba(29, 53, 34, 0.72)",
-     "text": "笔记",
+     "text": "Notes",
      "x": 320,
      "y": 45.375,
      "w": 54,
-     "h": 12.5
+     "h": 10.5
     },
     {
      "name": "搜索条那两个字",
      "sel": ".srch-go",
      "color": "rgb(242, 239, 233)",
-     "text": "搜索笔记",
-     "x": 305,
-     "y": 222.25,
-     "w": 48,
-     "h": 16.5
+     "text": "Search notes",
+     "x": 275.5625,
+     "y": 223.5,
+     "w": 77.4375,
+     "h": 14
     },
     {
      "name": "两枚 tab 未选中那枚",
      "sel": ".vtab",
      "color": "rgb(29, 53, 34)",
-     "text": "笔记列表",
+     "text": "List",
      "x": 29,
      "y": 261,
-     "w": 52,
-     "h": 34.5
+     "w": 26.3046875,
+     "h": 32
     },
     {
      "name": "分类行未选中那枚",
      "sel": ".ix-cat",
-     "color": "rgb(29, 53, 34)",
-     "text": "全部",
+     "color": "rgba(29, 53, 34, 0.72)",
+     "text": "All",
      "x": 12,
-     "y": 305.5,
-     "w": 26,
+     "y": 303,
+     "w": 17.15625,
      "h": 27.5
     },
     {
@@ -287,7 +283,7 @@
    "page": "/pages/create/create",
    "wallpaper": "tint-celadon",
    "wallpaperLabel": "天青",
-   "containerClass": "container theme-tint-celadon",
+   "containerClass": "container theme-tint-celadon mood-celadon",
    "png": "无图-新建-tint-celadon.png",
    "win": {
     "w": 390,
@@ -297,22 +293,18 @@
     {
      "name": "头部大字",
      "sel": ".page-title",
-     "color": "rgb(29, 53, 34)",
-     "text": "看到好内容，随手记下来",
-     "x": 12,
-     "y": 25,
-     "w": 220,
-     "h": 29.5
+     "color": "rgb(53, 46, 29)",
+     "text": "",
+     "x": 4,
+     "y": 64.1953125,
+     "w": 118,
+     "h": 58.0546875
     },
     {
      "name": "框外那行 Tips",
      "sel": ".tips-line",
-     "color": "rgba(29, 53, 34, 0.72)",
-     "text": "Tips：拍照或截图存进来，会自动提",
-     "x": 49,
-     "y": 475,
-     "w": 319,
-     "h": 16.796875
+     "kind": "opt",
+     "missing": false
     },
     {
      "name": "铺满那层底图",
@@ -329,11 +321,11 @@
     {
      "name": "「换背景」那两字",
      "sel": ".swap-text",
-     "color": "rgba(29, 53, 34, 0.72)",
-     "text": "换背景",
-     "x": 17,
-     "y": 63.5,
-     "w": 39,
+     "color": "rgba(20, 22, 26, 0.7)",
+     "text": "Background",
+     "x": 12,
+     "y": 443,
+     "w": 67.5234375,
      "h": 17
     }
    ]
@@ -343,7 +335,7 @@
    "page": "/pages/me/me",
    "wallpaper": "tint-celadon",
    "wallpaperLabel": "天青",
-   "containerClass": "container theme-tint-celadon",
+   "containerClass": "container theme-tint-celadon mood-celadon",
    "png": "无图-我的-tint-celadon.png",
    "win": {
     "w": 390,
@@ -354,40 +346,40 @@
      "name": "头部大字",
      "sel": ".h1",
      "color": "rgb(29, 53, 34)",
-     "text": "设置",
+     "text": "Settings",
      "x": 16,
      "y": 11,
-     "w": 40,
-     "h": 29.5
+     "w": 74.7109375,
+     "h": 25
     },
     {
      "name": "脑力值数字",
      "sel": ".score-n",
      "color": "rgba(20, 22, 26, 0.86)",
-     "text": "144",
-     "x": 328.65625,
+     "text": "154",
+     "x": 328.0625,
      "y": 12,
-     "w": 45.34375,
+     "w": 45.9375,
      "h": 28.375
     },
     {
      "name": "脑力值小字",
      "sel": ".score-l",
      "color": "rgba(20, 22, 26, 0.68)",
-     "text": "魅力",
-     "x": 328.65625,
+     "text": "MIND",
+     "x": 328.0625,
      "y": 45.375,
-     "w": 45.34375,
-     "h": 12.5
+     "w": 45.9375,
+     "h": 10.5
     },
     {
      "name": "名片行 slogan",
      "sel": ".sheet-slogan",
      "color": "rgba(29, 53, 34, 0.72)",
-     "text": "把图文，提炼成有用的干货",
+     "text": "Make every read us",
      "x": 82,
-     "y": 301.1015625,
-     "w": 165,
+     "y": 301.6015625,
+     "w": 125.6796875,
      "h": 16.796875
     },
     {
@@ -409,7 +401,7 @@
    "page": "/pages/index/index",
    "wallpaper": "tint-blush",
    "wallpaperLabel": "樱落",
-   "containerClass": "container theme-tint-blush",
+   "containerClass": "container theme-tint-blush mood-blush",
    "png": "无图-首页-tint-blush.png",
    "win": {
     "w": 390,
@@ -420,17 +412,17 @@
      "name": "头部大字",
      "sel": ".h1",
      "color": "rgb(53, 29, 41)",
-     "text": "我的笔记",
+     "text": "My notes",
      "x": 16,
      "y": 11,
-     "w": 80,
-     "h": 29.5
+     "w": 102.984375,
+     "h": 30.5
     },
     {
      "name": "页头数字",
      "sel": ".stats .n",
      "color": "rgb(53, 29, 41)",
-     "text": "27",
+     "text": "30",
      "x": 320,
      "y": 12,
      "w": 54,
@@ -440,40 +432,40 @@
      "name": "页头小字",
      "sel": ".stats .l",
      "color": "rgba(53, 29, 41, 0.72)",
-     "text": "笔记",
+     "text": "Notes",
      "x": 320,
      "y": 45.375,
      "w": 54,
-     "h": 12.5
+     "h": 10.5
     },
     {
      "name": "搜索条那两个字",
      "sel": ".srch-go",
      "color": "rgb(242, 239, 233)",
-     "text": "搜索笔记",
-     "x": 305,
-     "y": 222.25,
-     "w": 48,
-     "h": 16.5
+     "text": "Search notes",
+     "x": 275.5625,
+     "y": 223.5,
+     "w": 77.4375,
+     "h": 14
     },
     {
      "name": "两枚 tab 未选中那枚",
      "sel": ".vtab",
      "color": "rgb(53, 29, 41)",
-     "text": "笔记列表",
+     "text": "List",
      "x": 29,
      "y": 261,
-     "w": 52,
-     "h": 34.5
+     "w": 26.3046875,
+     "h": 32
     },
     {
      "name": "分类行未选中那枚",
      "sel": ".ix-cat",
-     "color": "rgb(53, 29, 41)",
-     "text": "全部",
+     "color": "rgba(53, 29, 41, 0.72)",
+     "text": "All",
      "x": 12,
-     "y": 305.5,
-     "w": 26,
+     "y": 303,
+     "w": 17.15625,
      "h": 27.5
     },
     {
@@ -489,7 +481,7 @@
    "page": "/pages/create/create",
    "wallpaper": "tint-blush",
    "wallpaperLabel": "樱落",
-   "containerClass": "container theme-tint-blush",
+   "containerClass": "container theme-tint-blush mood-blush",
    "png": "无图-新建-tint-blush.png",
    "win": {
     "w": 390,
@@ -499,22 +491,18 @@
     {
      "name": "头部大字",
      "sel": ".page-title",
-     "color": "rgb(53, 29, 41)",
-     "text": "看到好内容，随手记下来",
-     "x": 12,
-     "y": 25,
-     "w": 220,
-     "h": 29.5
+     "color": "rgb(53, 46, 29)",
+     "text": "",
+     "x": 4,
+     "y": 64.1953125,
+     "w": 118,
+     "h": 58.0546875
     },
     {
      "name": "框外那行 Tips",
      "sel": ".tips-line",
-     "color": "rgba(53, 29, 41, 0.72)",
-     "text": "Tips：拍照或截图存进来，会自动提",
-     "x": 49,
-     "y": 475,
-     "w": 319,
-     "h": 16.796875
+     "kind": "opt",
+     "missing": false
     },
     {
      "name": "铺满那层底图",
@@ -531,11 +519,11 @@
     {
      "name": "「换背景」那两字",
      "sel": ".swap-text",
-     "color": "rgba(53, 29, 41, 0.72)",
-     "text": "换背景",
-     "x": 17,
-     "y": 63.5,
-     "w": 39,
+     "color": "rgba(20, 22, 26, 0.7)",
+     "text": "Background",
+     "x": 12,
+     "y": 443,
+     "w": 67.5234375,
      "h": 17
     }
    ]
@@ -545,7 +533,7 @@
    "page": "/pages/me/me",
    "wallpaper": "tint-blush",
    "wallpaperLabel": "樱落",
-   "containerClass": "container theme-tint-blush",
+   "containerClass": "container theme-tint-blush mood-blush",
    "png": "无图-我的-tint-blush.png",
    "win": {
     "w": 390,
@@ -556,40 +544,40 @@
      "name": "头部大字",
      "sel": ".h1",
      "color": "rgb(53, 29, 41)",
-     "text": "设置",
+     "text": "Settings",
      "x": 16,
      "y": 11,
-     "w": 40,
-     "h": 29.5
+     "w": 74.7109375,
+     "h": 25
     },
     {
      "name": "脑力值数字",
      "sel": ".score-n",
      "color": "rgba(20, 22, 26, 0.86)",
-     "text": "144",
-     "x": 328.65625,
+     "text": "154",
+     "x": 328.0625,
      "y": 12,
-     "w": 45.34375,
+     "w": 45.9375,
      "h": 28.375
     },
     {
      "name": "脑力值小字",
      "sel": ".score-l",
      "color": "rgba(20, 22, 26, 0.68)",
-     "text": "魅力",
-     "x": 328.65625,
+     "text": "MIND",
+     "x": 328.0625,
      "y": 45.375,
-     "w": 45.34375,
-     "h": 12.5
+     "w": 45.9375,
+     "h": 10.5
     },
     {
      "name": "名片行 slogan",
      "sel": ".sheet-slogan",
      "color": "rgba(53, 29, 41, 0.72)",
-     "text": "把图文，提炼成有用的干货",
+     "text": "Make every read us",
      "x": 82,
-     "y": 301.1015625,
-     "w": 165,
+     "y": 301.6015625,
+     "w": 125.6796875,
      "h": 16.796875
     },
     {
@@ -611,7 +599,7 @@
    "page": "/pages/index/index",
    "wallpaper": "gradient-blue",
    "wallpaperLabel": "雨雾",
-   "containerClass": "container theme-blue",
+   "containerClass": "container theme-blue mood-mist",
    "png": "无图-首页-gradient-blue.png",
    "win": {
     "w": 390,
@@ -622,17 +610,17 @@
      "name": "头部大字",
      "sel": ".h1",
      "color": "rgb(33, 36, 49)",
-     "text": "我的笔记",
+     "text": "My notes",
      "x": 16,
      "y": 11,
-     "w": 80,
-     "h": 29.5
+     "w": 102.984375,
+     "h": 30.5
     },
     {
      "name": "页头数字",
      "sel": ".stats .n",
      "color": "rgb(33, 36, 49)",
-     "text": "27",
+     "text": "30",
      "x": 320,
      "y": 12,
      "w": 54,
@@ -642,40 +630,40 @@
      "name": "页头小字",
      "sel": ".stats .l",
      "color": "rgba(33, 36, 49, 0.72)",
-     "text": "笔记",
+     "text": "Notes",
      "x": 320,
      "y": 45.375,
      "w": 54,
-     "h": 12.5
+     "h": 10.5
     },
     {
      "name": "搜索条那两个字",
      "sel": ".srch-go",
      "color": "rgb(242, 239, 233)",
-     "text": "搜索笔记",
-     "x": 305,
-     "y": 222.25,
-     "w": 48,
-     "h": 16.5
+     "text": "Search notes",
+     "x": 275.5625,
+     "y": 223.5,
+     "w": 77.4375,
+     "h": 14
     },
     {
      "name": "两枚 tab 未选中那枚",
      "sel": ".vtab",
      "color": "rgb(33, 36, 49)",
-     "text": "笔记列表",
+     "text": "List",
      "x": 29,
      "y": 261,
-     "w": 52,
-     "h": 34.5
+     "w": 26.3046875,
+     "h": 32
     },
     {
      "name": "分类行未选中那枚",
      "sel": ".ix-cat",
-     "color": "rgb(33, 36, 49)",
-     "text": "全部",
+     "color": "rgba(33, 36, 49, 0.72)",
+     "text": "All",
      "x": 12,
-     "y": 305.5,
-     "w": 26,
+     "y": 303,
+     "w": 17.15625,
      "h": 27.5
     },
     {
@@ -691,7 +679,7 @@
    "page": "/pages/create/create",
    "wallpaper": "gradient-blue",
    "wallpaperLabel": "雨雾",
-   "containerClass": "container theme-blue",
+   "containerClass": "container theme-blue mood-mist",
    "png": "无图-新建-gradient-blue.png",
    "win": {
     "w": 390,
@@ -701,22 +689,18 @@
     {
      "name": "头部大字",
      "sel": ".page-title",
-     "color": "rgb(33, 36, 49)",
-     "text": "看到好内容，随手记下来",
-     "x": 12,
-     "y": 25,
-     "w": 220,
-     "h": 29.5
+     "color": "rgb(53, 46, 29)",
+     "text": "",
+     "x": 4,
+     "y": 64.1953125,
+     "w": 118,
+     "h": 58.0546875
     },
     {
      "name": "框外那行 Tips",
      "sel": ".tips-line",
-     "color": "rgba(33, 36, 49, 0.72)",
-     "text": "Tips：拍照或截图存进来，会自动提",
-     "x": 49,
-     "y": 475,
-     "w": 319,
-     "h": 16.796875
+     "kind": "opt",
+     "missing": false
     },
     {
      "name": "铺满那层底图",
@@ -733,11 +717,11 @@
     {
      "name": "「换背景」那两字",
      "sel": ".swap-text",
-     "color": "rgba(33, 36, 49, 0.72)",
-     "text": "换背景",
-     "x": 17,
-     "y": 63.5,
-     "w": 39,
+     "color": "rgba(20, 22, 26, 0.7)",
+     "text": "Background",
+     "x": 12,
+     "y": 443,
+     "w": 67.5234375,
      "h": 17
     }
    ]
@@ -747,7 +731,7 @@
    "page": "/pages/me/me",
    "wallpaper": "gradient-blue",
    "wallpaperLabel": "雨雾",
-   "containerClass": "container theme-blue",
+   "containerClass": "container theme-blue mood-mist",
    "png": "无图-我的-gradient-blue.png",
    "win": {
     "w": 390,
@@ -758,40 +742,40 @@
      "name": "头部大字",
      "sel": ".h1",
      "color": "rgb(33, 36, 49)",
-     "text": "设置",
+     "text": "Settings",
      "x": 16,
      "y": 11,
-     "w": 40,
-     "h": 29.5
+     "w": 74.7109375,
+     "h": 25
     },
     {
      "name": "脑力值数字",
      "sel": ".score-n",
      "color": "rgba(20, 22, 26, 0.86)",
-     "text": "144",
-     "x": 328.65625,
+     "text": "154",
+     "x": 328.0625,
      "y": 12,
-     "w": 45.34375,
+     "w": 45.9375,
      "h": 28.375
     },
     {
      "name": "脑力值小字",
      "sel": ".score-l",
      "color": "rgba(20, 22, 26, 0.68)",
-     "text": "魅力",
-     "x": 328.65625,
+     "text": "MIND",
+     "x": 328.0625,
      "y": 45.375,
-     "w": 45.34375,
-     "h": 12.5
+     "w": 45.9375,
+     "h": 10.5
     },
     {
      "name": "名片行 slogan",
      "sel": ".sheet-slogan",
      "color": "rgba(33, 36, 49, 0.72)",
-     "text": "把图文，提炼成有用的干货",
+     "text": "Make every read us",
      "x": 82,
-     "y": 301.1015625,
-     "w": 165,
+     "y": 301.6015625,
+     "w": 125.6796875,
      "h": 16.796875
     },
     {

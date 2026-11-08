@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>旅行打卡 App · 三个界面方向（示意）</title>
+<style>
+  :root{
+    --paper:#F2EFE9; --paper2:#FBFAF7; --ink:#14161A; --ink2:#4A4E57; --ink3:#8A8F99;
+    --clay:#D2683F; --yellow:#F6C445; --teal:#1F6F63; --indigo:#2E3A8C; --line:#DDD8CE;
+    --mapdark:#0E1A22; --mapsea:#0B141B;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{background:#E7E3DA;font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;color:var(--ink)}
+  .sheet{width:1440px;height:1100px;padding:44px 48px;position:relative;overflow:hidden;background:var(--paper);border-bottom:1px solid var(--line)}
+  .kicker{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--clay);font-weight:700}
+  h1{font-size:30px;letter-spacing:-.01em;margin:6px 0 4px}
+  h2{font-size:15px;font-weight:600;color:var(--ink2);margin-bottom:22px}
+  .note{font-size:12.5px;color:var(--ink3);margin-top:14px;line-height:1.55}
+  .flag{position:absolute;top:44px;right:48px;font-size:11px;letter-spacing:.1em;color:var(--ink3);border:1px solid var(--line);padding:5px 9px;border-radius:6px;background:var(--paper2)}
+  .row{display:flex;gap:26px;align-items:flex-start}
+  /* 参考栏 */
+  .refs{width:250px;flex:none}
+  .refs .cap{font-size:11px;line-height:1.5;color:var(--ink2);margin-bottom:8px;font-weight:600}
+  .refs img{width:112px;height:242px;object-fit:cover;object-position:top;border-radius:10px;border:1px solid var(--line);display:inline-block;vertical-align:top}
+  .refs img+.img{margin-left:8px}
+  .refs .src{font-size:10.5px;color:var(--ink3);margin-top:6px}
+  /* 手机 */
+  .phones{display:flex;gap:30px}
+  .ph{width:302px;flex:none}
+  .frame{width:302px;height:620px;border:2px solid var(--ink);border-radius:38px;background:var(--paper2);overflow:hidden;position:relative}
+  .island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:92px;height:24px;background:var(--ink);border-radius:14px;z-index:9}
+  .status{height:44px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 18px 4px;font-size:11px;font-weight:600;color:var(--ink)}
+  .scr{padding:0 14px;height:calc(100% - 44px);position:relative;display:flex;flex-direction:column}
+  .cap2{font-size:12px;color:var(--ink2);margin-top:10px;line-height:1.5}
+  .cap2 b{color:var(--ink)}
+  /* 通用件 */
+  .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 12px;font-size:11.5px;font-weight:650}
+  .tabbar{margin-top:auto;display:flex;align-items:center;justify-content:space-around;height:56px;border-top:1px solid var(--line);font-size:10.5px;color:var(--ink3);background:var(--paper2)}
+  .tabbar .on{color:var(--ink);font-weight:700}
+  .fab{width:52px;height:34px;border-radius:999px;background:var(--yellow);color:var(--ink);display:flex;align-items:center;justify-content:center;font-weight:750;font-size:11.5px}
+  .card{display:flex;gap:10px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px;align-items:stretch}
+  .blk{width:34px;border-radius:8px;flex:none}
+  .card .t{font-size:12.5px;font-weight:700;line-height:1.35}
+  .card .s{font-size:10.5px;color:var(--ink2);line-height:1.45;margin-top:3px}
+  .meta{font-size:9.5px;color:var(--ink3);margin-top:5px;letter-spacing:.02em}
+  .place{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;color:var(--teal)}
+  .dot{width:5px;height:5px;border-radius:50%;background:var(--clay);display:inline-block}
+  /* 地图（纯示意，非真地图渲染） */
+  .map{background:linear-gradient(160deg,#12222B 0%,#0B141B 60%,#0E1A22 100%);border-radius:14px;position:relative;overflow:hidden}
+  .map .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:26px 26px}
+  .pin{position:absolute;width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+  .route{position:absolute;inset:0}
+  .lite{background:#EDE7DC;border-radius:14px;position:relative;overflow:hidden}
+  .lite .dots{position:absolute;inset:0}
+  .lite i{position:absolute;width:5px;height:5px;border-radius:50%;background:var(--indigo);opacity:.85}
+  .grp{display:flex;align-items:center;gap:8px;margin:12px 0 7px}
+  .grp .sq{width:16px;height:16px;border-radius:5px}
+  .grp .n{font-size:12px;font-weight:750}
+  .grp .c{margin-left:auto;font-size:10px;color:var(--ink3)}
+  .stat{display:flex;gap:8px;margin:10px 0 4px}
+  .stat div{flex:1;border-radius:10px;padding:8px 9px;color:#fff}
+  .stat b{display:block;font-size:19px;line-height:1.1}
+  .stat span{font-size:9.5px;opacity:.9}
+  .wall{display:grid;grid-template-columns:repeat(8,1fr);gap:5px}
+  .wall i{aspect-ratio:1;border-radius:4px;background:#E3DDD2}
+  .wall i.on{background:var(--clay)}
+  .wall i.on2{background:var(--teal)}
+  .wall i.on3{background:var(--yellow)}
+  .btn{border-radius:12px;padding:12px;text-align:center;font-size:12.5px;font-weight:750}
+  .y{background:var(--yellow);color:var(--ink)}
+  .ghost{border:1px solid var(--line);color:var(--ink2);background:#fff}
+  .sheet .title2{font-size:13px;font-weight:750;margin:2px 0 8px}
+  .hairsplit{height:1px;background:var(--line);margin:10px 0}
+</style></head>
+<body>
+
+<!-- ============ 方向 A ============ -->
+<section class="sheet">
+  <div class="flag">全部为 CSS 画的示意图 · 非真机渲染</div>
+  <div class="kicker">Direction A</div>
+  <h1>地图当顶 · 笔记流当身</h1>
+  <h2>骨架抄 Polarsteps（地图＋底部卡），但底下那一排换成<b>笔记</b>——我们卖的是内容，不是轨迹</h2>
+  <div class="row">
+    <div class="refs">
+      <div class="cap">参考：Polarsteps 首页<br>（App Store 真截图）</div>
+      <img src="参考/polarsteps_1.jpg" alt=""><img src="参考/polarsteps_2.jpg" alt="" class="img">
+      <div class="src">读到的：全屏卫星图当背景／针＝圆形照片／底部一张大地点卡横滑／Day 58 时间轴／Plan·Track 两枚药丸</div>
+    </div>
+    <div class="phones">
+      <div class="ph"><div class="frame"><div class="island"></div>
+        <div class="scr">
+          <div class="status"><span>9:41</span><span>&#9679;&#9679;&#9679; ⌁ ▮</span></div>
+          <div class="map" style="height:210px">
+            <div class="grid"></div>
+            <svg class="route" viewBox="0 0 274 210"><path d="M40 160 C 90 120, 120 60, 190 70 S 240 140, 250 150" fill="none" stroke="#fff" stroke-width="1.6" stroke-dasharray="4 4" opacity=".8"/></svg>
+            <div class="pin" style="left:30px;top:150px;background:var(--clay)"></div>
+            <div class="pin" style="left:118px;top:56px;background:var(--teal)"></div>
+            <div class="pin" style="left:238px;top:140px;background:var(--yellow)"></div>
+            <div class="pill" style="position:absolute;right:8px;top:8px;background:rgba(255,255,255,.9);color:var(--ink)">Today · Kyoto</div>
+          </div>
+          <div class="title2">Notes near today</div>
+          <div class="card"><div class="blk" style="background:var(--clay)"></div><div>
+            <div class="place"><span class="dot"></span>Fushimi Inari Taisha · Apr 3</div>
+            <div class="t" style="margin-top:3px">三千座鸟居的登山道，走到第四段才没人</div>
+            <div class="s">山门 06:40 起开放；上山道两侧每百步一座朱红鸟居，光线在 07:30 前最好……</div>
+            <div class="meta">3 photos · 1,240 words · from camera</div></div></div>
+          <div class="card" style="margin-top:8px"><div class="blk" style="background:var(--teal)"></div><div>
+            <div class="place"><span class="dot"></span>Nishiki Market · Apr 2</div>
+            <div class="t" style="margin-top:3px">三条巷子的食材地图：哪家带得走</div>
+            <div class="meta">5 photos · link import</div></div></div>
+          <div class="tabbar"><span class="on">Feed</span><span>Map</span><span class="fab">Check in</span><span>Search</span><span>Me</span></div>
+        </div></div>
+        <div class="cap2"><b>首页。</b>地图只占 1/3，作用是"今天在哪"；主体仍是左色块右文的笔记卡（沿用图麦的母题）。底部中央那枚黄色 <b>Check in</b> 是唯一高饱和动作。</div>
+      </div>
+      <div class="ph"><div class="frame"><div class="island"></div>
+        <div class="scr">
+          <div class="status"><span>9:41</span><span>&#9679;&#9679;&#9679; ⌁ </span></div>
+          <div class="map" style="flex:1;min-height:150px"><div class="grid"></div>
+            <div class="pin" style="left:130px;top:52px;width:26px;height:26px;background:var(--yellow)"></div>
+            <div style="position:absolute;left:120px;top:80px;width:46px;height:46px;border-radius:50%;border:1px solid rgba(246,196,69,.6)"></div>
+          </div>
+          <div style="background:#fff;border:1px solid var(--line);border-radius:16px 16px 0 0;margin:-14px -14px -14px;padding:14px;margin-top:auto">
+            <div style="width:34px;height:3px;background:var(--line);border-radius:2px;margin:0 auto 12px"></div>
+            <div style="font-size:13px;font-weight:750">Check in here?</div>
+            <div style="font-size:10.5px;color:var(--ink2);margin:4px 0 12px;line-height:1.5">Fushimi Inari Taisha, Uji-ward, Kyoto<br><span style="color:var(--ink3)">±12 m · precise location on</span></div>
+            <div class="btn y">Use this place</div>
+            <div class="btn ghost" style="margin-top:8px">Pick on map instead</div>
+            <div style="font-size:9.5px;color:var(--ink3);text-align:center;margin-top:10px">Location is saved on this device only · Not in any backup you don't export</div>
+          </div>
+        </div></div>
+        <div class="cap2"><b>打卡抽屉。</b>这一屏就是任务单 T3 那四态要走的屏：<b>拒权限</b>时"Use this place"变灰、"Pick on map"升为主按钮；<b>精确关闭</b>那一档，±12 m 那行要换成城市级说法。</div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>这一方向的代价与好处</b>：地图页与首页合一，少一屏；但笔记流被地图压掉 1/3 高度，长文用户会嫌挤。Polarsteps 用"底部大卡横滑"解决，我们如果照搬，卡片高度要重新定尺。</div>
+</section>
+
+<!-- ============ 方向 B ============ -->
+<section class="sheet">
+  <div class="flag">全部为 CSS 画的示意图 · 非真机渲染</div>
+  <div class="kicker">Direction B</div>
+  <h1>地点分组账本 · 地图退到二级</h1>
+  <h2>首页直接回答"我在哪些地方存过东西"，把自动分组摆在最上层——这是你拍板那一格（只读虚拟分组）最直的译法</h2>
+  <div class="row">
+    <div class="refs">
+      <div class="cap">参考：Visited 首页／Places Been 首页<br>（App Store 真截图）</div>
+      <img src="参考/visited_2.jpg" alt=""><img src="参考/placesbeen_1.jpg" alt="" class="img">
+      <div class="src">读到的：Visited＝环形统计＋点位世界图＋Been/Want 药丸＋双列卡；Places Been＝首页干脆是统计卡片墙，地图在二级页</div>
+    </div>
+    <div class="phones">
+      <div class="ph"><div class="frame"><div class="island"></div>
+        <div class="scr">
+          <div class="status"><span>9:41</span><span>&#9679;&#9679;&#9679; ⌁ </span></div>
+          <div class="stat">
+            <div style="background:var(--ink)"><b>38</b><span>notes</span></div>
+            <div style="background:var(--clay)"><b>12</b><span>places</span></div>
+            <div style="background:var(--teal)"><b>4</b><span>countries</span></div>
+          </div>
+          <div class="pill" style="background:var(--ink);color:#fff;margin-top:6px">By place</div>
+          <span style="font-size:11px;color:var(--ink3);margin-left:6px">By my folders</span>
+          <div class="grp"><span class="sq" style="background:var(--clay)"></span><span class="n">Fushimi Inari Taisha</span><span class="c">Apr 1–3 · 3</span></div>
+          <div class="card"><div class="blk" style="background:var(--clay)"></div><div>
+            <div class="t">三千座鸟居的登山道</div><div class="meta">Apr 3 · 1,240 words · 3 photos</div></div></div>
+          <div class="card" style="margin-top:6px"><div class="blk" style="background:var(--yellow)"></div><div>
+            <div class="t">山门口的御朱印排队时间</div><div class="meta">Apr 2 · 240 words</div></div></div>
+          <div class="grp"><span class="sq" style="background:var(--teal)"></span><span class="n">Nishiki Market</span><span class="c">Apr 2 · 2</span></div>
+          <div class="card"><div class="blk" style="background:var(--teal)"></div><div>
+            <div class="t">三条巷子的食材地图：哪家带得走</div><div class="meta">Apr 2 · 5 photos · link import</div></div></div>
+          <div class="grp"><span class="sq" style="background:var(--indigo)"></span><span class="n">Arashiyama Bamboo Grove</span><span class="c">Apr 1 · 2</span></div>
+          <div class="card"><div class="blk" style="background:var(--indigo)"></div><div>
+            <div class="t">竹林道口几点没人：两个时间窗</div><div class="meta">Apr 1 · 2 photos · from screenshot</div></div></div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:10px">9 more places · scroll</div>
+          <div class="tabbar"><span class="on">Places</span><span>Map</span><span class="fab">Check in</span><span>Search</span><span>Me</span></div>
+        </div></div>
+        <div class="cap2"><b>首页。</b>顶部三枚计数是这一族公认的"炫耀位"（Visited 用环、Places Been 用卡墙）。<b>By place / By my folders</b> 那两枚就是拍板那一格的落地：地点分组是只读视图，不写进手建分类。</div>
+      </div>
+      <div class="ph"><div class="frame"><div class="island"></div>
+        <div class="scr">
+          <div class="status"><span>9:41</span><span>&#9679;&#9679;&#9679; ⌁ </span></div>
+          <div class="lite" style="flex:1;min-height:280px"><div class="dots">
+            <i style="left:38px;top:150px"></i><i style="left:44px;top:158px"></i><i style="left:52px;top:146px"></i>
+            <i style="left:150px;top:70px"></i><i style="left:158px;top:78px"></i><i style="left:166px;top:66px"></i><i style="left:154px;top:88px"></i>
+            <i style="left:214px;top:120px"></i><i style="left:222px;top:132px"></i><i style="left:96px;top:196px"></i>
+            <i style="left:64px;top:262px"></i><i style="left:188px;top:238px"></i><i style="left:120px;top:300px"></i><i style="left:236px;top:286px"></i>
+          </div>
+          <div style="position:absolute;left:140px;top:56px;width:22px;height:22px;border-radius:50%;background:var(--clay);border:2px solid #fff"></div></div>
+          <div style="background:#fff;border:1px solid var(--line);border-radius:12px;margin:-26px 6px 0;padding:10px;position:relative">
+            <div class="place"><span class="dot"></span>Kyoto · 4 notes</div>
+            <div class="t" style="font-size:12.5px;margin-top:3px">三千座鸟居的登山道，走到第四段才没人</div>
+            <div class="s" style="font-size:10.5px;color:var(--ink2);margin-top:3px">山门 06:40 起开放；上山道两侧每百步一座朱红鸟居……</div>
+            <div class="meta">Apr 3 · 1,240 words</div>
+          </div>
+          <div class="hairsplit"></div>
+          <div style="font-size:10.5px;color:var(--ink3)">Tap a dot for its notes · long-press to move it</div>
+          <div class="tabbar"><span>Places</span><span class="on">Map</span><span class="fab">Check in</span><span>Search</span><span>Me</span></div>
+        </div></div>
+        <div class="cap2"><b>二级地图页。</b>浅色点位底图（Visited 那一族的画法，<b>不是真地图渲染</b>）。这一屏要等任务单 T1/T2 量完才敢定：偏移与反查读数没回来之前，这里不放"精确针＋地址"。</div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>这一方向的代价与好处</b>：笔记最多、最像"我自己的东西"，且完全绕开地图渲染风险；坏处是第一眼不炫，截图发不出去——所以它必须配一个"足迹墙"当分享产物（见方向 C 那一屏）。</div>
+</section>
+
+<!-- ============ 方向 C ============ -->
+<section class="sheet">
+  <div class="flag">全部为 CSS 画的示意图 · 非真机渲染</div>
+  <div class="kicker">Direction C</div>
+  <h1>足迹墙优先 · 单地点时间线</h1>
+  <h2>把"可炫耀"提到第一屏：一面格子墙当首页，点进去是一个地点的时间线</h2>
+  <div class="row">
+    <div class="refs">
+      <div class="cap">参考：Visited 的统计环与双列卡<br>Places Been 的计数卡墙</div>
+      <img src="参考/visited_2.jpg" alt=""><img src="参考/polarsteps_1.jpg" alt="" class="img">
+      <div class="src">读到的：这一族的分享欲来自"覆盖率"与"点亮的格子"，不是来自正文——所以 C 把笔记退到二级</div>
+    </div>
+    <div class="phones">
+      <div class="ph"><div class="frame"><div class="island"></div>
+        <div class="scr">
+          <div class="status"><span>9:41</span><span>&#9679;&#9679;&#9679; ⌁ </span></div>
+          <div style="font-size:13px;font-weight:750;margin:2px 0 2px">Your places</div>
+          <div style="font-size:10.5px;color:var(--ink3);margin-bottom:10px">12 of 190 lit · 4 countries</div>
+          <div class="wall">
+            <i></i><i></i><i class="on"></i><i></i><i></i><i class="on2"></i><i></i><i></i>
+            <i></i><i class="on3"></i><i></i><i></i><i class="on"></i><i></i><i></i><i class="on2"></i>
+            <i class="on"></i><i></i><i></i><i class="on2"></i><i></i><i></i><i class="on3"></i><i></i>
+            <i></i><i></i><i class="on"></i><i></i><i></i><i class="on2"></i><i></i><i></i>
+            <i class="on3"></i><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i class="on2"></i>
+          </div>
+          <div class="hairsplit"></div>
+          <div class="card"><div class="blk" style="background:var(--clay)"></div><div>
+            <div class="place"><span class="dot"></span>Fushimi Inari Taisha · 3 notes</div>
+            <div class="t" style="margin-top:3px">Apr 1 – 3 · latest: 三千座鸟居的登山道</div>
+            <div class="meta">1,240 words · 3 photos · ±12 m</div></div></div>
+          <div class="card" style="margin-top:6px"><div class="blk" style="background:var(--teal)"></div><div>
+            <div class="place"><span class="dot"></span>Nishiki Market · 2 notes</div>
+            <div class="t" style="margin-top:3px">Apr 2 · 三条巷子的食材地图</div></div></div>
+          <div class="card" style="margin-top:6px"><div class="blk" style="background:var(--indigo)"></div><div>
+            <div class="place"><span class="dot"></span>Arashiyama · 2 notes</div>
+            <div class="t" style="margin-top:3px">Apr 1 · 竹林道口的两个时间窗</div></div></div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:10px">178 places still grey · this week +3</div>
+          <div class="tabbar"><span class="on">Wall</span><span>Feed</span><span class="fab">Check in</span><span>Search</span><span>Me</span></div>
+        </div></div>
+        <div class="cap2"><b>首页＝格子墙。</b>刻意不用真地图（偏移与合规都没量）：一面墙、去过的格子高饱和点亮。这一屏也是将来"年度报告"那张导出图的底。</div>
+      </div>
+      <div class="ph"><div class="frame"><div class="island"></div>
+        <div class="scr">
+          <div class="status"><span>9:41</span><span>&#9679;&#9679;&#9679; ⌁ </span></div>
+          <div style="height:96px;border-radius:14px;background:linear-gradient(135deg,var(--clay),#8E2F1A);position:relative;overflow:hidden">
+            <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px);background-size:100% 12px"></div>
+            <div style="position:absolute;left:12px;bottom:10px;color:#fff">
+              <div style="font-size:14.5px;font-weight:800">Fushimi Inari Taisha</div>
+              <div style="font-size:10px;opacity:.85">Uji-ward, Kyoto · 3 notes · Apr 1–3</div></div>
+            <div style="position:absolute;right:10px;top:10px;font-size:9px;color:#fff;background:rgba(0,0,0,.3);padding:4px 7px;border-radius:6px">photo slot 示意</div>
+          </div>
+          <div style="margin-left:6px;padding-left:14px;border-left:2px solid var(--line)">
+            <div class="grp" style="margin-top:10px"><span class="sq" style="background:var(--clay)"></span><span class="n">Apr 3 · 07:42</span><span class="c">±12 m</span></div>
+            <div class="card"><div class="blk" style="background:var(--clay)"></div><div>
+              <div class="t">三千座鸟居的登山道，走到第四段才没人</div><div class="s">山门 06:40 起开放……</div></div></div>
+            <div class="grp"><span class="sq" style="background:var(--yellow)"></span><span class="n">Apr 2 · 18:05</span><span class="c">manual pin</span></div>
+            <div class="card"><div class="blk" style="background:var(--yellow)"></div><div>
+              <div class="t">山门口的御朱印排队时间</div></div></div>
+            <div class="grp"><span class="sq" style="background:var(--teal)"></span><span class="n">Apr 1 · 09:20</span><span class="c">±12 m</span></div>
+            <div class="card"><div class="blk" style="background:var(--teal)"></div><div>
+              <div class="t">到站第一件事：把 JR 票留好</div></div></div>
+          </div>
+          <div class="btn y" style="margin-top:10px">Add note here</div>
+          <div class="tabbar"><span>Wall</span><span>Feed</span><span class="fab">Check in</span><span>Search</span><span>Me</span></div>
+        </div></div>
+        <div class="cap2"><b>单地点时间线。</b>一个地点下的多篇按时间竖排，每条标<b>取位来源</b>（±12 m ＝现场定位／manual pin ＝手动点针）——这两个词就是拍板"两条腿"在屏上的样子。</div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>这一方向的代价与好处</b>：最好卖、最好截图外传，格子墙天然就是分享物；坏处是它离"笔记工具"最远——正文与导入那套核心能力在这条路上会被压成二级。<b>格子墙不需要真地图，所以它也是三个方向里唯一不被 T1/T2 卡住的一屏。</b></div>
+</section>
+
+</body></html>

@@ -2337,7 +2337,6 @@ const SAMPLE_NOTE = {
   category_id: 1,
   source_type: 'manual',
   created_at: '2026-09-23T10:00:00Z',
-  noteImgPath: '/assets/share-card.jpg',
 }
 
 const SAMPLE_NOTE_EN = {
@@ -2349,7 +2348,6 @@ const SAMPLE_NOTE_EN = {
   category_id: 1,
   source_type: 'manual',
   created_at: '2026-09-23T10:00:00Z',
-  noteImgPath: '/assets/share-card.jpg',
 }
 
 module.exports = {

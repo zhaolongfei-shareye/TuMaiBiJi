@@ -1,0 +1,33 @@
+{
+  "layout": {
+    "pages": 27,
+    "errors": [],
+    "images": 0
+  },
+  "browser_interactions": [
+    {
+      "name": "下一页",
+      "ok": true
+    },
+    {
+      "name": "上一页",
+      "ok": true
+    },
+    {
+      "name": "首页边界",
+      "ok": true
+    },
+    {
+      "name": "末页边界",
+      "ok": true
+    },
+    {
+      "name": "打印入口",
+      "ok": true
+    }
+  ],
+  "pdf_pages": 27,
+  "pdf_bytes": 9270784,
+  "bookmarks": 27,
+  "pdf_sha256": "b9f71fb8a627d9b8695c99624345ffa5560d996d9f888e810b77739786ae7564"
+}

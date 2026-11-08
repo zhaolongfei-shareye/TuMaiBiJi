@@ -1,0 +1,170 @@
+const api = require('../../utils/api.js')
+const { t, texts } = require('../../utils/i18n.js')
+const { toneStyle } = require('../../utils/palette.js')
+
+Page({
+  data: {
+    categories: [],
+    loading: true,
+    showAddDialog: false,
+    newCategoryName: '',
+    editingId: null,
+    editingName: '',
+    themeClass: '',
+    lang: 'zh',
+    t: texts('zh'),
+  },
+
+  onShow() {
+    const app = getApp()
+    const lang = app.globalData.userInfo?.language || 'zh'
+    this.setData({
+      lang,
+      t: texts(lang),
+      themeClass: app.applyTheme(app.getWallpaper()),
+    })
+    // 站长 10-16 夜（附真机图）「最顶上的都改为"设置"，他们是设置的二级菜单」⇒ 这一栏不再报
+    // 自己那一格的名字（那是左上角那行大字的活），改报它挂在谁下面。键吃 `pillSettings`——
+    // 与「我的」那一屏顶上那一栏同一枚键、同一个数，不新起字串。
+    app.setNavTitle('pillSettings', lang)
+    this.loadCategories()
+  },
+
+  async loadCategories() {
+    this.setData({ loading: true })
+    try {
+      const categories = await api.getCategories()
+      // 色点就是该分类在首页方块上那组色，取同一套派生规则，两边不可能再对不上
+      categories.forEach((c) => { c.blockStyle = toneStyle(c.id) })
+      this.setData({ categories, loading: false })
+    } catch (err) {
+      console.error('加载分类失败', err)
+      this.setData({ loading: false })
+      wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
+    }
+  },
+
+  onAddTap() {
+    this.setData({ showAddDialog: true, newCategoryName: '' })
+  },
+
+  onCloseDialog() {
+    this.setData({ showAddDialog: false, newCategoryName: '' })
+  },
+
+  onNameInput(e) {
+    this.setData({ newCategoryName: e.detail.value })
+  },
+
+  async onAddConfirm() {
+    const { lang } = this.data
+    const name = this.data.newCategoryName.trim()
+    if (!name) {
+      wx.showToast({ title: t('addCategoryPrompt', lang), icon: 'none' })
+      return
+    }
+    try {
+      wx.showLoading({ title: t('adding', lang), mask: true })
+      await api.createCategory({ name })
+      wx.hideLoading()
+      this.setData({ showAddDialog: false, newCategoryName: '' })
+      wx.showToast({ title: t('added', lang), icon: 'success' })
+      this.loadCategories()
+    } catch (err) {
+      wx.hideLoading()
+      const msg = (err.data && err.data.detail) || t('addFailed', lang)
+      wx.showToast({ title: msg, icon: 'none' })
+    }
+  },
+
+  onEditTap(e) {
+    const { id, name } = e.currentTarget.dataset
+    this.setData({ editingId: id, editingName: name })
+  },
+
+  onEditInput(e) {
+    this.setData({ editingName: e.detail.value })
+  },
+
+  async onEditConfirm() {
+    const { lang } = this.data
+    const name = this.data.editingName.trim()
+    if (!name) {
+      wx.showToast({ title: t('nameRequired', lang), icon: 'none' })
+      return
+    }
+    try {
+      wx.showLoading({ title: t('saving', lang), mask: true })
+      await api.updateCategory(this.data.editingId, { name })
+      wx.hideLoading()
+      this.setData({ editingId: null, editingName: '' })
+      wx.showToast({ title: t('saveSucceeded', lang), icon: 'success' })
+      this.loadCategories()
+    } catch (err) {
+      wx.hideLoading()
+      const msg = (err.data && err.data.detail) || t('updateFailed', lang)
+      wx.showToast({ title: msg, icon: 'none' })
+    }
+  },
+
+  onEditCancel() {
+    this.setData({ editingId: null, editingName: '' })
+  },
+
+  onDeleteTap(e) {
+    const { id, name } = e.currentTarget.dataset
+    const { lang } = this.data
+    wx.showModal({
+      title: t('delete', lang),
+      content: t('deleteCategoryConfirm', lang),
+      success: async (res) => {
+        if (res.confirm) {
+          try {
+            wx.showLoading({ title: t('deleting', lang), mask: true })
+            await api.deleteCategory(id)
+            wx.hideLoading()
+            wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
+            this.loadCategories()
+          } catch (err) {
+            wx.hideLoading()
+            // 服务端那句原因要如实报出来：删「私密」那一格被拦下时它说的是"里还有几篇、
+            // 先挪走"，只回一句"删除失败"会让人以为按钮坏了，然后反复点。
+            wx.showToast({ title: (err.data && err.data.detail) || t('deleteFailed', lang), icon: 'none' })
+          }
+        }
+      }
+    })
+  },
+
+  async onMoveUp(e) {
+    const { index } = e.currentTarget.dataset
+    if (index === 0) return
+    const { categories } = this.data
+    const ids = categories.map(c => c.id)
+    const temp = ids[index]
+    ids[index] = ids[index - 1]
+    ids[index - 1] = temp
+    try {
+      await api.reorderCategories(ids)
+      this.loadCategories()
+    } catch (err) {
+      wx.showToast({ title: t('sortFailed', this.data.lang), icon: 'none' })
+    }
+  },
+
+  async onMoveDown(e) {
+    const { index } = e.currentTarget.dataset
+    const { categories } = this.data
+    if (index === categories.length - 1) return
+    const ids = categories.map(c => c.id)
+    const temp = ids[index]
+    ids[index] = ids[index + 1]
+    ids[index + 1] = temp
+    try {
+      await api.reorderCategories(ids)
+      this.loadCategories()
+    } catch (err) {
+      wx.showToast({ title: t('sortFailed', this.data.lang), icon: 'none' })
+    }
+  },
+})

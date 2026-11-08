@@ -1,0 +1,19 @@
+{
+  "pages": 32,
+  "pdf_bytes": 15250813,
+  "layout": {
+    "pages": 32,
+    "errors": [],
+    "images": 0
+  },
+  "nav": [
+    true,
+    true,
+    true,
+    true
+  ],
+  "full_mood_screens": 5,
+  "language_names": 16,
+  "story_panels": 6,
+  "bookmarks": 32
+}

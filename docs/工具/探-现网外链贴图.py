@@ -10,13 +10,19 @@
 只有张数上限这一枚是故意读模型的——那条判的就是"现网跑的这份代码里那个数是 9"。
 
 ⚠ 10-29 第七十四次补的一格：**这一族（通用档）本来就没有作者名**，而列表那一枚来源标
-判的正是"快照里有没有作者名"（`notes.py:230` 那句 `has_source = bool(imported.get("author_name"))`），
+判的正是"快照里有没有作者名"那一条老规则（`notes.py:230`），
 所以拿原来那两条硬判据去打网易这类文章页会当场两条红——那两条红不是坏，是尺子只会量两族。
 现在换成可换档：**默认还是那两条老链接**，要量别的族用环境变量递进去（值不进 argv、不落仓库）：
     PROBE_URL=https://… PROBE_LABEL=网易·文章页 PROBE_EXPECT_AUTHOR=0 \\
       ssh agentsbin 'cd /home/ubuntu/wtsj-backend && .venv/bin/python -' < docs/工具/探-现网外链贴图.py
-`PROBE_EXPECT_AUTHOR=0` 那档把两条判据翻成"这一族的现状"：作者名**该是空**、来源标**该是 False**，
+`PROBE_EXPECT_AUTHOR=0` 那档只把**作者名那一条**翻成"这一族的现状"：作者名**该是空**，
 仍然逐条念出来，不许静默跳过——空着不判就等于没量。
+
+⚠ 10-31 第八十次现网跑搜狐那一趟，这一档被服务端新加的那一半打红了一条（19 过／1 红，红的正是列表那颗
+`has_source`）：**服务端那一枚现在判的是「作者名或站名」两半**（现读 `app/api/routes/notes.py:242`），
+而这条尺子还按"只有作者名"那一条老规则期望 `False`。⇒ 红的归属＝尺子，不是链：搜狐那族作者名确实空、
+站名确实「搜狐」、那颗该为真。自此这一档**自己从快照那两格现算期望值**（不 import 应用里的谓词——
+共用一把尺子就永远红不了），并把站名逐条念出来；`PROBE_EXPECT_AUTHOR` 只管作者名，不再兼任来源标的期望。
 
 ⚠ 默认那两条里**小红书这一条从 10-21 起必然红**（10-29 现读现网黑名单表：`xhslink.cn` 在列，
 `fail_count` 3／`last_status` 200／`last_failed_at` 10-21 16:07）：命中黑名单的站**不发 HTTP、不起提炼**，
@@ -135,11 +141,13 @@ for label, url in URLS.items():
     lst = httpx.get(f"{BASE}/api/notes/", headers=H, params={"limit": 50}, timeout=30).json()
     items = lst if isinstance(lst, list) else lst.get("items", [])
     mine = [n for n in items if n.get("id") == note_id]
-    # 这一枚与上一条同一条根：服务端 `has_source = bool(author_name)`，所以通用档那趟它必然 False。
-    # 判据跟着档位走，两条不许各判各的（否则换一族就两条永红）。
-    say(bool(mine) and mine[0].get("has_source") is EXPECT_AUTHOR,
-        "列表那一行带 has_source（这一包客户端按它画来源；通用档那一档判的是它此刻该为假）",
-        str([n.get("has_source") for n in mine]))
+    # 这一枚判的是服务端那两半（作者名或站名），所以期望值从**这一篇自己的快照那两格**现算，
+    # 不 import 应用里的谓词（共用尺子就永远红不了）、也不跟着 PROBE_EXPECT_AUTHOR 走（那一档只管作者名）。
+    # 10-31 第八十次现网跑搜狐时，老版这里按"只有作者名"硬期望 False，当场一条红——那红归尺子不归链。
+    该真 = bool(snap.get("author_name") or snap.get("site_name"))
+    say(bool(mine) and mine[0].get("has_source") is 该真,
+        "列表那一行带 has_source（客户端按它画来源；期望值＝这一篇快照里作者名或站名有其一）",
+        f"作者名 {snap.get('author_name')!r}／站名 {snap.get('site_name')!r} ⇒ 该 {该真}｜接口回 {mine[0].get('has_source') if mine else '（列表里没这一篇）'}")
     dr = httpx.delete(f"{BASE}/api/notes/{note_id}", headers=H, timeout=60)
     say(dr.status_code == 200, "收尾：这一篇删掉了", f"HTTP {dr.status_code}")
     obj_bytes = sum(r.file_size or 0 for r in rows)

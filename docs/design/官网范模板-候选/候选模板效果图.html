@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  /* 色值与字体链全部取自线上 /assets/site.css 的 :root（已与本地逐字节核对一致） */
+  :root{
+    --paper:#F2EFE9; --ink:#14161A; --soft:rgba(20,22,26,.64); --faint:rgba(20,22,26,.42);
+    --hair:rgba(20,22,26,.15); --sage:#6E9070; --clay:#D2683F; --mustard:#E0A800;
+    --display:'Playfair Display',Didot,'Bodoni 72','Times New Roman',Georgia,serif;
+    --cn:'Songti SC',STSong,'Noto Serif CJK SC',SimSun,serif;
+    --ui:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e8e6e0;font-family:var(--ui);padding:28px}
+  .sheet{display:flex;flex-direction:column;gap:26px;align-items:flex-start}
+  .tag{font:400 12px/1 var(--ui);letter-spacing:.18em;color:#5a5750;text-transform:uppercase}
+  .tag b{color:#14161A;font-weight:600;letter-spacing:.06em;text-transform:none;font-size:14px}
+  /* 画布 750 宽，与小程序 poster 引擎同尺度 */
+  .card{width:750px;box-shadow:0 8px 30px rgba(20,22,26,.14)}
+
+  .qr{width:104px;height:104px;background:
+    repeating-conic-gradient(from 0deg,#14161A 0% 25%,transparent 0% 50%) 0 0/13px 13px;
+    border:1px solid var(--hair)}
+  .seal{width:52px;height:52px;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center;
+    font:400 26px/1 var(--cn);color:var(--ink)}
+
+  /* ── 一 · 素纸：官网那种"纸 + 墨 + 发丝线 + 字距" ── */
+  .p1{background:var(--paper);color:var(--ink);padding:64px 60px 56px;font-family:var(--cn)}
+  .p1 .kicker{font:400 19px/1 var(--ui);letter-spacing:.34em;color:var(--faint);text-transform:uppercase}
+  .p1 h2{margin:26px 0 0;font:400 54px/1.34 var(--cn);letter-spacing:.02em;max-width:15em}
+  .p1 .rule{height:1px;background:var(--hair);margin:38px 0 30px}
+  .p1 .lead{font:400 27px/1.85 var(--cn);color:var(--soft);max-width:34em}
+  .p1 ul{list-style:none;margin:30px 0 0;display:flex;flex-direction:column;gap:16px}
+  .p1 li{font:400 25px/1.7 var(--cn);color:var(--ink);padding-left:26px;position:relative}
+  .p1 li::before{content:"";position:absolute;left:0;top:16px;width:10px;height:1px;background:var(--clay)}
+  .p1 .foot{display:flex;align-items:flex-end;justify-content:space-between;margin-top:52px}
+  .p1 .who{font:400 22px/1.7 var(--cn);color:var(--soft)}
+  .p1 .who i{display:block;font-style:normal;font:400 17px/1.6 var(--ui);letter-spacing:.2em;color:var(--faint)}
+
+  /* ── 二 · 书眉：白底、顶部一条墨线、大字距眉标、居中单栏 ── */
+  .p2{background:#fff;color:var(--ink);padding:0 74px 58px;font-family:var(--cn)}
+  .p2 .mast{border-bottom:2px solid var(--ink);padding:34px 0 20px;display:flex;align-items:baseline;justify-content:space-between}
+  .p2 .mark{font:500 20px/1 var(--ui);letter-spacing:.44em;text-transform:uppercase}
+  .p2 .no{font:400 20px/1 var(--display);letter-spacing:.1em;color:var(--faint)}
+  .p2 h2{margin:56px 0 0;font:400 46px/1.5 var(--cn);letter-spacing:.03em;text-align:center}
+  .p2 .sub{margin:22px 0 0;text-align:center;font:400 24px/1.7 var(--cn);color:var(--soft)}
+  .p2 .quote{margin:44px auto 0;max-width:26em;text-align:center;font:400 30px/1.9 var(--cn);color:var(--ink)}
+  .p2 .quote::first-letter{font-family:var(--display)}
+  .p2 .foot{display:flex;align-items:center;justify-content:space-between;margin-top:56px;padding-top:22px;border-top:1px solid var(--hair)}
+  .p2 .who{font:400 21px/1.7 var(--cn);color:var(--soft)}
+
+  /* ── 三 · 留白：一句金句 + 四角小字，几乎不画线 ── */
+  .p3{background:var(--paper);color:var(--ink);padding:60px 66px 54px;min-height:1000px;display:flex;flex-direction:column}
+  .p3 .top{display:flex;justify-content:space-between;align-items:baseline;font:400 18px/1 var(--ui);letter-spacing:.3em;color:var(--faint)}
+  .p3 .mid{margin:auto 0;text-align:center}
+  .p3 .mid .q{font:500 italic 40px/1 var(--display);color:var(--faint);display:block;margin-bottom:18px}
+  .p3 .big{font:400 62px/1.5 var(--cn);letter-spacing:.04em}
+  .p3 .by{margin-top:40px;font:400 22px/1 var(--cn);color:var(--soft);letter-spacing:.1em}
+  .p3 .bot{display:flex;justify-content:space-between;align-items:flex-end}
+  .p3 .note{font:400 20px/1.8 var(--cn);color:var(--faint);max-width:20em}
+
+  /* ── 壁纸两枚淡雅 + 现有米白做对照 ── */
+  .wall{width:750px;display:flex;gap:14px}
+  .w{flex:1;height:210px;border-radius:22px;padding:22px 24px;box-shadow:0 6px 20px rgba(20,22,26,.10)}
+  .w b{display:block;font:600 26px/1.4 var(--cn)}
+  .w span{display:block;margin-top:10px;font:400 20px/1.6 var(--cn);opacity:.62}
+  .w i{display:block;margin-top:14px;height:8px;border-radius:4px;background:currentColor;opacity:.85}
+  .w0{background:#f4f2ec;color:#23252C}
+  .w1{background:#F2EFE9;color:#14161A}
+  .w2{background:#E9EEEA;color:#22322B}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="tag"><b>候选一 · 素纸</b>　纸 #F2EFE9 + 墨 #14161A + 发丝线 + kicker 字距，最贴官网首屏</div>
+  <div class="card p1">
+    <div class="kicker">阅读 · 09/23</div>
+    <h2>读过的东西，存成能转发的笔记</h2>
+    <div class="rule"></div>
+    <div class="lead">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+    <ul>
+      <li>一句话顶做大字，别人扫一眼就记得住</li>
+      <li>自己的头像和名字印在图上</li>
+    </ul>
+    <div class="foot">
+      <div class="who">阿飞<i>每天读一点再走</i></div>
+      <div class="qr"></div>
+    </div>
+  </div>
+
+  <div class="tag"><b>候选二 · 书眉</b>　白底一条墨线压顶，大字距眉标 + 居中单栏，像书页第一行</div>
+  <div class="card p2">
+    <div class="mast"><div class="mark">图麦笔记</div><div class="no">№ 012</div></div>
+    <h2>读过的东西，<br>存成能转发的笔记</h2>
+    <div class="sub">阅读 · 2026 年 9 月 23 日</div>
+    <div class="quote">一条链接、一张截图，或者自己写两句，存进来就自动分成能转发的样子。</div>
+    <div class="foot">
+      <div class="who">阿飞 · 每天读一点再走</div>
+      <div class="seal">麦</div>
+    </div>
+  </div>
+
+  <div class="tag"><b>候选三 · 留白</b>　只留一句金句，四角小字，几乎不画线；西文引号走 Playfair 斜体</div>
+  <div class="card p3">
+    <div class="top"><div>阅读</div><div>09 / 23</div></div>
+    <div class="mid">
+      <span class="q">“</span>
+      <div class="big">一句话顶做大字<br>别人扫一眼就记得住</div>
+      <div class="by">— 阿飞</div>
+    </div>
+    <div class="bot">
+      <div class="note">读过的东西，存成能转发的笔记</div>
+      <div class="qr"></div>
+    </div>
+  </div>
+
+  <div class="tag"><b>壁纸新增两枚（淡雅）</b>　左：现有米白 #f4f2ec 做对照　中：宣纸（官网纸色）　右：雨过青</div>
+  <div class="wall">
+    <div class="w w0"><b>米白（现有）</b><span>正文示例，标题与内文</span><i></i></div>
+    <div class="w w1"><b>宣纸（新）</b><span>正文示例，标题与内文</span><i></i></div>
+    <div class="w w2"><b>雨过青（新）</b><span>正文示例，标题与内文</span><i></i></div>
+  </div>
+</div>
+</body>
+</html>

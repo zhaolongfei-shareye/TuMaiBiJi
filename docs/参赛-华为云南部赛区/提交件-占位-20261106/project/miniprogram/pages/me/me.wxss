@@ -1,0 +1,718 @@
+/* 私密密码那一层的皮搬到 styles/pwd-sheet.wxss（站长 10-12「两个框风格不一致，要统一」，
+   这一层现在三页共用）。数值一个没改，搬文件的理由写在那份表头。 */
+@import '../../styles/pwd-sheet.wxss';
+/* 卡顶那一段玻璃（10-15 起与笔记列表共用一份实现，站长原话「两个渐变框架为什么不一样，
+   要统一到笔记列表那种…没有断层」）。@import 必须在最前面，与上面那一句同一条规矩。 */
+@import '../../styles/glass-sheet.wxss';
+
+/* 站长 10-15 01:4x「上面固定不变，下方超过竖向位置，只是下方滚动，不要全屏滚动，要与笔记列表
+   体验一致」⇒ 这一屏从"整页滚"改成笔记列表那一套竖排：容器撑满一屏、`.head` 定高不滚、
+   剩下的全给下面那枚 `scroll-view`。正本 `pages/index/index.wxss` 的 `.container`（v12 那一条），
+   三个数一个不改：`display:flex` ＋ `flex-direction:column` ＋ `height:100vh` ＋ `padding:0`。
+   ⚠ `padding:0` 是这一条带来的连带改动：原来左右那 24 由容器给，`.head` 再用 −24 顶回去贴屏边；
+   现在这一屏只有下面那一区要 24 的内缩，就挂在 `.me-body` 自己身上（挂在 scroll-view 上会给
+   滚动条留位、左右不等宽——同一条坑抄列表那页的注释），`.head` 那两道负 margin 跟着撤掉。
+   顶部那 2rpx 原来是为了堵外边距穿透（见下面 `.head` 那段旧注释），flex 容器本来不并外边距，
+   这一档归 0 之后那条白线的前提也不存在了（10-04 真机那条）。 */
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+/* 下面这一区＝这一屏唯一会滚的那一块。`min-height:0` 是必须的：flex 子项默认
+   `min-height:auto`，不给这一档它会被里面的卡片顶高、整块跟着页面长，滚动就白改了。
+   底栏那一档让位 150rpx 挂在**内容**的下内缩上（与列表页 `.xlist` 同一个道理：
+   滚到底时最后一张卡要能整片露出来），左右 24 仍由这一层给。 */
+.me-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 24rpx 150rpx;
+  box-sizing: border-box;
+  /* 10-15 03:5x：上面 `.head` 那一道 `margin-bottom:-94` 让卡顶玻璃的最后 94 与这一区重叠，
+     而 `.sheet` 是 `position:relative`（定位元素默认压在非定位的兄弟之上）——不抬这一层，
+     玻璃末段会把第一张卡的上沿盖掉一截。抬上来之后没有别的副作用：这一区自己不带底色，
+     玻璃那末段本来就是实心页面底同一个色，重叠区看上去与改之前逐像素相同。 */
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- 头部：底图一块 + 下面那一层往上凸出盖住它的下沿 ----------
+   图用的是「卡片模板」最上面那四个位置里勾了「背景」的那一张（poster.homeBg()），
+   和首页、新建页同一个来源、同一个取图口，这一页不开第二个上传入口。
+   盒子高 542 = 视口 1506 的三分之一，其中顶上 40 被 .sheet 盖住（那道弧的方向没动，
+   站长 10-04 指着第一版打过回：弧必须是"下面那层往上凸"，不是底图自己往下收）。 */
+.head {
+  position: relative;
+  /* 10-15 上面固定、下面自己滚 ⇒ 这一块在竖排里不许被压、也不跟着滚（`flex:none`）。
+     原来那两道 `margin-left/right: -24rpx` 是把容器的 24 内缩顶回去好让图贴屏边；
+     现在容器 `padding:0`（见上面那一条），再负 24 就变成往屏外各多出一截 ⇒ 一起撤掉，
+     落点一个字没变：改之前是 24−24=0 贴屏边，改之后是 0−0=0 同样贴屏边。
+     ⚠ 这两道负 margin 原来还留了一句"改了 --sp-3 要记得同步这里"，现在不需要了：
+     这一块的宽度不再跟 --sp-3 有关系。`验-我的页改版-真跑` 那条"底图左右贴屏边"仍照旧量。
+     ⚠ 10-15 03:5x 多出来这一道 `margin-bottom: -94rpx`：卡顶那段玻璃从 144 抬到与列表页
+     同一条 238（站长「统一到笔记列表那种…没有断层」），于是 `.head` 自己长到 740。
+     多出来那 94 **只借屏幕、不占流内**——下面那区仍从 646 起，名片行与第一张卡的落点一个像素不挪；
+     代价是玻璃末段与 `.me-body` 重叠 94，所以 `.me-body` 必须抬到它上面（见那一条）。 */
+  flex: none;
+  margin-bottom: -94rpx;
+}
+
+/* 下沿不给底图收圆（站长 10-04：弧的方向被我改反了，撤回来）。
+   接缝那道弧一直是由下面那一层 .sheet 的**上沿两角**凸出来盖住图形成的，方向不动。 */
+/* ★10-11 毛玻璃 R7／R12（站长原话「你只需要把背景图案往下侵入在第一个内框上面，
+   制作半透明毛玻璃效果即可」「毛玻璃白底下面如果没有背景图，你可以下移背景图」）：
+   10-11 那一趟从 542 抬到 646（把名片行那 144 整条垫在图下面）。
+   ★10-15 03:5x 再抬到 **740**：站长「两个渐变框架为什么不一样，要统一到笔记列表那种…没有断层」。
+   列表页那一段玻璃是 238 高（0／158／198／238 四个停点），实心那一档正好落在**照片被裁掉的那条线**上
+   ⇒ 那条硬边整条压在实心卡底下，读不出来。本页原来只有 144，实心落在 646＝照片的裁切线，
+   于是"淡到哪为止"和"图到哪为止"是同一条线——差一个像素就露一行照片，只能靠一枚实心封层去盖
+   （#151 那一刀），而封层自己又是一道台阶＝他今天抓的"断层"。
+   ⇒ 现在这一格抬到 740，玻璃段 502~740 与列表页逐字同一条，照片的裁切线挪到实心之后，封层撤掉。
+   ⚠ 这一格抬高的同时，`.head-band` 那道 `overflow:hidden` **必须留着**——它是"图只到 740、
+   740 以下是实心页面底"的唯一保险。效果图那一稿我把它画漏裁了，卡片四周透出原图＝他抓的"中间镂空"。
+   ⚠ 740 这一枚与全站唯一的照片锚点 `poster.HEAD_IMG_H`（＝740）同一个数，两件事从此同一档：
+   取景盒多高、图被裁在哪，都问这一枚（10-11 那趟"切 tab 背景图上下跳"的账见 me.js 头里那段）。 */
+.head-band {
+  position: relative;
+  height: 740rpx;
+  overflow: hidden;
+  background: var(--bg-page);
+}
+
+/* 图按"这一页单独定锚点"摆：aspectFill 只会把画面正中间那一条留在框里，
+   人像照的中段是胸口和手，脸会被裁掉。所以图按宽铺满算出真实高度，
+   再往上顶 15% 的余量（见 me.js 的 bandGeom），首页和新建页那条不动。 */
+.head-img {
+  position: absolute;
+}
+
+/* 与笔记列表那一格同一枚图、同一个落点（left 32 / top 22），尺寸与那一档透明度在 `app.wxss`
+   的 `.brand-title` 里只写一份。站长 10-16 夜两句话：这一行原来那行字（跟着下面那枚药丸念
+   设置／关于，10-04 那一版）搬进最顶上那一栏；位图**只在铺了背景图那一态**画（他第二句收窄）。
+   ⚠ `.h1` 这一支只留位置：文字那四条声明搬去 `.h1-txt`。留在这一条里，位图"看着有字号有字色"
+   却一条都不吃——那是"改一层皮静默失效"里最常见的一种假象。翻色挂 `filter`（下面那一条）。 */
+.h1 {
+  position: absolute;
+  left: var(--sp-4);
+  top: 22rpx;
+  z-index: 4;
+}
+
+/* 只有"没铺背景图"那一态才画这行字（站长 10-16 夜第二句收窄），所以这几条声明单独一支。
+   与笔记列表那一支同一档字号？不是——这一页仍吃全局 `--fs-h1`（42），笔记页那一支是 50，
+   那是他 10-16 白天只点了"笔记列表"那一屏的结果，我没替他并（并=改到没点的那一处）。 */
+.h1-txt {
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -1rpx;
+  color: var(--text-primary);
+}
+
+.head-band.has-bg:not(.bg-light) .h1 {
+  filter: invert(1);
+}
+
+/* ---------- 背景图是浅色那一档（站长 10-12 下的需求；判定与阈值在 utils/imgBrightness.js）
+   上面那几条"铺了图才翻纸白"的前提在浅图上是反的，所以这一格的字与罩子一起翻回墨／提亮。
+   停点仍照本页那条渐变自己的形状（守 542 那一档、末档平延 104），只换颜色方向；
+   浅色延段那支必须等于浅色渐变自己的末档（0.22），否则 542 那条线出硬边＝R6 打回的那种。
+   ⚠ 左上角那一枚不在这一组里：10-16 夜它换成位图，"浅图 ⇒ 不翻"由上面那条 `:not(.bg-light)`
+   自己成立（不满足就不挂 invert，本来就是那支墨），这里不再补一条空的 `color`。 */
+.head-band.has-bg.bg-light .score-n {
+  color: rgba(20, 22, 26, 0.86);
+}
+
+.head-band.has-bg.bg-light .score-l {
+  color: rgba(20, 22, 26, 0.68);
+}
+
+/* 10-13 23:36 站长撤了浅照片那一档的提亮罩（「调亮度应该是压暗，现在变成提亮」）。
+   这一枚键三页共用，新建页／笔记列表页那两条同名的 `.bg-light` 罩层覆盖一起删了；
+   延段照旧等于罩层渐变末档（0.22 那一档），否则带子与延段之间出硬边。 */
+
+.head-scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  /* 底边仍守 542 那一档（这一格 10-15 抬到 740 之后 `bottom` 跟着从 104 改成 198）：
+     那四个百分号停点是按 542 定的，让盒子跟着长会把明暗分布整条拉伸，头部那一屏的观感就跟着变了。
+     多出来那 198 由下面 `.head-scrim::after` 用渐变的末档平延过去，542 那条线上不会有亮度接缝。
+     ⚠ 这一枚与 `.head-band` 的 740、`.sheet` 的 -238／238 是同一笔账的三处，动一处要动齐（见上面那条）。 */
+  bottom: 198rpx;
+  /* 停点取首页那条罩子的前三分之一，同一张图两页的明暗要是一个连续体 */
+  background: linear-gradient(180deg, rgba(18, 20, 26, 0.58) 0%, rgba(18, 20, 26, 0.58) 14%,
+    rgba(18, 20, 26, 0.5) 58%, rgba(18, 20, 26, 0.44) 100%);
+}
+
+/* 542 以下那 198 的压暗延段——和首页那一条同一个改法（10-11 自查）：**挂在罩层自己身上**，
+   不挂 `.head-band`。理由是「调亮度」那一枚拧的是 `.head-scrim` 的 `opacity`
+   （`style="{{dimScrim}}"`，默认半月那一档 .5），伪元素跟着一起沉；画在 `.head-band` 上
+   那一段就永远吃满档 .44，默认档下 542 那条线一道硬边＝他打回的"一刀切"（R6）。
+   颜色取这条罩子渐变自己的末档（0.44）＝连续。`.head-scrim` 本身是 `wx:if="{{bgSrc}}"`，
+   没铺图那一态这两条都不存在，也就不会在纯色页面上多画一道暗带。 */
+.head-scrim::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 198rpx;
+  background: rgba(18, 20, 26, 0.44);
+}
+
+/* ---------- 药丸：关于的入口。默认「设置」 ----------
+   10-01 晚从照片上搬进留白卡（见 me.wxml 那段），所以这一块面不再吃纸白 @92%——
+   它现在坐在卡底上，面改成淡墨一档，选中那枚仍是墨底纸字，和「我的」页别处的按钮同两档。 */
+.pill {
+  flex: none;
+  display: flex;
+  gap: 4rpx;
+  padding: 5rpx;
+  border-radius: var(--r-pill);
+  background: rgba(35, 37, 44, 0.055);
+}
+
+.seg {
+  height: 58rpx;
+  line-height: 58rpx;
+  padding: 0 24rpx;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.seg.on {
+  background: var(--accent);
+  color: var(--bg-page);
+}
+
+/* MIND 钉右上角（站长 10-01 晚：和笔记页那三列同一个锚点、同一档数字，
+   两个 tab 的右上角对齐，这一格读起来就是"这页的状态数字"）。
+   原来它在照片右下角 bottom 56，被下面那张卡的上沿压着。 */
+.score {
+  position: absolute;
+  right: 32rpx;
+  top: 24rpx;
+  z-index: 4;
+}
+
+.score-n {
+  display: block;
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-size: 64rpx;
+  font-weight: 100;
+  line-height: 0.86;
+  /* ⚠ 2.1.11 第 0 步（§8.233 那条 P0 前置闸）量的就是这一行：`量-无图态字色` 12 个组合里
+     只有这对数字红（四套壁纸全红，实测对比度 1.10~1.17）。原因是这一档纸白**写死在基样式里**，
+     而基样式的假设是"这一格永远压在照片上"——上面 `.h1` 那条是把纸白挂在 `.has-bg` 上的，
+     这一对没挂，所以后台没配图、图被撤掉、或形象文件被系统清掉那一态，它就是浅页面底上的白字。
+     现在基样式改钉墨色（与 `.bg-light` 那两档同一个值：细字重 100 压到 .74 以下会发虚，
+     所以数字 .86、小字 .68，不是抄 `.h1` 的 .92），纸白退回"真铺了图"那一档。 */
+  color: rgba(20, 22, 26, 0.86);
+}
+
+.head-band.has-bg .score-n {
+  color: rgba(242, 239, 233, 0.74);
+}
+
+.score-l {
+  display: block;
+  margin-top: 10rpx;
+  /* 字距是加在每个字母后面的，整串会比视觉宽度多出一个字距的尾巴；
+     补一个同宽的左内边距，居中才真的对到数字中间 */
+  padding-left: 4rpx;
+  text-align: center;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: 4rpx;
+  color: rgba(20, 22, 26, 0.68);
+}
+
+.head-band.has-bg .score-l {
+  color: rgba(242, 239, 233, 0.62);
+}
+
+/* ---------- LOGO 那一行：圆 LOGO 与右边两行字等高（80 = 31×1.25 + 7 + 24×1.4）
+   站长 10-04：它原来是一张卡，和下方那枚列表框实测只差 5 个像素、两框互相粘连，所以把"卡"撤掉——
+   撤的是那层不透明的卡色补丁和四角圆角里的下沿两角，底色换成**页面底同一个色**：
+   这一层还在（它负责把图的下沿盖住、留出那道往上凸的弧），但和它下面的页面同一个颜色，
+   读起来就是一整片，不再有第二个框。
+   左右内缩那 24 由 .container 给、这里再补 32，于是 LOGO 与下方卡里的行名落在同一条左线。 */
+.sheet {
+  position: relative;
+  /* 10-15 03:5x 随上面 `.head-band` 抬到 740 一起改：-144／144 → **-238／238**，
+     与列表页那张纸卡同一条玻璃段（那两页从此吃 `styles/glass-sheet.wxss` 里同一条规则）。
+     名片行**自己的落点一个像素不挪**：多出来那 94 挂在 `padding-bottom` 上，
+     内容盒仍是 144 高、`align-items:center` 仍把它居中在 502~646 那一段（中心 574，与改前同一条线）。
+     左右内缩那 24 由 .container 给、这里再补 32，于是 LOGO 与下方卡里的行名落在同一条左线。 */
+  margin-top: -238rpx;
+  height: 238rpx;
+  box-sizing: border-box;
+  padding: 0 56rpx 94rpx;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  background: var(--bg-page);
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  /* 站长 10-14 20:5x 那一句里"关于、设置"两档的落点就是这一枚——两档都住在它下面，一处管两档。
+     与列表页那张纸卡同一枚 `--sh-lift`（`app.wxss`），不在这页另抄一串数。 */
+  box-shadow: var(--sh-lift);
+  /* 共用那条渐变里"淡到哪一层"由这两枚说：这一页淡到页面底（列表页淡到卡面）。 */
+  --glass-surface: var(--bg-page);
+  --glass-fade-surface: var(--glass-fade-page);
+}
+
+/* R6（「毛玻璃如果下方纯色，要进行渐变处理，不要一刀切」）：这一行下面就是实心页面底，
+   所以白纱必须往下渐退。原来这一页自己写了一条 0／56／108／144，
+   10-15 03:5x 站长判它"与列表页那个框架不一样、看到明显的断层"⇒ 整条撤掉，
+   换成两页共用的那一份（停点 0／158／198／238，正本 `styles/glass-sheet.wxss`）。
+   ⚠ 只在铺了形象图那一态读玻璃；退化方向与 IACVT 那一段账抄在那份表头，
+     四套壁纸那五块必须各有一份镜像值（`验-玻璃令牌齐不齐` 钉）。 */
+
+/* `.sheet-seal` 那一枚实心封层 10-15 03:5x 撤了（站长「设置和我的看到明显的断层…要统一到
+   笔记列表那种」）。它的来历与撤的理由是同一件事，两版都留字在这里：
+   · 10-15 01:4x 他打回"面板中间多了一条线"，实测那条线落在页内 641rpx＝照片被 `overflow:hidden`
+     裁掉的那条硬边在残余 α（那一档约 .95）里露了一行；当时把补色画在两枚伪元素上
+     （`.sheet::after`、`.head-band::after`）复量截图证明压根没画上，第三版换成真实一枚实心封层才压住。
+   · 但实心封层自己又是一道台阶：它从 622 起刷成实心，而它上面那一档渐变还没淡满 ⇒ 03:5x 那一刀
+     实测屏上 y=778~780 三行 Δ 灰阶 +6.7／+16.5／+10.1（＝他今天指的"断层"）。
+   · ⇒ 根因不在"要不要盖一行"，在**玻璃淡满那条线恰好就是照片被裁的那条线**：两者同一条，
+     差一个像素就露照片，只能靠补色去盖，而任何补色都是一道硬边。
+     现在把照片的裁切线抬到 740、玻璃也在 740 淡满（＝列表页那一条），实心段把裁切线整条压在下面，
+     封层与它那道台阶一起作废。量法与数：`docs/工具/量-面板顶断层.py`。 */
+
+/* X4：本页还留着的那枚居中弹窗（我的邮箱那一层）。站长 10-11 逐条裁定时原话「4、做」。
+   皮写在页内，只有 `--glass-veil`/`--glass-bf` 两枚 var()（α 全站只那一个出口，R10）；
+   为什么不写在 app.wxss，理由记在那张表 X4 那段注释里。
+   ⚠ 这枚底下垫的是 `rgba(20,20,28,.55)` 那层暗遮罩：白纱压暗底落成中灰（实测面 rgb(157~165)），
+      里面墨字的对比量出来给站长判——他 10-11 拍**甲**，见下面那一条说明字。
+   （密码那一层的同一档搬到 styles/pwd-sheet.wxss 了，10-12 起三页共用那一份。） */
+.container.has-bg .me-email-card.glass-dialog {
+  background: var(--glass-veil);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+}
+
+/* 站长 10-11 拍**甲**（原话「甲，弹窗不用，甲，不用。」里第二个"甲"＝待拍第 3 条选甲）：
+   这枚的说明字从 `--text-secondary`（墨 @.72）提到整档墨——量出来那两枚的说明字在玻璃面上是
+   3.30／3.10:1，不到小字门槛 4.5，而同样的面上整档墨是 4.98~6.17。
+   闸同样写在 `.container.has-bg` 上：没铺图那一态这张卡是实心 #FCFBF8，淡墨本来就够（≈7:1），那一态一个字不回改。 */
+.container.has-bg .me-email-card.glass-dialog .me-email-scene {
+  color: var(--text-primary);
+}
+
+.sheet-logo {
+  flex: none;
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+}
+
+.sheet-text {
+  display: flex;
+  flex-direction: column;
+  gap: 7rpx;
+  /* 药丸搬进来之后这一行是「LOGO + 两行字 + 药丸」：字那一格吃掉剩下的宽度并顶到药丸前，
+     药丸才真的钉在最右。两行字本来就是单行截断，宽度不够是省号，不会把药丸挤走。 */
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet-name {
+  font-size: var(--fs-title);
+  font-weight: 800;
+  letter-spacing: -0.4rpx;
+  line-height: 1.25;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-slogan {
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 名片行那两行字跟着图翻（站长 10-12：「……关于和设置，固定的两行文字」——这一行在设置与
+   关于两个档都摆着，翻案前翻案后是同一块）。
+   和列表页那两行同一个道理：这一格压的是 `.sheet` 那 144rpx 的白纱，不是头部那层暗罩，
+   白纱把暗图提成了中灰，所以跟着图翻的是墨的浓度、不是极性。
+   真机那张演唱会图实测（`docs/design/背景图深浅/量-分段候选.py`）：
+   名称那一行底中位灰阶 162 → 整档墨 5.25、纸白@.96 只有 2.17；slogan 那一行底 175 → 整档墨 6.11、
+   `.72` 那一档 3.53、纸白 1.88。
+   ⚠ 所以这里只抬 slogan：名称本来就是整档墨（`--text-primary`），已经过线，再动就是白动。
+   ⚠ `:not(.bg-light-low)` 不许省：浅那一态同一处量到 5.00，`.72` 本来就够（抬了等于把两档并成一档）。
+   ⚠ 吃的是**下那一档**（`bg-light-low`＝名片行那 144 的亮度），不是整页那一枚——10-12 21:1x 他那句
+   「请按照上下部分来分别判断」，这一页上截是头部大字与 MIND，下截就是这一行。 */
+.container.has-bg:not(.bg-light-low) .sheet-slogan {
+  color: var(--text-primary);
+}
+
+/* ---------- 条状列表：左名称，右一枚裸箭头 ---------- */
+.menu-group {
+  padding: 0 var(--sp-4);
+  overflow: hidden;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 106rpx;
+  border-bottom: var(--w-edge) solid var(--card-edge);
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-label {
+  font-size: var(--fs-body);
+  font-weight: 700;
+  letter-spacing: -0.3rpx;
+  color: var(--text-primary);
+}
+
+/* 行右侧那行小字说明（站长 10-05：「右侧要加小字说明，有哪些内容可以设置，也不要回行，提炼」）。
+   `margin-left: auto` 把它推到箭头左边；`white-space: nowrap` 就是"不要回行"那句的实现——
+   挤不下的处理是改文案，不折行也不缩字，宽度由 `docs/工具/探-小字不折行.js` 现量钉住。
+   字色走令牌：四套壁纸各有各的墨色，写死一个数会在别的套上掉队。 */
+.menu-hint {
+  margin-left: auto;
+  margin-right: 12rpx;
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.menu-right {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-width: 0;
+}
+
+/* 「关于」那两行箭头左侧的值（网站、邮箱）。站长 10-05：这一处的字体风格没和上面
+   「设置」那四行右侧的小字统一——那就并到同一档：同一个字号令牌、同一支 tertiary 墨色、
+   同样 nowrap。两行都只有 latin 串（agentsbin.cn / 邮箱），没有汉字，所以不必走
+   `验-数字字体全局` 那条"含汉字就别吃数字字形"的分支，仍不写 font-family。 */
+.menu-value {
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* ---------- 魅力值规则（站长 10-01 深夜：这一组最底下那行「魅力 + 数字」撤掉，换成一块规则）
+   站长 10-02 真机第二版：三行之间不要横线分隔——"这是一件事三个要点，是完整的论述，
+   不是区分三件事"。所以线撤了、行高从菜单那一档 106 收到 72，每行前面挂一枚点，
+   与新建页四步指引、Tips 同一枚黄点（色值由 me.js 的 ruleDotStyle 从 palette.TIP_DOT 递进来，
+   写进样式表就是第二份色板）。三个数不写死在模板里：由 me.js 的 loadQuota 从 /api/user/quota
+   填，读不到整块不出现。 */
+.rules {
+  padding-bottom: 0;
+}
+
+.rules-title {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  letter-spacing: -0.2rpx;
+}
+
+.rule {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 72rpx;
+}
+
+.rdot {
+  flex: none;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+}
+
+.rule-label {
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+/* 站长 10-05 两条一起落在这格上：「魅力值的数字也过大」＋"分小点的字要与产品介绍一样大"。
+   实测这一块的**字**本来就已经同档（`.rule-label` 与 `.about-p` 都 14px＝28rpx＝--fs-body），
+   真正高一档的只有这列数（原来 --fs-title 16px＝31rpx）。所以只降它，字不动——
+   把 28 改成 21 会让三句规则比介绍还小，那是另一回事，他没点。
+   字色给 secondary（与 `.rule-label` 同档），不再往下掉到 tertiary：这支数字是 Thin 字重，
+   再浅一档在浅色壁纸上就快看不见了。数字仍吃 'WtsjMind'（子集带 + - . / 那几个符号）。
+   ⚠ 降到 21rpx 之后他真机（天青那一套）还是回："部分数字颜色太浅，与背景太接近，很难看清，
+   请调高一档颜色"。卡底 #F1F3F2 上二级字实测 **5.17:1**——数字本身达标，但这支字体子集里
+   **只有 Thin 一个字重**（加不了粗），细笔画在同档墨色下就是比旁边的汉字淡一档。所以抬 primary：
+   **11.89:1**，与左边那三句标签拉开一档，读起来正好是"句子＋末尾那个数"。 */
+.rule-value {
+  margin-left: auto;
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-size: var(--fs-tiny);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* 站长 10-04：圆底撤了，只留箭头那一笔。盒子仍是 46 见方——行右端那条竖线要照它对齐。 */
+.ico {
+  flex: none;
+  width: 46rpx;
+  height: 46rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 箭头只是"这行还能进去"的指示，不是按钮面，所以吃三级字那一档：
+   压在卡底实测 3.4~3.7（图形门槛 3.0 过），比行名的墨浅两档，不抢读序。
+   原来这一笔是纸白、靠圆底把它撑出来，圆底一走就必须换个色。 */
+.ico .cv {
+  width: 13rpx;
+  height: 13rpx;
+  border-right: 4rpx solid var(--text-tertiary);
+  border-bottom: 4rpx solid var(--text-tertiary);
+  transform: rotate(-45deg);
+  margin-left: -4rpx;
+}
+
+.menu-item.open {
+  background: var(--accent-soft);
+}
+
+.menu-item.open .ico .cv {
+  transform: rotate(45deg);
+  margin-left: 0;
+  margin-top: -6rpx;
+}
+
+/* 注销这一行只给文字着色，不铺色块：一屏里只有一个动作是不可逆的，
+   它要看得见，但不该抢过别人的位置。 */
+.menu-item.menu-danger .menu-label {
+  color: var(--danger);
+}
+
+/* ---------- 分享行：这一行本身就是 button[open-type=share] ----------
+   要把小程序 button 的默认样式（灰底、圆角、::after 描边、居中、行高）全部推平。 */
+.menu-item.share-row {
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  border-bottom: var(--w-edge) solid var(--card-edge);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--fs-body);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  text-align: left;
+  letter-spacing: -0.3rpx;
+  white-space: normal;
+}
+
+.menu-item.share-row::after {
+  border: none;
+}
+
+.menu-item.share-row:active {
+  background: var(--accent-soft);
+}
+
+/* ---------- 私密密码：就地展开，长在列表里面，不再浮一层 ---------- */
+/* 私密密码这一层（`.pwd-*` 那一段）搬到 styles/pwd-sheet.wxss，标记搬到 templates/pwd-sheet.wxml，
+   三页共用一份（站长 10-12「看笔记提示输入密码的框，跟设置密码的框风格不一致。要统一」）。数值一个没改。 */
+
+/* ---------- 我的邮箱：那一行的值 + 点开那一层 ----------
+   层的几何一字抄 styles/pwd-sheet.wxss 那份私密密码那一层（遮罩色 / 卡宽 620 / 离顶 180 /
+   一行两枚各占一半），只有输入框替换了六格。类名带页面前缀：这一页与 about.wxss 各有一套 .menu-*，
+   再来一发裸名就是第三份。 */
+.me-email-val {
+  /* 地址最长收到 254，行里摆不下就得收：给个上限再用省略号，
+     否则 nowrap 会把右边那枚箭头顶出那一行（`探-小字不折行` 扫的正是这种"顶出去"）。 */
+  max-width: 340rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 站长 10-16 夜（附真机图）「第一个图亮度不能压暗，与密码设置的弹窗一样处理」⇒ 这一层从
+   `rgba(20,20,28,.55)` 改成**透明**，只留"点外面收口"那一个热区。同一件事 10-13 23:37 已经在
+   六位密码那一层做过一次（`styles/pwd-sheet.wxss` 的 `.pwd-mask`，他原话「密码弹窗突然变暗，
+   这个不合理，要亮度不变」），这一回是他指着邮箱这一层要同一档。
+   ⚠ 其余那两处压暗的层他没指，照旧压暗：`app.wxss` 的 `.ci-mask`（首页那张卡片小弹窗）与
+   `pages/categories/categories.wxss` 的 `.dialog-mask`（新增分类那一层）。别顺手一起改
+   （"去掉"只覆盖他指的那一处）。
+   ⚠ `styles/pwd-sheet.wxss` 那段注释里"其余四处同值的 `.dialog-mask`（app.wxss／me.wxss／
+   create.wxss／categories.wxss）"这一句今天对不上：全仓扫 `rgba(20, 20, 28, 0.55)` 实得三处，
+   类名分别是 `.ci-mask`／`.dialog-mask`／`.th-x`（最后一枚是缩略图右上角那枚 ✕ 的底色，不是遮罩），
+   而 `me.wxss` 这一处已经按他这一句改成透明了。那句历史话留着不改（它是 10-13 那天写的），
+   但别再照它去找"四处"。 */
+.me-email-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 180rpx;
+  z-index: 100;
+}
+
+.me-email-card {
+  width: 620rpx;
+  padding: var(--sp-5) var(--sp-4) var(--sp-4);
+  margin-bottom: 0;
+  box-shadow: var(--sh-float);
+}
+
+.me-email-name {
+  display: block;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  letter-spacing: -0.6rpx;
+  color: var(--text-primary);
+}
+
+/* 10-17 站长「两个弹窗中间英文小字连在一起了，应该要改为与下方菜单栏后面备注的小字一样的字体」
+   ⇒ 撤掉这一条 `letter-spacing: -0.2rpx`，让它与 `.menu-hint` 一样吃默认字距。
+   ⚠ 根因量出来了，不是"看着紧"：**`letter-spacing` 里小于一整像素的 rpx 会被取整成 ±1px**。
+     这一条写的是 −0.2rpx，在 390 宽那一台上屏上读到的计算值是 **−1px**（`探-药丸与三圆发光`
+     现量，`.menu-hint` 同一趟读到 `normal`）——21rpx 的字吃 −1px 就是每字符退 4.8%，
+     空格先被吃掉（它本来只有 0.28em≈5.9rpx），于是英文读成 "Replies,corrections"。
+     中文一句 21rpx 一个字，退 1px 看不出来 ⇒ 他点的正是英文这一头。
+   ⚠ 全仓这样的小数点字距还有一批（大字那几枚 −0.5／−0.6／−1rpx），**他没指的那些一处没动**：
+     字越大那一 1px 占比越小，读得出来的是小字。要一起并是另一刀，等他话。 */
+.me-email-scene {
+  display: block;
+  margin-top: 12rpx;
+  font-size: var(--fs-tiny);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.me-email-field {
+  margin-top: var(--sp-4);
+  height: 96rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  border-radius: var(--r-chip);
+  background: var(--chip-idle);
+  box-shadow: inset 0 0 0 var(--w-edge) var(--card-edge);
+  font-size: var(--fs-body);
+  color: var(--text-primary);
+}
+
+.me-email-ph {
+  color: var(--text-tertiary);
+}
+
+.me-email-two {
+  margin-top: var(--sp-5);
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.me-email-btn {
+  flex: 1;
+  text-align: center;
+  padding: var(--sp-3) 0;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.me-email-btn.ghost {
+  color: var(--text-secondary);
+  background: var(--chip-idle);
+}
+
+.me-email-btn.primary {
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+}
+
+/* ---------- 关于：头部下面直接生成，不分二级 ---------- */
+.about-lead {
+  padding: 24rpx 28rpx;
+}
+
+.about-who {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  margin-bottom: 10rpx;
+}
+
+.about-name {
+  font-size: var(--fs-title);
+  font-weight: 800;
+  letter-spacing: -0.5rpx;
+  color: var(--text-primary);
+}
+
+.about-ver {
+  /* 版本号是"v + 数字 + 点"，整串跟着全局那一档走，不然半粗半细更难看（字体里有 v 和 .）。
+     站长 10-05 真机："版本号也很浅"——二级字 .72 压在卡底实测 5.17:1，数字本身达标，
+     但这支是 **Thin 一档字重**（子集里就一个字重，加不了粗），细笔画在同档墨色下就是比汉字淡。
+     所以这一枚直接吃 primary（11.89:1）：它是这格里唯一需要被读准的标识，不是次要说明。 */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-size: var(--fs-label);
+  font-weight: 100;
+  color: var(--text-primary);
+  background: var(--chip-idle);
+  padding: 3rpx 14rpx;
+  border-radius: var(--r-pill);
+}
+
+.about-p {
+  display: block;
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+/* 「脑力值」那一行只能看，所以不给 icon（icon 的意思是"点得进去"） */
+.copyright {
+  display: block;
+  margin-top: 26rpx;
+  text-align: center;
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
+}
+
+/* 图片云空间那一行脚注（方案 §3.1.8）：只在比值过线时出现，不是一张能点的门，
+   所以不给 border-bottom、不给高度，就贴着卡片下面一行小字。 */
+.me-storage {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  padding: 0 var(--sp-4);
+  margin-top: var(--sp-2);
+  font-size: var(--fs-tiny);
+  line-height: 1.5;
+}
+
+.me-storage-k {
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.me-storage-v {
+  color: var(--text-secondary);
+}

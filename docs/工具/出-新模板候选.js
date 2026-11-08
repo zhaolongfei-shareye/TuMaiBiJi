@@ -275,8 +275,10 @@ ck('来源读数：这几套现在吃的是下发的配方，不是包内那一�
   ids.every((id) => poster.recipeSource(id) === 'remote'),
   ids.map((id) => `${id}=${poster.recipeSource(id)}`).join(' '))
 const nBundled = poster.TEMPLATES.length
-ck(`合并列表：${nBundled} 套包内 + ${ids.length} 套新的 = ${nBundled + ids.length} 套，且新 id 排在末尾`,
-    poster.templateList().length === nBundled + ids.length && poster.templateList().slice(-ids.length).map((x) => x.id).join(',') === ids.join(','),
+// 站长 11-08：「卡片市场／模板选择要把新的排前面，否则用户不知道更新了」⇒ 新稿 sort 1..6 排在包内 10..100 之前。
+// 判据跟着改：合并列表头 ids.length 格就是这几套新稿（按 sort_order），不再断言"排末尾"。
+ck(`合并列表：${nBundled} 套包内 + ${ids.length} 套新的 = ${nBundled + ids.length} 套，且新 id 按 sort 排在最前`,
+    poster.templateList().length === nBundled + ids.length && poster.templateList().slice(0, ids.length).map((x) => x.id).join(',') === cases.slice().sort((x, y) => x.meta.sort_order - y.meta.sort_order).map((c) => c.id).join(','),
   poster.templateList().map((x) => x.id).join(','))
 
 const profile = { name: '阿飞', slogan: '每天读一点再走', avatarPath: '' }

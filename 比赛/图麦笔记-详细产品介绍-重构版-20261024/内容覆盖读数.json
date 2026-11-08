@@ -1,0 +1,73 @@
+{
+  "chapters": 12,
+  "items": 77,
+  "chinese_body_chars": 18160,
+  "by_chapter": [
+    {
+      "id": "01",
+      "title": "先认识首页：记录、回看与个人设置的起点",
+      "count": 6
+    },
+    {
+      "id": "02",
+      "title": "录入：把眼前的资料接进来",
+      "count": 6
+    },
+    {
+      "id": "03",
+      "title": "整理：先读懂，再留下自己的判断",
+      "count": 4
+    },
+    {
+      "id": "04",
+      "title": "资料库：按时间回看，按主题找回",
+      "count": 6
+    },
+    {
+      "id": "05",
+      "title": "阅读与编辑：先顺畅回看，再改成自己的笔记",
+      "count": 8
+    },
+    {
+      "id": "06",
+      "title": "卡片表达：让一篇笔记找到合适的呈现方式",
+      "count": 18
+    },
+    {
+      "id": "07",
+      "title": "分享与转存：让内容流动，也说清谁能看见什么",
+      "count": 7
+    },
+    {
+      "id": "08",
+      "title": "私人空间：给只想自己看的内容加一道阅读门槛",
+      "count": 6
+    },
+    {
+      "id": "09",
+      "title": "让界面更像自己：背景、心情与阅读明暗",
+      "count": 4
+    },
+    {
+      "id": "10",
+      "title": "账号与数据：看得懂自己的记录如何保存",
+      "count": 6
+    },
+    {
+      "id": "11",
+      "title": "帮助、推荐与魅力值：从第一次使用到持续积累",
+      "count": 3
+    },
+    {
+      "id": "12",
+      "title": "把功能用成自己的习惯：三条完整场景",
+      "count": 3
+    }
+  ],
+  "missing_fields": 0,
+  "duplicate_ids": 0,
+  "evidence_paths_checked": 329,
+  "whitepaper_domains": 15,
+  "differences": 17,
+  "final_brochure_laid_out": true
+}

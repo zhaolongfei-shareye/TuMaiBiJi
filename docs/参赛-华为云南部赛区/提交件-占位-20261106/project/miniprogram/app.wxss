@@ -1,0 +1,1163 @@
+/* ------------------------------------------------------------------
+   设计令牌（V2 左块右文）。分工：
+   ① 非色彩令牌——全局一份，不随主题变。
+   ② 主题（=用户选的壁纸）只管 chrome：页面底、导航、搜索框、chips、正文文字。
+   ③ 方块的颜色不归主题管，由 utils/palette.js 按分类固定注入 --blk-bg / --blk-ink。
+      10-04 起这一条成了例外中的全部：四枚壁纸都带 ramp（整套色阶），方块一律跟着
+      当前主题那一支色相走，所以它们的方块色在下面各主题块与 palette.js 里各存一份镜像值。
+
+   V1→V2 只改了承载方式：颜色从"整张卡"退到卡片左侧那块方块，卡本身回白底。
+   这一改带来两个后果，写清楚免得下一个人当成 bug：
+   ① 描边（--w-edge + --card-edge）取代投影成为卡片的边界语言，投影令牌已经删干净，
+      只有浮层（弹窗、tab 栏）还留着 --sh-float。
+   ② 卡不再是饱和色，所以深色壁纸必须自己出一套卡（半透明底 + 亮描边 + 亮字）。
+      --bg-card / --card-edge 因此从兜底值升级成主题变量，切壁纸时它们必须跟着变。
+   ------------------------------------------------------------------ */
+
+page {
+  /* 字阶：八级。最下面两档只给"方块里的日期"和"小眉标"用，正文不下探到这里 */
+  --fs-h1: 42rpx;
+  --fs-h2: 34rpx;
+  --fs-title: 31rpx;
+  --fs-body: 28rpx;
+  --fs-meta: 24rpx;
+  --fs-tiny: 21rpx;
+  --fs-label: 20rpx;
+  --fs-micro: 18rpx;
+  --lh-body: 1.6;
+  --lh-tight: 1.38;
+
+  /* 间距模数：8rpx 一档 */
+  --sp-1: 8rpx;
+  --sp-2: 16rpx;
+  --sp-3: 24rpx;
+  --sp-4: 32rpx;
+  --sp-5: 48rpx;
+  --sp-6: 64rpx;
+  /* 行卡的三个数（块-文间距、上下留白、左右留白）在效果图里是同一个值，这里也锁成一个 */
+  --sp-row: 26rpx;
+
+  /* 圆角与描边——描边是这套方向的骨架，投影已经退役 */
+  --r-card: 40rpx;
+  --r-block: 32rpx;
+  --r-chip: 28rpx;
+  --r-pill: 999rpx;
+  --r-btn: 16rpx;
+  --w-edge: 3rpx;
+  --sh-float: 0 16rpx 44rpx rgba(35, 37, 44, 0.22);
+  /* 框框压着背景那一枚**向上抬**的投影：字面量只住在 `app.wxss`（这一处兜底＋下面五块心情各一枚），
+     页面里一律 `var()`，谁与背景相接的那条顶边都要它。
+     出处不是新画的——就是笔记列表／笔记卡片那张纸卡 10-09 起身上那一串（`index.wxss .sheet`），
+     站长 10-14 20:5x 对着真屏说「笔记列表和笔记卡片框框与背景之间有一点向上阴影，这个是对的，
+     要复制到其他页面，首屏，二屏，关于，设置等都要加上阴影，风格和高度全局一致」。
+     ⇒ 三个落点共用这一枚：列表页那张纸卡（换成 var，像素一个数不变）、
+       「我的」页那枚名片行 `.sheet`（设置／关于两档都在它下面，一处管两档）、
+       新建页那块通栏深色面板 `.stage-panel`（首屏／二屏是同一枚元素的两个高度）。 */
+  --sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
+
+  /* `--sh-lift` 的**镜像**（偏移取反、其余逐字相同）：给"贴在屏幕上沿、下边缘与背景相接"的那一类，
+     也就是首屏最上面那一行的 `.ai-line`。站长 10-14 00:0x 原话「左下和右下有圆弧，然后与背景之间带阴影。
+     要与下方面板渐变毛玻璃风格一致」——面板那条边在**上**，所以吃向上的 `--sh-lift`；这一行那条边在**下**，
+     方向必须反过来。**正本只有这一处，页面里一律 `var()`**（同 `验-向上阴影全局一枚` 那条规矩）。
+     ⚠ 10-15 站长拍甲之后，这两枚**也进了五档心情**（`.mood-*` 各覆写一份），但 α **五档同一个数 .16**：
+       我先给过一版"墨档单独 .42"，他 17:3x 拿真机两张图打回「墨档的阴影过黑，与其他色的阴影不一致。
+       你的算法不一样吗？」——是我不一样，那一版已撤。要抬就五档一起抬同一个数，别再开特例。
+     ⚠ 这一段注释里不许出现花括号：`验-五档彩色玻璃` 与 `验-玻璃令牌齐不齐` 取块用的是"到第一个右花括号为止"，
+     注释里一个右花括号就能把 `page` 这一块从中间截断，后面十几枚令牌当场读成 null（10-15 00:2x 真红过五条）。 */
+  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);
+
+  /* 列表里"一篇一张"那一枚卡自己那枚，比上面那本尊薄一档。
+     站长 10-17「每条笔记的面板阴影太厚，上下面板几乎连起来」——量的对比对象是他给的那张参考原件
+     （`docs/design/10-17列表合一/参考图-站长给的那张.jpg`）：那张两卡之间是一道约 29rpx 的干净面板，
+     缝里读数 238～242、与面板底 240 只差 2 级＝几乎没有暗环；现网同一处是 17rpx 净距里压出一道
+     21rpx 宽、最低 221.9 的暗带（比面板底暗 21 级）。
+     ⚠ 这一枚**故意不复用 `--sh-drop`**：那本尊全站六块共用（首屏 `.ai-line` 也吃它），
+       跟着改会把首屏那条边一起改薄，他这句只点到列表这一屏。偏移与模糊各收一半、α 减半。 */
+  --sh-row: 0 6rpx 14rpx rgba(18, 20, 26, 0.08);
+
+  /* 方块：176rpx 见方，母题住在它里面 */
+  --blk: 176rpx;
+  --blk-pad: 18rpx;
+  --fs-block: 32rpx;
+  --motif-size: 124rpx;
+  --motif-shift: 32rpx;
+
+  /* chrome 色彩兜底：这一份就是象牙那一套（THEMES[0]，未登录/脏值都落在这里）。
+     下面四个 .theme-* 块各写一份镜像值，等值由色板那把尺子逐枚钉死。 */
+  --text-primary: #352E1D;
+  /* 二级字 0.66 → 0.72（站长 10-04 拍）：压在卡底实测象牙/天青只有 4.35/4.38，本来就不过
+     正文门槛 4.5；「我的」那行 LOGO／名称／Slogan 撤掉自己的框退到页底之后更暗（页底比卡底
+     低 ΔL 8 档），同一档只有 3.99~4.34。抬到 .72 是两面同时过线的最低值（.70 还差一点）。 */
+  --text-secondary: rgba(53, 46, 29, 0.72);
+  /* 三级字 0.4 →（10-04）0.55 →（10-05 真机）0.72。
+     10-04 那次抬到 .55 写的理由是"仍比二级字浅一档"——今天他真机（天青）连着两句：
+     "部分数字颜色太浅，与背景太接近，很难看清"、"版本号也很浅"。按四套壁纸实算，.55 压在
+     页底只有 **3.03~3.25:1**、卡底 **3.21~3.52:1**：连 WCAG 大字门槛 3.0 都是勉强贴线，
+     而这些字全是 20~24rpx 的小字，按小字门槛 4.5 算四套一套都没过。
+     抬到 .72 是**四套壁纸、页底与卡底两面都过 4.5 的最低档**（页底 4.70~5.15、卡底 5.19~5.87；
+     `探-数字对比度` 在天青真机上量到 4.67/5.17，比这两头略低，差的是合成前景时取整的那半档）。
+     再往上一档（.75）本身没问题，但 .72 已经是二级字那一档，三级字比它深就倒过来了。
+     代价要说清楚：这一档与 `--text-secondary` 合并成同一个值，"次要"这件事从此只靠**字号与字重**
+     表达，不再靠深浅。要保留三档深浅就得二级字再往上抬（.85 起），那是改他 10-04 拍过的值，
+     等他点头再动。 */
+  --text-tertiary: rgba(53, 46, 29, 0.72);
+  /* 私密那一格的分类名标红（站长 10-18「如果是私密，字体标红」）。全站只有这一支红，
+     三处落点（列表那一行／详情窗／独立详情页）都从这一枚取色。
+     为什么是 #A83224 而不是官网那支品牌赭 `#D2683F`：后者压在最浅的卡底实测只有 3.26:1，
+     读着像橙色、且过不了小字门槛 4.5。这一支是按**最坏那一档底**选的——列表那一行的面是
+     `--glass-plate-dock`（五档心情各一支，α .72 铺在卡底上），最暗的是象牙档 226,221,218，
+     对它 4.82:1；卡底 #F3F3F1 对它是 6.01:1。再往浅一档（#B03A2E）在象牙档掉到 4.35，不过线。
+     ⚠ 这一枚不进四套主题块、也不进五档心情：它不是 chrome，是"这一格是私密"的语义色，
+       跟着壁纸换色就等于哪天有一档心情把它染得读不出来。 */
+  --priv-ink: #A83224;
+  --bg-page: #E2DED4;
+  --bg-card: #F3F3F1;
+  --bg-card-glass: rgba(243, 243, 241, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F3F3F1 ／ #E2DED4 各取 .62（效果图 229／332 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(243, 243, 241, 0.62);
+  --glass-fade-page: rgba(226, 222, 212, 0.62);
+  /* ---------- 10-11 毛玻璃那一档：全站唯一出口 ----------
+     需求正本 `docs/需求清单-10-11毛玻璃.md` R1／R2／R3／R10。α＝.30 是站长在校准条上点的那一档，
+     四套壁纸下都是这一组——白纱本身与壁纸无关，只有"往下渐退"的终点才吃各主题的 --bg-card／--bg-page。
+     ⚠ 数值一律写死，不许改成 rgba(255,255,255,var(--glass-a))：var() 嵌进函数参数在老安卓 XWEB 上
+     会让整条声明掉下来（上面 min() 那条留退路是同一个原因）。
+     blur 用 px 不用 rpx：filter 里的 rpx 微信编译器不保证换算；23px ≈ 46rpx（375 屏那一档）。
+     上面那行 --bg-card-glass 是 §8.85「横条 95% 模仿毛玻璃」的残留（消费方 .note-row 已整块撤掉），
+     本轮另起一组、不去动它，免得把他拍过的那条痕迹一起抹了。 */
+  --glass-veil: rgba(255, 255, 255, 0.30);
+  /* ---------- 卡顶那一段玻璃单独一档：.60（站长 10-12 21:4x 拍甲） ----------
+     为什么非要第二档：`.sheet` 那一段（列表 158／「我的」144）底下压的是**形象图本身**，
+     而 .30 这档白纱把近黑的图只提到灰阶 89~175——正好是"墨嫌暗、白嫌亮"的中灰死区：
+     他那张真机图上「返回」那一枚底 89 ⇒ 整档墨只有 **1.93**（纸白反而 5.75），同一行左半底 152
+     ⇒ 墨 4.69／白 2.42。**一行之内两个极性互相打架，换哪一极都会挂掉另一半**（量法与全部数：
+     `docs/design/背景图深浅/量-卡顶纱档位.py`）。抬到 .60 之后同一处推到面 160 ⇒ 整档墨 5.15，
+     那两行与分类那一排整行过 4.5。
+     ⚠ 这一档**只给卡顶那一段**，`.30` 那枚一个字不动：全站还有三处吃 `--glass-veil`
+     （index／me 那两枚居中弹窗＋密码面板那一层）。它们底下**曾经**垫着 `rgba(20,20,28,.55)` 那层
+     **暗**遮罩——白纱压暗底落成中灰是他 10-11 逐条裁定时拍过的那一版皮（app.wxss 末尾 X4 那段注释里
+     写着"不过线我不自己抬 α，由他判"）；那层暗底后来一处一处撤掉了（密码 10-13、邮箱 10-16、
+     卡片这一层 10-18），撤的是遮罩、不是这三枚的 α。不跟着抬到 .60 的理由照旧成立：
+     等于把弹窗改成半张白纸，不在这一刀里。
+     ⚠ 数值照旧写死，不许 `rgba(255,255,255,var(--glass-a))`（老安卓 XWEB 上整条掉下来，同上面那条）。 */
+  --glass-veil-band: rgba(255, 255, 255, 0.60);
+  --glass-bf: blur(23px) saturate(1.8);
+  /* 窗外面那一档**暗**纱的面（列表那扇详情窗的 `.float-mask` 与分享落地页整屏那一层共用一枚）。
+     原来 .45 这一档只写在 `pages/index/index.wxss` 一处，10-24 站长把落地页也要成"这种界面"
+     （原话「我要是这种界面，三个按钮变成一个，存入笔记」）⇒ 第二处消费方进场，按"两页共用 UI
+     抄两遍必然漂"那条老规矩收进令牌。这一档不吃五档心情（五档那五支全是浅色，暗纱做不出第六枚色）。 */
+  --glass-veil-dim: rgba(8, 10, 14, 0.45);
+  --glass-hair: rgba(255, 255, 255, 0.55);
+  --glass-fill: rgba(255, 255, 255, 0.20);
+  /* 首页那两条白条那一档（`--glass-jot` .38）**2.2 B 方案整条删掉**：白条本身被撤了
+     （站长 10-12 原话「左下的记下来这部部分，去掉」），全仓最后一处消费方就是 create.wxss
+     那两条 `.container.has-bg .blk-jot/.blk-strip`，跟着一起退。
+     10-11 那一轮它被"没人吃"过一次（那趟把玻璃撤了），这一回是真的没有白条这个东西了：
+     首屏那块面换成两片各自带渐变的皮（白面毛玻璃＋墨面毛玻璃），不再是"白纱压一层浅面"。
+     ⚠ 撤令牌要连着 `验-玻璃令牌齐不齐.js` 那份名单一起撤，不然它会把"齐不齐"钉成缺一枚。 */
+  /* 首页那三块的白底（站长 10-11 11:0x 原话：「首页三个块磨玻璃的背景图换成白底再毛玻璃，否则现在如果背景
+     深色的话，毛玻璃就会很暗，13，12 等数字完全看不清」；12:5x 他把我做错的版本纠正回来，原话
+     「不是加厚白色，是把原来根据背景风格自动切换的底色，换成白色，然后按照半透明毛玻璃进行处理……
+     假如 100% 白色，半透明 50%，也变成毛玻璃」）。
+     ⇒ 这一枚是**块／面板自己的面**：固定成白、半透 **.50 一档**（他点名的数），糊由 `--glass-bf` 给。
+     吃它的两处：**首页那三块** ＋ **第二屏那张录入面板**（站长 13:0x 追加「改第二屏面板毛玻璃（三个功能），
+     30变50，与首页一致」）。别处不吃——井与小圆那几档仍是 `--glass-fill` .20，他没指就没动。
+     我 12:03 那版把白纱 .30 与白 .70 叠成合成白 **.79**，真机上等于半块实心卡纸，糊被吃掉＝他 12:5x 打回的原因。
+     全站那支 .30 白纱（`--glass-veil`）一个字没动，列表卡顶那两行与「我的」名片行照旧吃它。 */
+  --glass-plate: rgba(255, 255, 255, 0.50);
+  --accent: #352E1D;
+  --accent-soft: rgba(53, 46, 29, 0.07);
+  /* 实心按钮那一块面与压在上面的字（站长 10-04：深色按钮必须和底部导航"选中那一格"
+     下面那块圆底同色，无论哪套壁纸）。唯一真相是 palette.chromeOf(壁纸).sel / .ink。
+     10-04 第二轮：sel 的明度不再写死（原来一律"底栏条抬 16 档"＝L36.5，只看色相不看对比），
+     改成按纸白 4.7 反解——于是"两处同色"和站长那句"不想太深"同时成立。字仍是纸白。 */
+  --btn-bg: #766948;
+  --btn-ink: #F2EFE9;
+  --border: rgba(53, 46, 29, 0.09);
+  --card-edge: rgba(53, 46, 29, 0.12);
+  --chip-idle: rgba(53, 46, 29, 0.07);
+  --danger: #b4231f;
+  --danger-soft: rgba(180, 35, 31, 0.08);
+  /* 层色那四条在 page 这一档也必须有一份兜底：`themeClass` 是各页 onLoad/onShow 里
+     `applyTheme` 之后才写进 data 的（detail.js:22／share.js:34 初值都是空串），
+     首帧那一刹容器上没有主题类——少了这四行，`background: var(--bg-layer)` 解不出值就是透明，
+     那一层会透空露出页面底，闪一下才回来。值＝象牙那一套（THEMES[0] 的兜底口径同上面那段）。 */
+  --bg-layer: #CDC9C1;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.72);
+  --layer-edge: rgba(35, 37, 44, 0.6);
+  /* 白内框那一档的面（规格 §5「底条走白内框」）。它与壁纸无关、四套同一个值，
+     所以只在这里出现一次；真身是 palette.INNER_FACE，等值由 验-列表层底色.js 钉。 */
+  --inner-face: #FFFFFF;
+
+  background-color: var(--bg-page);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  color: var(--text-primary);
+}
+
+/* ---------- 全局那一档"数字"：Poppins Thin ----------
+   这一支现在管的是**所有纯数字加符号的显示字段**：「我的」右上角那枚大数字、
+   首页顶部三列、列表日期 MM-DD、要点序号、字数 137/500、版本号 v1.9.7。
+   声明只放在这里（原来在 pages/me/me.wxss），各页只写 font-family、不抄第二份 base64
+   ——`验-列表头部铺图.js` 有一条专门数这段声明的出现次数（所以这条注释里也不再提它的名字，
+   写了就会被那条尺子当成第二份）。
+   站长要的是 iPhone 锁屏时钟那种"细、长、圆"。那版真身是 SF Pro Rounded，
+   苹果许可只允许在苹果设备上用、不能打进包分发，所以走开源最接近的一支：
+   Poppins Thin 100（OFL，可商用可内嵌）。字体只裁要用的那十几个字符、base64 内嵌，
+   2.2KB 进包，不占域名、不会出现"字体还没到、数字先跳一下"。
+   字符集站长 10-01 晚扩了一次：从只有 0-9 扩到 `0-9 - / . : + 空格 v`，
+   加新字符要重出一版子集，判据写在 `验-数字字体全局.js`（它逐条比对界面用到的符号
+   在不在子集里，缺一个就会在真机上掉回系统字体、全局数字风格当场分成两半）。
+   字号一条都不动——只换字形，不改大小（他原话："但只改字体，之前字体尺寸不改变"）。 */
+@font-face {
+  font-family: 'WtsjMind';
+  src: url(data:font/ttf;base64,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) format('truetype');
+  font-weight: 100;
+}
+
+/* ---------- 四套壁纸（=主题）10-04 定稿 ----------
+   这四枚都是"整套色阶"：页面底、卡底、文字四级、chips、按钮、左侧那块方块
+   全部收进同一支色相，所以方块色也在这里（镜像值），真身在 utils/palette.js 的 THEMES。
+   两边逐字等值由色板那把尺子钉死：--bg-page=theme.page、--bg-card=theme.line、
+   --btn-bg=chromeOf(key).sel，10-09 起再加四条 --bg-layer / --ink-on-layer / --ink-on-layer-soft
+   / --layer-edge ＝ palette 的 listLayerOf／layerSkinOf（`验-列表层底色.js` 逐套各钉一条）。改一边必须改另一边，只改一边会在真机上出现
+   "导航条是上一页那套色"这一类对不上。
+   卡底不用纯白：白纸贴在米纸上像一张张贴纸，退到比页面底亮 9 档的那一支。
+   色值出处：docs/design/配色统一-四套莫兰迪/生成色板5.py（那一份是唯一算法，别在手底下改）。 */
+.theme-tint-paper {
+  --bg-page: #E2DED4;
+  --bg-card: #F3F3F1;
+  --bg-card-glass: rgba(243, 243, 241, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F3F3F1 ／ #E2DED4 各取 .62（效果图 229／332 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(243, 243, 241, 0.62);
+  --glass-fade-page: rgba(226, 222, 212, 0.62);
+  --text-primary: #352E1D;
+  --text-secondary: rgba(53, 46, 29, 0.72);
+  --text-tertiary: rgba(53, 46, 29, 0.72);
+  --border: rgba(53, 46, 29, 0.09);
+  --card-edge: rgba(53, 46, 29, 0.12);
+  --accent: #352E1D;
+  --accent-soft: rgba(53, 46, 29, 0.07);
+  --btn-bg: #766948;
+  --chip-idle: rgba(53, 46, 29, 0.07);
+  /* 列表那一层（.sheet）的三档：层色与它那两档字。真身在 utils/palette.js 的 listLayerOf／layerSkinOf
+     （层色从底栏那一支派生，不许另挑色相），这三行是**镜像值**，逐字等值由 验-列表层底色.js 钉住。 */
+  --bg-layer: #CDC9C1;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.72);
+  --layer-edge: rgba(35, 37, 44, 0.6);
+}
+
+.theme-tint-celadon {
+  --bg-page: #D4E2D7;
+  --bg-card: #F1F3F2;
+  --bg-card-glass: rgba(241, 243, 242, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F1F3F2 ／ #D4E2D7 各取 .62（效果图 229／332 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(241, 243, 242, 0.62);
+  --glass-fade-page: rgba(212, 226, 215, 0.62);
+  --text-primary: #1D3522;
+  --text-secondary: rgba(29, 53, 34, 0.72);
+  --text-tertiary: rgba(29, 53, 34, 0.72);
+  --border: rgba(29, 53, 34, 0.09);
+  --card-edge: rgba(29, 53, 34, 0.12);
+  --accent: #1D3522;
+  --accent-soft: rgba(29, 53, 34, 0.07);
+  --btn-bg: #467350;
+  --chip-idle: rgba(29, 53, 34, 0.07);
+  --bg-layer: #C1CDC3;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.72);
+  --layer-edge: rgba(35, 37, 44, 0.6);
+}
+
+.theme-tint-blush {
+  --bg-page: #E2D4DB;
+  --bg-card: #F3F1F2;
+  --bg-card-glass: rgba(243, 241, 242, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F3F1F2 ／ #E2D4DB 各取 .62（效果图 229／332 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(243, 241, 242, 0.62);
+  --glass-fade-page: rgba(226, 212, 219, 0.62);
+  --text-primary: #351D29;
+  --text-secondary: rgba(53, 29, 41, 0.72);
+  --text-tertiary: rgba(53, 29, 41, 0.72);
+  --border: rgba(53, 29, 41, 0.09);
+  --card-edge: rgba(53, 29, 41, 0.12);
+  --accent: #351D29;
+  --accent-soft: rgba(53, 29, 41, 0.07);
+  --btn-bg: #915975;
+  --chip-idle: rgba(53, 29, 41, 0.07);
+  --bg-layer: #CDC1C7;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.78);
+  --layer-edge: rgba(35, 37, 44, 0.6);
+}
+
+/* 雨雾沿用旧 key gradient-blue / 类名 theme-blue：后端 WALLPAPER_PRESETS 那六个值一个都没动，
+   旧值还收得下，所以压成四枚这件事零部署（别名表在 utils/palette.js 的 WALLPAPER_ALIAS）。
+   这一枚 S 只有 13，是"冷灰"不是蓝——和站长 10-04 撤掉的那支雾蓝（S 21）不是一回事。 */
+.theme-blue {
+  --bg-page: #D7D9E0;
+  --bg-card: #F1F2F3;
+  --bg-card-glass: rgba(241, 242, 243, 0.85);
+  /* 10-11 毛玻璃渐退段那两个色标：＝本套 #F1F2F3 ／ #D7D9E0 各取 .62（效果图 229／332 行那个档）。
+     等值由 验-玻璃令牌齐不齐 钉，值本身与上面 --bg-page／--bg-card 同出一套。 */
+  --glass-fade-card: rgba(241, 242, 243, 0.62);
+  --glass-fade-page: rgba(215, 217, 224, 0.62);
+  --text-primary: #212431;
+  --text-secondary: rgba(33, 36, 49, 0.72);
+  --text-tertiary: rgba(33, 36, 49, 0.72);
+  --border: rgba(33, 36, 49, 0.09);
+  --card-edge: rgba(33, 36, 49, 0.12);
+  --accent: #212431;
+  --accent-soft: rgba(33, 36, 49, 0.07);
+  --btn-bg: #616986;
+  --chip-idle: rgba(33, 36, 49, 0.07);
+  --bg-layer: #C1C4CD;
+  --ink-on-layer: #23252C;
+  --ink-on-layer-soft: rgba(35, 37, 44, 0.78);
+  --layer-edge: rgba(35, 37, 44, 0.6);
+}
+
+/* ---------- 10-14 五档彩色毛玻璃：「心情」那一档 ----------
+   需求原话与量的过程记在 `utils/palette.js` 的 MOODS 上面那段；这里只是它的**镜像**。
+   五块挂在 `.container` 上（`app.containerClass()` 把 `mood-*` 与 `theme-*` 拼在一起发出去），
+   与 `.theme-*` 同一档 specificity（都是 0-1-0），所以**必须排在四块主题之后**：
+   心情要覆盖的正是主题里那几枚玻璃令牌，谁在后面谁赢。
+   ⚠ 值不许手改：改了要连着 `docs/工具/验-五档彩色玻璃.js` 一起改，那条尺子拿 palette 现算逐字对。
+   ⚠ `page{}` 里那几枚玻璃原值一个字不动——它是**没挂上心情类时的兜底**，
+      也是墨档那份的出处；`.mood-ink` 这一叠与它逐字相同，就是"默认态零变化"的证据。
+   ⚠ `--glass-hair` 不在这一叠里：描边那枚五档一律留白（玻璃自己的反光，不是玻璃的本色）。
+   ⚠ `--glass-chrome-dock` ＝**底栏那一排（＋／列表／人物）的本色**：α .62 这一档不是随手挑的，
+   它就是 `utils/palette.js` 里 `moodChromeOf()` 发给那枚组件的 `--chrome-bg`（同一个函数、同一个 .62）。
+   两处不许漂：`验-玻璃令牌齐不齐` 现读 palette 那个 .62 与这一枚的 α 比，五档各比一次。
+   ⚠ `--glass-chrome-slide` ＝**第二屏那枚右滑长条的面**：彩色四档与上面那一枚同一个数，
+   墨档单独是 .28（站长 10-16 18:3x「墨版的右滑太深了，要对照其他色系深浅程度，按比例降低」，
+   数是 `docs/工具/量-五档右滑深浅.js` 在屏上量出来的，算式写在 `moodVars()` 那两枚令牌的注释里）。
+   `--slide-ink` 与 `--slide-ink-dim` 是条上那句字：面翻浅了字就得跟着翻深，两支候选里谁对比高用谁。 */
+
+.mood-ink {
+  --glass-veil: rgba(255, 255, 255, 0.30);
+  --glass-veil-band: rgba(255, 255, 255, 0.60);
+  --glass-plate: rgba(255, 255, 255, 0.50);
+  --glass-fill: rgba(255, 255, 255, 0.20);
+  --glass-plate-dock: rgba(255, 255, 255, 0.72);
+  --glass-fill-dock: rgba(255, 255, 255, 0.42);
+  --glass-chrome-dock: rgba(35, 37, 44, 0.62);
+  --glass-chrome-slide: rgba(35, 37, 44, 0.28);
+  --slide-ink: #23252C;
+  --slide-ink-dim: rgba(35, 37, 44, 0.72);
+  --stage-face: linear-gradient(180deg, rgba(35, 37, 44, 0.16) 0%, rgba(35, 37, 44, 0.94) 43.8%, rgba(35, 37, 44, 0.95) 43.8%, rgba(35, 37, 44, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(35, 37, 44, 0.16) 0%, rgba(35, 37, 44, 0.94) 36%, rgba(35, 37, 44, 0.95) 36%, rgba(35, 37, 44, 0.95) 100%);
+  --stage-strip: linear-gradient(180deg, rgba(35, 37, 44, 0.94) 0%, rgba(35, 37, 44, 0.80) 55%, rgba(35, 37, 44, 0.16) 100%);
+  --blk-count-bg: linear-gradient(180deg, rgba(18, 20, 26, 0.45) 0%, rgba(18, 20, 26, 0.45) 10%, rgba(18, 20, 26, 0.38) 43%, rgba(18, 20, 26, 0.35) 62%, rgba(18, 20, 26, 0.50) 83%, rgba(18, 20, 26, 0.68) 88%, rgba(18, 20, 26, 0.92) 100%);
+  --stage-ink-solid: #F2EFE9;
+  --stage-ink-strong: rgba(242, 239, 233, 0.96);
+  --stage-ink: rgba(242, 239, 233, 0.85);
+  --stage-ink-soft: rgba(242, 239, 233, 0.78);
+  --stage-ink-dim: rgba(242, 239, 233, 0.72);
+  --stage-ink-faint: rgba(242, 239, 233, 0.56);
+
+  /* 面板与背景之间那一条：五档同一个 α（正本在 `utils/palette.js` 的 moodVars）。
+     10-15 17:3x 站长真机打回「墨档的阴影过黑，与其他色的阴影不一致」⇒ 这一族**不给任何一档开特例**，
+     与上面 page 那一族那枚兜底同一档 .16。要抬就五档一起抬同一个数。
+     ⚠ 这一段不许出现花括号（同上面 page 那一族那条警告：取块取到第一个右花括号为止，
+       注释里一枚就能把这一块从中间截断，后面十几枚令牌当场读成 null）。 */
+  --sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
+  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);
+}
+
+.mood-ivory {
+  --glass-veil: rgba(220, 213, 209, 0.30);
+  --glass-veil-band: rgba(220, 213, 209, 0.60);
+  --glass-plate: rgba(220, 213, 209, 0.50);
+  --glass-fill: rgba(220, 213, 209, 0.20);
+  --glass-plate-dock: rgba(220, 213, 209, 0.72);
+  --glass-fill-dock: rgba(220, 213, 209, 0.42);
+  --glass-chrome-dock: rgba(177, 162, 153, 0.62);
+  --glass-chrome-slide: rgba(177, 162, 153, 0.62);
+  --slide-ink: #352E1D;
+  --slide-ink-dim: rgba(53, 46, 29, 0.72);
+  --stage-face: linear-gradient(180deg, rgba(177, 162, 153, 0.16) 0%, rgba(177, 162, 153, 0.94) 43.8%, rgba(177, 162, 153, 0.95) 43.8%, rgba(177, 162, 153, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(177, 162, 153, 0.16) 0%, rgba(177, 162, 153, 0.94) 36%, rgba(177, 162, 153, 0.95) 36%, rgba(177, 162, 153, 0.95) 100%);
+  --stage-strip: linear-gradient(180deg, rgba(177, 162, 153, 0.94) 0%, rgba(177, 162, 153, 0.80) 55%, rgba(177, 162, 153, 0.16) 100%);
+  --blk-count-bg: linear-gradient(180deg, rgba(141, 117, 100, 0.45) 0%, rgba(141, 117, 100, 0.45) 10%, rgba(141, 117, 100, 0.38) 43%, rgba(141, 117, 100, 0.35) 62%, rgba(141, 117, 100, 0.50) 83%, rgba(141, 117, 100, 0.68) 88%, rgba(141, 117, 100, 0.92) 100%);
+  --stage-ink-solid: #352E1D;
+  --stage-ink-strong: rgba(53, 46, 29, 0.96);
+  --stage-ink: rgba(53, 46, 29, 0.85);
+  --stage-ink-soft: rgba(53, 46, 29, 0.78);
+  --stage-ink-dim: rgba(53, 46, 29, 0.72);
+  --stage-ink-faint: rgba(53, 46, 29, 0.56);
+
+  /* 面板与背景之间那一条：五档同一个 α（正本在 `utils/palette.js` 的 moodVars）。
+     10-15 17:3x 站长真机打回「墨档的阴影过黑，与其他色的阴影不一致」⇒ 这一族**不给任何一档开特例**，
+     与上面 page 那一族那枚兜底同一档 .16。要抬就五档一起抬同一个数。
+     ⚠ 这一段不许出现花括号（同上面 page 那一族那条警告：取块取到第一个右花括号为止，
+       注释里一枚就能把这一块从中间截断，后面十几枚令牌当场读成 null）。 */
+  --sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
+  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);
+}
+
+.mood-celadon {
+  --glass-veil: rgba(210, 225, 214, 0.30);
+  --glass-veil-band: rgba(210, 225, 214, 0.60);
+  --glass-plate: rgba(210, 225, 214, 0.50);
+  --glass-fill: rgba(210, 225, 214, 0.20);
+  --glass-plate-dock: rgba(210, 225, 214, 0.72);
+  --glass-fill-dock: rgba(210, 225, 214, 0.42);
+  --glass-chrome-dock: rgba(155, 188, 163, 0.62);
+  --glass-chrome-slide: rgba(155, 188, 163, 0.62);
+  --slide-ink: #1D3522;
+  --slide-ink-dim: rgba(29, 53, 34, 0.72);
+  --stage-face: linear-gradient(180deg, rgba(155, 188, 163, 0.16) 0%, rgba(155, 188, 163, 0.94) 43.8%, rgba(155, 188, 163, 0.95) 43.8%, rgba(155, 188, 163, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(155, 188, 163, 0.16) 0%, rgba(155, 188, 163, 0.94) 36%, rgba(155, 188, 163, 0.95) 36%, rgba(155, 188, 163, 0.95) 100%);
+  --stage-strip: linear-gradient(180deg, rgba(155, 188, 163, 0.94) 0%, rgba(155, 188, 163, 0.80) 55%, rgba(155, 188, 163, 0.16) 100%);
+  --blk-count-bg: linear-gradient(180deg, rgba(121, 156, 129, 0.45) 0%, rgba(121, 156, 129, 0.45) 10%, rgba(121, 156, 129, 0.38) 43%, rgba(121, 156, 129, 0.35) 62%, rgba(121, 156, 129, 0.50) 83%, rgba(121, 156, 129, 0.68) 88%, rgba(121, 156, 129, 0.92) 100%);
+  --stage-ink-solid: #1D3522;
+  --stage-ink-strong: rgba(29, 53, 34, 0.96);
+  --stage-ink: rgba(29, 53, 34, 0.85);
+  --stage-ink-soft: rgba(29, 53, 34, 0.78);
+  --stage-ink-dim: rgba(29, 53, 34, 0.72);
+  --stage-ink-faint: rgba(29, 53, 34, 0.56);
+
+  /* 面板与背景之间那一条：五档同一个 α（正本在 `utils/palette.js` 的 moodVars）。
+     10-15 17:3x 站长真机打回「墨档的阴影过黑，与其他色的阴影不一致」⇒ 这一族**不给任何一档开特例**，
+     与上面 page 那一族那枚兜底同一档 .16。要抬就五档一起抬同一个数。
+     ⚠ 这一段不许出现花括号（同上面 page 那一族那条警告：取块取到第一个右花括号为止，
+       注释里一枚就能把这一块从中间截断，后面十几枚令牌当场读成 null）。 */
+  --sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
+  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);
+}
+
+.mood-blush {
+  --glass-veil: rgba(222, 216, 226, 0.30);
+  --glass-veil-band: rgba(222, 216, 226, 0.60);
+  --glass-plate: rgba(222, 216, 226, 0.50);
+  --glass-fill: rgba(222, 216, 226, 0.20);
+  --glass-plate-dock: rgba(222, 216, 226, 0.72);
+  --glass-fill-dock: rgba(222, 216, 226, 0.42);
+  --glass-chrome-dock: rgba(181, 168, 191, 0.62);
+  --glass-chrome-slide: rgba(181, 168, 191, 0.62);
+  --slide-ink: #351D29;
+  --slide-ink-dim: rgba(53, 29, 41, 0.72);
+  --stage-face: linear-gradient(180deg, rgba(181, 168, 191, 0.16) 0%, rgba(181, 168, 191, 0.94) 43.8%, rgba(181, 168, 191, 0.95) 43.8%, rgba(181, 168, 191, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(181, 168, 191, 0.16) 0%, rgba(181, 168, 191, 0.94) 36%, rgba(181, 168, 191, 0.95) 36%, rgba(181, 168, 191, 0.95) 100%);
+  --stage-strip: linear-gradient(180deg, rgba(181, 168, 191, 0.94) 0%, rgba(181, 168, 191, 0.80) 55%, rgba(181, 168, 191, 0.16) 100%);
+  --blk-count-bg: linear-gradient(180deg, rgba(158, 149, 176, 0.45) 0%, rgba(158, 149, 176, 0.45) 10%, rgba(158, 149, 176, 0.38) 43%, rgba(158, 149, 176, 0.35) 62%, rgba(158, 149, 176, 0.50) 83%, rgba(158, 149, 176, 0.68) 88%, rgba(158, 149, 176, 0.92) 100%);
+  --stage-ink-solid: #351D29;
+  --stage-ink-strong: rgba(53, 29, 41, 0.96);
+  --stage-ink: rgba(53, 29, 41, 0.85);
+  --stage-ink-soft: rgba(53, 29, 41, 0.78);
+  --stage-ink-dim: rgba(53, 29, 41, 0.72);
+  --stage-ink-faint: rgba(53, 29, 41, 0.56);
+
+  /* 面板与背景之间那一条：五档同一个 α（正本在 `utils/palette.js` 的 moodVars）。
+     10-15 17:3x 站长真机打回「墨档的阴影过黑，与其他色的阴影不一致」⇒ 这一族**不给任何一档开特例**，
+     与上面 page 那一族那枚兜底同一档 .16。要抬就五档一起抬同一个数。
+     ⚠ 这一段不许出现花括号（同上面 page 那一族那条警告：取块取到第一个右花括号为止，
+       注释里一枚就能把这一块从中间截断，后面十几枚令牌当场读成 null）。 */
+  --sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
+  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);
+}
+
+.mood-mist {
+  --glass-veil: rgba(214, 219, 227, 0.30);
+  --glass-veil-band: rgba(214, 219, 227, 0.60);
+  --glass-plate: rgba(214, 219, 227, 0.50);
+  --glass-fill: rgba(214, 219, 227, 0.20);
+  --glass-plate-dock: rgba(214, 219, 227, 0.72);
+  --glass-fill-dock: rgba(214, 219, 227, 0.42);
+  --glass-chrome-dock: rgba(164, 176, 192, 0.62);
+  --glass-chrome-slide: rgba(164, 176, 192, 0.62);
+  --slide-ink: #212431;
+  --slide-ink-dim: rgba(33, 36, 49, 0.72);
+  --stage-face: linear-gradient(180deg, rgba(164, 176, 192, 0.16) 0%, rgba(164, 176, 192, 0.94) 43.8%, rgba(164, 176, 192, 0.95) 43.8%, rgba(164, 176, 192, 0.95) 100%);
+  --stage-face-open: linear-gradient(180deg, rgba(164, 176, 192, 0.16) 0%, rgba(164, 176, 192, 0.94) 36%, rgba(164, 176, 192, 0.95) 36%, rgba(164, 176, 192, 0.95) 100%);
+  --stage-strip: linear-gradient(180deg, rgba(164, 176, 192, 0.94) 0%, rgba(164, 176, 192, 0.80) 55%, rgba(164, 176, 192, 0.16) 100%);
+  --blk-count-bg: linear-gradient(180deg, rgba(109, 141, 170, 0.45) 0%, rgba(109, 141, 170, 0.45) 10%, rgba(109, 141, 170, 0.38) 43%, rgba(109, 141, 170, 0.35) 62%, rgba(109, 141, 170, 0.50) 83%, rgba(109, 141, 170, 0.68) 88%, rgba(109, 141, 170, 0.92) 100%);
+  --stage-ink-solid: #212431;
+  --stage-ink-strong: rgba(33, 36, 49, 0.96);
+  --stage-ink: rgba(33, 36, 49, 0.85);
+  --stage-ink-soft: rgba(33, 36, 49, 0.78);
+  --stage-ink-dim: rgba(33, 36, 49, 0.72);
+  --stage-ink-faint: rgba(33, 36, 49, 0.56);
+
+  /* 面板与背景之间那一条：五档同一个 α（正本在 `utils/palette.js` 的 moodVars）。
+     10-15 17:3x 站长真机打回「墨档的阴影过黑，与其他色的阴影不一致」⇒ 这一族**不给任何一档开特例**，
+     与上面 page 那一族那枚兜底同一档 .16。要抬就五档一起抬同一个数。
+     ⚠ 这一段不许出现花括号（同上面 page 那一族那条警告：取块取到第一个右花括号为止，
+       注释里一枚就能把这一块从中间截断，后面十几枚令牌当场读成 null）。 */
+  --sh-lift: 0 -12rpx 28rpx rgba(18, 20, 26, 0.16);
+  --sh-drop: 0 12rpx 28rpx rgba(18, 20, 26, 0.16);
+}
+
+/* 界面字体：不挂这三个类就是上面 page 那条苹方链（默认）。
+   宋体把 STSong 放在 Songti SC 前面：Mac 模拟器上实测命中的是 STSong，'Songti SC' 点不中；
+   iOS 真机没验过（站长那台是安卓），所以两个名字都留在链里，谁命中用谁。
+   这一排只承诺 iOS——这几套字是苹果系统自带的。安卓机型一律回落系统黑体，
+   站长 09-26 定的不为此内置字体包（"避免浪费开发资源"），界面文案直接写明仅 iPhone / iPad 可选。 */
+.font-song { font-family: 'STSong', 'Songti SC', '宋体-简', 'Noto Serif CJK SC', 'Noto Serif SC', 'Source Han Serif SC', '思源宋体 CN', 'SimSun', 'Noto Serif', serif; }
+
+.font-fang { font-family: 'STFangsong', 'FangSong', '仿宋', 'FangSong_GB2312', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Noto Serif', serif; }
+
+.font-kai { font-family: 'Kaiti SC', 'STKaiti', 'Kaiti', '楷体', 'KaiTi', 'TW-Kai', 'AR PL KaitiM GB', 'Noto Serif CJK SC', 'Noto Serif', serif; }
+
+.container {
+  /* 顶部这 2rpx 不是间距，是堵外边距穿透的：子元素第一个的 margin-top 会和
+     没有 padding-top 的父级合并，把整个容器往下推，露出 page 自己的那一底。
+     浅色壁纸下看不出来，深色壁纸下导航条底下就是一条白带（深色那两枚 10-04 已撤）。 */
+  padding: 2rpx var(--sp-3) 0;
+  /* 主题类挂在 .container 上而不是 page 上（小程序给不了 page 类名），
+     所以底色必须由容器自己画。真机实测：少了这两行，切壁纸只改导航条和 chip，整页底色永远不变。 */
+  background: var(--bg-page);
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* ---------- 卡：白底 + 描边，不投影 ---------- */
+.card {
+  position: relative;
+  display: block;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: var(--w-edge) solid var(--card-edge);
+  border-radius: var(--r-card);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  margin-bottom: var(--sp-2);
+  overflow: hidden;
+}
+
+.card:active {
+  transform: scale(0.988);
+}
+
+/* ---------- 行卡：左侧方块 + 右侧正文。列表、详情头、入口列表共用这一套 ---------- */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-row);
+  padding: var(--sp-row);
+}
+
+.blk {
+  flex: none;
+  position: relative;
+  width: var(--blk);
+  height: var(--blk);
+  box-sizing: border-box;
+  padding: var(--blk-pad);
+  border-radius: var(--r-block);
+  background: var(--blk-bg, var(--accent));
+  color: var(--blk-ink, #ffffff);
+  border: var(--w-edge) solid var(--blk-edge, transparent);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* 块内分类名：单行，顶到边就用渐隐收掉，不打省略号。
+   渐隐只吃盒子最右 14%，而盒子宽度固定，所以短名字的末字落在渐隐区之前、完全不受影响，
+   只有真被裁掉的长名字会淡出。这块只是提示：识别由颜色承担、阅读由右侧标题承担，
+   所以裁掉尾巴不丢信息——中文 2~3 字永远到不了渐隐区，这条规则实际上只对英文生效。
+   省略号会把一个被裁断的词变成半个词，渐隐是"这里还有，不必读"，所以选渐隐。 */
+.blk-name {
+  position: relative;
+  z-index: 2;
+  font-size: var(--fs-block, 32rpx);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.6rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #000 0 86%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0 86%, transparent 100%);
+}
+
+.blk-date {
+  position: relative;
+  z-index: 2;
+  font-size: var(--fs-micro);
+  font-weight: 800;
+  letter-spacing: 1.4rpx;
+  opacity: 0.72;
+}
+
+.blk-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-title {
+  font-size: var(--fs-title);
+  font-weight: 800;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.5rpx;
+  color: var(--text-primary);
+  margin-bottom: 10rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.row-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+.row-foot .src {
+  color: var(--text-secondary);
+}
+
+.row-foot .foot-l {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 方块的小尺寸变体：分类管理那一列色点。
+   方块里的字用汉字而不是图标字体——项目没有 iconfont，单个汉字在苹方下必定渲染得出来，
+   换成 ✎ ⌗ 这类符号就要赌设备字体。 */
+.blk.tall {
+  height: 200rpx;
+}
+
+.blk.dot {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 18rpx;
+  padding: 0;
+}
+
+/* ---------- 抽象母题：由 palette.js 按笔记 id 选一个，位置大小也从 id 派生 ---------- */
+.motif {
+  position: absolute;
+  right: calc(0px - var(--motif-shift));
+  bottom: calc(0px - var(--motif-shift));
+  width: var(--motif-size);
+  height: var(--motif-size);
+  pointer-events: none;
+  /* 母题永远在文字下面。真机实测过：不给这一层，长标题的后半句会被条纹盖掉。 */
+  z-index: 0;
+}
+
+.motif-circle {
+  border-radius: 50%;
+  background: var(--blk-motif);
+}
+
+.motif-arc {
+  border-radius: 50%;
+  border: 12rpx solid var(--blk-motif);
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.motif-stripes {
+  background: repeating-linear-gradient(
+    115deg,
+    var(--blk-motif) 0 12rpx,
+    transparent 12rpx 26rpx
+  );
+}
+
+.motif-dots {
+  background-image: radial-gradient(var(--blk-motif) 6rpx, transparent 7rpx);
+  background-size: 26rpx 26rpx;
+}
+
+.motif-pill {
+  width: calc(var(--motif-size) * 1.5);
+  height: calc(var(--motif-size) * 0.42);
+  border-radius: var(--r-pill);
+  background: var(--blk-motif);
+}
+
+/* ---------- chrome ---------- */
+.chip {
+  display: inline-block;
+  padding: 14rpx 28rpx;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  background: var(--chip-idle);
+  color: var(--text-secondary);
+}
+
+.chip.active {
+  background: var(--tone-bg, var(--accent));
+  color: var(--tone-ink, var(--bg-page));
+}
+
+.tag {
+  display: inline-block;
+  background: var(--chip-idle);
+  color: var(--text-primary);
+  font-size: var(--fs-tiny);
+  font-weight: 700;
+  padding: 6rpx 18rpx;
+  border-radius: 14rpx;
+  margin-right: var(--sp-1);
+}
+
+.btn-primary {
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-body);
+  font-weight: 700;
+  padding: var(--sp-3) 0;
+  text-align: center;
+}
+
+.btn-secondary {
+  background: var(--chip-idle);
+  color: var(--text-primary);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  padding: var(--sp-3) 0;
+  text-align: center;
+}
+
+/* ---------- 卡内控件的面 ----------
+   饱和色大卡里的输入框、按钮、多行区长什么样。--face / --face-ink / --solid-bg /
+   --solid-ink 由 utils/palette.js 的 toneStyle 按这块色的深浅发下来，这里只写形状。
+   深底卡（蓝）用半透明白面，亮底卡（橙/黄）用近白面 + 该卡墨色字。
+
+   这份定义从 pages/create 提到全局，是因为首页的搜索卡要用同一套控件：
+   两个页面各写一遍，早晚会走样成两种输入框，而"和新建那几张卡一致"恰恰是要求本身。 */
+.face-box {
+  display: flex;
+  align-items: center;
+  height: 88rpx;
+  margin-top: 26rpx;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-btn);
+  background: var(--face);
+  color: var(--face-ink);
+}
+
+.face-input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-body);
+  color: var(--face-ink);
+}
+
+.face-ph {
+  color: var(--face-ph, var(--face-ink));
+}
+
+.face-x {
+  flex: none;
+  padding: 0 8rpx;
+  font-size: var(--fs-meta);
+  opacity: 0.6;
+}
+
+.face-area {
+  width: 100%;
+  height: 180rpx;
+  margin-top: 16rpx;
+  padding: 18rpx var(--sp-3);
+  box-sizing: border-box;
+  border-radius: var(--r-btn);
+  background: var(--face);
+  color: var(--face-ink);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.acts {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: 20rpx;
+}
+
+.act {
+  flex: 1;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.act.ghost { background: var(--face); color: var(--face-ink); }
+.act.solid { background: var(--solid-bg); color: var(--solid-ink); }
+/* 不可用：面变薄、字变淡，且和 solid 的差别一眼看得出来，不靠文字解释 */
+.act.off { background: var(--face-off); color: var(--face-off-ink); }
+
+/* ---------- 卡底功能图形 ----------
+   几何取自 Lucide v1.50.0（ISC）：这里只放公共的"怎么把一张 SVG 变成压在水印位置的色"，
+   具体形状（mask-image）由各页自己给。图形本体是一块 var(--blk-glyph) 的色，
+   SVG 只当遮罩用，所以换分类色时图形跟着变，颜色不会在 WXSS 里出现第二份。 */
+.glyph {
+  position: absolute;
+  right: -30rpx;
+  bottom: -46rpx;
+  width: 264rpx;
+  height: 264rpx;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--blk-glyph);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+/* ---------- 「卡片上的信息」那一层（首页成品弹窗 + 笔记卡片页共用，10-07 从 index.wxss 挪上来） ----------
+   外壳照「我的」页密码那一层：卡宽 620、离顶 180。
+   层级要压过成品弹窗（遮罩 100、窗 101），所以这里 102。
+   遮罩这一层 10-18 从"压暗"换成"糊"（站长拿着真机图那句「这里不能突然压暗，要保存亮度，
+   背景要变成毛玻璃」）：底色不涂，只留一层滤镜 ⇒ 屏的亮度一个字不掉，区分靠糊不靠暗。
+   同一件事前面拍过两次（10-13 23:5x 六位密码那一层、10-16 夜「我的邮箱」那一层都改成 transparent），
+   那两回只撤压暗、没补糊，他这一句指名要糊，所以这一层比那两层多一条 backdrop-filter。
+   ⚠ 只这一层：`pages/categories/categories.wxss` 的 `.dialog-mask`（新增分类那一层）他没指，照旧压暗。
+   字色写死：这一层永远浮在那张写死的纸白弹窗上，吃主题变量会在深色壁纸下读不出来
+   （同一条口径写在 .tpl-btn 上面那条注释里）。 */
+.ci-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 180rpx;
+  z-index: 102;
+}
+
+.ci-card {
+  width: 620rpx;
+  box-sizing: border-box;
+  padding: var(--sp-5) var(--sp-4) var(--sp-4);
+  background: #FCFBF8;
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-float);
+}
+
+/* 10-11 毛玻璃 X4（站长逐条裁定时原话「4、做」）：那三枚居中弹窗挂同一枚 `glass-dialog`
+   ——index.wxml 的 .ci-card、me.wxml 的 .pwd-card 与 .me-email-card。
+   皮写在**各自那一页**（index.wxss / me.wxss），这条只留口径说明，原因有两条：
+   ① 闸名 `has-bg` 一旦出现在全局这张表里，`验-第一屏三块` 那条"页面类名不许和 app.wxss
+      同名"就永久报红（它按 `.has-bg` 全文匹配，分不清"给这枚上色"还是"只当祖先"）；
+   ② 这一屏要不要玻璃，问的是"这一页铺没铺形象图"，本来就是页内的事。
+   α 出口两枚（10-12 起）：弹窗这三枚吃 `--glass-veil`（全站 .30，R10），**只有卡顶那一段玻璃**
+   吃 `--glass-veil-band`（.60，站长拍甲）——两页都只吃 var()，页面里不许再写第三支。
+   ⚠ 10-18 改口：这三枚底下的遮罩**都已经不压暗了**（六位密码 10-13、邮箱 10-16、「卡片上的信息」
+      这一层 10-18 一处一处撤掉的），原来那句"底下垫着 `rgba(20,20,28,.55)` 那层暗遮罩、白纱压暗底
+      落成中灰"的前提没了。撤的是遮罩不是这三枚的 α（他 10-11 拍的「弹窗不做渐变／不抬 α」照旧）。
+      压没压暗是屏上看得见的差别，但**这一档的对比度撤暗之后没重算过**——要量走
+      `docs/工具/探-弹窗玻璃对比度.js`，不过线我不自己抬 α。 */
+
+.ci-title {
+  display: block;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  letter-spacing: -0.6rpx;
+  color: #23252C;
+}
+
+.ci-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: var(--fs-tiny);
+  line-height: 1.5;
+  color: rgba(35, 37, 44, 0.55);
+}
+
+/* 四枚一行放满不滚：净宽 620−64 = 556 = 4×124 + 3×20。
+   有图那一格下面是**两行角色芯片**（「背景」／「头像」，10-18 01:3x 他那句定的叫法与次序），
+   与「我的→卡片模板」那一页同一套语义——「背景」这一枚从那一页搬进这一层，归站长 10-18
+   「首页换背景，也要拉起这个弹窗，不需要跳到设置里面换」。空格那一格只有位置号一行，两个角色都点不动。 */
+.ci-slots {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--sp-5);
+}
+
+.ci-slot {
+  position: relative;
+  flex: none;
+  width: 124rpx;
+}
+
+.ci-disc {
+  position: relative;
+  width: 124rpx;
+  height: 124rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(35, 37, 44, 0.06);
+  border: var(--w-edge) solid rgba(35, 37, 44, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 修饰类一律带 ci- 前缀，不能光写 empty/filled：首页 index.wxss 642 行有一条
+   `.loading, .empty, .loading-more { padding: var(--sp-6) 0 }`（列表空态用的），
+   10-03 第一版就叫 empty，四枚 124 的圆被那条 padding 撑成 124×254 的竖椭圆。
+   这一组挪进 app.wxss 之后是全局的，那条教训更要留着：任何一页里有 .empty 都会串进来。 */
+.ci-disc.ci-empty {
+  background: transparent;
+  border: 3rpx dashed rgba(35, 37, 44, 0.22);
+}
+
+.ci-img {
+  width: 100%;
+  height: 100%;
+}
+
+.ci-plus {
+  font-size: 56rpx;
+  font-weight: 300;
+  line-height: 1;
+  color: rgba(35, 37, 44, 0.42);
+}
+
+/* 「更换」压在图的下沿：现网那一页点已填的格子是故意不响应的（怕误一下把在用的图换掉），
+   所以这里给一枚明确的口，而不是把整枚圆都变成可点。 */
+.ci-repl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 32rpx;
+  line-height: 32rpx;
+  text-align: center;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  color: #F2EFE9;
+  background: rgba(20, 22, 26, 0.62);
+}
+
+/* 垃圾桶逐寸抄 profile.wxss 的 .bin（44 见方、离格边 2、深圆 + 白描边 + 三段线形桶）。 */
+.ci-bin {
+  position: absolute;
+  right: 2rpx;
+  top: 2rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: rgba(20, 22, 26, 0.72);
+  border: 2rpx solid rgba(255, 255, 255, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ci-bin-lid {
+  position: absolute;
+  left: 13rpx;
+  right: 13rpx;
+  top: 15rpx;
+  height: 2rpx;
+  background: #fff;
+  border-radius: 1rpx;
+}
+
+.ci-bin-lid::before {
+  content: "";
+  position: absolute;
+  left: 5rpx;
+  right: 5rpx;
+  top: -3rpx;
+  height: 2rpx;
+  background: #fff;
+  border-radius: 2rpx;
+}
+
+.ci-bin-body {
+  position: absolute;
+  left: 15rpx;
+  right: 15rpx;
+  top: 17rpx;
+  bottom: 12rpx;
+  border: 2rpx solid #fff;
+  border-top: none;
+  border-radius: 0 0 4rpx 4rpx;
+}
+
+/* 有图那一格下面两行角色芯片，次序照站长 10-18 01:3x 那句念的顺序：**「背景」在前、「头像」在后**
+   （原话「卡片上的信息，改为，图片设置 两个按钮，分别是背景，头像」）。没勾上是一句淡字
+   （「背景」／「头像」，空格那一格只写位置 N），勾上换成现网那枚"选中"芯片的墨底纸白，
+   里面画一个 ✔ 而不是写这两个字（10-03 看图改的口径）。两枚同档同壳，只差一行字距。
+   ⚠ 空格那一格只有「位置 N」这一行，它现在吃的是第二行那 6rpx 上距（原来是 12rpx）——
+      位置号离圆近 6rpx，这一处他没说过，是我为了两枚共一条声明留下的代价，屏上量得到。 */
+.ci-cap,
+.ci-bg {
+  display: block;
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: var(--fs-micro);
+  line-height: 34rpx;
+  height: 34rpx;
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.ci-cap {
+  margin-top: 6rpx;
+}
+
+.ci-cap.role,
+.ci-bg.role {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  background: #23252C;
+  font-weight: 700;
+}
+
+/* 勾是两条边转 −45° 画出来的，跟底栏那三枚 icon 同一做法：
+   不赌系统字体里有没有 U+2713 这个字形，也不吃 emoji 在不同机型上的样子。 */
+.ci-tick {
+  width: 18rpx;
+  height: 10rpx;
+  border-left: 3rpx solid #F2EFE9;
+  border-bottom: 3rpx solid #F2EFE9;
+  transform: rotate(-45deg);
+  margin-top: -6rpx;
+}
+
+.ci-field {
+  margin-top: var(--sp-4);
+  padding-bottom: 12rpx;
+  border-bottom: 2rpx solid rgba(35, 37, 44, 0.08);
+}
+
+.ci-label {
+  display: block;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: rgba(35, 37, 44, 0.55);
+}
+
+.ci-input {
+  margin-top: 8rpx;
+  font-size: var(--fs-title);
+  font-weight: 600;
+  color: #23252C;
+}
+
+.ci-ph {
+  color: rgba(35, 37, 44, 0.3);
+  font-weight: 400;
+}
+
+.ci-acts {
+  display: flex;
+  gap: 20rpx;
+  margin-top: var(--sp-5);
+}
+
+.ci-btn {
+  flex: 1;
+  text-align: center;
+  padding: 22rpx 0;
+  border-radius: var(--r-pill);
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.ci-btn.ghost {
+  color: rgba(35, 37, 44, 0.62);
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.16);
+}
+
+.ci-btn.pri {
+  background: #23252C;
+  color: #F2EFE9;
+}
+
+/* ---------- 「笔记卡片」那一格（详情窗右上 + 详情页右上，两页共用这一份） ----------
+   10-07 从 index.wxss 搬上来：详情页要补同一格，尺寸/描边/品牌字必须逐寸一样，抄一遍就是
+   第二份真相。类名前缀 `ds-` 是当年"详情窗"留下的名字，现在两页都吃，别再当成某一页私有。
+   每一页只留自己那一行的分栏（详情窗内净宽 634、详情页卡内净宽 638，不是同一个数），所以 `.ds-hero`
+   与 `.dt-hero` 各自留在本页。
+   10-17 站长一句「如果没卡片图，这个位置就完全被标题占满」⇒ 这一格只剩有卡片那一态：原来那张
+   一张都没有时的淡底方形（`.ds-empty` / `.ds-swatch` / `.ds-plus` / `.ds-logo*` / `.ds-e1` / `.ds-e2`
+   十族）连同它的淡底色规则 `paleStep` 的页面消费者一起撤净，`palette.paleStep` 本身留着（它是一条
+   色阶规则，不是这一格私有的）。
+   尺子：`docs/工具/验-卡片那一格两页同源.js`。 */
+.ds-rt {
+  flex: none;
+  width: 252rpx;
+}
+
+/* 站长 10-17 深夜那一句：「笔记详情页右上角的笔记卡片图，去掉白边和阴影，只显示卡片图……
+   但相对空间不要压缩，保留现在的布局」⇒ 盒子仍是 252×352（那一格的位置、宽高、圆角一个数没改），
+   撤的是白垫与投影，里面那张图从 232×330 抬到与盒子同大小。
+   抬到同大小不是"顺手放大"：卡片那屏的底数就是 340×474，252／352 是同一比例乘 0.7412 的两个结果，
+   所以图本来就正好填得满这个盒子，原来那 10rpx 白圈是把图缩小换来的，不是布局要的。
+   ⚠ 这一条两页共用（详情窗与独立详情页画的是同一格，`验-卡片那一格两页同源` 钉着"不许有两份"）
+   ⇒ 只改一处就得把这一条拆成两份皮，站长那句"保留现在的布局"在两页上就不成立了。 */
+.ds-pad {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 252rpx;
+  height: 352rpx;
+  border-radius: 20rpx;
+}
+
+.ds-pad-img {
+  width: 252rpx;
+  height: 352rpx;
+  border-radius: 20rpx;
+}
+
+/* ---------- 左上角那枚书法位图（站长 10-16 夜「之前首屏和二屏不是有左上角的图片标题吗？
+     这个图片全量放在其他页面左上角，原来左上角的纯文字标题替换最顶上的标题」） ----------
+     正本就是首屏／二屏那一枚 `/assets/title-heading.png`（`pages/create` 的 `.page-title`：
+     宽 228rpx、不透明度 .8、压在深色照片上时 filter invert）。从这一夜起，笔记列表／卡片列表、
+     「我的」（设置／关于）那两屏左上角原来那行**纯文字**大标题换成同一张图，那行字搬进最顶上
+     那一栏（`wx.setNavigationBarTitle`）。
+     ⚠ 同一夜他第二句把范围收窄：「这个图片，不需要所有页面加，只需要在有背景图状态下加」
+     ⇒ 只有**铺了照片**那一态画这一枚；没铺那一态那两屏仍画原来那行字（各自页面的 `.h1-txt`）。
+     分类页与外观设置页（`pages/wallpaper`）因此回到原样（图没铺、bar 也没动）。
+     尺寸与那一档透明度只写这一份，各页只管"站在哪儿"——抄几遍必然漂（同一件事见上面 `.ds-*` 那一族）。
+     ⚠ 深浅翻色不写在这里：那半条链吃的是各页自己那两枚"铺了图／图很浅"的容器类，
+     笔记页是 `.container.has-bg:not(.bg-light)`、「我的」页是 `.head-band.has-bg:not(.bg-light)`，
+     盒子不同名 ⇒ 只能各页各写一条 filter。
+     ⚠ 代价一条，说死：这一枚从此不跟着五档心情的 `--text-primary` 走了——它是位图，
+     字色烘在像素里，换到象牙／天青／樱落／雨雾那几档时它仍是同一支墨。 */
+.brand-title {
+  flex: none;
+  width: 228rpx;
+  opacity: 0.8;
+}
+
+/* ---------- 私密那一格的分类名（站长 10-18「详情页顶部，来源前面加『分类』，如果是私密，
+     字体标红。列表页也同样加上」） ----------
+     三个落点共用这一条：笔记列表那一行（`.ixl-cat`）、首页详情窗那一行（`.ds-cat`）、
+     独立详情页那一行（`.hero-cat`）。红值只从上面那枚 `--priv-ink` 来，页面里不许再写第二支红；
+     各页自己那一条只管字号与"不许被折断"，颜色一律由这一枚盖上去。
+     ⚠ 挂在分类那一段自己身上，不挂整行：他这一句点的是"如果是私密，字体标红"，
+       红的是那一格的身份，不是来源与时间（红字范围甲／乙仍等他一句，现在落的是甲＝只红分类那一段）。 */
+.cat-priv {
+  color: var(--priv-ink);
+}

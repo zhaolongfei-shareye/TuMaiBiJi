@@ -1,0 +1,197 @@
+"""自建 OCR：RapidOCR（PP-OCR 检测+方向+识别三模型，ONNXRuntime 纯 CPU）。
+
+对外契约保持不变：ocr_image(bytes) -> str / ocr_images(list[bytes]) -> str。
+"""
+import asyncio
+import logging
+import re
+import threading
+import time
+from io import BytesIO
+from typing import NamedTuple
+
+from PIL import Image, ImageOps
+
+from app.core.errors import UserError
+
+logger = logging.getLogger(__name__)
+
+# 实测：3420×2214 单张峰值 RSS 1064MB，而 RapidOCR 会把每个检测框按原图比例放大回去
+# （process_img.map_img_to_original），所以峰值由输入像素量决定，必须先缩放。
+MAX_LONG_EDGE = 1600
+# 缩放前要先解码，所以"文件小"挡不住内存：实测 0.43MB 的纯色 PNG（12000×12000）解码后
+# 峰值 RSS 1271MB，而 Pillow 的报错阈值在 1.79 亿像素、这条只给 warning。10MB 的上传上限
+# 管得住字节管不住像素，所以在 load() 之前按像素数当场拒——超了的图缩放也救不回来。
+MAX_PIXELS = 40_000_000
+TOO_MANY_PIXELS_HINT = "图片像素过大，请换一张或分次截取"
+MIN_CONFIDENCE = 0.5
+# 实测噪声是工具栏图标/角标（"AB X"、"κ7"）：不含中文且字符极少的行一律丢
+MAX_SHORT_LATIN_RUN = 4
+
+_CJK = re.compile("[一-鿿㐀-䶿豈-﫿぀-ヿ]")
+_MEANINGFUL = re.compile("[一-鿿㐀-䶿豈-﫿぀-ヿA-Za-z0-9]")
+
+
+class Row(NamedTuple):
+    text: str
+    score: float
+    x_left: float
+    y_center: float
+    height: float
+
+
+_engine = None
+_engine_lock = threading.Lock()
+# RapidOCR.__call__ 会 update_params 改自身状态，非线程安全；串行也为了压住内存峰值
+_run_lock = threading.Lock()
+
+
+def _get_engine():
+    global _engine
+    if _engine is not None:
+        return _engine
+    with _engine_lock:
+        if _engine is None:
+            try:
+                from rapidocr import RapidOCR
+            except ImportError as exc:
+                # 这句是给运维看的（apt install libgl1 / 换 headless），不能进用户 toast
+                logger.error(
+                    "RapidOCR 加载失败。无桌面的 Ubuntu 上多为 opencv 找不到 libGL.so.1，"
+                    "需 apt install libgl1，或把 opencv-python 换成 opencv-python-headless。",
+                    exc_info=True,
+                )
+                raise UserError("图片识别暂不可用，请稍后重试") from exc
+            started = time.perf_counter()
+            _engine = RapidOCR()
+            logger.info("RapidOCR 模型加载完成 %.2fs", time.perf_counter() - started)
+    return _engine
+
+
+def _prepare(image_data: bytes) -> Image.Image:
+    """解码为 PIL 图像并缩放长边。交给 RapidOCR 时保持 RGB/RGBA，由它做 RGB→BGR。"""
+    try:
+        img = Image.open(BytesIO(image_data))
+        # open 只读文件头，宽高在这一步就已拿到；必须在任何解码动作之前判掉
+        if img.width * img.height > MAX_PIXELS:
+            raise UserError(TOO_MANY_PIXELS_HINT)
+        img = ImageOps.exif_transpose(img) or img
+        if img.mode not in ("RGB", "RGBA", "L"):
+            # P 模式可能带调色板透明，转 RGBA 才能正确合成背景
+            img = img.convert("RGBA" if img.mode == "P" else "RGB")
+        # PNG 的截断要在这里才暴露（open 是懒解析），否则拖到缩放处抛英文栈
+        img.load()
+    except Image.UnidentifiedImageError as exc:
+        raise UserError("图片无法识别，可能格式不受支持") from exc
+    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError) as exc:
+        raise UserError("图片已损坏或尺寸过大，请重新截图后上传") from exc
+
+    width, height = img.size
+    long_edge = max(width, height)
+    if long_edge > MAX_LONG_EDGE:
+        scale = MAX_LONG_EDGE / long_edge
+        img = img.resize(
+            (max(1, round(width * scale)), max(1, round(height * scale))),
+            Image.LANCZOS,
+        )
+    return img
+
+
+def _extract_rows(image_data: bytes) -> list[Row]:
+    img = _prepare(image_data)
+    started = time.perf_counter()
+    with _run_lock:
+        res = _get_engine()(img)
+    elapsed = time.perf_counter() - started
+
+    if not res.txts or res.boxes is None:
+        logger.info("OCR 无文字 输入=%dx%d 耗时=%.2fs", img.width, img.height, elapsed)
+        return []
+
+    scores = list(res.scores) if res.scores is not None else [0.0] * len(res.txts)
+    rows = []
+    for box, text, score in zip(res.boxes, res.txts, scores):
+        xs = [float(p[0]) for p in box]
+        ys = [float(p[1]) for p in box]
+        rows.append(
+            Row(
+                text=str(text),
+                score=float(score),
+                x_left=min(xs),
+                y_center=sum(ys) / len(ys),
+                height=max(ys) - min(ys),
+            )
+        )
+    logger.info(
+        "OCR 完成 输入=%dx%d 框=%d 耗时=%.2fs", img.width, img.height, len(rows), elapsed
+    )
+    return rows
+
+
+def is_noise(row: Row) -> bool:
+    """F7 验收第 2 条：单字行全丢（图标被认成"品/稿/像/区"），非中文短行 ≤4 字符也丢。"""
+    if row.score < MIN_CONFIDENCE:
+        return True
+    chars = _MEANINGFUL.findall(row.text.strip())
+    if len(chars) <= 1:
+        return True
+    if not _CJK.search(row.text):
+        return len(chars) <= MAX_SHORT_LATIN_RUN
+    return len(chars) > 1 and len(set(chars)) == 1
+
+
+def _same_line(a: Row, b: Row) -> bool:
+    gap = abs(a.y_center - b.y_center)
+    return gap <= max(a.height, b.height) * 0.7
+
+
+def _merge(line: list[Row]) -> str:
+    """同一行的多个框是彼此独立的文本，用空格隔开，避免粘成假词。"""
+    return " ".join(r.text.strip() for r in sorted(line, key=lambda r: r.x_left))
+
+
+def layout(rows: list[Row]) -> list[str]:
+    """RapidOCR 按检测框顺序输出，不是视觉顺序：先按 y 聚行，行内按 x 排。"""
+    kept = sorted((r for r in rows if not is_noise(r)), key=lambda r: r.y_center)
+
+    lines: list[list[Row]] = []
+    for row in kept:
+        if lines and all(_same_line(row, prev) for prev in lines[-1]):
+            lines[-1].append(row)
+        else:
+            lines.append([row])
+
+    return [_merge(line) for line in lines]
+
+
+async def ocr_image(image_data: bytes) -> str:
+    rows = await asyncio.to_thread(_extract_rows, image_data)
+    return "\n".join(layout(rows))
+
+
+async def ocr_images(images_data: list[bytes]) -> str:
+    """对多张图片依次 OCR，合并结果。
+
+    分页标记只在"认出字的页"有两页以上时才加：单张加标记会让"第一条正文"变成标记串，
+    而提炼降级时标题正是取正文首行，用户看到的标题就成了 `--- 第1页 ---`。
+    """
+    pages: list[str] = []
+    for img in images_data:
+        text = await ocr_image(img)
+        if text.strip():
+            pages.append(text)
+    if len(pages) < 2:
+        return pages[0] if pages else ""
+    return "\n\n".join(f"--- 第{i + 1}页 ---\n{text}" for i, text in enumerate(pages))
+
+
+_PAGE_MARKER = re.compile(r"^--- 第\d+页 ---$")
+
+
+def title_hint(text: str, max_len: int = 30) -> str:
+    """给提炼当兜底标题：第一条正文行，跳过我们自己插的分页标记。"""
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not _PAGE_MARKER.match(line):
+            return line[:max_len]
+    return ""

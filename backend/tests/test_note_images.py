@@ -155,7 +155,15 @@ class FakeHttp:
 
 
 def _wire(monkeypatch, fake: FakeHttp):
-    monkeypatch.setattr(note_images.httpx, "AsyncClient", lambda **kw: fake)
+    # 顺手把"这一批实际挂上去了哪些头"记回替身身上（`Test六_来路那一枚` 要读的就是它）：
+    # 原来这里写成 `lambda **kw: fake`，把头吞掉了——那样的替身量不出"默认那一批到底带没带 Referer"。
+    fake.客户端头 = {}
+
+    def _造(**kw):
+        fake.客户端头 = dict(kw.get("headers") or {})
+        return fake
+
+    monkeypatch.setattr(note_images.httpx, "AsyncClient", _造)
     # 域名一律解析到公网；写成字面 IP 的那些回它自己（否则"第一跳公网、Location 指向元数据地址"
     # 那条绕法根本测不出来——替身把所有解析都改成公网，等于把闸门替产品关掉了）。
     import ipaddress
@@ -230,12 +238,72 @@ class Test一_占位图与硬拒:
         assert out.total == 1 and not out.kept and len(out.failed) == 1
         assert len(fake.posts) == 0, "响应头就不是图，还往桶里传了一次"
 
-    def test_下载那条路不许带任何Referer(self):
-        """两族防盗链方向相反：带自己域名踩小红书那族 403，带对家域踩同一坑。唯一对的做法是不带。"""
+    def test_默认那一批一个字的Referer都不加(self, channel, monkeypatch):
+        """模块头第 3 条那条纪律的下半场。`archive` 新添的 `referer` 一格默认必须是空——
+        做成全局开关会同时带坏两族：`mmbiz.qpic.cn` 带错来路回的是 **200＋2,090 B 那张 140×140 占位图**
+        （状态码抓不到），`sns-webpic-qc.xhscdn.com` 带任何外来路回**硬 403**（10-19 各打三次复现）。"""
+        import asyncio
+        url = "https://a.test/1.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(500, 500))))
+        out = asyncio.run(note_images.archive([url], "1", MAX_ASSETS_PER_NOTE))
+        assert "Referer" not in fake.客户端头, fake.客户端头
+        assert len(out.kept) == 1, "不加来路这一批本来就该存得下——那两族的形状不许被这一刀改坏"
+
+    def test_默认那一批也不许换UA(self, channel, monkeypatch):
+        """10-31 搜狐那一刀给 `archive` 又添了一枚 `user_agent`。同一枚纪律：默认那一批
+        必须还是 `IMAGE_HEADERS` 那枚 Windows 桌面 UA——微博那族卡的是"这枚 UA 配微博的来路"，
+        全局换掉等于把已经上现网的那一族推到未知里（现读：生产 UA＋微博来路三档全 200）。"""
+        import asyncio
+        url = "https://a.test/1.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(500, 500))))
+        asyncio.run(note_images.archive([url], "1", MAX_ASSETS_PER_NOTE))
+        assert fake.客户端头.get("User-Agent") == note_images.IMAGE_HEADERS["User-Agent"], fake.客户端头
+
+    def test_点名要的那一批才带那一枚来路(self, channel, monkeypatch):
+        """微博那族 10-31 现网出口读数：生产那套头（桌面 UA＋`Accept: image/*`）不带 Referer 时
+        `wx*.sinaimg.cn` 整批 **403／238 B**；带 `https://m.weibo.cn/`（或 `https://weibo.com/`）时
+        `orj360`／`mw2000`／`large` 三档全 **200**；带一枚外站来路（example.com）**仍 403／304 B**。
+        ⇒ 这一枚只能是"这一族点名要"，不能是按域名猜、更不能全局。"""
+        import asyncio
+        url = "https://wx4.sinaimg.cn/mw2000/62541bfaly1iiic446fobj22cc34gnpe.jpg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(500, 500))))
+        out = asyncio.run(note_images.archive([url], "1", MAX_ASSETS_PER_NOTE,
+                                             referer="https://m.weibo.cn/"))
+        assert fake.客户端头.get("Referer") == "https://m.weibo.cn/", fake.客户端头
+        assert len(out.kept) == 1
+
+    def test_点名要UA的那一批只换UA不带来路(self, channel, monkeypatch):
+        """搜狐那族 10-31 现网出口读数：三篇文章九张逐张打——带生产那套头 **6 张 403／3 张 200**，
+        换成 `scraper._SOHU_IMAGE_UA` **九张全 200**；而带 Referer（本站、整篇地址）救不回来。
+        ⇒ 这一族点名换的就是 UA，来路那一格必须仍是"不加"（加了也不解决问题，还把纪律做成两台判分机）。"""
+        import asyncio
+        url = "https://q8.itc.cn/q_70/images03/20261031/42287244a08644d1b7d0036c808ffe46.jpeg"
+        fake = _wire(monkeypatch, FakeHttp(_img(url, _jpeg(500, 500))))
+        out = asyncio.run(note_images.archive([url], "1", MAX_ASSETS_PER_NOTE,
+                                             user_agent=scraper._SOHU_IMAGE_UA))
+        assert fake.客户端头.get("User-Agent") == scraper._SOHU_IMAGE_UA, fake.客户端头
+        assert "Referer" not in fake.客户端头, fake.客户端头
+        assert len(out.kept) == 1
+
+    def test_来路只从参数来_不许在这一层按域名猜(self):
+        """10-31 改口后的形状：默认那一批仍一个字都不加（`IMAGE_HEADERS` 里没有 Referer、
+        `_download` 也不加），唯一的出口是 `archive` 的 `referer` 那一格；
+        而且这一层不许出现"看着像哪一族就补哪一枚"的域名判断——两族防盗链方向相反
+        （`mmbiz.qpic.cn` 带错来路是 200＋占位图、`xhscdn` 是硬 403），按域名猜等于把这条纪律做成一台判分机。"""
         assert not any("referer" in k.lower() for k in note_images.IMAGE_HEADERS)
-        for fn in (note_images._download, note_images.archive):
-            src = __import__("inspect").getsource(fn).lower()
-            assert "referer" not in src, f"{fn.__name__} 里出现了 Referer，那条规则就破了"
+        src = __import__("inspect").getsource(note_images._download).lower()
+        assert "referer" not in src, "_download 里出现了 Referer，默认那一批就不再是空"
+        档 = __import__("inspect").getsource(note_images.archive).lower()
+        assert 档.count('"referer"') <= 1, "那一枚头只许在'参数非空才挂'那一句里出现"
+        assert 档.count('"user-agent"') <= 1, "UA 也只许在'参数非空才换'那一句里出现"
+        # 域名黑白名单只许在**抓取那一层**（它才知道自己落在哪一站）；这一层只按参数办事。
+        # 扫 `co_consts` 不扫整段源码：docstring 里那些读数就写着 `_SOHU_IMAGE_UA`、微博那几枚域名，
+        # 拿它当"代码里按域名猜"的证据会把一条好话读成假话。
+        串 = [c for c in note_images.archive.__code__.co_consts
+              if isinstance(c, str) and c != (note_images.archive.__doc__ or "")]
+        for 域名 in ("sinaimg", "qpic", "xhscdn", "itc.cn", "sspai", "sohu"):
+            assert not any(域名 in c.lower() for c in 串), \
+                f"在这一层按域名补头（命中 {域名}）——上面那几条反向钉就白钉了"
 
 
 # ------------------------------------------------------------------ 二、SSRF 闸门
@@ -735,7 +803,7 @@ class Test七_任务回体:
         statuses = []
         urls = [f"https://a.test/{i}.jpg" for i in range(12)]
 
-        async def fake_archive(images, user_id, limit, on_ready=None, *, openid):
+        async def fake_archive(images, user_id, limit, on_ready=None, *, openid, referer="", user_agent=""):
             kept = [note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u)
                     for i, u in enumerate(images[:limit])]
             for s in kept:
@@ -756,7 +824,7 @@ class Test七_任务回体:
         statuses = []
         urls = [f"https://a.test/{i}.jpg" for i in range(3)]
 
-        async def fake_archive(images, user_id, limit, on_ready=None, *, openid):
+        async def fake_archive(images, user_id, limit, on_ready=None, *, openid, referer="", user_agent=""):
             kept = [note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 1000, 10, 10, False, u)
                     for i, u in enumerate(images)]
             for s_ in kept:
@@ -793,7 +861,7 @@ class Test七_任务回体:
         statuses = []
         urls = ["https://a.test/1.jpg", "https://a.test/2.jpg"]
 
-        async def fake_archive(images, user_id, limit, on_ready=None, *, openid):
+        async def fake_archive(images, user_id, limit, on_ready=None, *, openid, referer="", user_agent=""):
             kept = [note_images.Prepared(f"cloud://e.x/{i}", "image/jpeg", 2048 + i, 40, 30, False, u)
                     for i, u in enumerate(images)]
             for s_ in kept:
@@ -817,7 +885,7 @@ class Test七_任务回体:
         urls = [f"https://a.test/{i}.jpg" for i in range(3)]
         handed = []
 
-        async def fake_archive(images, user_id, limit, on_ready=None, *, openid):
+        async def fake_archive(images, user_id, limit, on_ready=None, *, openid, referer="", user_agent=""):
             for i, u in enumerate(images):
                 handed.append(u)
                 on_ready(note_images.Prepared(
@@ -1013,7 +1081,7 @@ class Test八之补_worker把真openid递下来:
         user, _ = _make_user(db)
         grabbed: dict = {}
 
-        async def spy(images, user_id, limit, on_ready=None, *, openid):
+        async def spy(images, user_id, limit, on_ready=None, *, openid, referer="", user_agent=""):
             grabbed["openid"] = openid
             return note_images.ArchiveResult(kept=[], failed=[], total=len(images))
 
@@ -1027,6 +1095,42 @@ class Test八之补_worker把真openid递下来:
         scraped = {"images": ["https://a.test/1.jpg"], "author": "someone"}
         ingest_tasks._archive_images(db, note, scraped, str(user.id))
         assert grabbed.get("openid") == user.openid, f"递给内容安全的是 {grabbed.get('openid')!r}，不是那个人的 openid"
+
+    def test_抓取那一层点名的来路要一路递到下载这一步(self, db, monkeypatch):
+        """接线钉：`scraper` 在微博那一路写 `image_referer`，worker 把它递给 `archive`。
+        中间任何一环漏掉，屏上都是"笔记建好了、图一张没存"，念的还是那句"没存上"——
+        而现网读数说这一族不带微博来路时 `wx*.sinaimg.cn` 整批 **403／238 B**（10-31）。
+        10-31 第二刀（搜狐）走的是同一根线、另一枚参数 `image_user_agent`：
+        那族卡的是我们那枚 Windows 桌面 UA，现网出口九张里 6 张 403、换成点名的那枚九张全 200。"""
+        user, _ = _make_user(db)
+        grabbed: dict = {}
+
+        async def spy(images, user_id, limit, on_ready=None, *, openid, referer="", user_agent=""):
+            grabbed["referer"] = referer
+            grabbed["user_agent"] = user_agent
+            return note_images.ArchiveResult(kept=[], failed=[], total=len(images))
+
+        monkeypatch.setattr(note_images, "archive", spy)
+        monkeypatch.setattr(note_images.settings, "IMAGE_STORE_CF_URL", CF_URL)
+        monkeypatch.setattr(note_images.settings, "IMAGE_STORE_CF_KEY", CF_KEY)
+        note = Note(user_id=str(user.id), title="微博篇", source_type="web_article")
+        db.add(note)
+        db.commit()
+        db.refresh(note)
+
+        换一枚 = scraper._SOHU_IMAGE_UA
+        for 抓取回体, 该递来路, 该递UA in (
+                ({"images": ["https://wx1.sinaimg.cn/x.jpg"],
+                  "image_referer": "https://m.weibo.cn/"}, "https://m.weibo.cn/", ""),
+                ({"images": ["https://q8.itc.cn/a.jpeg"],
+                  "image_user_agent": 换一枚}, "", 换一枚),
+                ({"images": ["https://mmbiz.qpic.cn/y.jpg"]}, "", ""),
+                ({"images": ["https://a.test/z.jpg"],
+                  "image_referer": None, "image_user_agent": None}, "", "")):
+            grabbed.clear()
+            ingest_tasks._archive_images(db, note, 抓取回体, str(user.id))
+            assert grabbed.get("referer") == 该递来路, f"{抓取回体} 来路递成 {grabbed.get('referer')!r}"
+            assert grabbed.get("user_agent") == 该递UA, f"{抓取回体} UA 递成 {grabbed.get('user_agent')!r}"
 
 
 def _stub_check_image(monkeypatch, verdict="risky"):

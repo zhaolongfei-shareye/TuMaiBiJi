@@ -7,8 +7,14 @@
 
     cd /home/ubuntu/wtsj-backend && .venv/bin/python probes/share_live_probe.py
 
-它只用 deploy-test 那个账号（user_id=1），跑完自己把建出来的笔记删掉；
-别的账号一行都不碰。全程只在结尾断言"我建的行都清了"。
+它主打 deploy-test 那个账号（user_id=1），跑完自己把建出来的笔记删掉；别的**真人**账号一行都不碰。
+⚠ 10-24 起它还会**临时造一个只给这一把探针用的假 openid 账号**（`probe-reader-<标记>`），
+因为「别人扫我的码存进来」这条生产上真跑的路，在现网只有一个可写号时变不出来；而 10-24 那道自存闸
+把原来这一组「自己转存自己」的走法当场挡掉了——不改就永远读不到成功那半条腿。收尾按记下的主键
+把那个号连它名下的笔记、台账行一起删净，并核对「转存给作者结的那 1 分」已还原（起点/收尾各读一次）。
+全程只在结尾断言"我建的行都清了、MIND 台账与 deploy-test 的奖励回到起点"。
+⚠ 崩在半路也有一套兜底：建出来的每一篇笔记主键都记在 `CREATED` 里，进程退出前 `sweep()` 按它补删
+（10-24 那一趟崩在 ⑥ 之前，① 那篇——标题中途被改过、只剩摘要带着标记——留在现网，一张码还是开着的）。
 
 要看的七件事：
 ① 改标题之后，公开分享页不再挂着旧内容（隐私泄漏本体）。
@@ -17,8 +23,10 @@
 ④ 同一张小程序码第二次拿不重复打微信（看耗时差）。
 ⑤ 撤掉分享（2026-09-24 这批）：状态接口说的是实话、撤掉之后旧码当场扫不开、
    重新分享换的是全新的一张码而旧码不会复活、新码不再有七天过期、落地页带要点与链接。
-⑥ 作者署名与转存（2026-09-24 下午这批）：昵称进公开快照、转存抄的是同一份字段、
-   来源那一栏任何写接口都改不动、原笔记没了转存那篇照旧、撤掉之后那张码也转存不进东西。
+⑥ 作者署名与转存（10-24 夜里加了一道自存闸，这一组跟着改口径）：昵称进公开快照、
+   **自己扫自己那张码当场 400 且一行不写**、别人拿同一张码转存照旧通并抄同一份字段、
+   来源那一栏任何写接口都改不动、原笔记没了转存那篇照旧、撤掉之后那张码也转存不进东西、
+   转存给作者结的那 1 分到账（这条以前在现网证不了）。
 ⑦ MIND（2026-10-01 改口径）：笔记不限量，所以这里断的是"五条入口都不再挂闸门"；
    接口形状、那两条部分唯一索引真在库里、自己转存自己那一趟一分都不结。
    现网只有 deploy-test 一个可写的号，"给别人转存结 1 分"那条真给钱的分支在这里证不了，
@@ -27,12 +35,14 @@
 import json
 import sys
 import time
+import traceback
 import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import httpx
+from sqlalchemy import or_
 
 from app.core.auth import _create_token
 from app.db.database import SessionLocal
@@ -47,12 +57,49 @@ PHONE_TITLE = f"我的手机号是 1380000{MARK[:5]}"
 CLEAN_TITLE = "改成正常的标题"
 VIOLATING = "线上赌场 六合彩 特码 内部资料 稳赚 下注网址"   # deploy.sh 自检里实测判 risky 的那串
 
+# 这一次建出来的笔记主键。收尾正常走真口删；这一列是**崩在半路时的兜底**（见 `sweep()`）。
+CREATED = []
+
 results = []
 
 
 def check(name, ok, detail=""):
     results.append((name, bool(ok), detail))
     print(f"{'✓' if ok else '✗'} {name}" + (f"  · {detail}" if detail else ""))
+
+
+def marked(db, user_id):
+    """带着这一次标记的笔记行数。
+
+    摘要那一栏也要搜：① 那一组的标题在中途被改成 `CLEAN_TITLE`（标记跟着没了），
+    只按标题找就看不见它。10-24 就是这个洞——崩在半路的那一趟在现网留下一篇笔记、
+    三行分享，其中一张码还开着（公开页当场 HTTP 200），而收尾那句"标记的笔记一条不留"是绿的。
+    """
+    return db.query(Note).filter(
+        Note.user_id == str(user_id),
+        or_(Note.title.like(f"%{MARK}%"), Note.summary.like(f"%{MARK}%"))).count()
+
+
+def sweep(db):
+    """崩在半路时按记下的主键把这一次的笔记收掉（正常收尾走真口，这里只兜崩的那一趟）。
+
+    为什么不复用真口 DELETE：崩的时候手里那把票可能已经属于一个被删掉的临时账号，
+    而这一趟的目的是"无论怎样都别在现网留东西"。配图那一栏不许默默放过：`delete_note`
+    只删行，云上那个对象要客户端去删，所以这里一旦数到配图就停下来大声报。
+    """
+    from app.models.asset import Asset
+    for nid in list(CREATED):
+        row = db.query(Note).filter(Note.id == nid).first()
+        if not row:
+            continue
+        n_asset = db.query(Asset).filter(Asset.note_id == nid).count()
+        if n_asset:
+            print(f"⚠ 补删停住：笔记 {nid} 名下还有 {n_asset} 行配图，云上对象删不掉，人工看")
+            continue
+        n_share = db.query(Share).filter(Share.note_id == nid).delete(synchronize_session=False)
+        db.delete(row)
+        db.commit()
+        print(f"· 补删：这一次留下的笔记 {nid} 已删（连带 {n_share} 行分享）")
 
 
 def main():
@@ -65,10 +112,22 @@ def main():
     client = httpx.Client(base_url=BASE, timeout=30)
 
     def count_rows():
-        return db.query(Note).filter(Note.user_id == str(user.id),
-                                    Note.title.like(f"%{MARK}%")).count()
+        return marked(db, user.id)
 
     check("起点干净：这次标记的行一条都没有", count_rows() == 0, f"标记={MARK}")
+    # 这一条比上面那条有用：上面的标记是**这一次**的，抓不到上一次崩在半路留下的行。
+    # 10-24 那篇漏网的笔记就是靠这个形状（摘要前缀）现量找出来的。
+    shape = db.query(Note).filter(
+        Note.user_id == str(user.id),
+        or_(Note.summary.like("联系方式%"), Note.title.like("我的手机号是 1380000%"))).all()
+    check("起点干净：历次探针形状的行一条都没留（崩在半路的兜不住就在这里露头）",
+          not shape, f"还剩 {[x.id for x in shape]}")
+
+    # 涉钱与归属的起点：收尾要把台账行数、deploy-test 的已到奖励、users 总数都核对回这三个数。
+    inv_start = db.query(Invitation).count()
+    users_start = db.query(User).count()
+    bonus_start = int(db.get(User, user.id).quota_bonus or 0)
+    print(f"起点：台账 {inv_start} 行 · users {users_start} · deploy-test bonus {bonus_start}")
 
     # ---- ① 快照必须跟着笔记走 ------------------------------------------------
     r = client.post("/api/notes/", headers=hdr,
@@ -77,6 +136,7 @@ def main():
     if r.status_code != 200:
         return finish(client, db, user, MARK)
     note_id = r.json()["id"]
+    CREATED.append(note_id)
 
     r = client.post("/api/shares/", headers=hdr, json={"note_id": note_id})
     check("建分享", r.status_code == 200, f"HTTP {r.status_code} {r.text[:80]}")
@@ -208,7 +268,7 @@ def main():
           live and live[0].expires_at is None,
           f"expires_at={getattr(live[0], 'expires_at', None) if live else '无行'}")
 
-    # ---- ⑥ 作者署名与转存（2026-09-24 下午这批）--------------------------------
+    # ---- ⑥ 作者署名与转存（10-24 那道自存闸把这一组的走法改了口径）------------
     src_note_id = note_id
     r = client.post("/api/shares/revoke", headers=hdr, json={"note_id": note_id})
     check("⑥ 先撤掉上一组那张码，给这一组腾位置", r.status_code == 200, r.text[:60])
@@ -222,11 +282,43 @@ def main():
           pub6.status_code == 200 and pub6.json().get("author_name") == AUTHOR, f"HTTP {pub6.status_code}")
     snap = pub6.json()
 
+    # 站长 10-24「为什么自己可以转存自己的，这个不合理，要限制」⇒ 作者本人这一趟当场拒。
+    rows_before = count_rows()
     r = client.post("/api/notes/from-share", headers=hdr, json={"token": tok6})
+    check("⑥ 自己扫自己那张码：当场 400，屏上那句逐字对上",
+          r.status_code == 400 and r.json().get("detail") == "这是你自己的笔记",
+          f"HTTP {r.status_code} · {r.text[:80]}")
+    db.expire_all()
+    check("⑥ 被挡那一趟一行都不写（名下笔记数自 10-01 起没上限，只能靠这道闸）",
+          count_rows() == rows_before, f"{rows_before} → {count_rows()}")
+
+    # 「别人扫我的码存进来」是生产上真跑的那半条腿，现网只有一个可写号时变不出来 ⇒ 现造一个临时号，
+    # 用完连它名下的行一起删（做法与 docs/工具/本地-造一个别人.py 同源：openid 不参与鉴权）。
+    from app.models.account import Account, AccountIdentity
+    from app.services import accounts, generation
+    other = User(openid=f"probe-reader-{MARK}", language="zh")
+    other.generation = generation.allocate(db)
+    db.add(other)
+    db.commit()
+    db.refresh(other)
+    other_acct = accounts.ensure_for_user(db, other)
+    db.commit()
+    hdr2 = {"Authorization": "Bearer " + _create_token(other.id, other.generation)}
+    # 收尾要按"当场读下来的值"对账：对象删掉之后再读它的属性会炸（现网实测 ObjectDeletedError）。
+    # 两枚主键类型不一样——users 是自增整数，accounts 是 UUID 串，所以这里**不套 int()**。
+    other_id, other_acct_id = other.id, other_acct.id
+    check("⑥ 临时转存者账号建出来了（收尾删净，见最后三条）", bool(other_id) and bool(other_acct_id),
+          f"user={other_id} account={other_acct_id}")
+
+    inv_before = db.query(Invitation).count()
+    bonus_before = int(db.get(User, user.id).quota_bonus or 0)
+    r = client.post("/api/notes/from-share", headers=hdr2, json={"token": tok6})
     copy = r.json()
-    check("⑥ 转存成功并落进自己库", r.status_code == 200 and bool(copy.get("id")),
-          f"HTTP {r.status_code} · id={copy.get('id')}")
+    check("⑥ 别人拿同一张码转存：照旧 200（那道闸只挡作者本人）",
+          r.status_code == 200 and bool(copy.get("id")), f"HTTP {r.status_code} · id={copy.get('id')}")
     copy_id = copy.get("id")
+    if copy_id:
+        CREATED.append(copy_id)
     fields = ("title", "summary", "tags", "key_points", "key_links", "source_url")
     diff = [f for f in fields if snap.get(f) != copy.get(f)]
     check("⑥ 整条抄：公开页那六个字段逐字一致", not diff, f"不一致：{diff}" if diff else "全等")
@@ -237,37 +329,52 @@ def main():
           f"{ {k: src.get(k) for k in ('author_name', 'title_at_import', 'imported_at')} }")
     check("⑥ 来源类型标成转存，不是手写", copy.get("source_type") == "share_import", copy.get("source_type"))
 
-    r = client.put(f"/api/notes/{copy_id}", headers=hdr,
+    # ⚠ 转存带图那一条（他 10-24 拍的乙）此刻在现网**还读不出正样本**：这一把探针的原篇没有配图，
+    #    所以 `copy_for_import` 一张都不该打网关。真正的"图跟过来了"要等云函数那只上了现网、
+    #    再拿一篇带图的篇子验（账 §8.479，两条通道要一起上）。
+    db.expire_all()
+    from app.models.asset import Asset
+    check("⑥ 原篇没有配图时，副本名下不该凭空多出 assets 行",
+          db.query(Asset).filter(Asset.note_id == copy_id).count() == 0)
+
+    r = client.put(f"/api/notes/{copy_id}", headers=hdr2,
                    json={"title": "改过的标题", "source_type": "manual",
                          "imported_from": {"author_name": "李鬼", "share_token": "伪造"}})
-    after = client.get(f"/api/notes/{copy_id}", headers=hdr).json()
-    check("⑥ 正文改得动（这条还是他自己的笔记）", r.status_code == 200 and after.get("title") == "改过的标题",
+    after = client.get(f"/api/notes/{copy_id}", headers=hdr2).json()
+    check("⑥ 正文改得动（这条已是转存者自己的笔记）", r.status_code == 200 and after.get("title") == "改过的标题",
           f"HTTP {r.status_code}")
     check("⑥ 来源那一栏改不动：伪造的字段整个被忽略",
           (after.get("imported_from") or {}).get("author_name") == AUTHOR
           and (after.get("imported_from") or {}).get("share_token") == tok6,
           f"改后={ {k: (after.get('imported_from') or {}).get(k) for k in ('author_name', 'share_token')} }")
     check("⑥ 来源类型也改不回手写", after.get("source_type") == "share_import", after.get("source_type"))
+    check("⑥ 作者本人读不到转存者那篇（归属没串）",
+          client.get(f"/api/notes/{copy_id}", headers=hdr).status_code == 404)
     db.expire_all()
-    check("⑥ 转存不新增分享行：这篇自己没开过码",
+    check("⑥ 转存不新增分享行：那篇副本没开过码",
           db.query(Share).filter(Share.note_id == copy_id).count() == 0)
+    db.expire_all()
+    check("⑥ 别人转存我这篇 ⇒ 给作者结到账（台账 +1 行、MIND +1）——这条以前在现网证不了",
+          db.query(Invitation).count() == inv_before + 1
+          and int(db.get(User, user.id).quota_bonus or 0) == bonus_before + 1,
+          f"台账 {inv_before}→{db.query(Invitation).count()} · bonus {bonus_before}→"
+          f"{int(db.get(User, user.id).quota_bonus or 0)}")
 
     client.post("/api/shares/revoke", headers=hdr, json={"note_id": note_id})
-    r = client.post("/api/notes/from-share", headers=hdr, json={"token": tok6})
+    r = client.post("/api/notes/from-share", headers=hdr2, json={"token": tok6})
     check("⑥ 撤掉分享之后，那张码也转存不进东西", r.status_code == 404, f"HTTP {r.status_code} {r.text[:70]}")
     r = client.delete(f"/api/notes/{note_id}", headers=hdr)
     check("⑥ 删掉原笔记", r.status_code in (200, 204), f"HTTP {r.status_code}")
-    still = client.get(f"/api/notes/{copy_id}", headers=hdr)
+    still = client.get(f"/api/notes/{copy_id}", headers=hdr2)
     check("⑥ 原笔记没了，转存那篇照旧读得到、来源照旧在",
           still.status_code == 200 and (still.json().get("imported_from") or {}).get("share_token") == tok6,
           f"HTTP {still.status_code}")
-    note_id = copy_id      # 收尾按这一条清（原笔记已经删掉了）
 
     # ---- ⑦ MIND 这一轮（2026-10-01 口径：笔记不限量 + 动笔 +10 + 转存按"这篇×人" +1）----
-    # 现网只有 deploy-test 这一个可以写的号，所以"给别人转存结 1 分""带来新写作者结 10 分"
-    # 这两条真给钱的分支在这里证不了（要两个账号），它们由 backend/tests 的
-    # Test转存加分 / Test邀请到账 守着。这里证的是：接口形状、五条入口都不再挂闸门、
-    # 那两条部分唯一索引真在库里、自己转存自己那一趟一分都不结。
+    # 「给别人转存结 1 分」这一条以前在现网证不了（只有一个可写号），10-24 起 ⑥ 现造了一个临时号，
+    # 所以那一笔真给钱现在有线上读数了——它在 ⑥ 里断过，收尾按主键撤掉并核对回到进程起点。
+    # 这里证的是：接口形状、五条入口都不再挂闸门、那两条部分唯一索引真在库里、
+    # 以及「自己扫自己那张码」那一趟一行都不写、一分都不结（闸在 ⑥ 前半）。
     inv_before = db.query(Invitation).count()
     db.expire_all()
     bonus_before = int(db.get(User, user.id).quota_bonus or 0)
@@ -327,35 +434,71 @@ def main():
           len(wired) == 5 and not still,
           f"查到 {len(wired)} 条，还挂着闸门的：{still or '无'}")
 
-    check("⑦ ⑥ 那一趟是「自己转存自己那篇」，一分钱都不该结",
-          db.query(Invitation).count() == inv_before, f"台账 {inv_before} → {db.query(Invitation).count()}")
+    check("⑦ ⑥ 那一笔转存的台账行此刻还在（给作者结的那 1 分没被别的路径偷偷撤，收尾才按主键撤）",
+          db.query(Invitation).filter(Invitation.invitee_id == other_id).count() == 1,
+          f"临时转存者名下的台账行 {db.query(Invitation).filter(Invitation.invitee_id == other_id).count()} 行")
     r = client.post("/api/notes/", headers=hdr, json={"title": f"额度基线核对{MARK}"})
     check("⑦ 存一条笔记不影响已到手的奖励（额度这一轮没把钱乱发）",
           r.status_code == 200 and (db.query(Invitation).count() == inv_before) and
           int(db.get(User, user.id).quota_bonus or 0) == bonus_before,
           f"HTTP {r.status_code} · bonus={bonus_before}→{db.get(User, user.id).quota_bonus}")
     if r.status_code == 200:
-        client.delete(f"/api/notes/{r.json()['id']}", headers=hdr)
+        baseline_id = r.json()["id"]
+        CREATED.append(baseline_id)
+        client.delete(f"/api/notes/{baseline_id}", headers=hdr)
 
-    # ---- 收尾：只清这一次建的东西 ---------------------------------------------
+    # ---- 收尾：只清这一次建的东西（含那个临时转存号与它结走的那 1 分）----------
 
-    r = client.delete(f"/api/notes/{note_id}", headers=hdr)
-    check("删掉这条笔记", r.status_code in (200, 204), f"HTTP {r.status_code}")
-    check("删掉的笔记，那张码扫开是 404",
-          client.get(f"/api/shares/{new_token}").status_code == 404)
-    check("收尾：撤掉过的旧码也仍然是 404",
-          client.get(f"/api/shares/{token}").status_code == 404)
+    check("收尾：原笔记在 ⑥ 里已经删掉了，此刻读是 404",
+          client.get(f"/api/notes/{src_note_id}", headers=hdr).status_code == 404)
+    r = client.delete(f"/api/notes/{copy_id}", headers=hdr2)
+    check("收尾：删掉转存者那篇副本", r.status_code in (200, 204), f"HTTP {r.status_code}")
+    check("收尾：撤掉过的码扫开仍然是 404（两张都测）",
+          client.get(f"/api/shares/{new_token}").status_code == 404
+          and client.get(f"/api/shares/{token}").status_code == 404)
+
+    # 涉钱这一笔要闭环：⑥ 给作者结的那 1 分按主键撤掉，再核对台账与奖励回到**进程起点**。
+    db.expire_all()
+    credit_rows = db.query(Invitation).filter(Invitation.invitee_id == other_id).all()
+    credit_ids = [x.id for x in credit_rows]
+    for x in credit_rows:
+        db.delete(x)
+    user_row = db.get(User, user.id)
+    user_row.quota_bonus = bonus_start
+    db.commit()
+    db.expire_all()
+    check("收尾：那一笔转存的台账行按记下的主键删净",
+          db.query(Invitation).filter(Invitation.id.in_(credit_ids)).count() == 0, f"ids={credit_ids}")
+    check("收尾：MIND 台账行数与 deploy-test 的已到奖励都回到进程起点",
+          db.query(Invitation).count() == inv_start
+          and int(db.get(User, user.id).quota_bonus or 0) == bonus_start,
+          f"台账 {inv_start}→{db.query(Invitation).count()} · bonus {bonus_start}→"
+          f"{int(db.get(User, user.id).quota_bonus or 0)}")
+
+    db.query(AccountIdentity).filter(AccountIdentity.account_id == other_acct_id).delete(
+        synchronize_session=False)
+    db.query(Account).filter(Account.id == other_acct_id).delete(synchronize_session=False)
+    db.delete(other)
+    db.commit()
+    db.expire_all()
+    check("收尾：临时转存号连它的账号行一并删净（别的账号一行都没碰）",
+          db.query(User).filter(User.id == other_id).count() == 0
+          and db.query(Account).filter(Account.id == other_acct_id).count() == 0,
+          f"user={other_id} account={other_acct_id}")
+    check("收尾：真人的行一条都没少（users 只比起点多 0）",
+          db.query(User).count() == users_start, f"users {users_start}→{db.query(User).count()}")
+
     db.expire_all()
     check("收尾：这次标记的笔记一条不留", count_rows() == 0)
-    check("收尾：两条笔记名下都没有孤儿分享行",
-          db.query(Share).filter(Share.note_id.in_([note_id, src_note_id])).count() == 0)
+    check("收尾：两篇名下都没有孤儿分享行",
+          db.query(Share).filter(Share.note_id.in_([copy_id, src_note_id])).count() == 0)
     return finish(client, db, user, MARK)
 
 
 def finish(client, db, user, mark):
     client.close()
     db.expire_all()
-    left = db.query(Note).filter(Note.user_id == str(user.id), Note.title.like(f"%{mark}%")).count()
+    left = marked(db, user.id)
     check("收尾（失败路径）：标记行已清", left == 0, f"还剩 {left} 条")
     passed = sum(1 for _, ok, _ in results if ok)
     print(f"\n{passed}/{len(results)} 条通过")
@@ -366,4 +509,18 @@ def finish(client, db, user, mark):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        code = main()
+    except BaseException:
+        # 崩在这里不吞：先把栈打出来，再补删这一次的笔记。10-24 那一趟崩在 ⑥ 之前，
+        # 现网留下一笔记＋三行分享（一张码还开着），而收尾那句是绿的——因为它只按标题找。
+        traceback.print_exc()
+        code = 1
+    bd = SessionLocal()
+    try:
+        sweep(bd)
+    except Exception as exc:
+        print(f"⚠ 补删这一趟没跑成：{type(exc).__name__}: {exc}")
+    finally:
+        bd.close()
+    sys.exit(code)

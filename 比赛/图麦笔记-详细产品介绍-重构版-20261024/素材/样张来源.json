@@ -1,0 +1,443 @@
+{
+ "edition": "瑞士排版旅行故事版",
+ "status": "完整63页：16页旅行故事、1页索引、41页详细功能、4页能力与边界、1页结尾。以当前HTML/PDF为准，A至D系列为历史稿。下列旧图片记录保留来源，新一轮选用以current_scene_assets为准。",
+ "retired_image_assets": [
+  "旅行-林夏咖啡馆.png",
+  "旅行-林夏晚间.png",
+  "旅行-林夏与朋友.png"
+ ],
+ "current_scene_assets": [
+  "旅行-地标介绍-v3.png",
+  "旅行-林夏全身蓝衬衣-v3.png",
+  "旅行-林夏半身棕针织.png",
+  "旅行-国外朋友圈特写.png",
+  "旅行-小禾国内阅读.png",
+  "旅行-打印手账俯拍.png",
+  "旅行-回国照片墙全身.png",
+  "旅行-闺蜜扫码特写-v2.png",
+  "旅行-九个瞬间.png"
+ ],
+ "scene_revision_record": "旅行扩展场景来源.json",
+ "palette": {
+  "paper": "#f4f1eb",
+  "ink": "#19201f",
+  "green": "#223d35",
+  "clay": "#b95b3b"
+ },
+ "character": "虚构人物林夏，22岁中国大学女生；朋友小禾同为成年中国大学女生。不是用户证言。",
+ "images": [
+  {
+   "asset": "旅行-地标介绍-v3.png",
+   "source": "/Users/zlfmac/Documents/AgentsNote/vibe_images/tumarknote-rome-phone-screen-correct-v3_1792827336365_be0f73c2.png",
+   "role": "封面与拍照场景",
+   "prompt": "Use case: precise photographic object correction for a travel note app brochure. Input image 1 is the edit target. Correct ONLY the smartphone orientation and the small hand adjustments necessary to hold it. Preserve exactly the same adult Chinese woman, face, hairstyle, ivory linen shirt, Pantheon plaque, architecture, warm natural light, composition and photorealistic texture. Critical physical correction: she is photographing the stone plaque on her RIGHT. The phone's BACK and rear camera lenses must face the PLAQUE to her right, while its FRONT DISPLAY faces the WOMAN to its left. In this camera viewpoint we must SEE THE FRONT GLASS DISPLAY of the phone, NOT THE BACK, NOT ANY rear camera lenses. Replace the visible black phone back and camera bump with a dark luminous FRONT SCREEN showing a subtle generic live image of the plaque. Do not add detailed UI or text. Her eyes look at the phone screen; the rear camera side is hidden facing the stone sign. Show the smartphone as thin black glass screen with a minimal bezel and side edge, held naturally in both hands. The image must not show round rear camera lenses anywhere on the visible screen side. Keep everything else unchanged.",
+   "verification": "已查看生成图，当前可见面为显示介绍牌的屏幕，后置镜头面朝牌子。旧版手机背面朝人物的图不进入当前稿。"
+  },
+  {
+   "asset": "旅行-林夏咖啡馆.png",
+   "source": "/Users/zlfmac/Documents/AgentsNote/vibe_images/tumarknote-linxia-rome-cafe_1792827446417_8f386e07.png",
+   "role": "链接录入的故事场景",
+   "prompt": "Use case: editorial travel-story photograph for a literary note-taking app brochure. Image 1 is character and photographic style reference only. Keep the same adult 22-year-old Chinese university woman, facial identity, low black ponytail and ivory linen shirt. New scene: seated at a quiet outdoor cafe in Rome, espresso on a small table, old warm stone street in background. She is reading a travel article on her smartphone before heading out. Frame as a calm wider side/over-shoulder editorial photo with generous architectural space, not a close-up phone advertisement. Photorealistic, warm natural daylight, authentic linen grain, relaxed candid mood, restrained creamy olive palette. Phone display faces her and is seen obliquely by the viewer, indistinct article blocks only, NO readable words and no invented app interface. Natural hands, phone rear facing away from her. No extra people in foreground, no logos, no captions or collage."
+  },
+  {
+   "asset": "旅行-林夏晚间.png",
+   "source": "/Users/zlfmac/Documents/AgentsNote/vibe_images/tumarknote-linxia-rome-evening-notes_1792827507563_04b69b53.png",
+   "role": "文字录入与旅行回顾",
+   "prompt": "Use case: editorial travel-story photograph for a literary note app brochure. Image 1 is reference for the SAME adult Chinese woman, facial identity, black low ponytail, ivory linen shirt and warm photographic style. New scene: at dusk in a simple tasteful Rome guesthouse, seated at a wooden desk beside an open window with terracotta rooftops beyond, she is thoughtfully typing a short travel reflection on her smartphone. A closed notebook and glass of water on desk, no excess props. Frame medium-wide three-quarter profile, plenty of negative space and rich but quiet warm paper/olive colors. Photorealistic realistic skin and textiles, soft evening light. The phone screen faces HER, she looks at it, rear phone shell away from her. Prefer oblique small phone in scene rather than detailed interface. No visible readable text, no captions, no brand, no fake app UI, no additional people."
+  },
+  {
+   "asset": "旅行-林夏与朋友.png",
+   "source": "/Users/zlfmac/Documents/AgentsNote/vibe_images/tumarknote-linxia-friend-travel-sharing_1792827562182_8bb9519f.png",
+   "role": "朋友阅读与转存的故事场景",
+   "prompt": "Use case: closing story photograph for a literary travel note app brochure. Image 1 provides the identity of the main character: keep the same adult 22-year-old Chinese woman, black low ponytail, ivory linen shirt. Scene: after the trip, she sits with an adult Chinese woman friend of similar age with a short black bob and muted olive shirt at a bright calm university cafe in China. They are reviewing a travel note on the friend's smartphone together, looking down at the SAME front display with relaxed engaged expressions. This is an ordinary shared reading moment, not an advertisement pose or testimonial. Wider editorial lifestyle framing, table and light wall form spacious composition, natural soft daylight, warm ivory/olive palette, photographic textures. The smartphone screen faces BOTH women on the same side of the table; photographed from side, no visible detailed interface or readable text. No back cameras facing the readers, no extra phones, no branding, no captions.",
+   "verification": "生成图改为林夏持机、两人相对而坐；正文只说一起阅读，不把图当作真实转存操作证据。"
+  },
+  {
+   "asset": "旅行-九个瞬间.png",
+   "source": "/Users/zlfmac/Documents/AgentsNote/vibe_images/tumarknote-rome-nine-moments_1792825991674_8c3dc62c.png",
+   "role": "万神殿与罗马沿途细节组照",
+   "prompt_summary": "罗马旅行九图：万神殿外景、介绍牌、穹顶圆孔、石柱、咖啡与笔记本、街道、窗与立面、喷泉、屋顶；暖光文艺旅行摄影，无APP界面。",
+   "derived_assets": [
+    "旅行-故事镜头0.png",
+    "旅行-故事镜头1.png",
+    "旅行-故事镜头2.png"
+   ],
+   "provenance": "AI图；衍生三图为第1、3、6格的等分裁切，不是OCR实测材料。"
+  }
+ ],
+ "controls": {
+  "simulator_source": "/Users/zlfmac/Documents/TuMaiBiJi/docs/design/10-08创建入口暗面板/实测/B-照片三枚圈.png",
+  "simulator_crops": {
+   "相册": [
+    130,
+    1220,
+    234,
+    1324
+   ],
+   "拍照": [
+    281,
+    1185,
+    453,
+    1357
+   ],
+   "粘贴": [
+    502,
+    1220,
+    606,
+    1324
+   ],
+   "翻译开关": [
+    42,
+    1008,
+    94,
+    1036
+   ]
+  },
+  "device_source": "/Users/zlfmac/.qoder/tmp/-Users-zlfmac-Documents-AgentsNote/images/fb085725-0b39-4ece-bc6b-935e4051df68/fe0bd85c498f1c064ef3ea859b85a41e730b357bac6c13c2e4b02e56437962fd.jpeg",
+  "device_slider_crop": [
+   100,
+   1690,
+   823,
+   1817
+  ],
+  "treatment": "只保留控件自身的椭圆/胶囊轮廓，透明分离；去掉无关背景，不能冒充完整真机画面。"
+ },
+ "cards": {
+  "record": "旅行卡-绘制记录.json",
+  "count": 11,
+  "provenance": "本地2.4.16产品代码及图文卡本地种子配方，离线真实绘制；同一份虚构罗马手记与林夏署名，无真实二维码，无线上操作。",
+  "limitation": "letter原配方一枚无填充或描边的路径层不产生像素，保持产品原样；本次不是微信真机渲染测试。"
+ },
+ "mood_color_source": "miniprogram/utils/palette.js:356-377；展示五档心情基础色，不包含实际透明叠色。",
+ "language_source": [
+  "backend/probes/multilingual_zh_probe.py:67-82",
+  "比赛/图麦笔记-V7素材-20261015/16语实测-历史工具结果.json:5-12"
+ ],
+ "model_source": [
+  "cloudfunctions/extract/index.js:15-67",
+  "backend/app/services/ocr.py:131-140"
+ ],
+ "composition": "HTML/CSS瑞士网格、色块、线条与留白；示例笔记结构和分类关系注明示意，不伪造产品UI。PDF保留可搜索文字，PNG为逐页导出。",
+ "implementation": "../制作方向样张.py",
+ "export": "../导出旅行故事版.mjs",
+ "outputs": [
+  "../图麦笔记-旅行故事版.html",
+  "../图麦笔记-旅行故事版.pdf",
+  "../瑞士故事版图片/"
+ ],
+ "interface_diagrams": {
+  "kind": "自绘单色线稿，不是截图",
+  "generator": "界面示意图.py",
+  "binding": "内容/功能要点.json",
+  "screens_defined": 20,
+  "screens": [
+   "about",
+   "cardinfo",
+   "create-home",
+   "create-photo",
+   "create-url",
+   "create-write",
+   "delete",
+   "detail",
+   "detail-sheet",
+   "language",
+   "list",
+   "list-edit",
+   "market",
+   "me-about",
+   "me-set",
+   "private",
+   "share-view",
+   "tpl-sheet",
+   "wallpaper",
+   "write"
+  ],
+  "features_bound": 66,
+  "features_using_real_card": 11,
+  "text_source": "屏上字样逐字取自 miniprogram/utils/i18n.js 的 zh 字典与各界面 wxml 原文（2.4.16）",
+  "label_on_page": "界面位置示意 · 屏名（非真实截图）",
+  "not_claimed": [
+   "不是真机截图",
+   "不是设计稿导出",
+   "不代表实际像素尺寸与间距"
+  ],
+  "external_pattern": "四款笔记类 App 商店截图页的共性：一条短标题＋一张界面图＋图内高亮该项位置，零段落。只看过其截图做模式归纳，成册未嵌入任何第三方图片。",
+  "corrections_1024": [
+   "list-edit 第一版画错了：画成了独立的 pages/categories 那一页（↑↓／编辑／删除／取消／确定）。现网真相是首页井格只开笔记页自己的管理态，独立页两个入口（首页跳转 goCategories 与「我的」那一行）都已撤，页文件留着没删。",
+   "管理态画法照 pages/index/index.wxml 与 index.js：输入框长在井格右手边、这一态不画搜索那枚、芯片不画「全部」、每枚右上角一枚 ✕（私密那一枚不画 ✕ 也不给改名与拖动）、提示句浮在对应那一枚上面、点页面空白那一下批量保存。",
+   "删除确认那句报数的话取自 i18n catDelBody「这一格里有 {n} 篇，删掉会归到未分类。」"
+  ]
+ },
+ "reference_copy": {
+  "mode": "要点罗列",
+  "features": 77,
+  "bullets_total": 231,
+  "cautions_total": 77,
+  "scaffolding_removed": [
+   "有什么用",
+   "怎么使用",
+   "会得到什么"
+  ],
+  "full_prose_still_in": "详细产品介绍-内容核对稿.html（77 项 × 四段＝308 段，未删）"
+ },
+ "pdf_bookmark_step": "出PDF书签.py：Playwright 不写文档大纲，出完 PDF 后按版面计划补 63 条并回读自证",
+ "market_shelf_page": {
+  "page_heading": "让内容，找到合适的样子。",
+  "builder": "market_shelf()",
+  "rows": {
+   "经典款（5）": [
+    "图文卡",
+    "玉版宣",
+    "摘句",
+    "叠翠",
+    "规格卡"
+   ],
+   "个性款（6）": [
+    "素宣信笺",
+    "波普分格",
+    "网点漫画",
+    "荧光渐变",
+    "杂志封面",
+    "纸间文艺"
+   ]
+  },
+  "group_order_source": "utils/poster.js TEMPLATES 的 group 字段 + 站长 10-21「图文卡，纳入经典款，第一个」",
+  "art": "十一张卡面全部是本地 2.4.16 产品代码实绘（素材/旅行卡-*.png），内容为虚构示例",
+  "selected_cell": "图文卡那一格带陶土描边与圆点，对应现网 .cell-on 那一态"
+ },
+ "cover_1024": {
+  "现状": "封面放的是新建页首屏的真实渲染（素材/首屏实拍-林夏.png，734×1588，20:30 那一帧）：首屏背景＝故事里那位女主角在罗马柱廊下看手机那张。手机直接坐在页面底色上，只留柔和投影。",
+  "拍摄通道": "微信开发者工具 cli auto（端口 9450）+ miniprogram-automator 的 mp.screenshot()，设备档 iPhone 12/13 (Pro)，视口 390×753；2026-10-24 17:45 拍。跑完已 cli close 交还端口、9450 现读无监听。",
+  "诚实边界": "这是开发者工具里的真实渲染（产品自己的代码、自己的皮、自己的数据跑出来的那一屏），不是手机摄像头拍的物理真机照片。纸白那一帧是背景图尚未落到本机时的真实回退态（本机形象图四槽 bg 那一格为 false，且缓存读数被临时摘掉的那一拍），稳态首屏吃的是后台「运营图」那张下发图。册内页脚写明「拍的是背景图尚未落到本机那一帧」。",
+  "图里的内容出处": {
+   "为什么这一屏是纸白": "已作废：封面不再用纸白那一帧。纸白版留作备选（素材/首屏实拍-纸白.png）。",
+   "45 笔记 / 152 图片": "封面这一帧读回的是 38 笔记 / 150 图片（这台设备所登账号的真实计数，两次拍之间账号数据自己动了）。",
+   "书法标题 / 告诉好友 / EN / 换背景·换心情 / Tips / ➕ / 底栏三格": "全是现网渲染出来的原样，未改。",
+   "少了「调亮度」那一枚": "不是漏画——那一枚在 `create.wxml` 里挂 `wx:if=\"{{bgSrc}}\"`，纸白那一档没有背景图，可点的东西不存在，所以它本来就不该在屏上。"
+  },
+  "处理": "① 清掉模拟器漏进来的左下角「rea」与右下角「··」（填成外围同一支 #2a2c31 系黑，取样 px[6,1545]=(42,44,49)）；② 屏 324px 宽、圆角 32px（＝宽×9.9%，iPhone 比例），投影 0 34px 64px -24px rgba(25,32,31,.42) ＋ 0 5px 16px rgba(25,32,31,.14)，无描边、无垫板；③ 出处那两行从画面上撤掉，只留在本页页脚说明里。",
+  "另一张已拍但没用": "素材/首屏实拍.png＝带后台运营图（红玩偶）那一帧，734×1588，已降饱和处理过；换纸白版后不再上封面，留作备选。",
+  "品牌位": "素材/品牌小程序码.png＝比赛/图麦笔记-小程序码-透明底.png（md5 f7580a8b8de0ffa49d664649b1e31433），微信官方太阳码，中心即小程序 logo。",
+  "口号": "「看到好内容，随手记下来。」——站长 10-24 从三版方向稿里挑的这一句；首屏那张书法位图念的也是这一句。",
+  "重复图处理": "旅行影像那条带原在第 1/4/64 页复用三处，现从封面撤走，只剩第 4 页与第 64 页两处故事位。",
+  "作废记录": "本条更早一版记的是 CSS 手绘首屏（逐件字样出处＋撤掉的三件）；那套界面带与手绘规则已从生成器整段删除（`ui-*` 只剩 shot/shotwrap/side/meta），该版记录作废。",
+  "撤掉的处理": "19:2x 那一版做过三层嵌套（640px 深绿色块 → 纸色台面 → 5px 墨框 → 截图），并对红玩偶背景降饱和＋叠绿纱。用户 19:5x 问「绿底套白底是参考哪个竞品」——查完九家商店图＋六家官网首屏，没有任何一家做色块里再垫浅色卡片的嵌套，竞品是设备/裸截图直接坐在页面底色上靠柔影衔接；深色那两家（Obsidian、Readwise）是整页做深色。那层台面当初是为了补「暗屏幕压不住深绿」这个自己造出来的冲突，随色块一起撤掉，降饱和与绿纱也不再需要（纸白那一帧没有抢眼背景照片）。",
+  "怎么让背景变成女主角": "临时把本机 poster_profile 的 images[1] 设成 {path: 沙箱里那张 jpg, bg:true}（图是 base64 递进 appservice 再 writeFile 落进 USER_DATA_PATH，文件名带时间戳防同路径缓存）→ reLaunch 新建页 → 截图 → 用快照整份还原 poster_profile 并读回比对＝\"一致\"。拍完 cli close 交还端口，9451 现读无监听。",
+  "线稿同批修的三件": "① create-home 那张不再混画第二屏：「原文翻译／识别到外文自动翻译成中文／右滑开始提炼／面板三档」搬进 create-photo；② 撤掉造出来的「点一下进拍照」，补上首屏真有的 Tips 与那枚「＋／记下来」；③ 语言角标从「中/EN」改成「EN」（现网只显示要点过去的那一门），H05 那三条要点跟着改口。02-05／03-04／U02 三项从 create-home 改绑到 create-photo。"
+ },
+ "typography_1024": {
+  "字体": "朱雀仿宋 ZhuqueFangsong v0.212（Regular，13,805 个字形），文件在素材/朱雀仿宋-Regular.ttf",
+  "授权": "字体内 name 表第 13/14 条原文＝SIL Open Font License 1.1（http://scripts.sil.org/OFL）；仓库 TrionesType/zhuque 的 GitHub license 字段＝OFL-1.1，README 明写免费商用含\"软件嵌入\"。",
+  "取法": "GitHub releases 资产（直连超时，走本机 127.0.0.1:7897 代理拿到 5,743,932 B，与 API 报的 size 逐字一致）",
+  "为什么不是系统仿宋": "这台 Mac 上没有 STFangsong／楷体（/System/Library/Fonts 与 Supplemental 全列过，中文只有 Songti SC 四档与 STSong），所以必须自带字体。",
+  "生效证据": "document.fonts 里 \"Zhuque Fangsong:loaded\"、check() 为 true；同一条要点文字换成 Songti SC 后逐像素比对差 6.1%（1568/25823，最大差 192）⇒ 真在用，不是静默回退。",
+  "落点": "body 字体栈改成 \"Zhuque Fangsong\",\"Songti SC\",\"Hiragino Sans GB\",\"PingFang SC\",serif；页码／功能号那几处 Arial 数字令牌没动（改了会撞 letter-spacing rpx 取整那一条）。"
+ },
+ "page_background_1024": {
+  "值": "#E2DED4",
+  "出处": "miniprogram/app.wxss 的 --bg-page（113 行与 228 行两处同值），站长口径\"PDF 背景色与小程序界面背景色一致\"",
+  "读回": "渲染端 getComputedStyle(.page).backgroundColor = rgb(226, 222, 212) 现读一致"
+ },
+ "copy_rewrite_1024": {
+  "触发": "站长两句：「标题都不行，不知道表达什么。能否用正常的人话来描述。故事要带钩子，能与用户共鸣，清晰点出场景痛点和我们的产品。」＋「每个页面都要有前后逻辑」",
+  "立规矩": [
+   "每页大标题＝场景里的具体麻烦＋产品替她做的那一下；不许出现\"让…找到合适的样子\"这类没有主语的抽象句。",
+   "数字一律写中文（十六种、九张、十秒），与文艺排版同调；能力说明页保留\"16种界面语言\"这类源码口径不动。",
+   "每页引导句的最后一句＝下一页的钩子；下一页标题要接得住（例：11 末句\"隔着七个小时\"→12 开头\"在国内刷到这张卡的小禾\"）。",
+   "同一章内所有页共用这一章的那一句大标题（18–59 页按章重复是刻意的书脊，不是漏改）。"
+  ],
+  "逐条对照_页标题": [
+   "02｜这次，她不想只带回一册照片。｜拍了三百张照片，回来一句也说不清。",
+   "03｜出门前，把攻略从聊天里留下来。｜攻略在同学发来的链接里，到了路口翻不到。",
+   "04｜到了万神殿，却读不懂介绍牌。｜介绍牌写着意大利语，她举起手机拍了一张。",
+   "05｜16种外文，最多9张照片，浓缩成一篇旅行笔记。｜十六种外文、九张照片，收进同一篇笔记。",
+   "06｜那一刻的感受，只有她自己知道。｜穹顶下的光，介绍牌上没写。",
+   "07｜让素材先有条理，再写成自己的口吻。｜右滑一下，十秒变成一篇有标题有要点的笔记。",
+   "08｜照片排好，故事才有自己的顺序。｜第一张放穹顶，重复的那两张删掉。",
+   "09｜旅程还没结束，资料已经各就各位。｜十几篇笔记，别再堆成一个「未分类」。",
+   "10｜写给自己，也可以分享给朋友。｜想发出去的那一篇，先做成一张发得出去的卡。",
+   "11｜隔着时差，也能把这一刻分享出去。｜罗马傍晚七点，国内的朋友刚吃完早饭。",
+   "12｜她在罗马记录，小禾在国内读到了。｜小禾扫了卡上那个码，读完存成自己的攻略。",
+   "13｜把屏幕里的旅行，贴进可以翻阅的手账。｜回了国，她把这一站打印出来贴进手账。",
+   "14｜回到家，旅行也可以留在墙上。｜照片墙上那张卡，别人看一眼，她记得一整天。",
+   "15｜墙上是一张卡，扫码后，还有整个故事。｜朋友指着墙上那张问：这是哪儿？她指了指那个码。",
+   "16｜旅行结束了，积累没有停下来。｜旅行会结束，这样记下来的东西不会。",
+   "17｜故事之外，把每一项讲清楚。｜后半册不必顺着读，要哪一项查哪一项。",
+   "18(卡片市场页)｜让内容，找到合适的样子。｜同一篇笔记，十一套版式。",
+   "19(语言)｜外文内容读进来，用熟悉的中文回看。｜十六种外文进来，出去是一篇中文。",
+   "20(模型)｜把\"看见文字\"与\"理解内容\"分开。｜先认出字，再整理意思。",
+   "21(边界·记录前)｜（旧：先说清能做什么，也说清不能做什么。）｜记之前先确认：这张图读得清吗，这篇能用吗。",
+   "22(边界·传播后)｜（旧：分享之后，事情不由你一个人说了算。）｜公开、撤回、被别人转存，是三件不同的事。",
+   "23(结尾)｜（旧：下一趟，从一篇你自己的笔记开始。）｜下一趟出门，带一篇说得清的东西回来。"
+  ],
+  "逐条对照_章标题": [
+   "01｜不止一个拍照入口。｜打开就是首页，拍照、贴链接、写字都在这一屏。",
+   "02｜让不同的素材，都有入口。｜三种素材三个入口，不用换软件。",
+   "03｜先把重点理清楚。｜右滑一下，外文变成中文要点，原文还在下面。",
+   "04｜需要的时候，找得到。｜记了五十篇，还能一秒钟找到那一句。",
+   "05｜回看之后，还能继续写。｜回看不只是看，还能改、能补图、能接着写。",
+   "06｜同一篇笔记，不同种表达。｜同一篇笔记，十一套版式。",
+   "07｜让内容流动，也说清边界。｜一张卡发出去，谁能看、能不能撤回。",
+   "08｜不想公开的，留给自己。｜不想给别人看的那一格，设个密码。",
+   "09｜让每次打开，都更像自己。｜界面能换成你自己顺眼的那一套。",
+   "10｜自己的资料，心里有数。｜你的资料存在哪、怎么删，这里查得到。",
+   "11｜从第一次用，到持续积累。｜第一次用不会的地方，有地方问。",
+   "12｜带回日常，继续使用。｜旅行之外，读书、生活、写东西同样能用。"
+  ],
+  "顺带修的两处撞车": {
+   "第06章三个标题": "改前 33/41/42/43 页＝\"同一篇笔记，不同种表达。\"、34 页＝\"同一篇笔记，十一种样子。\"、35–40 页＝\"让内容，找到合适的样子。\"，同一章三种口径。现整章统一为\"同一篇笔记，十一套版式。\"，差别交给引导句：34 页引导写\"先摆在一起看一眼…下面按组拆开细看\"，35 页起引导写\"这两张卡面出自 2.4.16 的真实模板…差别在信息主次和阅读节奏\"。",
+   "目录页编号": "改前目录 12 格用章号 01–12，下方那条 ribbon 又用 01–04 标\"完整功能说明/十一套真实模板/…\"，同号不同义。现 ribbon 改成短横块（numbered=False）。",
+   "目录页章名": "改前直接抄完整内容.json 的章题前半（\"先认识首页\"\"帮助、推荐与魅力值\"\"把功能用成自己的习惯\"），\"魅力值\"是内部词。现另立 chapter_labels 十二枚短标签：首页与新建／三种记法／整理成要点／找回那一篇／回看与修改／做成一张卡／发出去与撤回／只给自己看／界面换成你的／数据与删除／帮助与反馈／旅行之外的用法。"
+  },
+  "作废记录": "旧 23 条页标题与 12 条章标题自 2026-10-24 21:4x 起不再出现在样张与 PDF 上；正本改动在 制作方向样张.py（改前副本 /tmp/样张-改标题前.py，会话临时件，不随交付件走）。",
+  "没动的部分": "77 项功能要点的小标题、三到四条要点与\"需要知道\"那一行本轮未改（上一轮已按源码逐条核过）；内部件 详细产品介绍-内容核对稿.html 与 内容/旅行主线文案.json 仍是改前的长句，站长看的是样张与 PDF，未同步。",
+  "尺子读数": "结构尺子复跑 PASS：pages 64／features 77／bullets 231／cautions 77／templates 11／images 46／minHeaderGap 18.72／minFooterGap 35.89／mobile 390 不横滚 bodyFont 16px。",
+  "PDF读数": "出PDF书签.py 回读：pdf_pages 64／bookmarks 64／searchable_pages 64／36,105,886 B；首枚书签\"01｜看到好内容， 随手记下来。\"，末枚\"64｜下一趟出门，带一篇说得清的东西回来。\"。"
+ },
+ "pages_and_voice_1024b": {
+  "触发": "站长六条：①说完故事加一页总结 ②过渡句换成「我虽然渺小，只有 XX K，但还能做很多」③功能描述站用户角度 ④大标题下的小字与下面重复，删掉无意义备注 ⑤五档配色要完整界面一行排列、可重叠露一半 ⑥结尾加官网与联系方式页；另加「啰嗦的删掉」。",
+  "新增三页": {
+   "17 故事总结": "「林夏的罗马五天，到这里讲完。」＋五行对照（她留下的东西 → 变成什么），每行都能回指前十几页。",
+   "52 五档心情": "「五档心情，同一屏。」整页只放五张真实渲染，一行排列、后一张压住前一张一半，下面逐张标墨／象牙／天青／樱落／雨雾。",
+   "67 找到我们": "四枚：小程序 图麦笔记／官网 agentsbin.cn／反馈邮箱 jacky28471258@gmail.com／微信号 jackyai2026，右边那枚小程序码与封面同一枚。"
+  },
+  "712KB 的出处": "docs/版本与发布现状.md 第 14 行现读：`cli upload -v 2.4.17`（729,103 B）。729103/1024＝712.0 KB。这一枚数出现在第 18 页大标题与引导句里。⚠ 口径：这是那颗代码包的字节数（上传时工具报的），不是压缩后平台侧的展示数。",
+  "联系方式的出处": "小程序名与官网＝miniprogram/utils/appInfo.js 的 SITE（第 521 行「agentsbin.cn」）；邮箱＝miniprogram/utils/contact.js 第 3 行 CONTACT_EMAIL；这两枚屏上「我的」与「关于」读的是同一份。微信号 jackyai2026＝站长 2026-10-25 当面给的，全仓 grep 该串零命中，所以页脚注里明写它是站长给的那一枚，不挂到包内现值上。",
+  "五档实拍通道": {
+   "拍摄": "开发者工具 cli auto（端口 9451，AppID wx4416d1283b5de721）→ iPhone 12/13 档 → 走 App 自己那条 cycleGlassMood（首页「换心情」按下去的同一段代码：记档＋跟着换壁纸＋重算主题），逐档 reLaunch 首页后 mp.screenshot()，734×1588。",
+   "为什么第一版是假的": "第一次只写 wx.setStorageSync(\"glassMood\") 不切壁纸 ⇒ app.js:380 的 glassMood() 会拿本机这一档与壁纸对账，对不上就落回壁纸钉的那档，结果五张里只有象牙变了。像素自检：五张 md5 只有一种＋nav 采样全等 #23252C。改走 cycleGlassMood 后五张 md5 全不同。",
+   "色值核对": "导航条取样：墨 (35,37,43)＝#23252C、象牙 (174,163,154)≈#B1A299、天青 (162,187,165)≈#9BBCA3、樱落 (179,168,189)≈#B5A8BF、雨雾 (166,176,190)≈#A4B0C0，逐档对上 utils/palette.js 的 MOODS.glass。",
+   "还原": "拍完把 poster_profile、glassMood、wallpaper 三件写回并按快照读回：RESTORE -> {\"mood\":\"ink\",\"wallpaper\":\"tint-paper\"}。首屏背景用的是 /tmp/bg-linxia.jpg（故事里那位女主角那张），与封面同一张。"
+  },
+  "章首小字": "12 段从 72–104 字压到 23–37 字，全部换成「你可以…」那一句；旧值整段留在 完整内容.json 的 chapters[i].intro_old，页面上不再出现。",
+  "功能标题": "77 项标题全部从「功能名：说明」换成用户视角整句（例：P02「背景照片：从自己的图片中指定」→「首页背景换成你自己拍的照片」）；旧值留在 features[i].title_old。最长 24 字。",
+  "撤掉的小字": "feature_html 从前把标题按冒号切成两半（前半做大字、后半做灰色小字），造成「没提炼好和没存下来不是一回事」下面跟一条没有信息量的「分开重试」。现整句进 h2，`.feature-subtitle` 这一行全册撤掉（CSS 规则留着，页面上已无引用）。",
+  "撤掉的备注": "参考半册续页那句「左边那一格按 2.4.16 源码画出这一屏，标号就是它的位置。」与模板页那句讲画法的话，全部置空；每屏下方的「界面位置示意 · 非真实截图」那行保留（那是诚实标注，不是备注）。",
+  "尺子读数": "结构尺子 PASS：pages 67／features 77／bullets 231／cautions 77／templates 11／images 52（46＋五档＋封底码）／minHeaderGap 18.72／minFooterGap 35.89／390 视口不横滚 bodyFont 16px。",
+  "PDF读数": "67 页／67 枚书签／67 页可检索／37,605,795 B；首枚「01｜看到好内容， 随手记下来。」，末枚「67｜想试的话， 从这里进来。」。",
+  "一处口径疑点": "全册的 provenance 行写的是「按 2.4.16 源码绘制」，而本地工作树 miniprogram/utils/appInfo.js 的 VERSION 已是 2.4.17（线上发布的是 2.4.16，2.4.17 在审核中）。线稿与要点是照本地这棵树核的，严格说应写 2.4.17。本轮没动这 64 处字样，等他定口径。",
+  "没动的部分": "77 项的三到四条要点与「需要知道」那一行（本轮只改标题）；故事半册 16 页的引导句（那是叙事，不是备注）；页脚那句旧口号「读懂这一站，写下自己的旅程」仍在 67 页每一页上，待拍。",
+  "联系方式的变更记录": "原先第四枚写的是公众号「杰克AI日记」（appInfo.js 第 530 行 OFFICIAL_ACCOUNT），站长 10-25 一句「公众号换成：微信号 jackyai2026」后替换；公众号那一枚从册子上撤掉，包内常量没动。"
+ },
+ "pdf_shadow_band_1025": {
+  "现象": "站长 10-25 截图：封面手机左侧与下方出现一块硬边灰框（他截图里量到纸色 225,222,213 一步跳到 142,142,137，再跳 125,126,122，两级平色＋直边）。",
+  "定位": "不是素材里的框。素材 首屏实拍-林夏.png 左边缘中段实测 (138,116,86)＝照片内容，无黑边；Playwright 出的页面 PNG 同一条行也是纸色→软投影→内容，正常。差别在 PDF 那一路：Chromium print-to-PDF 把 CSS box-shadow 光栅化成低分辨率小图再放大，两级平色硬边＝色带化。",
+  "处理": "全册四条 box-shadow 撤干净：封面手机改 1px 发丝边、分享卡那两张改 1px var(--line) 边、卡片市场选中格改 border-width:2px、五档心情重叠改 5px var(--paper) 纸色描边（重叠处靠纸色缝分开，不靠影）。",
+  "复测": "PDF 自己渲染回读：第1页手机左侧一行 css x=30..74 全是 (226,222,212) 纸色，x=78 直接进画面；手机下方 y=1460 起回纸色。第52页重叠处 x≤210 为纸色，无灰带。结构尺子 PASS（67 页／77 项／52 图，最小脚距 35.89→38.22）。",
+  "读数": "PDF 37,364,478 B／67 页／67 枚书签／67 页可检索。",
+  "新加的跨通道尺子": "设计样张/量-PDF与截图对账.py：67 页逐页把 PDF 自渲染像素与 Playwright 页图比平均色差。本次读数 min 1.06／max 3.28／闸 6.0／0 页超阈。牙口自证：往第 1 页人为画回那块灰框，mean_diff 从 1.06 跳到 35.71 ⇒ 这把尺子抓得住同类失真。"
+ },
+ "cover_directions_round2_1026": {
+  "触发": "站长 10-26 一句「封面设计不行，你再设计几个风格给我选，先出效果图」。",
+  "产物": [
+   "设计样张/封面方向2/A.png … F.png（六张 1280×1600 整页效果图，与册子同尺寸，选定后可 1:1 落地）",
+   "设计样张/封面方向第二轮-取证板.html（自包含 13,628,272 B：每版左边效果图、右边它对标的外部真实参考 3 张）",
+   "生成器＝设计样张/出封面方向稿2.py ＋ 渲封面方向2.mjs ＋ 拼封面取证板2.py"
+  ],
+  "守住的三条已拍约束": "主口号＝「看到好内容，随手记下来。」（现网首页书法位图那句）；四色 logo 上封面；界面必须是真实渲染（无台面、无墨框）且画面里有人物。六版都守，没有一版偷偷换口号或去掉 logo。",
+  "六版一句话": "A 满版人像（对标 Day One／Notion）；B 左右对分（Cubox／Craft）；C 三段居中（flomo／Readwise）；D 深绿精装（Obsidian 深色）；E 卡片拼贴（成果物当主角）；F 瑞士数字（712 KB／16 种／9 张／11 套／77 项）。",
+  "参考图来源": "/tmp/ref（10 家 App Store 商店首图，iTunes lookup 取的 screenshotUrls）与 /tmp/hero/img（6 家官网首屏），2026-10-24 逐张打开看过；本轮直接复用，未重新下载。",
+  "出图前自查修掉的三处硬伤": "① B 版 logo 压在品牌字标上（挪回右上）；② B／C／E／F 四版口号在栏宽内被自动断成难看的两行（改成手动断行＋字号压进栏宽，B 最终 82px）；③ 底部三屏原本是同一张首屏换三档颜色＝重复，改成 首屏（墨）→ 首屏（纸白档）→ 真实分享卡。",
+  "尺子读数": "六页逐元素越界检查＝0（第一轮 B 版曾越界 4px，钉死 grid-template-rows:1600px 后归零）；取证板 headless 渲染：24 张图 0 张加载失败、6 行每行 1 张封面＋3 张参考、pageerror 0、总高 5202px。",
+  "落地状态": "**本轮只出效果图，产品代码与册子一行没动**（封面 CSS／HTML 均未改）。选定后再动 制作方向样张.py 的封面块。"
+ },
+ "cover_directions_round3_1026": {
+  "触发": "站长 10-26 一句「A风格，然后两张界面图就行，1+3，然后列一些数字，3种方式，16种语言，XXXXX，你设计好给我确认」。",
+  "我对「1+3」的读法": "上一轮底部那条是三屏（首屏墨档／首屏纸白档／真实分享卡），他只要第 1 张和第 3 张＝真实首屏 + 真实分享卡，中间那张纸白档撤掉（它与第一张是同一屏换色，本来就是重复）。这层理解写在确认板首页，他一行就能改。",
+  "产物": [
+   "设计样张/封面方向3/A0.png｜A1.png｜A2.png（三张 1280×1600 整页效果图，与册子封面同尺寸，选定后 1:1 落地）",
+   "设计样张/封面A风格-三版确认板.html（自包含 7,561,618 B：三版并排＋每版一行说明＋一行风险＋A2 标推荐）",
+   "生成器＝设计样张/出封面方向稿3.py ＋ 渲封面方向3.mjs ＋ 拼封面确认板3.py"
+  ],
+  "三版只差数字的摆法": "A0 数字横排在口号下方；A1 数字右侧竖成一列；A2 底部一条半透深色带（rgba(20,22,20,.72)），左两张界面图、右五枚数字——推荐 A2：唯一把「界面图＋数字」同时压在人像下方、不与人脸抢中间那块的做法。",
+  "五枚数字与口径": {
+   "3 种": "图片·链接·文字三种记法——完整内容.json 章 02「三种记法」",
+   "16 种": "外文整理成中文——站长自己拍的实测数，不许降级",
+   "9 张": "一篇笔记最多存 9 张图——小程序包内现值",
+   "11 套": "卡片版式套数——与册子章 06 标题「同一篇笔记，十一套版式」同口径",
+   "712 KB": "整个小程序代码包＝729,103 B，来自 cli upload -v 2.4.17 的读数，正本 docs/版本与发布现状.md:14"
+  },
+  "素材": "旅行-林夏咖啡馆.png（虚构人物背景）＋首屏实拍-林夏.png（开发者工具真实渲染）＋旅行卡-cover.png（真实分享卡出图）；本轮未新增拍摄，全部复用已核对素材。",
+  "尺子读数": "三页逐元素越界检查＝无；headless pageerrors＝0；确认板自渲染：3 张图 0 张加载失败、3 个 figure、headless errs 0；已亲自看过 A2 拼图落点（/tmp/confirm-board.png）。",
+  " landing 状态": "只出效果图。产品代码零行、册子 67 页零行未动；他选定哪一版后才改进 制作方向样张.py 的封面块，并重跑结构尺子＋PDF对账尺子＋出PDF书签.py。"
+ },
+ "cover_A2_revise_1026": {
+  "触发": "站长 10-26 一句「看到XXX那几句话挪到右下深色带上方，然后下方加一行社交平台的LOGO，小圆LOGO（之前分享小图时候，收集国的圆形LOGO），K数不要写。」＝他挑了 A2 并给三条改法。",
+  "三条落点": "① 口号两行＋那句英文从上半屏挪到深色带正上方、整体右对齐（hero 现占 695–1005）；② 深色带下方加一行六枚小圆标；③ 数字撤掉 712 KB 那枚，只剩 3／16／9／11 四枚。",
+  "圆标来源": "docs/design/分享图-10-19平台logo/圆标/（做分享卡那轮收集的六枚 512×512：微信／公众号／小红书／微博／知乎／抖音），已拷进 素材/平台圆标/。这六枚是无 alpha 的方图（四角铺满品牌色），所以用 CSS border-radius:50% 圆裁＋1px 亮描边，抖音那枚黑底才打得开。",
+  "那句配文口径": "「卡片存成一张图，发这些地方」——产品只出图，代发做不到（平台侧限制），所以不写「一键发布」。",
+  "我自己补的两刀（他没提，但为落地必须）": "① 四枚数字原本横排只占带高 110px、深色带 496px，右上空一大块 ⇒ 改成 2×2 细线格铺满带高；② 深色带顶边落在 y=937，正切在照片里她拿的那部手机上（照片 src y 487–630 → 页面 761–984）⇒ 界面图 196→172、带内边距 34/36→26/28，带顶降到 y=1005，让开手机 21px。",
+  "尺子读数": "逐元素越界＝0；pageerrors＝0；口号两行白字对背景中位实测 5.43／6.51（>4.5），英文行 peach 8.51；DOM 几何 hero 695-1005／bar 1005-1433(h428)／strip 366×374／col 710×374／每格 187 高。",
+  "产物": [
+   "设计样张/封面方向4/A2改.png（1280×1600 整页效果图）",
+   "生成器＝设计样张/出封面方向稿4.py ＋ 渲封面方向4.mjs"
+  ],
+  "landing 状态": "只出效果图：产品代码零行、册子 67 页一行没动。他点头后才把这一版 1:1 写进 制作方向样张.py 的封面块，并重跑结构尺子＋PDF对账尺子＋出PDF书签.py。"
+ },
+ "cover_A2_revise_v2_1026": {
+  "触发": "站长 10-26 第二轮四条：「看到XXXX，这几句要移到暗色带上，不要遮挡人物。你那个卡片图，砍了一截，好难看，为什么不对齐首屏。或者下方写一段文字。右上角应该换成小程序的二维码。」",
+  "① 口号搬进带内": "两行口号＋Save what matters 从照片上（上一版白字对背景中位只有 5.43／6.51）搬进深色带右列上半，实测 15.51；带顶降到 y=1043，人物手里那部手机（页面 761–984）整幅露出来，让开 59px。",
+  "② 卡片图先取证再改": "先量了 11 张真实出图的画布高：quote 706／card 913／topBleedEdge 930／popDots 950／spec 1040／lit 1053／block 1074／popGrid 1112／letter 1188／cover 1230／acid 1262（宽都 750）⇒ 每张模板自己的高度不同，旅行卡-cover.png 内容没被裁。所谓「砍了一截」是我按同宽摆（首屏 734×1588 与卡片 750×1230 同宽⇒卡片矮 91px）。改法＝按同高摆：两张都 380 高，宽各按比例 177 与 232，顶边 y=1091、底边 y=1471 同线。他给的第二个选项（下方写一段文字）因此不需要，留作他改口。",
+  "③ 数字改一排": "口号占了右列上半，四枚数字退到右列下半一排（细线分隔），带高 428；若仍用 2×2 会把带顶顶到手机上。",
+  "④ 右上角换码": "浅色块里的四色标识换成正宗小程序码 素材/品牌小程序码.png（344×344、四角透明、圆形点阵、码心就是那枚四色标识⇒标识没丢）；码 152px、浅色托底 176×200、右上内缩 76。这枚与最后一册「找到我们」页那枚同一份。",
+  "我加的一句（可否决）": "码下面「扫一扫打开」五个字——一枚没有说明的码在封面上容易被当成装饰。不要就撤。",
+  "尺子读数": "逐元素越界＝0；pageerrors＝0；DOM 几何 bar 1043-1471(h428)／strip 431×380／right 649×404／nums 121 高／social 65／foot 64；两张界面图 177×380 与 232×380；对比度：口号 15.51、数字行 15.91、圆标配文 15.36、页脚 15.73。",
+  "产物": [
+   "设计样张/封面方向5/A2改v2.png（1280×1600）",
+   "生成器＝设计样张/出封面方向稿5.py ＋ 渲封面方向5.mjs；上一版留在 设计样张/封面方向4/A2改.png 作回滚点"
+  ],
+  "landing 状态": "只出效果图：产品代码零行、册子 67 页一行没动。"
+ },
+ "cover_A2_revise_v3_v4_1026": {
+  "触发": "站长 10-26 第三轮三条：「看到XXXX，这个用界面上的文字图片。笔记卡片太大，不能比手机界面大。二维码要去白底。」",
+  "① 口号换界面位图": "正本＝miniprogram/assets/title-heading.png（500×246，LA 模式，透明底，含「看到好内容，／随手记下来。／Save what matters」三行；create.wxml 用 mode=widthFix 画它，白底由 docs/工具/出-标题字透明底.py 抠掉）。封面带子是深的，原图墨色近黑看不见，所以按它的 α 通道重出一枚亮墨版 素材/口号书法-亮墨.png（α 与原图逐像素一致，字形零改动，只换墨色）。位图自带英文行⇒原来那行排版英文撤掉，不重复。",
+  "② 卡片不许比手机大": "改成与首屏同宽 177、底边对齐：首屏 734×1588→177×381，卡片 750×1230→177×289，两张底边同在 y=1471。上一版按同高摆（卡片 232 宽）确实比手机宽 55px，是他这一条否掉的。",
+  "③ 二维码去白底→量出问题→换亮墨": "去白底后逐像素量：黑码点对墙面中位只有 2.38:1、最差 5% 处 1.81:1，纸上多数手机扫不出。按站长记忆里那句「色阶用反差」把墨色换成封面同一支亮墨（247,244,237），中位升到 6.42:1、最差 5% 2.08:1。平台事实已核官方文档：wxacode.getUnlimited 有 auto_color（默认 false）、line_color（默认 {r:0,g:0,b:0}）、is_hyaline（默认 false，true＝透明底）、width（默认 430px）⇒亮色＋透明底的小程序码是官方支持的形态。",
+  "亮墨版补的一刀": "整枚换色会把码心那枚四色标识和右下绿色徽标变成一坨同色亮圆⇒把这两块原样贴回（标识圆 101-259、徽标 236-315），α 只在这两处边缘动了 978 像素＝0.83%，点阵一个像素没动。",
+  "未证实的边界": "亮墨/反色码能不能被微信真扫出来，这台 Mac 验不了（要手机摄像头）。官方接口支持自定义线色，但文档没承诺反色可扫。上线前两选一：拿这枚亮墨码打印一张用他手机扫一次；或退回乙（圆形白底，中位 17.45:1）。",
+  "尺子口径修过两次（记下来防再犯）": "第一版按「比底压暗 15%」筛码点⇒抗锯齿中间灰混进来，圆白底那格读出假低 2.46；第二版按「全框最暗 15%」筛⇒把圆外的墙算进来（comp==ref，整格 1.0）。终版口径＝素材 α>128 且自身近黑（亮墨版改为整枚亮墨），并剔掉码心标识与右下徽标两块非点阵区。牙口验证＝甲(2.38) 与 乙(17.45) 只差一层白底，读数按物理方向拉开。",
+  "产物": [
+   "设计样张/封面方向7/A2改v4.png（1280×1600，最终建议版）",
+   "设计样张/封面方向7/二维码四种摆法.html（甲乙丙丁逐像素读数，自包含 310,472 B）",
+   "回滚点：封面方向6/A2改v3.png（黑码去白底那版）、封面方向5/A2改v2.png（同高摆那版）、封面方向4/A2改.png",
+   "生成器＝出封面方向稿6.py／7.py ＋ 渲封面方向6.mjs／7.mjs ＋ 出二维码摆法对比.py"
+  ],
+  "尺子读数（v4 整页）": "逐元素越界＝0；pageerrors＝0；两张界面图 177×381 与 177×289 底边同线；口号位图 560×276 右对齐、右缘 1204＝1280−76；带顶 y=1029，让开照片里那部手机（占到 984）45px。",
+  "landing 状态": "只出效果图：产品代码零行、册子 67 页一行没动。"
+ },
+ "cover_A2_revise_v5_1026": {
+  "触发": "站长 10-26 第四轮四条：「看到XXXX，要透明80%，缩小一点，留白。LOGO上移到SLOGAN下方，突出支持的LOGO，尺寸稍微放大一点。然后数字移到二维码下方，由上往下排列。背景的女人，靠左一点。」",
+  "① 口号": "书法位图从 560 宽缩到 470，opacity 设 .8——这一档不是目测，App 里 `app.wxss:1148 .brand-title{opacity:.8}` 就是这一枚在屏上的透明度，封面与界面同值。右对齐后左侧留白 234px。",
+  "② 平台圆标": "从深色带下方搬进带内、口号正下方（细线隔开），直径 44→58，六枚一行 438 宽。配文「卡片存成一张图，发这些地方」原样跟着搬，结果在 704 宽的列里被挤成两行断在「地／方」⇒ 收成「存成一张图，发这些地方」并加 white-space:nowrap。",
+  "③ 数字": "四枚搬到右上角小程序码正下方竖排（x 914..1204，y 300..769，块间细线）。这一片原本墙面最亮处会把说明字压到 4.46:1（差一点点），所以右侧加了一层横向纱，并把说明字从 #d5cfc3 抬到 #e6e1d7；现读数＝数字 6.29~7.92、说明 5.30~6.67，四块全过 4.5。",
+  "④ 人物左移": "background-position 横向 56%→72%。这把尺只有横向能动（照片按 cover 放大到 2400×1600，纵向正好占满，百分比在纵向没有余量）。实测位移＝发丝左边缘在 y=360/420/480/560 四行都是 421→242，即 179px，与映射算出来的 1120×(0.72−0.56)÷1.5625×1.5625＝179 一致。先用「暗点质心」量过一次，被右侧那层纱污染（暗点数 10319→19563，质心假报只移 50px），换成按特征边缘量才对。",
+  "那层纱返工一次": "第一版做成 top:0;height:820px，下沿一道硬切；改成通高 top:0;bottom:0 后在 x=1250／1268 两列纵向扫，最大跳变 0.011／0.006＝边没了。",
+  "亮墨码在新底上": "码点对底中位从 6.42 升到 9.21，最差 5% 1.58（那几点在点阵最外圈压到墙最亮处）。能不能被微信真扫出来仍未证实——要手机摄像头。",
+  "尺子读数": "逐元素越界＝0；pageerrors＝0；带顶 y=1121（照片里那部手机占到 984，让开 137px）；两张界面图 177×381 与 177×289 底边同线 y=1533；口号图 470×231 右缘 1204＝1280−76；圆标行 438×58。",
+  "产物": [
+   "设计样张/封面方向8/A2改v5.png（1280×1600，本轮最终建议版）",
+   "生成器＝设计样张/出封面方向稿8.py ＋ 渲封面方向8.mjs",
+   "回滚点：封面方向7/A2改v4.png（口号 560 宽、圆标在带下、数字横排、人物在 56%）"
+  ],
+  "landing 状态": "只出效果图：产品代码零行、册子 67 页一行没动。"
+ },
+ "cover_landed_v5_1027": {
+  "触发": "站长 10-27 一句「新的文档PDF什么时候渲染好」＝把 v5 落进册子并重出 PDF。",
+  "落点": "制作方向样张.py 的封面块整块重写：旧 brand_mark／phone_ui／cv-strip 那套撤下，换成 cv2-* 一组新类（满版照片＋三层纱＋左上字标＋右上亮墨小程序码＋其下四枚数字竖排＋底部深色带：两张真实渲染同宽 177 底对齐、书法口号位图 470 宽 opacity .8、六枚平台圆标 58）。照片 background-position 横向 72%（人物左移 179px）。",
+  "h1 留文字这一手": "口号视觉上是位图，但 add() 里那句 h1「看到好内容，\\n随手记下来。」留着、只用 clip-path 视觉隐藏——PDF 书签第 01 条与检索层都靠它，撤掉就搜不着这句话了。",
+  "顺手改掉的一句假话": "旧封面页脚写着「拍的是背景图尚未落到本机那一帧，所以首屏呈纸白」——现在封面用的那一帧首屏背景就是人物照片，不是纸白，那句从 10-25 起已是假话。新页脚改成：两帧均为真实渲染：首屏（开发者工具 iPhone 12/13 档）与本机代码画出的卡片；人物故事为虚构。长说明（书法位图与 App 同档 .8、卡片由本机代码画出）从页脚搬进这份留档。",
+  "页脚为什么短": "尺子要求封面里每张图底边离 footer 顶 ≥18px；页脚写两行就会把这条挤破（实测两行时 foot.top 降到 1523，封面图底 1517 就贴线了）。所以页脚锁一行。",
+  "新素材": [
+   "素材/口号书法-亮墨.png（正本 miniprogram/assets/title-heading.png 500×246，按 α 换亮墨，字形零改动）",
+   "素材/品牌小程序码-亮墨.png（点阵换亮墨；码心四色标识与右下徽标原样贴回，α 只在两处边缘动 978 像素＝0.83%）",
+   "素材/平台圆标/{微信,公众号,小红书,微博,知乎,抖音}-512.png（拷自 docs/design/分享图-10-19平台logo/圆标/）"
+  ],
+  "尺子读数（落地后现跑）": "结构尺子 PASS：67 页／77 项／231 条要点／77 条边界／11 套模板／图 52→60 张；minHeaderGap 18.72 不变、minFooterGap 38.22→31.17（封面页脚贴得更近，仍在闸内）；导航与章内跳转 true；390 视口 scrollWidth 390、正文 16px、单列。书签 67 条、一级 36、67 页可检索。跨通道对账 67 页 0 页超闸，分布 最小 1.06／中位 1.88／最大 3.28，第 1 页 2.73。封面新 CSS 里 box-shadow 命中 0（黑框那族的根）。",
+  "亲眼看的两通道": "PDF 自己吐的第 1 页（1344×1680）已逐眼看：无灰带、三层纱平滑、书法与圆标都在；390 手机档另拍一张，越界元素 0。",
+  "文件": [
+   "图麦笔记-旅行故事版.pdf＝39,688,042 B（上一版 37,364,478 B，涨在封面这几枚内嵌素材）",
+   "图麦笔记-旅行故事版.html＝50,360,534 B"
+  ],
+  "仍未证实": "亮墨小程序码能不能被微信真扫出来——要手机摄像头，这台机器验不了。册子里最后一枚（找到我们那页）仍是黑码浅底，那枚不受影响。"
+ }
+}

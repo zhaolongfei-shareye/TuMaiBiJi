@@ -1,0 +1,132 @@
+<!-- 私密密码那一层的标记在 templates/pwd-sheet.wxml（10-12 起三页共用一份，站长
+     「看笔记提示输入密码的框，跟设置密码的框风格不一致。要统一」）。
+     <import> 不渲染任何东西；漏了这一句，下面那枚 template 是静默不画的。 -->
+<import src="../../templates/pwd-sheet.wxml"/>
+<view class="container {{themeClass}}">
+  <view wx:if="{{loading}}" class="loading">{{t.loading}}</view>
+
+  <view wx:elif="{{note}}" class="detail-wrapper">
+    <!-- 抬头：v4 那条口径——详情页不要色彩方块，纯文字抬头。
+         10-07 补上右上那一格（v20 那一稿画了、一直没落地）：这篇留过卡片就是那张缩略图。
+         10-17 深夜两样跟着改（站长那两句，逐字在 docs/产品需求.md §8.297）：
+         ① 那格去白边去阴影、图撑满，盒子仍是 252×352 ⇒ 两页同一条件（`app.wxss` 的 `.ds-pad`）；
+         ② 没卡片时那一格整块不画、左列摊满，制作卡片的口挪到下面那枚「分享」（10-17 那版叫「分享笔记」）
+            ⇒ 这一页与详情窗**同一套结构**，`验-卡片那一格两页同源` 钉的就是这一条。 -->
+    <view class="card hero-flat">
+      <view class="dt-hero {{note.is_private || !detailCards.length ? 'solo' : ''}}">
+        <view class="dt-lt">
+          <view class="hero-meta"><text wx:if="{{note.catSeg}}" class="hero-cat {{note.is_private ? 'cat-priv' : ''}}">{{note.catSeg}}·</text><text class="hero-src">{{note.source_type_label}}</text><text class="hero-time">· {{note.created_at_label}}</text></view>
+          <view class="hero-title">{{note.title}}</view>
+          <view class="tags" wx:if="{{note.tags && note.tags.length}}">
+            <text class="tag" wx:for="{{note.tags}}" wx:for-item="tg" wx:key="*this">#{{tg}}</text>
+          </view>
+        </view>
+        <view class="ds-rt" wx:if="{{!note.is_private && detailCards.length}}">
+          <block>
+            <!-- 一篇一张，所以这一格没有 ‹ i/n ›：点它就是拉起这一张的大图（站长 10-03 23:40，
+                 10-17 深夜追那一句「小图拉起大图的动作还保留」） -->
+            <view class="ds-pad ds-entry" catchtap="onCardCell">
+              <image class="ds-pad-img" src="{{detailCards[0].p}}" mode="aspectFit" />
+            </view>
+          </block>
+        </view>
+      </view>
+    </view>
+
+    <!-- 操作条：两枚并排一行，全部钉在文档上方（站长 09-30："详情页所有功能都要在文档上方而不是下方"）。
+         原来「生成笔记卡片」和公开状态那两行落在长文末尾，得滚到底才看得见。
+         10-07：第三枚「生成笔记卡片」撤净——出卡片的入口只剩右上那一格，同一件事不留两个把手
+         （站长原话"生成后，不应该出现生成卡片的入口，很多余"；这条是 v20 那一稿早就拍了的口径）。
+         ⚠ 10-17 深夜这一枚以「分享笔记」的名字回来了（他原话在 §8.297）：那次撤的是**同一件事的两个把手**，
+         不是"这排不许有第三枚"。现在右上那一格只在留过卡片时才画，制作卡片的口只剩下面这一枚，
+         两件事各一个口，没有重复。
+         私密笔记那一格不出、公开状态那行也不给（与列表详情窗同一条口径）。
+         「置顶」那一枚 10-03 跟着列表一起撤了——列表已经不再显示置顶状态，按了只有一句话回应、
+         笔记却会一直顶在最前面且没法解开，那是个只进不出的门。 -->
+    <view class="action-bar">
+      <view class="icon-btn {{note.is_preset ? 'disabled' : ''}}" bindtap="onEdit">{{t.edit}}</view>
+      <!-- 中间这一枚与详情窗同一件事（站长 10-17 深夜「编辑和删除中间增加一按钮，分享笔记」）。
+           这一页没有画布，所以办事的口就是这一页原有的那一个 `onCardCell`：
+           这篇留过卡片 → 拉那一张的大图；一张都没有 → 去笔记卡片页出图。
+           私密篇置灰、理由写在这行下面，与详情窗同一套。 -->
+      <view class="icon-btn {{(note.is_private || note.is_preset) ? 'disabled' : ''}}" bindtap="onCardCell">{{t.shareNote}}</view>
+      <view class="icon-btn danger" bindtap="onDelete">{{t.delete}}</view>
+    </view>
+    <text wx:if="{{note.is_private}}" class="dt-no-share">{{t.privateNoShare}}</text>
+    <!-- 官方那一篇不能编辑也不能分享、但删得掉（站长 10-18）。这一行只在既不是私密、也没被私密那句
+         挡过的时候念，两条各占一格不叠加——上面那排三枚按钮等宽，字塞进按钮里会折行、整排高低不齐。 -->
+    <text wx:elif="{{note.is_preset}}" class="dt-no-share">{{t.presetHint}}</text>
+    <!-- 海报上的码不过期，所以这一行是用户唯一能把已公开内容收回来的入口；只在真的公开着时出现 -->
+    <view wx:if="{{shared && !note.is_private}}" class="share-state">
+      <text class="state-hint">{{t.sharedNow}}</text>
+      <text class="state-act" bindtap="onUnshare">{{t.unshare}}</text>
+    </view>
+
+    <!-- 配图（方案 §3.1.6）：横滑一排，点一下是 wx.previewImage 的全屏大图，左右划在这
+         一排里换。缩略图是定宽定高的方格 + aspectFill，所以不会被夹扁（站长那条"图片盒子
+         被夹扁"的坑：只定宽不定高时才需要 widthFix）。
+         这一排在 CLOUD_ENV 没填之前永远不渲染——loadImages 第一步就判 cloudReady，
+         连请求都不发（cloud:// 那个地址在没有 wx.cloud.init 过的环境里画不出来）。 -->
+    <view wx:if="{{noteImages.length}}" class="panel dt-shots-panel">
+      <text class="section-label">{{t.shotsLabel}}</text>
+      <scroll-view class="dt-shots" scroll-x>
+        <image wx:for="{{noteImages}}" wx:key="id"
+               class="dt-shot"
+               src="{{item.cloud_url}}" mode="aspectFill" lazy-load
+               bindtap="onPreviewImage" data-url="{{item.cloud_url}}"
+               binderror="onRemoteImgError" data-slot="detail-page" data-src="{{item.cloud_url}}" />
+      </scroll-view>
+    </view>
+    <!-- 那两句实话（原文一共几张、这次留下几张；有几张没存下来）。
+         落点写在面板**外面**：九张全没存上时那个面板压根不渲染，那句话恰恰最该出现的场合
+         要是被面板的 wx:if 圈在里面，就成了"越该说的时候越不说"。
+         没有这一句就是静默截断——库里 9 行看着像"这篇只有 9 张图"。 -->
+    <text wx:if="{{note.shots_note}}" class="dt-shots-note">{{note.shots_note}}</text>
+
+    <!-- 长文本一律回中性卡：方块只承担"这一条是什么"，不承担阅读 -->
+    <view wx:if="{{note.summary}}" class="panel">
+      <text class="section-label">{{t.summaryLabel}}</text>
+      <text class="summary-text">{{note.summary}}</text>
+    </view>
+
+    <view wx:if="{{note.key_points && note.key_points.length}}" class="panel" style="{{note.toneStyle}}">
+      <text class="section-label">{{t.keyPoints}}</text>
+      <view class="points-list">
+        <view class="point-item" wx:for="{{note.key_points}}" wx:key="index">
+          <text class="point-num">{{index + 1}}</text>
+          <text class="point-text">{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{note.source_url}}" class="panel">
+      <text class="section-label">{{t.sourceLink}}</text>
+      <text class="link-text" bindtap="openSourceUrl">{{note.source_url}}</text>
+    </view>
+
+    <view wx:if="{{note.original_content}}" class="panel">
+      <view class="original-header" bindtap="toggleOriginal">
+        <text class="section-label">{{t.originalContent}}</text>
+        <text class="expand-icon">{{showOriginal ? t.collapse : t.expand}}</text>
+      </view>
+      <scroll-view wx:if="{{showOriginal}}" class="original-scroll" scroll-y>
+        <text class="original-text">{{note.original_content}}</text>
+      </scroll-view>
+    </view>
+
+    <!-- 转存来源：这一栏由服务端钉在笔记上，编辑接口里没有它，界面上也没有任何改它的入口。
+         判据是**有没有作者名**而不是"快照在不在"：10-19 起那份快照里还可能只装四个贴图计数
+         （那篇没取到作者名、但图存下了），按"在不在"判就会画出一格「作者：—」的空来源。 -->
+    <view wx:if="{{note.imported_from.author_name}}" class="panel import-panel">
+      <text class="section-label">{{t.importedFromLabel}}</text>
+      <text class="import-line">{{t.authorLabel}}{{t.colon}}{{note.imported_from.author_name || '—'}}</text>
+      <text class="import-line">{{t.importedTitle}}{{t.colon}}{{note.imported_from.title_at_import || note.title}}</text>
+      <text class="import-line">{{t.importedAt}}{{t.colon}}{{note.imported_label}}</text>
+      <text class="import-hint">{{t.importedFromHint}}</text>
+    </view>
+  </view>
+
+  <!-- 私密密码那一层（与「我的」那一条链同一份标记、同一张皮）。
+       这一屏根节点没有 has-bg（详情页不铺形象图），所以它是实心卡那一态。 -->
+  <template is="pwdSheet" data="{{pwdOpen, pwdEntering, pwdName, pwdScene, pwdTip, pwdBuf, pwdFocus, t}}"/>
+</view>

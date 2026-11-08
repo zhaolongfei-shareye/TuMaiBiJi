@@ -1,0 +1,185 @@
+"""配置装载回归测试：`.env` 的查找路径，以及配置校验失败的外泄面。
+
+起因（2026-09-19 部署 AppSecret 修复时踩到）：在服务器 /home/ubuntu 下跑一个
+`import app.core.config` 的脚本，它读到了同机另一个项目的 `.env`；而 `extra` 默认 forbid
+的校验错误又把这些字段的原值打印了出来。这里钉的是四件事：路径钉死、多余字段忽略、
+校验失败不回显任何值、测试进程手里不能出现真凭据。
+
+    cd backend && .venv/bin/python -m pytest tests/test_config_env_file.py -v
+
+env 由 `conftest.py` 在本文件之前钉好，这里不再重复设。
+"""
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import conftest
+import pytest
+from pydantic import ValidationError
+
+from app.core.config import PROJECT_ROOT, Settings, _load_settings, settings
+
+DECOY_CORS = "DECOY-cors-8K2P"
+DECOY_DB = "sqlite:////tmp/DECOY-9M4Q.db"
+# 假密钥：一旦有哪个通道把字段原值带出去，这里就能抓到
+LEAK_SENTINEL = "DECOY-leak-sentinel-3T7X"
+SENTINEL_APP_SECRET = "SENTINEL-appsecret-4c9a"
+SENTINEL_DB_PASSWORD = "SENTINEL-dbpass-8h2k"
+JWT_PLACEHOLDER = "change-me-in-production-use-a-long-random-string"
+
+
+def _decoy_env(tmp_path: Path) -> Path:
+    env = tmp_path / ".env"
+    env.write_text(
+        f"CORS_ORIGINS={DECOY_CORS}\n"
+        f"DATABASE_URL={DECOY_DB}\n"
+        "JWT_SECRET_KEY=decoy-jwt-not-a-real-one\n"
+        f"OTHER_PROJECT_SIGNING_SECRET={LEAK_SENTINEL}\n",
+        encoding="utf-8",
+    )
+    return env
+
+
+def test_env_file_is_pinned_absolute_and_extra_is_ignore():
+    env_file = Settings.model_config["env_file"]
+    assert Path(env_file).is_absolute(), "env_file 写成相对路径时它按当前工作目录解析"
+    assert Path(env_file) == PROJECT_ROOT / ".env"
+    # PROJECT_ROOT 必须真的是 backend/，否则钉死的路径指向别处
+    assert (PROJECT_ROOT / "app" / "main.py").exists()
+    assert Settings.model_config.get("extra") == "ignore"
+    assert Settings.model_config.get("hide_input_in_errors") is True
+
+
+def test_stray_keys_do_not_raise_and_never_echo_their_values(tmp_path, monkeypatch):
+    env = _decoy_env(tmp_path)
+    for key in ("CORS_ORIGINS", "DATABASE_URL"):
+        monkeypatch.delenv(key, raising=False)
+    try:
+        loaded = Settings(_env_file=env)
+    except ValidationError as e:
+        pytest.fail(f"未知字段让配置加载失败了。若报错文本含字段值即密钥外泄：{LEAK_SENTINEL in str(e)}")
+    # 这条同时证明"测试真的在读 dotenv"，否则下面的用例会因为没读而假绿
+    assert loaded.CORS_ORIGINS == DECOY_CORS
+
+
+def test_current_directory_env_file_is_ignored(tmp_path, monkeypatch):
+    _decoy_env(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    # DATABASE_URL 这一栏**不许跟着删**（10-25 M1 那一刀留下的坑）：它现在没有可用的默认值，
+    # 干净检出（没有本地 `.env`）时删掉它会让 `Settings()` 先撞那道启动校验，这条用例就红在
+    # 一个和"cwd 那份 .env 读不读"无关的地方上。留一个非空值，判据仍然由 CORS_ORIGINS 扛。
+    monkeypatch.setenv("DATABASE_URL", "sqlite:////tmp/cwd-probe-not-the-decoy.db")
+    loaded = Settings()
+    assert loaded.CORS_ORIGINS != DECOY_CORS
+    assert loaded.DATABASE_URL != DECOY_DB
+
+
+def test_config_failure_message_carries_no_values_and_no_exception_link(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", JWT_PLACEHOLDER)
+    monkeypatch.setenv("WECHAT_APP_SECRET", SENTINEL_APP_SECRET)
+    monkeypatch.setenv("DATABASE_URL", f"postgresql://postgres:{SENTINEL_DB_PASSWORD}@db.internal:5432/wtsj")
+    with pytest.raises(RuntimeError) as excinfo:
+        _load_settings()
+    message = str(excinfo.value)
+    assert "JWT_SECRET_KEY" in message, "摘要里还得说清是哪个字段错的"
+    assert SENTINEL_APP_SECRET not in message
+    assert SENTINEL_DB_PASSWORD not in message
+    # pydantic 的 str() 会截断中间，但 errors() 里字段原值是完整的：异常对象本身不能留在链上
+    assert excinfo.value.__cause__ is None
+    assert excinfo.value.__context__ is None
+
+
+def test_startup_refuses_bad_config_without_printing_values(tmp_path):
+    """子进程走真实通道：CPython 自己打印 traceback，那才是终端和 journal 会留下的东西。"""
+    child_env = {k: v for k, v in os.environ.items() if not k.startswith(
+        ("DATABASE_", "WECHAT_", "JWT_", "HUNYUAN_", "EXTRACT_", "REDIS_", "CORS_"))}
+    child_env.update({
+        "DATABASE_URL": f"postgresql://postgres:{SENTINEL_DB_PASSWORD}@db.internal:5432/wtsj",
+        "WECHAT_APP_SECRET": SENTINEL_APP_SECRET,
+        "JWT_SECRET_KEY": JWT_PLACEHOLDER,
+        "PYTHONPATH": str(PROJECT_ROOT),
+    })
+    # cwd 故意不是项目目录：本轮事故就是跑错目录引起的
+    result = subprocess.run([sys.executable, "-c", "import app.core.config"],
+                            cwd=str(tmp_path), env=child_env,
+                            capture_output=True, text=True)
+    assert "ModuleNotFoundError" not in result.stderr, "子进程没找到包，这条测试就成了空跑"
+    assert result.returncode != 0, "配置坏了必须拒绝启动"
+    stderr = result.stderr
+    assert "配置校验未通过" in stderr
+    assert "ValidationError" not in stderr, "原始 pydantic 校验异常不应逃到调用方"
+    assert SENTINEL_DB_PASSWORD not in stderr
+    assert SENTINEL_APP_SECRET not in stderr
+
+
+def test_this_process_holds_only_disposable_config_values():
+    """`test_note_flows` 的夹具会 drop_all()，地址一旦被环境里的业务库污染就是在真库上删表。"""
+    assert settings.DATABASE_URL == conftest.TEST_DB
+    assert settings.JWT_SECRET_KEY == conftest.TEST_JWT
+    assert settings.EXTRACT_PROVIDER == conftest.TEST_EXTRACT_PROVIDER
+    assert settings.HUNYUAN_CF_KEY == conftest.PLACEHOLDER_CF_KEY
+    assert settings.WECHAT_APP_SECRET == conftest.FAKE_WECHAT_APP_SECRET
+    assert settings.WECHAT_APP_ID == conftest.FAKE_WECHAT_APP_ID
+
+
+# ---------------- DATABASE_URL 不许退到默认值（10-25 第八轮审计 M1）
+def test_database_url_没有可用的默认值():
+    """默认值那一栏**必须是空串**。
+
+    原来这里是 `sqlite:///./tmbj.db`：`.env` 少抄一栏时服务照样起、`/health` 照样 200，
+    只是连的是一只当场新建的空库——站长的第一反应是"笔记全丢了"，而真库一个字节都没动。
+    盘上那两只 0 字节的壳文件（现网 `app.db`、本机 `backend/tmbj.db`）就是这一族默认值活过的证据。
+    空串本身不是配置，它只是"让下面那条校验去说话"的那个值。
+    """
+    default = Settings.model_fields["DATABASE_URL"].default
+    assert default == "", f"DATABASE_URL 又长出默认值了：{default!r}——退到默认＝连上一只新建的空库"
+
+
+def test_database_url_空白一律拒起而话里不许带出别的值(monkeypatch):
+    """`mode="after"` 的整模型校验器出来的 `loc` 是**空的**（本仓 `_load_settings` 里那句
+    `or '(整体)'` 就是为它写的），所以这一条不许按 `loc == ("DATABASE_URL",)` 下尺子——
+    那样写会永远红，而红的原因跟代码对不对没关系。说的是哪一栏，只能看消息本身。
+    """
+    for bad in ("", "   ", "\t"):
+        monkeypatch.setenv("DATABASE_URL", bad)
+        with pytest.raises(ValidationError) as excinfo:
+            Settings()
+        msgs = "；".join(e["msg"] for e in excinfo.value.errors())
+        assert "DATABASE_URL" in msgs, f"拒起了却没说是哪一栏：{msgs}"
+        assert ".env" in msgs, f"报错没告诉人去哪儿改：{msgs}"
+        assert SENTINEL_DB_PASSWORD not in msgs and bad.strip() == ""
+
+
+def test_database_url_没走校验时另两栏照样拦得住(monkeypatch):
+    """反证上面那两条不是"随便填个非空就过"：非空但仍是公开占位符的 JWT 必须照样被拦。
+
+    这一族校验最容易悄悄变成只对新加的那一栏生效，而老那一栏（`JWT_SECRET_KEY`）没人再看。
+    """
+    monkeypatch.setenv("DATABASE_URL", "sqlite:////tmp/whatever-is-set-here.db")
+    monkeypatch.setenv("JWT_SECRET_KEY", JWT_PLACEHOLDER)
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_少了database_url_真起一个进程也拒绝启动(tmp_path):
+    """子进程走真实通道：这一条要证的正是"uvicorn 那一侧起不来"，而不是单元测试里的一个异常。
+
+    故意不删 `.env`：`env_file` 钉的是绝对路径，进程环境里那一栏空串会盖住文件里的值，
+    这样这一刀量的就是"哪天真去重写 .env 时漏了这一行"那一个形状。
+    """
+    child_env = {k: v for k, v in os.environ.items()
+                 if not k.startswith(("DATABASE_", "WECHAT_", "JWT_", "HUNYUAN_", "EXTRACT_", "REDIS_", "CORS_"))}
+    child_env.update({
+        "DATABASE_URL": "",
+        "JWT_SECRET_KEY": "child-proc-secret-not-a-real-one",
+        "PYTHONPATH": str(PROJECT_ROOT),
+    })
+    result = subprocess.run([sys.executable, "-c", "import app.core.config"],
+                            cwd=str(tmp_path), env=child_env, capture_output=True, text=True)
+    assert "ModuleNotFoundError" not in result.stderr, "子进程没找到包，这条测试就成了空跑"
+    assert result.returncode != 0, "少 DATABASE_URL 而服务照样起得来——那正是这条要挡的事"
+    assert "配置校验未通过" in result.stderr
+    assert "DATABASE_URL" in result.stderr, "拒起了却没说清是哪一栏"
+

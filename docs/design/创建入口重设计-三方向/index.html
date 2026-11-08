@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>创建入口重设计三方向</title>
+<style>
+* { box-sizing: border-box; margin: 0; }
+body { background: #1a1a1a; padding: 40px; font-family: -apple-system, "SF Pro Display", system-ui; }
+h1 { color: #fff; text-align: center; font-size: 24px; margin-bottom: 8px; }
+.subtitle { color: #999; text-align: center; font-size: 13px; margin-bottom: 40px; }
+.row { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.direction { text-align: center; }
+.direction h2 { color: #e0e0e0; font-size: 14px; margin-bottom: 4px; }
+.direction .desc { color: #888; font-size: 11px; max-width: 280px; margin-bottom: 12px; }
+.phone { width: 280px; height: 500px; border-radius: 32px; background: #000; padding: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.6); }
+.screen { width: 100%; height: 100%; border-radius: 26px; overflow: hidden; position: relative; background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 100%); }
+.screen .wallpaper { position: absolute; inset: 0; background: linear-gradient(135deg, #667eea33, #764ba233); }
+
+/* Direction A: 圆点 + 色浸 */
+.a-collapsed .bar { position: absolute; bottom: 50px; left: 12px; right: 12px; height: 52px; border-radius: 26px; background: rgba(242,239,233,0.92); display: flex; align-items: center; padding: 0 16px; backdrop-filter: blur(8px); }
+.a-collapsed .bar-label { flex: 1; font-size: 13px; font-weight: 600; color: #23252c; }
+.a-collapsed .dots { display: flex; gap: 10px; }
+.a-collapsed .dot { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.a-collapsed .dot-circle { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.a-collapsed .dot-circle svg { width: 14px; height: 14px; }
+.a-collapsed .dot-label { font-size: 8px; color: rgba(35,37,44,.7); font-weight: 600; }
+
+.a-expanded .bar { position: absolute; bottom: 50px; left: 12px; right: 12px; border-radius: 20px 20px 0 0; background: #E9723D; padding: 10px 16px 0; }
+.a-expanded .bar-tabs { display: flex; gap: 0; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.2); }
+.a-expanded .tab { flex: 1; text-align: center; font-size: 10px; font-weight: 700; color: rgba(255,255,255,.5); padding-bottom: 6px; }
+.a-expanded .tab.on { color: #fff; border-bottom: 2px solid #fff; margin-bottom: -1px; }
+.a-expanded .panel { position: absolute; bottom: 50px; left: 12px; right: 12px; height: 220px; background: rgba(233,114,61,0.06); border-radius: 0 0 20px 20px; padding: 16px; }
+.a-expanded .panel-body { background: #fff; border-radius: 12px; padding: 12px; height: 80px; margin-bottom: 10px; }
+.a-expanded .panel-btn { height: 32px; border-radius: 16px; background: #23252c; display: flex; align-items: center; justify-content: center; }
+.a-expanded .panel-btn span { font-size: 11px; color: #f2efe9; font-weight: 700; }
+
+/* Direction B: 大色胶囊 */
+.b-collapsed .strip { position: absolute; bottom: 50px; left: 12px; right: 12px; display: flex; gap: 6px; }
+.b-collapsed .chip { flex: 1; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.b-collapsed .chip svg { width: 14px; height: 14px; }
+.b-collapsed .chip span { font-size: 10px; font-weight: 700; color: #fff; }
+.b-collapsed .chip.c1 { background: #E9723D; }
+.b-collapsed .chip.c2 { background: #46A863; }
+.b-collapsed .chip.c3 { background: #3F52D6; }
+.b-collapsed .chip.c4 { background: #F6C445; }
+.b-collapsed .chip.c4 span { color: #2A2005; }
+
+.b-expanded .sheet { position: absolute; bottom: 50px; left: 12px; right: 12px; top: 160px; background: #fff; border-radius: 20px; display: flex; flex-direction: column; }
+.b-expanded .sheet-tabs { display: flex; gap: 4px; padding: 10px 10px 0; }
+.b-expanded .stab { height: 28px; border-radius: 14px; display: flex; align-items: center; justify-content: center; padding: 0 10px; gap: 3px; }
+.b-expanded .stab svg { width: 12px; height: 12px; }
+.b-expanded .stab span { font-size: 9px; font-weight: 700; }
+.b-expanded .stab.on { background: #E9723D; }
+.b-expanded .stab.on span { color: #fff; }
+.b-expanded .stab.off { background: rgba(35,37,44,.06); }
+.b-expanded .stab.off span { color: rgba(35,37,44,.5); }
+.b-expanded .sheet-body { flex: 1; padding: 16px; }
+.b-expanded .input-line { height: 36px; border-radius: 8px; background: rgba(35,37,44,.05); margin-bottom: 10px; }
+.b-expanded .action-btn { height: 36px; border-radius: 18px; background: #23252c; display: flex; align-items: center; justify-content: center; margin-top: 20px; }
+.b-expanded .action-btn span { font-size: 11px; color: #f2efe9; font-weight: 700; }
+
+/* Direction C: 大圆网格 */
+.c-collapsed .floating { position: absolute; bottom: 50px; left: 12px; right: 12px; height: 72px; background: rgba(255,255,255,0.88); border-radius: 22px; display: flex; align-items: center; justify-content: center; gap: 14px; backdrop-filter: blur(12px); box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+.c-collapsed .action { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.c-collapsed .action-circle { width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.c-collapsed .action-circle svg { width: 16px; height: 16px; }
+.c-collapsed .action-label { font-size: 9px; font-weight: 600; color: rgba(35,37,44,.72); }
+
+.c-expanded { position: absolute; bottom: 50px; left: 12px; right: 12px; top: 140px; display: flex; flex-direction: column; }
+.c-expanded .header { background: rgba(255,255,255,0.88); border-radius: 22px 22px 0 0; padding: 14px; display: flex; gap: 12px; justify-content: center; align-items: flex-start; backdrop-filter: blur(12px); }
+.c-expanded .h-action { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.c-expanded .h-circle { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; transition: transform .2s; }
+.c-expanded .h-circle.sel { transform: scale(1.2); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.c-expanded .h-circle svg { width: 14px; height: 14px; }
+.c-expanded .h-label { font-size: 8px; font-weight: 600; color: rgba(35,37,44,.6); }
+.c-expanded .h-label.sel { color: #23252c; }
+.c-expanded .body { flex: 1; background: rgba(255,255,255,0.92); border-radius: 0 0 22px 22px; padding: 20px; backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,.1); }
+.c-expanded .body-input { height: 36px; border-radius: 10px; background: rgba(35,37,44,.05); margin-bottom: 12px; }
+.c-expanded .body-btn { height: 36px; border-radius: 18px; background: #23252c; display: flex; align-items: center; justify-content: center; margin-top: auto; }
+.c-expanded .body-btn span { font-size: 11px; color: #f2efe9; font-weight: 700; }
+
+.note { color: #666; font-size: 10px; text-align: center; max-width: 280px; margin: 8px auto 0; }
+</style></head><body>
+<h1>创建入口重设计 · 三方向</h1>
+<p class="subtitle">每列上方 = 收起态（首页那一条） · 下方 = 展开态（点进去那屏） · 示意非终稿</p>
+
+<!-- Direction A -->
+<div class="row">
+  <div class="direction">
+    <h2>A · 圆点胶囊 + 色浸面板</h2>
+    <p class="desc">收起：胶囊里三枚大圆各带两字标签。展开：选中那枚颜色"浸"满面板顶部并渐淡到白底。参考 iOS 26 action circles。</p>
+    <div class="phone"><div class="screen"><div class="wallpaper"></div>
+      <div class="a-collapsed">
+        <div class="bar">
+          <div class="bar-label">记一笔</div>
+          <div class="dots">
+            <div class="dot"><div class="dot-circle" style="background:#E9723D"><svg viewBox="0 0 24 24" fill="none" stroke="#2C1204" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></div><span class="dot-label">拍</span></div>
+            <div class="dot"><div class="dot-circle" style="background:#46A863"><svg viewBox="0 0 24 24" fill="none" stroke="#06260F" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><span class="dot-label">图</span></div>
+            <div class="dot"><div class="dot-circle" style="background:#3F52D6"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></div><span class="dot-label">链</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="phone" style="margin-top: 12px;"><div class="screen"><div class="wallpaper"></div>
+      <div class="a-expanded">
+        <div class="bar"><div class="bar-tabs"><div class="tab on">拍</div><div class="tab">图</div><div class="tab">链</div><div class="tab">写</div></div></div>
+        <div class="panel" style="top: 230px;"><div class="panel-body"></div><div class="panel-btn"><span>开始提炼</span></div></div>
+      </div>
+    </div></div>
+    <p class="note">色彩从选中那枚圆渗透到整个面板顶，收起/展开是一件事的两态</p>
+  </div>
+
+  <!-- Direction B -->
+  <div class="direction">
+    <h2>B · 四枚色胶囊横排</h2>
+    <p class="desc">取消单条胶囊概念，直接铺四枚高饱和色块（拍/图/链/写），每枚自带图标+文字。展开后选中那枚变成面板顶部色条。参考 Things 3 / Raycast。</p>
+    <div class="phone"><div class="screen"><div class="wallpaper"></div>
+      <div class="b-collapsed">
+        <div class="strip">
+          <div class="chip c1"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg><span>拍</span></div>
+          <div class="chip c2"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>图</span></div>
+          <div class="chip c3"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg><span>链</span></div>
+          <div class="chip c4"><svg viewBox="0 0 24 24" fill="none" stroke="#2A2005" stroke-width="2.5" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span>写</span></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="phone" style="margin-top: 12px;"><div class="screen"><div class="wallpaper"></div>
+      <div class="b-expanded">
+        <div class="sheet">
+          <div class="sheet-tabs">
+            <div class="stab on"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg><span>拍照</span></div>
+            <div class="stab off"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(35,37,44,.5)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>图</span></div>
+            <div class="stab off"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(35,37,44,.5)" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg><span>链</span></div>
+            <div class="stab off"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(35,37,44,.5)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span>写</span></div>
+          </div>
+          <div class="sheet-body">
+            <div class="input-line"></div>
+            <div class="input-line" style="height: 60px;"></div>
+            <div class="action-btn"><span>开始提炼</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <p class="note">四枚色块即四个入口，一眼看清；展开后同色药丸高亮、其余变灰</p>
+  </div>
+
+  <!-- Direction C -->
+  <div class="direction">
+    <h2>C · 圆角方块组 + 毛玻璃</h2>
+    <p class="desc">取消胶囊概念，4 枚 12px 圆角方块（squircle）配极短标签。展开后选中那枚微放大，面板用白色高透明度浮层（类似 iOS 26 玻璃质感）。参考 iOS 26 / Arc。</p>
+    <div class="phone"><div class="screen"><div class="wallpaper"></div>
+      <div class="c-collapsed">
+        <div class="floating">
+          <div class="action"><div class="action-circle" style="background:#E9723D"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></div><span class="action-label">拍</span></div>
+          <div class="action"><div class="action-circle" style="background:#46A863"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><span class="action-label">图</span></div>
+          <div class="action"><div class="action-circle" style="background:#3F52D6"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></div><span class="action-label">链</span></div>
+          <div class="action"><div class="action-circle" style="background:#F6C445"><svg viewBox="0 0 24 24" fill="none" stroke="#2A2005" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div><span class="action-label">写</span></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="phone" style="margin-top: 12px;"><div class="screen"><div class="wallpaper"></div>
+      <div class="c-expanded">
+        <div class="header">
+          <div class="h-action"><div class="h-circle sel" style="background:#E9723D"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></div><span class="h-label sel">拍</span></div>
+          <div class="h-action"><div class="h-circle" style="background:#46A863"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><span class="h-label">图</span></div>
+          <div class="h-action"><div class="h-circle" style="background:#3F52D6"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></div><span class="h-label">链</span></div>
+          <div class="h-action"><div class="h-circle" style="background:#F6C445"><svg viewBox="0 0 24 24" fill="none" stroke="#2A2005" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div><span class="h-label">写</span></div>
+        </div>
+        <div class="body">
+          <div class="body-input"></div>
+          <div class="body-input" style="height: 60px;"></div>
+          <div class="body-btn"><span>开始提炼</span></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="note">圆角方块比纯圆更"苹果感"；展开时选中那枚微放大 + 毛玻璃面板</p>
+  </div>
+</div>
+
+<p class="note" style="color:#555; font-size: 11px; max-width: 800px; margin: 0 auto;">三方向均使用现有色板 TONES（芥末黄/宝蓝/橙/草绿），不新增色。关键差异在：收起态的形态（胶囊 vs 横排 vs 方块组）和展开态与横条的关联方式（色浸 vs 同色药丸 vs 微放大）。</p>
+</body></html>

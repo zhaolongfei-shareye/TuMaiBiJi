@@ -1,0 +1,383 @@
+"""卡片留档：一张笔记当前那一张卡片的登记、读回、与删除连带（2.0.1 P0 · S1）。
+
+这一组接口只做一件事——**把"这篇有没有卡片"从"这台手机上那个文件在不在"里救出来**。
+成因与实测量：`docs/方案-卡片留档上服务端.md` §一、PRD §8.148。图片字节不经过这台服务器
+（前端画完直接传云开发，拿到 fileID 再来这里登记一行），所以这里没有上传口，只有账——
+与 `routes/assets.py` 那条同型。
+
+四条口径先讲明白，它们都是"不写下来下一个人一定改错"的那种：
+
+1. **一篇只留一张**：写口是幂等的 upsert——新的进来，旧的 `is_current` 置 0 留档不删。
+   库上还压了一道部分唯一索引（`ux_note_cards_one_current_per_note`），两个请求同时写也只有一行当前。
+   历史行留着不是为了"翻旧卡片"（界面没有这个入口），是为了撤回/回滚时那句"旧值必须一直读得懂"。
+2. **`tpl` 不许在服务端卡白名单**。卡片模板走的是"不走发版"那条线（`docs/方案-卡片模板不走发版.md`），
+   下发多一套 id，界面上就多一格；服务端要是抄一份名单，就得跟着每次新模板发一次后端，
+   那条承诺当场作废。所以这里只校形状（长度、不许带空白），语义交给客户端那份闭集解释器。
+3. **`origin` 是给用户看的那句话的数据来源**，四个取值各有各的话术（见 models/note_card.py）。
+   写错一档等于悄悄把一张他没见过的图当成"你原来的那张"——这条是整张表里最容易伤到用户的一栏。
+4. **fileID 是别人能读的地址**：入口校格式与长度，读口校归属，与 assets 那条一字不差同口径。
+"""
+import logging
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from app.api.routes.assets import (
+    MAX_FILE_ID_LEN,
+    _assert_ours,
+    _clean_file_id,
+    _owned_note_or_404,
+)
+from app.core.auth import get_current_user
+from app.services.preset_note import PRESET_CARD_MSG, is_help_doc
+from app.core.private_access import is_private_note, private_category_ids, unlocked
+from app.core.rate_limit import limiter
+from app.core.timefmt import UTCDatetime
+from app.db.database import get_db
+from app.models.note import Note
+from app.models.note_card import CARD_ORIGINS, NoteCard, current
+from app.models.share import Share
+from app.models.user import User
+
+router = APIRouter()  # 路径写全（跨 /api/notes 与 /api/user 两个前缀），同 assets.py 那条
+logger = logging.getLogger(__name__)
+
+# NoteCard.object_key 是 String(500)，但 SQLite 上那只是装饰——长度只能在入口卡。
+# 那个数与那条校法现在只有一个出处：`assets.py` 的 `MAX_FILE_ID_LEN` / `_clean_file_id`。
+MAX_TPL_LEN = 50
+# 写口的 size 拦的是"这不像一张卡片"，不是配额：上界取**云开发单文件上限 20MB**（与
+# assets 那条同值同理由）。⚠ 故意**不拿"一张卡片大概多少字节"当拒收线**——拿一个估算数
+# 当闸门，症状会是真用户的卡片存不上。配额是另一件事：它 SUM 的是每一行登记自带的真实
+# `file_size`（`assets._sum_bytes`，10-09 审计换的口径）。两个数不许混成一个。
+MAX_CARD_UPLOAD_BYTES = 20 * 1024 * 1024
+
+
+class CardIn(BaseModel):
+    file_id: str = Field(min_length=1, max_length=MAX_FILE_ID_LEN)
+    tpl: str = Field(min_length=1, max_length=MAX_TPL_LEN)
+    no_qr: bool = False
+    size: Optional[int] = Field(default=None, ge=0, le=MAX_CARD_UPLOAD_BYTES)
+    width: Optional[int] = Field(default=None, ge=0, le=20000)
+    height: Optional[int] = Field(default=None, ge=0, le=20000)
+    # 默认 live（用户当场生成的那一趟）。补传/重渲那几档由 S3 的修复趟显式带过来，
+    # 不许它们靠默认值混成"用户刚生成的"——那会在界面上说出假话。
+    origin: str = Field(default="live", min_length=1, max_length=24)
+
+
+class CardOut(BaseModel):
+    id: int
+    note_id: int
+    cloud_url: str
+    tpl: str
+    no_qr: bool
+    size: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    origin: str
+    created_at: UTCDatetime = None
+    # 这一趟被顶成历史的那几条地址。交回给调用方去删，理由与 `file_ids` 那两个口同一条：
+    # **对象只有客户端删得动**（这台后端没有云开发凭据）。不交的话，"同一篇换了一套模板重出"
+    # 那一条路上旧的那张图就在云上永久留着，谁都不认得它——离线时那道"一篇一张"的闸失效
+    # （share.js:75 明写"读不到就当没有，让他生成"）走的正是这一条。
+    replaced_file_ids: List[str] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+
+class CardReadOut(BaseModel):
+    """读一篇。`had_share` 是给"待确认档"用的：这篇公开过、但服务器没有它的卡片行。
+
+    这一栏必须在**同一个口**里回：分两个请求就会出现"界面先画了空白格、再去问有没有公开过"
+    那种中间态，而那正好是我们要消灭的症状长出来的地方。
+    """
+    card: Optional[CardOut] = None
+    had_share: bool = False
+
+
+class CardSnapshot(BaseModel):
+    """补卡那一趟的第二份输入：这篇**当年分享出去那一份**的文字快照。
+
+    为什么必须由服务端给、客户端自己去读笔记当前内容不行：`shares` 存的是建分享那刻的快照，
+    笔记后来被改过也不动它（§二 那条决定）。按快照重渲出来的才是"当年那张"，按当前内容渲出来的是
+    "现在这张"——后者发生在用户改过标题之后，界面上却说"补回你原来那张"，那是假话。
+    撤掉的分享同样要给：`GET /api/shares/{token}` 对关了的那张回 404，客户端拿不到，
+    而那篇当年确实出过一张卡。`active` 只是如实回那一行的状态，不影响给不给。
+    """
+    note_id: int
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    # 这三栏是 JSON 列，形状由上游那一份决定，**这里不重钉一遍**：现网的 `key_links` 一行是
+    # `[{"text": "…", "url": "…"}]`，钉成 List[str] 的用例照样全绿（喂的是自己编的字符串数组），
+    # 而线上第一条读取就炸成 500——2026-10-08 这次部署就是这么红的，探针抓的。
+    # 类型与 shares.py:ShareResponse 一字相同（`list | None`）：同一份数据不许有两个说法。
+    tags: Optional[list] = None
+    key_points: Optional[list] = None
+    key_links: Optional[list] = None
+    source_url: Optional[str] = None
+    author_name: Optional[str] = None
+    active: bool = False
+
+
+class CardsListOut(BaseModel):
+    cards: List[CardOut] = Field(default_factory=list)
+    need_confirm: List[int] = Field(default_factory=list)
+    snapshots: List[CardSnapshot] = Field(default_factory=list)
+
+
+class CardDropOut(BaseModel):
+    """撤掉那一格的回体。键名钉死是 `file_ids`——与 `delete_note`、`deactivate` 同一个键，
+    客户端 `cloudUpload.dropFromDeleteRes` 只读这一个（多一个键就是那一份永远没人删）。"""
+    file_ids: List[str] = Field(default_factory=list)
+
+
+def _views(rows) -> List[dict]:
+    out = []
+    for r in rows:
+        out.append({
+            "id": r.id,
+            "note_id": r.note_id,
+            # 字段名与 AssetOut 那边保持一致（客户端读的是 cloud_url，别在这儿换成 object_key）
+            "cloud_url": r.object_key,
+            "tpl": r.tpl,
+            "no_qr": bool(r.no_qr),
+            "size": r.file_size,
+            "width": r.width,
+            "height": r.height,
+            "origin": r.origin,
+            "created_at": r.created_at,
+        })
+    return out
+
+
+@router.post("/api/notes/{note_id}/card", response_model=CardOut)
+@limiter.limit("60/minute")
+def put_note_card(
+    request: Request,
+    note_id: int,
+    payload: CardIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """登记这篇笔记当前那张卡片。**幂等 upsert**：旧的转历史，新的成为当前。
+
+    限流这一道原来没有（10-09 审计）：这一口写的是库，个人主体的小程序没有第二个人会打到它，
+    但它同时是"把别人的地址挂到自己名下"那条路的入口，脚本化的尝试不该白打。
+    60/分钟是照着"回前台一次把存量卡片整批补登记"那个最宽的合法场景给的，不是照人手速给的。
+    """
+    note = _owned_note_or_404(db, user, note_id)
+    # 私密笔记不登记卡片（站长 2026-10-12：「设了密码的笔记是不能生成卡片的」）。
+    # 界面上那一格对私密篇整个不渲染（pages/index/index.js 的 onCardTap／_openPosterFor），
+    # 可接口原本是照收的——与 shares.py 那条「私密笔记不能分享」同一个形状：承诺要卡在服务端。
+    # 不卡的后果不是"看见别人的东西"，是**这篇的标题＋概要＋要点被压成一张留档卡片**，
+    # 而这张卡片会跟着 `GET /api/user/cards` 回到任何一台登录设备上。
+    if is_private_note(note, private_category_ids(db, user.id)):
+        raise HTTPException(status_code=400, detail="私密笔记不能生成卡片")
+    # 官方那一篇不生成卡片（站长 10-18「不能分享」那一句里点的其中一条：这一类从这一屏撤掉）。
+    # 与上面那条私密闸同一个形状——界面上那一枚不渲染，接口不挡就等于没挡。
+    if is_help_doc(note):
+        raise HTTPException(status_code=400, detail=PRESET_CARD_MSG)
+    if payload.origin not in CARD_ORIGINS:
+        raise HTTPException(status_code=400, detail="卡片来源不认得")
+    if any(c.isspace() for c in payload.tpl.strip()) or not payload.tpl.strip():
+        raise HTTPException(status_code=400, detail="模板名不对")
+    fid = _clean_file_id(payload.file_id)
+    uid = str(user.id)
+    # 归属这一刀原来只有配图与名片两个口有，卡片这个口漏了（10-09 审计第五条）。漏的后果不是
+    # "看见别人的图"，是**别人的对象会被这台客户端删掉**：撤档与删笔记的回体把 file_ids 交回调用方。
+    _assert_ours(db, uid, fid)
+
+    # 先查是不是"同一张卡片再登记一次"（重传、补传重跑都算）：那就不该留一条历史，
+    # 否则补传跑两遍就攒出两行同址的记录，读回来靠顺序决胜——那是不确定行为。
+    same = (
+        db.query(NoteCard)
+        .filter(NoteCard.note_id == note_id, NoteCard.user_id == uid, current())
+        .all()
+    )
+    if len(same) == 1 and same[0].object_key == fid:
+        row = same[0]
+        row.tpl = payload.tpl.strip()
+        row.no_qr = payload.no_qr
+        row.file_size = payload.size if payload.size is not None else row.file_size
+        row.width = payload.width if payload.width is not None else row.width
+        row.height = payload.height if payload.height is not None else row.height
+        row.origin = payload.origin
+        db.commit()
+        db.refresh(row)
+        return _views([row])[0]
+
+    demoted = [o.object_key for o in same if o.object_key != fid]
+    for old in same:
+        old.is_current = False
+    row = NoteCard(
+        user_id=uid,
+        note_id=note_id,
+        object_key=fid,
+        tpl=payload.tpl.strip(),
+        no_qr=payload.no_qr,
+        file_size=payload.size,
+        width=payload.width,
+        height=payload.height,
+        origin=payload.origin,
+        is_current=True,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    out = _views([row])[0]
+    out["replaced_file_ids"] = demoted
+    return out
+
+
+@router.get("/api/notes/{note_id}/card", response_model=CardReadOut)
+def read_note_card(
+    request: Request,
+    note_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    note = _owned_note_or_404(db, user, note_id)
+    had_share = (
+        db.query(Share.id)
+        .filter(Share.note_id == note_id, Share.user_id == str(user.id))
+        .first()
+        is not None
+    )
+    # 卡片图就是一篇正文的副本，所以私密篇没验密码时回"这一篇没有卡片"（形状与真的没有
+    # 时一致，不新增失败态）。写口对私密篇本来就是 400，所以这里不会诱导出一次失败的生成。
+    if is_private_note(note, private_category_ids(db, user.id)) and not unlocked(request, user):
+        return {"card": None, "had_share": had_share}
+    # 多条当前行在今天不可能存在（索引挡着），但读的时候按最新的取，别用 .one()：
+    # 一处 .one() 崩掉的症状是整篇详情页 500，而那正好是用户最不该看到的东西。
+    row = (
+        db.query(NoteCard)
+        .filter(NoteCard.note_id == note_id, NoteCard.user_id == str(user.id), current())
+        .order_by(NoteCard.id.desc())
+        .first()
+    )
+    return {"card": _views([row])[0] if row else None, "had_share": had_share}
+
+
+@router.delete("/api/notes/{note_id}/card", response_model=CardDropOut)
+def drop_note_card(
+    note_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """撤掉这篇的卡片留档：行删掉，对象回给客户端删（后端没有云开发凭据）。
+
+    为什么必须有这一个口：界面上「删除」那一枚（首页成品弹窗底排）说的本来就是"这篇不该再有
+    卡片"。S2 把"有没有卡片"的权威从本机文件挪到服务器这一行之后，只删本机那个 jpg 不删这一行，
+    症状就是**那一格删不掉**——本机账清了，下次进详情页又从云上读回来画上去。
+
+    历史行（`is_current=0`）一起删：那些对象在这一趟一并从云上清掉，留一行指向已经不存在的
+    地址就是 `assets` 那条说过的"幽灵行"——算进配额却什么都读不出来。
+    """
+    # 撤掉那道闸之后这一句只剩"这篇是不是你的"那一层校验（返回值没人读了）：
+    # 别人名下的 note_id 仍然要 404，不能因为不判来源就省掉。
+    _owned_note_or_404(db, user, note_id)
+    # （10-14 那道「自带的卡片撤不掉」的闸随站长 10-18 那一句「允许删除」一起撤了；
+    #   这一类现在根本登记不出卡片——闸在上面那个 POST 口，所以这里没有残留状态要挡。）
+    rows = (
+        db.query(NoteCard)
+        .filter(NoteCard.note_id == note_id, NoteCard.user_id == str(user.id))
+        .all()
+    )
+    # 去重但保序：同一篇的历史行与当前行**可以指向同一个 fileID**（登记 A → 换 B → 又换回 A，
+    # 库里就是 A 历史 / B 历史 / A 当前三行）。递 `fileList: [A, A]` 给 wx.cloud.deleteFile，
+    # 第二次的 status 不是 0，`cloudUpload.deleteFiles` 就把 A 记成"没删成的那条"落进待删队列，
+    # 从此每次回前台都替一个已经不存在的对象重打一遍删除。
+    ids = list(dict.fromkeys(r.object_key for r in rows))
+    for r in rows:
+        db.delete(r)
+    db.commit()
+    return {"file_ids": ids}
+
+
+@router.get("/api/user/cards", response_model=CardsListOut)
+def list_cards(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """列表页一次拿全（判据在服务器，不在这台手机的文件目录）。
+
+    `need_confirm` 是"待确认档"的候选：这篇有分享记录、但服务器没有它的当前卡片行。
+    **服务端只能给到"该有一张"，给不到当年用的是哪套模板**——那一栏只在用户自己手机的
+    `cardLog` 里，而那个台账不能当准（S0 现读到里面混着尺子写的假条目）。
+    所以这里回 id 名单，具体是"补传"还是"重渲"还是"请你重出"由客户端那趟分档判（S3）。
+    """
+    uid = str(user.id)
+    rows = (
+        db.query(NoteCard)
+        .filter(NoteCard.user_id == uid, current())
+        .order_by(NoteCard.id.asc())
+        .all()
+    )
+    have = {r.note_id for r in rows}
+    shared = [
+        r[0]
+        for r in db.query(Share.note_id).filter(Share.user_id == uid).distinct().all()
+    ]
+    # 只报还真实存在的笔记：撤过分享、笔记已删的那些不该在界面上冒出一句"待确认"。
+    alive = set()
+    if shared:
+        alive = {
+            n.id
+            for n in db.query(Note).filter(Note.user_id == uid, Note.id.in_(shared)).all()
+        }
+    need = sorted({nid for nid in alive if nid not in have})
+    # 这一趟没带解锁凭证时，私密篇的两样东西都不给：卡片行（图上印着标题＋摘要＋要点，
+    # 那就是一篇正文的副本）和当年那份分享快照（summary/key_points 是明文栏）。
+    # "该有几张卡"的账（have/need）仍按全量算，只有**回体**里把私密篇那几行裁掉；
+    # need_confirm 也跟着裁，是因为私密篇本来就登记不出卡片（写口那道闸），留着只会
+    # 让界面提示他去补一张补不出来的卡。
+    priv = private_category_ids(db, user.id)
+    hidden = set()
+    if priv and not unlocked(request, user):
+        locked_note_ids = {
+            n.id
+            for n in db.query(Note).filter(
+                Note.user_id == uid, Note.category_id.in_(priv)
+            ).all()
+        }
+        rows = [r for r in rows if r.note_id not in locked_note_ids]
+        hidden = locked_note_ids
+    shown_need = [nid for nid in need if nid not in hidden]
+    return {"cards": _views(rows), "need_confirm": shown_need, "snapshots": _snapshots(db, uid, shown_need)}
+
+
+def _snapshots(db: Session, uid: str, note_ids: List[int]) -> List[dict]:
+    """给补卡那一趟按篇配一份当年分享的快照。没有分享记录的不在 `note_ids` 里，客户端自己回退读笔记当前内容。
+
+    一篇可能有好几行分享（撤过又开、换码重来）：取**最新那一行**（id 最大），因为最后一次建分享
+    才是"那张卡片当初印出去的内容"——取最早那行会渲出一张他早就改过的旧版本。
+    """
+    if not note_ids:
+        return []
+    rows = (
+        db.query(Share)
+        .filter(Share.user_id == uid, Share.note_id.in_(note_ids))
+        .order_by(Share.id.asc())
+        .all()
+    )
+    latest = {}
+    for s in rows:
+        latest[s.note_id] = s
+    return [
+        {
+            "note_id": s.note_id,
+            "title": s.title,
+            "summary": s.summary,
+            "tags": s.tags,
+            "key_points": s.key_points,
+            "key_links": s.key_links,
+            "source_url": s.source_url,
+            "author_name": s.author_name,
+            "active": bool(s.is_active),
+        }
+        for nid in note_ids
+        for s in ([latest[nid]] if nid in latest else [])
+    ]

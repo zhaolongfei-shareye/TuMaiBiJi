@@ -1,0 +1,484 @@
+<!-- `--cp-*` 这一整套变量改挂在容器上（原来挂在 `.panel` 那一枚元素上）：
+     首屏那枚圆形 ➕ 要吃的 `--cp-cam`／`--cp-cam-ink` 与第二屏快门是同一支（站长 10-13 原话
+     「带+号的按钮颜色与第二屏拍照按钮颜色一致」），而它在 `.panel` 外面，拿不到那一层的作用域。
+     `createSkin()` 发的全是变量声明、没有一条直接生效的属性，挂到根上不会把别处的皮带下来。
+     ⚠ 10-16 真跑量出来的一根刺：`skinPanel` 那串**末尾没有分号**，所以 `--kb` 拼在它后面会被
+     粘成上一条变量的值（`--cp-extract-ink:#FFFFFF --kb:229px` 是一条声明，不是两条），
+     变量根本没定义、位移恒 0。`--kb` 必须拼在前面，自己的分号自己带。 -->
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}} {{bgLightTitle ? 'bg-light-title' : ''}} {{bgLightSwap ? 'bg-light-swap' : ''}} {{bgLightOut ? 'bg-light-out' : ''}} {{active ? 'entry-dock' : ''}} {{panelOpen ? 'dock-open' : ''}} {{kbLift ? 'kb-up' : ''}}" style="{{kbLift ? '--kb:' + kbLift + 'px;' : ''}}{{skinPanel}}" bindtap="collapse">
+  <!-- 首页背景。图就是「我的 → 卡片模板」最上面那张形象图，没设过就用包里这张站长人像。
+       必须用 <image> 组件而不是 wxss 的 background-image：后者不认小程序包里的
+       本地文件（只认 base64 和网络地址），而这张 89KB 的图转 base64 会把主包撑坏。
+       两个都 fixed，跟着视口不跟着滚；点它们等于点容器空白处，照样收条。 -->
+  <image wx:if="{{bgSrc}}" class="page-bg" src="{{bgSrc}}" mode="aspectFill" />
+  <!-- 「调亮度」那一枚点拧的就是这一层的透明度：dimScrim 空串＝全铺（最沉那一档，
+       也就是这半年一直在跑的样子），opacity:0＝一点不压（＝原图亮度，站长拿原图对过才认的）。
+       不再另叠第二层黑——上一版那么做，"纯白"档实测只有原图亮度的 62%，压暗的其实一直是这层罩子。 -->
+  <view wx:if="{{bgSrc}}" class="page-scrim" style="{{dimScrim}}"></view>
+  <!-- 2.2 B 方案那一层深色面板（站长 10-12 原话「在目前背景与框框直接加一层深色面板，面板左上和右上
+       有圆角」＋「只是多了外面一层深色面板，深色面板上部要做渐变半透明毛玻璃，类似"我的"效果」）。
+       通栏（左右 0、贴到屏底）不是半屏：第一版我把它画成右侧一块，左下角露着原图，被他整张打回
+       （「错误，为什么左下角没有背景，参考图是完整的深色面板」）。
+       顶：**两屏同一根线**（10-14 站长「第二屏，高度不准，要和第一屏一致」）。这一层的顶＝内框的顶
+       往上 24，而两屏的内框同高（372）同底线（离底栏 152）⇒ 点 ➕ 那一下这一层一动不动。
+       展开那一档（内框 490）它跟着那张卡一起往上长（`.container.dock-open .stage-panel`）。
+       这里换过三版，账写在 `docs/方案-2.2大版本.md` §9.12／§9.17：107（效果图那一版）→
+       首屏 24、第二屏钉 749（D16 甲，为了让框外那一行整行坐在墨面上）→ 今天那一行只剩「返回」
+       并且抬到墨面之上，749 那 107 的预留成了死墨 ⇒ 并成一根。
+       ⚠ 这一层**不吃 `bgSrc`**：面板是这一屏的底板，不铺形象图那一态照旧在（否则同一屏要养两套布局）。
+       这一条他没拍过，我按「只是多一层」的字面落的；要只在铺图时才有，说一声，闸挂在 `.has-bg` 上就行。 -->
+  <view class="stage-panel"></view>
+
+  <!-- 首屏最上面那一行（站长 10-14 22:4x 原话「在看到…上方加一行。用 AI 帮你读懂一切：拍照 | 读图 |
+       翻译 | 提炼 | 分享」＋「底部加一层同色毛玻璃」）。底色吃 `--stage-strip`＝与面板同一支玻璃
+       （`moodVars()` 出、`app.wxss` 五块镜像，换心情一起跟）；字色吃 `--stage-ink-strong`＝与面板上
+       其余那几行同一个来源：浅面配深字、深面配白字。这两枚必须同档，否则就是 §8.240 量出来的那一档
+       （纸白压浅玻璃 2.35～2.79:1，读不动）。 -->
+  <view class="ai-line">
+         <!-- 站长 10-20 一夜这枚按钮的十五句原话，逐句记在这里（①～⑪ 是前半夜，⑫～⑮ 是深夜最后四句）；
+         凡被后一句顶掉的，前面都标了"随这一句作废"，别照旧稿读：
+         ①「随手记下来英文的下方增加一个黄色醒目立体横条按钮，推荐好友使用，点击就是拉起微信小程序分享页面」
+         ②「按钮太大了，要精致小巧，不能盖住人，按钮长度不要超过英文」
+         ③「位置要在英文下放，首屏和笔记列表都要，相同的位置」
+         ④（10-20 夜里追的两句，改的就是③那一处与这一枚的字）「推荐好友使用的按钮，只放在首屏和拍照屏，
+         不再放在列表页」＋「按钮整体80%透明度。字体压缩成"推荐好友"前后加小圆点」
+         ⇒ 现在这一枚住在**这一页的两态**：第一屏（人物那一张）与展开那一屏（快门／拍照那一档），
+         列表页那一枚已按④撤掉。
+         ⑤（10-20 夜里追的这一刀，改的是字面、落点与整块皮）「推荐好友，改为推荐给好友，长度多一点，
+         然后按钮位置再上移一点，字母与按钮空间太大了。按钮能否改为，黄色纸飞机 ICON，然后按钮和文字
+         在底下，黑色半透明，字体变成白色」＋当场纠回来的一句「纸飞机在文字左边，按钮高度维持之前高度。
+         纸飞机要大一点。高度斜45度，有飞行的感觉」⇒ 我照这一句把飞机嵌进了胶囊里（横排、飞机在左）。
+         ⑥（10-20 夜里又纠一回）「纸飞机要大一点，都说高度要超过按钮高度，不是嵌入按钮，是在按钮上面。
+         目前按钮离英文太近了，往下一点，留出空间给纸飞机ICON」⇒ 飞机搬出胶囊、悬在按钮上方。
+         ⑦（同一夜第三回纠）「按钮在纸飞机的底部，纸飞机整体要超过按钮高度，**下尖超过，上尖也超过**，
+         明白吗，字体不要加粗，要清晰」
+         ⑧（第四回，我把 ⑦⑧ 对不上的地方摆出来请你指，你指了"胶囊加宽、飞机照旧上下出头"这一格）
+         「按钮长度要长一点，能容纳纸飞机和文字，纸飞机整体都在按钮下方」
+         ⑨（前半夜第五轮第一句）「没有对齐，英文下方与按钮应该是居中对齐」⇒ 两枚共享的从"左沿同一条线"
+         换成"中心同一条竖线"，板宽由 205 那一档反解得来（⑭ 之后这一条整块作废，见下面落点那一段）。
+         ⑩「推荐给好友与纸飞机之间的空隙太大」⇒ 缝改由写死的 `margin-left` 给（不靠"板宽−内缩−渲染宽"反推，
+         那一档在模拟器与真机之间差 5.3rpx：见 §8.393）。
+         ⑪「按钮透明度再大一点，50%」⇒ 整枚那层 `opacity: .8` 撤掉、透明度改由板承担；随 ⑫「黄底」整条作废。
+         ⑫（10-20 深夜最后一刀，甩来一张 Material 那个「Send」按钮的图）
+         「参考这个ICON设计，改为黄底，文字改为"告诉好友"」＋「1比1复刻，这是国际大厂设计的」
+         ＋我摆出"图里飞机收在胶囊里面，而你 ⑥⑦ 钉过'不是嵌入按钮''上下都要出头'"这一处对不上，
+         你指的是**照这张图收进去**
+         ⇒ 现在的形（⑥⑦⑪ 与 ⑤ 那"黑半透明＋白字"随这一句一起作废）：
+         · 底＝**实心那支黄**（色板里唯一一支），图标与字＝**墨**——白压黄只有 1.63（门槛 4.5），
+           墨压同一支黄 9.40；他那张图本身也是"一块实心色＋同色的图标与字"；
+         · 飞机收进胶囊里、与字左右排、同一中线，斜 −45°（机头朝右上）；元素框 18 见方
+           （图里量到图标墨迹 0.365H 见方，墨迹＝框的 0.884 倍）；
+         · 圆角 13（图里 0.286H，不是原来 22 那一档胶囊帽）、投影撤（图里是扁平的）；
+         · 宽 144＝左内缩 18＋图标 18＋缝 5＋四个字 84＋右内缩 19（每一格都是从那张图按 H 比例量回来的）；
+         · 高仍 44（⑤⑥⑦ 三句钉着「按钮高度维持之前高度」，这一句到 ⑬ 他也没撤）；
+           字仍 400、仍吃 `--fs-tiny`（⑦「不要加粗」＋项目字阶，图里那句英文折过来是 17rpx，我没照抄）。
+         ⚠ 这一版的命中区反而干净：图标与字都在 144×44 这个矩形之内，不再有"出头那一截点不点得着"那一问。
+         ⑭（10-20 深夜紧跟着的一刀）「按钮位置不好，帮我移到左上角，就是用AI帮你XXXX的前面」
+         ⑮（同一刀里追的那句）「然后那句话也改下，图麦笔记：仅需10秒拍照截图网页转笔记」
+         ⇒ 落点＝**首屏最上面那一行（`.ai-line`）的最左**，住在那句新话之前。①③⑨ 那一串
+           （"在英文那一行下面""相同的位置""与那行英文中心对齐"）随这一句整块作废——皮与 144 那一档
+           宽不动，只搬落点；上面那枚图片字底下现在什么都不挂。
+         ⚠ 这一枚现在与那枚黄点、那行字、最右的中/EN 角标挤在同一条 702rpx 的内容宽里
+           （`.ai-text` 是 nowrap，挤不下不折行，会把角标顶出屏）⇒ ⑮ 那句改短不是顺手，
+           是这一刀能落在同一行的前提。右沿挤不挤得下由 `验-推荐按钮两态-真跑` 量渲染端那三个矩形，
+           不靠这段估数。
+         ⑯（10-20 深夜，他手机上切到英文之后回的那一句）「真机看不到线，那不用修了，只是切换到英文，
+         按钮黄色的英文超出按钮，这个能否换个字母」
+         ⇒ 两件事：英文那一格从 'Recommend' 换成**字典里已有的** 'Share'（`shareNote` 的 en 值，
+           详情页与详情窗那两枚分享按钮屏上就叫这个；'Recommend' 九个拉丁字符按 21rpx 要 ~118rpx，
+           而字那一列只有 84 的位置，nowrap 之下不折行、直接顶出板沿被裁＝他截图里那一格）；
+           同时把这一枚里的"图标＋字"整组改成**居中**——短词靠左会空出右边 48rpx，而图里那两档
+           内缩本来就对称（17.1／18.2）。中文那一格「告诉好友」一字没动。
+           同一句里「真机看不到线，那不用修了」把上一条待拍（首屏那条玻璃带下沿那道白线）关掉：
+           模拟器量到的那一档 α .16 尾巴在他手机上读不出来，**那一处代码一行没改**。
+         皮（含 144 这一档宽、那枚斜 45° 的图标与实心黄底）住在 styles/rec-bar.wxss；
+         墨迹带怎么量的、图里那几档内缩怎么按 H 比例折回来的，推导写在 create.wxss 那一段，
+         这一页只给落点那一条 margin。
+         面板由 `open-type="share"` 拉起＝微信原生那个分享面板，不自己画一层；
+         载荷那三格与「我的」页那枚「推荐图麦」共用 utils/shareCard.js 一份实现。
+         不写 catchtap：整页那个 `bindtap="collapse"` 在收起态第一行就 return，
+         展开态按到这一枚也只是开分享面板、顺带把面板收掉——那是这一枚本来就该办的事。
+         皮两档全走 `--cp-rec-*`（由 `createSkin()` 从 palette 发下来）：这里不写饱和色，
+         写进来会被 `验-统一录入条.js` 扫色板那一条打红。 -->
+    <button class="rec-bar" open-type="share" aria-label="{{t.recBarTitle}}">
+      <view class="rec-plane"></view><text class="rec-tx">{{t.recBarTitle}}</text>
+    </button>
+    <view class="ai-dot" style="{{tipDotStyle}}"></view>
+    <text class="ai-text">{{t.aiLine}}</text>
+    <!-- 语言切换（站长 10-15 01:4x 原话「中 EN 移到**左上角**，固定位置。变成 中和EN切换，
+         只显示其中一个。显示待切换」；但他 10-14 22:4x 那句是「中，EN**仍然在右侧**，不需要改在左边」
+         ⇒ 两句话隔三小时反了方向，屏上目前落的是**右上角**（那一行最左住着 Tips 那枚点与那行字，
+         挪过去就要把整条字往右顶 ~40rpx）。落点归他拍，见台账 §8.250 待拍 D30，这里不许当已定。）
+         原来那两枚住在 `.title-row` 右边、跟着大标题走，现在并进上面这一条玻璃带、钉在最右。
+         屏上只留**点下去会切到的那一门**——中文态写 EN、英文态写 中。
+         跟着这一行走还顺带解决一件事：`.ai-line` 自己带一层玻璃，字色吃 `--stage-ink-strong`
+         （浅面深字、深面白字），它不再需要为"压在照片上"另配一套翻色规则。
+         只切界面文案，不动账号也不重新登录；服务端那一栏由 PUT /api/user/language 记着，
+         换设备登录还是他选的那一门。整页是"收起"点击区，catchtap 不吃进 collapse。 -->
+    <view class="lang-corner" catchtap="onSwitchLang" data-key="{{lang === 'zh' ? 'en' : 'zh'}}"
+          role="button" aria-label="{{t.selectLanguage}}"><view class="lang-dot" style="{{langDotStyle}}"></view><text>{{lang === 'zh' ? 'EN' : '中'}}</text></view>
+  </view>
+
+  <view class="title-row">
+    <!-- 大标题换成一张**透明底的图片字**（站长 10-15 01:4x「大标题变成透明底的图片文字，去白底…
+         中英文不影响，都只显示图片。70%透明度」；源件是他给的那张书法字，白底由
+         `docs/工具/出-标题字透明底.py` 抠掉、按内容包围盒裁好）。两门同一张图 ⇒ 这一枚不读 i18n。
+         70% 不透明度写在 wxss 的 `opacity` 里，改档不用重出图。
+         文字那两行（createHeading／createHeading2）从渲染里撤了、键留着：aria-label 与
+         `验-中英切换-真跑` 都还读它，撤干净就没人说清这张图上念的是哪句话。 -->
+    <image class="page-title" src="/assets/title-heading.png" mode="widthFix"
+           aria-label="{{t.createHeading}}{{t.createHeading2}}" />
+  </view>
+
+
+  <!-- 站长 10-09 夜拿效果图 c5 打回：这一行不再"住在日期下面"，而是**顶掉日期那一格**
+       （稿上标题下面那一条就是它，日期那行在稿上没有）。两件事各一个入口照旧：
+       左边「调亮度」换深浅一档，右边「换背景」导流到「我的 → 卡片模板」那一页选图
+       （这里不弹相册——一个功能只留一个入口）。
+       两截都是 catchtap：点左边不能顺手把右边那条导流也触发，点整行也不该冒到
+       容器的 collapse 上去。
+       ⚠ 站长 10-14 定：这一行**白底那一档也要画**（原话「白底也要换背景，这是核心功能」）。
+       §8.231 把包内那张默认图删掉之后，两级都空＝bgSrc 是空串，而这一行原来整条挂在
+       `wx:if="{{bgSrc}}"` 上——于是新用户第一屏连「换背景」这个入口都看不见，等于把核心
+       功能只留给已经设过图的人。所以行不再看图，只有**左边那一截**看图：「调亮度」拧的是
+       `.page-scrim` 那一层的透明度，没图时那一层压根没渲染，留着它是一枚按了什么都不发生的钮。
+       盒子还是原来那一条（88rpx 高、−14/−22 那两道 margin 一个字没改），所以少一截不改流内
+       高度，下面录入条那三块的落点不漂。
+       ⚠ 这一行的深浅判法两趟改过口，记全：10-15 清晨按他「计算深浅背景区域**仅限文字图片覆盖的区域**
+       的平均值」拆成**三枚各一个矩形**（那一趟他那张真机图在这一条横带上从左到右是亮墙 → 浅衣服 →
+       深色背包，三段中位 175／129／105、整行平均 126，正好压在 160 那道闸的口上，一个数管三枚
+       必有一头读不出来）；拆完之后三枚各按各的底色翻了极性，他 09:2x 打回
+       「首屏下面三个设置，深浅字要一致，现在是左边两个黑，右边一个白，不合理。要一致」
+       ⇒ 现在**并回一个矩形**：量的还是这一行自己那一块（`.home-swap` 的框——`space-between`
+       把三枚顶到两端，这一枚的框就等于三枚并起来那一块），不是上面那两截整幅宽的带、更不是全屏，
+       所以 03:2x 那句"不需要全屏计算"仍然成立。三枚各自的类名留着，但它们现在只用来指名哪一枚，
+       不再各带一枚深浅 flag（`bgLightDim`／`-Wallpaper`／`-Mood` 随这一刀作废，回到 `bgLightSwap`）。
+       ⚠ 并回一个数的代价一条要说死：这一行底下从左到右明暗差很大（本轮屏上实测三段 232／207／51），
+       一个数只能取一个极性 ⇒ 最右那枚的字会压在它自己那块暗区上。这一条不靠注释自证，
+       由 `验-第一屏三块-真跑` §9b 现量现报（三枚同一极性 ＋ 各枚自己那块底上的对比度）。 -->
+  <view class="home-swap">
+    <view wx:if="{{bgSrc}}" class="swap-half swap-dim" catchtap="onCycleDim" aria-label="{{t.bgDimLabel}}" role="button">
+      <text class="swap-text">{{t.bgDimLabel}}</text>
+      <!-- 「调亮度」那一枚 10-15 01:4x 换成太阳（他原话「调亮度的icon 改为太阳icon，风格与其他一致」）：
+           与右边「换背景」那枚箭头、「换心情」那枚云朵同一个画法（`.swap-glyph` ＋ 一支 mask SVG），
+           同一档 21rpx、同一个色来源（浅面翻墨、深面翻纸白，跟着 `.swap-glyph` 那两条走）。
+           ⚠ 代价一条要说清：原来那枚圆点的**填充色**是当前亮度档（`dimDot` 从 style 递进来），
+           换成太阳之后这个读数在首屏没有了。`dimDot` 那一格三页还在算（create／index／me 的 data
+           里都留着），但全仓**只有这一处在画它**——撤了渲染它就是死数，要一并清干净是另一件事，等他点头。 -->
+      <view class="swap-glyph glyph-sun"></view>
+    </view>
+    <view class="swap-half swap-wallpaper" catchtap="goHomeBg" aria-label="{{t.homeBgSwap}}" role="button">
+      <text class="swap-text">{{t.homeBgSwap}}</text>
+      <view class="swap-glyph glyph-chev"></view>
+    </view>
+    <!-- 「换心情」＝切那一档彩色毛玻璃（站长 10-14：「切换毛玻璃改到首页，增加一个入口『换心情』
+         icon是小云朵。每次点击切换一种」）。排在「换背景」之后：这两枚的位置是已拍内容，
+         新添的一枚只往后加，不挪前面的落点。图形沿用同一行的落点形状（字在前、小图形在后）。 -->
+    <view class="swap-half swap-mood" catchtap="onCycleMood" aria-label="{{t.moodSwap}}" role="button">
+      <text class="swap-text">{{t.moodSwap}}</text>
+      <view class="swap-glyph glyph-cloud"></view>
+    </view>
+  </view>
+
+  <!-- 统一录入条（10-08 改版，10-09 又收一步）。收起态就是那条纸白胶囊：一枚图形 + 一句话，
+       整条点下去直接进「拍照提炼」那一档——右边那三枚小圆站长 10-09 撤了（"不清晰"）。
+       展开之后条身整条让位——上面换成框外那一行小字，下面升起一张暗面板。
+       面板里只剩两样东西：一个输入框（或一横排小图）＋ 一枚"右滑才开始提炼"的长条。
+       功能一个没少：校验、忙态、报错、权限引导全部照旧，改的是承载方式。 -->
+  <!-- 收起态那一组（2.2 B 方案，效果图正本 docs/design/10-12-2.2全量效果图/单屏-B中-01.png）。
+       站长 10-12 那一轮的原话逐条对上：
+       · 「右侧两块去掉，换成 Tips，然后右侧底下圆形+，就是添加的意思」
+       · 「左下的记下来这部部分，去掉，改为"笔记:16 卡片:13"，下划线可点击」
+       · 「如果点击圆形+，就是第二个屏」
+       · 「左边内框要与第二个图高度对齐」⇒ 左块从 308 见方抬成与第二屏那张面板同高（10-13 是 410；
+         10-14 站长追一句「两个屏的内框高度要一致」＋「第二屏的内面板，高度压缩一下」⇒ 两屏一起压到 372）
+       · 「两个人背景用纯白渐变毛玻璃，下方数字区域用黑色毛玻璃」⇒ 块里两片皮
+       整组仍是 fixed 按视口比例定顶、不吃流内 margin：这条链上"上面多一行就把整组顶下去"栽过三回。
+       ⚠ 组名必须叫 `.home-blk`，不能简写成 `.blk`：app.wxss 里那一条 `.blk` 是笔记列表的
+       "分类色方块"（176 见方 + 18 内边距 + overflow:hidden + flex 纵排），全局生效、同名就撞上，
+       整组会被裁成一块 176 的小方盒——10-10 落码第一版就是这么翻车的。 -->
+  <view wx:if="{{!active}}" class="home-blk">
+    <view class="blk-row">
+      <!-- 左块这一点仍是"开门进拍照那一档"（openBar 落 photo，一字未改；10-10 深夜撤掉的
+           "连点两下换人"不许回来——那一下会让每次开门被一枚 300ms 定时器延住）。
+           ⚠ 这一层**自己不吃 overflow:hidden**：人头要高出块顶那 52rpx 的出血（他 10-13
+           「两个人切换到大人时候，人头要高于内框上沿，与目前现网一样」），裁在卡上就把头切平了；
+           只由下面那块 .blk-figwrap 自己裁。 -->
+      <view class="blk-person" role="button" aria-label="{{t.barIdle}}" catchtap="openBar" hover-class="blk-person-press" hover-stay-time="120">
+        <view class="blk-face"></view>
+        <view class="blk-figwrap">
+          <!-- 主人物在前，另一张画成右后方那枚淡灰剪影（他 10-10 深夜那句：「女人在前，
+               男人就在右侧，用剪影淡灰缩小在右下，高度约为女的一半，在女的后面」）。
+               剪影自己不吃点击——它压在主人物后面，重叠那一条会被上面那张的方框吞掉，
+               所以另起一枚透明热区盖在最上层（下面那块 .blk-alt-hit）。
+               ⚠ 这一枚不挂 hover-class：它没有底色也没有子节点，按下态加在它身上画不出任何东西
+               （留着一行就是一条永不现形的声明）。换人那一下的反馈就是两张图当场对调。 -->
+          <image class="blk-fig" src="{{personSrc}}" mode="widthFix" />
+          <!-- 剪影这一枚 10-11 13:2x 改成**按高定**（原来是按宽）：站长原话「切换男孩后，右侧女孩高度太低，
+               要与之前右侧男孩高度一致」。两张源件比例不同（女 360×433／男 360×522），按宽给同一个数
+               ⇒ 女当剪影时只有 109.5 高、男当剪影是 132 高，换人那一下右边那位就矮一截。 -->
+          <image class="blk-fig-alt" src="{{personAltSrc}}" mode="heightFix" />
+          <view class="blk-alt-hit" role="button" aria-label="{{t.personSwap}}" catchtap="swapPerson"></view>
+        </view>
+        <!-- 下面那一格墨黑毛玻璃里的两枚计数：数字在横线上方、名字在横线下方（他 10-13 原话
+             「数字在横线上方，笔记和卡片文字在横线下方。数字稍微大一点，文字稍微小一点，与正常小字一样」）。
+             两枚都是整格可点（catchtap 不吃进左块那一点 openBar）。
+             ⚠ 10-18 他改口：「把首屏左下角的"卡片"和上面的"数量"，改为图片和数量」⇒ 右边那一枚
+             念的是「图片」＋配图张数（`storage-quota` 的 `user_count`），不再是卡片张数。
+             那一排几何一个字没动：还是同一枚 .blk-cell、同一条 .blk-rule、同一个 .blk-lab 档。 -->
+        <view class="blk-count">
+          <view class="blk-cell" role="button" aria-label="{{noteCount}}{{t.statNotes}}" catchtap="goNotes" hover-class="blk-cell-press" hover-stay-time="120">
+            <text class="blk-num">{{noteCount}}</text>
+            <view class="blk-rule"></view>
+            <text class="blk-lab">{{t.statNotes}}</text>
+          </view>
+          <view class="blk-cell" role="button" aria-label="{{imageCount}}{{t.statImages}}" catchtap="goImages" hover-class="blk-cell-press" hover-stay-time="120">
+            <text class="blk-num">{{imageCount}}</text>
+            <view class="blk-rule"></view>
+            <text class="blk-lab">{{t.statImages}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="blk-col">
+        <!-- 轮播 Tips 搬进右列（原来它住在三块上面那一整行）。他 10-13：「每个图片Tips处在区域，
+             Tips 要上下居中对齐」⇒ 这一格吃满 ➕ 以上剩下的那一段，字在里面垂直居中。
+             与第二屏框外那一行不一样：那一行只给一条线宽、超长打省略号；这一格窄（382rpx），
+             句子必然折成两三行，所以这里**不套 nowrap**——原来那条 nowrap 防的是"折行把面板顶下去"，
+             现在整组是 fixed 定顶、Tips 又在定高的一格里折，顶不动任何东西。
+             点仍是 palette.TIP_DOT 从 style 递进来——写进 wxss 会被「饱和色不许抄进样式表」那条打红。 -->
+        <view wx:if="{{tips.length}}" class="blk-tips">
+          <view class="blk-tips-in">
+            <view class="tips-dot" style="{{tipDotStyle}}"></view>
+            <text class="blk-tips-line">{{tipsPrefix}}{{tips[tipIdx]}}</text>
+          </view>
+        </view>
+        <!-- 圆形 ➕ ＝ "添加"，点的就是进第二屏（与左块同一个 openBar，落拍照那一档）。
+             颜色吃第二屏快门那同一支 --cp-cam（他原话「带+号的按钮颜色与第二屏拍照按钮颜色一致」），
+             饱和色一律由 palette.createSkin() 从 style 递进来，这份样式表里不写死。
+             aria-label 复用字典里那句 barIdle（「记下来」），不为这一枚另起一句文案。
+             ⚠ 这一枚与底栏第一格那枚 ➕ 现在是同一个动作的两个入口——他那句「其他元素去掉」
+             我没往底栏上引（只覆盖他指到的那两处），要不要撤底栏那一枚归 #100 待拍。 -->
+        <view class="blk-plus" role="button" aria-label="{{t.barIdle}}" catchtap="openBar" hover-class="blk-plus-press" hover-stay-time="120">
+          <view class="blk-plus-glyph glyph-plus"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{active}}" class="entry-wrap">
+    <!-- 框外那一行：左边「原文翻译」那枚开关，右边「返回」。
+         「返回」的历史：10-08 站长「这一行移出框外」，10-14「第二屏，Tips 去掉，back 抬到暗面板上面」
+         ⇒ 右半只剩它一枚，且整枚坐在深色面板**之上**（见 .out 那条的账）；Tips 仍在首屏右列那一格
+         （`.blk-tips`），一个功能只留一个入口。
+         10-16 站长在这一行上连下三刀：
+         ①「把原文翻译的开关上移到与返回同一行左边，三个tab全局都可用」⇒ 开关从卡里搬进来，并撤掉
+            `active === 'write' && panelOpen` 那道闸——这一行三档都在，开关就三档都在；
+         ②「默认是翻译，关闭就不翻译」⇒ 默认改成开（`create.js` data 那一位），提炼完那一次复位也回 true；
+         ③「药丸按钮改为最靠左，文字说明字体样式与返回一样」⇒ 这一组里三枚的**次序**是
+            轨道 → 名字 → 说明，说明那句与「返回」同字号同字色（吃 `.out` 那一支 @70）。
+         说明那句现在**跟着这一位走**（开一句、关一句，站长各给了原话），不再是一句两态共用的注释。
+         ⚠ 皮吃的 `--face`／`--face-ink`／`--face-ph`／`--solid-bg`／`--solid-ink` 五枚别名仍挂在 `.container`：
+            它们原来写在 `.panel` 里面，这一行在 `.panel` 外面，不抬就解析不到值、轨道画成透明
+            （同一类坑的正本记在 `验-第一屏三块.js` 钉的那条 `--cp-*` 上）。
+         ⚠ 字色吃 `.out` 那一支 @70（`color: inherit`），深浅翻转跟的是**这一行整块矩形**
+            （`toneRects()` 量的就是 `.out`）⇒ 左半那两行字与右半那个「返回」永远同一个极性。 -->
+    <view class="out">
+      <view class="wr-sw {{writeTranslate ? 'wr-sw-on' : ''}}" catchtap="onToggleTranslate">
+        <view class="wr-sw-track"><view class="wr-sw-dot"></view></view>
+        <text class="wr-sw-lab">{{t.origTranslate}}</text>
+        <!-- 两态各一句，站长 10-16 给的原话（`i18n.js` 的 translateOn／translateOff）。
+             这句紧跟名字、与「返回」同一档字号同一支字色；放不下由 `验-统一录入条` 中英各算一次钉住。 -->
+        <text class="wr-sw-hint">{{writeTranslate ? t.translateOn : t.translateOff}}</text>
+      </view>
+      <text class="out-r" role="button" aria-label="{{t.back}}" catchtap="collapse">{{t.back}}</text>
+    </view>
+    <!-- 报错不再占框外那一行（10-10 深夜改的，见下面 .hint-bubble 那条注释）：
+         整枚浮在输入框正上方，几秒自己走，权限那一类整枚可点进设置。 -->
+    <view class="panel {{panelOpen ? 'panel-open' : ''}}" catchtap="noop">
+      <view wx:if="{{hintLine}}" class="hint-bubble {{errPerm ? 'hint-bubble-act' : ''}}"
+            role="alert" aria-label="{{hintLine}}" catchtap="onHintTap">{{hintLine}}</view>
+      <view class="modes" catchtap="noop">
+        <view class="md {{active === 'photo' ? 'on' : ''}}" catchtap="onTab" data-tab="photo">{{t.modePhoto}}</view>
+        <view class="md {{active === 'url' ? 'on' : ''}}" catchtap="onTab" data-tab="url">{{t.modeUrl}}</view>
+        <view class="md {{active === 'write' ? 'on' : ''}}" catchtap="onTab" data-tab="write">{{t.modeWrite}}</view>
+      </view>
+
+      <view class="card">
+        <!-- 照片 · 还没选图：三枚圈。中间那枚大的（白环＋实心）就是快门，是全篇唯一的大钮；
+             左边小圆走相册、右边小圆读剪贴板（10-16 站长把这一枚从"跳链接"改口成"粘贴"）。
+             三个图形都带字，没有裸图。 -->
+        <view wx:if="{{active === 'photo' && !previewImages.length}}" class="crow">
+          <view class="mini" catchtap="pickImage" data-source="album" aria-label="{{t.fromAlbum}}">
+            <view class="mini-c"><view class="mini-glyph glyph-images"></view></view>
+            <text class="mini-lb">{{t.fromAlbum}}</text>
+          </view>
+          <view class="shutcol" catchtap="pickImage" data-source="camera" aria-label="{{t.takePhoto}}">
+            <view class="shut"><view class="shut-core"><view class="shut-glyph glyph-camera"></view></view></view>
+            <text class="shut-lb">{{t.takePhoto}}</text>
+          </view>
+          <view class="mini" catchtap="onPasteAny" aria-label="{{t.paste}}">
+            <view class="mini-c"><view class="mini-glyph glyph-clipboard"></view></view>
+            <text class="mini-lb">{{t.paste}}</text>
+          </view>
+        </view>
+
+        <!-- 照片 · 已选：一横排小图，➕ 那枚与小图同尺寸同圆角、钉在最右端。
+             「已选 N 张」那一行撤了，序号直接标在每张图的左下角（数一看就知道是第几张、删的是哪张）。
+             一行放 5 格：9 张 + ➕ = 10 格 = 正好两行，所以"展开只多一行"这条落得下去。
+             ⚠ 这一态是快门那一排（上面 crow，条件 `!previewImages.length`）唯一的接替者，
+             所以 data-source 必须在：漏了它 pickImage 读到的是 undefined，发出去就是 sourceType:[undefined]，
+             第二张再也进不了相机。 -->
+        <view wx:elif="{{active === 'photo'}}" class="strip">
+          <view class="th" wx:for="{{previewImages}}" wx:key="*this">
+            <!-- 检体没回来之前那一格是块占位色，回来才把图换上去（站长 10-22 拍丙）。
+                 'bad'＝微信说违规：不换图、钉成拦下那一态，✕ 由他自己删。 -->
+            <view wx:if="{{shotStates[index] !== 'ok'}}"
+                  class="th-wait {{shotStates[index] === 'bad' ? 'th-bad' : ''}}">
+              <text wx:if="{{shotStates[index] === 'bad'}}" class="th-bad-lb">{{t.shotBlockedTag}}</text>
+            </view>
+            <image wx:else class="th-img" src="{{item}}" mode="aspectFill" />
+            <view class="th-x" data-index="{{index}}" catchtap="removeShot">✕</view>
+            <text class="th-no">{{index + 1}}</text>
+          </view>
+          <view class="th th-add {{shotsFull ? 'th-add-dis' : ''}}" catchtap="onAddShot"
+                data-source="any" aria-label="{{t.importScreenshot}}">
+            <view class="th-plus glyph-plus"></view>
+          </view>
+        </view>
+
+        <!-- 链接：一个输入框，提示词吃现网那句 linkDesc，点进去就没了。
+             「保存」那枚撤了，换成右滑那一枚。「粘贴」这枚 10-08 加回来：站长真机反馈
+             长按粘不上（撤它的理由是"交给系统长按"，那条在真机上不成立）。 -->
+        <view wx:elif="{{active === 'url'}}" class="field">
+          <input
+            class="field-input"
+            value="{{urlInput}}"
+            placeholder="{{t.linkDesc}}"
+            placeholder-class="field-ph"
+            confirm-type="done"
+            adjust-position="{{false}}"
+            bindkeyboardheightchange="onKeyboardHeight"
+            bindinput="onUrlInput"
+            bindblur="onUrlBlur"
+          />
+          <view wx:if="{{urlInput}}" class="field-x" catchtap="clearUrl">✕</view>
+          <view class="field-paste" catchtap="onPasteUrl" aria-label="{{t.paste}}">
+            <view class="paste-glyph glyph-clipboard"></view>
+          </view>
+        </view>
+
+        <!-- 文字：一个原文框（收起一行、展开两行）。标题和归类挪到详情页「编辑」里改，
+             所以这一屏只有一个框——站长 10-08 原话「砍一个输入框，只留一个输入框」。
+             10-10 深夜补：右边那枚「粘贴」与链接那一档同一画法、同一个位置（他原话
+             「文字tab，里面输入框也要提供粘贴ICON，与链接tab一致」）。
+             ⚠ textarea 是原生组件，装不下子节点，所以这一格多包一层壳：壳吃 .field 那套皮，
+             钮是它的兄弟节点，框自己只负责字。 -->
+        <view wx:else class="field field-write {{panelOpen ? 'field-write-2' : ''}}">
+          <textarea
+            class="field-area"
+            value="{{writeBody}}"
+            placeholder="{{t.manualDesc}}"
+            placeholder-class="field-ph"
+            maxlength="2000"
+            show-confirm-bar="{{false}}"
+            adjust-position="{{false}}"
+            bindkeyboardheightchange="onKeyboardHeight"
+            bindinput="onWriteBody"
+            bindfocus="onBodyFocus"
+            bindblur="onBodyBlur"
+          />
+          <view class="field-paste" catchtap="onPasteWrite" aria-label="{{t.paste}}">
+            <view class="paste-glyph glyph-clipboard"></view>
+          </view>
+        </view>
+
+        <!-- 这里原来住着「原文翻译」那枚开关（只在文字档的展开态出现）。10-16 站长
+             「上移到与返回同一行左边，三个tab全局都可用」⇒ 搬到上面 `.out` 那一行，卡里少一枚。
+             展开那一档 490rpx 因此多出原来给它的那 56rpx 富余——**这一档的高度我没动**（他拍过 372/490），
+             要不要收这一截留白是另一刀，记在 PRD 里等他话。 -->
+
+        <!-- 右滑才开始提炼。三档共用同一枚画法，只差圆里那支图形（照片=叠图、链接=链环、文字=钢笔）。
+             圆跟着手指走、停在最右、颜色全程不变；是轨道随进度由纸白吃成实心，那一圈白环一直在。 -->
+        <template
+          wx:if="{{active !== 'photo' || previewImages.length}}"
+          is="sld"
+          data="{{t, busy, done, dragging, ready, knobRpx, fillPct, sldIcon}}"
+        />
+      </view>
+    </view>
+
+  </view>
+
+  <!-- 「卡片上的信息」：站长 10-18 01:1x「首页换背景，也要拉起这个弹窗，不需要跳到设置里面换」。
+       markup 与 `pages/index`／`pages/share` 那两屏逐字同一份（三页同源由 `验-名片弹窗两页同源` 钉），
+       逻辑同一份在 utils/cardInfo.js，样式同一组在 app.wxss 的 .ci-*；这一页只多两件事：
+       ① 上面那枚「换背景」不再 navigateTo profile，改成调 onOpenCardInfo；
+       ② `_ciAfterCommit()` 把 bgSrc 与深浅那一档当场带一下——这一层不跳页，没人替它在 onShow 重取，
+          不接这一刀就是"点完芯片屏上这张图还是旧的"（他这句里的"背景图自动刷新为最新"）。
+       皮照首页那一屏：铺了形象图时这张卡是白纱＋糊（X4），实心那条留在没铺图那一态。 -->
+  <view wx:if="{{cardInfoOpen}}" class="ci-mask" catchtap="">
+    <view class="ci-card glass-dialog" catchtap="">
+      <text class="ci-title">{{t.cardInfo}}</text>
+      <text class="ci-hint">{{t.cardInfoHint}}</text>
+      <view class="ci-slots">
+        <view wx:for="{{ciSlots}}" wx:key="index" class="ci-slot">
+          <view class="ci-disc {{item.path ? 'ci-filled' : 'ci-empty'}}" data-i="{{index}}" catchtap="onCiSlotTap">
+            <image wx:if="{{item.path}}" src="{{item.path}}" mode="aspectFill" class="ci-img" />
+            <text wx:else class="ci-plus">+</text>
+            <text wx:if="{{item.path}}" class="ci-repl" data-i="{{index}}" catchtap="onCiReplace">{{t.cardReplace}}</text>
+          </view>
+          <view wx:if="{{item.path}}" class="ci-bin" data-i="{{index}}" catchtap="onCiDrop">
+            <view class="ci-bin-lid"></view>
+            <view class="ci-bin-body"></view>
+          </view>
+          <!-- 两枚角色芯片，次序照他 10-18 01:3x 那句念的顺序：先「背景」、后「头像」。
+               原话「卡片上的信息，改为，图片设置 两个按钮，分别是背景，头像」——
+               「头像」就是原来那枚「卡片」（画在卡片头像上那一张），指的内容没换，只是叫法。 -->
+          <view wx:if="{{item.path}}" class="ci-bg {{item.bg ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetBg"
+            aria-label="{{item.bg ? t.slotBg : ''}}">
+            <view wx:if="{{item.bg}}" class="ci-tick"></view>
+            <text wx:else>{{t.slotBg}}</text>
+          </view>
+          <view class="ci-cap {{item.card ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetCard"
+            aria-label="{{item.card ? t.slotAvatar : ''}}">
+            <view wx:if="{{item.card}}" class="ci-tick"></view>
+            <text wx:else>{{item.cap}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileName}}</text>
+        <!-- adjust-position 关掉是抄「我的」页私密密码那一层在他 iPhone 11 上验过的口径：
+             微信只保证焦点框不被压住，它不知道这张卡底下还有别的控件，一顶整页就把这种
+             fixed 浮层顶得跟原生输入层对不上（首页那层的原话，同一条结论）。 -->
+        <input class="ci-input" value="{{ciName}}" maxlength="16" placeholder="{{t.profileNamePh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiName" />
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileSlogan}}</text>
+        <input class="ci-input" value="{{ciSlogan}}" maxlength="24" placeholder="{{t.profileSloganPh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiSlogan" />
+      </view>
+      <view class="ci-acts">
+        <view class="ci-btn ghost" catchtap="onCloseCardInfo">{{t.cancel}}</view>
+        <view class="ci-btn pri" catchtap="onCiSave">{{t.save}}</view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- 滑动确认那一枚长条。三个模式共用一份，所以写成模板；
+     ⚠️ <template is> 不继承页面 data，用到的字段必须一个个显式递进去——
+     漏了 t 整句是空的，漏了 knobRpx 圆就永远停在 CSS 那个起点 10rpx（10-08 真跑量出来的：
+     data 里 knobRpx 一路走到 456，屏上那枚圆一动不动，四张截图里都是左边那颗）。
+     拖动中那条 transition 由 sld-drag 关掉，松手回弹与进位才交还给 CSS 过渡。 -->
+<template name="sld">
+  <view class="sld {{ready ? '' : 'sld-off'}} {{busy ? 'sld-busy' : ''}} {{done ? 'sld-done' : ''}} {{dragging ? 'sld-drag' : ''}}"
+        catchtap="onSldTap"
+        bindtouchstart="onSlideStart" catchtouchmove="onSlideMove" bindtouchend="onSlideEnd" bindtouchcancel="onSlideEnd">
+    <view class="sld-clip"><view class="sld-fill" style="width:{{fillPct}}%"></view></view>
+    <view class="sld-txt">{{busy || done ? t.busyExtract : t.slideExtract}}</view>
+    <view class="sld-knob" style="left:{{knobRpx}}rpx"><view class="sld-glyph glyph-{{sldIcon}}"></view></view>
+  </view>
+</template>

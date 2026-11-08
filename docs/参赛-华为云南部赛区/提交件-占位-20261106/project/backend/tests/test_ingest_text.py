@@ -1,0 +1,425 @@
+"""「直接写」也走提炼这一条链路（2026-10-04 站长改口径：标题 + 原文 → 模型补摘要）。
+
+四条不变量：
+① 标题用用户自己打的那个，摘要／要点／标签用模型那一份——他说的是"我给标题和原文，
+   自动生成提要"（屏幕上那一格写「摘要」），模型另起的标题只当 fallback。
+② 用户手打的这两段字在**入队前**过内容安全，命中就不入队。worker 落库那条路不经过
+   notes 的 `_guard_manual_text`（那道闸只在 HTTP 建笔记时跑），这一趟漏了就没有第二处检。
+③ 正文落 original_content、形状与 URL／截图两条一致，详情页那三块不为这一种来源特判。
+④ 归类跟着这一篇落库；那一格若在提交后被删掉，只当未分类，不报废一次提炼。
+"""
+import asyncio
+import os
+import sys
+
+os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest.db"
+os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
+os.environ["EXTRACT_PROVIDER"] = "none"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.api.routes import ingest as ingest_route
+from app.api.routes import notes as notes_route
+from app.core.auth import _create_token
+from app.db.database import Base, SessionLocal, engine
+from app.main import app
+from app.models.category import Category
+from app.models.note import Note
+from app.models.user import User
+
+
+@pytest.fixture(scope="module")
+def client():
+    app.state.limiter.enabled = False
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    with TestClient(app) as c:
+        yield c
+    app.state.limiter.enabled = True
+
+
+@pytest.fixture()
+def db():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    session = SessionLocal()
+    yield session
+    session.close()
+
+
+def mk_user(db, openid, generation=1):
+    u = User(openid=openid, generation=generation)
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return u
+
+
+def hdr(user):
+    return {"Authorization": f"Bearer {_create_token(user.id, user.generation)}"}
+
+
+class Recorder:
+    def __init__(self):
+        self.calls = []
+
+    def enqueue(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+
+
+@pytest.fixture()
+def rec(monkeypatch):
+    r = Recorder()
+    monkeypatch.setattr(ingest_route, "get_queue", lambda: r)
+    # set_task_status 要连 Redis，pytest 环境里没有；这里断的是入队参数，不是任务状态。
+    monkeypatch.setattr(ingest_route, "set_task_status", lambda *a, **kw: None)
+    return r
+
+
+def post_text(client, user, **body):
+    return client.post("/api/ingest/text", json=body, headers=hdr(user))
+
+
+class Test入队:
+    def test_用_一条正常提交把四样都带进队列(self, client, db, rec):
+        u = mk_user(db, "txt-wire", generation=7)
+        cat = Category(user_id=str(u.id), name="产品")
+        db.add(cat)
+        db.commit()
+
+        resp = post_text(client, u, title="我的标题", content="原文第一段。", category_id=cat.id)
+        assert resp.status_code == 200, resp.text
+        assert len(rec.calls) == 1
+        args = rec.calls[0][0]
+        assert args[0] == "app.tasks.ingest_tasks.process_manual_text_task"
+        assert args[2] == str(u.id)
+        assert args[3] == "我的标题"
+        assert args[4] == "原文第一段。"
+        assert args[5] == cat.id
+        # generation 漏传 = worker 退回"只查存在性"，A6 那条串号闸门静默失效
+        assert 7 in args, f"入队参数里没带上账号代数：{args}"
+
+    def test_用_标题和正文都去掉空白才判空(self, client, db, rec):
+        u = mk_user(db, "txt-blank")
+        # 空串在 pydantic 那层就挡掉（min_length=1），只剩空白要到 strip 之后才判得出——
+        # 两条都得拒，但走的是两道门，所以各自钉一次。
+        for body, code in (
+            ({"title": "   ", "content": "有正文"}, 400),
+            ({"title": "有标题", "content": "   \n "}, 400),
+            ({"title": "", "content": "有正文"}, 422),
+            ({"title": "有标题", "content": ""}, 422),
+        ):
+            resp = post_text(client, u, **body)
+            assert resp.status_code == code, f"{body} 竟然 {resp.status_code}：{resp.text}"
+        assert not rec.calls, "判空失败却已经入了队"
+
+    def test_用_别人的分类不放行(self, client, db, rec):
+        mine = mk_user(db, "txt-owner")
+        other = mk_user(db, "txt-other")
+        cat = Category(user_id=str(other.id), name="他的分类")
+        db.add(cat)
+        db.commit()
+
+        resp = post_text(client, mine, title="标题", content="正文", category_id=cat.id)
+        assert resp.status_code == 400
+        assert "分类" in resp.json()["detail"]
+        assert not rec.calls
+
+    def test_用_原文命中违规就不入队(self, client, db, rec, monkeypatch):
+        """这条是这一整块最要紧的：检不到就是"手打内容从没进过 msgSecCheck"。
+
+        测试环境 SEC_CHECK_ENABLED=false，check_text 一律回 unavailable（放行），
+        所以只能把 enforce_text_safety 换成"必定拒"的那一档来断接线。
+        """
+        from app.core.errors import UserError
+
+        def refuse(openid, *parts):
+            raise UserError("内容不合规，请修改后再试")
+
+        monkeypatch.setattr(ingest_route, "enforce_text_safety", refuse)
+        u = mk_user(db, "txt-risky")
+        resp = post_text(client, u, title="标题", content="违规原文")
+        assert resp.status_code == 400
+        assert "不合规" in resp.json()["detail"]
+        assert not rec.calls, "内容被拒了却还是排进了队列"
+
+    def test_用_送检的是标题加原文两段(self, client, db, rec, monkeypatch):
+        seen = []
+        monkeypatch.setattr(ingest_route, "enforce_text_safety",
+                            lambda openid, *parts: seen.extend(parts))
+        u = mk_user(db, "txt-parts")
+        post_text(client, u, title="这一句要检", content="这一句也要检")
+        assert seen == ["这一句要检", "这一句也要检"], seen
+
+    def test_用_原文长度上限读的是notes那一处(self, client, db, rec):
+        """两处必须同一个数：手打内容一旦超过送检窗口，超出部分永远检不到。"""
+        from app.api.routes import ingest as m
+
+        assert m.MAX_BODY == notes_route.MAX_BODY == 16_000
+        u = mk_user(db, "txt-long")
+        resp = post_text(client, u, title="标题", content="字" * (notes_route.MAX_BODY + 1))
+        assert resp.status_code == 422
+
+
+@pytest.fixture()
+def worker(monkeypatch, users):
+    import app.tasks.ingest_tasks as tasks
+
+    statuses = []
+    monkeypatch.setattr(tasks, "set_task_status",
+                        lambda tid, st, res=None, **kw: statuses.append((st, res)))
+    monkeypatch.setattr(tasks, "SessionLocal", SessionLocal)
+    return tasks, statuses, str(users["a"]), monkeypatch
+
+
+@pytest.fixture()
+def users(db):
+    return {"a": mk_user(db, "txt-worker-a", generation=1).id}
+
+
+class Test落库:
+    def test_标题用用户打的那份_摘要要点标签用模型那份(self, worker, db):
+        tasks, statuses, uid, mp = worker
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            assert text == "原文第一段。", "送进模型的应该是用户打的原文"
+            assert fallback_title == "我的标题", "降级时的标题也该拿用户那个，不是另起"
+            return {"title": "模型另起的标题", "summary": "模型摘要",
+                    "key_points": ["要点一"], "tags": ["标签一"]}
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        tasks.process_manual_text_task("t1", uid, "我的标题", "原文第一段。")
+        status, result = statuses[-1]
+        assert status == "completed", result
+        note = db.get(Note, result["note_id"])
+        assert note.title == "我的标题"          # 不是模型那个
+        assert note.summary == "模型摘要"
+        assert note.key_points == ["要点一"]
+        assert note.original_content == "原文第一段。"
+        assert note.source_type == "manual"      # 编辑这一篇时仍要走"用户写的要复检"
+        assert result["degraded"] is False
+
+    def test_归类跟着落库(self, worker, db):
+        tasks, statuses, uid, mp = worker
+        cat = Category(user_id=uid, name="产品")
+        db.add(cat)
+        db.commit()
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            return {"title": "t", "summary": "s", "key_points": [], "tags": []}
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        tasks.process_manual_text_task("t2", uid, "标题", "正文", cat.id)
+        _, result = statuses[-1]
+        assert db.get(Note, result["note_id"]).category_id == cat.id
+
+    def test_那一格在提交后被删掉_只当未分类不报废(self, worker, db):
+        tasks, statuses, uid, mp = worker
+        cat = Category(user_id=uid, name="会被删掉")
+        db.add(cat)
+        db.commit()
+        cat_id = cat.id
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            # 提炼这十几秒之间，另一个设备把那一格删了
+            db.query(Category).filter(Category.id == cat_id).delete()
+            db.commit()
+            return {"title": "t", "summary": "s", "key_points": [], "tags": []}
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        tasks.process_manual_text_task("t3", uid, "标题", "正文", cat_id)
+        status, result = statuses[-1]
+        assert status == "completed", result
+        assert db.get(Note, result["note_id"]).category_id is None
+
+    def test_别人的分类即使被塞进job也不落(self, worker, db):
+        """入队前查过归属，这条钉的是 worker 那道也认人——不认就只是"少检一次"。"""
+        tasks, statuses, uid, mp = worker
+        other = mk_user(db, "txt-worker-b")
+        cat = Category(user_id=str(other.id), name="他的")
+        db.add(cat)
+        db.commit()
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            return {"title": "t", "summary": "s", "key_points": [], "tags": []}
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        tasks.process_manual_text_task("t4", uid, "标题", "正文", cat.id)
+        _, result = statuses[-1]
+        assert db.get(Note, result["note_id"]).category_id is None
+
+
+class Test原文翻译开关:
+    """站长 10-04：贴一段纯英文原文，摘要不该被自动翻成中文——给一枚开关，默认关。
+
+    三样各钉一处：① 这一位从 HTTP 一路带到队列，且落在**最后一个位置**（放中间会把
+    队列里正在跑的老 job 的 generation 挪一位，A6 那次串号就是这个形状）；
+    ② 到 worker 变成 extract_knowledge 的那个参数；
+    ③ 链接／截图两条不带这个参数，提示词必须与改动前一字不差。
+    """
+
+    def test_不带这个字段时入队的是关闭态(self, client, db, rec):
+        u = mk_user(db, "tr-default", generation=4)
+        resp = post_text(client, u, title="Title", content="An English paragraph.")
+        assert resp.status_code == 200, resp.text
+        args = rec.calls[0][0]
+        assert len(args) == 8, f"这一位没进队列：{args}"
+        assert args[7] is False, f"默认应该是关闭态：{args}"
+
+    def test_打开开关时入队最后一位是True(self, client, db, rec):
+        u = mk_user(db, "tr-on", generation=4)
+        resp = post_text(client, u, title="Title", content="An English paragraph.", translate=True)
+        assert resp.status_code == 200, resp.text
+        assert rec.calls[0][0][7] is True, rec.calls[0][0]
+
+    def test_这一位排在签名最后(self):
+        import inspect
+
+        from app.tasks.ingest_tasks import process_manual_text_task as fn
+
+        names = list(inspect.signature(fn).parameters)
+        assert names[-1] == "translate", names
+        assert names[names.index("generation") + 1] == "translate", names
+
+    def test_老job那六个位置参数照样落库(self, worker, db):
+        """队列里可能还躺着上一版入队的 job（不带第七位），它必须仍按老形状绑对。"""
+        tasks, statuses, uid, mp = worker
+        seen = {}
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            seen["translate"] = translate
+            return {"title": "t", "summary": "s", "key_points": [], "tags": []}
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        tasks.process_manual_text_task("t5", uid, "标题", "正文", None, 1)
+        status, result = statuses[-1]
+        assert status == "completed", result
+        assert seen["translate"] is False, seen
+        assert db.get(Note, result["note_id"]).title == "标题"
+
+    def test_worker把开关的值原样交给提炼(self, worker, db):
+        tasks, statuses, uid, mp = worker
+        seen = {}
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            seen["translate"] = translate
+            return {"title": "t", "summary": "s", "key_points": [], "tags": []}
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        tasks.process_manual_text_task("t6", uid, "标题", "正文", None, 1, True)
+        assert seen["translate"] is True, seen
+        tasks.process_manual_text_task("t7", uid, "标题", "正文", None, 1, False)
+        assert seen["translate"] is False, seen
+
+
+class Test链接与截图两条也带这一位:
+    """站长 10-16 三句：「三个tab全局都可用」＋「默认是翻译，关闭就不翻译」＋「图片识别英文，不是也可以翻译吗」。
+
+    三样各钉一处，与上面那个类同一个形状：① 两个入口都把这一位带到队列，且落在**最后一个位置**
+    （放中间会把队列里正在跑的老 job 的 generation 挪一位，A6 那次串号就是这个形状）；
+    ② 到 worker 变成 extract_knowledge 的那个参数；③ **不带就不表态**——这一条与 /text 那头相反，
+    /text 的默认是 False（10-04 站长拍的"默认关"），链接／截图两条今天的现网行为是提示词里
+    根本不加"输出语言"那一段，所以默认必须是 None；写成 False 会让 2.2.x 那些不带这一位的老包当场变味。
+    """
+
+    def test_链接不带这个字段时入队的是None(self, client, db, rec):
+        u = mk_user(db, "url-tr-default", generation=4)
+        resp = client.post("/api/ingest/url", data={"url": "https://example.com/a"}, headers=hdr(u))
+        assert resp.status_code == 200, resp.text
+        args = rec.calls[0][0]
+        assert args[0] == "app.tasks.ingest_tasks.process_url_task"
+        assert len(args) == 6, f"这一位没进队列：{args}"
+        assert args[5] is None, f"不带字段的默认必须是不表态（None），不是 False：{args}"
+
+    def test_链接开关两态原样落到最后一位(self, client, db, rec):
+        u = mk_user(db, "url-tr-on", generation=4)
+        for sent, want in (("true", True), ("false", False)):
+            resp = client.post("/api/ingest/url",
+                               data={"url": "https://example.com/a", "translate": sent}, headers=hdr(u))
+            assert resp.status_code == 200, resp.text
+            assert rec.calls[-1][0][5] is want, (sent, rec.calls[-1][0])
+
+    def test_截图不带这个字段时入队的也是None(self, client, db, rec):
+        u = mk_user(db, "shot-tr-default", generation=9)
+        staged = client.post(
+            "/api/ingest/screenshots/stage",
+            files={"images": ("a.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+            headers=hdr(u),
+        )
+        assert staged.status_code == 200, staged.text
+        resp = client.post("/api/ingest/screenshots/process",
+                           data={"batch_id": staged.json()["batch_id"]}, headers=hdr(u))
+        assert resp.status_code == 200, resp.text
+        args = rec.calls[0][0]
+        assert args[0] == "app.tasks.ingest_tasks.process_screenshots_task"
+        assert len(args) == 6, f"这一位没进队列：{args}"
+        assert args[5] is None, f"同上：默认得是 None：{args}"
+
+    def test_两条的签名里这一位都排在最后(self):
+        import inspect
+
+        from app.tasks.ingest_tasks import process_screenshots_task, process_url_task
+
+        for fn in (process_url_task, process_screenshots_task):
+            names = list(inspect.signature(fn).parameters)
+            assert names[-1] == "translate", (fn.__name__, names)
+            assert names[names.index("generation") + 1] == "translate", (fn.__name__, names)
+
+    def test_两条worker把值原样交给提炼(self, worker, db):
+        tasks, statuses, uid, mp = worker
+
+        seen = []
+
+        async def fake_llm(text, fallback_title="", translate=None):
+            seen.append(translate)
+            return {"title": "t", "summary": "s", "key_points": [], "tags": []}
+
+        async def fake_scrape(url):
+            return {"title": "抓来的标题", "content": "An English paragraph."}
+
+        async def fake_ocr(images):
+            return "English text from the screenshot"
+
+        mp.setattr(tasks, "extract_knowledge", fake_llm)
+        mp.setattr(tasks, "scrape_url", fake_scrape)
+        mp.setattr(tasks, "ocr_images", fake_ocr)
+
+        tasks.process_url_task("u1", uid, "https://example.com/a", 1, True)
+        tasks.process_url_task("u2", uid, "https://example.com/a", 1, False)
+        tasks.process_url_task("u3", uid, "https://example.com/a", 1)      # 老 job：不带第七位
+        tasks.process_screenshots_task("s1", uid, [b"img"], 1, True)
+        tasks.process_screenshots_task("s2", uid, [b"img"], 1)             # 老 job
+        assert seen == [True, False, None, True, None], seen
+
+    def test_不表态那一份提示词与改动前逐字相同(self):
+        """这一条是上面那个 None 的落点：默认写成 False 就会在这里红。"""
+        from app.services import llm
+
+        assert llm.system_prompt(None) == llm.SYSTEM_PROMPT
+        assert "输出语言" not in llm.system_prompt(None)
+        assert "输出语言" in llm.system_prompt(True) and "输出语言" in llm.system_prompt(False)
+
+
+class Test提示词里的输出语言:
+    def test_关_写明跟随原文不翻译(self):
+        from app.services import llm
+
+        p = llm.system_prompt(False)
+        assert p.startswith(llm.SYSTEM_PROMPT)
+        assert "不要翻译成中文" in p
+
+    def test_开_要求用简体中文整理(self):
+        from app.services import llm
+
+        p = llm.system_prompt(True)
+        assert "简体中文" in p
+        assert "不要翻译成中文" not in p
+
+    def test_不表态时与改动前那份一字不差(self):
+        """链接／截图两条不带这个参数：它们的行为不能跟着这一枚开关一起动。"""
+        from app.services import llm
+
+        assert llm.system_prompt() == llm.SYSTEM_PROMPT
+        assert llm.system_prompt(None) == llm.SYSTEM_PROMPT

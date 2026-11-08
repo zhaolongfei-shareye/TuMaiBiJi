@@ -1,0 +1,37 @@
+<!-- 六位密码那一层的标记，三页共用（「我的」设／改／重置、首页详情窗解锁、详情页解锁）。
+     站长 10-12 原话：「看笔记提示输入密码的框，跟设置密码的框风格不一致。要统一。」
+     这一份是从 pages/me/me.wxml 里整段搬过来的，几何、类名、数据键名一个字没改；
+     皮在 styles/pwd-sheet.wxss（同样三页 @import），收键与推格在 utils/pwdSheet.js。
+
+     数据键就吃各页自己 data 里那七个同名的（pwdOpen/pwdEntering/pwdName/pwdScene/pwdTip/pwdBuf/pwdFocus）：
+     「我的」那一页原本就是这么挂的，首页与详情页由 utils/pwdSheet.js 写同名的键，
+     所以每一页那一句 <template is> 完全一样，不必再映射一遍名字。
+
+     事件名也是「我的」原来那一套（onPwdBuf/onPwdOk/onClosePwdPanel/onPwdReset）——
+     模板只能按名字找页面自己的方法，换名字就得两头一起改。首页与详情页那三枚是薄手，
+     转给 utils/pwdSheet.js；onPwdReset 只有「我的」用（要输的那一态不画它）。
+
+     ⚠ 遮罩那一条从 bindtap 改成了 catchtap：「我的」的根节点没有 bindtap，这一改对本页无差别；
+       但首页的根 `.container` 挂着 onBlankTap（点空白收搜索条），冒泡上去就会在"关掉密码层"
+       的同时把他打的词一起清掉——一次点击只干一件事。 -->
+<template name="pwdSheet">
+  <view wx:if="{{pwdOpen}}" class="pwd-mask" catchtap="onClosePwdPanel">
+    <view class="pwd-card card glass-dialog" catchtap="">
+      <text class="pwd-name">{{pwdName}}</text>
+      <text class="pwd-scene">{{pwdScene}}</text>
+      <text wx:if="{{pwdEntering}}" class="pwd-tip">{{pwdTip}}</text>
+      <view wx:if="{{pwdEntering}}" class="pwd-boxes">
+        <view wx:for="{{[0, 1, 2, 3, 4, 5]}}" wx:key="index"
+          class="pwd-cell {{pwdBuf.length > index ? 'fill' : ''}}"></view>
+        <input class="pwd-capture" type="number" maxlength="6" adjust-position="{{false}}"
+          style="left:{{(pwdBuf.length > 5 ? 5 : pwdBuf.length) * 92}}rpx"
+          focus="{{pwdFocus}}" value="{{pwdBuf}}" bindinput="onPwdBuf" />
+      </view>
+      <view class="pwd-two">
+        <view class="pwd-btn ghost" bindtap="onClosePwdPanel">{{t.cancel}}</view>
+        <view wx:if="{{pwdEntering}}" class="pwd-btn primary" bindtap="onPwdOk">{{t.privatePasswordOk}}</view>
+        <view wx:else class="pwd-btn danger" bindtap="onPwdReset">{{t.privatePasswordReset}}</view>
+      </view>
+    </view>
+  </view>
+</template>

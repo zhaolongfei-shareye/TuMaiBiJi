@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# 图麦笔记后端一键安装脚本
+# 支持环境：macOS (Apple Silicon) 与 Ubuntu 22.04
+# 依据：requirements.txt 实测清单、.env 10 键实测、本机 .venv/bin/python
+# 不做的事：不联网拉仓库、不碰数据库、不调用任何线上接口、不写真实密钥
+set -euo pipefail
+
+red()    { printf '\033[31m%s\033[0m\n' "$*"; }
+green()  { printf '\033[32m%s\033[0m\n' "$*"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
+blue()   { printf '\033[34m%s\033[0m\n' "$*"; }
+die()    { red "错误：$*" >&2; exit 1; }
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$REPO_ROOT/backend"
+VENV_DIR="$BACKEND_DIR/.venv"
+REQ_FILE="$BACKEND_DIR/requirements.txt"
+ENV_FILE="$BACKEND_DIR/.env"
+ENV_EXAMPLE="$BACKEND_DIR/.env.example"
+
+# ---------- 1. 判系统 ----------
+detect_os() {
+  case "$(uname -s)" in
+    Darwin)
+      local arch
+      arch="$(uname -m)"
+      [ "$arch" = "arm64" ] || yellow "当前 macOS 架构为 $arch，本脚本按 Apple Silicon 验证过，Intel 版待核对。"
+      echo "macos"
+      ;;
+    Linux)
+      [ -f /etc/os-release ] || die "无法识别 Linux 发行版（缺 /etc/os-release）。"
+      . /etc/os-release
+      case "${ID:-}:${VERSION_ID:-}" in
+        ubuntu:22.04) echo "ubuntu22" ;;
+        *) die "仅支持 Ubuntu 22.04，当前为 ${ID:-}:${VERSION_ID:-}。如确需在此环境安装，请人工核对系统库与 wheel 可用性。" ;;
+      esac
+      ;;
+    *) die "仅支持 macOS 与 Ubuntu 22.04，当前系统为 $(uname -s)。" ;;
+  esac
+}
+
+# ---------- 2. 检 python3 ----------
+check_python() {
+  local os="$1"
+  if ! command -v python3 >/dev/null 2>&1; then
+    case "$os" in
+      macos)   die "未找到 python3。请安装 Python 3.10+：brew install python@3.13 （或用 pyenv）。" ;;
+      ubuntu22) die "未找到 python3。请执行：sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-dev" ;;
+    esac
+  fi
+  local ver minor
+  ver="$(python3 -c 'import sys;print("%d.%d.%d"%sys.version_info[:3])')"
+  minor="$(python3 -c 'import sys;print("%d.%d"%sys.version_info[:2])')"
+  # 实测：服务器 3.10.12，本机 3.13；最低要求 3.10
+  if python3 -c 'import sys;sys.exit(0 if sys.version_info[:2]>=(3,10) else 1)'; then
+    green "python3 版本 $ver（>= 3.10，通过）"
+  else
+    die "python3 版本 $ver 低于 3.10。本机：brew install python@3.13；服务器：sudo apt-get install -y python3.10 python3.10-venv python3.10-dev"
+  fi
+  # onnxruntime 跨版本提示（实测：py3.10 解出 1.23.2，py3.13 解出 1.30.0）
+  if [ "$minor" = "3.10" ]; then
+    yellow "提示：onnxruntime 在 Python 3.10 上最高 1.23.2（实测），与 3.13 解出的 1.30.0 不同，同一份 requirements 两端版本不同属已知现象。"
+  fi
+}
+
+# ---------- 3. 检 venv 模块 ----------
+check_venv() {
+  local os="$1"
+  if ! python3 -c 'import venv' 2>/dev/null; then
+    case "$os" in
+      macos)    die "python3 缺 venv 模块。请重装完整 Python：brew reinstall python@3.13" ;;
+      ubuntu22) die "python3 缺 venv 模块。请执行：sudo apt-get install -y python3-venv" ;;
+    esac
+  fi
+  green "venv 模块可用。"
+}
+
+# ---------- 4. Ubuntu 系统库预检（libGL / libglib，为 rapidocr→opencv） ----------
+ubuntu_system_libs() {
+  local missing=()
+  for lib in libGL.so.1 libglib-2.0.so.0; do
+    if ! ldconfig -p 2>/dev/null | grep -q "$lib"; then
+      missing+=("$lib")
+    fi
+  done
+  if [ "${#missing[@]}" -gt 0 ]; then
+    yellow "缺少系统库：${missing[*]}"
+    yellow "rapidocr 依赖带 GUI 的 opencv，在无桌面 Ubuntu 上 import 时报缺 libGL.so.1（实测坑）。"
+    yellow "请执行：sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0"
+    die "系统库预检未通过，已中止。"
+  fi
+  green "系统库 libGL / libglib 已就位。"
+}
+
+# ---------- 5. 建虚拟环境 ----------
+make_venv() {
+  if [ -x "$VENV_DIR/bin/python" ]; then
+    yellow "虚拟环境已存在：$VENV_DIR（沿用；如需重建请先 rm -rf \"$VENV_DIR\"）"
+  else
+    blue "建虚拟环境：$VENV_DIR"
+    python3 -m venv "$VENV_DIR" || die "建虚拟环境失败（python3 -m venv）。"
+  fi
+  "$VENV_DIR/bin/python" -m pip install --upgrade pip wheel setuptools >/dev/null || die "升级 pip/wheel/setuptools 失败。"
+  green "虚拟环境就绪：$VENV_DIR/bin/python"
+}
+
+# ---------- 6. 装依赖 ----------
+install_deps() {
+  [ -f "$REQ_FILE" ] || die "找不到 $REQ_FILE。请确认 install.sh 位于仓库根目录（与 backend/ 同级）。"
+  blue "按 $REQ_FILE 装依赖..."
+  # 注意：numpy 故意不钉版本（不在 requirements.txt 中），脚本不替它补版本。
+  "$VENV_DIR/bin/python" -m pip install -r "$REQ_FILE" || die "pip install -r requirements.txt 失败。请看上方报错；常见为系统库缺失或 wheel 不兼容。"
+  green "依赖安装完成。"
+}
+
+# ---------- 7. 生成 .env（10 键占位符；已存在则跳过） ----------
+gen_env() {
+  if [ -f "$ENV_FILE" ]; then
+    yellow ".env 已存在，跳过生成（避免覆盖你已填的真实值）。如需重生成：mv \"$ENV_FILE\" \"$ENV_FILE.bak\""
+    return 0
+  fi
+  blue "生成 $ENV_FILE（值均为占位符，需手工填值）..."
+  cat > "$ENV_FILE" <<'ENVEOF'
+# ===== 图麦笔记后端 .env（install.sh 生成，值均为占位符）=====
+# 严禁把真实值提交到仓库。每行末尾写"去哪申请/怎么生成"。
+# 本机最小运行集 10 键；完整 33 键模板见 backend/.env.example。
+
+# 管理员令牌：自己生成 → .venv/bin/python -c "import secrets;print(secrets.token_urlsafe(32))"
+ADMIN_TOKEN=<在此填入：自己用 secrets.token_urlsafe(32) 生成>
+
+# 跨域允许来源：本地开发填 http://localhost:<前端端口>；生产填小程序后台业务域名
+CORS_ORIGINS=<在此填入：逗号分隔的前端来源，如 http://localhost:5173>
+
+# PostgreSQL 连接串：自己搭库 → postgresql+psycopg2://user:pass@host:port/dbname
+DATABASE_URL=<在此填入：PostgreSQL 连接串>
+
+# DeepSeek API Key：在 DeepSeek 开放平台控制台申请
+DEEPSEEK_API_KEY=<在此填入：DeepSeek 平台 API Key>
+
+# JWT 签名算法：通常填 HS256
+JWT_ALGORITHM=<在此填入：如 HS256>
+
+# JWT 过期分钟数：通常填 60
+JWT_EXPIRE_MINUTES=<在此填入：如 60>
+
+# JWT 签名密钥：自己生成 → .venv/bin/python -c "import secrets;print(secrets.token_urlsafe(48))"
+JWT_SECRET_KEY=<在此填入：自己用 secrets.token_urlsafe(48) 生成>
+
+# Redis 连接串：自己搭 Redis → redis://host:port/db
+REDIS_URL=<在此填入：Redis 连接串>
+
+# 微信小程序 AppID：微信公众平台 mp.weixin.qq.com 后台 → 开发管理 → 开发设置
+WECHAT_APP_ID=<在此填入：微信小程序 AppID>
+
+# 微信小程序 AppSecret：同上后台"开发设置"页（仅本人可见，勿提交、勿外传）
+WECHAT_APP_SECRET=<在此填入：微信小程序 AppSecret>
+ENVEOF
+  yellow "已生成 $ENV_FILE，请用编辑器逐项填入真实值后再启动服务。"
+  if [ ! -f "$ENV_EXAMPLE" ]; then
+    yellow "未发现 $ENV_EXAMPLE（含 HUNYUAN_CF_/IMAGE_STORE_CF_/SEC_CHECK_/EXTRACT_/MP_ASSETS_ 等前缀键的完整 33 键模板）。如需启用云函数/安全检查/提取等扩展功能，请从仓库补齐该文件。"
+  fi
+}
+
+# ---------- 8. 跑 pytest 并念出条数 ----------
+run_tests() {
+  local tests_dir="$BACKEND_DIR/tests"
+  [ -d "$tests_dir" ] || die "找不到测试目录 $tests_dir。"
+  blue "运行 pytest（本机用例目录 $tests_dir）..."
+  local out rc last
+  out="$(mktemp)"
+  set +e
+  "$VENV_DIR/bin/python" -m pytest "$tests_dir" -q --color=no 2>&1 | tee "$out"
+  rc=${PIPESTATUS[0]}
+  set -e
+  last="$(tail -1 "$out")"
+  rm -f "$out"
+  if [ "$rc" -eq 0 ]; then
+    green "pytest 通过 → $last"
+  else
+    red "pytest 失败 → $last（退出码 $rc）"
+    red "install.sh 在此中止。请修复测试后重跑本脚本。"
+    exit "$rc"
+  fi
+}
+
+# ---------- main ----------
+main() {
+  blue "===== 图麦笔记后端一键安装 ====="
+  local os
+  os="$(detect_os)"
+  green "识别系统：$os"
+  check_python "$os"
+  check_venv "$os"
+  case "$os" in
+    ubuntu22) ubuntu_system_libs ;;
+    macos)    yellow "macOS 分支：跳过 libGL/libglib 预检（macOS 自带 OpenGL）。若 rapidocr 在 macOS 上 import 报缺库，请人工核对。" ;;
+  esac
+  make_venv
+  install_deps
+  gen_env
+  run_tests
+  green "===== 安装完成 ====="
+  green "虚拟环境：$VENV_DIR"
+  green "下一步：编辑 $ENV_FILE 填入真实值，然后："
+  green "  cd backend && .venv/bin/python -m uvicorn app.main:app --reload"
+  yellow "提示：入口模块 app.main 来自 deploy.sh 第 57 行 import 检查；FastAPI 实例变量名（:app）与监听端口待核对。"
+}
+
+main "$@"

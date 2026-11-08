@@ -1,0 +1,102 @@
+<view class="container {{themeClass}}">
+  <!-- 预览框定高：成品图按内容定高，图一换下面那排小图就会上下跳。
+       框子高度固定，图在框里等比缩放居中，小图的位子就永远不动。
+       （试过把小图那排钉进底部固定条——画布是原生层，放进 fixed 里会整体错位，已回退。） -->
+  <view class="preview-box">
+    <canvas type="2d" id="shareCanvas" class="share-canvas" style="width: {{canvasW}}rpx; height: {{canvasH}}rpx"></canvas>
+  </view>
+
+  <!-- 码的开关。只影响上面这张成品图。 -->
+  <view class="qr-opt">
+    <view class="pill {{noQr ? '' : 'pill-on'}}" bindtap="onToggleQr">
+      <view class="pill-dot"></view>
+    </view>
+    <view class="qr-opt-text">
+      <text class="qr-opt-label">{{t.qrToggle}}</text>
+      <text class="qr-opt-hint">{{t.qrToggleHint}}</text>
+    </view>
+  </view>
+
+  <!-- 模板一排：左右滚着挑，默认是「卡片模板」里选的那套 -->
+  <scroll-view wx:if="{{!generating && tpls.length}}" class="tpl-strip" scroll-x enhanced show-scrollbar="{{false}}">
+    <view class="tpl-strip-inner">
+      <view
+        wx:for="{{tpls}}"
+        wx:key="id"
+        class="pick {{picked === item.id ? 'pick-on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickTemplate"
+      >
+        <canvas type="2d" id="pick-{{item.id}}" class="pick-canvas" style="height: {{item.h}}rpx"></canvas>
+        <text class="pick-label">{{item.label}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{generating}}" class="loading-overlay">
+    <text>{{t.generatingShare}}</text>
+  </view>
+
+  <view class="actions-bar">
+    <view class="actions-row">
+      <!-- 站长 10-07：这一枚原来是「取消」，现在换成「编辑个人名片」。
+           退出这一页仍留着导航条左上那颗 ‹，没有少一条口。 -->
+      <view class="btn-secondary" bindtap="onOpenCardInfo">{{t.editCard}}</view>
+      <view class="btn-primary" bindtap="saveToAlbum" disabled="{{!imagePath}}">{{t.saveToAlbum}}</view>
+    </view>
+  </view>
+
+  <!-- 「卡片上的信息」：与首页成品弹窗那一层同一份实现（utils/cardInfo.js）、同一套样式
+       （app.wxss 里那组 .ci-*），改的是同一份数据。这一页没有第二个 fixed 浮层要避让，
+       所以不像首页那样在弹窗开着时把底下那层摘掉——那一带是 10-03 真机两轮 BUG 换来的，
+       挪到这里会把画布清成空白。 -->
+  <view wx:if="{{cardInfoOpen}}" class="ci-mask" catchtap="">
+    <view class="ci-card" catchtap="">
+      <text class="ci-title">{{t.cardInfo}}</text>
+      <text class="ci-hint">{{t.cardInfoHint}}</text>
+      <view class="ci-slots">
+        <view wx:for="{{ciSlots}}" wx:key="index" class="ci-slot">
+          <view class="ci-disc {{item.path ? 'ci-filled' : 'ci-empty'}}" data-i="{{index}}" catchtap="onCiSlotTap">
+            <image wx:if="{{item.path}}" src="{{item.path}}" mode="aspectFill" class="ci-img" />
+            <text wx:else class="ci-plus">+</text>
+            <text wx:if="{{item.path}}" class="ci-repl" data-i="{{index}}" catchtap="onCiReplace">{{t.cardReplace}}</text>
+          </view>
+          <view wx:if="{{item.path}}" class="ci-bin" data-i="{{index}}" catchtap="onCiDrop">
+            <view class="ci-bin-lid"></view>
+            <view class="ci-bin-body"></view>
+          </view>
+          <!-- 两枚角色芯片，次序照他 10-18 01:3x 那句念的顺序：先「背景」、后「头像」。
+               原话「卡片上的信息，改为，图片设置 两个按钮，分别是背景，头像」——
+               「头像」就是原来那枚「卡片」（画在卡片头像上那一张），指的内容没换，只是叫法。 -->
+          <view wx:if="{{item.path}}" class="ci-bg {{item.bg ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetBg"
+            aria-label="{{item.bg ? t.slotBg : ''}}">
+            <view wx:if="{{item.bg}}" class="ci-tick"></view>
+            <text wx:else>{{t.slotBg}}</text>
+          </view>
+          <view class="ci-cap {{item.card ? 'role' : ''}}" data-i="{{index}}" catchtap="onCiSetCard"
+            aria-label="{{item.card ? t.slotAvatar : ''}}">
+            <view wx:if="{{item.card}}" class="ci-tick"></view>
+            <text wx:else>{{item.cap}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileName}}</text>
+        <!-- adjust-position 关掉是抄「我的」页私密密码那一层在他 iPhone 11 上验过的口径：
+             微信只保证焦点框不被压住，它不知道这张卡底下还有别的控件，一顶整页就把这种
+             fixed 浮层顶得跟原生输入层对不上（首页那层的原话，同一条结论）。 -->
+        <input class="ci-input" value="{{ciName}}" maxlength="16" placeholder="{{t.profileNamePh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiName" />
+      </view>
+      <view class="ci-field">
+        <text class="ci-label">{{t.profileSlogan}}</text>
+        <input class="ci-input" value="{{ciSlogan}}" maxlength="24" placeholder="{{t.profileSloganPh}}"
+          placeholder-class="ci-ph" adjust-position="{{false}}" bindinput="onCiSlogan" />
+      </view>
+      <view class="ci-acts">
+        <view class="ci-btn ghost" catchtap="onCloseCardInfo">{{t.cancel}}</view>
+        <view class="ci-btn pri" catchtap="onCiSave">{{t.save}}</view>
+      </view>
+    </view>
+  </view>
+</view>

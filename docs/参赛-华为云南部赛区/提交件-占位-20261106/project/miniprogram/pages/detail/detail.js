@@ -1,0 +1,379 @@
+const api = require('../../utils/api.js')
+const { t, texts } = require('../../utils/i18n.js')
+const { blockSkinFor, toneVars } = require('../../utils/palette.js')
+const { formatDateTime, formatShortDate } = require('../../utils/date.js')
+const cloudUpload = require('../../utils/cloudUpload.js')
+const mpAssets = require('../../utils/mpAssets.js')
+const cardCloud = require('../../utils/cardCloud.js')
+const privateGate = require('../../utils/privateGate.js')
+const { labelOf, bracketOf } = require('../../utils/catText.js')
+// 私密解锁那一层六位密码面板的三个方法转给它（标记与皮三页共用，见 utils/pwdSheet.js 头）。
+const pwdSheet = require('../../utils/pwdSheet.js')
+// 「来源那一格念什么」三处共用同一只实现（列表／详情／卡片绘制），见 utils/sourceLabel.js 顶上那段。
+const { sourceLabelOf } = require('../../utils/sourceLabel.js')
+
+/**
+ * 那一排配图下面的两句实话（方案 docs/方案-公众号贴图随笔记存档.md §八.4／§八.11）。
+ *
+ * 两个数都读服务端钉在 `notes.imported_from` 里那一份快照，不拿"现在库里有几行"去倒推：
+ * 那篇原文当时一共 26 张图，这件事只有转存那一刻知道——之后用户删掉一张配图，
+ * "原文有 26 张"就再也问不出来了。截断与没存上是两件事，一句都不许替另一句兜底。
+ * 两个数都是 0（或这一篇压根不是外链转存来的）时回空串，那一格整块不画。
+ */
+function shotsTruth(src, lang) {
+  const s = src || {}
+  const bits = []
+  if (s.images_truncated > 0) {
+    bits.push(t('shotsTruncated', lang)
+      .replace('{n}', s.images_total)
+      .replace('{k}', s.images_kept))
+  }
+  if (s.images_failed > 0) {
+    bits.push(t('shotsPartlyFailed', lang).replace('{n}', s.images_failed))
+  }
+  return bits.join('')
+}
+
+Page({
+  data: {
+    note: null,
+    loading: true,
+    showOriginal: false,
+    themeClass: '',
+    lang: 'zh',
+    t: texts('zh'),
+    noteId: null,
+    shared: false,
+    // 这篇的配图（云开发存储里的 fileID 列表）。这条链 10-07 整条上线了（后端 + 桶可写），
+    // 没传过图的这篇才是空数组。
+    noteImages: [],
+    // 右上那一格：这篇留过的那张卡片（图已经被系统清掉的那一条不算，见 cardLog.aliveFor）。
+    // 10-17 那一格只剩这一份数据：原来还跟着两枚键（淡底方形的底色 `swatchBg`、品牌字 `brandGlyph`），
+    // 站长那句「如果没卡片图，这个位置就完全被标题占满」把空态那一整块撤了，两枚键同时没有消费者。
+    detailCards: [],
+    _loaded: false,
+  },
+
+  onLoad(options) {
+    const app = getApp()
+    const lang = app.globalData.userInfo?.language || 'zh'
+    // ⚠ 原来这一屏还认一枚 `saved=1` 开关（落地页存完跳进来时页底画一条「你已收藏该笔记」的 bar，
+    // 后面接半句「有 N 张图没能存下来」）。站长 10-27 把存完的落点翻成笔记列表 ⇒ 那一跳不再进来，
+    // 这一枚开关与那条 bar（含皮与字典那两支串）一并撤净——"这次少带了几张"那句实话现在由**落地页
+    // 自己在跳走之前**说一句（`pages/share/view.js` 的 `saveToMine`），因为它只在那一次回体里拿得到。
+    this.setData({
+      lang,
+      t: texts(lang),
+      themeClass: app.applyTheme(app.getWallpaper()),
+    })
+    app.setNavTitle('navDetail', lang)
+    if (options.id) {
+      this.setData({ noteId: options.id })
+      this.loadNote(options.id)
+    }
+  },
+
+  onShow() {
+    // 从看大图那一趟退回来不算"该重取"：内容还是这一篇，重取会让人看见整页闪一遍、
+    // 配图那一排先空再回来。只放过这一种入口——从编辑那一趟回来、或换了一篇，照旧重取。
+    const fromShot = this._shotFrom
+    this._shotFrom = 0
+    const shown = this.data.note
+    if (fromShot && shown && String(shown.id) === String(fromShot)) return
+    // Skip first show (onLoad already loaded), only reload on navigateBack
+    if (this.data.noteId && this.data._loaded) {
+      this.loadNote(this.data.noteId)
+    }
+  },
+
+  async loadNote(id) {
+    this.setData({ loading: true })
+    // 这一面旗每趟进门先落下：它只由 unlockOn 抬起（真验过一次）。原来只在私密那一支里复位，
+    // 一篇验过的笔记后来被改成非私密（或这一趟没走那个分支）时就一直立着，
+    // 于是每次 onShow 都白打两趟详情。
+    this._unlockRenewed = false
+    try {
+      let note = await api.getNote(id)
+      if (note.is_private && !(await privateGate.unlockOn(this, note))) {
+        // 没验过就一篇都不给看：收掉加载态，不留半截内容在屏上。
+        // 退哪儿由 exitOrHome 判（C4）：从分享码或深链直接落这一页时页面栈只有一层，
+        // 那时 `navigateBack` 是静默失败，人会停在一屏空白。
+        this.setData({ loading: false })
+        privateGate.exitOrHome()
+        return
+      }
+      if (this._unlockRenewed) {
+        // 刚验完必须重取一次：上一份是服务端裁过的空壳（正文、要点、概要都是 null），
+        // 直接渲染会渲染出一篇"什么都没有"的笔记。解锁凭证已经在 api.js 里存好了，
+        // 这一次带上请求头，服务端才发全文。手里那把还管用时不重取——白打一趟。
+        note = await api.getNote(id)
+      }
+      const lang = this.data.lang
+      // 有站名就只念站名，没站名才退到那六档（与列表、卡片那一格同一份实现）。
+      note.source_type_label = sourceLabelOf(note, lang)
+      // 官方那一篇（站长 10-18 给它定了名「帮助文档」）：编辑与分享两枚在这一篇上置灰、点了不办事。
+      // 判据用服务端那个 `source_type`，不靠标题也不靠"名下第一篇"。
+      note.is_preset = note.source_type === 'preset'
+      note.created_at_label = formatDateTime(note.created_at)
+      
+      // Resolve category name from categories list
+      let categoryName = null
+      if (note.category_id) {
+        try {
+          const categories = await api.getCategories()
+          const category = categories.find(c => c.id === note.category_id)
+          // 这一栏是给人看的，吃界面语言那一档（规则只在 utils/catText.js 那一份里）。
+          if (category) categoryName = labelOf(category, lang)
+        } catch (err) {
+          console.error('加载分类列表失败', err)
+        }
+      }
+      // 没分到任何一格里也照样念「未分类」：站长 10-18 那一刀的排布丙就是 `「未分类」· 公众号文章 · 10月18日`，
+      // 那一档空着会让人以为这一行缺了一栏。查不到（分类表那一趟挂了）而 category_id 有值时仍念空串，
+      // 与首页 `skin()` 里 `privKnown` 同一个口径：不知道的时候宁可少念，不猜。
+      note.category_name = categoryName || (note.category_id == null ? this.data.t.noCategory : '')
+      // 那一档两边的那对引号（中英两档不一样，规则只在 utils/catText.js）。
+      // 屏上念的是这一串；`category_name` 那一份原样留着给卡片模板那行小字吃，那张上面不裹引号。
+      note.catSeg = bracketOf(note.category_name, lang)
+
+      // 详情页头部沿用列表那一行的方块：颜色与构图必须和列表里那条一模一样，
+      // 所以复用 blockSkinFor，不在这另写一套取色规则。
+      const skin = blockSkinFor(note.category_id, note.id)
+      note.blockStyle = skin.style
+      // 中性面板里的序号圆点要借分类色，但不能贴方块那串——那会把整块面板染成色块
+      note.toneStyle = toneVars(note.category_id)
+      note.motif = skin.motif
+      // 方块上的字跟列表那条保持同一规则：第一个标签优先，没标签才回退分类名
+      const firstTag = (note.tags || []).map((x) => (x || '').trim()).find(Boolean) || ''
+      note.blockName = firstTag || note.category_name || (note.category_id == null ? this.data.t.noCategory : '')
+      note.date_label = formatShortDate(note.created_at)
+      // 转存进来的那一条才有：来源是服务端钉住的，编辑接口碰不到这一栏，所以这里只读。
+      note.imported_label = note.imported_from ? formatShortDate(note.imported_from.imported_at) : ''
+      // 那一排配图下面那两句实话（截了 N 张、M 张没存上），读的是同一份快照里的计数。
+      note.shots_note = shotsTruth(note.imported_from, this.data.lang)
+      
+      // noteImages 跟着这一篇重新起头：这一页会从"另一篇"navigateTo 进来，onShow 也会
+      // 用新的 id 重取。读图那一步要是慢了或失败了，留着上一篇的图就等于张冠李戴。
+      // detailCards 同理跟着重读一遍：从笔记卡片页生成完返回这一页走的就是 onShow → 这里，
+      // 右上那一格于是从「+」翻成那张缩略图——站长 10-07 报的就是这一页出完一张还能再点一次。
+      // 这一趟先吃本机那一份（cellFor：文件在就画它），紧接着 loadCard 再从服务器补一次——
+      // 本机那个 jpg 已经被系统清掉的那些，就是靠后一趟找回来的。
+      this.setData({
+        note, loading: false, _loaded: true, noteImages: [],
+        detailCards: cardCloud.cellFor(note.id),
+      })
+      this.loadShareStatus(note.id)
+      this.loadImages(note.id)
+      this.loadCard(note.id)
+      // 搜一搜索引页面标题：用笔记真实标题替代静态"笔记详情"
+      if (note.title) {
+        wx.setNavigationBarTitle({ title: note.title })
+      }
+    } catch (err) {
+      console.error('加载笔记失败', err)
+      this.setData({ loading: false })
+      wx.showToast({ title: t('loadFailed', this.data.lang), icon: 'none' })
+    }
+  },
+
+  // 私密解锁那一层（templates/pwd-sheet.wxml，与「我的」同一份）的三个把手。
+  // 方法名是模板里写死的那三枚——模板只能按名字找页面自己的方法，所以这三枚不许改名。
+  // 这一页的调用点在 loadNote：私密篇没验成就直接退回上一页，半截内容都不画。
+  onPwdBuf(e) { pwdSheet.input(this, e) },
+  onPwdOk() { pwdSheet.submit(this) },
+  onClosePwdPanel() { pwdSheet.cancel(this) },
+
+  // 这篇有哪些配图。
+  //
+  // 为什么先判 cloudReady 再打这个请求：`cloud://…` 这个地址只有在 wx.cloud.init 过的
+  // 环境里才画得出来（app.js onLaunch 那一步），环境 ID 没填时就算把行读回来也只能画出一
+  // 片破图。所以这一句同时挡住三件事：今天不新增任何请求、不出现破图、不让人以为"图丢了"。
+  async loadImages(noteId) {
+    // 后台那张官方配图（站长 10-18「默认笔记，后台也应该支持上传图片」）。这一页与详情窗
+    // 里那一排吃的是**同一个取口**（`mpAssets.serverPresetImage()`）、同一个形状（`{id, cloud_url}`），
+    // 所以那一格的分寸、横滑、点一下看大图都不用为它改画法。
+    const n = this.data.note
+    const remote = n && n.is_preset ? mpAssets.serverPresetImage() : null
+    const official = remote ? { id: 'preset-image', cloud_url: remote } : null
+    if (!cloudUpload.cloudReady()) {
+      // 用户自己那一排画不出来 ⇒ 不发这一趟请求（原口径）。后台那一张是 https、不吃这道门，
+      // 这一类该画的还是要画，否则会出现"列表右侧有图、点进来那一格是空的"那种自相矛盾的屏。
+      this.setData({ noteImages: official ? [official] : [] })
+      return
+    }
+    try {
+      const list = await api.getNoteAssets(noteId)
+      // 拿回来的路上这一页可能已经切到别篇（onShow 重取）——按当前这一篇对一下号再画。
+      if (String(this.data.noteId) !== String(noteId)) return
+      this.setData({ noteImages: [...(list || []), ...(official ? [official] : [])] })
+    } catch (err) {
+      // 配图读不到不该影响这篇笔记本身，界面上也就是少一排缩略图
+      console.warn('配图读取失败（不影响正文）', err && (err.errMsg || err.statusCode))
+    }
+  },
+
+  // 右上那一格画哪一张（2.0.1 S2）。**判据在服务器那一行 `note_cards` 上**，不在本机那个 jpg：
+  // 本机那张还在就照画（快、不花钱），不在了就用云上登记的这份顶上——后者就是站长 10-08
+  // 定性成严重问题的那一态（"版本更新之后卡片不见了"）。
+  // 先画本机那一份再等这一趟：这一格从来不是主流程，晚一拍补上比转圈合适。
+  async loadCard(noteId) {
+    if (!cloudUpload.cloudReady()) return
+    try {
+      const r = await cardCloud.refreshOne(noteId)
+      if (!r || String(this.data.noteId) !== String(noteId)) return
+      this.setData({ detailCards: cardCloud.cellFor(noteId) })
+    } catch (err) {
+      console.warn('卡片留档没读到（不影响正文）', err && (err.errMsg || err.statusCode))
+    }
+  },
+
+  // 远端那张图取不到时屏上只留一格空白，不出声（与首页那一条同一个探测器，10-18 全量审查）。
+  onRemoteImgError(e) {
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {}
+    const det = (e && e.detail) || {}
+    console.warn('远端配图取不到:', ds.slot || '?', ds.src || '?', det.errMsg || '')
+  },
+
+  // 点缩略图看大图。urls 给整排而不是那一张：大图态里左右划能划到这篇的其余几张。
+  onPreviewImage(e) {
+    const urls = this.data.noteImages.map((x) => x.cloud_url).filter(Boolean)
+    if (!urls.length) return
+    this._previewShot(urls, e.currentTarget.dataset.url)
+  },
+
+  // 看大图那一趟开在新页面里（官方文档原话「在新页面中全屏预览图片」），退回来平台补发一次 onShow，
+  // 而这一页的 onShow 一进门就 `loadNote()`——整页重转一遍、配图那一排先空再回来（与详情窗那处同一个
+  // 根子，10-18 站长「那条 BUG 没修」查出来的）。出去前记一格"这一篇是为了看大图才出去的"，
+  // onShow 只放过那一趟；开不成就在 fail 里当场撤掉：没有"退回来"那一趟，留着会顶住下一次真从编辑那趟回来。
+  _previewShot(urls, cur) {
+    this._shotFrom = this.data.noteId || 0
+    wx.previewImage({
+      current: cur && urls.indexOf(cur) >= 0 ? cur : urls[0],
+      urls,
+      fail: () => { this._shotFrom = 0 },
+    })
+  },
+
+  // 这篇对外不对外，只有服务端知道（海报可能是在另一台手机上生成的）。
+  async loadShareStatus(noteId) {
+    try {
+      const s = await api.getShareStatus(noteId)
+      this.setData({ shared: !!(s && s.active) })
+    } catch (err) {
+      // 读不到就不显示这一行。绝不能猜一个"没在公开"给人看——那等于把该收的东西留着。
+      console.error('分享状态读取失败', err)
+    }
+  },
+
+  onUnshare() {
+    const { noteId, lang } = this.data
+    wx.showModal({
+      title: t('unshare', lang),
+      content: t('unshareBody', lang),
+      confirmText: t('unshareConfirm', lang),
+      cancelText: t('cancel', lang),
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await api.revokeShare(noteId)
+          this.setData({ shared: false })
+          wx.showToast({ title: t('unshared', lang), icon: 'success' })
+        } catch (err) {
+          console.error('撤掉分享失败', err)
+          wx.showToast({ title: t('unshareFailed', lang), icon: 'none' })
+        }
+      },
+    })
+  },
+
+  onEdit() {
+    const { note } = this.data
+    // 官方那一篇改不了（站长 10-18「不能编辑（按钮置灰）」）。这一扇与 wxml 上那枚 `disabled` 是一对：
+    // 置灰只是画，挡住才是真挡；服务端 `notes.py` 那道 PUT 闸是第三层（老包打接口也一样拒）。
+    if (!note || note.is_preset) return
+    wx.navigateTo({ 
+      url: `/pages/write/write?id=${note.id}&mode=edit` 
+    })
+  },
+
+  onDelete() {
+    const { lang } = this.data
+    wx.showModal({
+      title: t('confirmDelete', lang),
+      content: t('cannotRestore', lang),
+      success: async (res) => {
+        if (res.confirm) {
+          // 先把这篇的云端地址记进待删那一格，再按删除。顺序反过来的那一种失败是：
+          // 服务端行没了、回体丢在网络上，那批对象就永久没人认得（只有客户端删得动）。
+          // 本机知道这些地址的时机就是现在——配图那一排与卡片那一格都是刚读回来的。
+          const known = this.data.noteImages.map((x) => x && x.cloud_url).filter(Boolean)
+          const card = cardCloud.serverCard(this.data.note.id)
+          if (card && card.cloud_url) known.push(card.cloud_url)
+          cloudUpload.reservePurge(known)
+          try {
+            const r = await api.deleteNote(this.data.note.id)
+            // 行是服务端删的，**对象只有这一侧删得动**（那台后端没有云开发凭据）。
+            // 不等它：这一句自己不会抛（cloudUpload 任何失败都回 0），而"删除成功"那声
+            // 吐司不该被一次清库存的慢请求拖住。
+            cloudUpload.dropFromDeleteRes(r)
+            // 这篇的卡片留档也跟着忘：服务端那几行是 delete_note 一起删的（回体里就带着
+            // 它们的 fileID），本机这一半漏了的话，SQLite 把同一个号发给下一篇时，
+            // 那一篇头上会挂着这一篇那张图。
+            cardCloud.forget(this.data.note.id)
+            wx.showToast({ title: t('deleteSucceeded', lang), icon: 'success' })
+            setTimeout(() => {
+              wx.navigateBack()
+            }, 1000)
+          } catch (err) {
+            // 这一篇没删掉，刚才记进待删那一格的地址就得撤回来（不撤＝下次进前台把还活着的那份删没）
+            cloudUpload.unreservePurge(known)
+            // 服务端回了原因的照实念（10-14 那道「自带那一篇是产品说明，删不掉」；与分类页
+            // `deleteCategory` 那一条同一个手法）。只回"删除失败"会让人以为按钮坏了，反复点。
+            wx.showToast({ title: (err.data && err.data.detail) || t('deleteFailed', lang), icon: 'none' })
+          }
+        }
+      },
+    })
+  },
+
+  toggleOriginal() {
+    this.setData({ showOriginal: !this.data.showOriginal })
+  },
+
+  openSourceUrl() {
+    const { source_url } = this.data.note
+    if (source_url) {
+      wx.setClipboardData({
+        data: source_url,
+        success: () => {
+          wx.showToast({ title: t('linkCopied', this.data.lang), icon: 'success' })
+        },
+      })
+    }
+  },
+
+  /* 右上那一格 = 这一页出卡片的唯一入口（底排那枚「生成笔记卡片」10-07 撤了，
+     同一件事不留两个把手；这条是 v20 那一稿早就拍了的口径）。两态两件事：
+     · 这篇留过卡片 → 看那一张大图（跟详情窗那格点了拉成品弹窗同一句话："点小图直接看大图"，
+       站长 10-04）。这一页没有画布，所以走 `wx.previewImage` 看台账里那份成品图。
+     · 一张都没有 → 去笔记卡片页生成。生成完回来这一格自己会翻成缩略图（见 loadNote）。
+     私密笔记走不到这里：那一格整块不渲染（与详情窗同一条口径），服务端也不许私密篇分享。 */
+  onCardCell() {
+    // 私密篇这一枚在屏上是置灰的，这里那一扇是它背后那一句：不发请求、不跳页
+    // （服务端 cards.py／shares.py 同一句；10-17 深夜他把这一格从"不画"改成"画出来但置灰"，
+    //  所以挡住这件事不能再靠"屏上没有落点"）。
+    if (this.data.note && (this.data.note.is_private || this.data.note.is_preset)) return
+    const cards = this.data.detailCards
+    if (cards && cards.length) {
+      // 大图吃云上那一份：本机那张在 USER_DATA_PATH 下，`<image>` 画得出来、previewImage 不认它
+      // （10-08 测试包报的"看到小图，大图看不到"）。没登记过云时才退回本机路径。
+      const url = cards[0].cloud || cards[0].p
+      if (!url) return
+      this._previewShot([url], url)
+      return
+    }
+    const { note } = this.data
+    if (!note) return
+    wx.navigateTo({ url: `/pages/share/share?id=${note.id}` })
+  },
+})

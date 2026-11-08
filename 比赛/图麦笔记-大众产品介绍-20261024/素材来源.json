@@ -1,0 +1,167 @@
+{
+  "assets": [
+    {
+      "asset": "study.jpg",
+      "source": "/Users/zlfmac/Documents/AgentsNote/vibe_images/tumarknote-study-chinese-student_1792810874489_7d1cc358.png",
+      "type": "AI-generated scenario, not a real customer or app capture",
+      "crop_fraction": null
+    },
+    {
+      "asset": "travel.jpg",
+      "source": "/Users/zlfmac/Documents/AgentsNote/vibe_images/tumarknote-travel-chinese-student_1792810921417_0b027398.png",
+      "type": "AI-generated scenario, not a real customer or app capture",
+      "crop_fraction": null
+    },
+    {
+      "asset": "creator.jpg",
+      "source": "/Users/zlfmac/Documents/AgentsNote/vibe_images/tumarknote-creator-chinese-student_1792810964390_6162834d.png",
+      "type": "AI-generated scenario, not a real customer or app capture",
+      "crop_fraction": null
+    },
+    {
+      "asset": "capture.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/docs/design/10-08创建入口暗面板/实测/B-照片三枚圈.png",
+      "type": "simulator screenshot captured 2026-10-22; new shared input panel",
+      "crop_fraction": [
+        0.025,
+        0.625,
+        0.975,
+        0.909
+      ]
+    },
+    {
+      "asset": "home-entry.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/docs/design/10-08创建入口暗面板/实测/A-收起态.png",
+      "type": "simulator screenshot captured 2026-10-22; new home layout",
+      "crop_fraction": [
+        0.001,
+        0.056,
+        0.999,
+        0.99
+      ]
+    },
+    {
+      "asset": "category-tabs.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/docs/design/10-18-列表头部间距/实测/30-列表头部-2.4.16.png",
+      "type": "2.4.16 simulator screenshot captured 2026-10-23; all note rows excluded",
+      "crop_fraction": [
+        0.015,
+        0.418,
+        0.985,
+        0.5
+      ]
+    },
+    {
+      "asset": "brightness.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/docs/design/10-08创建入口暗面板/实测/A-收起态.png",
+      "type": "simulator screenshot captured 2026-10-22; brightness, background and mood controls",
+      "crop_fraction": [
+        0.015,
+        0.632,
+        0.98,
+        0.658
+      ]
+    },
+    {
+      "asset": "extract-slider.jpg",
+      "source": "/Users/zlfmac/.qoder/tmp/-Users-zlfmac-Documents-AgentsNote/images/fb085725-0b39-4ece-bc6b-935e4051df68/fe0bd85c498f1c064ef3ea859b85a41e730b357bac6c13c2e4b02e56437962fd.jpeg",
+      "type": "physical-device screenshot supplied 2026-10-22; slider only; all private photos excluded",
+      "crop_fraction": [
+        0.095,
+        0.821,
+        0.905,
+        0.891
+      ]
+    },
+    {
+      "asset": "card.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-card.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "quote.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-quote.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "block.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-block.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "spec.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-spec.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "letter.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-letter.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "popGrid.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-popGrid.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "popDots.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-popDots.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "acid.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-acid.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "cover.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-cover.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "lit.jpg",
+      "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-大众产品介绍-20261024/assets/current-lit.png",
+      "type": "freshly rendered from local 2.4.16 product code in desktop Chrome; fictional note and profile, AI scenario photo, no note QR",
+      "crop_fraction": null
+    },
+    {
+      "asset": "logo.png",
+      "source": "docs/design/标识/图麦笔记logo-1024-透明底.png"
+    },
+    {
+      "asset": "qr.png",
+      "source": "比赛/图麦笔记-正式小程序码.png",
+      "status": "existing product entry code; no live scan verified in this run"
+    }
+  ],
+  "interface_revision": "New interface captures from 2026-10-22 and 2026-10-23; list screenshot explicitly 2.4.16; prior interface images removed from all brochure outputs",
+  "physical_device_evidence": {
+    "asset": "extract-slider.jpg",
+    "source": "User-supplied screenshot received 2026-10-22; cropped to extraction slider only"
+  },
+  "simulator_evidence": [
+    "docs/工具/验-统一录入条-真跑.js",
+    "docs/工具/验-列表头部间距-真跑.js"
+  ],
+  "card_render_record": "卡面重绘记录.json",
+  "copy_correction": "create.js writeTranslate true and three ingest paths pass translate; whitepaper old description not reused",
+  "limits": [
+    "Home, recording panel, category bar and appearance controls are developer-tool captures, not physical-device screenshots.",
+    "Cards are freshly drawn with local 2.4.16 code and bundled recipes, not live server recipes or physical-device captures.",
+    "Product entry QR not scanned during this task."
+  ],
+  "scene_prompts": {
+    "study": "Adult 22-year-old Chinese university woman reading and photographing printed text in a library, natural minimal makeup; warm ivory oak and black, no app UI.",
+    "travel": "Adult 22-year-old Chinese university woman with phone and menu in a coastal cafe, natural minimal makeup; warm ivory terracotta, no app UI.",
+    "creator": "Adult 22-year-old Chinese university woman arranging printed photos in a creative studio, natural minimal makeup; no app UI."
+  }
+}

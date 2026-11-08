@@ -1,0 +1,758 @@
+#!/bin/bash
+# 图麦笔记后端部署脚本（在服务器上执行）
+#
+# 本地上传：cd /Users/zlfmac/Documents/TuMaiBiJi/backend && ./upload.sh
+# 服务器部署：ssh agentsbin && cd /home/ubuntu/wtsj-backend && ./deploy.sh
+#
+# 进程由 systemd 托管：wtsj-api.service / wtsj-worker.service（Restart=always, enabled）。
+# 本脚本只重启 unit 并校验，绝不自己 nohup 拉进程 —— 旧版用 pkill+nohup 与 systemd
+# 抢 8000 端口，导致 wtsj-api 累计 crash-loop 5966 次；同时 pkill 的文本模式匹配不到
+# `rq worker default`，使旧 worker 长期不死，与新 worker 并存随机消费陈旧代码。
+#
+# 不用 set -e：脚本大量依赖命令返回非零来判断状态，交由函数显式返回。
+set -uo pipefail
+
+PROJECT_DIR="/home/ubuntu/wtsj-backend"
+VENV_DIR="$PROJECT_DIR/.venv"
+API_PORT=8000
+UNITS=(wtsj-api wtsj-worker)
+PUBLIC_URL="https://api.agentsbin.cn/wtsj/health"
+
+cd "$PROJECT_DIR"
+START_TS=$(date +%s)
+
+echo "=== 图麦笔记后端部署 ==="
+source "$VENV_DIR/bin/activate"
+
+RC=0
+
+# ---- 0. 版本指纹（只念，不判红）----
+# 为什么只念不判：`upload.sh` 打的是工作树，而工作树里常年躺着另一条线没提交的文件
+# （§8.492 收尾那一格：现网与 HEAD 此刻差 8 只，全是故意没上的）⇒ "不等"是常态，
+# 判红会把这道读数用废。真正"现网 ≠ 仓库"两个方向的判据在
+# `docs/工具/对账-现网那四目录.py --compare`，那把才负责红。
+# 放在重启之前而不是之后：下面任何一步 exit 1（语法闸门、libGL、备不出快照、迁移失败）
+# 都得先留下"这一趟上来的字节出自哪一次提交、当时工作树有多脏"，否则出事那一趟反而没记录。
+echo ""
+echo ">>> 版本指纹（upload.sh 打进包里的 DEPLOY_STAMP.txt）..."
+if [[ -f "$PROJECT_DIR/DEPLOY_STAMP.txt" ]]; then
+    sed 's/^/  /' "$PROJECT_DIR/DEPLOY_STAMP.txt"
+    echo "  · 只念不判：现网与仓库不等是常态（另一条路那 8 只故意没上）"
+else
+    echo "  · 包里没有 DEPLOY_STAMP.txt —— 这一趟没走 upload.sh（逐只 scp 或手工放的字节）；"
+    echo '  · 这一条不算红，但「现网那批字节等于哪一次提交」这个问题此刻没有证据可答。'
+fi
+
+# ---- 1. 语法闸门：坏代码不要推上去，否则 systemd 会反复拉起又崩溃 ----
+echo ""
+echo ">>> 语法检查..."
+if python -m compileall -q app > /tmp/tumaibiji_compile.err 2>&1; then
+    echo "✓ 语法通过"
+else
+    echo "✗ 语法错误，终止部署（未重启服务，线上保持旧版本继续运行）"
+    tail -20 /tmp/tumaibiji_compile.err
+    exit 1
+fi
+
+# ---- 1.2 入口 import 闸门（第九轮审计 Y5）----
+# 上面那道只编字节码：**"某一栏导不到"这种形状它过得去**（compileall 不执行 import），
+# 而那一形状重启之后就是全站起不来——症状不是"某个功能坏了"，是"整站没响应"。
+# 10-30 凌晨工作树里正摆着这一形状（主程序导一只已被标删的栏），所以补这一道。
+# 副作用先说清楚：`main.py` 里没有 `create_all`（见下面第 90 行那条注释），
+# 所以这一步只导模块、不建表，放在迁移之前不影响 alembic。
+echo ""
+echo ">>> 入口 import 检查（这一道量的不是语法，是「服务起不起得来」）..."
+if python -c "import app.main" > /tmp/tumaibiji_import.err 2>&1; then
+    echo "✓ 入口导得动"
+else
+    echo "✗ 入口 import 失败，终止部署（未重启服务，线上保持旧版本继续运行）"
+    tail -30 /tmp/tumaibiji_import.err
+    exit 1
+fi
+
+# ---- 1.5 系统库预检 + 数据库快照 ----
+# libGL / libglib 是当时手工 apt 装的，不在任何脚本里：换机器或重装系统后 opencv 会
+# 以 "ImportError: libGL.so.1" 复发（R13）。先查这两样，缺了就停下给命令，
+# 别让下面那个 OCR 预检抛一句看不懂的 import 错。
+echo ""
+echo ">>> 系统库预检（opencv 运行期依赖）..."
+MISS=""
+ldconfig -p 2>/dev/null | grep -q 'libGL\.so\.1' || MISS="$MISS libgl1"
+ldconfig -p 2>/dev/null | grep -q 'libglib-2\.0\.so\.0' || MISS="$MISS libglib2.0-0"
+if [[ -n "$MISS" ]]; then
+    echo "✗ 缺系统库：${MISS# }"
+    echo "  先装再部署：sudo apt-get install -y${MISS}"
+    exit 1
+fi
+echo "✓ libGL / libglib 在位"
+
+# 重启前给数据库留一份可恢复的快照。deploy.sh 本身不跑迁移，但一旦这次带上去的代码
+# 有意外（比如误删数据的路径），这份就是唯一能回头的东西；备不出来就别重启。
+echo ""
+echo ">>> 重启前数据库快照..."
+if [[ -x "$PROJECT_DIR/backup.sh" ]]; then
+    if "$PROJECT_DIR/backup.sh" | sed 's/^/  /'; then
+        echo "✓ 快照与恢复演练通过"
+    else
+        echo "✗ 备份/恢复演练失败，终止部署（服务未重启，线上仍是旧版本）"
+        exit 1
+    fi
+else
+    echo "✗ 找不到 $PROJECT_DIR/backup.sh，终止部署（不允许在没有回退点的情况下重启）"
+    exit 1
+fi
+
+# ---- 1.6 schema 迁移：表和列只有这一条路会长出来 ----
+# main.py 里没有 create_all，测试用例建表走 create_all、线上建表走 alembic，两条路对不上
+# 时测试全绿而线上在第一条写入时报 no such column —— 所以这一步既跑迁移，也按模型点一次名。
+# 放在备份之后：万一迁移出问题，1.5 那份快照就是唯一的回退点。
+echo ""
+echo ">>> 数据库迁移（alembic upgrade head）..."
+echo "  迁移前: $(python -m alembic current 2>&1 | tail -1)"
+# 迁移前先给"每篇的头图是哪张"留一个指纹，迁移之后回来对一次（下面的 2.3 那一段）。
+# 为什么在这里量：这一趟要动的那条不变量只有在这一刻量得出来——晚一步，真拖过序的行就混进来了。
+ASSET_ORDER_PRE=$(python <<'PY'
+import hashlib
+from sqlalchemy import create_engine, text
+from app.core.config import settings
+with create_engine(settings.DATABASE_URL).connect() as c:
+    rows = c.execute(text("SELECT note_id, object_key FROM assets ORDER BY note_id, sort_order, id")).all()
+    nz = c.execute(text("SELECT COUNT(*) FROM assets WHERE sort_order <> 0")).scalar()
+print(hashlib.md5("|".join(f"{a}:{b}" for a, b in rows).encode()).hexdigest() + " " + str(len(rows)) + " " + str(nz))
+PY
+)
+if [ -z "${ASSET_ORDER_PRE:-}" ]; then echo "✗ 迁移前那个头图指纹取不出来，终止部署"; exit 1; fi
+export ASSET_ORDER_PRE
+if python -m alembic upgrade head 2>&1 | sed 's/^/  /'; then
+    echo "  迁移后: $(python -m alembic current 2>&1 | tail -1)"
+else
+    echo "✗ 迁移失败，终止部署（服务未重启，线上仍是旧版本；库可用 1.5 的快照还原）"
+    exit 1
+fi
+
+python <<'PY'
+from sqlalchemy import create_engine, inspect, text
+
+from app.core.config import settings
+
+engine = create_engine(settings.DATABASE_URL)
+insp = inspect(engine)
+cols = {c["name"] for c in insp.get_columns("users")}
+tables = set(insp.get_table_names())
+missing = sorted({"quota_bonus", "invited_by", "generation", "private_password_hash"} - cols)
+if "invitations" not in tables:
+    missing.append("invitations 表")
+if missing:
+    print(f"  ✗ 迁移后仍缺：{'、'.join(missing)} —— 模型和库对不上，第一条写入就会炸")
+    raise SystemExit(1)
+# 邀请台账的幂等是数据库挡的，不是应用层记得住的。2026-10-01 起这本账拆成两半：
+# 动笔 +10 按"一个人一次"、转存 +1 按"这篇 × 这个人一次"，所以原来是 `invitee_id`
+# 全局 UNIQUE + 一篇一次，现在是两条各管一半的部分唯一索引。缺任何一条，
+# 应用层那道"先查一遍"在并发下都拦不住。
+with engine.connect() as conn:
+    inv_idx = {
+        r[0]: (r[1] or "") for r in conn.execute(text(
+            "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='invitations'"
+        ))
+    }
+for name, need in (
+    ("ux_invitations_first_note_per_invitee", "invitee_id"),
+    ("ux_invitations_import_once_per_pair", "source_note_id"),
+):
+    sql = inv_idx.get(name)
+    if not sql or "UNIQUE" not in sql.upper():
+        print(f"  ✗ invitations 缺部分唯一索引 {name}（去重没人挡，重复到账只是时间问题）")
+        raise SystemExit(1)
+    if need not in sql:
+        print(f"  ✗ {name} 建上了但钉的不是 {need}：{sql}")
+        raise SystemExit(1)
+    # WHERE 子句是这两条索引的全部意义：丢了它，动笔那条就退化成"一个人一辈子只能结一笔"，
+    # 谁先转存过就再也结不了动笔的 +10——而索引名和列名照样全对，只有这条能发现。
+    want_where = "source_note_id IS NULL" if name.endswith("first_note_per_invitee") else "source_note_id IS NOT NULL"
+    if want_where not in sql:
+        print(f"  ✗ {name} 缺部分索引的 WHERE {want_where}：{sql}")
+        raise SystemExit(1)
+if "uq_invitations_invitee" in {u["name"] or "" for u in insp.get_unique_constraints("invitations")}:
+    print("  ✗ invitations 上还挂着老的 invitee_id 全局唯一——那会让同一个人动笔之后再也结不了转存")
+    raise SystemExit(1)
+# 分享快照这两列是公开页要点/原文链接的唯一来源；缺一列就是扫码的人又只能看摘要。
+# 再确认"一篇笔记一张有效码"那个部分唯一索引真的建上了：没有它，并发建分享还是会
+# 给同一篇笔记发出好几张码，而用户撤的时候只关得掉他手里那一张。
+sh_cols = {c["name"] for c in insp.get_columns("shares")}
+missing = sorted({"key_points", "source_url", "author_name"} - sh_cols)
+if missing:
+    print(f"  ✗ shares 表迁移后仍缺：{'、'.join(missing)}")
+    raise SystemExit(1)
+# notes.imported_from 是"转存进来的那条把来源钉住"唯一的落点：没有它，接口会
+# 把来源信息静默丢掉，转存出来的笔记看不出是谁的哪篇，而这条不会报错。
+note_cols = {c["name"] for c in insp.get_columns("notes")}
+missing = sorted({"imported_from"} - note_cols)
+if missing:
+    print(f"  ✗ notes 表迁移后仍缺：{'、'.join(missing)}")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    one_code_idx = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND name='ux_shares_one_active_per_note'"
+    )).scalar()
+if not one_code_idx or "is_active" not in one_code_idx:
+    print("  ✗ shares 上缺 ux_shares_one_active_per_note（或它没带 is_active 条件）")
+    raise SystemExit(1)
+# 转存那条路给作者结的账要能回答"是哪篇笔记带来的"——这一列是那条去重的左半边。
+inv_cols = {c["name"] for c in insp.get_columns("invitations")}
+if "source_note_id" not in inv_cols:
+    print("  ✗ invitations 缺 source_note_id 列，转存那条激活记不到是哪篇带来的")
+    raise SystemExit(1)
+# ---- 2.0.1 卡片留档那条链（2026-10-08）----
+# users.contact_email：账号能力「我的邮箱」唯一的落点。缺它的话 GET/PUT 那两口会 500，
+# 但关于页与「我的」那一格是客户端画的，界面看着正常、一存就坏——所以在这里点一次名。
+if "contact_email" not in cols:
+    print("  ✗ users 缺 contact_email 列，邮箱换址那两口会当场炸")
+    raise SystemExit(1)
+# note_cards 是"卡片不见了"那一态的解药本体。表不在，POST /card 只是 500（还看得见）；
+# 真正静默的是**那条部分唯一索引丢了**：写口的代码照样"一篇一张"，但两个请求同时进来
+# 就能给同一篇留下两张当前，读回来哪张赢取决于 id 顺序——界面就成了不确定的。
+if "note_cards" not in tables:
+    print("  ✗ 缺 note_cards 表，卡片留档整条链没落点")
+    raise SystemExit(1)
+card_cols = {c["name"] for c in insp.get_columns("note_cards")}
+missing = sorted({"user_id", "note_id", "object_key", "tpl", "no_qr", "origin", "is_current"} - card_cols)
+if missing:
+    print(f"  ✗ note_cards 迁移后仍缺：{'、'.join(missing)}")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    card_idx = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND name='ux_note_cards_one_current_per_note'"
+    )).scalar()
+if not card_idx or "UNIQUE" not in card_idx.upper():
+    print("  ✗ note_cards 上缺那条部分唯一索引（一篇一张只剩代码里一句自觉）")
+    raise SystemExit(1)
+if "is_current" not in card_idx:
+    print(f"  ✗ ux_note_cards_one_current_per_note 建上了但没带 is_current 条件：{card_idx}")
+    raise SystemExit(1)
+# ---- 2.1 名片与背景亮度档那条链（2026-10-08）----
+# user_profiles 缺表的症状与 note_cards 同型：POST 会 500（看得见），而**静默的那一半**是
+# 客户端读不到就落回本机那份缓存——界面上"名片好好的"，换一台手机才发现四格全是空的。
+if "user_profiles" not in tables:
+    print("  ✗ 缺 user_profiles 表，名片与亮度档整条链没落点")
+    raise SystemExit(1)
+prof_cols = {c["name"] for c in insp.get_columns("user_profiles")}
+missing = sorted({"user_id", "name", "slogan", "slots", "tpl", "bg_dim"} - prof_cols)
+if missing:
+    print(f"  ✗ user_profiles 迁移后仍缺：{'、'.join(missing)}")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    prof_idx = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND name='ix_user_profiles_user_id'"
+    )).scalar()
+if not prof_idx or "UNIQUE" not in (prof_idx or "").upper():
+    print("  ✗ user_profiles.user_id 上缺那条唯一索引（一人一份只剩代码里一句自觉）")
+    raise SystemExit(1)
+# ---- 2.2 代次水位线那一条防线（2026-10-10）----
+# 症状是**登录 500**（`services/generation._row` 第一句就查这张表），所以表不在一定看得见。
+# 真正静默的是**那一格的值低于库里在用的代次**：这一格是"这张代表发过哪些号"唯一的记忆，
+# 而它只在有人注册时才被读——现网这批人手里还有 7 天有效期的旧 token（实测最高代次 39）。
+# 一旦那一格落后（迁移没跑到、有人手工清库、初值写成了 0），今天什么都不红；等 `users` 被
+# `DELETE /v1/account` 删空一次，下一个人就接走一个旧号，被删那人的旧钥匙当场开得了新人的门。
+# 这条不变量只有在这里、在还有活人的时候量得出来。
+if "generation_seq" not in tables:
+    print("  ✗ 缺 generation_seq 表（迁移 b71f4e0c9d52 没跑到），登录那一路第一句就炸")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    seq_val = conn.execute(text("SELECT value FROM generation_seq WHERE key='users'")).scalar()
+    gen_max = conn.execute(text("SELECT COALESCE(MAX(generation), 0) FROM users")).scalar()
+if seq_val is None:
+    print("  ✗ generation_seq 里 key='users' 那一行不在：取号第一步就 500")
+    raise SystemExit(1)
+if int(seq_val) < int(gen_max):
+    print(f"  ✗ 水位线 {seq_val} 低于库里在用的代次 {gen_max}："
+          "users 被删空之后取出的号会撞上旧 token（旧钥匙开得了新人的门）")
+    raise SystemExit(1)
+print(f"  ✓ generation_seq 那一格 = {seq_val}（≥ 库里最高代次 {gen_max}）")
+# assets.sort_order 是"编辑那一屏拖动配图"唯一的落点（迁移 a4d7e2b91c58，2026-10-19）。
+# 少了这一列，读那一组缩略图的 `order_by_note()` 会在**第一条请求**上炸 no such column——
+# 症状不是"排序不生效"，是详情窗/列表封面/卡片大图位三处一起 500。
+asset_cols = {c["name"] for c in insp.get_columns("assets")}
+if "sort_order" not in asset_cols:
+    print("  ✗ assets 缺 sort_order（迁移 a4d7e2b91c58 没跑到）：配图三处读图口当场 500")
+    raise SystemExit(1)
+# 这一条 10-21 改过口径，改的原因值得留着：原先钉的是"存量行必须全是 0"，
+# 那是**迁移当天**的一次性前提（那天空列刚建出来，非 0 只可能是迁移自己写的，症状＝他没拖东西、头图却换了）。
+# 拖动排序上线之后非 0 就是常态（第五十二次部署被它挡下那次，现网已经有 28 行是真拖出来的），
+# 前提没了，这条判据从此每次部署都红——而它挡的仍然不是它以为那件事。
+# 现在钉的是不变量本身：**这一趟部署前后，每篇的头图与那一排的顺序都不许变**。
+# 比旧的强：旧那条只看"有没有非 0"，看不见"顺序被改了什么"；新这条迁移真把顺序动了就红。
+import hashlib
+import os
+with engine.connect() as conn:
+    rows = conn.execute(text("SELECT note_id, object_key FROM assets ORDER BY note_id, sort_order, id")).all()
+    nz = conn.execute(text("SELECT COUNT(*) FROM assets WHERE sort_order <> 0")).scalar()
+now = hashlib.md5("|".join(f"{a}:{b}" for a, b in rows).encode()).hexdigest()
+_pre = (os.environ.get("ASSET_ORDER_PRE") or "").split()
+if len(_pre) != 3:
+    print("  ✗ 迁移前那个头图指纹没读进来（deploy.sh 上面那一步 ASSET_ORDER_PRE 挂了）：这一档等于没验")
+    raise SystemExit(1)
+pre_n, pre_total, pre_nz = _pre
+if now != pre_n:
+    print(f"  ✗ 这一趟部署改动了配图顺序（头图指纹 {pre_n[:12]}… → {now[:12]}…）："
+          "没人拖东西，头图却会换——用 1.5 那份快照还原，别重启")
+    raise SystemExit(1)
+if str(len(rows)) != pre_total:
+    print(f"  ✗ assets 行数在这一趟里变了：迁移前 {pre_total} 行，现在 {len(rows)} 行")
+    raise SystemExit(1)
+print(f"  ✓ assets.sort_order 到位（顺序指纹与迁移前一字不差；其中 {nz} 行非 0＝{pre_nz} 行，都是真拖过的那几行）")
+print("  ✓ users.quota_bonus / users.invited_by / users.generation / users.contact_email / invitations（两半各一条部分唯一索引：动笔按人、转存按这篇×人；老的 invitee 全局唯一已撤）/ shares.key_points / shares.source_url / shares.author_name / notes.imported_from / note_cards（含「一篇一张」那条部分唯一索引）/ user_profiles（含「一人一份」那条唯一索引）/ 一篇笔记一张有效码的索引 / generation_seq（代次水位线，含「那一格不许落后库里代次」那条不变量） 到位")
+PY
+if [[ $? -ne 0 ]]; then
+    echo "✗ schema 校验未通过，终止部署"
+    exit 1
+fi
+
+# ---- 1.7 卡片模板配方：默认只读体检，写库要显式开闸 ----
+# 为什么要有这道闸：这段原本无条件挂在部署主流程里，一旦跑就写库——灌十套种子，
+# 还会把同模板的旧 live 行翻成 archived。而站长 10-05 的口径是这批先不部署。
+# "不部署"不能只靠人记得没跑脚本：以后任何一次常规部署（哪怕部署的是别的事）都会顺带
+# 把这十行带进现网。所以默认这一行都不写，只报现状；真要灌的那天带 POSTER_TEMPLATES=1 跑。
+# 闸门开着时四道都查：表在不在、那条部分唯一索引在不在（没带 WHERE 就等于没有）、
+# 种子灌完 live 够不够条数、落库的每条配方再拿服务端那份校验器重跑一遍。
+# 种子唯一出处是 seed/poster_templates.json，它由 docs/工具/出-模板配方种子.js 从客户端
+# 现读的名单生成；迁移里不抄一份，启动时也不自动灌。
+# 四道都查的原因：客户端那条兜底是"下发失败就用包内那份"，而它是静默的——表里少一套、
+# 或灌进去的配方服务端读不懂，接口照样回 200，站长以为新模板生效了，用户看到的还是老卡片。
+echo ""
+echo ">>> 卡片模板配方表与种子（默认只读，写库需 POSTER_TEMPLATES=1）..."
+python <<'PY'
+import os
+
+from sqlalchemy import create_engine, inspect, text
+
+from app.core.config import settings
+from app.db.database import SessionLocal
+from app.models.poster_template import GROUP_KEYS
+from app.services.poster_recipe import validate_recipe
+from app.services.poster_templates import live_templates, seed_poster_templates, seed_rows
+
+GATE = os.environ.get("POSTER_TEMPLATES", "") == "1"
+
+engine = create_engine(settings.DATABASE_URL)
+insp = inspect(engine)
+if "poster_templates" not in set(insp.get_table_names()):
+    print("  ✗ 没有 poster_templates 表（迁移没跑到 a7d2e5b8c310）")
+    raise SystemExit(1)
+with engine.connect() as conn:
+    one_live_idx = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' "
+        "AND name='ux_poster_templates_one_live_per_template'"
+    )).scalar()
+if not one_live_idx or "status" not in one_live_idx or "WHERE" not in one_live_idx.upper():
+    print(f"  ✗ 缺 ux_poster_templates_one_live_per_template 那条部分唯一索引（或它没带 status 的 WHERE）：{one_live_idx}")
+    print("    没有它，同一个模板可以有两行 live，客户端按 id 合并时哪条赢取决于查询顺序")
+    raise SystemExit(1)
+
+if not GATE:
+    db = SessionLocal()
+    try:
+        n_live = len(live_templates(db))
+    finally:
+        db.close()
+    print(f"  ⏸ 闸门关着（没带 POSTER_TEMPLATES=1）：一行都没写，现有 live {n_live} 条")
+    print("    表本身会随上面的 alembic 自动建出来，这一步管的只是往库里灌那十套配方")
+    print("    live 为 0 时那个 GET 回空数组，客户端照画包内那十套，画面不变")
+    print("    真要下发那天：POSTER_TEMPLATES=1 bash deploy.sh")
+    raise SystemExit(0)
+
+want = seed_rows()
+# 先纯检查、再动库：灌到一半才发现某条不合格的话，其余那几条已经 commit 进表了，
+# 于是"部署失败、线上保持原样"这句承诺是假的——表里会少一套，而少一套是静默的
+# （客户端拿不到那一套就照用包内那份，画面看着对、其实新配方没生效）。
+dirty = []
+for r in want:
+    errs = validate_recipe(r["recipe"])
+    if errs:
+        dirty.append(f"{r['template_id']}: {'；'.join(errs)}")
+    elif r["group_key"] not in GROUP_KEYS:
+        dirty.append(f"{r['template_id']}: group_key「{r['group_key']}」不在名单里（能用的是 {'、'.join(GROUP_KEYS)}）")
+    elif r["recipe"].get("id") != r["template_id"]:
+        # 客户端 poster.js 那条规则一模一样：名字对、内容不对的配方，整套丢。
+        dirty.append(f"{r['template_id']}: 配方里的 id「{r['recipe'].get('id')}」与这行的 template_id 不一致")
+if len({r["template_id"] for r in want}) != len(want):
+    dirty.append("种子里同一个 template_id 出现了两次（客户端按 id 合并，留哪条看查询顺序）")
+if dirty:
+    print(f"  ✗ 种子有 {len(dirty)} 条不合格，一行都没写，部署到此为止：")
+    for line in dirty:
+        print(f"    　{line}")
+    print("    → 改完配方跑 node docs/工具/出-模板配方种子.js 重新生成，别手改这份 JSON")
+    raise SystemExit(1)
+
+db = SessionLocal()
+try:
+    report = seed_poster_templates(db)
+    if report["rejected"]:
+        # 上面那道纯检查过了就不该走到这里；真走到，说明两边校验的口径不一致——那是更要紧的红。
+        print(f"  ✗ 灌的时候仍有 {len(report['rejected'])} 条被拒（那几条没落库，其余照常落）：")
+        for line in report["rejected"]:
+            print(f"    　{line}")
+        raise SystemExit(1)
+    print(f"  灌种子：新增 {report['inserted']} / 原样不动 {report['unchanged']} / 收旧版 {report['archived']}")
+    live = live_templates(db)
+    if len(live) != len(want):
+        print(f"  ✗ live 只有 {len(live)} 条，种子有 {len(want)} 条")
+        raise SystemExit(1)
+    missing = sorted({r["template_id"] for r in want} - {x.template_id for x in live})
+    if missing:
+        print(f"  ✗ 这几套在种子里但库里没有 live 行：{'、'.join(missing)}")
+        raise SystemExit(1)
+    bad = [f"{x.template_id}: {'；'.join(validate_recipe(x.recipe))}" for x in live if validate_recipe(x.recipe)]
+    if bad:
+        print("  ✗ 落库的配方过不了服务端这份名单（下发出去客户端会整条丢掉）：")
+        for line in bad:
+            print(f"    　{line}")
+        raise SystemExit(1)
+    print(f"  ✓ poster_templates：{len(live)} 套 live，每条都过名单校验，一条模板最多一行 live 由索引兜着")
+finally:
+    db.close()
+PY
+if [[ $? -ne 0 ]]; then
+    # 这句话以前写的是"线上仍是旧版本"——那一半是假的（N16）：这一步真走到过落库那一支时，
+    # 旧行已经 status='archived'、新行已经 live，而 `/api/poster/templates/` 读的是库不是进程。
+    # 所以这里必须让操作者去看上面那几行到底动了什么，再决定要不要按 archived 那把把手撤回去。
+    echo "✗ 卡片模板配方这一步没过，终止部署（服务未重启）"
+    echo "  ⚠ 库里那一行可能已经翻了：旧行 archived、新行 live，下发口读的是库不是进程。"
+    echo "     上面每条被拒的都印了原因；要退回去，把那一行 status 改回 live、新行改 archived（秒级，不发版、不删行）。"
+    exit 1
+fi
+
+# ---- 2. OCR 运行期预检：依赖装没装对，只有真跑一张才知道 ----
+# 放在 restart 之前：这份自检会在独立进程里加载模型（本机两次读数 789.8MB / 816~826MB，
+# 这块常驻开销本身有几十 MB 抖动），失败说明依赖有问题、新代码推上去只会让线上多一个
+# 坏掉的功能，因此直接终止、不重启。
+echo ""
+echo ">>> 自建 OCR 预检..."
+python <<'PY'
+import asyncio
+import io
+import resource
+import sys
+import time
+
+try:
+    import cv2  # noqa: F401  GUI 版 opencv 在无桌面 Ubuntu 上会在此抛 OSError: libGL.so.1
+except Exception as exc:
+    print(f"  !! import cv2 失败：{exc}")
+    print("     修复：sudo apt install -y libgl1（或把 requirements 里的 opencv-python 换成 opencv-python-headless）")
+    sys.exit(1)
+
+from PIL import Image, ImageDraw
+
+from app.services.ocr import ocr_image
+
+img = Image.new("RGB", (760, 140), "white")
+ImageDraw.Draw(img).text((16, 50), "TUMAIJI SELFTEST OCR 123", fill="black")
+buf = io.BytesIO()
+img.save(buf, format="PNG")
+
+t = time.perf_counter()
+text = asyncio.run(ocr_image(buf.getvalue()))
+dt = time.perf_counter() - t
+peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 if sys.platform != "darwin" else 1048576)
+print(f"  识别耗时 {dt:.2f}s  峰值 RSS {peak:.1f} MB  文本={text!r}")
+assert "OCR" in text and "123" in text, "自检图像未识别出预期文字"
+PY
+if [[ $? -ne 0 ]]; then
+    # 同样不许说"线上保持旧版本"就完事：走到这一行时 §1.6 的迁移与 §1.7 的种子（开闸那一次）
+    # 已经在库里了，进程确实是旧的、库不一定是旧的（N16）。
+    echo "✗ OCR 预检失败，终止部署（未重启服务）"
+    echo "  ⚠ 上面 §1.6/§1.7 已经动过的东西不会自动退回去：schema 迁移与（若开了 POSTER_TEMPLATES=1）"
+    echo "     模板那几行都已落库。撤模板走那一行 status→archived，撤迁移要另走 downgrade，别顺手跑。"
+    exit 1
+fi
+echo "  ✓ OCR 链路可用（含首次模型加载；常驻进程复用同一引擎，后续单张更快）"
+
+# ---- 3. 记录重启前的 MainPID，用于确认「真的换了进程」----
+declare -A OLD_PID
+for u in "${UNITS[@]}"; do
+    OLD_PID[$u]=$(systemctl show "$u" -p MainPID --value 2>/dev/null)
+    [[ -z "${OLD_PID[$u]}" ]] && OLD_PID[$u]=0
+done
+
+echo ""
+echo ">>> 通过 systemd 重启服务..."
+for u in "${UNITS[@]}"; do
+    echo "  systemctl restart $u  (旧 MainPID=${OLD_PID[$u]})"
+done
+if ! sudo systemctl restart "${UNITS[@]}"; then
+    echo "✗ systemctl restart 失败"
+    sudo journalctl -u "${UNITS[0]}" -u "${UNITS[1]}" -n 20 --no-pager | tail -20
+    exit 1
+fi
+sleep 5
+
+# ---- 4. 校验每个 unit：active、MainPID 是本次新起的 ----
+echo ""
+echo ">>> 验证服务..."
+for u in "${UNITS[@]}"; do
+    state=$(systemctl is-active "$u" 2>/dev/null)
+    pid=$(systemctl show "$u" -p MainPID --value 2>/dev/null)
+    nrs=$(systemctl show "$u" -p NRestarts --value 2>/dev/null)
+
+    if [[ "$state" != "active" ]]; then
+        echo "✗ $u 状态为 $state"
+        RC=1
+        continue
+    fi
+    if [[ -z "$pid" || "$pid" == "0" ]]; then
+        echo "✗ $u 无 MainPID"
+        RC=1
+        continue
+    fi
+    st=$(stat -c %Y "/proc/$pid" 2>/dev/null)   # /proc/<pid> 的 mtime 即进程启动时刻
+    if [[ -z "$st" || "$st" -lt "$START_TS" ]]; then
+        echo "✗ $u MainPID=$pid 早于本次部署（代码未更新）"
+        RC=1
+        continue
+    fi
+    if [[ "$pid" == "${OLD_PID[$u]}" ]]; then
+        echo "✗ $u MainPID 未变化（$pid）—— 服务实际未被重启"
+        RC=1
+        continue
+    fi
+    echo "✓ $u  active  PID $pid  NRestarts=$nrs  启动于 $(ps -o lstart= -p "$pid" 2>/dev/null | xargs)"
+done
+
+# ---- 5. 孤儿检测：本项目目录下不允许有游离于 systemd 之外的进程 ----
+orphans=""
+for d in /proc/[0-9]*; do
+    p=${d#/proc/}
+    cwd=$(readlink "$d/cwd" 2>/dev/null)
+    [[ "$cwd" == "$PROJECT_DIR" ]] || continue
+    cmd=$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null)
+    [[ -n "$cmd" ]] || continue
+    # 命令行含 deploy.sh 的是本脚本自身的子 shell，跳过自匹配
+    [[ "$cmd" == *deploy.sh* || "$cmd" == *"systemctl "* ]] && continue
+    # 只看真能抢端口/抢队列的那类：uvicorn 和 rq worker（两个 unit 的 argv[0] 都是
+    # .venv/bin/python3）。上一轮 `./deploy.sh | tail -60` 里的 tail 继承了本目录当 cwd，
+    # 被判成"游离进程"，脚本还让我去 kill 它——假红比漏报更坑，因为它把注意力引偏。
+    [[ "$cmd" == *python* || "$cmd" == *uvicorn* || "$cmd" == *rq* ]] || continue
+    svc=$(awk -F/ '/0::/{gsub(/\.service$/,"",$NF); print $NF}' "$d/cgroup" 2>/dev/null)
+    if [[ "$svc" != "wtsj-api" && "$svc" != "wtsj-worker" ]]; then
+        orphans+="${p}(${svc:-非systemd}) "
+    fi
+done
+if [[ -n "$orphans" ]]; then
+    echo "✗ 发现游离进程，会与 systemd 抢端口/抢队列：$orphans"
+    echo "  处理：kill -TERM ${orphans%% *}"
+    RC=1
+else
+    echo "✓ 无游离进程（进程数与 unit 数一致）"
+fi
+
+# ---- 6. 端口归属必须是 wtsj-api 的 MainPID ----
+api_pid=$(systemctl show wtsj-api -p MainPID --value 2>/dev/null)
+port_pid=$(sudo ss -ltnp "sport = :$API_PORT" 2>/dev/null | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
+if [[ -n "$port_pid" && "$port_pid" == "$api_pid" ]]; then
+    echo "✓ 端口 $API_PORT 由 wtsj-api (PID $api_pid) 持有"
+else
+    echo "✗ 端口 $API_PORT 归属异常：监听者 PID=${port_pid:-无}，wtsj-api PID=${api_pid:-无}"
+    RC=1
+fi
+
+# ---- 7. HTTP 连通 ----
+code_local=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$API_PORT/docs" || echo 000)
+[[ "$code_local" == "200" ]] && echo "✓ 本机 /docs HTTP $code_local" || { echo "✗ 本机 /docs HTTP $code_local"; RC=1; }
+code_pub=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_URL" || echo 000)
+[[ "$code_pub" == "200" ]] && echo "✓ 公网 $PUBLIC_URL HTTP $code_pub" || { echo "✗ 公网健康检查 HTTP $code_pub"; RC=1; }
+
+# ---- 8. 配置自检（只报有无，绝不打印明文密钥）----
+echo ""
+echo ">>> 配置自检..."
+python <<'PY'
+from app.core.config import Settings, settings as s
+from app.services.llm import KNOWN_PROVIDERS, key_usable, provider_implemented
+
+# 缺失即【功能完全不可用】
+REQUIRED = {
+    "WECHAT_APP_ID": "微信登录（小程序进不去）",
+    "WECHAT_APP_SECRET": "微信登录（小程序进不去）",
+}
+# 缺失即【该条链路不可用】，但不影响其它功能
+FEATURE = {
+    "ADMIN_TOKEN": "运营后台 /ops（图与 Tips 两个写口；没配则一律 503，现网其它功能照常）",
+    "ADMIN_EXCHANGE_SECRET": "融合后台换票（图麦克那侧来验管理票的口；没配则该口 503，两边各自登录照常）",
+}
+# 缺失只是【降级】：采集照常入库，少掉自动提炼
+DEGRADABLE = {
+    "HUNYUAN_CF_URL": "提炼云函数地址（缺失则只存原文，任务不再失败）",
+    "HUNYUAN_CF_KEY": "提炼云函数触发凭据（缺失则只存原文，任务不再失败）",
+}
+# 截图 OCR 已无凭据依赖（自建 RapidOCR），已在第 2 节做过运行期预检。
+
+
+def unusable(name):
+    """空值或仍是 .env.example 里的占位串，都算未配置。"""
+    return not key_usable(str(getattr(s, name, "") or ""))
+
+
+print(f"  数据库类型: {s.DATABASE_URL.split('://')[0]}")
+missing = sorted(f"{v}  ← {k}" for k, v in REQUIRED.items() if unusable(k))
+deg_missing = sorted(f"{v}  ← {k}" for k, v in DEGRADABLE.items() if unusable(k))
+
+if missing:
+    print(f"  !! 缺失 {len(missing)} 项必需配置，对应功能在生产环境【完全不可用】：")
+    for m in missing:
+        print(f"     - {m}")
+    print("  !! 因此本次部署【不能】宣称核心功能已验证 —— 需先在 .env 补齐并重启。")
+else:
+    print("  ✓ 必需配置齐全（注意：这只是配置层面，接口是否真通仍需端到端验证）")
+
+# provider 单独判：未实现与没配凭据是两件事，混在一起会让人去查一个不存在的问题。
+provider = (s.EXTRACT_PROVIDER or "hunyuan_cf").strip()
+if provider not in KNOWN_PROVIDERS:
+    print(f"  · EXTRACT_PROVIDER={provider!r} 不在已知取值内，该 provider 未实现，走降级")
+elif not provider_implemented(provider):
+    print(f"  · EXTRACT_PROVIDER={provider!r} 该 provider 未实现，走降级")
+elif provider == "none":
+    print("  · EXTRACT_PROVIDER=none，按配置跳过提炼，只存原文")
+elif deg_missing:
+    print("  · 可降级项未配置（服务照常，功能降级）：")
+    for d in deg_missing:
+        print(f"     - {d}")
+
+# .env 被整份重写时最容易"静默少几行"——10-12 23:59 就是这么把提炼那两行弄丢的：
+# 改坏当天什么都没发生（进程里还是旧值），14 小时后站长第一次录笔记才暴露，
+# 而 deploy.sh 只在部署那一刻跑，所以它抓不到"两次部署之间的手改"。
+# 这里补一刀：拿最新那份 .env.bak-* 的键名做对照，少了键就单独念出来（值一个字不打）。
+import glob as _glob
+import os as _os
+
+
+def _keys(path):
+    out = set()
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                name = line.split("=", 1)[0].strip()
+                if line.count("=") and name.replace("_", "").isalnum() and name.isupper():
+                    out.add(name)
+    except OSError:
+        pass
+    return out
+
+
+_baks = sorted(_glob.glob(".env.bak*"), key=_os.path.getmtime)
+if _baks:
+    _lost = sorted(_keys(_baks[-1]) - _keys(".env"))
+    if _lost:
+        print(f"  !! 与最新备份 {_baks[-1]} 相比，.env 少了 {len(_lost)} 个键：{', '.join(_lost)}")
+        print("  !! 少键的症状通常是【静默降级】而不是报错——请逐个确认是故意删的还是重写时丢了。")
+    else:
+        print(f"  ✓ 键名与最新备份一致（{len(_keys('.env'))} 个，值不比对）")
+
+# 上面那一道只拿"最新一份备份"当基准，所以备份自己也缺键时它是绿的（10-25 审计 M1 附带的那条）。
+# 这一道换一个不会一起烂掉的基准：代码里现读的字段清单（Settings 的字段名）。双向都比——
+# 少了就是静默降级，多了就是打错字或留着已废弃的键。只念键名与值的长度，值一个字不打。
+_declared = set(Settings.model_fields.keys())
+_in_env = _keys(".env")
+_lost2 = sorted(_declared - _in_env)
+_extra = sorted(_in_env - _declared)
+if _lost2:
+    print(f"  !! .env 比代码少 {len(_lost2)} 个键：{', '.join(_lost2)}")
+    print("  !! 其中 JWT_SECRET_KEY / DATABASE_URL 缺失会让服务直接拒起，其余的键缺失是静默降级。")
+if _extra:
+    print(f"  · .env 里有 {len(_extra)} 个代码不读的键（不参与 pydantic 校验）：{', '.join(_extra)}")
+if not _lost2:
+    print(f"  ✓ 代码声明的 {len(_declared)} 个键在 .env 里全有（值不比对）")
+
+# 运营图这一条链：口令有没有配、闸门开没开，两件事都只在这台服务器上看得见，
+# 而它们的症状都是"点了没反应"——不念出来的话，下一次查这个问题的人（可能是我）
+# 会先去翻 nginx 日志。值一个字都不打印，只报有无（同上面 REQUIRED 那一条纪律）。
+feat_missing = sorted(f"{v}  ← {k}" for k, v in FEATURE.items() if unusable(k))
+if feat_missing:
+    print("  · 该条链路不可用（其余功能照常）：")
+    for m in feat_missing:
+        print(f"     - {m}")
+else:
+    print("  ✓ 运营图后台可用（/ops，管理口令已配置；口令值不打印）")
+if s.MP_ASSETS_FREEZE:
+    print("  ⏸ MP_ASSETS_FREEZE=1：运营内容下发已冻结（图和文案一起），后台怎么点都不影响线上（提审期用）")
+else:
+    print("  · MP_ASSETS_FREEZE=0：下发未冻结。")
+    print("    - 背景图：⚠ 现网那个包**已经在读**（10-15 查 nginx 日志：非 devtools 的 /api/mp/a 下载 12 条）")
+    print("      ⇒ 这一栏点「发布」当天就改真实用户看到的首页图，不是等下一个包")
+    print("    - 首屏 Tips：现网那个包里还没有 `serverTips` 这一段 ⇒ 要等下一个出包（2.2.0 那批）才跟着变。")
+    print("      判它生效没有，看模拟器/真机读到的是下发那份还是包里那六句，")
+    print("      别只看后台有没有点过「发布」（尺子：验-Tips下发收得进.js／验-Tips现网收到-真跑.js）")
+
+# 分享码指向哪个版本。留在 trial 就发布，等于让真实用户扫到一张只有体验成员
+# 才打得开的码——这个错在服务器上看不出来，只有拿别人手机扫才发现，所以每次部署都念一遍。
+if s.SHARE_QR_ENV_VERSION == "release":
+    print("  ✓ 分享小程序码指向 release（正式版），真实用户扫得开")
+else:
+    print(f"  !! SHARE_QR_ENV_VERSION={s.SHARE_QR_ENV_VERSION!r} —— 分享码指向的是非正式版，"
+          f"只有体验/开发成员扫得开。测试完必须改回 release 再发布。")
+PY
+
+# ---- 9. 内容安全端到端自检 ----
+# 这条必须是"真打一次"而不是"看配置有没有"：代码里 unavailable 一律放行（不能让微信侧
+# 抖动变成用户存不了笔记），所以一旦 openid 传错、凭据失效或接口没开通，机制会**静默失效**，
+# 只有这里能发现。断言两头：正常文本要 pass，已知违规文本必须被判下来。
+echo ""
+echo ">>> 内容安全自检（真打 msgSecCheck，用的是 100 次/天额度里的 2 次）..."
+python <<'PY'
+from app.core.config import settings
+from app.services.wechat import probe_sec_check
+import sqlite3
+
+if not settings.SEC_CHECK_ENABLED:
+    print("  ✗ SEC_CHECK_ENABLED=false —— 生产环境内容安全被关掉，公开出口等于没有过滤")
+    raise SystemExit(1)
+
+db = sqlite3.connect(settings.DATABASE_URL.split(":///")[-1] if "sqlite" in settings.DATABASE_URL else "")
+# 只要真 openid：微信的是 28 位，deploy-test 那种手写短串会被接口判 40003，
+# 拿它自检会得到"机制没生效"的假警报。
+row = db.execute("select openid from users where length(openid) >= 20 order by id desc limit 1").fetchone()
+db.close()
+if not row:
+    print("  ✗ 库里没有可用的真 openid，无法自检（msgSecCheck v2 的 openid 必填且必须真实）")
+    raise SystemExit(1)
+openid = row[0]
+print(f"  用最新一个账号的 openid 自检（长度 {len(openid)}，值不打印）")
+
+CLEAN = "厦门三日路线：鼓浪屿要早去早回，傍晚去沙坡尾拍照。"
+RISKY = "线上赌场 六合彩 特码 内部资料 稳赚 下注网址"
+a = probe_sec_check(openid, CLEAN)
+b = probe_sec_check(openid, RISKY)
+print(f"  正常文本 → {a['verdict']}；已知违规文本 → {b['verdict']}")
+
+# 三种"没检成"分开处理：额度是会自己好的，配置错不会。
+QUOTA = (45009, 44991)
+if a["errcode"] in QUOTA or b["errcode"] in QUOTA:
+    print("  !! 今天的 msgSecCheck 额度已打光 —— 这不算这次部署失败（代码没问题），")
+    print("     但今天剩下的所有内容检查都是静默放行，公开出口等于没过滤。")
+    print("     官方口径：未上架小程序 100 次/天，上架后 200 万次/天。")
+    print("     **提审/发布当天必须先跑通这条自检**：审核员会拿违规文本试 UGC 功能，")
+    print("     额度被前面的测试用掉的话，拦不住就是驳回。")
+    raise SystemExit(0)
+
+bad = []
+if a["verdict"] != "pass":
+    bad.append(f"正常文本被判成 {a['verdict']}（errcode={a['errcode']}，接口或凭据有问题）")
+if b["verdict"] not in ("risky", "review"):
+    bad.append(f"违规文本没被判下来（{b['verdict']}，errcode={b['errcode']}）——内容安全机制实际没在生效")
+for msg in bad:
+    print(f"  ✗ {msg}")
+if bad:
+    raise SystemExit(1)
+print("  ✓ 内容安全在生效：正常放行、违规拦得下")
+PY
+[[ $? -eq 0 ]] || RC=1
+
+echo ""
+if [[ "$RC" -eq 0 ]]; then
+    echo "=== 部署完成：服务已由 systemd 重启并确认为新进程 ==="
+    echo "日志：sudo journalctl -u wtsj-api -f    sudo journalctl -u wtsj-worker -f"
+else
+    echo "=== 部署异常：请按上面的 ✗ 项排查 ==="
+fi
+exit "$RC"

@@ -1,0 +1,812 @@
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.orm import Session
+from typing import Annotated, List, Optional
+from pydantic import BaseModel, Field, model_validator
+from datetime import datetime, timezone
+import logging
+from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
+from app.core.rate_limit import limiter
+from app.db.database import get_db
+from app.models.asset import Asset, not_failed, order_by_note
+from app.models.invitation import Invitation
+from app.models.note import Note, SOURCE_SHARE_IMPORT
+from app.models.share import Share
+from app.models.user import User
+from app.core.auth import get_current_user
+from app.core.private_access import (
+    LOCKED_DROP_DETAIL,
+    LOCKED_DROP_LIST,
+    NOTE_BRIEF_FIELDS,
+    NOTE_DETAIL_FIELDS,
+    is_private_note,
+    locked_view,
+    private_category_ids,
+    unlocked,
+)
+from app.core.timefmt import UTCDatetime, UTCDatetimeOrNone
+from app.core.errors import UserError
+from app.services import daily_budget
+from app.services.wechat import enforce_text_safety
+from app.services.sharing import (
+    SNAPSHOT_COLUMNS,
+    active_shares,
+    close_shares,
+    public_fields,
+    sync_snapshot,
+)
+from app.services import quota
+from app.services.preset_note import PRESET_EDIT_MSG, is_help_doc, touches_content
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# 模型上写的 String(500) 在 SQLite 上只是装饰：实测 500 万字的标题、2 千万字的正文
+# 都照样 200 存进去，三次请求就把库撑到 74MB。而 title 会进列表响应，一条超长标题
+# 足以让每个人的首页拉不动。长度只能在入口这一层卡。
+# MAX_BODY / MAX_SUMMARY 特意和内容安全的送检窗口（wechat.SEC_CHUNK * SEC_MAX_CHUNKS
+# = 16,000 字/字段）对齐：再长的话，超出那部分永远检不到，用户只要把违规内容垫在
+# 一万六千字之后就绕过了公开分享那道闸。抓取来的正文由 worker 直接落库、不走这里，
+# 所以这个上限只约束手打的量——一万六千字已经远超任何真人笔记。
+MAX_TITLE = 500
+MAX_SUMMARY = 16_000
+MAX_BODY = 16_000
+MAX_URL = 1000
+MAX_LIST_ITEMS = 50
+MAX_ITEM_LEN = 200
+# 列表翻页那一栏的上界（见 `list_notes` 里那条注释）。
+MAX_SKIP = 100_000
+
+Title = Annotated[str, Field(max_length=MAX_TITLE)]
+# 只有**写入口**才卡这一栏不许空着，读模型（`NoteBrief` 那一族）故意不吃它：
+# 库里万一已经躺着一行空标题，把 min_length 加到共享的那个 `Title` 上会让列表当场
+# 校验失败——那是拿一处脏数据去把一整屏打成 500。抓取那一条口本来就是 `min_length=1`
+# （`routes/ingest.py`），两条写入口一个拦一个不拦才是今天的不一致。
+# ⚠ 它拦的是"一个字也没有"，不拦"只有空格"——后者客户端 `write.js:234` 的 `!title.trim()` 拦着，
+#    服务端这一层要不要一起收严他没拍过，我不动。
+TitleIn = Annotated[str, Field(min_length=1, max_length=MAX_TITLE)]
+Summary = Annotated[str, Field(max_length=MAX_SUMMARY)]
+Body = Annotated[str, Field(max_length=MAX_BODY)]
+Url = Annotated[str, Field(max_length=MAX_URL)]
+Item = Annotated[str, Field(max_length=MAX_ITEM_LEN)]
+Items = Annotated[list[Item], Field(max_length=MAX_LIST_ITEMS)]
+
+
+# 手动笔记里"用户自己写的、落库前要过内容安全"的那几列。创建和编辑两条路共用这一份：
+# 少列一个字段，就等于"改那个字段时不复检"。key_links 原本就是这么漏掉的——它客户端
+# 可写，又会出现在公开分享页上，却一次都没进过 msgSecCheck。
+MANUAL_TEXT_FIELDS = ("title", "summary", "key_points", "tags", "key_links", "content")
+
+
+def _guard_manual_text(user: User, note) -> None:
+    """用户自己写的内容在落库前过一遍微信内容安全；命中违规回 400 + 中文。
+
+    只卡 manual：链接抓取和截图识别带进来的是外部原文，一篇旧文章里出现一个
+    敏感词就让整条笔记存不下来，是误伤。真正需要过滤的是"公开可见"那一刻，
+    所以那条放在创建分享里（shares.create_share 会校验整条笔记）。
+    """
+    if getattr(note, "source_type", None) != "manual":
+        return
+    try:
+        budget = daily_budget.charge(str(user.id), daily_budget.KIND_SEC_CHECK)
+        if not budget.ok:
+            raise HTTPException(status_code=429, detail=budget.message)
+        enforce_text_safety(
+            user.openid,
+            *(getattr(note, f, None) for f in MANUAL_TEXT_FIELDS),
+        )
+    except UserError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class NoteBrief(BaseModel):
+    id: int
+    title: str
+    summary: str | None
+    tags: list | None
+    source_type: str
+    source_url: str | None
+    category_id: int | None
+    is_pinned: bool
+    created_at: UTCDatetime
+    # 这一篇是从哪一家存的（站长 10-29「把目前来源标注的网页文章，改为具体的网站文章，
+    # 例如：小红书文章，网易文章」）。两栏都直接读 `Note` 上那对 property，接口这里不重算一遍
+    # ——读的实现只有模型那一处，写在 `services/site_names.snapshot_fields` 那一处。
+    # 空串＝四级链没认出来，屏上退到 `source_type` 那六档通用文案（不许画出一个空格）。
+    # ⚠ 这两栏**不许进** `core/private_access.NOTE_BRIEF_FIELDS`／`NOTE_DETAIL_FIELDS`：
+    #    私密篇没解锁时行是按那两份名单重建的，站名虽然不是正文，也告诉别人这篇是从哪儿抄的。
+    #    钉住这一条的是 `tests/test_site_names.py` 里那条正反用例，与封面那两条同一个路子。
+    source_site: str = ""
+    source_site_en: str = ""
+
+    class Config:
+        from_attributes = True
+
+
+class NoteDetail(NoteBrief):
+    key_points: list | None
+    key_links: list | None
+    content: str | None
+    original_content: str | None
+    updated_at: UTCDatetimeOrNone
+    imported_from: dict | None = None
+    is_private: bool = False
+
+
+class NoteListItem(NoteBrief):
+    """列表那一行比详情多出来的四样：这一篇此刻有没有开着的分享码、有没有被人存下来、
+    该显示谁的昵称、右侧那枚配图。
+
+    只挂 GET /api/notes 这一条路由。详情页另走 getShareStatus，如果两处都发一份
+    同样的事实，早晚会出现"列表说已分享、详情说没有"这种对不上的样子——所以
+    NoteDetail 故意不继承这个类。
+    """
+
+    has_active_share: bool = False
+    # 列表上那一枚星现在念的是「有人把这一篇存下来了」（站长 10-23 一句「我要改为，有人转存，就加星」）。
+    # 真相只有一处：`invitations` 里 `source_note_id` 非空那一路的凭据行。它天然不含"自己转自己"
+    # （`quota._credit_import` 那一刀挡着，`test_quota_and_invite.py::test_自己转存自己的笔记不给钱`
+    # 连"一行都不写"都钉了），也天然一人一行（`(source_note_id, invitee_id)` 那条部分唯一索引挡着），
+    # 所以这一枚不数人头。⚠ 不许改回吃 `shares`：撤掉分享那张码，已经被人存走的几份收不回来，
+    # 星跟着灭就是假话。`has_active_share` 仍照发——它在 1.x 那份契约快照里撤不得，
+    # 只是列表上再没有哪一枚图形读它（"此刻开不开着码"改由详情窗那句念，走 getShareStatus 另一条真相源）。
+    has_saved: bool = False
+    share_author_name: str | None = None
+    # 「这一格该不该画名字」由服务端回答，不再让前端拿 `source_type === 'share_import'` 自己猜。
+    # 为什么必须换：外链转存那一族（公众号／小红书）也带来源，但它的 `source_type` 是
+    # `wechat_article`／`web_article`，**不许改成 `share_import`**（那枚值在配额里有专门用途，
+    # `quota._is_his_first_note` 把它从"他自己动笔"里排出去、`credit_import` 的账也认它）。
+    # 判的是"快照里有没有一个真的作者名**或有站名**"，不是"快照存不存在"——只有贴图计数、
+    # 两个名字都没有那一态不该在屏上画出一个空名字。
+    # ⚠ 后半句是 10-29 加的（待拍⑤按默认甲落，他一句「继续实现剩余的四项配置」）：
+    # 网易那一类页今天没有作者名、只有站名，原来这一枚回 `False` ⇒ 来源那一整行不画，
+    # 他这次点的就是那一格，只做名字而那一行还不画＝改了一半（方案第五节）。
+    # 它不进 `NOTE_BRIEF_FIELDS`：私密篇锁着时那一行按九栏重建，出不了 `False` 之外的东西。
+    has_source: bool = False
+    # 列表右侧那枚缩略图（云开发 fileID，客户端拿去 getTempFileURL）。一篇只给一张，
+    # 取哪一张见 _attach_covers。没配过图、或那一张备份失败 ⇒ null，界面上那一格不画。
+    # ⚠ 这一栏**不许**进 NOTE_BRIEF_FIELDS：私密篇没解锁时那一行是按那九栏重建的，
+    #    白名单是这一闸唯一的屏障——一张照片里可能正写着密码、脸、票据。
+    cover_file_id: str | None = None
+
+
+class NoteCreate(BaseModel):
+    title: TitleIn
+    summary: Optional[Summary] = None
+    key_points: Optional[Items] = None
+    key_links: Optional[Items] = None
+    tags: Optional[Items] = None
+    content: Optional[Body] = None
+    original_content: Optional[Body] = None
+    # source_type 故意不在这个模型里：它是"要不要过内容安全"的开关（见 _guard_manual_text），
+    # 交给客户端填等于让客户端自己决定是否被审查。抓取/截图来的笔记由 worker 直接落库，
+    # 不走这个入口，所以 HTTP 建的一律是 manual。客户端多传的这个字段会被 Pydantic 忽略。
+    source_url: Optional[Url] = None
+    category_id: int | None = None
+
+
+class NoteUpdate(BaseModel):
+    title: Optional[TitleIn] = None
+    summary: Optional[Summary] = None
+    key_points: Optional[Items] = None
+    key_links: Optional[Items] = None
+    tags: Optional[Items] = None
+    content: Optional[Body] = None
+    original_content: Optional[Body] = None
+    source_url: Optional[Url] = None
+    category_id: int | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_null_title(cls, values):
+        if isinstance(values, dict) and "title" in values and values["title"] is None:
+            values.pop("title")  # Remove null title so it won't be updated
+        return values
+
+
+def _attach_share_marks(db: Session, notes: list) -> None:
+    """给这一页的每条笔记挂上「此刻有没有开着的码」「有没有人把它存下来」和「那一格该显示谁的昵称」。
+
+    一次 IN 查完，不逐篇查：一页 20 篇各自查一次，首页拉一次就是 20 个来回。
+    shares 上有"一篇只留一张开着的码"那个部分唯一索引（models/share.py），所以一个
+    note_id 至多命中一行，做成字典不会互相覆盖。
+    昵称那一格说的是"这篇打哪儿来"，所以两头都有来源，而**转存那份优先**：
+    从别人那儿转存来、之后自己又分享出去的那一篇，两张名字同时可得，取的是原分享者那份
+    （码上快照的 author_name 是他自己，画在自己纸片上不说明任何事）。
+    两头都没有就留空——界面上那一格不画名字，不拿"图麦"这类假名去填。
+    「存过没有」只问 `invitations` 有没有那一行，不问几个人存的：星是一枚布尔，不是计数。
+    """
+    ids = [n.id for n in notes]
+    shared: dict = {}
+    saved: set = set()
+    if ids:
+        shared = {
+            row[0]: row[1]
+            for row in db.query(Share.note_id, Share.author_name)
+            .filter(Share.note_id.in_(ids), Share.is_active == True)  # noqa: E712
+            .all()
+        }
+        saved = {
+            row[0]
+            for row in db.query(Invitation.source_note_id)
+            .filter(Invitation.source_note_id.in_(ids),
+                    Invitation.source_note_id.is_not(None)).distinct().all()
+        }
+    for n in notes:
+        n.has_active_share = n.id in shared
+        n.has_saved = n.id in saved
+        imported = n.imported_from if isinstance(n.imported_from, dict) else {}
+        n.share_author_name = imported.get("author_name") or shared.get(n.id)
+        # 名字来自"抄自谁"那一份快照时才算来源篇；只来自自己那张分享码的不算
+        # （画在自己纸片上不说明任何事——这条判据原来只能靠 `source_type` 猜，见 NoteListItem 那行注释）。
+        n.has_source = bool(imported.get("author_name") or imported.get("site_name"))
+
+
+def _attach_covers(db: Session, uid: str, notes: list) -> None:
+    """给这一页每条笔记挂上右侧那枚配图（`cover_file_id`，一篇一张）。
+
+    一次 IN 查完，理由与 `_attach_share_marks` 那行注释同：一页 20 篇逐篇问就是 20 个来回，
+    而这一栏本来一条查询就能取完。
+
+    三条口径写在这儿，免得下一个人按自己的读法改错：
+    ① **取哪一张**＝`order_by_note()` 的第一张（`sort_order` 升序、同值再按 `id`）。这不是
+       "随便挑一张"，而是**与详情页那组缩略图同一个序**（`routes/assets.py` 的 `list_note_assets`
+       吃的就是同一个函数）——两处各挑一张的话，"列表上那枚"和"点进去第一张"就会不是同一张图。
+       10-19 起这一档从"注释里的约定"变成屏上看得见的差别：编辑那一屏拖动排序改的就是
+       `sort_order`，少改一处就是他拖完、列表上那枚还是旧那张。
+    ② **必须过 `not_failed()`**：`backup_status='failed'` 的行云上根本没有对象，
+       拿它当封面就是一张碎图；历史遗留的 NULL 跟着算进来（那个函数头写清楚了为什么）。
+    ③ **带上 `user_id` 这一道**：`note_id` 已经由外层那条 `Note.user_id == user.id` 限过，
+       这里是第二把锁——B 链那批行是"先传图后绑 note_id"，绑错一篇的可能形状就在这儿。
+
+    没配过图、或那一篇的图全部备份失败 ⇒ 留 null，界面上那一格不画（他原话"没有不显示"）。
+    """
+    ids = [n.id for n in notes]
+    cover: dict = {}
+    if ids:
+        for nid, key in (
+            db.query(Asset.note_id, Asset.object_key)
+            .filter(
+                Asset.note_id.in_(ids),
+                Asset.user_id == uid,
+                not_failed(),
+            )
+            .order_by(Asset.note_id, *order_by_note())
+            .all()
+        ):
+            cover.setdefault(nid, key)  # 按 (sort_order, id) 升序，第一篇命中的就是它当前排第一那一张
+    for n in notes:
+        n.cover_file_id = cover.get(n.id)
+
+
+@router.get("/", response_model=List[NoteListItem])
+def list_notes(
+    request: Request,
+    # 上下界都得卡，只卡 `limit` 是漏了一半：`skip` 裸 `int` 时框架原样放行超大整数
+    # （本地实测 `skip=10^21` 进得了业务层），而 SQLite 驱动绑一个超过 int64 的数会当场抛
+    # `OverflowError`——一个查询参数把接口打成 500。负数更阴：SQLite 不报错，等于回到第一页，
+    # 客户端翻页会翻出一堆重复行。这一档上界（10 万）远高于任何一个真人的篇数，
+    # 又远低于驱动那一层会炸的数，两头都不许从查询参数走进来。
+    skip: int = Query(0, ge=0, le=MAX_SKIP),
+    limit: int = Query(20, ge=1, le=100),
+    category_id: int | None = None,
+    # 搜索串也要有上界：这一栏原样进 `LIKE '%…%'` 扫全表正文，一条没有长度的串等于
+    # 拿一次请求烧一轮 CPU（N13）。档位用的是现成的 `MAX_ITEM_LEN`（一条标签/要点那两栏的尺），
+    # 不是新造的数——搜索框本来就装不下 200 字。
+    search: Annotated[str | None, Query(max_length=MAX_ITEM_LEN)] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    private_ids = private_category_ids(db, user.id)
+    # 这一条路由上"解没解锁"只判一次，下面裁字段和搜索条件共用同一个答案。
+    # 分开判会漏：搜索那支要是自己按"未解锁"判，裁字段却按另一个答案走，
+    # 就等于留了一条"用搜索探正文"的旁路。
+    locked = bool(private_ids) and not unlocked(request, user)
+    q = db.query(Note).filter(Note.user_id == str(user.id))
+    if category_id is not None:
+        q = q.filter(Note.category_id == category_id)
+    if search:
+        escaped = search.replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        title_like = Note.title.ilike(pattern, escape="\\")
+        body_like = or_(
+            Note.summary.ilike(pattern, escape="\\"),
+            Note.content.ilike(pattern, escape="\\"),
+            Note.original_content.ilike(pattern, escape="\\"),
+        )
+        if locked:
+            # 锁着的时候私密笔记只有标题参与搜索——"这篇里有没有某个词"这个问题，
+            # 原来的搜索会老老实实用命中与否来回答，那本身就是正文的旁漏。
+            # 未分类的 category_id 是 NULL，而 `NULL NOT IN (...)` 判的是 NULL 不是真，
+            # 所以要把 NULL 显式并进来，否则普通笔记会从搜索结果里凭空消失。
+            q = q.filter(
+                or_(
+                    title_like,
+                    and_(
+                        body_like,
+                        or_(Note.category_id.is_(None), Note.category_id.notin_(private_ids)),
+                    ),
+                )
+            )
+        else:
+            q = q.filter(or_(title_like, body_like))
+    # 站长 10-04 真机报：「排序没有按照日期倒序，要改」。根因就是原来这里前两档
+    # （`is_pinned DESC, pinned_at DESC`）——置顶这个能力在客户端 10-03 已经整条撤净
+    # （列表、详情窗、独立详情页三处入口都没了），而他库里那两篇还是钉着的
+    # （实测 notes.id=7、id=8 `is_pinned=1`），于是 09/23 那篇压在 10/04 那篇上面。
+    # 只清数据不改这条，以后任何一篇被别的路径钉上就又会跳顶，所以撤的是规则本身。
+    # `pin_note` 那个接口与 is_pinned/pinned_at 两列暂时留着（动路由和删列要另一次部署，另拍）。
+    notes = (
+        q.order_by(Note.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    # 挂在这一步而不是最后一步：下面 locked 那支只裁私密那几行，普通笔记仍是原对象，
+    # 两支出门都得带着这两样。
+    _attach_share_marks(db, notes)
+    # 封面与它同一个位置、同一套规矩：先给每一行都算出来，私密那几行由下面那份白名单
+    # （`NOTE_BRIEF_FIELDS` 九栏，不含 `cover_file_id`）挡在门外。看着像多做了一遍，
+    # 但"少列一个字段就等于那个字段照给"是这份代码里反复踩过的一条 ⇒ 挡人的是白名单，
+    # 钉住它的是 tests/test_list_cover.py 那两条正反用例，不是这段的自觉。
+    _attach_covers(db, str(user.id), notes)
+    if not locked:
+        return notes
+    # 概要跟着正文一起裁：界面上它只在验过密码、展开那一行时才画，所以裁掉不影响
+    # 正常流程；不裁才是原来的样子——列表响应里直接躺着私密笔记的概要。
+    out = []
+    for n in notes:
+        if not is_private_note(n, private_ids):
+            out.append(n)
+            continue
+        row = {f: getattr(n, f) for f in NOTE_BRIEF_FIELDS}
+        for f in LOCKED_DROP_LIST:
+            row[f] = None
+        out.append(row)
+    return out
+
+
+@router.get("/{note_id}", response_model=NoteDetail)
+def get_note(
+    request: Request,
+    note_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    note = (
+        db.query(Note)
+        .filter(Note.id == note_id, Note.user_id == str(user.id))
+        .first()
+    )
+    if not note:
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
+    note.is_private = is_private_note(note, private_category_ids(db, user.id))
+    if note.is_private and not unlocked(request, user):
+        # 回 200 + 裁过的正文，而不是 403：详情页要先拿到这条笔记的形状才知道
+        # "这是一篇私密的、该弹密码框"。is_private 仍然如实带着，客户端拿它决定弹哪一层。
+        return locked_view(note, NOTE_DETAIL_FIELDS, LOCKED_DROP_DETAIL)
+    return note
+
+
+@router.post("/", response_model=NoteDetail)
+def create_note(
+    note: NoteCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from app.models.category import Category
+    
+    # Validate category ownership if provided
+    if note.category_id is not None:
+        category = (
+            db.query(Category)
+            .filter(Category.id == note.category_id, Category.user_id == str(user.id))
+            .first()
+        )
+        if not category:
+            raise HTTPException(status_code=400, detail="分类不存在或无权使用")
+
+    db_note = Note(**note.model_dump(), user_id=str(user.id), source_type="manual")
+
+    # 检的是 db_note 而不是入参 note：_guard_manual_text 靠 source_type 决定要不要检，
+    # 而 source_type 刚在上面由服务端钉死，入参里已经没有这个字段了。
+    _guard_manual_text(user, db_note)
+
+    db.add(db_note)
+    db.commit()
+    db.refresh(db_note)
+    quota.credit_first_note(db_note, db, user)
+    return db_note
+
+
+@router.put("/{note_id}", response_model=NoteDetail)
+def update_note(
+    request: Request,
+    note_id: int,
+    note: NoteUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from app.models.category import Category
+    
+    db_note = (
+        db.query(Note)
+        .filter(Note.id == note_id, Note.user_id == str(user.id))
+        .first()
+    )
+    if not db_note:
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
+    
+    update_data = note.model_dump(exclude_unset=True)
+
+    # 官方那一篇内容改不了（站长 10-18「这类笔记，不能编辑（按钮置灰）」）。闸必须在服务端：
+    # 界面上那一枚灰了挡不住线上那个老包，也挡不住直接打接口。
+    # **只挡内容那五栏，`category_id` 仍放行**：`pages/write/write.js:290` 只发"真动过的那几栏"，
+    # 线上那个包里有一条单纯挪分类的 PUT，把它一起挡掉等于把老包的归类功能打坏（那句"私密篇挪进私密
+    # 分类要顺手清卡片"的接线也跟着断）。新包里这一篇的编辑钮整个灰、进不去那一屏，所以界面上改不了。
+    if is_help_doc(db_note) and touches_content(update_data):
+        raise HTTPException(status_code=400, detail=PRESET_EDIT_MSG)
+
+    # Validate category ownership if provided
+    if "category_id" in update_data and update_data["category_id"] is not None:
+        category = (
+            db.query(Category)
+            .filter(Category.id == update_data["category_id"], Category.user_id == str(user.id))
+            .first()
+        )
+        if not category:
+            raise HTTPException(status_code=400, detail="分类不存在或无权使用")
+
+    for key, value in update_data.items():
+        setattr(db_note, key, value)
+
+    # 复检必须在赋值之后：要检的是"这次改完之后的样子"，不是改之前的旧正文。
+    # 被拦下时显式 rollback，否则脏对象还挂在会话上。
+    if set(update_data) & set(MANUAL_TEXT_FIELDS):
+        try:
+            _guard_manual_text(user, db_note)
+        except HTTPException:
+            db.rollback()
+            raise
+
+    # 改成私密 = 用户说过这篇不给人看。已经发出去的码当场关掉：不关的话公开落地页会
+    # 继续供正文，而界面上「撤掉分享」那一枚对私密笔记整个不渲染——他再没有别的入口
+    # 能收回它。close_shares 不自己 commit，跟着下面那次一起提交。
+    now_private = is_private_note(db_note, private_category_ids(db, user.id))
+    if now_private:
+        closed = close_shares(db, db_note.id)
+        if closed:
+            logger.info("笔记 %s 归入私密，顺手关掉 %s 条在跑的分享", db_note.id, closed)
+
+    # 改一条已经分享出去的笔记，改的就是公开页上的内容。同步和重检必须绑在一起：
+    # 只同步不重检，抓取来源的笔记（上面那道 _guard_manual_text 对它直接放行）就能
+    # 靠"改一下标题"把没过公开审查的文本推上去；只重检不同步，就是这次修的那个洞——
+    # 用户把手机号从标题里删掉了，那张卡片扫开还是手机号。
+    # 判据取 SNAPSHOT_COLUMNS：公开页只给那几列，改正文不影响它。
+    if set(update_data) & set(SNAPSHOT_COLUMNS):
+        if not now_private and active_shares(db, db_note.id):
+            try:
+                budget = daily_budget.charge(str(user.id), daily_budget.KIND_SEC_CHECK)
+                if not budget.ok:
+                    raise HTTPException(status_code=429, detail=budget.message)
+                enforce_text_safety(user.openid, *public_fields(db_note))
+            except UserError as e:
+                db.rollback()
+                raise HTTPException(status_code=400, detail=str(e))
+            sync_snapshot(db, db_note)
+
+    db.commit()
+    db.refresh(db_note)
+    # 回体走与 GET 详情同一份裁剪：这篇是私密的、这一趟又没带解锁凭证，正文那五栏一个字都不给。
+    # 写入本身照做不改语义——线上那个包有一条不弹密码就进编辑页的路，改成拒绝会把它打坏。
+    if now_private and not unlocked(request, user):
+        return locked_view(db_note, NOTE_DETAIL_FIELDS, LOCKED_DROP_DETAIL)
+    return db_note
+
+
+@router.post("/{note_id}/pin", response_model=NoteBrief)
+def pin_note(
+    request: Request,
+    note_id: int,
+    pin: bool = Query(True),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    db_note = (
+        db.query(Note)
+        .filter(Note.id == note_id, Note.user_id == str(user.id))
+        .first()
+    )
+    if not db_note:
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
+    from datetime import datetime, timezone
+    db_note.is_pinned = pin
+    db_note.pinned_at = datetime.now(timezone.utc) if pin else None
+    db.commit()
+    db.refresh(db_note)
+    # 置顶这一口回的是 NoteBrief，里面带着 summary：私密篇没验密码时按列表那一份裁。
+    if (
+        is_private_note(db_note, private_category_ids(db, user.id))
+        and not unlocked(request, user)
+    ):
+        return locked_view(db_note, NOTE_BRIEF_FIELDS, LOCKED_DROP_LIST)
+    return db_note
+
+
+class NoteDeleteOut(BaseModel):
+    """删一篇的回体。写成模型而不是裸 dict，是为了让它进 `scripts/api_contract.py` 那份快照：
+    客户端要拿 `file_ids` 去清云上的对象，这一列要是哪天被人改名或删掉，光看代码看不出来，
+    症状却是云上堆一堆没人认领的对象占全站配额。裸 dict 的回体不进快照，等于没人守。"""
+    message: str
+    file_ids: List[str] = []
+
+
+@router.delete("/{note_id}", response_model=NoteDeleteOut)
+def delete_note(
+    note_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from app.models.share import Share
+    from app.models.job import Job
+    
+    note = (
+        db.query(Note)
+        .filter(Note.id == note_id, Note.user_id == str(user.id))
+        .first()
+    )
+    if not note:
+        raise HTTPException(status_code=404, detail="笔记不存在或已删除")
+
+    # 这一类**删得掉**（站长 10-18 改口，作废 10-14 那句「默认的不能删除」）。
+    # 删了也不会回来：播种只挂在建号那一个分支，后台那次全量刷新（`preset_note.resync_all`）
+    # 只改还留着的那几行，不替删掉的人补一行。
+
+    # Delete related shares and jobs first to avoid foreign key constraint errors
+    db.query(Share).filter(Share.note_id == note_id).delete()
+    db.query(Job).filter(Job.note_id == note_id).delete()
+
+    # 配图：行在这里删，**对象删不掉**——云开发存储只有客户端（`wx.cloud.deleteFile`）
+    # 或云函数那两侧能删，这台自建后端没有那个凭据。所以把 fileID 一起回给调用方，
+    # 谁删的笔记谁去把对象清掉。残留是已知缺口（离线时删的笔记、注销账号那条路径都清不到），
+    # 记在 docs/方案-2.0大版本.md §3 阶段 3 的出口条件里，不当已解决。
+    from app.models.asset import Asset
+
+    file_ids = [
+        r.object_key
+        for r in db.query(Asset).filter(Asset.note_id == note_id).all()
+    ]
+    db.query(Asset).filter(Asset.note_id == note_id).delete()
+
+    # 卡片对象并进**同一个** `file_ids`，不另起一个 `card_file_ids` 键：客户端
+    # `cloudUpload.dropFromDeleteRes` 只读那一个键，加新键等于两端各改一遍、各漏一遍。
+    # 历史行（is_current=0）一起带出去——那些对象在云上还在，留着不删就是白占全站那 5GB。
+    from app.models.note_card import NoteCard
+
+    file_ids += [
+        r.object_key
+        for r in db.query(NoteCard).filter(NoteCard.note_id == note_id).all()
+    ]
+    db.query(NoteCard).filter(NoteCard.note_id == note_id).delete()
+
+    db.delete(note)
+    db.commit()
+    # 去重保序：配图与卡片两张表**可以指向同一个 fileID**（同一篇的历史行与当前行也会），
+    # 而重复的 id 递到 wx.cloud.deleteFile 里第二次不算成功，客户端就会把它当成"没删成的那条"
+    # 落进待删队列，从此每次回前台都替一个已经不存在的对象重打一遍删除。
+    return {"message": "Note deleted", "file_ids": list(dict.fromkeys(file_ids))}
+
+
+class NoteFromShare(BaseModel):
+    token: str
+
+
+class NoteFromShareOut(NoteDetail):
+    """转存那一趟的回体＝详情那一份 ＋ 三个配图数（10-25 第八轮审计 M7 的第二半）。
+
+    为什么必须有这三个数：抄图那一段是"笔记优先"的设计（整段失败也不许把这一次变成失败），
+    而失败此前**只进日志**——回体里一个数都没有、响应码也不变，于是屏上那句"已存入笔记"
+    是一句半假话：笔记真有了，图可能一张都没跟过来，而用户没有任何办法知道。
+    旧包读不到这三栏（不在它的模型里），一个字节都不变——这是**纯前向**加字段。
+    """
+
+    images_kept: int = 0        # 真复制过来并登记成的张数
+    images_failed: int = 0      # 试了没成的张数（含超字节、网关拒、云上写不成）
+    images_skipped: int = 0     # 超出单篇上限、根本没去取的那几张
+
+
+def _share_out(note, kept: int, failed: int, skipped: int) -> NoteFromShareOut:
+    return NoteFromShareOut.model_validate(note, from_attributes=True).model_copy(
+        update={"images_kept": kept, "images_failed": failed, "images_skipped": skipped}
+    )
+
+
+@router.post("/from-share", response_model=NoteFromShareOut)
+# 10-25 第八轮审计 M8：这一次转存内部最多扇九趟存图网关（`_copy_share_images`），而它前面
+# 一道门闩都没有 ⇒ 一张有效票能反复把这份成本打上来。分钟档按人分桶（`get_user_key`）。
+@limiter.limit("10/minute")
+def import_from_share(
+    request: Request,
+    req: NoteFromShare,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """把别人分享页上的这一条整份抄进自己的库。
+
+    抄的是 `shares` 上那份**公开快照**，不是原笔记：正文、识别出的原文、分类、
+    置顶都不在公开范围内，也不该跟着过来。来源钉在 `imported_from` 上，
+    而它不在 NoteCreate / NoteUpdate 里，所以这一栏转存之后编辑不掉、只能整条删。
+
+    这里不再送一次 msgSecCheck：这份内容在建分享时已经按公开口径检过一遍，
+    而这一趟没有任何用户可写的自由文本进库（每个字段都是服务端从既有快照搬的）。
+    再检一遍等于把别人写的内容算到转存者头上，顺带烧掉我们一天 100 次的额度。
+    """
+    from app.services.sharing import active_share_by_token
+
+    share = active_share_by_token(db, req.token)
+    if share is None:
+        raise HTTPException(status_code=404, detail="这条分享不存在、已关闭或已删除")
+
+    # 站长 10-24 一句「为什么自己可以转存自己的，这个不合理，要限制，否则浪费资源，要改」
+    # ⇒ 自己存自己这一路当场拒。**这一刀只能落在这里**：分数那侧早就结不到了
+    # （`quota._credit_import` 里 `author_pk == importer.id` 直接 return 0），但**笔记那一行当时
+    # 照样 commit 了**，而 10-01 之后名下笔记数没有上限 ⇒ 一个人扫自己那张码能堆任意多条重复笔记。
+    # 那句 `detail` 会由落地页那枚按钮原样念出来（`pages/share/view.js` 的 toast 直接读它），
+    # 所以这一趟**不需要出包**：现网部署完，屏上立刻是这个口径。
+    if str(share.user_id) == str(user.id):
+        raise HTTPException(status_code=400, detail="这是你自己的笔记")
+
+    # 同一个人对同一篇只留一份（站长 10-25 一句「一个用户不能重复收藏同一篇笔记，除非删了
+    # 再收藏，避免冗余数据」）。判"同一篇"认的是**原笔记那一栏** `imported_from.source_note_id`，
+    # 不是 `share_token`：作者撤回再分享会换一张新码（见 test_撤掉分享之后旧码扫不开再分享是新码），
+    # 拿 token 当尺子的话，同一篇在他名下就会因为换了码而多堆一份。
+    # 笔记是**硬删**（上面 `DELETE /api/notes/{note_id}` 走 `db.delete`，没有软删标记栏），
+    # 所以"删了再收藏"不需要任何代码：那一条查不到了，下一趟自然走得进。
+    # 为什么这一趟回 200 而不是 400：他同一句里刚拍的下一条是"存入后跳到详情页、页底 bar 念
+    # 『你已收藏该笔记』"，那句话本来就是完成时——第二次点还是跳那一篇、还是这一句，屏上不必
+    # 造第二种态；而 400 会让落地页把那一句念成错误气泡。
+    # 已有的那一份**原样回**，一个副作用都不重跑：分早被 `(source_note_id, invitee_id)` 那条
+    # 部分唯一索引挡着结不到第二次，而配图再跑一遍就是给同一篇多堆最多九行 assets——那正是他
+    # 这句要避免的冗余数据。
+    mine = _find_share_import_copy(db, str(user.id), share.note_id)
+    if mine is not None:
+        kept, failed, skipped = _top_up_share_images(db, mine, share.note_id)
+        return _share_out(mine, kept, failed, skipped)
+
+    note = Note(
+        user_id=str(user.id),
+        title=share.title or "（未命名笔记）",
+        summary=share.summary,
+        tags=share.tags,
+        key_points=share.key_points,
+        key_links=share.key_links,
+        source_type=SOURCE_SHARE_IMPORT,
+        source_url=share.source_url,
+        share_copy_key=_share_copy_key(str(user.id), share.note_id),
+        imported_from={
+            "share_token": share.token,
+            "source_note_id": share.note_id,
+            "author_user_id": share.user_id,
+            "author_name": share.author_name,
+            "title_at_import": share.title,
+            "imported_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    db.add(note)
+    try:
+        db.commit()
+    except IntegrityError:
+        # 两个请求真同时进来（同步路由跑在线程池里）、各自都在对方落库前查过"存过没有"，
+        # 于是都要建。索引让后到的那一个失败，这里把他领回先落的那一篇（10-25 第八轮审计 M6）。
+        # 领回这一趟**一个副作用都不许多跑**：分与配图都由先落那一趟做过了。
+        db.rollback()
+        raced = _find_share_import_copy(db, str(user.id), share.note_id)
+        if raced is None:
+            raise HTTPException(status_code=409, detail="这篇笔记的收藏状态刚变过，请再试一次")
+        # 抢输的这一趟**不报配图数**：图由先落那一趟在抄，这一刻这里没有任何可念的数，
+        # 而 0 在客户端那一侧读成"一张没少"——宁可不说话，不许编一个数。
+        return _share_out(raced, 0, 0, 0)
+    db.refresh(note)
+    # 转存给**那一篇的作者** +1（不是 +10）：`quota._credit_import` 挣的是"有人把我这篇存下来了"，
+    # 同一篇 × 同一个人只挣一次（判定与唯一索引都在 quota 里）。
+    # 这一趟**不结**邀请人那 +10：转存不是"他自己动笔"，`_is_his_first_note` 把 `share_import`
+    # 这一档排出去了，所以他哪天真自己写一篇时那 +10 照样结得出来（10-16 审计第二条，
+    # 原来这里写的"那份 +10 就记在原笔记作者头上"是句假话，一并改净）。
+    # 和动笔那条一样，结不到账不能让转存本身失败。
+    quota.credit_import(db, user, share.note_id)
+    kept, failed, skipped = _copy_share_images(db, note, share.note_id)
+    return _share_out(note, kept, failed, skipped)
+
+
+def _find_share_import_copy(db, user_id, source_note_id):
+    """这个人名下有没有已经存过这一篇（认 `imported_from.source_note_id`）。
+
+    只取 `id` 与 `imported_from` 两栏、比法落在 Python：JSON 栏的路径写法两个引擎不一样
+    （SQLite 的 json_extract 回整数、MySQL 回一个 JSON 值），而一个人名下的转存份数是小数
+    ⇒ 不为一趟小查询引入一层引擎方言。
+    ⚠ 拿 `.get()` 回 None 当"没存过"是安全的，靠的是两件事同时成立：`shares.note_id` 写的是
+    `nullable=False`（永远是个整数，撞不上 None），而外链贴图那一路（`ingest_tasks._source_snapshot`）
+    根本不写 `source_note_id` 这一键 ⇒ 它那些笔记不会被误认成"这一篇已经存过了"。
+    """
+    rows = (
+        db.query(Note.id, Note.imported_from)
+        .filter(Note.user_id == user_id, Note.source_type == SOURCE_SHARE_IMPORT)
+        .all()
+    )
+    for note_id, snap in rows:
+        if not isinstance(snap, dict):
+            # 只防 None 是不够的（10-25 第八轮审计 M14）：这一栏是 JSON，历史上被手工 SQL 写成
+            # 数组或字符串的那一行会在这里抛 AttributeError，而那等于让这个人以后每一次转存都 500、
+            # 坏一行就全堵死。同文件读这一栏的别处（列表那一趟）早就有同一道 `isinstance` 闸，
+            # 两处口径必须一样，否则"哪一处先脏"要看运气。
+            continue
+        if snap.get("source_note_id") == source_note_id:
+            return db.get(Note, note_id)
+    return None
+
+
+def _share_copy_key(user_id: str, source_note_id: int) -> str:
+    """这一篇在这个人名下的数据库层身份证：`user_id:原笔记 id`。
+
+    唯一索引只吃非 NULL 的行（见那条迁移），所以它约束的是"从这一趟起写的转存"；闸上线之前
+    落的那一对重复行留 NULL ⇒ **不必删任何人的笔记**，迁移当场就建得上。
+    判"同一篇"的口径与 `_find_share_import_copy` 同一处：都认原笔记 id，不认 `share_token`。
+    """
+    return f"{user_id}:{source_note_id}"
+
+
+def _top_up_share_images(db, note, from_note_id) -> None:
+    """闸命中那一路唯一允许的一次补账：这一篇名下**一张图都没有**、而原篇有 ⇒ 补抄一次。
+
+    为什么要有这一刀（10-25 第八轮审计 M7）：第一次转存时抄图那一段整段失败（存图网关抖一下、
+    通道没配上）会留下"存下了但没图"的那一篇，而屏上那一句已经是完成时；第二次点被闸领回的
+    正是这篇没图的，用户怎么重试都补不回来，唯一的自救是删掉再存。
+    为什么只认"零张"这一档：部分成功（九张里成了五张）刻意不补——再跑一遍就是给同一篇多堆重复
+    assets，那正是站长 10-25 那句"避免冗余数据"要挡的。零张是那一趟**什么都没做成**的那一态，
+    补它不会产生重复行，只会再花一趟网关。
+    ⚠ 通道整段没配好时，这个人每点一次都会再扇九趟——这一刀**不封那个顶**。封顶靠的是同一趟
+    请求前面那道 10/分钟的门闩（M8 那一刀），不是靠这里的判据；写这一行是为了让下一次加"每次点
+    都记一次、记过就不再补"那种状态时，别以为现在已经有了。
+    """
+    have = db.query(Asset.id).filter(Asset.note_id == note.id, not_failed()).count()
+    if have:
+        return 0, 0, 0
+    src = db.query(Asset.id).filter(Asset.note_id == from_note_id, not_failed()).count()
+    if not src:
+        return 0, 0, 0
+    logger.warning("转存配图补一次：副本 %s 名下零张而原篇 %s 有 %s 张", note.id, from_note_id, src)
+    return _copy_share_images(db, note, from_note_id)
+
+
+def _copy_share_images(db, note, from_note_id):
+    """原篇那几张配图逐张复制一份到这一篇名下（站长 10-24：「转存必须带图。乙，复制一份到自己名下」）。
+
+    整段裹住是**必须的**：图是转存的加值，笔记已经建好、分已经结好都在它前面 ⇒ 任何一趟出事
+    都不许把这一次变成一次失败（屏上那句"存下了"退成报错，而他那篇笔记其实已经有了）。
+    为什么这一段落在请求里而不是排进后台任务：客户端那枚按钮成功时只念一句"已存入笔记"、
+    不轮询，图排在九张之后异步落账的话，他点完立刻进列表看到的那一篇还是没图——而他这次要的就是图。
+    代价直说：最多九张、每张一趟网关，转存那一次的响应会慢几秒（`IMAGE_STORE_CF_TIMEOUT` 一张一算）。
+
+    回 `(kept, failed, skipped)` 三个数（10-25 第八轮审计 M7 第二半）：这一趟原来只进日志，
+    于是"笔记优先"这个正确的设计在屏上变成一句半假话。整段没跑成时 `failed` 按**原篇张数**报，
+    不是报 0——原篇有九张而这里报"0 张没跟过来"，念出去的还是一个反的数。
+    """
+    from app.services import note_images
+
+    def _src_count() -> int:
+        try:
+            return db.query(Asset.id).filter(Asset.note_id == from_note_id, not_failed()).count()
+        except Exception:
+            return 0
+
+    try:
+        shots = note_images.copy_for_import(db, note, from_note_id)
+    except Exception:
+        logger.exception("转存配图整段没跑成（笔记已建）：note=%s src_note=%s", note.id, from_note_id)
+        n = _src_count()
+        return 0, n, 0
+    if shots.failed or shots.truncated:
+        logger.warning("转存配图：%s 张跟过来、%s 张没跟过来、%s 张超出上限没带（笔记已建）："
+                       "note=%s src_note=%s",
+                       len(shots.kept), len(shots.failed), shots.truncated, note.id, from_note_id)
+    return len(shots.kept), len(shots.failed), int(shots.truncated or 0)

@@ -1,0 +1,384 @@
+// 名片与外观档位上云那一条链（2.1 第一条）。
+//
+// 一句话：**换手机或重置手机之后，名片那四格图不该是空的。**
+// 2.0.1 之前卡片那一格是同一个毛病（图只在本机、判据是"文件在不在"），S2 已经把它根治在
+// `note_cards` 上；这一份是同一做法搬到"人"这一层——权威在服务器 `user_profiles` 那一行，
+// 本机那四张 `.img` 降级成**缓存**：在就直接用（画布读本机路径，零改动），不在就从云上拉回来。
+//
+// 与 `cardCloud.js` 三条一样的纪律：
+// · **全程不抛**。名片是附属品，读不到就维持本机那一份，不许把主流程带回错误提示。
+// · 换下来的旧对象由回体 `file_ids` 交给 `cloudUpload.dropFromDeleteRes`——服务器删不掉它们。
+// · 换身份／注销之后 `signOut()` 必须清内存那份，留着就是上一个人的名片画到这个人头上。
+//
+// ⚠ 一条与卡片不同的地方，也是最容易写出数据丢失的一条：**"云上没这一行"≠"云上四格都是空的"**。
+// 老用户本机有图而服务器一行都还没有，这时候照"服务器权威"办就会把他那四张当"已删除"跟着删掉。
+// 所以整个模块只认一个判据：`GET` 回体的 `updated_at` 是不是 null（见 utils/api.js 那条注释）。
+const api = require('./api.js')
+const cloudUpload = require('./cloudUpload.js')
+const poster = require('./poster.js')
+// 本机存储读写统一走这一枚（M15），见 utils/safeStorage.js 顶上那段。
+const storage = require('./safeStorage.js')
+
+// 名片图放哪一层前缀。⚠ 复用已经量过的 `images` 那一层，**不自开 `profile/` 前缀**：
+// 桶权限完全可能是按前缀给的，而这条链按设计不报错，写不进的症状是"每张都静默没上云"。
+// 要单开一层，先跑 `APREFIX=profile zsh docs/工具/跑尺子.sh 9431 探-云存储可写` 量过再改这一栏。
+const PROFILE_KIND = 'images'
+
+const _bytes = (p) => {
+  try {
+    const s = wx.getFileSystemManager().statSync(p)
+    const n = s && (s.size != null ? s.size : s.stats && s.stats.size)
+    return Number.isFinite(Number(n)) ? Number(n) : null
+  } catch (e) {
+    return null
+  }
+}
+
+const _dims = (p) => new Promise((resolve) => {
+  wx.getImageInfo({ src: p, success: (r) => resolve({ width: r.width, height: r.height }), fail: () => resolve({}) })
+})
+
+const _download = (fileID) => new Promise((resolve) => {
+  if (!cloudUpload.cloudReady() || !fileID) return resolve(null)
+  wx.cloud.downloadFile({
+    fileID,
+    success: (r) => resolve((r && r.tempFilePath) || null),
+    fail: (e) => {
+      console.warn('名片那格的对象没拉下来（界面维持本机那一份）:', (e && e.errMsg) || e)
+      resolve(null)
+    },
+  })
+})
+
+/** 把一张本机的图传上云，回 fileID（传不成回 null，不抛）。 */
+async function _upload(path) {
+  const userId = getApp().globalData.userId
+  if (!userId || !path) return null
+  const up = await cloudUpload.uploadImage(path, userId, PROFILE_KIND)
+  return (up && up.fileID) || null
+}
+
+// ---------- 读的那一半 ----------
+
+let serverProfile = null
+let serverLoaded = false
+
+function setServer(data) {
+  serverProfile = data || null
+  serverLoaded = true
+}
+
+function clearServer() {
+  serverProfile = null
+  serverLoaded = false
+}
+
+/** 服务器上有没有这一行。没有＝这个人从没登记过，此时本机那份才是唯一的一份。 */
+function serverHasRow() {
+  return !!(serverProfile && serverProfile.updated_at)
+}
+
+function isLoaded() {
+  return serverLoaded
+}
+
+function serverState() {
+  return serverProfile
+}
+
+/**
+ * 从服务器读那一份，并把本机对齐过去。返回一句发生了什么，只用来记日志与给测试钉判据，
+ * 不用来改界面（界面照旧读 `poster.readSlots()`，本机文件在不在决定画哪一张）。
+ *
+ * 三种情况，走法完全不同：
+ * 1. **读不到**（网络、401）→ 什么都不动，本机那一份照用。这一趟不许出声。
+ * 2. **服务器上没这一行** → 这是老用户第一次升到 2.1：本机那四张是唯一的一份，
+ *    于是反过来把本机这份推上去（登记）。**绝不许删本机任何一张**。
+ * 3. **服务器有这一行** → 服务器权威，逐格对齐：地址没变且本机文件还在就沿用（不重下、不花钱），
+ *    地址变了就拉新的并收回旧那张占的地方，云上这一格是空的就把本机这一格也撤掉。
+ */
+async function pull() {
+  // 第一件事：把欠着的那一笔补送一次。**还欠着的时候这一趟整段都不许往下走**——
+  // 下面的对齐拿"服务器权威"办事，会把云上还没有的那一格当已删除、把用户刚换的那张本机图删掉。
+  if (!(await flushPending())) return { ok: true, deferred: true, reason: 'pending-write' }
+  let r
+  try {
+    r = await api.getProfile()
+  } catch (e) {
+    console.warn('名片那一份没读到（维持本机这份）', e && (e.errMsg || e.statusCode))
+    return { ok: false, reason: 'read' }
+  }
+  setServer(r || null)
+  if (!r) return { ok: false, reason: 'empty' }
+  // 「这一行存在」有**两种**，只有后者才许拿服务器当权威：
+  // · `slots` 是数组（哪怕四个全 null）＝这个人真的登记过四格——清空是"四个 null"，
+  //   写口永远补齐四格（`backend/app/api/routes/profiles.py` 顶上第 2 条），所以数组就是登记过。
+  // · `slots` 是 null＝这一行只是被名称／一句话／亮度档顺手建出来的**半行**，四格从没登记过。
+  //   10-11 代码审计严重①：原来只认 `updated_at`，于是这种半行走进逐格对齐，
+  //   把本机那四张从没上传成功过的图按"云上这一格是空的"逐格 `removeAvatar` 删了——不可逆。
+  if (!serverHasRow() || !Array.isArray(r.slots)) return await bootstrap()
+
+  const local = poster.readSlots()          // 已经按"本机文件在不在"滤过：不在的那格是 null
+  const byId = {}
+  local.forEach((s) => { if (s && s.fileID) byId[s.fileID] = s })
+
+  const remote = r.slots.slice(0, poster.SLOT_COUNT)
+  const next = poster.blankSlots()
+  const removed = []
+  let downloaded = 0
+  let failed = 0
+
+  for (let i = 0; i < poster.SLOT_COUNT; i++) {
+    const s = remote[i]
+    const L = local[i]
+    if (!s || !s.file_id) {
+      // 云上这一格是空的：本机这一格跟着撤（旧对象不在清单里——它本来就是被这一格引用的那张）
+      if (L) { removed.push(L.path); next[i] = null }
+      continue
+    }
+    if (L && L.fileID === s.file_id) {
+      next[i] = { path: L.path, card: !!s.card, bg: !!s.bg, fileID: s.file_id }
+      continue
+    }
+    const tmp = await _download(s.file_id)
+    if (!tmp) {
+      failed += 1
+      // 拉不下来时本机那张还在就照画它：宁可画一张"云上已经换掉的旧图"，
+      // 也不许把这一格画成空的——空的会让人以为名片丢了。
+      next[i] = L ? { path: L.path, card: !!s.card, bg: !!s.bg, fileID: L.fileID || null } : null
+      continue
+    }
+    const path = await poster.adoptLocal(tmp)
+    if (!path) {
+      failed += 1
+      next[i] = L ? { path: L.path, card: !!s.card, bg: !!s.bg, fileID: L.fileID || null } : null
+      continue
+    }
+    downloaded += 1
+    if (L) removed.push(L.path)   // 换了一张：旧那份占着本机 10MB，收掉
+    next[i] = { path, card: !!s.card, bg: !!s.bg, fileID: s.file_id }
+  }
+
+  // 本机这一份**先落对，再删被换下来的那些**，而且这一整段包起来：`writeSlots`/`writeProfile`
+  // 里面是裸 `wx.setStorageSync`，storage 满就直接抛，而这一支按"全程不抛"设计（文件头第 9 行）。
+  // 原来这两句在 try 外面，一抛就变成一个没人接的 rejection（`app.js` 那个 `.then` 没有 `.catch`），
+  // 对齐停在半路。落不成的时候一个文件都不删——宁可多留几张占地方，不许删掉唯一的那一份。
+  try {
+    poster.writeSlots(next)
+    // 名称/一句话：与模板那一栏同一条判据——**null 是"这一栏从没登记过"，不是"他清空了"**。
+    // （清空走的是 `pushText`，那一份带的是空串，服务端存的就是空串，读回来是 `''` 不是 null。）
+    // 10-11 审计严重①的另一半：原来这两句无条件 `|| ''`，一行只有亮度档的半行会把本机填好的
+    // 名称与一句话清成空。
+    const textPatch = {}
+    if (r.name !== null && r.name !== undefined) textPatch.name = r.name
+    if (r.slogan !== null && r.slogan !== undefined) textPatch.slogan = r.slogan
+    if (Object.keys(textPatch).length) poster.writeProfile(textPatch)
+    if (r.tpl) poster.writeProfile({ template: r.tpl })
+  } catch (e) {
+    console.warn('名片对齐这一步没落到本机（先不删任何一张）', e && (e.message || e))
+    return { ok: false, reason: 'local-write' }
+  }
+  removed.forEach((p) => poster.removeAvatar(p))
+  // 那两档外观：读回来有值才落本机（null 是"没登记过这一档"，不是"要清成默认"）。
+  // ⚠ 第二个参数 `fromServer` 必须传 true：`app.setBgDim` 不带它就会顺手 pushDim 回写一次，
+  // 于是"读服务器"变成"往服务器写"，每次登录白打一次 PUT 并把那一行的 updated_at 顶新
+  //（10-09 审计那条；原来这里连注释都写了两遍，第二遍就是漏口留下的疤）。
+  const app = getApp()
+  if (app && r.bg_dim !== null && r.bg_dim !== undefined) app.setBgDim(r.bg_dim, true)
+  return { ok: true, server: true, downloaded, failed, removed: removed.length }
+}
+
+/**
+ * 服务器上还没有这一行：把本机这一份推上去（老用户升 2.1 的那一趟）。
+ * 一张本机图都没有、名称与一句话也都没填过 → 什么都不做，也不建那一行
+ * （建一行全空等于替他宣布"我名片是空的"，之后换手机就没有对照了）。
+ */
+async function bootstrap() {
+  const p = poster.readProfile()
+  const local = poster.readSlots()
+  const slots = []
+  const fresh = []
+  let uploaded = 0
+  let missing = 0
+  for (const s of local) {
+    if (!s) { slots.push(null); continue }
+    let fileID = s.fileID
+    if (!fileID) {
+      fileID = await _upload(s.path)
+      if (fileID) { uploaded += 1; fresh.push(fileID) }
+    }
+    if (!fileID) missing += 1
+    slots.push({ file_id: fileID || null, card: !!s.card, bg: !!s.bg,
+      width: null, height: null, size: fileID ? _bytes(s.path) : null })
+  }
+  const hasAnything = local.some(Boolean) || p.name || p.slogan
+  if (!hasAnything) return { ok: false, reason: 'nothing-local' }
+  // 本机有图却传不上去 ⇒ **这一趟干脆不登记**（10-11 审计严重②：原来照样 PUT，服务端就落一行
+  // "登记过、四格全空"，而 `pull()` 认数组＝登记过，下一次登录正是拿这一行走逐格对齐，
+  // 把本机那几张唯一存在的图当"云上已删"撤掉——严重①的单机版入口，不用换手机就踩得上）。
+  // 已经传上去的那几张当场收掉：留着就是"云上有、库里没账"的孤儿，占的是全站那 5GB，
+  // 而且只有客户端删得动。
+  if (missing) {
+    if (fresh.length) cloudUpload.deleteFiles(fresh)
+    return { ok: false, reason: 'upload' }
+  }
+  const body = { slots }
+  if (p.template) body.tpl = p.template
+  if (p.name) body.name = p.name
+  if (p.slogan) body.slogan = p.slogan
+  const app = getApp()
+  if (app && typeof app.bgDim === 'function') body.bg_dim = app.bgDim()
+  return push(body, { bootstrap: true, uploaded })
+}
+
+// ---------- 写的那一半 ----------
+
+/* 欠着的那一笔（单格，补丁语义）。
+ *
+ * 为什么必须有这一格：`_push` 失败原来只 `console.warn`，而 `pull()` 那一趟对齐是按
+ * "服务器权威"做的——云上这一格是空的就把本机那一格 `removeAvatar` 删掉（:123-126），
+ * 地址不一样就下新的、收旧的（:147）。于是"换图那一下 PUT 没成"＋"下次再登录"这两件事一撞，
+ * **用户刚换的那张图被静默删掉、退回旧的那张**，而刚传上去那个对象没人登记成孤儿（10-09 审计严重①）。
+ * 卡片那一族早就有 `cardQueue` 干这件事，名片这一族 `signOut()` 的注释里本来也写着"待补都清"，
+ * 只是那一格一直没做。
+ *
+ * 单格、后写的覆盖先写的：服务端 PUT 是补丁语义（只带要改的那几栏），所以同一栏以最后一次为准，
+ * 不同栏各留各的——这正是 `Object.assign` 的语义，不需要队列。 */
+const PENDING_KEY = 'profilePendingPatch'
+
+/** 读出欠着的那一笔，并把"到底读没读到"一并交回：读不到 ≠ 没欠着（见下面 `hasPending`）。 */
+function _pendingRead() {
+  const r = storage.tryRead(PENDING_KEY)
+  const v = r.value
+  const patch = v && typeof v === 'object' && Object.keys(v).length ? v : null
+  return { ok: r.ok, patch }
+}
+
+function _pending() {
+  return _pendingRead().patch
+}
+
+function _putPending(patch) {
+  try {
+    if (patch && Object.keys(patch).length) wx.setStorageSync(PENDING_KEY, patch)
+    else wx.removeStorageSync(PENDING_KEY)
+  } catch (e) {
+    // 写不进去只是补不成（下一次 pull 会因为"还欠着"而不去动本机），不许把调用方卡住
+    console.warn('名片待补那一格写不进去', e)
+  }
+}
+
+// 读不到时按"还欠着"算：这一格回 false 会让 `pull()` 不敢动本机那几张图，而把读不到当成
+// "没欠着"放行 pull，正是 10-09 审计严重①那一族（用户刚换的那张被服务器那份顶掉）。
+function hasPending() { const r = _pendingRead(); return r.ok ? !!r.patch : true }
+
+function _mergePending(patch) {
+  if (!patch) return
+  const cur = _pendingRead()
+  // 旧的那半读不到就不要写回：这一格是补丁语义，只带新那几栏写回去会把别的栏欠账盖掉。
+  if (!cur.ok) { console.warn('名片待补那一格这次没读到，先不合并写回'); return }
+  _putPending(Object.assign(cur.patch || {}, patch))
+}
+
+/** 送成了只摘这一笔涉及的那几栏：别的栏可能还欠着，整格清会把它们一起抹掉。 */
+function _subPending(patch) {
+  const cur = _pending()
+  if (!cur) return
+  const left = Object.assign({}, cur)
+  Object.keys(patch || {}).forEach((k) => { delete left[k] })
+  _putPending(left)
+}
+
+/** 把欠着的那一笔补送一次。全送掉了回 true；还欠着回 false——pull 就据此决定敢不敢动本机那一份。 */
+// 两个入口会同时叫它（app.flushQueues 与 pull 自己），而 `api` 这一层没有去重：
+// 同一笔 PUT 发两遍是白打一个请求，更要紧的是两遍回来都会去摘那一格，顺序不定。
+// 所以同一时刻只让一趟在飞，后到的拿前一趟的结果。
+let _flushing = null
+function flushPending() {
+  if (_flushing) return _flushing
+  const r = _pendingRead()
+  // 读不到时回 false（"这次还没补成"）：`pull()` 据此不去动本机那几张图，与 hasPending 同一保守向。
+  if (!r.ok) return Promise.resolve(false)
+  const patch = r.patch
+  if (!patch) return Promise.resolve(true)
+  _flushing = _push(patch).then(() => !hasPending())
+    .finally(() => { _flushing = null })
+  return _flushing
+}
+
+/**
+ * 把一份补丁送到服务器，并把回体里"被换下／撤掉"的旧对象删掉。
+ * @param {object} patch 只带要改的那几栏（服务端是补丁语义）
+ */
+function push(patch, meta) {
+  if (!patch || !Object.keys(patch).length) return Promise.resolve({ ok: false, reason: 'empty' })
+  return _push(patch, meta)
+}
+
+async function _push(patch, meta) {
+  try {
+    const res = await api.putProfile(patch)
+    setServer(Object.assign({}, serverProfile || {}, res && res.profile ? res.profile : patch,
+      { updated_at: (res && res.profile && res.profile.updated_at) || new Date().toISOString() }))
+    serverLoaded = true
+    _subPending(patch)
+    const dropped = await cloudUpload.dropFromDeleteRes(res)
+    return Object.assign({ ok: true, dropped }, meta || {})
+  } catch (e) {
+    console.warn('名片这一趟没登记上（界面上还是本机那份）', e && (e.errMsg || e.statusCode))
+    _mergePending(patch)
+    return Object.assign({ ok: false, reason: 'write' }, meta || {})
+  }
+}
+
+/**
+ * 四格变了（放一张／换一张／撤掉一格／勾角色）：先把还没有 fileID 的本机图传上云，
+ * 再整份 PUT 那四格。**先传后写、写成了才删旧**——反过来会留孤儿，
+ * 而孤儿占的是全站那 5GB，且只有客户端删得动。
+ */
+async function pushSlots(slots) {
+  const local = (slots || []).slice()
+  const out = []
+  let uploaded = 0
+  for (let i = 0; i < local.length; i++) {
+    const s = local[i]
+    if (!s) { out.push(null); continue }
+    let fileID = s.fileID
+    if (!fileID && s.path) {
+      fileID = await _upload(s.path)
+      if (fileID) uploaded += 1
+    }
+    const d = fileID ? await _dims(s.path) : {}
+    out.push({ file_id: fileID || null, card: !!s.card, bg: !!s.bg,
+      width: d.width || null, height: d.height || null, size: fileID ? _bytes(s.path) : null })
+    if (fileID && !s.fileID) local[i] = Object.assign({}, s, { fileID })
+  }
+  // 新拿到的 fileID 记回本机这一份：不记的话下一次 pull 认不出"云上这一格就是本机这张"，
+  // 会白下一遍，而落下来的新文件会顶掉画布正在用的那个路径。
+  if (uploaded) poster.writeSlots(local)
+  return push({ slots: out }, { uploaded })
+}
+
+/** 名称／一句话／选的那一套模板（卡片模板那一页保存时调）。 */
+function pushText(patch) {
+  const body = { name: patch.name || '', slogan: patch.slogan || '' }
+  if (patch.template) body.tpl = patch.template
+  return push(body)
+}
+
+/** 亮度档：改一档就顺手登记一次（不弹窗、不出声，失败维持本机）。
+ * 字体档**不在这条链上**：`app.js` 顶上那段写着安卓命不中那三档字体，跟着账号跑到别人
+ * 设备上只会让人看到"没生效"。那不是丢东西，是那台设备本来就没这个能力。 */
+function pushDim(v) { return push({ bg_dim: v }) }
+
+/** 换身份／注销之后由 app.clearSession 调：内存那份与待补都清，本机文件一份都不动。 */
+function signOut() {
+  clearServer()
+  _putPending(null)
+}
+
+module.exports = {
+  PROFILE_KIND, PENDING_KEY,
+  pull, bootstrap, push, pushSlots, pushText, pushDim, flushPending, hasPending,
+  setServer, clearServer, serverHasRow, serverState, isLoaded, signOut,
+}

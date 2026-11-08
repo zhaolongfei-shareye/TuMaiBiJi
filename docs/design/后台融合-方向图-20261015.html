@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>后台融合 · 方向图（两套皮各一版）· 2026-10-15</title>
+<style>
+  /* 方向图：两张壳并排，同一个信息架构、两套皮。屏幕示意，非真实界面。
+     令牌全部从两份现役页面现读，见文末数值表；未实现的格子统一挂「规划中」章。 */
+  * { box-sizing: border-box; }
+  body { margin:0; padding:28px 24px 44px; background:#e8e5dd; color:#14161A;
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC",sans-serif; }
+  .pagehead { max-width:1560px; margin:0 auto 20px; }
+  .pagehead h1 { font-size:20px; margin:0 0 6px; font-weight:650; }
+  .pagehead p { font-size:13px; line-height:1.75; color:#4a4d55; margin:4px 0; }
+  .legend { font-size:12px; color:#6b6f78; }
+  .tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:4px; margin-right:6px;
+         background:#fff4e6; color:#7a4b12; }
+  .tag.plan { background:#eceff3; color:#4a5568; }
+  .wrap { display:flex; gap:22px; align-items:flex-start; max-width:1560px; margin:0 auto; flex-wrap:wrap; }
+
+  .shell { flex:1 1 660px; min-width:620px; border-radius:14px; overflow:hidden;
+           box-shadow:0 1px 0 rgba(0,0,0,.12); }
+  .shell > .cap { font-size:12px; padding:8px 14px; letter-spacing:.02em; }
+
+  /* ---------- A 版｜浅色纸感（现役 /wtsj/ops 与官网同一族） ---------- */
+  .A { background:#F2EFE9; color:#14161A; }
+  .A > .cap { background:#14161A; color:#fff; }
+  .A .bar { display:flex; align-items:center; gap:12px; padding:14px 18px; background:#fff; border-bottom:1px solid #e3e0d8; }
+  .A .brand { font-weight:700; font-size:14px; }
+  .A .sw { display:flex; gap:2px; background:#faf9f6; border:1px solid #e3e0d8; border-radius:9px; padding:3px; }
+  .A .sw b { font-size:12.5px; font-weight:600; padding:5px 12px; border-radius:7px; color:#6b6f78; }
+  .A .sw b.on { background:#14161A; color:#fff; }
+  .A .who { margin-left:auto; font-size:12px; color:#6b6f78; }
+  .A .body { display:flex; gap:16px; padding:16px 18px 22px; }
+  .A nav { width:132px; flex:none; font-size:12.5px; color:#6b6f78; }
+  .A nav i { display:block; font-style:normal; font-size:11px; letter-spacing:.08em; margin:12px 0 5px; color:#a2a49c; }
+  .A nav s { display:block; text-decoration:none; padding:6px 9px; border-radius:8px; }
+  .A nav s.on { background:#fff; color:#14161A; font-weight:600; border:1px solid #e3e0d8; }
+  .A main { flex:1; min-width:0; }
+  .A .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .A .kpi { background:#fff; border:1px solid #e3e0d8; border-radius:12px; padding:12px 13px; }
+  .A .kpi u { display:block; text-decoration:none; font-size:11.5px; color:#6b6f78; }
+  .A .kpi strong { display:block; font-size:21px; font-weight:650; margin-top:5px; letter-spacing:-.01em; }
+  .A .kpi em { display:block; font-style:normal; font-size:11px; color:#a2a49c; margin-top:3px; }
+  .A .panel { background:#fff; border:1px solid #e3e0d8; border-radius:12px; padding:14px; margin-top:12px; }
+  .A .panel h4 { margin:0 0 4px; font-size:13.5px; }
+  .A .panel p { margin:0 0 12px; font-size:12px; color:#6b6f78; line-height:1.7; }
+  .A .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .A .file { flex:1; min-width:190px; border:1px dashed #d8d4ca; border-radius:8px; padding:9px 11px;
+             font-size:12px; color:#6b6f78; background:#faf9f6; }
+  .A .btn { font-size:12.5px; padding:8px 13px; border-radius:8px; background:#14161A; color:#fff; }
+  .A .btn.ghost { background:#fff; color:#14161A; border:1px solid #e3e0d8; }
+  .A .btn.clay { background:#fff4e6; color:#7a4b12; border:1px solid #f0d9bd; }
+  .A .hint { font-size:11.5px; color:#7a4b12; background:#fff4e6; border-radius:8px; padding:7px 10px; margin-top:10px; }
+
+  /* ---------- B 版｜深色 slate（现役 admin.html 那套） ---------- */
+  .B { background:#0d1117; color:#e0e0e0; }
+  .B > .cap { background:#1e293b; color:#f1f5f9; }
+  .B .bar { display:flex; align-items:center; gap:12px; padding:14px 18px; background:#1e293b; border-bottom:1px solid #334155; }
+  .B .brand { font-weight:700; font-size:14px; color:#f1f5f9; }
+  .B .sw { display:flex; gap:2px; background:#0d1117; border:1px solid #334155; border-radius:9px; padding:3px; }
+  .B .sw b { font-size:12.5px; font-weight:600; padding:5px 12px; border-radius:7px; color:#94a3b8; }
+  .B .sw b.on { background:#2563eb; color:#fff; }
+  .B .who { margin-left:auto; font-size:12px; color:#94a3b8; }
+  .B .body { display:flex; gap:16px; padding:16px 18px 22px; }
+  .B nav { width:132px; flex:none; font-size:12.5px; color:#64748b; }
+  .B nav i { display:block; font-style:normal; font-size:11px; letter-spacing:.08em; margin:12px 0 5px; color:#475569; }
+  .B nav s { display:block; text-decoration:none; padding:6px 9px; border-radius:8px; color:#94a3b8; }
+  .B nav s.on { background:#1e293b; color:#60a5fa; font-weight:600; border:1px solid #334155; }
+  .B main { flex:1; min-width:0; }
+  .B .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .B .kpi { background:#1e293b; border:1px solid #334155; border-radius:12px; padding:12px 13px; }
+  .B .kpi u { display:block; text-decoration:none; font-size:11.5px; color:#94a3b8; }
+  .B .kpi strong { display:block; font-size:21px; font-weight:650; margin-top:5px; color:#f1f5f9; }
+  .B .kpi em { display:block; font-style:normal; font-size:11px; color:#64748b; margin-top:3px; }
+  .B .panel { background:#1e293b; border:1px solid #334155; border-radius:12px; padding:14px; margin-top:12px; }
+  .B .panel h4 { margin:0 0 4px; font-size:13.5px; color:#f1f5f9; }
+  .B .panel p { margin:0 0 12px; font-size:12px; color:#94a3b8; line-height:1.7; }
+  .B .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .B .file { flex:1; min-width:190px; border:1px dashed #334155; border-radius:8px; padding:9px 11px;
+             font-size:12px; color:#94a3b8; background:#0d1117; }
+  .B .btn { font-size:12.5px; padding:8px 13px; border-radius:8px; background:#2563eb; color:#fff; }
+  .B .btn.ghost { background:#334155; color:#e2e8f0; }
+  .B .btn.warn { background:#3b82f6; color:#fff; }
+  .B .hint { font-size:11.5px; color:#fcd34d; background:#1e293b; border:1px solid #334155;
+             border-radius:8px; padding:7px 10px; margin-top:10px; }
+
+  .foot { max-width:1560px; margin:22px auto 0; font-size:11.5px; color:#4a4d55; line-height:1.85; }
+  .foot code { font-size:11px; }
+</style>
+</head>
+<body>
+
+<div class="pagehead">
+  <h1>后台融合 · 方向图（两套皮各画一版，等他挑）</h1>
+  <p><b>这是 CSS 画的示意，不是真实界面</b>；两版共用同一个信息架构——顶栏一枚产品切换、左栏统一分「数据／配置」、主区先数字后配置。<b>登录账号是同一个</b>（切换产品不重新登录），图上写「已登录 · 一次通行两小程序」表达的就是这点。</p>
+  <p class="legend"><span class="tag">现网已有</span>格子上的字取自两份现役页面与后端真字段；<span class="tag plan">规划中</span>＝代码零行（A 档五枚见 §8.248、四个统计口见 §8.249），落地前不许当现状卖。</p>
+</div>
+
+<div class="wrap">
+
+  <!-- ================= A 版 ================= -->
+  <section class="shell A">
+    <div class="cap">A 版｜浅色纸感 —— 与 <code>/wtsj/ops</code>、官网 <code>agentsbin.cn</code> 同一族（建议选这版）</div>
+    <div class="bar">
+      <span class="brand">AgentsBin 管理台</span>
+      <span class="sw"><b class="on">图麦笔记</b><b>图麦克</b></span>
+      <span class="who">已登录 · 一次通行两小程序 · 登出</span>
+    </div>
+    <div class="body">
+      <nav>
+        <i>数据</i><s class="on">总览</s><s>运营图状态</s><s>转存与模板</s>
+        <i>配置</i><s>运营图</s><s>笔记模板</s><s>账号与口令</s>
+      </nav>
+      <main>
+        <div class="grid">
+          <div class="kpi"><u>新增笔记</u><strong>—</strong><em>已剔除预置那一篇</em></div>
+          <div class="kpi"><u>来源分布</u><strong>—</strong><em>6 类 source_type</em></div>
+          <div class="kpi"><u>转存量</u><strong>—</strong><em>别人存进他自己的库</em></div>
+          <div class="kpi"><u>邀请对账</u><strong>—</strong><em>两个数必须相等</em></div>
+        </div>
+        <div class="grid" style="margin-top:10px">
+          <div class="kpi"><u>模板热度榜</u><strong>—</strong><em>十套谁被用</em></div>
+          <div class="kpi"><u>卡片生成量</u><strong>—</strong><em>含不带码那一档</em></div>
+          <div class="kpi"><u>举报待核</u><strong>—</strong><em>人工处置 · 四期</em></div>
+          <div class="kpi"><u>运营图</u><strong>当前生效 #—</strong><em>现网已有</em></div>
+        </div>
+        <div class="panel">
+          <h4>运营图 <span class="tag">现网已有</span></h4>
+          <p>上传 → 先看一眼 → 点「发布这一张」才生效；历史里点一张就是「回滚到那一张」；点「停用」小程序退回包里那一张。备注会显示在历史里。</p>
+          <div class="row">
+            <span class="file">先选一张 JPG 或 PNG</span>
+            <span class="btn clay">发布之前先看一眼</span>
+            <span class="btn">发布这一张</span>
+            <span class="btn ghost">停用</span>
+          </div>
+          <div class="hint">下发已冻结（MP_ASSETS_FREEZE=1）：现在怎么改都不影响线上，解冻后生效。</div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ================= B 版 ================= -->
+  <section class="shell B">
+    <div class="cap">B 版｜深色 slate —— 与 <code>admin.html</code> 同一套令牌（改动最小，但对外会有两种视觉）</div>
+    <div class="bar">
+      <span class="brand">AgentsBin 管理台</span>
+      <span class="sw"><b>图麦笔记</b><b class="on">图麦克</b></span>
+      <span class="who">已登录 · 一次通行两小程序 · 登出</span>
+    </div>
+    <div class="body">
+      <nav>
+        <i>数据</i><s class="on">总览</s><s>用户</s><s>邀请码</s><s>支付记录</s><s>额度漏斗</s><s>API 指标</s><s>支付对账</s>
+        <i>配置</i><s>产品</s><s>生成VIP邀请码</s><s>修改密码</s>
+      </nav>
+      <main>
+        <div class="grid">
+          <div class="kpi"><u>总用户数</u><strong>—</strong><em>现网已有</em></div>
+          <div class="kpi"><u>今日访问</u><strong>—</strong><em>现网已有</em></div>
+          <div class="kpi"><u>本周新增</u><strong>—</strong><em>现网已有</em></div>
+          <div class="kpi"><u>图片处理总数</u><strong>—</strong><em>现网已有</em></div>
+        </div>
+        <div class="grid" style="margin-top:10px">
+          <div class="kpi"><u>今日处理</u><strong>—</strong><em>现网已有</em></div>
+          <div class="kpi"><u>VIP兑换数</u><strong>—</strong><em>现网已有</em></div>
+          <div class="kpi"><u>未使用VIP码</u><strong>—</strong><em>现网已有</em></div>
+          <div class="kpi"><u>今日事件</u><strong>—</strong><em>现网已有</em></div>
+        </div>
+        <div class="panel">
+          <h4>额度漏斗 / API 指标 / 支付对账 <span class="tag plan">规划中</span></h4>
+          <p>后端四个口今天已经写好了（<code>/admin/stats/credit-funnel</code>、<code>/admin/stats/api-metrics</code>、<code>/admin/payments/reconcile</code>、<code>/admin/payments/reconciliations</code>），界面上没有入口——补四块卡片就有数，不用写后端。</p>
+          <div class="row">
+            <span class="file">选择时间窗 · 产品</span>
+            <span class="btn">查看漏斗</span>
+            <span class="btn warn">发起对账</span>
+            <span class="btn ghost">对账记录</span>
+          </div>
+          <div class="hint">每个数字都要写明统计窗口与来源表；任务态只在 Redis 活一小时，任何「最近」类数字不许当历史卖。</div>
+        </div>
+      </main>
+    </div>
+  </section>
+</div>
+
+<div class="foot">
+  <b>两版令牌都是现读的，不是我挑的：</b>
+  A 版 <code>--paper #F2EFE9 · --ink #14161A · --muted #6b6f78 · --line #e3e0d8 · --clay #D2683F</code>，卡 <code>#fff</code>＋圆角 12px，强调态 <code>#fff4e6/#7a4b12</code>，主按钮墨底白字（出处 <code>backend/app/api/routes/ops_page.py</code> 的 style 段）。
+  B 版 底 <code>#0d1117</code>、卡 <code>#1e293b</code>、控件 <code>#334155</code>、字 <code>#e0e0e0/#94a3b8/#f1f5f9</code>、强调 <code>#60a5fa/#3b82f6/#2563eb</code>、状态四色 <code>#6ee7b7/#fcd34d/#fdba74/#f87171</code>（出处 <code>AgentsWatermark/cloud/image-service/app/admin.html</code> 的 style 段）。
+  <br><b>两版共用、不随皮变的东西：</b>顶栏产品切换 → 左栏「数据／配置」两组 → 主区先数字后配置 → 危险动作二次确认 → 每个数字标来源与时间窗。
+  <br><b>图上的「—」是故意留空</b>：这趟一行代码没写、没取过任何生产数字，别把这些格子当成读数。
+</div>
+
+</body>
+</html>

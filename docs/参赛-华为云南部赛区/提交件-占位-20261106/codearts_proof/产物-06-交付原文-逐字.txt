@@ -1,0 +1,204 @@
+===== BEGIN README-deploy.md =====
+# 图麦笔记 — 部署与运行步骤
+
+> 本文件只描述操作步骤，不写任何真实密钥、账号、AppID、服务器地址或内网 IP。
+> 凡未从仓库读到的具体值一律标 **「待核对」**。
+
+## 0. 角色与环境
+
+| 项 | 值 | 来源 |
+|---|---|---|
+| 后端框架 | FastAPI | 仓库实测 |
+| 后端代码目录 | `backend/` | 仓库实测 |
+| 脚本位置 | `install.sh`、`deploy.sh`、`upload.sh`、`backup.sh` 均在 `backend/` 下 | 仓库实测 |
+| 开发机 | macOS（Apple Silicon），Python 3.13 | 实测 |
+| 部署服务器 | Ubuntu 22.04，Python 3.10.12 | 实测 |
+| 虚拟环境 | `backend/.venv/bin/python` | 实测 |
+| 进程托管 | systemd，两个确定单元 `wtsj-api`、`wtsj-worker` | 实测 |
+| 第三个单元 `wtsj-backend` | 是否真实存在 | **待核对** |
+| 仓库内 unit 文件 | 不含 `.service` 文件；`deploy.sh` 仅对已存在的 `wtsj-api`/`wtsj-worker` 做 `systemctl restart` | 仓库实测 |
+| API 入口 | `app.main:app`（`backend/app/main.py` 第 29 行 `app = FastAPI(title=图麦笔记 API, version=0.1.0)`） | 仓库实测 |
+| API 端口 | 8000（`backend/deploy.sh` 第 17 行 `API_PORT=8000`） | 仓库实测 |
+| 网侧 ExecStart | `uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1` | 仓库实测 |
+| 图片存储 | 微信云开发存储 | 项目背景 |
+| AI 提炼 | 微信云函数 | 项目背景 |
+
+## 1. 本地开发（macOS）
+
+### 1.1 一键安装
+```bash
+chmod +x backend/install.sh
+backend/install.sh
+```
+脚本会：判系统 → 检 python3 ≥ 3.10 → 检 venv → 建虚拟环境 → 按 `backend/requirements.txt` 装依赖 → 生成 `backend/.env`（占位符）→ 跑 `pytest` 并念出通过条数。任一步失败均非零退出并给出原因。
+
+### 1.2 填配置
+编辑 `backend/.env`，按文件内注释逐项填入真实值（10 键）。完整 33 键模板见 `backend/.env.example`，含 `HUNYUAN_CF_`、`IMAGE_STORE_CF_`、`SEC_CHECK_`、`EXTRACT_`、`MP_ASSETS_` 前缀键及 `ROAMMARK_APP_GATE`、`SHARE_QR_ENV_VERSION`、`APPLE_CLIENT_ID`、`ADMIN_EXCHANGE_SECRET`、`ADMIN_SESSION_MINUTES`、`PRIVATE_UNLOCK_MINUTES`、`EXTRACT_PROVIDER` 等。`.env.example` 中 23 个多出键的完整键名 **待核对**。
+
+关键键的代码默认值（出处 `backend/app/core/config.py`）：
+- `CORS_ORIGINS` 默认 `*`（第 83 行）
+- `JWT_EXPIRE_MINUTES` 默认 `10080`（即 60×24×7，7 天，第 86 行）
+- `DATABASE_URL` 默认空串，空值直接抛错「DATABASE_URL 未配置」（第 12、183–185 行）；`.env.example` 实测值为 `sqlite:///./tmbj.db`，测试用例钉 `sqlite:////tmp/tumaibiji_pytest.db`。本地与模板这一档是 SQLite；生产是否用 PostgreSQL **待核对**（`requirements` 含 `psycopg2-binary` 仅说明支持，不等于现网在用）。
+
+### 1.3 起服务
+```bash
+cd backend
+.venv/bin/python -m uvicorn app.main:app --reload
+```
+入口 `app.main:app` 与端口 8000 均为仓库实测（见第 0 节）。本地 `--reload` 默认监听 `127.0.0.1:8000`。
+
+### 1.4 跑测试
+```bash
+cd backend
+.venv/bin/python -m pytest tests/ -q
+```
+用例目录 `backend/tests/`（实测）。条数由 pytest 实时输出，不写死。
+
+### 1.5 验证服务活着
+```bash
+curl -i http://127.0.0.1:8000/docs
+```
+期望 HTTP 200 返回 Swagger UI 页面。专用健康检查路径（如 `/healthz`）**待核对**。
+
+## 2. 网侧部署（Ubuntu 22.04）
+
+### 2.1 上传代码
+仓库自带 `backend/upload.sh`，整树上传（具体 `rsync`/`scp` 命令 **待核对**）。
+```bash
+backend/upload.sh
+```
+
+### 2.2 执行部署脚本
+```bash
+backend/deploy.sh
+```
+`deploy.sh` 实测执行顺序（行号为现场读数）：
+
+| 行号 | 动作 | 性质 |
+|---|---|---|
+| 17 | `API_PORT=8000` | 配置 |
+| 24 | 打印标题 | 日志 |
+| 37 | 写 `DEPLOY_STAMP.txt` | 部署印记 |
+| 46 | `compileall` 语法检查 | **闸门 1** |
+| 57 | `python -c "import app.main"` 入口 import 检查 | **闸门 2** |
+| 77 | 系统库预检 `libGL` / `libglib` | **闸门 3** |
+| 92 | 重启前先做数据库快照 | 保护动作 |
+| 110 | `alembic current` → `alembic upgrade head` | **闸门 4** |
+| 325 | 卡片模板配方表与种子（写库需 `POSTER_TEMPLATES=1`，默认只读） | 数据初始化 |
+| 432 | 自建 OCR 预检（独立进程，内存 789.8MB，上限 816–826MB，断言含 `OCR` 与 `123`） | **闸门 5** |
+| 481 | `systemctl show -p MainPID` 后重启 systemd | 动作 |
+
+**五道自检闸门**归纳为：① compileall 语法 ② 入口 import ③ 系统库 libGL/libglib ④ alembic 迁移 ⑤ OCR 内存预检。若你的"五道"口径与此不同，以你的口径为准，本表 **待核对**。
+
+任一闸门失败，`deploy.sh` 应非零退出且不重启 systemd（具体失败行为 **待核对**）。
+
+### 2.3 重启 systemd 两个单元
+**unit 已在服务器上存在**：仓库内不含 `.service` 文件，`deploy.sh` 与 `install.sh` 均不创建 unit、也不修改 unit 文件。`deploy.sh` 第 481 行仅对已存在的 `wtsj-api`、`wtsj-worker` 执行 `systemctl restart`。
+
+`deploy.sh` 第 481 行已内置重启。如需手动重启：
+```bash
+sudo systemctl restart wtsj-api
+sudo systemctl restart wtsj-worker
+sudo systemctl status wtsj-api wtsj-worker --no-pager
+```
+单元 `wtsj-api`（API 服务）与 `wtsj-worker`（任务队列 worker，配合 redis/rq）为实测确定。网侧 ExecStart 实读为 `uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1`。`wtsj-backend` 字符串曾在脚本出现，是否为独立单元 **待核对**。
+
+### 2.4 回滚
+`deploy.sh` 第 92 行在重启前做了数据库快照；仓库另有 `backend/backup.sh`（具体行为 **待核对**）。回滚建议步骤（**具体回滚脚本未在仓库读到，以下为建议，待核对**）：
+1. 用第 92 行快照（或 `backup.sh` 产物）恢复数据库；
+2. `cd backend && .venv/bin/alembic downgrade <上一版本号>`（版本号 **待核对**）；
+3. 回退代码到上一稳定提交（`git checkout <prev-tag>` 或 `upload.sh` 传旧版整树）；
+4. `sudo systemctl restart wtsj-api wtsj-worker`；
+5. 跑 2.5 验证。
+
+### 2.5 网侧验证服务活着
+```bash
+sudo systemctl is-active wtsj-api wtsj-worker
+curl -i http://127.0.0.1:8000/docs
+```
+期望两个单元均为 `active`，curl 返回 200。专用健康检查路径 **待核对**。
+
+## 3. 必须由项目所有者本人操作的步骤
+
+以下动作涉及平台账号与人工审核，**不可脚本化、不可自动化**，必须由项目所有者本人在微信后台手动完成：
+
+| 动作 | 在哪做 | 谁能做 |
+|---|---|---|
+| 小程序提审 | 微信公众平台 mp.weixin.qq.com → 版本管理 → 提交审核 | 所有者本人 |
+| 设体验版/正式版 | 微信公众平台 → 版本管理 | 所有者本人 |
+| 点发布上线 | 微信公众平台 → 审核通过后点发布 | 所有者本人 |
+| 配置 AppID/AppSecret | 微信公众平台 → 开发管理 → 开发设置 | 所有者本人（写入服务器 `.env`，勿提交仓库） |
+| 配置合法域名/白名单 | 微信公众平台 → 开发管理 → 服务器域名 | 所有者本人 |
+| 云函数部署 | 微信开发者工具 → 云开发 → 云函数 | 所有者本人 |
+| 云存储开通 | 微信开发者工具 → 云开发 → 存储 | 所有者本人 |
+
+任何脚本（含 `install.sh`、`deploy.sh`、`upload.sh`、`backup.sh`）均不得、也不能代为执行以上步骤。
+
+## 4. 待核对清单（汇总）
+
+- `wtsj-backend` 是否为第三个 systemd 单元
+- `upload.sh`、`backup.sh` 的具体命令与行为
+- `deploy.sh` 五道闸门的确切口径与失败行为
+- 回滚的具体脚本/步骤
+- 专用健康检查路径（如 `/healthz`）
+- `.env.example` 中 23 个多出键的完整键名
+- 生产环境 `DATABASE_URL` 是否为 PostgreSQL
+- 各依赖包许可证最终值（见 `OPEN-SOURCE-LICENSES.md`）
+===== END README-deploy.md =====
+===== BEGIN OPEN-SOURCE-LICENSES.md =====
+# 图麦笔记 — 开源组件说明
+
+> 本文件逐条列出 `backend/requirements.txt` 中的依赖。
+> **许可证**列：对公开且稳定声明的值写出，并标注"以包元数据为准"；拿不准的一律写 **「需核对」**，不凭印象编。
+> **用途**列：依据包名与项目背景（FastAPI 后端 + 微信小程序 + AI 提炼云函数 + 图片云存储）推断，未逐 `import` 核对，如与实际不符以代码为准。
+> 许可证最终值请以安装后 `pip show <包名>` 的 `License` 字段及上游仓库 `LICENSE` 文件为准。
+
+## 1. 依赖清单（逐字照抄自 `backend/requirements.txt`）
+
+| 包名 | 版本约束 | 许可证 | 在本项目里的用途（推断） |
+|---|---|---|---|
+| fastapi | 0.115.0 | MIT（以包元数据为准） | Web 框架，提供 API 路由与请求/响应模型 |
+| uvicorn[standard] | 0.32.0 | BSD-3-Clause（以包元数据为准） | ASGI 服务器，运行 FastAPI 应用 |
+| sqlalchemy | 2.0.36 | MIT（以包元数据为准） | ORM，数据库模型与查询 |
+| alembic | 1.14.0 | MIT（以包元数据为准） | 数据库迁移工具，`alembic upgrade head` |
+| pydantic | 2.9.2 | MIT（以包元数据为准） | 数据校验与序列化 |
+| pydantic-settings | 2.6.1 | MIT（以包元数据为准） | 从 `.env` 加载配置 |
+| python-multipart | 0.0.12 | Apache-2.0（以包元数据为准） | 表单/文件上传解析 |
+| httpx | 0.27.2 | BSD-3-Clause（以包元数据为准） | HTTP 客户端，调用外部接口（如 DeepSeek） |
+| beautifulsoup4 | 4.12.3 | MIT（以包元数据为准） | HTML 解析 |
+| trafilatura | 1.12.2 | **需核对** | 网页正文提取（推断，配合 AI 提炼） |
+| lxml_html_clean | 0.4.2 | **需核对** | HTML 清洗（推断，去危险标签/脚本） |
+| redis | 8.1.0 | MIT（以包元数据为准） | Redis 客户端，缓存与队列后端 |
+| rq | 2.12.0 | BSD-3-Clause（以包元数据为准） | 任务队列，配合 `wtsj-worker` 异步处理 |
+| Pillow | 10.4.0 | MIT-CMU HP（以包元数据为准） | 图像处理（缩放/格式转换等） |
+| qrcode[pil] | 7.4.2 | BSD-3-Clause（以包元数据为准） | 二维码生成（推断，分享/登录场景） |
+| PyJWT | 2.9.0 | MIT（以包元数据为准） | JWT 签发与验签（登录态） |
+| cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause（以包元数据为准） | 加密原语（推断，配合 JWT/敏感字段） |
+| slowapi | 0.1.9 | MIT（以包元数据为准） | API 限流 |
+| rapidocr | 3.9.2 | **需核对** | 自建 OCR 引擎（`deploy.sh` 第 432 行预检对象） |
+| onnxruntime | >=1.23.2,<2 | MIT（以包元数据为准） | OCR 模型推理运行时 |
+| opencv-python | 5.0.0.93 | Apache-2.0（以包元数据为准） | 图像/OCR 预处理（带 GUI，依赖 libGL） |
+| psycopg2-binary | 2.9.10 | LGPL-3.0-or-later（以包元数据为准） | PostgreSQL 驱动；现网是否在用待核对（本地/模板实测为 SQLite，此包仅说明支持 PG） |
+
+共 21 条。`numpy` 未在 `requirements.txt` 中钉版本（实测，非遗漏），脚本与本文档不替它补版本。
+
+## 2. 已实测的依赖坑
+
+1. **rapidocr → opencv 缺 libGL**
+   `rapidocr` 依赖带 GUI 的 `opencv`，在无桌面 Ubuntu 22.04 上 `import` 时报缺 `libGL.so.1`。`deploy.sh` 第 77 行做系统库预检（`libGL` 与 `libglib`），`install.sh` 的 Ubuntu 分支同样预检。替代方案是换 `opencv-python-headless==5.0.0.93`，**本项目未采用，保持 `opencv-python==5.0.0.93` 现值**（实测）。
+
+2. **onnxruntime 跨版本**
+   `onnxruntime>=1.23.2,<2` 在服务器 Python 3.10 上最高解出 `1.23.2`，本机 Python 3.13 上解出 `1.30.0`。同一份 `requirements.txt` 两端解出版本不同，属已知现象，非故障。
+
+3. **cryptography 50.0.2 wheel**
+   `cryptography 50.0.2` 有 `cp39-abi3` 的 `manylinux2014_x86_64` wheel，服务器侧无需 Rust 编译（实测）。
+
+## 3. 核对建议
+
+安装完成后，逐包核对许可证：
+```bash
+cd backend
+.venv/bin/python -m pip show <包名> | grep -i license
+```
+或直接查看上游仓库 `LICENSE` 文件。本文档标 **「需核对」** 的三项（`trafilatura`、`lxml_html_clean`、`rapidocr`）请优先核对。
+===== END OPEN-SOURCE-LICENSES.md =====

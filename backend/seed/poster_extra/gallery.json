@@ -1,0 +1,558 @@
+{
+  "template_id": "gallery",
+  "label": "画廊",
+  "label_en": "Gallery Mat",
+  "group_key": "classic",
+  "sort_order": 2,
+  "min_app_version": "2.4.25",
+  "recipe": {
+    "id": "gallery",
+    "min_version": 1,
+    "steps": [
+      {
+        "let": "s",
+        "value": {
+          "prim": "scheme",
+          "args": {
+            "name": "riso",
+            "categoryId": {
+              "var": "note.category_id"
+            }
+          }
+        }
+      },
+      {
+        "let": "pad",
+        "value": 64
+      },
+      {
+        "let": "imgH",
+        "value": 720
+      },
+      {
+        "let": "qrSize",
+        "value": 108
+      },
+      {
+        "let": "colTop",
+        "value": {
+          "+": [
+            {
+              "var": "imgH"
+            },
+            48
+          ]
+        }
+      },
+      {
+        "let": "colH",
+        "value": 380
+      },
+      {
+        "let": "slot",
+        "value": 64
+      },
+      {
+        "let": "x0",
+        "value": {
+          "-": [
+            {
+              "var": "W"
+            },
+            70
+          ]
+        }
+      },
+      {
+        "let": "T",
+        "value": {
+          "prim": "vertCols",
+          "args": {
+            "text": {
+              "var": "note.title"
+            },
+            "colH": {
+              "var": "colH"
+            },
+            "step": 54,
+            "maxCols": 2,
+            "size": 42,
+            "bold": true,
+            "fam": {
+              "prim": "token",
+              "args": {
+                "name": "serif"
+              }
+            }
+          }
+        }
+      },
+      {
+        "let": "tN",
+        "value": {
+          "len": {
+            "var": "T.cols"
+          }
+        }
+      },
+      {
+        "let": "B",
+        "value": {
+          "prim": "vertCols",
+          "args": {
+            "text": {
+              "if": [
+                {
+                  "truthy": {
+                    "var": "note.summary"
+                  }
+                },
+                {
+                  "var": "note.summary"
+                },
+                ""
+              ]
+            },
+            "colH": {
+              "var": "colH"
+            },
+            "step": 30,
+            "maxCols": 2,
+            "size": 22,
+            "fam": {
+              "prim": "token",
+              "args": {
+                "name": "serif"
+              }
+            }
+          }
+        }
+      },
+      {
+        "let": "sumX",
+        "value": {
+          "-": [
+            {
+              "var": "x0"
+            },
+            {
+              "*": [
+                {
+                  "+": [
+                    {
+                      "var": "tN"
+                    },
+                    1
+                  ]
+                },
+                {
+                  "var": "slot"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "let": "usedH",
+        "value": {
+          "max": [
+            {
+              "prim": "maxOf",
+              "args": {
+                "values": {
+                  "var": "T.advs"
+                },
+                "seed": 0
+              }
+            },
+            {
+              "prim": "maxOf",
+              "args": {
+                "values": {
+                  "var": "B.advs"
+                },
+                "seed": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "let": "meta",
+        "value": {
+          "prim": "joinNonEmpty",
+          "args": {
+            "sep": " · ",
+            "parts": [
+              {
+                "prim": "sourceLabel",
+                "args": {}
+              },
+              {
+                "prim": "noteDate",
+                "args": {}
+              }
+            ]
+          }
+        }
+      },
+      {
+        "let": "metaY",
+        "value": {
+          "+": [
+            {
+              "var": "colTop"
+            },
+            {
+              "var": "usedH"
+            },
+            44
+          ]
+        }
+      },
+      {
+        "let": "signTop",
+        "value": {
+          "+": [
+            {
+              "var": "metaY"
+            },
+            48
+          ]
+        }
+      },
+      {
+        "let": "sign",
+        "value": {
+          "prim": "signRow",
+          "args": {
+            "x": {
+              "var": "pad"
+            },
+            "y": {
+              "var": "signTop"
+            },
+            "maxW": {
+              "-": [
+                {
+                  "var": "W"
+                },
+                {
+                  "*": [
+                    {
+                      "var": "pad"
+                    },
+                    2
+                  ]
+                },
+                {
+                  "var": "qrSize"
+                },
+                30
+              ]
+            },
+            "size": 26,
+            "avatarD": 64,
+            "onDark": false
+          }
+        }
+      },
+      {
+        "let": "qr",
+        "value": {
+          "prim": "qrSticker",
+          "args": {
+            "x": {
+              "-": [
+                {
+                  "var": "W"
+                },
+                {
+                  "var": "pad"
+                },
+                {
+                  "var": "qrSize"
+                }
+              ]
+            },
+            "y": {
+              "var": "signTop"
+            },
+            "size": {
+              "var": "qrSize"
+            },
+            "offset": {
+              "var": "s.accent"
+            },
+            "ink": {
+              "var": "s.sub"
+            },
+            "label": {
+              "prim": "i18n",
+              "args": {
+                "key": "scanToView"
+              }
+            }
+          }
+        }
+      },
+      {
+        "let": "height",
+        "value": {
+          "+": [
+            {
+              "var": "signTop"
+            },
+            {
+              "max": [
+                {
+                  "var": "sign.h"
+                },
+                {
+                  "prim": "footH",
+                  "args": {
+                    "qrSize": {
+                      "var": "qrSize"
+                    }
+                  }
+                }
+              ]
+            },
+            48
+          ]
+        }
+      },
+      {
+        "emit": {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": {
+            "var": "W"
+          },
+          "h": {
+            "var": "height"
+          },
+          "color": {
+            "var": "s.bg"
+          }
+        }
+      },
+      {
+        "if": {
+          "cond": {
+            "truthy": {
+              "var": "hasNote"
+            }
+          },
+          "then": [
+            {
+              "emit": {
+                "k": "image",
+                "key": "note",
+                "x": 0,
+                "y": 0,
+                "w": {
+                  "var": "W"
+                },
+                "h": {
+                  "var": "imgH"
+                }
+              }
+            }
+          ],
+          "else": [
+            {
+              "emitOne": {
+                "prim": "glyphPlate",
+                "args": {
+                  "x": 0,
+                  "y": 0,
+                  "w": {
+                    "var": "W"
+                  },
+                  "h": {
+                    "var": "imgH"
+                  },
+                  "color": {
+                    "prim": "withAlpha",
+                    "args": {
+                      "color": {
+                        "prim": "token",
+                        "args": {
+                          "name": "ink"
+                        }
+                      },
+                      "alpha": 0.12
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "emit": {
+          "k": "line",
+          "x1": 0,
+          "y1": {
+            "var": "imgH"
+          },
+          "x2": {
+            "var": "W"
+          },
+          "y2": {
+            "var": "imgH"
+          },
+          "w": 2,
+          "color": {
+            "prim": "withAlpha",
+            "args": {
+              "color": {
+                "var": "s.ink"
+              },
+              "alpha": 0.18
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "cond": {
+            "truthy": {
+              "len": {
+                "var": "T.cols"
+              }
+            }
+          },
+          "then": [
+            {
+              "emit": {
+                "k": "text",
+                "x": {
+                  "var": "x0"
+                },
+                "y": {
+                  "var": "colTop"
+                },
+                "lines": {
+                  "var": "T.cols"
+                },
+                "vert": true,
+                "lh": 54,
+                "colGap": {
+                  "-": [
+                    {
+                      "var": "slot"
+                    },
+                    54
+                  ]
+                },
+                "size": 42,
+                "weight": "bold",
+                "color": {
+                  "var": "s.ink"
+                },
+                "fam": {
+                  "prim": "token",
+                  "args": {
+                    "name": "serif"
+                  }
+                },
+                "vpunct": true
+              }
+            }
+          ],
+          "else": []
+        }
+      },
+      {
+        "if": {
+          "cond": {
+            "truthy": {
+              "len": {
+                "var": "B.cols"
+              }
+            }
+          },
+          "then": [
+            {
+              "emit": {
+                "k": "text",
+                "x": {
+                  "var": "sumX"
+                },
+                "y": {
+                  "var": "colTop"
+                },
+                "lines": {
+                  "var": "B.cols"
+                },
+                "vert": true,
+                "lh": 30,
+                "colGap": {
+                  "-": [
+                    {
+                      "var": "slot"
+                    },
+                    30
+                  ]
+                },
+                "size": 22,
+                "color": {
+                  "prim": "withAlpha",
+                  "args": {
+                    "color": {
+                      "var": "s.ink"
+                    },
+                    "alpha": 0.72
+                  }
+                },
+                "fam": {
+                  "prim": "token",
+                  "args": {
+                    "name": "serif"
+                  }
+                },
+                "vpunct": true
+              }
+            }
+          ],
+          "else": []
+        }
+      },
+      {
+        "emit": {
+          "k": "text",
+          "x": {
+            "var": "pad"
+          },
+          "y": {
+            "var": "metaY"
+          },
+          "lines": [
+            {
+              "var": "meta"
+            }
+          ],
+          "size": 20,
+          "color": {
+            "var": "s.sub"
+          }
+        }
+      },
+      {
+        "emitMany": {
+          "var": "sign.layers"
+        }
+      },
+      {
+        "emitMany": {
+          "var": "qr.layers"
+        }
+      }
+    ]
+  }
+}

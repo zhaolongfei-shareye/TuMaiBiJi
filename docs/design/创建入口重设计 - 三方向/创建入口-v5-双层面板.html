@@ -1,0 +1,359 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>创建入口 v5.3 · 双层面板（扁平化 + 按钮分大小）</title>
+<style>
+  :root{
+    /* 面板这一支墨黑 = palette.UNCATEGORIZED.bg，也是现网 .panel 的 --blk-ink / --solid-bg */
+    --panel:#23252C; --card:#2B2D35; --field:#1A1C21;
+    /* 强调色 = palette.TONES[2] 橙，配它固定的深墨字（色板规则①） */
+    --cam:#E9723D; --cam-ink:#2C1204;
+    /* 纸白 = palette.PAPER，现网铺图那一页翻白之后的三级字就是它的 .78 / .56 */
+    --paper:#F2EFE9;
+    --p92:rgba(242,239,233,.92); --p78:rgba(242,239,233,.78); --p62:rgba(242,239,233,.62);
+    --p56:rgba(242,239,233,.56); --p50:rgba(242,239,233,.50); --p42:rgba(242,239,233,.42);
+    --p38:rgba(242,239,233,.38); --p14:rgba(242,239,233,.14); --p10:rgba(242,239,233,.10); --p07:rgba(242,239,233,.07);
+    /* 底栏那两支 = chromeOf('tint-paper') 实测输出 */
+    --chrome-bg:#443B25; --chrome-sel:#766948;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif}
+  body{background:#0B0C0F;padding:26px 20px 30px}
+  h1{color:var(--paper);font-size:21px;letter-spacing:.3px;font-weight:700;display:flex;align-items:center;gap:10px}
+  h1 i{width:3px;height:19px;border-radius:2px;background:var(--cam);flex:none}
+  .sub{color:#9AA1AC;font-size:12.5px;margin-top:9px;line-height:1.75;max-width:1520px}
+  .sub b{color:#D6DBE2;font-weight:600}
+  .row{display:flex;gap:18px;margin-top:20px;align-items:flex-start}
+  .side{width:250px;flex:none}
+  .side img{width:100%;border-radius:14px;display:block;box-shadow:0 16px 40px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.08)}
+  .side .what{font-size:11px;color:#9AA1AC;margin-top:9px;line-height:1.7}
+  .col{display:flex;flex-direction:column;align-items:center}
+  .cap{color:#C7CDD6;font-size:12px;margin-top:12px;text-align:center;line-height:1.55;max-width:300px}
+  .cap b{color:var(--paper);font-weight:600}
+  .legend{margin-top:20px;font-size:12px;color:#C7CDD6;line-height:2.05;border-left:3px solid #333A45;padding-left:14px;max-width:1520px}
+  .legend b{color:var(--paper);font-weight:600}
+  .n{display:inline-block;width:17px;height:17px;border-radius:50%;background:#F6C445;color:#2A2005;font-size:11px;font-weight:800;text-align:center;line-height:17px;margin-right:6px}
+
+  /* ================= 屏 ================= */
+  .phone{width:300px;height:650px;border-radius:44px;overflow:hidden;position:relative;flex:none;background:#000;
+    box-shadow:0 0 0 5px #17181C, 0 0 0 6px rgba(255,255,255,.09), 0 30px 60px rgba(0,0,0,.55)}
+
+  /* --- 系统状态栏 + 微信导航条：底色 #181A20 = app.js applyNavForBand 铺图时写的那一支 --- */
+  .chrome{position:absolute;left:0;right:0;top:0;height:78px;background:#181A20;z-index:6}
+  .island{position:absolute;left:50%;transform:translateX(-50%);top:8px;width:96px;height:27px;border-radius:14px;background:#000}
+  .stime{position:absolute;left:20px;top:18px;font-size:12.5px;font-weight:600;color:#fff;letter-spacing:.2px}
+  .sright{position:absolute;right:15px;top:20px;display:flex;align-items:flex-end;gap:5px}
+  .sig{display:flex;align-items:flex-end;gap:1.6px;height:10px}
+  .sig i{width:3px;border-radius:1px;background:#fff}
+  .sig i:nth-child(1){height:4px}.sig i:nth-child(2){height:6px}
+  .sig i:nth-child(3){height:8px}.sig i:nth-child(4){height:10px}
+  .wifi{width:15px;height:11px;margin-bottom:-1px}
+  .bat{width:20px;height:10.5px;border-radius:3.2px;border:1px solid rgba(255,255,255,.42);position:relative;margin-bottom:-.5px}
+  .bat u{position:absolute;left:1.4px;top:1.4px;bottom:1.4px;width:13px;background:#fff;border-radius:1.6px}
+  .bat::after{content:"";position:absolute;right:-3.2px;top:3px;width:1.8px;height:4px;border-radius:0 1px 1px 0;background:rgba(255,255,255,.42)}
+  .navtitle{position:absolute;left:0;right:0;top:52px;text-align:center;font-size:13px;font-weight:600;color:rgba(255,255,255,.96);letter-spacing:.2px}
+  /* 微信胶囊：右上那一枚「⋯｜◎」 */
+  .capsule{position:absolute;right:6px;top:46px;width:70px;height:26px;border-radius:13px;display:flex;align-items:center;
+    background:rgba(0,0,0,.22);border:1px solid rgba(242,239,233,.28)}
+  .capsule .half{flex:1;display:flex;align-items:center;justify-content:center;gap:3.2px}
+  .capsule .dv{width:1px;height:14px;background:rgba(242,239,233,.24);flex:none}
+  .capsule .half i{width:3px;height:3px;border-radius:50%;background:var(--p92)}
+  .capsule .tgt{width:11px;height:11px;border-radius:50%;border:1.3px solid var(--p92);position:relative}
+  .capsule .tgt::after{content:"";position:absolute;left:2.6px;top:2.6px;width:3.4px;height:3.4px;border-radius:50%;background:var(--p92)}
+
+  /* --- 页面：形象图 + 现网那层压暗罩 --- */
+  .screen{position:absolute;left:0;right:0;top:78px;bottom:0;overflow:hidden}
+  .bgimg{position:absolute;inset:0;background:url("../../../miniprogram/assets/home-bg-portrait.jpg") 50% 22% / cover no-repeat}
+  .scrim{position:absolute;inset:0;
+    background:linear-gradient(180deg, rgba(18,20,26,.58) 0%, rgba(18,20,26,.58) 10%,
+      rgba(18,20,26,.44) 43%, rgba(18,20,26,.42) 62%,
+      rgba(18,20,26,.52) 83%, rgba(18,20,26,.62) 88%, rgba(18,20,26,.72) 100%)}
+  .head{position:absolute;left:13px;right:13px;top:38px}
+  .hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  /* 42rpx=16.8px / 700 / -1rpx 字距，色 = has-bg 翻白之后的 --text-primary */
+  .htitle{font-size:16.8px;font-weight:700;letter-spacing:-.4px;color:var(--paper);line-height:1.3}
+  .lang{display:flex;align-items:baseline;gap:8px;flex:none}
+  .lang span{font-size:9.6px;line-height:1.4;color:var(--p56);padding:0 1px 2px;border-bottom:1.6px solid transparent}
+  .lang span.on{color:var(--paper);font-weight:700;border-bottom-color:var(--paper)}
+  .date{display:flex;align-items:baseline;gap:5.6px;margin-top:9px;font-size:9.6px;line-height:1.4}
+  .date .d{color:var(--p78);letter-spacing:.4px}
+  .date .w{color:var(--p56);letter-spacing:.8px}
+
+  /* --- 底栏：浮起胶囊，几何与色全是现网实测值；选中的是第一格「新建」 --- */
+  .pill{position:absolute;left:9.6px;right:9.6px;bottom:8px;height:43.2px;border-radius:17.6px;display:flex;align-items:center;
+    background:var(--chrome-bg);border:1.2px solid var(--p14);z-index:4}
+  .pill .it{flex:1;display:flex;align-items:center;justify-content:center;color:var(--p62)}
+  .pill .it svg{width:16px;height:16px}
+  .pill .it.on{color:var(--paper)}
+  .pill .it.on .ic{width:30.4px;height:30.4px;border-radius:50%;background:var(--chrome-sel);display:flex;align-items:center;justify-content:center}
+  .pill .ic{display:flex;align-items:center;justify-content:center}
+
+  /* --- 大面板：现网 700rpx 定高、贴底 152rpx，一个数没改 --- */
+  .dock{position:absolute;left:9.6px;right:9.6px;bottom:60.8px;height:280px;border-radius:22px;display:flex;flex-direction:column;
+    padding:14px 13px 13px;z-index:5;
+    background:var(--panel);
+    border:1px solid var(--p14)}
+  .kick{font-size:8px;letter-spacing:3px;color:var(--p42);font-weight:600}
+  .dh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:5px}
+  .dtitle{font-size:17px;font-weight:700;color:var(--paper);letter-spacing:.3px;line-height:1.2}
+  .dhint{font-size:9.6px;color:var(--p42);letter-spacing:.2px;flex:none}
+  .tabs{display:flex;margin-top:12px}
+  .tab{flex:1;text-align:center;font-size:13px;color:var(--p50);padding-bottom:7px;position:relative;letter-spacing:.4px}
+  .tab::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:26px;height:2px;border-radius:1px;background:var(--p10)}
+  .tab.on{color:var(--paper);font-weight:600}
+  .tab.on::after{background:var(--cam)}
+
+  /* --- 小面板：撑满剩余高度，四态同大 --- */
+  .card{margin-top:11px;flex:1;min-height:0;border-radius:16px;padding:12px;display:flex;flex-direction:column;
+    background:var(--card);
+    border:1px solid var(--p10)}
+  .line{display:flex;align-items:center;gap:10px}
+  .line.mid{margin:auto 0}
+  /* 相册那枚下面挂着一行字，左边两行说明和大钮补同样高度，三者圆心才齐 */
+  .line.mid .desc,.line.mid .big{margin-bottom:15px}
+  .desc{flex:1;min-width:0}
+  .d1{font-size:12.5px;color:var(--p92);font-weight:600;letter-spacing:.2px;line-height:1.35}
+  .d2{font-size:10.5px;color:var(--p50);margin-top:5px;line-height:1.5;letter-spacing:.2px}
+  .flab{font-size:10px;color:var(--p42);letter-spacing:.4px;margin-bottom:7px}
+  .hint{flex:1;min-width:0;font-size:10px;color:var(--p42);line-height:1.5;letter-spacing:.2px;padding-bottom:3px}
+  .field{width:100%;flex:none;height:42px;border-radius:7px;color:var(--p38);font-size:11px;letter-spacing:.2px;
+    display:flex;align-items:center;padding:0 11px;gap:1px;
+    background:var(--field);border:1px solid var(--p14)}
+  .field.ta{height:auto;flex:1;min-height:42px;align-items:flex-start;padding:9px 11px;line-height:1.55}
+  .caret{width:1.4px;height:14px;background:var(--p78);flex:none;border-radius:1px}
+  .field.ta .caret{height:12px;margin-top:1px}
+
+  /* 只有照片态那枚是大钮（58 圆）；小圆钮 42 只留给次动作（相册/清空）；
+     主动作「开始提炼」在链接/文字/多图三态是同一枚通栏长条 */
+  .mini{width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .mini .c{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--p78);
+    background:rgba(242,239,233,.10)}
+  .mini .c svg{width:16px;height:16px}
+  .mini span{font-size:9px;color:var(--p50);letter-spacing:.4px}
+  .big{width:58px;height:58px;flex:none;border-radius:50%;color:var(--cam-ink);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    background:var(--cam)}
+  .big svg{width:20px;height:20px}
+  .big span{font-size:10px;font-weight:700;letter-spacing:.4px}
+
+  /* --- 多图态 --- */
+  .strip{position:relative;overflow:hidden;padding-top:5px;margin:-5px -12px 0 0;padding-right:12px}
+  .strip .in{display:flex;gap:6px}
+  .strip::after{content:"";position:absolute;right:0;top:0;bottom:0;width:20px;
+    background:linear-gradient(90deg,rgba(43,45,53,0),#2B2D35 82%)}
+  .th{width:48px;height:48px;border-radius:7px;flex:none;position:relative;overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+  .th.p1{background:linear-gradient(165deg,#E7B981 0%,#C4834C 46%,#7A4A2A 100%)}
+  .th.p2{background:linear-gradient(165deg,#9DB2D2 0%,#6C82A8 48%,#3E4C68 100%)}
+  .th.p3{background:linear-gradient(165deg,#A8C4A2 0%,#6F9068 50%,#41573C 100%)}
+  .th.p1::before,.th.p2::before,.th.p3::before{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;
+    background:linear-gradient(180deg,rgba(30,18,8,0),rgba(30,18,8,.5))}
+  .th.p1::after{content:"";position:absolute;right:9px;top:8px;width:9px;height:9px;border-radius:50%;background:rgba(255,238,205,.88)}
+  .th.p2::after{content:"";position:absolute;left:-6px;bottom:6px;width:30px;height:16px;border-radius:50% 50% 0 0;background:rgba(24,30,42,.55)}
+  .th.p3::after{content:"";position:absolute;right:-4px;bottom:4px;width:26px;height:18px;border-radius:50% 50% 0 0;background:rgba(24,34,22,.5)}
+  /* 截图那两张：纸白底 + 一行标题块 + 几行正文线（现网存进来的一半是截图） */
+  .th.s1,.th.s2{background:linear-gradient(180deg,#F1EEE6,#E2DED4)}
+  .th.s1::before,.th.s2::before{content:"";position:absolute;left:7px;right:7px;top:15px;height:24px;
+    background:repeating-linear-gradient(180deg, rgba(53,46,29,.34) 0 2px, transparent 2px 6.5px)}
+  .th.s1::after{content:"";position:absolute;left:7px;top:7px;width:20px;height:3.4px;border-radius:2px;background:#766B50}
+  .th.s2::after{content:"";position:absolute;left:7px;top:7px;width:14px;height:3.4px;border-radius:2px;background:#AFA488}
+  /* 右上角那枚 ✕ = 现网 .shot-x：40rpx=16px、遮罩 rgba(20,20,28,.55) 原值 */
+  .th b{position:absolute;right:4px;top:4px;width:16px;height:16px;border-radius:50%;background:rgba(20,20,28,.55);
+    color:#fff;font-size:9px;font-weight:400;display:flex;align-items:center;justify-content:center;line-height:1}
+  .cnt{font-size:10px;color:var(--p50);letter-spacing:.3px;margin-top:9px}
+  .act{display:flex;align-items:flex-end;gap:12px;margin-top:auto}
+  /* 清空那枚下面还挂着一行字，长条抬同样高度，两者的圆心才齐 */
+  .act .long{flex:1;margin-bottom:15px}
+  .long{flex:none;height:44px;border-radius:12px;color:var(--cam-ink);
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;letter-spacing:.6px;
+    background:var(--cam)}
+  .long.off{background:rgba(242,239,233,.10);color:var(--p42)}
+</style></head><body>
+
+<h1><i></i>创建入口 v5.3 · 双层面板（扁平化 + 按钮分大小）</h1>
+<div class="sub">真机现在跑<b>线上 1.9.29</b>（2026-10-07 19:32:01 发布），<b>2.0.0 已提审、正在审核中</b>（10-07 22:31:26 提交）；首页还是<b>白胶囊条 + 700rpx 纸白面板</b>；本稿是效果图，<b>代码一行没动</b>。<b>这一稿按你的话改：①链接态撤掉「保存」，进来直接提炼；主动作统一成一枚通栏长条「开始提炼」，链接/文字/多图三态是同一枚钮（同高同色同字同圆角），照片态仍只留 58px 大圆钮「拍照」；②四个态的框体尺寸一模一样，拍完照那一格的构图一个零件没动；③整体扁平——渐变、内高光、投影全清掉，只留单色块 + 一道描边。</b>底下这些还是上一稿换上的现网实物：背景就是包里那张 <b>/assets/home-bg-portrait.jpg</b>，压暗罩七个档位逐字抄 <b>.page-scrim</b>，顶上补系统状态栏、微信胶囊、导航条（标题「图麦笔记」= i18n appName，底色 #181A20 = applyNavForBand 的值），底栏照 <b>chromeOf('tint-paper')</b> 实测色画成浮起胶囊、选中的是第一格「新建」；面板里每句中文出自现网 i18n，每枚图标用现网同一套 Lucide 路径；几何按 750rpx→300px 折算，<b>面板仍是 700rpx 定高、贴底 152rpx，一个尺寸没改</b>。</div>
+
+<div class="row">
+  <div class="side">
+    <img src="refs/ref-用户给的双层面板参考.jpg" alt="用户参考图">
+    <div class="what">你给的参考：黑底大圆角面板、标题上一行小字 CARRY、List/Gear 橙色下划线 tab、内层浅一档圆角卡、底部点状栏。抄的是这套结构，装饰件（刻度尺那一类）不抄；标题上那行小字换成官网 .mark 那一个词。</div>
+  </div>
+
+  <!-- 1 照片 -->
+  <div class="col"><div class="phone">
+    <div class="chrome">
+      <div class="island"></div>
+      <div class="stime">9:41</div>
+      <div class="sright">
+        <div class="sig"><i></i><i></i><i></i><i></i></div>
+        <svg class="wifi" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M1 4.1a10.2 10.2 0 0 1 14 0"/><path d="M3.7 6.9a6.4 6.4 0 0 1 8.6 0"/><path d="M6.3 9.6a2.8 2.8 0 0 1 3.4 0"/></svg>
+        <div class="bat"><u></u></div>
+      </div>
+      <div class="navtitle">图麦笔记</div>
+      <div class="capsule"><div class="half"><i></i><i></i><i></i></div><div class="dv"></div><div class="half"><div class="tgt"></div></div></div>
+    </div>
+    <div class="screen">
+      <div class="bgimg"></div><div class="scrim"></div>
+      <div class="head">
+        <div class="hrow"><div class="htitle">看到好内容，随手记下来</div>
+          <div class="lang"><span class="on">中</span><span>EN</span></div></div>
+        <div class="date"><span class="d">10月7日</span><span class="w">周三</span></div>
+      </div>
+      <div class="dock">
+        <div class="kick">TUMARK</div>
+        <div class="dh"><div class="dtitle">创建笔记</div><div class="dhint">点空白处收起</div></div>
+        <div class="tabs"><div class="tab on">照片</div><div class="tab">链接</div><div class="tab">文字</div></div>
+        <div class="card"><div class="line mid">
+          <div class="desc"><div class="d1">拍照或截图存进来</div><div class="d2">会自动提炼成要点</div></div>
+          <div class="mini"><div class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"/><path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"/><circle cx="13" cy="7" r="1" fill="currentColor" stroke="none"/><rect x="8" y="2" width="14" height="14" rx="2"/></svg></div><span>相册</span></div>
+          <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg><span>拍照</span></div>
+        </div></div>
+      </div>
+      <div class="pill">
+        <div class="it on"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></div></div>
+        <div class="it"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M21 9H3"/><path d="M21 15H3"/></svg></div></div>
+        <div class="it"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></div></div>
+      </div>
+    </div>
+  </div><div class="cap"><b>1 · 照片（默认）</b><br>唯一留大钮的一态——这里没有输入框，动作就是按快门。左边那句是现网 Tips 第一句拆两行，右边两枚：小圆钮「相册」42px + 大圆钮「拍照」58px</div></div>
+
+  <!-- 2 链接 -->
+  <div class="col"><div class="phone">
+    <div class="chrome">
+      <div class="island"></div>
+      <div class="stime">9:41</div>
+      <div class="sright">
+        <div class="sig"><i></i><i></i><i></i><i></i></div>
+        <svg class="wifi" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M1 4.1a10.2 10.2 0 0 1 14 0"/><path d="M3.7 6.9a6.4 6.4 0 0 1 8.6 0"/><path d="M6.3 9.6a2.8 2.8 0 0 1 3.4 0"/></svg>
+        <div class="bat"><u></u></div>
+      </div>
+      <div class="navtitle">图麦笔记</div>
+      <div class="capsule"><div class="half"><i></i><i></i><i></i></div><div class="dv"></div><div class="half"><div class="tgt"></div></div></div>
+    </div>
+    <div class="screen">
+      <div class="bgimg"></div><div class="scrim"></div>
+      <div class="head">
+        <div class="hrow"><div class="htitle">看到好内容，随手记下来</div>
+          <div class="lang"><span class="on">中</span><span>EN</span></div></div>
+        <div class="date"><span class="d">10月7日</span><span class="w">周三</span></div>
+      </div>
+      <div class="dock">
+        <div class="kick">TUMARK</div>
+        <div class="dh"><div class="dtitle">创建笔记</div><div class="dhint">点空白处收起</div></div>
+        <div class="tabs"><div class="tab">照片</div><div class="tab on">链接</div><div class="tab">文字</div></div>
+        <div class="card">
+          <div>
+            <div class="flab">公众号文章 / 网页链接</div>
+            <div class="field">https://mp.weixin.qq.com/…<span class="caret"></span></div>
+          </div>
+          <div class="hint" style="flex:none;margin-top:auto;padding:0 0 8px">输入或粘贴链接后直接提炼</div>
+          <div class="long">开始提炼</div>
+        </div>
+      </div>
+      <div class="pill">
+        <div class="it on"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></div></div>
+        <div class="it"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M21 9H3"/><path d="M21 15H3"/></svg></div></div>
+        <div class="it"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></div></div>
+      </div>
+    </div>
+  </div><div class="cap"><b>2 · 链接</b><br>没有「保存」这一步：链接进来直接按通栏长条「开始提炼」，与多图态那枚同一枚钮；粘贴走长按，不单独占钮</div></div>
+
+  <!-- 3 文字 -->
+  <div class="col"><div class="phone">
+    <div class="chrome">
+      <div class="island"></div>
+      <div class="stime">9:41</div>
+      <div class="sright">
+        <div class="sig"><i></i><i></i><i></i><i></i></div>
+        <svg class="wifi" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M1 4.1a10.2 10.2 0 0 1 14 0"/><path d="M3.7 6.9a6.4 6.4 0 0 1 8.6 0"/><path d="M6.3 9.6a2.8 2.8 0 0 1 3.4 0"/></svg>
+        <div class="bat"><u></u></div>
+      </div>
+      <div class="navtitle">图麦笔记</div>
+      <div class="capsule"><div class="half"><i></i><i></i><i></i></div><div class="dv"></div><div class="half"><div class="tgt"></div></div></div>
+    </div>
+    <div class="screen">
+      <div class="bgimg"></div><div class="scrim"></div>
+      <div class="head">
+        <div class="hrow"><div class="htitle">看到好内容，随手记下来</div>
+          <div class="lang"><span class="on">中</span><span>EN</span></div></div>
+        <div class="date"><span class="d">10月7日</span><span class="w">周三</span></div>
+      </div>
+      <div class="dock">
+        <div class="kick">TUMARK</div>
+        <div class="dh"><div class="dtitle">创建笔记</div><div class="dhint">点空白处收起</div></div>
+        <div class="tabs"><div class="tab">照片</div><div class="tab">链接</div><div class="tab on">文字</div></div>
+        <div class="card">
+          <div class="field">标题<span class="caret"></span></div>
+          <div class="field ta" style="margin-top:6px">把原文贴在这里…</div>
+          <div class="long" style="margin-top:8px">开始提炼</div>
+        </div>
+      </div>
+      <div class="pill">
+        <div class="it on"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></div></div>
+        <div class="it"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M21 9H3"/><path d="M21 15H3"/></svg></div></div>
+        <div class="it"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></div></div>
+      </div>
+    </div>
+  </div><div class="cap"><b>3 · 文字</b><br>标题 + 原文两格（都 42px 起）+ 同一枚长条「开始提炼」；说明行在 700rpx 里装不下，省掉（现网全屏页里还在）</div></div>
+
+  <!-- 4 多图 -->
+  <div class="col"><div class="phone">
+    <div class="chrome">
+      <div class="island"></div>
+      <div class="stime">9:41</div>
+      <div class="sright">
+        <div class="sig"><i></i><i></i><i></i><i></i></div>
+        <svg class="wifi" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M1 4.1a10.2 10.2 0 0 1 14 0"/><path d="M3.7 6.9a6.4 6.4 0 0 1 8.6 0"/><path d="M6.3 9.6a2.8 2.8 0 0 1 3.4 0"/></svg>
+        <div class="bat"><u></u></div>
+      </div>
+      <div class="navtitle">图麦笔记</div>
+      <div class="capsule"><div class="half"><i></i><i></i><i></i></div><div class="dv"></div><div class="half"><div class="tgt"></div></div></div>
+    </div>
+    <div class="screen">
+      <div class="bgimg"></div><div class="scrim"></div>
+      <div class="head">
+        <div class="hrow"><div class="htitle">看到好内容，随手记下来</div>
+          <div class="lang"><span class="on">中</span><span>EN</span></div></div>
+        <div class="date"><span class="d">10月7日</span><span class="w">周三</span></div>
+      </div>
+      <div class="dock">
+        <div class="kick">TUMARK</div>
+        <div class="dh"><div class="dtitle">创建笔记</div><div class="dhint">点空白处收起</div></div>
+        <div class="tabs"><div class="tab on">照片</div><div class="tab">链接</div><div class="tab">文字</div></div>
+        <div class="card">
+          <div class="strip"><div class="in">
+            <div class="th p1"><b>✕</b></div>
+            <div class="th s1"><b>✕</b></div>
+            <div class="th p2"><b>✕</b></div>
+            <div class="th s2"><b>✕</b></div>
+            <div class="th p3"><b>✕</b></div>
+          </div></div>
+          <div class="cnt">已选 6 张 · 可再加</div>
+          <div class="act">
+            <div class="mini"><div class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></div><span>清空</span></div>
+            <div class="long">开始提炼</div>
+          </div>
+        </div>
+      </div>
+      <div class="pill">
+        <div class="it on"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></div></div>
+        <div class="it"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M21 9H3"/><path d="M21 15H3"/></svg></div></div>
+        <div class="it"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></div></div>
+      </div>
+    </div>
+  </div><div class="cap"><b>4 · 拍照完（选了多张）</b><br>框体与其他三态完全同尺寸，构图一个零件没动：缩略图横排 + 圆钮「清空」+ 长条「开始提炼」——这枚长条与链接/文字态是同一枚（同高同色同字），只因左边让位给「清空」短一截</div></div>
+</div>
+
+<div class="legend">
+  <span class="n">1</span><b>屏不再是空的。</b>背景 = 包里那张 <b>/assets/home-bg-portrait.jpg</b>（1116×1920，aspectFill），上面那层压暗罩的七个档位（.58/.58/.44/.42/.52/.62/.72）逐字抄 create.wxss 的 <b>.page-scrim</b>；标题那两句、日期那行、中/EN 那枚下划线，字号字色都按 has-bg 翻白之后的令牌给。<br>
+  <span class="n">2</span><b>几何按 1rpx=0.4px 折算，全用现网原值：</b>面板高 700rpx=280、贴底 152rpx=60.8、左右各 24rpx；底栏胶囊 bottom 20 / 高 108 / 圆角 44 / 描边 3，图标 40、选中圆底 76。<b>面板一个尺寸没改</b>——所以这一稿落地不用重排整页，只换面板里面。<br>
+  <span class="n">3</span><b>面板里每句中文都出自现网 i18n：</b>右上「点空白处收起」= barCollapse；照片态那两行 = Tips 第一句「拍照或截图存进来，会自动提炼成要点」拆行；链接态占位符 = 输入框原样那一串、左下那句 = urlHintIdle；文字态 = writeTitlePh「标题」/ writeBodyPh「把原文贴在这里…」/ manualDesc；多图态那行 = pickedCount「已选 {n} 张 · 可再加」。<br>
+  <span class="n">4</span><b>保存这一步撤掉了，全篇只剩三个动作字：</b>「拍照」（捕获，照片态独有）、「开始提炼」（提交，链接/文字/多图三态共用）、「清空」（只清已选的图，不关面板；关面板是点空白处）。链接态不再用现网 t.save；<b>现网那句 urlHintIdle「输入或粘贴链接后可保存」里的"保存"二字要跟着换</b>，我建议新 key 写「输入或粘贴链接后直接提炼」（中英各一份），这条要你拍。<b>「开始提炼」三态是同一枚钮：</b>44px 高、圆角 12、实心橙、13px 字；链接/文字态通栏，多图态因左边让位给「清空」短一截——高、色、字、圆角四个数完全一样。<br>
+  <span class="n">5</span><b>三个 tab 名是你给的：</b>照片 = 现网两枚入口（t.takePhoto 拍照 + t.fromAlbum 相册）合并，文字 = 现网「直接写」t.modeWrite。落地要动 modes 那一排和 active 的分型（现网是四档 write/camera/album/url，合并后是三档）。<br>
+  <span class="n">6</span><b>图标不是新画的：</b>camera / images / link / pen-line 四条路径逐字取自 create.wxss 那几枚 mask，底栏三枚（plus / rows-3 / user-round）取自 custom-tab-bar，全是 Lucide v1.49.0、24 格、描边 1.6、圆头线帽——所以粗细和现网一模一样。多选那枚 ✕ 是 Lucide 的 x，同一套。<br>
+  <span class="n">7</span><b>标题上那行小字换成 TUMARK</b>，抄官网 .mark 的语法（小字 + 大字距 + 一条底线），词也是官网那一个。上一稿我写的「TUMAI MIND」是我自己造的，而且 MIND 在现网是「我的」页那枚魅力值的英文名（i18n brainScore），会撞。<br>
+  <span class="n">8</span><b>缩略图按现网那一排放：</b>48px 方块（128rpx）、右上角 ✕ 徽 16px（40rpx、遮罩 rgba(20,20,28,.55) 原值）、右缘一道渐隐表示还能横着滑——现网就是一横排 scroll-view，所以不做「+2」那种收法。两张画成截图样（纸白底 + 一行标题块 + 正文线），因为现网存进来的一半是截图。<br>
+  <span class="n">9</span><b>橙这一支要你拍：</b>#E9723D 现在界面上一个像素都没有（10-04 起四套壁纸都带 ramp，五支饱和色只留在海报那条 toneFor），而 create.wxss 里写这个 hex 会被 <b>docs/工具/验-统一录入条.js</b> 第 169–173 行那条「wxss 里没有抄色板里的饱和色」打红。<b>甲</b>：橙当品牌强调色，由 palette 经 style 递进来（和 TIP_DOT 同一套路子），规范里补一句名分；<b>乙</b>：主钮吃 --btn-bg（象牙档 #766948），界面继续零饱和、四套壁纸自动各配各的。另有一支可选：官网 --clay <b>#D2683F</b>，不在 TONES 五支里，尺子不红，暖调跟象牙壁纸同族。<br>
+  <span class="n">10</span><b>深色面板 vs 现网纸白面板：</b>现网 .panel 是一张白卡（#fff、只有下面两个圆角，挂在白胶囊条下面）；本稿按你给的参考图翻成独立浮起的深色大面板、四角都圆。落地要改 .panel 的底色与圆角，还要给四套壁纸各配一支面板色（这张深色面板现在不跟主题走）；底栏实测色 #443B25 是暖橄榄，和面板这支冷墨黑 #23252C 不同族，两者挨着只差 9.6px——面板跟底栏走暖、还是底栏跟面板走冷，这一处也要拍。<br>
+  <span class="n">11</span><b>文字态少放了两样，先说清：</b>现网那一格是 标题 + 分类 picker + 原文（228rpx）+「原文翻译」开关，700rpx 的面板被标题那块吃掉约 73px 之后装不下四样，本稿只画了 标题 + 原文。三条路：面板加高到 780rpx（照片少露 32px）／分类挪到提炼完再选、开关留下（原文框缩到约 100rpx）／就照本稿，分类默认未分类、开关默认关。<b>这一稿还多省了一样：</b>两格 42px 加长条 44px 吃满内高之后，说明行 manualDesc「写下标题和原文，摘要自动生成」也装不下了，面板里省掉（现网「直接写」全屏页里还在）；链接态内高有剩，那句提示留着。<br>
+  <span class="n">12</span><b>扁平化清了哪些东西（逐个点名，方便你要求还原）：</b>大面板去掉了从上到下那层提亮渐变和外落影，只剩单色 #23252C + 一道 14% 纸白描边；内层卡去掉了渐变和落影，只剩单色 #2B2D35 + 一道 10% 描边；输入框去掉了内凹影；小圆钮去掉了「上亮下暗」渐变（.13→.06 纸白）、1px 描边、内高光和 0 2px 6px 落影，改成一块 10% 纸白实心圆；大圆钮去掉了橙色渐变（#F0814C→#E1682F）、内高光、内暗影和 0 8px 18px 那圈橙雾，改成 #E9723D 一个色到底；多图态那根长条同理（原来还带 0 6px 14px 橙雾），灰态从渐变改成一块 10% 纸白；tab 选中那条橙下划线去掉了发光。<b>两处留着渐变，因为它们不是立体感而是内容：</b>缩略图那五张本身是「照片」，右缘那道渐隐表示还能横着滑。<b>还有一处是我擅自跟着改的：</b>底栏浮起胶囊现网有 0 6.4px 17.6px 的落影，这一稿为了全屏一致也去掉了——底栏是现网已有件、不在你这次要改的范围里，要还原现网那层影说一声。<br>
+  <span class="n">13</span><b>四个框的尺寸是同一套数：</b>外层面板四态都是 700rpx=280px 定高、贴底 152rpx，内层卡四态都是「面板减掉标题与 tab 之后的剩余高度」，一个态都没单独加高或缩短；单行输入框统一 42px（链接态那一格、文字态标题那一格、小圆钮三者同高）；小圆钮统一 42px 正圆；<b>拍照完那一格（第 4 屏）按你「框体也一样、风格不能改」的话处理：外框尺寸与其他三态相同，里面的构图——缩略图横排 + 「已选 6 张 · 可再加」+ 左边圆钮「清空」+ 右边长条「开始提炼」——一个零件没挪、没删、没换字，只把渐变和落影去掉。</b>
+</div>
+</body></html>

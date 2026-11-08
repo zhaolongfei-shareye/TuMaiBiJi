@@ -1,0 +1,21 @@
+{
+  "_这份是写法示例，生成器不读它（文件名以 .example.json 结尾才会被跳过）": "要真加一套卡片：复制成 <你的 template_id>.json，然后把下面每一个 id 都换成那个文件名（三处），再跑 bash docs/工具/跑新模板流程.sh。配方里每一个值都是数据——不许出现 JS 字符串、eval、wxml。",
+  "template_id": "example-copy-me",
+  "label": "示例卡",
+  "label_en": "Example",
+  "group_key": "bold",
+  "sort_order": 900,
+  "min_app_version": "1.0.0",
+  "recipe": {
+    "id": "example-copy-me",
+    "min_version": 1,
+    "steps": [
+      { "let": "pad", "value": 56 },
+      { "let": "innerW", "value": { "-": [{ "var": "W" }, { "*": [{ "var": "pad" }, 2] }] } },
+      { "let": "titleLines", "value": { "prim": "fitLines", "args": { "text": { "var": "note.title" }, "maxW": { "var": "innerW" }, "n": 3, "size": 46, "bold": true } } },
+      { "let": "height", "value": 900 },
+      { "emit": { "k": "fill", "x": 0, "y": 0, "w": { "var": "W" }, "h": { "var": "height" }, "color": { "prim": "token", "args": { "name": "paper" } } } },
+      { "emit": { "k": "text", "x": { "var": "pad" }, "y": { "+": [180, 46] }, "lines": { "var": "titleLines" }, "lh": 60, "size": 46, "weight": "bold", "color": { "prim": "token", "args": { "name": "ink" } } } }
+    ]
+  }
+}

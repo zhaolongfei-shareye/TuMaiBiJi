@@ -1,0 +1,23 @@
+{
+  "result": "PASS",
+  "chapters": 12,
+  "items": 77,
+  "paragraph_blocks": 308,
+  "searchHits": 3,
+  "emptySearch": true,
+  "clearSearch": true,
+  "chapterNavigation": true,
+  "sourceDisclosure": true,
+  "imagesDecoded": 4,
+  "previewLinks": [
+    "瑞士故事版图片/01.png",
+    "瑞士故事版图片/11.png",
+    "瑞士故事版图片/13.png",
+    "瑞士故事版图片/15.png"
+  ],
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390
+  },
+  "errors": []
+}

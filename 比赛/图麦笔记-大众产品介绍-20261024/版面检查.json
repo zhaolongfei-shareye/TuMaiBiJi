@@ -1,0 +1,110 @@
+{
+  "pages": [
+    {
+      "page": 1,
+      "title": "封面",
+      "gap": 78,
+      "spill": 0
+    },
+    {
+      "page": 2,
+      "title": "产品全貌",
+      "gap": 78,
+      "spill": 0
+    },
+    {
+      "page": 3,
+      "title": "三种录入",
+      "gap": 72,
+      "spill": 0
+    },
+    {
+      "page": 4,
+      "title": "AI整理",
+      "gap": 33,
+      "spill": 0
+    },
+    {
+      "page": 5,
+      "title": "多语言",
+      "gap": 41,
+      "spill": 0
+    },
+    {
+      "page": 6,
+      "title": "搜索分类",
+      "gap": 63,
+      "spill": 0
+    },
+    {
+      "page": 7,
+      "title": "编辑与回看",
+      "gap": 68,
+      "spill": 0
+    },
+    {
+      "page": 8,
+      "title": "卡片风格",
+      "gap": 67,
+      "spill": 0
+    },
+    {
+      "page": 9,
+      "title": "模板图集",
+      "gap": 166,
+      "spill": 0
+    },
+    {
+      "page": 10,
+      "title": "分享转存",
+      "gap": 152,
+      "spill": 0
+    },
+    {
+      "page": 11,
+      "title": "外观与名片",
+      "gap": 60,
+      "spill": 0
+    },
+    {
+      "page": 12,
+      "title": "私密与删除",
+      "gap": 175,
+      "spill": 0
+    },
+    {
+      "page": 13,
+      "title": "创作场景",
+      "gap": 103,
+      "spill": 0
+    },
+    {
+      "page": 14,
+      "title": "开始使用与数据",
+      "gap": 75,
+      "spill": 0
+    },
+    {
+      "page": 15,
+      "title": "功能速览",
+      "gap": 209,
+      "spill": 0
+    },
+    {
+      "page": 16,
+      "title": "扫码开始",
+      "gap": 192,
+      "spill": 0
+    }
+  ],
+  "desktop": {
+    "navWorks": true,
+    "images": 27,
+    "errors": []
+  },
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390,
+    "firstPageWidth": 390
+  }
+}

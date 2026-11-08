@@ -1,0 +1,480 @@
+{
+  "_meta": {
+    "source_commit": "ea1f1e2",
+    "routes": 36
+  },
+  "DELETE /api/categories/{category_id}": {},
+  "DELETE /api/notes/{note_id}": {},
+  "GET /": {},
+  "GET /api/categories/": {
+    "response": {
+      "[]": "array<CategoryResponse>",
+      "[].id": "integer",
+      "[].name": "string",
+      "[].color": "string",
+      "[].sort_order": "integer",
+      "[].created_at": "string"
+    }
+  },
+  "GET /api/notes/": {
+    "response": {
+      "[]": "array<NoteListItem>",
+      "[].id": "integer",
+      "[].title": "string",
+      "[].summary": "string?",
+      "[].tags": "array<object>",
+      "[].source_type": "string",
+      "[].source_url": "string?",
+      "[].category_id": "integer?",
+      "[].is_pinned": "boolean",
+      "[].created_at": "string",
+      "[].has_active_share": "boolean",
+      "[].share_author_name": "string?"
+    }
+  },
+  "GET /api/notes/{note_id}": {
+    "response": {
+      "id": "integer",
+      "title": "string",
+      "summary": "string?",
+      "tags": "array<object>",
+      "source_type": "string",
+      "source_url": "string?",
+      "category_id": "integer?",
+      "is_pinned": "boolean",
+      "created_at": "string",
+      "key_points": "array<object>",
+      "key_links": "array<object>",
+      "content": "string?",
+      "original_content": "string?",
+      "updated_at": "string",
+      "imported_from": "object?",
+      "is_private": "boolean"
+    },
+    "response_required": [
+      "category_id",
+      "content",
+      "created_at",
+      "id",
+      "is_pinned",
+      "key_links",
+      "key_points",
+      "original_content",
+      "source_type",
+      "source_url",
+      "summary",
+      "tags",
+      "title",
+      "updated_at"
+    ]
+  },
+  "GET /api/poster/templates/": {
+    "response": {
+      "[]": "array<PosterTemplateResponse>",
+      "[].template_id": "string",
+      "[].label": "string",
+      "[].label_en": "string",
+      "[].group_key": "string",
+      "[].sort_order": "integer",
+      "[].min_app_version": "string",
+      "[].content_hash": "string",
+      "[].recipe": "object"
+    }
+  },
+  "GET /api/shares/status": {
+    "response": {
+      "active": "boolean",
+      "token": "string?"
+    },
+    "response_required": [
+      "active",
+      "token"
+    ]
+  },
+  "GET /api/shares/{token}": {
+    "response": {
+      "token": "string",
+      "title": "string?",
+      "summary": "string?",
+      "tags": "array<object>",
+      "key_points": "array<object>",
+      "key_links": "array<object>",
+      "source_url": "string?",
+      "author_name": "string?",
+      "created_at": "string"
+    },
+    "response_required": [
+      "author_name",
+      "created_at",
+      "key_links",
+      "key_points",
+      "source_url",
+      "summary",
+      "tags",
+      "title",
+      "token"
+    ]
+  },
+  "GET /api/shares/{token}/qrcode": {},
+  "GET /api/tasks/{task_id}": {},
+  "GET /api/user/private-password": {},
+  "GET /api/user/quota": {},
+  "GET /api/user/wallpaper/options": {},
+  "GET /health": {},
+  "POST /api/auth/wechat": {
+    "response": {
+      "token": "string",
+      "user_id": "integer",
+      "nickname": "string?",
+      "avatar_url": "string?",
+      "language": "string",
+      "wallpaper": "string"
+    },
+    "request_required": [
+      "code"
+    ],
+    "response_required": [
+      "avatar_url",
+      "language",
+      "nickname",
+      "token",
+      "user_id",
+      "wallpaper"
+    ],
+    "request": {
+      "code": "string",
+      "inviter": "integer?"
+    }
+  },
+  "POST /api/categories/": {
+    "response": {
+      "id": "integer",
+      "name": "string",
+      "color": "string",
+      "sort_order": "integer",
+      "created_at": "string"
+    },
+    "request_required": [
+      "name"
+    ],
+    "response_required": [
+      "color",
+      "created_at",
+      "id",
+      "name",
+      "sort_order"
+    ],
+    "request": {
+      "name": "string",
+      "color": "string"
+    }
+  },
+  "POST /api/categories/reorder": {
+    "request_required": [
+      "ids"
+    ],
+    "request": {
+      "ids": "array<integer>"
+    }
+  },
+  "POST /api/ingest/screenshots/process": {
+    "request_required": [
+      "batch_id"
+    ],
+    "request": {
+      "batch_id": "string"
+    }
+  },
+  "POST /api/ingest/screenshots/stage": {},
+  "POST /api/ingest/text": {
+    "request_required": [
+      "content",
+      "title"
+    ],
+    "request": {
+      "title": "string",
+      "content": "string",
+      "category_id": "integer?",
+      "translate": "boolean"
+    }
+  },
+  "POST /api/ingest/url": {
+    "request_required": [
+      "url"
+    ],
+    "request": {
+      "url": "string"
+    }
+  },
+  "POST /api/notes/": {
+    "response": {
+      "id": "integer",
+      "title": "string",
+      "summary": "string?",
+      "tags": "array<object>",
+      "source_type": "string",
+      "source_url": "string?",
+      "category_id": "integer?",
+      "is_pinned": "boolean",
+      "created_at": "string",
+      "key_points": "array<object>",
+      "key_links": "array<object>",
+      "content": "string?",
+      "original_content": "string?",
+      "updated_at": "string",
+      "imported_from": "object?",
+      "is_private": "boolean"
+    },
+    "request_required": [
+      "title"
+    ],
+    "response_required": [
+      "category_id",
+      "content",
+      "created_at",
+      "id",
+      "is_pinned",
+      "key_links",
+      "key_points",
+      "original_content",
+      "source_type",
+      "source_url",
+      "summary",
+      "tags",
+      "title",
+      "updated_at"
+    ],
+    "request": {
+      "title": "string",
+      "summary": "string?",
+      "key_points": "array<string>",
+      "key_links": "array<string>",
+      "tags": "array<string>",
+      "content": "string?",
+      "original_content": "string?",
+      "source_url": "string?",
+      "category_id": "integer?"
+    }
+  },
+  "POST /api/notes/from-share": {
+    "response": {
+      "id": "integer",
+      "title": "string",
+      "summary": "string?",
+      "tags": "array<object>",
+      "source_type": "string",
+      "source_url": "string?",
+      "category_id": "integer?",
+      "is_pinned": "boolean",
+      "created_at": "string",
+      "key_points": "array<object>",
+      "key_links": "array<object>",
+      "content": "string?",
+      "original_content": "string?",
+      "updated_at": "string",
+      "imported_from": "object?",
+      "is_private": "boolean"
+    },
+    "request_required": [
+      "token"
+    ],
+    "response_required": [
+      "category_id",
+      "content",
+      "created_at",
+      "id",
+      "is_pinned",
+      "key_links",
+      "key_points",
+      "original_content",
+      "source_type",
+      "source_url",
+      "summary",
+      "tags",
+      "title",
+      "updated_at"
+    ],
+    "request": {
+      "token": "string"
+    }
+  },
+  "POST /api/notes/{note_id}/pin": {
+    "response": {
+      "id": "integer",
+      "title": "string",
+      "summary": "string?",
+      "tags": "array<object>",
+      "source_type": "string",
+      "source_url": "string?",
+      "category_id": "integer?",
+      "is_pinned": "boolean",
+      "created_at": "string"
+    },
+    "response_required": [
+      "category_id",
+      "created_at",
+      "id",
+      "is_pinned",
+      "source_type",
+      "source_url",
+      "summary",
+      "tags",
+      "title"
+    ]
+  },
+  "POST /api/shares/": {
+    "response": {
+      "token": "string",
+      "title": "string?",
+      "summary": "string?",
+      "tags": "array<object>",
+      "key_points": "array<object>",
+      "key_links": "array<object>",
+      "source_url": "string?",
+      "author_name": "string?",
+      "created_at": "string"
+    },
+    "request_required": [
+      "note_id"
+    ],
+    "response_required": [
+      "author_name",
+      "created_at",
+      "key_links",
+      "key_points",
+      "source_url",
+      "summary",
+      "tags",
+      "title",
+      "token"
+    ],
+    "request": {
+      "note_id": "integer",
+      "author_name": "string?"
+    }
+  },
+  "POST /api/shares/revoke": {
+    "request_required": [
+      "note_id"
+    ],
+    "request": {
+      "note_id": "integer"
+    }
+  },
+  "POST /api/user/deactivate": {
+    "request_required": [
+      "confirm"
+    ],
+    "request": {
+      "confirm": "boolean"
+    }
+  },
+  "POST /api/user/inviter": {
+    "request_required": [
+      "inviter"
+    ],
+    "request": {
+      "inviter": "integer"
+    }
+  },
+  "POST /api/user/private-password/reset": {},
+  "POST /api/user/private-password/verify": {
+    "request_required": [
+      "password"
+    ],
+    "request": {
+      "password": "string"
+    }
+  },
+  "PUT /api/categories/{category_id}": {
+    "response": {
+      "id": "integer",
+      "name": "string",
+      "color": "string",
+      "sort_order": "integer",
+      "created_at": "string"
+    },
+    "response_required": [
+      "color",
+      "created_at",
+      "id",
+      "name",
+      "sort_order"
+    ],
+    "request": {
+      "name": "string?",
+      "color": "string?"
+    }
+  },
+  "PUT /api/notes/{note_id}": {
+    "response": {
+      "id": "integer",
+      "title": "string",
+      "summary": "string?",
+      "tags": "array<object>",
+      "source_type": "string",
+      "source_url": "string?",
+      "category_id": "integer?",
+      "is_pinned": "boolean",
+      "created_at": "string",
+      "key_points": "array<object>",
+      "key_links": "array<object>",
+      "content": "string?",
+      "original_content": "string?",
+      "updated_at": "string",
+      "imported_from": "object?",
+      "is_private": "boolean"
+    },
+    "response_required": [
+      "category_id",
+      "content",
+      "created_at",
+      "id",
+      "is_pinned",
+      "key_links",
+      "key_points",
+      "original_content",
+      "source_type",
+      "source_url",
+      "summary",
+      "tags",
+      "title",
+      "updated_at"
+    ],
+    "request": {
+      "title": "string?",
+      "summary": "string?",
+      "key_points": "array<string>",
+      "key_links": "array<string>",
+      "tags": "array<string>",
+      "content": "string?",
+      "original_content": "string?",
+      "source_url": "string?",
+      "category_id": "integer?"
+    }
+  },
+  "PUT /api/user/language": {
+    "request_required": [
+      "language"
+    ],
+    "request": {
+      "language": "string"
+    }
+  },
+  "PUT /api/user/private-password": {
+    "request_required": [
+      "password"
+    ],
+    "request": {
+      "password": "string"
+    }
+  },
+  "PUT /api/user/wallpaper": {
+    "request_required": [
+      "wallpaper"
+    ],
+    "request": {
+      "wallpaper": "string"
+    }
+  }
+}

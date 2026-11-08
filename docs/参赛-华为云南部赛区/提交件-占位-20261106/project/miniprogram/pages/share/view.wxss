@@ -1,0 +1,397 @@
+/* 分享落地页。10-21 那一稿定的是"外人打开的，不吃用户壁纸，整套颜色写死成 V2 的中性壳"，
+   只借详情窗的**数**（字号、行高、半径、间距、图区高），不借它的色——那几档灰吃
+   `--text-tertiary`／`--accent-soft`，借过来就成了"读者自己那套壁纸决定别人这篇的字色"。
+   ⚠ 10-24 他自己把这一句推翻了一半：附一张列表详情窗的实拍，原话「我要是这种界面，三个按钮
+   变成一个，存入笔记」⇒ **皮要借**（壁纸＋窗外面那档暗纱糊），**卡内的色仍不借**。
+   ⚠ 同日第二句把骨架这条也钉死了：「你干嘛要自己重新设计……无论是自己看笔记，还是别人看笔记，
+   打开的风格布局要一致性。不要另外设计」⇒ 这一屏的骨架从这一趟起**整块照 `.float-sheet` 那一份抄**：
+   窗锁死、只有中间那层滚、动作条钉在窗底，窗外不留一个字（原来压纱上的眉标／作者行／品牌行
+   全部搬进窗内，加载中与报错两态也进同一张窗）。
+   ⇒ 上一趟为"窗外那三行字"做的深浅翻色**在这一页整条作废**：判据不再是"字压在壁纸的哪一段"，
+   而是"字全在白窗里"。撤的是这一页对 `utils/imgBrightness.js` 的调用与五条规则，共用实现本身没动。 */
+.container {
+  /* 窗锁死：这一层撑满视口且不滚（`min-height` ＋ 流里长内容＝整页滚，那正是他打回的那一版）。
+     里面除了两层皮就是那张 fixed 的窗，没有任何块在流里撑高度，所以这一屏的页面滚动量恒为 0。 */
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* 10-21 那一版这一枚是写死的 `#f4f2ec`（"外人打开的，不吃用户壁纸"）。10-25 这一句作废：
+     窗外现在是壁纸＋暗纱，这一层是**纱底下那层底**——没壁纸的人打开时它就是屏上唯一那层色，
+     写死一枚米白＝别人那四套心情的底色在这页全退成同一支，与列表那扇对不上。
+     取 `--bg-page`＝与列表／详情同一枚出处（`app.wxss` 五档各一份，`page{}` 那一份是墨档兜底）。 */
+  background: var(--bg-page);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  color: #23252c;
+}
+
+/* ---------- 底图那一层与窗外面那档暗纱（数一枚不新造，全与列表那扇窗同源） ---------- */
+.sv-bg {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.sv-veil {
+  /* ⚠ 这一层在 wxml 里**不带 `wx:if`**（10-25 那一刀修的就是这个）：列表 `.float-mask` 的条件
+     从来只有"窗开没开"，壁纸只是它底下有没有东西可糊。这一页的窗永远开着 ⇒ 永远铺这一层。 */
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--glass-veil-dim);
+  backdrop-filter: var(--glass-bf);
+  -webkit-backdrop-filter: var(--glass-bf);
+  /* 层序照抄详情窗那一对：纱 100（`.float-mask`）、窗 101（`.float-sheet`）。 */
+  z-index: 100;
+}
+
+/* ---------- 这一窗：骨架逐条照 `.float-sheet`（列表那扇详情窗）抄 ----------
+   left／right 24rpx、top 130rpx、圆角 `--r-block`、投影 `0 30rpx 60rpx rgba(8,10,14,.32)`、
+   `display:flex` ＋ 竖排 ＋ `overflow:hidden` 六条一个不改。
+   ⚠ 只有底边那一枚不能照抄：列表那扇写的是 `bottom:192rpx`，那 192 里有 128 是给底栏（自定义
+   组件，离底 20 ＋ 高 108）让的位置——**这一页没有底栏**，照抄就成了窗底下白留一条比左右宽八倍的空。
+   所以取同一份里本来就有的那枚侧内缩 24rpx ＋ 系统底安全区，与 `share.wxss` 那一条写法同源。
+   ⚠ 原来这一层还有一圈 `--w-edge` 墨色 10% 描边：`.float-sheet` 没有描边（它靠那圈 30/60 的投影
+   与背后分层），照图 ⇒ 撤。
+   ⚠ 面吃的是与列表那扇同一枚 `--bg-card`（墨档那一份 #F3F3F1），不再是这一页自己写死的纯白：
+   10-21 那版留纯白的理由是"背后那层是米白 #f4f2ec，卡与页面同色就只剩描边"——这一屏背后现在是
+   壁纸＋暗纱（与列表同一型），那条理由已经不成立；而他今天这两句要的就是"打开的风格布局一致"。
+   ⚠ 只并**面**这一层：卡里那几档灰照旧钉死成这一页自己的墨 #23252c，读者换哪套心情都不改别人这篇的字色。 */
+.sv-sheet {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  top: 130rpx;
+  bottom: calc(24rpx + env(safe-area-inset-bottom));
+  background: var(--bg-card);
+  border-radius: var(--r-block);
+  box-shadow: 0 30rpx 60rpx rgba(8, 10, 14, 0.32);
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 窗里只有这一层滚（照 `.ds-body`：`flex:1` ＋ `min-height:0`，少那一行就顶穿窗底）。 */
+.sv-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.loading {
+  text-align: center;
+  padding: var(--sp-6) 0;
+  font-size: var(--fs-body);
+  color: #5c6068;
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 160rpx 0;
+}
+
+.error-icon {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background: #23252c;
+  color: #ffffff;
+  font-size: 48rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  margin-bottom: var(--sp-4);
+}
+
+.error-text {
+  font-size: var(--fs-body);
+  color: #5c6068;
+}
+
+/* ⚠ 眉标「分享笔记」这一枚 10-25 整条撤掉（站长把自己那扇详情窗与这一屏并排发来，一句
+   「对比两个，把多余的去掉，我都说要一比一……不要自己加需求」）——参考那一窗里没有这么一行，
+   它是这一页自己加的标签，所以是撤不是搬。撤掉之后原来挂在眉标上的那一枚 34rpx 顶距
+   **搬到现在的第一行（作者行）身上**：窗顶到第一行字那一档一寸没改，只是不再有两行字。
+   详情窗那里不吃这一枚是因为它上面还有一行把手（`.grip`），这一页按 10-21 已拍的口径不画那一行。
+   ⚠ 作者行下面那 32rpx（`--sp-4`）10-24 已撤成 0：那是"窗外一行字与窗之间"的缝，搬进窗里就不存在了；
+   标题自己带 34rpx 顶距（与详情窗标题到上一行的那一档一致），留着就成 66rpx 的空。 */
+
+/* 作者行：昵称前面那个圆形色块是这一行唯一的装饰，墨底白字，和错误态那颗同源。 */
+.author-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: 34rpx;
+  margin-bottom: 0;
+}
+
+.author-mark {
+  flex: none;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #23252c;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.author-name {
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: #5c6068;
+}
+
+/* 内缩挂在内容层，不挂在窗自己身上：与详情窗那条同一写法（挂在带滚动的那一层上左右会不等宽）。
+   通栏那一段（配图）挂在这一层**外面**——34rpx 一让出去就不叫通栏了。 */
+.sv-in {
+  padding: 0 34rpx;
+}
+
+.sv-h2 {
+  padding-top: 34rpx;
+  font-size: 46rpx;
+  font-weight: 800;
+  letter-spacing: -0.9rpx;
+  line-height: 1.3;
+  color: rgba(35, 37, 44, 0.9);
+}
+
+.sv-tags {
+  margin-top: 14rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+/* 标签弱化那一档照抄（灰字、不加底色、不加粗）。撤了 padding 之后上下沿比原来矮 10rpx，
+   这一排的折行行距全靠上面 `.sv-tags` 那 10rpx gap 撑，动 gap 就成了"标签挤成一坨"。 */
+.sv-tag {
+  font-size: var(--fs-tiny);
+  color: rgba(35, 37, 44, 0.72);
+}
+
+/* 图区 高＝宽×0.5627 ⇒ 通栏 702rpx 配 395rpx（这数是 10-17 深夜照他附的视频号截图量的，不是挑的）。
+   定高，所以不会撞"只定宽不定高被夹扁"那一坑。 */
+.sv-fig {
+  width: 100%;
+  height: 395rpx;
+  margin-top: 24rpx;
+  background: rgba(35, 37, 44, 0.07);
+  overflow: hidden;
+}
+
+.sv-fig-cell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sv-fig-bg {
+  /* 外挪 6% ＋ 112%：模糊会把图自己边缘那一圈半透明渐隐带出来，不外推就露在图区四边上（读成"框了一条脏边"）。
+     高斯半径 30rpx 是"看得出是同一张照片糊了、又读不出第二张内容"那一档，要更糊只改这一个数。 */
+  position: absolute;
+  left: -6%;
+  top: -6%;
+  width: 112%;
+  height: 112%;
+  filter: blur(30rpx);
+}
+
+.sv-fig-img {
+  /* 高跟盒子走同一个数（395rpx 只在 `.sv-fig` 写一遍）：两处各写一遍就是两个落点。
+     aspectFit＝完整放进盒子、剩下的白交给底那一层铺。 */
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 数字那一枚照参考图：浅灰实底压白字。实测 1.84:1（远低于 UI 元素那道 3）——
+   详情窗那一枚当时就是"照抄不抬深"，这一页跟它同一档，要改两处一起改。 */
+.sv-cnt {
+  margin-top: 20rpx;
+  padding-right: 34rpx;
+  text-align: right;
+}
+
+.sv-cnt-n {
+  display: inline-block;
+  min-width: 78rpx;
+  height: 51rpx;
+  line-height: 51rpx;
+  text-align: center;
+  border-radius: var(--r-pill);
+  background: #BFBFBF;
+  color: #FFFFFF;
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.sv-dots {
+  margin-top: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+}
+
+.sv-dot {
+  width: 11rpx;
+  height: 11rpx;
+  border-radius: 50%;
+  background: #E4E4E4;
+}
+
+/* 当前那枚不是点，是横杠：只加宽，高度与圆点同一档，圆角跟着半径走 */
+.sv-dot.on {
+  width: 25rpx;
+  border-radius: 6rpx;
+  background: #191919;
+}
+
+.sv-lab {
+  margin-top: 30rpx;
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 1.6rpx;
+  color: rgba(35, 37, 44, 0.42);
+}
+
+.sv-para {
+  margin-top: 12rpx;
+  font-size: var(--fs-body);
+  line-height: 1.7;
+  color: rgba(35, 37, 44, 0.7);
+  /* 宿主是 `<view>`＝一个 div，默认会把串里的 `\n` 折成一个空格（详情窗同一坑，见 [[mp-view-folds-newline]]）。
+     库里那一份带着 `\n`，所以必须在渲染这一层认回来。 */
+  white-space: pre-wrap;
+}
+
+.sv-pt {
+  margin-top: 14rpx;
+  display: flex;
+  gap: 16rpx;
+  align-items: flex-start;
+}
+
+.sv-pt + .sv-pt {
+  margin-top: 16rpx;
+}
+
+.sv-pt-dot {
+  flex: none;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  margin-top: 18rpx;
+}
+
+.sv-pt-x {
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: rgba(35, 37, 44, 0.9);
+}
+
+.sv-link {
+  margin-top: 12rpx;
+  font-size: var(--fs-meta);
+  color: #3F52D6;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+/* 链接下面那行小字：点了就是"已复制"，不说明的话人会以为是我们没做。 */
+.sv-hint {
+  margin-top: 8rpx;
+  font-size: var(--fs-tiny);
+  line-height: 1.5;
+  color: rgba(35, 37, 44, 0.5);
+}
+
+.sv-pad-b {
+  height: 24rpx;
+}
+
+/* ---------- 底部动作条（图二那一排的位置，这一页只有一枚） ---------- */
+.sv-dock {
+  /* 钉在窗底：照 `.ds-dock` 的 `flex:none`——它是窗这一列的末项，挂在 scroll-view 外面，
+     窗里滚多少它都不动（他这一句要的就是这一条：「界面锁死，只有文字上下滚动」）。 */
+  flex: none;
+  padding: 22rpx 30rpx 30rpx;
+}
+
+.sv-irow {
+  display: flex;
+  gap: 14rpx;
+}
+
+.sv-ibtn {
+  flex: 1;
+  height: 72rpx;
+  border-radius: var(--r-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: #23252C;
+  /* 描边吃 `--layer-edge`（四档都反解到 60% 墨）＝详情窗 `.ds-ibtn` 同一枚令牌。
+     ⚠ 这一枚原来是这一页自己写死的 `rgba(35,37,44,.24)`，理由写的是"这一页的卡是纯白，
+     比详情窗那层浅面更亮，所以不能用 `--layer-edge`"——**那个前提在 10-24 那一趟已经没了**：
+     窗面从写死纯白换成与 `.float-sheet` 同一枚 `--bg-card` 之后，两扇窗底下是同一支面，
+     一枚描边没有理由两档。10-25 他第二句「一比一复刻」把这一处一起并掉。
+     ⚠ 已存态 `.sv-ibtn.done` 那两枚（65% 字 ＋ 12% 边）照旧与 `.ds-ibtn.disabled` 逐字同值。 */
+  box-shadow: inset 0 0 0 var(--w-edge) var(--layer-edge);
+}
+
+/* 已存态：字与那一圈一起降一档（与详情窗 `.ds-ibtn.disabled` 同一对数），位置不动、字不换行。 */
+.sv-ibtn.done {
+  color: rgba(35, 37, 44, 0.65);
+  box-shadow: inset 0 0 0 var(--w-edge) rgba(35, 37, 44, 0.12);
+}
+
+/* 品牌行搬进正文末尾（跟着滚），所以左右那一档 8rpx（`--sp-1`）归 0：
+   它现在住在 `.sv-in` 里，那 34rpx 内缩由父级给，再叠一层就与上面几段文字不齐。 */
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-5) 0 0;
+}
+
+.brand-mark {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 18rpx;
+  background: #23252c;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.brand-text {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: #5c6068;
+}

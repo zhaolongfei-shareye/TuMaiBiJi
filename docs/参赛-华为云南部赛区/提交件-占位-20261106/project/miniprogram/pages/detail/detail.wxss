@@ -1,0 +1,310 @@
+/* 私密密码那一层的皮（10-12 起三页共用一份，站长原话「看笔记提示输入密码的框，跟设置密码的
+   框风格不一致。要统一」）。@import 必须在最前面。
+   这一屏的根节点没有 `has-bg` 那一档（详情页不铺形象图），所以这一层在这里是实心卡——
+   和「我的」没铺图那一态同一张脸，不是第二种画法。 */
+@import '../../styles/pwd-sheet.wxss';
+
+/* v31（#27 落码第 4 步，规格 §9 第 4 条）：这一屏的主面吃层色，不再吃页面底。
+   主题类挂在 `.container` 上而不是 page 上（小程序给不了 page 类名，app.wxss 那段同一条口径），
+   所以这一屏的覆盖也写在 `.container` 上；页面样式比 app.wxss 后到、权重相同，这一份赢。
+   里面一段段的块仍是 `--bg-card` 那张白卡——层退到 L78 之后白与层的分离只有 1.64~1.74，
+   靠颜色分不开了，这是这一档认下的代价（规格 §7 第一条），本轮没动那张卡本身。 */
+.container {
+  background: var(--bg-layer);
+}
+
+.loading {
+  text-align: center;
+  padding: var(--sp-6) 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.detail-wrapper {
+  padding-top: var(--sp-2);
+}
+
+/* 头部行卡：方块比列表里那块高一点，给标题腾出三行的位置 */
+.hero {
+  padding: var(--sp-4);
+}
+
+/* v4 那条口径：详情页不要色彩方块，纯文字抬头 */
+.hero-flat {
+  padding: var(--sp-4);
+}
+
+/* 抬头分两列：左标题那一叠，右「笔记卡片」那一格（格子的样式在 app.wxss，两页共用一份）。
+   卡内净宽 638 = 750 − 容器左右 --sp-3(24)×2 − .hero-flat 内缩 --sp-4(32)×2，分给 362 + 24 + 252。
+   私密笔记不出那一格，左列摊满整宽。
+   ⚠ 详情窗（首页那层浮窗）10-17 深夜按站长那句「统一把右侧的笔记卡片图位置去掉」把两列分栏
+   整套撤了（`.ds-hero`/`.ds-lt` 已不存在），所以**这一页现在是唯一还画那一格的地方**；
+   两页同源那把尺子（`验-卡片那一格两页同源`）的口径要跟到哪儿，等站长一句。 */
+.dt-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 24rpx;
+}
+
+.dt-hero .dt-lt {
+  flex: 1;
+  min-width: 0;
+}
+
+.dt-hero.solo .dt-lt {
+  flex: none;
+  width: 100%;
+}
+
+/* 与详情窗 `.ds-meta` 同一套骨架（站长 10-30 拍「一起并平」）。这一屏原来一条省略号都没挂：
+   站名一长就自己折第二行，跟详情窗那种"把时间吃掉"是两种坏法（第九轮审计 Y10 的最后一句）。
+   现在两处同一形状：来源可缩可出点，时间与分类都不让位。 */
+.hero-meta {
+  display: flex;
+  align-items: baseline;
+  font-size: var(--fs-tiny);
+  font-weight: 800;
+  letter-spacing: 1rpx;
+  color: var(--text-tertiary);
+  margin-bottom: 10rpx;
+}
+
+/* 分类那一档（站长 10-18 丙：`「分类」· 来源 · 时间`，分类在最左、不要竖线）。
+   与详情窗 `.ds-cat` 同一条规矩：那个点号写在文字里，空隙挂在自己身上，后面两段各裹成一枚
+   `<text>`（`.hero-src`／`.hero-time`）让真跑量得到那道缝；颜色不写在这里——私密那一格的红
+   只从 `app.wxss` 那枚 `--priv-ink` 走一处出口。 */
+.hero-cat {
+  flex: none;
+  margin-right: 8rpx;
+}
+
+.hero-src {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero-time {
+  flex: none;
+  margin-left: 8rpx;
+}
+
+.hero-title {
+  font-size: 36rpx;
+  font-weight: 800;
+  letter-spacing: -0.8rpx;
+  line-height: 1.34;
+  color: var(--text-primary);
+  margin-bottom: 0;
+}
+
+.tags {
+  margin-top: var(--sp-3);
+}
+
+/* 操作条：两枚中性胶囊（10-07 起这排没有第三枚——出卡片的口在右上那一格） */
+.action-bar {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.icon-btn {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 0;
+  border-radius: var(--r-pill);
+  background: var(--chip-idle);
+  color: var(--text-primary);
+  font-size: 25rpx;
+  font-weight: 700;
+  /* 与详情窗那一排同一条规矩：一行两枚不许折行（英文 Edit / Delete 本来就短） */
+  white-space: nowrap;
+}
+
+.icon-btn.danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* 私密那一枚「分享」置灰（站长 10-17 深夜那一枚叫「分享笔记」，10-18 凌晨改成两个字；两页同一档：详情窗那排见 index.wxss 的 `.ds-ibtn.disabled`）。
+   65% 墨压在这一枚自己的 4% 淡底上实测 **4.51:1**（详情窗那一枚没有底、压在 L78 浅面上是 3.89:1——
+   两页的按钮底本来就不同层，同一个 alpha 是两个数，这里是同一支色不是同一组数）。
+   挡事的不是这个类，是 `onCardCell` 里那一句 `is_private` return：置灰只是画。 */
+.icon-btn.disabled {
+  color: rgba(35, 37, 44, 0.65);
+  background: rgba(35, 37, 44, 0.04);
+}
+
+.dt-no-share {
+  display: block;
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: var(--fs-tiny);
+  color: var(--text-tertiary);
+}
+
+/* 那两句实话（截了几张、几张没存上）。与 `.dt-no-share` 同一档小字、同一个三级色：它是说明不是内容。
+   落点在配图那一块的**面板外面**（wxml 那条注释写了原因：九张全没存上时那块面板不渲染）。
+   下缘留一档：它下面就是正文那几张卡，贴着读成上一块的脚注。 */
+.dt-shots-note {
+  display: block;
+  margin: 12rpx 0 var(--sp-2);
+  font-size: var(--fs-tiny);
+  line-height: var(--lh-body);
+  color: var(--text-tertiary);
+}
+
+/* 中性面板：长文本在这里读 */
+.panel {
+  background: var(--bg-card);
+  border: var(--w-edge) solid var(--card-edge);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-2);
+}
+
+.section-label {
+  display: block;
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: var(--text-tertiary);
+  margin-bottom: var(--sp-2);
+}
+
+.summary-text {
+  font-size: var(--fs-body);
+  line-height: 1.68;
+  color: var(--text-primary);
+}
+
+.points-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.point-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+
+.point-num {
+  flex: none;
+  width: 38rpx;
+  height: 38rpx;
+  border-radius: 50%;
+  /* 序号用这条笔记的分类色，把中性面板和上面那块方块接上 */
+  background: var(--tone-bg, var(--chip-idle));
+  color: var(--tone-ink, var(--text-secondary));
+  /* 纯数字序号吃全局那一档（首页要点序号同一写法）；这一支只出 Thin，
+     原来那条 800 留着就是让系统假加粗，两边平台还不一致。字号 21 没动。 */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-size: var(--fs-tiny);
+  font-weight: 100;
+  text-align: center;
+  line-height: 38rpx;
+  margin-top: 4rpx;
+}
+
+.point-text {
+  flex: 1;
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.link-text {
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.original-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.original-header .section-label {
+  margin-bottom: 0;
+}
+
+.expand-icon {
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+.original-scroll {
+  max-height: 60vh;
+  margin-top: var(--sp-3);
+}
+
+.original-text {
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+/* 已公开那一行：小字说明 + 一个文字按钮，不跟主按钮抢位置。
+   它现在紧跟操作条（条自带下间距），所以自己不再加上间距。 */
+.share-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-top: 0;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-body);
+  color: var(--text-tertiary);
+}
+
+.state-act {
+  font-weight: 700;
+  color: var(--accent);
+  /* 和分享形象页那两个动作同一个毛病：不写死不换行会被拆成两行 */
+  white-space: nowrap;
+}
+
+/* 转存来源：中性面板 + 一条锁住的说明，不给任何可点的样子 */
+.import-line {
+  display: block;
+  margin-top: 10rpx;
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  color: #3c4046;
+}
+
+.import-hint {
+  display: block;
+  margin-top: var(--sp-3);
+  font-size: var(--fs-tiny);
+  color: #9a9ea6;
+}
+
+/* ---------------- 配图那一排（方案 §3.1.6） ---------------- */
+/* 横滑：scroll-view 吃整宽，里面的方格靠 inline-block 排。定宽**又**定高 + aspectFill
+   才不会被夹扁——只定宽用 widthFix 时，flex/高度约束会压高不压宽（站长踩过那条）。 */
+.dt-shots {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.dt-shot {
+  display: inline-block;
+  width: 180rpx;
+  height: 180rpx;
+  margin-right: var(--sp-2);
+  border-radius: var(--r-block);
+  background: var(--accent-soft);  /* 图还没落下来时那一格不是白的 */
+}
+
+.dt-shot:last-child {
+  margin-right: 0;
+}

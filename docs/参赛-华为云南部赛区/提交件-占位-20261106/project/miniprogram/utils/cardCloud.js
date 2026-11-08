@@ -1,0 +1,339 @@
+// 卡片留档上云那一条链（2.0.1 P0 · S2）：**一张成品图从"本机有"变成"服务器知道有"**。
+//
+// 为什么单独一个模块而不是塞进 `cardLog.js`：本机那本账管的是"这台手机还看得见哪张"，
+// 这一份管的是"云上那份与库里那一行"。两件事的失败方式完全不同——本机写不进只是这一格画不出缩略图，
+// 云上没登记就是换台手机那张卡片凭空消失（站长 10-08 定性成必须解决的严重问题）。
+//
+// **全程不抛**。这是 B 链那条纪律的照搬：出图那一步（分享／存相册）已经成功了，留档是附属品，
+// 附属品失败不许把主流程带回错误提示。所以这里的返回值只用来给调用方记日志，不用来改界面。
+// 也正因为它是静默的，任何"新开的层"都要先量过再开——见下面 CARD_KIND 那条。
+const cloudUpload = require('./cloudUpload.js')
+const cardQueue = require('./cardQueue.js')
+const cardLog = require('./cardLog.js')
+const api = require('./api.js')
+
+// 卡片对象放哪一层前缀。⚠ 换前缀**必须先拿探针量过写得进**：桶权限完全可能是按前缀给的，
+// 而这条链按设计不报错——写不进的症状是"每张卡片都静默没上云"，界面上零异常。
+// 量法：`APREFIX=cards zsh docs/工具/跑尺子.sh 9431 探-云存储可写`。
+// 10-08 现读结果：`cards/` 这一层**写得进也删得掉**（uploadFile 回 fileID
+// `cloud://cloudbase-d6gzh0i0tff02943a.636c-…/cards/zzprobe/20261008/probe-ygt4w5.txt`，
+// deleteFile 那一条 `status: 0`），所以这一栏定成 `cards`。
+// 分层的用处：将来按前缀批量清理时，"这张是笔记配图还是卡片成品"在 fileID 上就看得出来；
+// 真混进 `images/` 里，那批对象和配图就再也分不开了，而对象只有客户端删得动。
+const CARD_KIND = 'cards'
+
+const _bytes = (p) => {
+  try {
+    const s = wx.getFileSystemManager().statSync(p)
+    const n = s && (s.size != null ? s.size : s.stats && s.stats.size)
+    return Number.isFinite(Number(n)) ? Number(n) : null
+  } catch (e) {
+    return null
+  }
+}
+
+// 尺寸取不到就留 null：那一栏只用来给占位与"这张多大"，取不到不该挡住登记。
+// 但**bytes 一定要尽力取**——它就是"一张卡片到底多少字节"那个还没量到的实测数（≤200KB 是估算
+// 入账口径，见 models/note_card.py 与 PRD §8.149），每条登记的这一栏自己会把那个数攒出来。
+const _dims = (p) => new Promise((resolve) => {
+  wx.getImageInfo({ src: p, success: (r) => resolve({ width: r.width, height: r.height }), fail: () => resolve({}) })
+})
+
+/**
+ * 把本机那一张传上云并登记给这篇。
+ * @param {number} noteId
+ * @param {{p:string,tpl:string,noQr:boolean,origin?:string}} entry 本机台账那一条（cardLog.copyIn 给的形状）
+ * @returns {Promise<{skipped?:boolean,ok?:boolean,queued?:boolean,fileID?:string,reason?:string}>}
+ */
+async function archive(noteId, entry) {
+  try {
+    if (!noteId || !entry || !entry.p || !entry.tpl) return { skipped: true }
+    // 云能力不可用（环境没填、基础库太老）就没有 fileID 可登记，队列也帮不上——队列存的是 fileID。
+    // 这一张于是留在"本机有、云上没"那一档，由 S3 的补传档处理，不在这里硬试。
+    if (!cloudUpload.cloudReady()) return { skipped: true, reason: 'cloud' }
+    const userId = getApp().globalData.userId
+    // 判 falsy 不判 undefined：`clearSession` 把这一栏置成**空串**而不是删掉，
+    // 只判 undefined 就会拼出 `cards//20261008/xxx.jpg` 那种带一个空段的路径——
+    // 那一层的用处本来就是"这是谁的"，空了就没人在认得出来。
+    if (!userId) return { skipped: true, reason: 'user' }
+    const up = await cloudUpload.uploadImage(entry.p, userId, CARD_KIND)
+    if (!up || !up.fileID) return { skipped: true, reason: 'upload' }
+    const d = await _dims(entry.p)
+    const item = {
+      file_id: up.fileID,
+      tpl: entry.tpl,
+      no_qr: !!entry.noQr,
+      size: _bytes(entry.p),
+      width: d.width || null,
+      height: d.height || null,
+      // 来源写 live：这一趟只处理"用户刚留下的那一张"。补传／重渲那几档由 S3 显式带 origin 进来，
+      // 不许靠默认值混成"用户刚生成的"——那会在界面上说出假话。
+      origin: entry.origin || 'live',
+    }
+    try {
+      const res = await api.putNoteCard(noteId, item)
+      // 这一趟顶成历史的那几张：对象只有客户端删得动，服务端把地址交回来、这一侧顺手删掉，
+      // 删不成由 `deleteFiles` 自己落进待删那一格。走这一条的两种现场：同一篇换模板重出，
+      // 和离线时"一篇一张"那道闸失效（share.js 明写读不到就当没有，让他生成）。
+      const replaced = (res && res.replaced_file_ids) || []
+      if (replaced.length) cloudUpload.deleteFiles(replaced)
+      // 这一篇直发赢了：队列里那张旧账当场摘掉，不然下次进前台会被旧的顶回来（10-11 审计）。
+      cardQueue.settle(noteId)
+      // 缓存里那一条也得换成刚登记这张：原来不回填，于是"刚重出一张 → 点详情页右上那一格看大图"
+      // 拿的是**上一张**的 `cloud://`，而上一张已经被上面那趟 `deleteFiles` 删掉了＝"图片不存在"
+      //（10-11 审计中⑤）。重读一篇比手拼一份可靠：那一条的形状与 `had_share` 只有服务端说得清。
+      refreshOne(noteId)
+      return { ok: true, fileID: up.fileID, replaced: replaced.length }
+    } catch (e) {
+      cardQueue.push(noteId, item)
+      return { ok: false, queued: true, fileID: up.fileID }
+    }
+  } catch (e) {
+    console.warn('卡片留档这一趟没走完（不影响分享）', e && (e.errMsg || e.message))
+    return { skipped: true, reason: 'throw' }
+  }
+}
+
+/** 补登记：由 app.js 的 onShow 调（与待补绑、待删对象同一个位置）。 */
+function flush() {
+  return cardQueue.flush(api, (ids) => cloudUpload.deleteFiles(ids))
+}
+
+/**
+ * 补传：本机那张 jpg 还在、云上却没有那一行的那几张（10-08 那次撤 S3 把 `_archive` 那一趟
+ * 整个抛死，那一段时间生成的卡片全是这个形状）。origin 写 `backfilled`——服务端那一栏本来就
+ * 给这一档留着值，界面上那句话是"这张是从你手机上补传上去的"，不是"找回"。
+ *
+ * 云上已经有那一行的（`serverCard` 读得回来）不重复传：只把本机这一栏立上 `up`，
+ * 免得一次 onShow 就在桶里多落一个没人认的对象。
+ * 与另外两头同一纪律：不 await、不提示、失败不进界面（app.onShow 那一处调）。
+ */
+async function backfillLocal() {
+  if (!cloudUpload.cloudReady()) return { sent: 0, total: 0 }
+  const pending = cardLog.pendingBackfill()
+  let sent = 0
+  for (const it of pending) {
+    if (serverCard(it.noteId)) { cardLog.markUploaded(it.noteId, it.entry.p); continue }
+    const r = await archive(it.noteId, Object.assign({}, it.entry, { origin: 'backfilled' }))
+    if (r && (r.ok || r.queued)) { cardLog.markUploaded(it.noteId, it.entry.p); sent += 1 }
+  }
+  return { sent, total: pending.length }
+}
+
+// ---------- 读的那一半：这篇到底有没有卡片、画哪一张 ----------
+//
+// 这是"更新之后卡片不见了"那一态的根治点。今天三处判据（首页那一格、详情页右上那一格、
+// 笔记卡片页那道「一篇只留一张」的闸）吃的都是"这台手机上那个 jpg 还在不在"——
+// 系统清缓存、删小程序重装、换手机，图先没、账常留着，那一格就退回"从没生成过"，不报错也不留痕。
+// 从 S2 起权威换成服务器那行 `note_cards`，本机文件降级成**缓存**：在就画它（快、不花钱），
+// 不在就画云上那一份（`cloud://` 直接给 `<image src>`，与笔记配图那一路同一个用法）。
+let serverCards = {}
+let serverLoaded = false
+
+function setServer(list) {
+  serverCards = {}
+  ;(list || []).forEach((c) => {
+    if (c && c.note_id != null) serverCards[String(c.note_id)] = c
+  })
+  serverLoaded = true
+}
+
+/** 换身份／注销之后必须清：留着就是上一个人的卡片画到这个人头上。 */
+function clearServer() {
+  serverCards = {}
+  serverLoaded = false
+}
+
+function serverCard(noteId) {
+  return serverCards[String(noteId)] || null
+}
+
+/**
+ * 本机此刻知道的云上地址（那一份名单读回来过就有）。
+ * 注销账号那一路只有这一个时机能预留：那个请求一回体丢了，服务器上什么都没了，
+ * 再没有第二个地方能告诉这台手机"曾经有这几张图归你"。配图那一批不在这里——
+ * 本机从没整份读过那个清单，那一条要真做严得服务端先交清单后删行（另开一次，见 PRD §8.161）。
+ */
+function knownFileIDs() {
+  return Object.keys(serverCards)
+    .map((k) => serverCards[k] && serverCards[k].cloud_url)
+    .filter(Boolean)
+}
+
+/** 这批数有没有真从服务端读回来过。没读回来时"没有卡片"这句话不成立，界面对此要保守。 */
+function isLoaded() {
+  return serverLoaded
+}
+
+/**
+ * 这一格画什么。**本机那张优先**：它是刚生成的那一张，可能还没来得及登记（登记是异步的，
+ * 也可能正躺在待补队列里）。云上那份只在"本机这个文件已经不在了"时顶上——那正是这次要修的那一态。
+ *
+ * 每一格都额外带一个 `cloud`（云上那一份的 `cloud://`，没登记过就是空串）：
+ * 画缩略图吃 `p` 就够，**拉大图必须吃 `cloud`**——本机那一张在 `USER_DATA_PATH` 下
+ * （iOS 上是 `http://usr/…`），`<image>` 认它，`wx.previewImage` 在真机上不认（10-08 测试包报的
+ * "看到小图，但大图看不到"）。云上那一份与笔记配图同一用法，那一路真机是通的。
+ * @returns {Array<{p:string,cloud:string,tpl:string,noQr:boolean,at:number,fromServer:boolean,origin?:string}>}
+ */
+function cellFor(noteId) {
+  const s = serverCard(noteId)
+  const cloud = (s && s.cloud_url) || ''
+  const local = cardLog.aliveFor(noteId).map((x) => Object.assign({}, x, { cloud }))
+  if (local.length) return local
+  if (!cloud) return []
+  return [{
+    p: cloud,
+    cloud,
+    tpl: s.tpl,
+    noQr: !!s.no_qr,
+    at: 0,
+    fromServer: true,
+    origin: s.origin,
+  }]
+}
+
+/** 「一篇只留一张」那道闸与"有没有卡片"全部问这一个谓词——两处各判各的就会一屏两句反话。 */
+function hasCard(noteId) {
+  return cellFor(noteId).length > 0
+}
+
+/** 拉一次全量（列表页那一批 + 待确认名单 + 那些篇的快照）。失败不抛：读不到就维持上一次那份数。 */
+async function refresh() {
+  try {
+    const r = await api.getMyCards()
+    setServer((r && r.cards) || [])
+    return r || { cards: [], need_confirm: [], snapshots: [] }
+  } catch (e) {
+    console.warn('卡片留档名单没读到（不影响界面）', e && (e.errMsg || e.statusCode))
+    return null
+  }
+}
+
+/** 读一篇（详情页与那道闸要用 had_share 那一栏）。 */
+async function refreshOne(noteId) {
+  try {
+    const r = await api.getNoteCard(noteId)
+    const card = r && r.card
+    if (card) {
+      serverCards = Object.assign({}, serverCards, { [String(noteId)]: card })
+      serverLoaded = true
+    }
+    return r || { card: null, had_share: false }
+  } catch (e) {
+    console.warn('这一篇的卡片登记没读到', e && (e.errMsg || e.statusCode))
+    return null
+  }
+}
+
+/**
+ * 撤掉这一格（界面上那枚「删除」）。**先撤服务器那一行，撤成了才动本地那份数**：
+ * 反过来做会留孤儿——本机清了、云上那个对象再没人记得要去删（对象只有客户端删得动），
+ * 而它一直占着全站那 5GB。回体那份 `file_ids` 直接交给 `dropFromDeleteRes`，
+ * 删不成的那几条自己落待删队列（与删笔记、注销同一条路）。
+ * @returns {Promise<boolean|string>} 撤掉了回 true；没撤掉回 false；**服务端回了一句原因的**
+ *   （10-14 那道「自带那一篇的卡片删不掉」）把那句原样交回去，调用方拿它当吐司。
+ */
+async function dropServer(noteId) {
+  // `known` 声明在 try **外面**：下面 catch 那一支要拿它把预留的地址还回去，声明在里面它就是个
+  // 未定义名 —— 10-11 静态尺子撞出来：撤服务器行一失败，catch 自己抛 ReferenceError，
+  // 那句"失败就撤"从来没执行过（`验-删卡片二次确认.js` 离线④那一条就是拿它炸的）。
+  let known = null
+  try {
+    // 先把这一张的地址记进待删那一格，**再**发撤档请求。顺序是有讲究的：服务端那一步是
+    // "删行 + 把地址交回来"，而对象只有客户端删得动（那台后端没有云开发凭据）。回体要是丢在
+    // 网络上，行没了、地址也没人记得，那个对象就永久占着全站配额。本机知道这个地址的时机只有现在。
+    known = serverCard(noteId)
+    if (known && known.cloud_url) cloudUpload.reservePurge([known.cloud_url])
+    const res = await api.deleteNoteCard(noteId)
+    serverCards = Object.assign({}, serverCards)
+    delete serverCards[String(noteId)]
+    await cloudUpload.dropFromDeleteRes(res)
+    return true
+  } catch (e) {
+    // 行没撤掉，刚才预留的那条地址必须还回去：留着的话下一次进前台会把**这一格还在用的对象**删掉，
+    // 界面上小图还在（本机优先）、大图点开是"图片不存在"，换设备那一格直接空（10-11 审计严重①）。
+    if (known && known.cloud_url) cloudUpload.unreservePurge([known.cloud_url])
+    // 服务端回了一句原因的（10-14 那道「自带的卡片删不掉」就是）把那句原样交回去，
+    // 调用方拿它当吐司——只回 false 会被念成"没连上后端"，而真实原因是"这一张不许删"。
+    // 判据 4 那类"没原因"的失败（离线、超时、401）仍然回 false，走原来那句实话。
+    const detail = api.friendlyDetail(e && e.data && e.data.detail)
+    if (detail) return detail
+    console.warn('服务器那一行没撤掉，这一格先照原样留着', e && (e.errMsg || e.statusCode))
+    return false
+  }
+}
+
+/**
+ * 换身份／注销之后由 `app.clearSession` 调这一个（不收在 app.js 里挨个调两下，是为了
+ * 让"这一叠必须一起清"只有一份说法）：
+ * · 待补登记队列——里面是"往库里写一行"的活儿，人没了就没有可写的库行了；
+ * · 从服务器读回来那份卡片名单——留着就是下一个身份第一次进首页看见上一个人的卡片。
+ * ⚠ 与 `assetPurge`（待删对象）相反，那一叠注销不许清：见 assetQueue.js 顶上那段同一条对比。
+ */
+function signOut() {
+  cardQueue.clear()
+  clearServer()
+}
+
+/**
+ * 这篇没了：本机那本账（连那张位图）与从服务器读回来那一份都要跟着忘。
+ * 收成一个出处是因为漏一半的症状很坏：SQLite 在非 AUTOINCREMENT 主键上**会复用刚空出来的号**
+ * （注销那一条踩过，见 PRD），下一篇文章拿到同一个 note_id 时，留着的那一份会把上一个人的
+ * 卡片画到新文章头上。
+ */
+function forget(noteId) {
+  cardLog.dropNote(noteId)
+  serverCards = Object.assign({}, serverCards)
+  delete serverCards[String(noteId)]
+}
+
+/**
+ * 这篇被归进私密了 ⇒ 它那张卡片该跟着没。三处一起清，少一处就是假清：
+ *   ① 云上那个对象（私密正文就印在上面）② 服务器那一行登记 ③ 本机 jpg 与台账。
+ *
+ * 为什么必须在"改分类那一刻"动手，不能等补传那条链去挡：私密那道闸（服务端登记口拒私密篇）
+ * 拦的是**新的登记**，而这张图是在它还公开的时候出的。本机留着图、云上没那一行的时候，
+ * `backfillLocal` 只问"本机有没有、云上有没有"——它整条链上没有一处读"这篇现在是不是私密"。
+ * 于是每次进前台都把这张带正文的图重传一遍。站长 10-16 拍的就是这一条（乙）。
+ *
+ * 顺序照 `dropServer` 那条既有纪律：先把地址记进待删那一格，再撤行；撤行没成就停手，
+ * **不许先把本机账清了**——那样地址就没人记得，对象永久占着全站配额（10-11 审计严重①同型）。
+ *
+ * @returns {Promise<string|boolean>} 'dropped' 清完了；'none' 本来就没有卡片；服务端回了一句原因的
+ *   原样交回去；连原因都没有的那种失败回 `false`。**这一支不抛**（留档链同一条纪律）：
+ *   笔记那一步是真存成了，这里炸不许把它念成保存失败。
+ */
+async function dropForPrivate(noteId) {
+  try {
+    if (!noteId) return 'none'
+    const known = serverCard(noteId)
+    const queued = cardQueue.take().filter((x) => x && String(x.noteId) === String(noteId))
+    const local = cardLog.forNote(noteId)
+    if (!known && !queued.length && !local.length) return 'none'
+    if (known) {
+      const r = await dropServer(noteId)
+      // 撤不下来不许往下清本机账（地址一没人记得就是永久孤儿）。这里也**不许造一个 'failed'
+      // 之类的码交出去**——调用方会把它原样拼进吐司，屏上就长出一句字典里没有的英文。
+      if (r !== true) return typeof r === 'string' ? r : false
+    }
+    // 队列里那几条是"对象已经传上去了、只差登记"。行一没就再没人去登记它，
+    // 所以地址同样要先记进待删那一格；删不成由 `deleteFiles` 自己落回队列，下次进前台再试。
+    const ids = queued.map((q) => q.item && q.item.file_id).filter(Boolean)
+    if (ids.length) {
+      cloudUpload.reservePurge(ids)
+      cardQueue.settle(noteId)
+      await cloudUpload.deleteFiles(ids)
+    }
+    forget(noteId)
+    return 'dropped'
+  } catch (e) {
+    console.warn('改私密清卡片这一趟没走完（笔记那一步已经存好了）', e && (e.errMsg || e.message))
+    return false
+  }
+}
+
+module.exports = {
+  CARD_KIND, archive, flush, backfillLocal,
+  setServer, clearServer, serverCard,
+  isLoaded, cellFor, hasCard, refresh, refreshOne, dropServer, signOut, forget, dropForPrivate, knownFileIDs,
+}

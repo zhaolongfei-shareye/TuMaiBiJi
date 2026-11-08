@@ -1,0 +1,112 @@
+{
+  "version": "2.4.16",
+  "method": "Current local product renderer in desktop Chrome; fictional note and profile; AI-generated photo; showQr=false; no remote recipes or network access",
+  "dependencies": {
+    "poster.js": "e3716b1c7efaa3be59dc6a39f1f640db7d820061a61858f33c5eca61a6644a86",
+    "palette.js": "aa8b675179d18edfd3e37c3d7901057aa2007ef298ad8ef913cb5054435be4a2",
+    "date.js": "0dd837c9f4c1e5b959643bac36ea9ed0aa1f643d2ae5f8bae3e4e24e2ea47670",
+    "i18n.js": "1bf32765d69133f1a3e7330d04b0cd718a7edad9343c78f79d703080f219ed90",
+    "posterRecipe.js": "5bcf8161b2fc5426ed29926c7a02dcadbaad063e763c6068211c34222e7b2b88",
+    "posterRecipes.js": "eb47b73278b875a5b22d54306ddc9aa79bc22399f06d7b9bdd87e0adfa0dd1d2",
+    "appInfo.js": "8538a77830b530ab5dc771372d48a889b79b88e31001236b1a250adf45cc74ca",
+    "mpAssets.js": "dcd7010f943edb992681ea74f71ee61eead7feed0d71912c7fe3c41b1fe81c69",
+    "api.js": "0f89fa53e3ee4c6be0dda1005fb9893dc668370c05716c9dafefc51a83fc41f9"
+  },
+  "cards": [
+    {
+      "id": "card",
+      "width": 750,
+      "height": 913,
+      "layers": 25,
+      "imageKeys": [
+        "avatar"
+      ]
+    },
+    {
+      "id": "quote",
+      "width": 750,
+      "height": 706,
+      "layers": 10,
+      "imageKeys": [
+        "avatar"
+      ]
+    },
+    {
+      "id": "block",
+      "width": 750,
+      "height": 1074,
+      "layers": 20,
+      "imageKeys": [
+        "note"
+      ]
+    },
+    {
+      "id": "spec",
+      "width": 750,
+      "height": 1040,
+      "layers": 21,
+      "imageKeys": [
+        "avatar"
+      ]
+    },
+    {
+      "id": "letter",
+      "width": 750,
+      "height": 1228,
+      "layers": 13,
+      "imageKeys": [
+        "avatar"
+      ]
+    },
+    {
+      "id": "popGrid",
+      "width": 750,
+      "height": 1112,
+      "layers": 17,
+      "imageKeys": [
+        "note",
+        "note",
+        "note",
+        "note",
+        "avatar"
+      ]
+    },
+    {
+      "id": "popDots",
+      "width": 750,
+      "height": 1038,
+      "layers": 20,
+      "imageKeys": [
+        "note"
+      ]
+    },
+    {
+      "id": "acid",
+      "width": 750,
+      "height": 1262,
+      "layers": 22,
+      "imageKeys": [
+        "note"
+      ]
+    },
+    {
+      "id": "cover",
+      "width": 750,
+      "height": 1320,
+      "layers": 13,
+      "imageKeys": [
+        "note",
+        "avatar"
+      ]
+    },
+    {
+      "id": "lit",
+      "width": 750,
+      "height": 1053,
+      "layers": 13,
+      "imageKeys": [
+        "note"
+      ]
+    }
+  ]
+}

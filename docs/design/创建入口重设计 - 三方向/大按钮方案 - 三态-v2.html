@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>创建入口 - 大按钮方案 v2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    background: #f0f0f3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    gap: 50px;
+  }
+
+  .reference-note {
+    max-width: 680px;
+    background: #fff;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    font-size: 14px;
+    line-height: 1.7;
+    color: #333;
+  }
+  .reference-note h3 {
+    margin-bottom: 14px;
+    color: #1a1a1a;
+    font-size: 16px;
+  }
+  .reference-note ul {
+    margin-left: 20px;
+    margin-top: 10px;
+  }
+  .reference-note li {
+    margin-bottom: 8px;
+  }
+  .reference-note strong {
+    color: #1a1a1a;
+  }
+  .reference-note .highlight {
+    background: #fff3cd;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  h2 {
+    font-size: 22px;
+    color: #1a1a1a;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 700;
+  }
+
+  .phone-frame {
+    width: 375px;
+    height: 812px;
+    background: #fff;
+    border-radius: 44px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.18);
+    overflow: hidden;
+    position: relative;
+    border: 8px solid #1a1a1a;
+  }
+
+  .status-bar {
+    height: 48px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  /* 态 1: 默认 - 巨大拍照按钮 */
+  .state1 {
+    height: calc(100% - 48px);
+    background: linear-gradient(180deg, #fafbfc 0%, #f0f2f5 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 28px;
+    position: relative;
+  }
+
+  .mode-switcher {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 48px;
+    background: #fff;
+    padding: 8px;
+    border-radius: 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .mode-dot {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid transparent;
+  }
+
+  .mode-dot.active {
+    background: #3F52D6;
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px rgba(63, 82, 214, 0.3);
+  }
+
+  .mode-dot:active {
+    transform: scale(0.95);
+  }
+
+  .giant-button {
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #F6C445 0%, #E9723D 50%, #D64545 100%);
+    box-shadow: 
+      0 24px 80px rgba(233, 114, 61, 0.35),
+      0 8px 24px rgba(233, 114, 61, 0.25),
+      inset 0 -8px 24px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .giant-button:active {
+    transform: scale(0.96);
+    box-shadow: 
+      0 16px 60px rgba(233, 114, 61, 0.3),
+      0 6px 18px rgba(233, 114, 61, 0.2),
+      inset 0 -6px 18px rgba(0,0,0,0.15);
+  }
+
+  .giant-button .icon {
+    font-size: 88px;
+    margin-bottom: 4px;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+  }
+
+  .giant-button .label {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+
+  .giant-button .sublabel {
+    font-size: 13px;
+    opacity: 0.92;
+    margin-top: 10px;
+    font-weight: 500;
+    letter-spacing: 1px;
+  }
+
+  .hint-text {
+    margin-top: 48px;
+    font-size: 14px;
+    color: #868e96;
+    text-align: center;
+    font-weight: 500;
+  }
+
+  /* 态 2: 选中其他模式 */
+  .state2 {
+    height: calc(100% - 48px);
+    background: linear-gradient(180deg, #fafbfc 0%, #f0f2f5 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 28px;
+  }
+
+  .state2 .giant-button {
+    background: linear-gradient(135deg, #46A863 0%, #2d8a4e 50%, #1e6b3a 100%);
+    box-shadow: 
+      0 24px 80px rgba(70, 168, 99, 0.35),
+      0 8px 24px rgba(70, 168, 99, 0.25),
+      inset 0 -8px 24px rgba(0,0,0,0.1);
+  }
+
+  .state2 .giant-button:active {
+    box-shadow: 
+      0 16px 60px rgba(70, 168, 99, 0.3),
+      0 6px 18px rgba(70, 168, 99, 0.2),
+      inset 0 -6px 18px rgba(0,0,0,0.15);
+  }
+
+  .state3 .giant-button {
+    background: linear-gradient(135deg, #3F52D6 0%, #2d3a9e 50%, #1e2878 100%);
+    box-shadow: 
+      0 24px 80px rgba(63, 82, 214, 0.35),
+      0 8px 24px rgba(63, 82, 214, 0.25),
+      inset 0 -8px 24px rgba(0,0,0,0.1);
+  }
+
+  .state4 .giant-button {
+    background: linear-gradient(135deg, #23252C 0%, #1a1c22 50%, #0f1014 100%);
+    box-shadow: 
+      0 24px 80px rgba(35, 37, 44, 0.35),
+      0 8px 24px rgba(35, 37, 44, 0.25),
+      inset 0 -8px 24px rgba(0,0,0,0.2);
+  }
+
+  /* 态 3: 卡片压低成横条 */
+  .state3 {
+    height: calc(100% - 48px);
+    background: #fff;
+    position: relative;
+  }
+
+  .content-behind {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #f8f9fa;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .content-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .content-card .title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #1a1a1a;
+  }
+
+  .content-card .text {
+    font-size: 14px;
+    color: #495057;
+    line-height: 1.7;
+  }
+
+  .content-card .meta {
+    font-size: 12px;
+    color: #868e96;
+    margin-top: 12px;
+    font-weight: 500;
+  }
+
+  .compressed-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 128px;
+    background: #fff;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px;
+  }
+
+  .bar-button {
+    width: 100%;
+    height: 76px;
+    border-radius: 38px;
+    background: linear-gradient(135deg, #F6C445 0%, #E9723D 50%, #D64545 100%);
+    box-shadow: 
+      0 12px 32px rgba(233, 114, 61, 0.3),
+      0 4px 12px rgba(233, 114, 61, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.25s;
+  }
+
+  .bar-button:active {
+    transform: scale(0.98);
+    box-shadow: 
+      0 8px 24px rgba(233, 114, 61, 0.25),
+      0 3px 10px rgba(233, 114, 61, 0.15);
+  }
+
+  .bar-button .icon {
+    font-size: 30px;
+    margin-right: 14px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+  }
+
+  .label {
+    font-size: 13px;
+    color: #868e96;
+    text-align: center;
+    margin-top: 18px;
+    font-weight: 500;
+  }
+
+  .comparison-note {
+    max-width: 680px;
+    background: #fff;
+    padding: 20px 24px;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    font-size: 14px;
+    line-height: 1.7;
+    color: #495057;
+    border-left: 4px solid #3F52D6;
+  }
+  .comparison-note strong {
+    color: #1a1a1a;
+  }
+</style>
+</head>
+<body>
+
+<div class="reference-note">
+  <h3>📱 国际 App 大按钮模式参考</h3>
+  <ul>
+    <li><strong>iOS 相机</strong>：底部巨大圆形快门键（直径≈屏幕宽度 70%），上方小字切换模式（照片/视频/人像）</li>
+    <li><strong>Things 3</strong>：右下角大红色"Magic Plus"浮动按钮，点击展开新建任务表单</li>
+    <li><strong>Vivino</strong>：底部大深红色扫描按钮，占导航栏中央位置</li>
+    <li><strong>Planty</strong>：醒目黄色"Identify"相机按钮，圆角矩形占满底部</li>
+    <li><strong>Google Keep</strong>：右下角大彩色"+"浮动按钮，点击直接开始记笔记</li>
+    <li><strong>Instagram</strong>：底部导航栏中间是巨大的相机图标按钮</li>
+  </ul>
+  <p style="margin-top: 14px;"><span class="highlight">共同特征</span>：一个主操作 dominate 整个界面，其他选项退居次要位置（小 dots、小 tabs、或隐藏）。用户一眼就知道"这个 App 主要是干什么的"。</p>
+</div>
+
+<h2>态 1：默认 — 巨大"拍照"按钮 dominate 卡片</h2>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>9:41</span>
+    <span>●●● 📶 </span>
+  </div>
+  <div class="state1">
+    <div class="mode-switcher">
+      <div class="mode-dot active">📷</div>
+      <div class="mode-dot">🖼️</div>
+      <div class="mode-dot">🔗</div>
+      <div class="mode-dot">✍️</div>
+    </div>
+    <div class="giant-button">
+      <div class="icon">📷</div>
+      <div class="label">拍照</div>
+      <div class="sublabel">TAP TO CAPTURE</div>
+    </div>
+    <div class="hint-text">点击切换模式 · 长按直接拍摄</div>
+  </div>
+</div>
+<div class="label">260×260 渐变大圆按钮，占卡片 65% 面积 · 橙黄→橙红渐变</div>
+
+<h2>态 2：切换到"写文章"模式 — 按钮变色</h2>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>9:41</span>
+    <span>●●● 📶 🔋</span>
+  </div>
+  <div class="state2">
+    <div class="mode-switcher">
+      <div class="mode-dot">📷</div>
+      <div class="mode-dot">️</div>
+      <div class="mode-dot">🔗</div>
+      <div class="mode-dot active">✍️</div>
+    </div>
+    <div class="giant-button">
+      <div class="icon">️</div>
+      <div class="label">写文章</div>
+      <div class="sublabel">TAP TO WRITE</div>
+    </div>
+    <div class="hint-text">点击切换模式 · 长按直接开始</div>
+  </div>
+</div>
+<div class="label">按钮颜色随模式变化（拍照=橙黄，写文章=草绿，链接=宝蓝，相册=墨黑）</div>
+
+<h2>态 3：切换到"链接"模式</h2>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>9:41</span>
+    <span>●●● 📶 🔋</span>
+  </div>
+  <div class="state2 state3">
+    <div class="mode-switcher">
+      <div class="mode-dot">📷</div>
+      <div class="mode-dot">🖼️</div>
+      <div class="mode-dot active">🔗</div>
+      <div class="mode-dot">✍️</div>
+    </div>
+    <div class="giant-button">
+      <div class="icon">🔗</div>
+      <div class="label">链接</div>
+      <div class="sublabel">TAP TO PASTE URL</div>
+    </div>
+    <div class="hint-text">点击切换模式 · 长按粘贴链接</div>
+  </div>
+</div>
+<div class="label">宝蓝渐变按钮 · 每个模式有独特色相</div>
+
+<h2>态 4：拍照/写完后，卡片压低成横条</h2>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>9:41</span>
+    <span>●●● 📶 🔋</span>
+  </div>
+  <div class="state3">
+    <div class="content-behind">
+      <div class="content-card">
+        <div class="title">📸 刚拍的照片</div>
+        <div class="text">这张照片显示了...</div>
+        <div class="meta">2 分钟前 · 待提炼</div>
+      </div>
+      <div class="content-card">
+        <div class="title">📝 草稿笔记</div>
+        <div class="text">今天学到了...</div>
+        <div class="meta">5 分钟前 · 编辑中</div>
+      </div>
+      <div class="content-card">
+        <div class="title"> 网页链接</div>
+        <div class="text">https://example.com...</div>
+        <div class="meta">8 分钟前 · 待提炼</div>
+      </div>
+    </div>
+    <div class="compressed-bar">
+      <div class="bar-button">
+        <span class="icon">✨</span>
+        <span>提炼生成笔记</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="label">内容出现在卡片后面 · 卡片压缩成 128px 高的横条按钮</div>
+
+<div class="comparison-note">
+  <strong>与之前方案的核心区别：</strong><br>
+  之前：4 个平等的小格子（Canva 式）→ 用户不知道点哪个<br>
+  现在：1 个巨大主按钮 dominate + 4 个小 dots 切换 → 用户一眼知道默认是拍照，想换就点 dots<br>
+  <br>
+  <strong>色彩策略：</strong>每个模式有独特色相（橙黄/草绿/宝蓝/墨黑），切换时按钮整体变色，视觉反馈强烈
+</div>
+
+</body>
+</html>

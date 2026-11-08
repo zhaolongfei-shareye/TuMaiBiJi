@@ -1,0 +1,92 @@
+【第 6 轮·代码重构这一档】下面这份是我们仓库 backend/app/services/site_names.py 里"站名怎么认"那一段的独立化版本（去掉数据库与抓包依赖，判法原样保留）。这一档不要你修 bug——现在 9 条用例全绿，我要的是**行为逐字不变的重构**。
+
+文件一 site_names.py（现状）：
+```python
+import re
+
+MAX_SITE_CHARS = 20
+_META_MAX_CHARS = 40
+_META_SEPARATORS = (" - ", " | ", " _ ", " · ", "»")
+_SUFFIX_WORDS = ("文章", "笔记", "网页", "网站", "页面", "客户端")
+
+
+def _clean(raw) -> str:
+    text = re.sub(r"\s+", " ", str(raw or "")).strip()
+    return text if len(text) <= MAX_SITE_CHARS else ""
+
+
+def _pair(zh: str, en: str = "") -> dict:
+    zh = _clean(zh)
+    if not zh:
+        return {}
+    return {"zh": zh, "en": _clean(en) or zh, "via": ""}
+
+
+def _drop_mixed_name(raw) -> str:
+    text = str(raw or "").strip()
+    return "" if any(text.endswith(w) for w in _SUFFIX_WORDS) else text
+
+
+def meta_site(raw) -> dict:
+    text = re.sub(r"\s+", " ", str(raw or "")).strip()
+    if not text or len(text) > _META_MAX_CHARS:
+        return {}
+    if any(sep in text for sep in _META_SEPARATORS):
+        return {}
+    out = _pair(text)
+    out["via"] = "meta" if out else ""
+    return out
+
+
+def model_site(raw) -> dict:
+    text = _drop_mixed_name(raw)
+    out = _pair(text)
+    out["via"] = "model" if out else ""
+    return out
+```
+
+文件二 test_site_names.py（9 条，现在全绿，一条都不许改）：
+```python
+from site_names import meta_site, model_site, _clean, _pair
+
+
+def test_meta_plain():
+    assert meta_site("微信公众平台") == {"zh": "微信公众平台", "en": "微信公众平台", "via": "meta"}
+
+def test_meta_collapses_whitespace():
+    assert meta_site("  腾讯\n  新闻  ")["zh"] == "腾讯 新闻"
+
+def test_meta_too_long_rejected():
+    assert meta_site("站" * 41) == {}
+
+def test_meta_with_separator_rejected():
+    assert meta_site("腾讯新闻 - 每日热点") == {}
+
+def test_meta_dirty_then_via_stays_empty():
+    assert meta_site("") == {}
+
+def test_model_suffix_gate_rejects_whole_name():
+    # 现读就是这个形状：_pair 回空 dict 后又被挂了个 via，不是 {}。重构不许把它"顺手改对"。
+    assert model_site("网易文章") == {"via": ""}
+
+def test_model_keeps_real_name_untouched():
+    assert model_site("  少数派  ") == {"zh": "少数派", "en": "少数派", "via": "model"}
+
+def test_pair_en_falls_back_to_zh():
+    assert _pair("网易", "") == {"zh": "网易", "en": "网易", "via": ""}
+
+def test_clean_over_limit_returns_empty():
+    assert _clean("名" * 21) == ""
+```
+
+要重构的点（就这三条，别自己加）：
+1. `meta_site` 里那行 `re.sub(r"\s+", " ", str(raw or "")).strip()` 与 `_clean` 是同一件事写了两遍，请抽成一个带长度上限参数的共用清洗；两处上限不同（20 与 40），不许并成一个常量。
+2. `out["via"] = "..." if out else ""` 这两处同形，请收成一个"给结果盖来源章"的共用写法，但**必须保住那个不对称**：`model_site("网易文章")` 现在回 `{"via": ""}` 而不是 `{}`，这是盘上现读行为，用例钉死了，不许"顺手改对"。
+3. `_drop_mixed_name` 只做"以那几个字收尾就整枚不认"，不许改成砍后缀，也不许把它挂到 `meta_site` 上（那道闸只属于模型那一级）。
+
+硬约束：不许改测试文件一个字；不许改那三枚常量的值（两枚长度上限、分隔符名单、后缀名单）；不许加类型注解、日志、docstring 以外的新行为；不许新增依赖。
+
+先跑一次 pytest 把基线贴出来，重构后再跑一次，两次都要 9 passed。产出（我要逐字节抄回）：
+- 产物文件 site_names-重构后.txt：第一行 `===== BEGIN-REFACTORED =====`，最后一行 `===== END-REFACTORED =====`，中间是重构后的 site_names.py 全文。
+- 产物文件 重构对照.txt：第一行 `===== BEGIN-DIFF =====`，最后一行 `===== END-DIFF =====`，中间写：改前改后的逐条对照（每条指到函数名）、两次 pytest 的输出、以及你判断"行为没变"的依据是什么。
+- 这两份以外的任何已有文件，一份都不许修改或覆盖。

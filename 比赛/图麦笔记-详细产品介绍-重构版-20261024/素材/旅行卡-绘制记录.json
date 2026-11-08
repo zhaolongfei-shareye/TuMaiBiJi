@@ -1,0 +1,5065 @@
+{
+  "version": "2.4.16",
+  "generatedAt": "2026-10-24T07:40:13.366Z",
+  "root": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024",
+  "utils": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils",
+  "ids": [
+    "topBleedEdge",
+    "card",
+    "quote",
+    "block",
+    "letter",
+    "popGrid",
+    "popDots",
+    "acid",
+    "cover",
+    "lit",
+    "spec"
+  ],
+  "method": "本地2.4.16产品代码实绘、林夏为虚构主角，非自动生成游记的实测证据。",
+  "renderer": "Unmodified local poster.js planPoster(strict) + paintLayers; desktop Chrome; 10 bundled recipes + 1 local seed recipe",
+  "browserVersion": "155.0.8059.85",
+  "options": {
+    "showQr": false,
+    "strict": true,
+    "hasNote": true
+  },
+  "note": {
+    "id": 0,
+    "title": "罗马慢游记",
+    "summary": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+    "key_points": [
+      "读懂介绍，让地标不只剩一张打卡照",
+      "把建筑、街巷与沿途细节放进同一篇",
+      "补上自己的感受，再分享给朋友"
+    ],
+    "tags": [
+      "罗马",
+      "旅行手记"
+    ],
+    "category_id": 1,
+    "source_type": "manual",
+    "created_at": "2026-10-24T10:00:00Z"
+  },
+  "profile": {
+    "name": "林夏",
+    "slogan": "看见，也记得",
+    "avatarPath": ""
+  },
+  "seed": {
+    "path": "/Users/zlfmac/Documents/TuMaiBiJi/backend/seed/poster_templates.json",
+    "sha256": "bd512e4b669fbadf3d616502cedcd238f89e84b4c862ff287ea55c4dcac9d8ec",
+    "ids": [
+      "card",
+      "quote",
+      "block",
+      "letter",
+      "popGrid",
+      "popDots",
+      "acid",
+      "cover",
+      "lit",
+      "spec",
+      "topBleedEdge"
+    ],
+    "contentHashes": {
+      "card": "6afcdbb368ee64fe9b93509378b356bbf8d8baf4343b4b94f115b9e8e59f6320",
+      "quote": "0ac978040c37d76ee01bf0e81ed3402263aeb47c186ebbdb0a9eba5c46770cff",
+      "block": "c5d1f07e597a7f468260b9435fc81c136580c6d8ecc157f50a8599dda04a7250",
+      "letter": "d168924d0cd7b0973901a6bbe92abeadd97101c00411adafc4d4bffb9e28ffc6",
+      "popGrid": "97e804a255b09392674c270bdb6272b3ee75adba86d669332d1a2c6e9c72245d",
+      "popDots": "0f55f945b267866315fb45131790302d95c4c4c53e799642d99d1f6f1e121652",
+      "acid": "9c6dd4fba4a070d0851befe0f93116ecb34be9756bccaac6f3f27678ab4134a7",
+      "cover": "d4f7ce2521f72f0236c860b806a90329c11108b268fdf41932134777f0ad450b",
+      "lit": "c32e82b872dc7b0a3f7430ab9e7eec722f217c8e30ddfc1a490670dd9e26b0db",
+      "spec": "6b3aa6a9909f690767f4ef84e73c2570feb8289daa27ec50f856f354aa9a2e4d",
+      "topBleedEdge": "c2415afcf6c7928f8ce8ab8068936aa24895854a47a4352ea550460446ff1f8d"
+    },
+    "recipeHashAlgorithm": "SHA-256 of recursively key-sorted compact UTF-8 JSON",
+    "allContentHashesVerified": true,
+    "bundledIds": [
+      "card",
+      "quote",
+      "block",
+      "letter",
+      "popGrid",
+      "popDots",
+      "acid",
+      "cover",
+      "lit",
+      "spec"
+    ],
+    "injectedIds": [
+      "topBleedEdge"
+    ],
+    "storageKey": "poster_templates_v1",
+    "entry": "posterTemplates.restore -> poster.applyRemoteTemplates -> poster.templateList / recipeOf",
+    "restore": {
+      "accepted": 1,
+      "rejected": [],
+      "cached": true
+    },
+    "storageReads": [
+      "poster_templates_v1"
+    ]
+  },
+  "illustration": {
+    "source": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行-九个瞬间.png",
+    "kind": "本稿既有 AI 罗马图，不是实拍或真实人物数据",
+    "originalWidth": 1536,
+    "originalHeight": 1024,
+    "crop": [
+      0,
+      0,
+      512,
+      341
+    ],
+    "transport": "in-memory PNG data URL only",
+    "width": 512,
+    "height": 341,
+    "sourceSha256": "ba2fb4943a1a768be6e8cc9bde042cb5d8ceadb295624149a9f351b4df902a6d",
+    "sha256": "bcff603656c824a0d46fa15cabf8df728c5091e861b61fcb93dac28da290a899",
+    "sameBitmapForEveryImageLayer": true
+  },
+  "validation": {
+    "allElevenRendered": true,
+    "allPlannedLayersExecuted": true,
+    "allDrawableLayersPainted": true,
+    "allLayersChangedPixels": false,
+    "originalNoPaintLayers": [
+      {
+        "id": "letter",
+        "index": 2
+      }
+    ],
+    "noFallback": true,
+    "missingImages": [],
+    "blockedRequests": [],
+    "observedRequests": [],
+    "pageErrors": [],
+    "forbiddenPlatformCalls": [],
+    "readOnlyInputsUnchanged": true,
+    "evidence": "逐层记录原生 Canvas 操作、逐字核对 fillText、同源 drawImage 次数及前后实际变化像素；原配方路径空层单独披露。"
+  },
+  "scope": {
+    "realNoteData": false,
+    "avatarProvided": false,
+    "qrProvided": false,
+    "liveRemoteRecipes": false,
+    "network": "offline context + abort all routes + CSP + disabled network APIs + disabled host resolution; no live service access",
+    "writes": "仅本脚本和本稿素材/旅行卡-*；原图、裁图、产品源码与其他稿件不改",
+    "whitePaper16": "用户确认数；本任务未测试",
+    "layout": "保留十一套真实配方及原生无 QR 分支；不补齐模板本来不展示的摘要、slogan、要点或图片位。",
+    "limitations": [
+      "桌面 Chrome 离线画布，不代表微信真机字体、导出外框或分享链路的验收。",
+      "同一张 512×341 AI 配图按模板原规则裁切、放大、去色或套色；未提供真实头像或二维码。",
+      "letter 原模板存在无 fill/stroke 的路径空层：已执行但没有像素，未修改模板以伪造全层实绘。"
+    ]
+  },
+  "scriptSha256": "4afb037d483f380a1f82aca20bb3187d50af451b5fe4df908afa638c841897ef",
+  "dependencies": {
+    "poster.js": "e3716b1c7efaa3be59dc6a39f1f640db7d820061a61858f33c5eca61a6644a86",
+    "posterTemplates.js": "c26b8d290859a205631611f61b2348df07c7a46b37765f570cf312bfa36c65d1",
+    "palette.js": "aa8b675179d18edfd3e37c3d7901057aa2007ef298ad8ef913cb5054435be4a2",
+    "date.js": "0dd837c9f4c1e5b959643bac36ea9ed0aa1f643d2ae5f8bae3e4e24e2ea47670",
+    "i18n.js": "1bf32765d69133f1a3e7330d04b0cd718a7edad9343c78f79d703080f219ed90",
+    "posterRecipe.js": "5bcf8161b2fc5426ed29926c7a02dcadbaad063e763c6068211c34222e7b2b88",
+    "posterRecipes.js": "eb47b73278b875a5b22d54306ddc9aa79bc22399f06d7b9bdd87e0adfa0dd1d2",
+    "appInfo.js": "8538a77830b530ab5dc771372d48a889b79b88e31001236b1a250adf45cc74ca",
+    "mpAssets.js": "dcd7010f943edb992681ea74f71ee61eead7feed0d71912c7fe3c41b1fe81c69",
+    "api.js": "0f89fa53e3ee4c6be0dda1005fb9893dc668370c05716c9dafefc51a83fc41f9"
+  },
+  "cards": [
+    {
+      "id": "topBleedEdge",
+      "label": "图文卡",
+      "labelEn": "Photo & Text",
+      "group": "classic",
+      "ord": 5,
+      "template": "topBleedEdge",
+      "width": 750,
+      "height": 930,
+      "recipeSource": "remote",
+      "recipeOrigin": "local-seed-via-memory-restore",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 8,
+      "layerPlan": [
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 930,
+          "color": "#FFFFFF"
+        },
+        {
+          "k": "image",
+          "key": "note",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 470
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 66,
+          "size": 48,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "left",
+          "x": 48,
+          "y": 562
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在转",
+            "角喝杯咖啡。记下沿途风景与自己的感受。"
+          ],
+          "lh": 44,
+          "size": 28,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 48,
+          "y": 620
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 30,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "left",
+          "x": 48,
+          "y": 742
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 24,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "left",
+          "x": 48,
+          "y": 782
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 21,
+          "weight": "bold",
+          "color": "#9A9EA6",
+          "align": "center",
+          "x": 644,
+          "y": 773.3
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 9,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "center",
+          "x": 644,
+          "y": 792.26
+        }
+      ],
+      "imageKeys": [
+        "note"
+      ],
+      "imageDraws": 1,
+      "expectedImageDraws": 1,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [
+          [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在转",
+            "角喝杯咖啡。记下沿途风景与自己的感受。"
+          ]
+        ],
+        "completePoints": [
+          false,
+          false,
+          false
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 697500,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "image",
+          "calls": {
+            "save": 1,
+            "beginPath": 1,
+            "rect": 1,
+            "clip": 1,
+            "drawImage": 1,
+            "restore": 1
+          },
+          "paintedText": "",
+          "changedPixels": 352500,
+          "rasterCalls": 1,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 6122,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "text",
+          "calls": {
+            "fillText": 2
+          },
+          "paintedText": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+          "changedPixels": 14195,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1131,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1510,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1168,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 497,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/backend/seed/poster_templates.json",
+      "recipeSha256": "c2415afcf6c7928f8ce8ab8068936aa24895854a47a4352ea550460446ff1f8d",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-topBleedEdge.png",
+      "sha256": "7d44aca8bf523882ab3422ab56579dac32aea22196967056e8490cea9bd45ef1"
+    },
+    {
+      "id": "card",
+      "label": "玉版宣",
+      "labelEn": "Jade Paper",
+      "group": "classic",
+      "ord": 10,
+      "template": "card",
+      "width": 750,
+      "height": 913,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 24,
+      "layerPlan": [
+        {
+          "k": "grad",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 913,
+          "c1": "#f1f2f2",
+          "c2": "#dadcdb"
+        },
+        {
+          "k": "rrect",
+          "x": 40,
+          "y": 60,
+          "w": 670,
+          "h": 793,
+          "r": 44,
+          "fill": "#FFFFFF",
+          "shadow": "rgba(35, 37, 44, 0.10)"
+        },
+        {
+          "k": "rrect",
+          "x": 40,
+          "y": 60,
+          "w": 670,
+          "h": 236,
+          "r": 44,
+          "fill": "#55625C"
+        },
+        {
+          "k": "fill",
+          "x": 40,
+          "y": 104,
+          "w": 670,
+          "h": 192,
+          "color": "#55625C"
+        },
+        {
+          "k": "rrect",
+          "x": 84,
+          "y": 104,
+          "w": 148,
+          "h": 148,
+          "r": 28,
+          "fill": "rgba(255,255,255,0.16)"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马"
+          ],
+          "lh": 40,
+          "size": 28,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "left",
+          "x": 104,
+          "y": 152
+        },
+        {
+          "k": "text",
+          "lines": [
+            "10/24"
+          ],
+          "lh": 40,
+          "size": 17,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "left",
+          "x": 104,
+          "y": 230,
+          "alpha": 0.75
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 46,
+          "size": 34,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "left",
+          "x": 256,
+          "y": 138
+        },
+        {
+          "k": "text",
+          "lines": [
+            "亲自撰写 · 罗马 / 旅行手记"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#9A9EA6",
+          "align": "left",
+          "x": 84,
+          "y": 352
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。",
+            "在转角喝杯咖啡。记下沿途风景与自己的感受。"
+          ],
+          "lh": 40,
+          "size": 27,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 84,
+          "y": 400
+        },
+        {
+          "k": "text",
+          "lines": [
+            "核心要点"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#9A9EA6",
+          "align": "left",
+          "x": 84,
+          "y": 488
+        },
+        {
+          "k": "circle",
+          "x": 102,
+          "y": 523,
+          "r": 18,
+          "fill": "#55625C"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "1"
+          ],
+          "lh": 40,
+          "size": 21,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "center",
+          "x": 102,
+          "y": 530
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读懂介绍，让地标不只剩一张打卡照"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 134,
+          "y": 532
+        },
+        {
+          "k": "circle",
+          "x": 102,
+          "y": 565,
+          "r": 18,
+          "fill": "#55625C"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "2"
+          ],
+          "lh": 40,
+          "size": 21,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "center",
+          "x": 102,
+          "y": 572
+        },
+        {
+          "k": "text",
+          "lines": [
+            "把建筑、街巷与沿途细节放进同一篇"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 134,
+          "y": 574
+        },
+        {
+          "k": "circle",
+          "x": 102,
+          "y": 607,
+          "r": 18,
+          "fill": "#55625C"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "3"
+          ],
+          "lh": 40,
+          "size": 21,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "center",
+          "x": 102,
+          "y": 614
+        },
+        {
+          "k": "text",
+          "lines": [
+            "补上自己的感受，再分享给朋友"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 134,
+          "y": 616
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 28,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "left",
+          "x": 84,
+          "y": 692
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "left",
+          "x": 84,
+          "y": 730
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#9A9EA6",
+          "align": "center",
+          "x": 606,
+          "y": 727.5600000000001
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 10,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "center",
+          "x": 606,
+          "y": 747
+        }
+      ],
+      "imageKeys": [],
+      "imageDraws": 0,
+      "expectedImageDraws": 0,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [
+          [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。",
+            "在转角喝杯咖啡。记下沿途风景与自己的感受。"
+          ]
+        ],
+        "completePoints": [
+          true,
+          true,
+          true
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "grad",
+          "calls": {
+            "createLinearGradient": 1,
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 684750,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 614411,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 156589,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 924,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 21289,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马",
+          "changedPixels": 826,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "10/24",
+          "changedPixels": 358,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 3236,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "亲自撰写 · 罗马 / 旅行手记",
+          "changedPixels": 2936,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 9,
+          "kind": "text",
+          "calls": {
+            "fillText": 2
+          },
+          "paintedText": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+          "changedPixels": 13470,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 10,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "核心要点",
+          "changedPixels": 1185,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 11,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1070,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 12,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "1",
+          "changedPixels": 75,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 13,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "读懂介绍，让地标不只剩一张打卡照",
+          "changedPixels": 4592,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 14,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1070,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 15,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "2",
+          "changedPixels": 128,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 16,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "把建筑、街巷与沿途细节放进同一篇",
+          "changedPixels": 5072,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 17,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1070,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 18,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "3",
+          "changedPixels": 138,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 19,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "补上自己的感受，再分享给朋友",
+          "changedPixels": 4161,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 20,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1008,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 21,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1298,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 22,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1303,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 23,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 594,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "6afcdbb368ee64fe9b93509378b356bbf8d8baf4343b4b94f115b9e8e59f6320",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-card.png",
+      "sha256": "e3be1d9aa93638e2a61a2f5f418e06c83c2ea12d4b5b67500ef157c803b0e18b"
+    },
+    {
+      "id": "quote",
+      "label": "摘句",
+      "labelEn": "Verse Slip",
+      "group": "classic",
+      "ord": 20,
+      "template": "quote",
+      "width": 750,
+      "height": 706,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 9,
+      "layerPlan": [
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 706,
+          "color": "#55625C"
+        },
+        {
+          "k": "rrect",
+          "x": 40,
+          "y": 60,
+          "w": 670,
+          "h": 360,
+          "r": 48,
+          "fill": "#FFFFFF"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马 · 10/24"
+          ],
+          "lh": 40,
+          "size": 24,
+          "weight": "bold",
+          "color": "#3f4746",
+          "align": "left",
+          "x": 92,
+          "y": 136
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读懂介绍，让地标不只剩一",
+            "张打卡照"
+          ],
+          "lh": 68,
+          "size": 46,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "left",
+          "x": 92,
+          "y": 234
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "left",
+          "x": 92,
+          "y": 368
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 30,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 92,
+          "y": 506
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 24,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "left",
+          "x": 92,
+          "y": 546
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 23,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "center",
+          "x": 594,
+          "y": 543.6600000000001
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 10,
+          "weight": "normal",
+          "color": "#EEF0EB",
+          "align": "center",
+          "x": 594,
+          "y": 564.1999999999999
+        }
+      ],
+      "imageKeys": [],
+      "imageDraws": 0,
+      "expectedImageDraws": 0,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [],
+        "completePoints": [
+          true,
+          false,
+          false
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 529500,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 239356,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马 · 10/24",
+          "changedPixels": 1320,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "text",
+          "calls": {
+            "fillText": 2
+          },
+          "paintedText": "读懂介绍，让地标不只剩一张打卡照",
+          "changedPixels": 15561,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 1682,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1131,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1518,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1423,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 597,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "0ac978040c37d76ee01bf0e81ed3402263aeb47c186ebbdb0a9eba5c46770cff",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-quote.png",
+      "sha256": "3236a9b084fb045bde043a4273814094beb66818f83914ea945082080350a3fd"
+    },
+    {
+      "id": "block",
+      "label": "叠翠",
+      "labelEn": "Layered Paper",
+      "group": "classic",
+      "ord": 30,
+      "template": "block",
+      "width": 750,
+      "height": 1074,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 20,
+      "layerPlan": [
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 1074,
+          "color": "#F5F4F0"
+        },
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 280,
+          "color": "#55625C"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马 · 亲自撰写"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "left",
+          "x": 44,
+          "y": 92,
+          "alpha": 0.8
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 54,
+          "size": 40,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "left",
+          "x": 44,
+          "y": 184
+        },
+        {
+          "k": "rrect",
+          "x": 40,
+          "y": 320,
+          "w": 670,
+          "h": 521,
+          "r": 44,
+          "fill": "#FFFFFF",
+          "shadow": "rgba(35, 37, 44, 0.10)"
+        },
+        {
+          "k": "avatar",
+          "x": 309,
+          "y": 214,
+          "d": 132,
+          "ring": 8,
+          "ringColor": "#FFFFFF",
+          "key": "note"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。",
+            "在转角喝杯咖啡。记下沿途风景与自己的感受。"
+          ],
+          "lh": 40,
+          "size": 27,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 84,
+          "y": 437
+        },
+        {
+          "k": "circle",
+          "x": 100,
+          "y": 516,
+          "r": 16,
+          "fill": "#55625C"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "1"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "center",
+          "x": 100,
+          "y": 523
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读懂介绍，让地标不只剩一张打卡照"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 130,
+          "y": 525
+        },
+        {
+          "k": "circle",
+          "x": 100,
+          "y": 558,
+          "r": 16,
+          "fill": "#55625C"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "2"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "center",
+          "x": 100,
+          "y": 565
+        },
+        {
+          "k": "text",
+          "lines": [
+            "把建筑、街巷与沿途细节放进同一篇"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 130,
+          "y": 567
+        },
+        {
+          "k": "circle",
+          "x": 100,
+          "y": 600,
+          "r": 16,
+          "fill": "#55625C"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "3"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "bold",
+          "color": "#EEF0EB",
+          "align": "center",
+          "x": 100,
+          "y": 607
+        },
+        {
+          "k": "text",
+          "lines": [
+            "补上自己的感受，再分享给朋友"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 130,
+          "y": 609
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 28,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "left",
+          "x": 84,
+          "y": 739
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "left",
+          "x": 84,
+          "y": 777
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#9A9EA6",
+          "align": "center",
+          "x": 646,
+          "y": 948.5600000000001
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 10,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "center",
+          "x": 646,
+          "y": 968
+        }
+      ],
+      "imageKeys": [
+        "note"
+      ],
+      "imageDraws": 1,
+      "expectedImageDraws": 1,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [
+          [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。",
+            "在转角喝杯咖啡。记下沿途风景与自己的感受。"
+          ]
+        ],
+        "completePoints": [
+          true,
+          true,
+          true
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 805500,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 210000,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马 · 亲自撰写",
+          "changedPixels": 1793,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 4395,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 408726,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "avatar",
+          "calls": {
+            "save": 1,
+            "beginPath": 2,
+            "arc": 2,
+            "clip": 1,
+            "drawImage": 1,
+            "restore": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 16370,
+          "rasterCalls": 2,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "text",
+          "calls": {
+            "fillText": 2
+          },
+          "paintedText": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+          "changedPixels": 13470,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 856,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "1",
+          "changedPixels": 72,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 9,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "读懂介绍，让地标不只剩一张打卡照",
+          "changedPixels": 4592,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 10,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 856,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 11,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "2",
+          "changedPixels": 113,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 12,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "把建筑、街巷与沿途细节放进同一篇",
+          "changedPixels": 5072,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 13,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 856,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 14,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "3",
+          "changedPixels": 119,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 15,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "补上自己的感受，再分享给朋友",
+          "changedPixels": 4161,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 16,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1008,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 17,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1298,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 18,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1303,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 19,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 594,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "c5d1f07e597a7f468260b9435fc81c136580c6d8ecc157f50a8599dda04a7250",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-block.png",
+      "sha256": "2f138a1f3277e1aa9e4a128f174cb47dd8d5cedf15b247189c5f4f4b676d1738"
+    },
+    {
+      "id": "letter",
+      "label": "素宣信笺",
+      "labelEn": "Vertical Letter",
+      "group": "bold",
+      "ord": 40,
+      "template": "letter",
+      "width": 750,
+      "height": 1188,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 12,
+      "layerPlan": [
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 1188,
+          "color": "#F4EFE6"
+        },
+        {
+          "k": "rrect",
+          "x": 624,
+          "y": 52,
+          "w": 52,
+          "h": 52,
+          "r": 6,
+          "fill": "#9E3B2F"
+        },
+        {
+          "k": "rrect",
+          "x": 630,
+          "y": 58,
+          "w": 40,
+          "h": 40,
+          "r": 4
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 66,
+          "size": 46,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "left",
+          "x": 650,
+          "y": 176,
+          "fam": "serif",
+          "vert": true,
+          "colGap": -6,
+          "vpunct": true
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读完介绍再逛广场。看石柱间的光和穹顶的",
+            "天。在转角喝杯咖啡。记下沿途风景与自己",
+            "的感受。"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#4d4d51",
+          "align": "left",
+          "x": 530,
+          "y": 176,
+          "fam": "serif",
+          "vert": true,
+          "colGap": 20,
+          "vpunct": true
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马 · 10/24"
+          ],
+          "lh": 32,
+          "size": 20,
+          "weight": "normal",
+          "color": "rgba(35,37,44,0.5)",
+          "align": "left",
+          "x": 120,
+          "y": 176,
+          "fam": "serif",
+          "vert": true,
+          "vpunct": true
+        },
+        {
+          "k": "rrect",
+          "x": 98,
+          "y": 380.556640625,
+          "w": 44,
+          "h": 44,
+          "r": 5,
+          "fill": "#9E3B2F"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "麦"
+          ],
+          "lh": 40,
+          "size": 24,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "center",
+          "x": 120,
+          "y": 413.556640625,
+          "fam": "serif"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 30,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "left",
+          "x": 56,
+          "y": 1010
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 24,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "left",
+          "x": 56,
+          "y": 1050
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 19,
+          "weight": "bold",
+          "color": "rgba(35,37,44,0.62)",
+          "align": "center",
+          "x": 640,
+          "y": 1036.94
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 8,
+          "weight": "normal",
+          "color": "rgba(35,37,44,0.62)",
+          "align": "center",
+          "x": 640,
+          "y": 1054.32
+        }
+      ],
+      "imageKeys": [],
+      "imageDraws": 0,
+      "expectedImageDraws": 0,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": false,
+      "originalNoPaintLayers": [
+        2
+      ],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [
+          [
+            "读完介绍再逛广场。看石柱间的光和穹顶的",
+            "天。在转角喝杯咖啡。记下沿途风景与自己",
+            "的感受。"
+          ]
+        ],
+        "completePoints": [
+          false,
+          false,
+          false
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 891000,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 2684,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 0,
+          "rasterCalls": 0,
+          "imageDraws": 0,
+          "status": "original-path-only-no-pixels",
+          "limitation": "原模板无 fill/stroke，只构建路径；保留原配方，未补画。"
+        },
+        {
+          "index": 3,
+          "kind": "text",
+          "calls": {
+            "fillText": 5
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 5650,
+          "rasterCalls": 5,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "text",
+          "calls": {
+            "fillText": 42
+          },
+          "paintedText": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+          "changedPixels": 12761,
+          "rasterCalls": 42,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "text",
+          "calls": {
+            "measureText": 2,
+            "fillText": 5,
+            "save": 2,
+            "translate": 2,
+            "rotate": 2,
+            "restore": 2
+          },
+          "paintedText": "罗马 · 10/24",
+          "changedPixels": 729,
+          "rasterCalls": 5,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1966,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "麦",
+          "changedPixels": 410,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1131,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 9,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1510,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 10,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1027,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 11,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 409,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "d168924d0cd7b0973901a6bbe92abeadd97101c00411adafc4d4bffb9e28ffc6",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-letter.png",
+      "sha256": "2de3223c82ca3085004551d4ffaabd760ddd620b1ff3d452d4cd7b465da37191"
+    },
+    {
+      "id": "popGrid",
+      "label": "波普分格",
+      "labelEn": "Pop Panels",
+      "group": "bold",
+      "ord": 50,
+      "template": "popGrid",
+      "width": 750,
+      "height": 1112,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 16,
+      "layerPlan": [
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 1112,
+          "color": "#12121A"
+        },
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 370,
+          "h": 296,
+          "color": "#FFD84D"
+        },
+        {
+          "k": "image",
+          "key": "note",
+          "x": 0,
+          "y": 0,
+          "w": 370,
+          "h": 296,
+          "gray": true,
+          "tint": "rgba(255,216,77,0.62)"
+        },
+        {
+          "k": "fill",
+          "x": 380,
+          "y": 0,
+          "w": 370,
+          "h": 296,
+          "color": "#FF3D6E"
+        },
+        {
+          "k": "image",
+          "key": "note",
+          "x": 380,
+          "y": 0,
+          "w": 370,
+          "h": 296,
+          "gray": true,
+          "tint": "rgba(255,61,110,0.62)"
+        },
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 306,
+          "w": 370,
+          "h": 296,
+          "color": "#FF3D6E"
+        },
+        {
+          "k": "image",
+          "key": "note",
+          "x": 0,
+          "y": 306,
+          "w": 370,
+          "h": 296,
+          "gray": true,
+          "tint": "rgba(255,61,110,0.62)"
+        },
+        {
+          "k": "fill",
+          "x": 380,
+          "y": 306,
+          "w": 370,
+          "h": 296,
+          "color": "#FFD84D"
+        },
+        {
+          "k": "image",
+          "key": "note",
+          "x": 380,
+          "y": 306,
+          "w": 370,
+          "h": 296,
+          "gray": true,
+          "tint": "rgba(255,216,77,0.62)"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马 · 10/24"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#FFD84D",
+          "align": "left",
+          "x": 44,
+          "y": 678,
+          "track": 3
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 70,
+          "size": 58,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 44,
+          "y": 770
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖",
+            "啡。记下沿途风景与自己的感受。"
+          ],
+          "lh": 36,
+          "size": 24,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.7)",
+          "align": "left",
+          "x": 44,
+          "y": 820
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 28,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 44,
+          "y": 928
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "left",
+          "x": 44,
+          "y": 966
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 21,
+          "weight": "bold",
+          "color": "rgba(255,255,255,0.66)",
+          "align": "center",
+          "x": 647,
+          "y": 962.3
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 9,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.66)",
+          "align": "center",
+          "x": 647,
+          "y": 981.26
+        }
+      ],
+      "imageKeys": [
+        "note",
+        "note",
+        "note",
+        "note"
+      ],
+      "imageDraws": 4,
+      "expectedImageDraws": 4,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [
+          [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖",
+            "啡。记下沿途风景与自己的感受。"
+          ]
+        ],
+        "completePoints": [
+          false,
+          false,
+          false
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 834000,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 109520,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "image",
+          "calls": {
+            "save": 1,
+            "beginPath": 1,
+            "rect": 1,
+            "clip": 1,
+            "drawImage": 1,
+            "fillRect": 2,
+            "restore": 1
+          },
+          "paintedText": "",
+          "changedPixels": 109520,
+          "rasterCalls": 3,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 109520,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "image",
+          "calls": {
+            "save": 1,
+            "beginPath": 1,
+            "rect": 1,
+            "clip": 1,
+            "drawImage": 1,
+            "fillRect": 2,
+            "restore": 1
+          },
+          "paintedText": "",
+          "changedPixels": 109520,
+          "rasterCalls": 3,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 109520,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "image",
+          "calls": {
+            "save": 1,
+            "beginPath": 1,
+            "rect": 1,
+            "clip": 1,
+            "drawImage": 1,
+            "fillRect": 2,
+            "restore": 1
+          },
+          "paintedText": "",
+          "changedPixels": 109520,
+          "rasterCalls": 3,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 109520,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "image",
+          "calls": {
+            "save": 1,
+            "beginPath": 1,
+            "rect": 1,
+            "clip": 1,
+            "drawImage": 1,
+            "fillRect": 2,
+            "restore": 1
+          },
+          "paintedText": "",
+          "changedPixels": 109520,
+          "rasterCalls": 3,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 9,
+          "kind": "text",
+          "calls": {
+            "measureText": 10,
+            "fillText": 10
+          },
+          "paintedText": "罗马 · 10/24",
+          "changedPixels": 1086,
+          "rasterCalls": 10,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 10,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 8656,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 11,
+          "kind": "text",
+          "calls": {
+            "fillText": 2
+          },
+          "paintedText": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+          "changedPixels": 11163,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 12,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1008,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 13,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1314,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 14,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1168,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 15,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 497,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "97e804a255b09392674c270bdb6272b3ee75adba86d669332d1a2c6e9c72245d",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-popGrid.png",
+      "sha256": "764017478eae786d98f46d7707c045edb31b9a8e4b03fb1aedbf0ac3949955b1"
+    },
+    {
+      "id": "popDots",
+      "label": "网点漫画",
+      "labelEn": "Ben-Day Comic",
+      "group": "bold",
+      "ord": 60,
+      "template": "popDots",
+      "width": 750,
+      "height": 950,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 20,
+      "layerPlan": [
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 950,
+          "color": "#ffe58a"
+        },
+        {
+          "k": "dots",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 428,
+          "gap": 26,
+          "r": 4.5,
+          "color": "rgba(23,24,28,0.16)",
+          "oddRowShift": 13
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 88,
+          "size": 76,
+          "weight": "bold",
+          "color": "#FF3D6E",
+          "align": "left",
+          "x": 59,
+          "y": 421
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 88,
+          "size": 76,
+          "weight": "bold",
+          "color": "#363022",
+          "align": "left",
+          "x": 46,
+          "y": 408
+        },
+        {
+          "k": "rrect",
+          "x": 38,
+          "y": 70,
+          "w": 205.6519775390625,
+          "h": 44,
+          "r": 22,
+          "fill": "#FF3D6E"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马 · 亲自撰写"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 54,
+          "y": 100,
+          "track": 2
+        },
+        {
+          "k": "avatar",
+          "x": 504,
+          "y": 40,
+          "d": 200,
+          "ring": 10,
+          "ringColor": "#363022",
+          "fallback": "rgba(54,48,34,0.16)",
+          "key": "note"
+        },
+        {
+          "k": "rrect",
+          "x": 58,
+          "y": 460,
+          "w": 658,
+          "h": 248,
+          "r": 28,
+          "fill": "rgba(54,48,34,0.9)"
+        },
+        {
+          "k": "rrect",
+          "x": 46,
+          "y": 448,
+          "w": 658,
+          "h": 248,
+          "r": 28,
+          "fill": "#FFFFFF",
+          "stroke": "#363022",
+          "strokeWidth": 4
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在转",
+            "角喝杯咖啡。记下沿途风景与自己的感受。"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#3C4046",
+          "align": "left",
+          "x": 74,
+          "y": 492
+        },
+        {
+          "k": "circle",
+          "x": 92,
+          "y": 579,
+          "r": 18,
+          "fill": "#FFFFFF",
+          "stroke": "#363022",
+          "strokeWidth": 3
+        },
+        {
+          "k": "text",
+          "lines": [
+            "1"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "bold",
+          "color": "#363022",
+          "align": "center",
+          "x": 92,
+          "y": 586
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读懂介绍，让地标不只剩一张打卡照"
+          ],
+          "lh": 40,
+          "size": 25,
+          "weight": "normal",
+          "color": "#23252C",
+          "align": "left",
+          "x": 124,
+          "y": 588
+        },
+        {
+          "k": "circle",
+          "x": 92,
+          "y": 623,
+          "r": 18,
+          "fill": "#FFFFFF",
+          "stroke": "#363022",
+          "strokeWidth": 3
+        },
+        {
+          "k": "text",
+          "lines": [
+            "2"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "bold",
+          "color": "#363022",
+          "align": "center",
+          "x": 92,
+          "y": 630
+        },
+        {
+          "k": "text",
+          "lines": [
+            "把建筑、街巷与沿途细节放进同一篇"
+          ],
+          "lh": 40,
+          "size": 25,
+          "weight": "normal",
+          "color": "#23252C",
+          "align": "left",
+          "x": 124,
+          "y": 632
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 28,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 46,
+          "y": 768
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "left",
+          "x": 46,
+          "y": 806
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 21,
+          "weight": "bold",
+          "color": "#363022",
+          "align": "center",
+          "x": 646,
+          "y": 801.3
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 9,
+          "weight": "normal",
+          "color": "#363022",
+          "align": "center",
+          "x": 646,
+          "y": 820.26
+        }
+      ],
+      "imageKeys": [
+        "note"
+      ],
+      "imageDraws": 1,
+      "expectedImageDraws": 1,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [
+          [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在转",
+            "角喝杯咖啡。记下沿途风景与自己的感受。"
+          ]
+        ],
+        "completePoints": [
+          true,
+          true,
+          false
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 712500,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "dots",
+          "calls": {
+            "save": 1,
+            "beginPath": 457,
+            "rect": 1,
+            "clip": 1,
+            "arc": 456,
+            "fill": 456,
+            "restore": 1
+          },
+          "paintedText": "",
+          "changedPixels": 36480,
+          "rasterCalls": 456,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 13820,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 13820,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 8697,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "text",
+          "calls": {
+            "measureText": 9,
+            "fillText": 9
+          },
+          "paintedText": "罗马 · 亲自撰写",
+          "changedPixels": 1793,
+          "rasterCalls": 9,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "avatar",
+          "calls": {
+            "save": 1,
+            "beginPath": 2,
+            "arc": 2,
+            "clip": 1,
+            "drawImage": 1,
+            "restore": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 38336,
+          "rasterCalls": 2,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 162578,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 166142,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 9,
+          "kind": "text",
+          "calls": {
+            "fillText": 2
+          },
+          "paintedText": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+          "changedPixels": 12741,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 10,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 464,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 11,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "1",
+          "changedPixels": 72,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 12,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "读懂介绍，让地标不只剩一张打卡照",
+          "changedPixels": 4309,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 13,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 464,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 14,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "2",
+          "changedPixels": 113,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 15,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "把建筑、街巷与沿途细节放进同一篇",
+          "changedPixels": 4708,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 16,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1004,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 17,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1294,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 18,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1174,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 19,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 502,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "0f55f945b267866315fb45131790302d95c4c4c53e799642d99d1f6f1e121652",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-popDots.png",
+      "sha256": "e0ded613880efdbc10f6e0ea208e6c6803557486e8edcdf0115ddf0806c5f6d9"
+    },
+    {
+      "id": "acid",
+      "label": "荧光渐变",
+      "labelEn": "Acid Gradient",
+      "group": "bold",
+      "ord": 70,
+      "template": "acid",
+      "width": 750,
+      "height": 1262,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 22,
+      "layerPlan": [
+        {
+          "k": "grad",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 1262,
+          "c1": "#5B4BF0",
+          "c2": "#1B1470",
+          "stops": [
+            {
+              "at": 0,
+              "color": "#5B4BF0"
+            },
+            {
+              "at": 0.52,
+              "color": "#3b30b0"
+            },
+            {
+              "at": 1,
+              "color": "#1B1470"
+            }
+          ]
+        },
+        {
+          "k": "radial",
+          "x": 512,
+          "y": 266,
+          "r0": 0,
+          "r1": 399,
+          "c1": "rgba(255,255,255,0.38)",
+          "c2": "rgba(255,255,255,0)",
+          "box": [
+            0,
+            0,
+            750,
+            540
+          ]
+        },
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 539,
+          "w": 750,
+          "h": 723,
+          "color": "rgba(18,18,26,0.28)"
+        },
+        {
+          "k": "avatar",
+          "x": 322,
+          "y": 76,
+          "d": 380,
+          "ring": 6,
+          "ringColor": "rgba(255,255,255,0.6)",
+          "fallback": "rgba(255,255,255,0.2)",
+          "key": "note"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马 · 10/24"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "rgba(255,255,255,0.84)",
+          "align": "left",
+          "x": 48,
+          "y": 614,
+          "track": 4
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 88,
+          "size": 72,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 48,
+          "y": 730
+        },
+        {
+          "k": "rrect",
+          "x": 48,
+          "y": 740,
+          "w": 654,
+          "h": 76,
+          "r": 38,
+          "fill": "rgba(255,255,255,0.14)"
+        },
+        {
+          "k": "circle",
+          "x": 78,
+          "y": 774,
+          "r": 22,
+          "fill": "#FFFFFF"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "1"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#2A22A0",
+          "align": "center",
+          "x": 78,
+          "y": 782
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读懂介绍，让地标不只剩一张打卡照"
+          ],
+          "lh": 40,
+          "size": 25,
+          "weight": "normal",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 114,
+          "y": 783
+        },
+        {
+          "k": "rrect",
+          "x": 48,
+          "y": 824,
+          "w": 654,
+          "h": 76,
+          "r": 38,
+          "fill": "rgba(255,255,255,0.14)"
+        },
+        {
+          "k": "circle",
+          "x": 78,
+          "y": 858,
+          "r": 22,
+          "fill": "#FFFFFF"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "2"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#2A22A0",
+          "align": "center",
+          "x": 78,
+          "y": 866
+        },
+        {
+          "k": "text",
+          "lines": [
+            "把建筑、街巷与沿途细节放进同一篇"
+          ],
+          "lh": 40,
+          "size": 25,
+          "weight": "normal",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 114,
+          "y": 867
+        },
+        {
+          "k": "rrect",
+          "x": 48,
+          "y": 908,
+          "w": 654,
+          "h": 76,
+          "r": 38,
+          "fill": "rgba(255,255,255,0.14)"
+        },
+        {
+          "k": "circle",
+          "x": 78,
+          "y": 942,
+          "r": 22,
+          "fill": "#FFFFFF"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "3"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#2A22A0",
+          "align": "center",
+          "x": 78,
+          "y": 950
+        },
+        {
+          "k": "text",
+          "lines": [
+            "补上自己的感受，再分享给朋友"
+          ],
+          "lh": 40,
+          "size": 25,
+          "weight": "normal",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 114,
+          "y": 951
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 28,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 48,
+          "y": 1078
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "left",
+          "x": 48,
+          "y": 1116
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 21,
+          "weight": "bold",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "center",
+          "x": 643,
+          "y": 1112.3000000000002
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 9,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "center",
+          "x": 643,
+          "y": 1131.26
+        }
+      ],
+      "imageKeys": [
+        "note"
+      ],
+      "imageDraws": 1,
+      "expectedImageDraws": 1,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [],
+        "completePoints": [
+          true,
+          true,
+          true
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "grad",
+          "calls": {
+            "createLinearGradient": 1,
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 946500,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "radial",
+          "calls": {
+            "createRadialGradient": 1,
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 324116,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 542250,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "avatar",
+          "calls": {
+            "save": 1,
+            "beginPath": 2,
+            "arc": 2,
+            "clip": 1,
+            "drawImage": 1,
+            "restore": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 121248,
+          "rasterCalls": 2,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "text",
+          "calls": {
+            "measureText": 10,
+            "fillText": 10
+          },
+          "paintedText": "罗马 · 10/24",
+          "changedPixels": 1086,
+          "rasterCalls": 10,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 12515,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 48534,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1569,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "1",
+          "changedPixels": 76,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 9,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "读懂介绍，让地标不只剩一张打卡照",
+          "changedPixels": 4309,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 10,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 48535,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 11,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1569,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 12,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "2",
+          "changedPixels": 137,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 13,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "把建筑、街巷与沿途细节放进同一篇",
+          "changedPixels": 4708,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 14,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 48535,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 15,
+          "kind": "circle",
+          "calls": {
+            "beginPath": 1,
+            "arc": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1569,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 16,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "3",
+          "changedPixels": 147,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 17,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "补上自己的感受，再分享给朋友",
+          "changedPixels": 3924,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 18,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1008,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 19,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1314,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 20,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1174,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 21,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 502,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "9c6dd4fba4a070d0851befe0f93116ecb34be9756bccaac6f3f27678ab4134a7",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-acid.png",
+      "sha256": "c76f9e24c923c031976d525868cc224c02c95ae36ed754b9557b60299a955937"
+    },
+    {
+      "id": "cover",
+      "label": "杂志封面",
+      "labelEn": "Magazine Cover",
+      "group": "bold",
+      "ord": 80,
+      "template": "cover",
+      "width": 750,
+      "height": 1230,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 12,
+      "layerPlan": [
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 1230,
+          "color": "#0E0F12"
+        },
+        {
+          "k": "image",
+          "key": "note",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 1230
+        },
+        {
+          "k": "grad",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 1230,
+          "c1": "rgba(14,15,18,0.2)",
+          "c2": "rgba(14,15,18,0.97)",
+          "stops": [
+            {
+              "at": 0,
+              "color": "rgba(14,15,18,0.2)"
+            },
+            {
+              "at": 0.5,
+              "color": "rgba(14,15,18,0.42)"
+            },
+            {
+              "at": 0.66,
+              "color": "rgba(14,15,18,0.88)"
+            },
+            {
+              "at": 1,
+              "color": "rgba(14,15,18,0.97)"
+            }
+          ]
+        },
+        {
+          "k": "rrect",
+          "x": 48,
+          "y": 38,
+          "w": 216.80795288085938,
+          "h": 44,
+          "r": 22,
+          "fill": "rgba(18,18,26,0.5)"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马 · 10/24"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 68,
+          "y": 68,
+          "track": 4
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 90,
+          "size": 76,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 48,
+          "y": 872
+        },
+        {
+          "k": "fill",
+          "x": 48,
+          "y": 770,
+          "w": 84,
+          "h": 8,
+          "color": "#F6C445"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝",
+            "杯咖啡。记下沿途风景与自己的感受。"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "left",
+          "x": 48,
+          "y": 928
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 30,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "align": "left",
+          "x": 48,
+          "y": 1050
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 24,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "left",
+          "x": 48,
+          "y": 1090
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 21,
+          "weight": "bold",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "center",
+          "x": 644,
+          "y": 1081.3000000000002
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 9,
+          "weight": "normal",
+          "color": "rgba(255,255,255,0.72)",
+          "align": "center",
+          "x": 644,
+          "y": 1100.26
+        }
+      ],
+      "imageKeys": [
+        "note"
+      ],
+      "imageDraws": 1,
+      "expectedImageDraws": 1,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [
+          [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝",
+            "杯咖啡。记下沿途风景与自己的感受。"
+          ]
+        ],
+        "completePoints": [
+          false,
+          false,
+          false
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 922500,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "image",
+          "calls": {
+            "save": 1,
+            "beginPath": 1,
+            "rect": 1,
+            "clip": 1,
+            "drawImage": 1,
+            "restore": 1
+          },
+          "paintedText": "",
+          "changedPixels": 922500,
+          "rasterCalls": 1,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "grad",
+          "calls": {
+            "createLinearGradient": 1,
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 922500,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 9183,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "text",
+          "calls": {
+            "measureText": 10,
+            "fillText": 10
+          },
+          "paintedText": "罗马 · 10/24",
+          "changedPixels": 960,
+          "rasterCalls": 10,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 13820,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 672,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "text",
+          "calls": {
+            "fillText": 2
+          },
+          "paintedText": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+          "changedPixels": 12741,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1131,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 9,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1518,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 10,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1174,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 11,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 502,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "d4f7ce2521f72f0236c860b806a90329c11108b268fdf41932134777f0ad450b",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-cover.png",
+      "sha256": "96e3255495814c4bdd3398526af6bba4b3016f00e88cc3c79344ba6401e2cb5c"
+    },
+    {
+      "id": "lit",
+      "label": "纸间文艺",
+      "labelEn": "Paper & Ink",
+      "group": "bold",
+      "ord": 90,
+      "template": "lit",
+      "width": 750,
+      "height": 1053,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 13,
+      "layerPlan": [
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 1053,
+          "color": "#F4EFE6"
+        },
+        {
+          "k": "rrect",
+          "x": 185,
+          "y": 92,
+          "w": 380,
+          "h": 380,
+          "r": 190,
+          "fill": "#E4694A"
+        },
+        {
+          "k": "fill",
+          "x": 185,
+          "y": 282,
+          "w": 380,
+          "h": 190,
+          "color": "#E4694A"
+        },
+        {
+          "k": "avatar",
+          "x": 265,
+          "y": 148,
+          "d": 220,
+          "ring": 8,
+          "ringColor": "#F4EFE6",
+          "fallback": "rgba(244,239,230,0.3)",
+          "key": "note"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马 · 10/24"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "bold",
+          "color": "rgba(35,37,44,0.62)",
+          "align": "center",
+          "x": 341,
+          "y": 548,
+          "fam": "serif",
+          "track": 6
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 74,
+          "size": 52,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "center",
+          "x": 341,
+          "y": 640,
+          "fam": "serif"
+        },
+        {
+          "k": "line",
+          "x1": 56,
+          "y1": 686,
+          "x2": 694,
+          "y2": 686,
+          "w": 2,
+          "color": "rgba(35,37,44,0.18)"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。",
+            "在转角喝杯咖啡。记下沿途风景与自己的感受。"
+          ],
+          "lh": 42,
+          "size": 27,
+          "weight": "normal",
+          "color": "#515155",
+          "align": "left",
+          "x": 56,
+          "y": 757
+        },
+        {
+          "k": "text",
+          "lines": [
+            "亲自撰写"
+          ],
+          "lh": 40,
+          "size": 28,
+          "weight": "normal",
+          "color": "rgba(35,37,44,0.62)",
+          "align": "left",
+          "x": 706,
+          "y": 588,
+          "fam": "serif",
+          "vert": true
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 28,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "left",
+          "x": 56,
+          "y": 879
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "left",
+          "x": 56,
+          "y": 917
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 19,
+          "weight": "bold",
+          "color": "rgba(35,37,44,0.62)",
+          "align": "center",
+          "x": 640,
+          "y": 907.94
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 8,
+          "weight": "normal",
+          "color": "rgba(35,37,44,0.62)",
+          "align": "center",
+          "x": 640,
+          "y": 925.32
+        }
+      ],
+      "imageKeys": [
+        "note"
+      ],
+      "imageDraws": 1,
+      "expectedImageDraws": 1,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [
+          [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。",
+            "在转角喝杯咖啡。记下沿途风景与自己的感受。"
+          ]
+        ],
+        "completePoints": [
+          false,
+          false,
+          false
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 789750,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "rrect",
+          "calls": {
+            "beginPath": 1,
+            "roundRect": 1,
+            "fill": 1
+          },
+          "paintedText": "",
+          "changedPixels": 114024,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 15892,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "avatar",
+          "calls": {
+            "save": 1,
+            "beginPath": 2,
+            "arc": 2,
+            "clip": 1,
+            "drawImage": 1,
+            "restore": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 44093,
+          "rasterCalls": 2,
+          "imageDraws": 1,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "text",
+          "calls": {
+            "measureText": 10,
+            "fillText": 10
+          },
+          "paintedText": "罗马 · 10/24",
+          "changedPixels": 891,
+          "rasterCalls": 10,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 7137,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "line",
+          "calls": {
+            "beginPath": 1,
+            "moveTo": 1,
+            "lineTo": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1276,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "text",
+          "calls": {
+            "fillText": 2
+          },
+          "paintedText": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+          "changedPixels": 13470,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "text",
+          "calls": {
+            "fillText": 4
+          },
+          "paintedText": "亲自撰写",
+          "changedPixels": 1580,
+          "rasterCalls": 4,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 9,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1008,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 10,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1298,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 11,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1027,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 12,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 409,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "c32e82b872dc7b0a3f7430ab9e7eec722f217c8e30ddfc1a490670dd9e26b0db",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-lit.png",
+      "sha256": "3da4016a670fa09d7d9d0e139735a3797da5666314b1b5a0d0d3292a2b3535e9"
+    },
+    {
+      "id": "spec",
+      "label": "规格卡",
+      "labelEn": "Spec Sheet",
+      "group": "classic",
+      "ord": 100,
+      "template": "spec",
+      "width": 750,
+      "height": 1040,
+      "recipeSource": "bundled",
+      "recipeOrigin": "current-bundled-recipe",
+      "fellBack": false,
+      "noFallback": true,
+      "layers": 20,
+      "layerPlan": [
+        {
+          "k": "fill",
+          "x": 0,
+          "y": 0,
+          "w": 750,
+          "h": 1040,
+          "color": "#F7F8FA"
+        },
+        {
+          "k": "grad",
+          "x": 52,
+          "y": 98,
+          "w": 646,
+          "h": 10,
+          "c1": "#2E6BFF",
+          "c2": "rgba(46,107,255,0.1)",
+          "dir": "h"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "NO.000  /  10/24  /  亲自撰写"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "normal",
+          "color": "rgba(11,13,18,0.62)",
+          "align": "left",
+          "x": 52,
+          "y": 72,
+          "fam": "Courier New",
+          "track": 1
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "bold",
+          "color": "#2E6BFF",
+          "align": "left",
+          "x": 52,
+          "y": 154,
+          "track": 5
+        },
+        {
+          "k": "text",
+          "lines": [
+            "罗马慢游记"
+          ],
+          "lh": 74,
+          "size": 60,
+          "weight": "bold",
+          "color": "#0B0D12",
+          "align": "left",
+          "x": 52,
+          "y": 248
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在",
+            "转角喝杯咖啡。记下沿途风景与自己的感受。"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#3f4145",
+          "align": "left",
+          "x": 52,
+          "y": 400
+        },
+        {
+          "k": "line",
+          "x1": 52,
+          "y1": 460,
+          "x2": 698,
+          "y2": 460,
+          "w": 1.5,
+          "color": "rgba(11,13,18,0.14)"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "01"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#2E6BFF",
+          "align": "left",
+          "x": 52,
+          "y": 494,
+          "fam": "Courier New"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "读懂介绍，让地标不只剩一张打卡照"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#2c2e32",
+          "align": "left",
+          "x": 114,
+          "y": 494
+        },
+        {
+          "k": "line",
+          "x1": 52,
+          "y1": 534,
+          "x2": 698,
+          "y2": 534,
+          "w": 1.5,
+          "color": "rgba(11,13,18,0.14)"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "02"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#2E6BFF",
+          "align": "left",
+          "x": 52,
+          "y": 568,
+          "fam": "Courier New"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "把建筑、街巷与沿途细节放进同一篇"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#2c2e32",
+          "align": "left",
+          "x": 114,
+          "y": 568
+        },
+        {
+          "k": "line",
+          "x1": 52,
+          "y1": 608,
+          "x2": 698,
+          "y2": 608,
+          "w": 1.5,
+          "color": "rgba(11,13,18,0.14)"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "03"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "bold",
+          "color": "#2E6BFF",
+          "align": "left",
+          "x": 52,
+          "y": 642,
+          "fam": "Courier New"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "补上自己的感受，再分享给朋友"
+          ],
+          "lh": 40,
+          "size": 26,
+          "weight": "normal",
+          "color": "#2c2e32",
+          "align": "left",
+          "x": 114,
+          "y": 642
+        },
+        {
+          "k": "line",
+          "x1": 52,
+          "y1": 682,
+          "x2": 698,
+          "y2": 682,
+          "w": 1.5,
+          "color": "rgba(11,13,18,0.14)"
+        },
+        {
+          "k": "text",
+          "lines": [
+            "林夏"
+          ],
+          "lh": 40,
+          "size": 28,
+          "weight": "bold",
+          "color": "#23252C",
+          "align": "left",
+          "x": 52,
+          "y": 862
+        },
+        {
+          "k": "text",
+          "lines": [
+            "看见，也记得"
+          ],
+          "lh": 40,
+          "size": 22,
+          "weight": "normal",
+          "color": "#9A9EA6",
+          "align": "left",
+          "x": 52,
+          "y": 900
+        },
+        {
+          "k": "text",
+          "lines": [
+            "图麦笔记"
+          ],
+          "lh": 40,
+          "size": 20,
+          "weight": "bold",
+          "color": "rgba(11,13,18,0.62)",
+          "align": "center",
+          "x": 642,
+          "y": 893.12
+        },
+        {
+          "k": "text",
+          "lines": [
+            "微信搜「图麦笔记」"
+          ],
+          "lh": 40,
+          "size": 9,
+          "weight": "normal",
+          "color": "rgba(11,13,18,0.62)",
+          "align": "center",
+          "x": 642,
+          "y": 911.4599999999999
+        }
+      ],
+      "imageKeys": [],
+      "imageDraws": 0,
+      "expectedImageDraws": 0,
+      "missingImages": [],
+      "unsupportedLayers": [],
+      "allPlannedLayersExecuted": true,
+      "allDrawableLayersPainted": true,
+      "allLayersChangedPixels": true,
+      "originalNoPaintLayers": [],
+      "textCoverage": {
+        "title": true,
+        "name": true,
+        "slogan": true,
+        "summary": [
+          [
+            "读完介绍再逛广场。看石柱间的光和穹顶的天。在",
+            "转角喝杯咖啡。记下沿途风景与自己的感受。"
+          ]
+        ],
+        "completePoints": [
+          true,
+          true,
+          true
+        ],
+        "summaryLeadingPunctuation": []
+      },
+      "layerAudit": [
+        {
+          "index": 0,
+          "kind": "fill",
+          "calls": {
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 780000,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 1,
+          "kind": "grad",
+          "calls": {
+            "createLinearGradient": 1,
+            "fillRect": 1
+          },
+          "paintedText": "",
+          "changedPixels": 6460,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 2,
+          "kind": "text",
+          "calls": {
+            "measureText": 25,
+            "fillText": 25
+          },
+          "paintedText": "NO.000  /  10/24  /  亲自撰写",
+          "changedPixels": 1581,
+          "rasterCalls": 25,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 3,
+          "kind": "text",
+          "calls": {
+            "measureText": 2,
+            "fillText": 2
+          },
+          "paintedText": "罗马",
+          "changedPixels": 469,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 4,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "罗马慢游记",
+          "changedPixels": 9202,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 5,
+          "kind": "text",
+          "calls": {
+            "fillText": 2
+          },
+          "paintedText": "读完介绍再逛广场。看石柱间的光和穹顶的天。在转角喝杯咖啡。记下沿途风景与自己的感受。",
+          "changedPixels": 12741,
+          "rasterCalls": 2,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 6,
+          "kind": "line",
+          "calls": {
+            "beginPath": 1,
+            "moveTo": 1,
+            "lineTo": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1292,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 7,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "01",
+          "changedPixels": 213,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 8,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "读懂介绍，让地标不只剩一张打卡照",
+          "changedPixels": 4592,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 9,
+          "kind": "line",
+          "calls": {
+            "beginPath": 1,
+            "moveTo": 1,
+            "lineTo": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1292,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 10,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "02",
+          "changedPixels": 236,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 11,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "把建筑、街巷与沿途细节放进同一篇",
+          "changedPixels": 5072,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 12,
+          "kind": "line",
+          "calls": {
+            "beginPath": 1,
+            "moveTo": 1,
+            "lineTo": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1292,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 13,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "03",
+          "changedPixels": 238,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 14,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "补上自己的感受，再分享给朋友",
+          "changedPixels": 4161,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 15,
+          "kind": "line",
+          "calls": {
+            "beginPath": 1,
+            "moveTo": 1,
+            "lineTo": 1,
+            "stroke": 1
+          },
+          "paintedText": "",
+          "changedPixels": 1292,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 16,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "林夏",
+          "changedPixels": 1008,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 17,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "看见，也记得",
+          "changedPixels": 1298,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 18,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "图麦笔记",
+          "changedPixels": 1099,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        },
+        {
+          "index": 19,
+          "kind": "text",
+          "calls": {
+            "fillText": 1
+          },
+          "paintedText": "微信搜「图麦笔记」",
+          "changedPixels": 502,
+          "rasterCalls": 1,
+          "imageDraws": 0,
+          "status": "painted"
+        }
+      ],
+      "recipePath": "/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/posterRecipes.js",
+      "recipeSha256": "6b3aa6a9909f690767f4ef84e73c2570feb8289daa27ec50f856f354aa9a2e4d",
+      "output": "/Users/zlfmac/Documents/TuMaiBiJi/比赛/图麦笔记-详细产品介绍-重构版-20261024/素材/旅行卡-spec.png",
+      "sha256": "f6e9b2578e62d2767f6c81b27003105c25cd345df8e71c161871539895d278fa"
+    }
+  ]
+}

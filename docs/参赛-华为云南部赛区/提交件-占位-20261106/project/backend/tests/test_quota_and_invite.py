@@ -1,0 +1,873 @@
+"""MIND 台账的行为用例。
+
+五条不变量（口径 2026-10-01 站长改定："拆掉后端100篇，不同用户转存都加分，
+但同一个用户只算一次。其他的照常。"）：
+① **笔记不限量**。原来那道"到顶之后四条入口全部拦下"的闸门撤掉了，任何一条入口
+   都不该再回 403"上限"。100 现在是 MIND 的起始值，不是上限。
+② 动笔 +10：被邀请人写下名下第一条才结，一个人一辈子只成就一次。
+③ 转存 +1：**不同用户各算一次，同一个用户对同一篇只算一次**；转存的人是不是新用户
+   不再重要（老用户转存也算）。
+④ 带来多少人不限，不设总闸也不设次数上限。封住套利的是②③那两条去重，
+   由数据库索引挡，不靠应用层记得住。
+⑤ 数字只有一个来源：客户端拿 /api/user/quota 的 `mind`，不硬编码、也不自己相加。
+
+限流在测试里关掉：这几个用例要打 /api/auth/wechat（5 次/分钟），而那层是 Redis 的事，
+不是这里的判定逻辑。
+"""
+import os
+import sys
+
+os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest.db"
+os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
+os.environ["EXTRACT_PROVIDER"] = "none"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import Session
+
+from app.api.routes import ingest as ingest_route
+from app.core.auth import _create_token
+from app.db.database import Base, SessionLocal, engine
+from app.main import app
+from app.models.invitation import Invitation
+from app.models.note import Note, SOURCE_SHARE_IMPORT
+from app.models.user import User
+from app.services import quota
+
+
+@pytest.fixture(scope="module")
+def client():
+    app.state.limiter.enabled = False
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    with TestClient(app) as c:
+        yield c
+    app.state.limiter.enabled = True
+
+
+@pytest.fixture()
+def db():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    session = SessionLocal()
+    yield session
+    session.close()
+
+
+def mk_user(db, openid, bonus=0, generation=1):
+    u = User(openid=openid, quota_bonus=bonus, generation=generation)
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return u
+
+
+def hdr(user):
+    # 走真实登录注册出来的号，generation 是全局递增的（防 id 复用冒充），
+    # 所以这里必须带上它自己的那一份，不能默认第 1 代。
+    return {"Authorization": f"Bearer {_create_token(user.id, user.generation)}"}
+
+
+def mk_notes(db, user, n):
+    for i in range(n):
+        db.add(Note(user_id=str(user.id), title=f"占位{i}", source_type="manual"))
+    db.commit()
+
+
+def create_note(client, user, title="一条笔记"):
+    return client.post("/api/notes/", json={"title": title}, headers=hdr(user))
+
+
+class Test口径常量:
+    def test_三个数字钉住_改了就是改产品口径(self):
+        assert quota.BASE_QUOTA == 100      # MIND 起始值，不再是"每人几篇"
+        assert quota.INVITE_REWARD == 10    # 带来一个新的写作者
+        assert quota.IMPORT_REWARD == 1     # 有人转存了某一
+
+    def test_没有次数上限这一档(self, db):
+        """带来几个人不限——这条也得钉住，否则哪天有人"顺手"加回一个 max 没人会发现。"""
+        assert not hasattr(quota, "MAX_REWARDED_INVITES")
+        u = mk_user(db, "no-cap")
+        body = quota.quota_view(u, db)
+        assert "invites_left" not in body  # 接口不许再回一个"还剩几次"
+        assert body["invites_rewarded"] == 0  # 只报已经带来几个人，不报额度
+
+
+class Test不限量:
+    """闸门这一档整个撤掉了：四条入口都不许再说"到顶"。
+
+    留着这些用例而不是直接删，是因为它们原来钉的是"漏一条路就能绕开上限"——
+    现在钉的是反过来的事：**任何一条路都不许再拦人**。哪天有人顺手把配额判断
+    加回某一条入口，这里会红。
+    """
+
+    def test_闸门函数已经不在(self):
+        assert not hasattr(quota, "ensure_room")
+        import importlib.util
+        assert importlib.util.find_spec("app.core.quota_gate") is None
+
+    def test_起始值再小也照样能存第五条(self, client, db, monkeypatch):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 2)
+        u = mk_user(db, "free-manual")
+        for i in range(5):
+            assert create_note(client, u, f"第{i}条").status_code == 200
+        assert db.query(Note).filter(Note.user_id == str(u.id)).count() == 5
+
+    def test_链接入口不再拦人(self, client, db, monkeypatch):
+        """起始值压到 0 也照样放行进队：这条钉的是"没人在入队前查额度"。
+        队列换成记录器，否则这条路由真跑要碰 Redis。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 0)
+        u = mk_user(db, "free-url")
+        calls = []
+
+        class FakeQueue:
+            def enqueue(self, *a, **kw):
+                calls.append((a, kw))
+
+        monkeypatch.setattr(ingest_route, "get_queue", lambda: FakeQueue())
+        # set_task_status 要连 Redis，pytest 环境里没有：这条断的是"没被拦、走到入队"，
+        # 不是任务状态（隔壁 Test入队带上账号代数 同一处理）。
+        monkeypatch.setattr(ingest_route, "set_task_status", lambda *a, **kw: None)
+        resp = client.post(
+            "/api/ingest/url", data={"url": "https://example.com/a"}, headers=hdr(u)
+        )
+        assert resp.status_code == 200, resp.text
+        assert calls, "放行了却没入队"
+
+    def test_截图暂存与提交两处都不拦(self, client, db, monkeypatch):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 0)
+        u = mk_user(db, "free-shot")
+        staged = client.post(
+            "/api/ingest/screenshots/stage",
+            files={"images": ("a.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+            headers=hdr(u),
+        )
+        assert staged.status_code == 200, staged.text
+        processed = client.post(
+            "/api/ingest/screenshots/process", data={"batch_id": "nope"}, headers=hdr(u)
+        )
+        # 到顶这件事不存在了，这里只剩"批次不存在"那一条正常分支
+        assert processed.status_code == 404
+
+    def test_删不删笔记都跟能不能存无关(self, client, db, monkeypatch):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 1)
+        u = mk_user(db, "free-delete")
+        first = create_note(client, u, "第一条")
+        assert create_note(client, u, "第二条").status_code == 200
+        assert client.delete(f"/api/notes/{first.json()['id']}", headers=hdr(u)).status_code == 200
+        assert create_note(client, u, "第三条").status_code == 200
+
+
+class Test入队带上账号代数:
+    """worker 那道串号闸门，靠的是入队时把 generation 一起塞进 payload。
+
+    路由这里漏传的话，worker 收到 generation=None，会当成"部署切换期的存量 job"退回
+    只查存在性——A6 整条修复就静默失效，而且一路不报错。所以这段接线得自己断一次，
+    不能指望 worker 那边的用例替它兜（那些用例都是直接调函数、显式传 generation）。
+    """
+
+    class _Recorder:
+        def __init__(self):
+            self.calls = []
+
+        def enqueue(self, *args, **kwargs):
+            self.calls.append((args, kwargs))
+
+    @pytest.fixture()
+    def rec(self, monkeypatch):
+        r = self._Recorder()
+        monkeypatch.setattr(ingest_route, "get_queue", lambda: r)
+        # set_task_status 要连 Redis，pytest 环境里没有；这里断的是入队参数，不是任务状态。
+        monkeypatch.setattr(ingest_route, "set_task_status", lambda *a, **kw: None)
+        return r
+
+    def test_链接入口入队时带上generation(self, client, db, monkeypatch, rec):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        u = mk_user(db, "wire-url", generation=7)
+
+        resp = client.post("/api/ingest/url", data={"url": "https://example.com/a"}, headers=hdr(u))
+        assert resp.status_code == 200, resp.text
+
+        assert len(rec.calls) == 1
+        args = rec.calls[0][0]
+        assert args[0] == "app.tasks.ingest_tasks.process_url_task"
+        assert args[2] == str(u.id)
+        assert 7 in args, f"入队参数里没带上账号代数，worker 会退回只查存在性：{args}"
+
+    def test_截图入口入队时带上generation(self, client, db, monkeypatch, rec):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        u = mk_user(db, "wire-shot", generation=9)
+
+        staged = client.post(
+            "/api/ingest/screenshots/stage",
+            files={"images": ("a.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+            headers=hdr(u),
+        )
+        assert staged.status_code == 200, staged.text
+        batch_id = staged.json()["batch_id"]
+
+        resp = client.post("/api/ingest/screenshots/process", data={"batch_id": batch_id}, headers=hdr(u))
+        assert resp.status_code == 200, resp.text
+
+        assert len(rec.calls) == 1
+        args = rec.calls[0][0]
+        assert args[0] == "app.tasks.ingest_tasks.process_screenshots_task"
+        assert args[2] == str(u.id)
+        assert 9 in args, f"入队参数里没带上账号代数，worker 会退回只查存在性：{args}"
+
+
+class Test限流挂没挂:
+    """限流是 Redis 那一层的事，测试夹具里 limiter 是关掉的，所以这里只能断"挂没挂上"。
+
+    读 _route_limits 这个私有注册表是没法里的办法：真跑出一次 429 得有 Redis 在。
+    私有属性意味着 slowapi 升版本时这条会红——那正是要的失败方式（逼人回来看一眼），
+    比悄悄放行强。同文件的 deactivate 也是这个待遇，两个都是不可逆/可刷的写口子。
+    """
+
+    def _limits(self, func_name):
+        from app.core.rate_limit import limiter
+
+        return limiter._route_limits.get(f"app.api.routes.user.{func_name}") or []
+
+    def test_补报邀请人挂了限流(self):
+        got = [str(x.limit) for x in self._limits("update_inviter")]
+        assert got, "/api/user/inviter 上没挂 limiter.limit，可以被无限打"
+        assert "10 per 1 minute" in got, got
+
+    def test_注销也还挂着限流(self):
+        got = [str(x.limit) for x in self._limits("deactivate_account")]
+        assert got, "/api/user/deactivate 的限流被摘掉了"
+        assert "5 per 1 minute" in got, got
+
+
+class Test额度接口:
+    def test_返回的就是客户端要的那几个数(self, client, db, monkeypatch):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        u = mk_user(db, "quota-view", bonus=10)
+        create_note(client, u, "一条")
+        client.post("/api/categories/", json={"name": "旅行"}, headers=hdr(u))
+        body = client.get("/api/user/quota", headers=hdr(u)).json()
+        assert body == {
+            "used": 1,
+            # 分类条数一起给：注销那段确认文案要报出真实条数，不能含糊说"你的数据"
+            "categories": 1,
+            "mind": 110,          # 客户端读这一个数，不许自己 base+bonus
+            "limit": 110,         # 留给线上 1.5.0 那一版（它渲染 used/limit）
+            "remaining": 109,
+            "base": 100,
+            "bonus": 10,
+            "reward_each": 10,
+            "import_each": 1,
+            "invites_rewarded": 0,
+        }
+
+    def test_客户端只要读mind_不许自己相加(self, client, db, monkeypatch):
+        """`mind` 和 `limit` 现在是同一个数，但语义不同：前者是积分，后者是老字段名。
+        哪天改回"limit 是上限"，这条会红，提醒一起把老字段删掉。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        u = mk_user(db, "mind-only", bonus=30)
+        body = client.get("/api/user/quota", headers=hdr(u)).json()
+        assert body["mind"] == 130 == body["base"] + body["bonus"]
+
+
+class Test邀请归因:
+    def test_新用户带邀请人_归因落在账号上(self, client, db, monkeypatch):
+        inviter = mk_user(db, "inviter-1")
+        login(client, db, monkeypatch, "invitee-1", inviter.id)
+        u = db.query(User).filter_by(openid="invitee-1").first()
+        assert u.invited_by == inviter.id
+
+    def test_没带参数_自己邀自己_不存在的邀请人_都不认(self, client, db, monkeypatch):
+        a = mk_user(db, "inviter-2")
+
+        assert login(client, db, monkeypatch, "none-1", None).invited_by is None
+
+        self_user = login(client, db, monkeypatch, "self-1", None)
+        again = login(client, db, monkeypatch, "self-1", self_user.id)
+        assert again.id == self_user.id
+        assert db.get(User, self_user.id).invited_by is None
+
+        ghost = login(client, db, monkeypatch, "ghost-1", 999999)
+        assert ghost.invited_by is None
+        assert db.get(User, a.id).invited_by is None
+
+    def test_已经有笔记的老用户改不了归属(self, client, db, monkeypatch):
+        inviter = mk_user(db, "inviter-3")
+        old = login(client, db, monkeypatch, "old-user", None)
+        mk_notes(db, old, 2)
+        db.expire_all()
+        login(client, db, monkeypatch, "old-user", inviter.id)
+        assert db.get(User, old.id).invited_by is None
+
+    def test_归属只认第一次_后续登录不覆盖(self, client, db, monkeypatch):
+        i1 = mk_user(db, "inviter-4a")
+        i2 = mk_user(db, "inviter-4b")
+        login(client, db, monkeypatch, "stable", i1.id)
+        login(client, db, monkeypatch, "stable", i2.id)
+        assert db.query(User).filter_by(openid="stable").first().invited_by == i1.id
+
+
+class Test热启动补报归因:
+    """已经登录着的人从分享卡片进来，只走 onShow、不走 onLaunch。
+
+    登录那条路带不上 inviter，所以他写下第一篇时服务端根本不知道有这回事；等他下次
+    冷启再报，名下已经有笔记了，attribute_inviter 又会照规矩拒掉——这笔奖励就永久丢了。
+    POST /api/user/inviter 是补那一次的口子。
+    """
+
+    def post_inviter(self, client, user, inviter_id):
+        return client.post("/api/user/inviter", headers=hdr(user), json={"inviter": inviter_id})
+
+    def test_补报成功并且如实回报已认(self, client, db, monkeypatch):
+        inviter = mk_user(db, "late-inviter")
+        late = login(client, db, monkeypatch, "late-user", None)
+        assert late.invited_by is None
+
+        resp = self.post_inviter(client, late, inviter.id)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["applied"] is True
+        db.expire_all()
+        assert db.get(User, late.id).invited_by == inviter.id
+
+    def test_补报过之后写第一篇能正常结账(self, client, db, monkeypatch):
+        """这条才是补报的意义所在：光把 invited_by 写上不算，钱要能结出来。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        inviter = mk_user(db, "late-pay-inviter")
+        late = login(client, db, monkeypatch, "late-pay-user", None)
+        assert self.post_inviter(client, late, inviter.id).json()["applied"] is True
+
+        assert create_note(client, late, "补报之后的第一篇").status_code == 200
+        db.refresh(inviter)
+        assert inviter.quota_bonus == quota.INVITE_REWARD
+
+    def test_已有归属时改不动(self, client, db, monkeypatch):
+        i1 = mk_user(db, "late-i1")
+        i2 = mk_user(db, "late-i2")
+        u = login(client, db, monkeypatch, "late-stable", i1.id)
+
+        resp = self.post_inviter(client, u, i2.id)
+        assert resp.json()["applied"] is False
+        db.expire_all()
+        assert db.get(User, u.id).invited_by == i1.id
+
+    def test_名下已有笔记的人补不回来(self, client, db, monkeypatch):
+        inviter = mk_user(db, "late-inviter-3")
+        old = login(client, db, monkeypatch, "late-old", None)
+        mk_notes(db, old, 2)
+        db.expire_all()
+
+        assert self.post_inviter(client, old, inviter.id).json()["applied"] is False
+        assert db.get(User, old.id).invited_by is None
+
+    def test_自己邀自己和不存在的邀请人都不认(self, client, db, monkeypatch):
+        u = login(client, db, monkeypatch, "late-self", None)
+        assert self.post_inviter(client, u, u.id).json()["applied"] is False
+        assert self.post_inviter(client, u, 999999).json()["applied"] is False
+        db.expire_all()
+        assert db.get(User, u.id).invited_by is None
+
+    def test_没登录不能补报(self, client, db):
+        assert client.post("/api/user/inviter", json={"inviter": 1}).status_code == 401
+
+    def test_inviter不是整数时422(self, client, db, monkeypatch):
+        u = login(client, db, monkeypatch, "late-bad-payload", None)
+        assert self.post_inviter(client, u, "abc").status_code == 422
+
+
+class Test邀请到账:
+    def test_写下第一篇才到账_且只到一次(self, client, db, monkeypatch):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        inviter = mk_user(db, "pay-inviter")
+        invitee = login(client, db, monkeypatch, "pay-invitee", inviter.id)
+        assert inviter.quota_bonus == 0
+        assert create_note(client, invitee, "第一篇").status_code == 200
+
+        db.refresh(inviter)
+        assert inviter.quota_bonus == 10
+        assert db.query(Invitation).filter(Invitation.invitee_id == invitee.id).count() == 1
+
+        # 第二篇、以及重复调用都不该再加
+        assert create_note(client, invitee, "第二篇").status_code == 200
+        note2 = db.query(Note).filter(Note.user_id == str(invitee.id)).order_by(Note.id.desc()).first()
+        assert quota.credit_first_note(note2, db, invitee) == 0
+        db.refresh(inviter)
+        assert inviter.quota_bonus == 10
+
+    def test_没被邀请的人写笔记不给任何人钱(self, client, db, monkeypatch):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        lonely = login(client, db, monkeypatch, "lonely", None)
+        assert create_note(client, lonely, "自己的第一篇").status_code == 200
+        assert db.query(Invitation).count() == 0
+
+    def test_同一篇被连结两次不报错也不重复给钱(self, db):
+        """连点两次保存时，两趟结算可能都以为"这就是他的第一篇"。
+
+        这种交错下第二次结算必须静默返回 0，而不是把 IntegrityError 顶到接口上——
+        笔记已经存下来了，回 500 等于告诉用户"没存上"。
+        """
+        inviter = mk_user(db, "twice-inviter")
+        invitee = mk_user(db, "twice-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        note = Note(user_id=str(invitee.id), title="唯一的一篇", source_type="manual")
+        db.add(note)
+        db.commit()
+
+        assert quota.credit_first_note(note, db, invitee) == quota.INVITE_REWARD
+        assert quota.credit_first_note(note, db, invitee) == 0
+        db.refresh(inviter)
+        assert inviter.quota_bonus == quota.INVITE_REWARD
+        assert db.query(Invitation).count() == 1
+
+    def test_名下已有笔记的人补不回来(self, client, db, monkeypatch):
+        """到账的触发条件是"写下第一篇"，不是"这人欠他一笔"。
+
+        归因那一步本来就要求 0 篇，所以这个状态正常走不到；写出来是把规则钉在
+        判定函数上，而不是钉在"上游应该不会漏进来"的指望上。
+        """
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        inviter = mk_user(db, "late-inviter")
+        invitee = mk_user(db, "late-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        mk_notes(db, invitee, 2)
+        last = db.query(Note).filter(Note.user_id == str(invitee.id)).order_by(Note.id.desc()).first()
+        assert quota.credit_first_note(last, db, invitee) == 0
+        db.refresh(inviter)
+        assert inviter.quota_bonus == 0
+        assert db.query(Invitation).count() == 0
+
+    def test_两篇真并发时号小的那一篇必须结得上(self, db):
+        """10-16 审计第一条。原来判的是"名下正好一条"，两笔真并发就两边都数到 2、谁都不结。
+
+        这一把不去起两个线程（交错本身不是判据要钉的东西，撞车由唯一索引兜），
+        摆的是交错之后**必然留下的那个库状态**：名下已经有两条动笔行。
+        老代码在这里两条都回 0（那条 +10 从此永久结不出来，且永不自愈），
+        现在判的是"本次这一篇是不是他动笔那几篇里 id 最小的"——先落库那条必须结上。
+        """
+        inviter = mk_user(db, "race-inviter")
+        invitee = mk_user(db, "race-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        first = Note(user_id=str(invitee.id), title="先落库的那一篇", source_type="manual")
+        second = Note(user_id=str(invitee.id), title="后落库的那一篇", source_type="manual")
+        db.add_all([first, second])
+        db.commit()
+
+        assert quota.credit_first_note(second, db, invitee) == 0
+        assert quota.credit_first_note(first, db, invitee) == quota.INVITE_REWARD
+        db.refresh(inviter)
+        assert inviter.quota_bonus == quota.INVITE_REWARD
+        assert db.query(Invitation).count() == 1
+
+    def test_名下第一条是转存时_真动笔那一篇照样结(self, db):
+        """10-16 审计第二条。`authored_count` 只把预置那一篇排出去，转存那一篇它照数，
+        所以他要是先抄了别人一篇、之后才自己写，判据读到的条数已经是 2 ⇒ 那 +10 永久漏。
+        转存不是"他动笔"，必须从这一档里排出去（排出去的是判定，不是那一条笔记）。
+        """
+        inviter = mk_user(db, "imp-inviter")
+        invitee = mk_user(db, "imp-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        db.add(Note(user_id=str(invitee.id), title="抄来的那一篇", source_type=SOURCE_SHARE_IMPORT))
+        db.commit()
+        mine = Note(user_id=str(invitee.id), title="他自己写的第一篇", source_type="manual")
+        db.add(mine)
+        db.commit()
+
+        assert quota.credit_first_note(mine, db, invitee) == quota.INVITE_REWARD
+        db.refresh(inviter)
+        assert inviter.quota_bonus == quota.INVITE_REWARD
+
+    def test_转存那一篇自己不会触发到账(self, db):
+        """排出去是"别让它占掉首篇那一格"，不是"转存也算动笔"。
+        名下只有转存行的时候，谁都不该结那 +10（否则抄一次别人就替邀请人挣满分）。
+        """
+        inviter = mk_user(db, "imp-only-inviter")
+        invitee = mk_user(db, "imp-only-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        copied = Note(user_id=str(invitee.id), title="只有这一篇，是抄的", source_type=SOURCE_SHARE_IMPORT)
+        db.add(copied)
+        db.commit()
+
+        assert quota.credit_first_note(copied, db, invitee) == 0
+        assert db.query(Invitation).count() == 0
+
+    def test_自己指向自己的台账也不结(self, db):
+        """登录那条路写不出这种状态（attribute_inviter 先拒），但结钱不该依赖上游不漏。
+
+        集成探针就是直接改库摆出这个状态时把它抓出来的。
+        """
+        u = mk_user(db, "self-credit")
+        u.invited_by = u.id
+        db.commit()
+        note = Note(user_id=str(u.id), title="自己的第一篇", source_type="manual")
+        db.add(note)
+        db.commit()
+        assert quota.credit_first_note(note, db, u) == 0
+        db.refresh(u)
+        assert u.quota_bonus == 0
+        assert db.query(Invitation).count() == 0
+
+    def test_指向不存在账号的归因不结也不报错(self, db):
+        u = mk_user(db, "ghost-credit")
+        u.invited_by = 987654
+        db.commit()
+        note = Note(user_id=str(u.id), title="第一篇", source_type="manual")
+        db.add(note)
+        db.commit()
+        assert quota.credit_first_note(note, db, u) == 0
+        assert db.query(Invitation).count() == 0
+
+    def test_带来七个人就到账七次_次数不封(self, client, db, monkeypatch):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        inviter = mk_user(db, "cap-inviter")
+        for i in range(7):
+            invitee = login(client, db, monkeypatch, f"cap-invitee-{i}", inviter.id)
+            assert create_note(client, invitee, f"第{i}篇").status_code == 200
+        db.refresh(inviter)
+        assert inviter.quota_bonus == quota.INVITE_REWARD * 7
+        assert db.query(Invitation).filter(Invitation.inviter_id == inviter.id).count() == 7
+        body = client.get("/api/user/quota", headers=hdr(inviter)).json()
+        assert body["invites_rewarded"] == 7
+        assert body["limit"] == 170
+
+    def test_同一个人再写第十篇也不重复给(self, client, db, monkeypatch):
+        """一人一次是这本账的地基：次数不封顶之后，全靠它挡"一个人刷出十笔"。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        inviter = mk_user(db, "once-inviter")
+        invitee = login(client, db, monkeypatch, "once-invitee", inviter.id)
+        for i in range(10):
+            assert create_note(client, invitee, f"第{i}篇").status_code == 200
+        db.refresh(inviter)
+        assert inviter.quota_bonus == quota.INVITE_REWARD
+        assert db.query(Invitation).count() == 1
+
+    def test_动笔那一路一人一次是数据库挡的(self, db):
+        """同一个人在动笔这条路上只能成就一次——哪怕指向两个不同的邀请人。"""
+        db.add(Invitation(inviter_id=1, invitee_id=7, reward=10))
+        db.commit()
+        db.add(Invitation(inviter_id=2, invitee_id=7, reward=10))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+    def test_链接与截图这两条路同样到账(self, db, monkeypatch):
+        """worker 那边也是"写下笔记"的一条路，必须接同一个函数。"""
+        from app.tasks import ingest_tasks
+
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        inviter = mk_user(db, "worker-inviter")
+        invitee = mk_user(db, "worker-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+
+        async def fake_ocr(images):
+            return "识别出来的文字内容"
+
+        async def fake_extract(text, fallback_title=None, translate=None):
+            return {
+                "title": "截图笔记",
+                "summary": "摘要",
+                "key_points": [],
+                "tags": [],
+                "degraded": False,
+            }
+
+        seen = {}
+
+        def fake_status(task_id, status, result=None):
+            seen[status] = result
+
+        monkeypatch.setattr(ingest_tasks, "ocr_images", fake_ocr)
+        monkeypatch.setattr(ingest_tasks, "extract_knowledge", fake_extract)
+        monkeypatch.setattr(ingest_tasks, "set_task_status", fake_status)
+        ingest_tasks.process_screenshots_task("t1", str(invitee.id), [b"img"])
+
+        assert seen.get("completed"), seen
+        db.expire_all()
+        assert db.get(User, inviter.id).quota_bonus == 10
+
+
+class Test转存加分:
+    """2026-10-01 改定：不同用户转存各 +1，同一个用户对同一篇只算一次，老用户也算。"""
+
+    def share_token(self, client, db, author):
+        note_id = create_note(client, author, "我的手机号是 13800000000").json()["id"]
+        resp = client.post("/api/shares/", json={"note_id": note_id}, headers=hdr(author))
+        assert resp.status_code == 200
+        return note_id, resp.json()["token"]
+
+    def import_as(self, client, user, token):
+        return client.post("/api/notes/from-share", json={"token": token}, headers=hdr(user))
+
+    def test_有人转存这一篇_作者到账一分(self, client, db, monkeypatch):
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        author = mk_user(db, "imp-author")
+        note_id, token = self.share_token(client, db, author)
+        friend = login(client, db, monkeypatch, "imp-friend", None)
+
+        assert self.import_as(client, friend, token).status_code == 200
+
+        db.expire_all()
+        assert db.get(User, author.id).quota_bonus == quota.IMPORT_REWARD
+        row = db.query(Invitation).filter(Invitation.invitee_id == friend.id).one()
+        assert (row.inviter_id, row.source_note_id, row.reward) == (
+            author.id, note_id, quota.IMPORT_REWARD,
+        )
+        body = client.get("/api/user/quota", headers=hdr(author)).json()
+        assert (body["mind"], body["used"]) == (101, 1)
+
+    def test_不同用户各算一次(self, client, db, monkeypatch):
+        """这一条就是"不同用户转存都加分"：三个人转，作者拿三分。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        author = mk_user(db, "many-author")
+        _, token = self.share_token(client, db, author)
+        for i in range(3):
+            friend = login(client, db, monkeypatch, f"many-friend-{i}", None)
+            assert self.import_as(client, friend, token).status_code == 200
+
+        db.expire_all()
+        assert db.get(User, author.id).quota_bonus == 3
+        assert db.query(Invitation).filter(Invitation.source_note_id.isnot(None)).count() == 3
+
+    def test_同一个人对同一篇第二次转存不再加(self, client, db, monkeypatch):
+        """"同一个用户只算一次"落在数据库上：复合唯一索引，不靠应用层记得住。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        author = mk_user(db, "dup-author")
+        _, token = self.share_token(client, db, author)
+        friend = login(client, db, monkeypatch, "dup-friend", None)
+
+        assert self.import_as(client, friend, token).status_code == 200
+        assert self.import_as(client, friend, token).status_code == 200  # 转存本身要成功
+
+        db.expire_all()
+        assert db.get(User, author.id).quota_bonus == quota.IMPORT_REWARD
+        assert db.query(Invitation).count() == 1
+
+    def test_老用户转存也算一分(self, client, db, monkeypatch):
+        """旧口径要求"他名下正好一条"，2026-10-01 起撤掉：老用户转存同样给作者加分。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        author = mk_user(db, "old-author")
+        _, token = self.share_token(client, db, author)
+        old = login(client, db, monkeypatch, "old-friend", None)
+        assert create_note(client, old, "他早就写过笔记").status_code == 200
+
+        assert self.import_as(client, old, token).status_code == 200
+
+        db.expire_all()
+        assert db.get(User, author.id).quota_bonus == quota.IMPORT_REWARD
+
+    def test_自己转存自己的笔记不给钱(self, client, db, monkeypatch):
+        """接口能直接被调，所以"作者 = 转存人"这一刀必须在服务层补上。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        author = mk_user(db, "self-author")
+        note_id, _ = self.share_token(client, db, author)
+
+        assert quota.credit_import(db, author, note_id) == 0
+        db.expire_all()
+        assert db.get(User, author.id).quota_bonus == 0
+        assert db.query(Invitation).count() == 0
+
+    def test_同一个人可以既有一笔动笔又有一笔转存(self, client, db, monkeypatch):
+        """两条新索引按 source_note_id 空不空分界，所以同一个人两本账各记各的：
+        他动笔给自己那位邀请人挣 +10，之后转存别人那篇又给那位作者挣 +1。
+        旧口径下 `invitee_id` 全局唯一，第二笔会被数据库直接挡掉。
+
+        顺序只能是先动笔后转存：转存那一下已经让他名下有了第一条，
+        之后再手写就不算"写下第一篇"了——那句"其他的照常"里没改。
+        """
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        author = mk_user(db, "ledger-author")      # 被转存的那篇的作者
+        sponsor = mk_user(db, "ledger-sponsor")    # 带他来的人
+        _, token = self.share_token(client, db, author)
+        friend = login(client, db, monkeypatch, "ledger-friend", sponsor.id)
+
+        assert create_note(client, friend, "他自己动笔的第一篇").status_code == 200
+        assert self.import_as(client, friend, token).status_code == 200
+
+        db.expire_all()
+        assert db.get(User, sponsor.id).quota_bonus == quota.INVITE_REWARD
+        assert db.get(User, author.id).quota_bonus == quota.IMPORT_REWARD
+        assert db.query(Invitation).count() == 2
+
+    def test_源笔记删掉之后那笔账还查得到(self, client, db, monkeypatch):
+        """source_note_id 故意不带外键：作者删笔记不能顺手抹掉已发生的加分凭证，
+        更不能让删笔记这件事多一种失败方式。"""
+        monkeypatch.setattr(quota, "BASE_QUOTA", 100)
+        author = mk_user(db, "gone-author")
+        note_id, token = self.share_token(client, db, author)
+        friend = login(client, db, monkeypatch, "gone-friend", None)
+        assert self.import_as(client, friend, token).status_code == 200
+
+        assert client.delete(f"/api/notes/{note_id}", headers=hdr(author)).status_code == 200
+
+        db.expire_all()
+        assert db.get(Note, note_id) is None
+        row = db.query(Invitation).filter(Invitation.invitee_id == friend.id).one()
+        assert row.source_note_id == note_id
+        assert db.get(User, author.id).quota_bonus == quota.IMPORT_REWARD
+
+    def test_去重是数据库挡的_而且两条路各管各的(self, db):
+        """部分唯一索引写错方向的两种死法都要挡住：
+        ① 转存那半边没约束 → 同一个人反复转同一篇就能刷分；
+        ② 约束把空行也一起管 → 同一个人"先替别人挣一分、后来自己动笔"就插不进去。
+        """
+        db.add(Invitation(inviter_id=1, invitee_id=11, source_note_id=77, reward=1))
+        db.commit()
+        db.add(Invitation(inviter_id=1, invitee_id=11, source_note_id=77, reward=1))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+        # 同一个人、另一篇 → 该给
+        db.add(Invitation(inviter_id=1, invitee_id=11, source_note_id=78, reward=1))
+        db.commit()
+
+        # 两笔没有源笔记的（动笔那一路）照记不误，哪怕源笔记那半边已经有同一个人的行
+        db.add(Invitation(inviter_id=2, invitee_id=11, reward=10))
+        db.commit()
+        assert db.query(Invitation).filter(Invitation.source_note_id.is_(None)).count() == 1
+
+    def test_索引真撞上来那一趟只回零不把请求弄失败(self, db):
+        """动笔那一路没有"先查一遍"，那条部分唯一索引是它唯一的闸——所以这里真撞索引。
+
+        原来这一条是拿转存那路测的，而它给的 `source_note_id=5` 在这个库里根本不存在：
+        `_credit_import` 第一句 `src is None` 就返回 0 了，索引一次都没碰过。
+        变异检查把兜底那个 except 摘掉，这条照样绿——2026-10-01 全面审查抓出来的假绿。
+        """
+        inviter = mk_user(db, "idx-inviter")
+        invitee = mk_user(db, "idx-invitee")
+        invitee.invited_by = inviter.id
+        db.commit()
+        first = Note(user_id=str(invitee.id), title="他名下的第一条", source_type="manual")
+        db.add(first)
+        db.commit()
+        # 台账里先躺着一笔"这个人已经替别人成就过"（源笔记为空），换个人也挡：
+        # 索引钉的是 invitee_id，不是 inviter_id。
+        db.add(Invitation(inviter_id=999999, invitee_id=invitee.id, source_note_id=None, reward=quota.INVITE_REWARD))
+        db.commit()
+        db.expire_all()
+
+        assert quota.credit_first_note(db.get(Note, first.id), db, db.get(User, invitee.id)) == 0
+
+        db.expire_all()
+        assert db.get(User, inviter.id).quota_bonus == 0, "撞索引那一趟不该把分加上"
+        assert db.query(Invitation).count() == 1
+
+
+class Test迁移与模型对齐:
+    def test_alembic升级后的库和模型一字不差(self, tmp_path):
+        """用例建表走 create_all，线上建表走 alembic —— 两条路对不上时，
+        测试全绿而线上在第一条写入时报 no such column。所以这里真跑一遍迁移。
+        """
+        import sqlite3
+        import subprocess
+        from pathlib import Path
+
+        from alembic.autogenerate import compare_metadata
+        from alembic.migration import MigrationContext
+        from sqlalchemy import create_engine
+
+        from app.db.database import Base as DbBase
+        import app.models  # noqa: F401  确保全部模型都注册进 metadata
+
+        db_file = tmp_path / "mig.db"
+        env = dict(os.environ, DATABASE_URL=f"sqlite:///{db_file}")
+        root = Path(__file__).resolve().parents[1]
+        subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            cwd=str(root), env=env, check=True, capture_output=True, text=True,
+        )
+        assert sqlite3.connect(db_file).execute(
+            "select count(*) from sqlite_master where name='invitations'"
+        ).fetchone()[0] == 1
+
+        engine_to_check = create_engine(f"sqlite:///{db_file}")
+        with engine_to_check.connect() as conn:
+            diffs = compare_metadata(MigrationContext.configure(conn), DbBase.metadata)
+        assert diffs == [], diffs
+
+
+def login(client, db, monkeypatch, openid, inviter):
+    """打真实登录路由，只把 code2session 换成指定 openid。返回拿到的 User。"""
+    from app.core import auth as auth_core
+
+    async def fake(code):
+        return {"openid": openid, "session_key": "k"}
+
+    monkeypatch.setattr(auth_core, "_wechat_code2session", fake)
+    body = {"code": "x"}
+    if inviter is not None:
+        body["inviter"] = inviter
+    resp = client.post("/api/auth/wechat", json=body)
+    assert resp.status_code == 200, resp.text
+    uid = resp.json()["user_id"]
+    user = db.get(User, uid)
+    db.expire_all()
+    return user
+
+
+class Test不泄漏:
+    def test_登录响应与额度响应里都没有openid(self, client, db, monkeypatch):
+        u = login(client, db, monkeypatch, "no-leak", None)
+        text = client.get("/api/user/quota", headers=hdr(u)).text
+        assert u.openid not in text
+        assert "openid" not in text
+
+
+class Test审查补的两条:
+    """2026-10-01 全面审查查出来的两条，都是"看着对、并发下错"那一类。
+
+    ① 余额原来是 `inviter.quota_bonus = 读出来 + reward` 再写回：两笔并发各自读到旧值，
+       后写的把先写的覆盖掉——台账记了 6 行而余额只加 1。唯一索引只保证台账不重复，
+       保证不了余额不丢。
+    ② 原来只兜 IntegrityError。API 与 worker 共用同一个 SQLite 文件，
+       `database is locked` 是 OperationalError，它会冒到路由上把一个已经存好的
+       笔记回成 500。
+    """
+
+    def test_两笔并发各自读到旧余额_一笔都不能丢(self, db):
+        author = mk_user(db, "lost-author")
+        first = mk_user(db, "lost-friend-1")
+        second = mk_user(db, "lost-friend-2")
+        note = Note(user_id=str(author.id), title="一篇被很多人转存的笔记", source_type="manual")
+        db.add(note)
+        db.commit()
+
+        s1, s2 = Session(engine), Session(engine)
+        try:
+            # 交错点：两个会话都在对方提交之前把作者读进自己的 identity map，
+            # 于是两边手里那份 bonus 都还是 0。
+            a1, a2 = s1.get(User, author.id), s2.get(User, author.id)
+            assert a1.quota_bonus == 0 and a2.quota_bonus == 0
+            assert quota.credit_import(s1, s1.get(User, first.id), note.id) == 1
+            assert quota.credit_import(s2, s2.get(User, second.id), note.id) == 1
+            s1.commit()
+            s2.commit()
+        finally:
+            s1.close()
+            s2.close()
+
+        db.expire_all()
+        assert db.get(User, author.id).quota_bonus == 2, "并发的那一笔被覆盖掉了（余额不能读出来加完再写回去）"
+        assert db.query(Invitation).count() == 2
+
+    def test_结算抛非唯一约束的错也不冒到接口上(self, db, monkeypatch):
+        author = mk_user(db, "boom-author")
+        friend = mk_user(db, "boom-friend")
+        note = Note(user_id=str(author.id), title="那篇", source_type="manual")
+        db.add(note)
+        db.commit()
+
+        def locked(*args, **kwargs):
+            raise OperationalError("SELECT ...", {}, Exception("database is locked"))
+
+        monkeypatch.setattr(quota, "_credit_import", locked)
+        assert quota.credit_import(db, friend, note.id) == 0
+        db.expire_all()
+        assert db.get(User, author.id).quota_bonus == 0
+        assert db.query(Invitation).count() == 0

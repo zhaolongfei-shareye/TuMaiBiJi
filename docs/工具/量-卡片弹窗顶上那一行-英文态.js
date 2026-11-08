@@ -27,7 +27,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const els = await ip.$$('.float-sheet .grip .grip-tx')
   const box = []
   for (const el of els) { const o = await el.offset(); const s = await el.size(); box.push({ l: o.left, r: o.left + s.width, w: s.width }) }
-  console.log('念的是：', JSON.stringify(d.posterTplName), '／左端那句：', JSON.stringify((d.t || {}).swipeHint))
+  console.log('念的是：', JSON.stringify(d.posterTplName), '／左端那句：', JSON.stringify((d.t || {}).browseMarket))
   console.log('三枚盒子(css px)：', JSON.stringify(box))
   await mp.screenshot({ path: '/tmp/grip-en-Magazine-Cover.png' })
   await ip.callMethod('_closeTemplate')

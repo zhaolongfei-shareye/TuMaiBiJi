@@ -1921,7 +1921,8 @@ Page({
           const ctx = canvas.getContext('2d')
           const images = {}
           if (profile.avatarPath) images.avatar = await poster.loadImage(canvas, profile.avatarPath, 4000)
-          if (sample.noteImgPath) images.note = await poster.loadImage(canvas, sample.noteImgPath, 4000)
+          const bgPath = poster.homeBg()
+          if (bgPath) images.note = await poster.loadImage(canvas, bgPath, 4000)
           canvas.width = poster.W
           canvas.height = MKT_MEASURE_H
           const plan = poster.planPoster(ctx, sample, tpl.id, profile, lang, { hasNote: !!images.note })

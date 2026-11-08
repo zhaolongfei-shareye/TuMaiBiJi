@@ -1,0 +1,452 @@
+import asyncio
+import hashlib
+import json
+import logging
+import time
+from collections import OrderedDict
+
+import httpx
+
+from app.core.config import settings
+from app.core.errors import UserError
+from app.services import service_secrets
+
+logger = logging.getLogger(__name__)
+
+# 不用 /cgi-bin/token：那个接口是"轮转"的，任何第二个进程（本地调试、另一台机器、
+# 甚至同项目的 worker）拿一次凭据去要 token，就会把前一个进程手里那份挤成
+# "invalid credential / not latest"（40001），而本进程的缓存还要抱着旧 token 到过期为止。
+# 2026-09-24 现网就被这么打断过：二维码和内容安全两条一起 502/降级。
+# 稳定版接口按凭据回同一份"当前有效"的 token，不轮转，所以多进程不再互相踢。
+WX_STABLE_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/stable_token"
+WX_QRCODE_URL = "https://api.weixin.qq.com/wxa/getwxacodeunlimit"
+WX_SEC_CHECK_URL = "https://api.weixin.qq.com/wxa/msg_sec_check"
+# 图片侧那一条。`media_check_async`（异步、要配消息推送回调才拿得到结论）今天不接，
+# 接的是这条同步的：站长 10-22 那句「能过审就行」要的是**当场给个说法**，
+# 而回调那条的结论最快也是几秒后另开一趟，图已经进桶、屏上已经画出来了。
+# 2026-10-22 现网凭据实测：这张口活着（纯色图回 `errcode 0 / ok`），并且**不要 openid**。
+# 官方口径的三条硬限制在下面那道字节闸里认（≤1MB、bmp/png/jpeg/jpg/gif、单次一张）。
+WX_IMG_SEC_URL = "https://api.weixin.qq.com/wxa/img_sec_check"
+IMG_SEC_MAX_BYTES = 1024 * 1024
+# 命中违规那一个码。87014 是这条接口**唯一**会给出的"不通过"，它没有 pass/risky 那层
+# `result.suggest`，也没有 label——所以图片侧没有"需人工复核"这一档，只有过与不过。
+IMG_RISKY_ERRCODE = 87014
+# 这三种都是"token 这一环不对"，不是我们送的内容有问题：清缓存重取一次再判。
+TOKEN_ERRORS = {40001, 42001, 40014}
+
+# 实测（2026-09-22，现网凭据）：v2 送 2,501 字和 6,000 字都正常返回，不报错。
+# 但文档口径是单次 2,500 字符，而且模型到底看了前 2,500 还是全文无从验证——
+# 分段送才不漏检，所以按 2,000 字一段切。
+SEC_CHUNK = 2000
+# 一段最多送几次：8 段 × 2,000 = 16,000 字，这就是**单个字段能被检到的上限**。
+# notes 路由的 MAX_BODY / MAX_SUMMARY 特意钉在同一个数上——手打内容一旦超过这个窗口，
+# 多出来的部分永远不会被检，把违规文本垫在一万六千字之后就是一条现成的绕过路径。
+# 抓取来的正文可以远超这个窗口（worker 直接落库），那部分只能检前 16,000 字，
+# 所以下面截断时会记一条 warning，别让"检了"和"其实只检了开头"混成一件事。
+SEC_MAX_CHUNKS = 8
+
+_access_token_cache = {"token": None, "expires_at": 0}
+
+# 小程序码是"同一个 scene 出一张一模一样的图"，每次都去微信要等于白烧那个接口的日配额，
+# 而且从我们这边的错误率完全看不出来（微信回得一切正常，钱却花掉了）。
+# 上限是刻意的：一张码实测约 55KB，100 张封顶 5.5MB，这台机器内存本来就紧。
+# 键里带 env_version，所以测试期改成 trial、发布前改回 release 时，旧图自然失效。
+_QR_CACHE_MAX = 100
+_qr_cache: "OrderedDict[tuple, bytes]" = OrderedDict()
+
+# 内容安全是**按次配额**的接口：未上架的小程序 100 次/天（实测 2026-09-23 打到过上限，
+# 回 45009），上架后才是 200 万次/天。一次保存要按字段打好几趟，而其中绝大多数是
+# "这段文本今天已经判过正常"——所以按 (openid, 文本散列) 记住 pass。
+# 只记 pass：risky/review 不进缓存，判罚偶尔不对时下一次还能纠正；unavailable 更进不得，
+# 那等于把"配额打光"固化成永久放行，第二天额度恢复了也不会再检。
+_SEC_PASS_CACHE_MAX = 4000
+_sec_pass_cache: "OrderedDict[tuple, bool]" = OrderedDict()
+
+
+def _invalidate_access_token() -> None:
+    """丢掉缓存的 token。拿到 40001 这一类"凭据不对"时必须调，否则旧值会一直抱到过期。"""
+    _access_token_cache["token"] = None
+    _access_token_cache["expires_at"] = 0
+
+
+def _token_body() -> dict:
+    # 凭据走 POST body，不进 URL：httpx 的异常文本会把整条 URL 拼进去，
+    # 而日志里只要出现过一次这种异常，AppSecret 就出去了。
+    # secret 那一句走 `service_secrets.resolve`：后台换了库里那一行就当场生效，
+    # 库里没有这一行时回的就是 `.env` 那一份（与 `core/auth.py` 的 code2session 同一把，
+    # 两处必须一起走这一个读法，否则登录用新钥匙、取 token 用旧的那把）。
+    return {
+        "grant_type": "client_credential",
+        "appid": settings.WECHAT_APP_ID,
+        "secret": service_secrets.resolve("WECHAT_APP_SECRET", settings.WECHAT_APP_SECRET),
+    }
+
+
+def _store_token(data: dict) -> str:
+    _access_token_cache["token"] = data["access_token"]
+    _access_token_cache["expires_at"] = time.time() + data.get("expires_in", 7200)
+    logger.info("微信 access_token 已刷新")
+    return data["access_token"]
+
+
+async def get_access_token() -> str:
+    """获取微信 access_token（稳定版接口），带内存缓存（提前 5 分钟刷新）。"""
+    now = time.time()
+    if _access_token_cache["token"] and _access_token_cache["expires_at"] > now + 300:
+        return _access_token_cache["token"]
+
+    # `_token_body` 里那句读密钥是同步查库（`service_secrets.resolve`）。这一口站在每一条打微信
+    # 接口的路上（内容安全、二维码…），10-25 第八轮审计 M2 把它挪出事件循环：库里那一行慢／
+    # 连接池排满时，卡的是整站的循环，不只是这一次取 token。
+    # 同步版 `_access_token_sync` 不动——那条本来就跑在线程池里（同步路由自己用）。
+    body = await asyncio.to_thread(_token_body)
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(WX_STABLE_TOKEN_URL, json=body)
+        if resp.status_code >= 400:
+            logger.error("获取 access_token 失败：HTTP %s，响应=%s", resp.status_code, resp.text[:200])
+            raise UserError("微信接口暂不可用，请稍后重试")
+        data = resp.json()
+
+    if "access_token" not in data:
+        logger.error("获取 access_token 被拒：%s", data)
+        raise UserError("微信接口暂不可用，请稍后重试")
+
+    return _store_token(data)
+
+
+def _access_token_sync() -> str:
+    """同步版取 token，和上面共用同一份缓存。
+
+    为什么再来一份而不是复用异步版：笔记写入和创建分享这几条路由是同步 def（跑在
+    threadpool 里），在里面 `asyncio.run` 一个协程去拿 token 是给自己埋雷。两边都只
+    读写同一个 dict，最坏是并发时多取一次 token，不会拿到错值。
+    """
+    now = time.time()
+    if _access_token_cache["token"] and _access_token_cache["expires_at"] > now + 300:
+        return _access_token_cache["token"]
+
+    with httpx.Client(timeout=10) as client:
+        resp = client.post(WX_STABLE_TOKEN_URL, json=_token_body())
+        if resp.status_code >= 400:
+            logger.error("获取 access_token 失败：HTTP %s，响应=%s", resp.status_code, resp.text[:200])
+            raise UserError("微信接口暂不可用，请稍后重试")
+        data = resp.json()
+
+    if "access_token" not in data:
+        logger.error("获取 access_token 被拒：%s", data)
+        raise UserError("微信接口暂不可用，请稍后重试")
+
+    return _store_token(data)
+
+
+def check_text(openid: str, content: str) -> str:
+    """送一段文本给微信内容安全，返回 pass / review / risky / unavailable。
+
+    `unavailable` 是"这次没检成"而不是"内容没问题"：调用方必须把它和 pass 区分开，
+    否则接口挂了会导致自检误报绿灯。
+    """
+    if not settings.SEC_CHECK_ENABLED:
+        # 只有测试环境会走到这里（conftest 显式置 false，为的是整套用例不出网）
+        return "unavailable"
+    if not content or not content.strip():
+        return "pass"
+
+    cache_key = (openid, hashlib.sha256(content.encode("utf-8")).hexdigest())
+    if _sec_pass_cache.get(cache_key):
+        # 同一个人同一段文本判过"正常"就不再问微信。省下来的都是真额度：
+        # 一次保存原本要按 6 个字段各打一次，而移动端保存往往把没改过的字段一起 PUT 回来。
+        _sec_pass_cache.move_to_end(cache_key)
+        return "pass"
+
+    verdict = _ask_sec_check(openid, content)["verdict"]
+    if verdict == "pass":
+        _sec_pass_cache[cache_key] = True
+        _sec_pass_cache.move_to_end(cache_key)
+        while len(_sec_pass_cache) > _SEC_PASS_CACHE_MAX:
+            _sec_pass_cache.popitem(last=False)
+    return verdict
+
+
+def probe_sec_check(openid: str, content: str) -> dict:
+    """部署自检用的那一趟：必定真打，并且把微信原样回的 errcode 一起交出来。
+
+    为什么不复用 check_text：同样是"没检成"，三种原因的处置完全不同——网络抖动不用管；
+    额度打光是今天剩下的时间内容安全等于没做，明天 00:00 自己恢复，不该拦下这次部署；
+    凭据或 openid 错则是永远不好，必须拦。自检要按这个分流，就只有拿得到 errcode 才行。
+    也不吃判定缓存：自检要的就是这一趟真的出网。
+    """
+    if not settings.SEC_CHECK_ENABLED:
+        return {"verdict": "unavailable", "errcode": "disabled"}
+    return _ask_sec_check(openid, content)
+
+
+def _ask_sec_check(openid: str, content: str) -> dict:
+    """真打一趟 msgSecCheck，回 {"verdict": ..., "errcode": ...}。"""
+    try:
+        payload = {"content": content, "version": 2, "scene": 1, "openid": openid}
+        data = None
+        for attempt in (1, 2):
+            token = _access_token_sync()
+            # 不能用 client.post(json=...)：httpx 默认 ensure_ascii=True，中文会被转义成
+            # \uXXXX，而微信这个接口**不解析转义**——实测同一段赌博引流文本，原样 UTF-8 体
+            # 判 risky(20006)，转义体判 pass。用 json= 就等于把内容安全静默关掉。
+            with httpx.Client(timeout=10) as client:
+                resp = client.post(
+                    f"{WX_SEC_CHECK_URL}?access_token={token}",
+                    content=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                )
+            data = resp.json()
+            # 40001 这一类是"这一份 token 不算数了"，不是配置错：清掉缓存再要一次，
+            # 只重试一趟，避免凭据真的错了的时候来回打。
+            if data.get("errcode") in TOKEN_ERRORS and attempt == 1:
+                _invalidate_access_token()
+                logger.warning("内容安全拿到 %s（token 已失效），清缓存重试一趟", data.get("errcode"))
+                continue
+            break
+    except Exception as exc:
+        # httpx 异常文本可能带整条含 token 的 URL，只进日志
+        logger.error("内容安全接口异常 %s: %s", type(exc).__name__, exc)
+        return {"verdict": "unavailable", "errcode": "exception"}
+
+    errcode = data.get("errcode")
+    if errcode != 0:
+        # 实测 44004=空内容（上面已挡）、40003=openid 非法、45009=限流、-1=系统繁忙。
+        # 这些都不是"内容有问题"，日志级别按会不会让机制静默失效来分。
+        if errcode in (45009, 44991):
+            # 额度打光不是"抖一下"：未上架的小程序这个接口只有 100 次/天（2026-09-23 实测
+            # 打到过上限），此后今天所有检查看作没做。必须留 ERROR，否则它和一次普通的
+            # 网络抖动在日志里长得一模一样。
+            logger.error(
+                "内容安全额度已打光（errcode=%s），此后今天的检查看作没做。"
+                "未上架小程序上限 100 次/天，上架后 200 万次/天：%s",
+                errcode, data.get("errmsg"),
+            )
+        elif errcode in (40001, 42001, 40003, 48001):
+            logger.error("内容安全接口配置异常 errcode=%s errmsg=%s", errcode, data.get("errmsg"))
+        else:
+            logger.warning("内容安全接口暂不可用 errcode=%s errmsg=%s", errcode, data.get("errmsg"))
+        return {"verdict": "unavailable", "errcode": errcode}
+
+    suggest = ((data.get("result") or {}).get("suggest") or "").lower()
+    if suggest in ("risky", "review"):
+        logger.info("内容安全判定 %s label=%s", suggest, (data.get("result") or {}).get("label"))
+        return {"verdict": suggest, "errcode": 0}
+    return {"verdict": "pass", "errcode": 0}
+
+
+def enforce_text_safety(openid: str, *parts) -> None:
+    """用户要公开或自己写的内容，送检；命中 risky/review 直接拒。
+
+    策略上两条分开：**内容确实违规 → 拒**；**接口没检成（unavailable）→ 放行并记日志**，
+    不能让微信侧抖动变成"用户存不了自己的笔记"。静默失效的风险由部署自检兜（deploy.sh
+    会拿一段已知违规的文本打一次，断言必须被拦下来）。
+    """
+    chunks = []
+    for part in parts:
+        if isinstance(part, (list, tuple)):
+            part = ' / '.join(str(x) for x in part)
+        text = str(part or '').strip()
+        if not text:
+            continue
+        window = SEC_CHUNK * SEC_MAX_CHUNKS
+        if len(text) > window:
+            # 这里不许出现 openid 原值：它是这个人在这家平台上的身份标识，而 journald 谁都能翻
+            logger.warning(
+                "内容安全只检了前 %d 字，后面 %d 字未送检（openid 长度 %d）",
+                window, len(text) - window, len(openid or ""),
+            )
+        for i in range(0, min(len(text), window), SEC_CHUNK):
+            chunks.append(text[i:i + SEC_CHUNK])
+
+    for chunk in chunks:
+        verdict = check_text(openid, chunk)
+        if verdict == 'risky':
+            raise UserError('内容包含违规信息，无法保存，请修改后再试')
+        if verdict == 'review':
+            raise UserError('内容需人工复核，请调整表述后再试')
+
+
+def _shrink_for_img_sec(data: bytes) -> bytes:
+    """把一张超过接口上限的图压回 1MB 以内，压完再送。
+
+    为什么不"超了就不检"：`img_sec_check` 收到 >1MB 回的是 `40006 invalid media size`，
+    按下面的策略那等于 `unavailable` ⇒ 放行。那样一来**图越大越安全**，是一条现成的绕过路径，
+    而审核员随手一张原图就可能过线。压一遍的成本是几百毫秒 CPU，换的是这条口子不存在。
+
+    只降质量不缩尺寸（先 82 再逐档降到 45）：判图看的是画面内容，不是像素数，
+    而缩尺寸会动到长图／截图那一族的版面。压完还过线就按原样送出去，让接口自己判
+    ——那一刻它是"没检成"，日志会写明，不假装成"检过且没问题"。
+    """
+    if len(data) <= IMG_SEC_MAX_BYTES:
+        return data
+    try:
+        import io
+
+        from PIL import Image
+
+        im = Image.open(io.BytesIO(data))
+        im = im.convert("RGB")
+        for quality in (82, 70, 58, 45):
+            buf = io.BytesIO()
+            im.save(buf, format="JPEG", quality=quality)
+            out = buf.getvalue()
+            if len(out) <= IMG_SEC_MAX_BYTES:
+                logger.info("送检前把一张 %d 字节的图压到 %d 字节（JPEG q=%d）",
+                            len(data), len(out), quality)
+                return out
+    except Exception as exc:
+        logger.warning("送检前压图没成，按原样送：%s: %s", type(exc).__name__, exc)
+    return data
+
+
+def _ask_img_sec_check(data: bytes) -> dict:
+    """真打一趟 imgSecCheck，回 {"verdict": "pass"|"risky"|"unavailable", "errcode": ...}。
+
+    这条接口没有 `result.suggest` 那一层，判定全在 errcode 上：0＝正常，87014＝命中违规。
+    所以它给不出"需人工复核"，也没有 label——图片侧只有过与不过两态。
+    """
+    try:
+        data = _shrink_for_img_sec(data)
+        body = None
+        for attempt in (1, 2):
+            token = _access_token_sync()
+            with httpx.Client(timeout=10) as client:
+                resp = client.post(
+                    f"{WX_IMG_SEC_URL}?access_token={token}",
+                    files={"media": ("media", data, "application/octet-stream")},
+                )
+            body = resp.json()
+            # 与文字那条同一句：40001 这一类是"这一份 token 不算数了"，清缓存重试一趟就够。
+            if body.get("errcode") in TOKEN_ERRORS and attempt == 1:
+                _invalidate_access_token()
+                logger.warning("图片内容安全拿到 %s（token 已失效），清缓存重试一趟", body.get("errcode"))
+                continue
+            break
+    except Exception as exc:
+        # httpx 异常文本可能带整条含 token 的 URL，只进日志
+        logger.error("图片内容安全接口异常 %s: %s", type(exc).__name__, exc)
+        return {"verdict": "unavailable", "errcode": "exception"}
+
+    errcode = body.get("errcode")
+    if errcode == IMG_RISKY_ERRCODE:
+        return {"verdict": "risky", "errcode": errcode}
+    if errcode != 0:
+        if errcode in (45009, 44991):
+            logger.error("图片内容安全额度已打光（errcode=%s），此后今天的检查看作没做：%s",
+                         errcode, body.get("errmsg"))
+        elif errcode in (40001, 42001, 48001, 40004, 40006, 41005, 44003, 45002):
+            # 40004/40006/44003 都是"这一张送得不合规格"（空／不是图片／过大或格式不对）。
+            # 它们不会自己好，必须留 ERROR——否则它长得像一次普通的网络抖动。
+            # 10-22 现网实测补进两族：41005=media data missing（空体）、45002=content size out of limit
+            # （同一份 2MB 全零字节回 45002，而 1.5MB 随机字节回 40006，两族都得认）。
+            logger.error("图片内容安全接口配置或参数异常 errcode=%s errmsg=%s",
+                         errcode, body.get("errmsg"))
+        else:
+            logger.warning("图片内容安全接口暂不可用 errcode=%s errmsg=%s",
+                           errcode, body.get("errmsg"))
+        return {"verdict": "unavailable", "errcode": errcode}
+    return {"verdict": "pass", "errcode": 0}
+
+
+def check_image(data: bytes) -> str:
+    """送一张图给微信内容安全，返回 pass / risky / unavailable。
+
+    `unavailable` 是"这次没检成"而不是"这张图没问题"——与 `check_text` 同一条纪律，
+    调用方必须把它和 pass 分开，否则自检会拿一次挂掉的接口当绿灯。
+    """
+    if not settings.SEC_CHECK_ENABLED:
+        return "unavailable"
+    if not data:
+        return "pass"
+    return _ask_img_sec_check(data)["verdict"]
+
+
+def probe_img_sec_check(data: bytes) -> dict:
+    """部署自检用的那一趟：必定真打，并把微信原样回的 errcode 交出来（同 `probe_sec_check`）。"""
+    if not settings.SEC_CHECK_ENABLED:
+        return {"verdict": "unavailable", "errcode": "disabled"}
+    return _ask_img_sec_check(data)
+
+
+def enforce_image_safety(*images) -> None:
+    """用户传进来的图，逐张送检；命中违规直接拒。
+
+    文案与文字那两句同一句式（驳回通知的原话是「仅需提示用户所发布内容含违规信息」，
+    不要求点名是哪一张）。**不另立一套策略**：`unavailable` 放行并留日志，与文字那条同一条
+    纪律——微信侧抖动不许变成"用户存不了自己的笔记"。
+    """
+    for data in images:
+        if not data:
+            continue
+        if check_image(data) == "risky":
+            raise UserError('图片包含违规信息，无法保存，请换一张再试')
+
+
+async def get_qr_code_image(scene: str, page: str = "") -> bytes:
+    """调用微信 getUnlimitedQRCode 接口，返回图片字节；同一张码只真打一次。
+
+    实测微信回的是 JPEG，调用方别按 PNG 声明硬编码。
+    scene 最长 32 字符。page 那个路径必须存在于码指向的那个版本里：不传 env_version
+    时微信按正式版（release）出码，所以在过审之前那张码扫开必然打不开——这就是
+    SHARE_QR_ENV_VERSION 存在的理由，测试期填 trial，发布前改回 release。
+
+    命中缓存时连 access_token 都不取：这个接口没有鉴权，被反复打的时候烧的是我们
+    自己的微信接口配额，而失败方从我们的日志里看不出来（微信回得一切正常）。
+    """
+    # 填错值微信回 40097 invalid args，用户只会看到一句"小程序码生成失败"，查不到原因。
+    # 所以这里宁可静默退回最安全的 release。
+    env_version = settings.SHARE_QR_ENV_VERSION
+    if env_version not in ("release", "trial", "develop"):
+        logger.warning("SHARE_QR_ENV_VERSION=%r 不是合法值，按 release 出码", env_version)
+        env_version = "release"
+
+    key = (env_version, page, scene)
+    cached = _qr_cache.get(key)
+    if cached is not None:
+        _qr_cache.move_to_end(key)
+        return cached
+
+    body = {"scene": scene, "check_path": False, "width": 280, "env_version": env_version}
+    if page:
+        body["page"] = page
+
+    for attempt in (1, 2):
+        token = await get_access_token()
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{WX_QRCODE_URL}?access_token={token}",
+                json=body,
+            )
+
+        # Check HTTP status first
+        if resp.status_code != 200:
+            raise RuntimeError(f"生成小程序码失败: HTTP {resp.status_code}")
+
+        content_type = resp.headers.get("content-type", "")
+
+        # Handle JSON error responses
+        if content_type.startswith("application/json"):
+            data = resp.json()
+            # 40001 这一类是 token 这一环失效（别的进程轮转过凭据也会造成），
+            # 清掉缓存重来一趟；配置真错了第二趟还是同样的错，就照原样抛。
+            if data.get("errcode") in TOKEN_ERRORS and attempt == 1:
+                _invalidate_access_token()
+                logger.warning("小程序码拿到 %s（token 已失效），清缓存重试一趟", data.get("errcode"))
+                continue
+            raise RuntimeError(f"生成小程序码失败: errcode={data.get('errcode')}, errmsg={data.get('errmsg')}")
+
+        # Verify we got an image
+        if "image" not in content_type and content_type:
+            raise RuntimeError(f"生成小程序码失败: 非图片响应 (content-type: {content_type})")
+
+        image = resp.content
+        _qr_cache[key] = image
+        _qr_cache.move_to_end(key)
+        while len(_qr_cache) > _QR_CACHE_MAX:
+            _qr_cache.popitem(last=False)
+        # 这一行是"有没有真的回源"唯一的外部证据：命中缓存时不打。
+        # 只记 scene 的前 6 位和字节数——URL 上挂着 access_token，整条请求日志都不能留。
+        logger.info("小程序码回源微信 env=%s scene=%s… %d 字节",
+                    env_version, scene[:6], len(image))
+        return image

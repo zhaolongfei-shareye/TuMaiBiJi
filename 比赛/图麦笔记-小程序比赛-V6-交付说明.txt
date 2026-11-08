@@ -1,0 +1,75 @@
+图麦笔记 · 小程序比赛作品集 V6
+日期：2026-10-15
+
+一、交付文件（全部在本目录，不覆盖原稿）
+1. 图麦笔记-小程序比赛-编辑设计版-V6-20261015.pdf
+   27页 A4；正文可选择；带27个章节书签。
+2. 图麦笔记-小程序比赛-编辑设计版-V6-20261015.html
+   自包含源稿，图片和字体已内嵌；可离线打开，支持翻页和打印。
+3. 图麦笔记-小程序比赛-V6-重点页预览.jpg
+   封面、录入、五档心情、模板、手账、联系页共六页总览。
+4. 图麦笔记-新版素材-20261015/
+   生成新版.py：内容及排版的可维护生成源。
+   检查导出.py：本地Chrome检查、导出和预览生成。
+   截图来源.json：界面截图对应项目相对路径。
+   最终检查.json：实际布局、图片、翻页、PDF检查结果。
+   新版-01.png 至 新版-27.png：逐页渲染图。
+
+二、编排
+01 封面
+02 需求与人群
+03 产品闭环
+04 三种录入
+05 右滑交互
+06 AI结构化与原文核对
+07 首页与预置内容
+08 搜索和分类
+09 五档心情
+10 个性形象与设置
+11 私密与公开边界
+12 笔记、配图、卡片留档
+13 十套模板总览
+14—18 十套模板逐款介绍
+19 分享与转存
+20 朋友圈、小红书、公众号应用场景
+21 纸面手账
+22 技术架构
+23 微信平台与开源贡献
+24 运营后台
+25 交互设计原则
+26 未来合作与能力边界
+27 联系方式、体验码与来源说明
+
+三、最新事实与范围
+本地 appInfo.js 版本实读为2.2.3；产品需求§8.258记载该版仅出预览码，未upload、未提审。
+发布状态沿用产品需求中既有记录：线上2.1.10、送审2.2.0。本轮未登录微信后台重新核实。
+上一轮“产品功能说明文档”含旧版布局和未经代码核对的接口、数据库说明，本次未直接照搬。
+小程序比赛稿不把iPhone端功能、付费墙、相册解码、平台自适应尺寸等构想写成现有能力。
+未改小程序代码、未改原PDF/HTML/PPTX、未发布、未提交比赛。
+
+四、素材口径与页码
+封面及第07、09页：首页五档截图来自 docs/design/10-14五档彩色玻璃/实测/，文件实际更新于10-15 17:58，模拟器截图，非手机实拍。第09页后三幅仅取底部面板局部。
+第04、05页：docs/design/10-15首屏六件/探针-entry-photo.png、探针-entry-url.png、探针-entry-write.png 的原比例局部裁切；未改图内文字和控件。
+第08页：docs/design/笔记列表-背景图/实测/实测-列表搜索展开态.png；10-15模拟器记录，保留当时英文界面，数字不代表用户规模。
+第10页：docs/design/10-15首屏六件/探针-me-设置.png；当日早间开发留影，不冒称2.2.3完整界面。
+第11页：docs/design/我的-改版-实测/01-设置-私密密码弹层.png；10-15模拟器弹层局部。
+第13—19页：用户V3 HTML内嵌十套产品Canvas实绘卡片；沿用原稿说明：10-11生成、同一条虚拟旅行笔记、无码档、已确认人像素材。
+第20—21页：用户V3 HTML内嵌场景概念图，原稿标为AI辅助生成；不是社交平台实拍。
+第24页：docs/design/后台融合-自证-20261015/壳页-现网-数据.png 的上部裁切；18:04部署后留影。数字是当时业务记录，不用作商业成效。
+第26页：用户V3 HTML内嵌三幅联名概念图；明确标为未获品牌授权、非官方、非现有模板。
+第27页：体验码原样沿用用户V3 HTML附件；本轮未重新扫码验证。
+
+五、核对源
+/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/appInfo.js
+/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/pages/create/create.js
+/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/palette.js
+/Users/zlfmac/Documents/TuMaiBiJi/miniprogram/utils/cardCloud.js
+/Users/zlfmac/Documents/TuMaiBiJi/backend/app/api/routes/notes.py
+/Users/zlfmac/Documents/TuMaiBiJi/backend/app/api/routes/cards.py
+/Users/zlfmac/Documents/TuMaiBiJi/backend/app/api/routes/ops_page.py
+/Users/zlfmac/Documents/TuMaiBiJi/backend/requirements.txt
+/Users/zlfmac/Documents/TuMaiBiJi/docs/产品需求.md（近期记录，尤其§8.258）
+
+六、实际检查范围
+本地Chrome渲染27页；检查正文与页注间距、横向溢出、图片加载；操作上下翻页、首末页边界与打印入口；导出PDF重新打开核对页数、文本、书签并查看页面渲染。
+这是文档检查，不代表重新进行小程序真机验收、安全审计或线上可用性验证。

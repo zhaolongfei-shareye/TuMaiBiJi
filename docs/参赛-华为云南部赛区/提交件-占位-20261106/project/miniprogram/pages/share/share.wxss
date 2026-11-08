@@ -1,0 +1,189 @@
+/* 固定条只有按钮那一行，预览让开它就行。
+   v31（#27 落码第 4 步，规格 §9 第 4 条）：这一屏的主面改吃层色，与详情独立页同一条改法
+   （主题类挂在 .container 上、page 给不了类名，所以覆盖也写在这里；页面样式后到、同权重下赢）。 */
+.container {
+  padding-bottom: 260rpx;
+  background: var(--bg-layer);
+}
+
+/* 预览框定高，图在框里等比缩放居中：换模板时框子不变高，下面那排小图就不跟着上下跳。
+   （试过把小图那排钉进底部固定条——画布是原生层，放进 fixed 容器里整排会错位到正文上，已回退。）
+   容器左右各有 --sp-3 的内边距，这里用负 margin 铺满屏宽，预览才和存出去的图一致。 */
+.preview-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 750rpx;
+  height: 900rpx;
+  margin-left: calc(var(--sp-3) * -1);
+}
+
+/* 画布位图 750 宽，1 位图像素 = 1rpx，所以宽高由 wxml 按算出来的行内 rpx 给就是等比。
+   存出去的图取的是画布位图，和这里显示的尺寸无关。 */
+.share-canvas {
+  background: transparent;
+}
+
+/* 码开关那一行：药丸在左，标题 + 一句备注在右。放在海报和模板小图之间，
+   读起来就是"这张图的一个选项"，不是页面级设置。 */
+.qr-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: 2rpx;
+}
+
+.pill {
+  flex: none;
+  position: relative;
+  width: 92rpx;
+  height: 52rpx;
+  border-radius: 26rpx;
+  background: var(--face);
+  transition: background 160ms ease-out;
+}
+
+.pill-on {
+  background: var(--accent);
+}
+
+.pill-dot {
+  position: absolute;
+  top: 6rpx;
+  left: 6rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.2);
+  transition: transform 160ms ease-out;
+}
+
+.pill-on .pill-dot {
+  transform: translateX(40rpx);
+}
+
+.qr-opt-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.qr-opt-label {
+  display: block;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.qr-opt-hint {
+  display: block;
+  margin-top: 4rpx;
+  font-size: var(--fs-meta);
+  line-height: var(--lh-tight);
+  color: var(--text-secondary);
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* 这一层是整屏 fixed 的加载垫，它盖住的就是这一屏的主面——主面换成层色之后它不许还留页面底，
+     否则加载那一段会先闪一支更暗的米色。 */
+  background: var(--bg-layer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.actions-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0 var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom));
+  /* 站长 10-08 一句「白内框」：这条通栏底条原来吃 `--bg-page`，层退到 L78 之后它比层还亮，
+     就是"灰底与背景之间那条白边"在这屏换了个位置（规格 §5 第 4 条）。
+     面＝白（`--inner-face`，真身 palette.INNER_FACE），与层靠一条**上投影**分开——
+     那三个数是 `.sheet` 与照片分家用的同一条，不新调一支。 */
+  background: var(--inner-face);
+  box-shadow: var(--sh-lift);
+}
+
+/* 模板一排：左右滚着挑。它坐在按钮条里、按钮上方那一行，跟着按钮条一起固定，
+   不然页面滚动起来会从小图中间穿过去。 */
+/* 这一排放在页面正常流里，不塞进底部那条 position: fixed 的条里：
+   canvas 是原生层，套在 fixed 容器里跟着页面滚动时合成会出错（实测滚到底会
+   留下一排空白格子 + 上面一层画过的残影）。 */
+.tpl-strip {
+  width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) 0;
+}
+
+.tpl-strip-inner {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--sp-2);
+}
+
+.pick {
+  flex: none;
+  width: 200rpx;
+  box-sizing: border-box;
+  padding: 8rpx;
+  border-radius: var(--r-card);
+  border: var(--w-edge) solid var(--card-edge);
+  background: var(--bg-card);
+}
+
+/* 选中态只改颜色 + 描一圈外发光似的外环，边框粗细不能变：
+   变粗会让这一格高出去 2px，整排跟着抖一下，而他要求这排是"固定样式"。 */
+.pick-on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3rpx var(--accent);
+}
+
+/* 位图 750 宽、这一格只有 176，高度由 JS 按比例算好写进 style，
+   这里给个兜底值，别让它在小图画出来之前塌成 0。
+   底色透明，理由同 profile.wxss 的 .cell-canvas：圆角画在位图里，
+   真机上原生画布不吃 CSS 圆角，留着灰底就等于在四个角外垫四块直角灰斑。 */
+.pick-canvas {
+  width: 176rpx;
+  height: 235rpx;
+  /* 不写 var(--r-chip)：真机上是 share.js 的 PICK_R 说了算（圆角画在位图里），
+     这里跟它取同一个数，模拟器才不会比真机圆一圈。 */
+  border-radius: 18rpx;
+  background: transparent;
+}
+
+.pick-label {
+  display: block;
+  margin-top: 6rpx;
+  text-align: center;
+  font-size: var(--fs-tiny);
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.actions-row {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.actions-row .btn-secondary,
+.actions-row .btn-primary {
+  flex: 1;
+  text-align: center;
+  padding: var(--sp-3) 0;
+  font-size: var(--fs-body);
+}

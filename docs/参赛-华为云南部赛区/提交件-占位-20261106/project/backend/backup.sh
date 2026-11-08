@@ -1,0 +1,200 @@
+#!/bin/bash
+# 图麦笔记 · 数据库每日备份（服务器上由 cron 调用，也可手工跑）
+#
+# 为什么要有这个：整站数据就是一个 SQLite 文件（wtsj.db，122KB 量级），此前**机器上
+# 没有任何一份副本**（crontab 为空、目录里只有源文件）。删库、误 commit、磁盘坏，
+# 用户笔记就没了——这是本项目目前唯一一个"发生即不可逆"的口子。
+#
+# 三条不省的地方：
+# ① 用 sqlite3 的 backup API，不是 cp。两种 journal_mode 都得用它：delete 模式下服务在写的时候
+#    cp 会拿到撕裂的半份文件；WAL 模式（2026-10-16 起 `app/db/database.py` 给每条连接设上了）
+#    光 cp 主文件还会**丢掉 -wal 里那一批还没合并回去的事务**——那份副本看着完整，恢复出来少最近的行。
+#    backup API 是在线备份，两种模式都把 -wal 一起带上。
+# ② 备份完先 `PRAGMA integrity_check` 再压缩——坏副本留着只会给人虚假的安全感。
+# ③ 做一次**恢复演练**：把快照还原成库、和源库比行数与内容散列。只比文件存在与否
+#    证明不了"这份能恢复"。
+#
+# 用法：./backup.sh            正常备份（cron 用这条）
+#       ./backup.sh --verify   只做恢复演练，不产生新备份
+set -uo pipefail
+
+DIR="/home/ubuntu/wtsj-backend"
+DB="$DIR/wtsj.db"
+VENV_PY="$DIR/.venv/bin/python"
+STORE="/home/ubuntu/wtsj-backups"
+KEEP_DAYS=14
+LOG="$STORE/backup.log"
+mkdir -p "$STORE"
+
+ts() { date '+%Y-%m-%d %H:%M:%S'; }
+log() { echo "$(ts) $*" | tee -a "$LOG"; }
+
+if [[ ! -f "$DB" ]]; then
+    log "!! 源库不存在：$DB"
+    exit 1
+fi
+
+# 备份 + 校验 + 演练都在 python 里做：sqlite3 CLI 在这台机器上不一定有，
+# venv 里的标准库一定有。
+VERIFY_ONLY=0
+[[ "${1:-}" == "--verify" ]] && VERIFY_ONLY=1
+
+"$VENV_PY" - "$DB" "$STORE" "$LOG" "$VERIFY_ONLY" <<'PY'
+import glob
+import gzip
+import hashlib
+import os
+import sqlite3
+import sys
+import time
+
+db_path, store, log_path, verify_only = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == '1'
+# 演练那一份落在**进程独有的路径**上（N15④）：cron 03:40 与 `deploy.sh §1.5` 撞在同一秒时，
+# 固定路径会让两边互相 `os.remove` 对面那一份，症状是"演练忽然红/忽然找不到文件"，
+# 而这两种都会被人当成"备份坏了"。文件名带 pid，撤自己的那一份，谁也碰不到谁。
+RESTORE = f'/tmp/wtsj_restore-{os.getpid()}.sqlite'
+
+
+def say(msg):
+    line = time.strftime('%Y-%m-%d %H:%M:%S') + ' ' + msg
+    print(line)
+    with open(log_path, 'a', encoding='utf-8') as f:
+        f.write(line + '\n')
+
+
+def fingerprint(path):
+    """内容散列：按 rowid 排序把整表串起来再 sha256。行数对得上但内容错位也能被抓出来。"""
+    con = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+    h = hashlib.sha256()
+    counts = {}
+    try:
+        tables = [r[0] for r in con.execute(
+            "select name from sqlite_master where type='table' and name not like 'sqlite_%' order by name")]
+        for t in tables:
+            h.update(t.encode())
+            cols = [r[1] for r in con.execute(f'pragma table_info({t})')]
+            h.update(('|'.join(cols)).encode())
+            for row in con.execute(f'select * from "{t}" order by rowid'):
+                h.update(repr(row).encode())
+            counts[t] = con.execute(f'select count(*) from "{t}"').fetchone()[0]
+        return h.hexdigest(), counts
+    finally:
+        con.close()
+
+
+def gunzip(src, dst):
+    # 落盘就以 0600 **创建**，不是先 644 再补 chmod：dst 是 `/tmp` 上那份可读的明文全库，
+    # 同机任何进程在"创建出来"到"chmod"之间那几毫秒里就能把它打开（这台机器上还跑着别的项目）。
+    fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'wb') as o, gzip.open(src, 'rb') as f:
+        o.write(f.read())
+
+
+if sqlite3.connect(db_path).execute('pragma integrity_check').fetchone()[0] != 'ok':
+    say('!! 源库 integrity_check 不是 ok，先查源库再谈备份')
+    raise SystemExit(1)
+
+# M27：RESTORE 那一份是**生产库的完整明文副本**，而它落在共享的 /tmp 上。
+# 原来唯一那句 os.remove 关在 `if not verify_only:` 分支里，两条 raise SystemExit
+# （还原库完整性不过、内容散列不一致）都在它前面 ⇒ "只做演练"或"演练红"这两种情况下，
+# 那份库会永久留在 /tmp（deploy.sh §1.5 每趟都跑它，红的次数只多不少）。
+# 所以整段包 try/finally：**无论绿、无论红、无论中途抛什么，一律删**。
+try:
+    if verify_only:
+        cands = sorted(glob.glob(f'{store}/wtsj-*.sqlite.gz'))
+        if not cands:
+            say('!! 演练模式：一份备份都没有')
+            raise SystemExit(1)
+        gunzip(cands[-1], RESTORE)
+        say(f'演练：还原最近一份备份 {os.path.basename(cands[-1])}')
+    else:
+        stamp = time.strftime('%Y%m%d-%H%M%S')
+        out = f'{store}/wtsj-{stamp}.sqlite.gz'
+        tmp = f'{store}/.staging-{stamp}.sqlite'
+        src = sqlite3.connect(db_path)
+        dst = sqlite3.connect(tmp)
+        with dst:
+            src.backup(dst)              # 在线安全备份，不是 cp
+        src.close()
+        dst.close()
+        if sqlite3.connect(tmp).execute('pragma integrity_check').fetchone()[0] != 'ok':
+            os.remove(tmp)
+            say('!! 快照 integrity_check 不通过，本次备份作废')
+            raise SystemExit(1)
+        with open(tmp, 'rb') as f_in, gzip.open(out, 'wb', compresslevel=6) as f_out:
+            f_out.write(f_in.read())
+        os.remove(tmp)
+        gunzip(out, RESTORE)
+        say(f'备份完成 {os.path.basename(out)}（{os.path.getsize(out)} 字节）')
+
+    if sqlite3.connect(RESTORE).execute('pragma integrity_check').fetchone()[0] != 'ok':
+        say('!! 还原出来的库 integrity_check 不通过，这份备份不可用')
+        raise SystemExit(1)
+    src_fp, src_counts = fingerprint(db_path)
+    res_fp, res_counts = fingerprint(RESTORE)
+    if src_fp != res_fp:
+        say(f'!! 恢复演练不一致：源 {src_counts} / 备份 {res_counts}')
+        raise SystemExit(1)
+    say(f'✓ 恢复演练通过：还原库与源库内容散列一致，{sum(src_counts.values())} 行'
+        f'（notes={src_counts.get("notes", 0)} users={src_counts.get("users", 0)} shares={src_counts.get("shares", 0)}）')
+
+    if not verify_only:
+        for path in sorted(glob.glob(f'{store}/wtsj-*.sqlite.gz'))[:-14]:
+            os.remove(path)
+            say(f'保留 14 份：删除 {os.path.basename(path)}')
+        kept = glob.glob(f'{store}/wtsj-*.sqlite.gz')
+        free_gb = os.statvfs(store).f_bavail * os.statvfs(store).f_frsize // 2**30
+        say(f'当前 {len(kept)} 份备份，备份目录所在盘剩余约 {free_gb} GB')
+finally:
+    try:
+        os.remove(RESTORE)
+    except FileNotFoundError:
+        # 演练在 gunzip 之前就没走到（没备份可演练）时本来就什么都没生成——
+        # 这一支不许把退出码换成一句 traceback，否则日志里"没备份可演"变成"备份脚本崩了"。
+        pass
+PY
+RC=$?
+[[ $RC -eq 0 ]] || log "!! 备份流程退出码 $RC"
+
+# ---- 运营图那一个目录（方案 docs/方案-cn后台资产管理.md 配套第 1 条）----
+# 库里的 `mp_assets` 记的是"盘上有一个文件"，而这两个东西分开备份就会分开丢：
+# 库恢复了、文件没了，症状是后台显示"已发布"而小程序画不出来（发图口 404，客户端静默落回包里那张）。
+# 所以同一个 cron 里一起走，且保留份数与上面那条对齐（14 份）。
+# 这一段的判据同样是"验内容不是验存在"：tar 完立刻 `tar tzf` 数一遍条目，条数对不上就报红。
+ASSETS="$DIR/var/mp-assets"
+if [[ -d "$ASSETS" ]] && [[ -n "$(ls -A "$ASSETS" 2>/dev/null)" ]]; then
+    stamp=$(date '+%Y%m%d-%H%M%S')
+    out="$STORE/mp-assets-$stamp.tar.gz"
+    tmp="$STORE/.staging-mp-assets-$stamp.tar.gz"
+    if tar czf "$tmp" -C "$DIR/var" mp-assets && tar tzf "$tmp" >/dev/null 2>&1; then
+        n_src=$(find "$ASSETS" -type f | wc -l | tr -d ' ')
+        n_arc=$(tar tzf "$tmp" | grep -vc '/$')
+        mv "$tmp" "$out"
+        if [[ "$n_src" == "$n_arc" ]]; then
+            log "运营图备份完成 $(basename "$out")（$n_arc/$n_src 个文件，$(stat -c%s "$out" 2>/dev/null || echo ?) 字节）"
+        else
+            log "!! 运营图备份条目数对不上：盘上 $n_src，归档里 $n_arc"
+            RC=1
+        fi
+    else
+        rm -f "$tmp"
+        log "!! 运营图打包失败，本次没产出归档"
+        RC=1
+    fi
+    for path in $(ls -1dt "$STORE"/mp-assets-*.tar.gz 2>/dev/null | tail -n +15); do
+        rm -f "$path"
+        log "运营图保留 14 份：删除 $(basename "$path")"
+    done
+else
+    # 原来这一支什么都没有（N15①）：目录不存在或为空就整段跳过、`RC` 不动、脚本退 0，
+    # 而 `deploy.sh:61` 正是拿这个退出码当重启闸门 ⇒ "运营图一个字都没备"与"备好了"是同一种静音。
+    # 这里只出声、不报红：新装的机器上 `var/mp-assets` 本来就可以还没有（后台还没发过图），
+    # 为它拦住部署是误伤；但它必须在这一份日志里留下痕迹，别让人以为它一直在备。
+    if [[ ! -d "$ASSETS" ]]; then
+        log "运营图那一个目录不存在（$ASSETS），这一份归档里不包含它"
+    else
+        log "运营图那一个目录是空的，这一份归档里不包含它"
+    fi
+fi
+
+exit $RC

@@ -23,6 +23,11 @@ const ck = (name, ok, got) => {
 }
 
 const CREATE = strip(read('miniprogram/pages/create/create.js'))
+const WRITE = strip(read('miniprogram/pages/write/write.js'))
+// 11-08 起前端那一份搬进 `utils/api.js`（前后端那道边界）：编辑页补传配图那一条也要它，
+// 两页各写一份 9 的话，改了服务端那一份就会出现"选得上来的服务端收不下"——症状是静默少图，
+// 界面不报错、接口也不报错。这一把尺子的"前端这一侧"因此改从那一处读数。
+const API_JS = strip(read('miniprogram/utils/api.js'))
 const MODEL = read('backend/app/models/asset.py')
 const ASSETS_ROUTE = read('backend/app/api/routes/assets.py')
 const SHARES_ROUTE = read('backend/app/api/routes/shares.py')
@@ -31,14 +36,19 @@ const DETAIL = strip(read('miniprogram/pages/detail/detail.js'))
 const VIEW = strip(read('miniprogram/pages/share/view.js'))
 
 // ① 前端这一侧
-const feConst = /const MAX_SHOTS = (\d+)/.exec(CREATE)
+const feConst = /const MAX_SHOTS = (\d+)/.exec(API_JS)
 ck('前端选图上限是一个具名常量（不再是散在各处的字面量）', !!feConst, feConst ? feConst[1] : '没找到 MAX_SHOTS')
 // 这一条原来写成"全文不许有裸 9"，红了七次——那七处全在 LINK_RE 的 `[a-z0-9]` 里，
 // 与张数无关。判据要钉的是"张数那三种写法"，不是字符本身。
-const SHOT_LITERAL = CREATE.match(/count:\s*9\b|slice\(\s*0\s*,\s*9\s*\)|previewImages[\s\S]{0,30}\b9\b|length\s*[><=]+\s*9\b/g) || []
+// 11-08 起这一侧**有两页**吃它（录入页选图、编辑页补传），两页都要扫。
+const SHOT_LITERAL = `${CREATE}\n${WRITE}`.match(/count:\s*9\b|slice\(\s*0\s*,\s*9\s*\)|previewImages[\s\S]{0,30}\b9\b|length\s*[><=]+\s*9\b/g) || []
 ck('这一侧只写一次（选图 count / 合并 slice / 张数比较里都不许再有裸 9）',
   feConst && SHOT_LITERAL.length === 0, SHOT_LITERAL.join(' | '))
-// 10-08 起这一侧的写法换了：满了先挡在门口（不开选择器 + 一句吐司），
+// 11-08 新增：两页必须吃**同一枚**常量。谁自己再写一份 9，谁就成第二个出处。
+ck('录入页与编辑页吃的是同一枚常量（两页各写一份 9 正是这把尺子要防的漂）',
+  /const MAX_SHOTS = api\.MAX_SHOTS/.test(CREATE) && /api\.MAX_SHOTS/.test(WRITE),
+  `录入页 ${/const MAX_SHOTS = api\.MAX_SHOTS/.test(CREATE) ? '吃常量' : '没吃'}／编辑页 ${/api\.MAX_SHOTS/.test(WRITE) ? '吃常量' : '没吃'}`)
+// 10-08 起录入页的写法换了：满了先挡在门口（不开选择器 + 一句吐司），
 // 没满时把"还能选几张"交给系统（count = 剩余位），合并那一处不再自己截一刀。
 // 原来那把尺子钉的是 `count: MAX_SHOTS` + `.slice(0, MAX_SHOTS)` 两处都用常量；
 // 现在钉的是"count 从常量推出来"且"截那一刀整个没了"——静默截断就是这一轮要修的病症。
@@ -47,6 +57,11 @@ ck('满了挡在门口：不开选择器，先给一句吐司',
   && /if \(left <= 0\)/.test(CREATE) && /t\('maxShots', lang\)/.test(CREATE))
 ck('选图 count 给的是剩余位（不再是整个上限），且合并处不再截一刀',
   /count: left,/.test(CREATE) && !/\.slice\(0, MAX_SHOTS\)/.test(CREATE))
+// 11-08：编辑页补传那一条也守同一条纪律——能选几张＝还剩几格，满了先给话。
+ck('编辑页补传：能选几张＝还剩几格，满了先给一句吐司',
+  /const left = maxShots - shots\.length/.test(WRITE)
+  && /if \(left <= 0\)/.test(WRITE) && /count: left,/.test(WRITE)
+  && /t\('maxShots', lang\)/.test(WRITE))
 
 // ② 跨端同值
 const beConst = /MAX_ASSETS_PER_NOTE = (\d+)/.exec(MODEL)

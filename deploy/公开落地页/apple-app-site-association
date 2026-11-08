@@ -1,0 +1,22 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "5ZSNGJ742P.com.agentsbin.TumarkNote"
+        ],
+        "components": [
+          {
+            "/": "/n/*/report",
+            "exclude": true,
+            "comment": "举报那张表单留在浏览器里。它是一张要匿名提交的 HTML 表单，抢进 App 就等于把举报入口藏起来——Apple 1.2 要的是任何人都能举报。"
+          },
+          {
+            "/": "/n/*",
+            "comment": "笔记公开页。装了 App 的系统相机扫这张码直接进只读页；没装的走服务器渲染的那份 HTML。"
+          }
+        ]
+      }
+    ]
+  }
+}

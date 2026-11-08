@@ -1,0 +1,176 @@
+/* 私密解锁那一层的皮，三页共用一份（templates/pwd-sheet.wxml 那一张模板吃它）。 */
+@import '../../styles/pwd-sheet.wxss';
+
+.form-section {
+  margin-top: var(--sp-5);
+  padding: var(--sp-4);
+}
+
+.form-group {
+  margin-bottom: var(--sp-5);
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+/* 标签做成眉标：小字 + 收字距，让输入框自己当主角 */
+.label {
+  display: block;
+  font-size: var(--fs-label);
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: var(--text-tertiary);
+  margin-bottom: var(--sp-2);
+}
+
+.input,
+.picker-value {
+  background: var(--chip-idle);
+  border-radius: var(--r-btn);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+}
+
+/* ⚠ `width: 100%` 与 `box-sizing: border-box` 只许挂在 `.textarea` 上，不许并回上面那一条：
+   10-18 我并在一起挂过一次，站长真机当场打回——`<input>` 自己带一个原生高度，换成 border-box
+   之后左右内边距把那点高度吃干净，标题与标签那两格的字被横切一半（模拟器同一趟量到那两格从 46 掉到 24，
+   数就在回体里，我没看出来）。
+   只有 `<textarea>` 需要这一对：CSS 不给宽时它退回原生**固定 300px**，而 300px 不随屏宽缩（rpx 才随），
+   卡片内容区是 rpx 的 ⇒ 屏一窄就溢出、压在卡片右沿被裁，字跑到边上像被切——就是"页面错位"那一条。
+   真机量到摘要／要点两格 992px、旁边三格 901px；模拟器 390 宽上两者只差 1.3pt，所以这一刀在模拟器量不出来。
+   `width: 100%` 必须配 `box-sizing: border-box`，只写前者会让内边距加在 100% 之外、更宽。 */
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--chip-idle);
+  border-radius: var(--r-btn);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+  /* 198 不是新数：改前那 150 是 content-box 的高，画出来是 150＋上下内边距各 24 ＝ 198。
+     换成 border-box 之后这个数必须跟着抬，否则那两格最短高度会悄悄矮 48rpx。 */
+  min-height: 198rpx;
+}
+
+/* 「原文」那一格不给 auto-height，定高让它自己滚：库里那一栏上限 50000 字，
+   跟着字数长高的话这一屏会拉成一条没有头的长卷。 */
+.textarea-orig {
+  height: 300rpx;
+  min-height: 0;
+}
+
+.char-count {
+  display: block;
+  text-align: right;
+  /* 「137/500」是数字加斜杠，跟着全局那一档走；字号仍吃 --fs-tiny，一位没动 */
+  font-family: 'WtsjMind', 'Poppins', sans-serif;
+  font-size: var(--fs-tiny);
+  font-weight: 100;
+  color: var(--text-secondary);
+  margin-top: var(--sp-1);
+}
+
+.actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+}
+
+.actions .btn-secondary,
+.actions .btn-primary {
+  flex: 1;
+  text-align: center;
+  padding: var(--sp-3) 0;
+  font-size: var(--fs-body);
+}
+
+.tag-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.tag-chip {
+  padding: 12rpx 22rpx;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+}
+
+/* 第一位就是列表方块上那个字，所以它用主按钮那对配色单独标出来
+   （--accent 底 + --bg-page 字，深浅两套壁纸都读得清；--bg-card 在深色下是半透明白，不能用） */
+.tag-chip.first {
+  background: var(--accent);
+  color: var(--bg-page);
+}
+
+.tag-order-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+/* 配图那一排（10-18 站长「编辑时，图片要展示，然后支持删除图片」）。
+   方格定宽**又**定高 + aspectFill：只定宽时 flex 会压高不压宽，那张图就被夹扁（详情页同一排那张
+   注释记的就是这一条）。类名带页面前缀 wr-。 */
+.wr-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.wr-shot {
+  position: relative;
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: var(--r-block);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.16);
+}
+
+.wr-shot-img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--r-block);
+  background: var(--accent-soft);  /* 图还没落下来时那一格不是白的 */
+}
+
+/* ✕ 浮在照片上、不浮在面板那套面上，所以不走 --cp-*：暗纱底 + #fff 字，与录入页 .th-x 同一支
+   （照片是亮的，墨字压上去读不出来）。 */
+.wr-shot-x {
+  position: absolute;
+  right: 10rpx;
+  top: 10rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: rgba(20, 20, 28, 0.55);
+  color: #fff;
+  font-size: var(--fs-micro);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 拖动中的那一枚浮起来（10-19「配图要支持拖动排序」）。只给"哪一枚在你手上"这一个读数，
+   不给位移：换位置靠的是列表调序后它自己落到那一格，跟着手指飞会露出"两套位置"。
+   ⚠ 这一枚不许加 `transition: transform`——换序那一瞬它正被挪到新位置，带缓动的缩放会把
+   那一帧拉成一段漂移，看着像没换成功（分类那一排同一条）。 */
+.wr-shot.wr-drag {
+  transform: scale(1.06);
+  z-index: 3;
+  box-shadow: 0 10rpx 26rpx rgba(18, 20, 26, 0.30);
+}
+
+.container {
+  padding-bottom: 60rpx;
+}

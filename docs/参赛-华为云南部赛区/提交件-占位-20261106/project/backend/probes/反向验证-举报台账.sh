@@ -1,0 +1,365 @@
+#!/bin/bash
+# 反向验证（举报台账读取侧，#181／站长 2026-10-10 那句"把没做的全部做完"里剩下的那半）：
+# 逐条把 `services/report_ledger.py` 与 `probes/读-举报台账.py` 的实现改坏，确认对应的判据真的会红。
+# 全程 cp 备份 + cp 还原，**不碰 git**（`git checkout --` 在这套链里出过事，见记忆里那一条）。
+#
+# A～L 打在台账归组那一段（去重、NULL 那一档、台账边界、状态四档、排序两档、理由分布、
+# 原话封顶与取尾、归组键、数据侧不许清洗），M、N、O、U、V 打在探针的展示卫生那一个函数上，
+# P～T 是 10-10 那轮双支审计补的牙（跨篇去重、瞬间而不是墙上时间、naive 与 aware 混排、
+# 字段集合、hidden 进了计算），W 是同一晚自审第三轮补的（台账那发 select 里不许混 ORM 实体）。
+# AB～AR 打在保留期那一批与状态／默认值那两条前提（RR＝services/report_retention.py，
+# PC＝probes/清-过期举报.py，SM＝app/models/share_report.py）：
+# AB～AF 是 #186 乙 落地那批的五把，AG～AI 是第五轮审计回执补的三把（守恒那一档自己数／
+# dry-run 那个分支单独改坏／删除计数对不上时不许提交），AJ～AN 是第六轮补的五把（复跑那份的
+# 自洽闸／删之前那道闸／独立 COUNT 那一面／无时间戳变少／本次名单里还剩），AO、AP 把原来写
+# "钉不红"的两条立成真刀，AQ、AR 是第七轮补的两把（复跑那份不与本次名单取交集／屏幕上那句
+# "到期"写死成 0）。
+# 名单里第一版写过"M～W 全在探针那一支"——数错了，W 动的是台账。
+#
+# ⚠ 这个脚本自己的说明文字里不许出现反引号：`run` 用 `eval` 跑，那会被当成命令替换。
+#
+# 判据口径与前几批一致（阶段2-2／2-2b／2-3），但这一支比那几支多四道闸——三条是审计撞出来的，
+# 一条是站长这条链自己定过的：
+# ① 每条突变先 `--collect-only` 数这根针覆盖几条用例（`pytest -k` 空匹配退出码是 5，
+#    少了这一步脚本会自己造★假绿★）；
+# ② 比 md5 证明改动真落盘，并把 diff 头两行贴进回执（证明落的是意图那一行，不是别的行）；
+# ③ **改坏之后必须还编译得过**——语法崩掉的红是"整条针全红"，读起来极像"这一刀有牙"
+#    （这一条是 10-10 那支审计自己在它的沙箱里撞上来的，它撞到的那一发在我这一支同样会中）；
+# ④ **红还得红在该扎的那条判据上**——collection error、夹具报错（`no such table`）都是非零退出，
+#    光看退出码会把"环境坏了"记成"刀有牙"。所以判红之后再 grep 一遍 FAILED 的行名。
+# ⑤ 这一支用 `perl -pi` **直接改仓库里的真源文件**，中途被打断就会把坏文件留在工作树里，
+#    而这个工作树**还有另一路会话在同时提交**。所以：`mkdir` 抢一把锁（并发直接不跑），
+#    外加 `trap`：EXIT／INT／TERM 都还原。上一轮就有一位审计员因为我这边正在突变而读到坏文件。
+#
+# 最后一档 probe_gate 不属于 pytest：它验的是**探针自己那道覆盖闸门**有没有牙——台账如果悄悄
+# 漏掉一类行（C 那一刀的形状），脚本必须 exit 1，而不是打出一本少了一页的台账。现网那张表
+# 最后一次读数是 0 行（§8.185，10-09 23:45），空库跑一万次也读不到这一发，所以用一次性库造。
+#
+# **这一段 10-10 深夜被自己更正过一次**（第六轮审计）。它原来写的是"两条没做的突变，写在这里而不是
+# 假装做过"，其中两条现在都有刀了，所以那两句"没有任何一个字符能把它弄红"是**假的**：
+# ① test_显式写_created_at_为_None_会被_server_default_填上 → 刀 AP（把 app/models/share_report.py
+#    里那个 server_default=func.now() 摘掉，那一发当场红）。它钉的不是 SQLAlchemy 的天性，
+#    是**我们自己写了那一行**——所以本来就可钉。
+# ② 状态四档里"已撤回"那一支 → 刀 AO（elif not active: 改成 elif False:，test_四档各读对各 报
+#    「公开中 ≠ 已撤回」）。原来那句"成本与 D 刀重复"也没量过：D 撤的是**已过期**那一档
+#    （`elif is_expired_at(expires_at):`），AO 撤的是**已撤回**那一档，两把各撤一档、互不相交。
+#    （这一句第七轮才写对——第六轮回执里我把它说成"D 撤的是整条链的后两档"，同样是没量就写。）
+# 现在**真正钉不红**的只剩一条：test_走ORM写入的这一列读回来是_naive_且丢偏移不换算 钉的是
+# SQLAlchemy 的 SQLite 方言（aware → naive 丢偏移不换算），本仓没有一个字符能改它——那条是**前提**，
+# 不是尺子，留着当"为什么要 _instant()"的证据。
+cd /Users/zlfmac/Documents/TuMaiBiJi/backend || exit 1
+LR=app/services/report_ledger.py
+PB=probes/读-举报台账.py
+RR=app/services/report_retention.py
+PC=probes/清-过期举报.py
+SM=app/models/share_report.py
+GATE_DB=/tmp/ledger-gate.db
+# 锁、trap 还原、四道闸都在 probes/反向验证-lib.sh 里（10-10 深夜六支链共用一份，
+# 这一支原本是那份实现的出处；本地副本删掉，别再留第二份）。
+source probes/反向验证-lib.sh
+rv_init 举报台账
+
+
+# ── 台账归组那一段 ────────────────────────────────────────────────
+rv_run A "去重整个撤掉（人·天档退回点击次数，台账按它排的那一档就废了）" \
+  "同一个人一天里刷三次折成一档但条数照给" \
+  "perl -pi -e 's/^            reporter_days=len\\(named\\) \\+ unknown,/            reporter_days=len(items),  # rv/' $LR" "$LR"
+
+rv_run B "NULL 折成同一个未知的人（少报，正是最坏那种错）" \
+  "bucket为空时每行各算一个人" \
+  "perl -pi -e 's/^        unknown = sum\\(1 for r in items if r\\[2\\] is None\\)/        unknown = min(1, sum(1 for r in items if r[2] is None))  # rv/' $LR" "$LR"
+
+rv_run C "把台账的边界收成\"现在还开着的那一类\"（撤掉的与从来不存在的整批消失）" \
+  "撤掉的码不许从台账上消失 or 四档各读对各" \
+  "perl -pi -e 's/^    for token, items in grouped\\.items\\(\\):/    for token, items in ((t, i) for t, i in grouped.items() if i[0][5]):  # rv/' $LR" "$LR"
+
+rv_run D "状态那一档不再问现成那个出处（早打不开的页被台账说成公开中）" \
+  "四档各读对各" \
+  "perl -pi -e 's/^        elif is_expired_at\\(expires_at\\):/        elif False:  # rv/' $LR" "$LR"
+
+rv_run E "主排序反过来（最没人在意的那篇排进第一屏）" \
+  "人多的那篇排在前面" \
+  "perl -pi -e 's/^    out\\.sort\\(key=lambda g: g\\.reporter_days, reverse=True\\)/    out.sort(key=lambda g: g.reporter_days)  # rv/' $LR" "$LR"
+
+rv_run F "空值那一支兜底撤掉（有一行 created_at 是 NULL 就整本台账 AttributeError）" \
+  "最近时间读空的那一组不许崩也不许占前排" \
+  "perl -0pi -e 's/    if value is None:\\n        return \"\"\\n//' $LR" "$LR"
+
+rv_run G "理由分布不累加（每篇每个理由都只算一件，排优先级没了依据）" \
+  "理由分布按那一列计数" \
+  "perl -pi -e 's/^            reasons\\[r\\[1\\]\\] = reasons\\.get\\(r\\[1\\], 0\\) \\+ 1/            reasons.setdefault(r[1], 1)  # rv/' $LR" "$LR"
+
+rv_run H "原话封顶撤掉（台账一行放不下长篇，等于把整张表打印一遍）" \
+  "封顶取的是写入顺序里最后那几条" \
+  "perl -pi -e 's/^            samples=tuple\\(noted\\[-SAMPLE_LIMIT:\\]\\),/            samples=tuple(noted),  # rv/' $LR" "$LR"
+
+rv_run I "原话取头不取尾（一个人反复举报时，读到的是最初那几句）" \
+  "封顶取的是写入顺序里最后那几条" \
+  "perl -pi -e 's/noted\\[-SAMPLE_LIMIT:\\]/noted[:SAMPLE_LIMIT]/' $LR" "$LR"
+
+rv_run J "空白原话也收进来（表单那栏写着「可以不填」，印出来却像有人写了话）" \
+  "没写补充说明的那些不进原话" \
+  "perl -pi -e 's/^        noted = \\[r\\[4\\]\\.strip\\(\\) for r in items if r\\[4\\] and r\\[4\\]\\.strip\\(\\)\\]/        noted = [r[4] for r in items if r[4] is not None]  # rv/' $LR" "$LR"
+
+rv_run K "归组的键切成前缀（不同篇的举报互相并档，人数与原话都串）" \
+  "原话按篇归组不许串到别篇上" \
+  "perl -pi -e 's/^        grouped\\.setdefault\\(row\\[0\\], \\[\\]\\)\\.append\\(row\\)/        grouped.setdefault(row[0][:4], []).append(row)  # rv/' $LR" "$LR"
+
+rv_run L "台账里也做一次清洗（换行被抹成空格，交出去的就不是举报人写的那句话）" \
+  "台账交出去的是原样文本_清洗在脚本那一层" \
+  "perl -pi -e 's/^        noted = \\[r\\[4\\]\\.strip\\(\\) for r in items if r\\[4\\] and r\\[4\\]\\.strip\\(\\)\\]/        noted = [r[4].strip().replace(chr(10), \" \") for r in items if r[4] and r[4].strip()]  # rv/' $LR" "$LR"
+
+# ── 10-10 双支审计补的五把刀（P～T）───────────────────────────────
+rv_run P "把去重集合整块提到循环外面（跨篇全局折一次——原版那条判据对这种写法没有牙）" \
+  "去重的作用域是一篇而不是全站" \
+  "perl -pi -e 's/named = \\{r\\[2\\] for r in items if/named = {r[2] for r in rows if/' $LR && perl -pi -e 's/unknown = sum\\(1 for r in items if/unknown = sum(1 for r in rows if/' $LR" "$LR"
+
+rv_run Q "aware 不再换算成 UTC（比的是那串墙上字面，不是那个瞬间）" \
+  "比的是那个瞬间而不是那串墙上时间" \
+  "perl -pi -e 's/^        value = value\\.astimezone\\(timezone\\.utc\\)\\.replace\\(tzinfo=None\\)/        value = value.replace(tzinfo=None)  # rv/' $LR" "$LR"
+
+rv_run R "取最近那一次退回裸日期比较（naive 与 aware 混在一组里当场 TypeError）" \
+  "同一篇上混着_naive_与带偏移的行不许崩" \
+  "perl -pi -e 's/latest_at=max\\(\\(r\\[3\\] for r in items\\), key=_instant\\),/latest_at=max(r[3] for r in items if r[3] is not None) if any(r[3] for r in items) else None,/' $LR" "$LR"
+
+rv_run S "往台账的格子里再加一格（模块口径写着不读 hidden，却没有尺子守着字段集合）" \
+  "台账交出的字段就是那七格" \
+  "perl -0pi -e 's/    samples: tuple\\[str, \\.\\.\\.\\] = \\(\\)\\n/    samples: tuple[str, ...] = ()\\n    hidden: bool = False  # rv\\n/' $LR" "$LR"
+
+rv_run T "把 hidden 真读进来并参与人数（那条死列一旦被接线，台账的所有数字都会跟着动）" \
+  "置真了也不许改动台账的任何数字" \
+  "perl -pi -e 's/Share\\.is_active, Share\\.expires_at,/Share.is_active, Share.expires_at, ShareReport.hidden,/' $LR && perl -pi -e 's/^            reporter_days=len\\(named\\) \\+ unknown,/            reporter_days=len(named) + unknown + sum(1 for r in items if r[7]),  # rv/' $LR" "$LR"
+
+# ── 本批自审补的一把（W）：注释说"只取标量"，纸面话要有牙 ──────────
+rv_run W "把 Share 实体混进那一发 select 的列里（注释写着不许，实测整行相等就折行）" \
+  "同一个人一天里刷三次折成一档但条数照给" \
+  "perl -pi -e 's/Share\\.is_active, Share\\.expires_at,/Share.is_active, Share.expires_at, Share,/' $LR" "$LR"
+
+# ── 探针里那一个展示函数 ──────────────────────────────────────────
+rv_run M "控制字符那一道闸门撤掉（NUL 与 ESC 原样吐进终端）" \
+  "其余控制字符换成可见码而不是原样吐出" \
+  "perl -pi -e 's/^        elif 0x20 <= ord\\(ch\\) and ord\\(ch\\) != 0x7F:/        elif True:  # rv/' $PB" "$PB"
+
+rv_run N "可见映射撤掉（换行被打成 ␀0a，读的人看不出那一格本来是换行）" \
+  "换行不许原样进终端" \
+  "perl -pi -e 's/^        mapped = _CTRL\\.get\\(ch\\)$/        mapped = None  # rv/' $PB" "$PB"
+
+rv_run O "整句改走 repr（真实理由是它给句子加引号、把换行打成两个字符——不是中文会被转义）" \
+  "中文原话不许被转义成读不懂的样子" \
+  "perl -pi -e 's/^    rendered = \"\"\\.join\\(out\\)$/    rendered = repr(\"\".join(out))  # rv/' $PB" "$PB"
+
+rv_run U "截断不留记号（500 字的话被静默砍成 120 字，尾巴读起来像原话说完了）" \
+  "超长那一句限长而且看得出被截" \
+  "perl -pi -e 's/^        return rendered\\[:limit - 1\\] \\+ \"…\"$/        return rendered[:limit]  # rv/' $PB" "$PB"
+
+rv_run V "可见码退回成尖括号写法（举报人自己打一串 <1b> 就能和一个真 ESC 撞成同一个读数）" \
+  "可见码的写法不许举报人自己能打出来" \
+  "perl -pi -e 's/^            out\\.append\\(f\"␀\\{ord\\(ch\\):02x\\}\"\\)$/            out.append(f\"<{ord(ch):02x}>\")  # rv/' $PB" "$PB"
+
+# ── 保留期那一批（#186 乙：`report_retention` ＋清理脚本）──────────────────
+# 这一组是全仓**唯一不可逆**那一步的牙：删错了没有下一版能补回来，所以五条各钉一面。
+rv_run AB "空时间戳落进过期名单（「不知道」被当成「最旧、该删」）" \
+  "时间为空的行保留且单独数得出来" \
+  "perl -pi -e 's/^        if stamp == \"\":/        if stamp is None:  # rv/' $RR" "$RR"
+
+rv_run AC "截止那一刻本身也算过期（边界两头都放行）" \
+  "截止那一刻本身不算过期再早一秒算" \
+  "perl -pi -e 's/^        if stamp < key:/        if stamp <= key:  # rv/' $RR" "$RR"
+
+rv_run AD "默认期限在函数签名里又写死一个数（180 那个旋钮不再是唯一出处）" \
+  "到期的被点名而没过期的不动" \
+  "perl -pi -e 's/days: int = RETENTION_DAYS/days: int = 90/' $RR" "$RR"
+
+rv_run AE "分批循环只跑第一批（半删状态比不删更难看出来）" \
+  "超过一批也要删全" \
+  "perl -pi -e 's/^    for start in range\\(0, len\\(ids\\), batch\\):/    for start in range(0, min(len(ids), batch), batch):  # rv/' $RR" "$RR"
+
+rv_run AF "清理脚本默认就执行（手滑一次就把证据清了）" \
+  "不带执行那条脚本就是只报告" \
+  "perl -pi -e 's/^EXECUTE = .*/EXECUTE = True  # rv/' $PC" "$PC"
+
+rv_run AG "未到期那一档不再自己数（守恒检查退化成一道减法，分类里掉出去的行再也看不见）" \
+  "三档加起来必须等于总行数" \
+  "perl -pi -e 's/^            kept \\+= 1$/            pass  # rv/' $RR" "$RR"
+
+rv_run AH "dry-run 那个分支单独改坏（照打「一行都没删」却删两行、退出码 0）" \
+  "不带执行跑一次库里一行都不许少" \
+  "perl -pi -e 's/^    if not execute:/    if False:  # rv/' $PC" "$PC"
+
+rv_run AI "删除计数与名单对不上时照样提交（屏幕打过「已删除 N 条」而库里没删干净）" \
+  "删除条数与名单对不上时不许提交" \
+  "perl -pi -e 's/^    if deleted != len\\(p\\.expired_ids\\):/    if False:  # rv/' $PC" "$PC"
+
+# ── 第六、七轮审计回执补的九把（AJ～AR）──────────────────────────
+# 前八把是"报告自我销毁"那一族的延续：复跑那份没闸／删之前那道闸没接上／独立 COUNT 那一面被废／
+# 无时间戳那一档变少不再报／**本次名单里还剩行**那一面被撤（AN 原来的锚是 `if after.expired_ids:`，
+# 第七轮改成 `if leftover:`，锚跟着改），屏幕上"到期"那一格写死成 0（AR）。
+# AO、AP 钉的是链头部原来写着"没有任何一个字符能把它弄红"的那两条——**那句是假的**，10-10 深夜
+# 实测都能弄红，所以直接立成刀。
+# AQ 是第七轮抓的那一发：`reconcile` 不与本次名单取交集 ⇒ 几秒里刚跨线的那一行被算成"没删干净"。
+rv_run AJ "复跑那份只走外部对账、内部自洽那道闸没跟上（自相矛盾的读数照退 0）" \
+  "复跑那份自相矛盾时也必须报红" \
+  "perl -pi -e 's/^    bad = selfcheck\\(after\\) \\+ reconcile\\(p, after\\)$/    bad = reconcile(p, after)  # rv/' $PC" "$PC"
+
+rv_run AK "删之前那道自洽闸整个没接上（读数不稳却直接去删）" \
+  "删之前读数就不稳时一行都不许动" \
+  "perl -pi -e 's/^    bad = selfcheck\\(p\\)$/    bad = []  # rv/' $PC" "$PC"
+
+rv_run AL "独立那条 COUNT 与逐行数到的不等不再报（「读到的不是全表」这一面被悄悄废掉）" \
+  "内部两道检查各抓一种错" \
+  "perl -pi -e 's/^    if p\\.scanned != p\\.total:/    if False:  # rv/' $RR" "$RR"
+
+rv_run AM "无时间戳那一档变少不再报红（这一档说好一条都不删的）" \
+  "无时间戳那一档变少才是真的删错了" \
+  "perl -pi -e 's/^    if after\\.undated < before\\.undated:/    if False:  # rv/' $RR" "$RR"
+
+rv_run AN "到期那一档不再只看本次名单（还剩几行＝没删干净，那句指控就漂回诬陷）" \
+  "对账函数不许漏掉删完还剩到期行那一面" \
+  "perl -pi -e 's/^    if leftover:/    if False:  # rv/' $RR" "$RR"
+
+rv_run AO "状态那一档不再问 is_active（撤掉的页被台账读成公开中）" \
+  "四档各读对各" \
+  "perl -pi -e 's/^        elif not active:/        elif False:  # rv/' $LR" "$LR"
+
+rv_run AP "server_default 那一路撤掉（ORM 显式给 None 就真写出 NULL，口径②那个空值出处就不存在了）" \
+  "显式写_created_at_为_None_会被_server_default_填上" \
+  "perl -pi -e 's/, server_default=func\\.now\\(\\)\\)/)  # rv/' $SM" "$SM"
+
+rv_run AQ "复跑那份不再与本次名单取交集（几秒里刚跨线的那一行被算成没删干净）" \
+  "复跑读到刚跨线的那一行不许算成没删干净" \
+  "perl -pi -e 's/^    leftover = \\[row_id for row_id in after\\.expired_ids if row_id in promised\\]/    leftover = list(after.expired_ids)  # rv/' $RR" "$RR"
+
+rv_run AR "复跑那句把到期行数写死成 0（屏幕上一句「到期 0」而库里那行刚过线）" \
+  "复跑读到刚跨线的那一行不许算成没删干净" \
+  "perl -pi -e 's/· 到期 \\{len\\(after\\.expired_ids\\)\\} · /· 到期 0 · /' $PC" "$PC"
+
+# ── 探针自己那道覆盖闸门的牙 ──────────────────────────────────────
+probe_gate() {
+  # 这一档不走 rv_run（它验的不是 pytest，是探针自己那道覆盖闸门），所以 rv_run 的几道闸必须在这儿
+  # 再立一遍。第四轮审计抓出的四处：① 入口没闸，`RV_BAKDIR` 为空时备份写成 `/tmp//GATE`、而那句 `cp`
+  # 连返回值都没查；② 两份输出写死 `/tmp/rv-gate*`，盘上留着上一轮的读数就会被当成本轮的；
+  # ③ 只认"退出码非零＝有牙"，而探针压根没跑起来（导入炸）也是非零；④ 突变命令 perl 的返回值没查。
+  if [ -z "$RV_BAKDIR" ] || [ ! -d "$RV_BAKDIR" ]; then
+    echo "gate ★rv_init 没跑★：备份目录没备好（RV_BAKDIR='$RV_BAKDIR'），这一档不跑"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  local gout mout bak before after
+  gout=$(mktemp /tmp/rv-gate-out.XXXXXX)
+  mout=$(mktemp /tmp/rv-gate-out.XXXXXX)
+  if [ -z "$gout" ] || [ -z "$mout" ]; then
+    echo "gate ★临时输出建不出来★：没有地方收探针的读数，这一档不跑"
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  bak="$RV_BAKDIR/GATE"
+  rm -f "$GATE_DB"
+  if ! DATABASE_URL="sqlite:///$GATE_DB" JWT_SECRET_KEY=gate-only-not-a-real-one EXTRACT_PROVIDER=none \
+    SEC_CHECK_ENABLED=false .venv/bin/python -c '
+from app.db.database import Base, SessionLocal, engine
+import app.models.note, app.models.share, app.models.share_report  # 不 import 模型，metadata 是空的
+from datetime import datetime, timezone
+from app.models.note import Note
+from app.models.share import Share
+from app.models.share_report import ShareReport
+
+Base.metadata.create_all(bind=engine)
+db = SessionLocal()
+n = Note(user_id="1", title="gate", source_type="manual", tags=[], key_points=[], key_links=[])
+db.add(n)
+db.commit()
+for tok, active in (("gate-live", True), ("gate-revoked", False)):
+    db.add(Share(user_id="1", note_id=n.id, token=tok, title="T", summary="", tags=[],
+                 key_points=[], key_links=[], author_name="a", is_active=active))
+db.commit()
+now = datetime.now(timezone.utc).replace(microsecond=0)
+db.add_all([ShareReport(token="gate-live", reason="spam", reporter_bucket="甲", created_at=now),
+            ShareReport(token="gate-revoked", reason="spam", reporter_bucket="乙", created_at=now)])
+db.commit()
+db.close()
+' >"$gout" 2>&1; then
+    echo "gate ★一次性库造不出来★：这一档不算数"
+    tail -3 "$gout" | sed 's/^/      /'
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  if [ ! -s "$GATE_DB" ]; then echo "gate ★一次性库是空的★：$GATE_DB，这一档不算数"; rm -f "$gout" "$mout"; RV_BAD=$((RV_BAD + 1)); return; fi
+
+  DATABASE_URL="sqlite:///$GATE_DB" JWT_SECRET_KEY=gate-only-not-a-real-one .venv/bin/python "$PB" >"$gout" 2>&1
+  before=$?
+  # 「原始行数」那行是探针读完了库、走到归组之后才打的——它在，退出码才是**读数**；不在，非零只说明
+  # 这一发压根没跑起来（那种该记账成"不算数"，而不是替探针喊"有牙"或"没牙"）。
+  if ! grep -aq '原始行数' "$gout"; then
+    echo "gate ★改坏之前探针就没走到读数那一行★（exit=$before）：这一档不算数"
+    tail -3 "$gout" | sed 's/^/      /'
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  if [ "$before" -ne 0 ]; then
+    echo "gate ★改坏之前探针就不走绿★：退出码 $before，这一档的对比没有意义（一次性库里两篇都该归上）"
+    sed 's/^/      /' "$gout"
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  if ! cp "$LR" "$bak"; then
+    echo "gate ★备份没建成★：$LR → $bak，没有备份就不动真源文件，这一档不跑"
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  # 一建成备份就登记：从"文件被改坏"到"trap 认这个文件"之间不许有空窗（同 lib 里 rv_run 那条理由）。
+  RV_LIVE_FILE="$LR"; RV_LIVE_BAK="$bak"
+  if ! perl -pi -e 's/^    for token, items in grouped\.items\(\):/    for token, items in ((t, i) for t, i in grouped.items() if i[0][5]):  # rv/' "$LR"; then
+    echo "gate ★突变命令失败★：perl 非零退出，没跑到探针那一步"
+    cp "$bak" "$LR"
+    RV_LIVE_FILE=""; RV_LIVE_BAK=""
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  if [ "$(md5 -q "$LR")" = "$(md5 -q "$bak")" ]; then
+    echo "gate ★突变没落盘★：C 那一刀没写进 $LR，这一档不算数"
+    RV_LIVE_FILE=""; RV_LIVE_BAK=""
+    rm -f "$gout" "$mout"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  DATABASE_URL="sqlite:///$GATE_DB" JWT_SECRET_KEY=gate-only-not-a-real-one .venv/bin/python "$PB" >"$mout" 2>&1
+  after=$?
+  cp "$bak" "$LR"
+  if [ "$(md5 -q "$LR")" != "$(md5 -q "$bak")" ]; then
+    # 还原没成：登记**不许注销**，留着让 trap 还有机会再试一次
+    echo "gate 还原失败，检查 $LR（备份在 $bak，那一趟输出留在 $mout）"
+    RV_BAD=$((RV_BAD + 1))
+    return
+  fi
+  RV_LIVE_FILE=""; RV_LIVE_BAK=""
+
+  if ! grep -aq '原始行数' "$mout"; then
+    echo "gate ★改坏之后探针没走到读数那一行★（exit=$after）：非零退出但不是读数，这一档不算数"
+    tail -3 "$mout" | sed 's/^/      /'
+    RV_BAD=$((RV_BAD + 1))
+  elif [ "$after" -eq 0 ]; then
+    echo "gate ★假绿★：C 那一刀让撤掉那一篇整批消失，探针仍然 exit 0 —— 覆盖那道闸门没牙"
+    sed 's/^/      /' "$mout"
+    RV_FAKE_GREEN=$((RV_FAKE_GREEN + 1))
+  else
+    echo "gate 红（符合预期）：漏掉撤掉那一篇时探针 exit=$after，读数：$(grep -o '原始行数 [0-9]* · 台账条数 [0-9]*' "$mout" | head -1)"
+    RV_RED=$((RV_RED + 1))
+  fi
+  rm -f "$gout" "$mout"
+}
+
+probe_gate
+
+echo "=== 全部还原后复跑这一批与共享那一格的出处，必须全绿 ==="
+# 带上 share/landing 那两份是因为 `is_expired` 这一批被拆成了"标量实现＋ORM 外衣"两层，
+# 台账调的是标量那一层——公开页与转存走的还是 `is_expired(share)`，两边都得跟着复跑一次。
+# （名单里不写 `test_import_from_share.py`：那份源文件早就不在了，只剩 `tests/__pycache__`
+# 里一个 stale 的 .pyc——照它写会一句都不跑，而这批已经在末尾那道"全绿"上撞过一回。）
+rv_recheck tests/test_report_ledger.py tests/test_report_retention.py tests/test_landing_page.py tests/test_share_snapshot.py tests/test_note_flows.py
+rv_status

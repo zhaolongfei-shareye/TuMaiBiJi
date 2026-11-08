@@ -1,0 +1,9 @@
+{
+  "name": "site_name",
+  "version": "1.0.0",
+  "description": "图麦笔记站名识别哑管道：域名/标题/开头进 → {site_name} 出（混元，只在云函数内调用才抵扣成长计划额度）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": ">=4.0.1"
+  }
+}

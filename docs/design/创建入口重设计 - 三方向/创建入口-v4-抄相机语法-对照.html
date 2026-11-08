@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>创建入口 v4 · 抄抖音/Snapchat/小红书 的相机语法（对照证明稿）</title>
+<style>
+  :root{
+    --cam:#E9723D; --cam-ink:#2C1204;
+    --alb:#46A863; --alb-ink:#06260F;
+    --url:#3F52D6; --url-ink:#FFFFFF;
+    --wri:#6E4BD0; --wri-ink:#FFFFFF;
+    --paper:#F2EFE9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{font-family:-apple-system,"PingFang SC",sans-serif;background:#0E1014;color:#EDEFF2;padding:34px 40px 70px}
+  h1{font-size:22px;font-weight:800}
+  .sub{font-size:13px;color:#9AA1AC;margin-top:8px;max-width:1080px;line-height:1.7}
+  .pair{display:flex;gap:30px;align-items:flex-start;margin-top:40px;flex-wrap:wrap}
+  .side{width:250px}
+  .side img{width:100%;border-radius:14px;display:block;box-shadow:0 14px 36px rgba(0,0,0,.5)}
+  .side .who{font-size:12px;font-weight:800;color:#fff;margin-bottom:8px}
+  .side .what{font-size:11px;color:#9AA1AC;margin-top:8px;line-height:1.6}
+  .arrow{align-self:center;font-size:26px;color:#5A616C;font-weight:800}
+  .legend{width:100%;margin-top:14px;font-size:12px;color:#C7CDD6;line-height:1.9;border-left:3px solid #333A45;padding-left:14px}
+  .legend b{color:#fff}
+  .n{display:inline-block;width:17px;height:17px;border-radius:50%;background:#F6C445;color:#2A2005;
+     font-size:11px;font-weight:800;text-align:center;line-height:17px;margin-right:6px}
+
+  /* ---------- 我的屏 ---------- */
+  .phone{width:300px;height:620px;border-radius:38px;overflow:hidden;position:relative;
+    background:radial-gradient(120% 55% at 50% 0%,#3A4150 0%,rgba(58,65,80,0) 60%),
+               linear-gradient(180deg,#232833 0%,#171B23 45%,#12151B 100%);
+    box-shadow:0 30px 70px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.07);
+    display:flex;flex-direction:column}
+  .head{padding:24px 22px 0;display:flex;justify-content:space-between;align-items:center}
+  .head .t{font-size:23px;font-weight:800;color:#F2EFE9}
+  .head .lang{font-size:11px;color:rgba(242,239,233,.6);border-bottom:2px solid rgba(242,239,233,.8);padding-bottom:2px}
+  .grow{flex:1}
+
+  /* 底部捕捉面板：一块圆角半透明面，装下 模式排+快门排+药丸 */
+  .hud{margin:0 12px 14px;border-radius:26px;background:rgba(16,18,24,.66);
+       backdrop-filter:blur(14px);padding:16px 14px 36px}
+  /* ② 模式排：抄抖音快门上面那排 视频/照片/文字 */
+  .modes{display:flex;justify-content:center;gap:20px}
+  .md{font-size:13px;font-weight:700;color:rgba(242,239,233,.55);padding-bottom:6px;position:relative}
+  .md.on{color:#fff}
+  .md.on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);bottom:0;
+     width:16px;height:4px;border-radius:2px;background:var(--h)}
+  /* ① 快门排：抄抖音/Snapchat 的大圆快门 + 两侧带字圆钮 */
+  .shotrow{display:flex;align-items:center;justify-content:space-between;margin-top:18px;padding:0 8px}
+  .side-btn{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .side-btn .c{width:46px;height:46px;border-radius:50%;background:rgba(242,239,233,.14);
+     display:flex;align-items:center;justify-content:center;color:#F2EFE9}
+  .side-btn .c svg{width:20px;height:20px}
+  .side-btn .lb{font-size:10px;color:rgba(242,239,233,.75);font-weight:700}
+  .shutter{width:86px;height:86px;border-radius:50%;border:5px solid #fff;
+     display:flex;align-items:center;justify-content:center;position:relative}
+  .shutter .core{width:62px;height:62px;border-radius:50%;background:var(--h);
+     display:flex;align-items:center;justify-content:center;color:var(--hi)}
+  .shutter .core svg{width:28px;height:28px}
+  .shutter .cap{position:absolute;bottom:-24px;left:50%;transform:translateX(-50%);
+     font-size:12px;font-weight:800;color:#fff;white-space:nowrap}
+  /* ③ 饱和药丸：抄小红书 发布笔记 / Snapchat Send To */
+  .pill{margin-top:34px;height:52px;border-radius:16px;background:var(--h);color:var(--hi);
+     display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;font-weight:800}
+  .pill svg{width:18px;height:18px}
+  .tabbar{height:56px;display:flex;align-items:center;justify-content:space-around;padding:0 30px 6px}
+  .tabbar i{width:20px;height:20px;border-radius:50%;background:rgba(242,239,233,.26)}
+  .tabbar i.on{background:#F2EFE9}
+
+  /* 态3：内容在后面 + 面板压成一条药丸 */
+  .behind{margin:0 12px;border-radius:22px 22px 0 0;background:#fff;padding:16px 14px;flex:1;
+     display:flex;flex-direction:column;gap:12px}
+  .behind .hint{font-size:11px;color:#8A8F98}
+  .thumbs{display:flex;gap:10px}
+  .thumbs i{width:70px;height:70px;border-radius:12px;background:linear-gradient(140deg,#D8D2C6,#B9B2A4)}
+  .thumbs i:nth-child(2){background:linear-gradient(140deg,#C9CFD6,#A6AEB8)}
+  .thumbs i:nth-child(3){background:linear-gradient(140deg,#D9C9BE,#BCA79A)}
+  .behind .line{height:10px;border-radius:5px;background:#ECEAE5}
+  .behind .line.w60{width:60%}
+  .pillbar{margin:12px 12px 14px;height:56px;border-radius:18px;background:var(--cam);color:var(--cam-ink);
+     display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;font-weight:800;
+     box-shadow:0 16px 36px rgba(0,0,0,.45)}
+  .pillbar svg{width:18px;height:18px}
+  .cap-line{font-size:12px;font-weight:700;color:#C7CDD6;margin-top:12px;text-align:center}
+  .cap-line b{color:#fff}
+</style>
+</head>
+<body>
+
+<h1>创建入口 v4 · 直接抄相机系主流语法（对照证明稿）</h1>
+<div class="sub">
+  这一版不是"参考"，是把抖音 / Snapchat / 小红书 三个现网 App 的捕捉屏结构原样搬过来，左边是真截图、右边是我的屏，编号逐条对上。
+  抖音给「大圆快门 + 快门上一排带字模式」；Snapchat 给「白环空心快门 + 饱和药丸主按钮」；小红书给「内容缩略图在后 + 底部一枚饱和药丸」。
+  每个图标都带字，颜色走 palette 规则①。
+</div>
+
+<!-- ============ 对照 1：默认拍照 ============ -->
+<div class="pair">
+  <div class="side">
+    <div class="who">真截图 · 抖音 捕捉屏</div>
+    <img src="refs/crop-douyin-快门与模式排.png">
+    <div class="what">底部一枚红色大圆快门；快门正上方一排带字模式（视频 / 照片 / 文字）；再下面一排带字 tab。</div>
+  </div>
+  <div class="arrow">→</div>
+  <div>
+    <div class="phone" style="--h:var(--cam);--hi:var(--cam-ink)">
+      <div class="head"><div class="t">创建</div><div class="lang">中</div></div>
+      <div class="grow"></div>
+      <div class="hud">
+        <div class="modes">
+          <div class="md on">拍照</div><div class="md">相册</div><div class="md">链接</div><div class="md">写</div>
+        </div>
+        <div class="shotrow">
+          <div class="side-btn"><div class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4-4-8 8"/></svg></div><div class="lb">相册</div></div>
+          <div class="shutter"><div class="core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4a2 2 0 0 1 1.76 1.05l.49.9A2 2 0 0 0 18 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2a2 2 0 0 0 1.76-1.05l.48-.9A2 2 0 0 1 10 4z"/><circle cx="12" cy="13" r="3"/></svg></div><div class="cap">拍照</div></div>
+          <div class="side-btn"><div class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></div><div class="lb">链接</div></div>
+        </div>
+      </div>
+      <div class="tabbar"><i class="on"></i><i></i><i></i></div>
+    </div>
+    <div class="cap-line">我的态1 · 默认 <b>拍照</b></div>
+  </div>
+  <div class="legend">
+    <span class="n">1</span><b>大圆快门</b>：左图抖音底部那枚红圆 = 右图我的白环圆快门，圆心填当前功能的色相，默认拍照=橙。<br>
+    <span class="n">2</span><b>快门上一排带字模式</b>：左图 视频/照片/文字 = 右图 拍照/相册/链接/写，选中加粗+色相下划条，点它切换。<br>
+    <span class="n">4</span><b>每枚图标带字</b>：左图快门两侧与底 tab 全带字 = 右图快门两侧圆钮下各有一行小字（相册 / 链接）。
+  </div>
+</div>
+
+<!-- ============ 对照 2：切换 + 环形快门 ============ -->
+<div class="pair">
+  <div class="side">
+    <div class="who">真截图 · Snapchat 捕捉屏</div>
+    <img src="refs/crop-snapchat-环形快门与黄药丸.png">
+    <div class="what">快门是白环空心圆，两侧一排镜头小圆；底排带字 tab（Create / Snap / Browse / Explore）。</div>
+  </div>
+  <div class="arrow">→</div>
+  <div>
+    <div class="phone" style="--h:var(--url);--hi:var(--url-ink)">
+      <div class="head"><div class="t">创建</div><div class="lang">中</div></div>
+      <div class="grow"></div>
+      <div class="hud">
+        <div class="modes">
+          <div class="md">拍照</div><div class="md">相册</div><div class="md on">链接</div><div class="md">写</div>
+        </div>
+        <div class="shotrow">
+          <div class="side-btn"><div class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4-4-8 8"/></svg></div><div class="lb">相册</div></div>
+          <div class="shutter"><div class="core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div><div class="cap">链接</div></div>
+          <div class="side-btn"><div class="c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div><div class="lb">写</div></div>
+        </div>
+      </div>
+      <div class="tabbar"><i class="on"></i><i></i><i></i></div>
+    </div>
+    <div class="cap-line">我的态2 · 切到 <b>链接</b>（宝蓝）</div>
+  </div>
+  <div class="legend">
+    <span class="n">1</span><b>白环空心快门</b>：左图 Snapchat 那枚白环 = 右图我的快门外环恒白、圆心换色相，切到链接=宝蓝。<br>
+    <span class="n">3</span><b>饱和药丸主按钮</b>：出处是下一组小红书那枚红药丸「发布笔记」= 右图底部随色相变的药丸（链接态文案=粘贴链接）；捕捉态没内容时不出现，抄抖音。<br>
+    <span class="n">2</span><b>模式排换选中</b>：结构不动，只有下划条和快门圆心换色——所以各态不割裂。
+  </div>
+</div>
+
+<!-- ============ 对照 3：有内容后压成一条 ============ -->
+<div class="pair">
+  <div class="side">
+    <div class="who">真截图 · 小红书 发布屏</div>
+    <img src="refs/crop-xiaohongshu-选项行与红药丸.png">
+    <div class="what">上面是已选内容缩略图排（带一枚 + 继续加），中间一列图标+文字选项行，底部一枚饱和红药丸「发布笔记」。</div>
+  </div>
+  <div class="arrow">→</div>
+  <div>
+    <div class="phone">
+      <div class="head"><div class="t">创建</div><div class="lang">中</div></div>
+      <div class="grow"></div>
+      <div class="behind">
+        <div class="hint">已拍 3 张 · 待提炼</div>
+        <div class="thumbs"><i></i><i></i><i></i></div>
+        <div class="line"></div>
+        <div class="line w60"></div>
+      </div>
+      <div class="pillbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4a2 2 0 0 1 1.76 1.05l.49.9A2 2 0 0 0 18 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2a2 2 0 0 0 1.76-1.05l.48-.9A2 2 0 0 1 10 4z"/><circle cx="12" cy="13" r="3"/></svg>提炼生成笔记 · 3 张</div>
+      <div class="tabbar"><i class="on"></i><i></i><i></i></div>
+    </div>
+    <div class="cap-line">我的态3 · 有内容后 <b>压成一条药丸</b>，内容在后面</div>
+  </div>
+  <div class="legend">
+    <span class="n">3</span><b>内容在后 + 一枚饱和药丸</b>：左图小红书缩略图排在上、红药丸在下 = 右图已拍三张在上、橙色「提炼生成笔记」在下。<br>
+    <span class="n">5</span><b>面板收起</b>：抖音/小红书提交前面板都让位给内容，我的捕捉面板整块收起，只留那枚药丸——就是你要的"压低成大横条"。
+  </div>
+</div>
+
+</body>
+</html>

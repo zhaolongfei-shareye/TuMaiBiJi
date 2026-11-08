@@ -1,0 +1,482 @@
+"""账号自助注销：删干净、只删自己的、删完还能证明它真的没了。
+
+四条不变量：
+① 只删自己名下的：每个删除查询都带着 user_id，别人的笔记/分类/分享一条不动。
+② 注销后旧 token 立刻失效（用户行没了，get_current_user 自然回 401），公开分享页
+   也必须扫不开——那张卡片图已经发出去了，留着就是泄漏。
+③ 同一个 openid 重新登录是一个全新账号，看不到旧数据。2.1.11 起"全新"不等于"名下 0 条"：
+   新号出生带着一篇 §8.232 的预置笔记，判据钉的是**那一条只能是预置那一型**，旧笔记一条不许跟过来。
+④ id 被新号复用之后，旧 token 依然失效。②靠的是"行没了"，可 SQLite 会把那个 id 发
+   给下一个注册的人，行又有了——这时候挡住的必须是账号代数，不是行的存在性。
+   见 Test账号代数。
+
+存在性断言一律走 query 而不是 db.get：这个夹具会话里已经缓存着那些对象，
+`db.get` 命中身份映射时会把"内存里还有"当成"库里还有"，删干净了也照样返回绿。
+"""
+import os
+import re
+import sys
+import time
+
+os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest.db"
+os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
+os.environ["EXTRACT_PROVIDER"] = "none"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import jwt
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import text, update
+
+from app.core.auth import _create_token
+from app.db.database import Base, SessionLocal, engine
+from app.main import app
+from app.models.asset import Asset
+from app.models.category import Category
+from app.models.invitation import Invitation
+from app.models.job import Job
+from app.models.note import Note
+from app.models.note_card import NoteCard
+from app.models.share import Share
+from app.models.share_report import ShareReport
+from app.models.user import User
+from app.models.user_profile import UserProfile
+from app.services import deletion, preset_note, quota
+
+
+@pytest.fixture(scope="module")
+def client():
+    app.state.limiter.enabled = False
+    with TestClient(app) as c:
+        yield c
+    app.state.limiter.enabled = True
+
+
+@pytest.fixture()
+def db():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    session = SessionLocal()
+    yield session
+    session.close()
+
+
+def hdr(user):
+    return {"Authorization": f"Bearer {_create_token(user.id, user.generation)}"}
+
+
+def rows(db, model, uid):
+    return db.query(model).filter(model.user_id == str(uid)).count()
+
+
+@pytest.fixture()
+def mine(db):
+    """一个有全套数据的人：笔记、分类、分享、任务、素材、卡片，外加两行邀请台账。
+
+    他既被别人邀进来（inviter 那个人拿到过一笔奖励），也邀成功过别人（999 那个假 id
+    只是台账里的一个号，不需要真有其人）。
+    """
+    u = User(openid="del-me")
+    db.add(u)
+    db.commit()
+    inviter = User(openid="invited-him", quota_bonus=quota.INVITE_REWARD)
+    db.add(inviter)
+    db.commit()
+    cat = Category(user_id=str(u.id), name="旅行", color="#F6C445")
+    note = Note(user_id=str(u.id), title="要消失的笔记", source_type="manual")
+    db.add_all([cat, note])
+    db.commit()
+    share = Share(user_id=str(u.id), note_id=note.id, token="tok-del-me", title="要消失的分享")
+    db.add_all([
+        share,
+        Job(user_id=str(u.id), job_type="ingest_url", status="done", note_id=note.id),
+        Asset(user_id=str(u.id), object_key="a/b.png"),
+        # 卡片那一行 10-08 起是第六类：注销是清云端对象的**唯一一次机会**，漏了它
+        # 云上那个 jpg 就永远没人删得动（后端没有云开发凭据）。
+        NoteCard(user_id=str(u.id), note_id=note.id, object_key="cloud://x/del-me.jpg",
+                 tpl="classic", no_qr=False, origin="live", is_current=True),
+        Invitation(inviter_id=inviter.id, invitee_id=u.id, reward=quota.INVITE_REWARD),
+        Invitation(inviter_id=u.id, invitee_id=999, reward=quota.INVITE_REWARD),
+        # 名片是第七类（2.1 起那四格图在云上）：同一条理由——注销之后没有任何口能再问出
+        # 这个人留了哪些地址，所以这些 fileID 必须在这一次响应里一起交回去。
+        UserProfile(user_id=str(u.id), name="要消失的名片",
+                    slots=[{"file_id": "cloud://x/del-me-avatar.jpg", "card": True, "bg": True,
+                            "width": None, "height": None, "size": None}, None, None, None]),
+    ])
+    db.commit()
+    return {"user": u, "id": u.id, "note": note.id, "cat": cat.id, "share": share.id,
+            "token": share.token, "inviter": inviter.id}
+
+
+@pytest.fixture()
+def other(db):
+    u = User(openid="stay-alive")
+    db.add(u)
+    db.commit()
+    n = Note(user_id=str(u.id), title="别人的笔记", source_type="manual")
+    c = Category(user_id=str(u.id), name="别人的分类", color="#3F52D6")
+    db.add_all([n, c])
+    db.commit()
+    return {"user": u, "id": u.id, "note": n.id, "cat": c.id}
+
+
+def wipe(client, target):
+    user = target["user"] if isinstance(target, dict) else target
+    return client.post("/api/user/deactivate", json={"confirm": True}, headers=hdr(user))
+
+
+class Test注销入口:
+    def test_没确认不动手(self, client, db, mine):
+        resp = client.post("/api/user/deactivate", json={"confirm": False}, headers=hdr(mine["user"]))
+        assert resp.status_code == 400
+        assert rows(db, Note, mine["id"]) == 1
+        assert db.query(User).filter(User.id == mine["id"]).count() == 1
+
+    def test_没登录不能注销(self, client, db, mine):
+        resp = client.post("/api/user/deactivate", json={"confirm": True})
+        assert resp.status_code == 401
+        assert rows(db, Note, mine["id"]) == 1
+        assert db.query(User).count() == 2
+
+    def test_确认字段缺失也当作没确认(self, client, db, mine):
+        resp = client.post("/api/user/deactivate", json={}, headers=hdr(mine["user"]))
+        assert resp.status_code == 422
+        assert rows(db, Note, mine["id"]) == 1
+
+
+class Test删干净:
+    def test_一次删完七类数据并回报条数(self, client, db, mine):
+        # 第八类：举报行。它只挂 token、不建外键（撤掉的码也要收得到举报，这是刻意不设约束的
+        # 理由），所以库里挡不住"注销之后留着一堆指向已删码的孤儿"——只能由这一趟连带清掉，
+        # 并把条数一起回报（docstring 承诺的是"删净"，不是"删掉看得见的"）。
+        db.add(ShareReport(token=mine["token"], reason="spam"))
+        db.commit()
+
+        resp = wipe(client, mine)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["deleted"] == {
+            "notes": 1, "categories": 1, "shares": 1, "jobs": 1, "assets": 1, "cards": 1,
+            "profile": 1, "reports": 1,
+            # 日量计数（10-25 审计 M33 之后新增的一类）：这一格在场是**枚举尺子**逼出来的——
+            # 删了号却留着"这个人今天用过几次"是个人信息留存问题。这个人没打过提炼，所以 0。
+            "daily_usage": 0,
+            # 这三格 2026-10-10 起**一律在场**（`purge` 预先摆平），不再随"这一路带不带 account"
+            # 出现或消失。这个人是直接 `User(openid=…)` 造的、没有 account_id，所以三格都是 0；
+            # 走真登录路造的人那一格会是 1。键集合会变形的那一版，这两个字典比的是八格。
+            "identities": 0, "link_codes": 0, "account": 0,
+        }
+        for model in (Note, Category, Share, Job, Asset, NoteCard, UserProfile):
+            assert rows(db, model, mine["id"]) == 0, model.__tablename__
+        assert db.query(ShareReport).filter(
+            ShareReport.token == mine["token"]
+        ).count() == 0, "举报行留下了指向已删 token 的孤儿"
+        # 卡片那行的对象必须出现在同一份 file_ids 里——客户端只读那一个键，
+        # 没带出去的那个 jpg 在云上就永远没人删得动。
+        assert "cloud://x/del-me.jpg" in resp.json()["file_ids"], resp.json()
+        # 名片那四格的对象同理（第七类，2.1）
+        assert "cloud://x/del-me-avatar.jpg" in resp.json()["file_ids"], resp.json()
+        assert db.query(User).filter(User.id == mine["id"]).count() == 0
+        assert db.query(Invitation).count() == 0
+
+    def test_别人的一条不动(self, client, db, mine, other):
+        wipe(client, mine)
+        assert rows(db, Note, other["id"]) == 1
+        assert rows(db, Category, other["id"]) == 1
+        assert db.query(Note).filter(Note.id == other["note"]).count() == 1
+        assert db.query(User).filter(User.id == other["id"]).count() == 1
+
+    def test_空账号注销也只删自己(self, client, db, other):
+        empty = User(openid="nothing-here")
+        db.add(empty)
+        db.commit()
+        # 留两条日量计数在这一行名下：这一格不许"删了号还在"（M33）。
+        # `test_v1_account_deletion.py` 那把枚举尺子钉的是"表必须在名单里"，这里钉的是真删得掉。
+        from app.models.daily_usage import DailyUsage
+        from app.services import daily_budget
+
+        db.add(DailyUsage(user_id=str(empty.id), day=daily_budget.today(),
+                          kind=daily_budget.KIND_EXTRACT, count=2))
+        db.commit()
+        resp = wipe(client, {"user": empty})
+        assert resp.status_code == 200
+        assert resp.json()["deleted"] == {"notes": 0, "categories": 0, "shares": 0,
+                                          "jobs": 0, "assets": 0, "cards": 0, "profile": 0,
+                                          "reports": 0, "daily_usage": 1,
+                                          # 这个人压根没有 account（`account_id` 为 NULL，那道闸
+                                          # 直接回 None），所以那三格是 0 而不是缺席——键集合不许
+                                          # 随"这一路带不带 account"变形。
+                                          "identities": 0, "link_codes": 0, "account": 0}
+        assert db.query(DailyUsage).filter(DailyUsage.user_id == str(empty.id)).count() == 0
+        assert rows(db, Note, other["id"]) == 1
+
+
+class Test注销之后:
+    def test_旧token立刻失效(self, client, db, mine, other):
+        h = hdr(mine["user"])
+        wipe(client, mine)
+        db.expunge_all()
+        cases = [
+            ("get", "/api/notes/"),
+            ("get", "/api/user/quota"),
+            ("post", "/api/notes/"),
+            ("post", "/api/ingest/url"),
+            ("post", "/api/ingest/text"),
+            ("put", "/api/user/wallpaper"),
+            ("delete", f"/api/notes/{mine['note']}"),
+        ]
+        for method, url in cases:
+            kwargs = {"json": {}} if method in ("post", "put") else {}
+            resp = getattr(client, method)(url, headers=h, **kwargs)
+            assert resp.status_code == 401, f"{method.upper()} {url} → {resp.status_code} {resp.text[:120]}"
+            assert "重新登录" in resp.json()["detail"]
+
+    def test_分享页扫不开了(self, client, db, mine):
+        assert client.get(f"/api/shares/{mine['token']}").status_code == 200
+        wipe(client, mine)
+        assert client.get(f"/api/shares/{mine['token']}").status_code == 404
+
+    def test_重新登录是全新空账号(self, client, db, mine, monkeypatch):
+        from app.core import auth as auth_core
+
+        async def fake(code):
+            return {"openid": "del-me", "session_key": "k"}
+
+        monkeypatch.setattr(auth_core, "_wechat_code2session", fake)
+        old_note = mine["note"]
+        wipe(client, mine)
+        db.expunge_all()
+        resp = client.post("/api/auth/wechat", json={"code": "x"})
+        assert resp.status_code == 200
+        token = resp.json()["token"]
+        body = client.get(
+            "/api/user/quota", headers={"Authorization": f"Bearer {token}"}
+        ).json()
+        # ⚠ 这一条从 2.1.11（§8.232 新用户预置那一篇）起从 0 变成 1，**改的是判据不是代码**：
+        #   这一格原本钉的是"旧笔记没跟过来"，而它顺手用了"名下一条都不剩"当代理读数。
+        #   现在新号出生就带一篇我们自己写进去的预置笔记，代理读数不再是 0。
+        #   真正要钉的那句话换成两条：他旧的那篇仍然读不到（下面那行 404 原样留着），
+        #   而他名下这一条必须是预置那一型（source_type='preset'），不是旧笔记借尸回来。
+        assert body["used"] == 1, body
+        # 列表口回的就是一个数组（`response_model=List[NoteListItem]`），不包 items。
+        items = client.get("/api/notes/", headers={"Authorization": f"Bearer {token}"}).json()
+        assert [n["source_type"] for n in items] == [preset_note.PRESET_SOURCE_TYPE], items
+        assert body["bonus"] == 0
+        assert body["limit"] == quota.BASE_QUOTA
+        assert body["invites_rewarded"] == 0
+        # SQLite 在非 AUTOINCREMENT 主键上会复用刚空出来的 rowid，所以"新账号一定拿到
+        # 新 id"是不能断的；能断的是这个号底下什么都没有了——旧笔记、旧归因都不跟过来。
+        # 名下那唯一一条上面已经钉死是预置那一型，所以这一格不必再断"列表是空的"。
+        # ⚠ 旧笔记那个号 2.1.11 起**可能就是新号的预置那一篇**（rowid 复用是这一格自己的前提，
+        #   这次跑出来就是 200）：所以"404"不再是"旧数据没跟过来"的证明。换成钉读到的那一行
+        #   绝不是旧内容——要么根本没有那一行，要么那一行是预置那一型、标题不是他那篇旧的。
+        back = client.get(f"/api/notes/{old_note}", headers={"Authorization": f"Bearer {token}"})
+        if back.status_code == 200:
+            row = back.json()
+            assert row["source_type"] == preset_note.PRESET_SOURCE_TYPE, row
+            assert row["title"] != "要消失的笔记", row
+        else:
+            assert back.status_code == 404
+        new = db.query(User).filter(User.openid == "del-me").first()
+        assert new.invited_by is None
+        assert db.query(Invitation).count() == 0
+
+
+class Test邀请台账跟着走:
+    def test_注销要把邀请人已到手的奖励追回来(self, client, db, mine, other):
+        """注销 = 这笔邀请当成没发生过，奖励跟着退回去。
+
+        不追回的话，"注册小号 → 写一篇 → 注销 → 再注册"能把邀请人的额度刷到无穷大：
+        MAX_REWARDED_INVITES 是按 invitations 行数算的，而行数在注销时被清掉了。
+        """
+        wipe(client, mine)
+        db.expire_all()
+        assert db.get(User, mine["inviter"]).quota_bonus == 0
+        assert db.query(Invitation).filter(Invitation.invitee_id == mine["id"]).count() == 0
+        # 他替别人成就的那一笔也一起没了：账号都不在了，台账不该继续记着他
+        assert db.query(Invitation).filter(Invitation.inviter_id == mine["id"]).count() == 0
+
+    def test_追回不会把余额扣成负数(self, client, db, mine):
+        """台账说有 10 篇、余额却已经不够扣时，宁可不追也不能扣成负数。
+
+        负余额会把上限压到 BASE_QUOTA 以下，那个邀请人连自己的笔记都存不下了。
+        正常路径走不到这里（除了注销没有别的地方减 quota_bonus），这是给对不上账兜底。
+        """
+        inviter = db.get(User, mine["inviter"])
+        inviter.quota_bonus = 0
+        db.commit()
+        wipe(client, mine)
+        db.expire_all()
+        assert db.get(User, mine["inviter"]).quota_bonus == 0
+
+    def test_注销回退不许覆盖同一瞬间刚结的那一笔(self, client, db, mine):
+        """10-16 审计第二批第五条：加分那侧是 SQL 相对自增，回退这侧原来是"读出来减完写回去"。
+
+        两种写法落在同一列上，症状不是报错而是**钱静默少一笔**：注销这一趟手上攥着旧值，
+        把这一瞬间刚结的那一笔直接盖掉——台账多一行、余额却没那一分。
+        本地两个 session 真交错量过一次：库里 20（原本 10 ＋ 并发结的 10）被老写法写成 **0**，
+        新写法留 **10**。
+
+        不起线程（交错本身不是判据要钉的东西），而是把"旧值"这一格亲手造出来：
+        ① 先在**这条 session** 里把邀请人读进身份映射——`_release_invitations` 拿到的就是这一枚；
+        ② 再从**另一条 session** 给同一个人相对自增 10 并 commit，就是并发那一边真做的事；
+        ③ 然后走真代码 `deletion.purge`。所以中间那两条 assert 钉的是"坑确实造出来了"，
+        最后那条才钉"没被坑盖掉"。
+        """
+        inviter_id = mine["inviter"]
+        cached = db.get(User, inviter_id)
+        assert cached.quota_bonus == quota.INVITE_REWARD, cached.quota_bonus
+
+        side = SessionLocal()
+        try:
+            side.execute(
+                update(User)
+                .where(User.id == inviter_id)
+                .values(quota_bonus=User.quota_bonus + quota.INVITE_REWARD)
+            )
+            side.commit()
+            assert side.get(User, inviter_id).quota_bonus == quota.INVITE_REWARD * 2
+            assert cached.quota_bonus == quota.INVITE_REWARD, "坑没造出来：这条 session 读到新值了"
+
+            deletion.purge(db, [db.get(User, mine["id"])], None)
+            db.commit()
+        finally:
+            side.close()
+
+        fresh = SessionLocal()
+        try:
+            left = fresh.execute(
+                text("select quota_bonus from users where id = :i"), {"i": inviter_id}
+            ).scalar()
+        finally:
+            fresh.close()
+        assert left == quota.INVITE_REWARD, (
+            f"并发结的那一笔被注销回退盖掉了：应剩 {quota.INVITE_REWARD}（20 减 10），库里是 {left}"
+        )
+
+    def test_同一列不许再出现整列赋值那种写法(self, db):
+        """上一条量的是行为，这一条钉的是写法——同一条列上只准有一种更新机制。
+
+        先剥注释再测：这一支的注释本来就要解释"原来那里是读出来减完写回去"，
+        不去注释的话这条判据从写下那句解释的那天起就永远红。
+        """
+        src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "app", "services", "deletion.py")
+        with open(src, encoding="utf-8") as fh:
+            body = "\n".join(line.split("#", 1)[0] for line in fh)
+        assert ".quota_bonus" in body, "读错了文件，这一条就成了假绿"
+        assert not re.search(r"\w+\.quota_bonus\s*=[^=]", body), (
+            "注销这一支又用整列赋值改余额了：会和 `quota._settle` 的相对自增互相覆盖"
+        )
+
+    def test_没结过钱的人注销不动邀请人余额(self, client, db):
+        """只有 invited_by、没有台账行（还没写下第一篇）→ 邀请人本来就没拿到钱，不该被扣。"""
+        inviter = User(openid="has-bonus", quota_bonus=30)
+        db.add(inviter)
+        db.commit()
+        u = User(openid="never-wrote", invited_by=inviter.id)
+        db.add(u)
+        db.commit()
+        wipe(client, u)
+        db.expire_all()
+        assert db.get(User, inviter.id).quota_bonus == 30
+
+    def test_别人指向我的归因被清空(self, client, db, mine):
+        follower = User(openid="knew-me", invited_by=mine["id"])
+        db.add(follower)
+        db.commit()
+        fid = follower.id
+        wipe(client, mine)
+        db.expire_all()
+        assert db.get(User, fid).invited_by is None
+
+
+def register(client, db, monkeypatch, openid):
+    """打真实登录路由，只把 code2session 换成指定 openid。"""
+    from app.core import auth as auth_core
+
+    async def fake(code):
+        return {"openid": openid, "session_key": "k"}
+
+    monkeypatch.setattr(auth_core, "_wechat_code2session", fake)
+    resp = client.post("/api/auth/wechat", json={"code": "x"})
+    assert resp.status_code == 200, resp.text
+    uid = resp.json()["user_id"]
+    db.expire_all()
+    return db.get(User, uid)
+
+
+class Test账号代数:
+    """SQLite 的 INTEGER PRIMARY KEY 会复用已删除行的 id。
+
+    只认 id 的话，注销掉的那个人手里的旧 token 会直接变成新号的身份——新号一注册，
+    陌生人就能读能写他的笔记。generation 就是为此加的：token 里带着签发时那一代，
+    对不上就 401。
+    """
+
+    def test_注册出来的号代数递增(self, client, db, monkeypatch):
+        a = register(client, db, monkeypatch, "gen-a")
+        b = register(client, db, monkeypatch, "gen-b")
+        assert b.generation > a.generation
+
+    def test_同id重注册后旧token被拒(self, client, db, monkeypatch):
+        old = register(client, db, monkeypatch, "gen-victim")
+        uid, old_hdr = old.id, hdr(old)
+        assert client.get("/api/user/quota", headers=old_hdr).status_code == 200
+
+        db.delete(old)
+        db.commit()
+        # 摆成"id 被复用、代数往前走了一格"这个确定状态
+        fresh = User(id=uid, openid="gen-takeover", generation=old.generation + 1)
+        db.add(fresh)
+        db.commit()
+
+        resp = client.get("/api/user/quota", headers=old_hdr)
+        assert resp.status_code == 401
+        assert "失效" in resp.json()["detail"]
+
+    def test_旧token对复用后的id也写不进去(self, client, db, monkeypatch):
+        old = register(client, db, monkeypatch, "gen-writer")
+        uid, old_hdr = old.id, hdr(old)
+        db.delete(old)
+        db.commit()
+        fresh = User(id=uid, openid="gen-takeover2", generation=old.generation + 1)
+        db.add(fresh)
+        db.commit()
+
+        # 冒充那一趟之前的底数：`register` 现在会替他种下 §8.232 那一篇预置笔记，
+        # 而这一格是直接 `db.delete(old)`（不走 /v1/account 那条级联），那一行留在库里挂在同一个
+        # 数字 id 上。所以"名下 0 条"从 2.1.11 起不再是这件事的证明——它证明的是残留行。
+        # 判据换成**差分**：那一趟 POST 前后条数一模一样，而且没有一条叫这个名字。
+        before = db.query(Note).filter(Note.user_id == str(uid)).count()
+        assert client.post("/api/notes/", headers=old_hdr, json={"title": "冒充写入"}).status_code == 401
+        db.expire_all()
+        assert db.query(Note).filter(Note.user_id == str(uid)).count() == before
+        assert db.query(Note).filter(Note.user_id == str(uid), Note.title == "冒充写入").count() == 0
+
+    def test_新号自己的token照常可用(self, client, db, monkeypatch):
+        old = register(client, db, monkeypatch, "gen-old2")
+        uid, old_gen = old.id, old.generation
+        db.delete(old)
+        db.commit()
+        fresh = User(id=uid, openid="gen-fresh2", generation=old_gen + 1)
+        db.add(fresh)
+        db.commit()
+
+        assert client.get("/api/user/quota", headers=hdr(fresh)).status_code == 200
+
+    def test_没有gen字段的老token仍按第一代处理(self, client, db):
+        """升级那一刻，线上已发出去的 token 全都不带 gen。
+
+        库里的老号经迁移后 generation 也是 1，两边对得上，所以老 token 不该被一刀切失效
+        ——否则一部署就要全量用户重新登录。
+        """
+        u = User(openid="legacy-token", generation=1)
+        db.add(u)
+        db.commit()
+        legacy = jwt.encode(
+            {"sub": str(u.id), "exp": int(time.time()) + 3600, "jti": "legacy-jti"},
+            "pytest-only-secret-not-a-real-one",
+            algorithm="HS256",
+        )
+        resp = client.get("/api/user/quota", headers={"Authorization": f"Bearer {legacy}"})
+        assert resp.status_code == 200, resp.text

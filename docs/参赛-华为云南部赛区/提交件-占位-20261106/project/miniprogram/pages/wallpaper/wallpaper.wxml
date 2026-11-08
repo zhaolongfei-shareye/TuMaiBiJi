@@ -1,0 +1,77 @@
+<view class="container {{themeClass}}">
+  <view class="page-head">
+    <text class="page-title">{{t.wallpaper}}</text>
+    <text class="page-hint">{{t.wallpaperHint}}</text>
+  </view>
+
+  <!-- 界面字体那一排已撤（iOS 与安卓真机都证伪：微信不认这些系统字体名，点了不换字）。
+       字体栈和 app.js 里那套开关留着没删，走 wx.loadFontFace 挂自己的字体时再加回来。 -->
+
+  <view class="sec-head">
+    <text class="sec-title">{{t.wallpaperSection}}</text>
+    <text class="sec-hint">{{t.wallpaperSubHint}}</text>
+  </view>
+
+  <!-- 手机模拟预览：画的是「当前生效那一套」下的笔记列表屏。站长 10-04 撤了
+       "再点一下上面手机才算"那一步，所以这一块只看不点。
+       里面每个颜色都来自 mock（JS 按那套主题算出来的字面值），
+       不吃本页的 CSS 变量，否则预览永远只能画出已经生效的那一套。 -->
+  <!-- 外面这一圈是这一页的壳，颜色一律走当前主题的变量；只有 mock 里面那几块走被预览那套。 -->
+  <view class="stage">
+    <view class="mock" style="background: {{mock.frame}}">
+      <view class="mock-screen" style="background: {{mock.page}}">
+        <view class="mock-notch" style="background: {{mock.ink}}"></view>
+        <view class="mock-nav" style="color: {{mock.ink}}">{{t.appName}}</view>
+        <view class="mock-body">
+          <view class="mock-h1" style="color: {{mock.ink}}">{{t.notesHeading}}</view>
+          <view
+            class="mock-row"
+            wx:for="{{mock.rows}}"
+            wx:key="index"
+            style="background: {{mock.card}};border-color: {{mock.edge}}"
+          >
+            <view class="mock-blk" style="background: {{item}}"></view>
+            <view class="mock-lines">
+              <view class="mock-ln" style="background: {{mock.bar}}"></view>
+              <view class="mock-ln mock-ln-short" style="background: {{mock.bar}}"></view>
+            </view>
+          </view>
+        </view>
+        <view class="mock-tabs" style="background: {{mock.card}};border-color: {{mock.edge}}">
+          <view class="mock-tab" wx:for="{{mock.tabs}}" wx:key="index" style="background: {{item}}"></view>
+        </view>
+      </view>
+    </view>
+    <view class="stage-hint">{{t.swatchHint}}</view>
+  </view>
+
+  <!-- 四枚排成一行：一枚就是一个色块，横向不滚（站长 10-04 把六枚压成四枚）。
+       宽度交给 flex 分、不写死数字——写死了在窄一点的机上又会滚起来。
+       点哪一枚就定哪一枚，在用那一枚画勾加外环（外环走 box-shadow，不占布局，
+       免得选中那一格高出去、整排跟着抖）。 -->
+  <view class="wp-row">
+    <view
+      class="wp-chip {{item.active ? 'wp-chip-on' : ''}}"
+      wx:for="{{wallpapers}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="onPick"
+    >
+      <view class="wp-tile" style="{{item.itemStyle}}">
+        <view wx:if="{{item.active}}" class="wp-dot">✓</view>
+      </view>
+      <text class="wp-name">{{item.label}}</text>
+    </view>
+  </view>
+
+  <view class="strip-foot">{{t.inUse}}{{t.colon}}{{currentLabel}}</view>
+
+  <!-- 这里原来有一排「背景图：用人像 / 不用」。站长 09-30 判它是错的：图本来就和
+       「我的 → 卡片模板」最上面那张同一个来源（poster.homeBg()），这一页不该再有
+       第二个门；整屏要么用那张图、两级都没设过就是白底（§8.231 已删包内那张硬编码默认图），不给"关掉"这个选项。
+       换图只有一个入口：首页那枚「换背景」，它导流到卡片模板页。 -->
+
+  <view wx:if="{{applying}}" class="applying-mask">
+    <text class="applying-text">{{t.applying}}</text>
+  </view>
+</view>

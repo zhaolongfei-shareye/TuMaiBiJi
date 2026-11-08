@@ -1,0 +1,68 @@
+<view class="container {{themeClass}}">
+  <!-- 头部沿用"我的"页那条母题：logo 靠左，右侧名称 + slogan，版本做角标 -->
+  <view class="about-header card">
+    <image class="brand-logo" src="/assets/logo.png" mode="aspectFill"></image>
+    <view class="brand-text">
+      <view class="brand-line">
+        <text class="brand-name">{{t.appName}}</text>
+        <text class="brand-ver">v{{version}}</text>
+      </view>
+      <text class="brand-slogan">{{t.slogan}}</text>
+    </view>
+  </view>
+
+  <!-- 三栏在同一页里切，不再往下开新页面。文字 + 下划线，不做按钮态 -->
+  <view class="tabs card">
+    <view class="tab {{tab === 'intro' ? 'on' : ''}}" bindtap="onTab" data-key="intro">{{t.aboutTabIntro}}</view>
+    <view class="tab {{tab === 'features' ? 'on' : ''}}" bindtap="onTab" data-key="features">{{t.aboutTabFeatures}}</view>
+    <view class="tab {{tab === 'privacy' ? 'on' : ''}}" bindtap="onTab" data-key="privacy">{{t.aboutTabPrivacy}}</view>
+  </view>
+
+  <block wx:if="{{tab === 'intro'}}">
+    <view class="card block-card">
+      <text class="lead">{{introLead}}</text>
+    </view>
+
+    <!-- 没有值的行点了不会复制：onCopy 里对空值直接返回 -->
+    <view class="menu-group card">
+      <view class="menu-item" wx:for="{{infoRows}}" wx:key="label" bindtap="onCopy" data-value="{{item.copy}}">
+        <text class="menu-label">{{item.label}}</text>
+        <view class="menu-right">
+          <text class="menu-value">{{item.value}}</text>
+          <text class="menu-arrow" wx:if="{{item.copy}}">›</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <block wx:elif="{{tab === 'features'}}">
+    <view class="card feature" wx:for="{{features}}" wx:key="title" style="{{item.skin}}">
+      <view class="f-block">
+        <text class="f-mark">{{item.mark}}</text>
+      </view>
+      <view class="f-body">
+        <text class="f-title">{{item.title}}</text>
+        <text class="f-text">{{item.body}}</text>
+      </view>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="card block-card">
+      <text class="lead">{{t.aboutPrivacyLead}}</text>
+    </view>
+
+    <view class="card policy">
+      <view class="p-section" wx:for="{{privacy}}" wx:key="title">
+        <text class="p-title">{{index + 1 }}. {{item.title}}</text>
+        <view class="p-line" wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this">
+          <view class="p-dot"></view>
+          <text class="p-text">{{line}}</text>
+        </view>
+      </view>
+      <text class="p-updated">{{t.aboutUpdatedAtLabel}}{{t.colon}}{{updatedAt}}</text>
+    </view>
+  </block>
+
+  <text class="copyright">{{t.copyright}}</text>
+</view>

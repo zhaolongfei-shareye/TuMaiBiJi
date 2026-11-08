@@ -1,0 +1,48 @@
+<import src="../../templates/card-info-sheet.wxml"/>
+<view class="container {{themeClass}}">
+  <!-- 站长 10-21 一句「卡片模板改为"卡片市场"，进去后"卡片模板"改为"卡片市场"（类似商店货架形式），
+       之前的图片，名字，一句话都去掉。只保留按钮，按钮就是修改图片，名字和一句话的弹窗，
+       按钮名字"编辑卡片信息"，按钮放在卡片市场标题的右侧」。
+       · 两处叫法吃同一枚键 `navProfile`：「我的」菜单那一行与这一屏的大标题，一处改口另一处跟着改
+         （10-16 夜「左上角统一为该菜单名称」定的就是这一条，不新起字串）。
+       · 上面那三块（四个形象槽／名称框／一句话框）与那条「保存」整片撤掉，收进标题右侧那一枚按钮
+         拉起的那一层——层的标记在 templates/card-info-sheet.wxml，收数据与推格在 utils/cardInfo.js（与首页同一份）。
+       · 货架那一排（一组一条、左右滑着挑）的**结构一个字没换**：他还是按分组标题＋一排格子来认这一屏的，
+         下面 `.grid-head` 那两行字要大一档，也是同一句里点的。
+       · 站长 10-30 一句「卡片市场，取消选择的黑边和黑点，这里只是浏览功能，不需要选择」⇒ 这一排不再有点中那一格：
+         外环（`.cell-on`）、名字后面那枚圆点（`.cell-on-dot`）、名字变深（`.cell-on .cell-label`）三样一起没，
+         连"点一格就当场落盘"那一下（`bindtap`／`onPickTemplate`）也一起撤——留着它就是屏上不动、背后偷偷改默认模板。
+         格子左右那 8rpx 内缩**没跟着撤**：那一档是这一排的几何，他这次点的是皮不是位置。 -->
+  <view class="mk-head">
+    <text class="page-title">{{t.navProfile}}</text>
+    <view class="mk-edit" bindtap="onOpenCardInfo">{{t.editCardInfo}}</view>
+  </view>
+
+  <block wx:for="{{groups}}" wx:for-item="g" wx:key="id">
+    <view class="grid-head">{{g.label}}</view>
+    <scroll-view class="grid" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="grid-inner">
+        <view
+          wx:for="{{g.items}}"
+          wx:key="id"
+          class="cell"
+        >
+          <canvas
+            type="2d"
+            id="tpl-{{item.id}}"
+            class="cell-canvas"
+            style="height: {{item.h}}rpx"
+          ></canvas>
+          <view class="cell-label">
+            <text>{{item.label}}</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </block>
+
+  <!-- 改名片那一层（图片／名称／一句话）：与首页成品弹窗里那枚入口同一份标记、同一份实现。
+       这一屏没有"背景图那一态"，所以 index.wxss 那条 `.container.has-bg .ci-card.glass-dialog`
+       的补皮不吃得到——遮罩与卡片那两层皮都在 app.wxss 全局那份里。 -->
+  <template is="cardInfoSheet" data="{{cardInfoOpen, ciSlots, ciName, ciSlogan, t}}"/>
+</view>

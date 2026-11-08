@@ -138,10 +138,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     await sleep(900)
     const enD = await ip.data()
     ck('⑰-1 英文态真翻到了，左端那句念的就是 ⑰ 压过的那一格（不是屏上还留着汉字）',
-      enD.lang === 'en' && (enD.t || {}).swipeHint === texts('en').swipeHint,
-      JSON.stringify((enD.t || {}).swipeHint))
+      enD.lang === 'en' && (enD.t || {}).browseMarket === texts('en').browseMarket,
+      JSON.stringify((enD.t || {}).browseMarket))
     ck('⑰-2 那句压到 16 个字符以内（他截图那一版 24 个字母正是撞上的那一段）',
-      texts('en').swipeHint.length <= 16, `${texts('en').swipeHint.length} 字符：${texts('en').swipeHint}`)
+      texts('en').browseMarket.length <= 16, `${texts('en').browseMarket.length} 字符：${texts('en').browseMarket}`)
     /* 中间那枚的盒子**不是**内容宽：`.grip-tx-c` 写的是 `left:0; right:0; max-width:340rpx; margin:0 auto`
        ⇒ 绝对定位两边钉死＝拉满 702，再被 max-width 夹回 340，余量分给两个 auto margin
        ⇒ **盒子恒等于 340rpx、恒居中**。第一版判据按"盒子＝墨迹"写，11 套量回来全是同一组数
@@ -150,9 +150,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
          中间那枚的墨迹宽拿 `wx.createOffscreenCanvas(2d)·measureText` 现测，并且**用左端那一句自校一档**：
          同一枚 `.grip-tx`（同字号、同 700、同字距），量回来的宽 ÷ 屏上盒子的宽 ＝ 这一台的折算率 k，
          名字乘同一个 k ⇒ 不猜"一个字母几 rpx"，也顺手把模拟器把 21rpx 取整成 10px 那一档吃掉。
-       ⚠ 残余风险：k 标在 `Swipe to switch` 那一句上，名字里有该句没有的字形（大写 V/L、`&`）时差几个百分点
+       ⚠ 残余风险：k 标在左端那一句上，名字里有该句没有的字形（大写 V/L、`&`）时差几个百分点
          ⇒ 这一条判"缝 ≥ 8rpx"，不是判"绝不重叠"；他要是回一句"还压着"，就换截图采像素那条路（本仓有现成做法）。 */
-    const enHint = texts('en').swipeHint
+    const enHint = texts('en').browseMarket
     const walk = []
     for (const id of ids) {
       await ip.callMethod('_tplPick', id)

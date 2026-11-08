@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="628" viewBox="0 0 880 628">
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="7" refX="8.5" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#000"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="880" height="628" fill="#fff" stroke="none"/>
+  <rect x="216" y="36" width="204" height="36" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="318" y="58.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">小程序运行环境</text>
+  <rect x="426" y="36" width="204" height="36" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="528" y="58.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">原生移动操作系统环境</text>
+  <rect x="636" y="36" width="204" height="36" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="738" y="58.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12" fill="#000">网页浏览器环境</text>
+  <rect x="40" y="80" width="170" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="125" y="125.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">异步任务句柄</text>
+  <rect x="216" y="80" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="318" y="116.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">未被等待的</text>
+  <text x="318" y="133.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">Promise 对象</text>
+  <rect x="426" y="80" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="528" y="116.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">未被串联等待的协程</text>
+  <text x="528" y="133.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">任务或其作业句柄</text>
+  <rect x="636" y="80" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="738" y="116.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">未被等待的</text>
+  <text x="738" y="133.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">Promise 对象</text>
+  <rect x="40" y="168" width="170" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="125" y="213.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">离屏绘图表面</text>
+  <rect x="216" y="168" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="318" y="213.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">离屏画布组件</text>
+  <rect x="426" y="168" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="528" y="213.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">位图绘制上下文</text>
+  <rect x="636" y="168" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="738" y="204.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">画布元素或</text>
+  <text x="738" y="221.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">离屏画布接口</text>
+  <rect x="40" y="256" width="170" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="125" y="292.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">带质量参数的</text>
+  <text x="125" y="309.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">有损编码接口</text>
+  <rect x="216" y="256" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="318" y="292.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">画布导出临时</text>
+  <text x="318" y="309.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">文件接口</text>
+  <rect x="426" y="256" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="528" y="292.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">带质量参数的位图</text>
+  <text x="528" y="309.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">有损编码接口</text>
+  <rect x="636" y="256" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="738" y="292.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">画布转数据链接或</text>
+  <text x="738" y="309.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">转文件对象接口</text>
+  <rect x="40" y="344" width="170" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="125" y="389.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">客户端文件直传接口</text>
+  <rect x="216" y="344" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="318" y="389.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">云存储上传接口</text>
+  <rect x="426" y="344" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="528" y="380.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">对象存储软件开发</text>
+  <text x="528" y="397.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">工具包的上传接口</text>
+  <rect x="636" y="344" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="738" y="380.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">凭服务端签发的临时上传</text>
+  <text x="738" y="397.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">凭证发起的写入请求</text>
+  <rect x="40" y="432" width="170" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="125" y="477.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">非易失性补偿队列</text>
+  <rect x="216" y="432" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="318" y="477.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">键值存储项</text>
+  <rect x="426" y="432" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="528" y="468.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">本地数据库表</text>
+  <text x="528" y="485.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">或偏好存储项</text>
+  <rect x="636" y="432" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="738" y="468.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">浏览器端索引数据库</text>
+  <text x="738" y="485.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">或本地存储项</text>
+  <rect x="40" y="520" width="170" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="125" y="565.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">前台生命周期事件</text>
+  <rect x="216" y="520" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="318" y="565.32" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">应用前台恢复回调</text>
+  <rect x="426" y="520" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="528" y="556.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">场景激活回调</text>
+  <text x="528" y="573.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">或活动恢复回调</text>
+  <rect x="636" y="520" width="204" height="82" fill="#fff" stroke="#000" stroke-width="1.6"/>
+  <text x="738" y="556.8" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">页面可见性变更事件</text>
+  <text x="738" y="573.84" text-anchor="middle" font-family="Songti SC, STSong, SimSun, serif" font-size="12.0" fill="#000">与窗口聚焦事件</text>
+</svg>

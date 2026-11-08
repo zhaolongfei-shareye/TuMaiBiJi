@@ -1,0 +1,207 @@
+<!-- 私密密码那一层的标记搬到 templates/pwd-sheet.wxml（10-12 起三页共用一份），本页只挂数据与方法。
+     <import> 不渲染任何东西，放在根节点外面。 -->
+<import src="../../templates/pwd-sheet.wxml"/>
+<view class="container {{themeClass}} {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}} {{bgLightLow ? 'bg-light-low' : ''}}">
+  <!-- has-bg 这一档 10-11 才补到 container 上（原来只有下面 .head-band 带）。需求原文：
+       站长 10-11「界面纯色底色部分改为半透明毛玻璃效果，按钮ICON不变」＋「毛玻璃白底下面
+       如果没有背景图，你可以下移背景图」＋ X4 那一格他回「做」。玻璃那几条规则全站统一以
+       `.container.has-bg` 为闸（首页/录入页本来就是这一档，本页只有 .head-band 带，导致
+       me.wxss 新写的 `.container.has-bg .sheet` 与 app.wxss 那两枚弹窗规则落不到实处）——
+       补上之后这两处才生效，没铺图时照旧是实心（§8.85 同一口径：背后是纯色页面，模糊没有对象）。 -->
+  <!-- 头部这块：底图贴屏边铺满；接缝那道弧的方向不动（站长 10-04 指出我改反了，已改回）——
+       仍是"下面那一层往上凸出来盖住图的下沿"，只是这一层的颜色换成了页面底，
+       所以它不再是一张卡，只是把那道弧留住。 -->
+  <view class="head">
+    <view class="head-band {{bgSrc ? 'has-bg' : ''}} {{bgLight ? 'bg-light' : ''}}">
+      <image wx:if="{{bgSrc}}" class="head-img" style="{{imgStyle}}" src="{{bgSrc}}" mode="aspectFill" />
+      <!-- 「调亮度」那一枚点拧的就是这一层：dimScrim 空串＝全铺（最沉那一档＝现网样子），
+           opacity:0＝一点不压（＝原图亮度）。三页同一个本机键，所以一起沉、一起亮。 -->
+      <view wx:if="{{bgSrc}}" class="head-scrim" style="{{dimScrim}}"></view>
+      <!-- 左上角这行大字与首页那一行是同一档量（--fs-h1 / 700 / -1rpx / left 32 top 22），
+           站长 10-01：三个 tab 的首页风格要一致，这一页原来只有右上角那枚药丸。
+           站长 10-04：这一行不再写死「我的」，改成跟着下面那枚药丸走——停在设置就写设置、
+           翻到关于就写关于，让这行大字报出当前这一屏是哪一档。-->
+      <!-- 站长 10-16 夜两句话，第二句把第一句收窄（「只需要在有背景图状态下加」）：
+           铺了照片那一态画首屏那枚书法位图（宽与透明度在 `app.wxss` 的 `.brand-title`，
+           这一页只给落点），没铺那一态回到原来那行跟着药丸走的文字（设置／关于）。
+           原来那行字两态都同时住在最顶上那一栏（`me.js` 的 `syncNavTitle`）。
+           `aria-label` 与那一栏同源，屏读用户听到的话不因为换图而变成"图片"。 -->
+      <image wx:if="{{bgSrc}}" class="h1 brand-title" src="/assets/title-heading.png" mode="widthFix"
+             aria-label="{{tab === 'about' ? t.pillAbout : t.pillSettings}}" />
+      <view wx:else class="h1 h1-txt">{{tab === 'about' ? t.pillAbout : t.pillSettings}}</view>
+      <!-- 数字没从 /api/user/quota 读回来之前整块不占位：宁可空着，也不先摆一个猜的数 -->
+      <view wx:if="{{scoreText}}" class="score">
+        <text class="score-n">{{scoreText}}</text>
+        <text class="score-l">{{t.brainScore}}</text>
+      </view>
+    </view>
+    <!-- 站长 10-04：这一行不再是一张卡——那层"把卡色叠在页底上画成不透明"的补丁撤了，
+         换成页面底同一个色，下沿两角也不再收圆；留着的只有往上凸那道弧。
+         它在 .head 里面，为的是吃那块顶回去的 24 内缩、贴屏边把图的下沿盖住。 -->
+    <view class="sheet">
+      <image class="sheet-logo" src="{{logoSrc}}" mode="aspectFill" />
+      <view class="sheet-text">
+        <text class="sheet-name">{{nameText}}</text>
+        <text class="sheet-slogan">{{sloganText}}</text>
+      </view>
+      <!-- 站长 10-01 晚：这枚药丸从图上搬进 LOGO 这一行的最右。原来它浮在照片右上角，
+           和左上角那行「我的」抢同一条视线；搬进来之后这一行就是「圆 LOGO + 两行字 + 两个档」。 -->
+      <view class="pill">
+        <view class="seg {{tab === 'set' ? 'on' : ''}}" bindtap="onTab" data-key="set">{{t.pillSettings}}</view>
+        <view class="seg {{tab === 'about' ? 'on' : ''}}" bindtap="onTab" data-key="about">{{t.pillAbout}}</view>
+      </view>
+      <!-- 10-15 01:4x「面板中间多了一条线」那一刀的实心封层（`.sheet-seal`）**同一天 03:5x 撤了**：
+           站长「设置和我的看到明显的断层…要统一到笔记列表那种」。那条线是照片被 `overflow:hidden`
+           裁掉的那条硬边，封层盖住它、自己却成了一道新台阶（实测 Δ 灰阶 +6.7／+16.5／+10.1 三行）。
+           根因是"玻璃淡满那一条线＝照片裁切那一条线"同一档 ⇒ 现在这一格抬到 740、玻璃段抬到
+           与列表页同一条 238，裁切线整条压在实心段底下，封层与它那道台阶一起作废。
+           来历、两版伪元素为什么没画上、全部实测数抄在 me.wxss 那段注释里。 -->
+    </view>
+  </view>
+
+  <!-- 站长 10-15 01:4x「设置和我的，上面固定不变，下方超过竖向位置，只是下方滚动，不要全屏滚动，
+       要与笔记列表体验一致。要改」⇒ 从这一行往下整个搬进一枚 `scroll-view`。
+       正本抄 `pages/index/index.wxml` 那枚 `.list`（同一套 `scroll-y` ＋ `enhanced` ＋
+       `show-scrollbar="{{false}}"`）；内缩挂在**这一层**的 padding 上，不挂在 scroll-view 自己身上，
+       理由抄在那一页的注释里（挂在它身上时右侧要给滚动条留位，左右不等宽）。
+       上面那一块 `.head`（底图＋名片行）不再跟着走：它由 `.container` 那条竖排给 `flex:none` 钉住。 -->
+  <scroll-view class="me-body" scroll-y enhanced show-scrollbar="{{false}}"
+               scroll-into-view="{{into}}">
+  <!-- 切档回顶用的两枚零高锚点（见 me.js `onTab` 那一段：这一屏不再整页滚，
+       原来那句 `wx.pageScrollTo` 管不到 scroll-view 里面，改用 `scroll-into-view`）。
+     两枚挨着放、内容都是零高，滚到哪一枚都是回到最顶；交替用是因为同一个 id 连设两次不触发。 -->
+  <view id="meTopA"></view><view id="meTopB"></view>
+  <!-- ---------------- 设置：能操作的那几样 ---------------- -->
+  <block wx:if="{{tab === 'set'}}">
+    <view class="menu-group card">
+      <view class="menu-item" bindtap="onNavigate" data-page="profile">
+        <text class="menu-label">{{t.navProfile}}</text>
+        <text class="menu-hint">{{t.navProfileTip}}</text>
+        <view class="ico"><view class="cv"></view></view>
+      </view>
+      <!-- 「外观设置」这一格按站长的话**隐藏**（10-14 原话「设置里面的风格入口隐藏」＋
+           「切换毛玻璃改到首页，增加一个入口『换心情』」）。
+           ⚠ 去的是入口，不是能力：换壁纸这件事整条搬到了首页那枚「换心情」（五档彩色毛玻璃，
+              见 utils/palette.js 的 MOODS 与 pages/create 的 onCycleMood），
+              所以这一格留着＝同一件事两个入口（他定过"一个功能只留一个入口"）。
+           路由表里那一位（me.js 的 wallpaper）与那一页都留着没删：删页要连着改 app.json、
+           判据与那页的图标资源，是另一件事，等他拍要不要一起撤。 -->
+      <!-- 「分类管理」那一行站长 10-17 关了（原话「分类做好好，原设置的分类入口关闭」）：
+           管理整条搬进笔记列表那一屏——按面板顶那枚井格就地增、删、拖，点空白存，不跳页。
+           `t.categories` 与 `t.categoriesTip` 那两枚键留着不删：`pages/categories/` 那一页还在
+           读它们（那一页的文件与注册也留着，理由写在 docs/方案-分类面板内管理-20261017.md §4），
+           撤键等于把那一页也判死，是另一刀。 -->
+      <!-- 私密密码：这一行只是门，输入整块搬到屏幕下方那一层（站长 10-01 晚：
+           「不在原菜单处理方式」——原来就地展开成两个长输入框，混在列表里像另一行菜单）。
+           门仍然只吃服务端那条读数，读没读回来决定右边按钮是「重置密码」还是「确定」。 -->
+      <view class="menu-item {{pwdOpen ? 'open' : ''}}" bindtap="onTogglePwd">
+        <text class="menu-label">{{t.privatePassword}}</text>
+        <text class="menu-hint">{{t.privatePasswordTip}}</text>
+        <view class="ico"><view class="cv"></view></view>
+      </view>
+      <!-- 我的邮箱：这一行不给小字说明（右侧那一档要留给现读回来的地址，两处都要字就挤了），
+           说明整句搬进点开的这一层。地址没读回来之前右侧什么都不摆——连「未填写」也不摆，
+           那也是一个猜的数（这页另外几处读不到就整块不占位是同一条规矩）。 -->
+      <view class="menu-item {{emailOpen ? 'open' : ''}}" bindtap="onToggleEmail">
+        <text class="menu-label">{{t.myEmail}}</text>
+        <view class="menu-right">
+          <text wx:if="{{emailLoaded}}" class="menu-value me-email-val">{{emailText || t.myEmailUnset}}</text>
+          <view class="ico"><view class="cv"></view></view>
+        </view>
+      </view>
+      <view class="menu-item menu-danger" bindtap="onDeleteAccount">
+        <text class="menu-label">{{t.deleteAccount}}</text>
+        <view class="ico"><view class="cv"></view></view>
+      </view>
+    </view>
+
+    <!-- 图片云空间（方案 §3.1.8）：过了 0.9 才出现的脚注，不是菜单里的一格——
+         它没有能点进去的页面，画成 menu-item 就是给了一个按不动的门（站长那条
+         "一个功能只留一个入口"）。比值是**全站**口径，所以这句说的是这一池水，
+         不是"你的空间"。 -->
+    <view wx:if="{{storageWarn}}" class="me-storage">
+      <text class="me-storage-k">{{t.storageSpace}}</text>
+      <text class="me-storage-v">{{storageTip}}</text>
+    </view>
+  </block>
+
+  <!-- ---------------- 关于：只能看的那几样，直接在头部下面生成，不分二级 ---------------- -->
+  <block wx:else>
+    <view class="card about-lead">
+      <view class="about-who">
+        <text class="about-name">{{t.appName}}</text>
+        <text class="about-ver">v{{version}}</text>
+      </view>
+      <text class="about-p">{{introLead}}</text>
+    </view>
+
+    <view class="menu-group card">
+      <view class="menu-item" bindtap="onCopy" data-value="{{site}}">
+        <text class="menu-label">{{t.officialSite}}</text>
+        <view class="menu-right">
+          <text class="menu-value">{{site}}</text>
+          <view class="ico"><view class="cv"></view></view>
+        </view>
+      </view>
+      <view class="menu-item" bindtap="onCopy" data-value="{{contactEmail}}">
+        <text class="menu-label">{{t.feedbackEmail}}</text>
+        <view class="menu-right">
+          <text class="menu-value">{{contactEmail}}</text>
+          <view class="ico"><view class="cv"></view></view>
+        </view>
+      </view>
+      <!-- 这一行本身就是 button[open-type=share]：点它直接弹微信分享面板。
+           右边不再挂那句「新写作者 +10」（站长 10-02：撤掉）——同一个数下面那块规则
+           第二行已经说了，一行右边再摆一遍就是两张卡各说一遍。这一行只留箭头。 -->
+      <button class="menu-item share-row" open-type="share" aria-label="{{t.shareToFriend}}">
+        <text class="menu-label">{{t.shareToFriend}}</text>
+        <view class="menu-right">
+          <view class="ico"><view class="cv"></view></view>
+        </view>
+      </button>
+    </view>
+
+    <!-- 魅力值规则（站长 10-01 深夜：原来这一组最底下那行「魅力 + 数字」撤掉，换成一块规则）。
+         站长 10-02 真机打回第二版：三行之间不要横线——"这是一件事三个要点，是完整的论述，
+         不是区分三件事"。所以线撤掉，每行前面挂一枚点，行高收回到一行的呼吸，读下来是一段话。
+         三个数仍由 loadQuota 从 /api/user/quota 填，读不到整块不出现。 -->
+    <view wx:if="{{mindRules.length}}" class="card rules">
+      <text class="rules-title">{{t.mindRulesTitle}}</text>
+      <view class="rule" wx:for="{{mindRules}}" wx:key="label">
+        <view class="rdot" style="{{ruleDotStyle}}"></view>
+        <text class="rule-label">{{item.label}}</text>
+        <text class="rule-value">{{item.value}}</text>
+      </view>
+    </view>
+
+    <text class="copyright">{{t.copyright}}</text>
+  </block>
+  </scroll-view>
+
+  <!-- 私密密码那一层：整屏遮罩 + 卡，从上到下是 功能名 → 使用场景说明 → 校验提醒 + 六个方格 →
+       一行两枚（左退出、右动作）。10-12 起这一层三页共用一份：标记在 templates/pwd-sheet.wxml、
+       皮在 styles/pwd-sheet.wxss，来历与 10-01/10-02 那两条真机结论（iOS 密文点会漏在六格左边、
+       键盘压住下面两枚按钮）都写在那两份的头里。
+       数据与方法仍是本页自己那七个同名键（pwdOpen/pwdEntering/pwdName/pwdScene/pwdTip/pwdBuf/pwdFocus）
+       与 onPwdBuf/onPwdOk/onPwdReset/onClosePwdPanel——换的是面，不是这一页的账。
+       两步确认与重置那一条链留在 me.js（那是这一页自己的事），共用的是这一层的皮。 -->
+  <template is="pwdSheet" data="{{pwdOpen, pwdEntering, pwdName, pwdScene, pwdTip, pwdBuf, pwdFocus, t}}"/>
+
+  <!-- 我的邮箱这一层：几何全部抄上面那一层（遮罩 rgba(20,20,28,.55)、卡宽 620rpx、
+       离顶 180rpx、一行两枚各占一半），只是把六个格子换成一只普通输入框。
+       输入框预填的是**现读回来的那一条**（不是本机存的），所以 me.js 在读没回来之前不让打开——
+       预填成空再把人引导去点保存，就等于替他把原来那条清了。 -->
+  <view wx:if="{{emailOpen}}" class="me-email-mask" bindtap="onCloseEmailPanel">
+    <view class="me-email-card card glass-dialog" catchtap="">
+      <text class="me-email-name">{{t.myEmail}}</text>
+      <text class="me-email-scene">{{t.myEmailScene}}</text>
+      <input class="me-email-field" type="text" confirm-type="done" adjust-position="{{false}}"
+        focus="{{emailFocus}}" placeholder="{{t.myEmailPlaceholder}}" placeholder-class="me-email-ph"
+        value="{{emailBuf}}" bindinput="onEmailBuf" bindconfirm="onEmailSave" />
+      <view class="me-email-two">
+        <view class="me-email-btn ghost" bindtap="onCloseEmailPanel">{{t.cancel}}</view>
+        <view class="me-email-btn primary" bindtap="onEmailSave">{{t.myEmailSave}}</view>
+      </view>
+    </view>
+  </view>
+</view>

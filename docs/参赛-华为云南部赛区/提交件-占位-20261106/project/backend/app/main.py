@@ -1,0 +1,190 @@
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+import logging
+
+from app.api.routes import notes, ingest, auth, categories, shares, user, tasks, poster_templates, assets, cards, profiles, landing, v1_auth, v1_account, v1_extract, mp_config, admin_ops, ops_page, roammark
+from app.core.error_codes import http_exception_handler
+from app.core.rate_limit import limiter, rate_limit_exception_handler
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+# 日志装配。uvicorn 只配它自己那四个 logger，root 上一个 handler 都没有，
+# 所以 app.* 的记录最后落到 logging.lastResort——那个 handler 级别是 WARNING，
+# 写 INFO 等于没写。现网实测：连打 9 次小程序码，journald 里"小程序码回源微信"零条，
+# 同一个文件的 ERROR 却查得到。配额这类事实查不到就等于没做，所以在这里补上。
+_app_log = logging.getLogger("app")
+if not _app_log.handlers:
+    _app_handler = logging.StreamHandler()
+    _app_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    _app_log.addHandler(_app_handler)
+    _app_log.setLevel(logging.INFO)
+
+app = FastAPI(title="图麦笔记 API", version="0.1.0")
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
+# `/v1` 的错误体多带一个稳定 `code`（契约 §六）。这一支是**全局** handler，`/api/*` 也走它，
+# 所以"不动旧门"完全靠 `error_codes.is_v1_path` 那一句（它读 `route_path()` 而不是 `url.path`，
+# 理由记在 `error_codes.py` 顶部）——注册与判断分在两处，任何一处被改掉，
+# `tests/test_v1_error_codes.py` 里那一组"表里每一格在 /api 上都不得现身"就红。
+# 另注：这一行是**替换** FastAPI 默认那支 HTTPException handler，不是追加；默认那支里
+# "204/205/304 与 1xx 不给 body"那道闸门已经一起搬进 `http_exception_handler`，别在这儿删。
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# 字段名 -> 用户看得懂的叫法。没列进来的走通用文案。
+_FIELD_LABELS = {
+    "title": "标题",
+    "summary": "摘要",
+    "content": "正文",
+    "original_content": "原文",
+    "tags": "标签",
+    "key_points": "要点",
+    "key_links": "链接",
+    "source_url": "链接",
+    "name": "分类名",
+    "color": "颜色",
+    "ids": "分类顺序",
+    "inviter": "邀请人",
+    "url": "链接",
+    # 列表页那一枚搜索框。不给这一格，超长时屏上会出现"search太长了，最多 200 字"——
+    # 用户不认识那个词（10-20 审计同一条道理：屏上不许露英文字段名）。
+    "search": "搜索的内容",
+    # 后台「卡片模板」那一栏的四个可改字段。类型不对时（排序填了汉字）走的就是这个字典，
+    # 不给中文名的话屏上会出现"sort_order格式不对"——操作者不认识那个词。
+    "label": "中文名",
+    "label_en": "英文名",
+    "sort_order": "排序",
+    "min_app_version": "最低包版本",
+    "status": "状态",
+}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """把 Pydantic 的英文报错数组翻成一句中文。
+
+    不加这个的话 detail 是个 list，前端 `(err.data && err.data.detail)` 拿到数组直接塞进
+    errLine，用户看到的是一串 [object Object]。加了长度上限之后，粘贴一篇长文当标题
+    就会走到这里——这是正常用户能碰到的路径，不是只有攻击者才会看见的角落。
+    原始错误进日志，排查时对得上。
+    """
+    errors = exc.errors()
+    # 只记定位信息，绝不记 input：RequestValidationError 的每一项都自带 `input`，
+    # 那是用户提交的原样内容（标题/正文/摘要）。整份打出去等于把私密笔记抄进 journald，
+    # 而 journald 没有按用户隔离、也没有随账号注销一起删。
+    logger.warning(
+        "入参校验失败 path=%s errors=%s",
+        request.url.path,
+        [
+            {
+                "loc": [str(p) for p in err.get("loc", ())],
+                "type": err.get("type"),
+                "ctx": err.get("ctx"),
+            }
+            for err in errors
+        ],
+    )
+
+    detail = "提交的内容格式不对，请检查后重试"
+    if errors:
+        first = errors[0]
+        loc = [str(p) for p in first.get("loc", ()) if p not in ("body", "query", "path")]
+        # `loc` 可以是空的：pydantic 的 `model_attributes_type`（该给对象却给了别的）只到 `body` 那一层，
+        # 而 `body` 在上面已被滤掉。取 `[-1]` 要放在判空之后——先 `.get(loc[-1], … if loc else …)` 会把
+        # IndexError 留在实参里，处理器自己炸成 500，客户端就拿不到这句中文 422 了。
+        field = loc[-1] if loc else ""
+        label = _FIELD_LABELS.get(field, field)
+        kind = first.get("type", "")
+        limit = (first.get("ctx") or {}).get("max_length")
+        if kind == "string_too_long" and limit:
+            detail = f"{label}太长了，最多 {limit} 字" if label else f"内容太长了，最多 {limit} 字"
+        elif kind == "too_long" and limit:
+            detail = f"{label}最多 {limit} 条" if label else f"最多 {limit} 条"
+        elif kind in ("string_too_short", "value_error.missing"):
+            detail = f"{label}不能为空" if label else "缺少必填内容"
+        elif kind in ("int_parsing", "string_parsing", "bool_parsing"):
+            detail = f"{label}格式不对" if label else detail
+    return JSONResponse(status_code=422, content={"detail": detail})
+
+
+@app.exception_handler(OverflowError)
+async def overflow_exception_handler(request: Request, exc: OverflowError):
+    """编号越界这一类，回一句中文 400，不许留成 500（N1 剩下的那 33 处裸 `int` 入口）。
+
+    逐个参数补 `le=` 要改三十多个签名，而它们的错法是同一条：整数进 SQLite 绑定，
+    超过 int64 驱动当场抛 `OverflowError: Python int too large to convert to SQLite INTEGER`
+    （本地实测 `10^21` 抛、`10^18` 与 `2^63-1` 正常）。这里收一次口，路径进日志便于查是谁在打。
+    ⚠ 只挡 `OverflowError`，别扩到 `Exception`——那会把真正的编程错误一并抹成 400。
+    """
+    logger.warning("编号越界 path=%s: %s", request.url.path, exc)
+    return JSONResponse(status_code=400, content={"detail": "这个编号不对，请退出这一屏再试一次"})
+
+_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
+app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
+app.include_router(shares.router, prefix="/api/shares", tags=["shares"])
+app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"])
+app.include_router(user.router, prefix="/api/user", tags=["user"])
+app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
+# 卡片模板配方下发。两个 GET（整批配方＋那份清单），没有写口——这张表能改画面，
+# 写路径留在部署脚本里（见 routes/poster_templates.py）
+app.include_router(poster_templates.router, prefix="/api/poster/templates", tags=["poster-templates"])
+# 笔记配图：路径写在模块里（跨 /api/notes/{id}/assets 与 /api/user/storage-quota 两个前缀），
+# 所以这里不再给 prefix——一个模块两组路径，是为了让"归属校验"和"配额口径"只有一份实现。
+app.include_router(assets.router, tags=["assets"])
+# 卡片留档那三个口跨两个前缀（/api/notes/{id}/card 与 /api/user/cards），同 assets 那条写法
+app.include_router(cards.router, tags=["cards"])
+# 名片与外观档位（2.1）：路径也写在模块里（/api/user/profile），与上面两条同一做法
+app.include_router(profiles.router, tags=["profiles"])
+# 公开落地页：路径写在模块里（/n/{token}），而且**必须留在 /api 之外**——
+# Universal Link 要求"链接的域名与路径"和 App 那条 Associated Domains 一致，
+# 卡片上印的、微信里传的都是 https://agentsbin.cn/n/<token>，没有 /api 这一段。
+app.include_router(landing.router, tags=["landing"])
+# 运营图（方案 docs/方案-cn后台资产管理.md P0-a）：小程序读的两个口 + 后台那一页与它背后的四个口。
+# 三个模块、路径都写在模块里（`/api/mp/*`、`/api/admin/*`、`/ops`），所以这里都不给 prefix。
+# ⚠ 这一段现网是 **inert** 的：客户端还没有读 `/api/mp/config` 的代码，两张新表除了 `/ops`
+# 那一页以外没有任何写入者。上线它不等于"换图能力已经对用户生效"，P0-b 那一刀才生效。
+app.include_router(mp_config.router, tags=["mp-assets"])
+app.include_router(admin_ops.router, tags=["admin"])
+app.include_router(ops_page.router, tags=["admin"])
+# 阶段2 跨端身份。`/v1` 是**另一种钥匙**开的一组门：token 里 `sub` 是 `accounts.id`、
+# 带 `kind=account`，而 `/api/*` 那批按 `users.id` 发的老钥匙原样保留（现网 7 天有效期的
+# token 认的是后者）。两组门并存、互不开对方的房间，判据在 tests/test_v1_auth_and_link.py。
+app.include_router(v1_auth.router, prefix="/v1/auth", tags=["v1-auth"])
+app.include_router(v1_account.router, prefix="/v1/account", tags=["v1-account"])
+# iPhone 那一发"只要提炼结果"的口（站长 10-27 拍的甲）。它挂在 `/v1` 下**但不吃 token**：
+# 那一端没有账号（`ios/Sources` 全仓 0 处 `AuthenticationServices`），靠的是门闩＋IP 限流＋
+# 舱壁＋全站日闸那四样叠起来，理由与"为什么不在服务端建笔记"的全文在 `routes/v1_extract.py` 顶上。
+# ⚠ 现网 `TUMARKNOTE_APP_GATE` 还没配 ⇒ 这一口今天一律 503（inert），配了才真的开始花钱。
+app.include_router(v1_extract.router, prefix="/v1/extract", tags=["v1-extract"])
+# RoamMark 那一路的 AI 转发（方案 docs/方案-roammark-AI转发.md）：路径写在模块里（/api/roammark/*），
+# 所以这里不给 prefix。⚠ 这一组口**不吃用户 JWT**，靠的是 `ROAMMARK_APP_GATE` 那枚门闩＋IP 限流＋三发舱壁，
+# 与上面两组门的钥匙来源完全不同——挂错依赖就等于给整条小程序用户开了一个匿名 AI 出口。
+# 现网是 inert 的：`.env` 里还没有 `ROAMMARK_APP_GATE` 那一行，所以两个口今天一律 503。
+app.include_router(roammark.router, tags=["roammark"])
+
+@app.get("/")
+async def root():
+    return {"message": "图麦笔记 API", "version": "0.1.0"}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
