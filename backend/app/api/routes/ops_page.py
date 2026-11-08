@@ -1516,7 +1516,8 @@ function drawInto(box, r) {
   try {
     // strict：配方跑不动就抛。不 strict 会静默退回包里那份 JS 画法，
     // 那画出来的就不是这一行的样子了——这一栏最不该骗人的就是这张图。
-    plan = POSTER.planPoster(ctx, POSTER.SAMPLE_NOTE, r.template_id, PREVIEW_PROFILE, 'zh', { showQr: true, strict: true });
+    // hasNote：后台预览不加载图片（服务器没有 assets 目录），避免 404。
+    plan = POSTER.planPoster(ctx, POSTER.SAMPLE_NOTE, r.template_id, PREVIEW_PROFILE, 'zh', { showQr: true, strict: true, hasNote: false });
   } catch (e) {
     box.appendChild(el('p', 'no', '这一行配方跑不出图：' + ((e && e.message) || e)
       + '。线上遇到它，用户看到的是退回默认那一套的卡。'));

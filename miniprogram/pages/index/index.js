@@ -1921,9 +1921,10 @@ Page({
           const ctx = canvas.getContext('2d')
           const images = {}
           if (profile.avatarPath) images.avatar = await poster.loadImage(canvas, profile.avatarPath, 4000)
+          if (sample.noteImgPath) images.note = await poster.loadImage(canvas, sample.noteImgPath, 4000)
           canvas.width = poster.W
           canvas.height = MKT_MEASURE_H
-          const plan = poster.planPoster(ctx, sample, tpl.id, profile, lang)
+          const plan = poster.planPoster(ctx, sample, tpl.id, profile, lang, { hasNote: !!images.note })
           const h = Math.round((plan.height * MKT_W) / poster.W)
           // 跑坏退到默认那一套时，这一格的名字跟着**画出来的那张**念（N10）：
           // 念着「图文卡」而格子里是笔记卡，人会以为那套模板长这样。
