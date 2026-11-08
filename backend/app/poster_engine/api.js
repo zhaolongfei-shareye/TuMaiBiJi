@@ -236,7 +236,17 @@ const pollTask = (taskId, intervalMs = 2000, maxWaitMs = 300000) => {
   })
 }
 
+// 一篇笔记能挂几张配图。**服务端那份定义在 `backend/app/models/asset.py` 的
+// `MAX_ASSETS_PER_NOTE`**（绑图那一个口卡它：超了回 400「一篇笔记最多 N 张图」），
+// 这里是那份数的前端副本——两边同值由 `docs/工具/验-张数只有一个出处.js` 钉着。
+//
+// 为什么放在这一份（前后端那道边界）而不是各页各写：前端有两个落点要它
+// （录入页选图那一枚、编辑页补传那一枚），各写一份 9 的话，改了服务端那一份
+// 就会出现"选得上来的服务端收不下"，而症状是静默少图——界面不报错、接口也不报错。
+const MAX_SHOTS = 9
+
 module.exports = {
+  MAX_SHOTS,
   request,
   // 收口后的那一句：只有带中文的才留得下来（N7）——utils 里自己读 `err.data.detail` 的
   // 两处（privateGate／cardCloud）都走这一枚，别再各写一份判据。

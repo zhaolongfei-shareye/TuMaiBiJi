@@ -355,9 +355,11 @@
            `onTplNameTap`（一枚可点的东西不拆成三枚），限宽那 340rpx 也仍是整条一起省略。 -->
       <text wx:if="{{!posterHasCard && posterTplName}}" class="grip-tx grip-tx-c" catchtap="onTplNameTap">{{'< ' + posterTplName + ' >'}}</text>
       <view wx:else class="grip-bar"></view>
-      <!-- 左右各一句、同一行同一档：右边收窗，左边告诉他这一屏能左右滑。
-           原来那句挂在卡片下面，卡片一高就被顶到看不见。 -->
-      <text class="grip-tx grip-tx-l" wx:if="{{!posterHasCard}}">{{t.swipeHint}}</text>
+      <!-- 左端那一句：11-08 起改成「浏览卡片市场」，点了浮出下面那一层（两层横着看、点一格选中）。
+           原来这里是「左右滑换模板」——那句只是告诉他这一屏能横着滑，现在这句话本身就是把手。
+           ⚠ 必须是 `catchtap`：这一句住在 `.grip` 里，而 `.grip` 那一条 bindtap 是"点把手收窗"，
+             不截住的话点这句顺手把整层收了，等于什么都看不到。 -->
+      <text class="grip-tx grip-tx-l" wx:if="{{!posterHasCard}}" catchtap="onOpenMarket">{{t.browseMarket}}</text>
       <text class="grip-tx">{{t.grip}}</text>
     </view>
     <view class="tpl-body" bindtouchstart="onPosterTouchStart" bindtouchend="onPosterTouchEnd">
@@ -419,6 +421,48 @@
         <view class="pill {{noQr ? '' : 'pill-on'}}" catchtap="onToggleQr"><view class="pill-dot"></view></view>
         <text>{{t.posterMake}}</text>
       </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- 卡片市场那一层（站长 11-08）：成品弹窗左上角那句「浏览卡片市场」点了浮出来。
+       现有所有卡片分上下两层横着看（经典款／个性款各一条），点一格选中就回成品那一屏。
+       · **不是全屏**：四周那一圈是磨砂玻璃（与 `.float-mask` 同一支的那一档暗纱＋模糊），
+         中间浮一张小窗，四边都看得见后面的东西——他要的就是"浮窗里面显示"。
+       · 底下那层成品弹窗**不摘**：选完还得回到那张图上，所以这一层只是盖在它上头。
+       · 层序 102／103，压在成品弹窗（100／101）之上、微信图片面板（1000）之下。 -->
+  <view wx:if="{{marketOpen}}" class="float-mask mkt-mask" catchtap="onCloseMarket"></view>
+  <view wx:if="{{marketOpen}}" class="mkt-sheet">
+    <view class="mkt-hd">
+      <text class="mkt-title">{{t.navProfile}}</text>
+      <text class="mkt-x" catchtap="onCloseMarket">✕</text>
+    </view>
+    <!-- 两层各一条横着滚：结构与「我的」页那十格货架同一条路（scroll-view scroll-x ＋
+         inline-flex 的一条内排），只是格子小一档——那一屏是整页的货架，这一层是浮窗里的小窗。 -->
+    <view class="mkt-rows">
+      <block wx:for="{{marketRows}}" wx:key="id" wx:for-item="g">
+        <view class="mkt-row">
+          <text class="mkt-row-h">{{g.label}}</text>
+          <scroll-view class="mkt-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+            <view class="mkt-line">
+              <view
+                wx:for="{{g.items}}" wx:key="id" wx:for-item="tpl"
+                class="mkt-cell {{tpl.id === posterTpl ? 'mkt-on' : ''}}"
+                style="width: {{mktW}}rpx"
+                data-id="{{tpl.id}}"
+                catchtap="onMarketPick"
+              >
+                <canvas
+                  type="2d"
+                  id="mkt-{{tpl.id}}"
+                  class="mkt-canvas"
+                  style="width: {{mktW}}rpx; height: {{tpl.h}}rpx"
+                ></canvas>
+                <text class="mkt-lab">{{tpl.label}}</text>
+              </view>
+            </view>
+          </scroll-view>
+        </view>
       </block>
     </view>
   </view>

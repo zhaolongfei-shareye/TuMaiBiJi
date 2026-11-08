@@ -3,13 +3,13 @@
  "files": [
   {
    "name": "api.js",
-   "bytes": 20732,
-   "md5": "8bf04b6e799cf1dd06076c37cb1012b9"
+   "bytes": 21430,
+   "md5": "9cac3504da0c1c2e5e9b6bf8b4c3bc26"
   },
   {
    "name": "appInfo.js",
    "bytes": 78787,
-   "md5": "caf285d67b0e6de7957d175a3857c8ed"
+   "md5": "5d6e46fa4aa6dfd5783eb4f50b8d3093"
   },
   {
    "name": "date.js",
@@ -18,8 +18,8 @@
   },
   {
    "name": "i18n.js",
-   "bytes": 55666,
-   "md5": "db5a9117393bb59903e5b574108fd4ea"
+   "bytes": 57752,
+   "md5": "a9f4f74cbdbff96216ef42ac5ec7ca48"
   },
   {
    "name": "mpAssets.js",

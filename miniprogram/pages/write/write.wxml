@@ -67,20 +67,18 @@
       </picker>
     </view>
 
-    <!-- 配图（站长 10-18「编辑时，图片要展示，然后支持删除图片」）。一排方格 + 每枚右上角一枚 ✕
-         （与录入页"已选"那一排的 .th-x 同一画法）。
-         没有图时整栏不画：他没提空态要说什么，而"还没有配图"那一句下面既没有图也没有加图的口，
-         念起来像坏了。加图这一条也没做——选图只在录入那一屏，这一页只管看和删。
-         方格定宽定高 + aspectFill：只定宽不定高时会被 flex 压扁（那条坑记在详情页同一排）。 -->
     <!-- 配图（站长 10-18「编辑时，图片要展示，然后支持删除图片」＋ 10-19「要支持拖动排序，
-         方便用户选择好的图片作为头图」）。一排方格 + 每枚右上角一枚 ✕
-         （与录入页"已选"那一排的 .th-x 同一画法）。
-         没有图时整栏不画：他没提空态要说什么，而"还没有配图"那一句下面既没有图也没有加图的口，
-         念起来像坏了。加图这一条也没做——选图只在录入那一屏，这一页只管看、删和排。
+         方便用户选择好的图片作为头图」＋ 11-08「提炼笔记后，再编辑笔记，支持上传新的图片，
+         仍然是 9 张，要过审」）。一排方格 + 每枚右上角一枚 ✕（与录入页"已选"那一排的 .th-x 同一画法）。
          方格定宽定高 + aspectFill：只定宽不定高时会被 flex 压扁（那条坑记在详情页同一排）。
          拖动那一趟：长按起拖 → 越过谁的中心就换到谁的位置 → 松手发一次 reorder（第一张＝头图）。
-         事件全用 bind 不用 catch，与笔记页分类那一排同一画法——那一排也是拖得动、页面也滚得动。 -->
-    <view class="form-group" wx:if="{{shots.length}}">
+         事件全用 bind 不用 catch，与笔记页分类那一排同一画法——那一排也是拖得动、页面也滚得动。
+         11-08 补的那一枚 ➕：只在编辑态有（新建那一篇还没建出来，没有可绑的篇），
+         满了或在忙就转灰；点它开系统选择器，能选几张＝还剩几格（张数那个数在 utils/api.js，
+         与服务端同值，由 docs/工具/验-张数只有一个出处.js 钉着）。
+         这一栏的显隐：原来 `wx:if="{{shots.length}}"`（没图整栏不画），现在多了一枚 ➕
+         就得连着改——否则一篇没图的笔记进了编辑页，加图那个口整条消失。 -->
+    <view class="form-group" wx:if="{{isEdit || shots.length}}">
       <text class="label">{{t.shotsLabel}}</text>
       <view class="wr-shots">
         <view class="wr-shot {{shotDrag === index ? 'wr-drag' : ''}}"
@@ -92,6 +90,15 @@
           bindtouchcancel="onShotDragEnd">
           <image class="wr-shot-img" src="{{item.cloud_url}}" mode="aspectFill" lazy-load />
           <view class="wr-shot-x" data-id="{{item.id}}" data-url="{{item.cloud_url}}" catchtap="onDelShot">✕</view>
+        </view>
+        <!-- ➕ 那一枚。与上面那些图同边长同圆角（不许自己另写一档边长／圆角，
+             否则那一排里就出现两种方格）。转灰的两态：满了／那一趟在飞。
+             在飞时那格不画 ➕、改念"处理中"，不然他点了没反应会以为坏了。 -->
+        <view wx:if="{{isEdit}}"
+          class="wr-shot wr-shot-add {{(shotsBusy || shots.length >= maxShots) ? 'wr-add-dis' : ''}}"
+          catchtap="onAddShot" aria-label="{{t.addShot}}">
+          <view wx:if="{{!shotsBusy}}" class="wr-plus glyph-plus"></view>
+          <text wx:else class="wr-add-busy">{{t.shotsUploading}}</text>
         </view>
       </view>
     </view>

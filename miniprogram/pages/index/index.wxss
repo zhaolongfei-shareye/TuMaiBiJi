@@ -1398,6 +1398,133 @@
   opacity: 1;
 }
 
+/* ---------- 卡片市场那一层（站长 11-08） ----------
+   成品弹窗左上角那句「浏览卡片市场」点了浮出来：现有所有卡片分上下两层横着看，
+   点一格选中就回成品那一屏。**不是全屏**——四周那一圈是磨砂玻璃，中间浮一张小窗。 */
+.mkt-mask {
+  /* 玻璃那一层是 `.float-mask` 那一支（暗纱＋`--glass-bf`），这里只把它抬到成品弹窗之上：
+     成品弹窗是 100／101，这一层是 102／103。 */
+  z-index: 102;
+}
+
+.mkt-sheet {
+  position: fixed;
+  left: 40rpx;
+  right: 40rpx;
+  top: 150rpx;
+  bottom: 240rpx;
+  box-sizing: border-box;
+  background: var(--bg-card);
+  border-radius: var(--r-block);
+  box-shadow: 0 30rpx 60rpx rgba(8, 10, 14, 0.32);
+  z-index: 103;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mkt-hd {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72rpx;
+  padding: 0 var(--sp-4);
+}
+
+/* 标题这一枚比「我的」页那个左上角大字小一档：那一屏是整页的标题，这一屏是浮窗里的一个抬头，
+   按 42rpx 写会把浮窗撑得像整页。 */
+.mkt-title {
+  font-size: var(--fs-body);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* 收起这一枚：热区 64rpx（32pt），比它画出来的那一个字大得多——一个字按不住。 */
+.mkt-x {
+  flex: none;
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  font-size: var(--fs-meta);
+  color: var(--text-secondary);
+}
+
+.mkt-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 var(--sp-4);
+}
+
+/* 两层各一条：组名那一行 + 一条横着滚的货架（结构与「我的」页那十格同一条路）。 */
+.mkt-row {
+  margin-bottom: var(--sp-3);
+}
+
+.mkt-row-h {
+  display: block;
+  margin: var(--sp-3) 0 var(--sp-2);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.mkt-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+/* 内缩挂在内容层，不挂在 scroll-view 自己身上（挂在它身上时右侧要给滚动条留位，左右就不等宽）。 */
+.mkt-line {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: 0 8rpx;
+}
+
+/* 宽度吃 data 里那个 mktW（与 index.js 的 MKT_W 同一个数）：格子跟着小样走，
+   两边各留 8rpx 内缩，这一排才不会贴着浮窗的边。 */
+.mkt-cell {
+  flex: none;
+  box-sizing: border-box;
+}
+
+/* 圆角写死 20rpx：与 index.js 的 MKT_R 同一个数（clipRounded 画进位图的那一份）。
+   真机上原生画布不吃 CSS 圆角，所以位图里已经弯过一次，这里再写一次是给"位图之外那圈"用的。
+   底色只能透明：留一块底色就是在四个角外各垫一块直角灰斑。 */
+.mkt-canvas {
+  display: block;
+  width: 200rpx;
+  height: 267rpx;
+  border-radius: 20rpx;
+  background: transparent;
+}
+
+.mkt-lab {
+  display: block;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-tiny);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 选中的那一格：名字变主色加粗，小样外圈加一道主色细环。
+   ⚠ 不是黑边——「我的」页那个市场 10-30 撤掉的正是黑边与黑点（那里只浏览、不选）；
+   这一层要选，就得让人一眼看见选中的是哪一格。 */
+.mkt-on .mkt-lab {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.mkt-on .mkt-canvas {
+  box-shadow: 0 0 0 4rpx var(--accent);
+}
+
 /* 弹窗下沿（站长 10-03 第三稿）：取消｜编辑个人名片 一行，通栏那枚组合按钮一行，
    小字在按钮下面。左右内缩交给 dock。 */
 .tpl-dock {

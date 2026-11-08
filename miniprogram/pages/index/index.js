@@ -88,6 +88,39 @@ function fmt(tpl, map) {
    站长那句「如果没卡片图，这个位置就完全被标题占满」。它带的两枚 data 键（`swatchBg` 淡底色、
    `brandGlyph` 品牌字）同时没有消费者，一起删——留着就是"屏上不再画的东西还在代码里被算"。 */
 
+/* 卡片市场那一层的小样尺寸（站长 11-08：成品弹窗左上角那句「左右滑换模板」改成「浏览卡片市场」，
+   点了浮出这一层：现有所有卡片分上下两层横着看，点一格选中就回成品那一屏）。
+   这一套数与「我的」页那十格不是同一份——那一格是整页的货架（320rpx 一格），
+   这一层是浮在成品弹窗上头的一个小窗，格子得小一档才放得下两层。
+   · MKT_W：格子里那张位图的显示宽（rpx）。高度由 js 按每套模板自己的比例算好写进 style。
+   · MKT_R：圆角。真机上原生画布不吃 CSS 圆角，所以这个值还要画进位图一次（poster.clipRounded）。
+   · MKT_SCALE：落笔比例。位图宽 = 750 × 0.22 ≈ 165px，而这一格在 375pt 宽的屏上只有 100px
+     ——位图比显示大一倍半，放大了也不糊（十格全屏那一版是 0.46）。
+   · MKT_MEASURE_H：量高度用的临时画布。排版只依赖字体度量，与画布多大无关（与「我的」页同一句）。 */
+const MKT_W = 200
+const MKT_R = 20
+const MKT_SCALE = 0.22
+const MKT_MEASURE_H = 750
+
+/* 这一层的格子骨架：分层两组（经典款／个性款），每组一条横着滚。
+   与「我的」页那份 `groupSkeleton` 是同一条路（`poster.templateList()`＝包内 ∪ 下发，
+   数一个都不写死），只是格子小一档——那一屏是整页的货架，这一层是浮在成品弹窗上头的小窗。 */
+function marketSkeleton(lang) {
+  return poster.TEMPLATE_GROUPS.map((g) => {
+    const items = poster.templateList().filter((x) => x.group === g.id).map((x) => ({
+      id: x.id,
+      label: poster.templateLabel(x.id, lang),
+      h: Math.round((MKT_W * 4) / 3),
+    }))
+    const n = items.length
+    return {
+      id: g.id,
+      label: poster.groupName(g.id, lang) + (lang === 'en' ? ` (${n})` : `（${n}）`),
+      items,
+    }
+  })
+}
+
 Page({
   data: {
     notes: [],
@@ -174,6 +207,14 @@ Page({
     // 弹窗底部那一排圆点：每套模板一枚，颜色吃分类那同一套色板（toneColor），
     // 谁被选中由 wxml 现比 posterTpl，所以换模板时不用再 setData 一次这个数组。
     tplIds: [],
+    // 卡片市场那一层（11-08）：`marketOpen` 是"那一层浮着"这一个开关，
+    // `marketRows` 是那一层里的两层货架（经典款／个性款，各一条横着滚）。
+    // 骨架先落在 data 里（小样还没画出来时也有格子可摆），画完再把每格的高度补上。
+    marketOpen: false,
+    marketRows: [],
+    // 小样格子的显示宽：wxml 里那个 canvas 的 style 吃它（与 MKT_W 是同一个数，
+    // 写在 data 里是为了让 wxml 那一处只有一个出处）。
+    mktW: MKT_W,
     posterImagePath: '',
     posterW: 750,
     posterH: 900,
@@ -1837,6 +1878,96 @@ Page({
     this._tplDrawing = false
   },
 
+  /* 卡片市场那一层（站长 11-08：「生成分享图时候，左上角的左右滑换模板，改为"浏览卡片市场"，
+     浮窗里面显示，现有所有卡片，上下两层，左右切换浏览……点击选中后，回到生成分享图界面」）。
+     这一层不是全屏：四周那一圈仍是磨砂玻璃（与 `.float-mask` 同一支），中间浮一张小窗。
+     底下那层成品弹窗**不摘**（与「卡片上的信息」那一层相反）——他要点选，选完还得回到那张图上。 */
+  onOpenMarket() {
+    if (this.data.posterHasCard) return
+    this.setData({ marketOpen: true, marketRows: marketSkeleton(this.data.lang) }, () => {
+      this._renderMarketThumbs()
+    })
+  },
+
+  onCloseMarket() {
+    this.setData({ marketOpen: false })
+  },
+
+  /* 点一格＝选中那套并回成品那一屏。**先收这一层再换模板**：`_tplPick` 会触发一次重画，
+     重画要几百毫秒，这一层若还浮在上面，那几百毫秒里人看到的还是小窗而不是新那张卡。 */
+  onMarketPick(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    this.setData({ marketOpen: false })
+    this._tplPick(id)
+  },
+
+  /* 十格小样那套算法（与「我的」页同一条路）：量高度 → 逐格把高度提交给视图层 → 落笔。
+     两处不同只有三个数（MKT_W／MKT_R／MKT_SCALE）与选择器前缀（`#mkt-`）。
+     头像照样画（posterProfile 现算，见 poster.js 那条注释）——名字/一句话住在 storage 里。 */
+  async _renderMarketThumbs() {
+    const gen = (this._mktGen || 0) + 1
+    this._mktGen = gen
+    const lang = this.data.lang
+    const profile = poster.posterProfile()
+    const sample = lang === 'en' ? poster.SAMPLE_NOTE_EN : poster.SAMPLE_NOTE
+    const rows = this.data.marketRows.map((g) => ({ id: g.id, label: g.label, items: g.items.slice() }))
+    for (let gi = 0; gi < rows.length; gi++) {
+      for (let ii = 0; ii < rows[gi].items.length; ii++) {
+        if (this._mktGen !== gen) return
+        const tpl = rows[gi].items[ii]
+        try {
+          const canvas = await this._mktCanvas(`#mkt-${tpl.id}`)
+          const ctx = canvas.getContext('2d')
+          const images = {}
+          if (profile.avatarPath) images.avatar = await poster.loadImage(canvas, profile.avatarPath, 4000)
+          canvas.width = poster.W
+          canvas.height = MKT_MEASURE_H
+          const plan = poster.planPoster(ctx, sample, tpl.id, profile, lang)
+          const h = Math.round((plan.height * MKT_W) / poster.W)
+          // 跑坏退到默认那一套时，这一格的名字跟着**画出来的那张**念（N10）：
+          // 念着「图文卡」而格子里是笔记卡，人会以为那套模板长这样。
+          const shown = plan.fellBack ? poster.templateLabel(plan.template, lang) : tpl.label
+          // 高度必须在落笔之前逐格提交：这一格显示的真是 {{item.h}}rpx，
+          // 骨架里那是个 4:3 的占位数。等整轮画完再一次性 setData，画的过程中这些格
+          // 都被压在占位框里（clipRounded 是画进位图的，位图不弯、显示弯）。
+          this.setData({
+            [`marketRows[${gi}].items[${ii}].h`]: h,
+            [`marketRows[${gi}].items[${ii}].label`]: shown,
+          })
+          await new Promise((r) => wx.nextTick(r))
+          // 改宽高会重置画布状态，所以 scale 必须在之后设
+          canvas.width = Math.round(plan.width * MKT_SCALE)
+          canvas.height = Math.round(plan.height * MKT_SCALE)
+          ctx.scale(MKT_SCALE, MKT_SCALE)
+          poster.clipRounded(ctx, plan.width, plan.height, MKT_R, MKT_W)
+          // 解码头像可以慢到四秒，落笔前必须再对一次号。
+          if (this._mktGen !== gen) return
+          poster.paintLayers(ctx, plan.layers, images)
+          rows[gi].items[ii] = Object.assign({}, tpl, { h, label: shown })
+        } catch (err) {
+          console.error('卡片市场小样没画出来', tpl.id, err)
+          rows[gi].items[ii] = Object.assign({}, tpl, { h: Math.round(MKT_W * 1.4) })
+        }
+      }
+    }
+    if (this._mktGen !== gen) return
+    this.setData({ marketRows: rows })
+  },
+
+  _mktCanvas(selector) {
+    return new Promise((resolve, reject) => {
+      wx.createSelectorQuery().in(this)
+        .select(selector)
+        .fields({ node: true, size: true })
+        .exec((res) => {
+          const canvas = res && res[0] && res[0].node
+          if (canvas) resolve(canvas)
+          else reject(new Error(`画布未就绪：${selector}`))
+        })
+    })
+  },
+
   // 码的开关只影响这一张成品图：翻一下重画一次（与海报页同一条语义）。
   async onToggleQr() {
     if (this.data.posterBusy) return
@@ -1858,6 +1989,8 @@ Page({
     const note = this.data.posterNote
     this.setData({
       templateOpen: false,
+      // 卡片市场那一层是浮在这一屏上头的：不跟着收，收完弹窗它还剩一个孤零零的小窗。
+      marketOpen: false,
       posterImagePath: '',
       posterBusy: false,
       posterNote: null,

@@ -264,7 +264,13 @@ const i18n = {
     resetWithBioBody: '重置需要用这台手机的指纹或面容确认。识别通过后，再输两遍设一条新密码。',
     resetWithBioOk: '继续',
     bioUnavailable: '这台手机没有可用的指纹或面容，直接重置即可。',
-    swipeHint: '左右滑换模板',
+    // 站长 11-08：「生成分享图时候，左上角的左右滑换模板，改为"浏览卡片市场"」。
+    // 这一枚顶掉的是原来那句「左右滑换模板」那一格的位置（同一行左端、同一档字号字重）——
+    // 那一句 11-08 之后屏上不再画，字典里也不留（留着就是"屏上不再念的东西还在表里"）。
+    // ⚠ 中文这一格是他原话，一字没动；英文那一门要短：这一格右邻着中间那枚模板名
+    //   （限宽 340rpx、居中，左沿在 205rpx），英文长句会骑上去（与 10-20 ⑰ 同一个坑）。
+    //   'Browse market' 13 个字母折 ≈141rpx，加左边 34 到 175rpx，离 205 还有 30rpx。
+    browseMarket: '浏览卡片市场',
     // 站长 10-20 原话逐字：「左上角，加提示词"左右滑动看下一篇"」——这一格不许我改口径。
     noteSwipeHint: '左右滑动看下一篇',
     grip: '点一下收起',
@@ -389,6 +395,18 @@ const i18n = {
     permCamera: '没拿到相机权限，点这里去设置',
     permAlbum: '没拿到相册权限，点这里去设置',
     pickFailed: '没能打开相机或相册，请再试一次',
+    // 编辑页补传配图那几枚（11-08）。这一屏与录入页**不是同一条链**：录入页那批图是提炼的
+    // 原料（内容安全那道闸在提交那一趟上），这一页补的是已经建好的那一篇的配图——字节客户端
+    // 直传云存储、登记只发 file_id，服务端压根读不到那张图。
+    // ⇒ "要过审"这一格落在客户端送检上：微信判 risky 的那一张**不上云、不登记**。
+    // ⚠ 这一组句子里不许出现写死的"N 张"（数量从常量拼，与 maxShots 同一支纪律）。
+    addShot: '加图',
+    shotsUploading: '处理中…',
+    cloudNotReady: '云服务暂时用不了，请稍后再试',
+    shotsQueued: '图已传上去了，稍后自动补记',
+    shotsAdded: '已加上',
+    shotsAddedSome: '已加上，有 {n} 张没通过审核',
+    shotsSaveFailed: '没能存上这几张，请再试一次',
     // 站长 10-04 要的这枚开关，叫法用他原话「原文翻译」，不改口。10-16 两刀落在同一句里：搬到「返回」同一行
     // ＋「默认是翻译，关闭就不翻译」⇒ 这一位现在**默认开**（`create.js` data 那一位，三档的请求都带上它）。
     // 开＝提炼出来的标题／摘要／要点／标签写成中文；关＝跟着原文的语言走。原文本身两种状态下都不动。
@@ -689,15 +707,16 @@ const i18n = {
     resetWithBioBody: 'Resetting needs your fingerprint or face. Once it passes, type the new code twice.',
     resetWithBioOk: 'Go',
     bioUnavailable: 'This phone has no fingerprint or face unlock — reset directly.',
-    // 10-20 ⑰「英文版，左上角与中间重叠了，你要压缩左侧英文」。那一行只有 702rpx（窗 750−左右各 24），
+    // 11-08：这一枚顶掉原来那句 `Swipe to switch`（英文那一门原本是它，那一枚 11-08 之后
+    // 屏上不再画，字典里也不留）。
+    // 为什么非得短：10-20 ⑰「英文版，左上角与中间重叠了」。那一行只有 702rpx（窗 750−左右各 24），
     // 中间那枚模板名限到 340rpx、左右两句各内缩 34rpx——**这一格是按中文排的**：`左右滑换模板` 六个汉字
     // 折 126rpx，离中间那枚还有 120rpx；英文旧那句 24 个字母折 ≈252rpx，右沿压到中间那枚的左沿里面，
     // 屏上读成 `Swipe to change te…` 骑在 `< Vertical Letter >` 上（他截图那一眼）。
-    // 收成 `Swipe to switch`（15 字母 ≈163rpx）：宾语不写死成 template 是因为**那一格就住在模板名旁边**，
-    // 中间那枚正在念它的名字，重复一次既长又绕（同 ⑯ 那条「名字里不承诺别处已经显示的东西」）。
-    // ⚠ 中文那一格是他 10-19 的原话，一字没动；这一处只动英文那一门。折算宽度是**算的不是量的**，
-    // 量的那条在真跑那把（逐套模板在英文态量三枚矩形不相撞）。
-    swipeHint: 'Swipe to switch',
+    // 现在这一枚是「浏览卡片市场」的入口，英文仍得短：'Browse market' 13 个字母 ≈141rpx，
+    // 加左边内缩 34 到 175rpx，中间那枚模板名的框左沿在 205rpx——离它还有 30rpx，够放。
+    // 折算宽度是**算的不是量的**，量的那条在真跑那把（逐套模板在英文态量三枚矩形不相撞）。
+    browseMarket: 'Browse market',
     // 不直译"左右"（英文里 swipe 本来就是横向），也放得进详情页顶上那一行小字。
     noteSwipeHint: 'Swipe for the next note',
     grip: 'Tap to close',
@@ -800,6 +819,14 @@ const i18n = {
     permCamera: 'No camera access — tap to open settings',
     permAlbum: 'No album access — tap to open settings',
     pickFailed: 'Could not open the camera or album — please try again',
+    // 与上面中文一一对应（编辑页补传配图，11-08）。
+    addShot: 'Add image',
+    shotsUploading: 'Working…',
+    cloudNotReady: 'Cloud service is unavailable — try again later',
+    shotsQueued: 'Uploaded — it will be attached shortly',
+    shotsAdded: 'Added',
+    shotsAddedSome: 'Added — {n} didn’t pass the check',
+    shotsSaveFailed: 'Couldn’t save these images — please try again',
     // 与中文同一枚：开＝摘要整理成中文，关＝跟着原文的语言走。这里不写 "Translate"
     // （光秃秃会被读成"把界面翻译一下"），点明翻的是原文。
     origTranslate: 'Translate original',

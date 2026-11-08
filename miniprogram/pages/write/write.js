@@ -5,6 +5,11 @@ const { allowPrivate, isPrivate, unlockOn, exitOrHome } = require('../../utils/p
 const { labelOf } = require('../../utils/catText.js')
 const cardCloud = require('../../utils/cardCloud.js')
 const cloudUpload = require('../../utils/cloudUpload.js')
+// 补传配图那一条要的两枚（11-08）：压图走 imageCompress（与录入页同一个压法，
+// 免得同一张图在这一页压成另一副样子），"传上去了还没登记"那批走 assetQueue
+// （与录入页 B 链同一条路：app.js 在进前台时把那批补上）。
+const { compressForBackup } = require('../../utils/imageCompress.js')
+const assetQueue = require('../../utils/assetQueue.js')
 
 /* 这一页要发出去的那五栏，读回来时先存一份基线（站长 10-12 拍 C3 甲）。两个用途：
    ① 保存只发**真动过**的那几栏——原来这一页是整份 PUT，拿一份服务端裁过的空壳去存，
@@ -37,6 +42,10 @@ Page({
     tagList: [],
     shots: [],
     shotDrag: -1,   // 拖动中那一枚的下标（-1＝没在拖）。只用来给它挂一枚浮起来的皮
+    // 补传配图那几格（11-08「提炼笔记后，再编辑笔记，支持上传新的图片，仍然是 9 张，要过审」）
+    shotsBusy: false,   // 那一趟在飞（压图→送检→上传→登记，串行走一遍）
+    shotsLoaded: false, // 这一篇现有几张读回来过：读失败就不知道还剩几格，不许开选图
+    maxShots: api.MAX_SHOTS, // 一篇能挂几张（同一个出处：utils/api.js；前后端两侧同值由尺子钉）
     // 「原文」这一栏（站长 10-18 连着三句「看不到原文」）。编辑这一屏原来只有五栏，
     // 原文只在详情那一屏、还默认收起——他要的是在改的这一屏就能看见它。
     originalText: '',
@@ -192,9 +201,177 @@ Page({
     if (!cloudUpload.cloudReady()) return
     try {
       const list = await api.getNoteAssets(this.data.noteId)
-      this.setData({ shots: list || [] })
+      this.setData({ shots: list || [], shotsLoaded: true })
     } catch (err) {
       console.warn('配图读取失败（不影响正文）', err && (err.errMsg || err.statusCode))
+    }
+  },
+
+  // 重读整排（登记完那一次用）。绑图那个口回的是**这次登记的那几行**、不是整排，
+  // 拿它直接铺会只剩新加的那几张、老的那几张从屏上消失。
+  async _refreshShots() {
+    try {
+      const list = await api.getNoteAssets(this.data.noteId)
+      this.setData({ shots: list || [] })
+    } catch (err) {
+      console.warn('配图重读失败（屏上这一排是登记前的）', err && (err.errMsg || err.statusCode))
+    }
+  },
+
+  // ---------- 补传配图（11-08「提炼笔记后，再编辑笔记，支持上传新的图片，仍然是 9 张，要过审」）
+  //
+  // 这一条与录入页那一条**不是同一条链**，差别决定了两件事：
+  //  · 录入页那批图是提炼的**原料**：走 ingest 提交，服务端那道内容安全闸
+  //    （`wechat.enforce_image_safety`）在提交那一趟上。
+  //  · 这一页补的是**已经建好的那一篇**的配图：字节客户端直传云存储，登记只发 file_id，
+  //    服务端那个绑图的口（POST /api/notes/{id}/assets）只管张数与归属，**不碰字节**
+  //    ——后端没有云开发凭据，它压根读不到那张图。
+  // ⇒ "要过审"这一格只能在这一侧落地：上传之前先送 `api.checkShot`（服务端真跑微信内容安全，
+  //   回 pass/risky/unavailable 三态），微信明确说 risky 的那一张**不上云、不登记**。
+  // 纪律与录入页那一趟同一支：只有微信明确判 risky 才拦；unavailable（微信抖动）与没检成
+  // 一律放行——微信侧抖动不许变成"用户存不了自己的笔记"。
+
+  // 补图那一枚（➕）。点了先过四道：编辑态、有没有这篇、这一篇现有几张读回来过、还剩几格。
+  onAddShot() {
+    const { lang, noteId, shots, maxShots } = this.data
+    if (!this.data.isEdit || !noteId) return
+    if (this.data.shotsBusy) return
+    if (!this.data.shotsLoaded) {
+      // 现有几张没读回来 ⇒ 不知道还剩几格。这时候放选图，选上来的必然装不下，
+      // 而症状是静默少图（界面不报错，绑图那一个口回一句 400 也只是半句）。宁可先说加载失败。
+      wx.showToast({ title: t('loadFailed', lang), icon: 'none' })
+      return
+    }
+    const left = maxShots - shots.length
+    if (left <= 0) {
+      // 满了。静默截掉是这一条最容易犯的错（选了 12 张只留 9 张、界面一句都不说），
+      // 所以先给话，而且话里带那个数（从常量拼，不在字典里写死第二个数）。
+      wx.showToast({ title: t('maxShots', lang).replace('{n}', maxShots), icon: 'none' })
+      return
+    }
+    if (!cloudUpload.cloudReady()) {
+      wx.showToast({ title: t('cloudNotReady', lang), icon: 'none' })
+      return
+    }
+    wx.chooseMedia({
+      // 只给"还剩几格"：系统选择器自己就把上限卡住了，这里不需要再截一刀
+      count: left,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const files = (res && res.tempFiles) || []
+        if (!files.length) {
+          wx.showToast({ title: t('noImagePicked', lang), icon: 'none' })
+          return
+        }
+        this._addShots(files.map((f) => f.tempFilePath))
+      },
+      fail: (err) => {
+        const msg = String((err && err.errMsg) || '')
+        if (msg.indexOf('cancel') > -1) return   // 他自己按了取消，不是故障
+        console.error('chooseMedia 失败', msg)
+        // 这一屏没有"点这里去设置"那一格 ⇒ 不许说去设置（说了他找不到那个口），
+        // 只说没能打开相册／相机，请再试一次。
+        wx.showToast({ title: t('pickFailed', lang), icon: 'none' })
+      },
+    })
+  },
+
+  // 一张一张走：压 → 送检 → 上云 → 登记。**串行**（与录入页同一条理由：九张 4000×3000
+  // 一起重绘离屏 canvas 会把内存吃穿，真机在这件事上比模拟器诚实得多）。
+  async _addShots(paths) {
+    const { lang, noteId } = this.data
+    if (this.data.shotsBusy || !noteId) return
+    this.setData({ shotsBusy: true })
+    wx.showLoading({ title: t('shotsUploading', lang), mask: false })
+    const userId = getApp().globalData.userId
+    const items = []
+    const fileIDs = []
+    let risky = 0
+    let badFormat = ''
+    try {
+      for (const p of paths) {
+        const small = await compressForBackup(p)
+        // 压不动（读不到尺寸／画不出来）就交原图：宁可这一张大一点，也不要"图丢了"
+        const src = small || { path: p, bytes: null }
+        const v = await this._shotVerdict(src.path)
+        if (v.risky) { risky += 1; continue }   // 没过审的那一张：不上云、不登记
+        if (v.badFormat) { badFormat = v.badFormat; continue }
+        const up = await cloudUpload.uploadImage(src.path, userId)
+        if (!up) continue
+        fileIDs.push(up.fileID)
+        items.push({
+          file_id: up.fileID,
+          size: small ? small.bytes : null,
+          width: small ? small.width : null,
+          height: small ? small.height : null,
+        })
+      }
+      if (!items.length) {
+        // 一张都没成：要么全没过审，要么全传不上。这两种话说两句不同的实话，
+        // 不许合成一句"失败"——他分不清该换图还是该重试。
+        wx.hideLoading()
+        this.setData({ shotsBusy: false })
+        wx.showToast({
+          title: risky ? t('shotBlocked', lang) : (badFormat || t('shotsSaveFailed', lang)),
+          icon: 'none',
+        })
+        return
+      }
+      try {
+        await api.bindNoteAssets(noteId, items)
+      } catch (e) {
+        const code = e && e.statusCode
+        // 4xx（超张数／不是你的／这篇没了）⇒ 这批对象永远绑不上（绑图那一个口只认"登记"这一件事），
+        // 留着就是占全站配额又没人认得的孤儿 ⇒ 删掉，并把服务端那句话照实说出来。
+        // 其它（网络／5xx／429）⇒ 图已经上去了，登记这一趟下次进前台补
+        // （assetQueue 与录入页 B 链同一条路）。
+        if (code && code >= 400 && code < 500 && code !== 429) {
+          await cloudUpload.deleteFiles(fileIDs)
+          wx.hideLoading()
+          this.setData({ shotsBusy: false })
+          wx.showToast({ title: (e.data && e.data.detail) || t('saveFailed', lang), icon: 'none' })
+          return
+        }
+        assetQueue.push(noteId, items)
+        wx.hideLoading()
+        this.setData({ shotsBusy: false })
+        wx.showToast({ title: t('shotsQueued', lang), icon: 'none' })
+        return
+      }
+      await this._refreshShots()
+      wx.hideLoading()
+      this.setData({ shotsBusy: false })
+      wx.showToast({
+        title: risky
+          ? t('shotsAddedSome', lang).replace('{n}', risky)
+          : t('shotsAdded', lang),
+        icon: risky ? 'none' : 'success',
+      })
+    } catch (err) {
+      wx.hideLoading()
+      this.setData({ shotsBusy: false })
+      console.error('补传配图失败', err)
+      wx.showToast({ title: t('shotsSaveFailed', lang), icon: 'none' })
+    }
+  },
+
+  // 送检那一趟，回三态：
+  //   risky     —— 微信明确说这张有问题：**拦住**（不上云、不登记）
+  //   badFormat —— 门口就拒的那两种（不是能识别的图片、大过那一道）：这是**格式**问题，
+  //                说成"违规"是一句冤枉话，所以单独一档，念的是后端回的那句实话
+  //   ok        —— 过检，或没检成（微信抖动／网络）。**没检成 ≠ 这张有问题**，放行。
+  async _shotVerdict(path) {
+    try {
+      const res = await api.checkShot(path)
+      if (res && res.verdict === 'risky') return { risky: true }
+      return { ok: true }
+    } catch (e) {
+      if (e && e.statusCode === 400) {
+        return { badFormat: (e.data && e.data.detail) || t('shotBadFormat', this.data.lang) }
+      }
+      console.warn('这张没检成，按未检成放行', e)
+      return { ok: true }
     }
   },
 

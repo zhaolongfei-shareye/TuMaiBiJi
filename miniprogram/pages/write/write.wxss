@@ -171,6 +171,48 @@
   box-shadow: 0 10rpx 26rpx rgba(18, 20, 26, 0.30);
 }
 
+/* ➕ 那一枚（11-08 编辑页补传配图）。它**自己不许另写一档边长／圆角**——那会让那一排里
+   出现两种方格（录入页那一枚同理，`验-统一录入条` 钉的就是"➕ 与小图同边长同圆角"）。
+   所以边长与圆角都从 .wr-shot 继承，这里只许差"面"与"里面那枚图形"。
+   ⚠ `.wr-shot` 那一圈 inset 白环撤掉：那是给照片垫的一圈，垫在空方格上会读成"这里有一张图"。 */
+.wr-shot-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: var(--chip-idle);
+  border: 2rpx solid var(--card-edge);
+  box-shadow: none;
+}
+
+.wr-shot-add:active {
+  opacity: 0.82;
+}
+
+/* Lucide plus：24 格、1.6 描边，与录入页那一枚同一份图形（create.wxss 那支是页内样式，
+   搬不过来，这一页自己写一份同参数的）。⚠ 两条都要写：iOS 的 WKWebView 只认
+   `-webkit-mask-image`，只写标准那行在 iPhone 上静默不生效（这一条记在 create.wxss 那支旁边）。 */
+.wr-plus {
+  width: 45rpx;
+  height: 45rpx;
+  background: var(--text-tertiary);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='M12 5v14' /%3E%3C/svg%3E");
+}
+
+/* 满了／那一趟在飞：整枚转灰。转灰用 opacity 而不是另配一档颜色——各套主题的墨色不一样，
+   另配一档就得跟着五套主题各写一遍（写死色那一族坑记在 app.wxss 顶上）。 */
+.wr-add-dis {
+  opacity: 0.38;
+}
+
+/* 在飞时那格不画 ➕，改念这三个字：不然他点了没反应会以为坏了。 */
+.wr-add-busy {
+  font-size: var(--fs-micro);
+  line-height: 1.2;
+  color: var(--text-tertiary);
+}
+
 .container {
   padding-bottom: 60rpx;
 }
