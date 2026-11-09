@@ -49,6 +49,14 @@ BLOCKING = {
     "check_image": "同步 HTTP 送微信内容安全",
     "read_body": "同步读整份请求体＋逐张 b64decode",
     "SessionLocal": "同步建库连接",
+    # 11-09 手机号登录那一发添的：`services/sms.py` 里那五枚同步 helper，
+    # 全部挂在 `/v1/auth/sms`、`/v1/auth/login` 两只异步口上。不登记的话这一族就是假绿——
+    # 判据按**被调函数名**匹配，名字不在名单里它根本不看。
+    "_resolve_all": "壳子：里面五句 resolve 各同步查一次密钥库",
+    "check_cooldown": "真打 Redis（TTL 一趟）",
+    "store_code": "真打 Redis（SETEX 一趟）",
+    "set_cooldown": "真打 Redis（SETEX 一趟）",
+    "verify_code": "真打 Redis（GETDEL 或 pipeline 一趟）",
 }
 
 # 现读到的、**本轮不动**的阻塞点，逐条写清归谁。名单只许变短不许变长。

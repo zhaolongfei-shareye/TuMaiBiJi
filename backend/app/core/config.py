@@ -162,6 +162,26 @@ class Settings(BaseSettings):
     # 不是靠压低这一档兜住。再抬到 45 秒只会让"客户端早就走了、服务端还在写"那一段更长。
     IMAGE_STORE_CF_TIMEOUT: float = 30.0
 
+    # ---- H5 手机号+验证码登录（/v1/auth/sms、/v1/auth/login）----
+    # 腾讯云短信凭据。前五项任一为空 = 开发模式：验证码只写日志不发短信，H5 登录口照常能用。
+    # 五栏都走 service_secrets 那条链（库里优先、.env 兜底），所以生产环境由后台密钥页写入，
+    # 不必 ssh 上去改 .env、不必重启。`SMS_SECRET_ID`/`SMS_SECRET_KEY` 是腾讯云 API 密钥
+    # （CAM 那一对），不是短信应用里的 AppKey；另三栏是公开标识但也一起收进 CONSUMED_NAMES——
+    # 那张名单钉的是"源码真读了哪些字面量"，少一个名字后台就会对活着的配置说"没人读"。
+    SMS_SECRET_ID: str = ""
+    SMS_SECRET_KEY: str = ""
+    # 短信应用 ID（腾讯云控制台→短信→应用管理→应用列表→SDK AppID，纯数字）。
+    SMS_SDK_APPID: str = ""
+    # 签名内容（审核通过的那一句中文，例「图麦笔记」）。腾讯云 API 不包书名号。
+    SMS_SIGN_NAME: str = ""
+    # 模板 ID（腾讯云控制台→短信→国内消息→模板列表里那一行，纯数字）。
+    # 模板内容必须只有一个变量：{1}，服务端往里塞 6 位数字验证码。
+    SMS_TEMPLATE_ID: str = ""
+    # 验证码活多久（分钟）。Redis 里那一枚 key 的 TTL 与回给客户端的「X 分钟内有效」都读它。
+    SMS_CODE_TTL_MINUTES: int = 5
+    # 同一手机号两次发送之间最少间隔（秒）。防连点、防刷钱（每条短信腾讯云收一分钱左右）。
+    SMS_COOLDOWN_SECONDS: int = 60
+
     @model_validator(mode="after")
     def _require_jwt_secret(self) -> "Settings":
         placeholder = "change-me-in-production-use-a-long-random-string"

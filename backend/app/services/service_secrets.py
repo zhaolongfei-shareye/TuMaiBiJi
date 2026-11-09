@@ -46,7 +46,9 @@ MAX_NOTE_CHARS = 200
 # 后台那一页用它决定要不要多说一句"这一条存进去了，但还没有代码在读"。
 # ⚠ 加一条读法 = 在这里加一个名字，同时 `tests/test_service_secrets.py` 里那条
 # 「名单里每一个名字都要真改得出消费者的行为」会跟着加一条——少了那一条，这张名单会说假话。
-CONSUMED_NAMES = ("WECHAT_APP_SECRET", "HUNYUAN_CF_KEY", "DEEPSEEK")
+CONSUMED_NAMES = ("WECHAT_APP_SECRET", "HUNYUAN_CF_KEY", "DEEPSEEK",
+                  "SMS_SECRET_ID", "SMS_SECRET_KEY", "SMS_SDK_APPID",
+                  "SMS_SIGN_NAME", "SMS_TEMPLATE_ID")
 
 
 def canonical_name(raw: str) -> str:

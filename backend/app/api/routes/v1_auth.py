@@ -10,17 +10,29 @@
 `openid=NULL` 的写法（当年的甲）能让所有按 `users.id` 挂业务的老代码原样跑通，代价是
 "这个人是哪一行"从此有两个答案，而 iPhone 那一路往后每一步（公开快照、跨端同步）都要
 在两个答案之间做翻译。乙把这个问题从源头掐掉：需要 `users` 行的口，本来就登不进 Apple-only 的人。
+
+手机号登录（`/v1/auth/sms` + `/v1/auth/login`）是 H5 那一路的门：H5 没有微信 code 也没有
+Apple identityToken，只能走短信验证码。这一支发的钥匙是**老式**（`sub=<users.id>`，不带
+`kind`），因为 H5 要调 `/api/notes/*`、`/api/user/profile` 这一堆 legacy 口，那些口只认
+老式钥匙。Account + AccountIdentity 照样建（provider="phone"），但 token 走 legacy 那支。
 """
-from fastapi import APIRouter, Depends, Request
+import asyncio
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+import logging
 
 from app.core.apple_identity import verify_identity_token
-from app.core.auth import _create_account_token, login_or_register
+from app.core.auth import _create_account_token, _create_token, login_or_register
 from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
 from app.models.account import Account
-from app.services import accounts, linking
+from app.models.user import User
+from app.services import accounts, category_names, generation, linking, sms
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -85,3 +97,107 @@ async def wechat_login(request: Request, req: WechatLoginRequest, db: Session = 
     user, _legacy_user_token, _seeded_note_id = await login_or_register(req.code, db, req.inviter)
     account = accounts.ensure_for_user(db, user)
     return _login_response(db, account)
+
+
+# ---- 手机号 + 验证码登录（H5 那一路）----
+
+class SendSmsRequest(BaseModel):
+    phone: str = Field(min_length=11, max_length=11)
+
+
+class PhoneLoginRequest(BaseModel):
+    phone: str = Field(min_length=11, max_length=11)
+    code: str = Field(min_length=4, max_length=6)
+
+
+class PhoneLoginResponse(BaseModel):
+    """H5 登录回体。比 Apple/Wechat 那两支多带用户信息——H5 没有 `/api/user/profile` 的预请求，
+    登录成功那一刻就要拿到 nickname/wallpaper 去渲染首屏。legacy token 走 `sub=<users.id>`，
+    与小程序那批发出来的是同一种钥匙（`get_current_user` 认它）。"""
+    token: str
+    user_id: int
+    nickname: str
+    language: str
+    wallpaper: str
+
+
+@router.post("/sms")
+@limiter.limit("3/minute", key_func=get_ip_key)
+async def send_sms_code(request: Request, req: SendSmsRequest):
+    """发验证码。两道闸：IP 限流（slowapi 那枚装饰器）＋ 手机号冷却（Redis 里那一枚 TTL key）。
+
+    回体只有一个 `{}`：不管发没发成功都回 200。原因与 `/api/auth/wechat` 失败时不回细节同型——
+    告诉攻击者「这个号码已被注册」或「冷却中」都是在帮他们枚举手机号。真正的错误只写日志。
+    """
+    phone = req.phone.strip()
+    if not sms.PHONE_RE.match(phone):
+        return {}
+
+    cooldown = await asyncio.to_thread(sms.check_cooldown, phone)
+    if cooldown > 0:
+        return {}
+
+    code = sms.generate_code()
+    try:
+        await asyncio.to_thread(sms.store_code, phone, code)
+    except Exception:
+        logger.exception("验证码存储失败（Redis 不可用）phone=%s…%s", phone[:3], phone[-4:])
+        raise HTTPException(status_code=503, detail="验证码服务暂不可用，请稍后重试")
+    ok = await sms.send_code(phone, code)
+    if ok:
+        await asyncio.to_thread(sms.set_cooldown, phone)
+    return {}
+
+
+@router.post("/login", response_model=PhoneLoginResponse)
+@limiter.limit("5/minute", key_func=get_ip_key)
+async def phone_login(request: Request, req: PhoneLoginRequest, db: Session = Depends(get_db)):
+    """手机号 + 验证码登录。验过码之后走 `ensure_for_provider(provider="phone")` 那条现成链——
+    与微信、Apple 同一扇门，Account + AccountIdentity 的并发保护、代次分配全部复用。
+
+    与微信那一路的区别：这里**必须**同时建一行 `users`（openid = `phone:<号码>`），因为 H5
+    拿到 legacy token 之后要调 `/api/notes/*`、`/api/user/profile`，那些口只认 `get_current_user`，
+    而 `get_current_user` 要查得到 `users` 行。Apple 那一路可以不建（站长 10-09 拍的乙），
+    是因为 iPhone 走的是 `/v1/*` 那一组口，认 `get_current_account`。
+    """
+    phone = req.phone.strip()
+    if not sms.PHONE_RE.match(phone) or not sms.CODE_RE.match(req.code.strip()):
+        raise HTTPException(status_code=400, detail="手机号或验证码格式错误")
+
+    if not await asyncio.to_thread(sms.verify_code, phone, req.code.strip()):
+        raise HTTPException(status_code=400, detail="验证码错误或已过期")
+
+    provider_uid = f"phone:{phone}"
+    account = accounts.ensure_for_provider(db, "phone", provider_uid)
+
+    user = db.query(User).filter(User.account_id == account.id).first()
+    is_new = user is None
+    if is_new:
+        user = User(
+            openid=provider_uid,
+            generation=generation.allocate(db),
+            account_id=account.id,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    elif user.account_id != account.id:
+        user.account_id = account.id
+        db.commit()
+
+    if is_new:
+        try:
+            category_names.seed_default_categories(db, str(user.id))
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("默认分类没种下去（不影响登录）：user=%s", user.id)
+
+    token = _create_token(user.id, user.generation)
+    return PhoneLoginResponse(
+        token=token,
+        user_id=user.id,
+        nickname=user.nickname or "",
+        language=user.language or "zh",
+        wallpaper=user.wallpaper or "default",
+    )
