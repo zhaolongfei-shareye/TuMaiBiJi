@@ -35,7 +35,7 @@ code { background:#e9e4db; padding:1px 5px; border-radius:4px; font-size:12.8px;
 .foot { margin-top:34px; font-size:12.5px; color:#6b655c; border-top:1px solid var(--line); padding-top:12px; }
 </style></head><body><div class="wrap">
 <h1>H5「提炼了图片，但原图没有被保存」· 取证板</h1>
-<p class="sub">2026-11-12 生成（13:58）· 现网 <code>https://agentsbin.cn/app/</code> ＋ 现网库 <code>wtsj.db</code> · 两趟（12:3x–13:0x 那一刀 ＋ 13:2x–13:5x 第二轮）· 数字全是当场读回来的</p>
+<p class="sub">2026-11-12 生成（14:03）· 现网 <code>https://agentsbin.cn/app/</code> ＋ 现网库 <code>wtsj.db</code> · 两趟（12:3x–13:0x 那一刀 ＋ 13:2x–13:5x 第二轮）· 数字全是当场读回来的</p>
 
 <h2>一句话结论</h2>
 <div class="cards">
@@ -53,7 +53,7 @@ code { background:#e9e4db; padding:1px 5px; border-radius:4px; font-size:12.8px;
     <div class="strip">提炼完本该直接开这一篇的详情窗，一直没开成（<code>pendingDetailNoteId</code> 被灌成任务结果那个对象）。同一个对象让我新加的上传回 422。现在都好了。</div></div>
   <div class="card"><b>第二轮（他 13:2x 那句「还是看不到图片」）</b>
     <div class="big">15 <span class="strip">只文件改了、号没抬</span></div>
-    <div class="strip">他那一篇库里<b>有</b> assets 那行、桶里对象 200 读得出——坏在<b>他手机上还是 12:38 之前那份 JS</b>：nginx 没发 <code>Cache-Control</code>，同一个 <code>?v=1112b</code> 的 URL 把旧字节接着用。这一趟把 42 只资源号全刷成「标签＋内容哈希」，并把列表卡片那枚封面按小程序那条判据补上（H5 原来是 0 枚）。</div></div>
+    <div class="strip">库里<b>有</b> assets 那行、桶里对象 200 读得出——坏在<b>他手机上还是 12:38 之前那份 JS</b>：nginx 没发 <code>Cache-Control</code>，同一个 <code>?v=1112b</code> 的 URL 把旧字节接着用。这一趟把 42 只资源号全刷成「标签＋内容哈希」，14:01 又把 <code>/app/</code> 的缓存头补上（文档 <code>no-cache</code>、资源 <code>immutable</code>，<code>nginx -t</code> 先过再 reload、改前留备份），并把列表卡片那枚封面按小程序那条判据补上（H5 原来是 0 枚）。</div></div>
 </div>
 
 <h2>根因链（三层，逐层点名落点）</h2>
@@ -124,10 +124,12 @@ code { background:#e9e4db; padding:1px 5px; border-radius:4px; font-size:12.8px;
 
 <h3>第二轮（13:4x）落盘那三只——这一趟后端零改动，不进部署次数</h3>
 <table><tr><th>文件</th><th>动手前</th><th>现网（md5 现读）</th><th>回滚件</th></tr>
-<tr><td><code>pages/index.js</code></td><td>f289ef5ca42e…（上一版：行里没有封面这一栏）</td><td>5da75626…（本地＝盘上＝https 回读）</td><td>pages/index.js.bak-1112i</td></tr><tr><td><code>css/mp-index.css</code></td><td>2bc846e0fdbd…（.ixl-th 有规则、没人画它）</td><td>c405c0d1…（同上三只对等）</td><td>css/mp-index.css.bak-1112i</td></tr><tr><td><code>index.html</code></td><td>2830eac4 之前是 344bcd5c…（42 只资源号全是裸标签）</td><td>2830eac4…（42 只全带内容哈希）</td><td>index.html.bak-1112i</td></tr>
+<tr><td><code>pages/index.js</code></td><td>f289ef5ca42e…（上一版：行里没有封面这一栏）</td><td>5da75626…（本地＝盘上＝https 回读）</td><td>pages/index.js.bak-1112i</td></tr><tr><td><code>css/mp-index.css</code></td><td>2bc846e0fdbd…（.ixl-th 有规则、没人画它）</td><td>c405c0d1…（同上三只对等）</td><td>css/mp-index.css.bak-1112i</td></tr><tr><td><code>index.html</code></td><td>344bcd5c…（42 只资源号全是裸标签，没有一只带内容哈希）</td><td>2830eac4…（42 只全带内容哈希）</td><td>index.html.bak-1112i</td></tr>
 </table>
 <p>三只都是<b>本地＝服务器盘＝https 回读</b>逐只对等（脚本现读，不是手打），AppleDouble 0 只。
 另外 <code>index.html</code> 这一趟把 42 只资源的号全刷了一遍，所以它一只的改动等于把整站缓存作废一次——回滚它就能退回旧号，但旧号会重新踩缓存那一坑，回滚件因此同时留了 <code>index.html.bak-1112i</code> 与工具自己那份 <code>index.html.bak-hash</code>。</p>
+<p>同一趟 14:01 还落了<b>一份网关配置</b>（不是 H5 盘上的文件）：<code>/etc/nginx/sites-enabled/agentsbin-cn</code> 加了两枚 <code>location</code>，
+改前备份 <code>/root/nginx-agentsbin-cn.bak-20261112-140137</code>、<code>nginx -t</code> 过了才 reload；回滚就是拿那份备份盖回去再 reload 一次。逐条读数见文末「那一行 nginx 已经加了」。</p>
 
 <h2>链接档那一支（同一处改动带到的，单独量过）</h2>
 <p><code>_noteIdOf()</code> 挂在两条链的公共口上，所以链接档也一起验了一趟（<code>/tmp/h5-url-autopen.js</code>，真打现网 OCR）：
@@ -201,17 +203,23 @@ uuid 型号<b>认不出是不是探针</b>——仓里那把清扫尺子的规�
 <li><b>传不成不排队重试</b>：小程序有 <code>utils/assetQueue.js</code>（这次没绑上，下次进详情页补绑），H5 这一路是当场传、传不上就说一句，没有下一次。<b>要不要补这条队列</b>，等他点头。</li>
 <li><b>「编辑」那一屏不能补传配图</b>：小程序 <code>pages/write/write.js:203</code> 读 <code>getNoteAssets</code> 并支持补传，H5 的 write 页整块没有配图这一栏（缺口在 <code>docs/审计报告-20261112-H5云端链与小程序对照.html</code> 点名过）。这一刀没扩到那里。</li>
 <li><b>删笔记时桶里对象删不动</b>：现网回体把地址交回来了，浏览器没法删（同上一条审计报告里那格）。真用户的笔记攒久了会在桶里留孤儿。</li>
-<li><b>还差一行 nginx 才算根治</b>：这一趟把 42 只资源的号刷成内容哈希，"改了看不到"这一型当场断掉；
-但 <code>index.html</code> 本身仍没发 <code>Cache-Control</code>（现读只有 <code>Last-Modified</code>＋<code>ETag</code>），
-浏览器还是按猜的新鲜期用它——只是猜出来的窗口很短（分钟级）。要钉死就在 <code>/etc/nginx/sites-enabled/agentsbin-cn</code> 的 <code>/app/</code> 那一档加两行：
-<code>location = /app/index.html { add_header Cache-Control "no-cache"; }</code> 让文档每次回源问一遍，
-<code>location ~* \.(js|css)$ { add_header Cache-Control "public, max-age=31536000, immutable"; }</code> 让带哈希的资源放心存一年。
-<b>这一行我没加</b>：那是动整站网关配置（agentsbin.cn 全站都在那一份文件里），改坏了是整个站挂，归他点头；加之前先 <code>nginx -t</code>、留备份。</li>
+<li><b>那一行 nginx 已经加了（14:01）</b>：这一趟把 42 只资源的号刷成内容哈希，"改了看不到"这一型当场断掉；
+14:01 又把缓存头补上，才算根治。加在 <code>/etc/nginx/sites-enabled/agentsbin-cn</code> 的 <code>/app/</code> 那一档前面，两枚新口：
+<code>location = /app/index.html</code> 发 <code>Cache-Control: no-cache</code>（文档每次回源问一遍），
+<code>location ~ ^/app/(…\.(js|css))$</code> 发 <code>public, max-age=31536000, immutable</code>（带哈希的资源放心存一年）。
+<b>动手前后都量了</b>：改前备份 <code>/root/nginx-agentsbin-cn.bak-20261112-140137</code>（2,962 B），
+<code>nginx -t</code> 先过再 reload（没过就自动还原，实际没走到那一支）。
+现读六条：<code>/app/</code> 与 <code>/app/index.html</code> → <code>no-cache</code>、正文 md5 仍是 2830eac4（一个字节没变）；
+<code>js/api.js?v=1112g-1f1586df</code> 与 <code>css/mp-index.css?v=1112b-c405c0d1</code> → <code>immutable</code>，
+而且<b>回读内容的 md5 与 URL 里那枚哈希段逐字相等</b>（1f1586df／c405c0d1）；
+安装包那页 <code>/app/dl/</code> 200、两枚 apk 走 Range 回 206／总长 4,117,874 B 不受影响；官网首页 200／31,273 B 照旧。
+⚠ 这一条只管 <code>.js</code>／<code>.css</code>：<code>/app/</code> 底下那些图片仍没发缓存头（还是浏览器猜），
+真要一起钉死得给它们也上内容号——那是下一刀的事，先记在这儿。</li>
 <li><b>两台真机各扫一次</b>仍归他：安卓壳里装 v1.1 那枚（<code>https://agentsbin.cn/app/dl/</code>）走一遍拍照截图那条，iPhone Safari 走一遍相册那条。
 <b>这一趟他只要做一件事：下拉刷新一次</b>——URL 已经换了，刷新那一趟必然拿到新代码。</li>
 </ul>
 
-<p class="foot">生成时间 2026-11-12 13:58 · 屏证 9 张（各 620 边缩样）·
+<p class="foot">生成时间 2026-11-12 14:03 · 屏证 9 张（各 620 边缩样）·
 尺子：<code>/tmp/h5-noteimg-e2e.js</code>（现网端到端 13 条）、<code>/tmp/h5-noteimg-diag.js</code>（那发 422 的单点诊断）、<code>/tmp/h5-noteimg-failhint.js</code>（失败那一句）、
 <code>/tmp/mp-detail-figs.js</code>（小程序同屏逐块）· 后端用例 <code>backend/tests/test_note_image_upload.py</code>（9 条）·
 第二轮：<code>/tmp/h5-land-detail.js</code>（横屏那一张端到端＋DOM 读数）、<code>/tmp/h5-cover-check.js</code>（列表封面那一格）、<code>/tmp/mp-list-cover.js</code>（小程序那一格）、<code>/tmp/h5-scan-errors.js</code>（全界面零异常）·
