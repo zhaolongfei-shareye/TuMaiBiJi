@@ -711,7 +711,12 @@ if not settings.SEC_CHECK_ENABLED:
 db = sqlite3.connect(settings.DATABASE_URL.split(":///")[-1] if "sqlite" in settings.DATABASE_URL else "")
 # 只要真 openid：微信的是 28 位，deploy-test 那种手写短串会被接口判 40003，
 # 拿它自检会得到"机制没生效"的假警报。
-row = db.execute("select openid from users where length(openid) >= 20 order by id desc limit 1").fetchone()
+# ⚠ 光按长度拦不住 11-09 起的**设备游客号**：它们的 openid 是 `guest:<uuid>`（42 位）与
+#   `guest:probe-…`（31 位），长度全过——11-12 那趟自检就是挑中一枚探针游客号，微信回 40003，
+#   于是"内容安全机制实际没在生效"这句假红被念了出来。这一栏只认真 openid：`guest:` 打头的一概跳过。
+row = db.execute(
+    "select openid from users where length(openid) >= 20 and openid not like 'guest:%' "
+    "order by id desc limit 1").fetchone()
 db.close()
 if not row:
     print("  ✗ 库里没有可用的真 openid，无法自检（msgSecCheck v2 的 openid 必填且必须真实）")
