@@ -1,0 +1,84 @@
+{
+ "tag": "post1112r",
+ "site": "http://127.0.0.1:8098/",
+ "window_ms": 6000,
+ "elapsed_ms": 6076,
+ "seeded": {
+  "token": "DEADTICKET-0000000000000000",
+  "uid": "246",
+  "origin": "http://127.0.0.1:8098"
+ },
+ "total_api_requests": 6,
+ "byUrl": {
+  "/api/user/profile": 3,
+  "/v1/auth/guest": 1,
+  "/api/user/quota": 1,
+  "/api/user/storage-quota": 1
+ },
+ "loadingFailed": 0,
+ "failedKinds": [],
+ "state": {
+  "hash": "#/create",
+  "token": "eyJhbGciOiJI",
+  "uid": "248",
+  "guestMode": false,
+  "loading": null,
+  "empty": null,
+  "stats": null,
+  "tabbar": "flex",
+  "chars": 67,
+  "head": "告诉好友 图麦笔记：仅需 10 秒拍照截图网页转笔记 调亮度 换背景 换心情 0 笔记 0 图片 Tips：外文内容，直接写成中文摘要"
+ },
+ "first20": [
+  {
+   "t": 814,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 836,
+   "url": "/v1/auth/guest"
+  },
+  {
+   "t": 837,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 845,
+   "url": "/api/user/quota"
+  },
+  {
+   "t": 846,
+   "url": "/api/user/storage-quota"
+  },
+  {
+   "t": 850,
+   "url": "/api/user/profile"
+  }
+ ],
+ "last10": [
+  {
+   "t": 814,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 836,
+   "url": "/v1/auth/guest"
+  },
+  {
+   "t": 837,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 845,
+   "url": "/api/user/quota"
+  },
+  {
+   "t": 846,
+   "url": "/api/user/storage-quota"
+  },
+  {
+   "t": 850,
+   "url": "/api/user/profile"
+  }
+ ]
+}

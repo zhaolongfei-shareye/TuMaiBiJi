@@ -1,0 +1,48 @@
+{
+ "docH": 20503,
+ "step": 3200,
+ "files": [
+  {
+   "f": "/tmp/rpt-seg-phone-01.png",
+   "y": 0,
+   "h": 3200,
+   "bytes": 432675
+  },
+  {
+   "f": "/tmp/rpt-seg-phone-02.png",
+   "y": 3200,
+   "h": 3200,
+   "bytes": 597730
+  },
+  {
+   "f": "/tmp/rpt-seg-phone-03.png",
+   "y": 6400,
+   "h": 3200,
+   "bytes": 396164
+  },
+  {
+   "f": "/tmp/rpt-seg-phone-04.png",
+   "y": 9600,
+   "h": 3200,
+   "bytes": 393586
+  },
+  {
+   "f": "/tmp/rpt-seg-phone-05.png",
+   "y": 12800,
+   "h": 3200,
+   "bytes": 439109
+  },
+  {
+   "f": "/tmp/rpt-seg-phone-06.png",
+   "y": 16000,
+   "h": 3200,
+   "bytes": 467242
+  },
+  {
+   "f": "/tmp/rpt-seg-phone-07.png",
+   "y": 19200,
+   "h": 1303,
+   "bytes": 164566
+  }
+ ]
+}

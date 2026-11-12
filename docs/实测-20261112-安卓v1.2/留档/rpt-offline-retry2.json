@@ -1,0 +1,48 @@
+=== 2) 恢复网并等到真通 ===
+try1: PING api.agentsbin.cn (101.33.202.178) 56(84) bytes of data.
+=== 3) 真输入事件点那一句 ===
+{"tapped":[188,360],"elementAtPoint":"SPAN. | 没连上服务器，点这里重试"}
+=== 4) 立刻读 ===
+{
+ "hash": "#/index",
+ "empty": {
+  "disp": "block",
+  "text": "还没有笔记"
+ },
+ "loading": {
+  "disp": "none",
+  "text": "加载中…"
+ },
+ "stats": {
+  "disp": "flex",
+  "text": "0\n笔记"
+ },
+ "cats": {
+  "disp": "inline-flex",
+  "text": "全部\n灵感\n生活\n工作\n学习"
+ },
+ "rows": 0,
+ "tabbar": "flex"
+}
+=== 5) 三秒后读 ===
+{
+ "hash": "#/index",
+ "empty": {
+  "disp": "block",
+  "text": "还没有笔记"
+ },
+ "loading": {
+  "disp": "none",
+  "text": "加载中…"
+ },
+ "stats": {
+  "disp": "flex",
+  "text": "0\n笔记"
+ },
+ "cats": {
+  "disp": "inline-flex",
+  "text": "全部\n灵感\n生活\n工作\n学习"
+ },
+ "rows": 0,
+ "tabbar": "flex"
+}

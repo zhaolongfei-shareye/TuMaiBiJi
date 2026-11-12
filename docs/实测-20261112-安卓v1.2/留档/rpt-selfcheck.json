@@ -1,0 +1,98 @@
+{
+ "views": [
+  {
+   "tag": "desktop",
+   "width": 1440,
+   "clientW": 1440,
+   "docW": 1440,
+   "hScroll": false,
+   "docH": 11373,
+   "imgs": 31,
+   "broken": 0,
+   "notLoaded": 0,
+   "overflow": [],
+   "tableScrollers": 0,
+   "navLinks": 9,
+   "navOn": 1,
+   "h2": 9,
+   "tables": 9,
+   "copyables": 8,
+   "chars": 5893,
+   "emptyCells": 0,
+   "lightbox": {
+    "on": true,
+    "closed": true
+   },
+   "nav": {
+    "clicked": "s6",
+    "active": "s6",
+    "top": 26
+   },
+   "shot": "/tmp/rpt-self-desktop.png",
+   "bytes": 2883016
+  },
+  {
+   "tag": "tablet",
+   "width": 900,
+   "clientW": 900,
+   "docW": 900,
+   "hScroll": false,
+   "docH": 13244,
+   "imgs": 31,
+   "broken": 0,
+   "notLoaded": 0,
+   "overflow": [],
+   "tableScrollers": 0,
+   "navLinks": 9,
+   "navOn": 1,
+   "h2": 9,
+   "tables": 9,
+   "copyables": 8,
+   "chars": 5893,
+   "emptyCells": 0,
+   "lightbox": {
+    "on": true,
+    "closed": true
+   },
+   "nav": {
+    "clicked": "s6",
+    "active": "s6",
+    "top": 66
+   },
+   "shot": "/tmp/rpt-self-tablet.png",
+   "bytes": 2887273
+  },
+  {
+   "tag": "phone",
+   "width": 390,
+   "clientW": 390,
+   "docW": 390,
+   "hScroll": false,
+   "docH": 20627,
+   "imgs": 31,
+   "broken": 0,
+   "notLoaded": 0,
+   "overflow": [],
+   "tableScrollers": 9,
+   "navLinks": 9,
+   "navOn": 1,
+   "h2": 9,
+   "tables": 9,
+   "copyables": 8,
+   "chars": 5893,
+   "emptyCells": 0,
+   "lightbox": {
+    "on": true,
+    "closed": true
+   },
+   "nav": {
+    "clicked": "s6",
+    "active": "s6",
+    "top": 66
+   },
+   "shot": "/tmp/rpt-self-phone.png",
+   "bytes": 2983521
+  }
+ ],
+ "jsErrors": []
+}

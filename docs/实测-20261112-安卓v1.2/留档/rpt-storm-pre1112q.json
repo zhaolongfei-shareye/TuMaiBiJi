@@ -1,0 +1,153 @@
+{
+ "tag": "pre1112q",
+ "site": "http://127.0.0.1:8099/",
+ "window_ms": 6000,
+ "elapsed_ms": 6008,
+ "seeded": {
+  "token": "DEADTICKET-0000000000000000",
+  "uid": "246",
+  "origin": "http://127.0.0.1:8099"
+ },
+ "total_api_requests": 375,
+ "byUrl": {
+  "/api/user/profile": 375
+ },
+ "loadingFailed": 0,
+ "failedKinds": [],
+ "state": {
+  "hash": "#/create",
+  "token": "DEADTICKET-0",
+  "uid": "246",
+  "guestMode": false,
+  "loading": null,
+  "empty": null,
+  "stats": null,
+  "tabbar": "flex",
+  "chars": 1,
+  "head": "‹"
+ },
+ "first20": [
+  {
+   "t": 174,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 175,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 187,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 214,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 242,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 259,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 293,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 308,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 340,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 376,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 409,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 419,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 437,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 465,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 486,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 514,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 537,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 541,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 577,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 592,
+   "url": "/api/user/profile"
+  }
+ ],
+ "last10": [
+  {
+   "t": 5857,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 5884,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 5894,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 5916,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 5927,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 5937,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 5950,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 5961,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 5982,
+   "url": "/api/user/profile"
+  },
+  {
+   "t": 5995,
+   "url": "/api/user/profile"
+  }
+ ]
+}

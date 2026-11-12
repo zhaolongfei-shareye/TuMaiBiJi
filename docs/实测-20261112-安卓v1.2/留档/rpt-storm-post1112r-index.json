@@ -1,0 +1,44 @@
+{
+ "tag": "post1112r",
+ "api_requests_in_6s": 7,
+ "byUrl": {
+  "/api/categories/": 2,
+  "/api/user/cards": 2,
+  "/api/notes/?skip=0&limit=20": 2,
+  "/api/user/quota": 1
+ },
+ "state": {
+  "hash": "#/index",
+  "uid": "248",
+  "loading": {
+   "disp": "none",
+   "text": "加载中…",
+   "y": 0,
+   "h": 0
+  },
+  "empty": {
+   "disp": "block",
+   "text": "还没有笔记",
+   "y": 328,
+   "h": 86
+  },
+  "stats": {
+   "disp": "flex",
+   "text": "0 笔记",
+   "y": 12,
+   "h": 47
+  },
+  "cats": {
+   "disp": "inline-flex",
+   "text": "全部 灵感 生活 工作 学习",
+   "y": 283,
+   "h": 33
+  },
+  "rows": 0,
+  "tabbar": "flex",
+  "chars": 25,
+  "text": "0 笔记 全部 灵感 生活 工作 学习 还没有笔记"
+ },
+ "shot": "/tmp/rpt-storm-post1112r-index.png",
+ "shot_bytes": 470478
+}

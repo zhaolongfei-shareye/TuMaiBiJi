@@ -1,0 +1,194 @@
+{
+ "steps": [
+  {
+   "tag": "1-index",
+   "hash": "#/index",
+   "tabbar": "flex",
+   "navbar": "none",
+   "tabs": [
+    {
+     "p": "create",
+     "on": false
+    },
+    {
+     "p": "index",
+     "on": true
+    },
+    {
+     "p": "me",
+     "on": false
+    }
+   ]
+  },
+  {
+   "tag": "2-me",
+   "hash": "#/me",
+   "tabbar": "flex",
+   "navbar": "none",
+   "tabs": [
+    {
+     "p": "create",
+     "on": false
+    },
+    {
+     "p": "index",
+     "on": false
+    },
+    {
+     "p": "me",
+     "on": true
+    }
+   ]
+  },
+  {
+   "tag": "3-market",
+   "hash": "#/market",
+   "tabbar": "none",
+   "navbar": "none",
+   "tabs": [
+    {
+     "p": "create",
+     "on": false
+    },
+    {
+     "p": "index",
+     "on": false
+    },
+    {
+     "p": "me",
+     "on": true
+    }
+   ]
+  },
+  {
+   "tag": "4-after-close-x",
+   "hash": "#/me",
+   "tabbar": "flex",
+   "navbar": "none",
+   "tabs": [
+    {
+     "p": "create",
+     "on": false
+    },
+    {
+     "p": "index",
+     "on": false
+    },
+    {
+     "p": "me",
+     "on": true
+    }
+   ]
+  },
+  {
+   "tag": "5-market-again",
+   "hash": "#/market",
+   "tabbar": "none",
+   "navbar": "none",
+   "tabs": [
+    {
+     "p": "create",
+     "on": false
+    },
+    {
+     "p": "index",
+     "on": false
+    },
+    {
+     "p": "me",
+     "on": true
+    }
+   ]
+  },
+  {
+   "tag": "6-after-mask-click",
+   "hash": "#/me",
+   "tabbar": "flex",
+   "navbar": "none",
+   "tabs": [
+    {
+     "p": "create",
+     "on": false
+    },
+    {
+     "p": "index",
+     "on": false
+    },
+    {
+     "p": "me",
+     "on": true
+    }
+   ]
+  }
+ ],
+ "marketSheet": {
+  "mask": true,
+  "x": true,
+  "cells": 17
+ },
+ "tabHits": [
+  {
+   "p": "index",
+   "found": true,
+   "rect": [
+    130,
+    702,
+    116,
+    51
+   ],
+   "hitSelf": true,
+   "hash": "#/index",
+   "tabbar": "flex"
+  },
+  {
+   "p": "create",
+   "found": true,
+   "rect": [
+    13,
+    702,
+    116,
+    51
+   ],
+   "hitSelf": true,
+   "hash": "#/create",
+   "tabbar": "flex"
+  },
+  {
+   "p": "cards",
+   "found": false
+  },
+  {
+   "p": "me",
+   "found": true,
+   "rect": [
+    246,
+    702,
+    116,
+    51
+   ],
+   "hitSelf": true,
+   "hash": "#/me",
+   "tabbar": "flex"
+  }
+ ],
+ "final": {
+  "tag": "7-final-index",
+  "hash": "#/index",
+  "tabbar": "flex",
+  "navbar": "none",
+  "tabs": [
+   {
+    "p": "create",
+    "on": false
+   },
+   {
+    "p": "index",
+    "on": true
+   },
+   {
+    "p": "me",
+    "on": false
+   }
+  ]
+ }
+}

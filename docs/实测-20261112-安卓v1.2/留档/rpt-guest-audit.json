@@ -1,0 +1,71 @@
+{
+ "identity": [
+  [
+   "8fd5fff6-df91-42c7-b886-6fb24d51403f",
+   "guest",
+   "guest:09daeaa1-25de-4d24-861e-9cdbc12d57d1"
+  ]
+ ],
+ "accounts": [
+  [
+   "8fd5fff6-df91-42c7-b886-6fb24d51403f",
+   "2026-11-12 14:43:42"
+  ]
+ ],
+ "users": [
+  [
+   246,
+   "8fd5fff6-df91-42c7-b886-6fb24d51403f",
+   null,
+   "2026-11-12 14:43:42"
+  ]
+ ],
+ "notes": [
+  [
+   0
+  ]
+ ],
+ "note_cards": [
+  [
+   0
+  ]
+ ],
+ "categories": [
+  [
+   4
+  ]
+ ],
+ "daily_usage": [
+  [
+   1
+  ]
+ ],
+ "user_profiles": [
+  [
+   0
+  ]
+ ],
+ "shares": [
+  [
+   0
+  ]
+ ],
+ "note_rows": [],
+ "card_rows": [
+  [
+   "ERR",
+   "no such column: file_id"
+  ]
+ ],
+ "asset_rows": [
+  [
+   "ERR",
+   "no such column: a.file_id"
+  ]
+ ],
+ "guest_total": [
+  [
+   107
+  ]
+ ]
+}

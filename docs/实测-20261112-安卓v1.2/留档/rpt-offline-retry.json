@@ -1,0 +1,71 @@
+=== 1) 断网 ===
+{
+ "tokenLen": 217,
+ "guestMode": false,
+ "hash": "#/index",
+ "loading": {
+  "disp": "none",
+  "text": "加载中…",
+  "clickable": false
+ },
+ "empty": {
+  "disp": "block",
+  "text": "没连上服务器，点这里重试",
+  "clickable": true
+ },
+ "listChildren": 3,
+ "stats": {
+  "disp": "flex",
+  "text": "",
+  "clickable": false
+ },
+ "tabbar": "flex"
+}
+=== 2) 恢复网并确认通 ===
+ping: unknown host api.agentsbin.cn
+=== 3) 真输入事件点那一句（不是 element.click）===
+{"tapped":[188,360],"elementAtPoint":"SPAN. | 没连上服务器，点这里重试"}
+=== 4) 立刻读（应在加载中）===
+{
+ "hash": "#/index",
+ "empty": {
+  "disp": "block",
+  "text": "没连上服务器，点这里重试"
+ },
+ "loading": {
+  "disp": "none",
+  "text": "加载中…"
+ },
+ "stats": {
+  "disp": "flex",
+  "text": ""
+ },
+ "cats": {
+  "disp": "inline-flex",
+  "text": ""
+ },
+ "rows": 0,
+ "tabbar": "flex"
+}
+=== 5) 三秒后读（应读回来）===
+{
+ "hash": "#/index",
+ "empty": {
+  "disp": "block",
+  "text": "没连上服务器，点这里重试"
+ },
+ "loading": {
+  "disp": "none",
+  "text": "加载中…"
+ },
+ "stats": {
+  "disp": "flex",
+  "text": ""
+ },
+ "cats": {
+  "disp": "inline-flex",
+  "text": ""
+ },
+ "rows": 0,
+ "tabbar": "flex"
+}

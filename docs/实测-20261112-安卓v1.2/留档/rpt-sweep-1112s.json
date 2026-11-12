@@ -1,0 +1,75 @@
+{
+ "screens": [
+  {
+   "name": "index",
+   "hash": "#/index",
+   "chars": 25,
+   "head": "0 笔记 全部 灵感 生活 工作 学习 还没有笔记",
+   "imgs": 2,
+   "broken": [],
+   "overflow": 0,
+   "docW": 376,
+   "clientW": 376,
+   "tabbar": "flex",
+   "navbar": "none",
+   "shot": "/tmp/ev-apk-screen-index.png"
+  },
+  {
+   "name": "me",
+   "hash": "#/me",
+   "chars": 86,
+   "head": "100 魅力 你好！我是图麦笔记 把图文，提炼成有用的干货 设置 关于 卡片市场 分享给朋友那张卡片上印什么 私密密码 锁住不想让别人看到的笔记 我的邮箱 未填写 注销账号",
+   "imgs": 3,
+   "broken": [],
+   "overflow": 0,
+   "docW": 376,
+   "clientW": 376,
+   "tabbar": "flex",
+   "navbar": "none",
+   "shot": "/tmp/ev-apk-screen-me.png"
+  },
+  {
+   "name": "market",
+   "hash": "#/market",
+   "chars": 177,
+   "head": "100 魅力 你好！我是图麦笔记 把图文，提炼成有用的干货 设置 关于 卡片市场 分享给朋友那张卡片上印什么 私密密码 锁住不想让别人看到的笔记 我的邮箱 未填写 注销账号 卡片市",
+   "imgs": 20,
+   "broken": [],
+   "overflow": 46,
+   "docW": 376,
+   "clientW": 376,
+   "tabbar": "none",
+   "navbar": "none",
+   "shot": "/tmp/ev-apk-screen-market.png"
+  },
+  {
+   "name": "about",
+   "hash": "#/about",
+   "chars": 165,
+   "head": "‹ 关于 W 图麦笔记 v0.1.0 (H5) 产品介绍 看到好内容，随手存下来。 照片、链接、文字，AI 自动整理成标题、摘要、要点、标签四栏。 联系方式 邮箱 zlf139@1",
+   "imgs": 0,
+   "broken": [],
+   "overflow": 0,
+   "docW": 376,
+   "clientW": 376,
+   "tabbar": "flex",
+   "navbar": "flex",
+   "shot": "/tmp/ev-apk-screen-about.png"
+  },
+  {
+   "name": "create",
+   "hash": "#/create",
+   "chars": 66,
+   "head": "告诉好友 图麦笔记：仅需 10 秒拍照截图网页转笔记 调亮度 换背景 换心情 0 笔记 0 图片 Tips：想存多少存多少，不限篇数",
+   "imgs": 3,
+   "broken": [],
+   "overflow": 0,
+   "docW": 376,
+   "clientW": 376,
+   "tabbar": "flex",
+   "navbar": "none",
+   "shot": "/tmp/ev-apk-screen-create.png"
+  }
+ ],
+ "jsErrors": []
+}

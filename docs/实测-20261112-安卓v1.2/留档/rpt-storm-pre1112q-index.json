@@ -1,0 +1,45 @@
+{
+ "tag": "pre1112q",
+ "api_requests_in_6s": 443,
+ "byUrl": {
+  "/api/user/profile": 436,
+  "/api/categories/": 2,
+  "/api/user/cards": 2,
+  "/api/notes/?skip=0&limit=20": 2,
+  "/api/user/quota": 1
+ },
+ "state": {
+  "hash": "#/index",
+  "uid": "246",
+  "loading": {
+   "disp": "block",
+   "text": "加载中…",
+   "y": 0,
+   "h": 0
+  },
+  "empty": {
+   "disp": "none",
+   "text": "还没有笔记",
+   "y": 0,
+   "h": 0
+  },
+  "stats": {
+   "disp": "flex",
+   "text": "",
+   "y": 0,
+   "h": 0
+  },
+  "cats": {
+   "disp": "inline-flex",
+   "text": "",
+   "y": 0,
+   "h": 0
+  },
+  "rows": 0,
+  "tabbar": "flex",
+  "chars": 11,
+  "text": "‹ 加载中…还没有笔记"
+ },
+ "shot": "/tmp/rpt-storm-pre1112q-index.png",
+ "shot_bytes": 7082
+}

@@ -1,0 +1,54 @@
+{
+ "before": {
+  "len": 217,
+  "userId": "246",
+  "hash": "#/index"
+ },
+ "early": {
+  "n": 7,
+  "hash": "#/index",
+  "loading": "none"
+ },
+ "after": {
+  "probe": {
+   "n": 7,
+   "byUrl": {
+    "/api/user/profile": 2,
+    "/v1/auth/guest": 1,
+    "/api/categories/": 1,
+    "/api/user/cards": 1,
+    "/api/notes/?skip=0&limit=20": 1,
+    "/api/user/quota": 1
+   },
+   "t0": 1794497219277
+  },
+  "elapsed_ms": 11756,
+  "hash": "#/index",
+  "userId": 246,
+  "guestMode": false,
+  "isGuestAccount": true,
+  "storedUserId": "246",
+  "loading": {
+   "disp": "none",
+   "text": "加载中…"
+  },
+  "empty": {
+   "disp": "block",
+   "text": "还没有笔记"
+  },
+  "stats": {
+   "disp": "flex",
+   "text": "0 笔记"
+  },
+  "cats": {
+   "disp": "inline-flex",
+   "text": "全部 灵感 生活 工作 学习"
+  },
+  "tabbar": "flex",
+  "text": "0 笔记 全部 灵感 生活 工作 学习 还没有笔记"
+ },
+ "shots": [
+  "/tmp/rpt-dead-01-ticket.png",
+  "/tmp/rpt-dead-02-recovered.png"
+ ]
+}

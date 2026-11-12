@@ -1,0 +1,176 @@
+[
+ {
+  "width": 390,
+  "clientW": 390,
+  "docW": 390,
+  "hScroll": false,
+  "rows": 4,
+  "table": [
+   16,
+   194,
+   358,
+   756
+  ],
+  "buttons": [
+   {
+    "text": "下载 APK",
+    "rect": [
+     31,
+     374,
+     328,
+     48
+    ],
+    "right": 359,
+    "inside": true,
+    "href": "tumarknote-android-v1.2-debug.apk"
+   },
+   {
+    "text": "下载 APK",
+    "rect": [
+     31,
+     630,
+     328,
+     48
+    ],
+    "right": 359,
+    "inside": true,
+    "href": "tumarknote-android-v1.1-debug.apk"
+   },
+   {
+    "text": "下载 APK",
+    "rect": [
+     31,
+     885,
+     328,
+     48
+    ],
+    "right": 359,
+    "inside": true,
+    "href": "tumarknote-android-v1.0-debug.apk"
+   }
+  ],
+  "overflowEls": 0,
+  "versionTexts": [
+   "v1.1",
+   "v1.0"
+  ],
+  "shot": "/tmp/rpt-dl-live-390.png",
+  "shot_bytes": 609707
+ },
+ {
+  "width": 768,
+  "clientW": 768,
+  "docW": 768,
+  "hScroll": false,
+  "rows": 4,
+  "table": [
+   20,
+   178,
+   728,
+   271
+  ],
+  "buttons": [
+   {
+    "text": "下载 APK",
+    "rect": [
+     655,
+     228,
+     82,
+     59
+    ],
+    "right": 737,
+    "inside": true,
+    "href": "tumarknote-android-v1.2-debug.apk"
+   },
+   {
+    "text": "下载 APK",
+    "rect": [
+     655,
+     304,
+     82,
+     59
+    ],
+    "right": 737,
+    "inside": true,
+    "href": "tumarknote-android-v1.1-debug.apk"
+   },
+   {
+    "text": "下载 APK",
+    "rect": [
+     655,
+     381,
+     82,
+     59
+    ],
+    "right": 737,
+    "inside": true,
+    "href": "tumarknote-android-v1.0-debug.apk"
+   }
+  ],
+  "overflowEls": 0,
+  "versionTexts": [
+   "v1.1",
+   "v1.0"
+  ],
+  "shot": "/tmp/rpt-dl-live-768.png",
+  "shot_bytes": 583503
+ },
+ {
+  "width": 1200,
+  "clientW": 1200,
+  "docW": 1200,
+  "hScroll": false,
+  "rows": 4,
+  "table": [
+   140,
+   178,
+   920,
+   200
+  ],
+  "buttons": [
+   {
+    "text": "下载 APK",
+    "rect": [
+     942,
+     228,
+     86,
+     36
+    ],
+    "right": 1028,
+    "inside": true,
+    "href": "tumarknote-android-v1.2-debug.apk"
+   },
+   {
+    "text": "下载 APK",
+    "rect": [
+     942,
+     281,
+     86,
+     36
+    ],
+    "right": 1028,
+    "inside": true,
+    "href": "tumarknote-android-v1.1-debug.apk"
+   },
+   {
+    "text": "下载 APK",
+    "rect": [
+     942,
+     333,
+     86,
+     36
+    ],
+    "right": 1028,
+    "inside": true,
+    "href": "tumarknote-android-v1.0-debug.apk"
+   }
+  ],
+  "overflowEls": 0,
+  "versionTexts": [
+   "v1.1",
+   "v1.0"
+  ],
+  "shot": "/tmp/rpt-dl-live-1200.png",
+  "shot_bytes": 595161
+ }
+]

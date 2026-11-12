@@ -1,0 +1,37 @@
+{
+ "before": {
+  "empty": {
+   "disp": "block",
+   "text": "没连上服务器，点这里重试"
+  },
+  "listChildren": 0
+ },
+ "hitSelf": false,
+ "rect": [
+  12,
+  678,
+  352,
+  86
+ ],
+ "after": {
+  "empty": {
+   "disp": "block",
+   "text": "还没有笔记"
+  },
+  "loading": {
+   "disp": "none",
+   "text": "加载中…"
+  },
+  "stats": {
+   "disp": "flex",
+   "text": "0\n笔记"
+  },
+  "listChildren": 0,
+  "cats": {
+   "disp": "inline-flex",
+   "text": "全部\n灵感\n生活\n工作\n学习"
+  },
+  "tabbar": "flex",
+  "hash": "#/index"
+ }
+}

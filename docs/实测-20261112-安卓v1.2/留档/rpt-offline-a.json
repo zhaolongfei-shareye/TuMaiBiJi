@@ -1,0 +1,22 @@
+{
+ "tokenLen": 217,
+ "guestMode": false,
+ "hash": "#/index",
+ "loading": {
+  "disp": "none",
+  "text": "加载中…",
+  "clickable": false
+ },
+ "empty": {
+  "disp": "block",
+  "text": "没连上服务器，点这里重试",
+  "clickable": true
+ },
+ "listChildren": 0,
+ "stats": {
+  "disp": "flex",
+  "text": "",
+  "clickable": false
+ },
+ "tabbar": "flex"
+}
