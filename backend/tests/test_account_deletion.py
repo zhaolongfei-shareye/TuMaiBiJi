@@ -160,10 +160,12 @@ class Test删干净:
             # 日量计数（10-25 审计 M33 之后新增的一类）：这一格在场是**枚举尺子**逼出来的——
             # 删了号却留着"这个人今天用过几次"是个人信息留存问题。这个人没打过提炼，所以 0。
             "daily_usage": 0,
-            # 这三格 2026-10-10 起**一律在场**（`purge` 预先摆平），不再随"这一路带不带 account"
-            # 出现或消失。这个人是直接 `User(openid=…)` 造的、没有 account_id，所以三格都是 0；
+            # 这四格 2026-10-10 起**一律在场**（`purge` 预先摆平），不再随"这一路带不带 account"
+            # 出现或消失。这个人是直接 `User(openid=…)` 造的、没有 account_id，所以四格都是 0；
             # 走真登录路造的人那一格会是 1。键集合会变形的那一版，这两个字典比的是八格。
-            "identities": 0, "link_codes": 0, "account": 0,
+            # `passwords` 是 11-12 口令登录那一支加的（`account_passwords`）：不清它，
+            # 死账号会一直占着那个登录名（那一列唯一），本人再注册撞索引。
+            "identities": 0, "link_codes": 0, "passwords": 0, "account": 0,
         }
         for model in (Note, Category, Share, Job, Asset, NoteCard, UserProfile):
             assert rows(db, model, mine["id"]) == 0, model.__tablename__
@@ -203,9 +205,10 @@ class Test删干净:
                                           "jobs": 0, "assets": 0, "cards": 0, "profile": 0,
                                           "reports": 0, "daily_usage": 1,
                                           # 这个人压根没有 account（`account_id` 为 NULL，那道闸
-                                          # 直接回 None），所以那三格是 0 而不是缺席——键集合不许
+                                          # 直接回 None），所以那四格是 0 而不是缺席——键集合不许
                                           # 随"这一路带不带 account"变形。
-                                          "identities": 0, "link_codes": 0, "account": 0}
+                                          "identities": 0, "link_codes": 0, "passwords": 0,
+                                          "account": 0}
         assert db.query(DailyUsage).filter(DailyUsage.user_id == str(empty.id)).count() == 0
         assert rows(db, Note, other["id"]) == 1
 

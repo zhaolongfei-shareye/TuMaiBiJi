@@ -1,0 +1,270 @@
+{
+  "side": "h5",
+  "windowWidth": 390,
+  "windowHeight": 844,
+  "pixelRatio": 2,
+  "toRpx": "px*750/windowWidth",
+  "rows": [
+    {
+      "label": "账号",
+      "hint": "登录/注册，换设备也能看到",
+      "value": "",
+      "labelFs": "14px",
+      "labelColor": "rgb(53, 46, 29)",
+      "labelWeight": "700",
+      "labelLs": "-0.15px",
+      "hintFs": "10.5px",
+      "hintColor": "rgba(53, 46, 29, 0.72)",
+      "hintMr": "6px",
+      "valFs": "",
+      "valColor": "",
+      "itemBorderBottom": "1px",
+      "itemBorderBottomColor": "rgba(53, 46, 29, 0.12)",
+      "hasIco": true,
+      "icoRect": {
+        "x": 338,
+        "y": 335.5,
+        "w": 23,
+        "h": 23
+      },
+      "cvRect": {
+        "x": 343.9,
+        "y": 342.4,
+        "w": 9.19,
+        "h": 9.19
+      },
+      "cvBorderRight": "2px",
+      "cvBorderRightColor": "rgba(53, 46, 29, 0.72)",
+      "rect": {
+        "x": 29,
+        "y": 321,
+        "w": 332,
+        "h": 53
+      },
+      "labelRect": {
+        "x": 29,
+        "y": 335.8,
+        "w": 27.7,
+        "h": 22.39
+      },
+      "hintRect": {
+        "x": 196.61,
+        "y": 338.59,
+        "w": 135.39,
+        "h": 16.8
+      }
+    },
+    {
+      "label": "卡片市场",
+      "hint": "分享给朋友那张卡片上印什么",
+      "value": "",
+      "labelFs": "14px",
+      "labelColor": "rgb(53, 46, 29)",
+      "labelWeight": "700",
+      "labelLs": "-0.15px",
+      "hintFs": "10.5px",
+      "hintColor": "rgba(53, 46, 29, 0.72)",
+      "hintMr": "6px",
+      "valFs": "",
+      "valColor": "",
+      "itemBorderBottom": "1px",
+      "itemBorderBottomColor": "rgba(53, 46, 29, 0.12)",
+      "hasIco": true,
+      "icoRect": {
+        "x": 338,
+        "y": 388.5,
+        "w": 23,
+        "h": 23
+      },
+      "cvRect": {
+        "x": 343.9,
+        "y": 395.4,
+        "w": 9.19,
+        "h": 9.19
+      },
+      "cvBorderRight": "2px",
+      "cvBorderRightColor": "rgba(53, 46, 29, 0.72)",
+      "rect": {
+        "x": 29,
+        "y": 374,
+        "w": 332,
+        "h": 53
+      },
+      "labelRect": {
+        "x": 29,
+        "y": 388.8,
+        "w": 55.41,
+        "h": 22.39
+      },
+      "hintRect": {
+        "x": 195.5,
+        "y": 391.59,
+        "w": 136.5,
+        "h": 16.8
+      }
+    },
+    {
+      "label": "私密密码",
+      "hint": "锁住不想让别人看到的笔记",
+      "value": "",
+      "labelFs": "14px",
+      "labelColor": "rgb(53, 46, 29)",
+      "labelWeight": "700",
+      "labelLs": "-0.15px",
+      "hintFs": "10.5px",
+      "hintColor": "rgba(53, 46, 29, 0.72)",
+      "hintMr": "6px",
+      "valFs": "",
+      "valColor": "",
+      "itemBorderBottom": "1px",
+      "itemBorderBottomColor": "rgba(53, 46, 29, 0.12)",
+      "hasIco": true,
+      "icoRect": {
+        "x": 338,
+        "y": 441.5,
+        "w": 23,
+        "h": 23
+      },
+      "cvRect": {
+        "x": 343.9,
+        "y": 448.4,
+        "w": 9.19,
+        "h": 9.19
+      },
+      "cvBorderRight": "2px",
+      "cvBorderRightColor": "rgba(53, 46, 29, 0.72)",
+      "rect": {
+        "x": 29,
+        "y": 427,
+        "w": 332,
+        "h": 53
+      },
+      "labelRect": {
+        "x": 29,
+        "y": 441.8,
+        "w": 55.41,
+        "h": 22.39
+      },
+      "hintRect": {
+        "x": 206,
+        "y": 444.59,
+        "w": 126,
+        "h": 16.8
+      }
+    },
+    {
+      "label": "我的邮箱",
+      "hint": "",
+      "value": "未填写",
+      "labelFs": "14px",
+      "labelColor": "rgb(53, 46, 29)",
+      "labelWeight": "700",
+      "labelLs": "-0.15px",
+      "hintFs": "",
+      "hintColor": "",
+      "hintMr": "",
+      "valFs": "10.5px",
+      "valColor": "rgba(53, 46, 29, 0.72)",
+      "itemBorderBottom": "1px",
+      "itemBorderBottomColor": "rgba(53, 46, 29, 0.12)",
+      "hasIco": true,
+      "icoRect": {
+        "x": 338,
+        "y": 494.5,
+        "w": 23,
+        "h": 23
+      },
+      "cvRect": {
+        "x": 343.9,
+        "y": 501.4,
+        "w": 9.19,
+        "h": 9.19
+      },
+      "cvBorderRight": "2px",
+      "cvBorderRightColor": "rgba(53, 46, 29, 0.72)",
+      "rect": {
+        "x": 29,
+        "y": 480,
+        "w": 332,
+        "h": 53
+      },
+      "labelRect": {
+        "x": 29,
+        "y": 494.8,
+        "w": 55.41,
+        "h": 22.39
+      },
+      "hintRect": null
+    },
+    {
+      "label": "注销账号",
+      "hint": "",
+      "value": "",
+      "labelFs": "14px",
+      "labelColor": "rgb(180, 35, 31)",
+      "labelWeight": "700",
+      "labelLs": "-0.15px",
+      "hintFs": "",
+      "hintColor": "",
+      "hintMr": "",
+      "valFs": "",
+      "valColor": "",
+      "itemBorderBottom": "0px",
+      "itemBorderBottomColor": "rgb(53, 46, 29)",
+      "hasIco": true,
+      "icoRect": {
+        "x": 338,
+        "y": 548,
+        "w": 23,
+        "h": 23
+      },
+      "cvRect": {
+        "x": 343.9,
+        "y": 554.9,
+        "w": 9.19,
+        "h": 9.19
+      },
+      "cvBorderRight": "2px",
+      "cvBorderRightColor": "rgba(53, 46, 29, 0.72)",
+      "rect": {
+        "x": 29,
+        "y": 533,
+        "w": 332,
+        "h": 53
+      },
+      "labelRect": {
+        "x": 29,
+        "y": 548.3,
+        "w": 55.41,
+        "h": 22.39
+      },
+      "hintRect": null
+    }
+  ],
+  "group": {
+    "paddingLeft": "16px",
+    "paddingTop": "0px",
+    "radius": "20px",
+    "borderWidth": "1px",
+    "borderColor": "rgba(53, 46, 29, 0.12)",
+    "bg": "rgb(243, 243, 241)",
+    "shadow": "rgba(18, 20, 26, 0.08) 0px 3px 7px 0px",
+    "marginBottom": "12px",
+    "rect": {
+      "x": 12,
+      "y": 320,
+      "w": 366,
+      "h": 267
+    }
+  },
+  "sheetRect": {
+    "x": 0,
+    "y": 251,
+    "w": 390,
+    "h": 593
+  },
+  "overflowX": false,
+  "innerWidth": 390,
+  "innerHeight": 844,
+  "dpr": 2
+}

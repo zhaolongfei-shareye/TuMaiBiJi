@@ -345,6 +345,7 @@ class Test一次删净:
         want["reports"] = before_reports
         want["identities"] = before_acct["account_identities"]
         want["link_codes"] = before_acct["link_codes"]
+        want["passwords"] = before_acct["account_passwords"]
         want["account"] = 1
         assert set(deleted) == set(want), \
             f"回体的键集合与库里真少的那批不一致：多了 {sorted(set(deleted) - set(want))}、" \

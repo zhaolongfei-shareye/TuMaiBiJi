@@ -1,0 +1,69 @@
+页面：http://127.0.0.1:8123/index.html
+后端：https://api.agentsbin.cn/wtsj
+视口：390×844 @2x
+档：UI_ONLY（只量屏上四组，一个号都没造）
+
+  ✓ ① 冷启动直接进应用（设备游客号）　→ {"page":"create","isLoggedIn":true}
+  ✓ ① 这一态是设备游客号（还没口令）　→ {"isLoggedIn":true,"guestMode":false,"isGuestAccount":true,"accountLogin":"","providers":["guest"],"userId":"261"}
+  ✓ ① 屏上零横向溢出
+  ✓ ② 设置栏第一行＝账号　→ ["账号","卡片市场","私密密码","我的邮箱","注销账号"]
+  ✓ ② 未设口令时那一行念「登录 / 注册，换设备也能看到」　→ 登录 / 注册，换设备也能看到
+  ✓ ② 设置栏五行齐（账号／卡片市场／私密密码／我的邮箱／注销账号）　→ ["账号","卡片市场","私密密码","我的邮箱","注销账号"]
+  ✓ ② 每行仍是 53px（新增一行没把既有行挤扁）　→ [53,53,53,53,53]
+  ✓ ② 没有一行文字折行　→ []
+  ✓ ③ 点账号进登录屏　→ 登录
+  ✓ ③ 两只输入框：登录名＋密码（密码框 type=password）　→ [{"id":"lg-name","type":"text","ph":"手机号或邮箱","ac":"username"},{"id":"lg-pass","type":"password","ph":"密码","ac":"current-password"}]
+  ✓ ③ 登录名框 autocomplete=username（系统密码管理器认得）　→ username
+  ✓ ③ 三个入口：注册新账号／忘记密码／给本机这个账号设密码　→ ["注册新账号","忘记密码","给本机这个账号设密码 ›"]
+  ✓ ③ 留了本机试用的退路　→ ["先随便看看，本机试用 ›"]
+  ✓ ③ 登录卡不溢出屏幕　→ {"x":35,"y":195,"w":320,"h":454}
+  ✓ ③ 主按钮不折行（高度 ≤ 52）　→ {"text":"登录","disabled":false,"box":{"x":59,"y":435,"w":272,"h":44}}
+  ✓ ④ 注册态三只框（登录名／密码／再输一遍）　→ ["lg-name","lg-pass","lg-pass2"]
+  ✓ ④ 屏上写明「不会发验证码」　→ ["手机号或邮箱只当登录名用，我们不会发验证码。"]
+  ✓ ④ 主按钮念「注册并登录」　→ 注册并登录
+  ✓ ④a 登录名形状不对 ⇒ 屏上拦住　→ 登录名要填手机号或邮箱
+  ✓ ④a 密码太短 ⇒ 屏上拦住
+  ✓ ④a 两次不一样 ⇒ 屏上拦住
+  ✓ ⑰ login 态标题「登录」　→ 登录
+  ✓ ⑰ login 态输入框 lg-name,lg-pass　→ ["lg-name","lg-pass"]
+  ✓ ⑰ login 态主按钮「登录」　→ 登录
+  ✓ ⑰ login 态零横向溢出
+  ✓ ⑰ login 态卡片在屏内　→ {"x":35,"y":195,"w":320,"h":454}
+  ✓ ⑰ login 态没有元素横向出屏　→ []
+  ✓ ⑰ register 态标题「注册新账号」　→ 注册新账号
+  ✓ ⑰ register 态输入框 lg-name,lg-pass,lg-pass2　→ ["lg-name","lg-pass","lg-pass2"]
+  ✓ ⑰ register 态主按钮「注册并登录」　→ 注册并登录
+  ✓ ⑰ register 态零横向溢出
+  ✓ ⑰ register 态卡片在屏内　→ {"x":35,"y":148,"w":320,"h":548}
+  ✓ ⑰ register 态没有元素横向出屏　→ []
+  ✓ ⑰ recover 态标题「找回密码」　→ 找回密码
+  ✓ ⑰ recover 态输入框 lg-name,lg-code,lg-pass　→ ["lg-name","lg-code","lg-pass"]
+  ✓ ⑰ recover 态主按钮「重置密码并登录」　→ 重置密码并登录
+  ✓ ⑰ recover 态零横向溢出
+  ✓ ⑰ recover 态卡片在屏内　→ {"x":35,"y":158,"w":320,"h":528}
+  ✓ ⑰ recover 态没有元素横向出屏　→ []
+  ✓ ⑰ upgrade 态标题「给本机账号设密码」　→ 给本机账号设密码
+  ✓ ⑰ upgrade 态输入框 lg-name,lg-pass,lg-pass2　→ ["lg-name","lg-pass","lg-pass2"]
+  ✓ ⑰ upgrade 态主按钮「设好密码」　→ 设好密码
+  ✓ ⑰ upgrade 态零横向溢出
+  ✓ ⑰ upgrade 态卡片在屏内　→ {"x":35,"y":167,"w":320,"h":511}
+  ✓ ⑰ upgrade 态没有元素横向出屏　→ []
+  ✓ ⑰ change 态标题「修改密码」　→ 修改密码
+  ✓ ⑰ change 态输入框 lg-old,lg-pass,lg-pass2　→ ["lg-old","lg-pass","lg-pass2"]
+  ✓ ⑰ change 态主按钮「改密码」　→ 改密码
+  ✓ ⑰ change 态零横向溢出
+  ✓ ⑰ change 态卡片在屏内　→ {"x":35,"y":176,"w":320,"h":492}
+  ✓ ⑰ change 态没有元素横向出屏　→ []
+  ✓ ⑰ account 态标题「账号」　→ 账号
+  ✓ ⑰ account 态输入框 （无）　→ []
+  ✓ ⑰ account 态零横向溢出
+  ✓ ⑰ account 态卡片在屏内　→ {"x":35,"y":240,"w":320,"h":364}
+  ✓ ⑰ account 态没有元素横向出屏　→ []
+  ✓ ⑰ recovery 态（样本码，只量排版）标题对　→ 记下这串恢复码
+  ✓ ⑰ recovery 态码原样在屏上　→ ABCD-EFGH-JKLM-NPQR
+  ✓ ⑰ recovery 态两枚按钮：复制／我记下了
+  ✓ ⑰ recovery 态零横向溢出
+  ✓ ⑰ 全程页面零未捕获异常
+  ✓ ⑰ 全程零 console.error（4xx 资源噪声除外）
+
+62 过 / 0 红

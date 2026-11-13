@@ -28,6 +28,7 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models.account import Account, AccountIdentity
+from app.models.account_password import AccountPassword
 from app.models.asset import Asset, not_failed
 from app.models.category import Category
 from app.models.invitation import Invitation
@@ -79,7 +80,7 @@ def purge(db: Session, users: list[User], account_id: str | None) -> tuple[dict,
     # 「人」那三格的键与上面七格同一句口径：**不许随"这一路带不带 account"变形**。2026-10-10
     # 拍甲之后 `/api` 在"名下还有第二行"时传 None，那时它们是 0 而不是消失——回体是给人对账的，
     # 键集合一变，下一个客户端就得先判"这个键今天该不该在"。
-    deleted.update({"identities": 0, "link_codes": 0, "account": 0})
+    deleted.update({"identities": 0, "link_codes": 0, "passwords": 0, "account": 0})
 
     # 举报行只挂 token、不挂外键。理由**别说反**（10-10 审计改口，`routes/landing.py` 第一句就是
     # `active_share_by_token`，撤掉／过期／不存在的码一律 404，**撤掉之后收不到新举报**）：
@@ -147,6 +148,11 @@ def purge(db: Session, users: list[User], account_id: str | None) -> tuple[dict,
         # 写下的时候这张表还不存在），钉在 `tests/test_v1_account_deletion.py`。
         deleted["link_codes"] = (
             db.query(LinkCode).filter(LinkCode.account_id == account_id).delete()
+        )
+        # 口令那一行同理，而且更要紧：留着它，`account_id` 那道唯一索引会一直被这个死账号占着，
+        # 同一个人拿同一个登录名重新注册时 `passwords.create` 当场 IntegrityError。
+        deleted["passwords"] = (
+            db.query(AccountPassword).filter(AccountPassword.account_id == account_id).delete()
         )
         deleted["account"] = db.query(Account).filter(Account.id == account_id).delete()
 

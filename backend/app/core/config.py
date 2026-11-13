@@ -182,6 +182,29 @@ class Settings(BaseSettings):
     # 同一手机号两次发送之间最少间隔（秒）。防连点、防刷钱（每条短信腾讯云收一分钱左右）。
     SMS_COOLDOWN_SECONDS: int = 60
 
+    # ---- H5 邮箱+验证码登录（/v1/auth/email、/v1/auth/email-login）----
+    # AWS SES 或任意 SMTP 凭据。五栏任一为空 = 开发模式：验证码只写日志不发邮件，与短信兜底同型。
+    # 五栏都走 service_secrets 那条链（库里优先、.env 兜底），生产环境由后台密钥页写入。
+    EMAIL_SMTP_HOST: str = ""
+    EMAIL_SMTP_PORT: int = 587
+    EMAIL_SMTP_USER: str = ""
+    EMAIL_SMTP_PASSWORD: str = ""
+    EMAIL_FROM_ADDRESS: str = ""
+    # 验证码活多久（分钟）。与短信共用同一枚 TTL 配置，不另开一档。
+    EMAIL_CODE_TTL_MINUTES: int = 5
+    # 同一邮箱两次发送之间最少间隔（秒）。与短信冷却同型。
+    EMAIL_COOLDOWN_SECONDS: int = 60
+
+    # ---- 开发态固定登录（H5 跑通流程用，不依赖短信/邮件）----
+    # 默认全关：`DEV_LOGIN_ENABLED=False` 时这四栏一个都不参与任何判断，生产行为零变化。
+    # 打开后，只有「账号 == 锁定的那一枚」且「码 == DEV_LOGIN_CODE」才跳过 Redis 校验与真实发信——
+    # 不是"任意账号 + 固定码"，blast radius 锁死在一个专用测试号上。
+    # 用完必须关：这一档一旦在生产 .env 里开着，等于给那个号留了一道不验码的登录门。
+    DEV_LOGIN_ENABLED: bool = False
+    DEV_LOGIN_PHONE: str = ""
+    DEV_LOGIN_EMAIL: str = ""
+    DEV_LOGIN_CODE: str = ""
+
     @model_validator(mode="after")
     def _require_jwt_secret(self) -> "Settings":
         placeholder = "change-me-in-production-use-a-long-random-string"

@@ -9,6 +9,10 @@ from app.models.poster_template import PosterTemplate
 from app.models.note_card import NoteCard
 from app.models.share_report import ShareReport
 from app.models.account import Account, AccountIdentity
+# 口令登录那一行（11-12「免费的技术方案」：现网没有短信/邮件凭据，口令是零外部依赖的那条路）。
+# 漏挂的症状与下面几条同型：`create_all` 建不出这张表，而 `/v1/auth/register` 第一趟写入就
+# no such table——不是"登录静默降级"，是整条注册路 500。
+from app.models.account_password import AccountPassword
 from app.models.link_code import LinkCode
 # `user_profile` 原来只挂在 `alembic/env.py` 上、没进这张名单。后果不是 alembic 认不出表
 # （那条有 §8.161 的尺子钉着），而是**任何按 Base.metadata 建表的调用都建不出这一张**：
@@ -34,5 +38,5 @@ from app.models.service_secret import ServiceSecret
 # 都变成 429"，不是"限额没生效"，所以更要挂在版本里而不是靠某只路由顺手 import。
 from app.models.daily_usage import DailyUsage
 
-__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting", "SourceBlocklist", "ServiceSecret", "DailyUsage"]
+__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "AccountPassword", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting", "SourceBlocklist", "ServiceSecret", "DailyUsage"]
 

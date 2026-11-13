@@ -1,0 +1,4 @@
+登录: 200 user_id= 249
+注销: 200 {"message": "账号已注销", "deleted": {"shares": 0, "jobs": 0, "notes": 1, "categories": 4, "assets": 0, "cards": 0, "profile": 0, "daily_usage": 1, "identities": 1, "link_codes": 0, "passwords": 1, "account": 1, "reports": 0}, "file_ids": []}
+旧票（应 401）: 401
+注销后再登（应 400）: 400 {"detail": "登录名或密码不对"}

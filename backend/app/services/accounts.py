@@ -6,6 +6,8 @@
 
 - `ensure_for_provider` 是"建一个人并挂上他的第一种登录方式"的唯一落点，微信和 Apple
   两条登录路都走它（幂等：已经有这条 identity 就原样返回它的主人）。
+- `add_identity` 是"给**已存在**的人挂第二种登录方式"的落点（游客号设密码那一路）。
+  它与上一支的区别只有一句：不新建 account。抢同一个登录名时抛 `IdentityTaken`。
 - `ensure_for_user` 在它外面包一层，只管"这一行 `users` 连到哪条 account"。它是幂等的，
   登录那一路每次都过一遍：迁移只回填它当时看得见的那些行，迁移之后新建的用户要在这里当场
   补上。两条路共用一支函数，才有"每个用户都有 account"这句话是真的。
@@ -22,12 +24,17 @@ from app.models.user import User
 from app.services import generation
 
 
-def ensure_for_provider(db: Session, provider: str, provider_uid: str) -> Account:
+def ensure_for_provider(db: Session, provider: str, provider_uid: str,
+                        verified: bool = True) -> Account:
     """**唯一**一处"建一条 account 并给它挂第一种登录方式"的代码。
 
     建号这件事只能有一个出处，理由和 `ensure_for_user` 只能有一个一样：两处各写一遍
     `Account(...) + AccountIdentity(...)`，那么并发保护、`verified_at` 的口径、撞唯一索引之后
     怎么找回赢家，就会在两处分别长歪。`/v1/auth/apple` 建号和微信建号走的必须是同一扇门。
+
+    `verified=False` 只有口令登录那一支用：登录名（手机号/邮箱）**没有**被任何平台确认过——
+    我们没有发信通道，验不了归属。`verified_at` 那一列本来就是为"绑上了但没验证"设的，
+    写 now 等于把没验过的说成验过了。
     """
     identity = db.query(AccountIdentity).filter(
         AccountIdentity.provider == provider,
@@ -48,7 +55,7 @@ def ensure_for_provider(db: Session, provider: str, provider_uid: str) -> Accoun
         account_id=account.id, provider=provider, provider_uid=provider_uid,
         # 走到这里的两条路（微信 code2session 换回 openid / Apple 的 identityToken 验完签）
         # 都已经**由平台确认过**这一串是本人的。留 null 会让每个新用户看起来像"绑了没验"。
-        verified_at=datetime.now(timezone.utc),
+        verified_at=datetime.now(timezone.utc) if verified else None,
     ))
     try:
         db.commit()
@@ -73,6 +80,57 @@ def ensure_for_provider(db: Session, provider: str, provider_uid: str) -> Accoun
             )
     db.refresh(account)
     return account
+
+
+class IdentityTaken(Exception):
+    """这个 `(provider, provider_uid)` 已经挂在**别的** account 名下。路由翻成 409。
+
+    与 `ensure_for_provider` 里那次 IntegrityError 的区别：那一支是"同一个人同时登录两趟"，
+    赢家就是他自己，所以退回去读赢的那一行继续走；这一支是"两个不同的人抢同一个登录名"，
+    读赢家继续走就等于把后来者的密码写进前一个人的账号。必须响。
+    """
+
+
+def add_identity(db: Session, account: Account, provider: str, provider_uid: str,
+                 verified: bool = True) -> AccountIdentity:
+    """给一条**已存在**的 account 挂第二种登录方式（游客号设密码那一路）。
+
+    为什么不让调用方走 `ensure_for_provider`：那一支在身份不存在时会**新建一条 account**，
+    而"给本机游客号设个密码"要的恰恰是**不新建**——游客那几百篇笔记挂在这条 account 的
+    `users` 行上，新建一条就等于设完密码数据全没了。
+
+    写口仍然只在本文件：`AccountIdentity(...)` 这个构造在本仓只出现在这里与
+    `ensure_for_provider` 两处，并发保护与 `verified_at` 的口径因此只有一份说法。
+    **不 commit**：挂身份与紧随其后的那行口令必须同一个事务落地。
+    """
+    existing = db.query(AccountIdentity).filter(
+        AccountIdentity.provider == provider,
+        AccountIdentity.provider_uid == provider_uid,
+    ).first()
+    if existing is not None:
+        if existing.account_id != account.id:
+            raise IdentityTaken()
+        return existing
+
+    row = AccountIdentity(
+        account_id=account.id, provider=provider, provider_uid=provider_uid,
+        verified_at=datetime.now(timezone.utc) if verified else None,
+    )
+    db.add(row)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        winner = db.query(AccountIdentity).filter(
+            AccountIdentity.provider == provider,
+            AccountIdentity.provider_uid == provider_uid,
+        ).first()
+        if winner is None:
+            raise
+        if winner.account_id != account.id:
+            raise IdentityTaken()
+        return winner
+    return row
 
 
 def ensure_for_user(db: Session, user: User) -> Account:

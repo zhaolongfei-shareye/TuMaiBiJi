@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import UserError
 from app.models.account import Account, AccountIdentity
+from app.models.account_password import AccountPassword
 from app.models.link_code import LinkCode
 from app.models.note import Note
 from app.models.user import User
@@ -105,7 +106,23 @@ def merge_into(db: Session, keep: Account, absorb: Account) -> None:
 
     `link_codes` 里那张死账号的码必须一起删：留着的话它还能被 redeem 一次，
     而 `find_usable` 会查出 `account_id` 指向一行不存在的 account——那时能给的只有 500。
+
+    口令那一行（`account_passwords`）跟着人走，但一个 account 只能有一行（那一列唯一）。
+    keep 已经有了 ⇒ 被并掉那条的口令**与它的 password 身份行一起**摘掉：只删口令行会留下
+    一个"念得出登录名、却永远登不进去"的名字。两样一起摘的口径同 `unbind`。
     """
+    keep_pwd = db.query(AccountPassword).filter(AccountPassword.account_id == keep.id).first()
+    absorb_pwd = db.query(AccountPassword).filter(AccountPassword.account_id == absorb.id).first()
+    if absorb_pwd is not None:
+        if keep_pwd is None:
+            absorb_pwd.account_id = keep.id
+        else:
+            db.delete(absorb_pwd)
+            for row in db.query(AccountIdentity).filter(
+                AccountIdentity.account_id == absorb.id,
+                AccountIdentity.provider == "password",
+            ).all():
+                db.delete(row)
     for identity in db.query(AccountIdentity).filter(AccountIdentity.account_id == absorb.id).all():
         identity.account_id = keep.id
     for user in db.query(User).filter(User.account_id == absorb.id).all():

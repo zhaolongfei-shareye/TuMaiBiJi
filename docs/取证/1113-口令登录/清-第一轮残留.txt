@@ -1,0 +1,4 @@
+登录残留号: 200
+注销: 422 {"detail": "提交的内容格式不对，请检查后重试"}
+旧票（应 401）: 200
+注销后再登（应 400）: 200 {'token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyNDkiLCJnZW4iOjI5NywiaWF0IjoxNzk0NTcyODc2LCJleHAiOjE3OTUxNzc2NzYsImp0aSI6IjRjNWE2M2JhLTc0OTUtNDY4ZS1hYWZmLWRkYzNjZDcyMDNlMyJ9.rvr_TsnHAkIqJWYw_EdP5IYoQZX_8nmLOu_jk9IsboI', 'user_id': 249, 'nickname': '', 'language': 'zh', 'wallpaper': 'default', 'login': 'probe-413d3eee30@example.com', 'recovery_code': None}

@@ -1,0 +1,17 @@
+H5 口令登录落地凭据（2026-11-13 22:56 落地，sudo bash /tmp/land-pwd-1113.sh）
+三方核对：本机文件 md5 ＝ 服务器暂存 /tmp/h5in-pwd-1113/ md5 ＝ 现网 HTTPS 抓回字节 md5（curl https://agentsbin.cn/app/<f> | md5）
+落地后服务器现读 /var/www/tumaibiji-h5/ 亦与下表逐字相等（land 脚本输出）。
+
+文件                  本机＝暂存＝现网抓回                        服务器落地现读
+css/app.css           f0c9df26ec10d908ba83b65598e15d23   f0c9df26ec10d908ba83b65598e15d23
+css/mp-me.css         1f9481ec9a46d218041efa5eca26a9e8   1f9481ec9a46d218041efa5eca26a9e8
+js/api.js             d7056e10959bcf19d2a0a3b4d38f317c   d7056e10959bcf19d2a0a3b4d38f317c
+js/app.js             3bb1546b912478896e2370ec88beab8e   3bb1546b912478896e2370ec88beab8e
+pages/login.js        a5342c25209eae3f3bfcad4c9dac59a1   a5342c25209eae3f3bfcad4c9dac59a1
+pages/me.js           a0c9fa019ed0268776e237fac0ce3f56   a0c9fa019ed0268776e237fac0ce3f56
+index.html            54b6ee476850f59fdbf451204b7111aa   54b6ee476850f59fdbf451204b7111aa
+
+只落点名的 7 只；现网独有的 dl/index.html 未动。
+备份与回滚：/var/backups/tumaibiji-h5/pwd-1113/（7 只旧字节＋rollback.sh）
+回滚命令：sudo bash /var/backups/tumaibiji-h5/pwd-1113/rollback.sh
+后端那一半：第八十三次 11-13 20:24:25 已上（迁移头 a3c9e7f1b482，探针 34/0），回滚位 /var/backups/wtsj-backend/pwd-1113/
