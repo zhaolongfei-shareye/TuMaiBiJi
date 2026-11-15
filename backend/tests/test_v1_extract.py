@@ -258,6 +258,32 @@ class Test额度:
         assert [c for u, _, c in 记录 if u.startswith("device:")] == [], \
             f"设备那一档 0 条时拦下的请求仍留了行：{记录}"
 
+    def test记账那一趟顶到上限也要当场拒并且不打上游(self, client, monkeypatch):
+        """第十轮审计 Z31：peek 与 charge 之间挤进并发时，缝里那多发必须被拒在记账之后。
+
+        `charge` 是"先加一再判"，它的返回值就是"加完之还剩不剩"——旧写法把它丢掉，
+        于是缝里挤进来的那一发照样打上游，日闸上限只是个软目标。
+        本机造不出真并发（SQLite 把两趟挤成先后），所以把并发做成 peek 说谎：读档那一趟
+        一律回 ok，而 `charge` 吃的仍是**真库里的真数**。这样量到的只有"返回值吃没吃"这一格。
+        代价照旧写明：被拒那一发的全站那一行仍然 ＋1（多记一格），这是"先加一再判"的固有账。
+        """
+        calls = _fake_knowledge(monkeypatch)
+        monkeypatch.setattr(settings, "EXTRACT_GLOBAL_DAILY_LIMIT", 1)
+        monkeypatch.setattr(daily_budget, "peek",
+                            lambda user_id, kind, times=1: daily_budget.Budget(
+                                True, kind, times, daily_budget.limit_of(kind), ""))
+        assert client.post("/v1/extract", json={"text": BODY},
+                           headers=HEADERS).status_code == 200
+        第二发 = client.post("/v1/extract", json={"text": BODY}, headers=HEADERS)
+        assert 第二发.status_code == 429, \
+            f"peek 说还行、charge 加完已经超上限，那一发不该放行：{第二发.text}"
+        assert "全站" in 第二发.json()["detail"] and "提炼" in 第二发.json()["detail"], \
+            f"该念全站那一档的话：{第二发.json()}"
+        assert len(calls) == 1, f"被记账顶回的那一发还是打到上游花钱了：{len(calls)} 次"
+        assert [c for u, _, c in _usage_rows() if u == v1_extract.GLOBAL_LEDGER_KEY] == [2], \
+            "被拒那一发按口径该多记一格（先加一再判），数字变了说明这一步没真跑到 charge"
+        assert v1_extract.in_flight() == 0, "记账这一道 429 是新出口，漏还一次位在飞上就永久 429"
+
     def test换一枚设备编号照样能用而全站仍然挡着(self, client, monkeypatch):
         """⑥：按设备记的是公平，不是钱的上限。这句要能被量出来，否则下一轮会有人拿 50 当总闸。"""
         _fake_knowledge(monkeypatch)

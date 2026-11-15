@@ -187,9 +187,12 @@ async def extract(request: Request, payload: ExtractRequest):
         for key, kind in ledgers:
             await _reject_if_full(key, kind)
         for key, kind in ledgers:
-            # 记账仍走 `charge`（先加一再判）：peek 与 charge 之间的那道缝里可能挤进并发，
-            # 那种情况下宁可多记一格再拒，也不把"没通过的请求"记进账。
-            await asyncio.to_thread(daily_budget.charge, key, kind)
+            # 记账仍走 `charge`（先加一再判），而它的返回值必须吃下去：peek 与 charge 之间的
+            # 那道缝里挤进并发时，最坏是多记一格，但那一格要在这里当场拒掉——只记不拒，上限
+            # 就只是个软目标，超了照样打上游（第十轮审计 Z31；`ingest.py` 一直是收返回值的）。
+            budget = await asyncio.to_thread(daily_budget.charge, key, kind)
+            if not budget.ok:
+                raise HTTPException(status_code=429, detail=budget.message)
 
         # `extract_knowledge` 自己不抛错（里面那条 except 兜住一切出网失败并降级），
         # 所以这里不 try 它：真出事是它兜不住的那一类，让它抛、让 500 如实红。
