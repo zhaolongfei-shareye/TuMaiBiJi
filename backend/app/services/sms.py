@@ -112,11 +112,16 @@ def set_cooldown(phone: str) -> None:
 
 
 def verify_code(phone: str, code: str) -> bool:
-    """比对验证码。用 `GETDEL`（Redis 6.2+）原子取走：**取与删在同一条命令里**，
-    并发请求不会读到同一枚码再各自判"我对了"。
+    """比对验证码。取与删必须在**同一次往返**里做完（MULTI 里 GET＋DEL），
+    并发请求才不会读到同一枚码再各自判"我对了"。
 
     比完就删：一枚码只能用一次，不管对错（错了也删——不许留着让人反复试）。
-    redis-py 版本不带 `getdel()` 时回退到 pipeline（MULTI 里取+删，仍比裸 GET+DEL 安全）。
+
+    ⚠ 别改回 `conn.getdel()`：那条命令要 Redis 6.2，而现网那台服务端是 **6.0.16**。
+    `hasattr(conn, "getdel")` 判的是**客户端库**有没有这个方法（服务器上的 redis-py 一直有），
+    命令发出去服务端回 `unknown command`、被下面的 `except` 吞成 False
+    ⇒「码发得出去、填对也念验证码错」。同一处 11-15 在邮箱那条上真撞过（那条已修并上现网），
+    这一条此刻还没被触发（`.env` 里没有 `SMS_*` 凭据），修法是同一种。
 
     ⚠ 同步打 Redis ⇒ 异步口调用它必须裹 `asyncio.to_thread`。
     """
@@ -125,13 +130,10 @@ def verify_code(phone: str, code: str) -> bool:
     try:
         conn = get_redis_conn()
         key = f"{REDIS_CODE_PREFIX}{phone}"
-        if hasattr(conn, "getdel"):
-            stored = conn.getdel(key)
-        else:
-            pipe = conn.pipeline(True)
-            pipe.get(key)
-            pipe.delete(key)
-            stored = pipe.execute()[0]
+        pipe = conn.pipeline(True)
+        pipe.get(key)
+        pipe.delete(key)
+        stored = pipe.execute()[0]
         if stored is None:
             return False
         return hmac.compare_digest(
