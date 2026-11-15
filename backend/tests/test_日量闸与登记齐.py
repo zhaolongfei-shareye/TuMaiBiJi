@@ -5,10 +5,13 @@
 - M33 日量闸：`daily_budget.charge` 真拦得住第 N+1 条、话里带档位；`SEC_CHECK_ENABLED=False`
   时一个字都不记（测试环境要的是"根本不出网"那条不变量，记了会把额度打光、症状是一片与本条
   无关的用例回 429）。
-- M33 登记齐：`app/api/routes/*.py` 里**每一只**做内容送检的函数都必须在同一只函数里记一笔
-  `sec_check`，每一只往 `app.tasks.ingest_tasks.*` 排队提炼的口都必须记一笔 `extract`。
+- M33 登记齐：`app/api/routes/*.py`＋`app/tasks/*.py`＋`app/services/*.py` 里**每一只**做内容送检的
+  函数都必须在记日量账的链上有一笔 `sec_check`，每一只往 `app.tasks.ingest_tasks.*` 排队提炼的口都
+  必须记一笔 `extract`（扫描面 11-16 从只剩路由扩到这三处，Z7 第二件事）。
   这一把不点名——点名的注册表就是 M8 那条的成因（"挂没挂靠一份手抄名单，新长的口不会露头"）。
   名单方向硬写：**漏记即红**，多记（有 charge 没送检）只念。
+  ⚠ 扩面当天量出 7 只已知欠账（全在 worker 与门面那两层），冻成 `DEBT_SEC_UNCHARGED`；
+  补那批账＝Z7 第一件事，要他先拍（与 Z23「按次还是按发」同一本账），本刀只收盲区不收运行时行为。
 - M32：两张表的 `object_key` 索引在模型里声明了、而且**新迁移里真建**（只在模型里写 index=True
   而忘记迁移＝现网永远全表扫，而这件事在屏上看不出来）。
 - M18：交给云函数的 `text` 里不许出现 `参考标题：`（拼标题只有函数那一处），长文那条的截断标记
@@ -24,11 +27,31 @@ import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 ROUTES = BACKEND / "app" / "api" / "routes"
+# Z7 第二件事（11-16）：扫描面补上真出网的那两层。只扫路由看不见这一批——`/url` 那条链的送检
+# 全在 worker 里跑（`app/tasks/ingest_tasks.py` 的 `_guard_*`）与 `note_images` 的取图那两格里，
+# 尺子留在 `ROUTES`，下一只新长出来的口照样从这个盲区里静悄悄漏出去。
+TASKS = BACKEND / "app" / "tasks"
+SERVICES = BACKEND / "app" / "services"
+SURFACES = (ROUTES, TASKS, SERVICES)
 
 # 真打一次平台送检的三个入口（`services/wechat.py` 的门面）。新增第四个入口的名字时，
 # 这一行要跟着加——加在这一行是**收紧**尺子（新口一进来就必须记账），不会造出假绿。
 SEC_CALLS = {"enforce_text_safety", "check_image", "enforce_image_safety", "check_text"}
 CHARGE_KINDS = {"sec_check": "KIND_SEC_CHECK", "extract": "KIND_EXTRACT"}
+
+# 今天已知的欠账（11-16 现读 `_gaps` 的 7 条，逐条对着源码看过）。判据是**集合相等**：
+# 多一只即红＝新口不许漏账；少一只也即红＝补完账就把名字划掉，别让账本虚报一个不存在的洞。
+# 为什么不写成子集（"名单里没有就放过"）：那样"补掉一只、同时新漏一只"照样绿，扩面等于没扩。
+# 这一批要怎么补是 Z7 第一件事（门口预记／worker 真记），与 Z23「按次还是按发」是同一本账，等他拍。
+DEBT_SEC_UNCHARGED = {
+    "app/tasks/ingest_tasks.py:_guard_screenshot_text",
+    "app/tasks/ingest_tasks.py:_guard_screenshot_images",
+    "app/tasks/ingest_tasks.py:_guard_scraped_text",
+    "app/services/note_images.py:_guard_image_pixels",
+    "app/services/note_images.py:_guard_image_text",
+    "app/services/wechat.py:enforce_text_safety",
+    "app/services/wechat.py:enforce_image_safety",
+}
 
 
 def _funcs(tree):
@@ -68,21 +91,99 @@ def _enqueue_targets(raw, fn):
     return re.findall(r'"app\.tasks\.ingest_tasks\.([a-z_]+)"', seg)
 
 
-def test_送检与提炼的每一只口都在记日量账():
-    """枚举，不点名：漏记即红（M33；形状照 `test_写口限流齐不齐.py` 那一把）。"""
-    missing = []
-    for path in sorted(ROUTES.glob("*.py")):
+def _charging_names(trees):
+    """扫描面上**自己记了 sec_check 这一档**的函数名。
+
+    为什么送检那一档要看这一层、extract 那一档不看：门面（`wechat.enforce_text_safety`）补上账之后，
+    worker 里那五处只是"调用已记账的门面"，按老写法会把它们读成漏记；照着那批红去补，
+    就是把同一趟出网记了两次——偏大比偏小更难发现（偏少念出来是"额度没花完"，偏多是"没花却当场拦人"）。
+    extract 那一档的记账本来就在路由里、排的是 worker 的函数名，两层重名的风险不为它编规则，
+    那条判据保持 10-25 原样。
+    """
+    return {name for _, tree in trees for name, fn in _funcs(tree).items()
+            if "KIND_SEC_CHECK" in _charge_kinds_in(fn)}
+
+
+def _gaps(paths):
+    """[(位置, 漏了什么)]：扫描面上每一只真出一趟网却没记账的口。"""
+    trees = [(p, ast.parse(p.read_text(encoding="utf-8"))) for p in paths]
+    charged = _charging_names(trees)
+    out = []
+    for path, tree in trees:
         raw = path.read_text(encoding="utf-8")
-        tree = ast.parse(raw)
         for name, fn in _funcs(tree).items():
             charges = _charge_kinds_in(fn)
-            where = f"{path.name}:{name}"
-            if _sec_hits(fn) and "KIND_SEC_CHECK" not in charges:
-                missing.append(f"{where} 送检却没记 sec_check")
+            try:
+                rel = str(path.relative_to(BACKEND))
+            except ValueError:                      # 临时目录里造的桩不在仓内
+                rel = path.name
+            where = f"{rel}:{name}"
+            hits = _sec_hits(fn) - charged
+            if hits and "KIND_SEC_CHECK" not in charges:
+                out.append((where, f"送检 {sorted(hits)} 却没记 sec_check"))
             targets = _enqueue_targets(raw, fn)
             if targets and "KIND_EXTRACT" not in charges:
-                missing.append(f"{where} 排队 {targets} 却没记 extract")
-    assert not missing, "日量闸漏记：\n" + "\n".join(missing)
+                out.append((where, f"排队 {targets} 却没记 extract"))
+    return out
+
+
+def test_送检与提炼的每一只口都在记日量账():
+    """枚举，不点名：漏记即红（M33；形状照 `test_写口限流齐不齐.py` 那一把）。
+
+    扫描面 11-16 起是三处（`SURFACES`）；今天量出的 7 只欠账冻在 `DEBT_SEC_UNCHARGED` 里等 Z7 拍。
+    """
+    gaps = _gaps(p for d in SURFACES for p in sorted(d.glob("*.py")))
+    assert {w for w, _ in gaps} == DEBT_SEC_UNCHARGED, (
+        "日量闸的欠账名单动了（多＝新长的口漏记，少＝补完了就把名字从名单里划掉，别让账本虚报）：\n"
+        + "\n".join(f"{w} {why}" for w, why in gaps))
+
+
+def test_扩面后的尺子对门面与漏记两种形状都有牙(tmp_path):
+    """反向验证：同一份真形状扫两趟，差别只在门面里那一句 `charge` 有没有（不碰仓里任何文件）。
+
+    这一条不是走过场：扩面第一趟量出的 7 只里，5 只的"送检"是调门面、2 只就是门面本身。
+    要是 `_gaps` 把"调已记账的门面"也读成漏记，Z7 补完门面那一格会一次红五格，
+    修的人只剩一条路可走＝在 worker 里再记一遍（偏大）；反过来要是门面不记账也算已覆盖，
+    这 7 只就永远读不出来。两头都钉住。
+    """
+    def src(charged):
+        return '''
+from app.services import daily_budget
+from app.services.daily_budget import KIND_SEC_CHECK
+
+
+def check_text(openid, *texts):
+    return 0
+
+
+def enforce_text_safety(openid, *texts):
+{charge}    return check_text(openid, *texts)
+
+
+async def _guard_via_facade(openid, text):
+    enforce_text_safety(openid, text)
+
+
+async def _guard_via_raw(openid, data):
+    return check_text(openid, data)
+
+
+async def _guard_via_raw_but_charges(openid, data):
+    daily_budget.charge(openid, KIND_SEC_CHECK)
+    return check_text(openid, data)
+'''.format(charge="    daily_budget.charge(openid, KIND_SEC_CHECK)\n" if charged else "")
+
+    def scan(charged, tag):
+        d = tmp_path / tag
+        d.mkdir()
+        p = d / "synthetic.py"
+        p.write_text(src(charged), encoding="utf-8")
+        return {w.split(":")[-1] for w, _ in _gaps([p])}
+
+    # 门面不记账（＝今天仓里的形状）：门面本身与只调它的 worker 都该露头。
+    assert scan(False, "uncharged") == {"enforce_text_safety", "_guard_via_facade", "_guard_via_raw"}
+    # 门面记账（＝Z7 拍完补上的形状）：调门面的转绿，只有绕过门面直打平台的还红。
+    assert scan(True, "charged") == {"_guard_via_raw"}
 
 
 def test_记档只许两支名字():
