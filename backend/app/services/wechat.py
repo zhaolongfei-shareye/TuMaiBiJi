@@ -267,6 +267,11 @@ def enforce_text_safety(openid: str, *parts) -> None:
             raise UserError('内容需人工复核，请调整表述后再试')
 
 
+# 送检压图的两族阶梯（第十轮审计 Z35）。第一档 `None` ＝ 不缩尺寸，先把"只降质量"走完。
+_SEC_EDGE_LADDER = (None, 4096, 2048, 1280, 800)
+_SEC_QUALITIES = (82, 70, 58, 45)
+
+
 def _shrink_for_img_sec(data: bytes) -> bytes:
     """把一张超过接口上限的图压回 1MB 以内，压完再送。
 
@@ -274,9 +279,17 @@ def _shrink_for_img_sec(data: bytes) -> bytes:
     按下面的策略那等于 `unavailable` ⇒ 放行。那样一来**图越大越安全**，是一条现成的绕过路径，
     而审核员随手一张原图就可能过线。压一遍的成本是几百毫秒 CPU，换的是这条口子不存在。
 
-    只降质量不缩尺寸（先 82 再逐档降到 45）：判图看的是画面内容，不是像素数，
-    而缩尺寸会动到长图／截图那一族的版面。压完还过线就按原样送出去，让接口自己判
-    ——那一刻它是"没检成"，日志会写明，不假装成"检过且没问题"。
+    两族阶梯、尺寸那一族排在后面（Z35）：先只降质量（82→70→58→45，不动版面），
+    四档还过线才逐档缩长边（4096→2048→1280→800，每一档再走一遍那四档质量）。
+    旧写法只有质量那一族，本机实测一张 2400×2400 的噪声图最低那一档仍是 2,188,476 B
+    ——过线，于是原图直接交出去，"图越大越安全"这句话只被"恰好压得下来"那一部分挡住了。
+    缩尺寸会动长图／截图那一族的版面，所以能不动就不动；但"不动版面"不能当"干脆不检"的理由：
+    这一族缩完只送去判定，入库与屏上那张原图一个字节都不动，而这张接口判的是画面内容
+    （10-21 实测：已知违规文字画成图送过去，微信回 `pass`，细则在
+    `docs/审计报告-20261021-内容审查全覆盖.md` §四），缩到 1280 不改变"检得出／检不出"两态。
+
+    两族阶梯全走完仍过线才按原样送出去，让接口自己判——那一刻它是"没检成"，
+    日志按 ERROR 写明，不假装成"检过且没问题"。
 
     ⚠ 压图之前先过 `ocr.guard_pixels` 那道像素闸（Z2），而且它必须排在下面那句
     "字节 ≤1MB 就原样返回"**之前**：炸弹的形状正是"字节很小、像素极大"（实测读数记在
@@ -302,17 +315,34 @@ def _shrink_for_img_sec(data: bytes) -> bytes:
     if len(data) <= IMG_SEC_MAX_BYTES:
         return data
     try:
-        im = im.convert("RGB")
-        for quality in (82, 70, 58, 45):
-            buf = io.BytesIO()
-            im.save(buf, format="JPEG", quality=quality)
-            out = buf.getvalue()
-            if len(out) <= IMG_SEC_MAX_BYTES:
-                logger.info("送检前把一张 %d 字节的图压到 %d 字节（JPEG q=%d）",
-                            len(data), len(out), quality)
-                return out
+        rgb = im.convert("RGB")
+        tried: set[tuple[int, int]] = set()
+        for cap in _SEC_EDGE_LADDER:
+            if cap is None or max(rgb.width, rgb.height) <= cap:
+                frame = rgb
+            else:
+                scale = cap / max(rgb.width, rgb.height)
+                frame = rgb.resize((max(1, round(rgb.width * scale)),
+                                    max(1, round(rgb.height * scale))), Image.LANCZOS)
+            if frame.size in tried:
+                # 原图本来就比这一档窄：缩与不缩是同一张，不必把四档质量重编码一遍。
+                continue
+            tried.add(frame.size)
+            for quality in _SEC_QUALITIES:
+                buf = io.BytesIO()
+                frame.save(buf, format="JPEG", quality=quality)
+                out = buf.getvalue()
+                if len(out) <= IMG_SEC_MAX_BYTES:
+                    logger.info("送检前把一张 %d 字节／长边 %d 的图压到 %d 字节"
+                                "（长边缩到 %d，JPEG q=%d）",
+                                len(data), max(rgb.size), len(out), max(frame.size), quality)
+                    return out
     except Exception as exc:
         logger.warning("送检前压图没成，按原样送：%s: %s", type(exc).__name__, exc)
+        return data
+    logger.error("送检前质量与尺寸两族阶梯走完，这张 %d 字节／长边 %d 的图仍过 %d 字节上限："
+                 "按原样送出，接口会判成没检成（放行）",
+                 len(data), max(rgb.size), IMG_SEC_MAX_BYTES)
     return data
 
 

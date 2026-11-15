@@ -643,6 +643,73 @@ def test_超过接口上限的图先压再送(monkeypatch):
     assert len(body) <= wechat.IMG_SEC_MAX_BYTES, f"压完还是 {len(body)} B，等于没压"
 
 
+def _noise_png(width: int, height: int) -> bytes:
+    """一张真解码得动、但按质量档压不下来的图。
+
+    噪声是必需的（理由抄上面那条用例）：纯色图压到几 KB，样本根本没越过上限，用例就成了空闸。
+    2400×2400 现量：PNG 17,297,442 B，长边不动时 JPEG q45 = 2,188,476 B —— **仍过 1MB 那道线**，
+    所以"这一发是靠缩尺寸才压下来的"这句话有唯一解释。像素 576 万 < `ocr.MAX_PIXELS` 4,000 万，
+    撞不到 Z2 那扇像素门（撞上了这两条量的就不是同一件事）。
+    """
+    import io
+    import os as _os
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.frombytes("RGB", (width, height), _os.urandom(width * height * 3)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_质量四档压不下来的大图要缩长边再压(monkeypatch):
+    """第十轮审计 Z35：旧写法只有质量那一族 ⇒ 压不下来就**原样**送 ⇒ 接口回 40006 ⇒ 判"没检成" ⇒ 放行。
+
+    那条放行正是上面 `test_超过接口上限的图先压再送` 开头 refute 的"图越大越安全"，
+    只是换了一个方向：不是没压，是**压不动了还不缩**。所以这一条量的不是"字节数变小"
+    （那一格旧代码对 1600 那一档也给得出），是"变小靠的是缩长边"：
+    断言发出去那张图的长边严格小于原图，撤掉尺寸阶梯它必然红在原来那 2400。
+    """
+    import io
+
+    from PIL import Image
+
+    big = _noise_png(2400, 2400)
+    assert len(big) > wechat.IMG_SEC_MAX_BYTES, f"样本没造大：{len(big)} B"
+    # 前提自己先成立：光靠质量四档压不下来（否则这一条量的还是旧那一族，Z35 没钉住）
+    全尺寸最低档 = io.BytesIO()
+    Image.open(io.BytesIO(big)).convert("RGB").save(全尺寸最低档, format="JPEG", quality=45)
+    assert len(全尺寸最低档.getvalue()) > wechat.IMG_SEC_MAX_BYTES, \
+        f"质量四档的最后一档已压到 {len(全尺寸最低档.getvalue())} B，样本挑得没区分度"
+
+    sent = _wire_image(monkeypatch, {"errcode": 0})
+    assert wechat.check_image(big) == "pass"
+    assert len(sent) == 1
+    body = list(sent[0].values())[0][1]
+    assert len(body) <= wechat.IMG_SEC_MAX_BYTES, f"缩了尺寸还是 {len(body)} B，等于没压"
+    长边 = max(Image.open(io.BytesIO(body)).size)
+    assert 长边 < 2400, f"发出去的仍是原尺寸 {长边}：那一族阶梯根本没走"
+
+
+def test_两族阶梯都压不下来时按原样送并留下ERROR(monkeypatch, caplog):
+    """放行那条口径**不许动**（站长拍的），但"这一张没检成"必须在日志里查得到。
+
+    把尺寸那一族削成一档（＝回到旧形状），同一张 2400 的样本就只能回原图：
+    这一条钉的是兜底那两件事——回的是**逐字相同的原字节**（不许伪造一张压小的充数），
+    以及留的是 **ERROR** 而不是 warning（`40006` 那一族按"不会自己好、要人去改配置"分级，
+    这条同属"我们送得不合规格"，混进 warning 就等于没有告警）。
+    """
+    import logging
+
+    monkeypatch.setattr(wechat, "_SEC_EDGE_LADDER", (None,))
+    big = _noise_png(2400, 2400)
+    with caplog.at_level(logging.DEBUG, logger="app.services.wechat"):
+        assert wechat._shrink_for_img_sec(big) == big, "压不下来时该原样交出去，不许冒充压过了"
+    lines = [r for r in caplog.records if "两族阶梯走完" in r.getMessage()]
+    assert lines, "回原图这件事在日志里没留下痕迹：现网无从知道哪一张其实是没检的"
+    assert all(r.levelno >= logging.ERROR for r in lines), \
+        f"只留了 warning：{[(r.levelname, r.getMessage()) for r in lines]}"
+
+
 def test_像素炸弹在送检这一扇门也被拒(monkeypatch):
     """Z2 第二扇门：`_shrink_for_img_sec` 原先只看字节、不看像素。
 
