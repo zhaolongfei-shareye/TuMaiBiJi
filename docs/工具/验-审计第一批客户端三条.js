@@ -1,10 +1,12 @@
 // 审计第一批那三条**客户端**的判据（#17 队列 id 类型／#7 上传 401 漏清解锁凭证／#16 图层值与死循环）。
+// 11-16 第十轮审计在这把尺子上追加了 ⑤＝Z47（并发 401 把"同一趟只登录一次"那枚闸拆了）：
+// 同一份形状、同一个桩，只是那条链上的另一格，不必另开一把。
 //
 // 三条共同点：都不报错。#17 是同一篇留两条、最后一条 PUT 顶掉刚出的那张；#7 是重登之后还留着
 // 上一身份的解锁凭证，下一次读私密拿到一份裁过的空壳；#16 更狠——NaN 进 `fitSize` 是一条死循环，
 // 直接把出图那一步的主线程打死，而 NaN 进图层是那一层静默不画。
 //
-// 反向对照走的是"把旧写法做成变异副本再跑一遍"：三条都是**同一条判据在旧实现下必须红**，
+// 反向对照走的是"把旧写法做成变异副本再跑一遍"：四条都是**同一条判据在旧实现下必须红**，
 // 红在断言那一句上，不是红在 require 失败上。变异副本只落在 /tmp，跑完就删，工作树一个字不动。
 //
 // 跑法：node docs/工具/验-审计第一批客户端三条.js
@@ -21,12 +23,13 @@ const ck = (name, cond, got) => {
 
 const STORE = {}
 let LAST_UPLOAD_401 = false
+let LAST_REQUEST_401 = false
 global.wx = {
   getStorageSync: (k) => (k in STORE ? STORE[k] : ''),
   setStorageSync: (k, v) => { STORE[k] = v },
   removeStorageSync: (k) => { delete STORE[k] },
   uploadFile: ({ success }) => success({ statusCode: LAST_UPLOAD_401 ? 401 : 500, data: '{}' }),
-  request: ({ success }) => success({ statusCode: 500, data: {} }),
+  request: ({ success }) => success({ statusCode: LAST_REQUEST_401 ? 401 : 500, data: {} }),
   // `poster.js` 开局 require 了 `mpAssets.js`，那一支在模块顶层就要文件系统与 env。
   getFileSystemManager: () => ({ accessSync: () => true, unlinkSync: () => {}, readFileSync: () => '' }),
   env: { USER_DATA_PATH: '/u' },
@@ -151,6 +154,67 @@ setTimeout(() => {
       return true
     })())
 
-  console.log(`\n结果：红 ${bad.length} 条${bad.length ? '：' + bad.join('、') : ''}`)
-  process.exitCode = bad.length ? 1 : 0
+  console.log('\n———— ⑤ Z47 N 个并发 401 只许共用一趟登录（登录口带 5/minute IP 限流） ————')
+  // 闸的桩照 `app.js:172-184` 那份 `getLoginPromise()` 的形状写：判 isLoggedIn+token、
+  // 没有才新建、落定 self-null。桩与真相差一行，量的就是我编的那台机器而不是产品里那一台，
+  // 所以那三行的相同处另由下面两枚结构钉子比给机器看。
+  function 装一台登录闸() {
+    const 得 = { 趟数: 0, 闸落回: false }
+    APP.globalData = {
+      token: 'T', userId: 'U', isLoggedIn: true, loginPromise: null,
+      userInfo: { language: 'en' }, privateUnlock: null,
+    }
+    APP.getLoginPromise = function () {
+      if (this.globalData.isLoggedIn && this.globalData.token) return Promise.resolve()
+      if (!this.globalData.loginPromise) {
+        得.趟数 += 1
+        this.globalData.loginPromise = new Promise((res) => setTimeout(res, 20))
+          .finally(() => { this.globalData.loginPromise = null })
+      }
+      return this.globalData.loginPromise
+    }
+    return 得
+  }
+  // 两波：第一波四发并发（同一 tick 里各吃一个 401），第二波两发（第一波那趟已落定、票又过期了）。
+  // 期望**一共两趟**——每波一趟。旧写法（清理时把闸拆掉）量到的是 4+2＝6 趟，而登录口 `5/minute`
+  // 限流就在那时候把后面几发打死 ⇒ 屏上是一片"认证失败，请重新登录"，越登越锁。
+  function 量两波重登(mod) {
+    LAST_REQUEST_401 = true
+    const 得 = 装一台登录闸()
+    const 一波 = (n) => Promise.all(
+      Array.from({ length: n }, () => mod.request('/api/notes/1').catch(() => {})))
+    return 一波(4).then(() => {
+      得.闸落回 = APP.globalData.loginPromise === null
+      APP.globalData.isLoggedIn = true      // 那一趟登录成功了
+      APP.globalData.token = 'T2'
+      return 一波(2)
+    }).then(() => 得)
+  }
+  量两波重登(api).then((得) => {
+    ck('四发并发 401 只共用一趟登录，落定后的第二波才起第二趟',
+      得.趟数 === 2 && 得.闸落回 === true, 得)
+    return 量两波重登(变异('api.js',
+      '  app.globalData.isLoggedIn = false\n',
+      '  app.globalData.isLoggedIn = false\n  app.globalData.loginPromise = null\n'))
+  }).then((旧) => {
+    ck('反向⑤：把那句清闸放回清理里 → 两波各起各的（4＋2＝6 趟，正是撞限流的那形状）',
+      旧.趟数 === 6 && 旧.闸落回 === true, 旧)
+
+    const apiSrc = fs.readFileSync(U('api.js'), 'utf8')
+    const 清理那段 = apiSrc.slice(apiSrc.indexOf('function _dropAuthForRelogin'),
+      apiSrc.indexOf('const request ='))
+    ck('结构钉子：那份清理里一处 `globalData.loginPromise =` 都不许写',
+      清理那段.length > 0 && !/globalData\.loginPromise\s*=/.test(清理那段),
+      (清理那段.match(/globalData\.loginPromise\s*=/g) || []).length)
+    const appSrc = fs.readFileSync(path.join(ROOT, 'miniprogram/app.js'), 'utf8')
+    ck('结构钉子：闸仍在 `getLoginPromise()` 里自建自清（搬走了上面量的就是我编的桩）',
+      /if \(this\.globalData\.isLoggedIn && this\.globalData\.token\) \{/.test(appSrc)
+      && /if \(!this\.globalData\.loginPromise\) \{/.test(appSrc)
+      && /this\.globalData\.loginPromise = this\._doLogin\(\)\.finally\(\(\) => \{/.test(appSrc))
+    ck('结构钉子：注销那一个出口照旧归零（那里清的是"身份没了"，不是"这一发没验过"）',
+      /clearSession\(\) \{[\s\S]{0,400}?this\.globalData\.loginPromise = null/.test(appSrc))
+
+    console.log(`\n结果：红 ${bad.length} 条${bad.length ? '：' + bad.join('、') : ''}`)
+    process.exitCode = bad.length ? 1 : 0
+  })
 }, 300)

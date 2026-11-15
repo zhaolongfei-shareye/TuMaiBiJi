@@ -80,7 +80,13 @@ function _dropAuthForRelogin(app) {
   const keepLang = (app.globalData.userInfo || {}).language
   app.globalData.userInfo = keepLang ? { language: keepLang } : null
   app.globalData.isLoggedIn = false
-  app.globalData.loginPromise = null // Reset login promise to allow retry
+  // Z47（11-16）：这一格**不许在这里清**。它就是"同一趟只登录一次"的那枚闸——`app.js` 的
+  // `getLoginPromise()` 判的是"有没有还在飞的那一趟"，而 N 个在飞的请求各吃一个 401 时，
+  // 回调是一前一后到的：各清一次就各起一趟 `wx.login`+换票，而登录口带 `5/minute` 的 IP 限流
+  // ⇒ 后几趟被限 ⇒ 又 401 ⇒ 又重登，越登越锁。
+  // 留着它也照样能重试：那枚闸在登录落定（成功或失败）时自己 `finally` 归 null，
+  // 所以字段里存着的只会是"还在飞的那一趟"，不会是一份 settled 的旧凭证。
+  // 真要把它归零的出口是注销（`app.js` 的 `clearSession()`）——那一个是"身份没了"，不是"这一发没验过"。
   // 解锁凭证跟着登录态一起清：重登之后可能是另一个 generation 的账号，
   // 留着旧凭证只会让下一次读私密笔记拿到一份裁过的空壳。
   app.globalData.privateUnlock = null
