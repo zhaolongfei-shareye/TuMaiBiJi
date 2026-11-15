@@ -48,7 +48,9 @@ MAX_NOTE_CHARS = 200
 # 「名单里每一个名字都要真改得出消费者的行为」会跟着加一条——少了那一条，这张名单会说假话。
 CONSUMED_NAMES = ("WECHAT_APP_SECRET", "HUNYUAN_CF_KEY", "DEEPSEEK",
                   "SMS_SECRET_ID", "SMS_SECRET_KEY", "SMS_SDK_APPID",
-                  "SMS_SIGN_NAME", "SMS_TEMPLATE_ID")
+                  "SMS_SIGN_NAME", "SMS_TEMPLATE_ID",
+                  "EMAIL_SES_SECRET_ID", "EMAIL_SES_SECRET_KEY",
+                  "EMAIL_SES_FROM_ADDRESS", "EMAIL_SES_TEMPLATE_ID")
 
 
 def canonical_name(raw: str) -> str:

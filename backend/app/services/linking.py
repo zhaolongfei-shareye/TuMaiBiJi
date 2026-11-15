@@ -1,4 +1,4 @@
-"""把两个平台的身份合成一个"人"：短码 Redeem 与解绑的全部规则都在这一个文件里。
+"""把两个平台的身份合成一个"人"：短码 Redeem、绑邮箱、解绑的全部规则都在这一个文件里。
 
 契约 §二 那四步（iPhone 生成短码 → 用户去小程序念 → 服务端把两条 identity 归到一个
 account → 两边 token 全部作废）里，只有"归到哪一个"这句话是有歧义的，所以它必须有
@@ -245,3 +245,119 @@ def unbind(db: Session, account: Account, provider: str) -> Account:
         db.delete(row)
     db.commit()
     return account
+
+
+# ---- 把一枚验过归属的邮箱绑到当前这个人身上 ----
+
+def email_provider_uid(email_addr: str) -> str:
+    """邮箱那条身份的 `provider_uid` = `email:<小写地址>`。
+
+    前缀与转小写都不是随手写的：`services/email.py` 头部钉过"裸邮箱会与别的 provider 撞",
+    而 `v1_auth.py:364`（H5 邮箱**登录**）早就按 `email:{addr}` 建号了。绑定与登录必须算出
+    **同一串**——差一个前缀，同一个人同一枚邮箱就会落出两条 account，"绑上就打通"那句是假话。
+    """
+    return f"email:{email_addr.strip().lower()}"
+
+
+def real_wechat_users(db: Session, account_id: str) -> list[User]:
+    """这条 account 名下**真正用微信登录**的那些 `users` 行。
+
+    与 `users_of` 差一句筛子，而这一句决定这个功能能不能用：H5 那四枝（游客／手机号／
+    邮箱／口令）把 `provider_uid` 直接塞进了 `users.openid`（`v1_auth.py:207/:266/:371/:468`），
+    那些串开头是 `phone:`／`guest:`／`email:`／`pwd:`。只看 `openid is not None` 的话，
+    "先在安卓上用过邮箱、再回小程序绑同一枚邮箱"这条**本该合并**的路会被当成
+    "这里已经有一个微信真人了"而当场 409。冒号是那些前缀与微信 openid 之间唯一稳定的分界。
+    """
+    return [row for row in users_of(db, account_id) if ":" not in (row.openid or "")]
+
+
+def _drop_other_emails(db: Session, account_id: str, keep_uid: str) -> int:
+    """摘掉这条 account 上除 `keep_uid` 之外的 email 身份行，返回摘掉的条数。
+
+    一个人只留一枚邮箱：`GET /v1/account` 那一句"绑了没有"、以及"下次拿这枚邮箱登进来
+    的是谁"，都只在这条不变量成立时才有唯一答案。留两枚的话界面会念出其中一枚而另一枚
+    照样能登录，那不是"多一个入口"，是两个人共用一份笔记还看不见彼此。
+    """
+    rows = db.query(AccountIdentity).filter(
+        AccountIdentity.account_id == account_id,
+        AccountIdentity.provider == "email",
+    ).all()
+    stale = [row for row in rows if row.provider_uid != keep_uid]
+    for row in stale:
+        db.delete(row)
+    return len(stale)
+
+
+def bind_email(db: Session, user: User, email_addr: str) -> tuple[Account, bool]:
+    """把一枚**已经收过验证码**的邮箱挂到当前这个人身上。返回 (归属的 account, 是否并了账)。
+
+    调用方（`POST /v1/account/email/bind`）负责先验码——这一支不再看 Redis，它只回答
+    "这个人现在算哪条 account"，与 `redeem` 是同一个问题，所以规则也住在这一个文件里。
+
+    三种库面状态，代价不同，分开走：
+
+    ① **这枚邮箱在库里没有主人** ⇒ `add_identity` 挂到当前 account 上，**不抬代次**。
+       与 `/v1/auth/upgrade`（游客号设口令）同一条理由：加一种登录方式不是归属变更，
+       手里这把钥匙应当继续能用。
+    ② **这枚邮箱就是当前这个人已经绑的那一枚** ⇒ 原样返回，一行不写。他多点一次"绑定"
+       不该把他踢下线，也不该把 `verified_at` 刷新成今天（那格记的是"什么时候验过归属"）。
+    ③ **这枚邮箱属于另一条 account**（他在安卓／iPhone 上用邮箱登过）⇒ 这才是"打通多端"
+       真正发生的那一支：先过一对一闸门（那条 account 名下已有**别的微信真人**就 409，
+       两个真人的笔记并成一份是不可逆的），再按 `choose_main`／`merge_into` 并账，
+       最后抬一次代次。方向规则与 `redeem` 共用同一支函数，不在此处另写一遍。
+
+    换绑（这一支的 `user` 原来绑着 a@x、现在改绑 b@y）不单独成条：①与③之后各接一次
+    `_drop_other_emails`，把 a@x 摘掉。摘旧登录方式按 `unbind` 的口径**要抬代次**——
+    从那条身份换来的钥匙不能再开门；③本来就抬，①只在真摘掉旧邮箱时才抬。
+    """
+    mine = accounts.ensure_for_user(db, user)
+    uid = email_provider_uid(email_addr)
+    holder = db.query(AccountIdentity).filter(
+        AccountIdentity.provider == "email",
+        AccountIdentity.provider_uid == uid,
+    ).first()
+
+    if holder is not None and holder.account_id == mine.id:
+        return mine, False
+
+    target = None
+    if holder is not None:
+        target = db.query(Account).filter(Account.id == holder.account_id).first()
+        if target is None:
+            # 身份行指着一条不存在的 account：账坏了，不在这里猜（同 `ensure_for_provider` 那句）。
+            raise LinkRefused("这个邮箱的归属记录坏了，请联系开发者", 500)
+        if "wechat" in identity_providers(db, target.id) or real_wechat_users(db, target.id):
+            raise LinkRefused("这个邮箱已经绑在另一个微信号上了，一个邮箱只能属于一个人", 409)
+
+    if target is None:
+        try:
+            accounts.add_identity(db, mine, "email", uid, verified=True)
+        except accounts.IdentityTaken:
+            # ①与③之间隔了几毫秒，另一个人恰好把同一枚邮箱绑走了（他验得过那封邮件）。
+            # 闸门读的是我这一趟开始时的库，并发时它会说错——所以这里再认一次真答案。
+            db.rollback()
+            raise LinkRefused("这个邮箱刚刚已经绑到别的账号上了", 409)
+        if _drop_other_emails(db, mine.id, uid):
+            accounts.bump_generation(db, mine)
+        db.commit()
+        return mine, False
+
+    keep, absorb = choose_main(db, mine, target)
+    merge_into(db, keep, absorb)
+    # ⚠ 这一句 `flush` 不是卫生代码，它挡的是一类**静默不生效**：`SessionLocal` 是
+    # `autoflush=False`（`db/database.py`），而 `merge_into` 搬身份行与登录行走的是 ORM 赋值——
+    # 不 flush 的话，紧随其后的两次 SELECT 读到的仍是**搬之前**的库面：
+    # `_drop_other_emails` 看不见从对面搬过来的那枚邮箱，`bump_generation` 更致命，它按
+    # `users.account_id == keep.id` 逐行抬代次，看不见刚搬过来的登录行 ⇒ 对面那台设备手里
+    # 的 legacy token 在"归属已经变了"之后照样开门，而契约 §二 第 4 步要的是两侧全部失效。
+    # `redeem` 今天撞不到这一发，因为被并掉的 iPhone 那侧按拍乙**没有 `users` 行**；
+    # 邮箱这一侧有（H5 邮箱登录就是靠那行存在的），所以这条路上必须显式 flush。
+    db.flush()
+    # `merge_into` 已经把两边其余的 email 身份行一起搬到 keep 上了，所以"只留这一枚"
+    # 在这一处摘就够了，不必在合并之前分两侧各摘一遍。
+    _drop_other_emails(db, keep.id, uid)
+    # 代次必须在搬完之后抬，理由与 `redeem` 里那一段一模一样（契约 §二 第 4 步：归属一变，
+    # 两侧旧 token 全部失效）。发起者手里这把会在回体里换成新的，见那只路由。
+    accounts.bump_generation(db, keep)
+    db.commit()
+    return keep, True

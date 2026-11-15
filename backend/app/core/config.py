@@ -182,14 +182,23 @@ class Settings(BaseSettings):
     # 同一手机号两次发送之间最少间隔（秒）。防连点、防刷钱（每条短信腾讯云收一分钱左右）。
     SMS_COOLDOWN_SECONDS: int = 60
 
-    # ---- H5 邮箱+验证码登录（/v1/auth/email、/v1/auth/email-login）----
-    # AWS SES 或任意 SMTP 凭据。五栏任一为空 = 开发模式：验证码只写日志不发邮件，与短信兜底同型。
-    # 五栏都走 service_secrets 那条链（库里优先、.env 兜底），生产环境由后台密钥页写入。
-    EMAIL_SMTP_HOST: str = ""
-    EMAIL_SMTP_PORT: int = 587
-    EMAIL_SMTP_USER: str = ""
-    EMAIL_SMTP_PASSWORD: str = ""
-    EMAIL_FROM_ADDRESS: str = ""
+    # ---- H5 邮箱+验证码登录（/v1/auth/email、/v1/auth/email-login）／邮箱绑定（/v1/account/email/send）----
+    # 腾讯云邮件推送 SES，走 **API**（`SendEmail`）发信，不走 SMTP 协议。
+    # 四栏任一为空 = 开发模式：验证码只写日志不发邮件，与短信兜底同型。
+    # 为什么不是 SMTP：SES 对 2026-03-02 之后创建的账号关掉了 SMTP 发信（控制台那枚「设置 SMTP 密码」
+    # 按钮持续禁用、`SmtpPwdType=0`，11-15 现读），只剩 API 这一条。
+    EMAIL_SES_SECRET_ID: str = ""
+    EMAIL_SES_SECRET_KEY: str = ""
+    # 发信地址：SES「发信地址」那一栏里已验证的那一枚（域名要先在 SES 里验证过）。
+    EMAIL_SES_FROM_ADDRESS: str = ""
+    # 模板 ID（SES→邮件配置→发信模板 里那一行，纯数字）。11-15 实测：这一枚账号只能按模板发信，
+    # 正文内联的三个参数名 `Body`／`Content`／`Simple` 全部回 `UnknownParameter`，只有 `Template` 通。
+    # 模板正文里只放两个变量：{{code}}＝验证码、{{minutes}}＝有效期分钟数；后者由服务端从
+    # `EMAIL_CODE_TTL_MINUTES` 现读再塞进去，屏上那句「几分钟后失效」就不会跟 Redis 那枚 TTL 说两样话。
+    # ⚠ 模板要过腾讯云审核（控制台原话「预计1个工作日内完成审核（周末、节假日顺延）」），
+    #   审核中发信回 `FailedOperation.InvalidTemplateID`。`EMAIL_SES_TEMPLATE_ID` 235732 已过审
+    #   （`TemplateStatus=0`，11-15 夜现读），发信那一格本机六封真投递量通；现网仍发不出是这四栏没配。
+    EMAIL_SES_TEMPLATE_ID: str = ""
     # 验证码活多久（分钟）。与短信共用同一枚 TTL 配置，不另开一档。
     EMAIL_CODE_TTL_MINUTES: int = 5
     # 同一邮箱两次发送之间最少间隔（秒）。与短信冷却同型。

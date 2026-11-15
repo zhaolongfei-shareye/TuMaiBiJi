@@ -1,24 +1,30 @@
-"""`/v1/account`：我是谁、关联另一个平台、解绑、删账号。契约 §二、§四。
+"""`/v1/account`：我是谁、关联另一个平台、绑邮箱、解绑、删账号。契约 §二、§四。
 
 鉴权这一路是**混着**的，而且是故意的，因为两扇门后面站的人不一样：
 `GET /v1/account`、`POST /v1/account/link/code`、`DELETE /v1/account/link/{provider}`、
 `DELETE /v1/account` 拿的是 iPhone 那把钥匙（`kind=account`）；`POST /v1/account/link/redeem`
 拿的是小程序那把老钥匙（`sub=<users.id>`）——契约 §二 第 3 步写的就是"小程序调"，而小程序手里
 只有那一种 token。要它换一把，得先让所有客户端升一次级；在那之前，认老钥匙才是照实写。
+`POST /v1/account/email/send|bind` 同样认老钥匙：发起绑定的正是**已经有东西要保住的那一端**
+（小程序／安卓 H5），iPhone 那一路只负责之后用同一枚邮箱登进来。
 """
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.auth import get_current_account, get_current_user
-from app.core.rate_limit import limiter
+from app.core.auth import _create_token, get_current_account, get_current_user
+from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
 from app.models.account import Account
 from app.models.user import User
-from app.services import deletion, linking, link_codes
+from app.services import deletion, email, linking, link_codes
 from app.services.linking import LinkRefused
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class AccountResponse(BaseModel):
@@ -48,6 +54,29 @@ class RedeemRequest(BaseModel):
 class RedeemResponse(BaseModel):
     account_id: str
     merged: bool
+
+
+class EmailSendRequest(BaseModel):
+    # 长度闸与 `/v1/auth/email`（H5 邮箱登录）那一只一字不差，免得同一枚地址在一扇门发得出去、
+    # 在另一扇门连格式都不过。真正的形状校验在 `services/email.py` 的 `EMAIL_RE`。
+    email: str = Field(min_length=5, max_length=100)
+
+
+class EmailBindRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=100)
+    code: str = Field(min_length=4, max_length=6)
+
+
+class EmailBindResponse(BaseModel):
+    """`merged=True` = 这一趟真的把两条 account 并成了一条。
+
+    `token` 是**当场重签的一把老钥匙**：合并／换绑都会抬代次，手里那把下一发就是 401。
+    没有它，用户点完"绑定成功"会立刻被踢回登录页——而 `/recover`、`/change-password`
+    早就是"抬完当场发新钥匙"这一个样子，绑定不必更差。
+    """
+    account_id: str
+    merged: bool
+    token: str
 
 
 def _refused(exc: LinkRefused) -> HTTPException:
@@ -107,6 +136,76 @@ def redeem_link_code(
     except LinkRefused as exc:
         raise _refused(exc)
     return RedeemResponse(account_id=account.id, merged=merged)
+
+
+@router.post("/email/send")
+@limiter.limit("3/minute", key_func=get_ip_key)
+async def send_bind_email_code(
+    request: Request,
+    req: EmailSendRequest,
+    user: User = Depends(get_current_user),
+):
+    """往要绑定的那枚邮箱发 6 位验证码。发码／冷却／存储全用 `services/email.py` 那一套，
+    与 H5 的邮箱**登录**共用同一枚 Redis key（`email:code:<邮箱>`）——这是有意的：
+    那枚码证明的是"这封邮件我收得到"，至于拿它去登录还是去绑定，是同一份凭证的两种用法。
+
+    回体只有 `{}`，与 `/v1/auth/email` 同一条理由：这一扇门对**任何**输入都回同一句话，
+    它就不是一台"这个邮箱绑过没有"的枚举机。格式不对、正在冷却、发信失败都只写日志。
+
+    ⚠ 发信那一格**本机已经量通**（11-15 夜拿子账号密钥直发六封，外部邮箱真收到、腾讯云回执
+    六行 `SendStatus=0`＋`DeliverStatus=1`），但**现网此刻仍发不出去**：服务器 `EMAIL_SES_*`
+    四栏一行没配（11-15 现读），这一批代码也没部署 ⇒ `email.send_code` 走"只写日志"那条兜底，
+    **用户收不到邮件**。差的不是平台，是这两步：`.env` 补四栏 + 他一句「部署」。
+    判据在 pytest 里是拿假 Redis 与假 `httpx` 验的，没有绕过这个事实。
+    """
+    email_addr = req.email.strip().lower()
+    if not email.EMAIL_RE.match(email_addr):
+        return {}
+    cooldown = await asyncio.to_thread(email.check_cooldown, email_addr)
+    if cooldown > 0:
+        return {}
+    code = email.generate_code()
+    try:
+        await asyncio.to_thread(email.store_code, email_addr, code)
+    except Exception:
+        logger.exception("绑定验证码存储失败（Redis 不可用）email=%s…%s",
+                         email_addr[:3], email_addr[-4:])
+        raise HTTPException(status_code=503, detail="验证码服务暂不可用，请稍后重试")
+    if await email.send_code(email_addr, code):
+        await asyncio.to_thread(email.set_cooldown, email_addr)
+    return {}
+
+
+@router.post("/email/bind", response_model=EmailBindResponse)
+@limiter.limit("5/minute")
+async def bind_email(
+    request: Request,
+    req: EmailBindRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """填回验证码，把这枚邮箱认成"我"，并把两个端的账并到一起。
+
+    码只在这里验一次（`verify_code` 是 `GETDEL`：取走即销毁，猜错也销毁——一枚码换一次机会）。
+    之后"这个邮箱算哪个人"的整段规则在 `services/linking.py:bind_email`，与短码合并同源，
+    这一处只把 `LinkRefused` 翻成 HTTP。
+
+    限流挂的是默认那把 key（按 `sub` 计），因为这一扇门必须登录才够得着：它挡的是
+    **同一个人**拿一枚没销毁干净的码反复试，不是匿名爆破（那是 `/email/send` 那三档的活）。
+    """
+    email_addr = req.email.strip().lower()
+    if not email.EMAIL_RE.match(email_addr) or not email.CODE_RE.match(req.code.strip()):
+        raise HTTPException(status_code=400, detail="邮箱或验证码格式错误")
+    if not await asyncio.to_thread(email.verify_code, email_addr, req.code.strip()):
+        raise HTTPException(status_code=400, detail="验证码错误或已过期")
+
+    try:
+        account, merged = linking.bind_email(db, user, email_addr)
+    except LinkRefused as exc:
+        raise _refused(exc)
+    db.refresh(user)
+    return EmailBindResponse(account_id=account.id, merged=merged,
+                             token=_create_token(user.id, user.generation))
 
 
 @router.delete("/link/{provider}", response_model=AccountResponse)
