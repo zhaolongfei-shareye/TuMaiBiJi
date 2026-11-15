@@ -26,6 +26,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 import logging
 
@@ -532,9 +533,20 @@ async def password_register(request: Request, req: PasswordRegisterRequest, db: 
     if passwords.row_for(db, account.id) is not None:
         raise HTTPException(status_code=409, detail="这个登录名已经有人用了，换一个，或者直接登录")
 
+    password_hash = await asyncio.to_thread(passwords.hash_password, password)
+    recovery = passwords.create(db, account, password_hash)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Z33：上面那道 `row_for` 检查与这一句 commit 之间现在有了一枚 await
+        # （`to_thread(hash_password)`），两趟同时注册同一个登录名不再被事件循环串行化，
+        # 后一趟会撞 `account_passwords.account_id` 那道唯一索引。撞了就是并发赢家通吃，
+        # 回与上面同一句话，不许裸 500。
+        db.rollback()
+        raise HTTPException(status_code=409, detail="这个登录名已经有人用了，换一个，或者直接登录")
+    # `_user_of_account` 必须排在口令行落地**之后**：它自己会 commit，两趟都跑到它的话
+    # 赢家的 account 名下会留下两行 users（"这个人的数据在哪"从此有两个答案）。
     user = _user_of_account(db, account, uid)
-    recovery = passwords.create(db, account, password)
-    db.commit()
     return _password_response(user, login, recovery)
 
 
@@ -552,11 +564,11 @@ async def password_login(request: Request, req: PasswordLoginRequest, db: Sessio
     row = passwords.row_for(db, account.id) if account is not None else None
     if row is None:
         # 号不存在也花一次同等成本的 scrypt，否则"注册过没有"能靠响应快慢量出来。
-        passwords.dummy_verify(req.password)
+        await asyncio.to_thread(passwords.dummy_verify, req.password)
         raise HTTPException(status_code=400, detail="登录名或密码不对")
     if passwords.locked(row):
         raise HTTPException(status_code=429, detail=f"试的次数太多了，请 {passwords.LOCK_MINUTES} 分钟后再试")
-    if not passwords.verify_password(req.password, row.password_hash):
+    if not await asyncio.to_thread(passwords.verify_password, req.password, row.password_hash):
         passwords.note_failure(db, row)
         raise HTTPException(status_code=400, detail="登录名或密码不对")
 
@@ -596,8 +608,19 @@ async def password_upgrade(
     except accounts.IdentityTaken:
         raise HTTPException(status_code=409, detail="这个登录名已经有人用了，换一个")
 
-    recovery = passwords.create(db, account, password)
-    db.commit()
+    password_hash = await asyncio.to_thread(passwords.hash_password, password)
+    recovery = passwords.create(db, account, password_hash)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Z33 那枚并发窗口（上面那句 await 让"检查—插入"不再被循环串行化）。这一支上
+        # 撞的是 `account_passwords.account_id` 那道唯一索引＝同一个人两台设备同时升级
+        # （登录名被**别的** account 抢走那一发在 `add_identity` 的 flush 里就已经翻成
+        # IdentityTaken → 409 了，到不了这里）。回滚后照口令行在不在念那一句，别一律说"名字被占了"。
+        db.rollback()
+        if passwords.row_for(db, account.id) is not None:
+            raise HTTPException(status_code=409, detail="这个账号已经设过密码了，要改请用「修改密码」")
+        raise HTTPException(status_code=409, detail="这个登录名已经有人用了，换一个")
     return _password_response(user, login, recovery)
 
 
@@ -617,7 +640,8 @@ async def password_recover(request: Request, req: PasswordRecoverRequest, db: Se
         raise HTTPException(status_code=400, detail="登录名或恢复码不对")
     password = _checked_password(req.new_password)
 
-    recovery = passwords.set_password(db, row, password)
+    password_hash = await asyncio.to_thread(passwords.hash_password, password)
+    recovery = passwords.set_password(db, row, password_hash)
     accounts.bump_generation(db, account)
     db.commit()
     user = _user_of_account(db, account, passwords.uid_of(login))
@@ -642,12 +666,13 @@ async def password_change(
     row = passwords.row_for(db, account.id)
     if row is None:
         raise HTTPException(status_code=409, detail="这个账号还没设过密码")
-    if not passwords.verify_password(req.old_password, row.password_hash):
+    if not await asyncio.to_thread(passwords.verify_password, req.old_password, row.password_hash):
         raise HTTPException(status_code=400, detail="现在的密码不对")
     password = _checked_password(req.new_password)
 
     login = passwords.login_of(db, account.id)
-    recovery = passwords.set_password(db, row, password)
+    password_hash = await asyncio.to_thread(passwords.hash_password, password)
+    recovery = passwords.set_password(db, row, password_hash)
     accounts.bump_generation(db, account)
     db.commit()
     db.refresh(user)

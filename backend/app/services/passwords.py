@@ -70,6 +70,10 @@ def password_ok(raw: str) -> bool:
 
 
 def hash_password(password: str) -> str:
+    """⚠ 这是**同步阻塞**的 CPU 重活：单次几十毫秒、吃 16 MiB。`async def` 的口里调它必须
+    `await asyncio.to_thread(hash_password, …)`——现网是单进程 uvicorn，裸跑在循环上等于
+    每一发口令请求把整站（含 `/health`）按住几十毫秒。守门名单 `BLOCKING` 里挂着这个名字。
+    """
     salt = secrets.token_bytes(_SALT_BYTES)
     dk = hashlib.scrypt(password.encode(), salt=salt, n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P, dklen=_DK_LEN)
     return f"scrypt${SCRYPT_N}${SCRYPT_R}${SCRYPT_P}${salt.hex()}${dk.hex()}"
@@ -78,6 +82,7 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, stored: str) -> bool:
     """格式不对一律 False，不抛：库里那一列将来可能被别的写法填过，
     而"读不懂"与"密码不对"对调用方是同一个答案（都不让进）。
+    同样是同步阻塞的 scrypt（同 `hash_password`），异步口要裹 `to_thread`。
     """
     try:
         scheme, n, r, p, salt_hex, hash_hex = stored.split("$")
@@ -161,26 +166,33 @@ def row_for(db: Session, account_id: str) -> AccountPassword | None:
     return db.query(AccountPassword).filter(AccountPassword.account_id == account_id).first()
 
 
-def create(db: Session, account: Account, password: str) -> str:
+def create(db: Session, account: Account, password_hash: str) -> str:
     """给这条 account 落第一行口令，返回恢复码原文。**不 commit**：调用方那次写
     （建号 / 挂身份）必须与这一行在同一个事务里落地，口径同 `services/generation`。
+
+    `password_hash` 由**调用方算好传进来**（`await asyncio.to_thread(hash_password, …)`），
+    本函数里不碰 scrypt：这一层只管"行的形状"，CPU 重活留在路由那一层挪出循环。
+    反过来把整只 `create` 裹进 `to_thread` 也能挪开 scrypt，但那样会连带把同步会话
+    拖进工作线程，而且名单里就得登记 `create` 这种"壳子"名——新加一只异步口直接调
+    `hash_password` 时守门尺子就看不见它了。
     """
     code = new_recovery_code()
     db.add(AccountPassword(
         account_id=account.id,
-        password_hash=hash_password(password),
+        password_hash=password_hash,
         recovery_hash=recovery_hash(code),
     ))
     return code
 
 
-def set_password(db: Session, row: AccountPassword, password: str) -> str:
-    """改口令并**换一枚新恢复码**（旧的那枚当场作废：找回之后旧码还能再用一次的话，
-    捡到旧码的人就能把刚改好的密码再改回去）。返回新恢复码原文。**不 commit**，
-    理由同 `create`，而且这一支后面紧跟着 `bump_generation`——两者必须同一个事务。
+def set_password(db: Session, row: AccountPassword, password_hash: str) -> str:
+    """改口令（吃**调用方算好的**哈希，理由同 `create`）并**换一枚新恢复码**（旧的那枚当场作废：
+    找回之后旧码还能再用一次的话，捡到旧码的人就能把刚改好的密码再改回去）。
+    返回新恢复码原文。**不 commit**，理由同 `create`，而且这一支后面紧跟着
+    `bump_generation`——两者必须同一个事务。
     """
     code = new_recovery_code()
-    row.password_hash = hash_password(password)
+    row.password_hash = password_hash
     row.recovery_hash = recovery_hash(code)
     row.failed_count = 0
     row.locked_until = None

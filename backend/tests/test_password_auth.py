@@ -170,7 +170,7 @@ class Test算式:
 
     def test_连错十次锁十五分钟而且计数清零(self, db):
         account = accounts.ensure_for_provider(db, "password", passwords.uid_of(LOGIN), verified=False)
-        passwords.create(db, account, PASSWORD)
+        passwords.create(db, account, passwords.hash_password(PASSWORD))
         db.commit()
         row = passwords.row_for(db, account.id)
         for i in range(passwords.MAX_FAILED - 1):
@@ -187,7 +187,7 @@ class Test算式:
 
     def test_登对一次把计数与锁一起清掉(self, db):
         account = accounts.ensure_for_provider(db, "password", passwords.uid_of(LOGIN), verified=False)
-        passwords.create(db, account, PASSWORD)
+        passwords.create(db, account, passwords.hash_password(PASSWORD))
         db.commit()
         row = passwords.row_for(db, account.id)
         passwords.note_failure(db, row)
@@ -277,14 +277,68 @@ class Test注册:
     def test_并发那一趟也不许覆盖赢家的口令(self, client, db):
         """两趟同时注册同一个登录名：后一趟 `ensure_for_provider` 会返回**赢家**的 account。
         这一条手工把"赢家已经落了口令行"摆出来，量的就是路由里那道后置检查——
-        少了它，后一趟会 `passwords.create` 再插一行，撞唯一索引回 500（或者更糟：覆盖）。"""
+        少了它，后一趟会 `passwords.create` 再插一行，撞 `account_passwords.account_id`
+        那道唯一索引（Z4 之后由 commit 那圈 IntegrityError 兜成 409，但那已经是覆水之后
+        才崩，覆盖与半截事务的风险都不该留到那一步）；更糟的是直接覆盖赢家的口令。"""
         winner = accounts.ensure_for_provider(db, "password", passwords.uid_of(LOGIN), verified=False)
-        passwords.create(db, winner, PASSWORD)
+        passwords.create(db, winner, passwords.hash_password(PASSWORD))
         db.commit()
         r = _register(client, password="late-arrival-password")
         assert r.status_code == 409, r.text
         assert db.query(AccountPassword).count() == 1
         assert _login(client, password="late-arrival-password").status_code == 400
+
+    def test_并发输家撞唯一索引要回409不是裸500(self, client, db, monkeypatch):
+        """Z33。上面那条把"赢家已落口令"摆出来，量的是**顺序晚到**；这一条量的是**读空之后才撞**：
+        把输家那一趟的两道检查都做成"库里还什么都没有"（`find_account_by_login`→None、
+        `row_for`→None），它就能一路走到 commit 并在那里撞上 `account_passwords.account_id`
+        那道唯一索引。Z4 之前这一发走不到——`hash_password` 裸跑在事件循环上，两趟注册被循环
+        串成了先后；Z4 把它挪进 `to_thread` 之后，检查与 commit 之间多了一个 await 插队点，
+        这一格才真的空出来。少了 commit 外面那圈 `IntegrityError`，这里回的是 500。
+        """
+        first = _register(client).json()
+        monkeypatch.setattr(passwords, "find_account_by_login", lambda db, login: None)
+        monkeypatch.setattr(passwords, "row_for", lambda db, account_id: None)
+        r = _register(client, password="late-arrival-password")
+        assert r.status_code == 409, f"并发输家那一趟回的是 {r.status_code}：{r.text}"
+        # 回滚必须是干净的：不许留下半截事务（多一行口令、多一个账号、或多一行 users）。
+        assert db.query(AccountPassword).count() == 1, "输家那一行没跟着回滚"
+        assert db.query(Account).count() == 1, "输家另建了一条 account"
+        assert db.query(User).count() == 1, "输家在赢家名下多建了一行 users"
+        # 赢家那一边一切照旧：口令没被覆盖，身份没变。⚠ 那两道读必须**先还原**再验，
+        # 否则这里量的还是我自己抹掉的那两次读（`_login` 走的正是同一对函数）。
+        monkeypatch.undo()
+        assert _login(client).status_code == 200
+        assert _login(client, password="late-arrival-password").status_code == 400
+        assert _login(client).json()["user_id"] == first["user_id"]
+
+    def test_建users行那一步必须排在口令行落地之后(self, client, db, monkeypatch):
+        """`_user_of_account` 自己会 commit，且**找不到 users 行就建一行**（不是"找到就返回"那么无害）。
+        两趟同时注册时，输家那一趟一旦抢在口令行落地之前跑到它，就会在赢家的 account 名下
+        多插一行 users——从此"这个人的数据在哪"有两个答案。把这一句钉住的写法是量**顺序**：
+        走到那一步时，另开一条连接去库里数口令行，必须是 1（已提交）而不是 0（还悬在事务里）。
+
+        为什么不用线程做真并发：SQLite 那一趟会把两趟挤成先后，红了也不说明问题（Z33 正文同一句）。
+        """
+        import app.api.routes.v1_auth as v1_auth
+        from app.db.database import SessionLocal
+
+        real = v1_auth._user_of_account
+        seen = []
+
+        def spy(session, account, provider_uid):
+            probe = SessionLocal()
+            try:
+                seen.append(probe.query(AccountPassword).filter(
+                    AccountPassword.account_id == account.id).count())
+            finally:
+                probe.close()
+            return real(session, account, provider_uid)
+
+        monkeypatch.setattr(v1_auth, "_user_of_account", spy)
+        r = _register(client)
+        assert r.status_code == 200, r.text
+        assert seen == [1], f"走到建 users 行那一步时，库里已有 {seen} 行口令：口令行还没提交就先动 users 行"
 
 
 # ---------------------------------------------------------------- 登录

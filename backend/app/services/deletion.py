@@ -150,7 +150,8 @@ def purge(db: Session, users: list[User], account_id: str | None) -> tuple[dict,
             db.query(LinkCode).filter(LinkCode.account_id == account_id).delete()
         )
         # 口令那一行同理，而且更要紧：留着它，`account_id` 那道唯一索引会一直被这个死账号占着，
-        # 同一个人拿同一个登录名重新注册时 `passwords.create` 当场 IntegrityError。
+        # 同一个人拿同一个登录名重新注册时那一行插不进去（Z4 之后路由兜成 409，不再是 500，
+        # 但对那个人来说一样是"这个名字我永远注册不回来"）。
         deleted["passwords"] = (
             db.query(AccountPassword).filter(AccountPassword.account_id == account_id).delete()
         )

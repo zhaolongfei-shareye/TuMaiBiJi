@@ -57,6 +57,12 @@ BLOCKING = {
     "store_code": "真打 Redis（SETEX 一趟）",
     "set_cooldown": "真打 Redis（SETEX 一趟）",
     "verify_code": "真打 Redis（GETDEL 或 pipeline 一趟）",
+    # 11-16 Z4 那一刀添的：`services/passwords.py` 里那三枚**自己就跑 scrypt** 的函数
+    # （几十毫秒、吃 16 MiB）。口令族五口 11-13 上现网时一枚都没裹，等于每一发登录／注册
+    # 都把单进程循环按住几十毫秒，而且登录口匿名、只按 IP 限流 ⇒ 换 IP 叠发可放大成全站。
+    "hash_password": "跑 scrypt（几十毫秒 CPU＋16 MiB）",
+    "verify_password": "跑 scrypt（同上）",
+    "dummy_verify": "壳子：里面那句 verify_password 跑 scrypt",
 }
 
 # 现读到的、**本轮不动**的阻塞点，逐条写清归谁。名单只许变短不许变长。
@@ -190,10 +196,11 @@ def test_尺子自己看得见():
 def test_名单里那几只到现在仍然真是同步函数():
     """哪天有人把 `resolve` 改成 `async def`，`to_thread(resolve, …)` 会回一枚**没人 await 的协程**：
     不抛错、不查库，屏上只是"那一步没生效"。这一条把"名单＝同步函数"这个前提钉住。"""
-    from app.services import llm, queue as queue_service, service_secrets, wechat  # noqa: F401
+    from app.services import llm, passwords, queue as queue_service, service_secrets, wechat  # noqa: F401
     for fn in (service_secrets.resolve, queue_service.set_task_status,
                queue_service.get_task_status, wechat.check_text,
-               wechat.check_image, wechat._token_body):
+               wechat.check_image, wechat._token_body,
+               passwords.hash_password, passwords.verify_password, passwords.dummy_verify):
         assert not inspect.iscoroutinefunction(fn), (
             f"{fn.__module__}.{fn.__name__} 变成协程了——那它上面所有 "
             f"`asyncio.to_thread(...)` 都得改回直接 await，名单也要撤掉这一行")
@@ -259,6 +266,26 @@ def test_微信登录主路那几段库活真的挪出了循环():
     from app.core import auth
     assert not inspect.iscoroutinefunction(auth._bootstrap_user), "同上：静态判据与运行时得一致"
     assert inspect.iscoroutinefunction(auth.login_or_register)
+
+
+def test_口令服务层那两只不许自己跑scrypt():
+    """Z4 的分工：scrypt 在**路由**那一层挪出循环，`passwords.create`／`set_password` 只管行的形状、
+    吃调用方算好的哈希（`create(db, account, await asyncio.to_thread(hash_password, pw))`）。
+
+    为什么这一条必须有：判据①按**被调函数名**查，`create`／`set_password` 不在名单里（它们是
+    "行的形状"，不是阻塞点）。哪天有人把 `hash_password` 收回这两只函数内部——那是最自然的
+    顺手一改，签名短一个 await——路由里那句裸 `create(db, account, password)` 就又是一枚压在
+    循环上的 scrypt，而①一个字都看不见。这一条把"这一层不碰 CPU 重活"这句分工钉死。
+    """
+    tree = ast.parse((APP / "services" / "passwords.py").read_text(encoding="utf-8"))
+    for name in ("create", "set_password"):
+        fn, is_coro = _fn_body(tree, name)
+        assert fn is not None and not is_coro, f"`passwords.{name}` 没了或变成协程了，判据要跟着改口径"
+        inside = {_call_name(c) for c in ast.walk(fn) if isinstance(c, ast.Call)}
+        scrypt = sorted(inside & {"hash_password", "verify_password", "dummy_verify"})
+        assert not scrypt, (
+            f"`passwords.{name}` 里又出现了 {scrypt}＝scrypt 回到了这一层，"
+            f"而调用它的那些异步路由只裹了 `hash_password` 那一枚：这一发又压回循环上了")
 
 
 # ── ③ 连接复用 ────────────────────────────────────────────────────────────
