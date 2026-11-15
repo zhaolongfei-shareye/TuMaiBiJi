@@ -167,16 +167,18 @@ def get_current_account(
 
 
 
-async def login_or_register(code: str, db: Session, inviter: int | None = None) -> tuple[User, str, int | None]:
-    """换票、建号、发钥匙，并且**只在建号那一次**给这个人名下播一篇预置笔记（§8.232）。
+def _bootstrap_user(db: Session, openid: str, inviter: int | None) -> tuple[User, int | None]:
+    """openid 拿到之后的全部数据库活：查人／建号／归因／播种。回（这个人, 这次种下去的那篇 id）。
 
-    回第三个值＝这次种下去的那篇 id，没种（老用户、或这一趟出岔子）就是 None。
-    它唯一的作用是告诉客户端"这一台设备上这个账号是刚出生的"，好让首启那一张卡片知道该给哪一篇出图——
-    种没种成功都不许影响登录本身，所以它下面被 try 包住。
+    整段都是**同步** SQLite 读写与 commit，抽出来只为一件事：调用方一句
+    `await asyncio.to_thread(...)` 就能把它整体挪出事件循环（11-15 第十轮审计 Z3）。
+    原来这些句子直接写在 `async def login_or_register` 里，而现网是单进程 uvicorn——
+    建号那一次 commit 撞上 worker 的写事务时，驱动在原地等 `busy_timeout`（`db/database.py`
+    钉死的 5000ms），这五秒里**整站**（含 `/health`）一起排队。同一个文件里
+    `_wechat_code2session` 早就为同样的理由裹了 `to_thread`，这一趟把剩下的补齐。
+    ⚠  session 是请求级的那一只，交给线程跑的前提是 `database.py` 的
+    `check_same_thread=False`；两条合起来才成立，动任何一边都要复核另一边。
     """
-    data = await _wechat_code2session(code)
-    openid = data["openid"]
-
     user = db.query(User).filter(User.openid == openid).first()
     is_new_user = user is None
     if is_new_user:
@@ -230,6 +232,21 @@ async def login_or_register(code: str, db: Session, inviter: int | None = None) 
             # 用户连自己都进不来，比首屏空着严重。这里出声只出在日志里。
             db.rollback()
             logger.exception("预置笔记没种下去（不影响登录）：user=%s", user.id)
+
+    return user, seeded_note_id
+
+
+async def login_or_register(code: str, db: Session, inviter: int | None = None) -> tuple[User, str, int | None]:
+    """换票、建号、发钥匙，并且**只在建号那一次**给这个人名下播一篇预置笔记（§8.232）。
+
+    回第三个值＝这次种下去的那篇 id，没种（老用户、或这一趟出岔子）就是 None。
+    它唯一的作用是告诉客户端"这一台设备上这个账号是刚出生的"，好让首启那一张卡片知道该给哪一篇出图——
+    种没种成功都不许影响登录本身，所以 _bootstrap_user 里那两段各自被 try 包住。
+    """
+    data = await _wechat_code2session(code)
+    openid = data["openid"]
+
+    user, seeded_note_id = await asyncio.to_thread(_bootstrap_user, db, openid, inviter)
 
     token = _create_token(user.id, user.generation)
     return user, token, seeded_note_id

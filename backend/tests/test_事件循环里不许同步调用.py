@@ -68,6 +68,20 @@ EXEMPT = {
 # 长度**硬写**：2026-10-25 这一趟落码后现数是 1 条。不许写成 `len(EXEMPT)`——那样加一行它也跟着涨。
 EXEMPT_SIZE = 1
 
+# 11-16 Z3 那一刀用的**按函数**名单：`core/auth.login_or_register` 里"一碰库就同步"的那几枚调用。
+# 为什么不并进上面的 `BLOCKING`（审计原话是"把上述函数名补进守门名单"）：这五枚名字现在还被
+# `app/api/routes/v1_auth.py` 里另一串异步口裸调（`apple_login`／`guest_login`／`phone_login`／
+# `email_login`／口令族五口），并进 `BLOCKING` 会当场挂出十几条红，而豁免名单只许变短不许变长
+# （`EXEMPT_SIZE` 是硬写的）。那些口各归 Z4 与后面的刀，收一处并一处；这一条先把**现网小程序登录
+# 主路**（`/api/auth/wechat` 与 `/v1/auth/wechat` 都转调 `login_or_register`）钉住。
+# `query`／`add`／`commit`／`refresh`／`rollback` 是 SQLAlchemy 会话上的方法名，故意算进来：
+# 只在这一只函数里查，不在全文查，所以敢用这么通用的名字。
+LOGIN_DB_CALLS = {
+    "query", "add", "commit", "refresh", "rollback",
+    "allocate", "ensure_for_user", "attribute_inviter",
+    "seed_default_categories", "seed_note_for_new_user",
+}
+
 
 def _call_name(node: ast.Call) -> str | None:
     """`service_secrets.resolve(...)` → `resolve`；`q.enqueue(...)` → `enqueue`；`get_queue().enqueue` → `enqueue`。"""
@@ -117,6 +131,20 @@ def _scan_app() -> list[tuple[str, str, int, str]]:
 
 def _keys(hits) -> set[str]:
     return {f"{f}:{fn}:{name}" for f, fn, _line, name in hits}
+
+
+def _fn_body(tree: ast.AST, name: str):
+    """按名字取函数体，回（节点，是不是协程）。重名不管——这几只名字在本仓唯一。"""
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.AsyncFunctionDef, ast.FunctionDef)) and n.name == name:
+            return n, isinstance(n, ast.AsyncFunctionDef)
+    return None, None
+
+
+def _to_thread_count(fn) -> int:
+    return sum(1 for c in ast.walk(fn)
+               if isinstance(c, ast.Call)
+               and (getattr(c.func, "attr", None) or getattr(c.func, "id", None)) == "to_thread")
 
 
 # ── ① 枚举 ────────────────────────────────────────────────────────────────
@@ -193,6 +221,44 @@ def test_那三条录入口两次Redis往返都真的挪出了循环():
     assert set(seen) == wanted, f"这三只口改名或没了，判据要跟着改口径：{sorted(seen)}"
     for name, count in seen.items():
         assert count >= 2, f"{name} 只有 {count} 枚 to_thread：登记与入队是两趟网络，少一枚就是还有一趟在循环上"
+
+
+def test_微信登录主路那几段库活真的挪出了循环():
+    """Z3 落码处：`core/auth.login_or_register` 是现网小程序登录唯一那条路（`/api/auth/wechat`
+    与 `/v1/auth/wechat` 都转调它），它下面**一句同步库调用都不许留在事件循环上**。
+
+    为什么单独一条、不复用上面①：①按**被调函数名**在全仓查，而 `query`／`commit` 这些名字
+    还被 `v1_auth.py` 里另一串异步口裸调（那些口归 Z4 与后面的刀），并进 `BLOCKING` 会一次挂出
+    十几条红、逼着豁免名单变长。这一条按**函数**查，只盯这一只口，收一处并一处。
+
+    三段各挡一种失效：
+    - ①本体出现未裹 `to_thread` 的名单内调用 ⇒ 红（就是审计要挡的那个症状：单进程 uvicorn
+      撞 worker 写锁时驱动原地等 `busy_timeout` 5000ms，这五秒里含 `/health` 整站排队）。
+    - 助手 `_bootstrap_user` 不在了／改名了 ⇒ 红。这条必须有，否则"把整段删了"也算修好了。
+    - 助手必须是**同步** `def` 而且真装着那些库调用 ⇒ 红。哪天有人给它加 `async`，
+      `await asyncio.to_thread(协程)` 回一枚没人 await 的协程：**不抛错、不查库、屏上只是登录没反应**。
+    """
+    tree = ast.parse((APP / "core" / "auth.py").read_text(encoding="utf-8"))
+
+    fn, is_coro = _fn_body(tree, "login_or_register")
+    assert fn is not None and is_coro, "`login_or_register` 改名、没了或变成同步函数了，判据要跟着改口径"
+    wrapped = _thread_wrapped_ids(fn)
+    bare = [(c.lineno, _call_name(c)) for c in ast.walk(fn)
+            if isinstance(c, ast.Call) and id(c) not in wrapped and _call_name(c) in LOGIN_DB_CALLS]
+    assert not bare, (f"这些还在事件循环上：{sorted(bare)}——"
+                      f"整段搬进一只同步 helper，调用处写 `await asyncio.to_thread(helper, db, ...)`")
+    assert _to_thread_count(fn) >= 1, "`login_or_register` 里一枚 `to_thread` 都没有＝那段库活还在循环上"
+
+    helper, helper_is_coro = _fn_body(tree, "_bootstrap_user")
+    assert helper is not None, "`_bootstrap_user` 不在了或改了名——上面那条『未裹 to_thread 的调用』也一起失明"
+    assert not helper_is_coro, "`_bootstrap_user` 变成协程了，`to_thread` 会回一枚没人 await 的协程：静默不干活"
+    inside = {_call_name(c) for c in ast.walk(helper) if isinstance(c, ast.Call)}
+    missing = sorted({"query", "commit", "allocate", "ensure_for_user", "attribute_inviter"} - inside)
+    assert not missing, f"这些库活没在那只 helper 里（说明还留在循环上的某处）：{missing}"
+
+    from app.core import auth
+    assert not inspect.iscoroutinefunction(auth._bootstrap_user), "同上：静态判据与运行时得一致"
+    assert inspect.iscoroutinefunction(auth.login_or_register)
 
 
 # ── ③ 连接复用 ────────────────────────────────────────────────────────────
