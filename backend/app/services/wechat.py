@@ -277,15 +277,31 @@ def _shrink_for_img_sec(data: bytes) -> bytes:
     只降质量不缩尺寸（先 82 再逐档降到 45）：判图看的是画面内容，不是像素数，
     而缩尺寸会动到长图／截图那一族的版面。压完还过线就按原样送出去，让接口自己判
     ——那一刻它是"没检成"，日志会写明，不假装成"检过且没问题"。
+
+    ⚠ 压图之前先过 `ocr.guard_pixels` 那道像素闸（Z2），而且它必须排在下面那句
+    "字节 ≤1MB 就原样返回"**之前**：炸弹的形状正是"字节很小、像素极大"（实测读数记在
+    `ocr.py:22-24`——0.43MB 的 12000×12000 PNG 解码后峰值 RSS 1271MB），走那句早退就绕开了
+    整道闸。这一支跑在 API 进程的 `to_thread` 里，单进程现网下两三发并发即上 GB，
+    坏的是整站而不是这一张图。`Image.open` 只读文件头、不要钱，所以先开一次拿宽高。
     """
+    import io
+
+    from PIL import Image
+
+    from app.services.ocr import guard_pixels
+
+    try:
+        im = Image.open(io.BytesIO(data))
+        width, height = im.width, im.height
+    except Exception as exc:
+        logger.warning("送检前读不出这张图的宽高，按原样送：%s: %s", type(exc).__name__, exc)
+        return data
+    # 这一句抛的 UserError 不许被下面那个 except Exception 吞掉：吞了就等于"图越大越安全"，
+    # 而那正是本函数开头写明 refuse 的那条绕过路径。放行与否由调用方的 `except UserError` 决定。
+    guard_pixels(width, height)
     if len(data) <= IMG_SEC_MAX_BYTES:
         return data
     try:
-        import io
-
-        from PIL import Image
-
-        im = Image.open(io.BytesIO(data))
         im = im.convert("RGB")
         for quality in (82, 70, 58, 45):
             buf = io.BytesIO()
@@ -323,6 +339,11 @@ def _ask_img_sec_check(data: bytes) -> dict:
                 logger.warning("图片内容安全拿到 %s（token 已失效），清缓存重试一趟", body.get("errcode"))
                 continue
             break
+    except UserError:
+        # 「这张图像素过大」是**对用户的答案**，不是"这次没检成"。走下面那个 except 就变成
+        # unavailable ⇒ 放行 ⇒ 像素闸形同虚设，而且拒掉的那句话还丢了。Z2 的修法要落到位，
+        # 这一句不可省：调用方的兜底 except 覆盖面比抛错的那几行宽。
+        raise
     except Exception as exc:
         # httpx 异常文本可能带整条含 token 的 URL，只进日志
         logger.error("图片内容安全接口异常 %s: %s", type(exc).__name__, exc)

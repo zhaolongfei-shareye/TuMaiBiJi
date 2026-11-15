@@ -68,13 +68,24 @@ def _get_engine():
     return _engine
 
 
+def guard_pixels(width: int, height: int) -> None:
+    """全仓唯一的像素闸：谁要解码，先过这一句。
+
+    抽出来是因为同一发炸弹有三扇门（OCR、取图送检压图、外链贴图），而闸原来只写在
+    `_prepare` 里 ⇒ 另外两扇绕过去就直接在单进程 API 上整份解码。数字不在这儿第二遍写：
+    阈值只有上面那一枚 `MAX_PIXELS`，调用方只许传 `Image.open` 之后的 `.width`/`.height`
+    （open 只读文件头，这两格不要钱；`load()`/`convert()` 才要钱）。
+    """
+    if width * height > MAX_PIXELS:
+        raise UserError(TOO_MANY_PIXELS_HINT)
+
+
 def _prepare(image_data: bytes) -> Image.Image:
     """解码为 PIL 图像并缩放长边。交给 RapidOCR 时保持 RGB/RGBA，由它做 RGB→BGR。"""
     try:
         img = Image.open(BytesIO(image_data))
         # open 只读文件头，宽高在这一步就已拿到；必须在任何解码动作之前判掉
-        if img.width * img.height > MAX_PIXELS:
-            raise UserError(TOO_MANY_PIXELS_HINT)
+        guard_pixels(img.width, img.height)
         img = ImageOps.exif_transpose(img) or img
         if img.mode not in ("RGB", "RGBA", "L"):
             # P 模式可能带调色板透明，转 RGBA 才能正确合成背景

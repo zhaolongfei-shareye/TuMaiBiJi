@@ -16,7 +16,9 @@
 各自 monkeypatch check_text。
 """
 import os
+import struct
 import sys
+import zlib
 
 os.environ["DATABASE_URL"] = "sqlite:////tmp/tumaibiji_pytest_sec.db"
 os.environ["JWT_SECRET_KEY"] = "pytest-only-secret-not-a-real-one"
@@ -508,6 +510,25 @@ def test_本地那道闸先挡所以不花配额(client, db_session, person, mon
 # 所以图片侧只有"过"与"不过"两态，没有"需人工复核"那一档。
 
 
+def png_header_only(width: int, height: int) -> bytes:
+    """只有 IHDR、没有任何像素数据的 PNG：几十字节，用来造"字节小、像素大"那一发炸弹。
+
+    与 `tests/test_ocr_flows.py:37` 同一件工具（那边量 OCR 门，这边量送检压图门）。
+    两边各留一份、不互相 import：这两个文件都在模块级写 `os.environ["DATABASE_URL"]`
+    （这边是直接赋值，那边是 `setdefault`）再 import `app.db.database`，而 engine 只认
+    第一次 import 时读到的那串 ⇒ 谁先被收集决定整套用例落在哪只库文件上。
+    """
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(body)) + kind + body
+            + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+        )
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IEND", b"")
+
+
 class _Recording:
     """记下送出去的每一份 multipart，用来验"压没压"与"送没送"。"""
 
@@ -620,6 +641,44 @@ def test_超过接口上限的图先压再送(monkeypatch):
     assert len(sent) == 1
     body = list(sent[0].values())[0][1]
     assert len(body) <= wechat.IMG_SEC_MAX_BYTES, f"压完还是 {len(body)} B，等于没压"
+
+
+def test_像素炸弹在送检这一扇门也被拒(monkeypatch):
+    """Z2 第二扇门：`_shrink_for_img_sec` 原先只看字节、不看像素。
+
+    炸弹的形状是"字节极小、像素极大"（实测读数在 `ocr.py:22-24`：0.43MB／1.44 亿像素的
+    纯色 PNG 解码后峰值 RSS 1271MB），而这一支跑在 API 进程的 `to_thread` 里、现网单进程
+    ⇒ 两三发并发就上百 MB×N。更要紧的是它当时抛的错会被 `_ask_img_sec_check` 的
+    `except Exception` 接成 `unavailable` ⇒ **放行**——那正是上面那条用例专门 refute 的
+    "图越大越安全"的同一条绕过路径，只是换了个方向（像素而不是字节）。
+    撤掉 `except UserError: raise` 那一句，这条必红（会当成没检成放过去）。
+    """
+    from app.services import ocr
+
+    sent = _wire_image(monkeypatch, {"errcode": 0})
+    bomb = png_header_only(7000, 7000)
+    assert len(bomb) < 200, f"样本本该只有几十字节，否则量的不是'字节小像素大'：{len(bomb)} B"
+    assert len(bomb) < wechat.IMG_SEC_MAX_BYTES, "样本没落在'字节那道闸放行'的一侧，量的就不是像素闸"
+
+    with pytest.raises(UserError) as exc:
+        # 走 worker 实际调用的那一句，而不是 check_image：连 enforce 一起量，
+        # 免得日后有人在中间插一层 except 把拒又降回放行。
+        wechat.enforce_image_safety(bomb)
+    assert str(exc.value) == ocr.TOO_MANY_PIXELS_HINT, f"拒的话不是给用户那句：{exc.value}"
+    assert sent == [], f"像素过线的图还是出网了（{len(sent)} 趟）⇒ 闸门排在送检之后"
+
+
+def test_像素刚好在线下的图照常送检(monkeypatch):
+    """反向半：闸门不许顺手把正常图也拒了，否则"存不了笔记"的锅又回到我们头上。
+
+    8000×5000 正正等于 `ocr.MAX_PIXELS`（闸是 `>` 不是 `>=`），它必须一路走到微信。
+    """
+    from app.services import ocr
+
+    assert 8000 * 5000 == ocr.MAX_PIXELS, "样本对不上阈值 ⇒ 这条量的不是线下那一侧"
+    sent = _wire_image(monkeypatch, {"errcode": 0})
+    assert wechat.check_image(png_header_only(8000, 5000)) == "pass"
+    assert len(sent) == 1, "线下那一侧被误伤 ⇒ 像素闸挡住了正常图"
 
 
 def test_开关关着时图片这道也不出网(monkeypatch):
