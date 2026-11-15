@@ -165,6 +165,15 @@ def redeem(db: Session, user: User, code: str) -> tuple[Account, bool]:
 
     keep, absorb = choose_main(db, mine, target)
     merge_into(db, keep, absorb)
+    # ⚠ 这一句 `flush` 与 `bind_email` 里那句是同一条命：`SessionLocal` 是 `autoflush=False`，
+    # 而 `merge_into` 搬 `users.account_id` 走的是 ORM 赋值——不 flush 的话紧随其后的
+    # `bump_generation` 那句 `WHERE users.account_id = keep.id` 打到库上读到的是**搬之前**的库面。
+    # 主账号是 iPhone 那一条时（`choose_main` 完全可能选出它：那边有笔记、或两边都没笔记但那边
+    # 更早创建），发起者自己的微信登录行正是这一趟刚搬过来的 ⇒ 他的 `users.generation` 没被抬 ⇒
+    # **他手里那把旧钥匙在归属已经变了之后照样开门**，而契约 §二 第 4 步要的是两侧全部失效。
+    # `test_主账号换成_iphone_时发起者那把老钥匙也失效` 钉这一发；`db.commit()` 在下一行，
+    # 所以 flush 不改变事务边界，只改变那两句 SELECT 看得见什么。
+    db.flush()
     # 代次必须在**搬完之后**抬：`bump_generation` 抬的是 keep 这一格加"当前挂在 keep 名下
     # 的所有 users 行"。先抬后搬的话，被并掉那个人手里的微信 token 还活着，
     # 而契约 §二 第 4 步要的是两侧旧 token **全部**失效。

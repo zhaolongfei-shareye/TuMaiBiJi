@@ -947,6 +947,46 @@ class Test合并方向与吊销:
         row = db.query(Note).filter(Note.id == note_id).one()
         assert row.user_id == note_owner, "搬 users 行的时候顺手把笔记也搬了"
 
+    def test_主账号换成_iphone_时发起者那把老钥匙也失效(self, client, db):
+        """Z6：`redeem` 里 `merge_into` 之后少一句 `db.flush`，抬代次就抬不到发起者自己。
+
+        `SessionLocal` 是 `autoflush=False`，而 `merge_into` 搬 `users.account_id` 走的是 ORM
+        赋值（不落库）。主账号是微信那条时，`bump_generation` 那句
+        `WHERE users.account_id = keep.id` 在库里本来就看得见这一行，抬得到 ⇒ 一切正常；
+        **主账号换成 iPhone 那条**时（`choose_main` 真会选出来：那边有笔记），那一行是这一趟
+        刚搬过来的，不 flush 库里还是旧值 ⇒ 发起者的 `users.generation` 原地不动 ⇒
+        他手里那把**合并之前**的钥匙在归属已经变了之后照样开门，而契约 §二 第 4 步和那只路由
+        的 docstring 都写明"合并一旦发生，两侧旧 token 全部失效"。
+
+        与上面 `test_合并之后两侧钥匙全部失效` 的分工：那一条把创建时间留成默认，平局会让
+        **微信**那条当主，正好走在这句 flush 不影响结果的分支上——所以它对这一发没有区分度，
+        这一条必须把笔记钉在 iPhone 那侧，才能把主账号换成 iPhone。
+        """
+        iphone = _account_with_provider(db, "apple", "apple-revoke-iphone-main",
+                                        created_at=_utc_now() + timedelta(days=2))
+        iphone_id = iphone.id
+        user, wc = _wechat_person(db)
+        wc.created_at = _utc_now() - timedelta(days=10)   # 微信早创建：主账号换人只能由笔记决定
+        db.commit()
+        iphone_user = User(openid=None, generation=1, account_id=iphone_id)
+        db.add(iphone_user)
+        db.commit()
+        _note(db, iphone_user, title="iPhone 那边的一篇")
+
+        old_token = _user_token(user)
+        resp = client.post("/v1/account/link/redeem", json={"code": _code(db, iphone)},
+                           headers=_bearer(old_token))
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["account_id"] == iphone_id, \
+            "前提没了：这一趟的主账号不是 iPhone 那条，量的就不是缺 flush 那一发"
+        assert client.get("/api/user/quota", headers=_bearer(old_token)).status_code == 401, \
+            "合并发生了，发起者手里那把旧钥匙却还开着门"
+        # 反向的一半：不是把所有钥匙都打死——重新登录拿到的新钥匙必须开得了门，
+        # 否则上面那句 401 也可以是"整条鉴权坏了"给的。
+        fresh = _reissued_user_token(db, user)
+        assert client.get("/api/user/quota", headers=_bearer(fresh)).status_code == 200, \
+            "老钥匙是死了，但新钥匙也开不了门"
+
     def test_创建时间缺失要响不许当成_1970(self, client, db):
         """`_created_at` 里那道 NULL 守卫。`created_at` 有 server_default，正常不会是 NULL，
         所以这一条量的是"账坏了"那一路：把它当成 1970 年会让时间戳坏掉的那个人**永远当主账号**，
