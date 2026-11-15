@@ -132,7 +132,10 @@ App({
     if (!this.globalData.isLoggedIn) return
     // 这五趟补账只 .then 不 .catch 的话，一旦 reject 就是未处理的 Promise 拒绝：
     // 屏上无声、日志捞不到（10-18 修过同型，这里是漏网的几只，N8）。补账失败照旧不打扰用户，但必须被接住。
-    assetQueue.flush(apiModule).then((r) => {
+    // 第二个回调是 Z49（11-16）：补绑被服务端**永久**拒掉（4xx，非 429）的那几条，图上已经不在账上了，
+    // 可那几张图此刻还在云上——只有客户端删得动。摘条不删就是占全站 5GB 配额又没人认得的孤儿，
+    // 与 `pages/write/write.js` 直发那一条同一个口径。删不成由 `deleteFiles` 自己落进待删队列。
+    assetQueue.flush(apiModule, (ids) => cloudUpload.deleteFiles(ids)).then((r) => {
       if (r && r.sent) console.log(`补绑回 ${r.sent} 张图`)
     }).catch((e) => console.warn('补绑这一趟没走完:', e))
     // 待删队列：笔记删了、云上对象没删成的那批（同一族，另一头）。不 await、不提示。

@@ -84,8 +84,10 @@ function 判(src) {
   ck('上限 50、超了丢最旧的并留一句日志', /MAX_QUEUE = 50/.test(queue) && /丢掉最旧的/.test(queue))
   ck('4xx 不再重试、其余留着下次（与待补绑同一条纪律）',
     /code >= 400 && code < 500/.test(queue))
+  // ⚠ 11-16 Z49：待补绑那一趟多带了第二个实参（被永久拒绝的那批地址交给删除），
+  // 所以钉子只认调用头，不锁实参个数——实参的形状由 `验-审计Z49队列永久拒绝删孤儿.js` 量。
   ck('回前台三族一起补：待补绑、待删对象、待补登记',
-    /assetQueue\.flush\(apiModule\)/.test(app) && /cloudUpload\.flushPurge\(\)/.test(app) && /cardCloud\.flush\(\)/.test(app))
+    /assetQueue\.flush\(apiModule[,)]/.test(app) && /cloudUpload\.flushPurge\(\)/.test(app) && /cardCloud\.flush\(\)/.test(app))
 
   // —— ⑤ 10-11 代码审计补的三条 ——
   // 限流不是"这一笔永远不合法"：`cards.py` 60/分钟、`profiles.py` 30/分钟，一次进前台几队齐发就撞得上。
@@ -103,8 +105,9 @@ function 判(src) {
     /cardQueue\.settle\(noteId\)/.test(arch) && /function settle\(/.test(queue),
     `archive 段长 ${arch.length}`)
   // 补登记这一趟也会顶下旧对象，直发那一条早就接了这个回体，队列这一条原来没接。
+  // 11-16 Z49：这个回调改叫 `onOrphan`，除了被顶下的那几张，还交「被服务端永久拒掉」那几条手上的地址。
   ck('补登记顶下的旧对象也交给 deleteFile（不留孤儿占全站配额）',
-    /onReplaced/.test(queue) && /cardQueue\.flush\(api, \(ids\) => cloudUpload\.deleteFiles\(ids\)\)/.test(cloud))
+    /onOrphan\(replaced\)/.test(queue) && /cardQueue\.flush\(api, \(ids\) => cloudUpload\.deleteFiles\(ids\)\)/.test(cloud))
 
   // 预留排在删除请求之前是有理由的（回体丢了就没人记得那批地址），但失败那一条原来没人撤——
   // 10-11 审计严重①：飞行模式里点删除（请求根本没出去）也会留着那几条，

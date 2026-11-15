@@ -112,19 +112,42 @@ ck('assets 路由在 main.py 注册了（没注册就是 404，且没有任何�
 // 整批归 `验-张数只有一个出处.js` 管，这里不抄第二条：两条尺子各钉一份同一个数，
 // 改数量时就有一条会悄悄失效（这一轮就差点留下一条"公开页也认这个常量"的旧判据）。
 
+/* 11-16 这一轮把四条钉子的**锚点**改成了**行为**（见 §五／§六／§八 各自的注释）。
+   四条判据在这里各定义一次，正例与 §八b 的反向共用同一份定义——一条规矩两份写法，
+   迟早只有一份跟着改（这一把自己撞过好几回）。 */
+const N1 = (m, be, sh, del, usr) => (m.match(/def not_failed/g) || []).length === 1
+  && (be.match(/not_failed\(\)/g) || []).length >= 3
+  && (sh.match(/not_failed\(\)/g) || []).length === 1
+  && (del.match(/not_failed\(\)/g) || []).length >= 1
+  && !/not_failed\(\)/.test(usr)
+  && !/backup_status\s*(!=|==|\.is_)/.test(be + sh + del + usr)
+const N2 = (c) => /const backup = this\._backupShots\(batch/.test(c) && !/await this\._backupShots/.test(c)
+const N3 = (c) => {
+  const i = c.indexOf('async _backupShots(')
+  const body = i < 0 ? '' : c.slice(i, i + 1600)
+  return body.includes('for (') && !/Promise\.all/.test(c)
+}
+const N4 = (d) => {
+  const i = d.indexOf('async loadImages(')
+  const body = i < 0 ? '' : d.slice(i, i + 1600)
+  const gate = body.indexOf('cloudUpload.cloudReady()')
+  const req = body.indexOf('api.getNoteAssets(')
+  return gate >= 0 && req >= 0 && gate < req
+}
+
 /* ---------- 五、后端那三条口径不能被人改回"每人 5GB" ---------- */
 ck('配额比值按全站算（total_bytes 不带 user 过滤）',
   /total_bytes = _sum_bytes\(db\)/.test(BE) && /used_ratio=round\(total_bytes \/ cap/.test(BE))
 ck('NULL 的 backup_status 算进配额（SQL 三值逻辑那条坑）',
   /backup_status\.is_\(None\)/.test(MODEL))
-ck('"这张图到底还在不在"只有一个定义，读图那三处与注销那一路都调它',
-  (MODEL.match(/def not_failed/g) || []).length === 1
-    && (BE.match(/not_failed\(\)/g) || []).length === 3
-    && (SHARES.match(/not_failed\(\)/g) || []).length === 1
-    && (DELETION.match(/not_failed\(\)/g) || []).length >= 1
-    // 注销那一路**不许**再自己写一份判据：抽公共函数就是为了这个。旧判据钉的是"路由里调一次"，
-    // 抽完之后那一格变成 0 处，红得毫无道理——现在钉成"路由里没有"。
-    && !/not_failed\(\)/.test(USER_ROUTE),
+ck('"这张图到底还在不在"只有一个定义，读图与配额那几处与注销那一路都调它',
+  // ⚠ 11-16 改口：原来钉 assets.py **恰好 3 处**。配额那两条求和／计数（`_sum_bytes` 与
+  // "这篇有几张"）后来也接了同一个判据，现在是 5 处——钉死数字量的是"我上一版数到几"，
+  // 不是这条规矩本身。规矩是：只有一个定义、几个读口都调它、没人内联复刻那条 SQL 条件。
+  // 内联复刻的症状与文件头那句一模一样：老行的 NULL 被漏掉，配额悄悄少算（现查四个读口 0 处）。
+  // 注销那一路**不许**再自己写一份判据：旧判据钉的是"路由里调一次"，抽成公共函数后那一格变成 0 处，
+  // 红得毫无道理——现在钉成"路由里没有"。
+  N1(MODEL, BE, SHARES, DELETION, USER_ROUTE),
   `定义 ${(MODEL.match(/def not_failed/g) || []).length}／assets ${(BE.match(/not_failed\(\)/g) || []).length}`
   + `／shares ${(SHARES.match(/not_failed\(\)/g) || []).length}／deletion ${(DELETION.match(/not_failed\(\)/g) || []).length}`)
 ck('张数卡的是"这篇最终有多少张"，不是"这一次送几条"',
@@ -139,11 +162,15 @@ ck('fileID 光杆 cloud:// 被拒（前缀之外还得有东西）——三张�
 const CREATE = stripComments(read('miniprogram/pages/create/create.js'))
 const QUEUE = stripComments(read('miniprogram/utils/assetQueue.js'))
 ck('submitScreenshots 里 B 链是"起头不等收尾"（const backup = this._backupShots，没有 await）',
-  /const backup = this\._backupShots\(batch\)/.test(CREATE) && !/await this\._backupShots/.test(CREATE))
+  // ⚠ 11-16 改口：实参多了一个 `comps`（按下标复用压缩那一份），锚点原来把右括号写死在
+  // `(batch)` 上，那是钉"上一版怎么写的字"。这条规矩管的是**没有 await**，照这个钉。
+  N2(CREATE))
 ck('A 链失败那条口也收尾（_settleBackup(null, backup) → 把孤儿对象删掉）',
   /catch \(err\) \{[\s\S]{0,200}?this\._settleBackup\(null, backup\)/.test(CREATE))
 ck('B 链逐张串行，不 Promise.all（九张 4000×3000 一起重绘会吃穿内存）',
-  /for \(const p of paths/.test(CREATE) && !/Promise\.all/.test(CREATE))
+  // ⚠ 11-16 改口：循环从 `for (const p of paths)` 改成按下标走（要和 comps 那一份对上号），
+  // 原锚点红了但规矩没坏。改成量 `_backupShots` 那一段正文里有一圈 for，且整页没有 Promise.all。
+  N3(CREATE))
 ck('_settleBackup 整体裹在 try 里，任何炸法都不冒 unhandled rejection',
   /async _settleBackup[\s\S]{0,700}?console\.warn\('图片备份收尾没走完/.test(CREATE))
 ck('压不动就传原图（"宁可大一点也不丢图"在调用侧也成立）',
@@ -159,7 +186,8 @@ ck('收尾按差量写回，不许拿开头那份快照整表覆盖（10-09 审�
 ck('push 对同一 fileID 去重（bind 幂等，但队列并起来才少打请求）',
   /new Set\(mine\.items\.map\(\(it\) => it\.file_id\)\)/.test(QUEUE))
 ck('回到前台补一次绑，且被登录态挡着（闸门收在 flushQueues 开头那一句）',
-  /assetQueue\.flush\(apiModule\)/.test(APP)
+  // ⚠ 11-16 Z49：这一趟多带第二个实参（被服务端永久拒掉的那批地址交给删除），钉子只认调用头。
+  /assetQueue\.flush\(apiModule[,)]/.test(APP)
     && /flushQueues\(\) \{\s*if \(!this\.globalData\.isLoggedIn\) return/.test(APP))
 ck('B 链的 gate 只有一处判 cloudReady（判两次会出现"一半传了一半没传"）',
   (CREATE.match(/cloudReady\(\)/g) || []).length === 1,
@@ -200,7 +228,9 @@ ck('注销也清，而且排在 clearSession 之前（过了那一步再没有�
 ck('clearSession 里连待补绑队列一起清（留着会让下一个身份替别人重试绑图）',
   /assetQueue\.clear\(\)/.test(APP))
 ck('读配图第一步判 cloudReady（环境没填连请求都不发，也就不可能出现画不出来的破图）',
-  /async loadImages\(noteId\)[\s\S]{0,160}?if \(!cloudUpload\.cloudReady\(\)\) return/.test(DETAIL))
+  // ⚠ 11-16 改口：闸与那句请求之间插进了"后台那张官方配图"那三行，回形也从 `return` 变成 `{ … return }`，
+  // 原锚点（160 字符内紧跟着 `cloudReady()) return`）红了而规矩没坏。规矩是**发请求之前先过这道门**。
+  N4(DETAIL))
 ck('换一篇的时候 noteImages 先归零（读图慢了或失败，不许把上一篇的图挂在这一篇上）',
   /note, loading: false, _loaded: true, noteImages: \[\]/.test(DETAIL))
 ck('读回来先对一下号：这一页可能已经切到别篇了',
@@ -257,6 +287,33 @@ ck('新写类名带页面前缀（dt- / sv- / me-storage），别的页面同名
   /\.dt-shots/.test(read('miniprogram/pages/detail/detail.wxss'))
     && /\.sv-sheet\s*\{/.test(read('miniprogram/pages/share/view.wxss'))
     && /\.me-storage/.test(read('miniprogram/pages/me/me.wxss')))
+
+/* ---------- 八b、11-16 改口那四条钉子的牙（反向）---------- */
+/* 把锚点改成行为判据有个副作用：判据可能变成"怎么改都绿"。所以每条都撤一刀，
+   红了才算它还在量规矩本身。变异没打上（锚点漂了）当场 exit 2——那是尺子坏了，不是代码红。 */
+const mut = (name, src, patched) => {
+  if (patched === src) { console.log(`✗ ${name}：变异没打上（锚点漂了）`); process.exit(2) }
+  return patched
+}
+ck('反向①：注销那一路不再调公共判据 → ①那条红',
+  N1(MODEL, BE, SHARES, mut('①', DELETION, DELETION.replace(/not_failed\(\)/g, 'x')), USER_ROUTE) === false)
+ck('反向①b：读口里内联复刻那条 SQL 条件 → ①那条红',
+  N1(MODEL, BE, mut('①b', SHARES, SHARES + '\n    Asset.backup_status != "failed"\n'), DELETION, USER_ROUTE) === false)
+ck('反向①c：配额那两处不再调公共判据 → ①那条红',
+  N1(MODEL, mut('①c', BE, BE.replace(/not_failed\(\)/g, 'x')), SHARES, DELETION, USER_ROUTE) === false)
+ck('反向②：B 链那一趟改成 await（起头等收尾）→ ②那条红',
+  N2(mut('②', CREATE, CREATE.replace('const backup = this._backupShots(batch', 'const backup = await this._backupShots(batch'))) === false)
+ck('反向③：那一圈 for 换成 Promise.all → ③那条红',
+  N3(mut('③', CREATE, CREATE.replace('for (let k = 0; k < list.length; k++) {', 'await Promise.all(list.map(async (p) => {'))) === false)
+ck('反向③b：整页没有 Promise.all 但那一圈 for 撤了 → ③那条红',
+  N3(mut('③b', CREATE, CREATE.replace('for (let k = 0; k < list.length; k++) {', 'const __none = 0; if (false) {'))) === false)
+ck('反向④：那道 cloudReady 闸整个撤掉 → ④那条红',
+  N4(mut('④', DETAIL, DETAIL.replace('if (!cloudUpload.cloudReady()) {', 'if (false) {'))) === false)
+// 顺序那一半用合成串量：真文件里"闸挪到请求之后"要用两处编辑才能拼出来，拼错了红的是变异不是判据。
+ck('反向④b：合成串里闸排在请求之后 → ④那条红',
+  N4('async loadImages(id) {\n if (false) { const l = await api.getNoteAssets(id) }\n cloudUpload.cloudReady()\n}') === false)
+ck('      同一条合成串把闸挪回请求之前 → 绿（证明④b 红的是顺序，不是桩子写歪）',
+  N4('async loadImages(id) {\n if (!cloudUpload.cloudReady()) { return }\n const l = await api.getNoteAssets(id)\n}') === true)
 
 /* ---------- 九、队列跑起来（不以正则为准：真把产品那份 require 进来打一遍） ---------- */
 /* 上面八段查的都是"代码长这样"。这一段查"它真那么做"：拿一个会数调用次数的假 api 与一个假

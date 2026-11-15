@@ -11,6 +11,11 @@
 //
 // 上限 50 条，超了丢最旧的：丢掉的那几条是真漏了（对象留在云上占配额，而对象只有客户端删得动），
 // 但比队列无界长下去把 storage 撑爆要好，而且这条路径只在弱网下才会走到。丢了要能看见，所以留日志。
+//
+// 「服务端明确不要了」那一档不能只丢账（11-16 Z49）：笔记删了／地址不是你的／来源不认得这类 4xx
+// 重试一万次也不会成，可那张成品图已经在云上了。原来摘条就完事，留下一批谁都不认得的孤儿；
+// 现在摘条的同时把地址也从 `flush` 的第二个回调交出去删（与 `write.js` 直发那一条同一个口径）。
+// 上面那档"超上限丢最旧的"仍只丢账，那是本机存储撑不住的取舍，本轮没改。
 const KEY = 'pendingNoteCards'
 const MAX_QUEUE = 50
 // 本机存储读写统一走这一枚（M15），见 utils/safeStorage.js 顶上那段。
@@ -74,13 +79,16 @@ function settle(noteId) {
 /**
  * 把队列里能登记的都登记掉。**一条一条摘**：一次网络抖动不该丢掉整批。
  * @param api 传 utils/api 进来（这个模块自己不 require api，免得和 app 启动顺序绕在一起）
- * @param onReplaced 可选：拿到回体里被顶下的 fileID 清单时调一次（`cardCloud` 递给 cloudUpload.deleteFiles）
+ * @param onOrphan 可选：这一趟**该删的** `cloud://` 地址，两种都从这里走（`cardCloud` 递给 cloudUpload.deleteFiles）：
+ *                 ① 回体里被顶成历史的那几张（10-11 审计）；② 被服务端永久拒掉那几条手上的那一张（11-16 Z49）。
  * @returns {Promise<{sent:number, left:number}>}
  */
-async function flush(api, onReplaced) {
+async function flush(api, onOrphan) {
   const list = take()
   if (!list.length) return { sent: 0, left: 0 }
   const done = []
+  const bound = []
+  const rejected = []
   let sent = 0
   for (const entry of list) {
     try {
@@ -88,26 +96,58 @@ async function flush(api, onReplaced) {
       // 这一趟顶成历史的那几张：对象只有客户端删得动。直发那一条（`cardCloud.archive`）早就处理了
       // 这个回体，队列这一条原来没接——被顶掉的那张就永久占着全站配额（10-11 审计）。
       const replaced = (res && res.replaced_file_ids) || []
-      if (replaced.length && typeof onReplaced === 'function') onReplaced(replaced)
+      if (replaced.length && typeof onOrphan === 'function') onOrphan(replaced)
       sent += 1
       done.push(entry)
+      bound.push(entry)
     } catch (e) {
       // 服务端明确拒绝（4xx：笔记已删、地址不属于你、来源不认得）就摘掉——重试一万次也不会成，
       // 留着只会让每次进前台都白打一个请求。api.js 对非 2xx 回的是整个 res，所以这里读 statusCode。
       const code = e && e.statusCode
-      // 429 不算「永久拒绝」：那两个口都挂了限流（`cards.py` 60/分钟、`profiles.py` 30/分钟），
+      // 429 不算「永久拒绝」：这一口自己就挂了限流（`cards.py:156` `POST /api/notes/{id}/card` 60/分钟），
       // 一次进前台几队齐发或连点生成就会撞上。撞上就摘条 = 这笔卡片账被永远丢掉，
       // 留下的正是文件头说的那笔「云上有对象、库里没账」。它只是「现在别打」，下次进前台再试。
       if (code >= 400 && code < 500 && code !== 429) {
         console.warn('卡片补登记被服务端拒绝，这条不再重试', code)
         done.push(entry)
+        rejected.push(entry)
         continue
       }
       console.warn('卡片补登记没成，留在队列里下次再试', e && (e.errMsg || e.message))
     }
   }
   _prune(done)
+  // 摘条不等于这笔账结了：那张成品图已经在云上，不删就是占全站配额又没人认得的孤儿（Z49）。
+  // 现表这次没读到就当"还有人要"——宁可留孤儿下次再删，也不许删掉还活着的那一份（与 assetQueue 同一条）。
+  const still = take()
+  const ids = readFailed ? [] : _orphanIds(rejected, still, bound)
+  if (ids.length && typeof onOrphan === 'function') {
+    console.warn('卡片补登记被永久拒绝，这张云上对象交给删除', ids.length)
+    onOrphan(ids)
+  }
   return { sent, left: take().length }
+}
+
+/** 一条待补登记手上的那一个云上地址。 */
+function _idsOf(entry) {
+  const id = entry && entry.item && entry.item.file_id
+  return id ? [id] : []
+}
+
+/**
+ * 被永久拒掉那几条的地址，扣掉两种"还有人要"的：① 摘完之后现表里还留着的
+ * （`_prune` 那条纪律：几条 await 之间被重新 push 过的那条留着要补登记，它的地址还在账上）；
+ * ② 这一趟真登记成的（一篇只有一张当前，同一个地址并成两条过时那边已进库）。
+ * 与 `assetQueue._orphanIds` 同形，只是这一族一条只有一个地址。
+ */
+function _orphanIds(rejected, stillQueued, bound) {
+  const wanted = new Set()
+  for (const x of stillQueued.concat(bound)) for (const id of _idsOf(x)) wanted.add(id)
+  const out = []
+  for (const x of rejected) {
+    for (const id of _idsOf(x)) if (!wanted.has(id) && out.indexOf(id) < 0) out.push(id)
+  }
+  return out
 }
 
 /**
