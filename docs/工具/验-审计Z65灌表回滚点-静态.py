@@ -6,15 +6,17 @@
 旧形状（改前）：PUT 已改了库，之后 `.json()`、裸 get、`resolve()` 任何一句抛 ⇒ 带 traceback 退场、
 `fails` 一条红都没记、`if fails:` 那一支压根不跑 ⇒ 现网那一栏停在半截。
 
-崩法五档（`FAKE_FAIL`）：`put-badjson` 回体不是 JSON／`state-raise` 后台读回那一发抛／
-`resolve-raise` 第 3 步查表抛／`put-lost` **回体丢了但服务端已提交**／`put-raise` PUT 本身抛。
-最后一档服务端压根没收到，库里本来就是动手前那份 ⇒ 它只能被「走了回滚那句」分辨，别把五档读成
-五档都有同样区分度；真留在半截的那种（`put-lost`）在下面 G 档被单独量一次。
+崩法六档（`FAKE_FAIL`）：`put-badjson` 回体不是 JSON／`state-raise` 后台读回那一发抛／
+`resolve-raise` 第 3 步查表抛／`put-lost` **回体丢了但服务端已提交**／`put-raise` PUT 本身抛／
+`login-raise` 换票那一发抛（PUT 还没发出去 ⇒ 反向：这一档**不许**走回滚）。
+前五档里 `put-raise` 服务端压根没收到，库里本来就是动手前那份 ⇒ 它只能被「走了回滚那句」分辨，
+别把六档读成六档都有同样区分度；真留在半截的那种（`put-lost`）在下面 G 档被单独量一次。
 另两档：`put-500` 服务端整份退回（＝判据红那一路）、`FAKE_ROLLBACK=1` 配 `state-raise`＝回滚自己没成。
 
-反向验证两档：G 把收尾那句 `if attempted and (fails or crashed):` 短路成永不成立，
-H 把 `except BaseException` 换成永不匹配的异常类。两档都要看到「库里停在灌进去那几行」，
-否则这条兜底是假绿。
+反向验证三档：G 把收尾那句 `if attempted and (fails or crashed):` 短路成永不成立，
+H 把 `except BaseException` 换成永不匹配的异常类，I 把 `attempted` 那枚闸撤掉。
+G／H 都要看到「库里停在灌进去那几行」，I 要看到「换票那发抛也凭空发了一发回滚 PUT 且当场 NameError」，
+否则这条兜底与那枚闸都是假绿。
 
 ⚠ 桩里 `BUILTIN` 六行、动手前那份一行——两把行数必须不同，否则「回到动手前」没有区分度；
 ⚠ 工具会往 `/tmp/site-names-table-<时刻>.json` 落备份，本尺子按跑前跑后的差集把这一趟新增的删净。
@@ -85,6 +87,8 @@ def _save(s):
 
 
 def post(url, json=None, timeout=None):
+    if MODE == "login-raise":
+        raise ConnectError("换票那一发抛（PUT 还没发出去）")
     return Resp(200, {"session": "S" * 32})
 
 
@@ -282,7 +286,15 @@ print("  · 口径提醒：「PUT 这一发本身抛」那一档，桩里服务�
       "『库里＝动手前』在那一档没有区分度；分辨它的是『走了回滚那句』。真留在半截的是"
       "「回体丢了但服务端已提交」那一档，它在下面 G 档里被单独量了一次。")
 
-print("\n== 5~6. 回滚自己没成 / 服务端退回 500 ==")
+print("\n== 6. 换票那一发抛 ⇒ PUT 根本没发出去，就不许发回滚那一发 ==")
+rc, store, text = run(SRC, "login-raise")
+ck("换票抛 ⇒ 退 1", rc == 1, f"rc={rc}")
+ck("换票抛 ⇒ 屏上没有「写回去」那句（库里没动过，回滚＝凭空多写一发）", "写回去" not in text, "")
+ck("换票抛 ⇒ 库里＝动手前那份", store["current"] == BEFORE, rows_of(store))
+ck("换票抛 ⇒ 桩里 PUT 0 发（`attempted` 那枚闸就是拦这一档）", store["puts"] == 0,
+   f"{store['puts']} 发")
+
+print("\n== 7~8. 回滚自己没成 / 服务端退回 500 ==")
 rc, store, text = run(SRC, "state-raise", {"FAKE_ROLLBACK": "1"})
 ck("回滚这一发也抛 ⇒ 退 1", rc == 1, f"rc={rc}")
 ck("回滚这一发也抛 ⇒ 屏上大声说「没成／人工拿备份再灌」",
@@ -294,7 +306,7 @@ ck("PUT 回 500（判据红那一路）⇒ 退 1", rc == 1, f"rc={rc}")
 ck("PUT 回 500 ⇒ 库里仍是动手前那份", store["current"] == BEFORE, rows_of(store))
 ck("PUT 回 500 ⇒ 与崩共用同一个还原口（屏上有「写回去」）", "写回去" in text, "")
 
-print("\n== 7~9. 反向：把兜底拆掉，上面的判据必须转红 ==")
+print("\n== 9~11. 反向：把兜底拆掉，上面的判据必须转红 ==")
 g = mutate("G 收尾那句永不成立", "if attempted and (fails or crashed):", "if False:")
 rc, store, text = run(g, "state-raise")
 ck("G：崩了但库里停在灌进去那 6 行（＝旧 BUG 的形状）",
@@ -309,6 +321,13 @@ rc, store, text = run(h, "state-raise")
 ck("H：异常没被接住 ⇒ traceback 退 1（⚠ 退出码不足以分辨，别拿它当判据）",
    rc == 1 and "Traceback" in text, f"rc={rc}")
 ck("H：异常没被接住 ⇒ 库里停在灌进去那 6 行", store["current"] == GREEN, rows_of(store))
+i = mutate("I 撤掉 attempted 那枚闸", "if attempted and (fails or crashed):",
+           "if (fails or crashed):")
+rc, store, text = run(i, "login-raise")
+ck("I：撤闸后换票那一发抛也走回滚那句（＝凭空多发一发 PUT，且 `AU` 还没定义）",
+   "写回去" in text, "")
+ck("I：撤闸后 `AU` 未定义 ⇒ restore 自己崩，NameError 带走",
+   "NameError" in text and rc == 1, f"rc={rc}")
 
 print(f"\n合计 {len(fails)} 红")
 for n in fails:
