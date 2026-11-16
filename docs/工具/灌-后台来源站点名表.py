@@ -15,8 +15,11 @@
 
 ⚠ 这一支**会改现网那张表**，而且「保存就是发布」：下一趟转存就按这张表念，不用发版、不用重启
 （第 1 级每次转存现读库，进程里没有缓存那份表）。
-⚠ 任何一条判据红 ⇒ 立刻把备份那份写回去，并以退出码 1 收场——不留"报了红、库里却已经改了"那种半趟
-（第九轮审计 Y12 那条纪律：写现网的工具必须自带兜底与退出码）。
+⚠ 任何一条判据红、**或第 2/3 步中途抛异常／被打断** ⇒ 立刻把备份那份写回去并以退出码 1 收场——
+   不留"报了红、库里却已经改了"那种半趟（第九轮审计 Y12 那条纪律：写现网的工具必须自带兜底与退出码）。
+   Z65 那一刀补的就是后半句：PUT 在 `== 2.` 第一发就改了现网，之后每一句都可能抛（连接断、
+   回体不是 JSON、`resolve()` 崩），旧写法只在 `if fails:` 里还原 ⇒ 抛异常那一路 traceback 直接带走，
+   一条红都没记，库停在半截还退 0 之外的码。现在从 PUT 那一句起套 try，异常与判据红走同一个还原口。
 """
 import asyncio
 import datetime
@@ -80,6 +83,27 @@ def resolve(url, meta):
     return asyncio.run(site_names.resolve(database.SessionLocal(), url, meta_site_raw=meta))
 
 
+def restore(why):
+    """把动手前读到的那一行写回去，并回读核对；核对不上或回滚没成要大声说。"""
+    print(f"  ! {why} ⇒ 把备份那份写回去（这一栏退回灌之前的样子）")
+    try:
+        rb = httpx.put(TABLE_PUT, json={"value": before or None}, headers=AU, timeout=30)
+        code = rb.status_code
+    except Exception as exc:
+        code = f"抛 {type(exc).__name__}"
+    try:
+        now = stored()
+    except Exception as exc:
+        now = f"读不到（{type(exc).__name__}）"
+    n0 = len(before) if isinstance(before, list) else 0
+    n1 = len(now) if isinstance(now, list) else 0
+    print(f"  · 回滚 PUT {code}｜库里现在 {n1} 行（动手前 {n0} 行）")
+    if code != 200:
+        print(f"  !! 回滚这一发没成 ⇒ 现网那一栏停在半截，只能人工拿 {bak} 再灌一次")
+    elif now != (before if isinstance(before, list) else None):
+        print(f"  !! 回滚回了 200 但读回来的不是动手前那份（现在 {now!r}）⇒ 人工核 {bak}")
+
+
 print("== 0. 底数（只读） ==")
 env = {}
 with open(".env", encoding="utf-8") as f:
@@ -121,41 +145,49 @@ ck("同一家在这张表里只占一行（域名不重复）",
 for r in rows:
     print(f"  · {r['domain']:<20} {r['zh']:<12} {r['en']}")
 
-print("\n== 2. 整份灌进去，并从后台那一个口读回 ==")
-login = httpx.post(f"{BASE}/api/admin/login", json={"token": ADMIN}, timeout=30).json()
-AU = {"Authorization": "Bearer " + (login.get("session") or "")}
-ck("拿口令换到 session 票（值不进输出）", len(login.get("session") or "") > 20,
-   f"{len(login.get('session') or '')} 位")
-put = httpx.put(TABLE_PUT, json={"value": rows}, headers=AU, timeout=30)
-ck("PUT 回 200（不合格会整份退回成 400，不收半张表）", put.status_code == 200,
-   f"HTTP {put.status_code} {put.text[:120] if put.status_code != 200 else ''}")
-after = put.json().get("current") if put.status_code == 200 else None
-ck("回体里就是刚灌进去的那几行（逐字段）", after == rows,
-   f"{len(after) if isinstance(after, list) else after} 行")
-st = httpx.get(STATE, headers=AU, timeout=30).json()
-tab = next((t for t in st.get("tables", []) if t.get("kind") == KIND), None)
-ck("后台那一页读回的那一个口也念这几行（屏上画得出＝这一栏不是空着）",
-   isinstance(tab, dict) and tab.get("current") == rows,
-   f"{len(tab['current']) if isinstance(tab, dict) else '读不到'} 行")
-ck("库里那一行与回体一字不差（不是接口自己拼的）", stored() == rows)
 
-print("\n== 3. 第 1 级在现网真赢（含盖住页面自报那几族） ==")
-for url, meta, want in PROOF:
-    got = resolve(url, meta)
-    zh = (got or {}).get("zh") or ""
-    via = (got or {}).get("via") or ""
-    if want:
-        ck(f"{url[:44]}… → 「{want}」且来自这张表", zh == want and via == "table",
-           f"实读 zh={zh!r} via={via!r}（页面自报喂的是 {meta!r}）")
-    else:
-        ck(f"{url[:44]}… 这张表里没有 ⇒ 不许硬认成表里任何一家",
-           via != "table", f"实读 zh={zh!r} via={via!r}")
+attempted = False
+crashed = None
+try:
+    print("\n== 2. 整份灌进去，并从后台那一个口读回 ==")
+    login = httpx.post(f"{BASE}/api/admin/login", json={"token": ADMIN}, timeout=30).json()
+    AU = {"Authorization": "Bearer " + (login.get("session") or "")}
+    ck("拿口令换到 session 票（值不进输出）", len(login.get("session") or "") > 20,
+       f"{len(login.get('session') or '')} 位")
+    attempted = True
+    put = httpx.put(TABLE_PUT, json={"value": rows}, headers=AU, timeout=30)
+    ck("PUT 回 200（不合格会整份退回成 400，不收半张表）", put.status_code == 200,
+       f"HTTP {put.status_code} {put.text[:120] if put.status_code != 200 else ''}")
+    after = put.json().get("current") if put.status_code == 200 else None
+    ck("回体里就是刚灌进去的那几行（逐字段）", after == rows,
+       f"{len(after) if isinstance(after, list) else after} 行")
+    st = httpx.get(STATE, headers=AU, timeout=30).json()
+    tab = next((t for t in st.get("tables", []) if t.get("kind") == KIND), None)
+    ck("后台那一页读回的那一个口也念这几行（屏上画得出＝这一栏不是空着）",
+       isinstance(tab, dict) and tab.get("current") == rows,
+       f"{len(tab['current']) if isinstance(tab, dict) else '读不到'} 行")
+    ck("库里那一行与回体一字不差（不是接口自己拼的）", stored() == rows)
+
+    print("\n== 3. 第 1 级在现网真赢（含盖住页面自报那几族） ==")
+    for url, meta, want in PROOF:
+        got = resolve(url, meta)
+        zh = (got or {}).get("zh") or ""
+        via = (got or {}).get("via") or ""
+        if want:
+            ck(f"{url[:44]}… → 「{want}」且来自这张表", zh == want and via == "table",
+               f"实读 zh={zh!r} via={via!r}（页面自报喂的是 {meta!r}）")
+        else:
+            ck(f"{url[:44]}… 这张表里没有 ⇒ 不许硬认成表里任何一家",
+               via != "table", f"实读 zh={zh!r} via={via!r}")
+except BaseException as exc:  # 含 Ctrl-C：PUT 已发出去之后中断同样不许把库留在半截
+    crashed = exc
+    print(f"\n!! 第 2/3 步中途抛异常：{type(exc).__name__}: {exc}")
 
 print("\n== 4. 收尾 ==")
-if fails:
-    print("  ! 有红 ⇒ 把备份那份写回去（这一栏退回灌之前的样子）")
-    rb = httpx.put(TABLE_PUT, json={"value": before or None}, headers=AU, timeout=30)
-    print(f"  · 回滚 PUT HTTP {rb.status_code}｜库里现在 "
-          f"{len(stored()) if isinstance(stored(), list) else 0} 行")
+if attempted and (fails or crashed):
+    restore("中途抛异常" if crashed else "判据有红")
+if crashed:
+    print(f"\n结果：中途崩 ⇒ 1 红｜备份在 {bak}")
+    sys.exit(1)
 print(f"\n结果：{len(fails)} 红｜备份在 {bak}")
 sys.exit(1 if fails else 0)
