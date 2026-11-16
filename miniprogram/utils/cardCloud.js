@@ -111,6 +111,16 @@ function flush() {
 async function backfillLocal() {
   if (!cloudUpload.cloudReady()) return { sent: 0, total: 0 }
   const pending = cardLog.pendingBackfill()
+  if (!pending.length) return { sent: 0, total: 0 }
+  // 下面那句 `serverCard(noteId)` 读的是内存里这一份，而"云上没那一行"这句话只有名单真读回来过
+  // 才成立（`isLoaded` 顶上那句同口径）。调用点 `app.js` 的 onShow 不等在列表页那一趟：冷开时
+  // 这一份内存是空的，本机每一张没登记成的都会被当成"云上缺"重送一趟，而服务端「一篇一张」
+  // 让后到的赢 ⇒ 另一台设备刚出的那一张被这台手机上那份旧缓存顶成历史（Z69）。
+  // 名单读不回来就整趟不送：这些条本来就还挂在台账里，下次进前台再补。
+  if (!isLoaded()) {
+    await refresh()
+    if (!isLoaded()) return { sent: 0, total: pending.length, deferred: true }
+  }
   let sent = 0
   for (const it of pending) {
     if (serverCard(it.noteId)) { cardLog.markUploaded(it.noteId, it.entry.p); continue }
