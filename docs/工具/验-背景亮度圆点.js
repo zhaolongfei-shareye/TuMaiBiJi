@@ -3,6 +3,9 @@
 // 为什么先要一把静态的：这一档的数散在 palette / app.wxss / 三个页面里，
 // 任何一处抄第二份（把 opacity 写死进 wxss、把那道投影一份一份各写各的）当下都看不出问题，
 // 等下次调色时才有一条跟着、两条不跟。
+// ⚠ 这一把里"不许出现 X"那一型判据一共十几条，正向全绿也可能带着一句已经死掉的空话
+//   （11-16 就抓到一条哑了 32 天的，见 ⑤ 那段注释）⇒ 它们都登记进 NEG，末尾 ⑦ 逐条塞回被禁的那一样，
+//   塞回去不红＝没牙，计数并进退出码。新增否定式判据请走 neg()，别再手写 ck + 一个取反正则。
 const fs = require('fs')
 const path = require('path')
 const p = require('../../miniprogram/utils/palette.js')
@@ -18,6 +21,18 @@ const ROOT = path.resolve(__dirname, '../..')
 const P = (rel) => path.join(ROOT, 'miniprogram', rel)
 const read = (rel) => fs.readFileSync(P(rel), 'utf8')
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '')
+/* 否定式判据（「不许出现 X／一次都不读 X／X 撤干净了」）统一走 neg()：
+   除正向那一句之外，再登记一份"把 X 塞回原字节"的变异，收尾时逐条复跑——塞回去必须红。
+   这一族判据的失效方式最贵：锚点跟着改名漂走之后，正则扫不到被禁的东西，
+   判据就成了一句永远绿的空话，正向那几十条读数一条都不会露馅
+   （正本 §33 第三种哑法；本仓 2026-10-25 `fe7f225` 把 getStorageSync 换成 storage.read 后哑了 22 天）。
+   所以 neg() 把正例与反向**绑成同一份谓词**：改口只改一处，不会改到一半。 */
+const NEG = []
+function neg(name, inputs, check, mutate) {
+  const args = inputs()
+  ck(name, check(...args))
+  NEG.push({ name, check, mutate, args })
+}
 
 // ---------- ① 三档只在 palette 活一份 ----------
 const D = p.BG_DIMS
@@ -77,11 +92,16 @@ ck('app 上有 bgSkin()（进页读当前档）和 cycleBgDim()（点一下换�
    或 10-25 之后的 `storage.read`，两样都算），这一刀就只是换了个函数名，首页点完那四屏照样跟着变。
    ⚠ 锚钉**键名**不钉取法：`fe7f225`（第八轮 M15）把这一族的取值口换过一支，原先那句
    `!/getStorageSync/` 当场变成一句空话（怎么写都绿），钉键名才跟着行为走。 */
-ck('bgSkinLocked() 只吃 DIM_PLAIN，一次都不读本机那个键（读了就还是"跟随"）',
-  (() => {
-    const b = /bgSkinLocked\(\)\s*\{[\s\S]*?\n  \}/.exec(app)
+neg('bgSkinLocked() 只吃 DIM_PLAIN，一次都不读本机那个键（读了就还是"跟随"）',
+  () => [app],
+  (src) => {
+    const b = /bgSkinLocked\(\)\s*\{[\s\S]*?\n  \}/.exec(src)
     return !!b && /DIM_PLAIN\.v/.test(b[0]) && !/BG_DIM_KEY/.test(b[0])
-  })())
+  },
+  // 塞回去＝把这一道口改回"读本机那一档"（正是 fe7f225 之前那个形状）：判据必须翻红。
+  // 锚吃的是**键名**不是取法，所以旧拼写／新拼写两种塞法都拦得住。
+  (src) => [src.replace('    const v = DIM_PLAIN.v',
+    '    const v = dimAt(storage.read(BG_DIM_KEY)).v')])
 ck('只存本机，键名是 bgDim', /const BG_DIM_KEY = 'bgDim'/.test(app))
 ck('cycleBgDim 先算下一档、再落盘、最后才发样式（顺序反了会把旧档写回去）',
   (() => {
@@ -113,23 +133,39 @@ for (const [rel, cls] of Object.entries(pages)) {
        被自家注释打红两条（同一族坑本文件上面记过一次："拿原文正则扫，把自家注释判成残留"）。 */
   const codeOf = (s) => s.replace(/^\s*\/\/.*$/gm, '')
   const CREATE_REL = 'pages/create/create'
-  ck(`${name} 进页只从 app.${rel === CREATE_REL ? 'bgSkin()' : 'bgSkinLocked()'} 取档（不各拼一份）`,
-    rel === CREATE_REL
-      ? /app\.bgSkin\(\)/.test(codeOf(js))
-      : /app\.bgSkinLocked\(\)/.test(codeOf(js)) && !/app\.bgSkin\(\)/.test(codeOf(js)))
+  if (rel === CREATE_REL) {
+    ck(`${name} 进页只从 app.bgSkin() 取档（不各拼一份）`, /app\.bgSkin\(\)/.test(codeOf(js)))
+  } else {
+    // 反面那半句「不许出现 app.bgSkin()」也走 neg()：塞回那一发必须红。
+    neg(`${name} 进页只从 app.bgSkinLocked() 取档（不各拼一份）`, () => [js],
+      (src) => {
+        const c = codeOf(src)
+        return /app\.bgSkinLocked\(\)/.test(c) && !/app\.bgSkin\(\)/.test(c)
+      },
+      (src) => [src.replace(/\.\.\.app\.bgSkinLocked\(\),/, '...app.bgSkin(),')])
+  }
   ck(`${name} 初值与那一道口同一个数（create 中档 .5／另两页最亮那一档＝原图，第一帧不闪）`,
     new RegExp(`dimV: ${rel === CREATE_REL ? 1 : 0},`).test(js))
   ck(`${name} 那层罩子吃 dimScrim（拧它自己的透明度）`,
     new RegExp(`class="${cls}" style="\\{\\{dimScrim\\}\\}"`).test(wxml))
-  ck(`${name} 不再另叠第二层黑（上一版那种 .page-dim / .head-dim 撤干净了）`,
-    !/page-dim|head-dim|dimVeil/.test(wxml + wxss + js))
+  neg(`${name} 不再另叠第二层黑（上一版那种 .page-dim / .head-dim 撤干净了）`,
+    () => [wxml + wxss + js],
+    (all) => !/page-dim|head-dim|dimVeil/.test(all),
+    (all) => [all.replace(`class="${cls}"`, `class="${cls} page-dim"`)])
   // 站长 10-02 夜里否掉了"字自己带一道淡投影"那版：这三页压在照片上的字不许再挂任何阴影。
-  ck(`${name} 压在照片上的字没有投影（那道 --photo-shadow 撤干净了）`,
-    !/text-shadow|--photo-shadow|filter:\s*drop-shadow/.test(wxss))
+  // 变异用"往文件尾追加一条带投影的规则"：判据扫的是整只文件，追加与插进某条规则对这一条等价，
+  // 且不依赖任何一条规则的名字还活着。
+  neg(`${name} 压在照片上的字没有投影（那道 --photo-shadow 撤干净了）`,
+    () => [wxss],
+    (s) => !/text-shadow|--photo-shadow|filter:\s*drop-shadow/.test(s),
+    (s) => [`${s}\n.self-check-mutant { text-shadow: 0 0 2rpx rgba(0, 0, 0, .4); }\n`])
 }
-ck('--photo-shadow 这个令牌整个撤掉了（全仓一处都不许剩）',
-  !/--photo-shadow/.test(['app.wxss', 'pages/create/create.wxss', 'pages/index/index.wxss',
-    'pages/me/me.wxss'].map((f) => read(f)).join('')))
+const SHADOWED = ['app.wxss', 'pages/create/create.wxss', 'pages/index/index.wxss',
+  'pages/me/me.wxss']
+neg('--photo-shadow 这个令牌整个撤掉了（全仓一处都不许剩）',
+  () => [SHADOWED.map((f) => read(f)).join('\n')],
+  (all) => !/--photo-shadow/.test(all),
+  (all) => [all.replace('.page-scrim', '.self-check-mutant { --photo-shadow: 0 0 2rpx rgba(0, 0, 0, .4); }\n.page-scrim')])
 
 // ---------- ④ 现网那层罩子的七个停点一个字没动（弯月档＝改版前的样子） ----------
 //（10-10 我一度照效果图 c5 把新建页这层翻成提亮罩，站长说没下过这条需求，已撤回；
@@ -137,7 +173,12 @@ ck('--photo-shadow 这个令牌整个撤掉了（全仓一处都不许剩）',
 const scrim = /\.page-scrim\s*\{[\s\S]*?background:\s*linear-gradient\(([^;]*)\);/.exec(strip(read('pages/create/create.wxss')))
 ck('新建页罩子仍是那七个停点', !!scrim && (scrim[1].match(/rgba\(18, 20, 26/g) || []).length === 7,
   scrim ? `${(scrim[1].match(/rgba\(18, 20, 26/g) || []).length} 个停点` : '没找到那条规则')
-ck('罩子那条规则里没有 opacity（透明度只从 style 递进来）', !!scrim && !/opacity/.test(scrim[0]))
+// ⚠ 反向那一份必须先证"锚还在"：锚读不到（rule 空串）时判据本身就红，
+//   不会像旧那条 `.dim-dot` 一样在界面撤掉之后变成一句永远绿的空话。
+neg('罩子那条规则里没有 opacity（透明度只从 style 递进来）',
+  () => [scrim ? scrim[0] : ''],
+  (rule) => rule !== '' && !/opacity/.test(rule),
+  (rule) => [rule.replace('{', '{ opacity: 0.5;')])
 
 // ---------- ⑤ 那一行两截的文案与热区 ----------
 const labels = [...read('utils/i18n.js').matchAll(/bgDimLabel:\s*'([^']+)'/g)].map((m) => m[1])
@@ -161,8 +202,31 @@ ck('那一行三枚各带一枚身份类（`.swap-dim`／`.swap-wallpaper`／`.s
     .every((c) => (cw.match(new RegExp(`class="swap-half ${c}"`, 'g')) || []).length === 1),
   ['swap-dim', 'swap-wallpaper', 'swap-mood']
     .filter((c) => (cw.match(new RegExp(`class="swap-half ${c}"`, 'g')) || []).length !== 1).join('、'))
-ck('点的颜色从 style 递进来，wxss 里不写死 background，也没有 mask / 投影残留',
-  !/\.dim-dot\s*\{[^}]*(background|mask-image|filter)/.test(strip(read('pages/create/create.wxss')).replace(/\s+/g, ' ')))
+/* ⚠ 这一条原先钉的是 `.dim-dot` 那条规则（「点的颜色从 style 递进来，wxss 里不写死 background」）。
+   11-16 现读：`dim-dot` 全仓 **0 命中**——它随 `e796603`（10-15 05:36，站长「调亮度的icon 改为太阳icon」
+   那一刀）整族删掉了，而这条锚什么也没扫到 ⇒ 判据**恒真、哑了约 32 天**。这是正本 §33 第三种哑法
+   在本仓最老的一例，比 `fe7f225`（改名那次）还隐蔽：**不是改名，是被判的那枚界面整个撤了**，
+   正向那几十条一条不会露馅。所以下面三条都先钉"现行那枚还在"，再钉"不许写成什么样"。
+   ⚠ `dimDot`（palette 算出来那一格）三页还在算、屏上已无处可画——create.wxss 里那段
+     「要一并清干净是另一件事，等他点头」⇒ 本尺子不动它，也不替它编一条判据。 */
+const CWX = strip(read('pages/create/create.wxss'))
+const SUN = /\.glyph-sun\s*\{[^}]*\}/.exec(CWX)
+const GLYPH = /\.swap-glyph\s*\{[^}]*\}/.exec(CWX)
+ck('「调亮度」那一枚画的还是太阳（`.glyph-sun` 规则在、只含 mask；wxml 里一枚）',
+  !!SUN && /mask-image/.test(SUN[0]) && (cw.match(/class="swap-glyph glyph-sun"/g) || []).length === 1,
+  SUN ? `规则 ${SUN[0].length} 字符／wxml ${(cw.match(/class="swap-glyph glyph-sun"/g) || []).length} 枚`
+    : '没找到 .glyph-sun 规则')
+neg('太阳那一格只给 mask（background／filter 不许写在 `.glyph-sun` 里，色与尺寸从 `.swap-glyph` 那一枚来）',
+  () => [SUN ? SUN[0] : ''],
+  (s) => s !== '' && !/background|filter\s*:/.test(s),
+  (s) => [s.replace('{', '{ background: rgba(20, 22, 26, 0.7);')])
+neg('那一枚不许退回到灰度圆点（`.dim-dot` 全仓一处都不许再出现）',
+  () => [CWX + cw],
+  (s) => !/dim-dot/.test(s),
+  (s) => [s.replace('class="swap-glyph glyph-sun"', 'class="dim-dot"')])
+ck('那一枚的色与尺寸同一份出处（`.swap-glyph` 里 background／宽高各只写一次，三枚共用一类）',
+  !!GLYPH && (GLYPH[0].match(/background\s*:/g) || []).length === 1
+    && (GLYPH[0].match(/width\s*:/g) || []).length === 1)
 
 // ---------- ⑥ 2.1 换口径：亮度档升成账号级（换手机后还是自己那一档），字体档仍留本机 ----------
 // 这一节 10-08 之前钉的是"亮度档只走本机、不许变成第二条上传链路"。站长把跨端定成
@@ -171,12 +235,39 @@ ck('点的颜色从 style 递进来，wxss 里不写死 background，也没有 m
 // 上云只准走 profileCloud 那一个出处，页面里再出现第二处 PUT 就是红。
 const whole = ['app.js', 'utils/poster.js', 'utils/api.js'].map((f) => strip(read(f))).join('\n')
 const PC = strip(read('utils/profileCloud.js'))
-ck('亮度档上云只有 profileCloud.pushDim 那一个出处（app/poster/api 里不许出现第二处 bg_dim）',
-  !/bg_dim/.test(whole) && /function pushDim\(v\) \{ return push\(\{ bg_dim: v \}\) \}/.test(PC))
+neg('亮度档上云只有 profileCloud.pushDim 那一个出处（app/poster/api 里不许出现第二处 bg_dim）',
+  () => [whole, PC],
+  (w, pc) => !/bg_dim/.test(w) && /function pushDim\(v\) \{ return push\(\{ bg_dim: v \}\) \}/.test(pc),
+  (w, pc) => [`${w}\nfunction leakDim(v) { return request('/v1/profile', 'PUT', { bg_dim: v }) }\n`, pc])
 ck('那一档仍然先落本机存储再登记（读的一路没换成网络，界面不许为它多等一趟）',
   /wx\.setStorageSync\(BG_DIM_KEY, v\)/.test(strip(read('app.js'))) && /profileCloud\.pushDim\(v\)/.test(strip(read('app.js'))))
-ck('界面字体档**没有**跟着上云（安卓命不中那三档，跟着账号跑只会让人看到"没生效"）',
-  !/ui_font/.test(whole + PC) && !/pushFont/.test(whole + PC))
+neg('界面字体档**没有**跟着上云（安卓命不中那三档，跟着账号跑只会让人看到"没生效"）',
+  () => [whole + PC],
+  (x) => !/ui_font/.test(x) && !/pushFont/.test(x),
+  (x) => [`${x}\nfunction pushFont(f) { return push({ ui_font: f }) }\n`])
 
-console.log(`\n${bad.length ? '✗ ' + bad.length + ' 条不过：' + bad.join('、') : `背景亮度圆点 静态：${n} 条全过`}`)
-process.exit(bad.length ? 1 : 0)
+// ---------- ⑦ 常驻反向：把每句"不许"里被禁的那一样塞回原字节，判据必须翻红 ----------
+/* 这一段是本文件唯一能证明"上面那些否定式判据还有效"的读数——正向 40 多条全绿
+   也可以带着一条死判据（正本 §33：正向合计那一行不是耳朵）。
+   两种没牙分开念：变异后字节没变＝锚点已经漂走（正是 `.dim-dot` 那次的形状）；
+   字节变了而判据仍绿＝被禁的那一样落不进去／判据写得太松。 */
+let toothless = 0
+console.log(`\n反向 ${NEG.length} 发（每发＝把被禁的那一样塞回去，判据必须翻红）：`)
+for (const t of NEG) {
+  const mArgs = t.mutate(...t.args)
+  const noCut = JSON.stringify(mArgs) === JSON.stringify(t.args)
+  let flipped = false
+  if (!noCut) {
+    try { flipped = t.check(...mArgs) === false } catch (e) { flipped = false }
+  }
+  if (flipped) console.log(`  ✓ ${t.name}`)
+  else {
+    toothless++
+    console.log(`  ✗ ${t.name}　→ ★刀没切进去` +
+      (noCut ? '（塞回去字节没变＝被禁的那一样已经摆在盘上，或那句"不许"的锚点已漂走）' : '（塞回去仍判绿）'))
+  }
+}
+console.log(`反向 ${NEG.length - toothless}/${NEG.length} 有牙`)
+
+console.log(`\n${bad.length ? '✗ ' + bad.length + ' 条不过：' + bad.join('、') : `背景亮度圆点 静态：${n} 条全过`}${toothless ? `　✗ ${toothless} 发反向没牙` : ''}`)
+process.exit(bad.length === 0 && toothless === 0 ? 0 : 1)
