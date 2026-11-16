@@ -185,8 +185,13 @@ async function main() {
       stage === 18, `${stage} 发`)
     ck('A4 换票只一趟（Z68 这一头同样成立：九条 401 共用一枚在飞的登录）',
       guest === 1, `${guest} 发 /v1/auth/guest`)
+    const perKey = {}
+    w.calls.forEach((c) => { perKey[c.key] = (perKey[c.key] || 0) + 1 })
     ck('A5 熔断没跳（没有任何路径打到 ' + CIRCUIT + ' 次以上）',
-      w.calls.every((c) => c.n <= CIRCUIT), w.calls.map((c) => `${c.key}#${c.n}`).slice(0, 3).join(' '))
+      w.calls.every((c) => c.n <= CIRCUIT),
+      // 读数打的是**每一口共几发**，不是"第几发"：熔断跳了要一眼看出是哪一口打爆的
+      //（`--rev2` 撤掉重试上限时，stage 那口从 18 发涨到 39 发）。
+      Object.keys(perKey).map((k) => `${k}＝${perKey[k]} 发`).join('，') || '(零发)')
   }
   {
     // 反向证据必须先有正向读数：2xx 那一路真的能把回体交回来
