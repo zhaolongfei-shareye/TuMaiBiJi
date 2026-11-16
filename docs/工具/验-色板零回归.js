@@ -396,11 +396,10 @@ ck('在用那一枚只画勾，勾和框不吃当前主题的变量',
 //    四个直角就会戳到选中框的圆弧外面（站长 09-26 真机截图里那条）。
 //    这条没法在模拟器里自证（两种圆角看着一样），所以钉的是"落笔前确实裁过"这个动作。
 const shareJs = readSrc('pages/share/share.js')
-const profJs = readSrc('pages/profile/profile.js')
 ck('poster 把 clipRounded 交出来了', /clipRounded,/.test(readSrc('utils/poster.js')))
 // 必须按"那一个画小样的函数"来比先后：分享页里 paintLayers 出现两次（大的预览也用它），
 // 全文找第一个会把顺序比反。
-for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker'], ['卡片模板那十格', profJs, 'renderThumbs']]) {
+for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker']]) {
   const b = fnBody(src, fn)
   const at = b ? b.indexOf('clipRounded') : -1
   const paint = b ? b.indexOf('paintLayers') : -1
@@ -408,21 +407,25 @@ for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker'], ['
     b ? `clip@${at} paint@${paint}` : `没抓到 ${fn} 函数体`)
 }
 
-// ⑲ 小样那一排的三件事，都是 09-26 代码审查里翻出来的：
-//    一、每格的真实高度必须在落笔之前交给视图层。骨架里那是个 4:3 的占位数，
-//        等整轮画完再一次性 setData，画的过程中这一格就被压在占位框里竖着挤——
-//        圆角是画进位图的（⑱），显示框一歪，圆角看着就是椭圆，正合站长圈的那类毛病。
-//    二、落笔前必须再对一次轮次号。解码头像慢到四秒，只在循环头对，
-//        旧那一遍可能后落笔，把新那一遍盖掉。
-//    三、画布底色要透明、选中态不许改 border-width。前者留着灰底就是在四个角外
-//        垫直角灰斑；后者一改，格子里定宽的画布整块挪 1rpx，一排跟着抖。
+// ⑨ 小样那一排的三件事，都是 09-26 代码审查里翻出来的：
+//    一、每格的真实高度要在落笔过程中就交给视图层（不能让这一格一直压在骨架的 4:3 占位里）；
+//    二、落笔前必须再对一次轮次号，且对完到落笔之间不能再 await（一让出主线程，
+//        旧那一遍就可能后落笔，把新那一遍盖掉）；
+//    三、画布底色透明，四角外不许垫直角灰斑。
+//    ⚠ 11-08 卡片市场改版把 profile 那一屏的"十格"整块换掉了：renderThumbs／_renderGen／
+//    .cell-canvas 三个旧锚随旧货架一起撤（全仓 grep 均 0 命中；那批字节本身还没入库，
+//    现行形状以工作树为准），新画法是首页与「我的」同吃一份 utils/marketThumbs.js——
+//    屏外一枚画布逐套落笔出 PNG，fixed 窗里只放 <image>（画布是原生层，进 fixed 容器
+//    真机合成会出错，仓里 1.8.0 那轮踩过两次）。四条判据按新架构重新落锚，
+//    其中"高度"那条的旧口径（落笔前先交高度）在新架构不成立也不需要——显示框里是
+//    <image>，h 与 img 在同一枚 setData 里落地，占位高度压不住已经画好的图，改钉"同帧"。
 const shareCss = fs.readFileSync(path.join(pageDir, 'pages/share/share.wxss'), 'utf8')
 const profCss = fs.readFileSync(path.join(pageDir, 'pages/profile/profile.wxss'), 'utf8')
 const cssRule = (src, sel) => {
   const m = new RegExp(`\\n\\.${sel}\\s*\\{([^}]*)\\}`).exec(src)
   return m ? m[1] : null
 }
-for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker'], ['卡片模板那十格', profJs, 'renderThumbs']]) {
+for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker']]) {
   const b = fnBody(src, fn)
   // 逐格改高度写的是 `...].h`]:` 这种路径 key，找得到它才谈得上先后
   const hSet = b ? b.indexOf('].h`]') : -1
@@ -430,15 +433,42 @@ for (const [nm, src, fn] of [['分享页那一排', shareJs, 'renderPicker'], ['
   ck(`${nm}：落笔前就把这一格的真实高度交给视图层`, hSet >= 0 && paint >= 0 && hSet < paint,
     b ? `逐格高度@${hSet} 落笔@${paint}` : `没抓到 ${fn} 函数体`)
 }
+/* marketThumbs.paint 不吃 fnBody：那把正则按第一个两空格缩进的 `}` 收尾，
+   而 paint 体内整批命中那个 if 的闭合恰好就是两空格缩进，函数体会被截在半路。
+   改用"函数头 → module.exports"整段截。 */
+const mtPaint = (src) => {
+  const at = src.indexOf('async function paint(')
+  const end = at >= 0 ? src.indexOf('module.exports', at) : -1
+  return at >= 0 && end > at ? src.slice(at, end) : null
+}
+const mtJs = readSrc('utils/marketThumbs.js')
 {
-  const b = fnBody(profJs, 'renderThumbs')
+  const b = mtPaint(mtJs)
+  const clip = b ? b.indexOf('clipRounded') : -1
   const paint = b ? b.indexOf('paintLayers') : -1
-  const at = b && paint >= 0 ? b.slice(0, paint).lastIndexOf('_renderGen !== gen') : -1
+  ck('卡片市场那一层：先裁圆角再落笔', !!b && clip >= 0 && paint >= 0 && clip < paint,
+    b ? `clip@${clip} paint@${paint}` : '没抓到 marketThumbs.paint 函数体')
+  const at = b && paint >= 0 ? b.slice(0, paint).lastIndexOf('_mktGen !== gen') : -1
   // 光"对过两次号"不够，要紧的是最后一次对号到落笔之间不能再有 await：
   // 一 await 就让出主线程，旧那一遍完全可能在这缝里被新那一遍插队。
   const gap = at >= 0 ? b.slice(at, paint) : ''
-  ck('卡片模板那十格：落笔前对号，且对完到落笔之间不让出主线程',
-    at >= 0 && !/await /.test(gap), b ? `最后一次对号@${at}，落笔@${paint}，中间${/await /.test(gap) ? '有 await' : '没有 await'}` : '没抓到 renderThumbs 函数体')
+  ck('卡片市场那一层：落笔前对号，且对完到落笔之间不让出主线程',
+    at >= 0 && !/await /.test(gap), b ? `最后一次对号@${at}，落笔@${paint}，中间${/await /.test(gap) ? '有 await' : '没有 await'}` : '没抓到 paint 函数体')
+  // h 与 img 同一枚 setData：显示框里那张 <image> 带着自己的真实高度落地，
+  // 不存在"先占位、后换图"的缝；哪一枚 setData 落了 img 没落 h，就是破了这个形状。
+  // 骨架的占位 h 与"画坏退默认"那枚只落 h 的 setData 都算合法形状，不拦。
+  const setBodies = b ? [...b.matchAll(/page\.setData\(\{([\s\S]*?)\}\)/g)].map((m) => m[1]) : []
+  const pair = setBodies.filter((s) => s.includes('].h`]') && s.includes('].img`]'))
+  const orphan = setBodies.filter((s) => s.includes('].img`]') && !s.includes('].h`]'))
+  ck('卡片市场那一层：每一格 h 与 img 同一枚 setData 交出去（逐格路径 key，不等整批）',
+    pair.length > 0 && orphan.length === 0,
+    `含 h+img 的 setData ${pair.length} 枚，img 单飞 ${orphan.length} 枚`)
+  // 四角灰斑的老坑换了个落点：显示层从画布元素换成 PNG，CSS background 不进位图，
+  // 垫底色只剩"clipRounded 之前往画布上 fill"这一条路，钉死它。
+  const preClip = clip >= 0 ? b.slice(0, clip) : ''
+  ck('卡片市场那一层：裁圆角之前不往画布上垫底色（fill）',
+    !!b && clip >= 0 && !/fillRect|fillStyle/.test(preClip),
+    b ? `clip@${clip}，之前 fill=${/fillRect|fillStyle/.test(preClip)}` : '没抓到 paint 函数体')
 }
 /* 原来这个循环里有两格：分享页那一排＋「卡片模板那十格」。10-30 站长一句「卡片市场，取消选择的
    黑边和黑点，这里只是浏览功能，不需要选择」⇒ profile 那一屏的选中态整块没了
@@ -456,9 +486,24 @@ for (const [nm, css, canvasSel, onSel] of [['分享页那一排', shareCss, 'pic
     on ? on.trim().replace(/\s+/g, ' ') : `没读到 .${onSel}`)
 }
 {
-  const rule = cssRule(profCss, 'cell-canvas')
-  ck('卡片模板那十格的画布底色透明（不留直角灰斑）', !!rule && /background:\s*transparent/.test(rule),
-    rule ? rule.trim().replace(/\s+/g, ' ') : '没读到 .cell-canvas')
+  // "画布底色透明"的落点也跟着换：显示层从画布元素换成 PNG（窗里只放 image），
+  // CSS background 不进位图——四角灰斑的老坑钉在"clipRounded 之前不许 fill"那条上（⑨）。
+  // 这里改钉的是画布离屏那条真机不变量：原生画布套进 fixed 窗＝iPhone 空白格子
+  // （index.wxml 与 share.wxss 的注释里各记过一次），所以 #mktCanvas 只许在窗外、窗里只放 image。
+  const pageSrc = (rel) => fs.readFileSync(path.join(pageDir, rel), 'utf8')
+  const offRule = cssRule(pageSrc('app.wxss'), 'mkt-offscreen')
+  ck('卡片市场画布挂在屏外（.mkt-offscreen 在 app.wxss 且离屏定位）',
+    !!offRule && /position:\s*absolute/.test(offRule),
+    offRule ? offRule.trim().replace(/\s+/g, ' ') : '没读到 .mkt-offscreen')
+  for (const [nm, rel] of [['首页', 'pages/index/index.wxml'], ['我的', 'pages/profile/profile.wxml']]) {
+    const w = pageSrc(rel).replace(/<!--[\s\S]*?-->/g, '')
+    const canvas = w.indexOf('<canvas id="mktCanvas"')
+    const sheet = w.indexOf('class="mkt-sheet"')
+    const after = sheet >= 0 ? w.slice(sheet) : ''
+    ck(`${nm}卡片市场：#mktCanvas 在窗（.mkt-sheet）外面，窗里只放 image`,
+      canvas >= 0 && sheet >= 0 && canvas < sheet && !after.includes('<canvas'),
+      `canvas@${canvas} sheet@${sheet}，窗后还有 canvas=${after.includes('<canvas')}`)
+  }
   // 这一屏不再有选中态是**拍过的口径**，不是漏做的皮：留一条反向钉，谁要再加回外环/圆点，
   // 得先把站长这句撤了才能过尺子。
   // ⚠ 判据只认"标记里真在用"，所以先把 wxml 的注释整段剥掉再找——这一屏的注释里正写着
