@@ -238,12 +238,15 @@ Page({
     this.stopProgress()
     // 气泡那枚"几秒后消失"的表也要撤：人在别的 tab 上时不该有个定时器还想着这一屏。
     this._clearHint()
+    // 粘贴看门狗同一道理：回调要是永远不来（图片那堵墙），别在人不在的这一屏上说那句话。
+    this._pasteWatchStop()
   },
 
   onUnload() {
     this.stopTips()
     this.stopProgress()
     this._clearHint()
+    this._pasteWatchStop()
   },
 
   // 首屏那枚黄色横条「推荐好友使用」是 `button open-type="share"`，微信弹分享面板时来这一取载荷。
@@ -786,13 +789,34 @@ Page({
     this._sync()
   },
 
+  // 剪贴板里是图片时 getClipboardData 的 success 与 fail 谁都不回（10-16 实测，细则在下面
+  // onPasteAny 头上）。这条看门狗三枚粘贴入口共用：两秒没回音就当面说一句 pasteNoText，
+  // 不许哪一枚永远无声——11-16 报的「链接档／写文字档两枚 ICON 点了没动作」根因就在这：
+  // 那两枚没挂它，模拟器/纯文字剪贴板量不出来，真机剪贴板装着图就永远哑。
+  _pasteWatchBegin() {
+    if (this._pasteTimer) clearTimeout(this._pasteTimer)
+    this._pasteTimer = setTimeout(() => {
+      this._pasteTimer = null
+      this.sayErr(t('pasteNoText', this.data.lang))
+    }, PASTE_WAIT_MS)
+  },
+
+  _pasteWatchStop() {
+    if (this._pasteTimer) {
+      clearTimeout(this._pasteTimer)
+      this._pasteTimer = null
+    }
+  },
+
   // 站长 10-08 真机反馈：链接那一档长按粘不上，所以把「粘贴」这枚加回输入框右侧
   // （当初撤它的理由是"交给系统长按"，那条在真机上不成立）。
   // 读剪贴板走 wx.getClipboardData：iOS 16+ 那一下由系统自己弹「粘贴」提示，不由我们请权限。
   onPasteUrl() {
     if (this.data.busy) return
+    this._pasteWatchBegin()
     wx.getClipboardData({
       success: (res) => {
+        this._pasteWatchStop()
         const s = String((res && res.data) || '').trim()
         if (!s) {
           this.sayErr(t('pasteEmpty', this.data.lang))
@@ -808,6 +832,7 @@ Page({
         if (count > 1) this.sayErr(t('linkFirstOfMany', this.data.lang))
       },
       fail: () => {
+        this._pasteWatchStop()
         // 读不到与"里面没东西"是两件事，不许合成一句糊过去
         this.sayErr(t('pasteFailed', this.data.lang))
       },
@@ -820,8 +845,10 @@ Page({
   // 读不到与"剪贴板里没东西"仍是两句话，沿用链接那两条键。
   onPasteWrite() {
     if (this.data.busy) return
+    this._pasteWatchBegin()
     wx.getClipboardData({
       success: (res) => {
+        this._pasteWatchStop()
         const s = String((res && res.data) || '').trim()
         if (!s) {
           this.sayErr(t('pasteEmpty', this.data.lang))
@@ -832,6 +859,7 @@ Page({
         this._sync()
       },
       fail: () => {
+        this._pasteWatchStop()
         this.sayErr(t('pasteFailed', this.data.lang))
       },
     })
@@ -847,20 +875,10 @@ Page({
   // 多行原文框沿用 onPasteWrite 的语义（已有内容时接在后面，不顶掉他打好的字）。
   onPasteAny() {
     if (this.data.busy) return
-    if (this._pasteTimer) clearTimeout(this._pasteTimer)
-    this._pasteTimer = setTimeout(() => {
-      this._pasteTimer = null
-      this.sayErr(t('pasteNoText', this.data.lang))
-    }, PASTE_WAIT_MS)
-    const stop = () => {
-      if (this._pasteTimer) {
-        clearTimeout(this._pasteTimer)
-        this._pasteTimer = null
-      }
-    }
+    this._pasteWatchBegin()
     wx.getClipboardData({
       success: (res) => {
-        stop()
+        this._pasteWatchStop()
         const s = String((res && res.data) || '').trim()
         if (!s) {
           this.sayErr(t('pasteNoText', this.data.lang))
@@ -889,7 +907,7 @@ Page({
         this.open('write')
       },
       fail: () => {
-        stop()
+        this._pasteWatchStop()
         this.sayErr(t('pasteReadFail', this.data.lang))
       },
     })
