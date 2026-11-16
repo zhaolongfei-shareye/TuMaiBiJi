@@ -26,6 +26,46 @@ source "$VENV_DIR/bin/activate"
 
 RC=0
 
+# ---- 0.5 代码回滚点（Z54，第十轮审计）----
+# 为什么在这一步：`upload.sh` 覆盖现网代码树发生在**本脚本任何一道闸之前**，所以回滚点只能
+# 由它做（快照＝覆盖前那一版），本脚本负责两件事：开头念一遍它在不在，以及**任何非零退出
+# 都打印那条还原命令**。用 EXIT 而不是逐个失败分支加句子：全文有 4 处 `exit 1`（语法闸门、
+# libGL、备不出库快照、迁移失败）与末尾一道 `exit "$RC"`，漏掉任何一处的症状都是"红完了
+# 但没告诉人怎么退回去"——而那一刻是全场最需要这句话的时候。
+CODE_STORE="/home/ubuntu/wtsj-backups"
+CODE_SNAP=""
+if [[ -f "$CODE_STORE/code-latest" ]]; then
+    CODE_SNAP=$(head -n 1 "$CODE_STORE/code-latest")
+fi
+if [[ -n "$CODE_SNAP" && -f "$CODE_SNAP" ]]; then
+    echo ">>> 代码回滚点：$CODE_SNAP（$(du -h "$CODE_SNAP" | cut -f1)，upload.sh 覆盖前拍的）"
+else
+    echo ">>> ⚠ 没有可用的代码回滚点。"
+    echo "  · 要么这一趟没走 upload.sh（逐只 scp／手工放的字节），要么那份快照没做成。"
+    echo "  · 这一条不算红（下面各闸照常跑），但一旦起不来只能手工改文件——先确认字节来源再重启。"
+fi
+
+print_code_restore() {
+    if [[ -n "$CODE_SNAP" && -f "$CODE_SNAP" ]]; then
+        echo "  代码退回去（只退代码，不动库与 .env）："
+        echo "    cd $PROJECT_DIR && tar xzf $CODE_SNAP && sudo systemctl restart ${UNITS[*]}"
+        echo "  ⚠ 退不了数据库：这一趟若跑过 alembic，代码退回旧版而库里新列还在（本脚本只 upgrade）。"
+        echo "  · 库那一份的回退点在 $CODE_STORE（backup.sh 每趟部署前都做在线快照＋恢复演练）。"
+    else
+        echo "  ⚠ 没有代码快照可退（$CODE_STORE/code-latest 不在或指向的文件已不存在）。"
+    fi
+}
+
+on_exit() {
+    local code=$?
+    if [[ "$code" -ne 0 ]]; then
+        echo ""
+        echo "=== 这一趟以退出码 $code 结束；现网代码树已被 upload.sh 覆盖过 ==="
+        print_code_restore
+    fi
+}
+trap on_exit EXIT
+
 # ---- 0. 版本指纹（只念，不判红）----
 # 为什么只念不判：`upload.sh` 打的是工作树，而工作树里常年躺着另一条线没提交的文件
 # （§8.492 收尾那一格：现网与 HEAD 此刻差 8 只，全是故意没上的）⇒ "不等"是常态，
@@ -683,6 +723,43 @@ else:
     print("    - 首屏 Tips：现网那个包里还没有 `serverTips` 这一段 ⇒ 要等下一个出包（2.2.0 那批）才跟着变。")
     print("      判它生效没有，看模拟器/真机读到的是下发那份还是包里那六句，")
     print("      别只看后台有没有点过「发布」（尺子：验-Tips下发收得进.js／验-Tips现网收到-真跑.js）")
+
+# Z54 的第二处：上面三档键表只点了六栏的名，而"缺了就整条静默不做"的链路有四族共十四栏
+# （短信五栏、邮箱四栏、存图两栏、站名第 4 级一栏）。这一格不自己列名字判空，理由有两条：
+# ① 这些凭据现在**优先读后台「密钥配置」那张表**（`service_secrets.resolve` 库优先、.env 兜底），
+#    只看 .env 会把"库里配好了而 .env 空着"念成"这条链路不可用"——那是假红；
+# ② 每一族代码里已经有一句真的闸，抄一遍判据就是再造一本会漂移的账。
+# 所以这里直接调那四句闸本身。全部只报有无、不打印任何值；缺了一律「·」不判红
+# （这四种都是设计上的可降级，与 REQUIRED 那一档"进不去门"不是一个性质）。
+import asyncio
+
+from app.services import email, note_images, sms
+from app.services.llm import site_channel_ready
+
+try:
+    _site_ok = asyncio.run(site_channel_ready())
+except Exception as _exc:  # 自检不许把部署带崩：读不到就当未知
+    _site_ok = None
+    print(f"  · 来源站名第 4 级：闸门读不出（{type(_exc).__name__}）")
+
+_gates = (
+    ("短信验证码登录", sms._sms_ready(sms._resolve_all(s)),
+     "SMS 五栏未配齐 ⇒ 码只写进服务器日志，屏上仍念「已发送」而手机收不到"),
+    ("邮箱验证码发信", email._email_ready(email._resolve_all(s)),
+     "EMAIL_SES 四栏未配齐 ⇒ 同上：码在日志里，用户那封信永远不来（绑定那一格当场卡住）"),
+    ("外链贴图存云开发", note_images.channel_ready(),
+     "IMAGE_STORE_CF_URL/_KEY 未配 ⇒ 链接里的正文图一张都不存，笔记正文照常入库"),
+    ("来源站名第 4 级（云函数）", _site_ok,
+     "SITE_NAME_CF_URL 或那把凭据未配 ⇒ 词表没认出来的站不再问模型，来源那一格留空"),
+)
+print("  四条按配置开关的链路（缺=静默降级，不判红）：")
+for _name, _ok, _consequence in _gates:
+    if _ok is True:
+        print(f"     ✓ {_name}")
+    elif _ok is False:
+        print(f"     · {_name}：未配置 —— {_consequence}")
+    else:
+        print(f"     · {_name}：未知（见上面那行读不出的说明）")
 
 # 分享码指向哪个版本。留在 trial 就发布，等于让真实用户扫到一张只有体验成员
 # 才打得开的码——这个错在服务器上看不出来，只有拿别人手机扫才发现，所以每次部署都念一遍。
