@@ -220,6 +220,41 @@ def test_换口令之后旧登录当场失效(client, admin_pw, monkeypatch, sto
     assert client.post("/api/admin/login", json={"token": ADMIN_PW}).status_code == 401
 
 
+def test_不勾记住还是60分钟的短票(client, admin_pw, store):
+    import jwt as pyjwt
+    r = client.post("/api/admin/login", json={"token": ADMIN_PW})
+    assert r.status_code == 200
+    assert r.json()["expires_in"] == settings.ADMIN_SESSION_MINUTES * 60
+    p = pyjwt.decode(r.json()["session"], settings.JWT_SECRET_KEY,
+                     algorithms=[settings.JWT_ALGORITHM])
+    assert p["exp"] - p["iat"] == settings.ADMIN_SESSION_MINUTES * 60
+
+
+def test_勾记住签的是30天的票并且照常开门(client, admin_pw, store):
+    """「记住 30 天」只改时长，不造第二把 weaker 的钥匙：scope/atk/换口令即废逐条照旧。"""
+    import jwt as pyjwt
+    r = client.post("/api/admin/login", json={"token": ADMIN_PW, "remember": True})
+    assert r.status_code == 200
+    assert r.json()["expires_in"] == settings.ADMIN_REMEMBER_DAYS * 86400
+    tok = r.json()["session"]
+    p = pyjwt.decode(tok, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    assert p["exp"] - p["iat"] == settings.ADMIN_REMEMBER_DAYS * 86400
+    assert client.get(STATE, headers={"Authorization": f"Bearer {tok}"}).status_code == 200
+
+
+def test_记住30天那一格两端接线(client, store):
+    """后端签了长票、页面不存不搬，站长看到的还是"每天都要输"——只测哪一半都等于没测。"""
+    src = (Path(__file__).resolve().parents[1] / "app/api/routes/ops_page.py").read_text(encoding="utf-8")
+    body = src.split("_PAGE", 1)[1]
+    assert 'id="pwRemember"' in body and "记住这台电脑 30 天" in body, "登录框没那枚勾"
+    assert "remember: $('pwRemember').checked" in body, "登录那一趟没把勾发给服务器"
+    assert "localStorage.setItem('opsRemember'" in body, "勾了没往本机存"
+    assert "localStorage.getItem('opsRemember')" in body, "开局没把本机那份搬回来"
+    assert body.count("dropSession(); showLogin();") == 2, "两处 401 没都走 dropSession：本机票死了还赖着"
+    seg = body.split("$('btnLogout').addEventListener", 1)[1].split("showLogin();", 1)[0]
+    assert "dropSession()" in seg, "退出没清本机记住的那份：记住 30 天不能没有关得上的门"
+
+
 # ---------------------------------------------------------------- 二、上传：三道上限各自咬得住
 
 def test_传上来就落盘并记一行账(client, admin_pw, db, store):
@@ -467,7 +502,13 @@ def test_ops页面匿名可取但只是一个口令框(client, admin_pw, store):
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
     assert "no-store" in r.headers["cache-control"] and 'content="noindex"' in r.text
     assert ADMIN_PW not in r.text, "口令写进 HTML = 谁 F12 都读得到，A7 那把钥匙当场作废"
-    assert "sessionStorage" in r.text and "localStorage" not in r.text
+    assert "sessionStorage" in r.text
+    # 2026-11-16「记住这台电脑 30 天」在 sessionStorage 之外放开了本机存储的一道口，
+    # 但只许 opsRemember 这一格：整页每一处 localStorage 都必须是记住那条链上的，
+    # 想往本机塞任何别的东西仍然不许（旧纪律"整页不许出现另一种存储"改口径后的样子）。
+    for ln in r.text.splitlines():
+        if "localStorage" in ln:
+            assert "opsRemember" in ln, "localStorage 溢出了记住那一格：" + ln.strip()
     # 10-16 审计（融合那一路第 3 条）：这一页拿着管理票，不许被任何别的站嵌进去做点击劫持。
     # 'self' 不挡我们自己那一屏——图麦克那个 iframe 是同源的，同源就在 'self' 里面。
     assert r.headers.get("content-security-policy") == "frame-ancestors 'self'", r.headers.get("content-security-policy")

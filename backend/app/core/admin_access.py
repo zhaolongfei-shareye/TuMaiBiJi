@@ -56,17 +56,24 @@ def _token_fingerprint(secret: str) -> str:
     return hashlib.sha256(("admin-session:" + secret).encode()).hexdigest()[:16]
 
 
-def create_session_token() -> str:
-    """登录成功后发的那把短命凭证。调用方负责先比对过 ADMIN_TOKEN，这里只管签。"""
+def create_session_token(remember_days: int = 0) -> str:
+    """登录成功后发的那把凭证。调用方负责先比对过 ADMIN_TOKEN，这里只管签。
+
+    `remember_days > 0` 走「记住这台电脑」那一档（浏览器登录框那枚勾是唯一开关）；
+    其余一切判据（scope、atk 指纹、换口令即废）两种档完全一致——记住的只是时长，
+    不是第二把 weaker 的钥匙。
+    """
     if not enabled():
         raise HTTPException(status_code=503, detail="后台未开放：服务器还没配置管理口令")
     now = datetime.now(timezone.utc)
+    ttl = (timedelta(days=remember_days) if remember_days and remember_days > 0
+           else timedelta(minutes=settings.ADMIN_SESSION_MINUTES))
     payload = {
         "sub": "admin",
         "scope": ADMIN_SCOPE,
         "atk": _token_fingerprint(_configured()),
         "iat": now,
-        "exp": now + timedelta(minutes=settings.ADMIN_SESSION_MINUTES),
+        "exp": now + ttl,
         "jti": str(uuid.uuid4()),
     }
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)

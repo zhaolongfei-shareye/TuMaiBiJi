@@ -61,6 +61,9 @@ router = APIRouter()
 class LoginIn(BaseModel):
     # 长度上限只是个防"把整个文件粘进来"的护栏，不是安全判据——口令对不对由 compare_digest 说。
     token: str = Field(min_length=1, max_length=200)
+    # 「记住这台电脑」那一档的开关（2026-11-16）：勾上签 ADMIN_REMEMBER_DAYS 天，
+    # 不勾还是 ADMIN_SESSION_MINUTES 分钟。scope/atk/换口令即废两种档完全一样。
+    remember: bool = False
 
 
 class PublishIn(BaseModel):
@@ -95,10 +98,12 @@ def admin_login(request: Request, body: LoginIn):
     if not check_login(body.token):
         logger.warning("管理口令不对 remote=%s", request.client.host if request.client else "?")
         raise HTTPException(status_code=401, detail="管理口令不对")
-    logger.info("后台登录 remote=%s", request.client.host if request.client else "?")
+    logger.info("后台登录 remote=%s remember=%s",
+                request.client.host if request.client else "?", body.remember)
+    days = settings.ADMIN_REMEMBER_DAYS if body.remember else 0
     return {
-        "session": create_session_token(),
-        "expires_in": settings.ADMIN_SESSION_MINUTES * 60,
+        "session": create_session_token(remember_days=days),
+        "expires_in": days * 86400 if days else settings.ADMIN_SESSION_MINUTES * 60,
     }
 
 

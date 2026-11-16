@@ -52,6 +52,7 @@ h1 { font-size:19px; margin:0 0 4px }
 .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px }
 .card h2 { font-size:15px; margin:0 0 10px }
 .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px }
+.remember { color:var(--muted); font-size:13px; cursor:pointer }
 .note { color:var(--muted); font-size:13px }
 .state { font-size:14px; margin:0 0 10px }
 .state.on { color:#1d6b3f } .state.off { color:var(--muted) }
@@ -240,8 +241,9 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
       <input id="pw" type="password" placeholder="输入 .env 里的 ADMIN_TOKEN" autocomplete="off">
       <button id="btnLogin">登录</button>
     </div>
+    <label class="row remember"><input id="pwRemember" type="checkbox" checked>记住这台电脑 30 天（票存本机浏览器，退出或换口令即失效）</label>
     <div id="loginErr" class="err"></div>
-    <p class="note">口令只存在这个标签页里（sessionStorage），关掉页面就没了；服务器换过口令后旧登录会立刻失效。</p>
+    <p class="note">勾了「记住」：票存本机浏览器 30 天，开新窗口也不用再输。不勾只存这个标签页（sessionStorage），关掉就没了。服务器换过口令后旧登录立刻失效。</p>
   </section>
 
   <div id="app" class="hidden shell">
@@ -269,6 +271,14 @@ var ROOT = location.pathname.replace(/[^/]*$/, '');
 function u(p) { return ROOT + String(p).replace(/^\\//, ''); }
 function session() { return sessionStorage.getItem('opsSession') || ''; }
 
+// 清这一页自己的登录态：标签页那份 + 本机记住的那份（opsRemember 是 localStorage 在这一页
+// 唯一合法的用途）。401（票死了/换过口令）、退出按钮、开局发现过期——三个口都走这一把。
+function dropSession() {
+  sessionStorage.removeItem('opsSession');
+  sessionStorage.removeItem('opsSessionSetBy');
+  localStorage.removeItem('opsRemember');
+}
+
 function el(tag, cls, text) {
   var n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -287,7 +297,7 @@ function authed(opts) {
 function api(path, opts) {
   return fetch(u(path), authed(opts)).then(function (r) {
     return r.json().catch(function () { return {}; }).then(function (body) {
-      if (r.status === 401) { sessionStorage.removeItem('opsSession'); showLogin(); }
+      if (r.status === 401) { dropSession(); showLogin(); }
       if (!r.ok) { var e = new Error(body.detail || ('HTTP ' + r.status)); e.status = r.status; throw e; }
       return body;
     });
@@ -342,7 +352,7 @@ function makeRequire(files) {
 function loadEngine() {
   if (ENGINE_AT) return ENGINE_AT;
   ENGINE_AT = fetch(u('api/admin/poster/engine'), authed()).then(function (r) {
-    if (r.status === 401) { sessionStorage.removeItem('opsSession'); showLogin(); throw new Error('登录已过期'); }
+    if (r.status === 401) { dropSession(); showLogin(); throw new Error('登录已过期'); }
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }).then(function (d) {
@@ -578,26 +588,30 @@ $('btnLogin').addEventListener('click', function () {
   $('loginErr').textContent = '';
   api('api/admin/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: $('pw').value })
+    body: JSON.stringify({ token: $('pw').value, remember: $('pwRemember').checked })
   }).then(function (body) {
     sessionStorage.setItem('opsSession', body.session);
+    // 「记住这台电脑」：本机存一份票，到期毫秒数以服务器回的 expires_in 为准（页面上不写死 30 天）。
+    // 不勾就当场清掉旧的，别让上一次勾的票赖着不走。
+    if ($('pwRemember').checked && body.expires_in) {
+      localStorage.setItem('opsRemember', JSON.stringify({ t: body.session, exp: Date.now() + body.expires_in * 1000 }));
+    } else {
+      localStorage.removeItem('opsRemember');
+    }
     $('pw').value = '';
     return refresh();
   }, function (e) { $('loginErr').textContent = e.message; });
 });
 $('pw').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') $('btnLogin').click(); });
 
-// 退出：只清这一页自己那把票（含融合那条链盖的"跟这把票走"的戳），不碰图麦克存在它自己
-// 那一侧的票——那把不是这一页写的（`test_admin_fusion` 里钉的就是这个方向：它那一侧退出
-// 也不许顺手抹掉这一侧的票；这一页只吃 sessionStorage 那一条硬纪律由 `test_mp_assets_admin`
-// 那条静态扫描钉着，它扫的就是"整页不许出现另一种存储"那四个字）。
-// 共享一台电脑时，"关掉标签页"之外还得有一个能按的出口。
+// 退出：清这一页自己那把票（含融合那条链盖的"跟这把票走"的戳）与「记住 30 天」本机那份——
+// 共享一台电脑时，"退出"必须把记住的那份也清掉，否则那枚勾就成了关不上的门。
+// 不碰图麦克存在它自己那一侧的票：那把不是这一页写的（`test_admin_fusion` 里钉的就是这个方向）。
 $('btnLogout').addEventListener('click', function () {
-  sessionStorage.removeItem('opsSession');
-  sessionStorage.removeItem('opsSessionSetBy');
+  dropSession();
   for (var k in DRAFTS) if (Object.prototype.hasOwnProperty.call(DRAFTS, k)) delete DRAFTS[k];
   showLogin();
-  $('loginErr').textContent = '已退出这一台。口令还在服务器那边，只是这个标签页不再带着它。';
+  $('loginErr').textContent = '已退出这一台：标签页里和本机记住的那份票都清了，下次要重新输口令。';
 });
 
 function fmtBytes(n) { return n >= 1024 ? (Math.round(n / 102.4) / 10) + ' KB' : n + ' B'; }
@@ -2071,7 +2085,7 @@ function refresh() {
 // 而是在主区嵌一个 iframe 指它那一页。两边同源（都在 api.agentsbin.cn），它那一页开局读的就是
 // 同源的存储，所以这一侧登过之后框里直接是它的 dashboard，不会再要第二次口令。
 // src 只在第一次点的时候挂：不点就不去它那口上花一次请求。这一页仍不替它存任何凭证
-// （本页硬纪律：只吃 sessionStorage，见 `test_mp_assets_admin` 里那条"不许出现另一种存储"的判据）。
+// （本页的存储纪律：sessionStorage ＋「记住 30 天」那一格 opsRemember，localStorage 只有这一个用途）。
 function setProduct(which) {
   var other = which === 'other';
   $('swSelf').classList.toggle('on', !other);
@@ -2095,6 +2109,13 @@ $('swOther').addEventListener('click', function () {
 setProduct('self');
 buildNav();
 
+// 开局先看「记住 30 天」那份本机票：没过期就搬回 sessionStorage 当这一页的工作票，
+// 新开窗口／重启浏览器就不用再输。过期或坏掉的那份当场清掉，别留着当摆设。
+try {
+  var rm = JSON.parse(localStorage.getItem('opsRemember') || 'null');
+  if (rm && rm.t && rm.exp > Date.now()) sessionStorage.setItem('opsSession', rm.t);
+  else if (rm) localStorage.removeItem('opsRemember');
+} catch (e) { localStorage.removeItem('opsRemember'); }
 if (session()) refresh();
 </script>
 </body>
