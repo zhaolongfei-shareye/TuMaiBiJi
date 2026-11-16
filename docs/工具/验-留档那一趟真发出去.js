@@ -13,6 +13,7 @@ const path = require('path')
 
 const ROOT = path.resolve(__dirname, '../..')
 const R = (p) => fs.readFileSync(path.resolve(ROOT, p), 'utf8')
+const SRC_DIR = path.resolve(ROOT, 'miniprogram/utils')
 const CARD_LOG = 'miniprogram/utils/cardLog.js'
 const CARD_CLOUD = 'miniprogram/utils/cardCloud.js'
 const DETAIL = 'miniprogram/pages/detail/detail.js'
@@ -52,7 +53,22 @@ function harness(code, archiveImpl) {
       return archiveImpl ? archiveImpl(noteId, entry) : Promise.resolve({ ok: true, fileID: 'cloud://x/cards/a.jpg' })
     },
   }
-  const req = (p) => (String(p).indexOf('cardCloud') >= 0 ? cloudStub : require(p))
+  const req = (p) => (String(p).indexOf('cardCloud') >= 0 ? cloudStub : load(path.resolve(SRC_DIR, p)))
+  // 相对 require 按"发起那一份代码自己所在的目录"解析，不按这把尺子所在的目录。
+  // 10-25 safeStorage 层进来之后，`require('./safeStorage.js')` 从 docs/工具/ 解析不到，
+  // 这一把哑了近一个月——判据全绿不等于尺子还在跑，所以这一段是它的耳朵。
+  const loaded = new Map()
+  function load(file) {
+    if (loaded.has(file)) return loaded.get(file).exports
+    const dep = { exports: {} }
+    loaded.set(file, dep)
+    const dir = path.dirname(file)
+    // eslint-disable-next-line no-new-func
+    new Function('require', 'module', 'exports', 'wx', fs.readFileSync(file, 'utf8'))(
+      (p) => (String(p).indexOf('cardCloud') >= 0 ? cloudStub : load(path.resolve(dir, p))),
+      dep, dep.exports, wx)
+    return dep.exports
+  }
   const mod = { exports: {} }
   // eslint-disable-next-line no-new-func
   new Function('require', 'module', 'exports', 'wx', code)(req, mod, mod.exports, wx)
@@ -149,14 +165,23 @@ async function main() {
   console.log(`${红5 ? '✓' : '✗'} 反向⑤：那一枚改成只吃本机路径 → "吃云上那一份"这条当场红`)
   if (!红5) bad.push('反向⑤没红在对的地方')
 
-  ck('补传那一头挂在 app.onShow（与待补绑、待删、待补登记同一处）',
-    /cardCloud\.backfillLocal\(\)/.test(app))
+  // 「挂在回前台」与「调用点不 await」是同一条规矩的两半，写成一枚谓词、正反两处共用
+  // （§24 那条：一条规矩只定义一次，否则改口只改到一半）。
+  // ⚠ 这一条量的只是**调用点**：backfillLocal 里面 Z69 起会 `await refresh()`，那是
+  //   `验-审计Z69补传先读名单-静态.js` 的格子，不归这一把，别把它当成"整族不许 await"来读。
+  const backfillWired = (appSrc) => /cardCloud\.backfillLocal\(\)/.test(appSrc) && !/await cardCloud\.backfillLocal/.test(appSrc)
+  ck('补传那一头挂在 app.onShow（与待补绑、待删、待补登记同一处），且调用点不 await',
+    backfillWired(app))
+  const awaitedApp = app.replace('cardCloud.backfillLocal()', 'await cardCloud.backfillLocal()')
+  const 红6 = awaitedApp !== app && backfillWired(awaitedApp) === false
+  console.log(`${红6 ? '✓' : '✗'} 反向⑥：调用点加上 await（回前台那一趟被网络挂住）→ 这一条当场红`)
+  if (!红6) bad.push('反向⑥没红在对的地方')
   ck('补传只处理"图还在本机"这一档，origin 走服务端已有的 backfilled',
     /origin: 'backfilled'/.test(cloud) && /cardLog\.pendingBackfill\(\)/.test(cloud))
   ck('云上已经有那一行的不重复传（只立 up）——一次 onShow 多传一个没人认的对象是白丢配额',
     /if \(serverCard\(it\.noteId\)\) \{ cardLog\.markUploaded\(it\.noteId, it\.entry\.p\); continue \}/.test(cloud))
-  ck('补传这一族全程不抛、不 await、不动界面（archive 自己那一层已经包死）',
-    /async function backfillLocal\(\)/.test(cloud) && !/await cardCloud\.backfillLocal/.test(app))
+  ck('backfillLocal 自己那一头是 async（调用点靠它回一个 promise，`.then` 才接得住）',
+    /async function backfillLocal\(\)/.test(cloud))
 
   console.log(`\n${bad.length ? '红 ' + bad.length + ' 条：' + bad.join('、') : '全绿'}`)
   process.exit(bad.length ? 1 : 0)

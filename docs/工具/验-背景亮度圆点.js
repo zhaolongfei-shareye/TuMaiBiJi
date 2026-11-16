@@ -73,12 +73,14 @@ for (const rel of IMPORTERS) {
 const app = read('app.js')
 ck('app 上有 bgSkin()（进页读当前档）和 cycleBgDim()（点一下换档）',
   /bgSkin\(\)\s*\{/.test(app) && /cycleBgDim\(\)\s*\{/.test(app))
-/* 那道"锁档"的口必须**一次都不读那个键**——它要是还去 `getStorageSync(BG_DIM_KEY)`，
-   这一刀就只是换了个函数名，首页点完那四屏照样跟着变。 */
+/* 那道"锁档"的口必须**一次都不读那个键**——它要是还去读本机那一档（`wx.getStorageSync`
+   或 10-25 之后的 `storage.read`，两样都算），这一刀就只是换了个函数名，首页点完那四屏照样跟着变。
+   ⚠ 锚钉**键名**不钉取法：`fe7f225`（第八轮 M15）把这一族的取值口换过一支，原先那句
+   `!/getStorageSync/` 当场变成一句空话（怎么写都绿），钉键名才跟着行为走。 */
 ck('bgSkinLocked() 只吃 DIM_PLAIN，一次都不读本机那个键（读了就还是"跟随"）',
   (() => {
     const b = /bgSkinLocked\(\)\s*\{[\s\S]*?\n  \}/.exec(app)
-    return !!b && /DIM_PLAIN\.v/.test(b[0]) && !/getStorageSync/.test(b[0])
+    return !!b && /DIM_PLAIN\.v/.test(b[0]) && !/BG_DIM_KEY/.test(b[0])
   })())
 ck('只存本机，键名是 bgDim', /const BG_DIM_KEY = 'bgDim'/.test(app))
 ck('cycleBgDim 先算下一档、再落盘、最后才发样式（顺序反了会把旧档写回去）',

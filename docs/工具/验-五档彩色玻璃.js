@@ -460,8 +460,12 @@ const KNIVES = [
     // 撤掉整句才是这一条要验的坏法——只撤 try 里面的那一半，界面照样留缓存。
     (s) => s.replace("    try { wx.setStorageSync(WALLPAPER_CACHE_KEY, key) } catch (e) { console.warn('壁纸本机缓存没存住:', e) }\n", '')],
   ['★把缓存排到服务端那一枚前面（换手机后他选的壁纸被本机旧值顶掉，10-04 那条"服务端当家"就翻了）', 'appjs',
-    (s) => s.replace("const wanted = fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper)\n      || wx.getStorageSync(WALLPAPER_CACHE_KEY) || 'default'",
-      "const wanted = wx.getStorageSync(WALLPAPER_CACHE_KEY) || fromServer || (this.globalData.userInfo && this.globalData.userInfo.wallpaper) || 'default'")],
+    // ⚠ 锚只钉"这两枚谁排在前面"（上面那条判据量的就是这一件事），不吃取本机那一份的那一支部叫什么：
+    //   `fe7f225`（10-25 17:05，第八轮 M15）把 `wx.getStorageSync(WALLPAPER_CACHE_KEY)` 换成
+    //   `storage.read(...)`，原先那串字面锚当场哑了——正向仍 101/101，只有"刀没切进去"这一行露了馅
+    //   （同一趟还把 `验-留档那一趟真发出去.js` 的 require 桩打死，两把尺子一起哑了近一个月）。
+    (s) => s.replace(/const wanted = fromServer([\s\S]{0,200}?)\|\|(\s*[\w.]+\(WALLPAPER_CACHE_KEY\))/,
+      (all, mid, cache) => `const wanted =${cache} ||fromServer${mid.replace(/\s*\|\|\s*$/, ' ||')}`)],
   ['★cycleGlassMood 不写本机存储（点一下当场变了，重进就回默认）', 'appjs',
     (s) => s.replace('wx.setStorageSync(MOOD_KEY, m.key)', '')],
   ['★create.wxss 那处引用换回写死的墨（这一档下面板还是黑的）', 'createWxss',
