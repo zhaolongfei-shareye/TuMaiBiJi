@@ -247,7 +247,7 @@ footer { color:var(--muted); font-size:12.5px; margin-top:24px; line-height:1.7 
   <div id="app" class="hidden shell">
     <nav id="nav" aria-label="后台分栏"></nav>
     <div id="main">
-      <div id="view-stats" class="view"><div id="stats"></div><div id="aiusage"></div></div>
+      <div id="view-stats" class="view"><div id="stats"></div><div id="aiusage"></div><div id="ascbox"></div></div>
       <div id="view-config" class="view hidden"><div id="kinds"></div><div id="texts"></div><div id="note"></div><div id="tables"></div><div id="block"></div><div id="secrets"></div></div>
       <div id="view-tpl" class="view hidden"><div id="tpls"></div></div>
       <div id="view-tumaike" class="view hidden"><iframe id="frameOther" class="frame" title="图麦克后台" src="about:blank"></iframe></div>
@@ -482,7 +482,8 @@ var NAV = [
     { label: '图片备份', view: 'stats', key: 'assets' },
     { label: '邀请对账', view: 'stats', key: 'invites' },
     { label: '分享', view: 'stats', key: 'shares' },
-    { label: '用量看板', view: 'stats', key: 'aiusage' }
+    { label: '用量看板', view: 'stats', key: 'aiusage' },
+    { label: 'iPhone 数据', view: 'stats', key: 'asc' }
   ] },
   { grp: '配置', items: [
     { label: '运营图', view: 'config', key: 'kind:home_bg' },
@@ -1959,12 +1960,108 @@ function loadUsage() {
   });
 }
 
+// 「iPhone 数据」这一栏：图麦笔记 iPhone 版在 App Store 的日报读数（站长 11-16 那句
+// 「苹果官网的数据，能否与我们后台打通——下载和使用情况、用户量、订阅数」）。
+// 与「用量看板」同一条分栏理由：读数口只碰我们自己的库（asc_daily 表），同步口才出网打
+// Apple，两头各管各的（services/asc_reports.py 那一侧）。缺数念 —，不补 0：
+// "那天没数"与"那天是零"在这里指向相反的决定。
+function ascCard(title, sub) {
+  var c = statCard(title, sub);
+  c.dataset.key = 'asc';
+  return c;
+}
+
+// 拉一回的回执要活得过 loadAsc() 那次整栏重画（同步成功后本来就会重画一次带新时间戳，
+// 不存下来回执就被自己抹掉，屏上又回到"没动静"）。
+var ascReceipt = null;
+
+function renderAsc(d) {
+  var box = $('ascbox');
+  while (box.firstChild) box.removeChild(box.firstChild);
+  d = d || {};
+
+  var c1 = ascCard('App Store 日报（近 ' + numOf(d.window_days) + ' 天）',
+    '数是 Apple 的日报口径：sales 日报在报告日后一到两天才齐，analytics 首批实例要上架后 24–48 小时才出现。'
+    + '下载／更新／重装来自 sales 日报，安装／删除／会话／独立设备来自 analytics，'
+    + '两份报告口径不同，不相加也不互替。');
+  tableOf(c1, ['日期', '下载', '更新', '重装', '安装', '删除', '会话', '独立设备', '收入(美元)'],
+    (d.series || []).map(function (p) {
+      return [p.date, numOf(p.downloads), numOf(p.updates), numOf(p.redownloads),
+              numOf(p.installs), numOf(p.deletes), numOf(p.sessions), numOf(p.unique_devices),
+              (p.proceeds_usd === null || p.proceeds_usd === undefined)
+                ? '—' : (numOf(p.proceeds_usd) + ' ' + (p.proceeds_currency || ''))];
+    }));
+  box.appendChild(c1);
+
+  var t = d.totals || {};
+  var c2 = ascCard('这 ' + numOf(d.window_days) + ' 天合计与最近拉取', d.sentence || '');
+  knum(c2, numOf(t.downloads), '合计下载', 'sales 日报口径');
+  knum(c2, numOf(t.installs) + ' / ' + numOf(t.deletes), '合计安装 / 删除',
+    'analytics 口径，与上面那列下载不是同一个数，不互替');
+  knum(c2, numOf(t.sessions), '合计会话', 'App Sessions 报告');
+  knum(c2, numOf(t.unique_devices), '合计独立设备',
+    'totalUniqueDevices 是按天去重的设备数，跨天相加会重复计人——看趋势，别当用户总量');
+  knum(c2, d.last_sales_at || '还没拉到过', '最近一次拉到 sales 日报',
+    d.last_sales_at ? '这一刻是服务器记下的拉取时刻（UTC）' : '点下面那枚「拉一次」就能试');
+  knum(c2, d.last_analytics_at || '还没拉到过', '最近一次拉到 analytics',
+    d.last_analytics_at ? '这一刻是服务器记下的拉取时刻（UTC）' : '首批实例要上架后 24–48 小时才出现');
+  knum(c2, d.key_file_present ? '在' : '不在', '苹果商店那把钥的文件',
+    d.key_file_present ? '文件在配置写的那个路径上；值本身一次都不进这一屏' : '文件不在配置写的那个路径上，这一栏拉不动数');
+  box.appendChild(c2);
+
+  box.appendChild(ascCard('订阅数', d.subscription_sentence || '—'));
+
+  var c4 = ascCard('手动拉一次',
+    '每天由服务器定时打同一只口；这一枚按钮是当场补拉。sales 窗口回看 7 天，'
+    + 'analytics 拉全部已有实例——重复拉不会长出重复的行。');
+  var out = el('p', 'note', ascReceipt || '这一趟还没跑过，回执会写在这里。');
+  var btn = el('button', 'mini', '拉一次');
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.textContent = '正在拉……';
+    api('api/admin/asc/sync', { method: 'POST' }).then(function (r) {
+      var s = r.sales || {}, a = r.analytics || {};
+      var txt = 'sales：拉到 ' + numOf(s.pulled) + ' 天／' + numOf(s.no_sales) + ' 天没数'
+        + ((s.errors || []).length ? '／' + numOf(s.errors.length) + ' 条错' : '')
+        + '；analytics：' + numOf(a.instances_pulled) + ' 份实例／状态 ' + (a.state || '—')
+        + ((a.errors || []).length ? '／' + numOf(a.errors.length) + ' 条错' : '');
+      ascReceipt = txt;
+      out.textContent = txt;
+      return loadAsc();
+    }, function (e) {
+      if (e.status === 401) return;
+      btn.disabled = false;
+      btn.textContent = '再拉一次';
+      ascReceipt = '这一趟没拉成：' + e.message;
+      out.textContent = ascReceipt;
+    });
+  });
+  c4.appendChild(btn);
+  c4.appendChild(out);
+  box.appendChild(c4);
+  repaintFocus();
+}
+
+function loadAsc() {
+  return api('api/admin/asc/state').then(function (d) {
+    keepScroll(function () { renderAsc(d); });
+  }, function (e) {
+    if (e.status === 401) return;
+    // 红了不许把别的栏一起带走（与 loadUsage 同一条纪律），这一栏只念自己没读到。
+    keepScroll(function () {
+      var box = $('ascbox');
+      while (box.firstChild) box.removeChild(box.firstChild);
+      box.appendChild(el('p', 'note err', '这一栏没读到数：' + e.message));
+    });
+  });
+}
+
 function refresh() {
   return api('api/admin/mp/state').then(function (state) {
     showApp();
     keepScroll(function () { render(state); });
     // 各读各的口，互不牵连：统计、模板、黑名单任何一头红了，不许把其余两屏一起带走（三个函数自己吞错）。
-    return Promise.all([loadStats(), loadTemplates(), loadBlocklist(), loadSecrets(), loadUsage()]);
+    return Promise.all([loadStats(), loadTemplates(), loadBlocklist(), loadSecrets(), loadUsage(), loadAsc()]);
   }, function (e) {
     if (e.status === 503) { $('login').classList.remove('hidden'); $('loginErr').textContent = e.message; }
   });

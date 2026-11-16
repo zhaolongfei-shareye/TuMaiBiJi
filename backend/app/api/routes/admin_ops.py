@@ -44,7 +44,7 @@ from app.core.config import settings
 from app.core.errors import UserError
 from app.core.rate_limit import get_ip_key, limiter
 from app.db.database import get_db
-from app.services import admin_stats, admin_templates, mp_assets, poster_engine, preset_note, service_secrets, source_blocklist, usage_board
+from app.services import admin_stats, admin_templates, asc_reports, mp_assets, poster_engine, preset_note, service_secrets, source_blocklist, usage_board
 
 logger = logging.getLogger(__name__)
 
@@ -472,6 +472,47 @@ def admin_blocklist_remove(
         return {"removed": source_blocklist.remove(db, host)}
     except UserError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/api/admin/asc/state")
+@limiter.limit("60/minute")
+def admin_asc_state(
+    request: Request,
+    days: int = 14,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """「iPhone 数据」那一栏的全部读数（口径与算法都在 `services/asc_reports.py`）。
+
+    与 `admin_usage_board` 同一条分栏理由：这一栏的数**要出网打 Apple**（同步口），
+    而读数口只碰我们自己的库——Apple 那头红了、慢了，都不该把这一栏变成 500，
+    更不该拖累别的那几栏。缺数不补 0（"没报"与"是零"分开念），
+    订阅那一格的实话由服务层一起给（这颗 App 没有内购，Apple 没有订阅报告可拉）。
+    """
+    try:
+        return asc_reports.state(db, days=days)
+    except asc_reports.AscNotConfigured:
+        raise HTTPException(status_code=503, detail="苹果商店数据这一栏还没配置：服务器配置文件里密钥编号、签发方编号、钥文件路径、卖方编号、应用编号这五栏没配齐")
+
+
+@router.post("/api/admin/asc/sync")
+@limiter.limit("5/minute", key_func=get_ip_key)
+def admin_asc_sync(
+    request: Request,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(get_admin),
+):
+    """手动拉一次：sales 日报窗口 7 天＋analytics 全部已有实例，回一张账。
+
+    同步 `def`（Starlette 丢工作线程跑）与整链从不抛是这里的两条：Apple 一头红了
+    另一头照拉，结果里 `errors[]` 逐条说人话，操作者看到的是"哪一头没拉到"，
+    不是一张 500。限流按 IP（同 login 那条的教训）：这一口挂在管理凭证后面，
+    防的是登录态被拿着之后连环点，不是防爆破。
+    """
+    try:
+        return asc_reports.sync(db)
+    except asc_reports.AscNotConfigured:
+        raise HTTPException(status_code=503, detail="苹果商店数据这一栏还没配置：服务器配置文件里密钥编号、签发方编号、钥文件路径、卖方编号、应用编号这五栏没配齐")
 
 
 class SecretIn(BaseModel):

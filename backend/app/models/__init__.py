@@ -37,6 +37,9 @@ from app.models.service_secret import ServiceSecret
 # 这张表，而第一趟记账（`services/daily_budget.py:charge`）当场 no such table——症状是"所有限额
 # 都变成 429"，不是"限额没生效"，所以更要挂在版本里而不是靠某只路由顺手 import。
 from app.models.daily_usage import DailyUsage
+# Apple App Store Connect 每日读数（「iPhone 数据」那一栏）。同一族坑再防一遍：
+# 没人 import 它 `create_all` 就建不出这张表，第一趟同步就 no such table。
+from app.models.asc_daily import AscDaily
 
-__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "AccountPassword", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting", "SourceBlocklist", "ServiceSecret", "DailyUsage"]
+__all__ = ["Note", "User", "Category", "Asset", "Job", "Share", "Invitation", "PosterTemplate", "NoteCard", "ShareReport", "Account", "AccountIdentity", "AccountPassword", "LinkCode", "UserProfile", "GenerationSeq", "MpAsset", "MpSetting", "SourceBlocklist", "ServiceSecret", "DailyUsage", "AscDaily"]
 

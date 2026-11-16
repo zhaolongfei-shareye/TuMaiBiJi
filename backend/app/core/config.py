@@ -204,6 +204,20 @@ class Settings(BaseSettings):
     # 同一邮箱两次发送之间最少间隔（秒）。与短信冷却同型。
     EMAIL_COOLDOWN_SECONDS: int = 60
 
+    # ---- App Store Connect 数据进后台（「iPhone 数据」那一栏）----
+    # 五栏一起配齐才算"这一路开过"（`services/asc_reports.configured()`），任何一栏空着
+    # = 两个口一律 503，与 `ADMIN_TOKEN` 同一条纪律：没配是"功能不可用"，不是"门槛消失"。
+    # 五栏都**不是密钥**（Key ID 与 Issuer ID 是 JWT 里的公开字段、vendor number 印在
+    # 付款和财务报告页面上），真正的凭据是 `ASC_KEY_PATH` 指向的那只 .p8 私钥文件——
+    # 它在 `backend/.gitignore` 的 keys/ 规则里，永远不进 git、也不进这一页任何回体。
+    ASC_KEY_ID: str = ""
+    ASC_ISSUER_ID: str = ""
+    # 服务器上就是 /home/ubuntu/wtsj-backend/keys/AuthKey_<KEY_ID>.p8（600 权限）。
+    ASC_KEY_PATH: str = ""
+    ASC_VENDOR_NUMBER: str = ""
+    # 图麦笔记 iPhone：ASC 里那颗「图麦笔记」的 App ID（iPhone 那颗独立于小程序线）。
+    ASC_APP_ID: str = ""
+
     # ---- 开发态固定登录（H5 跑通流程用，不依赖短信/邮件）----
     # 默认全关：`DEV_LOGIN_ENABLED=False` 时这四栏一个都不参与任何判断，生产行为零变化。
     # 打开后，只有「账号 == 锁定的那一枚」且「码 == DEV_LOGIN_CODE」才跳过 Redis 校验与真实发信——
