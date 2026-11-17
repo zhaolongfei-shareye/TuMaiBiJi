@@ -138,7 +138,13 @@ def pull_sales(db) -> Dict[str, Any]:
     """窗口内逐日拉 sales 日报并 upsert。404＝那天没数（跳过），其余非 200 记错。"""
     result: Dict[str, Any] = {"pulled": 0, "no_sales": 0, "errors": [],
                               "dates": []}
-    token = _token()
+    # configured() 只保证检查那一刻钥在盘上；读到签出之间它坏了也得记进 errors[]，
+    # 不许把"整链从不抛"这条纪律从签票这一发穿出去（第十一轮 W2）。
+    try:
+        token = _token()
+    except Exception as exc:
+        result["errors"].append(f"签票那一发没成（{type(exc).__name__}）")
+        return result
     headers = {"Authorization": "Bearer " + token, "Accept": "application/a-gzip"}
     today = date.today()
     for offset in range(SALES_BACKFILL_DAYS):
@@ -268,7 +274,12 @@ def pull_analytics(db) -> Dict[str, Any]:
     """ONGOING 单 → 四份想要的报告 → 最新 DAILY 实例 → segments 逐行聚合。"""
     result: Dict[str, Any] = {"state": "ok", "reports_seen": 0,
                               "instances_pulled": 0, "errors": [], "dates": []}
-    token = _token()
+    try:
+        token = _token()
+    except Exception as exc:
+        result["state"] = "unreachable"
+        result["errors"].append(f"签票那一发没成（{type(exc).__name__}）")
+        return result
     headers = {"Authorization": "Bearer " + token}
     try:
         request_id = _find_ongoing_request(headers)

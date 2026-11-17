@@ -322,6 +322,22 @@ def test_sync_上游一头红另一头照拉(client, db, asc_config, monkeypatch
     assert body["analytics"]["instances_pulled"] == 3
 
 
+def test_sync_签票那一发红了回账不是500(client, db, asc_config, monkeypatch):
+    # W2：configured() 放行之后钥才坏（被删、权限漂了）——sync 仍要回一张账，不许炸穿成 500。
+    def boom() -> str:
+        raise RuntimeError("pytest: key gone")
+
+    monkeypatch.setattr(asc_reports, "_token", boom)
+    r = client.post("/api/admin/asc/sync", headers=ah(client))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["sales"]["pulled"] == 0
+    assert len(body["sales"]["errors"]) == 1
+    assert body["analytics"]["state"] == "unreachable"
+    assert len(body["analytics"]["errors"]) == 1
+    assert db.query(AscDaily).count() == 0
+
+
 def test_列请求里没有这颗App的ONGOING单(client, db, asc_config, monkeypatch):
     def no_request(url, headers, timeout):
         if url.endswith("/v1/analyticsReportRequests"):
