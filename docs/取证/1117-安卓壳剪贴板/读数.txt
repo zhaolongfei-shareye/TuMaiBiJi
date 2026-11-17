@@ -1,0 +1,15 @@
+=== 读数：14 过 / 0 红　2026/11/17 18:13:41　页面 http://127.0.0.1:8125/index.html#/create ===
+  ✓ 首屏起来了（➕ 在屏上、游客登录走完）
+  ✓ 剪贴板桥（打桩）已装进页面
+  ✓ A0 点 ➕ 进照片档
+  ✓ A1 桥回图：照片档真长出一枚缩略图（_preview=1、.th-x=1）　→ preview=1 th=1
+  ✓ A2 清场：缩略图点掉归零
+  ✓ B1 桥回链接：跳到链接档且框里真填上　→ active=url url=https://mp.weixin.qq.com/s/abc123
+  ✓ C1 桥回文字：跳到文字档且域里真填上　→ active=write write=今天在公众号看到一段很值得记下来的话。
+  ✓ D 桥回空：提示「剪贴板里没有能贴的内容」　→ 剪贴板里没有能贴的内容
+  ✓ E 桥拒绝：提示「读不到剪贴板，麻烦长按输入框再粘」　→ 读不到剪贴板，麻烦长按输入框再粘
+  ✓ F 链接档粘贴钮：readText 真填进链接框　→ https://sspai.com/post/70483962
+  ✓ G 文字档粘贴钮：readText 真填进正文域　→ 从别处复制来的一段正文，准备直接提炼。
+  ✓ H 拆桥：退回浏览器老路（_pickImage 被调到、什么都没贴、页面活着）　→ pick=1 preview=0
+  ✓ 全程零 JS 异常（exceptionThrown=0）　→ 0
+  ✓ 全程零 console.error（consoleErrs=0）　→ 0
